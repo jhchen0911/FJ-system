@@ -2353,7 +2353,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.257';
+var APP_VERSION='v5.258';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -9621,7 +9621,7 @@ function renderContracts(){
     return`<div class="ql" style="cursor:default">
       <div class="qdot" style="background:${statusClr[c.status]||'var(--b2)'}"></div>
       <div class="qm">
-        <div class="qt">${esc(c.code?'['+c.code+'] ':'')}${esc(c.name||'未命名')}</div>
+        <div class="qt">${esc(c.code?'['+c.code+'] ':'')}${esc(c.name||'未命名')}${linkedQ?`<button type="button" onclick="event.stopPropagation();openProjectCosts('${linkedQ.id}')" title="檢視專案施工成本" style="margin-left:8px;border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit;vertical-align:2px">⛏ 專案成本</button>`:''}</div>
         <div class="qsb">${esc(c.client||'—')} ／ ${c.date||'—'}${c.end?` ／ 完工：${c.end}`:''}</div>
         ${c.note?`<div style="font-size:10px;color:var(--b3)"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> ${esc(c.note)}</div>`:''}
         ${c.attachment?`<div style="font-size:10px;margin-top:2px"><button type="button" onclick="viewContractAttachment('${c.id}');event.stopPropagation()" style="border:none;background:none;color:#1a73e8;cursor:pointer;padding:0;font-size:10px">📎 ${esc(c.attachmentName||'查看合約附件')}</button></div>`:''}
@@ -10818,7 +10818,7 @@ function renderLedger(){
   document.getElementById('ledger-out').innerHTML=outs.length?outs.map(function(r){
     return row('<b>'+esc(r.number||'（未填號碼）')+'</b>　'+esc(r.client||'')+'<div style="font-size:10.5px;color:var(--b3)">'+esc(r.date||'')+'</div>',
       'NT$ '+fmt(r.amount||0)+'<div style="font-size:10.5px;color:var(--b3)">稅 '+fmt(r.taxAmt||0)+'</div>');
-  }).join(''):'<div style="color:var(--b3);font-size:12px;padding:8px 0">本月無銷項發票（於應收卡 🧾 開立）</div>';
+  }).join(''):(function(){var tot=(INVOICE_RECS||[]).filter(function(r){return r.status!=='cancelled';}).length;return '<div style="color:var(--b3);font-size:12px;padding:8px 0">本月（'+m+'）無銷項發票'+(tot?'——其他月份共 '+tot+' 張，請切換月份':'（於應收卡 🧾 開立）')+'</div>';})();
   document.getElementById('ledger-in-vendor').innerHTML=vins.length?vins.map(function(p2){
     return row('<b>'+esc(p2.to||'')+'</b>　'+(p2.invNo?'🧾 '+esc(p2.invNo):'<span style="color:var(--red);font-size:11px">⚠ 未登錄發票號</span>')+'<div style="font-size:10.5px;color:var(--b3)">'+esc(p2.project||'')+'</div>',
       'NT$ '+fmt(_payEff(p2))+'<div style="font-size:10.5px;color:var(--b3)">稅 '+fmt(_payVatAmt(p2))+'</div>');
@@ -10827,7 +10827,7 @@ function renderLedger(){
     return row('<b>'+esc(e.seller||'')+'</b>　'+esc(e.number||'')+'<div style="font-size:10.5px;color:var(--b3)">'+esc(e.date||'')+'　'+esc(e.note||'')+'</div>',
       'NT$ '+fmt(e.amount||0)+'<div style="font-size:10.5px;color:var(--b3)">稅 '+fmt(e.tax||0)+'</div>'
       +'<a href="javascript:void(0)" onclick="expDel(\''+e.id+'\')" style="font-size:10.5px;color:var(--b3)">刪除</a>');
-  }).join(''):'<div style="color:var(--b3);font-size:12px;padding:8px 0">尚無費用發票——加油、五金、文具打統編的都拍進來</div>';
+  }).join(''):(function(){var tot=(EXPENSES||[]).length;return '<div style="color:var(--b3);font-size:12px;padding:8px 0">本月（'+m+'）無費用發票'+(tot?'——其他月份共 '+tot+' 筆，發票以「開立月份」歸帳，請切換上方月份查看':'——加油、五金、文具打統編的都拍進來')+'</div>';})();
 }
 function _expForm(pre){
   pre=pre||{};
@@ -11921,6 +11921,37 @@ function recalcAllExpected(){
       toast('✅ 已重算 '+n+' 筆收款日');
     },false,null,true);
 }
+// 一次性資料修復：v5.256 之前自動算出的「估驗當月收款日」不可能正確，開機自動重推
+function _erdMigrate(){
+  try{
+    if(localStorage.getItem('fy_erd_fix1'))return;
+    var n=0;
+    (INV||[]).forEach(function(v){
+      if(v.receivedConfirmed)return;
+      var un=((v.totals&&v.totals.total)||0)-(parseFloat(v.received)||0);
+      if(un<=0||!v.expectedRecvDate)return;
+      // 估驗基準月
+      var y=0,m=0;
+      if(v.date&&/^\d{4}-\d{2}/.test(v.date)){y=parseInt(v.date.slice(0,4));m=parseInt(v.date.slice(5,7));}
+      else if(v.month){
+        var m2=String(v.month).match(/^(\d{2,3})年(\d{1,2})月/);var m1=String(v.month).match(/^(\d{4})[-/](\d{1,2})/);
+        if(m1){y=parseInt(m1[1]);m=parseInt(m1[2]);}else if(m2){y=parseInt(m2[1])+1911;m=parseInt(m2[2]);}
+      }
+      if(!y||!m)return;
+      var nextMonthFirst=new Date(y,m,1);   // 估驗次月1日
+      var cur=new Date(v.expectedRecvDate);
+      if(cur<nextMonthFirst){               // 收款日早於估驗次月＝舊邏輯錯值 → 重推
+        var bak=v.expectedRecvDate;v.expectedRecvDate='';
+        var e=_invExpectedDate(v);
+        v.expectedRecvDate=e?e.date:bak;
+        if(e){v._mt=Date.now();n++;}
+      }
+    });
+    if(n){try{saveInv();}catch(e){}console.log('[修復] 重算 '+n+' 筆預計收款日');try{toast('🔧 已依付款條件修正 '+n+' 筆預計收款日');}catch(e){}}
+    localStorage.setItem('fy_erd_fix1','1');
+  }catch(e){}
+}
+setTimeout(function(){try{_erdMigrate();try{renderInvList();}catch(e){}try{rDash();}catch(e){}}catch(e){}},2500);
 function _invExpectedDate(inv){
   if(inv.expectedRecvDate)return {date:inv.expectedRecvDate,est:false};
   // 估驗基準月：估驗日期優先，其次 month 欄（支援 YYYY-MM 與 115年07月）
