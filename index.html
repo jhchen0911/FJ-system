@@ -2114,6 +2114,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <button type="button" class="btn btn-xs" onclick="addInvSec()">+ 分類</button>
           <button type="button" class="btn btn-xs btn-g" onclick="addInvItem()">+ 工項</button>
           <button type="button" class="btn btn-xs" onclick="addInvRental()" style="border-color:var(--ym);color:var(--yd)">+ 租用工項</button>
+          <button type="button" class="btn btn-xs" onclick="openInvClauseModal()" style="border-color:var(--gm);color:var(--g3)">+ 條款項目</button>
         </div>
       </div>
       <div style="font-size:10px;color:var(--b3);text-align:right;padding:3px 4px 1px;display:none" class="mob-scroll-hint">← 左右滑動 →</div>
@@ -2353,7 +2354,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.258';
+var APP_VERSION='v5.260';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -4064,6 +4065,63 @@ function addInvRental(){
   rInvItems();
 }
 
+// ── 備註條款請款：勾選條款項目並輸入數量，帶入估驗明細 ──
+var CLAUSE_DEFS=[
+  {k:'walk',clause:'第11條',name:'安全走道',unit:'M'},
+  {k:'tech',clause:'第11條',name:'技術工',unit:'天'},
+  {k:'bh',clause:'第12條',name:'型鋼（買斷）',unit:'KG'},
+  {k:'br',clause:'第12條',name:'鋼軌樁（買斷）',unit:'KG'},
+  {k:'bs',clause:'第12條',name:'鋼板樁（買斷）',unit:'KG'},
+  {k:'bb',clause:'第12條',name:'支撐料（買斷）',unit:'KG'},
+  {k:'c2',clause:'第12條',name:'2M覆工板（買斷）',unit:'片'},
+  {k:'c3',clause:'第12條',name:'3M覆工板（買斷）',unit:'片'},
+  {k:'ir',clause:'第12條',name:'鋪路鐵板（買斷）',unit:'片'},
+  {k:'mob',clause:'第16條',name:'動員費',unit:'次'}
+];
+function openInvClauseModal(){
+  // 找關聯報價單的條款金額（sourceQid 優先，退回工程名稱比對）
+  const inv=INV.find(x=>x.id===invEid);
+  let q=null;
+  if(inv){
+    if(inv.sourceQid)q=Q.find(x=>x.id===inv.sourceQid);
+    if(!q&&inv.project)q=Q.find(x=>x.name===inv.project);
+  }
+  const rmk=(q&&q.rmk)||{};
+  const tb=document.getElementById('icl-rows');if(!tb)return;
+  const inp='padding:5px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-size:12px;font-family:inherit;width:100%;box-sizing:border-box';
+  tb.innerHTML=CLAUSE_DEFS.map(d=>{
+    const p=parseFloat(rmk[d.k])||'';
+    return `<tr>
+      <td style="text-align:center;padding:3px 2px"><input type="checkbox" id="icl-ck-${d.k}"></td>
+      <td style="padding:3px 4px"><span style="color:var(--b3);font-size:10px">${d.clause}</span> ${d.name}<span style="color:var(--b3);font-size:10px">（$/${d.unit}）</span></td>
+      <td style="padding:3px 4px"><input type="number" id="icl-p-${d.k}" value="${p}" placeholder="單價" style="${inp}"></td>
+      <td style="padding:3px 4px"><input type="number" id="icl-q-${d.k}" placeholder="數量" style="${inp}" oninput="var c=document.getElementById('icl-ck-${d.k}');if(c)c.checked=!!this.value"></td>
+    </tr>`;
+  }).join('');
+  document.getElementById('inv-clause-modal').style.display='flex';
+}
+function confirmInvClause(){
+  let added=0;
+  CLAUSE_DEFS.forEach(d=>{
+    const ck=document.getElementById('icl-ck-'+d.k);
+    if(!ck||!ck.checked)return;
+    const p=parseFloat(document.getElementById('icl-p-'+d.k)?.value)||0;
+    const qy=parseFloat(document.getElementById('icl-q-'+d.k)?.value)||0;
+    if(p<=0||qy<=0)return;
+    invItems.push({type:'item',desc:d.clause+'：'+d.name,unit:d.unit,
+      contractPrice:p,contractQty:0,prevQty:0,prevAmt:0,
+      curQty:qy,curDays:0,curAmt:Math.round(p*qy),
+      note:'備註條款計價',cumQty:0,cumAmt:0,
+      payRate:100,prevPayRate:100,installCum:0,removeCum:0,otPrice:0,otUnit:'',sec:false});
+    added++;
+  });
+  if(!added){toast('請勾選項目並填寫單價與數量');return;}
+  document.getElementById('inv-clause-modal').style.display='none';
+  rInvItems();
+  try{autoSaveInv();}catch(e){}
+  toast('✅ 已帶入 '+added+' 項條款請款項目');
+}
+
 // 只更新請款明細行的金額顯示（不重渲染整個表格）
 function updateInvRowAmt(i, tr){
   const it=invItems[i];
@@ -5114,6 +5172,8 @@ function buildInvPreview(){
     const prevAmtRaw=parseFloat(it.prevAmt)||0;
     const prevQtyShow=parseFloat(it.prevQty)||0;
     const cumQty=parseFloat(it.cumQty)||0;
+    // 累積數量顯示：未另存 cumQty 時自動以「前期＋本期」計算（僅供顯示，不影響金額計算）
+    const cumQtyShow=cumQty||(Math.round((prevQtyShow+(parseFloat(it.curQty)||0))*100)/100);
     const _previewPr=(it.payRate!=null?it.payRate:100)/100;
     let curAmt=0;
     if(isRental&&it.curQty&&it.contractPrice){
@@ -5182,7 +5242,7 @@ function buildInvPreview(){
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8f5e8">${it.curDays||''}</td>
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8f5e8;font-weight:700;color:#1a6b3f">${curAmt?fmt(curAmt):''}</td>
       <td style="padding:3px 5px;border-bottom:1px solid #f0f0f0;font-size:9.5px;color:#555;max-width:100px;word-break:break-all">${(()=>{const rate=it.payRate!=null?it.payRate:100;const rateTxt=rate!==100?(rate+'%請款'):'';const raw=it.note||'';const noteTxt=esc(raw).replace(/\n/g,'<br>').replace(/工料（一次性工項）/g,'工料(一次性)').replace(/工料\(一次性工項\)/g,'工料(一次性)');const sep=(rateTxt&&noteTxt)?'<br>':'';return(rateTxt?('<span style="color:#1a6b3f;font-weight:700">'+rateTxt+'</span>'):'')+(sep||'')+noteTxt;})()}</td>
-      <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8eef8">${cumQty||''}</td>
+      <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8eef8">${cumQtyShow||''}</td>
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8eef8;color:#2a4a8a">${cumAmt?fmt(cumAmt):''}</td>
     </tr>`;
   });
@@ -9621,7 +9681,7 @@ function renderContracts(){
     return`<div class="ql" style="cursor:default">
       <div class="qdot" style="background:${statusClr[c.status]||'var(--b2)'}"></div>
       <div class="qm">
-        <div class="qt">${esc(c.code?'['+c.code+'] ':'')}${esc(c.name||'未命名')}${linkedQ?`<button type="button" onclick="event.stopPropagation();openProjectCosts('${linkedQ.id}')" title="檢視專案施工成本" style="margin-left:8px;border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit;vertical-align:2px">⛏ 專案成本</button>`:''}</div>
+        <div class="qt">${esc(c.code?'['+c.code+'] ':'')}${esc(c.name||'未命名')}</div>
         <div class="qsb">${esc(c.client||'—')} ／ ${c.date||'—'}${c.end?` ／ 完工：${c.end}`:''}</div>
         ${c.note?`<div style="font-size:10px;color:var(--b3)"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> ${esc(c.note)}</div>`:''}
         ${c.attachment?`<div style="font-size:10px;margin-top:2px"><button type="button" onclick="viewContractAttachment('${c.id}');event.stopPropagation()" style="border:none;background:none;color:#1a73e8;cursor:pointer;padding:0;font-size:10px">📎 ${esc(c.attachmentName||'查看合約附件')}</button></div>`:''}
@@ -13774,6 +13834,29 @@ function exportCurrentReportExcel(){
       <div style="display:flex;gap:8px">
         <button type="button" class="btn btn-g" onclick="applyRmkCustom()" style="flex:1;justify-content:center;padding:9px">✓ 確認套用</button>
         <button type="button" class="btn" onclick="document.getElementById('rmk-modal').style.display='none'" style="flex:1;justify-content:center;padding:9px">取消</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ████ 請款條款 MODAL ████ -->
+<div id="inv-clause-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:12px;overflow-y:auto;align-items:flex-start;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
+  <div style="max-width:540px;width:100%;margin:20px auto;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="background:var(--g3);padding:13px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:2.5px solid var(--y)">
+      <span style="color:#fff;font-size:14px;font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 備註條款請款</span>
+      <button type="button" onclick="document.getElementById('inv-clause-modal').style.display='none'" style="border:none;background:transparent;color:rgba(255,255,255,.75);font-size:20px;cursor:pointer;line-height:1;padding:0 4px">✕</button>
+    </div>
+    <div style="padding:12px 16px">
+      <div style="font-size:11.5px;color:var(--b4);margin-bottom:10px;background:var(--yl);padding:7px 10px;border-radius:var(--r6);border:1px solid var(--ym)">
+        勾選要請款的條款項目並填寫數量，確認後帶入估驗明細。單價自動帶入報價單「備註填寫」的金額，可直接修改。
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="color:var(--b4);font-size:11px;text-align:left"><th style="width:8%;padding:4px 2px"></th><th style="padding:4px">條款項目</th><th style="width:24%;padding:4px">單價</th><th style="width:22%;padding:4px">數量</th></tr></thead>
+        <tbody id="icl-rows"></tbody>
+      </table>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button type="button" class="btn btn-g" onclick="confirmInvClause()" style="flex:1;justify-content:center;padding:9px">✓ 帶入請款單</button>
+        <button type="button" class="btn" onclick="document.getElementById('inv-clause-modal').style.display='none'" style="flex:1;justify-content:center;padding:9px">取消</button>
       </div>
     </div>
   </div>
