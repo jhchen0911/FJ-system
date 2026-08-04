@@ -2354,7 +2354,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.261';
+var APP_VERSION='v5.262';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -9634,6 +9634,25 @@ function saveContract(){
 
 function closeContractModal(){document.getElementById('contract-modal').style.display='none';}
 
+// ── 竣工結算：實作數量少於合約時，將合約金額調整為實際請款累積並結案 ──
+function settleContract(id){
+  const c=CONTRACTS.find(x=>x.id===id);if(!c)return;
+  const invs=INV.filter(i=>i.project===c.name);
+  const billed=invs.reduce((a,i)=>a+(i.totals?.total||0),0);
+  if(billed<=0){toast('此合約尚無請款紀錄，無法結算');return;}
+  const orig=c.amount||0;
+  let ok=false;
+  try{ok=window.confirm('竣工結算\n\n原合約金額　NT$ '+fmt(orig)+'\n實際請款累積 NT$ '+fmt(billed)+'\n差額（追減）NT$ '+fmt(orig-billed)+'\n\n確定將合約金額調整為結算金額，並標記為已完成？\n（原合約金額會記錄在備註，可隨時手動改回）');}catch(e){ok=true;}
+  if(!ok)return;
+  if(c.originalAmount==null)c.originalAmount=orig; // 保留原始合約金額
+  c.amount=billed;
+  c.status='completed';
+  const settleNote='竣工結算：原合約 NT$'+fmt(orig)+' → 結算 NT$'+fmt(billed);
+  c.note=c.note?(c.note+'　'+settleNote):settleNote;
+  saveContracts();renderContracts();
+  toast('⚖ 已結算：合約金額調整為 NT$ '+fmt(billed)+'，狀態已完成');
+}
+
 function delContract(id){_tomb('contracts',id);
   showConfirm('刪除合約','確定刪除此合約？此操作無法復原。',()=>{
     CONTRACTS=CONTRACTS.filter(x=>x.id!==id);
@@ -9697,6 +9716,7 @@ function renderContracts(){
         ${c.linkedQid?`<button type="button" class="btn btn-xs" style="background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4" onclick="viewContractQuote('${c.linkedQid}')" title="查看原始報價單"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 報價</button>`:''}
         <button type="button" class="btn btn-xs btn-g" onclick="newInvFromContract('${c.id}')" title="為此合約新增請款單"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 請款</button>
         ${c.linkedQid?`<button type="button" class="btn btn-xs" style="background:#fff3e0;color:#e65100;border:1px solid #ffcc80" onclick="openContractCosts('${c.linkedQid}')" title="記錄施工成本"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>`:''}
+        ${c.status!=='completed'&&billed>0?`<button type="button" class="btn btn-xs" style="background:#ede7f6;color:#4527a0;border:1px solid #b39ddb" onclick="settleContract('${c.id}')" title="竣工結算：實作數量少於合約時，將合約金額調整為實際請款累積並結案">⚖ 結算</button>`:''}
         <button type="button" class="btn btn-xs btn-r" onclick="delContract('${c.id}')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button>
       </div>
     </div>`;
