@@ -2354,7 +2354,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.263';
+var APP_VERSION='v5.264';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -4122,7 +4122,7 @@ function confirmInvClause(){
   toast('✅ 已帶入 '+added+' 項條款請款項目');
 }
 
-// ── 工項結算：單一工項完成時，把合約數量調整為累積實作數量（追加／追減，原數量記錄於備註）──
+// ── 工項結算：單一工項完成時，把合約數量調整為累積實作數量（追加／追減，原數量記錄於備註，合約金額同步連動）──
 function settleInvItem(i){
   const it=invItems[i];
   if(!it||it.type==='sec')return;
@@ -4130,8 +4130,14 @@ function settleInvItem(i){
   if(cum<=0){toast('此工項尚無實作數量，無法結算');return;}
   const orig=parseFloat(it.contractQty)||0;
   if(orig===cum){toast('合約數量已與實作數量一致，無需結算');return;}
+  // 預先找關聯合約並計算含稅差額（合約金額為含稅總額，工項單價為未稅）
+  const _inv=invEid?INV.find(x=>x.id===invEid):null;
+  const _contract=(_inv&&_inv.project)?CONTRACTS.find(x=>x.name===_inv.project):null;
+  const _taxR=1+((P.tax||5)/100);
+  const _delta=Math.round((orig-cum)*(parseFloat(it.contractPrice)||0)*_taxR); // 正=追減、負=追加
+  const _willSync=_contract&&(_contract.amount||0)>0&&_delta!==0;
   let ok=false;
-  try{ok=window.confirm('工項結算：'+(it.desc||'未命名工項')+'\n\n合約數量 '+orig+' → 實作數量 '+cum+(cum<orig?'（追減 '+(Math.round((orig-cum)*100)/100)+'）':'（追加 '+(Math.round((cum-orig)*100)/100)+'）')+'\n\n確定將此工項的合約數量調整為實作數量？\n（原數量會記錄在備註，合約總額不受影響）');}catch(e){ok=true;}
+  try{ok=window.confirm('工項結算：'+(it.desc||'未命名工項')+'\n\n合約數量 '+orig+' → 實作數量 '+cum+(cum<orig?'（追減 '+(Math.round((orig-cum)*100)/100)+'）':'（追加 '+(Math.round((cum-orig)*100)/100)+'）')+(_willSync?'\n合約金額同步調整 '+(_delta>0?'−':'＋')+'NT$ '+fmt(Math.abs(_delta))+'（含稅）\n　NT$ '+fmt(_contract.amount)+' → NT$ '+fmt(Math.max(0,_contract.amount-_delta)):'')+'\n\n確定結算此工項？\n（原數量會記錄在備註）');}catch(e){ok=true;}
   if(!ok)return;
   if(it.origContractQty==null)it.origContractQty=orig; // 保留原始合約數量
   it.contractQty=cum;
@@ -4139,8 +4145,19 @@ function settleInvItem(i){
   it.note=it.note?(it.note+'　'+tag):tag;
   // 立即同步回 INV（確保下一期帶到結算後的合約數量）
   if(invEid){const inv=INV.find(x=>x.id===invEid);if(inv){inv.items=JSON.parse(JSON.stringify(invItems));saveInv();}}
+  // 連動合約金額（追加／追減），並記錄調整軌跡
+  let syncTxt='';
+  if(_willSync){
+    const oldAmt=_contract.amount;
+    _contract.amount=Math.max(0,Math.round(oldAmt-_delta));
+    const cTag='工項結算('+(it.desc||'').slice(0,10)+')：NT$'+fmt(oldAmt)+'→NT$'+fmt(_contract.amount);
+    _contract.note=_contract.note?(_contract.note+'　'+cTag):cTag;
+    try{saveContracts();}catch(e){}
+    try{if(document.getElementById('page-contracts')?.classList.contains('active'))renderContracts();}catch(e){}
+    syncTxt='，合約金額→NT$ '+fmt(_contract.amount);
+  }
   rInvItems();rInvTots();
-  toast('⚖ 工項已結算：合約數量 '+orig+' → '+cum);
+  toast('⚖ 工項已結算：'+orig+' → '+cum+syncTxt);
 }
 
 // 只更新請款明細行的金額顯示（不重渲染整個表格）
