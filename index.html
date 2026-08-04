@@ -2354,7 +2354,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.262';
+var APP_VERSION='v5.263';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -4122,6 +4122,27 @@ function confirmInvClause(){
   toast('✅ 已帶入 '+added+' 項條款請款項目');
 }
 
+// ── 工項結算：單一工項完成時，把合約數量調整為累積實作數量（追加／追減，原數量記錄於備註）──
+function settleInvItem(i){
+  const it=invItems[i];
+  if(!it||it.type==='sec')return;
+  const cum=Math.round(((parseFloat(it.prevQty)||0)+(parseFloat(it.curQty)||0))*100)/100;
+  if(cum<=0){toast('此工項尚無實作數量，無法結算');return;}
+  const orig=parseFloat(it.contractQty)||0;
+  if(orig===cum){toast('合約數量已與實作數量一致，無需結算');return;}
+  let ok=false;
+  try{ok=window.confirm('工項結算：'+(it.desc||'未命名工項')+'\n\n合約數量 '+orig+' → 實作數量 '+cum+(cum<orig?'（追減 '+(Math.round((orig-cum)*100)/100)+'）':'（追加 '+(Math.round((cum-orig)*100)/100)+'）')+'\n\n確定將此工項的合約數量調整為實作數量？\n（原數量會記錄在備註，合約總額不受影響）');}catch(e){ok=true;}
+  if(!ok)return;
+  if(it.origContractQty==null)it.origContractQty=orig; // 保留原始合約數量
+  it.contractQty=cum;
+  const tag='工項結算：原'+orig+'→實'+cum;
+  it.note=it.note?(it.note+'　'+tag):tag;
+  // 立即同步回 INV（確保下一期帶到結算後的合約數量）
+  if(invEid){const inv=INV.find(x=>x.id===invEid);if(inv){inv.items=JSON.parse(JSON.stringify(invItems));saveInv();}}
+  rInvItems();rInvTots();
+  toast('⚖ 工項已結算：合約數量 '+orig+' → '+cum);
+}
+
 // 只更新請款明細行的金額顯示（不重渲染整個表格）
 function updateInvRowAmt(i, tr){
   const it=invItems[i];
@@ -4209,6 +4230,12 @@ function rInvItems(){
         });
         hR.appendChild(mb);
       });
+      const stl=document.createElement('button');
+      stl.type='button';stl.textContent='⚖';stl.className='btn btn-xs';
+      stl.title='工項結算：合約數量改為累積實作數量';
+      stl.style.cssText='padding:3px 9px;color:#4527a0;border-color:#b39ddb';
+      stl.addEventListener('click',function(){settleInvItem(i);});
+      hR.appendChild(stl);
       const del=document.createElement('button');
       del.type='button';del.textContent='✕';del.className='btn btn-xs btn-r';
       del.addEventListener('click',function(){invItems.splice(i,1);rInvItems();rInvTots();});
@@ -4402,9 +4429,14 @@ function rInvItems(){
       }
 
       const tdDel=document.createElement('td');
+      tdDel.style.whiteSpace='nowrap';
+      const stlBtn=document.createElement('button');stlBtn.className='dbtn';stlBtn.textContent='⚖';
+      stlBtn.title='工項結算：合約數量改為累積實作數量（追加／追減）';
+      stlBtn.style.color='#4527a0';
+      stlBtn.addEventListener('click',function(){settleInvItem(i);});
       const delBtn=document.createElement('button');delBtn.className='dbtn';delBtn.textContent='✕';
       delBtn.addEventListener('click',function(){invItems.splice(i,1);rInvItems();rInvTots();});
-      tdDel.appendChild(delBtn);tr.appendChild(tdDel);
+      tdDel.appendChild(stlBtn);tdDel.appendChild(delBtn);tr.appendChild(tdDel);
     }
     // 拖動排序（drag to reorder）
     if(it.type!=='sec'){
