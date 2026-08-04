@@ -2354,7 +2354,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.260';
+var APP_VERSION='v5.261';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -4108,7 +4108,7 @@ function confirmInvClause(){
     const p=parseFloat(document.getElementById('icl-p-'+d.k)?.value)||0;
     const qy=parseFloat(document.getElementById('icl-q-'+d.k)?.value)||0;
     if(p<=0||qy<=0)return;
-    invItems.push({type:'item',desc:d.clause+'：'+d.name,unit:d.unit,
+    invItems.push({type:'item',desc:d.name,unit:d.unit,
       contractPrice:p,contractQty:0,prevQty:0,prevAmt:0,
       curQty:qy,curDays:0,curAmt:Math.round(p*qy),
       note:'備註條款計價',cumQty:0,cumAmt:0,
@@ -5210,10 +5210,10 @@ function buildInvPreview(){
       _totalCum  += prevAmtRaw + curAmt;
     } else {
       let prevAmtCalc = 0;
-      if(prevQtyShow && _cpEff2){
+      if(prevQtyShow && _cpEff2 && _prevPr>0){
         prevAmtCalc = Math.round(prevQtyShow * _cpEff2 * _prevPr);
       } else if(prevAmtRaw){
-        prevAmtCalc = prevAmtRaw; // 直接用儲存的前期金額（已含請款%）
+        prevAmtCalc = prevAmtRaw; // 直接用儲存的前期金額（已含請款%）；prevPayRate=0（上期未請款）時也走此分支，避免前期金額被歸零
       }
 
       // 累積請款金額 = 累積數量 × 單價 × 請款%
@@ -5241,7 +5241,7 @@ function buildInvPreview(){
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8f5e8">${it.curQty||''}</td>
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8f5e8">${it.curDays||''}</td>
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8f5e8;font-weight:700;color:#1a6b3f">${curAmt?fmt(curAmt):''}</td>
-      <td style="padding:3px 5px;border-bottom:1px solid #f0f0f0;font-size:9.5px;color:#555;max-width:100px;word-break:break-all">${(()=>{const rate=it.payRate!=null?it.payRate:100;const rateTxt=rate!==100?(rate+'%請款'):'';const raw=it.note||'';const noteTxt=esc(raw).replace(/\n/g,'<br>').replace(/工料（一次性工項）/g,'工料(一次性)').replace(/工料\(一次性工項\)/g,'工料(一次性)');const sep=(rateTxt&&noteTxt)?'<br>':'';return(rateTxt?('<span style="color:#1a6b3f;font-weight:700">'+rateTxt+'</span>'):'')+(sep||'')+noteTxt;})()}</td>
+      <td style="padding:3px 5px;border-bottom:1px solid #f0f0f0;font-size:9.5px;color:#555;max-width:100px;word-break:break-all">${(()=>{const rate=it.payRate!=null?it.payRate:100;const rateTxt=(rate!==100&&rate!==0)?(rate+'%請款'):'';const raw=it.note||'';const noteTxt=esc(raw).replace(/\n/g,'<br>').replace(/工料（一次性工項）/g,'工料(一次性)').replace(/工料\(一次性工項\)/g,'工料(一次性)');const sep=(rateTxt&&noteTxt)?'<br>':'';return(rateTxt?('<span style="color:#1a6b3f;font-weight:700">'+rateTxt+'</span>'):'')+(sep||'')+noteTxt;})()}</td>
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8eef8">${cumQtyShow||''}</td>
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8eef8;color:#2a4a8a">${cumAmt?fmt(cumAmt):''}</td>
     </tr>`;
