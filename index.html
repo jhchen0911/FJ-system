@@ -2354,7 +2354,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.264';
+var APP_VERSION='v5.265';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -6134,6 +6134,61 @@ function updateDashTodo(){
       text:(p.to||'廠商')+' '+p.date+(daysLeft<0?'（逾期'+Math.abs(daysLeft)+'天）':daysLeft===0?'（今天）':'（'+daysLeft+'天後）'),
       sub:'NT$ '+fmt(_payEff(p))
     });
+  });
+
+  // ── 以下三類原屬「提醒區」，v5.265 整併入本月待辦 ──
+  function _du2(dateStr){var _p=dateStr.split('-');return Math.ceil((new Date(parseInt(_p[0]),parseInt(_p[1])-1,parseInt(_p[2])).getTime()-now.getTime())/864e5);}
+
+  // 4. 收款追蹤：預計收款前1天／當天／逾期未收
+  INV.forEach(function(inv){
+    if(inv.receivedConfirmed)return;
+    var unpaid=(inv.totals&&inv.totals.total||0)-parseFloat(inv.received||0);
+    if(unpaid<=0)return;
+    var label=(inv.project||'未命名')+' 第'+(inv.periodNo||'?')+'期';
+    var _expA=null;try{_expA=_invExpectedDate(inv);}catch(e){}
+    if(_expA){
+      var d=_du2(_expA.date);
+      if(d>1)return;
+      var txt=d===1?(label+' 預計明天收款（'+_expA.date+'）'):d===0?(label+' 今天預計收款'):('⚠ '+label+' 逾期 '+(-d)+' 天未收款（預計'+_expA.date+'）');
+      items.push({type:'recv',urgent:d<=0,jump:"loadInvoice('"+inv.id+"')",
+        icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>',color:d<0?'var(--red)':'var(--yd)',
+        text:txt,sub:'NT$ '+fmt(unpaid)});
+    }else{
+      var recvDay=parseInt(inv.recvDay)||parseInt(inv.payDue)||0;if(!recvDay)return;
+      var payDelay=parseInt(inv.payMonthDelay)||0;
+      var baseDate=inv.date?new Date(inv.date):now;
+      var dueD=new Date(baseDate.getFullYear(),baseDate.getMonth()+payDelay,recvDay);
+      var overDays=Math.floor((now.getTime()-dueD.getTime())/864e5);
+      if(overDays>0&&overDays<1825)items.push({type:'recv',urgent:true,jump:"loadInvoice('"+inv.id+"')",
+        icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>',color:'var(--red)',
+        text:'⚠ '+label+' 逾期 '+overDays+' 天未收款',sub:'NT$ '+fmt(unpaid)});
+    }
+  });
+
+  // 5. 逾期未付（本月以前；本月內的已在上方「本月需付款」列出）
+  PAYABLES.forEach(function(p){
+    if(p.status==='paid')return;
+    if(!p.date||p.date>=mStartStr)return;
+    var od=Math.floor((now.getTime()-new Date(p.date).getTime())/864e5);
+    if(od<=0)return;
+    items.push({type:'pay_overdue',urgent:true,
+      jump:"go('finance');setTimeout(function(){switchFinanceTab('payable')},250)",
+      icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>',color:'var(--red)',
+      text:'🔴 逾期 '+od+' 天未付款：'+(p.to||'廠商')+(p.project?' / '+p.project:'')+'（預計'+p.date+'）',
+      sub:'NT$ '+fmt(_payEff(p))});
+  });
+
+  // 6. 合約到期（30天內／已到期）
+  CONTRACTS.forEach(function(ct){
+    var _cEnd=ct.end||ct.endDate;
+    if(!_cEnd||ct.status==='completed')return;
+    var days=Math.ceil((new Date(_cEnd).getTime()-now.getTime())/864e5);
+    if(days>30)return;
+    items.push({type:'ct_exp',urgent:days<=7,jump:"go('contracts')",
+      icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>',
+      color:days<0?'var(--red)':days<=7?'var(--yd)':'var(--g3)',
+      text:days<0?('合約「'+(ct.name||'')+'」已於 '+_cEnd+' 到期'):('合約「'+(ct.name||'')+'」將於 '+days+' 天後到期（'+_cEnd+'）'),
+      sub:''});
   });
 
   // 按緊急度排序
@@ -11999,19 +12054,9 @@ function checkNotifications(){
     else if(days<=30) alerts.push({type:'info',tag:'ct_soon_'+ct.id,msg:`合約「${ct.name}」將於 ${days} 天後到期（${_cEnd}）`});
   });
 
-  // ── 5. 更新 dash-notif 橫幅 ──
+  // ── 5. 提醒橫幅已整併入「本月待辦」（v5.265）：不再顯示紅色提醒區，僅保留下方推播來源 ──
   const notifEl=document.getElementById('dash-notif');
-  if(notifEl){
-    if(alerts.length>0){
-      notifEl.style.display='block';
-      const colorMap={overdue:'var(--red)',warn:'#e65100',error:'var(--red)',info:'var(--g3)'};
-      notifEl.innerHTML=`<div style="font-weight:700;font-size:12px;color:var(--red);margin-bottom:6px"><svg class="ic ib" aria-hidden="true"><use href="#i-bell"/></svg> ${alerts.length} 則提醒</div>`+
-        alerts.slice(0,8).map(a=>`<div ${a.jump?`onclick="${a.jump}" style="cursor:pointer;font-size:11px;color:${colorMap[a.type]||'var(--b5)'};padding:4px 0;border-bottom:1px solid var(--b1)"`:`style="font-size:11px;color:${colorMap[a.type]||'var(--b5)'};padding:4px 0;border-bottom:1px solid var(--b1)"`}>${esc(a.msg)}${a.jump?' <span style="color:var(--b3)">›</span>':''}</div>`).join('')+
-        (alerts.length>8?`<div style="font-size:10px;color:var(--b3);padding:3px 0">...還有 ${alerts.length-8} 則</div>`:'');
-    } else {
-      notifEl.style.display='none';
-    }
-  }
+  if(notifEl){notifEl.style.display='none';notifEl.innerHTML='';}
 
   // ── 6. 推播通知（只推「前1天」和「逾期」，避免重複）──
   try{
