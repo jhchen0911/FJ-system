@@ -2401,7 +2401,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.279';
+var APP_VERSION='v5.280';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -5734,8 +5734,9 @@ function printVendorStatement(cid){
   const sub=Math.round(cc.amt||0),tax=Math.round(sub*0.05),tot=sub+tax;
   const today=new Date();const dstr=today.getFullYear()+'/'+String(today.getMonth()+1).padStart(2,'0')+'/'+String(today.getDate()).padStart(2,'0');
   const html='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>計價單</title><style>'
-    +'@page{size:A4 portrait;margin:14mm 14mm;}*{box-sizing:border-box;}'
-    +'body{font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;font-size:11px;color:#111;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+    +'@page{size:A4 landscape;margin:12mm 14mm;}*{box-sizing:border-box;}'
+    +'html,body{width:auto;max-width:100%;}'
+    +'body{font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;font-size:11.5px;color:#111;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
     +'h1{font-size:17px;letter-spacing:8px;text-align:center;margin:4px 0 2px;color:#0e3d22;}'
     +'table{width:100%;border-collapse:collapse;margin-top:8px;}'
     +'th{background:#1a6b3f;color:#fff;padding:6px 8px;font-size:10.5px;}'
@@ -5759,7 +5760,7 @@ function printVendorStatement(cid){
     +'<div style="margin-top:34px;display:flex;justify-content:space-between;font-size:11px">'
     +'<span>廠商簽收：＿＿＿＿＿＿＿＿＿＿</span><span>覆核：＿＿＿＿＿＿＿＿</span><span>製表：＿＿＿＿＿＿＿＿</span></div>'
     +'</body></html>';
-  _printNativeHTML(html,(cc.vendor||'廠商')+'_計價單_'+(q.name||'')+'_'+dstr.replace(/\//g,''),Math.round((297-28)*96/25.4));
+  _printNativeHTML(html,(cc.vendor||'廠商')+'_計價單_'+(q.name||'')+'_'+dstr.replace(/\//g,''),Math.round((210-24)*96/25.4));
 }
 function printInvNative(){
   var el=document.getElementById('inv-prev-html');
@@ -11556,8 +11557,10 @@ function renderLedger(){
       'NT$ '+fmt(r.amount||0)+'<div style="font-size:10.5px;color:var(--b3)">稅 '+fmt(r.taxAmt||0)+'</div>');
   }).join(''):(function(){var tot=(INVOICE_RECS||[]).filter(function(r){return r.status!=='cancelled';}).length;return '<div style="color:var(--b3);font-size:12px;padding:8px 0">本月（'+m+'）無銷項發票'+(tot?'——其他月份共 '+tot+' 張，請切換月份':'（於應收卡 🧾 開立）')+'</div>';})();
   document.getElementById('ledger-in-vendor').innerHTML=vins.length?vins.map(function(p2){
-    return row('<b>'+esc(p2.to||'')+'</b>　'+(p2.invNo?'🧾 '+esc(p2.invNo):'<span style="color:var(--red);font-size:11px">⚠ 未登錄發票號</span>')+'<div style="font-size:10.5px;color:var(--b3)">'+esc(p2.project||'')+'</div>',
-      'NT$ '+fmt(_payEff(p2))+'<div style="font-size:10.5px;color:var(--b3)">稅 '+fmt(_payVatAmt(p2))+'</div>');
+    return '<div onclick="ledgerRegInvNo(\''+p2.id+'\')" title="點擊登錄／修改發票號碼" style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--b1);font-size:12.5px;cursor:pointer">'
+      +'<div style="min-width:0;flex:1"><b>'+esc(p2.to||'')+'</b>　'+(p2.invNo?'🧾 '+esc(p2.invNo):'<span style="color:var(--red);font-size:11px;text-decoration:underline dotted">⚠ 未登錄發票號（點擊登錄）</span>')+'<div style="font-size:10.5px;color:var(--b3)">'+esc(p2.project||'')+'</div></div>'
+      +'<div style="text-align:right;white-space:nowrap">NT$ '+fmt(_payEff(p2))+'<div style="font-size:10.5px;color:var(--b3)">稅 '+fmt(_payVatAmt(p2))+'</div></div>'
+      +'</div>';
   }).join(''):'<div style="color:var(--b3);font-size:12px;padding:8px 0">本月無廠商進項</div>';
   document.getElementById('ledger-in-exp').innerHTML=exps.length?exps.map(function(e){
     return row('<b>'+esc(e.seller||'')+'</b>　'+esc(e.number||'')+'<div style="font-size:10.5px;color:var(--b3)">'+esc(e.date||'')+'　'+esc(e.note||'')+'</div>',
@@ -11565,6 +11568,23 @@ function renderLedger(){
       +'<a href="javascript:void(0)" onclick="expDel(\''+e.id+'\')" style="font-size:10.5px;color:var(--b3)">刪除</a>');
   }).join(''):(function(){var tot=(EXPENSES||[]).length;return '<div style="color:var(--b3);font-size:12px;padding:8px 0">本月（'+m+'）無費用發票'+(tot?'——其他月份共 '+tot+' 筆，發票以「開立月份」歸帳，請切換上方月份查看':'——加油、五金、文具打統編的都拍進來')+'</div>';})();
 }
+// 帳務頁：點擊廠商進項列，登錄／修改發票號碼
+function ledgerRegInvNo(pid){
+  var p=PAYABLES.find(function(x){return x.id===pid;});if(!p)return;
+  showConfirm('🧾 登錄廠商發票號',
+    '<div style="font-size:12.5px;color:var(--b4);margin-bottom:10px"><b>'+esc(p.to||'')+'</b>　'+esc(p.project||'')+'<br>金額 NT$ '+fmt(_payEff(p))+'　稅 '+fmt(_payVatAmt(p))+'</div>'
+    +'<div class="f"><label>發票號碼</label><input id="lg-invno" value="'+esc(p.invNo||'')+'" placeholder="AB12345678" maxlength="10" style="text-transform:uppercase;font-size:15px;font-weight:700;letter-spacing:1px"></div>'
+    +'<div style="font-size:11px;color:var(--b3);margin-top:8px">提示：也可用「智慧收件」拍發票照片，AI 自動登錄號碼並歸檔到此筆應付。</div>',
+    function(){
+      var v=(gv('lg-invno')||'').trim().toUpperCase();
+      p.invNo=v;p.updatedAt=Date.now();
+      savePayables();
+      try{renderLedger();}catch(e){}
+      toast(v?('🧾 已登錄發票號 '+v):'已清除發票號');
+    },false,null,true);
+  setTimeout(function(){var e=document.getElementById('lg-invno');if(e)e.focus();},120);
+}
+
 function _expForm(pre){
   pre=pre||{};
   showConfirm('登錄費用發票',
