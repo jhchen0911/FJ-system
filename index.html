@@ -1043,7 +1043,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <div class="ch green">
         <div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本記錄</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <select id="cost-group-mode" onchange="rCostItems()" style="font-size:11px;padding:4px 7px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);font-family:inherit"><option value="none">依建立順序</option><option value="vendor">依廠商分組</option></select>
+          <select id="cost-group-mode" onchange="rCostItems()" style="font-size:11px;padding:4px 7px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);font-family:inherit"><option value="none">依建立順序</option><option value="vendor">依廠商分組</option><option value="analysis">📊 工項成本分析</option></select>
           <button type="button" class="btn btn-xs" onclick="addCostItem('own')" style="background:#FFFDE7;color:#8a6d00;border-color:#f0da7a">+ 自有成本</button>
             <button type="button" class="btn btn-xs" onclick="addCostItem('sub')" style="background:#E3F2FD;color:#1565C0;border-color:#90CAF9">+ 承包</button>
           <button type="button" class="btn btn-xs" onclick="addCostItem('labor')" style="background:#FFF3E0;color:#E65100;border-color:#FFCC80">+ 點工</button>
@@ -2358,7 +2358,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.270';
+var APP_VERSION='v5.271';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -7930,7 +7930,8 @@ function addCostItem(type){
   if(!q){toast('請先開啟報價單');return;}
   if(!q.costs)q.costs=[];
   var cid=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
-  var base={id:cid,type:type,isAttached:false,attachedTo:'',mergedInto:''};
+  var base={id:cid,type:type,isAttached:false,attachedTo:'',mergedInto:'',
+    cat:_costDefaultCat(type),date:localToday()};
   if(type==='own'){
     // 自有成本：公司自備材料機具（不入應付）
     base.vendor='';
@@ -7950,6 +7951,86 @@ function addCostItem(type){
   q.costs.push(base);
   rCostItems();
   try{persist();_immediateUpload();}catch(e){}
+}
+
+// ── 成本科目分類（跨案分析用）──
+var COST_CATS=['外包工程','人工','材料','機具租金','運輸','油料耗材','管理雜費','其他'];
+function _costDefaultCat(type){return({own:'材料',sub:'外包工程',labor:'人工',extra:'管理雜費'})[type]||'其他';}
+function updCostField(cid,field,val){
+  var q=Q.find(function(x){return x.id===eid;});
+  if(!q||!q.costs)return;
+  var cc=q.costs.find(function(x){return x.id===cid;});
+  if(!cc)return;
+  cc[field]=val;
+  q._mt=Date.now();
+  try{persist();}catch(e){}
+}
+// 成本歸戶：依關聯工項彙總實際成本（承包逐列、其餘整項）
+function _costByItem(q){
+  var map={},unassigned=0;
+  (q&&q.costs||[]).forEach(function(c){
+    if(c.type==='sub'&&c.rows&&c.rows.length){
+      c.rows.forEach(function(r){
+        var amt=(parseFloat(r.qty)||0)*(parseFloat(r.unitPrice)||0);
+        if(r.linkedItemIdx>=0)map[r.linkedItemIdx]=(map[r.linkedItemIdx]||0)+amt;
+        else unassigned+=amt;
+      });
+    }else{
+      var amt2=parseFloat(c.amt)||0;
+      if(c.linkedItemIdx>=0)map[c.linkedItemIdx]=(map[c.linkedItemIdx]||0)+amt2;
+      else unassigned+=amt2;
+    }
+  });
+  return {map:map,unassigned:unassigned};
+}
+// 工項成本分析表：報價複價 vs 預估成本 vs 實際成本 vs 毛利
+function buildCostAnalysisHtml(q){
+  if(!q)return '';
+  var att=_costByItem(q);
+  var rows='';var totQuote=0,totEst=0,totAct=0;
+  (q.items||[]).forEach(function(it,i){
+    if(it.sec)return;
+    var qty=parseFloat(it.qty)||0,price=parseFloat(it.price)||0,est=parseFloat(it.estCost)||0;
+    var quoteAmt=qty*price,estAmt=qty*est,actAmt=att.map[i]||0;
+    if(quoteAmt<=0&&actAmt<=0)return;
+    totQuote+=quoteAmt;totEst+=estAmt;totAct+=actAmt;
+    var execR=estAmt>0?Math.round(actAmt/estAmt*100):null;         // 執行率：實際/預估
+    var mgn=quoteAmt-actAmt;
+    var mgnR=quoteAmt>0&&actAmt>0?Math.round(mgn/quoteAmt*1000)/10:null;
+    var execClr=execR==null?'var(--b3)':execR>100?'var(--red)':execR>85?'#e65100':'var(--g3)';
+    var mgnClr=mgnR==null?'var(--b3)':mgnR<0?'var(--red)':mgnR<15?'#e65100':'var(--g3)';
+    rows+='<tr style="border-bottom:1px solid var(--b1)">'
+      +'<td style="padding:5px 8px;font-size:12px">'+esc((it.desc||'工項'+(i+1)).split('\n')[0].slice(0,26))+'</td>'
+      +'<td style="padding:5px 8px;text-align:right">'+fmt(quoteAmt)+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;color:'+(estAmt?'var(--b5)':'var(--b3)')+'">'+(estAmt?fmt(Math.round(estAmt)):'—')+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;font-weight:700">'+(actAmt?fmt(Math.round(actAmt)):'—')+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;font-weight:700;color:'+execClr+'">'+(execR!=null?execR+'%':'—')+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;font-weight:700;color:'+mgnClr+'">'+(mgnR!=null?(fmt(Math.round(mgn))+'（'+mgnR+'%）'):'—')+'</td>'
+      +'</tr>';
+  });
+  var unRow=att.unassigned>0
+    ?'<tr style="border-bottom:1px solid var(--b1);background:#fff8ec"><td style="padding:5px 8px;font-size:12px;color:#b26a00">⚠ 未歸戶成本（未關聯工項）</td><td></td><td></td><td style="padding:5px 8px;text-align:right;font-weight:700;color:#b26a00">'+fmt(Math.round(att.unassigned))+'</td><td colspan="2" style="padding:5px 8px;font-size:10.5px;color:#b26a00">請在成本記錄選「工項」歸戶</td></tr>'
+    :'';
+  var totMgn=totQuote-totAct-att.unassigned;
+  var totMgnR=totQuote>0?Math.round(totMgn/totQuote*1000)/10:0;
+  return '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:640px">'
+    +'<thead><tr style="background:var(--gl);color:var(--b5);font-size:11px">'
+    +'<th style="padding:6px 8px;text-align:left">報價工項</th>'
+    +'<th style="padding:6px 8px;text-align:right">報價複價</th>'
+    +'<th style="padding:6px 8px;text-align:right">預估成本🔒</th>'
+    +'<th style="padding:6px 8px;text-align:right">實際成本</th>'
+    +'<th style="padding:6px 8px;text-align:right" title="實際成本÷預估成本">執行率</th>'
+    +'<th style="padding:6px 8px;text-align:right" title="報價複價−實際成本">實際毛利</th>'
+    +'</tr></thead><tbody>'+rows+unRow+'</tbody>'
+    +'<tfoot><tr style="border-top:2px solid var(--gm);font-weight:900">'
+    +'<td style="padding:6px 8px">合計</td>'
+    +'<td style="padding:6px 8px;text-align:right">'+fmt(totQuote)+'</td>'
+    +'<td style="padding:6px 8px;text-align:right">'+(totEst?fmt(Math.round(totEst)):'—')+'</td>'
+    +'<td style="padding:6px 8px;text-align:right">'+fmt(Math.round(totAct+att.unassigned))+'</td>'
+    +'<td></td>'
+    +'<td style="padding:6px 8px;text-align:right;color:'+(totMgnR<0?'var(--red)':totMgnR<15?'#e65100':'var(--g3)')+'">'+fmt(Math.round(totMgn))+'（'+totMgnR+'%）</td>'
+    +'</tr></tfoot></table></div>'
+    +'<div style="font-size:10.5px;color:var(--b3);margin-top:6px">執行率＝實際成本÷預估成本（>100% 紅字＝超支）；實際毛利＝報價複價−實際成本。未歸戶成本已計入合計毛利。</div>';
 }
 
 function delCostItem(cid){
@@ -8689,6 +8770,12 @@ function rCostItems(){
   // 施工成本廠商分組模式
   var _costGroupBtn=document.getElementById('cost-group-mode');
   var _costGroupMode=_costGroupBtn?_costGroupBtn.value:'none';
+  // 📊 工項成本分析視圖：報價複價 vs 預估成本 vs 實際成本 vs 毛利
+  if(_costGroupMode==='analysis'){
+    el.innerHTML=buildCostAnalysisHtml(q);
+    var _tw2=document.getElementById('cost-total-wrap');if(_tw2)_tw2.style.display='none';
+    return;
+  }
   if(_costGroupMode==='vendor'){
     costs.sort(function(a,b){
       var va=a.vendor||'（未填廠商）',vb=b.vendor||'（未填廠商）';
@@ -8714,8 +8801,15 @@ function rCostItems(){
       var _ownChips='';
       if(c.srcInvNo||c.srcVendor)_ownChips+='<span class="bdg" style="font-size:10px;background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4">🧾 '+esc(c.srcVendor||'')+(c.srcInvNo?' '+esc(c.srcInvNo):'')+'</span>';
       if(c.linkedItemIdx>=0&&q&&q.items&&q.items[c.linkedItemIdx])_ownChips+='<span class="bdg" style="font-size:10px;background:var(--gl);color:var(--g3);border:1px solid var(--gm)">↳ '+esc((q.items[c.linkedItemIdx].desc||'').slice(0,16))+'</span>';
+      var _ownItemOpts='<option value="-1">── 選擇對應報價工項（供成本歸戶）──</option>';
+      (q&&q.items||[]).forEach(function(it2,i2){if(!it2.sec)_ownItemOpts+='<option value="'+i2+'"'+(c.linkedItemIdx===i2?' selected':'')+'>'+esc((it2.desc||'工項'+(i2+1)).slice(0,28))+'</option>';});
       fieldsHtml=
         (_ownChips?'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px">'+_ownChips+'</div>':'')
+        +'<div style="display:flex;gap:5px;align-items:center;margin-bottom:5px">'
+        +'<span style="font-size:11px;font-weight:700;color:var(--g3);white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 工項</span>'
+        +'<select onchange="updCostField(\''+c.id+'\',\'linkedItemIdx\',parseInt(this.value))" style="flex:1;font-size:12px;padding:4px 6px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w)">'
+        +_ownItemOpts+'</select>'
+        +'</div>'
         +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;align-items:center">'
         +'<span style="font-size:10.5px;color:var(--b3)">常用：</span>'
         +OWN_PRESETS.map(function(p2){
@@ -8836,6 +8930,11 @@ function rCostItems(){
       +`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;`
       +`background:${typeBg[c.type]};color:${typeColor[c.type]};white-space:nowrap">${typeLabel[c.type]}</span>`
       +(c.mergedInto?`<span style="font-size:10px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;padding:2px 6px;border-radius:8px"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 已合併</span>`:'')
+      +(function(){var _cat=c.cat||_costDefaultCat(c.type);
+        return `<select onchange="updCostField('${c.id}','cat',this.value)" title="成本科目（跨案分析用）" style="font-size:10.5px;padding:2px 4px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);color:var(--b5);font-family:inherit">`
+          +COST_CATS.map(function(k){return '<option value="'+k+'"'+(_cat===k?' selected':'')+'>'+k+'</option>';}).join('')
+          +`</select>`
+          +`<input type="date" value="${c.date||''}" onchange="updCostField('${c.id}','date',this.value)" title="成本發生日期" style="font-size:10.5px;padding:2px 4px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);color:var(--b4);font-family:inherit;width:118px">`;})()
       +`<button type="button" onclick="delCostItem('${c.id}')" style="margin-left:auto;padding:2px 8px;border:1px solid var(--red);color:var(--red);background:transparent;border-radius:var(--r6);cursor:pointer;font-size:11px">✕</button>`
       +`</div>`
       +fieldsHtml+attRow
@@ -8845,12 +8944,20 @@ function rCostItems(){
   // 分類小計列
   var _catSum={own:0,sub:0,labor:0,extra:0};
   (q.costs||[]).forEach(function(c2){if(_catSum[c2.type]!=null)_catSum[c2.type]+=(c2.amt||0);});
-  var _catBar='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;font-size:11.5px">'
+  var _catBar='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;font-size:11.5px">'
     +[['own','自有','#8a6d00','#FFFDE7'],['sub','承包','#1565C0','#E3F2FD'],['labor','點工','#E65100','#FFF3E0'],['extra','額外','#4A148C','#F3E5F5']].map(function(x){
       return '<span style="padding:4px 10px;border-radius:99px;background:'+x[3]+';color:'+x[2]+';font-weight:700">'+x[1]+' '+fmt(_catSum[x[0]])+'</span>';
     }).join('')
     +'</div>';
-  el.innerHTML=_catBar+html;
+  // 科目匯總列（材料/機具/人工/運輸…，跨案分析口徑）
+  var _csum={};
+  (q.costs||[]).forEach(function(c2){var k=c2.cat||_costDefaultCat(c2.type);_csum[k]=(_csum[k]||0)+(parseFloat(c2.amt)||0);});
+  var _catKeys=COST_CATS.filter(function(k){return _csum[k]>0;});
+  var _catBar2=_catKeys.length?('<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;align-items:center">'
+    +'<span style="font-size:10px;color:var(--b3)">科目：</span>'
+    +_catKeys.map(function(k){return '<span style="padding:3px 10px;border-radius:99px;background:var(--b0);border:1px solid var(--b2);color:var(--b5)">'+k+' <b style="font-variant-numeric:tabular-nums">'+fmt(Math.round(_csum[k]))+'</b></span>';}).join('')
+    +'</div>'):'';
+  el.innerHTML=_catBar+_catBar2+html;
 
   // 同步 linkedItemIdx
   costs.forEach(c=>{
