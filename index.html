@@ -2360,7 +2360,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.276';
+var APP_VERSION='v5.277';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -8073,8 +8073,10 @@ function _histCostFor(name){
 }
 
 // ── 成本科目分類（跨案分析用）──
-var COST_CATS=['外包工程','人工','材料','機具租金','運輸','油料耗材','管理雜費','其他'];
-function _costDefaultCat(type){return({own:'材料',sub:'外包工程',labor:'人工',extra:'管理雜費'})[type]||'其他';}
+var COST_CATS=['材料租金','材料運費','外包工程','人工','機具','機具運費','五金零件','油料耗材','雜費','其他'];
+function _costDefaultCat(type){return({own:'材料租金',sub:'外包工程',labor:'人工',extra:'雜費'})[type]||'其他';}
+// 舊科目名稱對應（v5.271~275 的舊值自動歸入新分類）
+function _costCatNorm(cat){var m={'材料':'材料租金','機具租金':'機具','運輸':'材料運費','管理雜費':'雜費'};return m[cat]||cat;}
 function updCostField(cid,field,val){
   var q=Q.find(function(x){return x.id===eid;});
   if(!q||!q.costs)return;
@@ -8177,7 +8179,7 @@ function buildCostAuditHtml(q){
     else{st=p.status==='paid'?'✓ 一致（已付款）':'✓ 一致（未付款）';clr='var(--g3)';}
     rows+='<tr style="border-bottom:1px solid var(--b1)">'
       +'<td style="padding:5px 8px;font-size:12px">'+esc(c.vendor||'（未填廠商）')+'</td>'
-      +'<td style="padding:5px 8px;font-size:11px;color:var(--b4)">'+(tLabel[c.type]||c.type)+(c.cat?'／'+esc(c.cat):'')+'</td>'
+      +'<td style="padding:5px 8px;font-size:11px;color:var(--b4)">'+(tLabel[c.type]||c.type)+(c.cat?'／'+esc(_costCatNorm(c.cat)):'')+'</td>'
       +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(amt)+'</td>'
       +'<td style="padding:5px 8px;font-size:11.5px;font-weight:700;color:'+clr+'">'+st+'</td>'
       +'<td style="padding:5px 8px;text-align:right">'+fixBtn+'</td>'
@@ -9117,7 +9119,7 @@ function rCostItems(){
       +`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;`
       +`background:${typeBg[c.type]};color:${typeColor[c.type]};white-space:nowrap">${typeLabel[c.type]}</span>`
       +(c.mergedInto?`<span style="font-size:10px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;padding:2px 6px;border-radius:8px"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 已合併</span>`:'')
-      +(function(){var _cat=c.cat||_costDefaultCat(c.type);
+      +(function(){var _cat=c.cat?_costCatNorm(c.cat):_costDefaultCat(c.type);
         return `<select onchange="updCostField('${c.id}','cat',this.value)" title="成本科目（跨案分析用）" style="font-size:10.5px;padding:2px 4px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);color:var(--b5);font-family:inherit">`
           +COST_CATS.map(function(k){return '<option value="'+k+'"'+(_cat===k?' selected':'')+'>'+k+'</option>';}).join('')
           +`</select>`
@@ -9138,7 +9140,7 @@ function rCostItems(){
     +'</div>';
   // 科目匯總列（材料/機具/人工/運輸…，跨案分析口徑）
   var _csum={};
-  (q.costs||[]).forEach(function(c2){var k=c2.cat||_costDefaultCat(c2.type);_csum[k]=(_csum[k]||0)+(parseFloat(c2.amt)||0);});
+  (q.costs||[]).forEach(function(c2){var k=c2.cat?_costCatNorm(c2.cat):_costDefaultCat(c2.type);_csum[k]=(_csum[k]||0)+(parseFloat(c2.amt)||0);});
   var _catKeys=COST_CATS.filter(function(k){return _csum[k]>0;});
   var _catBar2=_catKeys.length?('<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;align-items:center">'
     +'<span style="font-size:10px;color:var(--b3)">科目：</span>'
