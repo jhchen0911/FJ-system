@@ -2355,7 +2355,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.268';
+var APP_VERSION='v5.269';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -9837,6 +9837,17 @@ function settleContract(id){
   const billed=invs.reduce((a,i)=>a+(i.totals?.total||0),0);
   if(billed<=0){toast('此合約尚無請款紀錄，無法結算');return;}
   const orig=c.amount||0;
+  // 防呆：疑似尚未完工（已請款未達合約 90%，或預計完工日未到）→ 先跳強警告
+  const _pct=orig>0?Math.round(billed/orig*100):0;
+  const _endFuture=!!(c.end&&c.end>localToday());
+  if(_pct<90||_endFuture){
+    let warn=false;
+    try{warn=window.confirm('⚠️ 此合約疑似尚未完工！\n\n'
+      +(_pct<90?'・已請款累積僅達合約金額的 '+_pct+'%\n':'')
+      +(_endFuture?'・預計完工日 '+c.end+' 尚未到期\n':'')
+      +'\n「結算」是整個工程全部完工後的最後收尾，會把合約金額直接改成目前已請款累積 NT$ '+fmt(billed)+'。\n\n如果只是單一工項做完要追加減，請改用請款單裡各工項旁的「⚖ 工項結算」，不要按這裡。\n\n確定整個工程已完工、要繼續合約總結算嗎？');}catch(e){warn=true;}
+    if(!warn)return;
+  }
   let ok=false;
   try{ok=window.confirm('竣工結算\n\n原合約金額　NT$ '+fmt(orig)+'\n實際請款累積 NT$ '+fmt(billed)+'\n差額（追減）NT$ '+fmt(orig-billed)+'\n\n確定將合約金額調整為結算金額，並標記為已完成？\n（原合約金額會記錄在備註，可隨時手動改回）');}catch(e){ok=true;}
   if(!ok)return;
