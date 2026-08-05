@@ -2360,7 +2360,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.277';
+var APP_VERSION='v5.278';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -6268,10 +6268,17 @@ function rDash(){
       const totalQ=Q.length;
       const awardedQ=Q.filter(q=>q.awarded).length;
       const totalAmt=Q.reduce((a,q)=>a+(q.t?.total||0),0);
-      const awardedAmt=Q.filter(q=>q.awarded).reduce((a,q)=>a+(q.t?.total||0),0);
+      // 得標金額以「合約現值」為準（含追加減／結算）；原始得標價保留為小字參考
+      let awardedAmt=0,awardedOrig=0;
+      Q.filter(q=>q.awarded).forEach(function(q){
+        const t=q.t?.total||0;awardedOrig+=t;
+        const ct=(CONTRACTS||[]).find(c=>c.linkedQid===q.id)||(CONTRACTS||[]).find(c=>c.name===q.name);
+        awardedAmt+=(ct&&(parseFloat(ct.amount)||0)>0)?ct.amount:t;
+      });
+      const _diffs=Math.abs(awardedOrig-awardedAmt)>1;
       kgrid.innerHTML=
         '<div class="kpi" style="flex:1;min-width:120px"><div class="kl">總報價金額</div><div class="kv" style="font-size:18px">NT$ '+fmt(totalAmt)+'</div><div class="ks">共 '+totalQ+' 件</div></div>'+
-        '<div class="kpi hi" style="flex:1;min-width:120px"><div class="kl">得標金額</div><div class="kv" style="font-size:18px;color:var(--g3)">NT$ '+fmt(awardedAmt)+'</div><div class="ks">'+awardedQ+' 件得標</div></div>';
+        '<div class="kpi hi" style="flex:1;min-width:120px"><div class="kl">得標金額'+(_diffs?'（合約現值）':'')+'</div><div class="kv" style="font-size:18px;color:var(--g3)">NT$ '+fmt(awardedAmt)+'</div><div class="ks">'+awardedQ+' 件得標'+(_diffs?'　·　原始得標 NT$ '+fmt(awardedOrig):'')+'</div></div>';
     }
     // 最近報價
     const dl=document.getElementById('dash-list');
