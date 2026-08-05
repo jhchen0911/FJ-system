@@ -2401,7 +2401,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.280';
+var APP_VERSION='v5.281';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -11311,10 +11311,10 @@ function updateFinanceKPIs(){
       <div class="kv" style="font-size:16px;color:var(--red)">NT$ ${fmt(totalAP)}</div>
       <div class="ks">待付 ${PAYABLES.filter(p=>p.status==='pending').length} 筆${totalVendorRetention>0?' ／ <svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg>保留NT$'+fmt(Math.round(totalVendorRetention)):''}</div>
     </div>
-    <div class="kpi ${netCF>=0?'hi':''}" style="flex:1;min-width:130px;${netCF<0?'background:#fff0f0':''}">
-      <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 可用現金</div>
-      <div class="kv" style="font-size:16px;color:${netCF>=0?'var(--g3)':'var(--red)'}">NT$ ${fmt(availableCash)}</div>
-      <div class="ks">${ticketPending>0?`票期中 NT$ ${fmt(ticketPending)}`:'淨現金流 NT$ '+fmt(netCF)}</div>
+    <div class="kpi ${netCF>=0?'hi':''}" style="flex:1;min-width:150px;${netCF<0?'background:#fff0f0':''}">
+      <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 可動用資金（已扣應付）</div>
+      <div class="kv" style="font-size:16px;color:${netCF>=0?'var(--g3)':'var(--red)'}">NT$ ${fmt(netCF)}</div>
+      <div class="ks">可用現金 ${fmt(availableCash)} − 待付 ${fmt(totalAP)}${ticketPending>0?'　·　票期中 '+fmt(ticketPending):''}</div>
     </div>
     <div class="kpi" style="flex:1;min-width:130px">
       <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 本月實收</div>
@@ -13149,6 +13149,10 @@ function renderPermMatrixPanel(){
     return '<tr><td style="padding:5px 8px;font-size:11.5px;font-weight:600;white-space:nowrap">'+esc(em)+'</td>'
       +cols.map(pp=>'<td style="text-align:center;padding:4px"><input type="checkbox" '+(up[pp.id]===false?'':'checked')+' onchange="permMxSet(\''+esc(em)+'\',\''+pp.id+'\',this.checked)"></td>').join('')
       +'<td style="text-align:center;padding:4px"><input type="checkbox" '+(u.hideProfit?'checked':'')+' onchange="permMxHideProfit(\''+esc(em)+'\',this.checked)"></td>'
+      +'<td style="white-space:nowrap;padding:4px">'
+      +'<button type="button" class="btn btn-xs" title="工務範本：僅開放快速支出，隱藏利潤與金流" onclick="permMxApplyRole(\''+esc(em)+'\',\'site\')" style="border-color:#ffcc80;color:#e65100">⛑ 工務</button> '
+      +'<button type="button" class="btn btn-xs" title="管理部範本：全部開放（單價分析／參數／權限本為管理員限定）" onclick="permMxApplyRole(\''+esc(em)+'\',\'office\')" style="border-color:#90CAF9;color:#1565C0">🏢 管理部</button>'
+      +'</td>'
       +'<td style="text-align:center"><button type="button" class="btn btn-xs btn-r" title="移除此使用者設定" onclick="permMxRemove(\''+esc(em)+'\')">✕</button></td></tr>';
   }).join('');
   box.innerHTML='<div style="margin-top:16px;border-top:2px solid var(--gm);padding-top:14px">'
@@ -13161,7 +13165,7 @@ function renderPermMatrixPanel(){
       ?'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:640px"><thead><tr>'
         +'<th style="text-align:left;padding:5px 8px;font-size:10.5px;color:var(--b3)">使用者</th>'
         +cols.map(pp=>'<th style="padding:4px 6px;font-size:10px;color:var(--b3);font-weight:600">'+pp.label+'</th>').join('')
-        +'<th style="padding:4px 6px;font-size:10px;color:#4A148C;font-weight:700">隱藏利潤</th><th></th></tr></thead>'
+        +'<th style="padding:4px 6px;font-size:10px;color:#4A148C;font-weight:700">隱藏利潤</th><th style="padding:4px 6px;font-size:10px;color:var(--b3);font-weight:600">角色範本</th><th></th></tr></thead>'
         +'<tbody>'+rows+'</tbody></table></div>'
       :'<div style="font-size:12px;color:var(--b3);padding:8px">尚未加入任何使用者——輸入 Email 開始設定</div>')
     +'</div>';
@@ -13181,6 +13185,24 @@ function permMxAdd(){
   toast('已加入：'+em);
 }
 function permMxSet(em,pid,allowed){_permMxMutate(mx=>{if(!mx[em])mx[em]={pages:{}};if(!mx[em].pages)mx[em].pages={};if(allowed)delete mx[em].pages[pid];else mx[em].pages[pid]=false;});}
+// 角色範本：一鍵套用整列權限
+// 工務：僅快速支出（現場記帳），其餘頁面全關＋隱藏利潤——不涉及利潤、金流
+// 管理部：全部開放；單價分析／參數設定／權限管理本為管理員限定，一般帳號本來就看不到
+function permMxApplyRole(em,role){
+  _permMxMutate(function(mx){
+    if(!mx[em])mx[em]={pages:{},hideProfit:false};
+    var u=mx[em];u.pages={};
+    if(role==='site'){
+      ALL_PAGES.filter(function(p){return !p.adminOnly;}).forEach(function(p){
+        if(p.id!=='quickcost')u.pages[p.id]=false;
+      });
+      u.hideProfit=true;
+    }else{
+      u.hideProfit=false;
+    }
+  });
+  toast(role==='site'?'⛑ 已套用「工務」：僅快速支出、隱藏利潤與金流':'🏢 已套用「管理部」：全部開放（單價分析僅管理員可見）');
+}
 function permMxHideProfit(em,v){_permMxMutate(mx=>{if(!mx[em])mx[em]={pages:{}};mx[em].hideProfit=!!v;});}
 function permMxRemove(em){showConfirm('移除使用者設定','移除後「'+esc(em)+'」回到全域預設權限。',()=>{_permMxMutate(mx=>{delete mx[em];});});}
 function renderPagePermPanel(){
