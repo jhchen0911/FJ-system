@@ -2359,7 +2359,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.274';
+var APP_VERSION='v5.275';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2978,6 +2978,8 @@ function applyUPA(){
   // 成本連動：單價分析算出的成本單價(costUnit)自動帶入工項「成本單價🔒」，報價當下即見毛利
   let _estCost='';
   try{const _r=upaCalc();if(_r&&_r.costUnit>0)_estCost=String(Math.round(_r.costUnit));}catch(e){}
+  // 分析未提供成本時，退回歷史單價庫實績均價
+  if(!_estCost){try{const _h=_histCostFor(desc);if(_h&&_h.avg>0)_estCost=String(_h.avg);}catch(e){}}
   items.push({desc,unit,qty:String(qty),price:String(price),estCost:_estCost,note,ot,otu:otUnit,sec:false});
   rItems();rTots();
   // 水平支撐：自動累加層數
@@ -3375,9 +3377,13 @@ function rItems(){
         histM.style.cssText='font-size:10.5px;color:#1a3a6b;margin:-2px 0 6px;cursor:pointer;text-decoration:underline dotted';
         function updHistM(){
           const h=_histCostFor(items[i].desc);
-          if(h&&!(parseFloat(items[i].estCost)>0)){
+          const cur=parseFloat(items[i].estCost)||0;
+          if(h&&cur<=0){
             histM.textContent='📚 歷史實際成本 '+fmt(h.avg)+(h.unit?'/'+h.unit:'')+'（'+h.n+' 筆，點擊帶入）';
-            histM.style.display='';
+            histM.style.color='#1a3a6b';histM.style.display='';
+          }else if(h&&cur>0&&Math.abs(h.avg-cur)/h.avg>0.05){
+            histM.textContent='⚠ 與實績均價 '+fmt(h.avg)+' 偏差>5%（'+h.n+' 筆，點擊改用實績）';
+            histM.style.color='#e65100';histM.style.display='';
           }else histM.style.display='none';
         }
         histM.addEventListener('click',function(){
@@ -3487,7 +3493,7 @@ function rItems(){
           mgnSpan.textContent=p==null?'':('毛利 '+p+'%');
           mgnSpan.style.color=_mgnColor(p);
         }
-        costInp.addEventListener('input',function(){items[i].estCost=this.value;updMgn();rTots();});
+        costInp.addEventListener('input',function(){items[i].estCost=this.value;updMgn();try{updHist();}catch(e){}rTots();});
         updMgn();
         tdCost.appendChild(costInp);tdCost.appendChild(mgnSpan);
         // 歷史單價庫提示：有同名工項實績且尚未填成本時顯示，點擊帶入
@@ -3495,10 +3501,17 @@ function rItems(){
         histDiv.style.cssText='font-size:9.5px;text-align:right;line-height:1.3;color:#1a3a6b;cursor:pointer;text-decoration:underline dotted';
         function updHist(){
           const h=_histCostFor(items[i].desc);
-          if(h&&!(parseFloat(items[i].estCost)>0)){
+          const cur=parseFloat(items[i].estCost)||0;
+          if(h&&cur<=0){
+            // 未填成本：藍字提示可帶入
             histDiv.textContent='歷史 '+fmt(h.avg)+(h.unit?'/'+h.unit:'')+'（'+h.n+'筆）';
             histDiv.title='歷史實際成本：平均 '+fmt(h.avg)+'，區間 '+fmt(h.min)+'～'+fmt(h.max)+'，共 '+h.n+' 筆實績。點擊帶入成本單價';
-            histDiv.style.display='';
+            histDiv.style.color='#1a3a6b';histDiv.style.display='';
+          }else if(h&&cur>0&&Math.abs(h.avg-cur)/h.avg>0.05){
+            // 已填但與實績均價偏差>5%：橘字警示，點擊改用實績
+            histDiv.textContent='⚠ 實績 '+fmt(h.avg)+'（'+h.n+'筆）';
+            histDiv.title='目前成本 '+fmt(cur)+' 與歷史實績均價 '+fmt(h.avg)+' 偏差超過 5%（區間 '+fmt(h.min)+'～'+fmt(h.max)+'）。點擊改用實績均價';
+            histDiv.style.color='#e65100';histDiv.style.display='';
           }else histDiv.style.display='none';
         }
         histDiv.addEventListener('click',function(){
