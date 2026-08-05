@@ -2358,7 +2358,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.271';
+var APP_VERSION='v5.272';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -3365,6 +3365,24 @@ function rItems(){
         const mgnWrap=mkField('單項毛利',mgnBox);
         costRow.appendChild(mgnWrap);
         card.appendChild(costRow);
+        // 歷史單價庫提示（手機）
+        const histM=document.createElement('div');
+        histM.style.cssText='font-size:10.5px;color:#1a3a6b;margin:-2px 0 6px;cursor:pointer;text-decoration:underline dotted';
+        function updHistM(){
+          const h=_histCostFor(items[i].desc);
+          if(h&&!(parseFloat(items[i].estCost)>0)){
+            histM.textContent='📚 歷史實際成本 '+fmt(h.avg)+(h.unit?'/'+h.unit:'')+'（'+h.n+' 筆，點擊帶入）';
+            histM.style.display='';
+          }else histM.style.display='none';
+        }
+        histM.addEventListener('click',function(){
+          const h=_histCostFor(items[i].desc);if(!h)return;
+          items[i].estCost=String(h.avg);costInp.value=h.avg;updMgnM();updHistM();rTots();
+          toast('已帶入歷史實際成本 '+fmt(h.avg));
+        });
+        descTa.addEventListener('blur',updHistM);
+        updHistM();
+        card.appendChild(histM);
         // 逾期租金
         const otAmt=it.ot?(it.ot.match(/^[\d.]+/)||[''])[0]:'';
         const otU=it.otu||'$/M/天';
@@ -3467,6 +3485,25 @@ function rItems(){
         costInp.addEventListener('input',function(){items[i].estCost=this.value;updMgn();rTots();});
         updMgn();
         tdCost.appendChild(costInp);tdCost.appendChild(mgnSpan);
+        // 歷史單價庫提示：有同名工項實績且尚未填成本時顯示，點擊帶入
+        const histDiv=document.createElement('div');
+        histDiv.style.cssText='font-size:9.5px;text-align:right;line-height:1.3;color:#1a3a6b;cursor:pointer;text-decoration:underline dotted';
+        function updHist(){
+          const h=_histCostFor(items[i].desc);
+          if(h&&!(parseFloat(items[i].estCost)>0)){
+            histDiv.textContent='歷史 '+fmt(h.avg)+(h.unit?'/'+h.unit:'')+'（'+h.n+'筆）';
+            histDiv.title='歷史實際成本：平均 '+fmt(h.avg)+'，區間 '+fmt(h.min)+'～'+fmt(h.max)+'，共 '+h.n+' 筆實績。點擊帶入成本單價';
+            histDiv.style.display='';
+          }else histDiv.style.display='none';
+        }
+        histDiv.addEventListener('click',function(){
+          const h=_histCostFor(items[i].desc);if(!h)return;
+          items[i].estCost=String(h.avg);costInp.value=h.avg;updMgn();updHist();rTots();
+          toast('已帶入歷史實際成本 '+fmt(h.avg));
+        });
+        descInp.addEventListener('blur',updHist);
+        updHist();
+        tdCost.appendChild(histDiv);
         const tdNote=mkTd('');
         const noteInp=mkTblInp(null,it.note,'備註','left');
         noteInp.addEventListener('input',function(){items[i].note=this.value;});
@@ -7338,7 +7375,7 @@ function _syncPayload(){
     quotes:Q, invoices:INV, upaHistory:UH, params:P,
     contracts:CONTRACTS, vendors:VENDORS, payables:PAYABLES,
     invoiceRecs:INVOICE_RECS, expenses:EXPENSES, tombs:TOMBS, activityLog:ACTIVITY_LOG.slice(0,100),
-    customers:CUSTOMERS, upaCostDB:UPA_COST_DB, pagePerms:pagePerms
+    customers:CUSTOMERS, upaCostDB:UPA_COST_DB, pagePerms:pagePerms, costHist:COST_HIST
   }};
 }
 // Firebase 物件 key 不能含 . # $ / [ ]，上傳前編碼、下載後還原（記憶體結構不變）
@@ -7391,6 +7428,18 @@ function _applyCloud(data){
     if(data.expenses)EXPENSES=_safeMerge(EXPENSES,data.expenses,'expenses');
     if(data.activityLog)ACTIVITY_LOG=data.activityLog;
     if(data.customers)CUSTOMERS=data.customers;
+    if(data.costHist){
+      // 單價庫合併：以 qid+idx 為鍵，雲端與本機聯集（同鍵取日期新者）
+      try{
+        var _chMap={};
+        (Array.isArray(data.costHist)?data.costHist:Object.values(data.costHist||{})).concat(COST_HIST).forEach(function(r){
+          if(!r||!r.qid)return;var k2=r.qid+'#'+r.idx;
+          if(!_chMap[k2]||String(r.date||'')>=String(_chMap[k2].date||''))_chMap[k2]=r;
+        });
+        COST_HIST=Object.values(_chMap);
+        localStorage.setItem('fy_cost_hist',JSON.stringify(COST_HIST));
+      }catch(e){}
+    }
     if(data.upaCostDB){
       try{
         var deepMerge=function(target,src){
@@ -7953,6 +8002,41 @@ function addCostItem(type){
   try{persist();_immediateUpload();}catch(e){}
 }
 
+// ── 歷史單價庫：結案復盤回寫的「工項實際成本單價」，報價時自動提示 ──
+var COST_HIST=[];
+try{const _ch=localStorage.getItem('fy_cost_hist');if(_ch)COST_HIST=JSON.parse(_ch);}catch(e){}
+function saveCostHist(){try{localStorage.setItem('fy_cost_hist',JSON.stringify(COST_HIST));}catch(e){} try{_autoUpload();}catch(e){}}
+function _normName(s){return (s||'').split('\n')[0].replace(/[\s，,。.()（）\-–—/／]/g,'').toLowerCase();}
+// 回寫：把此案各工項的實際成本單價存入單價庫（同案同工項覆蓋更新）
+function writeCostHist(qid){
+  const q=Q.find(x=>x.id===(qid||eid));if(!q)return 0;
+  const att=_costByItem(q);let n=0;
+  (q.items||[]).forEach(function(it,i){
+    if(it.sec)return;
+    const qty=parseFloat(it.qty)||0;const act=att.map[i]||0;
+    if(qty<=0||act<=0)return;
+    const rec={qid:q.id,idx:i,key:_normName(it.desc),
+      name:(it.desc||'').split('\n')[0].slice(0,40),unit:it.unit||'',
+      date:localToday(),qname:(q.name||'').slice(0,30),qty:qty,
+      priceUnit:parseFloat(it.price)||0,actUnit:Math.round(act/qty*100)/100};
+    if(!rec.key)return;
+    COST_HIST=COST_HIST.filter(r=>!(r.qid===rec.qid&&r.idx===rec.idx));
+    COST_HIST.push(rec);n++;
+  });
+  if(n)saveCostHist();
+  return n;
+}
+// 查詢：依工項名稱找歷史實際成本（正規化後精準或包含比對）
+function _histCostFor(name){
+  const k=_normName(name);if(!k||k.length<2)return null;
+  const recs=COST_HIST.filter(r=>r.key===k||(k.length>=4&&(r.key.includes(k)||k.includes(r.key))));
+  if(!recs.length)return null;
+  const avg=Math.round(recs.reduce((a,r)=>a+r.actUnit,0)/recs.length);
+  return {avg:avg,n:recs.length,unit:recs[0].unit,
+    min:Math.round(Math.min.apply(null,recs.map(r=>r.actUnit))),
+    max:Math.round(Math.max.apply(null,recs.map(r=>r.actUnit)))};
+}
+
 // ── 成本科目分類（跨案分析用）──
 var COST_CATS=['外包工程','人工','材料','機具租金','運輸','油料耗材','管理雜費','其他'];
 function _costDefaultCat(type){return({own:'材料',sub:'外包工程',labor:'人工',extra:'管理雜費'})[type]||'其他';}
@@ -8030,7 +8114,11 @@ function buildCostAnalysisHtml(q){
     +'<td></td>'
     +'<td style="padding:6px 8px;text-align:right;color:'+(totMgnR<0?'var(--red)':totMgnR<15?'#e65100':'var(--g3)')+'">'+fmt(Math.round(totMgn))+'（'+totMgnR+'%）</td>'
     +'</tr></tfoot></table></div>'
-    +'<div style="font-size:10.5px;color:var(--b3);margin-top:6px">執行率＝實際成本÷預估成本（>100% 紅字＝超支）；實際毛利＝報價複價−實際成本。未歸戶成本已計入合計毛利。</div>';
+    +'<div style="font-size:10.5px;color:var(--b3);margin-top:6px">執行率＝實際成本÷預估成本（>100% 紅字＝超支）；實際毛利＝報價複價−實際成本。未歸戶成本已計入合計毛利。</div>'
+    +'<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+    +'<button type="button" onclick="var n=writeCostHist();toast(n?(\'📥 已回寫 \'+n+\' 筆工項實績到歷史單價庫，下次報價自動提示\'):\'尚無可回寫的工項實績（需有實際成本且已歸戶）\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:var(--r8);padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📥 回寫單價庫（結案復盤）</button>'
+    +'<span style="font-size:10.5px;color:var(--b3)">單價庫目前累積 '+COST_HIST.length+' 筆工項實績；專案「標記結案」時也會自動回寫</span>'
+    +'</div>';
 }
 
 function delCostItem(cid){
@@ -10552,10 +10640,11 @@ function projDelConfirmFile(qid,idx){
 function toggleProjClosed(qid,close){
   const q=Q.find(x=>x.id===qid);if(!q)return;
   if(close){
-    showConfirm('標記結案','結案後此專案預設從各清單隱藏（可透過「顯示已結案」切換查看），資料完整保留。確定結案？',()=>{
+    showConfirm('標記結案','結案後此專案預設從各清單隱藏（可透過「顯示已結案」切換查看），資料完整保留。結案時會自動把各工項的實際成本單價回寫到歷史單價庫，供之後報價參考。確定結案？',()=>{
       q.closed=true;q.closedAt=Date.now();persist();
       try{logActivity('專案','結案：'+(q.name||''));}catch(e){}
-      renderProjects();toast('已結案：'+(q.name||''));
+      let _n=0;try{_n=writeCostHist(q.id);}catch(e){}
+      renderProjects();toast('已結案：'+(q.name||'')+(_n?('　📥 回寫 '+_n+' 筆工項實績到單價庫'):''));
     },false);
   }else{
     q.closed=false;delete q.closedAt;persist();
