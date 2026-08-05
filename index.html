@@ -559,24 +559,25 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 
 <div class="shell">
 <nav class="sidebar">
-  <div class="ssec">主要功能</div>
   <button type="button" class="snav active" id="sn-dash" onclick="go('dash')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg></span>總覽</button>
-  <button type="button" class="snav" id="sn-projects" onclick="go('projects')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>專案總覽</button>
+  <div class="ssec">📋 接案流</div>
   <button type="button" class="snav" id="sn-editor" onclick="newQ()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span>新增報價</button>
   <button type="button" class="snav" id="sn-quotes" onclick="go('quotes')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span>報價管理 <span class="cnt" id="qbadge">0</span></button>
   <button type="button" class="snav" id="sn-contracts" onclick="go('contracts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>合約管理<span class="cnt" id="contractbadge" style="display:none">0</span></button>
+  <button type="button" class="snav" id="sn-projects" onclick="go('projects')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>專案總覽</button>
+  <div class="ssec" style="margin-top:5px">💰 收付流</div>
   <button type="button" class="snav" id="sn-invoice" onclick="go('invoice')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>應收管理 <span class="cnt" id="invbadge" style="display:none">0</span></button>
   <button type="button" class="snav" id="sn-payables" onclick="goPayables()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg></span>應付管理</button>
+  <button type="button" class="snav" id="sn-finance" onclick="go('finance')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>財務管理</button>
+  <div class="ssec" style="margin-top:5px">⛏ 成本流</div>
+  <button type="button" class="snav" id="sn-quickcost" onclick="go('quickcost');setTimeout(rQuickCost,60)"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg></span>快速支出・日報</button>
+  <button type="button" class="snav" id="sn-profit" onclick="go('profit')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>利潤分析</button>
+  <div class="ssec" style="margin-top:5px">🛠 資料與工具</div>
   <button type="button" class="snav" id="sn-contacts" onclick="go('contacts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>客戶管理</button>
-  <button type="button" class="snav" id="sn-quickcost" onclick="go('quickcost');setTimeout(rQuickCost,60)"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg></span>快速支出</button>
-  <div class="ssec" style="margin-top:5px">財務分析</div>
   <button type="button" class="snav" onclick="smartIntake()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
-      <button type="button" class="snav" id="sn-finance" onclick="go('finance')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>財務管理</button>
-    <button type="button" class="snav" id="sn-reports" onclick="go('reports')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span>報表中心</button>
-  <div class="ssec" style="margin-top:5px">工具</div>
   <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
-  <div class="ssec" style="margin-top:5px">系統</div>
-
+  <button type="button" class="snav" id="sn-reports" onclick="go('reports')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span>報表中心</button>
+  <div class="ssec" style="margin-top:5px">⚙ 系統</div>
   <button type="button" class="snav" id="sn-permissions" onclick="go('permissions')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span>權限管理</button>
   <button type="button" class="snav" id="sn-params" onclick="go('params')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg></span>參數設定</button>
 </nav>
@@ -1099,6 +1100,29 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px"><div style="flex:1;height:1px;background:var(--b1)"></div><span style="font-size:11px;color:var(--b3)">有發票／收據？</span><div style="flex:1;height:1px;background:var(--b1)"></div></div>
         <button type="button" class="btn" onclick="smartIntake()" style="width:100%;justify-content:center;padding:12px;font-size:14px;font-weight:700;border-color:var(--gm);color:var(--g3)"><svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg> 拍照智慧收件（AI 自動判讀）</button>
         <div style="font-size:10.5px;color:var(--b3);margin-top:6px">拍發票或收據，AI 自動判讀類型與金額，連動寫入施工成本、應付帳款與帳務進項。</div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="ch green"><div class="cht">📋 工作日報</div></div>
+      <div class="cb">
+        <div class="f" style="margin-bottom:10px">
+          <label>工程專案 *</label>
+          <select id="dr-proj" style="width:100%;font-size:14px;padding:9px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit"></select>
+        </div>
+        <div class="fg fg2" style="margin-bottom:10px">
+          <div class="f"><label>日期</label><input id="dr-date" type="date" style="font-size:14px;padding:8px 10px"></div>
+          <div class="f"><label>出工人數</label><input id="dr-workers" type="number" inputmode="numeric" placeholder="0" style="font-size:16px;font-weight:700;text-align:right;padding:8px 10px"></div>
+        </div>
+        <div class="f" style="margin-bottom:10px">
+          <label>今日進度／工作內容</label>
+          <textarea id="dr-progress" rows="3" placeholder="例：H型鋼樁打設 12 支；第 2 層支撐安裝中" style="width:100%;font-size:14px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;resize:vertical"></textarea>
+        </div>
+        <div class="f" style="margin-bottom:12px">
+          <label>現場照片（最多 3 張，自動壓縮）</label>
+          <div id="dr-photos" style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0"></div>
+          <button type="button" class="btn btn-xs" onclick="drAddPhoto()" style="padding:7px 14px">📷 拍照／選圖</button>
+        </div>
+        <button type="button" class="btn btn-g" onclick="submitDailyReport()" style="width:100%;justify-content:center;padding:13px;font-size:15px;font-weight:900">✓ 送出日報</button>
       </div>
     </div>
     <div class="card" style="margin-top:12px">
@@ -2389,6 +2413,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <button type="button" onclick="toggleMobMore();smartIntake()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
       <button type="button" onclick="go('finance');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span><span>財務</span></button>
     <button type="button" onclick="go('reports');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span><span>報表</span></button>
+    <button type="button" onclick="go('profit');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span><span>利潤</span></button>
       </div>
       <div style="font-size:11px;font-weight:700;color:var(--b3);margin:14px 0 10px;letter-spacing:.06em;display:flex;align-items:center;gap:6px;cursor:pointer" onclick="var g=document.getElementById('mm-sysgrp');var on=g.style.display==='none';g.style.display=on?'grid':'none';this.querySelector('span').textContent=on?'▾':'▸'">⚙ 系統管理 <span>▸</span></div>
       <div id="mm-sysgrp" style="display:none;grid-template-columns:repeat(4,1fr);gap:10px">
@@ -2401,7 +2426,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.281';
+var APP_VERSION='v5.282';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -8217,6 +8242,14 @@ function rQuickCost(){
   sel.innerHTML='<option value="">── 選擇專案 ──</option>'+mains.map(q=>'<option value="'+q.id+'"'+(q.id===cur?' selected':'')+'>'+esc(q.name||'未命名')+'</option>').join('');
   const ch=document.getElementById('qc-chips');
   if(ch)ch.innerHTML=QC_TYPES.map((t,i)=>'<button type="button" onclick="qcPick('+i+')" style="padding:8px 16px;border-radius:99px;border:1.5px solid '+(i===_qcSel?'var(--g3)':'var(--b2)')+';background:'+(i===_qcSel?'var(--gl)':'var(--w)')+';color:'+(i===_qcSel?'var(--g3)':'var(--b4)')+';font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">'+t[0]+'</button>').join('');
+  // 工作日報：專案下拉與日期預設
+  const dsel=document.getElementById('dr-proj');
+  if(dsel){
+    const dcur=dsel.value;
+    dsel.innerHTML='<option value="">── 選擇專案 ──</option>'+mains.map(q=>'<option value="'+q.id+'"'+(q.id===dcur?' selected':'')+'>'+esc(q.name||'未命名')+'</option>').join('');
+  }
+  const dd=document.getElementById('dr-date');if(dd&&!dd.value)dd.value=localToday();
+  drRenderPhotos();
   rQuickCostItems();rQcLog();
 }
 function qcPick(i){_qcSel=i;rQuickCost();}
@@ -8254,7 +8287,70 @@ function submitQuickCost(){
 function rQcLog(){
   const el=document.getElementById('qc-log');if(!el)return;
   if(!_qcLog.length){el.innerHTML='尚未登錄任何支出';return;}
-  el.innerHTML=_qcLog.map(r=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--b1)"><span>'+r.t+'　'+esc(r.proj)+'　'+esc(r.desc)+'<span style="color:var(--b3);font-size:10.5px">（'+r.cat+'）</span></span><b style="white-space:nowrap">NT$ '+fmt(r.amt)+'</b></div>').join('');
+  el.innerHTML=_qcLog.map(r=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--b1)"><span>'+r.t+'　'+esc(r.proj)+'　'+esc(r.desc)+'<span style="color:var(--b3);font-size:10.5px">（'+r.cat+'）</span></span><b style="white-space:nowrap">'+(r.amt!=null?('NT$ '+fmt(r.amt)):'')+'</b></div>').join('');
+}
+
+// ── 工作日報：工務每天記出工人數／進度／照片（存於專案 q.dailyLogs，隨 Q 雲端同步）──
+var _drPhotos=[];
+function drAddPhoto(){
+  if(_drPhotos.length>=3){toast('最多 3 張照片');return;}
+  var inp=document.getElementById('dr-photo-input');
+  if(!inp){
+    inp=document.createElement('input');
+    inp.type='file';inp.id='dr-photo-input';inp.accept='image/*';inp.style.display='none';
+    inp.onchange=function(){
+      var f=this.files&&this.files[0];this.value='';if(!f)return;
+      _fileToDataUrl(f,900).then(function(du){
+        if(_drPhotos.length>=3)return;
+        _drPhotos.push(du);drRenderPhotos();
+      });
+    };
+    document.body.appendChild(inp);
+  }
+  inp.click();
+}
+function drRenderPhotos(){
+  var box=document.getElementById('dr-photos');if(!box)return;
+  box.innerHTML=_drPhotos.map(function(du,i){
+    return '<div style="position:relative"><img src="'+du+'" style="width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--b2)">'
+      +'<button type="button" onclick="_drPhotos.splice('+i+',1);drRenderPhotos()" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:var(--red);color:#fff;font-size:11px;cursor:pointer;line-height:1">✕</button></div>';
+  }).join('');
+}
+function submitDailyReport(){
+  const qid=document.getElementById('dr-proj')?.value;
+  const q=Q.find(x=>x.id===qid);
+  if(!q){toast('請先選擇工程專案');return;}
+  const workers=parseInt(document.getElementById('dr-workers')?.value)||0;
+  const progress=(document.getElementById('dr-progress')?.value||'').trim();
+  if(!workers&&!progress&&!_drPhotos.length){toast('請至少填寫人數、進度或照片');return;}
+  if(!q.dailyLogs)q.dailyLogs=[];
+  q.dailyLogs.unshift({id:'d'+Date.now(),date:document.getElementById('dr-date')?.value||localToday(),
+    workers:workers,progress:progress,photos:_drPhotos.slice(0,3),
+    by:((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||''),ts:Date.now()});
+  if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120); // 保留近 120 篇防爆量
+  q._mt=Date.now();
+  try{persist();}catch(e){}
+  try{_immediateUpload();}catch(e){try{_onSave();}catch(e2){}}
+  _qcLog.unshift({t:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),proj:(q.name||'').slice(0,14),desc:'📋 日報'+(workers?('｜出工 '+workers+' 人'):'')+(_drPhotos.length?('｜照片 '+_drPhotos.length+' 張'):''),amt:null,cat:'日報'});
+  _drPhotos=[];drRenderPhotos();
+  const w=document.getElementById('dr-workers');if(w)w.value='';
+  const pg=document.getElementById('dr-progress');if(pg)pg.value='';
+  rQcLog();
+  toast('📋 日報已送出：'+(q.name||''));
+}
+// 主管檢視：專案頁「檢視日報」
+function viewDailyReports(qid){
+  const q=Q.find(x=>x.id===qid);if(!q)return;
+  const logs=q.dailyLogs||[];
+  const html=logs.length?logs.map(function(L){
+    return '<div style="border-bottom:1px solid var(--b1);padding:9px 0">'
+      +'<div style="display:flex;justify-content:space-between;font-size:12.5px"><b>'+esc(L.date||'')+'</b><span style="color:var(--b4)">'+(L.workers?('出工 '+L.workers+' 人'):'')+'</span></div>'
+      +(L.progress?'<div style="font-size:12.5px;color:var(--b5);margin-top:3px;white-space:pre-line">'+esc(L.progress)+'</div>':'')
+      +((L.photos&&L.photos.length)?('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+L.photos.map(function(p){return '<img src="'+p+'" style="width:86px;height:86px;object-fit:cover;border-radius:8px;border:1px solid var(--b2);cursor:zoom-in" onclick="var w=window.open(\'\');w.document.write(\'<img src=&quot;\'+this.src+\'&quot; style=&quot;max-width:100%&quot;>\')">';}).join('')+'</div>'):'')
+      +(L.by?'<div style="font-size:10px;color:var(--b3);margin-top:4px">'+esc(L.by)+'</div>':'')
+      +'</div>';
+  }).join(''):'<div style="color:var(--b3);font-size:12px;padding:10px 0">尚無日報——工務可從「快速支出」頁的工作日報送出</div>';
+  showConfirm('📋 工作日報：'+esc(q.name||''),'<div style="max-height:60vh;overflow-y:auto">'+html+'</div>',function(){},false,null,true);
 }
 
 // ── 成本勾稽：施工成本 vs 應付帳款一致性檢查（防漏記／殘留）──
@@ -10888,9 +10984,11 @@ function renderProjects(){
     const cfChips=(q.confirmFiles||[]).map((f,fi)=>'<span style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--b2);background:var(--w);border-radius:99px;padding:2px 8px;font-size:11px">'
       +'<button type="button" onclick="event.stopPropagation();projDownload(\''+q.id+'\',\'confirm\','+fi+')" style="border:none;background:none;color:var(--g3);cursor:pointer;font-size:11px;padding:0;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> '+esc((f.name||'確認單').slice(0,16))+'</button>'
       +'<button type="button" onclick="event.stopPropagation();projDelConfirmFile(\''+q.id+'\','+fi+')" style="border:none;background:none;color:var(--b3);cursor:pointer;padding:0;font-size:11px">✕</button></span>').join(' ');
+    const drN=(q.dailyLogs||[]).length;
     steps.push({label:'施工進度',done:cost>0||cfN>0,
-      info:'施工成本 '+((q.costs||[]).length+adds.reduce((a,x)=>a+((x.costs||[]).length),0))+' 筆・NT$ '+fmt(cost)+'　/　工作確認單 '+cfN+' 份',
-      extra:'<button type="button" onclick="event.stopPropagation();openProjectCosts(\''+q.id+'\')" style="border:1px solid #ffcc80;background:#fff8ec;color:#e65100;border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本</button> '
+      info:'施工成本 '+((q.costs||[]).length+adds.reduce((a,x)=>a+((x.costs||[]).length),0))+' 筆・NT$ '+fmt(cost)+'　/　工作確認單 '+cfN+' 份'+(drN?('　/　日報 '+drN+' 篇'):''),
+      extra:'<button type="button" onclick="event.stopPropagation();viewDailyReports(\''+q.id+'\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit">📋 日報'+(drN?('（'+drN+'）'):'')+'</button> '
+        +'<button type="button" onclick="event.stopPropagation();openProjectCosts(\''+q.id+'\')" style="border:1px solid #ffcc80;background:#fff8ec;color:#e65100;border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本</button> '
         +'<button type="button" onclick="event.stopPropagation();projUpload(\'confirm\',\''+q.id+'\')" style="border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 上傳確認單</button>'
         +(cfChips?' '+cfChips:''),
       jump:"openProjectCosts('"+q.id+"')"});
