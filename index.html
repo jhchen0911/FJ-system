@@ -2355,7 +2355,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.266';
+var APP_VERSION='v5.267';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -3045,10 +3045,13 @@ function rTots(){
 
 // ── 議價：輸入議價後含稅總價，各工項單價等比例調整，尾差以「議價調整」項補足 ──
 var NGT_ADJ_DESC='議價調整（尾差）';
+function _ngtMode(){var e=document.querySelector('input[name="ngt-mode"]:checked');return e?e.value:'incl';}
 function openNegotiateModal(){
   const t=calcT();
   if(t.sub<=0){toast('請先填寫工項單價與數量，再進行議價');return;}
   const cur=document.getElementById('ngt-current');if(cur)cur.textContent='NT$ '+fmt(t.total);
+  const curSub=document.getElementById('ngt-current-sub');if(curSub)curSub.textContent='NT$ '+fmt(t.sub);
+  const mi=document.querySelector('input[name="ngt-mode"][value="incl"]');if(mi)mi.checked=true;
   const inp=document.getElementById('ngt-target');if(inp)inp.value='';
   const pv=document.getElementById('ngt-preview');if(pv)pv.textContent='';
   document.getElementById('negotiate-modal').style.display='flex';
@@ -3058,20 +3061,24 @@ function updNegotiatePreview(){
   const t=calcT();
   const target=parseFloat(document.getElementById('ngt-target')?.value)||0;
   const pv=document.getElementById('ngt-preview');if(!pv)return;
-  if(target<=0||t.total<=0){pv.textContent='';return;}
-  const pct=Math.round(target/t.total*1000)/10;
-  const diff=target-t.total;
-  pv.innerHTML='折合原價 <strong>'+pct+'%</strong>（'+(diff<0?'減價':'加價')+' NT$ '+fmt(Math.abs(diff))+'）';
+  const base=_ngtMode()==='excl'?t.sub:t.total;   // 未稅比未稅、含稅比含稅
+  if(target<=0||base<=0){pv.textContent='';return;}
+  const pct=Math.round(target/base*1000)/10;
+  const diff=target-base;
+  const r=(P.tax||5)/100;
+  const other=_ngtMode()==='excl'?('含稅約 NT$ '+fmt(Math.round(target*(1+r)))):('未稅約 NT$ '+fmt(Math.round(target/(1+r))));
+  pv.innerHTML='折合原價 <strong>'+pct+'%</strong>（'+(diff<0?'減價':'加價')+' NT$ '+fmt(Math.abs(diff))+'）｜'+other;
 }
 function applyNegotiate(){
   const target=parseFloat(document.getElementById('ngt-target')?.value)||0;
-  if(target<=0){toast('請輸入議價後總價');return;}
+  if(target<=0){toast('請輸入議價後金額');return;}
+  const mode=_ngtMode();
   // 先移除舊的議價調整行（重複議價時以現行單價為基準重算）
   items=items.filter(it=>it.desc!==NGT_ADJ_DESC);
   const t=calcT();
   if(t.sub<=0){toast('工項小計為 0，無法議價');return;}
   const r=(P.tax||5)/100;
-  const subTarget=target/(1+r);           // 目標未稅小計
+  const subTarget=mode==='excl'?target:target/(1+r);   // 未稅：直接就是目標小計；含稅：換算回未稅
   const factor=subTarget/t.sub;
   items.forEach(it=>{
     if(it.sec)return;
@@ -3083,11 +3090,15 @@ function applyNegotiate(){
   const sub2=items.reduce((a,it)=>it.sec?a:a+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0),0);
   const adj=Math.round((subTarget-sub2)*100)/100;
   if(Math.abs(adj)>=1){
-    items.push({desc:NGT_ADJ_DESC,unit:'式',qty:1,price:adj,note:'議價後總價 NT$'+fmt(target)+'（原 NT$'+fmt(t.total)+'）',ot:'',otu:'$/M/天',sec:false});
+    const lbl=mode==='excl'?'未稅':'含稅';
+    const origBase=mode==='excl'?t.sub:t.total;
+    items.push({desc:NGT_ADJ_DESC,unit:'式',qty:1,price:adj,note:'議價後'+lbl+' NT$'+fmt(target)+'（原'+lbl+' NT$'+fmt(origBase)+'）',ot:'',otu:'$/M/天',sec:false});
   }
   rItems();rTots();
   document.getElementById('negotiate-modal').style.display='none';
-  toast('💰 已議價：NT$ '+fmt(t.total)+' → NT$ '+fmt(target)+'，記得儲存');
+  const lbl2=mode==='excl'?'未稅':'含稅';
+  const base2=mode==='excl'?t.sub:t.total;
+  toast('💰 已議價（'+lbl2+'）：NT$ '+fmt(base2)+' → NT$ '+fmt(target)+'，記得儲存');
 }
 // 手機端工項排序：上/下移一格（觸控裝置不支援 HTML5 拖曳）
 function moveQItem(i,dir){
@@ -14039,14 +14050,23 @@ function exportCurrentReportExcel(){
     </div>
     <div style="padding:14px 16px">
       <div style="font-size:11.5px;color:var(--b4);margin-bottom:10px;background:var(--yl);padding:7px 10px;border-radius:var(--r6);border:1px solid var(--ym)">
-        輸入議價後的<strong>含稅總價</strong>，各工項單價會依比例自動調整（原單價保留在資料中），尾差自動以「議價調整」項補足，總價精準等於議價金額。
+        選擇議價口徑（含稅或未稅）並輸入議價後金額，各工項單價會依比例自動調整（原單價保留在資料中），尾差自動以「議價調整」項補足，金額精準等於議價數字。
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:13px">
+        <span style="color:var(--b4)">目前未稅小計</span>
+        <strong id="ngt-current-sub" style="font-size:13px;color:var(--b5)">NT$ 0</strong>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:13px">
-        <span style="color:var(--b4)">目前報價總計（含稅）</span>
+        <span style="color:var(--b4)">目前含稅總計</span>
         <strong id="ngt-current" style="font-size:15px;color:var(--g3)">NT$ 0</strong>
       </div>
+      <div style="display:flex;gap:14px;margin-bottom:8px;font-size:13px;align-items:center">
+        <span style="color:var(--b4);font-weight:700">議價口徑：</span>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="ngt-mode" value="incl" checked onchange="updNegotiatePreview()"> 含稅</label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="ngt-mode" value="excl" onchange="updNegotiatePreview()"> 未稅</label>
+      </div>
       <div class="f" style="margin-bottom:6px">
-        <label>議價後總價（含稅）</label>
+        <label>議價後金額</label>
         <input type="number" id="ngt-target" placeholder="例：7000000" oninput="updNegotiatePreview()" style="font-size:16px;font-weight:700;text-align:right">
       </div>
       <div id="ngt-preview" style="font-size:12px;color:var(--b4);min-height:18px;margin-bottom:12px;text-align:right"></div>
