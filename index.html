@@ -2359,7 +2359,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.273';
+var APP_VERSION='v5.274';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2975,7 +2975,10 @@ function applyUPA(){
   const otUnit=document.getElementById('upa-ot-unit')?.value||'$/支/天';
   const ot=otAmt?otAmt+otUnit:'';
   const price=document.getElementById('upa-price-custom')?.value||'';
-  items.push({desc,unit,qty:String(qty),price:String(price),note,ot,otu:otUnit,sec:false});
+  // 成本連動：單價分析算出的成本單價(costUnit)自動帶入工項「成本單價🔒」，報價當下即見毛利
+  let _estCost='';
+  try{const _r=upaCalc();if(_r&&_r.costUnit>0)_estCost=String(Math.round(_r.costUnit));}catch(e){}
+  items.push({desc,unit,qty:String(qty),price:String(price),estCost:_estCost,note,ot,otu:otUnit,sec:false});
   rItems();rTots();
   // 水平支撐：自動累加層數
   if(cfg?.autoLayer){
@@ -3027,7 +3030,7 @@ function rUPAHist(){
 function applyUPAHist(id){
   const h=UH.find(x=>x.id===id);if(!h)return;
   items.push({desc:h.desc||`${h.type} ${h.spec} L=${h.len}M`,unit:'支',
-    qty:'',price:String(h.final),note:`含${h.period}天租期`,ot:'',otu:'$/M/天',sec:false});
+    qty:'',price:String(h.final),estCost:(h.cost>0?String(h.cost):''),note:`含${h.period}天租期`,ot:'',otu:'$/M/天',sec:false});
   toast('已套用！');go('editor');
 }
 function delUPAHist(id){UH=UH.filter(x=>x.id!==id);saveUH();rUPAHist();}
