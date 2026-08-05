@@ -1043,7 +1043,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <div class="ch green">
         <div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本記錄</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <select id="cost-group-mode" onchange="rCostItems()" style="font-size:11px;padding:4px 7px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);font-family:inherit"><option value="none">依建立順序</option><option value="vendor">依廠商分組</option><option value="analysis">📊 工項成本分析</option></select>
+          <select id="cost-group-mode" onchange="rCostItems()" style="font-size:11px;padding:4px 7px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);font-family:inherit"><option value="none">依建立順序</option><option value="vendor">依廠商分組</option><option value="analysis">📊 工項成本分析</option><option value="audit">⚖ 成本勾稽（對應付）</option></select>
           <button type="button" class="btn btn-xs" onclick="addCostItem('own')" style="background:#FFFDE7;color:#8a6d00;border-color:#f0da7a">+ 自有成本</button>
             <button type="button" class="btn btn-xs" onclick="addCostItem('sub')" style="background:#E3F2FD;color:#1565C0;border-color:#90CAF9">+ 承包</button>
           <button type="button" class="btn btn-xs" onclick="addCostItem('labor')" style="background:#FFF3E0;color:#E65100;border-color:#FFCC80">+ 點工</button>
@@ -1907,6 +1907,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <div class="cb">
         <div class="fg fg2">
           <div class="f"><label>營業稅率 (%)</label><input id="ptax" type="number" value="5"><div class="hint">通常為 5%，影響報價單稅額計算</div></div>
+          <div class="f"><label>管理費率 (%)</label><input id="pohd" type="number" value="0" min="0" max="50"><div class="hint">公司間接成本攤提（辦公室、行政、車輛…）。利潤中心的「實際淨利」會多扣 稅前收入×此%，避免毛利高估。0＝不攤提</div></div>
         </div>
       </div>
     </div>
@@ -2358,7 +2359,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.272';
+var APP_VERSION='v5.273';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2632,6 +2633,7 @@ function doSaveP(){
   delete P.aiKey; // Key 僅存本機，絕不上雲
   P.tel=gv('ptel');P.email=gv('pem');P.addr=gv('pad');
   P.tax=parseFloat(gv('ptax'))||5;
+  P.overheadPct=parseFloat(gv('pohd'))||0;
   P.mult=parseFloat(gv('pmul'))||1.4;
   P.profit=parseFloat(gv('ppro'))||18;
   P.s1=parseFloat(gv('ps1'))||1.12;P.s2=parseFloat(gv('ps2'))||1.0;P.s3=parseFloat(gv('ps3'))||0.9;
@@ -2720,7 +2722,7 @@ function _aiKey(){
 function syncParamsUI(){
   try{var _pk=document.getElementById('paikey');if(_pk)_pk.value=_aiKey();}catch(e){}
   const m={pc:'company',pt:'taxid',pb:'boss',pco:'contact',ptel:'tel',pem:'email',pad:'addr',
-    ptax:'tax',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
+    ptax:'tax',pohd:'overheadPct',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
     'dp-rent':'dpRent','dp-loss':'dpLoss','dp-process':'dpProcess','dp-period':'dpPeriod',
     'dp-i-h300':'dpIH300','dp-r-h300':'dpRH300','dp-i-h350':'dpIH350','dp-r-h350':'dpRH350',
     'dp-i-h400':'dpIH400','dp-r-h400':'dpRH400','dp-i-s':'dpIS','dp-r-s':'dpRS',
@@ -8121,6 +8123,64 @@ function buildCostAnalysisHtml(q){
     +'</div>';
 }
 
+// ── 成本勾稽：施工成本 vs 應付帳款一致性檢查（防漏記／殘留）──
+function buildCostAuditHtml(q){
+  if(!q)return '<div style="padding:20px;text-align:center;color:var(--b3);font-size:12px">請先開啟專案</div>';
+  var rows='',issues=0,checked=0;
+  var tLabel={sub:'承包',labor:'點工',extra:'額外支出'};
+  (q.costs||[]).forEach(function(c){
+    if(c.type==='own')return; // 自有成本不入應付
+    checked++;
+    var amt=parseFloat(c.amt)||0;
+    var selfPay=c.vendor==='公司支出（自付）';
+    var p=PAYABLES.find(function(x){return x.costId===c.id;});
+    var st,clr,fixBtn='';
+    if(selfPay){st='自付，不入應付';clr='var(--b3)';}
+    else if(amt<=0){st='金額 0，免建應付';clr='var(--b3)';}
+    else if(!p){st='❌ 缺應付帳款（可能漏記）';clr='var(--red)';issues++;
+      fixBtn='<button type="button" onclick="fixCostPayable(\''+c.id+'\')" style="font-size:11px;padding:2px 10px;border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;cursor:pointer;font-family:inherit">🔧 補建應付</button>';}
+    else if(Math.abs((p.amount||0)-amt)>1){st='⚠ 金額不符（應付記 '+fmt(p.amount||0)+'）';clr='#e65100';issues++;
+      fixBtn='<button type="button" onclick="fixCostPayable(\''+c.id+'\')" style="font-size:11px;padding:2px 10px;border:1px solid #ffcc80;background:#fff8ec;color:#b26a00;border-radius:99px;cursor:pointer;font-family:inherit">🔧 同步金額</button>';}
+    else{st=p.status==='paid'?'✓ 一致（已付款）':'✓ 一致（未付款）';clr='var(--g3)';}
+    rows+='<tr style="border-bottom:1px solid var(--b1)">'
+      +'<td style="padding:5px 8px;font-size:12px">'+esc(c.vendor||'（未填廠商）')+'</td>'
+      +'<td style="padding:5px 8px;font-size:11px;color:var(--b4)">'+(tLabel[c.type]||c.type)+(c.cat?'／'+esc(c.cat):'')+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(amt)+'</td>'
+      +'<td style="padding:5px 8px;font-size:11.5px;font-weight:700;color:'+clr+'">'+st+'</td>'
+      +'<td style="padding:5px 8px;text-align:right">'+fixBtn+'</td>'
+      +'</tr>';
+  });
+  // 孤兒應付：應付掛在此案但成本記錄已刪
+  PAYABLES.filter(function(p){return p.quoteId===q.id&&p.costId&&!(q.costs||[]).some(function(c){return c.id===p.costId;});})
+    .forEach(function(p){
+      issues++;
+      rows+='<tr style="border-bottom:1px solid var(--b1);background:#fdecea">'
+        +'<td style="padding:5px 8px;font-size:12px">'+esc(p.to||'')+'</td>'
+        +'<td style="padding:5px 8px;font-size:11px;color:var(--b4)">應付殘留</td>'
+        +'<td style="padding:5px 8px;text-align:right">'+fmt(p.amount||0)+'</td>'
+        +'<td style="padding:5px 8px;font-size:11.5px;font-weight:700;color:var(--red)">❌ 成本記錄已刪，應付殘留</td>'
+        +'<td style="padding:5px 8px;text-align:right"><button type="button" onclick="removePayableByCostId(\''+p.costId+'\');rCostItems();toast(\'已刪除殘留應付\')" style="font-size:11px;padding:2px 10px;border:1px solid var(--red);background:#fff;color:var(--red);border-radius:99px;cursor:pointer;font-family:inherit">🗑 刪除殘留</button></td>'
+        +'</tr>';
+    });
+  if(!checked&&!rows)return '<div style="padding:20px;text-align:center;color:var(--b3);font-size:12px">此案尚無需勾稽的成本（自有成本不入應付）</div>';
+  var head=issues
+    ?'<div style="background:#fdecea;border:1px solid #f5b5ae;border-radius:var(--r8);padding:8px 12px;margin-bottom:10px;font-size:12.5px;font-weight:700;color:var(--red)">⚠ 發現 '+issues+' 筆成本／應付不一致，請逐筆處理</div>'
+    :'<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:var(--r8);padding:8px 12px;margin-bottom:10px;font-size:12.5px;font-weight:700;color:#1B5E20">✓ 施工成本與應付帳款全部一致</div>';
+  return head
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px">'
+    +'<thead><tr style="background:var(--gl);color:var(--b5);font-size:11px">'
+    +'<th style="padding:6px 8px;text-align:left">廠商</th><th style="padding:6px 8px;text-align:left">類型／科目</th>'
+    +'<th style="padding:6px 8px;text-align:right">成本金額</th><th style="padding:6px 8px;text-align:left">勾稽狀態</th><th style="padding:6px 8px"></th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function fixCostPayable(cid){
+  var q=Q.find(function(x){return x.id===eid;});if(!q)return;
+  var c=(q.costs||[]).find(function(x){return x.id===cid;});if(!c)return;
+  try{recalcCostAmt(c);}catch(e){}
+  try{syncCostToPayable(q,c);}catch(e){}
+  rCostItems();toast('🔧 已重新同步應付帳款');
+}
+
 function delCostItem(cid){
   var q=Q.find(function(x){return x.id===eid;});
   if(!q||!q.costs)return;
@@ -8862,6 +8922,12 @@ function rCostItems(){
   if(_costGroupMode==='analysis'){
     el.innerHTML=buildCostAnalysisHtml(q);
     var _tw2=document.getElementById('cost-total-wrap');if(_tw2)_tw2.style.display='none';
+    return;
+  }
+  // ⚖ 成本勾稽視圖：施工成本 vs 應付帳款一致性
+  if(_costGroupMode==='audit'){
+    el.innerHTML=buildCostAuditHtml(q);
+    var _tw3=document.getElementById('cost-total-wrap');if(_tw3)_tw3.style.display='none';
     return;
   }
   if(_costGroupMode==='vendor'){
@@ -13765,7 +13831,9 @@ function rProfit(){
     // 避免 received=0 造成 actualNet = -actualCost 的誤導
     const hasReceipt=totalReceived>0;
     const hasCost=actualCost>0;
-    const actualNet=(hasCost&&hasReceipt)?(actualRevenuePre-actualCost):null;
+    // 管理費攤提：稅前收入 × 管理費率（params 設定，0=不攤提）
+    const overhead=actualRevenuePre*((P.overheadPct||0)/100);
+    const actualNet=(hasCost&&hasReceipt)?(actualRevenuePre-actualCost-overhead):null;
     const actualNetR=actualNet!=null&&actualRevenuePre>0?(actualNet/actualRevenuePre*100):null;
 
     // 差異
@@ -13774,7 +13842,7 @@ function rProfit(){
 
     return{q,estRevenue,estCostQ,estNet,estNetR,
       actualCost,totalInvoiced,totalReceived,actualCash,
-      actualRevenuePre,actualNet,actualNetR,netDiff,costDiff};
+      actualRevenuePre,actualNet,actualNetR,netDiff,costDiff,overhead};
   }
 
   const cases=awarded.map(calcCase);
@@ -13818,7 +13886,7 @@ function rProfit(){
           <div>
             <div class="kl">✅ 實際淨利（已收款案件）</div>
             <div class="kv" style="font-size:20px;color:${totActualNet>=0?'var(--g3)':'var(--red)'}">NT$ ${fmt(totActualNet)}</div>
-            <div class="ks">淨利率 ${totActualNetR.toFixed(1)}%　${casesWithData} 件有成本資料</div>
+            <div class="ks">淨利率 ${totActualNetR.toFixed(1)}%　${casesWithData} 件有成本資料${(P.overheadPct||0)>0?'　·　已攤提管理費 '+P.overheadPct+'%':''}</div>
           </div>
           <div style="text-align:right">
             <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 預估淨利（報價毛利）</div>
