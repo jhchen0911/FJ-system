@@ -2355,7 +2355,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.267';
+var APP_VERSION='v5.268';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -4202,8 +4202,8 @@ function settleInvItem(i){
   it.contractQty=cum;
   const tag='工項結算：原'+orig+'→實'+cum;
   it.note=it.note?(it.note+'　'+tag):tag;
-  // 立即同步回 INV（確保下一期帶到結算後的合約數量）
-  if(invEid){const inv=INV.find(x=>x.id===invEid);if(inv){inv.items=JSON.parse(JSON.stringify(invItems));saveInv();}}
+  // 立即同步回 INV（確保下一期帶到結算後的合約數量；更新 _mt 讓跨裝置同步新值獲勝）
+  if(invEid){const inv=INV.find(x=>x.id===invEid);if(inv){inv.items=JSON.parse(JSON.stringify(invItems));inv._mt=Date.now();saveInv();}}
   // 連動合約金額（追加／追減），並記錄調整軌跡
   let syncTxt='';
   if(_willSync){
@@ -4211,6 +4211,7 @@ function settleInvItem(i){
     _contract.amount=Math.max(0,Math.round(oldAmt-_delta));
     const cTag='工項結算('+(it.desc||'').slice(0,10)+')：NT$'+fmt(oldAmt)+'→NT$'+fmt(_contract.amount);
     _contract.note=_contract.note?(_contract.note+'　'+cTag):cTag;
+    _contract._mt=Date.now();_contract.updatedAt=Date.now();
     try{saveContracts();}catch(e){}
     try{if(document.getElementById('page-contracts')?.classList.contains('active'))renderContracts();}catch(e){}
     syncTxt='，合約金額→NT$ '+fmt(_contract.amount);
@@ -4363,7 +4364,7 @@ function rInvItems(){
       rs.addEventListener('change',function(){
         invItems[i].payRate=parseInt(this.value);
         updateInvRowAmt(i);rInvTots();
-        try{const _inv=INV.find(x=>x.id===invEid);if(_inv&&_inv.items&&_inv.items[i])_inv.items[i].payRate=invItems[i].payRate;}catch(e){}
+        try{const _inv=INV.find(x=>x.id===invEid);if(_inv&&_inv.items&&_inv.items[i]){_inv.items[i].payRate=invItems[i].payRate;_inv._mt=Date.now();}}catch(e){}
       });
       rw.appendChild(rl);rw.appendChild(rs);grid.appendChild(rw);
       card.appendChild(grid);
@@ -4497,8 +4498,8 @@ function rInvItems(){
           const newRate=parseInt(this.value);
           invItems[i].payRate=newRate;
           updateInvRowAmt(i,tr);rInvTots();
-          // 立即同步回 INV（確保 addNextPeriod 能讀到最新 payRate）
-          if(invEid){const inv=INV.find(x=>x.id===invEid);if(inv){inv.items=JSON.parse(JSON.stringify(invItems));saveInv();}}
+          // 立即同步回 INV（確保 addNextPeriod 能讀到最新 payRate；更新 _mt 讓跨裝置同步新值獲勝）
+          if(invEid){const inv=INV.find(x=>x.id===invEid);if(inv){inv.items=JSON.parse(JSON.stringify(invItems));inv._mt=Date.now();saveInv();}}
         });
         rateCell.appendChild(rateSel);
         tr.appendChild(rateCell);
@@ -4741,6 +4742,7 @@ function autoSaveInv(){
     if(invIdx>=0){
       if(notes.length)INV[invIdx].note=notes;
       if(recv!==null)INV[invIdx].received=recv;
+      INV[invIdx]._mt=Date.now(); // 更新修改時間，確保跨裝置同步時新值獲勝
       saveInv();
   window._invSnap=JSON.stringify(invItems);
     }
@@ -4872,6 +4874,7 @@ function saveCustomer(){
         relC.forEach(c=>{
           if(obj.payTermCash!=null)c.payTermCash=obj.payTermCash;
           if(obj.payTermTicket!=null)c.payTermTicket=obj.payTermTicket;
+          c._mt=Date.now();c.updatedAt=Date.now();
         });
         relI.forEach(v=>{
           if(obj.payDue!=null)v.payDue=obj.payDue;
@@ -4880,6 +4883,7 @@ function saveCustomer(){
           if(obj.payTermCash!=null)v.cashPct=obj.payTermCash;
           if(obj.payTermTicket!=null)v.ticketDays=obj.payTermTicket;
           if(obj.retentionPct!=null)v.retentionPct=obj.retentionPct;
+          v._mt=Date.now();
         });
         saveContracts();saveInv();
         try{recalcAllExpected();}catch(e){}
@@ -9841,6 +9845,7 @@ function settleContract(id){
   c.status='completed';
   const settleNote='竣工結算：原合約 NT$'+fmt(orig)+' → 結算 NT$'+fmt(billed);
   c.note=c.note?(c.note+'　'+settleNote):settleNote;
+  c._mt=Date.now();c.updatedAt=Date.now(); // 更新修改時間，確保跨裝置同步時新值獲勝
   saveContracts();renderContracts();
   toast('⚖ 已結算：合約金額調整為 NT$ '+fmt(billed)+'，狀態已完成');
 }
