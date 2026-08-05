@@ -964,6 +964,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <button type="button" class="btn btn-xs" onclick="addSec()" style="padding:8px 14px;font-size:13px">+ 分類</button>
           <button type="button" class="btn btn-xs btn-g" onclick="addIt()" style="padding:8px 14px;font-size:13px;font-weight:700">＋ 新增工項</button>
           <button type="button" class="btn btn-xs" style="border-color:var(--gm);color:var(--g)" onclick="go('upa')">🔢 單價分析</button>
+          <button type="button" class="btn btn-xs" onclick="backfillEstCosts()" title="把歷史單價庫的實績均價回填到尚未填成本的工項" style="border-color:#b39ddb;color:#4527a0;padding:8px 14px;font-size:13px">⟲ 實績回填</button>
         </div>
       </div>
       <div class="tbl-wrap" id="itbody-wrap">
@@ -2359,7 +2360,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.275';
+var APP_VERSION='v5.276';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2975,11 +2976,10 @@ function applyUPA(){
   const otUnit=document.getElementById('upa-ot-unit')?.value||'$/支/天';
   const ot=otAmt?otAmt+otUnit:'';
   const price=document.getElementById('upa-price-custom')?.value||'';
-  // 成本連動：單價分析算出的成本單價(costUnit)自動帶入工項「成本單價🔒」，報價當下即見毛利
-  let _estCost='';
-  try{const _r=upaCalc();if(_r&&_r.costUnit>0)_estCost=String(Math.round(_r.costUnit));}catch(e){}
-  // 分析未提供成本時，退回歷史單價庫實績均價
-  if(!_estCost){try{const _h=_histCostFor(desc);if(_h&&_h.avg>0)_estCost=String(_h.avg);}catch(e){}}
+  // 成本連動：實績均價為主（結案越多越貼市場）、單價分析理論成本(costUnit)為輔
+  let _estCost='',_costSrc='';
+  try{const _h=_histCostFor(desc);if(_h&&_h.avg>0){_estCost=String(_h.avg);_costSrc='實績均價 '+fmt(_h.avg)+'（'+_h.n+'筆）';}}catch(e){}
+  if(!_estCost){try{const _r=upaCalc();if(_r&&_r.costUnit>0){_estCost=String(Math.round(_r.costUnit));_costSrc='理論成本 '+fmt(Math.round(_r.costUnit));}}catch(e){}}
   items.push({desc,unit,qty:String(qty),price:String(price),estCost:_estCost,note,ot,otu:otUnit,sec:false});
   rItems();rTots();
   // 水平支撐：自動累加層數
@@ -2999,7 +2999,7 @@ function applyUPA(){
       return;
     }
   }
-  toast('✅ 已套用至報價明細！');
+  toast('✅ 已套用至報價明細！'+(_costSrc?'　成本：'+_costSrc:''));
   go('editor');
   // Q3: 套用後自動清空所有欄位，下次進來是空白
   setTimeout(()=>upaReset(), 300);
@@ -3031,14 +3031,31 @@ function rUPAHist(){
 }
 function applyUPAHist(id){
   const h=UH.find(x=>x.id===id);if(!h)return;
-  items.push({desc:h.desc||`${h.type} ${h.spec} L=${h.len}M`,unit:'支',
-    qty:'',price:String(h.final),estCost:(h.cost>0?String(h.cost):''),note:`含${h.period}天租期`,ot:'',otu:'$/M/天',sec:false});
+  const _desc=h.desc||`${h.type} ${h.spec} L=${h.len}M`;
+  // 實績均價為主、當時的理論成本為輔
+  let _ec='';try{const _h2=_histCostFor(_desc);if(_h2&&_h2.avg>0)_ec=String(_h2.avg);}catch(e){}
+  if(!_ec&&h.cost>0)_ec=String(h.cost);
+  items.push({desc:_desc,unit:'支',
+    qty:'',price:String(h.final),estCost:_ec,note:`含${h.period}天租期`,ot:'',otu:'$/M/天',sec:false});
   toast('已套用！');go('editor');
 }
 function delUPAHist(id){UH=UH.filter(x=>x.id!==id);saveUH();rUPAHist();}
 function clearUPAHistory(){var _ok1=false;try{_ok1=window.confirm('確定清除所有分析記錄？');}catch(e){_ok1=true;}if(!_ok1)return;UH=[];saveUH();rUPAHist();}
 
 // ════════════════════ EDITOR ════════════════════
+// 實績回填：把歷史單價庫的實績均價，回推寫入尚未填成本的工項（手動新增／舊報價皆適用）
+function backfillEstCosts(){
+  let n=0,miss=0;
+  items.forEach(function(it){
+    if(it.sec)return;
+    if(parseFloat(it.estCost)>0)return;   // 已填的不動（快照原則）
+    const h=_histCostFor(it.desc);
+    if(h&&h.avg>0){it.estCost=String(h.avg);n++;}
+    else if((it.desc||'').trim())miss++;
+  });
+  if(n){rItems();rTots();toast('⟲ 已回填 '+n+' 個工項的實績成本'+(miss?('；'+miss+' 項單價庫無同名實績'):''));}
+  else toast(miss?('單價庫找不到同名實績（'+miss+' 項）——結案回寫累積後再試'):'所有工項都已有成本，無需回填');
+}
 // 單項毛利率（%）：price/estCost 皆為未稅單價；任一為 0 回傳 null
 function _mgnPct(price,cost){price=parseFloat(price)||0;cost=parseFloat(cost)||0;if(price<=0||cost<=0)return null;return Math.round((price-cost)/price*1000)/10;}
 function _mgnColor(p){return p==null?'var(--b3)':p<0?'var(--red)':p<15?'#e65100':'var(--g3)';}
