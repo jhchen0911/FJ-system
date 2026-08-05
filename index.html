@@ -568,6 +568,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-invoice" onclick="go('invoice')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>應收管理 <span class="cnt" id="invbadge" style="display:none">0</span></button>
   <button type="button" class="snav" id="sn-payables" onclick="goPayables()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg></span>應付管理</button>
   <button type="button" class="snav" id="sn-contacts" onclick="go('contacts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>客戶管理</button>
+  <button type="button" class="snav" id="sn-quickcost" onclick="go('quickcost');setTimeout(rQuickCost,60)"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg></span>快速支出</button>
   <div class="ssec" style="margin-top:5px">財務分析</div>
   <button type="button" class="snav" onclick="smartIntake()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
       <button type="button" class="snav" id="sn-finance" onclick="go('finance')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>財務管理</button>
@@ -1064,6 +1065,45 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ████ 快速支出（工務現場登錄；不顯示任何成本合計）████ -->
+<div class="page" id="page-quickcost">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-t">快速支出</div><div class="ph-s">現場花費隨手記，自動列入專案施工成本</div></div>
+  </div>
+  <div class="pad" style="max-width:560px">
+    <div class="card">
+      <div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 登錄支出</div></div>
+      <div class="cb">
+        <div class="f" style="margin-bottom:10px">
+          <label>工程專案 *</label>
+          <select id="qc-proj" onchange="rQuickCostItems()" style="width:100%;font-size:14px;padding:9px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit"></select>
+        </div>
+        <div class="f" style="margin-bottom:10px">
+          <label>支出類型 *</label>
+          <div id="qc-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px"></div>
+        </div>
+        <div class="fg fg2" style="margin-bottom:10px">
+          <div class="f"><label>品名／說明</label><input id="qc-desc" placeholder="例：涼水 2 箱" style="font-size:14px;padding:9px 10px"></div>
+          <div class="f"><label>金額 *</label><input id="qc-amt" type="number" inputmode="decimal" placeholder="0" style="font-size:16px;font-weight:700;text-align:right;padding:9px 10px"></div>
+        </div>
+        <div class="f" style="margin-bottom:14px">
+          <label>對應工項（選填，供成本歸戶）</label>
+          <select id="qc-item" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit"><option value="-1">── 不指定 ──</option></select>
+        </div>
+        <button type="button" class="btn btn-g" onclick="submitQuickCost()" style="width:100%;justify-content:center;padding:13px;font-size:15px;font-weight:900">✓ 登錄支出</button>
+        <div style="font-size:10.5px;color:var(--b3);margin-top:8px">登錄後自動列入該專案施工成本（公司自付，不入應付帳款），科目與工項已自動歸戶。</div>
+        <div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px"><div style="flex:1;height:1px;background:var(--b1)"></div><span style="font-size:11px;color:var(--b3)">有發票／收據？</span><div style="flex:1;height:1px;background:var(--b1)"></div></div>
+        <button type="button" class="btn" onclick="smartIntake()" style="width:100%;justify-content:center;padding:12px;font-size:14px;font-weight:700;border-color:var(--gm);color:var(--g3)"><svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg> 拍照智慧收件（AI 自動判讀）</button>
+        <div style="font-size:10.5px;color:var(--b3);margin-top:6px">拍發票或收據，AI 自動判讀類型與金額，連動寫入施工成本、應付帳款與帳務進項。</div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <div class="ch"><div class="cht">📝 本次登錄記錄</div></div>
+      <div class="cb"><div id="qc-log" style="font-size:12.5px;color:var(--b4)">尚未登錄任何支出</div></div>
     </div>
   </div>
 </div>
@@ -2345,6 +2385,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <button type="button" onclick="go('projects');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span><span>專案</span></button>
     <button type="button" onclick="go('contacts');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span><span>客戶</span></button>
     <button type="button" onclick="goPayables();toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg></span><span>應付</span></button>
+    <button type="button" onclick="go('quickcost');toggleMobMore();setTimeout(rQuickCost,60)" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg></span><span>快速支出</span></button>
     <button type="button" onclick="toggleMobMore();smartIntake()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
       <button type="button" onclick="go('finance');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span><span>財務</span></button>
     <button type="button" onclick="go('reports');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span><span>報表</span></button>
@@ -2360,7 +2401,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.278';
+var APP_VERSION='v5.279';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -8080,7 +8121,7 @@ function _histCostFor(name){
 }
 
 // ── 成本科目分類（跨案分析用）──
-var COST_CATS=['材料租金','材料運費','外包工程','人工','機具','機具運費','五金零件','油料耗材','雜費','其他'];
+var COST_CATS=['工項材料','材料租金','材料運費','外包工程','人工','機具','機具運費','五金零件','油料耗材','雜費','其他'];
 function _costDefaultCat(type){return({own:'材料租金',sub:'外包工程',labor:'人工',extra:'雜費'})[type]||'其他';}
 // 舊科目名稱對應（v5.271~275 的舊值自動歸入新分類）
 function _costCatNorm(cat){var m={'材料':'材料租金','機具租金':'機具','運輸':'材料運費','管理雜費':'雜費'};return m[cat]||cat;}
@@ -8163,6 +8204,56 @@ function buildCostAnalysisHtml(q){
     +'<button type="button" onclick="var n=writeCostHist();toast(n?(\'📥 已回寫 \'+n+\' 筆工項實績到歷史單價庫，下次報價自動提示\'):\'尚無可回寫的工項實績（需有實際成本且已歸戶）\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:var(--r8);padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📥 回寫單價庫（結案復盤）</button>'
     +'<span style="font-size:10.5px;color:var(--b3)">單價庫目前累積 '+COST_HIST.length+' 筆工項實績；專案「標記結案」時也會自動回寫</span>'
     +'</div>';
+}
+
+// ── 快速支出：工務現場登錄（不顯示成本合計；寫入專案施工成本，自付不入應付）──
+var QC_TYPES=[['涼水','雜費'],['便當','雜費'],['加油','油料耗材'],['五金','五金零件'],['運費','材料運費'],['雜費','雜費'],['其他','其他']];
+var _qcSel=0,_qcLog=[];
+function rQuickCost(){
+  const sel=document.getElementById('qc-proj');if(!sel)return;
+  const cur=sel.value;
+  const mains=Q.filter(q=>q.awarded&&!q.closed&&!q.parentId);
+  sel.innerHTML='<option value="">── 選擇專案 ──</option>'+mains.map(q=>'<option value="'+q.id+'"'+(q.id===cur?' selected':'')+'>'+esc(q.name||'未命名')+'</option>').join('');
+  const ch=document.getElementById('qc-chips');
+  if(ch)ch.innerHTML=QC_TYPES.map((t,i)=>'<button type="button" onclick="qcPick('+i+')" style="padding:8px 16px;border-radius:99px;border:1.5px solid '+(i===_qcSel?'var(--g3)':'var(--b2)')+';background:'+(i===_qcSel?'var(--gl)':'var(--w)')+';color:'+(i===_qcSel?'var(--g3)':'var(--b4)')+';font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">'+t[0]+'</button>').join('');
+  rQuickCostItems();rQcLog();
+}
+function qcPick(i){_qcSel=i;rQuickCost();}
+function rQuickCostItems(){
+  const qid=document.getElementById('qc-proj')?.value;
+  const isel=document.getElementById('qc-item');if(!isel)return;
+  let opts='<option value="-1">── 不指定 ──</option>';
+  const q=Q.find(x=>x.id===qid);
+  (q&&q.items||[]).forEach((it,i)=>{if(!it.sec)opts+='<option value="'+i+'">'+esc((it.desc||'工項'+(i+1)).slice(0,28))+'</option>';});
+  isel.innerHTML=opts;
+}
+function submitQuickCost(){
+  const qid=document.getElementById('qc-proj')?.value;
+  const q=Q.find(x=>x.id===qid);
+  if(!q){toast('請先選擇工程專案');return;}
+  const amt=parseFloat(document.getElementById('qc-amt')?.value)||0;
+  if(amt<=0){toast('請填寫金額');return;}
+  const t=QC_TYPES[_qcSel]||QC_TYPES[0];
+  const desc=(document.getElementById('qc-desc')?.value||'').trim()||t[0];
+  const linkedIdx=parseInt(document.getElementById('qc-item')?.value);
+  if(!q.costs)q.costs=[];
+  const cid=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  q.costs.push({id:cid,type:'extra',vendor:'公司支出（自付）',cat:t[1],date:localToday(),
+    linkedItemIdx:(linkedIdx>=0?linkedIdx:-1),isAttached:false,attachedTo:'',mergedInto:'',
+    rows:[{id:cid+'_0',subType:'worker',desc:desc,reason:'',days:1,dayRate:amt,transport:0}],amt:amt});
+  q._mt=Date.now();
+  try{persist();}catch(e){}
+  try{_immediateUpload();}catch(e){try{_onSave();}catch(e2){}}
+  _qcLog.unshift({t:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),proj:(q.name||'').slice(0,14),desc:desc,amt:amt,cat:t[1]});
+  const ai=document.getElementById('qc-amt');if(ai)ai.value='';
+  const di=document.getElementById('qc-desc');if(di)di.value='';
+  rQcLog();
+  toast('✓ 已登錄：'+desc+' NT$ '+fmt(amt));
+}
+function rQcLog(){
+  const el=document.getElementById('qc-log');if(!el)return;
+  if(!_qcLog.length){el.innerHTML='尚未登錄任何支出';return;}
+  el.innerHTML=_qcLog.map(r=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--b1)"><span>'+r.t+'　'+esc(r.proj)+'　'+esc(r.desc)+'<span style="color:var(--b3);font-size:10.5px">（'+r.cat+'）</span></span><b style="white-space:nowrap">NT$ '+fmt(r.amt)+'</b></div>').join('');
 }
 
 // ── 成本勾稽：施工成本 vs 應付帳款一致性檢查（防漏記／殘留）──
@@ -9140,20 +9231,15 @@ function rCostItems(){
   // 分類小計列
   var _catSum={own:0,sub:0,labor:0,extra:0};
   (q.costs||[]).forEach(function(c2){if(_catSum[c2.type]!=null)_catSum[c2.type]+=(c2.amt||0);});
-  var _catBar='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;font-size:11.5px">'
-    +[['own','自有','#8a6d00','#FFFDE7'],['sub','承包','#1565C0','#E3F2FD'],['labor','點工','#E65100','#FFF3E0'],['extra','額外','#4A148C','#F3E5F5']].map(function(x){
-      return '<span style="padding:4px 10px;border-radius:99px;background:'+x[3]+';color:'+x[2]+';font-weight:700">'+x[1]+' '+fmt(_catSum[x[0]])+'</span>';
-    }).join('')
-    +'</div>';
-  // 科目匯總列（材料/機具/人工/運輸…，跨案分析口徑）
+  // 科目匯總列（v5.279：原「自有/承包/點工/額外」類型列與科目列重複，已移除，僅留科目）
   var _csum={};
   (q.costs||[]).forEach(function(c2){var k=c2.cat?_costCatNorm(c2.cat):_costDefaultCat(c2.type);_csum[k]=(_csum[k]||0)+(parseFloat(c2.amt)||0);});
   var _catKeys=COST_CATS.filter(function(k){return _csum[k]>0;});
   var _catBar2=_catKeys.length?('<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;align-items:center">'
     +'<span style="font-size:10px;color:var(--b3)">科目：</span>'
-    +_catKeys.map(function(k){return '<span style="padding:3px 10px;border-radius:99px;background:var(--b0);border:1px solid var(--b2);color:var(--b5)">'+k+' <b style="font-variant-numeric:tabular-nums">'+fmt(Math.round(_csum[k]))+'</b></span>';}).join('')
+    +_catKeys.map(function(k){return '<span style="padding:4px 10px;border-radius:99px;background:var(--gl);border:1px solid var(--gm);color:var(--g3);font-weight:700">'+k+' <b style="font-variant-numeric:tabular-nums">'+fmt(Math.round(_csum[k]))+'</b></span>';}).join('')
     +'</div>'):'';
-  el.innerHTML=_catBar+_catBar2+html;
+  el.innerHTML=_catBar2+html;
 
   // 同步 linkedItemIdx
   costs.forEach(c=>{
@@ -11567,21 +11653,50 @@ function _intakeConfirm(r,du){
   window._ikRenderExtra=function(){
     var box=document.getElementById('ik-extra');if(!box)return;
     var ty=gv('ik-type'),qid2=gv('ik-proj');
-    if(ty!=='own_material'){box.innerHTML='';return;}
-    var q2=Q.find(function(x){return x.id===qid2;});
-    var opts='<option value="-1">（不對應特定工項）</option>'
-      +((q2&&q2.items)||[]).map(function(it,i){return it.sec?'':'<option value="'+i+'">'+esc((it.desc||'工項'+(i+1)).slice(0,28))+'</option>';}).join('');
-    box.innerHTML='<div class="f"><label>對應報價工項（自有成本歸戶）</label><select id="ik-item">'+opts+'</select></div>';
+    var html2='';
+    // 成本科目：會建立成本的類型顯示（預設依類型帶入）
+    if(ty==='vendor_quote'||ty==='own_material'||ty==='expense'){
+      var defCat=ty==='vendor_quote'?'外包工程':ty==='own_material'?'工項材料':'雜費';
+      var cur=document.getElementById('ik-cat')?gv('ik-cat'):defCat;
+      html2+='<div class="f"><label>成本科目</label><select id="ik-cat">'
+        +COST_CATS.map(function(k){return '<option value="'+k+'"'+(cur===k?' selected':'')+'>'+k+'</option>';}).join('')
+        +'</select></div>';
+    }
+    if(ty==='own_material'){
+      var q2=Q.find(function(x){return x.id===qid2;});
+      var opts='<option value="-1">（不對應特定工項）</option>'
+        +((q2&&q2.items)||[]).map(function(it,i){return it.sec?'':'<option value="'+i+'">'+esc((it.desc||'工項'+(i+1)).slice(0,28))+'</option>';}).join('');
+      html2+='<div class="f"><label>對應報價工項（自有成本歸戶）</label><select id="ik-item">'+opts+'</select></div>';
+    }
+    box.innerHTML=html2;
   };
   showConfirm('📷 智慧收件確認',
-    '<div style="font-size:12px;color:var(--b4);margin-bottom:6px">AI 判讀（'+(r.confidence==='high'?'信心高':'⚠ 信心低，請確認')+'）：'+esc(r.note||'')+'</div>'
+    '<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">'
+    +'<img src="'+du+'" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--b2);flex-shrink:0;cursor:zoom-in" onclick="var w=window.open(\'\');w.document.write(\'<img src=&quot;\'+this.src+\'&quot; style=&quot;max-width:100%&quot;>\')">'
+    +'<div style="font-size:12px;color:var(--b4);line-height:1.6">AI 判讀（'+(r.confidence==='high'?'<span style="color:var(--g3);font-weight:700">信心高</span>':'<span style="color:#e65100;font-weight:700">⚠ 信心低，請逐欄確認</span>')+'）<br>'+esc(r.note||'')+'</div>'
+    +'</div>'
     +'<div class="f"><label>文件類型</label><select id="ik-type" onchange="_ikRenderExtra()">'+typeOpts+'</select></div>'
     +'<div class="f"><label>歸屬專案</label><select id="ik-proj" onchange="_ikRenderExtra()">'+projOpts+'</select></div>'
+    +'<div class="fg fg2">'
+    +'<div class="f"><label>對方名稱</label><input id="ik-vendor" value="'+esc(r.vendor||'')+'" placeholder="廠商／賣方"></div>'
+    +'<div class="f"><label>金額（含稅）</label><input id="ik-amount" type="number" value="'+(r.amount||'')+'" style="text-align:right;font-weight:700"></div>'
+    +'</div>'
+    +'<div class="fg fg2">'
+    +'<div class="f"><label>日期</label><input id="ik-date" type="date" value="'+esc(r.date||'')+'"></div>'
+    +'<div class="f"><label>發票號碼</label><input id="ik-number" value="'+esc(r.number||'')+'" placeholder="（無則留空）"></div>'
+    +'</div>'
     +'<div id="ik-extra"></div>'
-    +((r.number||r.amount)?('<div style="font-size:12px;color:var(--b5)">'+(r.number?('🧾 '+esc(r.number)+'　'):'')+(r.amount?('NT$ '+fmt(r.amount)):'')+(r.vendor?('　'+esc(r.vendor)):'')+'</div>'):'')
     +itemsPrev
-    +'<div style="font-size:11px;color:var(--b3);margin-top:8px">確認後才會寫入系統；可先改類型或專案。</div>',
-    function(){_intakeRoute(gv('ik-type'),gv('ik-proj'),r,du);},false,null,true);
+    +'<div style="font-size:11px;color:var(--b3);margin-top:8px">欄位皆可修正；確認後才會寫入系統並連動施工成本／應付／帳務。</div>',
+    function(){
+      var r2=Object.assign({},r);
+      var _v=gv('ik-vendor');if(_v!==undefined)r2.vendor=_v;
+      var _a=parseFloat(gv('ik-amount'));if(_a>0)r2.amount=_a;
+      var _d=gv('ik-date');if(_d)r2.date=_d;
+      var _n=gv('ik-number');if(_n!==undefined)r2.number=_n;
+      try{r2._cat=gv('ik-cat')||'';}catch(e){r2._cat='';}
+      _intakeRoute(gv('ik-type'),gv('ik-proj'),r2,du);
+    },false,null,true);
   setTimeout(function(){try{_ikRenderExtra();}catch(e){}},80);
 }
 var INTAKE_LOG=[];try{INTAKE_LOG=JSON.parse(localStorage.getItem('fy_intake_log')||'[]');}catch(e){}
@@ -11659,10 +11774,12 @@ function _intakeRoute(type,qid,r,du){
     if(!q2.costs)q2.costs=[];
     var cid=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
     var cc={id:cid,type:'sub',isAttached:false,attachedTo:'',mergedInto:'',vendor:r.vendor||'',
+      cat:(r._cat||'外包工程'),date:r.date||today,
       rows:(r.items||[]).filter(function(it){return it.desc;}).map(function(it,i){return {id:cid+'_'+i,linkedItemIdx:-1,desc:it.desc||'',qty:parseFloat(it.qty)||1,unitPrice:parseFloat(it.price)||0};}),amt:0};
     if(!cc.rows.length)cc.rows=[{id:cid+'_0',linkedItemIdx:-1,desc:r.note||'',qty:1,unitPrice:parseFloat(r.amount)||0}];
     recalcCostAmt(cc);
     q2.costs.push(cc);
+    q2._mt=Date.now();
     try{persist();_immediateUpload();}catch(e){}
     _ikLog({label:'廠商報價 → 成本',detail:q2.name+'／'+(r.vendor||'')+' NT$ '+fmt(cc.amt),undo:{kind:'cost',qid:qid,cid:cid}});
     toast('✅ 已為「'+esc(q2.name)+'」建立成本：'+esc(r.vendor||'廠商')+' NT$ '+fmt(cc.amt));
@@ -11682,9 +11799,10 @@ function _intakeRoute(type,qid,r,du){
       return {id:cidm+'_'+i,preset:hit||'',desc:hit?'':(it.desc||''),qty:parseFloat(it.qty)||1,unit:it.unit||'',unitPrice:parseFloat(it.price)||0};
     });
     if(!rowsM.length)rowsM=[{id:cidm+'_0',preset:'',desc:(r.note||r.vendor||'材料採購'),qty:1,unit:'式',unitPrice:untaxed>0?untaxed:(parseFloat(r.amount)||0)}];
-    var ccm={id:cidm,type:'own',isAttached:false,attachedTo:'',mergedInto:'',vendor:'',linkedItemIdx:itemIdx,srcInvNo:r.number||'',srcVendor:r.vendor||'',rows:rowsM,amt:0};
+    var ccm={id:cidm,type:'own',isAttached:false,attachedTo:'',mergedInto:'',vendor:'',linkedItemIdx:itemIdx,srcInvNo:r.number||'',srcVendor:r.vendor||'',cat:(r._cat||'工項材料'),date:r.date||today,rows:rowsM,amt:0};
     recalcCostAmt(ccm);
     qm.costs.push(ccm);
+    qm._mt=Date.now();
     try{persist();_immediateUpload();}catch(e){}
     // 同步登入帳務進項（稅額可扣抵）
     var eidm='E'+Date.now();
@@ -12877,6 +12995,7 @@ const ALL_PAGES = [
   {id:'contracts', label:'合約管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>', adminOnly:false},
   {id:'projects',  label:'專案總覽', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg>', adminOnly:false},
   {id:'costs',     label:'施工成本', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg>', adminOnly:false},
+  {id:'quickcost', label:'快速支出', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>', adminOnly:false},
   {id:'ledger',    label:'帳務管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>', adminOnly:false},
   {id:'reports',   label:'報表中心', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg>', adminOnly:false},
   {id:'permissions',label:'權限管理', icon:'🔐', adminOnly:true},
