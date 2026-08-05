@@ -975,6 +975,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
             <th style="width:70px" class="r">數量</th>
             <th style="width:86px" class="r">單價</th>
             <th style="width:100px" class="r">複價</th>
+            <th style="width:96px" class="r" title="內部預估成本單價（未稅），不會出現在報價單上；填了即顯示單項毛利率">成本單價🔒</th>
             <th style="width:105px">備註</th>
             <th style="width:120px">逾期租金</th>
             <th style="width:28px"></th>
@@ -995,6 +996,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="trow"><label>小計</label><span id="tsub">NT$ 0</span></div>
         <div class="trow"><label id="ttaxlbl">5% 營業稅</label><span id="ttax">NT$ 0</span></div>
         <div class="trow grand"><label>總計</label><span id="ttot">NT$ 0</span></div>
+        <div class="trow" id="tcost-row" style="display:none;border-top:1px dashed var(--ym);padding-top:4px"><label style="color:#e65100;font-size:11px">預估成本 🔒內部</label><span id="tcost" style="color:#e65100;font-size:12px">NT$ 0</span></div>
+        <div class="trow" id="tmgn-row" style="display:none"><label style="color:#e65100;font-size:11px">預估毛利 🔒內部</label><span id="tmgn" style="font-size:12px;font-weight:900">NT$ 0</span></div>
       </div>
     </div>
     <!-- 施工成本卡片 -->
@@ -2355,7 +2358,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.269';
+var APP_VERSION='v5.270';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -3029,18 +3032,42 @@ function delUPAHist(id){UH=UH.filter(x=>x.id!==id);saveUH();rUPAHist();}
 function clearUPAHistory(){var _ok1=false;try{_ok1=window.confirm('確定清除所有分析記錄？');}catch(e){_ok1=true;}if(!_ok1)return;UH=[];saveUH();rUPAHist();}
 
 // ════════════════════ EDITOR ════════════════════
+// 單項毛利率（%）：price/estCost 皆為未稅單價；任一為 0 回傳 null
+function _mgnPct(price,cost){price=parseFloat(price)||0;cost=parseFloat(cost)||0;if(price<=0||cost<=0)return null;return Math.round((price-cost)/price*1000)/10;}
+function _mgnColor(p){return p==null?'var(--b3)':p<0?'var(--red)':p<15?'#e65100':'var(--g3)';}
 function calcT(){
   const sub=items.reduce((a,it)=>it.sec?a:a+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0),0);
   const tax=sub*(P.tax||5)/100;const total=sub+tax;
   const ext=exs.reduce((a,e)=>a+(parseFloat(e.amt)||0),0);
-  const cost=total/(P.mult||1.4);const gross=total-cost;const net=total-cost-ext;
-  return{sub,tax,total,ext,cost,gross,net,grossR:total?gross/total:0,netR:total?net/total:0};
+  // 成本：有填「成本單價」的工項逐項計算；未填的部分退回倍率(P.mult)推估
+  let costKnown=0,subUnknown=0;
+  items.forEach(it=>{
+    if(it.sec)return;
+    const q=parseFloat(it.qty)||0,p=parseFloat(it.price)||0,c=parseFloat(it.estCost)||0;
+    if(q>0&&c>0)costKnown+=q*c;
+    else subUnknown+=q*p;
+  });
+  const cost=costKnown+(subUnknown*(1+(P.tax||5)/100))/(P.mult||1.4);
+  const gross=total-cost;const net=total-cost-ext;
+  return{sub,tax,total,ext,cost,gross,net,grossR:total?gross/total:0,netR:total?net/total:0,costKnown,costFilled:costKnown>0};
 }
 function rTots(){
   const t=calcT();
   st('tsub','NT$ '+fmt(t.sub));st('ttax','NT$ '+fmt(t.tax));st('ttot','NT$ '+fmt(t.total));st('mbar-qtot','NT$ '+fmt(t.total));
   const tl=document.getElementById('ttaxlbl');if(tl)tl.textContent=(P.tax||5)+'% 營業稅';
   const tb=document.getElementById('totbox-el');if(tb)tb.style.width=isMob()?'100%':'272px';
+  // 內部成本／毛利列（有填任一工項成本才顯示；毛利以未稅口徑：小計−成本）
+  const cr=document.getElementById('tcost-row'),mr=document.getElementById('tmgn-row');
+  if(cr&&mr){
+    if(t.costFilled){
+      cr.style.display='';mr.style.display='';
+      st('tcost','NT$ '+fmt(Math.round(t.cost)));
+      const mgn=t.sub-t.cost;
+      const mgnR=t.sub>0?Math.round(mgn/t.sub*1000)/10:0;
+      const el=document.getElementById('tmgn');
+      if(el){el.textContent='NT$ '+fmt(Math.round(mgn))+'（'+mgnR+'%）';el.style.color=mgnR<0?'var(--red)':mgnR<15?'#e65100':'var(--g3)';}
+    }else{cr.style.display='none';mr.style.display='none';}
+  }
 }
 
 // ── 議價：輸入議價後含稅總價，各工項單價等比例調整，尾差以「議價調整」項補足 ──
@@ -3242,7 +3269,7 @@ function rItems(){
     if(mob){
       // ═══ 手機端卡片式 ═══
       const td=document.createElement('td');
-      td.colSpan=9;td.style.cssText='padding:0;border:none';
+      td.colSpan=10;td.style.cssText='padding:0;border:none';
       if(it.sec){
         const card=document.createElement('div');
         card.style.cssText='background:#e8f5ee;border-left:4px solid var(--g);padding:8px 12px;margin:6px 0 2px;display:flex;align-items:center;gap:8px;border-radius:4px';
@@ -3321,6 +3348,23 @@ function rItems(){
         amtVal.style.cssText='font-size:15px;font-weight:900;color:var(--g3)';
         amtBox.appendChild(amtLbl);amtBox.appendChild(amtVal);
         card.appendChild(amtBox);
+        // 成本單價（內部）＋毛利率
+        const costRow=document.createElement('div');
+        costRow.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px';
+        const costInp=mkInput('number',it.estCost,'(內部，不印)','right');costInp.inputMode='decimal';
+        const mgnBox=document.createElement('div');
+        mgnBox.style.cssText='display:flex;align-items:flex-end;padding-bottom:7px;font-size:13px;font-weight:900';
+        function updMgnM(){
+          const p=_mgnPct(items[i].price,items[i].estCost);
+          mgnBox.textContent=p==null?'—':('毛利 '+p+'%');
+          mgnBox.style.color=_mgnColor(p);
+        }
+        costInp.addEventListener('input',function(){items[i].estCost=this.value;updMgnM();rTots();});
+        updMgnM();
+        costRow.appendChild(mkField('成本單價🔒',costInp));
+        const mgnWrap=mkField('單項毛利',mgnBox);
+        costRow.appendChild(mgnWrap);
+        card.appendChild(costRow);
         // 逾期租金
         const otAmt=it.ot?(it.ot.match(/^[\d.]+/)||[''])[0]:'';
         const otU=it.otu||'$/M/天';
@@ -3374,7 +3418,7 @@ function rItems(){
         fb.style.cssText='border:none;background:transparent;color:var(--g3);font-size:13px;cursor:pointer;padding:0 2px';
         fb.addEventListener('click',function(e){e.stopPropagation();window._qFold[eid+':'+_mySec]=!window._qFold[eid+':'+_mySec];rItems();});
         td0.textContent='';td0.appendChild(fb);
-        const td1=mkTd('');td1.colSpan=7;
+        const td1=mkTd('');td1.colSpan=8;
         const si=document.createElement('input');
         si.value=it.desc||'';si.placeholder='分類名稱';
         si.style.cssText='width:100%;font-weight:700;font-size:13px;color:var(--g3);border:none;background:transparent;padding:3px 0;outline:none';
@@ -3409,6 +3453,20 @@ function rItems(){
         tdPrice.appendChild(priceInp);
         const tdAmt=mkTd('text-align:right;font-weight:700;color:var(--g3);white-space:nowrap');
         tdAmt.textContent=amt?'NT$ '+fmt(amt):'';
+        // 成本單價（內部）＋單項毛利率
+        const tdCost=mkTd('background:#fffdf5');
+        const costInp=mkTblInp('number',it.estCost,'成本','right');
+        costInp.title='內部預估成本單價（未稅），不印在報價單上';
+        const mgnSpan=document.createElement('div');
+        mgnSpan.style.cssText='font-size:10px;text-align:right;font-weight:700;line-height:1.3;min-height:12px';
+        function updMgn(){
+          const p=_mgnPct(items[i].price,items[i].estCost);
+          mgnSpan.textContent=p==null?'':('毛利 '+p+'%');
+          mgnSpan.style.color=_mgnColor(p);
+        }
+        costInp.addEventListener('input',function(){items[i].estCost=this.value;updMgn();rTots();});
+        updMgn();
+        tdCost.appendChild(costInp);tdCost.appendChild(mgnSpan);
         const tdNote=mkTd('');
         const noteInp=mkTblInp(null,it.note,'備註','left');
         noteInp.addEventListener('input',function(){items[i].note=this.value;});
@@ -3434,7 +3492,7 @@ function rItems(){
         tdDel.appendChild(delBtn);
         tr.appendChild(tdIdx);tr.appendChild(tdDesc);tr.appendChild(tdUnit);
         tr.appendChild(tdQty);tr.appendChild(tdPrice);tr.appendChild(tdAmt);
-        tr.appendChild(tdNote);tr.appendChild(tdOt);tr.appendChild(tdDel);
+        tr.appendChild(tdCost);tr.appendChild(tdNote);tr.appendChild(tdOt);tr.appendChild(tdDel);
       }
     }
     body.appendChild(tr);
@@ -3452,12 +3510,12 @@ function rFoot(){
   const t=calcT();
   foot.innerHTML=`
     <tr class="sub-tr"><td colspan="5" style="text-align:right;color:var(--b4)">小計</td>
-      <td class="r">NT$ ${fmt(t.sub)}</td><td colspan="3"></td></tr>
+      <td class="r">NT$ ${fmt(t.sub)}</td><td colspan="4"></td></tr>
     <tr class="sub-tr"><td colspan="5" style="text-align:right;color:var(--b4)">${P.tax||5}% 營業稅</td>
-      <td class="r">NT$ ${fmt(t.tax)}</td><td colspan="3"></td></tr>
+      <td class="r">NT$ ${fmt(t.tax)}</td><td colspan="4"></td></tr>
     <tr class="tot-tr"><td colspan="5" style="text-align:right">總計</td>
       <td style="text-align:right;font-variant-numeric:tabular-nums">NT$ ${fmt(t.total)}</td>
-      <td colspan="3"></td></tr>`;
+      <td colspan="4"></td></tr>`;
 }
 function addIt(){items.push({desc:'',unit:'',qty:'',price:'',note:'',ot:'',otu:'$/M/天',sec:false});rItems();}
 function addSec(){items.push({desc:'',sec:true});rItems();}
