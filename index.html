@@ -2031,7 +2031,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start">
           <div style="flex:1;min-width:200px">
             <div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:4px"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 匯出全部資料</div>
-            <div style="font-size:11.5px;color:var(--b4);margin-bottom:8px;line-height:1.6">將所有報價單、請款單、單價分析歷史及參數設定匯出為 JSON 檔案。</div>
+            <div style="font-size:11.5px;color:var(--b4);margin-bottom:8px;line-height:1.6">全量備份：報價、請款、合約、廠商、應付、發票、費用、客戶、單價庫、參數與權限，一檔匯出。建議每月手動備份一次離線保存。</div>
             <button type="button" class="btn btn-g" onclick="exportData();setTimeout(_updBackupHint,300)"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 立即匯出</button>
           </div>
           <div style="width:1px;background:var(--b2);align-self:stretch"></div>
@@ -2448,7 +2448,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.286';
+var APP_VERSION='v5.287';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -6151,17 +6151,32 @@ function importData(file){
       const qLen=(data.quotes||[]).length;
       const iLen=(data.invoices||[]).length;
       showImportConfirm(qLen,iLen,()=>{
+        const arr=x=>Array.isArray(x)?x:(x&&typeof x==='object'?Object.values(x):[]);
         Q=data.quotes||[];
         INV=data.invoices||[];
         UH=data.upaHistory||[];
         if(data.params)Object.assign(P,data.params);
+        // 全量還原（舊備份檔沒有的區塊保留現值，不清空）
+        if(data.contracts)CONTRACTS=arr(data.contracts);
+        if(data.vendors)VENDORS=arr(data.vendors);
+        if(data.payables)PAYABLES=arr(data.payables);
+        if(data.invoiceRecs)INVOICE_RECS=arr(data.invoiceRecs);
+        if(data.expenses)EXPENSES=arr(data.expenses);
+        if(data.customers)CUSTOMERS=arr(data.customers);
+        if(data.costHist){COST_HIST=arr(data.costHist);try{localStorage.setItem('fy_cost_hist',JSON.stringify(COST_HIST));}catch(e2){}}
+        if(data.upaCostDB){try{Object.assign(UPA_COST_DB,data.upaCostDB);localStorage.setItem('fy_upa_cost',JSON.stringify(UPA_COST_DB));}catch(e2){}}
+        if(data.activityLog)ACTIVITY_LOG=arr(data.activityLog);
         persist();saveInv();saveUH();persistP();
+        try{saveContracts();saveVendors();savePayables();saveInvoiceRecs();saveExpenses();saveCustomers();saveActivityLog();}catch(e2){}
         syncParamsUI();
         // 全面刷新所有頁面資料
         rDash();updBadge();
         renderList();renderInvList();
+        try{renderContracts();}catch(e2){}
+        try{renderCustomers();}catch(e2){}
         if(document.getElementById('page-profit')?.classList.contains('active'))rProfit();
-        toast('✅ 資料匯入成功！報價 '+qLen+' 筆，請款 '+iLen+' 筆');
+        const extra=[data.contracts?('合約 '+arr(data.contracts).length):null,data.payables?('應付 '+arr(data.payables).length):null,data.customers?('客戶 '+arr(data.customers).length):null].filter(Boolean).join('、');
+        toast('✅ 全量還原成功！報價 '+qLen+'、請款 '+iLen+(extra?('、'+extra):'')+' 筆');
       });
     }catch(err){
       toast('❌ 匯入失敗：'+err.message);
@@ -7215,7 +7230,9 @@ function _updBackupHint(){
 function exportData(){
   try{localStorage.setItem('fy_last_backup_ts',String(Date.now()));}catch(e){}
   try{
-    const data={version:'fy-v5',exportDate:new Date().toISOString(),quotes:Q,invoices:INV,upaHistory:UH,params:P};
+    // 全量備份：與雲端同步同一份 payload（報價/請款/合約/廠商/應付/發票/費用/客戶/單價庫/權限/參數）
+    const data=_syncPayload().data;
+    data.exportDate=new Date().toISOString();
     const json=JSON.stringify(data,null,2);
     const blob=new Blob([json],{type:'application/json'});
     const url=URL.createObjectURL(blob);
@@ -7225,7 +7242,7 @@ function exportData(){
     const _ry=_d.getFullYear()-1911;
     const _mm=String(_d.getMonth()+1).padStart(2,'0');
     const _dd=String(_d.getDate()).padStart(2,'0');
-    a.download='豐有工程_報價資料_'+_ry+_mm+_dd+'.json';
+    a.download='豐有工程_全量備份_'+_ry+_mm+_dd+'.json';
     document.body.appendChild(a);a.click();
     setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1000);
     // 記錄備份時間
