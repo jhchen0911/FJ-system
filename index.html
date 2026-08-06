@@ -1397,6 +1397,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     </div>
     <!-- 現金流預測 -->
     <div id="finance-cashflow" style="display:none">
+      <div id="cashflow-forecast" style="margin-bottom:12px"></div>
       <div id="cashflow-chart" style="margin-bottom:12px"></div>
       <div class="card"><div id="cashflow-detail"></div></div>
     </div>
@@ -2447,7 +2448,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.284';
+var APP_VERSION='v5.285';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -11492,7 +11493,98 @@ function updateFinanceKPIs(){
 }
 
 
+// ── 90天現金水位預測：可用現金為起點，疊加 應收(含票期後移)/已收票款到期/應付/每月固定成本 ──
+function renderCashForecast(){
+  var el=document.getElementById('cashflow-forecast');if(!el)return;
+  var now=new Date();now.setHours(0,0,0,0);var t0=now.getTime();
+  // 起始可用現金（與金流 KPI 同口徑：票期未到不算）
+  var startCash=INV.reduce(function(a,i){
+    var rcv=parseFloat(i.received||0);if(!rcv)return a;
+    var cp=(i.cashPct||100)/100,td=i.ticketDays||0;
+    var cashAmt=rcv*cp,tk=rcv*(1-cp);
+    if(td>0&&i.receivedDate){var rdy=new Date(i.receivedDate).getTime()+td*864e5;if(rdy>t0)tk=0;}
+    return a+cashAmt+tk;
+  },0);
+  var events=[];
+  function dayOf(ds){var d=new Date(ds);if(isNaN(d))return null;d.setHours(0,0,0,0);return Math.round((d.getTime()-t0)/864e5);}
+  // 1) 已收但票期未到 → 到期日 +
+  INV.forEach(function(i){
+    var rcv=parseFloat(i.received||0);if(!rcv||!i.receivedDate)return;
+    var td=i.ticketDays||0,cp=(i.cashPct||100)/100;
+    if(td<=0)return;
+    var tk=rcv*(1-cp);if(!tk)return;
+    var d=Math.round((new Date(i.receivedDate).getTime()+td*864e5-t0)/864e5);
+    if(d>0&&d<=90)events.push({day:d,amt:tk,label:(i.project||'')+' 第'+(i.periodNo||'?')+'期 票款到期'});
+  });
+  // 2) 應收未收 → 預計收款日 +（現金%當日、票期部分後移）
+  INV.forEach(function(i){
+    if(i.receivedConfirmed)return;
+    var unpaid=(i.totals&&i.totals.total||0)-(parseFloat(i.received)||0);
+    if(unpaid<=0)return;
+    var ds=i.expectedRecvDate||((i.payDue&&/^\d{4}-\d{2}-\d{2}/.test(i.payDue))?i.payDue:'');
+    if(!ds){try{var e2=_invExpectedDate(i);if(e2)ds=e2.date;}catch(e){}}
+    if(!ds)return;
+    var d=dayOf(ds);if(d==null)return;
+    if(d<0)d=3; // 逾期款：保守假設催收後3天內入帳
+    if(d>90)return;
+    var cp2=(i.cashPct!=null?i.cashPct:100)/100,td2=i.ticketDays||0;
+    var cashAmt=unpaid*cp2,tkAmt=unpaid-cashAmt;
+    var lbl=(i.project||'')+' 第'+(i.periodNo||'?')+'期';
+    if(cashAmt>0)events.push({day:d,amt:cashAmt,label:lbl+' 收款'+(cp2<1?'（現金'+Math.round(cp2*100)+'%）':'')});
+    if(tkAmt>0){var d2=d+td2;if(d2<=90)events.push({day:d2,amt:tkAmt,label:lbl+' 票款（'+td2+'天期）'});}
+  });
+  // 3) 應付待付 → 付款日 −
+  PAYABLES.forEach(function(p){
+    if(p.status==='paid'||!p.date)return;
+    var d=dayOf(p.date);if(d==null)return;
+    if(d<0)d=0;if(d>90)return;
+    events.push({day:d,amt:-_payEff(p),label:'付款：'+(p.to||'')+(p.project?'／'+p.project:'')});
+  });
+  // 4) 公司固定成本 → 每月1日 −
+  var mFixed=(P.fixedCosts||[]).reduce(function(a,r){return a+(parseFloat(r.amt)||0);},0);
+  if(mFixed>0){
+    for(var mi=0;mi<4;mi++){
+      var md=new Date(now.getFullYear(),now.getMonth()+1+mi,1);
+      var d3=Math.round((md.getTime()-t0)/864e5);
+      if(d3>0&&d3<=90)events.push({day:d3,amt:-mFixed,label:'公司固定成本（月）'});
+    }
+  }
+  // 逐日水位
+  var byDay={};events.forEach(function(e){byDay[e.day]=(byDay[e.day]||0)+e.amt;});
+  var bal=[startCash+(byDay[0]||0)];
+  for(var dd=1;dd<=90;dd++)bal[dd]=bal[dd-1]+(byDay[dd]||0);
+  var minV=Math.min.apply(null,bal),minD=bal.indexOf(minV),maxV=Math.max.apply(null,bal),endV=bal[90];
+  var minDate=new Date(t0+minD*864e5),minLabel=(minDate.getMonth()+1)+'/'+minDate.getDate();
+  // 折線 SVG
+  var W=720,H=150,pd2=8;
+  var lo=Math.min(minV,0),hi=Math.max(maxV,1);
+  function X(d){return pd2+(W-2*pd2)*d/90;}
+  function Y(v){return pd2+(H-2*pd2)*(1-(v-lo)/(hi-lo||1));}
+  var pts=bal.map(function(v,d){return X(d).toFixed(1)+','+Y(v).toFixed(1);}).join(' ');
+  var danger=minV<0,tight=!danger&&mFixed>0&&minV<mFixed;
+  var banner=danger
+    ?'<div style="background:#fdecea;border:1px solid #f5b5ae;color:var(--red);border-radius:var(--r8);padding:9px 14px;font-size:13px;font-weight:800;margin-bottom:10px">🚨 資金缺口警告：預計 '+minLabel+' 現金水位 −NT$ '+fmt(Math.abs(Math.round(minV)))+'，請提前調度資金或加速催收</div>'
+    :(tight
+      ?'<div style="background:#fff8ec;border:1px solid #ffd699;color:#b26a00;border-radius:var(--r8);padding:9px 14px;font-size:13px;font-weight:800;margin-bottom:10px">⚠ 水位偏緊：'+minLabel+' 最低 NT$ '+fmt(Math.round(minV))+'（不足一個月固定成本 '+fmt(mFixed)+'）</div>'
+      :'<div style="background:#E8F5E9;border:1px solid #A5D6A7;color:#1B5E20;border-radius:var(--r8);padding:9px 14px;font-size:13px;font-weight:800;margin-bottom:10px">✓ 未來 90 天現金無虞：最低水位 NT$ '+fmt(Math.round(minV))+'（'+minLabel+'）</div>');
+  var evRows=events.filter(function(e){return e.day>=0&&e.day<=90;}).sort(function(a,b){return a.day-b.day;}).slice(0,12).map(function(e){
+    var dt=new Date(t0+e.day*864e5);
+    return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:4px 6px;white-space:nowrap">'+(dt.getMonth()+1)+'/'+dt.getDate()+'</td><td style="padding:4px 6px;font-size:11.5px">'+esc(e.label)+'</td><td style="padding:4px 6px;text-align:right;font-weight:700;color:'+(e.amt>=0?'var(--g3)':'var(--red)')+';font-variant-numeric:tabular-nums">'+(e.amt>=0?'＋':'−')+fmt(Math.abs(Math.round(e.amt)))+'</td></tr>';
+  }).join('');
+  el.innerHTML='<div class="card"><div class="ch green"><div class="cht">📈 90 天現金水位預測</div><span style="font-size:11px;color:rgba(255,255,255,.85)">起點：可用現金 NT$ '+fmt(Math.round(startCash))+'</span></div><div class="cb">'
+    +banner
+    +'<div style="overflow-x:auto"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:520px;height:auto;display:block">'
+    +'<line x1="'+pd2+'" y1="'+Y(0)+'" x2="'+(W-pd2)+'" y2="'+Y(0)+'" stroke="#d9a0a0" stroke-dasharray="4 3" stroke-width="1"/>'
+    +'<polyline points="'+pts+'" fill="none" stroke="'+(danger?'#c62828':'#1a6b3f')+'" stroke-width="2.5" stroke-linejoin="round"/>'
+    +'<circle cx="'+X(minD)+'" cy="'+Y(minV)+'" r="4.5" fill="'+(danger?'#c62828':'#e65100')+'"/>'
+    +'</svg></div>'
+    +'<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--b4);margin:6px 0 10px"><span>最低（'+minLabel+'）<b style="color:'+(danger?'var(--red)':'var(--b5)')+'">NT$ '+fmt(Math.round(minV))+'</b></span><span>90天後 <b>NT$ '+fmt(Math.round(endV))+'</b></span>'+(mFixed?'<span>月固定成本 NT$ '+fmt(mFixed)+'</span>':'<span style="color:var(--b3)">（參數設定填入固定成本明細可納入預測）</span>')+'</div>'
+    +(evRows?('<div style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:4px">近期收付事件</div><table style="width:100%;border-collapse:collapse;font-size:12px">'+evRows+'</table>'):'')
+    +'</div></div>';
+}
+
 function renderCashflow(){
+  try{renderCashForecast();}catch(e){console.error('forecast',e);}
   const el=document.getElementById('cashflow-detail');
   const chartEl=document.getElementById('cashflow-chart');
   if(!el)return;
