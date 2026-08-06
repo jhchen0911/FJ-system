@@ -102,6 +102,8 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
 /* ═══ 表單 ═══ */
 .fg{display:grid;gap:10px;margin-bottom:10px}.fg:last-child{margin-bottom:0}
 .fg2{grid-template-columns:1fr 1fr}.fg3{grid-template-columns:1fr 1fr 1fr}.fg4{grid-template-columns:1fr 1fr 1fr 1fr}
+/* 參數設定：單價欄位改多欄自適應（寬螢幕 4~5 欄），避免超寬輸入框 */
+#page-params .fg.fg2{grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
 .f{display:flex;flex-direction:column;gap:4px}
 .f label{font-size:11px;font-weight:700;color:var(--b3);letter-spacing:.04em;text-transform:uppercase}
 .f input,.f select,.f textarea{padding:7px 10px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px;background:var(--w);color:var(--b5);font-family:inherit;transition:border-color var(--transition),box-shadow var(--transition);-webkit-appearance:none}
@@ -560,24 +562,23 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <div class="shell">
 <nav class="sidebar">
   <button type="button" class="snav active" id="sn-dash" onclick="go('dash')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg></span>總覽</button>
-  <div class="ssec">📋 接案流</div>
+  <div class="ssec">接案流</div>
   <button type="button" class="snav" id="sn-editor" onclick="newQ()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span>新增報價</button>
   <button type="button" class="snav" id="sn-quotes" onclick="go('quotes')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span>報價管理 <span class="cnt" id="qbadge">0</span></button>
   <button type="button" class="snav" id="sn-contracts" onclick="go('contracts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>合約管理<span class="cnt" id="contractbadge" style="display:none">0</span></button>
   <button type="button" class="snav" id="sn-projects" onclick="go('projects')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>專案總覽</button>
-  <div class="ssec" style="margin-top:5px">💰 收付流</div>
+  <div class="ssec" style="margin-top:5px">收付流</div>
   <button type="button" class="snav" id="sn-invoice" onclick="go('invoice')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>應收管理 <span class="cnt" id="invbadge" style="display:none">0</span></button>
-  <button type="button" class="snav" id="sn-payables" onclick="goPayables()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg></span>應付管理</button>
-  <button type="button" class="snav" id="sn-finance" onclick="go('finance')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>財務管理</button>
-  <div class="ssec" style="margin-top:5px">⛏ 成本流</div>
+  <button type="button" class="snav" id="sn-finance" onclick="go('finance')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>金流管理</button>
+  <div class="ssec" style="margin-top:5px">成本流</div>
   <button type="button" class="snav" id="sn-quickcost" onclick="go('quickcost');setTimeout(rQuickCost,60)"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg></span>快速支出・日報</button>
   <button type="button" class="snav" id="sn-profit" onclick="go('profit')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>利潤分析</button>
-  <div class="ssec" style="margin-top:5px">🛠 資料與工具</div>
+  <div class="ssec" style="margin-top:5px">資料與工具</div>
   <button type="button" class="snav" id="sn-contacts" onclick="go('contacts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>客戶管理</button>
   <button type="button" class="snav" onclick="smartIntake()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
   <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
   <button type="button" class="snav" id="sn-reports" onclick="go('reports')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span>報表中心</button>
-  <div class="ssec" style="margin-top:5px">⚙ 系統</div>
+  <div class="ssec" style="margin-top:5px">系統</div>
   <button type="button" class="snav" id="sn-permissions" onclick="go('permissions')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span>權限管理</button>
   <button type="button" class="snav" id="sn-params" onclick="go('params')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg></span>參數設定</button>
 </nav>
@@ -642,7 +643,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       </button>
       <button type="button" onclick="go('finance')" class="sc-btn">
         <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg></span>
-        <span class="sc-label">財務管理</span>
+        <span class="sc-label">金流管理</span>
         <span class="sc-sub">應收・應付</span>
       </button>
       <button type="button" onclick="go('profit')" class="sc-btn">
@@ -1347,7 +1348,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <!-- ████ 財務頁 ████ -->
 <div class="page" id="page-finance">
   <div class="ph">
-    <div class="ph-l"><div class="ph-t">財務管理</div><div class="ph-s">應付帳款・現金流預測・發票管理</div></div>
+    <div class="ph-l"><div class="ph-t">金流管理</div><div class="ph-s">應收應付・現金流預測・發票管理</div></div>
     <div class="ph-r">
       <button type="button" class="btn btn-sm" onclick="exportFinanceCSV()"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> Excel</button>
     </div>
@@ -1575,7 +1576,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <div class="f"><label>負責人</label><input id="pb" value="陳韋宏"></div>
         </div>
         <div class="fg fg3" style="margin-bottom:8px">
-          <div class="f"><label>客戶</label><input id="pco" value="陳茹軒"></div>
+          <div class="f"><label>聯絡人</label><input id="pco" value="陳茹軒"></div>
           <div class="f"><label>電話</label><input id="ptel" value="0989-023-760"></div>
           <div class="f"><label>Email</label><input id="pem" value="generous.const@gmail.com"></div>
         </div>
@@ -1973,6 +1974,21 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="fg fg2">
           <div class="f"><label>營業稅率 (%)</label><input id="ptax" type="number" value="5"><div class="hint">通常為 5%，影響報價單稅額計算</div></div>
           <div class="f"><label>管理費率 (%)</label><input id="pohd" type="number" value="0" min="0" max="50"><div class="hint">公司間接成本攤提（辦公室、行政、車輛…）。利潤中心的「實際淨利」會多扣 稅前收入×此%，避免毛利高估。0＝不攤提</div></div>
+        </div>
+        <div style="border-top:1px dashed var(--b2);margin:12px 0 0;padding-top:12px">
+          <div style="font-size:12.5px;font-weight:700;color:var(--b5);margin-bottom:4px">公司固定成本明細（每月）→ 自動推算管理費率</div>
+          <div style="font-size:10.5px;color:var(--b3);margin-bottom:8px">列出薪資、租金、機具貸款等間接成本，系統依近 12 個月稅前實收推算建議管理費率——比憑感覺填 % 精準，報價毛利門檻也更有依據。</div>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+            <span style="font-size:10.5px;color:var(--b3)">快速新增：</span>
+            <button type="button" class="btn btn-xs" onclick="fcQuick('人員薪資')">人員薪資</button>
+            <button type="button" class="btn btn-xs" onclick="fcQuick('辦公室租金')">辦公室租金</button>
+            <button type="button" class="btn btn-xs" onclick="fcQuick('機具貸款')">機具貸款</button>
+            <button type="button" class="btn btn-xs" onclick="fcQuick('保險')">保險</button>
+            <button type="button" class="btn btn-xs" onclick="fcQuick('車輛油資')">車輛油資</button>
+            <button type="button" class="btn btn-xs" onclick="fcAddRow()">＋ 自訂</button>
+          </div>
+          <div id="fixed-cost-rows"></div>
+          <div id="fixed-cost-summary" style="margin-top:8px"></div>
         </div>
       </div>
     </div>
@@ -2408,10 +2424,9 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
     <button type="button" onclick="go('projects');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span><span>專案</span></button>
     <button type="button" onclick="go('contacts');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span><span>客戶</span></button>
-    <button type="button" onclick="goPayables();toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg></span><span>應付</span></button>
     <button type="button" onclick="go('quickcost');toggleMobMore();setTimeout(rQuickCost,60)" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg></span><span>快速支出</span></button>
     <button type="button" onclick="toggleMobMore();smartIntake()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
-      <button type="button" onclick="go('finance');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span><span>財務</span></button>
+      <button type="button" onclick="go('finance');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span><span>金流</span></button>
     <button type="button" onclick="go('reports');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span><span>報表</span></button>
     <button type="button" onclick="go('profit');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span><span>利潤</span></button>
       </div>
@@ -2426,7 +2441,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.282';
+var APP_VERSION='v5.283';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2786,7 +2801,56 @@ function _aiKey(){
     return k;
   }catch(e){return '';}
 }
+// ── 公司固定成本明細 → 推算管理費率（存 P.fixedCosts，隨參數雲端同步）──
+function _fcSuggestRate(){
+  var mTotal=(P.fixedCosts||[]).reduce(function(a,r){return a+(parseFloat(r.amt)||0);},0);
+  var now=Date.now();
+  var recv12=INV.reduce(function(a,i){
+    var r=parseFloat(i.received)||0;if(!r||!i.receivedDate)return a;
+    var t=new Date(i.receivedDate).getTime();
+    return (now-t)<365*864e5?a+r:a;
+  },0);
+  var rev=recv12/(1+(P.tax||5)/100);
+  return {mTotal:mTotal,annualFixed:mTotal*12,rev12:Math.round(rev),
+    rate:rev>0&&mTotal>0?Math.round(mTotal*12/rev*1000)/10:null};
+}
+function _fcSave(){try{persistP();}catch(e){} try{_onSave();}catch(e){}}
+function fcQuick(name){if(!P.fixedCosts)P.fixedCosts=[];if(!P.fixedCosts.some(function(r){return r.name===name;}))P.fixedCosts.push({name:name,amt:0});rFixedCosts();}
+function fcAddRow(){if(!P.fixedCosts)P.fixedCosts=[];P.fixedCosts.push({name:'',amt:0});rFixedCosts();}
+function fcDelRow(i){P.fixedCosts.splice(i,1);_fcSave();rFixedCosts();}
+function rFixedCosts(){
+  var box=document.getElementById('fixed-cost-rows');if(!box)return;
+  var list=P.fixedCosts||[];
+  box.innerHTML=list.length?list.map(function(r,i){
+    return '<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">'
+      +'<input value="'+esc(r.name||'')+'" placeholder="項目（例：人員薪資）" oninput="P.fixedCosts['+i+'].name=this.value;_fcSave()" style="flex:2;font-size:12.5px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit">'
+      +'<input type="number" value="'+(r.amt||'')+'" placeholder="月金額" oninput="P.fixedCosts['+i+'].amt=parseFloat(this.value)||0;_fcSave();_fcSummary()" style="flex:1;font-size:12.5px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);text-align:right;font-family:inherit">'
+      +'<button type="button" class="dbtn" onclick="fcDelRow('+i+')">✕</button></div>';
+  }).join(''):'<div style="font-size:11px;color:var(--b3);padding:4px 0">尚無項目——點上方快速新增</div>';
+  _fcSummary();
+}
+function _fcSummary(){
+  var el=document.getElementById('fixed-cost-summary');if(!el)return;
+  var s=_fcSuggestRate();
+  if(!s.mTotal){el.innerHTML='';return;}
+  el.innerHTML='<div style="background:var(--gl);border:1px solid var(--gm);border-radius:var(--r8);padding:8px 12px;font-size:12px;color:var(--b5)">'
+    +'月固定成本 <b>NT$ '+fmt(s.mTotal)+'</b>（年 '+fmt(s.annualFixed)+'）'
+    +(s.rate!=null
+      ?('　·　近12月稅前實收 NT$ '+fmt(s.rev12)+'　→　建議管理費率 <b style="color:var(--g3);font-size:14px">'+s.rate+'%</b> '
+        +'<button type="button" class="btn btn-xs btn-g" onclick="fcApplySuggest()" style="margin-left:6px">套用</button>')
+      :'　·　近12個月尚無實收資料，累積收款後可自動推算費率')
+    +'</div>';
+}
+function fcApplySuggest(){
+  var s=_fcSuggestRate();
+  if(s.rate==null){toast('近12個月尚無實收資料，無法推算');return;}
+  var e=document.getElementById('pohd');if(e)e.value=s.rate;
+  P.overheadPct=s.rate;_fcSave();
+  toast('✓ 已套用管理費率 '+s.rate+'%（利潤中心即時生效）');
+}
+
 function syncParamsUI(){
+  try{rFixedCosts();}catch(e){}
   try{var _pk=document.getElementById('paikey');if(_pk)_pk.value=_aiKey();}catch(e){}
   const m={pc:'company',pt:'taxid',pb:'boss',pco:'contact',ptel:'tel',pem:'email',pad:'addr',
     ptax:'tax',pohd:'overheadPct',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
@@ -11656,7 +11720,7 @@ function renderLedger(){
   }).join(''):(function(){var tot=(INVOICE_RECS||[]).filter(function(r){return r.status!=='cancelled';}).length;return '<div style="color:var(--b3);font-size:12px;padding:8px 0">本月（'+m+'）無銷項發票'+(tot?'——其他月份共 '+tot+' 張，請切換月份':'（於應收卡 🧾 開立）')+'</div>';})();
   document.getElementById('ledger-in-vendor').innerHTML=vins.length?vins.map(function(p2){
     return '<div onclick="ledgerRegInvNo(\''+p2.id+'\')" title="點擊登錄／修改發票號碼" style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--b1);font-size:12.5px;cursor:pointer">'
-      +'<div style="min-width:0;flex:1"><b>'+esc(p2.to||'')+'</b>　'+(p2.invNo?'🧾 '+esc(p2.invNo):'<span style="color:var(--red);font-size:11px;text-decoration:underline dotted">⚠ 未登錄發票號（點擊登錄）</span>')+'<div style="font-size:10.5px;color:var(--b3)">'+esc(p2.project||'')+'</div></div>'
+      +'<div style="min-width:0;flex:1"><b>'+esc(p2.to||'')+'</b>　'+(p2.invNo?'🧾 '+esc(p2.invNo):'<span style="color:var(--red);font-size:11px;text-decoration:underline dotted">⚠ 未登錄發票號（點擊登錄）</span>')+((p2.files&&p2.files.length)?' <span style="font-size:10.5px;color:var(--g3)">📎'+p2.files.length+'</span>':'')+'<div style="font-size:10.5px;color:var(--b3)">'+esc(p2.project||'')+'</div></div>'
       +'<div style="text-align:right;white-space:nowrap">NT$ '+fmt(_payEff(p2))+'<div style="font-size:10.5px;color:var(--b3)">稅 '+fmt(_payVatAmt(p2))+'</div></div>'
       +'</div>';
   }).join(''):'<div style="color:var(--b3);font-size:12px;padding:8px 0">本月無廠商進項</div>';
@@ -11669,9 +11733,14 @@ function renderLedger(){
 // 帳務頁：點擊廠商進項列，登錄／修改發票號碼
 function ledgerRegInvNo(pid){
   var p=PAYABLES.find(function(x){return x.id===pid;});if(!p)return;
+  var _fN=(p.files||[]).length;
   showConfirm('🧾 登錄廠商發票號',
     '<div style="font-size:12.5px;color:var(--b4);margin-bottom:10px"><b>'+esc(p.to||'')+'</b>　'+esc(p.project||'')+'<br>金額 NT$ '+fmt(_payEff(p))+'　稅 '+fmt(_payVatAmt(p))+'</div>'
     +'<div class="f"><label>發票號碼</label><input id="lg-invno" value="'+esc(p.invNo||'')+'" placeholder="AB12345678" maxlength="10" style="text-transform:uppercase;font-size:15px;font-weight:700;letter-spacing:1px"></div>'
+    +'<div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    +'<button type="button" class="btn btn-xs" onclick="document.getElementById(\'gen-confirm-cancel\').click();_payUpload(\''+pid+'\',\'inv\')" style="padding:7px 14px;border-color:var(--gm);color:var(--g3)">📎 上傳發票檔（照片／PDF）</button>'
+    +'<span style="font-size:11px;color:'+(_fN?'var(--g3)':'var(--b3)')+'">'+(_fN?('已保存 '+_fN+' 個附件（於應付管理可查看）'):'尚無附件')+'</span>'
+    +'</div>'
     +'<div style="font-size:11px;color:var(--b3);margin-top:8px">提示：也可用「智慧收件」拍發票照片，AI 自動登錄號碼並歸檔到此筆應付。</div>',
     function(){
       var v=(gv('lg-invno')||'').trim().toUpperCase();
@@ -13107,13 +13176,13 @@ const ALL_PAGES = [
   {id:'dash',      label:'總覽',    icon:'▦', adminOnly:false},
   {id:'quotes',    label:'報價單', icon:'≡', adminOnly:false},
   {id:'invoice',   label:'請款單', icon:'✉', adminOnly:false},
-  {id:'finance',   label:'財務管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>', adminOnly:false},
+  {id:'finance',   label:'金流管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>', adminOnly:false},
   {id:'profit',    label:'利潤分析', icon:'↗', adminOnly:false},
   {id:'contacts',  label:'客戶管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg>', adminOnly:false},
   {id:'contracts', label:'合約管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>', adminOnly:false},
   {id:'projects',  label:'專案總覽', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg>', adminOnly:false},
   {id:'costs',     label:'施工成本', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg>', adminOnly:false},
-  {id:'quickcost', label:'快速支出', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>', adminOnly:false},
+  {id:'quickcost', label:'快速支出・日報', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>', adminOnly:false},
   {id:'ledger',    label:'帳務管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>', adminOnly:false},
   {id:'reports',   label:'報表中心', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg>', adminOnly:false},
   {id:'permissions',label:'權限管理', icon:'🔐', adminOnly:true},
