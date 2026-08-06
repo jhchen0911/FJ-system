@@ -2448,7 +2448,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.285';
+var APP_VERSION='v5.286';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -3942,6 +3942,31 @@ function doPrint(){
 
 
 
+// ── 報價狀態追蹤：待回覆→議價中→未得標(記原因)→流標 循環切換 ──
+function cycleBidStatus(qid){
+  const q=Q.find(x=>x.id===qid);if(!q||q.awarded)return;
+  const order=['','nego','lost','void'];
+  const next=order[(order.indexOf(q.bidStatus||'')+1)%order.length];
+  if(next==='lost'){markQuoteLost(qid);return;}
+  q.bidStatus=next;
+  if(next!=='lost'){delete q.lostReason;delete q.lostPrice;}
+  q._mt=Date.now();persist();renderList();try{updateQuoteStats();}catch(e){}
+  toast('報價狀態：'+({'':'待回覆',nego:'議價中','void':'流標'})[next]);
+}
+function markQuoteLost(qid){
+  const q=Q.find(x=>x.id===qid);if(!q)return;
+  showConfirm('📉 未得標記錄：'+esc((q.name||'').slice(0,20)),
+    '<div class="f"><label>未得標原因</label><select id="ql-reason">'+['價格過高','規格不符','工期不符','業主關係','未回應','其他'].map(function(r){return '<option'+(q.lostReason===r?' selected':'')+'>'+r+'</option>';}).join('')+'</select></div>'
+    +'<div class="f" style="margin-top:8px"><label>對手得標價（選填，含稅）</label><input id="ql-price" type="number" value="'+(q.lostPrice||'')+'" placeholder="0" style="text-align:right;font-weight:700"></div>'
+    +'<div style="font-size:11px;color:var(--b3);margin-top:8px">我方報價 NT$ '+fmt(q.t?.total||0)+'。填對手得標價可分析「平均高出多少 %」，回頭校準報價策略。</div>',
+    function(){
+      q.bidStatus='lost';
+      q.lostReason=gv('ql-reason')||'其他';
+      var lp=parseFloat(gv('ql-price'));q.lostPrice=lp>0?lp:null;
+      q._mt=Date.now();persist();renderList();try{updateQuoteStats();}catch(e){}
+      toast('已記錄未得標：'+q.lostReason);
+    },false,null,true);
+}
 function qlHTML(q,clickable){
   var t=q.t||{};var nr=(t.netR||0)*100;var ok=nr>=P.profit;
   // P1-2：實際毛利 =（報價額 − 實際發包成本）/ 報價額；有成本記錄才用實際
@@ -3951,7 +3976,12 @@ function qlHTML(q,clickable){
   if(_hasAct){nr=_actNr;ok=nr>=P.profit;}
   var awarded=q.awarded||false;
   var dotColor=awarded?'#1a3a6b':ok?'#1a6b3f':'#f5a623';
-  var awardedBdg=awarded?'<span class="bdg" style="background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4;font-size:10px"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 得標</span>':'';
+  var _bst=q.bidStatus||'';
+  var _bstLbl={'':'待回覆',nego:'議價中',lost:'未得標',void:'流標'}[_bst]||'待回覆';
+  var _bstClr={'':'#b26a00',nego:'#1565C0',lost:'#c62828','void':'#78909C'}[_bst]||'#b26a00';
+  var awardedBdg=awarded
+    ?'<span class="bdg" style="background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4;font-size:10px"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 得標</span>'
+    :'<span class="bdg" onclick="event.stopPropagation();cycleBidStatus(\''+q.id+'\')" title="點擊切換：待回覆→議價中→未得標→流標" style="cursor:pointer;background:var(--w);border:1px dashed '+_bstClr+';color:'+_bstClr+';font-size:10px">'+_bstLbl+(_bst==='lost'&&q.lostReason?('｜'+esc(q.lostReason)):'')+'</span>';
   var mob=isMob();
   var qid=q.id;
 
@@ -6897,11 +6927,22 @@ function updateQuoteStats(){
   const awarded=Q.filter(q=>q.awarded).length;
   const totalAmt=Q.reduce((a,q)=>a+(q.t?.total||0),0);
   const awardedAmt=Q.filter(q=>q.awarded).reduce((a,q)=>a+(q.t?.total||0),0);
+  // 報價追蹤統計：有效得標率＝得標/(得標+未得標)，流標與待回覆不計入分母
+  const lost=Q.filter(q=>!q.awarded&&q.bidStatus==='lost');
+  const voided=Q.filter(q=>!q.awarded&&q.bidStatus==='void').length;
+  const nego=Q.filter(q=>!q.awarded&&q.bidStatus==='nego').length;
+  const pending=Q.filter(q=>!q.awarded&&!q.bidStatus&&!q.parentId).length;
+  const decided=awarded+lost.length;
+  const effRate=decided?Math.round(awarded/decided*100):null;
+  const rc={};lost.forEach(function(q){var k=q.lostReason||'其他';rc[k]=(rc[k]||0)+1;});
+  const diffs=lost.filter(q=>q.lostPrice>0&&(q.t?.total||0)>0).map(q=>(q.t.total-q.lostPrice)/q.lostPrice*100);
+  const avgDiff=diffs.length?Math.round(diffs.reduce((a,b)=>a+b,0)/diffs.length*10)/10:null;
   el.innerHTML=
-    '<div class="kpi" style="flex:1;min-width:120px"><div class="kl">報價單總數</div><div class="kv" style="font-size:20px">'+total+'</div><div class="ks">得標 '+awarded+' 件</div></div>'
-    +'<div class="kpi" style="flex:1;min-width:120px"><div class="kl">得標件數</div><div class="kv" style="font-size:20px">'+awarded+'</div><div class="ks">得標率 '+(total?Math.round(awarded/total*100):0)+'%</div></div>'
+    '<div class="kpi" style="flex:1;min-width:120px"><div class="kl">報價單總數</div><div class="kv" style="font-size:20px">'+total+'</div><div class="ks">待回覆 '+pending+'・議價中 '+nego+'・流標 '+voided+'</div></div>'
+    +'<div class="kpi" style="flex:1;min-width:130px"><div class="kl">有效得標率</div><div class="kv" style="font-size:20px;color:'+(effRate==null?'var(--b3)':effRate>=50?'var(--g3)':'#e65100')+'">'+(effRate==null?'—':effRate+'%')+'</div><div class="ks">勝 '+awarded+'／敗 '+lost.length+'（流標不計）</div></div>'
     +'<div class="kpi" style="flex:1;min-width:140px"><div class="kl">總報價金額</div><div class="kv" style="font-size:16px">NT$ '+fmt(totalAmt)+'</div></div>'
-    +'<div class="kpi hi" style="flex:1;min-width:140px"><div class="kl">得標金額</div><div class="kv" style="font-size:16px">NT$ '+fmt(awardedAmt)+'</div></div>';
+    +'<div class="kpi hi" style="flex:1;min-width:140px"><div class="kl">得標金額</div><div class="kv" style="font-size:16px">NT$ '+fmt(awardedAmt)+'</div></div>'
+    +(lost.length?('<div class="kpi" style="flex:1.5;min-width:200px"><div class="kl">📉 輸標分析</div><div class="kv" style="font-size:13px;font-weight:700;line-height:1.6">'+Object.keys(rc).map(function(k){return k+' '+rc[k];}).join('・')+'</div><div class="ks">'+(avgDiff!=null?('報價平均'+(avgDiff>=0?'高出':'低於')+'得標價 '+Math.abs(avgDiff)+'%（'+diffs.length+' 筆有對手價）'):'在未得標記錄填「對手得標價」可分析差距')+'</div></div>'):'');
 }
 
 // 請款單統計面板
