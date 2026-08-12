@@ -2448,7 +2448,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.288';
+var APP_VERSION='v5.289';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -3289,7 +3289,51 @@ function applyNegotiate(){
   toast('💰 已議價（'+lbl2+'）：NT$ '+fmt(base2)+' → NT$ '+fmt(target)+'，記得儲存');
 }
 // 手機端工項排序：上/下移一格（觸控裝置不支援 HTML5 拖曳）
+// ── 分類群組：分類列＝連同其下所有工項一起移動 ──
+function _qBlockLen(from){
+  if(!items[from]||!items[from].sec)return 1;
+  let len=1;
+  while(from+len<items.length&&!items[from+len].sec)len++;
+  return len;
+}
+// 收合狀態以分類序號為 key，搬移後序號會變，先對物件快照、搬完再回寫
+function _qFoldSnapshot(){
+  const m=new Map();let s=-1;
+  items.forEach(x=>{if(x.sec){s++;m.set(x,!!(window._qFold&&window._qFold[eid+':'+s]));}});
+  return m;
+}
+function _qFoldRestore(m){
+  if(!window._qFold)window._qFold={};
+  let s=-1;
+  items.forEach(x=>{if(x.sec){s++;window._qFold[eid+':'+s]=!!m.get(x);}});
+}
+// 將 from 起的列（分類含整組）搬到目標列 to；回傳是否有移動
+function _qMoveBlock(from,to){
+  const len=_qBlockLen(from);
+  if(to>=from&&to<from+len)return false;
+  const snap=_qFoldSnapshot();
+  const moved=items.splice(from,len);
+  let ins=to>from?to-len+1:to;
+  if(ins<0)ins=0;if(ins>items.length)ins=items.length;
+  items.splice(ins,0,...moved);
+  _qFoldRestore(snap);
+  return true;
+}
 function moveQItem(i,dir){
+  if(items[i]&&items[i].sec){
+    // 分類：整組跳過相鄰群組
+    const len=_qBlockLen(i);
+    if(dir<0){
+      if(i===0)return;
+      let p=i-1;while(p>0&&!items[p].sec)p--;
+      if(!_qMoveBlock(i,p))return;
+    }else{
+      const n=i+len;
+      if(n>=items.length)return;
+      if(!_qMoveBlock(i,n+_qBlockLen(n)-1))return;
+    }
+    rItems();rTots();return;
+  }
   const j=i+dir;
   if(j<0||j>=items.length)return;
   const t=items[i];items[i]=items[j];items[j]=t;
@@ -3347,10 +3391,14 @@ function _attachTouchDrag(card,tr,i){
     const from=i;let to=insertTo;
     reset();
     if(to==null)return;
-    if(to>from)to--;                                      // 取出後索引位移補償
-    if(to===from)return;
-    const moved=items.splice(from,1)[0];
-    items.splice(to,0,moved);
+    const len=_qBlockLen(from);                           // 分類＝整組一起搬
+    if(to>from&&to<=from+len)return;                      // 落點在自己群組內＝原地
+    let ins=to>from?to-len:to;                            // 取出後索引位移補償
+    if(ins===from)return;
+    const snap=_qFoldSnapshot();
+    const moved=items.splice(from,len);
+    items.splice(ins,0,...moved);
+    _qFoldRestore(snap);
     rItems();rTots();
     if(navigator.vibrate){try{navigator.vibrate(8);}catch(_e){}}
   }
@@ -3411,6 +3459,14 @@ function rItems(){
       e.dataTransfer.effectAllowed='move';
       e.dataTransfer.setData('text/plain',String(i));
       tr.style.opacity='0.4';
+      // 分類列：整組（含其下工項）一起搬，全組半透明提示
+      if(it.sec){
+        const len=_qBlockLen(i);
+        for(let k=i+1;k<i+len;k++){
+          const r=body.querySelector('tr[data-i="'+k+'"]');
+          if(r)r.style.opacity='0.4';
+        }
+      }
       // 拖曳接近視窗上下緣時自動捲動，長清單才拖得到目標位置
       if(!window._qDragAS){
         window._qDragAS=function(ev){
@@ -3422,7 +3478,7 @@ function rItems(){
       }
     });
     tr.addEventListener('dragend',function(){
-      tr.style.opacity='1';
+      body.querySelectorAll('tr').forEach(function(r){r.style.opacity='';});
       if(window._qDragAS){document.removeEventListener('dragover',window._qDragAS);window._qDragAS=null;}
     });
     tr.addEventListener('dragover',function(e){
@@ -3435,9 +3491,7 @@ function rItems(){
       const from=parseInt(e.dataTransfer.getData('text/plain'));
       const to=parseInt(tr.dataset.i);
       if(from===to)return;
-      const moved=items.splice(from,1)[0];
-      items.splice(to,0,moved);
-      rItems();rTots();
+      if(_qMoveBlock(from,to)){rItems();rTots();}
     });
     if(mob){
       // ═══ 手機端卡片式 ═══
