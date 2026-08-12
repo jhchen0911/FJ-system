@@ -974,8 +974,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <div class="ch green">
         <div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 報價明細</div>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
-          <button type="button" class="btn btn-xs" onclick="addSec()" style="padding:8px 14px;font-size:13px">+ 分類</button>
-          <button type="button" class="btn btn-xs btn-g" onclick="addIt()" style="padding:8px 14px;font-size:13px;font-weight:700">＋ 新增工項</button>
+          <button type="button" class="btn btn-xs" onclick="addSec()" title="加在明細最末端；要插在中間請用分類列上的「＋分類」" style="padding:8px 14px;font-size:13px">+ 分類</button>
+          <button type="button" class="btn btn-xs btn-g" onclick="addIt()" title="加在明細最末端；要插在中間請用各列的「＋」或分類列的「＋工項」" style="padding:8px 14px;font-size:13px;font-weight:700">＋ 新增工項</button>
           <button type="button" class="btn btn-xs" style="border-color:var(--gm);color:var(--g)" onclick="go('upa')">🔢 單價分析</button>
           <button type="button" class="btn btn-xs" onclick="backfillEstCosts()" title="把歷史單價庫的實績均價回填到尚未填成本的工項" style="border-color:#b39ddb;color:#4527a0;padding:8px 14px;font-size:13px">⟲ 實績回填</button>
         </div>
@@ -2448,7 +2448,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.287';
+var APP_VERSION='v5.288';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -3411,8 +3411,20 @@ function rItems(){
       e.dataTransfer.effectAllowed='move';
       e.dataTransfer.setData('text/plain',String(i));
       tr.style.opacity='0.4';
+      // 拖曳接近視窗上下緣時自動捲動，長清單才拖得到目標位置
+      if(!window._qDragAS){
+        window._qDragAS=function(ev){
+          const y=ev.clientY,h=window.innerHeight,edge=90;
+          if(y<edge)window.scrollBy(0,-Math.ceil((edge-y)/4+4));
+          else if(y>h-edge)window.scrollBy(0,Math.ceil((y-(h-edge))/4+4));
+        };
+        document.addEventListener('dragover',window._qDragAS);
+      }
     });
-    tr.addEventListener('dragend',function(){tr.style.opacity='1';});
+    tr.addEventListener('dragend',function(){
+      tr.style.opacity='1';
+      if(window._qDragAS){document.removeEventListener('dragover',window._qDragAS);window._qDragAS=null;}
+    });
     tr.addEventListener('dragover',function(e){
       e.preventDefault();e.dataTransfer.dropEffect='move';
       tr.style.borderTop='2px solid var(--g)';
@@ -3602,11 +3614,35 @@ function rItems(){
         fb.addEventListener('click',function(e){e.stopPropagation();window._qFold[eid+':'+_mySec]=!window._qFold[eid+':'+_mySec];rItems();});
         td0.textContent='';td0.appendChild(fb);
         const td1=mkTd('');td1.colSpan=8;
+        const secFlex=document.createElement('div');
+        secFlex.style.cssText='display:flex;align-items:center;gap:6px';
         const si=document.createElement('input');
         si.value=it.desc||'';si.placeholder='分類名稱';
-        si.style.cssText='width:100%;font-weight:700;font-size:13px;color:var(--g3);border:none;background:transparent;padding:3px 0;outline:none';
+        si.style.cssText='flex:1;min-width:0;font-weight:700;font-size:13px;color:var(--g3);border:none;background:transparent;padding:3px 0;outline:none';
         si.addEventListener('input',function(){items[i].desc=this.value;});
-        td1.appendChild(si);
+        secFlex.appendChild(si);
+        // 插入式新增：直接加在這個分類裡／這個分類之後
+        const insItBtn=document.createElement('button');
+        insItBtn.type='button';insItBtn.textContent='＋工項';
+        insItBtn.title='在此分類末端插入工項';
+        insItBtn.style.cssText='flex-shrink:0;font-size:11px;padding:2px 8px;border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:10px;cursor:pointer;font-weight:700';
+        insItBtn.addEventListener('click',function(e){
+          e.stopPropagation();
+          let p=i+1;while(p<items.length&&!items[p].sec)p++;
+          insItAt(p,_mySec);
+        });
+        secFlex.appendChild(insItBtn);
+        const insSecBtn=document.createElement('button');
+        insSecBtn.type='button';insSecBtn.textContent='＋分類';
+        insSecBtn.title='在此分類之後插入新分類';
+        insSecBtn.style.cssText='flex-shrink:0;font-size:11px;padding:2px 8px;border:1px solid var(--b2);background:var(--w);color:var(--b4);border-radius:10px;cursor:pointer;font-weight:700';
+        insSecBtn.addEventListener('click',function(e){
+          e.stopPropagation();
+          let p=i+1;while(p<items.length&&!items[p].sec)p++;
+          insSecAt(p);
+        });
+        secFlex.appendChild(insSecBtn);
+        td1.appendChild(secFlex);
         const td2=mkTd('');
         const delBtn=document.createElement('button');delBtn.textContent='✕';delBtn.className='btn btn-xs btn-r';
         delBtn.addEventListener('click',function(){items.splice(i,1);rItems();});
@@ -3695,7 +3731,13 @@ function rItems(){
         });
         otSel.addEventListener('change',function(){items[i].otu=this.value;});
         otDiv.appendChild(otInp);otDiv.appendChild(otSel);tdOt.appendChild(otDiv);
-        const tdDel=mkTd('text-align:center');
+        const tdDel=mkTd('text-align:center;white-space:nowrap;padding:3px 2px');
+        const insBtn=document.createElement('button');
+        insBtn.type='button';insBtn.textContent='＋';
+        insBtn.title='在此列下方插入工項';
+        insBtn.style.cssText='display:block;margin:0 auto 3px;font-size:12px;line-height:1;padding:3px 6px;border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:5px;cursor:pointer;font-weight:900';
+        insBtn.addEventListener('click',function(e){e.stopPropagation();insItAt(i+1,_mySec);});
+        tdDel.appendChild(insBtn);
         const delBtn=document.createElement('button');delBtn.textContent='✕';delBtn.className='btn btn-xs btn-r';
         delBtn.addEventListener('click',function(){items.splice(i,1);rItems();});
         tdDel.appendChild(delBtn);
@@ -3706,6 +3748,19 @@ function rItems(){
     }
     body.appendChild(tr);
   });
+  // 插入新列後：捲動到該列、聚焦說明欄並短暫標亮
+  if(window._qFocusI!=null){
+    const fi=window._qFocusI;window._qFocusI=null;
+    const row=body.querySelector('tr[data-i="'+fi+'"]');
+    if(row){
+      setTimeout(function(){row.scrollIntoView({block:'center',behavior:'smooth'});},30);
+      const inp=row.querySelector('input,textarea');
+      if(inp)setTimeout(function(){try{inp.focus({preventScroll:true});}catch(e){inp.focus();}},80);
+      row.style.transition='background-color .25s';
+      row.style.backgroundColor='#fff8c4';
+      setTimeout(function(){row.style.backgroundColor='';},900);
+    }
+  }
   rTots();
 }
 function upRow(i){
@@ -3726,8 +3781,16 @@ function rFoot(){
       <td style="text-align:right;font-variant-numeric:tabular-nums">NT$ ${fmt(t.total)}</td>
       <td colspan="4"></td></tr>`;
 }
-function addIt(){items.push({desc:'',unit:'',qty:'',price:'',note:'',ot:'',otu:'$/M/天',sec:false});rItems();}
-function addSec(){items.push({desc:'',sec:true});rItems();}
+function _qInsAt(pos,obj,unfoldSec){
+  items.splice(pos,0,obj);
+  if(unfoldSec!=null){if(!window._qFold)window._qFold={};window._qFold[eid+':'+unfoldSec]=false;}
+  window._qFocusI=pos;
+  rItems();
+}
+function insItAt(pos,unfoldSec){_qInsAt(pos,{desc:'',unit:'',qty:'',price:'',note:'',ot:'',otu:'$/M/天',sec:false},unfoldSec);}
+function insSecAt(pos){_qInsAt(pos,{desc:'',sec:true});}
+function addIt(){insItAt(items.length);}
+function addSec(){insSecAt(items.length);}
 function rExs(){
   const body=document.getElementById('exbody');if(!body)return;body.innerHTML='';
   exs.forEach((e,i)=>{
