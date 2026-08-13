@@ -2448,7 +2448,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.290';
+var APP_VERSION='v5.291';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -3234,16 +3234,63 @@ function rTots(){
 // ── 議價：輸入議價後含稅總價，各工項單價等比例調整，尾差以「議價調整」項補足 ──
 var NGT_ADJ_DESC='議價調整（尾差）';
 function _ngtMode(){var e=document.querySelector('input[name="ngt-mode"]:checked');return e?e.value:'incl';}
+function _ngtWay(){var e=document.querySelector('input[name="ngt-way"]:checked');return e?e.value:'whole';}
+function updNgtWay(){
+  var way=_ngtWay();
+  var w=document.getElementById('ngt-whole-wrap'),it=document.getElementById('ngt-items-wrap');
+  if(w)w.style.display=way==='whole'?'':'none';
+  if(it)it.style.display=way==='items'?'':'none';
+  if(way==='items')buildNgtItems();
+}
+// 逐項調價：列出所有工項的現行單價，逐一輸入新單價
+function buildNgtItems(){
+  var box=document.getElementById('ngt-items');if(!box)return;
+  var html='<table style="width:100%;border-collapse:collapse;font-size:11.5px">'
+    +'<tr style="background:var(--gl);color:var(--g3)"><th style="padding:5px 6px;text-align:left">工項</th><th style="padding:5px 4px;width:64px;text-align:right">數量</th><th style="padding:5px 4px;width:80px;text-align:right">現行單價</th><th style="padding:5px 4px;width:92px;text-align:right">議價後單價</th></tr>';
+  items.forEach(function(it,i){
+    if(it.sec){
+      html+='<tr><td colspan="4" style="padding:4px 6px;background:#f2f7f3;font-weight:700;color:var(--g3);font-size:11px">'+esc(it.desc||'分類')+'</td></tr>';
+      return;
+    }
+    var p=parseFloat(it.price)||0;
+    html+='<tr style="border-top:1px solid var(--b1)">'
+      +'<td style="padding:4px 6px;word-break:break-all">'+esc((it.desc||'').slice(0,28)||('工項'+(i+1)))+'</td>'
+      +'<td style="padding:4px;text-align:right;color:var(--b4);white-space:nowrap">'+(it.qty||0)+' '+esc(it.unit||'')+'</td>'
+      +'<td style="padding:4px;text-align:right;color:var(--b4)">'+fmt(p)+'</td>'
+      +'<td style="padding:3px 4px"><input type="number" id="ngt-ip-'+i+'" value="'+p+'" oninput="updNgtItemsSum()" style="width:100%;font-size:12px;height:26px;text-align:right;font-weight:700"></td>'
+      +'</tr>';
+  });
+  html+='</table>';
+  box.innerHTML=html;
+  updNgtItemsSum();
+}
+function updNgtItemsSum(){
+  var el=document.getElementById('ngt-items-sum');if(!el)return;
+  var t=calcT();
+  var sub=0;
+  items.forEach(function(it,i){
+    if(it.sec)return;
+    var inp=document.getElementById('ngt-ip-'+i);
+    var p=inp&&inp.value!==''?(parseFloat(inp.value)||0):(parseFloat(it.price)||0);
+    sub+=(parseFloat(it.qty)||0)*p;
+  });
+  var r=(P.tax||5)/100;
+  var diff=sub-t.sub;
+  el.innerHTML='調整後未稅小計 NT$ '+fmt(sub)+'　含稅總計 NT$ '+fmt(Math.round(sub*(1+r)))
+    +(diff!==0?('　<span style="color:'+(diff<0?'#c0392b':'#1a6b3f')+'">（'+(diff<0?'減':'加')+' NT$ '+fmt(Math.abs(diff))+'）</span>'):'');
+}
 function openNegotiateModal(){
   const t=calcT();
   if(t.sub<=0){toast('請先填寫工項單價與數量，再進行議價');return;}
   const cur=document.getElementById('ngt-current');if(cur)cur.textContent='NT$ '+fmt(t.total);
   const curSub=document.getElementById('ngt-current-sub');if(curSub)curSub.textContent='NT$ '+fmt(t.sub);
   const mi=document.querySelector('input[name="ngt-mode"][value="incl"]');if(mi)mi.checked=true;
+  const wi=document.querySelector('input[name="ngt-way"][value="whole"]');if(wi)wi.checked=true;
   const inp=document.getElementById('ngt-target');if(inp)inp.value='';
   const pv=document.getElementById('ngt-preview');if(pv)pv.textContent='';
+  updNgtWay();
   document.getElementById('negotiate-modal').style.display='flex';
-  setTimeout(function(){if(inp){inp.focus();}},100);
+  setTimeout(function(){if(inp&&_ngtWay()==='whole'){inp.focus();}},100);
 }
 function updNegotiatePreview(){
   const t=calcT();
@@ -3258,6 +3305,29 @@ function updNegotiatePreview(){
   pv.innerHTML='折合原價 <strong>'+pct+'%</strong>（'+(diff<0?'減價':'加價')+' NT$ '+fmt(Math.abs(diff))+'）｜'+other;
 }
 function applyNegotiate(){
+  // ── 逐項調價模式：只改談定的工項單價，不動其他工項、不補尾差 ──
+  if(_ngtWay()==='items'){
+    const before=calcT();
+    let changed=0;
+    items.forEach(function(it,i){
+      if(it.sec)return;
+      const inp=document.getElementById('ngt-ip-'+i);
+      if(!inp||inp.value==='')return;
+      const np=parseFloat(inp.value);
+      if(isNaN(np)||np<0)return;
+      const op=parseFloat(it.price)||0;
+      if(np===op)return;
+      if(it.origPrice==null)it.origPrice=op; // 保留議價前原單價（可追溯）
+      it.price=np;
+      changed++;
+    });
+    if(!changed){toast('沒有工項單價被修改');return;}
+    rItems();rTots();
+    document.getElementById('negotiate-modal').style.display='none';
+    const after=calcT();
+    toast('💰 已逐項調價 '+changed+' 項：未稅小計 NT$ '+fmt(before.sub)+' → NT$ '+fmt(after.sub)+'，記得儲存');
+    return;
+  }
   const target=parseFloat(document.getElementById('ngt-target')?.value)||0;
   if(target<=0){toast('請輸入議價後金額');return;}
   const mode=_ngtMode();
@@ -3888,8 +3958,9 @@ function saveQ(){
   if(idx>=0)Q[idx]=q;else Q.unshift(q);
   persist();
   // 連動更新：所有關聯請款單（含歷期）同步更新合約單價，並重算本期金額
+  let _linkedByQid=true;
   let linkedInvs=INV.filter(x=>x.sourceQid===q.id);
-  if(!linkedInvs.length)linkedInvs=INV.filter(x=>x.project===q.name);
+  if(!linkedInvs.length){linkedInvs=INV.filter(x=>x.project===q.name);_linkedByQid=false;}
   if(linkedInvs.length){
     // 新增工項只加到最新一期（歷史期別不補列）
     const latestInv=linkedInvs.slice().sort((a,b)=>(parseInt(b.periodNo)||0)-(parseInt(a.periodNo)||0))[0];
@@ -3921,6 +3992,12 @@ function saveQ(){
           }
         });
       }
+      // 表頭欄位同步（工程名稱改名後仍以 sourceQid 連動，顯示不脫鉤）
+      if(_linkedByQid){
+        linkedInv.project=q.name||linkedInv.project;
+        linkedInv.client=q.client||linkedInv.client;
+        linkedInv.loc=q.loc||linkedInv.loc;
+      }
       _recalcInvAmounts(linkedInv);
       linkedInv._mt=Date.now(); // 跨裝置同步：連動後的新值必須獲勝
     });
@@ -3929,6 +4006,26 @@ function saveQ(){
   } else {
     toast('報價已儲存！');
   }
+  // 連動更新：得標案的關聯合約（僅進行中未結算者）同步合約金額與基本資料
+  try{
+    if(q.awarded){
+      const _ct=CONTRACTS.find(c=>c.linkedQid===q.id);
+      if(_ct&&_ct.status==='active'&&_ct.originalAmount==null&&!/工項結算|竣工結算/.test(_ct.note||'')){
+        const _newAmt=q.t?.total||0;
+        const _chg=(_ct.amount||0)!==_newAmt||_ct.name!==q.name||_ct.client!==q.client;
+        if(_chg){
+          _ct.amount=_newAmt;
+          _ct.name=q.name||_ct.name;
+          _ct.client=q.client||_ct.client;
+          _ct.code=q.code||_ct.code;
+          _ct._mt=Date.now();_ct.updatedAt=Date.now();
+          saveContracts();
+          toast('📋 已連動更新合約金額：NT$ '+fmt(_newAmt));
+          try{if(document.getElementById('page-contracts')?.classList.contains('active'))renderContracts();}catch(e){}
+        }
+      }
+    }
+  }catch(e){}
   try{const _q=Q.find(x=>x.id===(eid||''));if(_q)saveQVersion(_q.id,_q);}catch(e){}
   try{logActivity('報價','儲存報價：'+(gv('fn')||'未命名'));}catch(e){}
   // 批次同步所有施工成本到應付帳款
@@ -3944,7 +4041,10 @@ function saveQ(){
       _sq.costs.forEach(function(c){syncCostToPayable(_sq,c);});
       // 2) 清除「已被刪除成本」的殘留：屬於本報價、但 costId 已不在現有成本清單中
       PAYABLES=PAYABLES.filter(function(p){
-        if(p.quoteId===_qid && p.costId && !_syncIds.has(p.costId) && !(p.costId&&p.costId.indexOf('merge_')===0))return false;
+        if(p.quoteId===_qid && p.costId && !_syncIds.has(p.costId) && !(p.costId&&p.costId.indexOf('merge_')===0)){
+          if(p.id)_tomb('payables',p.id); // 立墓碑，否則同步後殘留復活
+          return false;
+        }
         return true;
       });
       // 3) 全域去重保險：同一 costId 只留一筆，優先保留「已付款」那筆
@@ -3958,7 +4058,9 @@ function saveQ(){
         });
         PAYABLES=PAYABLES.filter(function(p){
           if(!p.costId)return true;
-          return _byCost[p.costId]===p;
+          if(_byCost[p.costId]===p)return true;
+          if(p.id)_tomb('payables',p.id); // 被去重的重複記錄也要立墓碑
+          return false;
         });
       }catch(e){}
       try{savePayables();}catch(e){}
@@ -3983,17 +4085,18 @@ function loadQ(id){
   go('editor');
   try{migrateCostRows(q);rCostItems();}catch(e){}
 }
-function confirmDelQ(id){Q=Q.filter(q=>q.id!==id);persist();renderList();rDash();updBadge();toast('🗑 已刪除');}
-function confirmDelInv(id){INV=INV.filter(x=>x.id!==id);saveInv();renderInvList();toast('🗑 已刪除');}
+function confirmDelQ(id){_tomb('quotes',id);Q=Q.filter(q=>q.id!==id);persist();renderList();rDash();updBadge();toast('🗑 已刪除');}
+function confirmDelInv(id){_tomb('invoices',id);INV=INV.filter(x=>x.id!==id);saveInv();renderInvList();toast('🗑 已刪除');}
 
-function delQ(id,ev){_tomb('quotes',id);
+function delQ(id,ev){
   if(ev&&ev.stopPropagation)ev.stopPropagation();
   if(ev&&ev.preventDefault)ev.preventDefault();
   var ok=false;
   try{ok=window.confirm('確定刪除此報價？');}catch(e){ok=true;}
   if(!ok)return;
-  // 同時刪除追加合約
+  // 同時刪除追加合約；確認後才立墓碑（含子單），否則按取消也會在下次同步時誤刪
   const _delIds=Q.filter(q=>q.id===id||q.parentId===id).map(q=>q.id);
+  _delIds.forEach(x=>_tomb('quotes',x));
   // 連同雲端工作確認單檔案（best-effort，不阻擋刪除）
   try{
     if(_fbStorage)Q.filter(q=>_delIds.includes(q.id)).forEach(q=>{
@@ -4004,12 +4107,13 @@ function delQ(id,ev){_tomb('quotes',id);
   // 資料完整性：清除此報價衍生的應付帳款、解除合約連結（避免孤兒/斷鏈）
   try{
     const _pb=PAYABLES.length;
+    PAYABLES.forEach(p=>{if(_delIds.includes(p.quoteId))_tomb('payables',p.id);});
     PAYABLES=PAYABLES.filter(p=>!_delIds.includes(p.quoteId));
     if(PAYABLES.length!==_pb)savePayables();
   }catch(e){}
   try{
     let _ctChanged=false;
-    (CONTRACTS||[]).forEach(c=>{if(_delIds.includes(c.linkedQid)){c.linkedQid=null;_ctChanged=true;}});
+    (CONTRACTS||[]).forEach(c=>{if(_delIds.includes(c.linkedQid)){c.linkedQid=null;c._mt=Date.now();c.updatedAt=Date.now();_ctChanged=true;}});
     if(_ctChanged&&typeof saveContracts==='function')saveContracts();
   }catch(e){}
   persist();renderList();rDash();updBadge();
@@ -8324,15 +8428,21 @@ function syncCostToPayable(q, cost){
   }
 
   // 移除所有與此成本相關的記錄（含被領養的孤立記錄 existIdx），再建立唯一一筆
+  var _removedIds=[];
   PAYABLES=PAYABLES.filter(function(p,i){
-    if(i===existIdx)return false;            // 被比對/領養的那筆 → 移除（下面重建）
-    if(p.costId===cost.id)return false;       // 任何 costId 重複 → 移除
-    if(p.costSourceId===cost.id)return false; // 任何 costSourceId 重複 → 移除
+    var drop=false;
+    if(i===existIdx)drop=true;                // 被比對/領養的那筆 → 移除（下面重建）
+    else if(p.costId===cost.id)drop=true;      // 任何 costId 重複 → 移除
+    else if(p.costSourceId===cost.id)drop=true;// 任何 costSourceId 重複 → 移除
     // 同廠商+專案+金額、但無 costId/costSourceId 的孤立殘留（舊版/手動殘留）→ 移除
-    if(!p.costId&&!p.costSourceId&&cost.vendor&&cost.amt>0&&
-       p.to===cost.vendor&&p.project===(q.name||'')&&Math.abs((p.amount||0)-(cost.amt||0))<1)return false;
-    return true;
+    else if(!p.costId&&!p.costSourceId&&cost.vendor&&cost.amt>0&&
+       p.to===cost.vendor&&p.project===(q.name||'')&&Math.abs((p.amount||0)-(cost.amt||0))<1)drop=true;
+    if(drop&&p.id)_removedIds.push(p.id);
+    return !drop;
   });
+  // 墓碑：被移除且「不會用同 id 重建」的記錄要立墓碑，否則雲端同步會復活成重複帳款
+  var _willRebuild=(cost.amt>0&&cost.vendor!=='公司支出（自付）');
+  _removedIds.forEach(function(pid){if(!(_willRebuild&&pid===existId))_tomb('payables',pid);});
   if(cost.amt<=0){
     // 金額為零：不建立應付（已移除相關記錄）
     savePayables();return;
@@ -8380,6 +8490,7 @@ function syncCostToPayable(q, cost){
 // 刪除對應的應付帳款（當施工成本刪除時）
 function removePayableByCostId(costId){
   const before=PAYABLES.length;
+  PAYABLES.forEach(p=>{if(p.costId===costId)_tomb('payables',p.id);}); // 立墓碑，否則同步後復活
   PAYABLES=PAYABLES.filter(p=>p.costId!==costId);
   if(PAYABLES.length!==before)savePayables();
 }
@@ -10706,8 +10817,9 @@ function settleContract(id){
   toast('⚖ 已結算：合約金額調整為 NT$ '+fmt(billed)+'，狀態已完成');
 }
 
-function delContract(id){_tomb('contracts',id);
+function delContract(id){
   showConfirm('刪除合約','確定刪除此合約？此操作無法復原。',()=>{
+    _tomb('contracts',id); // 確認後才立墓碑，按取消不會誤刪
     CONTRACTS=CONTRACTS.filter(x=>x.id!==id);
     saveContracts();renderContracts();toast('已刪除');
   });
@@ -11058,8 +11170,9 @@ function calcPayableAmt(){
 }
 
 
-function delPayable(id){_tomb('payables',id);
+function delPayable(id){
   showConfirm('刪除付款記錄','確定刪除此付款記錄？',()=>{
+    _tomb('payables',id); // 確認後才立墓碑，按取消不會誤刪
     PAYABLES=PAYABLES.filter(x=>x.id!==id);savePayables();renderPayables();updateFinanceKPIs();toast('已刪除');
   });
 }
@@ -11192,11 +11305,13 @@ function _projAttachFile(qid,type,name,dataUrl){
     if(ct.filePath&&_fbStorage){try{_fbStorage.ref(ct.filePath).delete().catch(function(){});}catch(e){}}
     ct.fileName=name;ct.fileData=dataUrl;ct.fileTs=Date.now();
     delete ct.fileUrl;delete ct.filePath;
+    ct._mt=Date.now();ct.updatedAt=Date.now();
     if(typeof saveContracts==='function')saveContracts();
     toast('合約檔已上傳：'+name);
   }else{
     if(!q.confirmFiles)q.confirmFiles=[];
     q.confirmFiles.push({name:name,data:dataUrl,ts:Date.now()});
+    q._mt=Date.now();
     persist();
     toast('工作確認單已上傳：'+name);
   }
@@ -11225,7 +11340,7 @@ function projDelConfirmFile(qid,idx){
   showConfirm('刪除附件','確定刪除「'+esc(q.confirmFiles[idx]?.name||'')+'」？',()=>{
     var f=q.confirmFiles[idx];
     if(f&&f.path&&_fbStorage){try{_fbStorage.ref(f.path).delete().catch(function(){});}catch(e){}}
-    q.confirmFiles.splice(idx,1);persist();renderProjects();
+    q.confirmFiles.splice(idx,1);q._mt=Date.now();persist();renderProjects();
     var el=document.getElementById('proj-detail-'+qid);if(el)el.style.display='block';
   });
 }
@@ -11233,13 +11348,13 @@ function toggleProjClosed(qid,close){
   const q=Q.find(x=>x.id===qid);if(!q)return;
   if(close){
     showConfirm('標記結案','結案後此專案預設從各清單隱藏（可透過「顯示已結案」切換查看），資料完整保留。結案時會自動把各工項的實際成本單價回寫到歷史單價庫，供之後報價參考。確定結案？',()=>{
-      q.closed=true;q.closedAt=Date.now();persist();
+      q.closed=true;q.closedAt=Date.now();q._mt=Date.now();persist();
       try{logActivity('專案','結案：'+(q.name||''));}catch(e){}
       let _n=0;try{_n=writeCostHist(q.id);}catch(e){}
       renderProjects();toast('已結案：'+(q.name||'')+(_n?('　📥 回寫 '+_n+' 筆工項實績到單價庫'):''));
     },false);
   }else{
-    q.closed=false;delete q.closedAt;persist();
+    q.closed=false;delete q.closedAt;q._mt=Date.now();persist();
     renderProjects();
     const el=document.getElementById('proj-detail-'+qid);if(el)el.style.display='block';
     toast('已恢復進行中：'+(q.name||''));
@@ -12098,8 +12213,9 @@ function _expForm(pre){
     },false,null,true);
 }
 function expManual(){_expForm();}
-function expDel(id){_tomb('expenses',id);
+function expDel(id){
   showConfirm('刪除費用發票','確定刪除這筆進項記錄？',function(){
+    _tomb('expenses',id); // 確認後才立墓碑，按取消不會誤刪
     EXPENSES=EXPENSES.filter(function(e){return e.id!==id;});
     saveExpenses();renderLedger();
   },true);
@@ -12237,18 +12353,21 @@ function intakeUndo(id){
   try{
     if(e.undo.kind==='cost'){
       var q=Q.find(function(x){return x.id===e.undo.qid;});
-      if(q&&q.costs){q.costs=q.costs.filter(function(c){return c.id!==e.undo.cid;});persist();_immediateUpload();}
+      if(q&&q.costs){q.costs=q.costs.filter(function(c){return c.id!==e.undo.cid;});q._mt=Date.now();persist();_immediateUpload();}
     }else if(e.undo.kind==='payinv'){
       var p2=PAYABLES.find(function(x){return x.id===e.undo.pid;});
       if(p2){if(e.undo.prevInvNo!==undefined)p2.invNo=e.undo.prevInvNo;
         if(p2.files)p2.files=p2.files.filter(function(f){return f.ts!==e.undo.fileTs;});
+        p2._mt=Date.now();
         savePayables();try{renderPayables();}catch(x){}}
     }else if(e.undo.kind==='owncost'){
       var qo=Q.find(function(x){return x.id===e.undo.qid;});
-      if(qo&&qo.costs){qo.costs=qo.costs.filter(function(c){return c.id!==e.undo.cid;});try{persist();_immediateUpload();}catch(x){}}
+      if(qo&&qo.costs){qo.costs=qo.costs.filter(function(c){return c.id!==e.undo.cid;});qo._mt=Date.now();try{persist();_immediateUpload();}catch(x){}}
+      _tomb('expenses',e.undo.eid);
       EXPENSES=EXPENSES.filter(function(x){return x.id!==e.undo.eid;});
       try{saveExpenses();}catch(x){}
     }else if(e.undo.kind==='expense'){
+      _tomb('expenses',e.undo.eid);
       EXPENSES=EXPENSES.filter(function(x){return x.id!==e.undo.eid;});
       saveExpenses();try{renderLedger();}catch(x){}
     }
@@ -12438,8 +12557,9 @@ function saveInvoiceRecord(){
 
 function closeInvoiceRecModal(){document.getElementById('invoice-rec-modal').style.display='none';}
 
-function delInvoiceRecord(id){_tomb('invoiceRecs',id);
+function delInvoiceRecord(id){
   showConfirm('刪除發票記錄','確定刪除此發票記錄？',()=>{
+    _tomb('invoiceRecs',id); // 確認後才立墓碑，按取消不會誤刪
     INVOICE_RECS=INVOICE_RECS.filter(x=>x.id!==id);saveInvoiceRecs();renderInvoiceRecords();toast('已刪除');
   });
 }
@@ -15079,7 +15199,7 @@ function exportCurrentReportExcel(){
 
 <!-- ████ 議價 MODAL ████ -->
 <div id="negotiate-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:12px;overflow-y:auto;align-items:flex-start;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
-  <div style="max-width:440px;width:100%;margin:20px auto;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <div style="max-width:520px;width:100%;margin:20px auto;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="background:var(--g3);padding:13px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:2.5px solid var(--y)">
       <span style="color:#fff;font-size:14px;font-weight:700">💰 議價</span>
       <button type="button" onclick="document.getElementById('negotiate-modal').style.display='none'" style="border:none;background:transparent;color:rgba(255,255,255,.75);font-size:20px;cursor:pointer;line-height:1;padding:0 4px">✕</button>
@@ -15097,15 +15217,27 @@ function exportCurrentReportExcel(){
         <strong id="ngt-current" style="font-size:15px;color:var(--g3)">NT$ 0</strong>
       </div>
       <div style="display:flex;gap:14px;margin-bottom:8px;font-size:13px;align-items:center">
-        <span style="color:var(--b4);font-weight:700">議價口徑：</span>
-        <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="ngt-mode" value="incl" checked onchange="updNegotiatePreview()"> 含稅</label>
-        <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="ngt-mode" value="excl" onchange="updNegotiatePreview()"> 未稅</label>
+        <span style="color:var(--b4);font-weight:700">調價方式：</span>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="ngt-way" value="whole" checked onchange="updNgtWay()"> 整單等比</label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="ngt-way" value="items" onchange="updNgtWay()"> 逐項調價</label>
       </div>
-      <div class="f" style="margin-bottom:6px">
-        <label>議價後金額</label>
-        <input type="number" id="ngt-target" placeholder="例：7000000" oninput="updNegotiatePreview()" style="font-size:16px;font-weight:700;text-align:right">
+      <div id="ngt-whole-wrap">
+        <div style="display:flex;gap:14px;margin-bottom:8px;font-size:13px;align-items:center">
+          <span style="color:var(--b4);font-weight:700">議價口徑：</span>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="ngt-mode" value="incl" checked onchange="updNegotiatePreview()"> 含稅</label>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="ngt-mode" value="excl" onchange="updNegotiatePreview()"> 未稅</label>
+        </div>
+        <div class="f" style="margin-bottom:6px">
+          <label>議價後金額</label>
+          <input type="number" id="ngt-target" placeholder="例：7000000" oninput="updNegotiatePreview()" style="font-size:16px;font-weight:700;text-align:right">
+        </div>
+        <div id="ngt-preview" style="font-size:12px;color:var(--b4);min-height:18px;margin-bottom:12px;text-align:right"></div>
       </div>
-      <div id="ngt-preview" style="font-size:12px;color:var(--b4);min-height:18px;margin-bottom:12px;text-align:right"></div>
+      <div id="ngt-items-wrap" style="display:none">
+        <div style="font-size:11px;color:var(--b4);margin-bottom:6px">只調整談定的工項單價（未稅），其他工項不動；原單價會保留在資料中可追溯。</div>
+        <div id="ngt-items" style="max-height:280px;overflow-y:auto;border:1px solid var(--b1);border-radius:var(--r6);margin-bottom:8px"></div>
+        <div id="ngt-items-sum" style="font-size:12.5px;text-align:right;min-height:20px;margin-bottom:12px;font-weight:700;color:var(--g3)"></div>
+      </div>
       <div style="display:flex;gap:8px">
         <button type="button" class="btn btn-g" onclick="applyNegotiate()" style="flex:1;justify-content:center;padding:9px">✓ 套用議價</button>
         <button type="button" class="btn" onclick="document.getElementById('negotiate-modal').style.display='none'" style="flex:1;justify-content:center;padding:9px">取消</button>
