@@ -607,6 +607,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   </div>
   <div id="pay-reminder-banner" style="display:none;padding:10px 18px 0"></div>
   <div class="kgrid" id="dash-kpis"></div>
+  <div id="dash-gates" style="margin-top:12px"></div>
   <div class="pad" style="display:flex;flex-direction:column;gap:12px">
 
     <!-- 通知提醒 -->
@@ -1123,6 +1124,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="fg fg2" style="margin-bottom:10px">
           <div class="f"><label>日期</label><input id="dr-date" type="date" style="font-size:14px;padding:8px 10px"></div>
           <div class="f"><label>出工人數</label><input id="dr-workers" type="number" inputmode="numeric" placeholder="0" style="font-size:16px;font-weight:700;text-align:right;padding:8px 10px"></div>
+          <div class="f" style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 0"><input type="checkbox" id="dr-own-equip" style="width:18px;height:18px"> 🏗 本日使用自有機具（震動機）<span style="font-size:10.5px;color:var(--b3)">— 供機具稼動率統計</span></label></div>
         </div>
         <div class="f" style="margin-bottom:10px">
           <label>今日進度／工作內容</label>
@@ -1382,6 +1384,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         style="padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--b4);font-family:inherit;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 現金流</button>
       <button type="button" class="finance-tab" id="ftab-invoice" onclick="switchFinanceTab('invoice')"
         style="padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--b4);font-family:inherit;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 發票</button>
+      <button type="button" class="finance-tab" id="ftab-share" onclick="switchFinanceTab('share')"
+        style="padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--b4);font-family:inherit;white-space:nowrap">🤝 分潤</button>
     </div>
     <!-- 應收帳款 -->
     <div id="finance-ar">
@@ -1407,6 +1411,10 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <button type="button" class="btn btn-sm btn-g" onclick="newInvoiceRecord()">＋ 新增發票</button>
       </div>
       <div class="card" style="margin-bottom:0"><div id="invoice-record-list"></div></div>
+    </div>
+    <!-- 股東分潤 -->
+    <div id="finance-share" style="display:none">
+      <div id="share-profit-box"></div>
     </div>
   </div>
 </div>
@@ -2448,7 +2456,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.292';
+var APP_VERSION='v5.293';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -6245,7 +6253,35 @@ function openAwardDetail(id){
   document.getElementById('award-paydue').value=q.payDue||'';
   document.getElementById('award-name').textContent=q.name||'未命名工程';
   document.getElementById('award-total').textContent='NT$ '+fmt(q.t?.total||0);
+  // 介紹佣金欄位：帶入既有設定；費率預設依預估毛利率（≥35%→3%、未達→2%）
+  const ref=q.referral||{};
+  const sv=(i,v)=>{const e=document.getElementById(i);if(e)e.value=v;};
+  const margin=(q.t?.netR||0)*100;
+  sv('award-ref-name',ref.name||'');
+  sv('award-ref-rate',ref.rate!=null?ref.rate:(margin>=35?3:2));
+  sv('award-ref-cap',ref.cap||'');
+  sv('award-ref-tid',ref.tid||'');
+  sv('award-ref-type',ref.incomeType||'9A');
+  const wh=document.getElementById('award-ref-withheld');if(wh)wh.checked=!!ref.withheld;
+  updAwardCommPreview();
   document.getElementById('award-modal').style.display='flex';
+}
+// 佣金試算：min(總工程款(含稅)×費率, 上限)
+function _calcCommission(total,rate,cap){
+  let amt=Math.round((total||0)*(rate||0)/100);
+  if(cap>0)amt=Math.min(amt,Math.round(cap));
+  return amt;
+}
+function updAwardCommPreview(){
+  const el=document.getElementById('award-comm-preview');if(!el)return;
+  const id=document.getElementById('award-qid').value;
+  const q=Q.find(x=>x.id===id);
+  const name=(gv('award-ref-name')||'').trim();
+  if(!name||!q){el.textContent='';return;}
+  const rate=parseFloat(gv('award-ref-rate'))||0;
+  const cap=parseFloat(gv('award-ref-cap'))||0;
+  const amt=_calcCommission(q.t?.total||0,rate,cap);
+  el.innerHTML='佣金試算：<b style="color:var(--g3)">NT$ '+fmt(amt)+'</b>（'+rate+'% × NT$ '+fmt(q.t?.total||0)+(cap>0?'，上限 NT$ '+fmt(cap):'')+'）';
 }
 
 function confirmAward(){
@@ -6254,6 +6290,33 @@ function confirmAward(){
   const q=Q.find(x=>x.id===id);if(!q)return;
   q.awarded=true;
   q.payDue=payDue;
+  // ── 介紹佣金：存設定＋連動應付帳款（依實收進度分期支付）──
+  try{
+    const refName=(gv('award-ref-name')||'').trim();
+    const commPayId='comm_'+id;
+    if(refName){
+      const rate=parseFloat(gv('award-ref-rate'))||0;
+      const cap=parseFloat(gv('award-ref-cap'))||0;
+      const amt=_calcCommission(q.t?.total||0,rate,cap);
+      q.referral={name:refName,rate:rate,cap:cap||null,amount:amt,
+        tid:(gv('award-ref-tid')||'').trim(),
+        incomeType:gv('award-ref-type')||'9A',
+        withheld:!!document.getElementById('award-ref-withheld')?.checked};
+      // 應付帳款 upsert（固定 id 防重複；保留既有付款狀態）
+      let cp=PAYABLES.find(p=>p.id===commPayId);
+      if(!cp){cp={id:commPayId,status:'pending'};PAYABLES.unshift(cp);}
+      cp.kind='commission';cp.to=refName;cp.project=q.name||'';cp.quoteId=id;
+      cp.amount=amt;
+      cp.note='介紹佣金 '+rate+'%・依實收款進度分期支付・'+(q.referral.incomeType==='9A'?'執行業務所得(9A)':'其他所得(92)')+(q.referral.withheld?'・已辦扣繳':'・⚠未辦扣繳');
+      cp._mt=Date.now();
+      savePayables();
+    }else{
+      // 清除介紹人＝取消佣金：移除未付款的佣金應付（已付款者保留帳）
+      const cp=PAYABLES.find(p=>p.id===commPayId);
+      if(cp&&cp.status!=='paid'){_tomb('payables',commPayId);PAYABLES=PAYABLES.filter(p=>p.id!==commPayId);savePayables();}
+      delete q.referral;
+    }
+  }catch(e){}
   q._mt=Date.now(); // 跨裝置同步：新狀態必須獲勝
   persist();
   document.getElementById('award-modal').style.display='none';
@@ -6761,7 +6824,86 @@ function rDash(){
     try{updateDashTodo();}catch(e){}
     try{checkNotifications();}catch(e){}
     try{checkPayReminders();}catch(e){}
+    try{renderBizGates();}catch(e){}
   }catch(e){console.error('rDash error',e);}
+}
+
+// ── 經營儀表板（十年規劃 Gate 指標）──
+// 自有機具稼動：統計指定月份(YYYY-MM)中有勾「使用自有機具」的日報「不重複日期」數
+function _equipDaysInMonth(ym){
+  var days={};
+  Q.forEach(function(q){(q.dailyLogs||[]).forEach(function(d){
+    if(d.ownEquip&&d.date&&d.date.slice(0,7)===ym)days[d.date]=1;
+  });});
+  return Object.keys(days).length;
+}
+function _hasEquipRecords(){
+  return Q.some(function(q){return (q.dailyLogs||[]).some(function(d){return d.ownEquip;});});
+}
+function renderBizGates(){
+  var el=document.getElementById('dash-gates');if(!el)return;
+  if(!canAccess||!canAccess('finance')){el.innerHTML='';return;}   // 內部經營數據：無金流權限者不顯示
+  // 1) 有效成交率（勝/(勝+敗)，流標與待回覆不計）
+  var awarded=Q.filter(function(q){return q.awarded&&!q.parentId;}).length;
+  var lost=Q.filter(function(q){return q.bidStatus==='lost';}).length;
+  var winRate=(awarded+lost)>0?Math.round(awarded/(awarded+lost)*100):null;
+  // 2) 預估 vs 實際毛利率（得標案；實際=有成本記錄者）
+  var estT=0,estC=0,actT=0,actC=0;
+  Q.filter(function(q){return q.awarded;}).forEach(function(q){
+    var tot=q.t?.total||0;if(tot<=0)return;
+    var ec=0;(q.items||[]).forEach(function(it){if(!it.sec)ec+=(parseFloat(it.qty)||0)*(parseFloat(it.estCost)||0);});
+    if(ec>0){estT+=tot;estC+=ec*(1+(P.tax||5)/100);}
+    var ac=0;try{ac=_projCostTotal(q);}catch(e){}
+    if(ac>0){actT+=tot;actC+=ac;}
+  });
+  var estM=estT>0?Math.round((estT-estC)/estT*100):null;
+  var actM=actT>0?Math.round((actT-actC)/actT*100):null;
+  // 3) 機具稼動（本月／上月），連 2 個完整月 <6 天 → 警示
+  var now=new Date();
+  var ymNow=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  var d1=new Date(now.getFullYear(),now.getMonth()-1,1),d2=new Date(now.getFullYear(),now.getMonth()-2,1);
+  var ymPrev=d1.getFullYear()+'-'+String(d1.getMonth()+1).padStart(2,'0');
+  var ymPrev2=d2.getFullYear()+'-'+String(d2.getMonth()+1).padStart(2,'0');
+  var eqNow=_equipDaysInMonth(ymNow),eqPrev=_equipDaysInMonth(ymPrev),eqPrev2=_equipDaysInMonth(ymPrev2);
+  var hasEq=_hasEquipRecords();
+  var eqAlert=hasEq&&eqPrev<6&&eqPrev2<6;
+  // 4) 平均回收天數（請款日→預計收款日）
+  var recvSum=0,recvN=0;
+  INV.forEach(function(v){
+    if(v.date&&v.expectedRecvDate){
+      var d=(new Date(v.expectedRecvDate)-new Date(v.date))/86400000;
+      if(d>0&&d<400){recvSum+=d;recvN++;}
+    }
+  });
+  var recvAvg=recvN>0?Math.round(recvSum/recvN):null;
+  // 5) 保留款餘額（各請款單保留款累計；出土面退回後請手動在請款單取消保留款勾選或沖銷）
+  var retSum=0;
+  INV.forEach(function(v){retSum+=(v.totals&&parseFloat(v.totals.retention))||0;});
+  // 6) 前三大業主佔比（得標金額）
+  var byClient={};var awardTot=0;
+  Q.filter(function(q){return q.awarded;}).forEach(function(q){
+    var t=q.t?.total||0;byClient[q.client||'未填']=(byClient[q.client||'未填']||0)+t;awardTot+=t;
+  });
+  var top3=Object.keys(byClient).map(function(k){return [k,byClient[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,3);
+  var top3Amt=top3.reduce(function(a,x){return a+x[1];},0);
+  var top3Pct=awardTot>0?Math.round(top3Amt/awardTot*100):null;
+  var kpi=function(label,val,sub,color){
+    return '<div class="kpi" style="flex:1;min-width:118px"><div class="kl">'+label+'</div><div class="kv" style="font-size:17px;color:'+(color||'var(--b5)')+'">'+val+'</div><div class="ks">'+sub+'</div></div>';
+  };
+  var na='<span style="color:var(--b3)">—</span>';
+  var html='<div class="card"><div class="ch"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 經營儀表板（十年規劃 Gate 指標）</div></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 14px">'
+    +kpi('有效成交率',winRate==null?na:winRate+'%','勝 '+awarded+'／敗 '+lost,winRate==null?null:winRate>=30?'var(--g3)':'#e65100')
+    +kpi('預估毛利率',estM==null?na:estM+'%','報價時預估（含稅口徑）',estM==null?null:estM>=35?'var(--g3)':'#e65100')
+    +kpi('實際毛利率',actM==null?na:actM+'%','已登錄成本的得標案',actM==null?null:actM>=35?'var(--g3)':'#e65100')
+    +kpi('機具稼動',hasEq?(eqNow+' 天'):na,hasEq?('本月｜上月 '+eqPrev+' 天'):'日報勾「自有機具」後開始統計',eqAlert?'#c62828':(hasEq&&eqNow>=6?'var(--g3)':null))
+    +kpi('平均回收天數',recvAvg==null?na:recvAvg+' 天','請款日→預計收款日（'+recvN+' 筆）',recvAvg==null?null:recvAvg<=60?'var(--g3)':'#e65100')
+    +kpi('保留款累計',retSum>0?('NT$ '+fmt(retSum)):na,'押在業主端的保證金',retSum>0?'#b26a00':null)
+    +kpi('前三大業主佔比',top3Pct==null?na:top3Pct+'%',top3.map(function(x){return esc(String(x[0]).slice(0,6));}).join('・')||'—',top3Pct==null?null:top3Pct<50?'var(--g3)':'#e65100')
+    +'</div>'
+    +(eqAlert?'<div style="margin:0 14px 12px;background:#fdf0ef;border:1px solid #f5c6c0;border-left:4px solid #c62828;border-radius:var(--r8);padding:10px 14px;font-size:12.5px;color:#8a2f26"><b>⚠ 機具稼動警示：</b>自有機具已連續兩個完整月（'+ymPrev2+'、'+ymPrev+'）稼動低於 6 天／月，依十年規劃紅線應啟動<b>接案策略檢討</b>——檢視報價量是否不足、價格策略是否過高、或機具外租消化閒置。</div>':'')
+    +'</div>';
+  el.innerHTML=html;
 }
 
 //
@@ -7817,6 +7959,12 @@ try{const x=localStorage.getItem('fy_activity');if(x)ACTIVITY_LOG=JSON.parse(x);
 
 function saveContracts(){try{localStorage.setItem('fy_contracts',JSON.stringify(CONTRACTS));}catch(e){} try{_autoUpload();}catch(e){}}
 
+// ── 股東分潤（茹軒／姊夫）：年度可提領上限＋實際領取記錄 ──
+// 可提領上限 = 稅後淨利 − 當年保留款增額 − 當年循環資金增額 − 機具自付款
+var SHARE_PROFIT={cfg:{},draws:[]};
+try{var _sp=localStorage.getItem('fy_share');if(_sp){var _spo=JSON.parse(_sp);if(_spo&&typeof _spo==='object'){SHARE_PROFIT.cfg=_spo.cfg||{};SHARE_PROFIT.draws=Array.isArray(_spo.draws)?_spo.draws:[];}}}catch(e){}
+function saveShareProfit(){try{localStorage.setItem('fy_share',JSON.stringify(SHARE_PROFIT));}catch(e){} try{_autoUpload();}catch(e){}}
+
 // ══ 自動雲端同步（debounced）══
 // 資料有任何變動後 3 秒無新變動，自動上傳到雲端
 var _autoUploadTimer=null;
@@ -7891,7 +8039,8 @@ function _syncPayload(){
     quotes:Q, invoices:INV, upaHistory:UH, params:P,
     contracts:CONTRACTS, vendors:VENDORS, payables:PAYABLES,
     invoiceRecs:INVOICE_RECS, expenses:EXPENSES, tombs:TOMBS, activityLog:ACTIVITY_LOG.slice(0,100),
-    customers:CUSTOMERS, upaCostDB:UPA_COST_DB, pagePerms:pagePerms, costHist:COST_HIST
+    customers:CUSTOMERS, upaCostDB:UPA_COST_DB, pagePerms:pagePerms, costHist:COST_HIST,
+    shareProfit:SHARE_PROFIT
   }};
 }
 // Firebase 物件 key 不能含 . # $ / [ ]，上傳前編碼、下載後還原（記憶體結構不變）
@@ -7942,6 +8091,19 @@ function _applyCloud(data){
     if(data.payables)PAYABLES=_safeMerge(PAYABLES,data.payables,'payables');
     if(data.invoiceRecs)INVOICE_RECS=_safeMerge(INVOICE_RECS,data.invoiceRecs,'invoiceRecs');
     if(data.expenses)EXPENSES=_safeMerge(EXPENSES,data.expenses,'expenses');
+    if(data.shareProfit){
+      try{
+        var _spc=data.shareProfit||{};
+        var _cd=Array.isArray(_spc.draws)?_spc.draws:Object.values(_spc.draws||{});
+        SHARE_PROFIT.draws=_safeMerge(SHARE_PROFIT.draws,_cd,'shareDraws');
+        var _cc=_spc.cfg||{};
+        Object.keys(_cc).forEach(function(y){
+          var lc=SHARE_PROFIT.cfg[y];
+          if(!lc||((_cc[y]&&_cc[y]._mt)||0)>=((lc&&lc._mt)||0))SHARE_PROFIT.cfg[y]=_cc[y];
+        });
+        localStorage.setItem('fy_share',JSON.stringify(SHARE_PROFIT));
+      }catch(e){}
+    }
     if(data.activityLog)ACTIVITY_LOG=data.activityLog;
     if(data.customers)CUSTOMERS=data.customers;
     if(data.costHist){
@@ -8561,10 +8723,15 @@ function _histCostFor(name){
 }
 
 // ── 成本科目分類（跨案分析用）──
-var COST_CATS=['工項材料','材料租金','材料運費','外包工程','人工','機具','機具運費','五金零件','油料耗材','雜費','其他'];
-function _costDefaultCat(type){return({own:'材料租金',sub:'外包工程',labor:'人工',extra:'雜費'})[type]||'其他';}
-// 舊科目名稱對應（v5.271~275 的舊值自動歸入新分類）
-function _costCatNorm(cat){var m={'材料':'材料租金','機具租金':'機具','運輸':'材料運費','管理雜費':'雜費'};return m[cat]||cat;}
+// v5.293：科目對齊十年規劃的六大成本類別（＋「其他」承接無法歸類的雜項）
+var COST_CATS=['動員費','打設拔除','裝設拆除','材料租金','材料運費','一次性材料購置','其他'];
+function _costDefaultCat(type){return({own:'材料租金',sub:'打設拔除',labor:'裝設拆除',extra:'其他'})[type]||'其他';}
+// 舊科目名稱對應（歷代舊值自動歸入新六大類）
+function _costCatNorm(cat){var m={
+  '材料':'材料租金','機具租金':'動員費','運輸':'材料運費','管理雜費':'其他',
+  '工項材料':'一次性材料購置','外包工程':'打設拔除','人工':'裝設拆除',
+  '機具':'動員費','機具運費':'動員費','五金零件':'其他','油料耗材':'其他','雜費':'其他'
+};return m[cat]||cat;}
 function updCostField(cid,field,val){
   var q=Q.find(function(x){return x.id===eid;});
   if(!q||!q.costs)return;
@@ -8740,7 +8907,9 @@ function submitDailyReport(){
   if(!q.dailyLogs)q.dailyLogs=[];
   q.dailyLogs.unshift({id:'d'+Date.now(),date:document.getElementById('dr-date')?.value||localToday(),
     workers:workers,progress:progress,photos:_drPhotos.slice(0,3),
+    ownEquip:!!document.getElementById('dr-own-equip')?.checked,
     by:((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||''),ts:Date.now()});
+  try{var _oe=document.getElementById('dr-own-equip');if(_oe)_oe.checked=false;}catch(e){}
   if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120); // 保留近 120 篇防爆量
   q._mt=Date.now();
   try{persist();}catch(e){}
@@ -12067,7 +12236,7 @@ function renderCashflow(){
 }
 
 function switchFinanceTab(tab){
-  ['ar','payable','cashflow','invoice'].forEach(t=>{
+  ['ar','payable','cashflow','invoice','share'].forEach(t=>{
     const btn=document.getElementById('ftab-'+t);
     const panel=document.getElementById('finance-'+t);
     const isActive=t===tab;
@@ -12082,6 +12251,124 @@ function switchFinanceTab(tab){
   if(tab==='cashflow')renderCashflow();
   if(tab==='invoice')renderInvoiceRecords();
   if(tab==='payable')renderPayables();
+  if(tab==='share')renderShareProfit();
+}
+
+// ══ 股東分潤：年度可提領上限＝稅後淨利−保留款增額−循環資金增額−機具自付款 ══
+var SHARE_WHO=['茹軒','姊夫'];
+function _shareYear(){return window._shareY||String(new Date().getFullYear());}
+function _shareCfg(y){return SHARE_PROFIT.cfg[y]||{netProfit:0,retentionAdd:0,wcAdd:0,machineSelfPay:0};}
+function shareSetYear(y){window._shareY=y;renderShareProfit();}
+function shareCfgInput(field,val){
+  var y=_shareYear();
+  var c=SHARE_PROFIT.cfg[y]||{netProfit:0,retentionAdd:0,wcAdd:0,machineSelfPay:0};
+  c[field]=parseFloat(val)||0;
+  c._mt=Date.now();
+  SHARE_PROFIT.cfg[y]=c;
+  saveShareProfit();
+  renderShareProfit(true); // 只更新數字區，避免輸入框失焦
+}
+function shareSuggestRetention(){
+  // 建議值：本年度各請款單保留款合計 − 去年同項（首年即為全額）
+  var y=_shareYear();
+  var cur=0,prev=0;
+  INV.forEach(function(v){
+    var r=(v.totals&&parseFloat(v.totals.retention))||0;if(!r)return;
+    var yy=(v.date||'').slice(0,4);
+    if(yy===y)cur+=r;else if(yy===String(parseInt(y)-1))prev+=r;
+  });
+  return Math.max(0,Math.round(cur));
+}
+function addShareDraw(){
+  var d=gv('share-d-date')||localToday();
+  var who=gv('share-d-who')||SHARE_WHO[0];
+  var amt=parseFloat(gv('share-d-amt'))||0;
+  if(amt<=0){toast('請填寫領取金額');return;}
+  SHARE_PROFIT.draws.unshift({id:'sd'+Date.now(),date:d,who:who,amount:amt,note:gv('share-d-note')||'',_mt:Date.now()});
+  saveShareProfit();
+  try{logActivity('分潤',who+' 領取 NT$ '+fmt(amt));}catch(e){}
+  renderShareProfit();
+  toast('已記錄：'+who+' 領取 NT$ '+fmt(amt));
+}
+function delShareDraw(id){
+  showConfirm('刪除領取記錄','確定刪除這筆分潤領取記錄？',function(){
+    _tomb('shareDraws',id);
+    SHARE_PROFIT.draws=SHARE_PROFIT.draws.filter(function(x){return x.id!==id;});
+    saveShareProfit();renderShareProfit();toast('已刪除');
+  });
+}
+function renderShareProfit(numOnly){
+  var el=document.getElementById('share-profit-box');if(!el)return;
+  var y=_shareYear();
+  var c=_shareCfg(y);
+  var cap=(c.netProfit||0)-(c.retentionAdd||0)-(c.wcAdd||0)-(c.machineSelfPay||0);
+  var draws=SHARE_PROFIT.draws.filter(function(x){return (x.date||'').slice(0,4)===y;});
+  var drawn=draws.reduce(function(a,x){return a+(parseFloat(x.amount)||0);},0);
+  var byWho={};SHARE_WHO.forEach(function(w){byWho[w]=0;});
+  draws.forEach(function(x){byWho[x.who]=(byWho[x.who]||0)+(parseFloat(x.amount)||0);});
+  var remain=cap-drawn;
+  var pct=cap>0?Math.min(100,Math.round(drawn/cap*100)):0;
+  if(numOnly){
+    // 僅更新計算結果區（輸入中不重繪輸入框）
+    var capEl=document.getElementById('share-cap-num');
+    if(capEl){
+      capEl.innerHTML=_shareCapHtml(cap,drawn,remain,pct,byWho);
+      return;
+    }
+  }
+  var years=[];var thisY=new Date().getFullYear();
+  for(var i=thisY+1;i>=thisY-3;i--)years.push(String(i));
+  Object.keys(SHARE_PROFIT.cfg).forEach(function(k){if(years.indexOf(k)<0)years.push(k);});
+  var inp=function(id,label,val,hint){
+    return '<div class="f"><label>'+label+(hint?' <span style="font-size:10px;color:var(--b3)">'+hint+'</span>':'')+'</label><input id="'+id+'" type="number" value="'+(val||'')+'" placeholder="0" style="text-align:right;font-weight:700" onchange="shareCfgInput(\''+id.replace('share-cfg-','')+'\',this.value)"></div>';
+  };
+  el.innerHTML=
+  '<div class="card"><div class="ch green"><div class="cht">🤝 股東分潤（茹軒／姊夫）</div>'
+  +'<select onchange="shareSetYear(this.value)" style="font-size:12px;padding:5px 10px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit">'
+  +years.map(function(v){return '<option value="'+v+'"'+(v===y?' selected':'')+'>'+v+' 年度</option>';}).join('')+'</select></div>'
+  +'<div style="padding:14px 16px">'
+  +'<div style="font-size:11.5px;color:var(--b4);background:var(--yl);border:1px solid var(--ym);border-radius:var(--r8);padding:8px 12px;margin-bottom:12px">'
+  +'<b>年度可提領上限 ＝ 稅後淨利 − 當年保留款增額 − 當年循環資金增額 − 機具自付款</b><br>超過上限的提領＝動用下一年的營運資金。稅後淨利可參考「報表中心 → 年度損益」；保留款增額可按「帶入建議值」。</div>'
+  +'<div class="fg fg2" style="margin-bottom:8px">'
+  +inp('share-cfg-netProfit','稅後淨利（元）',c.netProfit,'參考年度損益報表')
+  +'<div class="f"><label>保留款增額（元）<button type="button" class="btn btn-xs" style="margin-left:6px;padding:1px 8px;font-size:10px" onclick="shareCfgInput(\'retentionAdd\',shareSuggestRetention());renderShareProfit()">帶入建議值</button></label><input id="share-cfg-retentionAdd" type="number" value="'+(c.retentionAdd||'')+'" placeholder="0" style="text-align:right;font-weight:700" onchange="shareCfgInput(\'retentionAdd\',this.value)"></div>'
+  +'</div>'
+  +'<div class="fg fg2" style="margin-bottom:12px">'
+  +inp('share-cfg-wcAdd','循環資金增額（元）',c.wcAdd,'成長需增提的週轉金')
+  +inp('share-cfg-machineSelfPay','機具自付款（元）',c.machineSelfPay,'本年度機具貸款月付合計')
+  +'</div>'
+  +'<div id="share-cap-num">'+_shareCapHtml(cap,drawn,remain,pct,byWho)+'</div>'
+  +'<hr style="border:none;border-top:1px solid var(--b1);margin:14px 0">'
+  +'<div style="font-size:12.5px;font-weight:700;color:var(--b5);margin-bottom:8px">＋ 新增領取記錄</div>'
+  +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'
+  +'<div class="f" style="flex:0 0 130px"><label>日期</label><input id="share-d-date" type="date" value="'+localToday()+'"></div>'
+  +'<div class="f" style="flex:0 0 90px"><label>領取人</label><select id="share-d-who">'+SHARE_WHO.map(function(w){return '<option>'+w+'</option>';}).join('')+'</select></div>'
+  +'<div class="f" style="flex:0 0 130px"><label>金額（元）</label><input id="share-d-amt" type="number" placeholder="0" style="text-align:right;font-weight:700"></div>'
+  +'<div class="f" style="flex:1;min-width:120px"><label>備註</label><input id="share-d-note" placeholder="（選填）"></div>'
+  +'<button type="button" class="btn btn-g" style="padding:8px 18px" onclick="addShareDraw()">記錄</button>'
+  +'</div>'
+  +'<div style="font-size:12.5px;font-weight:700;color:var(--b5);margin-bottom:6px">'+y+' 年度領取記錄</div>'
+  +(draws.length?draws.map(function(x){
+      return '<div style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--b1);font-size:12.5px">'
+      +'<span style="color:var(--b4);flex:0 0 84px">'+fmtD(x.date||'')+'</span>'
+      +'<span style="font-weight:700;flex:0 0 52px">'+esc(x.who||'')+'</span>'
+      +'<span style="font-weight:800;color:var(--g3);flex:0 0 110px;text-align:right">NT$ '+fmt(x.amount||0)+'</span>'
+      +'<span style="color:var(--b4);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.note||'')+'</span>'
+      +'<button type="button" class="btn btn-xs btn-r" onclick="delShareDraw(\''+x.id+'\')">✕</button>'
+      +'</div>';
+    }).join(''):'<div style="padding:12px;color:var(--b3);font-size:12px;text-align:center">本年度尚無領取記錄</div>')
+  +'</div></div>';
+}
+function _shareCapHtml(cap,drawn,remain,pct,byWho){
+  var capClr=cap>0?'var(--g3)':'#c62828';
+  var remClr=remain>=0?'var(--g3)':'#c62828';
+  return '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'
+  +'<div class="kpi hi" style="flex:1;min-width:130px"><div class="kl">年度可提領上限</div><div class="kv" style="font-size:18px;color:'+capClr+'">NT$ '+fmt(cap)+'</div></div>'
+  +'<div class="kpi" style="flex:1;min-width:120px"><div class="kl">已領取合計</div><div class="kv" style="font-size:17px">NT$ '+fmt(drawn)+'</div><div class="ks">'+SHARE_WHO.map(function(w){return w+' '+fmt(byWho[w]||0);}).join('・')+'</div></div>'
+  +'<div class="kpi" style="flex:1;min-width:120px"><div class="kl">剩餘可領</div><div class="kv" style="font-size:17px;color:'+remClr+'">NT$ '+fmt(remain)+'</div>'+(remain<0?'<div class="ks" style="color:#c62828">⚠ 已超領，動用到營運資金</div>':'')+'</div>'
+  +'</div>'
+  +'<div style="background:var(--b1);border-radius:8px;height:14px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(remain<0?'#c62828':'linear-gradient(90deg,var(--g),var(--g3))')+';border-radius:8px"></div></div>'
+  +'<div style="font-size:10.5px;color:var(--b3);text-align:right;margin-top:3px">已領 '+pct+'%</div>';
 }
 
 function exportFinanceCSV(){
@@ -15335,6 +15622,24 @@ function exportCurrentReportExcel(){
           <label>備註</label>
           <input type="text" id="award-note" placeholder="例：含稅總價、分期付款...">
         </div>
+      </div>
+      <!-- 介紹佣金（人脈引薦案源）-->
+      <div style="border:1px solid var(--b1);border-radius:var(--r10);padding:10px 13px;margin-bottom:14px;background:var(--b0)">
+        <div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:8px">🤝 介紹佣金 <span style="font-size:10.5px;font-weight:400;color:var(--b3)">（人脈引薦之案源；沒有介紹人請留空）</span></div>
+        <div class="fg fg2" style="margin-bottom:8px">
+          <div class="f"><label>介紹人姓名</label><input id="award-ref-name" placeholder="留空＝無佣金" oninput="updAwardCommPreview()"></div>
+          <div class="f"><label>佣金率％ <span style="font-size:10px;color:var(--b3)">毛利≥35%建議3%、未達35%建議2%</span></label><input id="award-ref-rate" type="number" step="0.5" min="0" max="10" placeholder="3" style="text-align:right;font-weight:700" oninput="updAwardCommPreview()"></div>
+        </div>
+        <div class="fg fg2" style="margin-bottom:8px">
+          <div class="f"><label>單案佣金上限（元，選填）</label><input id="award-ref-cap" type="number" placeholder="不設限" style="text-align:right" oninput="updAwardCommPreview()"></div>
+          <div class="f"><label>受領人身分證／統編</label><input id="award-ref-tid" placeholder="扣繳申報用"></div>
+        </div>
+        <div class="fg fg2" style="margin-bottom:6px">
+          <div class="f"><label>所得類別</label><select id="award-ref-type"><option value="9A">9A 執行業務所得</option><option value="92">92 其他所得</option></select></div>
+          <div class="f"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding-top:20px"><input type="checkbox" id="award-ref-withheld" style="width:16px;height:16px"> 已辦扣繳／開立憑單</label></div>
+        </div>
+        <div id="award-comm-preview" style="font-size:12px;color:var(--b4);text-align:right;min-height:16px"></div>
+        <div style="font-size:10.5px;color:var(--b3);margin-top:4px">佣金以「總工程款（含稅）×費率」計算，<b>依實收款進度分期支付</b>；受領人須辦扣繳並留存憑單，否則不得列費用。</div>
       </div>
       <div style="display:flex;gap:8px">
         <button type="button" class="btn btn-g" onclick="confirmAward()" style="flex:2;justify-content:center;padding:9px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 確認得標 / 更新</button>
