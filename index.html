@@ -2448,7 +2448,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.291';
+var APP_VERSION='v5.292';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -4172,7 +4172,7 @@ function cycleBidStatus(qid){
   const next=order[(order.indexOf(q.bidStatus||'')+1)%order.length];
   if(next==='lost'){markQuoteLost(qid);return;}
   q.bidStatus=next;
-  if(next!=='lost'){delete q.lostReason;delete q.lostPrice;}
+  if(next!=='lost'){delete q.lostReason;delete q.lostPrice;delete q.lostNote;}
   q._mt=Date.now();persist();renderList();try{updateQuoteStats();}catch(e){}
   toast('報價狀態：'+({'':'待回覆',nego:'議價中','void':'流標'})[next]);
 }
@@ -4180,14 +4180,16 @@ function markQuoteLost(qid){
   const q=Q.find(x=>x.id===qid);if(!q)return;
   showConfirm('📉 未得標記錄：'+esc((q.name||'').slice(0,20)),
     '<div class="f"><label>未得標原因</label><select id="ql-reason">'+['價格過高','規格不符','工期不符','業主關係','未回應','其他'].map(function(r){return '<option'+(q.lostReason===r?' selected':'')+'>'+r+'</option>';}).join('')+'</select></div>'
+    +'<div class="f" style="margin-top:8px"><label>補充說明（選填，自由填寫）</label><input id="ql-note" value="'+esc(q.lostNote||'')+'" placeholder="例：對手用舊料報價、業主要求工期壓半個月…" style="font-size:13px"></div>'
     +'<div class="f" style="margin-top:8px"><label>對手得標價（選填，含稅）</label><input id="ql-price" type="number" value="'+(q.lostPrice||'')+'" placeholder="0" style="text-align:right;font-weight:700"></div>'
     +'<div style="font-size:11px;color:var(--b3);margin-top:8px">我方報價 NT$ '+fmt(q.t?.total||0)+'。填對手得標價可分析「平均高出多少 %」，回頭校準報價策略。</div>',
     function(){
       q.bidStatus='lost';
       q.lostReason=gv('ql-reason')||'其他';
+      q.lostNote=(gv('ql-note')||'').trim();
       var lp=parseFloat(gv('ql-price'));q.lostPrice=lp>0?lp:null;
       q._mt=Date.now();persist();renderList();try{updateQuoteStats();}catch(e){}
-      toast('已記錄未得標：'+q.lostReason);
+      toast('已記錄未得標：'+q.lostReason+(q.lostNote?('｜'+q.lostNote):''));
     },false,null,true);
 }
 function qlHTML(q,clickable){
@@ -4204,7 +4206,7 @@ function qlHTML(q,clickable){
   var _bstClr={'':'#b26a00',nego:'#1565C0',lost:'#c62828','void':'#78909C'}[_bst]||'#b26a00';
   var awardedBdg=awarded
     ?'<span class="bdg" style="background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4;font-size:10px"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 得標</span>'
-    :'<span class="bdg" onclick="event.stopPropagation();cycleBidStatus(\''+q.id+'\')" title="點擊切換：待回覆→議價中→未得標→流標" style="cursor:pointer;background:var(--w);border:1px dashed '+_bstClr+';color:'+_bstClr+';font-size:10px">'+_bstLbl+(_bst==='lost'&&q.lostReason?('｜'+esc(q.lostReason)):'')+'</span>';
+    :'<span class="bdg" onclick="event.stopPropagation();cycleBidStatus(\''+q.id+'\')" title="'+(_bst==='lost'&&q.lostNote?esc(q.lostNote)+'（點擊切換狀態）':'點擊切換：待回覆→議價中→未得標→流標')+'" style="cursor:pointer;background:var(--w);border:1px dashed '+_bstClr+';color:'+_bstClr+';font-size:10px">'+_bstLbl+(_bst==='lost'&&q.lostReason?('｜'+esc(q.lostReason)+(q.lostNote?'｜'+esc(q.lostNote.length>12?q.lostNote.slice(0,12)+'…':q.lostNote):'')):'')+'</span>';
   var mob=isMob();
   var qid=q.id;
 
@@ -12634,6 +12636,10 @@ function cleanupQHistory(){
 
 // ── 報價進版：封存現行為歷史版本、版本號 +1（改價重報時使用）──
 function bumpQVersion(qid){
+  // 編輯頁開著時先自動儲存，確保封存的正式版＝畫面上的內容
+  try{
+    if(typeof eid!=='undefined'&&eid===qid&&document.getElementById('page-editor')?.classList.contains('active'))saveQ();
+  }catch(e){}
   const q=Q.find(x=>x.id===qid);
   if(!q){toast('請先儲存報價單，再進版');return;}
   const curVer=q.ver||1;
@@ -12651,10 +12657,18 @@ function bumpQVersion(qid){
       toast('已進版至 v'+q.ver+'（v'+curVer+' 已存入歷史）');
     });
 }
-// ── 版本差異比較：歷史快照 vs 現行 ──
-function compareQVersion(qid,idx){
+// ── 版本差異比較：歷史快照 vs 現行；或指定 newerIdx＝版次對版次（看某次進版改了什麼）──
+function compareQVersion(qid,idx,newerIdx){
   const vs=Q_HISTORY[qid];if(!vs||!vs[idx])return;
-  const entry=vs[idx], old=entry.snapshot, cur=Q.find(x=>x.id===qid);
+  const entry=vs[idx], old=entry.snapshot;
+  let cur,curLabel;
+  if(newerIdx!=null&&vs[newerIdx]){
+    cur=vs[newerIdx].snapshot;
+    curLabel=(vs[newerIdx].formal?('v'+(vs[newerIdx].ver||'?')+' 正式版'):'自動存檔');
+  }else{
+    cur=Q.find(x=>x.id===qid);
+    curLabel=null; // 現行
+  }
   if(!cur){toast('找不到現行報價單');return;}
   const key=it=>String(it.desc||'').trim();
   const oldMap={},curMap={};
@@ -12700,7 +12714,7 @@ function compareQVersion(qid,idx){
   const head='<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--gl);border:1px solid var(--gm);border-radius:var(--r8);padding:8px 12px;margin-bottom:10px;flex-wrap:wrap">'
     +'<div style="font-size:12px"><div style="font-weight:700;color:var(--b5)">'+vLabel+'</div><div style="color:var(--b4);font-size:11px">'+new Date(entry.savedAt).toLocaleString('zh-TW')+'　NT$ '+fmt(oldTot)+'</div></div>'
     +'<div style="font-size:16px;color:var(--b3)">→</div>'
-    +'<div style="font-size:12px;text-align:right"><div style="font-weight:700;color:var(--b5)">現行'+((cur.ver||1)>1?' v'+cur.ver:'')+'</div><div style="color:var(--b4);font-size:11px">NT$ '+fmt(curTot)+'</div></div>'
+    +'<div style="font-size:12px;text-align:right"><div style="font-weight:700;color:var(--b5)">'+(curLabel?curLabel:('現行'+((cur.ver||1)>1?' v'+cur.ver:'')))+'</div><div style="color:var(--b4);font-size:11px">NT$ '+fmt(curTot)+'</div></div>'
     +'</div>';
   const table=(added.length+changed.length+removed.length)
     ?'<table style="width:100%;border-collapse:collapse"><thead><tr>'+th('工項')+th('數量','text-align:center')+th('單價','text-align:right')+th('金額差','text-align:right')+'</tr></thead><tbody>'+rows+'</tbody></table>'
@@ -12728,27 +12742,46 @@ function saveQVersion(qid,q,opts){
 
 function showQVersions(qid){
   const versions=Q_HISTORY[qid]||[];
-  if(!versions.length){toast('此報價單尚無歷史版本');return;}
-  const row=(v,i)=>`
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--b1)">
+  const cur=Q.find(x=>x.id===qid);
+  if(!versions.length&&!cur){toast('此報價單尚無歷史版本');return;}
+  // 各正式版的「前一版」索引（versions 由新到舊排列，往後找下一個 formal）
+  const prevFormalOf=i=>{for(let j=i+1;j<versions.length;j++){if(versions[j].formal)return j;}return -1;};
+  const row=(v,i)=>{
+    const pf=prevFormalOf(i);
+    return `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--b1);flex-wrap:wrap">
       <div style="flex:0 0 auto;font-family:'Noto Serif TC',serif;font-size:${v.formal?'17px':'12px'};font-weight:900;color:${v.formal?'var(--g3)':'var(--b3)'};min-width:38px">${v.formal?('V'+(v.ver||1)):'存檔'}</div>
-      <div style="flex:1;min-width:0">
+      <div style="flex:1;min-width:130px">
         <div style="font-size:12px;font-weight:700;color:var(--b5)">
           ${v.formal?`<span style="display:inline-block;background:var(--gl);color:var(--g3);border:1px solid var(--gm);border-radius:99px;padding:1px 9px;font-size:11px;margin-right:6px">v${v.ver||'?'} 正式版</span>`:''}
-          ${new Date(v.savedAt).toLocaleString('zh-TW')}
+          ${v.snapshot.date?('報價日 '+fmtD(v.snapshot.date)):new Date(v.savedAt).toLocaleString('zh-TW')}
         </div>
-        <div style="font-size:11px;color:var(--b4)">由 ${esc(v.by||'')} 儲存 ／ NT$ ${fmt(v.snapshot.t?.total||0)}</div>
+        <div style="font-size:11px;color:var(--b4)">NT$ ${fmt(v.snapshot.t?.total||0)} ／ ${new Date(v.savedAt).toLocaleString('zh-TW')} ／ ${esc(v.by||'')}</div>
       </div>
-      <button type="button" onclick="viewQVersion('${qid}',${i})" class="btn btn-xs">查看</button>
-      <button type="button" onclick="compareQVersion('${qid}',${i})" class="btn btn-xs" style="border-color:var(--g);color:var(--g)">比較</button>
-      <button type="button" onclick="restoreQVersion('${qid}',${i})" class="btn btn-xs" style="border-color:#1a73e8;color:#1a73e8">還原</button>
-    </div>`;
+      <div style="display:flex;gap:4px;flex-wrap:wrap">
+        <button type="button" onclick="viewQVersion('${qid}',${i})" class="btn btn-xs">查看</button>
+        <button type="button" onclick="compareQVersion('${qid}',${i})" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" title="此版與現行內容比較">vs現行</button>
+        ${(v.formal&&pf>=0)?`<button type="button" onclick="compareQVersion('${qid}',${pf},${i})" class="btn btn-xs" style="border-color:#7e57c2;color:#5e35b1" title="此版與前一個正式版比較（看這次進版改了什麼）">vs前版</button>`:''}
+        <button type="button" onclick="restoreQVersion('${qid}',${i})" class="btn btn-xs" style="border-color:#1a73e8;color:#1a73e8">還原</button>
+      </div>
+    </div>`;};
   const formals=[],autos=[];
   versions.forEach((v,i)=>{(v.formal?formals:autos).push(row(v,i));});
   const sec=(t,hint)=>`<div style="padding:7px 12px;background:var(--b0);font-size:11px;font-weight:700;color:var(--b4)">${t}${hint?` <span style="font-weight:400">${hint}</span>`:''}</div>`;
+  // 現行版列：版次鏈的最頂端
+  const curRow=cur?`
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--b1);background:#f4f9f5">
+      <div style="flex:0 0 auto;font-family:'Noto Serif TC',serif;font-size:17px;font-weight:900;color:#1a3a6b;min-width:38px">V${cur.ver||1}</div>
+      <div style="flex:1;min-width:130px">
+        <div style="font-size:12px;font-weight:700;color:var(--b5)"><span style="display:inline-block;background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4;border-radius:99px;padding:1px 9px;font-size:11px;margin-right:6px">現行版（編輯中）</span>${cur.date?('報價日 '+fmtD(cur.date)):''}</div>
+        <div style="font-size:11px;color:var(--b4)">NT$ ${fmt(cur.t?.total||0)}</div>
+      </div>
+      <button type="button" onclick="loadQ('${qid}')" class="btn btn-xs btn-g">開啟編輯</button>
+    </div>`:'';
   const body=
-    sec('正式版次','· 永久保留，供業主比選')
-    +(formals.length?formals.join(''):'<div style="padding:10px 12px;font-size:11.5px;color:var(--b3)">尚無正式版次 — 在編輯頁按「進版」即可封存現行內容為正式版</div>')
+    sec('版次鏈','· 現行版＋歷來正式版，由新到舊排列')
+    +curRow
+    +(formals.length?formals.join(''):'<div style="padding:10px 12px;font-size:11.5px;color:var(--b3)">尚無正式版次 — 在編輯頁按「進版」即可封存現行內容為正式版（V1、V2…依序累積）</div>')
     +sec('自動存檔','· 每次儲存自動留存，僅保留最近 10 份')
     +(autos.length?autos.join(''):'<div style="padding:10px 12px;font-size:11.5px;color:var(--b3)">尚無自動存檔</div>');
   showConfirm('歷史版本',`<div style="max-height:340px;overflow-y:auto;margin:-8px -12px">${body}</div>`,()=>{},false,null,true);
@@ -12783,7 +12816,12 @@ function restoreQVersion(qid,versionIdx){
       const curVer=Q[idx].ver||1;
       try{saveQVersion(qid,Q[idx]);}catch(e){}          // 還原前備份現行，避免內容遺失
       Q[idx]={...snapshot,id:qid,ver:Math.max(curVer,snapshot.ver||1)};  // 版號不倒退
+      Q[idx]._mt=Date.now(); // 快照裡的 _mt 是舊值，不蓋新戳記的話雲端同步會把還原吃掉
       persist();renderList();rDash();
+      // 編輯頁若正開著這張報價單，重新載入還原後的內容，避免舊畫面覆蓋還原結果
+      try{
+        if(typeof eid!=='undefined'&&eid===qid&&document.getElementById('page-editor')?.classList.contains('active'))loadQ(qid);
+      }catch(e){}
       toast('已還原（原內容已自動存檔）');
     }
   });
