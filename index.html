@@ -2477,7 +2477,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.299';
+var APP_VERSION='v5.300';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -8024,19 +8024,19 @@ try{var _sp=localStorage.getItem('fy_share');if(_sp){var _spo=JSON.parse(_sp);if
 function saveShareProfit(){try{localStorage.setItem('fy_share',JSON.stringify(SHARE_PROFIT));}catch(e){} try{_autoUpload();}catch(e){}}
 
 // ── 材料管理：自有／租賃庫存台帳 ──
-var MAT_CATALOG=[
-  ['型鋼',['H300','H350','H400']],
-  ['鋼軌樁',['50KG/M']],
-  ['鋼板樁',['III','IV']],
-  ['支撐',['H300','H350','H400']],
-  ['斜撐',['H300','H350','H400']],
-  ['短節',['H300','H350','H400']],
-  ['油壓千斤頂',['—']],
-  ['土壓計',['—']],
-  ['大U(含角鐵)',['H300','H350','H400']],
-  ['小U',['—']],
-  ['螺絲',['長','短','魚鉤']],
-  ['三角架',['三角架','大三角架','鋼軌三角架']],
+var MAT_CATALOG=[ // [品項, 規格陣列, 可輸入長度]
+  ['型鋼',['H300','H350','H400'],true],
+  ['鋼軌樁',['50KG/M'],true],
+  ['鋼板樁',['III','IV'],true],
+  ['支撐',['H300','H350','H400'],true],
+  ['斜撐',['H300','H350','H400'],false],
+  ['短節',['H300','H350','H400'],true],
+  ['油壓千斤頂',['—'],false],
+  ['土壓計',['—'],false],
+  ['大U(含角鐵)',['H300','H350','H400'],false],
+  ['小U',['H300','H350','H400'],false],
+  ['螺絲',['長','短','魚鉤'],false],
+  ['三角架',['三角架','大三角架','鋼軌三角架'],false],
 ];
 var MAT_STOCK={}; // key='品項|規格' → {own,rent,note,_mt}
 try{var _ms=localStorage.getItem('fy_mat_stock');if(_ms)MAT_STOCK=JSON.parse(_ms)||{};}catch(e){}
@@ -8058,18 +8058,22 @@ function _matUpdTotals(){
 function renderMaterials(){
   var el=document.getElementById('materials-list');if(!el)return;
   var html='<div id="mat-totals" style="padding:8px 14px;font-size:12.5px;color:var(--b4);border-bottom:1px solid var(--b1)"></div>';
-  html+='<div class="tbl-wrap"><table class="tbl" style="min-width:560px"><thead><tr>'
-    +'<th style="width:130px">品項</th><th style="width:120px">規格</th>'
-    +'<th style="width:90px" class="r">自有數量</th><th style="width:90px" class="r">租賃數量</th><th>備註</th>'
+  html+='<div class="tbl-wrap"><table class="tbl" style="min-width:640px"><thead><tr>'
+    +'<th style="width:120px">品項</th><th style="width:100px">規格</th>'
+    +'<th style="width:84px" class="r">長度(M)</th>'
+    +'<th style="width:84px" class="r">自有數量</th><th style="width:84px" class="r">租賃數量</th><th>備註</th>'
     +'</tr></thead><tbody>';
   MAT_CATALOG.forEach(function(cat){
-    var name=cat[0],specs=cat[1];
+    var name=cat[0],specs=cat[1],hasLen=!!cat[2];
     specs.forEach(function(sp,si){
       var key=name+'|'+sp;
-      var r=MAT_STOCK[key]||{own:'',rent:'',note:''};
+      var r=MAT_STOCK[key]||{own:'',rent:'',note:'',len:''};
       html+='<tr>'
         +(si===0?('<td rowspan="'+specs.length+'" style="font-weight:700;color:var(--g3);vertical-align:middle;background:#f7faf8">'+esc(name)+'</td>'):'')
         +'<td style="color:var(--b5)">'+esc(sp)+'</td>'
+        +(hasLen
+          ?'<td><input type="number" inputmode="decimal" step="0.5" value="'+(r.len!==''&&r.len!=null?r.len:'')+'" placeholder="長度" onchange="matStockUpd(\''+key.replace(/'/g,"\\'")+'\',\'len\',this.value)" style="width:100%;font-size:13px;height:30px;text-align:right"></td>'
+          :'<td style="text-align:center;color:var(--b2)">—</td>')
         +'<td><input type="number" inputmode="decimal" value="'+(r.own!==''&&r.own!=null?r.own:'')+'" placeholder="0" onchange="matStockUpd(\''+key.replace(/'/g,"\\'")+'\',\'own\',this.value)" style="width:100%;font-size:13px;height:30px;text-align:right;font-weight:700"></td>'
         +'<td><input type="number" inputmode="decimal" value="'+(r.rent!==''&&r.rent!=null?r.rent:'')+'" placeholder="0" onchange="matStockUpd(\''+key.replace(/'/g,"\\'")+'\',\'rent\',this.value)" style="width:100%;font-size:13px;height:30px;text-align:right;font-weight:700;color:#b26a00"></td>'
         +'<td><input value="'+esc(r.note||'')+'" placeholder="" onchange="matStockUpd(\''+key.replace(/'/g,"\\'")+'\',\'note\',this.value)" style="width:100%;font-size:12px;height:30px"></td>'
@@ -11954,7 +11958,15 @@ function renderProjects(){
         +'</div></div>';
     }).join('');
     const dot=done?'var(--b3)':(q.awarded?'var(--g)':'var(--ym)');
-    const kpi=(l,v,c2)=>'<div style="min-width:96px"><div style="font-size:10px;color:var(--b3)">'+l+'</div><div style="font-size:13px;font-weight:700;color:'+(c2||'var(--b5)')+';font-variant-numeric:tabular-nums">'+v+'</div></div>';
+    // KPI 可點擊跳轉；材料租金/運輸成本自施工成本科目彙總
+    const kpi=(l,v,c2,jump,tip)=>'<div style="min-width:96px;'+(jump?'cursor:pointer;':'')+'" '+(jump?('onclick="event.stopPropagation();'+jump.replace(/"/g,'&quot;')+'" title="'+(tip||'點擊開啟')+'"'):'')+'><div style="font-size:10px;color:var(--b3)">'+l+(jump?' <span style="font-size:9px">↗</span>':'')+'</div><div style="font-size:13px;font-weight:700;color:'+(c2||'var(--b5)')+';font-variant-numeric:tabular-nums">'+v+'</div></div>';
+    // 依科目彙總：材料租金／材料運費（含追加案）
+    let matRentCost=0,matTransCost=0;
+    [q].concat(adds).forEach(x=>{(x.costs||[]).forEach(c2=>{
+      const cat=c2.cat?_costCatNorm(c2.cat):_costDefaultCat(c2.type);
+      if(cat==='材料租金')matRentCost+=parseFloat(c2.amt)||0;
+      else if(cat==='材料運費')matTransCost+=parseFloat(c2.amt)||0;
+    });});
     return '<div class="card" style="margin-bottom:10px">'
       +'<div class="cb" style="padding:12px 14px">'
       +'<div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="toggleProjDetail(\''+q.id+'\')">'
@@ -11966,11 +11978,13 @@ function renderProjects(){
       +'<span style="font-size:11px;color:var(--b3)">展開流程 ▾</span>'
       +'</div>'
       +'<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px">'
-      +kpi('合約／報價',base?'NT$ '+fmt(base):'—')
-      +kpi('累計請款','NT$ '+fmt(billed),'var(--g3)')
-      +kpi('已收款','NT$ '+fmt(recv),'var(--g)')
-      +kpi('發包成本','NT$ '+fmt(cost),'#e65100')
-      +kpi('預估毛利','NT$ '+fmt(profit),profit<0?'var(--red)':'var(--g3)')
+      +kpi('合約／報價',base?'NT$ '+fmt(base):'—',null,"loadQ('"+q.id+"')",'開啟報價單')
+      +kpi('累計請款','NT$ '+fmt(billed),'var(--g3)',"go('invoice')",'開啟業主計價')
+      +kpi('已收款','NT$ '+fmt(recv),'var(--g)',"go('finance');setTimeout(function(){switchFinanceTab('ar')},150)",'開啟金流—業主計價')
+      +kpi('材料租金成本',matRentCost?'NT$ '+fmt(matRentCost):'—','#b26a00',"openProjectCosts('"+q.id+"')",'開啟施工成本（科目：材料租金；自有/租賃明細見材料管理）')
+      +kpi('材料運輸成本',matTransCost?'NT$ '+fmt(matTransCost):'—','#b26a00',"openProjectCosts('"+q.id+"')",'開啟施工成本（科目：材料運費，運輸以來回趟計）')
+      +kpi('發包成本','NT$ '+fmt(cost),'#e65100',"openProjectCosts('"+q.id+"')",'開啟施工成本')
+      +kpi('預估毛利','NT$ '+fmt(profit),profit<0?'var(--red)':'var(--g3)',"go('profit')",'開啟利潤分析')
       +'</div>'
       +'<div id="proj-detail-'+q.id+'" style="display:none;margin-top:14px;border-top:1px solid var(--b1);padding-top:14px">'
       +stepHtml
