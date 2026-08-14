@@ -558,10 +558,10 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <button type="button" class="tnav" id="tn-editor" onclick="newQ()">＋ 新增報價</button>
     <button type="button" class="tnav" id="tn-quotes" onclick="go('quotes')">報價管理</button>
     <button type="button" class="tnav" id="tn-contracts" onclick="go('contracts')">合約</button>
-    <button type="button" class="tnav" id="tn-invoice" onclick="go('invoice')">應收管理</button>
+    <button type="button" class="tnav" id="tn-invoice" onclick="go('invoice')">業主計價</button>
     <button type="button" class="tnav" id="tn-contacts" onclick="go('contacts')">客戶</button>
     <button type="button" class="tnav" id="tn-finance" onclick="go('finance')">財務</button>
-    <button type="button" class="tnav" id="tn-payables" onclick="goPayables()">應付</button>
+    <button type="button" class="tnav" id="tn-payables" onclick="goPayables()">廠商請款</button>
     <button type="button" class="tnav" id="tn-profit" onclick="go('profit')">分析</button>
     <button type="button" class="tnav" id="tn-params" onclick="go('params')">設定</button>
   </nav>
@@ -578,7 +578,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-projects" onclick="go('projects')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>專案管理</button>
   <button type="button" class="snav" id="sn-costs" onclick="go('costs')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>施工成本</button>
   <div class="ssec" style="margin-top:5px">收付流</div>
-  <button type="button" class="snav" id="sn-invoice" onclick="go('invoice')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>應收管理 <span class="cnt" id="invbadge" style="display:none">0</span></button>
+  <button type="button" class="snav" id="sn-invoice" onclick="go('invoice')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>業主計價 <span class="cnt" id="invbadge" style="display:none">0</span></button>
   <button type="button" class="snav" id="sn-finance" onclick="go('finance')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>金流管理</button>
   <div class="ssec" style="margin-top:5px">成本流</div>
   <button type="button" class="snav" id="sn-quickcost" onclick="go('quickcost');setTimeout(rQuickCost,60)"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg></span>支出．日報</button>
@@ -601,7 +601,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <!-- 手機版快捷入口 -->
   <div class="mob-quick-bar" style="padding:10px 14px 8px;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
     <button type="button" onclick="go('projects')" class="mob-chip mob-chip-primary"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 專案／成本</button>
-    <button type="button" onclick="go('invoice')" class="mob-chip mob-chip-blue"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 應收</button>
+    <button type="button" onclick="go('invoice')" class="mob-chip mob-chip-blue"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 業主計價</button>
     <button type="button" onclick="go('finance')" class="mob-chip mob-chip-orange"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 財務</button>
     <button type="button" onclick="fbDownload&&fbDownload()" class="mob-chip mob-chip-default"><svg class="ic ib" aria-hidden="true"><use href="#i-cloud"/></svg> 同步</button>
   </div>
@@ -649,7 +649,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       </button>
       <button type="button" onclick="go('invoice')" class="sc-btn">
         <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg></span>
-        <span class="sc-label">應收管理</span>
+        <span class="sc-label">業主計價</span>
         <span id="dash-inv-count" class="sc-sub">0 件</span>
       </button>
       <button type="button" onclick="go('finance')" class="sc-btn">
@@ -746,7 +746,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 
     <!-- 步驟2：輸入數量參數 -->
     <div class="card" style="margin-bottom:10px" id="upa-params-card">
-      <div class="ch green"><div class="cht">📐 步驟2：輸入參數</div></div>
+      <div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-sliders"/></svg> 步驟2：輸入參數</div></div>
       <div style="padding:12px">
         <div class="fg fg2" style="margin-bottom:10px">
           <div class="f" id="upa-len-wrap">
@@ -978,7 +978,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <button type="button" class="btn btn-xs" onclick="addSec()" title="加在明細最末端；要插在中間請用分類列上的「＋分類」" style="padding:8px 14px;font-size:13px">+ 分類</button>
           <button type="button" class="btn btn-xs btn-g" onclick="addIt()" title="加在明細最末端；要插在中間請用各列的「＋」或分類列的「＋工項」" style="padding:8px 14px;font-size:13px;font-weight:700">＋ 新增工項</button>
           <button type="button" class="btn btn-xs" style="border-color:var(--gm);color:var(--g);padding:8px 14px;font-size:13px" onclick="go('upa')"><svg class="ic ib" aria-hidden="true"><use href="#i-calc"/></svg> 單價分析</button>
-          <button type="button" class="btn btn-xs" onclick="backfillEstCosts()" title="把歷史單價庫的實績均價回填到尚未填成本的工項" style="border-color:#b39ddb;color:#4527a0;padding:8px 14px;font-size:13px">⟲ 實績回填</button>
+
         </div>
       </div>
       <div class="tbl-wrap" id="itbody-wrap">
@@ -990,7 +990,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
             <th style="width:70px" class="r">數量</th>
             <th style="width:86px" class="r">單價</th>
             <th style="width:100px" class="r">複價</th>
-            <th style="width:96px" class="r" title="內部預估成本單價（未稅），不會出現在報價單上；填了即顯示單項毛利率">成本單價🔒</th>
+            <th class="r" data-col="cost" style="display:none"></th>
             <th style="width:105px">備註</th>
             <th style="width:120px">逾期租金</th>
             <th style="width:28px"></th>
@@ -1050,8 +1050,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <div style="font-size:10.5px;color:var(--g3);margin-top:2px">✓ 所有變更即時自動儲存</div></div>
     <div class="ph-r">
       <button type="button" class="btn btn-sm" onclick="go('projects')">← 專案管理</button>
-      <button type="button" class="btn btn-sm" onclick="go('invoice')" title="本專案應收請款">應收</button>
-      <button type="button" class="btn btn-sm" onclick="go('finance');setTimeout(function(){switchFinanceTab('payable');},250)" title="應付管理">應付</button>
+      <button type="button" class="btn btn-sm" onclick="go('invoice')" title="本專案應收請款">業主計價</button>
+      <button type="button" class="btn btn-sm" onclick="go('finance');setTimeout(function(){switchFinanceTab('payable');},250)" title="廠商請款管理">廠商請款</button>
       <button type="button" class="btn btn-sm" onclick="if(eid)loadQ(eid)"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯報價</button>
     </div>
   </div>
@@ -1116,7 +1116,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       </div>
     </div>
     <div class="card" style="margin-top:12px">
-      <div class="ch green"><div class="cht">📋 工作日報</div></div>
+      <div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 工作日報</div></div>
       <div class="cb">
         <div class="f" style="margin-bottom:10px">
           <label>工程專案 *</label>
@@ -1128,19 +1128,24 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <div class="f" style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 0"><input type="checkbox" id="dr-own-equip" style="width:18px;height:18px"> 🏗 本日使用自有機具（震動機）<span style="font-size:10.5px;color:var(--b3)">— 供機具稼動率統計</span></label></div>
         </div>
         <div class="f" style="margin-bottom:10px">
-          <label>今日進度／工作內容</label>
-          <textarea id="dr-progress" rows="3" placeholder="例：H型鋼樁打設 12 支；第 2 層支撐安裝中" style="width:100%;font-size:14px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;resize:vertical"></textarea>
+          <label>今日進度／工作內容 <span style="font-size:10.5px;color:var(--b3)">— 選工項填數量，回報量連動專案施工進度條</span></label>
+          <div id="dr-prog-rows"></div>
+          <button type="button" class="btn btn-xs" onclick="drAddProgRow()" style="padding:6px 14px;margin-top:4px">＋ 加一列</button>
         </div>
         <div class="f" style="margin-bottom:12px">
           <label>現場照片（最多 3 張，自動壓縮）</label>
           <div id="dr-photos" style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0"></div>
-          <button type="button" class="btn btn-xs" onclick="drAddPhoto()" style="padding:7px 14px">📷 拍照／選圖</button>
+          <button type="button" class="btn btn-xs" onclick="drAddPhoto()" style="padding:7px 14px"><svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg> 拍照／選圖</button>
         </div>
-        <button type="button" class="btn btn-g" onclick="submitDailyReport()" style="width:100%;justify-content:center;padding:13px;font-size:15px;font-weight:900">✓ 送出日報</button>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button type="button" class="btn" onclick="drAddToList()" style="flex:1;justify-content:center;padding:11px;border-color:var(--gm);color:var(--g3);font-weight:700" title="把這個工地加入回報清單，繼續填下一個工地">＋ 加入清單，填下一個工地</button>
+        </div>
+        <div id="dr-list" style="margin-bottom:10px"></div>
+        <button type="button" class="btn btn-g" onclick="submitDailyReport()" style="width:100%;justify-content:center;padding:13px;font-size:15px;font-weight:900">✓ 送出日報（全部工地）</button>
       </div>
     </div>
     <div class="card" style="margin-top:12px">
-      <div class="ch"><div class="cht">📝 本次登錄記錄</div></div>
+      <div class="ch"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 本次登錄記錄</div></div>
       <div class="cb"><div id="qc-log" style="font-size:12.5px;color:var(--b4)">尚未登錄任何支出</div></div>
     </div>
   </div>
@@ -1378,9 +1383,9 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <!-- 分頁標籤 -->
     <div id="finance-tabs-wrap" style="display:flex;gap:0;margin-bottom:12px;border-bottom:2px solid var(--b1);overflow-x:auto;-webkit-overflow-scrolling:touch">
       <button type="button" class="finance-tab active" id="ftab-ar" onclick="switchFinanceTab('ar')"
-        style="padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--g3);border-bottom:3px solid var(--g3);margin-bottom:-2px;font-family:inherit;font-weight:700;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 應收</button>
+        style="padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--g3);border-bottom:3px solid var(--g3);margin-bottom:-2px;font-family:inherit;font-weight:700;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 業主計價</button>
       <button type="button" class="finance-tab" id="ftab-payable" onclick="switchFinanceTab('payable')"
-        style="padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--b4);font-family:inherit;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 應付</button>
+        style="padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--b4);font-family:inherit;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 廠商請款</button>
       <button type="button" class="finance-tab" id="ftab-cashflow" onclick="switchFinanceTab('cashflow')"
         style="padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--b4);font-family:inherit;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 現金流</button>
       <button type="button" class="finance-tab" id="ftab-invoice" onclick="switchFinanceTab('invoice')"
@@ -1472,7 +1477,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div style="font-size:12px;color:var(--b4);margin-bottom:10px">管理員可使用所有功能，一般使用者受下方頁面權限限制。</div>
         <!-- 首次設定說明 -->
         <div id="admin-setup-hint" style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:var(--r8);padding:10px 14px;margin-bottom:12px;font-size:12px;color:#1b5e20">
-          <div style="font-weight:700;margin-bottom:6px">🔐 如何設定管理員帳號？</div>
+          <div style="font-weight:700;margin-bottom:6px"><svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg> 如何設定管理員帳號？</div>
           <div style="line-height:1.8">
             1. 先至「<svg class="ic ib" aria-hidden="true"><use href="#i-sliders"/></svg> 參數設定」→「<svg class="ic ib" aria-hidden="true"><use href="#i-cloud"/></svg> Firebase 雲端同步」→ 登入帳號<br>
             2. <strong>第一位登入的帳號</strong>自動成為管理員<br>
@@ -1502,7 +1507,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <div class="ph-s" id="ledger-sub">進項・銷項發票與稅額彙總</div></div>
     <div class="ph-r">
       <input type="month" id="ledger-month" style="font-family:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--b2);border-radius:var(--r6)" onchange="renderLedger()">
-      <button type="button" class="btn btn-sm" style="border-color:#1a3a6b;color:#1a3a6b" onclick="expScan()">📷 拍照登錄費用發票</button>
+      <button type="button" class="btn btn-sm" style="border-color:#1a3a6b;color:#1a3a6b" onclick="expScan()"><svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg> 拍照登錄費用發票</button>
       <button type="button" class="btn btn-sm btn-g" onclick="expManual()">＋ 手動新增</button>
       <button type="button" class="btn btn-sm" onclick="ledgerExportCsv()">⬇ 匯出給會計師</button>
     </div>
@@ -2069,7 +2074,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <!-- ████ INVOICE PAGE ████ -->
 <div class="page" id="page-invoice">
   <div class="ph">
-    <div class="ph-l"><div class="ph-t">應收管理</div><div class="ph-s" id="inv-sub">請款 / 估驗管理</div></div>
+    <div class="ph-l"><div class="ph-t">業主計價</div><div class="ph-s" id="inv-sub">對業主請款 / 估驗管理</div></div>
     <div class="ph-r" style="display:flex;gap:6px;align-items:center">
       <button type="button" class="btn btn-sm" onclick="exportInvExcel()" style="color:var(--g3);border-color:var(--gm)"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> Excel</button>
       <button type="button" class="btn btn-sm" title="依付款條件重新計算所有未收款請款單的預計收款日" onclick="recalcAllExpected()">⟳ 重算收款日</button>
@@ -2430,7 +2435,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <span style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;background:var(--g);border-radius:50%;margin-top:-16px;box-shadow:0 3px 12px rgba(26,107,63,.4);border:3px solid var(--w)"><svg class="ic" aria-hidden="true" style="width:21px;height:21px;stroke:#fff;stroke-width:2"><use href="#i-contract"/></svg></span>
     <span style="font-size:9px;color:var(--g);font-weight:700;margin-top:1px">專案</span>
   </button>
-  <button type="button" class="mnav" id="mn-invoice" onclick="go('invoice')"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>應收<span class="cnt2" id="invbadge3" style="display:none">0</span></button>
+  <button type="button" class="mnav" id="mn-invoice" onclick="go('invoice')"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>業主計價<span class="cnt2" id="invbadge3" style="display:none">0</span></button>
   <button type="button" class="mnav" id="mn-more" onclick="toggleMobMore()"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></span>更多</button>
 </nav>
 <!-- 手機端「更多」展開選單 -->
@@ -2458,7 +2463,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.297';
+var APP_VERSION='v5.298';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -3656,9 +3661,9 @@ function rItems(){
         amtVal.style.cssText='font-size:15px;font-weight:900;color:var(--g3)';
         amtBox.appendChild(amtLbl);amtBox.appendChild(amtVal);
         card.appendChild(amtBox);
-        // 成本單價（內部）＋毛利率
+        // 成本單價（內部）＋毛利率（v5.298 自報價編輯移除顯示：成本由系統自動維護）
         const costRow=document.createElement('div');
-        costRow.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px';
+        costRow.style.cssText='display:none';
         const costInp=mkInput('number',it.estCost,'(內部，不印)','right');costInp.inputMode='decimal';
         const mgnBox=document.createElement('div');
         mgnBox.style.cssText='display:flex;align-items:flex-end;padding-bottom:7px;font-size:13px;font-weight:900';
@@ -3677,6 +3682,7 @@ function rItems(){
         const histM=document.createElement('div');
         histM.style.cssText='font-size:10.5px;color:#1a3a6b;margin:-2px 0 6px;cursor:pointer;text-decoration:underline dotted';
         function updHistM(){
+          histM.style.display='none';return; // v5.298 成本提示自報價編輯移除（成本由系統自動維護）
           const h=_histCostFor(items[i].desc);
           const cur=parseFloat(items[i].estCost)||0;
           if(h&&cur<=0){
@@ -3805,10 +3811,31 @@ function rItems(){
         const priceInp=mkTblInp('number',it.price,'0','right');
         priceInp.addEventListener('input',function(){items[i].price=this.value;rTots();});
         tdPrice.appendChild(priceInp);
+        // 成交行情提示：歷史得標均價（點擊帶入），與 UPA 理論價互為參考
+        const dealDiv=document.createElement('div');
+        dealDiv.style.cssText='font-size:9.5px;text-align:right;line-height:1.3;color:#7b5800;cursor:pointer;text-decoration:underline dotted';
+        function updDeal(){
+          const d=_dealPriceFor(items[i].desc);
+          const cur=parseFloat(items[i].price)||0;
+          if(d&&(cur<=0||Math.abs(d.avg-cur)/d.avg>0.05)){
+            dealDiv.textContent='成交 '+fmt(d.avg)+(d.unit?'/'+d.unit:'')+'（'+d.n+'筆）';
+            dealDiv.title='歷史得標成交單價：平均 '+fmt(d.avg)+'，區間 '+fmt(d.min)+'～'+fmt(d.max)+'，共 '+d.n+' 筆。點擊帶入單價（可與單價分析 UPA 理論價互相比較後擇一）';
+            dealDiv.style.display='';
+          }else dealDiv.style.display='none';
+        }
+        dealDiv.addEventListener('click',function(){
+          const d=_dealPriceFor(items[i].desc);if(!d)return;
+          items[i].price=String(d.avg);priceInp.value=d.avg;updDeal();rTots();
+          toast('已帶入歷史成交均價 '+fmt(d.avg));
+        });
+        priceInp.addEventListener('blur',updDeal);
+        try{descInp.addEventListener('blur',updDeal);}catch(e){}
+        updDeal();
+        tdPrice.appendChild(dealDiv);
         const tdAmt=mkTd('text-align:right;font-weight:700;color:var(--g3);white-space:nowrap');
         tdAmt.textContent=amt?'NT$ '+fmt(amt):'';
-        // 成本單價（內部）＋單項毛利率
-        const tdCost=mkTd('background:#fffdf5');
+        // 成本單價（內部）＋單項毛利率（v5.298 自報價編輯移除顯示：成本由得標回寫/UPA/歷史庫自動維護）
+        const tdCost=mkTd('background:#fffdf5;display:none');
         const costInp=mkTblInp('number',it.estCost,'成本','right');
         costInp.title='內部預估成本單價（未稅），不印在報價單上';
         const mgnSpan=document.createElement('div');
@@ -6301,6 +6328,8 @@ function confirmAward(){
   const q=Q.find(x=>x.id===id);if(!q)return;
   q.awarded=true;
   q.payDue=payDue;
+  // 成交單價自動回寫：報價→議價→得標的最終單價進成交單價庫，供未來報價比對行情
+  try{var _dn=writeDealHist(q);if(_dn)toast('📈 已回寫 '+_dn+' 筆成交單價');}catch(e){}
   // ── 介紹佣金：存設定＋連動應付帳款（依實收進度分期支付）──
   try{
     const refName=(gv('award-ref-name')||'').trim();
@@ -6516,6 +6545,7 @@ function importData(file){
         if(data.expenses)EXPENSES=arr(data.expenses);
         if(data.customers)CUSTOMERS=arr(data.customers);
         if(data.costHist){COST_HIST=arr(data.costHist);try{localStorage.setItem('fy_cost_hist',JSON.stringify(COST_HIST));}catch(e2){}}
+        if(data.dealHist){DEAL_HIST=arr(data.dealHist);try{localStorage.setItem('fy_deal_hist',JSON.stringify(DEAL_HIST));}catch(e2){}}
         if(data.upaCostDB){try{Object.assign(UPA_COST_DB,data.upaCostDB);localStorage.setItem('fy_upa_cost',JSON.stringify(UPA_COST_DB));}catch(e2){}}
         if(data.activityLog)ACTIVITY_LOG=arr(data.activityLog);
         persist();saveInv();saveUH();persistP();
@@ -8052,7 +8082,7 @@ function _syncPayload(){
     contracts:CONTRACTS, vendors:VENDORS, payables:PAYABLES,
     invoiceRecs:INVOICE_RECS, expenses:EXPENSES, tombs:TOMBS, activityLog:ACTIVITY_LOG.slice(0,100),
     customers:CUSTOMERS, upaCostDB:UPA_COST_DB, pagePerms:pagePerms, costHist:COST_HIST,
-    shareProfit:SHARE_PROFIT
+    shareProfit:SHARE_PROFIT, dealHist:DEAL_HIST
   }};
 }
 // Firebase 物件 key 不能含 . # $ / [ ]，上傳前編碼、下載後還原（記憶體結構不變）
@@ -8118,6 +8148,18 @@ function _applyCloud(data){
     }
     if(data.activityLog)ACTIVITY_LOG=data.activityLog;
     if(data.customers)CUSTOMERS=data.customers;
+    if(data.dealHist){
+      // 成交單價庫合併：以 rid 為鍵，雲端與本機聯集（同鍵取日期新者）
+      try{
+        var _dhMap={};
+        (Array.isArray(data.dealHist)?data.dealHist:Object.values(data.dealHist||{})).concat(DEAL_HIST).forEach(function(r){
+          if(!r||!r.rid)return;
+          if(!_dhMap[r.rid]||String(r.date||'')>=String(_dhMap[r.rid].date||''))_dhMap[r.rid]=r;
+        });
+        DEAL_HIST=Object.values(_dhMap);
+        localStorage.setItem('fy_deal_hist',JSON.stringify(DEAL_HIST));
+      }catch(e){}
+    }
     if(data.costHist){
       // 單價庫合併：以 qid+idx 為鍵，雲端與本機聯集（同鍵取日期新者）
       try{
@@ -8766,6 +8808,35 @@ function changeCostType(cid,newType){
 }
 
 // ── 歷史單價庫：結案復盤回寫的「工項實際成本單價」，報價時自動提示 ──
+// ── 成交單價庫：得標時自動回寫各工項成交單價，報價時提示行情（與 UPA 理論價互相比對）──
+var DEAL_HIST=[];
+try{const _dh=localStorage.getItem('fy_deal_hist');if(_dh)DEAL_HIST=JSON.parse(_dh);}catch(e){}
+function saveDealHist(){try{localStorage.setItem('fy_deal_hist',JSON.stringify(DEAL_HIST));}catch(e){} try{_autoUpload();}catch(e){}}
+function writeDealHist(q){
+  if(!q||!q.items)return 0;
+  let n=0;
+  q.items.forEach(function(it,i){
+    if(it.sec)return;
+    var p=parseFloat(it.price)||0;if(p<=0)return;
+    var key=_normName(it.desc);if(!key||key.length<2)return;
+    var rid=q.id+'#'+i;
+    DEAL_HIST=DEAL_HIST.filter(function(r){return r.rid!==rid;}); // 同工項重複得標（進版重得標）以最新為準
+    DEAL_HIST.push({rid:rid,qid:q.id,idx:i,key:key,desc:(it.desc||'').split('\n')[0].slice(0,40),
+      unit:it.unit||'',price:p,date:q.date||localToday(),client:q.client||''});
+    n++;
+  });
+  if(n)saveDealHist();
+  return n;
+}
+function _dealPriceFor(name){
+  const k=_normName(name);if(!k||k.length<2)return null;
+  const recs=DEAL_HIST.filter(r=>r.key===k||(k.length>=4&&(r.key.includes(k)||k.includes(r.key))));
+  if(!recs.length)return null;
+  const avg=Math.round(recs.reduce((a,r)=>a+r.price,0)/recs.length);
+  return {avg:avg,n:recs.length,unit:recs[0].unit,
+    min:Math.round(Math.min.apply(null,recs.map(r=>r.price))),
+    max:Math.round(Math.max.apply(null,recs.map(r=>r.price)))};
+}
 var COST_HIST=[];
 try{const _ch=localStorage.getItem('fy_cost_hist');if(_ch)COST_HIST=JSON.parse(_ch);}catch(e){}
 function saveCostHist(){try{localStorage.setItem('fy_cost_hist',JSON.stringify(COST_HIST));}catch(e){} try{_autoUpload();}catch(e){}}
@@ -8906,9 +8977,12 @@ function rQuickCost(){
   if(dsel){
     const dcur=dsel.value;
     dsel.innerHTML='<option value="">── 選擇專案 ──</option>'+mains.map(q=>'<option value="'+q.id+'"'+(q.id===dcur?' selected':'')+'>'+esc(q.name||'未命名')+'</option>').join('');
+    dsel.onchange=function(){drRenderProgRows(true);};
   }
   const dd=document.getElementById('dr-date');if(dd&&!dd.value)dd.value=localToday();
   drRenderPhotos();
+  drRenderProgRows();
+  drRenderList();
   rQuickCostItems();rQcLog();
 }
 function qcPick(i){_qcSel=i;rQuickCost();}
@@ -8975,29 +9049,97 @@ function drRenderPhotos(){
       +'<button type="button" onclick="_drPhotos.splice('+i+',1);drRenderPhotos()" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:var(--red);color:#fff;font-size:11px;cursor:pointer;line-height:1">✕</button></div>';
   }).join('');
 }
-function submitDailyReport(){
+// ── 工作日報：多工地一次回報＋工項下拉進度列（連動專案施工進度條）──
+var _drList=[];        // 待送出的回報清單（每項＝一個工地）
+var _drProgRows=[];    // 目前表單的進度列 {itemIdx,qty,note}
+function drRenderProgRows(reset){
+  if(reset)_drProgRows=[];
+  if(!_drProgRows.length)_drProgRows=[{itemIdx:-1,qty:'',note:''}];
+  const box=document.getElementById('dr-prog-rows');if(!box)return;
   const qid=document.getElementById('dr-proj')?.value;
   const q=Q.find(x=>x.id===qid);
-  if(!q){toast('請先選擇工程專案');return;}
+  box.innerHTML=_drProgRows.map(function(r,ri){
+    const opts=(q&&q.items||[]).map((it,i)=>it.sec?null:'<option value="'+i+'"'+(r.itemIdx===i?' selected':'')+'>'+esc((it.desc||'工項'+(i+1)).split('\n')[0].slice(0,22))+'</option>').filter(Boolean).join('');
+    return '<div style="display:flex;gap:5px;margin-bottom:5px;align-items:center">'
+    +'<select onchange="_drProgRows['+ri+'].itemIdx=parseInt(this.value)" style="flex:2;min-width:0;font-size:13px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)">'
+    +'<option value="-1"'+(r.itemIdx<0?' selected':'')+'>－工項（選填）－</option>'
+    +opts
+    +'</select>'
+    +'<input type="number" inputmode="decimal" value="'+(r.qty||'')+'" placeholder="數量" oninput="_drProgRows['+ri+'].qty=this.value" style="flex:0 0 76px;font-size:14px;font-weight:700;text-align:right;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">'
+    +'<input value="'+esc(r.note||'')+'" placeholder="內容/備註" oninput="_drProgRows['+ri+'].note=this.value" style="flex:2;min-width:0;font-size:13px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">'
+    +(_drProgRows.length>1?'<button type="button" class="btn btn-xs btn-r" onclick="_drProgRows.splice('+ri+',1);drRenderProgRows()" style="flex-shrink:0">✕</button>':'')
+    +'</div>';
+  }).join('');
+}
+function drAddProgRow(){_drProgRows.push({itemIdx:-1,qty:'',note:''});drRenderProgRows();}
+// 把目前表單收成一筆回報（回傳 null＝表單為空）
+function _drCollect(){
+  const qid=document.getElementById('dr-proj')?.value;
+  const q=Q.find(x=>x.id===qid);
+  if(!q)return null;
   const workers=parseInt(document.getElementById('dr-workers')?.value)||0;
-  const progress=(document.getElementById('dr-progress')?.value||'').trim();
-  if(!workers&&!progress&&!_drPhotos.length){toast('請至少填寫人數、進度或照片');return;}
-  if(!q.dailyLogs)q.dailyLogs=[];
-  q.dailyLogs.unshift({id:'d'+Date.now(),date:document.getElementById('dr-date')?.value||localToday(),
-    workers:workers,progress:progress,photos:_drPhotos.slice(0,3),
+  const rows=_drProgRows.filter(r=>(r.itemIdx>=0&&parseFloat(r.qty)>0)||((''+(r.note||'')).trim()!==''));
+  if(!workers&&!rows.length&&!_drPhotos.length)return null;
+  const progRows=rows.map(r=>({itemIdx:r.itemIdx,desc:r.itemIdx>=0?((q.items[r.itemIdx]||{}).desc||'').split('\n')[0]:'',qty:parseFloat(r.qty)||0,note:(r.note||'').trim()}));
+  const progressText=progRows.map(r=>(r.desc?(r.desc+(r.qty?(' '+r.qty+((q.items[r.itemIdx]||{}).unit||'')):'')):'')+(r.note?((r.desc?'；':'')+r.note):'')).filter(Boolean).join('\n');
+  return {qid:qid,name:q.name||'',workers:workers,
     ownEquip:!!document.getElementById('dr-own-equip')?.checked,
-    by:((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||''),ts:Date.now()});
-  try{var _oe=document.getElementById('dr-own-equip');if(_oe)_oe.checked=false;}catch(e){}
-  if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120); // 保留近 120 篇防爆量
-  q._mt=Date.now();
+    progressRows:progRows,progress:progressText,photos:_drPhotos.slice(0,3)};
+}
+function _drClearForm(){
+  const w=document.getElementById('dr-workers');if(w)w.value='';
+  const oe=document.getElementById('dr-own-equip');if(oe)oe.checked=false;
+  _drPhotos=[];drRenderPhotos();
+  drRenderProgRows(true);
+}
+function drAddToList(){
+  const e=_drCollect();
+  if(!e){toast('請先選專案並填寫人數、進度或照片');return;}
+  _drList.push(e);
+  _drClearForm();
+  const sel=document.getElementById('dr-proj');if(sel)sel.value='';
+  drRenderList();
+  toast('已加入回報清單（'+_drList.length+' 個工地），繼續填下一個');
+}
+function drRemoveFromList(i){_drList.splice(i,1);drRenderList();}
+function drRenderList(){
+  const box=document.getElementById('dr-list');if(!box)return;
+  if(!_drList.length){box.innerHTML='';return;}
+  box.innerHTML='<div style="font-size:12px;font-weight:700;color:var(--g3);margin-bottom:4px">待送出（'+_drList.length+' 個工地）</div>'
+    +_drList.map(function(e,i){
+      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--gm);background:var(--gl);border-radius:var(--r8);margin-bottom:5px;font-size:12.5px">'
+      +'<span style="font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(e.name)+'</span>'
+      +'<span style="color:var(--b4);white-space:nowrap">'+(e.workers?('出工'+e.workers):'')+(e.ownEquip?'・機具':'')+(e.photos.length?('・📷'+e.photos.length):'')+'</span>'
+      +'<button type="button" class="btn btn-xs btn-r" onclick="drRemoveFromList('+i+')">✕</button></div>';
+    }).join('');
+}
+function submitDailyReport(){
+  // 表單上還有內容 → 自動先收進清單
+  const cur=_drCollect();
+  if(cur)_drList.push(cur);
+  if(!_drList.length){toast('請先選擇工程專案並填寫內容');return;}
+  const date=document.getElementById('dr-date')?.value||localToday();
+  let okN=0;
+  _drList.forEach(function(e){
+    const q=Q.find(x=>x.id===e.qid);if(!q)return;
+    if(!q.dailyLogs)q.dailyLogs=[];
+    q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:date,
+      workers:e.workers,progress:e.progress,progressRows:e.progressRows,photos:e.photos,
+      ownEquip:e.ownEquip,
+      by:((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||''),ts:Date.now()});
+    if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120);
+    q._mt=Date.now();
+    _qcLog.unshift({t:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),proj:(q.name||'').slice(0,14),desc:'📋 日報'+(e.workers?('｜出工 '+e.workers+' 人'):'')+(e.photos.length?('｜照片 '+e.photos.length+' 張'):''),amt:null,cat:'日報'});
+    okN++;
+  });
+  const n=_drList.length;
+  _drList=[];
   try{persist();}catch(e){}
   try{_immediateUpload();}catch(e){try{_onSave();}catch(e2){}}
-  _qcLog.unshift({t:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),proj:(q.name||'').slice(0,14),desc:'📋 日報'+(workers?('｜出工 '+workers+' 人'):'')+(_drPhotos.length?('｜照片 '+_drPhotos.length+' 張'):''),amt:null,cat:'日報'});
-  _drPhotos=[];drRenderPhotos();
-  const w=document.getElementById('dr-workers');if(w)w.value='';
-  const pg=document.getElementById('dr-progress');if(pg)pg.value='';
-  rQcLog();
-  toast('📋 日報已送出：'+(q.name||''));
+  _drClearForm();
+  drRenderList();rQcLog();
+  try{renderProjects();}catch(e){}
+  toast('📋 已送出 '+okN+' 個工地的日報');
 }
 // 主管檢視：專案頁「檢視日報」
 function viewDailyReports(qid){
@@ -11646,6 +11788,20 @@ function renderProjects(){
     let estCostTotal=0;
     [q].concat(adds).forEach(x=>{(x.items||[]).forEach(it=>{if(!it.sec)estCostTotal+=(parseFloat(it.qty)||0)*(parseFloat(it.estCost)||0);});});
     estCostTotal=estCostTotal*(1+(P.tax||5)/100);
+    // 施工實體進度：日報回報數量 vs 合約數量（金額加權；工務日報選工項填數量即連動）
+    let physRepV=0,physBaseV=0,hasPhysRep=false;
+    [q].concat(adds).forEach(x=>{
+      const rep={};
+      (x.dailyLogs||[]).forEach(d=>(d.progressRows||[]).forEach(r=>{if(r.itemIdx>=0&&(parseFloat(r.qty)||0)>0){rep[r.itemIdx]=(rep[r.itemIdx]||0)+parseFloat(r.qty);hasPhysRep=true;}}));
+      (x.items||[]).forEach((it,i)=>{
+        if(it.sec)return;
+        const qy=parseFloat(it.qty)||0,pr=parseFloat(it.price)||0;
+        if(qy<=0||pr<=0)return;
+        physBaseV+=qy*pr;
+        physRepV+=Math.min(rep[i]||0,qy)*pr;
+      });
+    });
+    const physPct=physBaseV>0?physRepV/physBaseV*100:0;
     // ── 里程碑步驟 ──
     const steps=[];
     // 1 報價（得標版本，可下載 PDF）
@@ -11670,18 +11826,19 @@ function renderProjects(){
     const drN=(q.dailyLogs||[]).length;
     steps.push({label:'施工進度',done:cost>0||cfN>0,
       info:'施工成本 '+((q.costs||[]).length+adds.reduce((a,x)=>a+((x.costs||[]).length),0))+' 筆・NT$ '+fmt(cost)+'　/　工作確認單 '+cfN+' 份'+(drN?('　/　日報 '+drN+' 篇'):''),
-      bar:(estCostTotal>0&&cost>0)?{pct:cost/estCostTotal*100,warn:cost>estCostTotal,label:'成本執行率（實際/預估成本）'}:null,
+      bar:hasPhysRep?{pct:physPct,warn:false,label:'施工進度（日報回報數量/合約數量，金額加權）'}
+        :((estCostTotal>0&&cost>0)?{pct:cost/estCostTotal*100,warn:cost>estCostTotal,label:'成本執行率（實際/預估成本）'}:null),
       extra:'<button type="button" onclick="event.stopPropagation();viewDailyReports(\''+q.id+'\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit">📋 日報'+(drN?('（'+drN+'）'):'')+'</button> '
         +'<button type="button" onclick="event.stopPropagation();openProjectCosts(\''+q.id+'\')" style="border:1px solid #ffcc80;background:#fff8ec;color:#e65100;border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本</button> '
         +'<button type="button" onclick="event.stopPropagation();projUpload(\'confirm\',\''+q.id+'\')" style="border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 上傳確認單</button>'
         +(cfChips?' '+cfChips:''),
       jump:"openProjectCosts('"+q.id+"')"});
     const periodChips=invs.map(v=>'<button type="button" onclick="event.stopPropagation();printInvById(\''+v.id+'\')" title="下載第'+esc(String(v.periodNo||'?'))+'期請款單" style="border:1px solid '+(v.receivedConfirmed?'var(--gm)':'#ffd699')+';background:'+(v.receivedConfirmed?'var(--gl)':'#fff8ec')+';color:'+(v.receivedConfirmed?'var(--g3)':'#b26a00')+';border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 第'+esc(String(v.periodNo||'?'))+'期 NT$ '+fmt((v.totals&&v.totals.total)||0)+(v.receivedConfirmed?' ✓':'')+'</button>').join(' ');
-    steps.push({label:'請款（應收）',done:invs.length>0,
+    steps.push({label:'業主計價（應收）',done:invs.length>0,
       info:invs.length?('已請 '+invs.length+' 期・累計 NT$ '+fmt(billed)):'尚未請款',
       bar:(base>0&&billed>0)?{pct:billed/base*100,warn:false,label:'估驗進度（累計請款/合約金額）'}:null,
       extra:periodChips,jump:"go('invoice')"});
-    steps.push({label:'應付（下包/材料）',done:payTotal>0&&payPaid>=payTotal,
+    steps.push({label:'廠商請款（應付）',done:payTotal>0&&payPaid>=payTotal,
       info:projPays.length?('應付 '+projPays.length+' 筆・NT$ '+fmt(payTotal)+'／已付 NT$ '+fmt(payPaid)
         +(payOverAR?'　<span style="color:#c62828;font-weight:800">⚠ 應付累計已超過應收請款（'+fmt(payTotal)+' > '+fmt(billed)+'），請核對下包請款數量</span>':'')):'尚無應付帳款（登錄施工成本後自動連動）',
       bar:payTotal>0?{pct:payPaid/payTotal*100,warn:payOverAR,label:'付款進度（已付/應付）'}:null,
@@ -12217,7 +12374,7 @@ function renderCashForecast(){
     var dt=new Date(t0+e.day*864e5);
     return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:4px 6px;white-space:nowrap">'+(dt.getMonth()+1)+'/'+dt.getDate()+'</td><td style="padding:4px 6px;font-size:11.5px">'+esc(e.label)+'</td><td style="padding:4px 6px;text-align:right;font-weight:700;color:'+(e.amt>=0?'var(--g3)':'var(--red)')+';font-variant-numeric:tabular-nums">'+(e.amt>=0?'＋':'−')+fmt(Math.abs(Math.round(e.amt)))+'</td></tr>';
   }).join('');
-  el.innerHTML='<div class="card"><div class="ch green"><div class="cht">📈 90 天現金水位預測</div><span style="font-size:11px;color:rgba(255,255,255,.85)">起點：可用現金 NT$ '+fmt(Math.round(startCash))+'</span></div><div class="cb">'
+  el.innerHTML='<div class="card"><div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 90 天現金水位預測</div><span style="font-size:11px;color:rgba(255,255,255,.85)">起點：可用現金 NT$ '+fmt(Math.round(startCash))+'</span></div><div class="cb">'
     +banner
     +'<div style="overflow-x:auto"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:520px;height:auto;display:block">'
     +'<line x1="'+pd2+'" y1="'+Y(0)+'" x2="'+(W-pd2)+'" y2="'+Y(0)+'" stroke="#d9a0a0" stroke-dasharray="4 3" stroke-width="1"/>'
@@ -12387,14 +12544,29 @@ function switchFinanceTab(tab){
 // ══ 股東分潤：年度可提領上限＝稅後淨利−保留款增額−循環資金增額−機具自付款 ══
 var SHARE_WHO=['陳茹軒','陳韋宏'];
 function _shareWhoNorm(w){return ({'茹軒':'陳茹軒','姊夫':'陳韋宏'})[w]||w;} // 舊記錄名稱歸一
-// 系統自動試算：稅後淨利＝(本年請款未稅－本年施工成本－本年費用發票)×(1−稅率20%)
+// 薪資制度：分潤之外，兩位股東每月各領 15 萬薪資（列入成本、不佔分潤額度）
+var SHARE_SALARY_MONTH=150000;
+function _shareMonths(y){
+  var now=new Date();var cy=String(now.getFullYear());
+  if(y<cy)return 12;
+  if(y>cy)return 0;
+  return now.getMonth()+1; // 本年＝已過月數（含當月）
+}
+// 系統自動試算：稅後淨利＝(本年請款未稅－施工成本－費用發票－股東薪資)×(1−稅率20%)
 function _shareAutoCalc(y){
   var rev=0;INV.forEach(function(v){if((v.date||'').slice(0,4)===y)rev+=(v.totals&&parseFloat(v.totals.total))||0;});
   var cost=0;Q.forEach(function(q){(q.costs||[]).forEach(function(c){if((c.date||'').slice(0,4)===y)cost+=parseFloat(c.amt)||0;});});
   var exp=0;(EXPENSES||[]).forEach(function(e){if((e.date||'').slice(0,4)===y)exp+=parseFloat(e.amount!=null?e.amount:e.amt)||0;});
-  var pretax=rev/(1+(P.tax||5)/100)-cost-exp;
-  return {rev:Math.round(rev),cost:Math.round(cost),exp:Math.round(exp),
-    netProfit:Math.round(Math.max(0,pretax)*0.8)};
+  var months=_shareMonths(y);
+  var salary=SHARE_SALARY_MONTH*2*months;
+  var pretax=rev/(1+(P.tax||5)/100)-cost-exp-salary;
+  // 循環資金增額估算：月均成本成長 ×（收款60天−付款約37天）/30
+  var prevCost=0;Q.forEach(function(q){(q.costs||[]).forEach(function(c){if((c.date||'').slice(0,4)===String(parseInt(y)-1))prevCost+=parseFloat(c.amt)||0;});});
+  var curMo=months>0?(cost+exp+salary)/months:0;
+  var prevMo=prevCost/12;
+  var wcAdd=Math.max(0,Math.round((curMo-prevMo)*23/30));
+  return {rev:Math.round(rev),cost:Math.round(cost),exp:Math.round(exp),salary:salary,months:months,
+    wcAdd:wcAdd,netProfit:Math.round(Math.max(0,pretax)*0.8)};
 }
 function shareAutoCalc(){
   var y=_shareYear();
@@ -12402,11 +12574,13 @@ function shareAutoCalc(){
   var c=SHARE_PROFIT.cfg[y]||{netProfit:0,retentionAdd:0,wcAdd:0,machineSelfPay:0};
   c.netProfit=a.netProfit;
   c.retentionAdd=shareSuggestRetention();
+  c.wcAdd=a.wcAdd;
+  // 機具自付款無資料來源，保留手動值
   c._mt=Date.now();
   SHARE_PROFIT.cfg[y]=c;
   saveShareProfit();
   renderShareProfit();
-  toast('已自動試算：'+y+' 年請款 '+fmt(a.rev)+'－成本 '+fmt(a.cost)+'－費用 '+fmt(a.exp)+' → 稅後淨利估 NT$ '+fmt(a.netProfit)+'（稅率以 20% 概估，可手動修正）');
+  toast('已自動試算：請款 '+fmt(a.rev)+'－成本 '+fmt(a.cost)+'－費用 '+fmt(a.exp)+'－股東薪資 '+fmt(a.salary)+'（'+a.months+'個月×2人×15萬）→ 稅後淨利估 NT$ '+fmt(a.netProfit)+'，可手動修正');
 }
 function _shareYear(){return window._shareY||String(new Date().getFullYear());}
 function _shareCfg(y){return SHARE_PROFIT.cfg[y]||{netProfit:0,retentionAdd:0,wcAdd:0,machineSelfPay:0};}
@@ -12516,13 +12690,23 @@ function renderShareProfit(numOnly){
 function _shareCapHtml(cap,drawn,remain,pct,byWho){
   var capClr=cap>0?'var(--g3)':'#c62828';
   var remClr=remain>=0?'var(--g3)':'#c62828';
+  // 每人可分＝上限對半；已領/剩餘逐人計算
+  var perCards=SHARE_WHO.map(function(w){
+    var capEach=Math.floor(cap/2);
+    var dEach=byWho[w]||0;
+    var rEach=capEach-dEach;
+    return '<div class="kpi" style="flex:1;min-width:150px"><div class="kl">'+w+' 可分潤</div>'
+      +'<div class="kv" style="font-size:16px;color:'+(rEach>=0?'var(--g3)':'#c62828')+'">NT$ '+fmt(capEach)+'</div>'
+      +'<div class="ks">已領 '+fmt(dEach)+'／剩 <b style="color:'+(rEach>=0?'var(--g3)':'#c62828')+'">'+fmt(rEach)+'</b></div></div>';
+  }).join('');
   return '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'
-  +'<div class="kpi hi" style="flex:1;min-width:130px"><div class="kl">年度可提領上限</div><div class="kv" style="font-size:18px;color:'+capClr+'">NT$ '+fmt(cap)+'</div></div>'
-  +'<div class="kpi" style="flex:1;min-width:120px"><div class="kl">已領取合計</div><div class="kv" style="font-size:17px">NT$ '+fmt(drawn)+'</div><div class="ks">'+SHARE_WHO.map(function(w){return w+' '+fmt(byWho[w]||0);}).join('・')+'</div></div>'
-  +'<div class="kpi" style="flex:1;min-width:120px"><div class="kl">剩餘可領</div><div class="kv" style="font-size:17px;color:'+remClr+'">NT$ '+fmt(remain)+'</div>'+(remain<0?'<div class="ks" style="color:#c62828">⚠ 已超領，動用到營運資金</div>':'')+'</div>'
+  +'<div class="kpi hi" style="flex:1;min-width:130px"><div class="kl">年度可提領上限</div><div class="kv" style="font-size:18px;color:'+capClr+'">NT$ '+fmt(cap)+'</div><div class="ks">兩人對半，各 '+fmt(Math.floor(cap/2))+'</div></div>'
+  +perCards
+  +'<div class="kpi" style="flex:1;min-width:120px"><div class="kl">剩餘可領（合計）</div><div class="kv" style="font-size:17px;color:'+remClr+'">NT$ '+fmt(remain)+'</div>'+(remain<0?'<div class="ks" style="color:#c62828">⚠ 已超領，動用到營運資金</div>':'')+'</div>'
   +'</div>'
   +'<div style="background:var(--b1);border-radius:8px;height:14px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(remain<0?'#c62828':'linear-gradient(90deg,var(--g),var(--g3))')+';border-radius:8px"></div></div>'
-  +'<div style="font-size:10.5px;color:var(--b3);text-align:right;margin-top:3px">已領 '+pct+'%</div>';
+  +'<div style="font-size:10.5px;color:var(--b3);text-align:right;margin-top:3px">已領 '+pct+'%</div>'
+  +'<div style="font-size:11px;color:var(--b4);margin-top:6px;background:var(--b0);border-radius:var(--r6);padding:6px 10px">薪資另計：兩位股東每月各領 NT$ '+fmt(SHARE_SALARY_MONTH)+' 薪資，已列入成本（自動計算時扣除），不佔分潤額度。</div>';
 }
 
 function exportFinanceCSV(){
@@ -14105,7 +14289,7 @@ function editCustomerContact(name){
 const ALL_PAGES = [
   {id:'dash',      label:'總覽',    icon:'▦', adminOnly:false},
   {id:'quotes',    label:'報價單', icon:'≡', adminOnly:false},
-  {id:'invoice',   label:'請款單', icon:'✉', adminOnly:false},
+  {id:'invoice',   label:'業主計價', icon:'✉', adminOnly:false},
   {id:'finance',   label:'金流管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>', adminOnly:false},
   {id:'profit',    label:'利潤分析', icon:'↗', adminOnly:false},
   {id:'contacts',  label:'客戶管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg>', adminOnly:false},
@@ -16075,7 +16259,7 @@ function exportCurrentReportExcel(){
         <div class="f"><label>業主/對象</label><input id="ir-client" placeholder="業主名稱"></div>
         <div class="f"><label>發票金額 (NT$)</label><input type="number" inputmode="decimal" id="ir-amount" placeholder="0" oninput="var t=document.getElementById('ir-tax');if(t&&!t.dataset.manual)t.value=Math.round((parseFloat(this.value)||0)/1.05*0.05)"></div>
           <div class="f"><label>稅額（5% 自動計算，可修改）</label><input type="number" inputmode="decimal" id="ir-tax" placeholder="0" oninput="this.dataset.manual='1'"></div>
-          <button type="button" class="btn btn-sm" style="border-color:#1a3a6b;color:#1a3a6b;margin:4px 0 8px" onclick="_einvScan()">📷 拍照帶入（自動辨識字軌／日期／金額）</button>
+          <button type="button" class="btn btn-sm" style="border-color:#1a3a6b;color:#1a3a6b;margin:4px 0 8px" onclick="_einvScan()"><svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg> 拍照帶入（自動辨識字軌／日期／金額）</button>
       </div>
       <div class="f" style="margin-bottom:10px"><label>關聯請款單（選填）</label>
         <select id="ir-linked-inv" style="font-family:inherit;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px">
