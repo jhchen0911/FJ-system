@@ -1109,7 +1109,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     #page-materials .tbl select{height:38px!important;font-size:14px!important}
   }
   </style>
-  <div class="pad" style="max-width:980px">
+  <div class="pad" style="max-width:1400px">
     <div id="mat-view-btns">
       <button type="button" class="btn btn-xs" id="mat-view-stock" onclick="matSetView('stock')" style="padding:8px 14px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 庫存台帳</button>
       <button type="button" class="btn btn-xs" id="mat-view-proj" onclick="matSetView('proj')" style="padding:8px 14px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 專案材料</button>
@@ -2515,7 +2515,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.303';
+var APP_VERSION='v5.304';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -8159,7 +8159,7 @@ function _shDefaults(){
     midSpec:'H350',coSpec:'H400',gtSpec:'H400',midLen:16,coLen:16,gtLen:16,
     layers:5,_layers:lys,autoRouteSpace:6,stiff:'0',_routesV:[{rc:4,rl:25}],_routesH:[{rc:4,rl:40}],heng:'0',zones:2,
     spliceWall:0,spliceMid:0,spliceCo:0,spliceGt:0,procWall:0,procMid:0,procCo:0,procGt:0,shearSp:0.3,studLen:3,
-    dogbone:'0',dbMid:false,dbCo:false,dbGt:false,rgMid:true,rgCo:true,rgGt:true,fengProc:'0',
+    dogbone:'0',dbWall:false,dbMid:false,dbCo:false,dbGt:false,rgMid:true,rgCo:true,rgGt:true,fengProc:'0',fengCnt:'',
     gantaiA:0,gantaiP:0,deck:'2',bigCap:0,gtRopeDeduct:'0',gtDeduct:0,
     railScope:'0',postH:'1.2m',toe:'0',hookType:'std',
     _ud:[{ul:6.5,uh:2.2}],udMods:'6,3,2,1.5,1',_dc:[]};
@@ -8189,15 +8189,15 @@ function computeShoringFY(inp){
   var posts=kingMid+kingCo+kingGt;
   var PW=pileP>0?pileP:P;
   // ── ① 擋土壁體（樁）──
-  var pile=[],pileSummary=null;
+  var pile=[],pileSummary=null,wallCnt=0;
   if(method==='連續壁'){pile.push({k:'連續壁',v:'—',u:'非本公司工項，僅判斷膨脹螺絲'});}
   else if(method==='鋼板樁'){
-    var pc=_shCeil(PW/0.4);
+    var pc=_shCeil(PW/0.4);wallCnt=pc;
     pile.push({k:'鋼板樁 '+pileSpec+' L='+pileLen+'M',v:_shR0(pc),u:'片'});
     if(corners>0)pile.push({k:'角樁',v:_shR0(corners),u:'片（租料）'});
     pileSummary={method:method,spec:pileSpec,len:pileLen,count:pc};
   }else{
-    var pc2=_shCeil(PW/pileSpacing);
+    var pc2=_shCeil(PW/pileSpacing);wallCnt=pc2;
     pile.push({k:method+' '+pileSpec+' L='+pileLen+'M',v:_shR0(pc2),u:'支'});
     if(method==='鋼軌樁'||method==='型鋼排樁')pile.push({k:'擋土板',v:_shR1(PW*H),u:'㎡'});
     pileSummary={method:method,spec:pileSpec,len:pileLen,count:pc2};
@@ -8247,7 +8247,7 @@ function computeShoringFY(inp){
   var rgGt=(inp.rgGt==null)?true:_shBool(inp.rgGt);
   var rgPosts=(rgMid?kingMid:0)+(rgCo?kingCo:0)+(rgGt?kingGt:0);
   var dogbone=b('dogbone');
-  var dbN=dogbone?((b('dbMid')?kingMid:0)+(b('dbCo')?kingCo:0)+(b('dbGt')?kingGt:0)):0;
+  var dbN=dogbone?((b('dbWall')?wallCnt:0)+(b('dbMid')?kingMid:0)+(b('dbCo')?kingCo:0)+(b('dbGt')?kingGt:0)):0;
   var spliceSum=spliceMid+spliceCo+spliceGt;
   var procRows=[];
   if(spliceMid>0)procRows.push({k:'接樁（中間樁）',v:_shR0(spliceMid),u:'接'});
@@ -8321,7 +8321,7 @@ function computeShoringFY(inp){
    ['土壓計','earth','顆'],['土壓計保護夾','earthClip','組'],['短節','shortJ','只（0.1~0.3M）'],['斜撐','diag','支'],
    ['角撐','corner','支'],['三角板','triPlate','片'],['加勁盒','stiffN','只'],['小U','smallU','支'],
    ['大U','bigU','支'],['大U角鐵','bigUangle','支'],['副支撐擋片','subBlock','片'],['合板','heban','片'],
-   ['長螺絲','longS','顆'],['短螺絲','shortS','顆'],['膨脹螺絲','eScrew','只'],['封頭版','fengtou','片']
+   ['長螺絲','longS','顆'],['短螺絲','shortS','顆'],['膨脹螺絲','eScrew','只'],['封頭鈑','fengtou','片']
   ].forEach(function(t){var n=tot(t[1]);if(n>0)main.push({k:t[0],v:_shR0(n),u:t[2]});});
   // 背填（每層常量 × 層數）
   var hookLabel=(inp.hookType==='rebar')?'背填鉤（業主#4鋼筋1:1）':'背填鉤';
@@ -8376,9 +8376,11 @@ function computeShoringFY(inp){
   back.push({k:'安全母索總長',v:_shR1(T.rope),u:'M'});
   back.push({k:'安全母索折捲',v:_shR0(_shCeil(T.rope/90)),u:'捲（1捲100M以90M計）'});
   back.push({k:'黃色立柱',v:_shR0(T.yellow),u:'支'});
-  // ── ⑤ 先行加工 ──
+  // ── ⑤ 先行加工（封頭鈑＝加工支數×2；未填支數則以各層路數×2 合計）──
   var pre=[];
-  if(b('fengProc'))pre.push({k:'封頭版（倉庫先行加工）',v:_shR0(T.fengtou),u:'片（數量已計入配件合計）'});
+  var fengCnt=v('fengCnt');
+  var preFeng=b('fengProc')?(fengCnt>0?fengCnt*2:T.fengtou):0;
+  if(preFeng>0)pre.push({k:'封頭鈑（倉庫先行加工）',v:_shR0(preFeng),u:'片'+(fengCnt>0?'（'+_shR0(fengCnt)+'支×2）':'（依各層路數×2）')});
   // ── 採購清冊（同名同單位彙總）──
   var ALLOW='支片個顆組只捲頂道座根接';
   var itemsMap={},items=[];
@@ -8425,7 +8427,7 @@ function computeShoringFY(inp){
   if(proc>0)sAdd(st3,'土豆','顆',waterLen+4);
   sAdd(st3,'狗骨頭','個',dbN);
   sAdd(st3,'剪力釘（根固）','顆',studPer*rgPosts);
-  sAdd(st3,'封頭版（先行加工）','片',T.fengtou);
+  sAdd(st3,'封頭鈑（先行加工）','片',b('fengProc')&&fengCnt>0?fengCnt*2:T.fengtou);
   if(st3.items.length)staged.push(st3);
   layerData.forEach(function(d,i2){
     var st={stage:'第'+(i2+1)+'層水平支撐',items:[]};
@@ -8707,6 +8709,7 @@ function matEstU(k,val){
     MAT_EST._layers.length=n;
     renderMatEst();
   }
+  if(k==='method'||k==='fengProc')renderMatEst(); // 工法連動加工矩陣列名／封頭鈑支數欄
 }
 function matEstExportPDF(){
   if(!window._matEstRes)matEstCalc();
@@ -8758,7 +8761,7 @@ function matEstUB(k,checked){
   if(!MAT_EST)MAT_EST=_shDefaults();
   MAT_EST[k]=!!checked;
   // 狗骨頭有無由三個樁別勾選自動推導
-  if(k==='dbMid'||k==='dbCo'||k==='dbGt')MAT_EST.dogbone=(_shBool(MAT_EST.dbMid)||_shBool(MAT_EST.dbCo)||_shBool(MAT_EST.dbGt))?'1':'0';
+  if(k==='dbWall'||k==='dbMid'||k==='dbCo'||k==='dbGt')MAT_EST.dogbone=(_shBool(MAT_EST.dbWall)||_shBool(MAT_EST.dbMid)||_shBool(MAT_EST.dbCo)||_shBool(MAT_EST.dbGt))?'1':'0';
 }
 function matEstLy(i,f,val){
   var ly=MAT_EST._layers[i]||(MAT_EST._layers[i]={w:'H350',s:'H350',st:false});
@@ -8845,12 +8848,15 @@ function renderMatEst(){
   h+='<div class="tbl-wrap"><table class="tbl" style="min-width:560px"><thead><tr>'
     +'<th style="min-width:130px">樁別</th><th style="width:110px" class="r">接樁 (接)</th><th style="width:110px" class="r">水刀 (支)</th>'
     +'<th style="width:84px;text-align:center">狗骨頭</th><th style="width:110px;text-align:center">根固(剪力釘)</th></tr></thead><tbody>';
-  h+='<tr><td style="font-weight:700">擋土壁（'+esc(m.method||'')+'）</td><td>'+procIn('spliceWall')+'</td><td>'+procIn('procWall')+'</td><td style="text-align:center;color:var(--b2)">—</td><td style="text-align:center;color:var(--b2)">—</td></tr>';
+  h+='<tr><td style="font-weight:700">擋土壁（'+esc(m.method||'')+'）</td><td>'+procIn('spliceWall')+'</td><td>'+procIn('procWall')+'</td><td style="text-align:center">'+procCk('dbWall')+'</td><td style="text-align:center;color:var(--b2)">—</td></tr>';
   h+='<tr><td style="font-weight:700">中間樁</td><td>'+procIn('spliceMid')+'</td><td>'+procIn('procMid')+'</td><td style="text-align:center">'+procCk('dbMid')+'</td><td style="text-align:center">'+procCk('rgMid')+'</td></tr>';
   h+='<tr><td style="font-weight:700">共構樁</td><td>'+procIn('spliceCo')+'</td><td>'+procIn('procCo')+'</td><td style="text-align:center">'+procCk('dbCo')+'</td><td style="text-align:center">'+procCk('rgCo')+'</td></tr>';
   h+='<tr><td style="font-weight:700">構台樁</td><td>'+procIn('spliceGt')+'</td><td>'+procIn('procGt')+'</td><td style="text-align:center">'+procCk('dbGt')+'</td><td style="text-align:center">'+procCk('rgGt')+'</td></tr>';
   h+='</tbody></table></div>';
-  h+='<div class="me-grid" style="margin-top:8px">'+fN('shearSp','剪力釘間距 (M)')+fN('studLen','貫入深度 (M)')+fS('fengProc','封頭版先行加工（支撐）',[['0','否'],['1','是']])+'</div>';
+  h+='<div class="me-grid" style="margin-top:8px">'+fN('shearSp','剪力釘間距 (M)')+fN('studLen','貫入深度 (M)')+'</div>';
+  h+='<div class="me-sub">支撐（封頭鈑）</div>';
+  h+='<div class="me-grid">'+fS('fengProc','封頭鈑先行加工',[['0','否'],['1','是']])
+    +(_shBool(m.fengProc)?fN('fengCnt','加工支數 (支)','封頭鈑＝支數×2'):'')+'</div>';
   h+=sec('⑥ 施工構台');
   h+='<div class="me-grid">'+fN('gantaiA','構台面積 (㎡)')+fN('gantaiP','構台周長 (M)')
     +fS('deck','覆工板規格',[['2','2M×1M'],['3','3M×1M']])+fN('bigCap','大構台帽 (頂)')
@@ -8928,7 +8934,7 @@ function matEstCalc(){
       ['大U 支',function(d){return d.bigU;},_shR0],['大U角鐵 支',function(d){return d.bigUangle;},_shR0],
       ['副支撐擋片 片',function(d){return d.subBlock;},_shR0],['合板 片',function(d){return d.heban;},_shR0],
       ['長螺絲 顆',function(d){return d.longS;},_shR0],['短螺絲 顆',function(d){return d.shortS;},_shR0],
-      ['膨脹螺絲 只',function(d){return d.eScrew;},_shR0],['封頭版 片',function(d){return d.fengtou;},_shR0],
+      ['膨脹螺絲 只',function(d){return d.eScrew;},_shR0],['封頭鈑 片',function(d){return d.fengtou;},_shR0],
       ['安全母索 M',function(d){return d.rope;},_shR1],['黃色立柱 支',function(d){return d.yellow;},_shR0],
       ['背填竹片 片',function(){return P0/2;},_shR1],['背填帆布 捲',function(){return P0/80;},_shR1],
       ['背填5分母索 捲',function(){return P0/70;},_shR1],[info.hookLabel+' 支',function(){return _shCeil(P0/0.3);},_shR0]
