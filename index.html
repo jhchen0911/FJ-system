@@ -2515,7 +2515,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.304';
+var APP_VERSION='v5.305';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -8504,24 +8504,68 @@ function renderMatLedger(){
   });
   var h='<div style="padding:8px 14px;font-size:12.5px;color:var(--b4);border-bottom:1px solid var(--b1)">重複性 <b style="color:var(--g3)">'+rep+'</b> 筆　一次性 <b style="color:#b26a00">'+once+'</b> 筆　購置總額 <b style="color:var(--g3)">NT$ '+fmt(Math.round(buyTotal))+'</b>'
     +'<span style="font-size:10.5px;color:var(--b3)">　※ 有單位重者單價為 $/kg（金額＝單位重×長度×單價×數量），其餘為 $/件</span></div>';
-  h+='<div class="tbl-wrap"><table class="tbl" style="min-width:1020px"><thead><tr>'
+  // ── 庫存總覽：依品項/規格/長度彙總（唯讀呈現）──
+  var agg={},aggKeys=[];
+  MAT_LEDGER.forEach(function(r){
+    if(!r.name)return;
+    var key=r.name+'|'+(r.spec||'')+'|'+(r.len!=null&&r.len!==''?r.len:'');
+    if(!agg[key]){agg[key]={name:r.name,spec:r.spec||'',len:r.len,rep:0,once:0};aggKeys.push(key);}
+    if(r.kind==='一次性')agg[key].once+=parseFloat(r.qty)||0;else agg[key].rep+=parseFloat(r.qty)||0;
+  });
+  h+='<div style="padding:12px 14px 4px;font-weight:700;font-size:13px;color:var(--g3)">庫存總覽</div>';
+  if(aggKeys.length){
+    h+='<div class="tbl-wrap"><table class="tbl" style="min-width:520px"><thead><tr>'
+      +'<th style="min-width:110px">品項</th><th style="min-width:90px">規格</th><th style="width:90px" class="r">長度(M)</th>'
+      +'<th style="width:130px" class="r">自有數量（重複性）</th><th style="width:120px" class="r">一次性（耗材）</th></tr></thead><tbody>';
+    aggKeys.forEach(function(k){
+      var a=agg[k];
+      h+='<tr><td style="font-weight:700">'+esc(a.name)+'</td><td style="color:var(--b5)">'+esc(a.spec)+'</td>'
+        +'<td class="r">'+(a.len!=null&&a.len!==''?a.len:'—')+'</td>'
+        +'<td class="r" style="font-weight:800;color:var(--g3);font-size:14px">'+(a.rep?fmt(a.rep):'—')+'</td>'
+        +'<td class="r" style="color:#b26a00">'+(a.once?fmt(a.once):'—')+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }else{
+    h+='<div style="padding:4px 14px 10px;font-size:12.5px;color:var(--b3)">尚無庫存，請於下方購置紀錄新增。</div>';
+  }
+  // ── 購置紀錄：後台資料，預設唯讀，按「編輯」才可修改 ──
+  h+='<div style="padding:14px 14px 4px;font-weight:700;font-size:13px;color:var(--g3);border-top:1px solid var(--b1);margin-top:10px">購置紀錄 <span style="font-weight:400;font-size:10.5px;color:var(--b3)">— 逐筆進貨資料；點「編輯」修改，避免誤觸</span></div>';
+  h+='<div class="tbl-wrap"><table class="tbl" style="min-width:1060px"><thead><tr>'
     +'<th style="min-width:118px">品項</th><th style="min-width:96px">規格</th><th style="width:76px" class="r">長度(M)</th>'
-    +'<th style="width:72px" class="r">數量</th><th style="width:92px" class="r">單位重<br>(kg/m)</th><th style="width:88px" class="r">單價</th><th style="width:104px" class="r">金額</th><th style="width:118px">購置日期</th>'
-    +'<th style="width:88px">類型</th><th style="min-width:96px">備註</th><th style="width:46px"></th>'
+    +'<th style="width:72px" class="r">數量</th><th style="width:88px" class="r">單位重<br>(kg/m)</th><th style="width:84px" class="r">單價</th><th style="width:104px" class="r">金額</th><th style="width:118px">購置日期</th>'
+    +'<th style="width:84px">類型</th><th style="min-width:90px">備註</th><th style="width:104px"></th>'
     +'</tr></thead><tbody>';
   var inCss='width:100%;font-size:13px;height:34px;border:1px solid var(--b2);border-radius:6px;padding:0 6px;font-family:inherit';
   var catNames=MAT_CATALOG.map(function(c){return c[0];});
   MAT_LEDGER.forEach(function(r,i){
+    var amt=_matLedAmt(r);
+    var editing=(window._matLedEditId===r.id);
+    if(!editing){
+      // 唯讀列
+      h+='<tr>'
+        +'<td style="font-weight:700;font-size:13px">'+esc(r.name||'—')+'</td>'
+        +'<td style="color:var(--b5);font-size:12.5px">'+esc(r.spec||'—')+'</td>'
+        +'<td class="r">'+(r.len!=null&&r.len!==''?r.len:'—')+'</td>'
+        +'<td class="r" style="font-weight:700">'+(r.qty!=null&&r.qty!==''?fmt(r.qty):'—')+'</td>'
+        +'<td class="r" style="color:var(--b5)">'+(r.uw!=null&&r.uw!==''?r.uw:'—')+'</td>'
+        +'<td class="r">'+(r.price!=null&&r.price!==''?fmt(r.price):'—')+'</td>'
+        +'<td class="r" style="font-weight:700;font-size:12.5px;white-space:nowrap">'+(amt?('NT$ '+fmt(Math.round(amt))):'—')+'</td>'
+        +'<td style="font-size:12.5px">'+esc(r.date||'—')+'</td>'
+        +'<td style="font-size:12.5px;color:'+(r.kind==='一次性'?'#b26a00':'var(--g3)')+'">'+esc(r.kind||'重複性')+'</td>'
+        +'<td style="font-size:12px;color:var(--b4)">'+esc(r.note||'')+'</td>'
+        +'<td style="text-align:center;white-space:nowrap"><button type="button" class="btn btn-xs" onclick="matLedEdit(\''+r.id+'\')" style="padding:4px 10px;font-size:12px">編輯</button></td>'
+        +'</tr>';
+      return;
+    }
+    // 編輯列
     var u=function(f){return ' onchange="matLedUpd('+i+',\''+f+'\',this.value)" ';};
     var isCat=catNames.indexOf(r.name)>=0;
     var custom=!!r.nameCustom||((r.name||'')!==''&&!isCat);
-    // 品項：下拉（含 其他＝自行輸入）
     var nameCell='<select'+u('name')+' style="'+inCss+'">'
       +'<option value=""'+(!r.name&&!custom?' selected':'')+'>— 選品項 —</option>';
     catNames.forEach(function(n){nameCell+='<option value="'+esc(n)+'"'+(r.name===n?' selected':'')+'>'+esc(n)+'</option>';});
     nameCell+='<option value="__custom"'+(custom?' selected':'')+'>其他（自填）</option></select>';
     if(custom)nameCell+='<input value="'+esc(r.nameCustom?(r.name==='__custom'?'':r.name):r.name||'')+'" placeholder="品項名稱" onchange="matLedUpd('+i+',\'nameFree\',this.value)" style="'+inCss+';margin-top:4px">';
-    // 規格：依品項帶下拉；其他→自由輸入
     var specCell;
     if(isCat){
       var specs=(MAT_CATALOG.find(function(c){return c[0]===r.name;})||[,[]])[1];
@@ -8532,8 +8576,7 @@ function renderMatLedger(){
     }else{
       specCell='<input value="'+esc(r.spec||'')+'"'+u('spec')+' style="'+inCss+'" placeholder="規格">';
     }
-    var amt=_matLedAmt(r);
-    h+='<tr>'
+    h+='<tr style="background:#f7faf8">'
       +'<td>'+nameCell+'</td>'
       +'<td>'+specCell+'</td>'
       +'<td><input type="number" inputmode="decimal" step="any" value="'+(r.len!=null&&r.len!==''?r.len:'')+'"'+u('len')+' style="'+inCss+';text-align:right"></td>'
@@ -8544,13 +8587,16 @@ function renderMatLedger(){
       +'<td><input type="date" value="'+esc(r.date||'')+'"'+u('date')+' style="'+inCss+'"></td>'
       +'<td><select'+u('kind')+' style="'+inCss+'"><option'+(r.kind!=='一次性'?' selected':'')+'>重複性</option><option'+(r.kind==='一次性'?' selected':'')+'>一次性</option></select></td>'
       +'<td><input value="'+esc(r.note||'')+'"'+u('note')+' style="'+inCss+';font-size:12px"></td>'
-      +'<td style="text-align:center"><button type="button" class="btn btn-xs" onclick="matLedDel('+i+')" style="color:var(--red);padding:4px 8px">✕</button></td>'
+      +'<td style="text-align:center;white-space:nowrap">'
+        +'<button type="button" class="btn btn-xs btn-g" onclick="matLedEdit(null)" style="padding:4px 10px;font-size:12px;font-weight:700">完成</button>'
+        +'<button type="button" class="btn btn-xs" onclick="matLedDel('+i+')" style="color:var(--red);padding:4px 8px;margin-left:4px">✕</button></td>'
       +'</tr>';
   });
   h+='</tbody></table></div>';
-  h+='<div style="padding:10px 14px"><button type="button" class="btn btn-xs btn-g" onclick="matLedAdd()" style="padding:9px 16px;font-size:13.5px;font-weight:700">＋ 新增材料</button></div>';
+  h+='<div style="padding:10px 14px"><button type="button" class="btn btn-xs btn-g" onclick="matLedAdd()" style="padding:9px 16px;font-size:13.5px;font-weight:700">＋ 新增購置紀錄</button></div>';
   el.innerHTML=h;
 }
+function matLedEdit(id){window._matLedEditId=id;renderMatLedger();}
 function matLedUpd(i,f,val){
   var r=MAT_LEDGER[i];if(!r)return;
   if(f==='name'){
@@ -8573,7 +8619,9 @@ function matLedUpd(i,f,val){
   renderMatLedger();
 }
 function matLedAdd(){
-  MAT_LEDGER.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:'',spec:'',len:'',qty:'',uw:'',price:'',date:localToday(),kind:'重複性',note:'',_mt:Date.now()});
+  var nid=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  MAT_LEDGER.push({id:nid,name:'',spec:'',len:'',qty:'',uw:'',price:'',date:localToday(),kind:'重複性',note:'',_mt:Date.now()});
+  window._matLedEditId=nid;
   saveMatLedger();renderMatLedger();
 }
 function matLedDel(i){
@@ -8626,7 +8674,7 @@ function renderMatProj(){
   h+='<div class="card"><div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 各專案材料</div>'
     +'<div style="font-size:11px;color:var(--b4)">點列展開：分配自有/租賃、填租金運費、更新施工成本</div></div>'
     +'<div class="cb" style="padding:0"><div class="tbl-wrap"><table class="tbl" style="min-width:640px"><thead><tr>'
-    +'<th>專案</th><th style="width:110px">材料估算</th><th style="width:90px" class="r">自有/租賃<br>項數</th><th style="width:120px" class="r">材料租金成本</th><th style="width:120px" class="r">材料運輸成本</th><th style="width:40px"></th>'
+    +'<th style="width:30%">專案</th><th style="width:150px">材料估算</th><th style="width:130px" class="r">自有/租賃項數</th><th style="width:160px" class="r">材料租金成本</th><th style="width:160px" class="r">材料運輸成本</th><th style="width:40px"></th>'
     +'</tr></thead><tbody>'+(rowsH||'<tr><td colspan="6" style="text-align:center;color:var(--b3);padding:20px">尚無得標專案</td></tr>')+'</tbody></table></div></div></div>';
   // 公司整體統計
   var buyTotal=0;MAT_LEDGER.forEach(function(r){buyTotal+=_matLedAmt(r);});
@@ -8728,34 +8776,39 @@ function matEstExportPDF(){
   var body='<h1>擋土支撐材料估算表</h1>'
     +'<div class="meta">'+(q?('專案：'+esc(q.name)+'　'):'')+'日期：'+localToday()+'</div>'
     +'<div class="meta">壁線周長 '+_shR1(info.PW)+'M｜路數 縱'+info.routesV+'＋橫'+info.routesH+'＝'+info.totalR+' 路｜支撐總長 '+_shR1(info.supLen)+'M｜中柱合計 '+info.posts+' 支｜退場留存 '+_shR1(info.keep)+'M/支</div>';
-  body+='<h2>① 擋土壁體（樁）</h2>'+tbl(res.pile);
-  body+='<h2>② 中柱（進場／退場／買斷）</h2>'+tbl(res.postRows)+tbl(res.procRows);
-  body+='<h2>③ 圍令／支撐／配件／上下設備</h2>'+tbl(res.main);
-  body+='<h2>④ 施工構台／欄杆／安全設施</h2>'+tbl(res.back);
-  if(res.pre.length)body+='<h2>⑤ 先行加工</h2>'+tbl(res.pre);
+  body+='<div class="cols">';
+  body+='<div class="blk"><h2>① 擋土壁體（樁）</h2>'+tbl(res.pile)+'</div>';
+  body+='<div class="blk"><h2>② 中柱（進場／退場／買斷）</h2>'+tbl(res.postRows)+tbl(res.procRows)+'</div>';
+  body+='<div class="blk"><h2>③ 圍令／支撐／配件／上下設備</h2>'+tbl(res.main)+'</div>';
+  body+='<div class="blk"><h2>④ 施工構台／欄杆／安全設施</h2>'+tbl(res.back)+'</div>';
+  if(res.pre.length)body+='<div class="blk"><h2>⑤ 先行加工</h2>'+tbl(res.pre)+'</div>';
   if(res.items.length){
-    body+='<h2 class="pb">材料需求清冊（彙總）</h2><table><thead><tr><th>材料</th><th class="r">數量</th><th>單位</th></tr></thead><tbody>';
+    body+='<div class="blk"><h2>材料需求清冊（彙總）</h2><table><thead><tr><th>材料</th><th class="r">數量</th><th>單位</th></tr></thead><tbody>';
     res.items.forEach(function(it){body+='<tr><td>'+esc(it.name)+'</td><td class="r">'+_shR0(it.quantity)+'</td><td class="u">'+esc(it.unit)+'</td></tr>';});
-    body+='</tbody></table>';
+    body+='</tbody></table></div>';
   }
   if(res.staged.length){
-    body+='<h2 class="pb">分階段叫料建議</h2>';
+    body+='<div class="blk"><h2>分階段叫料建議</h2>';
     res.staged.forEach(function(st){
       body+='<div class="stg"><b>▸ '+esc(st.stage)+'</b><div>'+st.items.map(function(it){return esc(it.name)+' <b>'+_shR0(it.quantity)+'</b>'+esc(it.unit);}).join('｜')+'</div></div>';
     });
+    body+='</div>';
   }
+  body+='</div>';
   var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>材料估算表</title><style>'
-    +'@page{size:A4;margin:12mm}body{font-family:"Microsoft JhengHei","PingFang TC",sans-serif;font-size:11px;color:#1a1a1a;margin:0}'
-    +'h1{font-size:18px;margin:0 0 4px;border-bottom:2px solid #2e5e42;padding-bottom:6px}'
-    +'h2{font-size:13px;margin:14px 0 4px;color:#2e5e42}.pb{page-break-before:auto}'
-    +'.meta{font-size:10.5px;color:#555;margin:2px 0}'
-    +'table{width:100%;border-collapse:collapse;margin:2px 0}'
-    +'th,td{border:1px solid #bbb;padding:3px 6px;text-align:left;font-size:10.5px}'
-    +'td.r,th.r{text-align:right;font-weight:700;white-space:nowrap}td.u{color:#666;font-size:9.5px}'
+    +'@page{size:A4;margin:8mm}body{font-family:"Microsoft JhengHei","PingFang TC",sans-serif;font-size:8px;color:#1a1a1a;margin:0}'
+    +'h1{font-size:13px;margin:0 0 2px;border-bottom:2px solid #2e5e42;padding-bottom:3px}'
+    +'h2{font-size:9px;margin:5px 0 2px;color:#2e5e42;break-after:avoid}'
+    +'.meta{font-size:7.5px;color:#555;margin:1px 0}'
+    +'.cols{column-count:3;column-gap:8px;margin-top:4px}'
+    +'.blk{break-inside:avoid;margin-bottom:4px}'
+    +'table{width:100%;border-collapse:collapse;margin:1px 0}'
+    +'th,td{border:0.5px solid #bbb;padding:1px 3px;text-align:left;font-size:7.5px;line-height:1.35}'
+    +'td.r,th.r{text-align:right;font-weight:700;white-space:nowrap}td.u{color:#666;font-size:6.5px}'
     +'td.sec{background:#eef4f0;font-weight:700;color:#2e5e42}'
-    +'.stg{margin:5px 0;font-size:10.5px}.stg>div{color:#444;line-height:1.7}'
+    +'.stg{margin:2px 0;font-size:7.5px;break-inside:avoid}.stg>div{color:#444;line-height:1.5}'
     +'</style></head><body>'+body+'</body></html>';
-  _printNativeHTML(html,'材料估算表');
+  _printNativeHTML(html,'材料估算表',Math.round((297-16)*96/25.4)); // A4 扣邊距一頁高，小幅溢出自動縮身
 }
 function matEstUB(k,checked){
   if(!MAT_EST)MAT_EST=_shDefaults();
@@ -8848,15 +8901,15 @@ function renderMatEst(){
   h+='<div class="tbl-wrap"><table class="tbl" style="min-width:560px"><thead><tr>'
     +'<th style="min-width:130px">樁別</th><th style="width:110px" class="r">接樁 (接)</th><th style="width:110px" class="r">水刀 (支)</th>'
     +'<th style="width:84px;text-align:center">狗骨頭</th><th style="width:110px;text-align:center">根固(剪力釘)</th></tr></thead><tbody>';
-  h+='<tr><td style="font-weight:700">擋土壁（'+esc(m.method||'')+'）</td><td>'+procIn('spliceWall')+'</td><td>'+procIn('procWall')+'</td><td style="text-align:center">'+procCk('dbWall')+'</td><td style="text-align:center;color:var(--b2)">—</td></tr>';
+  h+='<tr><td style="font-weight:700">'+esc(m.method||'擋土壁')+'</td><td>'+procIn('spliceWall')+'</td><td>'+procIn('procWall')+'</td><td style="text-align:center">'+procCk('dbWall')+'</td><td style="text-align:center;color:var(--b2)">—</td></tr>';
   h+='<tr><td style="font-weight:700">中間樁</td><td>'+procIn('spliceMid')+'</td><td>'+procIn('procMid')+'</td><td style="text-align:center">'+procCk('dbMid')+'</td><td style="text-align:center">'+procCk('rgMid')+'</td></tr>';
   h+='<tr><td style="font-weight:700">共構樁</td><td>'+procIn('spliceCo')+'</td><td>'+procIn('procCo')+'</td><td style="text-align:center">'+procCk('dbCo')+'</td><td style="text-align:center">'+procCk('rgCo')+'</td></tr>';
   h+='<tr><td style="font-weight:700">構台樁</td><td>'+procIn('spliceGt')+'</td><td>'+procIn('procGt')+'</td><td style="text-align:center">'+procCk('dbGt')+'</td><td style="text-align:center">'+procCk('rgGt')+'</td></tr>';
   h+='</tbody></table></div>';
   h+='<div class="me-grid" style="margin-top:8px">'+fN('shearSp','剪力釘間距 (M)')+fN('studLen','貫入深度 (M)')+'</div>';
-  h+='<div class="me-sub">支撐（封頭鈑）</div>';
-  h+='<div class="me-grid">'+fS('fengProc','封頭鈑先行加工',[['0','否'],['1','是']])
-    +(_shBool(m.fengProc)?fN('fengCnt','加工支數 (支)','封頭鈑＝支數×2'):'')+'</div>';
+  h+='<div class="me-sub">支撐</div>';
+  h+='<div class="me-grid">'+fS('fengProc','封頭鈑',[['0','否'],['1','是']])
+    +(_shBool(m.fengProc)?fN('fengCnt','加工支數 (支)'):'')+'</div>';
   h+=sec('⑥ 施工構台');
   h+='<div class="me-grid">'+fN('gantaiA','構台面積 (㎡)')+fN('gantaiP','構台周長 (M)')
     +fS('deck','覆工板規格',[['2','2M×1M'],['3','3M×1M']])+fN('bigCap','大構台帽 (頂)')
