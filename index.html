@@ -1061,7 +1061,9 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <div class="ch green">
         <div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本記錄</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <select id="cost-group-mode" onchange="rCostItems()" style="font-size:11px;padding:4px 7px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);font-family:inherit"><option value="none">依建立順序</option><option value="vendor">依廠商分組</option><option value="analysis">📊 工項成本分析</option><option value="audit">⚖ 成本勾稽（對應付）</option></select>
+          <select id="cost-group-mode" onchange="rCostItems()" style="font-size:11px;padding:4px 7px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);font-family:inherit"><option value="none">依建立順序</option><option value="vendor">依廠商分組</option></select>
+          <button type="button" class="btn btn-xs" id="cost-view-analysis" onclick="setCostView('analysis')" title="報價複價 vs 預估成本 vs 實際成本 vs 毛利"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 工項成本分析</button>
+          <button type="button" class="btn btn-xs" id="cost-view-audit" onclick="setCostView('audit')" title="施工成本 vs 應付帳款一致性比對"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 成本勾稽</button>
           <button type="button" class="btn btn-xs btn-g" onclick="addCostItem()" style="padding:6px 16px;font-size:13px;font-weight:700" title="先建立空白成本，類型（自有/承包/點工/額外）在卡片內再選">＋ 新增成本</button>
           
         </div>
@@ -2457,7 +2459,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.295';
+var APP_VERSION='v5.296';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -8651,13 +8653,18 @@ function syncCostToPayable(q, cost){
     itemName:itemName,
     updatedAt:Date.now()
   };
-  // 保留舊記錄的付款狀態相關欄位（已付款、付款日期、付款時間、備註）
+  // 保留舊記錄的付款狀態與附屬資料（已付款、日期、單據檔案、發票號碼、稅別…），只更新金額與來源欄位
   if(existP){
     if(existP.paidDate)p.paidDate=existP.paidDate;
     if(existP.paidAt)p.paidAt=existP.paidAt;
     if(existP.payDue)p.payDue=existP.payDue;
     if(existP.note&&!itemName)p.note=existP.note;
+    if(existP.files)p.files=existP.files;           // 已上傳的請款單/發票/匯款紀錄不可遺失
+    if(existP.invNo)p.invNo=existP.invNo;           // 廠商發票號碼
+    if(existP.vat!=null)p.vat=existP.vat;           // 5%稅勾選狀態
+    if(existP.costSourceId)p.costSourceId=existP.costSourceId;
   }
+  p._mt=Date.now(); // 跨裝置同步：連動後的新值必須獲勝
   PAYABLES.unshift(p); // 保證唯一一筆
   savePayables();
 }
@@ -8699,6 +8706,17 @@ function addCostItem(type){
   try{persist();_immediateUpload();}catch(e){}
 }
 
+// ── 成本視圖切換：工項成本分析／成本勾稽（獨立按鈕，再按一次回清單）──
+function setCostView(v){
+  window._costView=(window._costView===v)?'list':v;
+  var bA=document.getElementById('cost-view-analysis'),bU=document.getElementById('cost-view-audit');
+  var on='background:var(--g3);color:#fff;border-color:var(--g3)';
+  var off='';
+  if(bA)bA.style.cssText=window._costView==='analysis'?on:off;
+  if(bU)bU.style.cssText=window._costView==='audit'?on:off;
+  rCostItems();
+}
+
 // ── 成本類型切換：明細列自動換形（承包/自有＝數量×單價；點工/額外＝天數×日薪＋車資）──
 function changeCostType(cid,newType){
   var q=Q.find(function(x){return x.id===eid;});if(!q||!q.costs)return;
@@ -8732,6 +8750,7 @@ function changeCostType(cid,newType){
   if(!c.cat||c.cat===oldDef)c.cat=_costDefaultCat(newType); // 科目仍為預設者跟著換，手選過的保留
   if(newType==='own'){try{removePayableByCostId(c.id);}catch(e){}} // 自有成本不入應付，清掉舊連動
   recalcCostAmt(c);
+  if(newType!=='own'){try{syncCostToPayable(q,c);}catch(e){}} // 強連動：類型切換後應付即時重建
   q._mt=Date.now();
   try{persist();_immediateUpload();}catch(e){}
   rCostItems();
@@ -9214,6 +9233,7 @@ function updCostField(cid,field,val,rid){
       try{persist();}catch(e){} return;
     }
     if(field==='linkedItemIdx')rCostItems();
+    try{syncCostToPayable(q,cc);}catch(e){} // 強連動：任何頂層欄位（科目/日期…）變更即同步應付
   }
   try{persist();}catch(e){}
 }
@@ -9782,14 +9802,14 @@ function rCostItems(){
   // 施工成本廠商分組模式
   var _costGroupBtn=document.getElementById('cost-group-mode');
   var _costGroupMode=_costGroupBtn?_costGroupBtn.value:'none';
-  // 📊 工項成本分析視圖：報價複價 vs 預估成本 vs 實際成本 vs 毛利
-  if(_costGroupMode==='analysis'){
+  // 📊 工項成本分析視圖：報價複價 vs 預估成本 vs 實際成本 vs 毛利（獨立按鈕切換）
+  if(window._costView==='analysis'){
     el.innerHTML=buildCostAnalysisHtml(q);
     var _tw2=document.getElementById('cost-total-wrap');if(_tw2)_tw2.style.display='none';
     return;
   }
-  // ⚖ 成本勾稽視圖：施工成本 vs 應付帳款一致性
-  if(_costGroupMode==='audit'){
+  // ⚖ 成本勾稽視圖：施工成本 vs 應付帳款一致性（獨立按鈕切換）
+  if(window._costView==='audit'){
     el.innerHTML=buildCostAuditHtml(q);
     var _tw3=document.getElementById('cost-total-wrap');if(_tw3)_tw3.style.display='none';
     return;
@@ -11546,19 +11566,15 @@ function _projAttachFile(qid,type,name,dataUrl){
 }
 function projDownload(qid,type,idx){
   var q=Q.find(x=>x.id===qid);if(!q)return;
-  var name,data;
   if(type==='contract'){
     var ct=(CONTRACTS||[]).find(c=>c.linkedQid===qid)||(CONTRACTS||[]).find(c=>c.name===q.name);
     if(!ct||(!ct.fileData&&!ct.fileUrl)){toast('尚未上傳合約檔');return;}
-    if(ct.fileUrl){window.open(ct.fileUrl,'_blank');return;}   // 雲端：開啟下載連結
-    name=ct.fileName;data=ct.fileData;
+    _viewFile(ct.fileName||'合約檔',ct.fileUrl||ct.fileData);   // 點擊直接預覽（視窗內可下載）
   }else{
     var f=(q.confirmFiles||[])[idx];
     if(!f){toast('找不到檔案');return;}
-    if(f.url){window.open(f.url,'_blank');return;}             // 雲端：開啟下載連結
-    name=f.name;data=f.data;
+    _viewFile(f.name||'工作確認單',f.url||f.data);
   }
-  var a=document.createElement('a');a.href=data;a.download=name||'附件';document.body.appendChild(a);a.click();a.remove();
 }
 function projDelConfirmFile(qid,idx){
   var q=Q.find(x=>x.id===qid);if(!q||!q.confirmFiles)return;
@@ -11763,11 +11779,38 @@ function _payAttach(pid,name,urlOrData,path,kind){
   try{renderPayables();}catch(e){}
   toast('✅ 單據已附加：'+name);
 }
+// ── 通用檔案預覽：圖片直接看、PDF 內嵌、其他類型提供下載 ──
+function _viewFile(name,url){
+  if(!url){toast('無檔案內容');return;}
+  var isImg=/^data:image\//.test(url)||/\.(png|jpe?g|gif|webp|bmp)(\?|$)/i.test(url);
+  var isPdf=/^data:application\/pdf/.test(url)||/\.pdf(\?|$)/i.test(url);
+  var m=document.getElementById('file-view-modal');
+  if(!m){
+    m=document.createElement('div');
+    m.id='file-view-modal';
+    m.style.cssText='display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.72);padding:14px;align-items:center;justify-content:center';
+    m.onclick=function(e){if(e.target===m)m.style.display='none';};
+    m.innerHTML='<div style="max-width:920px;width:100%;max-height:94vh;background:var(--w);border-radius:var(--r14);overflow:hidden;display:flex;flex-direction:column">'
+      +'<div style="background:var(--g3);padding:10px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px">'
+      +'<span id="fv-title" style="color:#fff;font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>'
+      +'<div style="display:flex;gap:6px;flex-shrink:0">'
+      +'<a id="fv-dl" download style="color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:var(--r6);padding:3px 12px;font-size:12px;text-decoration:none"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 下載</a>'
+      +'<button type="button" onclick="document.getElementById(\'file-view-modal\').style.display=\'none\'" style="border:none;background:transparent;color:rgba(255,255,255,.8);font-size:20px;cursor:pointer;line-height:1;padding:0 4px">✕</button>'
+      +'</div></div>'
+      +'<div id="fv-body" style="flex:1;overflow:auto;background:#2b2f2c;display:flex;align-items:center;justify-content:center;min-height:200px"></div></div>';
+    document.body.appendChild(m);
+  }
+  document.getElementById('fv-title').textContent=name||'檔案';
+  var dl=document.getElementById('fv-dl');dl.href=url;dl.setAttribute('download',name||'file');
+  var body=document.getElementById('fv-body');
+  if(isImg)body.innerHTML='<img src="'+url+'" style="max-width:100%;max-height:88vh;object-fit:contain">';
+  else if(isPdf)body.innerHTML='<iframe src="'+url+'" style="width:100%;height:82vh;border:none;background:#fff"></iframe>';
+  else body.innerHTML='<div style="color:#cfd8d2;font-size:13px;padding:40px;text-align:center">此檔案格式無法預覽，請點右上角「下載」開啟</div>';
+  m.style.display='flex';
+}
 function _payOpenFile(pid,idx){
   var p=PAYABLES.find(x=>x.id===pid);var f=p&&p.files&&p.files[idx];if(!f)return;
-  if((f.url||'').startsWith('data:')){
-    var a=document.createElement('a');a.href=f.url;a.download=f.name||'file';a.click();
-  }else{window.open(f.url,'_blank');}
+  _viewFile(f.name,f.url);
 }
 function _payDelFile(pid,idx){
   var p=PAYABLES.find(x=>x.id===pid);var f=p&&p.files&&p.files[idx];if(!f)return;
@@ -11826,18 +11869,15 @@ async function aiScanDoc(dataUrl,hint){
 function _payFilesRow(p){
   var fs=p.files||[];
   var chips=fs.map(function(f,i){
-    var ic=f.kind==='pay'?'🏦':'📄';
+    var ic=f.kind==='pay'?'<svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg>':'<svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg>';
     return '<span style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--b2);border-radius:99px;padding:2px 8px;font-size:10.5px;background:var(--w)">'
-      +'<a href="javascript:void(0)" onclick="_payOpenFile(\''+p.id+'\','+i+')" style="color:var(--g3);text-decoration:none;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+ic+' '+esc((f.name||'單據').slice(0,20))+'</a>'
+      +'<a href="javascript:void(0)" onclick="_payOpenFile(\''+p.id+'\','+i+')" title="點擊查看" style="color:var(--g3);text-decoration:none;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+ic+' '+esc((f.name||'單據').slice(0,20))+'</a>'
       +'<a href="javascript:void(0)" onclick="_payDelFile(\''+p.id+'\','+i+')" style="color:var(--b3);text-decoration:none">✕</a></span>';
   }).join(' ');
-  var _srcChip='';
-  if(p.costId&&p.quoteId){_srcChip='<button type="button" title="檢視來源施工成本" onclick="openProjectCosts(\''+p.quoteId+'\')" style="border:1px solid var(--b2);background:#fff;color:var(--b4);border-radius:99px;padding:3px 10px;font-size:10.5px;cursor:pointer;font-family:inherit">⚙ 成本</button>';}
   return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 12px 10px;border-top:1px solid var(--b1);margin-top:8px;background:#fafbfc;border-radius:0 0 12px 12px">'
-    +_srcChip
-    +(p.invNo?'<span class="bdg" style="font-size:10.5px;background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4" title="廠商發票號碼">🧾 '+esc(p.invNo)+'</span>':'')
-    +'<button type="button" class="btn btn-xs" title="拍照或上傳廠商請款單與發票；照片會自動辨識發票號碼與金額" onclick="_payUpload(\''+p.id+'\',\'inv\')" style="border-color:#1a3a6b;color:#1a3a6b">📄 請款單/發票</button>'
-    +'<button type="button" class="btn btn-xs" title="拍照或上傳匯款紀錄／轉帳截圖" onclick="_payUpload(\''+p.id+'\',\'pay\')" style="border-color:var(--b3);color:var(--b4)">🏦 匯款紀錄</button>'
+    +(p.invNo?'<span class="bdg" style="font-size:10.5px;background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4" title="廠商發票號碼"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> '+esc(p.invNo)+'</span>':'')
+    +'<button type="button" class="btn btn-xs" title="拍照或上傳廠商請款單與發票；照片會自動辨識發票號碼與金額" onclick="_payUpload(\''+p.id+'\',\'inv\')" style="border-color:#1a3a6b;color:#1a3a6b"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 請款單/發票</button>'
+    +'<button type="button" class="btn btn-xs" title="拍照或上傳匯款紀錄／轉帳截圖" onclick="_payUpload(\''+p.id+'\',\'pay\')" style="border-color:var(--b3);color:var(--b4)"><svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg> 匯款紀錄</button>'
     +chips+'</div>';
 }
 function _payEff(p){var a=parseFloat(p.amount)||0;return p.vat===false?Math.round(a):Math.round(a*1.05);}
@@ -12752,12 +12792,13 @@ function _intakeRoute(type,qid,r,du){
     if(!q2.costs)q2.costs=[];
     var cid=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
     var cc={id:cid,type:'sub',isAttached:false,attachedTo:'',mergedInto:'',vendor:r.vendor||'',
-      cat:(r._cat||'外包工程'),date:r.date||today,
+      cat:(r._cat||'打設拔除'),date:r.date||today,
       rows:(r.items||[]).filter(function(it){return it.desc;}).map(function(it,i){return {id:cid+'_'+i,linkedItemIdx:-1,desc:it.desc||'',qty:parseFloat(it.qty)||1,unitPrice:parseFloat(it.price)||0};}),amt:0};
     if(!cc.rows.length)cc.rows=[{id:cid+'_0',linkedItemIdx:-1,desc:r.note||'',qty:1,unitPrice:parseFloat(r.amount)||0}];
     recalcCostAmt(cc);
     q2.costs.push(cc);
     q2._mt=Date.now();
+    try{syncCostToPayable(q2,cc);}catch(e){} // 強連動：智慧收件建立成本即同步應付
     try{persist();_immediateUpload();}catch(e){}
     _ikLog({label:'廠商報價 → 成本',detail:q2.name+'／'+(r.vendor||'')+' NT$ '+fmt(cc.amt),undo:{kind:'cost',qid:qid,cid:cid}});
     toast('✅ 已為「'+esc(q2.name)+'」建立成本：'+esc(r.vendor||'廠商')+' NT$ '+fmt(cc.amt));
