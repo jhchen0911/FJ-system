@@ -575,8 +575,9 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div class="ssec">接案流</div>
   <button type="button" class="snav" id="sn-editor" onclick="newQ()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span>新增報價</button>
   <button type="button" class="snav" id="sn-quotes" onclick="go('quotes')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span>報價管理 <span class="cnt" id="qbadge">0</span></button>
-  <button type="button" class="snav" id="sn-contracts" onclick="go('contracts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>合約管理<span class="cnt" id="contractbadge" style="display:none">0</span></button>
+  <button type="button" class="snav" id="sn-contracts" onclick="go('contracts')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>合約管理<span class="cnt" id="contractbadge" style="display:none">0</span></button>
   <button type="button" class="snav" id="sn-projects" onclick="go('projects')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>專案總覽</button>
+  <button type="button" class="snav" id="sn-costs" onclick="go('costs')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>施工成本</button>
   <div class="ssec" style="margin-top:5px">收付流</div>
   <button type="button" class="snav" id="sn-invoice" onclick="go('invoice')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>應收管理 <span class="cnt" id="invbadge" style="display:none">0</span></button>
   <button type="button" class="snav" id="sn-finance" onclick="go('finance')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>金流管理</button>
@@ -1045,7 +1046,9 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <!-- ████ COSTS PAGE（施工成本，自專案脈絡進入）████ -->
 <div class="page" id="page-costs">
   <div class="ph">
-    <div class="ph-l"><div class="ph-t">施工成本</div><div class="ph-s" id="costs-proj-name">請由專案總覽選擇工程</div><div style="font-size:10.5px;color:var(--g3);margin-top:2px">✓ 所有變更即時自動儲存</div></div>
+    <div class="ph-l"><div class="ph-t">施工成本</div><div class="ph-s" id="costs-proj-name">請選擇工程</div>
+      <select id="costs-proj-select" onchange="if(this.value)openProjectCosts(this.value)" style="margin-top:4px;font-size:13px;padding:6px 10px;border:1.5px solid var(--gm);border-radius:var(--r8);background:var(--gl);color:var(--g3);font-family:inherit;font-weight:700;max-width:320px"></select>
+      <div style="font-size:10.5px;color:var(--g3);margin-top:2px">✓ 所有變更即時自動儲存</div></div>
     <div class="ph-r">
       <button type="button" class="btn btn-sm" onclick="go('projects')">← 專案總覽</button>
       <button type="button" class="btn btn-sm" onclick="go('invoice')" title="本專案應收請款">應收</button>
@@ -2438,6 +2441,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div style="font-size:11px;font-weight:700;color:var(--b3);margin-bottom:10px;letter-spacing:.06em;text-transform:uppercase">功能選單</div>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
     <button type="button" onclick="go('projects');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span><span>專案</span></button>
+    <button type="button" onclick="go('costs');toggleMobMore()" id="mn-costs" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span><span>施工成本</span></button>
     <button type="button" onclick="go('contacts');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span><span>客戶</span></button>
     <button type="button" onclick="go('quickcost');toggleMobMore();setTimeout(rQuickCost,60)" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg></span><span>支出．日報</span></button>
     <button type="button" onclick="toggleMobMore();smartIntake()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
@@ -2456,7 +2460,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.293';
+var APP_VERSION='v5.294';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2649,6 +2653,7 @@ function go(p){
   ['tn-'+navKey,'sn-'+navKey,'mn-'+navKey].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('active');});
   // Page-specific init
   if(p==='dash')rDash();if(p==='customers')renderCustomers();if(p==='finance'){try{cleanDuplicatePayables();}catch(e){}try{updateFinanceKPIs();switchFinanceTab('ar');}catch(e){}}
+  if(p==='costs'){try{renderCostsProjSelect();}catch(e){}}
   if(p==='quotes'){renderList();updateQuoteStats();}
   if(p==='editor'){
     rItems();rExs();rTots();
@@ -4888,9 +4893,9 @@ function rInvItems(){
         hR.appendChild(mb);
       });
       const stl=document.createElement('button');
-      stl.type='button';stl.textContent='⚖';stl.className='btn btn-xs';
-      stl.title='工項結算：合約數量改為累積實作數量';
-      stl.style.cssText='padding:3px 9px;color:#4527a0;border-color:#b39ddb';
+      stl.type='button';stl.textContent='⚖ 追加減';stl.className='btn btn-xs';
+      stl.title='單項追加減結算：只把「這一個工項」的合約數量改為實作數量並連動合約金額。全案完工的收尾請改用專案卡的「⚖ 竣工總結算」';
+      stl.style.cssText='padding:3px 9px;color:#4527a0;border-color:#b39ddb;white-space:nowrap';
       stl.addEventListener('click',function(){settleInvItem(i);});
       hR.appendChild(stl);
       const del=document.createElement('button');
@@ -5088,7 +5093,7 @@ function rInvItems(){
       const tdDel=document.createElement('td');
       tdDel.style.whiteSpace='nowrap';
       const stlBtn=document.createElement('button');stlBtn.className='dbtn';stlBtn.textContent='⚖';
-      stlBtn.title='工項結算：合約數量改為累積實作數量（追加／追減）';
+      stlBtn.title='單項追加減結算：只把「這一個工項」的合約數量改為實作數量並連動合約金額。全案完工的收尾請改用專案卡的「⚖ 竣工總結算」';
       stlBtn.style.color='#4527a0';
       stlBtn.addEventListener('click',function(){settleInvItem(i);});
       const delBtn=document.createElement('button');delBtn.className='dbtn';delBtn.textContent='✕';
@@ -6356,8 +6361,8 @@ function confirmAward(){
       // 詢問是否立即前往合約管理
       setTimeout(()=>{
         showConfirm('<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 合約已自動建立',
-          '報價單「'+esc(q.name||'')+'」得標後已自動建立合約記錄。<br><br>是否立即前往合約管理上傳合約附件？',
-          ()=>{go('contracts');setTimeout(()=>editContract(newContract.id),300);},
+          '報價單「'+esc(q.name||'')+'」得標後已自動建立合約記錄。<br><br>是否前往專案總覽上傳合約附件？',
+          ()=>{go('projects');},
           false
         );
       }, 800);
@@ -8371,8 +8376,17 @@ function openProjectCosts(qid){
   go('costs');          // 隨即切至成本頁（同一 eid 脈絡）
   const t=document.getElementById('costs-proj-name');
   if(t)t.textContent=(q.name||'未命名')+(q.client?'　/　'+q.client:'');
+  try{renderCostsProjSelect();}catch(e){}
   try{rCostItems();}catch(e){}
   window.scrollTo({top:0});
+}
+// 施工成本頁選案下拉：得標案直達，不必繞道專案總覽
+function renderCostsProjSelect(){
+  const sel=document.getElementById('costs-proj-select');if(!sel)return;
+  const mains=Q.filter(q=>!q.parentId&&q.awarded&&!q.closed);
+  sel.innerHTML='<option value="">── 選擇工程（得標案）──</option>'
+    +mains.map(q=>'<option value="'+q.id+'"'+(typeof eid!=='undefined'&&eid===q.id?' selected':'')+'>'+esc((q.name||'未命名').slice(0,24))+(q.client?'／'+esc(q.client.slice(0,8)):'')+'</option>').join('');
+  if(!mains.length)sel.innerHTML='<option value="">尚無進行中的得標案</option>';
 }
 function openContractCosts(qid){
   openProjectCosts(qid);
@@ -10985,7 +10999,8 @@ function settleContract(id){
   c.note=c.note?(c.note+'　'+settleNote):settleNote;
   c._mt=Date.now();c.updatedAt=Date.now(); // 更新修改時間，確保跨裝置同步時新值獲勝
   saveContracts();renderContracts();
-  toast('⚖ 已結算：合約金額調整為 NT$ '+fmt(billed)+'，狀態已完成');
+  try{if(document.getElementById('page-projects')?.classList.contains('active'))renderProjects();}catch(e){}
+  toast('⚖ 已竣工總結算：合約金額調整為 NT$ '+fmt(billed)+'，狀態已完成');
 }
 
 function delContract(id){
@@ -11052,7 +11067,7 @@ function renderContracts(){
         ${c.linkedQid?`<button type="button" class="btn btn-xs" style="background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4" onclick="viewContractQuote('${c.linkedQid}')" title="查看原始報價單"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 報價</button>`:''}
         <button type="button" class="btn btn-xs btn-g" onclick="newInvFromContract('${c.id}')" title="為此合約新增請款單"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 請款</button>
         ${c.linkedQid?`<button type="button" class="btn btn-xs" style="background:#fff3e0;color:#e65100;border:1px solid #ffcc80" onclick="openContractCosts('${c.linkedQid}')" title="記錄施工成本"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>`:''}
-        ${c.status!=='completed'&&billed>0?`<button type="button" class="btn btn-xs" style="background:#ede7f6;color:#4527a0;border:1px solid #b39ddb" onclick="settleContract('${c.id}')" title="竣工結算：實作數量少於合約時，將合約金額調整為實際請款累積並結案">⚖ 結算</button>`:''}
+        ${c.status!=='completed'&&billed>0?`<button type="button" class="btn btn-xs" style="background:#ede7f6;color:#4527a0;border:1px solid #b39ddb" onclick="settleContract('${c.id}')" title="全案完工後的最後收尾：合約金額調整為實際請款累積並標記完成。單一工項追加減請改用請款單的「⚖ 追加減」">⚖ 竣工總結算</button>`:''}
         <button type="button" class="btn btn-xs btn-r" onclick="delContract('${c.id}')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button>
       </div>
     </div>`;
@@ -11452,7 +11467,7 @@ function _projAttachMeta(qid,type,name,url,path){
   var q=Q.find(x=>x.id===qid);if(!q)return;
   if(type==='contract'){
     var ct=(CONTRACTS||[]).find(c=>c.linkedQid===qid)||(CONTRACTS||[]).find(c=>c.name===q.name);
-    if(!ct){toast('尚未建立合約，請先至合約管理建立');return;}
+    if(!ct){toast('尚未建立合約（報價標記得標時會自動建立）');return;}
     // 汰換舊雲端檔（best-effort）
     if(ct.filePath&&_fbStorage){try{_fbStorage.ref(ct.filePath).delete().catch(function(){});}catch(e){}}
     ct.fileName=name;ct.fileUrl=url;ct.filePath=path;ct.fileTs=Date.now();
@@ -11472,7 +11487,7 @@ function _projAttachFile(qid,type,name,dataUrl){
   var q=Q.find(x=>x.id===qid);if(!q)return;
   if(type==='contract'){
     var ct=(CONTRACTS||[]).find(c=>c.linkedQid===qid)||(CONTRACTS||[]).find(c=>c.name===q.name);
-    if(!ct){toast('尚未建立合約，請先至合約管理建立');return;}
+    if(!ct){toast('尚未建立合約（報價標記得標時會自動建立）');return;}
     if(ct.filePath&&_fbStorage){try{_fbStorage.ref(ct.filePath).delete().catch(function(){});}catch(e){}}
     ct.fileName=name;ct.fileData=dataUrl;ct.fileTs=Date.now();
     delete ct.fileUrl;delete ct.filePath;
@@ -11562,10 +11577,11 @@ function renderProjects(){
     // 2 合約（可上傳/下載合約檔）
     const _hasCtFile=!!(ct&&(ct.fileData||ct.fileUrl));
     steps.push({label:'合約',done:!!ct,
-      info:ct?esc(ct.code||'')+'　NT$ '+fmt(ct.amount||0):'尚未建立合約',
+      info:ct?esc(ct.code||'')+'　NT$ '+fmt(ct.amount||0)+(done?'　<span style="color:var(--g3)">✓ 已完工結算</span>':''):'尚未建立合約',
       extra:ct?('<button type="button" onclick="event.stopPropagation();projUpload(\'contract\',\''+q.id+'\')" style="border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> '+(_hasCtFile?'重新上傳':'上傳合約檔')+'</button>'
-        +(_hasCtFile?' <button type="button" onclick="event.stopPropagation();projDownload(\''+q.id+'\',\'contract\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> '+esc((ct.fileName||'合約檔').slice(0,18))+'</button>':'')):'',
-      jump:"go('contracts')"});
+        +(_hasCtFile?' <button type="button" onclick="event.stopPropagation();projDownload(\''+q.id+'\',\'contract\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> '+esc((ct.fileName||'合約檔').slice(0,18))+'</button>':'')
+        +(!done&&billed>0?' <button type="button" onclick="event.stopPropagation();settleContract(\''+ct.id+'\')" title="全案完工後的最後收尾：把合約金額調整為實際請款累積並標記完成。單一工項的追加減請改用請款單裡的「⚖ 追加減」" style="border:1px solid #b39ddb;background:#ede7f6;color:#4527a0;border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit">⚖ 竣工總結算</button>':'')):'',
+      jump:"void(0)"});
     // 3 施工進度（成本 + 工作確認單）
     const cfN=(q.confirmFiles||[]).length;
     const cfChips=(q.confirmFiles||[]).map((f,fi)=>'<span style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--b2);background:var(--w);border-radius:99px;padding:2px 8px;font-size:11px">'
@@ -11588,7 +11604,7 @@ function renderProjects(){
       extra:isClosed
         ?'<button type="button" onclick="event.stopPropagation();toggleProjClosed(\''+q.id+'\',false)" style="border:1px solid var(--b2);background:var(--w);color:var(--b4);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit">↩ 取消結案</button>'
         :'<button type="button" onclick="event.stopPropagation();toggleProjClosed(\''+q.id+'\',true)" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit">✓ 標記結案</button>',
-      jump:"go('contracts')"});
+      jump:"void(0)"});
     let activeSet=false;
     const stepHtml=steps.map((st,i2)=>{
       let state='pending';
@@ -13952,7 +13968,7 @@ const ALL_PAGES = [
   {id:'finance',   label:'金流管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>', adminOnly:false},
   {id:'profit',    label:'利潤分析', icon:'↗', adminOnly:false},
   {id:'contacts',  label:'客戶管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg>', adminOnly:false},
-  {id:'contracts', label:'合約管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>', adminOnly:false},
+  {id:'contracts', label:'合約管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>', adminOnly:false, hidden:true}, // v5.294 併入專案總覽，導覽隱藏（頁面與資料保留）
   {id:'projects',  label:'專案總覽', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg>', adminOnly:false},
   {id:'costs',     label:'施工成本', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg>', adminOnly:false},
   {id:'quickcost', label:'支出．日報', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>', adminOnly:false},
@@ -14051,8 +14067,8 @@ function newInvFromContract(contractId){
 function applyRoleUI(){
   const perms=getPagePerms();
   ALL_PAGES.forEach(page=>{
-    // 完全隱藏：adminOnly 或 管理員設定為 false
-    const hidden=!_isAdminUser&&(page.adminOnly||perms[page.id]===false);
+    // 完全隱藏：頁面已整併退場(hidden)、adminOnly 或 管理員設定為 false
+    const hidden=page.hidden===true||(!_isAdminUser&&(page.adminOnly||perms[page.id]===false));
     // 隱藏 top-nav
     const tn=document.getElementById('tn-'+page.id);
     if(tn)tn.style.display=hidden?'none':'';
