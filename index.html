@@ -1062,10 +1062,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本記錄</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
           <select id="cost-group-mode" onchange="rCostItems()" style="font-size:11px;padding:4px 7px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);font-family:inherit"><option value="none">依建立順序</option><option value="vendor">依廠商分組</option><option value="analysis">📊 工項成本分析</option><option value="audit">⚖ 成本勾稽（對應付）</option></select>
-          <button type="button" class="btn btn-xs" onclick="addCostItem('own')" style="background:#FFFDE7;color:#8a6d00;border-color:#f0da7a">+ 自有成本</button>
-            <button type="button" class="btn btn-xs" onclick="addCostItem('sub')" style="background:#E3F2FD;color:#1565C0;border-color:#90CAF9">+ 承包</button>
-          <button type="button" class="btn btn-xs" onclick="addCostItem('labor')" style="background:#FFF3E0;color:#E65100;border-color:#FFCC80">+ 點工</button>
-          <button type="button" class="btn btn-xs" onclick="addCostItem('extra')" style="background:#F3E5F5;color:#4A148C;border-color:#CE93D8">+ 額外支出</button>
+          <button type="button" class="btn btn-xs btn-g" onclick="addCostItem()" style="padding:6px 16px;font-size:13px;font-weight:700" title="先建立空白成本，類型（自有/承包/點工/額外）在卡片內再選">＋ 新增成本</button>
           
         </div>
       </div>
@@ -2460,7 +2457,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.294';
+var APP_VERSION='v5.295';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -8674,6 +8671,7 @@ function removePayableByCostId(costId){
 }
 
 function addCostItem(type){
+  type=type||'sub'; // 未指定類型時先建為「承包」空白卡，類型在卡片內可隨時切換
   var q=Q.find(function(x){return x.id===eid;});
   if(!q){toast('請先開啟報價單');return;}
   if(!q.costs)q.costs=[];
@@ -8699,6 +8697,45 @@ function addCostItem(type){
   q.costs.push(base);
   rCostItems();
   try{persist();_immediateUpload();}catch(e){}
+}
+
+// ── 成本類型切換：明細列自動換形（承包/自有＝數量×單價；點工/額外＝天數×日薪＋車資）──
+function changeCostType(cid,newType){
+  var q=Q.find(function(x){return x.id===eid;});if(!q||!q.costs)return;
+  var c=q.costs.find(function(x){return x.id===cid;});if(!c||c.type===newType)return;
+  var oldType=c.type;
+  var oldDef=_costDefaultCat(oldType);
+  var wasQtyForm=(oldType==='sub'||oldType==='own');
+  var toQtyForm=(newType==='sub'||newType==='own');
+  if(wasQtyForm!==toQtyForm){
+    var rows=c.rows||[];
+    if(wasQtyForm){
+      // 數量×單價 → 天數×日薪
+      c.rows=rows.map(function(r,i){return {id:r.id||cid+'_'+i,subType:'worker',desc:r.desc||'',reason:'',
+        days:parseFloat(r.qty)||1,dayRate:parseFloat(r.unitPrice)||0,transport:0};});
+      var li=(rows.length&&rows[0].linkedItemIdx>=0)?rows[0].linkedItemIdx:(c.linkedItemIdx!=null?c.linkedItemIdx:-1);
+      c.linkedItemIdx=li>=0?li:-1;
+    }else{
+      // 天數×日薪＋車資 → 數量×單價（車資>0 另立一列保留金額）
+      var nr=[];
+      rows.forEach(function(r,i){
+        nr.push({id:r.id||cid+'_'+i,linkedItemIdx:(c.linkedItemIdx>=0?c.linkedItemIdx:-1),desc:r.desc||'',
+          qty:parseFloat(r.days)||1,unitPrice:parseFloat(r.dayRate)||0});
+        if((parseFloat(r.transport)||0)>0)nr.push({id:(r.id||cid+'_'+i)+'_t',linkedItemIdx:-1,
+          desc:(r.desc?r.desc+'－':'')+'車資/運費',qty:1,unitPrice:parseFloat(r.transport)||0});
+      });
+      c.rows=nr;
+      if(c.vendor==null)c.vendor='';
+    }
+  }
+  c.type=newType;
+  if(!c.cat||c.cat===oldDef)c.cat=_costDefaultCat(newType); // 科目仍為預設者跟著換，手選過的保留
+  if(newType==='own'){try{removePayableByCostId(c.id);}catch(e){}} // 自有成本不入應付，清掉舊連動
+  recalcCostAmt(c);
+  q._mt=Date.now();
+  try{persist();_immediateUpload();}catch(e){}
+  rCostItems();
+  toast('已切換為「'+({own:'自有成本',sub:'承包',labor:'點工',extra:'額外支出'}[newType])+'」');
 }
 
 // ── 歷史單價庫：結案復盤回寫的「工項實際成本單價」，報價時自動提示 ──
@@ -9712,7 +9749,7 @@ function rCostItems(){
   const costs=(q&&q.costs)||[];
 
   if(!costs.length){
-    el.innerHTML='<div style="text-align:center;padding:20px;color:var(--b3);font-size:12px">尚無成本記錄，點上方「+ 自有成本」「+ 承包」「+ 點工」「+ 額外支出」新增</div>';
+    el.innerHTML='<div style="text-align:center;padding:20px;color:var(--b3);font-size:12px">尚無成本記錄，點上方「＋ 新增成本」建立，類型（自有／承包／點工／額外）在卡片內選擇</div>';
     const tw=document.getElementById('cost-total-wrap');
     if(tw)tw.style.display='none';
     return;
@@ -9728,8 +9765,8 @@ function rCostItems(){
   const vendorOpts=(VENDORS||[]).map(v=>`<option value="${esc(v.name||'')}"></option>`).join('');
 
   const typeLabel={own:'自有成本',sub:'承包',labor:'點工',extra:'額外支出'};
-  const typeColor={sub:'#1565C0',labor:'#E65100',extra:'#4A148C'};
-  const typeBg={sub:'#E3F2FD',labor:'#FFF3E0',extra:'#F3E5F5'};
+  const typeColor={own:'#8a6d00',sub:'#1565C0',labor:'#E65100',extra:'#4A148C'};
+  const typeBg={own:'#FFFDE7',sub:'#E3F2FD',labor:'#FFF3E0',extra:'#F3E5F5'};
   // 已合併的項目顯示標記
   const isMerged=(cc)=>!!cc.mergedInto;
 
@@ -9908,8 +9945,10 @@ function rCostItems(){
     html+=
       `<div style="padding:8px 0;border-bottom:1px solid var(--b1);${indent}">`
       +`<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">`
-      +`<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;`
-      +`background:${typeBg[c.type]};color:${typeColor[c.type]};white-space:nowrap">${typeLabel[c.type]}</span>`
+      +`<select onchange="changeCostType('${c.id}',this.value)" title="成本類型（可隨時切換，明細列會自動轉換格式）" style="font-size:10.5px;font-weight:700;padding:2px 4px;border-radius:10px;border:1.5px solid ${typeColor[c.type]||'#999'};`
+      +`background:${typeBg[c.type]||'#f5f5f5'};color:${typeColor[c.type]||'#555'};font-family:inherit;cursor:pointer">`
+      +['sub','labor','extra','own'].map(function(tk){return '<option value="'+tk+'"'+(c.type===tk?' selected':'')+'>'+typeLabel[tk]+'</option>';}).join('')
+      +`</select>`
       +(c.mergedInto?`<span style="font-size:10px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;padding:2px 6px;border-radius:8px"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 已合併</span>`:'')
       +(function(){var _cat=c.cat?_costCatNorm(c.cat):_costDefaultCat(c.type);
         return `<select onchange="updCostField('${c.id}','cat',this.value)" title="成本科目（跨案分析用）" style="font-size:10.5px;padding:2px 4px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);color:var(--b5);font-family:inherit">`
