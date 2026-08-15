@@ -320,6 +320,14 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
   .ph-t{font-size:16px!important}
   #inv-ar-banner{padding:12px 14px!important}
   #mob-more-panel .btn{min-height:52px!important;font-size:13px!important}
+  /* 總覽快捷鍵：手機單排緊湊 */
+  #dash-shortcuts{gap:6px}
+  #dash-shortcuts .sc-btn{padding:10px 2px;gap:2px}
+  #dash-shortcuts .sc-icon{font-size:20px}
+  #dash-shortcuts .sc-label{font-size:10.5px;white-space:nowrap}
+  #dash-shortcuts .sc-sub{display:none}
+  /* 圖表：手機滿版＋可點放大 */
+  #report-content svg,#page-profit svg{width:100%!important;height:auto!important;cursor:zoom-in}
 }
 
 /* ═══ 手機底部導航 ═══ */
@@ -611,7 +619,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <!-- 應收/應付 財務摘要列 -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <!-- 應收帳款 -->
-      <div id="dash-ar-card" style="background:#fffbf0;border:1.5px solid #ffe082;border-radius:var(--r12);padding:14px 16px;cursor:pointer" onclick="go('finance');setTimeout(()=>switchFinanceTab('ar'),50)">
+      <div id="dash-ar-card" style="background:var(--w);border:1px solid var(--b1);border-left:4px solid #f0a500;border-radius:var(--r12);padding:14px 16px;cursor:pointer" onclick="go('finance');setTimeout(()=>switchFinanceTab('ar'),50)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-size:12px;font-weight:700;color:#7c5700"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 應收帳款</span>
           <span style="font-size:10px;color:var(--b3)">點擊查看 →</span>
@@ -619,7 +627,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div id="dash-ar-summary" style="font-size:13px;color:#7c5700"></div>
       </div>
       <!-- 應付帳款 -->
-      <div id="dash-ap-card" style="background:#fff0f0;border:1.5px solid #ffaaaa;border-radius:var(--r12);padding:14px 16px;cursor:pointer" onclick="go('finance');setTimeout(()=>switchFinanceTab('payable'),50)">
+      <div id="dash-ap-card" style="background:var(--w);border:1px solid var(--b1);border-left:4px solid #c62828;border-radius:var(--r12);padding:14px 16px;cursor:pointer" onclick="go('finance');setTimeout(()=>switchFinanceTab('payable'),50)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-size:12px;font-weight:700;color:#c62828"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 應付帳款</span>
           <span style="font-size:10px;color:var(--b3)">點擊查看 →</span>
@@ -630,8 +638,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       </div>
     </div>
 
-    <!-- 快速入口 2×2 -->
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px" id="dash-shortcuts">
+    <!-- 快速入口：單排 4 顆 -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="dash-shortcuts">
       <button type="button" onclick="go('quickcost');setTimeout(function(){try{rQuickCost();}catch(e){}},60)" class="sc-btn">
         <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg></span>
         <span class="sc-label">日報．支出</span>
@@ -1465,30 +1473,30 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <div class="ph-l"><div class="ph-t">報表中心</div><div class="ph-s">月報・年報・往來明細</div></div>
   </div>
   <div class="pad">
-    <!-- 報表類型選擇 -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-      <button type="button" class="btn btn-sm" id="rpt-monthly-btn" onclick="showReport('monthly')"
-        style="border-color:var(--g3);color:var(--g3)"><svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 月報表</button>
-      <button type="button" class="btn btn-sm" id="rpt-yearly-btn" onclick="showReport('yearly')"
-        style="border-color:var(--g3);color:var(--g3)"><svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 年度損益</button>
-      <button type="button" class="btn btn-sm" id="rpt-client-btn" onclick="showReport('client')"
-        style="border-color:var(--g3);color:var(--g3)"><svg class="ic ib" aria-hidden="true"><use href="#i-user"/></svg> 業主往來</button>
-      <button type="button" class="btn btn-sm" id="rpt-contract-btn" onclick="showReport('contract')"
-        style="border-color:var(--g3);color:var(--g3)"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 合約請款</button>
-      <button type="button" class="btn btn-sm" id="rpt-log-btn" onclick="showReport('log')"
-        style="border-color:var(--b3);color:var(--b3)"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 操作記錄</button>
-      <div style="display:flex;gap:6px;margin-left:auto;align-items:center">
-        <select id="rpt-year" style="padding:5px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-size:12px;font-family:inherit" onchange="renderCurrentReport()"></select>
-        <select id="rpt-month" style="padding:5px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-size:12px;font-family:inherit" onchange="renderCurrentReport()">
-          <option value="">全年</option>
-          <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option>
-          <option value="4">4月</option><option value="5">5月</option><option value="6">6月</option>
-          <option value="7">7月</option><option value="8">8月</option><option value="9">9月</option>
-          <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
-        </select>
-        <button type="button" class="btn btn-sm" onclick="exportCurrentReport()" style="background:var(--g);color:#fff;border-color:var(--g)"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 匯出CSV</button>
-        <button type="button" class="btn btn-sm" onclick="exportCurrentReportExcel()" style="background:#1d6f42;color:#fff;border-color:#1d6f42"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> Excel</button>
-      </div>
+    <!-- 報表類型選擇：等寬格狀，尺寸統一 -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-bottom:10px">
+      <button type="button" class="btn btn-sm rpt-tab" id="rpt-monthly-btn" onclick="showReport('monthly')"
+        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 月報表</button>
+      <button type="button" class="btn btn-sm rpt-tab" id="rpt-yearly-btn" onclick="showReport('yearly')"
+        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 年度損益</button>
+      <button type="button" class="btn btn-sm rpt-tab" id="rpt-client-btn" onclick="showReport('client')"
+        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-user"/></svg> 業主往來</button>
+      <button type="button" class="btn btn-sm rpt-tab" id="rpt-contract-btn" onclick="showReport('contract')"
+        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 合約請款</button>
+      <button type="button" class="btn btn-sm rpt-tab" id="rpt-log-btn" onclick="showReport('log')"
+        style="border-color:var(--b3);color:var(--b3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 操作記錄</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr 1fr;gap:8px;margin-bottom:14px">
+      <select id="rpt-year" style="height:40px;padding:0 8px;border:1px solid var(--b2);border-radius:var(--r8);font-size:13px;font-family:inherit;background:var(--w)" onchange="renderCurrentReport()"></select>
+      <select id="rpt-month" style="height:40px;padding:0 8px;border:1px solid var(--b2);border-radius:var(--r8);font-size:13px;font-family:inherit;background:var(--w)" onchange="renderCurrentReport()">
+        <option value="">全年</option>
+        <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option>
+        <option value="4">4月</option><option value="5">5月</option><option value="6">6月</option>
+        <option value="7">7月</option><option value="8">8月</option><option value="9">9月</option>
+        <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+      </select>
+      <button type="button" class="btn btn-sm" onclick="exportCurrentReport()" style="background:var(--g);color:#fff;border-color:var(--g);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 匯出CSV</button>
+      <button type="button" class="btn btn-sm" onclick="exportCurrentReportExcel()" style="background:#1d6f42;color:#fff;border-color:#1d6f42;justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> Excel</button>
     </div>
     <div id="report-content" class="card"></div>
   </div>
@@ -2479,8 +2487,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
     <button type="button" onclick="go('contacts');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span><span>客戶</span></button>
     <button type="button" onclick="toggleMobMore();smartIntake()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
-    <button type="button" onclick="go('reports');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span><span>報表</span></button>
-    <button type="button" onclick="go('profit');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span><span>利潤</span></button>
+    <button type="button" onclick="go('profit');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span><span>利潤．報表</span></button>
       </div>
       <div style="font-size:11px;font-weight:700;color:var(--b3);margin:14px 0 10px;letter-spacing:.06em;display:flex;align-items:center;gap:6px;cursor:pointer" onclick="var g=document.getElementById('mm-sysgrp');var on=g.style.display==='none';g.style.display=on?'grid':'none';this.querySelector('span').textContent=on?'▾':'▸'">⚙ 系統管理 <span>▸</span></div>
       <div id="mm-sysgrp" style="display:none;grid-template-columns:repeat(4,1fr);gap:10px">
@@ -2493,7 +2500,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.306';
+var APP_VERSION='v5.307';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -4821,7 +4828,7 @@ function settleInvItem(i){
   const _delta=Math.round((orig-cum)*(parseFloat(it.contractPrice)||0)*_taxR); // 正=追減、負=追加
   const _willSync=_contract&&(_contract.amount||0)>0&&_delta!==0;
   let ok=false;
-  try{ok=window.confirm('工項結算：'+(it.desc||'未命名工項')+'\n\n合約數量 '+orig+' → 實作數量 '+cum+(cum<orig?'（追減 '+(Math.round((orig-cum)*100)/100)+'）':'（追加 '+(Math.round((cum-orig)*100)/100)+'）')+(_willSync?'\n合約金額同步調整 '+(_delta>0?'−':'＋')+'NT$ '+fmt(Math.abs(_delta))+'（含稅）\n　NT$ '+fmt(_contract.amount)+' → NT$ '+fmt(Math.max(0,_contract.amount-_delta)):'')+'\n報價單同名工項數量將一併同步（成本/利潤統計跟著更新）'+'\n\n確定結算此工項？\n（原數量會記錄在備註）');}catch(e){ok=true;}
+  try{ok=window.confirm('工項結算：'+(it.desc||'未命名工項')+'\n\n合約數量 '+orig+' → 實作數量 '+cum+(cum<orig?'（追減 '+(Math.round((orig-cum)*100)/100)+'）':'（追加 '+(Math.round((cum-orig)*100)/100)+'）')+(_willSync?'\n合約金額同步調整 '+(_delta>0?'−':'＋')+'NT$ '+fmt(Math.abs(_delta))+'（含稅）\n　NT$ '+fmt(_contract.amount)+' → NT$ '+fmt(Math.max(0,_contract.amount-_delta)):'')+'\n報價單維持原樣；預估成本／施工進度／利潤統計自動改採結算後數量'+'\n\n確定結算此工項？\n（原數量會記錄在備註）');}catch(e){ok=true;}
   if(!ok)return;
   if(it.origContractQty==null)it.origContractQty=orig; // 保留原始合約數量
   it.contractQty=cum;
@@ -4841,28 +4848,6 @@ function settleInvItem(i){
     try{if(document.getElementById('page-contracts')?.classList.contains('active'))renderContracts();}catch(e){}
     syncTxt='，合約金額→NT$ '+fmt(_contract.amount);
   }
-  // 強關聯：同步回寫報價單（含追加單）同名工項數量並重算總價，
-  // 使施工成本頁預估成本、專案卡、施工進度條、利潤分析等統計一致
-  try{
-    var _q=_inv?(Q.find(function(x){return x.id===_inv.quoteId;})||Q.find(function(x){return x.name===_inv.project&&!x.parentId;})):null;
-    if(_q){
-      var _cands=[_q].concat(Q.filter(function(x){return x.parentId===_q.id;}));
-      var _d=String(it.desc||'').trim();
-      for(var _ci=0;_ci<_cands.length;_ci++){
-        var _qq=_cands[_ci];
-        var _qi=(_qq.items||[]).find(function(x){return !x.sec&&String(x.desc||'').trim()===_d;});
-        if(_qi){
-          if(_qi.origQty==null)_qi.origQty=_qi.qty; // 保留原始報價數量
-          _qi.qty=cum;
-          _recalcQuoteTotals(_qq);
-          _qq._mt=Date.now();
-          try{persist();}catch(e){}
-          syncTxt+='，報價數量→'+cum;
-          break;
-        }
-      }
-    }
-  }catch(e){}
   rInvItems();rInvTots();
   toast('⚖ 工項已結算：'+orig+' → '+cum+syncTxt);
 }
@@ -4883,6 +4868,38 @@ function _recalcQuoteTotals(q){
   var gross=total-cost,net=total-cost-ext;
   q.t={sub:sub,tax:tax,total:total,ext:ext,cost:cost,gross:gross,net:net,grossR:total?gross/total:0,netR:total?net/total:0,costKnown:costKnown,costFilled:costKnown>0};
 }
+
+// ── 追加減生效數量層：報價單保持原樣（歷史文件），
+//    預估成本／施工進度／利潤等統計改以請款單「工項結算」後的合約數量為準 ──
+function _effQtyMap(q){
+  var map={};
+  (INV||[]).forEach(function(inv){
+    if(!inv)return;
+    if(!(inv.quoteId===q.id||(!inv.quoteId&&inv.project===q.name)))return;
+    (inv.items||[]).forEach(function(x){
+      if(!x||x.type==='sec'||x.origContractQty==null)return;
+      map[String(x.desc||'').trim()]=parseFloat(x.contractQty)||0;
+    });
+  });
+  return map;
+}
+function _effQty(map,it){
+  var k=String((it&&it.desc)||'').trim();
+  return (map&&map[k]!=null)?map[k]:(parseFloat(it&&it.qty)||0);
+}
+// v5.307 一次性回滾：v5.306 曾把結算數量寫回報價單，改回「報價保持原樣」
+try{
+  if(!localStorage.getItem('fy_fix_settle_rollback')){
+    var _srCh=false;
+    Q.forEach(function(q){
+      var ch=false;
+      (q.items||[]).forEach(function(it){if(it&&it.origQty!=null){it.qty=it.origQty;delete it.origQty;ch=true;}});
+      if(ch){_recalcQuoteTotals(q);q._mt=Date.now();_srCh=true;}
+    });
+    if(_srCh){try{persist();}catch(e){}}
+    localStorage.setItem('fy_fix_settle_rollback','1');
+  }
+}catch(e){}
 
 // 只更新請款明細行的金額顯示（不重渲染整個表格）
 // 離頁重算請款單金額（不依賴 DOM）：邏輯與 updateInvRowAmt + rInvTots 一致
@@ -6964,7 +6981,8 @@ function renderBizGates(){
   var estT=0,estC=0,actT=0,actC=0;
   Q.filter(function(q){return q.awarded;}).forEach(function(q){
     var tot=q.t?.total||0;if(tot<=0)return;
-    var ec=0;(q.items||[]).forEach(function(it){if(!it.sec)ec+=(parseFloat(it.qty)||0)*(parseFloat(it.estCost)||0);});
+    var _em=_effQtyMap(q);
+    var ec=0;(q.items||[]).forEach(function(it){if(!it.sec)ec+=_effQty(_em,it)*(parseFloat(it.estCost)||0);});
     if(ec>0){estT+=tot;estC+=ec*(1+(P.tax||5)/100);}
     else if(q.t&&q.t.netR!=null){estT+=tot;estC+=tot*(1-q.t.netR);} // 未填成本單價：用報價時的估算毛利
     var ac=0;try{ac=_projCostTotal(q);}catch(e){}
@@ -7004,6 +7022,16 @@ function renderBizGates(){
   var kpi=function(label,val,sub,color){
     return '<div class="kpi" style="flex:1;min-width:118px"><div class="kl">'+label+'</div><div class="kv" style="font-size:17px;color:'+(color||'var(--b5)')+'">'+val+'</div><div class="ks">'+sub+'</div></div>';
   };
+  // 材料統計（全專案材料租金/運費科目＋台帳購置總額）
+  var _gMatRent=0,_gMatTrans=0,_gMatBuy=0;
+  try{
+    Q.forEach(function(q){(q.costs||[]).forEach(function(c2){
+      var cat=c2.cat?_costCatNorm(c2.cat):_costDefaultCat(c2.type);
+      if(cat==='材料租金')_gMatRent+=parseFloat(c2.amt)||0;
+      else if(cat==='材料運費')_gMatTrans+=parseFloat(c2.amt)||0;
+    });});
+    MAT_LEDGER.forEach(function(r){_gMatBuy+=_matLedAmt(r);});
+  }catch(e){}
   var na='<span style="color:var(--b3)">—</span>';
   var html='<div class="card"><div class="ch"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 經營儀表板</div></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 14px">'
@@ -7014,6 +7042,8 @@ function renderBizGates(){
     +kpi('平均回收天數',recvAvg==null?na:recvAvg+' 天','請款日→預計收款日（'+recvN+' 筆）',recvAvg==null?null:recvAvg<=60?'var(--g3)':'#e65100')
     +kpi('保留款累計',retSum>0?('NT$ '+fmt(retSum)):na,'押在業主端的保證金',retSum>0?'#b26a00':null)
     +kpi('前三大業主佔比',top3Pct==null?na:top3Pct+'%',top3.map(function(x){return esc(String(x[0]).slice(0,6));}).join('・')||'—',top3Pct==null?null:top3Pct<50?'var(--g3)':'#e65100')
+    +kpi('材料租金｜運費',(_gMatRent||_gMatTrans)?(fmt(_gMatRent)+'｜'+fmt(_gMatTrans)):na,'全專案累計（材料管理）',(_gMatRent||_gMatTrans)?'#b26a00':null)
+    +kpi('自有材料購置',_gMatBuy>0?('NT$ '+fmt(Math.round(_gMatBuy))):na,'庫存台帳購置總額',_gMatBuy>0?'var(--g3)':null)
     +'</div>'
     +(eqAlert?'<div style="margin:0 14px 12px;background:#fdf0ef;border:1px solid #f5c6c0;border-left:4px solid #c62828;border-radius:var(--r8);padding:10px 14px;font-size:12.5px;color:#8a2f26"><b>⚠ 機具稼動警示：</b>自有機具已連續兩個完整月（'+ymPrev2+'、'+ymPrev+'）稼動低於 6 天／月，依十年規劃紅線應啟動<b>接案策略檢討</b>——檢視報價量是否不足、價格策略是否過高、或機具外租消化閒置。</div>':'')
     +'</div>';
@@ -8171,7 +8201,7 @@ function _shBestFit(target,lens){
 function _shDefaults(){
   var lys=[];for(var i=0;i<5;i++)lys.push({w:'H350',s:'H350',st:false});
   return {P:130,A:1000,H:13,slabT:0.8,corners:4,irr:0,
-    method:'鋼板樁',pileSpec:'SP-IV',pileLen:13,pileP:0,pileSpacing:1.5,capType:'H型鋼壓樑(H300)',
+    method:'型鋼排樁',pileSpec:'H350',pileLen:13,pileP:0,pileSpacing:1.5,capType:'H型鋼壓樑(H300)',
     kingMid:120,kingCo:20,kingGt:0,
     midSpec:'H350',coSpec:'H400',gtSpec:'H400',midLen:16,coLen:16,gtLen:16,
     layers:5,_layers:lys,autoRouteSpace:6,stiff:'0',_routesV:[{rc:4,rl:25}],_routesH:[{rc:4,rl:40}],heng:'0',zones:2,
@@ -8507,7 +8537,7 @@ function renderMatLedger(){
   var el=document.getElementById('mat-ledger-box');if(!el)return;
   // 期初種子：僅在台帳全空且未被刪除過時帶入（固定 id，跨裝置合併不重複）
   if(!MAT_LEDGER.length&&!(TOMBS['matLedger']&&TOMBS['matLedger']['ml_seed_h350'])){
-    MAT_LEDGER.push({id:'ml_seed_h350',name:'型鋼',spec:'H350',len:9,qty:29,uw:135,price:'',date:'',kind:'重複性',note:'期初庫存',_mt:Date.now()});
+    MAT_LEDGER.push({id:'ml_seed_h350',name:'型鋼',spec:'H350',len:9,qty:29,uw:135,price:'',date:'',kind:'重複性',loc:'公司倉庫',note:'期初庫存',_mt:Date.now()});
     saveMatLedger();
   }
   // 舊記錄補單位重（不動 _mt；各裝置各自補齊相同值）
@@ -8521,60 +8551,55 @@ function renderMatLedger(){
   });
   var h='<div style="padding:8px 14px;font-size:12.5px;color:var(--b4);border-bottom:1px solid var(--b1)">重複性 <b style="color:var(--g3)">'+rep+'</b> 筆　一次性 <b style="color:#b26a00">'+once+'</b> 筆　購置總額 <b style="color:var(--g3)">NT$ '+fmt(Math.round(buyTotal))+'</b>'
     +'<span style="font-size:10.5px;color:var(--b3)">　※ 有單位重者單價為 $/kg（金額＝單位重×長度×單價×數量），其餘為 $/件</span></div>';
-  // ── 庫存總覽：依品項/規格/長度彙總（唯讀呈現）──
+  var lenTxt=function(l){return (l!=null&&l!=='')?('L='+l+'M'):'—';};
+  // ── 庫存總覽：依品項/規格/長度/位置彙總（給工務看：公司有什麼料、在哪裡）──
   var agg={},aggKeys=[];
   MAT_LEDGER.forEach(function(r){
     if(!r.name)return;
-    var key=r.name+'|'+(r.spec||'')+'|'+(r.len!=null&&r.len!==''?r.len:'');
-    if(!agg[key]){agg[key]={name:r.name,spec:r.spec||'',len:r.len,rep:0,once:0};aggKeys.push(key);}
-    if(r.kind==='一次性')agg[key].once+=parseFloat(r.qty)||0;else agg[key].rep+=parseFloat(r.qty)||0;
+    var loc=r.loc||'公司倉庫';
+    var key=r.name+'|'+(r.spec||'')+'|'+(r.len!=null&&r.len!==''?r.len:'')+'|'+loc+'|'+(r.kind==='一次性'?'1':'0');
+    if(!agg[key]){agg[key]={name:r.name,spec:r.spec||'',len:r.len,loc:loc,kind:r.kind==='一次性'?'一次性':'重複性',qty:0};aggKeys.push(key);}
+    agg[key].qty+=parseFloat(r.qty)||0;
   });
-  h+='<div style="padding:12px 14px 4px;font-weight:700;font-size:13px;color:var(--g3)">庫存總覽</div>';
-  if(aggKeys.length){
-    h+='<div class="tbl-wrap"><table class="tbl" style="min-width:520px"><thead><tr>'
-      +'<th style="min-width:110px">品項</th><th style="min-width:90px">規格</th><th style="width:90px" class="r">長度(M)</th>'
-      +'<th style="width:130px" class="r">自有數量（重複性）</th><th style="width:120px" class="r">一次性（耗材）</th></tr></thead><tbody>';
+  h+='<div style="padding:12px 14px 4px;font-weight:700;font-size:13px;color:var(--g3)">庫存總覽 <span style="font-weight:400;font-size:10.5px;color:var(--b3)">— 依品項×長度×位置彙總；租料前先查這裡</span></div>';
+  if(!aggKeys.length){
+    h+='<div style="padding:4px 14px 10px;font-size:12.5px;color:var(--b3)">尚無庫存，請於下方購置紀錄新增。</div>';
+  }else if(isMob()){
+    h+='<div style="padding:4px 12px 8px;display:flex;flex-direction:column;gap:8px">';
+    aggKeys.forEach(function(k){
+      var a=agg[k];
+      h+='<div style="border:1px solid var(--b1);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px">'
+        +'<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px">'+esc(a.name)+' '+esc(a.spec)+'　<span style="color:var(--b4);font-weight:600">'+lenTxt(a.len)+'</span></div>'
+        +'<div style="font-size:11.5px;color:var(--b3);margin-top:2px">📍 '+esc(a.loc)+'　<span style="color:'+(a.kind==='一次性'?'#b26a00':'var(--g3)')+'">'+a.kind+'</span></div></div>'
+        +'<div style="font-size:19px;font-weight:800;color:'+(a.kind==='一次性'?'#b26a00':'var(--g3)')+';white-space:nowrap">'+fmt(a.qty)+'<span style="font-size:11px;font-weight:600;color:var(--b3)"> 支/件</span></div></div>';
+    });
+    h+='</div>';
+  }else{
+    h+='<div class="tbl-wrap"><table class="tbl" style="min-width:560px;table-layout:fixed"><thead><tr>'
+      +'<th style="width:20%">品項</th><th style="width:16%">規格</th><th style="width:16%">長度</th>'
+      +'<th style="width:22%">位置</th><th style="width:13%">類型</th><th style="width:13%" class="r">數量</th></tr></thead><tbody>';
     aggKeys.forEach(function(k){
       var a=agg[k];
       h+='<tr><td style="font-weight:700">'+esc(a.name)+'</td><td style="color:var(--b5)">'+esc(a.spec)+'</td>'
-        +'<td class="r">'+(a.len!=null&&a.len!==''?a.len:'—')+'</td>'
-        +'<td class="r" style="font-weight:800;color:var(--g3);font-size:14px">'+(a.rep?fmt(a.rep):'—')+'</td>'
-        +'<td class="r" style="color:#b26a00">'+(a.once?fmt(a.once):'—')+'</td></tr>';
+        +'<td style="font-weight:600">'+lenTxt(a.len)+'</td>'
+        +'<td style="color:var(--b5)">'+esc(a.loc)+'</td>'
+        +'<td style="color:'+(a.kind==='一次性'?'#b26a00':'var(--g3)')+';font-size:12px">'+a.kind+'</td>'
+        +'<td class="r" style="font-weight:800;color:var(--g3);font-size:14px">'+fmt(a.qty)+'</td></tr>';
     });
     h+='</tbody></table></div>';
-  }else{
-    h+='<div style="padding:4px 14px 10px;font-size:12.5px;color:var(--b3)">尚無庫存，請於下方購置紀錄新增。</div>';
   }
   // ── 購置紀錄：後台資料，預設唯讀，按「編輯」才可修改 ──
   h+='<div style="padding:14px 14px 4px;font-weight:700;font-size:13px;color:var(--g3);border-top:1px solid var(--b1);margin-top:10px">購置紀錄 <span style="font-weight:400;font-size:10.5px;color:var(--b3)">— 逐筆進貨資料；點「編輯」修改，避免誤觸</span></div>';
-  h+='<div class="tbl-wrap"><table class="tbl" style="min-width:1060px"><thead><tr>'
-    +'<th style="min-width:118px">品項</th><th style="min-width:96px">規格</th><th style="width:76px" class="r">長度(M)</th>'
-    +'<th style="width:72px" class="r">數量</th><th style="width:88px" class="r">單位重<br>(kg/m)</th><th style="width:84px" class="r">單價</th><th style="width:104px" class="r">金額</th><th style="width:118px">購置日期</th>'
-    +'<th style="width:84px">類型</th><th style="min-width:90px">備註</th><th style="width:104px"></th>'
-    +'</tr></thead><tbody>';
   var inCss='width:100%;font-size:13px;height:34px;border:1px solid var(--b2);border-radius:6px;padding:0 6px;font-family:inherit';
   var catNames=MAT_CATALOG.map(function(c){return c[0];});
-  MAT_LEDGER.forEach(function(r,i){
-    var amt=_matLedAmt(r);
-    var editing=(window._matLedEditId===r.id);
-    if(!editing){
-      // 唯讀列
-      h+='<tr>'
-        +'<td style="font-weight:700;font-size:13px">'+esc(r.name||'—')+'</td>'
-        +'<td style="color:var(--b5);font-size:12.5px">'+esc(r.spec||'—')+'</td>'
-        +'<td class="r">'+(r.len!=null&&r.len!==''?r.len:'—')+'</td>'
-        +'<td class="r" style="font-weight:700">'+(r.qty!=null&&r.qty!==''?fmt(r.qty):'—')+'</td>'
-        +'<td class="r" style="color:var(--b5)">'+(r.uw!=null&&r.uw!==''?r.uw:'—')+'</td>'
-        +'<td class="r">'+(r.price!=null&&r.price!==''?fmt(r.price):'—')+'</td>'
-        +'<td class="r" style="font-weight:700;font-size:12.5px;white-space:nowrap">'+(amt?('NT$ '+fmt(Math.round(amt))):'—')+'</td>'
-        +'<td style="font-size:12.5px">'+esc(r.date||'—')+'</td>'
-        +'<td style="font-size:12.5px;color:'+(r.kind==='一次性'?'#b26a00':'var(--g3)')+'">'+esc(r.kind||'重複性')+'</td>'
-        +'<td style="font-size:12px;color:var(--b4)">'+esc(r.note||'')+'</td>'
-        +'<td style="text-align:center;white-space:nowrap"><button type="button" class="btn btn-xs" onclick="matLedEdit(\''+r.id+'\')" style="padding:4px 10px;font-size:12px">編輯</button></td>'
-        +'</tr>';
-      return;
-    }
-    // 編輯列
+  var locOpts=function(cur){
+    var opts=['公司倉庫'];
+    Q.filter(function(x){return x.awarded&&!x.parentId;}).forEach(function(x){if(x.name)opts.push(x.name);});
+    if(cur&&opts.indexOf(cur)<0)opts.push(cur);
+    return opts;
+  };
+  // 編輯欄位產生器（桌機表格格／手機卡片共用）
+  var edCells=function(r,i){
     var u=function(f){return ' onchange="matLedUpd('+i+',\''+f+'\',this.value)" ';};
     var isCat=catNames.indexOf(r.name)>=0;
     var custom=!!r.nameCustom||((r.name||'')!==''&&!isCat);
@@ -8593,27 +8618,125 @@ function renderMatLedger(){
     }else{
       specCell='<input value="'+esc(r.spec||'')+'"'+u('spec')+' style="'+inCss+'" placeholder="規格">';
     }
-    h+='<tr style="background:#f7faf8">'
-      +'<td>'+nameCell+'</td>'
-      +'<td>'+specCell+'</td>'
-      +'<td><input type="number" inputmode="decimal" step="any" value="'+(r.len!=null&&r.len!==''?r.len:'')+'"'+u('len')+' style="'+inCss+';text-align:right"></td>'
-      +'<td><input type="number" inputmode="decimal" value="'+(r.qty!=null&&r.qty!==''?r.qty:'')+'"'+u('qty')+' style="'+inCss+';text-align:right;font-weight:700"></td>'
-      +'<td><input type="number" inputmode="decimal" step="any" value="'+(r.uw!=null&&r.uw!==''?r.uw:'')+'"'+u('uw')+' placeholder="—" style="'+inCss+';text-align:right;color:var(--b5)"></td>'
-      +'<td><input type="number" inputmode="decimal" step="any" value="'+(r.price!=null&&r.price!==''?r.price:'')+'"'+u('price')+' style="'+inCss+';text-align:right"></td>'
-      +'<td class="r" style="font-weight:700;font-size:12.5px;white-space:nowrap">'+(amt?('NT$ '+fmt(Math.round(amt))):'—')+'</td>'
-      +'<td><input type="date" value="'+esc(r.date||'')+'"'+u('date')+' style="'+inCss+'"></td>'
-      +'<td><select'+u('kind')+' style="'+inCss+'"><option'+(r.kind!=='一次性'?' selected':'')+'>重複性</option><option'+(r.kind==='一次性'?' selected':'')+'>一次性</option></select></td>'
-      +'<td><input value="'+esc(r.note||'')+'"'+u('note')+' style="'+inCss+';font-size:12px"></td>'
-      +'<td style="text-align:center;white-space:nowrap">'
-        +'<button type="button" class="btn btn-xs btn-g" onclick="matLedEdit(null)" style="padding:4px 10px;font-size:12px;font-weight:700">完成</button>'
-        +'<button type="button" class="btn btn-xs" onclick="matLedDel('+i+')" style="color:var(--red);padding:4px 8px;margin-left:4px">✕</button></td>'
-      +'</tr>';
-  });
-  h+='</tbody></table></div>';
+    var locCell='<select'+u('loc')+' style="'+inCss+'">';
+    locOpts(r.loc).forEach(function(o){locCell+='<option value="'+esc(o)+'"'+((r.loc||'公司倉庫')===o?' selected':'')+'>'+esc(o)+'</option>';});
+    locCell+='</select>';
+    return {
+      name:nameCell,spec:specCell,loc:locCell,
+      len:'<input type="number" inputmode="decimal" step="any" value="'+(r.len!=null&&r.len!==''?r.len:'')+'"'+u('len')+' placeholder="長度" style="'+inCss+';text-align:right">',
+      qty:'<input type="number" inputmode="decimal" value="'+(r.qty!=null&&r.qty!==''?r.qty:'')+'"'+u('qty')+' placeholder="數量" style="'+inCss+';text-align:right;font-weight:700">',
+      uw:'<input type="number" inputmode="decimal" step="any" value="'+(r.uw!=null&&r.uw!==''?r.uw:'')+'"'+u('uw')+' placeholder="—" style="'+inCss+';text-align:right;color:var(--b5)">',
+      price:'<input type="number" inputmode="decimal" step="any" value="'+(r.price!=null&&r.price!==''?r.price:'')+'"'+u('price')+' placeholder="單價" style="'+inCss+';text-align:right">',
+      date:'<input type="date" value="'+esc(r.date||'')+'"'+u('date')+' style="'+inCss+'">',
+      kind:'<select'+u('kind')+' style="'+inCss+'"><option'+(r.kind!=='一次性'?' selected':'')+'>重複性</option><option'+(r.kind==='一次性'?' selected':'')+'>一次性</option></select>',
+      note:'<input value="'+esc(r.note||'')+'"'+u('note')+' placeholder="備註" style="'+inCss+';font-size:12px">'
+    };
+  };
+  if(isMob()){
+    // 手機：卡片式
+    h+='<div style="padding:4px 12px 4px;display:flex;flex-direction:column;gap:8px">';
+    MAT_LEDGER.forEach(function(r,i){
+      var amt=_matLedAmt(r);
+      var editing=(window._matLedEditId===r.id);
+      if(!editing){
+        h+='<div style="border:1px solid var(--b1);border-radius:10px;padding:10px 12px">'
+          +'<div style="display:flex;align-items:center;gap:8px">'
+          +'<div style="flex:1;min-width:0;font-weight:700;font-size:14px">'+esc(r.name||'—')+' '+esc(r.spec||'')+'　<span style="color:var(--b4);font-weight:600">'+lenTxt(r.len)+'</span> ×'+(r.qty!=null&&r.qty!==''?fmt(r.qty):'—')+'</div>'
+          +'<button type="button" class="btn btn-xs" onclick="matLedEdit(\''+r.id+'\')" style="padding:5px 12px;font-size:12px;flex-shrink:0">編輯</button></div>'
+          +'<div style="font-size:11.5px;color:var(--b4);margin-top:5px;line-height:1.7">📍 '+esc(r.loc||'公司倉庫')+'　<span style="color:'+(r.kind==='一次性'?'#b26a00':'var(--g3)')+'">'+esc(r.kind||'重複性')+'</span>'
+          +(r.date?'　'+esc(r.date):'')
+          +(amt?'　<b style="color:var(--g3)">NT$ '+fmt(Math.round(amt))+'</b>':'')
+          +(r.note?'<br>'+esc(r.note):'')+'</div>'
+          +'</div>';
+        return;
+      }
+      var c=edCells(r,i);
+      var fld=function(l,inner){return '<div><div style="font-size:10.5px;color:var(--b3);margin-bottom:2px">'+l+'</div>'+inner+'</div>';};
+      h+='<div style="border:1.5px solid var(--g3);border-radius:10px;padding:12px;background:#f7faf8">'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+        +fld('品項',c.name)+fld('規格',c.spec)
+        +fld('長度 (M)',c.len)+fld('數量',c.qty)
+        +fld('單位重 (kg/m)',c.uw)+fld('單價',c.price)
+        +fld('購置日期',c.date)+fld('類型',c.kind)
+        +fld('存放位置',c.loc)+fld('備註',c.note)
+        +'</div>'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">'
+        +'<div style="font-size:13px;font-weight:700;color:var(--g3)">金額 '+(amt?('NT$ '+fmt(Math.round(amt))):'—')+'</div>'
+        +'<div style="display:flex;gap:8px">'
+        +'<button type="button" class="btn btn-xs" onclick="matLedDel('+i+')" style="color:var(--red);padding:7px 12px">刪除</button>'
+        +'<button type="button" class="btn btn-xs btn-g" onclick="matLedEdit(null)" style="padding:7px 18px;font-weight:700">完成</button></div></div>'
+        +'</div>';
+    });
+    h+='</div>';
+  }else{
+    // 桌機：表格
+    h+='<div class="tbl-wrap"><table class="tbl" style="min-width:1160px"><thead><tr>'
+      +'<th style="min-width:118px">品項</th><th style="min-width:96px">規格</th><th style="width:76px" class="r">長度(M)</th>'
+      +'<th style="width:72px" class="r">數量</th><th style="width:88px" class="r">單位重<br>(kg/m)</th><th style="width:84px" class="r">單價</th><th style="width:104px" class="r">金額</th><th style="width:118px">購置日期</th>'
+      +'<th style="width:84px">類型</th><th style="min-width:110px">位置</th><th style="min-width:80px">備註</th><th style="width:104px"></th>'
+      +'</tr></thead><tbody>';
+    MAT_LEDGER.forEach(function(r,i){
+      var amt=_matLedAmt(r);
+      var editing=(window._matLedEditId===r.id);
+      if(!editing){
+        h+='<tr>'
+          +'<td style="font-weight:700;font-size:13px">'+esc(r.name||'—')+'</td>'
+          +'<td style="color:var(--b5);font-size:12.5px">'+esc(r.spec||'—')+'</td>'
+          +'<td class="r">'+(r.len!=null&&r.len!==''?r.len:'—')+'</td>'
+          +'<td class="r" style="font-weight:700">'+(r.qty!=null&&r.qty!==''?fmt(r.qty):'—')+'</td>'
+          +'<td class="r" style="color:var(--b5)">'+(r.uw!=null&&r.uw!==''?r.uw:'—')+'</td>'
+          +'<td class="r">'+(r.price!=null&&r.price!==''?fmt(r.price):'—')+'</td>'
+          +'<td class="r" style="font-weight:700;font-size:12.5px;white-space:nowrap">'+(amt?('NT$ '+fmt(Math.round(amt))):'—')+'</td>'
+          +'<td style="font-size:12.5px">'+esc(r.date||'—')+'</td>'
+          +'<td style="font-size:12.5px;color:'+(r.kind==='一次性'?'#b26a00':'var(--g3)')+'">'+esc(r.kind||'重複性')+'</td>'
+          +'<td style="font-size:12px;color:var(--b5)">'+esc(r.loc||'公司倉庫')+'</td>'
+          +'<td style="font-size:12px;color:var(--b4)">'+esc(r.note||'')+'</td>'
+          +'<td style="text-align:center;white-space:nowrap"><button type="button" class="btn btn-xs" onclick="matLedEdit(\''+r.id+'\')" style="padding:4px 10px;font-size:12px">編輯</button></td>'
+          +'</tr>';
+        return;
+      }
+      var c=edCells(r,i);
+      h+='<tr style="background:#f7faf8">'
+        +'<td>'+c.name+'</td><td>'+c.spec+'</td><td>'+c.len+'</td><td>'+c.qty+'</td><td>'+c.uw+'</td><td>'+c.price+'</td>'
+        +'<td class="r" style="font-weight:700;font-size:12.5px;white-space:nowrap">'+(amt?('NT$ '+fmt(Math.round(amt))):'—')+'</td>'
+        +'<td>'+c.date+'</td><td>'+c.kind+'</td><td>'+c.loc+'</td><td>'+c.note+'</td>'
+        +'<td style="text-align:center;white-space:nowrap">'
+          +'<button type="button" class="btn btn-xs btn-g" onclick="matLedEdit(null)" style="padding:4px 10px;font-size:12px;font-weight:700">完成</button>'
+          +'<button type="button" class="btn btn-xs" onclick="matLedDel('+i+')" style="color:var(--red);padding:4px 8px;margin-left:4px">✕</button></td>'
+        +'</tr>';
+    });
+    h+='</tbody></table></div>';
+  }
   h+='<div style="padding:10px 14px"><button type="button" class="btn btn-xs btn-g" onclick="matLedAdd()" style="padding:9px 16px;font-size:13.5px;font-weight:700">＋ 新增購置紀錄</button></div>';
   el.innerHTML=h;
 }
 function matLedEdit(id){window._matLedEditId=id;renderMatLedger();}
+// ── 圖表點擊放大（SVG viewBox 圖表通用；報表中心／利潤分析）──
+function _svgZoom(svg){
+  var old=document.getElementById('svg-zoom-modal');if(old)old.remove();
+  var m=document.createElement('div');
+  m.id='svg-zoom-modal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(20,24,21,.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px';
+  var clone=svg.cloneNode(true);
+  clone.removeAttribute('height');clone.removeAttribute('width');
+  clone.style.cssText='width:100%;height:auto;max-height:84vh;background:#fff;border-radius:10px;padding:10px;box-sizing:border-box';
+  var bar=document.createElement('div');
+  bar.style.cssText='display:flex;justify-content:flex-end;width:100%;max-width:920px;margin-bottom:8px';
+  bar.innerHTML='<button type="button" style="font-family:inherit;background:#fff;border:none;border-radius:8px;padding:9px 20px;font-size:14px;font-weight:700;cursor:pointer">✕ 關閉</button>';
+  bar.querySelector('button').onclick=function(){m.remove();};
+  m.onclick=function(ev){if(ev.target===m)m.remove();};
+  var wrap=document.createElement('div');
+  wrap.style.cssText='width:100%;max-width:920px;overflow:auto';
+  wrap.appendChild(clone);
+  m.appendChild(bar);m.appendChild(wrap);
+  document.body.appendChild(m);
+}
+document.addEventListener('click',function(e){
+  if(!e.target||!e.target.closest)return;
+  if(e.target.closest('button,a,input,select,textarea'))return;
+  var svg=e.target.closest('#report-content svg,#page-profit svg');
+  if(svg)_svgZoom(svg);
+});
 function matLedUpd(i,f,val){
   var r=MAT_LEDGER[i];if(!r)return;
   if(f==='name'){
@@ -8637,7 +8760,7 @@ function matLedUpd(i,f,val){
 }
 function matLedAdd(){
   var nid=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
-  MAT_LEDGER.push({id:nid,name:'',spec:'',len:'',qty:'',uw:'',price:'',date:localToday(),kind:'重複性',note:'',_mt:Date.now()});
+  MAT_LEDGER.push({id:nid,name:'',spec:'',len:'',qty:'',uw:'',price:'',date:localToday(),kind:'重複性',loc:'公司倉庫',note:'',_mt:Date.now()});
   window._matLedEditId=nid;
   saveMatLedger();renderMatLedger();
 }
@@ -10023,10 +10146,11 @@ function _costByItem(q){
 function buildCostAnalysisHtml(q){
   if(!q)return '';
   var att=_costByItem(q);
+  var _em=_effQtyMap(q); // 追加減結算後的生效數量
   var rows='';var totQuote=0,totEst=0,totAct=0;
   (q.items||[]).forEach(function(it,i){
     if(it.sec)return;
-    var qty=parseFloat(it.qty)||0,price=parseFloat(it.price)||0,est=parseFloat(it.estCost)||0;
+    var qty=_effQty(_em,it),price=parseFloat(it.price)||0,est=parseFloat(it.estCost)||0;
     var quoteAmt=qty*price,estAmt=qty*est,actAmt=att.map[i]||0;
     if(quoteAmt<=0&&actAmt<=0)return;
     totQuote+=quoteAmt;totEst+=estAmt;totAct+=actAmt;
@@ -12897,7 +13021,8 @@ function renderProjects(){
     const payOverAR=billed>0&&payTotal>billed; // 應付累計不得超過應收請款累計
     // 施工投入（成本執行率）：實際成本 vs 預估成本（工項成本單價×數量，未稅→含稅口徑對齊）
     let estCostTotal=0;
-    [q].concat(adds).forEach(x=>{(x.items||[]).forEach(it=>{if(!it.sec)estCostTotal+=(parseFloat(it.qty)||0)*(parseFloat(it.estCost)||0);});});
+    const effM=_effQtyMap(q); // 追加減結算後的生效數量（報價原樣保留）
+    [q].concat(adds).forEach(x=>{(x.items||[]).forEach(it=>{if(!it.sec)estCostTotal+=_effQty(effM,it)*(parseFloat(it.estCost)||0);});});
     estCostTotal=estCostTotal*(1+(P.tax||5)/100);
     // 施工實體進度：日報回報數量 vs 合約數量（金額加權；工務日報選工項填數量即連動）
     let physRepV=0,physBaseV=0,hasPhysRep=false;
@@ -12906,7 +13031,7 @@ function renderProjects(){
       (x.dailyLogs||[]).forEach(d=>(d.progressRows||[]).forEach(r=>{if(r.itemIdx>=0&&(parseFloat(r.qty)||0)>0){rep[r.itemIdx]=(rep[r.itemIdx]||0)+parseFloat(r.qty);hasPhysRep=true;}}));
       (x.items||[]).forEach((it,i)=>{
         if(it.sec)return;
-        const qy=parseFloat(it.qty)||0,pr=parseFloat(it.price)||0;
+        const qy=_effQty(effM,it),pr=parseFloat(it.price)||0;
         if(qy<=0||pr<=0)return;
         physBaseV+=qy*pr;
         physRepV+=Math.min(rep[i]||0,qy)*pr;
@@ -13235,7 +13360,7 @@ function renderPayables(){
       w7:pend.filter(p=>p.date&&p.date>=_today&&p.date<=_in7).length,
       later:pend.filter(p=>!p.date||p.date>_in7).length,
       paid:filtered.filter(p=>p.status==='paid').length};
-    const chip=(k,lb,clr)=>'<button type="button" onclick="window._payAging=\''+k+'\';renderPayables()" style="font-family:inherit;font-size:11.5px;padding:5px 12px;border-radius:99px;cursor:pointer;border:1px solid '+((window._payAging||'all')===k?clr:'var(--b2)')+';background:'+((window._payAging||'all')===k?clr:'#fff')+';color:'+((window._payAging||'all')===k?'#fff':'var(--b4)')+'">'+lb+'</button>';
+    const chip=(k,lb,clr)=>'<button type="button" onclick="window._payAging=\''+k+'\';renderPayables()" style="font-family:inherit;font-size:12.5px;padding:0 14px;height:36px;line-height:34px;border-radius:99px;cursor:pointer;border:1px solid '+((window._payAging||'all')===k?clr:'var(--b2)')+';background:'+((window._payAging||'all')===k?clr:'#fff')+';color:'+((window._payAging||'all')===k?'#fff':'var(--b4)')+'">'+lb+'</button>';
     return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
       +chip('all','全部','var(--g3)')
       +chip('overdue','🔴 逾期 '+cnt.overdue,'var(--red)')
