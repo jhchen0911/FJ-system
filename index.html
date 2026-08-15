@@ -1081,15 +1081,23 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   </style>
   <div class="pad" style="max-width:1400px">
     <div id="mat-view-btns">
-      <button type="button" class="btn btn-xs" id="mat-view-stock" onclick="matSetView('stock')" style="padding:8px 14px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 庫存台帳</button>
+      <button type="button" class="btn btn-xs" id="mat-view-stock" onclick="matSetView('stock')" style="padding:8px 14px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-box"/></svg> 材料庫存</button>
+      <button type="button" class="btn btn-xs" id="mat-view-buy" onclick="matSetView('buy')" style="padding:8px 14px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg> 材料購置</button>
       <button type="button" class="btn btn-xs" id="mat-view-proj" onclick="matSetView('proj')" style="padding:8px 14px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 專案材料</button>
       <button type="button" class="btn btn-xs" id="mat-view-est" onclick="matSetView('est')" style="padding:8px 14px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-calc"/></svg> 材料估算</button>
     </div>
     <div id="mat-stock-wrap">
       <div class="card">
-        <div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 自有材料台帳</div>
-          <div style="font-size:11px;color:var(--b4)">✓ 逐筆登錄，修改即自動儲存並同步</div></div>
-        <div class="cb" style="padding:0"><div id="mat-ledger-box"></div></div>
+        <div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-box"/></svg> 材料庫存（工務）</div>
+          <div style="font-size:11px;color:var(--b4)">L=長度×支數×位置；租料前先查有無自有料</div></div>
+        <div class="cb" style="padding:0"><div id="mat-stock-box"></div></div>
+      </div>
+    </div>
+    <div id="mat-buy-wrap" style="display:none">
+      <div class="card">
+        <div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg> 材料購置（管理）</div>
+          <div style="font-size:11px;color:var(--b4)">✓ 逐筆進貨登錄，修改即自動儲存並同步</div></div>
+        <div class="cb" style="padding:0"><div id="mat-buy-box"></div></div>
       </div>
     </div>
     <div id="mat-proj-wrap" style="display:none">
@@ -2479,7 +2487,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.308';
+var APP_VERSION='v5.309';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2703,9 +2711,9 @@ function go(p){
       if(pgEl&&!pgEl.querySelector('.statnav')){
         var nv=document.createElement('div');
         nv.className='statnav';
-        nv.style.cssText='display:flex;gap:8px;padding:10px 22px 0;flex-wrap:wrap';
+        nv.style.cssText='display:flex;gap:8px;padding:10px 22px 0;flex-wrap:wrap;justify-content:center';
         nv.innerHTML=[['profit','利潤分析'],['reports','報表中心'],['ledger','帳務管理']].map(function(x){
-          return '<button type="button" onclick="go(\''+x[0]+'\')" style="font-family:inherit;font-size:12.5px;flex:1;max-width:150px;height:36px;padding:0 10px;border-radius:99px;border:1px solid '+(x[0]===p?'var(--g3)':'var(--b2)')+';background:'+(x[0]===p?'var(--g3)':'#fff')+';color:'+(x[0]===p?'#fff':'var(--b4)')+';cursor:pointer;font-weight:'+(x[0]===p?'700':'500')+'">'+x[1]+'</button>';
+          return '<button type="button" onclick="go(\''+x[0]+'\')" style="font-family:inherit;font-size:12.5px;flex:1;max-width:130px;height:34px;padding:0 8px;border-radius:99px;border:1px solid '+(x[0]===p?'var(--g3)':'var(--b2)')+';background:'+(x[0]===p?'var(--g3)':'#fff')+';color:'+(x[0]===p?'#fff':'var(--b4)')+';cursor:pointer;font-weight:'+(x[0]===p?'700':'500')+'">'+x[1]+'</button>';
         }).join('');
         pgEl.insertBefore(nv,pgEl.firstChild);
       }else if(pgEl){
@@ -6918,8 +6926,8 @@ function rDash(){
       kgrid.innerHTML=
         '<div class="kpi" style="flex:1;min-width:120px"><div class="kl">總報價金額</div><div class="kv" style="font-size:18px">NT$ '+fmt(totalAmt)+'</div><div class="ks">共 '+totalQ+' 件</div></div>'+
         '<div class="kpi hi" style="flex:1;min-width:120px"><div class="kl">得標金額'+(_diffs?'（合約現值）':'')+'</div><div class="kv" style="font-size:18px;color:var(--g3)">NT$ '+fmt(awardedAmt)+'</div><div class="ks">'+awardedQ+' 件得標'+(_diffs?'　·　原始得標 NT$ '+fmt(awardedOrig):'')+'</div></div>'+
-        '<div class="kpi" style="flex:1;min-width:120px;cursor:pointer" onclick="go(\'finance\');setTimeout(function(){switchFinanceTab(\'ar\');},50)"><div class="kl">應收帳款 <span style="font-size:9px">↗</span></div><div class="kv" style="font-size:18px;color:#b26a00">NT$ '+fmt(_arT)+'</div><div class="ks">'+_arN+' 件待收</div></div>'+
-        '<div class="kpi" style="flex:1;min-width:120px;cursor:pointer" onclick="go(\'finance\');setTimeout(function(){switchFinanceTab(\'payable\');},50)"><div class="kl">應付帳款 <span style="font-size:9px">↗</span></div><div class="kv" style="font-size:18px;color:#c62828">NT$ '+fmt(_apT)+'</div><div class="ks">待付 '+_apN+' 筆</div></div>';
+        '<div class="kpi" style="flex:1;min-width:120px;cursor:pointer" onclick="go(\'finance\');setTimeout(function(){switchFinanceTab(\'ar\');},50)"><div class="kl">應收帳款</div><div class="kv" style="font-size:18px;color:#b26a00">NT$ '+fmt(_arT)+'</div><div class="ks">'+_arN+' 件待收</div></div>'+
+        '<div class="kpi" style="flex:1;min-width:120px;cursor:pointer" onclick="go(\'finance\');setTimeout(function(){switchFinanceTab(\'payable\');},50)"><div class="kl">應付帳款</div><div class="kv" style="font-size:18px;color:#c62828">NT$ '+fmt(_apT)+'</div><div class="ks">待付 '+_apN+' 筆</div></div>';
     }
     // 最近報價
     const dl=document.getElementById('dash-list');
@@ -8499,8 +8507,8 @@ var MAT_EST=null;
 var _SH_STR_KEYS={method:1,pileSpec:1,capType:1,gtMode:1,midSpec:1,coSpec:1,gtSpec:1,stiff:1,heng:1,dogbone:1,fengProc:1,deck:1,gtRopeDeduct:1,railScope:1,postH:1,toe:1,hookType:1,udMods:1};
 function matSetView(vw){
   window._matView=vw;
-  var wraps={stock:'mat-stock-wrap',proj:'mat-proj-wrap',est:'mat-est-wrap'};
-  var btns={stock:'mat-view-stock',proj:'mat-view-proj',est:'mat-view-est'};
+  var wraps={stock:'mat-stock-wrap',buy:'mat-buy-wrap',proj:'mat-proj-wrap',est:'mat-est-wrap'};
+  var btns={stock:'mat-view-stock',buy:'mat-view-buy',proj:'mat-view-proj',est:'mat-view-est'};
   var on='background:var(--g3);color:#fff;border-color:var(--g3);padding:8px 14px;font-size:13px';
   var off='padding:8px 14px;font-size:13px';
   Object.keys(wraps).forEach(function(k){
@@ -8508,7 +8516,7 @@ function matSetView(vw){
     var bb=document.getElementById(btns[k]);if(bb)bb.style.cssText=(k===vw)?on:off;
   });
   if(vw==='est')renderMatEst();
-  if(vw==='stock')renderMatLedger();
+  if(vw==='stock'||vw==='buy')renderMatLedger();
   if(vw==='proj')renderMatProj();
 }
 // ── 自有材料台帳（逐筆）──
@@ -8518,10 +8526,12 @@ var MAT_UNIT_W={'型鋼':{H300:94,H350:135,H400:172},'支撐':{H300:94,H350:135,
 function _matUW(name,spec){var t=MAT_UNIT_W[name];return (t&&t[spec]!=null)?t[spec]:'';}
 function _matLedAmt(r){
   var qty=parseFloat(r.qty)||0,price=parseFloat(r.price)||0,uw=parseFloat(r.uw)||0,len=parseFloat(r.len)||0;
-  return uw>0?uw*len*price*qty:price*qty; // 有單位重：$/kg×kg/m×m×支；否則 $/件×件
+  var bill=parseFloat(r.billM)||0; // 進貨總長（選填）：以總長計價時優先採用
+  var mSum=bill>0?bill:len*qty;
+  return uw>0?uw*mSum*price:price*qty; // 有單位重：$/kg×kg/m×總M；否則 $/件×件
 }
+function _matLenTxt(l){return (l!=null&&l!=='')?('L='+l+'M'):'—';}
 function renderMatLedger(){
-  var el=document.getElementById('mat-ledger-box');if(!el)return;
   // 期初種子：僅在台帳全空且未被刪除過時帶入（固定 id，跨裝置合併不重複）
   if(!MAT_LEDGER.length&&!(TOMBS['matLedger']&&TOMBS['matLedger']['ml_seed_h350'])){
     MAT_LEDGER.push({id:'ml_seed_h350',name:'型鋼',spec:'H350',len:9,qty:29,uw:135,price:'',date:'',kind:'重複性',loc:'公司倉庫',note:'期初庫存',_mt:Date.now()});
@@ -8531,15 +8541,13 @@ function renderMatLedger(){
   var lazyFilled=false;
   MAT_LEDGER.forEach(function(r){if(r.uw==null){var w=_matUW(r.name,r.spec);if(w!=='')  {r.uw=w;lazyFilled=true;}}});
   if(lazyFilled)try{localStorage.setItem('fy_mat_ledger',JSON.stringify(MAT_LEDGER));}catch(e){}
-  var rep=0,once=0,buyTotal=0;
-  MAT_LEDGER.forEach(function(r){
-    if(r.kind==='一次性')once++;else rep++;
-    buyTotal+=_matLedAmt(r);
-  });
-  var h='<div style="padding:8px 14px;font-size:12.5px;color:var(--b4);border-bottom:1px solid var(--b1)">重複性 <b style="color:var(--g3)">'+rep+'</b> 筆　一次性 <b style="color:#b26a00">'+once+'</b> 筆　購置總額 <b style="color:var(--g3)">NT$ '+fmt(Math.round(buyTotal))+'</b>'
-    +'<span style="font-size:10.5px;color:var(--b3)">　※ 有單位重者單價為 $/kg（金額＝單位重×長度×單價×數量），其餘為 $/件</span></div>';
-  var lenTxt=function(l){return (l!=null&&l!=='')?('L='+l+'M'):'—';};
-  // ── 庫存總覽：依品項/規格/長度/位置彙總（給工務看：公司有什麼料、在哪裡）──
+  renderMatStockView();
+  renderMatBuy();
+}
+// ── 材料庫存（工務面）：依品項×長度×位置彙總，一律 L=長度×支數 呈現 ──
+function renderMatStockView(){
+  var el=document.getElementById('mat-stock-box');if(!el)return;
+  var lenTxt=_matLenTxt;
   var agg={},aggKeys=[];
   MAT_LEDGER.forEach(function(r){
     if(!r.name)return;
@@ -8548,23 +8556,34 @@ function renderMatLedger(){
     if(!agg[key]){agg[key]={name:r.name,spec:r.spec||'',len:r.len,loc:loc,kind:r.kind==='一次性'?'一次性':'重複性',qty:0};aggKeys.push(key);}
     agg[key].qty+=parseFloat(r.qty)||0;
   });
-  h+='<div style="padding:12px 14px 4px;font-weight:700;font-size:13px;color:var(--g3)">庫存總覽 <span style="font-weight:400;font-size:10.5px;color:var(--b3)">— 依品項×長度×位置彙總；租料前先查這裡</span></div>';
+  var h='';
   if(!aggKeys.length){
-    h+='<div style="padding:4px 14px 10px;font-size:12.5px;color:var(--b3)">尚無庫存，請於下方購置紀錄新增。</div>';
+    h+='<div style="padding:16px 14px;font-size:12.5px;color:var(--b3)">尚無庫存。請至「材料購置」新增進貨紀錄，庫存會自動依 L=長度×支數 彙總到這裡。</div>';
   }else{
-    // 桌機/手機一致：卡片式庫存呈現（桌機自動多欄）
-    h+='<div style="padding:4px 12px 8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:8px">';
+    h+='<div style="padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:8px">';
     aggKeys.forEach(function(k){
       var a=agg[k];
       h+='<div style="border:1px solid var(--b1);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;background:var(--w)">'
         +'<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px">'+esc(a.name)+' '+esc(a.spec)+'　<span style="color:var(--b4);font-weight:600">'+lenTxt(a.len)+'</span></div>'
         +'<div style="font-size:11.5px;color:var(--b3);margin-top:2px">📍 '+esc(a.loc)+'　<span style="color:'+(a.kind==='一次性'?'#b26a00':'var(--g3)')+'">'+a.kind+'</span></div></div>'
-        +'<div style="font-size:19px;font-weight:800;color:'+(a.kind==='一次性'?'#b26a00':'var(--g3)')+';white-space:nowrap">'+fmt(a.qty)+'<span style="font-size:11px;font-weight:600;color:var(--b3)"> 支/件</span></div></div>';
+        +'<div style="font-size:19px;font-weight:800;color:'+(a.kind==='一次性'?'#b26a00':'var(--g3)')+';white-space:nowrap">×'+fmt(a.qty)+'<span style="font-size:11px;font-weight:600;color:var(--b3)"> 支/件</span></div></div>';
     });
     h+='</div>';
+    h+='<div style="padding:0 14px 12px;font-size:11px;color:var(--b3)">※ 長度不合的料件不能硬用（例：9M 料不適用需求 13M 的工地）；調撥工地後請至「材料購置」把該筆位置改為對應專案。</div>';
   }
-  // ── 購置紀錄：後台資料，預設唯讀，按「編輯」才可修改 ──
-  h+='<div style="padding:14px 14px 4px;font-weight:700;font-size:13px;color:var(--g3);border-top:1px solid var(--b1);margin-top:10px">購置紀錄 <span style="font-weight:400;font-size:10.5px;color:var(--b3)">— 逐筆進貨資料；點「編輯」修改，避免誤觸</span></div>';
+  el.innerHTML=h;
+}
+// ── 材料購置（管理面）：逐筆進貨資料 ──
+function renderMatBuy(){
+  var el=document.getElementById('mat-buy-box');if(!el)return;
+  var lenTxt=_matLenTxt;
+  var rep=0,once=0,buyTotal=0;
+  MAT_LEDGER.forEach(function(r){
+    if(r.kind==='一次性')once++;else rep++;
+    buyTotal+=_matLedAmt(r);
+  });
+  var h='<div style="padding:8px 14px;font-size:12.5px;color:var(--b4);border-bottom:1px solid var(--b1)">重複性 <b style="color:var(--g3)">'+rep+'</b> 筆　一次性 <b style="color:#b26a00">'+once+'</b> 筆　購置總額 <b style="color:var(--g3)">NT$ '+fmt(Math.round(buyTotal))+'</b>'
+    +'<span style="font-size:10.5px;color:var(--b3)">　※ 有單位重者單價為 $/kg；金額＝單位重×(進貨總長 或 長度×支數)×單價。庫存一律以 L=長度×支數 記錄</span></div>';
   var inCss='width:100%;font-size:13px;height:34px;border:1px solid var(--b2);border-radius:6px;padding:0 6px;font-family:inherit';
   var catNames=MAT_CATALOG.map(function(c){return c[0];});
   var locOpts=function(cur){
@@ -8600,6 +8619,7 @@ function renderMatLedger(){
       name:nameCell,spec:specCell,loc:locCell,
       len:'<input type="number" inputmode="decimal" step="any" value="'+(r.len!=null&&r.len!==''?r.len:'')+'"'+u('len')+' placeholder="長度" style="'+inCss+';text-align:right">',
       qty:'<input type="number" inputmode="decimal" value="'+(r.qty!=null&&r.qty!==''?r.qty:'')+'"'+u('qty')+' placeholder="數量" style="'+inCss+';text-align:right;font-weight:700">',
+      billM:'<input type="number" inputmode="decimal" step="any" value="'+(r.billM!=null&&r.billM!==''?r.billM:'')+'"'+u('billM')+' placeholder="選填" style="'+inCss+';text-align:right;color:var(--b5)">',
       uw:'<input type="number" inputmode="decimal" step="any" value="'+(r.uw!=null&&r.uw!==''?r.uw:'')+'"'+u('uw')+' placeholder="—" style="'+inCss+';text-align:right;color:var(--b5)">',
       price:'<input type="number" inputmode="decimal" step="any" value="'+(r.price!=null&&r.price!==''?r.price:'')+'"'+u('price')+' placeholder="單價" style="'+inCss+';text-align:right">',
       date:'<input type="date" value="'+esc(r.date||'')+'"'+u('date')+' style="'+inCss+'">',
@@ -8619,6 +8639,7 @@ function renderMatLedger(){
           +'<div style="flex:1;min-width:0;font-weight:700;font-size:14px">'+esc(r.name||'—')+' '+esc(r.spec||'')+'　<span style="color:var(--b4);font-weight:600">'+lenTxt(r.len)+'</span> ×'+(r.qty!=null&&r.qty!==''?fmt(r.qty):'—')+'</div>'
           +'<button type="button" class="btn btn-xs" onclick="matLedEdit(\''+r.id+'\')" style="padding:5px 12px;font-size:12px;flex-shrink:0">編輯</button></div>'
           +'<div style="font-size:11.5px;color:var(--b4);margin-top:5px;line-height:1.7">📍 '+esc(r.loc||'公司倉庫')+'　<span style="color:'+(r.kind==='一次性'?'#b26a00':'var(--g3)')+'">'+esc(r.kind||'重複性')+'</span>'
+          +(r.billM!=null&&r.billM!==''?('　總長'+fmt(r.billM)+'M'):'')
           +(r.date?'　'+esc(r.date):'')
           +(amt?'　<b style="color:var(--g3)">NT$ '+fmt(Math.round(amt))+'</b>':'')
           +(r.note?'<br>'+esc(r.note):'')+'</div>'
@@ -8631,7 +8652,8 @@ function renderMatLedger(){
         +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
         +fld('品項',c.name)+fld('規格',c.spec)
         +fld('長度 (M)',c.len)+fld('數量',c.qty)
-        +fld('單位重 (kg/m)',c.uw)+fld('單價',c.price)
+        +fld('進貨總長 (M) 選填',c.billM)+fld('單位重 (kg/m)',c.uw)
+        +fld('單價',c.price)
         +fld('購置日期',c.date)+fld('類型',c.kind)
         +fld('存放位置',c.loc)+fld('備註',c.note)
         +'</div>'
@@ -8645,9 +8667,9 @@ function renderMatLedger(){
     h+='</div>';
   }else{
     // 桌機：表格
-    h+='<div class="tbl-wrap"><table class="tbl" style="min-width:1160px"><thead><tr>'
+    h+='<div class="tbl-wrap"><table class="tbl" style="min-width:1240px"><thead><tr>'
       +'<th style="min-width:118px">品項</th><th style="min-width:96px">規格</th><th style="width:76px" class="r">長度(M)</th>'
-      +'<th style="width:72px" class="r">數量</th><th style="width:88px" class="r">單位重<br>(kg/m)</th><th style="width:84px" class="r">單價</th><th style="width:104px" class="r">金額</th><th style="width:118px">購置日期</th>'
+      +'<th style="width:72px" class="r">數量</th><th style="width:84px" class="r">進貨總長<br>(M)</th><th style="width:88px" class="r">單位重<br>(kg/m)</th><th style="width:84px" class="r">單價</th><th style="width:104px" class="r">金額</th><th style="width:118px">購置日期</th>'
       +'<th style="width:84px">類型</th><th style="min-width:110px">位置</th><th style="min-width:80px">備註</th><th style="width:104px"></th>'
       +'</tr></thead><tbody>';
     MAT_LEDGER.forEach(function(r,i){
@@ -8659,6 +8681,7 @@ function renderMatLedger(){
           +'<td style="color:var(--b5);font-size:12.5px">'+esc(r.spec||'—')+'</td>'
           +'<td class="r">'+(r.len!=null&&r.len!==''?r.len:'—')+'</td>'
           +'<td class="r" style="font-weight:700">'+(r.qty!=null&&r.qty!==''?fmt(r.qty):'—')+'</td>'
+          +'<td class="r" style="color:var(--b5)">'+(r.billM!=null&&r.billM!==''?fmt(r.billM):'—')+'</td>'
           +'<td class="r" style="color:var(--b5)">'+(r.uw!=null&&r.uw!==''?r.uw:'—')+'</td>'
           +'<td class="r">'+(r.price!=null&&r.price!==''?fmt(r.price):'—')+'</td>'
           +'<td class="r" style="font-weight:700;font-size:12.5px;white-space:nowrap">'+(amt?('NT$ '+fmt(Math.round(amt))):'—')+'</td>'
@@ -8672,7 +8695,7 @@ function renderMatLedger(){
       }
       var c=edCells(r,i);
       h+='<tr style="background:#f7faf8">'
-        +'<td>'+c.name+'</td><td>'+c.spec+'</td><td>'+c.len+'</td><td>'+c.qty+'</td><td>'+c.uw+'</td><td>'+c.price+'</td>'
+        +'<td>'+c.name+'</td><td>'+c.spec+'</td><td>'+c.len+'</td><td>'+c.qty+'</td><td>'+c.billM+'</td><td>'+c.uw+'</td><td>'+c.price+'</td>'
         +'<td class="r" style="font-weight:700;font-size:12.5px;white-space:nowrap">'+(amt?('NT$ '+fmt(Math.round(amt))):'—')+'</td>'
         +'<td>'+c.date+'</td><td>'+c.kind+'</td><td>'+c.loc+'</td><td>'+c.note+'</td>'
         +'<td style="text-align:center;white-space:nowrap">'
@@ -8727,7 +8750,7 @@ function matLedUpd(i,f,val){
     r.spec=val;
     var w2=_matUW(r.name,r.spec);if(w2!=='')r.uw=w2;
   }else{
-    r[f]=(f==='len'||f==='qty'||f==='price'||f==='uw')?(val===''?'':(parseFloat(val)||0)):val;
+    r[f]=(f==='len'||f==='qty'||f==='price'||f==='uw'||f==='billM')?(val===''?'':(parseFloat(val)||0)):val;
   }
   r._mt=Date.now();
   saveMatLedger();
@@ -8735,7 +8758,7 @@ function matLedUpd(i,f,val){
 }
 function matLedAdd(){
   var nid=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
-  MAT_LEDGER.push({id:nid,name:'',spec:'',len:'',qty:'',uw:'',price:'',date:localToday(),kind:'重複性',loc:'公司倉庫',note:'',_mt:Date.now()});
+  MAT_LEDGER.push({id:nid,name:'',spec:'',len:'',qty:'',billM:'',uw:'',price:'',date:localToday(),kind:'重複性',loc:'公司倉庫',note:'',_mt:Date.now()});
   window._matLedEditId=nid;
   saveMatLedger();renderMatLedger();
 }
@@ -13335,8 +13358,8 @@ function renderPayables(){
       w7:pend.filter(p=>p.date&&p.date>=_today&&p.date<=_in7).length,
       later:pend.filter(p=>!p.date||p.date>_in7).length,
       paid:filtered.filter(p=>p.status==='paid').length};
-    const chip=(k,lb,clr)=>'<button type="button" onclick="window._payAging=\''+k+'\';renderPayables()" style="font-family:inherit;font-size:12.5px;padding:0 14px;height:36px;line-height:34px;border-radius:99px;cursor:pointer;border:1px solid '+((window._payAging||'all')===k?clr:'var(--b2)')+';background:'+((window._payAging||'all')===k?clr:'#fff')+';color:'+((window._payAging||'all')===k?'#fff':'var(--b4)')+'">'+lb+'</button>';
-    return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
+    const chip=(k,lb,clr)=>'<button type="button" onclick="window._payAging=\''+k+'\';renderPayables()" style="font-family:inherit;font-size:12.5px;padding:0 12px;height:34px;line-height:32px;border-radius:99px;cursor:pointer;border:1px solid '+((window._payAging||'all')===k?clr:'var(--b2)')+';background:'+((window._payAging||'all')===k?clr:'#fff')+';color:'+((window._payAging||'all')===k?'#fff':'var(--b4)')+';flex:0 1 auto">'+lb+'</button>';
+    return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;justify-content:center">'
       +chip('all','全部','var(--g3)')
       +chip('overdue','🔴 逾期 '+cnt.overdue,'var(--red)')
       +chip('w7','7日內 '+cnt.w7,'#b45309')
