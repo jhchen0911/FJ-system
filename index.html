@@ -271,7 +271,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
   .f input,.f select,.f textarea{font-size:14px;padding:9px 10px;min-height:40px}
   .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .tbl td input{height:34px;font-size:13px;padding:6px 5px}
-  .tbl th:nth-child(8),.tbl td:nth-child(8){display:none}
+  #ittbl th:nth-child(8),#ittbl td:nth-child(8){display:none} /* v5.306：只隱藏報價編輯器第8欄，不再誤藏全站表格欄位 */
   .upa-grid{grid-template-columns:1fr}.totbox{width:100%!important}
   .desk-only{display:none}
   .mob-scroll-hint{display:block!important}
@@ -310,7 +310,9 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
   #ittbl thead{display:none}
   #ittbl{min-width:unset!important;border:none}
   #ittbl td{border:none!important;padding:0!important}
-  .tbl-wrap{overflow-x:unset!important}
+  /* 只有報價編輯器的工項表卡片化不需捲動；其餘頁面的表格一律可左右滑（v5.306 修正全站截斷） */
+  #page-editor .tbl-wrap{overflow-x:unset!important}
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
   #inv-tbl-wrap{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important}
   .mob-scroll-hint{display:none!important}
   .upa-grid4{grid-template-columns:1fr 1fr!important}
@@ -576,7 +578,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-quotes" onclick="go('quotes')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span>報價管理 <span class="cnt" id="qbadge">0</span></button>
   <button type="button" class="snav" id="sn-contracts" onclick="go('contracts')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>合約管理<span class="cnt" id="contractbadge" style="display:none">0</span></button>
   <button type="button" class="snav" id="sn-projects" onclick="go('projects')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>專案管理</button>
-  <button type="button" class="snav" id="sn-costs" onclick="go('costs')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>施工成本</button>
+  <button type="button" class="snav" id="sn-costs" onclick="go('costs')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span>施工成本</button>
   <button type="button" class="snav" id="sn-materials" onclick="go('materials')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg></span>材料管理</button>
   <div class="ssec" style="margin-top:5px">收付流</div>
   <button type="button" class="snav" id="sn-invoice" onclick="go('invoice')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>業主計價 <span class="cnt" id="invbadge" style="display:none">0</span></button>
@@ -599,16 +601,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 
 <!-- ████ DASHBOARD ████ -->
 <div class="page active" id="page-dash">
-  <!-- 手機版快捷入口 -->
-  <div class="mob-quick-bar" style="padding:10px 14px 8px;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
-    <button type="button" onclick="go('projects')" class="mob-chip mob-chip-primary"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 專案／成本</button>
-    <button type="button" onclick="go('invoice')" class="mob-chip mob-chip-blue"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 業主計價</button>
-    <button type="button" onclick="go('finance')" class="mob-chip mob-chip-orange"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 財務</button>
-    <button type="button" onclick="fbDownload&&fbDownload()" class="mob-chip mob-chip-default"><svg class="ic ib" aria-hidden="true"><use href="#i-cloud"/></svg> 同步</button>
-  </div>
   <div id="pay-reminder-banner" style="display:none;padding:10px 18px 0"></div>
   <div class="kgrid" id="dash-kpis"></div>
-  <div id="dash-gates" style="margin-top:12px"></div>
   <div class="pad" style="display:flex;flex-direction:column;gap:12px">
 
     <!-- 通知提醒 -->
@@ -636,39 +630,41 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       </div>
     </div>
 
-    <!-- 快速入口 3×2 -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px" id="dash-shortcuts">
-      <button type="button" onclick="go('quotes')" class="sc-btn">
-        <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg></span>
-        <span class="sc-label">報價管理</span>
-        <span id="dash-quote-count" class="sc-sub">0 件</span>
+    <!-- 快速入口 2×2 -->
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px" id="dash-shortcuts">
+      <button type="button" onclick="go('quickcost');setTimeout(function(){try{rQuickCost();}catch(e){}},60)" class="sc-btn">
+        <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg></span>
+        <span class="sc-label">日報．支出</span>
+        <span class="sc-sub">工作日報・現場花費</span>
       </button>
-      <button type="button" onclick="go('contracts')" class="sc-btn">
-        <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg></span>
-        <span class="sc-label">合約管理</span>
-        <span id="dash-contract-count" class="sc-sub">0 份</span>
+      <button type="button" onclick="go('costs')" class="sc-btn">
+        <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-wrench"/></svg></span>
+        <span class="sc-label">施工成本</span>
+        <span class="sc-sub">成本登錄・分析</span>
       </button>
-      <button type="button" onclick="go('invoice')" class="sc-btn">
-        <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg></span>
-        <span class="sc-label">業主計價</span>
-        <span id="dash-inv-count" class="sc-sub">0 件</span>
+      <button type="button" onclick="go('materials')" class="sc-btn">
+        <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-box"/></svg></span>
+        <span class="sc-label">材料管理</span>
+        <span class="sc-sub">台帳・估算</span>
       </button>
       <button type="button" onclick="go('finance')" class="sc-btn">
         <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg></span>
         <span class="sc-label">金流管理</span>
         <span class="sc-sub">應收・應付</span>
       </button>
-      <button type="button" onclick="go('profit')" class="sc-btn">
-        <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-trend"/></svg></span>
-        <span class="sc-label">利潤分析</span>
-        <span class="sc-sub">成本・毛利</span>
-      </button>
-      <button type="button" onclick="go('contacts')" class="sc-btn">
-        <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg></span>
-        <span class="sc-label">客戶管理</span>
-        <span id="dash-customer-count" class="sc-sub">0 位</span>
-      </button>
     </div>
+
+    <!-- 本月待辦（快捷鍵下方） -->
+    <div class="card" style="margin-bottom:0" id="dash-todo-card">
+      <div class="ch green" style="padding:8px 14px">
+        <div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 本月待辦</div>
+        <span id="dash-todo-badge" style="font-size:11px;background:rgba(255,255,255,.25);color:#fff;border-radius:10px;padding:1px 8px;display:none"></span>
+      </div>
+      <div id="dash-todo-list" style="padding:4px 0"></div>
+    </div>
+
+    <!-- 經營儀表板（最近報價前） -->
+    <div id="dash-gates"></div>
 
     <!-- 最近報價 -->
     <div>
@@ -676,20 +672,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <span style="font-size:14px;font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 最近報價</span>
         <button type="button" class="btn btn-sm" onclick="go('quotes')">查看全部 →</button>
       </div>
-      <div class="card" style="margin-bottom:10px" id="dash-todo-card">
-      <div class="ch green" style="padding:8px 14px">
-        <div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 本月待辦</div>
-        <span id="dash-todo-badge" style="font-size:11px;background:rgba(255,255,255,.25);color:#fff;border-radius:10px;padding:1px 8px;display:none"></span>
-      </div>
-      <div id="dash-todo-list" style="padding:4px 0"></div>
-    </div>
-    <div class="card" style="margin-bottom:0"><div id="dash-list"></div></div>
-    </div>
-
-    <!-- 快捷操作 -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button type="button" class="btn" onclick="go('projects')" style="flex:1;justify-content:center;min-width:120px;border-color:#e65100;color:#e65100;background:#fff8ec"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本</button>
-      <button type="button" class="btn btn-g" onclick="newQ()" style="flex:1;justify-content:center;min-width:120px"><svg class="ic ib" aria-hidden="true"><use href="#i-plus"/></svg> 新增報價</button>
+      <div class="card" style="margin-bottom:0"><div id="dash-list"></div></div>
     </div>
 
   </div>
@@ -2494,13 +2477,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div style="width:36px;height:4px;background:var(--b2);border-radius:99px;margin:0 auto 14px"></div>
   <div style="font-size:11px;font-weight:700;color:var(--b3);margin-bottom:10px;letter-spacing:.06em;text-transform:uppercase">功能選單</div>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
-    <button type="button" onclick="go('projects');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span><span>專案</span></button>
-    <button type="button" onclick="go('costs');toggleMobMore()" id="mn-costs" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span><span>施工成本</span></button>
-    <button type="button" onclick="go('materials');toggleMobMore()" id="mn-materials" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg></span><span>材料管理</span></button>
     <button type="button" onclick="go('contacts');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span><span>客戶</span></button>
-    <button type="button" onclick="go('quickcost');toggleMobMore();setTimeout(rQuickCost,60)" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg></span><span>日報．支出</span></button>
     <button type="button" onclick="toggleMobMore();smartIntake()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
-      <button type="button" onclick="go('finance');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span><span>金流</span></button>
     <button type="button" onclick="go('reports');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span><span>報表</span></button>
     <button type="button" onclick="go('profit');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span><span>利潤</span></button>
       </div>
@@ -2515,7 +2493,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.305';
+var APP_VERSION='v5.306';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -4843,7 +4821,7 @@ function settleInvItem(i){
   const _delta=Math.round((orig-cum)*(parseFloat(it.contractPrice)||0)*_taxR); // 正=追減、負=追加
   const _willSync=_contract&&(_contract.amount||0)>0&&_delta!==0;
   let ok=false;
-  try{ok=window.confirm('工項結算：'+(it.desc||'未命名工項')+'\n\n合約數量 '+orig+' → 實作數量 '+cum+(cum<orig?'（追減 '+(Math.round((orig-cum)*100)/100)+'）':'（追加 '+(Math.round((cum-orig)*100)/100)+'）')+(_willSync?'\n合約金額同步調整 '+(_delta>0?'−':'＋')+'NT$ '+fmt(Math.abs(_delta))+'（含稅）\n　NT$ '+fmt(_contract.amount)+' → NT$ '+fmt(Math.max(0,_contract.amount-_delta)):'')+'\n\n確定結算此工項？\n（原數量會記錄在備註）');}catch(e){ok=true;}
+  try{ok=window.confirm('工項結算：'+(it.desc||'未命名工項')+'\n\n合約數量 '+orig+' → 實作數量 '+cum+(cum<orig?'（追減 '+(Math.round((orig-cum)*100)/100)+'）':'（追加 '+(Math.round((cum-orig)*100)/100)+'）')+(_willSync?'\n合約金額同步調整 '+(_delta>0?'−':'＋')+'NT$ '+fmt(Math.abs(_delta))+'（含稅）\n　NT$ '+fmt(_contract.amount)+' → NT$ '+fmt(Math.max(0,_contract.amount-_delta)):'')+'\n報價單同名工項數量將一併同步（成本/利潤統計跟著更新）'+'\n\n確定結算此工項？\n（原數量會記錄在備註）');}catch(e){ok=true;}
   if(!ok)return;
   if(it.origContractQty==null)it.origContractQty=orig; // 保留原始合約數量
   it.contractQty=cum;
@@ -4863,8 +4841,47 @@ function settleInvItem(i){
     try{if(document.getElementById('page-contracts')?.classList.contains('active'))renderContracts();}catch(e){}
     syncTxt='，合約金額→NT$ '+fmt(_contract.amount);
   }
+  // 強關聯：同步回寫報價單（含追加單）同名工項數量並重算總價，
+  // 使施工成本頁預估成本、專案卡、施工進度條、利潤分析等統計一致
+  try{
+    var _q=_inv?(Q.find(function(x){return x.id===_inv.quoteId;})||Q.find(function(x){return x.name===_inv.project&&!x.parentId;})):null;
+    if(_q){
+      var _cands=[_q].concat(Q.filter(function(x){return x.parentId===_q.id;}));
+      var _d=String(it.desc||'').trim();
+      for(var _ci=0;_ci<_cands.length;_ci++){
+        var _qq=_cands[_ci];
+        var _qi=(_qq.items||[]).find(function(x){return !x.sec&&String(x.desc||'').trim()===_d;});
+        if(_qi){
+          if(_qi.origQty==null)_qi.origQty=_qi.qty; // 保留原始報價數量
+          _qi.qty=cum;
+          _recalcQuoteTotals(_qq);
+          _qq._mt=Date.now();
+          try{persist();}catch(e){}
+          syncTxt+='，報價數量→'+cum;
+          break;
+        }
+      }
+    }
+  }catch(e){}
   rInvItems();rInvTots();
   toast('⚖ 工項已結算：'+orig+' → '+cum+syncTxt);
+}
+
+// 離編輯器重算報價單總計（與 calcT 同口徑；工項結算/追加減回寫後使用）
+function _recalcQuoteTotals(q){
+  var its=q.items||[];
+  var sub=its.reduce(function(a,it){return it.sec?a:a+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0);},0);
+  var tax=sub*(P.tax||5)/100,total=sub+tax;
+  var ext=(q.exs||[]).reduce(function(a,e){return a+(parseFloat(e.amt)||0);},0);
+  var costKnown=0,subUnknown=0;
+  its.forEach(function(it){
+    if(it.sec)return;
+    var qn=parseFloat(it.qty)||0,p=parseFloat(it.price)||0,c=parseFloat(it.estCost)||0;
+    if(qn>0&&c>0)costKnown+=qn*c;else subUnknown+=qn*p;
+  });
+  var cost=costKnown+(subUnknown*(1+(P.tax||5)/100))/(P.mult||1.4);
+  var gross=total-cost,net=total-cost-ext;
+  q.t={sub:sub,tax:tax,total:total,ext:ext,cost:cost,gross:gross,net:net,grossR:total?gross/total:0,netR:total?net/total:0,costKnown:costKnown,costFilled:costKnown>0};
 }
 
 // 只更新請款明細行的金額顯示（不重渲染整個表格）
@@ -8662,20 +8679,24 @@ function renderMatProj(){
       if((it.quantity||0)-own>0)rentKinds++;
     });
     var open=window._matProjOpen===q.id;
-    rowsH+='<tr style="cursor:pointer" onclick="matProjToggle(\''+q.id+'\')">'
-      +'<td style="font-weight:700;font-size:13px">'+esc(q.name||'')+'</td>'
-      +'<td style="font-size:12px;color:'+(est?'var(--g3)':'var(--b3)')+'">'+(est?('✓ '+(est.date||'')):'未估算')+'</td>'
-      +'<td class="r" style="font-size:12.5px">'+(est?(ownKinds+'／'+rentKinds):'—')+'</td>'
-      +'<td class="r" style="font-weight:700;color:#b26a00;font-size:12.5px">'+(ct.rent?('NT$ '+fmt(ct.rent)):'—')+'</td>'
-      +'<td class="r" style="font-weight:700;color:#b26a00;font-size:12.5px">'+(ct.trans?('NT$ '+fmt(ct.trans)):'—')+'</td>'
-      +'<td style="text-align:center;color:var(--b3)">'+(open?'▲':'▼')+'</td></tr>';
-    if(open)rowsH+='<tr><td colspan="6" style="padding:0;background:#fbfdfc">'+_matProjDetail(q)+'</td></tr>';
+    var stat=function(l,v,c2){return '<div style="min-width:88px"><div style="font-size:10.5px;color:var(--b3)">'+l+'</div><div style="font-size:13px;font-weight:700;color:'+(c2||'var(--b5)')+'">'+v+'</div></div>';};
+    rowsH+='<div style="border-bottom:1px solid var(--b1);cursor:pointer" onclick="matProjToggle(\''+q.id+'\')">'
+      +'<div style="padding:12px 14px">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+        +'<div style="flex:1;font-weight:700;font-size:14px;min-width:0">'+esc(q.name||'')+'</div>'
+        +'<span style="color:var(--b3);flex-shrink:0">'+(open?'▲':'▼')+'</span></div>'
+      +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
+        +stat('材料估算',est?('✓ '+(est.date||'')):'未估算',est?'var(--g3)':'var(--b3)')
+        +stat('自有/租賃項數',est?(ownKinds+'／'+rentKinds):'—')
+        +stat('材料租金成本',ct.rent?('NT$ '+fmt(ct.rent)):'—','#b26a00')
+        +stat('材料運輸成本',ct.trans?('NT$ '+fmt(ct.trans)):'—','#b26a00')
+      +'</div></div>'
+      +(open?'<div style="background:#fbfdfc;border-top:1px dashed var(--b1)">'+_matProjDetail(q)+'</div>':'')
+      +'</div>';
   });
   h+='<div class="card"><div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 各專案材料</div>'
-    +'<div style="font-size:11px;color:var(--b4)">點列展開：分配自有/租賃、填租金運費、更新施工成本</div></div>'
-    +'<div class="cb" style="padding:0"><div class="tbl-wrap"><table class="tbl" style="min-width:640px"><thead><tr>'
-    +'<th style="width:30%">專案</th><th style="width:150px">材料估算</th><th style="width:130px" class="r">自有/租賃項數</th><th style="width:160px" class="r">材料租金成本</th><th style="width:160px" class="r">材料運輸成本</th><th style="width:40px"></th>'
-    +'</tr></thead><tbody>'+(rowsH||'<tr><td colspan="6" style="text-align:center;color:var(--b3);padding:20px">尚無得標專案</td></tr>')+'</tbody></table></div></div></div>';
+    +'<div style="font-size:11px;color:var(--b4)">點卡展開：分配自有/租賃、填租金運費、更新施工成本</div></div>'
+    +'<div class="cb" style="padding:0">'+(rowsH||'<div style="text-align:center;color:var(--b3);padding:24px;font-size:13px">尚無得標專案</div>')+'</div></div>';
   // 公司整體統計
   var buyTotal=0;MAT_LEDGER.forEach(function(r){buyTotal+=_matLedAmt(r);});
   h+='<div class="card" style="margin-top:12px"><div class="ch"><div class="cht">公司整體材料成本統計</div></div><div class="cb">'
@@ -15395,7 +15416,7 @@ const ALL_PAGES = [
   {id:'contacts',  label:'客戶管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg>', adminOnly:false},
   {id:'contracts', label:'合約管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>', adminOnly:false, hidden:true}, // v5.294 併入專案總覽，導覽隱藏（頁面與資料保留）
   {id:'projects',  label:'專案管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg>', adminOnly:false},
-  {id:'costs',     label:'施工成本', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg>', adminOnly:false},
+  {id:'costs',     label:'施工成本', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-wrench"/></svg>', adminOnly:false},
   {id:'materials', label:'材料管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg>', adminOnly:false},
   {id:'quickcost', label:'日報．支出', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>', adminOnly:false},
   {id:'ledger',    label:'帳務管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>', adminOnly:false},
