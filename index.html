@@ -258,6 +258,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
   .ql-desk-actions .btn-weak-action{/* 弱化：版本、存客戶 - btn-ghost */}
 }
 
+svg.fj-chart{cursor:zoom-in}
 /* ═══ 手機版 ═══ */
 @media(max-width:767px){
   :root{--top:48px;--mob:58px}
@@ -326,8 +327,8 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
   #dash-shortcuts .sc-icon{font-size:20px}
   #dash-shortcuts .sc-label{font-size:10.5px;white-space:nowrap}
   #dash-shortcuts .sc-sub{display:none}
-  /* 圖表：手機滿版＋可點放大 */
-  #report-content svg,#page-profit svg{width:100%!important;height:auto!important;cursor:zoom-in}
+  /* 圖表：手機滿版＋可點放大（只作用於圖表 svg，不影響小圖示） */
+  svg.fj-chart{width:100%!important;height:auto!important;max-width:none!important}
 }
 
 /* ═══ 手機底部導航 ═══ */
@@ -615,28 +616,6 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 
     <!-- 通知提醒 -->
     <div id="dash-notif" style="display:none;background:#fff0f0;border:1px solid #ffaaaa;border-radius:var(--r10);padding:10px 14px"></div>
-
-    <!-- 應收/應付 財務摘要列 -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-      <!-- 應收帳款 -->
-      <div id="dash-ar-card" style="background:var(--w);border:1px solid var(--b1);border-left:4px solid #f0a500;border-radius:var(--r12);padding:14px 16px;cursor:pointer" onclick="go('finance');setTimeout(()=>switchFinanceTab('ar'),50)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-size:12px;font-weight:700;color:#7c5700"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 應收帳款</span>
-          <span style="font-size:10px;color:var(--b3)">點擊查看 →</span>
-        </div>
-        <div id="dash-ar-summary" style="font-size:13px;color:#7c5700"></div>
-      </div>
-      <!-- 應付帳款 -->
-      <div id="dash-ap-card" style="background:var(--w);border:1px solid var(--b1);border-left:4px solid #c62828;border-radius:var(--r12);padding:14px 16px;cursor:pointer" onclick="go('finance');setTimeout(()=>switchFinanceTab('payable'),50)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-size:12px;font-weight:700;color:#c62828"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 應付帳款</span>
-          <span style="font-size:10px;color:var(--b3)">點擊查看 →</span>
-        </div>
-        <div id="dash-ap-summary" style="font-size:13px;color:#c62828">
-          <div style="font-size:11px;color:var(--b4)">載入中…</div>
-        </div>
-      </div>
-    </div>
 
     <!-- 快速入口：單排 4 顆 -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px" id="dash-shortcuts">
@@ -2500,7 +2479,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.307';
+var APP_VERSION='v5.308';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2726,7 +2705,7 @@ function go(p){
         nv.className='statnav';
         nv.style.cssText='display:flex;gap:8px;padding:10px 22px 0;flex-wrap:wrap';
         nv.innerHTML=[['profit','利潤分析'],['reports','報表中心'],['ledger','帳務管理']].map(function(x){
-          return '<button type="button" onclick="go(\''+x[0]+'\')" style="font-family:inherit;font-size:12px;padding:6px 14px;border-radius:99px;border:1px solid '+(x[0]===('PAGE'===p?p:p)?'var(--g3)':'var(--b2)')+';background:'+(x[0]===p?'var(--g3)':'#fff')+';color:'+(x[0]===p?'#fff':'var(--b4)')+';cursor:pointer">'+x[1]+'</button>';
+          return '<button type="button" onclick="go(\''+x[0]+'\')" style="font-family:inherit;font-size:12.5px;flex:1;max-width:150px;height:36px;padding:0 10px;border-radius:99px;border:1px solid '+(x[0]===p?'var(--g3)':'var(--b2)')+';background:'+(x[0]===p?'var(--g3)':'#fff')+';color:'+(x[0]===p?'#fff':'var(--b4)')+';cursor:pointer;font-weight:'+(x[0]===p?'700':'500')+'">'+x[1]+'</button>';
         }).join('');
         pgEl.insertBefore(nv,pgEl.firstChild);
       }else if(pgEl){
@@ -6930,9 +6909,17 @@ function rDash(){
         awardedAmt+=(ct&&(parseFloat(ct.amount)||0)>0)?ct.amount:t;
       });
       const _diffs=Math.abs(awardedOrig-awardedAmt)>1;
+      // 應收／應付併入同一組 KPI 卡（四卡形式統一）
+      let _arT=0,_arN=0,_apT=0,_apN=0;
+      try{
+        INV.forEach(inv=>{if(!inv.receivedConfirmed){_arT+=((inv.totals&&inv.totals.total)||0);_arN++;}});
+        (PAYABLES||[]).forEach(p=>{if(p.status!=='paid'){_apT+=_payEff(p);_apN++;}});
+      }catch(e){}
       kgrid.innerHTML=
         '<div class="kpi" style="flex:1;min-width:120px"><div class="kl">總報價金額</div><div class="kv" style="font-size:18px">NT$ '+fmt(totalAmt)+'</div><div class="ks">共 '+totalQ+' 件</div></div>'+
-        '<div class="kpi hi" style="flex:1;min-width:120px"><div class="kl">得標金額'+(_diffs?'（合約現值）':'')+'</div><div class="kv" style="font-size:18px;color:var(--g3)">NT$ '+fmt(awardedAmt)+'</div><div class="ks">'+awardedQ+' 件得標'+(_diffs?'　·　原始得標 NT$ '+fmt(awardedOrig):'')+'</div></div>';
+        '<div class="kpi hi" style="flex:1;min-width:120px"><div class="kl">得標金額'+(_diffs?'（合約現值）':'')+'</div><div class="kv" style="font-size:18px;color:var(--g3)">NT$ '+fmt(awardedAmt)+'</div><div class="ks">'+awardedQ+' 件得標'+(_diffs?'　·　原始得標 NT$ '+fmt(awardedOrig):'')+'</div></div>'+
+        '<div class="kpi" style="flex:1;min-width:120px;cursor:pointer" onclick="go(\'finance\');setTimeout(function(){switchFinanceTab(\'ar\');},50)"><div class="kl">應收帳款 <span style="font-size:9px">↗</span></div><div class="kv" style="font-size:18px;color:#b26a00">NT$ '+fmt(_arT)+'</div><div class="ks">'+_arN+' 件待收</div></div>'+
+        '<div class="kpi" style="flex:1;min-width:120px;cursor:pointer" onclick="go(\'finance\');setTimeout(function(){switchFinanceTab(\'payable\');},50)"><div class="kl">應付帳款 <span style="font-size:9px">↗</span></div><div class="kv" style="font-size:18px;color:#c62828">NT$ '+fmt(_apT)+'</div><div class="ks">待付 '+_apN+' 筆</div></div>';
     }
     // 最近報價
     const dl=document.getElementById('dash-list');
@@ -8564,29 +8551,17 @@ function renderMatLedger(){
   h+='<div style="padding:12px 14px 4px;font-weight:700;font-size:13px;color:var(--g3)">庫存總覽 <span style="font-weight:400;font-size:10.5px;color:var(--b3)">— 依品項×長度×位置彙總；租料前先查這裡</span></div>';
   if(!aggKeys.length){
     h+='<div style="padding:4px 14px 10px;font-size:12.5px;color:var(--b3)">尚無庫存，請於下方購置紀錄新增。</div>';
-  }else if(isMob()){
-    h+='<div style="padding:4px 12px 8px;display:flex;flex-direction:column;gap:8px">';
+  }else{
+    // 桌機/手機一致：卡片式庫存呈現（桌機自動多欄）
+    h+='<div style="padding:4px 12px 8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:8px">';
     aggKeys.forEach(function(k){
       var a=agg[k];
-      h+='<div style="border:1px solid var(--b1);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px">'
+      h+='<div style="border:1px solid var(--b1);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;background:var(--w)">'
         +'<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px">'+esc(a.name)+' '+esc(a.spec)+'　<span style="color:var(--b4);font-weight:600">'+lenTxt(a.len)+'</span></div>'
         +'<div style="font-size:11.5px;color:var(--b3);margin-top:2px">📍 '+esc(a.loc)+'　<span style="color:'+(a.kind==='一次性'?'#b26a00':'var(--g3)')+'">'+a.kind+'</span></div></div>'
         +'<div style="font-size:19px;font-weight:800;color:'+(a.kind==='一次性'?'#b26a00':'var(--g3)')+';white-space:nowrap">'+fmt(a.qty)+'<span style="font-size:11px;font-weight:600;color:var(--b3)"> 支/件</span></div></div>';
     });
     h+='</div>';
-  }else{
-    h+='<div class="tbl-wrap"><table class="tbl" style="min-width:560px;table-layout:fixed"><thead><tr>'
-      +'<th style="width:20%">品項</th><th style="width:16%">規格</th><th style="width:16%">長度</th>'
-      +'<th style="width:22%">位置</th><th style="width:13%">類型</th><th style="width:13%" class="r">數量</th></tr></thead><tbody>';
-    aggKeys.forEach(function(k){
-      var a=agg[k];
-      h+='<tr><td style="font-weight:700">'+esc(a.name)+'</td><td style="color:var(--b5)">'+esc(a.spec)+'</td>'
-        +'<td style="font-weight:600">'+lenTxt(a.len)+'</td>'
-        +'<td style="color:var(--b5)">'+esc(a.loc)+'</td>'
-        +'<td style="color:'+(a.kind==='一次性'?'#b26a00':'var(--g3)')+';font-size:12px">'+a.kind+'</td>'
-        +'<td class="r" style="font-weight:800;color:var(--g3);font-size:14px">'+fmt(a.qty)+'</td></tr>';
-    });
-    h+='</tbody></table></div>';
   }
   // ── 購置紀錄：後台資料，預設唯讀，按「編輯」才可修改 ──
   h+='<div style="padding:14px 14px 4px;font-weight:700;font-size:13px;color:var(--g3);border-top:1px solid var(--b1);margin-top:10px">購置紀錄 <span style="font-weight:400;font-size:10.5px;color:var(--b3)">— 逐筆進貨資料；點「編輯」修改，避免誤觸</span></div>';
@@ -8734,7 +8709,7 @@ function _svgZoom(svg){
 document.addEventListener('click',function(e){
   if(!e.target||!e.target.closest)return;
   if(e.target.closest('button,a,input,select,textarea'))return;
-  var svg=e.target.closest('#report-content svg,#page-profit svg');
+  var svg=e.target.closest('svg.fj-chart');
   if(svg)_svgZoom(svg);
 });
 function matLedUpd(i,f,val){
@@ -13365,7 +13340,7 @@ function renderPayables(){
       +chip('all','全部','var(--g3)')
       +chip('overdue','🔴 逾期 '+cnt.overdue,'var(--red)')
       +chip('w7','7日內 '+cnt.w7,'#b45309')
-      +chip('later','之後 '+cnt.later,'var(--b4)')
+      +chip('later','7日後 '+cnt.later,'var(--b4)')
       +chip('paid','已付 '+cnt.paid,'var(--g)')
       +'</div>';
   })();
@@ -13622,7 +13597,7 @@ function renderCashForecast(){
   }).join('');
   el.innerHTML='<div class="card"><div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 90 天現金水位預測</div><span style="font-size:11px;color:rgba(255,255,255,.85)">起點：可用現金 NT$ '+fmt(Math.round(startCash))+'</span></div><div class="cb">'
     +banner
-    +'<div style="overflow-x:auto"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:520px;height:auto;display:block">'
+    +'<div style="overflow-x:auto"><svg class="fj-chart" viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:520px;height:auto;display:block">'
     +'<line x1="'+pd2+'" y1="'+Y(0)+'" x2="'+(W-pd2)+'" y2="'+Y(0)+'" stroke="#d9a0a0" stroke-dasharray="4 3" stroke-width="1"/>'
     +'<polyline points="'+pts+'" fill="none" stroke="'+(danger?'#c62828':'#1a6b3f')+'" stroke-width="2.5" stroke-linejoin="round"/>'
     +'<circle cx="'+X(minD)+'" cy="'+Y(minV)+'" r="4.5" fill="'+(danger?'#c62828':'#e65100')+'"/>'
@@ -14791,7 +14766,7 @@ function renderMonthlyReport(el,year,month){
         <span style="margin-left:8px"><span style="display:inline-block;width:10px;height:10px;background:#1a6b3f;border-radius:2px"></span> 請款</span>
         <span style="margin-left:8px"><span style="display:inline-block;width:10px;height:10px;background:#f0a500;border-radius:2px"></span> 收款</span>
       </div>
-      <svg viewBox="0 0 ${60+rows.length*(barW+6)+10} ${chartH}" style="width:100%;height:${chartH}px">
+      <svg class="fj-chart" viewBox="0 0 ${60+rows.length*(barW+6)+10} ${chartH}" style="width:100%;height:${chartH}px">
         <line x1="56" y1="10" x2="56" y2="${chartH-28}" stroke="#eee" stroke-width="1"/>
         <line x1="56" y1="${chartH-28}" x2="${60+rows.length*(barW+6)}" y2="${chartH-28}" stroke="#eee" stroke-width="1"/>
         <text x="54" y="14" text-anchor="end" font-size="8" fill="#ccc">萬</text>
@@ -14892,7 +14867,7 @@ function renderYearlyReport(el,year){
         <span style="margin-left:10px"><span style="display:inline-block;width:10px;height:10px;background:#1a6b3f;border-radius:2px"></span> 收入</span>
         <span style="margin-left:6px"><span style="display:inline-block;width:10px;height:10px;background:#c62828;border-radius:2px;opacity:.7"></span> 支出</span>
       </div>
-      <svg viewBox="0 0 560 ${mChartH}" style="width:100%;height:${mChartH}px">
+      <svg class="fj-chart" viewBox="0 0 560 ${mChartH}" style="width:100%;height:${mChartH}px">
         <line x1="36" y1="10" x2="36" y2="${mChartH-28}" stroke="#eee" stroke-width="1"/>
         <line x1="36" y1="${mChartH-28}" x2="558" y2="${mChartH-28}" stroke="#eee" stroke-width="1"/>
         ${mBars}${mLabels}
@@ -16473,7 +16448,7 @@ function _buildBarChart(data, options){
     labels+=`<text x="${x+barW/2}" y="${height-8}" text-anchor="middle" font-size="9" fill="#888">${esc(labelFn(d,i))}</text>`;
     if(val>0)vals+=`<text x="${x+barW/2}" y="${y-3}" text-anchor="middle" font-size="8" fill="${color}" font-weight="700">${val>=10000?Math.round(val/10000)+'萬':val}</text>`;
   });
-  return`<div style="overflow-x:auto"><svg viewBox="0 0 ${width} ${height}" style="width:100%;max-width:${width}px;height:${height}px">
+  return`<div style="overflow-x:auto"><svg class="fj-chart" viewBox="0 0 ${width} ${height}" style="width:100%;max-width:${width}px;height:${height}px">
     ${title?`<text x="${width/2}" y="20" text-anchor="middle" font-size="11" fill="#555" font-weight="700">${title}</text>`:''}
     <text x="38" y="9" text-anchor="end" font-size="8" fill="#aaa">萬元</text>
     ${bars}${labels}${vals}
@@ -16504,7 +16479,7 @@ function _buildLineChart(series, options){
     labs+=`<text x="${xOf(i)}" y="${height-8}" text-anchor="middle" font-size="9" fill="#888">${esc(labelFn?labelFn(d,i):String(i))}</text>`;
   });
   const legend=series.map((s,i)=>`<rect x="${10+i*80}" y="3" width="12" height="8" fill="${s.color}" rx="2"/><text x="${24+i*80}" y="11" font-size="9" fill="#555">${esc(s.name)}</text>`).join('');
-  return`<div style="overflow-x:auto"><svg viewBox="0 0 ${width} ${height}" style="width:100%;max-width:${width}px;height:${height}px">
+  return`<div style="overflow-x:auto"><svg class="fj-chart" viewBox="0 0 ${width} ${height}" style="width:100%;max-width:${width}px;height:${height}px">
     <line x1="56" y1="10" x2="56" y2="${scaleH+10}" stroke="#ddd" stroke-width="1"/>
     <line x1="56" y1="${scaleH+10}" x2="${width-5}" y2="${scaleH+10}" stroke="#ddd" stroke-width="1"/>
     <text x="54" y="9" text-anchor="end" font-size="8" fill="#aaa">萬元</text>
