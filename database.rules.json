@@ -1,0 +1,29 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "fydata": {
+      "shared": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+
+        "admins": {
+          ".write": "auth != null && (!data.exists() || data.val().contains(auth.token.email))"
+        }
+      },
+
+      "backups": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+
+      "logs": {
+        ".read": "auth != null",
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid"
+        }
+      }
+    }
+  }
+}
