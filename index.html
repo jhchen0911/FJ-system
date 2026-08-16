@@ -259,8 +259,10 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
 }
 
 svg.fj-chart{cursor:zoom-in}
+.mob-only{display:none}
 /* ═══ 手機版 ═══ */
 @media(max-width:767px){
+  .mob-only{display:block}
   :root{--top:48px;--mob:58px}
   .fg4{grid-template-columns:1fr}
   .topbar{padding:env(safe-area-inset-top,0px) 12px 0;min-height:var(--top)}.brand-sub{display:none}.top-nav{display:none}.sidebar{display:none}
@@ -329,6 +331,14 @@ svg.fj-chart{cursor:zoom-in}
   #dash-shortcuts .sc-sub{display:none}
   /* 圖表：手機滿版＋可點放大（只作用於圖表 svg，不影響小圖示） */
   svg.fj-chart{width:100%!important;height:auto!important;max-width:none!important}
+  /* 材料管理視圖切換：手機兩排不截斷 */
+  #mat-view-btns{flex-wrap:wrap}
+  #mat-view-btns .btn{flex:1 1 46%;justify-content:center}
+  /* 施工成本卡片：欄位改換行 2 欄，不再擠成一行 */
+  #cost-list div[style*="display:flex"]{flex-wrap:wrap!important}
+  #cost-list div[style*="display:flex"]>select,#cost-list div[style*="display:flex"]>input{flex:1 1 46%!important;min-width:0!important;min-height:38px;font-size:14px!important}
+  #cost-list div[style*="display:flex"]>input[type="date"]{flex:1 1 46%!important}
+  #cost-list div[style*="display:flex"]>button{min-height:34px}
 }
 
 /* ═══ 手機底部導航 ═══ */
@@ -596,7 +606,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-quickcost" onclick="go('quickcost');setTimeout(rQuickCost,60)"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg></span>日報．支出</button>
   <button type="button" class="snav" id="sn-profit" onclick="go('profit')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>利潤分析</button>
   <div class="ssec" style="margin-top:5px">資料與工具</div>
-  <button type="button" class="snav" id="sn-contacts" onclick="go('contacts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>客戶管理</button>
+  <button type="button" class="snav" id="sn-contacts" onclick="go('contacts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>客戶．廠商</button>
   <button type="button" class="snav" onclick="smartIntake()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
   <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
   <button type="button" class="snav" id="sn-reports" onclick="go('reports')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span>報表中心</button>
@@ -1088,7 +1098,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     </div>
     <div id="mat-stock-wrap">
       <div class="card">
-        <div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-box"/></svg> 材料庫存（工務）</div>
+        <div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-box"/></svg> 材料庫存</div>
           <div style="font-size:11px;color:var(--b4)">L=長度×支數×位置；租料前先查有無自有料</div></div>
         <div class="cb" style="padding:0"><div id="mat-stock-box"></div></div>
       </div>
@@ -1290,7 +1300,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <!-- ████ 聯絡人頁（客戶+廠商整合）████ -->
 <div class="page" id="page-contacts">
   <div class="ph">
-    <div class="ph-l"><div class="ph-t">客戶</div></div>
+    <div class="ph-l"><div class="ph-t">客戶．廠商</div></div>
     <div class="ph-r">
       <button type="button" class="btn btn-sm" onclick="exportContactsCSV()"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> Excel</button>
       <button type="button" class="btn btn-sm btn-g" id="contacts-add-btn" onclick="newContactItem()">＋ 新增</button>
@@ -2472,8 +2482,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div style="width:36px;height:4px;background:var(--b2);border-radius:99px;margin:0 auto 14px"></div>
   <div style="font-size:11px;font-weight:700;color:var(--b3);margin-bottom:10px;letter-spacing:.06em;text-transform:uppercase">功能選單</div>
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
-    <button type="button" onclick="go('contacts');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span><span>客戶</span></button>
-    <button type="button" onclick="toggleMobMore();smartIntake()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
+    <button type="button" onclick="go('contacts');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span><span>客戶．廠商</span></button>
     <button type="button" onclick="go('profit');toggleMobMore()" class="mob-more-btn"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span><span>利潤．報表</span></button>
       </div>
       <div style="font-size:11px;font-weight:700;color:var(--b3);margin:14px 0 10px;letter-spacing:.06em;display:flex;align-items:center;gap:6px;cursor:pointer" onclick="var g=document.getElementById('mm-sysgrp');var on=g.style.display==='none';g.style.display=on?'grid':'none';this.querySelector('span').textContent=on?'▾':'▸'">⚙ 系統管理 <span>▸</span></div>
@@ -2487,7 +2496,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.310';
+var APP_VERSION='v5.311';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2711,7 +2720,7 @@ function go(p){
       if(pgEl&&!pgEl.querySelector('.statnav')){
         var nv=document.createElement('div');
         nv.className='statnav';
-        nv.style.cssText='display:flex;gap:8px;padding:10px 22px 0;flex-wrap:wrap;justify-content:center';
+        nv.style.cssText='display:flex;gap:8px;padding:14px 16px 10px;flex-wrap:wrap;justify-content:center';
         nv.innerHTML=[['profit','利潤分析'],['reports','報表中心'],['ledger','帳務管理']].map(function(x){
           return '<button type="button" onclick="go(\''+x[0]+'\')" style="font-family:inherit;font-size:12.5px;flex:1;max-width:130px;height:34px;padding:0 8px;border-radius:99px;border:1px solid '+(x[0]===p?'var(--g3)':'var(--b2)')+';background:'+(x[0]===p?'var(--g3)':'#fff')+';color:'+(x[0]===p?'#fff':'var(--b4)')+';cursor:pointer;font-weight:'+(x[0]===p?'700':'500')+'">'+x[1]+'</button>';
         }).join('');
@@ -6383,10 +6392,14 @@ function openAwardDetail(id){
   document.getElementById('award-paydue').value=q.payDue||'';
   document.getElementById('award-name').textContent=q.name||'未命名工程';
   document.getElementById('award-total').textContent='NT$ '+fmt(q.t?.total||0);
-  // 介紹佣金欄位：帶入既有設定；費率預設依預估毛利率（≥35%→3%、未達→2%）
+  // 專案獎金欄位：帶入既有設定；獎金率預設依預估毛利率（≥35%→3%、未達→2%）
   const ref=q.referral||{};
   const sv=(i,v)=>{const e=document.getElementById(i);if(e)e.value=v;};
   const margin=(q.t?.netR||0)*100;
+  sv('award-ref-who',ref.who||'中間人');
+  sv('award-ref-mode',ref.mode||'pct');
+  sv('award-ref-amt',ref.fixAmt||'');
+  try{updAwardModeUI();}catch(e){}
   sv('award-ref-name',ref.name||'');
   sv('award-ref-rate',ref.rate!=null?ref.rate:(margin>=35?3:2));
   sv('award-ref-cap',ref.cap||'');
@@ -6396,11 +6409,17 @@ function openAwardDetail(id){
   updAwardCommPreview();
   document.getElementById('award-modal').style.display='flex';
 }
-// 佣金試算：min(總工程款(含稅)×費率, 上限)
+// 專案獎金試算：合約金額％ → min(合約金額(含稅)×獎金率, 上限)；一筆金額 → 直接採用
 function _calcCommission(total,rate,cap){
   let amt=Math.round((total||0)*(rate||0)/100);
   if(cap>0)amt=Math.min(amt,Math.round(cap));
   return amt;
+}
+function updAwardModeUI(){
+  var m=gv('award-ref-mode')||'pct';
+  var rf=document.getElementById('award-ref-rate-f'),af=document.getElementById('award-ref-amt-f');
+  if(rf)rf.style.display=(m==='pct')?'':'none';
+  if(af)af.style.display=(m==='amt')?'':'none';
 }
 function updAwardCommPreview(){
   const el=document.getElementById('award-comm-preview');if(!el)return;
@@ -6408,10 +6427,17 @@ function updAwardCommPreview(){
   const q=Q.find(x=>x.id===id);
   const name=(gv('award-ref-name')||'').trim();
   if(!name||!q){el.textContent='';return;}
+  const mode=gv('award-ref-mode')||'pct';
+  const who=gv('award-ref-who')||'中間人';
+  if(mode==='amt'){
+    const fx=parseFloat(gv('award-ref-amt'))||0;
+    el.innerHTML='獎金試算：<b style="color:var(--g3)">NT$ '+fmt(fx)+'</b>（'+who+'・一筆金額）';
+    return;
+  }
   const rate=parseFloat(gv('award-ref-rate'))||0;
   const cap=parseFloat(gv('award-ref-cap'))||0;
   const amt=_calcCommission(q.t?.total||0,rate,cap);
-  el.innerHTML='佣金試算：<b style="color:var(--g3)">NT$ '+fmt(amt)+'</b>（'+rate+'% × NT$ '+fmt(q.t?.total||0)+(cap>0?'，上限 NT$ '+fmt(cap):'')+'）';
+  el.innerHTML='獎金試算：<b style="color:var(--g3)">NT$ '+fmt(amt)+'</b>（'+who+'・'+rate+'% × NT$ '+fmt(q.t?.total||0)+(cap>0?'，上限 NT$ '+fmt(cap):'')+'）';
 }
 
 function confirmAward(){
@@ -6422,15 +6448,18 @@ function confirmAward(){
   q.payDue=payDue;
   // 成交單價自動回寫：報價→議價→得標的最終單價進成交單價庫，供未來報價比對行情
   try{var _dn=writeDealHist(q);if(_dn)toast('📈 已回寫 '+_dn+' 筆成交單價');}catch(e){}
-  // ── 介紹佣金：存設定＋連動應付帳款（依實收進度分期支付）──
+  // ── 專案獎金：存設定＋連動應付帳款（依實收進度分期支付）──
   try{
     const refName=(gv('award-ref-name')||'').trim();
     const commPayId='comm_'+id;
     if(refName){
+      const who=gv('award-ref-who')||'中間人';
+      const mode=gv('award-ref-mode')||'pct';
       const rate=parseFloat(gv('award-ref-rate'))||0;
       const cap=parseFloat(gv('award-ref-cap'))||0;
-      const amt=_calcCommission(q.t?.total||0,rate,cap);
-      q.referral={name:refName,rate:rate,cap:cap||null,amount:amt,
+      const fixAmt=parseFloat(gv('award-ref-amt'))||0;
+      const amt=(mode==='amt')?Math.round(fixAmt):_calcCommission(q.t?.total||0,rate,cap);
+      q.referral={name:refName,who:who,mode:mode,rate:rate,cap:cap||null,fixAmt:fixAmt||null,amount:amt,
         tid:(gv('award-ref-tid')||'').trim(),
         incomeType:gv('award-ref-type')||'9A',
         withheld:!!document.getElementById('award-ref-withheld')?.checked};
@@ -6439,11 +6468,11 @@ function confirmAward(){
       if(!cp){cp={id:commPayId,status:'pending'};PAYABLES.unshift(cp);}
       cp.kind='commission';cp.to=refName;cp.project=q.name||'';cp.quoteId=id;
       cp.amount=amt;
-      cp.note='介紹佣金 '+rate+'%・依實收款進度分期支付・'+(q.referral.incomeType==='9A'?'執行業務所得(9A)':'其他所得(92)')+(q.referral.withheld?'・已辦扣繳':'・⚠未辦扣繳');
+      cp.note='專案獎金（'+who+'）'+(mode==='amt'?'一筆 NT$'+fmt(amt):rate+'%')+'・依實收款進度分期支付・'+(q.referral.incomeType==='9A'?'執行業務所得(9A)':'其他所得(92)')+(q.referral.withheld?'・已辦扣繳':'・⚠未辦扣繳');
       cp._mt=Date.now();
       savePayables();
     }else{
-      // 清除介紹人＝取消佣金：移除未付款的佣金應付（已付款者保留帳）
+      // 清除姓名＝取消獎金：移除未付款的獎金應付（已付款者保留帳）
       const cp=PAYABLES.find(p=>p.id===commPayId);
       if(cp&&cp.status!=='paid'){_tomb('payables',commPayId);PAYABLES=PAYABLES.filter(p=>p.id!==commPayId);savePayables();}
       delete q.referral;
@@ -7032,8 +7061,8 @@ function renderBizGates(){
   var top3=Object.keys(byClient).map(function(k){return [k,byClient[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,3);
   var top3Amt=top3.reduce(function(a,x){return a+x[1];},0);
   var top3Pct=awardTot>0?Math.round(top3Amt/awardTot*100):null;
-  var kpi=function(label,val,sub,color){
-    return '<div class="kpi" style="flex:1;min-width:118px"><div class="kl">'+label+'</div><div class="kv" style="font-size:17px;color:'+(color||'var(--b5)')+'">'+val+'</div><div class="ks">'+sub+'</div></div>';
+  var kpi=function(label,val,sub,color,jump){
+    return '<div class="kpi" style="'+(jump?'cursor:pointer':'')+'" '+(jump?('onclick="'+jump.replace(/"/g,'&quot;')+'" title="點擊開啟詳情"'):'')+'><div class="kl">'+label+'</div><div class="kv" style="font-size:17px;color:'+(color||'var(--b5)')+'">'+val+'</div><div class="ks">'+sub+'</div></div>';
   };
   // 材料統計（全專案材料租金/運費科目＋台帳購置總額）
   var _gMatRent=0,_gMatTrans=0,_gMatBuy=0;
@@ -7047,16 +7076,15 @@ function renderBizGates(){
   }catch(e){}
   var na='<span style="color:var(--b3)">—</span>';
   var html='<div class="card"><div class="ch"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 經營儀表板</div></div>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 14px">'
-    +kpi('有效成交率',winRate==null?na:winRate+'%','勝 '+awarded+'／敗 '+lost,winRate==null?null:winRate>=30?'var(--g3)':'#e65100')
-    +kpi('預估毛利率',estM==null?na:estM+'%','報價時預估',estM==null?null:estM>=35?'var(--g3)':'#e65100')
-    +kpi('實際毛利率',actM==null?na:actM+'%','已登錄成本的得標案',actM==null?null:actM>=35?'var(--g3)':'#e65100')
-    +kpi('機具稼動',hasEq?(eqNow+' 天'):na,hasEq?('本月｜上月 '+eqPrev+' 天'):'日報勾「自有機具」後開始統計',eqAlert?'#c62828':(hasEq&&eqNow>=6?'var(--g3)':null))
-    +kpi('平均回收天數',recvAvg==null?na:recvAvg+' 天','請款日→預計收款日（'+recvN+' 筆）',recvAvg==null?null:recvAvg<=60?'var(--g3)':'#e65100')
-    +kpi('保留款累計',retSum>0?('NT$ '+fmt(retSum)):na,'押在業主端的保證金',retSum>0?'#b26a00':null)
-    +kpi('前三大業主佔比',top3Pct==null?na:top3Pct+'%',top3.map(function(x){return esc(String(x[0]).slice(0,6));}).join('・')||'—',top3Pct==null?null:top3Pct<50?'var(--g3)':'#e65100')
-    +kpi('材料租金｜運費',(_gMatRent||_gMatTrans)?(fmt(_gMatRent)+'｜'+fmt(_gMatTrans)):na,'全專案累計（材料管理）',(_gMatRent||_gMatTrans)?'#b26a00':null)
-    +kpi('自有材料購置',_gMatBuy>0?('NT$ '+fmt(Math.round(_gMatBuy))):na,'庫存台帳購置總額',_gMatBuy>0?'var(--g3)':null)
+    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 14px">'
+    +kpi('前三大業主佔比',top3Pct==null?na:top3Pct+'%',top3.map(function(x){return esc(String(x[0]).slice(0,6));}).join('・')||'—',top3Pct==null?null:top3Pct<50?'var(--g3)':'#e65100',"go('contacts')")
+    +kpi('有效成交率',winRate==null?na:winRate+'%','勝 '+awarded+'／敗 '+lost,winRate==null?null:winRate>=30?'var(--g3)':'#e65100',"go('quotes')")
+    +kpi('實際毛利率',actM==null?na:actM+'%','已登錄成本的得標案',actM==null?null:actM>=35?'var(--g3)':'#e65100',"go('profit')")
+    +kpi('平均收款天數',recvAvg==null?na:recvAvg+' 天','請款日→預計收款日（'+recvN+' 筆）',recvAvg==null?null:recvAvg<=60?'var(--g3)':'#e65100',"go('finance');setTimeout(function(){switchFinanceTab('ar')},50)")
+    +kpi('保留款累計',retSum>0?('NT$ '+fmt(retSum)):na,'押在業主端的保證金',retSum>0?'#b26a00':null,"go('invoice')")
+    +kpi('機具稼動',hasEq?(eqNow+' 天'):na,'日報勾「自有機具」'+(hasEq?('・上月 '+eqPrev+' 天'):''),eqAlert?'#c62828':(hasEq&&eqNow>=6?'var(--g3)':null),"go('quickcost')")
+    +kpi('材料租金｜運費',(_gMatRent||_gMatTrans)?(fmt(_gMatRent)+'｜'+fmt(_gMatTrans)):na,'全專案累計（材料管理）',(_gMatRent||_gMatTrans)?'#b26a00':null,"go('materials');setTimeout(function(){matSetView('proj')},60)")
+    +kpi('材料購置',_gMatBuy>0?('NT$ '+fmt(Math.round(_gMatBuy))):na,'庫存台帳購置總額',_gMatBuy>0?'var(--g3)':null,"go('materials');setTimeout(function(){matSetView('buy')},60)")
     +'</div>'
     +(eqAlert?'<div style="margin:0 14px 12px;background:#fdf0ef;border:1px solid #f5c6c0;border-left:4px solid #c62828;border-radius:var(--r8);padding:10px 14px;font-size:12.5px;color:#8a2f26"><b>⚠ 機具稼動警示：</b>自有機具已連續兩個完整月（'+ymPrev2+'、'+ymPrev+'）稼動低於 6 天／月，依十年規劃紅線應啟動<b>接案策略檢討</b>——檢視報價量是否不足、價格策略是否過高、或機具外租消化閒置。</div>':'')
     +'</div>';
@@ -7095,10 +7123,9 @@ function updateDashTodo(){
       var _einv=null;try{_einv=_invEinvOf(inv.id);}catch(e){}
       if(_einv)return;
       var _hasItems=inv.items&&inv.items.length>0;
-      var _stage=_hasItems?'已製作 → 開立發票':'完成估驗明細';
-      var _jump=_hasItems
-        ?"go('finance');setTimeout(function(){switchFinanceTab('invoice');issueInvoiceForInv('"+inv.id+"')},250)"
-        :"loadInvoice('"+inv.id+"')";
+      if(_hasItems)return; // v5.311：已製作請款單＝請款完成，不再佔待辦（開票由發票管理處理）
+      var _stage='完成估驗明細';
+      var _jump="loadInvoice('"+inv.id+"')";
       items.push({
         type:'inv_submit', urgent:urgent, jump:_jump,
         icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>', color:urgent?'var(--red)':'var(--yd)',
@@ -8545,7 +8572,6 @@ function renderMatStockView(){
         +'<div style="font-size:19px;font-weight:800;color:'+(a.kind==='一次性'?'#b26a00':'var(--g3)')+';white-space:nowrap">×'+fmt(a.qty)+'<span style="font-size:11px;font-weight:600;color:var(--b3)"> 支/件</span></div></div>';
     });
     h+='</div>';
-    h+='<div style="padding:0 14px 12px;font-size:11px;color:var(--b3)">※ 長度不合的料件不能硬用（例：9M 料不適用需求 13M 的工地）；調撥工地後請至「材料購置」把該筆位置改為對應專案。</div>';
   }
   el.innerHTML=h;
 }
@@ -8559,7 +8585,7 @@ function renderMatBuy(){
     buyTotal+=_matLedAmt(r);
   });
   var h='<div style="padding:8px 14px;font-size:12.5px;color:var(--b4);border-bottom:1px solid var(--b1)">重複性 <b style="color:var(--g3)">'+rep+'</b> 筆　一次性 <b style="color:#b26a00">'+once+'</b> 筆　購置總額 <b style="color:var(--g3)">NT$ '+fmt(Math.round(buyTotal))+'</b>'
-    +'<span style="font-size:10.5px;color:var(--b3)">　※ 有單位重者單價為 $/kg；金額＝單位重×(進貨總長 或 長度×支數)×單價。庫存一律以 L=長度×支數 記錄</span></div>';
+    +'</div>';
   var inCss='width:100%;font-size:13px;height:34px;border:1px solid var(--b2);border-radius:6px;padding:0 6px;font-family:inherit';
   var catNames=MAT_CATALOG.map(function(c){return c[0];});
   var locOpts=function(cur){
@@ -13336,7 +13362,7 @@ function renderPayables(){
       later:pend.filter(p=>!p.date||p.date>_in7).length,
       paid:filtered.filter(p=>p.status==='paid').length};
     const chip=(k,lb,clr)=>'<button type="button" onclick="window._payAging=\''+k+'\';renderPayables()" style="font-family:inherit;font-size:12.5px;padding:0 12px;height:34px;line-height:32px;border-radius:99px;cursor:pointer;border:1px solid '+((window._payAging||'all')===k?clr:'var(--b2)')+';background:'+((window._payAging||'all')===k?clr:'#fff')+';color:'+((window._payAging||'all')===k?'#fff':'var(--b4)')+';flex:0 1 auto">'+lb+'</button>';
-    return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;justify-content:center">'
+    return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px;justify-content:center;padding:0 4px">'
       +chip('all','全部','var(--g3)')
       +chip('overdue','🔴 逾期 '+cnt.overdue,'var(--red)')
       +chip('w7','7日內 '+cnt.w7,'#b45309')
@@ -14775,7 +14801,7 @@ function renderMonthlyReport(el,year,month){
     </div>
     <!-- Table -->
     <div style="overflow-x:auto;padding:0 14px 14px">
-      <table class="pt" style="font-size:11px">
+      <table class="pt desk-only" style="font-size:11px">
         <thead><tr style="background:var(--gl)">
           <th style="padding:6px 8px;text-align:left">月份</th>
           <th style="padding:6px 8px;text-align:right">報價件數</th>
@@ -14804,6 +14830,17 @@ function renderMonthlyReport(el,year,month){
           <td style="padding:6px 8px;text-align:center">${totI>0?(totR/totI*100).toFixed(1)+'%':'—'}</td>
         </tfoot>
       </table>
+      <div class="mob-only" style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+        ${rows.map(r=>`<div style="border:1px solid var(--b1);border-radius:10px;padding:10px 12px">
+          <div style="font-weight:800;font-size:14px;margin-bottom:6px">${r.m}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:12px">
+            <div>報價 <b>${r.quotes} 件</b>・${fmt(r.qAmt)}</div>
+            <div>請款 <b>${r.invs} 件</b>・${fmt(r.iAmt)}</div>
+            <div>實收 <b style="color:var(--g3)">${fmt(r.rAmt)}</b></div>
+            <div>收款率 <b>${r.iAmt>0?(r.rAmt/r.iAmt*100).toFixed(1)+'%':'—'}</b></div>
+          </div>
+        </div>`).join('')}
+      </div>
     </div>`;
 }
 
@@ -15515,7 +15552,7 @@ const ALL_PAGES = [
   {id:'invoice',   label:'業主計價', icon:'✉', adminOnly:false},
   {id:'finance',   label:'金流管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>', adminOnly:false},
   {id:'profit',    label:'利潤分析', icon:'↗', adminOnly:false},
-  {id:'contacts',  label:'客戶管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg>', adminOnly:false},
+  {id:'contacts',  label:'客戶．廠商', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg>', adminOnly:false},
   {id:'contracts', label:'合約管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>', adminOnly:false, hidden:true}, // v5.294 併入專案總覽，導覽隱藏（頁面與資料保留）
   {id:'projects',  label:'專案管理', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg>', adminOnly:false},
   {id:'costs',     label:'施工成本', icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-wrench"/></svg>', adminOnly:false},
@@ -16541,7 +16578,8 @@ function rProfit(){
     const hasCost=actualCost>0;
     // 管理費攤提：稅前收入 × 管理費率（params 設定，0=不攤提）
     const overhead=actualRevenuePre*((P.overheadPct||0)/100);
-    const actualNet=(hasCost&&hasReceipt)?(actualRevenuePre-actualCost-overhead):null;
+    const bonus=(q.referral&&parseFloat(q.referral.amount))||0; // 專案獎金（中間人/工務）
+    const actualNet=(hasCost&&hasReceipt)?(actualRevenuePre-actualCost-overhead-bonus):null;
     const actualNetR=actualNet!=null&&actualRevenuePre>0?(actualNet/actualRevenuePre*100):null;
 
     // 差異
@@ -16550,7 +16588,7 @@ function rProfit(){
 
     return{q,estRevenue,estCostQ,estNet,estNetR,
       actualCost,totalInvoiced,totalReceived,actualCash,
-      actualRevenuePre,actualNet,actualNetR,netDiff,costDiff,overhead};
+      actualRevenuePre,actualNet,actualNetR,netDiff,costDiff,overhead,bonus};
   }
 
   const cases=awarded.map(calcCase);
@@ -16678,7 +16716,7 @@ function rProfit(){
     <!-- 各案明細 - 實際 vs 預估 -->
     <div id="profit-detail" style="display:none;padding:0 14px">
       <div class="card"><div class="ch green"><div class="cht">各案利潤對比（實際 vs 預估）</div></div>
-      <div style="overflow-x:auto"><table class="pt" style="font-size:11px;min-width:700px">
+      <div style="overflow-x:auto" class="desk-only"><table class="pt" style="font-size:11px;min-width:700px">
         <thead><tr style="background:var(--gl)">
           <th style="padding:6px 8px;text-align:left;min-width:120px">工程名稱</th>
           <th style="padding:6px 8px;text-align:right">報價金額</th>
@@ -16727,7 +16765,23 @@ function rProfit(){
           </td>
           <td style="padding:6px 8px;text-align:center">${totActualNetR.toFixed(1)}%</td>
         </tfoot>
-      </table></div></div>
+      </table></div>
+      <div class="mob-only" style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+        ${cases.map(r=>{
+          const clr=r.actualNet!=null?(r.actualNet>=0?'var(--g3)':'var(--red)'):'var(--b3)';
+          return `<div onclick="loadQ('${r.q.id}')" style="border:1px solid var(--b1);border-radius:10px;padding:10px 12px;cursor:pointer">
+            <div style="font-weight:700;font-size:14px;margin-bottom:2px">${esc(r.q.name||'—')}</div>
+            <div style="font-size:11px;color:var(--b3);margin-bottom:6px">${esc(r.q.client||'')}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:12px">
+              <div>報價 <b>${fmt(r.q.t?.total||0)}</b></div>
+              <div>已收款 <b style="color:var(--g3)">${fmt(r.totalReceived)}</b></div>
+              <div>實際成本 <b style="color:var(--red)">${r.actualCost>0?fmt(r.actualCost):'—'}</b></div>
+              <div>淨利率 <b>${r.actualNetR!=null?r.actualNetR.toFixed(1)+'%（實際）':r.estNetR.toFixed(1)+'%（預估）'}</b></div>
+            </div>
+            <div style="margin-top:6px;font-size:14px;font-weight:800;color:${clr}">實際淨利 ${r.actualNet!=null?'NT$ '+fmt(r.actualNet):'尚無成本資料'}</div>
+          </div>`;}).join('')}
+        <div style="border-top:2px solid var(--gm);padding-top:8px;font-size:13px;font-weight:700">合計（${awarded.length}件）　實際淨利 <span style="color:${totActualNet>=0?'var(--g3)':'var(--red)'}">NT$ ${fmt(totActualNet)}</span>（${totActualNetR.toFixed(1)}%）</div>
+      </div></div>
     </div>
 
     <!-- 成本執行率 -->
@@ -17188,15 +17242,20 @@ function exportCurrentReportExcel(){
           <input type="text" id="award-note" placeholder="例：含稅總價、分期付款...">
         </div>
       </div>
-      <!-- 介紹佣金（人脈引薦案源）-->
+      <!-- 專案獎金（得標後發放；對象：中間人／工務）-->
       <div style="border:1px solid var(--b1);border-radius:var(--r10);padding:10px 13px;margin-bottom:14px;background:var(--b0)">
-        <div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:8px">🤝 介紹佣金 <span style="font-size:10.5px;font-weight:400;color:var(--b3)">（人脈引薦之案源；沒有介紹人請留空）</span></div>
+        <div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:8px"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 專案獎金 <span style="font-size:10.5px;font-weight:400;color:var(--b3)">（發給中間人或工務；沒有請留空姓名）</span></div>
         <div class="fg fg2" style="margin-bottom:8px">
-          <div class="f"><label>介紹人姓名</label><input id="award-ref-name" placeholder="留空＝無佣金" oninput="updAwardCommPreview()"></div>
-          <div class="f"><label>佣金率％ <span style="font-size:10px;color:var(--b3)">毛利≥35%建議3%、未達35%建議2%</span></label><input id="award-ref-rate" type="number" step="0.5" min="0" max="10" placeholder="3" style="text-align:right;font-weight:700" oninput="updAwardCommPreview()"></div>
+          <div class="f"><label>對象</label><select id="award-ref-who" onchange="updAwardCommPreview()"><option>中間人</option><option>工務</option></select></div>
+          <div class="f"><label>姓名</label><input id="award-ref-name" placeholder="留空＝無獎金" oninput="updAwardCommPreview()"></div>
         </div>
         <div class="fg fg2" style="margin-bottom:8px">
-          <div class="f"><label>單案佣金上限（元，選填）</label><input id="award-ref-cap" type="number" placeholder="不設限" style="text-align:right" oninput="updAwardCommPreview()"></div>
+          <div class="f"><label>計算方式</label><select id="award-ref-mode" onchange="updAwardModeUI();updAwardCommPreview()"><option value="pct">合約金額％</option><option value="amt">一筆金額</option></select></div>
+          <div class="f" id="award-ref-rate-f"><label>獎金率％ <span style="font-size:10px;color:var(--b3)">毛利≥35%建議3%、未達建議2%</span></label><input id="award-ref-rate" type="number" step="0.5" min="0" max="10" placeholder="3" style="text-align:right;font-weight:700" oninput="updAwardCommPreview()"></div>
+          <div class="f" id="award-ref-amt-f" style="display:none"><label>一筆金額（元）</label><input id="award-ref-amt" type="number" placeholder="0" style="text-align:right;font-weight:700" oninput="updAwardCommPreview()"></div>
+        </div>
+        <div class="fg fg2" style="margin-bottom:8px">
+          <div class="f"><label>單案獎金上限（元，選填）</label><input id="award-ref-cap" type="number" placeholder="不設限" style="text-align:right" oninput="updAwardCommPreview()"></div>
           <div class="f"><label>受領人身分證／統編</label><input id="award-ref-tid" placeholder="扣繳申報用"></div>
         </div>
         <div class="fg fg2" style="margin-bottom:6px">
@@ -17204,7 +17263,7 @@ function exportCurrentReportExcel(){
           <div class="f"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding-top:20px"><input type="checkbox" id="award-ref-withheld" style="width:16px;height:16px"> 已辦扣繳／開立憑單</label></div>
         </div>
         <div id="award-comm-preview" style="font-size:12px;color:var(--b4);text-align:right;min-height:16px"></div>
-        <div style="font-size:10.5px;color:var(--b3);margin-top:4px">佣金以「總工程款（含稅）×費率」計算，<b>依實收款進度分期支付</b>；受領人須辦扣繳並留存憑單，否則不得列費用。</div>
+        <div style="font-size:10.5px;color:var(--b3);margin-top:4px">獎金以「合約金額（含稅）×獎金率」或一筆金額計，<b>依實收款進度分期支付</b>；受領人須辦扣繳並留存憑單，否則不得列費用。</div>
       </div>
       <div style="display:flex;gap:8px">
         <button type="button" class="btn btn-g" onclick="confirmAward()" style="flex:2;justify-content:center;padding:9px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 確認得標 / 更新</button>
