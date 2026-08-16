@@ -2503,7 +2503,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.313';
+var APP_VERSION='v5.314';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2577,7 +2577,7 @@ var Q=[],UH=[],INV=[],invItems=[],invEid=null;
 // ══ 客戶管理 ══
 var CUSTOMERS=[];
 try{const cx=localStorage.getItem('fy_customers');if(cx)CUSTOMERS=JSON.parse(cx);}catch(e){}
-const saveCustomers=()=>{try{localStorage.setItem('fy_customers',JSON.stringify(CUSTOMERS));}catch(e){} try{_autoUpload();}catch(e){}};
+const saveCustomers=()=>{_lsSet('fy_customers',JSON.stringify(CUSTOMERS),'客戶'); try{_autoUpload();}catch(e){}};
 
 var P={
   company:'豐有工程有限公司',taxid:'83224961',boss:'陳韋宏',contact:'陳茹軒',
@@ -2613,6 +2613,18 @@ try{const s=localStorage.getItem('fy6_q');if(s)Q=JSON.parse(s);}catch(e){}
 try{const s=localStorage.getItem('fy6_p');if(s)Object.assign(P,JSON.parse(s));}catch(e){}
 try{const s=localStorage.getItem('fy6_uh');if(s)UH=JSON.parse(s);}catch(e){}
 
+// v5.314：統一 localStorage 寫入。原本各 save 函式為空 catch，本機空間不足時
+// 畫面照樣顯示「已儲存」但實際沒寫入，重新整理即資料消失且使用者毫無察覺。
+var _lsWarnAt=0;
+function _lsSet(key,val,label){
+  try{localStorage.setItem(key,val);return true;}
+  catch(e){
+    try{console.error('[FY] 儲存失敗 '+key,e&&e.message);}catch(e2){}
+    var now=Date.now();
+    if(now-_lsWarnAt>8000){_lsWarnAt=now;try{toast('⚠️ '+(label||'資料')+'儲存失敗：本機空間不足，請立即匯出備份');}catch(e2){}}
+    return false;
+  }
+}
 const persist=()=>{try{
   try{if(typeof eid!=='undefined'&&eid){var _pq=Q.find(function(x){return x.id===eid;});if(_pq)_pq._mt=Date.now();}}catch(e){}
   const data=JSON.stringify(Q);
@@ -2620,8 +2632,8 @@ const persist=()=>{try{
   try{const used=JSON.stringify(localStorage).length;if(used>3*1024*1024)toast('⚠️ 本機資料已超過3MB，建議立即匯出備份');}catch(e){}
 }catch(e){toast('⚠️ 儲存失敗：本機儲存空間不足，請匯出備份資料');}
 try{_autoUpload();}catch(e){}};
-const persistP=()=>{try{localStorage.setItem('fy6_p',JSON.stringify(P));}catch(e){}};
-const saveUH=()=>{try{localStorage.setItem('fy6_uh',JSON.stringify(UH));}catch(e){}};
+const persistP=()=>{_lsSet('fy6_p',JSON.stringify(P),'參數');};
+const saveUH=()=>{_lsSet('fy6_uh',JSON.stringify(UH),'單價分析歷史');};
 
 const fmt=n=>Math.round(n).toLocaleString('zh-TW');
 // 本地日期字串（避免 UTC 時區問題）
@@ -4555,7 +4567,7 @@ try{const x=localStorage.getItem('fy_inv');if(x){INV=JSON.parse(x);const _before
 function saveInv(){
   // 儲存前自動清理空白資料（確保 badge 與列表一致）
   INV=INV.filter(function(inv){return inv&&(inv.project||inv.client||inv.id);});
-  try{localStorage.setItem('fy_inv',JSON.stringify(INV));}catch(e){toast('⚠️ 請款單儲存失敗：儲存空間不足，請匯出備份');} try{_autoUpload();}catch(e){}}
+  _lsSet('fy_inv',JSON.stringify(INV),'請款單'); try{_autoUpload();}catch(e){}}
 
 // ── Invoice Navigation handled in main go() ──
 
@@ -6672,6 +6684,12 @@ function importData(file){
         if(data.matLedger){MAT_LEDGER=arr(data.matLedger);try{localStorage.setItem('fy_mat_ledger',JSON.stringify(MAT_LEDGER));}catch(e2){}}
         if(data.upaCostDB){try{Object.assign(UPA_COST_DB,data.upaCostDB);localStorage.setItem('fy_upa_cost',JSON.stringify(UPA_COST_DB));}catch(e2){}}
         if(data.activityLog)ACTIVITY_LOG=arr(data.activityLog);
+        // v5.314 補齊還原：墓碑用「取代」而非合併，否則本機殘留墓碑會把剛還原的資料再殺一次
+        if(data.tombs&&typeof data.tombs==='object'){TOMBS=data.tombs;try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e2){}}
+        else{TOMBS={};try{localStorage.removeItem('fy_tombs');}catch(e2){}}
+        if(data.shareProfit&&typeof data.shareProfit==='object'){SHARE_PROFIT=data.shareProfit;try{localStorage.setItem('fy_share',JSON.stringify(SHARE_PROFIT));}catch(e2){}}
+        if(data.pagePerms){try{localStorage.setItem('fy_page_perms',JSON.stringify(data.pagePerms));}catch(e2){}}
+        if(data.admins){try{saveAdminEmails(arr(data.admins));}catch(e2){}}
         persist();saveInv();saveUH();persistP();
         try{saveContracts();saveVendors();savePayables();saveInvoiceRecs();saveExpenses();saveCustomers();saveActivityLog();}catch(e2){}
         syncParamsUI();
@@ -7237,7 +7255,7 @@ function awardQuote(id){
   try{openAwardDetail(id);}catch(e){
     // fallback
     const q=Q.find(x=>x.id===id);if(!q)return;
-    q.awarded=true;persist();renderList();rDash();updBadge();
+    q.awarded=true;q._mt=Date.now();persist();renderList();rDash();updBadge();
     toast('🏆 已標記為得標');
   }
 }
@@ -7871,12 +7889,14 @@ function getAdminEmails(){
 function saveAdminEmails(arr){
   localStorage.setItem('fy_admins',JSON.stringify(arr));
 }
+// 固定啟動管理員：清單為空（新裝置／剛清快取）時仍只有此帳號是管理員
+// v5.314：原本「清單為空 → 任何人自動成為管理員」，換台電腦登入即可提權，已移除
+const BOOTSTRAP_ADMINS=['jhchen0911@gmail.com'];
 function isAdmin(email){
   if(!email)return false;
-  const admins=getAdminEmails();
-  // 若尚未設定任何管理員，第一個登入的人自動成為管理員
-  if(admins.length===0)return true;
-  return admins.includes(email.toLowerCase());
+  const e=email.toLowerCase();
+  if(BOOTSTRAP_ADMINS.includes(e))return true;
+  return getAdminEmails().includes(e);
 }
 // _isAdminUser 已在頂部宣告
 
@@ -8143,13 +8163,13 @@ var EXPENSES=[];
 try{const x2=localStorage.getItem('fy_expenses');if(x2)EXPENSES=JSON.parse(x2);}catch(e){}
 try{const x=localStorage.getItem('fy_activity');if(x)ACTIVITY_LOG=JSON.parse(x);}catch(e){}
 
-function saveContracts(){try{localStorage.setItem('fy_contracts',JSON.stringify(CONTRACTS));}catch(e){} try{_autoUpload();}catch(e){}}
+function saveContracts(){_lsSet('fy_contracts',JSON.stringify(CONTRACTS),'合約'); try{_autoUpload();}catch(e){}}
 
 // ── 股東分潤（茹軒／姊夫）：年度可提領上限＋實際領取記錄 ──
 // 可提領上限 = 稅後淨利 − 當年保留款增額 − 當年循環資金增額 − 機具自付款
 var SHARE_PROFIT={cfg:{},draws:[]};
 try{var _sp=localStorage.getItem('fy_share');if(_sp){var _spo=JSON.parse(_sp);if(_spo&&typeof _spo==='object'){SHARE_PROFIT.cfg=_spo.cfg||{};SHARE_PROFIT.draws=Array.isArray(_spo.draws)?_spo.draws:[];}}}catch(e){}
-function saveShareProfit(){try{localStorage.setItem('fy_share',JSON.stringify(SHARE_PROFIT));}catch(e){} try{_autoUpload();}catch(e){}}
+function saveShareProfit(){_lsSet('fy_share',JSON.stringify(SHARE_PROFIT),'股東分潤'); try{_autoUpload();}catch(e){}}
 
 // ── 材料管理：自有／租賃庫存台帳 ──
 var MAT_CATALOG=[ // [品項, 規格陣列, 可輸入長度]
@@ -8172,7 +8192,7 @@ function saveMatStock(){try{localStorage.setItem('fy_mat_stock',JSON.stringify(M
 // 自有材料台帳（逐筆記錄）：{id,name,spec,len,qty,price,date,kind:'重複性'|'一次性',note,_mt}
 var MAT_LEDGER=[];
 try{var _ml=localStorage.getItem('fy_mat_ledger');if(_ml)MAT_LEDGER=JSON.parse(_ml)||[];}catch(e){}
-function saveMatLedger(){try{localStorage.setItem('fy_mat_ledger',JSON.stringify(MAT_LEDGER));}catch(e){} try{_autoUpload();}catch(e){}}
+function saveMatLedger(){_lsSet('fy_mat_ledger',JSON.stringify(MAT_LEDGER),'材料台帳'); try{_autoUpload();}catch(e){}}
 // （v5.310 移除舊格狀台帳 UI 死碼 matStockUpd/_matUpdTotals/renderMaterials；MAT_STOCK 資料保留同步相容）
 // ══ 擋土支撐材料估算（移植自威立采估算引擎；公式 1:1，UI 重製）══
 var SH_SPECS=['H300','H350','H400','H414','H428'];
@@ -9275,7 +9295,10 @@ function _initAutoSyncToggle(){
 // ════════════════════════════════════════════════════════════
 // ── 分集合差異同步：只上傳有變動的集合，避免整庫覆蓋 ──
 // 集合鍵（與 _syncPayload 對應；version/uploadedAt/uploadedBy 為 meta 每次都傳）
-var _SYNC_COLLS=['quotes','invoices','upaHistory','params','contracts','vendors','payables','invoiceRecs','activityLog','customers','upaCostDB','pagePerms','expenses'];
+var _SYNC_COLLS=['quotes','invoices','upaHistory','params','contracts','vendors','payables','invoiceRecs','activityLog','customers','upaCostDB','pagePerms','expenses',
+  // v5.314 補齊：這五個集合原本在 _syncPayload 內但不在上傳清單，等於從未真正上雲
+  // （墓碑不上雲 → 刪除無法跨裝置傳播；材料台帳／單價庫／分潤 → 實質為單機資料）
+  'tombs','costHist','shareProfit','dealHist','matLedger','admins'];
 function _collHash(v){ // djb2 於 JSON 字串
   var st;try{st=JSON.stringify(v);}catch(e){st=String(v);}
   var h=5381;for(var i=0;i<st.length;i++){h=((h<<5)+h+st.charCodeAt(i))|0;}
@@ -9301,13 +9324,14 @@ function _syncPayload(){
   var ts=Date.now();
   var pagePerms={};
   try{pagePerms=JSON.parse(localStorage.getItem('fy_page_perms')||'{}');}catch(e){}
+  var admins=getAdminEmails();   // v5.314：管理員清單納入同步，避免新裝置讀不到而權限失準
   return {ts:ts, data:{
     version:'fy-v5', uploadedAt:ts, uploadedBy:(_fbUser&&_fbUser.email)||'',
     quotes:Q, invoices:INV, upaHistory:UH, params:P,
     contracts:CONTRACTS, vendors:VENDORS, payables:PAYABLES,
     invoiceRecs:INVOICE_RECS, expenses:EXPENSES, tombs:TOMBS, activityLog:ACTIVITY_LOG.slice(0,100),
     customers:CUSTOMERS, upaCostDB:UPA_COST_DB, pagePerms:pagePerms, costHist:COST_HIST,
-    shareProfit:SHARE_PROFIT, dealHist:DEAL_HIST, matLedger:MAT_LEDGER
+    shareProfit:SHARE_PROFIT, dealHist:DEAL_HIST, matLedger:MAT_LEDGER, admins:admins
   }};
 }
 // Firebase 物件 key 不能含 . # $ / [ ]，上傳前編碼、下載後還原（記憶體結構不變）
@@ -9351,7 +9375,7 @@ function _applyCloud(data){
     var _safeMerge=function(loc,cld,nm){try{return _mergeColl(loc,cld,nm,data.tombs);}catch(e){console.error('[同步] '+nm+' 合併失敗，改用雲端版',e);return Array.isArray(cld)?cld:(cld?Object.values(cld):loc);}};
     Q=_safeMerge(Q,data.quotes,'quotes');
     INV=_safeMerge(INV,(Array.isArray(data.invoices)?data.invoices:Object.values(data.invoices||{})).filter(function(inv){return inv&&(inv.project||inv.client||inv.id);}),'invoices');
-    UH=data.upaHistory||[];
+    if(data.upaHistory)UH=data.upaHistory;   // v5.314：原本 ||[] 會在雲端缺此欄時把本機分析歷史清空
     if(data.params)Object.assign(P,data.params);
     if(data.contracts)CONTRACTS=_safeMerge(CONTRACTS,data.contracts,'contracts');
     if(data.vendors)VENDORS=_safeMerge(VENDORS,data.vendors,'vendors');
@@ -9437,6 +9461,7 @@ function _applyCloud(data){
       }catch(e){}
     }
     if(data.pagePerms){try{localStorage.setItem('fy_page_perms',JSON.stringify(data.pagePerms));}catch(e){}}
+    if(data.admins){try{saveAdminEmails(Array.isArray(data.admins)?data.admins:Object.values(data.admins));}catch(e){}}
     persist();saveInv();saveUH();persistP();
     saveContracts();saveVendors();savePayables();saveInvoiceRecs();saveActivityLog();saveCustomers();
     try{syncParamsUI();}catch(e){}
@@ -9498,7 +9523,8 @@ function _pushCloud(opts){
   // 他人更新偵測：雲端 ts 比本機新 → 先拉回合併再推，防止互相覆蓋
   if(_fbUser&&_fbDb&&!opts._merged&&!window._applyingCloud){
     try{
-      _fbDb.ref('fydata/shared/ts').once('value').then(function(snap){
+      // v5.314：原本讀 fydata/shared/ts，但該節點從未寫入（ts 在 payload 之外）→ 保護分支形同虛設
+      _fbDb.ref('fydata/shared/uploadedAt').once('value').then(function(snap){
         var cts=parseInt(snap.val())||0;
         var mine=parseInt(localStorage.getItem('fy_last_fb_sync'))||0;
         if(cts>mine){
@@ -9562,6 +9588,8 @@ function _pushCloud(opts){
     }
     if(opts.full){_SYNC_COLLS.forEach(function(k){delta[k]=clean[k];});}
     var okWrap=function(){_storeSyncHashes(newHashes);ok();};
+    // v5.314：完全沒有變動時不要空推 uploadedAt，否則會害其他裝置誤判「雲端有更新」而跳覆蓋提示
+    if(!opts.full&&baseHashes&&changed.length===0){okWrap();return;}
     _fbDb.ref('fydata/shared').update(delta).then(okWrap).catch(fail);
   }catch(e){
     // .set() 同步拋錯（例如資料仍含非法值）也要關掉 loading
@@ -9627,7 +9655,10 @@ function _dailyBackup(){
     if(!_fbUser||!_fbStorage)return;
     var today=new Date().toISOString().slice(0,10);
     if(localStorage.getItem('fy_snap_date')===today)return;
-    var payload=JSON.stringify({date:today,quotes:Q,invoices:INV,contracts:CONTRACTS,payables:PAYABLES,invoiceRecs:INVOICE_RECS,expenses:EXPENSES,params:P});
+    // v5.314：改用與匯出備份相同的完整 payload（原本缺客戶／廠商／單價庫／材料台帳／分潤，災難還原時救不回）
+    var _snap;try{_snap=_syncPayload().data;}catch(e2){_snap={quotes:Q,invoices:INV,contracts:CONTRACTS,payables:PAYABLES,invoiceRecs:INVOICE_RECS,expenses:EXPENSES,params:P};}
+    _snap.date=today;
+    var payload=JSON.stringify(_snap);
     var ref=_fbStorage.ref('fydata/backups/'+today+'.json');
     ref.putString(payload,'raw',{contentType:'application/json'}).then(function(){
       localStorage.setItem('fy_snap_date',today);
@@ -10062,7 +10093,7 @@ function changeCostType(cid,newType){
 // ── 成交單價庫：得標時自動回寫各工項成交單價，報價時提示行情（與 UPA 理論價互相比對）──
 var DEAL_HIST=[];
 try{const _dh=localStorage.getItem('fy_deal_hist');if(_dh)DEAL_HIST=JSON.parse(_dh);}catch(e){}
-function saveDealHist(){try{localStorage.setItem('fy_deal_hist',JSON.stringify(DEAL_HIST));}catch(e){} try{_autoUpload();}catch(e){}}
+function saveDealHist(){_lsSet('fy_deal_hist',JSON.stringify(DEAL_HIST),'成交單價庫'); try{_autoUpload();}catch(e){}}
 function writeDealHist(q){
   if(!q||!q.items)return 0;
   let n=0;
@@ -10090,7 +10121,7 @@ function _dealPriceFor(name){
 }
 var COST_HIST=[];
 try{const _ch=localStorage.getItem('fy_cost_hist');if(_ch)COST_HIST=JSON.parse(_ch);}catch(e){}
-function saveCostHist(){try{localStorage.setItem('fy_cost_hist',JSON.stringify(COST_HIST));}catch(e){} try{_autoUpload();}catch(e){}}
+function saveCostHist(){_lsSet('fy_cost_hist',JSON.stringify(COST_HIST),'歷史單價庫'); try{_autoUpload();}catch(e){}}
 function _normName(s){return (s||'').split('\n')[0].replace(/[\s，,。.()（）\-–—/／]/g,'').toLowerCase();}
 // 回寫：把此案各工項的實際成本單價存入單價庫（同案同工項覆蓋更新）
 function writeCostHist(qid){
@@ -10730,11 +10761,11 @@ function closeMergeCost(){
   if(vnEl)vnEl._userEdited=false;
 }
 
-function saveVendors(){try{localStorage.setItem('fy_vendors',JSON.stringify(VENDORS));}catch(e){} try{_autoUpload();}catch(e){}}
-function savePayables(){try{localStorage.setItem('fy_payables',JSON.stringify(PAYABLES));}catch(e){} try{_autoUpload();}catch(e){}}
-function saveInvoiceRecs(){try{localStorage.setItem('fy_inv_recs',JSON.stringify(INVOICE_RECS));}catch(e){} try{_autoUpload();}catch(e){}}
-function saveExpenses(){try{localStorage.setItem('fy_expenses',JSON.stringify(EXPENSES));}catch(e){} try{_autoUpload();}catch(e){}}
-function saveActivityLog(){try{localStorage.setItem('fy_activity',JSON.stringify(ACTIVITY_LOG.slice(0,500)));}catch(e){}}
+function saveVendors(){_lsSet('fy_vendors',JSON.stringify(VENDORS),'廠商'); try{_autoUpload();}catch(e){}}
+function savePayables(){_lsSet('fy_payables',JSON.stringify(PAYABLES),'應付帳款'); try{_autoUpload();}catch(e){}}
+function saveInvoiceRecs(){_lsSet('fy_inv_recs',JSON.stringify(INVOICE_RECS),'發票紀錄'); try{_autoUpload();}catch(e){}}
+function saveExpenses(){_lsSet('fy_expenses',JSON.stringify(EXPENSES),'費用'); try{_autoUpload();}catch(e){}}
+function saveActivityLog(){_lsSet('fy_activity',JSON.stringify(ACTIVITY_LOG.slice(0,500)),'活動紀錄');}
 
 
 // ═══════════════════════════════════════════
@@ -12933,11 +12964,13 @@ function _projAttachMeta(qid,type,name,url,path){
     if(ct.filePath&&_fbStorage){try{_fbStorage.ref(ct.filePath).delete().catch(function(){});}catch(e){}}
     ct.fileName=name;ct.fileUrl=url;ct.filePath=path;ct.fileTs=Date.now();
     delete ct.fileData;   // 移除舊內嵌，避免資料庫肥大
+    ct._mt=Date.now();ct.updatedAt=Date.now();   // v5.314：漏戳會讓剛上傳的合約檔被其他裝置的舊資料蓋掉
     if(typeof saveContracts==='function')saveContracts();
     toast('合約檔已上傳至雲端：'+name);
   }else{
     if(!q.confirmFiles)q.confirmFiles=[];
     q.confirmFiles.push({name:name,url:url,path:path,ts:Date.now()});
+    q._mt=Date.now();   // v5.314：工地上傳的確認單原本無戳記，會被辦公室裝置的舊版本蓋掉
     persist();
     toast('工作確認單已上傳至雲端：'+name);
   }
@@ -13187,7 +13220,7 @@ function _payUpload(pid,kind){
             if(!r)return;
             var pp=PAYABLES.find(function(x){return x.id===pid2;});if(!pp)return;
             var msg=[];
-            if(r.number){pp.invNo=r.number;msg.push('發票號 '+r.number);}
+            if(r.number){pp.invNo=r.number;pp._mt=Date.now();msg.push('發票號 '+r.number);}
             if(r.amount){
               var diff=Math.abs(r.amount-_payEff(pp));
               msg.push('金額 '+fmt(r.amount)+(diff<=Math.max(2,_payEff(pp)*0.01)?'（與應付相符 ✓）':'（⚠ 與應付 '+fmt(_payEff(pp))+' 不符，請核對）'));
@@ -14356,7 +14389,7 @@ function _intakeRoute(type,qid,r,du){
       return;
     }
     var _prevInvNo=hit.invNo;
-    if(type==='vendor_invoice'&&r.number){hit.invNo=r.number;}
+    if(type==='vendor_invoice'&&r.number){hit.invNo=r.number;hit._mt=Date.now();}   // v5.314：不再只依賴 _payAttach 順帶補戳
     var _fileTs=Date.now();
     _payAttach(hit.id,(type==='transfer'?'智慧收件_匯款_':'智慧收件_發票_')+today+'.jpg',du,null,type==='transfer'?'pay':'inv');
     _ikLog({label:type==='transfer'?'匯款紀錄 → 應付':'廠商發票 → 應付',detail:(hit.to||'')+(r.number?('／'+r.number):''),undo:{kind:'payinv',pid:hit.id,prevInvNo:_prevInvNo,fileTs:(PAYABLES.find(function(x){return x.id===hit.id;}).files.slice(-1)[0]||{}).ts}});
@@ -14538,6 +14571,7 @@ function bumpQVersion(qid){
       saveQVersion(qid,q,{formal:true});   // 封存為正式版次（永久保留，不受自動存檔修剪）
       q.ver=curVer+1;
       q.date=localToday();                  // 進版＝重新報價：日期更新為當天
+      q._mt=Date.now();                     // v5.314：漏戳會讓其他裝置的舊版本把版號打回去
       try{var _fdEl=document.getElementById('fd');if(_fdEl)_fdEl.value=q.date;}catch(e){}
       // 進版＝最新動態：移到報價列表最上面
       try{var _qi=Q.findIndex(function(x){return x.id===qid;});if(_qi>0){Q.splice(_qi,1);Q.unshift(q);}}catch(e){}
