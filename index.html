@@ -2500,7 +2500,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.322';
+var APP_VERSION='v5.323';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2685,12 +2685,16 @@ function _arTotal(){return _arList().reduce(function(a,i){return a+_invAR(i);},0
 // ══════════ 逾期租金自動計算（v5.322）══════════
 // 租期天數寫在工項備註，格式固定「含XX天租期」，但天數會變（30／60／90…），
 // 所以一律從備註解析、不寫死。解析不到＝該工項無租期約定，不計逾期。
+// v5.323：天數不限 30／60／90，任何數字都吃（45、75、120、180…），
+// 也容許全形數字與各種寫法：含XX天租期／租期XX天／租期：XX天／租期(XX日)／租期XX。
+// 用「緊鄰」比對避免誤抓——「含30天租期，逾期另計 12 元」只會抓到 30，不會抓到 12。
 function _rentDaysOf(it){
   if(!it)return 0;
   var s=String(it.note||'')+' '+String(it.desc||'');
-  var m=s.match(/含\s*(\d+(?:\.\d+)?)\s*天\s*租期/)
-      ||s.match(/租期\s*[:：]?\s*(\d+(?:\.\d+)?)\s*天/)
-      ||s.match(/(\d+(?:\.\d+)?)\s*天\s*租期/);
+  s=s.replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-65248);});
+  var m=s.match(/(\d+(?:\.\d+)?)\s*[天日]\s*[)）]?\s*租\s*期/)          // XX天租期
+      ||s.match(/租\s*期\s*[:：（(]{0,2}\s*(\d+(?:\.\d+)?)\s*[天日]/)     // 租期XX天／租期：XX天
+      ||s.match(/租\s*期\s*[:：]?\s*(\d+(?:\.\d+)?)(?!\d)/);              // 租期XX（沒寫單位）
   return m?Math.round(parseFloat(m[1])||0):0;
 }
 // 日期字串加減天／相差天數（一律走本地時間，避免 UTC 讓日期偏一天）
@@ -2756,6 +2760,21 @@ function _rentScan(q,endDate){
   });
   out.sort(function(a,b){return b.overDays-a.overDays;});
   return out;
+}
+
+// 得標金額（v5.323）：報價總額 ≠ 得標金額。議價、工項追加減、竣工總結算後，
+// 真正得標的金額寫在合約上；有合約就以合約為準（追加減已折進合約金額，不能再加追加案，
+// 否則同一筆錢算兩次），沒有合約才退回報價總額＋追加案報價。
+// 與專案卡的 base 同一口徑。傳入的必須是主案（parentId 為空）。
+function _wonAmt(q){
+  if(!q)return 0;
+  var ct=(CONTRACTS||[]).find(function(c){return c.linkedQid===q.id;})
+       ||(CONTRACTS||[]).find(function(c){return c.name&&c.name===q.name;});
+  var ctAmt=ct?(parseFloat(ct.amount)||0):0;
+  if(ctAmt>0)return ctAmt;
+  var base=(q.t&&parseFloat(q.t.total))||0;
+  Q.forEach(function(x){if(x.parentId===q.id)base+=(x.t&&parseFloat(x.t.total))||0;});
+  return base;
 }
 
 // 待付應付（status 為空的舊資料視為待付，與清單口徑一致）
@@ -7210,7 +7229,7 @@ function invScanRent(){
   if(!q){box.innerHTML=_rentScanMsg('找不到對應的報價單——請確認本張請款單是由報價單產生，或專案名稱與報價單一致。');return;}
   var list=[];try{list=_rentScan(q);}catch(e){}
   if(!list.length){
-    box.innerHTML=_rentScanMsg('本案沒有可自動計算的租期工項。需同時具備：①報價工項備註寫有「含XX天租期」；②該工項已有日報回報施工數量。');
+    box.innerHTML=_rentScanMsg('本案沒有可自動計算的租期工項。需同時具備：①報價工項備註寫有租期天數（「含XX天租期」「租期XX天」皆可，天數不限 30／60／90，45、120、180 等任何天數都能算）；②該工項已有日報回報施工數量。');
     return;
   }
   var rows=list.map(function(s){
@@ -7823,7 +7842,7 @@ function renderClientReport(el,year,month){
     el.innerHTML='<div class="empty" style="padding:40px"><div class="empty-ic"><svg class="ic ib" aria-hidden="true"><use href="#i-user"/></svg></div><p>'+year+'年無業主往來資料</p></div>';return;
   }
   el.innerHTML='<div style="overflow-x:auto;padding:14px"><table class="pt" style="font-size:12px;min-width:500px">'+
-    '<thead><tr style="background:var(--gl)"><th style="padding:6px 8px;text-align:left">業主</th><th style="padding:6px 8px;text-align:right">報價件數</th><th style="padding:6px 8px;text-align:right">報價金額</th><th style="padding:6px 8px;text-align:right">得標件數</th><th style="padding:6px 8px;text-align:right">得標金額</th><th style="padding:6px 8px;text-align:right">請款金額</th><th style="padding:6px 8px;text-align:right">已收款</th><th style="padding:6px 8px;text-align:right">應收餘額</th><th style="padding:6px 8px;text-align:right">實際淨利</th></tr></thead>'+
+    '<thead><tr style="background:var(--gl)"><th style="padding:6px 8px;text-align:left">業主</th><th style="padding:6px 8px;text-align:right">報價件數</th><th style="padding:6px 8px;text-align:right">報價金額</th><th style="padding:6px 8px;text-align:right">得標件數</th><th style="padding:6px 8px;text-align:right" title="得標案的合約金額（含稅）。有合約以合約金額為準——議價、工項追加減、竣工總結算的差額都已反映；沒建合約才用報價總額＋追加案報價。">得標金額</th><th style="padding:6px 8px;text-align:right">請款金額</th><th style="padding:6px 8px;text-align:right">已收款</th><th style="padding:6px 8px;text-align:right">應收餘額</th><th style="padding:6px 8px;text-align:right">實際淨利</th></tr></thead>'+
     '<tbody>'+Object.entries(byClient).map(([client,data])=>{
       const qAmt=data.quotes.reduce((a,q)=>a+(q.t?.total||0),0);
       const iAmt=data.invs.reduce((a,i)=>a+(i.totals?.total||0),0);
@@ -7836,7 +7855,7 @@ function renderClientReport(el,year,month){
       },0);
       // v5.321 新增：得標件數／得標金額／實際淨利（該業主案件的實收未稅 − 已登錄成本）
       const wonQs=data.quotes.filter(q=>q.awarded&&!q.parentId);
-      const wonAmt=wonQs.reduce((a,q)=>a+(q.t?.total||0)+Q.filter(x=>x.parentId===q.id).reduce((b,x)=>b+(x.t?.total||0),0),0);
+      const wonAmt=wonQs.reduce((a,q)=>a+_wonAmt(q),0);   // v5.323：有合約以合約金額為準
       const cAmt=wonQs.reduce((a,q)=>{
         const all=[q].concat(Q.filter(x=>x.parentId===q.id));
         return a+all.reduce((b,x)=>b+(x.costs||[]).reduce((c2,c)=>c2+(parseFloat(c.amt)||0),0),0);
@@ -14691,9 +14710,10 @@ function renderShareProfit(numOnly){
   +'<hr style="border:none;border-top:1px solid var(--b1);margin:14px 0">'
   +'<div style="font-size:12.5px;font-weight:700;color:var(--b5);margin-bottom:8px">＋ 新增領取記錄</div>'
   +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'
-  +'<div class="f" style="flex:0 0 130px"><label>日期</label><input id="share-d-date" type="date" value="'+localToday()+'"></div>'
-  +'<div class="f" style="flex:0 0 90px"><label>領取人</label><select id="share-d-who">'+SHARE_WHO.map(function(w){return '<option>'+w+'</option>';}).join('')+'</select></div>'
-  +'<div class="f" style="flex:0 0 130px"><label>金額（元）</label><input id="share-d-amt" type="number" placeholder="0" style="text-align:right;font-weight:700"></div>'
+  // v5.323：日期欄 130px 在手機上會把「2026年8月16日」擠成兩行，加寬並禁止再被壓縮
+  +'<div class="f" style="flex:0 0 175px;min-width:175px"><label>日期</label><input id="share-d-date" type="date" value="'+localToday()+'" style="width:100%"></div>'
+  +'<div class="f" style="flex:0 0 100px"><label>領取人</label><select id="share-d-who">'+SHARE_WHO.map(function(w){return '<option>'+w+'</option>';}).join('')+'</select></div>'
+  +'<div class="f" style="flex:1 1 130px;min-width:120px"><label>金額（元）</label><input id="share-d-amt" type="number" placeholder="0" style="text-align:right;font-weight:700"></div>'
   +'<div class="f" style="flex:1;min-width:120px"><label>備註</label><input id="share-d-note" placeholder="（選填）"></div>'
   +'<button type="button" class="btn btn-g" style="padding:8px 18px" onclick="addShareDraw()">記錄</button>'
   +'</div>'
@@ -14736,9 +14756,8 @@ function _shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,limitedBy){
   +'</div>'
   +'<div style="background:var(--b1);border-radius:8px;height:14px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(remain<0?'#c62828':'linear-gradient(90deg,var(--g),var(--g3))')+';border-radius:8px"></div></div>'
   +'<div style="font-size:10.5px;color:var(--b3);text-align:right;margin-top:3px">已領 '+pct+'%</div>'
+  // v5.323：上限公式的說明只留卡片上方那一份（原本上下各印一次，同一段話重複）
   +'<div style="font-size:11px;color:var(--b4);margin-top:6px;background:var(--b0);border-radius:var(--r6);padding:6px 10px">'
-  +'上限＝<b>min（盈餘上限、可動用現金）</b>。盈餘上限＝稅後淨利−保留款增額−循環資金增額−機具自付款；'
-  +'現金上限＝可動用資金＋本年度已領（帳上賺到不等於領得出來，錢多半卡在應收、保留款與材料上）。<br>'
   +'薪資另計：兩位股東每月各領 NT$ '+fmt(SHARE_SALARY_MONTH)+' 薪資，已列入成本（已於試算中扣除），不佔分潤額度。</div>';
 }
 
@@ -15692,10 +15711,9 @@ function renderYearlyReport(el,year){
     //（實際淨利＝該年度實收換算未稅 − 該年度發生的施工成本 − 該年度費用發票，與利潤中心同口徑）
     const wonQ=Q.filter(q=>q.awarded&&!q.parentId&&(q.date||'').startsWith(String(y)));
     const wonN=wonQ.length;
-    const wonAmt=wonQ.reduce((a,q)=>{
-      const adds=Q.filter(x=>x.parentId===q.id);
-      return a+(q.t?.total||0)+adds.reduce((b,x)=>b+(x.t?.total||0),0);
-    },0);
+    // v5.323：改用 _wonAmt（有合約以合約金額為準），原本一律用報價總額，
+    // 議價殺價、追加減與竣工結算後的差額完全反映不出來。
+    const wonAmt=wonQ.reduce((a,q)=>a+_wonAmt(q),0);
     const yCost=Q.reduce((a,q)=>a+(q.costs||[]).reduce((b,c)=>b+(((c.date||'').startsWith(String(y)))?(parseFloat(c.amt)||0):0),0),0);
     const yExp=(EXPENSES||[]).reduce((a,e)=>a+((e&&!e.costRef&&(e.date||'').startsWith(String(y)))?(parseFloat(e.amount!=null?e.amount:e.amt)||0):0),0);
     const actNet=Math.round(rAmt/_taxM()-yCost-yExp);
@@ -15729,7 +15747,7 @@ function renderYearlyReport(el,year){
           <th style="padding:6px 8px;text-align:left">年度</th>
           <th style="padding:6px 8px;text-align:right">報價金額</th>
           <th style="padding:6px 8px;text-align:right">得標件數</th>
-          <th style="padding:6px 8px;text-align:right">得標金額</th>
+          <th style="padding:6px 8px;text-align:right" title="得標案的合約金額（含稅）。有合約以合約金額為準——議價、工項追加減、竣工總結算的差額都已反映；沒建合約才用報價總額＋追加案報價。">得標金額</th>
           <th style="padding:6px 8px;text-align:right">請款金額</th>
           <th style="padding:6px 8px;text-align:right">實收金額</th>
           <th style="padding:6px 8px;text-align:right">已付支出（現金）</th>
