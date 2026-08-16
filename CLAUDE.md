@@ -6,6 +6,10 @@
 
 - **單一檔案應用**：整個系統就是 `index.html`（~1MB，含全部 HTML/CSS/JS），無建置流程、無框架、無相依套件
 - 資料存 localStorage ＋ Firebase RTDB 雲端同步（記錄級合併、`_mt` 修改時間新者勝）
+- **雲端分兩個節點**（v5.324）：`fydata/shared` 一般營運資料（登入即可讀）、`fydata/private`
+  敏感資料（成本／毛利／分潤／應付／費用／材料台帳／單價庫，僅 `fydata/adminUids` 內的管理員可讀）。
+  新增同步欄位時要想清楚該進哪一邊：`_SYNC_COLLS`（shared）或 `_PRIV_COLLS`（private）。
+  報價單裡的 `costs`／`items[].estCost`／`t.cost|gross|net` 由 `_stripQuoteSens` 抽走後另存 private。
 - `sw.js`：Service Worker，網路優先策略——部署新版使用者重新整理即生效，**不需改動**
 - 部署：push 到 `main` → GitHub Pages 自動上線（約 1 分鐘）→ https://jhchen0911.github.io/FJ-system/
 
@@ -42,6 +46,8 @@
 | 智慧收件 | `smartIntake` `aiClassifyDoc` `_intakeRoute`（Claude API 影像辨識） |
 | 權限 | `ALL_PAGES` `canAccess` `permMxApplyRole`(工務/管理部範本) |
 | 備份 | `exportData`/`importData`（全量，與 `_syncPayload` 同 payload） |
+| 雲端同步 | `_sharedPayload`/`_privatePayload` `_pushPrivate`/`_pullPrivate` `_applySensColls` `_seedAdminUid` |
+| 逾期租金 | `_rentDaysOf`(解析備註租期) `_itemProgress`(日報推完工日) `_rentStatus` `_rentScan` `invScanRent` |
 
 ## 測試
 

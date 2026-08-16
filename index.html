@@ -2500,7 +2500,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.323';
+var APP_VERSION='v5.324';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -8710,8 +8710,37 @@ function removeAdmin(email){
 
 // ── 自動同步：登入後比較雲端與本機時間，若雲端較新則自動下載 ──
 function _autoSyncOnLogin(){
-  // 委派到統一的「若雲端較新則下載」邏輯（含衝突詢問）
-  _pullCloudIfNewer({interactive:true});
+  // v5.324：先確保管理員名冊有自己的 uid（安全規則靠 uid 判斷能否讀寫 fydata/private），
+  // 再開始同步——順序反了會先吃到一次拒絕，整個工作階段都以為自己沒權限。
+  _seedAdminUid(function(){
+    _privReadOk=null;
+    _pullCloudIfNewer({interactive:true});
+  });
+}
+// 安全規則不能對 email 做字串處理（含「.」不能當 key），所以名冊改記 uid。
+// 只有本機判定為管理員的帳號才會寫入；規則允許名冊空的時候由第一個人建立（首次啟用用）。
+function _seedAdminUid(done){
+  var fin=function(){if(done)done();};
+  try{
+    if(!_fbUser||!_fbDb||!isAdmin(_fbUser.email)){fin();return;}
+    var ref=_fbDb.ref('fydata/adminUids/'+_fbUser.uid);
+    ref.once('value').then(function(s){
+      if(s.val()===true){fin();return;}
+      ref.set(true).then(function(){
+        console.log('[權限] 已將本帳號登記為管理員（可讀寫 fydata/private）');
+        _privReadOk=null;   // 之前被拒過的要重試，否則整個工作階段都同步不到成本
+        fin();
+      }).catch(function(e){
+        console.warn('[權限] 管理員名冊寫入被拒（成本／分潤將僅存在本機）：',e&&e.message);
+        fin();
+      });
+    }).catch(function(){fin();});
+  }catch(e){fin();}
+}
+// 在權限管理頁新增管理員時，同步把對方的 uid 登記進名冊——
+// 但 uid 只有本人登入時才知道，所以實際登記發生在對方下次登入（_seedAdminUid）。
+function _adminUidHint(){
+  return '新管理員需自行登入一次，系統才會把他登記進雲端管理員名冊（成本／分潤節點靠此判斷權限）。';
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -9868,10 +9897,12 @@ function _initAutoSyncToggle(){
 // ════════════════════════════════════════════════════════════
 // ── 分集合差異同步：只上傳有變動的集合，避免整庫覆蓋 ──
 // 集合鍵（與 _syncPayload 對應；version/uploadedAt/uploadedBy 為 meta 每次都傳）
-var _SYNC_COLLS=['quotes','invoices','upaHistory','params','contracts','vendors','payables','invoiceRecs','activityLog','customers','upaCostDB','pagePerms','expenses',
-  // v5.314 補齊：這五個集合原本在 _syncPayload 內但不在上傳清單，等於從未真正上雲
-  // （墓碑不上雲 → 刪除無法跨裝置傳播；材料台帳／單價庫／分潤 → 實質為單機資料）
-  'tombs','costHist','shareProfit','dealHist','matLedger','admins'];
+// v5.324 節點拆分：payables／expenses／costHist／upaCostDB／shareProfit／matLedger／dealHist
+// 全部移到 fydata/private（管理員限定），不再出現在 shared 的上傳清單。
+var _SYNC_COLLS=['quotes','invoices','upaHistory','params','contracts','vendors','invoiceRecs','activityLog','customers','pagePerms',
+  'tombs','admins'];
+// 敏感集合：只寫 fydata/private
+var _PRIV_COLLS=['payables','expenses','costHist','upaCostDB','shareProfit','matLedger','dealHist'];
 function _collHash(v){ // djb2 於 JSON 字串
   var st;try{st=JSON.stringify(v);}catch(e){st=String(v);}
   var h=5381;for(var i=0;i<st.length;i++){h=((h<<5)+h+st.charCodeAt(i))|0;}
@@ -9883,15 +9914,37 @@ function _calcSyncHashes(clean){
 function _loadSyncHashes(){try{return JSON.parse(localStorage.getItem('fy_sync_hashes')||'null');}catch(e){return null;}}
 function _storeSyncHashes(h){try{localStorage.setItem('fy_sync_hashes',JSON.stringify(h));}catch(e){}}
 // 將 payload 清洗+編碼（與上傳相同管線，供上傳與拉取後計 hash 共用）
-function _buildCleanPayload(){
-  var p=_syncPayload();
-  var clean=JSON.parse(JSON.stringify(p.data,function(k,v){
+function _cleanEnc(obj){
+  var clean=JSON.parse(JSON.stringify(obj,function(k,v){
     if(v===undefined)return undefined;
     if(typeof v==='number'&&!isFinite(v))return 0;
     return v;
   }));
-  clean=_deepEncodeKeys(clean);
-  return {ts:p.ts,clean:clean};
+  return _deepEncodeKeys(clean);
+}
+function _buildCleanPayload(){
+  var p=_sharedPayload();
+  return {ts:p.ts,clean:_cleanEnc(p.data)};
+}
+// v5.324：上 fydata/shared 的版本——報價去敏感、敏感集合整批移除
+function _sharedPayload(){
+  var p=_syncPayload();
+  var d=p.data;
+  var out={};
+  Object.keys(d).forEach(function(k){if(_PRIV_COLLS.indexOf(k)<0)out[k]=d[k];});
+  out.quotes=(d.quotes||[]).map(_stripQuoteSens);
+  return {ts:p.ts,data:out};
+}
+// v5.324：上 fydata/private 的版本——只有敏感資料
+function _privatePayload(){
+  var ts=Date.now();
+  var qs={};
+  Q.forEach(function(q){if(q&&q.id)qs[q.id]=_extractQuoteSens(q);});
+  return {ts:ts,data:{
+    version:'fy-v5p', uploadedAt:ts, uploadedBy:(_fbUser&&_fbUser.email)||'',
+    quoteSens:qs, payables:PAYABLES, expenses:EXPENSES, costHist:COST_HIST,
+    upaCostDB:UPA_COST_DB, shareProfit:SHARE_PROFIT, matLedger:MAT_LEDGER, dealHist:DEAL_HIST
+  }};
 }
 function _syncPayload(){
   var ts=Date.now();
@@ -9943,6 +9996,9 @@ function _applyCloud(data){
   // ★ 還原上傳時編碼過的 key（如 rail.rent 的 "12.5"）
   try{data=_deepDecodeKeys(data);}catch(e){}
   window._applyingCloud=true;
+  // v5.324：shared 上的報價已去敏感，合併會用雲端記錄整筆取代本機記錄。
+  // 先拍下本機的成本／成本單價／毛利，合併後補回空缺，否則讀不到 private 的人會被洗掉。
+  var _sensSnap=null;try{_sensSnap=_snapshotQuoteSens();}catch(e){}
   try{
     try{_mergeTombs(data.tombs);}catch(e){console.error('[同步] 墓碑合併失敗',e);}
     var _safeMerge=function(loc,cld,nm){try{return _mergeColl(loc,cld,nm,data.tombs);}catch(e){console.error('[同步] '+nm+' 合併失敗，改用雲端版',e);return Array.isArray(cld)?cld:(cld?Object.values(cld):loc);}};
@@ -9952,22 +10008,7 @@ function _applyCloud(data){
     if(data.params)Object.assign(P,data.params);
     if(data.contracts)CONTRACTS=_safeMerge(CONTRACTS,data.contracts,'contracts');
     if(data.vendors)VENDORS=_safeMerge(VENDORS,data.vendors,'vendors');
-    if(data.payables)PAYABLES=_safeMerge(PAYABLES,data.payables,'payables');
     if(data.invoiceRecs)INVOICE_RECS=_safeMerge(INVOICE_RECS,data.invoiceRecs,'invoiceRecs');
-    if(data.expenses)EXPENSES=_safeMerge(EXPENSES,data.expenses,'expenses');
-    if(data.shareProfit){
-      try{
-        var _spc=data.shareProfit||{};
-        var _cd=Array.isArray(_spc.draws)?_spc.draws:Object.values(_spc.draws||{});
-        SHARE_PROFIT.draws=_safeMerge(SHARE_PROFIT.draws,_cd,'shareDraws');
-        var _cc=_spc.cfg||{};
-        Object.keys(_cc).forEach(function(y){
-          var lc=SHARE_PROFIT.cfg[y];
-          if(!lc||((_cc[y]&&_cc[y]._mt)||0)>=((lc&&lc._mt)||0))SHARE_PROFIT.cfg[y]=_cc[y];
-        });
-        localStorage.setItem('fy_share',JSON.stringify(SHARE_PROFIT));
-      }catch(e){}
-    }
     if(data.activityLog)ACTIVITY_LOG=data.activityLog;
     if(data.customers)CUSTOMERS=_safeMerge(CUSTOMERS,data.customers,'customers');
     if(data.matStock){
@@ -9980,60 +10021,10 @@ function _applyCloud(data){
         localStorage.setItem('fy_mat_stock',JSON.stringify(MAT_STOCK));
       }catch(e){}
     }
-    if(data.matLedger){
-      // 自有材料台帳合併：以 id 為鍵、_mt 新者勝，尊重刪除墓碑
-      try{
-        var _mlT=(TOMBS['matLedger']||{});
-        var _mlMap={};
-        MAT_LEDGER.forEach(function(r){if(r&&r.id)_mlMap[r.id]=r;});
-        (Array.isArray(data.matLedger)?data.matLedger:Object.values(data.matLedger||{})).forEach(function(r){
-          if(!r||!r.id)return;
-          var lc=_mlMap[r.id];
-          if(!lc||((r._mt)||0)>=((lc._mt)||0))_mlMap[r.id]=r;
-        });
-        MAT_LEDGER=Object.values(_mlMap).filter(function(r){return !(_mlT[r.id]&&_mlT[r.id]>=(r._mt||0));});
-        localStorage.setItem('fy_mat_ledger',JSON.stringify(MAT_LEDGER));
-      }catch(e){}
-    }
-    if(data.dealHist){
-      // 成交單價庫合併：以 rid 為鍵，雲端與本機聯集（同鍵取日期新者）
-      try{
-        var _dhMap={};
-        (Array.isArray(data.dealHist)?data.dealHist:Object.values(data.dealHist||{})).concat(DEAL_HIST).forEach(function(r){
-          if(!r||!r.rid)return;
-          if(!_dhMap[r.rid]||String(r.date||'')>=String(_dhMap[r.rid].date||''))_dhMap[r.rid]=r;
-        });
-        DEAL_HIST=Object.values(_dhMap);
-        localStorage.setItem('fy_deal_hist',JSON.stringify(DEAL_HIST));
-      }catch(e){}
-    }
-    if(data.costHist){
-      // 單價庫合併：以 qid+idx 為鍵，雲端與本機聯集（同鍵取日期新者）
-      try{
-        var _chMap={};
-        (Array.isArray(data.costHist)?data.costHist:Object.values(data.costHist||{})).concat(COST_HIST).forEach(function(r){
-          if(!r||!r.qid)return;var k2=r.qid+'#'+r.idx;
-          if(!_chMap[k2]||String(r.date||'')>=String(_chMap[k2].date||''))_chMap[k2]=r;
-        });
-        COST_HIST=Object.values(_chMap);
-        localStorage.setItem('fy_cost_hist',JSON.stringify(COST_HIST));
-      }catch(e){}
-    }
-    if(data.upaCostDB){
-      try{
-        var deepMerge=function(target,src){
-          if(!src||typeof src!=='object')return;
-          Object.keys(src).forEach(function(k){
-            if(src[k]!==null&&typeof src[k]==='object'&&!Array.isArray(src[k])&&target[k]&&typeof target[k]==='object'){deepMerge(target[k],src[k]);}
-            // v5.319：原本排除 0，導致「把某項成本改成 0」永遠無法傳播、連本機重整都會被舊值蓋回
-            else if(src[k]!==undefined&&src[k]!==null){target[k]=src[k];}
-          });
-        };
-        deepMerge(UPA_COST_DB,data.upaCostDB);
-        localStorage.setItem('fy_upa_cost',JSON.stringify(UPA_COST_DB));
-        _syncUPAtoUI();
-      }catch(e){}
-    }
+    // v5.324：舊版（或尚未遷移）的 shared 仍夾帶敏感集合 → 照樣合併，避免升級當下漏資料
+    try{_applySensColls(data,data.tombs);}catch(e){console.error('[同步] 敏感集合合併失敗',e);}
+    // 報價敏感欄位補回：雲端沒有就用本機值，只補空缺不覆蓋
+    try{_regraftQuoteSens(_sensSnap);}catch(e){console.error('[同步] 成本欄位補回失敗',e);}
     if(data.pagePerms){try{localStorage.setItem('fy_page_perms',JSON.stringify(data.pagePerms));}catch(e){}}
     // v5.319：管理員清單改聯集合併（原本整包覆寫，A 加甲、B 加乙 → 後推者全贏，另一人的權限消失）
     if(data.admins){try{
@@ -10063,6 +10054,138 @@ function _applyCloud(data){
     setTimeout(function(){window._applyingCloud=false;},500);
   }
   return true;
+}
+// ══════════ 敏感資料節點拆分（v5.324）══════════
+// 報價單裡混著敏感欄位（施工成本明細、工項成本單價、毛利小計），不能整包上 shared。
+// 上傳前抽走，改放 fydata/private；工項用 _uid 對位，避免工項增刪後索引位移貼錯人。
+var _Q_SENS_T=['cost','gross','net','grossR','netR','costKnown','costFilled'];
+function _sensKeyOf(it,i){return (it&&it._uid)?String(it._uid):('#'+i);}
+// 去敏感深拷貝（給 fydata/shared 用）
+function _stripQuoteSens(q){
+  var c;try{c=JSON.parse(JSON.stringify(q));}catch(e){return q;}
+  delete c.costs;
+  if(Array.isArray(c.items))c.items.forEach(function(it){if(it)delete it.estCost;});
+  if(c.t)_Q_SENS_T.forEach(function(k){delete c.t[k];});
+  return c;
+}
+// 抽出敏感欄位（給 fydata/private 用）
+function _extractQuoteSens(q){
+  var est={};
+  (q.items||[]).forEach(function(it,i){
+    if(it&&it.estCost!=null&&it.estCost!=='')est[_sensKeyOf(it,i)]=it.estCost;
+  });
+  var t={};if(q.t)_Q_SENS_T.forEach(function(k){if(q.t[k]!=null)t[k]=q.t[k];});
+  return {costs:Array.isArray(q.costs)?q.costs:[],est:est,t:t,_mt:q._mt||0};
+}
+// 把敏感欄位貼回報價（fill=true 時只補空缺，不覆蓋既有值）
+function _applyQuoteSens(q,s,fill){
+  if(!q||!s)return;
+  if(Array.isArray(s.costs)&&(!fill||!Array.isArray(q.costs)||!q.costs.length)){
+    if(!fill||s.costs.length)q.costs=s.costs;
+  }
+  var est=s.est||{};
+  (q.items||[]).forEach(function(it,i){
+    if(!it)return;
+    var k=_sensKeyOf(it,i);
+    if(est[k]==null)return;
+    if(fill&&it.estCost!=null&&it.estCost!=='')return;
+    it.estCost=est[k];
+  });
+  if(s.t){q.t=q.t||{};Object.keys(s.t).forEach(function(k){
+    if(fill&&q.t[k]!=null)return;
+    q.t[k]=s.t[k];
+  });}
+}
+function _applyQuoteSensAll(map){
+  if(!map)return;
+  Q.forEach(function(q){if(q&&q.id&&map[q.id])_applyQuoteSens(q,map[q.id],false);});
+  try{persist();}catch(e){}
+}
+// 合併前先拍下本機敏感欄位；shared 的報價已去敏感，合併後必須補回，
+// 否則非管理員（讀不到 private）每次同步都會把自己的成本洗掉。
+function _snapshotQuoteSens(){
+  var m={};Q.forEach(function(q){if(q&&q.id)m[q.id]=_extractQuoteSens(q);});return m;
+}
+function _regraftQuoteSens(snap){
+  if(!snap)return;
+  Q.forEach(function(q){if(q&&q.id&&snap[q.id])_applyQuoteSens(q,snap[q.id],true);});
+}
+
+function _applySensColls(data,tombs){
+  if(!data)return;
+  var _safeMerge=function(loc,cld,nm){try{return _mergeColl(loc,cld,nm,tombs);}catch(e){console.error('[同步] '+nm+' 合併失敗，改用雲端版',e);return Array.isArray(cld)?cld:(cld?Object.values(cld):loc);}};
+  if(data.payables)PAYABLES=_safeMerge(PAYABLES,data.payables,'payables');
+  if(data.expenses)EXPENSES=_safeMerge(EXPENSES,data.expenses,'expenses');
+  if(data.shareProfit){
+    try{
+      var _spc=data.shareProfit||{};
+      var _cd=Array.isArray(_spc.draws)?_spc.draws:Object.values(_spc.draws||{});
+      SHARE_PROFIT.draws=_safeMerge(SHARE_PROFIT.draws,_cd,'shareDraws');
+      var _cc=_spc.cfg||{};
+      Object.keys(_cc).forEach(function(y){
+        var lc=SHARE_PROFIT.cfg[y];
+        if(!lc||((_cc[y]&&_cc[y]._mt)||0)>=((lc&&lc._mt)||0))SHARE_PROFIT.cfg[y]=_cc[y];
+      });
+      localStorage.setItem('fy_share',JSON.stringify(SHARE_PROFIT));
+    }catch(e){}
+  }
+    if(data.matLedger){
+    // 自有材料台帳合併：以 id 為鍵、_mt 新者勝，尊重刪除墓碑
+    try{
+      var _mlT=(TOMBS['matLedger']||{});
+      var _mlMap={};
+      MAT_LEDGER.forEach(function(r){if(r&&r.id)_mlMap[r.id]=r;});
+      (Array.isArray(data.matLedger)?data.matLedger:Object.values(data.matLedger||{})).forEach(function(r){
+        if(!r||!r.id)return;
+        var lc=_mlMap[r.id];
+        if(!lc||((r._mt)||0)>=((lc._mt)||0))_mlMap[r.id]=r;
+      });
+      MAT_LEDGER=Object.values(_mlMap).filter(function(r){return !(_mlT[r.id]&&_mlT[r.id]>=(r._mt||0));});
+      localStorage.setItem('fy_mat_ledger',JSON.stringify(MAT_LEDGER));
+    }catch(e){}
+  }
+  if(data.dealHist){
+    // 成交單價庫合併：以 rid 為鍵，雲端與本機聯集（同鍵取日期新者）
+    try{
+      var _dhMap={};
+      (Array.isArray(data.dealHist)?data.dealHist:Object.values(data.dealHist||{})).concat(DEAL_HIST).forEach(function(r){
+        if(!r||!r.rid)return;
+        if(!_dhMap[r.rid]||String(r.date||'')>=String(_dhMap[r.rid].date||''))_dhMap[r.rid]=r;
+      });
+      DEAL_HIST=Object.values(_dhMap);
+      localStorage.setItem('fy_deal_hist',JSON.stringify(DEAL_HIST));
+    }catch(e){}
+  }
+  if(data.costHist){
+    // 單價庫合併：以 qid+idx 為鍵，雲端與本機聯集（同鍵取日期新者）
+    try{
+      var _chMap={};
+      (Array.isArray(data.costHist)?data.costHist:Object.values(data.costHist||{})).concat(COST_HIST).forEach(function(r){
+        if(!r||!r.qid)return;var k2=r.qid+'#'+r.idx;
+        if(!_chMap[k2]||String(r.date||'')>=String(_chMap[k2].date||''))_chMap[k2]=r;
+      });
+      COST_HIST=Object.values(_chMap);
+      localStorage.setItem('fy_cost_hist',JSON.stringify(COST_HIST));
+    }catch(e){}
+  }
+  if(data.upaCostDB){
+    try{
+      var deepMerge=function(target,src){
+        if(!src||typeof src!=='object')return;
+        Object.keys(src).forEach(function(k){
+          if(src[k]!==null&&typeof src[k]==='object'&&!Array.isArray(src[k])&&target[k]&&typeof target[k]==='object'){deepMerge(target[k],src[k]);}
+          // v5.319：原本排除 0，導致「把某項成本改成 0」永遠無法傳播、連本機重整都會被舊值蓋回
+          else if(src[k]!==undefined&&src[k]!==null){target[k]=src[k];}
+        });
+      };
+      deepMerge(UPA_COST_DB,data.upaCostDB);
+      localStorage.setItem('fy_upa_cost',JSON.stringify(UPA_COST_DB));
+      _syncUPAtoUI();
+    }catch(e){}
+  }
+  if(data.quoteSens){try{_applyQuoteSensAll(data.quoteSens);}catch(e){console.error('[同步] 報價敏感欄位套用失敗',e);}}
+  try{savePayables();}catch(e){}
+  try{_lsSet('fy_expenses',JSON.stringify(EXPENSES),'費用');}catch(e){}
 }
 // 記錄級合併：以 _mt（修改時間）新者勝；墓碑防止刪除復活
 var _MERGE_COLLS=['quotes','invoices','payables','contracts','invoiceRecs','expenses','customers','vendors'];
@@ -10097,6 +10220,65 @@ function _mergeTombs(cloudTombs){
   });
   try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e){}
 }
+// ── fydata/private 的推拉（v5.324）──
+// 讀不到 private（非管理員或規則尚未發布）時：不寫、不清、不報錯——本機成本原樣保留。
+var _privReadOk=null;      // null=未知、true=可讀、false=被拒
+function _privRef(){return (_fbDb&&_fbUser)?_fbDb.ref('fydata/private'):null;}
+function _privHashKey(){return 'fy_priv_hash';}
+function _pushPrivate(cb){
+  var ref=_privRef();
+  if(!ref||_privReadOk===false){if(cb)cb(false);return;}
+  var clean,h;
+  try{
+    var pp=_privatePayload();
+    clean=_cleanEnc(pp.data);
+    h=_collHash({q:clean.quoteSens,p:clean.payables,e:clean.expenses,c:clean.costHist,
+      u:clean.upaCostDB,s:clean.shareProfit,m:clean.matLedger,d:clean.dealHist});
+  }catch(e){if(cb)cb(false);return;}
+  if(localStorage.getItem(_privHashKey())===h){if(cb)cb(true);return;}   // 無變更不空推
+  ref.update(clean).then(function(){
+    try{localStorage.setItem(_privHashKey(),h);}catch(e){}
+    _privReadOk=true;
+    _purgeLegacySensitive();     // 私有節點寫成功 → 才清 shared 上的舊敏感資料
+    if(cb)cb(true);
+  }).catch(function(err){
+    _privReadOk=false;
+    console.warn('[同步] 私有節點無寫入權限（成本／分潤僅保留在本機）：',err&&err.message);
+    if(cb)cb(false);
+  });
+}
+function _pullPrivate(cb){
+  var ref=_privRef();
+  if(!ref){if(cb)cb(false);return;}
+  ref.once('value').then(function(snap){
+    _privReadOk=true;
+    var d=snap.val();
+    if(d){
+      try{d=_deepDecodeKeys(d);}catch(e){}
+      var wasApplying=window._applyingCloud;window._applyingCloud=true;
+      try{_applySensColls(d,TOMBS);}catch(e){console.error('[同步] 私有節點套用失敗',e);}
+      finally{if(!wasApplying)setTimeout(function(){window._applyingCloud=false;},500);}
+    }
+    if(cb)cb(true);
+  }).catch(function(err){
+    _privReadOk=false;
+    console.warn('[同步] 私有節點無讀取權限（僅顯示本機成本資料）：',err&&err.message);
+    if(cb)cb(false);
+  });
+}
+// 舊版把敏感資料寫在 fydata/shared，遷移成功後一次性清掉，否則拆節點等於沒拆
+function _purgeLegacySensitive(){
+  try{
+    if(localStorage.getItem('fy_priv_purged')==='1')return;
+    if(!_fbDb||!_fbUser)return;
+    var nul={};_PRIV_COLLS.forEach(function(k){nul[k]=null;});
+    _fbDb.ref('fydata/shared').update(nul).then(function(){
+      try{localStorage.setItem('fy_priv_purged','1');}catch(e){}
+      console.log('[同步] 已將舊的敏感資料自 fydata/shared 移除');
+    }).catch(function(e){console.warn('[同步] 舊敏感資料清除失敗',e&&e.message);});
+  }catch(e){}
+}
+
 function _pushCloud(opts){
   opts=opts||{};
   // 他人更新偵測：雲端 ts 比本機新 → 先拉回合併再推，防止互相覆蓋
@@ -10177,6 +10359,8 @@ function _pushCloud(opts){
       if(opts.onDone)opts.onDone(true);
       return;
     }
+    // v5.324：敏感資料另寫 fydata/private（失敗不影響 shared，只是留在本機）
+    try{_pushPrivate();}catch(e){}
     _fbDb.ref('fydata/shared').update(delta).then(okWrap).catch(fail);
   }catch(e){
     // .set() 同步拋錯（例如資料仍含非法值）也要關掉 loading
@@ -10185,6 +10369,14 @@ function _pushCloud(opts){
 }
 function _applyCloudSnapshot(data,cloudTime,msg){
   if(_applyCloud(data)){
+    // v5.324：shared 套用完（管理員清單也才剛合併進來）先補登記 uid，再拉私有節點蓋上去。
+    // 新裝置上的第二位管理員，本機 fy_admins 是空的，非得等這次合併完才認得出自己。
+    try{_seedAdminUid(function(){
+      _pullPrivate(function(ok){
+        if(ok){try{localStorage.setItem('fy_last_priv_sync',String(Date.now()));}catch(e){}}
+        try{_storeSyncHashes(_calcSyncHashes(_buildCleanPayload().clean));}catch(e){}
+      });
+    });}catch(e){}
     var ts=(cloudTime||Date.now()).toString();
     localStorage.setItem('fy_last_fb_sync',ts);
     localStorage.setItem('fy_last_local_save',ts);
@@ -10230,8 +10422,25 @@ function _pullCloudIfNewer(opts){
     } else {
       window._pullInFlight=false;
       if(dirty)_pushCloud({silent:true});
+      else _pullPrivateIfNewer();   // v5.324：只有成本／分潤變動時 shared 不會動，要單獨看私有節點
     }
   }).catch(function(){window._pullInFlight=false;});
+}
+// 私有節點有自己的時間戳：另一位管理員只改成本時，shared 的 uploadedAt 不會前進
+function _pullPrivateIfNewer(){
+  if(!_fbUser||!_fbDb)return;
+  if(_privReadOk===false)return;
+  try{
+    _fbDb.ref('fydata/private/uploadedAt').once('value').then(function(s){
+      var ct=parseInt(s.val())||0;
+      var mine=parseInt(localStorage.getItem('fy_last_priv_sync')||'0');
+      if(ct>0&&ct>mine){
+        _pullPrivate(function(ok){
+          if(ok){try{localStorage.setItem('fy_last_priv_sync',String(ct));}catch(e){}}
+        });
+      }else if(ct===0){_privReadOk=true;}
+    }).catch(function(){_privReadOk=false;});
+  }catch(e){}
 }
 
 // ── 對外包裝（保留舊函數名，委派到新核心）──

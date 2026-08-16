@@ -13,9 +13,21 @@
         }
       },
 
-      "backups": {
+      "private": {
+        ".read": "auth != null && root.child('fydata/adminUids').child(auth.uid).exists()",
+        ".write": "auth != null && root.child('fydata/adminUids').child(auth.uid).exists()"
+      },
+
+      "adminUids": {
         ".read": "auth != null",
-        ".write": "auth != null"
+        "$uid": {
+          ".write": "auth != null && (!root.child('fydata/adminUids').exists() || root.child('fydata/adminUids').child(auth.uid).exists())"
+        }
+      },
+
+      "backups": {
+        ".read": "auth != null && root.child('fydata/adminUids').child(auth.uid).exists()",
+        ".write": "auth != null && root.child('fydata/adminUids').child(auth.uid).exists()"
       },
 
       "logs": {
