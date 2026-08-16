@@ -2047,6 +2047,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <div class="f"><label>營業稅率 (%)</label><input id="ptax" type="number" value="5"><div class="hint">通常為 5%，影響報價單稅額計算</div></div>
           <div class="f"><label>管理費率 (%)</label><input id="pohd" type="number" value="0" min="0" max="50"><div class="hint">公司間接成本攤提（辦公室、行政、車輛…）。利潤中心的「實際淨利」會多扣 稅前收入×此%，避免毛利高估。0＝不攤提</div></div>
           <div class="f"><label>標準點工日薪 (NT$)</label><input id="plabor" type="number" value="2800" min="0"><div class="hint">供「日報出工 vs 已記點工成本」勾稽用：專案勾稽表會以 日報累計工數×此日薪 估算應有點工成本，少記超過兩成即示警。0＝不勾稽</div></div>
+          <div class="f"><label>期初現金 (NT$)</label><input id="popen" type="number" value="0"><div class="hint">導入系統時的銀行帳戶餘額。「可動用資金」與「90天水位預測」＝期初現金＋歷史實收（依票期）−已付應付−已提分潤。填 0 則水位只反映系統內的收付變化，不是真實帳戶餘額</div></div>
         </div>
         <div style="border-top:1px dashed var(--b2);margin:12px 0 0;padding-top:12px">
           <div style="font-size:12.5px;font-weight:700;color:var(--b5);margin-bottom:4px">公司固定成本明細（每月）→ 自動推算管理費率</div>
@@ -2497,7 +2498,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.317';
+var APP_VERSION='v5.318';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2578,6 +2579,7 @@ var P={
   tel:'0989-023-760',email:'generous.const@gmail.com',addr:'新北市新莊區中央路722號7樓',
   tax:5,mult:1.4,profit:18,s1:1.12,s2:1.0,s3:0.9,
   laborDayRate:2800,   // v5.317 標準點工日薪：供「日報出工 vs 已記點工成本」勾稽用
+  openingCash:0,       // v5.318 期初現金：可動用資金與 90 天水位的起算基準
   bank:'國泰世華建成分行(013)',bankAccount:'031035008864',
   // unit price defaults
   dpRent:0.111,dpLoss:0.05,dpProcess:900,dpPeriod:60,
@@ -2605,6 +2607,12 @@ let items=[],exs=[],costs=[],eid=null;
 let rmkCustom={load:'',walk:'',tech:'',bh:'',br:'',bs:'',bb:'',c2:'',c3:'',ir:'',mob:''};
 
 try{const s=localStorage.getItem('fy6_q');if(s)Q=JSON.parse(s);}catch(e){}
+// v5.318：應付狀態正規化。status 為空的舊資料在 ==='pending' 與 !=='paid' 兩種寫法下
+// 會被分別計入／排除，造成金流頁與首頁的應付數字不同。
+setTimeout(function(){try{
+  var n=0;(PAYABLES||[]).forEach(function(p){if(!p.status){p.status='pending';n++;}});
+  if(n)try{savePayables();}catch(e){}
+}catch(e){}},0);
 try{const s=localStorage.getItem('fy6_p');if(s)Object.assign(P,JSON.parse(s));}catch(e){}
 try{const s=localStorage.getItem('fy6_uh');if(s)UH=JSON.parse(s);}catch(e){}
 
@@ -2639,7 +2647,101 @@ function _stripInternalNote(note){
   return s.replace(/^[\s　]+|[\s　]+$/g,'');
 }
 const fmt=n=>Math.round(n).toLocaleString('zh-TW');
+
+// ══════════════════════════════════════════════════════════════
+// v5.318 口徑統一：同一個指標全站只有一套算法，避免各頁數字對不上
+// ══════════════════════════════════════════════════════════════
+// 稅率／保留款%：0 是合法值（免稅案、不留保留款），不可被 || 預設值吃掉
+function _taxR(){var v=(P&&P.tax);return (v==null||v==='')?5:(parseFloat(v)||0);}
+function _taxM(){return 1+_taxR()/100;}
+function _retPctOf(inv){var v=inv&&inv.retentionPct;return (v==null||v==='')?10:(parseFloat(v)||0);}
+
+// 業主保留款（含稅基礎；已退還者不計）
+function _invRetention(inv){
+  if(!inv||!inv.retention||inv.retentionReturned)return 0;
+  var base=(inv.totals&&parseFloat(inv.totals.curTotal))||0;
+  if(!base)return (inv.totals&&parseFloat(inv.totals.retention))||0;
+  return Math.round(base*_taxM()*_retPctOf(inv)/100);
+}
+// 廠商保留款（改與業主端同為含稅基礎）
+function _payRetention(p){
+  if(!p||!(parseFloat(p.retentionPct)>0)||p.status==='paid')return 0;
+  return Math.round(_payEff(p)*parseFloat(p.retentionPct)/100);
+}
+
+// 單張請款單的應收（含稅、已扣保留款、扣除實收）
+function _invAR(inv){
+  if(!inv)return 0;
+  if(inv.receivedConfirmed)return 0;   // 已結清
+  var due=(inv.totals&&parseFloat(inv.totals.total))||0;
+  return Math.max(0,due-(parseFloat(inv.received)||0));
+}
+// 全部尚有應收的請款單（全站唯一過濾條件）
+function _arList(){return INV.filter(function(i){return _invAR(i)>0;});}
+function _arTotal(){return _arList().reduce(function(a,i){return a+_invAR(i);},0);}
+
+// 待付應付（status 為空的舊資料視為待付，與清單口徑一致）
+function _apList(){return PAYABLES.filter(function(p){return p.status!=='paid';});}
+function _apTotal(){return _apList().reduce(function(a,p){return a+_payEff(p);},0);}
+
+// ── 請款單↔報價單／合約 關聯：quoteId 優先，sourceQid 相容，名稱為最後手段 ──
+function _invsOfQuote(q){
+  if(!q)return [];
+  var byId=INV.filter(function(i){return i.quoteId===q.id||i.sourceQid===q.id;});
+  if(byId.length)return byId;
+  return INV.filter(function(i){return !i.quoteId&&!i.sourceQid&&i.project===q.name;});
+}
+// 含追加案的全部請款單（主案統計用）
+function _invsOfQuoteAll(q){
+  if(!q)return [];
+  var qs=[q].concat(Q.filter(function(x){return x.parentId===q.id;}));
+  var seen={},out=[];
+  qs.forEach(function(qq){_invsOfQuote(qq).forEach(function(i){if(!seen[i.id]){seen[i.id]=1;out.push(i);}});});
+  return out;
+}
+function _invsOfContract(c){
+  if(!c)return [];
+  if(c.linkedQid){
+    var q=Q.find(function(x){return x.id===c.linkedQid;});
+    if(q){var r=_invsOfQuote(q);if(r.length)return r;}
+    var byId=INV.filter(function(i){return i.quoteId===c.linkedQid||i.sourceQid===c.linkedQid;});
+    if(byId.length)return byId;
+  }
+  return INV.filter(function(i){return i.project===c.name;});
+}
+
+// ── 實收（含票期）：票期未到的票款不算可動用 ──
+function _cashOf(inv,atTs){
+  var rcv=parseFloat(inv&&inv.received)||0;if(!rcv)return 0;
+  var cp=(inv.cashPct==null?100:(parseFloat(inv.cashPct)||0))/100;
+  var td=parseFloat(inv.ticketDays)||0;
+  var cash=rcv*cp,tk=rcv*(1-cp);
+  if(td>0&&inv.receivedDate){
+    var rdy=new Date(inv.receivedDate).getTime()+td*864e5;
+    if(rdy>(atTs||Date.now()))tk=0;
+  }
+  return cash+tk;
+}
+// 可動用資金＝期初現金＋歷史實收（依票期）−已付應付−已提分潤
+// v5.318：原本只算「歷史全部實收累計」，從未扣掉已付款與提領，水位被系統性高估
+function _availableCash(atTs){
+  var ts=atTs||Date.now();
+  var recv=INV.reduce(function(a,i){return a+_cashOf(i,ts);},0);
+  var paid=PAYABLES.filter(function(p){return p.status==='paid';}).reduce(function(a,p){return a+_payEff(p);},0);
+  var draws=0;
+  try{
+    Object.keys((SHARE_PROFIT&&SHARE_PROFIT.draws)||{}).forEach(function(y){
+      (SHARE_PROFIT.draws[y]||[]).forEach(function(d){draws+=parseFloat(d.amount)||0;});
+    });
+  }catch(e){}
+  var opening=parseFloat(P.openingCash)||0;
+  return opening+recv-paid-draws;
+}
+
 // 本地日期字串（避免 UTC 時區問題）
+// 本地日期 +n 天（避免 UTC 造成日期偏移）
+function _datePlus(n){var d=new Date();d.setDate(d.getDate()+(n||0));
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function localToday(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 const fmtD=d=>d?d.replace(/-/g,'/'):'' ;
 const gv=id=>{const e=document.getElementById(id);return e?e.value:''};
@@ -2831,6 +2933,7 @@ function doSaveP(){
   P.tax=parseFloat(gv('ptax'))||5;
   P.overheadPct=parseFloat(gv('pohd'))||0;
   P.laborDayRate=parseFloat(gv('plabor'))||0;
+  P.openingCash=parseFloat(gv('popen'))||0;
   P.mult=parseFloat(gv('pmul'))||1.4;
   P.profit=parseFloat(gv('ppro'))||18;
   P.s1=parseFloat(gv('ps1'))||1.12;P.s2=parseFloat(gv('ps2'))||1.0;P.s3=parseFloat(gv('ps3'))||0.9;
@@ -2968,7 +3071,7 @@ function syncParamsUI(){
   try{rFixedCosts();}catch(e){}
   try{var _pk=document.getElementById('paikey');if(_pk)_pk.value=_aiKey();}catch(e){}
   const m={pc:'company',pt:'taxid',pb:'boss',pco:'contact',ptel:'tel',pem:'email',pad:'addr',
-    ptax:'tax',pohd:'overheadPct',plabor:'laborDayRate',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
+    ptax:'tax',pohd:'overheadPct',plabor:'laborDayRate',popen:'openingCash',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
     'dp-rent':'dpRent','dp-loss':'dpLoss','dp-process':'dpProcess','dp-period':'dpPeriod',
     'dp-i-h300':'dpIH300','dp-r-h300':'dpRH300','dp-i-h350':'dpIH350','dp-r-h350':'dpRH350',
     'dp-i-h400':'dpIH400','dp-r-h400':'dpRH400','dp-i-s':'dpIS','dp-r-s':'dpRS',
@@ -7073,16 +7176,18 @@ function rDash(){
       });
       const _diffs=Math.abs(awardedOrig-awardedAmt)>1;
       // 應收／應付併入同一組 KPI 卡（四卡形式統一）
+      // v5.318：改用全站統一的應收／應付函式。原本這裡不扣已收金額也不排除足額單，
+      // 與下方應收卡、金流頁的數字對不上（同一畫面兩個「應收帳款」）。
       let _arT=0,_arN=0,_apT=0,_apN=0;
       try{
-        INV.forEach(inv=>{if(!inv.receivedConfirmed){_arT+=((inv.totals&&inv.totals.total)||0);_arN++;}});
-        (PAYABLES||[]).forEach(p=>{if(p.status!=='paid'){_apT+=_payEff(p);_apN++;}});
+        _arT=_arTotal();_arN=_arList().length;
+        _apT=_apTotal();_apN=_apList().length;
       }catch(e){}
       kgrid.innerHTML=
         '<div class="kpi" style="flex:1;min-width:120px"><div class="kl">總報價金額</div><div class="kv" style="font-size:18px">NT$ '+fmt(totalAmt)+'</div><div class="ks">共 '+totalQ+' 件</div></div>'+
         '<div class="kpi hi" style="flex:1;min-width:120px"><div class="kl">得標金額'+(_diffs?'（合約現值）':'')+'</div><div class="kv" style="font-size:18px;color:var(--g3)">NT$ '+fmt(awardedAmt)+'</div><div class="ks">'+awardedQ+' 件得標'+(_diffs?'　·　原始得標 NT$ '+fmt(awardedOrig):'')+'</div></div>'+
         '<div class="kpi" style="flex:1;min-width:120px;cursor:pointer" onclick="go(\'finance\');setTimeout(function(){switchFinanceTab(\'ar\');},50)"><div class="kl">應收帳款</div><div class="kv" style="font-size:18px;color:#b26a00">NT$ '+fmt(_arT)+'</div><div class="ks">'+_arN+' 件待收</div></div>'+
-        '<div class="kpi" style="flex:1;min-width:120px;cursor:pointer" onclick="go(\'finance\');setTimeout(function(){switchFinanceTab(\'payable\');},50)"><div class="kl">應付帳款</div><div class="kv" style="font-size:18px;color:#c62828">NT$ '+fmt(_apT)+'</div><div class="ks">待付 '+_apN+' 筆</div></div>';
+        '<div class="kpi" style="flex:1;min-width:120px;cursor:pointer" onclick="go(\'finance\');setTimeout(function(){window._payAging=\'unpaid\';switchFinanceTab(\'payable\');},50)"><div class="kl">應付帳款</div><div class="kv" style="font-size:18px;color:#c62828">NT$ '+fmt(_apT)+'</div><div class="ks">待付 '+_apN+' 筆</div></div>';
     }
     // 最近報價
     const dl=document.getElementById('dash-list');
@@ -7128,15 +7233,25 @@ function renderBizGates(){
   var lost=Q.filter(function(q){return q.bidStatus==='lost';}).length;
   var winRate=(awarded+lost)>0?Math.round(awarded/(awarded+lost)*100):null;
   // 2) 預估 vs 實際毛利率（得標案；預估優先用工項成本單價，未填則退用系統估算毛利 netR）
+  // v5.318 口徑統一：一律「未稅對未稅」。原本分母用含稅報價總額、分子的成本卻是未稅，
+  // 毛利率被系統性高估約 5 個百分點，且與利潤頁的算法完全不同（點過去看到另一個數字）。
   var estT=0,estC=0,actT=0,actC=0;
-  Q.filter(function(q){return q.awarded;}).forEach(function(q){
-    var tot=q.t?.total||0;if(tot<=0)return;
-    var _em=_effQtyMap(q);
-    var ec=0;(q.items||[]).forEach(function(it){if(!it.sec)ec+=_effQty(_em,it)*(parseFloat(it.estCost)||0);});
-    if(ec>0){estT+=tot;estC+=ec*(1+(P.tax||5)/100);}
-    else if(q.t&&q.t.netR!=null){estT+=tot;estC+=tot*(1-q.t.netR);} // 未填成本單價：用報價時的估算毛利
-    var ac=0;try{ac=_projCostTotal(q);}catch(e){}
-    if(ac>0){actT+=tot;actC+=ac;}
+  Q.filter(function(q){return q.awarded&&!q.parentId;}).forEach(function(q){
+    var _all=[q].concat(Q.filter(function(x){return x.parentId===q.id;}));
+    var sub=_all.reduce(function(a,x){return a+(x.t?.sub||0);},0);   // 未稅報價金額
+    if(sub<=0)return;
+    var ec=0;
+    _all.forEach(function(x){
+      var _em=_effQtyMap(x);
+      (x.items||[]).forEach(function(it){if(!it.sec)ec+=_effQty(_em,it)*(parseFloat(it.estCost)||0);});
+    });
+    if(ec>0){estT+=sub;estC+=ec;}                                    // estCost 為未稅，不再乘稅
+    else{
+      var _en=_all.reduce(function(a,x){return a+(x.t?.net||0);},0);
+      if(_en)  {estT+=sub;estC+=Math.max(0,sub-_en);}                // 未填成本單價：用報價時的估算毛利
+    }
+    var ac=0;try{ac=_all.reduce(function(a,x){return a+_projCostTotal(x);},0);}catch(e){}
+    if(ac>0){actT+=sub;actC+=ac;}                                    // 實際成本亦為未稅
   });
   var estM=estT>0?Math.round((estT-estC)/estT*100):null;
   var actM=actT>0?Math.round((actT-actC)/actT*100):null;
@@ -7160,7 +7275,7 @@ function renderBizGates(){
   var recvAvg=recvN>0?Math.round(recvSum/recvN):null;
   // 5) 保留款餘額（各請款單保留款累計；出土面退回後請手動在請款單取消保留款勾選或沖銷）
   var retSum=0;
-  INV.forEach(function(v){if(!v.retentionReturned)retSum+=(v.totals&&parseFloat(v.totals.retention))||0;});
+  INV.forEach(function(v){retSum+=_invRetention(v);});   // v5.318 統一函式（即時重算＋排除已退還＋檢查勾選）
   // 6) 前三大業主佔比（得標金額）
   var byClient={};var awardTot=0;
   Q.filter(function(q){return q.awarded;}).forEach(function(q){
@@ -7175,7 +7290,9 @@ function renderBizGates(){
   // 材料統計（全專案材料租金/運費科目＋台帳購置總額）
   var _gMatRent=0,_gMatTrans=0,_gMatBuy=0;
   try{
-    Q.forEach(function(q){(q.costs||[]).forEach(function(c2){
+    // v5.318：母體與材料管理頁一致（僅得標或已估算的專案），原本連未得標報價的成本
+    // 都算進公司級 KPI，點過去看到的數字對不上
+    Q.filter(function(q){return q.awarded||q.matEst;}).forEach(function(q){(q.costs||[]).forEach(function(c2){
       var cat=c2.cat?_costCatNorm(c2.cat):_costDefaultCat(c2.type);
       if(cat==='材料租金')_gMatRent+=parseFloat(c2.amt)||0;
       else if(cat==='材料運費')_gMatTrans+=parseFloat(c2.amt)||0;
@@ -7187,7 +7304,7 @@ function renderBizGates(){
     +'<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:12px 14px">'
     +kpi('前三大業主佔比',top3Pct==null?na:top3Pct+'%',top3.map(function(x){return esc(String(x[0]).slice(0,6));}).join('・')||'—',top3Pct==null?null:top3Pct<50?'var(--g3)':'#e65100',"go('contacts')")
     +kpi('有效成交率',winRate==null?na:winRate+'%','勝 '+awarded+'／敗 '+lost,winRate==null?null:winRate>=30?'var(--g3)':'#e65100',"go('quotes')")
-    +kpi('實際毛利率',actM==null?na:actM+'%','已登錄成本的得標案',actM==null?null:actM>=35?'var(--g3)':'#e65100',"go('profit')")
+    +kpi('實際毛利率',actM==null?na:actM+'%','已登錄成本的得標案（未稅對未稅）',actM==null?null:actM>=35?'var(--g3)':'#e65100',"go('profit')")
     +kpi('平均收款天數',recvAvg==null?na:recvAvg+' 天','請款日→預計收款日（'+recvN+' 筆）',recvAvg==null?null:recvAvg<=60?'var(--g3)':'#e65100',"go('finance');setTimeout(function(){switchFinanceTab('ar')},50)")
     +kpi('保留款累計',retSum>0?('NT$ '+fmt(retSum)):na,'押在業主端的保證金',retSum>0?'#b26a00':null,"go('invoice')")
     +kpi('機具稼動',hasEq?(eqNow+' 天'):na,'日報勾「自有機具」'+(hasEq?('・上月 '+eqPrev+' 天'):''),eqAlert?'#c62828':(hasEq&&eqNow>=6?'var(--g3)':null),"go('quickcost')")
@@ -7296,7 +7413,7 @@ function updateDashTodo(){
     var od=Math.floor((now.getTime()-new Date(p.date).getTime())/864e5);
     if(od<=0)return;
     items.push({type:'pay_overdue',urgent:true,
-      jump:"go('finance');setTimeout(function(){switchFinanceTab('payable')},250)",
+      jump:"go('finance');setTimeout(function(){window._payAging='overdue';switchFinanceTab('payable')},250)",
       icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>',color:'var(--red)',
       text:'🔴 逾期 '+od+' 天未付款：'+(p.to||'廠商')+(p.project?' / '+p.project:'')+'（預計'+p.date+'）',
       sub:'NT$ '+fmt(_payEff(p))});
@@ -7358,12 +7475,13 @@ function newCustomer(){
 function renderClientReport(el,year,month){
   const mFilter=month?String(month).padStart(2,'0'):'';
   const byClient={};
-  Q.filter(q=>q.date&&q.date.startsWith(String(year))).forEach(q=>{
+  Q.filter(q=>q.date&&q.date.startsWith(String(year))&&(!mFilter||q.date.slice(5,7)===mFilter)).forEach(q=>{
     const k=q.client||'未知業主';
     if(!byClient[k])byClient[k]={quotes:[],invs:[]};
     byClient[k].quotes.push(q);
   });
-  INV.filter(i=>i.date&&i.date.startsWith(String(year))).forEach(i=>{
+  // v5.318：mFilter 原本宣告後從未使用，月份下拉對此報表無作用
+  INV.filter(i=>i.date&&i.date.startsWith(String(year))&&(!mFilter||i.date.slice(5,7)===mFilter)).forEach(i=>{
     const k=i.client||'未知業主';
     if(!byClient[k])byClient[k]={quotes:[],invs:[]};
     byClient[k].invs.push(i);
@@ -7376,7 +7494,13 @@ function renderClientReport(el,year,month){
     '<tbody>'+Object.entries(byClient).map(([client,data])=>{
       const qAmt=data.quotes.reduce((a,q)=>a+(q.t?.total||0),0);
       const iAmt=data.invs.reduce((a,i)=>a+(i.totals?.total||0),0);
-      const rAmt=data.invs.reduce((a,i)=>a+(parseFloat(i.received||0)),0);
+      // 已收款只認「同年度（或同月）實際收到」的，避免跨年案的應收餘額失真
+      const rAmt=data.invs.reduce((a,i)=>{
+        const rd=i.receivedDate||'';
+        if(!rd.startsWith(String(year)))return a;
+        if(mFilter&&rd.slice(5,7)!==mFilter)return a;
+        return a+(parseFloat(i.received)||0);
+      },0);
       return`<tr style="border-bottom:1px solid var(--b1)">
         <td style="padding:6px 8px;font-weight:700">${esc(client)}</td>
         <td style="padding:6px 8px;text-align:right">${data.quotes.length}</td>
@@ -7709,12 +7833,7 @@ function updateInvStats(){
     +(overdue>0?'<div class="kpi yel" style="flex:1;min-width:120px"><div class="kl">逾期未收</div><div class="kv" style="font-size:20px;color:var(--red)">'+overdue+'</div><div class="ks">件</div></div>':'');
 
   // 保留款統計
-  const totalRetention=INV.reduce((a,i)=>{
-    if(!i.retention||i.retentionReturned)return a; // 已退還不再計入
-    const pct=(i.retentionPct||10)/100;
-    const gross=(i.totals?.curTotal||0)*(1+(P.tax||5)/100);
-    return a+gross*pct;
-  },0);
+  const totalRetention=INV.reduce((a,i)=>a+_invRetention(i),0);   // v5.318 統一函式
   const retEl=document.getElementById('inv-retention-stats');
   if(retEl){
     if(totalRetention>0){
@@ -7746,25 +7865,11 @@ function updateDashAR(){
   const arSum=document.getElementById('dash-ar-summary');
   if(!arCard||!arSum)return;
   const now=Date.now();
-  const unpaidInvs=INV.filter(inv=>{
-    const t=inv.totals||{};
-    const received=parseFloat(inv.received)||0;
-    return !inv.receivedConfirmed && received<(t.total||0);
-  });
-  const totalUnpaid=unpaidInvs.reduce((a,inv)=>{
-    const t=inv.totals||{};
-    return a+(t.total||0)-(parseFloat(inv.received)||0);
-  },0);
+  const unpaidInvs=_arList();                 // v5.318 全站統一
+  const totalUnpaid=_arTotal();
 
-  // 可用現金（所有INV，已收款中扣除票期未到部分）
-  const availCash=INV.reduce((a,i)=>{
-    const rcv=parseFloat(i.received||0);if(!rcv)return a;
-    const cp=(i.cashPct||100)/100;
-    const td=i.ticketDays||0;
-    let tkAmt=rcv*(1-cp);
-    if(td>0&&i.receivedDate){const r=new Date(i.receivedDate).getTime()+td*86400000;if(r>now)tkAmt=0;}
-    return a+rcv*cp+tkAmt;
-  },0);
+  // 可動用資金（與金流 KPI 同一函式）
+  const availCash=_availableCash(now);
   const ticketPending=INV.reduce((a,i)=>{
     const rcv=parseFloat(i.received||0);if(!rcv||!i.ticketDays||!i.receivedDate)return a;
     const tkAmt=rcv*(1-(i.cashPct||100)/100);if(!tkAmt)return a;
@@ -7803,14 +7908,8 @@ function updateInvPageBanners(){
   const arBanner=document.getElementById('inv-ar-banner');
   const arDetail=document.getElementById('inv-ar-detail');
   if(arBanner&&arDetail){
-    const unpaidInvs=INV.filter(inv=>{
-      const t=inv.totals||{};
-      return !inv.receivedConfirmed&&(parseFloat(inv.received)||0)<(t.total||0);
-    });
-    const totalUnpaid=unpaidInvs.reduce((a,inv)=>{
-      const t=inv.totals||{};
-      return a+(t.total||0)-(parseFloat(inv.received)||0);
-    },0);
+    const unpaidInvs=_arList();      // v5.318 全站統一
+    const totalUnpaid=_arTotal();
     if(unpaidInvs.length){
       arBanner.style.display='block';
       // 依業主分組
@@ -7819,7 +7918,7 @@ function updateInvPageBanners(){
         const k=inv.client||'未知業主';
         if(!byClient[k])byClient[k]={count:0,amount:0};
         byClient[k].count++;
-        byClient[k].amount+=(inv.totals?.total||0)-(parseFloat(inv.received)||0);
+        byClient[k].amount+=_invAR(inv);
       });
       arDetail.innerHTML=Object.entries(byClient).map(([client,data])=>
         `<div style="background:#fff8e1;border-radius:6px;padding:6px 10px">
@@ -7906,15 +8005,16 @@ function exportQuotesExcel(){
   toast('✅ 報價單已匯出');
 }
 function exportInvExcel(){
-  const headers=['工程名稱','業主','期數','月份','估驗日期','請款總額','含稅總額','已收款','待收款','收款狀態','備註'];
+  // v5.318：原本『請款總額』取 t.sub（totals 根本沒這欄，永遠輸出 0）；『含稅總額』其實是已扣保留款後的金額，標題誤導
+  const headers=['工程名稱','業主','期數','月份','估驗日期','未稅請款額','保留款','應收含稅額','已收款','待收款','收款狀態','備註'];
   const rows=INV.map(inv=>{
     const t=inv.totals||{};
     const received=parseFloat(inv.received)||0;
-    const unpaid=Math.max(0,(t.total||0)-received);
+    const unpaid=_invAR(inv);
     const status=inv.receivedConfirmed?'已結清':received>=(t.total||0)?'已收款':'未收款';
     const notes=Array.isArray(inv.note)?inv.note.join(' / '):(inv.note||'');
     return [inv.project||'',inv.client||'',inv.periodNo||'',inv.month||'',inv.date||'',
-      t.sub||0,t.total||0,received,unpaid,status,notes];
+      t.curTotal||0,_invRetention(inv),t.total||0,received,unpaid,status,notes];
   });
   downloadCSV('請款單_'+fmtDateStr(),headers,rows);
   toast('✅ 請款單已匯出');
@@ -9756,7 +9856,7 @@ function _onSave(){ _markDirty(); _pushCloud({silent:true}); }
 function _dailyBackup(){
   try{
     if(!_fbUser||!_fbStorage)return;
-    var today=new Date().toISOString().slice(0,10);
+    var today=localToday();   // v5.318 本地日期
     if(localStorage.getItem('fy_snap_date')===today)return;
     // v5.314：改用與匯出備份相同的完整 payload（原本缺客戶／廠商／單價庫／材料台帳／分潤，災難還原時救不回）
     var _snap;try{_snap=_syncPayload().data;}catch(e2){_snap={quotes:Q,invoices:INV,contracts:CONTRACTS,payables:PAYABLES,invoiceRecs:INVOICE_RECS,expenses:EXPENSES,params:P};}
@@ -10079,7 +10179,9 @@ function syncCostToPayable(q, cost){
     quoteId:q.id,
     to:cost.vendor||'未命名',
     amount:cost.amt,
-    date:(existP&&existP.date)||q.date||localToday(),
+    // v5.318：預設付款日改「今日＋30」。原本用 q.date（報價日，往往是幾個月前），
+    // 自動建立的應付一出生就是過去日期 → 帳齡全部落進「逾期」桶、90 天預測在第 0 天出現假凹陷
+    date:(existP&&existP.date)||cost.date||_datePlus(30),
     category:catMap[cost.type]||'subcontract',
     project:q.name||'',
     status:existStatus,
@@ -13202,11 +13304,16 @@ function renderProjects(){
     const adds=Q.filter(x=>x.parentId===q.id);
     const quoteTotal=(q.t&&q.t.total||0)+adds.reduce((a,x)=>a+((x.t&&x.t.total)||0),0);
     const ct=(CONTRACTS||[]).find(c=>c.linkedQid===q.id)||(CONTRACTS||[]).find(c=>c.name===q.name);
-    const invs=INV.filter(x=>x.quoteId===q.id||(!x.quoteId&&x.project===q.name)).sort((a,b)=>(parseInt(a.periodNo)||1)-(parseInt(b.periodNo)||1));
+    // v5.318：改用統一歸戶函式（含追加案的請款單，原本追加案的請款在專案卡完全看不到，
+    // 應收與估驗進度不含追加額、成本卻含，毛利被系統性低估）
+    const invs=_invsOfQuoteAll(q).slice().sort((a,b)=>(parseInt(a.periodNo)||1)-(parseInt(b.periodNo)||1));
     const billed=invs.reduce((a,x)=>a+((x.totals&&x.totals.total)||0),0);
-    const recv=invs.filter(x=>x.receivedConfirmed).reduce((a,x)=>a+((x.totals&&x.totals.total)||0),0);
-    const cost=_projCostTotal(q)+adds.reduce((a,x)=>a+_projCostTotal(x),0);
-    const base=ct?ct.amount:quoteTotal;
+    // 已收款一律以實收金額為準（原本只要按過確認就認列整張單全額，部分收款會虛增）
+    const recv=invs.reduce((a,x)=>a+(parseFloat(x.received)||0),0);
+    const costNet=_projCostTotal(q)+adds.reduce((a,x)=>a+_projCostTotal(x),0);   // 未稅
+    const cost=Math.round(costNet*_taxM());                                       // 含稅（與合約金額同稅基）
+    // 合約金額可能為空字串／未填 → 用報價總額，避免毛利顯示 NaN
+    const base=(ct&&parseFloat(ct.amount)>0)?parseFloat(ct.amount):quoteTotal;
     const profit=base-cost;
     const done=!!(ct&&(ct.status==='done'||ct.status==='completed'));
     // 進度條產生器（估驗/付款/施工共用）
@@ -13220,12 +13327,15 @@ function renderProjects(){
     const projPays=(PAYABLES||[]).filter(p=>p.quoteId===q.id||adds.some(a=>a.id===p.quoteId));
     const payTotal=projPays.reduce((a,p)=>a+_payEff(p),0);
     const payPaid=projPays.filter(p=>p.status==='paid').reduce((a,p)=>a+_payEff(p),0);
-    const payOverAR=billed>0&&payTotal>billed; // 應付累計不得超過應收請款累計
+    // v5.318：請款額已扣保留款、應付卻是含稅全額，保留款 10% 的案子會在成本執行率
+    // 還不到 95% 時就誤報。比較基準改為「請款額＋保留款」。
+    const billedInclRet=billed+invs.reduce((a,x)=>a+_invRetention(x),0);
+    const payOverAR=billedInclRet>0&&payTotal>billedInclRet;
     // 施工投入（成本執行率）：實際成本 vs 預估成本（工項成本單價×數量，未稅→含稅口徑對齊）
     let estCostTotal=0;
     const effM=_effQtyMap(q); // 追加減結算後的生效數量（報價原樣保留）
     [q].concat(adds).forEach(x=>{(x.items||[]).forEach(it=>{if(!it.sec)estCostTotal+=_effQty(effM,it)*(parseFloat(it.estCost)||0);});});
-    estCostTotal=estCostTotal*(1+(P.tax||5)/100);
+    // v5.318：預估與實際都用未稅（原本預估乘了稅、分子卻是未稅成本，執行率被低估約 5%）
     // 施工實體進度：日報回報數量 vs 合約數量（金額加權；工務日報選工項填數量即連動）
     let physRepV=0,physBaseV=0,hasPhysRep=false;
     [q].concat(adds).forEach(x=>{
@@ -13263,9 +13373,11 @@ function renderProjects(){
       +'<button type="button" onclick="event.stopPropagation();projDelConfirmFile(\''+q.id+'\','+fi+')" style="border:none;background:none;color:var(--b3);cursor:pointer;padding:0;font-size:11px">✕</button></span>').join(' ');
     const drN=(q.dailyLogs||[]).length;
     steps.push({label:'施工進度',done:cost>0||cfN>0,
-      info:'施工成本 '+((q.costs||[]).length+adds.reduce((a,x)=>a+((x.costs||[]).length),0))+' 筆・NT$ '+fmt(cost)+'　/　工作確認單 '+cfN+' 份'+(drN?('　/　日報 '+drN+' 篇'):''),
-      bar:physBaseV>0?{pct:physPct,warn:false,label:'施工進度（日報回報數量/合約數量，金額加權）'}
-        :((estCostTotal>0&&cost>0)?{pct:cost/estCostTotal*100,warn:cost>estCostTotal,label:'成本執行率（實際/預估成本）'}:null),
+      info:'施工成本 '+((q.costs||[]).length+adds.reduce((a,x)=>a+((x.costs||[]).length),0))+' 筆・NT$ '+fmt(costNet)+'（未稅）　/　工作確認單 '+cfN+' 份'+(drN?('　/　日報 '+drN+' 篇'):''),
+      // v5.318：原本判斷用 physBaseV>0（只要工項有數量單價就恆成立），使「完全沒寫日報」
+      // 的專案一律顯示施工進度 0%，成本執行率的退路永遠進不去。改判有無日報回報。
+      bar:(hasPhysRep&&physBaseV>0)?{pct:physPct,warn:false,label:'施工進度（日報回報數量/合約數量，金額加權）'}
+        :((estCostTotal>0&&costNet>0)?{pct:costNet/estCostTotal*100,warn:costNet>estCostTotal,label:'成本執行率（實際/預估成本，均未稅）'}:null),
       extra:'<button type="button" onclick="event.stopPropagation();viewDailyReports(\''+q.id+'\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit">📋 日報'+(drN?('（'+drN+'）'):'')+'</button> '
         +'<button type="button" onclick="event.stopPropagation();openProjectCosts(\''+q.id+'\')" style="border:1px solid #ffcc80;background:#fff8ec;color:#e65100;border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本</button> '
         +'<button type="button" onclick="event.stopPropagation();projUpload(\'confirm\',\''+q.id+'\')" style="border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 上傳確認單</button>'
@@ -13278,10 +13390,11 @@ function renderProjects(){
       extra:periodChips,jump:"go('invoice')"});
     steps.push({label:'廠商請款（應付）',done:payTotal>0&&payPaid>=payTotal,
       info:projPays.length?('應付 '+projPays.length+' 筆・NT$ '+fmt(payTotal)+'／已付 NT$ '+fmt(payPaid)
-        +(payOverAR?'　<span style="color:#c62828;font-weight:800">⚠ 應付累計已超過應收請款（'+fmt(payTotal)+' > '+fmt(billed)+'），請核對下包請款數量</span>':'')):'尚無應付帳款（登錄施工成本後自動連動）',
+        +(payOverAR?'　<span style="color:#c62828;font-weight:800">⚠ 應付累計已超過應收請款（'+fmt(payTotal)+' > '+fmt(billedInclRet)+'，均含稅），請核對下包請款數量</span>':'')):'尚無應付帳款（登錄施工成本後自動連動）',
       bar:payTotal>0?{pct:payPaid/payTotal*100,warn:payOverAR,label:'付款進度（已付/應付）'}:null,
       jump:"go('finance');setTimeout(function(){switchFinanceTab('payable')},150)"});
-    steps.push({label:'收款',done:invs.length>0&&recv>=billed&&billed>0,info:'已收 NT$ '+fmt(recv)+'／待收 NT$ '+fmt(billed-recv),jump:"go('invoice')"});
+    const arLeft=invs.reduce((a,x)=>a+_invAR(x),0);
+    steps.push({label:'收款',done:invs.length>0&&arLeft<=0&&billed>0,info:'已收 NT$ '+fmt(recv)+'／待收 NT$ '+fmt(arLeft),jump:"go('invoice')"});
     const isClosed=!!q.closed;
     steps.push({label:'完工／結案',done:isClosed,
       info:isClosed?('已結案'+(q.closedAt?('　'+new Date(q.closedAt).toLocaleDateString('zh-TW')):'')):(done?'合約已完工（可結案）':'進行中'),
@@ -13520,7 +13633,7 @@ function _payFilesRow(p){
     +'<button type="button" class="btn btn-xs" title="拍照或上傳匯款紀錄／轉帳截圖" onclick="_payUpload(\''+p.id+'\',\'pay\')" style="border-color:var(--b3);color:var(--b4)"><svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg> 匯款紀錄</button>'
     +chips+'</div>';
 }
-function _payEff(p){var a=parseFloat(p.amount)||0;return p.vat===false?Math.round(a):Math.round(a*1.05);}
+function _payEff(p){var a=parseFloat(p.amount)||0;return p.vat===false?Math.round(a):Math.round(a*_taxM());}   // v5.318 不再寫死 1.05
 function _payVatAmt(p){return _payEff(p)-Math.round(parseFloat(p.amount)||0);}
 function togglePayVat(pid,on){
   var p=PAYABLES.find(x=>x.id===pid);if(!p)return;
@@ -13546,11 +13659,13 @@ function renderPayables(){
   }
   // 到期分桶濾鏡
   const _today=localToday();
-  const _in7=(function(){var d=new Date();d.setDate(d.getDate()+7);return d.toISOString().slice(0,10);})();
+  const _in7=(function(){var d=new Date();d.setDate(d.getDate()+7);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();   // v5.318 改本地日期（原本用 UTC，台灣早上 8 點前差一天）
   const aged=filtered.filter(p=>{
     if(!window._payAging||_payAging==='all')return true;
     if(_payAging==='paid')return p.status==='paid';
     if(p.status==='paid')return false;
+    if(_payAging==='unpaid')return true;   // v5.318 待付（與應付 KPI 同口徑）
     if(_payAging==='overdue')return p.date&&p.date<_today;
     if(_payAging==='w7')return p.date&&p.date>=_today&&p.date<=_in7;
     if(_payAging==='later')return !p.date||p.date>_in7;
@@ -13558,16 +13673,19 @@ function renderPayables(){
   });
   const _agingBar=(function(){
     const pend=filtered.filter(p=>p.status!=='paid');
-    const cnt={overdue:pend.filter(p=>p.date&&p.date<_today).length,
-      w7:pend.filter(p=>p.date&&p.date>=_today&&p.date<=_in7).length,
-      later:pend.filter(p=>!p.date||p.date>_in7).length,
-      paid:filtered.filter(p=>p.status==='paid').length};
+    const sum=arr=>fmt(arr.reduce((a,p)=>a+_payEff(p),0));
+    const gOverdue=pend.filter(p=>p.date&&p.date<_today),
+          gW7=pend.filter(p=>p.date&&p.date>=_today&&p.date<=_in7),
+          gLater=pend.filter(p=>!p.date||p.date>_in7),
+          gPaid=filtered.filter(p=>p.status==='paid');
+    const cnt={overdue:gOverdue.length,w7:gW7.length,later:gLater.length,paid:gPaid.length};
     const chip=(k,lb,clr)=>'<button type="button" onclick="window._payAging=\''+k+'\';renderPayables()" style="font-family:inherit;font-size:12.5px;padding:0 12px;height:36px;line-height:34px;border-radius:99px;cursor:pointer;border:1px solid '+((window._payAging||'all')===k?clr:'var(--b2)')+';background:'+((window._payAging||'all')===k?clr:'#fff')+';color:'+((window._payAging||'all')===k?'#fff':'var(--b4)')+';flex:0 1 auto">'+lb+'</button>';
     return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 14px;justify-content:center;padding:0 4px">'
       +chip('all','全部','var(--g3)')
-      +chip('overdue','🔴 逾期 '+cnt.overdue,'var(--red)')
-      +chip('w7','7日內 '+cnt.w7,'#b45309')
-      +chip('later','7日後 '+cnt.later,'var(--b4)')
+      +chip('unpaid','待付 '+pend.length+'（'+sum(pend)+'）','var(--g3)')
+      +chip('overdue','逾期 '+cnt.overdue+'（'+sum(gOverdue)+'）','var(--red)')
+      +chip('w7','7日內 '+cnt.w7+'（'+sum(gW7)+'）','#b45309')
+      +chip('later','7日後 '+cnt.later+'（'+sum(gLater)+'）','var(--b4)')
       +chip('paid','已付 '+cnt.paid,'var(--g)')
       +'</div>';
   })();
@@ -13673,16 +13791,14 @@ function updateFinanceKPIs(){
   const taxRate=1+(P.tax||5)/100;
 
   // 應收帳款（未收款，含稅）
-  const arInvs=INV.filter(i=>!i.receivedConfirmed&&(parseFloat(i.received)||0)<(i.totals?.total||0));
-  const totalAR=arInvs.reduce((a,i)=>a+(i.totals?.total||0)-(parseFloat(i.received)||0),0);
+  const arInvs=_arList();
+  const totalAR=_arTotal();
 
-  // 應付帳款（待付）
-  const totalAP=PAYABLES.filter(p=>p.status==='pending').reduce((a,p)=>a+_payEff(p),0);
+  // 應付帳款（待付；status 為空的舊資料也算待付，與清單口徑一致）
+  const totalAP=_apTotal();
 
-  // 廠商保留款（待退還）
-  var totalVendorRetention=PAYABLES.filter(function(p){return (p.retentionPct||0)>0&&p.status!=='paid';}).reduce(function(a,p){
-    return a+(p.retentionPct||0)/100*(p.amount||0);
-  },0);
+  // 廠商保留款（待退還；改與業主端同為含稅基礎）
+  var totalVendorRetention=PAYABLES.reduce(function(a,p){return a+_payRetention(p);},0);
 
   // 本月實收
   const thisMonth=new Date();
@@ -13692,28 +13808,16 @@ function updateFinanceKPIs(){
     return d.getMonth()===thisMonth.getMonth()&&d.getFullYear()===thisMonth.getFullYear();
   }).reduce((a,i)=>a+(parseFloat(i.received)||0),0);
 
-  // 可用現金（考慮票期：票期未到的票款不算可用）
-  const availableCash=INV.reduce((a,i)=>{
-    const rcv=parseFloat(i.received||0);
-    if(!rcv)return a;
-    const cashPct=(i.cashPct||100)/100;
-    const ticketDays=i.ticketDays||0;
-    const cashAmt=rcv*cashPct;
-    let ticketAmt=rcv*(1-cashPct);
-    if(ticketDays>0&&i.receivedDate){
-      const ticketReady=new Date(i.receivedDate).getTime()+ticketDays*86400000;
-      if(ticketReady>now)ticketAmt=0;
-    }
-    return a+cashAmt+ticketAmt;
-  },0);
+  // 可用現金＝期初現金＋歷史實收（依票期）−已付應付−已提分潤（v5.318 統一口徑）
+  const availableCash=_availableCash(now);
 
   // 票期中（尚未到期的票款）
   const ticketPending=INV.reduce((a,i)=>{
     const rcv=parseFloat(i.received||0);
-    if(!rcv||!(i.ticketDays||0)||!i.receivedDate)return a;
-    const ticketAmt=rcv*(1-(i.cashPct||100)/100);
+    if(!rcv||!(parseFloat(i.ticketDays)||0)||!i.receivedDate)return a;
+    const ticketAmt=rcv*(1-(i.cashPct==null?100:(parseFloat(i.cashPct)||0))/100);
     if(!ticketAmt)return a;
-    const ticketReady=new Date(i.receivedDate).getTime()+(i.ticketDays||0)*86400000;
+    const ticketReady=new Date(i.receivedDate).getTime()+(parseFloat(i.ticketDays)||0)*86400000;
     return ticketReady>now?a+ticketAmt:a;
   },0);
 
@@ -13729,12 +13833,13 @@ function updateFinanceKPIs(){
     <div class="kpi" style="flex:1;min-width:130px;background:#fff0f0">
       <div class="kl" style="color:#b71c1c"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 應付帳款</div>
       <div class="kv" style="font-size:16px;color:var(--red)">NT$ ${fmt(totalAP)}</div>
-      <div class="ks">待付 ${PAYABLES.filter(p=>p.status==='pending').length} 筆${totalVendorRetention>0?' ／ <svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg>保留NT$'+fmt(Math.round(totalVendorRetention)):''}</div>
+      <div class="ks">待付 ${_apList().length} 筆${totalVendorRetention>0?' ／ <svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg>保留NT$'+fmt(Math.round(totalVendorRetention)):''}</div>
     </div>
     <div class="kpi ${netCF>=0?'hi':''}" style="flex:1;min-width:150px;${netCF<0?'background:#fff0f0':''}">
       <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 可動用資金（已扣應付）</div>
       <div class="kv" style="font-size:16px;color:${netCF>=0?'var(--g3)':'var(--red)'}">NT$ ${fmt(netCF)}</div>
       <div class="ks">可用現金 ${fmt(availableCash)} − 待付 ${fmt(totalAP)}${ticketPending>0?'　·　票期中 '+fmt(ticketPending):''}</div>
+      <div class="ks" style="font-size:10px;color:var(--b3)">期初 ${fmt(parseFloat(P.openingCash)||0)}＋實收−已付−已提分潤</div>
     </div>
     <div class="kpi" style="flex:1;min-width:130px">
       <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 本月實收</div>
@@ -13748,14 +13853,8 @@ function updateFinanceKPIs(){
 function renderCashForecast(){
   var el=document.getElementById('cashflow-forecast');if(!el)return;
   var now=new Date();now.setHours(0,0,0,0);var t0=now.getTime();
-  // 起始可用現金（與金流 KPI 同口徑：票期未到不算）
-  var startCash=INV.reduce(function(a,i){
-    var rcv=parseFloat(i.received||0);if(!rcv)return a;
-    var cp=(i.cashPct||100)/100,td=i.ticketDays||0;
-    var cashAmt=rcv*cp,tk=rcv*(1-cp);
-    if(td>0&&i.receivedDate){var rdy=new Date(i.receivedDate).getTime()+td*864e5;if(rdy>t0)tk=0;}
-    return a+cashAmt+tk;
-  },0);
+  // 起始可用現金（與金流 KPI 同一函式：期初＋實收−已付−已提分潤）
+  var startCash=_availableCash(t0);
   var events=[];
   function dayOf(ds){var d=new Date(ds);if(isNaN(d))return null;d.setHours(0,0,0,0);return Math.round((d.getTime()-t0)/864e5);}
   // 1) 已收但票期未到 → 到期日 +
@@ -13769,8 +13868,7 @@ function renderCashForecast(){
   });
   // 2) 應收未收 → 預計收款日 +（現金%當日、票期部分後移）
   INV.forEach(function(i){
-    if(i.receivedConfirmed)return;
-    var unpaid=(i.totals&&i.totals.total||0)-(parseFloat(i.received)||0);
+    var unpaid=_invAR(i);
     if(unpaid<=0)return;
     var ds=i.expectedRecvDate||((i.payDue&&/^\d{4}-\d{2}-\d{2}/.test(i.payDue))?i.payDue:'');
     if(!ds){try{var e2=_invExpectedDate(i);if(e2)ds=e2.date;}catch(e){}}
@@ -13784,12 +13882,43 @@ function renderCashForecast(){
     if(cashAmt>0)events.push({day:d,amt:cashAmt,label:lbl+' 收款'+(cp2<1?'（現金'+Math.round(cp2*100)+'%）':'')});
     if(tkAmt>0){var d2=d+td2;if(d2<=90)events.push({day:d2,amt:tkAmt,label:lbl+' 票款（'+td2+'天期）'});}
   });
-  // 3) 應付待付 → 付款日 −
+  // 3) 應付待付 → 付款日 −（v5.318：無付款日者不再被略過，改排在第 30 天並標註）
   PAYABLES.forEach(function(p){
-    if(p.status==='paid'||!p.date)return;
-    var d=dayOf(p.date);if(d==null)return;
+    if(p.status==='paid')return;
+    var noDate=!p.date;
+    var d=noDate?30:dayOf(p.date);
+    if(d==null)d=30;
     if(d<0)d=0;if(d>90)return;
-    events.push({day:d,amt:-_payEff(p),label:'付款：'+(p.to||'')+(p.project?'／'+p.project:'')});
+    var ret=_payRetention(p);          // 保留款押住不付，另排在第 90 天
+    var pay=_payEff(p)-ret;
+    if(pay>0)events.push({day:d,amt:-pay,label:'付款：'+(p.to||'')+(p.project?'／'+p.project:'')+(noDate?'（未定付款日，暫估30天）':'')});
+    if(ret>0)events.push({day:90,amt:-ret,label:'廠商保留款退還：'+(p.to||'')});
+  });
+  // 3b) 公司自付支出（快速支出／自有成本）：真實現金流出，原本完全不在預測內
+  (function(){
+    var byMonth={};
+    Q.forEach(function(q){
+      (q.costs||[]).forEach(function(c){
+        var selfPay=(c.type==='own')||c.vendor==='公司支出（自付）';
+        if(!selfPay)return;
+        var amt=parseFloat(c.amt)||0;if(amt<=0)return;
+        var d=c.date?dayOf(c.date):null;
+        if(d!=null&&d>=0&&d<=90)events.push({day:d,amt:-amt,label:'自付支出：'+(q.name||'').slice(0,12)+(c.cat?'／'+c.cat:'')});
+      });
+    });
+    return byMonth;
+  })();
+  // 3c) 材料台帳購置：依購置日排入（僅未來 90 天內者）
+  (MAT_LEDGER||[]).forEach(function(r){
+    if(!r||!r.date)return;
+    var d=dayOf(r.date);if(d==null||d<0||d>90)return;
+    var amt=0;try{amt=_matLedAmt(r);}catch(e){}
+    if(amt>0)events.push({day:d,amt:-amt,label:'材料購置：'+(r.name||'')+' '+(r.spec||'')});
+  });
+  // 3e) 業主保留款回收：竣工後才退，統一排在第 90 天（正向）
+  INV.forEach(function(i){
+    var ret=_invRetention(i);
+    if(ret>0)events.push({day:90,amt:ret,label:(i.project||'')+' 第'+(i.periodNo||'?')+'期 保留款回收（預估）'});
   });
   // 4) 公司固定成本 → 每月1日 −
   var mFixed=(P.fixedCosts||[]).reduce(function(a,r){return a+(parseFloat(r.amt)||0);},0);
@@ -13983,6 +14112,9 @@ function switchFinanceTab(tab){
     }
     if(panel)panel.style.display=isActive?'block':'none';
   });
+  // v5.318：切分頁時一律重算，否則在頁內來回切會看到上次渲染的舊資料
+  try{updateFinanceKPIs();}catch(e){}
+  if(tab==='ar')try{renderFinanceAR();}catch(e){}
   if(tab==='cashflow')renderCashflow();
   if(tab==='invoice')renderInvoiceRecords();
   if(tab==='payable')renderPayables();
@@ -14048,7 +14180,7 @@ function shareSuggestRetention(){
   var y=_shareYear();
   var cur=0,prev=0;
   INV.forEach(function(v){
-    var r=(v.totals&&parseFloat(v.totals.retention))||0;if(!r)return;
+    var r=_invRetention(v);if(!r)return;   // v5.318：統一函式，已退還者不再計入（原本沒排除）
     var yy=(v.date||'').slice(0,4);
     if(yy===y)cur+=r;else if(yy===String(parseInt(y)-1))prev+=r;
   });
@@ -15099,16 +15231,19 @@ function renderYearlyReport(el,year){
     const qAmt=Q.filter(q=>q.date&&q.date.startsWith(String(y))).reduce((a,q)=>a+(q.t?.total||0),0);
     const iAmt=INV.filter(i=>i.date&&i.date.startsWith(String(y))).reduce((a,i)=>a+(i.totals?.total||0),0);
     const rAmt=INV.filter(i=>i.receivedDate&&i.receivedDate.startsWith(String(y))).reduce((a,i)=>a+(parseFloat(i.received)||0),0);
-    const pAmt=PAYABLES.filter(p=>{const _d=p.status==='paid'?(p.paidDate||p.date):p.date;return _d&&_d.startsWith(String(y));}).reduce((a,p)=>a+_payEff(p),0);
+    // v5.318 現金基礎：只計已付款、且以實付日歸屬。原本把未付款也當成已支出，
+    // 「淨現金流」變成「實收 −（已付＋未付）」的混血，既非現金制也非權責制。
+    const pAmt=PAYABLES.filter(p=>p.status==='paid'&&(p.paidDate||p.date)&&String(p.paidDate||p.date).startsWith(String(y))).reduce((a,p)=>a+_payEff(p),0);
+    const pAccrual=PAYABLES.filter(p=>p.date&&String(p.date).startsWith(String(y))).reduce((a,p)=>a+_payEff(p),0);
     const netQ=Q.filter(q=>q.date&&q.date.startsWith(String(y))).reduce((a,q)=>a+(q.t?.net||0),0);
-    yearly.push({y,qAmt,iAmt,rAmt,pAmt,net:rAmt-pAmt,estNet:netQ});
+    yearly.push({y,qAmt,iAmt,rAmt,pAmt,pAccrual,net:rAmt-pAmt,estNet:netQ});
   }
   // Monthly breakdown for selected year
   const monthlyData=[];
   for(let m=1;m<=12;m++){
     const mStr=year+'-'+String(m).padStart(2,'0');
     const rAmt=INV.filter(i=>i.receivedDate&&i.receivedDate.startsWith(mStr)).reduce((a,i)=>a+(parseFloat(i.received)||0),0);
-    const pAmt=PAYABLES.filter(p=>{const _d=p.status==='paid'?(p.paidDate||p.date):p.date;return _d&&_d.startsWith(mStr);}).reduce((a,p)=>a+_payEff(p),0);
+    const pAmt=PAYABLES.filter(p=>p.status==='paid'&&(p.paidDate||p.date)&&String(p.paidDate||p.date).startsWith(mStr)).reduce((a,p)=>a+_payEff(p),0);
     monthlyData.push({m,rAmt,pAmt,net:rAmt-pAmt});
   }
   const maxMVal=Math.max(...monthlyData.flatMap(d=>[d.rAmt,d.pAmt]),1);
@@ -15132,7 +15267,7 @@ function renderYearlyReport(el,year){
           <th style="padding:6px 8px;text-align:right">報價金額</th>
           <th style="padding:6px 8px;text-align:right">請款金額</th>
           <th style="padding:6px 8px;text-align:right">實收金額</th>
-          <th style="padding:6px 8px;text-align:right">應付支出</th>
+          <th style="padding:6px 8px;text-align:right">已付支出（現金）</th>
           <th style="padding:6px 8px;text-align:right;font-weight:900">淨現金流</th>
           <th style="padding:6px 8px;text-align:right">預估淨利</th>
         </tr></thead>
@@ -15166,15 +15301,14 @@ function renderContractReport(el,year){
     el.innerHTML='<div class="empty" style="padding:60px"><div class="empty-ic"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg></div><p>尚無合約資料<br><span style="font-size:12px;color:var(--b3)">在合約管理頁新增合約後顯示</span></p></div>';
     return;
   }
-  const rows=CONTRACTS.map(ct=>{
-    // 正確關聯：先用 linkedQid 比對，再用 sourceQid 比對，最後才用名稱
-    const relInvs=INV.filter(i=>{
-      if(ct.linkedQid&&i.sourceQid&&i.sourceQid===ct.linkedQid)return true;
-      if(ct.linkedQid&&i.linkedQid&&i.linkedQid===ct.linkedQid)return true;
-      // 名稱比對：需完全一致且非空
-      if(ct.name&&i.project&&i.project.trim()===ct.name.trim())return true;
-      return false;
-    });
+  // v5.318：原本完全沒用到 year 參數，使用者選了年度仍看到全部合約
+  const _yStr=String(year);
+  const _inYear=ct=>{
+    if((ct.start||'').startsWith(_yStr)||(ct.end||'').startsWith(_yStr))return true;
+    return _invsOfContract(ct).some(i=>(i.date||'').startsWith(_yStr));
+  };
+  const rows=CONTRACTS.filter(_inYear).map(ct=>{
+    const relInvs=_invsOfContract(ct);   // 統一歸戶函式
     const totalInv=relInvs.reduce((a,i)=>a+(i.totals?.total||0),0);
     const totalRcv=relInvs.reduce((a,i)=>a+(parseFloat(i.received||0)),0);
     const ctAmt=ct.amount||0;
@@ -15258,7 +15392,51 @@ function exportCurrentReport(){
     const rows=ACTIVITY_LOG.map(l=>[new Date(l.time).toLocaleString('zh-TW'),l.user,l.action,l.detail||'']);
     downloadCSV('操作記錄_'+fmtDateStr(),headers,rows);
   } else if(_currentReport==='client'){
-    exportInvExcel();
+    // v5.318：原本直接匯出全部請款單，與畫面上的年度業主彙總無關
+    const headers=['業主','報價件數','報價金額','請款金額','已收款','應收餘額'];
+    const mF=month?String(month).padStart(2,'0'):'';
+    const byC={};
+    Q.filter(q=>(q.date||'').startsWith(String(year))&&(!mF||q.date.slice(5,7)===mF)).forEach(q=>{
+      const k=q.client||'未知業主';(byC[k]=byC[k]||{q:[],i:[]}).q.push(q);});
+    INV.filter(i=>(i.date||'').startsWith(String(year))&&(!mF||i.date.slice(5,7)===mF)).forEach(i=>{
+      const k=i.client||'未知業主';(byC[k]=byC[k]||{q:[],i:[]}).i.push(i);});
+    const rows=Object.entries(byC).map(([c,d])=>{
+      const qA=d.q.reduce((a,q)=>a+(q.t?.total||0),0);
+      const iA=d.i.reduce((a,i)=>a+(i.totals?.total||0),0);
+      const rA=d.i.reduce((a,i)=>{const rd=i.receivedDate||'';
+        if(!rd.startsWith(String(year))||(mF&&rd.slice(5,7)!==mF))return a;
+        return a+(parseFloat(i.received)||0);},0);
+      return [c,d.q.length,qA,iA,rA,iA-rA];
+    });
+    downloadCSV('業主往來_'+year+(mF?'_'+mF:'')+'_'+fmtDateStr(),headers,rows);
+  } else if(_currentReport==='yearly'){
+    // v5.318：原本落入月報表分支，輸出內容與檔名不符
+    const headers=['年度','報價金額','請款金額','實收金額（現金基礎）','已付支出（現金基礎）','淨現金流','預估淨利'];
+    const rows=[];
+    for(let y=year-2;y<=year;y++){
+      const qA=Q.filter(q=>(q.date||'').startsWith(String(y))).reduce((a,q)=>a+(q.t?.total||0),0);
+      const iA=INV.filter(i=>(i.date||'').startsWith(String(y))).reduce((a,i)=>a+(i.totals?.total||0),0);
+      const rA=INV.filter(i=>(i.receivedDate||'').startsWith(String(y))).reduce((a,i)=>a+(parseFloat(i.received)||0),0);
+      const pA=PAYABLES.filter(p=>p.status==='paid'&&String(p.paidDate||p.date||'').startsWith(String(y))).reduce((a,p)=>a+_payEff(p),0);
+      const nQ=Q.filter(q=>(q.date||'').startsWith(String(y))).reduce((a,q)=>a+(q.t?.net||0),0);
+      rows.push([y,qA,iA,rA,pA,rA-pA,nQ]);
+    }
+    downloadCSV('年度損益_'+year+'_'+fmtDateStr(),headers,rows);
+  } else if(_currentReport==='contract'){
+    // v5.318：原本落入月報表分支
+    const headers=['合約名稱','業主','合約金額','累計請款','已收款','應收餘額','請款進度%','收款進度%','期數'];
+    const yS=String(year);
+    const rows=CONTRACTS.filter(ct=>(ct.start||'').startsWith(yS)||(ct.end||'').startsWith(yS)
+        ||_invsOfContract(ct).some(i=>(i.date||'').startsWith(yS)))
+      .map(ct=>{
+        const rel=_invsOfContract(ct);
+        const tI=rel.reduce((a,i)=>a+(i.totals?.total||0),0);
+        const tR=rel.reduce((a,i)=>a+(parseFloat(i.received)||0),0);
+        const cA=parseFloat(ct.amount)||0;
+        return [ct.name||'',ct.client||'',cA,tI,tR,tI-tR,
+          cA>0?Math.round(tI/cA*100):0,tI>0?Math.round(tR/tI*100):0,rel.length];
+      });
+    downloadCSV('合約請款_'+year+'_'+fmtDateStr(),headers,rows);
   } else {
     const headers=['月份','報價件數','報價金額','請款件數','請款金額','實收金額'];
     const months=month?[month]:Array.from({length:12},(_,i)=>i+1);
@@ -15320,8 +15498,9 @@ function _goExtra(p){
   if(p==='vendors'){renderVendors();}
   if(p==='contacts'){switchContactsTab(_contactsTab||'all');try{updateCustomerStats();}catch(e){}}
   if(p==='finance'){updateFinanceKPIs();renderFinanceAR();switchFinanceTab('ar');}
-  if(p==='profit'){initReportYears();showReport('monthly');}
-  if(p==='reports'){initReportYears();showReport('monthly');}
+  // v5.318：進利潤頁只初始化年度下拉，不再強制把報表重設回月報
+  //（原本每次進頁都覆蓋使用者選的報表；且 reports 那行重複了一次）
+  if(p==='profit'){initReportYears();if(!window._currentReportInited){window._currentReportInited=true;showReport('monthly');}}
   if(p==='reports'){initReportYears();showReport('monthly');}
   if(p==='permissions'){initPermissionsPage();}
 }
@@ -15432,7 +15611,7 @@ function checkNotifications(){
     const d=daysUntil(p.date);
     if(d<0){
       const label=(p.to||'廠商')+(p.project?' / '+p.project:'');
-      alerts.push({type:'overdue',tag:'pay_overdue_'+p.id,jump:`go('finance');setTimeout(function(){switchFinanceTab('payable')},250)`,msg:`🔴 逾期 ${-d} 天未付款：${label} NT$ ${fmt(_payEff(p))}（預計${p.date}）`});
+      alerts.push({type:'overdue',tag:'pay_overdue_'+p.id,jump:`go('finance');setTimeout(function(){window._payAging='overdue';switchFinanceTab('payable')},250)`,msg:`🔴 逾期 ${-d} 天未付款：${label} NT$ ${fmt(_payEff(p))}（預計${p.date}）`});
     }
   });
 
@@ -15617,20 +15796,15 @@ function openRetentionModal(){
   if(!modal||!body)return;
 
   // 計算各期保留款
-  const rows=INV.filter(i=>i.retention&&(i.retentionPct||10)>0);
+  const rows=INV.filter(i=>i.retention&&_retPctOf(i)>0);
   if(!rows.length){body.innerHTML='<p style="color:var(--b4);text-align:center;padding:20px">目前無保留款記錄</p>';modal.style.display='flex';return;}
 
-  const totalRet=rows.reduce((a,i)=>{
-    if(i.retentionReturned)return a; // 已退還不再計入
-    const pct=(i.retentionPct||10)/100;
-    const gross=(i.totals?.curTotal||0)*(1+(P.tax||5)/100);
-    return a+gross*pct;
-  },0);
+  const totalRet=rows.reduce((a,i)=>a+_invRetention(i),0);
 
   const retRows=rows.map(i=>{
-    const pct=(i.retentionPct||10)/100;
-    const gross=(i.totals?.curTotal||0)*(1+(P.tax||5)/100);
-    const retAmt=gross*pct;
+    const pct=_retPctOf(i)/100;
+    const gross=(i.totals?.curTotal||0)*_taxM();
+    const retAmt=Math.round(gross*pct);
     const returned=i.retentionReturned||false;
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--b1)">
       <div>
@@ -16209,10 +16383,8 @@ function renderFinanceAR(){
   const el=document.getElementById('finance-ar-list');if(!el)return;
   const srch=(document.getElementById('finance-search')?.value||'').toLowerCase();
   const now=Date.now();
-  const taxRate=1+(P.tax||5)/100;
-  const unpaid=INV.filter(inv=>{
-    const t=inv.totals||{};
-    if(inv.receivedConfirmed||(parseFloat(inv.received)||0)>=(t.total||0))return false;
+  const taxRate=_taxM();
+  const unpaid=_arList().filter(inv=>{   // v5.318 全站統一
     if(srch&&![(inv.client||''),(inv.project||'')].some(v=>v.toLowerCase().includes(srch)))return false;
     return true;
   });
@@ -16229,10 +16401,7 @@ function renderFinanceAR(){
     byClient[k].push(inv);
   });
   el.innerHTML=Object.entries(byClient).map(([client,invs])=>{
-    const totalUnpaid=invs.reduce((a,inv)=>{
-      const t=inv.totals||{};
-      return a+(t.total||0)-(parseFloat(inv.received)||0);
-    },0);
+    const totalUnpaid=invs.reduce((a,inv)=>a+_invAR(inv),0);
     const items=invs.map(inv=>{
       const t=inv.totals||{};
       const unpaidAmt=(t.total||0)-(parseFloat(inv.received)||0);
@@ -16884,21 +17053,26 @@ function rProfit(){
   const el=document.getElementById('profbody');if(!el)return;
   if(!Q.length){el.innerHTML=`<div class="empty" style="padding:60px"><div class="empty-ic"><svg class="ic ib" aria-hidden="true"><use href="#i-trend"/></svg></div><p>尚無資料</p></div>`;return;}
 
-  // 只統計得標案
-  const awarded=Q.filter(q=>q.awarded);
+  // 只統計得標主案（追加案併入母案，避免同一件工程被算兩次；與經營儀表板定義一致）
+  const awarded=Q.filter(q=>q.awarded&&!q.parentId);
 
   // ── 核心計算：每案實際 vs 預估 ──
   function calcCase(q){
-    const estRevenue=q.t?.sub||0;           // 預估稅前收入（報價金額）
-    const estCostQ=q.t?.cost||0;            // 預估成本（報價倒推）
-    const estNet=q.t?.net||0;               // 預估淨利
-    const estNetR=(q.t?.netR||0)*100;       // 預估淨利率%
+    // v5.318 口徑統一：全部改「未稅對未稅」。原本預估淨利率分母是含稅報價總額、
+    // 實際淨利率分母是實收÷1.05（未稅），兩個數字並排顯示又直接相減算差異，
+    // 未稅分母天生較小，實際淨利率被無條件美化約 5 個百分點。
+    const _adds=Q.filter(x=>x.parentId===q.id);
+    const _all=[q].concat(_adds);
+    const estRevenue=_all.reduce((a,x)=>a+(x.t?.sub||0),0);          // 預估未稅收入
+    const estCostQ=_all.reduce((a,x)=>a+(x.t?.cost||0),0);           // 預估成本（未稅）
+    const estNet=estRevenue-estCostQ;                                 // 預估淨利（未稅對未稅）
+    const estNetR=estRevenue>0?(estNet/estRevenue*100):0;             // 預估淨利率%（分母未稅）
 
-    // 實際發包成本（施工成本記錄）
-    const actualCost=(q.costs||[]).reduce((a,c)=>a+(parseFloat(c.amt)||0),0);
+    // 實際發包成本（施工成本記錄；含追加案）
+    const actualCost=_all.reduce((a,x)=>a+((x.costs||[]).reduce((b,c)=>b+(parseFloat(c.amt)||0),0)),0);
 
-    // 實際收款（關聯請款單）
-    const qInvs=INV.filter(i=>i.sourceQid===q.id||i.project===q.name);
+    // 實際收款（關聯請款單；quoteId 優先、名稱為最後手段，含追加案）
+    const qInvs=_invsOfQuoteAll(q);
     const totalInvoiced=qInvs.reduce((a,i)=>a+(i.totals?.sub||i.totals?.curTotal||0),0); // 稅前請款
     const totalReceived=qInvs.reduce((a,i)=>a+(parseFloat(i.received||0)),0); // 已收含稅
 
@@ -16919,9 +17093,9 @@ function rProfit(){
       return a+cashAmt+ticketAmt;
     },0);
 
-    // 實際稅前收入（已收款÷1.05換算稅前，近似）
-    const taxRate=1+(P.tax||5)/100;
-    const actualRevenuePre=totalReceived/taxRate; // 稅前
+    // 實際稅前收入（已收款換算未稅）
+    const taxRate=_taxM();
+    const actualRevenuePre=totalReceived/taxRate; // 未稅
 
     // 實際淨利 = 稅前收入 - 實際發包成本
     // 只有在「已有收款」且「已有成本記錄」時才計算實際淨利
@@ -16930,7 +17104,12 @@ function rProfit(){
     const hasCost=actualCost>0;
     // 管理費攤提：稅前收入 × 管理費率（params 設定，0=不攤提）
     const overhead=actualRevenuePre*((P.overheadPct||0)/100);
-    const bonus=(q.referral&&parseFloat(q.referral.amount))||0; // 專案獎金（中間人/工務）
+    // 專案獎金：依實收進度比例認列（應付說明也是「依實收款進度分期支付」）。
+    // 原本一次扣全額，收款初期淨利被大幅低估。
+    const bonusFull=_all.reduce((a,x)=>a+((x.referral&&parseFloat(x.referral.amount))||0),0);
+    const _contractTotal=_all.reduce((a,x)=>a+(x.t?.total||0),0);
+    const _recvRate=_contractTotal>0?Math.min(1,totalReceived/_contractTotal):0;
+    const bonus=Math.round(bonusFull*_recvRate);
     const actualNet=(hasCost&&hasReceipt)?(actualRevenuePre-actualCost-overhead-bonus):null;
     const actualNetR=actualNet!=null&&actualRevenuePre>0?(actualNet/actualRevenuePre*100):null;
 
@@ -16940,20 +17119,26 @@ function rProfit(){
 
     return{q,estRevenue,estCostQ,estNet,estNetR,
       actualCost,totalInvoiced,totalReceived,actualCash,
-      actualRevenuePre,actualNet,actualNetR,netDiff,costDiff,overhead,bonus};
+      actualRevenuePre,actualNet,actualNetR,netDiff,costDiff,overhead,bonus,bonusFull};
   }
 
   const cases=awarded.map(calcCase);
 
   // ── 總計 KPI ──
+  // v5.318：實際淨利與淨利率的分子分母限定同一批案件（有實際淨利者），
+  // 原本分子只算有成本資料的案、分母卻是全部得標案的實收，整體淨利率被稀釋。
+  const _withData=cases.filter(r=>r.actualNet!=null);
   const totEstNet=cases.reduce((a,r)=>a+r.estNet,0);
-  const totActualNet=cases.filter(r=>r.actualNet!=null).reduce((a,r)=>a+r.actualNet,0);
+  const totActualNet=_withData.reduce((a,r)=>a+r.actualNet,0);
   const totActualCost=cases.reduce((a,r)=>a+r.actualCost,0);
   const totReceived=cases.reduce((a,r)=>a+r.totalReceived,0);
   const totCash=cases.reduce((a,r)=>a+r.actualCash,0);
   const totEstRevenue=cases.reduce((a,r)=>a+r.estRevenue,0);
-  const casesWithData=cases.filter(r=>r.actualNet!=null).length;
-  const totActualNetR=totActualCost>0&&totReceived>0?(totActualNet/(totReceived/(1+(P.tax||5)/100))*100):0;
+  const casesWithData=_withData.length;
+  const _wdRevenuePre=_withData.reduce((a,r)=>a+r.actualRevenuePre,0);
+  const totActualNetR=_wdRevenuePre>0?(totActualNet/_wdRevenuePre*100):0;
+  // 差異也只比同一批案件（原本是「子集實際」減「全集預估」）
+  const totEstNetSameSet=_withData.reduce((a,r)=>a+r.estNet,0);
 
   // 近12個月趨勢
   const now2=new Date();
@@ -16984,13 +17169,14 @@ function rProfit(){
           <div>
             <div class="kl">✅ 實際淨利（已收款案件）</div>
             <div class="kv" style="font-size:20px;color:${totActualNet>=0?'var(--g3)':'var(--red)'}">NT$ ${fmt(totActualNet)}</div>
-            <div class="ks">淨利率 ${totActualNetR.toFixed(1)}%　${casesWithData} 件有成本資料${(P.overheadPct||0)>0?'　·　已攤提管理費 '+P.overheadPct+'%':''}</div>
+            <div class="ks">淨利率 ${totActualNetR.toFixed(1)}%（未稅對未稅）　${casesWithData} 件有成本資料${(P.overheadPct||0)>0?'　·　已攤提管理費 '+P.overheadPct+'%':''}</div>
+            <div class="ks" style="font-size:10px;color:var(--b3)">權責制：收入以實收換算未稅、成本含未付應付</div>
           </div>
           <div style="text-align:right">
             <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 預估淨利（報價毛利）</div>
             <div style="font-size:16px;font-weight:700;color:var(--b4)">NT$ ${fmt(totEstNet)}</div>
-            <div class="ks" style="color:${totActualNet-totEstNet>=0?'var(--g)':'var(--red)'}">
-              差異 ${totActualNet-totEstNet>=0?'▲':'▼'} NT$ ${fmt(Math.abs(totActualNet-totEstNet))}
+            <div class="ks" style="color:${totActualNet-totEstNetSameSet>=0?'var(--g)':'var(--red)'}">
+              同批案件差異 ${totActualNet-totEstNetSameSet>=0?'▲':'▼'} NT$ ${fmt(Math.abs(totActualNet-totEstNetSameSet))}
             </div>
           </div>
         </div>
@@ -17385,7 +17571,7 @@ function exportCurrentReportExcel(){
     title='合約請款對比_'+year;
     headers=['合約編號','工程名稱','業主','合約金額','累積請款','累積收款','請款率%','收款率%'];
     CONTRACTS.forEach(ct=>{
-      const relInvs=INV.filter(i=>i.sourceQid===ct.linkedQ||i.project===ct.name);
+      const relInvs=_invsOfContract(ct);   // v5.318：原本比對 ct.linkedQ（欄位其實叫 linkedQid）恆為 undefined，只靠名稱比對
       const totalInv=relInvs.reduce((a,i)=>a+(i.totals?.total||0),0);
       const totalRcv=relInvs.reduce((a,i)=>a+(parseFloat(i.received||0)),0);
       const ctAmt=ct.amount||0;
