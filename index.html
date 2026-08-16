@@ -2498,7 +2498,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.319';
+var APP_VERSION='v5.320';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -3622,15 +3622,61 @@ function _qFoldRestore(m){
   items.forEach(x=>{if(x.sec){s++;window._qFold[eid+':'+s]=!!m.get(x);}});
 }
 // 將 from 起的列（分類含整組）搬到目標列 to；回傳是否有移動
+// ══ v5.320 工項索引重定位（K05）══
+// 成本歸戶 linkedItemIdx、日報進度 progressRows.itemIdx 都是「報價工項的絕對位置」，
+// 但刪除／拖曳工項時完全沒有補償 → 成本會錯掛到別的工項，索引超界者更會從成本分析
+// 表憑空蒸發（合計對不上）。這裡用穩定的 _uid 在每次異動後把索引重算回正確位置。
+function _qEnsureUids(arr){
+  (arr||[]).forEach(function(it){
+    if(it&&!it._uid)it._uid='it'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  });
+}
+function _qIdxSnapshot(){_qEnsureUids(items);return items.map(function(it){return it&&it._uid;});}
+function _qRemapAfter(oldUids){
+  try{
+    if(!Array.isArray(oldUids))return;
+    _qEnsureUids(items);
+    var pos={};items.forEach(function(it,i){if(it&&it._uid)pos[it._uid]=i;});
+    var map={};oldUids.forEach(function(u,oi){map[oi]=(u!=null&&pos[u]!=null)?pos[u]:-1;});
+    var q=Q.find(function(x){return x.id===eid;});if(!q)return;
+    var mv=function(v){
+      var n=parseInt(v);
+      if(isNaN(n)||n<0)return -1;          // 原本就未歸戶
+      return (map[n]!=null)?map[n]:-1;      // 找不到＝該工項已刪 → 改為未歸戶
+    };
+    var changed=false;
+    (q.costs||[]).forEach(function(c){
+      if(c.linkedItemIdx!=null){var nv=mv(c.linkedItemIdx);if(nv!==c.linkedItemIdx){c.linkedItemIdx=nv;changed=true;}}
+      (c.rows||[]).forEach(function(r){
+        if(r&&r.linkedItemIdx!=null){var nv2=mv(r.linkedItemIdx);if(nv2!==r.linkedItemIdx){r.linkedItemIdx=nv2;changed=true;}}
+      });
+    });
+    (q.dailyLogs||[]).forEach(function(L){
+      (L.progressRows||[]).forEach(function(r){
+        if(r&&r.itemIdx!=null){var nv3=mv(r.itemIdx);if(nv3!==r.itemIdx){r.itemIdx=nv3;changed=true;}}
+      });
+    });
+    if(changed){q._mt=Date.now();try{persist();}catch(e){}}
+  }catch(e){console.warn('[FY] 工項索引重定位失敗',e&&e.message);}
+}
+// 包裝任何會改動 items 順序／長度的操作
+function _qMutate(fn){
+  var snap=_qIdxSnapshot();
+  var r=fn();
+  _qRemapAfter(snap);
+  return r;
+}
 function _qMoveBlock(from,to){
   const len=_qBlockLen(from);
   if(to>=from&&to<from+len)return false;
   const snap=_qFoldSnapshot();
+  const idxSnap=_qIdxSnapshot();           // v5.320：搬移後重定位成本歸戶與日報進度索引
   const moved=items.splice(from,len);
   let ins=to>from?to-len+1:to;
   if(ins<0)ins=0;if(ins>items.length)ins=items.length;
   items.splice(ins,0,...moved);
   _qFoldRestore(snap);
+  _qRemapAfter(idxSnap);
   return true;
 }
 function moveQItem(i,dir){
@@ -3710,9 +3756,11 @@ function _attachTouchDrag(card,tr,i){
     let ins=to>from?to-len:to;                            // 取出後索引位移補償
     if(ins===from)return;
     const snap=_qFoldSnapshot();
+    const idxSnap=_qIdxSnapshot();          // v5.320 同上
     const moved=items.splice(from,len);
     items.splice(ins,0,...moved);
     _qFoldRestore(snap);
+    _qRemapAfter(idxSnap);
     rItems();rTots();
     if(navigator.vibrate){try{navigator.vibrate(8);}catch(_e){}}
   }
@@ -3828,7 +3876,7 @@ function rItems(){
         const delBtn=document.createElement('button');
         delBtn.textContent='✕';delBtn.className='btn btn-xs btn-r';
         delBtn.style.cssText='padding:3px 8px;flex-shrink:0';
-        delBtn.addEventListener('click',function(){items.splice(i,1);rItems();});
+        delBtn.addEventListener('click',function(){_qMutate(function(){items.splice(i,1);});rItems();});
         card.appendChild(si);
         card.appendChild(_mkMoveBtn(i,-1));card.appendChild(_mkMoveBtn(i,1));
         card.appendChild(delBtn);
@@ -3848,7 +3896,7 @@ function rItems(){
         const delBtn=document.createElement('button');
         delBtn.textContent='✕ 刪除';delBtn.className='btn btn-xs btn-r';
         delBtn.style.cssText='padding:3px 8px';
-        delBtn.addEventListener('click',function(){items.splice(i,1);rItems();});
+        delBtn.addEventListener('click',function(){_qMutate(function(){items.splice(i,1);});rItems();});
         const hRight=document.createElement('div');
         hRight.style.cssText='display:flex;gap:5px;align-items:center';
         hRight.appendChild(_mkMoveBtn(i,-1));hRight.appendChild(_mkMoveBtn(i,1));hRight.appendChild(delBtn);
@@ -4014,7 +4062,7 @@ function rItems(){
         td1.appendChild(secFlex);
         const td2=mkTd('');
         const delBtn=document.createElement('button');delBtn.textContent='✕';delBtn.className='btn btn-xs btn-r';
-        delBtn.addEventListener('click',function(){items.splice(i,1);rItems();});
+        delBtn.addEventListener('click',function(){_qMutate(function(){items.splice(i,1);});rItems();});
         td2.appendChild(delBtn);
         tr.appendChild(td0);tr.appendChild(td1);tr.appendChild(td2);
       } else {
@@ -4129,7 +4177,7 @@ function rItems(){
         insBtn.addEventListener('click',function(e){e.stopPropagation();insItAt(i+1,_mySec);});
         tdDel.appendChild(insBtn);
         const delBtn=document.createElement('button');delBtn.textContent='✕';delBtn.className='btn btn-xs btn-r';
-        delBtn.addEventListener('click',function(){items.splice(i,1);rItems();});
+        delBtn.addEventListener('click',function(){_qMutate(function(){items.splice(i,1);});rItems();});
         tdDel.appendChild(delBtn);
         tr.appendChild(tdIdx);tr.appendChild(tdDesc);tr.appendChild(tdUnit);
         tr.appendChild(tdQty);tr.appendChild(tdPrice);tr.appendChild(tdAmt);
@@ -4172,7 +4220,9 @@ function rFoot(){
       <td colspan="4"></td></tr>`;
 }
 function _qInsAt(pos,obj,unfoldSec){
+  const _idxSnap=_qIdxSnapshot();   // v5.320：中間插入會讓後方索引位移，需重定位
   items.splice(pos,0,obj);
+  _qRemapAfter(_idxSnap);
   if(unfoldSec!=null){if(!window._qFold)window._qFold={};window._qFold[eid+':'+unfoldSec]=false;}
   window._qFocusI=pos;
   rItems();
@@ -5027,15 +5077,42 @@ function confirmInvClause(){
 function settleInvItem(i){
   const it=invItems[i];
   if(!it||it.type==='sec')return;
-  const cum=Math.round(((parseFloat(it.prevQty)||0)+(parseFloat(it.curQty)||0))*100)/100;
+  const _inv=invEid?INV.find(x=>x.id===invEid):null;
+  // v5.320：累計數量改跨「同案所有期別」取最大值。原本只算到目前這一期，
+  // 回頭在舊期別按結算會把合約數量砍到該期為止的量（例如已做 95、卻被改成 40）。
+  const _dsc=String(it.desc||'').trim();
+  let _sib=[];
+  try{
+    const _q=_inv?Q.find(x=>x.id===(_inv.quoteId||_inv.sourceQid))||Q.find(x=>!x.parentId&&x.name===_inv.project):null;
+    _sib=_q?_invsOfQuoteAll(_q):(_inv?INV.filter(x=>x.project===_inv.project):[]);
+  }catch(e){_sib=_inv?[_inv]:[];}
+  let _cumAll=0,_maxPeriod=0,_curPeriod=parseInt(_inv&&_inv.periodNo)||0;
+  _sib.forEach(function(v){
+    const pn=parseInt(v.periodNo)||0;if(pn>_maxPeriod)_maxPeriod=pn;
+    // 目前這一期以畫面上的即時數量為準（已存記錄可能是尚未儲存前的舊值）
+    if(_inv&&v.id===_inv.id)return;
+    (v.items||[]).forEach(function(x){
+      if(x.type==='sec'||String(x.desc||'').trim()!==_dsc)return;
+      const c=(parseFloat(x.prevQty)||0)+(parseFloat(x.curQty)||0);
+      if(c>_cumAll)_cumAll=c;
+    });
+  });
+  const cum=Math.round(Math.max(_cumAll,(parseFloat(it.prevQty)||0)+(parseFloat(it.curQty)||0))*100)/100;
   if(cum<=0){toast('此工項尚無實作數量，無法結算');return;}
   const orig=parseFloat(it.contractQty)||0;
   if(orig===cum){toast('合約數量已與實作數量一致，無需結算');return;}
+  if(_maxPeriod>0&&_curPeriod>0&&_curPeriod<_maxPeriod){
+    toast('⚠ 請在最新一期（第'+_maxPeriod+'期）執行工項結算，避免以舊期數量誤砍合約');return;
+  }
   // 預先找關聯合約並計算含稅差額（合約金額為含稅總額，工項單價為未稅）
-  const _inv=invEid?INV.find(x=>x.id===invEid):null;
-  const _contract=(_inv&&_inv.project)?CONTRACTS.find(x=>x.name===_inv.project):null;
-  const _taxR=1+((P.tax||5)/100);
-  const _delta=Math.round((orig-cum)*(parseFloat(it.contractPrice)||0)*_taxR); // 正=追減、負=追加
+  // v5.320：改用統一歸戶（原本只比對工程名稱，同名／改名會調到別人的合約）
+  let _contract=null;
+  try{
+    _contract=CONTRACTS.find(function(c){return _invsOfContract(c).some(function(v){return v.id===(_inv&&_inv.id);});})
+      ||((_inv&&_inv.project)?CONTRACTS.find(x=>x.name===_inv.project):null);
+  }catch(e){_contract=(_inv&&_inv.project)?CONTRACTS.find(x=>x.name===_inv.project):null;}
+  const _tm=_taxM();
+  const _delta=Math.round((orig-cum)*(parseFloat(it.contractPrice)||0)*_tm); // 正=追減、負=追加
   const _willSync=_contract&&(_contract.amount||0)>0&&_delta!==0;
   let ok=false;
   try{ok=window.confirm('工項結算：'+(it.desc||'未命名工項')+'\n\n合約數量 '+orig+' → 實作數量 '+cum+(cum<orig?'（追減 '+(Math.round((orig-cum)*100)/100)+'）':'（追加 '+(Math.round((cum-orig)*100)/100)+'）')+(_willSync?'\n合約金額同步調整 '+(_delta>0?'−':'＋')+'NT$ '+fmt(Math.abs(_delta))+'（含稅）\n　NT$ '+fmt(_contract.amount)+' → NT$ '+fmt(Math.max(0,_contract.amount-_delta)):'')+'\n報價單維持原樣；預估成本／施工進度／利潤統計自動改採結算後數量'+'\n\n確定結算此工項？\n（原數量會記錄在備註）');}catch(e){ok=true;}
@@ -5047,7 +5124,12 @@ function settleInvItem(i){
   const tag='工項結算：原'+orig+'→實'+cum;
   it.internalNote=it.internalNote?(it.internalNote+'　'+tag):tag;
   // 立即同步回 INV（確保下一期帶到結算後的合約數量；更新 _mt 讓跨裝置同步新值獲勝）
-  if(invEid){const inv=INV.find(x=>x.id===invEid);if(inv){inv.items=JSON.parse(JSON.stringify(invItems));inv._mt=Date.now();saveInv();}}
+  // v5.320：一併回寫 totals。原本只寫 items，若結算後沒按主儲存就離開，
+  // 竣工結算讀的是舊 totals → 會把剛剛的追減金額反推回去。
+  if(invEid){const inv=INV.find(x=>x.id===invEid);if(inv){
+    inv.items=JSON.parse(JSON.stringify(invItems));
+    try{_recalcInvAmounts(inv);}catch(e){}
+    inv._mt=Date.now();saveInv();}}
   // 連動合約金額（追加／追減），並記錄調整軌跡
   let syncTxt='';
   if(_willSync){
@@ -5447,7 +5529,10 @@ function rInvItems(){
           invItems[i].payRate=newRate;
           updateInvRowAmt(i,tr);rInvTots();
           // 立即同步回 INV（確保 addNextPeriod 能讀到最新 payRate；更新 _mt 讓跨裝置同步新值獲勝）
-          if(invEid){const inv=INV.find(x=>x.id===invEid);if(inv){inv.items=JSON.parse(JSON.stringify(invItems));inv._mt=Date.now();saveInv();}}
+          if(invEid){const inv=INV.find(x=>x.id===invEid);if(inv){
+            inv.items=JSON.parse(JSON.stringify(invItems));
+            try{_recalcInvAmounts(inv);}catch(e){}   // v5.320：請款比率改變會影響金額，totals 一併回寫
+            inv._mt=Date.now();saveInv();}}
         });
         rateCell.appendChild(rateSel);
         tr.appendChild(rateCell);
@@ -10462,16 +10547,20 @@ function _costCatNorm(cat){var m={
 // 成本歸戶：依關聯工項彙總實際成本（承包逐列、其餘整項）
 function _costByItem(q){
   var map={},unassigned=0;
+  // v5.320：索引超出工項數（工項已刪）者一律併入「未歸戶」，否則該金額既不入工項列
+  // 也不入未歸戶列，會從成本分析表憑空蒸發，合計與實際成本對不上。
+  var _n=((q&&q.items)||[]).length;
+  var _ok=function(v){var i=parseInt(v);return !isNaN(i)&&i>=0&&i<_n;};
   (q&&q.costs||[]).forEach(function(c){
     if(c.type==='sub'&&c.rows&&c.rows.length){
       c.rows.forEach(function(r){
         var amt=(parseFloat(r.qty)||0)*(parseFloat(r.unitPrice)||0);
-        if(r.linkedItemIdx>=0)map[r.linkedItemIdx]=(map[r.linkedItemIdx]||0)+amt;
+        if(_ok(r.linkedItemIdx))map[r.linkedItemIdx]=(map[r.linkedItemIdx]||0)+amt;
         else unassigned+=amt;
       });
     }else{
       var amt2=parseFloat(c.amt)||0;
-      if(c.linkedItemIdx>=0)map[c.linkedItemIdx]=(map[c.linkedItemIdx]||0)+amt2;
+      if(_ok(c.linkedItemIdx))map[c.linkedItemIdx]=(map[c.linkedItemIdx]||0)+amt2;
       else unassigned+=amt2;
     }
   });
@@ -14072,30 +14161,35 @@ function renderCashflow(){
     const to=new Date(now.getTime()+(d+30)*86400000);
     const label=d===0?'0-30天':d===30?'30-60天':d===60?'60-90天':'90-120天';
     // 預計收款：未收款的請款單，payDue 在此期間內
-    const incoming=INV.filter(i=>{
-      if(i.receivedConfirmed||(parseFloat(i.received)||0)>=(i.totals?.total||0))return false;
-      // 預計收款日：expectedRecvDate 優先；payDue 僅在為完整日期時採用（估驗日號如「25」不可解析）
+    // v5.320：改用與上方水位圖同一套預計收款日（_invExpectedDate 有推算 fallback）。
+    // 原本只認 expectedRecvDate 或完整日期格式的 payDue，實務上 payDue 多為估驗日號
+    // 或「月結60天」之類文字 → 四個桶全部顯示 NT$ 0，與同一頁上方的預測自相矛盾。
+    const _dueOf=i=>{
       var ds=i.expectedRecvDate||((i.payDue&&/^\d{4}-\d{2}-\d{2}/.test(i.payDue))?i.payDue:'');
-      if(!ds)return false;
-      const due=new Date(ds);
-      if(isNaN(due))return false;
+      if(!ds){try{const e=_invExpectedDate(i);ds=(e&&e.date)||'';}catch(err){}}
+      if(!ds)return null;
+      const t=new Date(ds);return isNaN(t)?null:t;
+    };
+    const incoming=_arList().filter(i=>{
+      const due=_dueOf(i);
+      if(!due)return false;
       // 0-30 桶同時涵蓋「已逾期未收」（隨時可能入帳，且需優先催收）
       return d===0 ? (due<to) : (due>=from&&due<to);
-    }).reduce((a,i)=>a+(i.totals?.total||0)-(parseFloat(i.received)||0),0);
+    }).reduce((a,i)=>a+_invAR(i),0);
     // 逾期金額（僅為 0-30 桶標註用）
-    const overdueAmt=d!==0?0:INV.filter(i=>{
-      if(i.receivedConfirmed||(parseFloat(i.received)||0)>=(i.totals?.total||0))return false;
-      var ds2=i.expectedRecvDate||((i.payDue&&/^\d{4}-\d{2}-\d{2}/.test(i.payDue))?i.payDue:'');
-      if(!ds2)return false;
-      const d2=new Date(ds2);
-      return !isNaN(d2)&&d2<now;
-    }).reduce((a,i)=>a+(i.totals?.total||0)-(parseFloat(i.received)||0),0);
-    // 預計付款：待付的應付帳款（用付款日期）
-    const outgoing=PAYABLES.filter(p=>{
-      if(p.status==='paid')return false;
-      if(!p.date)return false;
-      const pd=new Date(p.date);
-      return pd>=from&&pd<=to;
+    const overdueAmt=d!==0?0:_arList().filter(i=>{
+      const due=_dueOf(i);return !!due&&due<now;
+    }).reduce((a,i)=>a+_invAR(i),0);
+    // 預計付款：待付應付。無付款日者比照水位圖排在第 30 天；日期比較以「當日 00:00」為準，
+    // 原本 from 帶當下時分秒會把「今天到期」與逾期的應付全部漏掉。
+    const _f0=new Date(from);_f0.setHours(0,0,0,0);
+    const _t0b=new Date(to);_t0b.setHours(0,0,0,0);
+    const outgoing=_apList().filter(p=>{
+      let pd;
+      if(!p.date){pd=new Date(now.getTime()+30*86400000);}
+      else{pd=new Date(p.date);if(isNaN(pd))return false;}
+      pd.setHours(0,0,0,0);
+      return d===0 ? (pd<_t0b) : (pd>=_f0&&pd<_t0b);   // 0-30 桶涵蓋逾期未付
     }).reduce((a,p)=>a+_payEff(p),0);
     predictions.push({label,incoming,outgoing,net:incoming-outgoing,overdue:overdueAmt});
   }
@@ -17186,22 +17280,11 @@ function rProfit(){
     const totalInvoiced=qInvs.reduce((a,i)=>a+(i.totals?.sub||i.totals?.curTotal||0),0); // 稅前請款
     const totalReceived=qInvs.reduce((a,i)=>a+(parseFloat(i.received||0)),0); // 已收含稅
 
-    // 實際可用現金（考慮票期）
+    // 各案「已收款中已可動用」的部分（依票期）；公司整體可動用資金另見 _availableCash()
     const now=Date.now();
-    const actualCash=qInvs.reduce((a,i)=>{
-      const rcv=parseFloat(i.received||0);
-      if(!rcv)return a;
-      const cashPct=(i.cashPct||100)/100;
-      const ticketDays=i.ticketDays||0;
-      const cashAmt=rcv*cashPct;
-      // 票期部分：收款日 + ticketDays 後才算可用
-      let ticketAmt=rcv*(1-cashPct);
-      if(ticketDays>0&&i.receivedDate){
-        const ticketReady=new Date(i.receivedDate).getTime()+ticketDays*86400000;
-        if(ticketReady>now)ticketAmt=0; // 票期未到
-      }
-      return a+cashAmt+ticketAmt;
-    },0);
+    // v5.320：改用全站統一的 _cashOf（原本自算一套，沒跟上 cashPct 的 0 值處理，
+    // 也讓利潤頁的「可用現金」與金流頁差一筆已付款）
+    const actualCash=qInvs.reduce((a,i)=>a+_cashOf(i,now),0);
 
     // 實際稅前收入（已收款換算未稅）
     const taxRate=_taxM();
@@ -17294,7 +17377,7 @@ function rProfit(){
       <div class="kpi">
         <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 已收款總額</div>
         <div class="kv" style="font-size:16px">NT$ ${fmt(totReceived)}</div>
-        <div class="ks">可用現金 NT$ ${fmt(totCash)}</div>
+        <div class="ks">其中已可動用（依票期）NT$ ${fmt(totCash)}<span style="color:var(--b3)">　·　公司整體可動用資金請見金流管理</span></div>
       </div>
       <div class="kpi" style="background:#fff0f0">
         <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 實際發包成本</div>
