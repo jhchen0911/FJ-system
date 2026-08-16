@@ -2020,7 +2020,6 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <div class="f"><label>安全母索 5分（$/M）</label><input type="number" id="cp-rope-5" value="250" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
           <div class="f"><label>安全母索 3分（$/M）</label><input type="number" id="cp-rope-3" value="300" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
           </div>
-        </div>
         <div style="font-size:12px;font-weight:900;color:#fff;background:#546E7A;border-radius:var(--r8);padding:6px 12px;margin:16px 0 8px;letter-spacing:1px">一次性工項</div>
         <div style="font-size:11px;font-weight:700;color:var(--g3);margin-bottom:6px;padding-bottom:3px;border-bottom:1px solid var(--gm)">一次性工項單價</div>
         <div class="fg fg2" style="margin-bottom:4px">
@@ -2039,6 +2038,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <div class="f"><label>安全欄杆（$/M）</label><input type="number" id="cp-rail-fence" value="380" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
           <div class="f"><label>技師簽證（$/式）</label><input type="number" id="cp-engineer" value="100000" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
         </div>
+      </div>
       </div>
     <div class="card">
       <div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 稅務設定</div></div>
@@ -2369,11 +2369,13 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="card" style="background:var(--yl);border:1px solid var(--ym);margin-bottom:0">
           <div class="ch" style="background:transparent;padding:8px 12px 0;border-bottom:none">
             <div class="cht" style="color:var(--yd);font-size:12px"><svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 租期 / 逾期天數計算</div>
+            <button type="button" class="btn btn-xs" onclick="invScanRent()" title="依報價備註「含XX天租期」＋日報施工紀錄，自動算出每個工項的到期日與逾期天數">依日報自動掃描</button>
           </div>
           <div class="cb" style="padding-top:4px">
+            <div id="inv-rent-scan" style="display:none;margin-bottom:8px"></div>
             <div class="fg fg2" style="margin-bottom:8px">
               <div class="f"><label>選擇工項（連動備註）</label>
-                <select id="inv-rental-item" onchange="calcInvDays()" style="font-family:inherit">
+                <select id="inv-rental-item" onchange="invRentalPick()" style="font-family:inherit">
                   <option value="">-- 選擇工項 --</option>
                 </select>
               </div>
@@ -2498,7 +2500,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.321';
+var APP_VERSION='v5.322';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2679,6 +2681,82 @@ function _invAR(inv){
 // 全部尚有應收的請款單（全站唯一過濾條件）
 function _arList(){return INV.filter(function(i){return _invAR(i)>0;});}
 function _arTotal(){return _arList().reduce(function(a,i){return a+_invAR(i);},0);}
+
+// ══════════ 逾期租金自動計算（v5.322）══════════
+// 租期天數寫在工項備註，格式固定「含XX天租期」，但天數會變（30／60／90…），
+// 所以一律從備註解析、不寫死。解析不到＝該工項無租期約定，不計逾期。
+function _rentDaysOf(it){
+  if(!it)return 0;
+  var s=String(it.note||'')+' '+String(it.desc||'');
+  var m=s.match(/含\s*(\d+(?:\.\d+)?)\s*天\s*租期/)
+      ||s.match(/租期\s*[:：]?\s*(\d+(?:\.\d+)?)\s*天/)
+      ||s.match(/(\d+(?:\.\d+)?)\s*天\s*租期/);
+  return m?Math.round(parseFloat(m[1])||0):0;
+}
+// 日期字串加減天／相差天數（一律走本地時間，避免 UTC 讓日期偏一天）
+function _dAdd(ds,n){
+  var d=new Date(ds);if(isNaN(d))return '';
+  d.setDate(d.getDate()+(n||0));
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function _dDiff(a,b){                       // b − a（天）
+  var x=new Date(a),y=new Date(b);
+  if(isNaN(x)||isNaN(y))return 0;
+  x.setHours(0,0,0,0);y.setHours(0,0,0,0);
+  return Math.round((y-x)/864e5);
+}
+// 單一工項的日報施工紀錄：累計回報量、首／末施工日、達合約量那天＝完工日
+function _itemProgress(q,idx){
+  var recs=[];
+  ((q&&q.dailyLogs)||[]).forEach(function(L){
+    (L.progressRows||[]).forEach(function(r){
+      if(!r||r.itemIdx!==idx)return;
+      var n=parseFloat(r.qty)||0;if(n<=0)return;
+      recs.push({date:L.date||'',qty:n});
+    });
+  });
+  recs.sort(function(a,b){return String(a.date)<String(b.date)?-1:1;});
+  var it=((q&&q.items)||[])[idx]||{};
+  var target=Math.abs(parseFloat(it.qty)||0);
+  var cum=0,doneDate='';
+  recs.forEach(function(r){cum+=r.qty;if(!doneDate&&target>0&&cum>=target-1e-6)doneDate=r.date;});
+  return {n:recs.length,first:recs.length?recs[0].date:'',last:recs.length?recs[recs.length-1].date:'',
+    cum:cum,target:target,doneDate:doneDate};
+}
+// 單一工項的租期／逾期狀態（純函式，不碰 DOM）
+//   起算日＝該工項完工次日（報價備註第 14 條：材料使用期限自各單一工項完成後之次日起算）
+//   到期日＝起算日＋租期−1
+//   逾期天數＝結束日 − 到期日（結束日：已結案取結案日，否則取今天＝材料仍在場）
+//   逾期租金＝逾期天數 × 合約數量 × 工項的逾期租金單價（it.ot）
+// 回傳 null＝無租期約定或日報還沒登錄，無從起算。
+function _rentStatus(q,idx,endDate){
+  var it=((q&&q.items)||[])[idx];if(!it||it.sec)return null;
+  var days=_rentDaysOf(it);if(days<=0)return null;
+  var pg=_itemProgress(q,idx);
+  var base=pg.doneDate||pg.last;                 // 未達合約量時，以最後施工日暫估
+  if(!base)return null;
+  var start=_dAdd(base,1);
+  var expiry=_dAdd(start,days-1);
+  var end=endDate||((q&&q.closed&&q.closedAt)?_dAdd(new Date(q.closedAt).getFullYear()+'-'
+    +String(new Date(q.closedAt).getMonth()+1).padStart(2,'0')+'-'
+    +String(new Date(q.closedAt).getDate()).padStart(2,'0'),0):localToday());
+  var over=Math.max(0,_dDiff(expiry,end));
+  var price=parseFloat((String(it.ot||'').match(/[\d.]+/)||[0])[0])||0;
+  var qty=Math.abs(parseFloat(it.qty)||0);
+  return {idx:idx,desc:String(it.desc||'').split('\n')[0],unit:it.unit||'',
+    days:days,installDate:base,estimated:!pg.doneDate,cum:pg.cum,target:pg.target,
+    start:start,expiry:expiry,endDate:end,overDays:over,
+    otPrice:price,otUnit:it.otu||'',qty:qty,amount:Math.round(price*qty*over)};
+}
+// 全案掃描：回傳所有「有租期約定且日報已登錄」的工項狀態（逾期者排前）
+function _rentScan(q,endDate){
+  var out=[];
+  ((q&&q.items)||[]).forEach(function(it,i){
+    var s=_rentStatus(q,i,endDate);if(s)out.push(s);
+  });
+  out.sort(function(a,b){return b.overDays-a.overDays;});
+  return out;
+}
 
 // 待付應付（status 為空的舊資料視為待付，與清單口徑一致）
 function _apList(){return PAYABLES.filter(function(p){return p.status!=='paid';});}
@@ -7079,6 +7157,109 @@ function getCostItemOptions(selectedVal){
 
 
 
+// ════════════ 逾期租金自動帶入（v5.322）════════════
+// 租期天數（報價備註「含XX天租期」）與完工日（日報回報量達合約量那天）本來都要手key，
+// 打錯一個數字整筆逾期租金就錯。改為系統自動解析＋自動帶入，人只要確認。
+function _invQuote(){
+  var rec=(typeof invEid!=='undefined'&&invEid)?INV.find(function(x){return x.id===invEid;}):null;
+  var qid=rec&&(rec.quoteId||rec.sourceQid);
+  var q=qid?Q.find(function(x){return x.id===qid;}):null;
+  if(q)return q;
+  var nm=String((rec&&rec.project)||gv('inv-project')||'').trim();
+  if(!nm)return null;
+  return Q.find(function(x){return String(x.name||'').trim()===nm;})||null;
+}
+// 請款工項名稱 → 報價工項索引（完全相同優先，其次前 6 字相同）
+function _qItemIdxByDesc(q,desc){
+  var items=(q&&q.items)||[];
+  var d=String(desc||'').split('\n')[0].trim();
+  if(!d)return -1;
+  for(var i=0;i<items.length;i++){if(items[i].sec)continue;
+    if(String(items[i].desc||'').split('\n')[0].trim()===d)return i;}
+  var key=d.slice(0,6);
+  if(key)for(var j=0;j<items.length;j++){if(items[j].sec)continue;
+    if(String(items[j].desc||'').indexOf(key)>=0)return j;}
+  return -1;
+}
+// 選工項時：租期天數與打設完成日自動帶入，再走原本的天數計算
+function invRentalPick(){
+  var sel=document.getElementById('inv-rental-item');
+  var desc=sel?sel.value:'';
+  if(desc){
+    try{
+      var q=_invQuote();
+      var idx=_qItemIdxByDesc(q,desc);
+      var st=(idx>=0)?_rentStatus(q,idx):null;
+      if(st){
+        var dEl=document.getElementById('inv-contract-days');if(dEl)dEl.value=st.days;
+        var iEl=document.getElementById('inv-install-date');if(iEl)iEl.value=st.installDate;
+        var cEl=document.getElementById('inv-claim-date');if(cEl&&!cEl.value)cEl.value=st.endDate;
+      }
+    }catch(e){}
+  }
+  calcInvDays();
+}
+function _rentScanMsg(txt){
+  return '<div style="font-size:11.5px;color:var(--b4);background:rgba(255,255,255,.7);border-radius:var(--r6);padding:7px 9px">'+txt+'</div>';
+}
+// 全案掃描：把每個「有租期約定」的工項算出到期日與逾期天數，逾期者可一鍵帶入
+function invScanRent(){
+  var box=document.getElementById('inv-rent-scan');if(!box)return;
+  box.style.display='block';
+  var q=null;try{q=_invQuote();}catch(e){}
+  if(!q){box.innerHTML=_rentScanMsg('找不到對應的報價單——請確認本張請款單是由報價單產生，或專案名稱與報價單一致。');return;}
+  var list=[];try{list=_rentScan(q);}catch(e){}
+  if(!list.length){
+    box.innerHTML=_rentScanMsg('本案沒有可自動計算的租期工項。需同時具備：①報價工項備註寫有「含XX天租期」；②該工項已有日報回報施工數量。');
+    return;
+  }
+  var rows=list.map(function(s){
+    var over=s.overDays>0;
+    var amtTxt=s.otPrice>0
+      ? 'NT$ '+fmt(s.amount)+'<span style="color:var(--b3);font-weight:400">（'+fmt(s.otPrice)+' '+esc(s.otUnit||'')+' × '+fmt(s.qty)+' × '+s.overDays+'天）</span>'
+      : '<span style="color:#c62828">報價未填逾期租金單價</span>';
+    return '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--ym)">'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:12px;font-weight:700;color:var(--b5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(s.desc||'工項')+'</div>'
+      +'<div style="font-size:10.5px;color:var(--b3);margin-top:1px">租期 '+s.days+' 天　完工 '+fmtD(s.installDate)+(s.estimated?'（暫估：日報累計 '+fmt(s.cum)+'／合約 '+fmt(s.target)+'，尚未達合約量）':'')+'　到期 '+fmtD(s.expiry)+'</div>'
+      +'<div style="font-size:11px;margin-top:2px;font-weight:700;color:'+(over?'#c62828':'var(--g3)')+'">'
+        +(over?('逾期 '+s.overDays+' 天　'+amtTxt):('未逾期，尚餘 '+Math.max(0,_dDiff(s.endDate,s.expiry))+' 天'))+'</div>'
+      +'</div>'
+      +(over?'<button type="button" class="btn btn-xs" style="flex-shrink:0" onclick="invRentApply('+s.idx+')">帶入本期</button>':'')
+      +'</div>';
+  }).join('');
+  var totOver=list.filter(function(s){return s.overDays>0;});
+  var totAmt=totOver.reduce(function(a,s){return a+s.amount;},0);
+  box.innerHTML='<div style="background:rgba(255,255,255,.75);border-radius:var(--r8);padding:8px 10px">'
+    +'<div style="font-size:11.5px;font-weight:800;color:var(--yd)">租期掃描結果（共 '+list.length+' 項'
+    +(totOver.length?('，其中 '+totOver.length+' 項逾期，合計 NT$ '+fmt(totAmt)+'　未稅'):'，皆未逾期')+'）</div>'
+    +'<div style="font-size:10px;color:var(--b3);margin-top:2px">起算＝工項完工次日；到期＝起算＋租期−1；結束日取'
+    +(q.closed?'結案日':'今天')+'。天數與單價一律以報價單為準。</div>'
+    +rows+'</div>';
+}
+// 把掃描結果帶進上方欄位並觸發計算（calcInvDays 會自動插入逾期租金工項列）
+function invRentApply(i){
+  var q=null,st=null;
+  try{q=_invQuote();st=_rentStatus(q,i);}catch(e){}
+  if(!st){toast('無法計算此工項的租期');return;}
+  var sel=document.getElementById('inv-rental-item');
+  if(sel){
+    var hit='';
+    var key=String(st.desc||'').slice(0,6);
+    for(var k=0;k<sel.options.length;k++){
+      var v=sel.options[k].value;if(!v)continue;
+      if(v===st.desc){hit=v;break;}
+      if(!hit&&key&&v.indexOf(key)>=0)hit=v;
+    }
+    if(!hit){toast('本期請款單沒有「'+String(st.desc).slice(0,10)+'」，請先把該工項加入本期');return;}
+    sel.value=hit;
+  }
+  var dEl=document.getElementById('inv-contract-days');if(dEl)dEl.value=st.days;
+  var iEl=document.getElementById('inv-install-date');if(iEl)iEl.value=st.installDate;
+  var cEl=document.getElementById('inv-claim-date');if(cEl)cEl.value=st.endDate;
+  calcInvDays();
+}
+
 // ════════════ 天數計算 ════════════
 function calcInvDays(){
   const contractDays=parseInt(document.getElementById('inv-contract-days')?.value)||60;
@@ -7140,7 +7321,10 @@ function calcInvDays(){
       const baseDesc=cleanDesc(selDesc);
       const overLabel=baseDesc+'  逾期租金：'+fmtMD(overStart2)+'～'+fmtMD(claimDate)+'（'+overDays+'天）';
       // 找是否已存在逾期租金行
-      const existIdx=invItems.findIndex((x,ii)=>ii>itemIdx&&x.desc&&x.desc.includes('逾期租金')&&x.desc.includes(selDesc.slice(0,6)));
+      // v5.322 修正：原本用 selDesc 前 6 字比對，但插入的列名已被 cleanDesc 洗掉「打設/拔除」，
+      // 永遠比不中 → 每算一次就多插一列重複的逾期租金。改用 _ovKey 標記（舊資料退回名稱比對）。
+      const existIdx=invItems.findIndex((x,ii)=>ii>itemIdx&&x.desc&&x.desc.includes('逾期租金')
+        &&(x._ovKey===baseDesc||x.desc.indexOf(baseDesc)===0||x.desc.includes(selDesc.slice(0,6))));
       // 取得來源工項的逾期租金單價（it.otPrice）和合約數量
       const srcItem=invItems[itemIdx];
       // otPrice = 報價單填的逾期租金單價（$/支/天 or $/M2/天）
@@ -7149,26 +7333,20 @@ function calcInvDays(){
       const srcQty=srcItem?(srcItem.contractQty||1):1;
       const srcUnit=srcItem?(srcItem.unit||'式'):'式';
       const overAmt=Math.round(srcPrice*srcQty*overDays);
+      // v5.322 修正：原本把「已乘過天數的總額」塞進單價欄，又同時填了天數欄。
+      //   ‧ 編輯頁（updateInvRowAmt）只要有 curDays 就再乘一次天數 → 金額被放大 N 倍；
+      //   ‧ 列印預覽只有 type==='rental' 才乘天數 → 兩邊算出來還不一樣，PDF 與畫面對不起來。
+      // 改為租用型正規寫法：單價＝逾期租金單價、數量＝合約數量、天數＝逾期天數，
+      // 兩邊都得到 單價×數量×天數，請款單上也看得到計價依據。
+      const _ow={type:'rental',desc:overLabel,unit:srcUnit,
+        contractPrice:srcPrice,contractQty:srcQty,
+        prevQty:0,prevAmt:0,
+        curQty:srcQty,curDays:overDays,curAmt:overAmt,
+        payRate:100,note:'逾期租金',otPrice:0,otUnit:'',_ovKey:baseDesc};
       if(existIdx>=0){
-        invItems[existIdx].desc=overLabel;
-        invItems[existIdx].unit='式';
-        invItems[existIdx].contractPrice=overAmt;
-        invItems[existIdx].curDays=overDays;
-        invItems[existIdx].curQty=1;
-        invItems[existIdx].curAmt=overAmt;
-        invItems[existIdx].note='逾期';
+        Object.keys(_ow).forEach(function(k){invItems[existIdx][k]=_ow[k];});
       } else {
-        invItems.splice(itemIdx+1,0,{
-          type:'item',desc:overLabel,
-          unit:'式',
-          contractPrice:overAmt,
-          contractQty:1,
-          prevQty:0,prevAmt:0,
-          curQty:1,curDays:overDays,
-          curAmt:overAmt,
-          note:'逾期租金',
-          otPrice:0,otUnit:''
-        });
+        invItems.splice(itemIdx+1,0,_ow);
       }
       rInvItems();
       const otDetail=srcPrice?`（$${srcPrice}×${srcQty}${srcUnit}×${overDays}天=NT$${overAmt.toLocaleString()}）`:'（請手動填入金額）';
@@ -13584,10 +13762,24 @@ function renderProjects(){
         +(cfChips?' '+cfChips:''),
       jump:"openProjectCosts('"+q.id+"')"});
     const periodChips=invs.map(v=>'<button type="button" onclick="event.stopPropagation();printInvById(\''+v.id+'\')" title="下載第'+esc(String(v.periodNo||'?'))+'期請款單" style="border:1px solid '+(v.receivedConfirmed?'var(--gm)':'#ffd699')+';background:'+(v.receivedConfirmed?'var(--gl)':'#fff8ec')+';color:'+(v.receivedConfirmed?'var(--g3)':'#b26a00')+';border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 第'+esc(String(v.periodNo||'?'))+'期 NT$ '+fmt((v.totals&&v.totals.total)||0)+(v.receivedConfirmed?' ✓':'')+'</button>').join(' ');
+    // v5.322 逾期租金：依報價備註「含XX天租期」＋日報完工日自動算，逾期才提示（可請款收入）
+    let rentOver=[],rentAmt=0;
+    try{
+      [q].concat(adds).forEach(x=>{_rentScan(x).forEach(s=>{if(s.overDays>0)rentOver.push(s);});});
+      rentAmt=rentOver.reduce((a,s)=>a+s.amount,0);
+    }catch(e){}
+    const rentBox=rentOver.length
+      ? '<div style="width:100%;font-size:11.5px;color:#b26a00;background:#fff8ec;border:1px solid #ffd699;border-radius:var(--r6);padding:6px 9px;margin-top:2px">'
+        +'<b>⏱ 逾期租金可請款：'+rentOver.length+' 項・合計 NT$ '+fmt(rentAmt)+'（未稅）</b>'
+        +'<div style="font-size:10.5px;color:var(--b4);margin-top:2px">'
+        +rentOver.slice(0,3).map(s=>esc(String(s.desc).slice(0,14))+' 逾期 '+s.overDays+' 天'+(s.otPrice>0?'（NT$ '+fmt(s.amount)+'）':'（未填逾期單價）')).join('　·　')
+        +(rentOver.length>3?'　…等 '+rentOver.length+' 項':'')
+        +'<br>到期日＝工項完工次日＋租期；請到請款單「租期／逾期天數計算 → 依日報自動掃描」帶入本期。</div></div>'
+      : '';
     steps.push({label:'業主計價（應收）',done:invs.length>0,
       info:invs.length?('已請 '+invs.length+' 期・累計 NT$ '+fmt(billed)):'尚未請款',
       bar:base>0?{pct:billed/base*100,warn:false,label:'估驗進度（累計請款/合約金額）'}:null,
-      extra:periodChips,jump:"go('invoice')"});
+      extra:periodChips+rentBox,jump:"go('invoice')"});
     steps.push({label:'廠商請款（應付）',done:payTotal>0&&payPaid>=payTotal,
       info:projPays.length?('應付 '+projPays.length+' 筆・NT$ '+fmt(payTotal)+'／已付 NT$ '+fmt(payPaid)
         +(payOverAR?'　<span style="color:#c62828;font-weight:800">⚠ 應付累計已超過應收請款（'+fmt(payTotal)+' > '+fmt(billedInclRet)+'，均含稅），請核對下包請款數量</span>':'')):'尚無應付帳款（登錄施工成本後自動連動）',
@@ -14432,9 +14624,13 @@ function renderShareProfit(numOnly){
   var capEarn=(c.netProfit||0)-(c.retentionAdd||0)-(c.wcAdd||0)-(c.machineSelfPay||0);
   var draws=SHARE_PROFIT.draws.filter(function(x){return (x.date||'').slice(0,4)===y;});
   var drawn=draws.reduce(function(a,x){return a+(parseFloat(x.amount)||0);},0);
-  // v5.321 現金上限：可動用資金已扣掉「已提分潤」，把本年度已領加回才是「可分配的現金池」。
-  // 帳上賺到不等於領得出來——錢多半卡在應收、保留款與材料上。
-  var capCash=0;try{capCash=Math.max(0,Math.round(_availableCash()+drawn));}catch(e){capCash=capEarn;}
+  // v5.322 現金上限＝金流頁「可動用資金（已扣應付）」＋本年度已領。
+  //   ‧ _availableCash() 已扣掉「已提分潤」，把本年已領加回才是「本年可分配的現金池」；
+  //   ‧ 再扣掉待付應付——欠廠商的錢不是自己的，先分掉就會跳票。
+  // 帳上賺到不等於領得出來：錢多半卡在應收、保留款與材料上。
+  var capCash=0,apPend=0;
+  try{apPend=Math.round(_apTotal());}catch(e){apPend=0;}
+  try{capCash=Math.max(0,Math.round(_availableCash()-apPend+drawn));}catch(e){capCash=capEarn;}
   var cap=Math.max(0,Math.min(capEarn,capCash));
   var capLimitedBy=(capCash<capEarn)?'cash':'earn';
   var byWho={};SHARE_WHO.forEach(function(w){byWho[w]=0;});
@@ -14452,14 +14648,26 @@ function renderShareProfit(numOnly){
   var years=[];var thisY=new Date().getFullYear();
   for(var i=thisY+1;i>=thisY-3;i--)years.push(String(i));
   Object.keys(SHARE_PROFIT.cfg).forEach(function(k){if(years.indexOf(k)<0)years.push(k);});
-  // 唯讀顯示（系統自動試算的欄位）
+  // v5.322 唯讀欄位改為緊湊磚塊（原本用整欄大方框，數字靠右、左半邊全空，版面很空洞）
+  var _tile=function(inner,bg,bd){
+    return '<div style="flex:1 1 190px;min-width:150px;background:'+bg+';border:1px solid '+bd+';border-radius:var(--r8);padding:9px 11px">'+inner+'</div>';
+  };
+  var _tag=function(txt,clr,bg){
+    return '<span style="font-size:9px;font-weight:800;color:'+clr+';background:'+bg+';border-radius:99px;padding:1px 6px;letter-spacing:.5px">'+txt+'</span>';
+  };
   var ro=function(label,val,hint){
-    return '<div class="f"><label>'+label+(hint?' <span style="font-size:10px;color:var(--b3)">'+hint+'</span>':'')+'</label>'
-      +'<div style="text-align:right;font-weight:800;font-size:15px;color:var(--b5);background:var(--b0);border:1px solid var(--b1);border-radius:var(--r6);padding:8px 10px;min-height:36px">'
-      +fmt(parseFloat(val)||0)+'</div></div>';
+    return _tile(
+      '<div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--b4)"><span>'+label+'</span>'+_tag('自動','var(--g3)','var(--gl)')+'</div>'
+      +'<div style="font-size:17px;font-weight:800;color:var(--b5);margin-top:3px;letter-spacing:.2px">NT$ '+fmt(parseFloat(val)||0)+'</div>'
+      +(hint?'<div style="font-size:10px;color:var(--b3);line-height:1.4;margin-top:3px">'+hint+'</div>':''),
+      'var(--b0)','var(--b1)');
   };
   var inp=function(id,label,val,hint){
-    return '<div class="f"><label>'+label+(hint?' <span style="font-size:10px;color:var(--b3)">'+hint+'</span>':'')+'</label><input id="'+id+'" type="number" value="'+(val||'')+'" placeholder="0" style="text-align:right;font-weight:700" onchange="shareCfgInput(\''+id.replace('share-cfg-','')+'\',this.value)"></div>';
+    return _tile(
+      '<div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--b4)"><span>'+label+'</span>'+_tag('手動','#b26a00','#fff3e0')+'</div>'
+      +'<input id="'+id+'" type="number" value="'+(val||'')+'" placeholder="0" style="width:100%;font-size:17px;font-weight:800;color:var(--b5);background:transparent;border:none;border-bottom:1px solid var(--b2);border-radius:0;padding:2px 0;margin-top:2px" onchange="shareCfgInput(\''+id.replace('share-cfg-','')+'\',this.value)">'
+      +(hint?'<div style="font-size:10px;color:var(--b3);line-height:1.4;margin-top:3px">'+hint+'</div>':''),
+      'var(--w)','var(--b2)');
   };
   el.innerHTML=
   '<div class="card"><div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg> 股東分潤</div>'
@@ -14471,15 +14679,13 @@ function renderShareProfit(numOnly){
   +'<div style="font-size:11.5px;color:var(--b4);background:var(--yl);border:1px solid var(--ym);border-radius:var(--r8);padding:8px 12px;margin-bottom:12px">'
   +'<b>年度可提領上限 ＝ min（盈餘上限、可動用現金）</b><br>'
   +'盈餘上限＝稅後淨利 − 保留款增額 − 循環資金增額 − 機具自付款，由系統依本年請款、施工成本、費用發票<b>自動試算</b>（不需手動輸入）；'
-  +'現金上限＝可動用資金＋本年度已領。超過上限的提領＝動用下一年的營運資金。</div>'
-  // v5.321：三個盈餘欄位改唯讀（永遠採系統試算），僅機具自付款需手動輸入
-  +'<div class="fg fg2" style="margin-bottom:8px">'
-  +ro('稅後淨利（元）',c.netProfit,'系統試算：本年請款換算未稅 − 施工成本 − 費用發票 − 股東薪資，再乘 80%')
-  +ro('保留款增額（元）',c.retentionAdd,'系統試算：本年度各期保留款合計（已排除已退還）')
-  +'</div>'
-  +'<div class="fg fg2" style="margin-bottom:12px">'
-  +ro('循環資金增額（元）',c.wcAdd,'系統試算：月均成本成長 ×（收款60天−付款37天）/30')
-  +inp('share-cfg-machineSelfPay','機具自付款（元）',c.machineSelfPay,'本年度機具貸款月付合計（需手動輸入）')
+  +'現金上限＝金流頁的<b>可動用資金（已扣應付）</b>＋本年度已領。超過上限的提領＝動用下一年的營運資金。</div>'
+  // v5.322：四個欄位改為同一列緊湊磚塊；前三項系統試算唯讀，機具自付款手動輸入
+  +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
+  +ro('稅後淨利',c.netProfit,'本年請款換算未稅 − 施工成本 − 費用發票 − 股東薪資，再 ×80%')
+  +ro('保留款增額',c.retentionAdd,'本年度各期保留款合計（已排除已退還）')
+  +ro('循環資金增額',c.wcAdd,'月均成本成長 ×（收款 60 天 − 付款 37 天）/30')
+  +inp('share-cfg-machineSelfPay','機具自付款',c.machineSelfPay,'本年度機具貸款月付合計')
   +'</div>'
   +'<div id="share-cap-num">'+_shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,capLimitedBy)+'</div>'
   +'<hr style="border:none;border-top:1px solid var(--b1);margin:14px 0">'
@@ -14521,8 +14727,8 @@ function _shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,limitedBy){
     +(capEarn!=null&&capCash!=null
       ?('<div class="ks" style="font-size:10.5px;color:'+(limitedBy==='cash'?'#b26a00':'var(--b3)')+'">'
         +(limitedBy==='cash'
-          ?'受現金限制：帳上盈餘可分 '+fmt(capEarn)+'，但可動用現金只有 '+fmt(capCash)
-          :'盈餘上限 '+fmt(capEarn)+'（現金可支應 '+fmt(capCash)+'）')
+          ?'受現金限制：帳上盈餘可分 '+fmt(capEarn)+'，但可動用資金（已扣應付）只有 '+fmt(capCash)
+          :'盈餘上限 '+fmt(capEarn)+'（可動用資金已扣應付 '+fmt(capCash)+'，足以支應）')
         +'</div>'):'')
     +'</div>'
   +perCards
