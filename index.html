@@ -2503,7 +2503,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.314';
+var APP_VERSION='v5.315';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -3391,6 +3391,8 @@ function applyNegotiate(){
       changed++;
     });
     if(!changed){toast('沒有工項單價被修改');return;}
+    // v5.315：逐項調價後也要清掉先前整體議價留下的尾差列，否則會殘留在報價單與 PDF 上
+    items=items.filter(it=>it.desc!==NGT_ADJ_DESC);
     rItems();rTots();
     document.getElementById('negotiate-modal').style.display='none';
     const after=calcT();
@@ -3419,6 +3421,7 @@ function applyNegotiate(){
   if(Math.abs(adj)>=1){
     const lbl=mode==='excl'?'未稅':'含稅';
     const origBase=mode==='excl'?t.sub:t.total;
+    // 尾差可為負（單價取整後超過目標）。此列為系統產生的議價折讓，儲存驗證會放行負值。
     items.push({desc:NGT_ADJ_DESC,unit:'式',qty:1,price:adj,note:'議價後'+lbl+' NT$'+fmt(target)+'（原'+lbl+' NT$'+fmt(origBase)+'）',ot:'',otu:'$/M/天',sec:false});
   }
   rItems();rTots();
@@ -4030,6 +4033,8 @@ function saveQ(){
   if(!(gv('fn')||'').trim()){toast('⚠ 請填寫「工程名稱」再儲存');const el=document.getElementById('fn');if(el)el.focus();return;}
   for(const it of (items||[])){
     if(it.sec)continue;
+    // v5.315：議價尾差列是系統產生的折讓，可為負值（原本會被擋下，導致議價後整張報價單存不了）
+    if(it.desc===NGT_ADJ_DESC)continue;
     if((parseFloat(it.qty)||0)<0||(parseFloat(it.price)||0)<0){toast('⚠ 數量／單價不可為負數');return;}
   }
   const t=calcT();
@@ -4052,6 +4057,7 @@ function saveQ(){
   persist();
   // 連動更新：所有關聯請款單（含歷期）同步更新合約單價，並重算本期金額
   let _linkedByQid=true;
+  let _settleKept=0;   // v5.315：本次有幾項因已結算而保留合約數量（提示使用者）
   let linkedInvs=INV.filter(x=>x.sourceQid===q.id);
   if(!linkedInvs.length){linkedInvs=INV.filter(x=>x.project===q.name);_linkedByQid=false;}
   if(linkedInvs.length){
@@ -4064,7 +4070,10 @@ function saveQ(){
         const li=linkedInv.items.find(x=>x.type!=='sec'&&x.desc===qi.desc);
         if(li){
           li.contractPrice=parseFloat(qi.price)||0;
-          li.contractQty=parseFloat(qi.qty)||0;
+          // v5.315：已做過「工項結算」的項目不覆寫合約數量，否則追加減成果會被靜默還原
+          //（結算時 contractQty 已改為實作量並存下 origContractQty，合約金額也已連動追加減）
+          if(li.origContractQty==null){li.contractQty=parseFloat(qi.qty)||0;}
+          else{_settleKept++;}
           li.note=qi.note||li.note;
           li.otPrice=qi.ot?parseFloat((qi.ot.match(/^[\d.]+/)||[''])[0])||0:0;
           li.otUnit=qi.otu||li.otUnit||'';
@@ -4096,6 +4105,7 @@ function saveQ(){
     });
     saveInv();
     toast('報價已儲存，已連動更新 '+linkedInvs.length+' 期請款單的合約單價與金額！');
+    if(_settleKept>0)setTimeout(function(){toast('⚖ 有 '+_settleKept+' 項已做過工項結算，合約數量維持結算後的實作量（未被報價數量覆寫）');},450);
   } else {
     toast('報價已儲存！');
   }
@@ -5427,7 +5437,12 @@ function saveInvoice(){
     }
   }catch(e){}
   if(_overN>0)setTimeout(()=>toast('⚠ 有 '+_overN+' 項累計數量超過合約（已標紅，仍照常出單）'),350);
+  // v5.315：以展開保留既有欄位。原本重建全新物件，會把收款確認狀態
+  //（receivedConfirmed／receivedDate／receivedNote）、保留款退還旗標、
+  // 以及報價連結（sourceQid／quoteId）整批清空——已收款的單改個備註再存就變回未收款。
+  const _existInv=invEid?INV.find(x=>x.id===invEid):null;
   const inv={
+    ...(_existInv||{}),
     id:invEid||Date.now().toString(),_mt:Date.now(),
     client:gv('inv-client'),taxid:gv('inv-taxid'),tel:gv('inv-tel'),fax:gv('inv-fax'),
     project:gv('inv-project'),loc:gv('inv-loc'),scope:gv('inv-scope'),
@@ -5447,7 +5462,7 @@ function saveInvoice(){
   const idx=INV.findIndex(x=>x.id===inv.id);
   if(idx>=0)INV[idx]=inv;else INV.unshift(inv);
   // 立即存 localStorage（主儲存）
-  try{localStorage.setItem('fy_inv',JSON.stringify(INV));}catch(e){}
+  _lsSet('fy_inv',JSON.stringify(INV),'請款單');
   toast('✅ 請款單已儲存！');
   updBadge();
   // 跳到列表頁並強制重新渲染
@@ -7348,7 +7363,8 @@ function renderLogReport(el){
 
 // 舊版 UPA stubs（新版已由 upaOnCat1Change/upaUpdateDesc 取代）
 function syncUPAFromParams(){try{loadUPACostParams();}catch(e){}}
-function upaCalc(){try{upaUpdateDesc();}catch(e){}}
+// 重新試算並回傳結果（{costUnit,quoted,final,siteC,soilC,methC}）；無法計算時回 null
+function upaCalc(){try{upaUpdateDesc();}catch(e){}return window._upaLast||null;}
 function upaFill(){try{upaUpdateDesc();}catch(e){}}
 
 // ════════ 頁面初始化 ════════
@@ -7508,15 +7524,22 @@ function confirmReceipt(){
   const amt=parseFloat(document.getElementById('receipt-amount').value)||0;
   const dt=document.getElementById('receipt-date').value;
   const note=document.getElementById('receipt-note').value.trim();
+  if(amt<=0){toast('⚠ 實收金額必須大於 0');const el=document.getElementById('receipt-amount');if(el)el.focus();return;}
+  // v5.315：部分收款不再標記為「已結清」。原本收一半也設 receivedConfirmed=true，
+  // 使該期整張單從應收與逾期提醒中消失，剩餘未收的錢就此不見。
+  const _due=(inv.totals&&inv.totals.total)||0;
+  const _full=_due<=0||amt>=_due-1e-6;
   inv.received=String(amt);
   inv.receivedDate=dt;
   inv.receivedNote=note;
-  inv.receivedConfirmed=true;  // 標記為「已手動確認」
+  inv.receivedConfirmed=_full;      // 足額才算結清
+  inv.partialConfirmed=!_full;      // 部分收款：已對帳但仍在應收
   inv._mt=Date.now();
   saveInv();
   renderInvList();
   closeReceiptModal();
-  toast('✅ 收款已確認'+(note?' — '+note:''));
+  if(_full)toast('✅ 收款已確認'+(note?' — '+note:''));
+  else toast('✅ 已登錄部分收款 NT$ '+fmt(amt)+'，尚差 NT$ '+fmt(_due-amt)+' 仍列入應收');
 }
 
 // ── 跳轉到得標案件篩選 ──
@@ -7593,11 +7616,17 @@ function updateInvStats(){
   const totalAmt=INV.reduce((a,i)=>a+(i.totals?.total||0),0);
   const receivedAmt=INV.reduce((a,i)=>a+(parseFloat(i.received||0)),0);
   const unpaidAmt=totalAmt-receivedAmt;
+  // v5.315：原本用 new Date(i.payDue)，但 payDue 存的是估驗日號（如「25」），
+  // new Date("25") 會被解析成 1925 年而恆小於今天 → 幾乎所有未收單都被標成逾期。
+  // 改用與應收清單、待辦提醒相同的預計收款日函式，三處判定一致。
+  const _todayStr=localToday();
   const overdue=INV.filter(i=>{
     if(i.receivedConfirmed)return false;
     const up=(i.totals?.total||0)-parseFloat(i.received||0);
-    const due=i.payDue?new Date(i.payDue).getTime():0;
-    return up>0&&due&&due<now;
+    if(up<=0)return false;
+    let due='';
+    try{const _e=_invExpectedDate(i);due=(_e&&_e.date)||'';}catch(e){due=/^\d{4}-\d{2}-\d{2}/.test(i.payDue||'')?i.payDue:'';}
+    return !!due&&due<_todayStr;
   }).length;
   el.innerHTML=
     '<div class="kpi" style="flex:1;min-width:120px"><div class="kl">請款單總數</div><div class="kv" style="font-size:20px">'+total+'</div><div class="ks">逾期 '+overdue+' 件</div></div>'
@@ -10444,6 +10473,9 @@ function buildCostAuditHtml(q){
     var st,clr,fixBtn='';
     if(selfPay){st='自付，不入應付';clr='var(--b3)';}
     else if(amt<=0){st='金額 0，免建應付';clr='var(--b3)';}
+    // v5.315：已合併的子成本，其應付已由合併單統一入帳。原本會誤判為「缺應付」並顯示
+    // 「🔧 補建應付」，使用者一按就會在合併應付之外再建一筆，應付總額直接變兩倍。
+    else if(c.mergedInto){st='已併入合併應付';clr='var(--b3)';}
     else if(!p){st='❌ 缺應付帳款（可能漏記）';clr='var(--red)';issues++;
       fixBtn='<button type="button" onclick="fixCostPayable(\''+c.id+'\')" style="font-size:11px;padding:2px 10px;border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;cursor:pointer;font-family:inherit">🔧 補建應付</button>';}
     else if(Math.abs((p.amount||0)-amt)>1){st='⚠ 金額不符（應付記 '+fmt(p.amount||0)+'）';clr='#e65100';issues++;
@@ -10458,7 +10490,8 @@ function buildCostAuditHtml(q){
       +'</tr>';
   });
   // 孤兒應付：應付掛在此案但成本記錄已刪
-  PAYABLES.filter(function(p){return p.quoteId===q.id&&p.costId&&!(q.costs||[]).some(function(c){return c.id===p.costId;});})
+  // 合併應付（mergedCostIds）的 costId 是虛擬鍵，不對應任何單筆成本，不算孤兒
+  PAYABLES.filter(function(p){return p.quoteId===q.id&&p.costId&&!p.mergedCostIds&&!(q.costs||[]).some(function(c){return c.id===p.costId;});})
     .forEach(function(p){
       issues++;
       rows+='<tr style="border-bottom:1px solid var(--b1);background:#fdecea">'
@@ -10469,6 +10502,21 @@ function buildCostAuditHtml(q){
         +'<td style="padding:5px 8px;text-align:right"><button type="button" onclick="removePayableByCostId(\''+p.costId+'\');rCostItems();toast(\'已刪除殘留應付\')" style="font-size:11px;padding:2px 10px;border:1px solid var(--red);background:#fff;color:var(--red);border-radius:99px;cursor:pointer;font-family:inherit">🗑 刪除殘留</button></td>'
         +'</tr>';
     });
+  // 合併應付：另列一行並勾稽合計金額是否等於各子成本相加
+  PAYABLES.filter(function(p){return p.quoteId===q.id&&p.mergedCostIds;}).forEach(function(p){
+    var sum=0;(p.mergedCostIds||[]).forEach(function(cid){
+      var c=(q.costs||[]).find(function(x){return x.id===cid;});if(c)sum+=parseFloat(c.amt)||0;
+    });
+    var diff=Math.abs((p.amount||0)-sum)>1;
+    if(diff)issues++;
+    rows+='<tr style="border-bottom:1px solid var(--b1)'+(diff?';background:#fff8ec':'')+'">'
+      +'<td style="padding:5px 8px;font-size:12px">'+esc(p.to||'')+'</td>'
+      +'<td style="padding:5px 8px;font-size:11px;color:var(--b4)">合併應付（'+((p.mergedCostIds||[]).length)+' 筆）</td>'
+      +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(p.amount||0)+'</td>'
+      +'<td style="padding:5px 8px;font-size:11.5px;font-weight:700;color:'+(diff?'#e65100':'var(--g3)')+'">'
+        +(diff?('⚠ 與子成本合計 '+fmt(sum)+' 不符'):(p.status==='paid'?'✓ 一致（已付款）':'✓ 一致（未付款）'))+'</td>'
+      +'<td style="padding:5px 8px"></td></tr>';
+  });
   if(!checked&&!rows)return '<div style="padding:20px;text-align:center;color:var(--b3);font-size:12px">此案尚無需勾稽的成本（自有成本不入應付）</div>';
   var head=issues
     ?'<div style="background:#fdecea;border:1px solid #f5b5ae;border-radius:var(--r8);padding:8px 12px;margin-bottom:10px;font-size:12.5px;font-weight:700;color:var(--red)">⚠ 發現 '+issues+' 筆成本／應付不一致，請逐筆處理</div>'
@@ -10733,6 +10781,7 @@ function confirmMergeCost(){
   PAYABLES.unshift({
     id:'pay'+mergeId,
     costId:mergeId,
+    quoteId:q.id,   // v5.315：原本缺此欄，導致專案應付總額與付款進度漏算這筆合併應付
     to:vendorName,
     amount:totalAmt,
     date:q.date||localToday(),
@@ -10740,7 +10789,7 @@ function confirmMergeCost(){
     project:q.name||'',
     status:'pending',
     note:'合併工項：'+descs.join('、'),
-    updatedAt:Date.now(),
+    updatedAt:Date.now(),_mt:Date.now(),
     mergedCostIds:selectedIds  // 記錄合併的來源
   });
   savePayables();
@@ -11971,7 +12020,12 @@ function upaUpdateDesc(){
         // 自動填入 upa-price 欄位
         const priceCustom=document.getElementById('upa-price-custom');
         if(priceCustom&&!priceCustom._userEdited)priceCustom.value=siteAdjPrice;
+        // v5.315：把試算結果留給 upaCalc() 回傳。原本 upaCalc 是空殼、恆回 undefined，
+        // 導致「套用至報價單」帶不出理論成本、「儲存分析」按了永遠跳「請先填寫參數」。
+        window._upaLast={costUnit:priceResult.total,quoted:basePrice,final:siteAdjPrice,
+          siteC:siteFactor,soilC:groundFactor,methC:1,breakdown:priceResult.breakdown};
       } else {
+        window._upaLast=null;
         upaPriceEl.innerHTML='<div style="font-size:12px;color:var(--b3);text-align:center"><svg class="ic ib" aria-hidden="true"><use href="#i-bulb"/></svg> 填寫長度和租期後顯示建議單價</div>';
         const priceCustom=document.getElementById('upa-price-custom');
         if(priceCustom&&!priceCustom._userEdited)priceCustom.value='';
@@ -12466,7 +12520,10 @@ function closeContractModal(){document.getElementById('contract-modal').style.di
 function settleContract(id){
   const c=CONTRACTS.find(x=>x.id===id);if(!c)return;
   const invs=INV.filter(i=>i.project===c.name);
-  const billed=invs.reduce((a,i)=>a+(i.totals?.total||0),0);
+  // v5.315：totals.total 是「已扣保留款」的金額。原本直接拿來當結算基準，
+  // 等於把押在業主端、日後會退還的保留款當成工程追減永久砍掉合約金額（10% 保留款＝合約短少 10%）。
+  const billed=invs.reduce((a,i)=>a+(i.totals?.total||0)+(i.totals?.retention||0),0);
+  const _retSum=invs.reduce((a,i)=>a+(i.totals?.retention||0),0);
   if(billed<=0){toast('此合約尚無請款紀錄，無法結算');return;}
   const orig=c.amount||0;
   // 防呆：疑似尚未完工（已請款未達合約 90%，或預計完工日未到）→ 先跳強警告
@@ -12477,11 +12534,11 @@ function settleContract(id){
     try{warn=window.confirm('⚠️ 此合約疑似尚未完工！\n\n'
       +(_pct<90?'・已請款累積僅達合約金額的 '+_pct+'%\n':'')
       +(_endFuture?'・預計完工日 '+c.end+' 尚未到期\n':'')
-      +'\n「結算」是整個工程全部完工後的最後收尾，會把合約金額直接改成目前已請款累積 NT$ '+fmt(billed)+'。\n\n如果只是單一工項做完要追加減，請改用請款單裡各工項旁的「⚖ 工項結算」，不要按這裡。\n\n確定整個工程已完工、要繼續合約總結算嗎？');}catch(e){warn=true;}
+      +'\n「結算」是整個工程全部完工後的最後收尾，會把合約金額直接改成目前已請款累積 NT$ '+fmt(billed)+'（含保留款）。\n\n如果只是單一工項做完要追加減，請改用請款單裡各工項旁的「⚖ 工項結算」，不要按這裡。\n\n確定整個工程已完工、要繼續合約總結算嗎？');}catch(e){warn=true;}
     if(!warn)return;
   }
   let ok=false;
-  try{ok=window.confirm('竣工結算\n\n原合約金額　NT$ '+fmt(orig)+'\n實際請款累積 NT$ '+fmt(billed)+'\n差額（追減）NT$ '+fmt(orig-billed)+'\n\n確定將合約金額調整為結算金額，並標記為已完成？\n（原合約金額會記錄在備註，可隨時手動改回）');}catch(e){ok=true;}
+  try{ok=window.confirm('竣工結算\n\n原合約金額　NT$ '+fmt(orig)+'\n實際請款累積 NT$ '+fmt(billed)+'（含保留款 NT$ '+fmt(_retSum)+'）\n差額（追減）NT$ '+fmt(orig-billed)+'\n\n確定將合約金額調整為結算金額，並標記為已完成？\n（保留款屬押在業主端、日後會退還的款項，已計入結算金額，不視為追減）\n（原合約金額會記錄在備註，可隨時手動改回）');}catch(e){ok=true;}
   if(!ok)return;
   if(c.originalAmount==null)c.originalAmount=orig; // 保留原始合約金額
   c.amount=billed;
@@ -13852,7 +13909,8 @@ function _shareMonths(y){
 function _shareAutoCalc(y){
   var rev=0;INV.forEach(function(v){if((v.date||'').slice(0,4)===y)rev+=(v.totals&&parseFloat(v.totals.total))||0;});
   var cost=0;Q.forEach(function(q){(q.costs||[]).forEach(function(c){if((c.date||'').slice(0,4)===y)cost+=parseFloat(c.amt)||0;});});
-  var exp=0;(EXPENSES||[]).forEach(function(e){if((e.date||'').slice(0,4)===y)exp+=parseFloat(e.amount!=null?e.amount:e.amt)||0;});
+  // v5.315：排除 costRef 標記者（智慧收件的材料發票已計入施工成本，再加一次就是雙重扣除）
+  var exp=0;(EXPENSES||[]).forEach(function(e){if(e&&e.costRef)return;if((e.date||'').slice(0,4)===y)exp+=parseFloat(e.amount!=null?e.amount:e.amt)||0;});
   var months=_shareMonths(y);
   var salary=SHARE_SALARY_MONTH*2*months;
   var pretax=rev/(1+(P.tax||5)/100)-cost-exp-salary;
@@ -14364,8 +14422,11 @@ function _intakeRoute(type,qid,r,du){
     try{persist();_immediateUpload();}catch(e){}
     // 同步登入帳務進項（稅額可扣抵）
     var eidm='E'+Date.now();
+    // costRef：這筆進項的金額已經記在專案施工成本裡，僅供扣抵進項稅額用。
+    // v5.315：股東分潤試算會同時扣「施工成本」與「費用發票」，沒有這個標記就會被扣兩次。
     EXPENSES.push({id:eidm,seller:r.vendor||'',number:(r.number||'').toUpperCase(),date:r.date||today,
-      amount:parseFloat(r.amount)||0,tax:parseFloat(r.tax)||0,note:'自有成本／'+(qm.name||'').slice(0,14),ts:Date.now()});
+      amount:parseFloat(r.amount)||0,tax:parseFloat(r.tax)||0,note:'自有成本／'+(qm.name||'').slice(0,14),ts:Date.now(),
+      costRef:cidm,costQid:qid});
     try{saveExpenses();}catch(e){}
     _ikLog({label:'材料發票 → 自有成本＋進項',detail:(qm.name||'')+'／'+(r.vendor||'')+' NT$ '+fmt(ccm.amt),
       undo:{kind:'owncost',qid:qid,cid:cidm,eid:eidm}});
@@ -16898,7 +16959,7 @@ function rProfit(){
         </tbody>
         <tfoot><tr style="background:var(--gl);font-weight:700;border-top:2px solid var(--gm)">
           <td style="padding:6px 8px">合計（${awarded.length}件）</td>
-          <td style="padding:6px 8px;text-align:right">${fmt(cases.reduce((a,r)=>a+r.q.t?.total||0,0))}</td>
+          <td style="padding:6px 8px;text-align:right">${fmt(cases.reduce((a,r)=>a+(r.q.t?.total||0),0))}</td>
           <td style="padding:6px 8px;text-align:right;color:var(--b4)">${fmt(totEstNet)}</td>
           <td style="padding:6px 8px;text-align:right;color:var(--g3)">${fmt(totReceived)}</td>
           <td style="padding:6px 8px;text-align:right;color:var(--red)">${fmt(totActualCost)}</td>
