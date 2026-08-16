@@ -1038,14 +1038,15 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   </div>
   <div class="pad">
     <div id="editor-sec-cost"></div><div class="card" id="cost-card" style="margin-top:10px">
-      <div class="ch green">
-        <div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本記錄</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <select id="cost-group-mode" onchange="rCostItems()" style="font-size:11px;padding:4px 7px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);font-family:inherit"><option value="none">依建立順序</option><option value="vendor">依廠商分組</option></select>
-          <button type="button" class="btn btn-xs" id="cost-view-analysis" onclick="setCostView('analysis')" title="報價複價 vs 預估成本 vs 實際成本 vs 毛利"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 工項成本分析</button>
-          <button type="button" class="btn btn-xs" id="cost-view-audit" onclick="setCostView('audit')" title="施工成本 vs 應付帳款一致性比對"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 成本勾稽</button>
-          <button type="button" class="btn btn-xs btn-g" onclick="addCostItem()" style="padding:6px 16px;font-size:13px;font-weight:700" title="先建立空白成本，類型（自有/承包/點工/額外）在卡片內再選">＋ 新增成本</button>
-          
+      <div class="ch green" style="flex-wrap:wrap;row-gap:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:8px">
+          <div class="cht" style="white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本記錄</div>
+          <select id="cost-group-mode" onchange="rCostItems()" style="font-size:12px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);font-family:inherit"><option value="none">依建立順序</option><option value="vendor">依廠商分組</option></select>
+        </div>
+        <div style="display:flex;gap:6px;width:100%">
+          <button type="button" class="btn btn-xs" id="cost-view-analysis" onclick="setCostView('analysis')" style="flex:1;justify-content:center;height:38px" title="報價複價 vs 預估成本 vs 實際成本 vs 毛利"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 工項成本分析</button>
+          <button type="button" class="btn btn-xs" id="cost-view-audit" onclick="setCostView('audit')" style="flex:1;justify-content:center;height:38px" title="施工成本 vs 應付帳款一致性比對"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 成本勾稽</button>
+          <button type="button" class="btn btn-xs btn-g" onclick="addCostItem()" style="flex:1;justify-content:center;height:38px;font-size:13px;font-weight:700" title="先建立空白成本，類型（自有/承包/點工/額外）在卡片內再選">＋ 新增成本</button>
         </div>
       </div>
       <div style="padding:10px 14px">
@@ -1308,14 +1309,23 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   </div>
   <div id="customer-stats-grid" style="display:flex;gap:10px;flex-wrap:wrap;padding:12px 18px 10px"></div>
   <div class="pad">
-    <!-- 分頁切換 -->
+    <!-- 分頁切換：統一庫（全部）預設 -->
     <div style="display:flex;gap:4px;margin-bottom:12px;border-bottom:2px solid var(--b1)">
-      <button type="button" class="contacts-tab active" id="ctab-customers" onclick="switchContactsTab('customers')"
-        style="padding:8px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--g3);border-bottom:2px solid var(--g3);margin-bottom:-2px;font-family:inherit;font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg> 客戶</button>
+      <button type="button" class="contacts-tab active" id="ctab-all" onclick="switchContactsTab('all')"
+        style="padding:8px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--g3);border-bottom:2px solid var(--g3);margin-bottom:-2px;font-family:inherit;font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg> 全部</button>
+      <button type="button" class="contacts-tab" id="ctab-customers" onclick="switchContactsTab('customers')"
+        style="padding:8px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--b4);font-family:inherit">客戶</button>
       <button type="button" class="contacts-tab" id="ctab-vendors" onclick="switchContactsTab('vendors')"
         style="padding:8px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--b4);font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 廠商</button>
     </div>
-    <div id="contacts-customers">
+    <div id="contacts-all">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input id="contact-srch-all" type="text" placeholder="搜尋名稱／統編／電話…" oninput="renderContactsAll()"
+          style="padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px;flex:1;font-family:inherit">
+      </div>
+      <div class="card" style="margin-bottom:0"><div id="contacts-all-list"></div></div>
+    </div>
+    <div id="contacts-customers" style="display:none">
       <div style="display:flex;gap:8px;margin-bottom:10px">
         <input id="customer-srch" type="text" placeholder="搜尋客戶…" oninput="renderCustomersContact()"
           style="padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px;flex:1;font-family:inherit">
@@ -2496,7 +2506,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.311';
+var APP_VERSION='v5.312';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2733,7 +2743,7 @@ function go(p){
       }
     }catch(e){}
   }
-  if(p==='ledger'){try{renderLedger();}catch(e){}}
+  if(p==='ledger'){try{renderLedger();}catch(e){} try{_cardifyTables(document.getElementById('page-ledger'));}catch(e){}}
   if(p==='params'){syncParamsUI();try{_updBackupHint();}catch(e){}try{loadUPACostParams();}catch(e){}initGoogleSignIn();try{renderStorageUsage();}catch(e){}}
   try{var _qb=document.querySelector('.mob-quick-bar');if(_qb)_qb.classList.toggle('hide-on-dash',p==='dash');}catch(e){}
   try{if(typeof _goExtra!=='undefined')_goExtra(p);}catch(ex){}
@@ -7076,7 +7086,7 @@ function renderBizGates(){
   }catch(e){}
   var na='<span style="color:var(--b3)">—</span>';
   var html='<div class="card"><div class="ch"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 經營儀表板</div></div>'
-    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 14px">'
+    +'<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:12px 14px">'
     +kpi('前三大業主佔比',top3Pct==null?na:top3Pct+'%',top3.map(function(x){return esc(String(x[0]).slice(0,6));}).join('・')||'—',top3Pct==null?null:top3Pct<50?'var(--g3)':'#e65100',"go('contacts')")
     +kpi('有效成交率',winRate==null?na:winRate+'%','勝 '+awarded+'／敗 '+lost,winRate==null?null:winRate>=30?'var(--g3)':'#e65100',"go('quotes')")
     +kpi('實際毛利率',actM==null?na:actM+'%','已登錄成本的得標案',actM==null?null:actM>=35?'var(--g3)':'#e65100',"go('profit')")
@@ -8629,9 +8639,9 @@ function renderMatBuy(){
       note:'<input value="'+esc(r.note||'')+'"'+u('note')+' placeholder="備註" style="'+inCss+';font-size:12px">'
     };
   };
-  if(isMob()){
-    // 手機：卡片式
-    h+='<div style="padding:4px 12px 4px;display:flex;flex-direction:column;gap:8px">';
+  // 卡片式（桌機/手機一致；桌機自動多欄）
+  {
+    h+='<div style="padding:6px 12px 4px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(360px,100%),1fr));gap:8px">';
     MAT_LEDGER.forEach(function(r,i){
       var amt=_matLedAmt(r);
       var editing=(window._matLedEditId===r.id);
@@ -8667,45 +8677,6 @@ function renderMatBuy(){
         +'</div>';
     });
     h+='</div>';
-  }else{
-    // 桌機：表格
-    h+='<div class="tbl-wrap"><table class="tbl" style="min-width:1240px"><thead><tr>'
-      +'<th style="min-width:118px">品項</th><th style="min-width:96px">規格</th><th style="width:76px" class="r">長度(M)</th>'
-      +'<th style="width:72px" class="r">數量</th><th style="width:84px" class="r">進貨總長<br>(M)</th><th style="width:88px" class="r">單位重<br>(kg/m)</th><th style="width:84px" class="r">單價</th><th style="width:104px" class="r">金額</th><th style="width:118px">購置日期</th>'
-      +'<th style="width:84px">類型</th><th style="min-width:110px">位置</th><th style="min-width:80px">備註</th><th style="width:104px"></th>'
-      +'</tr></thead><tbody>';
-    MAT_LEDGER.forEach(function(r,i){
-      var amt=_matLedAmt(r);
-      var editing=(window._matLedEditId===r.id);
-      if(!editing){
-        h+='<tr>'
-          +'<td style="font-weight:700;font-size:13px">'+esc(r.name||'—')+'</td>'
-          +'<td style="color:var(--b5);font-size:12.5px">'+esc(r.spec||'—')+'</td>'
-          +'<td class="r">'+(r.len!=null&&r.len!==''?r.len:'—')+'</td>'
-          +'<td class="r" style="font-weight:700">'+(r.qty!=null&&r.qty!==''?fmt(r.qty):'—')+'</td>'
-          +'<td class="r" style="color:var(--b5)">'+(r.billM!=null&&r.billM!==''?fmt(r.billM):'—')+'</td>'
-          +'<td class="r" style="color:var(--b5)">'+(r.uw!=null&&r.uw!==''?r.uw:'—')+'</td>'
-          +'<td class="r">'+(r.price!=null&&r.price!==''?fmt(r.price):'—')+'</td>'
-          +'<td class="r" style="font-weight:700;font-size:12.5px;white-space:nowrap">'+(amt?('NT$ '+fmt(Math.round(amt))):'—')+'</td>'
-          +'<td style="font-size:12.5px">'+esc(r.date||'—')+'</td>'
-          +'<td style="font-size:12.5px;color:'+(r.kind==='一次性'?'#b26a00':'var(--g3)')+'">'+esc(r.kind||'重複性')+'</td>'
-          +'<td style="font-size:12px;color:var(--b5)">'+esc(r.loc||'公司倉庫')+'</td>'
-          +'<td style="font-size:12px;color:var(--b4)">'+esc(r.note||'')+'</td>'
-          +'<td style="text-align:center;white-space:nowrap"><button type="button" class="btn btn-xs" onclick="matLedEdit(\''+r.id+'\')" style="padding:4px 10px;font-size:12px">編輯</button></td>'
-          +'</tr>';
-        return;
-      }
-      var c=edCells(r,i);
-      h+='<tr style="background:#f7faf8">'
-        +'<td>'+c.name+'</td><td>'+c.spec+'</td><td>'+c.len+'</td><td>'+c.qty+'</td><td>'+c.billM+'</td><td>'+c.uw+'</td><td>'+c.price+'</td>'
-        +'<td class="r" style="font-weight:700;font-size:12.5px;white-space:nowrap">'+(amt?('NT$ '+fmt(Math.round(amt))):'—')+'</td>'
-        +'<td>'+c.date+'</td><td>'+c.kind+'</td><td>'+c.loc+'</td><td>'+c.note+'</td>'
-        +'<td style="text-align:center;white-space:nowrap">'
-          +'<button type="button" class="btn btn-xs btn-g" onclick="matLedEdit(null)" style="padding:4px 10px;font-size:12px;font-weight:700">完成</button>'
-          +'<button type="button" class="btn btn-xs" onclick="matLedDel('+i+')" style="color:var(--red);padding:4px 8px;margin-left:4px">✕</button></td>'
-        +'</tr>';
-    });
-    h+='</tbody></table></div>';
   }
   h+='<div style="padding:10px 14px"><button type="button" class="btn btn-xs btn-g" onclick="matLedAdd()" style="padding:9px 16px;font-size:13.5px;font-weight:700">＋ 新增購置紀錄</button></div>';
   el.innerHTML=h;
@@ -14729,6 +14700,49 @@ function renderCurrentReport(){
   else if(_currentReport==='client')renderClientReport(el,year,month);
   else if(_currentReport==='contract')renderContractReport(el,year);
   else if(_currentReport==='log')renderLogReport(el);
+  try{_cardifyTables(el);}catch(e){}
+}
+// ── 手機通用：把報表表格轉為卡片（首欄為卡片標題，其餘欄位 label:value 列出）──
+function _cardifyTables(root){
+  if(!isMob()||!root)return;
+  root.querySelectorAll('table.pt,table.tbl').forEach(function(tbl){
+    if(tbl.closest('.desk-only'))return;      // 已有專屬手機卡片版的表格跳過
+    if(tbl._cardified)return;
+    var heads=[].slice.call(tbl.querySelectorAll('thead th')).map(function(th){return th.textContent.trim();});
+    if(heads.length<3)return;                 // 兩欄以下的表格直接顯示即可
+    var wrapEl=document.createElement('div');
+    wrapEl.style.cssText='display:flex;flex-direction:column;gap:8px;padding:10px 12px';
+    [].slice.call(tbl.querySelectorAll('tbody tr')).forEach(function(tr){
+      var tds=[].slice.call(tr.children);if(!tds.length)return;
+      var card=document.createElement('div');
+      card.style.cssText='border:1px solid var(--b1);border-radius:10px;padding:10px 12px;background:var(--w)';
+      var oc=tr.getAttribute('onclick');
+      if(oc){card.setAttribute('onclick',oc);card.style.cursor='pointer';}
+      var rowsH='';
+      tds.slice(1).forEach(function(td,i){
+        var lb=heads[i+1]||'';
+        var v=(td.innerHTML||'').trim();
+        if(!v||v==='—'||v==='-')return;
+        rowsH+='<div style="display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:2px 0"><span style="color:var(--b3);flex-shrink:0">'+lb+'</span><span style="font-weight:600;text-align:right;min-width:0">'+v+'</span></div>';
+      });
+      card.innerHTML='<div style="font-weight:700;font-size:13.5px;margin-bottom:5px">'+(tds[0]?tds[0].innerHTML:'')+'</div>'+rowsH;
+      wrapEl.appendChild(card);
+    });
+    var tf=tbl.querySelector('tfoot tr');
+    if(tf){
+      var tds2=[].slice.call(tf.children),rows2='';
+      tds2.slice(1).forEach(function(td,i){var lb=heads[i+1]||'';var v=(td.innerHTML||'').trim();if(!v)return;
+        rows2+='<div style="display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:2px 0"><span style="color:var(--b3)">'+lb+'</span><span style="font-weight:700;text-align:right">'+v+'</span></div>';});
+      var c2=document.createElement('div');
+      c2.style.cssText='border-top:2px solid var(--gm);padding:8px 4px 0;margin-top:2px';
+      c2.innerHTML='<div style="font-weight:800;font-size:13.5px;margin-bottom:4px">'+(tds2[0]?tds2[0].innerHTML:'合計')+'</div>'+rows2;
+      wrapEl.appendChild(c2);
+    }
+    var hideEl=tbl.closest('div[style*="overflow-x"]')||tbl;
+    hideEl.style.display='none';
+    if(hideEl.parentNode)hideEl.parentNode.insertBefore(wrapEl,hideEl.nextSibling);
+    tbl._cardified=true;
+  });
 }
 
 function initReportYears(){
@@ -15069,7 +15083,7 @@ function fbDownload(){
 function _goExtra(p){
   if(p==='contracts'){renderContracts();}
   if(p==='vendors'){renderVendors();}
-  if(p==='contacts'){switchContactsTab('customers');renderCustomersContact();try{updateCustomerStats();}catch(e){};updateCustomerStats();}
+  if(p==='contacts'){switchContactsTab(_contactsTab||'all');try{updateCustomerStats();}catch(e){}}
   if(p==='finance'){updateFinanceKPIs();renderFinanceAR();switchFinanceTab('ar');}
   if(p==='profit'){initReportYears();showReport('monthly');}
   if(p==='reports'){initReportYears();showReport('monthly');}
@@ -15448,26 +15462,76 @@ document.addEventListener('click',e=>{
 // ══════════════════════════════════════════════════════════════
 // 聯絡人整合頁（客戶+廠商）
 // ══════════════════════════════════════════════════════════════
-let _contactsTab='customers';
+let _contactsTab='all';
 
 function switchContactsTab(tab){
   _contactsTab=tab;
-  ['customers','vendors'].forEach(t=>{
+  ['all','customers','vendors'].forEach(t=>{
     const btn=document.getElementById('ctab-'+t);
     const panel=document.getElementById('contacts-'+t);
     const isActive=t===tab;
-    if(btn){btn.style.color=isActive?'var(--g3)':'var(--b4)';btn.style.fontWeight=isActive?'700':'400';btn.style.borderBottom=isActive?'2px solid var(--g3)':'none';}
+    if(btn){btn.style.color=isActive?'var(--g3)':'var(--b4)';btn.style.fontWeight=isActive?'700':'400';btn.style.borderBottom=isActive?'2px solid var(--g3)':'none';btn.style.marginBottom=isActive?'-2px':'0';}
     if(panel)panel.style.display=isActive?'block':'none';
   });
   const addBtn=document.getElementById('contacts-add-btn');
-  if(addBtn)addBtn.textContent=tab==='customers'?'＋ 新增客戶':'＋ 新增廠商';
+  if(addBtn)addBtn.textContent=tab==='customers'?'＋ 新增客戶':(tab==='vendors'?'＋ 新增廠商':'＋ 新增');
   if(tab==='customers')renderCustomersContact();
-  else renderVendors2();
+  else if(tab==='vendors')renderVendors2();
+  else renderContactsAll();
 }
 
 function newContactItem(){
-  if(_contactsTab==='customers') newCustomer();
-  else newVendor();
+  if(_contactsTab==='vendors') newVendor();
+  else newCustomer();
+}
+
+// ── 聯絡對象統一庫：客戶＋廠商依名稱合併呈現，可互補身分 ──
+function renderContactsAll(){
+  const el=document.getElementById('contacts-all-list');if(!el)return;
+  const srch=(document.getElementById('contact-srch-all')?.value||'').toLowerCase();
+  const map={},order=[];
+  CUSTOMERS.forEach(c=>{const k=(c.name||'').trim();if(!k)return;if(!map[k]){map[k]={name:k};order.push(k);}map[k].cust=c;});
+  VENDORS.forEach(v=>{const k=(v.name||'').trim();if(!k)return;if(!map[k]){map[k]={name:k};order.push(k);}map[k].vend=v;});
+  const list=order.map(k=>map[k]).filter(r=>{
+    if(!srch)return true;
+    const c=r.cust||{},v=r.vend||{};
+    return r.name.toLowerCase().includes(srch)||(c.taxid||'').includes(srch)||(v.taxid||'').includes(srch)||(c.tel||'').includes(srch)||(v.phone||'').includes(srch);
+  });
+  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-ic"><svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg></div><p>尚無聯絡對象</p></div>';return;}
+  el.innerHTML=list.map(r=>{
+    const c=r.cust,v=r.vend;
+    const tel=(c&&c.tel)||(v&&v.phone)||'';
+    const taxid=(c&&c.taxid)||(v&&v.taxid)||'';
+    const contact=(c&&c.contact)||(v&&v.contact)||'';
+    const badges=(c?'<span class="bdg" style="font-size:10px;background:var(--gl);color:var(--g3);border:1px solid var(--gm)">客戶</span>':'')
+      +(v?' <span class="bdg" style="font-size:10px;background:#fff3e0;color:#c8450a;border:1px solid #ffcc80">廠商</span>':'');
+    return `<div class="ql" style="cursor:default">
+      <div class="qdot" style="background:${c&&v?'var(--g)':(c?'var(--gm)':'#ffcc80')}"></div>
+      <div class="qm">
+        <div class="qt">${esc(r.name)} ${badges}</div>
+        <div class="qsb">${taxid?'統編：'+esc(taxid):''}${tel?' ／ '+esc(tel):''}${contact?' ／ '+esc(contact):''}</div>
+      </div>
+      <div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;justify-content:flex-end">
+        ${tel?`<a href="tel:${tel}" class="btn btn-xs" style="text-decoration:none">📞</a>`:''}
+        ${c?`<button type="button" class="btn btn-xs" onclick="editCustomerContact('${escq(r.name)}')" title="編輯客戶資料"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 客戶</button>`
+           :`<button type="button" class="btn btn-xs" onclick="contactAddRole('${escq(r.name)}','cust')" style="border-style:dashed;color:var(--b4)" title="把這個廠商也建立為客戶">＋客戶身分</button>`}
+        ${v?`<button type="button" class="btn btn-xs" onclick="editVendor('${escq(v.id)}')" title="編輯廠商資料"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 廠商</button>`
+           :`<button type="button" class="btn btn-xs" onclick="contactAddRole('${escq(r.name)}','vend')" style="border-style:dashed;color:var(--b4)" title="把這個客戶也建立為廠商">＋廠商身分</button>`}
+      </div>
+    </div>`;}).join('');
+}
+// 補身分：同名互相帶入基本資料（名稱/統編/電話/聯絡人）
+function contactAddRole(name,role){
+  const c=CUSTOMERS.find(x=>(x.name||'').trim()===name);
+  const v=VENDORS.find(x=>(x.name||'').trim()===name);
+  if(role==='cust'&&!c){
+    CUSTOMERS.unshift({id:'cu'+Date.now(),name:name,taxid:(v&&v.taxid)||'',tel:(v&&v.phone)||'',fax:'',contact:(v&&v.contact)||'',siteTel:'',companyContact:'',addr:(v&&v.addr)||'',note:'由廠商身分補建',_mt:Date.now()});
+    saveCustomers();toast('✅ 已補建客戶身分：'+name);
+  }else if(role==='vend'&&!v){
+    VENDORS.unshift({id:Date.now().toString(),name:name,type:'other',contact:(c&&c.contact)||'',phone:(c&&c.tel)||'',taxid:(c&&c.taxid)||'',email:'',addr:(c&&c.addr)||'',items:'',note:'由客戶身分補建',updatedAt:Date.now(),_mt:Date.now()});
+    saveVendors();toast('✅ 已補建廠商身分：'+name);
+  }
+  renderContactsAll();try{updateCustomerStats();}catch(e){}
 }
 
 function renderCustomersContact(){
@@ -16829,6 +16893,7 @@ function rProfit(){
       </div></div>`
       :`<div class="empty"><div class="empty-ic"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg></div><p>尚無施工成本資料<br><span style="font-size:12px;color:var(--b3)">在得標報價單中填入施工成本後，這裡會顯示執行率分析</span></p></div>`}
     </div>`;
+  try{_cardifyTables(document.getElementById('page-profit'));}catch(e){}
 }
 
 
