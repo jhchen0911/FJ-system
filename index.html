@@ -593,23 +593,20 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <div class="shell">
 <nav class="sidebar">
   <button type="button" class="snav active" id="sn-dash" onclick="go('dash')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg></span>總覽</button>
-  <div class="ssec">接案流</div>
   <button type="button" class="snav" id="sn-quotes" onclick="go('quotes')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span>報價管理 <span class="cnt" id="qbadge">0</span></button>
-  <button type="button" class="snav" id="sn-contracts" onclick="go('contracts')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>合約管理<span class="cnt" id="contractbadge" style="display:none">0</span></button>
   <button type="button" class="snav" id="sn-projects" onclick="go('projects')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>專案管理</button>
   <button type="button" class="snav" id="sn-costs" onclick="go('costs')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span>施工成本</button>
-  <button type="button" class="snav" id="sn-materials" onclick="go('materials')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg></span>材料管理</button>
-  <div class="ssec" style="margin-top:5px">收付流</div>
+  <button type="button" class="snav" id="sn-materials" onclick="go('materials')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>材料管理</button>
   <button type="button" class="snav" id="sn-invoice" onclick="go('invoice')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>業主計價 <span class="cnt" id="invbadge" style="display:none">0</span></button>
+  <button type="button" class="snav" id="sn-quickcost" onclick="go('quickcost');setTimeout(rQuickCost,60)"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></span>日報．支出</button>
+  <button type="button" class="snav" id="sn-contracts" onclick="go('contracts')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>合約管理<span class="cnt" id="contractbadge" style="display:none">0</span></button>
+  <div class="ssec" style="margin-top:5px">財務流</div>
   <button type="button" class="snav" id="sn-finance" onclick="go('finance')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>金流管理</button>
-  <div class="ssec" style="margin-top:5px">成本流</div>
-  <button type="button" class="snav" id="sn-quickcost" onclick="go('quickcost');setTimeout(rQuickCost,60)"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg></span>日報．支出</button>
-  <button type="button" class="snav" id="sn-profit" onclick="go('profit')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>利潤分析</button>
+  <button type="button" class="snav" id="sn-profit" onclick="go('profit')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>利潤．報表</button>
   <div class="ssec" style="margin-top:5px">資料與工具</div>
-  <button type="button" class="snav" id="sn-contacts" onclick="go('contacts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>客戶．廠商</button>
   <button type="button" class="snav" onclick="smartIntake()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
+  <button type="button" class="snav" id="sn-contacts" onclick="go('contacts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>客戶．廠商</button>
   <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
-  <button type="button" class="snav" id="sn-reports" onclick="go('reports')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span>報表中心</button>
   <div class="ssec" style="margin-top:5px">系統</div>
   <button type="button" class="snav" id="sn-permissions" onclick="go('permissions')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span>權限管理</button>
   <button type="button" class="snav" id="sn-params" onclick="go('params')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg></span>參數設定</button>
@@ -2506,7 +2503,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.312';
+var APP_VERSION='v5.313';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -6413,9 +6410,6 @@ function openAwardDetail(id){
   sv('award-ref-name',ref.name||'');
   sv('award-ref-rate',ref.rate!=null?ref.rate:(margin>=35?3:2));
   sv('award-ref-cap',ref.cap||'');
-  sv('award-ref-tid',ref.tid||'');
-  sv('award-ref-type',ref.incomeType||'9A');
-  const wh=document.getElementById('award-ref-withheld');if(wh)wh.checked=!!ref.withheld;
   updAwardCommPreview();
   document.getElementById('award-modal').style.display='flex';
 }
@@ -6469,16 +6463,13 @@ function confirmAward(){
       const cap=parseFloat(gv('award-ref-cap'))||0;
       const fixAmt=parseFloat(gv('award-ref-amt'))||0;
       const amt=(mode==='amt')?Math.round(fixAmt):_calcCommission(q.t?.total||0,rate,cap);
-      q.referral={name:refName,who:who,mode:mode,rate:rate,cap:cap||null,fixAmt:fixAmt||null,amount:amt,
-        tid:(gv('award-ref-tid')||'').trim(),
-        incomeType:gv('award-ref-type')||'9A',
-        withheld:!!document.getElementById('award-ref-withheld')?.checked};
+      q.referral={name:refName,who:who,mode:mode,rate:rate,cap:cap||null,fixAmt:fixAmt||null,amount:amt};
       // 應付帳款 upsert（固定 id 防重複；保留既有付款狀態）
       let cp=PAYABLES.find(p=>p.id===commPayId);
       if(!cp){cp={id:commPayId,status:'pending'};PAYABLES.unshift(cp);}
       cp.kind='commission';cp.to=refName;cp.project=q.name||'';cp.quoteId=id;
       cp.amount=amt;
-      cp.note='專案獎金（'+who+'）'+(mode==='amt'?'一筆 NT$'+fmt(amt):rate+'%')+'・依實收款進度分期支付・'+(q.referral.incomeType==='9A'?'執行業務所得(9A)':'其他所得(92)')+(q.referral.withheld?'・已辦扣繳':'・⚠未辦扣繳');
+      cp.note='專案獎金（'+who+'）'+(mode==='amt'?'一筆 NT$'+fmt(amt):rate+'%')+'・依實收款進度分期支付';
       cp._mt=Date.now();
       savePayables();
     }else{
@@ -8572,8 +8563,9 @@ function renderMatStockView(){
   var h='';
   if(!aggKeys.length){
     h+='<div style="padding:16px 14px;font-size:12.5px;color:var(--b3)">尚無庫存。請至「材料購置」新增進貨紀錄，庫存會自動依 L=長度×支數 彙總到這裡。</div>';
-  }else{
-    h+='<div style="padding:10px 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:8px">';
+  }else if(isMob()){
+    // 手機：卡片
+    h+='<div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">';
     aggKeys.forEach(function(k){
       var a=agg[k];
       h+='<div style="border:1px solid var(--b1);border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;background:var(--w)">'
@@ -8582,6 +8574,20 @@ function renderMatStockView(){
         +'<div style="font-size:19px;font-weight:800;color:'+(a.kind==='一次性'?'#b26a00':'var(--g3)')+';white-space:nowrap">×'+fmt(a.qty)+'<span style="font-size:11px;font-weight:600;color:var(--b3)"> 支/件</span></div></div>';
     });
     h+='</div>';
+  }else{
+    // 桌機：表格（等寬）
+    h+='<div class="tbl-wrap"><table class="tbl" style="table-layout:fixed"><thead><tr>'
+      +'<th style="width:18%">品項</th><th style="width:14%">規格</th><th style="width:14%">長度</th>'
+      +'<th style="width:26%">位置</th><th style="width:14%">類型</th><th style="width:14%" class="r">數量（支/件）</th></tr></thead><tbody>';
+    aggKeys.forEach(function(k){
+      var a=agg[k];
+      h+='<tr><td style="font-weight:700">'+esc(a.name)+'</td><td style="color:var(--b5)">'+esc(a.spec)+'</td>'
+        +'<td style="font-weight:600">'+lenTxt(a.len)+'</td>'
+        +'<td style="color:var(--b5)">'+esc(a.loc)+'</td>'
+        +'<td style="color:'+(a.kind==='一次性'?'#b26a00':'var(--g3)')+';font-size:12px">'+a.kind+'</td>'
+        +'<td class="r" style="font-weight:800;color:var(--g3);font-size:15px">'+fmt(a.qty)+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
   }
   el.innerHTML=h;
 }
@@ -8639,9 +8645,9 @@ function renderMatBuy(){
       note:'<input value="'+esc(r.note||'')+'"'+u('note')+' placeholder="備註" style="'+inCss+';font-size:12px">'
     };
   };
-  // 卡片式（桌機/手機一致；桌機自動多欄）
-  {
-    h+='<div style="padding:6px 12px 4px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(360px,100%),1fr));gap:8px">';
+  if(isMob()){
+    // 手機：卡片式
+    h+='<div style="padding:6px 12px 4px;display:flex;flex-direction:column;gap:8px">';
     MAT_LEDGER.forEach(function(r,i){
       var amt=_matLedAmt(r);
       var editing=(window._matLedEditId===r.id);
@@ -8677,6 +8683,45 @@ function renderMatBuy(){
         +'</div>';
     });
     h+='</div>';
+  }else{
+    // 桌機：表格（含進貨總長/位置；點「編輯」列內修改）
+    h+='<div class="tbl-wrap"><table class="tbl" style="min-width:1240px"><thead><tr>'
+      +'<th style="min-width:118px">品項</th><th style="min-width:96px">規格</th><th style="width:76px" class="r">長度(M)</th>'
+      +'<th style="width:72px" class="r">數量</th><th style="width:84px" class="r">進貨總長<br>(M)</th><th style="width:88px" class="r">單位重<br>(kg/m)</th><th style="width:84px" class="r">單價</th><th style="width:104px" class="r">金額</th><th style="width:118px">購置日期</th>'
+      +'<th style="width:84px">類型</th><th style="min-width:110px">位置</th><th style="min-width:80px">備註</th><th style="width:104px"></th>'
+      +'</tr></thead><tbody>';
+    MAT_LEDGER.forEach(function(r,i){
+      var amt=_matLedAmt(r);
+      var editing=(window._matLedEditId===r.id);
+      if(!editing){
+        h+='<tr>'
+          +'<td style="font-weight:700;font-size:13px">'+esc(r.name||'—')+'</td>'
+          +'<td style="color:var(--b5);font-size:12.5px">'+esc(r.spec||'—')+'</td>'
+          +'<td class="r">'+(r.len!=null&&r.len!==''?r.len:'—')+'</td>'
+          +'<td class="r" style="font-weight:700">'+(r.qty!=null&&r.qty!==''?fmt(r.qty):'—')+'</td>'
+          +'<td class="r" style="color:var(--b5)">'+(r.billM!=null&&r.billM!==''?fmt(r.billM):'—')+'</td>'
+          +'<td class="r" style="color:var(--b5)">'+(r.uw!=null&&r.uw!==''?r.uw:'—')+'</td>'
+          +'<td class="r">'+(r.price!=null&&r.price!==''?fmt(r.price):'—')+'</td>'
+          +'<td class="r" style="font-weight:700;font-size:12.5px;white-space:nowrap">'+(amt?('NT$ '+fmt(Math.round(amt))):'—')+'</td>'
+          +'<td style="font-size:12.5px">'+esc(r.date||'—')+'</td>'
+          +'<td style="font-size:12.5px;color:'+(r.kind==='一次性'?'#b26a00':'var(--g3)')+'">'+esc(r.kind||'重複性')+'</td>'
+          +'<td style="font-size:12px;color:var(--b5)">'+esc(r.loc||'公司倉庫')+'</td>'
+          +'<td style="font-size:12px;color:var(--b4)">'+esc(r.note||'')+'</td>'
+          +'<td style="text-align:center;white-space:nowrap"><button type="button" class="btn btn-xs" onclick="matLedEdit(\''+r.id+'\')" style="padding:4px 10px;font-size:12px">編輯</button></td>'
+          +'</tr>';
+        return;
+      }
+      var c=edCells(r,i);
+      h+='<tr style="background:#f7faf8">'
+        +'<td>'+c.name+'</td><td>'+c.spec+'</td><td>'+c.len+'</td><td>'+c.qty+'</td><td>'+c.billM+'</td><td>'+c.uw+'</td><td>'+c.price+'</td>'
+        +'<td class="r" style="font-weight:700;font-size:12.5px;white-space:nowrap">'+(amt?('NT$ '+fmt(Math.round(amt))):'—')+'</td>'
+        +'<td>'+c.date+'</td><td>'+c.kind+'</td><td>'+c.loc+'</td><td>'+c.note+'</td>'
+        +'<td style="text-align:center;white-space:nowrap">'
+          +'<button type="button" class="btn btn-xs btn-g" onclick="matLedEdit(null)" style="padding:4px 10px;font-size:12px;font-weight:700">完成</button>'
+          +'<button type="button" class="btn btn-xs" onclick="matLedDel('+i+')" style="color:var(--red);padding:4px 8px;margin-left:4px">✕</button></td>'
+        +'</tr>';
+    });
+    h+='</tbody></table></div>';
   }
   h+='<div style="padding:10px 14px"><button type="button" class="btn btn-xs btn-g" onclick="matLedAdd()" style="padding:9px 16px;font-size:13.5px;font-weight:700">＋ 新增購置紀錄</button></div>';
   el.innerHTML=h;
@@ -17319,16 +17364,11 @@ function exportCurrentReportExcel(){
           <div class="f" id="award-ref-rate-f"><label>獎金率％ <span style="font-size:10px;color:var(--b3)">毛利≥35%建議3%、未達建議2%</span></label><input id="award-ref-rate" type="number" step="0.5" min="0" max="10" placeholder="3" style="text-align:right;font-weight:700" oninput="updAwardCommPreview()"></div>
           <div class="f" id="award-ref-amt-f" style="display:none"><label>一筆金額（元）</label><input id="award-ref-amt" type="number" placeholder="0" style="text-align:right;font-weight:700" oninput="updAwardCommPreview()"></div>
         </div>
-        <div class="fg fg2" style="margin-bottom:8px">
-          <div class="f"><label>單案獎金上限（元，選填）</label><input id="award-ref-cap" type="number" placeholder="不設限" style="text-align:right" oninput="updAwardCommPreview()"></div>
-          <div class="f"><label>受領人身分證／統編</label><input id="award-ref-tid" placeholder="扣繳申報用"></div>
-        </div>
         <div class="fg fg2" style="margin-bottom:6px">
-          <div class="f"><label>所得類別</label><select id="award-ref-type"><option value="9A">9A 執行業務所得</option><option value="92">92 其他所得</option></select></div>
-          <div class="f"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding-top:20px"><input type="checkbox" id="award-ref-withheld" style="width:16px;height:16px"> 已辦扣繳／開立憑單</label></div>
+          <div class="f"><label>單案獎金上限（元，選填）</label><input id="award-ref-cap" type="number" placeholder="不設限" style="text-align:right" oninput="updAwardCommPreview()"></div>
         </div>
         <div id="award-comm-preview" style="font-size:12px;color:var(--b4);text-align:right;min-height:16px"></div>
-        <div style="font-size:10.5px;color:var(--b3);margin-top:4px">獎金以「合約金額（含稅）×獎金率」或一筆金額計，<b>依實收款進度分期支付</b>；受領人須辦扣繳並留存憑單，否則不得列費用。</div>
+        <div style="font-size:10.5px;color:var(--b3);margin-top:4px">獎金以「合約金額（含稅）×獎金率」或一筆金額計，<b>依實收款進度分期支付</b>。</div>
       </div>
       <div style="display:flex;gap:8px">
         <button type="button" class="btn btn-g" onclick="confirmAward()" style="flex:2;justify-content:center;padding:9px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 確認得標 / 更新</button>
