@@ -2510,7 +2510,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.333';
+var APP_VERSION='v5.334';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -4126,10 +4126,10 @@ function rItems(){
           const h=_histCostFor(items[i].desc);
           const cur=parseFloat(items[i].estCost)||0;
           if(h&&cur<=0){
-            histM.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 歷史實際成本 '+fmt(h.avg)+(h.unit?'/'+h.unit:'')+'（'+h.n+' 筆，點擊帶入）';
+            histM.textContent='歷史實際成本 '+fmt(h.avg)+(h.unit?'/'+h.unit:'')+'（'+h.n+' 筆，點擊帶入）';
             histM.style.color='#1a3a6b';histM.style.display='';
           }else if(h&&cur>0&&Math.abs(h.avg-cur)/h.avg>0.05){
-            histM.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 與實績均價 '+fmt(h.avg)+' 偏差>5%（'+h.n+' 筆，點擊改用實績）';
+            histM.textContent='與實績均價 '+fmt(h.avg)+' 偏差>5%（'+h.n+' 筆，點擊改用實績）';
             histM.style.color='#e65100';histM.style.display='';
           }else histM.style.display='none';
         }
@@ -4301,7 +4301,7 @@ function rItems(){
             histDiv.style.color='#1a3a6b';histDiv.style.display='';
           }else if(h&&cur>0&&Math.abs(h.avg-cur)/h.avg>0.05){
             // 已填但與實績均價偏差>5%：橘字警示，點擊改用實績
-            histDiv.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 實績 '+fmt(h.avg)+'（'+h.n+'筆）';
+            histDiv.textContent='實績 '+fmt(h.avg)+'（'+h.n+'筆）';
             histDiv.title='目前成本 '+fmt(cur)+' 與歷史實績均價 '+fmt(h.avg)+' 偏差超過 5%（區間 '+fmt(h.min)+'～'+fmt(h.max)+'）。點擊改用實績均價';
             histDiv.style.color='#e65100';histDiv.style.display='';
           }else histDiv.style.display='none';
@@ -5494,7 +5494,7 @@ function rInvItems(){
         hR.appendChild(mb);
       });
       const stl=document.createElement('button');
-      stl.type='button';stl.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 追加減';stl.className='btn btn-xs';
+      stl.type='button';stl.innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 追加減';stl.className='btn btn-xs';
       stl.title='單項追加減結算：只把「這一個工項」的合約數量改為實作數量並連動合約金額。全案完工的收尾請改用專案卡的「<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 竣工總結算」';
       stl.style.cssText='padding:3px 9px;color:#4527a0;border-color:#b39ddb;white-space:nowrap';
       stl.addEventListener('click',function(){settleInvItem(i);});
@@ -5667,7 +5667,7 @@ function rInvItems(){
       const _noteTd=mkTxtTd('note',it.note,'備註');
       if(it.internalNote){   // 內部軌跡：只在系統內顯示，不列印給業主
         const _iv=document.createElement('div');
-        _iv.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg> '+it.internalNote;
+        _iv.textContent=it.internalNote;
         _iv.style.cssText='font-size:10px;color:var(--b3);margin-top:2px;line-height:1.35;word-break:break-all';
         _iv.title='內部備註，不會出現在列印文件';
         _noteTd.appendChild(_iv);
@@ -5704,7 +5704,7 @@ function rInvItems(){
 
       const tdDel=document.createElement('td');
       tdDel.style.whiteSpace='nowrap';
-      const stlBtn=document.createElement('button');stlBtn.className='dbtn';stlBtn.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg>';
+      const stlBtn=document.createElement('button');stlBtn.className='dbtn';stlBtn.innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg>';
       stlBtn.title='單項追加減結算：只把「這一個工項」的合約數量改為實作數量並連動合約金額。全案完工的收尾請改用專案卡的「<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 竣工總結算」';
       stlBtn.style.color='#4527a0';
       stlBtn.addEventListener('click',function(){settleInvItem(i);});
@@ -6022,7 +6022,7 @@ function renderCustomers(){
 
 function addCustomer(){
   document.getElementById('customer-edit-id').value='';
-  document.getElementById('customer-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 新增客戶';
+  document.getElementById('customer-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 新增客戶';
   ['cust-name','cust-taxid','cust-contact','cust-tel','cust-fax','cust-addr','cust-note','cust-paydue','cust-pay-month-delay','cust-recv-day','cust-pay-cash','cust-pay-ticket','cust-retention'].forEach(id=>{
     const e=document.getElementById(id);if(e)e.value='';
   });
@@ -6032,7 +6032,7 @@ function addCustomer(){
 function editCustomer(id){
   const c=CUSTOMERS.find(x=>x.id===id);if(!c)return;
   document.getElementById('customer-edit-id').value=id;
-  document.getElementById('customer-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯客戶';
+  document.getElementById('customer-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯客戶';
   const m={'cust-name':'name','cust-taxid':'taxid','cust-tel':'tel','cust-fax':'fax','cust-contact':'contact','cust-site-tel':'siteTel','cust-company-contact':'companyContact','cust-addr':'addr','cust-note':'note'};
   Object.entries(m).forEach(([eid,key])=>{
     const e=document.getElementById(eid);if(e)e.value=c[key]||'';
@@ -8769,7 +8769,7 @@ function fbSignIn(){
     const retries = (window._fbSignInRetry||0) + 1;
     window._fbSignInRetry = retries;
     if(retries <= 20){
-      if(errEl){errEl.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> Firebase 連線中（'+retries+'/20）…';errEl.style.display='block';}
+      if(errEl){errEl.textContent='Firebase 連線中（'+retries+'/20）…';errEl.style.display='block';}
       setTimeout(fbSignIn, 500);
     } else {
       window._fbSignInRetry = 0;
@@ -12988,7 +12988,7 @@ function upaUpdateDesc(){
     const methodCfg=cfg.methods.find(m=>m.value===method);
     if(methodCfg?.addonFn&&UPA_ADDON_FNS[methodCfg.addonFn]){
       const msg=UPA_ADDON_FNS[methodCfg.addonFn](len,anchorLen);
-      if(msg){addonPreview.style.display='block';addonPreview.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-bulb"/></svg> '+msg;}
+      if(msg){addonPreview.style.display='block';addonPreview.textContent=msg;}
       else addonPreview.style.display='none';
     } else {
       addonPreview.style.display='none';
@@ -13396,7 +13396,7 @@ function clearAdvSearch(){
 // ══════════════════════════════════════════════════════════════
 function newContract(){
   document.getElementById('contract-edit-id').value='';
-  document.getElementById('contract-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 新增合約';
+  document.getElementById('contract-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 新增合約';
   ['c-code','c-date','c-name','c-client','c-amount','c-start','c-end','c-note','c-pay-cash','c-pay-ticket'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
@@ -13413,7 +13413,7 @@ function newContract(){
 function editContract(id){
   const c=CONTRACTS.find(x=>x.id===id);if(!c)return;
   document.getElementById('contract-edit-id').value=id;
-  document.getElementById('contract-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 編輯合約';
+  document.getElementById('contract-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 編輯合約';
   document.getElementById('c-code').value=c.code||'';
   document.getElementById('c-date').value=c.date||'';
   document.getElementById('c-name').value=c.name||'';
@@ -13588,7 +13588,7 @@ function exportContractsCSV(){
 // ══════════════════════════════════════════════════════════════
 function newVendor(){
   document.getElementById('vendor-edit-id').value='';
-  document.getElementById('vendor-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 新增廠商';
+  document.getElementById('vendor-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 新增廠商';
   ['v-name','v-contact','v-phone','v-taxid','v-email','v-addr','v-items','v-note','v-pay-cash','v-pay-ticket'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
@@ -13599,7 +13599,7 @@ function newVendor(){
 function editVendor(id){
   const v=VENDORS.find(x=>x.id===id);if(!v)return;
   document.getElementById('vendor-edit-id').value=id;
-  document.getElementById('vendor-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 編輯廠商';
+  document.getElementById('vendor-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 編輯廠商';
   document.getElementById('v-name').value=v.name||'';
   document.getElementById('v-type').value=v.type||'material';
   document.getElementById('v-contact').value=v.contact||'';
@@ -13702,7 +13702,7 @@ function togglePaidDateField(){
 }
 function newPayable(){
   document.getElementById('payable-edit-id').value='';
-  document.getElementById('payable-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 新增付款記錄';
+  document.getElementById('payable-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 新增付款記錄';
   ['p-to','p-amount','p-qty','p-unit-price','p-retention-pct','p-project','p-note','p-paid-date','p-cost-source'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   refreshCostSourceList();
   document.getElementById('p-date').value=localToday();
@@ -13715,7 +13715,7 @@ function newPayable(){
 function editPayable(id){
   const p=PAYABLES.find(x=>x.id===id);if(!p)return;
   document.getElementById('payable-edit-id').value=id;
-  document.getElementById('payable-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 編輯付款記錄';
+  document.getElementById('payable-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 編輯付款記錄';
   document.getElementById('p-to').value=p.to||'';
   document.getElementById('p-amount').value=p.amount||'';
   document.getElementById('p-date').value=p.date||'';
