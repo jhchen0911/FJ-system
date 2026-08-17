@@ -564,6 +564,11 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9.5 7V4.8a1.3 1.3 0 0 1 1.3-1.3h2.4a1.3 1.3 0 0 1 1.3 1.3V7"/><path d="M6.5 7l1 13h9l1-13"/><path d="M10 11v5M14 11v5"/></symbol>
 <symbol id="i-printer" viewBox="0 0 24 24"><path d="M7 8V3.5h10V8"/><rect x="4" y="8" width="16" height="8" rx="1.5"/><path d="M7 13.5h10V20H7z"/></symbol>
 <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3.5h11L20.5 8v11a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19V5A1.5 1.5 0 0 1 5 3.5z"/><path d="M8 3.5V8h7V3.5"/><path d="M8 20.5V14h8v6.5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+<symbol id="i-phone" viewBox="0 0 24 24"><path d="M6.5 3.5h3l1.5 4-2 1.5a12 12 0 0 0 6 6l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7a2 2 0 0 1 2-2.2z"/></symbol>
+<symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5 13.8 9l5.5 1.8-5.5 1.8L12 18l-1.8-5.4L4.7 10.8 10.2 9z"/><path d="M18.5 16.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 4v16M7 20h10M4 8h16"/><path d="M4 8 1.8 13.5h4.4zM20 8l-2.2 5.5h4.4"/></symbol>
 <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></symbol>
 <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 4h8v6a4 4 0 0 1-8 0z"/><path d="M8 5.5H4.5a3.5 3.5 0 0 0 3.7 3.5M16 5.5h3.5a3.5 3.5 0 0 1-3.7 3.5"/><path d="M12 14v3.5M8.5 20.5h7M9.5 17.5h5"/></symbol>
 <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M7.5 8.5 12 4l4.5 4.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></symbol>
@@ -932,7 +937,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div class="mob-jump-bar" id="editor-jump">
     <button type="button" class="mob-jump-chip" onclick="mobScrollTo('itbody-wrap')"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 工項明細</button>
     <button type="button" class="mob-jump-chip" onclick="mobScrollTo('totbox-el')"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 小計</button>
-    <button type="button" class="mob-jump-chip" onclick="mobScrollTo('editor-top')">⬆ 置頂</button>
+    <button type="button" class="mob-jump-chip" onclick="mobScrollTo('editor-top')"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 置頂</button>
   </div>
   <div class="pad">
     <div class="card">
@@ -996,8 +1001,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="trow"><label>小計</label><span id="tsub">NT$ 0</span></div>
         <div class="trow"><label id="ttaxlbl">5% 營業稅</label><span id="ttax">NT$ 0</span></div>
         <div class="trow grand"><label>總計</label><span id="ttot">NT$ 0</span></div>
-        <div class="trow" id="tcost-row" style="display:none;border-top:1px dashed var(--ym);padding-top:4px"><label style="color:#e65100;font-size:11px">預估成本 🔒內部</label><span id="tcost" style="color:#e65100;font-size:12px">NT$ 0</span></div>
-        <div class="trow" id="tmgn-row" style="display:none"><label style="color:#e65100;font-size:11px">預估毛利 🔒內部</label><span id="tmgn" style="font-size:12px;font-weight:900">NT$ 0</span></div>
+        <div class="trow" id="tcost-row" style="display:none;border-top:1px dashed var(--ym);padding-top:4px"><label style="color:#e65100;font-size:11px">預估成本 <svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg>內部</label><span id="tcost" style="color:#e65100;font-size:12px">NT$ 0</span></div>
+        <div class="trow" id="tmgn-row" style="display:none"><label style="color:#e65100;font-size:11px">預估毛利 <svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg>內部</label><span id="tmgn" style="font-size:12px;font-weight:900">NT$ 0</span></div>
       </div>
     </div>
     <!-- 施工成本卡片 -->
@@ -1555,14 +1560,14 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <div class="page" id="page-ledger">
   <div class="ph">
     <div class="ph-l">
-      <div class="ph-t"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg> 帳務管理</div>
+      <div class="ph-t">帳務管理</div>
       <div class="ph-s" id="ledger-sub">進項・銷項發票與稅額彙總</div>
     </div>
     <div class="ph-r">
       <input type="month" id="ledger-month" style="font-family:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--b2);border-radius:var(--r6)" onchange="renderLedger()">
       <button type="button" class="btn btn-sm" style="border-color:#1a3a6b;color:#1a3a6b" onclick="expScan()"><svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg> 拍照登錄費用發票</button>
       <button type="button" class="btn btn-sm btn-g" onclick="expManual()">＋ 手動新增</button>
-      <button type="button" class="btn btn-sm" onclick="ledgerExportCsv()">⬇ 匯出給會計師</button>
+      <button type="button" class="btn btn-sm" onclick="ledgerExportCsv()"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 匯出給會計師</button>
     </div>
   </div>
   <div class="pad">
@@ -1594,7 +1599,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <div class="cb">
         <div id="fb-not-signed" style="padding:4px 0">
           <div id="fb-file-protocol-warn" style="display:none;background:#fff3e0;border:1px solid #ff9800;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:#e65100">
-            ⚠ <strong>您目前從本機開啟（file://），無法連線 Firebase。</strong><br>
+            <svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> <strong>您目前從本機開啟（file://），無法連線 Firebase。</strong><br>
             雲端同步需透過 <strong>GitHub Pages 網址</strong> 開啟系統才能使用。<br>
             本機模式下所有資料仍正常儲存於瀏覽器（localStorage）。
           </div>
@@ -1622,8 +1627,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
             <button type="button" onclick="fbSignOut()" style="font-size:11px;padding:4px 10px;border:1px solid var(--b2);border-radius:var(--r6);background:transparent;color:var(--b4);cursor:pointer">登出</button>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-            <button type="button" onclick="fbUploadWithConflictCheck()" class="btn btn-sm" style="flex:1;justify-content:center;border-color:#1a73e8;color:#1a73e8">⬆️ 上傳至雲端</button>
-            <button type="button" onclick="fbDownload()" class="btn btn-sm" style="flex:1;justify-content:center;border-color:#0f9d58;color:#0f9d58">⬇️ 從雲端下載</button>
+            <button type="button" onclick="fbUploadWithConflictCheck()" class="btn btn-sm" style="flex:1;justify-content:center;border-color:#1a73e8;color:#1a73e8"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 上傳至雲端</button>
+            <button type="button" onclick="fbDownload()" class="btn btn-sm" style="flex:1;justify-content:center;border-color:#0f9d58;color:#0f9d58"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 從雲端下載</button>
           </div>
           <div style="background:#e8f5e9;border-radius:var(--r8);padding:8px 10px;font-size:11px;color:#1b5e20;margin-bottom:6px">
             <svg class="ic ib" aria-hidden="true"><use href="#i-bulb"/></svg> 上傳後另一位使用者點「從雲端下載」即可同步
@@ -1637,7 +1642,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
             </label>
           </div>
         </div>
-        <div id="fb-loading" style="display:none;text-align:center;padding:12px;color:var(--b4);font-size:13px">⏳ 處理中…</div>
+        <div id="fb-loading" style="display:none;text-align:center;padding:12px;color:var(--b4);font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> 處理中…</div>
       </div>
     </div>
     
@@ -2164,7 +2169,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     </div>
     <!-- 逾期未請款提醒 -->
     <div id="inv-overdue-banner" style="display:none;background:#fff0f0;border:1px solid #ffaaaa;border-radius:var(--r10);padding:12px 16px;margin-bottom:12px">
-      <div style="font-weight:700;font-size:13px;color:var(--red);margin-bottom:6px">⏰ 逾期未請款提醒</div>
+      <div style="font-weight:700;font-size:13px;color:var(--red);margin-bottom:6px"><svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> 逾期未請款提醒</div>
       <div id="inv-overdue-list" style="font-size:12px;color:var(--b5)"></div>
     </div>
     <div id="inv-list"><div class="empty"><div class="empty-ic"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg></div><p>尚無請款單，點右上「新增請款單」開始</p></div></div>
@@ -2438,7 +2443,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <div style="background:var(--gl);border:1px solid var(--gm);border-radius:var(--r8);padding:8px 12px;font-size:12px;flex:1;min-width:160px">
-          <div style="color:var(--g3);font-weight:700;margin-bottom:6px">🔨 打設 / 裝設<span style="font-weight:400;font-size:10px;color:var(--b3);margin-left:6px">合約 → 已打設</span></div>
+          <div style="color:var(--g3);font-weight:700;margin-bottom:6px"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 打設 / 裝設<span style="font-weight:400;font-size:10px;color:var(--b3);margin-left:6px">合約 → 已打設</span></div>
           <table style="width:100%;border-collapse:collapse;font-size:11px">
             <thead><tr>
               <th style="text-align:left;color:var(--b4);font-weight:500;padding:2px 4px">工項</th>
@@ -2480,7 +2485,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <div class="page" id="page-invoice-prev">
   <div class="prev-act">
     <button type="button" class="btn btn-sm" onclick="history.length>1?history.back():go('invoice')">← 返回</button>
-    <button type="button" class="btn btn-sm btn-y" onclick="printInvoice()" style="padding:8px 20px;font-size:14px">⬇️ 儲存PDF</button>
+    <button type="button" class="btn btn-sm btn-y" onclick="printInvoice()" style="padding:8px 20px;font-size:14px"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 儲存PDF</button>
     <button type="button" class="btn btn-sm" onclick="printInvNative()" style="padding:8px 20px;font-size:14px;background:#e8f5ee;color:#1a6b3f;border-color:#1a6b3f" title="瀏覽器原生分頁：兩端輸出一致、PDF文字可搜尋"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 列印 / 存PDF（新）</button>
   </div>
   <div class="pad" style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div id="inv-prev-html"></div></div>
@@ -2505,7 +2510,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.332';
+var APP_VERSION='v5.333';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2518,7 +2523,7 @@ if('serviceWorker' in navigator){
         var bar=document.createElement('div');
         bar.id='upd-bar';
         bar.style.cssText='position:fixed;left:12px;right:12px;bottom:calc(var(--mob,0px) + max(env(safe-area-inset-bottom),4px) + 74px);z-index:400;background:var(--g3);color:#fff;border-radius:12px;padding:12px 16px;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:10px;box-shadow:0 6px 20px rgba(0,0,0,.3)';
-        bar.innerHTML='🔄 系統有新版本<button onclick="location.reload()" style="font-family:inherit;background:var(--y);color:#3a2a05;border:none;border-radius:8px;padding:7px 16px;font-weight:800;cursor:pointer">立即更新</button>';
+        bar.innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-refresh"/></svg> 系統有新版本<button onclick="location.reload()" style="font-family:inherit;background:var(--y);color:#3a2a05;border:none;border-radius:8px;padding:7px 16px;font-weight:800;cursor:pointer">立即更新</button>';
         document.body.appendChild(bar);
       }
       if(reg.waiting)_promptUpdate();
@@ -2634,7 +2639,7 @@ function _lsSet(key,val,label){
   catch(e){
     try{console.error('[FY] 儲存失敗 '+key,e&&e.message);}catch(e2){}
     var now=Date.now();
-    if(now-_lsWarnAt>8000){_lsWarnAt=now;try{toast('⚠️ '+(label||'資料')+'儲存失敗：本機空間不足，請立即匯出備份');}catch(e2){}}
+    if(now-_lsWarnAt>8000){_lsWarnAt=now;try{toast(''+(label||'資料')+'儲存失敗：本機空間不足，請立即匯出備份');}catch(e2){}}
     return false;
   }
 }
@@ -2642,8 +2647,8 @@ const persist=()=>{try{
   try{if(typeof eid!=='undefined'&&eid){var _pq=Q.find(function(x){return x.id===eid;});if(_pq)_pq._mt=Date.now();}}catch(e){}
   const data=JSON.stringify(Q);
   localStorage.setItem('fy6_q',data);
-  try{const used=JSON.stringify(localStorage).length;if(used>3*1024*1024)toast('⚠️ 本機資料已超過3MB，建議立即匯出備份');}catch(e){}
-}catch(e){toast('⚠️ 儲存失敗：本機儲存空間不足，請匯出備份資料');}
+  try{const used=JSON.stringify(localStorage).length;if(used>3*1024*1024)toast('本機資料已超過3MB，建議立即匯出備份');}catch(e){}
+}catch(e){toast('儲存失敗：本機儲存空間不足，請匯出備份資料');}
 try{_autoUpload();}catch(e){}};
 const persistP=()=>{_lsSet('fy6_p',JSON.stringify(P),'參數');};
 const saveUH=()=>{_lsSet('fy6_uh',JSON.stringify(UH),'單價分析歷史');};
@@ -2995,7 +3000,7 @@ function go(p){
     // params/permissions 頁面：未登入可以進（需要從那裡登入）
     // 已登入時才做權限檢查
     if(_fbUser&&typeof canAccess==='function'&&!canAccess(p)){
-      toast('⛔ 此頁面已被管理員限制存取');return;
+      toast('此頁面已被管理員限制存取');return;
     }
   }catch(ex){}
   try{
@@ -3300,7 +3305,7 @@ function resetRmkBase(){
   var prmEl=document.getElementById('prm');
   if(prmEl)prmEl.value=DEFAULT_RMK;
   persistP();
-  toast('✅ 備註條款已還原為預設值，請再按「儲存參數」完成儲存');
+  toast('備註條款已還原為預設值，請再按「儲存參數」完成儲存');
 }
 
 function syncSiteLabels(){
@@ -3528,11 +3533,11 @@ function applyUPA(){
       if(noteEl){noteEl._userEdited=false;}
       upaUpdateDesc();
       go('editor');
-      toast('✅ 第'+(next-1)+'層已套用，返回報價單（可繼續新增下一層）');
+      toast('第'+(next-1)+'層已套用，返回報價單（可繼續新增下一層）');
       return;
     }
   }
-  toast('✅ 已套用至報價明細！'+(_costSrc?'　成本：'+_costSrc:''));
+  toast('已套用至報價明細！'+(_costSrc?'　成本：'+_costSrc:''));
   go('editor');
   // Q3: 套用後自動清空所有欄位，下次進來是空白
   setTimeout(()=>upaReset(), 300);
@@ -3723,7 +3728,7 @@ function applyNegotiate(){
     rItems();rTots();
     document.getElementById('negotiate-modal').style.display='none';
     const after=calcT();
-    toast('💰 已逐項調價 '+changed+' 項：未稅小計 NT$ '+fmt(before.sub)+' → NT$ '+fmt(after.sub)+'，記得儲存');
+    toast('已逐項調價 '+changed+' 項：未稅小計 NT$ '+fmt(before.sub)+' → NT$ '+fmt(after.sub)+'，記得儲存');
     return;
   }
   const target=parseFloat(document.getElementById('ngt-target')?.value)||0;
@@ -3759,7 +3764,7 @@ function applyNegotiate(){
   document.getElementById('negotiate-modal').style.display='none';
   const lbl2=mode==='excl'?'未稅':'含稅';
   const base2=mode==='excl'?t.sub:t.total;
-  toast('💰 已議價（'+lbl2+'）：NT$ '+fmt(base2)+' → NT$ '+fmt(target)+'，記得儲存');
+  toast('已議價（'+lbl2+'）：NT$ '+fmt(base2)+' → NT$ '+fmt(target)+'，記得儲存');
 }
 // 手機端工項排序：上/下移一格（觸控裝置不支援 HTML5 拖曳）
 // ── 分類群組：分類列＝連同其下所有工項一起移動 ──
@@ -4109,7 +4114,7 @@ function rItems(){
         }
         costInp.addEventListener('input',function(){items[i].estCost=this.value;updMgnM();rTots();});
         updMgnM();
-        costRow.appendChild(mkField('成本單價🔒',costInp));
+        costRow.appendChild(mkField('成本單價<svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg>',costInp));
         const mgnWrap=mkField('單項毛利',mgnBox);
         costRow.appendChild(mgnWrap);
         card.appendChild(costRow);
@@ -4121,10 +4126,10 @@ function rItems(){
           const h=_histCostFor(items[i].desc);
           const cur=parseFloat(items[i].estCost)||0;
           if(h&&cur<=0){
-            histM.textContent='📚 歷史實際成本 '+fmt(h.avg)+(h.unit?'/'+h.unit:'')+'（'+h.n+' 筆，點擊帶入）';
+            histM.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 歷史實際成本 '+fmt(h.avg)+(h.unit?'/'+h.unit:'')+'（'+h.n+' 筆，點擊帶入）';
             histM.style.color='#1a3a6b';histM.style.display='';
           }else if(h&&cur>0&&Math.abs(h.avg-cur)/h.avg>0.05){
-            histM.textContent='⚠ 與實績均價 '+fmt(h.avg)+' 偏差>5%（'+h.n+' 筆，點擊改用實績）';
+            histM.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 與實績均價 '+fmt(h.avg)+' 偏差>5%（'+h.n+' 筆，點擊改用實績）';
             histM.style.color='#e65100';histM.style.display='';
           }else histM.style.display='none';
         }
@@ -4296,7 +4301,7 @@ function rItems(){
             histDiv.style.color='#1a3a6b';histDiv.style.display='';
           }else if(h&&cur>0&&Math.abs(h.avg-cur)/h.avg>0.05){
             // 已填但與實績均價偏差>5%：橘字警示，點擊改用實績
-            histDiv.textContent='⚠ 實績 '+fmt(h.avg)+'（'+h.n+'筆）';
+            histDiv.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 實績 '+fmt(h.avg)+'（'+h.n+'筆）';
             histDiv.title='目前成本 '+fmt(cur)+' 與歷史實績均價 '+fmt(h.avg)+' 偏差超過 5%（區間 '+fmt(h.min)+'～'+fmt(h.max)+'）。點擊改用實績均價';
             histDiv.style.color='#e65100';histDiv.style.display='';
           }else histDiv.style.display='none';
@@ -4411,12 +4416,12 @@ function addEx(){exs.push({label:'',amt:'',note:''});rExs();}
 // ════════════════════ SAVE/LOAD ════════════════════
 function saveQ(){
   // 儲存驗證（最低限度）：必填與數值合理性
-  if(!(gv('fn')||'').trim()){toast('⚠ 請填寫「工程名稱」再儲存');const el=document.getElementById('fn');if(el)el.focus();return;}
+  if(!(gv('fn')||'').trim()){toast('請填寫「工程名稱」再儲存');const el=document.getElementById('fn');if(el)el.focus();return;}
   for(const it of (items||[])){
     if(it.sec)continue;
     // v5.315：議價尾差列是系統產生的折讓，可為負值（原本會被擋下，導致議價後整張報價單存不了）
     if(it.desc===NGT_ADJ_DESC)continue;
-    if((parseFloat(it.qty)||0)<0||(parseFloat(it.price)||0)<0){toast('⚠ 數量／單價不可為負數');return;}
+    if((parseFloat(it.qty)||0)<0||(parseFloat(it.price)||0)<0){toast('數量／單價不可為負數');return;}
   }
   const t=calcT();
   // 施工成本從 Q 陣列讀取現有資料（addCostItem 直接更新 q.costs）
@@ -4486,7 +4491,7 @@ function saveQ(){
     });
     saveInv();
     toast('報價已儲存，已連動更新 '+linkedInvs.length+' 期請款單的合約單價與金額！');
-    if(_settleKept>0)setTimeout(function(){toast('⚖ 有 '+_settleKept+' 項已做過工項結算，合約數量維持結算後的實作量（未被報價數量覆寫）');},450);
+    if(_settleKept>0)setTimeout(function(){toast('有 '+_settleKept+' 項已做過工項結算，合約數量維持結算後的實作量（未被報價數量覆寫）');},450);
   } else {
     toast('報價已儲存！');
   }
@@ -4504,7 +4509,7 @@ function saveQ(){
           _ct.code=q.code||_ct.code;
           _ct._mt=Date.now();_ct.updatedAt=Date.now();
           saveContracts();
-          toast('📋 已連動更新合約金額：NT$ '+fmt(_newAmt));
+          toast('已連動更新合約金額：NT$ '+fmt(_newAmt));
           try{if(document.getElementById('page-contracts')?.classList.contains('active'))renderContracts();}catch(e){}
         }
       }
@@ -4516,7 +4521,7 @@ function saveQ(){
     if(q.client&&q.client.trim()&&!CUSTOMERS.find(c=>c.name===q.client.trim())){
       CUSTOMERS.push({id:'cu'+Date.now(),name:q.client.trim(),contact:q.contact||'',tel:q.phone||'',taxid:q.taxid||'',addr:'',note:'由報價單自動建立',_mt:Date.now()});
       saveCustomers();
-      toast('📇 已自動將「'+q.client.trim()+'」加入客戶管理');
+      toast('已自動將「'+q.client.trim()+'」加入客戶管理');
     }
   }catch(e){}
   try{logActivity('報價','儲存報價：'+(gv('fn')||'未命名'));}catch(e){}
@@ -4580,8 +4585,8 @@ function loadQ(id){
   go('editor');
   try{migrateCostRows(q);rCostItems();}catch(e){}
 }
-function confirmDelQ(id){_tomb('quotes',id);Q=Q.filter(q=>q.id!==id);persist();renderList();rDash();updBadge();toast('🗑 已刪除');}
-function confirmDelInv(id){_tomb('invoices',id);INV=INV.filter(x=>x.id!==id);saveInv();renderInvList();toast('🗑 已刪除');}
+function confirmDelQ(id){_tomb('quotes',id);Q=Q.filter(q=>q.id!==id);persist();renderList();rDash();updBadge();toast('已刪除');}
+function confirmDelInv(id){_tomb('invoices',id);INV=INV.filter(x=>x.id!==id);saveInv();renderInvList();toast('已刪除');}
 
 function delQ(id,ev){
   if(ev&&ev.stopPropagation)ev.stopPropagation();
@@ -4680,7 +4685,7 @@ function cycleBidStatus(qid){
 }
 function markQuoteLost(qid){
   const q=Q.find(x=>x.id===qid);if(!q)return;
-  showConfirm('📉 未得標記錄：'+esc((q.name||'').slice(0,20)),
+  showConfirm('未得標記錄：'+esc((q.name||'').slice(0,20)),
     '<div class="f"><label>未得標原因</label><select id="ql-reason">'+['價格過高','規格不符','工期不符','業主關係','未回應','其他'].map(function(r){return '<option'+(q.lostReason===r?' selected':'')+'>'+r+'</option>';}).join('')+'</select></div>'
     +'<div class="f" style="margin-top:8px"><label>補充說明（選填，自由填寫）</label><input id="ql-note" value="'+esc(q.lostNote||'')+'" placeholder="例：對手用舊料報價、業主要求工期壓半個月…" style="font-size:13px"></div>'
     +'<div class="f" style="margin-top:8px"><label>對手得標價（選填，含稅）</label><input id="ql-price" type="number" value="'+(q.lostPrice||'')+'" placeholder="0" style="text-align:right;font-weight:700"></div>'
@@ -5134,7 +5139,7 @@ function delInvoice(id,ev){
   if(!ok)return;
   _tomb('invoices',id); // 確認刪除後才立墓碑（原本取消刪除也會立墓碑，導致同步後請款單被誤刪）
   INV=INV.filter(x=>x.id!==id);saveInv();renderInvList();
-  toast('🗑 已刪除');
+  toast('已刪除');
 }
 
 // ── 報價單（得標）→ 跳轉關聯請款單：有就開最新一期，被刪光則提示重建第1期 ──
@@ -5154,7 +5159,7 @@ function goQuoteInvoice(qid){
         INV.unshift(autoInv);saveInv();
         loadInvoice(autoInv.id);
         go('invoice-edit');
-        toast('📋 已從報價單重新建立第 1 期請款單');
+        toast('已從報價單重新建立第 1 期請款單');
       },false);
   }
 }
@@ -5229,7 +5234,7 @@ function confirmInvClause(){
   document.getElementById('inv-clause-modal').style.display='none';
   rInvItems();
   try{autoSaveInv();}catch(e){}
-  toast('✅ 已帶入 '+added+' 項條款請款項目');
+  toast('已帶入 '+added+' 項條款請款項目');
 }
 
 // ── 工項結算：單一工項完成時，把合約數量調整為累積實作數量（追加／追減，原數量記錄於備註，合約金額同步連動）──
@@ -5261,7 +5266,7 @@ function settleInvItem(i){
   const orig=parseFloat(it.contractQty)||0;
   if(orig===cum){toast('合約數量已與實作數量一致，無需結算');return;}
   if(_maxPeriod>0&&_curPeriod>0&&_curPeriod<_maxPeriod){
-    toast('⚠ 請在最新一期（第'+_maxPeriod+'期）執行工項結算，避免以舊期數量誤砍合約');return;
+    toast('請在最新一期（第'+_maxPeriod+'期）執行工項結算，避免以舊期數量誤砍合約');return;
   }
   // 預先找關聯合約並計算含稅差額（合約金額為含稅總額，工項單價為未稅）
   // v5.320：改用統一歸戶（原本只比對工程名稱，同名／改名會調到別人的合約）
@@ -5302,7 +5307,7 @@ function settleInvItem(i){
     syncTxt='，合約金額→NT$ '+fmt(_contract.amount);
   }
   rInvItems();rInvTots();
-  toast('⚖ 工項已結算：'+orig+' → '+cum+syncTxt);
+  toast('工項已結算：'+orig+' → '+cum+syncTxt);
 }
 
 // 離編輯器重算報價單總計（與 calcT 同口徑；工項結算/追加減回寫後使用）
@@ -5372,7 +5377,7 @@ try{
       }
     });
     if(_pfN||_pfNote){try{saveInv();}catch(e){}
-      setTimeout(function(){try{toast('🔧 已修復 '+_pfN+' 筆部分收款狀態'+(_pfNote?('、'+_pfNote+' 筆備註格式'):''));}catch(e){}},1500);}
+      setTimeout(function(){try{toast('已修復 '+_pfN+' 筆部分收款狀態'+(_pfNote?('、'+_pfNote+' 筆備註格式'):''));}catch(e){}},1500);}
     localStorage.setItem('fy_fix_partial_recv1','1');
   }
 }catch(e){}
@@ -5489,8 +5494,8 @@ function rInvItems(){
         hR.appendChild(mb);
       });
       const stl=document.createElement('button');
-      stl.type='button';stl.textContent='⚖ 追加減';stl.className='btn btn-xs';
-      stl.title='單項追加減結算：只把「這一個工項」的合約數量改為實作數量並連動合約金額。全案完工的收尾請改用專案卡的「⚖ 竣工總結算」';
+      stl.type='button';stl.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 追加減';stl.className='btn btn-xs';
+      stl.title='單項追加減結算：只把「這一個工項」的合約數量改為實作數量並連動合約金額。全案完工的收尾請改用專案卡的「<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 竣工總結算」';
       stl.style.cssText='padding:3px 9px;color:#4527a0;border-color:#b39ddb;white-space:nowrap';
       stl.addEventListener('click',function(){settleInvItem(i);});
       hR.appendChild(stl);
@@ -5649,7 +5654,7 @@ function rInvItems(){
         if(!inp2)return;
         if(cq>0&&cum>cq+1e-9){
           inp2.style.borderColor='var(--red)';inp2.style.background='#fdecea';inp2.style.color='var(--red)';inp2.style.fontWeight='700';
-          inp2.title='⚠ 累計 '+cum+' 已超過合約數量 '+cq+'（超請 '+(Math.round((cum-cq)*100)/100)+'，仍可出單）';
+          inp2.title='<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 累計 '+cum+' 已超過合約數量 '+cq+'（超請 '+(Math.round((cum-cq)*100)/100)+'，仍可出單）';
           pqTd.style.color='var(--red)';pqTd.style.fontWeight='700';pqTd.title='含本期累計 '+cum+'／合約 '+cq;
         }else{
           inp2.style.borderColor='';inp2.style.background='';inp2.style.color='';inp2.style.fontWeight='';
@@ -5662,7 +5667,7 @@ function rInvItems(){
       const _noteTd=mkTxtTd('note',it.note,'備註');
       if(it.internalNote){   // 內部軌跡：只在系統內顯示，不列印給業主
         const _iv=document.createElement('div');
-        _iv.textContent='🔒 '+it.internalNote;
+        _iv.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg> '+it.internalNote;
         _iv.style.cssText='font-size:10px;color:var(--b3);margin-top:2px;line-height:1.35;word-break:break-all';
         _iv.title='內部備註，不會出現在列印文件';
         _noteTd.appendChild(_iv);
@@ -5699,8 +5704,8 @@ function rInvItems(){
 
       const tdDel=document.createElement('td');
       tdDel.style.whiteSpace='nowrap';
-      const stlBtn=document.createElement('button');stlBtn.className='dbtn';stlBtn.textContent='⚖';
-      stlBtn.title='單項追加減結算：只把「這一個工項」的合約數量改為實作數量並連動合約金額。全案完工的收尾請改用專案卡的「⚖ 竣工總結算」';
+      const stlBtn=document.createElement('button');stlBtn.className='dbtn';stlBtn.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg>';
+      stlBtn.title='單項追加減結算：只把「這一個工項」的合約數量改為實作數量並連動合約金額。全案完工的收尾請改用專案卡的「<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 竣工總結算」';
       stlBtn.style.color='#4527a0';
       stlBtn.addEventListener('click',function(){settleInvItem(i);});
       const delBtn=document.createElement('button');delBtn.className='dbtn';delBtn.textContent='✕';
@@ -5883,11 +5888,11 @@ function calcInvTotals(){return rInvTots();}
 // ── Save ──
 function saveInvoice(){
   // 儲存驗證：必填與數值合理性；超請僅警告（業主可能同意直接請，不阻擋）
-  if(!(gv('inv-project')||'').trim()){toast('⚠ 請填寫「工程名稱」再儲存');const el=document.getElementById('inv-project');if(el)el.focus();return;}
+  if(!(gv('inv-project')||'').trim()){toast('請填寫「工程名稱」再儲存');const el=document.getElementById('inv-project');if(el)el.focus();return;}
   let _overN=0;
   for(const it of (invItems||[])){
     if(it.type==='sec')continue;
-    if((parseFloat(it.curQty)||0)<0||(parseFloat(it.contractPrice)||0)<0){toast('⚠ 數量／單價不可為負數');return;}
+    if((parseFloat(it.curQty)||0)<0||(parseFloat(it.contractPrice)||0)<0){toast('數量／單價不可為負數');return;}
     const cq=parseFloat(it.contractQty)||0;
     if(cq>0&&((parseFloat(it.prevQty)||0)+(parseFloat(it.curQty)||0))>cq+1e-9)_overN++;
   }
@@ -5900,7 +5905,7 @@ function saveInvoice(){
       if(_mq)_cur.quoteId=_mq.id;
     }
   }catch(e){}
-  if(_overN>0)setTimeout(()=>toast('⚠ 有 '+_overN+' 項累計數量超過合約（已標紅，仍照常出單）'),350);
+  if(_overN>0)setTimeout(()=>toast('有 '+_overN+' 項累計數量超過合約（已標紅，仍照常出單）'),350);
   // v5.315：以展開保留既有欄位。原本重建全新物件，會把收款確認狀態
   //（receivedConfirmed／receivedDate／receivedNote）、保留款退還旗標、
   // 以及報價連結（sourceQid／quoteId）整批清空——已收款的單改個備註再存就變回未收款。
@@ -5930,7 +5935,7 @@ function saveInvoice(){
   if(idx>=0)INV[idx]=inv;else INV.unshift(inv);
   // 立即存 localStorage（主儲存）
   _lsSet('fy_inv',JSON.stringify(INV),'請款單');
-  toast('✅ 請款單已儲存！');
+  toast('請款單已儲存！');
   updBadge();
   // v5.317：同上——儲存後未更新快照，會同時跳出「已儲存」與「尚未儲存」兩個矛盾訊息，
   // 且因 saveInvoice 自己會呼叫 go('invoice')，按「取消」還會卡在編輯頁
@@ -5975,7 +5980,7 @@ function autoSaveInv(){
 function saveClientFromRecord(name,taxid,tel,fax,contact,addr){
   if(!name){toast('無業主名稱，無法儲存');return;}
   const exists=CUSTOMERS.find(c=>c.name===name);
-  if(exists){toast('⚠️ 「'+name+'」已在客戶清單中');return;}
+  if(exists){toast('「'+name+'」已在客戶清單中');return;}
   const obj={
     id:Date.now().toString(),
     name:name||'',taxid:taxid||'',
@@ -6017,7 +6022,7 @@ function renderCustomers(){
 
 function addCustomer(){
   document.getElementById('customer-edit-id').value='';
-  document.getElementById('customer-modal-title').textContent='🏢 新增客戶';
+  document.getElementById('customer-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 新增客戶';
   ['cust-name','cust-taxid','cust-contact','cust-tel','cust-fax','cust-addr','cust-note','cust-paydue','cust-pay-month-delay','cust-recv-day','cust-pay-cash','cust-pay-ticket','cust-retention'].forEach(id=>{
     const e=document.getElementById(id);if(e)e.value='';
   });
@@ -6027,7 +6032,7 @@ function addCustomer(){
 function editCustomer(id){
   const c=CUSTOMERS.find(x=>x.id===id);if(!c)return;
   document.getElementById('customer-edit-id').value=id;
-  document.getElementById('customer-modal-title').textContent='✏️ 編輯客戶';
+  document.getElementById('customer-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯客戶';
   const m={'cust-name':'name','cust-taxid':'taxid','cust-tel':'tel','cust-fax':'fax','cust-contact':'contact','cust-site-tel':'siteTel','cust-company-contact':'companyContact','cust-addr':'addr','cust-note':'note'};
   Object.entries(m).forEach(([eid,key])=>{
     const e=document.getElementById(eid);if(e)e.value=c[key]||'';
@@ -6224,7 +6229,7 @@ function addAddendum(id){
   Q.unshift(copy);
   persist();
   loadQ(copy.id);
-  toast('📝 已建立追加合約，請填寫追加工項');
+  toast('已建立追加合約，請填寫追加工項');
 }
 
 // ── 新增下一期請款單 ──
@@ -6270,7 +6275,7 @@ function addNextPeriod(id){
   INV.unshift(next);saveInv();
   loadInvoice(next.id);
   go('invoice-edit');
-  toast('📋 已建立第 '+nextPeriod+' 期請款單，前期數量已自動帶入');
+  toast('已建立第 '+nextPeriod+' 期請款單，前期數量已自動帶入');
 }
 
 function toggleInvGroup(gid, proj){
@@ -6380,11 +6385,11 @@ function renderInvList(){
     // v5.319：部分收款要分得出來（原本與「一毛未收」外觀完全相同）
     var _partial=!confirmed&&(parseFloat(inv.received)||0)>0&&unpaid>0;
     if(confirmed) statusBadge='<span class="bdg ok" style="font-size:11px">✓ 已收款</span>';
-    else if(isOverdue) statusBadge='<span class="bdg warn" style="font-size:11px;background:#ffe0e0;color:#c62828;border-color:#ffaaaa">⚠ 逾期 '+_odDays+' 天'+(_partial?'（已收部分）':'')+'</span>';
+    else if(isOverdue) statusBadge='<span class="bdg warn" style="font-size:11px;background:#ffe0e0;color:#c62828;border-color:#ffaaaa"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 逾期 '+_odDays+' 天'+(_partial?'（已收部分）':'')+'</span>';
     else if(_partial) statusBadge='<span class="bdg warn" style="font-size:11px;background:#fff4e0;color:#b26a00;border-color:#ffd699">部分收款・尚差 NT$'+fmt(unpaid)+'</span>';
     else if(unpaid>0) statusBadge='<span class="bdg warn" style="font-size:11px">待收 NT$'+fmt(unpaid)+'</span>';
     var _einv=_invEinvOf(id);
-  if(_einv)statusBadge+=' <span class="bdg" style="font-size:10.5px;background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4" title="發票 '+esc(_einv.number||'')+'　'+esc(_einv.date||'')+'">🧾 '+esc(_einv.number||'已開票')+'</span>';
+  if(_einv)statusBadge+=' <span class="bdg" style="font-size:10.5px;background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4" title="發票 '+esc(_einv.number||'')+'　'+esc(_einv.date||'')+'"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> '+esc(_einv.number||'已開票')+'</span>';
   var canConfirm=!confirmed&&unpaid>0;
     var mobBtns='<div class="ql-actions mob-only">'
       +'<button type="button" class="btn mob-btn" style="background:var(--g);color:#fff;border-color:var(--g);flex:2" onclick="event.stopPropagation();loadInvoice(\''+id+'\');go(\'invoice-edit\')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯</button>'
@@ -6395,7 +6400,7 @@ function renderInvList(){
       +'</div>';
     var deskBtns='<div class="ql-desk-actions desk-only">'
       +'<button type="button" class="btn btn-xs" title="編輯請款單" onclick="event.stopPropagation();loadInvoice(\''+id+'\');go(\'invoice-edit\')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg></button>'
-      +(!_einv?'<button type="button" class="btn btn-xs" title="確認無誤後開立發票" style="border-color:#1a3a6b;color:#1a3a6b" onclick="event.stopPropagation();go(\'finance\');setTimeout(function(){switchFinanceTab(\'invoice\');issueInvoiceForInv(\''+id+'\');},250)">🧾</button>':'')
+      +(!_einv?'<button type="button" class="btn btn-xs" title="確認無誤後開立發票" style="border-color:#1a3a6b;color:#1a3a6b" onclick="event.stopPropagation();go(\'finance\');setTimeout(function(){switchFinanceTab(\'invoice\');issueInvoiceForInv(\''+id+'\');},250)"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg></button>':'')
       +'<button type="button" class="btn btn-xs btn-g" title="匯出 PDF" onclick="event.stopPropagation();printInvById(this.dataset.id)" data-id="'+id+'"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg></button>'
       +'<button type="button" class="btn btn-xs" style="background:#e8f0fb;color:#1a3a6b;border-color:#b5d4f4" onclick="event.stopPropagation();addNextPeriod(\''+id+'\')" title="複製為下一期"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg></button>'
       +(canConfirm?'<button type="button" class="btn btn-xs" title="確認收款" style="background:#e8f5e9;color:#1B5E20;border-color:var(--gm)" onclick="event.stopPropagation();openReceiptModal(\''+id+'\')">✓</button>':'')
@@ -6969,7 +6974,7 @@ function confirmAward(){
   q.awarded=true;
   q.payDue=payDue;
   // 成交單價自動回寫：報價→議價→得標的最終單價進成交單價庫，供未來報價比對行情
-  try{var _dn=writeDealHist(q);if(_dn)toast('📈 已回寫 '+_dn+' 筆成交單價');}catch(e){}
+  try{var _dn=writeDealHist(q);if(_dn)toast('已回寫 '+_dn+' 筆成交單價');}catch(e){}
   // ── 專案獎金：存設定＋連動應付帳款（依實收進度分期支付）──
   try{
     const refName=(gv('award-ref-name')||'').trim();
@@ -7001,15 +7006,15 @@ function confirmAward(){
   persist();
   document.getElementById('award-modal').style.display='none';
   _fbWriteAll(
-    ()=>{toast('🏆 已標記為得標並同步至雲端！');renderList();rDash();},
-    ()=>{toast('🏆 已標記為得標（本機）');renderList();rDash();}
+    ()=>{toast('已標記為得標並同步至雲端！');renderList();rDash();},
+    ()=>{toast('已標記為得標（本機）');renderList();rDash();}
   );
   // Auto-create invoice if not exists
   const existInv=INV.find(x=>x.sourceQid===id);
   if(!existInv){
     const autoInv=buildInvFromQuote(q);
     INV.unshift(autoInv);saveInv();
-    toast('📋 已自動建立請款單草稿，請至請款單填寫估驗資訊');
+    toast('已自動建立請款單草稿，請至請款單填寫估驗資訊');
   }
   renderList();rDash();
   checkPayReminders();
@@ -7032,7 +7037,7 @@ function confirmAward(){
       CONTRACTS.unshift(newContract);
       saveContracts();
       logActivity('合約','得標連動建立合約：'+q.name);
-      toast('📋 已自動建立合約記錄！');
+      toast('已自動建立合約記錄！');
       // 詢問是否立即前往合約管理
       setTimeout(()=>{
         showConfirm('<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 合約已自動建立',
@@ -7056,7 +7061,7 @@ function pullInvFromCustomer(){
   sv('inv-tel',cust.tel||'');
   sv('inv-fax',cust.fax||'');
   sv('inv-caddr',cust.addr||'');
-  toast('✅ 已帶入客戶資料：'+cust.name);
+  toast('已帶入客戶資料：'+cust.name);
 }
 
 function buildInvFromQuote(q){
@@ -7166,7 +7171,7 @@ function importData(file){
     try{
       const data=JSON.parse(e.target.result);
       if(!data.version||!data.quotes){
-        toast('❌ 檔案格式不符，請選擇正確的匯出檔案');return;
+        toast('檔案格式不符，請選擇正確的匯出檔案');return;
       }
       // 用自製確認框，避免手機 Safari 封鎖 window.confirm
       const qLen=(data.quotes||[]).length;
@@ -7206,10 +7211,10 @@ function importData(file){
         try{renderCustomers();}catch(e2){}
         if(document.getElementById('page-profit')?.classList.contains('active'))rProfit();
         const extra=[data.contracts?('合約 '+arr(data.contracts).length):null,data.payables?('應付 '+arr(data.payables).length):null,data.customers?('客戶 '+arr(data.customers).length):null].filter(Boolean).join('、');
-        toast('✅ 全量還原成功！報價 '+qLen+'、請款 '+iLen+(extra?('、'+extra):'')+' 筆');
+        toast('全量還原成功！報價 '+qLen+'、請款 '+iLen+(extra?('、'+extra):'')+' 筆');
       });
     }catch(err){
-      toast('❌ 匯入失敗：'+err.message);
+      toast('匯入失敗：'+err.message);
     }
   };
   reader.readAsText(file);
@@ -7431,7 +7436,7 @@ function calcInvDays(){
       }
       rInvItems();
       const otDetail=srcPrice?`（$${srcPrice}×${srcQty}${srcUnit}×${overDays}天=NT$${overAmt.toLocaleString()}）`:'（請手動填入金額）';
-      toast(`✅ 已插入逾期租金工項 ${otDetail}`);
+      toast(`已插入逾期租金工項 ${otDetail}`);
     }
   }
 
@@ -7460,7 +7465,7 @@ function calcInvDays(){
         overAmtPreview=`<div style="margin-top:6px;padding:5px 8px;background:#fff0f0;border-radius:4px;font-size:11px;color:#c00">`
           +`逾期金額：$${_ot} × ${_qty}${_unit} × ${overDays}天 = <strong>NT$${_amt.toLocaleString()}</strong></div>`;
       } else {
-        overAmtPreview=`<div style="margin-top:6px;font-size:11px;color:#c00">⚠ 請在報價單該工項填入逾期租金單價後，金額可自動計算</div>`;
+        overAmtPreview=`<div style="margin-top:6px;font-size:11px;color:#c00"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 請在報價單該工項填入逾期租金單價後，金額可自動計算</div>`;
       }
     }
     resultEl.innerHTML=
@@ -7501,7 +7506,7 @@ function copyQ(id){
   copy.name=(copy.name||'未命名')+' (複製)';
   Q.unshift(copy);
   persist();
-  toast('📋 已複製為新報價草稿！');
+  toast('已複製為新報價草稿！');
   renderList();rDash();updBadge();
 }
 
@@ -7725,7 +7730,7 @@ function renderBizGates(){
     +kpi('材料租金｜運費',(_gMatRent||_gMatTrans)?(fmt(_gMatRent)+'｜'+fmt(_gMatTrans)):na,'全專案累計（材料管理）',(_gMatRent||_gMatTrans)?'#b26a00':null,"go('materials');setTimeout(function(){matSetView('proj')},60)")
     +kpi('材料購置',_gMatBuy>0?('NT$ '+fmt(Math.round(_gMatBuy))):na,'庫存台帳購置總額',_gMatBuy>0?'var(--g3)':null,"go('materials');setTimeout(function(){matSetView('buy')},60)")
     +'</div>'
-    +(eqAlert?'<div style="margin:0 14px 12px;background:#fdf0ef;border:1px solid #f5c6c0;border-left:4px solid #c62828;border-radius:var(--r8);padding:10px 14px;font-size:12.5px;color:#8a2f26"><b>⚠ 機具稼動警示：</b>自有機具已連續兩個完整月（'+ymPrev2+'、'+ymPrev+'）稼動低於 6 天／月，依十年規劃紅線應啟動<b>接案策略檢討</b>——檢視報價量是否不足、價格策略是否過高、或機具外租消化閒置。</div>':'')
+    +(eqAlert?'<div style="margin:0 14px 12px;background:#fdf0ef;border:1px solid #f5c6c0;border-left:4px solid #c62828;border-radius:var(--r8);padding:10px 14px;font-size:12.5px;color:#8a2f26"><b><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 機具稼動警示：</b>自有機具已連續兩個完整月（'+ymPrev2+'、'+ymPrev+'）稼動低於 6 天／月，依十年規劃紅線應啟動<b>接案策略檢討</b>——檢視報價量是否不足、價格策略是否過高、或機具外租消化閒置。</div>':'')
     +'</div>';
   el.innerHTML=html;
 }
@@ -7804,7 +7809,7 @@ function updateDashTodo(){
     if(_expA){
       var d=_du2(_expA.date);
       if(d>1)return;
-      var txt=d===1?(label+' 預計明天收款（'+_expA.date+'）'):d===0?(label+' 今天預計收款'):('⚠ '+label+' 逾期 '+(-d)+' 天未收款（預計'+_expA.date+'）');
+      var txt=d===1?(label+' 預計明天收款（'+_expA.date+'）'):d===0?(label+' 今天預計收款'):('<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> '+label+' 逾期 '+(-d)+' 天未收款（預計'+_expA.date+'）');
       // v5.325：點下去是要「登錄收到多少錢」，不是改請款單內容 → 直接開確認收款彈窗
       items.push({type:'recv',urgent:d<=0,jump:"openReceiptModal('"+inv.id+"')",
         icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>',color:d<0?'var(--red)':'var(--yd)',
@@ -7817,7 +7822,7 @@ function updateDashTodo(){
       var overDays=Math.floor((now.getTime()-dueD.getTime())/864e5);
       if(overDays>0&&overDays<1825)items.push({type:'recv',urgent:true,jump:"openReceiptModal('"+inv.id+"')",
         icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>',color:'var(--red)',
-        text:'⚠ '+label+' 逾期 '+overDays+' 天未收款',sub:'NT$ '+fmt(unpaid)});
+        text:'<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> '+label+' 逾期 '+overDays+' 天未收款',sub:'NT$ '+fmt(unpaid)});
     }
   });
 
@@ -7830,7 +7835,7 @@ function updateDashTodo(){
     items.push({type:'pay_overdue',urgent:true,
       jump:"go('finance');setTimeout(function(){window._payAging='overdue';switchFinanceTab('payable')},250)",
       icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>',color:'var(--red)',
-      text:'🔴 逾期 '+od+' 天未付款：'+(p.to||'廠商')+(p.project?' / '+p.project:'')+'（預計'+p.date+'）',
+      text:'<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 逾期 '+od+' 天未付款：'+(p.to||'廠商')+(p.project?' / '+p.project:'')+'（預計'+p.date+'）',
       sub:'NT$ '+fmt(_payEff(p))});
   });
 
@@ -7851,7 +7856,7 @@ function updateDashTodo(){
   items.sort(function(a,b){return (b.urgent?1:0)-(a.urgent?1:0);});
 
   if(!items.length){
-    el.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--b3)">✅ 本月無待辦事項</div>';
+    el.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--b3)"><svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 本月無待辦事項</div>';
     if(badge)badge.style.display='none';
     return;
   }
@@ -7877,7 +7882,7 @@ function awardQuote(id){
     // fallback
     const q=Q.find(x=>x.id===id);if(!q)return;
     q.awarded=true;q._mt=Date.now();persist();renderList();rDash();updBadge();
-    toast('🏆 已標記為得標');
+    toast('已標記為得標');
   }
 }
 
@@ -7940,7 +7945,7 @@ function renderClientReport(el,year,month){
 
 // renderLogReport：操作記錄報表
 function renderLogReport(el){
-  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--b3)">⏳ 載入所有用戶記錄中...</div>';
+  el.innerHTML='<div style="padding:20px;text-align:center;color:var(--b3)"><svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> 載入所有用戶記錄中...</div>';
   // 從 Firebase 讀取所有用戶的活動記錄（合併）
   function renderRows(logs){
     if(!logs||!logs.length){
@@ -8177,7 +8182,7 @@ function confirmReceipt(){
   const dt=document.getElementById('receipt-date').value;
   const note=document.getElementById('receipt-note').value.trim();
   const off=_receiptOffsets();
-  if(amt<=0&&off.sum<=0){toast('⚠ 請填實收金額，或填入抵銷項');const el=document.getElementById('receipt-amount');if(el)el.focus();return;}
+  if(amt<=0&&off.sum<=0){toast('請填實收金額，或填入抵銷項');const el=document.getElementById('receipt-amount');if(el)el.focus();return;}
   // v5.315：部分收款不再標記為「已結清」。原本收一半也設 receivedConfirmed=true，
   // 使該期整張單從應收與逾期提醒中消失，剩餘未收的錢就此不見。
   // v5.326：抵銷項（匯費／扣款／業主保留款）併入結清判斷——這些錢確實不會再匯進來。
@@ -8201,8 +8206,8 @@ function confirmReceipt(){
   const _offTxt=off.sum>0?('（抵銷 '+fmt(off.sum)+'：'
     +[off.fee?'匯費'+fmt(off.fee):'',off.deduct?'扣款'+fmt(off.deduct):'',off.hold?'保留款'+fmt(off.hold):'']
       .filter(Boolean).join('、')+'）'):'';
-  if(_full)toast('✅ 收款已確認'+_offTxt+(note?' — '+note:''));
-  else toast('✅ 已登錄部分收款 NT$ '+fmt(amt)+_offTxt+'，尚差 NT$ '+fmt(_due-_settled)+' 仍列入應收');
+  if(_full)toast('收款已確認'+_offTxt+(note?' — '+note:''));
+  else toast('已登錄部分收款 NT$ '+fmt(amt)+_offTxt+'，尚差 NT$ '+fmt(_due-_settled)+' 仍列入應收');
 }
 
 // ── 跳轉到得標案件篩選 ──
@@ -8267,7 +8272,7 @@ function updateQuoteStats(){
     +'<div class="kpi" style="flex:1;min-width:130px"><div class="kl">有效得標率</div><div class="kv" style="font-size:20px;color:'+(effRate==null?'var(--b3)':effRate>=50?'var(--g3)':'#e65100')+'">'+(effRate==null?'—':effRate+'%')+'</div><div class="ks">勝 '+awarded+'／敗 '+lost.length+'（流標不計）</div></div>'
     +'<div class="kpi" style="flex:1;min-width:140px"><div class="kl">總報價金額</div><div class="kv" style="font-size:16px">NT$ '+fmt(totalAmt)+'</div></div>'
     +'<div class="kpi hi" style="flex:1;min-width:140px"><div class="kl">得標金額</div><div class="kv" style="font-size:16px">NT$ '+fmt(awardedAmt)+'</div></div>'
-    +(lost.length?('<div class="kpi" style="flex:1.5;min-width:200px"><div class="kl">📉 輸標分析</div><div class="kv" style="font-size:13px;font-weight:700;line-height:1.6">'+Object.keys(rc).map(function(k){return k+' '+rc[k];}).join('・')+'</div><div class="ks">'+(avgDiff!=null?('報價平均'+(avgDiff>=0?'高出':'低於')+'得標價 '+Math.abs(avgDiff)+'%（'+diffs.length+' 筆有對手價）'):'在未得標記錄填「對手得標價」可分析差距')+'</div></div>'):'');
+    +(lost.length?('<div class="kpi" style="flex:1.5;min-width:200px"><div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-trend"/></svg> 輸標分析</div><div class="kv" style="font-size:13px;font-weight:700;line-height:1.6">'+Object.keys(rc).map(function(k){return k+' '+rc[k];}).join('・')+'</div><div class="ks">'+(avgDiff!=null?('報價平均'+(avgDiff>=0?'高出':'低於')+'得標價 '+Math.abs(avgDiff)+'%（'+diffs.length+' 筆有對手價）'):'在未得標記錄填「對手得標價」可分析差距')+'</div></div>'):'');
 }
 
 // 請款單統計面板
@@ -8467,7 +8472,7 @@ function exportQuotesExcel(){
     q.awarded?'得標':'未得標'
   ]);
   downloadCSV('報價單_'+fmtDateStr(),headers,rows);
-  toast('✅ 報價單已匯出');
+  toast('報價單已匯出');
 }
 function exportInvExcel(){
   // v5.318：原本『請款總額』取 t.sub（totals 根本沒這欄，永遠輸出 0）；『含稅總額』其實是已扣保留款後的金額，標題誤導
@@ -8482,7 +8487,7 @@ function exportInvExcel(){
       t.curTotal||0,_invRetention(inv),t.total||0,received,unpaid,status,notes];
   });
   downloadCSV('請款單_'+fmtDateStr(),headers,rows);
-  toast('✅ 請款單已匯出');
+  toast('請款單已匯出');
 }
 function downloadCSV(filename, headers, rows){
   const BOM='\uFEFF';
@@ -8513,10 +8518,10 @@ function _updBackupHint(){
     btns[0].parentElement.appendChild(el);
   }
   var ts=parseInt(localStorage.getItem('fy_last_backup_ts')||'0');
-  if(!ts){el.innerHTML='<span style="color:var(--red);font-weight:700">⚠ 尚未做過完整備份</span>　<span style="color:var(--b4)">雲端同步≠備份（誤刪會同步刪），建議定期匯出留存</span>';return;}
+  if(!ts){el.innerHTML='<span style="color:var(--red);font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 尚未做過完整備份</span>　<span style="color:var(--b4)">雲端同步≠備份（誤刪會同步刪），建議定期匯出留存</span>';return;}
   var days=Math.floor((Date.now()-ts)/86400000);
   el.innerHTML=days>14
-    ?'<span style="color:var(--red);font-weight:700">⚠ 上次備份已是 '+days+' 天前</span>　<span style="color:var(--b4)">建議重新匯出</span>'
+    ?'<span style="color:var(--red);font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 上次備份已是 '+days+' 天前</span>　<span style="color:var(--b4)">建議重新匯出</span>'
     :'<span style="color:var(--g3)">✓ 上次備份：'+(days===0?'今天':days+' 天前')+'</span>';
 }
 function exportData(){
@@ -8540,8 +8545,8 @@ function exportData(){
     // 記錄備份時間
     localStorage.setItem('fy_last_backup',Date.now().toString());
     updateDashAR();
-    toast('✅ 資料已匯出備份');
-  }catch(e){toast('❌ 匯出失敗：'+e.message);}
+    toast('資料已匯出備份');
+  }catch(e){toast('匯出失敗：'+e.message);}
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -8764,7 +8769,7 @@ function fbSignIn(){
     const retries = (window._fbSignInRetry||0) + 1;
     window._fbSignInRetry = retries;
     if(retries <= 20){
-      if(errEl){errEl.textContent='⏳ Firebase 連線中（'+retries+'/20）…';errEl.style.display='block';}
+      if(errEl){errEl.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> Firebase 連線中（'+retries+'/20）…';errEl.style.display='block';}
       setTimeout(fbSignIn, 500);
     } else {
       window._fbSignInRetry = 0;
@@ -8781,7 +8786,7 @@ function fbSignIn(){
       _setFbLoading(false);
       if(remember) localStorage.setItem('fy_last_email', email);
       else localStorage.removeItem('fy_last_email');
-      toast('✅ 登入成功！');
+      toast('登入成功！');
     })
     .catch(err=>{
       _setFbLoading(false);
@@ -8802,7 +8807,7 @@ function fbRegister(){
   }
   _setFbLoading(true);
   _fbAuth.createUserWithEmailAndPassword(email,pw)
-    .then(()=>{_setFbLoading(false);toast('✅ 帳號建立成功！');if(errEl)errEl.style.display='none';})
+    .then(()=>{_setFbLoading(false);toast('帳號建立成功！');if(errEl)errEl.style.display='none';})
     .catch(err=>{_setFbLoading(false);if(errEl){errEl.textContent=_fbErrMsg(err.code);errEl.style.display='block';}});
 }
 function fbSignOut(){
@@ -8823,7 +8828,7 @@ function _setFbLoading(on){
       var ll=document.getElementById('fb-loading');
       if(ll&&ll.style.display!=='none'){
         _setFbLoading(false);
-        toast('⚠️ 雲端連線超時，請確認網路後重試');
+        toast('雲端連線超時，請確認網路後重試');
       }
     },45000);
   } else {
@@ -10014,7 +10019,7 @@ function toggleAutoSync(on){
   localStorage.setItem('fy_auto_sync', on?'1':'0');
   const label=document.getElementById('auto-sync-label');
   if(label) label.textContent=on?'已開啟':'已關閉';
-  if(on) toast('✅ 自動同步已開啟，每次儲存後3秒自動上傳雲端');
+  if(on) toast('自動同步已開啟，每次儲存後3秒自動上傳雲端');
   else toast('自動同步已關閉');
 }
 
@@ -10450,7 +10455,7 @@ function _pushCloud(opts){
     var built=_buildCleanPayload();
     p={ts:built.ts};clean=built.clean;
   }catch(e){
-    if(!opts.silent){_setFbLoading(false);toast('❌ 資料整理失敗：'+(e&&e.message||''));}
+    if(!opts.silent){_setFbLoading(false);toast('資料整理失敗：'+(e&&e.message||''));}
     if(opts.onDone)opts.onDone(false);
     return;
   }
@@ -10462,12 +10467,12 @@ function _pushCloud(opts){
     localStorage.removeItem('fy_pending_sync');
     if(!opts.silent)_setFbLoading(false);
     _updateFbSyncTime();try{updateDashAR();}catch(e){}
-    if(!opts.silent){logActivity('同步','上傳資料至雲端');toast('✅ 已上傳雲端（'+new Date(p.ts).toLocaleTimeString('zh-TW')+'）');}
+    if(!opts.silent){logActivity('同步','上傳資料至雲端');toast('已上傳雲端（'+new Date(p.ts).toLocaleTimeString('zh-TW')+'）');}
     if(opts.onDone)opts.onDone(true);
   };
   var fail=function(err){
     localStorage.setItem('fy_pending_sync','1');
-    if(!opts.silent){_setFbLoading(false);toast('❌ 上傳失敗：'+(err&&err.message||'')+'（已保留，將自動重試）');}
+    if(!opts.silent){_setFbLoading(false);toast('上傳失敗：'+(err&&err.message||'')+'（已保留，將自動重試）');}
     else{console.warn('[FY] 自動同步失敗:',err&&err.message);}
     if(opts.onDone)opts.onDone(false);
   };
@@ -10494,7 +10499,7 @@ function _pushCloud(opts){
     if(!opts.full&&baseHashes&&changed.length===0){
       _storeSyncHashes(newHashes);
       localStorage.removeItem('fy_pending_sync');
-      if(!opts.silent){_setFbLoading(false);toast('✅ 無新變更，雲端已是最新');}
+      if(!opts.silent){_setFbLoading(false);toast('無新變更，雲端已是最新');}
       if(opts.onDone)opts.onDone(true);
       return;
     }
@@ -10550,7 +10555,7 @@ function _pullCloudIfNewer(opts){
         _fbDb.ref('fydata/shared/uploadedBy').once('value').then(function(u){
           var who=u.val()||'他人';
           var when=new Date(cloudTime).toLocaleString('zh-TW');
-          showConfirm('⚠ 雲端與本機都有更新',
+          showConfirm('雲端與本機都有更新',
             '雲端由 <strong>'+who+'</strong> 於 '+when+' 上傳，<br>但本機也有<strong>尚未上傳</strong>的修改。<br><br>• 按「確定」＝用雲端覆蓋本機（本機未上傳的修改會消失）<br>• 按「取消」＝保留本機並上傳（只上傳你有修改的模組；若對方改的是同一模組，該模組會被你的版本覆蓋）',
             function(){ _fbDb.ref('fydata/shared').once('value').then(function(fs){ _applyCloudSnapshot(fs.val(),cloudTime,'<svg class="ic ib" aria-hidden="true"><use href="#i-cloud"/></svg> 已用雲端資料覆蓋本機'); }); },
             true,
@@ -11153,7 +11158,7 @@ function buildCostAnalysisHtml(q){
       +'</tr>';
   });
   var unRow=att.unassigned>0
-    ?'<tr style="border-bottom:1px solid var(--b1);background:#fff8ec"><td style="padding:5px 8px;font-size:12px;color:#b26a00">⚠ 未歸戶成本（未關聯工項）</td><td></td><td></td><td style="padding:5px 8px;text-align:right;font-weight:700;color:#b26a00">'+fmt(Math.round(att.unassigned))+'</td><td colspan="2" style="padding:5px 8px;font-size:10.5px;color:#b26a00">請在成本記錄選「工項」歸戶</td></tr>'
+    ?'<tr style="border-bottom:1px solid var(--b1);background:#fff8ec"><td style="padding:5px 8px;font-size:12px;color:#b26a00"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 未歸戶成本（未關聯工項）</td><td></td><td></td><td style="padding:5px 8px;text-align:right;font-weight:700;color:#b26a00">'+fmt(Math.round(att.unassigned))+'</td><td colspan="2" style="padding:5px 8px;font-size:10.5px;color:#b26a00">請在成本記錄選「工項」歸戶</td></tr>'
     :'';
   var totMgn=totQuote-totAct-att.unassigned;
   var totMgnR=totQuote>0?Math.round(totMgn/totQuote*1000)/10:0;
@@ -11161,7 +11166,7 @@ function buildCostAnalysisHtml(q){
     +'<thead><tr style="background:var(--gl);color:var(--b5);font-size:11px">'
     +'<th style="padding:6px 8px;text-align:left">報價工項</th>'
     +'<th style="padding:6px 8px;text-align:right">報價複價</th>'
-    +'<th style="padding:6px 8px;text-align:right">預估成本🔒</th>'
+    +'<th style="padding:6px 8px;text-align:right">預估成本<svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg></th>'
     +'<th style="padding:6px 8px;text-align:right">實際成本</th>'
     +'<th style="padding:6px 8px;text-align:right" title="實際成本÷預估成本">執行率</th>'
     +'<th style="padding:6px 8px;text-align:right" title="報價複價−實際成本">實際毛利</th>'
@@ -11176,7 +11181,7 @@ function buildCostAnalysisHtml(q){
     +'</tr></tfoot></table></div>'
     +'<div style="font-size:10.5px;color:var(--b3);margin-top:6px">執行率＝實際成本÷預估成本（>100% 紅字＝超支）；實際毛利＝報價複價−實際成本。未歸戶成本已計入合計毛利。</div>'
     +'<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
-    +'<button type="button" onclick="var n=writeCostHist();toast(n?(\'📥 已回寫 \'+n+\' 筆工項實績到歷史單價庫，下次報價自動提示\'):\'尚無可回寫的工項實績（需有實際成本且已歸戶）\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:var(--r8);padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📥 回寫單價庫（結案復盤）</button>'
+    +'<button type="button" onclick="var n=writeCostHist();toast(n?(\'<svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 已回寫 \'+n+\' 筆工項實績到歷史單價庫，下次報價自動提示\'):\'尚無可回寫的工項實績（需有實際成本且已歸戶）\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:var(--r8);padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 回寫單價庫（結案復盤）</button>'
     +'<span style="font-size:10.5px;color:var(--b3)">單價庫目前累積 '+COST_HIST.length+' 筆工項實績；專案「標記結案」時也會自動回寫</span>'
     +'</div>';
 }
@@ -11328,7 +11333,7 @@ function drRenderList(){
     +_drList.map(function(e,i){
       return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--gm);background:var(--gl);border-radius:var(--r8);margin-bottom:5px;font-size:12.5px">'
       +'<span style="font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(e.name)+'</span>'
-      +'<span style="color:var(--b4);white-space:nowrap">'+(e.workers?('出工'+e.workers):'')+(e.ownEquip?'・機具':'')+(e.photos.length?('・📷'+e.photos.length):'')+'</span>'
+      +'<span style="color:var(--b4);white-space:nowrap">'+(e.workers?('出工'+e.workers):'')+(e.ownEquip?'・機具':'')+(e.photos.length?('・<svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg>'+e.photos.length):'')+'</span>'
       +'<button type="button" class="btn btn-xs btn-r" onclick="drRemoveFromList('+i+')">✕</button></div>';
     }).join('');
 }
@@ -11348,7 +11353,7 @@ function submitDailyReport(){
       by:((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||''),ts:Date.now()});
     if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120);
     q._mt=Date.now();
-    _qcLog.unshift({t:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),proj:(q.name||'').slice(0,14),desc:'📋 日報'+(e.workers?('｜出工 '+e.workers+' 人'):'')+(e.photos.length?('｜照片 '+e.photos.length+' 張'):''),amt:null,cat:'日報'});
+    _qcLog.unshift({t:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),proj:(q.name||'').slice(0,14),desc:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 日報'+(e.workers?('｜出工 '+e.workers+' 人'):'')+(e.photos.length?('｜照片 '+e.photos.length+' 張'):''),amt:null,cat:'日報'});
     okN++;
   });
   const n=_drList.length;
@@ -11358,7 +11363,7 @@ function submitDailyReport(){
   _drClearForm();
   drRenderList();rQcLog();
   try{renderProjects();}catch(e){}
-  toast('📋 已送出 '+okN+' 個工地的日報');
+  toast('已送出 '+okN+' 個工地的日報');
 }
 // 主管檢視：專案頁「檢視日報」
 function viewDailyReports(qid){
@@ -11372,7 +11377,7 @@ function viewDailyReports(qid){
       +(L.by?'<div style="font-size:10px;color:var(--b3);margin-top:4px">'+esc(L.by)+'</div>':'')
       +'</div>';
   }).join(''):'<div style="color:var(--b3);font-size:12px;padding:10px 0">尚無日報——工務可從「快速支出」頁的工作日報送出</div>';
-  showConfirm('📋 工作日報：'+esc(q.name||''),'<div style="max-height:60vh;overflow-y:auto">'+html+'</div>',function(){},false,null,true);
+  showConfirm('工作日報：'+esc(q.name||''),'<div style="max-height:60vh;overflow-y:auto">'+html+'</div>',function(){},false,null,true);
 }
 
 // ── 成本勾稽：施工成本 vs 應付帳款一致性檢查（防漏記／殘留）──
@@ -11390,12 +11395,12 @@ function buildCostAuditHtml(q){
     if(selfPay){st='自付，不入應付';clr='var(--b3)';}
     else if(amt<=0){st='金額 0，免建應付';clr='var(--b3)';}
     // v5.315：已合併的子成本，其應付已由合併單統一入帳。原本會誤判為「缺應付」並顯示
-    // 「🔧 補建應付」，使用者一按就會在合併應付之外再建一筆，應付總額直接變兩倍。
+    // 「<svg class="ic ib" aria-hidden="true"><use href="#i-wrench"/></svg> 補建應付」，使用者一按就會在合併應付之外再建一筆，應付總額直接變兩倍。
     else if(c.mergedInto){st='已併入合併應付';clr='var(--b3)';}
-    else if(!p){st='❌ 缺應付帳款（可能漏記）';clr='var(--red)';issues++;
-      fixBtn='<button type="button" onclick="fixCostPayable(\''+c.id+'\')" style="font-size:11px;padding:2px 10px;border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;cursor:pointer;font-family:inherit">🔧 補建應付</button>';}
-    else if(Math.abs((p.amount||0)-amt)>1){st='⚠ 金額不符（應付記 '+fmt(p.amount||0)+'）';clr='#e65100';issues++;
-      fixBtn='<button type="button" onclick="fixCostPayable(\''+c.id+'\')" style="font-size:11px;padding:2px 10px;border:1px solid #ffcc80;background:#fff8ec;color:#b26a00;border-radius:99px;cursor:pointer;font-family:inherit">🔧 同步金額</button>';}
+    else if(!p){st='<svg class="ic ib" aria-hidden="true"><use href="#i-x"/></svg> 缺應付帳款（可能漏記）';clr='var(--red)';issues++;
+      fixBtn='<button type="button" onclick="fixCostPayable(\''+c.id+'\')" style="font-size:11px;padding:2px 10px;border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-wrench"/></svg> 補建應付</button>';}
+    else if(Math.abs((p.amount||0)-amt)>1){st='<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 金額不符（應付記 '+fmt(p.amount||0)+'）';clr='#e65100';issues++;
+      fixBtn='<button type="button" onclick="fixCostPayable(\''+c.id+'\')" style="font-size:11px;padding:2px 10px;border:1px solid #ffcc80;background:#fff8ec;color:#b26a00;border-radius:99px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-wrench"/></svg> 同步金額</button>';}
     else{st=p.status==='paid'?'✓ 一致（已付款）':'✓ 一致（未付款）';clr='var(--g3)';}
     rows+='<tr style="border-bottom:1px solid var(--b1)">'
       +'<td style="padding:5px 8px;font-size:12px">'+esc(c.vendor||'（未填廠商）')+'</td>'
@@ -11414,8 +11419,8 @@ function buildCostAuditHtml(q){
         +'<td style="padding:5px 8px;font-size:12px">'+esc(p.to||'')+'</td>'
         +'<td style="padding:5px 8px;font-size:11px;color:var(--b4)">應付殘留</td>'
         +'<td style="padding:5px 8px;text-align:right">'+fmt(p.amount||0)+'</td>'
-        +'<td style="padding:5px 8px;font-size:11.5px;font-weight:700;color:var(--red)">❌ 成本記錄已刪，應付殘留</td>'
-        +'<td style="padding:5px 8px;text-align:right"><button type="button" onclick="removePayableByCostId(\''+p.costId+'\');rCostItems();toast(\'已刪除殘留應付\')" style="font-size:11px;padding:2px 10px;border:1px solid var(--red);background:#fff;color:var(--red);border-radius:99px;cursor:pointer;font-family:inherit">🗑 刪除殘留</button></td>'
+        +'<td style="padding:5px 8px;font-size:11.5px;font-weight:700;color:var(--red)"><svg class="ic ib" aria-hidden="true"><use href="#i-x"/></svg> 成本記錄已刪，應付殘留</td>'
+        +'<td style="padding:5px 8px;text-align:right"><button type="button" onclick="removePayableByCostId(\''+p.costId+'\');rCostItems();toast(\'已刪除殘留應付\')" style="font-size:11px;padding:2px 10px;border:1px solid var(--red);background:#fff;color:var(--red);border-radius:99px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg> 刪除殘留</button></td>'
         +'</tr>';
     });
   // 合併應付：另列一行並勾稽合計金額是否等於各子成本相加
@@ -11430,7 +11435,7 @@ function buildCostAuditHtml(q){
       +'<td style="padding:5px 8px;font-size:11px;color:var(--b4)">合併應付（'+((p.mergedCostIds||[]).length)+' 筆）</td>'
       +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(p.amount||0)+'</td>'
       +'<td style="padding:5px 8px;font-size:11.5px;font-weight:700;color:'+(diff?'#e65100':'var(--g3)')+'">'
-        +(diff?('⚠ 與子成本合計 '+fmt(sum)+' 不符'):(p.status==='paid'?'✓ 一致（已付款）':'✓ 一致（未付款）'))+'</td>'
+        +(diff?('<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 與子成本合計 '+fmt(sum)+' 不符'):(p.status==='paid'?'✓ 一致（已付款）':'✓ 一致（未付款）'))+'</td>'
       +'<td style="padding:5px 8px"></td></tr>';
   });
   // v5.317 日報出工 vs 已記點工成本：日報只寫 dailyLogs，不產生任何成本，
@@ -11450,13 +11455,13 @@ function buildCostAuditHtml(q){
       +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(got)+'</td>'
       +'<td style="padding:5px 8px;font-size:11.5px;font-weight:700;color:'+(warn?'#e65100':'var(--g3)')+'">'
         +(rate<=0?'未設定標準日薪（參數設定）'
-          :warn?('⚠ 點工成本可能少記約 '+fmt(gap)+'（估算應有 '+fmt(should)+'）')
+          :warn?('<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 點工成本可能少記約 '+fmt(gap)+'（估算應有 '+fmt(should)+'）')
           :'✓ 點工成本與出工紀錄相符')+'</td>'
       +'<td style="padding:5px 8px"></td></tr>';
   })();
   if(!checked&&!rows)return '<div style="padding:20px;text-align:center;color:var(--b3);font-size:12px">此案尚無需勾稽的成本（自有成本不入應付）</div>';
   var head=issues
-    ?'<div style="background:#fdecea;border:1px solid #f5b5ae;border-radius:var(--r8);padding:8px 12px;margin-bottom:10px;font-size:12.5px;font-weight:700;color:var(--red)">⚠ 發現 '+issues+' 筆成本／應付不一致，請逐筆處理</div>'
+    ?'<div style="background:#fdecea;border:1px solid #f5b5ae;border-radius:var(--r8);padding:8px 12px;margin-bottom:10px;font-size:12.5px;font-weight:700;color:var(--red)"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 發現 '+issues+' 筆成本／應付不一致，請逐筆處理</div>'
     :'<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:var(--r8);padding:8px 12px;margin-bottom:10px;font-size:12.5px;font-weight:700;color:#1B5E20">✓ 施工成本與應付帳款全部一致</div>';
   return head
     +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:560px">'
@@ -11470,7 +11475,7 @@ function fixCostPayable(cid){
   var c=(q.costs||[]).find(function(x){return x.id===cid;});if(!c)return;
   try{recalcCostAmt(c);}catch(e){}
   try{syncCostToPayable(q,c);}catch(e){}
-  rCostItems();toast('🔧 已重新同步應付帳款');
+  rCostItems();toast('已重新同步應付帳款');
 }
 
 function delCostItem(cid){
@@ -11739,7 +11744,7 @@ function confirmMergeCost(){
   q._mt=Date.now();
   persist();
   closeMergeCost();
-  toast(`✅ 已合併 ${selectedIds.length} 筆工項為一筆應付帳款（NT$ ${fmt(totalAmt)}）`);
+  toast(`已合併 ${selectedIds.length} 筆工項為一筆應付帳款（NT$ ${fmt(totalAmt)}）`);
 }
 
 function closeMergeCost(){
@@ -12221,13 +12226,13 @@ function rCostItems(){
   // 施工成本廠商分組模式
   var _costGroupBtn=document.getElementById('cost-group-mode');
   var _costGroupMode=_costGroupBtn?_costGroupBtn.value:'none';
-  // 📊 工項成本分析視圖：報價複價 vs 預估成本 vs 實際成本 vs 毛利（獨立按鈕切換）
+  // <svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 工項成本分析視圖：報價複價 vs 預估成本 vs 實際成本 vs 毛利（獨立按鈕切換）
   if(window._costView==='analysis'){
     el.innerHTML=buildCostAnalysisHtml(q);
     var _tw2=document.getElementById('cost-total-wrap');if(_tw2)_tw2.style.display='none';
     return;
   }
-  // ⚖ 成本勾稽視圖：施工成本 vs 應付帳款一致性（獨立按鈕切換）
+  // <svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 成本勾稽視圖：施工成本 vs 應付帳款一致性（獨立按鈕切換）
   if(window._costView==='audit'){
     el.innerHTML=buildCostAuditHtml(q);
     var _tw3=document.getElementById('cost-total-wrap');if(_tw3)_tw3.style.display='none';
@@ -12259,7 +12264,7 @@ function rCostItems(){
 
     if(c.type==='own'){
       var _ownChips='';
-      if(c.srcInvNo||c.srcVendor)_ownChips+='<span class="bdg" style="font-size:10px;background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4">🧾 '+esc(c.srcVendor||'')+(c.srcInvNo?' '+esc(c.srcInvNo):'')+'</span>';
+      if(c.srcInvNo||c.srcVendor)_ownChips+='<span class="bdg" style="font-size:10px;background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> '+esc(c.srcVendor||'')+(c.srcInvNo?' '+esc(c.srcInvNo):'')+'</span>';
       if(c.linkedItemIdx>=0&&q&&q.items&&q.items[c.linkedItemIdx])_ownChips+='<span class="bdg" style="font-size:10px;background:var(--gl);color:var(--g3);border:1px solid var(--gm)">↳ '+esc((q.items[c.linkedItemIdx].desc||'').slice(0,16))+'</span>';
       var _ownItemOpts='<option value="-1">── 選擇對應報價工項（供成本歸戶）──</option>';
       (q&&q.items||[]).forEach(function(it2,i2){if(!it2.sec)_ownItemOpts+='<option value="'+i2+'"'+(c.linkedItemIdx===i2?' selected':'')+'>'+esc((it2.desc||'工項'+(i2+1)).slice(0,28))+'</option>';});
@@ -12983,7 +12988,7 @@ function upaUpdateDesc(){
     const methodCfg=cfg.methods.find(m=>m.value===method);
     if(methodCfg?.addonFn&&UPA_ADDON_FNS[methodCfg.addonFn]){
       const msg=UPA_ADDON_FNS[methodCfg.addonFn](len,anchorLen);
-      if(msg){addonPreview.style.display='block';addonPreview.textContent='💡 '+msg;}
+      if(msg){addonPreview.style.display='block';addonPreview.textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-bulb"/></svg> '+msg;}
       else addonPreview.style.display='none';
     } else {
       addonPreview.style.display='none';
@@ -13178,7 +13183,7 @@ function saveUPACostParams(){
   // 儲存到 localStorage
   try{localStorage.setItem('fy_upa_cost',JSON.stringify(UPA_COST_DB));}catch(e){}
   // 雲端同步交由 _onSave() 統一處理（完整上傳並更新 uploadedAt，確保其他裝置偵測得到）
-  toast('✅ 成本參數已儲存並同步雲端！');
+  toast('成本參數已儲存並同步雲端！');
   _onSave();
 }
 
@@ -13345,7 +13350,7 @@ function fbUploadWithConflictCheck(){
       _fbDb.ref('fydata/shared/uploadedBy').once('value').then(u=>{
         const who=u.val()||'他人';
         const when=new Date(cloudTime).toLocaleString('zh-TW');
-        showConfirm('⚠ 雲端有更新版本',
+        showConfirm('雲端有更新版本',
           '<strong>'+who+'</strong> 於 '+when+' 上傳了新版本<br><br>直接上傳只會覆蓋<strong>你有修改的模組</strong>；若對方改的是同一模組，會被你的版本覆蓋。<br>建議先「從雲端下載」後再編輯上傳。',
           ()=>fbUpload()
         );
@@ -13391,7 +13396,7 @@ function clearAdvSearch(){
 // ══════════════════════════════════════════════════════════════
 function newContract(){
   document.getElementById('contract-edit-id').value='';
-  document.getElementById('contract-modal-title').textContent='📋 新增合約';
+  document.getElementById('contract-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 新增合約';
   ['c-code','c-date','c-name','c-client','c-amount','c-start','c-end','c-note','c-pay-cash','c-pay-ticket'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
@@ -13408,7 +13413,7 @@ function newContract(){
 function editContract(id){
   const c=CONTRACTS.find(x=>x.id===id);if(!c)return;
   document.getElementById('contract-edit-id').value=id;
-  document.getElementById('contract-modal-title').textContent='📋 編輯合約';
+  document.getElementById('contract-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 編輯合約';
   document.getElementById('c-code').value=c.code||'';
   document.getElementById('c-date').value=c.date||'';
   document.getElementById('c-name').value=c.name||'';
@@ -13452,7 +13457,7 @@ function saveContract(){
   logActivity('合約', (idx>=0?'修改':'新增')+'合約：'+c.name);
   closeContractModal();
   renderContracts();
-  toast('✅ 合約已儲存');
+  toast('合約已儲存');
   _onSave();
 }
 
@@ -13473,10 +13478,10 @@ function settleContract(id){
   const _endFuture=!!(c.end&&c.end>localToday());
   if(_pct<90||_endFuture){
     let warn=false;
-    try{warn=window.confirm('⚠️ 此合約疑似尚未完工！\n\n'
+    try{warn=window.confirm('<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 此合約疑似尚未完工！\n\n'
       +(_pct<90?'・已請款累積僅達合約金額的 '+_pct+'%\n':'')
       +(_endFuture?'・預計完工日 '+c.end+' 尚未到期\n':'')
-      +'\n「結算」是整個工程全部完工後的最後收尾，會把合約金額直接改成目前已請款累積 NT$ '+fmt(billed)+'（含保留款）。\n\n如果只是單一工項做完要追加減，請改用請款單裡各工項旁的「⚖ 工項結算」，不要按這裡。\n\n確定整個工程已完工、要繼續合約總結算嗎？');}catch(e){warn=true;}
+      +'\n「結算」是整個工程全部完工後的最後收尾，會把合約金額直接改成目前已請款累積 NT$ '+fmt(billed)+'（含保留款）。\n\n如果只是單一工項做完要追加減，請改用請款單裡各工項旁的「<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 工項結算」，不要按這裡。\n\n確定整個工程已完工、要繼續合約總結算嗎？');}catch(e){warn=true;}
     if(!warn)return;
   }
   let ok=false;
@@ -13490,7 +13495,7 @@ function settleContract(id){
   c._mt=Date.now();c.updatedAt=Date.now(); // 更新修改時間，確保跨裝置同步時新值獲勝
   saveContracts();renderContracts();
   try{if(document.getElementById('page-projects')?.classList.contains('active'))renderProjects();}catch(e){}
-  toast('⚖ 已竣工總結算：合約金額調整為 NT$ '+fmt(billed)+'，狀態已完成');
+  toast('已竣工總結算：合約金額調整為 NT$ '+fmt(billed)+'，狀態已完成');
 }
 
 function delContract(id){
@@ -13544,7 +13549,7 @@ function renderContracts(){
         <div class="qt">${esc(c.code?'['+c.code+'] ':'')}${esc(c.name||'未命名')}</div>
         <div class="qsb">${esc(c.client||'—')} ／ ${c.date||'—'}${c.end?` ／ 完工：${c.end}`:''}</div>
         ${c.note?`<div style="font-size:10px;color:var(--b3)"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> ${esc(c.note)}</div>`:''}
-        ${c.attachment?`<div style="font-size:10px;margin-top:2px"><button type="button" onclick="viewContractAttachment('${c.id}');event.stopPropagation()" style="border:none;background:none;color:#1a73e8;cursor:pointer;padding:0;font-size:10px">📎 ${esc(c.attachmentName||'查看合約附件')}</button></div>`:''}
+        ${c.attachment?`<div style="font-size:10px;margin-top:2px"><button type="button" onclick="viewContractAttachment('${c.id}');event.stopPropagation()" style="border:none;background:none;color:#1a73e8;cursor:pointer;padding:0;font-size:10px"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> ${esc(c.attachmentName||'查看合約附件')}</button></div>`:''}
       </div>
       <div class="qr">
         <div class="qa">NT$ ${fmt(c.amount||0)}</div>
@@ -13557,7 +13562,7 @@ function renderContracts(){
         ${c.linkedQid?`<button type="button" class="btn btn-xs" style="background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4" onclick="viewContractQuote('${c.linkedQid}')" title="查看原始報價單"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 報價</button>`:''}
         <button type="button" class="btn btn-xs btn-g" onclick="newInvFromContract('${c.id}')" title="為此合約新增請款單"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 請款</button>
         ${c.linkedQid?`<button type="button" class="btn btn-xs" style="background:#fff3e0;color:#e65100;border:1px solid #ffcc80" onclick="openContractCosts('${c.linkedQid}')" title="記錄施工成本"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>`:''}
-        ${c.status!=='completed'&&billed>0?`<button type="button" class="btn btn-xs" style="background:#ede7f6;color:#4527a0;border:1px solid #b39ddb" onclick="settleContract('${c.id}')" title="全案完工後的最後收尾：合約金額調整為實際請款累積並標記完成。單一工項追加減請改用請款單的「⚖ 追加減」">⚖ 竣工總結算</button>`:''}
+        ${c.status!=='completed'&&billed>0?`<button type="button" class="btn btn-xs" style="background:#ede7f6;color:#4527a0;border:1px solid #b39ddb" onclick="settleContract('${c.id}')" title="全案完工後的最後收尾：合約金額調整為實際請款累積並標記完成。單一工項追加減請改用請款單的「 追加減」"><svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 竣工總結算</button>`:''}
         <button type="button" class="btn btn-xs btn-r" onclick="delContract('${c.id}')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button>
       </div>
     </div>`;
@@ -13575,7 +13580,7 @@ function exportContractsCSV(){
       c.start||'',c.end||'',statusMap[c.status]||'',billed,c.amount-billed,c.note||''];
   });
   downloadCSV('合約記錄_'+fmtDateStr(),headers,rows);
-  toast('✅ 合約記錄已匯出');
+  toast('合約記錄已匯出');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -13583,7 +13588,7 @@ function exportContractsCSV(){
 // ══════════════════════════════════════════════════════════════
 function newVendor(){
   document.getElementById('vendor-edit-id').value='';
-  document.getElementById('vendor-modal-title').textContent='🏭 新增廠商';
+  document.getElementById('vendor-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 新增廠商';
   ['v-name','v-contact','v-phone','v-taxid','v-email','v-addr','v-items','v-note','v-pay-cash','v-pay-ticket'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
@@ -13594,7 +13599,7 @@ function newVendor(){
 function editVendor(id){
   const v=VENDORS.find(x=>x.id===id);if(!v)return;
   document.getElementById('vendor-edit-id').value=id;
-  document.getElementById('vendor-modal-title').textContent='🏭 編輯廠商';
+  document.getElementById('vendor-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 編輯廠商';
   document.getElementById('v-name').value=v.name||'';
   document.getElementById('v-type').value=v.type||'material';
   document.getElementById('v-contact').value=v.contact||'';
@@ -13625,7 +13630,7 @@ function saveVendor(){
   if(idx>=0)VENDORS[idx]=v;else VENDORS.unshift(v);
   saveVendors();
   logActivity('廠商',(idx>=0?'修改':'新增')+'廠商：'+v.name);
-  closeVendorModal();renderVendors();toast('✅ 廠商已儲存');
+  closeVendorModal();renderVendors();toast('廠商已儲存');
   _onSave();
 }
 
@@ -13667,7 +13672,7 @@ function renderVendors(){
       <div style="display:flex;gap:4px;margin-left:8px;flex-direction:column;align-items:flex-end">
         ${vUnpaid>0?`<span class="bdg warn" style="font-size:10px">待付 NT$ ${fmt(vUnpaid)}</span>`:''}
         <div style="display:flex;gap:4px">
-          ${v.phone?`<a href="tel:${v.phone}" class="btn btn-xs" style="text-decoration:none">📞</a>`:''}
+          ${v.phone?`<a href="tel:${v.phone}" class="btn btn-xs" style="text-decoration:none"><svg class="ic ib" aria-hidden="true"><use href="#i-phone"/></svg></a>`:''}
           <button type="button" class="btn btn-xs" onclick="editVendor('${v.id}')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg></button>
           <button type="button" class="btn btn-xs btn-r" onclick="delVendor('${v.id}')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button>
         </div>
@@ -13684,7 +13689,7 @@ function exportVendorsCSV(){
   const rows=VENDORS.map(v=>[v.name||'',typeMap[v.type]||'',v.contact||'',v.phone||'',
     v.taxid||'',v.email||'',v.addr||'',v.items||'',v.note||'']);
   downloadCSV('廠商清單_'+fmtDateStr(),headers,rows);
-  toast('✅ 廠商清單已匯出');
+  toast('廠商清單已匯出');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -13697,7 +13702,7 @@ function togglePaidDateField(){
 }
 function newPayable(){
   document.getElementById('payable-edit-id').value='';
-  document.getElementById('payable-modal-title').textContent='💸 新增付款記錄';
+  document.getElementById('payable-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 新增付款記錄';
   ['p-to','p-amount','p-qty','p-unit-price','p-retention-pct','p-project','p-note','p-paid-date','p-cost-source'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   refreshCostSourceList();
   document.getElementById('p-date').value=localToday();
@@ -13710,7 +13715,7 @@ function newPayable(){
 function editPayable(id){
   const p=PAYABLES.find(x=>x.id===id);if(!p)return;
   document.getElementById('payable-edit-id').value=id;
-  document.getElementById('payable-modal-title').textContent='💸 編輯付款記錄';
+  document.getElementById('payable-modal-title').textContent='<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 編輯付款記錄';
   document.getElementById('p-to').value=p.to||'';
   document.getElementById('p-amount').value=p.amount||'';
   document.getElementById('p-date').value=p.date||'';
@@ -13753,7 +13758,7 @@ function savePayable(){
   const idx=PAYABLES.findIndex(x=>x.id===id);
   if(idx>=0)PAYABLES[idx]=p;else PAYABLES.unshift(p);
   savePayables();logActivity('應付',(idx>=0?'修改':'新增')+'付款：'+p.to+' NT$'+fmt(p.amount));
-  closePayableModal();renderPayables();updateFinanceKPIs();toast('✅ 付款記錄已儲存');
+  closePayableModal();renderPayables();updateFinanceKPIs();toast('付款記錄已儲存');
   _onSave();
 }
 
@@ -13761,7 +13766,7 @@ function confirmPayment(id){
   const p=PAYABLES.find(x=>x.id===id);if(!p)return;
   p.status='paid';p.paidAt=Date.now();p._mt=Date.now();
   if(!p.paidDate)p.paidDate=localToday();
-  savePayables();renderPayables();updateFinanceKPIs();toast('✅ 已標記為付款完成');
+  savePayables();renderPayables();updateFinanceKPIs();toast('已標記為付款完成');
   _onSave();
 }
 
@@ -13921,7 +13926,7 @@ function projUpload(type,qid){
       var ctx={type:_projFileCtx.type,qid:_projFileCtx.qid};
       // ── 正規路徑：Firebase Storage（登入且服務可用；上限 20MB）──
       if(_fbUser&&_fbStorage){
-        if(f.size>20*1024*1024){toast('⚠ 檔案過大（雲端上限 20MB）');return;}
+        if(f.size>20*1024*1024){toast('檔案過大（雲端上限 20MB）');return;}
         var safe=(f.name||'file').replace(/[^\w.\-\u4e00-\u9fff（）()]/g,'_');
         var path='fydata/projfiles/'+ctx.qid+'/'+ctx.type+'/'+Date.now()+'_'+safe;
         toast('雲端上傳中…');
@@ -13929,22 +13934,22 @@ function projUpload(type,qid){
         task.on('state_changed',null,function(err){
           // Storage 失敗（未開通/規則/網路）→ 小檔自動退回內嵌儲存
           if(f.size<=1500000){
-            toast('⚠ 雲端上傳失敗（'+((err&&err.code)||'未知')+'），已改用內嵌儲存');
+            toast('雲端上傳失敗（'+((err&&err.code)||'未知')+'），已改用內嵌儲存');
             var rd2=new FileReader();
             rd2.onload=function(){_projAttachFile(ctx.qid,ctx.type,f.name,rd2.result);};
             rd2.readAsDataURL(f);
           }else{
-            toast('❌ 雲端上傳失敗（'+((err&&err.code)||'未知')+'）且檔案超過內嵌上限 1.5MB');
+            toast('雲端上傳失敗（'+((err&&err.code)||'未知')+'）且檔案超過內嵌上限 1.5MB');
           }
         },function(){
           task.snapshot.ref.getDownloadURL().then(function(url){
             _projAttachMeta(ctx.qid,ctx.type,f.name,url,path);
-          }).catch(function(){toast('❌ 取得下載連結失敗');});
+          }).catch(function(){toast('取得下載連結失敗');});
         });
         return;
       }
       // ── 未登入：內嵌 base64（1.5MB）──
-      if(f.size>1500000){toast('⚠ 未登入雲端帳號：內嵌上限 1.5MB（登入後可傳 20MB）');return;}
+      if(f.size>1500000){toast('未登入雲端帳號：內嵌上限 1.5MB（登入後可傳 20MB）');return;}
       var rd=new FileReader();
       rd.onload=function(){_projAttachFile(ctx.qid,ctx.type,f.name,rd.result);};
       rd.readAsDataURL(f);
@@ -14026,7 +14031,7 @@ function toggleProjClosed(qid,close){
       q.closed=true;q.closedAt=Date.now();q._mt=Date.now();persist();
       try{logActivity('專案','結案：'+(q.name||''));}catch(e){}
       let _n=0;try{_n=writeCostHist(q.id);}catch(e){}
-      renderProjects();toast('已結案：'+(q.name||'')+(_n?('　📥 回寫 '+_n+' 筆工項實績到單價庫'):''));
+      renderProjects();toast('已結案：'+(q.name||'')+(_n?('　<svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 回寫 '+_n+' 筆工項實績到單價庫'):''));
     },false);
   }else{
     q.closed=false;delete q.closedAt;q._mt=Date.now();persist();
@@ -14108,7 +14113,7 @@ function renderProjects(){
       info:ct?esc(ct.code||'')+'　NT$ '+fmt(ct.amount||0)+(done?'　<span style="color:var(--g3)">✓ 已完工結算</span>':''):'尚未建立合約',
       extra:ct?('<button type="button" onclick="event.stopPropagation();projUpload(\'contract\',\''+q.id+'\')" style="border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> '+(_hasCtFile?'重新上傳':'上傳合約檔')+'</button>'
         +(_hasCtFile?' <button type="button" onclick="event.stopPropagation();projDownload(\''+q.id+'\',\'contract\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> '+esc((ct.fileName||'合約檔').slice(0,18))+'</button>':'')
-        +(!done&&billed>0?' <button type="button" onclick="event.stopPropagation();settleContract(\''+ct.id+'\')" title="全案完工後的最後收尾：把合約金額調整為實際請款累積並標記完成。單一工項的追加減請改用請款單裡的「⚖ 追加減」" style="border:1px solid #b39ddb;background:#ede7f6;color:#4527a0;border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit">⚖ 竣工總結算</button>':'')
+        +(!done&&billed>0?' <button type="button" onclick="event.stopPropagation();settleContract(\''+ct.id+'\')" title="全案完工後的最後收尾：把合約金額調整為實際請款累積並標記完成。單一工項的追加減請改用請款單裡的「 追加減」" style="border:1px solid #b39ddb;background:#ede7f6;color:#4527a0;border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 竣工總結算</button>':'')
         +' <button type="button" onclick="event.stopPropagation();editContract(\''+ct.id+'\')" title="編輯合約金額/日期/狀態/備註" style="border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit">✎ 合約資料</button>'):'',
       jump:"void(0)"});
     // 3 施工進度（成本 + 工作確認單）
@@ -14123,7 +14128,7 @@ function renderProjects(){
       // 的專案一律顯示施工進度 0%，成本執行率的退路永遠進不去。改判有無日報回報。
       bar:(hasPhysRep&&physBaseV>0)?{pct:physPct,warn:false,label:'施工進度（日報回報數量/合約數量，金額加權）'}
         :((estCostTotal>0&&costNet>0)?{pct:costNet/estCostTotal*100,warn:costNet>estCostTotal,label:'成本執行率（實際/預估成本，均未稅）'}:null),
-      extra:'<button type="button" onclick="event.stopPropagation();viewDailyReports(\''+q.id+'\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit">📋 日報'+(drN?('（'+drN+'）'):'')+'</button> '
+      extra:'<button type="button" onclick="event.stopPropagation();viewDailyReports(\''+q.id+'\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 日報'+(drN?('（'+drN+'）'):'')+'</button> '
         +'<button type="button" onclick="event.stopPropagation();openProjectCosts(\''+q.id+'\')" style="border:1px solid #ffcc80;background:#fff8ec;color:#e65100;border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本</button> '
         +'<button type="button" onclick="event.stopPropagation();projUpload(\'confirm\',\''+q.id+'\')" style="border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 上傳確認單</button>'
         +(cfChips?' '+cfChips:''),
@@ -14137,7 +14142,7 @@ function renderProjects(){
     }catch(e){}
     const rentBox=rentOver.length
       ? '<div style="width:100%;font-size:11.5px;color:#b26a00;background:#fff8ec;border:1px solid #ffd699;border-radius:var(--r6);padding:6px 9px;margin-top:2px">'
-        +'<b>⏱ 逾期租金可請款：'+rentOver.length+' 項・合計 NT$ '+fmt(rentAmt)+'（未稅）</b>'
+        +'<b><svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> 逾期租金可請款：'+rentOver.length+' 項・合計 NT$ '+fmt(rentAmt)+'（未稅）</b>'
         +'<div style="font-size:10.5px;color:var(--b4);margin-top:2px">'
         +rentOver.slice(0,3).map(s=>esc(String(s.desc).slice(0,14))+' 逾期 '+s.overDays+' 天'+(s.otPrice>0?'（NT$ '+fmt(s.amount)+'）':'（未填逾期單價）')).join('　·　')
         +(rentOver.length>3?'　…等 '+rentOver.length+' 項':'')
@@ -14149,7 +14154,7 @@ function renderProjects(){
       extra:periodChips+rentBox,jump:"go('invoice')"});
     steps.push({label:'廠商請款（應付）',done:payTotal>0&&payPaid>=payTotal,
       info:projPays.length?('應付 '+projPays.length+' 筆・NT$ '+fmt(payTotal)+'／已付 NT$ '+fmt(payPaid)
-        +(payOverAR?'　<span style="color:#c62828;font-weight:800">⚠ 應付累計已超過應收請款（'+fmt(payTotal)+' > '+fmt(billedInclRet)+'，均含稅），請核對下包請款數量</span>':'')):'尚無應付帳款（登錄施工成本後自動連動）',
+        +(payOverAR?'　<span style="color:#c62828;font-weight:800"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 應付累計已超過應收請款（'+fmt(payTotal)+' > '+fmt(billedInclRet)+'，均含稅），請核對下包請款數量</span>':'')):'尚無應付帳款（登錄施工成本後自動連動）',
       bar:payTotal>0?{pct:payPaid/payTotal*100,warn:payOverAR,label:'付款進度（已付/應付）'}:null,
       jump:"go('finance');setTimeout(function(){switchFinanceTab('payable')},150)"});
     const arLeft=invs.reduce((a,x)=>a+_invAR(x),0);
@@ -14247,16 +14252,16 @@ function _payUpload(pid,kind){
             if(r.number){pp.invNo=r.number;pp._mt=Date.now();msg.push('發票號 '+r.number);}
             if(r.amount){
               var diff=Math.abs(r.amount-_payEff(pp));
-              msg.push('金額 '+fmt(r.amount)+(diff<=Math.max(2,_payEff(pp)*0.01)?'（與應付相符 ✓）':'（⚠ 與應付 '+fmt(_payEff(pp))+' 不符，請核對）'));
+              msg.push('金額 '+fmt(r.amount)+(diff<=Math.max(2,_payEff(pp)*0.01)?'（與應付相符 ✓）':'（<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 與應付 '+fmt(_payEff(pp))+' 不符，請核對）'));
             }
             try{savePayables();}catch(e){}
             try{renderPayables();}catch(e){}
-            toast('🤖 '+(msg.join('；')||'辨識完成，未取得欄位'));
+            toast(''+(msg.join('；')||'辨識完成，未取得欄位'));
           });
         });
       }
       if(_fbUser&&_fbStorage){
-        if(f.size>20*1024*1024){toast('⚠ 檔案過大（上限 20MB）');return;}
+        if(f.size>20*1024*1024){toast('檔案過大（上限 20MB）');return;}
         var safe=(f.name||'file').replace(/[^\w.\-\u4e00-\u9fff（）()]/g,'_');
         var path='fydata/payfiles/'+pid2+'/'+Date.now()+'_'+safe;
         toast('雲端上傳中…');
@@ -14266,15 +14271,15 @@ function _payUpload(pid,kind){
             var rd2=new FileReader();
             rd2.onload=function(){_payAttach(pid2,f.name,rd2.result,null,kind2);};
             rd2.readAsDataURL(f);
-            toast('⚠ 雲端失敗，改內嵌儲存');
-          }else{toast('❌ 雲端上傳失敗且超過內嵌上限');}
+            toast('雲端失敗，改內嵌儲存');
+          }else{toast('雲端上傳失敗且超過內嵌上限');}
         },function(){
           task.snapshot.ref.getDownloadURL().then(function(url){_payAttach(pid2,f.name,url,path,kind2);})
-            .catch(function(){toast('❌ 取得下載連結失敗');});
+            .catch(function(){toast('取得下載連結失敗');});
         });
         return;
       }
-      if(f.size>1500000){toast('⚠ 未登入：內嵌上限 1.5MB');return;}
+      if(f.size>1500000){toast('未登入：內嵌上限 1.5MB');return;}
       var rd=new FileReader();
       rd.onload=function(){_payAttach(pid2,f.name,rd.result,null,kind2);};
       rd.readAsDataURL(f);
@@ -14289,7 +14294,7 @@ function _payAttach(pid,name,urlOrData,path,kind){
   p.files.push({name:name,url:urlOrData,path:path||'',ts:Date.now(),kind:kind||'inv'});p._mt=Date.now();
   try{savePayables();}catch(e){}
   try{renderPayables();}catch(e){}
-  toast('✅ 單據已附加：'+name);
+  toast('單據已附加：'+name);
 }
 // ── 通用檔案預覽：圖片直接看、PDF 內嵌、其他類型提供下載 ──
 function _viewFile(name,url){
@@ -14360,9 +14365,9 @@ function _fileToDataUrl(file,maxW){
   });
 }
 async function aiScanDoc(dataUrl,hint){
-  if(!_aiKey()){toast('⚠ 尚未設定智慧辨識 API Key（參數設定 → 智慧辨識，僅存本機）');return null;}
-  if(!/^data:image\//.test(dataUrl)){toast('⚠ 智慧辨識僅支援照片（PDF 請改拍照）');return null;}
-  toast('🤖 辨識中…');
+  if(!_aiKey()){toast('尚未設定智慧辨識 API Key（參數設定 → 智慧辨識，僅存本機）');return null;}
+  if(!/^data:image\//.test(dataUrl)){toast('智慧辨識僅支援照片（PDF 請改拍照）');return null;}
+  toast('辨識中…');
   try{
     var b64=dataUrl.split(',')[1];var mt=dataUrl.match(/^data:([^;]+)/)[1];
     var r=await fetch('https://api.anthropic.com/v1/messages',{
@@ -14373,10 +14378,10 @@ async function aiScanDoc(dataUrl,hint){
         {type:'text',text:'這是台灣營建業的'+(hint||'單據')+'照片。擷取欄位。回覆第一個字元必須是 { 、最後一個字元必須是 } ，禁止任何說明文字或圍欄。JSON 格式：{"docType":"invoice|transfer|receipt|other","number":"發票字軌號碼如AB12345678（無則空字串）","date":"YYYY-MM-DD（民國年請轉西元）","seller":"開立方/賣方名稱","buyerTaxId":"買受人統編（無則空）","amount":含稅總金額數字,"tax":營業稅額數字（未載明則以總額/21推算取整）,"note":"品名摘要或匯款帳號末五碼等關鍵資訊（20字內）"}'}]}]})
     });
     var d=await r.json();
-    if(d.error){toast('❌ 辨識失敗：'+(d.error.message||'').slice(0,60));return null;}
+    if(d.error){toast('辨識失敗：'+(d.error.message||'').slice(0,60));return null;}
     var txt=(d.content||[]).map(function(b){return b.text||'';}).join('');
     return _aiJson(txt);
-  }catch(e){toast('❌ 辨識失敗：'+(e.message||'').slice(0,50));return null;}
+  }catch(e){toast('辨識失敗：'+(e.message||'').slice(0,50));return null;}
 }
 function _payFilesRow(p){
   var fs=p.files||[];
@@ -14607,7 +14612,7 @@ function updateFinanceKPIs(){
     <div class="kpi" style="flex:1;min-width:130px">
       <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 本月實收</div>
       <div class="kv" style="font-size:16px">NT$ ${fmt(monthlyRecv)}</div>
-      <div class="ks">${ticketPending>0?`待兌現票 NT$ ${fmt(ticketPending)}`:netCF>=0?'資金正向':'⚠ 資金缺口'}</div>
+      <div class="ks">${ticketPending>0?`待兌現票 NT$ ${fmt(ticketPending)}`:netCF>=0?'資金正向':'<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 資金缺口'}</div>
     </div>`;
 }
 
@@ -14706,9 +14711,9 @@ function renderCashForecast(){
   var pts=bal.map(function(v,d){return X(d).toFixed(1)+','+Y(v).toFixed(1);}).join(' ');
   var danger=minV<0,tight=!danger&&mFixed>0&&minV<mFixed;
   var banner=danger
-    ?'<div style="background:#fdecea;border:1px solid #f5b5ae;color:var(--red);border-radius:var(--r8);padding:9px 14px;font-size:13px;font-weight:800;margin-bottom:10px">🚨 資金缺口警告：預計 '+minLabel+' 現金水位 −NT$ '+fmt(Math.abs(Math.round(minV)))+'，請提前調度資金或加速催收</div>'
+    ?'<div style="background:#fdecea;border:1px solid #f5b5ae;color:var(--red);border-radius:var(--r8);padding:9px 14px;font-size:13px;font-weight:800;margin-bottom:10px"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 資金缺口警告：預計 '+minLabel+' 現金水位 −NT$ '+fmt(Math.abs(Math.round(minV)))+'，請提前調度資金或加速催收</div>'
     :(tight
-      ?'<div style="background:#fff8ec;border:1px solid #ffd699;color:#b26a00;border-radius:var(--r8);padding:9px 14px;font-size:13px;font-weight:800;margin-bottom:10px">⚠ 水位偏緊：'+minLabel+' 最低 NT$ '+fmt(Math.round(minV))+'（不足一個月固定成本 '+fmt(mFixed)+'）</div>'
+      ?'<div style="background:#fff8ec;border:1px solid #ffd699;color:#b26a00;border-radius:var(--r8);padding:9px 14px;font-size:13px;font-weight:800;margin-bottom:10px"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 水位偏緊：'+minLabel+' 最低 NT$ '+fmt(Math.round(minV))+'（不足一個月固定成本 '+fmt(mFixed)+'）</div>'
       :'<div style="background:#E8F5E9;border:1px solid #A5D6A7;color:#1B5E20;border-radius:var(--r8);padding:9px 14px;font-size:13px;font-weight:800;margin-bottom:10px">✓ 未來 90 天現金無虞：最低水位 NT$ '+fmt(Math.round(minV))+'（'+minLabel+'）</div>');
   var evRows=events.filter(function(e){return e.day>=0&&e.day<=90;}).sort(function(a,b){return a.day-b.day;}).slice(0,12).map(function(e){
     var dt=new Date(t0+e.day*864e5);
@@ -15055,7 +15060,7 @@ function renderShareProfit(numOnly){
   +'現金上限＝金流頁的<b>可動用資金（已扣應付）</b> − <b>營運週轉保留金</b> ＋ 本年度已領。'
   +(_opReserve()>0
     ?('保留金＝'+_opReserveWhy()+' ＝ <b>'+fmt(_opReserve())+'</b>（薪資、租金、機具貸款每月照付，這筆錢不能分掉）。')
-    :('<b style="color:#c62828">⚠ 目前營運保留金為 0，等於沒有保留公司週轉金。</b>'
+    :('<b style="color:#c62828"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 目前營運保留金為 0，等於沒有保留公司週轉金。</b>'
       +'請到參數設定填「公司固定成本明細」（月薪資／租金／機具貸款…），或直接填「營運保留金（直接指定）」。'))
   +'超過上限的提領＝動用下一年的營運資金。</div>'
   // v5.322：四個欄位改為同一列緊湊磚塊；前三項系統試算唯讀，機具自付款手動輸入
@@ -15118,7 +15123,7 @@ function _shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,limitedBy,apPe
         +'</div>'):'')
     +'</div>'
   +perCards
-  +'<div class="kpi" style="flex:1;min-width:120px"><div class="kl">剩餘可領（合計）</div><div class="kv" style="font-size:17px;color:'+remClr+'">NT$ '+fmt(remain)+'</div>'+(remain<0?'<div class="ks" style="color:#c62828">⚠ 已超領，動用到營運資金</div>':'')+'</div>'
+  +'<div class="kpi" style="flex:1;min-width:120px"><div class="kl">剩餘可領（合計）</div><div class="kv" style="font-size:17px;color:'+remClr+'">NT$ '+fmt(remain)+'</div>'+(remain<0?'<div class="ks" style="color:#c62828"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 已超領，動用到營運資金</div>':'')+'</div>'
   +'</div>'
   +'<div style="background:var(--b1);border-radius:8px;height:14px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(remain<0?'#c62828':'linear-gradient(90deg,var(--g),var(--g3))')+';border-radius:8px"></div></div>'
   +'<div style="font-size:10.5px;color:var(--b3);text-align:right;margin-top:3px">已領 '+pct+'%</div>'
@@ -15132,7 +15137,7 @@ function exportFinanceCSV(){
   const rows=PAYABLES.map(p=>[p.to||'',p.amount||0,p.date||'',catMap[p.category]||'',
     p.project||'',p.status==='paid'?'已付款':'待付款',p.note||'']);
   downloadCSV('應付帳款_'+fmtDateStr(),headers,rows);
-  toast('✅ 財務記錄已匯出');
+  toast('財務記錄已匯出');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -15173,7 +15178,7 @@ function ledgerExportCsv(){
   var a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download='進銷項_'+m+'.csv';a.click();
-  toast('✅ 已匯出 '+(rows.length-1)+' 筆');
+  toast('已匯出 '+(rows.length-1)+' 筆');
 }
 function renderLedger(){
   var mEl=document.getElementById('ledger-month');
@@ -15204,10 +15209,10 @@ function renderLedger(){
   document.getElementById('ledger-out').innerHTML=outs.length?outs.map(function(r){
     return row('<b>'+esc(r.number||'（未填號碼）')+'</b>　'+esc(r.client||'')+'<div style="font-size:10.5px;color:var(--b3)">'+esc(r.date||'')+'</div>',
       'NT$ '+fmt(r.amount||0)+'<div style="font-size:10.5px;color:var(--b3)">稅 '+fmt(r.taxAmt||0)+'</div>');
-  }).join(''):(function(){var tot=(INVOICE_RECS||[]).filter(function(r){return r.status!=='cancelled';}).length;return '<div style="color:var(--b3);font-size:12px;padding:8px 0">本月（'+m+'）無銷項發票'+(tot?'——其他月份共 '+tot+' 張，請切換月份':'（於應收卡 🧾 開立）')+'</div>';})();
+  }).join(''):(function(){var tot=(INVOICE_RECS||[]).filter(function(r){return r.status!=='cancelled';}).length;return '<div style="color:var(--b3);font-size:12px;padding:8px 0">本月（'+m+'）無銷項發票'+(tot?'——其他月份共 '+tot+' 張，請切換月份':'（於應收卡 <svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 開立）')+'</div>';})();
   document.getElementById('ledger-in-vendor').innerHTML=vins.length?vins.map(function(p2){
     return '<div onclick="ledgerRegInvNo(\''+p2.id+'\')" title="點擊登錄／修改發票號碼" style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--b1);font-size:12.5px;cursor:pointer">'
-      +'<div style="min-width:0;flex:1"><b>'+esc(p2.to||'')+'</b>　'+(p2.invNo?'🧾 '+esc(p2.invNo):'<span style="color:var(--red);font-size:11px;text-decoration:underline dotted">⚠ 未登錄發票號（點擊登錄）</span>')+((p2.files&&p2.files.length)?' <span style="font-size:10.5px;color:var(--g3)">📎'+p2.files.length+'</span>':'')+'<div style="font-size:10.5px;color:var(--b3)">'+esc(p2.project||'')+'</div></div>'
+      +'<div style="min-width:0;flex:1"><b>'+esc(p2.to||'')+'</b>　'+(p2.invNo?'<svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> '+esc(p2.invNo):'<span style="color:var(--red);font-size:11px;text-decoration:underline dotted"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 未登錄發票號（點擊登錄）</span>')+((p2.files&&p2.files.length)?' <span style="font-size:10.5px;color:var(--g3)"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg>'+p2.files.length+'</span>':'')+'<div style="font-size:10.5px;color:var(--b3)">'+esc(p2.project||'')+'</div></div>'
       +'<div style="text-align:right;white-space:nowrap">NT$ '+fmt(_payEff(p2))+'<div style="font-size:10.5px;color:var(--b3)">稅 '+fmt(_payVatAmt(p2))+'</div></div>'
       +'</div>';
   }).join(''):'<div style="color:var(--b3);font-size:12px;padding:8px 0">本月無廠商進項</div>';
@@ -15221,11 +15226,11 @@ function renderLedger(){
 function ledgerRegInvNo(pid){
   var p=PAYABLES.find(function(x){return x.id===pid;});if(!p)return;
   var _fN=(p.files||[]).length;
-  showConfirm('🧾 登錄廠商發票號',
+  showConfirm('登錄廠商發票號',
     '<div style="font-size:12.5px;color:var(--b4);margin-bottom:10px"><b>'+esc(p.to||'')+'</b>　'+esc(p.project||'')+'<br>金額 NT$ '+fmt(_payEff(p))+'　稅 '+fmt(_payVatAmt(p))+'</div>'
     +'<div class="f"><label>發票號碼</label><input id="lg-invno" value="'+esc(p.invNo||'')+'" placeholder="AB12345678" maxlength="10" style="text-transform:uppercase;font-size:15px;font-weight:700;letter-spacing:1px"></div>'
     +'<div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-    +'<button type="button" class="btn btn-xs" onclick="document.getElementById(\'gen-confirm-cancel\').click();_payUpload(\''+pid+'\',\'inv\')" style="padding:7px 14px;border-color:var(--gm);color:var(--g3)">📎 上傳發票檔（照片／PDF）</button>'
+    +'<button type="button" class="btn btn-xs" onclick="document.getElementById(\'gen-confirm-cancel\').click();_payUpload(\''+pid+'\',\'inv\')" style="padding:7px 14px;border-color:var(--gm);color:var(--g3)"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 上傳發票檔（照片／PDF）</button>'
     +'<span style="font-size:11px;color:'+(_fN?'var(--g3)':'var(--b3)')+'">'+(_fN?('已保存 '+_fN+' 個附件（於應付管理可查看）'):'尚無附件')+'</span>'
     +'</div>'
     +'<div style="font-size:11px;color:var(--b3);margin-top:8px">提示：也可用「智慧收件」拍發票照片，AI 自動登錄號碼並歸檔到此筆應付。</div>',
@@ -15234,7 +15239,7 @@ function ledgerRegInvNo(pid){
       p.invNo=v;p.updatedAt=Date.now();p._mt=Date.now();
       savePayables();
       try{renderLedger();}catch(e){}
-      toast(v?('🧾 已登錄發票號 '+v):'已清除發票號');
+      toast(v?('<svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 已登錄發票號 '+v):'已清除發票號');
     },false,null,true);
   setTimeout(function(){var e=document.getElementById('lg-invno');if(e)e.focus();},120);
 }
@@ -15253,7 +15258,7 @@ function _expForm(pre){
         date:gv('ex-date'),amount:parseFloat(gv('ex-amount'))||0,tax:parseFloat(gv('ex-tax'))||0,note:gv('ex-note'),ts:Date.now()});
       var _eid=EXPENSES[EXPENSES.length-1].id;
       _ikLog({label:'費用發票登錄',detail:(gv('ex-seller')||'')+'／'+(gv('ex-number')||''),undo:{kind:'expense',eid:_eid}});
-      saveExpenses();renderLedger();toast('✅ 已登錄費用發票');
+      saveExpenses();renderLedger();toast('已登錄費用發票');
     },false,null,true);
 }
 function expManual(){_expForm();}
@@ -15286,7 +15291,7 @@ function expScan(){
 var _INTAKE_TYPES={work_confirm:'工作確認單（帶入估驗）',vendor_quote:'廠商報價單（建立成本）',vendor_invoice:'廠商發票（應付登錄）',own_material:'自有成本（材料採購發票）',transfer:'匯款紀錄（應付核實）',owner_invoice:'開給業主的發票',expense:'日常費用發票',other:'其他（手動處理）'};
 function _nrm(x){return String(x||'').replace(/[\s()（）\-－_／/]/g,'').toLowerCase();}
 function smartIntake(){
-  if(!_aiKey()){toast('⚠ 請先於參數設定填入智慧辨識 API Key（僅存本機）');return;}
+  if(!_aiKey()){toast('請先於參數設定填入智慧辨識 API Key（僅存本機）');return;}
   var inp=document.getElementById('intake-input');
   if(!inp){
     inp=document.createElement('input');
@@ -15300,8 +15305,8 @@ function smartIntake(){
   inp.click();
 }
 async function aiClassifyDoc(du){
-  if(!/^data:image\//.test(du)){toast('⚠ 僅支援照片');return;}
-  toast('🤖 辨識與分類中…');
+  if(!/^data:image\//.test(du)){toast('僅支援照片');return;}
+  toast('辨識與分類中…');
   var projs=Q.filter(function(q){return q.awarded&&!q.closed;}).slice(0,15).map(function(q){return {id:q.id,name:q.name};});
   var vendors=(typeof VENDORS!=='undefined'?VENDORS:[]).slice(0,20).map(function(v){return v.name||v;});
   var ctx='進行中專案：'+JSON.stringify(projs)+'；常用廠商：'+JSON.stringify(vendors);
@@ -15315,10 +15320,10 @@ async function aiClassifyDoc(du){
         {type:'text',text:'你是台灣營建公司「豐有工程」的文件分類員。'+ctx+'\n判斷這張照片的文件類型並擷取資料。類型定義：work_confirm=工地工作確認單/估驗單(業主或監造簽認數量)；vendor_quote=廠商給我們的報價單；vendor_invoice=工程承攬廠商的計價請款單或發票（有工程款/計價性質）；own_material=公司自購工程材料耗材的發票（鋼索、母索、止水鈑、五金、油壓配件、租金運費等，賣方為材料行/租賃商）；transfer=匯款/轉帳證明；owner_invoice=我們開給業主的統一發票(賣方為豐有)；expense=日常消費發票收據；other=無法判斷。\n回覆第一個字元必須是 { ，最後一個字元必須是 } ，禁止任何說明文字。JSON：{"docType":"上述其一","projectId":"從進行中專案清單比對出的id（無把握則空）","vendor":"對方名稱","items":[{"desc":"工項名","unit":"單位","qty":數量,"price":單價(無則0)}]（僅confirm/quote需要,最多12筆）,"number":"發票號碼","date":"YYYY-MM-DD","amount":總金額數字,"tax":稅額數字,"note":"關鍵摘要20字內","confidence":"high|low"}'}]}]})
     });
     var d=await r.json();
-    if(d.error){toast('❌ '+(d.error.message||'').slice(0,60));return;}
+    if(d.error){toast(''+(d.error.message||'').slice(0,60));return;}
     var res=_aiJson((d.content||[]).map(function(b){return b.text||'';}).join(''));
     _intakeConfirm(res,du);
-  }catch(e){toast('❌ 辨識失敗：'+(e.message||'').slice(0,50));}
+  }catch(e){toast('辨識失敗：'+(e.message||'').slice(0,50));}
 }
 function _intakeConfirm(r,du){
   var typeOpts=Object.keys(_INTAKE_TYPES).map(function(k){return '<option value="'+k+'" '+(r.docType===k?'selected':'')+'>'+_INTAKE_TYPES[k]+'</option>';}).join('');
@@ -15345,10 +15350,10 @@ function _intakeConfirm(r,du){
     }
     box.innerHTML=html2;
   };
-  showConfirm('📷 智慧收件確認',
+  showConfirm('智慧收件確認',
     '<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">'
     +'<img src="'+du+'" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--b2);flex-shrink:0;cursor:zoom-in" onclick="var w=window.open(\'\');w.document.write(\'<img src=&quot;\'+this.src+\'&quot; style=&quot;max-width:100%&quot;>\')">'
-    +'<div style="font-size:12px;color:var(--b4);line-height:1.6">AI 判讀（'+(r.confidence==='high'?'<span style="color:var(--g3);font-weight:700">信心高</span>':'<span style="color:#e65100;font-weight:700">⚠ 信心低，請逐欄確認</span>')+'）<br>'+esc(r.note||'')+'</div>'
+    +'<div style="font-size:12px;color:var(--b4);line-height:1.6">AI 判讀（'+(r.confidence==='high'?'<span style="color:var(--g3);font-weight:700">信心高</span>':'<span style="color:#e65100;font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 信心低，請逐欄確認</span>')+'）<br>'+esc(r.note||'')+'</div>'
     +'</div>'
     +'<div class="f"><label>文件類型</label><select id="ik-type" onchange="_ikRenderExtra()">'+typeOpts+'</select></div>'
     +'<div class="f"><label>歸屬專案</label><select id="ik-proj" onchange="_ikRenderExtra()">'+projOpts+'</select></div>'
@@ -15389,7 +15394,7 @@ function intakeHistory(){
         :(e.undo?'<button type="button" class="btn btn-xs" onclick="intakeUndo(\''+e.id+'\')" style="color:var(--red);border-color:#f0c4c4">撤銷</button>':''))
       +'</div>';
   }).join(''):'<div style="color:var(--b3);font-size:12px">尚無收件記錄</div>';
-  showConfirm('📷 智慧收件記錄（近20筆）',html,function(){},false,null,true);
+  showConfirm('智慧收件記錄（近20筆）',html,function(){},false,null,true);
 }
 function intakeUndo(id){
   var e=INTAKE_LOG.find(function(x){return x.id===id;});
@@ -15417,14 +15422,14 @@ function intakeUndo(id){
     }
     e.undone=true;
     localStorage.setItem('fy_intake_log',JSON.stringify(INTAKE_LOG));
-    toast('✅ 已撤銷');
+    toast('已撤銷');
     intakeHistory();
   }catch(err){toast('撤銷失敗：'+err.message);}
 }
 function _intakeRoute(type,qid,r,du){
   var today=localToday?localToday():new Date().toISOString().slice(0,10);
   if(type==='work_confirm'){
-    if(!qid){toast('⚠ 請選擇歸屬專案');return;}
+    if(!qid){toast('請選擇歸屬專案');return;}
     _projAttachFile(qid,'confirm','智慧收件_確認單_'+today+'.jpg',du);
     var q=Q.find(function(x){return x.id===qid;});
     var target=INV.filter(function(v){return v.project===q.name&&!v.receivedConfirmed;}).sort(function(a,b){return (b.periodNo||0)-(a.periodNo||0);})[0];
@@ -15438,16 +15443,16 @@ function _intakeRoute(type,qid,r,du){
           if(idx>=0){invItems[idx].curQty=_aiNum(it.qty);try{updateInvRowAmt(idx);}catch(e){}filled++;}
         });
         try{rInvTots();}catch(e){}
-        toast('✅ 確認單已歸檔；第'+(target.periodNo||'?')+'期已帶入 '+filled+' 項數量，請核對後儲存');
+        toast('確認單已歸檔；第'+(target.periodNo||'?')+'期已帶入 '+filled+' 項數量，請核對後儲存');
       },700);
     }else{
       _ikLog({label:'工作確認單 → 專案歸檔',detail:(Q.find(function(x){return x.id===qid;})||{}).name||''});
-      toast('✅ 確認單已歸檔至專案（未偵測到可帶入的估驗數量）');
+      toast('確認單已歸檔至專案（未偵測到可帶入的估驗數量）');
     }
     return;
   }
   if(type==='vendor_quote'){
-    if(!qid){toast('⚠ 請選擇歸屬專案');return;}
+    if(!qid){toast('請選擇歸屬專案');return;}
     var q2=Q.find(function(x){return x.id===qid;});if(!q2)return;
     if(!q2.costs)q2.costs=[];
     var cid=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
@@ -15461,12 +15466,12 @@ function _intakeRoute(type,qid,r,du){
     try{syncCostToPayable(q2,cc);}catch(e){} // 強連動：智慧收件建立成本即同步應付
     try{persist();_immediateUpload();}catch(e){}
     _ikLog({label:'廠商報價 → 成本',detail:q2.name+'／'+(r.vendor||'')+' NT$ '+fmt(cc.amt),undo:{kind:'cost',qid:qid,cid:cid}});
-    toast('✅ 已為「'+esc(q2.name)+'」建立成本：'+esc(r.vendor||'廠商')+' NT$ '+fmt(cc.amt));
+    toast('已為「'+esc(q2.name)+'」建立成本：'+esc(r.vendor||'廠商')+' NT$ '+fmt(cc.amt));
     try{openProjectCosts(qid);}catch(e){}
     return;
   }
   if(type==='own_material'){
-    if(!qid){toast('⚠ 請選擇歸屬專案');return;}
+    if(!qid){toast('請選擇歸屬專案');return;}
     var qm=Q.find(function(x){return x.id===qid;});if(!qm)return;
     if(!qm.costs)qm.costs=[];
     var itemIdx=parseInt(gv('ik-item'));if(isNaN(itemIdx))itemIdx=-1;
@@ -15493,7 +15498,7 @@ function _intakeRoute(type,qid,r,du){
     try{saveExpenses();}catch(e){}
     _ikLog({label:'材料發票 → 自有成本＋進項',detail:(qm.name||'')+'／'+(r.vendor||'')+' NT$ '+fmt(ccm.amt),
       undo:{kind:'owncost',qid:qid,cid:cidm,eid:eidm}});
-    toast('✅ 已登錄自有成本 NT$ '+fmt(ccm.amt)+'（未稅計）＋帳務進項'+(r.number?('，發票 '+r.number):''));
+    toast('已登錄自有成本 NT$ '+fmt(ccm.amt)+'（未稅計）＋帳務進項'+(r.number?('，發票 '+r.number):''));
     try{openProjectCosts(qid);}catch(e){}
     return;
   }
@@ -15509,7 +15514,7 @@ function _intakeRoute(type,qid,r,du){
     var hit=cands[0];
     if(!hit){
       if(type==='vendor_invoice'){toast('找不到匹配的應付款，轉為費用登錄');_expForm({seller:r.vendor,number:r.number,date:r.date,amount:r.amount,tax:r.tax,note:r.note});}
-      else toast('⚠ 找不到匹配的應付款，請至應付管理手動附加');
+      else toast('找不到匹配的應付款，請至應付管理手動附加');
       return;
     }
     var _prevInvNo=hit.invNo;
@@ -15519,9 +15524,9 @@ function _intakeRoute(type,qid,r,du){
     _ikLog({label:type==='transfer'?'匯款紀錄 → 應付':'廠商發票 → 應付',detail:(hit.to||'')+(r.number?('／'+r.number):''),undo:{kind:'payinv',pid:hit.id,prevInvNo:_prevInvNo,fileTs:(PAYABLES.find(function(x){return x.id===hit.id;}).files.slice(-1)[0]||{}).ts}});
     var diffMsg='';
     if(type==='vendor_invoice'&&r.amount){
-      diffMsg=Math.abs(r.amount-_payEff(hit))<=Math.max(2,_payEff(hit)*0.01)?'；金額相符 ✓':'；⚠ 金額與應付 '+fmt(_payEff(hit))+' 不符';
+      diffMsg=Math.abs(r.amount-_payEff(hit))<=Math.max(2,_payEff(hit)*0.01)?'；金額相符 ✓':'；<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 金額與應付 '+fmt(_payEff(hit))+' 不符';
     }
-    toast('✅ 已歸檔至應付：'+esc(hit.to||'')+(r.number?('，發票 '+r.number):'')+diffMsg);
+    toast('已歸檔至應付：'+esc(hit.to||'')+(r.number?('，發票 '+r.number):'')+diffMsg);
     try{go('finance');setTimeout(function(){switchFinanceTab('payable');},250);}catch(e){}
     return;
   }
@@ -15535,7 +15540,7 @@ function _intakeRoute(type,qid,r,du){
         if(r.date)document.getElementById('ir-date').value=r.date;
         if(r.amount)document.getElementById('ir-amount').value=r.amount;
         if(r.tax){var t=document.getElementById('ir-tax');t.value=r.tax;t.dataset.manual='1';}
-        toast('🤖 已帶入發票資料，請選擇關聯請款單後儲存');
+        toast('已帶入發票資料，請選擇關聯請款單後儲存');
       },300);
     },250);
     return;
@@ -15559,7 +15564,7 @@ function _einvScan(){
           if(r.date)document.getElementById('ir-date').value=r.date;
           if(r.amount){document.getElementById('ir-amount').value=r.amount;}
           if(r.tax){var t=document.getElementById('ir-tax');t.value=r.tax;t.dataset.manual='1';}
-          toast('🤖 已帶入：'+(r.number||'')+' '+(r.amount?('NT$ '+fmt(r.amount)):''));
+          toast('已帶入：'+(r.number||'')+' '+(r.amount?('NT$ '+fmt(r.amount)):''));
         });
       });
     };
@@ -15634,22 +15639,22 @@ function irPickFile(){
 function _irUpload(f){
   var nm=(f&&f.name)||'發票影像';
   var embed=function(){
-    if(f.size>1500000){toast('❌ 檔案超過內嵌上限 1.5MB，請壓縮後再試');return;}
+    if(f.size>1500000){toast('檔案超過內嵌上限 1.5MB，請壓縮後再試');return;}
     var rd=new FileReader();
     rd.onload=function(){_irSetFile(nm,'',rd.result);toast('已附上發票影像（內嵌）');};
     rd.readAsDataURL(f);
   };
   if(_fbUser&&_fbStorage){
-    if(f.size>20*1024*1024){toast('⚠ 檔案過大（雲端上限 20MB）');return;}
+    if(f.size>20*1024*1024){toast('檔案過大（雲端上限 20MB）');return;}
     var safe=nm.replace(/[^\w.\-一-鿿（）()]/g,'_');
     var path='fydata/einv/'+Date.now()+'_'+safe;
     toast('雲端上傳中…');
     var task=_fbStorage.ref(path).put(f);
     task.on('state_changed',null,function(err){
-      toast('⚠ 雲端上傳失敗（'+((err&&err.code)||'未知')+'），改用內嵌儲存');embed();
+      toast('雲端上傳失敗（'+((err&&err.code)||'未知')+'），改用內嵌儲存');embed();
     },function(){
       task.snapshot.ref.getDownloadURL().then(function(url){
-        _irSetFile(nm,url,'');toast('✅ 發票影像已上傳雲端');
+        _irSetFile(nm,url,'');toast('發票影像已上傳雲端');
       }).catch(function(){embed();});
     });
     return;
@@ -15668,7 +15673,7 @@ function saveInvoiceRecord(){
   if(idx>=0)INVOICE_RECS[idx]=ir;else INVOICE_RECS.unshift(ir);
   saveInvoiceRecs();
   logActivity('發票',(idx>=0?'修改':'新增')+'發票：'+ir.number);
-  closeInvoiceRecModal();renderInvoiceRecords();try{renderInvList();}catch(e){}try{renderFinanceAR();}catch(e){}toast('✅ 發票記錄已儲存');
+  closeInvoiceRecModal();renderInvoiceRecords();try{renderInvList();}catch(e){}try{renderFinanceAR();}catch(e){}toast('發票記錄已儲存');
   _onSave();
 }
 
@@ -15748,7 +15753,7 @@ function cleanupQHistory(){
   // 移除已不存在報價單的孤兒歷史
   Object.keys(Q_HISTORY).forEach(qid=>{if(!Q.find(q=>q.id===qid)){after-=(Q_HISTORY[qid]||[]).length;delete Q_HISTORY[qid];}});
   saveQHistory();
-  toast('🧹 版本歷史：'+before+' 版 → '+after+' 版');
+  toast('版本歷史：'+before+' 版 → '+after+' 版');
   renderStorageUsage();
 }
 
@@ -16381,7 +16386,7 @@ function exportCurrentReport(){
     });
     downloadCSV('月報表_'+year+'_'+fmtDateStr(),headers,rows);
   }
-  toast('✅ 報表已匯出');
+  toast('報表已匯出');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -16398,24 +16403,24 @@ function fbDownload(){
   _setFbLoading(true);
   _fbDb.ref('fydata/shared').once('value').then(function(snap){
     var data=snap.val();
-    if(!data||!data.quotes){_setFbLoading(false);toast('⚠️ 雲端尚無資料');return;}
+    if(!data||!data.quotes){_setFbLoading(false);toast('雲端尚無資料');return;}
     var uploader=data.uploadedBy||'未知';
     var upTime=data.uploadedAt?new Date(data.uploadedAt).toLocaleString('zh-TW'):'未知時間';
     _setFbLoading(false); // 讀取完成，先關 loading 等使用者確認
-    var dirtyWarn=_isDirty()?'<br><br>⚠ 注意：本機有<strong>尚未上傳</strong>的修改，下載將會覆蓋掉它們。':'';
+    var dirtyWarn=_isDirty()?'<br><br><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 注意：本機有<strong>尚未上傳</strong>的修改，下載將會覆蓋掉它們。':'';
     showConfirm('從雲端下載',
       '雲端資料由 <strong>'+uploader+'</strong> 上傳<br>時間：'+upTime+dirtyWarn+'<br><br>確定要覆蓋本機資料？',
       function(){
         _setFbLoading(true);
         try{
-          if(_applyCloudSnapshot(data, data.uploadedAt||Date.now(), '✅ 資料已從雲端下載（'+((data.invoices||[]).length)+'份請款單、'+((data.quotes||[]).length)+'份報價）！')){
+          if(_applyCloudSnapshot(data, data.uploadedAt||Date.now(), '<svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 資料已從雲端下載（'+((data.invoices||[]).length)+'份請款單、'+((data.quotes||[]).length)+'份報價）！')){
             logActivity('同步','從雲端下載資料');
           }
           _setFbLoading(false);
-        }catch(e){_setFbLoading(false);toast('❌ 載入資料時發生錯誤：'+e.message);}
+        }catch(e){_setFbLoading(false);toast('載入資料時發生錯誤：'+e.message);}
       }
     );
-  }).catch(function(err){_setFbLoading(false);toast('❌ 下載失敗：'+err.message);});
+  }).catch(function(err){_setFbLoading(false);toast('下載失敗：'+err.message);});
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -16508,7 +16513,7 @@ function checkNotifications(){
       const d=daysUntil(_expA.date);
       if(d===1) alerts.push({type:'warn',tag:'inv_recv_'+inv.id,jump:`loadInvoice('${inv.id}')`,msg:`${label} 預計明天收款（${inv.expectedRecvDate}），請確認款項入帳`});
       else if(d===0) alerts.push({type:'warn',tag:'inv_recv_'+inv.id,jump:`loadInvoice('${inv.id}')`,msg:`${label} 今天預計收款（${inv.expectedRecvDate}）NT$ ${fmt(unpaid)}`});
-      else if(d<0) alerts.push({type:'overdue',tag:'inv_overdue_'+inv.id,jump:`loadInvoice('${inv.id}')`,msg:`⚠ ${label} 逾期 ${-d} 天未收款（預計${inv.expectedRecvDate}）NT$ ${fmt(unpaid)}`});
+      else if(d<0) alerts.push({type:'overdue',tag:'inv_overdue_'+inv.id,jump:`loadInvoice('${inv.id}')`,msg:`<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> ${label} 逾期 ${-d} 天未收款（預計${inv.expectedRecvDate}）NT$ ${fmt(unpaid)}`});
     } else {
       // fallback：用 payDue + payMonthDelay + recvDay 推算
       const recvDay=parseInt(inv.recvDay)||parseInt(inv.payDue)||0;
@@ -16518,7 +16523,7 @@ function checkNotifications(){
       const dueDate=new Date(baseDate.getFullYear(),baseDate.getMonth()+payDelay,recvDay);
       const overDays=Math.floor((now-dueDate.getTime())/86400000);
       if(overDays>0&&overDays<1825){
-        alerts.push({type:'overdue',tag:'inv_overdue_'+inv.id,jump:`loadInvoice('${inv.id}')`,msg:`⚠ ${label} 逾期 ${overDays} 天未收款（NT$ ${fmt(unpaid)}）`});
+        alerts.push({type:'overdue',tag:'inv_overdue_'+inv.id,jump:`loadInvoice('${inv.id}')`,msg:`<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> ${label} 逾期 ${overDays} 天未收款（NT$ ${fmt(unpaid)}）`});
       }
     }
   });
@@ -16540,7 +16545,7 @@ function checkNotifications(){
     const d=daysUntil(p.date);
     if(d<0){
       const label=(p.to||'廠商')+(p.project?' / '+p.project:'');
-      alerts.push({type:'overdue',tag:'pay_overdue_'+p.id,jump:`go('finance');setTimeout(function(){window._payAging='overdue';switchFinanceTab('payable')},250)`,msg:`🔴 逾期 ${-d} 天未付款：${label} NT$ ${fmt(_payEff(p))}（預計${p.date}）`});
+      alerts.push({type:'overdue',tag:'pay_overdue_'+p.id,jump:`go('finance');setTimeout(function(){window._payAging='overdue';switchFinanceTab('payable')},250)`,msg:`<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 逾期 ${-d} 天未付款：${label} NT$ ${fmt(_payEff(p))}（預計${p.date}）`});
     }
   });
 
@@ -16592,7 +16597,7 @@ function recalcAllExpected(){
       try{saveInv();}catch(e){}
       try{renderInvList();}catch(e){}
       try{rDash();}catch(e){}
-      toast('✅ 已重算 '+n+' 筆收款日');
+      toast('已重算 '+n+' 筆收款日');
     },false,null,true);
 }
 // 一次性資料修復：v5.256 之前自動算出的「估驗當月收款日」不可能正確，開機自動重推
@@ -16621,7 +16626,7 @@ function _erdMigrate(){
         if(e){v._mt=Date.now();n++;}
       }
     });
-    if(n){try{saveInv();}catch(e){}console.log('[修復] 重算 '+n+' 筆預計收款日');try{toast('🔧 已依付款條件修正 '+n+' 筆預計收款日');}catch(e){}}
+    if(n){try{saveInv();}catch(e){}console.log('[修復] 重算 '+n+' 筆預計收款日');try{toast('已依付款條件修正 '+n+' 筆預計收款日');}catch(e){}}
     localStorage.setItem('fy_erd_fix1','1');
   }catch(e){}
 }
@@ -16702,7 +16707,7 @@ function requestPushPermission(){
   setTimeout(function(){
     Notification.requestPermission().then(function(perm){
       if(perm==='granted'){
-        toast('🔔 已開啟到期提醒通知！');
+        toast('已開啟到期提醒通知！');
         try{checkNotifications();}catch(e){}
       }
     });
@@ -16785,7 +16790,7 @@ function toggleRetentionReturn(invId, btn){
   btn.style.borderColor=inv.retentionReturned?'var(--g)':'var(--b2)';
   btn.style.background=inv.retentionReturned?'var(--gl)':'var(--w)';
   btn.style.color=inv.retentionReturned?'var(--g3)':'var(--b4)';
-  toast(inv.retentionReturned?('✅ 保留款已退還並入帳 NT$ '+fmt(_ret)):'已取消退還標記（入帳同步沖回）');
+  toast(inv.retentionReturned?('<svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 保留款已退還並入帳 NT$ '+fmt(_ret)):'已取消退還標記（入帳同步沖回）');
   try{updateInvStats();}catch(e){}
 }
 
@@ -16862,7 +16867,7 @@ function renderContactsAll(){
         <div class="qsb">${taxid?'統編：'+esc(taxid):''}${tel?' ／ '+esc(tel):''}${contact?' ／ '+esc(contact):''}</div>
       </div>
       <div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;justify-content:flex-end">
-        ${tel?`<a href="tel:${tel}" class="btn btn-xs" style="text-decoration:none">📞</a>`:''}
+        ${tel?`<a href="tel:${tel}" class="btn btn-xs" style="text-decoration:none"><svg class="ic ib" aria-hidden="true"><use href="#i-phone"/></svg></a>`:''}
         ${c?`<button type="button" class="btn btn-xs" onclick="editCustomerContact('${escq(r.name)}')" title="編輯客戶資料"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 客戶</button>`
            :`<button type="button" class="btn btn-xs" onclick="contactAddRole('${escq(r.name)}','cust')" style="border-style:dashed;color:var(--b4)" title="把這個廠商也建立為客戶">＋客戶身分</button>`}
         ${v?`<button type="button" class="btn btn-xs" onclick="editVendor('${escq(v.id)}')" title="編輯廠商資料"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 廠商</button>`
@@ -16876,10 +16881,10 @@ function contactAddRole(name,role){
   const v=VENDORS.find(x=>(x.name||'').trim()===name);
   if(role==='cust'&&!c){
     CUSTOMERS.unshift({id:'cu'+Date.now(),name:name,taxid:(v&&v.taxid)||'',tel:(v&&v.phone)||'',fax:'',contact:(v&&v.contact)||'',siteTel:'',companyContact:'',addr:(v&&v.addr)||'',note:'由廠商身分補建',_mt:Date.now()});
-    saveCustomers();toast('✅ 已補建客戶身分：'+name);
+    saveCustomers();toast('已補建客戶身分：'+name);
   }else if(role==='vend'&&!v){
     VENDORS.unshift({id:Date.now().toString(),name:name,type:'other',contact:(c&&c.contact)||'',phone:(c&&c.tel)||'',taxid:(c&&c.taxid)||'',email:'',addr:(c&&c.addr)||'',items:'',note:'由客戶身分補建',updatedAt:Date.now(),_mt:Date.now()});
-    saveVendors();toast('✅ 已補建廠商身分：'+name);
+    saveVendors();toast('已補建廠商身分：'+name);
   }
   renderContactsAll();try{updateCustomerStats();}catch(e){}
 }
@@ -16897,7 +16902,7 @@ function renderCustomersContact(){
         <div class="qsb">${c.taxid?'統編：'+esc(c.taxid):''}${c.tel?' ／ '+esc(c.tel):''}${c.contact?' ／ '+esc(c.contact):''}</div>
       </div>
       <div style="display:flex;gap:4px;margin-left:8px">
-        ${c.tel?`<a href="tel:${c.tel}" class="btn btn-xs" style="text-decoration:none">📞</a>`:''}
+        ${c.tel?`<a href="tel:${c.tel}" class="btn btn-xs" style="text-decoration:none"><svg class="ic ib" aria-hidden="true"><use href="#i-phone"/></svg></a>`:''}
         <button type="button" class="btn btn-xs" onclick="editCustomerContact('${escq(c.name)}')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg></button>
         <button type="button" class="btn btn-xs btn-r" onclick="delCustomerByName('${escq(c.name)}')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button>
       </div>
@@ -16925,7 +16930,7 @@ function renderVendors2(){
         <div class="qsb">${v.contact?esc(v.contact):''}${v.phone?' ／ '+esc(v.phone):''}${v.items?' ／ '+esc(v.items):''}${v.payTermCash!=null?' ／ <svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg>'+v.payTermCash+'%'+(v.payTermTicket?'+票'+v.payTermTicket+'天':''):''}</div>
       </div>
       <div style="display:flex;gap:4px;margin-left:8px">
-        ${v.phone?`<a href="tel:${v.phone}" class="btn btn-xs" style="text-decoration:none">📞</a>`:''}
+        ${v.phone?`<a href="tel:${v.phone}" class="btn btn-xs" style="text-decoration:none"><svg class="ic ib" aria-hidden="true"><use href="#i-phone"/></svg></a>`:''}
         <button type="button" class="btn btn-xs" onclick="editVendor('${v.id}')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg></button>
         <button type="button" class="btn btn-xs btn-r" onclick="delVendor('${v.id}')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button>
       </div>
@@ -16940,7 +16945,7 @@ function exportContactsCSV(){
   } else {
     exportVendorsCSV();
   }
-  toast('✅ 已匯出');
+  toast('已匯出');
 }
 
 function delCustomerByName(name){
@@ -17074,7 +17079,7 @@ function newInvFromContract(contractId){
     INV.unshift(autoInv);saveInv();
     loadInvoice(autoInv.id);
     go('invoice-edit');
-    toast('✅ 已從報價單建立第1期請款單，請填寫估驗資訊後儲存');
+    toast('已從報價單建立第1期請款單，請填寫估驗資訊後儲存');
   } else {
     // 無報價單 → 建立空白請款單
     const autoInv={
@@ -17506,7 +17511,7 @@ function togglePagePerm(pageId, allowed){
   else perms[pageId]=false;
   savePagePerms(perms);
   applyRoleUI();
-  toast(allowed?'✅ 已開放 '+pageId+' 頁面':'⛔ 已限制 '+pageId+' 頁面');
+  toast(allowed?'<svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 已開放 '+pageId+' 頁面':'<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 已限制 '+pageId+' 頁面');
 }
 
 // 更新 go() 的權限攔截以使用新的 canAccess
@@ -17592,7 +17597,7 @@ function renderFinanceAR(){
   if(!unpaid.length){
     el.innerHTML=srch
       ?'<div class="empty"><div class="empty-ic"><svg class="ic ib" aria-hidden="true"><use href="#i-search"/></svg></div><p>找不到符合「'+esc(srch)+'」的應收帳款</p></div>'
-      :'<div class="empty"><div class="empty-ic">✅</div><p>目前無應收帳款，所有款項已收齊</p></div>';
+      :'<div class="empty"><div class="empty-ic"><svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg></div><p>目前無應收帳款，所有款項已收齊</p></div>';
     return;
   }
   const byClient={};
@@ -17631,8 +17636,8 @@ function renderFinanceAR(){
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-size:13px;font-weight:700;color:${overdue?'var(--red)':'var(--b5)'}">NT$ ${fmt(unpaidAmt)}</div>
-          ${overdue?'<div style="font-size:10px;color:var(--red);font-weight:700">⚠ 逾期 '+odDays+' 天</div>':''}
-          ${_invEinvOf(inv.id)?'<div style="font-size:10px;color:#1a3a6b">🧾 已開票</div>':''}
+          ${overdue?'<div style="font-size:10px;color:var(--red);font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 逾期 '+odDays+' 天</div>':''}
+          ${_invEinvOf(inv.id)?'<div style="font-size:10px;color:#1a3a6b"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 已開票</div>':''}
           ${hasPmtTerms&&cashPct<100?`<div style="font-size:10px;color:var(--b4)">現金 NT$ ${fmt(Math.round(unpaidAmt*cashPct/100))}</div>`:''}
         </div>
         <button type="button" onclick="loadInvoice('${inv.id}');go('invoice-edit')" class="btn btn-xs" style="align-self:center"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯</button>
@@ -17663,7 +17668,7 @@ function initPermissionsPage(){
 // ══════════════════════════════════════════════════════════════
 function handleContractFileSelect(file){
   if(!file)return;
-  if(!_fbUser){toast('⚠️ 請先在「參數設定」登入 Firebase 帳號才能上傳附件（未登入僅支援 500KB 以下本機儲存）');return;}
+  if(!_fbUser){toast('請先在「參數設定」登入 Firebase 帳號才能上傳附件（未登入僅支援 500KB 以下本機儲存）');return;}
   if(!_fbStorage){toast('儲存服務未初始化，請重新整理');return;}
   uploadContractFile(file);
 }
@@ -17675,11 +17680,11 @@ function handleContractFileDrop(file){
 
 function uploadContractFile(file){
   const maxSize=10*1024*1024; // 10MB
-  if(file.size>maxSize){toast('❌ 檔案過大，限制 10MB');return;}
+  if(file.size>maxSize){toast('檔案過大，限制 10MB');return;}
 
   const ext=file.name.split('.').pop().toLowerCase();
   const allowed=['pdf','jpg','jpeg','png'];
-  if(!allowed.includes(ext)){toast('❌ 只支援 PDF、JPG、PNG 格式');return;}
+  if(!allowed.includes(ext)){toast('只支援 PDF、JPG、PNG 格式');return;}
 
   const progress=document.getElementById('c-upload-progress');
   const bar=document.getElementById('c-upload-bar');
@@ -17688,7 +17693,7 @@ function uploadContractFile(file){
   if(progress)progress.style.display='block';
 
   // Storage 未初始化（專案未開通）→ 直接用本機儲存
-  if(!_fbStorage){toast('⚠️ 雲端儲存未開通，改用本機儲存');_saveFileAsBase64(file);return;}
+  if(!_fbStorage){toast('雲端儲存未開通，改用本機儲存');_saveFileAsBase64(file);return;}
 
   // 上傳路徑：contracts/{userId}/{timestamp}_{filename}
   const path='contracts/'+_fbUser.uid+'/'+Date.now()+'_'+file.name;
@@ -17704,15 +17709,15 @@ function uploadContractFile(file){
     err=>{
       if(progress)progress.style.display='none';
       // Storage 未開通/權限不足/其他錯誤 → 一律 fallback 到 base64 本機儲存
-      toast('⚠️ 雲端儲存不可用（'+(err&&err.code?err.code:'未知')+'），改用本機儲存');
+      toast('雲端儲存不可用（'+(err&&err.code?err.code:'未知')+'），改用本機儲存');
       _saveFileAsBase64(file);
     },
     ()=>{
       task.snapshot.ref.getDownloadURL().then(url=>{
         document.getElementById('c-attachment').value=url;
         if(progress)progress.style.display='none';
-        if(label)label.innerHTML='✅ <strong>'+esc(file.name)+'</strong><br><a href="'+url+'" target="_blank" style="font-size:11px;color:#1a73e8">點擊預覽</a> &nbsp; <button type="button" onclick="clearContractFile()" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer">✕ 移除</button>';
-        toast('✅ 附件上傳成功！');
+        if(label)label.innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> <strong>'+esc(file.name)+'</strong><br><a href="'+url+'" target="_blank" style="font-size:11px;color:#1a73e8">點擊預覽</a> &nbsp; <button type="button" onclick="clearContractFile()" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer">✕ 移除</button>';
+        toast('附件上傳成功！');
       });
     }
   );
@@ -17720,14 +17725,14 @@ function uploadContractFile(file){
 
 // Fallback：base64 小檔案（< 500KB）
 function _saveFileAsBase64(file){
-  if(file.size>500*1024){toast('❌ 檔案過大，無法本機儲存（限 500KB）');return;}
+  if(file.size>500*1024){toast('檔案過大，無法本機儲存（限 500KB）');return;}
   const reader=new FileReader();
   reader.onload=e=>{
     const dataUrl=e.target.result;
     document.getElementById('c-attachment').value=dataUrl;
     const label=document.getElementById('c-attachment-label');
-    if(label)label.innerHTML='✅ <strong>'+esc(file.name)+'</strong>（本機儲存）<br><button type="button" onclick="clearContractFile()" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer">✕ 移除</button>';
-    toast('✅ 附件已儲存（本機）');
+    if(label)label.innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> <strong>'+esc(file.name)+'</strong>（本機儲存）<br><button type="button" onclick="clearContractFile()" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer">✕ 移除</button>';
+    toast('附件已儲存（本機）');
   };
   reader.readAsDataURL(file);
 }
@@ -17736,7 +17741,7 @@ function clearContractFile(){
   document.getElementById('c-attachment').value='';
   document.getElementById('c-file-input').value='';
   const label=document.getElementById('c-attachment-label');
-  if(label)label.innerHTML='📎 點擊或拖曳檔案上傳<br><span style="font-size:11px;color:var(--b3)">支援 PDF、圖片（需登入 Firebase）</span>';
+  if(label)label.innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 點擊或拖曳檔案上傳<br><span style="font-size:11px;color:var(--b3)">支援 PDF、圖片（需登入 Firebase）</span>';
 }
 
 // 開啟附件連結（合約列表）
@@ -17757,7 +17762,7 @@ function _restoreAttachmentDisplay(url, filename){
   if(!label||!url)return;
   const name=filename||'附件';
   const isBase64=url.startsWith('data:');
-  label.innerHTML='✅ <strong>'+esc(name)+'</strong><br>'+
+  label.innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> <strong>'+esc(name)+'</strong><br>'+
     '<button type="button" onclick="openAttachment(\''+url+'\')" style="font-size:11px;border:none;background:none;color:#1a73e8;cursor:pointer">點擊預覽</button>'+
     ' &nbsp; <button type="button" onclick="clearContractFile()" style="font-size:11px;border:none;background:none;color:var(--red);cursor:pointer">✕ 移除</button>';
 }
@@ -17989,11 +17994,11 @@ function _printNativeHTML(html,filename,fitPageHpx){
       try{f.contentWindow.onafterprint=function(){setTimeout(cleanup,300);};}catch(e){}
       f.contentWindow.focus();
       f.contentWindow.print();
-      toast('🖨️ 已開啟列印，可於對話框選「另存為 PDF」');
+      toast('已開啟列印，可於對話框選「另存為 PDF」');
       setTimeout(cleanup,120000); // 保險回收
     }catch(e){
       cleanup();
-      toast('❌ 此瀏覽器不支援原生列印，請改用「匯出PDF（正式版）」');
+      toast('此瀏覽器不支援原生列印，請改用「匯出PDF（正式版）」');
     }
   }
   // 等待內容/圖片就緒（logo、印章為 base64，極快）
@@ -18062,7 +18067,7 @@ function _printViaIframe(html,filename,landscape){
   setTimeout(function(){
     var jsPDFLib=window.jspdf&&(window.jspdf.jsPDF||window.jspdf);
     if(!window.html2canvas||!jsPDFLib){
-      actionBtn.textContent='\u274C 缺少 PDF 套件';actionBtn.disabled=false;toast('❌ PDF 套件未載入（網路或 CDN 問題）。請改用「🖨️ 列印 / 存PDF（新）」按鈕，該功能不需外部套件');return;
+      actionBtn.textContent='\u274C 缺少 PDF 套件';actionBtn.disabled=false;toast('PDF 套件未載入（網路或 CDN 問題）。請改用「 列印 / 存PDF（新）」按鈕，該功能不需外部套件');return;
     }
     html2canvas(inner,{
       scale:2,useCORS:true,allowTaint:true,backgroundColor:'#ffffff',
@@ -18380,7 +18385,7 @@ function rProfit(){
       <div class="kpi hi" style="grid-column:span 2">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
           <div>
-            <div class="kl">✅ 實際淨利（已收款案件）</div>
+            <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 實際淨利（已收款案件）</div>
             <div class="kv" style="font-size:20px;color:${totActualNet>=0?'var(--g3)':'var(--red)'}">NT$ ${fmt(totActualNet)}</div>
             <div class="ks">淨利率 ${totActualNetR.toFixed(1)}%（未稅對未稅）　${casesWithData} 件有成本資料${(P.overheadPct||0)>0?'　·　已攤提管理費 '+P.overheadPct+'%':''}</div>
             <div class="ks" style="font-size:10px;color:var(--b3)">權責制：收入以實收換算未稅、成本含未付應付</div>
@@ -18474,7 +18479,7 @@ function rProfit(){
           <th style="padding:6px 8px;text-align:right;color:var(--b4)">預估淨利</th>
           <th style="padding:6px 8px;text-align:right">已收款</th>
           <th style="padding:6px 8px;text-align:right;color:var(--red)">實際成本</th>
-          <th style="padding:6px 8px;text-align:right;font-weight:900">✅ 實際淨利</th>
+          <th style="padding:6px 8px;text-align:right;font-weight:900"><svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 實際淨利</th>
           <th style="padding:6px 8px;text-align:right">差異</th>
           <th style="padding:6px 8px;text-align:center">淨利率</th>
         </tr></thead>
@@ -18663,7 +18668,7 @@ function toggleQMenu(menuId,btn){
 function loadSealImage(input){
   if(!input.files||!input.files[0])return;
   const file=input.files[0];
-  if(file.size>500*1024){toast('❌ 印章圖片請小於 500KB');return;}
+  if(file.size>500*1024){toast('印章圖片請小於 500KB');return;}
   const reader=new FileReader();
   reader.onload=function(e){
     P.seal=e.target.result;
@@ -18672,7 +18677,7 @@ function loadSealImage(input){
     const clearBtn=document.getElementById('seal-clear-btn');
     if(prev){prev.src=P.seal;prev.style.display='block';}
     if(clearBtn)clearBtn.style.display='';
-    toast('✅ 印章已上傳');
+    toast('印章已上傳');
   };
   reader.readAsDataURL(file);
 }
@@ -18683,7 +18688,7 @@ function clearSeal(){
   if(prev){prev.src='';prev.style.display='none';}
   if(clearBtn)clearBtn.style.display='none';
   document.getElementById('seal-file').value='';
-  toast('✅ 印章已移除');
+  toast('印章已移除');
 }
 
 // ── 報價單預覽：使用正式 PDF 格式（與匯出PDF完全一致）──
@@ -18812,8 +18817,8 @@ function exportCurrentReportExcel(){
   const a=document.createElement('a');a.href=url;a.download=title+'.csv';
   document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},500);
-  toast('✅ Excel(CSV)已匯出：'+title);
-  toast('✅ Excel(CSV)已匯出：'+title);
+  toast('Excel(CSV)已匯出：'+title);
+  toast('Excel(CSV)已匯出：'+title);
 }
 </script>
 
@@ -18853,7 +18858,7 @@ function exportCurrentReportExcel(){
     </div>
     <div style="padding:12px 16px">
       <div style="font-size:11.5px;color:var(--b4);margin-bottom:10px;background:var(--yl);padding:7px 10px;border-radius:var(--r6);border:1px solid var(--ym)">
-        ⚠ 僅填入有金額的項目，未填寫欄位將<strong>不顯示於報價單備註</strong>中。
+        <svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 僅填入有金額的項目，未填寫欄位將<strong>不顯示於報價單備註</strong>中。
       </div>
 
       <div style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:5px">第8條：施工構台設計載重</div>
@@ -18904,7 +18909,7 @@ function exportCurrentReportExcel(){
 <div id="negotiate-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:12px;overflow-y:auto;align-items:flex-start;justify-content:center" onclick="if(event.target===this)this.style.display='none'">
   <div style="max-width:520px;width:100%;margin:20px auto;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="background:var(--g3);padding:13px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:2.5px solid var(--y)">
-      <span style="color:#fff;font-size:14px;font-weight:700">💰 議價</span>
+      <span style="color:#fff;font-size:14px;font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 議價</span>
       <button type="button" onclick="document.getElementById('negotiate-modal').style.display='none'" style="border:none;background:transparent;color:rgba(255,255,255,.75);font-size:20px;cursor:pointer;line-height:1;padding:0 4px">✕</button>
     </div>
     <div style="padding:14px 16px">
@@ -19049,13 +19054,13 @@ function exportCurrentReportExcel(){
 <div id="import-confirm-modal" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:16px">
   <div style="max-width:360px;width:100%;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35)">
     <div style="background:#c0392b;padding:13px 18px;display:flex;align-items:center;gap:8px">
-      <span style="color:#fff;font-size:16px">⚠</span>
+      <span style="color:#fff;font-size:16px"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg></span>
       <span style="color:#fff;font-size:14px;font-weight:700">確認匯入資料</span>
     </div>
     <div style="padding:16px 18px">
       <div id="import-confirm-msg" style="font-size:13px;color:var(--b5);margin-bottom:8px;line-height:1.6"></div>
       <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:var(--r8);padding:8px 12px;font-size:12px;color:#7c5700;margin-bottom:16px">
-        ⚠ 這將<strong>完全覆蓋</strong>目前的資料，此操作無法復原！
+        <svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 這將<strong>完全覆蓋</strong>目前的資料，此操作無法復原！
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button type="button" onclick="document.getElementById('import-confirm-modal').style.display='none'" style="padding:8px 18px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);color:var(--b4);cursor:pointer;font-size:13px">取消</button>
@@ -19124,7 +19129,7 @@ function exportCurrentReportExcel(){
           ondragleave="this.style.borderColor='var(--b2)'"
           ondrop="event.preventDefault();this.style.borderColor='var(--b2)';handleContractFileDrop(event.dataTransfer.files[0])">
           <div id="c-attachment-label" style="font-size:12px;color:var(--b4)">
-            📎 點擊或拖曳檔案上傳<br>
+            <svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 點擊或拖曳檔案上傳<br>
             <span style="font-size:11px;color:var(--b3)">支援 PDF、圖片（需登入 Firebase）</span>
           </div>
           <input type="file" id="c-file-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="handleContractFileSelect(this.files[0])">
@@ -19333,7 +19338,7 @@ function exportCurrentReportExcel(){
 <div id="receipt-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeReceiptModal()">
   <div style="max-width:420px;width:100%;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="background:var(--g3);padding:13px 18px;display:flex;justify-content:space-between;align-items:center">
-      <span style="color:#fff;font-size:14px;font-weight:700">✅ 確認收款</span>
+      <span style="color:#fff;font-size:14px;font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 確認收款</span>
       <button type="button" onclick="closeReceiptModal()" style="border:none;background:transparent;color:rgba(255,255,255,.75);font-size:20px;cursor:pointer;padding:0 4px">✕</button>
     </div>
     <div style="padding:16px 18px">
@@ -19413,7 +19418,7 @@ function exportCurrentReportExcel(){
       var act=document.querySelector('.page.active');
       var d=document.createElement('div');
       d.style.cssText='position:fixed;inset:0;z-index:99999;background:#fff;color:#22303f;font-family:sans-serif;padding:28px 20px;overflow:auto';
-      d.innerHTML='<div style="font-size:18px;font-weight:800;color:#0e3d22">⚠ 系統載入異常</div>'
+      d.innerHTML='<div style="font-size:18px;font-weight:800;color:#0e3d22"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 系統載入異常</div>'
         +'<div style="font-size:13px;margin:10px 0;color:#555">請把此畫面截圖回報。錯誤：</div>'
         +'<pre style="font-size:11px;background:#f5f5f5;padding:10px;border-radius:8px;white-space:pre-wrap">'
         +((window.__bootErrs.length?window.__bootErrs.slice(0,6).join('\n'):'（無 JS 錯誤——可能是快取或檔案不完整）')
@@ -19421,7 +19426,7 @@ function exportCurrentReportExcel(){
           +'\n版本: '+(typeof APP_VERSION!=='undefined'?APP_VERSION:'未知')
           +'\n主畫面: '+(act?act.id:'無')+' 內容長度: '+(act?(act.innerText||'').trim().length:0)).replace(/</g,'&lt;')
         +'</pre>'
-        +'<button onclick="try{if(navigator.serviceWorker)navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister()});caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k)}))}).then(function(){location.reload(true)})});else location.reload(true)}catch(e){location.reload(true)}" style="font-family:inherit;background:#0e3d22;color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:14px;font-weight:800">🔄 清除快取並重新載入</button>'
+        +'<button onclick="try{if(navigator.serviceWorker)navigator.serviceWorker.getRegistrations().then(function(rs){rs.forEach(function(r){r.unregister()});caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k)}))}).then(function(){location.reload(true)})});else location.reload(true)}catch(e){location.reload(true)}" style="font-family:inherit;background:#0e3d22;color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:14px;font-weight:800"><svg class="ic ib" aria-hidden="true"><use href="#i-refresh"/></svg> 清除快取並重新載入</button>'
         +'<button onclick="this.parentNode.remove()" style="font-family:inherit;background:#fff;border:1px solid #ccc;border-radius:10px;padding:12px 20px;font-size:14px;margin-left:10px">關閉</button>';
       document.body.appendChild(d);
     }catch(e){}
