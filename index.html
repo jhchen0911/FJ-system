@@ -2510,7 +2510,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.334';
+var APP_VERSION='v5.335';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -4841,6 +4841,9 @@ function toast(msg){
 
 // ════════════════════ INIT ════════════════════
 syncParamsUI();
+// v5.335 健檢F：開機（未登入）就套用權限隱藏。原本只在登入後呼叫，
+// 訪客的側欄看得到參數設定／單價分析等管理頁且點得進去。
+try{applyRoleUI();}catch(e){}
 window.addEventListener('resize',()=>{
   if(document.getElementById('page-editor').classList.contains('active'))rTots();
 });
@@ -8622,7 +8625,11 @@ function _syncAdminEmailsFromDepts(){
   var list=listStaff().filter(function(s){return s.active!==false&&isAdmin(s.email);})
     .map(function(s){return String(s.email||'').toLowerCase();})
     .concat(BOOTSTRAP_DEV).filter(function(e,i,a){return e&&a.indexOf(e)===i;});
-  saveAdminEmails(list);
+  // v5.335 健檢F：fy_admins 是由角色推導出來的快取（權限來源在 pagePerms.__roles），
+  // 直接寫本機即可。原本走 saveAdminEmails→_markDirty→_pushCloud，開機遷移一跑
+  // 就把全新裝置標成「有未上傳變更」，首次登入必跳假的衝突視窗。
+  try{_lsSet('fy_admins',JSON.stringify(list),'管理員');}catch(e){}
+  try{_syncAccessLists();}catch(e){}   // v5.335：名冊變更即上雲（僅管理員裝置會真的寫）
 }
 // ── 建立預設部門與角色；並把 v5.327 的三部門設定搬過來 ──
 function _migrateDepts(){
@@ -8631,12 +8638,12 @@ function _migrateDepts(){
     if(localStorage.getItem('fy_acct_mig1')==='1')return;
     var p=_acct();
     var userPages=ALL_PAGES.filter(function(x){return !x.sysOnly&&!x.hidden;}).map(function(x){return x.id;});
-    var mkDept=function(name){
-      var d=p.__depts2.find(function(x){return x.name===name;});
-      if(!d){d={id:_uid('d'),name:name};p.__depts2.push(d);}
+    var mkDept=function(fid,name){
+      var d=p.__depts2.find(function(x){return x.id===fid||x.name===name;});
+      if(!d){d={id:fid,name:name,_mt:Date.now()};p.__depts2.push(d);}
       return d;
     };
-    var dSys=mkDept('系統開發'),dAdm=mkDept('管理部'),dSite=mkDept('工務部');
+    var dSys=mkDept('d_sys','系統開發'),dAdm=mkDept('d_adm','管理部'),dSite=mkDept('d_site','工務部');
     var mkRole=function(id,name,dept,pages,cloud,sys){
       var r=p.__roles.find(function(x){return x.id===id;});
       if(!r){r={id:id};p.__roles.push(r);}
@@ -8650,8 +8657,14 @@ function _migrateDepts(){
     mkRole(SYS_ROLE_ID,'系統管理員',dSys.id,userPages,true,true);
     var rAdm=mkRole('r_admin','管理部',dAdm.id,userPages,true,false);
     var rSite=mkRole('r_site','工務部',dSite.id,['quickcost'],false,false);
-    // v5.327 的 __depts（email→dev/admin/site）轉成人員名冊
+    // v5.327 的 __depts（email→dev/admin/site）轉成人員名冊；
+    // v5.335 健檢F：補回 v5.326 以前的 fy_owners/fy_admins 中繼（原中繼已移除，
+    // 跳版升級的裝置會遺失舊管理員名單）
     var old=p.__depts||{};
+    try{(JSON.parse(localStorage.getItem('fy_owners')||'[]')||[]).forEach(function(e){
+      e=String(e||'').toLowerCase();if(e&&!old[e]&&BOOTSTRAP_DEV.indexOf(e)<0)old[e]='dev';});}catch(e){}
+    try{(JSON.parse(localStorage.getItem('fy_admins')||'[]')||[]).forEach(function(e){
+      e=String(e||'').toLowerCase();if(e&&!old[e]&&BOOTSTRAP_DEV.indexOf(e)<0)old[e]='admin';});}catch(e){}
     Object.keys(old).forEach(function(em){
       em=String(em||'').toLowerCase();if(!em)return;
       if(p.__staff.some(function(s){return String(s.email||'').toLowerCase()===em;}))return;
@@ -8685,6 +8698,7 @@ function initFirebase(){
     _fbUser = user;
     _updateFbUI(!!user);
     if(user) _autoSyncOnLogin();
+    else { _isOwnerUser=false;_isAdminUser=false;try{applyRoleUI();}catch(e){} }   // v5.335：登出即收回頁面
   });
 }
 function initGoogleSignIn(){
@@ -8867,18 +8881,19 @@ function _seedAdminUid(done){
   var fin=function(){if(done)done();};
   try{
     if(!_fbUser||!_fbDb||!isAdmin(_fbUser.email)){fin();return;}
-    var ref=_fbDb.ref('fydata/adminUids/'+_fbUser.uid);
-    ref.once('value').then(function(s){
-      if(s.val()===true){fin();return;}
-      ref.set(true).then(function(){
-        console.log('[權限] 已將本帳號登記為管理員（可讀寫 fydata/private）');
-        _privReadOk=null;   // 之前被拒過的要重試，否則整個工作階段都同步不到成本
-        fin();
-      }).catch(function(e){
-        console.warn('[權限] 管理員名冊寫入被拒（成本／分潤將僅存在本機）：',e&&e.message);
-        fin();
-      });
-    }).catch(function(){fin();});
+    // v5.335 健檢F：改以 email 名冊（fydata/access／adminEmails）為主——set 整包覆蓋，
+    // 移除人員／降級即時生效。adminUids 自我登記保留作舊規則過渡相容。
+    _syncAccessLists(function(){
+      _privReadOk=null;   // 名冊剛更新，被拒過的要重試
+      var ref=_fbDb.ref('fydata/adminUids/'+_fbUser.uid);
+      ref.once('value').then(function(s){
+        if(s.val()===true){fin();return;}
+        ref.set(true).then(function(){fin();}).catch(function(e){
+          console.warn('[權限] adminUids 登記被拒（新版規則已不使用，可忽略）：',e&&e.message);
+          fin();
+        });
+      }).catch(function(){fin();});
+    });
   }catch(e){fin();}
 }
 // 在權限管理頁新增管理員時，同步把對方的 uid 登記進名冊——
@@ -10169,7 +10184,17 @@ function _applyCloud(data){
     try{_applySensColls(data,data.tombs);}catch(e){console.error('[同步] 敏感集合合併失敗',e);}
     // 報價敏感欄位補回：雲端沒有就用本機值，只補空缺不覆蓋
     try{_regraftQuoteSens(_sensSnap);}catch(e){console.error('[同步] 成本欄位補回失敗',e);}
-    if(data.pagePerms){try{localStorage.setItem('fy_page_perms',JSON.stringify(data.pagePerms));}catch(e){}}
+    // v5.335 健檢F：pagePerms 改深合併。原本整包覆寫，兩台裝置各自新建的角色／人員
+    // （隨機 id）會互相蓋掉，被蓋掉那台的人員權限瞬間全失。
+    if(data.pagePerms){try{
+      var _locPP=getPagePerms(),_cldPP=data.pagePerms||{};
+      var _mrg=Object.assign({},_locPP,_cldPP);
+      _mrg.__matrix=Object.assign({},_locPP.__matrix||{},_cldPP.__matrix||{});
+      _mrg.__depts2=_mergeAcctList(_locPP.__depts2,_cldPP.__depts2,'acctDepts','name');
+      _mrg.__roles=_mergeAcctList(_locPP.__roles,_cldPP.__roles,'acctRoles',null);
+      _mrg.__staff=_mergeAcctList(_locPP.__staff,_cldPP.__staff,'acctStaff','email');
+      localStorage.setItem('fy_page_perms',JSON.stringify(_mrg));
+    }catch(e){try{localStorage.setItem('fy_page_perms',JSON.stringify(data.pagePerms));}catch(e2){}}}
     // v5.319：管理員清單改聯集合併（原本整包覆寫，A 加甲、B 加乙 → 後推者全贏，另一人的權限消失）
     if(data.admins){try{
       var _cd2=(Array.isArray(data.admins)?data.admins:Object.values(data.admins)).map(function(e){return String(e||'').toLowerCase();});
@@ -10208,8 +10233,11 @@ function _sensKeyOf(it,i){return (it&&it._uid)?String(it._uid):('#'+i);}
 function _stripQuoteSens(q){
   var c;try{c=JSON.parse(JSON.stringify(q));}catch(e){return q;}
   delete c.costs;
+  // v5.335 健檢F：referral（分潤約定）、matEst（材料估算含租金單價/運費）、
+  // exs（舊版額外支出）也是成本面資料，一併抽走
+  delete c.referral;delete c.matEst;delete c.exs;
   if(Array.isArray(c.items))c.items.forEach(function(it){if(it)delete it.estCost;});
-  if(c.t)_Q_SENS_T.forEach(function(k){delete c.t[k];});
+  if(c.t){_Q_SENS_T.forEach(function(k){delete c.t[k];});delete c.t.ext;}
   return c;
 }
 // 抽出敏感欄位（給 fydata/private 用）
@@ -10218,8 +10246,12 @@ function _extractQuoteSens(q){
   (q.items||[]).forEach(function(it,i){
     if(it&&it.estCost!=null&&it.estCost!=='')est[_sensKeyOf(it,i)]=it.estCost;
   });
-  var t={};if(q.t)_Q_SENS_T.forEach(function(k){if(q.t[k]!=null)t[k]=q.t[k];});
-  return {costs:Array.isArray(q.costs)?q.costs:[],est:est,t:t,_mt:q._mt||0};
+  var t={};if(q.t){_Q_SENS_T.forEach(function(k){if(q.t[k]!=null)t[k]=q.t[k];});if(q.t.ext!=null)t.ext=q.t.ext;}
+  var out={costs:Array.isArray(q.costs)?q.costs:[],est:est,t:t,_mt:q._mt||0};
+  if(q.referral)out.referral=q.referral;
+  if(q.matEst)out.matEst=q.matEst;
+  if(Array.isArray(q.exs)&&q.exs.length)out.exs=q.exs;
+  return out;
 }
 // 把敏感欄位貼回報價（fill=true 時只補空缺，不覆蓋既有值）
 function _applyQuoteSens(q,s,fill){
@@ -10239,10 +10271,21 @@ function _applyQuoteSens(q,s,fill){
     if(fill&&q.t[k]!=null)return;
     q.t[k]=s.t[k];
   });}
+  // v5.335：referral／matEst／exs 同步補回（fill 模式只補空缺）
+  if(s.referral&&(!fill||q.referral==null))q.referral=s.referral;
+  if(s.matEst&&(!fill||q.matEst==null))q.matEst=s.matEst;
+  if(Array.isArray(s.exs)&&s.exs.length&&(!fill||!Array.isArray(q.exs)||!q.exs.length))q.exs=s.exs;
 }
 function _applyQuoteSensAll(map){
   if(!map)return;
-  Q.forEach(function(q){if(q&&q.id&&map[q.id])_applyQuoteSens(q,map[q.id],false);});
+  // v5.335 健檢F：逐案比 _mt——本機較新（剛改完成本還沒推上去）就只補空缺，
+  // 不讓雲端的舊快照整包蓋掉；雲端較新才覆蓋。原本一律覆蓋，清掉的成本會復活。
+  Q.forEach(function(q){
+    if(!q||!q.id||!map[q.id])return;
+    var cloudMt=(map[q.id]&&map[q.id]._mt)||0;
+    var localNewer=(q._mt||0)>cloudMt;
+    _applyQuoteSens(q,map[q.id],localNewer);
+  });
   try{persist();}catch(e){}
 }
 // 合併前先拍下本機敏感欄位；shared 的報價已去敏感，合併後必須補回，
@@ -10255,6 +10298,31 @@ function _regraftQuoteSens(snap){
   Q.forEach(function(q){if(q&&q.id&&snap[q.id])_applyQuoteSens(q,snap[q.id],true);});
 }
 
+// v5.335 健檢F：部門／角色／人員的記錄級合併——id 對位、_mt 新者勝、尊重墓碑；
+// uniqField（name/email）用於兩台裝置各自 seed 出同名記錄時去重（保留 _mt 較新者）。
+function _mergeAcctList(loc,cld,tombKey,uniqField){
+  var arr=function(x){return Array.isArray(x)?x:(x&&typeof x==='object'?Object.values(x):[]);};
+  loc=arr(loc);cld=arr(cld);
+  var dead=(TOMBS&&TOMBS[tombKey])||{};
+  var map={};
+  var put=function(r){
+    if(!r||!r.id||dead[r.id]!=null)return;
+    var ex=map[r.id];
+    if(!ex||((r._mt||0)>=(ex._mt||0)))map[r.id]=r;
+  };
+  cld.forEach(put);loc.forEach(put);
+  var out=Object.values(map).sort(function(a,b){return (b._mt||0)-(a._mt||0);});
+  if(uniqField){
+    var seen={};
+    out=out.filter(function(r){
+      var k=String(r[uniqField]||'').toLowerCase();
+      if(!k)return true;
+      if(seen[k])return false;
+      seen[k]=1;return true;
+    });
+  }
+  return out;
+}
 function _applySensColls(data,tombs){
   if(!data)return;
   var _safeMerge=function(loc,cld,nm){try{return _mergeColl(loc,cld,nm,tombs);}catch(e){console.error('[同步] '+nm+' 合併失敗，改用雲端版',e);return Array.isArray(cld)?cld:(cld?Object.values(cld):loc);}};
@@ -10364,14 +10432,16 @@ function _mergeTombs(cloudTombs){
   });
   try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e){}
 }
-// ── fydata/private 的推拉（v5.324）──
+// ── fydata/private 的推拉（v5.324，v5.335 健檢F強化）──
 // 讀不到 private（非管理員或規則尚未發布）時：不寫、不清、不報錯——本機成本原樣保留。
 var _privReadOk=null;      // null=未知、true=可讀、false=被拒
+var _privFailAt=0;         // v5.335：被拒後冷卻 60 秒再試（原本一次失敗整個工作階段停擺）
 function _privRef(){return (_fbDb&&_fbUser)?_fbDb.ref('fydata/private'):null;}
 function _privHashKey(){return 'fy_priv_hash';}
 function _pushPrivate(cb){
   var ref=_privRef();
-  if(!ref||_privReadOk===false){if(cb)cb(false);return;}
+  if(!ref){if(cb)cb(false);return;}
+  if(_privReadOk===false&&Date.now()-_privFailAt<60000){if(cb)cb(false);return;}
   var clean,h;
   try{
     var pp=_privatePayload();
@@ -10380,16 +10450,34 @@ function _pushPrivate(cb){
       u:clean.upaCostDB,s:clean.shareProfit,m:clean.matLedger,d:clean.dealHist});
   }catch(e){if(cb)cb(false);return;}
   if(localStorage.getItem(_privHashKey())===h){if(cb)cb(true);return;}   // 無變更不空推
-  ref.update(clean).then(function(){
-    try{localStorage.setItem(_privHashKey(),h);}catch(e){}
-    _privReadOk=true;
-    _purgeLegacySensitive();     // 私有節點寫成功 → 才清 shared 上的舊敏感資料
-    if(cb)cb(true);
-  }).catch(function(err){
-    _privReadOk=false;
-    console.warn('[同步] 私有節點無寫入權限（成本／分潤僅保留在本機）：',err&&err.message);
-    if(cb)cb(false);
-  });
+  var doPush=function(){
+    var clean2,h2;
+    try{var pp2=_privatePayload();clean2=_cleanEnc(pp2.data);
+      h2=_collHash({q:clean2.quoteSens,p:clean2.payables,e:clean2.expenses,c:clean2.costHist,
+        u:clean2.upaCostDB,s:clean2.shareProfit,m:clean2.matLedger,d:clean2.dealHist});
+    }catch(e){if(cb)cb(false);return;}
+    ref.update(clean2).then(function(){
+      try{localStorage.setItem(_privHashKey(),h2);}catch(e){}
+      try{localStorage.setItem('fy_last_priv_sync',String(clean2.uploadedAt||Date.now()));}catch(e){}
+      _privReadOk=true;
+      _purgeLegacySensitive();     // 私有節點寫成功 → 才清 shared 上的舊敏感資料
+      if(cb)cb(true);
+    }).catch(function(err){
+      _privReadOk=false;_privFailAt=Date.now();
+      console.warn('[同步] 私有節點無寫入權限（成本／分潤僅保留在本機，60 秒後自動重試）：',err&&err.message);
+      if(cb)cb(false);
+    });
+  };
+  // v5.335：推送前先看雲端是否較新——另一位管理員剛改過成本時，先拉回合併再推，
+  // 否則本機的舊快照會整包蓋掉對方的新資料（quoteSens 是 per-quote 覆蓋）。
+  try{
+    _fbDb.ref('fydata/private/uploadedAt').once('value').then(function(sn){
+      var ct=parseInt(sn.val())||0;
+      var mine=parseInt(localStorage.getItem('fy_last_priv_sync')||'0');
+      if(ct>0&&ct>mine){_pullPrivate(function(){doPush();});}
+      else doPush();
+    }).catch(function(){doPush();});
+  }catch(e){doPush();}
 }
 function _pullPrivate(cb){
   var ref=_privRef();
@@ -10403,6 +10491,7 @@ function _pullPrivate(cb){
       try{_applySensColls(d,TOMBS);}catch(e){console.error('[同步] 私有節點套用失敗',e);}
       finally{if(!wasApplying)setTimeout(function(){window._applyingCloud=false;},500);}
     }
+    try{_pullRelayCosts();}catch(e){}
     if(cb)cb(true);
   }).catch(function(err){
     _privReadOk=false;
@@ -10413,14 +10502,106 @@ function _pullPrivate(cb){
 // 舊版把敏感資料寫在 fydata/shared，遷移成功後一次性清掉，否則拆節點等於沒拆
 function _purgeLegacySensitive(){
   try{
-    if(localStorage.getItem('fy_priv_purged')==='1')return;
+    // v5.335：原本一裝置只清一次；若還有裝置跑 v5.323 以前的版本，敏感資料會被
+    // 寫回 shared 且沒人再清。改為每天清一次，直到全部裝置升級為止。
+    if(localStorage.getItem('fy_priv_purged_d')===localToday())return;
     if(!_fbDb||!_fbUser)return;
     var nul={};_PRIV_COLLS.forEach(function(k){nul[k]=null;});
     _fbDb.ref('fydata/shared').update(nul).then(function(){
-      try{localStorage.setItem('fy_priv_purged','1');}catch(e){}
+      try{localStorage.setItem('fy_priv_purged_d',localToday());}catch(e){}
       console.log('[同步] 已將舊的敏感資料自 fydata/shared 移除');
     }).catch(function(e){console.warn('[同步] 舊敏感資料清除失敗',e&&e.message);});
   }catch(e){}
+}
+
+// ── 工務支出接力（v5.335 健檢F）──
+// 非管理員寫的施工成本（快速支出／點工）推不進 fydata/private、shared 又被去敏感，
+// 原本永遠困在工地人員的裝置上。改走 fydata/relay/costs 接力：
+// 非管理員上傳自己新增的成本 → 管理員裝置同步時收進 private → 刪除接力記錄。
+function _pushRelayCosts(){
+  try{
+    if(!_fbUser||!_fbDb)return;
+    if(isAdmin(_fbUser.email))return;            // 管理員直接走 private，不用接力
+    var sent={};try{sent=JSON.parse(localStorage.getItem('fy_relay_sent')||'{}');}catch(e){}
+    var ups={},n=0;
+    Q.forEach(function(q){
+      if(!q||!q.id)return;
+      (q.costs||[]).forEach(function(c){
+        if(!c||!c.id)return;
+        var k=q.id+'/'+c.id;
+        var h=_collHash(c);
+        if(sent[k]===h)return;
+        var rec=_cleanEnc(JSON.parse(JSON.stringify(c)));
+        rec._rq=q.id;rec._rmt=Date.now();rec._rby=(_fbUser&&_fbUser.email)||'';
+        ups[k]=rec;sent[k]=h;n++;
+      });
+    });
+    if(!n)return;
+    _fbDb.ref('fydata/relay/costs').update(ups).then(function(){
+      try{localStorage.setItem('fy_relay_sent',JSON.stringify(sent));}catch(e){}
+      console.log('[接力] 已上傳 '+n+' 筆現場支出，待管理員裝置收單');
+    }).catch(function(err){console.warn('[接力] 現場支出上傳失敗：',err&&err.message);});
+  }catch(e){}
+}
+// 管理員側：收接力的成本進 private，成功後清掉接力記錄
+function _pullRelayCosts(){
+  try{
+    if(!_fbUser||!_fbDb)return;
+    if(!isAdmin(_fbUser.email))return;
+    _fbDb.ref('fydata/relay/costs').once('value').then(function(sn){
+      var d=sn.val();if(!d)return;
+      var consumed={},merged=0;
+      Object.keys(d).forEach(function(qidEnc){
+        var qid=_fbDecKey(qidEnc);
+        var q=Q.find(function(x){return x&&x.id===qid;});
+        var group=d[qidEnc]||{};
+        Object.keys(group).forEach(function(cidEnc){
+          var rec=group[cidEnc];if(!rec)return;
+          if(!q)return;                                       // 本機還沒有這張報價 → 先留著下次收
+          try{rec=_deepDecodeKeys(rec);}catch(e){}
+          delete rec._rq;delete rec._rmt;delete rec._rby;
+          if(!q.costs)q.costs=[];
+          if(!q.costs.some(function(c){return c&&c.id===rec.id;})){
+            q.costs.push(rec);q._mt=Date.now();merged++;
+          }
+          consumed[qidEnc+'/'+cidEnc]=null;                   // 已存在也視為已消費
+        });
+      });
+      if(merged){
+        try{persist();}catch(e){}
+        try{rDash();}catch(e){}
+        toast('已收到 '+merged+' 筆現場支出（工地登錄）');
+      }
+      if(Object.keys(consumed).length){
+        _pushPrivate(function(ok){
+          if(ok)_fbDb.ref('fydata/relay/costs').update(consumed).catch(function(){});
+        });
+      }
+    }).catch(function(){});
+  }catch(e){}
+}
+// ── 名冊上雲（v5.335 健檢F）──
+// 安全規則改以 email 名冊驗證：fydata/access（可用 shared）、fydata/adminEmails（可用 private）。
+// set() 整包覆蓋 → 移除人員／降級即時生效，解決 adminUids 永不清除的問題。
+function _encEmailKey(e){return String(e||'').toLowerCase().replace(/\./g,',');}
+function _syncAccessLists(cb){
+  try{
+    if(!_fbUser||!_fbDb||!isAdmin(_fbUser.email)){if(cb)cb(false);return;}
+    var access={},admins={};
+    listStaff().forEach(function(st){
+      if(!st||st.active===false)return;
+      var e=_encEmailKey(st.email);if(!e)return;
+      access[e]=true;
+      if(isAdmin(st.email))admins[e]=true;
+    });
+    BOOTSTRAP_DEV.forEach(function(e){var k=_encEmailKey(e);access[k]=true;admins[k]=true;});
+    _fbDb.ref('fydata/access').set(access).then(function(){
+      return _fbDb.ref('fydata/adminEmails').set(admins);
+    }).then(function(){if(cb)cb(true);}).catch(function(err){
+      console.warn('[權限] 名冊上雲失敗（發布新版安全規則後恢復）：',err&&err.message);
+      if(cb)cb(false);
+    });
+  }catch(e){if(cb)cb(false);}
 }
 
 function _pushCloud(opts){
@@ -10496,6 +10677,11 @@ function _pushCloud(opts){
     // v5.314：完全沒有變動時不要空推 uploadedAt，否則會害其他裝置誤判「雲端有更新」而跳覆蓋提示
     // v5.319：無變更時不謊報「已上傳雲端」，也不推進 fy_last_fb_sync
     //（推進了會讓本機 watermark 超前雲端，之後他人的真實上傳會被誤判為「不是更新」而永遠拉不下來）
+    // v5.335 健檢F：私有推送必須在「shared 無變更提前 return」之前執行。
+    // 原本排在 return 之後，只改費用／應付／分潤／材料（全在 private）時
+    // shared 沒變 → 提前 return → 私有集合完全不上雲，還誤報「雲端已是最新」。
+    try{_pushPrivate();}catch(e){}
+    try{_pushRelayCosts();}catch(e){}
     if(!opts.full&&baseHashes&&changed.length===0){
       _storeSyncHashes(newHashes);
       localStorage.removeItem('fy_pending_sync');
@@ -10503,8 +10689,6 @@ function _pushCloud(opts){
       if(opts.onDone)opts.onDone(true);
       return;
     }
-    // v5.324：敏感資料另寫 fydata/private（失敗不影響 shared，只是留在本機）
-    try{_pushPrivate();}catch(e){}
     _fbDb.ref('fydata/shared').update(delta).then(okWrap).catch(fail);
   }catch(e){
     // .set() 同步拋錯（例如資料仍含非法值）也要關掉 loading
@@ -10583,6 +10767,7 @@ function _pullPrivateIfNewer(){
           if(ok){try{localStorage.setItem('fy_last_priv_sync',String(ct));}catch(e){}}
         });
       }else if(ct===0){_privReadOk=true;}
+      try{_pullRelayCosts();}catch(e){}
     }).catch(function(){_privReadOk=false;});
   }catch(e){}
 }
@@ -17192,7 +17377,8 @@ function staffEdit(id){
   var meSys=_isSysUser((_fbUser&&_fbUser.email)||'');
   // v5.331：人員管理開放給管理部後的防線——不是系統管理員的人，
   // 既不能指派／移除「系統管理員」角色，也不能碰已經持有該角色的帳號。
-  if(!meSys&&st&&(st.roles||[]).some(function(r){var x=_roleById(r);return x&&x.sys;})){
+  if(!meSys&&st&&(BOOTSTRAP_DEV.indexOf(String(st.email||'').toLowerCase())>=0
+    ||(st.roles||[]).some(function(r){var x=_roleById(r);return x&&x.sys;}))){
     toast('此帳號為系統管理員，僅系統管理員可編輯');return;
   }
   var roles=listRoles().filter(function(r){return meSys||!r.sys;});
@@ -17229,6 +17415,7 @@ function staffEdit(id){
     rec.phone=String((document.getElementById('stf-phone')||{}).value||'').trim();
     rec.roles=picked;
     rec.active=!!(document.getElementById('stf-active')||{}).checked;
+    rec._mt=Date.now();
     if(BOOTSTRAP_DEV.indexOf(em)>=0){rec.active=true;if(rec.roles.indexOf(SYS_ROLE_ID)<0)rec.roles.push(SYS_ROLE_ID);}
     _acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();
     toast('已儲存 '+em+'　·　對方需自行登入一次才生效');
@@ -17243,6 +17430,7 @@ function staffDel(id){
   }
   showConfirm('刪除人員','刪除「'+esc(st.name||st.email)+'」後，該帳號登入將看不到任何頁面。',function(){
     var p=_acct();p.__staff=p.__staff.filter(function(x){return x.id!==id;});
+    try{_tomb('acctStaff',id);}catch(e){}
     _acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();toast('已刪除');
   });
 }
@@ -17256,6 +17444,7 @@ function staffImport(inp){
   var rd=new FileReader();
   rd.onload=function(){
     try{
+      var meSys=_isSysUser((_fbUser&&_fbUser.email)||'');
       var lines=String(rd.result||'').replace(/^﻿/,'').split(/\r?\n/).filter(function(l){return l.trim();});
       lines.shift();   // 表頭
       var p=_acct(),add=0,upd=0,bad=0;
@@ -17265,13 +17454,19 @@ function staffImport(inp){
         if(!em||em.indexOf('@')<0){bad++;return;}
         var names=String(c[3]||'').split(/[、,;／\/]/).map(function(x){return x.trim();}).filter(Boolean);
         var ids=names.map(function(n){var r=listRoles().find(function(x){return x.name===n;});return r?r.id:null;}).filter(Boolean);
+        // v5.335 健檢F：匯入與編輯視窗同一套防提權——非系統管理員不得指派 sys 角色、
+        // 也不得動到已持有 sys 角色的帳號（原本匯入一列就能把自己變系統管理員）
+        if(!meSys)ids=ids.filter(function(rid){var r=_roleById(rid);return !(r&&r.sys);});
         var rec=p.__staff.find(function(x){return String(x.email||'').toLowerCase()===em;});
+        if(!meSys&&(BOOTSTRAP_DEV.indexOf(em)>=0
+          ||(rec&&(rec.roles||[]).some(function(rid){var r=_roleById(rid);return r&&r.sys;})))){bad++;return;}
         if(rec)upd++;else{rec={id:_uid('s'),active:true};p.__staff.push(rec);add++;}
         rec.email=em;
         rec.name=String(c[1]||'').trim()||rec.name||em.split('@')[0];
         rec.phone=String(c[2]||'').trim()||rec.phone||'';
         if(ids.length)rec.roles=ids;
         if(rec.roles==null)rec.roles=[];
+        rec._mt=Date.now();
       });
       _acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();
       toast('匯入完成：新增 '+add+' 人、更新 '+upd+' 人'+(bad?('、略過 '+bad+' 列（信箱無效）'):''));
@@ -17314,7 +17509,7 @@ function renderRolesPage(){
 }
 function roleToggle(id,on){
   var p=_acct();var r=p.__roles.find(function(x){return x.id===id;});if(!r||r.sys)return;
-  r.enabled=!!on;_acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();
+  r.enabled=!!on;r._mt=Date.now();_acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();
 }
 function roleEdit(id){
   var r=id?_roleById(id):null;
@@ -17335,6 +17530,7 @@ function roleEdit(id){
     rec.name=nm;
     rec.dept=(document.getElementById('rl-dept')||{}).value||'';
     rec.cloudCost=!!(document.getElementById('rl-cost')||{}).checked;
+    rec._mt=Date.now();
     _acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();
     toast('已儲存角色「'+nm+'」');
     return true;
@@ -17346,7 +17542,8 @@ function roleDel(id){
   showConfirm('刪除角色','刪除「'+esc(r.name)+'」'+(used?('，'+used+' 位人員會失去這個角色的權限。'):'。'),function(){
     var p=_acct();
     p.__roles=p.__roles.filter(function(x){return x.id!==id;});
-    p.__staff.forEach(function(s){s.roles=(s.roles||[]).filter(function(x){return x!==id;});});
+    try{_tomb('acctRoles',id);}catch(e){}
+    p.__staff.forEach(function(s){s.roles=(s.roles||[]).filter(function(x){return x!==id;});s._mt=Date.now();});
     _acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();toast('已刪除');
   });
 }
@@ -17371,6 +17568,7 @@ function rolePerm(id){
     [].slice.call(document.querySelectorAll('.rl-page')).forEach(function(c){
       if(c.checked&&!c.disabled)rec.pages[c.getAttribute('data-pid')]=true;
     });
+    rec._mt=Date.now();
     _acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();
     toast('已更新「'+rec.name+'」的頁面權限');
     return true;
@@ -17386,7 +17584,7 @@ function deptEdit(id){
     var p=_acct();
     var rec=d?p.__depts2.find(function(x){return x.id===d.id;}):null;
     if(!rec){rec={id:_uid('d')};p.__depts2.push(rec);}
-    rec.name=nm;_acctSave(p);applyRoleUI();toast('已儲存部門「'+nm+'」');
+    rec.name=nm;rec._mt=Date.now();_acctSave(p);applyRoleUI();toast('已儲存部門「'+nm+'」');
     return true;
   });
 }
