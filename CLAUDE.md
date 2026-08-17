@@ -44,7 +44,7 @@
 | 金流 | `updateFinanceKPIs` `renderCashForecast`(90天水位預測) |
 | 支出．日報 | `rQuickCost` `submitQuickCost` `submitDailyReport`(頁 id: quickcost) |
 | 智慧收件 | `smartIntake` `aiClassifyDoc` `_intakeRoute`（Claude API 影像辨識） |
-| 權限 | `ALL_PAGES` `canAccess` `permMxApplyRole`(工務/管理部範本) |
+| 權限 | `ALL_PAGES`(含 `adminOnly`/`ownerOnly`) `canAccess` `permMxSetRole`(擁有者/負責人/管理部/工務) `_permRoleOf` `getOwnerEmails` |
 | 備份 | `exportData`/`importData`（全量，與 `_syncPayload` 同 payload） |
 | 雲端同步 | `_sharedPayload`/`_privatePayload` `_pushPrivate`/`_pullPrivate` `_applySensColls` `_seedAdminUid` |
 | 逾期租金 | `_rentDaysOf`(解析備註租期) `_itemProgress`(日報推完工日) `_rentStatus` `_rentScan` `invScanRent` |
