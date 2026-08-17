@@ -2504,7 +2504,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.327';
+var APP_VERSION='v5.328';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -16968,7 +16968,7 @@ const ALL_PAGES = [
   // v5.327 devOnly：單價分析＝報價的成本模型，只有系統開發（報價者）看得到
   {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, devOnly:true},
   {id:'permissions',label:'權限管理', icon:_pgIcon('lock'),     grp:'sys',   adminOnly:true},
-  {id:'params',    label:'參數設定',  icon:_pgIcon('sliders'),  grp:'sys',   adminOnly:true},
+  {id:'params',    label:'參數設定',  icon:_pgIcon('sliders'),  grp:'sys',   adminOnly:true, devOnly:true},
 ];
 const PAGE_GRP_LABEL={main:'主功能',fin:'財務流',data:'資料與工具',sys:'系統'};
 // 導覽可見頁面（排除隱藏與無權限者）
@@ -18039,8 +18039,22 @@ function rProfit(){
     // 未稅分母天生較小，實際淨利率被無條件美化約 5 個百分點。
     const _adds=Q.filter(x=>x.parentId===q.id);
     const _all=[q].concat(_adds);
-    const estRevenue=_all.reduce((a,x)=>a+(x.t?.sub||0),0);          // 預估未稅收入
-    const estCostQ=_all.reduce((a,x)=>a+(x.t?.cost||0),0);           // 預估成本（未稅）
+    // v5.328：改用「追加減結算後的生效數量」。原本直接吃報價總額，
+    // 現場 57 支結算成 43 支後，利潤頁的預估收入仍停在 57 支，跟專案卡對不起來。
+    // 報價單本身保持原樣（那是給業主的文件），只有分析口徑跟著實際數量走。
+    const _eff=_effQtyMap(q);
+    let estRevenue=0,estCostQ=0,_settled=false;
+    _all.forEach(x=>{
+      (x.items||[]).forEach(it=>{
+        if(!it||it.sec)return;
+        const qy=_effQty(_eff,it),pr=parseFloat(it.price)||0;
+        if((parseFloat(it.qty)||0)!==qy)_settled=true;
+        estRevenue+=qy*pr;
+        estCostQ+=qy*(parseFloat(it.estCost)||0);
+      });
+    });
+    // 沒有任何工項數量／單價可算時（舊資料）退回報價總額，避免整列變 0
+    if(estRevenue<=0){estRevenue=_all.reduce((a,x)=>a+(x.t?.sub||0),0);estCostQ=_all.reduce((a,x)=>a+(x.t?.cost||0),0);}
     const estNet=estRevenue-estCostQ;                                 // 預估淨利（未稅對未稅）
     const estNetR=estRevenue>0?(estNet/estRevenue*100):0;             // 預估淨利率%（分母未稅）
 
@@ -18084,7 +18098,8 @@ function rProfit(){
 
     return{q,estRevenue,estCostQ,estNet,estNetR,
       actualCost,totalInvoiced,totalReceived,actualCash,
-      actualRevenuePre,actualNet,actualNetR,netDiff,costDiff,overhead,bonus,bonusFull};
+      actualRevenuePre,actualNet,actualNetR,netDiff,costDiff,overhead,bonus,bonusFull,
+      hasCost,hasReceipt,settled:_settled};
   }
 
   const cases=awarded.map(calcCase);
@@ -18237,7 +18252,9 @@ function rProfit(){
               <div style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.q.name||'—')}</div>
               <div style="font-size:10px;color:var(--b4)">${esc(r.q.client||'')}</div>
             </td>
-            <td style="padding:6px 8px;text-align:right">${fmt(r.q.t?.total||0)}</td>
+            <td style="padding:6px 8px;text-align:right">${fmt(r.q.t?.total||0)}
+              ${r.settled?`<div style="font-size:9px;color:#b26a00" title="工項追加減結算後的生效數量已與報價不同；報價單保持原樣，下方預估與淨利率已改用結算後數量">結算後 ${fmt(Math.round(r.estRevenue*_taxM()))}</div>`:''}
+            </td>
             <td style="padding:6px 8px;text-align:right;color:var(--b4)">${fmt(r.estNet)}<div style="font-size:9px">${r.estNetR.toFixed(1)}%</div></td>
             <td style="padding:6px 8px;text-align:right;color:var(--g3)">
               ${fmt(r.totalReceived)}
@@ -18245,7 +18262,10 @@ function rProfit(){
             </td>
             <td style="padding:6px 8px;text-align:right;color:var(--red)">${r.actualCost>0?fmt(r.actualCost):'—'}</td>
             <td style="padding:6px 8px;text-align:right;font-weight:900;font-size:13px;color:${r.actualNet!=null?(r.actualNet>=0?'var(--g3)':'var(--red)'):'var(--b3)'}">
-              ${r.actualNet!=null?'NT$ '+fmt(r.actualNet):'尚無成本資料'}
+              ${r.actualNet!=null?'NT$ '+fmt(r.actualNet)
+                :(!r.hasReceipt&&r.hasCost)?'<span style="font-size:11px">尚未收款</span>'
+                :(r.hasReceipt&&!r.hasCost)?'<span style="font-size:11px">尚無成本資料</span>'
+                :'<span style="font-size:11px">尚未收款・無成本</span>'}
             </td>
             <td style="padding:6px 8px;text-align:right;font-size:11px">
               ${r.netDiff!=null?('<span style="color:'+(r.netDiff>=0?'var(--g)':'var(--red)')+';font-weight:700">'+(r.netDiff>=0?'▲':'▼')+fmt(Math.abs(r.netDiff))+'</span>'):'—'}
@@ -18281,7 +18301,9 @@ function rProfit(){
               <div>實際成本 <b style="color:var(--red)">${r.actualCost>0?fmt(r.actualCost):'—'}</b></div>
               <div>淨利率 <b>${r.actualNetR!=null?r.actualNetR.toFixed(1)+'%（實際）':r.estNetR.toFixed(1)+'%（預估）'}</b></div>
             </div>
-            <div style="margin-top:6px;font-size:14px;font-weight:800;color:${clr}">實際淨利 ${r.actualNet!=null?'NT$ '+fmt(r.actualNet):'尚無成本資料'}</div>
+            <div style="margin-top:6px;font-size:14px;font-weight:800;color:${clr}">實際淨利 ${r.actualNet!=null?'NT$ '+fmt(r.actualNet)
+              :(!r.hasReceipt&&r.hasCost)?'尚未收款'
+              :(r.hasReceipt&&!r.hasCost)?'尚無成本資料':'尚未收款・無成本'}</div>
           </div>`;}).join('')}
         <div style="border-top:2px solid var(--gm);padding-top:8px;font-size:13px;font-weight:700">合計（${awarded.length}件）　實際淨利 <span style="color:${totActualNet>=0?'var(--g3)':'var(--red)'}">NT$ ${fmt(totActualNet)}</span>（${totActualNetR.toFixed(1)}%）</div>
       </div></div>
@@ -19092,15 +19114,14 @@ function exportCurrentReportExcel(){
         <input type="date" id="receipt-date" style="font-size:13px">
       </div>
       <!-- v5.326 抵銷項：這些錢業主沒匯給你，但也不該再列為應收／逾期 -->
+      <!-- v5.328：改 grid 平均三欄並允許換行，原本 fg3 在窄視窗會把第三欄擠出彈窗外 -->
       <div style="border:1px dashed var(--b2);border-radius:var(--r8);padding:9px 11px;margin-bottom:10px">
-        <div style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:7px">抵銷項 <span style="font-weight:400;color:var(--b3)">（沒收到但視同結清，填了就不會再跳逾期提醒）</span></div>
-        <div class="fg fg3" style="gap:7px">
-          <div class="f"><label style="font-size:10.5px">匯費</label><input type="number" id="receipt-fee" placeholder="0" style="font-size:13px;text-align:right" oninput="_receiptCalc()"></div>
-          <div class="f"><label style="font-size:10.5px">業主扣款</label><input type="number" id="receipt-deduct" placeholder="0" style="font-size:13px;text-align:right" oninput="_receiptCalc()"></div>
-          <div class="f"><label style="font-size:10.5px">業主保留款</label><input type="number" id="receipt-hold" placeholder="0" style="font-size:13px;text-align:right" oninput="_receiptCalc()"></div>
+        <div style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:7px">抵銷項</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:7px">
+          <div class="f" style="min-width:0"><label style="font-size:10.5px">匯費</label><input type="number" id="receipt-fee" placeholder="0" style="width:100%;font-size:13px;text-align:right" oninput="_receiptCalc()"></div>
+          <div class="f" style="min-width:0"><label style="font-size:10.5px">業主扣款</label><input type="number" id="receipt-deduct" placeholder="0" style="width:100%;font-size:13px;text-align:right" oninput="_receiptCalc()"></div>
+          <div class="f" style="min-width:0"><label style="font-size:10.5px">業主保留款</label><input type="number" id="receipt-hold" placeholder="0" style="width:100%;font-size:13px;text-align:right" oninput="_receiptCalc()"></div>
         </div>
-        <div style="font-size:10px;color:var(--b3);line-height:1.45;margin-top:5px">
-          匯費／扣款＝這筆錢收不回來了；<b>業主保留款</b>＝之後才會退還，系統會另外記著提醒你請退。</div>
       </div>
       <!-- 備註說明 -->
       <div class="f" style="margin-bottom:12px">
