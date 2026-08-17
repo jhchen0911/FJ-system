@@ -1141,7 +1141,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="fg fg2" style="margin-bottom:10px">
           <div class="f"><label>日期</label><input id="dr-date" type="date" style="font-size:14px;padding:8px 10px"></div>
           <div class="f"><label>出工人數</label><input id="dr-workers" type="number" inputmode="numeric" placeholder="0" style="font-size:16px;font-weight:700;text-align:right;padding:8px 10px"></div>
-          <div class="f" style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 0"><input type="checkbox" id="dr-own-equip" style="width:18px;height:18px"> <svg class="ic ib" aria-hidden="true"><use href="#i-truck"/></svg> 本日使用自有機具（震動機）<span style="font-size:10.5px;color:var(--b3)">— 供機具稼動率統計</span></label></div>
+          <div class="f" style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 0"><input type="checkbox" id="dr-own-equip" style="width:18px;height:18px"> <svg class="ic ib" aria-hidden="true"><use href="#i-truck"/></svg> 本日使用自有機具<span style="font-size:10.5px;color:var(--b3)">— 供機具稼動率統計</span></label></div>
         </div>
         <div class="f" style="margin-bottom:10px">
           <label>今日進度／工作內容 <span style="font-size:10.5px;color:var(--b3)">— 選工項填數量，回報量連動專案施工進度條</span></label>
@@ -1537,6 +1537,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           </div>
         </div>
         <div id="admin-panel-content-perm"><div style="font-size:12px;color:var(--b3)">請先登入後查看（前往參數設定登入）</div></div>
+        <div id="owner-panel-content"></div>
       </div>
     </div>
     <div class="card">
@@ -1677,7 +1678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         </div>
       </div>
     </div>
-    <div class="card" style="margin-bottom:10px">
+    <div class="card" style="margin-bottom:10px" id="upa-cost-param-card">
       <div class="ch green">
         <div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-truck"/></svg> 單價分析成本參數</div>
         <button type="button" class="btn btn-xs" onclick="saveUPACostParams()"><svg class="ic ib" aria-hidden="true"><use href="#i-save"/></svg> 儲存</button>
@@ -2047,7 +2048,9 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <div class="f"><label>營業稅率 (%)</label><input id="ptax" type="number" value="5"><div class="hint">通常為 5%，影響報價單稅額計算</div></div>
           <div class="f"><label>管理費率 (%)</label><input id="pohd" type="number" value="0" min="0" max="50"><div class="hint">公司間接成本攤提（辦公室、行政、車輛…）。利潤中心的「實際淨利」會多扣 稅前收入×此%，避免毛利高估。0＝不攤提</div></div>
           <div class="f"><label>標準點工日薪 (NT$)</label><input id="plabor" type="number" value="2800" min="0"><div class="hint">供「日報出工 vs 已記點工成本」勾稽用：專案勾稽表會以 日報累計工數×此日薪 估算應有點工成本，少記超過兩成即示警。0＝不勾稽</div></div>
-          <div class="f"><label>期初現金 (NT$)</label><input id="popen" type="number" value="0"><div class="hint">導入系統時的銀行帳戶餘額。「可動用資金」與「90天水位預測」＝期初現金＋歷史實收（依票期）−已付應付−已提分潤。填 0 則水位只反映系統內的收付變化，不是真實帳戶餘額</div></div>
+          <div class="f"><label>期初現金 (NT$)</label><input id="popen" type="number" value="0"><div class="hint">基準日當天的銀行帳戶餘額。填 0 則水位只反映系統內的收付變化，不是真實帳戶餘額</div></div>
+          <div class="f"><label>期初基準日</label><input id="popendate" type="date"><div class="hint"><b>務必與上面的餘額同一天</b>。系統只累加基準日<b>之後</b>的實收與付款——基準日當天以前的錢已經在餘額裡了。沒填基準日會把歷史實收整包再加一次，可動用資金會虛高（例：帳上 348 萬卻顯示 591 萬）。沒填實收日期的舊請款單一律視為期初之前</div></div>
+          <div class="f"><label>營運週轉保留月數</label><input id="popres" type="number" value="3" min="0" max="24" step="1"><div class="hint">分潤上限會先扣掉「月固定成本 × 此月數」。薪資、租金、機具貸款每月照付，這筆錢不能分掉。填 0 表示不保留（不建議）</div></div>
         </div>
         <div style="border-top:1px dashed var(--b2);margin:12px 0 0;padding-top:12px">
           <div style="font-size:12.5px;font-weight:700;color:var(--b5);margin-bottom:4px">公司固定成本明細（每月）→ 自動推算管理費率</div>
@@ -2500,7 +2503,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.324';
+var APP_VERSION='v5.325';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2582,6 +2585,8 @@ var P={
   tax:5,mult:1.4,profit:18,s1:1.12,s2:1.0,s3:0.9,
   laborDayRate:2800,   // v5.317 標準點工日薪：供「日報出工 vs 已記點工成本」勾稽用
   openingCash:0,       // v5.318 期初現金：可動用資金與 90 天水位的起算基準
+  openingDate:'',      // v5.325 期初基準日：只累加此日之後的收付，避免與期初餘額重複計算
+  opReserveMonths:3,   // v5.325 營運週轉保留月數：分潤上限先扣掉 月固定成本×此月數
   bank:'國泰世華建成分行(013)',bankAccount:'031035008864',
   // unit price defaults
   dpRent:0.111,dpLoss:0.05,dpProcess:900,dpPeriod:60,
@@ -2828,8 +2833,24 @@ function _cashPctOf(inv){
   var n=parseFloat(v);
   return (v==null||v===''||!isFinite(n)||n<=0)?1:Math.min(1,n/100);
 }
+// v5.325：期初現金若填「今天的銀行餘額」，再把歷史實收整包加上去就會重複計算
+// （使用者填 348 萬，系統卻算出 591 萬）。改為以「期初基準日」切線：
+// 基準日當天（含）以前的收付都當作已包含在期初餘額裡，只累加基準日之後的。
+function _openingDate(){
+  var d=String(P.openingDate||'').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(d)?d:'';
+}
+// 收付日期是否應計入（基準日之後才算）
+function _afterOpening(dateStr){
+  var od=_openingDate();
+  if(!od)return true;                                   // 沒設基準日 → 維持舊行為，全部計入
+  var d=String(dateStr||'').slice(0,10);
+  if(!d)return false;                                   // 沒有日期的舊資料視為期初之前（已在餘額裡）
+  return d>od;
+}
 function _cashOf(inv,atTs){
   var rcv=parseFloat(inv&&inv.received)||0;if(!rcv)return 0;
+  if(!_afterOpening(inv&&inv.receivedDate))return 0;
   var cp=_cashPctOf(inv);
   var td=parseFloat(inv.ticketDays)||0;
   var cash=rcv*cp,tk=rcv*(1-cp);
@@ -2844,14 +2865,28 @@ function _cashOf(inv,atTs){
 function _availableCash(atTs){
   var ts=atTs||Date.now();
   var recv=INV.reduce(function(a,i){return a+_cashOf(i,ts);},0);
-  var paid=PAYABLES.filter(function(p){return p.status==='paid';}).reduce(function(a,p){return a+_payEff(p);},0);
+  // v5.325：已付款與已提分潤同樣只算期初基準日之後的（之前的已反映在期初餘額）
+  var paid=PAYABLES.filter(function(p){return p.status==='paid'&&_afterOpening(p.paidDate||p.date);}).reduce(function(a,p){return a+_payEff(p);},0);
   // v5.319 修正：SHARE_PROFIT.draws 是一維陣列（不是 {年:[...]}）。
   // 原本用 Object.keys 逐年遍歷會對物件呼叫 forEach 而拋錯，被 catch 吞掉 → 提領恆為 0。
   var draws=0;
   var _dw=(SHARE_PROFIT&&Array.isArray(SHARE_PROFIT.draws))?SHARE_PROFIT.draws:[];
-  _dw.forEach(function(d){draws+=parseFloat(d&&d.amount)||0;});
+  _dw.forEach(function(d){if(_afterOpening(d&&d.date))draws+=parseFloat(d&&d.amount)||0;});
   var opening=parseFloat(P.openingCash)||0;
   return opening+recv-paid-draws;
+}
+// ── 營運週轉保留金（v5.325）──
+// 「可動用」不等於「可以全部領走」：薪資、租金、機具貸款每個月照付。
+// 保留＝公司月固定成本 × 保留月數，分潤上限要先扣掉這筆。
+function _opReserveMonths(){
+  var n=parseFloat(P.opReserveMonths);
+  return (isFinite(n)&&n>=0)?n:3;      // 預設保留 3 個月
+}
+function _monthlyFixedCost(){
+  return (P.fixedCosts||[]).reduce(function(a,r){return a+(parseFloat(r&&r.amt)||0);},0);
+}
+function _opReserve(){
+  return Math.round(_monthlyFixedCost()*_opReserveMonths());
 }
 
 // 本地日期字串（避免 UTC 時區問題）
@@ -3057,6 +3092,8 @@ function doSaveP(){
   P.overheadPct=parseFloat(gv('pohd'))||0;
   P.laborDayRate=parseFloat(gv('plabor'))||0;
   P.openingCash=parseFloat(gv('popen'))||0;
+  P.openingDate=gv('popendate')||'';
+  P.opReserveMonths=(function(){var v=parseFloat(gv('popres'));return (isFinite(v)&&v>=0)?v:3;})();
   P.mult=parseFloat(gv('pmul'))||1.4;
   P.profit=parseFloat(gv('ppro'))||18;
   P.s1=parseFloat(gv('ps1'))||1.12;P.s2=parseFloat(gv('ps2'))||1.0;P.s3=parseFloat(gv('ps3'))||0.9;
@@ -3194,7 +3231,7 @@ function syncParamsUI(){
   try{rFixedCosts();}catch(e){}
   try{var _pk=document.getElementById('paikey');if(_pk)_pk.value=_aiKey();}catch(e){}
   const m={pc:'company',pt:'taxid',pb:'boss',pco:'contact',ptel:'tel',pem:'email',pad:'addr',
-    ptax:'tax',pohd:'overheadPct',plabor:'laborDayRate',popen:'openingCash',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
+    ptax:'tax',pohd:'overheadPct',plabor:'laborDayRate',popen:'openingCash',popendate:'openingDate',popres:'opReserveMonths',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
     'dp-rent':'dpRent','dp-loss':'dpLoss','dp-process':'dpProcess','dp-period':'dpPeriod',
     'dp-i-h300':'dpIH300','dp-r-h300':'dpRH300','dp-i-h350':'dpIH350','dp-r-h350':'dpRH350',
     'dp-i-h400':'dpIH400','dp-r-h400':'dpRH400','dp-i-s':'dpIS','dp-r-s':'dpRS',
@@ -7743,7 +7780,8 @@ function updateDashTodo(){
       var d=_du2(_expA.date);
       if(d>1)return;
       var txt=d===1?(label+' 預計明天收款（'+_expA.date+'）'):d===0?(label+' 今天預計收款'):('⚠ '+label+' 逾期 '+(-d)+' 天未收款（預計'+_expA.date+'）');
-      items.push({type:'recv',urgent:d<=0,jump:"loadInvoice('"+inv.id+"')",
+      // v5.325：點下去是要「登錄收到多少錢」，不是改請款單內容 → 直接開確認收款彈窗
+      items.push({type:'recv',urgent:d<=0,jump:"openReceiptModal('"+inv.id+"')",
         icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>',color:d<0?'var(--red)':'var(--yd)',
         text:txt,sub:'NT$ '+fmt(unpaid)});
     }else{
@@ -7752,7 +7790,7 @@ function updateDashTodo(){
       var baseDate=inv.date?new Date(inv.date):now;
       var dueD=new Date(baseDate.getFullYear(),baseDate.getMonth()+payDelay,recvDay);
       var overDays=Math.floor((now.getTime()-dueD.getTime())/864e5);
-      if(overDays>0&&overDays<1825)items.push({type:'recv',urgent:true,jump:"loadInvoice('"+inv.id+"')",
+      if(overDays>0&&overDays<1825)items.push({type:'recv',urgent:true,jump:"openReceiptModal('"+inv.id+"')",
         icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>',color:'var(--red)',
         text:'⚠ '+label+' 逾期 '+overDays+' 天未收款',sub:'NT$ '+fmt(unpaid)});
     }
@@ -8464,8 +8502,34 @@ function isAdmin(email){
   if(!email)return false;
   const e=email.toLowerCase();
   if(BOOTSTRAP_ADMINS.includes(e))return true;
+  if(isOwner(e))return true;                 // 擁有者恆為管理員
   return getAdminEmails().includes(e);
 }
+// ── 三層角色（v5.325）──
+//   擁有者：全部，含單價分析與權限管理（報價的成本模型只有報價者知道）
+//   管理員（負責人）：利潤／金流／成本／分潤全部看得到，但看不到單價分析與權限管理
+//   一般使用者（工務）：只開放指定頁面，資料庫層也讀不到 fydata/private
+// 擁有者清單不上雲、也不由權限頁的一般管理員改動——避免管理員自行提權。
+const BOOTSTRAP_OWNERS=['jhchen0911@gmail.com'];
+function getOwnerEmails(){
+  try{
+    const a=JSON.parse(localStorage.getItem('fy_owners')||'null');
+    if(Array.isArray(a)&&a.length)return a.map(x=>String(x||'').toLowerCase()).filter(Boolean);
+  }catch(e){}
+  return BOOTSTRAP_OWNERS.slice();
+}
+function saveOwnerEmails(arr){
+  const list=(arr||[]).map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
+  // 永遠留住啟動擁有者，避免手滑把自己踢掉之後沒人能改權限
+  BOOTSTRAP_OWNERS.forEach(function(e){if(list.indexOf(e)<0)list.unshift(e);});
+  try{localStorage.setItem('fy_owners',JSON.stringify(list));}catch(e){}
+  return list;
+}
+function isOwner(email){
+  if(!email)return false;
+  return getOwnerEmails().includes(String(email).toLowerCase());
+}
+var _isOwnerUser=false;
 // _isAdminUser 已在頂部宣告
 
 // _fbApp/_fbAuth/_fbDb/_fbUser 已在頂部宣告
@@ -8504,6 +8568,7 @@ function _updateFbUI(on){
     if(btn)btn.style.display='';
     const em=document.getElementById('fb-user-email-show');if(em)em.textContent=_fbUser.email||'';
     // 設定管理員狀態
+    _isOwnerUser=isOwner(_fbUser.email);
     _isAdminUser=isAdmin(_fbUser.email);
     applyRoleUI();
     // 初始化自動同步開關狀態
@@ -8647,6 +8712,58 @@ function _fbErrMsg(code){
 
 
 // ── 帳號管理面板渲染 ──
+// ── 擁有者名冊（v5.325，僅擁有者可見可改）──
+// 擁有者＝報價的人，單價分析與權限管理只有這一層看得到。
+function renderOwnerPanel(){
+  var el=document.getElementById('owner-panel-content');if(!el)return;
+  if(!_fbUser||!_isOwnerUser){el.innerHTML='';return;}
+  var owners=getOwnerEmails();
+  var me=String((_fbUser&&_fbUser.email)||'').toLowerCase();
+  el.innerHTML=
+    '<div style="margin-top:14px;border-top:1px solid var(--b1);padding-top:12px">'
+    +'<div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:4px"><svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg> 擁有者帳號（共 '+owners.length+' 位）</div>'
+    +'<div style="font-size:10.5px;color:var(--b3);line-height:1.5;margin-bottom:8px">'
+    +'擁有者可以看到<b>單價分析</b>與<b>權限管理</b>，管理員（負責人）看不到。'
+    +'此清單只存在本機、不上雲，也不會被其他管理員改動——換裝置需重新設定。</div>'
+    +'<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">'
+    +owners.map(function(e){
+      var isBoot=BOOTSTRAP_OWNERS.indexOf(e)>=0;
+      return '<div style="display:flex;align-items:center;justify-content:space-between;background:#fff8e1;border:1px solid #ffe082;border-radius:var(--r6);padding:5px 10px">'
+        +'<div style="font-size:12px;color:var(--b5)"><svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg> '+esc(e)
+        +(e===me?'<span style="font-size:10px;color:var(--g3);margin-left:4px">（你）</span>':'')
+        +(isBoot?'<span style="font-size:10px;color:var(--b3);margin-left:4px">（預設，不可移除）</span>':'')+'</div>'
+        +(isBoot?'':'<button type="button" onclick="removeOwner(\''+escq(e)+'\')" style="border:none;background:none;color:var(--red);cursor:pointer;font-size:14px;line-height:1">✕</button>')
+        +'</div>';
+    }).join('')
+    +'</div>'
+    +'<div style="display:flex;gap:6px">'
+    +'<input id="new-owner-email" type="email" placeholder="輸入電子郵件設為擁有者" style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit">'
+    +'<button type="button" onclick="addOwner()" class="btn btn-sm" style="border-color:#e65100;color:#e65100;white-space:nowrap">＋ 新增擁有者</button>'
+    +'</div></div>';
+}
+function addOwner(){
+  var inp=document.getElementById('new-owner-email');
+  var em=String((inp&&inp.value)||'').trim().toLowerCase();
+  if(!em||em.indexOf('@')<0){toast('請輸入正確的電子郵件');return;}
+  var list=getOwnerEmails();
+  if(list.indexOf(em)>=0){toast('此帳號已是擁有者');return;}
+  saveOwnerEmails(list.concat([em]));
+  // 擁有者恆為管理員（才讀得到雲端成本），順手加進管理員清單
+  var ad=getAdminEmails();
+  if(ad.indexOf(em)<0)saveAdminEmails(ad.concat([em]));
+  if(inp)inp.value='';
+  applyRoleUI();
+  toast('已新增擁有者 '+em+'（對方需自行登入一次才會生效）');
+}
+function removeOwner(em){
+  em=String(em||'').toLowerCase();
+  if(BOOTSTRAP_OWNERS.indexOf(em)>=0){toast('預設擁有者不可移除');return;}
+  showConfirm('移除擁有者','移除後「'+esc(em)+'」看不到單價分析與權限管理，但仍保留管理員身分（利潤／成本／分潤照常）。',function(){
+    saveOwnerEmails(getOwnerEmails().filter(function(x){return x!==em;}));
+    applyRoleUI();
+    toast('已移除擁有者 '+em);
+  });
+}
 function renderAdminPanel(){
   // 同時更新兩個容器（params 頁 + permissions 頁）
   const els=[
@@ -14459,7 +14576,7 @@ function updateFinanceKPIs(){
       <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 可動用資金（已扣應付）</div>
       <div class="kv" style="font-size:16px;color:${netCF>=0?'var(--g3)':'var(--red)'}">NT$ ${fmt(netCF)}</div>
       <div class="ks">可用現金 ${fmt(availableCash)} − 待付 ${fmt(totalAP)}${ticketPending>0?'　·　票期中 '+fmt(ticketPending):''}</div>
-      <div class="ks" style="font-size:10px;color:var(--b3)">期初 ${fmt(parseFloat(P.openingCash)||0)}＋實收−已付−已提分潤</div>
+      <div class="ks" style="font-size:10px;color:var(--b3)">期初 ${fmt(parseFloat(P.openingCash)||0)}${_openingDate()?('（'+fmtD(_openingDate())+'起算）'):'<span style="color:#c62828">（未設基準日，歷史實收會重複計入）</span>'}＋實收−已付−已提分潤</div>
     </div>
     <div class="kpi" style="flex:1;min-width:130px">
       <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 本月實收</div>
@@ -14856,9 +14973,11 @@ function renderShareProfit(numOnly){
   //   ‧ _availableCash() 已扣掉「已提分潤」，把本年已領加回才是「本年可分配的現金池」；
   //   ‧ 再扣掉待付應付——欠廠商的錢不是自己的，先分掉就會跳票。
   // 帳上賺到不等於領得出來：錢多半卡在應收、保留款與材料上。
-  var capCash=0,apPend=0;
+  // v5.325 再扣營運週轉保留金：帳上有錢不代表可以全部領走，薪資租金貸款每月照付。
+  var capCash=0,apPend=0,opRes=0;
   try{apPend=Math.round(_apTotal());}catch(e){apPend=0;}
-  try{capCash=Math.max(0,Math.round(_availableCash()-apPend+drawn));}catch(e){capCash=capEarn;}
+  try{opRes=_opReserve();}catch(e){opRes=0;}
+  try{capCash=Math.max(0,Math.round(_availableCash()-apPend-opRes+drawn));}catch(e){capCash=capEarn;}
   var cap=Math.max(0,Math.min(capEarn,capCash));
   var capLimitedBy=(capCash<capEarn)?'cash':'earn';
   var byWho={};SHARE_WHO.forEach(function(w){byWho[w]=0;});
@@ -14907,7 +15026,10 @@ function renderShareProfit(numOnly){
   +'<div style="font-size:11.5px;color:var(--b4);background:var(--yl);border:1px solid var(--ym);border-radius:var(--r8);padding:8px 12px;margin-bottom:12px">'
   +'<b>年度可提領上限 ＝ min（盈餘上限、可動用現金）</b><br>'
   +'盈餘上限＝稅後淨利 − 保留款增額 − 循環資金增額 − 機具自付款，由系統依本年請款、施工成本、費用發票<b>自動試算</b>（不需手動輸入）；'
-  +'現金上限＝金流頁的<b>可動用資金（已扣應付）</b>＋本年度已領。超過上限的提領＝動用下一年的營運資金。</div>'
+  +'現金上限＝金流頁的<b>可動用資金（已扣應付）</b> − <b>營運週轉保留金</b> ＋ 本年度已領。'
+  +'保留金＝公司月固定成本 '+fmt(_monthlyFixedCost())+' × '+_opReserveMonths()+' 個月 ＝ <b>'+fmt(_opReserve())+'</b>'
+  +'（薪資、租金、機具貸款每月照付，這筆錢不能分掉；月數可在參數設定調整）。'
+  +'超過上限的提領＝動用下一年的營運資金。</div>'
   // v5.322：四個欄位改為同一列緊湊磚塊；前三項系統試算唯讀，機具自付款手動輸入
   +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
   +ro('稅後淨利',c.netProfit,'本年請款換算未稅 − 施工成本 − 費用發票 − 股東薪資，再 ×80%')
@@ -14956,8 +15078,8 @@ function _shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,limitedBy){
     +(capEarn!=null&&capCash!=null
       ?('<div class="ks" style="font-size:10.5px;color:'+(limitedBy==='cash'?'#b26a00':'var(--b3)')+'">'
         +(limitedBy==='cash'
-          ?'受現金限制：帳上盈餘可分 '+fmt(capEarn)+'，但可動用資金（已扣應付）只有 '+fmt(capCash)
-          :'盈餘上限 '+fmt(capEarn)+'（可動用資金已扣應付 '+fmt(capCash)+'，足以支應）')
+          ?'受現金限制：帳上盈餘可分 '+fmt(capEarn)+'，但扣掉應付與營運保留金後只剩 '+fmt(capCash)
+          :'盈餘上限 '+fmt(capEarn)+'（扣掉應付與營運保留金後尚有 '+fmt(capCash)+'，足以支應）')
         +'</div>'):'')
     +'</div>'
   +perCards
@@ -16752,8 +16874,9 @@ const ALL_PAGES = [
   {id:'ledger',    label:'帳務管理',  icon:_pgIcon('wallet'),   grp:'fin',   adminOnly:false},
   {id:'reports',   label:'報表中心',  icon:_pgIcon('chart'),    grp:'fin',   adminOnly:false, hidden:true}, // 由「利潤．報表」頁內分頁進入
   {id:'contacts',  label:'客戶．廠商',icon:_pgIcon('users'),    grp:'data',  adminOnly:false},
-  {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true},
-  {id:'permissions',label:'權限管理', icon:_pgIcon('lock'),     grp:'sys',   adminOnly:true},
+  // v5.325 ownerOnly：單價分析＝報價的成本模型（只有報價者知道）；權限管理＝角色的最終決定權
+  {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, ownerOnly:true},
+  {id:'permissions',label:'權限管理', icon:_pgIcon('lock'),     grp:'sys',   adminOnly:true, ownerOnly:true},
   {id:'params',    label:'參數設定',  icon:_pgIcon('sliders'),  grp:'sys',   adminOnly:true},
 ];
 const PAGE_GRP_LABEL={main:'主功能',fin:'財務流',data:'資料與工具',sys:'系統'};
@@ -16788,9 +16911,10 @@ function savePagePerms(obj){
 
 // 判斷某頁面使用者是否可進入
 function canAccess(pageId){
-  if(_isAdminUser)return true;
   const page=ALL_PAGES.find(p=>p.id===pageId);
-  if(!page)return true;
+  if(!page)return !!_isAdminUser||true;
+  if(page.ownerOnly)return !!_isOwnerUser;   // v5.325：擁有者限定，管理員也不給
+  if(_isAdminUser)return true;
   if(page.adminOnly)return false;
   // 檢查管理員是否限制此頁
   const perms=getPagePerms();
@@ -16895,7 +17019,9 @@ function applyRoleUI(){
   try{renderTopNav();renderMobMore();}catch(e){}   // 權限變動後重建導覽
   ALL_PAGES.forEach(page=>{
     // 完全隱藏：頁面已整併退場(hidden)、adminOnly 或 管理員設定為 false
-    const hidden=page.hidden===true||(!_isAdminUser&&(page.adminOnly||perms[page.id]===false));
+    const hidden=page.hidden===true
+      ||(page.ownerOnly&&!_isOwnerUser)
+      ||(!_isAdminUser&&(page.adminOnly||perms[page.id]===false));
     // 隱藏 top-nav
     const tn=document.getElementById('tn-'+page.id);
     if(tn)tn.style.display=hidden?'none':'';
@@ -16913,7 +17039,14 @@ function applyRoleUI(){
       });
     }catch(e){}
   });
+  // v5.325：參數設定頁裡的「單價分析成本參數」＝報價的成本模型，僅擁有者可見；
+  // 該頁其他區塊（稅率、期初現金、固定成本）負責人仍需要，所以只隱藏這張卡。
+  try{
+    var _upc=document.getElementById('upa-cost-param-card');
+    if(_upc)_upc.style.display=_isOwnerUser?'':'none';
+  }catch(e){}
   renderPagePermPanel();try{renderPermMatrixPanel();}catch(e){}
+  try{renderOwnerPanel();}catch(e){}
   renderAdminPanel();
 }
 
@@ -16926,15 +17059,16 @@ function renderPermMatrixPanel(){
   const perms=getPagePerms();
   const mx=perms.__matrix||{};
   const emails=Object.keys(mx);
-  const cols=ALL_PAGES.filter(pp=>!pp.adminOnly);
+  const cols=ALL_PAGES.filter(pp=>!pp.adminOnly&&!pp.ownerOnly);
   const rows=emails.map(em=>{
     const u=mx[em]||{};const up=u.pages||{};
     return '<tr><td style="padding:5px 8px;font-size:11.5px;font-weight:600;white-space:nowrap">'+esc(em)+'</td>'
       +cols.map(pp=>'<td style="text-align:center;padding:4px"><input type="checkbox" '+(up[pp.id]===false?'':'checked')+' onchange="permMxSet(\''+esc(em)+'\',\''+pp.id+'\',this.checked)"></td>').join('')
       +'<td style="text-align:center;padding:4px"><input type="checkbox" '+(u.hideProfit?'checked':'')+' onchange="permMxHideProfit(\''+esc(em)+'\',this.checked)"></td>'
       +'<td style="white-space:nowrap;padding:4px">'
-      +'<button type="button" class="btn btn-xs" title="工務範本：僅開放快速支出，隱藏利潤與金流" onclick="permMxApplyRole(\''+esc(em)+'\',\'site\')" style="border-color:#ffcc80;color:#e65100">⛑ 工務</button> '
-      +'<button type="button" class="btn btn-xs" title="管理部範本：全部開放（單價分析／參數／權限本為管理員限定）" onclick="permMxApplyRole(\''+esc(em)+'\',\'office\')" style="border-color:#90CAF9;color:#1565C0">🏢 管理部</button>'
+      +'<button type="button" class="btn btn-xs" title="工務範本：日報．支出＋客戶．廠商（協力廠商資訊），隱藏利潤與金流" onclick="permMxApplyRole(\''+esc(em)+'\',\'site\')" style="border-color:#ffcc80;color:#e65100">⛑ 工務</button> '
+      +'<button type="button" class="btn btn-xs" title="負責人範本：利潤／金流／成本／分潤全部開放，但看不到單價分析與權限管理。需另外把此帳號設為管理員（下方管理員清單）才能讀到雲端的成本資料" onclick="permMxApplyRole(\''+esc(em)+'\',\'partner\')" style="border-color:#A5D6A7;color:#2E7D32">🤝 負責人</button> '
+      +'<button type="button" class="btn btn-xs" title="管理部範本：一般頁面全部開放" onclick="permMxApplyRole(\''+esc(em)+'\',\'office\')" style="border-color:#90CAF9;color:#1565C0">🏢 管理部</button>'
       +'</td>'
       +'<td style="text-align:center"><button type="button" class="btn btn-xs btn-r" title="移除此使用者設定" onclick="permMxRemove(\''+esc(em)+'\')">✕</button></td></tr>';
   }).join('');
@@ -16976,15 +17110,20 @@ function permMxApplyRole(em,role){
     if(!mx[em])mx[em]={pages:{},hideProfit:false};
     var u=mx[em];u.pages={};
     if(role==='site'){
-      ALL_PAGES.filter(function(p){return !p.adminOnly;}).forEach(function(p){
-        if(p.id!=='quickcost')u.pages[p.id]=false;
+      // 工務：日報．支出（登錄出工與支出）＋ 客戶．廠商（發包／點工要查協力廠商）
+      var _siteOpen=['quickcost','contacts'];
+      ALL_PAGES.filter(function(p){return !p.adminOnly&&!p.ownerOnly;}).forEach(function(p){
+        if(_siteOpen.indexOf(p.id)<0)u.pages[p.id]=false;
       });
       u.hideProfit=true;
     }else{
+      // 負責人／管理部：一般頁面全開（單價分析與權限管理是 ownerOnly，本來就不在清單裡）
       u.hideProfit=false;
     }
   });
-  toast(role==='site'?'⛑ 已套用「工務」：僅快速支出、隱藏利潤與金流':'🏢 已套用「管理部」：全部開放（單價分析僅管理員可見）');
+  toast(role==='site'?'⛑ 已套用「工務」：日報．支出＋客戶．廠商，隱藏利潤與金流'
+    :role==='partner'?'🤝 已套用「負責人」：利潤／金流／成本全開，單價分析與權限管理仍為擁有者限定'
+    :'🏢 已套用「管理部」：一般頁面全部開放');
 }
 function permMxHideProfit(em,v){_permMxMutate(mx=>{if(!mx[em])mx[em]={pages:{}};mx[em].hideProfit=!!v;});}
 function permMxRemove(em){showConfirm('移除使用者設定','移除後「'+esc(em)+'」回到全域預設權限。',()=>{_permMxMutate(mx=>{delete mx[em];});});}
@@ -16993,7 +17132,7 @@ function renderPagePermPanel(){
   if(!el)return;
   if(!_isAdminUser){el.innerHTML='';return;}
   const perms=getPagePerms();
-  const userPages=ALL_PAGES.filter(p=>!p.adminOnly);
+  const userPages=ALL_PAGES.filter(p=>!p.adminOnly&&!p.ownerOnly);
   el.innerHTML=`
     <div style="margin-top:14px">
       <div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:8px"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 頁面存取權限（一般使用者）</div>
