@@ -591,7 +591,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <div><div class="brand-name">豐有工程</div><div class="brand-sub">報價管理系統 <span id="brand-ver" style="color:var(--y);font-weight:700"></span></div></div>
   </div>
   <nav class="top-nav" id="top-nav"></nav>
-  <div style="width:8px;flex-shrink:0"></div>
+  <div id="user-chip" style="position:relative;flex-shrink:0;margin-right:8px"></div>
   </div>
 </header>
 
@@ -613,7 +613,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-contacts" onclick="go('contacts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>客戶．廠商</button>
   <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
   <div class="ssec" style="margin-top:5px">系統</div>
-  <button type="button" class="snav" id="sn-permissions" onclick="go('permissions')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span>權限管理</button>
+  <button type="button" class="snav" id="sn-staff" onclick="go('staff')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>人員管理</button>
+  <button type="button" class="snav" id="sn-roles" onclick="go('roles')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span>角色權限</button>
   <button type="button" class="snav" id="sn-params" onclick="go('params')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg></span>參數設定</button>
 </nav>
 
@@ -623,6 +624,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <!-- ████ DASHBOARD ████ -->
 <div class="page active" id="page-dash">
   <div id="pay-reminder-banner" style="display:none;padding:10px 18px 0"></div>
+  <div id="dash-greet" style="padding:14px 18px 0;font-size:19px;font-weight:800;color:var(--b5)"></div>
   <div class="kgrid" id="dash-kpis"></div>
   <div class="pad" style="display:flex;flex-direction:column;gap:12px">
 
@@ -1514,20 +1516,39 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 
 
 <!-- ████ 權限管理頁 ████ -->
-<div class="page" id="page-permissions">
+<!-- ████ 人員管理 ████ -->
+<div class="page" id="page-staff">
   <div class="ph">
-    <div class="ph-l"><div class="ph-t">權限管理</div><div class="ph-s">設定各帳號的功能存取權限</div></div>
-  </div>
-  <div class="pad">
-    <div class="card">
-      <div class="ch" style="background:#e8f0fe">
-        <div class="cht" style="color:#1a73e8"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 工務部預設可見頁面</div>
-      </div>
-      <div class="cb">
-        <div id="page-perm-panel-2"></div>
-      </div>
+    <div class="ph-l"><div class="ph-t">人員管理</div><div class="ph-s" id="staff-sub">共 0 人</div></div>
+    <div class="ph-r" style="display:flex;gap:6px;flex-wrap:wrap">
+      <button type="button" class="btn btn-sm" onclick="staffTemplate()"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 下載範本</button>
+      <button type="button" class="btn btn-sm" onclick="document.getElementById('staff-import-file').click()"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 匯入名冊</button>
+      <input type="file" id="staff-import-file" accept=".csv,text/csv" style="display:none" onchange="staffImport(this)">
+      <button type="button" class="btn btn-sm btn-g" onclick="staffEdit('')">＋ 新增人員</button>
     </div>
   </div>
+  <div class="pad"><div class="card"><div class="cb">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <input id="staff-q" placeholder="搜尋 姓名／帳號" oninput="renderStaffPage()" style="flex:1;min-width:160px;font-size:13px;padding:7px 10px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit">
+      <select id="staff-f-role" onchange="renderStaffPage()" style="font-size:13px;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)"></select>
+      <select id="staff-f-state" onchange="renderStaffPage()" style="font-size:13px;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)">
+        <option value="">狀態</option><option value="1">啟用</option><option value="0">停用</option>
+      </select>
+    </div>
+    <div id="staff-table"></div>
+  </div></div></div>
+</div>
+
+<!-- ████ 角色權限 ████ -->
+<div class="page" id="page-roles">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-t">角色權限</div><div class="ph-s">角色決定看得到哪些頁面；一人可兼任多個角色，權限取聯集</div></div>
+    <div class="ph-r" style="display:flex;gap:6px">
+      <button type="button" class="btn btn-sm" onclick="deptEdit('')">＋ 新增部門</button>
+      <button type="button" class="btn btn-sm btn-g" onclick="roleEdit('')">＋ 新增角色</button>
+    </div>
+  </div>
+  <div class="pad"><div class="card"><div class="cb"><div id="roles-table"></div></div></div></div>
 </div>
 
 <!-- ████ 帳務管理（進銷項）████ -->
@@ -2482,7 +2503,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.329';
+var APP_VERSION='v5.330';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -8537,106 +8558,109 @@ function saveAdminEmails(arr){
 }
 // 固定啟動管理員：清單為空（新裝置／剛清快取）時仍只有此帳號是管理員
 // v5.314：原本「清單為空 → 任何人自動成為管理員」，換台電腦登入即可提權，已移除
-// ══════════ 部門權限（v5.327）══════════
-// 三個維度，取代先前的擁有者／負責人／管理部／工務四層：
-//   dev   系統開發：全部功能，含單價分析
-//   admin 管理部　：除單價分析外全部（可再逐頁收斂）
-//   site  工務部　：預設只有日報．支出（可再逐頁開放）
-// 部門決定「看得到哪些頁面」與「讀不讀得到雲端成本（fydata/private）」。
-const DEPTS={
-  dev:  {label:'系統開發', short:'開發', color:'#4527a0', bg:'#ede7f6', desc:'全部功能，含單價分析'},
-  admin:{label:'管理部',   short:'管理', color:'#1565C0', bg:'#e3f2fd', desc:'除單價分析外全部'},
-  site: {label:'工務部',   short:'工務', color:'#e65100', bg:'#fff3e0', desc:'預設只有日報．支出'}
-};
-const DEPT_ORDER=['dev','admin','site'];
-const BOOTSTRAP_DEV=['jhchen0911@gmail.com'];   // 系統開發永遠保留，避免沒人能改權限
+// ══════════ 部門・角色・人員（v5.330）══════════
+// 三層：部門 → 角色（帶一組可見頁面）→ 人員（可兼任多個角色，權限取聯集）。
+// 取代先前寫死的三部門，未來加編制只要新增角色即可。
+const SYS_ROLE_ID='sysadmin';
+const BOOTSTRAP_DEV=['jhchen0911@gmail.com'];   // 永遠是系統管理員，避免沒人能改權限
 const BOOTSTRAP_ADMINS=BOOTSTRAP_DEV;           // 相容舊呼叫
-// 部門對照表放在 pagePerms 裡，隨既有的參數同步一起上雲（換裝置不用重設）
-function _deptMap(){
-  var perms=getPagePerms();
-  return (perms&&perms.__depts)||{};
+function _acct(){
+  var p=getPagePerms();
+  if(!p.__depts2)p.__depts2=[];
+  if(!p.__roles)p.__roles=[];
+  if(!p.__staff)p.__staff=[];
+  return p;
 }
-function _deptOf(email){
+function _acctSave(p){savePagePerms(p);}
+function _uid(pre){return pre+Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
+function listDepts(){return _acct().__depts2||[];}
+function listRoles(){return _acct().__roles||[];}
+function listStaff(){return _acct().__staff||[];}
+function _roleById(id){return listRoles().find(function(r){return r.id===id;})||null;}
+function _deptName(id){var d=listDepts().find(function(x){return x.id===id;});return d?d.name:'';}
+function _staffOf(email){
   var e=String(email||'').toLowerCase();
-  if(!e)return '';
-  if(BOOTSTRAP_DEV.indexOf(e)>=0)return 'dev';
-  var d=_deptMap()[e];
-  return DEPTS[d]?d:'site';     // 未指派＝最小權限，不是全開
+  if(!e)return null;
+  return listStaff().find(function(x){return String(x.email||'').toLowerCase()===e;})||null;
 }
-function setDept(email,dept){
+// 某人生效的角色（人員停用或角色停用都不算）
+function _rolesOf(email){
   var e=String(email||'').toLowerCase();
-  if(!e||!DEPTS[dept])return;
-  var perms=getPagePerms();
-  if(!perms.__depts)perms.__depts={};
-  perms.__depts[e]=dept;
-  savePagePerms(perms);
-  _syncAdminEmailsFromDepts();
+  if(BOOTSTRAP_DEV.indexOf(e)>=0){
+    var sr=_roleById(SYS_ROLE_ID);
+    return sr?[sr]:[{id:SYS_ROLE_ID,name:'系統管理員',sys:true,enabled:true,pages:{},cloudCost:true}];
+  }
+  var st=_staffOf(e);
+  if(!st||st.active===false)return [];
+  return (st.roles||[]).map(_roleById).filter(function(r){return r&&r.enabled!==false;});
 }
-function removeDept(email){
-  var e=String(email||'').toLowerCase();
-  var perms=getPagePerms();
-  if(perms.__depts)delete perms.__depts[e];
-  if(perms.__matrix)delete perms.__matrix[e];
-  savePagePerms(perms);
-  _syncAdminEmailsFromDepts();
+function _isSysUser(email){return _rolesOf(email).some(function(r){return r.sys;});}
+// 人員身上的部門（取第一個角色的部門，僅供顯示）
+function _staffDept(st){
+  var r=(st&&(st.roles||[]).map(_roleById).filter(Boolean))||[];
+  return r.length?_deptName(r[0].dept):'';
 }
-function deptMembers(){
-  var m=_deptMap(),out={};
-  DEPT_ORDER.forEach(function(d){out[d]=[];});
-  BOOTSTRAP_DEV.forEach(function(e){out.dev.push(e);});
-  Object.keys(m).forEach(function(e){
-    if(BOOTSTRAP_DEV.indexOf(e)>=0)return;
-    var d=DEPTS[m[e]]?m[e]:'site';
-    out[d].push(e);
-  });
-  return out;
+// 可讀雲端成本（fydata/private）＝任一角色勾了「成本資料」
+function isAdmin(email){
+  return _rolesOf(email).some(function(r){return r.sys||r.cloudCost;});
 }
-// fy_admins 決定誰能讀雲端的 fydata/private（登入時據此登記 adminUids）
-// → 由部門推導，不再各管各的
+function isOwner(email){return _isSysUser(email);}
+function getOwnerEmails(){
+  return listStaff().filter(function(s){return (s.roles||[]).some(function(id){var r=_roleById(id);return r&&r.sys;});})
+    .map(function(s){return String(s.email||'').toLowerCase();})
+    .concat(BOOTSTRAP_DEV).filter(function(e,i,a){return e&&a.indexOf(e)===i;});
+}
+// fy_admins 決定登入時要不要登記 adminUids（雲端成本節點）→ 由角色推導
 function _syncAdminEmailsFromDepts(){
-  var mem=deptMembers();
-  var list=mem.dev.concat(mem.admin).filter(function(e,i,a){return e&&a.indexOf(e)===i;});
+  var list=listStaff().filter(function(s){return s.active!==false&&isAdmin(s.email);})
+    .map(function(s){return String(s.email||'').toLowerCase();})
+    .concat(BOOTSTRAP_DEV).filter(function(e,i,a){return e&&a.indexOf(e)===i;});
   saveAdminEmails(list);
 }
-// 舊資料搬遷：fy_owners → 系統開發、fy_admins → 管理部
-// 注意：getPagePerms 定義在另一個 script 區塊，parse 時呼叫會 ReferenceError，
-// 所以改為延後由 applyRoleUI／啟動流程觸發（只跑一次）。
+// ── 建立預設部門與角色；並把 v5.327 的三部門設定搬過來 ──
 function _migrateDepts(){
   try{
-    if(localStorage.getItem('fy_dept_mig1')==='1')return;
     if(typeof getPagePerms!=='function'||typeof ALL_PAGES==='undefined')return;
-    var perms=getPagePerms();
-    if(!perms.__depts)perms.__depts={};
-    var touched=false;
-    try{
-      (JSON.parse(localStorage.getItem('fy_admins')||'[]')||[]).forEach(function(e){
-        e=String(e||'').toLowerCase();
-        if(e&&!perms.__depts[e]&&BOOTSTRAP_DEV.indexOf(e)<0){perms.__depts[e]='admin';touched=true;}
-      });
-    }catch(e){}
-    try{
-      (JSON.parse(localStorage.getItem('fy_owners')||'[]')||[]).forEach(function(e){
-        e=String(e||'').toLowerCase();
-        if(e&&BOOTSTRAP_DEV.indexOf(e)<0){perms.__depts[e]='dev';touched=true;}
-      });
-    }catch(e){}
-    // 工務部預設＝只有日報．支出（原本全域是全開，等於任何登入帳號都看得到利潤與金流）
-    var SITE_DEFAULT=['quickcost'];
-    ALL_PAGES.forEach(function(pg){
-      if(pg.adminOnly||pg.devOnly)return;
-      if(SITE_DEFAULT.indexOf(pg.id)>=0){if(perms[pg.id]===false)delete perms[pg.id];}
-      else if(perms[pg.id]!==false){perms[pg.id]=false;touched=true;}
+    if(localStorage.getItem('fy_acct_mig1')==='1')return;
+    var p=_acct();
+    var userPages=ALL_PAGES.filter(function(x){return !x.sysOnly&&!x.hidden;}).map(function(x){return x.id;});
+    var mkDept=function(name){
+      var d=p.__depts2.find(function(x){return x.name===name;});
+      if(!d){d={id:_uid('d'),name:name};p.__depts2.push(d);}
+      return d;
+    };
+    var dSys=mkDept('系統開發'),dAdm=mkDept('管理部'),dSite=mkDept('工務部');
+    var mkRole=function(id,name,dept,pages,cloud,sys){
+      var r=p.__roles.find(function(x){return x.id===id;});
+      if(!r){r={id:id};p.__roles.push(r);}
+      r.name=name;r.dept=dept;r.enabled=true;
+      if(sys)r.sys=true;
+      r.cloudCost=!!cloud;
+      r.pages=r.pages||{};
+      (pages||[]).forEach(function(pg){r.pages[pg]=true;});
+      return r;
+    };
+    mkRole(SYS_ROLE_ID,'系統管理員',dSys.id,userPages,true,true);
+    var rAdm=mkRole('r_admin','管理部',dAdm.id,userPages,true,false);
+    var rSite=mkRole('r_site','工務部',dSite.id,['quickcost'],false,false);
+    // v5.327 的 __depts（email→dev/admin/site）轉成人員名冊
+    var old=p.__depts||{};
+    Object.keys(old).forEach(function(em){
+      em=String(em||'').toLowerCase();if(!em)return;
+      if(p.__staff.some(function(s){return String(s.email||'').toLowerCase()===em;}))return;
+      var d=old[em];
+      var rid=(d==='dev')?SYS_ROLE_ID:(d==='admin')?rAdm.id:rSite.id;
+      p.__staff.push({id:_uid('s'),email:em,name:em.split('@')[0],phone:'',roles:[rid],active:true});
     });
-    if(touched)savePagePerms(perms);
-    localStorage.setItem('fy_dept_mig1','1');
+    BOOTSTRAP_DEV.forEach(function(em){
+      if(p.__staff.some(function(s){return String(s.email||'').toLowerCase()===em;}))return;
+      p.__staff.push({id:_uid('s'),email:em,name:'系統管理員',phone:'',roles:[SYS_ROLE_ID],active:true});
+    });
+    _acctSave(p);
+    try{_syncAdminEmailsFromDepts();}catch(e){}
+    localStorage.setItem('fy_acct_mig1','1');
   }catch(e){}
 }
-function isAdmin(email){                       // ＝可讀雲端成本（開發＋管理部）
-  var d=_deptOf(email);
-  return d==='dev'||d==='admin';
-}
-function isOwner(email){return _deptOf(email)==='dev';}
-function getOwnerEmails(){return deptMembers().dev;}
 var _isOwnerUser=false;
 // _isAdminUser 已在頂部宣告
 
@@ -16877,18 +16901,19 @@ const ALL_PAGES = [
   {id:'materials', label:'材料管理',  icon:_pgIcon('box'),      grp:'main',  adminOnly:false},
   {id:'invoice',   label:'業主計價',  icon:_pgIcon('receipt'),  grp:'main',  adminOnly:false},
   {id:'quickcost', label:'日報．支出',icon:_pgIcon('pencil'),   grp:'main',  adminOnly:false},
-  {id:'contracts', label:'合約管理',  icon:_pgIcon('contract'), grp:'main',  adminOnly:false, hidden:true}, // v5.294 併入專案總覽，導覽隱藏（頁面與資料保留）
+  {id:'contracts', label:'合約管理',  icon:_pgIcon('contract'), grp:'main',  adminOnly:false, hidden:true, parent:'projects'}, // v5.294 併入專案總覽，導覽隱藏（頁面與資料保留）
   {id:'finance',   label:'金流管理',  icon:_pgIcon('coins'),    grp:'fin',   adminOnly:false},
   {id:'profit',    label:'利潤．報表',icon:_pgIcon('trend'),    grp:'fin',   adminOnly:false},
   {id:'ledger',    label:'帳務管理',  icon:_pgIcon('wallet'),   grp:'fin',   adminOnly:false},
-  {id:'reports',   label:'報表中心',  icon:_pgIcon('chart'),    grp:'fin',   adminOnly:false, hidden:true}, // 由「利潤．報表」頁內分頁進入
+  {id:'reports',   label:'報表中心',  icon:_pgIcon('chart'),    grp:'fin',   adminOnly:false, hidden:true, parent:'profit'}, // 由「利潤．報表」頁內分頁進入
   {id:'contacts',  label:'客戶．廠商',icon:_pgIcon('users'),    grp:'data',  adminOnly:false},
-  // v5.327 devOnly：單價分析＝報價的成本模型，只有系統開發（報價者）看得到
-  {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, devOnly:true},
-  {id:'permissions',label:'權限管理', icon:_pgIcon('lock'),     grp:'sys',   adminOnly:true, devOnly:true},
-  {id:'params',    label:'參數設定',  icon:_pgIcon('sliders'),  grp:'sys',   adminOnly:true, devOnly:true},
+  // v5.330 sysOnly：只有「系統管理員」角色能開，其他角色的權限表上是鎖住的
+  {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, sysOnly:true},
+  {id:'staff',     label:'人員管理',  icon:_pgIcon('users'),    grp:'acct',  adminOnly:true, sysOnly:true},
+  {id:'roles',     label:'角色權限',  icon:_pgIcon('lock'),     grp:'acct',  adminOnly:true, sysOnly:true},
+  {id:'params',    label:'參數設定',  icon:_pgIcon('sliders'),  grp:'sys',   adminOnly:true, sysOnly:true},
 ];
-const PAGE_GRP_LABEL={main:'主功能',fin:'財務流',data:'資料與工具',sys:'系統'};
+const PAGE_GRP_LABEL={main:'主功能',fin:'財務流',data:'資料與工具',acct:'帳號權限管理',sys:'系統'};
 // 導覽可見頁面（排除隱藏與無權限者）
 function navPages(){
   return ALL_PAGES.filter(function(p){return !p.hidden&&canAccess(p.id);});
@@ -16922,21 +16947,21 @@ function savePagePerms(obj){
 function canAccess(pageId){
   const page=ALL_PAGES.find(p=>p.id===pageId);
   if(!page)return true;
-  const dept=_deptOf((_fbUser&&_fbUser.email)||'');
-  // 系統開發：全部
-  if(dept==='dev')return true;
-  // 單價分析＝報價成本模型，只有系統開發看得到
-  if(page.devOnly)return false;
-  // 管理部：除單價分析外全部，但仍可由個別設定逐頁收斂
-  const perms=getPagePerms();
-  const em=String((_fbUser&&_fbUser.email)||'').toLowerCase();
-  const mine=(perms.__matrix||{})[em];
-  if(mine&&mine.pages&&mine.pages[pageId]===false)return false;
-  if(dept==='admin')return true;
-  // 工務部（含未指派）：走「工務部預設可見頁面」，個別設定可再放寬
-  if(page.adminOnly)return false;
-  if(mine&&mine.pages&&mine.pages[pageId]===true)return true;
-  return perms[pageId]!==false;
+  const em=(_fbUser&&_fbUser.email)||'';
+  // 未登入＝本機資料模式（資料只在這台裝置上，雲端規則才是真正的防線）：
+  // 一般頁面照常使用，帳號／參數／單價分析等管理頁不開。與 v5.326 以前一致。
+  if(!em)return !page.adminOnly;
+  const roles=_rolesOf(em);
+  if(roles.some(r=>r.sys))return true;          // 系統管理員：全部
+  if(page.sysOnly)return false;                 // 單價分析／參數設定／人員／角色：系統管理員限定
+  // 導覽上隱藏的頁面（合約管理、報表中心）是從別頁點進去的內部目的地，
+  // 權限跟著它的母頁走，不然角色權限表上沒得勾、點過去卻被擋。
+  const pid=page.parent||pageId;
+  return roles.some(r=>r.pages&&r.pages[pid]===true);
+}
+// 已登入但沒有任何生效角色 → 尚未指派
+function _noRoleYet(){
+  return !!(_fbUser&&_fbUser.email)&&_rolesOf(_fbUser.email).length===0;
 }
 
 // 目前使用者是否被設定「隱藏利潤數據」
@@ -17023,6 +17048,332 @@ function renderMobMore(){
 
 // 更新 applyRoleUI 加入頁面權限控制
 // applyRoleUI 已統一處理
+// ══════════ 人員管理（v5.330）══════════
+var _staffPage=1;
+function _staffRoleNames(st){
+  return (st.roles||[]).map(_roleById).filter(Boolean);
+}
+function renderStaffPage(){
+  var box=document.getElementById('staff-table');if(!box)return;
+  var all=listStaff().slice();
+  // 角色篩選下拉
+  var sel=document.getElementById('staff-f-role');
+  if(sel){
+    var cur=sel.value;
+    sel.innerHTML='<option value="">角色</option>'+listRoles().map(function(r){
+      return '<option value="'+esc(r.id)+'"'+(r.id===cur?' selected':'')+'>'+esc(r.name)+'</option>';}).join('');
+  }
+  var q=String((document.getElementById('staff-q')||{}).value||'').trim().toLowerCase();
+  var fr=(document.getElementById('staff-f-role')||{}).value||'';
+  var fs=(document.getElementById('staff-f-state')||{}).value||'';
+  var rows=all.filter(function(st){
+    if(q&&String(st.name||'').toLowerCase().indexOf(q)<0&&String(st.email||'').toLowerCase().indexOf(q)<0)return false;
+    if(fr&&(st.roles||[]).indexOf(fr)<0)return false;
+    if(fs==='1'&&st.active===false)return false;
+    if(fs==='0'&&st.active!==false)return false;
+    return true;
+  });
+  var sub=document.getElementById('staff-sub');
+  if(sub)sub.textContent='共 '+all.length+' 人'+(rows.length!==all.length?('（篩選後 '+rows.length+'）'):'');
+  var per=10,pages=Math.max(1,Math.ceil(rows.length/per));
+  if(_staffPage>pages)_staffPage=pages;
+  var view=rows.slice((_staffPage-1)*per,_staffPage*per);
+  if(!rows.length){box.innerHTML='<div class="empty" style="padding:36px"><p>尚無人員——按右上「＋ 新增人員」開始</p></div>';return;}
+  box.innerHTML='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+    +'<thead><tr style="background:var(--gl)">'
+    +['帳號（登入信箱）','姓名','角色（可兼任多個）','部門','電話','狀態','操作']
+      .map(function(h,i){return '<th style="text-align:'+(i>=5?'center':'left')+';padding:7px 10px;font-size:11px;color:var(--b4);white-space:nowrap">'+h+'</th>';}).join('')
+    +'</tr></thead><tbody>'
+    +view.map(function(st){
+      var rs=_staffRoleNames(st);
+      return '<tr style="border-bottom:1px solid var(--b1)">'
+      +'<td style="padding:7px 10px;white-space:nowrap">'+esc(st.email||'')
+        +(String((_fbUser&&_fbUser.email)||'').toLowerCase()===String(st.email||'').toLowerCase()?'<span style="font-size:10px;color:var(--g3);margin-left:4px">（你）</span>':'')+'</td>'
+      +'<td style="padding:7px 10px;font-weight:600;white-space:nowrap">'+esc(st.name||'')+'</td>'
+      +'<td style="padding:7px 10px">'+(rs.length?rs.map(function(r){
+          return '<span style="display:inline-block;background:'+(r.sys?'#ede7f6':'var(--gl)')+';color:'+(r.sys?'#4527a0':'var(--g3)')+';border:1px solid '+(r.sys?'#d1c4e9':'var(--gm)')+';border-radius:99px;padding:1px 8px;font-size:11px;margin:1px 3px 1px 0">'+esc(r.name)+'</span>';
+        }).join(''):'<span style="color:#c62828;font-size:11px">未指派角色</span>')+'</td>'
+      +'<td style="padding:7px 10px;white-space:nowrap;color:var(--b4)">'+esc(_staffDept(st))+'</td>'
+      +'<td style="padding:7px 10px;white-space:nowrap;color:var(--b4)">'+esc(st.phone||'')+'</td>'
+      +'<td style="padding:7px 10px;text-align:center"><span class="bdg '+(st.active===false?'warn':'ok')+'">'+(st.active===false?'停用':'啟用')+'</span></td>'
+      +'<td style="padding:7px 10px;text-align:center;white-space:nowrap">'
+        +'<button type="button" class="btn btn-xs" onclick="staffEdit(\''+escq(st.id)+'\')">編輯</button> '
+        +(BOOTSTRAP_DEV.indexOf(String(st.email||'').toLowerCase())>=0?''
+          :'<button type="button" class="btn btn-xs btn-r" onclick="staffDel(\''+escq(st.id)+'\')">刪除</button>')
+      +'</td></tr>';
+    }).join('')
+    +'</tbody></table></div>'
+    +(pages>1?('<div style="display:flex;gap:4px;justify-content:flex-end;align-items:center;margin-top:10px">'
+      +Array.from({length:pages},function(_,i){return i+1;}).map(function(n){
+        return '<button type="button" class="btn btn-xs"'+(n===_staffPage?' style="background:var(--g3);color:#fff;border-color:var(--g3)"':'')
+          +' onclick="_staffPage='+n+';renderStaffPage()">'+n+'</button>';}).join('')
+      +'</div>'):'');
+}
+function staffEdit(id){
+  var st=id?listStaff().find(function(x){return x.id===id;}):null;
+  var roles=listRoles();
+  var body='<div class="f" style="margin-bottom:9px"><label>登入信箱 <span style="color:var(--red)">*</span></label>'
+    +'<input id="stf-email" type="email" value="'+esc((st&&st.email)||'')+'" placeholder="對方登入用的 Google 帳號"></div>'
+    +'<div class="fg fg2" style="margin-bottom:9px">'
+    +'<div class="f"><label>姓名</label><input id="stf-name" value="'+esc((st&&st.name)||'')+'"></div>'
+    +'<div class="f"><label>電話</label><input id="stf-phone" value="'+esc((st&&st.phone)||'')+'"></div></div>'
+    +'<div class="f" style="margin-bottom:9px"><label>角色（可複選，權限取聯集）</label>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:3px">'
+    +roles.map(function(r){
+      var on=st&&(st.roles||[]).indexOf(r.id)>=0;
+      return '<label style="display:inline-flex;align-items:center;gap:4px;border:1px solid '+(on?'var(--gm)':'var(--b2)')+';background:'+(on?'var(--gl)':'var(--w)')+';border-radius:99px;padding:3px 10px;font-size:12px;cursor:pointer">'
+        +'<input type="checkbox" class="stf-role" value="'+esc(r.id)+'"'+(on?' checked':'')+' style="margin:0">'+esc(r.name)
+        +(r.enabled===false?'<span style="font-size:10px;color:#c62828">（停用）</span>':'')+'</label>';
+    }).join('')+'</div></div>'
+    +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="stf-active"'+(!st||st.active!==false?' checked':'')+'> 啟用此帳號</label>';
+  _modal(id?'編輯人員':'新增人員',body,function(){
+    var em=String((document.getElementById('stf-email')||{}).value||'').trim().toLowerCase();
+    if(!em||em.indexOf('@')<0){toast('請輸入正確的登入信箱');return false;}
+    var dup=listStaff().find(function(x){return String(x.email||'').toLowerCase()===em&&x.id!==(st&&st.id);});
+    if(dup){toast('此信箱已在名冊中');return false;}
+    var picked=[].slice.call(document.querySelectorAll('.stf-role:checked')).map(function(c){return c.value;});
+    var p=_acct();
+    var rec=st?p.__staff.find(function(x){return x.id===st.id;}):null;
+    if(!rec){rec={id:_uid('s')};p.__staff.push(rec);}
+    rec.email=em;
+    rec.name=String((document.getElementById('stf-name')||{}).value||'').trim()||em.split('@')[0];
+    rec.phone=String((document.getElementById('stf-phone')||{}).value||'').trim();
+    rec.roles=picked;
+    rec.active=!!(document.getElementById('stf-active')||{}).checked;
+    if(BOOTSTRAP_DEV.indexOf(em)>=0){rec.active=true;if(rec.roles.indexOf(SYS_ROLE_ID)<0)rec.roles.push(SYS_ROLE_ID);}
+    _acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();
+    toast('已儲存 '+em+'　·　對方需自行登入一次才生效');
+    return true;
+  });
+}
+function staffDel(id){
+  var st=listStaff().find(function(x){return x.id===id;});if(!st)return;
+  if(BOOTSTRAP_DEV.indexOf(String(st.email||'').toLowerCase())>=0){toast('預設系統管理員不可刪除');return;}
+  showConfirm('刪除人員','刪除「'+esc(st.name||st.email)+'」後，該帳號登入將看不到任何頁面。',function(){
+    var p=_acct();p.__staff=p.__staff.filter(function(x){return x.id!==id;});
+    _acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();toast('已刪除');
+  });
+}
+function staffTemplate(){
+  var csv='登入信箱,姓名,電話,角色（多個用頓號分隔）\n'
+    +'someone@gmail.com,王小明,0912345678,'+((listRoles()[1]||{}).name||'工務部')+'\n';
+  _dlText('人員名冊範本.csv','﻿'+csv);
+}
+function staffImport(inp){
+  var f=inp&&inp.files&&inp.files[0];if(!f)return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    try{
+      var lines=String(rd.result||'').replace(/^﻿/,'').split(/\r?\n/).filter(function(l){return l.trim();});
+      lines.shift();   // 表頭
+      var p=_acct(),add=0,upd=0,bad=0;
+      lines.forEach(function(l){
+        var c=l.split(',');
+        var em=String(c[0]||'').trim().toLowerCase();
+        if(!em||em.indexOf('@')<0){bad++;return;}
+        var names=String(c[3]||'').split(/[、,;／\/]/).map(function(x){return x.trim();}).filter(Boolean);
+        var ids=names.map(function(n){var r=listRoles().find(function(x){return x.name===n;});return r?r.id:null;}).filter(Boolean);
+        var rec=p.__staff.find(function(x){return String(x.email||'').toLowerCase()===em;});
+        if(rec)upd++;else{rec={id:_uid('s'),active:true};p.__staff.push(rec);add++;}
+        rec.email=em;
+        rec.name=String(c[1]||'').trim()||rec.name||em.split('@')[0];
+        rec.phone=String(c[2]||'').trim()||rec.phone||'';
+        if(ids.length)rec.roles=ids;
+        if(rec.roles==null)rec.roles=[];
+      });
+      _acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();
+      toast('匯入完成：新增 '+add+' 人、更新 '+upd+' 人'+(bad?('、略過 '+bad+' 列（信箱無效）'):''));
+    }catch(e){toast('匯入失敗：'+(e&&e.message||''));}
+    inp.value='';
+  };
+  rd.readAsText(f);
+}
+
+// ══════════ 角色權限（v5.330）══════════
+function renderRolesPage(){
+  var box=document.getElementById('roles-table');if(!box)return;
+  var roles=listRoles(),staff=listStaff();
+  var cnt=function(rid){return staff.filter(function(s){return (s.roles||[]).indexOf(rid)>=0;}).length
+    +(rid===SYS_ROLE_ID?BOOTSTRAP_DEV.filter(function(e){return !staff.some(function(s){return String(s.email||'').toLowerCase()===e;});}).length:0);};
+  if(!roles.length){box.innerHTML='<div class="empty" style="padding:36px"><p>尚無角色——按右上「＋ 新增角色」開始</p></div>';return;}
+  box.innerHTML='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+    +'<thead><tr style="background:var(--gl)">'
+    +['角色','部門','人數','狀態','操作'].map(function(h,i){
+      return '<th style="text-align:'+(i>=2?'center':'left')+';padding:7px 10px;font-size:11px;color:var(--b4);white-space:nowrap">'+h+'</th>';}).join('')
+    +'</tr></thead><tbody>'
+    +roles.map(function(r){
+      var n=Object.keys(r.pages||{}).filter(function(k){return r.pages[k];}).length;
+      return '<tr style="border-bottom:1px solid var(--b1)">'
+      +'<td style="padding:7px 10px;font-weight:700;white-space:nowrap">'+esc(r.name)
+        +(r.sys?'<span style="font-size:10px;background:var(--b1);color:var(--b4);border-radius:4px;padding:1px 6px;margin-left:5px">系統</span>':'')
+        +'<div style="font-size:10px;color:var(--b3);font-weight:400">可見 '+(r.sys?'全部頁面':n+' 個頁面')
+        +(r.cloudCost||r.sys?'　·　可讀成本資料':'')+'</div></td>'
+      +'<td style="padding:7px 10px;white-space:nowrap;color:var(--b4)">'+esc(_deptName(r.dept)||'—')+'</td>'
+      +'<td style="padding:7px 10px;text-align:center">'+cnt(r.id)+'</td>'
+      +'<td style="padding:7px 10px;text-align:center">'
+        +(r.sys?'<span class="bdg ok">啟用</span>'
+          :'<label style="cursor:pointer"><input type="checkbox" '+(r.enabled!==false?'checked':'')+' onchange="roleToggle(\''+escq(r.id)+'\',this.checked)"></label>')+'</td>'
+      +'<td style="padding:7px 10px;text-align:center;white-space:nowrap">'
+        +'<button type="button" class="btn btn-xs" onclick="rolePerm(\''+escq(r.id)+'\')">編輯權限</button> '
+        +(r.sys?'':'<button type="button" class="btn btn-xs" onclick="roleEdit(\''+escq(r.id)+'\')">改名</button> '
+          +'<button type="button" class="btn btn-xs btn-r" onclick="roleDel(\''+escq(r.id)+'\')">刪除</button>')
+      +'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+}
+function roleToggle(id,on){
+  var p=_acct();var r=p.__roles.find(function(x){return x.id===id;});if(!r||r.sys)return;
+  r.enabled=!!on;_acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();
+}
+function roleEdit(id){
+  var r=id?_roleById(id):null;
+  if(r&&r.sys){toast('系統管理員角色不可改名');return;}
+  var depts=listDepts();
+  if(!depts.length){toast('請先新增部門');return;}
+  var body='<div class="f" style="margin-bottom:9px"><label>角色名稱 <span style="color:var(--red)">*</span></label>'
+    +'<input id="rl-name" value="'+esc((r&&r.name)||'')+'" placeholder="如：業務部－主管"></div>'
+    +'<div class="f" style="margin-bottom:9px"><label>所屬部門</label><select id="rl-dept" style="font-family:inherit;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px">'
+    +depts.map(function(d){return '<option value="'+esc(d.id)+'"'+((r&&r.dept===d.id)?' selected':'')+'>'+esc(d.name)+'</option>';}).join('')+'</select></div>'
+    +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="rl-cost"'+((r&&r.cloudCost)?' checked':'')+'> 可讀成本資料（成本／毛利／分潤）</label>';
+  _modal(id?'角色改名':'新增角色',body,function(){
+    var nm=String((document.getElementById('rl-name')||{}).value||'').trim();
+    if(!nm){toast('請輸入角色名稱');return false;}
+    var p=_acct();
+    var rec=r?p.__roles.find(function(x){return x.id===r.id;}):null;
+    if(!rec){rec={id:_uid('r'),pages:{},enabled:true};p.__roles.push(rec);}
+    rec.name=nm;
+    rec.dept=(document.getElementById('rl-dept')||{}).value||'';
+    rec.cloudCost=!!(document.getElementById('rl-cost')||{}).checked;
+    _acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();
+    toast('已儲存角色「'+nm+'」');
+    return true;
+  });
+}
+function roleDel(id){
+  var r=_roleById(id);if(!r||r.sys)return;
+  var used=listStaff().filter(function(s){return (s.roles||[]).indexOf(id)>=0;}).length;
+  showConfirm('刪除角色','刪除「'+esc(r.name)+'」'+(used?('，'+used+' 位人員會失去這個角色的權限。'):'。'),function(){
+    var p=_acct();
+    p.__roles=p.__roles.filter(function(x){return x.id!==id;});
+    p.__staff.forEach(function(s){s.roles=(s.roles||[]).filter(function(x){return x!==id;});});
+    _acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();toast('已刪除');
+  });
+}
+// 逐頁勾選：sysOnly 的頁面鎖住，只有系統管理員角色有
+function rolePerm(id){
+  var r=_roleById(id);if(!r)return;
+  var pages=ALL_PAGES.filter(function(p){return !p.hidden;});
+  var body='<div style="font-size:11.5px;color:var(--b4);margin-bottom:9px">勾選「'+esc(r.name)+'」看得到的頁面。</div>'
+    +'<div style="display:flex;flex-direction:column;gap:5px;max-height:52vh;overflow:auto">'
+    +pages.map(function(pg){
+      var lock=pg.sysOnly&&!r.sys;
+      var on=r.sys||(r.pages&&r.pages[pg.id]===true);
+      return '<label style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border:1px solid '+(on?'var(--gm)':'var(--b2)')+';background:'+(lock?'var(--b0)':(on?'var(--gl)':'var(--w)'))+';border-radius:var(--r6);font-size:12.5px;'+(lock?'opacity:.6':'cursor:pointer')+'">'
+        +'<span>'+esc(pg.label)+(lock?'<span style="font-size:10px;color:var(--b3);margin-left:5px">系統管理員限定</span>':'')+'</span>'
+        +'<input type="checkbox" class="rl-page" data-pid="'+esc(pg.id)+'"'+(on?' checked':'')+(lock||r.sys?' disabled':'')+'>'
+        +'</label>';
+    }).join('')+'</div>';
+  _modal('編輯權限：'+r.name,body,function(){
+    if(r.sys){toast('系統管理員永遠可見全部頁面');return true;}
+    var p=_acct();var rec=p.__roles.find(function(x){return x.id===r.id;});if(!rec)return true;
+    rec.pages={};
+    [].slice.call(document.querySelectorAll('.rl-page')).forEach(function(c){
+      if(c.checked&&!c.disabled)rec.pages[c.getAttribute('data-pid')]=true;
+    });
+    _acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();
+    toast('已更新「'+rec.name+'」的頁面權限');
+    return true;
+  });
+}
+function deptEdit(id){
+  var d=id?listDepts().find(function(x){return x.id===id;}):null;
+  var body='<div class="f"><label>部門名稱 <span style="color:var(--red)">*</span></label>'
+    +'<input id="dp-name" value="'+esc((d&&d.name)||'')+'" placeholder="如：採發部"></div>';
+  _modal(id?'編輯部門':'新增部門',body,function(){
+    var nm=String((document.getElementById('dp-name')||{}).value||'').trim();
+    if(!nm){toast('請輸入部門名稱');return false;}
+    var p=_acct();
+    var rec=d?p.__depts2.find(function(x){return x.id===d.id;}):null;
+    if(!rec){rec={id:_uid('d')};p.__depts2.push(rec);}
+    rec.name=nm;_acctSave(p);applyRoleUI();toast('已儲存部門「'+nm+'」');
+    return true;
+  });
+}
+// 通用小彈窗：onOk 回傳 false 代表驗證未過、不關閉
+function _modal(title,bodyHtml,onOk){
+  var old=document.getElementById('fy-modal');if(old)old.remove();
+  var d=document.createElement('div');
+  d.id='fy-modal';
+  d.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+  d.innerHTML='<div style="max-width:460px;width:100%;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+    +'<div style="background:var(--g3);padding:12px 16px;display:flex;justify-content:space-between;align-items:center">'
+    +'<span style="color:#fff;font-size:14px;font-weight:700">'+esc(title)+'</span>'
+    +'<button type="button" id="fy-modal-x" style="border:none;background:transparent;color:rgba(255,255,255,.8);font-size:19px;cursor:pointer">✕</button></div>'
+    +'<div style="padding:15px 17px">'+bodyHtml
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:15px">'
+    +'<button type="button" id="fy-modal-c" class="btn btn-sm">取消</button>'
+    +'<button type="button" id="fy-modal-o" class="btn btn-sm btn-g" style="padding:7px 20px">確定</button></div></div></div>';
+  document.body.appendChild(d);
+  var close=function(){d.remove();};
+  d.addEventListener('click',function(e){if(e.target===d)close();});
+  d.querySelector('#fy-modal-x').onclick=close;
+  d.querySelector('#fy-modal-c').onclick=close;
+  d.querySelector('#fy-modal-o').onclick=function(){ if(onOk()!==false)close(); };
+}
+function _dlText(name,text){
+  try{
+    var a=document.createElement('a');
+    a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(text);
+    a.download=name;document.body.appendChild(a);a.click();a.remove();
+  }catch(e){toast('下載失敗');}
+}
+
+// ══════════ 右上角使用者選單與總覽招呼（v5.330）══════════
+function _meName(){
+  var em=(_fbUser&&_fbUser.email)||'';
+  if(!em)return '';
+  var st=_staffOf(em);
+  return (st&&st.name)||(_fbUser&&_fbUser.displayName)||em.split('@')[0];
+}
+function _meRoleLabel(){
+  var rs=_rolesOf((_fbUser&&_fbUser.email)||'');
+  if(!rs.length)return '尚未指派角色';
+  return rs.map(function(r){return r.name;}).join('、');
+}
+function renderUserChip(){
+  var el=document.getElementById('user-chip');if(!el)return;
+  if(!_fbUser){el.innerHTML='';return;}
+  var nm=_meName();
+  var initial=esc(String(nm||'?').trim().charAt(0)||'?');
+  el.innerHTML='<button type="button" id="user-chip-btn" style="display:flex;align-items:center;gap:8px;background:transparent;border:none;cursor:pointer;padding:4px 6px;color:#fff;font-family:inherit">'
+    +'<span style="width:28px;height:28px;border-radius:50%;background:var(--y);color:#3a2b00;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+initial+'</span>'
+    +'<span style="font-size:12.5px;font-weight:700;white-space:nowrap" class="desk-only">'+esc(nm)+'（'+esc(_meRoleLabel())+'）</span>'
+    +'</button>'
+    +'<div id="user-menu" style="display:none;position:absolute;right:0;top:38px;background:var(--w);border:1px solid var(--b2);border-radius:var(--r10);box-shadow:0 12px 32px rgba(0,0,0,.18);min-width:190px;z-index:200;overflow:hidden">'
+    +'<div style="padding:9px 13px;border-bottom:1px solid var(--b1)">'
+      +'<div style="font-size:12.5px;font-weight:700;color:var(--b5)">'+esc(nm)+'</div>'
+      +'<div style="font-size:10.5px;color:var(--b3)">'+esc((_fbUser&&_fbUser.email)||'')+'</div>'
+      +'<div style="font-size:10.5px;color:var(--g3);margin-top:2px">'+esc(_meRoleLabel())+'</div></div>'
+    +'<button type="button" onclick="_userMenuClose();fbSignOut()" style="width:100%;text-align:left;padding:9px 13px;border:none;background:transparent;cursor:pointer;font-size:12.5px;color:var(--b5);font-family:inherit">登出</button>'
+    +'</div>';
+  var btn=document.getElementById('user-chip-btn');
+  if(btn)btn.onclick=function(e){
+    e.stopPropagation();
+    var m=document.getElementById('user-menu');
+    if(m)m.style.display=(m.style.display==='none'?'block':'none');
+  };
+  if(!window._userMenuBound){
+    window._userMenuBound=true;
+    document.addEventListener('click',function(){_userMenuClose();});
+  }
+}
+function _userMenuClose(){var m=document.getElementById('user-menu');if(m)m.style.display='none';}
+function renderDashGreet(){
+  var el=document.getElementById('dash-greet');if(!el)return;
+  if(!_fbUser){el.textContent='';el.style.display='none';return;}
+  el.style.display='';
+  el.textContent='嗨，'+_meName();
+}
+
 function applyRoleUI(){
   try{_migrateDepts();}catch(e){}
   const perms=getPagePerms();
@@ -17052,137 +17403,15 @@ function applyRoleUI(){
   // 該頁其他區塊（稅率、期初現金、固定成本）負責人仍需要，所以只隱藏這張卡。
   try{
     var _upc=document.getElementById('upa-cost-param-card');
-    if(_upc)_upc.style.display=(_deptOf((_fbUser&&_fbUser.email)||'')==='dev')?'':'none';
+    if(_upc)_upc.style.display=_isSysUser((_fbUser&&_fbUser.email)||'')?'':'none';
   }catch(e){}
-  renderPagePermPanel();try{renderPermMatrixPanel();}catch(e){}
+  try{renderStaffPage();}catch(e){}
+  try{renderRolesPage();}catch(e){}
+  try{renderUserChip();}catch(e){}
+  try{renderDashGreet();}catch(e){}
 }
 
 // 渲染頁面權限設定面板（在帳號管理卡片下方）
-// ══════════ 部門權限面板（v5.327）══════════
-// 一張表把三件事講完：誰在哪個部門、看得到哪些頁面、讀不讀得到雲端成本。
-function renderPermMatrixPanel(){
-  const host=document.getElementById('page-perm-panel-2')||document.getElementById('page-perm-panel');
-  if(!host||!_isAdminUser)return;
-  let box=document.getElementById('perm-matrix-box');
-  if(!box){box=document.createElement('div');box.id='perm-matrix-box';host.parentElement.appendChild(box);}
-  const perms=getPagePerms();
-  const mx=perms.__matrix||{};
-  const mem=deptMembers();
-  const meEm=String((_fbUser&&_fbUser.email)||'').toLowerCase();
-  const canEdit=(_deptOf(meEm)==='dev');    // 只有系統開發能調整部門
-  const cols=ALL_PAGES.filter(pp=>!pp.devOnly);
-  const deptSel=(em,dept)=>'<select '+(canEdit?'':'disabled ')
-    +'onchange="permSetDept(\''+escq(em)+'\',this.value)" style="font-size:11px;padding:3px 5px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;background:'+(canEdit?'var(--w)':'var(--b0)')+'">'
-    +DEPT_ORDER.map(d=>'<option value="'+d+'"'+(d===dept?' selected':'')+'>'+DEPTS[d].label+'</option>').join('')+'</select>';
-  const rowOf=(em,dept)=>{
-    const u=mx[em]||{};const up=u.pages||{};
-    const boot=BOOTSTRAP_DEV.indexOf(em)>=0;
-    const cell=pp=>{
-      // 系統開發全開、管理部預設全開（勾＝開）、工務部預設關（勾＝開）
-      if(dept==='dev')return '<td style="text-align:center;padding:4px;color:var(--g3)">✓</td>';
-      const on=(dept==='admin')?(up[pp.id]!==false):(up[pp.id]===true||(up[pp.id]!==false&&!pp.adminOnly&&perms[pp.id]!==false));
-      return '<td style="text-align:center;padding:4px"><input type="checkbox" '+(on?'checked':'')
-        +' onchange="permSetPage(\''+escq(em)+'\',\''+pp.id+'\',this.checked)"></td>';
-    };
-    return '<tr style="background:'+DEPTS[dept].bg+'44">'
-      +'<td style="padding:5px 8px;font-size:11.5px;font-weight:600;white-space:nowrap">'+esc(em)
-      +(em===meEm?'<span style="font-size:9.5px;color:var(--g3);margin-left:3px">（你）</span>':'')+'</td>'
-      +'<td style="padding:4px 6px;white-space:nowrap">'+deptSel(em,dept)+'</td>'
-      +'<td style="text-align:center;padding:4px;font-size:10.5px;color:'+(isAdmin(em)?'var(--g3)':'var(--b3)')+'">'+(isAdmin(em)?'✓':'—')+'</td>'
-      +cols.map(cell).join('')
-      +'<td style="text-align:center">'+(boot?'':'<button type="button" class="btn btn-xs btn-r" title="移除此帳號的部門設定" onclick="permRemoveUser(\''+escq(em)+'\')">✕</button>')+'</td></tr>';
-  };
-  let rows='';
-  DEPT_ORDER.forEach(d=>{
-    const list=mem[d]||[];
-    rows+='<tr><td colspan="'+(cols.length+4)+'" style="padding:6px 8px;background:'+DEPTS[d].bg+';font-size:11px;font-weight:800;color:'+DEPTS[d].color+'">'
-      +DEPTS[d].label+'　<span style="font-weight:400;font-size:10px">'+DEPTS[d].desc+'　·　'+list.length+' 人</span></td></tr>';
-    rows+=list.length?list.map(em=>rowOf(em,d)).join('')
-      :'<tr><td colspan="'+(cols.length+4)+'" style="padding:5px 12px;font-size:10.5px;color:var(--b3)">（無）</td></tr>';
-  });
-  box.innerHTML='<div style="margin-top:16px;border-top:2px solid var(--gm);padding-top:14px">'
-    +'<div style="font-size:13.5px;font-weight:800;color:var(--b5);margin-bottom:4px">部門與頁面權限</div>'
-    +'<div style="font-size:11px;color:var(--b4);line-height:1.7;margin-bottom:9px">'
-    +DEPT_ORDER.map(d=>'<span style="display:inline-block;background:'+DEPTS[d].bg+';color:'+DEPTS[d].color+';border-radius:99px;padding:1px 9px;font-weight:700;margin-right:5px">'+DEPTS[d].label+'</span>'+DEPTS[d].desc).join('<br>')
-    +'<br><span style="color:var(--b3)">部門決定預設權限，右邊的勾選可再針對個人調整（未來編制變多時逐人設定）。'
-    +'「雲端成本」＝能不能讀到成本／毛利／分潤（系統開發與管理部才有）。<b>沒被列在這裡的帳號一律當工務部</b>。</span></div>'
-    +(canEdit?'':'<div style="font-size:11px;color:#7c5700;background:#fff8e1;border:1px solid #ffe082;border-radius:var(--r8);padding:7px 10px;margin-bottom:9px">部門指派僅限「系統開發」調整，你可以查看但不能變更。</div>')
-    +(canEdit?'<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'
-      +'<input id="perm-mx-email" placeholder="輸入使用者 Email" style="flex:1;min-width:180px;font-size:12.5px;padding:7px 10px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit">'
-      +'<select id="perm-mx-role" style="font-size:12.5px;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)">'
-      +DEPT_ORDER.map(d=>'<option value="'+d+'"'+(d==='site'?' selected':'')+'>'+DEPTS[d].label+'</option>').join('')+'</select>'
-      +'<button type="button" class="btn btn-sm btn-g" onclick="permMxAdd()">＋ 加入</button></div>':'')
-    +'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:720px"><thead><tr>'
-    +'<th style="text-align:left;padding:5px 8px;font-size:10.5px;color:var(--b3)">帳號</th>'
-    +'<th style="padding:4px 6px;font-size:10.5px;color:var(--b3);font-weight:700">部門</th>'
-    +'<th style="padding:4px 6px;font-size:10px;color:var(--b3);font-weight:700">雲端成本</th>'
-    +cols.map(pp=>'<th style="padding:4px 6px;font-size:10px;color:var(--b3);font-weight:600">'+pp.label+'</th>').join('')
-    +'<th></th></tr></thead>'
-    +'<tbody>'+rows+'</tbody></table></div>'
-    +'</div>';
-}
-function permSetDept(em,dept){
-  em=String(em||'').toLowerCase();
-  if(_deptOf(String((_fbUser&&_fbUser.email)||''))!=='dev'){toast('僅「系統開發」可調整部門');renderPermMatrixPanel();return;}
-  if(BOOTSTRAP_DEV.indexOf(em)>=0&&dept!=='dev'){toast('預設的系統開發帳號不可調整');renderPermMatrixPanel();return;}
-  setDept(em,dept);
-  applyRoleUI();
-  toast('已將 '+em+' 設為「'+DEPTS[dept].label+'」'+(isAdmin(em)?'（可讀雲端成本）':'（讀不到雲端成本）')+'　·　對方需自行登入一次才生效');
-}
-// 個別頁面微調：勾＝可見、不勾＝不可見（覆寫部門預設）
-function permSetPage(em,pid,on){
-  _permMxMutate(mx=>{
-    if(!mx[em])mx[em]={pages:{},hideProfit:false};
-    if(!mx[em].pages)mx[em].pages={};
-    mx[em].pages[pid]=!!on;
-  });
-  applyRoleUI();
-}
-function permRemoveUser(em){
-  em=String(em||'').toLowerCase();
-  if(_deptOf(String((_fbUser&&_fbUser.email)||''))!=='dev'){toast('僅「系統開發」可調整部門');return;}
-  showConfirm('移除帳號設定','移除後「'+esc(em)+'」回到工務部預設權限（只看得到日報．支出）。',function(){
-    removeDept(em);applyRoleUI();toast('已移除 '+em);
-  });
-}
-function _permMxMutate(fn){
-  const perms=getPagePerms();
-  if(!perms.__matrix)perms.__matrix={};
-  fn(perms.__matrix);
-  savePagePerms(perms);
-  renderPermMatrixPanel();
-}
-function permMxAdd(){
-  const em=(document.getElementById('perm-mx-email').value||'').trim().toLowerCase();
-  if(!em||!em.includes('@')){toast('請輸入有效 Email');return;}
-  const dept=(document.getElementById('perm-mx-role')||{}).value||'site';
-  document.getElementById('perm-mx-email').value='';
-  permSetDept(em,dept);
-}
-function renderPagePermPanel(){
-  const el=document.getElementById('page-perm-panel-2')||document.getElementById('page-perm-panel');
-  if(!el)return;
-  if(!_isAdminUser){el.innerHTML='';return;}
-  const perms=getPagePerms();
-  const userPages=ALL_PAGES.filter(p=>!p.adminOnly&&!p.devOnly);
-  el.innerHTML=`
-    <div style="margin-top:14px">
-      <div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:8px"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 工務部預設可見頁面</div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        ${userPages.map(page=>{
-          const allowed=perms[page.id]!==false;
-          return`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:${allowed?'var(--gl)':'#f5f5f5'};border:1px solid ${allowed?'var(--gm)':'var(--b2)'};border-radius:var(--r6)">
-            <div style="font-size:12px;color:var(--b5)">${page.icon} ${page.label}</div>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-              <input type="checkbox" ${allowed?'checked':''} onchange="togglePagePerm('${page.id}',this.checked)"
-                style="width:15px;height:15px;accent-color:var(--g);cursor:pointer">
-              <span style="font-size:11px;color:${allowed?'var(--g3)':'var(--b3)'}">${allowed?'✓ 開放':'✗ 限制'}</span>
-            </label>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
-}
 
 function togglePagePerm(pageId, allowed){
   const perms=getPagePerms();
@@ -17336,7 +17565,10 @@ function renderFinanceAR(){
 // ── 權限管理頁初始化 ──
 function initPermissionsPage(){
   // 直接重新渲染（不要複製 innerHTML，那樣 onclick 不會更新）
-  renderPagePermPanel();try{renderPermMatrixPanel();}catch(e){}
+  try{renderStaffPage();}catch(e){}
+  try{renderRolesPage();}catch(e){}
+  try{renderUserChip();}catch(e){}
+  try{renderDashGreet();}catch(e){}
 }
 
 // ══════════════════════════════════════════════════════════════
