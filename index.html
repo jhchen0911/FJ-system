@@ -2510,7 +2510,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.335';
+var APP_VERSION='v5.336';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2714,6 +2714,8 @@ function _rentDaysOf(it){
   if(!it)return 0;
   var s=String(it.note||'')+' '+String(it.desc||'');
   s=s.replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-65248);});
+  // v5.336 健檢G：先剔除反向約定——「不含30天租期」「不計租期」「免租期」不得誤抓成 30 天
+  s=s.replace(/[不免][含計收算]?\s*\d*\s*[天日]?\s*租\s*期/g,' ');
   var m=s.match(/(\d+(?:\.\d+)?)\s*[天日]\s*[)）]?\s*租\s*期/)          // XX天租期
       ||s.match(/租\s*期\s*[:：（(]{0,2}\s*(\d+(?:\.\d+)?)\s*[天日]/)     // 租期XX天／租期：XX天
       ||s.match(/租\s*期\s*[:：]?\s*(\d+(?:\.\d+)?)(?!\d)/);              // 租期XX（沒寫單位）
@@ -2736,7 +2738,7 @@ function _itemProgress(q,idx){
   var recs=[];
   ((q&&q.dailyLogs)||[]).forEach(function(L){
     (L.progressRows||[]).forEach(function(r){
-      if(!r||r.itemIdx!==idx)return;
+      if(!r||Number(r.itemIdx)!==Number(idx))return;   // v5.336：匯入／同步的舊資料可能是字串型
       var n=parseFloat(r.qty)||0;if(n<=0)return;
       recs.push({date:L.date||'',qty:n});
     });
@@ -2757,6 +2759,7 @@ function _itemProgress(q,idx){
 // 回傳 null＝無租期約定或日報還沒登錄，無從起算。
 function _rentStatus(q,idx,endDate){
   var it=((q&&q.items)||[])[idx];if(!it||it.sec)return null;
+  if((parseFloat(it.qty)||0)<=0)return null;   // v5.336：減帳列（負數量）沒有租期計費
   var days=_rentDaysOf(it);if(days<=0)return null;
   var pg=_itemProgress(q,idx);
   var base=pg.doneDate||pg.last;                 // 未達合約量時，以最後施工日暫估
@@ -5242,6 +5245,9 @@ function confirmInvClause(){
 
 // ── 工項結算：單一工項完成時，把合約數量調整為累積實作數量（追加／追減，原數量記錄於備註，合約金額同步連動）──
 function settleInvItem(i){
+  // v5.336 健檢G：逾期租金列不是合約工項，不可拿它結算（原本會以逾期單價×數量差
+  // 改掉正式合約金額）
+  if(invItems&&invItems[i]&&invItems[i].type==='rental'){toast('逾期租金列不參與工項結算');return;}
   const it=invItems[i];
   if(!it||it.type==='sec')return;
   const _inv=invEid?INV.find(x=>x.id===invEid):null;
@@ -5282,7 +5288,7 @@ function settleInvItem(i){
   const _delta=Math.round((orig-cum)*(parseFloat(it.contractPrice)||0)*_tm); // 正=追減、負=追加
   const _willSync=_contract&&(_contract.amount||0)>0&&_delta!==0;
   let ok=false;
-  try{ok=window.confirm('工項結算：'+(it.desc||'未命名工項')+'\n\n合約數量 '+orig+' → 實作數量 '+cum+(cum<orig?'（追減 '+(Math.round((orig-cum)*100)/100)+'）':'（追加 '+(Math.round((cum-orig)*100)/100)+'）')+(_willSync?'\n合約金額同步調整 '+(_delta>0?'−':'＋')+'NT$ '+fmt(Math.abs(_delta))+'（含稅）\n　NT$ '+fmt(_contract.amount)+' → NT$ '+fmt(Math.max(0,_contract.amount-_delta)):'')+'\n報價單維持原樣；預估成本／施工進度／利潤統計自動改採結算後數量'+'\n\n確定結算此工項？\n（原數量會記錄在備註）');}catch(e){ok=true;}
+  try{ok=window.confirm('工項結算：'+(it.desc||'未命名工項')+'\n\n合約數量 '+orig+' → 實作數量 '+cum+(cum<orig?'（追減 '+(Math.round((orig-cum)*100)/100)+'）':'（追加 '+(Math.round((cum-orig)*100)/100)+'）')+(_willSync?'\n合約金額同步調整 '+(_delta>0?'−':'＋')+'NT$ '+fmt(Math.abs(_delta))+'（含稅）\n　NT$ '+fmt(_contract.amount)+' → NT$ '+fmt(Math.max(0,_contract.amount-_delta)):'')+'\n報價單維持原樣；預估成本／施工進度／利潤統計自動改採結算後數量'+'\n\n確定結算此工項？\n（原數量會記錄在備註）');}catch(e){ok=false;/* v5.336：confirm 被瀏覽器阻擋時不可靜默放行結算 */}
   if(!ok)return;
   if(it.origContractQty==null)it.origContractQty=orig; // 保留原始合約數量
   it.contractQty=cum;
@@ -6253,7 +6259,15 @@ function addNextPeriod(id){
   next.receivedNote='';
   next.retentionReturned=false;
   next.expectedRecvDate='';
+  // v5.336 健檢G：抵銷欄位屬單期對帳結果，不得帶到下一期
+  //（原本新期繼承上期的匯費／扣款／保留款，應收短計、保留款提醒逐期翻倍）
+  next.partialConfirmed=false;
+  next.recvFee=0;next.recvDeduct=0;next.recvHold=0;
   next._mt=Date.now();
+  // v5.336 健檢G：逾期租金列是「該期時段」的一次性計費，下一期直接剔除
+  //（原本照抄整列並把逾期金額滾進 prevQty/prevAmt，前期累計混入非合約項目、
+  // 打設累積與超請警示連帶誤報）
+  next.items=(next.items||[]).filter(it=>!(it&&it.type==='rental'&&it._ovKey!=null));
   // 把本期估驗移至前期，清空本期
   // prevPayRate 記錄上期的請款類型，供下期統計判斷是否類型切換
   next.items=(next.items||[]).map(it=>{
@@ -6519,7 +6533,7 @@ function buildInvPreview(srcInv){
   const _DOC_IDS=['inv-doc-confirm','inv-doc-invoice','inv-doc-receipt'];
   const _DOC_LBL=['工作確認單','統一發票','收據'];
   // 備註同理：指定記錄時讀該筆記錄，不讀編輯器畫面
-  const _noteStr=_src?(Array.isArray(_src.note)?_src.note.join('\n'):String(_src.note||'')):getInvNote();
+  const _noteStr=_stripInternalNote(_src?(Array.isArray(_src.note)?_src.note.join('\n'):String(_src.note||'')):getInvNote());
   const docs=[];
   if(_src&&Array.isArray(_src.docs)){
     _src.docs.forEach((on,i)=>{if(on&&_DOC_LBL[i])docs.push(_DOC_LBL[i]);});
@@ -7349,6 +7363,50 @@ function invRentApply(i){
   calcInvDays();
 }
 
+// ── 逾期租金跨期查詢（v5.336 健檢G）──
+// 掃同專案「其他期別」已請的逾期列，回傳最後已請迄日（ISO）與期別，本期從隔天接續計費
+function _rentBilledUntil(curRec,ovKey){
+  var best='',bestPer='';
+  (INV||[]).forEach(function(v){
+    if(!v)return;
+    if(curRec&&v.id===curRec.id)return;
+    var same=false;
+    if(curRec){
+      if(v.quoteId&&curRec.quoteId)same=(v.quoteId===curRec.quoteId);
+      else same=(String(v.project||'').trim()===String(curRec.project||'').trim());
+    }
+    if(!same)return;
+    (v.items||[]).forEach(function(x){
+      if(!x||x.type!=='rental')return;
+      if(!(x._ovKey===ovKey||(x._ovKey==null&&x.desc&&ovKey&&x.desc.includes('逾期租金')&&x.desc.includes(String(ovKey).slice(0,6)))))return;
+      var e=x._ovEnd||'';
+      if(!e&&x.desc){
+        // 舊列沒存日期：解析 desc 的「M/D～M/D」，年份取該期請款日
+        var m=String(x.desc).match(/(\d{1,2})\/(\d{1,2})～(\d{1,2})\/(\d{1,2})/);
+        if(m){
+          var y=(v.date||'').slice(0,4)||String(new Date().getFullYear());
+          e=y+'-'+String(parseInt(m[3],10)).padStart(2,'0')+'-'+String(parseInt(m[4],10)).padStart(2,'0');
+        }
+      }
+      if(e&&e>best){best=e;bestPer=v.periodNo||'';}
+    });
+  });
+  return {until:best,period:bestPer};
+}
+// 底部備註「只動一行」：依 key 找到既有那行就更新，找不到就附加——其他備註原樣保留
+// （原本 setInvNote 整區重建，使用者的多行備註會被洗掉並存檔）
+function _upsertInvNote(line,key){
+  var container=document.getElementById('inv-note-rows');
+  if(!container)return;
+  var inputs=[].slice.call(container.querySelectorAll('.inv-note-input'));
+  var hit=inputs.find(function(inp){return key&&String(inp.value||'').indexOf(key)>=0;});
+  if(hit){hit.value=line;return;}
+  // 只有一個空白列時直接填入，否則附加新列
+  var blank=inputs.length===1&&!String(inputs[0].value||'').trim()?inputs[0]:null;
+  if(blank){blank.value=line;return;}
+  container.appendChild(_mkNoteRow(line));
+}
+
 // ════════════ 天數計算 ════════════
 function calcInvDays(){
   const contractDays=parseInt(document.getElementById('inv-contract-days')?.value)||60;
@@ -7381,64 +7439,74 @@ function calcInvDays(){
   // 工項備註欄（需求4）：只放請款%
   const itemNoteStr=claimStr;  // 工項備註只顯示請款%，不含工項名稱
 
-  // 底部備註欄（需求2+3）：請款%;逾期租金 以「；」區隔，帶工項名稱
-  let overStr='';
+  // ── 逾期租金計費區間（v5.336 健檢G重寫）──
+  // 1) 跨期不重複計費：先掃同專案其他期別已請的逾期列，本期只從「上次請到的隔天」算起
+  //    （原本第 2 期從到期日全額重算，已請過的天數整段重請）
+  // 2) 備註不整區重建：只更新／新增逾期那一行，使用者的其他備註原樣保留
+  // 3) _ovKey 改用來源工項原名（selDesc）：手改列名、同名打設/拔除並存都不會重複插列
+  const _isoD=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  let billStart=null,billDays=0,prevBilled={until:'',period:''};
   if(overDays>0){
-    const overStart=new Date(expiryDate);overStart.setDate(overStart.getDate()+1);
-    overStr=(selDesc?selDesc+'  ':'')+'逾期租金：'+fmtMD(overStart)+'～'+fmtMD(claimDate)+'（'+overDays+'天）';
+    billStart=new Date(expiryDate);billStart.setDate(billStart.getDate()+1);   // 逾期第一天
+    if(selDesc){
+      const _rec=(typeof invEid!=='undefined'&&invEid)?INV.find(x=>x.id===invEid):null;
+      prevBilled=_rentBilledUntil(_rec,selDesc);
+      if(prevBilled.until){
+        const pu=new Date(prevBilled.until);pu.setDate(pu.getDate()+1);
+        if(pu>billStart)billStart=pu;
+      }
+    }
+    billDays=Math.floor((claimDate-billStart)/864e5)+1;
   }
-  const globalNoteStr=overStr||'';  // 底部備註只顯示逾期資訊
 
-  // 帶入全域備註欄（底部）
-  if(globalNoteStr) setInvNote(globalNoteStr);
+  // 底部備註：只動「該工項的逾期租金」那一行，其他備註不重建
+  if(billDays>0){
+    const line=(selDesc?selDesc+'  ':'')+'逾期租金：'+fmtMD(billStart)+'～'+fmtMD(claimDate)+'（'+billDays+'天）'
+      +(prevBilled.until?'　※第'+(prevBilled.period||'?')+'期已請至 '+prevBilled.until.slice(5).replace('-','/'):'');
+    _upsertInvNote(line,(selDesc||'')+'  逾期租金');
+  }
 
-  // 需求5: 自動插入逾期租金工項於選定工項下一行
+  // 自動插入逾期租金工項於選定工項下一行
   if(selDesc&&overDays>0){
     const itemIdx=invItems.findIndex(x=>x.type!=='sec'&&x.desc===selDesc);
-    if(itemIdx>=0){
-      const overStart2=new Date(expiryDate);overStart2.setDate(overStart2.getDate()+1);
+    if(itemIdx>=0&&billDays<=0){
+      toast('逾期租金已於第'+(prevBilled.period||'?')+'期請至 '+String(prevBilled.until).slice(5).replace('-','/')+'，本期無新增天數');
+    }
+    if(itemIdx>=0&&billDays>0){
       // 自動清理工項名稱：移除動作字眼和括號補充說明
       const cleanDesc=(desc)=>{
-        // 移除括號及其內容（含租期說明）
         let c=desc.replace(/（[^）]*）/g,'').replace(/\([^)]*\)/g,'');
-        // 移除常見施工動作字眼
         c=c.replace(/[\s、，,]*[打設拔除裝設拆除施工安裝完成]+[\s、，,]*/g,' ');
-        // 清理多餘空格和標點
         c=c.replace(/[、，\s]+$|^[、，\s]+/g,'').replace(/\s{2,}/g,' ').trim();
         return c;
       };
       const baseDesc=cleanDesc(selDesc);
-      const overLabel=baseDesc+'  逾期租金：'+fmtMD(overStart2)+'～'+fmtMD(claimDate)+'（'+overDays+'天）';
-      // 找是否已存在逾期租金行
-      // v5.322 修正：原本用 selDesc 前 6 字比對，但插入的列名已被 cleanDesc 洗掉「打設/拔除」，
-      // 永遠比不中 → 每算一次就多插一列重複的逾期租金。改用 _ovKey 標記（舊資料退回名稱比對）。
-      const existIdx=invItems.findIndex((x,ii)=>ii>itemIdx&&x.desc&&x.desc.includes('逾期租金')
-        &&(x._ovKey===baseDesc||x.desc.indexOf(baseDesc)===0||x.desc.includes(selDesc.slice(0,6))));
-      // 取得來源工項的逾期租金單價（it.otPrice）和合約數量
+      const overLabel=baseDesc+'  逾期租金：'+fmtMD(billStart)+'～'+fmtMD(claimDate)+'（'+billDays+'天）';
+      // 既有逾期列比對：_ovKey（v5.336 起＝selDesc；相容 v5.322 的 baseDesc 與更早的名稱比對）
+      const existIdx=invItems.findIndex((x,ii)=>ii!==itemIdx&&x&&x.type!=='sec'
+        &&(x._ovKey===selDesc
+          ||(x._ovKey!=null&&x._ovKey===baseDesc)
+          ||(x._ovKey==null&&x.desc&&x.desc.includes('逾期租金')&&(x.desc.indexOf(baseDesc)===0||x.desc.includes(selDesc.slice(0,6))))));
       const srcItem=invItems[itemIdx];
-      // otPrice = 報價單填的逾期租金單價（$/支/天 or $/M2/天）
-      // 逾期金額 = otPrice × 合約數量（contractQty）× 逾期天數
       const srcPrice=srcItem?(srcItem.otPrice||0):0;
       const srcQty=srcItem?(srcItem.contractQty||1):1;
       const srcUnit=srcItem?(srcItem.unit||'式'):'式';
-      const overAmt=Math.round(srcPrice*srcQty*overDays);
-      // v5.322 修正：原本把「已乘過天數的總額」塞進單價欄，又同時填了天數欄。
-      //   ‧ 編輯頁（updateInvRowAmt）只要有 curDays 就再乘一次天數 → 金額被放大 N 倍；
-      //   ‧ 列印預覽只有 type==='rental' 才乘天數 → 兩邊算出來還不一樣，PDF 與畫面對不起來。
-      // 改為租用型正規寫法：單價＝逾期租金單價、數量＝合約數量、天數＝逾期天數，
-      // 兩邊都得到 單價×數量×天數，請款單上也看得到計價依據。
+      const overAmt=Math.round(srcPrice*srcQty*billDays);
+      // 租用型正規寫法：單價＝逾期租金單價、數量＝合約數量、天數＝本期新增逾期天數
       const _ow={type:'rental',desc:overLabel,unit:srcUnit,
         contractPrice:srcPrice,contractQty:srcQty,
         prevQty:0,prevAmt:0,
-        curQty:srcQty,curDays:overDays,curAmt:overAmt,
-        payRate:100,note:'逾期租金',otPrice:0,otUnit:'',_ovKey:baseDesc};
+        curQty:srcQty,curDays:billDays,curAmt:overAmt,
+        payRate:100,note:'逾期租金',otPrice:0,otUnit:'',
+        _ovKey:selDesc,_ovStart:_isoD(billStart),_ovEnd:_isoD(claimDate)};
       if(existIdx>=0){
         Object.keys(_ow).forEach(function(k){invItems[existIdx][k]=_ow[k];});
       } else {
         invItems.splice(itemIdx+1,0,_ow);
       }
       rInvItems();
-      const otDetail=srcPrice?`（$${srcPrice}×${srcQty}${srcUnit}×${overDays}天=NT$${overAmt.toLocaleString()}）`:'（請手動填入金額）';
+      try{autoSaveInv();}catch(e){}   // v5.336：插列即存檔，離頁不再遺失
+      const otDetail=srcPrice?`（$${srcPrice}×${srcQty}${srcUnit}×${billDays}天=NT$${overAmt.toLocaleString()}）`:'（請手動填入金額）';
       toast(`已插入逾期租金工項 ${otDetail}`);
     }
   }
@@ -10092,6 +10160,12 @@ function _sharedPayload(){
   var out={};
   Object.keys(d).forEach(function(k){if(_PRIV_COLLS.indexOf(k)<0)out[k]=d[k];});
   out.quotes=(d.quotes||[]).map(_stripQuoteSens);
+  // v5.336 健檢G：發票的內嵌影像（base64）不上 RTDB——幾張就撞節點寫入上限。
+  // 雲端只留 fileUrl（Storage 連結）；內嵌影像留在本機，合併後由 regraft 補回。
+  out.invoiceRecs=(d.invoiceRecs||[]).map(function(r){
+    if(r&&r.fileData){r=Object.assign({},r);r.fileData='';r._fileLocal=1;}
+    return r;
+  });
   return {ts:p.ts,data:out};
 }
 // v5.324：上 fydata/private 的版本——只有敏感資料
@@ -10167,7 +10241,12 @@ function _applyCloud(data){
     if(data.params)Object.assign(P,data.params);
     if(data.contracts)CONTRACTS=_safeMerge(CONTRACTS,data.contracts,'contracts');
     if(data.vendors)VENDORS=_safeMerge(VENDORS,data.vendors,'vendors');
-    if(data.invoiceRecs)INVOICE_RECS=_safeMerge(INVOICE_RECS,data.invoiceRecs,'invoiceRecs');
+    if(data.invoiceRecs){
+      // v5.336：先拍下本機的內嵌影像，合併後補回（雲端版被剝離 fileData）
+      var _irSnap={};INVOICE_RECS.forEach(function(r){if(r&&r.id&&r.fileData)_irSnap[r.id]=r.fileData;});
+      INVOICE_RECS=_safeMerge(INVOICE_RECS,data.invoiceRecs,'invoiceRecs');
+      INVOICE_RECS.forEach(function(r){if(r&&r.id&&!r.fileData&&_irSnap[r.id])r.fileData=_irSnap[r.id];});
+    }
     if(data.activityLog)ACTIVITY_LOG=data.activityLog;
     if(data.customers)CUSTOMERS=_safeMerge(CUSTOMERS,data.customers,'customers');
     if(data.matStock){
@@ -15824,7 +15903,8 @@ function irPickFile(){
 function _irUpload(f){
   var nm=(f&&f.name)||'發票影像';
   var embed=function(){
-    if(f.size>1500000){toast('檔案超過內嵌上限 1.5MB，請壓縮後再試');return;}
+    // v5.336：內嵌上限下修 800KB——1.5MB 的 base64 一張就吃掉近半 localStorage 配額
+    if(f.size>800000){toast('檔案超過內嵌上限 800KB；登入後改走雲端儲存可傳 20MB');return;}
     var rd=new FileReader();
     rd.onload=function(){_irSetFile(nm,'',rd.result);toast('已附上發票影像（內嵌）');};
     rd.readAsDataURL(f);
