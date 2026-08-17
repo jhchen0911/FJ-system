@@ -1519,33 +1519,11 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <div class="ph-l"><div class="ph-t">權限管理</div><div class="ph-s">設定各帳號的功能存取權限</div></div>
   </div>
   <div class="pad">
-    <div class="card" style="margin-bottom:12px">
-      <div class="ch" style="background:#fce4ec;display:flex;justify-content:space-between;align-items:center">
-        <div class="cht" style="color:#c62828"><svg class="ic ib" aria-hidden="true"><use href="#i-user"/></svg> 帳號管理</div>
-        <span style="font-size:11px;color:#c62828">管理員帳號</span>
-      </div>
-      <div class="cb">
-        <div style="font-size:12px;color:var(--b4);margin-bottom:10px">管理員可使用所有功能，一般使用者受下方頁面權限限制。</div>
-        <!-- 首次設定說明 -->
-        <div id="admin-setup-hint" style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:var(--r8);padding:10px 14px;margin-bottom:12px;font-size:12px;color:#1b5e20">
-          <div style="font-weight:700;margin-bottom:6px"><svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg> 如何設定管理員帳號？</div>
-          <div style="line-height:1.8">
-            1. 先至「<svg class="ic ib" aria-hidden="true"><use href="#i-sliders"/></svg> 參數設定」→「<svg class="ic ib" aria-hidden="true"><use href="#i-cloud"/></svg> Firebase 雲端同步」→ 登入帳號<br>
-            2. <strong>第一位登入的帳號</strong>自動成為管理員<br>
-            3. 登入後回到此頁，可在下方新增其他管理員帳號<br>
-            4. 未在管理員清單的帳號，登入後為一般使用者
-          </div>
-        </div>
-        <div id="admin-panel-content-perm"><div style="font-size:12px;color:var(--b3)">請先登入後查看（前往參數設定登入）</div></div>
-        <div id="owner-panel-content"></div>
-      </div>
-    </div>
     <div class="card">
       <div class="ch" style="background:#e8f0fe">
         <div class="cht" style="color:#1a73e8"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 工務部預設可見頁面</div>
       </div>
       <div class="cb">
-        <div style="font-size:12px;color:var(--b4);margin-bottom:10px">這裡設定<b>工務部</b>（含未指派部門的帳號）預設看得到哪些頁面。系統開發與管理部不受此限；個別人員可在下方表格逐頁調整。</div>
         <div id="page-perm-panel-2"></div>
       </div>
     </div>
@@ -2504,7 +2482,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.328';
+var APP_VERSION='v5.329';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -8842,68 +8820,8 @@ function _fbErrMsg(code){
 
 
 // ── 帳號管理面板渲染 ──
-function renderAdminPanel(){
-  // 同時更新兩個容器（params 頁 + permissions 頁）
-  const els=[
-    document.getElementById('admin-panel-content'),
-    document.getElementById('admin-panel-content-perm')
-  ].filter(Boolean);
-  if(els.length===0)return;
-  const notLoggedIn='<div style="font-size:12px;color:var(--b3)">請先登入（前往參數設定登入）</div>';
-  const notAdmin='<div style="font-size:12px;color:var(--b3)"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 僅限管理員查看</div>';
-  if(!_fbUser){els.forEach(el=>el.innerHTML=notLoggedIn);return;}
-  if(!_isAdminUser){els.forEach(el=>el.innerHTML=notAdmin);return;}
-  const el=els[0];
-  if(!el)return;
-  const admins=getAdminEmails();
-  el.innerHTML=`
-    <div style="margin-bottom:10px">
-      <div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:6px">管理員帳號（共 ${admins.length} 位）</div>
-      <div id="admin-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
-        ${admins.map(email=>`
-          <div style="display:flex;align-items:center;justify-content:space-between;background:var(--gl);border:1px solid var(--gm);border-radius:var(--r6);padding:5px 10px">
-            <div style="font-size:12px;color:var(--b5)">
-              <svg class="ic ib" aria-hidden="true"><use href="#i-user"/></svg> ${email}
-              ${email===(_fbUser?.email||'').toLowerCase()?'<span style="font-size:10px;color:var(--g3);margin-left:4px">（你）</span>':''}
-            </div>
-            ${admins.length>1?`<button type="button" onclick="removeAdmin('${escq(email)}')" style="border:none;background:none;color:var(--red);cursor:pointer;font-size:12px;padding:0 4px">✕</button>`:''}
-          </div>`).join('')}
-      </div>
-      <div style="display:flex;gap:6px">
-        <input id="new-admin-email" type="email" placeholder="輸入電子郵件設為管理員" style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--b2);border-radius:var(--r6)">
-        <button type="button" onclick="addAdmin()" class="btn btn-sm" style="border-color:var(--red);color:var(--red);white-space:nowrap">＋ 新增管理員</button>
-      </div>
-    </div>
-    <div style="background:#fff8e1;border-radius:var(--r8);padding:8px 10px;font-size:11px;color:#7c5700">
-      <svg class="ic ib" aria-hidden="true"><use href="#i-bulb"/></svg> 未在管理員清單中的登入帳號，自動視為一般使用者（無法查看單價分析和參數設定）
-    </div>`;
-  // 同步到第二個容器
-  const el2=document.getElementById('admin-panel-content-perm');
-  if(el2)el2.innerHTML=el.innerHTML;
-}
-
-function addAdmin(){
-  const inp=document.getElementById('new-admin-email');
-  const email=(inp?.value||'').trim().toLowerCase();
-  if(!email||!email.includes('@')){toast('請輸入有效的電子郵件');return;}
-  const admins=getAdminEmails();
-  if(admins.includes(email)){toast('此帳號已是管理員');return;}
-  admins.push(email);
-  saveAdminEmails(admins);
-  if(inp)inp.value='';
-  renderAdminPanel();
-  toast('✅ 已將 '+email+' 設為管理員');
-}
-
-function removeAdmin(email){
-  const admins=getAdminEmails().filter(e=>e!==email);
-  if(admins.length===0){toast('至少需保留一位管理員');return;}
-  saveAdminEmails(admins);
-  renderAdminPanel();
-  toast('已移除管理員：'+email);
-}
-
-// ── 自動同步：登入後比較雲端與本機時間，若雲端較新則自動下載 ──
+// v5.329：舊的「帳號管理」卡已移除——管理員資格改由部門推導（見 setDept／_syncAdminEmailsFromDepts），
+// 再放一份手動清單只會與部門互相覆蓋。相關的 renderAdminPanel／addAdmin／removeAdmin 一併刪除。
 function _autoSyncOnLogin(){
   // v5.324：先確保管理員名冊有自己的 uid（安全規則靠 uid 判斷能否讀寫 fydata/private），
   // 再開始同步——順序反了會先吃到一次拒絕，整個工作階段都以為自己沒權限。
@@ -16967,7 +16885,7 @@ const ALL_PAGES = [
   {id:'contacts',  label:'客戶．廠商',icon:_pgIcon('users'),    grp:'data',  adminOnly:false},
   // v5.327 devOnly：單價分析＝報價的成本模型，只有系統開發（報價者）看得到
   {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, devOnly:true},
-  {id:'permissions',label:'權限管理', icon:_pgIcon('lock'),     grp:'sys',   adminOnly:true},
+  {id:'permissions',label:'權限管理', icon:_pgIcon('lock'),     grp:'sys',   adminOnly:true, devOnly:true},
   {id:'params',    label:'參數設定',  icon:_pgIcon('sliders'),  grp:'sys',   adminOnly:true, devOnly:true},
 ];
 const PAGE_GRP_LABEL={main:'主功能',fin:'財務流',data:'資料與工具',sys:'系統'};
@@ -17022,13 +16940,10 @@ function canAccess(pageId){
 }
 
 // 目前使用者是否被設定「隱藏利潤數據」
+// v5.329：不再有「隱藏利潤」勾選欄。讀不到雲端成本的部門（工務部）本來就沒有
+// 成本資料可算毛利，直接依部門判斷即可，不需要另一個手動開關。
 function _permHideProfit(){
-  try{
-    if(_isAdminUser)return false;
-    const em=((_fbUser&&_fbUser.email)||'').toLowerCase();
-    const mx=(getPagePerms().__matrix||{})[em];
-    return !!(mx&&mx.hideProfit);
-  }catch(e){return false;}
+  try{return !isAdmin((_fbUser&&_fbUser.email)||'');}catch(e){return true;}
 }
 
 // 從合約管理查看原始報價單
@@ -17140,7 +17055,6 @@ function applyRoleUI(){
     if(_upc)_upc.style.display=(_deptOf((_fbUser&&_fbUser.email)||'')==='dev')?'':'none';
   }catch(e){}
   renderPagePermPanel();try{renderPermMatrixPanel();}catch(e){}
-  renderAdminPanel();
 }
 
 // 渲染頁面權限設定面板（在帳號管理卡片下方）
@@ -17176,16 +17090,15 @@ function renderPermMatrixPanel(){
       +'<td style="padding:4px 6px;white-space:nowrap">'+deptSel(em,dept)+'</td>'
       +'<td style="text-align:center;padding:4px;font-size:10.5px;color:'+(isAdmin(em)?'var(--g3)':'var(--b3)')+'">'+(isAdmin(em)?'✓':'—')+'</td>'
       +cols.map(cell).join('')
-      +'<td style="text-align:center;padding:4px">'+(dept==='dev'?'—':'<input type="checkbox" '+(u.hideProfit?'checked':'')+' onchange="permMxHideProfit(\''+escq(em)+'\',this.checked)">')+'</td>'
       +'<td style="text-align:center">'+(boot?'':'<button type="button" class="btn btn-xs btn-r" title="移除此帳號的部門設定" onclick="permRemoveUser(\''+escq(em)+'\')">✕</button>')+'</td></tr>';
   };
   let rows='';
   DEPT_ORDER.forEach(d=>{
     const list=mem[d]||[];
-    rows+='<tr><td colspan="'+(cols.length+5)+'" style="padding:6px 8px;background:'+DEPTS[d].bg+';font-size:11px;font-weight:800;color:'+DEPTS[d].color+'">'
+    rows+='<tr><td colspan="'+(cols.length+4)+'" style="padding:6px 8px;background:'+DEPTS[d].bg+';font-size:11px;font-weight:800;color:'+DEPTS[d].color+'">'
       +DEPTS[d].label+'　<span style="font-weight:400;font-size:10px">'+DEPTS[d].desc+'　·　'+list.length+' 人</span></td></tr>';
     rows+=list.length?list.map(em=>rowOf(em,d)).join('')
-      :'<tr><td colspan="'+(cols.length+5)+'" style="padding:5px 12px;font-size:10.5px;color:var(--b3)">（無）</td></tr>';
+      :'<tr><td colspan="'+(cols.length+4)+'" style="padding:5px 12px;font-size:10.5px;color:var(--b3)">（無）</td></tr>';
   });
   box.innerHTML='<div style="margin-top:16px;border-top:2px solid var(--gm);padding-top:14px">'
     +'<div style="font-size:13.5px;font-weight:800;color:var(--b5);margin-bottom:4px">部門與頁面權限</div>'
@@ -17204,10 +17117,8 @@ function renderPermMatrixPanel(){
     +'<th style="padding:4px 6px;font-size:10.5px;color:var(--b3);font-weight:700">部門</th>'
     +'<th style="padding:4px 6px;font-size:10px;color:var(--b3);font-weight:700">雲端成本</th>'
     +cols.map(pp=>'<th style="padding:4px 6px;font-size:10px;color:var(--b3);font-weight:600">'+pp.label+'</th>').join('')
-    +'<th style="padding:4px 6px;font-size:10px;color:#4A148C;font-weight:700">隱藏利潤</th><th></th></tr></thead>'
+    +'<th></th></tr></thead>'
     +'<tbody>'+rows+'</tbody></table></div>'
-    +'<div style="font-size:10px;color:var(--b3);margin-top:6px">單價分析未列於表中——固定只有「系統開發」看得到。'
-    +'新加入的帳號需自行登入一次，權限才會在他的裝置上生效。</div>'
     +'</div>';
 }
 function permSetDept(em,dept){
@@ -17248,7 +17159,6 @@ function permMxAdd(){
   document.getElementById('perm-mx-email').value='';
   permSetDept(em,dept);
 }
-function permMxHideProfit(em,v){_permMxMutate(mx=>{if(!mx[em])mx[em]={pages:{}};mx[em].hideProfit=!!v;});}
 function renderPagePermPanel(){
   const el=document.getElementById('page-perm-panel-2')||document.getElementById('page-perm-panel');
   if(!el)return;
@@ -17258,7 +17168,6 @@ function renderPagePermPanel(){
   el.innerHTML=`
     <div style="margin-top:14px">
       <div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:8px"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 工務部預設可見頁面</div>
-      <div style="font-size:11px;color:var(--b4);margin-bottom:8px">系統開發與管理部不受此限；個別人員可在下方表格再逐頁調整。</div>
       <div style="display:flex;flex-direction:column;gap:6px">
         ${userPages.map(page=>{
           const allowed=perms[page.id]!==false;
@@ -17427,7 +17336,6 @@ function renderFinanceAR(){
 // ── 權限管理頁初始化 ──
 function initPermissionsPage(){
   // 直接重新渲染（不要複製 innerHTML，那樣 onclick 不會更新）
-  renderAdminPanel();
   renderPagePermPanel();try{renderPermMatrixPanel();}catch(e){}
 }
 
