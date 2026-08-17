@@ -171,7 +171,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
 .trow span{font-variant-numeric:tabular-nums;font-weight:700}
 
 /* ═══ KPI 格 ═══ */
-.kgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:14px 20px;border-bottom:1px solid var(--b1);background:var(--w)}
+.kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;padding:16px 20px 0}.dash-greet{padding:16px 20px 0;font-size:19px;font-weight:800;color:var(--b5)}/* v5.332：原本固定 5 欄，只有 4 張卡時右邊留一格空白，跟下方 4 顆捷徑對不齊；改 auto-fit 讓卡片自動填滿整列。白底與底線一併移除，與頁面同底色。 */
 .kpi{border:1px solid var(--b1);border-radius:var(--r10);padding:12px 14px;background:var(--w);transition:box-shadow var(--transition)}
 .kpi:hover{box-shadow:var(--shadow-md);cursor:default}
 .kpi.hi{border-color:var(--gm);background:var(--gl);box-shadow:0 1px 4px rgba(26,107,63,.1)}
@@ -278,7 +278,7 @@ svg.fj-chart{cursor:zoom-in}
   .fg4{grid-template-columns:1fr}
   .topbar{padding:env(safe-area-inset-top,0px) 12px 0;min-height:var(--top)}.brand-sub{display:none}.top-nav{display:none}.sidebar{display:none}
   .content{padding-bottom:calc(var(--mob) + max(env(safe-area-inset-bottom),4px) + 8px)}.ph{padding:9px 13px}.pad{padding:10px 12px}
-  .kgrid{grid-template-columns:1fr 1fr;gap:6px;padding:10px 12px}.kv{font-size:16px}
+  .kgrid{grid-template-columns:1fr 1fr;gap:6px;padding:10px 12px 0}.kv{font-size:16px}.dash-greet{padding:10px 12px 0;font-size:17px}
   .fg3,.fg4{grid-template-columns:1fr}
   .fg3{grid-template-columns:1fr 1fr}
   .fg2{grid-template-columns:1fr 1fr}
@@ -624,7 +624,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <!-- ████ DASHBOARD ████ -->
 <div class="page active" id="page-dash">
   <div id="pay-reminder-banner" style="display:none;padding:10px 18px 0"></div>
-  <div id="dash-greet" style="padding:14px 18px 0;font-size:19px;font-weight:800;color:var(--b5)"></div>
+  <div id="dash-greet" class="dash-greet"></div>
   <div class="kgrid" id="dash-kpis"></div>
   <div class="pad" style="display:flex;flex-direction:column;gap:12px">
 
@@ -1553,9 +1553,11 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 
 <!-- ████ 帳務管理（進銷項）████ -->
 <div class="page" id="page-ledger">
-  <div class="ph"><div>
-    <div class="ph-t"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg> 帳務管理</div>
-    <div class="ph-s" id="ledger-sub">進項・銷項發票與稅額彙總</div></div>
+  <div class="ph">
+    <div class="ph-l">
+      <div class="ph-t"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg> 帳務管理</div>
+      <div class="ph-s" id="ledger-sub">進項・銷項發票與稅額彙總</div>
+    </div>
     <div class="ph-r">
       <input type="month" id="ledger-month" style="font-family:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--b2);border-radius:var(--r6)" onchange="renderLedger()">
       <button type="button" class="btn btn-sm" style="border-color:#1a3a6b;color:#1a3a6b" onclick="expScan()"><svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg> 拍照登錄費用發票</button>
@@ -2503,7 +2505,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.331';
+var APP_VERSION='v5.332';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
