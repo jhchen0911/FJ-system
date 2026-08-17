@@ -614,7 +614,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-finance" onclick="go('finance')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>金流管理</button>
   <button type="button" class="snav" id="sn-profit" onclick="go('profit')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>利潤．報表</button>
   <div class="ssec" style="margin-top:5px">資料與工具</div>
-  <button type="button" class="snav" onclick="smartIntake()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
+  <button type="button" class="snav" id="sn-intake" onclick="smartIntake()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
   <button type="button" class="snav" id="sn-contacts" onclick="go('contacts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>客戶．廠商</button>
   <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
   <div class="ssec" style="margin-top:5px">系統</div>
@@ -2510,7 +2510,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.337';
+var APP_VERSION='v5.338';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -4136,7 +4136,7 @@ function rItems(){
         }
         costInp.addEventListener('input',function(){items[i].estCost=this.value;updMgnM();rTots();});
         updMgnM();
-        costRow.appendChild(mkField('成本單價<svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg>',costInp));
+        costRow.appendChild(mkField('成本單價',costInp));
         const mgnWrap=mkField('單項毛利',mgnBox);
         costRow.appendChild(mgnWrap);
         card.appendChild(costRow);
@@ -5177,7 +5177,7 @@ function goQuoteInvoice(qid){
     loadInvoice(latest.id);
     go('invoice-edit');
   }else{
-    showConfirm('<svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 建立請款單',
+    showConfirm('建立請款單',
       '此得標案目前沒有任何請款單（可能已被刪除）。<br><br>要從報價單重新建立第 1 期請款單嗎？',
       ()=>{
         const autoInv=buildInvFromQuote(q);
@@ -5523,7 +5523,7 @@ function rInvItems(){
       });
       const stl=document.createElement('button');
       stl.type='button';stl.innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 追加減';stl.className='btn btn-xs';
-      stl.title='單項追加減結算：只把「這一個工項」的合約數量改為實作數量並連動合約金額。全案完工的收尾請改用專案卡的「<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 竣工總結算」';
+      stl.title='單項追加減結算：只把「這一個工項」的合約數量改為實作數量並連動合約金額。全案完工的收尾請改用專案卡的「竣工總結算」';
       stl.style.cssText='padding:3px 9px;color:#4527a0;border-color:#b39ddb;white-space:nowrap';
       stl.addEventListener('click',function(){settleInvItem(i);});
       hR.appendChild(stl);
@@ -5682,7 +5682,7 @@ function rInvItems(){
         if(!inp2)return;
         if(cq>0&&cum>cq+1e-9){
           inp2.style.borderColor='var(--red)';inp2.style.background='#fdecea';inp2.style.color='var(--red)';inp2.style.fontWeight='700';
-          inp2.title='<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 累計 '+cum+' 已超過合約數量 '+cq+'（超請 '+(Math.round((cum-cq)*100)/100)+'，仍可出單）';
+          inp2.title='累計 '+cum+' 已超過合約數量 '+cq+'（超請 '+(Math.round((cum-cq)*100)/100)+'，仍可出單）';
           pqTd.style.color='var(--red)';pqTd.style.fontWeight='700';pqTd.title='含本期累計 '+cum+'／合約 '+cq;
         }else{
           inp2.style.borderColor='';inp2.style.background='';inp2.style.color='';inp2.style.fontWeight='';
@@ -5733,7 +5733,7 @@ function rInvItems(){
       const tdDel=document.createElement('td');
       tdDel.style.whiteSpace='nowrap';
       const stlBtn=document.createElement('button');stlBtn.className='dbtn';stlBtn.innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg>';
-      stlBtn.title='單項追加減結算：只把「這一個工項」的合約數量改為實作數量並連動合約金額。全案完工的收尾請改用專案卡的「<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 竣工總結算」';
+      stlBtn.title='單項追加減結算：只把「這一個工項」的合約數量改為實作數量並連動合約金額。全案完工的收尾請改用專案卡的「竣工總結算」';
       stlBtn.style.color='#4527a0';
       stlBtn.addEventListener('click',function(){settleInvItem(i);});
       const delBtn=document.createElement('button');delBtn.className='dbtn';delBtn.textContent='✕';
@@ -7076,7 +7076,7 @@ function confirmAward(){
       toast('已自動建立合約記錄！');
       // 詢問是否立即前往合約管理
       setTimeout(()=>{
-        showConfirm('<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 合約已自動建立',
+        showConfirm('合約已自動建立',
           '報價單「'+esc(q.name||'')+'」得標後已自動建立合約記錄。<br><br>是否前往專案管理上傳合約附件？',
           ()=>{go('projects');},
           false
@@ -7900,7 +7900,7 @@ function updateDashTodo(){
     if(_expA){
       var d=_du2(_expA.date);
       if(d>1)return;
-      var txt=d===1?(label+' 預計明天收款（'+_expA.date+'）'):d===0?(label+' 今天預計收款'):('<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> '+label+' 逾期 '+(-d)+' 天未收款（預計'+_expA.date+'）');
+      var txt=d===1?(label+' 預計明天收款（'+_expA.date+'）'):d===0?(label+' 今天預計收款'):(label+' 逾期 '+(-d)+' 天未收款（預計'+_expA.date+'）');
       // v5.325：點下去是要「登錄收到多少錢」，不是改請款單內容 → 直接開確認收款彈窗
       items.push({type:'recv',urgent:d<=0,jump:"openReceiptModal('"+inv.id+"')",
         icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>',color:d<0?'var(--red)':'var(--yd)',
@@ -7913,7 +7913,7 @@ function updateDashTodo(){
       var overDays=Math.floor((now.getTime()-dueD.getTime())/864e5);
       if(overDays>0&&overDays<1825)items.push({type:'recv',urgent:true,jump:"openReceiptModal('"+inv.id+"')",
         icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>',color:'var(--red)',
-        text:'<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> '+label+' 逾期 '+overDays+' 天未收款',sub:'NT$ '+fmt(unpaid)});
+        text:''+label+' 逾期 '+overDays+' 天未收款',sub:'NT$ '+fmt(unpaid)});
     }
   });
 
@@ -7926,7 +7926,7 @@ function updateDashTodo(){
     items.push({type:'pay_overdue',urgent:true,
       jump:"go('finance');setTimeout(function(){window._payAging='overdue';switchFinanceTab('payable')},250)",
       icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg>',color:'var(--red)',
-      text:'<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 逾期 '+od+' 天未付款：'+(p.to||'廠商')+(p.project?' / '+p.project:'')+'（預計'+p.date+'）',
+      text:'逾期 '+od+' 天未付款：'+(p.to||'廠商')+(p.project?' / '+p.project:'')+'（預計'+p.date+'）',
       sub:'NT$ '+fmt(_payEff(p))});
   });
 
@@ -8015,9 +8015,15 @@ function renderClientReport(el,year,month){
       // v5.321 新增：得標件數／得標金額／實際淨利（該業主案件的實收未稅 − 已登錄成本）
       const wonQs=data.quotes.filter(q=>q.awarded&&!q.parentId);
       const wonAmt=wonQs.reduce((a,q)=>a+_wonAmt(q),0);   // v5.323：有合約以合約金額為準
+      // v5.338 健檢I：成本同樣按年度過濾（原本實收按年、成本全案累計，跨年案的
+      // 年度實際淨利被前一年的成本壓低）
       const cAmt=wonQs.reduce((a,q)=>{
         const all=[q].concat(Q.filter(x=>x.parentId===q.id));
-        return a+all.reduce((b,x)=>b+(x.costs||[]).reduce((c2,c)=>c2+(parseFloat(c.amt)||0),0),0);
+        return a+all.reduce((b,x)=>b+(x.costs||[]).reduce((c2,c)=>{
+          if(!(String(c.date||'').startsWith(String(year))))return c2;
+          if(mFilter&&String(c.date||'').slice(5,7)!==mFilter)return c2;
+          return c2+(parseFloat(c.amt)||0);
+        },0),0);
       },0);
       const actNet=Math.round(rAmt/_taxM()-cAmt);
       return`<tr style="border-bottom:1px solid var(--b1)">
@@ -11494,7 +11500,7 @@ function buildCostAnalysisHtml(q){
     +'</tr></tfoot></table></div>'
     +'<div style="font-size:10.5px;color:var(--b3);margin-top:6px">執行率＝實際成本÷預估成本（>100% 紅字＝超支）；實際毛利＝報價複價−實際成本。未歸戶成本已計入合計毛利。</div>'
     +'<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
-    +'<button type="button" onclick="var n=writeCostHist();toast(n?(\'<svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 已回寫 \'+n+\' 筆工項實績到歷史單價庫，下次報價自動提示\'):\'尚無可回寫的工項實績（需有實際成本且已歸戶）\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:var(--r8);padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 回寫單價庫（結案復盤）</button>'
+    +'<button type="button" onclick="var n=writeCostHist();toast(n?(\'已回寫 \'+n+\' 筆工項實績到歷史單價庫，下次報價自動提示\'):\'尚無可回寫的工項實績（需有實際成本且已歸戶）\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:var(--r8);padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">回寫單價庫（結案復盤）</button>'
     +'<span style="font-size:10.5px;color:var(--b3)">單價庫目前累積 '+COST_HIST.length+' 筆工項實績；專案「標記結案」時也會自動回寫</span>'
     +'</div>';
 }
@@ -11733,7 +11739,7 @@ function buildCostAuditHtml(q){
         +'<td style="padding:5px 8px;font-size:11px;color:var(--b4)">應付殘留</td>'
         +'<td style="padding:5px 8px;text-align:right">'+fmt(p.amount||0)+'</td>'
         +'<td style="padding:5px 8px;font-size:11.5px;font-weight:700;color:var(--red)"><svg class="ic ib" aria-hidden="true"><use href="#i-x"/></svg> 成本記錄已刪，應付殘留</td>'
-        +'<td style="padding:5px 8px;text-align:right"><button type="button" onclick="removePayableByCostId(\''+p.costId+'\');rCostItems();toast(\'已刪除殘留應付\')" style="font-size:11px;padding:2px 10px;border:1px solid var(--red);background:#fff;color:var(--red);border-radius:99px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg> 刪除殘留</button></td>'
+        +'<td style="padding:5px 8px;text-align:right"><button type="button" onclick="removePayableByCostId(\''+p.costId+'\');rCostItems();toast(\'已刪除殘留應付\')" style="font-size:11px;padding:2px 10px;border:1px solid var(--red);background:#fff;color:var(--red);border-radius:99px;cursor:pointer;font-family:inherit">刪除殘留</button></td>'
         +'</tr>';
     });
   // 合併應付：另列一行並勾稽合計金額是否等於各子成本相加
@@ -11843,6 +11849,9 @@ function delCostRow(cid,rid){
 
 function recalcCostAmt(cc){
   if(!cc||!cc.rows)return;
+  // v5.338 健檢I：只有總額、沒有明細列的記錄（匯入／接力舊資料）保留原 amt，
+  // 不要在每次渲染時被明細合計（0）覆寫歸零
+  if(!cc.rows.length&&(parseFloat(cc.amt)||0)>0)return;
   if(cc.type==='sub'||cc.type==='own'){
     // v5.319：空數量一律 0（原為 ||1，與 _costByItem 的 ||0 不同，同一筆成本在專案卡與工項分析會是兩個金額）
     cc.amt=cc.rows.reduce(function(s,r){return s+(parseFloat(r.qty)||0)*(parseFloat(r.unitPrice)||0);},0);
@@ -13791,7 +13800,7 @@ function settleContract(id){
   const _endFuture=!!(c.end&&c.end>localToday());
   if(_pct<90||_endFuture){
     let warn=false;
-    try{warn=window.confirm('<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 此合約疑似尚未完工！\n\n'
+    try{warn=window.confirm('此合約疑似尚未完工！\n\n'
       +(_pct<90?'・已請款累積僅達合約金額的 '+_pct+'%\n':'')
       +(_endFuture?'・預計完工日 '+c.end+' 尚未到期\n':'')
       +'\n「結算」是整個工程全部完工後的最後收尾，會把合約金額直接改成目前已請款累積 NT$ '+fmt(billed)+'（含保留款）。\n\n如果只是單一工項做完要追加減，請改用請款單裡各工項旁的「<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 工項結算」，不要按這裡。\n\n確定整個工程已完工、要繼續合約總結算嗎？');}catch(e){warn=true;}
@@ -14344,7 +14353,7 @@ function toggleProjClosed(qid,close){
       q.closed=true;q.closedAt=Date.now();q._mt=Date.now();persist();
       try{logActivity('專案','結案：'+(q.name||''));}catch(e){}
       let _n=0;try{_n=writeCostHist(q.id);}catch(e){}
-      renderProjects();toast('已結案：'+(q.name||'')+(_n?('　<svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 回寫 '+_n+' 筆工項實績到單價庫'):''));
+      renderProjects();toast('已結案：'+(q.name||'')+(_n?('　回寫 '+_n+' 筆工項實績到單價庫'):''));
     },false);
   }else{
     q.closed=false;delete q.closedAt;q._mt=Date.now();persist();
@@ -15561,7 +15570,7 @@ function ledgerRegInvNo(pid){
       p.invNo=v;p.updatedAt=Date.now();p._mt=Date.now();
       savePayables();
       try{renderLedger();}catch(e){}
-      toast(v?('<svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 已登錄發票號 '+v):'已清除發票號');
+      toast(v?('已登錄發票號 '+v):'已清除發票號');
     },false,null,true);
   setTimeout(function(){var e=document.getElementById('lg-invno');if(e)e.focus();},120);
 }
@@ -16597,7 +16606,7 @@ function renderContractReport(el,year){
           const invPct=Math.min(100,Math.round(r.invRate*100));
           const rcvPct=Math.min(100,Math.round(r.rcvRate*100));
           const statusColor={active:'var(--g)',completed:'var(--b3)',suspended:'var(--red)'}[r.ct.status]||'var(--b4)';
-          const statusLabel={active:'進行中',completed:'已完成',suspended:'暫停'}[r.ct.status]||r.ct.status;
+          const statusLabel={active:'進行中',completed:'已完成',suspended:'暫停'}[r.ct.status]||(r.ct.status||'進行中');   // v5.338：無 status 的匯入舊資料不再印 undefined
           return`<tr onclick="go('contracts')" style="cursor:pointer;border-bottom:1px solid var(--b1)">
             <td style="padding:6px 8px;font-family:monospace;font-size:11px">${esc(r.ct.code||'—')}</td>
             <td style="padding:6px 8px">
@@ -16836,7 +16845,7 @@ function checkNotifications(){
       const d=daysUntil(_expA.date);
       if(d===1) alerts.push({type:'warn',tag:'inv_recv_'+inv.id,jump:`loadInvoice('${inv.id}')`,msg:`${label} 預計明天收款（${inv.expectedRecvDate}），請確認款項入帳`});
       else if(d===0) alerts.push({type:'warn',tag:'inv_recv_'+inv.id,jump:`loadInvoice('${inv.id}')`,msg:`${label} 今天預計收款（${inv.expectedRecvDate}）NT$ ${fmt(unpaid)}`});
-      else if(d<0) alerts.push({type:'overdue',tag:'inv_overdue_'+inv.id,jump:`loadInvoice('${inv.id}')`,msg:`<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> ${label} 逾期 ${-d} 天未收款（預計${inv.expectedRecvDate}）NT$ ${fmt(unpaid)}`});
+      else if(d<0) alerts.push({type:'overdue',tag:'inv_overdue_'+inv.id,jump:`loadInvoice('${inv.id}')`,msg:`${label} 逾期 ${-d} 天未收款（預計${inv.expectedRecvDate}）NT$ ${fmt(unpaid)}`});
     } else {
       // fallback：用 payDue + payMonthDelay + recvDay 推算
       const recvDay=parseInt(inv.recvDay)||parseInt(inv.payDue)||0;
@@ -16846,7 +16855,7 @@ function checkNotifications(){
       const dueDate=new Date(baseDate.getFullYear(),baseDate.getMonth()+payDelay,recvDay);
       const overDays=Math.floor((now-dueDate.getTime())/86400000);
       if(overDays>0&&overDays<1825){
-        alerts.push({type:'overdue',tag:'inv_overdue_'+inv.id,jump:`loadInvoice('${inv.id}')`,msg:`<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> ${label} 逾期 ${overDays} 天未收款（NT$ ${fmt(unpaid)}）`});
+        alerts.push({type:'overdue',tag:'inv_overdue_'+inv.id,jump:`loadInvoice('${inv.id}')`,msg:`${label} 逾期 ${overDays} 天未收款（NT$ ${fmt(unpaid)}）`});
       }
     }
   });
@@ -16868,7 +16877,7 @@ function checkNotifications(){
     const d=daysUntil(p.date);
     if(d<0){
       const label=(p.to||'廠商')+(p.project?' / '+p.project:'');
-      alerts.push({type:'overdue',tag:'pay_overdue_'+p.id,jump:`go('finance');setTimeout(function(){window._payAging='overdue';switchFinanceTab('payable')},250)`,msg:`<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 逾期 ${-d} 天未付款：${label} NT$ ${fmt(_payEff(p))}（預計${p.date}）`});
+      alerts.push({type:'overdue',tag:'pay_overdue_'+p.id,jump:`go('finance');setTimeout(function(){window._payAging='overdue';switchFinanceTab('payable')},250)`,msg:`逾期 ${-d} 天未付款：${label} NT$ ${fmt(_payEff(p))}（預計${p.date}）`});
     }
   });
 
@@ -17113,7 +17122,7 @@ function toggleRetentionReturn(invId, btn){
   btn.style.borderColor=inv.retentionReturned?'var(--g)':'var(--b2)';
   btn.style.background=inv.retentionReturned?'var(--gl)':'var(--w)';
   btn.style.color=inv.retentionReturned?'var(--g3)':'var(--b4)';
-  toast(inv.retentionReturned?('<svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 保留款已退還並入帳 NT$ '+fmt(_ret)):'已取消退還標記（入帳同步沖回）');
+  toast(inv.retentionReturned?('保留款已退還並入帳 NT$ '+fmt(_ret)):'已取消退還標記（入帳同步沖回）');
   try{updateInvStats();}catch(e){}
 }
 
@@ -17827,6 +17836,11 @@ function applyRoleUI(){
       });
     }catch(e){}
   });
+  // v5.338 健檢I：智慧收件（寫入報價／費用／應付）僅開給可讀成本資料的角色
+  try{
+    var _si=document.getElementById('sn-intake');
+    if(_si)_si.style.display=(_fbUser&&!isAdmin(_fbUser.email))?'none':'';
+  }catch(e){}
   // v5.325：參數設定頁裡的「單價分析成本參數」＝報價的成本模型，僅擁有者可見；
   // 該頁其他區塊（稅率、期初現金、固定成本）負責人仍需要，所以只隱藏這張卡。
   try{
@@ -17841,14 +17855,8 @@ function applyRoleUI(){
 
 // 渲染頁面權限設定面板（在帳號管理卡片下方）
 
-function togglePagePerm(pageId, allowed){
-  const perms=getPagePerms();
-  if(allowed) delete perms[pageId];
-  else perms[pageId]=false;
-  savePagePerms(perms);
-  applyRoleUI();
-  toast(allowed?'<svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 已開放 '+pageId+' 頁面':'<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 已限制 '+pageId+' 頁面');
-}
+// v5.338 健檢I：togglePagePerm（舊全域頁面開關）移除——v5.330 起 canAccess 只看
+// 角色的 pages 映射，這個 flat 設定已無作用，留著只會誤導。
 
 // 更新 go() 的權限攔截以使用新的 canAccess
 
