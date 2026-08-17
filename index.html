@@ -1542,10 +1542,10 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     </div>
     <div class="card">
       <div class="ch" style="background:#e8f0fe">
-        <div class="cht" style="color:#1a73e8"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 頁面存取權限</div>
+        <div class="cht" style="color:#1a73e8"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 工務部預設可見頁面</div>
       </div>
       <div class="cb">
-        <div style="font-size:12px;color:var(--b4);margin-bottom:10px">關閉後，一般使用者將完全看不到該頁面入口。</div>
+        <div style="font-size:12px;color:var(--b4);margin-bottom:10px">這裡設定<b>工務部</b>（含未指派部門的帳號）預設看得到哪些頁面。系統開發與管理部不受此限；個別人員可在下方表格逐頁調整。</div>
         <div id="page-perm-panel-2"></div>
       </div>
     </div>
@@ -2504,7 +2504,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.326';
+var APP_VERSION='v5.327';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -8559,38 +8559,106 @@ function saveAdminEmails(arr){
 }
 // 固定啟動管理員：清單為空（新裝置／剛清快取）時仍只有此帳號是管理員
 // v5.314：原本「清單為空 → 任何人自動成為管理員」，換台電腦登入即可提權，已移除
-const BOOTSTRAP_ADMINS=['jhchen0911@gmail.com'];
-function isAdmin(email){
-  if(!email)return false;
-  const e=email.toLowerCase();
-  if(BOOTSTRAP_ADMINS.includes(e))return true;
-  if(isOwner(e))return true;                 // 擁有者恆為管理員
-  return getAdminEmails().includes(e);
+// ══════════ 部門權限（v5.327）══════════
+// 三個維度，取代先前的擁有者／負責人／管理部／工務四層：
+//   dev   系統開發：全部功能，含單價分析
+//   admin 管理部　：除單價分析外全部（可再逐頁收斂）
+//   site  工務部　：預設只有日報．支出（可再逐頁開放）
+// 部門決定「看得到哪些頁面」與「讀不讀得到雲端成本（fydata/private）」。
+const DEPTS={
+  dev:  {label:'系統開發', short:'開發', color:'#4527a0', bg:'#ede7f6', desc:'全部功能，含單價分析'},
+  admin:{label:'管理部',   short:'管理', color:'#1565C0', bg:'#e3f2fd', desc:'除單價分析外全部'},
+  site: {label:'工務部',   short:'工務', color:'#e65100', bg:'#fff3e0', desc:'預設只有日報．支出'}
+};
+const DEPT_ORDER=['dev','admin','site'];
+const BOOTSTRAP_DEV=['jhchen0911@gmail.com'];   // 系統開發永遠保留，避免沒人能改權限
+const BOOTSTRAP_ADMINS=BOOTSTRAP_DEV;           // 相容舊呼叫
+// 部門對照表放在 pagePerms 裡，隨既有的參數同步一起上雲（換裝置不用重設）
+function _deptMap(){
+  var perms=getPagePerms();
+  return (perms&&perms.__depts)||{};
 }
-// ── 三層角色（v5.325）──
-//   擁有者：全部，含單價分析與權限管理（報價的成本模型只有報價者知道）
-//   管理員（負責人）：利潤／金流／成本／分潤全部看得到，但看不到單價分析與權限管理
-//   一般使用者（工務）：只開放指定頁面，資料庫層也讀不到 fydata/private
-// 擁有者清單不上雲、也不由權限頁的一般管理員改動——避免管理員自行提權。
-const BOOTSTRAP_OWNERS=['jhchen0911@gmail.com'];
-function getOwnerEmails(){
+function _deptOf(email){
+  var e=String(email||'').toLowerCase();
+  if(!e)return '';
+  if(BOOTSTRAP_DEV.indexOf(e)>=0)return 'dev';
+  var d=_deptMap()[e];
+  return DEPTS[d]?d:'site';     // 未指派＝最小權限，不是全開
+}
+function setDept(email,dept){
+  var e=String(email||'').toLowerCase();
+  if(!e||!DEPTS[dept])return;
+  var perms=getPagePerms();
+  if(!perms.__depts)perms.__depts={};
+  perms.__depts[e]=dept;
+  savePagePerms(perms);
+  _syncAdminEmailsFromDepts();
+}
+function removeDept(email){
+  var e=String(email||'').toLowerCase();
+  var perms=getPagePerms();
+  if(perms.__depts)delete perms.__depts[e];
+  if(perms.__matrix)delete perms.__matrix[e];
+  savePagePerms(perms);
+  _syncAdminEmailsFromDepts();
+}
+function deptMembers(){
+  var m=_deptMap(),out={};
+  DEPT_ORDER.forEach(function(d){out[d]=[];});
+  BOOTSTRAP_DEV.forEach(function(e){out.dev.push(e);});
+  Object.keys(m).forEach(function(e){
+    if(BOOTSTRAP_DEV.indexOf(e)>=0)return;
+    var d=DEPTS[m[e]]?m[e]:'site';
+    out[d].push(e);
+  });
+  return out;
+}
+// fy_admins 決定誰能讀雲端的 fydata/private（登入時據此登記 adminUids）
+// → 由部門推導，不再各管各的
+function _syncAdminEmailsFromDepts(){
+  var mem=deptMembers();
+  var list=mem.dev.concat(mem.admin).filter(function(e,i,a){return e&&a.indexOf(e)===i;});
+  saveAdminEmails(list);
+}
+// 舊資料搬遷：fy_owners → 系統開發、fy_admins → 管理部
+// 注意：getPagePerms 定義在另一個 script 區塊，parse 時呼叫會 ReferenceError，
+// 所以改為延後由 applyRoleUI／啟動流程觸發（只跑一次）。
+function _migrateDepts(){
   try{
-    const a=JSON.parse(localStorage.getItem('fy_owners')||'null');
-    if(Array.isArray(a)&&a.length)return a.map(x=>String(x||'').toLowerCase()).filter(Boolean);
+    if(localStorage.getItem('fy_dept_mig1')==='1')return;
+    if(typeof getPagePerms!=='function'||typeof ALL_PAGES==='undefined')return;
+    var perms=getPagePerms();
+    if(!perms.__depts)perms.__depts={};
+    var touched=false;
+    try{
+      (JSON.parse(localStorage.getItem('fy_admins')||'[]')||[]).forEach(function(e){
+        e=String(e||'').toLowerCase();
+        if(e&&!perms.__depts[e]&&BOOTSTRAP_DEV.indexOf(e)<0){perms.__depts[e]='admin';touched=true;}
+      });
+    }catch(e){}
+    try{
+      (JSON.parse(localStorage.getItem('fy_owners')||'[]')||[]).forEach(function(e){
+        e=String(e||'').toLowerCase();
+        if(e&&BOOTSTRAP_DEV.indexOf(e)<0){perms.__depts[e]='dev';touched=true;}
+      });
+    }catch(e){}
+    // 工務部預設＝只有日報．支出（原本全域是全開，等於任何登入帳號都看得到利潤與金流）
+    var SITE_DEFAULT=['quickcost'];
+    ALL_PAGES.forEach(function(pg){
+      if(pg.adminOnly||pg.devOnly)return;
+      if(SITE_DEFAULT.indexOf(pg.id)>=0){if(perms[pg.id]===false)delete perms[pg.id];}
+      else if(perms[pg.id]!==false){perms[pg.id]=false;touched=true;}
+    });
+    if(touched)savePagePerms(perms);
+    localStorage.setItem('fy_dept_mig1','1');
   }catch(e){}
-  return BOOTSTRAP_OWNERS.slice();
 }
-function saveOwnerEmails(arr){
-  const list=(arr||[]).map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
-  // 永遠留住啟動擁有者，避免手滑把自己踢掉之後沒人能改權限
-  BOOTSTRAP_OWNERS.forEach(function(e){if(list.indexOf(e)<0)list.unshift(e);});
-  try{localStorage.setItem('fy_owners',JSON.stringify(list));}catch(e){}
-  return list;
+function isAdmin(email){                       // ＝可讀雲端成本（開發＋管理部）
+  var d=_deptOf(email);
+  return d==='dev'||d==='admin';
 }
-function isOwner(email){
-  if(!email)return false;
-  return getOwnerEmails().includes(String(email).toLowerCase());
-}
+function isOwner(email){return _deptOf(email)==='dev';}
+function getOwnerEmails(){return deptMembers().dev;}
 var _isOwnerUser=false;
 // _isAdminUser 已在頂部宣告
 
@@ -8774,58 +8842,6 @@ function _fbErrMsg(code){
 
 
 // ── 帳號管理面板渲染 ──
-// ── 擁有者名冊（v5.325，僅擁有者可見可改）──
-// 擁有者＝報價的人，單價分析與權限管理只有這一層看得到。
-function renderOwnerPanel(){
-  var el=document.getElementById('owner-panel-content');if(!el)return;
-  if(!_fbUser||!_isOwnerUser){el.innerHTML='';return;}
-  var owners=getOwnerEmails();
-  var me=String((_fbUser&&_fbUser.email)||'').toLowerCase();
-  el.innerHTML=
-    '<div style="margin-top:14px;border-top:1px solid var(--b1);padding-top:12px">'
-    +'<div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:4px"><svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg> 擁有者帳號（共 '+owners.length+' 位）</div>'
-    +'<div style="font-size:10.5px;color:var(--b3);line-height:1.5;margin-bottom:8px">'
-    +'擁有者可以看到<b>單價分析</b>與<b>權限管理</b>，管理員（負責人）看不到。'
-    +'此清單只存在本機、不上雲，也不會被其他管理員改動——換裝置需重新設定。</div>'
-    +'<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">'
-    +owners.map(function(e){
-      var isBoot=BOOTSTRAP_OWNERS.indexOf(e)>=0;
-      return '<div style="display:flex;align-items:center;justify-content:space-between;background:#fff8e1;border:1px solid #ffe082;border-radius:var(--r6);padding:5px 10px">'
-        +'<div style="font-size:12px;color:var(--b5)"><svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg> '+esc(e)
-        +(e===me?'<span style="font-size:10px;color:var(--g3);margin-left:4px">（你）</span>':'')
-        +(isBoot?'<span style="font-size:10px;color:var(--b3);margin-left:4px">（預設，不可移除）</span>':'')+'</div>'
-        +(isBoot?'':'<button type="button" onclick="removeOwner(\''+escq(e)+'\')" style="border:none;background:none;color:var(--red);cursor:pointer;font-size:14px;line-height:1">✕</button>')
-        +'</div>';
-    }).join('')
-    +'</div>'
-    +'<div style="display:flex;gap:6px">'
-    +'<input id="new-owner-email" type="email" placeholder="輸入電子郵件設為擁有者" style="flex:1;font-size:12px;padding:5px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit">'
-    +'<button type="button" onclick="addOwner()" class="btn btn-sm" style="border-color:#e65100;color:#e65100;white-space:nowrap">＋ 新增擁有者</button>'
-    +'</div></div>';
-}
-function addOwner(){
-  var inp=document.getElementById('new-owner-email');
-  var em=String((inp&&inp.value)||'').trim().toLowerCase();
-  if(!em||em.indexOf('@')<0){toast('請輸入正確的電子郵件');return;}
-  var list=getOwnerEmails();
-  if(list.indexOf(em)>=0){toast('此帳號已是擁有者');return;}
-  saveOwnerEmails(list.concat([em]));
-  // 擁有者恆為管理員（才讀得到雲端成本），順手加進管理員清單
-  var ad=getAdminEmails();
-  if(ad.indexOf(em)<0)saveAdminEmails(ad.concat([em]));
-  if(inp)inp.value='';
-  applyRoleUI();
-  toast('已新增擁有者 '+em+'（對方需自行登入一次才會生效）');
-}
-function removeOwner(em){
-  em=String(em||'').toLowerCase();
-  if(BOOTSTRAP_OWNERS.indexOf(em)>=0){toast('預設擁有者不可移除');return;}
-  showConfirm('移除擁有者','移除後「'+esc(em)+'」看不到單價分析與權限管理，但仍保留管理員身分（利潤／成本／分潤照常）。',function(){
-    saveOwnerEmails(getOwnerEmails().filter(function(x){return x!==em;}));
-    applyRoleUI();
-    toast('已移除擁有者 '+em);
-  });
-}
 function renderAdminPanel(){
   // 同時更新兩個容器（params 頁 + permissions 頁）
   const els=[
@@ -16949,9 +16965,9 @@ const ALL_PAGES = [
   {id:'ledger',    label:'帳務管理',  icon:_pgIcon('wallet'),   grp:'fin',   adminOnly:false},
   {id:'reports',   label:'報表中心',  icon:_pgIcon('chart'),    grp:'fin',   adminOnly:false, hidden:true}, // 由「利潤．報表」頁內分頁進入
   {id:'contacts',  label:'客戶．廠商',icon:_pgIcon('users'),    grp:'data',  adminOnly:false},
-  // v5.325 ownerOnly：單價分析＝報價的成本模型（只有報價者知道）；權限管理＝角色的最終決定權
-  {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, ownerOnly:true},
-  {id:'permissions',label:'權限管理', icon:_pgIcon('lock'),     grp:'sys',   adminOnly:true, ownerOnly:true},
+  // v5.327 devOnly：單價分析＝報價的成本模型，只有系統開發（報價者）看得到
+  {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, devOnly:true},
+  {id:'permissions',label:'權限管理', icon:_pgIcon('lock'),     grp:'sys',   adminOnly:true},
   {id:'params',    label:'參數設定',  icon:_pgIcon('sliders'),  grp:'sys',   adminOnly:true},
 ];
 const PAGE_GRP_LABEL={main:'主功能',fin:'財務流',data:'資料與工具',sys:'系統'};
@@ -16987,21 +17003,24 @@ function savePagePerms(obj){
 // 判斷某頁面使用者是否可進入
 function canAccess(pageId){
   const page=ALL_PAGES.find(p=>p.id===pageId);
-  if(!page)return !!_isAdminUser||true;
-  if(page.ownerOnly)return !!_isOwnerUser;   // v5.325：擁有者限定，管理員也不給
-  if(_isAdminUser)return true;
-  if(page.adminOnly)return false;
-  // 檢查管理員是否限制此頁
+  if(!page)return true;
+  const dept=_deptOf((_fbUser&&_fbUser.email)||'');
+  // 系統開發：全部
+  if(dept==='dev')return true;
+  // 單價分析＝報價成本模型，只有系統開發看得到
+  if(page.devOnly)return false;
+  // 管理部：除單價分析外全部，但仍可由個別設定逐頁收斂
   const perms=getPagePerms();
-  // 使用者矩陣（優先於全域設定；未列入矩陣者用全域）
-  try{
-    const em=((_fbUser&&_fbUser.email)||'').toLowerCase();
-    const mx=perms.__matrix&&perms.__matrix[em];
-    if(mx&&mx.pages&&mx.pages[pageId]===false)return false;
-  }catch(e){}
-  if(perms[pageId]===false)return false;
-  return true;
+  const em=String((_fbUser&&_fbUser.email)||'').toLowerCase();
+  const mine=(perms.__matrix||{})[em];
+  if(mine&&mine.pages&&mine.pages[pageId]===false)return false;
+  if(dept==='admin')return true;
+  // 工務部（含未指派）：走「工務部預設可見頁面」，個別設定可再放寬
+  if(page.adminOnly)return false;
+  if(mine&&mine.pages&&mine.pages[pageId]===true)return true;
+  return perms[pageId]!==false;
 }
+
 // 目前使用者是否被設定「隱藏利潤數據」
 function _permHideProfit(){
   try{
@@ -17090,13 +17109,13 @@ function renderMobMore(){
 // 更新 applyRoleUI 加入頁面權限控制
 // applyRoleUI 已統一處理
 function applyRoleUI(){
+  try{_migrateDepts();}catch(e){}
   const perms=getPagePerms();
   try{renderTopNav();renderMobMore();}catch(e){}   // 權限變動後重建導覽
   ALL_PAGES.forEach(page=>{
     // 完全隱藏：頁面已整併退場(hidden)、adminOnly 或 管理員設定為 false
-    const hidden=page.hidden===true
-      ||(page.ownerOnly&&!_isOwnerUser)
-      ||(!_isAdminUser&&(page.adminOnly||perms[page.id]===false));
+    // v5.327：一律以 canAccess 為準，避免這裡與 canAccess 各判一套而不一致
+    const hidden=page.hidden===true||!canAccess(page.id);
     // 隱藏 top-nav
     const tn=document.getElementById('tn-'+page.id);
     if(tn)tn.style.display=hidden?'none':'';
@@ -17118,31 +17137,15 @@ function applyRoleUI(){
   // 該頁其他區塊（稅率、期初現金、固定成本）負責人仍需要，所以只隱藏這張卡。
   try{
     var _upc=document.getElementById('upa-cost-param-card');
-    if(_upc)_upc.style.display=_isOwnerUser?'':'none';
+    if(_upc)_upc.style.display=(_deptOf((_fbUser&&_fbUser.email)||'')==='dev')?'':'none';
   }catch(e){}
   renderPagePermPanel();try{renderPermMatrixPanel();}catch(e){}
-  try{renderOwnerPanel();}catch(e){}
   renderAdminPanel();
 }
 
 // 渲染頁面權限設定面板（在帳號管理卡片下方）
-// v5.326：矩陣改為「先指定身分、再微調頁面」。
-// 原本只有一堆勾勾，看不出誰是什麼角色，也看不出「管理員不受矩陣限制」這件事。
-function _permRoleOf(em){
-  em=String(em||'').toLowerCase();
-  if(isOwner(em))return 'owner';
-  if(isAdmin(em))return 'partner';
-  var mx=(getPagePerms().__matrix||{})[em]||{};
-  var up=mx.pages||{};
-  var cols=ALL_PAGES.filter(function(p){return !p.adminOnly&&!p.ownerOnly;});
-  var closed=cols.filter(function(p){return up[p.id]===false;}).map(function(p){return p.id;});
-  if(!closed.length)return 'office';
-  var siteOpen=['quickcost','contacts'];
-  var shouldClose=cols.filter(function(p){return siteOpen.indexOf(p.id)<0;}).map(function(p){return p.id;});
-  if(closed.length===shouldClose.length&&shouldClose.every(function(id){return closed.indexOf(id)>=0;}))return 'site';
-  return 'custom';
-}
-const PERM_ROLE_LABEL={owner:'擁有者',partner:'負責人（管理員）',office:'管理部',site:'工務',custom:'自訂'};
+// ══════════ 部門權限面板（v5.327）══════════
+// 一張表把三件事講完：誰在哪個部門、看得到哪些頁面、讀不讀得到雲端成本。
 function renderPermMatrixPanel(){
   const host=document.getElementById('page-perm-panel-2')||document.getElementById('page-perm-panel');
   if(!host||!_isAdminUser)return;
@@ -17150,82 +17153,86 @@ function renderPermMatrixPanel(){
   if(!box){box=document.createElement('div');box.id='perm-matrix-box';host.parentElement.appendChild(box);}
   const perms=getPagePerms();
   const mx=perms.__matrix||{};
-  // 管理員／擁有者即使沒被加進矩陣，也要出現在名單上（讓角色一目了然）
-  const emails=Object.keys(mx).concat(getAdminEmails(),getOwnerEmails())
-    .map(e=>String(e||'').toLowerCase()).filter((e,i,a)=>e&&a.indexOf(e)===i);
-  const cols=ALL_PAGES.filter(pp=>!pp.adminOnly&&!pp.ownerOnly);
-  const roleSel=(em,role)=>'<select onchange="permMxSetRole(\''+escq(em)+'\',this.value)" style="font-size:11px;padding:3px 5px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;background:var(--w)">'
-    +['owner','partner','office','site','custom'].map(function(r){
-      return '<option value="'+r+'"'+(r===role?' selected':'')+(r==='custom'?' disabled':'')+'>'+PERM_ROLE_LABEL[r]+'</option>';
-    }).join('')+'</select>';
-  const rows=emails.map(em=>{
+  const mem=deptMembers();
+  const meEm=String((_fbUser&&_fbUser.email)||'').toLowerCase();
+  const canEdit=(_deptOf(meEm)==='dev');    // 只有系統開發能調整部門
+  const cols=ALL_PAGES.filter(pp=>!pp.devOnly);
+  const deptSel=(em,dept)=>'<select '+(canEdit?'':'disabled ')
+    +'onchange="permSetDept(\''+escq(em)+'\',this.value)" style="font-size:11px;padding:3px 5px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;background:'+(canEdit?'var(--w)':'var(--b0)')+'">'
+    +DEPT_ORDER.map(d=>'<option value="'+d+'"'+(d===dept?' selected':'')+'>'+DEPTS[d].label+'</option>').join('')+'</select>';
+  const rowOf=(em,dept)=>{
     const u=mx[em]||{};const up=u.pages||{};
-    const role=_permRoleOf(em);
-    const boss=(role==='owner'||role==='partner');   // 管理員層級：不受矩陣限制
-    return '<tr style="'+(boss?'background:#f6fbf7':'')+'">'
+    const boot=BOOTSTRAP_DEV.indexOf(em)>=0;
+    const cell=pp=>{
+      // 系統開發全開、管理部預設全開（勾＝開）、工務部預設關（勾＝開）
+      if(dept==='dev')return '<td style="text-align:center;padding:4px;color:var(--g3)">✓</td>';
+      const on=(dept==='admin')?(up[pp.id]!==false):(up[pp.id]===true||(up[pp.id]!==false&&!pp.adminOnly&&perms[pp.id]!==false));
+      return '<td style="text-align:center;padding:4px"><input type="checkbox" '+(on?'checked':'')
+        +' onchange="permSetPage(\''+escq(em)+'\',\''+pp.id+'\',this.checked)"></td>';
+    };
+    return '<tr style="background:'+DEPTS[dept].bg+'44">'
       +'<td style="padding:5px 8px;font-size:11.5px;font-weight:600;white-space:nowrap">'+esc(em)
-      +(String((_fbUser&&_fbUser.email)||'').toLowerCase()===em?'<span style="font-size:9.5px;color:var(--g3);margin-left:3px">（你）</span>':'')+'</td>'
-      +'<td style="padding:4px 6px;white-space:nowrap">'+roleSel(em,role)+'</td>'
-      +(boss
-        ? '<td colspan="'+(cols.length+1)+'" style="padding:4px 10px;font-size:10.5px;color:var(--g3)">'
-          +(role==='owner'?'擁有者：所有頁面（含單價分析、權限管理）':'管理員：除單價分析與權限管理外全部開放')
-          +'　·　可讀雲端成本資料　·　<b>不受下方頁面勾選限制</b></td>'
-        : cols.map(pp=>'<td style="text-align:center;padding:4px"><input type="checkbox" '+(up[pp.id]===false?'':'checked')+' onchange="permMxSet(\''+escq(em)+'\',\''+pp.id+'\',this.checked)"></td>').join('')
-          +'<td style="text-align:center;padding:4px"><input type="checkbox" '+(u.hideProfit?'checked':'')+' onchange="permMxHideProfit(\''+escq(em)+'\',this.checked)"></td>')
-      +'<td style="text-align:center">'+(boss&&isOwner(em)?'':'<button type="button" class="btn btn-xs btn-r" title="移除此使用者設定" onclick="permMxRemove(\''+escq(em)+'\')">✕</button>')+'</td></tr>';
-  }).join('');
-  // 全域預設若把敏感頁面開著，未列入矩陣的人就看得到——明講出來
-  const risky=['profit','finance','costs','ledger','reports'].filter(id=>perms[id]!==false)
-    .map(id=>(ALL_PAGES.find(p=>p.id===id)||{}).label).filter(Boolean);
+      +(em===meEm?'<span style="font-size:9.5px;color:var(--g3);margin-left:3px">（你）</span>':'')+'</td>'
+      +'<td style="padding:4px 6px;white-space:nowrap">'+deptSel(em,dept)+'</td>'
+      +'<td style="text-align:center;padding:4px;font-size:10.5px;color:'+(isAdmin(em)?'var(--g3)':'var(--b3)')+'">'+(isAdmin(em)?'✓':'—')+'</td>'
+      +cols.map(cell).join('')
+      +'<td style="text-align:center;padding:4px">'+(dept==='dev'?'—':'<input type="checkbox" '+(u.hideProfit?'checked':'')+' onchange="permMxHideProfit(\''+escq(em)+'\',this.checked)">')+'</td>'
+      +'<td style="text-align:center">'+(boot?'':'<button type="button" class="btn btn-xs btn-r" title="移除此帳號的部門設定" onclick="permRemoveUser(\''+escq(em)+'\')">✕</button>')+'</td></tr>';
+  };
+  let rows='';
+  DEPT_ORDER.forEach(d=>{
+    const list=mem[d]||[];
+    rows+='<tr><td colspan="'+(cols.length+5)+'" style="padding:6px 8px;background:'+DEPTS[d].bg+';font-size:11px;font-weight:800;color:'+DEPTS[d].color+'">'
+      +DEPTS[d].label+'　<span style="font-weight:400;font-size:10px">'+DEPTS[d].desc+'　·　'+list.length+' 人</span></td></tr>';
+    rows+=list.length?list.map(em=>rowOf(em,d)).join('')
+      :'<tr><td colspan="'+(cols.length+5)+'" style="padding:5px 12px;font-size:10.5px;color:var(--b3)">（無）</td></tr>';
+  });
   box.innerHTML='<div style="margin-top:16px;border-top:2px solid var(--gm);padding-top:14px">'
-    +'<div style="font-size:13.5px;font-weight:800;color:var(--b5);margin-bottom:4px">使用者權限矩陣（建議每個人都列在這裡）</div>'
-    +'<div style="font-size:11px;color:var(--b4);line-height:1.65;margin-bottom:8px">'
-    +'<b>先選身分，頁面就自動設定好</b>，不用逐個勾。之後要微調再改勾選（會變成「自訂」）。<br>'
-    +'‧ <b>擁有者</b>：全部，含單價分析與權限管理　‧ <b>負責人（管理員）</b>：利潤／金流／成本／分潤全開，看不到單價分析與權限管理<br>'
-    +'‧ <b>管理部</b>：一般頁面全開，但讀不到雲端成本資料　‧ <b>工務</b>：日報．支出＋客戶．廠商<br>'
-    +'<span style="color:var(--b3)">上方「頁面存取權限」是<b>沒被列在這裡</b>的帳號才會套用的預設值。</span></div>'
-    +(risky.length
-      ? '<div style="font-size:11px;color:#7c5700;background:#fff8e1;border:1px solid #ffe082;border-radius:var(--r8);padding:7px 10px;margin-bottom:10px">'
-        +'⚠ 上方全域預設目前開放著「'+risky.join('、')+'」。<b>任何沒列在下方矩陣的登入帳號都看得到這些頁面。</b>'
-        +'請把每個人都加進矩陣並指定身分，或到上方把這些頁面關閉。</div>'
-      : '')
-    +'<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'
-    +'<input id="perm-mx-email" placeholder="輸入使用者 Email" style="flex:1;min-width:180px;font-size:12.5px;padding:7px 10px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit">'
-    +'<select id="perm-mx-role" style="font-size:12.5px;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)">'
-    +'<option value="site">工務</option><option value="office">管理部</option><option value="partner">負責人（管理員）</option><option value="owner">擁有者</option></select>'
-    +'<button type="button" class="btn btn-sm btn-g" onclick="permMxAdd()">＋ 加入</button></div>'
-    +(emails.length
-      ?'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:700px"><thead><tr>'
-        +'<th style="text-align:left;padding:5px 8px;font-size:10.5px;color:var(--b3)">使用者</th>'
-        +'<th style="padding:4px 6px;font-size:10.5px;color:var(--b3);font-weight:700">身分</th>'
-        +cols.map(pp=>'<th style="padding:4px 6px;font-size:10px;color:var(--b3);font-weight:600">'+pp.label+'</th>').join('')
-        +'<th style="padding:4px 6px;font-size:10px;color:#4A148C;font-weight:700">隱藏利潤</th>'
-        +'<th style="padding:4px 6px;font-size:10px;color:var(--b3);font-weight:600"></th></tr></thead>'
-        +'<tbody>'+rows+'</tbody></table></div>'
-      :'<div style="font-size:12px;color:var(--b3);padding:8px">尚未加入任何使用者——輸入 Email、選身分後按「加入」</div>')
+    +'<div style="font-size:13.5px;font-weight:800;color:var(--b5);margin-bottom:4px">部門與頁面權限</div>'
+    +'<div style="font-size:11px;color:var(--b4);line-height:1.7;margin-bottom:9px">'
+    +DEPT_ORDER.map(d=>'<span style="display:inline-block;background:'+DEPTS[d].bg+';color:'+DEPTS[d].color+';border-radius:99px;padding:1px 9px;font-weight:700;margin-right:5px">'+DEPTS[d].label+'</span>'+DEPTS[d].desc).join('<br>')
+    +'<br><span style="color:var(--b3)">部門決定預設權限，右邊的勾選可再針對個人調整（未來編制變多時逐人設定）。'
+    +'「雲端成本」＝能不能讀到成本／毛利／分潤（系統開發與管理部才有）。<b>沒被列在這裡的帳號一律當工務部</b>。</span></div>'
+    +(canEdit?'':'<div style="font-size:11px;color:#7c5700;background:#fff8e1;border:1px solid #ffe082;border-radius:var(--r8);padding:7px 10px;margin-bottom:9px">部門指派僅限「系統開發」調整，你可以查看但不能變更。</div>')
+    +(canEdit?'<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'
+      +'<input id="perm-mx-email" placeholder="輸入使用者 Email" style="flex:1;min-width:180px;font-size:12.5px;padding:7px 10px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit">'
+      +'<select id="perm-mx-role" style="font-size:12.5px;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)">'
+      +DEPT_ORDER.map(d=>'<option value="'+d+'"'+(d==='site'?' selected':'')+'>'+DEPTS[d].label+'</option>').join('')+'</select>'
+      +'<button type="button" class="btn btn-sm btn-g" onclick="permMxAdd()">＋ 加入</button></div>':'')
+    +'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:720px"><thead><tr>'
+    +'<th style="text-align:left;padding:5px 8px;font-size:10.5px;color:var(--b3)">帳號</th>'
+    +'<th style="padding:4px 6px;font-size:10.5px;color:var(--b3);font-weight:700">部門</th>'
+    +'<th style="padding:4px 6px;font-size:10px;color:var(--b3);font-weight:700">雲端成本</th>'
+    +cols.map(pp=>'<th style="padding:4px 6px;font-size:10px;color:var(--b3);font-weight:600">'+pp.label+'</th>').join('')
+    +'<th style="padding:4px 6px;font-size:10px;color:#4A148C;font-weight:700">隱藏利潤</th><th></th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table></div>'
+    +'<div style="font-size:10px;color:var(--b3);margin-top:6px">單價分析未列於表中——固定只有「系統開發」看得到。'
+    +'新加入的帳號需自行登入一次，權限才會在他的裝置上生效。</div>'
     +'</div>';
 }
-// 指定身分：一次把「頁面權限＋管理員資格＋擁有者資格」都設定好
-function permMxSetRole(em,role){
+function permSetDept(em,dept){
   em=String(em||'').toLowerCase();
-  if(role==='custom')return;
-  var me=String((_fbUser&&_fbUser.email)||'').toLowerCase();
-  if(em===me&&role!=='owner'&&isOwner(em)){toast('不能把自己降級，請由另一位擁有者操作');renderPermMatrixPanel();return;}
-  // 擁有者資格
-  var owners=getOwnerEmails();
-  if(role==='owner'){ if(owners.indexOf(em)<0)saveOwnerEmails(owners.concat([em])); }
-  else if(owners.indexOf(em)>=0)saveOwnerEmails(owners.filter(function(x){return x!==em;}));
-  // 管理員資格（＝能不能讀雲端成本）
-  var admins=getAdminEmails();
-  var wantAdmin=(role==='owner'||role==='partner');
-  if(wantAdmin&&admins.indexOf(em)<0)saveAdminEmails(admins.concat([em]));
-  if(!wantAdmin&&admins.indexOf(em)>=0)saveAdminEmails(admins.filter(function(x){return x!==em;}));
-  // 頁面權限
-  permMxApplyRole(em,role==='site'?'site':role==='partner'?'partner':'office');
+  if(_deptOf(String((_fbUser&&_fbUser.email)||''))!=='dev'){toast('僅「系統開發」可調整部門');renderPermMatrixPanel();return;}
+  if(BOOTSTRAP_DEV.indexOf(em)>=0&&dept!=='dev'){toast('預設的系統開發帳號不可調整');renderPermMatrixPanel();return;}
+  setDept(em,dept);
   applyRoleUI();
-  toast('已將 '+em+' 設為「'+PERM_ROLE_LABEL[role]+'」'
-    +(wantAdmin?'（可讀雲端成本）':'（讀不到雲端成本）')
-    +'　·　對方需自行登入一次才生效');
+  toast('已將 '+em+' 設為「'+DEPTS[dept].label+'」'+(isAdmin(em)?'（可讀雲端成本）':'（讀不到雲端成本）')+'　·　對方需自行登入一次才生效');
+}
+// 個別頁面微調：勾＝可見、不勾＝不可見（覆寫部門預設）
+function permSetPage(em,pid,on){
+  _permMxMutate(mx=>{
+    if(!mx[em])mx[em]={pages:{},hideProfit:false};
+    if(!mx[em].pages)mx[em].pages={};
+    mx[em].pages[pid]=!!on;
+  });
+  applyRoleUI();
+}
+function permRemoveUser(em){
+  em=String(em||'').toLowerCase();
+  if(_deptOf(String((_fbUser&&_fbUser.email)||''))!=='dev'){toast('僅「系統開發」可調整部門');return;}
+  showConfirm('移除帳號設定','移除後「'+esc(em)+'」回到工務部預設權限（只看得到日報．支出）。',function(){
+    removeDept(em);applyRoleUI();toast('已移除 '+em);
+  });
 }
 function _permMxMutate(fn){
   const perms=getPagePerms();
@@ -17237,47 +17244,21 @@ function _permMxMutate(fn){
 function permMxAdd(){
   const em=(document.getElementById('perm-mx-email').value||'').trim().toLowerCase();
   if(!em||!em.includes('@')){toast('請輸入有效 Email');return;}
-  const role=(document.getElementById('perm-mx-role')||{}).value||'site';
-  _permMxMutate(mx=>{if(!mx[em])mx[em]={pages:{},hideProfit:false};});
+  const dept=(document.getElementById('perm-mx-role')||{}).value||'site';
   document.getElementById('perm-mx-email').value='';
-  permMxSetRole(em,role);   // v5.326：加入時就套用身分，不用再逐頁勾
-}
-function permMxSet(em,pid,allowed){_permMxMutate(mx=>{if(!mx[em])mx[em]={pages:{}};if(!mx[em].pages)mx[em].pages={};if(allowed)delete mx[em].pages[pid];else mx[em].pages[pid]=false;});}
-// 角色範本：一鍵套用整列權限
-// 工務：僅快速支出（現場記帳），其餘頁面全關＋隱藏利潤——不涉及利潤、金流
-// 管理部：全部開放；單價分析／參數設定／權限管理本為管理員限定，一般帳號本來就看不到
-function permMxApplyRole(em,role){
-  _permMxMutate(function(mx){
-    if(!mx[em])mx[em]={pages:{},hideProfit:false};
-    var u=mx[em];u.pages={};
-    if(role==='site'){
-      // 工務：日報．支出（登錄出工與支出）＋ 客戶．廠商（發包／點工要查協力廠商）
-      var _siteOpen=['quickcost','contacts'];
-      ALL_PAGES.filter(function(p){return !p.adminOnly&&!p.ownerOnly;}).forEach(function(p){
-        if(_siteOpen.indexOf(p.id)<0)u.pages[p.id]=false;
-      });
-      u.hideProfit=true;
-    }else{
-      // 負責人／管理部：一般頁面全開（單價分析與權限管理是 ownerOnly，本來就不在清單裡）
-      u.hideProfit=false;
-    }
-  });
-  toast(role==='site'?'⛑ 已套用「工務」：日報．支出＋客戶．廠商，隱藏利潤與金流'
-    :role==='partner'?'🤝 已套用「負責人」：利潤／金流／成本全開，單價分析與權限管理仍為擁有者限定'
-    :'🏢 已套用「管理部」：一般頁面全部開放');
+  permSetDept(em,dept);
 }
 function permMxHideProfit(em,v){_permMxMutate(mx=>{if(!mx[em])mx[em]={pages:{}};mx[em].hideProfit=!!v;});}
-function permMxRemove(em){showConfirm('移除使用者設定','移除後「'+esc(em)+'」回到全域預設權限。',()=>{_permMxMutate(mx=>{delete mx[em];});});}
 function renderPagePermPanel(){
   const el=document.getElementById('page-perm-panel-2')||document.getElementById('page-perm-panel');
   if(!el)return;
   if(!_isAdminUser){el.innerHTML='';return;}
   const perms=getPagePerms();
-  const userPages=ALL_PAGES.filter(p=>!p.adminOnly&&!p.ownerOnly);
+  const userPages=ALL_PAGES.filter(p=>!p.adminOnly&&!p.devOnly);
   el.innerHTML=`
     <div style="margin-top:14px">
-      <div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:8px"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 頁面存取權限（一般使用者）</div>
-      <div style="font-size:11px;color:var(--b4);margin-bottom:8px">管理員帳號不受限制，以下設定僅影響一般使用者。</div>
+      <div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:8px"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 工務部預設可見頁面</div>
+      <div style="font-size:11px;color:var(--b4);margin-bottom:8px">系統開發與管理部不受此限；個別人員可在下方表格再逐頁調整。</div>
       <div style="display:flex;flex-direction:column;gap:6px">
         ${userPages.map(page=>{
           const allowed=perms[page.id]!==false;
