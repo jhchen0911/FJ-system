@@ -2503,7 +2503,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.330';
+var APP_VERSION='v5.331';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -15120,9 +15120,7 @@ function _shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,limitedBy,apPe
   +'</div>'
   +'<div style="background:var(--b1);border-radius:8px;height:14px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(remain<0?'#c62828':'linear-gradient(90deg,var(--g),var(--g3))')+';border-radius:8px"></div></div>'
   +'<div style="font-size:10.5px;color:var(--b3);text-align:right;margin-top:3px">已領 '+pct+'%</div>'
-  // v5.323：上限公式的說明只留卡片上方那一份（原本上下各印一次，同一段話重複）
-  +'<div style="font-size:11px;color:var(--b4);margin-top:6px;background:var(--b0);border-radius:var(--r6);padding:6px 10px">'
-  +'薪資另計：兩位股東每月各領 NT$ '+fmt(SHARE_SALARY_MONTH)+' 薪資，已列入成本（已於試算中扣除），不佔分潤額度。</div>';
+  ;
 }
 
 function exportFinanceCSV(){
@@ -15152,6 +15150,7 @@ function editInvoiceRecord(id){
   document.getElementById('ir-linked-inv').value=ir.linkedInvId||'';
   document.getElementById('ir-status').value=ir.status||'issued';
   document.getElementById('ir-note').value=ir.note||'';
+  _irSetFile(ir.fileName||'',ir.fileUrl||'',ir.fileData||'');
 }
 // ═══ 帳務管理：進銷項與稅額彙總 ═══
 function ledgerExportCsv(){
@@ -15549,6 +15548,8 @@ function _einvScan(){
     inp.type='file';inp.id='einv-scan-input';inp.accept='image/*';inp.style.display='none';
     inp.onchange=function(){
       var f=this.files&&this.files[0];this.value='';if(!f)return;
+      // v5.331：辨識用的那張影像順手存起來，之後在列表點得開
+      try{_irUpload(f);}catch(e){}
       _fileToDataUrl(f,1400).then(function(du){
         aiScanDoc(du,'開立給業主的統一發票').then(function(r){
           if(!r)return;
@@ -15585,7 +15586,73 @@ function newInvoiceRecord(){
   const sel=document.getElementById('ir-linked-inv');
   sel.innerHTML='<option value="">── 不關聯 ──</option>'+
     INV.map(i=>`<option value="${esc(i.id)}">${esc(i.project||'?')} 第${i.periodNo||'?'}期 (${esc(i.client||'?')})</option>`).join('');
+  _irSetFile('','','');
   document.getElementById('invoice-rec-modal').style.display='flex';
+}
+
+// ══════════ 發票影像（v5.331）══════════
+// 原本「拍照帶入」只把影像丟給 AI 辨識，辨識完就丟掉，所以列表點下去沒東西看。
+// 改為與合約檔同一套：優先傳 Firebase Storage，失敗或未登入時退回內嵌（1.5MB）。
+function _irSetFile(name,url,data){
+  var g=function(id){return document.getElementById(id);};
+  if(g('ir-file-nm'))g('ir-file-nm').value=name||'';
+  if(g('ir-file-url'))g('ir-file-url').value=url||'';
+  if(g('ir-file-data'))g('ir-file-data').value=data||'';
+  var has=!!(url||data);
+  if(g('ir-file-name'))g('ir-file-name').textContent=has?(name||'發票影像'):'（尚未上傳）';
+  if(g('ir-file-view'))g('ir-file-view').style.display=has?'':'none';
+  if(g('ir-file-del'))g('ir-file-del').style.display=has?'':'none';
+}
+function irClearFile(){_irSetFile('','','');}
+function irViewFile(){
+  var u=gv('ir-file-url')||gv('ir-file-data');
+  if(!u){toast('尚未上傳發票影像');return;}
+  _viewFile(gv('ir-file-nm')||'發票影像',u);
+}
+function irViewRec(id){
+  var ir=INVOICE_RECS.find(function(x){return x.id===id;});
+  if(!ir){toast('找不到此發票');return;}
+  var u=ir.fileUrl||ir.fileData;
+  if(!u){editInvoiceRecord(id);return;}
+  _viewFile(ir.fileName||('發票 '+(ir.number||'')),u);
+}
+function irPickFile(){
+  var inp=document.getElementById('ir-file-input');
+  if(!inp){
+    inp=document.createElement('input');
+    inp.type='file';inp.id='ir-file-input';inp.accept='image/*,.pdf';inp.style.display='none';
+    inp.onchange=function(){
+      var f=this.files&&this.files[0];this.value='';if(!f)return;
+      _irUpload(f);
+    };
+    document.body.appendChild(inp);
+  }
+  inp.click();
+}
+function _irUpload(f){
+  var nm=(f&&f.name)||'發票影像';
+  var embed=function(){
+    if(f.size>1500000){toast('❌ 檔案超過內嵌上限 1.5MB，請壓縮後再試');return;}
+    var rd=new FileReader();
+    rd.onload=function(){_irSetFile(nm,'',rd.result);toast('已附上發票影像（內嵌）');};
+    rd.readAsDataURL(f);
+  };
+  if(_fbUser&&_fbStorage){
+    if(f.size>20*1024*1024){toast('⚠ 檔案過大（雲端上限 20MB）');return;}
+    var safe=nm.replace(/[^\w.\-一-鿿（）()]/g,'_');
+    var path='fydata/einv/'+Date.now()+'_'+safe;
+    toast('雲端上傳中…');
+    var task=_fbStorage.ref(path).put(f);
+    task.on('state_changed',null,function(err){
+      toast('⚠ 雲端上傳失敗（'+((err&&err.code)||'未知')+'），改用內嵌儲存');embed();
+    },function(){
+      task.snapshot.ref.getDownloadURL().then(function(url){
+        _irSetFile(nm,url,'');toast('✅ 發票影像已上傳雲端');
+      }).catch(function(){embed();});
+    });
+    return;
+  }
+  embed();
 }
 
 function saveInvoiceRecord(){
@@ -15593,7 +15660,8 @@ function saveInvoiceRecord(){
   const ir={id,_mt:Date.now(),number:gv('ir-number'),date:gv('ir-date'),client:gv('ir-client'),
     amount:parseFloat(gv('ir-amount'))||0,taxAmt:parseFloat(gv('ir-tax'))||0,
     linkedInvId:document.getElementById('ir-linked-inv').value,
-    status:gv('ir-status'),note:gv('ir-note'),updatedAt:Date.now()};
+    status:gv('ir-status'),note:gv('ir-note'),updatedAt:Date.now(),
+    fileUrl:gv('ir-file-url')||'',fileData:gv('ir-file-data')||'',fileName:gv('ir-file-nm')||''};
   const idx=INVOICE_RECS.findIndex(x=>x.id===id);
   if(idx>=0)INVOICE_RECS[idx]=ir;else INVOICE_RECS.unshift(ir);
   saveInvoiceRecs();
@@ -15618,7 +15686,8 @@ function renderInvoiceRecords(){
   if(!INVOICE_RECS.length){el.innerHTML='<div class="empty"><div class="empty-ic"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg></div><p>尚無發票記錄</p></div>';return;}
   el.innerHTML=INVOICE_RECS.map(ir=>{
     const linkedInv=INV.find(i=>i.id===ir.linkedInvId);
-    return`<div class="ql" style="cursor:default">
+    const _hasF=!!(ir.fileUrl||ir.fileData);
+    return`<div class="ql" style="cursor:pointer" onclick="${_hasF?`irViewRec('${ir.id}')`:`editInvoiceRecord('${ir.id}')`}">
       <div class="qdot" style="background:${statusClr[ir.status]||'var(--b2)'}"></div>
       <div class="qm">
         <div class="qt"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> ${esc(ir.number||'未填號碼')}</div>
@@ -15627,9 +15696,11 @@ function renderInvoiceRecords(){
       <div class="qr">
         <div class="qa">NT$ ${fmt(ir.amount||0)}</div>
       ${ir.taxAmt?`<div style="font-size:10px;color:var(--b4)">稅額 NT$ ${fmt(ir.taxAmt)}</div>`:''}
+        ${_hasF?'<div style="font-size:10px;color:var(--g3)">有影像</div>':''}
         <span style="font-size:11px;color:${statusClr[ir.status]}">${statusMap[ir.status]||ir.status}</span>
       </div>
       <div style="display:flex;gap:4px;margin-left:8px">
+        ${(ir.fileUrl||ir.fileData)?`<button type="button" class="btn btn-xs" title="檢視發票影像" onclick="event.stopPropagation();irViewRec('${ir.id}')"><svg class="ic ib" aria-hidden="true"><use href="#i-search"/></svg></button>`:''}
         <button type="button" class="btn btn-xs" title="編輯" onclick="editInvoiceRecord('${ir.id}')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg></button>
         <button type="button" class="btn btn-xs btn-r" onclick="delInvoiceRecord('${ir.id}')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button>
       </div>
@@ -16909,7 +16980,7 @@ const ALL_PAGES = [
   {id:'contacts',  label:'客戶．廠商',icon:_pgIcon('users'),    grp:'data',  adminOnly:false},
   // v5.330 sysOnly：只有「系統管理員」角色能開，其他角色的權限表上是鎖住的
   {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, sysOnly:true},
-  {id:'staff',     label:'人員管理',  icon:_pgIcon('users'),    grp:'acct',  adminOnly:true, sysOnly:true},
+  {id:'staff',     label:'人員管理',  icon:_pgIcon('users'),    grp:'acct',  adminOnly:true},
   {id:'roles',     label:'角色權限',  icon:_pgIcon('lock'),     grp:'acct',  adminOnly:true, sysOnly:true},
   {id:'params',    label:'參數設定',  icon:_pgIcon('sliders'),  grp:'sys',   adminOnly:true, sysOnly:true},
 ];
@@ -17111,7 +17182,13 @@ function renderStaffPage(){
 }
 function staffEdit(id){
   var st=id?listStaff().find(function(x){return x.id===id;}):null;
-  var roles=listRoles();
+  var meSys=_isSysUser((_fbUser&&_fbUser.email)||'');
+  // v5.331：人員管理開放給管理部後的防線——不是系統管理員的人，
+  // 既不能指派／移除「系統管理員」角色，也不能碰已經持有該角色的帳號。
+  if(!meSys&&st&&(st.roles||[]).some(function(r){var x=_roleById(r);return x&&x.sys;})){
+    toast('此帳號為系統管理員，僅系統管理員可編輯');return;
+  }
+  var roles=listRoles().filter(function(r){return meSys||!r.sys;});
   var body='<div class="f" style="margin-bottom:9px"><label>登入信箱 <span style="color:var(--red)">*</span></label>'
     +'<input id="stf-email" type="email" value="'+esc((st&&st.email)||'')+'" placeholder="對方登入用的 Google 帳號"></div>'
     +'<div class="fg fg2" style="margin-bottom:9px">'
@@ -17132,6 +17209,11 @@ function staffEdit(id){
     var dup=listStaff().find(function(x){return String(x.email||'').toLowerCase()===em&&x.id!==(st&&st.id);});
     if(dup){toast('此信箱已在名冊中');return false;}
     var picked=[].slice.call(document.querySelectorAll('.stf-role:checked')).map(function(c){return c.value;});
+    if(!meSys){
+      picked=picked.filter(function(r){var x=_roleById(r);return !(x&&x.sys);});
+      // 保留對方原本就有的系統管理員角色（畫面上根本沒列出，不該被清掉）
+      if(st)(st.roles||[]).forEach(function(r){var x=_roleById(r);if(x&&x.sys&&picked.indexOf(r)<0)picked.push(r);});
+    }
     var p=_acct();
     var rec=st?p.__staff.find(function(x){return x.id===st.id;}):null;
     if(!rec){rec={id:_uid('s')};p.__staff.push(rec);}
@@ -17149,6 +17231,9 @@ function staffEdit(id){
 function staffDel(id){
   var st=listStaff().find(function(x){return x.id===id;});if(!st)return;
   if(BOOTSTRAP_DEV.indexOf(String(st.email||'').toLowerCase())>=0){toast('預設系統管理員不可刪除');return;}
+  if(!_isSysUser((_fbUser&&_fbUser.email)||'')&&(st.roles||[]).some(function(r){var x=_roleById(r);return x&&x.sys;})){
+    toast('此帳號為系統管理員，僅系統管理員可刪除');return;
+  }
   showConfirm('刪除人員','刪除「'+esc(st.name||st.email)+'」後，該帳號登入將看不到任何頁面。',function(){
     var p=_acct();p.__staff=p.__staff.filter(function(x){return x.id!==id;});
     _acctSave(p);_syncAdminEmailsFromDepts();applyRoleUI();toast('已刪除');
@@ -18184,15 +18269,21 @@ function rProfit(){
     // 報價單本身保持原樣（那是給業主的文件），只有分析口徑跟著實際數量走。
     const _eff=_effQtyMap(q);
     let estRevenue=0,estCostQ=0,_settled=false;
+    // v5.331 修正：v5.328 只加總「有填成本單價」的工項，沒填的一律當成本 0，
+    // 整案預估淨利率被算成 100%。改為與 calcT 同一套：沒填成本單價的工項
+    // 用「售價含稅 ÷ 目標倍率」回推成本，才不會憑空多出獲利。
+    let _subUnknown=0;
     _all.forEach(x=>{
       (x.items||[]).forEach(it=>{
         if(!it||it.sec)return;
-        const qy=_effQty(_eff,it),pr=parseFloat(it.price)||0;
+        const qy=_effQty(_eff,it),pr=parseFloat(it.price)||0,ec=parseFloat(it.estCost)||0;
         if((parseFloat(it.qty)||0)!==qy)_settled=true;
         estRevenue+=qy*pr;
-        estCostQ+=qy*(parseFloat(it.estCost)||0);
+        if(qy>0&&ec>0)estCostQ+=qy*ec;
+        else _subUnknown+=qy*pr;
       });
     });
+    if(_subUnknown>0)estCostQ+=(_subUnknown*_taxM())/(P.mult||1.4);
     // 沒有任何工項數量／單價可算時（舊資料）退回報價總額，避免整列變 0
     if(estRevenue<=0){estRevenue=_all.reduce((a,x)=>a+(x.t?.sub||0),0);estCostQ=_all.reduce((a,x)=>a+(x.t?.cost||0),0);}
     const estNet=estRevenue-estCostQ;                                 // 預估淨利（未稅對未稅）
@@ -19209,6 +19300,16 @@ function exportCurrentReportExcel(){
         <select id="ir-linked-inv" style="font-family:inherit;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px">
           <option value="">── 不關聯 ──</option>
         </select>
+      </div>
+      <div class="f" style="margin-bottom:10px">
+        <label>發票影像</label>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button type="button" class="btn btn-sm" onclick="irPickFile()"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 上傳／拍照</button>
+          <span id="ir-file-name" style="font-size:11.5px;color:var(--b4)"></span>
+          <button type="button" class="btn btn-xs" id="ir-file-view" style="display:none" onclick="irViewFile()">檢視</button>
+          <button type="button" class="btn btn-xs btn-r" id="ir-file-del" style="display:none" onclick="irClearFile()">移除</button>
+        </div>
+        <input type="hidden" id="ir-file-url"><input type="hidden" id="ir-file-data"><input type="hidden" id="ir-file-nm">
       </div>
       <div class="f" style="margin-bottom:10px">
         <label>狀態</label>
