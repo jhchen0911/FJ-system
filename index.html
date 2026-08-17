@@ -2050,7 +2050,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <div class="f"><label>標準點工日薪 (NT$)</label><input id="plabor" type="number" value="2800" min="0"><div class="hint">供「日報出工 vs 已記點工成本」勾稽用：專案勾稽表會以 日報累計工數×此日薪 估算應有點工成本，少記超過兩成即示警。0＝不勾稽</div></div>
           <div class="f"><label>期初現金 (NT$)</label><input id="popen" type="number" value="0"><div class="hint">基準日當天的銀行帳戶餘額。填 0 則水位只反映系統內的收付變化，不是真實帳戶餘額</div></div>
           <div class="f"><label>期初基準日</label><input id="popendate" type="date"><div class="hint"><b>務必與上面的餘額同一天</b>。系統只累加基準日<b>之後</b>的實收與付款——基準日當天以前的錢已經在餘額裡了。沒填基準日會把歷史實收整包再加一次，可動用資金會虛高（例：帳上 348 萬卻顯示 591 萬）。沒填實收日期的舊請款單一律視為期初之前</div></div>
-          <div class="f"><label>營運週轉保留月數</label><input id="popres" type="number" value="3" min="0" max="24" step="1"><div class="hint">分潤上限會先扣掉「月固定成本 × 此月數」。薪資、租金、機具貸款每月照付，這筆錢不能分掉。填 0 表示不保留（不建議）</div></div>
+          <div class="f"><label>營運週轉保留月數</label><input id="popres" type="number" value="3" min="0" max="24" step="1"><div class="hint">分潤上限會先扣掉「<b>下方公司固定成本明細合計</b> × 此月數」。<b>沒填固定成本明細＝保留金 0</b>，等於沒保留營運金。薪資、租金、機具貸款每月照付，這筆錢不能分掉</div></div>
+          <div class="f"><label>營運保留金（直接指定，NT$）</label><input id="popresamt" type="number" value="0" min="0"><div class="hint">填 &gt; 0 時<b>優先採用此金額</b>，不再用「月固定成本 × 月數」。懶得逐項列固定成本時直接填一個數字即可（例：2,000,000）</div></div>
         </div>
         <div style="border-top:1px dashed var(--b2);margin:12px 0 0;padding-top:12px">
           <div style="font-size:12.5px;font-weight:700;color:var(--b5);margin-bottom:4px">公司固定成本明細（每月）→ 自動推算管理費率</div>
@@ -2503,7 +2504,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.325';
+var APP_VERSION='v5.326';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -2587,6 +2588,7 @@ var P={
   openingCash:0,       // v5.318 期初現金：可動用資金與 90 天水位的起算基準
   openingDate:'',      // v5.325 期初基準日：只累加此日之後的收付，避免與期初餘額重複計算
   opReserveMonths:3,   // v5.325 營運週轉保留月數：分潤上限先扣掉 月固定成本×此月數
+  opReserveAmt:0,      // v5.326 直接指定保留金額（>0 時優先於月數×固定成本）
   bank:'國泰世華建成分行(013)',bankAccount:'031035008864',
   // unit price defaults
   dpRent:0.111,dpLoss:0.05,dpProcess:900,dpPeriod:60,
@@ -2677,12 +2679,21 @@ function _payRetention(p){
 }
 
 // 單張請款單的應收（含稅、已扣保留款、扣除實收）
+// v5.326 抵銷項：匯費／業主扣款／業主當場加扣的保留款，業主不會再匯這筆錢過來，
+// 所以不該繼續掛在應收與逾期提醒上（25 元匯費害整張單天天跳逾期）。
+function _invOffset(inv){
+  if(!inv)return 0;
+  return (parseFloat(inv.recvFee)||0)+(parseFloat(inv.recvDeduct)||0)+(parseFloat(inv.recvHold)||0);
+}
 function _invAR(inv){
   if(!inv)return 0;
   if(inv.receivedConfirmed)return 0;   // 已結清
   var due=(inv.totals&&parseFloat(inv.totals.total))||0;
-  return Math.max(0,due-(parseFloat(inv.received)||0));
+  return Math.max(0,due-(parseFloat(inv.received)||0)-_invOffset(inv));
 }
+// 業主當場扣下的保留款：之後可以請退，另外累計提醒，不要跟著應收一起消失
+function _invHold(inv){return (parseFloat(inv&&inv.recvHold)||0);}
+function _holdTotal(){return INV.reduce(function(a,i){return a+_invHold(i);},0);}
 // 全部尚有應收的請款單（全站唯一過濾條件）
 function _arList(){return INV.filter(function(i){return _invAR(i)>0;});}
 function _arTotal(){return _arList().reduce(function(a,i){return a+_invAR(i);},0);}
@@ -2885,8 +2896,20 @@ function _opReserveMonths(){
 function _monthlyFixedCost(){
   return (P.fixedCosts||[]).reduce(function(a,r){return a+(parseFloat(r&&r.amt)||0);},0);
 }
+// 保留金優先採「直接指定金額」；沒指定才用 月固定成本×月數。
+// v5.326：原本只有後者，使用者沒填公司固定成本明細時保留金靜悄悄變成 0，
+// 畫面上看起來像「沒有扣營運金」。現在改成可以直接填金額，且為 0 時會明講。
 function _opReserve(){
+  var fix=parseFloat(P.opReserveAmt);
+  if(isFinite(fix)&&fix>0)return Math.round(fix);
   return Math.round(_monthlyFixedCost()*_opReserveMonths());
+}
+function _opReserveWhy(){
+  var fix=parseFloat(P.opReserveAmt);
+  if(isFinite(fix)&&fix>0)return '直接指定 '+fmt(Math.round(fix));
+  var m=_monthlyFixedCost();
+  if(m>0)return '月固定成本 '+fmt(m)+' × '+_opReserveMonths()+' 個月';
+  return '';
 }
 
 // 本地日期字串（避免 UTC 時區問題）
@@ -3094,6 +3117,7 @@ function doSaveP(){
   P.openingCash=parseFloat(gv('popen'))||0;
   P.openingDate=gv('popendate')||'';
   P.opReserveMonths=(function(){var v=parseFloat(gv('popres'));return (isFinite(v)&&v>=0)?v:3;})();
+  P.opReserveAmt=parseFloat(gv('popresamt'))||0;
   P.mult=parseFloat(gv('pmul'))||1.4;
   P.profit=parseFloat(gv('ppro'))||18;
   P.s1=parseFloat(gv('ps1'))||1.12;P.s2=parseFloat(gv('ps2'))||1.0;P.s3=parseFloat(gv('ps3'))||0.9;
@@ -3231,7 +3255,7 @@ function syncParamsUI(){
   try{rFixedCosts();}catch(e){}
   try{var _pk=document.getElementById('paikey');if(_pk)_pk.value=_aiKey();}catch(e){}
   const m={pc:'company',pt:'taxid',pb:'boss',pco:'contact',ptel:'tel',pem:'email',pad:'addr',
-    ptax:'tax',pohd:'overheadPct',plabor:'laborDayRate',popen:'openingCash',popendate:'openingDate',popres:'opReserveMonths',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
+    ptax:'tax',pohd:'overheadPct',plabor:'laborDayRate',popen:'openingCash',popendate:'openingDate',popres:'opReserveMonths',popresamt:'opReserveAmt',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
     'dp-rent':'dpRent','dp-loss':'dpLoss','dp-process':'dpProcess','dp-period':'dpPeriod',
     'dp-i-h300':'dpIH300','dp-r-h300':'dpRH300','dp-i-h350':'dpIH350','dp-r-h350':'dpRH350',
     'dp-i-h400':'dpIH400','dp-r-h400':'dpRH400','dp-i-s':'dpIS','dp-r-s':'dpRS',
@@ -7724,7 +7748,7 @@ function updateDashTodo(){
   // 1. 本月估驗截止（payDue 在本月）
   INV.forEach(function(inv){
     if(inv.receivedConfirmed)return;
-    var unpaid=(inv.totals&&inv.totals.total||0)-parseFloat(inv.received||0);
+    var unpaid=_invAR(inv);   // v5.326：改走統一函式，抵銷項（匯費／扣款／保留款）不再誤報逾期
     if(unpaid<=0)return;
     var pd=parseInt(inv.payDue)||0;
     if(!pd)return;
@@ -7772,7 +7796,7 @@ function updateDashTodo(){
   // 4. 收款追蹤：預計收款前1天／當天／逾期未收
   INV.forEach(function(inv){
     if(inv.receivedConfirmed)return;
-    var unpaid=(inv.totals&&inv.totals.total||0)-parseFloat(inv.received||0);
+    var unpaid=_invAR(inv);   // v5.326：改走統一函式，抵銷項（匯費／扣款／保留款）不再誤報逾期
     if(unpaid<=0)return;
     var label=(inv.project||'未命名')+' 第'+(inv.periodNo||'?')+'期';
     var _expA=null;try{_expA=_invExpectedDate(inv);}catch(e){}
@@ -8091,29 +8115,56 @@ function openReceiptModal(invId, ev){
   document.getElementById('receipt-inv-id').value=invId;
   document.getElementById('receipt-proj-name').textContent=(inv.project||'未命名工程')+' — 第'+(inv.periodNo||'?')+'期';
   document.getElementById('receipt-total').textContent='NT$ '+fmt(total);
-  // 預填已有的實收金額
+  // 預填已有的實收金額與抵銷項
   const prevAmt=parseFloat(inv.received)||0;
   document.getElementById('receipt-amount').value=prevAmt||'';
   document.getElementById('receipt-date').value=inv.receivedDate||localToday();
   document.getElementById('receipt-note').value=inv.receivedNote||'';
-  document.getElementById('receipt-diff-row').style.display='none';
-  // 即時計算差額
-  document.getElementById('receipt-amount').oninput=function(){
-    const amt=parseFloat(this.value)||0;
-    const diff=total-amt;
-    const row=document.getElementById('receipt-diff-row');
-    if(amt>0&&Math.abs(diff)>0){
-      row.style.display='block';
-      document.getElementById('receipt-diff-txt').textContent=
-        diff>0?'尚差 NT$'+fmt(diff)+' 未收':
-               '溢收 NT$'+fmt(-diff);
-    } else {
-      row.style.display='none';
-    }
-  };
+  document.getElementById('receipt-fee').value=parseFloat(inv.recvFee)||'';
+  document.getElementById('receipt-deduct').value=parseFloat(inv.recvDeduct)||'';
+  document.getElementById('receipt-hold').value=parseFloat(inv.recvHold)||'';
+  document.getElementById('receipt-amount').oninput=_receiptCalc;
+  _receiptCalc();
   const m=document.getElementById('receipt-modal');
   m.style.display='flex';
   setTimeout(()=>document.getElementById('receipt-amount').focus(),100);
+}
+// v5.326：實收＋匯費＋扣款＋業主保留款 對上請款總額才算結清。
+// 原本只比對實收，25 元匯費差額就會讓整張單永遠掛在「逾期未收款」。
+function _receiptOffsets(){
+  const g=id=>parseFloat(document.getElementById(id)?.value)||0;
+  const fee=g('receipt-fee'),ded=g('receipt-deduct'),hold=g('receipt-hold');
+  return {fee:fee,deduct:ded,hold:hold,sum:fee+ded+hold};
+}
+function _receiptCalc(){
+  const inv=INV.find(x=>x.id===document.getElementById('receipt-inv-id')?.value);
+  const total=(inv&&inv.totals&&inv.totals.total)||0;
+  const amt=parseFloat(document.getElementById('receipt-amount')?.value)||0;
+  const off=_receiptOffsets();
+  const row=document.getElementById('receipt-diff-row');
+  const txt=document.getElementById('receipt-diff-txt');
+  if(!row||!txt)return;
+  if(amt<=0&&off.sum<=0){row.style.display='none';return;}
+  const gap=Math.round((total-amt-off.sum)*100)/100;
+  row.style.display='block';
+  const parts=[];
+  if(off.fee)parts.push('匯費 '+fmt(off.fee));
+  if(off.deduct)parts.push('扣款 '+fmt(off.deduct));
+  if(off.hold)parts.push('保留款 '+fmt(off.hold));
+  const detail=parts.length?('（實收 '+fmt(amt)+' ＋ '+parts.join(' ＋ ')+'）'):'';
+  if(Math.abs(gap)<1){
+    row.style.background='var(--gl)';row.style.border='1px solid var(--gm)';
+    txt.style.color='var(--g3)';
+    txt.textContent='✓ 已對平，本期結清'+detail+(off.hold?'　·　業主保留 '+fmt(off.hold)+' 之後可請退':'');
+  }else if(gap>0){
+    row.style.background='#fff8e1';row.style.border='1px solid #ffe082';
+    txt.style.color='#7c5700';
+    txt.textContent='尚差 NT$ '+fmt(gap)+' 未收'+detail+'　—　仍會列入應收與逾期提醒';
+  }else{
+    row.style.background='#fff0f0';row.style.border='1px solid #ffcdd2';
+    txt.style.color='#c62828';
+    txt.textContent='溢收 NT$ '+fmt(-gap)+detail;
+  }
 }
 function closeReceiptModal(){
   document.getElementById('receipt-modal').style.display='none';
@@ -8124,22 +8175,33 @@ function confirmReceipt(){
   const amt=parseFloat(document.getElementById('receipt-amount').value)||0;
   const dt=document.getElementById('receipt-date').value;
   const note=document.getElementById('receipt-note').value.trim();
-  if(amt<=0){toast('⚠ 實收金額必須大於 0');const el=document.getElementById('receipt-amount');if(el)el.focus();return;}
+  const off=_receiptOffsets();
+  if(amt<=0&&off.sum<=0){toast('⚠ 請填實收金額，或填入抵銷項');const el=document.getElementById('receipt-amount');if(el)el.focus();return;}
   // v5.315：部分收款不再標記為「已結清」。原本收一半也設 receivedConfirmed=true，
   // 使該期整張單從應收與逾期提醒中消失，剩餘未收的錢就此不見。
+  // v5.326：抵銷項（匯費／扣款／業主保留款）併入結清判斷——這些錢確實不會再匯進來。
   const _due=(inv.totals&&inv.totals.total)||0;
-  const _full=_due<=0||amt>=_due-1e-6;
+  const _settled=amt+off.sum;
+  const _full=_due<=0||_settled>=_due-1;      // 容許 1 元進位誤差
   inv.received=String(amt);
   inv.receivedDate=dt;
   inv.receivedNote=note;
-  inv.receivedConfirmed=_full;      // 足額才算結清
+  inv.recvFee=off.fee||0;
+  inv.recvDeduct=off.deduct||0;
+  inv.recvHold=off.hold||0;
+  inv.receivedConfirmed=_full;      // 足額（含抵銷）才算結清
   inv.partialConfirmed=!_full;      // 部分收款：已對帳但仍在應收
   inv._mt=Date.now();
   saveInv();
   renderInvList();
+  try{updateDashTodo();}catch(e){}
+  try{updateFinanceKPIs();}catch(e){}
   closeReceiptModal();
-  if(_full)toast('✅ 收款已確認'+(note?' — '+note:''));
-  else toast('✅ 已登錄部分收款 NT$ '+fmt(amt)+'，尚差 NT$ '+fmt(_due-amt)+' 仍列入應收');
+  const _offTxt=off.sum>0?('（抵銷 '+fmt(off.sum)+'：'
+    +[off.fee?'匯費'+fmt(off.fee):'',off.deduct?'扣款'+fmt(off.deduct):'',off.hold?'保留款'+fmt(off.hold):'']
+      .filter(Boolean).join('、')+'）'):'';
+  if(_full)toast('✅ 收款已確認'+_offTxt+(note?' — '+note:''));
+  else toast('✅ 已登錄部分收款 NT$ '+fmt(amt)+_offTxt+'，尚差 NT$ '+fmt(_due-_settled)+' 仍列入應收');
 }
 
 // ── 跳轉到得標案件篩選 ──
@@ -14565,7 +14627,11 @@ function updateFinanceKPIs(){
     <div class="kpi" style="flex:1;min-width:130px;background:#fff8e1;border-color:#ffe082">
       <div class="kl" style="color:#7c5700"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 應收帳款</div>
       <div class="kv" style="font-size:16px;color:#c8890a">NT$ ${fmt(totalAR)}</div>
-      <div class="ks">${arInvs.length} 件待收</div>
+      <div class="ks">${arInvs.length} 件待收${(function(){
+        // v5.326：業主當場扣下的保留款不列應收（不會再匯來），但要記著之後請退
+        var h=0;try{h=_holdTotal();}catch(e){}
+        return h>0?('　·　<span style="color:#7c5700">業主保留 '+fmt(h)+'（可請退）</span>'):'';
+      })()}</div>
     </div>
     <div class="kpi" style="flex:1;min-width:130px;background:#fff0f0">
       <div class="kl" style="color:#b71c1c"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 應付帳款</div>
@@ -14766,7 +14832,7 @@ function renderCashflow(){
       if(inv.receivedConfirmed)return s;
       var d=inv.expectedRecvDate||'';
       if(d.startsWith(mStr)){
-        var unpaid=(inv.totals&&inv.totals.total||0)-parseFloat(inv.received||0);
+        var unpaid=_invAR(inv);   // v5.326：改走統一函式，抵銷項（匯費／扣款／保留款）不再誤報逾期
         return s+(unpaid>0?unpaid:0);
       }
       return s;
@@ -14988,7 +15054,7 @@ function renderShareProfit(numOnly){
     // 僅更新計算結果區（輸入中不重繪輸入框）
     var capEl=document.getElementById('share-cap-num');
     if(capEl){
-      capEl.innerHTML=_shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,capLimitedBy);
+      capEl.innerHTML=_shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,capLimitedBy,apPend,opRes);
       return;
     }
   }
@@ -15027,8 +15093,10 @@ function renderShareProfit(numOnly){
   +'<b>年度可提領上限 ＝ min（盈餘上限、可動用現金）</b><br>'
   +'盈餘上限＝稅後淨利 − 保留款增額 − 循環資金增額 − 機具自付款，由系統依本年請款、施工成本、費用發票<b>自動試算</b>（不需手動輸入）；'
   +'現金上限＝金流頁的<b>可動用資金（已扣應付）</b> − <b>營運週轉保留金</b> ＋ 本年度已領。'
-  +'保留金＝公司月固定成本 '+fmt(_monthlyFixedCost())+' × '+_opReserveMonths()+' 個月 ＝ <b>'+fmt(_opReserve())+'</b>'
-  +'（薪資、租金、機具貸款每月照付，這筆錢不能分掉；月數可在參數設定調整）。'
+  +(_opReserve()>0
+    ?('保留金＝'+_opReserveWhy()+' ＝ <b>'+fmt(_opReserve())+'</b>（薪資、租金、機具貸款每月照付，這筆錢不能分掉）。')
+    :('<b style="color:#c62828">⚠ 目前營運保留金為 0，等於沒有保留公司週轉金。</b>'
+      +'請到參數設定填「公司固定成本明細」（月薪資／租金／機具貸款…），或直接填「營運保留金（直接指定）」。'))
   +'超過上限的提領＝動用下一年的營運資金。</div>'
   // v5.322：四個欄位改為同一列緊湊磚塊；前三項系統試算唯讀，機具自付款手動輸入
   +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">'
@@ -15037,7 +15105,7 @@ function renderShareProfit(numOnly){
   +ro('循環資金增額',c.wcAdd,'月均成本成長 ×（收款 60 天 − 付款 37 天）/30')
   +inp('share-cfg-machineSelfPay','機具自付款',c.machineSelfPay,'本年度機具貸款月付合計')
   +'</div>'
-  +'<div id="share-cap-num">'+_shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,capLimitedBy)+'</div>'
+  +'<div id="share-cap-num">'+_shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,capLimitedBy,apPend,opRes)+'</div>'
   +'<hr style="border:none;border-top:1px solid var(--b1);margin:14px 0">'
   +'<div style="font-size:12.5px;font-weight:700;color:var(--b5);margin-bottom:8px">＋ 新增領取記錄</div>'
   +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">'
@@ -15060,7 +15128,7 @@ function renderShareProfit(numOnly){
     }).join(''):'<div style="padding:12px;color:var(--b3);font-size:12px;text-align:center">本年度尚無領取記錄</div>')
   +'</div></div>';
 }
-function _shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,limitedBy){
+function _shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,limitedBy,apPend,opRes){
   var capClr=cap>0?'var(--g3)':'#c62828';
   var remClr=remain>=0?'var(--g3)':'#c62828';
   // 每人可分＝上限對半；已領/剩餘逐人計算
@@ -15075,6 +15143,13 @@ function _shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,limitedBy){
   return '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">'
   +'<div class="kpi hi" style="flex:1;min-width:130px"><div class="kl">年度可提領上限</div><div class="kv" style="font-size:18px;color:'+capClr+'">NT$ '+fmt(cap)+'</div>'
     +'<div class="ks">兩人對半，各 '+fmt(Math.floor(cap/2))+'</div>'
+    // v5.326：把現金側的算式攤開，才看得出保留金到底扣了沒
+    +((apPend!=null||opRes!=null)
+      ?('<div class="ks" style="font-size:10px;color:var(--b3);line-height:1.5">現金側：可用 '+fmt((capCash||0)+(apPend||0)+(opRes||0)-(drawn||0))
+        +' − 應付 '+fmt(apPend||0)
+        +' − 營運保留 '+(opRes>0?fmt(opRes):'<b style="color:#c62828">0（未設定）</b>')
+        +(drawn?(' ＋ 已領 '+fmt(drawn)):'')
+        +' ＝ '+fmt(capCash||0)+'</div>'):'')
     +(capEarn!=null&&capCash!=null
       ?('<div class="ks" style="font-size:10.5px;color:'+(limitedBy==='cash'?'#b26a00':'var(--b3)')+'">'
         +(limitedBy==='cash'
@@ -17051,6 +17126,23 @@ function applyRoleUI(){
 }
 
 // 渲染頁面權限設定面板（在帳號管理卡片下方）
+// v5.326：矩陣改為「先指定身分、再微調頁面」。
+// 原本只有一堆勾勾，看不出誰是什麼角色，也看不出「管理員不受矩陣限制」這件事。
+function _permRoleOf(em){
+  em=String(em||'').toLowerCase();
+  if(isOwner(em))return 'owner';
+  if(isAdmin(em))return 'partner';
+  var mx=(getPagePerms().__matrix||{})[em]||{};
+  var up=mx.pages||{};
+  var cols=ALL_PAGES.filter(function(p){return !p.adminOnly&&!p.ownerOnly;});
+  var closed=cols.filter(function(p){return up[p.id]===false;}).map(function(p){return p.id;});
+  if(!closed.length)return 'office';
+  var siteOpen=['quickcost','contacts'];
+  var shouldClose=cols.filter(function(p){return siteOpen.indexOf(p.id)<0;}).map(function(p){return p.id;});
+  if(closed.length===shouldClose.length&&shouldClose.every(function(id){return closed.indexOf(id)>=0;}))return 'site';
+  return 'custom';
+}
+const PERM_ROLE_LABEL={owner:'擁有者',partner:'負責人（管理員）',office:'管理部',site:'工務',custom:'自訂'};
 function renderPermMatrixPanel(){
   const host=document.getElementById('page-perm-panel-2')||document.getElementById('page-perm-panel');
   if(!host||!_isAdminUser)return;
@@ -17058,34 +17150,82 @@ function renderPermMatrixPanel(){
   if(!box){box=document.createElement('div');box.id='perm-matrix-box';host.parentElement.appendChild(box);}
   const perms=getPagePerms();
   const mx=perms.__matrix||{};
-  const emails=Object.keys(mx);
+  // 管理員／擁有者即使沒被加進矩陣，也要出現在名單上（讓角色一目了然）
+  const emails=Object.keys(mx).concat(getAdminEmails(),getOwnerEmails())
+    .map(e=>String(e||'').toLowerCase()).filter((e,i,a)=>e&&a.indexOf(e)===i);
   const cols=ALL_PAGES.filter(pp=>!pp.adminOnly&&!pp.ownerOnly);
+  const roleSel=(em,role)=>'<select onchange="permMxSetRole(\''+escq(em)+'\',this.value)" style="font-size:11px;padding:3px 5px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;background:var(--w)">'
+    +['owner','partner','office','site','custom'].map(function(r){
+      return '<option value="'+r+'"'+(r===role?' selected':'')+(r==='custom'?' disabled':'')+'>'+PERM_ROLE_LABEL[r]+'</option>';
+    }).join('')+'</select>';
   const rows=emails.map(em=>{
     const u=mx[em]||{};const up=u.pages||{};
-    return '<tr><td style="padding:5px 8px;font-size:11.5px;font-weight:600;white-space:nowrap">'+esc(em)+'</td>'
-      +cols.map(pp=>'<td style="text-align:center;padding:4px"><input type="checkbox" '+(up[pp.id]===false?'':'checked')+' onchange="permMxSet(\''+esc(em)+'\',\''+pp.id+'\',this.checked)"></td>').join('')
-      +'<td style="text-align:center;padding:4px"><input type="checkbox" '+(u.hideProfit?'checked':'')+' onchange="permMxHideProfit(\''+esc(em)+'\',this.checked)"></td>'
-      +'<td style="white-space:nowrap;padding:4px">'
-      +'<button type="button" class="btn btn-xs" title="工務範本：日報．支出＋客戶．廠商（協力廠商資訊），隱藏利潤與金流" onclick="permMxApplyRole(\''+esc(em)+'\',\'site\')" style="border-color:#ffcc80;color:#e65100">⛑ 工務</button> '
-      +'<button type="button" class="btn btn-xs" title="負責人範本：利潤／金流／成本／分潤全部開放，但看不到單價分析與權限管理。需另外把此帳號設為管理員（下方管理員清單）才能讀到雲端的成本資料" onclick="permMxApplyRole(\''+esc(em)+'\',\'partner\')" style="border-color:#A5D6A7;color:#2E7D32">🤝 負責人</button> '
-      +'<button type="button" class="btn btn-xs" title="管理部範本：一般頁面全部開放" onclick="permMxApplyRole(\''+esc(em)+'\',\'office\')" style="border-color:#90CAF9;color:#1565C0">🏢 管理部</button>'
-      +'</td>'
-      +'<td style="text-align:center"><button type="button" class="btn btn-xs btn-r" title="移除此使用者設定" onclick="permMxRemove(\''+esc(em)+'\')">✕</button></td></tr>';
+    const role=_permRoleOf(em);
+    const boss=(role==='owner'||role==='partner');   // 管理員層級：不受矩陣限制
+    return '<tr style="'+(boss?'background:#f6fbf7':'')+'">'
+      +'<td style="padding:5px 8px;font-size:11.5px;font-weight:600;white-space:nowrap">'+esc(em)
+      +(String((_fbUser&&_fbUser.email)||'').toLowerCase()===em?'<span style="font-size:9.5px;color:var(--g3);margin-left:3px">（你）</span>':'')+'</td>'
+      +'<td style="padding:4px 6px;white-space:nowrap">'+roleSel(em,role)+'</td>'
+      +(boss
+        ? '<td colspan="'+(cols.length+1)+'" style="padding:4px 10px;font-size:10.5px;color:var(--g3)">'
+          +(role==='owner'?'擁有者：所有頁面（含單價分析、權限管理）':'管理員：除單價分析與權限管理外全部開放')
+          +'　·　可讀雲端成本資料　·　<b>不受下方頁面勾選限制</b></td>'
+        : cols.map(pp=>'<td style="text-align:center;padding:4px"><input type="checkbox" '+(up[pp.id]===false?'':'checked')+' onchange="permMxSet(\''+escq(em)+'\',\''+pp.id+'\',this.checked)"></td>').join('')
+          +'<td style="text-align:center;padding:4px"><input type="checkbox" '+(u.hideProfit?'checked':'')+' onchange="permMxHideProfit(\''+escq(em)+'\',this.checked)"></td>')
+      +'<td style="text-align:center">'+(boss&&isOwner(em)?'':'<button type="button" class="btn btn-xs btn-r" title="移除此使用者設定" onclick="permMxRemove(\''+escq(em)+'\')">✕</button>')+'</td></tr>';
   }).join('');
+  // 全域預設若把敏感頁面開著，未列入矩陣的人就看得到——明講出來
+  const risky=['profit','finance','costs','ledger','reports'].filter(id=>perms[id]!==false)
+    .map(id=>(ALL_PAGES.find(p=>p.id===id)||{}).label).filter(Boolean);
   box.innerHTML='<div style="margin-top:16px;border-top:2px solid var(--gm);padding-top:14px">'
-    +'<div style="font-size:13.5px;font-weight:800;color:var(--b5);margin-bottom:4px">使用者權限矩陣</div>'
-    +'<div style="font-size:11px;color:var(--b4);margin-bottom:10px">針對特定帳號逐頁設定（勾＝可用）；「隱藏利潤」勾選後該帳號看不到毛利徽章與利潤數據。矩陣優先於上方全域設定；管理員不受限制。</div>'
-    +'<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">'
-    +'<input id="perm-mx-email" placeholder="輸入使用者 Email" style="flex:1;min-width:200px;font-size:12.5px;padding:7px 10px;border:1px solid var(--b2);border-radius:var(--r6)">'
-    +'<button type="button" class="btn btn-sm btn-g" onclick="permMxAdd()">＋ 加入矩陣</button></div>'
+    +'<div style="font-size:13.5px;font-weight:800;color:var(--b5);margin-bottom:4px">使用者權限矩陣（建議每個人都列在這裡）</div>'
+    +'<div style="font-size:11px;color:var(--b4);line-height:1.65;margin-bottom:8px">'
+    +'<b>先選身分，頁面就自動設定好</b>，不用逐個勾。之後要微調再改勾選（會變成「自訂」）。<br>'
+    +'‧ <b>擁有者</b>：全部，含單價分析與權限管理　‧ <b>負責人（管理員）</b>：利潤／金流／成本／分潤全開，看不到單價分析與權限管理<br>'
+    +'‧ <b>管理部</b>：一般頁面全開，但讀不到雲端成本資料　‧ <b>工務</b>：日報．支出＋客戶．廠商<br>'
+    +'<span style="color:var(--b3)">上方「頁面存取權限」是<b>沒被列在這裡</b>的帳號才會套用的預設值。</span></div>'
+    +(risky.length
+      ? '<div style="font-size:11px;color:#7c5700;background:#fff8e1;border:1px solid #ffe082;border-radius:var(--r8);padding:7px 10px;margin-bottom:10px">'
+        +'⚠ 上方全域預設目前開放著「'+risky.join('、')+'」。<b>任何沒列在下方矩陣的登入帳號都看得到這些頁面。</b>'
+        +'請把每個人都加進矩陣並指定身分，或到上方把這些頁面關閉。</div>'
+      : '')
+    +'<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'
+    +'<input id="perm-mx-email" placeholder="輸入使用者 Email" style="flex:1;min-width:180px;font-size:12.5px;padding:7px 10px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit">'
+    +'<select id="perm-mx-role" style="font-size:12.5px;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)">'
+    +'<option value="site">工務</option><option value="office">管理部</option><option value="partner">負責人（管理員）</option><option value="owner">擁有者</option></select>'
+    +'<button type="button" class="btn btn-sm btn-g" onclick="permMxAdd()">＋ 加入</button></div>'
     +(emails.length
-      ?'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:640px"><thead><tr>'
+      ?'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:700px"><thead><tr>'
         +'<th style="text-align:left;padding:5px 8px;font-size:10.5px;color:var(--b3)">使用者</th>'
+        +'<th style="padding:4px 6px;font-size:10.5px;color:var(--b3);font-weight:700">身分</th>'
         +cols.map(pp=>'<th style="padding:4px 6px;font-size:10px;color:var(--b3);font-weight:600">'+pp.label+'</th>').join('')
-        +'<th style="padding:4px 6px;font-size:10px;color:#4A148C;font-weight:700">隱藏利潤</th><th style="padding:4px 6px;font-size:10px;color:var(--b3);font-weight:600">角色範本</th><th></th></tr></thead>'
+        +'<th style="padding:4px 6px;font-size:10px;color:#4A148C;font-weight:700">隱藏利潤</th>'
+        +'<th style="padding:4px 6px;font-size:10px;color:var(--b3);font-weight:600"></th></tr></thead>'
         +'<tbody>'+rows+'</tbody></table></div>'
-      :'<div style="font-size:12px;color:var(--b3);padding:8px">尚未加入任何使用者——輸入 Email 開始設定</div>')
+      :'<div style="font-size:12px;color:var(--b3);padding:8px">尚未加入任何使用者——輸入 Email、選身分後按「加入」</div>')
     +'</div>';
+}
+// 指定身分：一次把「頁面權限＋管理員資格＋擁有者資格」都設定好
+function permMxSetRole(em,role){
+  em=String(em||'').toLowerCase();
+  if(role==='custom')return;
+  var me=String((_fbUser&&_fbUser.email)||'').toLowerCase();
+  if(em===me&&role!=='owner'&&isOwner(em)){toast('不能把自己降級，請由另一位擁有者操作');renderPermMatrixPanel();return;}
+  // 擁有者資格
+  var owners=getOwnerEmails();
+  if(role==='owner'){ if(owners.indexOf(em)<0)saveOwnerEmails(owners.concat([em])); }
+  else if(owners.indexOf(em)>=0)saveOwnerEmails(owners.filter(function(x){return x!==em;}));
+  // 管理員資格（＝能不能讀雲端成本）
+  var admins=getAdminEmails();
+  var wantAdmin=(role==='owner'||role==='partner');
+  if(wantAdmin&&admins.indexOf(em)<0)saveAdminEmails(admins.concat([em]));
+  if(!wantAdmin&&admins.indexOf(em)>=0)saveAdminEmails(admins.filter(function(x){return x!==em;}));
+  // 頁面權限
+  permMxApplyRole(em,role==='site'?'site':role==='partner'?'partner':'office');
+  applyRoleUI();
+  toast('已將 '+em+' 設為「'+PERM_ROLE_LABEL[role]+'」'
+    +(wantAdmin?'（可讀雲端成本）':'（讀不到雲端成本）')
+    +'　·　對方需自行登入一次才生效');
 }
 function _permMxMutate(fn){
   const perms=getPagePerms();
@@ -17097,9 +17237,10 @@ function _permMxMutate(fn){
 function permMxAdd(){
   const em=(document.getElementById('perm-mx-email').value||'').trim().toLowerCase();
   if(!em||!em.includes('@')){toast('請輸入有效 Email');return;}
+  const role=(document.getElementById('perm-mx-role')||{}).value||'site';
   _permMxMutate(mx=>{if(!mx[em])mx[em]={pages:{},hideProfit:false};});
   document.getElementById('perm-mx-email').value='';
-  toast('已加入：'+em);
+  permMxSetRole(em,role);   // v5.326：加入時就套用身分，不用再逐頁勾
 }
 function permMxSet(em,pid,allowed){_permMxMutate(mx=>{if(!mx[em])mx[em]={pages:{}};if(!mx[em].pages)mx[em].pages={};if(allowed)delete mx[em].pages[pid];else mx[em].pages[pid]=false;});}
 // 角色範本：一鍵套用整列權限
@@ -18969,14 +19110,25 @@ function exportCurrentReportExcel(){
         <label>收款日期</label>
         <input type="date" id="receipt-date" style="font-size:13px">
       </div>
+      <!-- v5.326 抵銷項：這些錢業主沒匯給你，但也不該再列為應收／逾期 -->
+      <div style="border:1px dashed var(--b2);border-radius:var(--r8);padding:9px 11px;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:7px">抵銷項 <span style="font-weight:400;color:var(--b3)">（沒收到但視同結清，填了就不會再跳逾期提醒）</span></div>
+        <div class="fg fg3" style="gap:7px">
+          <div class="f"><label style="font-size:10.5px">匯費</label><input type="number" id="receipt-fee" placeholder="0" style="font-size:13px;text-align:right" oninput="_receiptCalc()"></div>
+          <div class="f"><label style="font-size:10.5px">業主扣款</label><input type="number" id="receipt-deduct" placeholder="0" style="font-size:13px;text-align:right" oninput="_receiptCalc()"></div>
+          <div class="f"><label style="font-size:10.5px">業主保留款</label><input type="number" id="receipt-hold" placeholder="0" style="font-size:13px;text-align:right" oninput="_receiptCalc()"></div>
+        </div>
+        <div style="font-size:10px;color:var(--b3);line-height:1.45;margin-top:5px">
+          匯費／扣款＝這筆錢收不回來了；<b>業主保留款</b>＝之後才會退還，系統會另外記著提醒你請退。</div>
+      </div>
       <!-- 備註說明 -->
-      <div class="f" style="margin-bottom:16px">
-        <label>備註 <span style="color:var(--b3);font-size:10px">（如：匯費NT$15、分批付款等）</span></label>
+      <div class="f" style="margin-bottom:12px">
+        <label>備註 <span style="color:var(--b3);font-size:10px">（如：分批付款、扣款原因等）</span></label>
         <input type="text" id="receipt-note" placeholder="選填，說明特殊收款情況">
       </div>
-      <!-- 差額說明 -->
-      <div id="receipt-diff-row" style="display:none;background:#fff8e1;border:1px solid #ffe082;border-radius:var(--r8);padding:8px 12px;margin-bottom:14px;font-size:12px">
-        <span style="color:#7c5700">⚠ 差額：</span><span id="receipt-diff-txt" style="font-weight:700;color:#7c5700"></span>
+      <!-- 對帳結果 -->
+      <div id="receipt-diff-row" style="display:none;border-radius:var(--r8);padding:8px 12px;margin-bottom:14px;font-size:12px">
+        <span id="receipt-diff-txt" style="font-weight:700"></span>
       </div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button type="button" onclick="closeReceiptModal()" style="padding:7px 18px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);color:var(--b4);cursor:pointer;font-size:13px">取消</button>
