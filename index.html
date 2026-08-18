@@ -2510,7 +2510,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.338';
+var APP_VERSION='v5.339';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -17778,7 +17778,14 @@ function _meRoleLabel(){
 }
 function renderUserChip(){
   var el=document.getElementById('user-chip');if(!el)return;
-  if(!_fbUser){el.innerHTML='';return;}
+  if(!_fbUser){
+    // v5.339：v5.335 起訪客看不到參數設定頁，新瀏覽器沒有登入入口 → 右上角直接放登入鈕
+    el.innerHTML='<button type="button" onclick="fbSignIn()" style="display:flex;align-items:center;gap:6px;'
+      +'background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);border-radius:99px;'
+      +'padding:5px 14px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">'
+      +'<svg class="ic ib" aria-hidden="true"><use href="#i-user"/></svg> 登入</button>';
+    return;
+  }
   var nm=_meName();
   var initial=esc(String(nm||'?').trim().charAt(0)||'?');
   el.innerHTML='<button type="button" id="user-chip-btn" style="display:flex;align-items:center;gap:8px;background:transparent;border:none;cursor:pointer;padding:4px 6px;color:#fff;font-family:inherit">'
