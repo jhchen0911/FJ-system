@@ -2525,7 +2525,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.341';
+var APP_VERSION='v5.342';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -4478,6 +4478,16 @@ function saveQ(){
   const idx=Q.findIndex(x=>x.id===q.id);
   if(idx>=0)Q[idx]=q;else Q.unshift(q);
   persist();
+  // v5.342 名稱連動：工程名稱改了 → 請款單.project／合約.name／應付.project 是名稱複本＋
+  // 各頁的名稱比對鍵，必須跟著改，否則業主計價等頁面會斷鏈、顯示舊名
+  const _oldName=existingQ?String(existingQ.name||'').trim():'';
+  if(_oldName&&_oldName!==String(q.name||'').trim()){
+    let _rn=0;
+    INV.forEach(v=>{if(v.sourceQid===q.id||v.quoteId===q.id||v.project===_oldName){if(v.project!==q.name){v.project=q.name;v._mt=Date.now();_rn++;}}});
+    CONTRACTS.forEach(c=>{if(c.linkedQid===q.id||c.name===_oldName){if(c.name!==q.name){c.name=q.name;c._mt=Date.now();_rn++;}}});
+    PAYABLES.forEach(p=>{if(p.project===_oldName){p.project=q.name;p._mt=Date.now();_rn++;}});
+    if(_rn){try{saveInv();saveContracts();savePayables();}catch(e){}toast('工程名稱已連動更新 '+_rn+' 筆關聯記錄（請款單／合約／應付）');}
+  }
   // 連動更新：所有關聯請款單（含歷期）同步更新合約單價，並重算本期金額
   let _linkedByQid=true;
   let _settleKept=0;   // v5.315：本次有幾項因已結算而保留合約數量（提示使用者）
@@ -8488,11 +8498,18 @@ function updateCustomerStats(){
     return out;
   })();
   const activeContracts=_liveCts.filter(c=>c.status==='active'||!c.status).length;
-  const totalContractAmt=_liveCts.reduce((a,c)=>a+(parseFloat(c.amount)||0),0);
+  // v5.341 使用者回報三頁仍不一致：這裡原本加總合約清單，但「無得標報價可歸屬的合約」
+  // （孤兒合約／同案重複建的）會多算進來。改與總覽、報價管理完全同一條公式（得標案合約現值），
+  // 歸屬不到得標報價的合約另行列出件數提醒，用「重複資料檢查」可查明細。
+  const awardedQs=Q.filter(q=>q.awarded&&!q.parentId);
+  const totalContractAmt=awardedQs.reduce((a,q)=>a+_wonAmt(q),0);
+  const orphanCts=_liveCts.filter(c=>!awardedQs.some(q=>c.linkedQid===q.id||(c.name&&c.name===q.name)));
+  const orphanAmt=orphanCts.reduce((a,c)=>a+(parseFloat(c.amount)||0),0);
   el.innerHTML=
     '<div class="kpi" style="flex:1;min-width:120px"><div class="kl">客戶總數</div><div class="kv" style="font-size:20px">'+total+'</div><div class="ks">有合約往來 '+withContract+' 位</div></div>'
     +'<div class="kpi" style="flex:1;min-width:120px"><div class="kl">進行中合約</div><div class="kv" style="font-size:20px">'+activeContracts+'</div><div class="ks">件</div></div>'
-    +'<div class="kpi hi" style="flex:1;min-width:140px"><div class="kl">合約總金額</div><div class="kv" style="font-size:16px">NT$ '+fmt(totalContractAmt)+'</div></div>';
+    +'<div class="kpi hi" style="flex:1;min-width:140px"><div class="kl">得標金額（合約現值）</div><div class="kv" style="font-size:16px">NT$ '+fmt(totalContractAmt)+'</div>'
+    +(orphanCts.length?'<div class="ks" style="color:#c62828">另有 '+orphanCts.length+' 件合約未對應得標報價 NT$ '+fmt(orphanAmt)+'（參數設定→重複資料檢查）</div>':'')+'</div>';
 }
 
 function updateDashAR(){
@@ -18048,7 +18065,8 @@ function chipLoginOpen(){
       +'<div id="cl-err" style="display:none;color:#c62828;font-size:11.5px;margin:2px 0 4px"></div>'
       +'<div style="display:flex;gap:8px;margin-top:10px">'
       +'<button type="button" class="btn btn-g" style="flex:1" onclick="chipLoginGo()">登入</button>'
-      +'<button type="button" class="btn" onclick="chipLoginClose()">取消</button></div></div>';
+      +'<button type="button" class="btn" onclick="chipLoginClose()">取消</button></div>'
+      +'<button type="button" onclick="chipLoginForgot()" style="background:none;border:none;padding:8px 0 0;color:var(--g3);font-size:11.5px;cursor:pointer;font-family:inherit;text-decoration:underline">忘記密碼？寄送重設密碼信</button></div>';
     ov.onclick=chipLoginClose;
     document.body.appendChild(ov);
   }
@@ -18059,11 +18077,21 @@ function chipLoginOpen(){
   setTimeout(function(){var f=(em&&em.value)?document.getElementById('cl-password'):em;if(f)f.focus();},50);
 }
 function chipLoginClose(){window._clRetry=0;var ov=document.getElementById('chip-login-ov');if(ov)ov.style.display='none';}
+function chipLoginForgot(){
+  var email=String((document.getElementById('cl-email')||{}).value||'').trim();
+  var err=document.getElementById('cl-err');
+  var show=function(m,ok){if(err){err.textContent=m;err.style.color=ok?'var(--g3)':'#c62828';err.style.display='block';}};
+  if(!email){show('請先在上方輸入電子郵件');return;}
+  if(!_fbAuth){initGoogleSignIn();show('Firebase 連線中，請稍候再按一次');return;}
+  _fbAuth.sendPasswordResetEmail(email)
+    .then(function(){show('重設密碼信已寄到 '+email+'，請收信（含垃圾郵件匣）設定新密碼後回來登入',true);})
+    .catch(function(e){show(_fbErrMsg((e&&e.code)||''));});
+}
 function chipLoginGo(){
   var email=String((document.getElementById('cl-email')||{}).value||'').trim();
   var pw=(document.getElementById('cl-password')||{}).value||'';
   var err=document.getElementById('cl-err');
-  var show=function(m){if(err){err.textContent=m;err.style.display='block';}};
+  var show=function(m){if(err){err.textContent=m;err.style.color='#c62828';err.style.display='block';}};
   if(!email||!pw){show('請輸入電子郵件和密碼');return;}
   if(!_fbAuth){
     initGoogleSignIn();
