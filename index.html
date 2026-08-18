@@ -617,6 +617,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-intake" onclick="smartIntake()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
   <button type="button" class="snav" id="sn-contacts" onclick="go('contacts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>客戶．廠商</button>
   <button type="button" class="snav" id="sn-progress" onclick="go('progress')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg></span>施工進度</button>
+  <button type="button" class="snav" id="sn-plan" onclick="go('plan')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>施工計畫書</button>
   <button type="button" class="snav" id="sn-rebar" onclick="go('rebar')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-scale"/></svg></span>鋼筋籠檢料</button>
   <button type="button" class="snav" id="sn-matest" onclick="go('matest')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>材料估算</button>
   <button type="button" class="snav" id="sn-grout" onclick="go('grout')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>根固砂漿</button>
@@ -1164,6 +1165,10 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <div class="page" id="page-progress">
   <div class="ph"><div class="ph-l"><div class="ph-t">施工進度</div><div class="ph-s">機組平行排程・甘特圖・落後偵測・S 曲線</div></div></div>
   <div class="pad" style="max-width:1500px"><div id="progress-root"></div></div>
+</div>
+<div class="page" id="page-plan">
+  <div class="ph"><div class="ph-l"><div class="ph-t">施工計畫書</div><div class="ph-s">分項工程施工計畫書自動生成：填專案→勾工項→匯圖說→產出 Word／PDF＋自主檢查表</div></div></div>
+  <div class="pad" style="max-width:1300px"><div id="plan-root"></div></div>
 </div>
 <div class="page" id="page-matest">
   <div class="ph"><div class="ph-l"><div class="ph-t">材料估算</div><div class="ph-s">擋土支撐材料估算：選專案→輸入條件→計算所需材料</div></div></div>
@@ -2569,7 +2574,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.352';
+var APP_VERSION='v5.353';
 var FY_LOGO='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodpAAQAAAABAAABMuocAAcAAAEMAAAAJgAAAAAc6gAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWQAwACAAAAFAAAAoCQBAACAAAAFAAAApSSkQACAAAAAzAwAACSkgACAAAAAzAwAADqHAAHAAABDAAAAXQAAAAAHOoAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADIwMjQ6MTE6MjggMDc6MzM6MzQAMjAyNDoxMToyOCAwNzozMzozNAAAAP/hAqxodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvADw/eHBhY2tldCBiZWdpbj0n77u/JyBpZD0nVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkJz8+DQo8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIj48cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSJ1dWlkOmZhZjViZGQ1LWJhM2QtMTFkYS1hZDMxLWQzM2Q3NTE4MmYxYiIgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iPjxleGlmOkRhdGVUaW1lT3JpZ2luYWw+MjAyNC0xMS0yOFQwNzozMzozNDwvZXhpZjpEYXRlVGltZU9yaWdpbmFsPjwvcmRmOkRlc2NyaXB0aW9uPjwvcmRmOlJERj48L3g6eG1wbWV0YT4NCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8P3hwYWNrZXQgZW5kPSd3Jz8+/9sAQwADAgIDAgIDAwMDBAMDBAUIBQUEBAUKBwcGCAwKDAwLCgsLDQ4SEA0OEQ4LCxAWEBETFBUVFQwPFxgWFBgSFBUU/9sAQwEDBAQFBAUJBQUJFA0LDRQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU/8AAEQgAywDLAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYH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';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
@@ -3142,6 +3147,7 @@ function go(p){
   if(p==='backfill'){try{_bfRender();}catch(e){}}
   if(p==='progress'){try{_pgRender();}catch(e){}}
   if(p==='matest'){try{renderMatEst();}catch(e){}}
+  if(p==='plan'){try{_plRender();}catch(e){}}
   if(p==='quotes'){renderList();updateQuoteStats();}
   if(p==='editor'){
     rItems();rExs();rTots();
@@ -8965,6 +8971,22 @@ function _migrateDepts(){
       }
     }
   }catch(e){}
+  // v5.353：施工計畫書頁同樣預設開給既有非系統角色
+  try{
+    if(localStorage.getItem('fy_tools_seed4')!=='1'){
+      var pr4=_acct();
+      if((pr4.__roles||[]).length){
+        var sd4=false;
+        pr4.__roles.forEach(function(r){
+          if(r.sys)return;
+          r.pages=r.pages||{};
+          if(r.pages.plan!==true){r.pages.plan=true;r._mt=Date.now();sd4=true;}
+        });
+        if(sd4)_acctSave(pr4);
+        localStorage.setItem('fy_tools_seed4','1');
+      }
+    }
+  }catch(e){}
   try{
     if(localStorage.getItem('fy_tools_seed3')!=='1'){
       var pr3=_acct();
@@ -11185,7 +11207,7 @@ function _trSave(kind,title,proj,inputs,summary){
   _trPersist(a);
 }
 function _trGet(id){return _trAll().find(function(r){return r.id===id;});}
-var _TR_RERENDER={rebar:'_rbRender',grout:'_gtRender',backfill:'_bfRender',progress:'_pgRender'};
+var _TR_RERENDER={rebar:'_rbRender',grout:'_gtRender',backfill:'_bfRender',progress:'_pgRender',plan:'_plRender'};
 function _trDelUI(id,kind){
   _trPersist(_trAll().filter(function(r){return r.id!==id;}));
   toast('已刪除存檔');try{window[_TR_RERENDER[kind]]();}catch(e){}
@@ -11236,6 +11258,1654 @@ function _toolPrint(title,proj,body,opts){
     +body+'<script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>');
   w.document.close();
 }
+// ══════════ Word (.docx) 產生器（v5.353）══════════
+// 與 XLSX 同樣沿用 _zipStore/_crc32，無相依套件。段落套用真正的 Word 內建標題樣式
+// （heading 1/2/3），因此 Word 開檔後「參考資料→目錄」可直接自動產生目錄。
+var _DOCX_NS='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
+function _dxE(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+// 一段文字可能含換行 → 拆成多個 <w:br/>
+function _dxRuns(t,bold){
+  var parts=String(t==null?'':t).split('\n');
+  return '<w:r>'+(bold?'<w:rPr><w:b/></w:rPr>':'')+parts.map(function(s,i){
+    return (i?'<w:br/>':'')+'<w:t xml:space="preserve">'+_dxE(s)+'</w:t>';
+  }).join('')+'</w:r>';
+}
+function _dxP(t,style,opts){
+  var o=opts||{};
+  var pPr='<w:pPr>'+(style?'<w:pStyle w:val="'+style+'"/>':'')
+    +(o.center?'<w:jc w:val="center"/>':'')
+    +(o.ind?'<w:ind w:left="'+o.ind+'"/>':'')
+    +(o.pageBreak?'<w:pageBreakBefore/>':'')+'</w:pPr>';
+  return '<w:p>'+pPr+_dxRuns(t,o.bold)+'</w:p>';
+}
+function _dxTbl(rows,widths){
+  if(!rows||!rows.length)return '';
+  var grid=widths?('<w:tblGrid>'+widths.map(function(w){return '<w:gridCol w:w="'+w+'"/>';}).join('')+'</w:tblGrid>'):'';
+  return '<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblLayout w:type="fixed"/><w:tblBorders>'
+    +['top','left','bottom','right','insideH','insideV'].map(function(s){return '<w:'+s+' w:val="single" w:sz="6" w:color="8FA898"/>';}).join('')
+    +'</w:tblBorders></w:tblPr>'+grid
+    +rows.map(function(r,ri){
+      return '<w:tr>'+(ri===0?'<w:trPr><w:tblHeader/></w:trPr>':'')+(r||[]).map(function(c,ci){
+        var w=widths?widths[ci]:0;
+        return '<w:tc><w:tcPr><w:tcW w:w="'+(w||0)+'" w:type="'+(w?'dxa':'auto')+'"/>'
+          +(ri===0?'<w:shd w:val="clear" w:fill="0E3D22"/>':'')
+          +'<w:vAlign w:val="center"/></w:tcPr>'
+          +'<w:p><w:pPr><w:pStyle w:val="'+(ri===0?'DxTH':'DxTD')+'"/></w:pPr>'+_dxRuns(c)+'</w:p></w:tc>';
+      }).join('')+'</w:tr>';
+    }).join('')+'</w:tbl>'+_dxP('','DxGap');
+}
+function _dxImg(rid,cx,cy,name){
+  var n=String(rid).replace(/\D/g,'');
+  return '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
+    +'<wp:extent cx="'+cx+'" cy="'+cy+'"/><wp:docPr id="'+n+'" name="'+_dxE(name)+'"/>'
+    +'<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+    +'<pic:pic><pic:nvPicPr><pic:cNvPr id="'+n+'" name="'+_dxE(name)+'"/><pic:cNvPicPr/></pic:nvPicPr>'
+    +'<pic:blipFill><a:blip r:embed="'+rid+'"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>'
+    +'<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+cx+'" cy="'+cy+'"/></a:xfrm>'
+    +'<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>'
+    +'</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>';
+}
+function _dxB64ToU8(b64){
+  var s=atob(String(b64).replace(/^data:[^,]*,/,''));
+  var u=new Uint8Array(s.length);for(var i=0;i<s.length;i++)u[i]=s.charCodeAt(i);
+  return u;
+}
+// blocks：[{t:'title'|'sub'|'h1'|'h2'|'h3'|'p'|'li'|'tbl'|'img'|'break'}]
+function _docxBytes(blocks,opts){
+  var o=opts||{},enc=new TextEncoder();
+  var media=[],rels=['<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'];
+  var exts={};
+  var body=(blocks||[]).map(function(b){
+    if(!b)return '';
+    switch(b.t){
+      case 'title': return _dxP(b.v,'DxTitle',{center:true});
+      case 'sub':   return _dxP(b.v,'DxSub',{center:true});
+      case 'h1':    return _dxP(b.v,'DxH1',{pageBreak:!!b.pb});
+      case 'h2':    return _dxP(b.v,'DxH2');
+      case 'h3':    return _dxP(b.v,'DxH3');
+      case 'li':    return _dxP(b.v,'DxLi');
+      case 'note':  return _dxP(b.v,'DxNote');
+      case 'break': return _dxP('','DxGap',{pageBreak:true});
+      case 'tbl':   return _dxTbl(b.rows,b.w);
+      case 'img':   {
+        var idx=media.length+1,ext=(b.ext||'png').toLowerCase();exts[ext]=1;
+        media.push({name:'word/media/image'+idx+'.'+ext,data:_dxB64ToU8(b.b64)});
+        var rid='rId'+(idx+1);
+        rels.push('<Relationship Id="'+rid+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image'+idx+'.'+ext+'"/>');
+        return _dxImg(rid,b.cx||5486400,b.cy||3657600,b.name||('image'+idx))
+          +(b.cap?_dxP(b.cap,'DxCap',{center:true}):'');
+      }
+      default:      return _dxP(b.v,null,{bold:b.bold});
+    }
+  }).join('');
+  var doc='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document '+_DOCX_NS+'><w:body>'+body
+    +'<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1021" w:bottom="1134" w:left="1247" w:header="709" w:footer="709"/></w:sectPr></w:body></w:document>';
+  var F='<w:rFonts w:ascii="Microsoft JhengHei" w:eastAsia="Microsoft JhengHei" w:hAnsi="Microsoft JhengHei"/>';
+  function st(id,name,sz,bold,color,outline,before,after,extraPPr){
+    return '<w:style w:type="paragraph" w:styleId="'+id+'"><w:name w:val="'+name+'"/><w:basedOn w:val="Normal"/><w:qFormat/>'
+      +'<w:pPr>'+(outline!=null?'<w:outlineLvl w:val="'+outline+'"/>':'')
+      +'<w:spacing w:before="'+before+'" w:after="'+after+'"/>'+(extraPPr||'')+'</w:pPr>'
+      +'<w:rPr>'+F+(bold?'<w:b/>':'')+'<w:sz w:val="'+sz+'"/>'+(color?'<w:color w:val="'+color+'"/>':'')+'</w:rPr></w:style>';
+  }
+  var styles='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+    +'<w:docDefaults><w:rPrDefault><w:rPr>'+F+'<w:sz w:val="24"/></w:rPr></w:rPrDefault></w:docDefaults>'
+    +'<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="40" w:after="40" w:line="340" w:lineRule="auto"/></w:pPr></w:style>'
+    +st('DxTitle','Title',44,1,'0E3D22',null,600,200)
+    +st('DxSub','Subtitle',34,1,'2F6B45',null,60,600)
+    +st('DxH1','heading 1',32,1,'0E3D22',0,320,160)
+    +st('DxH2','heading 2',28,1,'0E3D22',1,240,120)
+    +st('DxH3','heading 3',25,1,'333333',2,180,90)
+    +st('DxLi','ListPara',24,0,null,null,20,20,'<w:ind w:left="480" w:hanging="240"/>')
+    +st('DxNote','NoteText',21,0,'555555',null,40,120)
+    +st('DxCap','Caption',20,0,'555555',null,20,160)
+    +st('DxTH','TableHead',20,1,'FFFFFF',null,30,30,'<w:jc w:val="center"/>')
+    +st('DxTD','TableCell',19,0,null,null,30,30)
+    +st('DxGap','Gap',12,0,null,null,0,0)
+    +'</w:styles>';
+  var defExt=Object.keys(exts).map(function(e){
+    return '<Default Extension="'+e+'" ContentType="image/'+(e==='jpg'?'jpeg':e)+'"/>';}).join('');
+  var ct='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+    +'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'+defExt
+    +'<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+    +'<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>';
+  var rr='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+  var dr='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+rels.join('')+'</Relationships>';
+  var files=[
+    {name:'[Content_Types].xml',data:enc.encode(ct)},
+    {name:'_rels/.rels',data:enc.encode(rr)},
+    {name:'word/document.xml',data:enc.encode(doc)},
+    {name:'word/_rels/document.xml.rels',data:enc.encode(dr)},
+    {name:'word/styles.xml',data:enc.encode(styles)}];
+  media.forEach(function(m){files.push(m);});
+  return _zipStore(files);
+}
+function docxDownload(fname,blocks,opts){
+  var blob=new Blob([_docxBytes(blocks,opts)],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=String(fname).replace(/[\\/:*?"<>|]/g,'')+'.docx';a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+  toast('已匯出 Word（可直接編輯、可自動產生目錄）');
+}
+
+// ══════════ 施工計畫書自動生成（v5.353）══════════
+// 內容來源：實務分項工程施工計畫書拆解（擋土支撐／地錨／止水樁／基樁），
+// 依「公共工程施工綱要規範第 02255 章」與品質計畫製作綱要編排。
+// 所有規格數值皆為單一資料源（PLAN_PROJ + 工項變數），全文以 {{變數}} 帶入，
+// 避免審查最常見的「同一數值前後不一致」缺失。
+
+var PLAN_ROMAN=['壹','貳','參','肆','伍','陸','柒','捌','玖','拾','拾壹','拾貳','拾參','拾肆','拾伍'];
+var PLAN_CN=['一','二','三','四','五','六','七','八','九','十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十'];
+
+// ── 專案欄位定義 ──
+var PLAN_FIELDS=[
+  {g:'工程基本資料',f:[
+    {k:'name',  l:'工程名稱',   ph:'例：新北市泰山區貴和段廠房大樓新建工程',w:2},
+    {k:'loc',   l:'工程地點',   ph:'例：新北市泰山區貴和段1402、1403地號',w:2},
+    {k:'permit',l:'建照號碼',   ph:'例：112泰建字第00123號'},
+    {k:'owner', l:'業主／起造人',ph:'例：○○建設股份有限公司'},
+    {k:'agency',l:'主辦機關',   ph:'公共工程填寫，民間工程可留空'},
+    {k:'design',l:'設計監造',   ph:'例：○○建築師事務所'},
+    {k:'pm',    l:'專案管理',   ph:'例：○○工程顧問股份有限公司'},
+    {k:'main',  l:'承攬廠商（營造）',ph:'例：○○營造股份有限公司'},
+    {k:'sub',   l:'協力廠商（本公司）',ph:'豐有工程有限公司'},
+    {k:'amount',l:'承攬金額',   ph:'例：新臺幣 12,800,000 元整'},
+    {k:'dur',   l:'契約工期',   ph:'例：120 日曆天'},
+    {k:'start', l:'預定開工日', ph:'YYYY-MM-DD',type:'date'}
+  ]},
+  {g:'基地與擋土條件',f:[
+    {k:'wallType',l:'擋土壁形式',ph:'例：連續壁／預壘排樁／H型鋼排樁／鋼板樁'},
+    {k:'wallSpec',l:'擋土壁規格',ph:'例：t=60cm，深度 27.0m'},
+    {k:'digDepth',l:'開挖深度',  ph:'例：GL-13.5m'},
+    {k:'digArea', l:'開挖面積',  ph:'例：2,860 m²'},
+    {k:'supArea', l:'支撐面積',  ph:'例：2,650 m²'},
+    {k:'layers',  l:'支撐層數',  ph:'例：3',type:'number'},
+    {k:'soil',    l:'地層概況',  ph:'例：GL-0~6m 為粉土質砂，以下為粉土質黏土',w:2},
+    {k:'nearby',  l:'鄰近構造物',ph:'例：北側緊鄰 5 層樓 RC 建物，南側為 12m 計畫道路',w:2}
+  ]},
+  {g:'現場人員（計畫書掛名，須與簽名欄一致）',f:[
+    {k:'chief',   l:'工地主任',    ph:'姓名'},
+    {k:'chiefLic',l:'工地主任證號',ph:'證照字號'},
+    {k:'mgr',     l:'擋土支撐作業主管',ph:'姓名'},
+    {k:'mgrLic',  l:'作業主管證號',ph:'證照字號／有效期限'},
+    {k:'safe',    l:'職業安全衛生業務主管',ph:'姓名'},
+    {k:'safeLic', l:'安衛主管證號',ph:'證照字號／回訓日期'},
+    {k:'qcp',     l:'品管工程師',  ph:'姓名'},
+    {k:'qcpLic',  l:'品管工程師證號',ph:'品管班結業證號'},
+    {k:'tel',     l:'工地聯絡電話',ph:'例：0912-345-678'}
+  ]},
+  {g:'緊急聯絡（審查最常被要求補正，請務必填寫）',f:[
+    {k:'hospital',l:'特約／鄰近醫院',ph:'例：衛福部臺北醫院'},
+    {k:'hospTel', l:'醫院電話',   ph:'例：02-2276-5566'},
+    {k:'police',  l:'轄區警察分局',ph:'例：新北市政府警察局泰山分局'},
+    {k:'policeTel',l:'警察電話',  ph:'例：02-2909-3611'},
+    {k:'fire',    l:'轄區消防分隊',ph:'例：新北市消防局泰山分隊'},
+    {k:'fireTel', l:'消防電話',   ph:'例：02-2296-1119'},
+    {k:'labor',   l:'勞動檢查機構',ph:'例：新北市政府勞動檢查處'},
+    {k:'laborTel',l:'勞檢電話',   ph:'例：02-8965-3990'}
+  ]}
+];
+
+// ── 共通條文（各專案不變，逐字取自實務計畫書範本）──
+var PLAN_TXT={
+  scope:'本計畫書為「{{name}}」之分項工程施工計畫書，就本公司承攬之擋土支撐相關分項工程，'
+    +'依契約圖說、結構計算書及公共工程施工綱要規範第 02255 章「臨時擋土樁設施」等相關規定編訂，'
+    +'內容涵蓋人員組織、施工機具、使用材料、預定進度、施工方法與步驟、分項品質計畫、'
+    +'分項作業安全衛生管理與設施設置措施、支撐應變計畫及緊急應變計畫，作為本工程施工、查驗及自主管理之依據。',
+  siteDesc:'本基地位於{{loc}}，開挖深度{{digDepth}}，開挖面積約{{digArea}}，'
+    +'四周採用{{wallType}}（{{wallSpec}}）作為擋土壁，配置{{layers}}層水平支撐系統。'
+    +'基地地層概況：{{soil}}。鄰近構造物：{{nearby}}。'
+    +'施工期間依監測計畫持續觀測擋土壁變位、支撐應力及鄰房沉陷，並依觀測結果動態調整施工步序。',
+  drawPrep:'開工前依契約圖說及結構計算書繪製施工圖，內容包含擋土支撐系統平面配置圖、'
+    +'各層支撐剖面圖（含高程、圍令、支撐、斜撐、預壓力、設計軸力、容許值、警戒值、行動值附表）、'
+    +'中間樁／共構樁樁位圖、施工構台覆工板系統平面配置圖及細部圖、零附件接合詳圖，'
+    +'經技師簽證並送監造單位審查核可後方據以施工。施工圖之比例及字級須確保列印後數值清晰可辨。',
+  duty:[
+    ['職稱','人數','工作職掌'],
+    ['工地主任','1','綜理工地一切事宜。依施工計畫書執行按圖施工。按日填報施工日誌。工地之人員、機具及材料等管理。工地勞工安全事項之督導、公共環境與安全之維護。工地遇緊急異常狀況之通報。'],
+    ['擋土支撐作業主管','1','負該分項工程安全衛生之責。督導有關人員編列及執行安全衛生作業。開工前將工作場所環境及危害因素與所需安全衛生措施以書面告知作業人員並簽章列管。各階段查驗點施工自主檢查。'],
+    ['職業安全衛生業務主管','1','釐訂職業災害防止計畫並指導實施。規劃、督導安全衛生設施之檢點與檢查並記錄於安全衛生日誌。規劃及實施安全衛生教育訓練。指導職業災害調查及處理。向主辦單位提供安全衛生資料及建議。'],
+    ['安衛工程師','1','巡檢工地安衛缺失與督導改善結果。工作前對工作人員提示應注意之安全事項、可能發生之危害情況、防範方法與應變措施。督導人員按規定佩戴適當防護具。採取有效措施預防火災、感電、墜落、噪音、倒塌等職災。'],
+    ['品管工程師','1','建立、管理、執行品質計畫。單項工作完成時辦理自主檢查並會同監造單位辦理查驗。查驗協力廠商、材料供應商之品管過程。辦理及查核施工自主檢查表。'],
+    ['主辦工程師','1','現場監督工班施作並核對與設計圖說相符。協助工班機具進場並聯絡調度施工人員。支援工地緊急事故。'],
+    ['鑽掘機操作手及指揮手','1~2','參與施工工法規劃及檢討。遵守安全衛生作業規範。確實穿戴個人防護具。主動提出作業流程無法符合安全作業規範之細節並討論可行方案。'],
+    ['起重及吊裝工班','1~2','吊裝作業範圍圈圍管制或禁止不相關人員進入。遵守吊掛作業安全規範。確實穿戴個人防護具。'],
+    ['支撐架設及拆除工班','4~10','遵守安全衛生作業規範。作業流程中預防感電、墜落、物體飛落等危害。確實穿戴個人防護具。']
+  ],
+  lic:[
+    ['證照／訓練','適用人員','法令依據','備註'],
+    ['擋土支撐作業主管','現場作業主管','職業安全衛生教育訓練規則','須在有效期限內'],
+    ['鋼構組配作業主管','構台組配作業主管','職業安全衛生教育訓練規則','須在有效期限內'],
+    ['營造業丙種職業安全衛生業務主管','安衛業務主管','職業安全衛生管理辦法','逾期須附在職回訓證明'],
+    ['移動式起重機操作人員技術士','吊車操作手','職業安全衛生教育訓練規則','一機三證'],
+    ['起重機具吊掛作業人員','吊掛指揮手','職業安全衛生教育訓練規則','—'],
+    ['職業安全衛生教育訓練（6小時）','全體進場人員','職業安全衛生教育訓練規則第17條','附簽到表'],
+    ['勞工保險（或職業災害保險）','全體進場人員','勞工職業災害保險及保護法','附投保資料']
+  ],
+  qcFlow:'品質管理採「三級品管」架構：協力廠商（本公司）執行自主檢查（□），現場人員查驗（△），'
+    +'品管人員與工地主任複查（☆），監造單位抽驗（◎）。各分項工作完成後由現場工程師填具自主檢查表，'
+    +'經工地主任及品管工程師複查合格後，通知監造單位辦理查驗；查驗不合格者依「不合標準值之處置方法」欄辦理改正，'
+    +'改正完成後重新提送查驗，並將檢查表與改正紀錄一併留存備查。',
+  matCheck:[
+    ['材料','檢驗項目','檢驗標準','檢驗時機','送驗文件'],
+    ['H型鋼（支撐、圍令、斜撐、中間樁）','規格尺寸、外觀、材質','CNS 2947 SS400 / SM490，斷面尺寸符合設計圖說','每批進場','material list、廠驗證明／材質證明書'],
+    ['鋼板樁','斷面規格、聯鎖完整性、外觀','CNS 7851','每批進場','材質證明書'],
+    ['水泥','種類、出廠日期','CNS 61 第Ⅰ型波特蘭水泥','每批進場','出廠證明'],
+    ['細粒料（砂）','級配、含泥量','CNS 1240','每批進場','試驗報告'],
+    ['水泥砂漿','抗壓強度','設計強度 fc′（見各工項）','每 100m³ 或每日一組，5×5×5cm 試體 3 顆','委外試驗報告'],
+    ['混凝土（背填、樁體）','坍度、抗壓強度','設計強度 fc′、坍度符合圖說','每 100m³ 或每日一組','試驗室報告'],
+    ['預力鋼絞線','規格、斷面積、極限強度','CNS 3332','每批進場','材質證明書、出廠檢驗報告'],
+    ['高強度螺栓','規格、材質','CNS 3269','每批進場','材質證明書'],
+    ['油壓千斤頂','出力校正','校正report 有效期限內（每半年校正一次）','進場前','校正證明']
+  ],
+  safeGeneral:[
+    '所有人員進入工地一律配戴安全帽及反光背心，穿著安全鞋，並依作業需要配戴護目鏡、防護手套、耳塞等個人防護具。',
+    '施工區域以圍籬、型鋼護欄或警示帶明確區隔，並設置警告標誌及夜間警示燈號。',
+    '施工完畢之開口處應以型鋼護欄或圍籬圈圍；覆工板因作業需要臨時掀開者，開口四周應設臨時護欄、警告標誌及警告燈號，禁止無關人員靠近，作業完成後立即恢復原狀。',
+    '高度 2 公尺以上之作業場所邊緣及開口部分，應設置適當強度之護欄、護蓋等防護設備；作業人員須穿著背負式雙勾安全帶並確實掛扣於安全母索或堅固處。',
+    '機具迴轉半徑內禁止人員進入；吊掛作業前後懸掛警示布條，並派專人持指揮棒及哨子管制車輛及人員。',
+    '安全支撐架設階段應避免與其他工項重疊施工；夜間施工時應備足夠之照明設備。',
+    '每日作業前實施機具檢點並填具自動檢查表，作業中隨時注意機具異常。',
+    '設置洗車設備，清洗駛出工區之車輛；工區車輛進出均派員指揮交通或設置警示設施。',
+    '開挖期間應對監測系統注意維護，並配合監測數據判讀基地外土壤變化及支撐應力變化，以確保作業安全。',
+    '緊急狀況發生後，現場工程師應即應變處理，同時向監造單位工程師報告狀況及處理方式。'
+  ],
+  safeHot:[
+    '動火作業前申請動火許可，並做好防火花噴濺之防護（滅火器、防火毯），移除周邊易燃物。',
+    '設置監火人員，且監火人員須受過滅火器操作教育訓練。',
+    '電銲機具應設接地線並加裝自動電擊防止裝置；一次側電源線裝設漏電斷路器。',
+    '電銲把柄應具絕緣性與耐熱性；電纜線應架高，不得隨意置於地面積水處。',
+    '下雨時不得進行銲接作業，作業中下雨應立即中止。',
+    '施工人員務必配戴防護衣、防護手套及電銲用護目鏡。'
+  ],
+  safeLift:[
+    '吊車施作前參與動線協調會議，安排吊掛時間及吊點，吊掛作業單須與會議決議相符。',
+    '作業前檢查「一機三證」（吊車檢查合格證、操作人員證照、吊掛人員證照），完成自動檢查表並簽名。',
+    '外伸撐座應完全展開，地面鋪設專用墊材（枕木、墊片、鐵板）。',
+    '吊車主體旋轉範圍以角錐連桿圈圍警示；吊掛旋轉半徑內之動線及出入口派人管制。',
+    '物品起吊行進需吹哨警示，並驅離吊掛路徑下方人員。',
+    '嚴禁關閉過捲揚裝置，並應預留至少 25 公分。',
+    '吊桿仰角嚴禁低於 30 度；天候不佳、風速超過 10 m/s 應停止吊掛。',
+    '吊鉤需有防滑舌片，吊掛前檢查功能正常、無變形損壞。'
+  ],
+  facility:[
+    ['設施項目','規格／說明','設置位置'],
+    ['安全母索','Ø16mm 以上鋼索，高度約 1.0m，兩端固定於中間樁或支撐上','各層支撐上方沿支撐軸向全長'],
+    ['安全護欄','上欄杆高 90~120cm、中欄杆、腳趾板，型鋼或鋼管組立','開挖面周邊、構台周邊、開口部'],
+    ['施工便梯','固定式鋼梯，兩側設扶手，梯階止滑','各層支撐面、開挖面出入口'],
+    ['車輪擋','H300×300 型鋼','施工構台周邊'],
+    ['警示設施','反光警示帶、警告標誌、夜間警示燈','施工區界、機具迴轉半徑、臨時開口'],
+    ['照明設備','投射燈，照度符合作業需求','夜間施工區域、坑底'],
+    ['滅火器','ABC 乾粉滅火器','動火作業點 5m 內、機具停放區'],
+    ['急救箱','符合勞工安全衛生設施規則規定','工務所'],
+    ['洗車設備','高壓沖洗設備及沉砂池','工區出入口']
+  ],
+  emerPrinciple:[
+    '緊急處理及遮斷：將接觸或有爆炸危險之動力源（如發電機開關）緊急停止，或將災害發生源（如火災起火源）迅速撲滅，並立即停止作業。',
+    '對罹災者施以急救：發現者迅速將罹災者救出並安置於安全場所，於送醫前先由受過急救訓練之人員實施先期急救處理以維持其生命。',
+    '採取必要搶救及避難措施：立即採取各項搶救工作以控制損失；若有災情擴散之虞影響人員安全時，應即停止搶救並採取緊急避難措施，使人員退避至安全場所。',
+    '報告與連絡：將災情依回報體系向相關人員報告，並儘速連絡支援單位。報告內容應包括發生時間、地點及位置、何種事故及嚴重程度、現場概況、所需外援及其他訊息。',
+    '預防二次災害：除進行必要之急救、搶救以防止災情擴大外，應防止二次爆炸、餘火延燒、持續崩坍等二次災害。',
+    '維持現場作業者士氣及秩序：緊急救援編組立即啟動運作，必要時封鎖現場並防止不正確消息傳遞；對外發言由最高主管指定之人員為之，其餘人員未經允許不得擅自對外發表意見。',
+    '災害現場保持原狀：保持現場以利事後調查；若為法定重大職業災害，除必要之急救、搶救措施外，非經司法機關或勞動檢查機構許可，不得移動或破壞現場。'
+  ],
+  emerReport:[
+    '聯絡要領——通報時應明確說明：一、何種事故？嚴重程度？二、發生地點？現場名稱？三、發生時間？四、狀況（現況、已採對策、人身傷害、財產損失情形）。',
+    '處理要領——一、迅速通報聯絡。二、交通管制與災區之隔離及警示。三、人身、生命之優先搶救。四、避難引導。五、避免二次災害發生。六、支援單位之協調配合。'
+  ],
+  emerType:'本工程可能發生之事故種類包括：墜落、感電、捲夾、物體飛落、火災、撞擊、跌倒、構造物崩塌、溺斃、交通事故及地下管線損壞等。'
+    +'工作人員或民眾因工地有關之意外事件致受傷或死亡時，立即啟動緊急應變機制，並立即通報工務所、警察機關、醫療院所及救援機構，'
+    +'告知或請求支援，以降低事故造成之衝擊損失。',
+  // 支撐應變計畫：狀況／原因／應變／防止
+  contingency:[
+    ['異常狀況','可能原因','應變措施','防止措施'],
+    ['開挖面大量積水','暴雨；坑外地表水流入','停止挖土；坑外截水溝加強防止坑外積水流入；增加抽排水設備；地下水位降至開挖面下 1m 以下始繼續開挖','雨季前完成截排水系統；備妥足量抽水機'],
+    ['開挖面土壤隆起','土壤回脹；開挖面與坑外水位差過大；週邊土壤剪力破壞','停止挖土；增加坑內水位或於基地邊緣緊急回填','控制單次開挖深度；隨挖隨撐'],
+    ['隆起破壞（Heaving）','開挖面下土壤剪力強度不足以抵抗側土重及地表超載，產生塑性流動','立即停止開挖並回填砂石以增加開挖面下土壤正向壓力；穩定後檢討擋土壁貫入深度，必要時基地內施作地質改良','嚴禁超挖；控制坑外堆載'],
+    ['土壤上舉破壞（Uplift）','開挖面下不透水黏土層下方水壓大於覆土壓力','立即停止開挖並回填砂石增加覆土重量；穩定後檢討貫入深度，必要時施作解壓井降低受壓水層水壓','施工前確認受壓水層位置；設置水位觀測井'],
+    ['向內擠進','開挖面下被動土壓不足以抵抗基地外主動土壓','立即停止開挖並回填砂石；穩定後檢討貫入深度，考慮增設一層支撐以縮短最後一層支撐與開挖面之距離，或施作地質改良','嚴格控制開挖高程；避免坑外過大載重'],
+    ['擋土壁體嚴重變形','超挖；週邊地盤負載重物或水壓過大','停止挖土；解除或降低週邊地盤之負載或水壓；必要時加設支撐','嚴格控制開挖高程與坑外堆載'],
+    ['支撐壓力大於警戒值','土方超挖；傾斜地盤產生應力集中；材料堆放於擋土壁外側','停止或分區開挖，加撐增加支撐穩定後再行檢討','嚴格控制開挖高程；支撐配置考慮地盤條件；避免過多材料堆放於擋土壁外側'],
+    ['支撐荷重超過容許值','側壓力超出設計預期','加設斜撐以減少無支撐長度提高容許荷重；於兩道支撐間加設一道支撐分攤荷重；若中間樁上浮或挫屈，與相鄰中間樁間加設角鐵拉桿補強','依監測數據提前預警；控制開挖步序'],
+    ['圍令因壓力過大變形','開挖或拆撐產生超預期側壓力；圍令未設加強座','停止開挖檢討安全，參考觀測報告補強','防止超挖或基地外側過大載重；確實施作加強座'],
+    ['中間樁隆起、傾斜','地質較預期軟弱致擋土壁貫入深度不足；接樁品質不良','停止開挖，分區進行開挖及結構構築','配合觀測報告解讀，注意應力異常變化；接樁完成檢驗垂直度'],
+    ['中間／共構樁無法打入至預定深度','地質較鑽探報告預期堅硬','改以其他工法（引孔、預鑽）打設','施工前徹底了解地質，遭遇差異過大之地質立即檢討'],
+    ['中間／共構樁偏斜至樑柱結構','打設垂直度不精確；接樁時上下節不垂直','埋置該樁於樑柱結構內或另行補樁','打設第一節時嚴格控制垂直度；接樁完成檢驗垂直度'],
+    ['施工機械或材料撞擊安全支撐','操作人員疏忽或超時工作；車輛施工前未做安全檢查','先撤離受撞擊部分支撐下方人員，再檢討是否補強','避免操作人員超時工作；施工前徹底做好車輛安全檢查'],
+    ['支撐材料堆放不當傾倒','堆放未注意平整及重心；堆放高度過高','吊車移除傾倒部分，先由人員管制該區域','注意堆放場所平整及重心穩定；管制堆放高度不超過 3m'],
+    ['油壓千斤頂預壓時支撐移位','支撐未適當固定或未調整垂直','停止預壓，調整正直後固定','預壓前確認支撐調整垂直並固定'],
+    ['螺栓或零件鬆脫','預壓後未詳細檢查；機械碰撞；溫度驟變熱漲冷縮','立即派人加強鎖固；參考土壓計數據評估','預壓後派專人再次檢查全數螺栓；避免機械碰撞'],
+    ['構台柱下陷','承載力不足或樁底土壤軟弱','加設拉桿使承載力由其他柱分攤；於下陷構台柱附近補做構台柱','控制構台載重；施作前確認樁底承載層'],
+    ['構台大梁破壞','超載或衝擊','補強加勁鈑並架設斜向支撐減少彎矩；必要時依序吊開覆工板、小梁及大梁後重新吊裝','嚴格管制上構台機具噸位（限 50 噸級）'],
+    ['構台小梁破壞','超載或衝擊','吊開覆工板，於小梁兩側重新吊裝兩路小梁以替代已破壞之小梁','依設計間距鋪設小梁，不得任意擴大'],
+    ['覆工板破壞','單片受力集中','吊開覆工板重新裝設，於覆工板上、施工車輛下架設鐵板或墊梁使受力由多片分攤','管制行車路線與速度']
+  ],
+  monitor:[
+    ['監測項目','儀器','設置位置','監測頻率','管理值判定'],
+    ['擋土壁變位','傾度管（Inclinometer）','擋土壁內，依監測計畫配置','開挖中每週 1~2 次；異常時加密','達警戒值即通報並檢討；達行動值立即停工並依應變計畫辦理'],
+    ['支撐應力','支撐應變計、油壓計','各層代表性支撐','開挖中每日 1 次','同上'],
+    ['地表沉陷','沉陷釘、水準儀','基地外側及鄰房周邊','每週 1 次','同上'],
+    ['鄰房傾斜','傾斜儀','鄰近建物','每週 1 次','同上'],
+    ['地下水位','水位觀測井','基地內外','每週 1 次','同上'],
+    ['土壓','土壓計','各層支撐（每層 2 組）','開挖中每日 1 次','同上']
+  ],
+  monitorNote:'監測系統之管理值、警戒值及行動值依結構計算書與監測計畫所訂數值辦理，'
+    +'並依監造單位同意之格式提送支撐荷重及地盤位移觀測結果。'
+    +'監測儀器之埋設、量測與資料判讀由專業監測廠商辦理，本公司配合支撐應變計之安裝並提供施工進度資訊。'
+    +'觀測數據達警戒值時，立即通報監造單位與設計技師會勘，並依「支撐應變計畫」採取對應措施。',
+  env:[
+    ['項目','管制措施'],
+    ['空氣污染','工區設置洗車設備清洗駛出車輛；裸露地面覆蓋防塵網或灑水；土方車輛加蓋帆布。'],
+    ['噪音振動','打設、鑽掘作業限於法定作業時間內施作；機具加裝消音設備；夜間不進行高噪音作業。'],
+    ['廢水','設置沉砂池，鑽掘廢漿不得溢流至工區外；廢漿委託合格清運機構處理。'],
+    ['廢棄物','生活垃圾指派專人清運至暫存區；鋼材餘料回收；廢棄物委託合格清除處理機構清運並取得聯單。'],
+    ['交通維持','施工期間對車輛通行道路經常維護及清理，防止運土車、預拌混凝土車行駛損壞道路、排水溝，或土石、雜物掉落路面、泥濘排入水溝；工區出入口派員指揮交通並設置警示設施。']
+  ],
+  auditRules:[
+    {k:'name',   m:'工程名稱未填。計畫書全文、附表、附圖標題之工程名稱須完全一致，此為審查最常見退件原因。'},
+    {k:'loc',    m:'工程地點未填。'},
+    {k:'main',   m:'承攬廠商（營造）未填，送審核章表將無法完成。'},
+    {k:'chief',  m:'工地主任未填。自主檢查表之簽名欄須與此欄一致，否則審查會要求釐清。'},
+    {k:'mgr',    m:'擋土支撐作業主管未填（法定必要人員）。'},
+    {k:'mgrLic', m:'作業主管證號未填，且須確認在有效期限內。'},
+    {k:'safe',   m:'職業安全衛生業務主管未填（法定必要人員）。'},
+    {k:'safeLic',m:'安衛業務主管證號未填。若證照逾期須另附在職回訓證明，否則必退件。'},
+    {k:'hospital',m:'鄰近醫院未填。緊急聯絡資訊留白是審查被要求補正率最高的一類。'},
+    {k:'hospTel',m:'醫院電話未填。'},
+    {k:'policeTel',m:'警察分局電話未填，且須確認為工區轄區單位。'},
+    {k:'fireTel',m:'消防分隊電話未填，且須確認為工區鄰近分隊。'},
+    {k:'digDepth',m:'開挖深度未填，工程概況表與施工方法之數值將無法帶入。'},
+    {k:'layers', m:'支撐層數未填，支撐系統章節無法完整展開。'}
+  ]
+};
+
+// ── 工項模組 ──
+// vars：該工項專屬變數；method：施工方法原文（含 {{變數}}）；flow：施工流程節點；
+// machines/materials：表格列；notes：施工注意事項；safety：安全衛生注意事項；
+// qc：品質管理標準列；checks：自主檢查表
+var PLAN_ITEMS=[
+{ id:'hpile', name:'H型鋼排樁（擋土壁）', short:'H型鋼排樁',
+  vars:[{k:'hpSpec',l:'H型鋼規格',d:'H350×350×12×19'},{k:'hpLen',l:'樁長',d:'L=13.4m'},
+        {k:'hpCount',l:'支數',d:''},{k:'hpPitch',l:'打設間距',d:'@1.5m'},{k:'hpBoard',l:'橫板條規格',d:'柳安木 厚 t≧1.8cm'}],
+  method:'本工法係以 H 型鋼為樁柱，以震動式打樁機依現場測設位置及施工圖所示間距（{{hpPitch}}）、深度連續打設至設計深度而構成擋土壁；'
+    +'隨開挖作業之進行於樁間嵌入橫板條（{{hpBoard}}），並填土於其背後，包括人工、材料、機具、動力等均屬本工作範圍。'
+    +'地盤堅硬致 H 型鋼樁不易打入時，得配合輔助措施因應，諸如裝置高強度鋼樁頭、加設噴射水流、運用大型振動打樁機等，將型鋼樁打設至設計深度。'
+    +'打設擋土設施時，須以垂球校正垂直度，壁面之目視垂球近似 1/100 以內。'
+    +'本工程採用 {{hpSpec}}，樁長 {{hpLen}}，數量 {{hpCount}} 支。'
+    +'結構體完成並回填後，以震動機配合吊車拔除型鋼，殘留孔洞隨拔隨灌砂回填。',
+  flow:['材料進場（H型鋼樁）及規格檢驗','機具進場（震動式打樁機、吊車）','放樣（依施工圖標示位置，石灰畫線作控制線）',
+        '導溝開挖（開挖寬度距基礎邊緣約 60cm，深度依現況而定）','H型鋼打設（震動方式連續打設至設計深度）',
+        '垂直度及高程確認（自主檢查☆／監造抽驗☆）','擋土壁施作完成',
+        '配合開挖嵌入橫板條並背填','（結構體完成回填後）H型鋼拔除','殘留孔洞灌砂回填'],
+  machines:[['機具名稱','規格','數量'],['震動式打樁機／拔樁機','PC400~500 型','1 台'],['履帶式吊車','25~50T','1 台'],['挖土機','PC120~200','1 台'],['電銲機','15kVA','1 台']],
+  materials:[['材料','規格','說明'],['H型鋼樁','{{hpSpec}}　{{hpLen}}','CNS 2947，可重複使用'],['橫板條','{{hpBoard}}','杉木或柳安'],['回填砂','級配砂','拔樁後隨拔隨灌']],
+  notes:['打樁周圍 30~60m 範圍內，齡期不足 7 天之混凝土不得打設。',
+         '施打前檢查型鋼接合部位是否彎曲受損，並清除塵垢。',
+         '垂直度誤差應在 1/100 以內，以垂球及垂直氣泡尺於 X、Y 兩方向校正。',
+         '避免打擊能量過大造成樁頭損壞或型鋼彎曲。',
+         '拔樁時如危及鄰近構造物應立即停止，並加強安全措施後再行檢討。'],
+  safety:['打樁機作業半徑內禁止人員進入，並以角錐連桿圈圍。','型鋼吊放採兩點吊掛，吊掛路徑下方淨空。',
+          '導溝開挖後周邊設置護欄或警示帶，防止人員墜落。','夜間不進行打樁作業；如需夜間施工應備足夠照明。'],
+  qc:[['H型鋼排樁','材料規格','符合設計圖說 {{hpSpec}}，附材質證明書','進場時','目視、量測、查證明文件','每批','退貨並更換合格材料'],
+      ['H型鋼排樁','放樣位置','中心位置誤差 ≦5cm','打設前','經緯儀、捲尺','逐支','重新放樣'],
+      ['H型鋼排樁','打設垂直度','≦1/100','打設中','垂球、垂直氣泡尺','逐支','拔除重打'],
+      ['H型鋼排樁','打設深度','達設計深度 {{hpLen}}','打設中','鑽桿標示、水準儀','逐支','續打至設計深度'],
+      ['H型鋼排樁','樁頂高程','符合設計圖說，誤差 ±3cm','打設後','水準儀','逐支','切除或補打'],
+      ['H型鋼排樁','橫板條','厚度 ≧1.8cm，背填密實無空隙','開挖中','目視、量測','逐層','補實並重新檢查']],
+  checks:[
+    {name:'擋土樁（H型鋼樁）工程自主檢查表',stage:'施工前',
+     rows:[['施工圖說及施工計畫是否已送審核可','查文件','已核可'],
+           ['地下管線及障礙物是否已查明並保護','目視、查資料','已完成調查與保護'],
+           ['H型鋼材料規格是否符合設計圖說','量測、查證明','符合 {{hpSpec}}'],
+           ['材質證明書是否齊全','查文件','每批皆有'],
+           ['打樁機具是否檢查合格','查證件、目視','檢查合格且在有效期'],
+           ['操作手及指揮手是否具合格證照','查證件','證照有效'],
+           ['放樣位置是否經複核','經緯儀複核','誤差 ≦5cm'],
+           ['作業區域是否已圈圍警示','目視','已圈圍並設警示標誌'],
+           ['作業前危害告知是否完成','查簽到表','已完成並簽認']]},
+    {name:'擋土樁（H型鋼樁）工程自主檢查表',stage:'施工中',
+     rows:[['打設垂直度是否符合規定','垂球、垂直氣泡尺','≦1/100'],
+           ['打設間距是否符合設計','捲尺','符合 {{hpPitch}}'],
+           ['打設深度是否達設計深度','鑽桿標示','達 {{hpLen}}'],
+           ['樁頭有無損壞或型鋼彎曲','目視','無損壞'],
+           ['鄰近構造物有無異常','目視、監測數據','無異常'],
+           ['作業半徑內是否淨空','目視','無人員進入'],
+           ['人員個人防護具是否確實配戴','目視','全數配戴']]},
+    {name:'擋土樁（H型鋼樁）工程自主檢查表',stage:'施工後',
+     rows:[['樁頂高程是否符合設計','水準儀','誤差 ±3cm'],
+           ['樁位偏心是否在容許範圍','捲尺','≦5cm'],
+           ['壁面平整度是否符合要求','目視、拉線','無明顯凹凸'],
+           ['橫板條背填是否密實','目視','無空隙'],
+           ['施工紀錄是否完整','查文件','逐支填錄'],
+           ['場地是否恢復整潔','目視','已清理']]}]
+},
+{ id:'sheet', name:'鋼板樁（擋土壁）', short:'鋼板樁',
+  vars:[{k:'spSpec',l:'鋼板樁型號',d:'FSP-Ⅲ 型'},{k:'spLen',l:'樁長',d:'L=13.0m'},{k:'spCount',l:'片數',d:''},{k:'spDepth',l:'打設深度',d:'GL-13.0m'}],
+  method:'本工法採連鎖型鋼板樁作為臨時擋土壁。放樣後設置導軌，將約 20 片鋼板樁沿導軌先行打入至可以直立之深度為止，'
+    +'豎立時相鄰兩樁須完全聯鎖；鋼板樁之打入應視施工情況分 2~4 次來回打入，以維持打設方向之平直，'
+    +'重複前述步驟直至全部打設完成。本工程採用 {{spSpec}}，樁長 {{spLen}}，數量 {{spCount}} 片，打設深度 {{spDepth}}。'
+    +'結構體完成回填後，鋼板樁於出土面時以 PC400~500 型震動機引拔，拔樁前應確保現場動線強度（土面或 RC 面）滿足震動機施作條件，'
+    +'並隨拔隨灌砂填實間隙。',
+  flow:['放樣（依施工圖標示位置）','探查試挖並清除地下障礙物','導溝開挖、設置導軌',
+        '鋼板樁吊裝（利用樁頂吊孔起吊）','首批約 20 片沿導軌打入至可直立深度，相鄰樁完全聯鎖',
+        '分 2~4 次來回打入至設計深度，維持打設方向平直','重複打設直至全部完成',
+        '垂直度及高程確認（自主檢查☆／監造抽驗☆）','配合開挖架設支撐系統',
+        '（結構體完成回填後）以震動機引拔','隨拔隨灌砂填實'],
+  machines:[['機具名稱','規格','數量'],['震動式打樁機／拔樁機','PC400~500 型','1 台'],['履帶式吊車','25~50T','1 台'],['挖土機','PC120~200','1 台']],
+  materials:[['材料','規格','說明'],['鋼板樁','{{spSpec}}　{{spLen}}','CNS 7851 熱軋鋼板樁，連鎖型'],['導軌用型鋼','H300×300','臨時設施，可重複使用'],['回填砂','級配砂','拔樁後隨拔隨灌']],
+  notes:['施打前檢查槽縫（聯鎖）有無彎曲受損，清除雜物並塗抹油脂以利聯鎖。',
+         '打設時以垂球校正垂直度，垂直度誤差 ≦1/100。',
+         '相鄰樁須完全聯鎖，發現脫鎖應立即拔除重打。',
+         '拔樁時如危及鄰近構造物應立即停止，並加強安全措施。',
+         '拔樁後之間隙應隨拔隨灌砂填實，避免地表沉陷。'],
+  safety:['打樁機作業半徑內禁止人員進入。','鋼板樁吊掛採專用吊具，吊掛路徑下方淨空。',
+          '導軌設置穩固，防止傾倒。','噪音振動應符合法令規定，並注意周邊建物監測數據。'],
+  qc:[['鋼板樁','材料規格','符合 {{spSpec}}，CNS 7851，附材質證明書','進場時','量測、查證明文件','每批','退貨更換'],
+      ['鋼板樁','聯鎖狀況','槽縫無彎曲受損，相鄰樁完全聯鎖','打設中','目視','逐片','拔除重打'],
+      ['鋼板樁','打設垂直度','≦1/100','打設中','垂球','逐片','拔除重打'],
+      ['鋼板樁','打設深度','達 {{spDepth}}','打設中','標示、水準儀','逐片','續打至設計深度'],
+      ['鋼板樁','樁頂高程','符合設計圖說，誤差 ±3cm','打設後','水準儀','逐片','切除或補打'],
+      ['鋼板樁','拔除後間隙','隨拔隨灌砂填實','拔除時','目視','逐片','補灌']],
+  checks:[
+    {name:'鋼板樁工程自主檢查表',stage:'施工前',
+     rows:[['施工圖說及施工計畫是否已送審核可','查文件','已核可'],
+           ['地下管線及障礙物是否已查明並保護','查資料、試挖','已完成'],
+           ['鋼板樁規格是否符合設計圖說','量測、查證明','符合 {{spSpec}}'],
+           ['槽縫（聯鎖）是否無彎曲受損並已清潔塗油','目視','已處理'],
+           ['導軌是否設置穩固','目視、量測','穩固平直'],
+           ['打樁機具是否檢查合格','查證件','檢查合格'],
+           ['操作手是否具合格證照','查證件','證照有效'],
+           ['放樣位置是否經複核','經緯儀','誤差 ≦5cm']]},
+    {name:'鋼板樁工程自主檢查表',stage:'施工中',
+     rows:[['相鄰樁是否完全聯鎖','目視','完全聯鎖無脫鎖'],
+           ['打設垂直度是否符合規定','垂球','≦1/100'],
+           ['打設方向是否維持平直','拉線、目視','平直無蛇行'],
+           ['打設深度是否達設計深度','標示','達 {{spDepth}}'],
+           ['鄰近構造物有無異常','目視、監測','無異常'],
+           ['噪音振動是否符合規定','目視、量測','符合法令'],
+           ['個人防護具是否確實配戴','目視','全數配戴']]},
+    {name:'鋼板樁工程自主檢查表',stage:'施工後',
+     rows:[['樁頂高程是否符合設計','水準儀','誤差 ±3cm'],
+           ['壁面平整度是否符合要求','拉線','無明顯凹凸'],
+           ['有無滲水情形','目視','無明顯滲漏'],
+           ['拔除後間隙是否灌砂填實','目視','已填實'],
+           ['施工紀錄是否完整','查文件','逐片填錄']]}]
+},
+{ id:'midpile', name:'中間樁／共構樁（鑽掘引孔根固）', short:'中間樁／共構樁',
+  vars:[{k:'mpSpec',l:'型鋼規格',d:'H350×350×12×19'},{k:'mpLen',l:'樁長',d:'L=21.5m'},
+        {k:'mpCount',l:'支數',d:''},{k:'mpDia',l:'引孔根固樁徑',d:'Ø80cm'},
+        {k:'mpTop',l:'根固頂部高程',d:'GL-13.3m'},{k:'mpBot',l:'根固底部高程',d:'GL-21.0m'},
+        {k:'mpFc',l:'水泥砂漿設計強度',d:"fc'=175 kgf/cm²"},{k:'mpMix',l:'水泥砂漿配比',d:'水泥 800kg：砂 0.65m³：水 350L'},
+        {k:'mpPlate',l:'止水鋼板',d:'t=6mm 滿焊'}],
+  method:'本項工作係先以鑽掘機之螺旋鑽桿依規定之位置、樁徑（{{mpDia}}）及深度鑽掘樁孔，'
+    +'於抽出鑽桿之同時，將已拌妥之水泥砂漿經由鑽桿之空心軸藉壓力（≧20 kgf/cm²）注入樁孔內，'
+    +'於所注水泥砂漿尚未凝固之前吊放 H 型鋼（{{mpSpec}}，{{mpLen}}）之施工方法。'
+    +'施作時應儘量保持型鋼正直，並用錘線及垂直氣泡尺於 X 及 Y 方向校對檢驗鑽桿之垂直度。'
+    +'根固段自 {{mpTop}} 至 {{mpBot}}，水泥砂漿設計強度 {{mpFc}}，配比 {{mpMix}}。\n'
+    +'中間樁與共構樁之作用：中間（共構）樁為支承安全支撐，以承受其重量並抑止支撐鉛垂方向之挫曲；'
+    +'施工時在中間樁翼板以螺栓固定三角托架，並配合使用 U 型螺栓固定安全支撐。'
+    +'共構樁除支承安全支撐之作用外，另直接承受構台大、小梁所傳遞之構台上各種車輛、機具及材料之重量，'
+    +'施工時在共構樁上方焊接樁帽以利大樑之置放。\n'
+    +'結構體完成後辦理買斷切除：於型鋼上焊接止水鋼板（{{mpPlate}}，位置為 PC 面上 30~50cm 或基礎厚度 1/2 處），'
+    +'俟第一層支撐或構台拆除時切除吊起。',
+  flow:['施工前準備：確認地下管線及障礙物位置並保護','樁位放樣及確認','鑽機定位，校正鑽桿垂直度',
+        '鑽孔前丈量鑽桿總長度並標示（供查驗鑽孔深度）','鑽孔作業：螺旋鑽桿旋轉鑽掘至預定深度',
+        '灌漿作業：以 ≧20kgf/cm² 壓力由空心軸澆置水泥砂漿，同時徐徐抽取鑽桿（連續澆置，中斷不得超過 3 分鐘）',
+        'H型鋼吊放：頂端切割吊耳孔與支撐孔，吊放固定；如傾斜須吊起修正','洗管、移機',
+        '垂直度及高程確認（自主檢查☆／監造抽驗☆）','製作水泥砂漿試體送驗',
+        '（結構體完成後）焊接止水鋼板','（第一層支撐或構台拆除時）買斷切除並吊離'],
+  machines:[['機具名稱','規格','數量'],['鑽掘機','400~500 型','1~2 台'],['挖土機','PC200 型','1 台'],
+            ['履帶式吊車','50T','1 台'],['中壓灌漿泵浦','600L','1 台'],['雙筒攪拌機','1200L','1 台'],
+            ['散裝水泥桶（Silo）','—','1 只'],['電銲機','15kVA','2 台'],['氧氣乙炔切割器','—','1 組']],
+  materials:[['材料','規格','說明'],['H型鋼','{{mpSpec}}　{{mpLen}}','CNS 2947，中間樁／共構樁'],
+             ['水泥','CNS 61 第Ⅰ型波特蘭水泥','根固水泥砂漿用'],['細粒料（砂）','CNS 1240','根固水泥砂漿用'],
+             ['水泥砂漿','{{mpFc}}　配比 {{mpMix}}','引孔根固段 {{mpDia}}'],
+             ['止水鋼板','{{mpPlate}}','買斷切除前焊接'],['三角托架','依設計圖','以螺栓固定於型鋼翼板']],
+  notes:['垂直度應 ≦1/100，鑽孔及吊放型鋼時均須以錘線及垂直氣泡尺於 X、Y 兩方向校正。',
+         '灌漿壓力 ≧20 kgf/cm²，澆置需連續，中斷不得超過 3 分鐘。',
+         '水泥砂漿須製作 5×5×5cm 試體每組 3 顆送驗，抗壓強度須達 {{mpFc}}。',
+         '樁心偏心容許 ±10cm；型鋼吊放後如傾斜須立即吊起修正，不得於砂漿初凝後強行校正。',
+         '廢漿應嚴防溢出污染，工區設置沉砂池並委託合格機構清運。',
+         '共構樁上方焊接樁帽前應清除表面雜物，銲道須符合規定。'],
+  safety:['鑽機定位應確實穩固，作業中隨時注意機身傾斜。','鑽機及吊車迴轉半徑內禁止人員進入。',
+          '型鋼吊放採兩點吊掛，並派專人指揮；吊掛路徑下方淨空。','操作手須具合格證照，並每日實施機具檢點。',
+          '灌漿管路接頭應確實鎖固，防止高壓漿液噴濺；作業人員配戴護目鏡。',
+          '氧氣乙炔切割作業須申請動火許可，並備妥滅火器及監火人員。'],
+  qc:[['中間／共構樁','材料規格',"符合 {{mpSpec}}，附材質證明書",'進場時','量測、查證明','每批','退貨更換'],
+      ['中間／共構樁','樁位放樣','偏心 ≦10cm','鑽孔前','經緯儀、捲尺','逐支','重新放樣'],
+      ['中間／共構樁','鑽孔孔徑','{{mpDia}}','鑽孔中','量測鑽頭','每日','更換合格鑽頭'],
+      ['中間／共構樁','鑽孔深度','達設計深度（根固底 {{mpBot}}）','鑽孔中','鑽桿標示丈量','逐孔','續鑽至設計深度'],
+      ['中間／共構樁','垂直度','≦1/100','鑽孔及吊放時','錘線、垂直氣泡尺（X、Y向）','逐支','拔除重做'],
+      ['中間／共構樁','灌漿壓力','≧20 kgf/cm²','灌漿中','壓力錶','逐孔','調整泵浦壓力'],
+      ['中間／共構樁','水泥砂漿配比','{{mpMix}}','拌合時','查配比單、目視','每日','重新拌合'],
+      ['中間／共構樁','水泥砂漿強度','{{mpFc}}','試體養護 28 天','委外抗壓試驗','每日或每 100m³ 一組 3 顆','檢討補強並報監造'],
+      ['中間／共構樁','型鋼吊放高程','符合設計圖說，誤差 ±5cm','吊放後','水準儀','逐支','吊起重新調整'],
+      ['中間／共構樁','止水鋼板','{{mpPlate}}，位置符合設計','切除前','目視、量測','逐支','補焊']],
+  checks:[
+    {name:'中間（共構）樁施工自主檢查表',stage:'施工前',
+     rows:[['施工圖說及施工計畫是否已送審核可','查文件','已核可'],
+           ['地下管線及障礙物是否已查明並保護','查資料、試挖','已完成'],
+           ['樁位放樣是否經複核','經緯儀複核','偏心 ≦10cm'],
+           ['H型鋼規格是否符合設計圖說','量測、查證明','符合 {{mpSpec}}'],
+           ['型鋼長度是否符合設計','捲尺','{{mpLen}}'],
+           ['吊耳孔及支撐孔是否依圖切割','目視、量測','符合圖說'],
+           ['鑽掘機是否檢查合格並定位穩固','目視、查證件','檢查合格'],
+           ['鑽桿總長是否丈量並標示','捲尺、標示','已標示'],
+           ['水泥砂漿配比是否經核可','查配比設計','{{mpMix}}'],
+           ['攪拌機、泵浦是否運轉正常','試運轉','正常'],
+           ['吊車一機三證是否齊備','查證件','齊備有效'],
+           ['作業區域是否圈圍警示','目視','已圈圍']]},
+    {name:'中間（共構）樁施工自主檢查表',stage:'施工中',
+     rows:[['鑽桿垂直度是否校正','錘線、垂直氣泡尺','≦1/100（X、Y向）'],
+           ['鑽孔深度是否達設計深度','鑽桿標示丈量','達 {{mpBot}}'],
+           ['鑽孔孔徑是否符合設計','量測鑽頭','{{mpDia}}'],
+           ['灌漿壓力是否足夠','壓力錶','≧20 kgf/cm²'],
+           ['灌漿是否連續澆置','碼錶、目視','中斷不超過 3 分鐘'],
+           ['水泥砂漿試體是否製作','目視、紀錄','每日一組 3 顆'],
+           ['型鋼吊放是否正直','錘線','傾斜即吊起修正'],
+           ['型鋼吊放高程是否正確','水準儀','誤差 ±5cm'],
+           ['廢漿是否妥善收集','目視','無溢出污染'],
+           ['機具迴轉半徑內是否淨空','目視','無人員進入'],
+           ['個人防護具是否確實配戴','目視','全數配戴']]},
+    {name:'中間（共構）樁施工自主檢查表',stage:'施工後',
+     rows:[['樁頂高程是否符合設計','水準儀','誤差 ±5cm'],
+           ['樁位偏心是否在容許範圍','捲尺','≦10cm'],
+           ['垂直度是否符合規定','錘線','≦1/100'],
+           ['水泥砂漿抗壓強度是否合格','查試驗報告','達 {{mpFc}}'],
+           ['三角托架螺栓是否確實鎖固','目視、扳手','確實鎖固'],
+           ['共構樁樁帽銲接是否確實','目視、量測銲道','符合圖說'],
+           ['止水鋼板是否依規定焊接','目視、量測','{{mpPlate}}'],
+           ['施工紀錄是否完整','查文件','逐支填錄'],
+           ['場地是否清理完成','目視','已清理']]}]
+},
+{ id:'strut', name:'水平支撐系統（圍令／支撐／斜撐）', short:'水平支撐系統',
+  vars:[{k:'stLayers',l:'支撐層數',d:'3'},{k:'stSpec',l:'各層規格',d:'第一層 H400×400×13×21；第二、三層 2H400×400×13×21'},
+        {k:'stBrace',l:'斜撐規格',d:'H350×350×12×19'},{k:'stPre',l:'各層預力值',d:'第一層 60T/支；第二層 100T/支；第三層 120T/支'},
+        {k:'stJack',l:'油壓千斤頂',d:'150T，各層交錯配置'},{k:'stTri',l:'三角架間距',d:'每 3~4m 一組'},
+        {k:'stBolt',l:'鎖固螺栓',d:'Ø22 高強度螺栓 4 支／處'},{k:'stStrength',l:'拆撐強度條件',d:'28 天設計強度之 80% 以上'}],
+  method:'擋土支撐系統之主要構材包含圍令、支撐、斜撐等。圍令之主要作用在傳遞由擋土壁所傳來之土壤側向壓力至支撐構件；'
+    +'支撐乃承受土壤側向壓力之主要壓力構材，其結構行為如同建築物中之柱；'
+    +'斜撐之設置使圍令所受之力能更均勻且有效地傳遞至支撐構件。本工程配置 {{stLayers}} 層支撐，'
+    +'規格為 {{stSpec}}，斜撐採 {{stBrace}}。\n'
+    +'支撐架設：首先安裝下層（一般為短向）支撐，吊放一段支撐，將其一端吊放於三角架之上，'
+    +'另一端以螺栓將支撐之封頭處固定於圍令上，然後依序逐段架設下一段支撐，並配合 U 型螺栓將支撐固定於三角架上；'
+    +'接著安裝上層（一般為長向）支撐，架設方式與下層相同。每道支撐須架設一組油壓千斤頂（{{stJack}}）且應交錯放置。'
+    +'圍令與擋土壁間之間隙以混凝土背填密實。三角架依 {{stTri}} 固定於擋土壁或中間樁翼板上。\n'
+    +'支撐預力之施加應由中間樁三角架承受之下層支撐先加壓固定後，再施作上層支撐；'
+    +'預力值為 {{stPre}}，預載施加完成後方得繼續開挖。\n'
+    +'支撐拆除：俟對應樓層結構體混凝土達 {{stStrength}}（第一層支撐並須留置至底板澆置後至少 48 小時），'
+    +'依序放鬆接合螺栓、連接板及大小 U 型螺栓，油壓千斤頂回壓，卸除螺栓及鎖固零件（每對接處暫留 2 支螺栓防止掉落），'
+    +'再依斜撐、支撐、圍令、三角托架之順序拆除，並清除圍令背填混凝土後吊至指定處集中運離。',
+  flow:['土方開挖至該層支撐設計高程（配合分層開挖進度）','支撐材料進場及尺寸、規格核對',
+        '安裝圍令三角架（{{stTri}}，固定於擋土壁或焊接於預壘樁鋼筋）','安裝中間樁三角架（螺栓緊固）',
+        '圍令架設：吊放調整平直度，擋土壁與圍令間隙以混凝土背填',
+        '支撐架設：先下層（短向）後上層（長向），螺栓固定封頭，U 型螺栓固定於三角架，短料調節長度',
+        '欄杆、安全母索、施工便梯安裝','千斤頂預壓：先下層後上層，依 {{stPre}} 分階段施壓',
+        '千斤頂保護夾安裝','支撐系統自主檢查與監造查驗（☆／◎）','連接板及 U 型螺栓鎖固補強、支撐巡檢',
+        '（結構體達 {{stStrength}} 後）放鬆螺栓、千斤頂回壓','斜撐拆除','支撐及圍令拆除',
+        '三角托架卸除、圍令背填混凝土清除','材料吊離、集中運離'],
+  machines:[['機具名稱','規格','數量'],['履帶式吊車','25~40T','1 台'],['改裝伸縮臂吊車','120 型','1 台'],
+            ['油壓千斤頂','{{stJack}}','依設計數量'],['高壓油泵','—','2 組'],['電銲機','15kVA','2 台'],
+            ['運料車（吊板／卡車）','—','4~5 台']],
+  materials:[['材料','規格','說明'],['支撐','{{stSpec}}','主要壓力構材'],['圍令','{{stSpec}}','傳遞側向土壓'],
+             ['斜撐','{{stBrace}}','角隅補強'],['三角托架','依設計圖','{{stTri}}'],
+             ['高強度螺栓','{{stBolt}}','CNS 3269'],['U 型螺栓','依設計圖','固定支撐於三角架'],
+             ['短料（調節材）','10~90cm','調節支撐長度'],['油壓千斤頂','{{stJack}}','交錯配置'],
+             ['背填混凝土','依設計圖說','圍令與擋土壁間隙']],
+  notes:['支撐須保持平直，避免產生偏心力矩；架設高程容許誤差 ±3cm。',
+         '圍令背填混凝土應密實無空隙，強度須達設計規定值。',
+         '高壓油管接頭應無漏油，預壓前後均須檢查。',
+         '每道支撐之千斤頂應交錯放置，避免同側集中。',
+         '預壓完成後應派專人再次檢查全數螺栓，防止鬆脫。',
+         '支撐上方應設置防止蛇行變形之角鐵。',
+         '拆撐須有委外混凝土抗壓試驗報告佐證強度已達 {{stStrength}}，並經監造單位同意。',
+         '拆除時每對接處暫留 2 支螺栓，待吊車受力後始全部卸除，防止構件掉落。'],
+  safety:['水平支撐上架設安全母索（高約 1.0m），作業人員須繫掛安全帶。',
+          '支撐架上作業前確認支撐已鎖固並穩定，嚴禁於未固定之支撐上行走。',
+          '吊裝作業範圍圈圍管制，吊掛路徑下方禁止人員進入。',
+          '預壓作業時千斤頂正面及後方淨空，人員退至安全位置。',
+          '拆除作業由下而上逐層進行，作業區域下方嚴禁人員通行。',
+          '動火（電銲、切割）作業須申請許可並設監火人員。'],
+  qc:[['支撐系統','材料規格','符合 {{stSpec}}，附材質證明書','進場時','量測、查證明','每批','退貨更換'],
+      ['支撐系統','三角架間距','{{stTri}}','架設時','捲尺','逐處','調整間距'],
+      ['支撐系統','三角架固定','螺栓確實鎖固／銲道符合圖說','架設時','目視、扳手','逐處','重新鎖固或補銲'],
+      ['支撐系統','圍令架設高程','符合設計圖說，誤差 ±3cm','架設後','水準儀','逐層','調整'],
+      ['支撐系統','圍令平直度','平直無明顯偏斜','架設後','拉線、目視','逐層','調整'],
+      ['支撐系統','背填混凝土','密實無空隙，強度符合設計','背填後','目視、試體','逐層','鑿除重做'],
+      ['支撐系統','支撐架設高程','符合設計圖說，誤差 ±3cm','架設後','水準儀','逐支','調整'],
+      ['支撐系統','螺栓鎖固','{{stBolt}} 確實鎖固','架設後','目視、扳手','全數','重新鎖固'],
+      ['支撐系統','千斤頂配置','交錯放置，數量符合設計','預壓前','目視、清點','逐層','調整配置'],
+      ['支撐系統','預力施加','{{stPre}}，先下層後上層','預壓時','油壓錶','逐支','重新施壓'],
+      ['支撐系統','安全設施','母索、護欄、便梯設置完成','架設後','目視','逐層','補設'],
+      ['支撐系統','拆撐強度','{{stStrength}}','拆除前','委外抗壓試驗報告','逐層','延後拆除']],
+  checks:[
+    {name:'安全支撐（含構台）工程自主檢查表',stage:'施工前',
+     rows:[['施工圖說及施工計畫是否已送審核可','查文件','已核可'],
+           ['支撐材料規格是否符合設計圖說','量測、查證明','符合 {{stSpec}}'],
+           ['材質證明書是否齊全','查文件','每批皆有'],
+           ['材料有無彎曲、變形、鏽蝕','目視','無異常'],
+           ['三角托架數量及規格是否足夠','清點、量測','符合設計'],
+           ['螺栓規格是否符合設計','量測','{{stBolt}}'],
+           ['油壓千斤頂是否在校正有效期內','查校正證明','有效（每半年校正）'],
+           ['高壓油管接頭有無漏油','目視、試壓','無漏油'],
+           ['吊車一機三證是否齊備','查證件','齊備有效'],
+           ['開挖高程是否已達該層支撐設計高程','水準儀','符合設計'],
+           ['作業區域是否圈圍警示','目視','已圈圍'],
+           ['作業前危害告知是否完成','查簽到表','已完成並簽認']]},
+    {name:'安全支撐（含構台）工程自主檢查表',stage:'施工中',
+     rows:[['三角架固定是否確實','目視、扳手','螺栓鎖固／銲道良好'],
+           ['圍令架設高程是否正確','水準儀','誤差 ±3cm'],
+           ['圍令與擋土壁間隙是否背填密實','目視','無空隙'],
+           ['支撐是否保持平直','拉線、目視','平直無偏心'],
+           ['支撐封頭螺栓是否確實鎖固','扳手','全數鎖固'],
+           ['U 型螺栓是否確實固定於三角架','目視、扳手','確實固定'],
+           ['短料調節是否確實接合','目視','接合良好'],
+           ['千斤頂是否交錯配置','目視','交錯放置'],
+           ['預力施加順序是否正確','紀錄','先下層後上層'],
+           ['預力值是否符合設計','油壓錶','{{stPre}}'],
+           ['千斤頂保護夾是否安裝','目視','已安裝'],
+           ['安全母索、護欄、便梯是否設置','目視','已設置'],
+           ['作業人員是否繫掛安全帶','目視','全數繫掛']]},
+    {name:'安全支撐（含構台）工程自主檢查表',stage:'施工後',
+     rows:[['預壓完成後螺栓是否複查','扳手、紀錄','全數複查無鬆脫'],
+           ['支撐有無變形、偏心','目視、拉線','無異常'],
+           ['土壓計、應變計是否安裝完成','目視、查紀錄','已安裝並取得初值'],
+           ['監測數據是否在管理值內','查監測報告','未達警戒值'],
+           ['防蛇行角鐵是否設置','目視','已設置'],
+           ['安全設施是否完整','目視','完整無缺'],
+           ['施工紀錄及照片是否完整','查文件','完整'],
+           ['（拆撐時）混凝土強度是否達規定','查試驗報告','{{stStrength}}'],
+           ['（拆撐時）拆除順序是否由下而上','查紀錄','符合規定'],
+           ['（拆撐後）材料是否清運完成','目視','已清運']]}]
+},
+{ id:'deck', name:'施工構台（含覆工板）', short:'施工構台',
+  vars:[{k:'dkGirder',l:'主樑規格',d:'H400×400×13×21'},{k:'dkBeam',l:'副樑規格',d:'H400×400×13×21'},
+        {k:'dkBeamPitch',l:'副樑間距',d:'@2.0m'},{k:'dkPlate',l:'覆工板規格',d:'2000×1000×200mm'},
+        {k:'dkArea',l:'構台面積',d:''},{k:'dkLoad',l:'構台限重',d:'限 50 噸級施工機具'},
+        {k:'dkStop',l:'車輪擋規格',d:'H300×300'}],
+  method:'施工構台係於地下室工程進行時於現場建造而成，用於開挖作業、擋土壁工程以及地下室結構體工程之機具進出與材料吊裝平台。'
+    +'構台以共構樁為支承，柱頂焊接樁帽後置放主樑（{{dkGirder}}），主樑上依 {{dkBeamPitch}} 舖設副樑（{{dkBeam}}），'
+    +'其上鋪設覆工板（{{dkPlate}}）並以電銲固定。構台面積約 {{dkArea}}，設計載重 {{dkLoad}}。\n'
+    +'有關施工構台之設計，尤其必須注意各構件之下陷與構台之搖動。為避免對各項作業造成障礙並確保安全，'
+    +'應極力抑制各構件之下陷，同時配合架設止搖擋柱以提高各結構面之剛性。'
+    +'構台上應安裝型鋼車輪擋（{{dkStop}}）及安全欄杆，以避免車輛翻覆及人員墜落。\n'
+    +'構台拆除依覆工板、副樑、主樑、構台帽及配件之順序進行，並配合共構樁切除同時辦理。',
+  flow:['共構樁樁頭高程測定','構台帽（樁帽）施作，螺栓固定','主樑吊放及鎖固（雙點吊掛）',
+        '副樑吊放及鎖固（依 {{dkBeamPitch}}，螺栓或銲接固定）',
+        '覆工板吊放及電銲固定（4 分鋼索吊鉤、四點吊掛，逐片鋪滿；小樑末端加銲角鐵防滑動）',
+        '止搖柱吊放及電銲固定','車輪擋（{{dkStop}}）及安全欄杆施作',
+        '構台自主檢查與監造查驗（☆／◎）','構台巡檢（每日、強風大雨或四級以上地震後）',
+        '（工程完成後）覆工板拆除','副樑（小梁）拆除','主樑（大梁）拆除',
+        '構台帽及配件拆除','共構樁切除','材料清運'],
+  machines:[['機具名稱','規格','數量'],['履帶式吊車','50T 級','1 台'],['電銲機','15kVA','2~3 台'],
+            ['氧氣乙炔切割器','—','1 組'],['運料車','—','2~3 台']],
+  materials:[['材料','規格','說明'],['主樑','{{dkGirder}}','置於共構樁樁帽上'],
+             ['副樑','{{dkBeam}}　{{dkBeamPitch}}','承載覆工板'],
+             ['覆工板','{{dkPlate}}','電銲固定於副樑'],['樁帽','依設計圖','焊接於共構樁頂'],
+             ['止搖柱','依設計圖','提高構台剛性'],['車輪擋','{{dkStop}}','構台周邊'],
+             ['安全欄杆','高 90~120cm','構台周邊']],
+  notes:['構台柱斜拉桿應配合開挖逐層架設。',
+         '大梁、小梁及覆工板安放前應清除支承面雜物。',
+         '構台高度 2m 以上者，覆工板間隙應在 3cm 以下。',
+         '遇強風大雨或四級以上地震後、構台局部解體變更後，作業前須確認支柱有無滑動或下沉、主梁有無損傷。',
+         '構台不能供起重機支撐站立之區域應以紅油漆標示。',
+         '構台大小梁須完全鎖固，覆工板須安放平穩且電銲確實。',
+         '嚴格管制上構台之機具噸位，不得超過 {{dkLoad}}。'],
+  safety:['構台周邊設置安全欄杆及車輪擋，防止人員墜落及車輛翻覆。',
+          '覆工板臨時掀開作為開口時，四周設臨時護欄、警告標誌及警示燈，作業完成立即恢復。',
+          '構台上作業人員須繫掛安全帶並掛扣於安全母索。',
+          '吊裝作業範圍圈圍管制，吊掛路徑下方淨空。',
+          '拆除作業由上而下逐層進行，下方區域嚴禁人員通行。',
+          '電銲及切割作業須申請動火許可並設監火人員。'],
+  qc:[['施工構台','材料規格','符合 {{dkGirder}} / {{dkBeam}} / {{dkPlate}}','進場時','量測、查證明','每批','退貨更換'],
+      ['施工構台','樁頭高程','符合設計圖說，誤差 ±3cm','施作前','水準儀','逐支','切除或補高'],
+      ['施工構台','樁帽銲接','銲道符合圖說，滿銲','施作中','目視、量測銲道','逐支','補銲'],
+      ['施工構台','主樑架設','平直，螺栓確實鎖固','架設後','拉線、扳手','逐支','重新調整'],
+      ['施工構台','副樑間距','{{dkBeamPitch}}','架設後','捲尺','逐支','調整'],
+      ['施工構台','覆工板鋪設','平穩，間隙 ≦3cm，電銲確實','鋪設後','目視、量測','全數','重新鋪設'],
+      ['施工構台','止搖柱','依設計圖設置並銲接固定','架設後','目視','逐支','補設'],
+      ['施工構台','車輪擋及欄杆','{{dkStop}}；欄杆高 90~120cm','完成後','目視、量測','全數','補設'],
+      ['施工構台','載重管制','{{dkLoad}}','使用中','目視、管制紀錄','每日','立即制止並檢討'],
+      ['施工構台','定期檢查','無下陷、滑動、主梁損傷','每日及強風大雨、四級以上地震後','目視、水準儀','每次','停止使用並補強']],
+  checks:[
+    {name:'施工構台組立自主檢查表',stage:'施工前',
+     rows:[['構台設計圖及計算書是否已送審核可','查文件','已核可'],
+           ['共構樁樁頭高程是否測定','水準儀','符合設計'],
+           ['構台材料規格是否符合設計','量測、查證明','符合圖說'],
+           ['材料有無彎曲、變形、鏽蝕','目視','無異常'],
+           ['吊車一機三證是否齊備','查證件','齊備有效'],
+           ['外伸撐座是否完全展開並鋪設墊材','目視','已完成'],
+           ['作業區域是否圈圍警示','目視','已圈圍'],
+           ['作業前危害告知是否完成','查簽到表','已完成']]},
+    {name:'施工構台組立自主檢查表',stage:'施工中',
+     rows:[['樁帽銲接是否確實','目視、量測銲道','滿銲符合圖說'],
+           ['主樑架設是否平直並鎖固','拉線、扳手','平直且確實鎖固'],
+           ['副樑間距是否符合設計','捲尺','{{dkBeamPitch}}'],
+           ['副樑末端是否加銲角鐵防滑動','目視','已加銲'],
+           ['覆工板是否逐片鋪滿並電銲固定','目視','已固定'],
+           ['覆工板間隙是否 ≦3cm','量測','符合'],
+           ['止搖柱是否設置並銲接','目視','已設置'],
+           ['吊掛作業是否派員指揮','目視','已派員'],
+           ['作業人員是否繫掛安全帶','目視','全數繫掛']]},
+    {name:'施工構台組立自主檢查表',stage:'施工後／使用中',
+     rows:[['車輪擋是否設置','目視、量測','{{dkStop}}'],
+           ['安全欄杆是否設置完整','目視、量測','高 90~120cm'],
+           ['不可供吊車站立區域是否紅漆標示','目視','已標示'],
+           ['構台載重管制標示是否設置','目視','已標示 {{dkLoad}}'],
+           ['支柱有無滑動或下沉','目視、水準儀','無異常'],
+           ['主梁有無損傷、變形','目視','無異常'],
+           ['螺栓有無鬆脫','扳手','無鬆脫'],
+           ['強風大雨或四級以上地震後是否複查','查紀錄','已複查'],
+           ['施工紀錄及照片是否完整','查文件','完整']]}]
+},
+{ id:'anchor', name:'預力地錨（含解壓回收）', short:'預力地錨',
+  vars:[{k:'anStrand',l:'鋼絞線規格',d:'Ø12.7mm 7 股（斷面積 98.71mm²）'},{k:'anCount',l:'地錨支數',d:''},
+        {k:'anHole',l:'鑽孔孔徑',d:'約 15cm'},{k:'anFree',l:'自由段長度 Lf',d:'8.0m'},
+        {k:'anFix',l:'固定段長度 La',d:'6.0m'},{k:'anTw',l:'設計拉力 Tw',d:'40T'},
+        {k:'anAngle',l:'地錨角度',d:'15°'},{k:'anWC',l:'水灰比',d:'0.4~0.5'},
+        {k:'anGrout',l:'灌漿體施拉強度',d:'200 kgf/cm² 以上'}],
+  method:'預力地錨係於擋土壁背側鑽孔並置入預力鋼腱，於固定段以水泥漿與地層握裹，'
+    +'俟漿體達強度後施加預力並鎖定，藉以抵抗擋土壁所受之側向土壓力。\n'
+    +'鑽孔應按地層條件及設計要求選擇適當之鑽掘系統施做，採用之鑽頭外徑不得小於設計孔徑，'
+    +'本工程鑽孔直徑約 {{anHole}}，傾角 {{anAngle}}。鑽孔過程中視地層實際狀況，'
+    +'必要時應以套管輔助保護孔壁，以防止發生崩坍等不利工程及影響地錨效用之現象。\n'
+    +'鋼腱採 {{anStrand}}，自由段長度 {{anFree}}，固定段長度 {{anFix}}；'
+    +'固定端環繞頭分散成圓錐狀，自由端加裝護管隔絕漿體。灌漿水灰比 {{anWC}}，'
+    +'以壓力灌漿由孔底灌至孔口滿漿，並維持滿漿狀態。\n'
+    +'預力鋼腱之施加預力，應依設計圖所述之施作程序會同監造單位施拉。'
+    +'水泥漿體抗壓強度達 {{anGrout}}，即可達到鋼腱施預力時要求之強度。'
+    +'本工程地錨完成後須實施例行性驗收試驗，其施拉預力達設計值 {{anTw}} 之 1.2 倍，'
+    +'並於穩定後釋放預力於設計值之 1.05 倍錨碇。鋼腱剪斷應保留 5~20cm，不得以火燒切。\n'
+    +'解壓回收：配合地下室樓板結構上升之順序分階段進行，待結構體升至與該階層地錨高度平行時，'
+    +'隨即進場進行解壓拆除托架、錨頭、夾片。利用氧氣乙炔切斷地錨鋼絞線使其預力損失，'
+    +'切斷時後方禁止人員出入並確實圈圍作業地區；'
+    +'鋼絞線尾端接上接頭後，使用全吊式吊車抽出回收，如無法抽動，'
+    +'先以挖土機將鋼絞線拉出 1~2 公尺後再以吊車抽出。',
+  flow:['工作面整理（依設計圖順序自最上層開始，開挖坡面平順配合設計高程）',
+        '鑽機定位（履帶式鑽掘機），依設計角度 {{anAngle}} 校正',
+        '鑽孔至設計深度（孔徑 {{anHole}}），崩孔時以套管保護孔壁','孔壁清理',
+        '鋼腱組立（鋼絞線裁切、固定端環繞頭分散成圓錐狀、自由端加裝護管）',
+        '鋼腱安裝入孔（避免扭曲、護管破損）',
+        '灌漿（水灰比 {{anWC}}，壓力灌漿由孔底灌至孔口滿漿）','固定端灌漿（壓力灌漿填滿護管外圍）',
+        '外端錨基座（承壓板）安裝','H型鋼圍令架設及背填（如採型鋼圍令）',
+        '漿體強度達 {{anGrout}} 後施拉預力（至設計值 1.2 倍，穩定後鎖定於 1.05 倍）',
+        '自由段灌漿（如採全灌漿型）','封頭保護、鋼腱剪斷（保留 5~20cm，不得燒切）',
+        '驗收試驗（例行全數＋追加每 10 支抽 1 支）',
+        '（結構體上升後）解壓拆除托架、錨頭、夾片','切斷鋼絞線','鋼絞線抽出與回收、運離'],
+  machines:[['機具名稱','規格','數量'],['履帶式鑽機','HD-120 型','1~2 台'],['灌漿台','JF-150','1~2 台'],
+            ['抽水機','—','1~2 台'],['預力鋼腱組立設備','—','1 套'],['拉線機（千斤頂）','JKT-80TON','1 台'],
+            ['氧氣乙炔切割器','—','2 組（解壓用）'],['吊卡車','20T','1 台'],['全吊式吊車','45T','1 台（解壓用）'],['挖土機','PC120~200','1 台']],
+  materials:[['材料','規格','說明'],['預力鋼絞線','{{anStrand}}','CNS 3332'],
+             ['夾片','Ø25.4mm×41L','搭配錨頭'],['錨頭','Ø125mm×7 孔','依設計'],
+             ['水泥','CNS 61 第Ⅰ型波特蘭水泥','灌漿用'],['水泥漿','水灰比 {{anWC}}','固定段握裹'],
+             ['護管（PE）','依設計','自由段隔絕漿體'],['承壓板／托架','依設計圖','外端錨基座']],
+  notes:['千斤頂施拉能力應 ≧鋼絞線極限強度之 80%，且每半年校正一次。',
+         '最小安全係數 Tu/Tw：臨時性 ≦6 個月為 1.4；臨時性 ≦2 年為 1.6；永久性或後果嚴重者為 2.0。',
+         '驗收試驗分例行驗收（全數）與追加驗收（每 10 支抽 1 支），潛變伸長量須小於容許值。',
+         '鑽孔傾角及深度須逐孔紀錄，孔壁崩坍時應以套管保護。',
+         '灌漿應由孔底灌至孔口滿漿並維持滿漿狀態，避免空隙。',
+         '鋼腱安裝入孔時避免扭曲及護管破損。',
+         '鋼腱剪斷保留 5~20cm，不得以氧氣乙炔燒切（解壓拆除階段除外）。'],
+  safety:['施加預力時千斤頂正後方須淨空，人員不得停留。',
+          '施拉作業須由受訓合格之專業人員操作。',
+          '解壓切斷鋼絞線時後方禁止人員出入，並確實圈圍作業地區。',
+          '鑽孔作業時注意孔口坍孔及機具傾倒，鑽機定位須穩固。',
+          '灌漿管路接頭確實鎖固，防止高壓漿液噴濺，人員配戴護目鏡。',
+          '高處作業（坡面、支撐面）須設安全母索並繫掛安全帶。'],
+  qc:[['預力地錨','材料規格','{{anStrand}}，CNS 3332，附材質證明書','進場時','量測、查證明','每批','退貨更換'],
+      ['預力地錨','鑽孔位置','符合設計圖說，誤差 ≦10cm','鑽孔前','捲尺、經緯儀','逐孔','重新放樣'],
+      ['預力地錨','鑽孔角度','{{anAngle}}，誤差 ±2°','鑽孔中','角度儀','逐孔','重新鑽孔'],
+      ['預力地錨','鑽孔孔徑及深度','孔徑 {{anHole}}；深度 ≧{{anFree}}＋{{anFix}}','鑽孔中','量測、鑽桿標示','逐孔','續鑽'],
+      ['預力地錨','鋼腱組立','自由段 {{anFree}}／固定段 {{anFix}}，護管完整','組立時','量測、目視','逐支','重新組立'],
+      ['預力地錨','灌漿水灰比','{{anWC}}','灌漿時','量測、查紀錄','每批','重新拌合'],
+      ['預力地錨','灌漿飽滿度','孔口滿漿並維持','灌漿時','目視','逐孔','補灌'],
+      ['預力地錨','漿體強度','{{anGrout}}','施拉前','委外抗壓試驗','每日一組','延後施拉'],
+      ['預力地錨','施拉預力','施拉至 {{anTw}} 之 1.2 倍，鎖定於 1.05 倍','施拉時','油壓錶、伸長量量測','逐支','重新施拉'],
+      ['預力地錨','潛變伸長量','小於規範容許值','試驗時','量測、紀錄','驗收試驗','檢討補做'],
+      ['預力地錨','千斤頂校正','校正證明在有效期內（每半年）','施拉前','查校正證明','每次','送校正']],
+  checks:[
+    {name:'預力地錨工程自主檢查表',stage:'施工前',
+     rows:[['施工圖說及施工計畫是否已送審核可','查文件','已核可'],
+           ['地下管線及鄰地界址是否已查明','查資料','已完成'],
+           ['鋼絞線規格及材質證明是否符合','量測、查證明','{{anStrand}}'],
+           ['錨頭、夾片規格是否符合設計','量測','符合圖說'],
+           ['千斤頂是否在校正有效期內','查校正證明','有效（每半年）'],
+           ['鑽機是否檢查合格並定位穩固','目視、查證件','檢查合格'],
+           ['工作面是否整理平順並符合設計高程','水準儀、目視','符合'],
+           ['作業區域是否圈圍警示','目視','已圈圍'],
+           ['作業前危害告知是否完成','查簽到表','已完成']]},
+    {name:'預力地錨工程自主檢查表',stage:'施工中',
+     rows:[['鑽孔位置是否符合設計','捲尺','誤差 ≦10cm'],
+           ['鑽孔角度是否符合設計','角度儀','{{anAngle}}±2°'],
+           ['鑽孔深度是否達設計深度','鑽桿標示','符合設計'],
+           ['孔壁是否穩定（必要時以套管保護）','目視','無崩孔'],
+           ['孔壁是否清理乾淨','目視、沖洗紀錄','已清理'],
+           ['鋼腱自由段護管是否完整','目視','無破損'],
+           ['鋼腱入孔是否無扭曲','目視','正常'],
+           ['灌漿水灰比是否符合規定','量測','{{anWC}}'],
+           ['灌漿是否由孔底灌至孔口滿漿','目視','滿漿'],
+           ['漿體試體是否製作送驗','紀錄','每日一組'],
+           ['個人防護具是否確實配戴','目視','全數配戴']]},
+    {name:'預力地錨工程自主檢查表',stage:'施工後／施拉',
+     rows:[['漿體強度是否達施拉要求','查試驗報告','{{anGrout}}'],
+           ['承壓板安裝是否垂直於錨孔軸線','目視、量測','符合'],
+           ['施拉程序是否依核可程序辦理','查紀錄','符合'],
+           ['施拉預力是否達設計值 1.2 倍','油壓錶','{{anTw}}×1.2'],
+           ['鎖定預力是否為設計值 1.05 倍','油壓錶','{{anTw}}×1.05'],
+           ['伸長量是否在容許範圍','量測、紀錄','符合規範'],
+           ['潛變試驗是否合格','查試驗紀錄','合格'],
+           ['千斤頂後方是否淨空','目視','已淨空'],
+           ['鋼腱剪斷是否保留 5~20cm 且未燒切','目視、量測','符合'],
+           ['封頭保護是否完成','目視','已完成'],
+           ['施工紀錄是否完整','查文件','逐支填錄']]},
+    {name:'預力地錨解壓拆除自主檢查表',stage:'解壓回收',
+     rows:[['結構體是否已達拆除條件','查試驗報告、查紀錄','已達強度且樓板上升至該層'],
+           ['解壓範圍是否確實圈圍','目視','已圈圍'],
+           ['鋼絞線後方是否禁止人員出入','目視','已管制'],
+           ['動火作業許可是否申請','查文件','已申請'],
+           ['滅火器及監火人員是否配置','目視','已配置'],
+           ['托架、錨頭、夾片是否依序拆除','查紀錄','依序拆除'],
+           ['鋼絞線抽出是否使用適當機具','目視','吊車／挖土機配合'],
+           ['回收材料是否清運完成','目視','已清運']]}]
+},
+{ id:'ccp', name:'CCP 止水樁（高壓噴射攪拌樁）', short:'CCP 止水樁',
+  vars:[{k:'ccDia',l:'改良樁徑',d:'Ø30cm'},{k:'ccDepth',l:'施作深度',d:'GL-15.0m'},
+        {k:'ccCount',l:'孔數',d:''},{k:'ccPress',l:'噴射灌漿壓力',d:'180~200 kg/cm²'},
+        {k:'ccRPM',l:'鑽桿迴轉速度',d:'12~15 RPM'},{k:'ccRise',l:'鑽桿上昇速度',d:'5cm/5sec'},
+        {k:'ccWC',l:'水灰比',d:'1:1（水玻璃 1:9）'}],
+  method:'CCP 止水樁係屬水泥止水樁之一種，簡稱 CCP（Chemical Churning Pile）工法。'
+    +'係利用前端裝設有 N.C.V. 高壓噴嘴之鑽桿，鑽入軟弱土壤層內至預定深度後，'
+    +'再利用高壓幫浦以 {{ccPress}} 之高壓力將水泥漿液之固化材灌注到土層內，'
+    +'強制切削土壤使形成一固結樁體，使其產生止水效果。本工程改良樁徑 {{ccDia}}，施作深度 {{ccDepth}}，'
+    +'孔數 {{ccCount}}，水灰比 {{ccWC}}。\n'
+    +'鑽桿一面噴射硬化劑漿液一面迴轉上昇，直至鑽桿前端噴射嘴到達設計高程。'
+    +'施工中鑽桿之迴轉速度應保持在 {{ccRPM}} 左右，上昇速度採 {{ccRise}}（視現況調整），'
+    +'並應設自動控制器控制鑽桿上昇速度。到達設計高程後停止灌注，'
+    +'一面抽出鑽桿一面以漿液填充孔洞，最後變換開關噴水洗淨鑽桿內漿液，完成一孔。',
+  flow:['樁位放樣（引測基準點，噴漆定位並標號）','廢漿溝（溢漿溝）開挖，防止漿液污染',
+        '鑽孔機定位，以水平器校正垂直度','以旋轉法鑽孔至設計深度（鑽泵壓力 ≦80kg/cm²）',
+        '泵浦輸送水泥漿壓力調整至 {{ccPress}}',
+        '噴射灌漿：硬化劑經灌漿管注入鑽桿由前端噴出，一面噴射一面迴轉上昇（{{ccRPM}}、{{ccRise}}）',
+        '到達設計高程後停止灌注，抽出鑽桿並以漿液填充孔洞','變換開關噴水洗淨鑽桿內漿液，完成一孔',
+        '移機至次一樁位，重複前述步驟','填寫 CCP 工事日報表（孔數、灌注壓力、配比、上昇速率）',
+        '廢漿收集及清運'],
+  machines:[['機具名稱','規格','數量'],['超高壓幫浦','Pmax=350 kg/cm²','1 組'],
+            ['油壓履帶式鑽機','DHJ-12','2 台'],['溶解槽／攪拌槽','200L ＋ 800L','1 組'],
+            ['水中幫浦','—','1 台'],['水槽','1m³ 及 6m³','各 1'],['挖土機','PC120~200','1 台']],
+  materials:[['材料','規格','說明'],['水泥','CNS 61 R2001 第Ⅰ型波特蘭水泥','固化材'],
+             ['水玻璃','—','速凝劑，配比 1:9'],['水泥漿','水灰比 {{ccWC}}','高壓噴射用'],
+             ['—','每公尺水泥用量約 60~75kg（Ø20cm 樁）','依樁徑調整']],
+  notes:['施工中應不斷監視灌漿壓力、輸漿量及已完成結構物之變化。',
+         '灌漿壓力異常時應立即停止並調查原因。',
+         '鑽桿上昇無支撐夾具之長度不得超過 18m，以免鑽機傾倒。',
+         '避免與其他施工活動同時進行，以免相互干擾。',
+         '廢漿應於溢漿溝內收集，不得溢流至工區外。'],
+  safety:['高壓管路及接頭應確實鎖固並定期檢查，防止高壓噴射傷人。',
+          '作業人員配戴護目鏡、防護手套及防水衣。',
+          '鑽機定位穩固，作業中隨時注意機身傾斜。',
+          '操作人員每日檢查電線電路，防止感電。',
+          '作業區域圈圍警示，禁止無關人員進入。'],
+  qc:[['CCP 止水樁','樁位放樣','符合設計圖說，誤差 ≦5cm','鑽孔前','捲尺、經緯儀','逐孔','重新放樣'],
+      ['CCP 止水樁','鑽孔垂直度','≦1/100','鑽孔中','水平器、垂球','逐孔','重新鑽孔'],
+      ['CCP 止水樁','鑽孔深度','達 {{ccDepth}}','鑽孔中','鑽桿標示','逐孔','續鑽'],
+      ['CCP 止水樁','噴射壓力','{{ccPress}}','灌漿中','壓力錶','逐孔','調整泵浦'],
+      ['CCP 止水樁','鑽桿迴轉速度','{{ccRPM}}','灌漿中','轉速錶','逐孔','調整轉速'],
+      ['CCP 止水樁','鑽桿上昇速度','{{ccRise}}','灌漿中','自動控制器紀錄','逐孔','調整速度'],
+      ['CCP 止水樁','漿液配比','{{ccWC}}','拌合時','查配比、量測','每批','重新拌合'],
+      ['CCP 止水樁','改良樁徑','{{ccDia}}','完成後','試挖抽查','抽查','補做'],
+      ['CCP 止水樁','止水效果','開挖後無明顯滲漏','開挖時','目視','逐段','補灌漿'],
+      ['CCP 止水樁','施工紀錄','工事日報表逐孔填錄','每日','查文件','每日','補正']],
+  checks:[
+    {name:'CCP 止水樁工程自主檢查表',stage:'施工前',
+     rows:[['施工圖說及施工計畫是否已送審核可','查文件','已核可'],
+           ['地下管線及障礙物是否已查明','查資料、試挖','已完成'],
+           ['樁位放樣是否經複核並標號','經緯儀、目視','誤差 ≦5cm'],
+           ['廢漿溝是否開挖完成','目視','已完成'],
+           ['水泥材質證明是否齊全','查文件','齊全'],
+           ['配比是否經核可','查配比設計','{{ccWC}}'],
+           ['高壓幫浦及管路是否檢查','目視、試壓','無洩漏'],
+           ['鑽機是否定位穩固並校正垂直','水平器','已校正']]},
+    {name:'CCP 止水樁工程自主檢查表',stage:'施工中',
+     rows:[['鑽孔深度是否達設計深度','鑽桿標示','{{ccDepth}}'],
+           ['噴射壓力是否符合規定','壓力錶','{{ccPress}}'],
+           ['鑽桿迴轉速度是否符合規定','轉速錶','{{ccRPM}}'],
+           ['鑽桿上昇速度是否符合規定','自動控制器','{{ccRise}}'],
+           ['漿液配比是否穩定','查紀錄','{{ccWC}}'],
+           ['已完成結構物有無異常變化','目視、監測','無異常'],
+           ['廢漿是否於溢漿溝內收集','目視','無溢流'],
+           ['鑽桿無支撐長度是否 ≦18m','量測','符合'],
+           ['個人防護具是否確實配戴','目視','全數配戴']]},
+    {name:'CCP 止水樁工程自主檢查表',stage:'施工後',
+     rows:[['孔數是否符合設計','清點、查紀錄','{{ccCount}}'],
+           ['改良樁徑是否符合設計','試挖抽查','{{ccDia}}'],
+           ['開挖後有無明顯滲漏','目視','無滲漏'],
+           ['工事日報表是否完整','查文件','逐孔填錄'],
+           ['廢漿是否清運完成並取得聯單','查文件','已完成'],
+           ['場地是否清理完成','目視','已清理']]}]
+},
+{ id:'upile', name:'抗浮基樁（鋼軌樁護壁場鑄 RC 樁）', short:'抗浮基樁',
+  vars:[{k:'upDia',l:'樁徑',d:'Ø150cm'},{k:'upDepth',l:'樁深',d:'GL-8.0m'},{k:'upCount',l:'支數',d:''},
+        {k:'upFc',l:'混凝土設計強度',d:"fc'=350 kgf/cm²"},{k:'upRebar',l:'主筋規格',d:'#8 竹節鋼筋'},
+        {k:'upPipe',l:'壓送管口徑',d:'18cm'}],
+  method:'本工項係以鋼軌樁作為孔壁保護，人工配合機械開挖至設計深度後，吊放鋼筋籠並以特密管（壓送管）'
+    +'澆置混凝土形成場鑄 RC 抗浮基樁。本工程樁徑 {{upDia}}，樁深 {{upDepth}}，數量 {{upCount}} 支，'
+    +'混凝土設計強度 {{upFc}}，主筋採 {{upRebar}}。\n'
+    +'基樁若開挖深度不超過鋼軌樁打設深度則應不致發生坍孔現象，故挖掘深度應與鋼軌樁打設深度密切配合。'
+    +'混凝土澆置時，最初之一至二節壓送管雖所灌混凝土數量不多，'
+    +'但若已有埋入混凝土面大於 1 倍樁徑（1.5~2m）以上時應可酌情拆管，'
+    +'以免鋼筋籠因上擠力過大而上浮；壓送管上移速度應保持於混凝土面上 200cm 以上。\n'
+    +'混凝土澆置完成後隨即拔出鋼軌樁，並隨拔隨灌砂填實。',
+  flow:['整地（清除障礙物，警示圈圍）','基樁點位放樣及測定（全站儀依座標放樣，鋼釘或角材標示樁心）',
+        '鋼軌樁打設（自由落錘及捲揚機打入，垂直校正）',
+        '開挖取土（分二階段機械＋人工挖掘並襯板；抽水設備排除積水）',
+        '樁深確認（水尺量測並做成紀錄）','垂直度檢測（雷射垂直儀或垂球，≦1/300）',
+        '鋼筋籠加工（依設計圖銲製，避免變形）','鋼筋籠吊放（主鉤＋輔助鉤緩慢吊放至設計高程）',
+        '壓送車定位及混凝土壓送管安裝（口徑 {{upPipe}}，底緣距開挖底約 200cm）',
+        '混凝土澆置（初期慢速，埋入混凝土面 >1 倍樁徑後方可拆管）',
+        '鋼軌樁拔出（隨拔隨灌砂）','試體製作送驗、施工紀錄整理'],
+  machines:[['機具名稱','規格','數量'],['履帶式吊車','80~90T','1 台'],['打樁機','—','1 台'],
+            ['破碎機','—','1 台'],['電銲機','15kVA','5 台'],['氧氣乙炔切斷器','—','1 組'],
+            ['混凝土壓送管','{{upPipe}}','1 套'],['混凝土壓送車','—','1 台'],
+            ['挖土機','PC200','1 台'],['雷射垂直儀','PL3','1 台'],['汽油抽水機','—','3 台']],
+  materials:[['材料','規格','說明'],['混凝土','{{upFc}}（28 天圓柱試體）','場鑄樁體'],
+             ['竹節鋼筋','{{upRebar}}；#5 以下 fy=2800、#6 以上 fy=4200 kgf/cm²','CNS 560'],
+             ['鋼軌樁','依設計','孔壁保護，可回收'],['襯板','木襯板','人工開挖時支撐孔壁'],
+             ['回填砂','級配砂','鋼軌樁拔除後填實']],
+  notes:['樁位中心最大偏心 ±7.5cm。',
+         '垂直度 ≦1/300，開挖面最大偏位 <10cm。',
+         '主筋搭接如需電銲，銲接長度須大於 5 倍鋼筋直徑×1.75。',
+         '壓送管上移速度保持於混凝土面上 200cm 以上，避免斷樁。',
+         '埋入混凝土面大於 1 倍樁徑（1.5~2m）以上時方可酌情拆管，避免鋼筋籠上浮。',
+         '開挖深度應與鋼軌樁打設深度密切配合，不得超挖。',
+         '施作速度約 1 天 1 支，不宜多孔同時開挖。'],
+  safety:['各基樁開挖範圍測定後，於開挖線外約 1.2m 設置安全護欄。',
+          '鋼筋籠暫置不得超過二層，並以型鋼枕木阻擋防止滾動。',
+          '人工開挖孔內作業須設通風設備並偵測有害氣體，孔口設專人監視。',
+          '孔口周邊設置護蓋或護欄，防止人員墜落。',
+          '吊放鋼筋籠時作業半徑內淨空，並派專人指揮。',
+          '電銲及切割作業須申請動火許可並設監火人員。'],
+  qc:[['抗浮基樁','樁位放樣','偏心 ≦±7.5cm','放樣後','全站儀','逐支','重新放樣'],
+      ['抗浮基樁','鋼軌樁打設','深度配合開挖深度，垂直','打設中','水準儀、垂球','逐支','補打'],
+      ['抗浮基樁','開挖深度','達 {{upDepth}}','開挖中','水尺量測','逐支','續挖'],
+      ['抗浮基樁','垂直度','≦1/300，開挖面偏位 <10cm','開挖後','雷射垂直儀、垂球','逐支','修正孔位'],
+      ['抗浮基樁','鋼筋籠加工','符合設計圖說，無變形','加工後','量測、目視','逐座','重新加工'],
+      ['抗浮基樁','鋼筋搭接','電銲長度 >5db×1.75','加工中','量測','逐處','補銲'],
+      ['抗浮基樁','鋼筋籠吊放高程','符合設計圖說','吊放後','水準儀','逐支','調整'],
+      ['抗浮基樁','壓送管位置','底緣距開挖底約 200cm','澆置前','量測','逐支','調整'],
+      ['抗浮基樁','混凝土坍度','符合圖說','澆置前','坍度試驗','每車','退貨'],
+      ['抗浮基樁','混凝土強度','{{upFc}}','28 天','圓柱試體抗壓試驗','每 100m³ 或每日一組','檢討補強並報監造'],
+      ['抗浮基樁','拆管時機','埋入混凝土面 >1 倍樁徑','澆置中','量測','逐支','停止拆管'],
+      ['抗浮基樁','鋼軌樁拔除','隨拔隨灌砂填實','澆置後','目視','逐支','補灌']],
+  checks:[
+    {name:'抗浮基樁施工自主檢查表',stage:'施工前',
+     rows:[['施工圖說及施工計畫是否已送審核可','查文件','已核可'],
+           ['地下管線及障礙物是否已清除','查資料、試挖','已完成'],
+           ['樁位放樣是否經複核','全站儀','偏心 ≦±7.5cm'],
+           ['鋼筋規格及材質證明是否符合','量測、查證明','{{upRebar}}'],
+           ['鋼筋籠加工是否符合圖說','量測、目視','符合'],
+           ['混凝土配比是否經核可','查配比設計','{{upFc}}'],
+           ['抽水設備是否備妥','目視','已備妥'],
+           ['開挖線外 1.2m 安全護欄是否設置','目視、量測','已設置'],
+           ['吊車一機三證是否齊備','查證件','齊備有效']]},
+    {name:'抗浮基樁施工自主檢查表',stage:'施工中',
+     rows:[['鋼軌樁打設深度是否配合開挖深度','量測','配合無超挖'],
+           ['開挖是否分階段並適時襯板','目視','已襯板'],
+           ['孔內積水是否排除','目視','已排除'],
+           ['孔內是否通風並偵測有害氣體','偵測器','安全'],
+           ['開挖深度是否達設計深度','水尺','{{upDepth}}'],
+           ['垂直度是否符合規定','雷射垂直儀','≦1/300'],
+           ['鋼筋籠吊放是否緩慢且未變形','目視','正常'],
+           ['壓送管底緣距開挖底是否約 200cm','量測','符合'],
+           ['混凝土坍度是否符合','坍度試驗','符合圖說'],
+           ['拆管時埋入深度是否 >1 倍樁徑','量測','符合'],
+           ['個人防護具是否確實配戴','目視','全數配戴']]},
+    {name:'抗浮基樁施工自主檢查表',stage:'施工後',
+     rows:[['樁頂高程是否符合設計','水準儀','符合圖說'],
+           ['樁位偏心是否在容許範圍','全站儀','≦±7.5cm'],
+           ['混凝土試體是否製作送驗','查紀錄','每支或每 100m³ 一組'],
+           ['混凝土抗壓強度是否合格','查試驗報告','{{upFc}}'],
+           ['鋼軌樁拔除後是否灌砂填實','目視','已填實'],
+           ['有無斷樁或縮頸情形','目視、查澆置紀錄','無異常'],
+           ['施工紀錄是否完整','查文件','逐支填錄'],
+           ['場地是否清理完成','目視','已清理']]}]
+}
+];
+function _plItem(id){return PLAN_ITEMS.find(function(x){return x.id===id;});}
+
+// ── 狀態 ──
+var _plState={proj:'',vars:{},items:[],figs:[],chkMode:'blank',chkAns:{},emer:null,histOpen:false,doc:null};
+function _plLoad(){
+  try{var s=JSON.parse(localStorage.getItem('fy_plan')||'null');if(s&&typeof s==='object')_plState=Object.assign(_plState,s);}catch(e){}
+  if(!_plState.vars)_plState.vars={};
+  if(!Array.isArray(_plState.items))_plState.items=[];
+  if(!Array.isArray(_plState.figs))_plState.figs=[];
+  if(!_plState.chkAns||typeof _plState.chkAns!=='object')_plState.chkAns={};
+  if(!_plState.emer)_plState.emer=_plEmerDefault();
+}
+function _plSave(){
+  try{var s=JSON.parse(JSON.stringify(_plState));s.doc=null;localStorage.setItem('fy_plan',JSON.stringify(s));}catch(e){}
+}
+function _plEmerDefault(){
+  return [['單位／職稱','姓名','聯絡電話'],
+    ['承造廠商（工地主任）','{{chief}}','{{tel}}'],
+    ['協力廠商（作業主管）','{{mgr}}',''],
+    ['職業安全衛生業務主管','{{safe}}',''],
+    ['設計監造單位','{{design}}',''],
+    ['專案管理單位','{{pm}}',''],
+    ['勞動檢查機構','{{labor}}','{{laborTel}}'],
+    ['鄰近醫療院所','{{hospital}}','{{hospTel}}'],
+    ['轄區警察分局','{{police}}','{{policeTel}}'],
+    ['轄區消防分隊','{{fire}}','{{fireTel}}'],
+    ['消防／救護專線','—','119'],
+    ['報案專線','—','110'],
+    ['自來水事業處','—','1910'],
+    ['台灣電力公司','—','1911'],
+    ['中華電信','—','123'],
+    ['天然氣公司','—','']];
+}
+// 變數代入：專案欄位＋已勾選工項變數
+function _plVarMap(){
+  var m={};
+  PLAN_FIELDS.forEach(function(g){g.f.forEach(function(f){m[f.k]=_plState.vars[f.k]||'';});});
+  PLAN_ITEMS.forEach(function(it){
+    (it.vars||[]).forEach(function(v){
+      var x=_plState.vars[v.k];
+      m[v.k]=(x===undefined||x==='')?(v.d||''):x;
+    });
+  });
+  return m;
+}
+function _plFill(s,m){
+  return String(s==null?'':s).replace(/\{\{(\w+)\}\}/g,function(_,k){
+    var v=m[k];return (v===undefined||v==='')?'＿＿＿＿':v;
+  });
+}
+function _plFillRows(rows,m){
+  return (rows||[]).map(function(r){return (r||[]).map(function(c){return _plFill(c,m);});});
+}
+
+// ── 產生計畫書 blocks ──
+function _plBuild(){
+  var m=_plVarMap(),B=[],ci=0;
+  var picked=_plState.items.map(_plItem).filter(Boolean);
+  function h1(t){B.push({t:'h1',v:PLAN_ROMAN[ci++]+'、'+t,pb:ci>1});}
+  function h2(i,t){B.push({t:'h2',v:PLAN_CN[i]+'、'+t});}
+  function p(t){B.push({t:'p',v:_plFill(t,m)});}
+  function li(a){(a||[]).forEach(function(x,i){B.push({t:'li',v:(i+1)+'. '+_plFill(x,m)});});}
+  function tbl(rows,w){B.push({t:'tbl',rows:_plFillRows(rows,m),w:w});}
+
+  // 封面
+  B.push({t:'title',v:_plFill('{{name}}',m)});
+  B.push({t:'sub',v:'分項工程施工計畫書——'+(picked.length?picked.map(function(x){return x.short;}).join('／'):'擋土支撐工程')});
+  tbl([['項目','內容'],
+    ['工程名稱','{{name}}'],['工程地點','{{loc}}'],['建照號碼','{{permit}}'],
+    ['業主／起造人','{{owner}}'],['主辦機關','{{agency}}'],['設計監造','{{design}}'],
+    ['專案管理','{{pm}}'],['承攬廠商','{{main}}'],['協力廠商','{{sub}}'],
+    ['承攬金額','{{amount}}'],['契約工期','{{dur}}'],['預定開工日','{{start}}'],
+    ['編訂日期',localToday()]],[2600,6600]);
+  B.push({t:'note',v:'本計畫書經工地主任、專任工程人員審核並簽章後送監造單位審查，核可後據以施工。'});
+  B.push({t:'p',v:'送審核章：　工地主任 '+(m.chief||'＿＿＿')+' ＿＿＿＿＿　　品管工程師 '+(m.qcp||'＿＿＿')+' ＿＿＿＿＿　　安衛主管 '+(m.safe||'＿＿＿')+' ＿＿＿＿＿'});
+
+  // 壹、工程概要
+  h1('工程概要');
+  h2(0,'計畫目的與適用範圍');p(PLAN_TXT.scope);
+  h2(1,'工程概況');
+  tbl([['項目','內容'],['擋土壁形式','{{wallType}}'],['擋土壁規格','{{wallSpec}}'],
+    ['開挖深度','{{digDepth}}'],['開挖面積','{{digArea}}'],['支撐面積','{{supArea}}'],
+    ['支撐層數','{{layers}} 層'],['地層概況','{{soil}}'],['鄰近構造物','{{nearby}}']],[2600,6600]);
+  h2(2,'基地位置與周邊環境');p(PLAN_TXT.siteDesc);
+  h2(3,'本計畫涵蓋之分項工項');
+  if(picked.length)tbl([['工項','主要規格']].concat(picked.map(function(it){
+    return [it.name,(it.vars||[]).slice(0,3).map(function(v){return v.l+' '+(m[v.k]||'—');}).join('；')];
+  })),[3200,6000]);
+  else p('（尚未勾選工項）');
+
+  // 貳、人員組織
+  h1('人員組織');
+  h2(0,'施工組織系統');
+  p('本工程之施工組織以承攬廠商{{main}}之工地主任為統籌，協力廠商{{sub}}配置擋土支撐作業主管、安衛工程師、'
+    +'工務工程師及施工組領班，下轄鑽掘機操作手及指揮手、起重及吊裝工班、支撐架設及拆除工班；'
+    +'品質管理由品管工程師負責，安全衛生由職業安全衛生業務主管負責，並接受設計監造單位{{design}}'
+    +'及專案管理單位{{pm}}之督導。');
+  tbl([['層級','單位','負責人'],
+    ['業主／起造人','{{owner}}','—'],['主辦機關','{{agency}}','—'],
+    ['設計監造','{{design}}','—'],['專案管理','{{pm}}','—'],
+    ['承攬廠商','{{main}}','工地主任 {{chief}}'],
+    ['協力廠商','{{sub}}','作業主管 {{mgr}}'],
+    ['職業安全衛生','{{sub}}','安衛業務主管 {{safe}}'],
+    ['品質管理','{{sub}}','品管工程師 {{qcp}}']],[2200,4200,2800]);
+  h2(1,'工作職掌');tbl(PLAN_TXT.duty,[1800,900,6500]);
+  h2(2,'法定證照及教育訓練');tbl(PLAN_TXT.lic,[3000,2000,2600,1600]);
+  tbl([['職稱','姓名','證照字號／有效期限'],
+    ['工地主任','{{chief}}','{{chiefLic}}'],
+    ['擋土支撐作業主管','{{mgr}}','{{mgrLic}}'],
+    ['職業安全衛生業務主管','{{safe}}','{{safeLic}}'],
+    ['品管工程師','{{qcp}}','{{qcpLic}}']],[3000,2400,3800]);
+
+  // 參、施工機具
+  h1('施工機具');
+  if(picked.length)picked.forEach(function(it,i){
+    h2(i,it.name);tbl(it.machines,[3600,3400,2200]);
+  });else p('（尚未勾選工項）');
+
+  // 肆、使用材料
+  h1('使用材料');
+  if(picked.length)picked.forEach(function(it,i){
+    h2(i,it.name);tbl(it.materials,[2800,4000,2400]);
+  });else p('（尚未勾選工項）');
+  B.push({t:'h2',v:PLAN_CN[picked.length]+'、材料檢驗程序'});
+  tbl(PLAN_TXT.matCheck,[2400,1800,2800,1700,2500]);
+
+  // 伍、預定作業進度
+  h1('預定作業進度');
+  p('本工程契約工期 {{dur}}，預定開工日 {{start}}。各工項之作業順序依「樁體系統建置 → 逐層開挖與支撐架設循環 '
+    +'→ 結構體回築與支撐拆除循環 → 構台拆除及共構樁切除」之原則排定，'
+    +'詳細日程另以「施工進度表」（本系統「施工進度」工具產製，含甘特圖及 S 曲線）提送。');
+  tbl([['階段','作業內容','先後關係'],
+    ['第一階段','擋土壁（{{wallType}}）、中間樁／共構樁施作','須先於支撐系統，為支撐之承載基礎'],
+    ['第二階段','逐層開挖 → 施工構台架設 → 圍令／支撐架設 → 千斤頂預壓','每層預載施加完成後方得繼續開挖'],
+    ['第三階段','開挖至坑底、底版及結構體施作','—'],
+    ['第四階段','結構體達強度後，由下而上逐層拆除支撐','須有混凝土抗壓試驗報告佐證'],
+    ['第五階段','施工構台拆除、共構樁切除、材料清運','構台拆除與共構樁切除同時辦理']],[1800,5000,3400]);
+
+  // 陸、施工方法與步驟
+  h1('施工方法與步驟');
+  if(picked.length)picked.forEach(function(it,i){
+    h2(i,it.name);
+    B.push({t:'h3',v:'（一）施工方法'});p(it.method);
+    B.push({t:'h3',v:'（二）施工流程'});
+    (it.flow||[]).forEach(function(s,j){B.push({t:'li',v:'步驟 '+(j+1)+'：'+_plFill(s,m)});});
+    B.push({t:'h3',v:'（三）施工注意事項'});li(it.notes);
+  });else p('（尚未勾選工項）');
+
+  // 柒、分項品質計畫
+  h1('分項品質計畫');
+  h2(0,'品質管理架構');p(PLAN_TXT.qcFlow);
+  B.push({t:'note',v:'權責區分：◎ 監造單位抽驗　☆ 工地主任／品管人員複查　△ 現場人員查驗　□ 協力廠商執行'});
+  h2(1,'品質管理標準');
+  if(picked.length)picked.forEach(function(it){
+    B.push({t:'h3',v:it.name});
+    tbl([['作業項目','管理項目','管理標準','檢查時機','檢查方法','檢查頻率','不合標準之處置']].concat(it.qc),
+      [1500,1300,2600,1200,1600,1000,1800]);
+  });else p('（尚未勾選工項）');
+  h2(2,'施工圖繪製');p(PLAN_TXT.drawPrep);
+  h2(3,'自主檢查表');
+  p('各工項之自主檢查表依施工前、施工中、施工後（含解壓／拆除）分階段訂定，表頭之工程名稱、'
+    +'承攬廠商、檢查人員等資訊由本計畫書專案資料自動帶入，檢查項目及合格標準隨勾選之工項與規格參數動態調整。'
+    +'完成之檢查表由現場工程師填具，經工地主任及品管工程師複查後留存備查，並作為監造單位查驗之依據。');
+  var chkList=[];
+  picked.forEach(function(it){(it.checks||[]).forEach(function(c){chkList.push({it:it,c:c});});});
+  if(chkList.length)tbl([['編號','檢查表名稱','階段','項目數']].concat(chkList.map(function(x,i){
+    return ['SC-'+String(i+1).padStart(2,'0'),x.c.name,x.c.stage,String(x.c.rows.length)];
+  })),[1400,5200,1800,1600]);
+
+  // 捌、分項作業安全衛生管理與設施設置措施
+  h1('分項作業安全衛生管理與設施設置措施');
+  h2(0,'安全衛生管理通則');li(PLAN_TXT.safeGeneral);
+  h2(1,'動火作業（電銲、切割、研磨）安全規範');li(PLAN_TXT.safeHot);
+  h2(2,'吊掛作業安全規範');li(PLAN_TXT.safeLift);
+  h2(3,'各工項安全衛生注意事項');
+  if(picked.length)picked.forEach(function(it){
+    B.push({t:'h3',v:it.name});li(it.safety);
+  });else p('（尚未勾選工項）');
+  h2(4,'安全衛生設施設置');tbl(PLAN_TXT.facility,[2200,4800,3200]);
+
+  // 玖、支撐應變計畫
+  h1('支撐應變計畫');
+  p('施工期間如發生下列異常狀況，應依本章所訂之應變措施處理，並立即通報監造單位及設計技師會勘，'
+    +'必要時停止開挖並採取補強措施；相關處理過程應詳實紀錄並納入施工日誌。');
+  tbl(PLAN_TXT.contingency,[2000,2600,3200,2400]);
+
+  // 拾、監測計畫配合事項
+  h1('監測計畫配合事項');
+  p(PLAN_TXT.monitorNote);
+  tbl(PLAN_TXT.monitor,[1800,1800,2600,1800,2200]);
+
+  // 拾壹、緊急應變計畫
+  h1('緊急應變計畫');
+  h2(0,'可能事故種類');p(PLAN_TXT.emerType);
+  h2(1,'緊急應變組織');
+  p('緊急應變由承攬廠商{{main}}之工地主任{{chief}}擔任總指揮，協力廠商{{sub}}之作業主管{{mgr}}'
+    +'負責現場搶救指揮，職業安全衛生業務主管{{safe}}負責通報聯絡與災害調查，'
+    +'各工班領班負責人員清點及避難引導。');
+  tbl([['編組','負責人','任務'],
+    ['總指揮','工地主任 {{chief}}','統籌指揮、對外發言、決定停工與復工'],
+    ['搶救組','作業主管 {{mgr}}','現場搶救、災害源遮斷、防止二次災害'],
+    ['通報組','安衛主管 {{safe}}','對外通報聯絡、災害調查與統計'],
+    ['急救組','安衛工程師','傷患急救、送醫陪同'],
+    ['避難引導組','各工班領班','人員清點、避難引導、警戒管制'],
+    ['支援組','品管工程師 {{qcp}}','機具材料調度、現場保全與紀錄']],[1800,3000,5400]);
+  h2(2,'通報聯絡與處理要領');li(PLAN_TXT.emerReport);
+  h2(3,'緊急應變處理原則');li(PLAN_TXT.emerPrinciple);
+  h2(4,'災害緊急聯絡人');
+  tbl(_plState.emer||_plEmerDefault(),[3400,3000,3800]);
+  B.push({t:'note',v:'上表電話應於開工前確認為工區鄰近之救援單位，並張貼於工務所明顯處。'});
+
+  // 拾貳、環境保護與交通維持
+  h1('環境保護與交通維持');
+  tbl(PLAN_TXT.env,[2400,7800]);
+
+  // 拾參、施工圖說與附件
+  h1('施工圖說與相關附件');
+  var imgs=(_plState.figs||[]).filter(function(f){return f.kind==='img';});
+  var docs=(_plState.figs||[]).filter(function(f){return f.kind!=='img';});
+  h2(0,'施工圖說');
+  if(imgs.length){
+    imgs.forEach(function(f){
+      B.push({t:'img',b64:f.b64,ext:f.ext,cx:f.cx,cy:f.cy,name:f.name,cap:f.cap||f.name});
+    });
+  }else{
+    p('本章應檢附：擋土支撐系統平面配置圖、各層支撐剖面圖（含高程、圍令、支撐、斜撐、預壓力、'
+      +'設計軸力、容許值、警戒值、行動值附表）、中間樁／共構樁樁位圖、施工構台覆工板系統平面配置圖及細部圖、'
+      +'零附件接合詳圖。（尚未匯入圖檔，請於系統「匯入圖說」上傳，或於本頁後另行插入。）');
+  }
+  h2(1,'結構計算書及其他附件');
+  if(docs.length){
+    tbl([['附件編號','檔案名稱','說明']].concat(docs.map(function(f,i){
+      return ['附件 '+(i+1),f.name,f.cap||'詳附件（另冊檢附）'];
+    })),[1600,5000,3600]);
+    B.push({t:'note',v:'上列 PDF／其他格式檔案未內嵌於本檔，請於送審時另冊檢附或以合併方式併入。'});
+  }else{
+    tbl([['附件編號','附件名稱','說明'],
+      ['附件 1','結構計算書（技師簽證）','另冊檢附'],
+      ['附件 2','材料材質證明書','施工中陸續補送'],
+      ['附件 3','人員證照及教育訓練紀錄','含 6 小時教育訓練簽到表、勞保投保資料'],
+      ['附件 4','機具檢查合格證及操作人員證照','一機三證'],
+      ['附件 5','千斤頂校正報告','有效期限內'],
+      ['附件 6','混凝土／水泥砂漿試驗報告','施工中陸續補送'],
+      ['附件 7','自主檢查表（空白表單）','詳本計畫書附表'],
+      ['附件 8','監測計畫及監測配置圖','由監測廠商提送']],[1600,5000,3600]);
+  }
+
+  // 附表：自主檢查表
+  if(chkList.length){
+    B.push({t:'h1',v:'附表　自主檢查表',pb:true});
+    chkList.forEach(function(x,i){
+      B.push({t:'h2',v:'SC-'+String(i+1).padStart(2,'0')+'　'+_plFill(x.c.name,m)+'（'+x.c.stage+'）'});
+      B.push({t:'tbl',rows:_plFillRows([['工程名稱','{{name}}','檢查日期','　年　月　日'],
+        ['施工廠商','{{sub}}','檢查位置','　'],
+        ['工項','　','文件編號','SC-'+String(i+1).padStart(2,'0')+'-　　']],m),w:[1600,3600,1600,3400]});
+      var rows=[['項次','檢查項目','檢查方法','合格標準','檢查結果','備註']];
+      (x.c.rows||[]).forEach(function(r,j){
+        var ans=_plState.chkAns[x.it.id+'|'+i+'|'+j]||'';
+        var res=(_plState.chkMode==='fill'&&ans)
+          ?({ok:'■合格　□不合格　□免檢',ng:'□合格　■不合格　□免檢',na:'□合格　□不合格　■免檢'}[ans]||'□合格　□不合格　□免檢')
+          :'□合格　□不合格　□免檢';
+        rows.push([String(j+1),r[0],r[1],r[2],res,'']);
+      });
+      B.push({t:'tbl',rows:_plFillRows(rows,m),w:[600,3200,1400,2400,1800,800]});
+      B.push({t:'tbl',rows:_plFillRows([['協力廠商（自主檢查）','現場工程師','工地主任','品管工程師','監造單位'],
+        ['　','　','　','　','　']],m),w:[2200,1900,1900,1900,2300]});
+    });
+  }
+  return B;
+}
+
+// ── 送審前檢核 ──
+function _plAudit(){
+  var m=_plVarMap(),out=[];
+  PLAN_TXT.auditRules.forEach(function(r){if(!m[r.k])out.push(r.m);});
+  if(!_plState.items.length)out.push('尚未勾選任何工項，施工方法、品質管理標準、自主檢查表章節將全部空白。');
+  if(!(_plState.figs||[]).length)out.push('尚未匯入施工圖說。審查最常要求補充：支撐系統平面配置圖／剖面圖（含高程、圍令、支撐、斜撐、預壓力、設計軸力、容許值、警戒值、行動值附表）、施工構台覆工板系統平面配置圖及細部圖。');
+  var lay=parseInt(m.layers,10);
+  if(_plState.items.indexOf('strut')>=0&&lay&&String(m.stLayers||'')&&parseInt(m.stLayers,10)&&parseInt(m.stLayers,10)!==lay)
+    out.push('「支撐層數」（'+lay+'）與水平支撐工項之「支撐層數」（'+m.stLayers+'）不一致，審查會要求釐清，請統一。');
+  return out;
+}
+
+// ── blocks → HTML（預覽與列印共用）──
+function _plHtml(B,forPrint){
+  return (B||[]).map(function(b){
+    if(!b)return '';
+    var v=esc(b.v==null?'':b.v).replace(/\n/g,'<br>');
+    switch(b.t){
+      case 'title': return '<h1 class="pl-title">'+v+'</h1>';
+      case 'sub':   return '<div class="pl-sub">'+v+'</div>';
+      case 'h1':    return '<h2 class="pl-h1'+(b.pb&&forPrint?' pl-pb':'')+'">'+v+'</h2>';
+      case 'h2':    return '<h3 class="pl-h2">'+v+'</h3>';
+      case 'h3':    return '<h4 class="pl-h3">'+v+'</h4>';
+      case 'li':    return '<div class="pl-li">'+v+'</div>';
+      case 'note':  return '<div class="pl-note">'+v+'</div>';
+      case 'break': return forPrint?'<div class="pl-pb"></div>':'<hr>';
+      case 'img':   return '<figure class="pl-fig"><img src="'+b.b64+'" alt="'+esc(b.name||'')+'">'
+                      +(b.cap?'<figcaption>'+esc(b.cap)+'</figcaption>':'')+'</figure>';
+      case 'tbl':   {
+        var rows=b.rows||[];if(!rows.length)return '';
+        return '<table class="pl-tbl"><thead><tr>'+(rows[0]||[]).map(function(c){return '<th>'+esc(c)+'</th>';}).join('')+'</tr></thead><tbody>'
+          +rows.slice(1).map(function(r){return '<tr>'+(r||[]).map(function(c){return '<td>'+esc(c).replace(/\n/g,'<br>')+'</td>';}).join('')+'</tr>';}).join('')
+          +'</tbody></table>';
+      }
+      default:      return '<p class="pl-p">'+v+'</p>';
+    }
+  }).join('');
+}
+var _PL_CSS='.pl-title{font-size:22px;color:#0e3d22;text-align:center;margin:24px 0 6px;font-weight:800;letter-spacing:.04em}'
+  +'.pl-sub{font-size:15px;color:#2f6b45;text-align:center;font-weight:700;margin-bottom:20px}'
+  +'.pl-h1{font-size:16px;color:#0e3d22;margin:22px 0 8px;padding:5px 10px;background:#eaf3ed;border-left:5px solid #0e3d22;font-weight:800}'
+  +'.pl-h2{font-size:14px;color:#0e3d22;margin:16px 0 6px;font-weight:700;border-bottom:1px solid #b9c6bd;padding-bottom:3px}'
+  +'.pl-h3{font-size:12.5px;color:#333;margin:12px 0 5px;font-weight:700}'
+  +'.pl-p{font-size:12px;line-height:1.9;margin:5px 0;text-align:justify}'
+  +'.pl-li{font-size:12px;line-height:1.85;margin:3px 0 3px 18px;text-indent:-14px}'
+  +'.pl-note{font-size:11px;color:#555;background:#f6f8f6;border-left:3px solid #7fae91;padding:5px 9px;margin:7px 0;border-radius:2px}'
+  +'.pl-tbl{width:100%;border-collapse:collapse;margin:8px 0 12px;page-break-inside:auto}'
+  +'.pl-tbl tr{page-break-inside:avoid}'
+  +'.pl-tbl th,.pl-tbl td{border:1px solid #b9c6bd;padding:4px 6px;font-size:10.5px;line-height:1.6;vertical-align:top}'
+  +'.pl-tbl th{background:#0e3d22;color:#fff;text-align:center;font-weight:700}'
+  +'.pl-fig{margin:12px 0;text-align:center}.pl-fig img{max-width:100%;border:1px solid #ccc}'
+  +'.pl-fig figcaption{font-size:10.5px;color:#555;margin-top:4px}';
+
+function _plPrintDoc(B,fname,title){
+  var w=window.open('','_blank');
+  if(!w){toast('瀏覽器阻擋了列印視窗，請允許彈出視窗');return;}
+  var css='*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
+    +'body{font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;color:#1f2937;padding:26px 30px}'
+    +_PL_CSS+'.pl-pb{page-break-before:always}'
+    +'.pl-hd{display:flex;align-items:center;gap:12px;border-bottom:2px solid #0e3d22;padding-bottom:8px;margin-bottom:6px}'
+    +'.pl-hd h1{font-size:15px;color:#0e3d22;margin:0}.pl-hd .d{margin-left:auto;font-size:10.5px;color:#555}'
+    +'@media print{body{padding:0}}@page{size:A4;margin:16mm 14mm}';
+  w.document.write('<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>'+_xlEsc(fname||title)+'</title><style>'+css+'</style></head><body>'
+    +'<div class="pl-hd"><img src="'+FY_LOGO+'" style="height:34px"><h1>'+_xlEsc(title)+'</h1><span class="d">列印日期：'+localToday()+'</span></div>'
+    +_plHtml(B,true)
+    +'<script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script></body></html>');
+  w.document.close();
+}
+
+// ── 表單渲染 ──
+function _plFieldRow(f){
+  var v=_plState.vars[f.k]||'';
+  return '<label style="display:block;'+(f.w===2?'grid-column:1/-1':'')+'">'
+    +'<span style="display:block;font-size:11px;color:var(--b4);margin-bottom:3px;font-weight:600">'+esc(f.l)+'</span>'
+    +'<input type="'+(f.type||'text')+'" value="'+esc(v)+'" placeholder="'+esc(f.ph||'')+'" '
+    +'oninput="_plSetVar(\''+f.k+'\',this.value)" style="width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit"></label>';
+}
+function _plSetVar(k,v){_plState.vars[k]=v;_plSave();}
+function _plSetProj(v){
+  _plState.proj=v;
+  var q=Q.find(function(x){return x&&x.name===v;});
+  if(q){
+    if(!_plState.vars.name)_plState.vars.name=q.name||'';
+    if(!_plState.vars.owner)_plState.vars.owner=q.client||'';
+    if(!_plState.vars.loc)_plState.vars.loc=q.loc||'';
+    if(!_plState.vars.sub)_plState.vars.sub='豐有工程有限公司';
+  }
+  _plSave();_plRender();
+}
+function _plToggleItem(id){
+  var i=_plState.items.indexOf(id);
+  if(i>=0)_plState.items.splice(i,1);else _plState.items.push(id);
+  _plSave();_plRender();
+}
+function _plSetChkMode(v){_plState.chkMode=v;_plSave();_plRender();}
+function _plSetAns(key,v){_plState.chkAns[key]=v;_plSave();}
+function _plEmerSet(r,c,v,tok){
+  if(!_plState.emer)_plState.emer=_plEmerDefault();
+  // 清空還原成自動帶入的 {{變數}}，避免使用者誤刪後就永久失去連動
+  _plState.emer[r][c]=(v===''&&tok)?('{{'+tok+'}}'):v;_plSave();
+}
+function _plEmerReset(){_plState.emer=_plEmerDefault();_plSave();_plRender();toast('已還原預設聯絡表');}
+
+// 圖說匯入
+function _plPickFig(){var el=document.getElementById('pl-fig-input');if(el)el.click();}
+function _plAddFigs(input){
+  var files=Array.prototype.slice.call(input.files||[]);
+  if(!files.length)return;
+  var pending=files.length;
+  files.forEach(function(f){
+    var isImg=/^image\//.test(f.type);
+    var rd=new FileReader();
+    rd.onload=function(){
+      if(isImg){
+        var img=new Image();
+        img.onload=function(){
+          // 版面可用寬度 A4 直式扣邊界 ≒ 17.4cm = 6299200 EMU
+          var maxW=6299200,maxH=8000000;
+          var cx=maxW,cy=Math.round(maxW*img.height/img.width);
+          if(cy>maxH){cy=maxH;cx=Math.round(maxH*img.width/img.height);}
+          _plState.figs.push({kind:'img',name:f.name,b64:rd.result,
+            ext:(/jpe?g/i.test(f.type)?'jpg':/gif/i.test(f.type)?'gif':'png'),cx:cx,cy:cy,cap:f.name});
+          if(--pending===0){_plSave();_plRender();toast('已匯入 '+files.length+' 個檔案');}
+        };
+        img.onerror=function(){if(--pending===0){_plSave();_plRender();}};
+        img.src=rd.result;
+      }else{
+        _plState.figs.push({kind:'doc',name:f.name,cap:'詳附件（另冊檢附）'});
+        if(--pending===0){_plSave();_plRender();toast('已匯入 '+files.length+' 個檔案');}
+      }
+    };
+    rd.onerror=function(){if(--pending===0){_plSave();_plRender();}};
+    if(isImg)rd.readAsDataURL(f);else rd.onload();
+  });
+  input.value='';
+}
+function _plDelFig(i){_plState.figs.splice(i,1);_plSave();_plRender();}
+function _plFigCap(i,v){_plState.figs[i].cap=v;_plSave();}
+
+function _plGen(){
+  _plState.doc=_plBuild();
+  _plRender();
+  var box=document.getElementById('pl-preview');
+  if(box)box.scrollIntoView({behavior:'smooth',block:'start'});
+  toast('計畫書已產生，共 '+_plState.doc.length+' 個段落區塊');
+}
+function _plFn(head){return _toolFileName('plan',head||'施工計畫書',_plState.proj||_plState.vars.name||'');}
+function _plDocxOut(){
+  if(!_plState.doc)_plState.doc=_plBuild();
+  docxDownload(_plFn('分項工程施工計畫書'),_plState.doc);
+}
+function _plPrintOut(){
+  if(!_plState.doc)_plState.doc=_plBuild();
+  _plPrintDoc(_plState.doc,_plFn('分項工程施工計畫書'),'分項工程施工計畫書');
+}
+// 只輸出自主檢查表（現場用空白表）
+function _plChkBlocks(){
+  var m=_plVarMap(),B=[],n=0;
+  _plState.items.map(_plItem).filter(Boolean).forEach(function(it){
+    (it.checks||[]).forEach(function(c){
+      var i=n++;
+      B.push({t:'h2',v:'SC-'+String(i+1).padStart(2,'0')+'　'+_plFill(c.name,m)+'（'+c.stage+'）',pb:i>0});
+      B.push({t:'tbl',rows:_plFillRows([['工程名稱','{{name}}','檢查日期','　年　月　日'],
+        ['施工廠商','{{sub}}','檢查位置','　'],
+        ['工項',it.name,'文件編號','SC-'+String(i+1).padStart(2,'0')+'-　　']],m)});
+      var rows=[['項次','檢查項目','檢查方法','合格標準','檢查結果','備註']];
+      (c.rows||[]).forEach(function(r,j){
+        var ans=_plState.chkAns[it.id+'|'+i+'|'+j]||'';
+        var res=(_plState.chkMode==='fill'&&ans)
+          ?({ok:'■合格　□不合格　□免檢',ng:'□合格　■不合格　□免檢',na:'□合格　□不合格　■免檢'}[ans])
+          :'□合格　□不合格　□免檢';
+        rows.push([String(j+1),r[0],r[1],r[2],res,'']);
+      });
+      B.push({t:'tbl',rows:_plFillRows(rows,m),w:[600,3200,1400,2400,1800,800]});
+      B.push({t:'tbl',rows:[['協力廠商（自主檢查）','現場工程師','工地主任','品管工程師','監造單位'],['　','　','　','　','　']],w:[2200,1900,1900,1900,2300]});
+    });
+  });
+  return B;
+}
+function _plChkPrint(){
+  var B=_plChkBlocks();
+  if(!B.length){toast('請先勾選工項');return;}
+  _plPrintDoc(B,_plFn('自主檢查表'),'施工自主檢查表');
+}
+function _plChkDocx(){
+  var B=_plChkBlocks();
+  if(!B.length){toast('請先勾選工項');return;}
+  docxDownload(_plFn('自主檢查表'),B);
+}
+function _plSaveRec(){
+  var nm=_plState.vars.name||_plState.proj||'未命名';
+  _trSave('plan','施工計畫書（'+nm+'）',_plState.proj||nm,
+    {proj:_plState.proj,vars:_plState.vars,items:_plState.items,figs:_plState.figs,chkMode:_plState.chkMode,chkAns:_plState.chkAns,emer:_plState.emer},
+    _plState.items.length+' 工項');
+  toast('已存檔（下次匯出版次自動 +1）');_plRender();
+}
+function _plLoadRec(id){
+  var r=_trGet(id);if(!r)return;
+  var v=JSON.parse(JSON.stringify(r.inputs));
+  _plState.proj=v.proj||'';_plState.vars=v.vars||{};_plState.items=v.items||[];
+  _plState.figs=v.figs||[];_plState.chkMode=v.chkMode||'blank';_plState.chkAns=v.chkAns||{};
+  _plState.emer=v.emer||_plEmerDefault();_plState.doc=null;_plState.histOpen=false;
+  _plSave();_plRender();toast('已回載存檔');
+}
+
+function _plRender(){
+  var root=document.getElementById('plan-root');if(!root)return;
+  _plLoad();
+  var m=_plVarMap();
+  var picked=_plState.items.map(_plItem).filter(Boolean);
+  var h='';
+
+  // 1 專案與基本資料
+  h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">'
+    +'<svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 專案資料</div>'
+    +'<div style="margin-left:auto;display:flex;gap:6px">'
+    +'<button type="button" class="btn btn-xs" onclick="_plSaveRec()">存檔</button>'
+    +'<button type="button" class="btn btn-xs" onclick="_plState.histOpen=!_plState.histOpen;_plRender()">存檔歷史</button>'
+    +'</div></div><div class="cb">';
+  h+='<label style="display:block;margin-bottom:12px"><span style="display:block;font-size:11px;color:var(--b4);margin-bottom:3px;font-weight:600">掛專案（從報價單帶入業主與地點）</span>'
+    +'<input list="fy-proj-list" value="'+esc(_plState.proj)+'" placeholder="輸入或選擇工程名稱" '
+    +'onchange="_plSetProj(this.value)" style="width:100%;box-sizing:border-box;font-size:12px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit"></label>';
+  PLAN_FIELDS.forEach(function(g){
+    h+='<div style="font-size:12px;font-weight:700;color:var(--g3);margin:14px 0 7px;padding-left:8px;border-left:3px solid var(--g3)">'+esc(g.g)+'</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:9px">'
+      +g.f.map(_plFieldRow).join('')+'</div>';
+  });
+  h+='</div></div>';
+  if(_plState.histOpen)h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">存檔歷史</div></div><div class="cb">'+_trHistHtml('plan','_plLoadRec')+'</div></div>';
+
+  // 2 工項勾選
+  h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">'
+    +'<svg class="ic ib" aria-hidden="true"><use href="#i-wrench"/></svg> 勾選工項（'+picked.length+'／'+PLAN_ITEMS.length+'）</div></div><div class="cb">'
+    +'<div style="font-size:11px;color:var(--b4);margin-bottom:10px">勾選後系統會展開該工項的規格欄位，並自動組出施工方法、施工流程、機具材料、品質管理標準與自主檢查表。</div>';
+  PLAN_ITEMS.forEach(function(it){
+    var on=_plState.items.indexOf(it.id)>=0;
+    h+='<div style="border:1px solid '+(on?'var(--g3)':'var(--b2)')+';border-radius:var(--r8);margin-bottom:8px;background:'+(on?'var(--gl)':'var(--w)')+'">'
+      +'<label style="display:flex;align-items:center;gap:9px;padding:9px 11px;cursor:pointer">'
+      +'<input type="checkbox" '+(on?'checked':'')+' onchange="_plToggleItem(\''+it.id+'\')" style="width:16px;height:16px">'
+      +'<b style="font-size:12.5px;color:'+(on?'var(--g3)':'var(--b5)')+'">'+esc(it.name)+'</b>'
+      +'<span style="margin-left:auto;font-size:10.5px;color:var(--b3)">流程 '+it.flow.length+' 步　品質標準 '+it.qc.length+' 項　檢查表 '+it.checks.length+' 張</span></label>';
+    if(on&&(it.vars||[]).length){
+      h+='<div style="padding:0 11px 11px;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px">'
+        +it.vars.map(function(v){
+          var val=_plState.vars[v.k];
+          return '<label style="display:block"><span style="display:block;font-size:11px;color:var(--b4);margin-bottom:3px;font-weight:600">'+esc(v.l)+'</span>'
+            +'<input value="'+esc(val===undefined?'':val)+'" placeholder="'+esc(v.d||'')+'" oninput="_plSetVar(\''+v.k+'\',this.value)" '
+            +'style="width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit"></label>';
+        }).join('')+'</div>';
+    }
+    h+='</div>';
+  });
+  h+='</div></div>';
+
+  // 3 圖說與附件
+  h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">'
+    +'<svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg> 匯入施工圖說／結構計算書</div>'
+    +'<div style="margin-left:auto"><button type="button" class="btn btn-xs btn-g" onclick="_plPickFig()">選擇檔案</button></div></div><div class="cb">'
+    +'<input type="file" id="pl-fig-input" multiple accept="image/*,application/pdf" style="display:none" onchange="_plAddFigs(this)">'
+    +'<div style="font-size:11px;color:var(--b4);margin-bottom:9px">圖片（PNG／JPG）會直接內嵌進 Word 與列印稿；PDF 與其他格式會列入附件清單並標註「另冊檢附」。</div>';
+  if(!_plState.figs.length)h+='<div style="color:var(--b3);padding:10px;font-size:12px">尚未匯入圖說。可先產生計畫書，圖說章節會列出審查要求的必附圖說清單。</div>';
+  else h+=_plState.figs.map(function(f,i){
+    return '<div style="display:flex;align-items:center;gap:9px;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r6);margin-bottom:5px;background:var(--w)">'
+      +(f.kind==='img'?'<img src="'+f.b64+'" style="width:52px;height:38px;object-fit:cover;border:1px solid var(--b2);border-radius:3px">'
+        :'<span class="sic" style="width:52px;text-align:center"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span>')
+      +'<span style="flex:1;min-width:0"><b style="font-size:12px">'+esc(f.name)+'</b>'
+      +'<br><input value="'+esc(f.cap||'')+'" placeholder="圖說標題／說明" oninput="_plFigCap('+i+',this.value)" '
+      +'style="width:100%;box-sizing:border-box;font-size:11px;padding:3px 6px;margin-top:3px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit"></span>'
+      +'<button type="button" class="btn btn-xs" onclick="_plDelFig('+i+')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button></div>';
+  }).join('');
+  h+='</div></div>';
+
+  // 4 緊急聯絡表
+  var em=_plState.emer||_plEmerDefault();
+  h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">'
+    +'<svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg> 災害緊急聯絡人</div>'
+    +'<div style="margin-left:auto"><button type="button" class="btn btn-xs" onclick="_plEmerReset()">還原預設</button></div></div><div class="cb">'
+    +'<div style="font-size:11px;color:var(--b4);margin-bottom:9px">此表留白是計畫書審查被要求補正率最高的一項。'
+    +'含 {{ }} 者會自動帶入上方專案資料，其餘請直接填寫；請確認救援單位確為工區轄區。</div>'
+    +'<div class="tbl-wrap"><table class="tbl" style="min-width:560px"><thead><tr><th style="min-width:180px">單位／職稱</th><th style="min-width:170px">姓名</th><th style="min-width:150px">聯絡電話</th></tr></thead><tbody>'
+    +em.slice(1).map(function(r,i){
+      var ri=i+1;
+      return '<tr><td style="font-size:11.5px">'+esc(r[0])+'</td>'
+        +[1,2].map(function(c){
+          var raw=r[c]||'',tk=/^\{\{(\w+)\}\}$/.exec(raw);
+          var val=tk?'':raw;
+          var ph=tk?('自動帶入：'+(m[tk[1]]||'（專案資料尚未填寫）')):'';
+          return '<td><input value="'+esc(val)+'" placeholder="'+esc(ph)+'" '
+            +'oninput="_plEmerSet('+ri+','+c+',this.value,'+(tk?("'"+tk[1]+"'"):'null')+')" '
+            +'style="width:100%;box-sizing:border-box;font-size:11.5px;padding:3px 5px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit"></td>';
+        }).join('')+'</tr>';
+    }).join('')+'</tbody></table></div></div></div>';
+
+  // 5 自主檢查表模式
+  h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">'
+    +'<svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 自主檢查表</div>'
+    +'<div style="margin-left:auto;display:flex;gap:6px">'
+    +'<button type="button" class="btn btn-xs'+(_plState.chkMode==='blank'?' btn-g':'')+'" onclick="_plSetChkMode(\'blank\')">列印空白表</button>'
+    +'<button type="button" class="btn btn-xs'+(_plState.chkMode==='fill'?' btn-g':'')+'" onclick="_plSetChkMode(\'fill\')">線上填寫</button>'
+    +'</div></div><div class="cb">';
+  if(!picked.length)h+='<div style="color:var(--b3);padding:10px;font-size:12px">請先勾選工項。</div>';
+  else if(_plState.chkMode==='blank'){
+    var tot=0;picked.forEach(function(it){(it.checks||[]).forEach(function(c){tot+=c.rows.length;});});
+    h+='<div style="font-size:12px;color:var(--b4);margin-bottom:9px">目前工項共 '
+      +picked.reduce(function(a,it){return a+it.checks.length;},0)+' 張檢查表、'+tot+' 個檢查項目，'
+      +'表頭工程名稱／施工廠商與各項合格標準的規格數值會依專案資料自動帶入。</div>';
+    h+=picked.map(function(it){
+      return '<div style="margin-bottom:7px"><b style="font-size:12px;color:var(--g3)">'+esc(it.name)+'</b>'
+        +'<div style="font-size:11px;color:var(--b4);margin-top:2px">'
+        +it.checks.map(function(c){return esc(c.name)+'（'+esc(c.stage)+'）· '+c.rows.length+' 項';}).join('　｜　')+'</div></div>';
+    }).join('');
+  }else{
+    var n=0;
+    picked.forEach(function(it){
+      (it.checks||[]).forEach(function(c){
+        var ci=n++;
+        h+='<div style="border:1px solid var(--b2);border-radius:var(--r8);margin-bottom:10px">'
+          +'<div style="padding:7px 10px;background:var(--gl);font-size:12px;font-weight:700;color:var(--g3);border-bottom:1px solid var(--b2)">'
+          +'SC-'+String(ci+1).padStart(2,'0')+'　'+esc(_plFill(c.name,m))+'（'+esc(c.stage)+'）</div>'
+          +'<div style="padding:6px 10px">';
+        (c.rows||[]).forEach(function(r,j){
+          var key=it.id+'|'+ci+'|'+j,ans=_plState.chkAns[key]||'';
+          h+='<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-bottom:1px dashed var(--b2)">'
+            +'<span style="width:22px;font-size:11px;color:var(--b3);flex:none;padding-top:2px">'+(j+1)+'</span>'
+            +'<span style="flex:1;min-width:0;font-size:11.5px">'+esc(_plFill(r[0],m))
+            +'<br><span style="font-size:10.5px;color:var(--b3)">'+esc(r[1])+'　→　'+esc(_plFill(r[2],m))+'</span></span>'
+            +'<span style="flex:none;display:flex;gap:3px">'
+            +[['ok','合格'],['ng','不合格'],['na','免檢']].map(function(o){
+              return '<button type="button" class="btn btn-xs'+(ans===o[0]?' btn-g':'')+'" onclick="_plSetAns(\''+key+'\',\''+o[0]+'\');_plRender()">'+o[1]+'</button>';
+            }).join('')+'</span></div>';
+        });
+        h+='</div></div>';
+      });
+    });
+  }
+  h+='<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px">'
+    +'<button type="button" class="btn btn-sm" onclick="_plChkPrint()"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 列印檢查表</button>'
+    +'<button type="button" class="btn btn-sm" onclick="_plChkDocx()"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 匯出檢查表 Word</button>'
+    +'</div></div></div>';
+
+  // 6 送審檢核＋產生
+  var au=_plAudit();
+  h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">'
+    +'<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 送審前檢核'
+    +(au.length?'（'+au.length+' 項待補）':'（全數通過）')+'</div></div><div class="cb">';
+  h+=au.length
+    ? '<div style="font-size:11px;color:var(--b4);margin-bottom:8px">以下為實務審查最常被退件或要求補正的項目：</div>'
+      +au.map(function(x){return '<div style="font-size:11.5px;line-height:1.8;padding:5px 9px;margin-bottom:4px;background:#fff7ed;border-left:3px solid #d97706;border-radius:2px">'+esc(x)+'</div>';}).join('')
+    : '<div style="font-size:12px;color:var(--g3);padding:8px 10px;background:var(--gl);border-radius:var(--r6)">必填欄位皆已填寫，可產生計畫書送審。</div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'
+    +'<button type="button" class="btn btn-g" onclick="_plGen()"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 產生計畫書</button>'
+    +'<button type="button" class="btn" onclick="_plDocxOut()"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 匯出 Word（可編輯）</button>'
+    +'<button type="button" class="btn" onclick="_plPrintOut()"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 列印／存 PDF</button>'
+    +'</div></div></div>';
+
+  // 7 預覽
+  h+='<div class="card" id="pl-preview"><div class="ch green"><div class="cht">'
+    +'<svg class="ic ib" aria-hidden="true"><use href="#i-eye"/></svg> 預覽</div></div><div class="cb">';
+  if(!_plState.doc)h+='<div style="color:var(--b3);padding:14px;font-size:12px">按「產生計畫書」後在此預覽全文。</div>';
+  else h+='<div style="max-height:70vh;overflow:auto;background:#fff;border:1px solid var(--b2);border-radius:var(--r8);padding:20px 24px">'
+    +'<style>'+_PL_CSS+'</style>'+_plHtml(_plState.doc,false)+'</div>';
+  h+='</div></div>';
+
+  root.innerHTML=h+_projDatalist();
+}
+
 // ══════════ 鋼筋籠檢料（v5.345：威立采集團計算引擎完整移植，計算行為與其 Excel 逐格一致）══════════
 // 規範搭接(ACI 318/內政部規範,公制) → TYPE 主表(分段/箍筋/工作筋) → 各 TYPE 料單 → 號數匯總
 var RB_BARS=[
@@ -18955,6 +20625,7 @@ const ALL_PAGES = [
   {id:'reports',   label:'報表中心',  icon:_pgIcon('chart'),    grp:'fin',   adminOnly:false, hidden:true, parent:'profit'}, // 由「利潤．報表」頁內分頁進入
   {id:'contacts',  label:'客戶．廠商',icon:_pgIcon('users'),    grp:'data',  adminOnly:false},
   {id:'progress',  label:'施工進度',  icon:_pgIcon('calendar'), grp:'data',  adminOnly:false}, // v5.347
+  {id:'plan',      label:'施工計畫書',icon:_pgIcon('contract'), grp:'data',  adminOnly:false}, // v5.353 分項工程施工計畫書自動生成
   {id:'rebar',     label:'鋼筋籠檢料',icon:_pgIcon('scale'),    grp:'data',  adminOnly:false}, // v5.343
   {id:'matest',    label:'材料估算',  icon:_pgIcon('box'),      grp:'data',  adminOnly:false}, // v5.352 自材料管理獨立
   {id:'grout',     label:'根固砂漿',  icon:_pgIcon('hardhat'),  grp:'data',  adminOnly:false}, // v5.346
