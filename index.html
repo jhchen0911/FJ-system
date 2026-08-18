@@ -2121,6 +2121,21 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       </div>
     </div>
     <div class="card">
+      <div class="ch" style="background:#fff3e0"><div class="cht" style="color:#e65100"><svg class="ic ib" aria-hidden="true"><use href="#i-refresh"/></svg> 資料救援（每日雲端快照）</div></div>
+      <div class="cb">
+        <div style="font-size:11.5px;color:var(--b4);line-height:1.7;margin-bottom:10px">
+          系統每天第一次開啟時會把全部資料快照存到雲端（保留 30 天）。誤刪報價單／請款單／合約時，
+          從這裡挑一天的快照，<b>只把不見的那幾筆撈回來</b>——不會動到其他資料。
+          誤刪過的記錄會以新編號還原（避免被「已刪除」標記再次清掉）。</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+          <button type="button" class="btn btn-sm btn-g" onclick="rescueListBackups()">列出雲端快照</button>
+          <button type="button" class="btn btn-sm" onclick="rescueDupCheck()" style="border-color:#7b1fa2;color:#7b1fa2">重複資料檢查</button>
+          <input id="rescue-kw" placeholder="以工程名稱過濾（選填）" style="flex:1;min-width:160px;font-size:12.5px;padding:6px 10px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit">
+        </div>
+        <div id="rescue-body" style="font-size:12.5px;color:var(--b5)"></div>
+      </div>
+    </div>
+    <div class="card">
       <div class="ch blue"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-box"/></svg> 本機儲存空間</div><div style="font-size:11px;color:var(--b4)">瀏覽器 localStorage 用量（上限約 5MB）</div></div>
       <div class="cb">
         <div id="storage-usage-body" style="font-size:12px;color:var(--b5)">載入中…</div>
@@ -2510,7 +2525,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.339';
+var APP_VERSION='v5.340';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -7144,7 +7159,12 @@ function buildInvFromQuote(q){
 }
 
 function revokeAward(id){
-  var _ok2=false;try{_ok2=window.confirm('確定取消得標標記？');}catch(e){_ok2=true;}if(!_ok2)return;
+  // v5.340：有請款單的案子取消得標，明講後果——請款單不會被刪，但專案卡與得標統計會少這一案
+  var _q0=Q.find(x=>x.id===id);
+  var _invN=0;try{_invN=_q0?_invsOfQuote(_q0).length:0;}catch(e){}
+  var _msg='確定取消得標標記？'+(_invN?('\n\n注意：此案已有 '+_invN+' 張請款單。取消得標不會刪除請款單，'
+    +'但關聯合約會一併移除、專案卡與得標統計會少這一案。\n若只是要修改報價內容，不需要取消得標。'):'');
+  var _ok2=false;try{_ok2=window.confirm(_msg);}catch(e){_ok2=false;}if(!_ok2)return;
   const q=Q.find(x=>x.id===id);if(!q)return;
   q.awarded=false;q.payDue='';
   q._mt=Date.now(); // 跨裝置同步：取消狀態必須獲勝，否則雲端舊資料會把「得標」蓋回來
@@ -8382,7 +8402,9 @@ function updateQuoteStats(){
   const total=Q.length;
   const awarded=Q.filter(q=>q.awarded).length;
   const totalAmt=Q.reduce((a,q)=>a+(q.t?.total||0),0);
-  const awardedAmt=Q.filter(q=>q.awarded).reduce((a,q)=>a+(q.t?.total||0),0);
+  // v5.340：與總覽同口徑（合約現值），原始報價額列小字——三頁數字不再各說各話
+  const awardedAmt=Q.filter(q=>q.awarded&&!q.parentId).reduce((a,q)=>a+_wonAmt(q),0);
+  const awardedOrigAmt=Q.filter(q=>q.awarded).reduce((a,q)=>a+(q.t?.total||0),0);
   // 報價追蹤統計：有效得標率＝得標/(得標+未得標)，流標與待回覆不計入分母
   const lost=Q.filter(q=>!q.awarded&&q.bidStatus==='lost');
   const voided=Q.filter(q=>!q.awarded&&q.bidStatus==='void').length;
@@ -8397,7 +8419,8 @@ function updateQuoteStats(){
     '<div class="kpi" style="flex:1;min-width:120px"><div class="kl">報價單總數</div><div class="kv" style="font-size:20px">'+total+'</div><div class="ks">待回覆 '+pending+'・議價中 '+nego+'・流標 '+voided+'</div></div>'
     +'<div class="kpi" style="flex:1;min-width:130px"><div class="kl">有效得標率</div><div class="kv" style="font-size:20px;color:'+(effRate==null?'var(--b3)':effRate>=50?'var(--g3)':'#e65100')+'">'+(effRate==null?'—':effRate+'%')+'</div><div class="ks">勝 '+awarded+'／敗 '+lost.length+'（流標不計）</div></div>'
     +'<div class="kpi" style="flex:1;min-width:140px"><div class="kl">總報價金額</div><div class="kv" style="font-size:16px">NT$ '+fmt(totalAmt)+'</div></div>'
-    +'<div class="kpi hi" style="flex:1;min-width:140px"><div class="kl">得標金額</div><div class="kv" style="font-size:16px">NT$ '+fmt(awardedAmt)+'</div></div>'
+    +'<div class="kpi hi" style="flex:1;min-width:140px"><div class="kl">得標金額（合約現值）</div><div class="kv" style="font-size:16px">NT$ '+fmt(awardedAmt)+'</div>'
+    +(Math.abs(awardedOrigAmt-awardedAmt)>1?'<div class="ks">原始報價 NT$ '+fmt(awardedOrigAmt)+'</div>':'')+'</div>'
     +(lost.length?('<div class="kpi" style="flex:1.5;min-width:200px"><div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-trend"/></svg> 輸標分析</div><div class="kv" style="font-size:13px;font-weight:700;line-height:1.6">'+Object.keys(rc).map(function(k){return k+' '+rc[k];}).join('・')+'</div><div class="ks">'+(avgDiff!=null?('報價平均'+(avgDiff>=0?'高出':'低於')+'得標價 '+Math.abs(avgDiff)+'%（'+diffs.length+' 筆有對手價）'):'在未得標記錄填「對手得標價」可分析差距')+'</div></div>'):'');
 }
 
@@ -8448,8 +8471,24 @@ function updateCustomerStats(){
   if(!el)return;
   const total=CUSTOMERS.length;
   const withContract=CUSTOMERS.filter(c=>CONTRACTS.some(ct=>ct.client===c.name)).length;
-  const activeContracts=CONTRACTS.filter(c=>c.status==='active').length;
-  const totalContractAmt=CONTRACTS.reduce((a,c)=>a+(c.amount||0),0);
+  // v5.340 健檢追補：原本把全部合約（含已完工、取消得標殘留、同案重複）整包加總，
+  // 與總覽的「得標金額（合約現值）」對不上。改為：進行中＋報價仍得標（或無關聯）＋同案去重。
+  const _liveCts=(()=>{
+    const seen={};const out=[];
+    (CONTRACTS||[]).forEach(c=>{
+      if(!c||c.status==='completed'||c.status==='done')return;
+      if(c.linkedQid){
+        const q=Q.find(x=>x.id===c.linkedQid);
+        if(q&&!q.awarded)return;               // 取消得標後殘留的合約不計
+      }
+      const k=c.linkedQid||('name:'+String(c.name||'').trim());
+      if(seen[k]){if((c._mt||0)>(seen[k]._mt||0)){out[out.indexOf(seen[k])]=c;seen[k]=c;}return;}
+      seen[k]=c;out.push(c);
+    });
+    return out;
+  })();
+  const activeContracts=_liveCts.filter(c=>c.status==='active'||!c.status).length;
+  const totalContractAmt=_liveCts.reduce((a,c)=>a+(parseFloat(c.amount)||0),0);
   el.innerHTML=
     '<div class="kpi" style="flex:1;min-width:120px"><div class="kl">客戶總數</div><div class="kv" style="font-size:20px">'+total+'</div><div class="ks">有合約往來 '+withContract+' 位</div></div>'
     +'<div class="kpi" style="flex:1;min-width:120px"><div class="kl">進行中合約</div><div class="kv" style="font-size:20px">'+activeContracts+'</div><div class="ks">件</div></div>'
@@ -10909,6 +10948,161 @@ function _pullPrivateIfNewer(){
 // ── 對外包裝（保留舊函數名，委派到新核心）──
 function _onSave(){ _markDirty(); _pushCloud({silent:true}); }
 // 每日自動快照：全量 JSON 存 Storage fydata/backups/，保留 30 份
+// ══════════ 資料救援（v5.340）══════════
+// 從每日雲端快照挑單筆記錄還原。重點：誤刪的記錄有墓碑（TOMBS），
+// 而墓碑合併是「取最大值、永不移除」——原編號塞回去會在下一次同步被再殺一次，
+// 所以曾被刪除的記錄一律換新編號還原（請款單的 quoteId 關聯照舊）。
+var _rescueSnap=null,_rescueDate='';
+function rescueListBackups(){
+  var el=document.getElementById('rescue-body');if(!el)return;
+  if(!_fbUser||!_fbStorage){el.innerHTML='<span style="color:#c62828">請先登入（雲端快照存在 Firebase Storage）</span>';return;}
+  el.innerHTML='讀取快照清單中…';
+  _fbStorage.ref('fydata/backups').listAll().then(function(res){
+    var names=res.items.map(function(i){return i.name;}).sort().reverse();
+    if(!names.length){el.innerHTML='雲端還沒有快照（每天第一次開啟系統時自動建立）';return;}
+    el.innerHTML='<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +names.map(function(nm){
+        var d=nm.replace('.json','');
+        return '<button type="button" class="btn btn-xs" onclick="rescueLoad(\''+escq(d)+'\')">'+esc(d)+'</button>';
+      }).join('')+'</div><div id="rescue-detail" style="margin-top:10px"></div>';
+  }).catch(function(e){el.innerHTML='<span style="color:#c62828">讀取失敗：'+esc((e&&e.message)||'')+'</span>';});
+}
+function rescueLoad(date){
+  var det=document.getElementById('rescue-detail')||document.getElementById('rescue-body');
+  det.innerHTML='下載 '+esc(date)+' 快照中…';
+  _fbStorage.ref('fydata/backups/'+date+'.json').getDownloadURL().then(function(url){
+    return fetch(url).then(function(r){return r.json();});
+  }).then(function(snap){
+    _rescueSnap=snap;_rescueDate=date;
+    rescueRenderDiff();
+  }).catch(function(e){det.innerHTML='<span style="color:#c62828">快照載入失敗：'+esc((e&&e.message)||'')+'</span>';});
+}
+function _rescueArr(x){return Array.isArray(x)?x:(x&&typeof x==='object'?Object.values(x):[]);}
+function rescueRenderDiff(){
+  var det=document.getElementById('rescue-detail')||document.getElementById('rescue-body');
+  if(!_rescueSnap){det.innerHTML='';return;}
+  var kw=String((document.getElementById('rescue-kw')||{}).value||'').trim();
+  var hit=function(txt){return !kw||String(txt||'').indexOf(kw)>=0;};
+  var rows=[];
+  var mk=function(coll,rec,label,sub){
+    rows.push('<label style="display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);margin-bottom:5px;cursor:pointer;background:var(--w)">'
+      +'<input type="checkbox" class="rescue-pick" data-coll="'+coll+'" data-id="'+esc(rec.id)+'" style="margin-top:3px">'
+      +'<span style="flex:1;min-width:0"><b>'+esc(label)+'</b>'
+      +(rec.__tombed?'<span style="font-size:10px;color:#c62828;margin-left:5px">曾被刪除，將以新編號還原</span>':'<span style="font-size:10px;color:var(--b3);margin-left:5px">本機缺少</span>')
+      +'<br><span style="font-size:11px;color:var(--b4)">'+esc(sub||'')+'</span></span></label>');
+  };
+  var diff=function(snapArr,localArr,tombKey){
+    var localIds={},restored={};
+    localArr.forEach(function(r){if(!r)return;if(r.id)localIds[r.id]=1;if(r._restoredFrom)restored[r._restoredFrom]=1;});
+    var dead=(TOMBS&&TOMBS[tombKey])||{};
+    return _rescueArr(snapArr).filter(function(r){
+      if(!r||!r.id)return false;
+      if(localIds[r.id]||restored[r.id])return false;   // 已在本機（含換新編號還原過的）
+      r.__tombed=dead[r.id]!=null;
+      return true;
+    });
+  };
+  var qMiss=diff(_rescueSnap.quotes,Q,'quotes').filter(function(q){return hit(q.name)||hit(q.client);});
+  var iMiss=diff(_rescueSnap.invoices,INV,'invoices').filter(function(v){return hit(v.project)||hit(v.client);});
+  var cMiss=diff(_rescueSnap.contracts,CONTRACTS,'contracts').filter(function(c){return hit(c.name)||hit(c.client);});
+  qMiss.forEach(function(q){mk('quotes',q,'報價：'+(q.name||'未命名'),
+    (q.client||'')+'　NT$ '+fmt((q.t&&q.t.total)||0)+(q.awarded?'　·　得標':''));});
+  iMiss.forEach(function(v){mk('invoices',v,'請款：'+(v.project||'未命名')+' 第'+(v.periodNo||'?')+'期',
+    (v.client||'')+'　'+(v.date||'')+'　NT$ '+fmt((v.totals&&v.totals.total)||0));});
+  cMiss.forEach(function(c){mk('contracts',c,'合約：'+(c.name||'未命名'),
+    (c.client||'')+'　NT$ '+fmt(c.amount||0)+'　'+(c.status||''));});
+  det.innerHTML='<div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:6px">'
+    +esc(_rescueDate)+' 快照 vs 目前資料'+(kw?('（過濾「'+esc(kw)+'」）'):'')+'：找到 '
+    +(qMiss.length+iMiss.length+cMiss.length)+' 筆本機沒有的記錄</div>'
+    +(rows.length?rows.join('')+'<div style="margin-top:8px"><button type="button" class="btn btn-sm btn-g" onclick="rescueRestore()">還原勾選的記錄</button></div>'
+      :'<div style="color:var(--b3)">沒有差異——這天快照裡的資料本機都在'+(kw?'（試試清掉過濾字）':'')+'</div>');
+}
+function rescueRestore(){
+  if(!_rescueSnap)return;
+  var picks=[].slice.call(document.querySelectorAll('.rescue-pick:checked'))
+    .map(function(c){return {coll:c.getAttribute('data-coll'),id:c.getAttribute('data-id')};});
+  if(!picks.length){toast('請先勾選要還原的記錄');return;}
+  var newId=function(pre){return pre+Date.now().toString(36)+Math.random().toString(36).slice(2,6);};
+  var qIdMap={};                 // 報價換新編號時，其請款單／合約要跟著改關聯
+  var nQ=0,nI=0,nC=0;
+  var pick=function(coll){return picks.filter(function(x){return x.coll===coll;}).map(function(x){return x.id;});};
+  // 先還原報價（建立 id 對照）
+  pick('quotes').forEach(function(id){
+    var rec=_rescueArr(_rescueSnap.quotes).find(function(r){return r&&r.id===id;});
+    if(!rec)return;
+    rec=JSON.parse(JSON.stringify(rec));delete rec.__tombed;
+    if((TOMBS.quotes||{})[rec.id]!=null){var nid=newId('q');qIdMap[rec.id]=nid;rec._restoredFrom=rec.id;rec.id=nid;}
+    rec._mt=Date.now();Q.push(rec);nQ++;
+  });
+  pick('invoices').forEach(function(id){
+    var rec=_rescueArr(_rescueSnap.invoices).find(function(r){return r&&r.id===id;});
+    if(!rec)return;
+    rec=JSON.parse(JSON.stringify(rec));delete rec.__tombed;
+    if((TOMBS.invoices||{})[rec.id]!=null){rec._restoredFrom=rec.id;rec.id=newId('iv');}
+    if(rec.quoteId&&qIdMap[rec.quoteId])rec.quoteId=qIdMap[rec.quoteId];
+    rec._mt=Date.now();INV.push(rec);nI++;
+  });
+  pick('contracts').forEach(function(id){
+    var rec=_rescueArr(_rescueSnap.contracts).find(function(r){return r&&r.id===id;});
+    if(!rec)return;
+    rec=JSON.parse(JSON.stringify(rec));delete rec.__tombed;
+    if((TOMBS.contracts||{})[rec.id]!=null){rec._restoredFrom=rec.id;rec.id=newId('ct');}
+    if(rec.linkedQid&&qIdMap[rec.linkedQid])rec.linkedQid=qIdMap[rec.linkedQid];
+    rec._mt=Date.now();CONTRACTS.push(rec);nC++;
+  });
+  try{persist();saveInv();saveContracts();}catch(e){}
+  try{_markDirty();_pushCloud({silent:true});}catch(e){}
+  try{renderList();renderInvList();renderContracts();rDash();updBadge();}catch(e){}
+  toast('已還原：報價 '+nQ+'、請款 '+nI+'、合約 '+nC+' 筆（已同步上雲）');
+  rescueRenderDiff();
+}
+// ── 重複資料檢查：同名主報價、同報價多合約、同專案同期別請款 ──
+function rescueDupCheck(){
+  var el=document.getElementById('rescue-body');if(!el)return;
+  var out=[];
+  // 1) 同名主報價（追加案不算）
+  var byName={};
+  Q.filter(function(q){return q&&!q.parentId;}).forEach(function(q){
+    var k=String(q.name||'').trim();if(!k)return;
+    (byName[k]=byName[k]||[]).push(q);
+  });
+  Object.keys(byName).forEach(function(k){
+    if(byName[k].length>1)out.push('報價單同名 ×'+byName[k].length+'：「'+esc(k)+'」'
+      +byName[k].map(function(q){return '<br>　·　'+(q.code||q.id)+'　NT$ '+fmt((q.t&&q.t.total)||0)+(q.awarded?'（得標）':'（'+(q.bidStatus||'待回覆')+'）')+'　建立 '+(q.date||'—');}).join(''));
+  });
+  // 2) 同一張報價掛多份合約
+  var byQ={};
+  (CONTRACTS||[]).forEach(function(c){
+    var k=c.linkedQid||('name:'+String(c.name||'').trim());
+    (byQ[k]=byQ[k]||[]).push(c);
+  });
+  Object.keys(byQ).forEach(function(k){
+    if(byQ[k].length>1)out.push('同案多份合約 ×'+byQ[k].length+'：「'+esc(byQ[k][0].name||k)+'」'
+      +byQ[k].map(function(c){return '<br>　·　'+(c.code||c.id)+'　NT$ '+fmt(c.amount||0)+'　'+(c.status||'');}).join(''));
+  });
+  // 3) 合約掛在「非得標」報價上（取消得標後殘留）
+  (CONTRACTS||[]).forEach(function(c){
+    if(!c.linkedQid)return;
+    var q=Q.find(function(x){return x.id===c.linkedQid;});
+    if(q&&!q.awarded)out.push('合約掛在非得標報價：「'+esc(c.name||'')+'」（NT$ '+fmt(c.amount||0)+'）——報價目前是'+(q.bidStatus||'待回覆')+'，客戶頁的合約總金額會因此偏高');
+  });
+  // 4) 同專案同期別的請款單
+  var byPer={};
+  (INV||[]).forEach(function(v){
+    var k=String(v.project||'').trim()+'#'+(v.periodNo||'?');
+    (byPer[k]=byPer[k]||[]).push(v);
+  });
+  Object.keys(byPer).forEach(function(k){
+    if(byPer[k].length>1)out.push('同專案同期別請款 ×'+byPer[k].length+'：「'+esc(k.replace('#','」第'))+'期'
+      +byPer[k].map(function(v){return '<br>　·　'+(v.date||'—')+'　NT$ '+fmt((v.totals&&v.totals.total)||0)+(v.receivedConfirmed?'（已結清）':'');}).join(''));
+  });
+  el.innerHTML='<div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:6px">重複資料檢查結果</div>'
+    +(out.length
+      ?out.map(function(t){return '<div style="border:1px solid #ffcc80;background:#fff8ec;border-radius:var(--r6);padding:7px 10px;margin-bottom:6px;color:#7c5700;line-height:1.6">'+t+'</div>';}).join('')
+        +'<div style="font-size:11px;color:var(--b3)">重複的請到各頁刪掉多餘那筆（報價管理／專案卡的合約資料／業主計價）。</div>'
+      :'<div style="color:var(--g3)">沒有發現同名報價、多份合約或重複期別</div>');
+}
+
 function _dailyBackup(){
   try{
     if(!_fbUser||!_fbStorage)return;
