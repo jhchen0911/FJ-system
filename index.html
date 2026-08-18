@@ -1136,16 +1136,9 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 <div class="page" id="page-rebar">
   <div class="ph">
-    <div class="ph-l"><div class="ph-t">鋼筋籠檢料</div><div class="ph-s">全樁基／排樁鋼筋籠 主筋．螺旋筋．補強環筋 重量計算</div></div>
-    <div class="ph-r" style="display:flex;gap:8px">
-      <button type="button" class="btn" onclick="rebarPrint()"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 列印檢料表</button>
-      <button type="button" class="btn btn-g" onclick="rebarAddGroup()"><svg class="ic ib" aria-hidden="true"><use href="#i-plus"/></svg> 新增鋼筋籠</button>
-    </div>
+    <div class="ph-l"><div class="ph-t">鋼筋籠檢料</div><div class="ph-s">全套管基樁鋼筋籠料單：規範搭接・分段主筋・內外箍・工作筋・板床</div></div>
   </div>
-  <div class="pad" style="max-width:1400px">
-    <div id="rebar-summary" style="margin-bottom:14px"></div>
-    <div id="rebar-groups"></div>
-  </div>
+  <div class="pad" style="max-width:1500px"><div id="rebar-root"></div></div>
 </div>
 <div class="page" id="page-quickcost">
   <div class="ph">
@@ -2539,7 +2532,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.344';
+var APP_VERSION='v5.345';
+var FY_LOGO='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodpAAQAAAABAAABMuocAAcAAAEMAAAAJgAAAAAc6gAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWQAwACAAAAFAAAAoCQBAACAAAAFAAAApSSkQACAAAAAzAwAACSkgACAAAAAzAwAADqHAAHAAABDAAAAXQAAAAAHOoAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADIwMjQ6MTE6MjggMDc6MzM6MzQAMjAyNDoxMToyOCAwNzozMzozNAAAAP/hAqxodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvADw/eHBhY2tldCBiZWdpbj0n77u/JyBpZD0nVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkJz8+DQo8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIj48cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSJ1dWlkOmZhZjViZGQ1LWJhM2QtMTFkYS1hZDMxLWQzM2Q3NTE4MmYxYiIgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iPjxleGlmOkRhdGVUaW1lT3JpZ2luYWw+MjAyNC0xMS0yOFQwNzozMzozNDwvZXhpZjpEYXRlVGltZU9yaWdpbmFsPjwvcmRmOkRlc2NyaXB0aW9uPjwvcmRmOlJERj48L3g6eG1wbWV0YT4NCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8P3hwYWNrZXQgZW5kPSd3Jz8+/9sAQwADAgIDAgIDAwMDBAMDBAUIBQUEBAUKBwcGCAwKDAwLCgsLDQ4SEA0OEQ4LCxAWEBETFBUVFQwPFxgWFBgSFBUU/9sAQwEDBAQFBAUJBQUJFA0LDRQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU/8AAEQgAywDLAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYH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';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -3088,7 +3082,7 @@ function go(p){
   if(p==='dash')rDash();if(p==='customers')renderCustomers();if(p==='finance'){try{cleanDuplicatePayables();}catch(e){}try{updateFinanceKPIs();switchFinanceTab('ar');}catch(e){}}
   if(p==='costs'){try{renderCostsProjSelect();}catch(e){}}
   if(p==='materials'){try{matSetView(window._matView||'stock');}catch(e){}}
-  if(p==='rebar'){try{rebarRender();}catch(e){}}
+  if(p==='rebar'){try{_rbRender();}catch(e){}}
   if(p==='quotes'){renderList();updateQuoteStats();}
   if(p==='editor'){
     rItems();rExs();rTots();
@@ -11002,158 +10996,626 @@ function _pullPrivateIfNewer(){
 // ── 對外包裝（保留舊函數名，委派到新核心）──
 function _onSave(){ _markDirty(); _pushCloud({silent:true}); }
 // 每日自動快照：全量 JSON 存 Storage fydata/backups/，保留 30 份
-// ══════════ 鋼筋籠檢料（v5.343）══════════
-// 全樁基／排樁鋼筋籠檢料：主筋（含搭接）＋螺旋筋（螺距展開）＋補強環筋，
-// CNS 竹節鋼筋標稱直徑與單位重。草稿存本機（fy_rebar），不進雲端同步。
-var REBAR_BARS={ '#3':{d:0.953,w:0.560},'#4':{d:1.27,w:0.994},'#5':{d:1.588,w:1.552},'#6':{d:1.905,w:2.25},
-  '#7':{d:2.22,w:3.04},'#8':{d:2.54,w:3.98},'#9':{d:2.87,w:5.08},'#10':{d:3.22,w:6.39},'#11':{d:3.58,w:7.90} };
-var _rebarGroups=(function(){try{return JSON.parse(localStorage.getItem('fy_rebar')||'[]');}catch(e){return [];}})();
-function _rebarSave(){try{localStorage.setItem('fy_rebar',JSON.stringify(_rebarGroups));}catch(e){}}
-function rebarAddGroup(src){
-  var g=src?JSON.parse(JSON.stringify(src)):{name:'P'+(_rebarGroups.length+1),cnt:1,D:120,L:15,cover:7.5,
-    mainNo:'#8',mainCnt:12,spiralNo:'#4',pitch:15,extraTurns:3,ringNo:'#5',ringGap:2,lapMult:40,stock:12,wastePct:3};
-  if(src)g.name=g.name+'（複製）';
-  _rebarGroups.push(g);_rebarSave();rebarRender();
-}
-function rebarDelGroup(i){
-  showConfirm('刪除鋼筋籠','確定刪除「'+(_rebarGroups[i]?_rebarGroups[i].name:'')+'」？',function(){
-    _rebarGroups.splice(i,1);_rebarSave();rebarRender();
-  },true);
-}
-function rebarUpd(i,k,v){
-  var g=_rebarGroups[i];if(!g)return;
-  if(k==='name'||k==='mainNo'||k==='spiralNo'||k==='ringNo')g[k]=v;
-  else g[k]=parseFloat(v)||0;
-  _rebarSave();rebarRender();
-}
-// 單組計算：回傳 {rows:[{item,no,len,cnt,total,unitW,kg}], kg, kgAll(×籠數含損耗)}
-function rebarCalc(g){
-  var mb=REBAR_BARS[g.mainNo]||REBAR_BARS['#8'], sb=REBAR_BARS[g.spiralNo]||REBAR_BARS['#4'], rb=REBAR_BARS[g.ringNo]||REBAR_BARS['#5'];
-  var L=g.L||0, D=g.D||0, cover=g.cover||0;
-  var Ds=Math.max(D-2*cover,0);                    // 螺旋筋外徑 cm
-  var Dc=Math.max(Ds-sb.d,0);                      // 螺旋筋中心圈徑 cm
-  var rows=[];
-  // 主筋：母材長度切段 → 搭接數 =段數-1，每處搭接 = 倍數×主筋徑
-  var laps=(g.stock>0&&L>g.stock)?Math.ceil(L/g.stock)-1:0;
-  var lapLen=g.lapMult*mb.d/100;                   // m
-  var mainLen=L+laps*lapLen;
-  rows.push({item:'主筋'+(laps?('（含搭接 '+laps+' 處×'+(lapLen*100).toFixed(0)+'cm）'):''),no:g.mainNo,
-    len:mainLen,cnt:g.mainCnt||0,total:mainLen*(g.mainCnt||0),unitW:mb.w,kg:mainLen*(g.mainCnt||0)*mb.w});
-  // 螺旋筋：圈數 = 籠長/螺距 ＋ 上下收頭；每圈以螺距展開 √((πDc)²＋p²)
-  if(g.pitch>0&&Dc>0){
-    var turns=L*100/g.pitch+(g.extraTurns||0);
-    var perTurn=Math.sqrt(Math.pow(Math.PI*Dc,2)+Math.pow(g.pitch,2))/100;  // m
-    var spLen=turns*perTurn;
-    var spLaps=(g.stock>0&&spLen>g.stock)?Math.ceil(spLen/g.stock)-1:0;
-    spLen+=spLaps*(g.lapMult*sb.d/100);
-    rows.push({item:'螺旋筋（'+turns.toFixed(1)+' 圈'+(spLaps?('，搭接 '+spLaps+' 處'):'')+'）',no:g.spiralNo,
-      len:spLen,cnt:1,total:spLen,unitW:sb.w,kg:spLen*sb.w});
-  }
-  // 補強環筋：間距佈環＋上下端各 1 環；環徑取主筋內側，搭接一處
-  if(g.ringGap>0&&Dc>0){
-    var rings=Math.floor(L/g.ringGap)+1;
-    var ringD=Math.max(Dc-sb.d-mb.d*2-rb.d,0);
-    var ringLen=Math.PI*ringD/100+g.lapMult*rb.d/100;
-    rows.push({item:'補強環筋（間距 '+g.ringGap+'m）',no:g.ringNo,
-      len:ringLen,cnt:rings,total:ringLen*rings,unitW:rb.w,kg:ringLen*rings*rb.w});
-  }
-  var kg=rows.reduce(function(a,r){return a+r.kg;},0);
-  var kgAll=kg*(g.cnt||1)*(1+(g.wastePct||0)/100);
-  return {rows:rows,kg:kg,kgAll:kgAll,Ds:Ds};
-}
-function _rebarSel(i,k,cur,opts){
-  return '<select onchange="rebarUpd('+i+',\''+k+'\',this.value)">'+opts.map(function(o){
-    return '<option value="'+o+'"'+(o===cur?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';
-}
-function _rebarNum(i,k,cur,step){
-  return '<input type="number" step="'+(step||1)+'" value="'+cur+'" onchange="rebarUpd('+i+',\''+k+'\',this.value)">';
-}
-function rebarRender(){
-  var box=document.getElementById('rebar-groups');if(!box)return;
-  var nos=Object.keys(REBAR_BARS);
-  if(!_rebarGroups.length){
-    box.innerHTML='<div class="card"><div class="cb" style="text-align:center;color:var(--b3);padding:30px">尚無資料——按右上「新增鋼筋籠」開始檢料</div></div>';
-    var sm0=document.getElementById('rebar-summary');if(sm0)sm0.innerHTML='';return;
-  }
-  var fld=function(label,html){return '<label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--b4)">'+label+html+'</label>';};
-  var sumByNo={},grand=0;
-  box.innerHTML=_rebarGroups.map(function(g,i){
-    var c=rebarCalc(g);
-    c.rows.forEach(function(r){var s=sumByNo[r.no]=sumByNo[r.no]||{len:0,kg:0};
-      s.len+=r.total*(g.cnt||1);s.kg+=r.kg*(g.cnt||1)*(1+(g.wastePct||0)/100);});
-    grand+=c.kgAll;
-    return '<div class="card" style="margin-bottom:12px"><div class="ch green">'
-      +'<div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> '+esc(g.name||('鋼筋籠 '+(i+1)))+'　<span style="font-weight:400;font-size:11px;color:var(--b4)">螺旋外徑 '+c.Ds.toFixed(1)+' cm</span></div>'
-      +'<div style="display:flex;gap:6px"><button type="button" class="btn btn-xs" onclick="rebarAddGroup(_rebarGroups['+i+'])">複製</button>'
-      +'<button type="button" class="btn btn-xs" onclick="rebarDelGroup('+i+')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button></div></div>'
-      +'<div class="cb"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px;margin-bottom:10px">'
-      +fld('樁號／名稱','<input value="'+esc(g.name||'')+'" onchange="rebarUpd('+i+',\'name\',this.value)">')
-      +fld('籠數（支）',_rebarNum(i,'cnt',g.cnt))
-      +fld('樁徑 D（cm）',_rebarNum(i,'D',g.D))
-      +fld('籠長 L（m）',_rebarNum(i,'L',g.L,0.1))
-      +fld('保護層（cm）',_rebarNum(i,'cover',g.cover,0.5))
-      +fld('主筋號數',_rebarSel(i,'mainNo',g.mainNo,nos))
-      +fld('主筋支數',_rebarNum(i,'mainCnt',g.mainCnt))
-      +fld('螺旋筋號數',_rebarSel(i,'spiralNo',g.spiralNo,nos))
-      +fld('螺距（cm）',_rebarNum(i,'pitch',g.pitch,0.5))
-      +fld('收頭加圈（圈）',_rebarNum(i,'extraTurns',g.extraTurns,0.5))
-      +fld('補強環號數',_rebarSel(i,'ringNo',g.ringNo,nos))
-      +fld('環間距（m）',_rebarNum(i,'ringGap',g.ringGap,0.5))
-      +fld('搭接倍數（×d）',_rebarNum(i,'lapMult',g.lapMult))
-      +fld('母材長（m）',_rebarNum(i,'stock',g.stock,0.5))
-      +fld('損耗（％）',_rebarNum(i,'wastePct',g.wastePct,0.5))
-      +'</div>'
-      +'<div style="overflow-x:auto"><table class="tbl" style="width:100%;font-size:12px"><thead><tr>'
-      +'<th style="text-align:left">項目</th><th>號數</th><th>單支長(m)</th><th>支數</th><th>總長(m)</th><th>單位重(kg/m)</th><th>重量(kg)</th></tr></thead><tbody>'
-      +c.rows.map(function(r){return '<tr><td style="text-align:left">'+esc(r.item)+'</td><td style="text-align:center">'+r.no+'</td>'
-        +'<td style="text-align:right">'+r.len.toFixed(2)+'</td><td style="text-align:right">'+r.cnt+'</td>'
-        +'<td style="text-align:right">'+r.total.toFixed(1)+'</td><td style="text-align:right">'+r.unitW.toFixed(3)+'</td>'
-        +'<td style="text-align:right;font-weight:700">'+fmt(Math.round(r.kg))+'</td></tr>';}).join('')
-      +'<tr style="background:var(--gl)"><td style="text-align:left;font-weight:700">單籠小計</td><td colspan="5"></td><td style="text-align:right;font-weight:800">'+fmt(Math.round(c.kg))+'</td></tr>'
-      +'<tr style="background:var(--gl)"><td style="text-align:left;font-weight:700">×'+(g.cnt||1)+' 支＋損耗 '+(g.wastePct||0)+'%</td><td colspan="5"></td><td style="text-align:right;font-weight:800;color:var(--g3)">'+fmt(Math.round(c.kgAll))+'</td></tr>'
-      +'</tbody></table></div></div></div>';
-  }).join('');
-  var sm=document.getElementById('rebar-summary');
-  if(sm){
-    var noKeys=Object.keys(sumByNo);
-    sm.innerHTML='<div style="display:flex;gap:10px;flex-wrap:wrap">'
-      +noKeys.map(function(no){return '<div class="kpi" style="min-width:110px"><div class="kl">'+no+'（含損耗）</div>'
-        +'<div class="kv" style="font-size:15px">'+fmt(Math.round(sumByNo[no].kg))+' kg</div>'
-        +'<div class="ks">總長 '+fmt(Math.round(sumByNo[no].len))+' m</div></div>';}).join('')
-      +'<div class="kpi hi" style="min-width:130px"><div class="kl">全部合計</div><div class="kv" style="font-size:17px">'+(grand/1000).toFixed(2)+' t</div>'
-      +'<div class="ks">'+fmt(Math.round(grand))+' kg</div></div></div>';
-  }
-}
-function rebarPrint(){
-  if(!_rebarGroups.length){toast('請先新增鋼筋籠');return;}
-  var d=localToday?localToday():new Date().toISOString().slice(0,10);
-  var h='<h1>豐有工程　鋼筋籠檢料表</h1><div class="sub">日期：'+esc(d)+'</div>';
-  var sumByNo={},grand=0;
-  _rebarGroups.forEach(function(g){
-    var c=rebarCalc(g);
-    c.rows.forEach(function(r){var s=sumByNo[r.no]=sumByNo[r.no]||{len:0,kg:0};
-      s.len+=r.total*(g.cnt||1);s.kg+=r.kg*(g.cnt||1)*(1+(g.wastePct||0)/100);});
-    grand+=c.kgAll;
-    h+='<h2>'+esc(g.name||'')+'　樁徑 '+g.D+'cm × 籠長 '+g.L+'m × '+(g.cnt||1)+' 支　（保護層 '+g.cover+'cm）</h2>'
-      +'<table><thead><tr><th>項目</th><th>號數</th><th>單支長(m)</th><th>支數</th><th>總長(m)</th><th>單位重</th><th>重量(kg)</th></tr></thead><tbody>'
-      +c.rows.map(function(r){return '<tr><td class="l">'+esc(r.item)+'</td><td>'+r.no+'</td><td class="r">'+r.len.toFixed(2)+'</td>'
-        +'<td class="r">'+r.cnt+'</td><td class="r">'+r.total.toFixed(1)+'</td><td class="r">'+r.unitW.toFixed(3)+'</td><td class="r">'+fmt(Math.round(r.kg))+'</td></tr>';}).join('')
-      +'<tr class="tt"><td class="l">單籠小計</td><td colspan="5"></td><td class="r">'+fmt(Math.round(c.kg))+'</td></tr>'
-      +'<tr class="tt"><td class="l">×'+(g.cnt||1)+' 支＋損耗 '+(g.wastePct||0)+'%</td><td colspan="5"></td><td class="r"><b>'+fmt(Math.round(c.kgAll))+'</b></td></tr></tbody></table>';
+// ══════════ 工具共用基礎（v5.345）：迷你 XLSX 產生器／本機存檔歷史／掛專案／列印外框 ══════════
+// XLSX：無相依套件，ZIP 以「不壓縮(store)」封裝，工作表用行內字串；公式列 <f> 不帶快取值，
+// Excel 開檔時會自動重算——匯出檔因此保留完整計算公式，業主可逐格檢核。
+var _zCRCT=(function(){var t=[],c,n,k;for(n=0;n<256;n++){c=n;for(k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
+function _crc32(u8){var c=0xFFFFFFFF;for(var i=0;i<u8.length;i++)c=_zCRCT[(c^u8[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+function _zipStore(files){
+  var parts=[],cd=[],off=0;
+  files.forEach(function(f){
+    var nm=new TextEncoder().encode(f.name),d=f.data,crc=_crc32(d);
+    var lh=new Uint8Array(30+nm.length),dv=new DataView(lh.buffer);
+    dv.setUint32(0,0x04034b50,true);dv.setUint16(4,20,true);
+    dv.setUint32(14,crc,true);dv.setUint32(18,d.length,true);dv.setUint32(22,d.length,true);
+    dv.setUint16(26,nm.length,true);
+    lh.set(nm,30);parts.push(lh,d);
+    var ch=new Uint8Array(46+nm.length),cv=new DataView(ch.buffer);
+    cv.setUint32(0,0x02014b50,true);cv.setUint16(4,20,true);cv.setUint16(6,20,true);
+    cv.setUint32(16,crc,true);cv.setUint32(20,d.length,true);cv.setUint32(24,d.length,true);
+    cv.setUint16(28,nm.length,true);cv.setUint32(42,off,true);
+    ch.set(nm,46);cd.push(ch);
+    off+=lh.length+d.length;
   });
-  h+='<h2>各號數彙總（含損耗）</h2><table><thead><tr><th>號數</th><th>總長(m)</th><th>重量(kg)</th></tr></thead><tbody>'
-    +Object.keys(sumByNo).map(function(no){return '<tr><td>'+no+'</td><td class="r">'+fmt(Math.round(sumByNo[no].len))+'</td><td class="r">'+fmt(Math.round(sumByNo[no].kg))+'</td></tr>';}).join('')
-    +'<tr class="tt"><td class="l"><b>合計</b></td><td></td><td class="r"><b>'+fmt(Math.round(grand))+' kg（'+(grand/1000).toFixed(2)+' t）</b></td></tr></tbody></table>';
-  var css='body{font-family:"Microsoft JhengHei",sans-serif;color:#1a1a1a;padding:24px;font-size:12px}'
-    +'h1{font-size:18px;color:#0e3d22;margin:0 0 2px}.sub{color:#666;font-size:11px;margin-bottom:14px}'
-    +'h2{font-size:13px;color:#0e3d22;border-left:4px solid #0e3d22;padding-left:8px;margin:16px 0 6px}'
-    +'table{width:100%;border-collapse:collapse;margin-bottom:8px}th,td{border:1px solid #bbb;padding:4px 7px;text-align:center}'
-    +'th{background:#e8f0ea;color:#0e3d22}td.l{text-align:left}td.r{text-align:right}tr.tt td{background:#f2f7f3;font-weight:700}'
-    +'@media print{body{padding:0}}';
+  var cdLen=cd.reduce(function(a,c){return a+c.length;},0);
+  var eo=new Uint8Array(22),ev=new DataView(eo.buffer);
+  ev.setUint32(0,0x06054b50,true);ev.setUint16(8,files.length,true);ev.setUint16(10,files.length,true);
+  ev.setUint32(12,cdLen,true);ev.setUint32(16,off,true);
+  var out=new Uint8Array(off+cdLen+22),p=0;
+  parts.concat(cd,[eo]).forEach(function(u){out.set(u,p);p+=u.length;});
+  return out;
+}
+function _xlCol(c){var s='';c++;while(c){var m=(c-1)%26;s=String.fromCharCode(65+m)+s;c=(c-1-m)/26|0;}return s;}
+function _xlEsc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function _xlSheetXML(sh){
+  var xml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
+  if(sh.widths)xml+='<cols>'+sh.widths.map(function(w,i){return '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>';}).join('')+'</cols>';
+  xml+='<sheetData>';
+  (sh.rows||[]).forEach(function(row,r){
+    xml+='<row r="'+(r+1)+'">';
+    (row||[]).forEach(function(cell,c){
+      if(cell==null||cell==='')return;
+      var ref=_xlCol(c)+(r+1);
+      var o=(typeof cell==='object')?cell:(typeof cell==='number'?{v:cell}:{v:cell,t:'s'});
+      var st=o.s?(' s="'+o.s+'"'):'';
+      if(o.f)xml+='<c r="'+ref+'"'+st+'><f>'+_xlEsc(o.f)+'</f></c>';
+      else if(o.t==='s'||typeof o.v==='string')xml+='<c r="'+ref+'"'+st+' t="inlineStr"><is><t xml:space="preserve">'+_xlEsc(o.v)+'</t></is></c>';
+      else xml+='<c r="'+ref+'"'+st+'><v>'+o.v+'</v></c>';
+    });
+    xml+='</row>';
+  });
+  return xml+'</sheetData></worksheet>';
+}
+function _xlsxBytes(sheets){
+  var enc=new TextEncoder();
+  var ct='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+    +sheets.map(function(s,i){return '<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';}).join('')+'</Types>';
+  var rels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+  var wb='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'
+    +sheets.map(function(s,i){return '<sheet name="'+_xlEsc(s.name)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>';}).join('')+'</sheets></workbook>';
+  var wbr='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+    +sheets.map(function(s,i){return '<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>';}).join('')
+    +'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>';
+  var styles='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    +'<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts>'
+    +'<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0E3D22"/><bgColor rgb="FF0E3D22"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEAF3ED"/><bgColor rgb="FFEAF3ED"/></patternFill></fill></fills>'
+    +'<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/><diagonal/></border></borders>'
+    +'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+    +'<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/><xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+  var files=[
+    {name:'[Content_Types].xml',data:enc.encode(ct)},
+    {name:'_rels/.rels',data:enc.encode(rels)},
+    {name:'xl/workbook.xml',data:enc.encode(wb)},
+    {name:'xl/_rels/workbook.xml.rels',data:enc.encode(wbr)},
+    {name:'xl/styles.xml',data:enc.encode(styles)}];
+  sheets.forEach(function(s,i){files.push({name:'xl/worksheets/sheet'+(i+1)+'.xml',data:enc.encode(_xlSheetXML(s))});});
+  return _zipStore(files);
+}
+function xlsxDownload(fname,sheets){
+  var blob=new Blob([_xlsxBytes(sheets)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=String(fname).replace(/[\\/:*?"<>|]/g,'')+'.xlsx';a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+  toast('已匯出 Excel（含計算公式）');
+}
+function _xlSheetName(s){return String(s||'工作表').replace(/[\[\]:*?\/\\]/g,'').slice(0,31)||'工作表';}
+// ── 工具存檔／歷史（本機 localStorage，最多 200 筆）──
+function _trAll(){try{return JSON.parse(localStorage.getItem('fy_toolrecs')||'[]');}catch(e){return [];}}
+function _trPersist(a){try{localStorage.setItem('fy_toolrecs',JSON.stringify(a));}catch(e){}}
+function _trList(kind){return _trAll().filter(function(r){return r.kind===kind;}).sort(function(a,b){return b.ts-a.ts;});}
+function _trSave(kind,title,proj,inputs,summary){
+  var a=_trAll();
+  a.push({id:'tr'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),kind:kind,title:title,proj:proj||'',inputs:JSON.parse(JSON.stringify(inputs)),summary:summary||'',ts:Date.now()});
+  while(a.length>200)a.shift();
+  _trPersist(a);
+}
+function _trGet(id){return _trAll().find(function(r){return r.id===id;});}
+var _TR_RERENDER={rebar:'_rbRender',grout:'_gtRender',backfill:'_bfRender',progress:'_pgRender'};
+function _trDelUI(id,kind){
+  _trPersist(_trAll().filter(function(r){return r.id!==id;}));
+  toast('已刪除存檔');try{window[_TR_RERENDER[kind]]();}catch(e){}
+}
+function _trHistHtml(kind,loadFn){
+  var list=_trList(kind);
+  if(!list.length)return '<div style="color:var(--b3);padding:10px">尚無存檔記錄——按「存檔」把目前輸入存起來</div>';
+  return list.map(function(r){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--b2);border-radius:var(--r6);margin-bottom:5px;background:var(--w)">'
+      +'<span style="flex:1;min-width:0"><b style="font-size:12.5px">'+esc(r.title||'未命名')+'</b>'
+      +(r.summary?'<span style="font-size:11px;color:var(--b4);margin-left:6px">'+esc(r.summary)+'</span>':'')
+      +'<br><span style="font-size:10.5px;color:var(--b3)">'+new Date(r.ts).toLocaleString('zh-TW')+(r.proj?('　·　'+esc(r.proj)):'')+'</span></span>'
+      +'<button type="button" class="btn btn-xs" onclick="'+loadFn+'(\''+r.id+'\')">回載</button>'
+      +'<button type="button" class="btn btn-xs" onclick="_trDelUI(\''+r.id+'\',\''+kind+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button></div>';
+  }).join('');
+}
+// ── 掛專案：報價單工程名稱 datalist（也可自由輸入）──
+function _projDatalist(){
+  return '<datalist id="fy-proj-list">'+Q.filter(function(q){return q&&!q.parentId&&q.name;}).map(function(q){return '<option value="'+esc(q.name)+'">';}).join('')+'</datalist>';
+}
+// ── 工具列印外框（豐有 logo＋配色；獨立視窗，純 HTML 無 sprite 引用）──
+function _toolPrint(title,proj,body){
+  var css='*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
+   +'body{font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;color:#1f2937;padding:20px;font-size:12px}'
+   +'h1{font-size:18px;color:#0e3d22;margin:0}.b{color:#0e3d22;font-weight:700;font-size:11px;margin:2px 0 12px}'
+   +'h2{color:#0e3d22;font-size:13.5px;margin:15px 0 5px;border-left:4px solid #0e3d22;padding-left:8px}h2 .sub{color:#555;font-size:11px;font-weight:600;margin-left:8px}'
+   +'.cond{font-size:10.5px;color:#555;margin:0 0 5px;padding:4px 8px;background:#eef5f0;border-left:3px solid #7fae91;border-radius:2px}'
+   +'table{width:100%;border-collapse:collapse;margin-bottom:8px;page-break-inside:auto}tr{page-break-inside:avoid}'
+   +'th,td{border:1px solid #b9c6bd;padding:3px 6px;font-size:10.5px;text-align:center}th{background:#0e3d22;color:#fff}'
+   +'td.l{text-align:left}td.r{text-align:right}tr.tt td{background:#eaf3ed;font-weight:700}'
+   +'@media print{body{padding:0}}';
   var w=window.open('','_blank');
   if(!w){toast('瀏覽器阻擋了列印視窗，請允許彈出視窗');return;}
-  w.document.write('<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>鋼筋籠檢料表</title><style>'+css+'</style></head><body>'+h+'<script>window.print()<\/script></body></html>');
+  w.document.write('<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>'+_xlEsc(title)+'</title><style>'+css+'</style></head><body>'
+    +'<div style="display:flex;align-items:center;gap:12px"><img src="'+FY_LOGO+'" style="height:42px"><h1>'+_xlEsc(title)+'</h1></div>'
+    +'<div class="b">'+(proj?('工地：'+_xlEsc(proj)+'　'):'')+'日期：'+localToday()+'</div>'
+    +body+'<script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>');
   w.document.close();
+}
+// ══════════ 鋼筋籠檢料（v5.345：威立采集團計算引擎完整移植，計算行為與其 Excel 逐格一致）══════════
+// 規範搭接(ACI 318/內政部規範,公制) → TYPE 主表(分段/箍筋/工作筋) → 各 TYPE 料單 → 號數匯總
+var RB_BARS=[
+  {no:'D10',db:0.953,w:0.56},{no:'D13',db:1.27,w:0.994},{no:'D15',db:1.588,w:1.56},
+  {no:'D16',db:1.588,w:1.56},{no:'D19',db:1.905,w:2.25},{no:'D22',db:2.222,w:3.04},
+  {no:'D25',db:2.54,w:3.98},{no:'D29',db:2.858,w:5.04},{no:'D32',db:3.175,w:6.23}];
+function _rbDbOf(no,fb){var b=RB_BARS.find(function(x){return x.no===no;});return b?b.db:fb;}
+function _rbWOf(no){var b=RB_BARS.find(function(x){return x.no===no;});return b?b.w:0;}
+function _rbCEIL(x,st){return Math.ceil(x/st)*st;}
+function _rbFLOOR(x,st){return Math.floor(x/st)*st;}
+function _rbNum(x){var n=typeof x==='string'?parseFloat(x):x;return Number.isFinite(n)?n:null;}
+function _rbN0(x){var n=_rbNum(x);return n==null?0:n;}
+// 規範搭接表：每號數 ld／拉力／壓力／設計搭接（設計採壓力式）
+function _rbSpecTable(p){
+  var lapFactor=p.lapClass==='B類'?1.3:1;
+  var rows=RB_BARS.map(function(b){
+    var ld=Math.max(0.9*p.fy*p.psiT*p.psiE/(p.lambda*Math.sqrt(p.fc))*b.db,30);
+    var tension=_rbCEIL(lapFactor*ld,5);
+    var compression=_rbCEIL(Math.max(0.071*p.fy/Math.sqrt(p.fc)*b.db,0.0005*p.fy*b.db,30),5);
+    var design=compression;
+    return {no:b.no,db:b.db,ld:ld,tension:tension,compression:compression,design:design,designM:design/100,unitW:b.w};
+  });
+  return {lapFactor:lapFactor,rows:rows};
+}
+function _rbLapM(spec,no){var r=spec.rows.find(function(x){return x.no===no;});return r?r.designM:0;}
+// 單一 TYPE 完整計算：料單僅列有效列、警告清單、外箍無定長料→圈數模式、間距空=跳段
+function _rbComputeType(t,spec){
+  if(t.active===false)return null;
+  var D=_rbN0(t.D),cover=_rbN0(t.cover),L=_rbN0(t.L),N=_rbN0(t.N);
+  var warns=[];
+  var ok=!!(D&&L&&N);
+  var segs=Math.max(1,Math.round(_rbN0(t.segments)||1));
+  var batch=segs<=1?_rbN0(t.mainCount):Math.round(_rbN0(t.mainCount)/2);
+  var lapSpec=_rbLapM(spec,t.mainBar);
+  var lap=(_rbNum(t.lapOverride)&&_rbN0(t.lapOverride)>0)?_rbN0(t.lapOverride):lapSpec;
+  var stagger=_rbNum(t.staggerOverride)!=null?_rbN0(t.staggerOverride):1.3*lap;
+  var lowers=(t.lowerLens||[]).map(function(x){return _rbNum(x);});
+  var uppers=[];
+  for(var i=1;i<=5;i++){
+    if(i>=segs){uppers.push(null);continue;}
+    var lo=lowers[i-1];
+    uppers.push(lo==null?null:lo-stagger-lap);
+  }
+  var lastLower,lastUpper=null;
+  if(segs<=1)lastLower=L;
+  else{
+    var su=0;for(var i2=0;i2<segs-1;i2++)su+=uppers[i2]||0;
+    lastLower=L-su+lap;
+    var sl=0;for(var i3=0;i3<segs-1;i3++)sl+=lowers[i3]||0;
+    lastUpper=L-sl+lap;
+  }
+  var rows=[],totalKg=0;
+  var push=function(bar,desc,len,perBatch){
+    if(!bar||!(_rbN0(len)>0)||!(_rbN0(perBatch)>0))return;
+    var totalLen=_rbN0(len)*_rbN0(perBatch)*N;
+    var unitW=_rbWOf(bar);
+    var totalCount=_rbN0(perBatch)*N;
+    var kg=totalLen*unitW;
+    rows.push({no:rows.length+1,bar:bar,desc:desc,len:len,perBatch:perBatch,piles:N,totalLen:totalLen,unitW:unitW,totalCount:totalCount,totalKg:kg});
+    totalKg+=kg;
+  };
+  if(ok){
+    for(var s2=1;s2<=segs;s2++){
+      if(segs<=1){push(t.mainBar,'第1段（整支）',lastLower,batch);break;}
+      var lo2=s2===segs?lastLower:lowers[s2-1];
+      var up2=s2===segs?lastUpper:uppers[s2-1];
+      push(t.mainBar,'第'+s2+'段（下批）',lo2,batch);
+      push(t.mainBar,'第'+s2+'段（上批）',up2,batch);
+      if(s2<segs&&!((lowers[s2-1]||0)>0))warns.push('第'+s2+'段下批料長未填，該段未計入');
+    }
+    if(segs>1){
+      if(!(lastLower>0))warns.push('最後段下批計算為 '+(Math.round(lastLower*100)/100)+' m（≤0），請檢查各段料長／錯開／搭接');
+      if(lastUpper!=null&&!(lastUpper>0))warns.push('最後段上批計算為 '+(Math.round((lastUpper||0)*100)/100)+' m（≤0），請檢查各段料長');
+    }
+    if(_rbN0(t.denseLen)>0&&_rbN0(t.denseCount)>0)push(t.denseBar||t.mainBar,'加密筋',_rbN0(t.denseLen),_rbN0(t.denseCount));
+  }
+  var hoopSpacing=_rbN0(t.hoopSpacing),hoopStock=_rbN0(t.hoopStock);
+  var hoop=null;
+  if(ok&&hoopSpacing>0){
+    var hdia=D-2*cover-_rbDbOf(t.hoopBar,1.27);
+    var circ=Math.PI*hdia/100;
+    var turns=Math.ceil(L*100/hoopSpacing+1);
+    var hoopLapSpec=_rbLapM(spec,t.hoopBar);
+    var hoopLap=_rbN0(t.hoopLapOverride)>0?_rbN0(t.hoopLapOverride):hoopLapSpec;
+    var perTurn=circ+hoopLap;
+    var total=turns*perTurn;
+    if(hoopStock>0){
+      var pieces=Math.ceil(total/hoopStock);
+      hoop={dia:hdia,circ:circ,turns:turns,perTurn:perTurn,total:total,pieces:pieces,mode:'stock',lap:hoopLap,lapSpec:hoopLapSpec};
+      push(t.hoopBar,'外箍筋（螺旋）',hoopStock,pieces);
+    }else{
+      hoop={dia:hdia,circ:circ,turns:turns,perTurn:perTurn,total:total,pieces:turns,mode:'ring',lap:hoopLap,lapSpec:hoopLapSpec};
+      push(t.hoopBar,'外箍筋（螺旋・按圈）',perTurn,turns);
+    }
+  }
+  var inner=null,work=null;
+  var innerSpacing=_rbN0(t.innerSpacing);
+  if(ok&&innerSpacing>0){
+    var odb=_rbDbOf(t.hoopBar,1.27);
+    var idia=D-2*(cover+odb+_rbDbOf(t.mainBar,2.54)+_rbDbOf(t.innerBar,1.27)/2);
+    var innerLapSpec=_rbLapM(spec,t.innerBar);
+    var innerLap=_rbN0(t.innerLapOverride)>0?_rbN0(t.innerLapOverride):innerLapSpec;
+    var iPerTurn=Math.PI*idia/100+innerLap;
+    var iTurns=Math.ceil(L/innerSpacing)+1;
+    inner={dia:idia,perTurn:iPerTurn,turns:iTurns,total:iTurns*iPerTurn,lap:innerLap,lapSpec:innerLapSpec};
+    push(t.innerBar,'內箍筋',iPerTurn,iTurns);
+    var r2=idia/2;
+    var boxLen=_rbFLOOR(r2*Math.SQRT2/100,0.1);
+    var diagLen=_rbFLOOR(Math.sqrt(Math.pow(r2/Math.SQRT2,2)+Math.pow((D-2*cover-odb)/2-r2/Math.SQRT2,2))/100,0.1);
+    var sets=iTurns+2;
+    work={r:r2,boxLen:boxLen,diagLen:diagLen,sets:sets,boxCount:4*sets,diagCount:4*sets};
+    push(t.workBar,'口字筋（工作筋）',boxLen,4*sets);
+    push(t.workBar,'斜撐筋（工作筋）',diagLen,4*sets);
+  }
+  var perPileKg=N>0?totalKg/N:0;
+  var cond={D:D,cover:cover,L:L,N:N,fc:_rbN0(t.fc),maxLen:_rbN0(t.maxLen)||15,
+    mainBar:t.mainBar,segments:segs,mainCount:_rbN0(t.mainCount),
+    hoopBar:t.hoopBar,hoopSpacing:_rbN0(t.hoopSpacing),hoopStock:_rbN0(t.hoopStock),
+    innerBar:t.innerBar,innerSpacing:_rbN0(t.innerSpacing)};
+  return {key:t.key,name:t.name||('TYPE '+t.key),ok:ok,warns:warns,cond:cond,
+    batch:batch,lapSpec:lapSpec,lap:lap,stagger:stagger,uppers:uppers,lastLower:lastLower,lastUpper:lastUpper,
+    hoop:hoop,inner:inner,work:work,rows:rows,totalKg:totalKg,perPileKg:perPileKg};
+}
+// 板床材料（共用組立床，不分 TYPE）：號數／料長留空自動帶第一個有效 TYPE 設定
+function _rbComputeBed(bed,types,typeResults){
+  var b=Object.assign({count:1,mainBars:12,outBars:10,mainNo:'',mainLen:null,outNo:'',outLen:null},bed||{});
+  var ftIdx=typeResults.findIndex(function(r){return r&&r.ok;});
+  var ft=ftIdx>=0?types[ftIdx]:null;
+  var segsOf=function(t){return Math.max(1,Math.round(_rbN0(t.segments)||1));};
+  var mainNo=b.mainNo||(ft?ft.mainBar:'D25');
+  var mainLen=(b.mainLen!=null&&String(b.mainLen)!=='')?_rbN0(b.mainLen)
+    :(ft?(segsOf(ft)<=1?_rbN0(ft.L):_rbN0(ft.lowerLens&&ft.lowerLens[0])):0);
+  var outNo=b.outNo||(ft?ft.hoopBar:'D13');
+  var outLen=(b.outLen!=null&&String(b.outLen)!=='')?_rbN0(b.outLen):(ft?_rbN0(ft.hoopStock):12);
+  var cnt=_rbNum(b.count)==null?1:_rbN0(b.count);
+  var mW=mainLen*_rbWOf(mainNo),oW=outLen*_rbWOf(outNo);
+  var mainCnt=_rbN0(b.mainBars)*cnt,outCnt=_rbN0(b.outBars)*cnt;
+  var mTot=mW*mainCnt,oTot=oW*outCnt;
+  return {cnt:cnt,mainNo:mainNo,mainLen:mainLen,mW:mW,mTot:mTot,mainCnt:mainCnt,
+    outNo:outNo,outLen:outLen,oW:oW,oTot:oTot,outCnt:outCnt,total:mTot+oTot,
+    auto:{mainNo:!b.mainNo,mainLen:!(b.mainLen!=null&&String(b.mainLen)!==''),outNo:!b.outNo,outLen:!(b.outLen!=null&&String(b.outLen)!=='')}};
+}
+// 全部 TYPE ＋板床＋號數匯總
+function _rbCompute(inp){
+  var spec=_rbSpecTable(inp.spec);
+  var types=inp.types.map(function(t){return _rbComputeType(t,spec);}).filter(Boolean);
+  var bed=_rbComputeBed(inp.bed,inp.types,types);
+  var matrix=RB_BARS.map(function(b){
+    var byType=types.map(function(r){return r.rows.filter(function(row){return row.bar===b.no;}).reduce(function(s,row){return s+row.totalKg;},0);});
+    var cnt=types.reduce(function(s,r){return s+r.rows.filter(function(row){return row.bar===b.no;}).reduce(function(x,row){return x+row.totalCount;},0);},0)
+      +(b.no===bed.mainNo?bed.mainCnt:0)+(b.no===bed.outNo?bed.outCnt:0);
+    var len=types.reduce(function(s,r){return s+r.rows.filter(function(row){return row.bar===b.no;}).reduce(function(x,row){return x+row.totalLen;},0);},0)
+      +(b.no===bed.mainNo?bed.mainLen*bed.mainCnt:0)+(b.no===bed.outNo?bed.outLen*bed.outCnt:0);
+    var bedKg=(b.no===bed.mainNo?bed.mTot:0)+(b.no===bed.outNo?bed.oTot:0);
+    var total=byType.reduce(function(s,x){return s+x;},0)+bedKg;
+    return {no:b.no,byType:byType,bedKg:bedKg,cnt:cnt,len:len,total:total};
+  });
+  var colTotals=types.map(function(_,ci){return matrix.reduce(function(s,m){return s+m.byType[ci];},0);});
+  var grand=matrix.reduce(function(s,m){return s+m.total;},0);
+  return {spec:spec,types:types,bed:bed,summary:{matrix:matrix,colTotals:colTotals,bedTotal:bed.total,grand:grand,grandT:Math.round(grand/10)/100}};
+}
+// ── 狀態（本機草稿 fy_rebar2）──
+function _rbDefType(name){
+  return {key:'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:name,
+    D:null,cover:7.5,L:null,N:null,fc:210,maxLen:15,
+    mainBar:'D25',segments:2,mainCount:8,lapOverride:null,staggerOverride:1,
+    lowerLens:[null,null,null,null,null],
+    denseBar:'',denseLen:null,denseCount:null,
+    hoopBar:'D13',hoopSpacing:50,hoopStock:12,hoopLapOverride:null,
+    innerBar:'D13',innerSpacing:1.5,innerLapOverride:null,workBar:'D13'};
+}
+var _rbState=(function(){
+  try{var s=JSON.parse(localStorage.getItem('fy_rebar2')||'');if(s&&s.spec&&s.types)return s;}catch(e){}
+  var t=_rbDefType('TYPE A');t.D=100;t.L=17;t.N=55;t.lapOverride=1.2;t.lowerLens=[15,null,null,null,null];
+  return {proj:'',spec:{fc:210,fy:4200,lapClass:'A類',psiT:1,psiE:1,lambda:1},types:[t],
+    bed:{count:1,mainBars:12,outBars:10,mainNo:'',mainLen:null,outNo:'',outLen:null}};
+})();
+var _rbActive=_rbState.types[0]?_rbState.types[0].key:'';
+var _rbHistOpen=false;
+function _rbSave(){try{localStorage.setItem('fy_rebar2',JSON.stringify(_rbState));}catch(e){}}
+var _RB_TSTR=['name','mainBar','denseBar','hoopBar','innerBar','workBar'];
+function _rbSetT(key,f,v){
+  var t=_rbState.types.find(function(x){return x.key===key;});if(!t)return;
+  t[f]=_RB_TSTR.indexOf(f)>=0?v:_rbNum(v);
+  _rbSave();_rbRender();
+}
+function _rbSetLower(key,i,v){
+  var t=_rbState.types.find(function(x){return x.key===key;});if(!t)return;
+  t.lowerLens=t.lowerLens||[null,null,null,null,null];
+  t.lowerLens[i]=_rbNum(v);
+  _rbSave();_rbRender();
+}
+function _rbSetSpec(f,v){_rbState.spec[f]=f==='lapClass'?v:(_rbNum(v)==null?_rbState.spec[f]:_rbNum(v));_rbSave();_rbRender();}
+function _rbSetBed(f,v){_rbState.bed[f]=(f==='mainNo'||f==='outNo')?v:_rbNum(v);_rbSave();_rbRender();}
+function _rbSetProj(v){_rbState.proj=String(v||'').trim();_rbSave();}
+function _rbAddType(){
+  var t=_rbDefType('TYPE '+('ABCDEFGHIJK'[_rbState.types.length]||(_rbState.types.length+1)));
+  _rbState.types.push(t);_rbActive=t.key;_rbSave();_rbRender();
+}
+function _rbCopyType(key){
+  var src=_rbState.types.find(function(x){return x.key===key;});if(!src)return;
+  var t=JSON.parse(JSON.stringify(src));
+  t.key='t'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  t.name=src.name+'(複製)';
+  _rbState.types.push(t);_rbActive=t.key;_rbSave();_rbRender();
+}
+function _rbDelType(key){
+  if(_rbState.types.length<=1){toast('至少保留一個 TYPE');return;}
+  _rbState.types=_rbState.types.filter(function(x){return x.key!==key;});
+  if(_rbActive===key)_rbActive=_rbState.types[0].key;
+  _rbSave();_rbRender();
+}
+function _rbR(x,d){if(x==null||!Number.isFinite(Number(x)))return '—';var p=Math.pow(10,d==null?1:d);return (Math.round(Number(x)*p)/p).toLocaleString();}
+// ── 畫面 ──
+function _rbRender(){
+  var root=document.getElementById('rebar-root');if(!root)return;
+  var res=_rbCompute(_rbState);
+  var nos=RB_BARS.map(function(b){return b.no;});
+  var fld=function(label,html,w){return '<label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--b4);min-width:0'+(w?';grid-column:span '+w:'')+'">'+label+html+'</label>';};
+  var numIn=function(key,f,val,step,ph){return '<input type="number" step="'+(step||1)+'" value="'+(val==null?'':val)+'"'+(ph?' placeholder="'+ph+'"':'')+' onchange="_rbSetT(\''+key+'\',\''+f+'\',this.value)">';};
+  var selIn=function(key,f,cur,allowEmpty,ph){return '<select onchange="_rbSetT(\''+key+'\',\''+f+'\',this.value)">'+(allowEmpty?('<option value="">'+(ph||'同主筋')+'</option>'):'')+nos.map(function(n){return '<option value="'+n+'"'+(n===cur?' selected':'')+'>'+n+'</option>';}).join('')+'</select>';};
+  var sec=function(t2){return '<div style="font-weight:700;font-size:12px;color:var(--b5);margin:12px 0 6px;display:flex;align-items:center;gap:6px"><span style="width:3px;height:13px;background:var(--g3);border-radius:2px"></span>'+t2+'</div>';};
+  var grid='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px">';
+  // 工具列
+  var h='<div class="card" style="margin-bottom:12px"><div class="cb" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
+    +fld('掛專案（可選報價單或自行輸入）','<input list="fy-proj-list" value="'+esc(_rbState.proj||'')+'" style="min-width:220px" onchange="_rbSetProj(this.value)">')
+    +'<button type="button" class="btn btn-sm" onclick="_rbSaveRec()"><svg class="ic ib" aria-hidden="true"><use href="#i-save"/></svg> 存檔</button>'
+    +'<button type="button" class="btn btn-sm" onclick="_rbHistToggle()"><svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> 歷史</button>'
+    +'<button type="button" class="btn btn-sm" onclick="_rbPrint()"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 列印</button>'
+    +'<button type="button" class="btn btn-sm" onclick="_rbXlsx()"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 匯出 Excel</button>'
+    +'</div></div>'+_projDatalist();
+  if(_rbHistOpen)h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">存檔歷史</div></div><div class="cb">'+_trHistHtml('rebar','_rbLoadRec')+'</div></div>';
+  // 規範搭接參數
+  var sp=_rbState.spec;
+  h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">規範搭接參數（ACI 318／內政部規範，全 TYPE 共用）</div></div><div class="cb">'
+    +grid
+    +fld("混凝土強度 fc'(kgf/cm²)",'<input type="number" value="'+sp.fc+'" onchange="_rbSetSpec(\'fc\',this.value)">')
+    +fld('鋼筋降伏 fy(kgf/cm²)','<input type="number" value="'+sp.fy+'" onchange="_rbSetSpec(\'fy\',this.value)">')
+    +fld('搭接分類','<select onchange="_rbSetSpec(\'lapClass\',this.value)"><option'+(sp.lapClass==='A類'?' selected':'')+'>A類</option><option'+(sp.lapClass==='B類'?' selected':'')+'>B類</option></select>')
+    +fld('ψt（頂部筋 1.3）','<input type="number" step="0.1" value="'+sp.psiT+'" onchange="_rbSetSpec(\'psiT\',this.value)">')
+    +fld('ψe（塗層筋 1.5）','<input type="number" step="0.1" value="'+sp.psiE+'" onchange="_rbSetSpec(\'psiE\',this.value)">')
+    +fld('λ（輕質 0.75）','<input type="number" step="0.05" value="'+sp.lambda+'" onchange="_rbSetSpec(\'lambda\',this.value)">')
+    +'</div><div style="font-size:11px;color:var(--b4);margin-top:8px">設計搭接長（壓力式，m）：'
+    +res.spec.rows.map(function(r){return r.no+'='+r.designM;}).join('、')+'</div></div></div>';
+  // TYPE 分頁列
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
+    +_rbState.types.map(function(t){return '<button type="button" class="btn btn-sm'+(t.key===_rbActive?' btn-g':'')+'" onclick="_rbActive=\''+t.key+'\';_rbRender()">'+esc(t.name||'TYPE')+'</button>';}).join('')
+    +'<button type="button" class="btn btn-sm" onclick="_rbAddType()"><svg class="ic ib" aria-hidden="true"><use href="#i-plus"/></svg> 新增 TYPE</button></div>';
+  // 目前 TYPE 表單
+  var t=_rbState.types.find(function(x){return x.key===_rbActive;})||_rbState.types[0];
+  if(t){
+    _rbActive=t.key;
+    var tr=res.types.find(function(x){return x.key===t.key;});
+    var segs=Math.max(1,Math.round(_rbN0(t.segments)||1));
+    h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">'+esc(t.name||'TYPE')+'</div>'
+      +'<div style="display:flex;gap:6px"><button type="button" class="btn btn-xs" onclick="_rbCopyType(\''+t.key+'\')">複製</button>'
+      +'<button type="button" class="btn btn-xs" onclick="_rbDelType(\''+t.key+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button></div></div><div class="cb">'
+      +fld('TYPE 名稱','<input value="'+esc(t.name||'')+'" onchange="_rbSetT(\''+t.key+'\',\'name\',this.value)">')
+      +(tr&&tr.warns.length?'<div style="background:#fff4e5;border:1px solid #f0c48a;border-radius:var(--r6);padding:7px 10px;font-size:11.5px;color:#8a5a00;margin:8px 0">'+tr.warns.map(esc).join('<br>')+'</div>':'')
+      +sec('基本條件')+grid
+      +fld('樁徑 D（cm）',numIn(t.key,'D',t.D))
+      +fld('保護層（cm）',numIn(t.key,'cover',t.cover,0.5))
+      +fld('樁長 L（m）',numIn(t.key,'L',t.L,0.1))
+      +fld('基樁支數 N',numIn(t.key,'N',t.N))
+      +fld('單支最大料長（m）',numIn(t.key,'maxLen',t.maxLen,0.5))
+      +fld("fc'（標示用）",numIn(t.key,'fc',t.fc))
+      +'</div>'+sec('主筋')+grid
+      +fld('主筋號數',selIn(t.key,'mainBar',t.mainBar))
+      +fld('分段數（1–6）',numIn(t.key,'segments',t.segments))
+      +fld('每樁主筋總支數',numIn(t.key,'mainCount',t.mainCount))
+      +fld('搭接長覆蓋（空=規範 '+(tr?_rbR(tr.lapSpec,2):'—')+'m）',numIn(t.key,'lapOverride',t.lapOverride,0.1,'規範值'))
+      +fld('錯開距離（空=1.3×搭接'+(tr?('='+_rbR(1.3*tr.lap,2)):'')+'）',numIn(t.key,'staggerOverride',t.staggerOverride,0.1,'自動'))
+      +'</div>';
+    if(segs>1){
+      h+='<div style="background:var(--gl);border-radius:var(--r6);padding:8px 10px;margin-top:8px">'
+        +'<div style="font-size:11px;color:var(--b4);margin-bottom:6px">各段下批料長（m，含搭接）——最後一段自動補足樁長</div>'+grid;
+      for(var si=0;si<segs-1;si++)h+=fld('第'+(si+1)+'段下批','<input type="number" step="0.1" value="'+(t.lowerLens&&t.lowerLens[si]!=null?t.lowerLens[si]:'')+'" onchange="_rbSetLower(\''+t.key+'\','+si+',this.value)">');
+      h+='</div>';
+      if(tr&&tr.ok)h+='<div style="font-size:11px;color:var(--b4);margin-top:5px">上批（自動）：'
+        +tr.uppers.slice(0,segs-1).map(function(u,i4){return '第'+(i4+1)+'段 '+_rbR(u,2)+'m';}).join('、')
+        +'｜最後段：下批 <b>'+_rbR(tr.lastLower,2)+'m</b>、上批 <b>'+_rbR(tr.lastUpper,2)+'m</b></div>';
+      h+='</div>';
+    }
+    h+=sec('加密筋（長度與支數填了才計；號數空＝同主筋）')+grid
+      +fld('號數',selIn(t.key,'denseBar',t.denseBar,true))
+      +fld('長度／段（m）',numIn(t.key,'denseLen',t.denseLen,0.1))
+      +fld('支數／段',numIn(t.key,'denseCount',t.denseCount))
+      +'</div>'+sec('外箍筋（螺旋；間距空＝不計；定長料空＝按圈列料）')+grid
+      +fld('號數',selIn(t.key,'hoopBar',t.hoopBar))
+      +fld('間距 @（cm）',numIn(t.key,'hoopSpacing',t.hoopSpacing))
+      +fld('定長料（12／14m）',numIn(t.key,'hoopStock',t.hoopStock,0.5,'空=按圈'))
+      +fld('搭接長（空=規範'+(tr&&tr.hoop?(' '+_rbR(tr.hoop.lapSpec,2)):'')+'m）',numIn(t.key,'hoopLapOverride',t.hoopLapOverride,0.05,'規範值'))
+      +'</div>'
+      +(tr&&tr.hoop?'<div style="font-size:11px;color:var(--g3);margin-top:5px">圈數 '+_rbR(tr.hoop.turns,0)+'｜單圈含搭接 '+_rbR(tr.hoop.perTurn,2)+'m｜每樁 '+_rbR(tr.hoop.total,1)+'m'+(tr.hoop.mode==='stock'?('→ '+_rbR(tr.hoop.pieces,0)+' 支定長料'):'（按圈列料）')+'</div>':'')
+      +sec('內箍筋（間距空＝內箍與工作筋皆不計）')+grid
+      +fld('號數',selIn(t.key,'innerBar',t.innerBar))
+      +fld('間距 @（m）',numIn(t.key,'innerSpacing',t.innerSpacing,0.1))
+      +fld('搭接長（空=規範'+(tr&&tr.inner?(' '+_rbR(tr.inner.lapSpec,2)):'')+'m）',numIn(t.key,'innerLapOverride',t.innerLapOverride,0.05,'規範值'))
+      +'</div>'
+      +(tr&&tr.inner?'<div style="font-size:11px;color:var(--g3);margin-top:5px">圈數 '+_rbR(tr.inner.turns,0)+'｜單圈含搭接 '+_rbR(tr.inner.perTurn,2)+'m（搭接 '+_rbR(tr.inner.lap,2)+'m）</div>':'')
+      +sec('工作筋（口字＋斜撐）')+grid
+      +fld('號數',selIn(t.key,'workBar',t.workBar))
+      +'</div>'
+      +(tr&&tr.work?'<div style="font-size:11px;color:var(--g3);margin-top:5px">口字 '+_rbR(tr.work.boxLen,2)+'m×'+_rbR(tr.work.boxCount,0)+'｜斜撐 '+_rbR(tr.work.diagLen,2)+'m×'+_rbR(tr.work.diagCount,0)+'</div>':'')
+      +'</div></div>';
+  }
+  // 板床
+  var bd=_rbState.bed,bres=res.bed;
+  h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">板床材料（共用組立床，不分 TYPE）</div>'
+    +'<div style="font-size:11px;color:var(--b4)">號數／料長留空自動帶第一個 TYPE；床數 0＝不計</div></div><div class="cb">'+grid
+    +fld('床數','<input type="number" min="0" value="'+(bd.count==null?'':bd.count)+'" onchange="_rbSetBed(\'count\',this.value)">')
+    +fld('主筋支／床','<input type="number" value="'+(bd.mainBars==null?'':bd.mainBars)+'" onchange="_rbSetBed(\'mainBars\',this.value)">')
+    +fld('外箍支／床','<input type="number" value="'+(bd.outBars==null?'':bd.outBars)+'" onchange="_rbSetBed(\'outBars\',this.value)">')
+    +fld('主筋號數'+(bres.auto.mainNo?('（自動：'+bres.mainNo+'）'):''),'<select onchange="_rbSetBed(\'mainNo\',this.value)"><option value="">自動</option>'+nos.map(function(n){return '<option'+(n===bd.mainNo?' selected':'')+'>'+n+'</option>';}).join('')+'</select>')
+    +fld('主筋料長'+(bres.auto.mainLen?('（自動：'+_rbR(bres.mainLen,2)+'）'):''),'<input type="number" step="0.1" value="'+(bd.mainLen==null?'':bd.mainLen)+'" placeholder="自動" onchange="_rbSetBed(\'mainLen\',this.value)">')
+    +fld('外箍號數'+(bres.auto.outNo?('（自動：'+bres.outNo+'）'):''),'<select onchange="_rbSetBed(\'outNo\',this.value)"><option value="">自動</option>'+nos.map(function(n){return '<option'+(n===bd.outNo?' selected':'')+'>'+n+'</option>';}).join('')+'</select>')
+    +fld('外箍料長'+(bres.auto.outLen?('（自動：'+_rbR(bres.outLen,2)+'）'):''),'<input type="number" step="0.1" value="'+(bd.outLen==null?'':bd.outLen)+'" placeholder="自動" onchange="_rbSetBed(\'outLen\',this.value)">')
+    +'</div>'
+    +(bres.cnt>0?'<div style="font-size:11.5px;color:var(--b5);margin-top:8px">主筋 '+bres.mainNo+' '+_rbR(bres.mainLen,2)+'m × '+_rbR(bres.mainCnt,0)+' 支 = '+_rbR(bres.mTot,1)+' kg　·　外箍 '+bres.outNo+' '+_rbR(bres.outLen,2)+'m × '+_rbR(bres.outCnt,0)+' 支 = '+_rbR(bres.oTot,1)+' kg　·　<b style="color:var(--g3)">板床總重 '+_rbR(bres.total,1)+' kg</b></div>':'')
+    +'</div></div>';
+  // 料單（各 TYPE）
+  var dtbl=function(tr2){
+    return '<div style="overflow-x:auto"><table class="tbl" style="width:100%;font-size:12px"><thead><tr><th>#</th><th>號數</th><th style="text-align:left">說明</th><th>料長(m)</th><th>支/批</th><th>基樁</th><th>總長(m)</th><th>單位重</th><th>總重(kg)</th></tr></thead><tbody>'
+      +tr2.rows.map(function(x){return '<tr><td style="text-align:center">'+x.no+'</td><td style="text-align:center"><b>'+x.bar+'</b></td><td style="text-align:left">'+esc(x.desc)+'</td>'
+        +'<td style="text-align:right">'+_rbR(x.len,3)+'</td><td style="text-align:right">'+_rbR(x.perBatch,0)+'</td><td style="text-align:right">'+_rbR(x.piles,0)+'</td>'
+        +'<td style="text-align:right">'+_rbR(x.totalLen,1)+'</td><td style="text-align:right">'+_rbR(x.unitW,3)+'</td><td style="text-align:right;font-weight:700">'+_rbR(x.totalKg,1)+'</td></tr>';}).join('')
+      +'<tr style="background:var(--gl)"><td colspan="8" style="text-align:right;font-weight:700">小計</td><td style="text-align:right;font-weight:800">'+_rbR(tr2.totalKg,1)+'</td></tr></tbody></table></div>';
+  };
+  res.types.forEach(function(tr2){
+    if(!tr2.ok){h+='<div class="card" style="margin-bottom:12px"><div class="cb" style="color:var(--b3)">'+esc(tr2.name)+'：請填妥 樁徑／樁長／基樁支數 後自動計算</div></div>';return;}
+    h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">料單｜'+esc(tr2.name)+'</div>'
+      +'<div style="font-size:11.5px"><b style="color:var(--g3)">總重 '+_rbR(tr2.totalKg,1)+' kg</b>　·　每支籠 '+_rbR(tr2.perPileKg,1)+' kg</div></div>'
+      +'<div class="cb" style="padding-top:8px">'+dtbl(tr2)+'</div></div>';
+  });
+  // 號數匯總
+  var okT=res.types.filter(function(x){return x.ok;});
+  var withBed=bres.cnt>0&&bres.total>0;
+  var mrows=res.summary.matrix.filter(function(m){return m.total>0;});
+  h+='<div class="card"><div class="ch green"><div class="cht">號數匯總（訂購表'+(withBed?'，含板床':'')+'）</div>'
+    +'<div style="font-size:11.5px"><b style="color:var(--g3)">全合計 '+_rbR(res.summary.grand,1)+' kg</b>　·　'+_rbR(res.summary.grandT,2)+' t</div></div>'
+    +'<div class="cb" style="padding-top:8px"><div style="overflow-x:auto"><table class="tbl" style="width:100%;font-size:12px"><thead><tr><th>號數</th>'
+    +okT.map(function(x){return '<th>'+esc(x.name)+'(kg)</th>';}).join('')
+    +(withBed?'<th>板床(kg)</th>':'')+'<th>總支數</th><th>總長(m)</th><th>合計(kg)</th><th>(t)</th></tr></thead><tbody>'
+    +(mrows.length?mrows.map(function(m){
+      var okIdx=res.types.map(function(x,i5){return x.ok?i5:-1;}).filter(function(i5){return i5>=0;});
+      return '<tr><td style="text-align:center"><b>'+m.no+'</b></td>'
+        +okIdx.map(function(i5){return '<td style="text-align:right">'+_rbR(m.byType[i5],1)+'</td>';}).join('')
+        +(withBed?'<td style="text-align:right">'+_rbR(m.bedKg,1)+'</td>':'')
+        +'<td style="text-align:right">'+_rbR(m.cnt,0)+'</td><td style="text-align:right">'+_rbR(m.len,0)+'</td>'
+        +'<td style="text-align:right;font-weight:700">'+_rbR(m.total,1)+'</td><td style="text-align:right">'+_rbR(m.total/1000,2)+'</td></tr>';
+    }).join(''):'<tr><td colspan="9" style="color:var(--b3)">尚無鋼筋量</td></tr>')
+    +'</tbody></table></div></div></div>';
+  root.innerHTML=h;
+}
+function _rbHistToggle(){_rbHistOpen=!_rbHistOpen;_rbRender();}
+function _rbSaveRec(){
+  var res=_rbCompute(_rbState);
+  _trSave('rebar','鋼筋籠檢料'+(_rbState.proj?('（'+_rbState.proj+'）'):''),_rbState.proj,_rbState,
+    '總重 '+_rbR(res.summary.grand,0)+' kg（'+_rbR(res.summary.grandT,2)+' t）');
+  toast('已存檔（本機）');if(_rbHistOpen)_rbRender();
+}
+function _rbLoadRec(id){
+  var r=_trGet(id);if(!r)return;
+  _rbState=JSON.parse(JSON.stringify(r.inputs));
+  _rbActive=_rbState.types[0]?_rbState.types[0].key:'';
+  _rbSave();_rbHistOpen=false;_rbRender();toast('已回載存檔');
+}
+function _rbPrint(){
+  var res=_rbCompute(_rbState);
+  var n1=function(x,d2){return x==null||!Number.isFinite(Number(x))?'—':Number(x).toLocaleString(undefined,{maximumFractionDigits:d2==null?1:d2});};
+  var body='';
+  res.types.filter(function(t){return t.ok;}).forEach(function(t){
+    var c=t.cond;
+    body+='<h2>料單｜'+_xlEsc(t.name)+' <span class="sub">總重 '+n1(t.totalKg)+' kg｜每支籠 '+n1(t.perPileKg)+' kg</span></h2>'
+      +'<div class="cond">樁徑 '+n1(c.D,0)+' cm｜保護層 '+n1(c.cover,1)+' cm｜樁長 '+n1(c.L,1)+' m｜樁數 '+n1(c.N,0)+' 支｜fc '+n1(c.fc,0)
+      +'｜主筋 '+_xlEsc(c.mainBar)+'×'+n1(c.mainCount,0)+'('+n1(c.segments,0)+' 段)｜外箍 '+_xlEsc(c.hoopBar)+'@'+n1(c.hoopSpacing,0)+'cm'
+      +(c.hoopStock>0?('，定長 '+n1(c.hoopStock,0)+'m'):'')+'｜內箍 '+_xlEsc(c.innerBar)+'@'+n1(c.innerSpacing,2)+'m</div>'
+      +'<table><tr><th>#</th><th>號數</th><th>說明</th><th>料長(m)</th><th>支/批</th><th>基樁</th><th>總長(m)</th><th>總支數</th><th>總重(kg)</th></tr>'
+      +t.rows.map(function(x){return '<tr><td>'+x.no+'</td><td><b>'+x.bar+'</b></td><td class="l">'+_xlEsc(x.desc)+'</td><td class="r">'+n1(x.len,3)+'</td><td class="r">'+n1(x.perBatch,0)+'</td><td class="r">'+n1(x.piles,0)+'</td><td class="r">'+n1(x.totalLen)+'</td><td class="r">'+n1(x.totalCount,0)+'</td><td class="r">'+n1(x.totalKg)+'</td></tr>';}).join('')
+      +'<tr class="tt"><td colspan="8" class="r"><b>'+_xlEsc(t.name)+' 小計</b></td><td class="r"><b>'+n1(t.totalKg)+'</b></td></tr></table>';
+  });
+  var bed=res.bed,withBed=bed.cnt>0&&bed.total>0;
+  if(withBed){
+    body+='<h2>板床明細（共用組立床，共 '+bed.cnt+' 床）<span class="sub">板床總重 '+n1(bed.total)+' kg</span></h2>'
+      +'<table><tr><th>項目</th><th>號數</th><th>料長(m)</th><th>單支重(kg)</th><th>支/床</th><th>床數</th><th>總支數</th><th>重量(kg)</th></tr>'
+      +'<tr><td>板床主筋</td><td><b>'+bed.mainNo+'</b></td><td class="r">'+n1(bed.mainLen,2)+'</td><td class="r">'+n1(bed.mW,2)+'</td><td class="r">'+n1(bed.mainCnt/bed.cnt,0)+'</td><td class="r">'+bed.cnt+'</td><td class="r">'+n1(bed.mainCnt,0)+'</td><td class="r">'+n1(bed.mTot)+'</td></tr>'
+      +'<tr><td>板床外箍</td><td><b>'+bed.outNo+'</b></td><td class="r">'+n1(bed.outLen,2)+'</td><td class="r">'+n1(bed.oW,2)+'</td><td class="r">'+n1(bed.outCnt/bed.cnt,0)+'</td><td class="r">'+bed.cnt+'</td><td class="r">'+n1(bed.outCnt,0)+'</td><td class="r">'+n1(bed.oTot)+'</td></tr>'
+      +'<tr class="tt"><td colspan="7" class="r"><b>板床總重量 (kg)</b></td><td class="r"><b>'+n1(bed.total)+'</b></td></tr></table>';
+  }
+  var okT=res.types.filter(function(t){return t.ok;});
+  var okIdx=res.types.map(function(t,i){return t.ok?i:-1;}).filter(function(i){return i>=0;});
+  body+='<h2>號數匯總（訂購表'+(withBed?'，含板床':'')+'）<span class="sub">全合計 '+n1(res.summary.grand,0)+' kg = '+res.summary.grandT+' t</span></h2>'
+    +'<table><tr><th>號數</th>'+okT.map(function(t){return '<th>'+_xlEsc(t.name)+'(kg)</th>';}).join('')+(withBed?'<th>板床(kg)</th>':'')+'<th>總支數</th><th>總長(m)</th><th>合計(kg)</th><th>(t)</th></tr>'
+    +res.summary.matrix.filter(function(m){return m.total>0;}).map(function(m){
+      return '<tr><td><b>'+m.no+'</b></td>'+okIdx.map(function(i){return '<td class="r">'+n1(m.byType[i])+'</td>';}).join('')
+        +(withBed?'<td class="r">'+n1(m.bedKg)+'</td>':'')+'<td class="r">'+n1(m.cnt,0)+'</td><td class="r">'+n1(m.len,0)+'</td><td class="r"><b>'+n1(m.total)+'</b></td><td class="r">'+n1(m.total/1000,2)+'</td></tr>';}).join('')
+    +'<tr class="tt"><td colspan="'+(okIdx.length+(withBed?2:1)+2)+'" class="r"><b>全部合計'+(withBed?'（含板床）':'')+'</b></td><td class="r"><b>'+n1(res.summary.grand,0)+'</b></td><td class="r"><b>'+res.summary.grandT+'</b></td></tr></table>'
+    +'<div class="cond">規範搭接：fc\' '+_rbState.spec.fc+'　fy '+_rbState.spec.fy+'　'+_xlEsc(_rbState.spec.lapClass)+'　ψt '+_rbState.spec.psiT+'　ψe '+_rbState.spec.psiE+'　λ '+_rbState.spec.lambda
+    +'｜設計搭接長(m)：'+res.spec.rows.map(function(r){return r.no+'='+r.designM;}).join('、')+'</div>';
+  _toolPrint('鋼筋籠檢料表',_rbState.proj,body);
+}
+function _rbXlsx(){
+  var res=_rbCompute(_rbState),sp=_rbState.spec;
+  var sheets=[];
+  // 1) 規範搭接（帶公式：業主可改參數自動重算）
+  var specRows=[
+    [{v:'規範搭接參數（ACI 318／內政部規範）',s:1}],
+    ['混凝土強度 fc\'(kgf/cm²)',{v:sp.fc}],
+    ['鋼筋降伏 fy(kgf/cm²)',{v:sp.fy}],
+    ['搭接分類',{v:sp.lapClass,t:'s'}],
+    ['ψt',{v:sp.psiT}],['ψe',{v:sp.psiE}],['λ',{v:sp.lambda}],
+    [],
+    [{v:'號數',s:2},{v:'db(cm)',s:2},{v:'ld(cm)',s:2},{v:'拉力搭接(cm)',s:2},{v:'壓力搭接(cm)',s:2},{v:'設計搭接(m)',s:2},{v:'單位重(kg/m)',s:2}]];
+  RB_BARS.forEach(function(b,i){
+    var n=10+i;
+    specRows.push([{v:b.no,t:'s',s:3},{v:b.db,s:3},
+      {f:'MAX(0.9*$B$3*$B$5*$B$6/($B$7*SQRT($B$2))*B'+n+',30)',s:3},
+      {f:'CEILING(IF($B$4="B類",1.3,1)*C'+n+',5)',s:3},
+      {f:'CEILING(MAX(0.071*$B$3/SQRT($B$2)*B'+n+',0.0005*$B$3*B'+n+',30),5)',s:3},
+      {f:'E'+n+'/100',s:3},{v:b.w,s:3}]);
+  });
+  sheets.push({name:'規範搭接',widths:[22,12,12,14,14,14,14],rows:specRows});
+  // 2) TYPE 主表（輸入條件）
+  var lb=['項目','樁徑 D(cm)','保護層(cm)','樁長 L(m)','基樁支數 N','fc\'','單支最大料長(m)','主筋號數','主筋分段數','每樁主筋總支數','搭接長覆蓋(m)','錯開距離(m)','第1段下批(m)','第2段下批(m)','第3段下批(m)','第4段下批(m)','第5段下批(m)','加密筋號數','加密筋長度(m)','加密筋支數','外箍筋號數','外箍筋間距(cm)','外箍定長料(m)','外箍搭接覆蓋(m)','內箍筋號數','內箍筋間距(m)','內箍搭接覆蓋(m)','工作筋號數'];
+  var mainRows=lb.map(function(l,ri){
+    var row=[{v:l,s:ri===0?2:1}];
+    _rbState.types.forEach(function(t){
+      var vals=[t.name,t.D,t.cover,t.L,t.N,t.fc,t.maxLen,t.mainBar,t.segments,t.mainCount,t.lapOverride,t.staggerOverride,
+        t.lowerLens&&t.lowerLens[0],t.lowerLens&&t.lowerLens[1],t.lowerLens&&t.lowerLens[2],t.lowerLens&&t.lowerLens[3],t.lowerLens&&t.lowerLens[4],
+        t.denseBar,t.denseLen,t.denseCount,t.hoopBar,t.hoopSpacing,t.hoopStock,t.hoopLapOverride,t.innerBar,t.innerSpacing,t.innerLapOverride,t.workBar];
+      var v=vals[ri];
+      row.push(v==null||v===''?null:(typeof v==='number'?{v:v,s:ri===0?2:0}:{v:String(v),t:'s',s:ri===0?2:0}));
+    });
+    return row;
+  });
+  sheets.push({name:'TYPE主表',widths:[20].concat(_rbState.types.map(function(){return 14;})),rows:mainRows});
+  // 3) 各 TYPE 料單（總長／總重為公式）
+  res.types.filter(function(t){return t.ok;}).forEach(function(t){
+    var rows=[[{v:'料單｜'+t.name,s:1}],
+      [{v:'#',s:2},{v:'號數',s:2},{v:'說明',s:2},{v:'料長(m)',s:2},{v:'支/批',s:2},{v:'基樁',s:2},{v:'總長(m)',s:2},{v:'單位重(kg/m)',s:2},{v:'總重(kg)',s:2}]];
+    t.rows.forEach(function(x,i){
+      var n=3+i;
+      rows.push([{v:x.no,s:3},{v:x.bar,t:'s',s:3},{v:x.desc,t:'s',s:3},{v:x.len,s:3},{v:x.perBatch,s:3},{v:x.piles,s:3},
+        {f:'D'+n+'*E'+n+'*F'+n,s:3},{v:x.unitW,s:3},{f:'G'+n+'*H'+n,s:3}]);
+    });
+    var last=2+t.rows.length;
+    rows.push([{v:'小計',s:4},null,null,null,null,null,null,null,{f:'SUM(I3:I'+last+')',s:4}]);
+    rows.push([{v:'每支籠(kg)',s:1},null,null,null,null,null,null,null,{f:'I'+(last+1)+'/'+t.cond.N,s:1}]);
+    sheets.push({name:_xlSheetName('料單-'+t.name),widths:[5,8,26,10,8,8,12,12,12],rows:rows});
+  });
+  // 4) 號數匯總（合計為公式）
+  var okT=res.types.filter(function(t){return t.ok;});
+  var withBed=res.bed.cnt>0&&res.bed.total>0;
+  var sumHdr=[{v:'號數',s:2}].concat(okT.map(function(t){return {v:t.name+'(kg)',s:2};}));
+  if(withBed)sumHdr.push({v:'板床(kg)',s:2});
+  sumHdr.push({v:'總支數',s:2},{v:'總長(m)',s:2},{v:'合計(kg)',s:2},{v:'(t)',s:2});
+  var sumRows=[sumHdr];
+  var okIdx=res.types.map(function(t,i){return t.ok?i:-1;}).filter(function(i){return i>=0;});
+  var mr=res.summary.matrix.filter(function(m){return m.total>0;});
+  mr.forEach(function(m,i){
+    var n=2+i;
+    var lastKg=_xlCol(okIdx.length+(withBed?1:0));
+    var row=[{v:m.no,t:'s',s:3}].concat(okIdx.map(function(ci){return {v:Math.round(m.byType[ci]*10)/10,s:3};}));
+    if(withBed)row.push({v:Math.round(m.bedKg*10)/10,s:3});
+    row.push({v:m.cnt,s:3},{v:Math.round(m.len),s:3},
+      {f:'SUM(B'+n+':'+lastKg+n+')',s:3},
+      {f:_xlCol(sumHdr.length-2)+n+'/1000',s:3});
+    sumRows.push(row);
+  });
+  var totCol=_xlCol(sumHdr.length-2);
+  sumRows.push([{v:'全部合計',s:4}].concat(new Array(sumHdr.length-3).fill(null)).concat([
+    {f:'SUM('+totCol+'2:'+totCol+(1+mr.length)+')',s:4},{f:totCol+(2+mr.length)+'/1000',s:4}]));
+  sheets.push({name:'號數匯總',widths:new Array(sumHdr.length).fill(13),rows:sumRows});
+  // 5) 公式說明（業主檢核）
+  sheets.push({name:'公式說明',widths:[110],rows:[
+    [{v:'鋼筋籠檢料 — 計算公式說明（豐有工程管理系統匯出）',s:1}],
+    ['1. 規範搭接：ld = MAX(0.9×fy×ψt×ψe ÷ (λ×√fc\') × db, 30)cm；拉力搭接 = CEILING(搭接分類係數×ld, 5)，B類係數1.3、A類1；壓力搭接 = CEILING(MAX(0.071×fy÷√fc\'×db, 0.0005×fy×db, 30), 5)；設計搭接採壓力式。「規範搭接」工作表為活公式，修改參數即自動重算。'],
+    ['2. 主筋：分段數>1 時上下批錯開，錯開距離預設 1.3×搭接；各段下批料長手動輸入，上批 = 下批 − 錯開 − 搭接；最後段下批 = 樁長 − Σ前段上批 + 搭接、上批 = 樁長 − Σ前段下批 + 搭接。每批支數 = 每樁主筋總支數 ÷ 2（單段不分批）。'],
+    ['3. 外箍筋（螺旋）：箍徑 = 樁徑 − 2×保護層 − 外箍db；圈數 = ROUNDUP(樁長×100÷間距 + 1)；單圈長 = π×箍徑 + 搭接；有定長料 → 支數 = ROUNDUP(總長÷定長料)，無定長料 → 按圈列料。'],
+    ['4. 內箍筋：箍徑 = 樁徑 − 2×(保護層 + 外箍db + 主筋db + 內箍db÷2)；圈數 = ROUNDUP(樁長÷間距) + 1；單圈長 = π×箍徑 + 搭接。'],
+    ['5. 工作筋：組數 = 內箍圈數 + 2；口字筋長 = FLOOR(內箍半徑×√2, 0.1)m × 每組4支；斜撐筋長 = FLOOR(√((r÷√2)² + (外箍半徑 − r÷√2)²), 0.1)m × 每組4支。'],
+    ['6. 料單「總長 = 料長×支/批×基樁支數」「總重 = 總長×單位重」均為活公式；號數匯總「合計」「(t)」亦為活公式，可逐格檢核。'],
+    ['7. 鋼筋標稱：D10 0.56、D13 0.994、D15/D16 1.56、D19 2.25、D22 3.04、D25 3.98、D29 5.04、D32 6.23 kg/m（CNS 竹節鋼筋）。'],
+    ['計算引擎：與威立采集團鋼筋籠檢料工具（自 Excel 活頁簿逐格移植）計算行為一致。']]});
+  var roc=(new Date().getFullYear()-1911)+String(new Date().getMonth()+1).padStart(2,'0')+String(new Date().getDate()).padStart(2,'0');
+  xlsxDownload((_rbState.proj||'鋼筋籠檢料')+'_'+roc,sheets);
 }
 // ══════════ 資料救援（v5.340）══════════
 // 從每日雲端快照挑單筆記錄還原。重點：誤刪的記錄有墓碑（TOMBS），
@@ -18698,7 +19160,7 @@ function _buildQuoteDocHTML(q){
   // 其他費用不列入報價文件（v5.244 移除；內部成本請用施工成本→額外支出）
   let exRows='';
   return `<div class="page-content-wrap">
-      <div style="text-align:center;margin-bottom:4px"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodpAAQAAAABAAABMuocAAcAAAEMAAAAJgAAAAAc6gAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWQAwACAAAAFAAAAoCQBAACAAAAFAAAApSSkQACAAAAAzAwAACSkgACAAAAAzAwAADqHAAHAAABDAAAAXQAAAAAHOoAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADIwMjQ6MTE6MjggMDc6MzM6MzQAMjAyNDoxMToyOCAwNzozMzozNAAAAP/hAqxodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvADw/eHBhY2tldCBiZWdpbj0n77u/JyBpZD0nVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkJz8+DQo8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIj48cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSJ1dWlkOmZhZjViZGQ1LWJhM2QtMTFkYS1hZDMxLWQzM2Q3NTE4MmYxYiIgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iPjxleGlmOkRhdGVUaW1lT3JpZ2luYWw+MjAyNC0xMS0yOFQwNzozMzozNDwvZXhpZjpEYXRlVGltZU9yaWdpbmFsPjwvcmRmOkRlc2NyaXB0aW9uPjwvcmRmOlJERj48L3g6eG1wbWV0YT4NCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8P3hwYWNrZXQgZW5kPSd3Jz8+/9sAQwADAgIDAgIDAwMDBAMDBAUIBQUEBAUKBwcGCAwKDAwLCgsLDQ4SEA0OEQ4LCxAWEBETFBUVFQwPFxgWFBgSFBUU/9sAQwEDBAQFBAUJBQUJFA0LDRQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU/8AAEQgAywDLAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYH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" style="height:44px;width:auto"></div>
+      <div style="text-align:center;margin-bottom:4px"><img src="${FY_LOGO}" style="height:44px;width:auto"></div>
       <div class="doc-title">豐有工程報價單</div>
 
       <div class="info-grid">
