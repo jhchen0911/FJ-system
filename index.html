@@ -2525,7 +2525,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.340';
+var APP_VERSION='v5.341';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){}
@@ -8987,7 +8987,10 @@ function fbRegister(){
     .catch(err=>{_setFbLoading(false);if(errEl){errEl.textContent=_fbErrMsg(err.code);errEl.style.display='block';}});
 }
 function fbSignOut(){
-  try{localStorage.removeItem('fy_sync_hashes');}catch(e){}   // v5.319：換帳號時基準必須重置，否則新帳號雲端會永遠是空的_fbAuth.signOut().then(()=>toast('已登出'));}function gdriveSync(){
+  try{localStorage.removeItem('fy_sync_hashes');}catch(e){}   // v5.319：換帳號時基準必須重置，否則新帳號雲端會永遠是空的
+  if(_fbAuth)_fbAuth.signOut().then(()=>toast('已登出'));
+}
+function gdriveSync(){
   if(!_fbUser){go('params');toast('請先在參數設定頁登入帳號');return;}
   fbUpload();
 }
@@ -10970,12 +10973,35 @@ function rescueListBackups(){
 function rescueLoad(date){
   var det=document.getElementById('rescue-detail')||document.getElementById('rescue-body');
   det.innerHTML='下載 '+esc(date)+' 快照中…';
+  window._rescueUrl='';
   _fbStorage.ref('fydata/backups/'+date+'.json').getDownloadURL().then(function(url){
-    return fetch(url).then(function(r){return r.json();});
+    window._rescueUrl=url;
+    return fetch(url).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});
   }).then(function(snap){
     _rescueSnap=snap;_rescueDate=date;
     rescueRenderDiff();
-  }).catch(function(e){det.innerHTML='<span style="color:#c62828">快照載入失敗：'+esc((e&&e.message)||'')+'</span>';});
+  }).catch(function(e){
+    // Storage 桶未設 CORS 時 fetch 會被瀏覽器擋（Failed to fetch）→ 提供手動兩步驟備援
+    det.innerHTML='<span style="color:#c62828">直接載入失敗：'+esc((e&&e.message)||'')+'</span>'
+      +'<div style="margin-top:8px;font-size:12px;color:var(--b4)">通常是瀏覽器跨網域限制，改用手動兩步驟（一樣安全）：</div>'
+      +'<div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">'
+      +(window._rescueUrl?'<button type="button" class="btn btn-sm" onclick="window.open(window._rescueUrl,\'_blank\')">1. 下載快照檔</button>':'')
+      +'<label class="btn btn-sm" style="cursor:pointer;margin:0">2. 選擇剛下載的檔案'
+      +'<input type="file" accept=".json,application/json" style="display:none" onchange="rescueLoadFile(this,\''+escq(date)+'\')"></label></div>';
+  });
+}
+function rescueLoadFile(inp,date){
+  var f=inp.files&&inp.files[0];if(!f)return;
+  var det=document.getElementById('rescue-detail')||document.getElementById('rescue-body');
+  var rd=new FileReader();
+  rd.onload=function(){
+    try{
+      _rescueSnap=JSON.parse(rd.result);
+      _rescueDate=date||String(f.name||'').replace(/\.json$/,'');
+      rescueRenderDiff();
+    }catch(e){det.innerHTML='<span style="color:#c62828">檔案解析失敗：'+esc((e&&e.message)||'')+'</span>';}
+  };
+  rd.readAsText(f);inp.value='';
 }
 function _rescueArr(x){return Array.isArray(x)?x:(x&&typeof x==='object'?Object.values(x):[]);}
 function rescueRenderDiff(){
@@ -17637,7 +17663,7 @@ function renderMobMore(){
   var grid=function(html){return '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">'+html+'</div>';};
   var title=function(t){return '<div style="font-size:11.5px;font-weight:700;color:var(--b4);margin:14px 0 10px;letter-spacing:.06em">'+t+'</div>';};
   var h='';
-  ['main','fin','data','sys'].forEach(function(g){
+  ['main','fin','data','acct','sys'].forEach(function(g){
     var ps=pages.filter(function(p){return p.grp===g;});
     if(!ps.length)return;
     h+=title(g==='main'?'常用功能':PAGE_GRP_LABEL[g])+grid(ps.map(btn).join(''));
@@ -17974,7 +18000,8 @@ function renderUserChip(){
   var el=document.getElementById('user-chip');if(!el)return;
   if(!_fbUser){
     // v5.339：v5.335 起訪客看不到參數設定頁，新瀏覽器沒有登入入口 → 右上角直接放登入鈕
-    el.innerHTML='<button type="button" onclick="fbSignIn()" style="display:flex;align-items:center;gap:6px;'
+    // v5.341：fbSignIn 讀的是參數設定頁的表單（訪客看不到）→ 改開獨立登入視窗
+    el.innerHTML='<button type="button" onclick="chipLoginOpen()" style="display:flex;align-items:center;gap:6px;'
       +'background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);border-radius:99px;'
       +'padding:5px 14px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit">'
       +'<svg class="ic ib" aria-hidden="true"><use href="#i-user"/></svg> 登入</button>';
@@ -18005,6 +18032,52 @@ function renderUserChip(){
   }
 }
 function _userMenuClose(){var m=document.getElementById('user-menu');if(m)m.style.display='none';}
+// ── 右上角登入視窗（v5.341）：訪客唯一的登入入口，不依賴參數設定頁的表單 ──
+function chipLoginOpen(){
+  initGoogleSignIn();
+  var ov=document.getElementById('chip-login-ov');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='chip-login-ov';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    var inp='width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--b2);border-radius:var(--r6);font-size:14px;font-family:inherit;margin-bottom:8px';
+    ov.innerHTML='<div style="background:var(--w);border-radius:var(--r10);padding:22px;width:100%;max-width:340px;box-shadow:0 18px 48px rgba(0,0,0,.3)" onclick="event.stopPropagation()">'
+      +'<div style="font-size:15px;font-weight:800;color:var(--b5);margin-bottom:14px">登入系統</div>'
+      +'<input id="cl-email" type="email" placeholder="電子郵件" autocomplete="username" style="'+inp+'">'
+      +'<input id="cl-password" type="password" placeholder="密碼" autocomplete="current-password" style="'+inp+'" onkeydown="if(event.key===\'Enter\')chipLoginGo()">'
+      +'<div id="cl-err" style="display:none;color:#c62828;font-size:11.5px;margin:2px 0 4px"></div>'
+      +'<div style="display:flex;gap:8px;margin-top:10px">'
+      +'<button type="button" class="btn btn-g" style="flex:1" onclick="chipLoginGo()">登入</button>'
+      +'<button type="button" class="btn" onclick="chipLoginClose()">取消</button></div></div>';
+    ov.onclick=chipLoginClose;
+    document.body.appendChild(ov);
+  }
+  ov.style.display='flex';
+  var err=document.getElementById('cl-err');if(err)err.style.display='none';
+  var em=document.getElementById('cl-email');
+  try{if(em&&!em.value)em.value=localStorage.getItem('fy_last_email')||'';}catch(e){}
+  setTimeout(function(){var f=(em&&em.value)?document.getElementById('cl-password'):em;if(f)f.focus();},50);
+}
+function chipLoginClose(){window._clRetry=0;var ov=document.getElementById('chip-login-ov');if(ov)ov.style.display='none';}
+function chipLoginGo(){
+  var email=String((document.getElementById('cl-email')||{}).value||'').trim();
+  var pw=(document.getElementById('cl-password')||{}).value||'';
+  var err=document.getElementById('cl-err');
+  var show=function(m){if(err){err.textContent=m;err.style.display='block';}};
+  if(!email||!pw){show('請輸入電子郵件和密碼');return;}
+  if(!_fbAuth){
+    initGoogleSignIn();
+    var n=(window._clRetry||0)+1;window._clRetry=n;
+    if(n<=20){show('Firebase 連線中（'+n+'/20）…');setTimeout(chipLoginGo,500);}
+    else{window._clRetry=0;show('Firebase 連線失敗，請重新整理頁面。');}
+    return;
+  }
+  window._clRetry=0;
+  _fbAuth.setPersistence('local')
+    .then(function(){return _fbAuth.signInWithEmailAndPassword(email,pw);})
+    .then(function(){try{localStorage.setItem('fy_last_email',email);}catch(e){}toast('登入成功！');chipLoginClose();})
+    .catch(function(e2){show(_fbErrMsg((e2&&e2.code)||''));});
+}
 function renderDashGreet(){
   var el=document.getElementById('dash-greet');if(!el)return;
   if(!_fbUser){el.textContent='';el.style.display='none';return;}
