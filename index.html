@@ -616,10 +616,11 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div class="ssec" style="margin-top:5px">資料與工具</div>
   <button type="button" class="snav" id="sn-intake" onclick="smartIntake()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
   <button type="button" class="snav" id="sn-contacts" onclick="go('contacts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>客戶．廠商</button>
+  <button type="button" class="snav" id="sn-progress" onclick="go('progress')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg></span>施工進度</button>
   <button type="button" class="snav" id="sn-rebar" onclick="go('rebar')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-scale"/></svg></span>鋼筋籠檢料</button>
+  <button type="button" class="snav" id="sn-matest" onclick="go('matest')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>材料估算</button>
   <button type="button" class="snav" id="sn-grout" onclick="go('grout')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>根固砂漿</button>
   <button type="button" class="snav" id="sn-backfill" onclick="go('backfill')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span>背填材料</button>
-  <button type="button" class="snav" id="sn-progress" onclick="go('progress')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg></span>施工進度</button>
   <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
   <div class="ssec" style="margin-top:5px">系統</div>
   <button type="button" class="snav" id="sn-staff" onclick="go('staff')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>人員管理</button>
@@ -1108,7 +1109,6 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <button type="button" class="btn btn-xs" id="mat-view-stock" onclick="matSetView('stock')" style="padding:8px 14px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-box"/></svg> 材料庫存</button>
       <button type="button" class="btn btn-xs" id="mat-view-buy" onclick="matSetView('buy')" style="padding:8px 14px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg> 材料購置</button>
       <button type="button" class="btn btn-xs" id="mat-view-proj" onclick="matSetView('proj')" style="padding:8px 14px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 專案材料</button>
-      <button type="button" class="btn btn-xs" id="mat-view-est" onclick="matSetView('est')" style="padding:8px 14px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-calc"/></svg> 材料估算</button>
     </div>
     <div id="mat-stock-wrap">
       <div class="card">
@@ -1126,14 +1126,6 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     </div>
     <div id="mat-proj-wrap" style="display:none">
       <div id="mat-proj-box"></div>
-    </div>
-    <div id="mat-est-wrap" style="display:none">
-      <div class="card">
-        <div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-calc"/></svg> 擋土支撐材料估算</div>
-          <div style="font-size:11px;color:var(--b4)">選專案→輸入條件→計算所需材料</div></div>
-        <div class="cb"><div id="mat-est-form"></div></div>
-      </div>
-      <div id="mat-est-out"></div>
     </div>
   </div>
 </div>
@@ -1172,6 +1164,18 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <div class="page" id="page-progress">
   <div class="ph"><div class="ph-l"><div class="ph-t">施工進度</div><div class="ph-s">機組平行排程・甘特圖・落後偵測・S 曲線</div></div></div>
   <div class="pad" style="max-width:1500px"><div id="progress-root"></div></div>
+</div>
+<div class="page" id="page-matest">
+  <div class="ph"><div class="ph-l"><div class="ph-t">材料估算</div><div class="ph-s">擋土支撐材料估算：選專案→輸入條件→計算所需材料</div></div></div>
+  <div class="pad" style="max-width:1300px">
+    <div id="mat-est-wrap">
+      <div class="card">
+        <div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-calc"/></svg> 擋土支撐材料估算</div></div>
+        <div class="cb"><div id="mat-est-form"></div></div>
+      </div>
+      <div id="mat-est-out"></div>
+    </div>
+  </div>
 </div>
 <div class="page" id="page-quickcost">
   <div class="ph">
@@ -2565,7 +2569,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.351';
+var APP_VERSION='v5.352';
 var FY_LOGO='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodpAAQAAAABAAABMuocAAcAAAEMAAAAJgAAAAAc6gAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWQAwACAAAAFAAAAoCQBAACAAAAFAAAApSSkQACAAAAAzAwAACSkgACAAAAAzAwAADqHAAHAAABDAAAAXQAAAAAHOoAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADIwMjQ6MTE6MjggMDc6MzM6MzQAMjAyNDoxMToyOCAwNzozMzozNAAAAP/hAqxodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvADw/eHBhY2tldCBiZWdpbj0n77u/JyBpZD0nVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkJz8+DQo8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIj48cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSJ1dWlkOmZhZjViZGQ1LWJhM2QtMTFkYS1hZDMxLWQzM2Q3NTE4MmYxYiIgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iPjxleGlmOkRhdGVUaW1lT3JpZ2luYWw+MjAyNC0xMS0yOFQwNzozMzozNDwvZXhpZjpEYXRlVGltZU9yaWdpbmFsPjwvcmRmOkRlc2NyaXB0aW9uPjwvcmRmOlJERj48L3g6eG1wbWV0YT4NCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8P3hwYWNrZXQgZW5kPSd3Jz8+/9sAQwADAgIDAgIDAwMDBAMDBAUIBQUEBAUKBwcGCAwKDAwLCgsLDQ4SEA0OEQ4LCxAWEBETFBUVFQwPFxgWFBgSFBUU/9sAQwEDBAQFBAUJBQUJFA0LDRQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU/8AAEQgAywDLAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYH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';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
@@ -2593,6 +2597,24 @@ if('serviceWorker' in navigator){
   }catch(e){}
 }
 try{console.log('%c豐有工程管理系統 '+APP_VERSION+' 已載入','color:#0e3d22;font-weight:700;font-size:14px');}catch(e){}
+// v5.352 一次性回填：v5.348 起材料採購（智慧收件、有發票號）要進應付帳款，
+// 但既有舊資料只在「下次編輯」才會同步——這裡開機時全量重跑一次連動（含外包/點工，
+// syncCostToPayable 本身有 costId 精確比對與孤兒領養，不會重複建）。
+setTimeout(function(){
+  try{
+    if(localStorage.getItem('fy_pay_sync1')==='1')return;
+    if(typeof syncCostToPayable!=='function')return;
+    var _n0=PAYABLES.length;
+    Q.forEach(function(q){(q&&q.costs||[]).forEach(function(c){try{syncCostToPayable(q,c);}catch(e){}});});
+    localStorage.setItem('fy_pay_sync1','1');
+    var added=PAYABLES.length-_n0;
+    if(added>0){
+      try{savePayables();_markDirty();}catch(e){}
+      try{toast('應付帳款回填完成：新增 '+added+' 筆（含既有材料採購）');}catch(e){}
+    }
+  }catch(e){}
+},1200);
+
 
 // 若未登入，隱藏所有非公開功能
 function applyGuestUI(){
@@ -3119,6 +3141,7 @@ function go(p){
   if(p==='grout'){try{_gtRender();}catch(e){}}
   if(p==='backfill'){try{_bfRender();}catch(e){}}
   if(p==='progress'){try{_pgRender();}catch(e){}}
+  if(p==='matest'){try{renderMatEst();}catch(e){}}
   if(p==='quotes'){renderList();updateQuoteStats();}
   if(p==='editor'){
     rItems();rExs();rTots();
@@ -8554,7 +8577,7 @@ function updateCustomerStats(){
     '<div class="kpi" style="flex:1;min-width:120px"><div class="kl">客戶總數</div><div class="kv" style="font-size:20px">'+total+'</div><div class="ks">有合約往來 '+withContract+' 位</div></div>'
     +'<div class="kpi" style="flex:1;min-width:120px"><div class="kl">進行中合約</div><div class="kv" style="font-size:20px">'+activeContracts+'</div><div class="ks">件</div></div>'
     +'<div class="kpi hi" style="flex:1;min-width:140px"><div class="kl">得標金額（合約現值）</div><div class="kv" style="font-size:16px">NT$ '+fmt(totalContractAmt)+'</div>'
-    +(orphanCts.length?'<div class="ks" style="color:#c62828">另有 '+orphanCts.length+' 件合約未對應得標報價 NT$ '+fmt(orphanAmt)+'（參數設定→重複資料檢查）</div>':'')+'</div>';
+    +(orphanCts.length?'<div class="ks" style="color:#c62828">另有 '+orphanCts.length+' 件合約未對應得標報價 NT$ '+fmt(orphanAmt)+'：'+orphanCts.slice(0,2).map(function(c){return '「'+esc(c.name||'未命名')+'」';}).join('、')+(orphanCts.length>2?'…':'')+'（參數設定→重複資料檢查）</div>':'')+'</div>';
 }
 
 function updateDashAR(){
@@ -8939,6 +8962,21 @@ function _migrateDepts(){
         });
         if(sd2)_acctSave(pr2);
         localStorage.setItem('fy_tools_seed2','1');
+      }
+    }
+  }catch(e){}
+  try{
+    if(localStorage.getItem('fy_tools_seed3')!=='1'){
+      var pr3=_acct();
+      if((pr3.__roles||[]).length){
+        var sd3=false;
+        pr3.__roles.forEach(function(r){
+          if(r.sys)return;
+          r.pages=r.pages||{};
+          if(r.pages.matest!==true){r.pages.matest=true;r._mt=Date.now();sd3=true;}
+        });
+        if(sd3)_acctSave(pr3);
+        localStorage.setItem('fy_tools_seed3','1');
       }
     }
   }catch(e){}
@@ -9552,6 +9590,7 @@ function computeShoringFY(inp){
 var MAT_EST=null;
 var _SH_STR_KEYS={method:1,pileSpec:1,capType:1,gtMode:1,midSpec:1,coSpec:1,gtSpec:1,stiff:1,heng:1,dogbone:1,fengProc:1,deck:1,gtRopeDeduct:1,railScope:1,postH:1,toe:1,hookType:1,udMods:1};
 function matSetView(vw){
+  if(vw==='est')vw='stock';   // v5.352 材料估算已獨立成頁
   window._matView=vw;
   var wraps={stock:'mat-stock-wrap',buy:'mat-buy-wrap',proj:'mat-proj-wrap',est:'mat-est-wrap'};
   var btns={stock:'mat-view-stock',buy:'mat-view-buy',proj:'mat-view-proj',est:'mat-view-est'};
@@ -10001,7 +10040,8 @@ function matEstExportPDF(){
     body+='</div>';
   }
   body+='</div>';
-  var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>材料估算表</title><style>'
+  var _mefn=_toolFileName('matest','材料估算表',(q&&q.name)||'');
+  var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(_mefn)+'</title><style>'
     +'@page{size:A4;margin:8mm}body{font-family:"Microsoft JhengHei","PingFang TC",sans-serif;font-size:8px;color:#1a1a1a;margin:0}'
     +'h1{font-size:13px;margin:0 0 2px;border-bottom:2px solid #2e5e42;padding-bottom:3px}'
     +'h2{font-size:9px;margin:5px 0 2px;color:#2e5e42;break-after:avoid}'
@@ -10014,7 +10054,7 @@ function matEstExportPDF(){
     +'td.sec{background:#eef4f0;font-weight:700;color:#2e5e42}'
     +'.stg{margin:2px 0;font-size:7.5px;break-inside:avoid}.stg>div{color:#444;line-height:1.5}'
     +'</style></head><body>'+body+'</body></html>';
-  _printNativeHTML(html,'材料估算表',Math.round((297-16)*96/25.4)); // A4 扣邊距一頁高，小幅溢出自動縮身
+  _printNativeHTML(html,_mefn,Math.round((297-16)*96/25.4)); // A4 扣邊距一頁高，小幅溢出自動縮身
 }
 function matEstUB(k,checked){
   if(!MAT_EST)MAT_EST=_shDefaults();
@@ -11167,6 +11207,17 @@ function _projDatalist(){
   return '<datalist id="fy-proj-list">'+Q.filter(function(q){return q&&!q.parentId&&q.name;}).map(function(q){return '<option value="'+esc(q.name)+'">';}).join('')+'</datalist>';
 }
 // ── 工具列印外框（豐有 logo＋配色；獨立視窗，純 HTML 無 sprite 引用）──
+// 匯出檔名：業主簡稱（去除(股份)有限公司）-專案簡稱（去除「工程」）_表頭_民國日期_v版次
+function _toolFileName(kind,head,projName){
+  var q=Q.find(function(x){return x&&x.name===projName;});
+  var client=String((q&&q.client)||'').replace(/股份有限公司|有限公司/g,'').trim();
+  var proj=String(projName||'').replace(/工程/g,'').trim();
+  var d=new Date();
+  var roc=(d.getFullYear()-1911)+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+  var ver=1;try{ver=_trList(kind).filter(function(r){return (r.proj||'')===(projName||'');}).length+1;}catch(e){}
+  var base=[client,proj].filter(Boolean).join('-');
+  return ((base?base+'_':'')+head+'_'+roc+'_v'+ver).replace(/[\\/:*?"<>|]/g,'');
+}
 function _toolPrint(title,proj,body,opts){
   var css='*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
    +'body{font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;color:#1f2937;padding:20px;font-size:12px}'
@@ -11179,7 +11230,7 @@ function _toolPrint(title,proj,body,opts){
    +'@media print{body{padding:0}}'+((opts&&opts.landscape)?'@page{size:A4 landscape}':'');
   var w=window.open('','_blank');
   if(!w){toast('瀏覽器阻擋了列印視窗，請允許彈出視窗');return;}
-  w.document.write('<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>'+_xlEsc(title)+'</title><style>'+css+'</style></head><body>'
+  w.document.write('<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>'+_xlEsc((opts&&opts.fname)||title)+'</title><style>'+css+'</style></head><body>'
     +'<div style="display:flex;align-items:center;gap:12px"><img src="'+FY_LOGO+'" style="height:42px"><h1>'+_xlEsc(title)+'</h1></div>'
     +'<div class="b">'+(proj?(_xlEsc(proj)+'　'):'')+'日期：'+localToday()+'</div>'
     +body+'<script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>');
@@ -11584,7 +11635,7 @@ function _rbPrint(){
     +'<tr class="tt"><td colspan="'+(okIdx.length+(withBed?2:1)+2)+'" class="r"><b>全部合計'+(withBed?'（含板床）':'')+'</b></td><td class="r"><b>'+n1(res.summary.grand,0)+'</b></td><td class="r"><b>'+res.summary.grandT+'</b></td></tr></table>'
     +'<div class="cond">規範搭接：fc\' '+_rbState.spec.fc+'　fy '+_rbState.spec.fy+'　'+_xlEsc(_rbState.spec.lapClass)+'　ψt '+_rbState.spec.psiT+'　ψe '+_rbState.spec.psiE+'　λ '+_rbState.spec.lambda
     +'｜設計搭接長(m)：'+res.spec.rows.map(function(r){return r.no+'='+r.designM;}).join('、')+'</div>';
-  _toolPrint('鋼筋籠檢料表',_rbState.proj,body);
+  _toolPrint('鋼筋籠檢料表',_rbState.proj,body,{fname:_toolFileName('rebar','鋼筋籠檢料表',_rbState.proj)});
 }
 function _rbXlsx(){
   var res=_rbCompute(_rbState),sp=_rbState.spec;
@@ -11669,8 +11720,7 @@ function _rbXlsx(){
     ['6. 料單「總長 = 料長×支/批×基樁支數」「總重 = 總長×單位重」均為活公式；號數匯總「合計」「(t)」亦為活公式，可逐格檢核。'],
     ['7. 鋼筋標稱：D10 0.56、D13 0.994、D15/D16 1.56、D19 2.25、D22 3.04、D25 3.98、D29 5.04、D32 6.23 kg/m（CNS 竹節鋼筋）。'],
     ['計算引擎：與威立采集團鋼筋籠檢料工具（自 Excel 活頁簿逐格移植）計算行為一致。']]});
-  var roc=(new Date().getFullYear()-1911)+String(new Date().getMonth()+1).padStart(2,'0')+String(new Date().getDate()).padStart(2,'0');
-  xlsxDownload((_rbState.proj||'鋼筋籠檢料')+'_'+roc,sheets);
+  xlsxDownload(_toolFileName('rebar','鋼筋籠檢料表',_rbState.proj),sheets);
 }
 // ══════════ 根固水泥砂漿（v5.346）══════════
 // 公式與豐有既有 Excel 檢料表一致：根固段長＝根固深度−基地開挖深度、
@@ -11781,7 +11831,7 @@ function _gtPrint(){
       return '<tr><td class="l">'+_xlEsc(p.name)+'</td><td class="r">'+p.depth+'</td><td class="r">'+p.dia+'</td><td class="r">'+r.secLen.toFixed(2)+'</td><td class="r">'+r.area.toFixed(4)+'</td><td class="r">'+r.vol.toFixed(3)+'</td><td class="r">'+p.count+'</td><td class="r">'+Math.round(r.cemPer).toLocaleString()+'</td><td class="r">'+r.cemTot.toFixed(2)+'</td><td class="r">'+r.sandPer.toFixed(3)+'</td><td class="r">'+r.sandTot.toFixed(1)+'</td></tr>';}).join('')
     +'<tr class="tt"><td colspan="8" class="r"><b>合計（含損耗）</b></td><td class="r"><b>'+res.cemT.toFixed(2)+' t</b></td><td></td><td class="r"><b>'+res.sandM3.toFixed(1)+' m³</b></td></tr></table>'
     +'<div class="cond">公式：根固段長＝根固深度−基地開挖深度；截面積＝π/4×口徑²；單支立方＝截面積×段長；水泥＝立方×配比水泥；砂＝立方×配比砂；總量另乘（1＋損耗%）。水泥約 '+Math.ceil(res.cemT*1000/50).toLocaleString()+' 包（50kg/包）。</div>';
-  _toolPrint('根固水泥砂漿用量表',st.proj,body);
+  _toolPrint('根固水泥砂漿用量表',st.proj,body,{fname:_toolFileName('grout','根固水泥砂漿用量表',st.proj)});
 }
 function _gtXlsx(){
   var st=_gtState;
@@ -11813,8 +11863,7 @@ function _gtXlsx(){
       ['3. 水泥/支 = 單支立方 × 配比水泥(kg/m³)；砂/支 = 單支立方 × 配比砂(m³/m³)。'],
       ['4. 水泥總量(t) = 水泥/支 × 支數 × (1＋損耗%) ÷ 1000；砂總量(m³) = 砂/支 × 支數 × (1＋損耗%)。'],
       ['5. 配比為各廠商實際配比，可於本表 B2–B5 直接修改，全表活公式自動重算。']]}];
-  var roc=(new Date().getFullYear()-1911)+String(new Date().getMonth()+1).padStart(2,'0')+String(new Date().getDate()).padStart(2,'0');
-  xlsxDownload((st.proj||'根固水泥砂漿')+'_'+roc,sheets);
+  xlsxDownload(_toolFileName('grout','根固水泥砂漿用量表',st.proj),sheets);
 }
 // ══════════ 背填材料（v5.346）══════════
 // 公式與豐有既有 Excel 一致：背填混凝土＝該層周長×圍令規格高×背填厚度(0.1m)、
@@ -11926,7 +11975,7 @@ function _bfPrint(){
       return '<tr><td>'+_xlEsc(L.name)+'</td><td>'+_xlEsc(L.size)+'</td><td class="r">'+L.h+'</td><td>'+(L.incDrive?'✓':'—')+'</td><td class="r">'+r.perim.toFixed(0)+'</td><td class="r">'+L.gap+'</td><td class="r">'+r.conc.toFixed(2)+'</td><td class="r">'+r.bars.toLocaleString()+'</td><td class="r">'+r.barKg.toFixed(1)+'</td></tr>';}).join('')
     +'<tr class="tt"><td colspan="6" class="r"><b>合計（含損耗）</b></td><td class="r"><b>'+res.concM3.toFixed(2)+'</b></td><td class="r"><b>'+res.bars.toLocaleString()+'</b></td><td class="r"><b>'+res.barKg.toFixed(1)+'</b></td></tr></table>'
     +'<div class="cond">公式：背填混凝土＝該層周長×圍令規格高×背填厚度；背填鋼筋支數＝該層周長÷間距（無條件進位）；鋼筋重＝支數×單支長×單位重；合計另乘（1＋損耗%）。含車道層的周長＝基地周長＋車道長度。</div>';
-  _toolPrint('背填材料用量表',st.proj,body);
+  _toolPrint('背填材料用量表',st.proj,body,{fname:_toolFileName('backfill','背填材料用量表',st.proj)});
 }
 function _bfXlsx(){
   var st=_bfState;
@@ -11957,8 +12006,7 @@ function _bfXlsx(){
       ['2. 背填混凝土(m³) = 該層周長 × 圍令規格高 × 背填厚度 ×（1＋損耗%）。'],
       ['3. 背填鋼筋(支) = CEILING(該層周長 ÷ 間距) ×（1＋損耗%）；鋼筋(kg) = 支數 × 單支長 × 單位重。'],
       ['4. 全表活公式：修改 B2–B7 或各層欄位，Excel 自動重算。']]}];
-  var roc=(new Date().getFullYear()-1911)+String(new Date().getMonth()+1).padStart(2,'0')+String(new Date().getDate()).padStart(2,'0');
-  xlsxDownload((st.proj||'背填材料')+'_'+roc,sheets);
+  xlsxDownload(_toolFileName('backfill','背填材料用量表',st.proj),sheets);
 }
 // ══════════ 施工進度表（v5.347：威立采排程引擎完整移植，排程行為與其 Excel 一致）══════════
 // 天數＝⌈數量÷日產能⌉或手動；開始＝同機組上一項完工+1（接力），否則機組進場日（缺→開工日），
@@ -12248,7 +12296,7 @@ function _pgPrint(){
       }).join('')+'</table>';
   }
   body+='<div class="cond">排程規則：天數＝⌈數量÷日產能⌉或手動；開始＝同機組上一項完工+1（接力），否則機組進場日（未填＝開工日）＋微調；「指定開始」優先。總工期＝最晚完成−最早開始+1（日曆天，已扣重疊）。</div>';
-  _toolPrint('施工進度表',st.proj,body,{landscape:true});
+  _toolPrint('施工進度表',st.proj,body,{landscape:true,fname:_toolFileName('progress','施工進度表',st.proj)});
 }
 function _pgXlsx(){
   var st=_pgState;
@@ -12294,8 +12342,7 @@ function _pgXlsx(){
       ['4. 總工期 = MAX(完成) − MIN(開始) + 1（日曆天，同時施工自動扣重疊）。'],
       ['5. 全表活公式：改數量/日產能/機組/進場日/開工日，Excel 自動重排。MAXIFS 需 Excel 2019 以上。'],
       ['排程引擎：與威立采集團施工進度表工具（自 Excel 活頁簿逐格移植）排程行為一致。']]}];
-  var roc=(new Date().getFullYear()-1911)+String(new Date().getMonth()+1).padStart(2,'0')+String(new Date().getDate()).padStart(2,'0');
-  xlsxDownload((st.proj||'施工進度表')+'_'+roc,sheets);
+  xlsxDownload(_toolFileName('progress','施工進度表',st.proj),sheets);
 }
 // ══════════ 資料救援（v5.340）══════════
 // 從每日雲端快照挑單筆記錄還原。重點：誤刪的記錄有墓碑（TOMBS），
@@ -18907,10 +18954,11 @@ const ALL_PAGES = [
   {id:'ledger',    label:'帳務管理',  icon:_pgIcon('wallet'),   grp:'fin',   adminOnly:false},
   {id:'reports',   label:'報表中心',  icon:_pgIcon('chart'),    grp:'fin',   adminOnly:false, hidden:true, parent:'profit'}, // 由「利潤．報表」頁內分頁進入
   {id:'contacts',  label:'客戶．廠商',icon:_pgIcon('users'),    grp:'data',  adminOnly:false},
-  {id:'rebar',     label:'鋼筋籠檢料',icon:_pgIcon('scale'),    grp:'data',  adminOnly:false}, // v5.343 檢料計算工具
-  {id:'grout',     label:'根固砂漿',  icon:_pgIcon('box'),      grp:'data',  adminOnly:false}, // v5.346
-  {id:'backfill',  label:'背填材料',  icon:_pgIcon('wrench'),   grp:'data',  adminOnly:false}, // v5.346
   {id:'progress',  label:'施工進度',  icon:_pgIcon('calendar'), grp:'data',  adminOnly:false}, // v5.347
+  {id:'rebar',     label:'鋼筋籠檢料',icon:_pgIcon('scale'),    grp:'data',  adminOnly:false}, // v5.343
+  {id:'matest',    label:'材料估算',  icon:_pgIcon('box'),      grp:'data',  adminOnly:false}, // v5.352 自材料管理獨立
+  {id:'grout',     label:'根固砂漿',  icon:_pgIcon('hardhat'),  grp:'data',  adminOnly:false}, // v5.346
+  {id:'backfill',  label:'背填材料',  icon:_pgIcon('wrench'),   grp:'data',  adminOnly:false}, // v5.346
   // v5.330 sysOnly：只有「系統管理員」角色能開，其他角色的權限表上是鎖住的
   {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, sysOnly:true},
   {id:'staff',     label:'人員管理',  icon:_pgIcon('users'),    grp:'acct',  adminOnly:true},
