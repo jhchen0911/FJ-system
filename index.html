@@ -619,6 +619,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-rebar" onclick="go('rebar')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-scale"/></svg></span>鋼筋籠檢料</button>
   <button type="button" class="snav" id="sn-grout" onclick="go('grout')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>根固砂漿</button>
   <button type="button" class="snav" id="sn-backfill" onclick="go('backfill')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span>背填材料</button>
+  <button type="button" class="snav" id="sn-progress" onclick="go('progress')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg></span>施工進度</button>
   <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
   <div class="ssec" style="margin-top:5px">系統</div>
   <button type="button" class="snav" id="sn-staff" onclick="go('staff')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>人員管理</button>
@@ -1149,6 +1150,10 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <div class="page" id="page-backfill">
   <div class="ph"><div class="ph-l"><div class="ph-t">背填材料</div><div class="ph-s">支撐圍令背填：混凝土＋鋼筋用量（逐層計算）</div></div></div>
   <div class="pad" style="max-width:1300px"><div id="backfill-root"></div></div>
+</div>
+<div class="page" id="page-progress">
+  <div class="ph"><div class="ph-l"><div class="ph-t">施工進度</div><div class="ph-s">機組平行排程・甘特圖・落後偵測・S 曲線</div></div></div>
+  <div class="pad" style="max-width:1500px"><div id="progress-root"></div></div>
 </div>
 <div class="page" id="page-quickcost">
   <div class="ph">
@@ -2542,7 +2547,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.346';
+var APP_VERSION='v5.347';
 var FY_LOGO='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodpAAQAAAABAAABMuocAAcAAAEMAAAAJgAAAAAc6gAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWQAwACAAAAFAAAAoCQBAACAAAAFAAAApSSkQACAAAAAzAwAACSkgACAAAAAzAwAADqHAAHAAABDAAAAXQAAAAAHOoAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADIwMjQ6MTE6MjggMDc6MzM6MzQAMjAyNDoxMToyOCAwNzozMzozNAAAAP/hAqxodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvADw/eHBhY2tldCBiZWdpbj0n77u/JyBpZD0nVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkJz8+DQo8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIj48cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSJ1dWlkOmZhZjViZGQ1LWJhM2QtMTFkYS1hZDMxLWQzM2Q3NTE4MmYxYiIgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iPjxleGlmOkRhdGVUaW1lT3JpZ2luYWw+MjAyNC0xMS0yOFQwNzozMzozNDwvZXhpZjpEYXRlVGltZU9yaWdpbmFsPjwvcmRmOkRlc2NyaXB0aW9uPjwvcmRmOlJERj48L3g6eG1wbWV0YT4NCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8P3hwYWNrZXQgZW5kPSd3Jz8+/9sAQwADAgIDAgIDAwMDBAMDBAUIBQUEBAUKBwcGCAwKDAwLCgsLDQ4SEA0OEQ4LCxAWEBETFBUVFQwPFxgWFBgSFBUU/9sAQwEDBAQFBAUJBQUJFA0LDRQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU/8AAEQgAywDLAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYH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';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
@@ -3095,6 +3100,7 @@ function go(p){
   if(p==='rebar'){try{_rbRender();}catch(e){}}
   if(p==='grout'){try{_gtRender();}catch(e){}}
   if(p==='backfill'){try{_bfRender();}catch(e){}}
+  if(p==='progress'){try{_pgRender();}catch(e){}}
   if(p==='quotes'){renderList();updateQuoteStats();}
   if(p==='editor'){
     rItems();rExs();rTots();
@@ -11092,7 +11098,7 @@ function _xlsxBytes(sheets){
     +'<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0E3D22"/><bgColor rgb="FF0E3D22"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEAF3ED"/><bgColor rgb="FFEAF3ED"/></patternFill></fill></fills>'
     +'<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/><diagonal/></border></borders>'
     +'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-    +'<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/><xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+    +'<cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/><xf numFmtId="0" fontId="1" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/><xf numFmtId="14" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
   var files=[
     {name:'[Content_Types].xml',data:enc.encode(ct)},
     {name:'_rels/.rels',data:enc.encode(rels)},
@@ -11935,6 +11941,341 @@ function _bfXlsx(){
       ['4. 全表活公式：修改 B2–B7 或各層欄位，Excel 自動重算。']]}];
   var roc=(new Date().getFullYear()-1911)+String(new Date().getMonth()+1).padStart(2,'0')+String(new Date().getDate()).padStart(2,'0');
   xlsxDownload((st.proj||'背填材料')+'_'+roc,sheets);
+}
+// ══════════ 施工進度表（v5.347：威立采排程引擎完整移植，排程行為與其 Excel 一致）══════════
+// 天數＝⌈數量÷日產能⌉或手動；開始＝同機組上一項完工+1（接力），否則機組進場日（缺→開工日），
+// 再加微調；可整列指定開始日。強化：實際進度、落後偵測、S 曲線、甘特圖時間軸（月列/週末/今日）。
+function _pgToDay(s){
+  if(!s)return null;
+  var m=String(s).slice(0,10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m)return null;
+  return Math.floor(Date.UTC(+m[1],+m[2]-1,+m[3],12)/86400000);
+}
+function _pgToISO(d){
+  if(d==null)return null;
+  var t=new Date(d*86400000);
+  return t.getUTCFullYear()+'-'+String(t.getUTCMonth()+1).padStart(2,'0')+'-'+String(t.getUTCDate()).padStart(2,'0');
+}
+function _pgDow(d){return new Date(d*86400000).getUTCDay();}
+function _pgMonth(d){var t=new Date(d*86400000);return {y:t.getUTCFullYear(),m:t.getUTCMonth()+1};}
+function _pgNum(x){var n=typeof x==='string'?parseFloat(x):x;return Number.isFinite(n)?n:null;}
+function _pgCompute(inp){
+  var projStart=_pgToDay(inp.startDate);
+  if(projStart==null)projStart=_pgToDay(new Date().toISOString());
+  var colDays=Math.max(1,Math.round(_pgNum(inp.colDays)||3));
+  var today=_pgToDay(inp.today)!=null?_pgToDay(inp.today):_pgToDay(new Date().toISOString());
+  var entryOf={};
+  (inp.crews||[]).forEach(function(c){if(c&&c.name!=null)entryOf[String(c.name)]=_pgToDay(c.entry);});
+  var rows=(inp.rows||[]).map(function(r,i){
+    var qty=_pgNum(r.qty),rate=_pgNum(r.rate),manual=_pgNum(r.manualDays);
+    var days=(qty!=null&&rate!=null&&rate!==0)?Math.ceil(qty/rate):(manual!=null?Math.round(manual):null);
+    return Object.assign({},r,{seq:r.seq!=null?r.seq:i+1,crew:String(r.crew==null?'':r.crew),days:days,start:null,end:null});
+  });
+  rows.forEach(function(r,i){
+    if(r.days==null)return;
+    var ov=_pgToDay(r.startOverride);
+    if(ov!=null){r.start=ov;r.end=ov+r.days-1;return;}
+    var prevEnd=0;
+    for(var j=0;j<i;j++)if(rows[j].crew===r.crew&&rows[j].end!=null)prevEnd=Math.max(prevEnd,rows[j].end);
+    var base;
+    if(prevEnd>0)base=prevEnd+1;
+    else{
+      var e=Object.prototype.hasOwnProperty.call(entryOf,r.crew)?entryOf[r.crew]:null;
+      base=(e||0)>0?e:projStart;
+    }
+    var off=_pgNum(r.offset)||0;
+    r.start=base+off;
+    r.end=r.start+r.days-1;
+  });
+  var starts=rows.filter(function(r){return r.start!=null;}).map(function(r){return r.start;});
+  var ends=rows.filter(function(r){return r.end!=null;}).map(function(r){return r.end;});
+  var minStart=starts.length?Math.min.apply(null,starts):projStart;
+  var maxEnd=ends.length?Math.max.apply(null,ends):projStart;
+  var duration=ends.length?maxEnd-minStart+1:null;
+  var outRows=rows.map(function(r){
+    var aStart=_pgToDay(r.actualStart);
+    var aDone=_pgToDay(r.doneAt);
+    var qty=_pgNum(r.qty);
+    var doneQty=_pgNum(r.doneQty)||0;
+    var pct=null;
+    if(aDone!=null)pct=100;
+    else if(qty&&qty>0)pct=Math.min(100,Math.round(doneQty/qty*1000)/10);
+    else if(aStart!=null&&r.days&&r.start!=null)pct=Math.min(100,Math.round(Math.max(0,Math.min(today,r.end)-aStart+1)/r.days*1000)/10);
+    var late=r.end!=null&&aDone==null&&today>r.end&&(pct==null||pct<100);
+    return {seq:r.seq,crew:r.crew,name:r.name,qty:_pgNum(r.qty),unit:r.unit||'',rate:_pgNum(r.rate),
+      manualDays:_pgNum(r.manualDays),offset:_pgNum(r.offset),startOverride:r.startOverride||null,
+      days:r.days,start:_pgToISO(r.start),end:_pgToISO(r.end),_s:r.start,_e:r.end,
+      actualStart:_pgToISO(aStart),doneAt:_pgToISO(aDone),doneQty:_pgNum(r.doneQty),pct:pct,late:late};
+  });
+  var axisStart=projStart;
+  var axisEnd=Math.max(maxEnd,today,projStart+colDays*20);
+  var nCols=Math.min(140,Math.ceil((axisEnd-axisStart+1)/colDays)+1);
+  var cols=[],prevM=null;
+  for(var i2=0;i2<nCols;i2++){
+    var dd=axisStart+i2*colDays;
+    var mm=_pgMonth(dd);
+    var month='';
+    if(!prevM)month=mm.y+'/'+mm.m+'月';
+    else if(mm.m!==prevM.m)month=mm.m===1?(mm.y+'/'+mm.m+'月'):(mm.m+'月');
+    prevM=mm;
+    var t2=new Date(dd*86400000);
+    cols.push({d:dd,label:(t2.getUTCMonth()+1)+'/'+t2.getUTCDate(),month:month,
+      weekend:colDays===1&&(_pgDow(dd)===0||_pgDow(dd)===6),
+      isToday:today>=dd&&today<dd+colDays});
+  }
+  var totalDays=rows.reduce(function(s,r){return s+(r.days||0);},0);
+  var planPctToday=null;
+  if(totalDays&&ends.length){
+    var p=0;
+    rows.forEach(function(r){if(r.start!=null&&r.days)p+=Math.min(r.days,Math.max(0,Math.min(today,r.end)-r.start+1));});
+    planPctToday=Math.round(p/totalDays*1000)/10;
+  }
+  var actualPctToday=null;
+  if(totalDays){
+    var a=0,has=false;
+    rows.forEach(function(r,i3){var o=outRows[i3];if(o.pct!=null&&r.days){a+=r.days*o.pct/100;has=true;}});
+    actualPctToday=has?Math.round(a/totalDays*1000)/10:null;
+  }
+  var curve=[];
+  if(totalDays>0&&ends.length){
+    var step=Math.max(1,Math.round((maxEnd-minStart+1)/60));
+    for(var dd2=minStart;dd2<=maxEnd;dd2+=step){
+      var plan=0;
+      rows.forEach(function(r){
+        if(r.start==null||r.days==null)return;
+        var done=Math.max(0,Math.min(dd2,r.end)-r.start+1);
+        plan+=Math.min(r.days,done);
+      });
+      curve.push({d:dd2,plan:Math.round(plan/totalDays*1000)/10,actual:null});
+    }
+  }
+  return {banner:{start:_pgToISO(minStart),finish:ends.length?_pgToISO(maxEnd):null,duration:duration},
+    rows:outRows,axis:{colDays:colDays,cols:cols,today:_pgToISO(today),_today:today,_min:minStart},
+    curve:curve,planPctToday:planPctToday,actualPctToday:actualPctToday,
+    lateCount:outRows.filter(function(r){return r.late;}).length};
+}
+// ── 狀態（本機草稿 fy_progress）──
+var _pgState=(function(){
+  try{var s=JSON.parse(localStorage.getItem('fy_progress')||'');if(s&&s.rows)return s;}catch(e){}
+  return {proj:'',startDate:localToday(),colDays:3,crews:[],
+    rows:[{crew:'',name:'整地及鋪面澆置',qty:null,unit:'天',rate:null,manualDays:3,offset:null,startOverride:'',doneQty:null,actualStart:'',doneAt:''},
+          {crew:'',name:'鋼筋籠、型鋼加工及設備機具進場',qty:null,unit:'天',rate:null,manualDays:7,offset:null,startOverride:'',doneQty:null,actualStart:'',doneAt:''}]};
+})();
+var _pgHistOpen=false;
+function _pgSave(){try{localStorage.setItem('fy_progress',JSON.stringify(_pgState));}catch(e){}}
+function _pgSet(f,v){_pgState[f]=f==='colDays'?(parseInt(v)||3):String(v||'').trim();_pgSave();if(f!=='proj')_pgRender();}
+var _PG_ROWSTR=['crew','name','unit','startOverride','actualStart','doneAt'];
+function _pgSetRow(i,f,v){
+  var r=_pgState.rows[i];if(!r)return;
+  r[f]=_PG_ROWSTR.indexOf(f)>=0?String(v||''):_pgNum(v);
+  _pgSave();_pgRender();
+}
+function _pgAddRow(){_pgState.rows.push({crew:'',name:'',qty:null,unit:'支',rate:null,manualDays:null,offset:null,startOverride:'',doneQty:null,actualStart:'',doneAt:''});_pgSave();_pgRender();}
+function _pgDelRow(i){_pgState.rows.splice(i,1);_pgSave();_pgRender();}
+function _pgMoveRow(i,dir){
+  var j=i+dir;if(j<0||j>=_pgState.rows.length)return;
+  var t=_pgState.rows[i];_pgState.rows[i]=_pgState.rows[j];_pgState.rows[j]=t;
+  _pgSave();_pgRender();
+}
+function _pgSetCrew(i,f,v){var c=_pgState.crews[i];if(!c)return;c[f]=String(v||'');_pgSave();_pgRender();}
+function _pgAddCrew(){_pgState.crews.push({name:'機組#'+(_pgState.crews.length+1),entry:'',note:''});_pgSave();_pgRender();}
+function _pgDelCrew(i){_pgState.crews.splice(i,1);_pgSave();_pgRender();}
+function _pgRender(){
+  var root=document.getElementById('progress-root');if(!root)return;
+  var res=_pgCompute(_pgState),st=_pgState;
+  var fld=function(l,html){return '<label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--b4);min-width:0">'+l+html+'</label>';};
+  var h='<div class="card" style="margin-bottom:12px"><div class="cb" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
+    +fld('掛專案（可選報價單或自行輸入）','<input list="fy-proj-list" value="'+esc(st.proj||'')+'" style="min-width:200px" onchange="_pgSet(\'proj\',this.value)">')
+    +fld('開工日','<input type="date" value="'+esc(st.startDate||'')+'" onchange="_pgSet(\'startDate\',this.value)">')
+    +fld('每欄天數','<select onchange="_pgSet(\'colDays\',this.value)">'+[1,3,7].map(function(d){return '<option value="'+d+'"'+(st.colDays===d?' selected':'')+'>'+(d===1?'1（逐日）':d===7?'7（每週）':d)+'</option>';}).join('')+'</select>')
+    +'<button type="button" class="btn btn-sm" onclick="_pgSaveRec()"><svg class="ic ib" aria-hidden="true"><use href="#i-save"/></svg> 存檔</button>'
+    +'<button type="button" class="btn btn-sm" onclick="_pgHistToggle()"><svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> 歷史</button>'
+    +'<button type="button" class="btn btn-sm" onclick="_pgPrint()"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 列印</button>'
+    +'<button type="button" class="btn btn-sm" onclick="_pgXlsx()"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 匯出 Excel</button>'
+    +'</div></div>'+_projDatalist();
+  if(_pgHistOpen)h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">存檔歷史</div></div><div class="cb">'+_trHistHtml('progress','_pgLoadRec')+'</div></div>';
+  // 摘要橫幅
+  h+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
+    +'<div class="kpi" style="min-width:110px"><div class="kl">開工</div><div class="kv" style="font-size:14px">'+(res.banner.start||'—')+'</div></div>'
+    +'<div class="kpi" style="min-width:110px"><div class="kl">預定完工</div><div class="kv" style="font-size:14px">'+(res.banner.finish||'—')+'</div></div>'
+    +'<div class="kpi hi" style="min-width:110px"><div class="kl">總工期（日曆天）</div><div class="kv" style="font-size:16px">'+(res.banner.duration!=null?res.banner.duration:'—')+'</div></div>'
+    +'<div class="kpi" style="min-width:110px"><div class="kl">今日預定進度</div><div class="kv" style="font-size:16px">'+(res.planPctToday!=null?res.planPctToday+'%':'—')+'</div></div>'
+    +'<div class="kpi" style="min-width:110px"><div class="kl">實際進度</div><div class="kv" style="font-size:16px">'+(res.actualPctToday!=null?res.actualPctToday+'%':'—')+'</div></div>'
+    +(res.lateCount?'<div class="kpi" style="min-width:110px;border-color:#e57373"><div class="kl" style="color:#c62828">落後工項</div><div class="kv" style="font-size:16px;color:#c62828">'+res.lateCount+' 項</div></div>':'')
+    +'</div>';
+  // 機組設定
+  h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">機組設定（一台機具＝一個機組；同機組作業自動接力、不同機組平行）</div>'
+    +'<button type="button" class="btn btn-xs" onclick="_pgAddCrew()"><svg class="ic ib" aria-hidden="true"><use href="#i-plus"/></svg> 加機組</button></div>'
+    +'<div class="cb" style="padding-top:8px"><div style="overflow-x:auto"><table class="tbl" style="width:100%;font-size:12px">'
+    +'<thead><tr><th>機組／工班名稱</th><th>進場日期（空=開工日）</th><th>機具／備註</th><th></th></tr></thead><tbody>'
+    +(st.crews.length?st.crews.map(function(c,i){
+      return '<tr><td><input value="'+esc(c.name||'')+'" onchange="_pgSetCrew('+i+',\'name\',this.value)"></td>'
+        +'<td><input type="date" value="'+esc(c.entry||'')+'" onchange="_pgSetCrew('+i+',\'entry\',this.value)"></td>'
+        +'<td><input value="'+esc(c.note||'')+'" onchange="_pgSetCrew('+i+',\'note\',this.value)"></td>'
+        +'<td><button type="button" class="btn btn-xs" onclick="_pgDelCrew('+i+')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button></td></tr>';
+    }).join(''):'<tr><td colspan="4" style="color:var(--b3)">尚未設定機組——工項不填機組時一律從開工日或接力排程</td></tr>')
+    +'</tbody></table></div></div></div>';
+  // 工項表
+  var crewOpts=function(cur){return '<option value="">—</option>'+st.crews.map(function(c){return '<option'+(c.name===cur?' selected':'')+'>'+esc(c.name)+'</option>';}).join('');};
+  h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">工項排程</div>'
+    +'<button type="button" class="btn btn-xs" onclick="_pgAddRow()"><svg class="ic ib" aria-hidden="true"><use href="#i-plus"/></svg> 加工項</button></div>'
+    +'<div class="cb" style="padding-top:8px"><div style="overflow-x:auto"><table class="tbl" style="width:100%;font-size:11.5px;min-width:1080px">'
+    +'<thead><tr><th>#</th><th>機組</th><th style="min-width:150px">作業項目</th><th>數量</th><th>單位</th><th>日產能</th><th>手動天數</th><th>微調(天)</th><th>指定開始</th><th>天數</th><th>開始</th><th>完成</th><th>實際完成量</th><th>完工日</th><th>％</th><th></th></tr></thead><tbody>'
+    +st.rows.map(function(r,i){
+      var o=res.rows[i];
+      return '<tr'+(o.late?' style="background:#fff5f5"':'')+'>'
+        +'<td style="text-align:center">'+(i+1)
+        +'<div style="display:flex;flex-direction:column"><button type="button" class="btn btn-xs" style="padding:0 4px" onclick="_pgMoveRow('+i+',-1)">▲</button><button type="button" class="btn btn-xs" style="padding:0 4px" onclick="_pgMoveRow('+i+',1)">▼</button></div></td>'
+        +'<td><select style="min-width:90px" onchange="_pgSetRow('+i+',\'crew\',this.value)">'+crewOpts(r.crew)+'</select></td>'
+        +'<td><input value="'+esc(r.name||'')+'" style="min-width:150px" onchange="_pgSetRow('+i+',\'name\',this.value)"></td>'
+        +'<td><input type="number" value="'+(r.qty==null?'':r.qty)+'" style="width:64px" onchange="_pgSetRow('+i+',\'qty\',this.value)"></td>'
+        +'<td><input value="'+esc(r.unit||'')+'" style="width:44px" onchange="_pgSetRow('+i+',\'unit\',this.value)"></td>'
+        +'<td><input type="number" step="0.5" value="'+(r.rate==null?'':r.rate)+'" style="width:56px" onchange="_pgSetRow('+i+',\'rate\',this.value)"></td>'
+        +'<td><input type="number" value="'+(r.manualDays==null?'':r.manualDays)+'" style="width:56px" onchange="_pgSetRow('+i+',\'manualDays\',this.value)"></td>'
+        +'<td><input type="number" value="'+(r.offset==null?'':r.offset)+'" style="width:52px" placeholder="±" onchange="_pgSetRow('+i+',\'offset\',this.value)"></td>'
+        +'<td><input type="date" value="'+esc(r.startOverride||'')+'" style="width:118px" onchange="_pgSetRow('+i+',\'startOverride\',this.value)"></td>'
+        +'<td style="text-align:right;font-weight:700">'+(o.days!=null?o.days:'—')+'</td>'
+        +'<td style="white-space:nowrap">'+(o.start||'—')+'</td>'
+        +'<td style="white-space:nowrap">'+(o.end||'—')+'</td>'
+        +'<td><input type="number" value="'+(r.doneQty==null?'':r.doneQty)+'" style="width:64px" onchange="_pgSetRow('+i+',\'doneQty\',this.value)"></td>'
+        +'<td><input type="date" value="'+esc(r.doneAt||'')+'" style="width:118px" onchange="_pgSetRow('+i+',\'doneAt\',this.value)"></td>'
+        +'<td style="text-align:right'+(o.late?';color:#c62828;font-weight:700':'')+'">'+(o.pct!=null?o.pct+'%':'—')+(o.late?'<br><span style="font-size:9.5px">落後</span>':'')+'</td>'
+        +'<td><button type="button" class="btn btn-xs" onclick="_pgDelRow('+i+')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button></td></tr>';
+    }).join('')
+    +'</tbody></table></div>'
+    +'<div style="font-size:10.5px;color:var(--b4);margin-top:6px">天數＝⌈數量÷日產能⌉，或直接填「手動天數」。開始＝同機組上一項完工+1（接力）；無前項→機組進場日（未填→開工日）＋微調；「指定開始」填了整列以其為準。</div>'
+    +'</div></div>';
+  h+=_pgGanttHtml(res)+_pgCurveHtml(res);
+  root.innerHTML=h;
+}
+function _pgGanttHtml(res){
+  var cols=res.axis.cols;
+  if(!cols.length)return '';
+  var colW=Math.max(26,Math.min(40,900/cols.length));
+  var h='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">甘特圖</div>'
+    +'<div style="font-size:11px;color:var(--b4)">綠=預定　紅框=落後　黃直欄=今日</div></div>'
+    +'<div class="cb" style="padding-top:8px"><div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:10px;min-width:100%">'
+    +'<tr><td style="min-width:130px"></td>'+cols.map(function(c){return '<td style="padding:1px 2px;color:var(--g3);font-weight:700;white-space:nowrap">'+(c.month||'')+'</td>';}).join('')+'</tr>'
+    +'<tr><td style="font-weight:700;color:var(--b4);padding:2px 6px">工項</td>'
+    +cols.map(function(c){return '<td style="padding:1px 2px;text-align:center;color:'+(c.isToday?'#b26a00':'var(--b4)')+';font-weight:'+(c.isToday?'800':'400')+';background:'+(c.isToday?'#fff3d6':(c.weekend?'var(--b0)':'transparent'))+';min-width:'+colW+'px">'+c.label+'</td>';}).join('')+'</tr>'
+    +res.rows.map(function(r){
+      if(r._s==null)return '';
+      return '<tr><td style="padding:2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;border-top:1px solid var(--b1)">'+esc(r.name||'')+'</td>'
+        +cols.map(function(c){
+          var inBar=r._s<c.d+res.axis.colDays&&r._e>=c.d;
+          return '<td style="border-top:1px solid var(--b1);padding:0;background:'+(c.isToday?'#fff3d6':(c.weekend?'var(--b0)':'transparent'))+'">'
+            +(inBar?'<div style="height:12px;background:'+(r.late?'#e57373':'var(--g3)')+';border-radius:3px;margin:2px 1px"></div>':'')+'</td>';
+        }).join('')+'</tr>';
+    }).join('')
+    +'</table></div></div></div>';
+  return h;
+}
+function _pgCurveHtml(res){
+  if(!res.curve.length)return '';
+  var W=680,H=160,PL=34,PB=22;
+  var n=res.curve.length;
+  var x=function(i){return PL+(W-PL-8)*(n<=1?0:i/(n-1));};
+  var y=function(p){return 8+(H-PB-8)*(1-p/100);};
+  var plan=res.curve.map(function(c,i){return (i?'L':'M')+x(i).toFixed(1)+','+y(c.plan).toFixed(1);}).join('');
+  var todayX=null;
+  res.curve.forEach(function(c,i){if(c.d<=res.axis._today)todayX=x(i);});
+  return '<div class="card"><div class="ch green"><div class="cht">S 曲線（預定累計進度）</div>'
+    +'<div style="font-size:11px;color:var(--b4)">今日預定 '+(res.planPctToday!=null?res.planPctToday+'%':'—')+'　實際 '+(res.actualPctToday!=null?res.actualPctToday+'%':'—')+'</div></div>'
+    +'<div class="cb" style="overflow-x:auto"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+W+'px;height:auto" aria-hidden="true">'
+    +[0,25,50,75,100].map(function(p){return '<line x1="'+PL+'" y1="'+y(p)+'" x2="'+(W-8)+'" y2="'+y(p)+'" stroke="#e3e8e4" stroke-width="1"/><text x="4" y="'+(y(p)+3)+'" font-size="9" fill="#8a958d">'+p+'%</text>';}).join('')
+    +(todayX!=null?'<line x1="'+todayX+'" y1="8" x2="'+todayX+'" y2="'+(H-PB)+'" stroke="#e0a13d" stroke-width="1.5" stroke-dasharray="4 3"/>':'')
+    +'<path d="'+plan+'" fill="none" stroke="#0e3d22" stroke-width="2"/>'
+    +(res.actualPctToday!=null&&todayX!=null?'<circle cx="'+todayX+'" cy="'+y(res.actualPctToday)+'" r="4" fill="#b26a00"/>':'')
+    +'<text x="'+PL+'" y="'+(H-6)+'" font-size="9" fill="#8a958d">'+(res.banner.start||'')+'</text>'
+    +'<text x="'+(W-80)+'" y="'+(H-6)+'" font-size="9" fill="#8a958d">'+(res.banner.finish||'')+'</text>'
+    +'</svg></div></div>';
+}
+function _pgHistToggle(){_pgHistOpen=!_pgHistOpen;_pgRender();}
+function _pgSaveRec(){
+  var res=_pgCompute(_pgState);
+  _trSave('progress','施工進度表'+(_pgState.proj?('（'+_pgState.proj+'）'):''),_pgState.proj,_pgState,
+    (res.banner.start||'')+'～'+(res.banner.finish||'')+'　'+(res.banner.duration!=null?res.banner.duration+' 天':''));
+  toast('已存檔（本機）');if(_pgHistOpen)_pgRender();
+}
+function _pgLoadRec(id){var r=_trGet(id);if(!r)return;_pgState=JSON.parse(JSON.stringify(r.inputs));_pgSave();_pgHistOpen=false;_pgRender();toast('已回載存檔');}
+function _pgPrint(){
+  var res=_pgCompute(_pgState),st=_pgState;
+  var body='<h2>專案摘要 <span class="sub">開工 '+(res.banner.start||'—')+'｜預定完工 '+(res.banner.finish||'—')+'｜總工期 '+(res.banner.duration!=null?res.banner.duration+' 日曆天':'—')
+    +(res.planPctToday!=null?('｜今日預定 '+res.planPctToday+'%'):'')+(res.actualPctToday!=null?('｜實際 '+res.actualPctToday+'%'):'')+(res.lateCount?('｜落後 '+res.lateCount+' 項'):'')+'</span></h2>'
+    +'<table><tr><th>#</th><th>機組/工班</th><th>作業項目</th><th>數量</th><th>單位</th><th>日產能</th><th>天數</th><th>開始</th><th>完成</th><th>％</th></tr>'
+    +res.rows.map(function(r,i){
+      return '<tr'+(r.late?' style="background:#fdecea"':'')+'><td>'+(i+1)+'</td><td>'+_xlEsc(r.crew||'—')+'</td><td class="l">'+_xlEsc(r.name||'')+'</td>'
+        +'<td class="r">'+(r.qty!=null?r.qty:'—')+'</td><td>'+_xlEsc(r.unit||'')+'</td><td class="r">'+(r.rate!=null?r.rate:'—')+'</td>'
+        +'<td class="r"><b>'+(r.days!=null?r.days:'—')+'</b></td><td>'+(r.start||'—')+'</td><td>'+(r.end||'—')+'</td>'
+        +'<td class="r">'+(r.pct!=null?r.pct+'%':'—')+(r.late?'<b>（落後）</b>':'')+'</td></tr>';
+    }).join('')+'</table>';
+  if(st.crews.length){
+    body+='<h2>機組設定</h2><table><tr><th>機組／工班</th><th>進場日期</th><th>機具／備註</th></tr>'
+      +st.crews.map(function(c){return '<tr><td>'+_xlEsc(c.name||'')+'</td><td>'+_xlEsc(c.entry||'開工日')+'</td><td class="l">'+_xlEsc(c.note||'')+'</td></tr>';}).join('')+'</table>';
+  }
+  // 甘特圖（簡化表格版）
+  var cols=res.axis.cols;
+  if(cols.length){
+    body+='<h2>甘特圖</h2><table style="table-layout:fixed"><tr><th style="width:120px">工項</th>'
+      +cols.map(function(c){return '<th style="padding:1px;font-size:8px'+(c.isToday?';background:#b26a00':'')+'">'+c.label+'</th>';}).join('')+'</tr>'
+      +res.rows.map(function(r){
+        if(r._s==null)return '';
+        return '<tr><td class="l" style="font-size:9px">'+_xlEsc(r.name||'')+'</td>'
+          +cols.map(function(c){
+            var inBar=r._s<c.d+res.axis.colDays&&r._e>=c.d;
+            return '<td style="padding:0;height:12px;background:'+(inBar?(r.late?'#e57373':'#2e7d4f'):(c.weekend?'#f2f2f2':'#fff'))+'"></td>';
+          }).join('')+'</tr>';
+      }).join('')+'</table>';
+  }
+  body+='<div class="cond">排程規則：天數＝⌈數量÷日產能⌉或手動；開始＝同機組上一項完工+1（接力），否則機組進場日（未填＝開工日）＋微調；「指定開始」優先。總工期＝最晚完成−最早開始+1（日曆天，已扣重疊）。</div>';
+  _toolPrint('工程施工進度表',st.proj,body);
+}
+function _pgXlsx(){
+  var st=_pgState;
+  var serial=function(iso){var d=_pgToDay(iso);return d==null?null:d+25569;};
+  var FR=4;                                       // 工項首列（Excel 列號）
+  var rows=[
+    [{v:'工程施工進度表'+(st.proj?('　'+st.proj):''),s:1}],
+    ['開工日',{v:serial(st.startDate),s:5},'每欄天數',{v:st.colDays}],
+    [{v:'#',s:2},{v:'機組/工班',s:2},{v:'作業項目',s:2},{v:'數量',s:2},{v:'單位',s:2},{v:'日產能',s:2},{v:'手動天數',s:2},{v:'微調(天)',s:2},{v:'天數',s:2},{v:'開始',s:2},{v:'完成',s:2}]];
+  st.rows.forEach(function(r,i){
+    var n=FR+i;
+    var ov=serial(r.startOverride);
+    var startCell;
+    if(ov!=null)startCell={v:ov,s:5};
+    else{
+      var prior=i>0?('MAXIFS($K$'+FR+':K'+(n-1)+',$B$'+FR+':B'+(n-1)+',B'+n+')'):'0';
+      var entry='IFERROR(IF(VLOOKUP(B'+n+',機組設定!$A:$B,2,FALSE)>0,VLOOKUP(B'+n+',機組設定!$A:$B,2,FALSE),$B$2),$B$2)';
+      startCell={f:'IF(I'+n+'="","",IF('+prior+'>0,'+prior+'+1,'+entry+')+IF(H'+n+'="",0,H'+n+'))',s:5};
+    }
+    rows.push([{v:i+1,s:3},{v:r.crew||'',t:'s',s:3},{v:r.name||'',t:'s',s:3},
+      r.qty==null?{v:'',t:'s',s:3}:{v:r.qty,s:3},{v:r.unit||'',t:'s',s:3},
+      r.rate==null?{v:'',t:'s',s:3}:{v:r.rate,s:3},
+      r.manualDays==null?{v:'',t:'s',s:3}:{v:r.manualDays,s:3},
+      r.offset==null?{v:'',t:'s',s:3}:{v:r.offset,s:3},
+      {f:'IF(AND(D'+n+'<>"",F'+n+'<>""),ROUNDUP(D'+n+'/F'+n+',0),IF(G'+n+'<>"",G'+n+',""))',s:3},
+      startCell,
+      {f:'IF(J'+n+'="","",J'+n+'+I'+n+'-1)',s:5}]);
+  });
+  var l1=FR,l2=FR+st.rows.length-1;
+  rows.push([{v:'施工總工期（日曆天，已扣重疊）',s:4},null,null,null,null,null,null,null,
+    {f:'IF(COUNT(K'+l1+':K'+l2+')=0,"",MAX(K'+l1+':K'+l2+')-MIN(J'+l1+':J'+l2+')+1)',s:4},
+    {f:'MIN(J'+l1+':J'+l2+')',s:5},{f:'MAX(K'+l1+':K'+l2+')',s:5}]);
+  var crewRows=[[{v:'機組/工班名稱',s:2},{v:'進場日期',s:2},{v:'機具／備註',s:2}]];
+  st.crews.forEach(function(c){crewRows.push([{v:c.name||'',t:'s',s:3},c.entry?{v:serial(c.entry),s:5}:{v:'',t:'s',s:3},{v:c.note||'',t:'s',s:3}]);});
+  var sheets=[
+    {name:'施工進度表',widths:[5,14,30,8,7,8,9,9,8,12,12],rows:rows},
+    {name:'機組設定',widths:[18,13,24],rows:crewRows},
+    {name:'公式說明',widths:[110],rows:[
+      [{v:'施工進度表 — 排程公式說明（豐有工程管理系統匯出）',s:1}],
+      ['1. 天數 I = IF(數量與日產能都有, ROUNDUP(數量÷日產能), 手動天數)。'],
+      ['2. 開始 J = 同機組上一項完成日+1（MAXIFS 找同機組前項完成）；無前項 → 機組進場日（VLOOKUP 機組設定，缺或 0 → 開工日 B2）＋微調 H。直接輸入日期的列＝指定開始，覆蓋公式。'],
+      ['3. 完成 K = 開始 + 天數 − 1。'],
+      ['4. 總工期 = MAX(完成) − MIN(開始) + 1（日曆天，同時施工自動扣重疊）。'],
+      ['5. 全表活公式：改數量/日產能/機組/進場日/開工日，Excel 自動重排。MAXIFS 需 Excel 2019 以上。'],
+      ['排程引擎：與威立采集團施工進度表工具（自 Excel 活頁簿逐格移植）排程行為一致。']]}];
+  var roc=(new Date().getFullYear()-1911)+String(new Date().getMonth()+1).padStart(2,'0')+String(new Date().getDate()).padStart(2,'0');
+  xlsxDownload((st.proj||'施工進度表')+'_'+roc,sheets);
 }
 // ══════════ 資料救援（v5.340）══════════
 // 從每日雲端快照挑單筆記錄還原。重點：誤刪的記錄有墓碑（TOMBS），
@@ -18525,6 +18866,7 @@ const ALL_PAGES = [
   {id:'rebar',     label:'鋼筋籠檢料',icon:_pgIcon('scale'),    grp:'data',  adminOnly:false}, // v5.343 檢料計算工具
   {id:'grout',     label:'根固砂漿',  icon:_pgIcon('box'),      grp:'data',  adminOnly:false}, // v5.346
   {id:'backfill',  label:'背填材料',  icon:_pgIcon('wrench'),   grp:'data',  adminOnly:false}, // v5.346
+  {id:'progress',  label:'施工進度',  icon:_pgIcon('calendar'), grp:'data',  adminOnly:false}, // v5.347
   // v5.330 sysOnly：只有「系統管理員」角色能開，其他角色的權限表上是鎖住的
   {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, sysOnly:true},
   {id:'staff',     label:'人員管理',  icon:_pgIcon('users'),    grp:'acct',  adminOnly:true},
