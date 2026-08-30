@@ -2218,6 +2218,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
             <button type="button" class="btn" onclick="document.getElementById('import-file-input').click()" style="border-color:var(--y);color:var(--yd)"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 選擇檔案匯入</button>
           </div>
         </div>
+        <div id="ls-gauge" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--b1)"></div>
       </div>
     </div>
     <div class="card">
@@ -2625,7 +2626,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.373';
+var APP_VERSION='v5.374';
 var FY_LOGO='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodpAAQAAAABAAABMuocAAcAAAEMAAAAJgAAAAAc6gAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWQAwACAAAAFAAAAoCQBAACAAAAFAAAApSSkQACAAAAAzAwAACSkgACAAAAAzAwAADqHAAHAAABDAAAAXQAAAAAHOoAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADIwMjQ6MTE6MjggMDc6MzM6MzQAMjAyNDoxMToyOCAwNzozMzozNAAAAP/hAqxodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvADw/eHBhY2tldCBiZWdpbj0n77u/JyBpZD0nVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkJz8+DQo8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIj48cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSJ1dWlkOmZhZjViZGQ1LWJhM2QtMTFkYS1hZDMxLWQzM2Q3NTE4MmYxYiIgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iPjxleGlmOkRhdGVUaW1lT3JpZ2luYWw+MjAyNC0xMS0yOFQwNzozMzozNDwvZXhpZjpEYXRlVGltZU9yaWdpbmFsPjwvcmRmOkRlc2NyaXB0aW9uPjwvcmRmOlJERj48L3g6eG1wbWV0YT4NCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8P3hwYWNrZXQgZW5kPSd3Jz8+/9sAQwADAgIDAgIDAwMDBAMDBAUIBQUEBAUKBwcGCAwKDAwLCgsLDQ4SEA0OEQ4LCxAWEBETFBUVFQwPFxgWFBgSFBUU/9sAQwEDBAQFBAUJBQUJFA0LDRQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU/8AAEQgAywDLAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYH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';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
@@ -2781,7 +2782,15 @@ const persist=()=>{try{
   try{if(typeof eid!=='undefined'&&eid){var _pq=Q.find(function(x){return x.id===eid;});if(_pq)_pq._mt=Date.now();}}catch(e){}
   const data=JSON.stringify(Q);
   localStorage.setItem('fy6_q',data);
-  try{const used=JSON.stringify(localStorage).length;if(used>3*1024*1024)toast('本機資料已超過3MB，建議立即匯出備份');}catch(e){}
+  // v5.374：原本每次存檔都把整個 localStorage 序列化一次量大小，資料一多就明顯卡頓。
+  // 改成每 30 次存檔才量一次，且改用實際位元組口徑。
+  try{
+    window._psN=(window._psN||0)+1;
+    if(window._psN%30===1){
+      var _u=_lsUsage().total;
+      if(_u>_LS_CAP*0.85)toast('本機儲存空間已用 '+Math.round(_u/_LS_CAP*100)+'%，請立即匯出備份');
+    }
+  }catch(e){}
 }catch(e){toast('儲存失敗：本機儲存空間不足，請匯出備份資料');}
 try{_autoUpload();}catch(e){}};
 const persistP=()=>{_lsSet('fy6_p',JSON.stringify(P),'參數');};
@@ -5178,11 +5187,84 @@ function buildRmkText(){
 // ════════════════ INVOICE / 請款 ════════════════
 // INV invItems invEid declared at top state
 
-try{const x=localStorage.getItem('fy_inv');if(x){INV=JSON.parse(x);const _before=INV.length;INV=INV.filter(function(inv){return inv&&(inv.project||inv.client||inv.id);});if(INV.length!==_before){try{localStorage.setItem('fy_inv',JSON.stringify(INV));}catch(e){}}}}catch(e){}
+// ══════════ v5.374：請款單工項的儲存層壓縮（記憶體結構完全不變）══════════
+// 每一期請款都完整複製一份全部工項，六期就是六份；實測 200 案時請款單佔掉
+// 全部資料的七成（8.8MB／12.6MB），而瀏覽器本機空間上限只有約 4.75MB。
+// 這裡只在「寫進 localStorage／上雲／匯出備份」的當下做可逆壓縮：
+//   ① 欄位名縮短（contractPrice→cp…）　② 等於預設值的欄位直接省略
+// 讀回來時原樣還原，所有業務邏輯與畫面程式完全不用改。
+// 未知欄位一律原樣保留，日後新增欄位不會在壓縮時遺失。
+var _INV_K={type:'t',desc:'d',unit:'u',contractPrice:'cp',contractQty:'cq',prevQty:'pq',prevAmt:'pa',
+  curQty:'q',curDays:'cd',curAmt:'a',note:'n',cumQty:'mq',cumAmt:'ma',payRate:'r',
+  installCum:'ic',removeCum:'rc',prevPayRate:'pr',otPrice:'op',otUnit:'ou'};
+var _INV_KR=(function(){var r={};Object.keys(_INV_K).forEach(function(k){r[_INV_K[k]]=k;});return r;})();
+// 可省略的欄位：全部的取用點都走 parseFloat(x)||0 或 x||''，「沒有」與「0／空字串」等價。
+// 刻意不列入的三個：
+//   type        —— it.type==='sec' 判斷分類列，絕不能靠推定
+//   payRate     —— 取用寫法是 it.payRate!=null?it.payRate:100
+//   prevPayRate —— 取用寫法是 it.prevPayRate!=null?it.prevPayRate:本期率，
+//                  「沒填」與「填 100」印出來的前期請款率不一樣，補預設值會改到列印結果
+// 這三個一律照原樣保留（有就有、沒有就沒有），只做欄位名縮短。
+var _INV_OMIT={desc:'',unit:'',contractPrice:0,contractQty:0,prevQty:0,prevAmt:0,
+  curQty:0,curDays:0,curAmt:0,note:'',cumQty:0,cumAmt:0,installCum:0,removeCum:0,otPrice:0,otUnit:''};
+function _invPackItem(it){
+  if(!it||typeof it!=='object')return it;
+  var o={};
+  Object.keys(it).forEach(function(k){
+    var v=it[k];
+    if(Object.prototype.hasOwnProperty.call(_INV_OMIT,k)){
+      var d=_INV_OMIT[k];
+      if(v==null||v===d)return;                                        // 等於預設值就省略
+      if(typeof d==='number'&&v!==''&&(parseFloat(v)||0)===d)return;    // '0'、0.0 也算預設值
+      o[_INV_K[k]]=v;
+    }else if(_INV_K[k]){
+      if(v!==undefined)o[_INV_K[k]]=v;                                 // 縮短欄位名但不省略
+    }else{
+      o[k]=v;                                                          // 未知欄位原樣保留
+    }
+  });
+  return o;
+}
+// 只還原「壓縮檔裡真的存在」的欄位，不補預設值——這樣欄位有無完全可逆
+function _invUnpackItem(o){
+  if(!o||typeof o!=='object')return o;
+  var it={};
+  Object.keys(o).forEach(function(k){
+    if(_INV_KR[k])it[_INV_KR[k]]=o[k];
+    else it[k]=o[k];
+  });
+  return it;
+}
+function _invPack(inv){
+  if(!inv||typeof inv!=='object'||inv._ip||!Array.isArray(inv.items))return inv;
+  var c=Object.assign({},inv);
+  c.items=inv.items.map(_invPackItem);
+  c._ip=1;                                                 // 壓縮標記：讀回時才知道要還原
+  return c;
+}
+function _invUnpack(inv){
+  if(!inv||typeof inv!=='object'||!inv._ip)return inv;      // 舊資料沒有標記 → 原樣使用
+  var c=Object.assign({},inv);
+  c.items=Array.isArray(inv.items)?inv.items.map(_invUnpackItem):[];
+  delete c._ip;
+  return c;
+}
+function _invPackAll(arr){return (arr||[]).map(_invPack);}
+function _invUnpackAll(arr){
+  var a=Array.isArray(arr)?arr:(arr&&typeof arr==='object'?Object.values(arr):[]);
+  return a.map(_invUnpack);
+}
+function _invStoreWrite(){return _lsSet('fy_inv',JSON.stringify(_invPackAll(INV)),'請款單');}
+function _invStoreRead(){
+  try{var x=localStorage.getItem('fy_inv');if(!x)return null;
+    var a=JSON.parse(x);return Array.isArray(a)?_invUnpackAll(a):null;}catch(e){return null;}
+}
+
+try{var _invLoaded=_invStoreRead();if(_invLoaded){INV=_invLoaded;const _before=INV.length;INV=INV.filter(function(inv){return inv&&(inv.project||inv.client||inv.id);});if(INV.length!==_before){try{_invStoreWrite();}catch(e){}}}}catch(e){}
 function saveInv(){
   // 儲存前自動清理空白資料（確保 badge 與列表一致）
   INV=INV.filter(function(inv){return inv&&(inv.project||inv.client||inv.id);});
-  _lsSet('fy_inv',JSON.stringify(INV),'請款單'); try{_autoUpload();}catch(e){}}
+  _invStoreWrite(); try{_autoUpload();}catch(e){}}
 
 // ── Invoice Navigation handled in main go() ──
 
@@ -6155,7 +6237,7 @@ function saveInvoice(){
   const idx=INV.findIndex(x=>x.id===inv.id);
   if(idx>=0)INV[idx]=inv;else INV.unshift(inv);
   // 立即存 localStorage（主儲存）
-  _lsSet('fy_inv',JSON.stringify(INV),'請款單');
+  _invStoreWrite();
   toast('請款單已儲存！');
   updBadge();
   // v5.317：同上——儲存後未更新快照，會同時跳出「已儲存」與「尚未儲存」兩個矛盾訊息，
@@ -6540,10 +6622,9 @@ function migrateInvQuoteIds(){
 function renderInvList(){
   // 永遠從 localStorage 讀取最新資料（確保記憶體與存儲一致）
   try{
-    const raw=localStorage.getItem('fy_inv');
-    if(raw){
-      const parsed=JSON.parse(raw);
-      if(Array.isArray(parsed)){INV=parsed;}
+    const parsed=_invStoreRead();
+    if(parsed){
+      INV=parsed;
       migrateInvQuoteIds();
     }
   }catch(e){}
@@ -7421,7 +7502,7 @@ function importData(file){
       showImportConfirm(qLen,iLen,()=>{
         const arr=x=>Array.isArray(x)?x:(x&&typeof x==='object'?Object.values(x):[]);
         Q=data.quotes||[];
-        INV=data.invoices||[];
+        INV=_invUnpackAll(data.invoices);   // v5.374 備份檔內的請款單為壓縮格式，還原後才進記憶體
         UH=data.upaHistory||[];
         if(data.params)Object.assign(P,data.params);
         // 全量還原（舊備份檔沒有的區塊保留現值，不清空）
@@ -8894,12 +8975,56 @@ function _updBackupHint(){
     el=document.createElement('div');el.id='backup-hint';el.style.cssText='font-size:11px;margin-top:6px';
     btns[0].parentElement.appendChild(el);
   }
+  try{renderLsGauge();}catch(e){}
   var ts=parseInt(localStorage.getItem('fy_last_backup_ts')||'0');
   if(!ts){el.innerHTML='<span style="color:var(--red);font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 尚未做過完整備份</span>　<span style="color:var(--b4)">雲端同步≠備份（誤刪會同步刪），建議定期匯出留存</span>';return;}
   var days=Math.floor((Date.now()-ts)/86400000);
   el.innerHTML=days>14
     ?'<span style="color:var(--red);font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 上次備份已是 '+days+' 天前</span>　<span style="color:var(--b4)">建議重新匯出</span>'
     :'<span style="color:var(--g3)">✓ 上次備份：'+(days===0?'今天':days+' 天前')+'</span>';
+}
+// ══════════ v5.374：本機儲存水位 ══════════
+// 瀏覽器給每個網站的空間約 5MB，用滿之後就存不進去、只會跳一行小提示。
+// 這裡把用量、佔比與前幾大項目直接攤開，讓水位在撞牆前就看得見。
+var _LS_CAP=4.75*1024*1024;   // 實測值（Chromium / Safari 皆約此量級）
+function _lsUsage(){
+  var total=0,items=[];
+  var NAME={fy6_q:'報價單',fy_inv:'請款單',fy_toolrecs:'工具存檔',fy_plan:'計畫書草稿',
+    fy_plan_attlib:'計畫書附件庫',fy_q_history:'報價版本歷史',fy_contracts:'合約',
+    fy_payables:'應付帳款',fy_expenses:'零星支出',fy_customers:'客戶',fy_vendors:'廠商',
+    fy_inv_recs:'發票紀錄',fy_mat_ledger:'材料台帳',fy_mat_stock:'材料庫存',
+    fy_cost_hist:'成本單價庫',fy_deal_hist:'成交單價庫',fy_activity:'活動紀錄',
+    fy6_uh:'單價分析歷史',fy_tombs:'刪除記錄',fy6_p:'參數設定'};
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i);var v=localStorage.getItem(k)||'';
+      var n=(k.length+v.length)*2;   // UTF-16
+      total+=n;
+      items.push({k:k,name:NAME[k]||k,bytes:n});
+    }
+  }catch(e){}
+  items.sort(function(a3,b3){return b3.bytes-a3.bytes;});
+  return {total:total,items:items};
+}
+function renderLsGauge(){
+  var el=document.getElementById('ls-gauge');if(!el)return;
+  var u=_lsUsage();
+  var pct=Math.min(100,Math.round(u.total/_LS_CAP*1000)/10);
+  var mb=function(n){return (n/1048576).toFixed(2);};
+  var clr=pct>=85?'var(--red)':(pct>=60?'#e65100':'var(--g3)');
+  var msg=pct>=85?'空間即將用盡，請立即匯出備份並考慮封存舊案'
+        :(pct>=60?'已用超過六成，建議定期匯出備份':'空間充裕');
+  var top=u.items.filter(function(x){return x.bytes>20480;}).slice(0,6);
+  el.innerHTML='<div style="font-size:12px;font-weight:700;color:var(--b5);margin-bottom:6px">本機儲存水位</div>'
+    +'<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+      +'<span style="font-size:20px;font-weight:900;color:'+clr+'">'+pct+'%</span>'
+      +'<span style="font-size:12px;color:var(--b4)">'+mb(u.total)+' MB ／ 約 '+mb(_LS_CAP)+' MB</span>'
+      +'<span style="font-size:11.5px;color:'+clr+'">'+msg+'</span></div>'
+    +'<div style="height:12px;background:var(--b1);border-radius:6px;overflow:hidden">'
+      +'<div style="height:100%;width:'+Math.max(1,pct)+'%;background:'+clr+';border-radius:6px"></div></div>'
+    +(top.length?('<div style="margin-top:8px;font-size:11.5px;color:var(--b4);line-height:1.9">佔用最多：'
+      +top.map(function(x){return esc(x.name)+' '+mb(x.bytes)+'MB';}).join('　·　')+'</div>'):'')
+    +'<div style="margin-top:6px;font-size:11px;color:var(--b3)">請款單自 v5.374 起以壓縮格式存放（欄位縮寫＋預設值省略），同樣內容約可少佔六成空間。</div>';
 }
 function exportData(){
   try{localStorage.setItem('fy_last_backup_ts',String(Date.now()));}catch(e){}
@@ -10643,7 +10768,7 @@ function _syncPayload(){
   var admins=getAdminEmails();   // v5.314：管理員清單納入同步，避免新裝置讀不到而權限失準
   return {ts:ts, data:{
     version:'fy-v5', uploadedAt:ts, uploadedBy:(_fbUser&&_fbUser.email)||'',
-    quotes:Q, invoices:INV, upaHistory:UH, params:P,
+    quotes:Q, invoices:_invPackAll(INV), upaHistory:UH, params:P,   // v5.374 請款單壓縮儲存
     contracts:CONTRACTS, vendors:VENDORS, payables:PAYABLES,
     invoiceRecs:INVOICE_RECS, expenses:EXPENSES, tombs:TOMBS, activityLog:ACTIVITY_LOG.slice(0,100),
     customers:CUSTOMERS, upaCostDB:UPA_COST_DB, pagePerms:pagePerms, costHist:COST_HIST,
@@ -10696,7 +10821,7 @@ function _applyCloud(data){
     try{_mergeTombs(data.tombs);}catch(e){console.error('[同步] 墓碑合併失敗',e);}
     var _safeMerge=function(loc,cld,nm){try{return _mergeColl(loc,cld,nm,data.tombs);}catch(e){console.error('[同步] '+nm+' 合併失敗，改用雲端版',e);return Array.isArray(cld)?cld:(cld?Object.values(cld):loc);}};
     Q=_safeMerge(Q,data.quotes,'quotes');
-    INV=_safeMerge(INV,(Array.isArray(data.invoices)?data.invoices:Object.values(data.invoices||{})).filter(function(inv){return inv&&(inv.project||inv.client||inv.id);}),'invoices');
+    INV=_safeMerge(INV,_invUnpackAll(data.invoices).filter(function(inv){return inv&&(inv.project||inv.client||inv.id);}),'invoices');   // v5.374 先解壓再合併
     if(data.upaHistory)UH=data.upaHistory;   // v5.314：原本 ||[] 會在雲端缺此欄時把本機分析歷史清空
     if(data.params)Object.assign(P,data.params);
     if(data.contracts)CONTRACTS=_safeMerge(CONTRACTS,data.contracts,'contracts');
@@ -18573,6 +18698,7 @@ function rescueLoad(date){
     window._rescueUrl=url;
     return fetch(url).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});
   }).then(function(snap){
+    if(snap&&snap.invoices)snap.invoices=_invUnpackAll(snap.invoices);   // v5.374 快照內請款單為壓縮格式
     _rescueSnap=snap;_rescueDate=date;
     rescueRenderDiff();
   }).catch(function(e){
@@ -18592,6 +18718,7 @@ function rescueLoadFile(inp,date){
   rd.onload=function(){
     try{
       _rescueSnap=JSON.parse(rd.result);
+      if(_rescueSnap&&_rescueSnap.invoices)_rescueSnap.invoices=_invUnpackAll(_rescueSnap.invoices);   // v5.374
       _rescueDate=date||String(f.name||'').replace(/\.json$/,'');
       rescueRenderDiff();
     }catch(e){det.innerHTML='<span style="color:#c62828">檔案解析失敗：'+esc((e&&e.message)||'')+'</span>';}
@@ -24990,7 +25117,7 @@ function toggleRetentionReturn(invId, btn){
     inv.retentionReceivedAmt=0;inv.retentionReturnedDate='';
   }
   inv._mt=Date.now();
-  try{saveInv();}catch(e){try{localStorage.setItem('fy_inv',JSON.stringify(INV));}catch(e2){}}
+  try{saveInv();}catch(e){try{_invStoreWrite();}catch(e2){}}
   btn.textContent=inv.retentionReturned?'✓ 已退還':'標記退還';
   btn.style.borderColor=inv.retentionReturned?'var(--g)':'var(--b2)';
   btn.style.background=inv.retentionReturned?'var(--gl)':'var(--w)';
