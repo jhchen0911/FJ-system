@@ -165,6 +165,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
   /* 堆疊卡片 */
   table.mst{display:block;min-width:0!important;width:100%!important;table-layout:auto}
   table.mst thead{display:none}
+  table.mst tbody tr.mst-hd{display:none}   /* v5.372：無 thead、以首列為表頭者一併隱藏 */
   table.mst tbody{display:block}
   table.mst tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:9px 10px;align-items:stretch;
     border:1px solid var(--b1);border-radius:var(--r8);padding:10px 11px;margin-bottom:9px;background:var(--w);
@@ -2624,7 +2625,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.371';
+var APP_VERSION='v5.372';
 var FY_LOGO='data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QKyRXhpZgAATU0AKgAAAAgAAodpAAQAAAABAAABMuocAAcAAAEMAAAAJgAAAAAc6gAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWQAwACAAAAFAAAAoCQBAACAAAAFAAAApSSkQACAAAAAzAwAACSkgACAAAAAzAwAADqHAAHAAABDAAAAXQAAAAAHOoAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADIwMjQ6MTE6MjggMDc6MzM6MzQAMjAyNDoxMToyOCAwNzozMzozNAAAAP/hAqxodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvADw/eHBhY2tldCBiZWdpbj0n77u/JyBpZD0nVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkJz8+DQo8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIj48cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSJ1dWlkOmZhZjViZGQ1LWJhM2QtMTFkYS1hZDMxLWQzM2Q3NTE4MmYxYiIgeG1sbnM6ZXhpZj0iaHR0cDovL25zLmFkb2JlLmNvbS9leGlmLzEuMC8iPjxleGlmOkRhdGVUaW1lT3JpZ2luYWw+MjAyNC0xMS0yOFQwNzozMzozNDwvZXhpZjpEYXRlVGltZU9yaWdpbmFsPjwvcmRmOkRlc2NyaXB0aW9uPjwvcmRmOlJERj48L3g6eG1wbWV0YT4NCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8P3hwYWNrZXQgZW5kPSd3Jz8+/9sAQwADAgIDAgIDAwMDBAMDBAUIBQUEBAUKBwcGCAwKDAwLCgsLDQ4SEA0OEQ4LCxAWEBETFBUVFQwPFxgWFBgSFBUU/9sAQwEDBAQFBAUJBQUJFA0LDRQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU/8AAEQgAywDLAwEiAAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQEAAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAABAgMEBQYH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';
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){}
@@ -3739,7 +3740,13 @@ function applyUPAHist(id){
   toast('已套用！');go('editor');
 }
 function delUPAHist(id){UH=UH.filter(x=>x.id!==id);saveUH();rUPAHist();}
-function clearUPAHistory(){var _ok1=false;try{_ok1=window.confirm('確定清除所有分析記錄？');}catch(e){_ok1=true;}if(!_ok1)return;UH=[];saveUH();rUPAHist();}
+// v5.372：一律走自製確認框。原本寫成「confirm 被瀏覽器擋掉就當作按了確定」，
+// 手機 Safari 擋下原生確認框時會直接清空記錄，使用者完全沒被問過。
+function clearUPAHistory(){
+  showConfirm('清除分析記錄','確定清除<b>所有</b>單價分析記錄？此動作無法復原。',function(){
+    UH=[];saveUH();rUPAHist();toast('已清除全部分析記錄');
+  });
+}
 
 // ════════════════════ EDITOR ════════════════════
 // 實績回填：把歷史單價庫的實績均價，回推寫入尚未填成本的工項（手動新增／舊報價皆適用）
@@ -4787,9 +4794,18 @@ function confirmDelInv(id){_tomb('invoices',id);INV=INV.filter(x=>x.id!==id);sav
 function delQ(id,ev){
   if(ev&&ev.stopPropagation)ev.stopPropagation();
   if(ev&&ev.preventDefault)ev.preventDefault();
-  var ok=false;
-  try{ok=window.confirm('確定刪除此報價？');}catch(e){ok=true;}
-  if(!ok)return;
+  // v5.372：改自製確認框（原生 confirm 被手機瀏覽器擋掉時，原本會直接刪除）
+  var _q=Q.find(function(x){return x.id===id;});
+  var _subN=Q.filter(function(x){return x.parentId===id;}).length;
+  var _invN=INV.filter(function(v){return v.sourceQid===id||v.quoteId===id;}).length;
+  showConfirm('刪除報價單',
+    '確定刪除「'+esc((_q&&_q.name)||'未命名')+'」？<br><br>'
+    +(_subN?('・連同 '+_subN+' 張追加報價<br>'):'')
+    +(_invN?('・連同 '+_invN+' 張關聯請款單<br>'):'')
+    +'・連同此案衍生的應付帳款<br><br>此動作無法復原。',
+    function(){_delQDo(id);});
+}
+function _delQDo(id){
   // 同時刪除追加合約；確認後才立墓碑（含子單），否則按取消也會在下次同步時誤刪
   const _delIds=Q.filter(q=>q.id===id||q.parentId===id).map(q=>q.id);
   _delIds.forEach(x=>_tomb('quotes',x));
@@ -5333,12 +5349,15 @@ function loadInvoice(id){
 function delInvoice(id,ev){
   if(ev&&ev.stopPropagation)ev.stopPropagation();
   if(ev&&ev.preventDefault)ev.preventDefault();
-  var ok=false;
-  try{ok=window.confirm('確定刪除此請款單？');}catch(e){ok=true;}
-  if(!ok)return;
-  _tomb('invoices',id); // 確認刪除後才立墓碑（原本取消刪除也會立墓碑，導致同步後請款單被誤刪）
-  INV=INV.filter(x=>x.id!==id);saveInv();renderInvList();
-  toast('已刪除');
+  // v5.372：改自製確認框（原生 confirm 被擋掉時，原本會直接刪除）
+  const _v=INV.find(x=>x.id===id);
+  showConfirm('刪除請款單',
+    '確定刪除「'+esc((_v&&_v.project)||'未命名')+'」第 '+((_v&&_v.periodNo)||'?')+' 期？<br><br>此動作無法復原，後續期數的前期累計需自行檢查。',
+    ()=>{
+      _tomb('invoices',id); // 確認刪除後才立墓碑（原本取消刪除也會立墓碑，導致同步後請款單被誤刪）
+      INV=INV.filter(x=>x.id!==id);saveInv();renderInvList();
+      toast('已刪除請款單');
+    });
 }
 
 // ── 報價單（得標）→ 跳轉關聯請款單：有就開最新一期，被刪光則提示重建第1期 ──
@@ -6294,9 +6313,14 @@ function saveCustomer(){
     const relC=CONTRACTS.filter(c=>c.client===name);
     const relI=INV.filter(v=>v.client===name&&!v.receivedConfirmed);
     if(id&&hasRule&&(relC.length||relI.length)){
-      let ok=false;
-      try{ok=window.confirm('要將「'+name+'」的付款規則同步到關聯資料嗎？\n\n・合約 '+relC.length+' 份（現金%／票期）\n・未收款請款單 '+relI.length+' 張（計價日／付款月／付款日／現金%／票期／保留款%）\n\n同步後，個別合約或請款單仍可單獨修改，之後以個別設定為準。');}catch(e){ok=true;}
-      if(ok){
+      // v5.372：改自製確認框。原本 confirm 被擋掉就當作「同意」，
+      // 會無聲覆寫所有關聯合約與未收款請款單的付款條件。
+      showConfirm('同步付款規則',
+        '要將「'+esc(name)+'」的付款規則同步到關聯資料嗎？<br><br>'
+        +'・合約 '+relC.length+' 份（現金%／票期）<br>'
+        +'・未收款請款單 '+relI.length+' 張（計價日／付款月／付款日／現金%／票期／保留款%）<br><br>'
+        +'同步後，個別合約或請款單仍可單獨修改，之後以個別設定為準。',
+        function(){
         relC.forEach(c=>{
           if(obj.payTermCash!=null)c.payTermCash=obj.payTermCash;
           if(obj.payTermTicket!=null)c.payTermTicket=obj.payTermTicket;
@@ -6315,7 +6339,7 @@ function saveCustomer(){
         try{recalcAllExpected();}catch(e){}
         try{if(document.getElementById('page-contracts')?.classList.contains('active'))renderContracts();}catch(e){}
         toast('✓ 付款規則已同步：'+relC.length+' 份合約、'+relI.length+' 張請款單');
-      }
+        },false);
     }
   }catch(e){}
   _onSave();
@@ -6324,8 +6348,11 @@ function saveCustomer(){
 function deleteCustomer(id){
   const c=CUSTOMERS.find(x=>x.id===id);
   if(!c)return;
-  var ok=false;try{ok=window.confirm('確定刪除「'+c.name+'」？');}catch(e){ok=true;}
-  if(!ok)return;
+  // v5.372：改自製確認框（原生 confirm 被擋掉時，原本會直接刪除）
+  showConfirm('刪除客戶','確定刪除「'+esc(c.name||'')+'」？<br><br>已建立的報價、合約、請款單不會被刪除，但之後不會再自動帶入這位客戶的資料。',
+    ()=>{_deleteCustomerDo(id);});
+}
+function _deleteCustomerDo(id){
   _tomb('customers',id);
   CUSTOMERS=CUSTOMERS.filter(x=>x.id!==id);
   saveCustomers();renderCustomers();
@@ -7763,7 +7790,12 @@ function syncInvMonth(){
 // ════════════ 複製報價 ════════════
 function copyQ(id){
   const q=Q.find(x=>x.id===id);if(!q)return;
-  var _ok3=false;try{_ok3=window.confirm('複製「'+( q.name||'未命名')+'」？\n複製後會新增一份草稿，工程編號重新產生');} catch(e){_ok3=true;} if(!_ok3)return;
+  // v5.372：改自製確認框（原生 confirm 被擋掉時，原本會直接複製）
+  showConfirm('複製報價單','複製「'+esc(q.name||'未命名')+'」？<br><br>會新增一份草稿，工程編號重新產生、得標狀態與施工成本不會帶過去。',
+    ()=>{_copyQDo(id);},false);
+}
+function _copyQDo(id){
+  const q=Q.find(x=>x.id===id);if(!q)return;
   const copy=JSON.parse(JSON.stringify(q));
   copy.id=Date.now().toString();
   copy.code=genQuoteCode();
@@ -13062,7 +13094,7 @@ async function _plSoilAI(input){
     var r=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'content-type':'application/json','x-api-key':_aiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:900,messages:[{role:'user',content:blocks.concat([
+      body:JSON.stringify({model:'claude-sonnet-5',max_tokens:900,messages:[{role:'user',content:blocks.concat([
         {type:'text',text:'這是工程鑽探報告（可能為多頁或多張照片）。請整理成 JSON（繁體中文，不要多餘文字）：'
           +'{"soil":"地層概況一段話：各深度區間之土壤分類與 SPT-N 值（例：GL-0~6m 粉土質砂 SPT-N=8~15，GL-6~20m 粉土質黏土 N=4~9），最後附地下水位深度",'
           +'"nearby":"若報告含基地周邊環境或鄰近構造物描述則整理一句，否則空字串"}'}])}]})
@@ -13093,7 +13125,7 @@ async function _plEmerAutofill(){
       var r=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
         headers:{'content-type':'application/json','x-api-key':_aiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:800,messages:[{role:'user',content:
+        body:JSON.stringify({model:'claude-sonnet-5',max_tokens:800,messages:[{role:'user',content:
           '台灣工地地址：'+loc+'。請依你對台灣行政區與機構的知識，提供距離此地址最近的下列單位（回傳 JSON，不要多餘文字；'
           +'每單位含 name/tel/addr 三欄，不確定之欄位給空字串，寧缺勿錯）：'
           +'{"hospital":{急診責任醫院},"police":{轄區警察分局},"fire":{轄區消防分隊},"labor":{該縣市勞動檢查機構},"gas":{當地天然氣公司}}'}]})
@@ -17228,13 +17260,25 @@ function _mstack(root){
   if(!root)return;
   root.querySelectorAll('table').forEach(function(tb){
     if(tb.__ms||tb.classList.contains('pl-tbl'))return;
+    var hdRow=null;
     var ths=Array.prototype.map.call(tb.querySelectorAll(':scope>thead th, :scope>thead td'),function(th){return th.textContent.trim();});
+    // v5.372：參數設定的單價矩陣表沒有寫 <thead>，首列直接就是一整排 <th>。
+    // 原本只認 thead → 這些表整組漏掉，手機上只能左右滑（違反「手機不得橫向捲動」）。
+    if(!ths.length){
+      var r0=tb.querySelector(':scope>tbody>tr, :scope>tr');
+      if(r0&&r0.children.length&&!Array.prototype.some.call(r0.children,function(c){return c.tagName!=='TH';})){
+        hdRow=r0;
+        ths=Array.prototype.map.call(r0.children,function(th){return th.textContent.trim();});
+      }
+    }
     if(!ths.length)return;
     var mw=0,st=tb.getAttribute('style')||'';
     var mm=/min-width:\s*(\d+)/.exec(st);if(mm)mw=parseInt(mm[1],10)||0;
     if(!(ths.length>=4||mw>=480))return;
     tb.__ms=1;tb.classList.add('mst');
+    if(hdRow)hdRow.classList.add('mst-hd');
     tb.querySelectorAll(':scope>tbody>tr').forEach(function(tr){
+      if(tr===hdRow)return;
       var ci=0;
       Array.prototype.forEach.call(tr.children,function(td){
         var span=parseInt(td.getAttribute('colspan')||'1',10)||1;
@@ -17245,7 +17289,8 @@ function _mstack(root){
   });
 }
 (function(){
-  var ids=['rebar-root','grout-root','backfill-root','progress-root','mat-est-form','mat-est-out','plan-root'];
+  var ids=['rebar-root','grout-root','backfill-root','progress-root','mat-est-form','mat-est-out','plan-root',
+           'page-params'];   // v5.372：參數設定的單價矩陣表也要堆疊，手機不得左右滑
   function _msApply(){ids.forEach(function(id){var el=document.getElementById(id);if(el)_mstack(el);});}
   try{
     var mo=new MutationObserver(_msApply);
@@ -21445,17 +21490,32 @@ function settleContract(id){
   // 防呆：疑似尚未完工（已請款未達合約 90%，或預計完工日未到）→ 先跳強警告
   const _pct=orig>0?Math.round(billed/orig*100):0;
   const _endFuture=!!(c.end&&c.end>localToday());
+  // v5.372：兩段確認一律走自製確認框。原本兩處 confirm 被擋掉都當作「同意」，
+  // 等於沒問過就把合約金額改掉並標記完成——這是最難回復的一種誤操作。
+  const _doSettle=function(){_settleContractDo(id,orig,billed,_retSum);};
+  const _askFinal=function(){
+    showConfirm('竣工總結算',
+      '原合約金額　<b>NT$ '+fmt(orig)+'</b><br>'
+      +'實際請款累積 <b>NT$ '+fmt(billed)+'</b>（含保留款 NT$ '+fmt(_retSum)+'）<br>'
+      +'差額（追減）<b>NT$ '+fmt(orig-billed)+'</b><br><br>'
+      +'確定將合約金額調整為結算金額，並標記為已完成？<br>'
+      +'<span style="font-size:11.5px;color:var(--b4)">保留款屬押在業主端、日後會退還的款項，已計入結算金額，不視為追減。原合約金額會記錄在備註，可隨時手動改回。</span>',
+      _doSettle);
+  };
   if(_pct<90||_endFuture){
-    let warn=false;
-    try{warn=window.confirm('此合約疑似尚未完工！\n\n'
-      +(_pct<90?'・已請款累積僅達合約金額的 '+_pct+'%\n':'')
-      +(_endFuture?'・預計完工日 '+c.end+' 尚未到期\n':'')
-      +'\n「結算」是整個工程全部完工後的最後收尾，會把合約金額直接改成目前已請款累積 NT$ '+fmt(billed)+'（含保留款）。\n\n如果只是單一工項做完要追加減，請改用請款單裡各工項旁的「<svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 工項結算」，不要按這裡。\n\n確定整個工程已完工、要繼續合約總結算嗎？');}catch(e){warn=true;}
-    if(!warn)return;
+    showConfirm('此合約疑似尚未完工',
+      (_pct<90?'・已請款累積僅達合約金額的 <b>'+_pct+'%</b><br>':'')
+      +(_endFuture?'・預計完工日 '+esc(c.end)+' 尚未到期<br>':'')
+      +'<br>「結算」是整個工程全部完工後的最後收尾，會把合約金額直接改成目前已請款累積 <b>NT$ '+fmt(billed)+'</b>（含保留款）。<br><br>'
+      +'如果只是單一工項做完要追加減，請改用請款單裡各工項旁的「工項結算」，不要按這裡。<br><br>'
+      +'確定整個工程已完工、要繼續合約總結算嗎？',
+      _askFinal);
+    return;
   }
-  let ok=false;
-  try{ok=window.confirm('竣工結算\n\n原合約金額　NT$ '+fmt(orig)+'\n實際請款累積 NT$ '+fmt(billed)+'（含保留款 NT$ '+fmt(_retSum)+'）\n差額（追減）NT$ '+fmt(orig-billed)+'\n\n確定將合約金額調整為結算金額，並標記為已完成？\n（保留款屬押在業主端、日後會退還的款項，已計入結算金額，不視為追減）\n（原合約金額會記錄在備註，可隨時手動改回）');}catch(e){ok=true;}
-  if(!ok)return;
+  _askFinal();
+}
+function _settleContractDo(id,orig,billed,_retSum){
+  const c=CONTRACTS.find(x=>x.id===id);if(!c)return;
   if(c.originalAmount==null)c.originalAmount=orig; // 保留原始合約金額
   c.amount=billed;
   c.status='completed';
@@ -22342,7 +22402,7 @@ async function aiScanDoc(dataUrl,hint){
     var r=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'content-type':'application/json','x-api-key':_aiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:600,messages:[{role:'user',content:[
+      body:JSON.stringify({model:'claude-sonnet-5',max_tokens:600,messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:mt,data:b64}},
         {type:'text',text:'這是台灣營建業的'+(hint||'單據')+'照片。擷取欄位。回覆第一個字元必須是 { 、最後一個字元必須是 } ，禁止任何說明文字或圍欄。JSON 格式：{"docType":"invoice|transfer|receipt|other","number":"發票字軌號碼如AB12345678（無則空字串）","date":"YYYY-MM-DD（民國年請轉西元）","seller":"開立方/賣方名稱","buyerTaxId":"買受人統編（無則空）","amount":含稅總金額數字,"tax":營業稅額數字（未載明則以總額/21推算取整）,"note":"品名摘要或匯款帳號末五碼等關鍵資訊（20字內）"}'}]}]})
     });
@@ -23293,7 +23353,7 @@ async function aiClassifyDoc(du){
     var r=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'content-type':'application/json','x-api-key':_aiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1200,messages:[{role:'user',content:[
+      body:JSON.stringify({model:'claude-sonnet-5',max_tokens:1200,messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:mt,data:b64}},
         {type:'text',text:'你是台灣營建公司「豐有工程」的文件分類員。'+ctx+'\n判斷這張照片的文件類型並擷取資料。類型定義：work_confirm=工地工作確認單/估驗單(業主或監造簽認數量)；vendor_quote=廠商給我們的報價單；vendor_invoice=工程承攬廠商的計價請款單或發票（有工程款/計價性質）；own_material=公司自購工程材料耗材的發票（鋼索、母索、止水鈑、五金、油壓配件、租金運費等，賣方為材料行/租賃商）；transfer=匯款/轉帳證明；owner_invoice=我們開給業主的統一發票(賣方為豐有)；expense=日常消費發票收據；other=無法判斷。\n回覆第一個字元必須是 { ，最後一個字元必須是 } ，禁止任何說明文字。JSON：{"docType":"上述其一","projectId":"從進行中專案清單比對出的id（無把握則空）","vendor":"對方名稱","items":[{"desc":"工項名","unit":"單位","qty":數量,"price":單價(無則0)}]（confirm/quote/own_material需要——材料發票務必逐品項列出品名/單位/數量/單價,最多12筆）,"number":"發票號碼","date":"YYYY-MM-DD","amount":總金額數字,"tax":稅額數字,"note":"關鍵摘要20字內","confidence":"high|low"}'}]}]})
     });
