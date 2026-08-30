@@ -170,7 +170,50 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ───────────── 5. 備份完整性 ─────────────
+  // ───────────── 5. 工項類別／期別與新報表 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      // 類別：名稱看不出來的工項，指定後要能正確歸類
+      out.catKeyword = JSON.stringify(_itemCat({ desc: 'H型鋼樁打設' })) === '{"install":true,"remove":false}';
+      out.catNoKeyword = JSON.stringify(_itemCat({ desc: '型鋼壓入回收' })) === '{"install":false,"remove":false}';
+      out.catExplicit = JSON.stringify(_itemCat({ desc: '型鋼壓入回收', cat: 'remove' })) === '{"install":false,"remove":true}';
+      // 期別：可由參數與逐項指定覆寫
+      P.removeRate = 30;
+      out.phaseAuto = _isRemovePeriod({ payRate: 30 }) === true && _isRemovePeriod({ payRate: 100 }) === false;
+      out.phaseExplicit = _isRemovePeriod({ payRate: 30, phase: 'install' }) === false && _isRemovePeriod({ payRate: 100, phase: 'remove' }) === true;
+      P.removeRate = 40;
+      out.phaseParam = _isRemovePeriod({ payRate: 30 }) === false && _isRemovePeriod({ payRate: 40 }) === true;
+      P.removeRate = 30;
+      // 兩張新報表要能渲染
+      Q = [{ id: 'q1', name: '案1', client: '甲營造', date: '2026-03-01', items: [], exs: [],
+             costs: [{ id: 'c1', type: 'sub', vendor: '甲協力', date: '2026-03-05', rows: [{ desc: 'H型鋼樁打設', qty: 100, unitPrice: 480 }] }],
+             awarded: true, t: { total: 100000 }, _mt: 1 },
+           { id: 'q2', name: '案2', client: '甲營造', date: '2026-04-01', items: [], exs: [],
+             costs: [{ id: 'c2', type: 'sub', vendor: '乙工程行', date: '2026-04-05', rows: [{ desc: 'H型鋼樁打設', qty: 80, unitPrice: 560 }] }],
+             awarded: false, bidStatus: 'lost', lostReason: '價格過高', t: { total: 90000 }, _mt: 1 }];
+      PAYABLES = [{ id: 'p1', to: '甲協力', amount: 480000, status: 'paid', date: '2026-03-10', due: '2026-04-10', paidDate: '2026-04-08', _mt: 1 }];
+      const el = document.createElement('div');
+      renderBidRateReport(el, 2026, 0);
+      out.bidReport = /已定案得標率/.test(el.textContent) && /甲營造/.test(el.textContent) && /價格過高/.test(el.textContent);
+      renderVendorReport(el, 2026, 0);
+      out.vendorReport = /甲協力/.test(el.textContent) && /乙工程行/.test(el.textContent) && /最高比最低貴/.test(el.textContent);
+      return out;
+    });
+    check('工項類別：名稱有關鍵字者自動歸類', r.catKeyword);
+    check('工項類別：名稱無關鍵字者不誤判', r.catNoKeyword);
+    check('工項類別：手動指定可覆寫', r.catExplicit);
+    check('期別：依請款率自動判斷', r.phaseAuto);
+    check('期別：逐項指定可覆寫', r.phaseExplicit);
+    check('期別：拔除請款率可由參數調整', r.phaseParam);
+    check('得標率報表可渲染', r.bidReport);
+    check('廠商績效報表可渲染', r.vendorReport);
+    check('報表測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── 6. 備份完整性 ─────────────
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
