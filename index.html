@@ -1599,6 +1599,10 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-user"/></svg> 業主往來</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-contract-btn" onclick="showReport('contract')"
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 合約請款</button>
+      <button type="button" class="btn btn-sm rpt-tab" id="rpt-bidrate-btn" onclick="showReport('bidrate')"
+        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 得標率</button>
+      <button type="button" class="btn btn-sm rpt-tab" id="rpt-vendor-btn" onclick="showReport('vendor')"
+        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg> 廠商績效</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-log-btn" onclick="showReport('log')"
         style="border-color:var(--b3);color:var(--b3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 操作記錄</button>
     </div>
@@ -2153,6 +2157,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="fg fg2">
           <div class="f"><label>營業稅率 (%)</label><input id="ptax" type="number" value="5"><div class="hint">通常為 5%，影響報價單稅額計算</div></div>
           <div class="f"><label>管理費率 (%)</label><input id="pohd" type="number" value="0" min="0" max="50"><div class="hint">公司間接成本攤提（辦公室、行政、車輛…）。利潤中心的「實際淨利」會多扣 稅前收入×此%，避免毛利高估。0＝不攤提</div></div>
+          <div class="f"><label>拔除期請款率 (%)</label><input id="prmrate" type="number" value="30" min="0" max="100"><div class="hint">請款單的「打設累積 vs 拔除累積」統計，用這個請款率判斷本期算拔除期。若你的拔除期請款率不是 30%，改成實際值即可；也可以在請款單各工項直接指定「期別」，指定過的以指定為準</div></div>
           <div class="f"><label>標準點工日薪 (NT$)</label><input id="plabor" type="number" value="2800" min="0"><div class="hint">供「日報出工 vs 已記點工成本」勾稽用：專案勾稽表會以 日報累計工數×此日薪 估算應有點工成本，少記超過兩成即示警。0＝不勾稽</div></div>
           <div class="f"><label>期初現金 (NT$)</label><input id="popen" type="number" value="0"><div class="hint">基準日當天的銀行帳戶餘額。填 0 則水位只反映系統內的收付變化，不是真實帳戶餘額</div></div>
           <div class="f"><label>期初基準日</label><input id="popendate" type="date"><div class="hint"><b>務必與上面的餘額同一天</b>。系統只累加基準日<b>之後</b>的實收與付款——基準日當天以前的錢已經在餘額裡了。沒填基準日會把歷史實收整包再加一次，可動用資金會虛高（例：帳上 348 萬卻顯示 591 萬）。沒填實收日期的舊請款單一律視為期初之前</div></div>
@@ -2626,7 +2631,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.376';
+var APP_VERSION='v5.377';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -2838,6 +2843,36 @@ function _stripInternalNote(note){
 const fmt=n=>Math.round(n).toLocaleString('zh-TW');
 
 // ══════════════════════════════════════════════════════════════
+// ══════════ v5.377：工項類別／期別（取代關鍵字猜測）══════════
+// 原本請款單的「打設累積 vs 拔除累積」統計，是靠工項名稱裡有沒有「打設／裝設／安裝」
+// 或「拔除／拆除」來分類，期別則用「請款率是不是 30%」來推。後果：
+//   ・工項換個寫法（型鋼壓入、型鋼回收、支撐解料）就完全不會被統計
+//   ・非拔除工項若剛好設 30% 請款率，會被誤判成拔除期而少算打設量
+// 改法：工項上加明確的 cat（類別）與 phase（期別）欄位，舊資料沿用關鍵字推定，
+// 拔除期的請款率門檻也從寫死的 30 改成參數（P.removeRate）。
+var ITEM_CATS=[['','自動判斷'],['install','打設／安裝'],['remove','拔除／拆除'],
+  ['both','打設＋拔除'],['other','其他（不列入數量統計）']];
+var ITEM_PHASES=[['','自動判斷'],['install','打設期'],['remove','拔除期']];
+function _removeRate(){var v=P&&P.removeRate;return (v==null||v==='')?30:(parseFloat(v)||30);}
+// 回傳 {install:bool, remove:bool}
+function _itemCat(it){
+  var c=it&&it.cat;
+  if(c==='install')return {install:true,remove:false};
+  if(c==='remove') return {install:false,remove:true};
+  if(c==='both')   return {install:true,remove:true};
+  if(c==='other')  return {install:false,remove:false};
+  // 未指定 → 沿用舊的關鍵字推定（舊資料完全相容）
+  var d=String((it&&it.desc)||'');
+  return {install:d.indexOf('打設')>=0||d.indexOf('裝設')>=0||d.indexOf('安裝')>=0,
+          remove: d.indexOf('拔除')>=0||d.indexOf('拆除')>=0};
+}
+// 本期屬於打設期還是拔除期
+function _isRemovePeriod(it){
+  if(it&&it.phase==='remove')return true;
+  if(it&&it.phase==='install')return false;
+  var rate=(it&&it.payRate!=null)?it.payRate:100;
+  return parseFloat(rate)===_removeRate();
+}
 // v5.318 口徑統一：同一個指標全站只有一套算法，避免各頁數字對不上
 // ══════════════════════════════════════════════════════════════
 // 稅率／保留款%：0 是合法值（免稅案、不留保留款），不可被 || 預設值吃掉
@@ -3321,6 +3356,7 @@ function doSaveP(){
   delete P.aiKey; // Key 僅存本機，絕不上雲
   P.tel=gv('ptel');P.email=gv('pem');P.addr=gv('pad');
   P.tax=parseFloat(gv('ptax'))||5;
+  P.removeRate=(function(){var v=parseFloat(gv('prmrate'));return (isFinite(v)&&v>=0&&v<=100)?v:30;})();   // v5.377
   P.overheadPct=parseFloat(gv('pohd'))||0;
   P.laborDayRate=parseFloat(gv('plabor'))||0;
   P.openingCash=parseFloat(gv('popen'))||0;
@@ -3464,7 +3500,7 @@ function syncParamsUI(){
   try{rFixedCosts();}catch(e){_err('syncParamsUI',e);}
   try{var _pk=document.getElementById('paikey');if(_pk)_pk.value=_aiKey();}catch(e){_err('syncParamsUI',e);}
   const m={pc:'company',pt:'taxid',pb:'boss',pco:'contact',ptel:'tel',pem:'email',pad:'addr',
-    ptax:'tax',pohd:'overheadPct',plabor:'laborDayRate',popen:'openingCash',popendate:'openingDate',popres:'opReserveMonths',popresamt:'opReserveAmt',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
+    ptax:'tax',prmrate:'removeRate',pohd:'overheadPct',plabor:'laborDayRate',popen:'openingCash',popendate:'openingDate',popres:'opReserveMonths',popresamt:'opReserveAmt',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
     'dp-rent':'dpRent','dp-loss':'dpLoss','dp-process':'dpProcess','dp-period':'dpPeriod',
     'dp-i-h300':'dpIH300','dp-r-h300':'dpRH300','dp-i-h350':'dpIH350','dp-r-h350':'dpRH350',
     'dp-i-h400':'dpIH400','dp-r-h400':'dpRH400','dp-i-s':'dpIS','dp-r-s':'dpRS',
@@ -4379,6 +4415,16 @@ function rItems(){
         row2.appendChild(mkField('計費單位',otSel));
         card.appendChild(row2);
         // 備註
+        // v5.377：工項類別（手機）
+        const catSelM=document.createElement('select');
+        catSelM.style.cssText='width:100%;font-size:13px;border:1px solid var(--b2);border-radius:6px;padding:6px 8px;background:var(--w);font-family:inherit';
+        ITEM_CATS.forEach(function(c){
+          const o=document.createElement('option');o.value=c[0];o.textContent=c[1];
+          if((it.cat||'')===c[0])o.selected=true;
+          catSelM.appendChild(o);
+        });
+        catSelM.addEventListener('change',function(){items[i].cat=this.value;});
+        card.appendChild(mkField('類別（影響請款數量統計）',catSelM));
         const noteInp=mkInput(null,it.note,_isSpare(it)?'備用單價':'(選填)','left');
         if(_isSpare(it)&&!it.note){items[i].note=SPARE_NOTE;noteInp.value=SPARE_NOTE;}
         const noteWrap=mkField('備註',noteInp);
@@ -4543,6 +4589,19 @@ function rItems(){
         updHist();
         tdCost.appendChild(histDiv);
         const tdNote=mkTd('');
+        // v5.377：工項類別。空值＝沿用名稱關鍵字自動判斷，與舊行為完全一致；
+        // 只有名稱看不出來（型鋼壓入、支撐解料…）時才需要手動指定。
+        const catSel=document.createElement('select');
+        catSel.title='工項類別：決定這一項要不要列入請款單的打設／拔除數量統計。留「自動判斷」即沿用工項名稱推定。';
+        catSel.style.cssText='width:100%;font-size:11px;height:22px;border:1px solid var(--b2);border-radius:4px;background:var(--w);color:var(--b4);margin-bottom:3px;font-family:inherit';
+        ITEM_CATS.forEach(function(c){
+          const o=document.createElement('option');o.value=c[0];o.textContent=c[1];
+          if((it.cat||'')===c[0])o.selected=true;
+          catSel.appendChild(o);
+        });
+        catSel.addEventListener('change',function(){items[i].cat=this.value;catSel.style.color=this.value?'var(--g3)':'var(--b4)';});
+        if(it.cat)catSel.style.color='var(--g3)';
+        tdNote.appendChild(catSel);
         const noteInp=mkTblInp(null,it.note,_isSpare(it)?'備用單價':'備註','left');
         noteInp.addEventListener('input',function(){items[i].note=this.value;});
         if(_isSpare(it)&&!it.note){items[i].note=SPARE_NOTE;noteInp.value=SPARE_NOTE;}
@@ -4620,12 +4679,12 @@ function _qInsAt(pos,obj,unfoldSec){
   window._qFocusI=pos;
   rItems();
 }
-function insItAt(pos,unfoldSec){_qInsAt(pos,{desc:'',unit:'',qty:'',price:'',note:'',ot:'',otu:'$/M/天',sec:false},unfoldSec);}
+function insItAt(pos,unfoldSec){_qInsAt(pos,{desc:'',unit:'',qty:'',price:'',note:'',ot:'',otu:'$/M/天',sec:false,cat:''},unfoldSec);}
 function insSecAt(pos){_qInsAt(pos,{desc:'',sec:true});}
 function addIt(){insItAt(items.length);}
 // 備用單價工項：單位＋數量固定 1＋單價；複價不顯示、不計入小計，備註固定「備用單價」
 function insSpareAt(pos,unfoldSec){
-  _qInsAt(pos,{desc:'',unit:'',qty:'1',price:'',note:SPARE_NOTE,ot:'',otu:'$/M/天',sec:false,spare:true},unfoldSec);
+  _qInsAt(pos,{desc:'',unit:'',qty:'1',price:'',note:SPARE_NOTE,ot:'',otu:'$/M/天',sec:false,spare:true,cat:'other'},unfoldSec);
 }
 function addSpare(){insSpareAt(items.length);}
 function addSec(){insSecAt(items.length);}
@@ -4721,6 +4780,7 @@ function saveQ(){
           if(li.origContractQty==null){li.contractQty=parseFloat(qi.qty)||0;}
           else{_settleKept++;}
           li.note=qi.note||li.note;
+          li.cat=qi.cat||'';                 // v5.377：類別以報價單為準
           li.otPrice=qi.ot?parseFloat((qi.ot.match(/^[\d.]+/)||[''])[0])||0:0;
           li.otUnit=qi.otu||li.otUnit||'';
         }
@@ -4734,6 +4794,7 @@ function saveQ(){
               type:'item',desc:qi.desc||'',unit:qi.unit||'',
               contractPrice:parseFloat(qi.price)||0,
               contractQty:parseFloat(qi.qty)||0,
+              cat:qi.cat||'',
               prevQty:0,prevAmt:0,curQty:0,curDays:0,curAmt:0,
               note:qi.note||''
             });
@@ -5248,7 +5309,8 @@ function buildRmkText(){
 // 未知欄位一律原樣保留，日後新增欄位不會在壓縮時遺失。
 var _INV_K={type:'t',desc:'d',unit:'u',contractPrice:'cp',contractQty:'cq',prevQty:'pq',prevAmt:'pa',
   curQty:'q',curDays:'cd',curAmt:'a',note:'n',cumQty:'mq',cumAmt:'ma',payRate:'r',
-  installCum:'ic',removeCum:'rc',prevPayRate:'pr',otPrice:'op',otUnit:'ou'};
+  installCum:'ic',removeCum:'rc',prevPayRate:'pr',otPrice:'op',otUnit:'ou',
+  cat:'ct',phase:'ph'};   // v5.377 類別／期別
 var _INV_KR=(function(){var r={};Object.keys(_INV_K).forEach(function(k){r[_INV_K[k]]=k;});return r;})();
 // 可省略的欄位：全部的取用點都走 parseFloat(x)||0 或 x||''，「沒有」與「0／空字串」等價。
 // 刻意不列入的三個：
@@ -5258,7 +5320,8 @@ var _INV_KR=(function(){var r={};Object.keys(_INV_K).forEach(function(k){r[_INV_
 //                  「沒填」與「填 100」印出來的前期請款率不一樣，補預設值會改到列印結果
 // 這三個一律照原樣保留（有就有、沒有就沒有），只做欄位名縮短。
 var _INV_OMIT={desc:'',unit:'',contractPrice:0,contractQty:0,prevQty:0,prevAmt:0,
-  curQty:0,curDays:0,curAmt:0,note:'',cumQty:0,cumAmt:0,installCum:0,removeCum:0,otPrice:0,otUnit:''};
+  curQty:0,curDays:0,curAmt:0,note:'',cumQty:0,cumAmt:0,installCum:0,removeCum:0,otPrice:0,otUnit:'',
+  cat:'',phase:''};   // v5.377：空字串＝自動判斷，與「沒有這個欄位」等價，可安全省略
 function _invPackItem(it){
   if(!it||typeof it!=='object')return it;
   var o={};
@@ -5908,6 +5971,25 @@ function rInvItems(){
         try{const _inv=INV.find(x=>x.id===invEid);if(_inv&&_inv.items&&_inv.items[i]){_inv.items[i].payRate=invItems[i].payRate;_inv._mt=Date.now();}}catch(e){_err('top',e);}
       });
       rw.appendChild(rl);rw.appendChild(rs);grid.appendChild(rw);
+      // v5.377：期別。原本靠「請款率是不是 30%」推打設期／拔除期，
+      // 非拔除工項若剛好設 30% 就會被誤判。這裡可以直接指定。
+      const pw=document.createElement('div');pw.style.cssText='flex:1;min-width:0';
+      const pl=document.createElement('label');pl.textContent='期別';
+      pl.style.cssText='font-size:10.5px;color:var(--b3);font-weight:700;display:block;margin-bottom:2px';
+      const ps=document.createElement('select');
+      ps.title='本期這一項算打設還是拔除。留「自動判斷」＝依請款率推定（'+_removeRate()+'% 視為拔除期）。';
+      ps.style.cssText='width:100%;font-size:13px;border:1px solid var(--b2);border-radius:6px;padding:7px 4px;box-sizing:border-box;background:#fff;font-family:inherit';
+      ITEM_PHASES.forEach(function(pv){
+        const o=document.createElement('option');o.value=pv[0];o.textContent=pv[1];
+        if((it.phase||'')===pv[0])o.selected=true;
+        ps.appendChild(o);
+      });
+      ps.addEventListener('change',function(){
+        invItems[i].phase=this.value;
+        rInvTots();
+        try{const _inv=INV.find(x=>x.id===invEid);if(_inv&&_inv.items&&_inv.items[i]){_inv.items[i].phase=invItems[i].phase;_inv._mt=Date.now();}}catch(e){_err('rInvItems',e);}
+      });
+      pw.appendChild(pl);pw.appendChild(ps);grid.appendChild(pw);
       card.appendChild(grid);
       // 本期金額
       const amt=document.createElement('div');
@@ -6159,11 +6241,13 @@ function rInvTots(srcInv){
   invItems.forEach(it=>{
     if(it.type==='sec')return;
     const d=it.desc||'';
-    const hasInstall=d.includes('打設')||d.includes('裝設')||d.includes('安裝');
-    const hasRemove=d.includes('拔除')||d.includes('拆除');
+    // v5.377：改用明確的類別／期別欄位；未指定時才退回舊的關鍵字推定
+    const _c=_itemCat(it);
+    const hasInstall=_c.install, hasRemove=_c.remove;
     if(!hasInstall&&!hasRemove)return;
     const rate=it.payRate!=null?it.payRate:100;
-    const isInstallPeriod=(rate!==30);
+    const _isRemove=_isRemovePeriod(it);
+    const isInstallPeriod=!_isRemove;
     const contract=parseFloat(it.contractQty)||0;
     const curQty=parseFloat(it.curQty)||0;
     const installCumPrev=parseFloat(it.installCum)||0;
@@ -6191,11 +6275,11 @@ function rInvTots(srcInv){
     }
 
     // ── 拔除累積 ──
-    const remCur=(rate===30)?curQty:0;
+    const remCur=_isRemove?curQty:0;
     const remCum=removeCumPrev+remCur;
 
     // ── 拔除面板（有拔除記錄才顯示）──
-    if(hasRemove&&(remCum>0||rate===30)){
+    if(hasRemove&&(remCum>0||_isRemove)){
       // 拔除面板的「合約」參照欄 = 打設累積（若已知）
       const remContract=instDataKnown?instCum:null;
       const remPending=instDataKnown?Math.max(0,instCum-remCum):null;
@@ -7444,6 +7528,7 @@ function buildInvFromQuote(q){
       unit:it.unit||'',
       contractPrice:parseFloat(it.price)||0,
       contractQty:parseFloat(it.qty)||0,
+      cat:it.cat||'',                       // v5.377：工項類別跟著帶進請款單
       prevQty:0,prevAmt:0,
       curQty:0,curDays:0,curAmt:0,
       note:it.note||'',cumQty:0,cumAmt:0,
@@ -24508,7 +24593,7 @@ let _currentReport='monthly';
 
 function showReport(type){
   _currentReport=type;
-  ['monthly','yearly','client','contract','log'].forEach(t=>{
+  ['monthly','yearly','client','contract','bidrate','vendor','log'].forEach(t=>{
     const btn=document.getElementById('rpt-'+t+'-btn');
     if(btn){
       btn.style.background=t===type?'var(--g)':'';
@@ -24527,8 +24612,268 @@ function renderCurrentReport(){
   else if(_currentReport==='yearly')renderYearlyReport(el,year);
   else if(_currentReport==='client')renderClientReport(el,year,month);
   else if(_currentReport==='contract')renderContractReport(el,year);
+  else if(_currentReport==='bidrate')renderBidRateReport(el,year,month);
+  else if(_currentReport==='vendor')renderVendorReport(el,year,month);
   else if(_currentReport==='log')renderLogReport(el);
   try{_cardifyTables(el);}catch(e){_err('renderCurrentReport',e);}
+}
+// ══════════════ v5.377：得標率分析 ══════════════
+// 未得標原因與對手得標價早就在記錄了，但一直沒有彙整。
+// 這張表把「依業主／依金額級距／依原因」的得標率攤開，直接當報價策略的依據。
+function _bidRows(year,month){
+  return (Q||[]).filter(function(q){
+    if(!q||q.parentId)return false;                 // 追加案不算獨立一件
+    var d=String(q.date||'');
+    if(year&&d.slice(0,4)!==String(year))return false;
+    if(month&&parseInt(d.slice(5,7))!==month)return false;
+    return true;
+  });
+}
+function _bidStat(list){
+  var won=list.filter(function(q){return q.awarded;});
+  var lost=list.filter(function(q){return !q.awarded&&q.bidStatus==='lost';});
+  var open=list.filter(function(q){return !q.awarded&&(!q.bidStatus||q.bidStatus==='nego');});
+  var voided=list.filter(function(q){return !q.awarded&&q.bidStatus==='void';});
+  var decided=won.length+lost.length;
+  return {n:list.length,won:won.length,lost:lost.length,open:open.length,void:voided.length,
+    decided:decided, rate:decided?(won.length/decided*100):null,
+    wonAmt:won.reduce(function(a,q){return a+((q.t&&q.t.total)||0);},0),
+    allAmt:list.reduce(function(a,q){return a+((q.t&&q.t.total)||0);},0)};
+}
+function _rateCell(r){
+  if(r==null)return '<span style="color:var(--b3)">—</span>';
+  var v=Math.round(r*10)/10;
+  var c=v>=50?'var(--g3)':v>=30?'#e65100':'var(--red)';
+  return '<b style="color:'+c+'">'+v+'%</b>';
+}
+function renderBidRateReport(el,year,month){
+  var list=_bidRows(year,month);
+  var period=year+(month?('年'+month+'月'):'年');
+  if(!list.length){
+    el.innerHTML='<div class="cb"><div class="empty"><p>'+esc(period)+'沒有報價記錄</p></div></div>';
+    return;
+  }
+  var all=_bidStat(list);
+  var tile=function(k,v,sub,clr){
+    return '<div style="background:var(--w);border:1px solid var(--b2);border-radius:var(--r8);padding:10px 12px">'
+      +'<div style="font-size:11px;color:var(--b3);font-weight:700;margin-bottom:4px">'+k+'</div>'
+      +'<div style="font-size:19px;font-weight:900;color:'+(clr||'var(--b5)')+';font-variant-numeric:tabular-nums">'+v+'</div>'
+      +(sub?'<div style="font-size:11px;color:var(--b4);margin-top:3px">'+sub+'</div>':'')+'</div>';
+  };
+  var html='<div class="cb">'
+    +'<div style="font-size:13px;font-weight:900;color:var(--g3);margin-bottom:8px">'+esc(period)+' 得標率分析</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:8px;margin-bottom:6px">'
+    +tile('已定案得標率',all.rate==null?'—':(Math.round(all.rate*10)/10+'%'),'得標 '+all.won+' ／ 未得標 '+all.lost,all.rate>=50?'var(--g3)':all.rate>=30?'#e65100':'var(--red)')
+    +tile('報價件數',all.n,'尚在洽談 '+all.open+'　流標 '+all.void)
+    +tile('得標金額','NT$ '+fmt(all.wonAmt),'全部報價 NT$ '+fmt(all.allAmt))
+    +tile('平均得標案金額',all.won?('NT$ '+fmt(Math.round(all.wonAmt/all.won))):'—','')
+    +'</div>'
+    +'<div style="font-size:11px;color:var(--b3);margin-bottom:14px">已定案得標率＝得標 ÷（得標＋未得標）。尚在洽談與流標不列入分母。</div>';
+
+  // ── 依業主 ──
+  var byC={};
+  list.forEach(function(q){var k=String(q.client||'（未填業主）').trim()||'（未填業主）';(byC[k]=byC[k]||[]).push(q);});
+  var cRows=Object.keys(byC).map(function(k){return {k:k,s:_bidStat(byC[k])};})
+    .sort(function(a,b){return b.s.n-a.s.n;});
+  html+='<div style="font-weight:900;font-size:12.5px;color:var(--g3);margin:4px 0 6px">依業主</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+    +'<thead><tr style="background:var(--gl);color:var(--b5)"><th style="padding:6px 8px;text-align:left">業主</th>'
+    +'<th style="padding:6px 8px;text-align:right">報價</th><th style="padding:6px 8px;text-align:right">得標</th>'
+    +'<th style="padding:6px 8px;text-align:right">未得標</th><th style="padding:6px 8px;text-align:right">得標率</th>'
+    +'<th style="padding:6px 8px;text-align:right">得標金額</th></tr></thead><tbody>'
+    +cRows.map(function(r){
+      return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px 8px">'+esc(r.k)+'</td>'
+        +'<td style="padding:5px 8px;text-align:right">'+r.s.n+'</td>'
+        +'<td style="padding:5px 8px;text-align:right">'+r.s.won+'</td>'
+        +'<td style="padding:5px 8px;text-align:right">'+r.s.lost+'</td>'
+        +'<td style="padding:5px 8px;text-align:right">'+_rateCell(r.s.rate)+'</td>'
+        +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(r.s.wonAmt)+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+
+  // ── 依報價金額級距 ──
+  var BANDS=[[0,500000,'50 萬以下'],[500000,2000000,'50～200 萬'],[2000000,5000000,'200～500 萬'],[5000000,Infinity,'500 萬以上']];
+  html+='<div style="font-weight:900;font-size:12.5px;color:var(--g3);margin:16px 0 6px">依報價金額級距</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+    +'<thead><tr style="background:var(--gl);color:var(--b5)"><th style="padding:6px 8px;text-align:left">級距（含稅）</th>'
+    +'<th style="padding:6px 8px;text-align:right">報價</th><th style="padding:6px 8px;text-align:right">得標</th>'
+    +'<th style="padding:6px 8px;text-align:right">未得標</th><th style="padding:6px 8px;text-align:right">得標率</th></tr></thead><tbody>'
+    +BANDS.map(function(b){
+      var sub=list.filter(function(q){var v=(q.t&&q.t.total)||0;return v>=b[0]&&v<b[1];});
+      if(!sub.length)return '';
+      var st2=_bidStat(sub);
+      return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px 8px">'+b[2]+'</td>'
+        +'<td style="padding:5px 8px;text-align:right">'+st2.n+'</td>'
+        +'<td style="padding:5px 8px;text-align:right">'+st2.won+'</td>'
+        +'<td style="padding:5px 8px;text-align:right">'+st2.lost+'</td>'
+        +'<td style="padding:5px 8px;text-align:right">'+_rateCell(st2.rate)+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+
+  // ── 未得標原因 ＋ 對手價差 ──
+  var lostList=list.filter(function(q){return !q.awarded&&q.bidStatus==='lost';});
+  if(lostList.length){
+    var byR={};
+    lostList.forEach(function(q){var k=q.lostReason||'未填原因';(byR[k]=byR[k]||[]).push(q);});
+    html+='<div style="font-weight:900;font-size:12.5px;color:var(--g3);margin:16px 0 6px">未得標原因</div>'
+      +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+      +'<thead><tr style="background:var(--gl);color:var(--b5)"><th style="padding:6px 8px;text-align:left">原因</th>'
+      +'<th style="padding:6px 8px;text-align:right">件數</th><th style="padding:6px 8px;text-align:right">佔比</th>'
+      +'<th style="padding:6px 8px;text-align:right">平均高出對手</th></tr></thead><tbody>'
+      +Object.keys(byR).sort(function(a,b){return byR[b].length-byR[a].length;}).map(function(k){
+        var arr=byR[k];
+        var cmp=arr.filter(function(q){return (parseFloat(q.lostPrice)||0)>0&&((q.t&&q.t.total)||0)>0;});
+        var gap=cmp.length?(cmp.reduce(function(a,q){return a+(((q.t.total-q.lostPrice)/q.lostPrice)*100);},0)/cmp.length):null;
+        return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px 8px">'+esc(k)+'</td>'
+          +'<td style="padding:5px 8px;text-align:right">'+arr.length+'</td>'
+          +'<td style="padding:5px 8px;text-align:right">'+Math.round(arr.length/lostList.length*100)+'%</td>'
+          +'<td style="padding:5px 8px;text-align:right">'+(gap==null?'<span style="color:var(--b3)">—</span>'
+            :('<b style="color:'+(gap>0?'var(--red)':'var(--g3)')+'">'+(gap>0?'+':'')+(Math.round(gap*10)/10)+'%</b><span style="color:var(--b3);font-size:11px">（'+cmp.length+' 件有對手價）</span>'))+'</td></tr>';
+      }).join('')+'</tbody></table></div>'
+      +'<div style="font-size:11px;color:var(--b3);margin-top:6px">「平均高出對手」＝（我方報價−對手得標價）÷對手得標價。正值代表我們開得比較高，是最直接的報價校準依據。</div>';
+  }
+  el.innerHTML=html+'</div>';
+}
+
+// ══════════════ v5.377：廠商績效比較 ══════════════
+// 應付帳款與施工成本裡已經有每個廠商每個工項的實際單價，但一直沒有橫向比較。
+// 這張表把發包量、付款準時度、以及「同一工項不同廠商的單價區間」擺在一起，發包議價直接可用。
+function _vendorStats(year,month){
+  var inRange=function(d){
+    d=String(d||'');
+    if(year&&d.slice(0,4)!==String(year))return false;
+    if(month&&parseInt(d.slice(5,7))!==month)return false;
+    return true;
+  };
+  var V={};
+  var get=function(name){
+    var k=String(name||'').trim();if(!k)return null;
+    if(!V[k])V[k]={name:k,cost:0,costN:0,projects:{},pay:0,paid:0,unpaid:0,payN:0,paidN:0,lateN:0,dayspan:0,daysN:0};
+    return V[k];
+  };
+  // 發包成本（報價單內的施工成本）
+  (Q||[]).forEach(function(q){
+    (q.costs||[]).forEach(function(c){
+      if(!c||!inRange(c.date))return;
+      var v=get(c.vendor);if(!v)return;
+      var amt=parseFloat(c.amt)||0;
+      if(!amt&&Array.isArray(c.rows))amt=c.rows.reduce(function(a,r){return a+((parseFloat(r.qty)||0)*(parseFloat(r.unitPrice)||0));},0);
+      v.cost+=amt;v.costN++;
+      if(q.name)v.projects[q.name]=1;
+    });
+  });
+  // 應付帳款與付款準時度
+  (PAYABLES||[]).forEach(function(p){
+    if(!p)return;
+    var d=p.status==='paid'?(p.paidDate||p.date):p.date;
+    if(!inRange(d))return;
+    var v=get(p.to);if(!v)return;
+    var amt=(typeof _payEff==='function')?_payEff(p):(parseFloat(p.amount)||0);
+    v.pay+=amt;v.payN++;
+    if(p.status==='paid'){
+      v.paid+=amt;v.paidN++;
+      if(p.due&&p.paidDate){
+        var gap=_dDiff(p.due,p.paidDate);
+        v.dayspan+=gap;v.daysN++;
+        if(gap>0)v.lateN++;
+      }
+    }else{
+      v.unpaid+=amt;
+      if(p.due&&p.due<localToday())v.lateN++;
+    }
+  });
+  return Object.keys(V).map(function(k){
+    var v=V[k];v.projN=Object.keys(v.projects).length;
+    v.avgDays=v.daysN?Math.round(v.dayspan/v.daysN):null;
+    return v;
+  }).sort(function(a,b){return (b.cost+b.pay)-(a.cost+a.pay);});
+}
+// 同一工項在不同廠商的單價（只看「承包」型成本的明細行）
+function _vendorItemPrices(year,month){
+  var inRange=function(d){
+    d=String(d||'');
+    if(year&&d.slice(0,4)!==String(year))return false;
+    if(month&&parseInt(d.slice(5,7))!==month)return false;
+    return true;
+  };
+  var M={};
+  (Q||[]).forEach(function(q){
+    (q.costs||[]).forEach(function(c){
+      if(!c||c.type!=='sub'||!inRange(c.date))return;
+      var ven=String(c.vendor||'').trim();if(!ven)return;
+      (c.rows||[]).forEach(function(r){
+        var qty=parseFloat(r.qty)||0,up=parseFloat(r.unitPrice)||0;
+        if(qty<=0||up<=0)return;
+        var name=String(r.desc||'').trim();
+        if(!name&&r.linkedItemIdx>=0&&q.items&&q.items[r.linkedItemIdx])name=String(q.items[r.linkedItemIdx].desc||'').split('\n')[0];
+        name=name.trim();if(!name)return;
+        var key=(typeof _normName==='function')?_normName(name):name;
+        if(!key)return;
+        if(!M[key])M[key]={label:name.slice(0,28),by:{}};
+        if(!M[key].by[ven])M[key].by[ven]={n:0,sum:0,qty:0,min:Infinity,max:0};
+        var b=M[key].by[ven];
+        b.n++;b.sum+=up*qty;b.qty+=qty;
+        if(up<b.min)b.min=up;
+        if(up>b.max)b.max=up;
+      });
+    });
+  });
+  return Object.keys(M).map(function(k){
+    var e=M[k];
+    e.vendors=Object.keys(e.by).map(function(v){
+      var b=e.by[v];return {v:v,n:b.n,avg:b.qty?Math.round(b.sum/b.qty):0,min:b.min===Infinity?0:Math.round(b.min),max:Math.round(b.max)};
+    }).sort(function(a,b){return a.avg-b.avg;});
+    return e;
+  }).filter(function(e){return e.vendors.length>=2;})     // 只有一家報過的沒有比較意義
+   .sort(function(a,b){return b.vendors.length-a.vendors.length;});
+}
+function renderVendorReport(el,year,month){
+  var period=year+(month?('年'+month+'月'):'年');
+  var list=_vendorStats(year,month);
+  if(!list.length){
+    el.innerHTML='<div class="cb"><div class="empty"><p>'+esc(period)+'沒有廠商發包或應付記錄</p></div></div>';
+    return;
+  }
+  var html='<div class="cb">'
+    +'<div style="font-size:13px;font-weight:900;color:var(--g3);margin-bottom:4px">'+esc(period)+' 廠商績效</div>'
+    +'<div style="font-size:11px;color:var(--b3);margin-bottom:10px">發包金額取自各報價單的施工成本；付款天數＝實付日−應付日，負數代表提前付款。</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+    +'<thead><tr style="background:var(--gl);color:var(--b5)"><th style="padding:6px 8px;text-align:left">廠商</th>'
+    +'<th style="padding:6px 8px;text-align:right">發包金額</th><th style="padding:6px 8px;text-align:right">合作案件</th>'
+    +'<th style="padding:6px 8px;text-align:right">應付總額</th><th style="padding:6px 8px;text-align:right">未付</th>'
+    +'<th style="padding:6px 8px;text-align:right">平均付款天數</th><th style="padding:6px 8px;text-align:right">逾期筆數</th></tr></thead><tbody>'
+    +list.map(function(v){
+      var dClr=v.avgDays==null?'var(--b3)':(v.avgDays>7?'var(--red)':v.avgDays>0?'#e65100':'var(--g3)');
+      return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:5px 8px">'+esc(v.name)+'</td>'
+        +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(Math.round(v.cost))+'</td>'
+        +'<td style="padding:5px 8px;text-align:right">'+v.projN+'</td>'
+        +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(Math.round(v.pay))+'</td>'
+        +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums;color:'+(v.unpaid>0?'#e65100':'var(--b3)')+'">'+fmt(Math.round(v.unpaid))+'</td>'
+        +'<td style="padding:5px 8px;text-align:right;color:'+dClr+'">'+(v.avgDays==null?'—':(v.avgDays>0?'+':'')+v.avgDays+' 天')+'</td>'
+        +'<td style="padding:5px 8px;text-align:right;color:'+(v.lateN?'var(--red)':'var(--b3)')+'">'+(v.lateN||'—')+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+
+  var cmp=_vendorItemPrices(year,month);
+  if(cmp.length){
+    html+='<div style="font-weight:900;font-size:12.5px;color:var(--g3);margin:18px 0 6px">同工項的廠商單價比較</div>'
+      +'<div style="font-size:11px;color:var(--b3);margin-bottom:6px">只列出兩家以上做過的工項，依家數排序；單價為該廠商的加權平均（總額÷總數量）。</div>';
+    html+=cmp.slice(0,15).map(function(e){
+      var lo=e.vendors[0],hi=e.vendors[e.vendors.length-1];
+      var spread=lo.avg>0?Math.round((hi.avg-lo.avg)/lo.avg*100):0;
+      return '<div style="border:1px solid var(--b2);border-radius:var(--r8);padding:8px 10px;margin-bottom:6px;background:var(--w)">'
+        +'<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:4px">'
+          +'<b style="font-size:12.5px">'+esc(e.label)+'</b>'
+          +'<span style="font-size:11.5px;color:'+(spread>=20?'var(--red)':'var(--b4)')+'">最高比最低貴 '+spread+'%</span></div>'
+        +'<div style="display:grid;grid-template-columns:1fr auto auto;gap:2px 12px;font-size:11.5px">'
+        +e.vendors.map(function(v,i){
+          var c=i===0?'var(--g3)':(i===e.vendors.length-1?'var(--red)':'var(--b5)');
+          return '<span style="color:'+c+'">'+(i===0?'最低　':'')+esc(v.v)+'</span>'
+            +'<span style="text-align:right;font-variant-numeric:tabular-nums;color:'+c+'">'+fmt(v.avg)+'</span>'
+            +'<span style="text-align:right;color:var(--b3)">'+v.n+' 筆</span>';
+        }).join('')+'</div></div>';
+    }).join('');
+  }else{
+    html+='<div style="font-size:11.5px;color:var(--b3);margin-top:14px">同工項的廠商單價比較：目前還沒有「同一工項、兩家以上廠商」的承包成本明細可比。在施工成本以「承包」建立、填入工項與單價後就會出現。</div>';
+  }
+  el.innerHTML=html+'</div>';
 }
 // ── 手機通用：把報表表格轉為卡片（首欄為卡片標題，其餘欄位 label:value 列出）──
 function _cardifyTables(root){
