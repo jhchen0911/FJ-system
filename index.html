@@ -18049,7 +18049,8 @@ function _mstack(root){
 }
 (function(){
   var ids=['rebar-root','grout-root','backfill-root','progress-root','mat-est-form','mat-est-out','plan-root',
-           'page-params'];   // v5.372：參數設定的單價矩陣表也要堆疊，手機不得左右滑
+           'page-params',                    // v5.372：參數設定的單價矩陣表
+           'page-staff','page-roles'];       // v5.382：人員／角色頁的名冊表（CI 在不同字型環境抓到溢出）
   function _msApply(){ids.forEach(function(id){var el=document.getElementById(id);if(el)_mstack(el);});}
   try{
     var mo=new MutationObserver(_msApply);
