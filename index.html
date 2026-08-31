@@ -2636,7 +2636,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.380';
+var APP_VERSION='v5.381';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -8503,6 +8503,25 @@ function updateDashTodo(){
         color:r.maxD>14?'var(--red)':'#b26a00',
         text:'「'+r.name+'」'+r.n+' 個工項租期已逾期（最長 '+r.maxD+' 天），尚未開逾期租金請款',
         sub:r.amt?('累計約 NT$ '+fmt(Math.round(r.amt))):''});
+    });
+  }catch(e){_err('updateDashTodo',e);}
+
+  // 10. v5.381 證照／檢驗合格證效期（讀共用附件庫；到期前 30 天提醒）
+  try{
+    var _lib=_plAttLibLoad();
+    var _slotName={lic:'人員證照',train:'教育訓練／勞保',mach:'機具檢查（一機三證）',jack:'千斤頂校正',mat:'材質證明'};
+    Object.keys(_lib||{}).forEach(function(k){
+      (_lib[k]||[]).forEach(function(f){
+        if(!f||!f.exp)return;
+        var dd=_dDiff(today,f.exp);
+        if(dd>30)return;
+        items.push({type:'att_exp',urgent:dd<=7,
+          jump:"go('plan')",
+          icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg>',
+          color:dd<0?'var(--red)':'#b26a00',
+          text:(_slotName[k]||'附件')+'「'+(f.cap||f.name||'')+'」'+(dd<0?('已於 '+f.exp+' 過期'):(dd===0?'今天到期':(dd+' 天後到期（'+f.exp+'）'))),
+          sub:dd<0?'過期證照會被排進新計畫書送審，請更換':''});
+      });
     });
   }catch(e){_err('updateDashTodo',e);}
 
@@ -16625,7 +16644,9 @@ function _plBuild(){
     var aImg=list.filter(function(f){return f.kind==='img';});
     var aDoc=list.filter(function(f){return f.kind!=='img';});
     aImg.forEach(function(f,fi){
-      B.push({t:'img',b64:f.b64,ext:f.ext,cx:f.cx,cy:f.cy,name:f.name,cap:''});
+      // v5.381：過期附件在文件內明確標註，避免拿過期證照送審被打回
+      var _cap=(f.exp&&f.exp<localToday())?('【已過期 '+f.exp+'，送審前請更換】'):'';
+      B.push({t:'img',b64:f.b64,ext:f.ext,cx:f.cx,cy:f.cy,name:f.name,cap:_cap});
     });
     if(aDoc.length){
       p('下列文件為 PDF 電子檔，另冊檢附並與本計畫書一併裝訂送審：');
@@ -17238,6 +17259,12 @@ function _plAddAtts(k,input){
 }
 function _plDelAtt(k,i){(_plState.atts[k]||[]).splice(i,1);_plAttLibSave();_plSave();_plRender();}
 function _plAttCap(k,i,v){_plState.atts[k][i].cap=v;_plAttLibSave();_plSave();}
+// v5.381：附件效期。存在檔案物件上，跟著共用附件庫走各工地
+function _plAttExp(k,i,v){
+  var f=(_plState.atts[k]||[])[i];if(!f)return;
+  f.exp=v||'';
+  _plSave();_plAttLibSave();_plRender();
+}
 // ── 產生／匯出 ──
 function _plGen(){
   _plState.doc=_plBuild();
@@ -17858,6 +17885,14 @@ function _plRender(){
           :'<span style="width:40px;text-align:center"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg></span>')
         +'<input value="'+esc(f.cap||f.name)+'" oninput="_plAttCap(\''+slot.k+'\','+i+',this.value)" '
         +'style="flex:1;min-width:0;font-size:11px;padding:3px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit">'
+        +(function(){   // v5.381 效期：證照／檢驗合格證過期會被排進送審文件，這裡標紅並進待辦
+          var expd=f.exp&&f.exp<localToday();
+          var soon=f.exp&&!expd&&_dDiff(localToday(),f.exp)<=30;
+          return '<input type="date" value="'+esc(f.exp||'')+'" title="有效期限（選填）：到期前 30 天會出現在總覽待辦" '
+            +'onchange="_plAttExp(\''+slot.k+'\','+i+',this.value)" '
+            +'style="width:118px;font-size:10.5px;padding:3px 4px;border:1px solid '+(expd?'var(--red)':(soon?'#e6a23c':'var(--b2)'))+';border-radius:var(--r6);font-family:inherit'+(expd?';color:var(--red);font-weight:700':'')+'">'
+            +(expd?'<span style="font-size:10px;color:var(--red);font-weight:700;white-space:nowrap">已過期</span>':(soon?'<span style="font-size:10px;color:#b26a00;font-weight:700;white-space:nowrap">將到期</span>':''));
+        })()
         +'<button type="button" class="btn btn-xs" onclick="_plDelAtt(\''+slot.k+'\','+i+')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button></div>';
     }).join('')+'</div>';
     h+='</div>';
@@ -23395,6 +23430,10 @@ function updateFinanceKPIs(){
 
 
 // ── 90天現金水位預測：可用現金為起點，疊加 應收(含票期後移)/已收票款到期/應付/每月固定成本 ──
+// v5.381 缺口模擬：假設「所有未收款延後 N 天入帳」，看水位哪天轉負。
+// 營建業最痛的就是這個——要調頭寸是提前兩週知道還是當天知道，差很多。
+var _cfDelay=0;
+function cfSetDelay(v){_cfDelay=Math.max(0,Math.min(90,parseInt(v)||0));renderCashForecast();}
 function renderCashForecast(){
   var el=document.getElementById('cashflow-forecast');if(!el)return;
   var now=new Date();now.setHours(0,0,0,0);var t0=now.getTime();
@@ -23433,6 +23472,7 @@ function renderCashForecast(){
     if(!ds)return;
     var d=dayOf(ds);if(d==null)return;
     if(d<0)d=3; // 逾期款：保守假設催收後3天內入帳
+    d+=_cfDelay; // v5.381 缺口模擬：未收款統一延後 N 天
     if(d>90)return;
     var cp2=_cashPctOf(i),td2=i.ticketDays||0;   // v5.337：同上，統一走 _cashPctOf
     var cashAmt=unpaid*cp2,tkAmt=unpaid-cashAmt;
@@ -23509,7 +23549,14 @@ function renderCashForecast(){
     var dt=new Date(t0+e.day*864e5);
     return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:4px 6px;white-space:nowrap">'+(dt.getMonth()+1)+'/'+dt.getDate()+'</td><td style="padding:4px 6px;font-size:11.5px">'+esc(e.label)+'</td><td style="padding:4px 6px;text-align:right;font-weight:700;color:'+(e.amt>=0?'var(--g3)':'var(--red)')+';font-variant-numeric:tabular-nums">'+(e.amt>=0?'＋':'−')+fmt(Math.abs(Math.round(e.amt)))+'</td></tr>';
   }).join('');
-  el.innerHTML='<div class="card"><div class="ch green" style="flex-wrap:wrap;gap:6px"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 90 天現金水位預測</div><span style="font-size:12px;font-weight:800;color:var(--g3);background:var(--w);border:1px solid var(--gm);border-radius:99px;padding:3px 10px;white-space:nowrap">起點 NT$ '+fmt(Math.round(startCash))+'</span></div><div class="cb">'
+  var simBar='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:'+(_cfDelay?'#fff8ec':'var(--b0)')+';border:1px solid '+(_cfDelay?'#ffd699':'var(--b1)')+';border-radius:var(--r8);padding:8px 12px;margin-bottom:10px">'
+    +'<span style="font-size:12px;font-weight:700;color:var(--b5);white-space:nowrap">情境模擬：所有未收款延後</span>'
+    +'<input type="range" min="0" max="90" step="5" value="'+_cfDelay+'" oninput="cfSetDelay(this.value)" style="flex:1;min-width:120px;accent-color:#b26a00">'
+    +'<span style="font-size:14px;font-weight:900;color:'+(_cfDelay?'#b26a00':'var(--b4)')+';white-space:nowrap;font-variant-numeric:tabular-nums">'+_cfDelay+' 天</span>'
+    +(_cfDelay?'<button type="button" class="btn btn-xs" onclick="cfSetDelay(0)">還原</button>':'')
+    +'<div style="width:100%;font-size:10.5px;color:var(--b3)">已收票據的到期日是事實，不參與延後；只延「還沒收到的錢」。拉到 30 天看業主晚一個月付會怎樣。</div></div>';
+  el.innerHTML='<div class="card"><div class="ch green" style="flex-wrap:wrap;gap:6px"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 90 天現金水位預測'+(_cfDelay?'（模擬：延後 '+_cfDelay+' 天）':'')+'</div><span style="font-size:12px;font-weight:800;color:var(--g3);background:var(--w);border:1px solid var(--gm);border-radius:99px;padding:3px 10px;white-space:nowrap">起點 NT$ '+fmt(Math.round(startCash))+'</span></div><div class="cb">'
+    +simBar
     +banner
     +'<div style="overflow-x:auto"><svg class="fj-chart" viewBox="0 0 '+W+' '+H+'" style="width:100%;min-width:520px;height:auto;display:block">'
     +'<line x1="'+pd2+'" y1="'+Y(0)+'" x2="'+(W-pd2)+'" y2="'+Y(0)+'" stroke="#d9a0a0" stroke-dasharray="4 3" stroke-width="1"/>'
@@ -26778,6 +26825,7 @@ function showConfirm(title, msg, onOk, danger, onCancel, wide){
   modal.style.display='flex';
   if(okBtn){
     const newOk=okBtn.cloneNode(true);
+    newOk.textContent='確認';   // v5.381：有些呼叫端會改按鈕文字（如催款的「複製」），每次開啟先還原
     okBtn.parentNode.replaceChild(newOk,okBtn);
     newOk.onclick=function(){modal.style.display='none';onOk();};
   }
@@ -26850,7 +26898,10 @@ function renderFinanceAR(){
           ${_invEinvOf(inv.id)?'<div style="font-size:10px;color:#1a3a6b"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 已開票</div>':''}
           ${hasPmtTerms&&cashPct<100?`<div style="font-size:10px;color:var(--b4)">現金 NT$ ${fmt(Math.round(unpaidAmt*cashPct/100))}</div>`:''}
         </div>
-        <button type="button" onclick="loadInvoice('${inv.id}');go('invoice-edit')" class="btn btn-xs" style="align-self:center"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯</button>
+        <div style="display:flex;gap:4px;align-self:center;flex-shrink:0">
+          ${overdue?`<button type="button" onclick="openDunning('${inv.id}')" class="btn btn-xs" style="border-color:var(--red);color:var(--red)"><svg class="ic ib" aria-hidden="true"><use href="#i-bell"/></svg> 催款</button>`:''}
+          <button type="button" onclick="loadInvoice('${inv.id}');go('invoice-edit')" class="btn btn-xs"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯</button>
+        </div>
       </div>`;
     }).join('');
     return`<div style="border:1px solid var(--b1);border-radius:var(--r10);margin-bottom:10px;overflow:hidden">
@@ -26864,6 +26915,54 @@ function renderFinanceAR(){
 }
 
 
+// ══════════ v5.381：一鍵催款通知 ══════════
+// 逾期清單早就有了，缺的是把「案名＋期數＋金額＋逾期天數」自動組成
+// 可以直接貼 LINE 的文字。十分鐘的體力活變三秒。
+function _dunningText(inv){
+  var un=_invAR(inv);
+  var exp=null;try{exp=_invExpectedDate(inv);}catch(e){}
+  var od=0;
+  if(exp){
+    var pp=exp.date.split('-');
+    var ed=new Date(parseInt(pp[0]),parseInt(pp[1])-1,parseInt(pp[2]));
+    od=Math.max(0,Math.floor((Date.now()-ed.getTime())/864e5));
+  }
+  var einv=null;try{einv=_invEinvOf(inv.id);}catch(e){}
+  var lines=[
+    (inv.client||'')+' 您好：',
+    '',
+    '「'+(inv.project||'')+'」第 '+(inv.periodNo||'?')+' 期工程款尚未收到，麻煩撥冗確認，謝謝。',
+    '',
+    '・請款期別：第 '+(inv.periodNo||'?')+' 期（'+(inv.month||inv.date||'')+'）',
+    '・應收金額：NT$ '+fmt(un),
+    exp?('・約定收款日：'+exp.date+(od>0?('（已逾期 '+od+' 天）'):'')):'',
+    einv&&einv.number?('・發票號碼：'+einv.number):'',
+    '',
+    '若款項已匯出請告知匯款日期與金額，以便對帳；',
+    '如有任何問題請與我們聯繫。',
+    '',
+    (P.company||'豐有工程有限公司')+(P.tel?('　'+P.tel):'')
+  ].filter(function(x){return x!==null&&x!==undefined&&x!=='';}).map(String);
+  return lines.join('\n');
+}
+function openDunning(invId){
+  var inv=INV.find(function(x){return x.id===invId;});if(!inv)return;
+  var txt=_dunningText(inv);
+  showConfirm('催款通知（複製後貼 LINE／訊息）',
+    '<textarea id="dun-txt" rows="12" style="width:100%;font-size:12.5px;line-height:1.7;padding:10px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;box-sizing:border-box">'+esc(txt)+'</textarea>'
+    +'<div style="font-size:11px;color:var(--b3);margin-top:6px">內容可直接修改；按「複製」放進剪貼簿。</div>',
+    function(){
+      var el=document.getElementById('dun-txt');
+      var v=el?el.value:txt;
+      try{
+        if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v);}
+        else{el.select();document.execCommand('copy');}
+        toast('催款內容已複製，直接貼上即可');
+      }catch(e){toast('複製失敗，請手動全選複製');}
+    },false,null,true);
+  // 把確定鈕文字改成「複製」
+  try{var ok=document.getElementById('gen-confirm-ok');if(ok)ok.textContent='複製';}catch(e){}
+}
 // ── 權限管理頁初始化 ──
 function initPermissionsPage(){
   // 直接重新渲染（不要複製 innerHTML，那樣 onclick 不會更新）
