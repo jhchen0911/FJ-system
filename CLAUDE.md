@@ -63,13 +63,38 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 支出．日報 | `rQuickCost` `submitQuickCost` `submitDailyReport`(頁 id: quickcost) |
 | 智慧收件 | `smartIntake` `aiClassifyDoc` `_intakeRoute`（Claude API 影像辨識） |
 | 權限 | 部門→角色→人員三層：`listDepts`/`listRoles`/`listStaff` `_rolesOf`(取聯集) `canAccess` `renderStaffPage` `renderRolesPage` `rolePerm`；`ALL_PAGES.sysOnly`＝系統管理員限定（單價分析／參數設定／人員／角色），`parent`＝隱藏頁跟隨母頁 |
-| 備份 | `exportData`/`importData`（全量，與 `_syncPayload` 同 payload） |
-| 雲端同步 | `_sharedPayload`/`_privatePayload` `_pushPrivate`/`_pullPrivate` `_applySensColls` `_seedAdminUid` |
+| 備份 | `exportData`/`importData`（全量，與 `_syncPayload` 同 payload；含六大工具存檔、計畫書草稿與附件庫、報價版本歷史、材料庫存） |
+| 錯誤日誌 | `_err(位置,e)` 收集器（本機最近 100 筆，不上雲）`renderErrLog` `exportErrLog`；空 catch 已全部接上 |
+| 請款單壓縮 | `_invPack`/`_invUnpack`（欄位縮寫＋預設值省略，僅在儲存層；`_INV_OMIT` 之外的欄位不省略） |
+| 工項類別 | `_itemCat`(打設／拔除／both／other，空＝沿用名稱關鍵字) `_isRemovePeriod`(期別，`P.removeRate` 可調) |
+| 得標率／廠商績效 | `renderBidRateReport` `renderVendorReport`（報表中心分頁） |
+| 票據登記 | `inv.receipts[]`（現金/票據、到期日、狀態）`_invTickets` `_cashOf` 登記模式優先；收款彈窗登記 |
+| 保留款總覽 | `_retentionRows` `renderRetention`（金流管理分頁）；已完工未退標紅 |
+| 催款／缺口模擬 | `_dunningText` `openDunning`；`cfSetDelay`（90天預測延收滑桿） |
+| 全域搜尋 | `openGlobalSearch` `runGlobalSearch`（頂欄放大鏡／Ctrl+K／手機更多） |
+| 出工月結 | `renderLaborReport`（報表中心分頁，日報出工×`P.laborDayRate` 對點工成本） |
+| 修改人 | `_touch(obj)` 統一戳 `_mt`+`_by`；雲端套用只戳 `_mt`。改記錄一律走 `_touch` |
+| 附件效期 | 檔案物件 `exp` 欄位 `_plAttExp`；過期進待辦並在產出文件加註 |
+| 雲端同步 | `_sharedPayload`/`_privatePayload` `_pushPrivate`/`_pullPrivate` `_applySensColls` `_seedAdminUid`；報價／請款走逐筆路徑 `_perRecordDelta`，筆數暴跌由 `_syncDropGuard` 攔下，墓碑 180 天由 `_tombPrune` 清理 |
 | 逾期租金 | `_rentDaysOf`(解析備註租期) `_itemProgress`(日報推完工日) `_rentStatus` `_rentScan` `invScanRent` |
 
 ## 測試
 
-無自動化測試。修改後至少：用瀏覽器開 `index.html` 確認 Console 無錯誤、被改動的頁面渲染正常。雲端環境無法登入 Firebase 屬正常（本機資料模式仍可驗證 UI 與邏輯）。
+`tests/smoke.js`（36 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+本機跑：`npm install && npx playwright install chromium && npm test`。
+
+涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
+請款單壓縮可逆（列印輸出逐字元比對）、破壞性操作必須經過確認、工項類別／期別、
+兩張分析報表、全量備份涵蓋所有集合。
+
+**新增功能時請一併補進 tests/smoke.js。** 其餘仍以人工驗證：用瀏覽器開 `index.html`
+確認被改動的頁面渲染正常。雲端環境無法登入 Firebase 屬正常（本機資料模式仍可驗證 UI 與邏輯）。
+
+## Firebase 安全規則
+
+`database.rules.json` 是原始碼，**改完必須到 Firebase 主控台手動發布才會生效**。
+目前規則：`fydata/shared`（名冊內可讀寫）／`fydata/private`（僅管理員），兩者都不得整包清空，
+並要求 `version`／`uploadedAt` 的基本形態。
 
 ## 語言
 

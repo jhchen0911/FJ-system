@@ -1,0 +1,36 @@
+# 冒煙測試：每次 PR 與推上 main 時自動跑，擋下三類最常見的回歸——
+#   ① 載入或切頁時 Console 有錯　② 手機版出現左右滑動　③ 金額口徑／儲存格式行為改變
+# 系統本身不需要建置，這個流程只安裝測試用的 playwright。
+name: 冒煙測試
+
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'tests/**'
+      - '.github/workflows/smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'tests/**'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 安裝 playwright 與 chromium
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: 執行冒煙測試
+        run: npm test
