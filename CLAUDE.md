@@ -68,12 +68,19 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 請款單壓縮 | `_invPack`/`_invUnpack`（欄位縮寫＋預設值省略，僅在儲存層；`_INV_OMIT` 之外的欄位不省略） |
 | 工項類別 | `_itemCat`(打設／拔除／both／other，空＝沿用名稱關鍵字) `_isRemovePeriod`(期別，`P.removeRate` 可調) |
 | 得標率／廠商績效 | `renderBidRateReport` `renderVendorReport`（報表中心分頁） |
+| 票據登記 | `inv.receipts[]`（現金/票據、到期日、狀態）`_invTickets` `_cashOf` 登記模式優先；收款彈窗登記 |
+| 保留款總覽 | `_retentionRows` `renderRetention`（金流管理分頁）；已完工未退標紅 |
+| 催款／缺口模擬 | `_dunningText` `openDunning`；`cfSetDelay`（90天預測延收滑桿） |
+| 全域搜尋 | `openGlobalSearch` `runGlobalSearch`（頂欄放大鏡／Ctrl+K／手機更多） |
+| 出工月結 | `renderLaborReport`（報表中心分頁，日報出工×`P.laborDayRate` 對點工成本） |
+| 修改人 | `_touch(obj)` 統一戳 `_mt`+`_by`；雲端套用只戳 `_mt`。改記錄一律走 `_touch` |
+| 附件效期 | 檔案物件 `exp` 欄位 `_plAttExp`；過期進待辦並在產出文件加註 |
 | 雲端同步 | `_sharedPayload`/`_privatePayload` `_pushPrivate`/`_pullPrivate` `_applySensColls` `_seedAdminUid`；報價／請款走逐筆路徑 `_perRecordDelta`，筆數暴跌由 `_syncDropGuard` 攔下，墓碑 180 天由 `_tombPrune` 清理 |
 | 逾期租金 | `_rentDaysOf`(解析備註租期) `_itemProgress`(日報推完工日) `_rentStatus` `_rentScan` `invScanRent` |
 
 ## 測試
 
-`tests/smoke.js`（27 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（36 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
