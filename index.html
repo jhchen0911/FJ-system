@@ -2631,7 +2631,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.378';
+var APP_VERSION='v5.379';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -3091,7 +3091,47 @@ function _afterOpening(dateStr){
   if(!d)return false;                                   // 沒有日期的舊資料視為期初之前（已在餘額裡）
   return d>od;
 }
+// ══════════ v5.379：票據登記簿 ══════════
+// 收款常是「部分現金＋一到多張期票」。原本只有 ticketDays 一個天數，
+// 由「收款日＋天數」推算兌現日——登記實體票（票號／到期日／狀態）之後，
+// 金流全部改讀登記值；沒登記的舊單維持原本的推算，完全相容。
+// inv.receipts=[{id,kind:'cash'|'ticket',amt,date,ticketNo,bank,dueDate,status:'hold'|'cleared'|'bounced',clearedDate,note}]
+function _invReceipts(inv){return Array.isArray(inv&&inv.receipts)?inv.receipts.filter(function(r){return r&&(parseFloat(r.amt)||0)>0;}):[];}
+function _invTickets(inv){return _invReceipts(inv).filter(function(r){return r.kind==='ticket';});}
+function _rcptValidSum(inv){   // 有效收款合計（退票不算）
+  return _invReceipts(inv).reduce(function(a,r){return a+(r.status==='bounced'?0:(parseFloat(r.amt)||0));},0);
+}
 function _cashOf(inv,atTs){
+  // ── 登記模式：有收款明細就逐筆計，現金看收款日、票據看到期日／兌現狀態 ──
+  var _rc=_invReceipts(inv);
+  if(_rc.length){
+    var c2=0,ts=atTs||Date.now();
+    _rc.forEach(function(r){
+      if(r.status==='bounced')return;                        // 退票：不是錢
+      var amt=parseFloat(r.amt)||0;if(!amt)return;
+      if(r.kind==='ticket'){
+        var cleared=r.status==='cleared';
+        var eff=cleared?(r.clearedDate||r.dueDate||r.date||''):(r.dueDate||'');
+        if(!cleared){
+          if(!eff)return;                                    // 未兌現又沒到期日 → 保守不計
+          if(new Date(eff).getTime()>ts)return;              // 票未到期
+        }
+        if(!_afterOpening(eff))return;                       // 基準日前已在期初餘額
+        c2+=amt;
+      }else{
+        var d0=r.date||inv.receivedDate||'';
+        if(!_afterOpening(d0))return;
+        if(d0&&new Date(d0).getTime()>ts)return;
+        c2+=amt;
+      }
+    });
+    var hr0=parseFloat(inv&&inv.holdRetAmt)||0;
+    if(hr0&&_afterOpening(inv.holdRetDate||'')){
+      var hd0=inv.holdRetDate?new Date(inv.holdRetDate).getTime():0;
+      if(!hd0||hd0<=(atTs||Date.now()))c2+=hr0;
+    }
+    return c2;
+  }
   var rcv=parseFloat(inv&&inv.received)||0;
   var cp=_cashPctOf(inv);
   var td=parseFloat(inv.ticketDays)||0;
@@ -8694,6 +8734,9 @@ function openReceiptModal(invId, ev){
     else if(ret>0){row.style.display='block';txt.textContent='保留款 NT$ '+fmt(ret)+' 已於 '+(inv.holdRetDate||'—')+' 退還';row.querySelector('button').style.display='none';}
     else{row.style.display='none';row.querySelector('button').style.display='';}
   })();
+  // v5.379：載入既有收款明細（工作副本，按確認才寫回）
+  _rcptList=JSON.parse(JSON.stringify(inv.receipts||[]));
+  _rcptRender();
   _receiptCalc();
   const m=document.getElementById('receipt-modal');
   m.style.display='flex';
@@ -8701,6 +8744,61 @@ function openReceiptModal(invId, ev){
 }
 // v5.326：實收＋匯費＋扣款＋業主保留款 對上請款總額才算結清。
 // 原本只比對實收，25 元匯費差額就會讓整張單永遠掛在「逾期未收款」。
+// ── v5.379 收款明細（票據登記）──
+var _rcptList=[];
+var _RCPT_ST=[['hold','未兌現'],['cleared','已兌現'],['bounced','退票']];
+function _rcptAdd(kind){
+  _rcptList.push({id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
+    kind:kind,amt:'',date:localToday(),ticketNo:'',bank:'',dueDate:'',status:'hold'});
+  _rcptRender();
+}
+function _rcptDel(i){_rcptList.splice(i,1);_rcptRender();}
+function _rcptSet(i,f,v){
+  var r=_rcptList[i];if(!r)return;
+  r[f]=v;
+  if(f==='status'&&v==='cleared'&&!r.clearedDate)r.clearedDate=localToday();
+  if(f==='status'&&v!=='cleared')delete r.clearedDate;
+  if(f==='status')_rcptRender();
+}
+function _rcptRender(){
+  var box=document.getElementById('rcpt-rows');if(!box)return;
+  var ap=document.getElementById('rcpt-apply-btn');
+  if(ap)ap.style.display=_rcptList.length?'':'none';
+  if(!_rcptList.length){box.innerHTML='<div style="font-size:10.5px;color:var(--b3)">尚未登記——僅填上方實收金額亦可</div>';return;}
+  box.innerHTML=_rcptList.map(function(r,i){
+    var stClr=r.status==='bounced'?'var(--red)':(r.status==='cleared'?'var(--g3)':'#b26a00');
+    var inp='style="width:100%;font-size:12px;padding:5px 6px;border:1px solid var(--b2);border-radius:5px;font-family:inherit;box-sizing:border-box"';
+    var head='<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'
+      +'<span style="font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:99px;background:'+(r.kind==='ticket'?'#fff3cf':'var(--gl)')+';color:'+(r.kind==='ticket'?'#a07800':'var(--g3)')+'">'+(r.kind==='ticket'?'票據':'現金')+'</span>'
+      +(r.kind==='ticket'?('<span style="font-size:10.5px;font-weight:700;color:'+stClr+'">'+(_RCPT_ST.find(function(x){return x[0]===r.status;})||_RCPT_ST[0])[1]+(r.status==='cleared'&&r.clearedDate?(' '+r.clearedDate):'')+'</span>'):'')
+      +'<button type="button" onclick="_rcptDel('+i+')" style="margin-left:auto;color:var(--b3);border:none;background:none;cursor:pointer;font-size:15px;padding:0 4px;line-height:1">×</button></div>';
+    var amt='<div><label style="font-size:9.5px;color:var(--b3);display:block">金額</label><input type="number" value="'+(r.amt||'')+'" oninput="_rcptSet('+i+',\'amt\',this.value)" '+inp+'></div>';
+    if(r.kind==='cash'){
+      return '<div style="border:1px solid var(--b1);border-radius:6px;padding:7px 8px;margin-bottom:5px">'+head
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+amt
+        +'<div><label style="font-size:9.5px;color:var(--b3);display:block">收款日</label><input type="date" value="'+esc(r.date||'')+'" onchange="_rcptSet('+i+',\'date\',this.value)" '+inp+'></div>'
+        +'</div></div>';
+    }
+    return '<div style="border:1px solid var(--b1);border-radius:6px;padding:7px 8px;margin-bottom:5px;background:#fffdf2">'+head
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">'+amt
+      +'<div><label style="font-size:9.5px;color:var(--b3);display:block">到期日（兌現日）</label><input type="date" value="'+esc(r.dueDate||'')+'" onchange="_rcptSet('+i+',\'dueDate\',this.value)" '+inp+'></div>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">'
+      +'<div><label style="font-size:9.5px;color:var(--b3);display:block">票號</label><input value="'+esc(r.ticketNo||'')+'" oninput="_rcptSet('+i+',\'ticketNo\',this.value)" '+inp+'></div>'
+      +'<div><label style="font-size:9.5px;color:var(--b3);display:block">發票銀行</label><input value="'+esc(r.bank||'')+'" oninput="_rcptSet('+i+',\'bank\',this.value)" '+inp+'></div>'
+      +'<div><label style="font-size:9.5px;color:var(--b3);display:block">狀態</label><select onchange="_rcptSet('+i+',\'status\',this.value)" '+inp+'>'
+        +_RCPT_ST.map(function(x){return '<option value="'+x[0]+'"'+(r.status===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select></div>'
+      +'</div></div>';
+  }).join('');
+}
+function _rcptApplySum(){
+  var sum=_rcptList.reduce(function(a,r){return a+(r.status==='bounced'?0:(parseFloat(r.amt)||0));},0);
+  var el=document.getElementById('receipt-amount');
+  if(el){el.value=sum||'';}
+  _receiptCalc();
+  var bounced=_rcptList.filter(function(r){return r.status==='bounced';}).length;
+  toast('已帶入有效收款合計 NT$ '+fmt(sum)+(bounced?('（退票 '+bounced+' 張不計）'):''));
+}
 function _receiptOffsets(){
   const g=id=>parseFloat(document.getElementById(id)?.value)||0;
   const fee=g('receipt-fee'),ded=g('receipt-deduct'),hold=g('receipt-hold');
@@ -8779,6 +8877,9 @@ function confirmReceipt(){
   inv.recvHold=off.hold||0;
   inv.receivedConfirmed=_full;      // 足額（含抵銷）才算結清
   inv.partialConfirmed=!_full;      // 部分收款：已對帳但仍在應收
+  // v5.379：收款明細寫回（去掉沒填金額的空列）
+  inv.receipts=_rcptList.filter(function(r){return r&&(parseFloat(r.amt)||0)>0;});
+  if(!inv.receipts.length)delete inv.receipts;
   _touch(inv);
   saveInv();
   renderInvList();
@@ -23236,6 +23337,17 @@ function renderCashForecast(){
   function dayOf(ds){var d=new Date(ds);if(isNaN(d))return null;d.setHours(0,0,0,0);return Math.round((d.getTime()-t0)/864e5);}
   // 1) 已收但票期未到 → 到期日 +
   INV.forEach(function(i){
+    // v5.379：有登記票據 → 逐張用登記的到期日，不再用「收款日＋票期天數」推算
+    var _tks=_invTickets(i);
+    if(_tks.length){
+      _tks.forEach(function(r){
+        if(r.status!=='hold'||!r.dueDate)return;
+        var d1=dayOf(r.dueDate);if(d1==null)return;
+        if(d1>0&&d1<=90)events.push({day:d1,amt:parseFloat(r.amt)||0,
+          label:(i.project||'')+' 第'+(i.periodNo||'?')+'期 票據到期'+(r.ticketNo?('（'+r.ticketNo+'）'):'')});
+      });
+      return;
+    }
     var rcv=parseFloat(i.received||0);if(!rcv||!i.receivedDate)return;
     // v5.337 健檢H：改用 _cashPctOf——cashPct=0/空值＝100% 現金（v5.319 在 _cashOf 修過的坑，
     // 預測這裡自算一套又重蹈：0 被當 0% 現金，整筆收款被錯誤後移票期天數）
@@ -28326,6 +28438,19 @@ function exportCurrentReportExcel(){
       <div class="f" style="margin-bottom:10px">
         <label>收款日期</label>
         <input type="date" id="receipt-date" style="font-size:13px">
+      </div>
+      <!-- v5.379 收款明細（現金／票據登記）：不填也可以，只填實收金額＝維持原本作法 -->
+      <div style="border:1px dashed var(--b2);border-radius:var(--r8);padding:9px 11px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px">
+          <span style="font-size:11px;font-weight:700;color:var(--b4)">收款明細（票據登記）</span>
+          <span style="font-size:10px;color:var(--b3)">收多張票時逐張登記，金流預測會改用票據到期日</span>
+        </div>
+        <div id="rcpt-rows"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+          <button type="button" class="btn btn-xs" onclick="_rcptAdd('cash')">＋ 現金／匯款</button>
+          <button type="button" class="btn btn-xs" onclick="_rcptAdd('ticket')">＋ 票據</button>
+          <button type="button" class="btn btn-xs" id="rcpt-apply-btn" style="display:none;border-color:var(--g3);color:var(--g3)" onclick="_rcptApplySum()">Σ 由明細帶入實收金額</button>
+        </div>
       </div>
       <!-- v5.326 抵銷項：這些錢業主沒匯給你，但也不該再列為應收／逾期 -->
       <!-- v5.328：改 grid 平均三欄並允許換行，原本 fg3 在窄視窗會把第三欄擠出彈窗外 -->
