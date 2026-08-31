@@ -2640,7 +2640,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.382';
+var APP_VERSION='v5.383';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -27290,9 +27290,14 @@ function _buildQuoteDocHTML(q){
   const t=q.t||{};
   let sc=0,li=0;
   let rows='';
+  // 空欄不占版面：整張報價單都沒有逾期租金／備註時，該欄不輸出，寬度讓給工程項目
+  const _lst=(q.items||[]).filter(x=>!x.sec);
+  const _hasOT=_lst.some(x=>x.ot&&String(x.ot).trim());
+  const _hasNote=_lst.some(x=>x.spare||(_stripInternalNote(x.note)||'').trim());
+  const _nCol=6+(_hasOT?1:0)+(_hasNote?1:0);
   (q.items||[]).forEach(it=>{
     if(it.sec){sc++;li=0;
-      rows+=`<tr style="background:#e8f5ee"><td colspan="8" style="font-weight:700;color:#1a6b3f;padding:4px 8px">${esc(it.desc||'')}</td></tr>`;
+      rows+=`<tr class="sec-row" style="background:#e8f5ee"><td colspan="${_nCol}" style="font-weight:700;color:#1a6b3f;padding:4px 8px">${esc(it.desc||'')}</td></tr>`;
     }else{li++;
       const amt=(parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
       const _otAmt=it.ot?String(it.ot).split(/[^0-9.]/)[0]:'';
@@ -27307,12 +27312,12 @@ function _buildQuoteDocHTML(q){
       rows+=`<tr${_sp?' style="background:#fffdf2"':''}>
         <td style="text-align:center">${li}</td>
         <td class="desc-col">${_descHtml}</td>
-        <td style="text-align:center">${esc(it.unit||'')}</td>
+        <td style="text-align:center;white-space:nowrap;word-break:keep-all">${esc(it.unit||'')}</td>
         <td class="num-col">${_sp?'1':(it.qty||'')}</td>
         <td class="num-col">${it.price?fmt(parseFloat(it.price)||0):''}</td>
         <td class="num-col" style="font-weight:700">${_sp?'':fmt(amt)}</td>
-        <td class="num-col" style="font-size:9px;color:#555">${_otAmt?fmt(parseFloat(_otAmt))+'&nbsp;<span style=\"color:#888;font-size:8px\">'+esc(_otU)+'</span>':''}</td>
-        <td style="font-size:8px;color:#555;vertical-align:middle;word-break:break-all;max-width:94px">${esc((_stripInternalNote(it.note)||(_sp?'備用單價':'')).replace(/（/g,'(').replace(/）/g,')'))}</td>
+        ${_hasOT?`<td class="num-col" style="font-size:9px;color:#555">${_otAmt?fmt(parseFloat(_otAmt))+'&nbsp;<span style=\"color:#888;font-size:8px\">'+esc(_otU)+'</span>':''}</td>`:''}
+        ${_hasNote?`<td style="font-size:8px;color:#555;vertical-align:middle;word-break:break-all;max-width:84px">${esc((_stripInternalNote(it.note)||(_sp?'備用單價':'')).replace(/（/g,'(').replace(/）/g,')'))}</td>`:''}
       </tr>`;
     }
   });
@@ -27337,14 +27342,14 @@ function _buildQuoteDocHTML(q){
       <div class="section-title">報價明細</div>
       <table>
         <thead><tr>
-          <th style="width:30px">項次</th>
+          <th style="width:28px">項次</th>
           <th>工程項目</th>
-          <th style="width:30px">單位</th>
-          <th style="width:42px">數量</th>
-          <th style="width:78px">單價</th>
-          <th style="width:92px">金額</th>
-          <th style="width:60px">逾期租金</th>
-          <th style="width:88px">備註</th>
+          <th style="width:44px">單位</th>
+          <th style="width:54px">數量</th>
+          <th style="width:68px">單價</th>
+          <th style="width:80px">金額</th>
+          ${_hasOT?'<th style="width:58px">逾期租金</th>':''}
+          ${_hasNote?'<th style="width:84px">備註</th>':''}
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -27412,8 +27417,10 @@ function exportQuotePDFNative(qid){
     .page-wrap{width:auto;padding:0;}
     thead{display:table-header-group;}           /* 表頭每頁重複 */
     tr{page-break-inside:avoid;break-inside:avoid;} /* 整列不拆頁 */
-    .page-footer{page-break-inside:avoid;break-inside:avoid;}
+    tr.sec-row{page-break-after:avoid;break-after:avoid;} /* 分項標題不落單 */
+    .page-footer,.stamp-row,.stamp-box{page-break-inside:avoid;break-inside:avoid;}
     .section-title{page-break-after:avoid;break-after:avoid;}
+    .rmk-text>div{page-break-inside:avoid;break-inside:avoid;}
     </style>
   </head><body>
     <div class="page-wrap">
@@ -27465,6 +27472,114 @@ function _printNativeHTML(html,filename,fitPageHpx){
 function _openPrintWindow(html,filename){
   // 電腦版與手機版統一使用 html2canvas+jsPDF，確保輸出完全一致
   _printViaIframe(html,filename);
+}
+// ── 分頁規劃（DOM 量測）──
+// 舊版靠掃描像素找空白線，切點會貼齊紙張邊緣、看起來像被裁掉。
+// 改為直接量測 DOM：切點只落在「列與列之間」等區塊邊界，
+// 每頁天地各留白 10mm，續頁自動重印表頭，整列／用印區絕不被拆開。
+function _pdfPlanPages(cvs,root,renderW,ls){
+  var K=cvs.width/(renderW||root.offsetWidth||1);   // css px → canvas px
+  var rr=root.getBoundingClientRect(),H=cvs.height;
+  var yT=function(el){return Math.round((el.getBoundingClientRect().top-rr.top)*K);};
+  var yB=function(el){return Math.round((el.getBoundingClientRect().bottom-rr.top)*K);};
+  var PAGE=Math.round(cvs.width*(ls?210/297:297/210));   // 一頁紙高（canvas px）
+  var MARG=Math.round(cvs.width*10/(ls?297:210));        // 天地各 10mm
+  var cands=[],atomic=[];
+  try{
+    root.querySelectorAll('tr').forEach(function(el){
+      atomic.push([yT(el),yB(el)]);
+      if(!el.classList.contains('sec-row'))cands.push(yB(el)); // 分項標題列後不換頁
+    });
+    root.querySelectorAll('.info-grid,.doc-sub,.rmk-text>div,.company-bar,table,p,h2,h3,li').forEach(function(el){
+      cands.push(yB(el));
+    });
+    // 不可拆開的整塊（用印區）；其頂緣為理想切點
+    root.querySelectorAll('.page-footer,.stamp-row,.stamp-box').forEach(function(el){
+      atomic.push([yT(el),yB(el)]);cands.push(yT(el));
+    });
+    // 備註區可跨頁（可能很長），但整區頂緣是理想切點
+    root.querySelectorAll('.rmk-text').forEach(function(el){cands.push(yT(el));});
+    // 區塊標題不可與內文分離 → 標題頂緣可切、底緣不可切
+    root.querySelectorAll('.section-title').forEach(function(el){cands.push(yT(el));});
+  }catch(e){_err('planPages',e);}
+  cands=cands.filter(function(v){return v>1&&v<H;}).sort(function(a,b){return a-b;});
+  // 主表表頭（續頁重印）
+  var hd=null;
+  try{
+    var th=root.querySelector('table thead');
+    if(th){var tbl=th.closest?th.closest('table'):th.parentNode;hd={s:yT(th),e:yB(th),te:yB(tbl||th)};}
+  }catch(e){_err('planPages',e);}
+  function keepWhole(cut,pos){        // 切點落在整塊中間 → 退到該塊頂緣
+    for(var i=0;i<atomic.length;i++){var a=atomic[i];
+      if(cut>a[0]+1&&cut<a[1]-1&&a[0]>pos+1)return a[0];}
+    return cut;
+  }
+  var pages=[],pos=0,first=true,guard=0;
+  while(pos<H-2&&guard++<300){
+    var rep=!!(!first&&hd&&pos>hd.e&&pos<hd.te-2);       // 續頁且仍在表格中 → 重印表頭
+    var hdH=rep?(hd.e-hd.s):0;
+    var top=first?0:MARG;                                // 首頁天邊由文件本身 padding 提供
+    var budget=PAGE-top-MARG-hdH;
+    if(budget<PAGE*0.2)budget=Math.round(PAGE*0.2);
+    if(pos+budget>=H){pages.push({s:pos,e:H,hd:rep});break;}
+    var lim=pos+budget,min=pos+Math.round(budget*0.25),cut=-1;
+    for(var i=0;i<cands.length;i++){var c=cands[i];if(c>min&&c<=lim&&c>cut)cut=c;}
+    if(cut<0)cut=lim;                                    // 極長列：只能硬切
+    cut=keepWhole(cut,pos);
+    if(cut<=pos)cut=lim;
+    pages.push({s:pos,e:cut,hd:rep});pos=cut;first=false;
+  }
+  if(!pages.length)pages.push({s:0,e:H,hd:false});
+  // 末頁過短（例如只剩用印區）→ 與前一頁重新均分，避免孤兒頁
+  if(pages.length>1){
+    var lp=pages[pages.length-1],pp=pages[pages.length-2];
+    if(lp.e-lp.s<PAGE*0.22){
+      var half=pp.s+Math.round((H-pp.s)/2),minC=pp.s+Math.round(PAGE*0.2),best=-1;
+      for(var j=0;j<cands.length;j++){var cc=cands[j];
+        if(cc>minC&&cc<pp.e&&(best<0||Math.abs(cc-half)<Math.abs(best-half)))best=cc;}
+      if(best>0){
+        var rep2=!!(hd&&best>hd.e&&best<hd.te-2);
+        if(H-best<=PAGE-2*MARG-(rep2?(hd.e-hd.s):0)){   // 後半仍放得進一頁才調整
+          pp.e=best;lp.s=best;lp.hd=rep2;
+        }
+      }
+    }
+  }
+  return {pages:pages,marg:MARG,hd:hd,PAGE:PAGE};
+}
+// 內容僅小幅超過一頁(≤28%)時，等比縮小塞進單頁（請款單/報價單避免第二頁只剩尾巴）
+function _pdfAddPaged(pdf,cvs,a4w,a4h,sc,plan,q){
+  var pageHpx=Math.round(a4h/sc);
+  var avail=pageHpx-((plan&&plan.marg)||0);   // 扣掉下緣留白後的可用高
+  if(cvs.height>avail && cvs.height<=pageHpx*1.28){
+    var f=avail/cvs.height;                   // 縮放比 <1
+    var w=a4w*f, x=(a4w-w)/2;                 // 水平置中
+    pdf.addImage(cvs.toDataURL('image/jpeg',q),'JPEG',x,0,w,cvs.height*sc*f);
+    return 1;
+  }
+  if(!plan)plan={pages:[{s:0,e:cvs.height,hd:false}],marg:0,hd:null};
+  var n=plan.pages.length;
+  function slice(y0,h){
+    var sl=document.createElement('canvas');
+    sl.width=cvs.width;sl.height=h;
+    sl.getContext('2d').drawImage(cvs,0,y0,cvs.width,h,0,0,cvs.width,h);
+    return sl.toDataURL('image/jpeg',q);
+  }
+  plan.pages.forEach(function(pg,i){
+    if(i>0)pdf.addPage();
+    var y=(i===0?0:plan.marg)*sc;
+    if(pg.hd&&plan.hd){
+      var hh=plan.hd.e-plan.hd.s;
+      pdf.addImage(slice(plan.hd.s,hh),'JPEG',0,y,a4w,hh*sc);
+      y+=hh*sc;
+    }
+    pdf.addImage(slice(pg.s,pg.e-pg.s),'JPEG',0,y,a4w,(pg.e-pg.s)*sc);
+    if(n>1){                                   // 頁碼（置中，落在下緣留白內）
+      try{pdf.setFontSize(8);pdf.setTextColor(140);
+        pdf.text(String(i+1)+' / '+n,a4w/2,a4h-11,{align:'center'});}catch(e){}
+    }
+  });
+  return n;
 }
 function _printViaIframe(html,filename,landscape){
   ['_fy_print_frame','_fy_print_overlay'].forEach(function(id){var el=document.getElementById(id);if(el)el.remove();});
@@ -27534,76 +27649,9 @@ function _printViaIframe(html,filename,landscape){
       }
     }).then(function(canvas){
 
-      // 智慧分頁（footer 保護）
-      function splitPages(cvs,pageH_px,footerY){
-        // 換頁只切在「列與列之間的橫向格線」上，確保整列（整格）完整往下一頁，
-        // 不會出現半截被切斷的儲存格。
-        //   • 深色文字像素(<120)：該水平線穿過文字 → 不可切
-        //   • 橫向格線 = 一整條幾乎橫跨整個表格寬度的非白線(灰框線/淺底邊界)
-        //   • 找不到格線時，退而求其次找「完全無文字的空白線」以避免切字
-        var pages=[],pos=0,total=cvs.height,ctx=cvs.getContext('2d'),W=cvs.width;
-        var DARK=120;                       // 深色文字門檻
-        var NEAR_WHITE=245;                 // 接近白色門檻
-        var LINE_MIN=Math.floor(W*0.40);    // 橫向格線至少覆蓋 40% 寬度
-        while(pos<total){
-          var te=Math.min(pos+pageH_px,total),cutAt=te;
-          if(te<total){
-            var anchor=(footerY>pos&&footerY<te)?footerY:te;
-            if(anchor>=total)anchor=total-1;
-            var minCut=pos+Math.floor(pageH_px*0.30); // 避免頁面過短
-            if(minCut<pos+1)minCut=pos+1;
-            var found=false;
-            if(anchor>=minCut){
-              // 一次取整個搜尋帶，避免逐行 getImageData 造成卡頓
-              var band=ctx.getImageData(0,minCut,W,anchor-minCut+1).data;
-              var cleanY=-1; // 備援：最接近邊界、且不含文字的空白線
-              for(var y=anchor;y>=minCut;y--){
-                var off=(y-minCut)*W*4,dark=0,nonWhite=0;
-                for(var x=0;x<W;x++){var i=off+x*4,r=band[i],g=band[i+1],b=band[i+2];
-                  if(r<DARK&&g<DARK&&b<DARK){dark=1;break;}          // 有文字→跳過此線
-                  if(r<NEAR_WHITE||g<NEAR_WHITE||b<NEAR_WHITE)nonWhite++;
-                }
-                if(dark===0){
-                  if(nonWhite>=LINE_MIN){cutAt=y;found=true;break;}  // 最佳：橫向格線
-                  if(cleanY<0)cleanY=y;                              // 記住空白線備援
-                }
-              }
-              if(!found&&cleanY>=0){cutAt=cleanY;found=true;}        // 退而求其次
-            }
-            if(!found&&footerY>pos&&footerY<te)cutAt=footerY;
-          }
-          if(cutAt<=pos)cutAt=te; // 保險：避免死迴圈
-          pages.push({start:pos,end:cutAt});pos=cutAt;
-        }
-        return pages;
-      }
+      var _plan=null;
+      try{_plan=_pdfPlanPages(canvas,inner,Math.max(A4W,inner.scrollWidth),!!landscape);}catch(e){_err('plan',e);}
 
-      // 偵測 footer Y
-      var _footerY=0;
-      try{
-        var _fEl=inner.querySelector('.page-footer');
-        if(_fEl)_footerY=Math.round((_fEl.getBoundingClientRect().top-inner.getBoundingClientRect().top)*2);
-      }catch(e){_err('top',e);}
-
-      // 內容僅小幅超過一頁(≤28%)時，等比縮小塞進單頁（請款單/報價單避免第二頁只剩尾巴）
-      function addCanvasPaged(pdf,cvs,a4w,a4h,sc,footerY,q){
-        var pageHpx=Math.round(a4h/sc);
-        if(cvs.height>pageHpx && cvs.height<=pageHpx*1.28){
-          var f=pageHpx/cvs.height;                 // 縮放比 <1
-          var w=a4w*f, x=(a4w-w)/2;                 // 水平置中
-          pdf.addImage(cvs.toDataURL('image/jpeg',q),'JPEG',x,0,w,a4h);
-          return 1;
-        }
-        var pages=splitPages(cvs,pageHpx,footerY);
-        pages.forEach(function(pg,i){
-          if(i>0)pdf.addPage();
-          var sh=pg.end-pg.start,sl=document.createElement('canvas');
-          sl.width=cvs.width;sl.height=sh;
-          sl.getContext('2d').drawImage(cvs,0,pg.start,cvs.width,sh,0,0,cvs.width,sh);
-          pdf.addImage(sl.toDataURL('image/jpeg',q),'JPEG',0,0,a4w,sh*sc);
-        });
-        return pages.length;
-      }
       if(isIOS){
         inner.style.display='none';
         var imgEl=document.createElement('img');
@@ -27616,7 +27664,7 @@ function _printViaIframe(html,filename,landscape){
             var a4w=landscape?841.89:595.28,a4h=landscape?595.28:841.89;
             var sc=a4w/canvas.width;
             var pdf=new jsPDFLib({orientation:landscape?'landscape':'portrait',unit:'pt',format:'a4'});
-            addCanvasPaged(pdf,canvas,a4w,a4h,sc,_footerY,0.95);
+            _pdfAddPaged(pdf,canvas,a4w,a4h,sc,_plan,0.95);
             var pdfBlob=pdf.output('blob');
             var safeName=(filename||'文件').replace(/[\/\\:*?"<>|]/g,'_')+'.pdf';
             var pdfFile=new File([pdfBlob],safeName,{type:'application/pdf'});
@@ -27640,7 +27688,7 @@ function _printViaIframe(html,filename,landscape){
         var a4w2=landscape?841.89:595.28,a4h2=landscape?595.28:841.89;
         var sc2=a4w2/canvas.width;
         var pdf2=new jsPDFLib({orientation:landscape?'landscape':'portrait',unit:'pt',format:'a4'});
-        addCanvasPaged(pdf2,canvas,a4w2,a4h2,sc2,_footerY,0.95);
+        _pdfAddPaged(pdf2,canvas,a4w2,a4h2,sc2,_plan,0.95);
         pdf2.save((filename||'文件').replace(/[\/\\:*?"<>|]/g,'_')+'.pdf');
         actionBtn.textContent='\u2705 已下載';actionBtn.disabled=false;
         setTimeout(cleanup,2000);
