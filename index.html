@@ -1539,7 +1539,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <button type="button" class="btn btn-xs" onclick="document.getElementById('finance-search').value='';renderFinanceSearch()" style="white-space:nowrap">✕ 清除</button>
     </div>
     <!-- 分頁標籤 -->
-    <div id="finance-tabs-wrap" style="display:flex;gap:0;margin-bottom:12px;border-bottom:2px solid var(--b1);overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <div id="finance-tabs-wrap" style="display:flex;flex-wrap:wrap;gap:0;margin-bottom:12px;border-bottom:2px solid var(--b1)">
       <button type="button" class="finance-tab active" id="ftab-ar" onclick="switchFinanceTab('ar')"
         style="padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--g3);border-bottom:3px solid var(--g3);margin-bottom:-2px;font-family:inherit;font-weight:700;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 業主計價</button>
       <button type="button" class="finance-tab" id="ftab-payable" onclick="switchFinanceTab('payable')"
@@ -1548,6 +1548,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         style="padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--b4);font-family:inherit;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 現金流</button>
       <button type="button" class="finance-tab" id="ftab-invoice" onclick="switchFinanceTab('invoice')"
         style="padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--b4);font-family:inherit;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 發票</button>
+      <button type="button" class="finance-tab" id="ftab-retention" onclick="switchFinanceTab('retention')"
+        style="padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--b4);font-family:inherit;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg> 保留款</button>
       <button type="button" class="finance-tab" id="ftab-share" onclick="switchFinanceTab('share')"
         style="padding:10px 16px;border:none;background:none;font-size:13px;cursor:pointer;color:var(--b4);font-family:inherit;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg> 分潤</button>
     </div>
@@ -1577,6 +1579,9 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <div class="card" style="margin-bottom:0"><div id="invoice-record-list"></div></div>
     </div>
     <!-- 股東分潤 -->
+    <div id="finance-retention" style="display:none">
+      <div id="finance-retention-list"></div>
+    </div>
     <div id="finance-share" style="display:none">
       <div id="share-profit-box"></div>
     </div>
@@ -2631,7 +2636,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.379';
+var APP_VERSION='v5.380';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -8438,6 +8443,68 @@ function updateDashTodo(){
       text:days<0?('合約「'+(ct.name||'')+'」已於 '+_cEnd+' 到期'):('合約「'+(ct.name||'')+'」將於 '+days+' 天後到期（'+_cEnd+'）'),
       sub:''});
   });
+
+  // ── v5.380：三類「錢會晚拿或拿不到」的提醒 ──
+  // 7. 保留款可請退：合約已完工，保留款卻還押在業主端
+  try{
+    _retentionRows().forEach(function(r){
+      if(!r.due)return;
+      var pend=r.pending+r.hold;
+      items.push({type:'ret_due',urgent:true,
+        jump:"go('finance');setTimeout(function(){switchFinanceTab('retention')},250)",
+        icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg>',color:'var(--red)',
+        text:'「'+(r.proj||'')+'」已完工，保留款尚未請退',
+        sub:'NT$ '+fmt(pend)});
+    });
+  }catch(e){_err('updateDashTodo',e);}
+  // 8. 票據 7 天內到期／已到期未兌現：該送託收了
+  try{
+    INV.forEach(function(inv){
+      _invTickets(inv).forEach(function(r){
+        if(r.status!=='hold'||!r.dueDate)return;
+        var dd=Math.ceil((new Date(r.dueDate).getTime()-now.getTime())/864e5);
+        if(dd>7)return;
+        items.push({type:'tk_due',urgent:dd<=1,
+          jump:"openReceiptModal('"+inv.id+"')",
+          icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg>',
+          color:dd<0?'var(--red)':'#b26a00',
+          text:'票據'+(r.ticketNo?('（'+r.ticketNo+'）'):'')+(dd<0?('已於 '+r.dueDate+' 到期，尚未登錄兌現'):(dd===0?'今天到期':dd+' 天後到期'))+'｜'+(inv.project||''),
+          sub:'NT$ '+fmt(parseFloat(r.amt)||0)});
+      });
+    });
+  }catch(e){_err('updateDashTodo',e);}
+  // 9. 逾期租金未開請款：每天自動掃一次進行中案（結果快取，不重複掃）
+  try{
+    var _rsKey='fy_rentscan_'+today;
+    var _rs=null;
+    try{_rs=JSON.parse(localStorage.getItem(_rsKey)||'null');}catch(e2){}
+    if(!_rs){
+      _rs=[];
+      Q.filter(function(q){return q&&q.awarded&&!q.parentId&&!q.closed;}).forEach(function(q){
+        try{
+          var sc=_rentScan(q,today)||[];
+          var over=sc.filter(function(x){return x&&x.overDays>0;});
+          if(over.length){
+            var amt=over.reduce(function(a,x){return a+(x.amount||0);},0);
+            _rs.push({qid:q.id,name:q.name||'',n:over.length,amt:amt,maxD:Math.max.apply(null,over.map(function(x){return x.overDays;}))});
+          }
+        }catch(e2){}
+      });
+      try{
+        Object.keys(localStorage).filter(function(k){return k.indexOf('fy_rentscan_')===0&&k!==_rsKey;})
+          .forEach(function(k){localStorage.removeItem(k);});
+        localStorage.setItem(_rsKey,JSON.stringify(_rs));
+      }catch(e2){}
+    }
+    _rs.forEach(function(r){
+      items.push({type:'rent_over',urgent:r.maxD>14,
+        jump:"goQuoteInvoice('"+r.qid+"')",
+        icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg>',
+        color:r.maxD>14?'var(--red)':'#b26a00',
+        text:'「'+r.name+'」'+r.n+' 個工項租期已逾期（最長 '+r.maxD+' 天），尚未開逾期租金請款',
+        sub:r.amt?('累計約 NT$ '+fmt(Math.round(r.amt))):''});
+    });
+  }catch(e){_err('updateDashTodo',e);}
 
   // 按緊急度排序
   items.sort(function(a,b){return (b.urgent?1:0)-(a.urgent?1:0);});
@@ -23596,7 +23663,7 @@ function renderCashflow(){
 }
 
 function switchFinanceTab(tab){
-  ['ar','payable','cashflow','invoice','share'].forEach(t=>{
+  ['ar','payable','cashflow','invoice','retention','share'].forEach(t=>{
     const btn=document.getElementById('ftab-'+t);
     const panel=document.getElementById('finance-'+t);
     const isActive=t===tab;
@@ -23614,9 +23681,70 @@ function switchFinanceTab(tab){
   if(tab==='cashflow')renderCashflow();
   if(tab==='invoice')renderInvoiceRecords();
   if(tab==='payable')renderPayables();
+  if(tab==='retention')try{renderRetention();}catch(e){_err('switchFinanceTab',e);}
   if(tab==='share')renderShareProfit();
 }
 
+// ══════════ v5.380：保留款總覽 ══════════
+// 每張請款單各自記保留款，但沒有一張表回答「全部案子還押多少在業主端、
+// 哪幾件已竣工早該請退」。以 10% 保留款計，十個案子就是一整個案子的錢押在外面。
+// 兩種保留款一起列：①請款時預扣的保留款（inv.retention）②收款時業主當場扣的（recvHold）。
+function _retentionRows(){
+  var byProj={};
+  INV.forEach(function(inv){
+    if(!inv)return;
+    var held=_invRetention(inv);                                   // 未退還的預扣保留款
+    var retAll=(!inv.retention)?0:((inv.totals&&parseFloat(inv.totals.curTotal))?Math.round(inv.totals.curTotal*_taxM()*_retPctOf(inv)/100):((inv.totals&&parseFloat(inv.totals.retention))||0));
+    var hold=_invHold(inv);                                        // 業主當場扣、可請退
+    var holdRet=parseFloat(inv.holdRetAmt)||0;                     // 已退還的當場扣款
+    if(!retAll&&!hold&&!holdRet)return;
+    var k=inv.project||'（未命名）';
+    var o=byProj[k]=byProj[k]||{proj:k,client:inv.client||'',accr:0,returned:0,pending:0,hold:0,invIds:[]};
+    o.accr+=retAll;
+    if(inv.retentionReturned)o.returned+=retAll;else o.pending+=held;
+    o.hold+=hold;o.returned+=holdRet;
+    o.invIds.push(inv.id);
+  });
+  var rows=Object.values(byProj);
+  rows.forEach(function(r){
+    var ct=(CONTRACTS||[]).find(function(c){return c.name===r.proj;});
+    r.status=ct?(ct.status==='completed'||ct.status==='done'?'completed':'active'):'';
+    r.end=(ct&&ct.end)||'';
+    r.due=r.status==='completed'&&(r.pending+r.hold)>0;            // 已完工還押著 → 該請退
+  });
+  rows.sort(function(a,b){return ((b.due?1:0)-(a.due?1:0))||((b.pending+b.hold)-(a.pending+a.hold));});
+  return rows;
+}
+function renderRetention(){
+  var el=document.getElementById('finance-retention-list');if(!el)return;
+  var rows=_retentionRows();
+  if(!rows.length){el.innerHTML='<div class="empty"><p>目前沒有任何保留款記錄</p><p style="font-size:12px;color:var(--b4)">請款單勾選「保留款」或收款時填「業主保留款」後會出現在這裡</p></div>';return;}
+  var totPend=rows.reduce(function(a,r){return a+r.pending+r.hold;},0);
+  var totDue=rows.filter(function(r){return r.due;}).reduce(function(a,r){return a+r.pending+r.hold;},0);
+  var html='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
+    +'<div style="flex:1;min-width:150px;background:var(--w);border:1px solid var(--b2);border-radius:var(--r10);padding:12px 14px"><div style="font-size:11px;color:var(--b4)">押在業主端（未退）</div><div style="font-size:20px;font-weight:900;color:#b26a00">NT$ '+fmt(totPend)+'</div></div>'
+    +'<div style="flex:1;min-width:150px;background:var(--w);border:1px solid '+(totDue?'#f5b5ae':'var(--b2)')+';border-radius:var(--r10);padding:12px 14px"><div style="font-size:11px;color:var(--b4)">已完工、該請退</div><div style="font-size:20px;font-weight:900;color:'+(totDue?'var(--red)':'var(--b3)')+'">NT$ '+fmt(totDue)+'</div></div>'
+    +'</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:560px">'
+    +'<thead><tr style="background:var(--gl);color:var(--b5);font-size:11px"><th style="padding:6px 8px;text-align:left">工程</th>'
+    +'<th style="padding:6px 8px;text-align:right">累計保留</th><th style="padding:6px 8px;text-align:right">已退還</th>'
+    +'<th style="padding:6px 8px;text-align:right">未退（押在業主）</th><th style="padding:6px 8px;text-align:center">狀態</th>'
+    +'<th style="padding:6px 8px"></th></tr></thead><tbody>'
+    +rows.map(function(r){
+      var pend=r.pending+r.hold;
+      return '<tr style="border-bottom:1px solid var(--b1)'+(r.due?';background:#fdecea':'')+'">'
+        +'<td style="padding:6px 8px"><b>'+esc(r.proj)+'</b>'+(r.client?('<br><span style="font-size:10.5px;color:var(--b3)">'+esc(r.client)+'</span>'):'')+'</td>'
+        +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(r.accr)+'</td>'
+        +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;color:var(--g3)">'+fmt(r.returned)+'</td>'
+        +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:'+(pend?(r.due?'var(--red)':'#b26a00'):'var(--b3)')+'">'+fmt(pend)+'</td>'
+        +'<td style="padding:6px 8px;text-align:center;font-size:11px;color:'+(r.status==='completed'?'var(--g3)':'var(--b4)')+'">'
+          +(r.status==='completed'?('已完工'+(r.due?'<br><b style="color:var(--red)">該請退</b>':'')):(r.status==='active'?'進行中':'—'))+'</td>'
+        +'<td style="padding:6px 8px;text-align:right"><button type="button" class="btn btn-xs" onclick="loadInvoice(\''+escq(r.invIds[r.invIds.length-1])+'\')">開請款單</button></td></tr>';
+    }).join('')+'</tbody></table></div>'
+    +'<div style="font-size:11px;color:var(--b3);margin-top:8px;line-height:1.7">「累計保留」＝請款時預扣的保留款；「未退」另含收款時業主當場扣下的可請退款項。'
+    +'退還後請到該案請款單登錄：預扣保留款按「退還」旗標、當場扣款用收款彈窗的「登錄已退還」。</div>';
+  el.innerHTML=html;
+}
 // ══ 股東分潤：年度可提領上限＝稅後淨利−保留款增額−循環資金增額−機具自付款 ══
 var SHARE_WHO=['陳茹軒','陳韋宏'];
 function _shareWhoNorm(w){return ({'茹軒':'陳茹軒','姊夫':'陳韋宏'})[w]||w;} // 舊記錄名稱歸一
