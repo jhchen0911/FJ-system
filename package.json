@@ -1,0 +1,12 @@
+{
+  "name": "fj-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "豐有工程管理系統：報價／合約／請款／成本／金流。單一檔案應用（index.html），無建置流程。此 package.json 只為冒煙測試而存在。",
+  "scripts": {
+    "test": "node tests/smoke.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}
