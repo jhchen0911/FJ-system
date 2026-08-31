@@ -231,6 +231,71 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── 7. 第二輪功能（v5.378～v5.382） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const D = n => { const d = new Date(); d.setDate(d.getDate() + n);
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+      // 稅率 0 是合法值（免稅案不得被課 5%）
+      items = [{ desc: '工項', unit: 'M', qty: '100', price: '500', sec: false }]; exs = [];
+      P.tax = 0; let t = calcT();
+      out.taxZero = t.tax === 0 && t.total === 50000;
+      P.tax = 5; t = calcT();
+      out.taxFive = t.tax === 2500 && Math.round(t.total) === 52500;
+      // 修改人戳記：_touch 戳 _by、套用雲端時不戳
+      localStorage.setItem('fy_last_email', 'smoke@test.com');
+      const o = { id: 'x' }; _touch(o);
+      window._applyingCloud = true; const o2 = { id: 'y' }; _touch(o2); window._applyingCloud = false;
+      out.touch = o._by === 'smoke@test.com' && o2._by === undefined;
+      // 票據登記：未到期票不算現金、退票永不算、到期後計入
+      const inv = { id: 'v1', received: '300000', receivedDate: D(-10), totals: { total: 300000 },
+        receipts: [{ id: 'r1', kind: 'cash', amt: 100000, date: D(-10), status: 'hold' },
+        { id: 'r2', kind: 'ticket', amt: 120000, dueDate: D(20), status: 'hold' },
+        { id: 'r3', kind: 'ticket', amt: 30000, dueDate: D(-5), status: 'bounced' }] };
+      P.openingCash = 0; P.openingDate = '';
+      out.ticketCash = _cashOf(inv, Date.now()) === 100000 && _cashOf(inv, Date.now() + 30 * 864e5) === 220000;
+      // 保留款總覽：已完工案標記該請退
+      INV = [{ id: 'w1', project: '完工案', retention: true, retentionPct: 10, totals: { curTotal: 1000000, total: 1050000 }, _mt: 1 }];
+      CONTRACTS = [{ id: 'c1', name: '完工案', status: 'completed', amount: 1, _mt: 1 }];
+      const rr = _retentionRows();
+      out.retention = rr.length === 1 && rr[0].due === true && rr[0].pending === 105000;
+      // 催款文字：金額與逾期天數
+      INV = [{ id: 'd1', project: '甲案', client: '甲營造', periodNo: 2, totals: { total: 840000 }, received: '0', expectedRecvDate: D(-20), _mt: 1 }];
+      const dt = _dunningText(INV[0]);
+      out.dunning = dt.indexOf('840,000') >= 0 && /逾期 \d+ 天/.test(dt);
+      // 全域搜尋：找得到且不誤報
+      Q = [{ id: 'q1', name: '中和廠房擋土支撐', code: '115001', client: '大山營造', items: [], exs: [], t: { total: 1 }, _mt: 1 },
+      { id: 'q2', name: '新莊基礎工程', code: '115002', client: '久大建設', items: [], exs: [], t: { total: 1 }, _mt: 1 }];
+      INV = []; CONTRACTS = []; CUSTOMERS = []; VENDORS = [];
+      openGlobalSearch();
+      document.getElementById('gsearch-inp').value = '中和'; runGlobalSearch();
+      const st = document.getElementById('gsearch-body').textContent;
+      out.gsearch = st.indexOf('中和廠房') >= 0 && st.indexOf('新莊') < 0;
+      closeGlobalSearch();
+      // 出工月結：出工×日薪 對 已記點工
+      P.laborDayRate = 2800;
+      Q = [{ id: 'q1', name: '甲案', items: [], exs: [], dailyLogs: [{ date: '2026-03-10', workers: 6 }],
+        costs: [{ id: 'c1', type: 'labor', date: '2026-03-15', rows: [{ subType: 'worker', desc: '技術工', days: 5, dayRate: 2800, transport: 0 }] }], _mt: 1 }];
+      const el = document.createElement('div');
+      renderLaborReport(el, 2026, 3);
+      const lt = el.textContent;
+      out.labor = lt.indexOf('6 工') >= 0 && lt.indexOf('16,800') >= 0 && lt.indexOf('14,000') >= 0;
+      return out;
+    });
+    check('免稅案稅率 0 不被課 5%', r.taxZero);
+    check('稅率 5% 行為不變', r.taxFive);
+    check('修改人戳記（雲端套用不誤標）', r.touch);
+    check('票據：未到期不算現金、退票永不算', r.ticketCash);
+    check('保留款總覽：完工案標記該請退', r.retention);
+    check('催款文字含金額與逾期天數', r.dunning);
+    check('全域搜尋找得到且不誤報', r.gsearch);
+    check('出工月結：出工×日薪對已記點工', r.labor);
+    check('第二輪功能無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

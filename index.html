@@ -646,6 +646,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <div><div class="brand-name">豐有工程</div><div class="brand-sub">管理系統 <span id="brand-ver" style="color:var(--y);font-weight:700"></span></div></div>
   </div>
   <nav class="top-nav" id="top-nav"></nav>
+  <button type="button" onclick="openGlobalSearch()" title="全域搜尋（報價／請款／合約／客戶／廠商）"
+    style="flex-shrink:0;margin-right:6px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;line-height:1"><svg class="ic ib" aria-hidden="true"><use href="#i-search"/></svg></button>
   <div id="user-chip" style="position:relative;flex-shrink:0;margin-right:8px"></div>
   </div>
 </header>
@@ -1608,6 +1610,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 得標率</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-vendor-btn" onclick="showReport('vendor')"
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg> 廠商績效</button>
+      <button type="button" class="btn btn-sm rpt-tab" id="rpt-labor-btn" onclick="showReport('labor')"
+        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 出工月結</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-log-btn" onclick="showReport('log')"
         style="border-color:var(--b3);color:var(--b3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 操作記錄</button>
     </div>
@@ -2636,7 +2640,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.381';
+var APP_VERSION='v5.382';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -24874,7 +24878,7 @@ let _currentReport='monthly';
 
 function showReport(type){
   _currentReport=type;
-  ['monthly','yearly','client','contract','bidrate','vendor','log'].forEach(t=>{
+  ['monthly','yearly','client','contract','bidrate','vendor','labor','log'].forEach(t=>{
     const btn=document.getElementById('rpt-'+t+'-btn');
     if(btn){
       btn.style.background=t===type?'var(--g)':'';
@@ -24895,6 +24899,7 @@ function renderCurrentReport(){
   else if(_currentReport==='contract')renderContractReport(el,year);
   else if(_currentReport==='bidrate')renderBidRateReport(el,year,month);
   else if(_currentReport==='vendor')renderVendorReport(el,year,month);
+  else if(_currentReport==='labor')renderLaborReport(el,year,month);
   else if(_currentReport==='log')renderLogReport(el);
   try{_cardifyTables(el);}catch(e){_err('renderCurrentReport',e);}
 }
@@ -25155,6 +25160,78 @@ function renderVendorReport(el,year,month){
     html+='<div style="font-size:11.5px;color:var(--b3);margin-top:14px">同工項的廠商單價比較：目前還沒有「同一工項、兩家以上廠商」的承包成本明細可比。在施工成本以「承包」建立、填入工項與單價後就會出現。</div>';
   }
   el.innerHTML=html+'</div>';
+}
+// ══════════════ v5.382：出工月結對帳 ══════════════
+// 工務日報每天記出工人數、點工成本另外記在施工成本——月底跟班長對帳
+// 「你們這個月在甲案出了幾工」要自己翻日報數。這張表把兩邊擺在一起：
+// 日報出工累計（人天）× 標準日薪（參數設定）＝推估點工成本，
+// 對上已記的點工成本，差超過兩成就標色。
+function renderLaborReport(el,year,month){
+  var period=year+(month?('年'+month+'月'):'年');
+  var inRange=function(d){
+    d=String(d||'');
+    if(year&&d.slice(0,4)!==String(year))return false;
+    if(month&&parseInt(d.slice(5,7))!==month)return false;
+    return true;
+  };
+  var rows={};
+  var get=function(name){
+    var k=String(name||'').trim()||'（未命名）';
+    return rows[k]=rows[k]||{proj:k,days:0,logN:0,laborCost:0,laborN:0};
+  };
+  (Q||[]).forEach(function(q){
+    (q.dailyLogs||[]).forEach(function(d){
+      if(!d||!inRange(d.date))return;
+      var w=parseFloat(d.workers)||0;if(!w)return;
+      var o=get(q.name);
+      o.days+=w;o.logN++;
+    });
+    (q.costs||[]).forEach(function(c){
+      if(!c||c.type!=='labor'||!inRange(c.date))return;
+      try{recalcCostAmt(c);}catch(e){}
+      var amt=parseFloat(c.amt)||0;if(!amt)return;
+      var o=get(q.name);
+      o.laborCost+=amt;o.laborN++;
+    });
+  });
+  var list=Object.values(rows).filter(function(r){return r.days>0||r.laborCost>0;})
+    .sort(function(a,b){return b.days-a.days;});
+  if(!list.length){
+    el.innerHTML='<div class="cb"><div class="empty"><p>'+esc(period)+'沒有日報出工或點工成本記錄</p>'
+      +'<p style="font-size:12px;color:var(--b4)">工務日報填「出工人數」、施工成本以「點工」建立後會出現在這裡</p></div></div>';
+    return;
+  }
+  var rate=parseFloat(P.laborDayRate)||0;
+  var totD=0,totC=0,totEst=0;
+  var body=list.map(function(r){
+    var est=rate>0?r.days*rate:0;
+    totD+=r.days;totC+=r.laborCost;totEst+=est;
+    var gap=est>0?((r.laborCost-est)/est*100):null;
+    var warn=gap!=null&&Math.abs(gap)>20&&r.days>0;
+    var gapTxt=gap==null?'<span style="color:var(--b3)">—</span>'
+      :('<b style="color:'+(warn?(gap<0?'var(--red)':'#b26a00'):'var(--g3)')+'">'+(gap>0?'+':'')+Math.round(gap)+'%</b>');
+    return '<tr style="border-bottom:1px solid var(--b1)'+(warn?';background:#fff8ec':'')+'">'
+      +'<td style="padding:6px 8px"><b>'+esc(r.proj)+'</b><br><span style="font-size:10.5px;color:var(--b3)">'+r.logN+' 篇日報'+(r.laborN?('　'+r.laborN+' 筆點工'):'')+'</span></td>'
+      +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">'+fmt(r.days)+' 工</td>'
+      +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;color:'+(rate?'var(--b5)':'var(--b3)')+'">'+(rate?fmt(Math.round(est)):'—')+'</td>'
+      +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">'+fmt(Math.round(r.laborCost))+'</td>'
+      +'<td style="padding:6px 8px;text-align:right">'+gapTxt+'</td></tr>';
+  }).join('');
+  el.innerHTML='<div class="cb">'
+    +'<div style="font-size:13px;font-weight:900;color:var(--g3);margin-bottom:4px">'+esc(period)+' 出工月結對帳</div>'
+    +'<div style="font-size:11px;color:var(--b3);margin-bottom:10px">推估點工成本＝日報出工累計 × 標準點工日薪'
+      +(rate?('（NT$ '+fmt(rate)+'／工，參數設定可調）'):'（<b style="color:#b26a00">參數設定尚未填標準點工日薪，無法推估</b>）')
+      +'。差異＝已記點工 vs 推估，超過 ±20% 標色：偏低（紅）可能漏記成本，偏高（橘）可能多記或日報漏填。</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:560px">'
+    +'<thead><tr style="background:var(--gl);color:var(--b5);font-size:11px"><th style="padding:6px 8px;text-align:left">工程</th>'
+    +'<th style="padding:6px 8px;text-align:right">日報出工累計</th><th style="padding:6px 8px;text-align:right">推估點工成本</th>'
+    +'<th style="padding:6px 8px;text-align:right">已記點工成本</th><th style="padding:6px 8px;text-align:right">差異</th></tr></thead>'
+    +'<tbody>'+body
+    +'<tr style="background:var(--gl);font-weight:900"><td style="padding:6px 8px">合計</td>'
+    +'<td style="padding:6px 8px;text-align:right">'+fmt(totD)+' 工</td>'
+    +'<td style="padding:6px 8px;text-align:right">'+(rate?fmt(Math.round(totEst)):'—')+'</td>'
+    +'<td style="padding:6px 8px;text-align:right">'+fmt(Math.round(totC))+'</td><td></td></tr>'
+    +'</tbody></table></div></div>';
 }
 // ── 手機通用：把報表表格轉為卡片（首欄為卡片標題，其餘欄位 label:value 列出）──
 function _cardifyTables(root){
@@ -26299,7 +26376,8 @@ function renderMobMore(){
   // 非頁面類動作
   // 智慧收件不列在此（v5.311 使用者指示：總覽的相機鈕已是入口，更多選單不重複）
   h+=title('工具')+grid(
-      '<button type="button" class="mob-more-btn" onclick="toggleMobMore();intakeHistory()"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span><span>收件記錄</span></button>'
+      '<button type="button" class="mob-more-btn" onclick="toggleMobMore();openGlobalSearch()"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></span><span>全域搜尋</span></button>'
+     +'<button type="button" class="mob-more-btn" onclick="toggleMobMore();intakeHistory()"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span><span>收件記錄</span></button>'
      +'<button type="button" id="mn-sync" class="mob-more-btn mob-more-btn-accent" onclick="fbUploadWithConflictCheck();toggleMobMore()"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-cloud"/></svg></span><span>同步</span></button>');
   box.innerHTML=h;
 }
@@ -26963,6 +27041,77 @@ function openDunning(invId){
   // 把確定鈕文字改成「複製」
   try{var ok=document.getElementById('gen-confirm-ok');if(ok)ok.textContent='複製';}catch(e){}
 }
+// ══════════ v5.382：全域搜尋 ══════════
+// 找「三年前那個中和的案子」原本要先想起它在報價、合約還是請款，
+// 再進該模組搜。這裡一次搜五種資料的名稱／編號／業主，點結果直接跳轉。
+function openGlobalSearch(){
+  var m=document.getElementById('gsearch-modal');if(!m)return;
+  m.style.display='flex';
+  var inp=document.getElementById('gsearch-inp');
+  if(inp){inp.value='';setTimeout(function(){inp.focus();},80);}
+  var body=document.getElementById('gsearch-body');
+  if(body)body.innerHTML='<div style="padding:16px;font-size:12px;color:var(--b3)">輸入兩個字以上開始搜尋。涵蓋：報價單、請款單、合約、客戶、廠商。</div>';
+}
+function closeGlobalSearch(){var m=document.getElementById('gsearch-modal');if(m)m.style.display='none';}
+function _gsRow(icon,title,sub,right,onclick){
+  return '<div onclick="closeGlobalSearch();'+onclick+'" '
+    +'style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--b0)" '
+    +'onmouseover="this.style.background=\'var(--gl)\'" onmouseout="this.style.background=\'\'">'
+    +'<span style="flex-shrink:0;width:26px;height:26px;border-radius:6px;background:var(--gl);color:var(--g3);display:flex;align-items:center;justify-content:center">'+icon+'</span>'
+    +'<span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:700;color:var(--b5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title+'</span>'
+    +(sub?('<span style="display:block;font-size:11px;color:var(--b3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+sub+'</span>'):'')+'</span>'
+    +(right?('<span style="flex-shrink:0;font-size:11px;color:var(--b4);font-variant-numeric:tabular-nums">'+right+'</span>'):'')+'</div>';
+}
+function runGlobalSearch(){
+  var body=document.getElementById('gsearch-body');if(!body)return;
+  var kw=(document.getElementById('gsearch-inp')||{}).value||'';
+  kw=kw.trim().toLowerCase();
+  if(kw.length<2){body.innerHTML='<div style="padding:16px;font-size:12px;color:var(--b3)">輸入兩個字以上開始搜尋。</div>';return;}
+  var hit=function(){for(var i=0;i<arguments.length;i++){if(String(arguments[i]||'').toLowerCase().indexOf(kw)>=0)return true;}return false;};
+  var IC={q:'<svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg>',
+    v:'<svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg>',
+    c:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>',
+    u:'<svg class="ic ib" aria-hidden="true"><use href="#i-user"/></svg>',
+    ven:'<svg class="ic ib" aria-hidden="true"><use href="#i-truck"/></svg>'};
+  var sec=[],total=0,CAP=8;
+  var qs=(Q||[]).filter(function(q){return q&&!q.parentId&&hit(q.name,q.code,q.client,q.loc);}).slice(0,CAP);
+  if(qs.length)sec.push('<div style="padding:7px 14px 3px;font-size:10.5px;font-weight:700;color:var(--b3);letter-spacing:.06em">報價單（'+qs.length+'）</div>'
+    +qs.map(function(q){total++;
+      return _gsRow(IC.q,esc(q.name||'未命名')+(q.awarded?'　<span style="font-size:10px;color:var(--g3)">得標</span>':''),
+        esc((q.code||'')+(q.client?('　'+q.client):'')+(q.date?('　'+q.date):'')),
+        'NT$ '+fmt((q.t&&q.t.total)||0),"loadQ('"+escq(q.id)+"')");
+    }).join(''));
+  var vs=(INV||[]).filter(function(v){return v&&hit(v.project,v.client,v.month);}).slice(0,CAP);
+  if(vs.length)sec.push('<div style="padding:7px 14px 3px;font-size:10.5px;font-weight:700;color:var(--b3);letter-spacing:.06em">請款單（'+vs.length+'）</div>'
+    +vs.map(function(v){total++;
+      return _gsRow(IC.v,esc(v.project||'未命名')+' 第'+(v.periodNo||'?')+'期',
+        esc((v.client||'')+(v.date?('　'+v.date):'')),
+        'NT$ '+fmt((v.totals&&v.totals.total)||0),"loadInvoice('"+escq(v.id)+"');go('invoice-edit')");
+    }).join(''));
+  var cs=(CONTRACTS||[]).filter(function(c){return c&&hit(c.name,c.code,c.client);}).slice(0,CAP);
+  if(cs.length)sec.push('<div style="padding:7px 14px 3px;font-size:10.5px;font-weight:700;color:var(--b3);letter-spacing:.06em">合約（'+cs.length+'）</div>'
+    +cs.map(function(c){total++;
+      return _gsRow(IC.c,esc(c.name||'未命名'),
+        esc((c.client||'')+(c.date?('　'+c.date):'')+(c.status==='completed'?'　已完成':'')),
+        'NT$ '+fmt(c.amount||0),"go('contracts')");
+    }).join(''));
+  var us=(CUSTOMERS||[]).filter(function(c){return c&&hit(c.name,c.taxid,c.contact);}).slice(0,CAP);
+  if(us.length)sec.push('<div style="padding:7px 14px 3px;font-size:10.5px;font-weight:700;color:var(--b3);letter-spacing:.06em">客戶（'+us.length+'）</div>'
+    +us.map(function(c){total++;
+      return _gsRow(IC.u,esc(c.name||''),esc((c.contact||'')+(c.tel?('　'+c.tel):'')),'',"go('contacts')");
+    }).join(''));
+  var ws=(VENDORS||[]).filter(function(v){return v&&hit(v.name,v.contact,v.taxid);}).slice(0,CAP);
+  if(ws.length)sec.push('<div style="padding:7px 14px 3px;font-size:10.5px;font-weight:700;color:var(--b3);letter-spacing:.06em">廠商（'+ws.length+'）</div>'
+    +ws.map(function(v){total++;
+      return _gsRow(IC.ven,esc(v.name||''),esc((v.contact||'')+(v.phone?('　'+v.phone):'')),'',"go('contacts')");
+    }).join(''));
+  body.innerHTML=total?sec.join(''):'<div style="padding:16px;font-size:12px;color:var(--b3)">找不到符合「'+esc(kw)+'」的資料</div>';
+}
+// Esc 關閉搜尋；Ctrl/Cmd+K 開啟（桌機習慣）
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape')closeGlobalSearch();
+  if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){e.preventDefault();openGlobalSearch();}
+});
 // ── 權限管理頁初始化 ──
 function initPermissionsPage(){
   // 直接重新渲染（不要複製 innerHTML，那樣 onclick 不會更新）
@@ -28640,6 +28789,18 @@ function exportCurrentReportExcel(){
   </div>
 </div>
 <!-- 確認收款 Modal -->
+<!-- v5.382 全域搜尋 -->
+<div id="gsearch-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:flex-start;justify-content:center" onclick="if(event.target===this)closeGlobalSearch()">
+  <div style="max-width:560px;width:100%;margin-top:8vh;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--b1)">
+      <svg class="ic ib" aria-hidden="true" style="color:var(--b3)"><use href="#i-search"/></svg>
+      <input id="gsearch-inp" placeholder="搜尋 案名／編號／業主／廠商／客戶…" oninput="runGlobalSearch()"
+        style="flex:1;border:none;outline:none;font-size:15px;font-family:inherit;background:transparent;min-width:0">
+      <button type="button" onclick="closeGlobalSearch()" style="border:none;background:transparent;color:var(--b3);font-size:20px;cursor:pointer;padding:0 4px;line-height:1">✕</button>
+    </div>
+    <div id="gsearch-body" style="max-height:60vh;overflow-y:auto;padding:6px 0"></div>
+  </div>
+</div>
 <div id="receipt-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeReceiptModal()">
   <div style="max-width:420px;width:100%;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="background:var(--g3);padding:13px 18px;display:flex;justify-content:space-between;align-items:center">
