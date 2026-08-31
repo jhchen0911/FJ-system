@@ -296,6 +296,73 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── 8. 報價單 PDF 排版（v5.383） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const mk = (n, extra) => {
+        const items = []; let sub = 0;
+        for (let i = 0; i < n; i++) {
+          if (i % 12 === 0) { items.push({ sec: true, desc: '第' + (i / 12 + 1) + '章' }); continue; }
+          items.push(Object.assign({ desc: '鋼板樁打拔工（H=12M，含運搬、機具進出場、假設工程）',
+            unit: ['支', '天/支', 'M2', '天/M2', '式'][i % 5], qty: 100, price: 12500 }, extra(i)));
+          sub += 100 * 12500;
+        }
+        return { id: 'pq', name: '排版測試', client: '甲', items, t: { sub, tax: sub * 0.05, total: sub * 1.05 } };
+      };
+      // 空欄不占版面：全無逾期租金／備註時該欄不輸出
+      const host = document.createElement('div');
+      host.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:#fff';
+      const st = document.createElement('style'); st.textContent = _getPrintCSS(); host.appendChild(st);
+      document.body.appendChild(host);
+      const put = q => { host.querySelectorAll('.page-wrap').forEach(e => e.remove());
+        host.insertAdjacentHTML('beforeend', '<div class="page-wrap">' + _buildQuoteDocHTML(q) + '</div>'); };
+      put(mk(30, () => ({})));
+      const ths = [...host.querySelectorAll('thead th')].map(e => e.textContent);
+      out.dropEmpty = ths.indexOf('逾期租金') < 0 && ths.indexOf('備註') < 0 && ths.indexOf('單位') >= 0;
+      const sc1 = host.querySelector('tr.sec-row td').getAttribute('colspan');
+      out.colspan6 = sc1 === '6';
+      put(mk(30, i => ({ ot: i % 5 === 0 ? '35' : '', note: i % 3 === 0 ? '含加班' : '' })));
+      const ths2 = [...host.querySelectorAll('thead th')].map(e => e.textContent);
+      out.keepUsed = ths2.indexOf('逾期租金') >= 0 && ths2.indexOf('備註') >= 0
+        && host.querySelector('tr.sec-row td').getAttribute('colspan') === '8';
+      // 單位欄不換行（天/M2 之類單位必須單行）
+      const uTd = [...host.querySelector('table').querySelectorAll('tbody tr:not(.sec-row)')].map(tr => tr.children[2]);
+      out.unitOneLine = uTd.every(td => td.offsetHeight <= td.parentNode.offsetHeight
+        && getComputedStyle(td).whiteSpace === 'nowrap');
+      // 分頁規劃：切點落在列邊界、天地留白、續頁重印表頭
+      const root = host;
+      const H = root.scrollHeight * 2;
+      const plan = _pdfPlanPages({ width: 1588, height: H }, root, 794, false);
+      out.multi = plan.pages.length >= 2;
+      out.marg = plan.marg > 40;                      // 10mm@2x ≈ 76px
+      out.noOverflow = plan.pages.every((p, i) =>
+        (p.e - p.s) + (i === 0 ? 0 : plan.marg) + plan.marg + (p.hd ? plan.hd.e - plan.hd.s : 0) <= plan.PAGE + 1);
+      out.contiguous = plan.pages[0].s === 0 && plan.pages[plan.pages.length - 1].e === H
+        && plan.pages.every((p, i) => i === 0 || p.s === plan.pages[i - 1].e);
+      out.repeatHead = plan.pages.slice(1).some(p => p.hd === true);
+      // 切點必須是某一列的下緣（±2px 容差）
+      const rr = root.getBoundingClientRect();
+      const edges = [...root.querySelectorAll('tr')].map(tr =>
+        Math.round((tr.getBoundingClientRect().bottom - rr.top) * 2));
+      out.rowBoundary = plan.pages.slice(0, -1).every(p =>
+        edges.some(e => Math.abs(e - p.e) <= 2) || p.e > (plan.hd ? plan.hd.te : 0));
+      host.remove();
+      return out;
+    });
+    check('空的逾期租金／備註欄不輸出', r.dropEmpty && r.colspan6);
+    check('有值時逾期租金／備註欄保留', r.keepUsed);
+    check('單位欄不換行', r.unitOneLine);
+    check('長報價單分成多頁', r.multi);
+    check('每頁天地保留邊界留白', r.marg && r.noOverflow);
+    check('分頁連續不重疊、不漏內容', r.contiguous);
+    check('續頁重印表頭', r.repeatHead);
+    check('換頁切在列與列之間', r.rowBoundary);
+    check('PDF 排版測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
