@@ -2640,7 +2640,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.389';
+var APP_VERSION='v5.390';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -26157,32 +26157,34 @@ function exportTrackPDF(){
   if(!rows.length){toast('沒有勾選任何案件');return;}
   var tot=rows.reduce(function(a,r){return a+r.amt;},0);
   var trs=rows.map(function(r,i){
-    return '<tr><td class="c">'+(i+1)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.client)+'</td><td>'+esc(r.loc||'')+'</td>'
+    return '<tr><td class="c">'+(i+1)+'</td><td class="nm" title="'+esc(r.name)+'">'+esc(r.name)+'</td><td class="nm">'+esc(r.client)+'</td><td class="nm">'+esc(r.loc||'')+'</td>'
       +'<td class="r">'+fmt(r.amt)+'</td><td class="c">'+esc(r.start||'')+'</td><td class="c">'+esc(r.end||'')+'</td><td class="c">'+r.status+'</td></tr>';
   }).join('');
   var period=window._trackY1+'～'+window._trackY2+'年';
+  // v5.390：改 A4 橫式——直式欄寬不足，公司名與日期被折行截斷很難看
   var html='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>工程實績表</title><style>'
     +'body{font-family:"Microsoft JhengHei",sans-serif;color:#111;margin:0;padding:0}'
-    +'.page-wrap{width:190mm;margin:0 auto;padding:6mm 0}'
-    +'h1{font-size:21px;text-align:center;letter-spacing:10px;margin:2px 0 4px}'
-    +'.co{text-align:center;font-size:13px;color:#1a6b3f;margin-bottom:2px;font-weight:900}'
-    +'.sub{text-align:center;font-size:10.5px;color:#666;margin-bottom:10px}'
-    +'table{width:100%;border-collapse:collapse;font-size:10.5px}'
-    +'th{background:#eef3ee;border:1px solid #444;padding:5px 4px;font-size:10.5px}'
-    +'td{border:1px solid #444;padding:5px 4px}'
-    +'td.c{text-align:center}td.r{text-align:right;font-variant-numeric:tabular-nums}'
+    +'.page-wrap{width:277mm;margin:0 auto;padding:6mm 0}'
+    +'h1{font-size:22px;text-align:center;letter-spacing:12px;margin:2px 0 5px}'
+    +'.co{text-align:center;font-size:13.5px;color:#1a6b3f;margin-bottom:2px;font-weight:900}'
+    +'.sub{text-align:center;font-size:11px;color:#666;margin-bottom:10px}'
+    +'table{width:100%;border-collapse:collapse;font-size:11.5px;table-layout:fixed}'
+    +'th{background:#eef3ee;border:1px solid #444;padding:7px 6px;font-size:11.5px;white-space:nowrap}'
+    +'td{border:1px solid #444;padding:7px 6px;overflow:hidden}'
+    +'td.c{text-align:center;white-space:nowrap}td.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}'
+    +'td.nm{white-space:nowrap;text-overflow:ellipsis}'
     +'tfoot td{font-weight:700;background:#f5f5f5}'
-    +'.foot{margin-top:14px;font-size:10px;color:#555;display:flex;justify-content:space-between}'
+    +'.foot{margin-top:14px;font-size:10.5px;color:#555;display:flex;justify-content:space-between}'
     +'</style></head><body><div class="page-wrap">'
     +'<div class="co">'+esc(P.company||'豐有工程有限公司')+'</div>'
     +'<h1>工程實績表</h1>'
     +'<div class="sub">實績期間：'+period+'　　共 '+rows.length+' 件　　製表日期：'+localToday()+'</div>'
-    +'<table><thead><tr><th style="width:6%">編號</th><th style="width:27%">工程名稱</th><th style="width:15%">定作人（業主）</th><th style="width:16%">工程地點</th><th style="width:12%">承攬金額（含稅）</th><th style="width:9%">開工日期</th><th style="width:9%">完工日期</th><th style="width:6%">狀態</th></tr></thead>'
+    +'<table><thead><tr><th style="width:4.5%">編號</th><th style="width:29%">工程名稱</th><th style="width:16%">定作人（業主）</th><th style="width:19%">工程地點</th><th style="width:10.5%">承攬金額（含稅）</th><th style="width:7.5%">開工日期</th><th style="width:7.5%">完工日期</th><th style="width:6%">狀態</th></tr></thead>'
     +'<tbody>'+trs+'</tbody>'
     +'<tfoot><tr><td colspan="4" class="c">合　計</td><td class="r">'+fmt(tot)+'</td><td colspan="3"></td></tr></tfoot></table>'
     +'<div class="foot"><span>本表所列均為本公司承攬之擋土支撐（假設工程）實績。</span><span>'+esc(P.company||'')+'　'+esc(P.tel||'')+'</span></div>'
     +'</div></body></html>';
-  _printViaIframe(html,'工程實績表_'+String(period).replace(/～/g,'-'));
+  _printViaIframe(html,'工程實績表_'+String(period).replace(/～/g,'-'),true);
 }
 function exportTrackXlsx(){
   var rows=_trackSelRows();
