@@ -54,6 +54,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 模組 | 關鍵函式 |
 |---|---|
 | 報價編輯 | `rItems` `calcT` `saveQ` `applyNegotiate`(議價) `backfillEstCosts` |
+| 版次 | `bumpQVersion`(進版→封存 V1、V2…永久保留) `showQVersions` `viewQVersion` `restoreQVersion` `compareQVersion`；自動存檔＝每次儲存留一份、只留 10 份，**不是版次** |
 | PDF 匯出 | `exportQuotePDF`(html2canvas 影像版) `exportQuotePDFNative`(瀏覽器原生列印)；分頁引擎 `_pdfPlanPages`(DOM 量測切點：只切列與列之間、天地各 10mm、續頁重印表頭、末頁過短自動均分) `_pdfAddPaged`(貼頁＋頁碼，**一律原比例、不縮放**；整份放得進一張紙才不分頁)；報價表空的逾期租金／備註欄自動不輸出 |
 | 單價分析 UPA | `upaCalc` `applyUPA`（套用時自動帶成本：實績優先、理論為輔） |
 | 歷史單價庫 | `COST_HIST` `writeCostHist`(結案回寫) `_histCostFor`(報價提示) |
@@ -69,6 +70,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 請款單壓縮 | `_invPack`/`_invUnpack`（欄位縮寫＋預設值省略，僅在儲存層；`_INV_OMIT` 之外的欄位不省略） |
 | 工項類別 | `_itemCat`(打設／拔除／both／other，空＝沿用名稱關鍵字) `_isRemovePeriod`(期別，`P.removeRate` 可調) |
 | 得標率／廠商績效 | `renderBidRateReport` `renderVendorReport`（報表中心分頁） |
+| 收款 | `openReceiptModal(invId)`：彈窗內可切換同專案各期；專案管理每期 chip 各自帶收款鈕 |
 | 票據登記 | `inv.receipts[]`（現金/票據、到期日、狀態）`_invTickets` `_cashOf` 登記模式優先；收款彈窗登記 |
 | 保留款總覽 | `_retentionRows` `renderRetention`（金流管理分頁）；已完工未退標紅 |
 | 催款／缺口模擬 | `_dunningText` `openDunning`；`cfSetDelay`（90天預測延收滑桿） |
@@ -82,7 +84,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 
 ## 測試
 
-`tests/smoke.js`（59 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（67 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
