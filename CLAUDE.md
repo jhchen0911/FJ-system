@@ -73,7 +73,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 請款單壓縮 | `_invPack`/`_invUnpack`（欄位縮寫＋預設值省略，僅在儲存層；`_INV_OMIT` 之外的欄位不省略） |
 | 工項類別 | `_itemCat`(打設／拔除／both／other，空＝沿用名稱關鍵字) `_isRemovePeriod`(期別，`P.removeRate` 可調) |
 | 專案獎金（佣金） | 得標設定 `confirmAward` 存 `q.referral`（％基底＝合約金額未稅 `q.t.sub`，或一筆金額；`_calcCommission`），連動應付 `comm_<qid>` 依實收進度分期支付；利潤頁依 `_recvRate` 計提 |
-| 工程實績表 | `renderTrackReport` `_trackRows` `exportTrackPDF`/`exportTrackXlsx`（報表中心分頁：年度區間＋逐案勾選；PDF 為 A4 橫式、先預覽） |
+| 工程實績表 | `renderTrackReport` `_trackRows` `exportTrackPDF`/`exportTrackXlsx`（報表中心分頁：年度區間＋逐案勾選；PDF 為 A4 橫式、表頭含 LOGO、先預覽） |
 | 得標率／廠商績效 | `renderBidRateReport` `renderVendorReport`（報表中心分頁）；得標率口徑＝得標÷全部報價（`_bidStat`，除得標外皆列未得標）；業主往來／得標率／廠商績效整列可點入明細 `openRptClientDetail`／`openRptBidDetail`／`openRptVendorDetail` |
 | 合約請款報表 | `renderContractReport`：同編號同名（即使掛不同報價）的重複建檔合併為一列，⚠×N 可點入 `openCtDupFix` 直接刪除未請款的重複筆 |
 | 統計卡總結 | 全站 KPI 卡皆可點：報價/請款 `openQuoteKpi`/`openInvKpi`、總覽與金流 `openFinKpi`(ar/ap/cash/month)、利潤 `openProfitKpi`(net/est/recv/cost)、佣金 `openCommKpi`、客戶 `openCustKpi`、累積估驗 `openInvCumDetail`（編輯器前期累計欄點入各期組成）；請款每期預計收款日 `_invExpectedDate` 顯示於列表小字與期別 chip（逾期轉紅） |

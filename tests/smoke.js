@@ -652,6 +652,12 @@ async function newPage(browser, width, height) {
       const el = document.createElement('div');
       renderTrackReport(el);
       out.track = /總結冒煙案/.test(el.innerText) && /匯出 Excel/.test(el.innerText) && /查看／匯出 PDF/.test(el.innerText);
+      // v5.391：業主欄正名、狀態欄移除、PDF 表頭同字級＋LOGO
+      out.trackCols = [...el.querySelectorAll('thead th')].map(t => t.innerText.trim()).join('|')
+        === '|工程名稱|業主|工程地點|承攬金額|開工|完工';
+      const pdfSrc = String(exportTrackPDF);
+      out.trackPdf = !/狀態/.test(pdfSrc) && /FY_LOGO/.test(pdfSrc) && /\.co\{font-size:22px/.test(pdfSrc)
+        && /width:28%">工程地點/.test(pdfSrc);
       const n0 = _trackSelRows().length;
       window._trackEx['Q389'] = true;
       out.trackTog = _trackSelRows().length === n0 - 1;
@@ -672,6 +678,8 @@ async function newPage(browser, width, height) {
     check('客戶統計卡可點出業主總結', r.custClick && /業主往來總結/.test(r.custBox), r.custBox.slice(0, 60));
     check('專案獎金改以未稅合約金額計', r.commUntaxed);
     check('工程實績表：渲染＋勾選＋匯出鈕', r.track && r.trackTog && r.trackFns);
+    check('工程實績表欄位：業主正名、刪除狀態欄', r.trackCols);
+    check('工程實績表 PDF：LOGO＋公司名同標題字級、地點欄加寬', r.trackPdf);
     check('v5.389 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
