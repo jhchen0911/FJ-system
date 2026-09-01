@@ -196,7 +196,7 @@ async function newPage(browser, width, height) {
       PAYABLES = [{ id: 'p1', to: '甲協力', amount: 480000, status: 'paid', date: '2026-03-10', due: '2026-04-10', paidDate: '2026-04-08', _mt: 1 }];
       const el = document.createElement('div');
       renderBidRateReport(el, 2026, 0);
-      out.bidReport = /已定案得標率/.test(el.textContent) && /甲營造/.test(el.textContent) && /價格過高/.test(el.textContent);
+      out.bidReport = /得標率分析/.test(el.textContent) && /甲營造/.test(el.textContent) && /價格過高/.test(el.textContent);
       renderVendorReport(el, 2026, 0);
       out.vendorReport = /甲協力/.test(el.textContent) && /乙工程行/.test(el.textContent) && /最高比最低貴/.test(el.textContent);
       return out;
@@ -512,6 +512,86 @@ async function newPage(browser, width, height) {
     check('廠商績效可點入明細', /廠商績效明細/.test(r2.ven) && /發包案件/.test(r2.ven), r2.ven.slice(0, 60));
     check('重複建檔的合約合併為一列', r2.dupMerged);
     check('報表明細測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── 8-5. KPI 點擊總結／得標率口徑／重複合約處理／先查看再下載（v5.388） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const grab = () => {
+        const b = document.getElementById('gen-confirm-box');
+        const t = b ? b.innerText.replace(/\s+/g, ' ') : '';
+        try { document.getElementById('gen-confirm-cancel').click(); } catch (e) {}
+        return t;
+      };
+      // 得標率口徑：得標 ÷ 全部（未得標、洽談、流標都在分母）
+      out.rate = Math.round(_bidStat([{ awarded: true }, { bidStatus: 'lost' }, { bidStatus: 'void' }, {}]).rate);
+      // 統計卡可點擊＋點擊出總結
+      Q.push({ id: 'Q388', name: 'KPI冒煙案', client: 'K營造', awarded: true, status: 'won',
+               date: '2026-02-01', items: [], t: { total: 210000 } });
+      INV.push({ id: 'I388', quoteId: 'Q388', project: 'KPI冒煙案', client: 'K營造', periodNo: '1',
+                 date: '2026-03-01', month: '2026-03', totals: { total: 105000 }, received: 0, items: [] });
+      updateQuoteStats(); updateInvStats();
+      out.qKpiClick = document.querySelectorAll('#quote-stats-grid .kpi[onclick]').length >= 4;
+      out.iKpiClick = document.querySelectorAll('#inv-stats-grid .kpi[onclick]').length >= 3;
+      openInvKpi('amt'); out.invBox = grab();
+      openQuoteKpi('rate'); out.quoteBox = grab();
+      openInvKpi('overdue'); out.odBox = grab();   // I388 預計 2026-04 月底收款 → 已逾期
+      // 既有請款單累計一次性回填（v5.385 前的直加值 57 → 加權 39.9）
+      const D = 'H型鋼樁回填檢';
+      INV.push({ id: 'I388a', quoteId: 'Q388f', project: '回填冒煙案', periodNo: '1',
+                 items: [{ type: 'item', desc: D, unit: '支', curQty: 57, payRate: 70, contractQty: 57 }] });
+      INV.push({ id: 'I388b', quoteId: 'Q388f', project: '回填冒煙案', periodNo: '2',
+                 items: [{ type: 'item', desc: D, unit: '支', prevQty: 57, curQty: 57, payRate: 30, contractQty: 57 }] });
+      out.migFixed = _fixInvCumWeighted() >= 1 && INV.find(x => x.id === 'I388b').items[0].prevQty === 39.9;
+      // 匯出 PDF 改「先預覽、按下載才存檔」
+      out.viewFirst = /不再自動下載/.test(_printViaIframe.toString());
+      return out;
+    });
+    // 重複合約（同編號同名但掛不同報價）＋ ⚠ 點入刪除未請款那筆
+    const r2 = await page.evaluate(async () => {
+      const out = {};
+      CONTRACTS.push({ id: 'CT88a', code: 'C-88', name: '亞東冒煙案', client: 'F公司', amount: 500000, linkedQid: 'QX1', start: '2026-01-01' });
+      CONTRACTS.push({ id: 'CT88b', code: 'C-88', name: '亞東冒煙案', client: 'F公司', amount: 500000, linkedQid: 'QX2', start: '2026-01-01' });
+      const box = document.createElement('div');
+      renderContractReport(box, 2026);
+      out.dupMerged = (box.innerText.match(/亞東冒煙案/g) || []).length === 1;
+      out.dupClickable = /openCtDupFix/.test(box.innerHTML);
+      openCtDupFix('CT88a', 'CT88b');
+      const b = document.getElementById('gen-confirm-box');
+      out.fixBox = /重複合約處理/.test(b.innerText) && /刪除此筆/.test(b.innerHTML);
+      try { document.getElementById('gen-confirm-cancel').click(); } catch (e) {}
+      const n0 = CONTRACTS.length;
+      ctDupDelete('CT88b');
+      await new Promise(res => setTimeout(res, 350));
+      out.askedFirst = CONTRACTS.length === n0 && /刪除重複合約/.test(document.getElementById('gen-confirm-box').innerText);
+      document.getElementById('gen-confirm-ok').click();
+      await new Promise(res => setTimeout(res, 80));
+      out.deleted = CONTRACTS.length === n0 - 1 && !CONTRACTS.some(c => c.id === 'CT88b');
+      return out;
+    });
+    await page.evaluate(() => go('projects'));
+    await page.waitForTimeout(700);
+    const r3 = await page.evaluate(() => ({
+      viewQuote: document.body.innerHTML.includes('查看報價PDF'),
+      chipView: /查看第1期請款單/.test(document.body.innerHTML),
+      chipDue: /預計收款 \d{4}-\d{2}-\d{2}/.test(document.body.innerHTML),
+    }));
+    check('得標率＝得標÷全部報價（1/4=25%）', r.rate === 25, '得到 ' + r.rate);
+    check('報價／請款統計卡可點擊', r.qKpiClick && r.iKpiClick);
+    check('總請款金額點擊出各工地總結', /總請款金額/.test(r.invBox) && /KPI冒煙案/.test(r.invBox), r.invBox.slice(0, 60));
+    check('得標率點擊出得標明細', /得標率總結/.test(r.quoteBox), r.quoteBox.slice(0, 60));
+    check('逾期未收點擊出逾期明細', /逾期未收總結/.test(r.odBox) && /逾期 \d+ 天/.test(r.odBox), r.odBox.slice(0, 60));
+    check('既有請款單累計一次性回填（57→39.9）', r.migFixed);
+    check('匯出 PDF 先預覽、按下載才存檔', r.viewFirst);
+    check('同編號同名不同報價的合約仍合併一列', r2.dupMerged);
+    check('⚠ 可點入處理且刪除需經確認', r2.dupClickable && r2.fixBox && r2.askedFirst);
+    check('未請款的重複合約可刪除', r2.deleted);
+    check('報價鈕改為查看、期別鈕帶預計收款日', r3.viewQuote && r3.chipView && r3.chipDue,
+          JSON.stringify(r3));
+    check('v5.388 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
