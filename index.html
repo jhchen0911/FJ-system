@@ -2640,7 +2640,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.390';
+var APP_VERSION='v5.391';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -26126,10 +26126,10 @@ function renderTrackReport(el){
     +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'
     +'<thead><tr style="background:var(--gl);color:var(--b5)">'
     +'<th style="padding:6px 8px;width:36px"><input type="checkbox" '+(selRows.length===rows.length&&rows.length?'checked':'')+' onchange="_trackAll(this.checked)" style="width:16px;height:16px"></th>'
-    +'<th style="padding:6px 8px;text-align:left">工程名稱</th><th style="padding:6px 8px;text-align:left">業主</th>'
-    +'<th style="padding:6px 8px;text-align:left">工程地點</th><th style="padding:6px 8px;text-align:right">承攬金額</th>'
+    +'<th style="padding:6px 8px;text-align:left;width:24%">工程名稱</th><th style="padding:6px 8px;text-align:left;width:14%">業主</th>'
+    +'<th style="padding:6px 8px;text-align:left;width:26%">工程地點</th><th style="padding:6px 8px;text-align:right">承攬金額</th>'
     +'<th style="padding:6px 8px;text-align:center">開工</th><th style="padding:6px 8px;text-align:center">完工</th>'
-    +'<th style="padding:6px 8px;text-align:center">狀態</th></tr></thead><tbody>'
+    +'</tr></thead><tbody>'
     +rows.map(function(r){
       return '<tr style="border-bottom:1px solid var(--b1)">'
         +'<td style="padding:5px 8px;text-align:center"><input type="checkbox" '+(!window._trackEx[r.id]?'checked':'')+' onchange="_trackTog(\''+r.id+'\',this.checked)" style="width:16px;height:16px"></td>'
@@ -26138,8 +26138,7 @@ function renderTrackReport(el){
         +'<td style="padding:5px 8px">'+esc(r.loc||'—')+'</td>'
         +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(r.amt)+'</td>'
         +'<td style="padding:5px 8px;text-align:center;font-size:11.5px">'+esc(r.start||'—')+'</td>'
-        +'<td style="padding:5px 8px;text-align:center;font-size:11.5px">'+esc(r.end||'—')+'</td>'
-        +'<td style="padding:5px 8px;text-align:center;color:'+(r.status==='已完工'?'var(--g3)':'#b26a00')+';font-weight:700;font-size:11.5px">'+r.status+'</td></tr>';
+        +'<td style="padding:5px 8px;text-align:center;font-size:11.5px">'+esc(r.end||'—')+'</td></tr>';
     }).join('')
     +'</tbody></table></div>'
     +(rows.length?'':'<div style="padding:20px;text-align:center;color:var(--b3)">此期間沒有得標案件</div>')+'</div>';
@@ -26158,7 +26157,7 @@ function exportTrackPDF(){
   var tot=rows.reduce(function(a,r){return a+r.amt;},0);
   var trs=rows.map(function(r,i){
     return '<tr><td class="c">'+(i+1)+'</td><td class="nm" title="'+esc(r.name)+'">'+esc(r.name)+'</td><td class="nm">'+esc(r.client)+'</td><td class="nm">'+esc(r.loc||'')+'</td>'
-      +'<td class="r">'+fmt(r.amt)+'</td><td class="c">'+esc(r.start||'')+'</td><td class="c">'+esc(r.end||'')+'</td><td class="c">'+r.status+'</td></tr>';
+      +'<td class="r">'+fmt(r.amt)+'</td><td class="c">'+esc(r.start||'')+'</td><td class="c">'+esc(r.end||'')+'</td></tr>';
   }).join('');
   var period=window._trackY1+'～'+window._trackY2+'年';
   // v5.390：改 A4 橫式——直式欄寬不足，公司名與日期被折行截斷很難看
@@ -26166,7 +26165,9 @@ function exportTrackPDF(){
     +'body{font-family:"Microsoft JhengHei",sans-serif;color:#111;margin:0;padding:0}'
     +'.page-wrap{width:277mm;margin:0 auto;padding:6mm 0}'
     +'h1{font-size:22px;text-align:center;letter-spacing:12px;margin:2px 0 5px}'
-    +'.co{text-align:center;font-size:13.5px;color:#1a6b3f;margin-bottom:2px;font-weight:900}'
+    +'.hd{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:6px}'
+    +'.hd img{height:46px;width:auto}'
+    +'.co{font-size:22px;color:#1a6b3f;font-weight:900;letter-spacing:2px}'
     +'.sub{text-align:center;font-size:11px;color:#666;margin-bottom:10px}'
     +'table{width:100%;border-collapse:collapse;font-size:11.5px;table-layout:fixed}'
     +'th{background:#eef3ee;border:1px solid #444;padding:7px 6px;font-size:11.5px;white-space:nowrap}'
@@ -26176,12 +26177,12 @@ function exportTrackPDF(){
     +'tfoot td{font-weight:700;background:#f5f5f5}'
     +'.foot{margin-top:14px;font-size:10.5px;color:#555;display:flex;justify-content:space-between}'
     +'</style></head><body><div class="page-wrap">'
-    +'<div class="co">'+esc(P.company||'豐有工程有限公司')+'</div>'
+    +'<div class="hd"><img src="'+FY_LOGO+'"><div class="co">'+esc(P.company||'豐有工程有限公司')+'</div></div>'
     +'<h1>工程實績表</h1>'
     +'<div class="sub">實績期間：'+period+'　　共 '+rows.length+' 件　　製表日期：'+localToday()+'</div>'
-    +'<table><thead><tr><th style="width:4.5%">編號</th><th style="width:29%">工程名稱</th><th style="width:16%">定作人（業主）</th><th style="width:19%">工程地點</th><th style="width:10.5%">承攬金額（含稅）</th><th style="width:7.5%">開工日期</th><th style="width:7.5%">完工日期</th><th style="width:6%">狀態</th></tr></thead>'
+    +'<table><thead><tr><th style="width:5%">編號</th><th style="width:24%">工程名稱</th><th style="width:13%">業主</th><th style="width:28%">工程地點</th><th style="width:12%">承攬金額（含稅）</th><th style="width:9%">開工日期</th><th style="width:9%">完工日期</th></tr></thead>'
     +'<tbody>'+trs+'</tbody>'
-    +'<tfoot><tr><td colspan="4" class="c">合　計</td><td class="r">'+fmt(tot)+'</td><td colspan="3"></td></tr></tfoot></table>'
+    +'<tfoot><tr><td colspan="4" class="c">合　計</td><td class="r">'+fmt(tot)+'</td><td colspan="2"></td></tr></tfoot></table>'
     +'<div class="foot"><span>本表所列均為本公司承攬之擋土支撐（假設工程）實績。</span><span>'+esc(P.company||'')+'　'+esc(P.tel||'')+'</span></div>'
     +'</div></body></html>';
   _printViaIframe(html,'工程實績表_'+String(period).replace(/～/g,'-'),true);
@@ -26189,12 +26190,12 @@ function exportTrackPDF(){
 function exportTrackXlsx(){
   var rows=_trackSelRows();
   if(!rows.length){toast('沒有勾選任何案件');return;}
-  var data=[['編號','工程名稱','定作人（業主）','工程地點','承攬金額（含稅）','開工日期','完工日期','狀態'].map(function(x){return {v:x,s:2};})];
+  var data=[['編號','工程名稱','業主','工程地點','承攬金額（含稅）','開工日期','完工日期'].map(function(x){return {v:x,s:2};})];
   rows.forEach(function(r,i){
-    data.push([{v:i+1,s:3},{v:r.name,s:3},{v:r.client,s:3},{v:r.loc||'',s:3},{v:r.amt,s:3},{v:r.start||'',s:3},{v:r.end||'',s:3},{v:r.status,s:3}]);
+    data.push([{v:i+1,s:3},{v:r.name,s:3},{v:r.client,s:3},{v:r.loc||'',s:3},{v:r.amt,s:3},{v:r.start||'',s:3},{v:r.end||'',s:3}]);
   });
-  data.push([{v:'合計',s:4},{v:'',s:4},{v:'',s:4},{v:'',s:4},{v:rows.reduce(function(a,r){return a+r.amt;},0),s:4},{v:'',s:4},{v:'',s:4},{v:'',s:4}]);
-  xlsxDownload('工程實績表_'+window._trackY1+'-'+window._trackY2,[{name:'工程實績',widths:[6,34,18,20,15,12,12,8],rows:data}]);
+  data.push([{v:'合計',s:4},{v:'',s:4},{v:'',s:4},{v:'',s:4},{v:rows.reduce(function(a,r){return a+r.amt;},0),s:4},{v:'',s:4},{v:'',s:4}]);
+  xlsxDownload('工程實績表_'+window._trackY1+'-'+window._trackY2,[{name:'工程實績',widths:[6,30,16,28,15,12,12],rows:data}]);
 }
 
 // v5.388：報表中心的重複合約可直接處理——未請款的重複筆當場刪除（有請款的保護不給刪）
