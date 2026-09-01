@@ -595,6 +595,86 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── 8-7. 全站 KPI 總結／佣金／實績表／寄送方式（v5.389） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const grab = () => {
+        const b = document.getElementById('gen-confirm-box');
+        const t = b ? b.innerText.replace(/\s+/g, ' ') : '';
+        try { document.getElementById('gen-confirm-cancel').click(); } catch (e) {}
+        return t;
+      };
+      // 材料估算：綁定專案的存檔缺 _layers 等欄位（雲端往返會剝掉空陣列）也要能渲染
+      Q.push({ id: 'QME', name: '估算冒煙案', awarded: true, items: [], t: {},
+               matEst: { inputs: { P: 100, A: 500, H: 8, layers: 2, method: '鋼板樁' } } });
+      window._matEstQid = 'QME';
+      MAT_EST = JSON.parse(JSON.stringify(Q[Q.length - 1].matEst.inputs));
+      renderMatEst();
+      out.matest = document.getElementById('mat-est-form').innerHTML.length > 1000;
+      // 寄送方式＋數量小數＋累積明細
+      Q.push({ id: 'Q389', name: '總結冒煙案', client: 'K營造', awarded: true, status: 'won',
+               date: '2026-02-01', loc: '新竹市', items: [{ desc: 'H型鋼樁', unit: '支', qty: '10', price: '1000' }],
+               t: { sub: 200000, tax: 10000, total: 210000 },
+               referral: { name: '王中間', who: '中間人', mode: 'pct', rate: 3, amount: 6000 } });
+      INV.push({ id: 'I389', quoteId: 'Q389', project: '總結冒煙案', client: 'K營造', periodNo: '1',
+                 date: '2026-03-01', totals: { total: 105000 }, received: 52500, sendMethod: '郵寄工地',
+                 items: [{ type: 'item', desc: 'H型鋼樁', unit: '支', contractPrice: 27500, contractQty: 57,
+                           prevQty: 40.6, curQty: 57, payRate: 30, curAmt: 470250 }] });
+      loadInvoice('I389');
+      buildInvPreview(INV.find(x => x.id === 'I389'));
+      const pv = document.getElementById('inv-prev-html').innerText;
+      out.send = /☑ 郵寄工地/.test(pv) && /□ 親送/.test(pv);
+      out.qtyDec = /17\.1/.test(pv) && /57\.7/.test(pv);
+      openInvCumDetail(0);
+      out.cumBox = grab();
+      // 利潤分析：KPI 一排可點＋佣金卡＋總結
+      rProfit();
+      out.profitClick = document.querySelectorAll('[onclick^="openProfitKpi"]').length >= 4;
+      out.profitComm = document.body.innerHTML.includes('專案獎金（佣金）');
+      openProfitKpi('net'); out.profitBox = grab();
+      openCommKpi(); out.commBox = grab();
+      // 金流／總覽／客戶 KPI 可點
+      updateFinanceKPIs();
+      out.finClick = document.querySelectorAll('#finance-kpis .kpi[onclick]').length >= 4;
+      openFinKpi('ar'); out.arBox = grab();
+      rDash();
+      out.dashClick = document.querySelectorAll('#dash-kpis .kpi[onclick]').length >= 4
+        && document.getElementById('dash-kpis').innerHTML.includes('專案獎金');
+      updateCustomerStats();
+      out.custClick = document.querySelectorAll('#customer-stats-grid .kpi[onclick]').length >= 3;
+      openCustKpi(); out.custBox = grab();
+      // 獎金改未稅基底
+      out.commUntaxed = /q\.t\?\.sub/.test(String(confirmAward))
+        && /不含稅/.test(document.getElementById('award-ref-mode').innerHTML);
+      // 工程實績表：渲染＋勾選排除
+      const el = document.createElement('div');
+      renderTrackReport(el);
+      out.track = /總結冒煙案/.test(el.innerText) && /匯出 Excel/.test(el.innerText) && /查看／匯出 PDF/.test(el.innerText);
+      const n0 = _trackSelRows().length;
+      window._trackEx['Q389'] = true;
+      out.trackTog = _trackSelRows().length === n0 - 1;
+      window._trackEx['Q389'] = false;
+      out.trackFns = typeof exportTrackPDF === 'function' && typeof exportTrackXlsx === 'function';
+      return out;
+    });
+    check('材料估算：存檔缺欄位不再整頁空白', r.matest);
+    check('寄送方式列印呈現三選一勾選', r.send);
+    check('列印數量保留小數（17.1／57.7）', r.qtyDec);
+    check('累積估驗可點出各期組成明細', /累積估驗明細/.test(r.cumBox) && /17\.1/.test(r.cumBox), r.cumBox.slice(0, 60));
+    check('利潤分析 KPI 一排可點＋佣金卡', r.profitClick && r.profitComm);
+    check('實際淨利點擊出各案明細', /實際淨利——各案明細/.test(r.profitBox), r.profitBox.slice(0, 60));
+    check('佣金總結：總額／已計提／已付', /專案獎金（佣金）總結/.test(r.commBox) && /依實收已計提 NT\$ 1,500/.test(r.commBox), r.commBox.slice(0, 80));
+    check('金流 KPI 可點、應收出明細', r.finClick && /應收帳款總結/.test(r.arBox), r.arBox.slice(0, 60));
+    check('總覽 KPI 可點＋專案獎金卡', r.dashClick);
+    check('客戶統計卡可點出業主總結', r.custClick && /業主往來總結/.test(r.custBox), r.custBox.slice(0, 60));
+    check('專案獎金改以未稅合約金額計', r.commUntaxed);
+    check('工程實績表：渲染＋勾選＋匯出鈕', r.track && r.trackTog && r.trackFns);
+    check('v5.389 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // ───────────── 8. 報價單 PDF 排版（v5.383） ─────────────
   {
     const { page, errors } = await newPage(browser, 1280, 900);
