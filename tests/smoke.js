@@ -296,6 +296,51 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── 8-1. 逾期租金單價以報價單為準／單位 m²（v5.384） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      out.uFix = ['M2', 'm2', '$/M2/天', 'm²', '㎡', 'M', 'M22'].map(x => _uFix(x)).join('|');
+      const qid = 'SMK384';
+      Q.push({
+        id: qid, name: '冒煙案384', client: 'X營造', date: '2026-06-06', status: 'won',
+        items: [{ desc: '第2層水平支撐 W=H400；S=H350', unit: 'M2', qty: '460', price: '1100',
+                  note: '含30天租期', ot: '7$/M2/天', otu: '$/M2/天' }],
+        dailyLogs: [{ date: '2026-07-10', progressRows: [{ itemIdx: 0, qty: 460 }] }], t: {}
+      });
+      // 請款單刻意存入過期的逾期租金快照（72），開單時應被報價單的 7 校正
+      INV.push({
+        id: 'SMKI384', quoteId: qid, project: '冒煙案384', client: 'X營造', periodNo: 1,
+        items: [{ type: 'item', desc: '第2層水平支撐 W=H400；S=H350', unit: 'M2', contractPrice: 1100,
+                  contractQty: 460, curQty: 0, curAmt: 0, payRate: 100, otPrice: 72, otUnit: '$/M2/天' }]
+      });
+      loadInvoice('SMKI384');
+      out.repaired = invItems[0].otPrice;                 // 期望 7（不是 72）
+      out.unitFixed = invItems[0].unit;                   // 期望 m²
+      document.getElementById('inv-rental-item').value = '第2層水平支撐 W=H400；S=H350';
+      invRentalPick();
+      document.getElementById('inv-claim-date').value = '2026-08-22';
+      calcInvDays();
+      out.overDays = document.getElementById('inv-overday').value;
+      out.preview = document.getElementById('inv-day-result').innerText.replace(/\s+/g, ' ');
+      const rent = invItems.find(x => x.type === 'rental');
+      out.rent = rent ? { p: rent.contractPrice, q: rent.contractQty, d: rent.curDays, a: rent.curAmt } : null;
+      const html = _buildQuoteDocHTML(Q.find(x => x.id === qid));
+      out.printNoM2 = !/>M2</.test(html) && />m²</.test(html);
+      return out;
+    });
+    check('單位正規化 M2／m2／㎡ → m²（M22 不動）', r.uFix === 'm²|m²|$/m²/天|m²|m²|M|M22', r.uFix);
+    check('開請款單即以報價單校正逾期租金單價', r.repaired === 7, '得到 ' + r.repaired);
+    check('請款單工項單位轉為 m²', r.unitFixed === 'm²', r.unitFixed);
+    check('逾期天數計算正確（30天租期→逾期13天）', r.overDays === '13', r.overDays);
+    check('逾期金額＝報價單價×合約量×逾期天數', !!r.rent && r.rent.p === 7 && r.rent.q === 460 && r.rent.d === 13 && r.rent.a === 41860, JSON.stringify(r.rent));
+    check('預覽標明單價取自報價單', /單價取自報價單/.test(r.preview) && /\$7/.test(r.preview), r.preview.slice(0, 90));
+    check('報價單列印單位輸出 m²', r.printNoM2);
+    check('逾期租金測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // ───────────── 8. 報價單 PDF 排版（v5.383） ─────────────
   {
     const { page, errors } = await newPage(browser, 1280, 900);
