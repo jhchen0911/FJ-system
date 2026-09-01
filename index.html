@@ -2640,7 +2640,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.391';
+var APP_VERSION='v5.392';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -5072,7 +5072,7 @@ function doPrint(){
     'body{padding:0;font-family:\'Microsoft JhengHei\',\'Noto Sans TC\',\'PingFang TC\',sans-serif;font-size:11px;color:#111;background:#fff;}',
     'table{border-collapse:collapse;}',
     'img{max-width:100%;}',
-    '@media print{body{padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}@page{size:A4 portrait;margin:8mm 10mm;}}',
+    '@media print{body{padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}@page{size:A4 portrait;margin:10mm;}}',
     '.no-print{display:none!important}'
   ].join('');
   const html='<!DOCTYPE html>'+_o+'html lang="zh-TW"'+_c+_o+'head'+_c
@@ -7423,7 +7423,7 @@ function printVendorStatement(cid){
   const sub=Math.round(cc.amt||0),tax=Math.round(sub*0.05),tot=sub+tax;
   const today=new Date();const dstr=today.getFullYear()+'/'+String(today.getMonth()+1).padStart(2,'0')+'/'+String(today.getDate()).padStart(2,'0');
   const html='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>計價單</title><style>'
-    +'@page{size:A4 landscape;margin:12mm 14mm;}*{box-sizing:border-box;}'
+    +'@page{size:A4 landscape;margin:10mm;}*{box-sizing:border-box;}'
     +'html,body{width:auto;max-width:100%;}'
     +'body{font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;font-size:11.5px;color:#111;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
     +'h1{font-size:17px;letter-spacing:8px;text-align:center;margin:4px 0 2px;color:#0e3d22;}'
@@ -7449,7 +7449,7 @@ function printVendorStatement(cid){
     +'<div style="margin-top:34px;display:flex;justify-content:space-between;font-size:11px">'
     +'<span>廠商簽收：＿＿＿＿＿＿＿＿＿＿</span><span>覆核：＿＿＿＿＿＿＿＿</span><span>製表：＿＿＿＿＿＿＿＿</span></div>'
     +'</body></html>';
-  _printNativeHTML(html,(cc.vendor||'廠商')+'_計價單_'+(q.name||'')+'_'+dstr.replace(/\//g,''),Math.round((210-24)*96/25.4));
+  _printNativeHTML(html,(cc.vendor||'廠商')+'_計價單_'+(q.name||'')+'_'+dstr.replace(/\//g,''));
 }
 function printInvNative(){
   var el=document.getElementById('inv-prev-html');
@@ -7462,7 +7462,7 @@ function printInvNative(){
   var pno=(_inv&&_inv.periodNo)||'';
   var dt=((_inv&&_inv.date)||localToday()).replace(/-/g,'');
   var fname=proj+'_請款單'+(pno?'第'+pno+'期':'')+'_'+dt;
-  var css='@page{size:A4 landscape;margin:9mm 10mm;}*{box-sizing:border-box;}'
+  var css='@page{size:A4 landscape;margin:10mm;}*{box-sizing:border-box;}'
     +'html,body{font-family:"Microsoft JhengHei","Noto Sans TC","PingFang TC",sans-serif;'
     +'font-size:9px;color:#111;background:#fff;margin:0;padding:0;'
     +'-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
@@ -7473,7 +7473,7 @@ function printInvNative(){
     +'img{max-width:100%;}'
     +'body>div{width:auto!important;min-width:0!important;max-width:100%!important;}';
   var html='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>'+esc(fname)+'</title><style>'+css+'</style></head><body>'+h+'</body></html>';
-  _printNativeHTML(html,fname,Math.round((210-18)*96/25.4)); // A4 橫式扣邊距的一頁高
+  _printNativeHTML(html,fname);
 }
 function printInvById(id){
   var _inv=INV.find(function(x){return x.id===id;});
@@ -11266,7 +11266,7 @@ function matEstExportPDF(){
   body+='</div>';
   var _mefn=_toolFileName('matest','材料估算表',(q&&q.name)||'');
   var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(_mefn)+'</title><style>'
-    +'@page{size:A4;margin:8mm}body{font-family:"Microsoft JhengHei","PingFang TC",sans-serif;font-size:8px;color:#1a1a1a;margin:0}'
+    +'@page{size:A4;margin:10mm}body{font-family:"Microsoft JhengHei","PingFang TC",sans-serif;font-size:8px;color:#1a1a1a;margin:0}'
     +'h1{font-size:13px;margin:0 0 2px;border-bottom:2px solid #2e5e42;padding-bottom:3px}'
     +'h2{font-size:9px;margin:5px 0 2px;color:#2e5e42;break-after:avoid}'
     +'.meta{font-size:7.5px;color:#555;margin:1px 0}'
@@ -11278,7 +11278,7 @@ function matEstExportPDF(){
     +'td.sec{background:#eef4f0;font-weight:700;color:#2e5e42}'
     +'.stg{margin:2px 0;font-size:7.5px;break-inside:avoid}.stg>div{color:#444;line-height:1.5}'
     +'</style></head><body>'+body+'</body></html>';
-  _printNativeHTML(html,_mefn,Math.round((297-16)*96/25.4)); // A4 扣邊距一頁高，小幅溢出自動縮身
+  _printNativeHTML(html,_mefn);
 }
 function matEstUB(k,checked){
   if(!MAT_EST)MAT_EST=_shDefaults();
@@ -12681,23 +12681,25 @@ function _toolFileName(kind,head,projName){
   var base=[client,proj].filter(Boolean).join('-');
   return ((base?base+'_':'')+head+'_'+roc+'_v'+ver).replace(/[\\/:*?"<>|]/g,'');
 }
+// v5.392：工具表單（鋼筋籠／根固砂漿／背填材料／施工進度）改走全站統一的 PDF 引擎，
+// 與報價單／請款單／實績表同一套規則：不縮放、四邊 10mm、填滿才換頁、續頁重印表頭、頁尾頁碼。
 function _toolPrint(title,proj,body,opts){
   var css='*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
-   +'body{font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;color:#1f2937;padding:20px;font-size:12px}'
+   +'body{font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;color:#1f2937;padding:0;font-size:12px}'
    +'h1{font-size:18px;color:#0e3d22;margin:0}.b{color:#0e3d22;font-weight:700;font-size:11px;margin:2px 0 12px}'
    +'h2{color:#0e3d22;font-size:13.5px;margin:15px 0 5px;border-left:4px solid #0e3d22;padding-left:8px}h2 .sub{color:#555;font-size:11px;font-weight:600;margin-left:8px}'
    +'.cond{font-size:10.5px;color:#555;margin:0 0 5px;padding:4px 8px;background:#eef5f0;border-left:3px solid #7fae91;border-radius:2px}'
    +'table{width:100%;border-collapse:collapse;margin-bottom:8px;page-break-inside:auto}tr{page-break-inside:avoid}'
    +'th,td{border:1px solid #b9c6bd;padding:3px 6px;font-size:10.5px;text-align:center}th{background:#0e3d22;color:#fff}'
    +'td.l{text-align:left}td.r{text-align:right}tr.tt td{background:#eaf3ed;font-weight:700}'
-   +'@media print{body{padding:0}.no-print{display:none!important}}'+((opts&&opts.landscape)?'@page{size:A4 landscape}':'');
-  var w=window.open('','_blank');
-  if(!w){toast('瀏覽器阻擋了列印視窗，請允許彈出視窗');return;}
-  w.document.write('<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+_xlEsc((opts&&opts.fname)||title)+'</title><style>'+css+'</style></head><body>'+_PL_PRINTBAR
+   +'thead{display:table-header-group}'
+   +'@page{size:A4 '+((opts&&opts.landscape)?'landscape':'portrait')+';margin:10mm}';
+  var html='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>'+_xlEsc((opts&&opts.fname)||title)+'</title><style>'+css+'</style></head><body>'
+    +'<div class="page-wrap">'
     +'<div style="display:flex;align-items:center;gap:12px"><img src="'+FY_LOGO+'" style="height:42px"><h1>'+_xlEsc(title)+'</h1></div>'
     +'<div class="b">'+(proj?(_xlEsc(proj)+'　'):'')+'日期：'+localToday()+'</div>'
-    +body+'<script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>');
-  w.document.close();
+    +body+'</div></body></html>';
+  _printViaIframe(html,(opts&&opts.fname)||title,!!(opts&&opts.landscape));
 }
 // ══════════ Word (.docx) 產生器（v5.357：公文級黑白版面＋分節頁碼＋橫向節）══════════
 // 沿用 _zipStore/_crc32，無相依套件。字體採標楷體（公文慣例）＋Times New Roman；
@@ -28195,7 +28197,7 @@ function exportQuotePDFNative(qid){
     <title>${esc(fname)}</title>
     <style>${_getPrintCSS()}
     /* ── 原生列印覆寫 ── */
-    @page{size:A4 portrait;margin:12mm 11mm;}
+    @page{size:A4 portrait;margin:10mm;}
     html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     .page-wrap{width:auto;padding:0;}
     thead{display:table-header-group;}           /* 表頭每頁重複 */
@@ -28209,10 +28211,10 @@ function exportQuotePDFNative(qid){
     <div class="page-wrap">
       ${_buildQuoteDocHTML(q)}</div>
   </body></html>`;
-  _printNativeHTML(html,fname,Math.round((297-24)*96/25.4)); // A4 直式扣邊距的一頁高
+  _printNativeHTML(html,fname);
 }
 // 隱藏 iframe + window.print()：使用者於列印對話框選「另存為 PDF」
-function _printNativeHTML(html,filename,fitPageHpx){
+function _printNativeHTML(html,filename){   // v5.392：一律不縮放（移除 fitPageHpx）
   var old=document.getElementById('_fy_native_print');if(old)old.remove();
   var f=document.createElement('iframe');
   f.id='_fy_native_print';
@@ -28251,16 +28253,29 @@ function _openPrintWindow(html,filename){
 // 舊版靠掃描像素找空白線，切點會貼齊紙張邊緣、看起來像被裁掉。
 // 改為直接量測 DOM：切點只落在「列與列之間」等區塊邊界，
 // 每頁天地各留白 10mm，續頁自動重印表頭，整列／用印區絕不被拆開。
+// PDF 匯出大原則（全站一致，CLAUDE.md 規則 8）：
+//   ① 一律維持原比例、不縮放（同一種文件在不同專案字級必然相同）
+//   ② 整份放得進一張紙才不分頁；超出就換頁——切在列與列之間、續頁重印表頭、
+//      上下左右各 10mm、頁尾頁碼
+//   ③ 換頁是「填滿才換」，不為了避開孤兒頁而留下大片空白
+var _PDF_MM=10;                                    // 四邊留白（mm）
+function _pdfPt(ls){return {w:ls?841.89:595.28,h:ls?595.28:841.89};}
+function _pdfMargPt(){return _PDF_MM*72/25.4;}      // 10mm → pt
+// 內容渲染寬度（css px）＝ A4 寬扣掉左右留白，確保貼頁時 1:1 不縮放
+function _pdfContentPx(ls){return Math.round(((ls?297:210)-2*_PDF_MM)*96/25.4);}
 function _pdfPlanPages(cvs,root,renderW,ls){
   var K=cvs.width/(renderW||root.offsetWidth||1);   // css px → canvas px
   var rr=root.getBoundingClientRect(),H=cvs.height;
   var yT=function(el){return Math.round((el.getBoundingClientRect().top-rr.top)*K);};
   var yB=function(el){return Math.round((el.getBoundingClientRect().bottom-rr.top)*K);};
-  var PAGE=Math.round(cvs.width*(ls?210/297:297/210));   // 一頁紙高（canvas px）
-  var MARG=Math.round(cvs.width*10/(ls?297:210));        // 天地各 10mm
+  // 貼頁比例：canvas 寬 → (A4 寬 − 左右各 10mm)
+  var _pt=_pdfPt(ls),_M=_pdfMargPt();
+  var _sc=(_pt.w-2*_M)/cvs.width;
+  var PAGE=Math.round(_pt.h/_sc);                        // 一頁紙高（canvas px）
+  var MARG=Math.round(_M/_sc);                           // 10mm（canvas px）
   // 整份放得進一張紙就別拆（v5.385）：只差幾公釐就把一頁切成兩個半頁很難看，
   // 這種情況下犧牲的只是下緣留白（內容本身沒有被裁到），不縮放、不分頁。
-  if(H<=PAGE)return {pages:[{s:0,e:H,hd:false}],marg:MARG,hd:null,PAGE:PAGE};
+  if(H<=PAGE-2*MARG)return {pages:[{s:0,e:H,hd:false}],marg:MARG,hd:null,PAGE:PAGE};
   var cands=[],atomic=[];
   try{
     root.querySelectorAll('tr').forEach(function(el){
@@ -28295,8 +28310,7 @@ function _pdfPlanPages(cvs,root,renderW,ls){
   while(pos<H-2&&guard++<300){
     var rep=!!(!first&&hd&&pos>hd.e&&pos<hd.te-2);       // 續頁且仍在表格中 → 重印表頭
     var hdH=rep?(hd.e-hd.s):0;
-    var top=first?0:MARG;                                // 首頁天邊由文件本身 padding 提供
-    var budget=PAGE-top-MARG-hdH;
+    var budget=PAGE-2*MARG-hdH;                          // 天地各 10mm（首頁亦同）
     if(budget<PAGE*0.2)budget=Math.round(PAGE*0.2);
     if(pos+budget>=H){pages.push({s:pos,e:H,hd:rep});break;}
     var lim=pos+budget,min=pos+Math.round(budget*0.25),cut=-1;
@@ -28317,6 +28331,9 @@ function _pdfPlanPages(cvs,root,renderW,ls){
 function _pdfAddPaged(pdf,cvs,a4w,a4h,sc,plan,q){
   if(!plan)plan={pages:[{s:0,e:cvs.height,hd:false}],marg:0,hd:null};
   var n=plan.pages.length;
+  // v5.392：左右各 10mm——內容寬固定為 A4 寬扣左右留白，比例由此決定（永不縮放塞頁）
+  var MX=_pdfMargPt(), CW=a4w-2*MX;
+  sc=CW/cvs.width;
   function slice(y0,h){
     var sl=document.createElement('canvas');
     sl.width=cvs.width;sl.height=h;
@@ -28325,16 +28342,16 @@ function _pdfAddPaged(pdf,cvs,a4w,a4h,sc,plan,q){
   }
   plan.pages.forEach(function(pg,i){
     if(i>0)pdf.addPage();
-    var y=(i===0?0:plan.marg)*sc;
+    var y=MX;                                  // 天邊一律 10mm（首頁與續頁相同）
     if(pg.hd&&plan.hd){
       var hh=plan.hd.e-plan.hd.s;
-      pdf.addImage(slice(plan.hd.s,hh),'JPEG',0,y,a4w,hh*sc);
+      pdf.addImage(slice(plan.hd.s,hh),'JPEG',MX,y,CW,hh*sc);
       y+=hh*sc;
     }
-    pdf.addImage(slice(pg.s,pg.e-pg.s),'JPEG',0,y,a4w,(pg.e-pg.s)*sc);
-    if(n>1){                                   // 頁碼（置中，落在下緣留白內）
+    pdf.addImage(slice(pg.s,pg.e-pg.s),'JPEG',MX,y,CW,(pg.e-pg.s)*sc);
+    if(n>1){                                   // 頁碼（置中，落在下緣 10mm 留白內）
       try{pdf.setFontSize(8);pdf.setTextColor(140);
-        pdf.text(String(i+1)+' / '+n,a4w/2,a4h-11,{align:'center'});}catch(e){}
+        pdf.text(String(i+1)+' / '+n,a4w/2,a4h-MX*0.42,{align:'center'});}catch(e){}
     }
   });
   return n;
@@ -28342,7 +28359,9 @@ function _pdfAddPaged(pdf,cvs,a4w,a4h,sc,plan,q){
 function _printViaIframe(html,filename,landscape){
   ['_fy_print_frame','_fy_print_overlay'].forEach(function(id){var el=document.getElementById(id);if(el)el.remove();});
   var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-  var A4W=landscape?1123:794;
+  // v5.392：渲染寬＝A4 寬扣掉左右各 10mm，各文件自帶的版心寬與左右內距一律歸零，
+  // 由 PDF 貼頁統一留出四邊 10mm——所有表單邊界因此完全一致且不縮放。
+  var A4W=_pdfContentPx(landscape);
 
   // ── overlay 工具列 ──
   var overlay=document.createElement('div');
@@ -28382,6 +28401,14 @@ function _printViaIframe(html,filename,landscape){
     _styleEl.textContent=_styleContent;
     inner.appendChild(_styleEl);
   }
+  // 正規化：文件自帶的版心寬／左右內距歸零（留白改由 PDF 四邊 10mm 提供）；
+  // 表頭續頁重印、整列與用印區不可拆開
+  var _normEl=document.createElement('style');
+  _normEl.textContent='.page-wrap{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}'
+    +'thead{display:table-header-group}'
+    +'tr,.page-footer,.stamp-row,.stamp-box{break-inside:avoid;page-break-inside:avoid}'
+    +'body{margin:0!important;padding:0!important}';
+  inner.appendChild(_normEl);
   inner.insertAdjacentHTML('beforeend',_bodyContent);
   frame.appendChild(inner);
   document.body.appendChild(frame);
@@ -28399,7 +28426,7 @@ function _printViaIframe(html,filename,landscape){
       cleanup();
       toast('PDF 套件未載入（網路或 CDN 問題），已改用瀏覽器列印，請於對話框選「另存為 PDF」');
       try{
-        var _css=_styleContent+'\n@page{size:A4 '+(landscape?'landscape':'portrait')+';margin:12mm 11mm;}'
+        var _css=_styleContent+'\n@page{size:A4 '+(landscape?'landscape':'portrait')+';margin:10mm;}'
           +'\n.page-wrap{width:auto;padding:0;}thead{display:table-header-group;}'
           +'\ntr{page-break-inside:avoid;break-inside:avoid;}'
           +'\n.page-footer,.stamp-row{page-break-inside:avoid;break-inside:avoid;}'
