@@ -77,11 +77,12 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 修改人 | `_touch(obj)` 統一戳 `_mt`+`_by`；雲端套用只戳 `_mt`。改記錄一律走 `_touch` |
 | 附件效期 | 檔案物件 `exp` 欄位 `_plAttExp`；過期進待辦並在產出文件加註 |
 | 雲端同步 | `_sharedPayload`/`_privatePayload` `_pushPrivate`/`_pullPrivate` `_applySensColls` `_seedAdminUid`；報價／請款走逐筆路徑 `_perRecordDelta`，筆數暴跌由 `_syncDropGuard` 攔下，墓碑 180 天由 `_tombPrune` 清理 |
-| 逾期租金 | `_rentDaysOf`(解析備註租期) `_itemProgress`(日報推完工日) `_rentStatus` `_rentScan` `invScanRent` |
+| 逾期租金 | `_rentDaysOf`(解析備註租期) `_itemProgress`(日報推完工日) `_rentStatus` `_rentScan` `invScanRent`；**單價一律以報價單 `it.ot` 為準**（`_otFromQuote`），請款單裡的 `otPrice` 只是建單快照，`loadInvoice` 開單即校正 |
+| 單位 | `_uFix()`：平方公尺一律顯示 `m²`（M2／m2／㎡ 全部正規化）。只作用在單位類短字串，不碰工項說明與備註 |
 
 ## 測試
 
-`tests/smoke.js`（45 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（53 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
