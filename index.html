@@ -2640,7 +2640,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.384';
+var APP_VERSION='v5.385';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -5590,6 +5590,17 @@ function loadInvoice(id){
       });
     }
   }catch(e){_err('loadInvoice.ot',e);}
+  // v5.385：前期累計數量改為「依請款比例加權」，並自同專案前期記錄重算——
+  // 修正舊資料把打設與拔除的數量直接相加（累計變成合約兩倍、誤標超請）的問題。
+  try{
+    const _cp=parseInt(inv.periodNo)||1;
+    invItems.forEach(it=>{
+      if(!it||it.type==='sec'||it.type==='rental')return;
+      const w=_prevCumQty(inv,it.desc,_cp);
+      if(w==null)return;
+      if(Math.abs(w-(parseFloat(it.prevQty)||0))>0.005)it.prevQty=w;
+    });
+  }catch(e){_err('loadInvoice.cum',e);}
   const map={
     'inv-client':'client','inv-taxid':'taxid','inv-tel':'tel','inv-fax':'fax',
     'inv-project':'project','inv-loc':'loc','inv-scope':'scope',
@@ -5760,11 +5771,11 @@ function settleInvItem(i){
     if(_inv&&v.id===_inv.id)return;
     (v.items||[]).forEach(function(x){
       if(x.type==='sec'||String(x.desc||'').trim()!==_dsc)return;
-      const c=(parseFloat(x.prevQty)||0)+(parseFloat(x.curQty)||0);
+      const c=(parseFloat(x.prevQty)||0)+_curW(x);
       if(c>_cumAll)_cumAll=c;
     });
   });
-  const cum=Math.round(Math.max(_cumAll,(parseFloat(it.prevQty)||0)+(parseFloat(it.curQty)||0))*100)/100;
+  const cum=Math.round(Math.max(_cumAll,(parseFloat(it.prevQty)||0)+_curW(it))*100)/100;
   if(cum<=0){toast('此工項尚無實作數量，無法結算');return;}
   const orig=parseFloat(it.contractQty)||0;
   if(orig===cum){toast('合約數量已與實作數量一致，無需結算');return;}
@@ -6171,7 +6182,7 @@ function rInvItems(){
       // 超請警示（不擋儲存）：前期+本期 > 合約數量 → 本期數量欄變紅
       function _chkOver(){
         const cq=parseFloat(invItems[i].contractQty)||0;
-        const cum=(parseFloat(invItems[i].prevQty)||0)+(parseFloat(invItems[i].curQty)||0);
+        const cum=Math.round(((parseFloat(invItems[i].prevQty)||0)+_curW(invItems[i]))*100)/100;
         const inp2=tr.querySelector('input[data-f="curQty"]');
         if(!inp2)return;
         if(cq>0&&cum>cq+1e-9){
@@ -6418,7 +6429,7 @@ function saveInvoice(){
     if(it.type==='sec')continue;
     if((parseFloat(it.curQty)||0)<0||(parseFloat(it.contractPrice)||0)<0){toast('數量／單價不可為負數');return;}
     const cq=parseFloat(it.contractQty)||0;
-    if(cq>0&&((parseFloat(it.prevQty)||0)+(parseFloat(it.curQty)||0))>cq+1e-9)_overN++;
+    if(cq>0&&((parseFloat(it.prevQty)||0)+_curW(it))>cq+1e-9)_overN++;
   }
   const t=rInvTots();
   // P1：儲存時回填 quoteId（依工程名稱對應主報價單）
@@ -6796,7 +6807,7 @@ function addNextPeriod(id){
   next.items=(next.items||[]).map(it=>{
     if(it.type==='sec')return it;
     const thisRate=it.payRate!=null?it.payRate:100;
-    const prevQ=(parseFloat(it.prevQty)||0)+(parseFloat(it.curQty)||0);
+    const prevQ=Math.round(((parseFloat(it.prevQty)||0)+_wQty(it.curQty,thisRate))*100)/100;  // v5.385：依請款比例加權
     const prevA=(parseFloat(it.prevAmt)||0)+(parseFloat(it.curAmt)||0);
     // 各類型累積：只加入本類型的 curQty
     const isInstall=(thisRate!==30);
@@ -7105,7 +7116,7 @@ function buildInvPreview(srcInv){
     const prevQtyShow=parseFloat(it.prevQty)||0;
     const cumQty=parseFloat(it.cumQty)||0;
     // 累積數量顯示：未另存 cumQty 時自動以「前期＋本期」計算（僅供顯示，不影響金額計算）
-    const cumQtyShow=cumQty||(Math.round((prevQtyShow+(parseFloat(it.curQty)||0))*100)/100);
+    const cumQtyShow=cumQty||(Math.round((prevQtyShow+_curW(it))*100)/100);   // v5.385：本期依請款比例加權
     const _previewPr=(it.payRate!=null?it.payRate:100)/100;
     let curAmt=0;
     if(isRental&&it.curQty&&it.contractPrice){
@@ -7146,8 +7157,9 @@ function buildInvPreview(srcInv){
       // 的請款比率，乘上全部前期累計數量並不成立——各期比率不同時（如 100%打設→70%打設→30%拔除）
       // 印給業主的前期／累積金額會與實際請過的金額對不上。僅在舊資料沒存 prevAmt 時才回退重算。
       let prevAmtCalc = prevAmtRaw;
-      if(!prevAmtCalc && prevQtyShow && _cpEff2 && _prevPr>0){
-        prevAmtCalc = Math.round(prevQtyShow * _cpEff2 * _prevPr);
+      // v5.385：prevQtyShow 已是加權後的累計量，這裡不可再乘一次請款率（會重複打折）
+      if(!prevAmtCalc && prevQtyShow && _cpEff2){
+        prevAmtCalc = Math.round(prevQtyShow * _cpEff2);
       }
       // 累積請款金額 = 前期累積 + 本期（與逐期實際請款額一致）
       let cumAmtCalc = prevAmtCalc + curAmt;
@@ -8740,6 +8752,37 @@ function upaFill(){try{upaUpdateDesc();}catch(e){_err('upaFill',e);}}
   }
 })();
 
+// ── 加權累計數量（v5.385）──────────────────────────────
+// 打設 70%／拔除 30% 這種分批請款，數量若直接相加，拔除期一到累計就變成合約的兩倍
+//（57 支打設 ＋ 57 支拔除 ＝ 114 > 合約 57）。累計一律依請款比例加權：
+//   57×70% ＋ 57×30% ＝ 57 —— 全部請完剛好等於合約數量。
+// 100% 請款的工項加權後與原本相同，行為完全不變。
+function _wQty(qty,rate){
+  var r=(rate==null?100:parseFloat(rate));if(!isFinite(r))r=100;
+  return (parseFloat(qty)||0)*r/100;
+}
+function _curW(it){return it?_wQty(it.curQty,it.payRate):0;}
+// 由同專案「期別較小」的請款單重算前期加權累計數量。
+// 回傳 null＝找不到任何前期記錄（例如手動建的第一期），此時不動原值。
+function _prevCumQty(inv,desc,curPeriod){
+  var d=String(desc||'').split('\n')[0].trim();
+  if(!d||!inv)return null;
+  var sum=0,found=false;
+  (INV||[]).forEach(function(v){
+    if(!v||v.id===inv.id)return;
+    var same=(v.quoteId&&inv.quoteId)?(v.quoteId===inv.quoteId)
+            :(String(v.project||'').trim()===String(inv.project||'').trim());
+    if(!same)return;
+    if(curPeriod&&(parseInt(v.periodNo)||0)>=curPeriod)return;
+    found=true;
+    (v.items||[]).forEach(function(x){
+      if(!x||x.type==='sec')return;
+      if(String(x.desc||'').split('\n')[0].trim()!==d)return;
+      sum+=_curW(x);
+    });
+  });
+  return found?Math.round(sum*100)/100:null;
+}
 // ── 重建 installCum/removeCum（修復手動新建或舊資料）──
 function rebuildCumulatives(inv){
   const currentPeriod=parseInt(inv.periodNo)||1;
@@ -27492,17 +27535,8 @@ function _printNativeHTML(html,filename,fitPageHpx){
   function go(){
     if(fired)return;fired=true;
     try{
-      // 小幅溢出(≤35%)時縮身為一頁：zoom 縮小 + 寬度補償維持滿版
-      if(fitPageHpx){
-        try{
-          var bh=d.body.scrollHeight;
-          if(bh>fitPageHpx && bh<=fitPageHpx*1.35){
-            var fz=(fitPageHpx/bh)*0.995;
-            d.body.style.zoom=fz;
-            d.body.style.width=(100/fz)+'%';
-          }
-        }catch(e){_err('go',e);}
-      }
+      // v5.385：不再「小幅溢出就縮身成一頁」——同一種文件在不同專案會印出不同字級大小。
+      // 一律維持原比例，超出的部分交給瀏覽器依 page-break 規則換頁。
       try{f.contentWindow.onafterprint=function(){setTimeout(cleanup,300);};}catch(e){_err('go',e);}
       f.contentWindow.focus();
       f.contentWindow.print();
@@ -27534,6 +27568,9 @@ function _pdfPlanPages(cvs,root,renderW,ls){
   var yB=function(el){return Math.round((el.getBoundingClientRect().bottom-rr.top)*K);};
   var PAGE=Math.round(cvs.width*(ls?210/297:297/210));   // 一頁紙高（canvas px）
   var MARG=Math.round(cvs.width*10/(ls?297:210));        // 天地各 10mm
+  // 整份放得進一張紙就別拆（v5.385）：只差幾公釐就把一頁切成兩個半頁很難看，
+  // 這種情況下犧牲的只是下緣留白（內容本身沒有被裁到），不縮放、不分頁。
+  if(H<=PAGE)return {pages:[{s:0,e:H,hd:false}],marg:MARG,hd:null,PAGE:PAGE};
   var cands=[],atomic=[];
   try{
     root.querySelectorAll('tr').forEach(function(el){
@@ -27597,16 +27634,10 @@ function _pdfPlanPages(cvs,root,renderW,ls){
   }
   return {pages:pages,marg:MARG,hd:hd,PAGE:PAGE};
 }
-// 內容僅小幅超過一頁(≤28%)時，等比縮小塞進單頁（請款單/報價單避免第二頁只剩尾巴）
+// 貼頁：所有匯出一律「同一比例」輸出（v5.385）
+// 舊版在內容只超出一點點時會整份縮小塞進一頁，同樣是請款單，A 案縮到 89%、B 案 100%，
+// 兩份 PDF 擺在一起字級大小不一。改為永遠不縮放，超出就照分頁規則換頁。
 function _pdfAddPaged(pdf,cvs,a4w,a4h,sc,plan,q){
-  var pageHpx=Math.round(a4h/sc);
-  var avail=pageHpx-((plan&&plan.marg)||0);   // 扣掉下緣留白後的可用高
-  if(cvs.height>avail && cvs.height<=pageHpx*1.28){
-    var f=avail/cvs.height;                   // 縮放比 <1
-    var w=a4w*f, x=(a4w-w)/2;                 // 水平置中
-    pdf.addImage(cvs.toDataURL('image/jpeg',q),'JPEG',x,0,w,cvs.height*sc*f);
-    return 1;
-  }
   if(!plan)plan={pages:[{s:0,e:cvs.height,hd:false}],marg:0,hd:null};
   var n=plan.pages.length;
   function slice(y0,h){
