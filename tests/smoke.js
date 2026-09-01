@@ -656,7 +656,8 @@ async function newPage(browser, width, height) {
       window._trackEx['Q389'] = true;
       out.trackTog = _trackSelRows().length === n0 - 1;
       window._trackEx['Q389'] = false;
-      out.trackFns = typeof exportTrackPDF === 'function' && typeof exportTrackXlsx === 'function';
+      out.trackFns = typeof exportTrackPDF === 'function' && typeof exportTrackXlsx === 'function'
+        && /277mm/.test(String(exportTrackPDF)) && /,true\);/.test(String(exportTrackPDF));   // v5.390 橫式
       return out;
     });
     check('材料估算：存檔缺欄位不再整頁空白', r.matest);
