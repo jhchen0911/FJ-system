@@ -447,6 +447,74 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── 8-4. 加權本期量／填滿才換頁／報表明細（v5.387） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const D = '第1層水平支撐 W=H350；S=H300';
+      Q.push({ id: 'Q387', name: '加權冒煙案', client: 'V營造', status: 'won', awarded: true,
+               date: '2026-02-01', items: [{ desc: D, unit: 'M2', qty: '460', price: '1150' }],
+               t: { total: 529000 },
+               costs: [{ vendor: '某某工程行', date: '2026-03-05', amt: 250000 }] });
+      INV.push({ id: 'I387', quoteId: 'Q387', project: '加權冒煙案', client: 'V營造', periodNo: '2',
+                 date: '', totals: { total: 158700 },
+                 items: [{ type: 'item', desc: D, unit: 'M2', contractPrice: 1150, contractQty: 460,
+                           prevQty: 322, prevAmt: 370300, curQty: 460, curAmt: 158700, payRate: 30 }] });
+      loadInvoice('I387');
+      out.dateAuto = document.getElementById('inv-date').value === localToday();
+      buildInvPreview(INV.find(x => x.id === 'I387'));
+      const t = document.getElementById('inv-prev-html').innerText.replace(/\s+/g, ' ');
+      out.curW = /138/.test(t);          // 460 × 30%
+      out.cum = /460/.test(t);           // 322 + 138
+      // 分頁：填滿才換頁（不再為了避免孤兒頁把兩頁均分）
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-99999px;top:0;width:1123px;background:#fff';
+      let rows = '';
+      for (let i = 0; i < 40; i++) rows += '<tr><td style="padding:6px;border-bottom:1px solid #eee">工項 ' + (i + 1) + '</td><td>1,000</td></tr>';
+      host.innerHTML = '<table><thead><tr><th>項目</th><th>金額</th></tr></thead><tbody>' + rows + '</tbody></table>'
+        + '<div class="page-footer" style="height:120px">用印區</div>';
+      document.body.appendChild(host);
+      const H = host.scrollHeight * 2;
+      const plan = _pdfPlanPages({ width: 2246, height: H }, host, 1123, true);
+      out.pages = plan.pages.length;
+      out.firstFill = +(((plan.pages[0].e - plan.pages[0].s) + plan.marg) / plan.PAGE).toFixed(2);
+      host.remove();
+      return out;
+    });
+    await page.evaluate(() => { go('reports'); });
+    await page.waitForTimeout(600);
+    const r2 = await page.evaluate(() => {
+      const out = {};
+      const grab = () => {
+        const b = document.getElementById('gen-confirm-box');
+        const t = b ? b.innerText.replace(/\s+/g, ' ') : '';
+        try { document.getElementById('gen-confirm-cancel').click(); } catch (e) {}
+        return t;
+      };
+      openRptClientDetail('V營造');  out.cli = grab();
+      openRptBidDetail('V營造');     out.bid = grab();
+      openRptVendorDetail('某某工程行'); out.ven = grab();
+      // 合約重複建檔應合併為一列
+      CONTRACTS.push({ id: 'C387a', code: 'DUP001', name: '重複案', client: 'V營造', amount: 1000000, start: '2026-01-01' });
+      CONTRACTS.push({ id: 'C387b', code: 'DUP001', name: '重複案', client: 'V營造', amount: 1000000, start: '2026-01-01' });
+      const box = document.createElement('div');
+      renderContractReport(box, 2026);
+      out.dupMerged = (box.innerHTML.match(/DUP001/g) || []).length === 1 && /已合併/.test(box.innerHTML);
+      return out;
+    });
+    check('本期估驗數量＝輸入量×請款%（460×30%=138）', r.curW, '預覽未見 138');
+    check('累積估驗回到合約量（322+138=460）', r.cum);
+    check('新期估驗日期自動帶當天', r.dateAuto);
+    check('分頁填滿才換頁（首頁使用率 ≥95%）', r.firstFill >= 0.95, '首頁使用率 ' + r.firstFill);
+    check('業主往來可點入明細', /業主往來明細/.test(r2.cli) && /報價（/.test(r2.cli), r2.cli.slice(0, 60));
+    check('得標率可點入業主明細', /得標明細/.test(r2.bid) && /得標率/.test(r2.bid), r2.bid.slice(0, 60));
+    check('廠商績效可點入明細', /廠商績效明細/.test(r2.ven) && /發包案件/.test(r2.ven), r2.ven.slice(0, 60));
+    check('重複建檔的合約合併為一列', r2.dupMerged);
+    check('報表明細測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // ───────────── 8. 報價單 PDF 排版（v5.383） ─────────────
   {
     const { page, errors } = await newPage(browser, 1280, 900);
