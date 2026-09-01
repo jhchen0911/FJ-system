@@ -58,7 +58,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 |---|---|
 | 報價編輯 | `rItems` `calcT` `saveQ` `applyNegotiate`(議價) `backfillEstCosts` |
 | 版次 | `bumpQVersion`(進版→封存 V1、V2…永久保留) `showQVersions` `viewQVersion` `restoreQVersion` `compareQVersion`；自動存檔＝每次儲存留一份、只留 10 份，**不是版次** |
-| PDF 匯出 | `exportQuotePDF`(html2canvas 影像版) `exportQuotePDFNative`(瀏覽器原生列印)；分頁引擎 `_pdfPlanPages`(DOM 量測切點：只切列與列之間、天地各 10mm、續頁重印表頭、末頁過短自動均分) `_pdfAddPaged`(貼頁＋頁碼，**一律原比例、不縮放**；整份放得進一張紙才不分頁)；報價表空的逾期租金／備註欄自動不輸出 |
+| PDF 匯出 | `exportQuotePDF`(html2canvas 影像版) `exportQuotePDFNative`(瀏覽器原生列印)；`_printViaIframe` 一律先開預覽、按「下載PDF」才存檔（v5.388，所有列印鈕不再一點就下載）；分頁引擎 `_pdfPlanPages`(DOM 量測切點：只切列與列之間、天地各 10mm、續頁重印表頭、末頁過短自動均分) `_pdfAddPaged`(貼頁＋頁碼，**一律原比例、不縮放**；整份放得進一張紙才不分頁)；報價表空的逾期租金／備註欄自動不輸出 |
 | 單價分析 UPA | `upaCalc` `applyUPA`（套用時自動帶成本：實績優先、理論為輔） |
 | 歷史單價庫 | `COST_HIST` `writeCostHist`(結案回寫) `_histCostFor`(報價提示) |
 | 請款單 | `rInvItems` `buildInvPreview` `addNextPeriod` `settleInvItem`(工項結算，連動合約金額)；**本期估驗數量與累計一律加權** `_wQty`／`_curW`（打設70%＋拔除30%＝合約量），`_prevCumQty` 於 `loadInvoice` 由各期實績重算 |
@@ -72,8 +72,9 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 錯誤日誌 | `_err(位置,e)` 收集器（本機最近 100 筆，不上雲）`renderErrLog` `exportErrLog`；空 catch 已全部接上 |
 | 請款單壓縮 | `_invPack`/`_invUnpack`（欄位縮寫＋預設值省略，僅在儲存層；`_INV_OMIT` 之外的欄位不省略） |
 | 工項類別 | `_itemCat`(打設／拔除／both／other，空＝沿用名稱關鍵字) `_isRemovePeriod`(期別，`P.removeRate` 可調) |
-| 得標率／廠商績效 | `renderBidRateReport` `renderVendorReport`（報表中心分頁）；業主往來／得標率／廠商績效整列可點入明細 `openRptClientDetail`／`openRptBidDetail`／`openRptVendorDetail` |
-| 合約請款報表 | `renderContractReport`：同編號同名的重複建檔自動合併為一列（不重複計入合約總額），標 ⚠×N |
+| 得標率／廠商績效 | `renderBidRateReport` `renderVendorReport`（報表中心分頁）；得標率口徑＝得標÷全部報價（`_bidStat`，除得標外皆列未得標）；業主往來／得標率／廠商績效整列可點入明細 `openRptClientDetail`／`openRptBidDetail`／`openRptVendorDetail` |
+| 合約請款報表 | `renderContractReport`：同編號同名（即使掛不同報價）的重複建檔合併為一列，⚠×N 可點入 `openCtDupFix` 直接刪除未請款的重複筆 |
+| 統計卡總結 | `openQuoteKpi`／`openInvKpi`（報價／請款頁 KPI 卡點擊出各工地/各狀態明細，逐列可再點入單據）；請款每期預計收款日 `_invExpectedDate` 顯示於列表小字與專案管理期別 chip（逾期轉紅） |
 | 收款 | `openReceiptModal(invId)`：彈窗內可切換同專案各期；專案管理每期 chip 各自帶收款鈕 |
 | 票據登記 | `inv.receipts[]`（現金/票據、到期日、狀態）`_invTickets` `_cashOf` 登記模式優先；收款彈窗登記 |
 | 保留款總覽 | `_retentionRows` `renderRetention`（金流管理分頁）；已完工未退標紅 |
@@ -88,12 +89,12 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 
 ## 測試
 
-`tests/smoke.js`（76 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（88 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
 請款單壓縮可逆（列印輸出逐字元比對）、破壞性操作必須經過確認、工項類別／期別、
-兩張分析報表、全量備份涵蓋所有集合、報價單 PDF 排版（分頁連續不重疊、切在列邊界、天地留白、續頁重印表頭、空欄不輸出）。
+兩張分析報表、全量備份涵蓋所有集合、KPI 卡點擊總結、得標率口徑、重複合約點入刪除、既有請款單累計回填、匯出 PDF 先預覽再下載、報價單 PDF 排版（分頁連續不重疊、切在列邊界、天地留白、續頁重印表頭、空欄不輸出）。
 
 **新增功能時請一併補進 tests/smoke.js。** 其餘仍以人工驗證：用瀏覽器開 `index.html`
 確認被改動的頁面渲染正常。雲端環境無法登入 Firebase 屬正常（本機資料模式仍可驗證 UI 與邏輯）。
