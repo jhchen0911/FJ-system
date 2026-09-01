@@ -390,6 +390,63 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── 8-3. 收款分期／進版／單一匯出鈕（v5.386） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      Q.push({ id: 'Q386', name: '收款冒煙案', client: 'W營造', status: 'won', awarded: true,
+               date: '2026-01-01', items: [{ desc: 'H型鋼樁', unit: '支', qty: '10', price: '1000' }],
+               t: { total: 42000 } });
+      for (let i = 1; i <= 4; i++)
+        INV.push({ id: 'I386_' + i, quoteId: 'Q386', project: '收款冒煙案', client: 'W營造',
+                   periodNo: String(i), date: '2026-0' + i + '-01', totals: { total: 100000 * i },
+                   received: i === 1 ? 100000 : 0, receivedConfirmed: i === 1, items: [] });
+      // 收款彈窗：期數可選、可切換
+      openReceiptModal('I386_4');
+      const sel = document.getElementById('receipt-period');
+      out.periods = sel.options.length;
+      out.opened4 = /第4期/.test(document.getElementById('receipt-proj-name').textContent);
+      sel.value = 'I386_2'; sel.dispatchEvent(new Event('change'));
+      out.switched2 = /第2期/.test(document.getElementById('receipt-proj-name').textContent)
+                   && document.getElementById('receipt-inv-id').value === 'I386_2';
+      closeReceiptModal();
+      // 預覽頁只留一顆匯出鈕
+      out.qBtns = [...document.querySelectorAll('#page-preview .prev-act button')].map(b => b.textContent.trim()).join('|');
+      out.iBtns = [...document.querySelectorAll('#page-invoice-prev .prev-act button')].map(b => b.textContent.trim()).join('|');
+      return out;
+    });
+    await page.evaluate(() => go('projects'));
+    await page.waitForTimeout(700);
+    const r2 = await page.evaluate(() => {
+      const h = document.getElementById('page-projects').innerHTML;
+      return { recvBtns: (h.match(/openReceiptModal\(/g) || []).length, paidChip: /已收</.test(h) };
+    });
+    await page.evaluate(() => go('quotes'));
+    await page.waitForTimeout(500);
+    const r3 = await page.evaluate(() => {
+      const h = document.getElementById('qlist').innerHTML;
+      showQVersions('Q386');
+      const box = document.getElementById('gen-confirm-box');
+      const vh = box ? box.innerHTML : '';
+      try { document.getElementById('gen-confirm-cancel').click(); } catch (e) {}
+      return { bump: (h.match(/bumpQVersion\(/g) || []).length,
+               saveCli: (h.match(/saveClientFromRecord\(/g) || []).length,
+               verBump: /進版（封存為/.test(vh), verHint: /不是版次/.test(vh) };
+    });
+    check('收款彈窗可選期數（列出全部 4 期）', r.periods === 4, '得到 ' + r.periods);
+    check('收款彈窗可切換到指定期別', r.opened4 && r.switched2);
+    check('專案管理每一未收期都有收款鈕', r2.recvBtns === 3, '得到 ' + r2.recvBtns);
+    check('已收款期別顯示已收、不出現收款鈕', r2.paidChip);
+    check('報價列表以「進版」取代「存至客戶清單」', r3.bump === 1 && r3.saveCli === 0,
+          'bump=' + r3.bump + ' saveCli=' + r3.saveCli);
+    check('歷史版本說明區分版次與自動存檔', r3.verBump && r3.verHint);
+    check('報價／請款預覽各只有一顆「匯出PDF」', r.qBtns === '← 返回|匯出PDF' && r.iBtns === '← 返回|匯出PDF',
+          r.qBtns + ' ／ ' + r.iBtns);
+    check('收款／進版測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // ───────────── 8. 報價單 PDF 排版（v5.383） ─────────────
   {
     const { page, errors } = await newPage(browser, 1280, 900);
