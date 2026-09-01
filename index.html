@@ -859,7 +859,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
               <select id="upa-ot-unit" style="font-size:12px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit">
                 <option>$/M/天</option>
                 <option>$/支/天</option>
-                <option>$/M2/天</option>
+                <option>$/m²/天</option>
                 <option>$/片/天</option>
                 <option>$/具/天</option>
               </select>
@@ -941,7 +941,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           </div>
           <div class="f">
             <label>單位</label>
-            <input id="upa-unit-custom" type="text" placeholder="支/M/M2/片..." style="font-size:13px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);width:100%">
+            <input id="upa-unit-custom" type="text" placeholder="支/M/m²/片..." style="font-size:13px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);width:100%">
           </div>
         </div>
         <!-- 建議單價 -->
@@ -2110,11 +2110,11 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="fg fg3" style="margin-bottom:4px">
           <div class="f"><label>覆工板（$/片/天）</label><input type="number" id="cp-plat-cover" value="25" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
           <div class="f"><label>車輪擋（$/M/天）</label><input type="number" id="cp-plat-wheel" value="3" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
-          <div class="f"><label>副件（$/M2/天）</label><input type="number" id="cp-plat-accs" value="0" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
+          <div class="f"><label>副件（$/m²/天）</label><input type="number" id="cp-plat-accs" value="0" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
         </div>
         <div class="fg fg3" style="margin-bottom:4px">
-          <div class="f"><label>防墜網（$/M2）</label><input type="number" id="cp-plat-net" value="150" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
-          <div class="f"><label>交叉拉桿（$/M2/天）</label><input type="number" id="cp-plat-cross" value="5" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
+          <div class="f"><label>防墜網（$/m²）</label><input type="number" id="cp-plat-net" value="150" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
+          <div class="f"><label>交叉拉桿（$/m²/天）</label><input type="number" id="cp-plat-cross" value="5" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
           <div class="f"><label>繫樑（$/M/天）</label><input type="number" id="cp-plat-tier" value="3" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
         </div>
 
@@ -2143,12 +2143,12 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div style="font-size:12px;font-weight:900;color:#fff;background:#546E7A;border-radius:var(--r8);padding:6px 12px;margin:16px 0 8px;letter-spacing:1px">一次性工項</div>
         <div style="font-size:11px;font-weight:700;color:var(--g3);margin-bottom:6px;padding-bottom:3px;border-bottom:1px solid var(--gm)">一次性工項單價</div>
         <div class="fg fg2" style="margin-bottom:4px">
-          <div class="f"><label>擋土板 6分（$/M2）</label><input type="number" id="cp-board-6" value="650" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
-          <div class="f"><label>擋土板 8分（$/M2）</label><input type="number" id="cp-board-8" value="750" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
+          <div class="f"><label>擋土板 6分（$/m²）</label><input type="number" id="cp-board-6" value="650" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
+          <div class="f"><label>擋土板 8分（$/m²）</label><input type="number" id="cp-board-8" value="750" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
         </div>
         <div class="fg fg2" style="margin-bottom:4px">
-          <div class="f"><label>擋土板 10分（$/M2）</label><input type="number" id="cp-board-10" value="850" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
-          <div class="f"><label>擋土板 12分（$/M2）</label><input type="number" id="cp-board-12" value="1300" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
+          <div class="f"><label>擋土板 10分（$/m²）</label><input type="number" id="cp-board-10" value="850" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
+          <div class="f"><label>擋土板 12分（$/m²）</label><input type="number" id="cp-board-12" value="1300" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
         </div>
         <div class="fg fg2" style="margin-bottom:4px">
           <div class="f"><label>油壓千斤頂（$/具/天）</label><input type="number" id="cp-jack" value="25" style="font-size:13px;padding:7px;border:1px solid var(--b2);border-radius:var(--r6);width:100%"></div>
@@ -2640,7 +2640,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.383';
+var APP_VERSION='v5.384';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -2942,6 +2942,13 @@ function _arTotal(){return _arList().reduce(function(a,i){return a+_invAR(i);},0
 // v5.323：天數不限 30／60／90，任何數字都吃（45、75、120、180…），
 // 也容許全形數字與各種寫法：含XX天租期／租期XX天／租期：XX天／租期(XX日)／租期XX。
 // 用「緊鄰」比對避免誤抓——「含30天租期，逾期另計 12 元」只會抓到 30，不會抓到 12。
+// ── 單位正規化（v5.384）：平方公尺一律寫成 m²──────────────────
+// 「M2」的 2 貼在單價旁邊（$7 /M2/天）很容易被讀成「72」，一律改用 m²。
+// 只作用在「單位」這類短字串（工項單位、逾期租金計費單位），不碰工項說明與備註。
+function _uFix(u){
+  if(u==null)return '';
+  return String(u).replace(/[Mm]\s*[2²㎡](?![0-9])/g,'m²').replace(/㎡/g,'m²');
+}
 function _rentDaysOf(it){
   if(!it)return 0;
   var s=String(it.note||'')+' '+String(it.desc||'');
@@ -3701,10 +3708,10 @@ function upaRACalc(){
   const vp=parseFloat(gv('up-ra-price'))||0,mult=parseFloat(gv('up-ra-mult'))||1.4;
   const D={'beam-rc':{p:2500,u:'M',n:'壓樑（RC）'},'beam-h300':{p:1390,u:'M',n:'壓樑（H300型鋼）'},
     'beam-rail':{p:1000,u:'M',n:'壓樑（鋼軌樁）'},
-    'board-5':{p:550,u:'M2',n:'襯板 5分'},'board-6':{p:650,u:'M2',n:'襯板 6分'},
-    'board-8':{p:750,u:'M2',n:'襯板 8分'},'board-10':{p:850,u:'M2',n:'襯板 10分'},
-    'canvas-2':{p:220,u:'M2',n:'夾板帆布 2分（型鋼/鋼軌樁）'},
-    'canvas-sp':{p:370,u:'M2',n:'夾板帆布（鋼板樁）'},
+    'board-5':{p:550,u:'m²',n:'襯板 5分'},'board-6':{p:650,u:'m²',n:'襯板 6分'},
+    'board-8':{p:750,u:'m²',n:'襯板 8分'},'board-10':{p:850,u:'m²',n:'襯板 10分'},
+    'canvas-2':{p:220,u:'m²',n:'夾板帆布 2分（型鋼/鋼軌樁）'},
+    'canvas-sp':{p:370,u:'m²',n:'夾板帆布（鋼板樁）'},
     'drill-400':{p:400,u:'M',n:'鑽堡引孔 φ400'},'drill-700':{p:700,u:'M',n:'鑽堡引孔 φ700'},
     'shear':{p:150,u:'只',n:'剪力釘加工'},
     'buyout-h':{p:P.dpBuH||33,u:'KG',n:'H型鋼買斷'},
@@ -3966,7 +3973,7 @@ function buildNgtItems(){
     var sp=_isSpare(it);
     html+='<tr style="border-top:1px solid var(--b1)'+(sp?';background:#fffdf2':'')+'">'
       +'<td style="padding:4px 6px;word-break:break-all">'+esc((it.desc||'')||('工項'+(i+1)))+(sp?' <span style="font-size:10px;color:#a07800">備用單價</span>':'')+'</td>'
-      +'<td style="padding:4px;text-align:right;color:var(--b4);white-space:nowrap">'+(it.qty||0)+' '+esc(it.unit||'')+'</td>'
+      +'<td style="padding:4px;text-align:right;color:var(--b4);white-space:nowrap">'+(it.qty||0)+' '+esc(_uFix(it.unit||''))+'</td>'
       +'<td style="padding:4px;text-align:right;color:var(--b4)">'+fmt(p)+'</td>'
       +(sp?'<td style="padding:4px;text-align:right;color:var(--b3);font-size:11px" title="備用單價不列入議價調整">不議價</td>'
           :'<td style="padding:3px 4px"><input type="number" id="ngt-ip-'+i+'" value="'+p+'" oninput="updNgtItemsSum()" style="width:100%;font-size:12px;height:26px;text-align:right;font-weight:700"></td>')
@@ -4397,7 +4404,7 @@ function rItems(){
         // 單位/數量/單價 三欄
         const row1=document.createElement('div');
         row1.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px';
-        const unitInp=mkInput(null,it.unit,'M/支/片','center');
+        const unitInp=mkInput(null,_uFix(it.unit),'M/支/m²','center');
         const qtyInp=mkInput('number',it.qty,'0','right');qtyInp.inputMode='decimal';
         if(_isSpare(it)){qtyInp.value='1';qtyInp.readOnly=true;qtyInp.title='備用單價數量固定為 1';qtyInp.style.background='var(--b1)';items[i].qty='1';}
         const priceInp=mkInput('number',it.price,'0','right');priceInp.inputMode='decimal';
@@ -4460,13 +4467,13 @@ function rItems(){
         card.appendChild(histM);
         // 逾期租金
         const otAmt=it.ot?(it.ot.match(/^[\d.]+/)||[''])[0]:'';
-        const otU=it.otu||'$/M/天';
+        const otU=_uFix(it.otu||'$/M/天');
         const row2=document.createElement('div');
         row2.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px';
         const otInp=mkInput('number',otAmt,'(選填)','right');
         const otSel=document.createElement('select');
         otSel.style.cssText='width:100%;font-size:13px;border:1px solid var(--b2);border-radius:6px;padding:6px 8px;background:var(--w);font-family:inherit';
-        ['$/M/天','$/M2/天','$/支/天','$/片/天','$/具/天','$/組/天','$/式/天'].forEach(u=>{
+        ['$/M/天','$/m²/天','$/支/天','$/片/天','$/具/天','$/組/天','$/式/天'].forEach(u=>{
           const op=document.createElement('option');op.value=u;op.textContent=u;
           if(u===otU)op.selected=true;
           otSel.appendChild(op);
@@ -4561,14 +4568,14 @@ function rItems(){
         li++;
         const amt=(parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
         const otAmt=it.ot?(it.ot.match(/^[\d.]+/)||[''])[0]:'';
-        const otU=it.otu||'$/M/天';
+        const otU=_uFix(it.otu||'$/M/天');
         const tdIdx=mkTd('text-align:center;color:var(--b3);font-size:11px');tdIdx.textContent=li;
         const tdDesc=mkTd('');
         const descInp=mkTblInp(null,it.desc,'項目說明','left');
         descInp.addEventListener('input',function(){items[i].desc=this.value;});
         tdDesc.appendChild(descInp);
         const tdUnit=mkTd('');
-        const unitInp=mkTblInp(null,it.unit,'單位','center');
+        const unitInp=mkTblInp(null,_uFix(it.unit),'單位','center');
         unitInp.addEventListener('input',function(){items[i].unit=this.value;});
         tdUnit.appendChild(unitInp);
         const tdQty=mkTd('');
@@ -4674,7 +4681,7 @@ function rItems(){
         otInp.addEventListener('input',function(){items[i].ot=this.value+(items[i].otu||'$/M/天');rTots();});
         const otSel=document.createElement('select');
         otSel.style.cssText='font-size:11px;padding:2px 3px;border:1px solid var(--b2);border-radius:3px;background:var(--b0);min-width:70px';
-        ['$/M/天','$/M2/天','$/支/天','$/片/天','$/具/天','$/組/天','$/式/天'].forEach(u=>{
+        ['$/M/天','$/m²/天','$/支/天','$/片/天','$/具/天','$/組/天','$/式/天'].forEach(u=>{
           const op=document.createElement('option');op.value=u;op.textContent=u;
           if(u===otU)op.selected=true;
           otSel.appendChild(op);
@@ -5567,6 +5574,22 @@ function loadInvoice(id){
       if(_cpMap[it.desc])it.contractPrice=_cpMap[it.desc];
     });
   }
+  // v5.384：逾期租金單價／單位一律以報價單為準——請款單存的是建單當下的快照，
+  // 報價事後改過（或當初填錯）就會對不上，造成預覽與掃描兩邊金額打架。開單即校正。
+  try{
+    const _q0=Q.find(x=>x.id===(inv.quoteId||inv.sourceQid))
+            ||Q.find(x=>String(x.name||'').trim()===String(inv.project||'').trim());
+    if(_q0){
+      invItems.forEach(it=>{
+        if(!it||it.type==='sec'||it.type==='rental')return;
+        if(it.unit)it.unit=_uFix(it.unit);
+        const _qi=(_q0.items||[])[_qItemIdxByDesc(_q0,it.desc)];
+        if(!_qi||_qi.sec)return;
+        it.otPrice=parseFloat((String(_qi.ot||'').match(/^[\d.]+/)||[''])[0])||0;
+        it.otUnit=_uFix(_qi.otu||'');
+      });
+    }
+  }catch(e){_err('loadInvoice.ot',e);}
   const map={
     'inv-client':'client','inv-taxid':'taxid','inv-tel':'tel','inv-fax':'fax',
     'inv-project':'project','inv-loc':'loc','inv-scope':'scope',
@@ -5995,7 +6018,7 @@ function rInvItems(){
       info.style.cssText='font-size:11px;color:var(--b4);margin-bottom:7px;display:flex;gap:10px;flex-wrap:wrap';
       const _pq2=parseFloat(it.prevQty)||0,_pa2=parseFloat(it.prevAmt)||0;
       info.innerHTML='<span>合約單價 <b style="color:var(--b5)">'+fmt(parseFloat(it.contractPrice)||0)+'</b></span>'
-        +'<span>合約量 <b style="color:var(--b5)">'+(it.contractQty||0)+'</b> '+esc(it.unit||'')+'</span>'
+        +'<span>合約量 <b style="color:var(--b5)">'+(it.contractQty||0)+'</b> '+esc(_uFix(it.unit||''))+'</span>'
         +(_pq2||_pa2?'<span>前期累計 <b style="color:var(--b5)">'+_pq2+'</b>／NT$ '+fmt(_pa2)+'</span>':'');
       card.appendChild(info);
       // 輸入格線：本期數量／天數／請款%
@@ -6129,7 +6152,7 @@ function rInvItems(){
       tdIdx.textContent='⠿ '+li;
       tr.appendChild(tdIdx);
       tr.appendChild(mkTxtTd('desc',it.desc,'工程項目','120px'));
-      tr.appendChild(mkTxtTd('unit',it.unit,isRental?'片/天':'支'));
+      tr.appendChild(mkTxtTd('unit',_uFix(it.unit),isRental?'片/天':'支'));
       tr.appendChild(mkNumTd('#f5faf7','contractPrice',it.contractPrice,'合約單價'));
       tr.appendChild(mkNumTd('#f5faf7','contractQty',it.contractQty,'合約數量'));
       tr.appendChild(mkNumTd('#ecf8ec','curQty',it.curQty,'本期數量'));
@@ -6250,7 +6273,7 @@ function rInvItems(){
       if(it.type==='sec')return;
       const opt=document.createElement('option');
       opt.value=it.desc||'';
-      opt.textContent=(it.desc||'未命名工項')+(it.unit?' ('+it.unit+')':'');
+      opt.textContent=(it.desc||'未命名工項')+(it.unit?' ('+_uFix(it.unit)+')':'');
       if(it.desc===curVal)opt.selected=true;
       rentalSel.appendChild(opt);
     });
@@ -7138,7 +7161,7 @@ function buildInvPreview(srcInv){
     rows+=`<tr>
       <td style="text-align:center;padding:3px 2px;border-bottom:1px solid #f0f0f0">${li}</td>
       <td style="padding:3px 6px;border-bottom:1px solid #f0f0f0">${esc(it.desc)}</td>
-      <td style="text-align:center;padding:3px 2px;border-bottom:1px solid #f0f0f0">${esc(it.unit||'')}</td>
+      <td style="text-align:center;padding:3px 2px;border-bottom:1px solid #f0f0f0">${esc(_uFix(it.unit||''))}</td>
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#f7fcf9">${it.contractPrice?fmt(it.contractPrice):''}</td>
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#f7fcf9">${it.contractQty||''}</td>
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#f0faf4">${prevQtyShow||''}</td>
@@ -7767,7 +7790,7 @@ function getCostItemOptions(selectedVal){
   const opts=[('<option value="">-- 選擇工項 --</option>')];
   items.forEach((it,i)=>{
     if(it.sec)return;
-    const label=(it.desc||'未命名工項')+(it.unit?' ('+it.unit+')':'');
+    const label=(it.desc||'未命名工項')+(it.unit?' ('+_uFix(it.unit)+')':'');
     const sel=(selectedVal&&selectedVal===it.desc)?'selected':'';
     opts.push('<option value="'+esc(it.desc)+'" '+sel+'>'+esc(label)+'</option>');
   });
@@ -7802,6 +7825,20 @@ function _qItemIdxByDesc(q,desc){
   if(key)for(var j=0;j<items.length;j++){if(items[j].sec)continue;
     if(String(items[j].desc||'').indexOf(key)>=0)return j;}
   return -1;
+}
+// 逾期租金單價一律以報價單為準（v5.384）
+// 請款單工項裡的 otPrice 只是「建立當下」的快照，報價事後改過就對不上——
+// 「依日報自動掃描」讀的是報價（_rentStatus），下方預覽讀的是快照，兩邊會給出不同金額。
+// 回傳 null＝這張請款單找不到對應報價工項（手動建單），此時才退回用快照。
+function _otFromQuote(desc){
+  try{
+    var q=_invQuote();if(!q)return null;
+    var idx=_qItemIdxByDesc(q,desc);if(idx<0)return null;
+    var qi=(q.items||[])[idx]||{};
+    return {price:parseFloat((String(qi.ot||'').match(/^[\d.]+/)||[''])[0])||0,
+            unit:_uFix(qi.otu||''),idx:idx,
+            desc:String(qi.desc||'').split('\n')[0]};
+  }catch(e){_err('_otFromQuote',e);return null;}
 }
 // 選工項時：租期天數與打設完成日自動帶入，再走原本的天數計算
 function invRentalPick(){
@@ -7838,7 +7875,7 @@ function invScanRent(){
   var rows=list.map(function(s){
     var over=s.overDays>0;
     var amtTxt=s.otPrice>0
-      ? 'NT$ '+fmt(s.amount)+'<span style="color:var(--b3);font-weight:400">（'+fmt(s.otPrice)+' '+esc(s.otUnit||'')+' × '+fmt(s.qty)+' × '+s.overDays+'天）</span>'
+      ? 'NT$ '+fmt(s.amount)+'<span style="color:var(--b3);font-weight:400">（'+fmt(s.otPrice)+' '+esc(_uFix(s.otUnit||''))+' × '+fmt(s.qty)+' × '+s.overDays+'天）</span>'
       : '<span style="color:#c62828">報價未填逾期租金單價</span>';
     return '<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--ym)">'
       +'<div style="flex:1;min-width:0">'
@@ -8007,9 +8044,12 @@ function calcInvDays(){
           ||(x._ovKey!=null&&x._ovKey===baseDesc)
           ||(x._ovKey==null&&x.desc&&x.desc.includes('逾期租金')&&(x.desc.indexOf(baseDesc)===0||x.desc.includes(selDesc.slice(0,6))))));
       const srcItem=invItems[itemIdx];
-      const srcPrice=srcItem?(srcItem.otPrice||0):0;
+      // v5.384：單價以報價單的逾期租金欄為準；找得到報價工項就順手校正請款單裡的舊快照
+      const _qot=_otFromQuote(selDesc);
+      if(_qot&&srcItem){srcItem.otPrice=_qot.price;srcItem.otUnit=_qot.unit||srcItem.otUnit||'';}
+      const srcPrice=_qot?_qot.price:(srcItem?(srcItem.otPrice||0):0);
       const srcQty=srcItem?(srcItem.contractQty||1):1;
-      const srcUnit=srcItem?(srcItem.unit||'式'):'式';
+      const srcUnit=_uFix(srcItem?(srcItem.unit||'式'):'式');
       const overAmt=Math.round(srcPrice*srcQty*billDays);
       // 租用型正規寫法：單價＝逾期租金單價、數量＝合約數量、天數＝本期新增逾期天數
       const _ow={type:'rental',desc:overLabel,unit:srcUnit,
@@ -8047,13 +8087,23 @@ function calcInvDays(){
     if(overDays>0){
       const selDesc=document.getElementById('inv-rental-item')?.value||'';
       const srcIt=selDesc?invItems.find(x=>x.type!=='sec'&&x.desc===selDesc):null;
-      const _ot=srcIt?(srcIt.otPrice||0):0;
+      // v5.384：單價來源＝報價單該工項的「逾期租金」欄（與上方掃描同一份資料）；
+      // 找不到對應報價工項（手動建單）才退回請款單裡的快照。
+      const _qot2=selDesc?_otFromQuote(selDesc):null;
+      const _ot=_qot2?_qot2.price:(srcIt?(srcIt.otPrice||0):0);
+      const _otU2=_uFix((_qot2?_qot2.unit:(srcIt?srcIt.otUnit:''))||'').replace('$','').trim();
       const _qty=srcIt?(srcIt.contractQty||1):1;
-      const _unit=srcIt?(srcIt.unit||'支'):'支';
+      const _unit=_uFix(srcIt?(srcIt.unit||'支'):'支');
       if(_ot>0){
         const _amt=Math.round(_ot*_qty*overDays);
+        const _src=_qot2?`單價取自報價單第 ${_qot2.idx+1} 項「${esc(String(_qot2.desc).slice(0,26))}」的逾期租金欄`
+                        :'單價取自本請款單（找不到對應的報價工項）';
+        const _billLine=(billDays>0&&billDays!==overDays)
+          ? `<div style="margin-top:3px">本期實際計費 ${billDays} 天（其餘已於前期請過）＝ <strong>NT$${Math.round(_ot*_qty*billDays).toLocaleString()}</strong></div>`:'';
         overAmtPreview=`<div style="margin-top:6px;padding:5px 8px;background:#fff0f0;border-radius:4px;font-size:11px;color:#c00">`
-          +`逾期金額：$${_ot} × ${_qty}${_unit} × ${overDays}天 = <strong>NT$${_amt.toLocaleString()}</strong></div>`;
+          +`逾期金額：$${fmt(_ot)}${_otU2?' '+esc(_otU2):''} × ${fmt(_qty)} ${esc(_unit)} × ${overDays} 天 = <strong>NT$${_amt.toLocaleString()}</strong>`
+          +_billLine
+          +`<div style="margin-top:3px;color:#8a5a5a;font-size:10px">${_src}</div></div>`;
       } else {
         overAmtPreview=`<div style="margin-top:6px;font-size:11px;color:#c00"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 請在報價單該工項填入逾期租金單價後，金額可自動計算</div>`;
       }
@@ -20653,7 +20703,7 @@ var UPA_ITEMS = {
         descFn:(spec,method,len,spacing)=>`${spec}微型樁，L=${len||'__'}M${spacing?'@'+spacing+'cm':''}`
       },
       '擋土板': {
-        unit:'M2', hasPeriod:false, hasLen:false, hasSpacing:false, hasLayer:false,
+        unit:'m²', hasPeriod:false, hasLen:false, hasSpacing:false, hasLayer:false,
         specs:['6分','8分','10分','12分'],
         methods:[
           {value:'', label:'不含背側回填土'},
@@ -20776,7 +20826,7 @@ var UPA_ITEMS = {
         }
       },
       '水平支撐': {
-        unit:'M2', hasPeriod:true, hasLen:false, hasSpacing:false, hasLayer:true, autoLayer:true,
+        unit:'m²', hasPeriod:true, hasLen:false, hasSpacing:false, hasLayer:true, autoLayer:true,
         specLabel:'圍令（W）',
         methodLabel:'支撐（S）',
         specs:['H300','H350','H400','H428','2H300','2H350','2H400','2H428'],
@@ -20797,7 +20847,7 @@ var UPA_ITEMS = {
         }
       },
       '施工構台': {
-        unit:'M2', hasPeriod:true, hasLen:false, hasSpacing:false, hasLayer:false,
+        unit:'m²', hasPeriod:true, hasLen:false, hasSpacing:false, hasLayer:false,
         specs:['載重50T','載重100T','自訂'],
         methods:[
           {value:'', label:'不含防墜網及交叉拉桿'},
@@ -21536,7 +21586,7 @@ function upaOnCat2Change(){
   if(spacingWrap)spacingWrap.style.display=cfg.hasSpacing?'':'none';
   if(periodWrap)periodWrap.style.display=cfg.hasPeriod?'':'none';
   if(qtyLabel){
-    const unitMap={'M':'數量（M）','M2':'數量（M2）','支':'支數','片':'片數','具':'數量（具）','座':'數量（座）','式':'式','處':'處數'};
+    const unitMap={'M':'數量（M）','M2':'數量（m²）','m²':'數量（m²）','支':'支數','片':'片數','具':'數量（具）','座':'數量（座）','式':'式','處':'處數'};
     qtyLabel.textContent=unitMap[cfg.unit]||'支/M 數';
   }
   // 單位同步
@@ -21672,7 +21722,7 @@ function upaUpdateDesc(){
         const _bKey={'6分':'6分','8分':'8分','10分':'10分','12分':'12分'}[spec]||'6分';
         const _cost=(_db.others?.board?.[_bKey]||650);
         const _price=Math.ceil(_cost/_profit/100)*100;
-        priceResult={total:_cost,price:_price,breakdown:`擋土板${_bKey}$${_cost}/M2（工料）`};
+        priceResult={total:_cost,price:_price,breakdown:`擋土板${_bKey}$${_cost}/m²（工料）`};
       } else if(cat2==='壓樑'&&len){
         // 壓樑：RC壓樑或型鋼壓樑，依長度
         const _cost=spec==='RC壓樑'?(_db.others?.rcBeam||3000):(_db.others?.steelBeam||1400);
@@ -21739,7 +21789,7 @@ function upaUpdateDesc(){
         priceResult={
           total:_r.total,
           price:_r.price,  // $/M2 單價
-          breakdown:_r.breakdown+`（鋼材：${_r.kk}；面積${_qty}M2×${period}天）`
+          breakdown:_r.breakdown+`（鋼材：${_r.kk}；面積${_qty}m²×${period}天）`
         };
       }
       if(priceResult){
@@ -21756,9 +21806,9 @@ function upaUpdateDesc(){
         let priceUnit='';
         let totalHint='';
         if(cat2==='施工構台'&&_qty){
-          priceUnit='/M2';
+          priceUnit='/m²';
           const grandTotal=Math.ceil(siteAdjPrice*_qty/1000)*1000;
-          totalHint='<div style="font-size:11px;color:var(--g3);margin-top:2px">全案估計：NT$'+grandTotal.toLocaleString()+'（'+_qty+'M2）</div>';
+          totalHint='<div style="font-size:11px;color:var(--g3);margin-top:2px">全案估計：NT$'+grandTotal.toLocaleString()+'（'+_qty+'m²）</div>';
         }
         upaPriceEl.innerHTML=
           '<div style="font-size:11px;color:var(--b3);margin-bottom:4px"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 建議單價（毛利'+(profitRate*100)+'%'+siteLabel+'）</div>'
@@ -21800,7 +21850,7 @@ function upaUpdateDesc(){
   // 逾期租金單位同步
   const otUnit=document.getElementById('upa-ot-unit');
   if(otUnit&&cfg.unit){
-    const map={'支':'$/支/天','M':'$/M/天','M2':'$/M2/天','片':'$/片/天','具':'$/具/天'};
+    const map={'支':'$/支/天','M':'$/M/天','M2':'$/m²/天','m²':'$/m²/天','片':'$/片/天','具':'$/具/天'};
     const suggested=map[cfg.unit];
     if(suggested){for(let i=0;i<otUnit.options.length;i++){if(otUnit.options[i].value===suggested){otUnit.selectedIndex=i;break;}}}
   }
@@ -24839,7 +24889,7 @@ function viewQVersion(qid,idx){
   const its=(sn.items||[]).filter(it=>!it.sec);
   const rows=its.slice(0,60).map(it=>
     `<tr><td style="padding:4px 6px;border-bottom:1px solid var(--b1)">${esc(it.desc||'')}</td>
-     <td style="padding:4px 6px;border-bottom:1px solid var(--b1);text-align:right;white-space:nowrap">${fmt(parseFloat(it.qty)||0)} ${esc(it.unit||'')}</td>
+     <td style="padding:4px 6px;border-bottom:1px solid var(--b1);text-align:right;white-space:nowrap">${fmt(parseFloat(it.qty)||0)} ${esc(_uFix(it.unit||''))}</td>
      <td style="padding:4px 6px;border-bottom:1px solid var(--b1);text-align:right">${fmt(parseFloat(it.price)||0)}</td>
      <td style="padding:4px 6px;border-bottom:1px solid var(--b1);text-align:right;font-weight:700">${_isSpare(it)?'<span style="color:var(--b3);font-weight:400">備用單價</span>':fmt((parseFloat(it.qty)||0)*(parseFloat(it.price)||0))}</td></tr>`).join('');
   showConfirm((v.formal?'V'+(v.ver||1)+' ':'')+'版本內容（唯讀）',
@@ -27301,7 +27351,7 @@ function _buildQuoteDocHTML(q){
     }else{li++;
       const amt=(parseFloat(it.qty)||0)*(parseFloat(it.price)||0);
       const _otAmt=it.ot?String(it.ot).split(/[^0-9.]/)[0]:'';
-      const _otU=(it.otu||'$/M/天').replace('$','').trim();
+      const _otU=_uFix(it.otu||'$/M/天').replace('$','').trim();
       // Q5: Split desc by \n → first line in main row, extra lines each own <tr>
       // 相容舊資料：若 desc 沒有 \n 但含根固括號，自動補換行
       const _rawDesc=(it.desc||'').replace(/([^\n])（根固處理/g,'$1\n（根固處理').replace(/([^\n])（不含水泥/g,'$1\n（不含水泥');
@@ -27312,7 +27362,7 @@ function _buildQuoteDocHTML(q){
       rows+=`<tr${_sp?' style="background:#fffdf2"':''}>
         <td style="text-align:center">${li}</td>
         <td class="desc-col">${_descHtml}</td>
-        <td style="text-align:center;white-space:nowrap;word-break:keep-all">${esc(it.unit||'')}</td>
+        <td style="text-align:center;white-space:nowrap;word-break:keep-all">${esc(_uFix(it.unit||''))}</td>
         <td class="num-col">${_sp?'1':(it.qty||'')}</td>
         <td class="num-col">${it.price?fmt(parseFloat(it.price)||0):''}</td>
         <td class="num-col" style="font-weight:700">${_sp?'':fmt(amt)}</td>
