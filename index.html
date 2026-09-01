@@ -2638,7 +2638,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.387';
+var APP_VERSION='v5.388';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -2725,6 +2725,35 @@ setTimeout(function(){
     }
   }catch(e){_err('top',e);}
 },1200);
+// v5.388 一次性回填：v5.385 起前期累計數量依請款比例加權，但既有請款單只在
+// 「下次開啟」時才校正畫面值，儲存層與列印讀到的仍是舊的直加值——開機時全量重算寫回。
+function _fixInvCumWeighted(){
+  var fixed=0;
+  (INV||[]).forEach(function(inv){
+    if(!inv||!Array.isArray(inv.items))return;
+    var cp=parseInt(inv.periodNo)||1,hit=false;
+    inv.items.forEach(function(it){
+      if(!it||it.type==='sec'||it.type==='rental')return;
+      var w=_prevCumQty(inv,it.desc,cp);
+      if(w==null)return;
+      if(Math.abs(w-(parseFloat(it.prevQty)||0))>0.005){it.prevQty=w;hit=true;}
+    });
+    if(hit){_touch(inv);fixed++;}
+  });
+  return fixed;
+}
+setTimeout(function(){
+  try{
+    if(localStorage.getItem('fy_fix_cumw_v388')==='1')return;
+    if(typeof _prevCumQty!=='function')return;
+    var fixed=_fixInvCumWeighted();
+    localStorage.setItem('fy_fix_cumw_v388','1');
+    if(fixed>0){
+      try{saveInv();_markDirty();}catch(e){_err('top',e);}
+      try{toast('已校正 '+fixed+' 張既有請款單的前期累計數量（依請款比例加權）');}catch(e){_err('top',e);}
+    }
+  }catch(e){_err('top',e);}
+},1400);
 
 
 // 若未登入，隱藏所有非公開功能
@@ -6942,10 +6971,11 @@ function renderInvList(){
     var unpaid=total-received;
     var hasRetention=!!(inv.retention&&(inv.retentionPct||0)>0);
     var _now2=Date.now();
-    var isOverdue=false,_odDays=0;
+    var isOverdue=false,_odDays=0,_dueStr='';
     if(!confirmed&&unpaid>0){
       var _dueTs=null,_expC=_invExpectedDate(inv);
       if(_expC){
+        _dueStr=_expC.date;
         var erp=_expC.date.split('-');
         _dueTs=new Date(parseInt(erp[0]),parseInt(erp[1])-1,parseInt(erp[2])).getTime();
       }
@@ -6973,7 +7003,7 @@ function renderInvList(){
     var deskBtns='<div class="ql-desk-actions desk-only">'
       +'<button type="button" class="btn btn-xs" title="編輯請款單" onclick="event.stopPropagation();loadInvoice(\''+id+'\');go(\'invoice-edit\')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg></button>'
       +(!_einv?'<button type="button" class="btn btn-xs" title="確認無誤後開立發票" style="border-color:#1a3a6b;color:#1a3a6b" onclick="event.stopPropagation();go(\'finance\');setTimeout(function(){switchFinanceTab(\'invoice\');issueInvoiceForInv(\''+id+'\');},250)"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg></button>':'')
-      +'<button type="button" class="btn btn-xs btn-g" title="匯出 PDF" onclick="event.stopPropagation();printInvById(this.dataset.id)" data-id="'+id+'"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg></button>'
+      +'<button type="button" class="btn btn-xs btn-g" title="查看／匯出 PDF（預覽內下載）" onclick="event.stopPropagation();printInvById(this.dataset.id)" data-id="'+id+'"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg></button>'
       +'<button type="button" class="btn btn-xs" style="background:#e8f0fb;color:#1a3a6b;border-color:#b5d4f4" onclick="event.stopPropagation();addNextPeriod(\''+id+'\')" title="複製為下一期"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg></button>'
       +(canConfirm?'<button type="button" class="btn btn-xs" title="確認收款" style="background:#e8f5e9;color:#1B5E20;border-color:var(--gm)" onclick="event.stopPropagation();openReceiptModal(\''+id+'\')">✓</button>':'')
       +(hasRetention?'<button type="button" class="btn btn-xs" style="background:#fff3e0;color:#c62828;border-color:#ffccbc" onclick="event.stopPropagation();openRetentionModal()" title="保留款"><svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg></button>':'')
@@ -6983,7 +7013,7 @@ function renderInvList(){
       +'<div class="qleft"><div class="qdot" style="background:'+dotColor+'"></div></div>'
       +'<div class="qmain">'
       +'<div class="qtitle">'+esc(inv.project||'（未填工程名）')+' — 第'+(inv.periodNo||'?')+'期'+(inv.month?' ('+esc(inv.month)+')':'')+'</div>'
-      +'<div class="qsub">'+esc(inv.client||'')+(inv.payDue?' / 估驗日：'+inv.payDue:'')+'</div>'
+      +'<div class="qsub">'+esc(inv.client||'')+(inv.payDue?' / 估驗日：'+inv.payDue:'')+(_dueStr?' / 預計收款：'+_dueStr:'')+'</div>'
       +'</div>'
       +'<div class="qr">'
       +'<div class="qa" style="font-size:'+(total>999999?'14px':'17px')+';font-weight:900">NT$ '+fmt(total)+'</div>'
@@ -9302,21 +9332,20 @@ function updateQuoteStats(){
   // v5.340：與總覽同口徑（合約現值），原始報價額列小字——三頁數字不再各說各話
   const awardedAmt=Q.filter(q=>q.awarded&&!q.parentId).reduce((a,q)=>a+_wonAmt(q),0);
   const awardedOrigAmt=Q.filter(q=>q.awarded).reduce((a,q)=>a+(q.t?.total||0),0);
-  // 報價追蹤統計：有效得標率＝得標/(得標+未得標)，流標與待回覆不計入分母
+  // v5.388：得標率口徑改為「得標 ÷ 全部報價」——除得標外（未得標、洽談中、流標、待回覆）皆列為未得標
   const lost=Q.filter(q=>!q.awarded&&q.bidStatus==='lost');
   const voided=Q.filter(q=>!q.awarded&&q.bidStatus==='void').length;
   const nego=Q.filter(q=>!q.awarded&&q.bidStatus==='nego').length;
   const pending=Q.filter(q=>!q.awarded&&!q.bidStatus&&!q.parentId).length;
-  const decided=awarded+lost.length;
-  const effRate=decided?Math.round(awarded/decided*100):null;
+  const effRate=total?Math.round(awarded/total*100):null;
   const rc={};lost.forEach(function(q){var k=q.lostReason||'其他';rc[k]=(rc[k]||0)+1;});
   const diffs=lost.filter(q=>q.lostPrice>0&&(q.t?.total||0)>0).map(q=>(q.t.total-q.lostPrice)/q.lostPrice*100);
   const avgDiff=diffs.length?Math.round(diffs.reduce((a,b)=>a+b,0)/diffs.length*10)/10:null;
   el.innerHTML=
-    '<div class="kpi" style="flex:1;min-width:120px"><div class="kl">報價單總數</div><div class="kv" style="font-size:20px">'+total+'</div><div class="ks">待回覆 '+pending+'・議價中 '+nego+'・流標 '+voided+'</div></div>'
-    +'<div class="kpi" style="flex:1;min-width:130px"><div class="kl">有效得標率</div><div class="kv" style="font-size:20px;color:'+(effRate==null?'var(--b3)':effRate>=50?'var(--g3)':'#e65100')+'">'+(effRate==null?'—':effRate+'%')+'</div><div class="ks">勝 '+awarded+'／敗 '+lost.length+'（流標不計）</div></div>'
-    +'<div class="kpi" style="flex:1;min-width:140px"><div class="kl">總報價金額</div><div class="kv" style="font-size:16px">NT$ '+fmt(totalAmt)+'</div></div>'
-    +'<div class="kpi hi" style="flex:1;min-width:140px"><div class="kl">得標金額（合約現值）</div><div class="kv" style="font-size:16px">NT$ '+fmt(awardedAmt)+'</div>'
+    '<div class="kpi" style="flex:1;min-width:120px;cursor:pointer" title="點擊查看各狀態報價明細" onclick="openQuoteKpi(\'all\')"><div class="kl">報價單總數</div><div class="kv" style="font-size:20px">'+total+'</div><div class="ks">待回覆 '+pending+'・議價中 '+nego+'・流標 '+voided+'</div></div>'
+    +'<div class="kpi" style="flex:1;min-width:130px;cursor:pointer" title="點擊查看得標／未得標明細" onclick="openQuoteKpi(\'rate\')"><div class="kl">得標率</div><div class="kv" style="font-size:20px;color:'+(effRate==null?'var(--b3)':effRate>=50?'var(--g3)':'#e65100')+'">'+(effRate==null?'—':effRate+'%')+'</div><div class="ks">得 '+awarded+'／其他 '+(total-awarded)+'（全部計入）</div></div>'
+    +'<div class="kpi" style="flex:1;min-width:140px;cursor:pointer" title="點擊查看各報價單金額" onclick="openQuoteKpi(\'amt\')"><div class="kl">總報價金額</div><div class="kv" style="font-size:16px">NT$ '+fmt(totalAmt)+'</div></div>'
+    +'<div class="kpi hi" style="flex:1;min-width:140px;cursor:pointer" title="點擊查看得標案明細" onclick="openQuoteKpi(\'won\')"><div class="kl">得標金額（合約現值）</div><div class="kv" style="font-size:16px">NT$ '+fmt(awardedAmt)+'</div>'
     +(Math.abs(awardedOrigAmt-awardedAmt)>1?'<div class="ks">原始報價 NT$ '+fmt(awardedOrigAmt)+'</div>':'')+'</div>'
     +(lost.length?('<div class="kpi" style="flex:1.5;min-width:200px"><div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-trend"/></svg> 輸標分析</div><div class="kv" style="font-size:13px;font-weight:700;line-height:1.6">'+Object.keys(rc).map(function(k){return k+' '+rc[k];}).join('・')+'</div><div class="ks">'+(avgDiff!=null?('報價平均'+(avgDiff>=0?'高出':'低於')+'得標價 '+Math.abs(avgDiff)+'%（'+diffs.length+' 筆有對手價）'):'在未得標記錄填「對手得標價」可分析差距')+'</div></div>'):'');
 }
@@ -9343,10 +9372,10 @@ function updateInvStats(){
     return !!due&&due<_todayStr;
   }).length;
   el.innerHTML=
-    '<div class="kpi" style="flex:1;min-width:120px"><div class="kl">請款單總數</div><div class="kv" style="font-size:20px">'+total+'</div><div class="ks">逾期 '+overdue+' 件</div></div>'
-    +'<div class="kpi" style="flex:1;min-width:140px"><div class="kl">總請款金額</div><div class="kv" style="font-size:16px">NT$ '+fmt(totalAmt)+'</div></div>'
-    +'<div class="kpi hi" style="flex:1;min-width:140px"><div class="kl">已收款金額</div><div class="kv" style="font-size:16px">NT$ '+fmt(receivedAmt)+'</div><div class="ks">差額 NT$ '+fmt(unpaidAmt)+'</div></div>'
-    +(overdue>0?'<div class="kpi yel" style="flex:1;min-width:120px"><div class="kl">逾期未收</div><div class="kv" style="font-size:20px;color:var(--red)">'+overdue+'</div><div class="ks">件</div></div>':'');
+    '<div class="kpi" style="flex:1;min-width:120px;cursor:pointer" title="點擊查看各工地請款總結" onclick="openInvKpi(\'all\')"><div class="kl">請款單總數</div><div class="kv" style="font-size:20px">'+total+'</div><div class="ks">逾期 '+overdue+' 件</div></div>'
+    +'<div class="kpi" style="flex:1;min-width:140px;cursor:pointer" title="點擊查看請款了哪些工地與金額" onclick="openInvKpi(\'amt\')"><div class="kl">總請款金額</div><div class="kv" style="font-size:16px">NT$ '+fmt(totalAmt)+'</div></div>'
+    +'<div class="kpi hi" style="flex:1;min-width:140px;cursor:pointer" title="點擊查看各工地收款明細" onclick="openInvKpi(\'recv\')"><div class="kl">已收款金額</div><div class="kv" style="font-size:16px">NT$ '+fmt(receivedAmt)+'</div><div class="ks">差額 NT$ '+fmt(unpaidAmt)+'</div></div>'
+    +(overdue>0?'<div class="kpi yel" style="flex:1;min-width:120px;cursor:pointer" title="點擊查看逾期明細" onclick="openInvKpi(\'overdue\')"><div class="kl">逾期未收</div><div class="kv" style="font-size:20px;color:var(--red)">'+overdue+'</div><div class="ks">件</div></div>':'');
 
   // 保留款統計
   const totalRetention=INV.reduce((a,i)=>a+_invRetention(i),0);   // v5.318 統一函式
@@ -9360,6 +9389,97 @@ function updateInvStats(){
       retEl.style.display='none';
     }
   }
+}
+
+// ══════════ v5.388：統計卡點擊出總結 ══════════
+// 報價／請款頁頂端的 KPI 原本只是數字，看不出「是由哪些單子組成」。
+// 沿用報表中心的 _rptBox 彈窗：逐列可再點入原始單據。
+function openQuoteKpi(kind){
+  var list=(Q||[]).filter(function(q){return q&&!q.parentId;});
+  var won=list.filter(function(q){return q.awarded;});
+  var lost=list.filter(function(q){return !q.awarded&&q.bidStatus==='lost';});
+  var nego=list.filter(function(q){return !q.awarded&&q.bidStatus==='nego';});
+  var voided=list.filter(function(q){return !q.awarded&&q.bidStatus==='void';});
+  var pending=list.filter(function(q){return !q.awarded&&!q.bidStatus;});
+  var totalAmt=list.reduce(function(a,q){return a+((q.t&&q.t.total)||0);},0);
+  var wonAmt=won.reduce(function(a,q){return a+_wonAmt(q);},0);
+  var rate=list.length?Math.round(won.length/list.length*100):null;
+  var sum=_rptTile('報價',list.length+' 件<br><span style="font-size:11px;font-weight:700">NT$ '+fmt(totalAmt)+'</span>')
+    +_rptTile('得標',won.length+' 件<br><span style="font-size:11px;font-weight:700">NT$ '+fmt(wonAmt)+'</span>','var(--g3)')
+    +_rptTile('得標率',rate==null?'—':rate+'%',rate>=50?'var(--g3)':'#c8890a')
+    +_rptTile('未得標',lost.length+' 件','var(--red)')
+    +_rptTile('洽談／待回覆',(nego.length+pending.length)+' 件')
+    +_rptTile('流標',voided.length+' 件','var(--b3)');
+  var qRow=function(q,clr){
+    return _rptRow(esc(q.name||'未命名'),(q.date||'')+'　'+esc(q.client||''),
+      'NT$ '+fmt(q.awarded?_wonAmt(q):((q.t&&q.t.total)||0)),'',clr,"_qvClose();loadQ('"+q.id+"')");
+  };
+  var rows='';
+  if(kind==='amt'){
+    rows=list.slice().sort(function(a,b){return ((b.t&&b.t.total)||0)-((a.t&&a.t.total)||0);})
+      .map(function(q){return qRow(q,q.awarded?'var(--g3)':'var(--b5)');}).join('');
+  }else if(kind==='won'){
+    rows=won.slice().sort(function(a,b){return _wonAmt(b)-_wonAmt(a);}).map(function(q){return qRow(q,'var(--g3)');}).join('');
+  }else{
+    [['得標',won,'var(--g3)'],['未得標',lost,'var(--red)'],['洽談中',nego,'var(--b5)'],['待回覆',pending,'var(--b5)'],['流標',voided,'var(--b3)']].forEach(function(g){
+      if(!g[1].length)return;
+      rows+='<div style="padding:6px 10px;background:var(--b0);font-size:11px;font-weight:700;color:var(--b4)">'+g[0]+'（'+g[1].length+' 件）</div>';
+      rows+=g[1].slice().sort(function(a,b){return ((b.t&&b.t.total)||0)-((a.t&&a.t.total)||0);}).map(function(q){return qRow(q,g[2]);}).join('');
+    });
+  }
+  var titles={all:'報價單總結',rate:'得標率總結（得標 ÷ 全部報價）',amt:'總報價金額——各報價單明細',won:'得標金額——得標案明細'};
+  _rptBox(titles[kind]||'報價總結',sum,rows,'目前沒有報價記錄');
+}
+function openInvKpi(kind){
+  var list=INV||[];
+  var _t=localToday();
+  if(kind==='overdue'){
+    var od=[];
+    list.forEach(function(i){
+      if(!i||i.receivedConfirmed)return;
+      var up=_invAR(i);if(up<=0)return;
+      var due='';try{var e1=_invExpectedDate(i);due=(e1&&e1.date)||'';}catch(e){_err('openInvKpi',e);}
+      if(!due||due>=_t)return;
+      od.push({i:i,due:due,days:Math.max(1,Math.round((new Date(_t)-new Date(due))/86400000)),up:up});
+    });
+    od.sort(function(a,b){return b.days-a.days;});
+    var oSum=_rptTile('逾期未收',od.length+' 件','var(--red)')
+      +_rptTile('逾期金額','NT$ '+fmt(od.reduce(function(a,r){return a+r.up;},0)),'var(--red)');
+    var oRows=od.map(function(r){
+      return _rptRow(esc(r.i.project||'未命名')+' 第'+(r.i.periodNo||'?')+'期',
+        esc(r.i.client||'')+'　預計收款 '+r.due,
+        '待收 NT$ '+fmt(r.up),'逾期 '+r.days+' 天','var(--red)',
+        "_qvClose();openReceiptModal('"+r.i.id+"')");
+    }).join('');
+    _rptBox('逾期未收總結',oSum,oRows,'目前沒有逾期未收的請款單');
+    return;
+  }
+  var byP={},order=[];
+  list.forEach(function(i){
+    if(!i)return;
+    var k=i.project||'（未填工程名稱）';
+    if(!byP[k]){byP[k]={n:0,amt:0,recv:0,client:i.client||'',ids:[]};order.push(k);}
+    var g=byP[k];
+    g.n++;g.amt+=(i.totals&&i.totals.total)||0;g.recv+=parseFloat(i.received)||0;g.ids.push(i.id);
+  });
+  order.sort(function(a,b){return byP[b].amt-byP[a].amt;});
+  var tAmt=0,tRecv=0,tN=0;
+  order.forEach(function(k){tAmt+=byP[k].amt;tRecv+=byP[k].recv;tN+=byP[k].n;});
+  var sum=_rptTile('請款單',tN+' 期')
+    +_rptTile('總請款','NT$ '+fmt(tAmt))
+    +_rptTile('已收款','NT$ '+fmt(tRecv),'var(--g3)')
+    +_rptTile('待收餘額','NT$ '+fmt(tAmt-tRecv),(tAmt-tRecv)>0?'#c8890a':'var(--b3)');
+  var rows=order.map(function(k){
+    var g=byP[k],un=g.amt-g.recv;
+    var right=kind==='recv'?('已收 NT$ '+fmt(g.recv)):('NT$ '+fmt(g.amt));
+    var rightSub=kind==='recv'?(un>0?('待收 '+fmt(un)):'<span style="color:var(--g3)">已收訖</span>')
+                              :('已收 '+fmt(g.recv)+(un>0?('・待收 '+fmt(un)):''));
+    return _rptRow(esc(k),esc(g.client||'')+'　'+g.n+' 期',right,rightSub,
+      kind==='recv'?'var(--g3)':'var(--b5)',
+      "_qvClose();openReceiptModal('"+g.ids[0]+"')");
+  }).join('');
+  var titles={all:'請款單總結（依工地）',amt:'總請款金額——各工地明細',recv:'已收款金額——各工地明細'};
+  _rptBox(titles[kind]||'請款總結',sum,rows,'目前沒有請款單');
 }
 
 // 客戶統計面板
@@ -23192,7 +23312,7 @@ function renderProjects(){
     // 1 報價（得標版本，可下載 PDF）
     steps.push({label:'報價',done:true,
       info:(q.code?esc(q.code)+'　':'')+'NT$ '+fmt(quoteTotal)+(adds.length?'（含 '+adds.length+' 筆追加）':''),
-      extra:'<button type="button" onclick="event.stopPropagation();exportQuotePDF(\''+q.id+'\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 下載報價PDF</button>',
+      extra:'<button type="button" onclick="event.stopPropagation();exportQuotePDF(\''+q.id+'\')" title="開啟報價單預覽，預覽內可下載 PDF" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-search"/></svg> 查看報價PDF</button>',
       jump:"loadQ('"+q.id+"')"});
     // 2 合約（可上傳/下載合約檔）
     const _hasCtFile=!!(ct&&(ct.fileData||ct.fileUrl));
@@ -23220,16 +23340,23 @@ function renderProjects(){
         +'<button type="button" onclick="event.stopPropagation();projUpload(\'confirm\',\''+q.id+'\')" style="border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 上傳確認單</button>'
         +(cfChips?' '+cfChips:''),
       jump:"openProjectCosts('"+q.id+"')"});
-    // v5.386：每一期各自帶「下載 PDF」與「確認收款」，收款不再只能從最新一期進去
+    // v5.386：每一期各自帶查看與「確認收款」；v5.388：加註預計收款日與逾期提醒，
+    // 且點期別鈕是「先開預覽、預覽內才下載」（不再一點就下載）
     const periodChips=invs.map(function(v){
       const _pv='第'+esc(String(v.periodNo||'?'))+'期';
       const _paid=!!v.receivedConfirmed;
       const _ar=_invAR(v);
-      const _col=_paid?['var(--gm)','var(--gl)','var(--g3)']:['#ffd699','#fff8ec','#b26a00'];
+      let _due='',_odN=0;
+      if(!_paid&&_ar>0){
+        try{const _e=_invExpectedDate(v);_due=(_e&&_e.date)||'';}catch(e){_err('periodChips',e);}
+        if(_due&&_due<localToday())_odN=Math.max(1,Math.round((new Date(localToday())-new Date(_due))/86400000));
+      }
+      const _col=_paid?['var(--gm)','var(--gl)','var(--g3)']:(_odN>0?['#ffaaaa','#fff0f0','#c62828']:['#ffd699','#fff8ec','#b26a00']);
+      const _dueTag=_paid?' ✓':(_odN>0?'・逾期'+_odN+'天':(_due?'・收'+_due.slice(5).replace('-','/'):''));
       return '<span style="display:inline-flex;align-items:stretch;margin:0 6px 4px 0">'
-        +'<button type="button" onclick="event.stopPropagation();printInvById(\''+v.id+'\')" title="下載'+_pv+'請款單"'
+        +'<button type="button" onclick="event.stopPropagation();printInvById(\''+v.id+'\')" title="查看'+_pv+'請款單（預覽內可下載 PDF）'+(_due?'　預計收款 '+_due:'')+'"'
         +' style="border:1px solid '+_col[0]+';background:'+_col[1]+';color:'+_col[2]+';border-radius:99px 0 0 99px;border-right:none;padding:2px 8px 2px 10px;font-size:11px;cursor:pointer;font-family:inherit">'
-        +'<svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> '+_pv+' NT$ '+fmt((v.totals&&v.totals.total)||0)+(_paid?' ✓':'')+'</button>'
+        +'<svg class="ic ib" aria-hidden="true"><use href="#i-search"/></svg> '+_pv+' NT$ '+fmt((v.totals&&v.totals.total)||0)+_dueTag+'</button>'
         +(_paid
           ?'<span style="border:1px solid '+_col[0]+';background:'+_col[1]+';color:'+_col[2]+';border-radius:0 99px 99px 0;padding:2px 9px;font-size:11px">已收</span>'
           :'<button type="button" onclick="event.stopPropagation();openReceiptModal(\''+v.id+'\')" title="登錄'+_pv+'的收款"'
@@ -25217,7 +25344,7 @@ function _bidStat(list){
   var voided=list.filter(function(q){return !q.awarded&&q.bidStatus==='void';});
   var decided=won.length+lost.length;
   return {n:list.length,won:won.length,lost:lost.length,open:open.length,void:voided.length,
-    decided:decided, rate:decided?(won.length/decided*100):null,
+    decided:decided, rate:list.length?(won.length/list.length*100):null,   // v5.388：分母改為全部報價（除得標外皆列未得標）
     wonAmt:won.reduce(function(a,q){return a+((q.t&&q.t.total)||0);},0),
     allAmt:list.reduce(function(a,q){return a+((q.t&&q.t.total)||0);},0)};
 }
@@ -25244,12 +25371,12 @@ function renderBidRateReport(el,year,month){
   var html='<div class="cb">'
     +'<div style="font-size:13px;font-weight:900;color:var(--g3);margin-bottom:8px">'+esc(period)+' 得標率分析</div>'
     +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:8px;margin-bottom:6px">'
-    +tile('已定案得標率',all.rate==null?'—':(Math.round(all.rate*10)/10+'%'),'得標 '+all.won+' ／ 未得標 '+all.lost,all.rate>=50?'var(--g3)':all.rate>=30?'#e65100':'var(--red)')
+    +tile('得標率',all.rate==null?'—':(Math.round(all.rate*10)/10+'%'),'得標 '+all.won+' ／ 其他 '+(all.n-all.won),all.rate>=50?'var(--g3)':all.rate>=30?'#e65100':'var(--red)')
     +tile('報價件數',all.n,'尚在洽談 '+all.open+'　流標 '+all.void)
     +tile('得標金額','NT$ '+fmt(all.wonAmt),'全部報價 NT$ '+fmt(all.allAmt))
     +tile('平均得標案金額',all.won?('NT$ '+fmt(Math.round(all.wonAmt/all.won))):'—','')
     +'</div>'
-    +'<div style="font-size:11px;color:var(--b3);margin-bottom:14px">已定案得標率＝得標 ÷（得標＋未得標）。尚在洽談與流標不列入分母。</div>';
+    +'<div style="font-size:11px;color:var(--b3);margin-bottom:14px">得標率＝得標 ÷ 全部報價件數；除「得標」外（未得標、洽談中、流標）皆列為未得標。</div>';
 
   // ── 依業主 ──
   var byC={};
@@ -25769,6 +25896,38 @@ function renderYearlyReport(el,year){
     </div>`;
 }
 
+// v5.388：報表中心的重複合約可直接處理——未請款的重複筆當場刪除（有請款的保護不給刪）
+function openCtDupFix(bestId,dupIdsCsv){
+  var best=CONTRACTS.find(function(c){return c.id===bestId;});
+  var ids=String(dupIdsCsv||'').split(',').filter(Boolean);
+  var rows='';
+  ids.forEach(function(id){
+    var ct=CONTRACTS.find(function(c){return c.id===id;});
+    if(!ct)return;
+    var invN=_invsOfContract(ct).length;
+    rows+='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--b1)">'
+      +'<div style="min-width:0;flex:1"><div style="font-size:12px;font-weight:700">'+esc(ct.code||'—')+'　'+esc(ct.name||'—')+'</div>'
+      +'<div style="font-size:10.5px;color:var(--b4)">'+esc(ct.client||'')+'　NT$ '+fmt(ct.amount||0)+'　'+(invN?('已掛 '+invN+' 期請款'):'<span style="color:var(--g3)">未請款</span>')+'</div></div>'
+      +(invN?'<span style="font-size:10.5px;color:var(--b3);flex-shrink:0">有請款紀錄，不可刪</span>'
+            :'<button type="button" class="btn btn-xs btn-r" onclick="ctDupDelete(\''+id+'\')">刪除此筆</button>')
+      +'</div>';
+  });
+  var head='<div style="font-size:11.5px;color:var(--b4);margin-bottom:8px">保留：<b>'+esc((best&&best.code)||'')+'　'+esc((best&&best.name)||'')+'</b>（請款紀錄較多／金額較大的一筆）。以下為重複建檔：</div>';
+  showConfirm('重複合約處理',head+'<div style="border:1px solid var(--b1);border-radius:var(--r8)">'+rows+'</div>',function(){},false,null,true);
+}
+function ctDupDelete(id){
+  var ct=CONTRACTS.find(function(c){return c.id===id;});if(!ct)return;
+  _qvClose();
+  setTimeout(function(){
+    showConfirm('刪除重複合約','確定刪除「'+esc(ct.code||'')+' '+esc(ct.name||'')+'」？此筆沒有掛任何請款單，刪除後報表不再重複。此操作無法復原。',function(){
+      _tomb('contracts',id);
+      CONTRACTS=CONTRACTS.filter(function(x){return x.id!==id;});
+      saveContracts();toast('已刪除重複合約');
+      try{if(typeof _currentReport!=='undefined'&&_currentReport==='contract')renderCurrentReport();}catch(e){_err('ctDupDelete',e);}
+      try{renderContracts();}catch(e){_err('ctDupDelete',e);}
+    },true);
+  },200);
+}
 function renderContractReport(el,year){
   if(!CONTRACTS.length){
     el.innerHTML='<div class="empty" style="padding:60px"><div class="empty-ic"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg></div><p>尚無合約資料<br><span style="font-size:12px;color:var(--b3)">在合約管理頁新增合約後顯示</span></p></div>';
@@ -25783,27 +25942,32 @@ function renderContractReport(el,year){
   // v5.387：同一份合約重複建檔（同編號＋同工程名＋同業主，或掛同一張得標報價）
   // 原本各列一行，合約總額連帶被重複計入。這裡合併為一列，並標記另有幾筆重複。
   const _dedup=(function(list){
-    const g={},order=[];
+    const g={},order=[],qmap={};
     list.forEach(function(ct){
-      const k=ct.linkedQid
-        ?('q:'+ct.linkedQid)
-        :('n:'+String(ct.code||'').trim()+'|'+String(ct.name||'').trim()+'|'+String(ct.client||'').trim());
+      // v5.388：先以「編號＋工程名＋業主」歸組——同一份合約重複建檔常掛了不同的
+      // linkedQid，v5.387 以 linkedQid 優先反而拆不掉；再用 linkedQid 把沒填編號的併進同組。
+      var trio=String(ct.code||'').trim()+'|'+String(ct.name||'').trim()+'|'+String(ct.client||'').trim();
+      var k=trio!=='||'?('n:'+trio):(ct.linkedQid?('q:'+ct.linkedQid):('id:'+ct.id));
+      if(ct.linkedQid){
+        if(qmap[ct.linkedQid])k=qmap[ct.linkedQid];
+        else qmap[ct.linkedQid]=k;
+      }
       if(!g[k]){g[k]=[];order.push(k);}
       g[k].push(ct);
     });
     return order.map(function(k){
       const arr=g[k];
-      if(arr.length===1)return {ct:arr[0],dupN:0};
+      if(arr.length===1)return {ct:arr[0],dupN:0,dupIds:[]};
       // 保留「有請款紀錄、其次金額較大」的那一筆，其餘視為重複建檔
       const best=arr.slice().sort(function(a,b){
         const ia=_invsOfContract(a).length,ib=_invsOfContract(b).length;
         if(ia!==ib)return ib-ia;
         return (parseFloat(b.amount)||0)-(parseFloat(a.amount)||0);
       })[0];
-      return {ct:best,dupN:arr.length-1};
+      return {ct:best,dupN:arr.length-1,dupIds:arr.filter(function(c){return c!==best;}).map(function(c){return c.id;})};
     });
   })(CONTRACTS.filter(_inYear));
-  const rows=_dedup.map(({ct,dupN})=>{
+  const rows=_dedup.map(({ct,dupN,dupIds})=>{
     const relInvs=_invsOfContract(ct);   // 統一歸戶函式
     const totalInv=relInvs.reduce((a,i)=>a+(i.totals?.total||0),0);
     const totalRcv=relInvs.reduce((a,i)=>a+(parseFloat(i.received||0)),0);
@@ -25811,7 +25975,7 @@ function renderContractReport(el,year){
     const invRate=ctAmt>0?totalInv/ctAmt:0;
     const rcvRate=totalInv>0?totalRcv/totalInv:0;
     const outstanding=totalInv-totalRcv;
-    return{ct,ctAmt,totalInv,totalRcv,outstanding,invRate,rcvRate,dupN,
+    return{ct,ctAmt,totalInv,totalRcv,outstanding,invRate,rcvRate,dupN,dupIds,
       periodCount:relInvs.length,lastInv:relInvs[relInvs.length-1]};
   });
   const totCtAmt=rows.reduce((a,r)=>a+r.ctAmt,0);
@@ -25847,7 +26011,7 @@ function renderContractReport(el,year){
           return`<tr onclick="go('contracts')" style="cursor:pointer;border-bottom:1px solid var(--b1)">
             <td style="padding:6px 8px;font-family:monospace;font-size:11px">${esc(r.ct.code||'—')}</td>
             <td style="padding:6px 8px">
-              <div style="font-weight:700;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.ct.name||'—')}${r.dupN?'<span title="另有 '+r.dupN+' 筆同編號同名合約重複建檔，已合併為一列（請到報價管理→重複資料檢查處理）" style="margin-left:4px;font-size:9.5px;color:#c62828">⚠×'+(r.dupN+1)+'</span>':''}</div>
+              <div style="font-weight:700;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.ct.name||'—')}${r.dupN?'<span onclick="event.stopPropagation();openCtDupFix(\''+r.ct.id+'\',\''+r.dupIds.join(',')+'\')" title="另有 '+r.dupN+' 筆重複建檔，點擊處理（未請款的可直接刪除）" style="margin-left:4px;font-size:9.5px;color:#c62828;text-decoration:underline;cursor:pointer">⚠×'+(r.dupN+1)+'</span>':''}</div>
               <div style="font-size:10px;color:var(--b4)">${esc(r.ct.client||'')}</div>
             </td>
             <td style="padding:6px 8px;text-align:right;font-weight:700">${fmt(r.ctAmt)}</td>
@@ -27992,9 +28156,13 @@ function _printViaIframe(html,filename,landscape){
         var sc2=a4w2/canvas.width;
         var pdf2=new jsPDFLib({orientation:landscape?'landscape':'portrait',unit:'pt',format:'a4'});
         _pdfAddPaged(pdf2,canvas,a4w2,a4h2,sc2,_plan,0.95);
-        pdf2.save((filename||'文件').replace(/[\/\\:*?"<>|]/g,'_')+'.pdf');
-        actionBtn.textContent='\u2705 已下載';actionBtn.disabled=false;
-        setTimeout(cleanup,2000);
+        // v5.388：不再自動下載——每顆列印鈕都變成先開預覽，按「下載PDF」才存檔
+        var _fname2=(filename||'文件').replace(/[\/\\:*?"<>|]/g,'_')+'.pdf';
+        actionBtn.textContent='\u2B07 下載PDF';actionBtn.disabled=false;
+        actionBtn.onclick=function(){
+          try{pdf2.save(_fname2);actionBtn.textContent='\u2705 已下載';setTimeout(cleanup,1500);}
+          catch(e3){toast('下載失敗：'+e3.message);}
+        };
       }
 
     }).catch(function(err){actionBtn.textContent='\u274C 截圖失敗：'+err.message;actionBtn.disabled=false;});
