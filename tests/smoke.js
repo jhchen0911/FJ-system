@@ -376,7 +376,7 @@ async function newPage(browser, width, height) {
         const stub = { addPage() {}, addImage(d, f, x, y, w) { imgs.push(w); },
                        setFontSize() {}, setTextColor() {}, text() {} };
         _pdfAddPaged(stub, c, a4w, a4h, sc, { pages: [{ s: 0, e: h, hd: false }], marg: 76, hd: null }, 0.9);
-        scales.push(+(imgs[0] / a4w).toFixed(3));
+        scales.push(+(imgs[0] / (a4w - 2 * _pdfMargPt())).toFixed(3));   // v5.392：內容寬＝A4扣左右10mm
       });
       out.scales = scales.join(',');
       return out;
@@ -478,7 +478,13 @@ async function newPage(browser, width, height) {
       const H = host.scrollHeight * 2;
       const plan = _pdfPlanPages({ width: 2246, height: H }, host, 1123, true);
       out.pages = plan.pages.length;
-      out.firstFill = +(((plan.pages[0].e - plan.pages[0].s) + plan.marg) / plan.PAGE).toFixed(2);
+      // v5.392「填滿才換頁」的嚴謹定義：切點之後的下一個列邊界必定超出本頁可用高度
+      //（若還放得下一列卻提早換頁，就是留白過多）
+      const _rr = host.getBoundingClientRect();
+      const _rows = [...host.querySelectorAll('tr')].map(el => Math.round((el.getBoundingClientRect().bottom - _rr.top) * 2));
+      const _budget = plan.PAGE - 2 * plan.marg;
+      out.fillTight = plan.pages.slice(0, -1).every(p =>
+        !_rows.some(b => b > p.e + 1 && b <= p.s + _budget));
       host.remove();
       return out;
     });
@@ -506,7 +512,7 @@ async function newPage(browser, width, height) {
     check('本期估驗數量＝輸入量×請款%（460×30%=138）', r.curW, '預覽未見 138');
     check('累積估驗回到合約量（322+138=460）', r.cum);
     check('新期估驗日期自動帶當天', r.dateAuto);
-    check('分頁填滿才換頁（首頁使用率 ≥95%）', r.firstFill >= 0.95, '首頁使用率 ' + r.firstFill);
+    check('填滿才換頁（再多一列就超出才換）', r.fillTight);
     check('業主往來可點入明細', /業主往來明細/.test(r2.cli) && /報價（/.test(r2.cli), r2.cli.slice(0, 60));
     check('得標率可點入業主明細', /得標明細/.test(r2.bid) && /得標率/.test(r2.bid), r2.bid.slice(0, 60));
     check('廠商績效可點入明細', /廠商績效明細/.test(r2.ven) && /發包案件/.test(r2.ven), r2.ven.slice(0, 60));
@@ -681,6 +687,81 @@ async function newPage(browser, width, height) {
     check('工程實績表欄位：業主正名、刪除狀態欄', r.trackCols);
     check('工程實績表 PDF：LOGO＋公司名同標題字級、地點欄加寬', r.trackPdf);
     check('v5.389 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── 8-8. PDF 大原則：不縮放／四邊10mm／填滿才換頁（v5.392） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const cv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+      const host = document.createElement('div');
+      host.style.cssText = 'position:fixed;left:-99999px;top:0;background:#fff';
+      document.body.appendChild(host);
+      const W = _pdfContentPx(false);
+      host.style.width = W + 'px';
+      out.contentPx = W;                       // (210−20)mm ≈ 718px
+      out.contentPxLs = _pdfContentPx(true);   // (297−20)mm ≈ 1047px
+      let tr = '';
+      for (let i = 0; i < 60; i++) tr += '<tr><td style="padding:6px;border-bottom:1px solid #eee">工項 ' + (i + 1) + '</td><td>1,000</td></tr>';
+      host.innerHTML = '<table><thead><tr><th>項目</th><th>金額</th></tr></thead><tbody>' + tr
+        + '</tbody></table><div class="page-footer" style="height:120px">用印區</div>';
+      const H = host.scrollHeight * 2, cvs = cv(W * 2, H);
+      const plan = _pdfPlanPages(cvs, host, W, false);
+      const rr = host.getBoundingClientRect();
+      const rowB = [...host.querySelectorAll('tr')].map(el => Math.round((el.getBoundingClientRect().bottom - rr.top) * 2));
+      const blockT = [...host.querySelectorAll('.page-footer')].map(el => Math.round((el.getBoundingClientRect().top - rr.top) * 2));
+      // 換頁只切在列與列之間（或整塊頂緣）
+      out.rowBoundary = plan.pages.slice(0, -1).every(p =>
+        rowB.some(b2 => Math.abs(b2 - p.e) <= 2) || blockT.some(b2 => Math.abs(b2 - p.e) <= 2));
+      // 續頁重印表頭（仍在表格中的頁）
+      out.repeatHead = plan.pages[1] && plan.pages[1].hd === true;
+      // 填滿才換頁：切點後的下一個列邊界必定超出本頁可用高度（放得下就不准換）
+      const budget = plan.PAGE - 2 * plan.marg;
+      out.fillTight = plan.pages.slice(0, -1).every(p => !rowB.some(b2 => b2 > p.e + 1 && b2 <= p.s + budget));
+      out.fill = Math.min(...plan.pages.slice(0, -1).map(p => ((p.e - p.s) + 2 * plan.marg) / plan.PAGE));
+      // 貼頁：四邊 10mm、比例固定不縮放
+      const M = _pdfMargPt(), imgs = [], nos = [];
+      const stub = { addPage() {}, addImage(d, f, x, y, w) { imgs.push({ x: +x.toFixed(1), y: +y.toFixed(1), w: +w.toFixed(1) }); },
+                     setFontSize() {}, setTextColor() {}, text(t) { nos.push(t); } };
+      _pdfAddPaged(stub, cvs, 595.28, 841.89, 0, plan, .95);
+      out.marg10 = Math.abs(imgs[0].x - M) < 0.5 && Math.abs(imgs[0].y - M) < 0.5
+        && imgs.every(i2 => Math.abs(i2.x - M) < 0.5) && Math.abs(imgs[0].w - (595.28 - 2 * M)) < 0.5;
+      out.pageNos = nos.length === plan.pages.length && /^1 \/ /.test(nos[0]);
+      // 不同長度的文件貼頁寬完全相同（絕不縮放塞頁）
+      const ws = [1200, 2600].map(h => {
+        const c2 = cv(W * 2, h), p2 = _pdfPlanPages(c2, host, W, false), a2 = [];
+        _pdfAddPaged({ addPage() {}, addImage(d, f, x, y, w) { a2.push(+w.toFixed(1)); }, setFontSize() {}, setTextColor() {}, text() {} },
+          c2, 595.28, 841.89, 0, p2, .95);
+        return a2[0];
+      });
+      out.sameScale = ws[0] === ws[1];
+      // 整份放得進一張紙 → 不分頁
+      host.innerHTML = '<table><thead><tr><th>項目</th></tr></thead><tbody><tr><td>一列</td></tr></tbody></table>';
+      const H2 = host.scrollHeight * 2;
+      out.shortOnePage = _pdfPlanPages(cv(W * 2, H2), host, W, false).pages.length === 1;
+      host.remove();
+      // 全站一致：工具表單走同一引擎、原生列印不再縮放
+      out.toolUnified = /_printViaIframe/.test(String(_toolPrint)) && !/window\.open/.test(String(_toolPrint));
+      out.nativeNoZoom = _printNativeHTML.length === 2;
+      out.previewNorm = /page-wrap\{width:100%!important/.test(String(_printViaIframe))
+        && /_pdfContentPx/.test(String(_printViaIframe));
+      return out;
+    });
+    check('內容寬＝A4扣左右各10mm（直718／橫1047）', r.contentPx === 718 && r.contentPxLs === 1047,
+          r.contentPx + '/' + r.contentPxLs);
+    check('貼頁四邊各 10mm 留白', r.marg10);
+    check('換頁切在列與列之間（或整塊頂緣）', r.rowBoundary);
+    check('續頁重印表頭', r.repeatHead);
+    check('填滿才換頁（放得下就不准換頁）', r.fillTight, '最低使用率 ' + (r.fill || 0).toFixed(2));
+    check('多頁時頁尾有頁碼', r.pageNos);
+    check('一律原比例、不因長度縮放', r.sameScale);
+    check('整份放得進一張紙就不分頁', r.shortOnePage);
+    check('工具表單走全站統一 PDF 引擎', r.toolUnified);
+    check('原生列印不再縮身成一頁', r.nativeNoZoom);
+    check('預覽正規化版心（留白統一由 PDF 提供）', r.previewNorm);
+    check('PDF 大原則測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
