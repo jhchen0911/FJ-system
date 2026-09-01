@@ -341,6 +341,55 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── 8-2. 加權累計數量／PDF 比例一致（v5.385） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const D = 'H型鋼樁 H350，L=9M@100cm 打設、拔除';
+      Q.push({ id: 'Q385', name: '累計冒煙案', client: 'Y營造', status: 'won', date: '2026-01-01',
+               items: [{ desc: D, unit: '支', qty: '57', price: '27500', note: '' }], t: {} });
+      INV.push({ id: 'I385a', quoteId: 'Q385', project: '累計冒煙案', client: 'Y營造', periodNo: 1,
+                 date: '2026-03-01',
+                 items: [{ type: 'item', desc: D, unit: '支', contractPrice: 27500, contractQty: 57,
+                           prevQty: 0, prevAmt: 0, curQty: 57,
+                           curAmt: Math.round(57 * 27500 * 0.7), payRate: 70 }] });
+      loadInvoice('I385a');
+      addNextPeriod('I385a');
+      const i2 = INV.find(x => x.project === '累計冒煙案' && (parseInt(x.periodNo) || 0) === 2);
+      out.p2prev = i2 ? i2.items[0].prevQty : null;             // 57×70% = 39.9
+      loadInvoice(i2.id);
+      invItems[0].payRate = 30; invItems[0].curQty = 57;
+      invItems[0].curAmt = Math.round(57 * 27500 * 0.3);
+      out.cum = Math.round(((parseFloat(invItems[0].prevQty) || 0) + _curW(invItems[0])) * 100) / 100;
+      out.contract = invItems[0].contractQty;
+      out.w = [_wQty(30, 100), _wQty(57, 70), _wQty(57, 30)].join(',');
+      i2.items = JSON.parse(JSON.stringify(invItems));
+      buildInvPreview(i2);
+      out.previewNo114 = !/114/.test(document.getElementById('inv-prev-html').innerText);
+      // PDF：不同高度的內容一律以同一比例貼頁（不再縮小塞成一頁）
+      const a4w = 841.89, a4h = 595.28, sc = a4w / 2246, scales = [];
+      [1774, 1538].forEach(h => {
+        const c = document.createElement('canvas'); c.width = 2246; c.height = h;
+        const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, h);
+        const imgs = [];
+        const stub = { addPage() {}, addImage(d, f, x, y, w) { imgs.push(w); },
+                       setFontSize() {}, setTextColor() {}, text() {} };
+        _pdfAddPaged(stub, c, a4w, a4h, sc, { pages: [{ s: 0, e: h, hd: false }], marg: 76, hd: null }, 0.9);
+        scales.push(+(imgs[0] / a4w).toFixed(3));
+      });
+      out.scales = scales.join(',');
+      return out;
+    });
+    check('分批請款：下一期前期累計依比例加權', r.p2prev === 39.9, '得到 ' + r.p2prev);
+    check('打設70%＋拔除30% 累計等於合約量', r.cum === r.contract, r.cum + ' / ' + r.contract);
+    check('加權換算（100%不變、70%、30%）', r.w === '30,39.9,17.1', r.w);
+    check('列印累計不再出現兩倍數量', r.previewNo114);
+    check('PDF 各檔比例一致（不縮小塞單頁）', r.scales === '1,1', r.scales);
+    check('累計／PDF 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // ───────────── 8. 報價單 PDF 排版（v5.383） ─────────────
   {
     const { page, errors } = await newPage(browser, 1280, 900);
