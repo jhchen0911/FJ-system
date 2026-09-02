@@ -832,6 +832,73 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── 9. 安全母索（v5.393：口徑須與豐有既有 Excel 逐格一致）─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const Z = (name, deck, v, h) => ({
+        name, deck,
+        v: { runs: v[0], rows: v[1].map(x => ({ n: x[0], len: x[1] })) },
+        h: { runs: h[0], rows: h[1].map(x => ({ n: x[0], len: x[1] })) },
+      });
+      // ① 原 Excel「工作表1」：縱向 279.1＋橫向 289.4＋周長 207 ＝ 775.5 m
+      Object.assign(_llState, {
+        perim: 207, perimRuns: 1, layers: 1, deductLayers: 1, unit: 'cm',
+        useSpare: false, spare: 0, waste: 0, reelLen: 200, clips: 8, turn: 1, shackle: 2,
+        zones: [Z('第一區', false, [7, [[2, 5650], [2, 4830], [2, 2590], [1, 1770]]],
+                                   [9, [[3, 4575], [1, 3925], [4, 2425], [1, 1590]]]),
+                Z('構台下', true, [0, [[0, 0]]], [0, [[0, 0]]])],
+      });
+      let c = _llCalc();
+      out.sheet1 = c.zones[0].v.len === 279.1 && c.zones[0].h.len === 289.4
+        && c.zoneLen === 568.5 && c.net === 775.5;
+      // ② 原 Excel「多區塊(轉換檔)」：縱橫 2973.75、構台下 849、3 層扣一層 ＝ 9275.25 m
+      _llState.perim = 401; _llState.layers = 3; _llState.deductLayers = 1;
+      _llState.zones = [
+        Z('第一區', false, [9, [[2, 4693], [7, 5112]]], [8, [[8, 5943]]]),
+        Z('第二區', false, [9, [[9, 5112]]], [8, [[6, 5512], [2, 4579]]]),
+        Z('第三區', false, [7, [[7, 3217]]], [5, [[5, 4573]]]),
+        Z('第四區', false, [9, [[5, 3217], [3, 2746], [1, 2591]]], [5, [[1, 3397], [1, 5292], [3, 5512]]]),
+        Z('轉換檔', false, [1, [[1, 8600]]], [1, [[1, 10300]]]),
+        Z('構台下', true, [11, [[6, 6400], [5, 1300]]], [19, [[16, 1300], [3, 6400]]])];
+      c = _llCalc();
+      out.multi = c.zoneLen === 2973.75 && c.deckLen === 849
+        && c.perLayer === 3374.75 && c.gross === 10124.25 && c.net === 9275.25;
+      out.noBad = c.bad.length === 0;                       // 各方向宣告路數與明細相符
+      // ③ 路數勾稽：宣告與明細不符要抓出來
+      _llState.zones[0].v.runs = 99;
+      out.catches = _llCalc().bad.join('') === '第一區 縱向';
+      _llState.zones[0].v.runs = 9;
+      // ④ 端部預留與損耗：(9275.25＋159路×1.5)×1.05
+      _llState.useSpare = true; _llState.spare = 1.5; _llState.waste = 5;
+      c = _llCalc();
+      out.runs = c.runs === 159;                            // (63路×3層)−(30路×1層)
+      out.need = Math.abs(c.need - (9275.25 + 238.5) * 1.05) < 1e-6;
+      out.reels = c.reels === Math.ceil(c.need / 200);
+      // ⑤ 匯出：Excel 必須是活公式、列印走統一引擎
+      let sheets = null, printed = null;
+      const oX = window.xlsxDownload, oP = window._printViaIframe;
+      window.xlsxDownload = (f, s) => { sheets = s; };
+      window._printViaIframe = h => { printed = h; };
+      try { _llXlsx(); _llPrint(); } finally { window.xlsxDownload = oX; window._printViaIframe = oP; }
+      const flat = JSON.stringify(sheets || []);
+      out.xlsxLive = /"f":"C\d+\*D\d+\*\$B\$6"/.test(flat) && /CEILING\(/.test(flat) && /IF\(F\d+=0/.test(flat);
+      out.printOk = !!printed && printed.indexOf('安全母索用量表') > 0 && /母索總長/.test(printed);
+      // ⑥ 畫面
+      go('lifeline');
+      out.rendered = document.getElementById('lifeline-root').innerText.indexOf('母索總長') >= 0;
+      return out;
+    });
+    check('安全母索：單區塊口徑與 Excel 一致', r.sheet1);
+    check('安全母索：多區塊＋扣除構台下與 Excel 一致', r.multi && r.noBad);
+    check('安全母索：宣告路數與明細不符會被抓出', r.catches);
+    check('安全母索：總路數、端部預留與損耗計入需求長度', r.runs && r.need && r.reels);
+    check('安全母索：Excel 匯出為活公式、列印走統一引擎', r.xlsxLive && r.printOk);
+    check('安全母索：頁面渲染無 JS 錯誤', r.rendered && errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
