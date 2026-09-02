@@ -152,7 +152,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
    由 _mstack() 自動掃描（有 thead 且欄數多的表加 .mst＋各格 data-th），此處只管排版。 */
 @media(max-width:767px){
   /* 工具頁未堆疊的小表也取消 min-width，改為壓縮欄寬而非左右滑動 */
-  #page-rebar table.tbl,#page-grout table.tbl,#page-backfill table.tbl,
+  #page-rebar table.tbl,#page-grout table.tbl,#page-backfill table.tbl,#page-lifeline table.tbl,
   #page-progress table.tbl,#page-matest table.tbl,#page-plan table.tbl{min-width:0!important}
   /* 工具頁頂列（掛專案／開工日／存檔列印…）：改網格，欄位各占整列不重疊，按鈕兩顆一排 */
   .tool-head{display:grid!important;grid-template-columns:1fr 1fr;gap:10px 8px;align-items:end}
@@ -674,6 +674,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-matest" onclick="go('matest')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>材料估算</button>
   <button type="button" class="snav" id="sn-grout" onclick="go('grout')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>根固砂漿</button>
   <button type="button" class="snav" id="sn-backfill" onclick="go('backfill')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span>背填材料</button>
+  <button type="button" class="snav" id="sn-lifeline" onclick="go('lifeline')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg></span>安全母索</button>
   <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
   <div class="ssec" style="margin-top:5px">系統</div>
   <button type="button" class="snav" id="sn-staff" onclick="go('staff')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>人員管理</button>
@@ -1185,19 +1186,22 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <style>
 /* v5.348 工具頁（鋼筋籠/根固/背填/進度）欄位統一系統風格 */
 #page-rebar input:not([type=checkbox]),#page-rebar select,#page-grout input:not([type=checkbox]),#page-grout select,
-#page-backfill input:not([type=checkbox]),#page-backfill select,#page-progress input:not([type=checkbox]),#page-progress select{
+#page-backfill input:not([type=checkbox]),#page-backfill select,#page-progress input:not([type=checkbox]),#page-progress select,
+#page-lifeline input:not([type=checkbox]),#page-lifeline select{
   height:36px;padding:7px 10px;border:1.5px solid var(--b2);border-radius:var(--r8);font-size:13.5px;
   font-family:inherit;background:var(--w);color:var(--b5);min-width:0;width:100%;box-sizing:border-box}
 #page-rebar input:focus,#page-rebar select:focus,#page-grout input:focus,#page-grout select:focus,
-#page-backfill input:focus,#page-backfill select:focus,#page-progress input:focus,#page-progress select:focus{
+#page-backfill input:focus,#page-backfill select:focus,#page-progress input:focus,#page-progress select:focus,
+#page-lifeline input:focus,#page-lifeline select:focus{
   border-color:var(--g3);outline:none;box-shadow:0 0 0 3px rgba(14,61,34,.08)}
-#page-backfill input[type=checkbox],#page-progress input[type=checkbox]{width:18px;height:18px;accent-color:var(--g3)}
-#page-rebar .tbl input,#page-progress .tbl input,#page-progress .tbl select,#page-backfill .tbl input,#page-backfill .tbl select{height:32px;font-size:12.5px;padding:5px 8px}
-#page-progress .tbl th,#page-backfill .tbl th{white-space:nowrap}
+#page-backfill input[type=checkbox],#page-progress input[type=checkbox],#page-lifeline input[type=checkbox]{width:18px;height:18px;accent-color:var(--g3)}
+#page-rebar .tbl input,#page-progress .tbl input,#page-progress .tbl select,#page-backfill .tbl input,#page-backfill .tbl select,#page-lifeline .tbl input{height:32px;font-size:12.5px;padding:5px 8px}
+#page-progress .tbl th,#page-backfill .tbl th,#page-lifeline .tbl th{white-space:nowrap}
 #page-progress .tbl td{padding:5px 4px}
 @media(max-width:640px){
   #page-rebar input:not([type=checkbox]),#page-rebar select,#page-grout input:not([type=checkbox]),#page-grout select,
-  #page-backfill input:not([type=checkbox]),#page-backfill select,#page-progress input:not([type=checkbox]),#page-progress select{font-size:16px;height:42px}
+  #page-backfill input:not([type=checkbox]),#page-backfill select,#page-progress input:not([type=checkbox]),#page-progress select,
+  #page-lifeline input:not([type=checkbox]),#page-lifeline select{font-size:16px;height:42px}
 }
 </style>
 <div class="page" id="page-rebar">
@@ -1213,6 +1217,10 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <div class="page" id="page-backfill">
   <div class="ph"><div class="ph-l"><div class="ph-t">背填材料</div><div class="ph-s">支撐圍令背填：混凝土＋鋼筋用量（逐層計算）</div></div></div>
   <div class="pad" style="max-width:1300px"><div id="backfill-root"></div></div>
+</div>
+<div class="page" id="page-lifeline">
+  <div class="ph"><div class="ph-l"><div class="ph-t">安全母索</div><div class="ph-s">水平安全母索用量：特多龍繩／鋼索兩種形式・分區塊縱橫向逐路計算・路數勾稽・扣除構台下・捲數與配件</div></div></div>
+  <div class="pad" style="max-width:1400px"><div id="lifeline-root"></div></div>
 </div>
 <div class="page" id="page-progress">
   <div class="ph"><div class="ph-l"><div class="ph-t">施工進度</div><div class="ph-s">機組平行排程・甘特圖・落後偵測・S 曲線</div></div></div>
@@ -2640,7 +2648,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.392';
+var APP_VERSION='v5.394';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -3367,6 +3375,7 @@ function go(p){
   if(p==='rebar'){try{_rbRender();}catch(e){_err('top',e);}}
   if(p==='grout'){try{_gtRender();}catch(e){_err('top',e);}}
   if(p==='backfill'){try{_bfRender();}catch(e){_err('top',e);}}
+  if(p==='lifeline'){try{_llRender();}catch(e){_err('top',e);}}
   if(p==='progress'){try{_pgRender();}catch(e){_err('top',e);}}
   if(p==='matest'){try{renderMatEst();}catch(e){_err('top',e);}}
   if(p==='plan'){try{_plRender();}catch(e){_err('top',e);}}
@@ -7828,7 +7837,7 @@ function importData(file){
         if(data.planAttLib&&typeof data.planAttLib==='object'){try{localStorage.setItem('fy_plan_attlib',JSON.stringify(data.planAttLib));}catch(e2){_err('top',e2);}}
         if(data.qHistory&&typeof data.qHistory==='object'){try{Q_HISTORY=data.qHistory;localStorage.setItem('fy_q_history',JSON.stringify(Q_HISTORY));}catch(e2){_err('top',e2);}}
         if(data.toolStates&&typeof data.toolStates==='object'){try{
-          var _km={progress:'fy_progress',rebar:'fy_rebar2',grout:'fy_grout',backfill:'fy_backfill'};
+          var _km={progress:'fy_progress',rebar:'fy_rebar2',grout:'fy_grout',backfill:'fy_backfill',lifeline:'fy_lifeline'};
           Object.keys(_km).forEach(function(k){if(data.toolStates[k])localStorage.setItem(_km[k],JSON.stringify(data.toolStates[k]));});
           localStorage.setItem('fy_toolstates_mt',String(data.toolStates._mt||Date.now()));
         }catch(e2){_err('top',e2);}}
@@ -10155,6 +10164,22 @@ function _migrateDepts(){
       }
     }
   }catch(e){_err('top',e);}
+  // v5.393：安全母索頁同樣預設開給既有非系統角色
+  try{
+    if(localStorage.getItem('fy_tools_seed5')!=='1'){
+      var pr5=_acct();
+      if((pr5.__roles||[]).length){
+        var sd5=false;
+        pr5.__roles.forEach(function(r){
+          if(r.sys)return;
+          r.pages=r.pages||{};
+          if(r.pages.lifeline!==true){r.pages.lifeline=true;_touch(r);sd5=true;}
+        });
+        if(sd5)_acctSave(pr5);
+        localStorage.setItem('fy_tools_seed5','1');
+      }
+    }
+  }catch(e){_err('top',e);}
   // v5.353：施工計畫書頁同樣預設開給既有非系統角色
   try{
     if(localStorage.getItem('fy_tools_seed4')!=='1'){
@@ -11604,7 +11629,7 @@ function _trAllSafe(){try{return JSON.parse(localStorage.getItem('fy_toolrecs')|
 function _toolStates(){
   var g=function(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}};
   return {_mt:parseInt(localStorage.getItem('fy_toolstates_mt')||'0')||0,
-    progress:g('fy_progress'),rebar:g('fy_rebar2'),grout:g('fy_grout'),backfill:g('fy_backfill')};
+    progress:g('fy_progress'),rebar:g('fy_rebar2'),grout:g('fy_grout'),backfill:g('fy_backfill'),lifeline:g('fy_lifeline')};
 }
 function _toolStatesTouch(){try{localStorage.setItem('fy_toolstates_mt',String(Date.now()));}catch(e){_err('_toolStatesTouch',e);}}
 function _planStateSaved(){
@@ -11921,7 +11946,7 @@ function _applyCloud(data){
     if(data.toolStates){try{
       var _locTS=_toolStates(),_cldTS=data.toolStates;
       if(((_cldTS&&_cldTS._mt)||0)>(_locTS._mt||0)){
-        var _kmap={progress:'fy_progress',rebar:'fy_rebar2',grout:'fy_grout',backfill:'fy_backfill'};
+        var _kmap={progress:'fy_progress',rebar:'fy_rebar2',grout:'fy_grout',backfill:'fy_backfill',lifeline:'fy_lifeline'};
         Object.keys(_kmap).forEach(function(k){
           if(_cldTS[k])localStorage.setItem(_kmap[k],JSON.stringify(_cldTS[k]));
         });
@@ -12648,7 +12673,7 @@ function _trSave(kind,title,proj,inputs,summary){
   _trPersist(a);
 }
 function _trGet(id){return _trAll().find(function(r){return r.id===id;});}
-var _TR_RERENDER={rebar:'_rbRender',grout:'_gtRender',backfill:'_bfRender',progress:'_pgRender',plan:'_plRender'};
+var _TR_RERENDER={rebar:'_rbRender',grout:'_gtRender',backfill:'_bfRender',progress:'_pgRender',plan:'_plRender',lifeline:'_llRender'};
 function _trDelUI(id,kind){
   _trPersist(_trAll().filter(function(r){return r.id!==id;}));
   toast('已刪除存檔');try{window[_TR_RERENDER[kind]]();}catch(e){_err('_trDelUI',e);}
@@ -18623,7 +18648,7 @@ function _mstack(root){
   });
 }
 (function(){
-  var ids=['rebar-root','grout-root','backfill-root','progress-root','mat-est-form','mat-est-out','plan-root',
+  var ids=['rebar-root','grout-root','backfill-root','lifeline-root','progress-root','mat-est-form','mat-est-out','plan-root',
            'page-params',                    // v5.372：參數設定的單價矩陣表
            'page-staff','page-roles'];       // v5.382：人員／角色頁的名冊表（CI 在不同字型環境抓到溢出）
   function _msApply(){ids.forEach(function(id){var el=document.getElementById(id);if(el)_mstack(el);});}
@@ -19404,6 +19429,430 @@ function _bfXlsx(){
       ['3. 背填鋼筋(支) = CEILING(該層周長 ÷ 間距) ×（1＋損耗%）；鋼筋(kg) = 支數 × 單支長 × 單位重。'],
       ['4. 全表活公式：修改 B2–B7 或各層欄位，Excel 自動重算。']]}];
   xlsxDownload(_toolFileName('backfill','背填材料用量表',st.proj),sheets);
+}
+// ══════════ 安全母索估算（v5.393；v5.394 加入特多龍繩／鋼索兩種形式）══════════
+// 依豐有既有 Excel「安全母索（多區塊轉換檔）」的邏輯：
+//   ① 一個工地切成數個區塊，每區塊再分縱向／橫向；
+//   ② 每個方向逐列填「條數 × 單長」，該方向總長 = Σ(條數×單長)（原表 D=B*C、總和 /100 換公尺）；
+//   ③ 方向另填「宣告路數」，必須等於明細條數合計（原表 IF(B2=B19,TRUE) 的檢核格）；
+//   ④ 總長 = 層數×(基地周長＋各區塊縱橫總長) − 構台下總長×扣除層數
+//      （原表 C27+C28 與 D27−B26 兩式同解，本工具採同一口徑）。
+// 優化：區塊可增刪命名、cm／m 切換、路數即時檢核、每路端部錨錠預留、損耗率、
+//       捲數與配件換算、存檔歷史、列印與活公式 Excel。
+// v5.394：母索形式分「特多龍繩」與「鋼索」——兩者規格、單位重、端部作法與配件都不同，
+//       故各自有規格／預留／每捲長度／配件參數；每個區塊可指定形式（預設跟隨共同條件），
+//       長度、捲數、重量與配件依形式分開彙總（同工地混用時不會被加在一起）。
+function _llNum(x){var n=typeof x==='string'?parseFloat(x):x;return Number.isFinite(n)?n:0;}
+function _llInt(x){return Math.max(0,Math.round(_llNum(x)));}
+var _LL_UNIT={cm:0.01,m:1};
+// 形式定義：規格（含單位重 kg/m）、端部作法對應的配件名稱與常用預設值
+var _LL_FORM={
+  wire:{label:'鋼索',note:'端部以套環＋鋼索夾固定，另設緊索器（花籃螺絲）張緊',
+        specs:[['Ø9.53mm（3/8″）',0.35],['Ø12.7mm（1/2″）',0.63],['Ø16mm（5/8″）',0.99]],
+        accs:['鋼索夾（只／路）','緊索器（組／路）','套環（只／路）'],
+        def:{spec:'Ø12.7mm（1/2″）',spare:1.5,reel:200,acc:[8,1,2]}},
+  rope:{label:'特多龍繩',note:'端部以套環＋繩用夾具（或編接）固定，另設棘輪張力器張緊；打結會多吃長度',
+        specs:[['Ø16mm',0.17],['Ø18mm',0.21],['Ø20mm',0.26]],
+        accs:['繩用夾具（只／路）','棘輪張力器（組／路）','套環（只／路）'],
+        def:{spec:'Ø16mm',spare:2,reel:200,acc:[4,1,2]}}};
+var _LL_FORMS=['wire','rope'];
+function _llFm(t){return _LL_FORM[t]||_LL_FORM.wire;}
+function _llDefF(t){var d=_llFm(t).def;return {spec:d.spec,spare:d.spare,reel:d.reel,acc:d.acc.slice()};}
+function _llSpecW(t,spec){var s=_llFm(t).specs.find(function(x){return x[0]===spec;});return s?s[1]:0;}
+function _llNewDir(){return {runs:'',rows:[{n:'',len:''}]};}
+function _llNewZone(name,deck){return {name:name||'新區塊',deck:!!deck,form:'',v:_llNewDir(),h:_llNewDir()};}
+// 存檔遷移：v5.393 的舊狀態只有鋼索一組參數（clips/turn/shackle/spare/reelLen）→ 收進 f.wire
+function _llMigrate(s){
+  if(!s||typeof s!=='object')return s;
+  if(s.form!=='wire'&&s.form!=='rope')s.form='wire';
+  var old=(s.clips!=null||s.reelLen!=null||s.spare!=null)&&(!s.f||typeof s.f!=='object');
+  if(!s.f||typeof s.f!=='object')s.f={};
+  if(old)s.f.wire={spec:_llDefF('wire').spec,spare:_llNum(s.spare),reel:_llNum(s.reelLen)||200,
+                   acc:[_llInt(s.clips),_llInt(s.turn),_llInt(s.shackle)]};
+  _LL_FORMS.forEach(function(t){
+    var d=_llDefF(t),o=s.f[t]||{};
+    s.f[t]={spec:o.spec||d.spec,spare:o.spare==null?d.spare:o.spare,
+            reel:o.reel==null?d.reel:o.reel,
+            acc:(o.acc&&o.acc.length===3)?o.acc.slice():d.acc.slice()};
+  });
+  (s.zones||[]).forEach(function(z){if(z.form!=='wire'&&z.form!=='rope')z.form='';});
+  delete s.clips;delete s.turn;delete s.shackle;delete s.reelLen;delete s.spare;
+  return s;
+}
+var _llState=(function(){
+  try{var s=JSON.parse(localStorage.getItem('fy_lifeline')||'');if(s&&s.zones&&s.zones.length)return _llMigrate(s);}catch(e){_err('top',e);}
+  return _llMigrate({proj:'',perim:'',perimRuns:1,layers:3,deductLayers:1,unit:'cm',
+    useSpare:true,waste:5,form:'wire',f:{},
+    zones:[_llNewZone('第一區',false),_llNewZone('構台下',true)]});
+})();
+function _llFP(t){if(!_llState.f)_llState.f={};if(!_llState.f[t])_llState.f[t]=_llDefF(t);return _llState.f[t];}
+var _llHistOpen=false;
+function _llSave(){try{localStorage.setItem('fy_lifeline',JSON.stringify(_llState));_toolStatesTouch();_autoUpload();}catch(e){_err('_llSave',e);}}
+function _llSet(f,v){
+  if(f==='proj'||f==='unit'||f==='form')_llState[f]=String(v||'').trim();
+  else if(f==='useSpare')_llState[f]=!!v;
+  else _llState[f]=v;
+  _llSave();if(f!=='proj')_llRender();
+}
+function _llSetF(t,f,v){var o=_llFP(t);o[f]=(f==='spec')?String(v||''):v;_llSave();_llRender();}
+function _llSetAcc(t,i,v){var o=_llFP(t);o.acc=(o.acc||[0,0,0]).slice();o.acc[i]=v;_llSave();_llRender();}
+function _llZ(i){return (_llState.zones||[])[i];}
+function _llSetZone(i,f,v){var z=_llZ(i);if(!z)return;
+  if(f==='name')z.name=String(v||'');
+  else if(f==='deck')z.deck=!!v;
+  else if(f==='form')z.form=(v==='wire'||v==='rope')?v:'';
+  _llSave();_llRender();}
+function _llSetDir(i,d,v){var z=_llZ(i);if(!z||!z[d])return;z[d].runs=v;_llSave();_llRender();}
+function _llSetRow(i,d,j,f,v){var z=_llZ(i);if(!z||!z[d]||!z[d].rows[j])return;z[d].rows[j][f]=v;_llSave();_llRender();}
+function _llAddRow(i,d){var z=_llZ(i);if(!z||!z[d])return;z[d].rows.push({n:'',len:''});_llSave();_llRender();}
+function _llDelRow(i,d,j){var z=_llZ(i);if(!z||!z[d])return;
+  if(z[d].rows.length<=1){z[d].rows=[{n:'',len:''}];}else z[d].rows.splice(j,1);
+  _llSave();_llRender();}
+function _llAddZone(){
+  var n=(_llState.zones||[]).filter(function(z){return !z.deck;}).length+1;
+  var cn=['第一區','第二區','第三區','第四區','第五區','第六區','第七區','第八區'][n-1]||('第'+n+'區');
+  _llState.zones.push(_llNewZone(cn,false));_llSave();_llRender();
+}
+function _llDelZone(i){
+  if((_llState.zones||[]).length<=1){toast('至少保留一個區塊');return;}
+  _llState.zones.splice(i,1);_llSave();_llRender();
+}
+// ── 計算（口徑與 Excel 逐格一致；依母索形式分開彙總）──
+function _llCalc(){
+  var st=_llState,u=_LL_UNIT[st.unit]||0.01;
+  var dirOf=function(dir){
+    var rows=(dir&&dir.rows)||[];
+    var cnt=rows.reduce(function(a,r){return a+_llNum(r.n);},0);
+    var len=rows.reduce(function(a,r){return a+_llNum(r.n)*_llNum(r.len)*u;},0);
+    var dec=_llNum(dir&&dir.runs);
+    return {cnt:cnt,len:len,dec:dec,ok:dec>0?(Math.abs(dec-cnt)<1e-9):null};
+  };
+  var zones=(st.zones||[]).map(function(z){
+    var V=dirOf(z.v),H=dirOf(z.h);
+    return {name:z.name||'',deck:!!z.deck,own:z.form||'',
+      form:(z.form==='wire'||z.form==='rope')?z.form:st.form,
+      v:V,h:H,len:V.len+H.len,runs:V.cnt+H.cnt};
+  });
+  var perim=_llNum(st.perim),layers=_llInt(st.layers),dl=Math.min(layers,_llInt(st.deductLayers));
+  var T={},used=[];
+  _LL_FORMS.forEach(function(t){
+    var zs=zones.filter(function(z){return z.form===t;});
+    var pick=function(deck,key){return zs.filter(function(z){return !!z.deck===deck;})
+      .reduce(function(a,z){return a+z[key];},0);};
+    var zoneLen=pick(false,'len'),deckLen=pick(true,'len');
+    var zoneRuns=pick(false,'runs'),deckRuns=pick(true,'runs');
+    var pm=(st.form===t)?perim:0,pr=(st.form===t)?_llInt(st.perimRuns):0;
+    var perLayer=pm+zoneLen,gross=perLayer*layers,deduct=deckLen*dl,net=gross-deduct;
+    var runs=Math.max(0,Math.round((zoneRuns+pr)*layers-deckRuns*dl));
+    var fp=_llFP(t);
+    var spare=st.useSpare?runs*_llNum(fp.spare):0;
+    var need=(net+spare)*(1+_llNum(st.waste)/100);
+    var reel=_llNum(fp.reel),w=_llSpecW(t,fp.spec);
+    var u2={form:t,label:_llFm(t).label,spec:fp.spec,unitW:w,zoneCount:zs.length,
+      used:zs.length>0||st.form===t,perim:pm,perimRuns:pr,
+      zoneLen:zoneLen,deckLen:deckLen,zoneRuns:zoneRuns,deckRuns:deckRuns,
+      perLayer:perLayer,gross:gross,deduct:deduct,net:net,runs:runs,spare:spare,need:need,
+      reels:reel>0?Math.ceil(need/reel):0,reel:reel,kg:need*w,
+      acc:(fp.acc||[0,0,0]).map(function(n){return runs*_llInt(n);})};
+    T[t]=u2;if(u2.used)used.push(u2);
+  });
+  var bad=[];
+  zones.forEach(function(z){
+    if(z.v.ok===false)bad.push((z.name||'區塊')+' 縱向');
+    if(z.h.ok===false)bad.push((z.name||'區塊')+' 橫向');
+  });
+  var sum=function(k){return used.reduce(function(a,x){return a+x[k];},0);};
+  return {zones:zones,T:T,used:used,mixed:used.length>1,layers:layers,deductLayers:dl,perim:perim,
+    perLayer:sum('perLayer'),gross:sum('gross'),deduct:sum('deduct'),net:sum('net'),
+    runs:sum('runs'),spare:sum('spare'),need:sum('need'),reels:sum('reels'),kg:sum('kg'),
+    zoneLen:sum('zoneLen'),deckLen:sum('deckLen'),bad:bad};
+}
+function _llM(x){return (Math.round(x*100)/100).toFixed(2);}
+function _llR(x){return _llM(x).replace(/\.00$/,'');}
+// ── 畫面 ──
+function _llDirHtml(i,key,label,z,r){
+  var st=_llState,u=st.unit==='m'?'m':'cm';
+  var badge;
+  if(r.ok===true)badge='<span style="font-size:11px;font-weight:700;color:var(--g3)">✓ 相符</span>';
+  else if(r.ok===false)badge='<span style="font-size:11px;font-weight:700;color:var(--red)">⚠ 明細 '+_llR(r.cnt)+' 路，宣告 '+_llR(r.dec)+' 路</span>';
+  else badge='<span style="font-size:11px;color:var(--b3)">明細 '+_llR(r.cnt)+' 路</span>';
+  var h='<div style="flex:1;min-width:260px">'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 5px">'
+    +'<b style="font-size:12.5px;color:var(--g3)">'+label+'</b>'
+    +'<label style="font-size:11px;color:var(--b4);display:flex;align-items:center;gap:4px">宣告路數'
+    +'<input type="number" min="0" style="width:66px;height:30px" value="'+esc(String(z[key].runs==null?'':z[key].runs))+'" onchange="_llSetDir('+i+',\''+key+'\',this.value)"></label>'
+    +badge
+    +'<button type="button" class="btn btn-xs" style="margin-left:auto" onclick="_llAddRow('+i+',\''+key+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-plus"/></svg> 加一列</button>'
+    +'</div><div style="overflow-x:auto"><table class="tbl" style="width:100%;font-size:12px">'
+    +'<thead><tr><th style="width:22%">條數</th><th style="width:34%">單長（'+u+'）</th><th style="width:32%">小計（m）</th><th style="width:12%"></th></tr></thead><tbody>';
+  (z[key].rows||[]).forEach(function(row,j){
+    var sub=_llNum(row.n)*_llNum(row.len)*(_LL_UNIT[st.unit]||0.01);
+    h+='<tr><td><input type="number" min="0" value="'+esc(String(row.n==null?'':row.n))+'" onchange="_llSetRow('+i+',\''+key+'\','+j+',\'n\',this.value)"></td>'
+      +'<td><input type="number" min="0" step="0.1" value="'+esc(String(row.len==null?'':row.len))+'" onchange="_llSetRow('+i+',\''+key+'\','+j+',\'len\',this.value)"></td>'
+      +'<td style="text-align:right;font-weight:700">'+_llM(sub)+'</td>'
+      +'<td class="del"><button type="button" class="btn btn-xs" onclick="_llDelRow('+i+',\''+key+'\','+j+')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button></td></tr>';
+  });
+  h+='<tr style="background:var(--gl);font-weight:700"><td style="text-align:right">'+_llR(r.cnt)+' 路</td><td style="text-align:right">小計</td>'
+    +'<td style="text-align:right">'+_llM(r.len)+'</td><td></td></tr>';
+  return h+'</tbody></table></div></div>';
+}
+function _llRender(){
+  var root=document.getElementById('lifeline-root');if(!root)return;
+  var st=_llState,res=_llCalc();
+  var fld=function(l,html){return '<label style="display:flex;flex-direction:column;justify-content:flex-end;gap:4px;font-size:11.5px;font-weight:700;color:var(--b5);min-width:0">'+l+html+'</label>';};
+  var grid='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px">';
+  var h='<div class="card" style="margin-bottom:12px"><div class="cb tool-head" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
+    +fld('掛專案（可選報價單或自行輸入）','<input list="fy-proj-list" value="'+esc(st.proj||'')+'" style="min-width:220px" onchange="_llSet(\'proj\',this.value)">')
+    +'<button type="button" class="btn btn-sm" onclick="_llSaveRec()"><svg class="ic ib" aria-hidden="true"><use href="#i-save"/></svg> 存檔</button>'
+    +'<button type="button" class="btn btn-sm" onclick="_llHistToggle()"><svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> 歷史</button>'
+    +'<button type="button" class="btn btn-sm" onclick="_llPrint()"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 列印</button>'
+    +'<button type="button" class="btn btn-sm" onclick="_llXlsx()"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 匯出 Excel</button>'
+    +'</div></div>'+_projDatalist();
+  if(_llHistOpen)h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">存檔歷史</div></div><div class="cb">'+_trHistHtml('lifeline','_llLoadRec')+'</div></div>';
+  h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">共同條件</div></div><div class="cb">'+grid
+    +fld('母索形式（預設）','<select onchange="_llSet(\'form\',this.value)">'+_LL_FORMS.map(function(t){return '<option value="'+t+'"'+(st.form===t?' selected':'')+'>'+_llFm(t).label+'</option>';}).join('')+'</select>')
+    +fld('基地周長（m）','<input type="number" step="0.1" value="'+esc(String(st.perim==null?'':st.perim))+'" onchange="_llSet(\'perim\',this.value)">')
+    +fld('周長路數','<input type="number" min="0" value="'+esc(String(st.perimRuns))+'" onchange="_llSet(\'perimRuns\',this.value)">')
+    +fld('支撐層數','<input type="number" min="0" value="'+esc(String(st.layers))+'" onchange="_llSet(\'layers\',this.value)">')
+    +fld('構台下扣除層數','<input type="number" min="0" value="'+esc(String(st.deductLayers))+'" onchange="_llSet(\'deductLayers\',this.value)">')
+    +fld('明細單長單位','<select onchange="_llSet(\'unit\',this.value)"><option value="cm"'+(st.unit==='cm'?' selected':'')+'>公分 cm</option><option value="m"'+(st.unit==='m'?' selected':'')+'>公尺 m</option></select>')
+    +fld('計入端部預留','<select onchange="_llSet(\'useSpare\',this.value===\'1\')"><option value="1"'+(st.useSpare?' selected':'')+'>是</option><option value="0"'+(st.useSpare?'':' selected')+'>否</option></select>')
+    +fld('損耗（％）','<input type="number" step="0.5" value="'+esc(String(st.waste))+'" onchange="_llSet(\'waste\',this.value)">')
+    +'</div><div style="font-size:11px;color:var(--b3);margin-top:8px">周長母索採「預設形式」計算；各區塊可自行指定形式，長度與配件會分開彙總。'
+    +'依營造安全衛生設施標準，安全母索材質得為鋼索、尼龍繩索或聚酯纖維（特多龍）等，最小斷裂強度應在 2,300 kgf 以上。</div></div></div>';
+  // 形式參數（只顯示有用到的形式）
+  h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">母索材料參數</div></div><div class="cb">';
+  res.used.forEach(function(T){
+    var fm=_llFm(T.form),fp=_llFP(T.form);
+    h+='<div style="border:1px solid var(--b2);border-radius:var(--r8);padding:10px 11px;margin-bottom:9px;background:var(--w)">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">'
+      +'<b style="font-size:13px;color:var(--g3)">'+fm.label+'</b>'
+      +'<span style="font-size:11px;color:var(--b3)">'+fm.note+'</span></div>'+grid
+      +fld('規格','<select onchange="_llSetF(\''+T.form+'\',\'spec\',this.value)">'+fm.specs.map(function(s){return '<option'+(fp.spec===s[0]?' selected':'')+'>'+s[0]+'</option>';}).join('')+'</select>')
+      +fld('單位重（kg/m）','<input type="number" value="'+T.unitW+'" disabled>')
+      +fld('每路端部預留（m）','<input type="number" step="0.1" value="'+esc(String(fp.spare))+'" onchange="_llSetF(\''+T.form+'\',\'spare\',this.value)"'+(st.useSpare?'':' disabled')+'>')
+      +fld('每捲長度（m）','<input type="number" step="10" value="'+esc(String(fp.reel))+'" onchange="_llSetF(\''+T.form+'\',\'reel\',this.value)">')
+      +fm.accs.map(function(lb,k){return fld(lb,'<input type="number" min="0" value="'+esc(String((fp.acc||[])[k]==null?0:fp.acc[k]))+'" onchange="_llSetAcc(\''+T.form+'\','+k+',this.value)">');}).join('')
+      +'</div></div>';
+  });
+  h+='</div></div>';
+  // 區塊
+  h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">區塊明細（'+(st.zones||[]).length+' 區）</div>'
+    +'<button type="button" class="btn btn-xs" onclick="_llAddZone()"><svg class="ic ib" aria-hidden="true"><use href="#i-plus"/></svg> 加一區</button></div><div class="cb">';
+  (st.zones||[]).forEach(function(z,i){
+    var r=res.zones[i];
+    h+='<div style="border:1px solid '+(z.deck?'var(--ym)':'var(--b2)')+';border-radius:var(--r8);padding:10px 11px;margin-bottom:10px;background:'+(z.deck?'var(--yl)':'var(--w)')+'">'
+      +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">'
+      +'<input value="'+esc(z.name||'')+'" style="max-width:170px;font-weight:700" onchange="_llSetZone('+i+',\'name\',this.value)">'
+      +'<label style="display:flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:var(--b5)">形式'
+      +'<select style="width:130px" onchange="_llSetZone('+i+',\'form\',this.value)">'
+      +'<option value=""'+(z.form?'':' selected')+'>同預設（'+_llFm(st.form).label+'）</option>'
+      +_LL_FORMS.map(function(t){return '<option value="'+t+'"'+(z.form===t?' selected':'')+'>'+_llFm(t).label+'</option>';}).join('')
+      +'</select></label>'
+      +'<label style="display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--b5)">'
+      +'<input type="checkbox"'+(z.deck?' checked':'')+' onchange="_llSetZone('+i+',\'deck\',this.checked)"> 構台下（自總長扣除）</label>'
+      +'<span style="font-size:11.5px;color:var(--b4)">本區合計 <b style="color:var(--g3)">'+_llM(r.len)+'</b> m</span>'
+      +'<button type="button" class="btn btn-xs" style="margin-left:auto" onclick="_llDelZone('+i+')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg> 刪除區塊</button>'
+      +'</div><div style="display:flex;gap:12px;flex-wrap:wrap">'
+      +_llDirHtml(i,'v','縱向',z,r.v)+_llDirHtml(i,'h','橫向',z,r.h)
+      +'</div></div>';
+  });
+  h+='</div></div>';
+  if(res.bad.length)h+='<div class="card" style="margin-bottom:12px;border-color:var(--red)"><div class="cb" style="color:var(--red);font-weight:700;font-size:12.5px">⚠ 路數檢核未通過：'+esc(res.bad.join('、'))+'——明細條數合計與宣告路數不符，請確認是否漏列。</div></div>';
+  // 彙總（依形式分欄）
+  var U=res.used,mix=res.mixed;
+  var head='<tr><th style="text-align:left">項目</th>'+U.map(function(T){return '<th style="text-align:right">'+esc(T.label)+'</th>';}).join('')
+    +(mix?'<th style="text-align:right">合計</th>':'')+'</tr>';
+  var row=function(k,fn,tot,b){
+    return '<tr'+(b?' style="background:var(--gl);font-weight:700"':'')+'><td style="text-align:left">'+k+'</td>'
+      +U.map(function(T){return '<td style="text-align:right">'+fn(T)+'</td>';}).join('')
+      +(mix?'<td style="text-align:right">'+(tot==null?'—':tot)+'</td>':'')+'</tr>';
+  };
+  h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">計算彙總</div></div><div class="cb" style="padding-top:8px">'
+    +'<div style="overflow-x:auto"><table class="tbl" style="width:100%;font-size:12.5px"><thead>'+head+'</thead><tbody>'
+    +row('規格',function(T){return esc(T.spec);},null)
+    +row('基地周長（歸屬預設形式）',function(T){return _llM(T.perim)+' m';},_llM(res.perim)+' m')
+    +row('各區塊縱橫總長（不含構台下）',function(T){return _llM(T.zoneLen)+' m';},_llM(res.zoneLen)+' m')
+    +row('每層長度＝周長＋區塊總長',function(T){return _llM(T.perLayer)+' m';},_llM(res.perLayer)+' m',true)
+    +row('總長（'+res.layers+' 層，未扣構台下）',function(T){return _llM(T.gross)+' m';},_llM(res.gross)+' m')
+    +row('構台下總長 × 扣除 '+res.deductLayers+' 層',function(T){return '−'+_llM(T.deduct)+' m';},'−'+_llM(res.deduct)+' m')
+    +row('母索總長（扣除後）',function(T){return _llM(T.net)+' m';},_llM(res.net)+' m',true)
+    +row('總路數',function(T){return fmt(T.runs)+' 路';},fmt(res.runs)+' 路')
+    +row('端部錨錠預留',function(T){return '+'+_llM(T.spare)+' m';},'+'+_llM(res.spare)+' m')
+    +row('損耗 '+_llNum(st.waste)+'%',function(){return '×'+(1+_llNum(st.waste)/100).toFixed(3);},null)
+    +row('需求長度',function(T){return _llM(T.need)+' m';},_llM(res.need)+' m',true)
+    +row('捲數',function(T){return fmt(T.reels)+' 捲（每捲 '+_llNum(T.reel)+' m）';},fmt(res.reels)+' 捲')
+    +row('概估重量',function(T){return fmt(Math.round(T.kg))+' kg';},fmt(Math.round(res.kg))+' kg')
+    +U.map(function(T,ci){
+      return _llFm(T.form).accs.map(function(lb,k){
+        return '<tr><td style="text-align:left">'+esc(T.label+'　'+lb.replace(/（.*/,''))+'</td>'
+          +U.map(function(X,cj){return '<td style="text-align:right">'+(cj===ci?fmt(T.acc[k]):'—')+'</td>';}).join('')
+          +(mix?'<td style="text-align:right">'+fmt(T.acc[k])+'</td>':'')+'</tr>';
+      }).join('');
+    }).join('')
+    +'</tbody></table></div></div></div>';
+  var kpi=function(l,v,s){return '<div class="kpi hi" style="flex:1;min-width:180px"><div class="kl">'+l+'</div><div class="kv" style="font-size:19px">'+v+'</div>'+(s?'<div class="ks">'+s+'</div>':'')+'</div>';};
+  h+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
+    +kpi('每層長度'+(mix?'（合計）':''),_llM(res.perLayer)+' m','周長 '+_llM(res.perim)+'＋區塊 '+_llM(res.zoneLen))
+    +kpi('母索總長（扣除後）',_llM(res.net)+' m',res.layers+' 層 − 構台下 '+_llM(res.deduct)+' m')
+    +U.map(function(T){
+      return kpi(esc(T.label)+' '+esc(T.spec)+' 需求長度',_llM(T.need)+' m',fmt(T.runs)+' 路／'+fmt(T.reels)+' 捲（每捲 '+_llNum(T.reel)+' m）／約 '+fmt(Math.round(T.kg))+' kg');
+    }).join('')
+    +'</div>';
+  root.innerHTML=h;
+}
+function _llHistToggle(){_llHistOpen=!_llHistOpen;_llRender();}
+function _llSaveRec(){
+  var res=_llCalc();
+  _trSave('lifeline','安全母索'+(_llState.proj?('（'+_llState.proj+'）'):''),_llState.proj,_llState,
+    res.used.map(function(T){return T.label+' '+_llM(T.need)+' m';}).join('／'));
+  toast('已存檔（本機）');if(_llHistOpen)_llRender();
+}
+function _llLoadRec(id){var r=_trGet(id);if(!r)return;_llState=_llMigrate(JSON.parse(JSON.stringify(r.inputs)));_llSave();_llHistOpen=false;_llRender();toast('已回載存檔');}
+function _llPrint(){
+  var st=_llState,res=_llCalc(),u=st.unit==='m'?'m':'cm',U=res.used,mix=res.mixed;
+  var body='<h2>共同條件 <span class="sub">預設形式 '+_xlEsc(_llFm(st.form).label)+'｜基地周長 '+_llM(res.perim)+' m｜周長 '+_llInt(st.perimRuns)+' 路｜支撐 '+res.layers+' 層｜構台下扣除 '+res.deductLayers+' 層｜損耗 '+_llNum(st.waste)+'%</span></h2>'
+    +'<table><tr><th>區塊</th><th>形式</th><th>方向</th><th>條數</th><th>單長（'+u+'）</th><th>小計（m）</th><th>宣告路數</th><th>檢核</th></tr>';
+  (st.zones||[]).forEach(function(z,i){
+    var r=res.zones[i];
+    [['v','縱向'],['h','橫向']].forEach(function(dd){
+      var key=dd[0],lab=dd[1],rr=r[key],rows=(z[key].rows||[]);
+      rows.forEach(function(row,j){
+        var sub=_llNum(row.n)*_llNum(row.len)*(_LL_UNIT[st.unit]||0.01);
+        body+='<tr><td class="l">'+(j===0&&key==='v'?_xlEsc(z.name||'')+(z.deck?'（扣除）':''):'')+'</td>'
+          +'<td>'+(j===0&&key==='v'?_xlEsc(_llFm(r.form).label):'')+'</td>'
+          +'<td>'+(j===0?lab:'')+'</td><td class="r">'+_llNum(row.n)+'</td><td class="r">'+_llNum(row.len)+'</td>'
+          +'<td class="r">'+_llM(sub)+'</td><td></td><td></td></tr>';
+      });
+      body+='<tr class="tt"><td class="l"></td><td></td><td>'+lab+' 小計</td><td class="r">'+_llR(rr.cnt)+'</td><td></td>'
+        +'<td class="r">'+_llM(rr.len)+'</td><td class="r">'+(rr.dec>0?_llR(rr.dec):'—')+'</td>'
+        +'<td>'+(rr.ok===true?'✓':(rr.ok===false?'✗':'—'))+'</td></tr>';
+    });
+  });
+  body+='</table><h2>計算彙總</h2><table><tr><th>項目</th>'
+    +U.map(function(T){return '<th>'+_xlEsc(T.label)+'</th>';}).join('')+(mix?'<th>合計</th>':'')+'</tr>';
+  var row=function(k,fn,tot,tt){
+    body+='<tr'+(tt?' class="tt"':'')+'><td class="l">'+k+'</td>'
+      +U.map(function(T){return '<td class="r">'+fn(T)+'</td>';}).join('')
+      +(mix?'<td class="r">'+(tot==null?'—':tot)+'</td>':'')+'</tr>';
+  };
+  row('規格',function(T){return _xlEsc(T.spec);},null);
+  row('基地周長（歸屬預設形式）',function(T){return _llM(T.perim)+' m';},_llM(res.perim)+' m');
+  row('各區塊縱橫總長（不含構台下）',function(T){return _llM(T.zoneLen)+' m';},_llM(res.zoneLen)+' m');
+  row('每層長度＝周長＋區塊總長',function(T){return _llM(T.perLayer)+' m';},_llM(res.perLayer)+' m',1);
+  row('總長（'+res.layers+' 層，未扣構台下）',function(T){return _llM(T.gross)+' m';},_llM(res.gross)+' m');
+  row('構台下總長 × 扣除 '+res.deductLayers+' 層',function(T){return '−'+_llM(T.deduct)+' m';},'−'+_llM(res.deduct)+' m');
+  row('母索總長（扣除後）',function(T){return _llM(T.net)+' m';},_llM(res.net)+' m',1);
+  row('總路數',function(T){return T.runs+' 路';},res.runs+' 路');
+  row('端部錨錠預留',function(T){return '+'+_llM(T.spare)+' m';},'+'+_llM(res.spare)+' m');
+  row('損耗 '+_llNum(st.waste)+'%',function(){return '×'+(1+_llNum(st.waste)/100).toFixed(3);},null);
+  row('需求長度',function(T){return _llM(T.need)+' m';},_llM(res.need)+' m',1);
+  row('捲數',function(T){return T.reels+' 捲（每捲 '+_llNum(T.reel)+' m）';},res.reels+' 捲');
+  row('概估重量',function(T){return Math.round(T.kg).toLocaleString()+' kg';},Math.round(res.kg).toLocaleString()+' kg');
+  U.forEach(function(T,ci){
+    _llFm(T.form).accs.forEach(function(lb,k){
+      body+='<tr><td class="l">'+_xlEsc(T.label+'　'+lb.replace(/（.*/,''))+'</td>'
+        +U.map(function(X,cj){return '<td class="r">'+(cj===ci?T.acc[k]:'—')+'</td>';}).join('')
+        +(mix?'<td class="r">'+T.acc[k]+'</td>':'')+'</tr>';
+    });
+  });
+  body+='</table>'
+    +'<div class="cond">公式：各方向總長＝Σ(條數×單長)；每層長度＝基地周長＋各區塊縱橫總長；'
+    +'母索總長＝每層長度×層數 − 構台下總長×扣除層數；'
+    +'需求長度＝(母索總長＋每路端部預留×總路數)×(1＋損耗%)。'
+    +'總路數＝(各區塊路數＋周長路數)×層數 − 構台下路數×扣除層數。宣告路數僅供與明細條數勾稽，不進入計算。'
+    +'母索形式（特多龍繩／鋼索）各自的規格、單位重、端部預留與配件分開計算，長度不互相混計。</div>';
+  _toolPrint('安全母索用量表',st.proj,body,{fname:_toolFileName('lifeline','安全母索用量表',st.proj)});
+}
+function _llXlsx(){
+  var st=_llState,res=_llCalc(),u=_LL_UNIT[st.unit]||0.01,U=res.used;
+  var rows=[
+    [{v:'安全母索用量',s:1}],
+    ['基地周長(m)',{v:_llNum(st.perim)}],
+    ['周長路數',{v:_llInt(st.perimRuns)}],
+    ['支撐層數',{v:res.layers}],
+    ['構台下扣除層數',{v:res.deductLayers}],
+    ['單長單位係數(→m)',{v:u}],
+    ['損耗(%)',{v:_llNum(st.waste)}],
+    ['預設母索形式',{v:_llFm(st.form).label,t:'s'}],
+    [],
+    [{v:'區塊',s:2},{v:'方向',s:2},{v:'條數',s:2},{v:'單長',s:2},{v:'小計(m)',s:2},{v:'宣告路數',s:2},{v:'檢核',s:2},{v:'形式',s:2},{v:'扣除',s:2},{v:'列別',s:2}]];
+  var rn=10,first=0;
+  (st.zones||[]).forEach(function(z,zi){
+    var zf=res.zones[zi].form,fl=_llFm(zf).label,dk=z.deck?1:0;
+    [['v','縱向'],['h','橫向']].forEach(function(dd){
+      var key=dd[0],lab=dd[1],det=(z[key].rows||[]);
+      var s0=rn+1;
+      det.forEach(function(row){
+        rn++;if(!first)first=rn;
+        rows.push([{v:z.name||'',t:'s',s:3},{v:lab,t:'s',s:3},{v:_llNum(row.n),s:3},{v:_llNum(row.len),s:3},
+          {f:'C'+rn+'*D'+rn+'*$B$6',s:3},null,null,{v:fl,t:'s',s:3},{v:dk,s:3},{v:'明細',t:'s',s:3}]);
+      });
+      var s1=rn;rn++;
+      rows.push([{v:(z.deck?'【扣除】':'')+(z.name||''),t:'s',s:4},{v:lab+' 小計',t:'s',s:4},
+        {f:'SUM(C'+s0+':C'+s1+')',s:4},null,{f:'SUM(E'+s0+':E'+s1+')',s:4},
+        {v:_llNum(z[key].runs),s:4},{f:'IF(F'+rn+'=0,"—",IF(F'+rn+'=C'+rn+',"OK","差"&TEXT(F'+rn+'-C'+rn+',"0")))',s:4},
+        {v:fl,t:'s',s:4},{v:dk,s:4},{v:'小計',t:'s',s:4}]);
+    });
+  });
+  var last=rn;if(!first)first=10;
+  var R=function(c){return '$'+c+'$'+first+':$'+c+'$'+last;};
+  var sif=function(col,form,deck){
+    return 'SUMIFS('+R(col)+','+R('J')+',"明細",'+R('H')+',"'+form+'",'+R('I')+','+deck+')';
+  };
+  rn++;rows.push([]);
+  rn++;rows.push([{v:'計算彙總（依母索形式分列）',s:1}]);
+  rn++;
+  rows.push([{v:'項目',s:2}].concat(U.map(function(T){return {v:T.label,s:2};})));
+  var ref={},col=['B','C','D'];
+  var b=function(label,fn){
+    rn++;
+    rows.push([{v:label,t:'s',s:4}].concat(U.map(function(T,ci){return {f:fn(T,col[ci]),s:4};})));
+    return rn;
+  };
+  var bv=function(label,fn){
+    rn++;
+    rows.push([{v:label,t:'s',s:4}].concat(U.map(function(T){var x=fn(T);return {v:x,t:(typeof x==='string')?'s':'',s:4};})));
+    return rn;
+  };
+  bv('規格',function(T){return T.spec;});
+  ref.w=bv('單位重(kg/m)',function(T){return T.unitW;});
+  ref.spare=bv('每路端部預留(m)',function(T){return st.useSpare?_llNum(_llFP(T.form).spare):0;});
+  ref.reel=bv('每捲長度(m)',function(T){return _llNum(_llFP(T.form).reel);});
+  ref.zone=b('各區塊縱橫總長(m)（不含構台下）',function(T){return sif('E',T.label,0);});
+  ref.deck=b('構台下總長(m)',function(T){return sif('E',T.label,1);});
+  ref.per =b('每層長度(m)＝基地周長(僅預設形式)＋區塊總長',function(T,c){return 'IF($B$8="'+T.label+'",$B$2,0)+'+c+ref.zone;});
+  ref.gro =b('總長(m)＝每層長度×層數',function(T,c){return c+ref.per+'*$B$4';});
+  ref.ded =b('扣除構台下(m)＝構台下總長×扣除層數',function(T,c){return c+ref.deck+'*$B$5';});
+  ref.net =b('母索總長(m)（扣除後）',function(T,c){return c+ref.gro+'-'+c+ref.ded;});
+  ref.rl  =b('每層路數＝區塊路數＋周長路數(僅預設形式)',function(T,c){return sif('C',T.label,0)+'+IF($B$8="'+T.label+'",$B$3,0)';});
+  ref.rd  =b('構台下路數',function(T){return sif('C',T.label,1);});
+  ref.run =b('總路數',function(T,c){return c+ref.rl+'*$B$4-'+c+ref.rd+'*$B$5';});
+  ref.sp  =b('端部錨錠預留(m)＝總路數×每路預留',function(T,c){return c+ref.run+'*'+c+ref.spare;});
+  ref.need=b('需求長度(m)＝(總長＋預留)×(1＋損耗%)',function(T,c){return '('+c+ref.net+'+'+c+ref.sp+')*(1+$B$7/100)';});
+  b('捲數（無條件進位）',function(T,c){return 'CEILING('+c+ref.need+'/'+c+ref.reel+',1)';});
+  b('概估重量(kg)',function(T,c){return c+ref.need+'*'+c+ref.w;});
+  var maxAcc=Math.max.apply(null,U.map(function(T){return _llFm(T.form).accs.length;}).concat([0]));
+  for(var k=0;k<maxAcc;k++)(function(k){
+    rn++;
+    rows.push([{v:'配件 '+(k+1),t:'s',s:4}].concat(U.map(function(T,ci){
+      var lb=(_llFm(T.form).accs[k]||'').replace(/（.*/,'');
+      return {f:'"'+lb+' "&TEXT('+col[ci]+ref.run+'*'+_llInt((_llFP(T.form).acc||[])[k])+',"0")',s:4};
+    })));
+  })(k);
+  var sheets=[{name:'安全母索',widths:[30,12,10,12,14,11,10,12,8,9],rows:rows},
+    {name:'公式說明',widths:[110],rows:[
+      [{v:'安全母索 — 計算公式說明（豐有工程管理系統匯出）',s:1}],
+      ['1. 每列小計(m) = 條數 × 單長 × 單位係數（B6：公分填 0.01、公尺填 1）。'],
+      ['2. 各方向小計 = 該方向各列相加；「宣告路數」與明細條數合計不符時，檢核欄顯示差額（原 Excel 的 IF 檢核格）。'],
+      ['3. 彙總以 SUMIFS 依「形式」與「扣除」旗標統計明細列，故新增或修改明細列即自動反映。'],
+      ['4. 每層長度 = 基地周長（僅計入 B8 指定的預設形式）＋ 該形式各區塊（縱向＋橫向）總長。'],
+      ['5. 母索總長 = 每層長度 × 層數 − 構台下總長 × 扣除層數。'],
+      ['6. 總路數 =（該形式區塊路數＋周長路數）× 層數 − 構台下路數 × 扣除層數。'],
+      ['7. 需求長度 =（母索總長 ＋ 總路數×每路端部預留）×（1＋損耗%）；重量 = 需求長度 × 單位重。'],
+      ['8. 安全母索形式分「特多龍繩（聚酯纖維）」與「鋼索」，規格、單位重、端部作法與配件皆不同，兩者分欄計算不混計。'],
+      ['9. 依營造安全衛生設施標準，安全母索材質得為鋼索、尼龍繩索或聚酯纖維等，最小斷裂強度應在 2,300 kgf 以上。']]}];
+  xlsxDownload(_toolFileName('lifeline','安全母索用量表',st.proj),sheets);
 }
 // ══════════ 施工進度表（v5.347：威立采排程引擎完整移植，排程行為與其 Excel 一致）══════════
 // 天數＝⌈數量÷日產能⌉或手動；開始＝同機組上一項完工+1（接力），否則機組進場日（缺→開工日），
@@ -27028,6 +27477,7 @@ const ALL_PAGES = [
   {id:'matest',    label:'材料估算',  icon:_pgIcon('box'),      grp:'data',  adminOnly:false}, // v5.352 自材料管理獨立
   {id:'grout',     label:'根固砂漿',  icon:_pgIcon('hardhat'),  grp:'data',  adminOnly:false}, // v5.346
   {id:'backfill',  label:'背填材料',  icon:_pgIcon('wrench'),   grp:'data',  adminOnly:false}, // v5.346
+  {id:'lifeline',  label:'安全母索',  icon:_pgIcon('link'),     grp:'data',  adminOnly:false}, // v5.393
   // v5.330 sysOnly：只有「系統管理員」角色能開，其他角色的權限表上是鎖住的
   {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, sysOnly:true},
   {id:'staff',     label:'人員管理',  icon:_pgIcon('users'),    grp:'acct',  adminOnly:true},
