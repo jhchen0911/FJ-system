@@ -925,6 +925,70 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────── 10. v5.395：單價庫單位限制／異常成本警示／單價分析逾期租金重置／材料估算引用安全母索 ─────────
+  {
+    const { page, errors } = await newPage(browser, 1400, 1000);
+    const r = await page.evaluate(() => {
+      const out = {};
+      // 單價庫：同名但「式」的實績不得套到逐 M 工項
+      COST_HIST = [{ qid: 'x', idx: 0, key: _normName('支撐架設及拆除'), name: '支撐架設及拆除', unit: '式', actUnit: 1500000, priceUnit: 2000000, qty: 1 },
+                   { qid: 'y', idx: 1, key: _normName('支撐架設'), name: '支撐架設', unit: 'M', actUnit: 420, priceUnit: 600, qty: 100 }];
+      out.histUnit = _histCostFor('支撐架設', 'M').avg === 420 && _histCostFor('支撐架設').avg === 420
+        && _histCostFor('支撐架設', '式').avg === 1500000;
+      // 異常成本：成本單價 > 報價單價 3 倍 → 合計區點名＋輸入框標紅
+      P.tax = 5; exs = [];
+      items = [{ desc: 'H型鋼樁打設', unit: 'M', qty: '100', price: '500', estCost: '380', ot: '', otu: '', sec: false },
+               { desc: '支撐架設', unit: 'M', qty: '800', price: '600', estCost: '1500000', ot: '', otu: '', sec: false }];
+      go('editor'); rItems(); rTots();
+      const w = document.getElementById('tcost-warn');
+      out.costWarn = w && w.style.display !== 'none' && /支撐架設/.test(w.textContent) && _costOddList().length === 1
+        && [...document.querySelectorAll('#page-editor input')].some(i => i.style.borderColor === 'var(--red)');
+      // 單價分析：換工項後逾期租金不得殘留上一項（H 型鋼）的數字
+      go('upa');
+      const c1 = document.getElementById('upa-cat1'), c2 = document.getElementById('upa-cat2');
+      const pick = (k1, k2) => { c1.value = k1; upaOnCat1Change(); c2.value = k2; upaOnCat2Change(); upaUpdateDesc();
+        return { amt: document.getElementById('upa-ot-amt').value, unit: document.getElementById('upa-ot-unit').value }; };
+      document.getElementById('upa-len').value = '12';
+      const h = pick('retaining', 'H型鋼樁');
+      const el = document.getElementById('upa-ot-amt'); el.value = '999'; el._userEdited = true;   // 使用者手改後再換工項
+      const st = pick('support', '水平支撐'), jk = pick('support', '油壓千斤頂'), pf = pick('support', '施工構台');
+      out.upaReset = +h.amt > 0 && h.unit === '$/支/天' && st.amt === '' && +jk.amt > 0 && jk.unit === '$/具/天' && +pf.amt > 0 && pf.unit === '$/m²/天';
+      // 期別名稱
+      out.labels = ITEM_PHASES.map(x => x[1]).join('|') === '自動判斷|打設／裝設期|拔除／拆除期'
+        && /拔除／拆除期請款率/.test(document.getElementById('page-params').textContent);
+      // 材料估算：綁定專案有安全母索計算 → 母索改引用工具結果（含扣構台下），沒有則沿用粗估並提示
+      Q = [{ id: 'qA', code: '1150', name: '冒煙案A新建工程', client: 'K營造', date: '2026-01-01', items: [], exs: [], costs: [], awarded: true, rmk: {}, _mt: 1 }];
+      window._matEstQid = 'qA'; MAT_EST = _shDefaults(); MAT_EST.P = 200; MAT_EST.A = 2000; MAT_EST.H = 10;
+      _llState.proj = ''; go('matest'); matEstCalc();
+      const r0 = window._matEstRes;
+      out.matPlain = !r0.ll && r0.back.some(x => x.k === '安全母索總長') && /開啟安全母索/.test(document.getElementById('mat-est-form').innerHTML);
+      _llState.proj = '冒煙案A新建工程'; _llState.perim = 200; _llState.layers = 3; _llState.form = 'wire';
+      _llState.zones = [{ name: '第一區', deck: false, form: '', v: { runs: 2, rows: [{ n: 2, len: 5000 }] }, h: { runs: 2, rows: [{ n: 2, len: 4000 }] } },
+                        { name: '構台下', deck: true, form: '', v: { runs: 1, rows: [{ n: 1, len: 3000 }] }, h: { runs: 0, rows: [{ n: '', len: '' }] } }];
+      _llSaveRec(); _llState.proj = '別的案';          // 目前輸入不是同案 → 應改讀存檔
+      renderMatEst(); matEstCalc();
+      const r1 = window._matEstRes;
+      out.matLinked = !!r1.ll && /存檔/.test(r1.ll.src) && r1.ll.net === 1110      // (200+180)×3−30
+        && !r1.back.some(x => x.k === '安全母索總長')
+        && r1.back.some(x => /工具，扣構台下後/.test(x.k) && x.v === '1,110')
+        && /已引用「安全母索」工具/.test(document.getElementById('mat-est-form').innerHTML);
+      // 構台下區塊形式沒有對應區塊：扣除不得扣成負數，並提出警告
+      _llState.proj = '冒煙案A新建工程'; _llState.zones[1].form = 'rope';
+      const c = _llCalc();
+      out.deckGuard = c.T.rope.net === 0 && c.T.rope.need === 0 && c.warn.length === 1 && c.T.wire.net === 1140;
+      return out;
+    });
+    check('單價庫：實績比對受單位限制（式不套到逐M）', r.histUnit);
+    check('報價成本：異常成本單價點名＋標紅', r.costWarn);
+    check('單價分析：換工項逾期租金重置、千斤頂／構台自動帶入', r.upaReset);
+    check('期別名稱：打設／裝設、拔除／拆除', r.labels);
+    check('材料估算：無安全母索計算時沿用粗估並提示', r.matPlain);
+    check('材料估算：同專案安全母索存檔自動引用', r.matLinked);
+    check('安全母索：構台下形式無對應區塊不扣成負數', r.deckGuard);
+    check('v5.395 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

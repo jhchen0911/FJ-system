@@ -1063,6 +1063,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="trow grand"><label>總計</label><span id="ttot">NT$ 0</span></div>
         <div class="trow" id="tcost-row" style="display:none;border-top:1px dashed var(--ym);padding-top:4px"><label style="color:#e65100;font-size:11px">預估成本 <svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg>內部</label><span id="tcost" style="color:#e65100;font-size:12px">NT$ 0</span></div>
         <div class="trow" id="tmgn-row" style="display:none"><label style="color:#e65100;font-size:11px">預估毛利 <svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg>內部</label><span id="tmgn" style="font-size:12px;font-weight:900">NT$ 0</span></div>
+        <div id="tcost-warn" style="display:none;font-size:10.5px;line-height:1.5;color:var(--red);background:var(--redl);border:1px solid #f3c4bf;border-radius:var(--r6);padding:6px 8px;margin-top:4px"></div>
       </div>
     </div>
     <!-- 施工成本卡片 -->
@@ -2175,7 +2176,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="fg fg2">
           <div class="f"><label>營業稅率 (%)</label><input id="ptax" type="number" value="5"><div class="hint">通常為 5%，影響報價單稅額計算</div></div>
           <div class="f"><label>管理費率 (%)</label><input id="pohd" type="number" value="0" min="0" max="50"><div class="hint">公司間接成本攤提（辦公室、行政、車輛…）。利潤中心的「實際淨利」會多扣 稅前收入×此%，避免毛利高估。0＝不攤提</div></div>
-          <div class="f"><label>拔除期請款率 (%)</label><input id="prmrate" type="number" value="30" min="0" max="100"><div class="hint">請款單的「打設累積 vs 拔除累積」統計，用這個請款率判斷本期算拔除期。若你的拔除期請款率不是 30%，改成實際值即可；也可以在請款單各工項直接指定「期別」，指定過的以指定為準</div></div>
+          <div class="f"><label>拔除／拆除期請款率 (%)</label><input id="prmrate" type="number" value="30" min="0" max="100"><div class="hint">分批請款時（例如打設／裝設 70%、拔除／拆除 30%），請款單的施工數量統計用這個請款率判斷本期屬於「拔除／拆除期」。若貴司拔除／拆除期的請款率不是 30%，改成實際值即可；也可以在請款單各工項直接指定「期別」，指定過的以指定為準</div></div>
           <div class="f"><label>標準點工日薪 (NT$)</label><input id="plabor" type="number" value="2800" min="0"><div class="hint">供「日報出工 vs 已記點工成本」勾稽用：專案勾稽表會以 日報累計工數×此日薪 估算應有點工成本，少記超過兩成即示警。0＝不勾稽</div></div>
           <div class="f"><label>期初現金 (NT$)</label><input id="popen" type="number" value="0"><div class="hint">基準日當天的銀行帳戶餘額。填 0 則水位只反映系統內的收付變化，不是真實帳戶餘額</div></div>
           <div class="f"><label>期初基準日</label><input id="popendate" type="date"><div class="hint"><b>務必與上面的餘額同一天</b>。系統只累加基準日<b>之後</b>的實收與付款——基準日當天以前的錢已經在餘額裡了。沒填基準日會把歷史實收整包再加一次，可動用資金會虛高（例：帳上 348 萬卻顯示 591 萬）。沒填實收日期的舊請款單一律視為期初之前</div></div>
@@ -2568,7 +2569,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <div id="inv-cum-fix-wrap" style="margin-bottom:8px">
       <button type="button" onclick="toggleCumFix()" style="font-size:11px;color:var(--b3);border:none;background:none;cursor:pointer;padding:2px 0;text-decoration:underline"><svg class="ic ib" aria-hidden="true"><use href="#i-sliders"/></svg> 手動設定前期累積數量（資料修正）</button>
       <div id="inv-cum-fix-panel" style="display:none;background:#f8f8f8;border:1px solid var(--b2);border-radius:var(--r8);padding:10px 14px;margin-top:6px;font-size:12px">
-        <div style="color:var(--b3);margin-bottom:8px">若前期數據有誤，可在此手動修正打設/拔除累積量（影響施工數量統計）</div>
+        <div style="color:var(--b3);margin-bottom:8px">若前期數據有誤，可在此手動修正「打設／裝設」「拔除／拆除」累積量（影響施工數量統計）</div>
         <div id="inv-cum-fix-rows"></div>
         <button type="button" onclick="applyCumFix()" style="margin-top:8px;padding:5px 14px;background:var(--g);color:#fff;border:none;border-radius:var(--r6);cursor:pointer;font-size:12px">✓ 套用修正</button>
       </div>
@@ -2648,7 +2649,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.394';
+var APP_VERSION='v5.395';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -2907,9 +2908,9 @@ const fmt=n=>Math.round(n).toLocaleString('zh-TW');
 //   ・非拔除工項若剛好設 30% 請款率，會被誤判成拔除期而少算打設量
 // 改法：工項上加明確的 cat（類別）與 phase（期別）欄位，舊資料沿用關鍵字推定，
 // 拔除期的請款率門檻也從寫死的 30 改成參數（P.removeRate）。
-var ITEM_CATS=[['','自動判斷'],['install','打設／安裝'],['remove','拔除／拆除'],
+var ITEM_CATS=[['','自動判斷'],['install','打設／裝設'],['remove','拔除／拆除'],
   ['both','打設＋拔除'],['other','其他（不列入數量統計）']];
-var ITEM_PHASES=[['','自動判斷'],['install','打設期'],['remove','拔除期']];
+var ITEM_PHASES=[['','自動判斷'],['install','打設／裝設期'],['remove','拔除／拆除期']];
 function _removeRate(){var v=P&&P.removeRate;return (v==null||v==='')?30:(parseFloat(v)||30);}
 // 回傳 {install:bool, remove:bool}
 function _itemCat(it){
@@ -3860,7 +3861,7 @@ function applyUPA(){
   const price=document.getElementById('upa-price-custom')?.value||'';
   // 成本連動：實績均價為主（結案越多越貼市場）、單價分析理論成本(costUnit)為輔
   let _estCost='',_costSrc='';
-  try{const _h=_histCostFor(desc);if(_h&&_h.avg>0){_estCost=String(_h.avg);_costSrc='實績均價 '+fmt(_h.avg)+'（'+_h.n+'筆）';}}catch(e){_err('applyUPA',e);}
+  try{const _h=_histCostFor(desc,unit);if(_h&&_h.avg>0){_estCost=String(_h.avg);_costSrc='實績均價 '+fmt(_h.avg)+'（'+_h.n+'筆）';}}catch(e){_err('applyUPA',e);}
   if(!_estCost){try{const _r=upaCalc();if(_r&&_r.costUnit>0){_estCost=String(Math.round(_r.costUnit));_costSrc='理論成本 '+fmt(Math.round(_r.costUnit));}}catch(e){_err('applyUPA',e);}}
   items.push({desc,unit,qty:String(qty),price:String(price),estCost:_estCost,note,ot,otu:otUnit,sec:false});
   rItems();rTots();
@@ -3915,7 +3916,7 @@ function applyUPAHist(id){
   const h=UH.find(x=>x.id===id);if(!h)return;
   const _desc=h.desc||`${h.type} ${h.spec} L=${h.len}M`;
   // 實績均價為主、當時的理論成本為輔
-  let _ec='';try{const _h2=_histCostFor(_desc);if(_h2&&_h2.avg>0)_ec=String(_h2.avg);}catch(e){_err('applyUPAHist',e);}
+  let _ec='';try{const _h2=_histCostFor(_desc,'支');if(_h2&&_h2.avg>0)_ec=String(_h2.avg);}catch(e){_err('applyUPAHist',e);}
   if(!_ec&&h.cost>0)_ec=String(h.cost);
   items.push({desc:_desc,unit:'支',
     qty:'',price:String(h.final),estCost:_ec,note:`含${h.period}天租期`,ot:'',otu:'$/M/天',sec:false});
@@ -3937,7 +3938,7 @@ function backfillEstCosts(){
   items.forEach(function(it){
     if(it.sec)return;
     if(parseFloat(it.estCost)>0)return;   // 已填的不動（快照原則）
-    const h=_histCostFor(it.desc);
+    const h=_histCostFor(it.desc,it.unit);
     if(h&&h.avg>0){it.estCost=String(h.avg);n++;}
     else if((it.desc||'').trim())miss++;
   });
@@ -3946,6 +3947,10 @@ function backfillEstCosts(){
 }
 // 單項毛利率（%）：price/estCost 皆為未稅單價；任一為 0 回傳 null
 function _mgnPct(price,cost){price=parseFloat(price)||0;cost=parseFloat(cost)||0;if(price<=0||cost<=0)return null;return Math.round((price-cost)/price*1000)/10;}
+// v5.395：成本單價高於報價單價 3 倍以上視為異常（多半是單位對不上或單價庫誤帶），列表標紅、合計區列出
+var _COST_ODD_X=3;
+function _costOdd(it){var p=parseFloat(it&&it.price)||0,c=parseFloat(it&&it.estCost)||0;return p>0&&c>p*_COST_ODD_X;}
+function _costOddList(){return items.filter(function(it){return it&&!it.sec&&!_isSpare(it)&&_costOdd(it);});}
 function _mgnColor(p){return p==null?'var(--b3)':p<0?'var(--red)':p<15?'#e65100':'var(--g3)';}
 var SPARE_NOTE='備用單價';
 // 備用單價列：僅供業主參考之單價，不計入小計／稅／總價，議價亦不調整
@@ -3982,6 +3987,17 @@ function rTots(){
       const el=document.getElementById('tmgn');
       if(el){el.textContent='NT$ '+fmt(Math.round(mgn))+'（'+mgnR+'%）';el.style.color=mgnR<0?'var(--red)':mgnR<15?'#e65100':'var(--g3)';}
     }else{cr.style.display='none';mr.style.display='none';}
+  }
+  // v5.395：異常成本提示——哪幾項成本單價比報價單價高 3 倍以上，直接點名
+  const wr=document.getElementById('tcost-warn');
+  if(wr){
+    const odd=t.costFilled?_costOddList():[];
+    if(odd.length){
+      wr.style.display='';
+      wr.innerHTML='⚠ '+odd.length+' 項成本單價高於報價單價 '+_COST_ODD_X+' 倍：'
+        +odd.slice(0,3).map(function(it){return '「'+esc(String(it.desc||'').split('\n')[0].slice(0,14))+'」成本 '+fmt(parseFloat(it.estCost)||0)+'／單價 '+fmt(parseFloat(it.price)||0)+'（'+esc(it.unit||'')+'）';}).join('、')
+        +(odd.length>3?'…':'')+'。多半是單位對不上（如把「式」的成本套到逐 '+esc(odd[0].unit||'M')+'），請檢查該列成本單價。';
+    }else{wr.style.display='none';wr.innerHTML='';}
   }
 }
 
@@ -4473,6 +4489,9 @@ function rItems(){
           const p=_mgnPct(items[i].price,items[i].estCost);
           mgnBox.textContent=p==null?'—':('毛利 '+p+'%');
           mgnBox.style.color=_mgnColor(p);
+          const odd=_costOdd(items[i]);
+          costInp.style.borderColor=odd?'var(--red)':'';costInp.style.background=odd?'var(--redl)':'';
+          costInp.title=odd?('成本單價高於報價單價 '+_COST_ODD_X+' 倍，請確認單位是否一致'):'';
         }
         costInp.addEventListener('input',function(){items[i].estCost=this.value;updMgnM();rTots();});
         updMgnM();
@@ -4485,7 +4504,7 @@ function rItems(){
         histM.style.cssText='font-size:10.5px;color:#1a3a6b;margin:-2px 0 6px;cursor:pointer;text-decoration:underline dotted';
         function updHistM(){
           histM.style.display='none';return; // v5.298 成本提示自報價編輯移除（成本由系統自動維護）
-          const h=_histCostFor(items[i].desc);
+          const h=_histCostFor(items[i].desc,items[i].unit);
           const cur=parseFloat(items[i].estCost)||0;
           if(h&&cur<=0){
             histM.textContent='歷史實際成本 '+fmt(h.avg)+(h.unit?'/'+h.unit:'')+'（'+h.n+' 筆，點擊帶入）';
@@ -4496,7 +4515,7 @@ function rItems(){
           }else histM.style.display='none';
         }
         histM.addEventListener('click',function(){
-          const h=_histCostFor(items[i].desc);if(!h)return;
+          const h=_histCostFor(items[i].desc,items[i].unit);if(!h)return;
           items[i].estCost=String(h.avg);costInp.value=h.avg;updMgnM();updHistM();rTots();
           toast('已帶入歷史實際成本 '+fmt(h.avg));
         });
@@ -4663,6 +4682,9 @@ function rItems(){
           const p=_mgnPct(items[i].price,items[i].estCost);
           mgnSpan.textContent=p==null?'':('毛利 '+p+'%');
           mgnSpan.style.color=_mgnColor(p);
+          const odd=_costOdd(items[i]);
+          costInp.style.borderColor=odd?'var(--red)':'';costInp.style.background=odd?'var(--redl)':'';
+          costInp.title=odd?('成本單價高於報價單價 '+_COST_ODD_X+' 倍，請確認單位是否一致'):'';
         }
         costInp.addEventListener('input',function(){items[i].estCost=this.value;updMgn();try{updHist();}catch(e){_err('updMgn',e);}rTots();});
         updMgn();
@@ -4671,7 +4693,7 @@ function rItems(){
         const histDiv=document.createElement('div');
         histDiv.style.cssText='font-size:9.5px;text-align:right;line-height:1.3;color:#1a3a6b;cursor:pointer;text-decoration:underline dotted';
         function updHist(){
-          const h=_histCostFor(items[i].desc);
+          const h=_histCostFor(items[i].desc,items[i].unit);
           const cur=parseFloat(items[i].estCost)||0;
           if(h&&cur<=0){
             // 未填成本：藍字提示可帶入
@@ -4686,7 +4708,7 @@ function rItems(){
           }else histDiv.style.display='none';
         }
         histDiv.addEventListener('click',function(){
-          const h=_histCostFor(items[i].desc);if(!h)return;
+          const h=_histCostFor(items[i].desc,items[i].unit);if(!h)return;
           items[i].estCost=String(h.avg);costInp.value=h.avg;updMgn();updHist();rTots();
           toast('已帶入歷史實際成本 '+fmt(h.avg));
         });
@@ -4697,7 +4719,7 @@ function rItems(){
         // v5.377：工項類別。空值＝沿用名稱關鍵字自動判斷，與舊行為完全一致；
         // 只有名稱看不出來（型鋼壓入、支撐解料…）時才需要手動指定。
         const catSel=document.createElement('select');
-        catSel.title='工項類別：決定這一項要不要列入請款單的打設／拔除數量統計。留「自動判斷」即沿用工項名稱推定。';
+        catSel.title='工項類別：決定這一項要不要列入請款單的「打設／裝設」「拔除／拆除」數量統計。留「自動判斷」即沿用工項名稱推定。';
         catSel.style.cssText='width:100%;font-size:11px;height:22px;border:1px solid var(--b2);border-radius:4px;background:var(--w);color:var(--b4);margin-bottom:3px;font-family:inherit';
         ITEM_CATS.forEach(function(c){
           const o=document.createElement('option');o.value=c[0];o.textContent=c[1];
@@ -6128,7 +6150,7 @@ function rInvItems(){
       const pl=document.createElement('label');pl.textContent='期別';
       pl.style.cssText='font-size:10.5px;color:var(--b3);font-weight:700;display:block;margin-bottom:2px';
       const ps=document.createElement('select');
-      ps.title='本期這一項算打設還是拔除。留「自動判斷」＝依請款率推定（'+_removeRate()+'% 視為拔除期）。';
+      ps.title='本期這一項算「打設／裝設」還是「拔除／拆除」。留「自動判斷」＝依請款率推定（'+_removeRate()+'% 視為拔除／拆除期）。';
       ps.style.cssText='width:100%;font-size:13px;border:1px solid var(--b2);border-radius:6px;padding:7px 4px;box-sizing:border-box;background:#fff;font-family:inherit';
       ITEM_PHASES.forEach(function(pv){
         const o=document.createElement('option');o.value=pv[0];o.textContent=pv[1];
@@ -9818,12 +9840,12 @@ function renderCumFixRows(){
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
       <div style="min-width:0;flex:1;font-size:12px;color:var(--b5);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px">${esc(it.desc||'')}</div>
       <div style="display:flex;gap:4px;align-items:center">
-        <label style="font-size:11px;color:var(--b4);white-space:nowrap">打設累積</label>
+        <label style="font-size:11px;color:var(--b4);white-space:nowrap">打設／裝設累積</label>
         <input type="number" value="${it.installCum||0}" style="width:70px;font-size:12px;text-align:right;border:1px solid var(--b2);border-radius:4px;padding:3px 5px"
           oninput="invItems[${invItems.indexOf(it)}].installCum=parseFloat(this.value)||0">
       </div>
       <div style="display:flex;gap:4px;align-items:center">
-        <label style="font-size:11px;color:var(--b4);white-space:nowrap">拔除累積</label>
+        <label style="font-size:11px;color:var(--b4);white-space:nowrap">拔除／拆除累積</label>
         <input type="number" value="${it.removeCum||0}" style="width:70px;font-size:12px;text-align:right;border:1px solid var(--b2);border-radius:4px;padding:3px 5px"
           oninput="invItems[${invItems.indexOf(it)}].removeCum=parseFloat(this.value)||0">
       </div>
@@ -11398,6 +11420,22 @@ function renderMatEst(){
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">'
     +'<div>'+routeTbl('_routesV','縱向路數（沿長邊）')+'</div>'
     +'<div>'+routeTbl('_routesH','橫向路數（沿短邊）')+'</div></div>';
+  // v5.395：與「安全母索」工具的分工——這裡的路數是支撐配置（千斤頂／短節／斜撐／封頭鈑都靠它），
+  // 母索用量若專案在安全母索工具有計算，結果改引用工具（分區塊、扣構台下、預留、損耗、可單獨出 PDF 給業主）
+  (function(){
+    var pn=_matEstProjName(),ll=pn?_llLinkFor(pn):null;
+    var box='<div style="margin-top:10px;padding:8px 11px;border-radius:var(--r8);font-size:11.5px;line-height:1.7;'
+      +(ll?'background:var(--gl);border:1px solid var(--gm);color:var(--g3)':'background:var(--b0);border:1px solid var(--b1);color:var(--b4)')+'">';
+    if(ll){
+      box+='<b>安全母索已引用「安全母索」工具</b>（'+esc(pn)+'，'+esc(ll.src)+'）：母索總長 <b>'+_shR1(ll.net)+'</b> M（'+ll.layers+' 層、已扣構台下 '+_shR1(ll.deduct)+' M），'
+        +ll.forms.map(function(f){return f.label+' '+f.spec+' 需求 '+_shR1(f.need)+' M／'+f.reels+' 捲';}).join('；')
+        +'。上方路數仍用於支撐配件計算。 <button type="button" class="btn btn-xs" onclick="_llOpenFor('+JSON.stringify(pn)+')">開啟安全母索</button>';
+    }else{
+      box+='上方路數用於支撐配件（千斤頂、短節、斜撐、封頭鈑）與母索粗估。要分區塊細算、扣除構台下、區分特多龍繩／鋼索並<b>單獨出 PDF 給業主核算</b>，請用「安全母索」工具'
+        +(pn?'——同一專案存檔後，這裡的母索用量會自動改引用工具結果。 <button type="button" class="btn btn-xs" onclick="_llOpenFor('+JSON.stringify(pn)+')">開啟安全母索</button>':'（先在上方綁定專案，兩邊才能對上）。');
+    }
+    h+=box+'</div>';
+  })();
   h+=sec('⑤ 加工','各樁別填數量／勾選項目，計算時自動帶出相應耗材');
   var procIn=function(k){return '<input type="number" inputmode="decimal" value="'+(m[k]===''||m[k]==null?'':m[k])+'" placeholder="0" onchange="matEstU(\''+k+'\',this.value)" style="width:100%;text-align:right;font-size:14px;height:38px;border:1px solid var(--b2);border-radius:6px;padding:0 8px;font-family:inherit">';};
   var procCk=function(k){return '<input type="checkbox"'+(_shBool(m[k])?' checked':'')+' onchange="matEstUB(\''+k+'\',this.checked)" style="width:19px;height:19px">';};
@@ -11458,9 +11496,23 @@ function _shPanelHtml(title,rows,chCls){
   });
   return h+'</tbody></table></div></div></div>';
 }
+function _matEstProjName(){var q=Q.find(function(x){return x.id===window._matEstQid;});return q?String(q.name||''):'';}
+// v5.395：綁定專案有安全母索工具的計算時，母索改引用工具結果（含分區塊、扣構台下、端部預留、損耗）
+function _matEstApplyLL(res){
+  var ll=_llLinkFor(_matEstProjName());res.ll=ll||null;if(!ll)return res;
+  res.back=res.back.filter(function(r){return !(r.k&&/^安全母索(總長|折捲)$/.test(r.k));});
+  var at=res.back.findIndex(function(r){return r.sec==='安全母索';});
+  var rows=[{k:'安全母索總長（工具，扣構台下後）',v:_shR1(ll.net),u:'M'}];
+  ll.forms.forEach(function(f){
+    rows.push({k:f.label+' '+f.spec+' 需求長度（含預留／損耗）',v:_shR1(f.need),u:'M'});
+    rows.push({k:f.label+' 折捲',v:_shR0(f.reels),u:'捲（每捲 '+f.reel+'M）'});
+  });
+  if(at>=0)res.back.splice.apply(res.back,[at+1,0].concat(rows));else res.back=res.back.concat([{sec:'安全母索'}]).concat(rows);
+  return res;
+}
 function matEstCalc(){
   if(!MAT_EST)MAT_EST=_shDefaults();
-  var res=computeShoringFY(MAT_EST);
+  var res=_matEstApplyLL(computeShoringFY(MAT_EST));
   window._matEstRes=res;
   var el=document.getElementById('mat-est-out');if(!el)return;
   var info=res.info;
@@ -19485,7 +19537,7 @@ var _llState=(function(){
     useSpare:true,waste:5,form:'wire',f:{},
     zones:[_llNewZone('第一區',false),_llNewZone('構台下',true)]});
 })();
-function _llFP(t){if(!_llState.f)_llState.f={};if(!_llState.f[t])_llState.f[t]=_llDefF(t);return _llState.f[t];}
+function _llFP(t,st){st=st||_llState;if(!st.f)st.f={};if(!st.f[t])st.f[t]=_llDefF(t);return st.f[t];}
 var _llHistOpen=false;
 function _llSave(){try{localStorage.setItem('fy_lifeline',JSON.stringify(_llState));_toolStatesTouch();_autoUpload();}catch(e){_err('_llSave',e);}}
 function _llSet(f,v){
@@ -19518,8 +19570,8 @@ function _llDelZone(i){
   _llState.zones.splice(i,1);_llSave();_llRender();
 }
 // ── 計算（口徑與 Excel 逐格一致；依母索形式分開彙總）──
-function _llCalc(){
-  var st=_llState,u=_LL_UNIT[st.unit]||0.01;
+function _llCalc(stArg){
+  var st=stArg||_llState,u=_LL_UNIT[st.unit]||0.01;
   var dirOf=function(dir){
     var rows=(dir&&dir.rows)||[];
     var cnt=rows.reduce(function(a,r){return a+_llNum(r.n);},0);
@@ -19534,7 +19586,7 @@ function _llCalc(){
       v:V,h:H,len:V.len+H.len,runs:V.cnt+H.cnt};
   });
   var perim=_llNum(st.perim),layers=_llInt(st.layers),dl=Math.min(layers,_llInt(st.deductLayers));
-  var T={},used=[];
+  var T={},used=[];_llCalc._warn=[];
   _LL_FORMS.forEach(function(t){
     var zs=zones.filter(function(z){return z.form===t;});
     var pick=function(deck,key){return zs.filter(function(z){return !!z.deck===deck;})
@@ -19542,9 +19594,10 @@ function _llCalc(){
     var zoneLen=pick(false,'len'),deckLen=pick(true,'len');
     var zoneRuns=pick(false,'runs'),deckRuns=pick(true,'runs');
     var pm=(st.form===t)?perim:0,pr=(st.form===t)?_llInt(st.perimRuns):0;
-    var perLayer=pm+zoneLen,gross=perLayer*layers,deduct=deckLen*dl,net=gross-deduct;
+    var perLayer=pm+zoneLen,gross=perLayer*layers,deduct=Math.min(gross,deckLen*dl),net=gross-deduct;
+    if(deckLen>0&&gross<=0)_llCalc._warn.push(_llFm(t).label+'：構台下區塊標了這個形式，但沒有同形式的一般區塊或周長可供扣除，扣除未生效');
     var runs=Math.max(0,Math.round((zoneRuns+pr)*layers-deckRuns*dl));
-    var fp=_llFP(t);
+    var fp=_llFP(t,st);
     var spare=st.useSpare?runs*_llNum(fp.spare):0;
     var need=(net+spare)*(1+_llNum(st.waste)/100);
     var reel=_llNum(fp.reel),w=_llSpecW(t,fp.spec);
@@ -19561,13 +19614,34 @@ function _llCalc(){
     if(z.v.ok===false)bad.push((z.name||'區塊')+' 縱向');
     if(z.h.ok===false)bad.push((z.name||'區塊')+' 橫向');
   });
+  var warn=_llCalc._warn.slice();
   var sum=function(k){return used.reduce(function(a,x){return a+x[k];},0);};
   return {zones:zones,T:T,used:used,mixed:used.length>1,layers:layers,deductLayers:dl,perim:perim,
     perLayer:sum('perLayer'),gross:sum('gross'),deduct:sum('deduct'),net:sum('net'),
     runs:sum('runs'),spare:sum('spare'),need:sum('need'),reels:sum('reels'),kg:sum('kg'),
-    zoneLen:sum('zoneLen'),deckLen:sum('deckLen'),bad:bad};
+    zoneLen:sum('zoneLen'),deckLen:sum('deckLen'),bad:bad,warn:warn};
 }
 function _llM(x){return (Math.round(x*100)/100).toFixed(2);}
+// v5.395：供材料估算引用——同專案名稱的安全母索計算（目前工具輸入優先，其次最新存檔）
+function _llLinkFor(projName){
+  projName=String(projName||'').trim();if(!projName)return null;
+  try{
+    var st=null,src='';
+    if(String(_llState.proj||'').trim()===projName){st=_llState;src='目前輸入';}
+    else{var rec=_trList('lifeline').find(function(r){return String(r.proj||'').trim()===projName;});
+      if(rec){st=_llMigrate(JSON.parse(JSON.stringify(rec.inputs)));src='存檔 '+new Date(rec.ts).toLocaleDateString('zh-TW');}}
+    if(!st)return null;
+    var r=_llCalc(st);
+    if(!(r.net>0))return null;
+    return {src:src,net:r.net,need:r.need,reels:r.reels,runs:r.runs,layers:r.layers,deduct:r.deduct,
+      forms:r.used.map(function(T){return {label:T.label,spec:T.spec,need:T.need,reels:T.reels,reel:T.reel,net:T.net};})};
+  }catch(e){_err('_llLinkFor',e);return null;}
+}
+function _llOpenFor(projName){
+  projName=String(projName||'').trim();
+  if(projName&&!String(_llState.proj||'').trim()){_llState.proj=projName;_llSave();}
+  go('lifeline');
+}
 function _llR(x){return _llM(x).replace(/\.00$/,'');}
 // ── 畫面 ──
 function _llDirHtml(i,key,label,z,r){
@@ -19659,6 +19733,7 @@ function _llRender(){
   });
   h+='</div></div>';
   if(res.bad.length)h+='<div class="card" style="margin-bottom:12px;border-color:var(--red)"><div class="cb" style="color:var(--red);font-weight:700;font-size:12.5px">⚠ 路數檢核未通過：'+esc(res.bad.join('、'))+'——明細條數合計與宣告路數不符，請確認是否漏列。</div></div>';
+  if(res.warn&&res.warn.length)h+='<div class="card" style="margin-bottom:12px;border-color:var(--ym)"><div class="cb" style="color:var(--yd);font-weight:700;font-size:12.5px">⚠ '+esc(res.warn.join('；'))+'</div></div>';
   // 彙總（依形式分欄）
   var U=res.used,mix=res.mixed;
   var head='<tr><th style="text-align:left">項目</th>'+U.map(function(T){return '<th style="text-align:right">'+esc(T.label)+'</th>';}).join('')
@@ -20912,9 +20987,29 @@ function writeCostHist(qid){
   return n;
 }
 // 查詢：依工項名稱找歷史實際成本（正規化後精準或包含比對）
-function _histCostFor(name){
+// v5.395：加「單位」限制。原本只比名稱，「支撐架設」會模糊命中「支撐架設及拆除（一式）」，
+// 把一式幾十萬的實績單價套到逐 M／逐支的工項，數量一乘預估成本就暴增十幾倍。
+// 有給單位時只認同單位的實績；「式」類實績永遠不套到非「式」工項。
+function _histUnitKey(u){
+  u=String(u||'').trim().toLowerCase().replace(/[\s（）()]/g,'');
+  if(!u)return '';
+  if(/^(m2|m²|㎡|平方公尺|平方米)$/.test(u))return 'm²';
+  if(/^(m|公尺|米|進行m|進行米)$/.test(u))return 'm';
+  if(/^(m3|m³|立方公尺|立方米)$/.test(u))return 'm³';
+  if(/^(kg|公斤)$/.test(u))return 'kg';
+  if(/^(t|ton|噸|公噸)$/.test(u))return 't';
+  if(/^(式|一式|lot)$/.test(u))return '式';
+  return u;
+}
+function _histCostFor(name,unit){
   const k=_normName(name);if(!k||k.length<2)return null;
-  const recs=COST_HIST.filter(r=>r.key===k||(k.length>=4&&(r.key.includes(k)||k.includes(r.key))));
+  const uk=_histUnitKey(unit);
+  const recs=COST_HIST.filter(r=>{
+    if(!(r.key===k||(k.length>=4&&(r.key.includes(k)||k.includes(r.key)))))return false;
+    const ru=_histUnitKey(r.unit);
+    if(uk)return ru===uk;                 // 指定單位：只認同單位
+    return ru!=='式';                     // 未指定：至少擋掉「一式」實績
+  });
   if(!recs.length)return null;
   const avg=Math.round(recs.reduce((a,r)=>a+r.actUnit,0)/recs.length);
   return {avg:avg,n:recs.length,unit:recs[0].unit,
@@ -22416,6 +22511,19 @@ function upaCalcStrut(strutSpec, wallSpec, period, region){
     breakdown:`支撐租$${Math.round(strutRent)}+圍令租$${Math.round(wallRent)}+安裝$${Math.round(install)}+拆除$${Math.round(remove)}+搬運$${Math.round(transport)}`};
 }
 
+// v5.395：施工構台日租率（$/m²/天）——與 upaCalcPlatform 同一套規格判定與租金率加總
+function _upaPlatformRentRate(spec,method,customSpec){
+  const db=UPA_COST_DB.platform;method=method||'';
+  let kk='H400';
+  if(spec==='載重50T')kk='H350';
+  else if(spec==='載重100T')kk='2H350';
+  else if(spec==='自訂'){
+    const specKeys=['2H428','2H400','2H350','H428','H400','H350','H300','75角鐵'];
+    kk=specKeys.find(k=>customSpec&&customSpec.includes(k))||'H400';
+  }
+  return (db.main?.[kk]||0)+(db.sub?.[kk]||0)+(db.coverBoard||25)+(db.accessory||0)+(db.wheelStop||3)
+    +(method.includes('交叉拉桿')?(db.crossBrace||5):0)+(method.includes('繫樑')?(db.tierBeam||3):0);
+}
 // 計算施工構台建議單價（$/M2）
 function upaCalcPlatform(spec, method, qty, period, region, customSpec){
   const db=UPA_COST_DB.platform;
@@ -22830,26 +22938,33 @@ function upaUpdateDesc(){
   }
 
   // 逾期租金自動計算（=租金 × 1.5 × 長度）
+  // v5.395：原本只會「算得出來才覆寫」，換到支撐／構台等算不出來的工項時，欄位還留著
+  // 上一個 H 型鋼的數字，套用時就跟著帶進報價單。改為：換工項即重置手改旗標、
+  // 算不出來就清空；並補上千斤頂／軸力計／施工構台的日租換算。
   const otAmtEl=document.getElementById('upa-ot-amt');
+  if(otAmtEl&&otAmtEl._cat!==cat2){otAmtEl._cat=cat2;otAmtEl._userEdited=false;}
   if(otAmtEl&&!otAmtEl._userEdited){
     let autoOt=0;
     const L=parseFloat(len)||0;
     try{
       if((cat2==='H型鋼樁'||cat2==='中間樁'||cat2==='共構樁')&&L){
         const spKey=spec.includes('H300')?'H300':spec.includes('H350')?'H350':'H400';
-        autoOt=Math.round(UPA_COST_DB.hsteel[spKey].rent*1.5*L);
-        // 單位改為 $/支/天（已是每支）
+        autoOt=Math.round(UPA_COST_DB.hsteel[spKey].rent*1.5*L);      // $/支/天
       } else if(cat2==='鋼軌樁'&&L){
-        const rentPerDay=upaGetRailRent(L);
-        autoOt=Math.round(rentPerDay*1.5*L);
+        autoOt=Math.round(upaGetRailRent(L)*1.5*L);                     // $/支/天
       } else if(cat2==='鋼板樁'&&L){
         const spType=spec.includes('IV')?'SP-IV':'SP-III';
-        const rentPerM=upaGetSPValue(spType,'rent',L);
-        autoOt=Math.round(rentPerM*1.5);
-        // 鋼板樁單位 $/M/天，不乘長度（已是每進行M）
+        autoOt=Math.round(upaGetSPValue(spType,'rent',L)*1.5);          // $/M/天（已是每進行 M）
+      } else if(cat2==='油壓千斤頂'){
+        autoOt=Math.round((UPA_COST_DB.others.jack||0)*1.5);            // $/具/天
+      } else if(cat2==='軸力計'){
+        autoOt=Math.round((UPA_COST_DB.others.loadCell||0)*1.5);        // $/具/天
+      } else if(cat2==='施工構台'){
+        autoOt=Math.round(_upaPlatformRentRate(spec,method,customSpec)*1.5);   // $/m²/天
       }
+      // 水平支撐：租金為 $/M/天，須依支撐間距換算成 $/m²/天，無法可靠自動帶入 → 留空由人填
     }catch(e){_err('top',e);}
-    if(autoOt>0)otAmtEl.value=autoOt;
+    otAmtEl.value=autoOt>0?autoOt:'';
   }
 }
 

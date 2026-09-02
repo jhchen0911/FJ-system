@@ -65,7 +65,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 版次 | `bumpQVersion`(進版→封存 V1、V2…永久保留) `showQVersions` `viewQVersion` `restoreQVersion` `compareQVersion`；自動存檔＝每次儲存留一份、只留 10 份，**不是版次** |
 | PDF 匯出 | `exportQuotePDF`(html2canvas 影像版) `exportQuotePDFNative`(瀏覽器原生列印)；`_printViaIframe` 一律先開預覽、按「下載PDF」才存檔（v5.388，所有列印鈕不再一點就下載）；分頁引擎 `_pdfPlanPages`(DOM 量測切點：只切列與列之間、天地各 10mm、續頁重印表頭、末頁過短自動均分) `_pdfAddPaged`(貼頁＋頁碼，**一律原比例、不縮放**；整份放得進一張紙才不分頁)；報價表空的逾期租金／備註欄自動不輸出 |
 | 單價分析 UPA | `upaCalc` `applyUPA`（套用時自動帶成本：實績優先、理論為輔） |
-| 歷史單價庫 | `COST_HIST` `writeCostHist`(結案回寫) `_histCostFor`(報價提示) |
+| 歷史單價庫 | `COST_HIST` `writeCostHist`(結案回寫) `_histCostFor(name,unit)`(報價提示；**限同單位**，「式」實績不套到逐 M 工項) `_costOdd`(成本單價＞報價 3 倍標紅) |
 | 請款單 | `rInvItems` `buildInvPreview` `addNextPeriod` `settleInvItem`(工項結算，連動合約金額)；**本期估驗數量與累計一律加權** `_wQty`／`_curW`（打設70%＋拔除30%＝合約量），`_prevCumQty` 於 `loadInvoice` 由各期實績重算 |
 | 合約 | `renderContracts` `settleContract`(竣工總結算) |
 | 施工成本 | `rCostItems` `COST_CATS`(科目) `_costByItem`(工項歸戶) `buildCostAnalysisHtml` `buildCostAuditHtml`(勾稽) |
@@ -92,12 +92,12 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 附件效期 | 檔案物件 `exp` 欄位 `_plAttExp`；過期進待辦並在產出文件加註 |
 | 雲端同步 | `_sharedPayload`/`_privatePayload` `_pushPrivate`/`_pullPrivate` `_applySensColls` `_seedAdminUid`；報價／請款走逐筆路徑 `_perRecordDelta`，筆數暴跌由 `_syncDropGuard` 攔下，墓碑 180 天由 `_tombPrune` 清理 |
 | 逾期租金 | `_rentDaysOf`(解析備註租期) `_itemProgress`(日報推完工日) `_rentStatus` `_rentScan` `invScanRent`；**單價一律以報價單 `it.ot` 為準**（`_otFromQuote`），請款單裡的 `otPrice` 只是建單快照，`loadInvoice` 開單即校正 |
-| 安全母索 | `_llCalc` `_llRender`（資料與工具新頁 id `lifeline`，存檔鍵 `fy_lifeline`）：形式分**特多龍繩／鋼索**（`_LL_FORM`：規格、單位重、端部作法配件各自一組，`st.form` 預設、`z.form` 逐區塊覆寫，`res.T[form]` 分開彙總、`_llMigrate` 遷移舊存檔）；分區塊×縱／橫向逐列「條數×單長」，方向總長＝Σ(條數×單長)；**總長＝層數×(基地周長＋各區塊縱橫總長) − 構台下總長×扣除層數**（與豐有既有 Excel 同口徑）；宣告路數僅與明細條數勾稽不進計算；另計每路端部錨錠預留、損耗、鋼索捲數與配件 |
+| 安全母索 | `_llCalc` `_llRender`（資料與工具新頁 id `lifeline`，存檔鍵 `fy_lifeline`）：形式分**特多龍繩／鋼索**（`_LL_FORM`：規格、單位重、端部作法配件各自一組，`st.form` 預設、`z.form` 逐區塊覆寫，`res.T[form]` 分開彙總、`_llMigrate` 遷移舊存檔）；分區塊×縱／橫向逐列「條數×單長」，方向總長＝Σ(條數×單長)；**總長＝層數×(基地周長＋各區塊縱橫總長) − 構台下總長×扣除層數**（與豐有既有 Excel 同口徑）；宣告路數僅與明細條數勾稽不進計算；另計每路端部錨錠預留、損耗、鋼索捲數與配件；材料估算綁定同名專案時以 `_llLinkFor` 引用工具結果取代粗估（`_matEstApplyLL`） |
 | 單位 | `_uFix()`：平方公尺一律顯示 `m²`（M2／m2／㎡ 全部正規化）。只作用在單位類短字串，不碰工項說明與備註 |
 
 ## 測試
 
-`tests/smoke.js`（123 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（131 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
