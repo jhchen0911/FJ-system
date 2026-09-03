@@ -2649,7 +2649,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.397';
+var APP_VERSION='v5.398';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -10580,7 +10580,7 @@ function _shDefaults(){
     method:'型鋼排樁',pileSpec:'H350',pileLen:13,pileP:0,pileSpacing:1.5,capType:'H型鋼壓樑(H300)',
     kingMid:120,kingCo:20,kingGt:0,
     midSpec:'H350',coSpec:'H400',gtSpec:'H400',midLen:16,coLen:16,gtLen:16,
-    layers:5,_layers:lys,autoRouteSpace:6,stiff:'0',_routesV:[{rc:4,rl:25}],_routesH:[{rc:4,rl:40}],heng:'0',zones:2,
+    layers:5,_layers:lys,autoRouteSpace:6,stiff:'0',_routesV:[{rc:4,rl:25}],_routesH:[{rc:4,rl:40}],_gtRoutesV:[],_gtRoutesH:[],heng:'0',zones:2,
     spliceWall:0,spliceMid:0,spliceCo:0,spliceGt:0,procWall:0,procMid:0,procCo:0,procGt:0,shearSp:0.3,studLen:3,
     dogbone:'0',dbWall:false,dbMid:false,dbCo:false,dbGt:false,rgMid:true,rgCo:true,rgGt:true,fengProc:'0',fengCnt:'',
     gantaiA:0,gantaiP:0,deck:'2',bigCap:0,gtRopeDeduct:'0',gtDeduct:0,ropeForm:'wire',ropeReel:200,ropeSpare:1.5,
@@ -10604,7 +10604,9 @@ function computeShoringFY(inp){
   var routesH=RH.cnt,lenH=RH.len;
   if(routesH===0){routesH=_shCeil(W/aSp)+1;lenH=routesH*L;autoH=true;}
   var totalR=routesV+routesH,supLen=lenV+lenH;
-  var gtDeduct=b('gtRopeDeduct')?v('gtDeduct'):0;
+  // v5.398：構台下母索改逐路輸入（縱向／橫向 路數×每路長），舊存檔仍有 gtDeduct 總長者沿用
+  var GV=rd(inp._gtRoutesV),GH=rd(inp._gtRoutesH);
+  var gtDeduct=b('gtRopeDeduct')?((GV.cnt+GH.cnt)>0?(GV.len+GH.len):v('gtDeduct')):0;
   // ── 派生 ──
   var exp=(method==='基樁'||method==='連續壁');
   var kingMid=v('kingMid'),kingCo=v('kingCo'),kingGt=v('kingGt');
@@ -11344,23 +11346,14 @@ function matEstExportPDF(){
   };
   var body='<h1>擋土支撐材料估算表</h1>'
     +'<div class="meta">'+(q?('專案：'+esc(q.name)+'　'):'')+'日期：'+localToday()+'　｜　壁線周長 '+_shR1(info.PW)+'M｜路數 縱'+info.routesV+'＋橫'+info.routesH+'＝'+info.totalR+' 路｜支撐總長 '+_shR1(info.supLen)+'M｜中柱合計 '+info.posts+' 支｜退場留存 '+_shR1(info.keep)+'M/支</div>';
+  body+='<h2>材料明細</h2>'+zip(flat,3);
   if(res.staged&&res.staged.length){
-    var srows=[];
-    res.staged.forEach(function(st){st.items.forEach(function(it,k){srows.push({stage:k===0?st.stage:'',name:it.name,q:it.quantity,u:it.unit});});});
-    var per=Math.ceil(srows.length/2);
-    body+='<h2>分階段叫料建議</h2><table class="z"><colgroup><col style="width:9%"><col style="width:30%"><col style="width:7%"><col style="width:4%"><col style="width:9%"><col style="width:30%"><col style="width:7%"><col style="width:4%"></colgroup>'
-      +'<thead><tr><th>階段</th><th>材料</th><th class="r">數量</th><th>單位</th><th>階段</th><th>材料</th><th class="r">數量</th><th>單位</th></tr></thead><tbody>';
-    for(var r=0;r<per;r++){
-      body+='<tr>';
-      [srows[r],srows[r+per]].forEach(function(s){
-        if(!s){body+='<td class="e"></td><td class="e"></td><td class="e"></td><td class="e"></td>';return;}
-        body+='<td class="stg">'+(s.stage?'▸ '+esc(s.stage):'')+'</td><td>'+esc(s.name)+'</td><td class="r">'+_shR0(s.q)+'</td><td class="u">'+esc(s.u)+'</td>';
-      });
-      body+='</tr>';
-    }
+    body+='<h2>分階段叫料建議</h2><table class="z"><colgroup><col style="width:14%"><col style="width:86%"></colgroup><tbody>';
+    res.staged.forEach(function(st){
+      body+='<tr><td class="stg">▸ '+esc(st.stage)+'</td><td class="w">'+st.items.map(function(it){return esc(it.name)+' <b>'+_shR0(it.quantity)+'</b> '+esc(it.unit);}).join('　｜　')+'</td></tr>';
+    });
     body+='</tbody></table>';
   }
-  body+='<h2>材料明細</h2>'+zip(flat,3);
   var _mefn=_toolFileName('matest','材料估算表',(q&&q.name)||'');
   var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(_mefn)+'</title><style>'
     +'@page{size:A4 landscape;margin:10mm}body{font-family:"Microsoft JhengHei","PingFang TC",sans-serif;font-size:11px;color:#1a1a1a;margin:0}'
@@ -11371,7 +11364,7 @@ function matEstExportPDF(){
     +'th,td{border:0.6px solid #b5b5b5;padding:2.5px 5px;text-align:left;font-size:10.5px;line-height:1.35;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}'
     +'th{background:#2e5e42;color:#fff;font-weight:700}th.r{text-align:right}'
     +'td.r{text-align:right;font-weight:700}td.u{color:#666;font-size:9.5px}td.e{border-color:transparent}'
-    +'td.hd{background:#2e5e42;color:#fff;font-weight:700}td.sec{background:#eef4f0;font-weight:700;color:#2e5e42}td.stg{font-weight:700;color:#2e5e42}'
+    +'td.hd{background:#2e5e42;color:#fff;font-weight:700}td.sec{background:#eef4f0;font-weight:700;color:#2e5e42}td.stg{font-weight:700;color:#2e5e42;vertical-align:top}td.w{white-space:normal;line-height:1.6;padding:4px 6px}'
     +'</style></head><body><div class="page-wrap">'+body+'</div></body></html>';
   _printViaIframe(html,_mefn,true);
 }
@@ -11387,7 +11380,7 @@ function matEstLy(i,f,val){
 }
 function matEstRowU(arr,i,f,val){MAT_EST[arr][i][f]=(f==='dcc'||f==='dcs')?val:(parseFloat(val)||0);}
 function matEstRowAdd(arr){
-  var tmpl={_routesV:{rc:1,rl:0},_routesH:{rc:1,rl:0},_ud:{ul:0,uh:0},_dc:{dcc:'圍令',dcs:'H400',dcv:0}}[arr];
+  var tmpl={_routesV:{rc:1,rl:0},_routesH:{rc:1,rl:0},_gtRoutesV:{rc:1,rl:0},_gtRoutesH:{rc:1,rl:0},_ud:{ul:0,uh:0},_dc:{dcc:'圍令',dcs:'H400',dcv:0}}[arr];
   MAT_EST[arr].push(JSON.parse(JSON.stringify(tmpl)));renderMatEst();
 }
 function matEstRowDel(arr,i){MAT_EST[arr].splice(i,1);renderMatEst();}
@@ -11408,7 +11401,7 @@ function renderMatEst(){
   //（Firebase 會剝掉空陣列），缺欄位會讓整頁拋錯變空白——先以預設值補齊再渲染
   try{
     MAT_EST=Object.assign(_shDefaults(),MAT_EST);
-    ['_layers','_routesV','_routesH'].forEach(function(k){if(!Array.isArray(MAT_EST[k]))MAT_EST[k]=[];});
+    ['_layers','_routesV','_routesH','_gtRoutesV','_gtRoutesH'].forEach(function(k){if(!Array.isArray(MAT_EST[k]))MAT_EST[k]=[];});
   }catch(e){_err('renderMatEst.norm',e);MAT_EST=_shDefaults();}
   var m=MAT_EST;
   var fN=function(k,label,hint){return '<div class="f"><label style="font-size:11px">'+label+(hint?' <span style="font-size:9.5px;color:var(--b3)">'+hint+'</span>':'')+'</label><input type="number" inputmode="decimal" step="any" value="'+(m[k]===''||m[k]==null?'':m[k])+'" onchange="matEstU(\''+k+'\',this.value)" style="font-size:14px;text-align:right;padding:7px 8px"></div>';};
@@ -11472,7 +11465,10 @@ function renderMatEst(){
   h+='<div style="font-size:12px;font-weight:700;margin:12px 0 4px">安全母索 <span style="font-weight:400;font-size:10px;color:var(--b3)">範圍＝每層圍令（周圍）＋上方縱橫支撐路；第一層扣除構台下方；每路另計端部預留</span></div>';
   h+='<div class="me-grid">'+fS('ropeForm','母索形式',[['wire','鋼索'],['rope','特多龍繩']])
     +fN('ropeReel','每捲長度 (M)')+fN('ropeSpare','每路端部預留 (M)')
-    +fS('gtRopeDeduct','扣構台下母索',[['0','否'],['1','是']])+fN('gtDeduct','構台下母索總長 (M)')+'</div>'
+    +fS('gtRopeDeduct','扣構台下母索',[['0','否'],['1','是']],';renderMatEst()')+'</div>'
+    +(_shBool(m.gtRopeDeduct)?('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:6px">'
+      +'<div>'+routeTbl('_gtRoutesV','構台下縱向路數')+'</div><div>'+routeTbl('_gtRoutesH','構台下橫向路數')+'</div></div>'
+      +'<div style="font-size:10.5px;color:var(--b3);margin-top:2px">構台下方不設母索：第一層母索扣除 Σ(路數×每路長)'+(_shNum(m.gtDeduct)>0?'（舊資料總長 '+_shNum(m.gtDeduct)+' M 於未填路數時沿用）':'')+'</div>'):'')
     +'<div style="margin-top:6px"><button type="button" class="btn btn-xs" onclick="matEstRopePDF()"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 母索用量表（單獨 PDF，供業主核算）</button></div>';
   h+=sec('⑤ 加工','各樁別填數量／勾選項目，計算時自動帶出相應耗材');
   var procIn=function(k){return '<input type="number" inputmode="decimal" value="'+(m[k]===''||m[k]==null?'':m[k])+'" placeholder="0" onchange="matEstU(\''+k+'\',this.value)" style="width:100%;text-align:right;font-size:14px;height:38px;border:1px solid var(--b2);border-radius:6px;padding:0 8px;font-family:inherit">';};
@@ -11553,7 +11549,9 @@ function matEstRopePDF(){
   var res=window._matEstRes;if(!res){toast('請先按「計算材料」');return;}
   var q=Q.find(function(x){return x.id===window._matEstQid;}),T=res.T||{},ld=res.layerData||[];
   var st=MAT_EST||{};
-  var body='<h2>條件 <span class="sub">形式 '+_xlEsc(T.ropeForm||'鋼索')+'｜壁線周長 '+_shR1(res.info.PW)+' M｜路數 縱'+res.info.routesV+'＋橫'+res.info.routesH+'｜每路端部預留 '+(_shNum(st.ropeSpare)||0)+' M｜每捲 '+(T.ropeReel||200)+' M</span></h2>'
+  var _gd=(ld[0]&&ld[0].ropeDed)||0,_gv=(st._gtRoutesV||[]),_gh=(st._gtRoutesH||[]);
+  var body='<h2>條件 <span class="sub">形式 '+_xlEsc(T.ropeForm||'鋼索')+'｜壁線周長 '+_shR1(res.info.PW)+' M｜路數 縱'+res.info.routesV+'＋橫'+res.info.routesH+'｜每路端部預留 '+(_shNum(st.ropeSpare)||0)+' M｜每捲 '+(T.ropeReel||200)+' M'
+    +(_gd>0?'｜構台下扣除 '+_shR1(_gd)+' M（縱 '+_gv.map(function(r){return _shNum(r.rc)+'×'+_shNum(r.rl);}).join('＋')+'；橫 '+_gh.map(function(r){return _shNum(r.rc)+'×'+_shNum(r.rl);}).join('＋')+'）':'')+'</span></h2>'
     +'<table><tr><th>層</th><th>圍令規格</th><th>圍令（周圍）M</th><th>縱橫支撐路 M</th><th>扣構台下 M</th><th>母索小計 M</th><th>路數</th><th>端部預留 M</th><th>需求 M</th></tr>';
   ld.forEach(function(d){
     body+='<tr><td>第'+d.L+'層</td><td>'+_xlEsc(d.w)+'</td><td class="r">'+_shR1(d.ropeWal)+'</td><td class="r">'+_shR1(d.ropeSup)+'</td><td class="r">'+(d.ropeDed?'−'+_shR1(d.ropeDed):'—')+'</td>'
