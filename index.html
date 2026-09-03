@@ -2649,7 +2649,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.398';
+var APP_VERSION='v5.399';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -11320,11 +11320,13 @@ function matEstExportPDF(){
   var res=window._matEstRes;if(!res){toast('請先按「計算材料」');return;}
   var q=Q.find(function(x){return x.id===window._matEstQid;});
   var info=res.info;
-  var flat=[];
+  // v5.399：明細維持表格（數量／單位須對齊核對），但改「依分類分塊」：每一分類一條色帶標題，
+  // 該分類的項目再左右兩欄並排、由上而下再換右欄——不再把整份長清單硬切三段
+  var secs=[];
   var addSec=function(title,rows){
     if(!rows||!rows.length)return;
-    flat.push({h:title});
-    rows.forEach(function(r){if(r.sec)flat.push({sec:r.sec});else flat.push({k:r.k,v:r.v,u:r.u||''});});
+    var list=[];rows.forEach(function(r){if(r.sec)list.push({sec:r.sec});else list.push({k:r.k,v:r.v,u:r.u||''});});
+    secs.push({h:title,rows:list});
   };
   addSec('① 擋土壁體（樁）',res.pile);
   addSec('② 中柱（進場／退場／買斷）',(res.postRows||[]).concat(res.procRows||[]));
@@ -11333,20 +11335,21 @@ function matEstExportPDF(){
   addSec('⑤ 先行加工',res.pre);
   var cell=function(c){
     if(!c)return '<td class="e"></td><td class="e"></td><td class="e"></td>';
-    if(c.h)return '<td colspan="3" class="hd">'+esc(c.h)+'</td>';
     if(c.sec)return '<td colspan="3" class="sec">'+esc(c.sec)+'</td>';
     return '<td>'+esc(c.k)+'</td><td class="r">'+esc(String(c.v))+'</td><td class="u">'+esc(c.u)+'</td>';
   };
-  var zip=function(list,ncol){
-    var per=Math.ceil(list.length/ncol),cols=[];
-    for(var c=0;c<ncol;c++)cols.push(list.slice(c*per,(c+1)*per));
-    var hh='<table class="z"><colgroup>'+Array(ncol).fill('<col style="width:'+(60/ncol)+'%"><col style="width:'+(24/ncol)+'%"><col style="width:'+(16/ncol)+'%">').join('')+'</colgroup><tbody>';
-    for(var r=0;r<per;r++){hh+='<tr>';for(var c2=0;c2<ncol;c2++)hh+=cell(cols[c2][r]);hh+='</tr>';}
-    return hh+'</tbody></table>';
-  };
+  var det='<table class="z"><colgroup><col style="width:33%"><col style="width:12%"><col style="width:5%"><col style="width:33%"><col style="width:12%"><col style="width:5%"></colgroup><tbody>';
+  secs.forEach(function(sc){
+    det+='<tr><td colspan="6" class="hd">'+esc(sc.h)+'</td></tr>';
+    var per=Math.ceil(sc.rows.length/2);
+    if(per>1&&sc.rows[per-1]&&sc.rows[per-1].sec)per--;   // 小標不落在左欄最後一列（與其項目分家）
+    var nr=Math.max(per,sc.rows.length-per);
+    for(var r=0;r<nr;r++)det+='<tr>'+cell(r<per?sc.rows[r]:null)+cell(sc.rows[r+per])+'</tr>';
+  });
+  det+='</tbody></table>';
   var body='<h1>擋土支撐材料估算表</h1>'
     +'<div class="meta">'+(q?('專案：'+esc(q.name)+'　'):'')+'日期：'+localToday()+'　｜　壁線周長 '+_shR1(info.PW)+'M｜路數 縱'+info.routesV+'＋橫'+info.routesH+'＝'+info.totalR+' 路｜支撐總長 '+_shR1(info.supLen)+'M｜中柱合計 '+info.posts+' 支｜退場留存 '+_shR1(info.keep)+'M/支</div>';
-  body+='<h2>材料明細</h2>'+zip(flat,3);
+  body+='<h2>材料明細</h2>'+det;
   if(res.staged&&res.staged.length){
     body+='<h2>分階段叫料建議</h2><table class="z"><colgroup><col style="width:14%"><col style="width:86%"></colgroup><tbody>';
     res.staged.forEach(function(st){
