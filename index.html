@@ -2649,7 +2649,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.399';
+var APP_VERSION='v5.400';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -11338,15 +11338,25 @@ function matEstExportPDF(){
     if(c.sec)return '<td colspan="3" class="sec">'+esc(c.sec)+'</td>';
     return '<td>'+esc(c.k)+'</td><td class="r">'+esc(String(c.v))+'</td><td class="u">'+esc(c.u)+'</td>';
   };
-  var det='<table class="z"><colgroup><col style="width:33%"><col style="width:12%"><col style="width:5%"><col style="width:33%"><col style="width:12%"><col style="width:5%"></colgroup><tbody>';
+  // v5.400：每一分類自成一張表、項目改 3～4 組並排（名稱都短就排 4 組、否則 3 組），版面更緊湊
+  var det='';
   secs.forEach(function(sc){
-    det+='<tr><td colspan="6" class="hd">'+esc(sc.h)+'</td></tr>';
-    var per=Math.ceil(sc.rows.length/2);
-    if(per>1&&sc.rows[per-1]&&sc.rows[per-1].sec)per--;   // 小標不落在左欄最後一列（與其項目分家）
-    var nr=Math.max(per,sc.rows.length-per);
-    for(var r=0;r<nr;r++)det+='<tr>'+cell(r<per?sc.rows[r]:null)+cell(sc.rows[r+per])+'</tr>';
+    var maxLen=0;sc.rows.forEach(function(r){if(!r.sec)maxLen=Math.max(maxLen,String(r.k||'').length);});
+    var ncol=maxLen<=11?4:3;
+    var gw=100/ncol,cg='';
+    for(var c=0;c<ncol;c++)cg+='<col style="width:'+(gw*0.56).toFixed(2)+'%"><col style="width:'+(gw*0.24).toFixed(2)+'%"><col style="width:'+(gw*0.20).toFixed(2)+'%">';
+    det+='<table class="z"><colgroup>'+cg+'</colgroup><tbody>';
+    det+='<tr><td colspan="'+(ncol*3)+'" class="hd">'+esc(sc.h)+'</td></tr>';
+    var cols=[],start=0,left=sc.rows.length;
+    for(var c2=0;c2<ncol;c2++){
+      var take=Math.ceil(left/(ncol-c2));
+      if(take>1&&sc.rows[start+take-1]&&sc.rows[start+take-1].sec)take--;   // 小標不落在該欄最後一列（與其項目分家）
+      cols.push(sc.rows.slice(start,start+take));start+=take;left-=take;
+    }
+    var nr=0;cols.forEach(function(cl){nr=Math.max(nr,cl.length);});
+    for(var r=0;r<nr;r++){det+='<tr>';cols.forEach(function(cl){det+=cell(cl[r]);});det+='</tr>';}
+    det+='</tbody></table>';
   });
-  det+='</tbody></table>';
   var body='<h1>擋土支撐材料估算表</h1>'
     +'<div class="meta">'+(q?('專案：'+esc(q.name)+'　'):'')+'日期：'+localToday()+'　｜　壁線周長 '+_shR1(info.PW)+'M｜路數 縱'+info.routesV+'＋橫'+info.routesH+'＝'+info.totalR+' 路｜支撐總長 '+_shR1(info.supLen)+'M｜中柱合計 '+info.posts+' 支｜退場留存 '+_shR1(info.keep)+'M/支</div>';
   body+='<h2>材料明細</h2>'+det;
@@ -11366,7 +11376,7 @@ function matEstExportPDF(){
     +'table{width:100%;border-collapse:collapse;margin:2px 0;table-layout:fixed}thead{display:table-header-group}tr{page-break-inside:avoid}'
     +'th,td{border:0.6px solid #b5b5b5;padding:2.5px 5px;text-align:left;font-size:10.5px;line-height:1.35;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}'
     +'th{background:#2e5e42;color:#fff;font-weight:700}th.r{text-align:right}'
-    +'td.r{text-align:right;font-weight:700}td.u{color:#666;font-size:9.5px}td.e{border-color:transparent}'
+    +'td.r{text-align:right;font-weight:700}td.u{color:#666;font-size:9.5px;white-space:normal;line-height:1.2}td.e{border-color:transparent}'
     +'td.hd{background:#2e5e42;color:#fff;font-weight:700}td.sec{background:#eef4f0;font-weight:700;color:#2e5e42}td.stg{font-weight:700;color:#2e5e42;vertical-align:top}td.w{white-space:normal;line-height:1.6;padding:4px 6px}'
     +'</style></head><body><div class="page-wrap">'+body+'</div></body></html>';
   _printViaIframe(html,_mefn,true);
