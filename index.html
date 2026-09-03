@@ -2649,7 +2649,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.395';
+var APP_VERSION='v5.396';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -3951,6 +3951,23 @@ function _mgnPct(price,cost){price=parseFloat(price)||0;cost=parseFloat(cost)||0
 var _COST_ODD_X=3;
 function _costOdd(it){var p=parseFloat(it&&it.price)||0,c=parseFloat(it&&it.estCost)||0;return p>0&&c>p*_COST_ODD_X;}
 function _costOddList(){return items.filter(function(it){return it&&!it.sec&&!_isSpare(it)&&_costOdd(it);});}
+// v5.396：異常成本修復——逐項改用「同單位」實績重新帶入；沒有同單位實績就清空（退回倍率推估）。
+// 回傳 {fixed:n, cleared:n, names:[]}；silent=false 時顯示提示並重繪。
+function _costOddFix(silent){
+  var fixed=0,cleared=0,names=[];
+  _costOddList().forEach(function(it){
+    var h=null;try{h=_histCostFor(it.desc,it.unit);}catch(e){_err('_costOddFix',e);}
+    var p=parseFloat(it.price)||0;
+    if(h&&h.avg>0&&!(p>0&&h.avg>p*_COST_ODD_X)){it.estCost=String(h.avg);fixed++;}
+    else{it.estCost='';cleared++;}
+    names.push(String(it.desc||'').split('\n')[0].slice(0,12));
+  });
+  if(!silent&&(fixed||cleared)){
+    rItems();rTots();
+    toast('已修正 '+(fixed+cleared)+' 項異常成本：'+(fixed?('重新帶入同單位實績 '+fixed+' 項'):'')+(fixed&&cleared?'、':'')+(cleared?('清空 '+cleared+' 項改倍率推估'):''));
+  }
+  return {fixed:fixed,cleared:cleared,names:names};
+}
 function _mgnColor(p){return p==null?'var(--b3)':p<0?'var(--red)':p<15?'#e65100':'var(--g3)';}
 var SPARE_NOTE='備用單價';
 // 備用單價列：僅供業主參考之單價，不計入小計／稅／總價，議價亦不調整
@@ -3996,7 +4013,8 @@ function rTots(){
       wr.style.display='';
       wr.innerHTML='⚠ '+odd.length+' 項成本單價高於報價單價 '+_COST_ODD_X+' 倍：'
         +odd.slice(0,3).map(function(it){return '「'+esc(String(it.desc||'').split('\n')[0].slice(0,14))+'」成本 '+fmt(parseFloat(it.estCost)||0)+'／單價 '+fmt(parseFloat(it.price)||0)+'（'+esc(it.unit||'')+'）';}).join('、')
-        +(odd.length>3?'…':'')+'。多半是單位對不上（如把「式」的成本套到逐 '+esc(odd[0].unit||'M')+'），請檢查該列成本單價。';
+        +(odd.length>3?'…':'')+'。多半是單位對不上（如把「式」的成本套到逐 '+esc(odd[0].unit||'M')+'）。'
+        +'<button type="button" class="btn btn-xs" style="margin-left:6px;vertical-align:middle" onclick="_costOddFix(false)">依同單位實績重新帶入</button>';
     }else{wr.style.display='none';wr.innerHTML='';}
   }
 }
@@ -5025,6 +5043,14 @@ function loadQ(id){
   const q=Q.find(x=>x.id===id);if(!q)return;
   eid=q.id;items=JSON.parse(JSON.stringify(q.items||[]));exs=JSON.parse(JSON.stringify(q.exs||[]));
   costs=JSON.parse(JSON.stringify(q.costs||[])); // ← 載入施工成本
+  // v5.396：v5.395 之前單價庫不比單位，舊報價可能已被帶入「一式」的成本單價；
+  // 開單時逐項重比對（限同單位），比不到就清空退回倍率推估，並提示改了哪幾項。
+  try{
+    if(_costOddList().length){
+      var _fx=_costOddFix(true);
+      if(_fx.fixed||_fx.cleared)setTimeout(function(){toast('⚠ 已修正 '+(_fx.fixed+_fx.cleared)+' 項單位不符的成本單價（'+_fx.names.slice(0,3).join('、')+(_fx.names.length>3?'…':'')+'），儲存後生效');},600);
+    }
+  }catch(e){_err('loadQ.costFix',e);}
   const map={fc:'code',fcl:'client',fn:'name',fl:'loc',fco:'contact',fp:'phone',fd:'date'};
   Object.entries(map).forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.value=q[k]||'';});
   if(q.rmk)Object.assign(rmkCustom,q.rmk);else Object.keys(rmkCustom).forEach(k=>rmkCustom[k]='');
@@ -22951,7 +22977,7 @@ function upaUpdateDesc(){
         const spKey=spec.includes('H300')?'H300':spec.includes('H350')?'H350':'H400';
         autoOt=Math.round(UPA_COST_DB.hsteel[spKey].rent*1.5*L);      // $/支/天
       } else if(cat2==='鋼軌樁'&&L){
-        autoOt=Math.round(upaGetRailRent(L)*1.5*L);                     // $/支/天
+        autoOt=Math.round(upaGetRailRent(L)*1.5);                       // 租金表已是 $/支/天（依樁長分級），不再乘長度
       } else if(cat2==='鋼板樁'&&L){
         const spType=spec.includes('IV')?'SP-IV':'SP-III';
         autoOt=Math.round(upaGetSPValue(spType,'rent',L)*1.5);          // $/M/天（已是每進行 M）
