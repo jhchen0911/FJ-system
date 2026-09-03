@@ -956,24 +956,35 @@ async function newPage(browser, width, height) {
       // 期別名稱
       out.labels = ITEM_PHASES.map(x => x[1]).join('|') === '自動判斷|打設／裝設期|拔除／拆除期'
         && /拔除／拆除期請款率/.test(document.getElementById('page-params').textContent);
-      // 材料估算：綁定專案有安全母索計算 → 母索改引用工具結果（含扣構台下），沒有則沿用粗估並提示
+      // v5.397：安全母索併入材料估算——範圍＝各層圍令（周圍）＋縱橫支撐路，第一層扣構台下；
+      // 形式／每捲長度／端部預留可設，折捲依需求長度；母索用量表可單獨列印
       Q = [{ id: 'qA', code: '1150', name: '冒煙案A新建工程', client: 'K營造', date: '2026-01-01', items: [], exs: [], costs: [], awarded: true, rmk: {}, _mt: 1 }];
-      window._matEstQid = 'qA'; MAT_EST = _shDefaults(); MAT_EST.P = 200; MAT_EST.A = 2000; MAT_EST.H = 10;
-      _llState.proj = ''; go('matest'); matEstCalc();
-      const r0 = window._matEstRes;
-      out.matPlain = !r0.ll && r0.back.some(x => x.k === '安全母索總長') && /開啟安全母索/.test(document.getElementById('mat-est-form').innerHTML);
-      _llState.proj = '冒煙案A新建工程'; _llState.perim = 200; _llState.layers = 3; _llState.form = 'wire';
-      _llState.zones = [{ name: '第一區', deck: false, form: '', v: { runs: 2, rows: [{ n: 2, len: 5000 }] }, h: { runs: 2, rows: [{ n: 2, len: 4000 }] } },
-                        { name: '構台下', deck: true, form: '', v: { runs: 1, rows: [{ n: 1, len: 3000 }] }, h: { runs: 0, rows: [{ n: '', len: '' }] } }];
-      _llSaveRec(); _llState.proj = '別的案';          // 目前輸入不是同案 → 應改讀存檔
-      renderMatEst(); matEstCalc();
-      const r1 = window._matEstRes;
-      out.matLinked = !!r1.ll && /存檔/.test(r1.ll.src) && r1.ll.net === 1110      // (200+180)×3−30
-        && !r1.back.some(x => x.k === '安全母索總長')
-        && r1.back.some(x => /工具，扣構台下後/.test(x.k) && x.v === '1,110')
-        && /已引用「安全母索」工具/.test(document.getElementById('mat-est-form').innerHTML);
+      window._matEstQid = 'qA'; MAT_EST = _shDefaults(); MAT_EST.P = 200; MAT_EST.A = 2000; MAT_EST.H = 10; MAT_EST.layers = 2;
+      MAT_EST._layers = [{ w: 'H350', s: 'H350', st: false }, { w: 'H350', s: 'H350', st: false }];
+      MAT_EST._routesV = [{ rc: 4, rl: 25 }]; MAT_EST._routesH = [{ rc: 4, rl: 40 }];   // 支撐路 260M
+      MAT_EST.gtRopeDeduct = '1'; MAT_EST.gtDeduct = 30; MAT_EST.ropeForm = 'rope'; MAT_EST.ropeReel = 200; MAT_EST.ropeSpare = 2;
+      go('matest'); matEstCalc();
+      const r0 = window._matEstRes, ld = r0.layerData;
+      // 每層＝圍令(200×倍數1=200)＋支撐路 260；第一層扣 30 → 430；第二層 460；合計 890
+      out.matRope = ld.length === 2 && ld[0].ropeWal === 200 && ld[0].ropeSup === 260 && ld[0].ropeDed === 30 && ld[0].rope === 430
+        && ld[1].ropeDed === 0 && ld[1].rope === 460 && r0.T.rope === 890
+        && ld[0].ropeRuns === 9 && r0.T.ropeSpare === 36 && r0.T.ropeNeed === 926 && r0.T.ropeReels === 5 && r0.T.ropeForm === '特多龍繩';
+      out.matRows = r0.back.some(x => x.sec === '安全母索（特多龍繩）') && r0.back.some(x => x.k === '安全母索需求長度' && x.v === '926')
+        && !r0.back.some(x => x.k === '安全母索總長') && r0.staged.some(st => st.items.some(it => /安全母索（特多龍繩，折捲）/.test(it.name)));
+      out.matForm = /母索形式/.test(document.getElementById('mat-est-form').innerHTML) && /matEstRopePDF/.test(document.getElementById('mat-est-form').innerHTML)
+        && !/開啟安全母索/.test(document.getElementById('mat-est-form').innerHTML);
+      // 材料估算表 PDF：橫式、叫料表格在最前、無彙總清冊；母索用量表可單獨列印
+      let printed = [], land = [];
+      const oP2 = window._printViaIframe; window._printViaIframe = (h, f, l) => { printed.push(h); land.push(!!l); };
+      try { matEstExportPDF(); matEstRopePDF(); } finally { window._printViaIframe = oP2; }
+      out.matPdf = printed.length === 2 && land[0] === true && /分階段叫料建議/.test(printed[0]) && !/材料需求清冊/.test(printed[0])
+        && printed[0].indexOf('分階段叫料建議') < printed[0].indexOf('材料明細') && /A4 landscape/.test(printed[0])
+        && /安全母索用量表/.test(printed[1]) && /扣構台下 M/.test(printed[1]) && /926/.test(printed[1]);
+      out.hidden = ALL_PAGES.find(p => p.id === 'lifeline').hidden === true;
       // 構台下區塊形式沒有對應區塊：扣除不得扣成負數，並提出警告
-      _llState.proj = '冒煙案A新建工程'; _llState.zones[1].form = 'rope';
+      _llState.perim = 200; _llState.layers = 3; _llState.form = 'wire';
+      _llState.zones = [{ name: '第一區', deck: false, form: '', v: { runs: 2, rows: [{ n: 2, len: 5000 }] }, h: { runs: 2, rows: [{ n: 2, len: 4000 }] } },
+                        { name: '構台下', deck: true, form: 'rope', v: { runs: 1, rows: [{ n: 1, len: 3000 }] }, h: { runs: 0, rows: [{ n: '', len: '' }] } }];
       const c = _llCalc();
       out.deckGuard = c.T.rope.net === 0 && c.T.rope.need === 0 && c.warn.length === 1 && c.T.wire.net === 1140;
       return out;
@@ -982,8 +993,9 @@ async function newPage(browser, width, height) {
     check('報價成本：異常成本單價點名＋標紅', r.costWarn);
     check('單價分析：換工項逾期租金重置、千斤頂／構台自動帶入', r.upaReset);
     check('期別名稱：打設／裝設、拔除／拆除', r.labels);
-    check('材料估算：無安全母索計算時沿用粗估並提示', r.matPlain);
-    check('材料估算：同專案安全母索存檔自動引用', r.matLinked);
+    check('材料估算：母索＝圍令周圍＋支撐路、扣構台下、預留與折捲', r.matRope && r.matRows);
+    check('材料估算：母索形式欄位＋單獨 PDF、獨立頁隱藏', r.matForm && r.hidden);
+    check('材料估算表 PDF：橫式、叫料表在前、無重複彙總', r.matPdf);
     check('安全母索：構台下形式無對應區塊不扣成負數', r.deckGuard);
     check('v5.395 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
