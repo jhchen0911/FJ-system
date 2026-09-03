@@ -981,6 +981,8 @@ async function newPage(browser, width, height) {
       out.matPdf = printed.length === 2 && land[0] === true && /分階段叫料建議/.test(printed[0]) && !/材料需求清冊/.test(printed[0])
         && printed[0].indexOf('材料明細') < printed[0].indexOf('分階段叫料建議') && /A4 landscape/.test(printed[0])
         && /安全母索用量表/.test(printed[1]) && /扣構台下 M/.test(printed[1]) && /926/.test(printed[1]);
+      // v5.400：明細每一分類自成一表、每列 3～4 組項目並排（分類標題 colspan 9 或 12），且分類不可少
+      out.matDet = (printed[0].match(/class="hd"/g) || []).length >= 4 && /colspan="(9|12)" class="hd"/.test(printed[0]) && !/colspan="6" class="hd"/.test(printed[0]);
       out.hidden = ALL_PAGES.find(p => p.id === 'lifeline').hidden === true;
       // 構台下區塊形式沒有對應區塊：扣除不得扣成負數，並提出警告
       _llState.perim = 200; _llState.layers = 3; _llState.form = 'wire';
@@ -997,6 +999,7 @@ async function newPage(browser, width, height) {
     check('材料估算：母索＝圍令周圍＋支撐路、扣構台下、預留與折捲', r.matRope && r.matRows);
     check('材料估算：母索形式欄位＋單獨 PDF、獨立頁隱藏', r.matForm && r.hidden);
     check('材料估算表 PDF：橫式、明細表在前、叫料條列在後、無重複彙總', r.matPdf);
+    check('材料估算表 PDF：明細每列 3～4 組並排', r.matDet);
     check('安全母索：構台下形式無對應區塊不扣成負數', r.deckGuard);
     check('v5.395 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
