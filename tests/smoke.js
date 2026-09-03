@@ -989,6 +989,38 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────── 11. v5.396：鋼軌樁逾期租金不乘長度／舊報價異常成本開單自動修復 ─────────
+  {
+    const { page, errors } = await newPage(browser, 1400, 1000);
+    const r = await page.evaluate(() => {
+      const out = {};
+      go('upa');
+      const c1 = document.getElementById('upa-cat1'), c2 = document.getElementById('upa-cat2');
+      c1.value = 'retaining'; upaOnCat1Change(); c2.value = '鋼軌樁'; upaOnCat2Change();
+      document.getElementById('upa-len').value = '9'; upaUpdateDesc();
+      // 租金表 9m ＝ 6 $/支/天 → 逾期租金 6×1.5 ＝ 9（不再 ×9m 變 81）
+      out.rail = document.getElementById('upa-ot-amt').value === String(Math.round(upaGetRailRent(9) * 1.5))
+        && +document.getElementById('upa-ot-amt').value === 9 && document.getElementById('upa-ot-unit').value === '$/支/天';
+      c2.value = 'H型鋼樁'; upaOnCat2Change(); document.getElementById('upa-len').value = '12'; upaUpdateDesc();
+      out.hsteelStill = +document.getElementById('upa-ot-amt').value > 0;   // H 型鋼租金 $/M/天 仍乘長度
+      // 舊報價帶著「一式」成本：開單自動改同單位實績；沒有同單位實績的清空
+      COST_HIST = [{ qid: 'x', idx: 0, key: _normName('支撐架設'), name: '支撐架設', unit: 'M', actUnit: 420, priceUnit: 600, qty: 100 }];
+      Q = [{ id: 'qF', code: '1151', name: '成本修復案', client: 'K', date: '2026-01-01', exs: [], costs: [], rmk: {}, _mt: 1,
+        items: [{ desc: '支撐架設', unit: 'M', qty: '800', price: '600', estCost: '1500000', ot: '', otu: '', sec: false },
+                { desc: '安全母索（5分特多龍繩）', unit: 'M', qty: '900', price: '400', estCost: '279000', ot: '', otu: '', sec: false },
+                { desc: 'H型鋼樁打設', unit: 'M', qty: '100', price: '500', estCost: '380', ot: '', otu: '', sec: false }] }];
+      loadQ('qF'); go('editor'); rItems(); rTots();
+      out.fixed = items[0].estCost === '420' && items[1].estCost === '' && items[2].estCost === '380' && _costOddList().length === 0;
+      out.warnGone = document.getElementById('tcost-warn').style.display === 'none';
+      out.button = typeof _costOddFix === 'function';
+      return out;
+    });
+    check('單價分析：鋼軌樁逾期租金依租金表（$/支/天）不乘長度', r.rail && r.hsteelStill);
+    check('報價成本：開單自動修復單位不符的成本單價', r.fixed && r.warnGone && r.button);
+    check('v5.396 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
