@@ -1091,6 +1091,55 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────── 13. v5.402：金流預測依進度推請款／廠商績效出工工期／機具逐台／未填日報提醒 ─────────
+  {
+    const { page, errors } = await newPage(browser, 1400, 1000);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const ago = n => { const d = new Date(Date.now() - n * 864e5); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+      const year = String(new Date().getFullYear());
+      Q = [{ id: 'qE', code: '1161', name: '串連二案', client: 'K', date: '2026-01-01', awarded: true, exs: [], rmk: {}, _mt: 1,
+        t: { sub: 100000, tax: 5000, total: 105000 },
+        items: [{ desc: 'H型鋼樁打設', unit: 'M', qty: '100', price: '1000', estCost: '', ot: '', otu: '', sec: false }],
+        costs: [],
+        dailyLogs: [
+          { id: 'd1', date: ago(5), workers: 0, subWorkers: 6, subVendor: '乙承包', progressRows: [{ itemIdx: 0, desc: 'H型鋼樁打設', qty: 50, note: '' }], photos: [], ownEquip: true, equip: [{ name: 'A機', hrs: 8 }] },
+          { id: 'd2', date: ago(6), workers: 0, subWorkers: 6, subVendor: '乙承包', progressRows: [], photos: [], ownEquip: true, equip: [{ name: 'A機', hrs: 4 }, { name: 'B機', hrs: 8 }] }] }];
+      INV.length = 0; CONTRACTS.splice(0);
+      // 金流預測：日報進度 50% → 預估第 1 期（尚未開單）
+      out.phys = Math.round(_projPhysProgress(Q[0]).pct) === 50;
+      go('finance'); renderCashForecast();
+      out.cf = /預估第1期（日報進度 50%，尚未開單）/.test(document.getElementById('cashflow-forecast').innerHTML);
+      // 廠商績效：日報承包出工 12 工、工期 2 天
+      const v = _vendorStats(year).find(x => x.name === '乙承包');
+      out.vendor = !!v && v.subDays === 12 && v.subLogN === 2 && (_dDiff(v.first, v.last) + 1) === 2;
+      const dv = document.createElement('div'); renderVendorReport(dv, year, null);
+      out.vendorHtml = /12 工/.test(dv.innerHTML) && /2 天・2 篇/.test(dv.innerHTML);
+      // 機具逐台：參數清單 → 日報勾選 → 出工月結逐台稼動
+      P.equipList = ['A機', 'B機']; P.drGapDays = 3;
+      go('quickcost'); rQuickCost();
+      const sel = document.getElementById('dr-proj'); sel.value = 'qE'; sel.onchange();
+      document.getElementById('dr-own-equip').checked = true; _drRenderEquip(); _drToggleEquip('A機');
+      out.equipUI = /✓ A機/.test(document.getElementById('dr-equip-box').innerHTML);
+      const col = _drCollect();
+      out.equipCollect = !!col && col.ownEquip && col.equip.length === 1 && col.equip[0].name === 'A機' && col.equip[0].hrs === 8;
+      const dl = document.createElement('div'); renderLaborReport(dl, year, null);
+      out.equipRpt = /自有機具稼動/.test(dl.innerHTML) && /A機/.test(dl.innerHTML) && /2 天/.test(dl.innerHTML) && /12 hr/.test(dl.innerHTML);
+      // 待辦：最近一篇日報 5 天前、門檻 3 天 → 提醒
+      updateDashTodo();
+      out.todo = /串連二案 已 5 天沒有工作日報/.test(document.getElementById('dash-todo-list').innerHTML);
+      P.drGapDays = 0; updateDashTodo();
+      out.todoOff = !/沒有工作日報/.test(document.getElementById('dash-todo-list').innerHTML);
+      return out;
+    });
+    check('金流預測：依日報進度推估尚未開單的請款', r.phys && r.cf);
+    check('廠商績效：日報承包出工累計與工期', r.vendor && r.vendorHtml);
+    check('日報：自有機具逐台勾選＋時數，出工月結逐台稼動', r.equipUI && r.equipCollect && r.equipRpt);
+    check('待辦：連續未填日報提醒（可關閉）', r.todo && r.todoOff);
+    check('v5.402 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
