@@ -1037,6 +1037,60 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────── 12. v5.401：日報承包出工／工項數量四方對照／請款帶入日報量／進度回填 ─────────
+  {
+    const { page, errors } = await newPage(browser, 1400, 1000);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const today = localToday();
+      Q = [{ id: 'qD', code: '1160', name: '日報串連案', client: 'K', date: '2026-01-01', awarded: true, exs: [], rmk: {}, _mt: 1,
+        items: [{ desc: 'H型鋼樁打設', unit: 'M', qty: '100', price: '500', estCost: '', ot: '', otu: '', sec: false },
+                { desc: '支撐架設', unit: '式', qty: '1', price: '80000', estCost: '', ot: '', otu: '', sec: false }],
+        costs: [{ id: 'c1', type: 'sub', vendor: '甲承包', rows: [{ id: 'c1_0', linkedItemIdx: 0, desc: '', qty: 80, unitPrice: 300 }] }],
+        dailyLogs: [] }];
+      INV.length = 0;
+      go('quickcost'); rQuickCost();
+      const sel = document.getElementById('dr-proj'); sel.value = 'qD'; sel.onchange();
+      out.vendorList = /甲承包/.test(document.getElementById('dr-sub-vendor-list').innerHTML);
+      document.getElementById('dr-workers').value = '2';
+      document.getElementById('dr-sub-workers').value = '6';
+      document.getElementById('dr-sub-vendor').value = '甲承包';
+      _drProgRows = [{ itemIdx: 0, qty: '120', note: '' }]; drRenderProgRows();
+      out.hintOver = /超過合約量/.test(document.getElementById('dr-hint-0').textContent);
+      document.getElementById('dr-date').value = today;
+      submitDailyReport();
+      const L = Q[0].dailyLogs[0];
+      out.saved = L && L.workers === 2 && L.subWorkers === 6 && L.subVendor === '甲承包' && L.progressRows[0].qty === 120;
+      // 成本勾稽：只算自有／點工 2 工，承包 6 人不計
+      window.eid = 'qD';
+      const audit = buildCostAuditHtml(Q[0]);
+      out.auditOnlyOwn = /自有／點工累計 2 工/.test(audit) && !/累計 8 工/.test(audit);
+      // 數量四方對照：回報 120 ＞ 合約 100；發包 80 ＜ 回報 120
+      const rec = _qtyRecon(Q[0]);
+      const r0 = rec.find(x => x.idx === 0);
+      out.recon = r0 && r0.contract === 100 && r0.reported === 120 && r0.sub === 80
+        && r0.warns.some(w => /回報量超過合約量/.test(w)) && r0.warns.some(w => /發包量低於回報量/.test(w));
+      out.reconHtml = /數量不一致/.test(buildQtyReconHtml(Q[0])) && !!document.getElementById('cost-view-qty');
+      // 請款帶入日報量：無上期 → 全部日報量 120；有上期（日期在日報之前）→ 仍 120；上期在日報之後 → 0
+      out.between = _dailyQtyBetween(Q[0], 'H型鋼樁打設', '', today) === 120
+        && _dailyQtyBetween(Q[0], 'H型鋼樁打設', today, today) === 0;
+      // 施工進度工具：從日報回填
+      _pgState.proj = '日報串連案';
+      _pgState.rows = [{ crew: '', name: 'H型鋼樁打設', qty: 100, unit: 'M', rate: 10, manualDays: null, offset: null, startOverride: '', doneQty: null, actualStart: '', doneAt: '' }];
+      go('progress');
+      const n = _pgFillFromDaily(true);
+      out.pgFill = n === 1 && _pgState.rows[0].doneQty === 120 && _pgState.rows[0].actualStart === today && _pgState.rows[0].doneAt === today;
+      return out;
+    });
+    check('日報：承包廠商出工另欄記錄，不入點工勾稽', r.vendorList && r.saved && r.auditOnlyOwn);
+    check('日報：進度列即時提示超過合約量', r.hintOver);
+    check('施工成本：工項數量四方對照抓出超報／漏發包', r.recon && r.reconHtml);
+    check('請款單：依上期請款日切日報回報量', r.between);
+    check('施工進度：從日報回填實際完成量與完工日', r.pgFill);
+    check('v5.401 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

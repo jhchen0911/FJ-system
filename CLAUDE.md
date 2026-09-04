@@ -70,7 +70,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 合約 | `renderContracts` `settleContract`(竣工總結算) |
 | 施工成本 | `rCostItems` `COST_CATS`(科目) `_costByItem`(工項歸戶) `buildCostAnalysisHtml` `buildCostAuditHtml`(勾稽) |
 | 金流 | `updateFinanceKPIs` `renderCashForecast`(90天水位預測) |
-| 支出．日報 | `rQuickCost` `submitQuickCost` `submitDailyReport`(頁 id: quickcost) |
+| 支出．日報 | `rQuickCost` `submitQuickCost` `submitDailyReport`(頁 id: quickcost)；日報出工分 `workers`(自有／點工，進成本勾稽與出工月結) 與 `subWorkers`/`subVendor`(承包廠商，只記錄)；進度列即時提示 `_drRowHint`；工項數量四方對照 `_qtyRecon`/`buildQtyReconHtml`(施工成本頁「數量對照」：合約量／日報回報／發包量／業主請款累計)；請款單本期數量可點「日報 N ↵」帶入 `_invDailySuggest`/`_dailyQtyBetween`；施工進度工具 `_pgFillFromDaily` 由日報回填實際進度 |
 | 智慧收件 | `smartIntake` `aiClassifyDoc` `_intakeRoute`（Claude API 影像辨識） |
 | 權限 | 部門→角色→人員三層：`listDepts`/`listRoles`/`listStaff` `_rolesOf`(取聯集) `canAccess` `renderStaffPage` `renderRolesPage` `rolePerm`；`ALL_PAGES.sysOnly`＝系統管理員限定（單價分析／參數設定／人員／角色），`parent`＝隱藏頁跟隨母頁 |
 | 備份 | `exportData`/`importData`（全量，與 `_syncPayload` 同 payload；含六大工具存檔、計畫書草稿與附件庫、報價版本歷史、材料庫存） |
@@ -97,7 +97,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 
 ## 測試
 
-`tests/smoke.js`（136 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（142 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
