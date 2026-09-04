@@ -1262,6 +1262,83 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────── 16. v5.405：分包合約／分期計價／逐期應付／保留款／數量對照 ─────────
+  {
+    const { page, errors } = await newPage(browser, 1400, 1000);
+    const r = await page.evaluate(() => {
+      const out = {};
+      P.vendorPayDay = 25; P.vendorPayDelay = 1;
+      Q = [{ id: 'qS', code: '1170', name: '分包案', client: 'K', date: '2026-01-01', awarded: true, exs: [], rmk: {}, _mt: 1,
+        items: [{ desc: 'H型鋼樁 H300 L=9M 打設', unit: 'M', qty: '100', price: '1000', estCost: '', ot: '', otu: '', sec: false },
+                { desc: 'H型鋼樁 H300 L=9M 拔除', unit: 'M', qty: '100', price: '400', estCost: '', ot: '', otu: '', sec: false }],
+        costs: [{ id: 'cS', type: 'sub', vendor: '丙承包', cat: '打設', date: '2026-02-01', amt: 0, retRate: 5, invoice: true, signDate: '2026-01-20', entryDate: '2026-02-01',
+          rows: [{ id: 'r1', linkedItemIdx: 0, desc: '', qty: 100, unitPrice: 500 }, { id: 'r2', linkedItemIdx: 1, desc: '', qty: 100, unitPrice: 200, ret: 0 }] }],
+        dailyLogs: [{ id: 'd1', date: '2026-03-05', workers: 0, subWorkers: 5, subVendor: '丙承包', progressRows: [{ itemIdx: 0, desc: 'H型鋼樁 H300 L=9M 打設', qty: 40, note: '' }], progress: '', photos: [] },
+                    { id: 'd2', date: '2026-03-20', workers: 0, subWorkers: 5, subVendor: '丙承包', progressRows: [{ itemIdx: 0, desc: 'H型鋼樁 H300 L=9M 打設', qty: 20, note: '' }], progress: '', photos: [] }] }];
+      INV.length = 0; CONTRACTS.splice(0); PAYABLES.length = 0;
+      openProjectCosts('qS');
+      const c = Q[0].costs[0];
+      syncCostToPayable(Q[0], c);
+      out.whole = PAYABLES.length === 1 && PAYABLES[0].id === 'paycS' && PAYABLES[0].amount === 70000;   // 未分期：整筆
+      // 本期計價：期間內日報 60M 自動帶入 → 30,000、保留 5% 1,500、應付 28,500×1.05、到期次月 25 日
+      openSubPeriod('cS');
+      document.getElementById('sp-date').value = '2026-03-31';
+      document.getElementById('sp-from').value = '2026-02-01'; document.getElementById('sp-to').value = '2026-03-31';
+      _spFillDaily();
+      const qtys = [...document.querySelectorAll('.sp-qty')].map(i => i.value);
+      out.daily = qtys[0] === '60' && qtys[1] === '';
+      out.totTxt = /應付金額[\s\S]*NT\$ 29,925/.test(document.getElementById('sp-tot').innerHTML) && /2026-04-25/.test(document.getElementById('sp-tot').innerHTML);
+      document.getElementById('gen-confirm-ok').click();
+      const per = c.periods && c.periods[0];
+      out.per = !!per && per.amt === 30000 && per.ret === 1500 && per.net === 28500 && per.due === '2026-04-25';
+      const pp = PAYABLES.find(p => p.id === 'paycS_p1');
+      out.pay = !!pp && pp.amount === 28500 && pp.vat === true && pp.date === '2026-04-25' && _payEff(pp) === 29925 && !PAYABLES.some(p => p.id === 'paycS');
+      // 第二期：拔除 30M（列保留 0%）
+      openSubPeriod('cS');
+      document.getElementById('sp-date').value = '2026-04-30';
+      document.querySelectorAll('.sp-qty')[1].value = '30'; document.querySelectorAll('.sp-qty')[0].value = ''; _spRecalc();
+      document.getElementById('gen-confirm-ok').click();
+      const p2 = PAYABLES.find(p => p.id === 'paycS_p2');
+      out.per2 = c.periods.length === 2 && c.periods[1].amt === 6000 && c.periods[1].ret === 0 && !!p2 && p2.amount === 6000;
+      const st = _subStat(c);
+      out.stat = st.n === 2 && st.billed === 36000 && st.retHeld === 1500 && st.remain === 34000 && st.byItem[0] === 60 && st.byItem[1] === 30;
+      // 數量對照多一欄「廠商計價累計」
+      const rec = _qtyRecon(Q[0]);
+      out.recon = rec[0].vb === 60 && rec[0].sub === 100 && rec[1].vb === 30;
+      setCostView('qty'); out.reconHtml = /廠商計價累計/.test(document.getElementById('cost-list').innerHTML); setCostView('list');
+      // 不開發票 → 各期應付不加稅
+      updSubField('cS', 'invoice', false);
+      out.noInv = PAYABLES.find(p => p.id === 'paycS_p1').vat === false && _payEff(PAYABLES.find(p => p.id === 'paycS_p1')) === 28500;
+      updSubField('cS', 'invoice', true);
+      // 勾稽：逐期比對
+      setCostView('audit'); out.audit = /分期 2 期一致/.test(document.getElementById('cost-list').innerHTML); setCostView('list');
+      // 退保留款 → 另建應付
+      releaseSubRet('cS'); document.getElementById('gen-confirm-ok').click();
+      const pr = PAYABLES.find(p => p.id === 'paycS_r3');
+      out.rel = !!pr && pr.amount === 1500 && _subStat(c).retHeld === 0;
+      // 已付的期不能刪；未付的期刪除後應付移除並立墓碑
+      PAYABLES.find(p => p.id === 'paycS_p2').status = 'paid';
+      delSubPeriod('cS', 2); out.delBlocked = c.periods.length === 3;
+      delSubPeriod('cS', 1); document.getElementById('gen-confirm-ok').click();
+      out.del = c.periods.length === 2 && !PAYABLES.some(p => p.id === 'paycS_p1') && !!(TOMBS.payables && TOMBS.payables['paycS_p1']);
+      // 分包管理視圖與專案卡入口
+      window._costView = 'list'; setCostView('subs');
+      const sh = document.getElementById('cost-list').innerHTML;
+      out.subs = /發包總額/.test(sh) && /丙承包/.test(sh) && /保留款退還/.test(sh) && /第2期/.test(sh) && !/releaseSubRet\(/.test(sh);
+      go('projects');
+      out.card = /分包管理（1 家・1 期）/.test(document.getElementById('projects-list').innerHTML);
+      // 業主列印不受影響：報價單列印不含 periods／costs
+      out.strip = !JSON.stringify(_stripQuoteSens(Q[0])).includes('periods');
+      return out;
+    });
+    check('分包：未分期為整筆應付，計價後改逐期（金額扣保留款、稅依開發票、到期次月 25 日）', r.whole && r.daily && r.totTxt && r.per && r.pay && r.per2 && r.noInv);
+    check('分包：累計統計／數量對照「廠商計價累計」／勾稽逐期比對', r.stat && r.recon && r.reconHtml && r.audit);
+    check('分包：退保留款另建應付、已付期不可刪、刪期連動應付與墓碑', r.rel && r.delBlocked && r.del);
+    check('分包管理視圖與專案卡入口；分期不進業主文件', r.subs && r.card && r.strip);
+    check('v5.405 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
