@@ -71,7 +71,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 施工成本 | `rCostItems` `setCostView`(analysis/audit/qty 視圖，再按同鈕或 `_costViewBack` 回清單) `COST_CATS`(科目：動員費／打設／拔除／裝設／拆除／材料租金／材料運費／一次性材料購置／其他；舊值 `_COST_CATS_LEGACY` 只顯示不新建，下拉用 `_costCatOpts`) 承包列選工項自動帶合約生效量、備註列 `crow-memo` `_costByItem`(工項歸戶) `buildCostAnalysisHtml` `buildCostAuditHtml`(勾稽；日報出工列可點「日報」檢視／「補記點工成本」)；承包成本應付到期日 `_vendorDueDate`＝成本日期次 `P.vendorPayDelay` 月第 `P.vendorPayDay` 日（預設本月計價、下月 25 日放款） |
 | 分包管理 | 承包成本（`type:'sub'`）＝分包合約：`signDate`／`entryDate`／`invoice`(開發票，預設 true → 應付 +5%)／`retRate`(保留款％，列可用 `row.ret` 覆寫)／`periods[]`(逐期計價 `{no,date,from,to,rows:[{rid,qty}],amt,ret,net,due}`，`isRet:true`＝保留款退還)。`openSubPeriod`(本期計價，依日報帶量 `_dailyQtyBetween`)／`_spSave`／`delSubPeriod`／`releaseSubRet`／`_subStat`(累計)／`buildSubMgmtHtml`(視圖 `setCostView('subs')`，專案卡 `openSubMgmt`)。**有分期後應付改逐期** `_syncSubPeriodPayables`（id `pay<cid>_p<no>`／`_r<no>`，金額＝本期未稅已扣保留款，`vat` 依開發票），整筆 `pay<cid>` 自動撤掉；`c.amt` 仍是發包總額（成本分析口徑）。勾稽逐期比對、數量對照多「廠商計價累計」、`printVendorStatement(cid,pno)` 可印單期 |
 | 金流 | `updateFinanceKPIs` `renderCashForecast`(90天水位預測) |
-| 支出．日報 | `rQuickCost` `submitQuickCost` `submitDailyReport`(頁 id: quickcost)；日報出工分 `workers`(自有／點工，進成本勾稽與出工月結) 與 `subWorkers`/`subVendor`(承包廠商，只記錄)；進度列即時提示 `_drRowHint`；工項數量四方對照 `_qtyRecon`/`buildQtyReconHtml`(施工成本頁「數量對照」：合約量／日報回報／發包量／業主請款累計)；請款單本期數量可點「日報 N ↵」帶入 `_invDailySuggest`/`_dailyQtyBetween`；施工進度工具 `_pgFillFromDaily` 由日報回填實際進度；自有機具逐台 `P.equipList`→`_drRenderEquip`／`log.equip[{name,hrs}]`，出工月結 `_equipUsage`；金流預測 `_projPhysProgress` 推估尚未開單的下一期請款；廠商績效 `_vendorStats` 含日報承包出工 `subDays`／工期；待辦 `dr_gap`（`P.drGapDays` 天沒日報）；專案頁「日報」檢視內 `editDailyLog`／`delDailyLog` 可修改刪除（重算 progressRows）；選工項後 `_drAutoVendor` 自動帶該工項的發包廠商 |
+| 支出．日報 | `rQuickCost` `submitQuickCost` `submitDailyReport`(頁 id: quickcost)；日報出工 v5.406 起為**廠商列** `log.crews[{type:'sub'|'labor',vendor,n}]`（表單 `_drCrews`／`drRenderCrews`／`drAddCrew`，預設點工＋承包兩列），送出時 `_crewsApply` 彙總成相容欄位 `workers`(點工，進成本勾稽與出工月結)／`subWorkers`／`subVendor`；舊日報用 `_crewsOf` 還原、`_crewsText` 顯示；選工項 `_drAutoVendor` 把 `_itemSubVendor` 填進承包列，進度提示列顯示「發包 廠商」；廠商績效 `_vendorStats` 逐家累計出工並加 `billed`(分包已計價)；金流預測 2c) 分包合約日報已完成未計價量 → 推估下期付款；進度列即時提示 `_drRowHint`；工項數量四方對照 `_qtyRecon`/`buildQtyReconHtml`(施工成本頁「數量對照」：合約量／日報回報／發包量／業主請款累計)；請款單本期數量可點「日報 N ↵」帶入 `_invDailySuggest`/`_dailyQtyBetween`；施工進度工具 `_pgFillFromDaily` 由日報回填實際進度；自有機具逐台 `P.equipList`→`_drRenderEquip`／`log.equip[{name,hrs}]`，出工月結 `_equipUsage`；金流預測 `_projPhysProgress` 推估尚未開單的下一期請款；廠商績效 `_vendorStats` 含日報承包出工 `subDays`／工期；待辦 `dr_gap`（`P.drGapDays` 天沒日報）；專案頁「日報」檢視內 `editDailyLog`／`delDailyLog` 可修改刪除（重算 progressRows）；選工項後 `_drAutoVendor` 自動帶該工項的發包廠商 |
 | 智慧收件 | `smartIntake` `aiClassifyDoc` `_intakeRoute`（Claude API 影像辨識） |
 | 權限 | 部門→角色→人員三層：`listDepts`/`listRoles`/`listStaff` `_rolesOf`(取聯集) `canAccess` `renderStaffPage` `renderRolesPage` `rolePerm`；`ALL_PAGES.sysOnly`＝系統管理員限定（單價分析／參數設定／人員／角色），`parent`＝隱藏頁跟隨母頁 |
 | 備份 | `exportData`/`importData`（全量，與 `_syncPayload` 同 payload；含六大工具存檔、計畫書草稿與附件庫、報價版本歷史、材料庫存） |
@@ -98,7 +98,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 
 ## 測試
 
-`tests/smoke.js`（165 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（171 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
