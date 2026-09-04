@@ -1140,6 +1140,41 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────── 14. v5.403：科目拆分／承包列自動帶合約量＋備註／日報欄位對齊 ─────────
+  {
+    const { page, errors } = await newPage(browser, 1400, 1000);
+    const r = await page.evaluate(() => {
+      const out = {};
+      out.cats = COST_CATS.indexOf('打設') >= 0 && COST_CATS.indexOf('拔除') >= 0 && COST_CATS.indexOf('裝設') >= 0 && COST_CATS.indexOf('拆除') >= 0
+        && COST_CATS.indexOf('打設拔除') < 0 && /打設拔除（舊）/.test(_costCatOpts('打設拔除')) && _costDefaultCat('sub') === '打設';
+      Q = [{ id: 'qG', code: '1162', name: '成本列案', client: 'K', date: '2026-01-01', awarded: true, exs: [], rmk: {}, _mt: 1,
+        items: [{ desc: 'H型鋼樁 H300 L=9M 打設拔除', unit: 'M', qty: '144', price: '5000', estCost: '', ot: '', otu: '', sec: false }],
+        costs: [{ id: 'cS', type: 'sub', vendor: '鴻玉開發', cat: '打設拔除', rows: [] }], dailyLogs: [] }];
+      openProjectCosts('qG');
+      addCostRow('cS');
+      const row = Q[0].costs[0].rows[0];
+      out.newQty = row.qty === 0;
+      updCostField('cS', 'linkedItemIdx', '0', row.id);
+      out.autoQty = Q[0].costs[0].rows[0].qty === 144;
+      const html = document.getElementById('cost-list').innerHTML;
+      out.memo = /crow-memo/.test(html) && /備註（例：\$4,050／M/.test(html) && /打設拔除（舊）/.test(html);
+      // 日報欄位
+      go('quickcost'); rQuickCost();
+      const lbls = [...document.querySelectorAll('#page-quickcost label')].map(l => l.textContent.trim());
+      out.labels = lbls.indexOf('點工出工人數') >= 0 && lbls.indexOf('承包出工人數') >= 0 && !lbls.some(t => /進點工成本勾稽|只記錄/.test(t));
+      const sel = document.getElementById('dr-proj'); sel.value = 'qG'; sel.onchange();
+      const row0 = document.getElementById('dr-prog-rows').firstElementChild;
+      const ws = [...row0.children].filter(e => e.tagName !== 'BUTTON').map(e => e.getBoundingClientRect().width);
+      out.equal = ws.length === 3 && Math.max(...ws) - Math.min(...ws) < 2;
+      return out;
+    });
+    check('施工成本：科目打設／拔除／裝設／拆除分開，舊科目照舊顯示', r.cats);
+    check('施工成本：承包列選工項自動帶合約量、備註欄整行', r.newQty && r.autoQty && r.memo);
+    check('日報：點工／承包出工欄位對齊、進度列三欄等寬', r.labels && r.equal);
+    check('v5.403 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
