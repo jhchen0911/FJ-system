@@ -1175,6 +1175,93 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────── 15. v5.404：引孔費／日報修改刪除／廠商放款日／毛利容錯／材料估算正規化／金流圖說明／成本頁回清單 ─────────
+  {
+    const { page, errors } = await newPage(browser, 1400, 1000);
+    const r = await page.evaluate(() => {
+      const out = {};
+      // ① 單價分析：鑽堡引孔 → 建議單價加「引孔費 $/M × 樁長」
+      UPA_COST_DB.rail.drill = 500; UPA_COST_DB.sheetpile.drill = 500;
+      const a = upaCalcRail(10, 3, '台北', '振動打設'), b = upaCalcRail(10, 3, '台北', '鑽堡引孔');
+      out.upaRail = a.addon === 0 && b.addon === 5000 && Math.round(b.total - a.total) === 5000 && /引孔\$5000/.test(b.breakdown);
+      const c = upaCalcSP('SP-IV型', 12, 3, '台北', '鑽掘引孔');
+      out.upaSP = c.addon === 6000 && /引孔/.test(c.breakdown);
+      // ② 廠商放款日：本月計價、下月 25 日放款（可調）
+      P.vendorPayDay = 25; P.vendorPayDelay = 1;
+      out.due = _vendorDueDate('2026-03-05') === '2026-04-25' && _vendorDueDate('2026-01-31') === '2026-02-25';
+      P.vendorPayDay = 31; out.dueClamp = _vendorDueDate('2026-01-15') === '2026-02-28';
+      P.vendorPayDay = 25; P.vendorPayDelay = 0; out.dueSame = _vendorDueDate('2026-03-05') === '2026-03-25';
+      P.vendorPayDelay = 1;
+      Q = [{ id: 'qH', code: '1163', name: '四零四案', client: 'K', date: '2026-01-01', awarded: true, exs: [], rmk: {}, _mt: 1,
+        items: [{ desc: 'H型鋼樁 H300 L=9M 打設', unit: 'M', qty: '100', price: '1000', estCost: '', ot: '', otu: '', sec: false },
+                { desc: '動員費', unit: '式', qty: '1', price: '20000', estCost: '90000', ot: '', otu: '', sec: false }],
+        costs: [{ id: 'cH', type: 'sub', vendor: '丙承包', cat: '打設', date: '2026-03-05', amt: 50000, rows: [{ id: 'r1', linkedItemIdx: 0, desc: '', qty: 100, unitPrice: 500 }] }],
+        dailyLogs: [{ id: 'dH', date: '2026-03-10', workers: 2, subWorkers: 5, subVendor: '', progressRows: [{ itemIdx: 0, desc: 'H型鋼樁 H300 L=9M 打設', qty: 30, note: '' }], progress: 'H型鋼樁 30M', photos: [] }] }];
+      PAYABLES.length = 0; INV.length = 0; CONTRACTS.splice(0);
+      syncCostToPayable(Q[0], Q[0].costs[0]);
+      const pay = PAYABLES.find(p => p.costId === 'cH');
+      out.payDue = !!pay && pay.date === '2026-04-25';
+      // ③ 報價列表毛利：成本單價 > 報價 3 倍視為未填，不再出現 −N千% 的淨利率
+      _recalcQuoteTotals(Q[0]);
+      const nr = _quoteEstNetR(Q[0]);
+      out.netR = nr > -1 && nr < 1;
+      const fixed = _fixOddCostsAll();
+      out.fixOdd = fixed === 1 && Q[0].items[1].estCost === '';
+      // ④ 日報：修改／刪除（專案頁日報檢視內）
+      viewDailyReports('qH');
+      const mb = document.getElementById('gen-confirm-modal');
+      out.viewBtns = /✎ 修改/.test(mb.innerHTML) && /delDailyLog/.test(mb.innerHTML);
+      editDailyLog('qH', 'dH');
+      document.getElementById('dle-w').value = '3';
+      document.querySelectorAll('.dle-q')[0].value = '45';
+      document.getElementById('gen-confirm-ok').click();
+      const L = Q[0].dailyLogs[0];
+      out.edited = L.workers === 3 && L.progressRows[0].qty === 45 && /45/.test(L.progress) && Q[0]._mt > 1;
+      delDailyLog('qH', 'dH');
+      document.getElementById('gen-confirm-ok').click();
+      out.deleted = Q[0].dailyLogs.length === 0;
+      // ⑤ 施工成本：分析／勾稽／數量對照都有「回成本清單」鈕，再按一次同鈕也回清單；勾稽出工列可點日報
+      Q[0].dailyLogs.push({ id: 'dH2', date: '2026-03-11', workers: 2, subWorkers: 0, subVendor: '', progressRows: [], progress: '', photos: [] });
+      openProjectCosts('qH');
+      setCostView('audit');
+      const cl = document.getElementById('cost-list').innerHTML;
+      out.back = /回成本清單/.test(cl) && /viewDailyReports\('qH'\)/.test(cl);
+      setCostView('audit'); out.toggle = window._costView === 'list' && !/回成本清單/.test(document.getElementById('cost-list').innerHTML);
+      setCostView('qty'); out.qtyLabel = /發包量/.test(document.getElementById('cost-list').innerHTML);
+      setCostView('list');
+      // ⑥ 日報：選工項自動帶發包廠商
+      go('quickcost'); rQuickCost();
+      const sel = document.getElementById('dr-proj'); sel.value = 'qH'; sel.onchange();
+      document.getElementById('dr-sub-vendor').value = '';
+      _drProgRows[0].itemIdx = 0; _drAutoVendor(0);
+      out.autoVendor = document.getElementById('dr-sub-vendor').value === '丙承包';
+      // ⑦ 材料估算：壞存檔（陣列被剝掉／元素不是物件／缺欄位）不得變空白
+      go('matest');
+      const bad = [{ _layers: { 0: { w: 'H300' } }, _routesV: 'x', _dc: [null, 5], layers: '3' }, { _layers: null }, 'garbage', 7];
+      out.matNorm = bad.every(function (src) {
+        MAT_EST = _matEstNorm(src);
+        return Array.isArray(MAT_EST._layers) && MAT_EST._layers.length >= 1 && Array.isArray(MAT_EST._routesV) && Array.isArray(MAT_EST._dc) && MAT_EST._dc.every(x => x && typeof x === 'object');
+      });
+      MAT_EST = { _layers: 'broken', _dc: [null] }; renderMatEst();
+      out.matRender = document.getElementById('mat-est-form').innerHTML.length > 500 && !/載入失敗/.test(document.getElementById('mat-est-form').innerHTML);
+      // ⑧ 90 天現金水位圖：橫軸日期、最高／最低標示與說明文字
+      go('finance'); renderCashForecast();
+      const cf = document.getElementById('cashflow-forecast').innerHTML;
+      out.chart = /今日 /.test(cf) && /90天後 /.test(cf) && /最低 NT\$/.test(cf) && /0（現金見底線）/.test(cf) && /折線＝每日現金水位/.test(cf);
+      return out;
+    });
+    check('單價分析：鑽堡／鑽掘引孔加引孔費 × 樁長', r.upaRail && r.upaSP);
+    check('應付：承包成本到期日＝次月 25 日（放款日／月延可調）', r.due && r.dueClamp && r.dueSame && r.payDue);
+    check('報價列表：異常成本單價不計入預估毛利，啟動一次性修正', r.netR && r.fixOdd);
+    check('日報：檢視內可修改／刪除並重算進度', r.viewBtns && r.edited && r.deleted);
+    check('施工成本：分析／勾稽／對照皆可回清單，勾稽出工列可點日報', r.back && r.toggle && r.qtyLabel);
+    check('日報：選工項自動帶發包廠商', r.autoVendor);
+    check('材料估算：壞存檔正規化，不再變空白', r.matNorm && r.matRender);
+    check('金流：90 天水位圖有座標與最高／最低說明', r.chart);
+    check('v5.404 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
