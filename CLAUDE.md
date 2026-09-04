@@ -61,16 +61,16 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 
 | 模組 | 關鍵函式 |
 |---|---|
-| 報價編輯 | `rItems` `calcT` `saveQ` `applyNegotiate`(議價) `backfillEstCosts` |
+| 報價編輯 | `rItems` `calcT` `saveQ` `applyNegotiate`(議價) `backfillEstCosts`；列表預估淨利率 `_quoteEstNetR`（成本單價＞報價 `_COST_ODD_X` 倍視為未填），啟動一次性 `_fixOddCostsAll` 清掉誤套的「式」成本 |
 | 版次 | `bumpQVersion`(進版→封存 V1、V2…永久保留) `showQVersions` `viewQVersion` `restoreQVersion` `compareQVersion`；自動存檔＝每次儲存留一份、只留 10 份，**不是版次** |
 | PDF 匯出 | `exportQuotePDF`(html2canvas 影像版) `exportQuotePDFNative`(瀏覽器原生列印)；`_printViaIframe` 一律先開預覽、按「下載PDF」才存檔（v5.388，所有列印鈕不再一點就下載）；分頁引擎 `_pdfPlanPages`(DOM 量測切點：只切列與列之間、天地各 10mm、續頁重印表頭、末頁過短自動均分) `_pdfAddPaged`(貼頁＋頁碼，**一律原比例、不縮放**；整份放得進一張紙才不分頁)；報價表空的逾期租金／備註欄自動不輸出 |
-| 單價分析 UPA | `upaCalc` `applyUPA`（套用時自動帶成本：實績優先、理論為輔） |
+| 單價分析 UPA | `upaCalc` `applyUPA`（套用時自動帶成本：實績優先、理論為輔）；鋼軌樁／鋼板樁工法含「引孔」時加 `db.drill`×樁長（參數 `cp-r-drill`／`cp-sp-drill`） |
 | 歷史單價庫 | `COST_HIST` `writeCostHist`(結案回寫) `_histCostFor(name,unit)`(報價提示；**限同單位**，「式」實績不套到逐 M 工項) `_costOdd`(成本單價＞報價 3 倍標紅) `_costOddFix`(開單自動改同單位實績／清空) |
 | 請款單 | `rInvItems` `buildInvPreview` `addNextPeriod` `settleInvItem`(工項結算，連動合約金額)；**本期估驗數量與累計一律加權** `_wQty`／`_curW`（打設70%＋拔除30%＝合約量），`_prevCumQty` 於 `loadInvoice` 由各期實績重算 |
 | 合約 | `renderContracts` `settleContract`(竣工總結算) |
-| 施工成本 | `rCostItems` `COST_CATS`(科目：動員費／打設／拔除／裝設／拆除／材料租金／材料運費／一次性材料購置／其他；舊值 `_COST_CATS_LEGACY` 只顯示不新建，下拉用 `_costCatOpts`) 承包列選工項自動帶合約生效量、備註列 `crow-memo` `_costByItem`(工項歸戶) `buildCostAnalysisHtml` `buildCostAuditHtml`(勾稽) |
+| 施工成本 | `rCostItems` `setCostView`(analysis/audit/qty 視圖，再按同鈕或 `_costViewBack` 回清單) `COST_CATS`(科目：動員費／打設／拔除／裝設／拆除／材料租金／材料運費／一次性材料購置／其他；舊值 `_COST_CATS_LEGACY` 只顯示不新建，下拉用 `_costCatOpts`) 承包列選工項自動帶合約生效量、備註列 `crow-memo` `_costByItem`(工項歸戶) `buildCostAnalysisHtml` `buildCostAuditHtml`(勾稽；日報出工列可點「日報」檢視／「補記點工成本」)；承包成本應付到期日 `_vendorDueDate`＝成本日期次 `P.vendorPayDelay` 月第 `P.vendorPayDay` 日（預設本月計價、下月 25 日放款） |
 | 金流 | `updateFinanceKPIs` `renderCashForecast`(90天水位預測) |
-| 支出．日報 | `rQuickCost` `submitQuickCost` `submitDailyReport`(頁 id: quickcost)；日報出工分 `workers`(自有／點工，進成本勾稽與出工月結) 與 `subWorkers`/`subVendor`(承包廠商，只記錄)；進度列即時提示 `_drRowHint`；工項數量四方對照 `_qtyRecon`/`buildQtyReconHtml`(施工成本頁「數量對照」：合約量／日報回報／發包量／業主請款累計)；請款單本期數量可點「日報 N ↵」帶入 `_invDailySuggest`/`_dailyQtyBetween`；施工進度工具 `_pgFillFromDaily` 由日報回填實際進度；自有機具逐台 `P.equipList`→`_drRenderEquip`／`log.equip[{name,hrs}]`，出工月結 `_equipUsage`；金流預測 `_projPhysProgress` 推估尚未開單的下一期請款；廠商績效 `_vendorStats` 含日報承包出工 `subDays`／工期；待辦 `dr_gap`（`P.drGapDays` 天沒日報） |
+| 支出．日報 | `rQuickCost` `submitQuickCost` `submitDailyReport`(頁 id: quickcost)；日報出工分 `workers`(自有／點工，進成本勾稽與出工月結) 與 `subWorkers`/`subVendor`(承包廠商，只記錄)；進度列即時提示 `_drRowHint`；工項數量四方對照 `_qtyRecon`/`buildQtyReconHtml`(施工成本頁「數量對照」：合約量／日報回報／發包量／業主請款累計)；請款單本期數量可點「日報 N ↵」帶入 `_invDailySuggest`/`_dailyQtyBetween`；施工進度工具 `_pgFillFromDaily` 由日報回填實際進度；自有機具逐台 `P.equipList`→`_drRenderEquip`／`log.equip[{name,hrs}]`，出工月結 `_equipUsage`；金流預測 `_projPhysProgress` 推估尚未開單的下一期請款；廠商績效 `_vendorStats` 含日報承包出工 `subDays`／工期；待辦 `dr_gap`（`P.drGapDays` 天沒日報）；專案頁「日報」檢視內 `editDailyLog`／`delDailyLog` 可修改刪除（重算 progressRows）；選工項後 `_drAutoVendor` 自動帶該工項的發包廠商 |
 | 智慧收件 | `smartIntake` `aiClassifyDoc` `_intakeRoute`（Claude API 影像辨識） |
 | 權限 | 部門→角色→人員三層：`listDepts`/`listRoles`/`listStaff` `_rolesOf`(取聯集) `canAccess` `renderStaffPage` `renderRolesPage` `rolePerm`；`ALL_PAGES.sysOnly`＝系統管理員限定（單價分析／參數設定／人員／角色），`parent`＝隱藏頁跟隨母頁 |
 | 備份 | `exportData`/`importData`（全量，與 `_syncPayload` 同 payload；含六大工具存檔、計畫書草稿與附件庫、報價版本歷史、材料庫存） |
@@ -92,12 +92,12 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 附件效期 | 檔案物件 `exp` 欄位 `_plAttExp`；過期進待辦並在產出文件加註 |
 | 雲端同步 | `_sharedPayload`/`_privatePayload` `_pushPrivate`/`_pullPrivate` `_applySensColls` `_seedAdminUid`；報價／請款走逐筆路徑 `_perRecordDelta`，筆數暴跌由 `_syncDropGuard` 攔下，墓碑 180 天由 `_tombPrune` 清理 |
 | 逾期租金 | `_rentDaysOf`(解析備註租期) `_itemProgress`(日報推完工日) `_rentStatus` `_rentScan` `invScanRent`；**單價一律以報價單 `it.ot` 為準**（`_otFromQuote`），請款單裡的 `otPrice` 只是建單快照，`loadInvoice` 開單即校正 |
-| 安全母索 | `_llCalc` `_llRender`（資料與工具新頁 id `lifeline`，存檔鍵 `fy_lifeline`）：形式分**特多龍繩／鋼索**（`_LL_FORM`：規格、單位重、端部作法配件各自一組，`st.form` 預設、`z.form` 逐區塊覆寫，`res.T[form]` 分開彙總、`_llMigrate` 遷移舊存檔）；分區塊×縱／橫向逐列「條數×單長」，方向總長＝Σ(條數×單長)；**總長＝層數×(基地周長＋各區塊縱橫總長) − 構台下總長×扣除層數**（與豐有既有 Excel 同口徑）；宣告路數僅與明細條數勾稽不進計算；另計每路端部錨錠預留、損耗、鋼索捲數與配件；**v5.397 起併入材料估算**（導覽隱藏、資料保留）：材料估算每層母索＝圍令周圍＋縱橫支撐路，第一層扣構台下，`ropeForm/ropeReel/ropeSpare` 決定形式、折捲與端部預留，`matEstRopePDF` 單獨出表 |
+| 安全母索 | `_llCalc` `_llRender`（資料與工具新頁 id `lifeline`，存檔鍵 `fy_lifeline`）：形式分**特多龍繩／鋼索**（`_LL_FORM`：規格、單位重、端部作法配件各自一組，`st.form` 預設、`z.form` 逐區塊覆寫，`res.T[form]` 分開彙總、`_llMigrate` 遷移舊存檔）；分區塊×縱／橫向逐列「條數×單長」，方向總長＝Σ(條數×單長)；**總長＝層數×(基地周長＋各區塊縱橫總長) − 構台下總長×扣除層數**（與豐有既有 Excel 同口徑）；宣告路數僅與明細條數勾稽不進計算；另計每路端部錨錠預留、損耗、鋼索捲數與配件；**v5.397 起併入材料估算**（導覽隱藏、資料保留）：材料估算每層母索＝圍令周圍＋縱橫支撐路，第一層扣構台下，`ropeForm/ropeReel/ropeSpare` 決定形式、折捲與端部預留，`matEstRopePDF` 單獨出表；**存檔一律經 `_matEstNorm` 正規化**（陣列／元素／欄位補齊），`renderMatEst` 外層 try/catch 失敗顯示重設鈕，不得空白 |
 | 單位 | `_uFix()`：平方公尺一律顯示 `m²`（M2／m2／㎡ 全部正規化）。只作用在單位類短字串，不碰工項說明與備註 |
 
 ## 測試
 
-`tests/smoke.js`（151 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（160 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
