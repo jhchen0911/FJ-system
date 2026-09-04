@@ -1112,10 +1112,11 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <div class="cht" style="white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本記錄</div>
           <select id="cost-group-mode" onchange="rCostItems()" style="font-size:12px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);font-family:inherit"><option value="none">依建立順序</option><option value="vendor">依廠商分組</option></select>
         </div>
-        <div style="display:flex;gap:6px;width:100%">
-          <button type="button" class="btn btn-xs" id="cost-view-analysis" onclick="setCostView('analysis')" style="flex:1;justify-content:center;height:38px" title="報價複價 vs 預估成本 vs 實際成本 vs 毛利"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 工項成本分析</button>
-          <button type="button" class="btn btn-xs" id="cost-view-audit" onclick="setCostView('audit')" style="flex:1;justify-content:center;height:38px" title="施工成本 vs 應付帳款一致性比對"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 成本勾稽</button>
-          <button type="button" class="btn btn-xs btn-g" onclick="addCostItem()" style="flex:1;justify-content:center;height:38px;font-size:13px;font-weight:700" title="先建立空白成本，類型（自有/承包/點工/額外）在卡片內再選">＋ 新增成本</button>
+        <div style="display:flex;gap:6px;width:100%;flex-wrap:wrap">
+          <button type="button" class="btn btn-xs" id="cost-view-analysis" onclick="setCostView('analysis')" style="flex:1 1 46%;justify-content:center;height:38px" title="報價複價 vs 預估成本 vs 實際成本 vs 毛利"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 工項成本分析</button>
+          <button type="button" class="btn btn-xs" id="cost-view-audit" onclick="setCostView('audit')" style="flex:1 1 46%;justify-content:center;height:38px" title="施工成本 vs 應付帳款一致性比對"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 成本勾稽</button>
+          <button type="button" class="btn btn-xs" id="cost-view-qty" onclick="setCostView('qty')" style="flex:1 1 46%;justify-content:center;height:38px" title="合約量 vs 日報回報 vs 發包（廠商計價）量 vs 業主請款累計"><svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 數量對照</button>
+          <button type="button" class="btn btn-xs btn-g" onclick="addCostItem()" style="flex:1 1 46%;justify-content:center;height:38px;font-size:13px;font-weight:700" title="先建立空白成本，類型（自有/承包/點工/額外）在卡片內再選">＋ 新增成本</button>
         </div>
       </div>
       <div style="padding:10px 14px">
@@ -1257,7 +1258,9 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         </div>
         <div class="fg fg2" style="margin-bottom:10px">
           <div class="f"><label>日期</label><input id="dr-date" type="date" style="font-size:14px;padding:8px 10px"></div>
-          <div class="f"><label>出工人數</label><input id="dr-workers" type="number" inputmode="numeric" placeholder="0" style="font-size:16px;font-weight:700;text-align:right;padding:8px 10px"></div>
+          <div class="f"><label>自有／點工人數 <span style="font-size:10.5px;color:var(--b3)">— 進點工成本勾稽</span></label><input id="dr-workers" type="number" inputmode="numeric" placeholder="0" style="font-size:16px;font-weight:700;text-align:right;padding:8px 10px"></div>
+          <div class="f"><label>承包廠商出工人數 <span style="font-size:10.5px;color:var(--b3)">— 只記錄，不計成本</span></label><input id="dr-sub-workers" type="number" inputmode="numeric" placeholder="0" style="font-size:16px;font-weight:700;text-align:right;padding:8px 10px"></div>
+          <div class="f"><label>承包廠商</label><input id="dr-sub-vendor" list="dr-sub-vendor-list" placeholder="選填，可自行輸入" style="font-size:13px;padding:8px 10px"><datalist id="dr-sub-vendor-list"></datalist></div>
           <div class="f" style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 0"><input type="checkbox" id="dr-own-equip" style="width:18px;height:18px"> <svg class="ic ib" aria-hidden="true"><use href="#i-truck"/></svg> 本日使用自有機具<span style="font-size:10.5px;color:var(--b3)">— 供機具稼動率統計</span></label></div>
         </div>
         <div class="f" style="margin-bottom:10px">
@@ -2649,7 +2652,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.400';
+var APP_VERSION='v5.401';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -5988,6 +5991,55 @@ try{
   }
 }catch(e){_err('top',e);}
 
+// v5.401：日報回報量帶入請款單——同名工項在 (上期請款日, 本期估驗日] 期間的日報進度列累計
+function _dailyQtyBetween(q,desc,from,to){
+  var d=String(desc||'').split('\n')[0].trim();if(!q||!d)return 0;
+  var sum=0;
+  (q.dailyLogs||[]).forEach(function(L){
+    var dt=String(L.date||'');
+    if(from&&dt<=from)return;
+    if(to&&dt>to)return;
+    (L.progressRows||[]).forEach(function(r){
+      if(!r)return;
+      var rd=String(r.desc||((q.items||[])[r.itemIdx]||{}).desc||'').split('\n')[0].trim();
+      if(rd!==d)return;
+      sum+=parseFloat(r.qty)||0;
+    });
+  });
+  return Math.round(sum*100)/100;
+}
+function _invCurQuote(){
+  var inv=(typeof invEid!=='undefined'&&invEid)?INV.find(function(x){return x.id===invEid;}):null;
+  var qid=inv&&(inv.quoteId||inv.sourceQid);
+  var q=qid?Q.find(function(x){return x.id===qid;}):null;
+  if(!q){var nm=String(gv('inv-project')||'').trim();if(nm)q=Q.find(function(x){return !x.parentId&&String(x.name||'').trim()===nm;});}
+  return q||null;
+}
+function _invDailySuggest(i){
+  var it=invItems&&invItems[i];if(!it||it.type==='sec')return 0;
+  var q=_invCurQuote();if(!q||!(q.dailyLogs||[]).length)return 0;
+  var to=String(gv('inv-date')||'').slice(0,10)||localToday();
+  var curNo=parseInt(gv('inv-period-no'))||0;
+  var from='';
+  (INV||[]).forEach(function(v){
+    if(!v||(typeof invEid!=='undefined'&&v.id===invEid))return;
+    var same=(v.quoteId===q.id)||(!v.quoteId&&String(v.project||'').trim()===String(q.name||'').trim());
+    if(!same)return;
+    if(curNo&&(parseInt(v.periodNo)||0)>=curNo)return;
+    var d=String(v.date||'').slice(0,10);
+    if(d&&d<to&&d>from)from=d;
+  });
+  return _dailyQtyBetween(q,it.desc,from,to);
+}
+function invFillDaily(i){
+  var sg=_invDailySuggest(i);if(!(sg>0))return;
+  invItems[i].curQty=sg;
+  var amtEl=document.getElementById('iamt-'+i),tr=amtEl?amtEl.closest('tr'):null;
+  var inp=tr?tr.querySelector('input[data-f="curQty"]'):null;
+  if(inp){inp.value=sg;updateInvRowAmt(i,tr);rInvTots();if(tr._chkOver)tr._chkOver();}
+  else{rInvItems();rInvTots();}
+  toast('已帶入日報回報量 '+fmt(sg));
+}
 // 只更新請款明細行的金額顯示（不重渲染整個表格）
 // 離頁重算請款單金額（不依賴 DOM）：邏輯與 updateInvRowAmt + rInvTots 一致
 function _recalcInvAmounts(inv){
@@ -6042,7 +6094,9 @@ function updateInvRowAmt(i, tr){
       var _h=tr.querySelector('.cqw');
       if(_h){
         var _w=Math.round(_q*rate*100)/100;
-        _h.textContent=(rate!==1&&_q>0)?('× '+Math.round(rate*100)+'% ＝ '+fmt(_w)):'';
+        var _wt=(rate!==1&&_q>0)?('× '+Math.round(rate*100)+'% ＝ '+fmt(_w)):'';
+        var _sg=0;try{_sg=_invDailySuggest(i);}catch(e){_err('invDailySuggest',e);}
+        _h.innerHTML=_wt+((_sg>0&&Math.abs(_sg-_q)>1e-6)?((_wt?'　':'')+'<span onclick="invFillDaily('+i+')" title="上期請款日之後的日報回報量，點擊帶入本期數量" style="cursor:pointer;color:var(--g3);font-weight:700;border-bottom:1px dashed var(--g3)">日報 '+fmt(_sg)+' ↵</span>'):'');
       }
     }
   }catch(e){_err('updateInvRowAmt',e);}
@@ -20120,6 +20174,33 @@ var _pgState=(function(){
           {crew:'',name:'鋼筋籠、型鋼加工及設備機具進場',qty:null,unit:'天',rate:null,manualDays:7,offset:null,startOverride:'',doneQty:null,actualStart:'',doneAt:''}]};
 })();
 var _pgHistOpen=false;
+// v5.401：從工務日報回填實際進度——作業項目名稱與報價工項互相包含即視為同一項
+function _pgFillFromDaily(silent){
+  var nm=String(_pgState.proj||'').trim();
+  var q=nm?Q.find(function(x){return !x.parentId&&String(x.name||'').trim()===nm;}):null;
+  if(!q){if(!silent)toast('請先在「專案名稱」填入系統內的專案名稱');return 0;}
+  if(!(q.dailyLogs||[]).length){if(!silent)toast('「'+nm+'」尚無日報');return 0;}
+  var norm=function(t){return String(t||'').split('\n')[0].replace(/\s+/g,'').toLowerCase();};
+  var n=0;
+  _pgState.rows.forEach(function(r){
+    var rn=norm(r.name);if(!rn)return;
+    var idx=-1;
+    (q.items||[]).forEach(function(it,i){
+      if(idx>=0||it.sec)return;
+      var dn=norm(it.desc);if(!dn)return;
+      if(dn===rn||dn.indexOf(rn)>=0||rn.indexOf(dn)>=0)idx=i;
+    });
+    if(idx<0)return;
+    var pg=_itemProgress(q,idx);if(!pg.n)return;
+    r.doneQty=Math.round(pg.cum*100)/100;
+    if(pg.first)r.actualStart=pg.first;
+    if(pg.doneDate)r.doneAt=pg.doneDate;
+    n++;
+  });
+  _pgSave();_pgRender();
+  if(!silent)toast(n?('已由日報回填 '+n+' 項實際進度'):'作業項目名稱與報價工項對不上，請改成相同名稱');
+  return n;
+}
 function _pgSave(){try{localStorage.setItem('fy_progress',JSON.stringify(_pgState));}catch(e){_err('_pgSave',e);}}
 function _pgSet(f,v){_pgState[f]=f==='colDays'?(parseInt(v)||3):String(v||'').trim();_pgSave();if(f!=='proj')_pgRender();}
 var _PG_ROWSTR=['crew','name','unit','startOverride','actualStart','doneAt'];
@@ -20150,6 +20231,7 @@ function _pgRender(){
     +'<button type="button" class="btn btn-sm" onclick="_pgHistToggle()"><svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> 歷史</button>'
     +'<button type="button" class="btn btn-sm" onclick="_pgPrint()"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 列印</button>'
     +'<button type="button" class="btn btn-sm" onclick="_pgXlsx()"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 匯出 Excel</button>'
+    +'<button type="button" class="btn btn-sm" onclick="_pgFillFromDaily()" title="依「專案名稱」找到專案，把日報進度列的累計量、首次回報日、達合約量日期回填到同名作業項目的實際完成量／完工日"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 從日報回填實際進度</button>'
     +'</div></div>'+_projDatalist();
   if(_pgHistOpen)h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">存檔歷史</div></div><div class="cb">'+_trHistHtml('progress','_pgLoadRec')+'</div></div>';
   // 摘要橫幅
@@ -20949,15 +21031,96 @@ function addCostItem(type){
   try{persist();_immediateUpload();}catch(e){_err('addCostItem',e);}
 }
 
-// ── 成本視圖切換：工項成本分析／成本勾稽（獨立按鈕，再按一次回清單）──
+// ── 成本視圖切換：工項成本分析／成本勾稽／數量對照（獨立按鈕，再按一次回清單）──
 function setCostView(v){
   window._costView=(window._costView===v)?'list':v;
-  var bA=document.getElementById('cost-view-analysis'),bU=document.getElementById('cost-view-audit');
+  var bA=document.getElementById('cost-view-analysis'),bU=document.getElementById('cost-view-audit'),bQ=document.getElementById('cost-view-qty');
   var on='background:var(--g3);color:#fff;border-color:var(--g3)';
   var off='';
   if(bA)bA.style.cssText=window._costView==='analysis'?on:off;
   if(bU)bU.style.cssText=window._costView==='audit'?on:off;
+  if(bQ)bQ.style.cssText=window._costView==='qty'?on:off;
   rCostItems();
+}
+// v5.401：工項數量四方對照——合約量／日報回報／發包（廠商計價）量／業主請款累計
+//   日報回報＝各日報進度列累計（_itemProgress）；發包量＝承包成本區塊歸戶到該工項的列數量加總
+//   （廠商計價單就是這些列）；業主請款累計＝各期請款單同名工項的加權累計（打設70%＋拔除30%＝合約量口徑）
+function _qtyRecon(q){
+  if(!q)return [];
+  var _em=_effQtyMap(q),out=[];
+  var subQ={};
+  (q.costs||[]).forEach(function(c){
+    if(c.type!=='sub'||!c.rows)return;
+    c.rows.forEach(function(r){var i=parseInt(r.linkedItemIdx);if(isNaN(i)||i<0)return;subQ[i]=(subQ[i]||0)+(parseFloat(r.qty)||0);});
+  });
+  var billed={};
+  (typeof INV!=='undefined'?INV:[]).forEach(function(v){
+    if(!v)return;
+    var same=v.quoteId?(v.quoteId===q.id):(String(v.project||'').trim()===String(q.name||'').trim());
+    if(!same)return;
+    (v.items||[]).forEach(function(x){
+      if(!x||x.type==='sec')return;
+      var d=String(x.desc||'').split('\n')[0].trim();if(!d)return;
+      billed[d]=(billed[d]||0)+_curW(x);
+    });
+  });
+  (q.items||[]).forEach(function(it,i){
+    if(it.sec||_isSpare(it))return;
+    var contract=Math.abs(_effQty(_em,it))||0;
+    var pg=_itemProgress(q,i);
+    var reported=Math.round(pg.cum*100)/100;
+    var sub=Math.round((subQ[i]||0)*100)/100;
+    var d=String(it.desc||'').split('\n')[0].trim();
+    var bill=Math.round((billed[d]||0)*100)/100;
+    if(contract<=0&&reported<=0&&sub<=0&&bill<=0)return;
+    var cat=_itemCat(it);
+    var warns=[];
+    if(contract>0&&reported>contract+1e-6)warns.push('回報量超過合約量 '+fmt(Math.round((reported-contract)*100)/100)+'（回報錯誤或合約需追加）');
+    if(sub>0&&reported>0&&sub<reported-1e-6)warns.push('發包量低於回報量（漏發包或廠商需追加）');
+    if(reported>0&&sub>reported+1e-6)warns.push('廠商計價量高於回報量 '+fmt(Math.round((sub-reported)*100)/100)+'（付款前先核對）');
+    if(contract>0&&bill>contract+1e-6)warns.push('業主請款累計超過合約量');
+    if(cat==='other'&&reported>0&&bill>reported+1e-6)warns.push('業主請款累計超過回報量');
+    out.push({idx:i,desc:d,unit:_uFix(it.unit||''),contract:contract,reported:reported,sub:sub,bill:bill,warns:warns,hasDaily:pg.n>0});
+  });
+  return out;
+}
+function buildQtyReconHtml(q){
+  if(!q)return '<div style="padding:20px;text-align:center;color:var(--b3);font-size:12px">請先開啟專案</div>';
+  var rows=_qtyRecon(q);
+  if(!rows.length)return '<div style="padding:20px;text-align:center;color:var(--b3);font-size:12px">此案沒有可對照的工項數量</div>';
+  var issues=rows.filter(function(r){return r.warns.length;}).length;
+  var noDaily=rows.every(function(r){return !r.hasDaily;});
+  var head=issues
+    ?'<div style="background:#fdecea;border:1px solid #f5b5ae;border-radius:var(--r8);padding:8px 12px;margin-bottom:10px;font-size:12.5px;font-weight:700;color:var(--red)"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> '+issues+' 個工項數量不一致，請逐項核對</div>'
+    :'<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:var(--r8);padding:8px 12px;margin-bottom:10px;font-size:12.5px;font-weight:700;color:#1B5E20">✓ 合約量／日報回報／發包量／業主請款 全部一致</div>';
+  head+='<div style="font-size:11px;color:var(--b3);margin-bottom:10px">日報回報＝工務日報進度列累計；發包量＝承包成本歸戶到該工項的數量（＝廠商計價量）；業主請款累計＝各期請款單加權累計（打設 70%＋拔除 30%）。'+(noDaily?'<b style="color:#b26a00">此案尚無日報回報數量，對照僅供參考。</b>':'')+'</div>';
+  var mob=window.innerWidth<=767;
+  var cell=function(v){return v>0?fmt(v):'<span style="color:var(--b3)">—</span>';};
+  if(mob){
+    return head+rows.map(function(r){
+      var bad=r.warns.length;
+      return '<div style="border:1px solid '+(bad?'#f5b5ae':'var(--b1)')+';background:'+(bad?'#fff8f7':'var(--w)')+';border-radius:var(--r8);padding:8px 10px;margin-bottom:6px;font-size:12px">'
+        +'<div style="font-weight:700;margin-bottom:4px">'+esc(r.desc)+' <span style="color:var(--b3);font-weight:400">'+esc(r.unit)+'</span></div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-variant-numeric:tabular-nums">'
+        +'<span>合約量 <b>'+cell(r.contract)+'</b></span><span>日報回報 <b>'+cell(r.reported)+'</b></span>'
+        +'<span>發包／廠商計價 <b>'+cell(r.sub)+'</b></span><span>業主請款累計 <b>'+cell(r.bill)+'</b></span></div>'
+        +(bad?'<div style="color:var(--red);font-weight:700;margin-top:4px">'+r.warns.map(esc).join('<br>')+'</div>':'<div style="color:var(--g3);margin-top:4px">✓ 一致</div>')
+        +'</div>';
+    }).join('');
+  }
+  var body=rows.map(function(r){
+    var bad=r.warns.length;
+    return '<tr style="border-bottom:1px solid var(--b1)'+(bad?';background:#fff8f7':'')+'">'
+      +'<td style="padding:5px 8px;font-size:12px">'+esc(r.desc)+'</td><td style="padding:5px 8px;font-size:11px;color:var(--b4)">'+esc(r.unit)+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">'+cell(r.contract)+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">'+cell(r.reported)+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">'+cell(r.sub)+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">'+cell(r.bill)+'</td>'
+      +'<td style="padding:5px 8px;font-size:11.5px;font-weight:700;color:'+(bad?'var(--red)':'var(--g3)')+'">'+(bad?r.warns.map(esc).join('<br>'):'✓ 一致')+'</td></tr>';
+  }).join('');
+  return head+'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:640px">'
+    +'<thead><tr style="background:var(--gl);color:var(--b5);font-size:11px"><th style="padding:6px 8px;text-align:left">工項</th><th style="padding:6px 8px;text-align:left">單位</th>'
+    +'<th style="padding:6px 8px;text-align:right">合約量</th><th style="padding:6px 8px;text-align:right">日報回報</th><th style="padding:6px 8px;text-align:right">發包／廠商計價</th><th style="padding:6px 8px;text-align:right">業主請款累計</th><th style="padding:6px 8px;text-align:left">狀態</th></tr></thead><tbody>'+body+'</tbody></table></div>';
 }
 
 // ── 成本類型切換：明細列自動換形（承包/自有＝數量×單價；點工/額外＝天數×日薪＋車資）──
@@ -21190,7 +21353,8 @@ function rQuickCost(){
   if(dsel){
     const dcur=dsel.value;
     dsel.innerHTML='<option value="">── 選擇專案 ──</option>'+mains.map(q=>'<option value="'+q.id+'"'+(q.id===dcur?' selected':'')+'>'+esc(q.name||'未命名')+'</option>').join('');
-    dsel.onchange=function(){drRenderProgRows(true);};
+    dsel.onchange=function(){drRenderProgRows(true);_drFillVendors();};
+    _drFillVendors();
   }
   const dd=document.getElementById('dr-date');if(dd&&!dd.value)dd.value=localToday();
   drRenderPhotos();
@@ -21265,6 +21429,32 @@ function drRenderPhotos(){
 // ── 工作日報：多工地一次回報＋工項下拉進度列（連動專案施工進度條）──
 var _drList=[];        // 待送出的回報清單（每項＝一個工地）
 var _drProgRows=[];    // 目前表單的進度列 {itemIdx,qty,note}
+// v5.401：承包廠商 datalist ＝ 該專案施工成本已建的承包廠商
+function _drFillVendors(){
+  const dl=document.getElementById('dr-sub-vendor-list');if(!dl)return;
+  const qid=document.getElementById('dr-proj')?.value;
+  const q=Q.find(x=>x.id===qid);
+  const names=[];
+  ((q&&q.costs)||[]).forEach(function(c){if(c.type==='sub'&&c.vendor&&c.vendor!=='公司支出（自付）'&&names.indexOf(c.vendor)<0)names.push(c.vendor);});
+  dl.innerHTML=names.map(function(n){return '<option value="'+esc(n)+'">';}).join('');
+}
+// v5.401：進度列即時提示——合約量／已回報／本次後累計，超過合約量標紅
+function _drRowHint(ri){
+  const r=_drProgRows[ri];if(!r||r.itemIdx<0)return {txt:'',over:false};
+  const qid=document.getElementById('dr-proj')?.value;
+  const q=Q.find(x=>x.id===qid);if(!q)return {txt:'',over:false};
+  const it=(q.items||[])[r.itemIdx];if(!it)return {txt:'',over:false};
+  const pg=_itemProgress(q,r.itemIdx);
+  const add=parseFloat(r.qty)||0,after=Math.round((pg.cum+add)*100)/100;
+  const over=pg.target>0&&after>pg.target+1e-6;
+  const u=_uFix(it.unit||'');
+  return {txt:'合約 '+fmt(pg.target)+u+'｜已回報 '+fmt(Math.round(pg.cum*100)/100)+'｜本次後 '+fmt(after)+(over?('　⚠ 超過合約量 '+fmt(Math.round((after-pg.target)*100)/100)):''),over:over,desc:(it.desc||'').split('\n')[0],after:after,target:pg.target};
+}
+function _drUpdHint(ri){
+  const el=document.getElementById('dr-hint-'+ri);if(!el)return;
+  const h=_drRowHint(ri);
+  el.textContent=h.txt;el.style.color=h.over?'var(--red)':'var(--b4)';el.style.fontWeight=h.over?'700':'400';
+}
 function drRenderProgRows(reset){
   if(reset)_drProgRows=[];
   if(!_drProgRows.length)_drProgRows=[{itemIdx:-1,qty:'',note:''}];
@@ -21274,15 +21464,17 @@ function drRenderProgRows(reset){
   box.innerHTML=_drProgRows.map(function(r,ri){
     const opts=(q&&q.items||[]).map((it,i)=>it.sec?null:'<option value="'+i+'"'+(r.itemIdx===i?' selected':'')+'>'+esc((it.desc||'工項'+(i+1)).split('\n')[0].slice(0,22))+'</option>').filter(Boolean).join('');
     return '<div style="display:flex;gap:5px;margin-bottom:5px;align-items:center">'
-    +'<select onchange="_drProgRows['+ri+'].itemIdx=parseInt(this.value)" style="flex:2;min-width:0;font-size:13px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)">'
+    +'<select onchange="_drProgRows['+ri+'].itemIdx=parseInt(this.value);_drUpdHint('+ri+')" style="flex:2;min-width:0;font-size:13px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)">'
     +'<option value="-1"'+(r.itemIdx<0?' selected':'')+'>－工項（選填）－</option>'
     +opts
     +'</select>'
-    +'<input type="number" inputmode="decimal" value="'+(r.qty||'')+'" placeholder="數量" oninput="_drProgRows['+ri+'].qty=this.value" style="flex:0 0 76px;font-size:14px;font-weight:700;text-align:right;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">'
+    +'<input type="number" inputmode="decimal" value="'+(r.qty||'')+'" placeholder="數量" oninput="_drProgRows['+ri+'].qty=this.value;_drUpdHint('+ri+')" style="flex:0 0 76px;font-size:14px;font-weight:700;text-align:right;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">'
     +'<input value="'+esc(r.note||'')+'" placeholder="內容/備註" oninput="_drProgRows['+ri+'].note=this.value" style="flex:2;min-width:0;font-size:13px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">'
     +(_drProgRows.length>1?'<button type="button" class="btn btn-xs btn-r" onclick="_drProgRows.splice('+ri+',1);drRenderProgRows()" style="flex-shrink:0">✕</button>':'')
-    +'</div>';
+    +'</div>'
+    +'<div id="dr-hint-'+ri+'" style="font-size:10.5px;color:var(--b4);margin:-2px 0 6px 2px;min-height:12px"></div>';
   }).join('');
+  _drProgRows.forEach(function(_r,ri){_drUpdHint(ri);});
 }
 function drAddProgRow(){_drProgRows.push({itemIdx:-1,qty:'',note:''});drRenderProgRows();}
 // 把目前表單收成一筆回報（回傳 null＝表單為空）
@@ -21291,16 +21483,21 @@ function _drCollect(){
   const q=Q.find(x=>x.id===qid);
   if(!q)return null;
   const workers=parseInt(document.getElementById('dr-workers')?.value)||0;
+  const subWorkers=parseInt(document.getElementById('dr-sub-workers')?.value)||0;   // v5.401 承包廠商出工（只記錄，不計成本）
+  const subVendor=(document.getElementById('dr-sub-vendor')?.value||'').trim();
   const rows=_drProgRows.filter(r=>(r.itemIdx>=0&&parseFloat(r.qty)>0)||((''+(r.note||'')).trim()!==''));
-  if(!workers&&!rows.length&&!_drPhotos.length)return null;
+  if(!workers&&!subWorkers&&!rows.length&&!_drPhotos.length)return null;
+  const over=[];_drProgRows.forEach(function(_r,ri){const h=_drRowHint(ri);if(h.over)over.push(h.desc+' 累計 '+fmt(h.after)+' ＞ 合約 '+fmt(h.target));});
   const progRows=rows.map(r=>({itemIdx:r.itemIdx,desc:r.itemIdx>=0?((q.items[r.itemIdx]||{}).desc||'').split('\n')[0]:'',qty:parseFloat(r.qty)||0,note:(r.note||'').trim()}));
   const progressText=progRows.map(r=>(r.desc?(r.desc+(r.qty?(' '+r.qty+((q.items[r.itemIdx]||{}).unit||'')):'')):'')+(r.note?((r.desc?'；':'')+r.note):'')).filter(Boolean).join('\n');
-  return {qid:qid,name:q.name||'',workers:workers,
+  return {qid:qid,name:q.name||'',workers:workers,subWorkers:subWorkers,subVendor:subVendor,over:over,
     ownEquip:!!document.getElementById('dr-own-equip')?.checked,
     progressRows:progRows,progress:progressText,photos:_drPhotos.slice(0,3)};
 }
 function _drClearForm(){
   const w=document.getElementById('dr-workers');if(w)w.value='';
+  const sw=document.getElementById('dr-sub-workers');if(sw)sw.value='';
+  const sv=document.getElementById('dr-sub-vendor');if(sv)sv.value='';
   const oe=document.getElementById('dr-own-equip');if(oe)oe.checked=false;
   _drPhotos=[];drRenderPhotos();
   drRenderProgRows(true);
@@ -21322,7 +21519,7 @@ function drRenderList(){
     +_drList.map(function(e,i){
       return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--gm);background:var(--gl);border-radius:var(--r8);margin-bottom:5px;font-size:12.5px">'
       +'<span style="font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(e.name)+'</span>'
-      +'<span style="color:var(--b4);white-space:nowrap">'+(e.workers?('出工'+e.workers):'')+(e.ownEquip?'・機具':'')+(e.photos.length?('・<svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg>'+e.photos.length):'')+'</span>'
+      +'<span style="color:var(--b4);white-space:nowrap">'+(e.workers?('自有'+e.workers):'')+(e.subWorkers?('・承包'+e.subWorkers):'')+(e.ownEquip?'・機具':'')+(e.photos.length?('・<svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg>'+e.photos.length):'')+'</span>'
       +'<button type="button" class="btn btn-xs btn-r" onclick="drRemoveFromList('+i+')">✕</button></div>';
     }).join('');
 }
@@ -21337,15 +21534,16 @@ function submitDailyReport(){
     const q=Q.find(x=>x.id===e.qid);if(!q)return;
     if(!q.dailyLogs)q.dailyLogs=[];
     q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:date,
-      workers:e.workers,progress:e.progress,progressRows:e.progressRows,photos:e.photos,
+      workers:e.workers,subWorkers:e.subWorkers||0,subVendor:e.subVendor||'',progress:e.progress,progressRows:e.progressRows,photos:e.photos,
       ownEquip:e.ownEquip,
       by:((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||''),ts:Date.now()});
     if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120);
     _touch(q);
-    _qcLog.unshift({t:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),proj:(q.name||'').slice(0,14),desc:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 日報'+(e.workers?('｜出工 '+e.workers+' 人'):'')+(e.photos.length?('｜照片 '+e.photos.length+' 張'):''),amt:null,cat:'日報'});
+    _qcLog.unshift({t:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),proj:(q.name||'').slice(0,14),desc:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 日報'+(e.workers?('｜自有 '+e.workers+' 人'):'')+(e.subWorkers?('｜承包 '+e.subWorkers+' 人'):'')+(e.photos.length?('｜照片 '+e.photos.length+' 張'):''),amt:null,cat:'日報'});
     okN++;
   });
   const n=_drList.length;
+  const overAll=[];_drList.forEach(function(e){(e.over||[]).forEach(function(o){overAll.push(e.name+'：'+o);});});
   _drList=[];
   try{persist();}catch(e){_err('submitDailyReport',e);}
   try{_immediateUpload();}catch(e){try{_onSave();}catch(e2){_err('submitDailyReport',e2);}}
@@ -21353,6 +21551,7 @@ function submitDailyReport(){
   drRenderList();rQcLog();
   try{renderProjects();}catch(e){_err('submitDailyReport',e);}
   toast('已送出 '+okN+' 個工地的日報');
+  if(overAll.length)setTimeout(function(){showConfirm('⚠ 回報量超過合約量','<div style="font-size:13px;line-height:1.7">'+overAll.map(esc).join('<br>')+'<div style="margin-top:8px;color:var(--b4);font-size:12px">日報已送出。請確認是否回報錯誤，或合約需要追加（請款單「追加減」）。</div></div>',function(){},false,null,true);},600);
 }
 // 主管檢視：專案頁「檢視日報」
 function viewDailyReports(qid){
@@ -21360,7 +21559,7 @@ function viewDailyReports(qid){
   const logs=q.dailyLogs||[];
   const html=logs.length?logs.map(function(L){
     return '<div style="border-bottom:1px solid var(--b1);padding:9px 0">'
-      +'<div style="display:flex;justify-content:space-between;font-size:12.5px"><b>'+esc(L.date||'')+'</b><span style="color:var(--b4)">'+(L.workers?('出工 '+L.workers+' 人'):'')+'</span></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:12.5px"><b>'+esc(L.date||'')+'</b><span style="color:var(--b4)">'+(L.workers?('自有／點工 '+L.workers+' 人'):'')+(L.subWorkers?((L.workers?'　':'')+'承包 '+L.subWorkers+' 人'+(L.subVendor?('（'+esc(L.subVendor)+'）'):'')):'')+'</span></div>'
       +(L.progress?'<div style="font-size:12.5px;color:var(--b5);margin-top:3px;white-space:pre-line">'+esc(L.progress)+'</div>':'')
       +((L.photos&&L.photos.length)?('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+L.photos.map(function(p){return '<img src="'+p+'" style="width:86px;height:86px;object-fit:cover;border-radius:8px;border:1px solid var(--b2);cursor:zoom-in" title="點擊查看" onclick="_viewFile(\'日報照片\',this.src)">';}).join('')+'</div>'):'')
       +(L.by?'<div style="font-size:10px;color:var(--b3);margin-top:4px">'+esc(L.by)+'</div>':'')
@@ -21440,7 +21639,7 @@ function buildCostAuditHtml(q){
     if(warn)issues++;
     rows+='<tr style="border-bottom:1px solid var(--b1)'+(warn?';background:#fff8ec':'')+'">'
       +'<td style="padding:5px 8px;font-size:12px">日報出工</td>'
-      +'<td style="padding:5px 8px;font-size:11px;color:var(--b4)">累計 '+fmt(wk)+' 工'+(rate?('／標準日薪 '+fmt(rate)):'')+'</td>'
+      +'<td style="padding:5px 8px;font-size:11px;color:var(--b4)">自有／點工累計 '+fmt(wk)+' 工（承包廠商出工不計）'+(rate?('／標準日薪 '+fmt(rate)):'')+'</td>'
       +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(got)+'</td>'
       +'<td style="padding:5px 8px;font-size:11.5px;font-weight:700;color:'+(warn?'#e65100':'var(--g3)')+'">'
         +(rate<=0?'未設定標準日薪（參數設定）'
@@ -22228,6 +22427,11 @@ function rCostItems(){
   if(window._costView==='audit'){
     el.innerHTML=buildCostAuditHtml(q);
     var _tw3=document.getElementById('cost-total-wrap');if(_tw3)_tw3.style.display='none';
+    return;
+  }
+  if(window._costView==='qty'){
+    el.innerHTML=buildQtyReconHtml(q);
+    var _tw4=document.getElementById('cost-total-wrap');if(_tw4)_tw4.style.display='none';
     return;
   }
   // v5.319：改用副本排序。原本直接對 q.costs 原地 sort，切一次「依廠商分組」就把
