@@ -1052,9 +1052,7 @@ async function newPage(browser, width, height) {
       go('quickcost'); rQuickCost();
       const sel = document.getElementById('dr-proj'); sel.value = 'qD'; sel.onchange();
       out.vendorList = /甲承包/.test(document.getElementById('dr-sub-vendor-list').innerHTML);
-      document.getElementById('dr-workers').value = '2';
-      document.getElementById('dr-sub-workers').value = '6';
-      document.getElementById('dr-sub-vendor').value = '甲承包';
+      _drCrews = [{ type: 'labor', vendor: '', n: '2' }, { type: 'sub', vendor: '甲承包', n: '6' }]; drRenderCrews();   // v5.406 出工列
       _drProgRows = [{ itemIdx: 0, qty: '120', note: '' }]; drRenderProgRows();
       out.hintOver = /超過合約量/.test(document.getElementById('dr-hint-0').textContent);
       document.getElementById('dr-date').value = today;
@@ -1161,7 +1159,7 @@ async function newPage(browser, width, height) {
       // 日報欄位
       go('quickcost'); rQuickCost();
       const lbls = [...document.querySelectorAll('#page-quickcost label')].map(l => l.textContent.trim());
-      out.labels = lbls.indexOf('點工出工人數') >= 0 && lbls.indexOf('承包出工人數') >= 0 && !lbls.some(t => /進點工成本勾稽|只記錄/.test(t));
+      out.labels = lbls.some(t => /^出工/.test(t)) && document.querySelectorAll('#dr-crews .dr-crew').length === 2;   // v5.406 出工列取代兩欄人數
       const sel = document.getElementById('dr-proj'); sel.value = 'qG'; sel.onchange();
       const row0 = document.getElementById('dr-prog-rows').firstElementChild;
       const ws = [...row0.children].filter(e => e.tagName !== 'BUTTON').map(e => e.getBoundingClientRect().width);
@@ -1212,7 +1210,7 @@ async function newPage(browser, width, height) {
       const mb = document.getElementById('gen-confirm-modal');
       out.viewBtns = /✎ 修改/.test(mb.innerHTML) && /delDailyLog/.test(mb.innerHTML);
       editDailyLog('qH', 'dH');
-      document.getElementById('dle-w').value = '3';
+      document.querySelector('#dle-crews .dle-cn').value = '3';   // v5.406 第一列＝點工 2 人 → 改 3
       document.querySelectorAll('.dle-q')[0].value = '45';
       document.getElementById('gen-confirm-ok').click();
       const L = Q[0].dailyLogs[0];
@@ -1232,9 +1230,9 @@ async function newPage(browser, width, height) {
       // ⑥ 日報：選工項自動帶發包廠商
       go('quickcost'); rQuickCost();
       const sel = document.getElementById('dr-proj'); sel.value = 'qH'; sel.onchange();
-      document.getElementById('dr-sub-vendor').value = '';
+      drRenderCrews(true);
       _drProgRows[0].itemIdx = 0; _drAutoVendor(0);
-      out.autoVendor = document.getElementById('dr-sub-vendor').value === '丙承包';
+      out.autoVendor = _drCrews.some(c => c.type === 'sub' && c.vendor === '丙承包');   // v5.406 帶進承包出工列
       // ⑦ 材料估算：壞存檔（陣列被剝掉／元素不是物件／缺欄位）不得變空白
       go('matest');
       const bad = [{ _layers: { 0: { w: 'H300' } }, _routesV: 'x', _dc: [null, 5], layers: '3' }, { _layers: null }, 'garbage', 7];
@@ -1336,6 +1334,65 @@ async function newPage(browser, width, height) {
     check('分包：退保留款另建應付、已付期不可刪、刪期連動應付與墓碑', r.rel && r.delBlocked && r.del);
     check('分包管理視圖與專案卡入口；分期不進業主文件', r.subs && r.card && r.strip);
     check('v5.405 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────── 17. v5.406：日報出工廠商列／工項顯示分包廠商／廠商績效已計價／金流推估未計價發包額 ─────────
+  {
+    const { page, errors } = await newPage(browser, 1400, 1000);
+    const r = await page.evaluate(() => {
+      const out = {};
+      P.vendorPayDay = 25; P.vendorPayDelay = 1; P.openingCash = 500000;
+      Q = [{ id: 'qC', code: '1171', name: '廠商列案', client: 'K', date: '2026-01-01', awarded: true, exs: [], rmk: {}, _mt: 1,
+        items: [{ desc: 'H型鋼樁 H300 L=9M 打設', unit: 'M', qty: '100', price: '1000', estCost: '', ot: '', otu: '', sec: false }],
+        costs: [{ id: 'cC', type: 'sub', vendor: '丙承包', cat: '打設', date: '2026-02-01', amt: 0, invoice: true, rows: [{ id: 'r1', linkedItemIdx: 0, desc: '', qty: 100, unitPrice: 500 }],
+                  periods: [{ no: 1, date: '2026-08-31', from: '2026-02-01', to: '2026-08-31', rows: [{ rid: 'r1', qty: 30 }], amt: 15000, ret: 0, net: 15000, due: '2026-09-25' }] },
+                { id: 'cL', type: 'labor', vendor: '甲點工', cat: '裝設', date: '2026-02-01', amt: 0, linkedItemIdx: 0, rows: [{ id: 'l1', subType: 'worker', desc: '', reason: '', days: 1, dayRate: 2800, transport: 0 }] }],
+        dailyLogs: [{ id: 'dOld', date: '2026-08-20', workers: 2, subWorkers: 5, subVendor: '丙承包', progressRows: [{ itemIdx: 0, desc: 'H型鋼樁 H300 L=9M 打設', qty: 30, note: '' }], progress: '', photos: [] },
+                    { id: 'dNew', date: '2026-09-02', workers: 0, subWorkers: 0, subVendor: '', progressRows: [{ itemIdx: 0, desc: 'H型鋼樁 H300 L=9M 打設', qty: 20, note: '' }], progress: '', photos: [] }] }];
+      INV.length = 0; CONTRACTS.splice(0); PAYABLES.length = 0;
+      // 舊日報（無 crews）照樣還原成兩列
+      out.legacy = _crewsOf(Q[0].dailyLogs[0]).length === 2 && /點工 2 人/.test(_crewsText(Q[0].dailyLogs[0])) && /承包 5 人（丙承包）/.test(_crewsText(Q[0].dailyLogs[0]));
+      go('quickcost'); rQuickCost();
+      const sel = document.getElementById('dr-proj'); sel.value = 'qC'; sel.onchange();
+      out.twoRows = document.querySelectorAll('#dr-crews .dr-crew').length === 2 && _drCrews[0].type === 'labor' && _drCrews[1].type === 'sub';
+      out.dl = /丙承包/.test(document.getElementById('dr-sub-vendor-list').innerHTML) && /甲點工/.test(document.getElementById('dr-labor-vendor-list').innerHTML);
+      // 選工項 → 承包列自動帶分包廠商，提示列顯示「發包 丙承包」
+      _drProgRows[0].itemIdx = 0; _drProgRows[0].qty = '10'; _drUpdHint(0); _drAutoVendor(0);
+      out.auto = _drCrews[1].vendor === '丙承包' && /發包 丙承包/.test(document.getElementById('dr-hint-0').textContent);
+      _drCrews[0].vendor = '甲點工'; _drCrews[0].n = '3'; _drCrews[1].n = '6'; drAddCrew('sub'); _drCrews[2].vendor = '丁承包'; _drCrews[2].n = '2'; drRenderCrews();
+      const col = _drCollect();
+      out.collect = !!col && col.workers === 3 && col.subWorkers === 8 && col.subVendor === '丙承包' && col.crews.length === 3;
+      document.getElementById('dr-date').value = '2026-09-04';
+      submitDailyReport();
+      const L = Q[0].dailyLogs[0];
+      out.saved = L.crews.length === 3 && L.workers === 3 && L.subWorkers === 8 && /甲點工/.test(_crewsText(L));
+      out.cleared = _drCrews.length === 2 && !_drCrews[0].vendor && !_drCrews[1].n;
+      // 廠商績效：逐家出工、已計價欄
+      const vs = _vendorStats(2026);
+      const vb = vs.find(v => v.name === '丙承包'), vd = vs.find(v => v.name === '丁承包'), va = vs.find(v => v.name === '甲點工');
+      out.stats = !!vb && vb.subDays === 11 && vb.billed === 15000 && !!vd && vd.subDays === 2 && !!va && va.subDays === 3;
+      const dv = document.createElement('div'); renderVendorReport(dv, 2026, null);
+      out.rpt = /已計價/.test(dv.innerHTML) && /15,000/.test(dv.innerHTML);
+      // 修改日報：出工列可改
+      editDailyLog('qC', 'dNew');
+      out.editRows = document.querySelectorAll('#dle-crews .dle-crew').length === 1;
+      document.querySelector('#dle-crews .dle-cv').value = '丙承包'; document.querySelector('#dle-crews .dle-cn').value = '4';
+      document.getElementById('gen-confirm-ok').click();
+      const L2 = Q[0].dailyLogs.find(x => x.id === 'dNew');
+      out.edited = L2.crews.length === 1 && L2.subWorkers === 4 && L2.subVendor === '丙承包';
+      // 金流：8/31 計價後日報又完成 30M → 推估下期付款 30×500×1.05
+      go('finance'); renderCashForecast();
+      const cf = document.getElementById('cashflow-forecast').innerHTML;
+      out.cf = /預估付款：丙承包／廠商列案（日報已完成未計價/.test(cf) && /15,750/.test(cf);
+      return out;
+    });
+    check('日報：出工改廠商列（預設點工＋承包兩列、可新增），舊日報照樣還原', r.legacy && r.twoRows && r.dl && r.cleared);
+    check('日報：選工項自動帶分包廠商到承包列，提示顯示發包廠商；送出彙總 workers／subWorkers', r.auto && r.collect && r.saved);
+    check('日報修改：出工列可改並重算彙總', r.editRows && r.edited);
+    check('廠商績效：逐家出工累計＋已計價欄', r.stats && r.rpt);
+    check('金流預測：分包合約日報已完成未計價 → 推估下期付款', r.cf);
+    check('v5.406 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
