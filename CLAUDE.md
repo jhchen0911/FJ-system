@@ -68,7 +68,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 歷史單價庫 | `COST_HIST` `writeCostHist`(結案回寫) `_histCostFor(name,unit)`(報價提示；**限同單位**，「式」實績不套到逐 M 工項) `_costOdd`(成本單價＞報價 3 倍標紅) `_costOddFix`(開單自動改同單位實績／清空) |
 | 請款單 | `rInvItems` `buildInvPreview` `addNextPeriod` `settleInvItem`(工項結算，連動合約金額)；**本期估驗數量與累計一律加權** `_wQty`／`_curW`（打設70%＋拔除30%＝合約量），`_prevCumQty` 於 `loadInvoice` 由各期實績重算 |
 | 合約 | `renderContracts` `settleContract`(竣工總結算) |
-| 施工成本 | `rCostItems` `COST_CATS`(科目) `_costByItem`(工項歸戶) `buildCostAnalysisHtml` `buildCostAuditHtml`(勾稽) |
+| 施工成本 | `rCostItems` `COST_CATS`(科目：動員費／打設／拔除／裝設／拆除／材料租金／材料運費／一次性材料購置／其他；舊值 `_COST_CATS_LEGACY` 只顯示不新建，下拉用 `_costCatOpts`) 承包列選工項自動帶合約生效量、備註列 `crow-memo` `_costByItem`(工項歸戶) `buildCostAnalysisHtml` `buildCostAuditHtml`(勾稽) |
 | 金流 | `updateFinanceKPIs` `renderCashForecast`(90天水位預測) |
 | 支出．日報 | `rQuickCost` `submitQuickCost` `submitDailyReport`(頁 id: quickcost)；日報出工分 `workers`(自有／點工，進成本勾稽與出工月結) 與 `subWorkers`/`subVendor`(承包廠商，只記錄)；進度列即時提示 `_drRowHint`；工項數量四方對照 `_qtyRecon`/`buildQtyReconHtml`(施工成本頁「數量對照」：合約量／日報回報／發包量／業主請款累計)；請款單本期數量可點「日報 N ↵」帶入 `_invDailySuggest`/`_dailyQtyBetween`；施工進度工具 `_pgFillFromDaily` 由日報回填實際進度；自有機具逐台 `P.equipList`→`_drRenderEquip`／`log.equip[{name,hrs}]`，出工月結 `_equipUsage`；金流預測 `_projPhysProgress` 推估尚未開單的下一期請款；廠商績效 `_vendorStats` 含日報承包出工 `subDays`／工期；待辦 `dr_gap`（`P.drGapDays` 天沒日報） |
 | 智慧收件 | `smartIntake` `aiClassifyDoc` `_intakeRoute`（Claude API 影像辨識） |
@@ -97,7 +97,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 
 ## 測試
 
-`tests/smoke.js`（147 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（151 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、

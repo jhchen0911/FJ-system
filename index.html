@@ -517,6 +517,10 @@ svg.fj-chart{cursor:zoom-in}
   #cost-list .crow select{flex:1 1 auto;min-width:0;font-size:11.5px!important}
   #cost-list .crow input[type=number]{width:56px!important;flex:0 0 56px;font-size:12px!important;padding:3px 4px!important}
   #cost-list .crow span{font-size:11px!important;white-space:nowrap}
+  /* v5.403 承包列「數量 × 單價 ＝ 金額」固定一行、備註整行 */
+  #cost-list .crow .crow-calc{display:flex!important;flex-wrap:nowrap!important;gap:4px!important}
+  #cost-list .crow .crow-calc input[type=number]{width:auto!important;flex:1 1 0!important;min-width:0}
+  #cost-list .crow .crow-memo{display:block;width:100%!important}
 }
 
 /* ═══ v5.240 雙端深檢修正 ═══ */
@@ -1258,9 +1262,9 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         </div>
         <div class="fg fg2" style="margin-bottom:10px">
           <div class="f"><label>日期</label><input id="dr-date" type="date" style="font-size:14px;padding:8px 10px"></div>
-          <div class="f"><label>自有／點工人數 <span style="font-size:10.5px;color:var(--b3)">— 進點工成本勾稽</span></label><input id="dr-workers" type="number" inputmode="numeric" placeholder="0" style="font-size:16px;font-weight:700;text-align:right;padding:8px 10px"></div>
-          <div class="f"><label>承包廠商出工人數 <span style="font-size:10.5px;color:var(--b3)">— 只記錄，不計成本</span></label><input id="dr-sub-workers" type="number" inputmode="numeric" placeholder="0" style="font-size:16px;font-weight:700;text-align:right;padding:8px 10px"></div>
-          <div class="f"><label>承包廠商</label><input id="dr-sub-vendor" list="dr-sub-vendor-list" placeholder="選填，可自行輸入" style="font-size:13px;padding:8px 10px"><datalist id="dr-sub-vendor-list"></datalist></div>
+          <div class="f"><label>點工出工人數</label><input id="dr-workers" type="number" inputmode="numeric" placeholder="0" title="自有／點工人數，進點工成本勾稽與出工月結" style="font-size:16px;font-weight:700;text-align:right;padding:8px 10px"></div>
+          <div class="f"><label>承包出工人數</label><input id="dr-sub-workers" type="number" inputmode="numeric" placeholder="0" title="承包廠商出工，只記錄不計成本" style="font-size:16px;font-weight:700;text-align:right;padding:8px 10px"></div>
+          <div class="f"><label>承包廠商</label><input id="dr-sub-vendor" list="dr-sub-vendor-list" placeholder="選填，可自行輸入" style="font-size:16px;padding:8px 10px;height:auto"><datalist id="dr-sub-vendor-list"></datalist></div>
           <div class="f" style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 0"><input type="checkbox" id="dr-own-equip" style="width:18px;height:18px" onchange="_drRenderEquip()"> <svg class="ic ib" aria-hidden="true"><use href="#i-truck"/></svg> 本日使用自有機具<span style="font-size:10.5px;color:var(--b3)">— 供機具稼動率統計</span></label>
             <div id="dr-equip-box" style="display:none;margin:2px 0 4px 26px"></div></div>
         </div>
@@ -2655,7 +2659,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.402';
+var APP_VERSION='v5.403';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -20819,19 +20823,22 @@ function buildCostRowsHtml(cc,q){
     var amtSpan='<span id="cost-row-amt-'+row.id+'" style="flex:0 0 74px;font-size:12.5px;font-weight:800;text-align:right;color:var(--g3)">';
     if(cc.type==='sub'){
       var rowAmt=(parseFloat(row.qty)||0)*(parseFloat(row.unitPrice)||0);
+      var _lit=(row.linkedItemIdx>=0&&q&&q.items)?q.items[row.linkedItemIdx]:null;
       html+='<div class="crow" style="background:#fff;border:1px solid var(--b1);border-radius:var(--r6);padding:6px 8px;margin-bottom:5px">'
         +'<div style="display:flex;gap:5px;align-items:center;margin-bottom:5px">'
-        +'<select onchange="updCostField(\''+cc.id+'\',\'linkedItemIdx\',this.value,\''+row.id+'\')" style="flex:1.3;'+IN+'">'
+        +'<select onchange="updCostField(\''+cc.id+'\',\'linkedItemIdx\',this.value,\''+row.id+'\')" style="flex:1;'+IN+'">'
         +itemOpts.replace('value="'+row.linkedItemIdx+'"','value="'+row.linkedItemIdx+'" selected')+'</select>'
-        +'<input value="'+esc(row.desc||'')+'" class="crow-note" placeholder="說明" oninput="updCostField(\''+cc.id+'\',\'desc\',this.value,\''+row.id+'\')" style="flex:1;'+IN+'">'
         +del+'</div>'
-        +'<div style="display:flex;gap:5px;align-items:center">'
-        +'<input type="number" inputmode="decimal" value="'+(row.qty||1)+'" placeholder="數量" oninput="updCostField(\''+cc.id+'\',\'qty\',this.value,\''+row.id+'\')" style="flex:0 0 64px;text-align:right;'+IN+'">'
+        +'<div class="crow-calc" style="display:flex;gap:5px;align-items:center;margin-bottom:5px">'
+        +'<input type="number" inputmode="decimal" value="'+(row.qty?row.qty:'')+'" placeholder="數量" title="選工項自動帶入合約數量，可修改" oninput="updCostField(\''+cc.id+'\',\'qty\',this.value,\''+row.id+'\')" style="flex:1;text-align:right;'+IN+'">'
+        +(_lit&&_lit.unit?'<span style="font-size:11px;color:var(--b3);white-space:nowrap">'+esc(_uFix(_lit.unit))+'</span>':'')
         +'<span style="font-size:11px;color:var(--b3)">×</span>'
         +'<input type="number" inputmode="decimal" value="'+(row.unitPrice||'')+'" placeholder="單價" oninput="updCostField(\''+cc.id+'\',\'unitPrice\',this.value,\''+row.id+'\')" style="flex:1;text-align:right;'+IN+'">'
         +'<span style="font-size:11px;color:var(--b3)">＝</span>'
         +amtSpan+fmt(rowAmt)+'</span>'
-        +'</div></div>';
+        +'</div>'
+        +'<input value="'+esc(row.desc||'')+'" class="crow-memo" placeholder="備註（例：$4,050／M，含 XX 加工）" oninput="updCostField(\''+cc.id+'\',\'desc\',this.value,\''+row.id+'\')" style="width:100%;box-sizing:border-box;'+IN+'">'
+        +'</div>';
     } else {
       var rowAmt2=(parseFloat(row.days)||0)*(parseFloat(row.dayRate)||0)+(parseFloat(row.transport)||0);
       var isMac=row.subType==='machine',isMisc=row.subType==='misc';
@@ -21290,12 +21297,14 @@ function _histCostFor(name,unit){
 
 // ── 成本科目分類（跨案分析用）──
 // v5.293：科目對齊十年規劃的六大成本類別（＋「其他」承接無法歸類的雜項）
-var COST_CATS=['動員費','打設拔除','裝設拆除','材料租金','材料運費','一次性材料購置','其他'];
-function _costDefaultCat(type){return({own:'材料租金',sub:'打設拔除',labor:'裝設拆除',extra:'其他'})[type]||'其他';}
+var COST_CATS=['動員費','打設','拔除','裝設','拆除','材料租金','材料運費','一次性材料購置','其他'];   // v5.403：打設／拔除、裝設／拆除分開
+var _COST_CATS_LEGACY=['打設拔除','裝設拆除'];   // 舊科目：既有記錄照舊顯示，新建不再提供
+function _costDefaultCat(type){return({own:'材料租金',sub:'打設',labor:'裝設',extra:'其他'})[type]||'其他';}
+function _costCatOpts(cur){var ks=COST_CATS.slice();if(cur&&ks.indexOf(cur)<0)ks.unshift(cur);return ks.map(function(k){return '<option value="'+k+'"'+(cur===k?' selected':'')+'>'+k+(COST_CATS.indexOf(k)<0?'（舊）':'')+'</option>';}).join('');}
 // 舊科目名稱對應（歷代舊值自動歸入新六大類）
 function _costCatNorm(cat){var m={
   '材料':'材料租金','機具租金':'動員費','運輸':'材料運費','管理雜費':'其他',
-  '工項材料':'一次性材料購置','外包工程':'打設拔除','人工':'裝設拆除',
+  '工項材料':'一次性材料購置','外包工程':'打設','人工':'裝設',
   '機具':'動員費','機具運費':'動員費','五金零件':'其他','油料耗材':'其他','雜費':'其他'
 };return m[cat]||cat;}
 // 成本歸戶：依關聯工項彙總實際成本（承包逐列、其餘整項）
@@ -21520,12 +21529,12 @@ function drRenderProgRows(reset){
   box.innerHTML=_drProgRows.map(function(r,ri){
     const opts=(q&&q.items||[]).map((it,i)=>it.sec?null:'<option value="'+i+'"'+(r.itemIdx===i?' selected':'')+'>'+esc((it.desc||'工項'+(i+1)).split('\n')[0].slice(0,22))+'</option>').filter(Boolean).join('');
     return '<div style="display:flex;gap:5px;margin-bottom:5px;align-items:center">'
-    +'<select onchange="_drProgRows['+ri+'].itemIdx=parseInt(this.value);_drUpdHint('+ri+')" style="flex:2;min-width:0;font-size:13px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)">'
-    +'<option value="-1"'+(r.itemIdx<0?' selected':'')+'>－工項（選填）－</option>'
+    +'<select onchange="_drProgRows['+ri+'].itemIdx=parseInt(this.value);_drUpdHint('+ri+')" style="flex:1 1 0;min-width:0;font-size:13px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)">'
+    +'<option value="-1"'+(r.itemIdx<0?' selected':'')+'>－工項－</option>'
     +opts
     +'</select>'
-    +'<input type="number" inputmode="decimal" value="'+(r.qty||'')+'" placeholder="數量" oninput="_drProgRows['+ri+'].qty=this.value;_drUpdHint('+ri+')" style="flex:0 0 76px;font-size:14px;font-weight:700;text-align:right;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">'
-    +'<input value="'+esc(r.note||'')+'" placeholder="內容/備註" oninput="_drProgRows['+ri+'].note=this.value" style="flex:2;min-width:0;font-size:13px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">'
+    +'<input type="number" inputmode="decimal" value="'+(r.qty||'')+'" placeholder="數量" oninput="_drProgRows['+ri+'].qty=this.value;_drUpdHint('+ri+')" style="flex:1 1 0;min-width:0;font-size:14px;font-weight:700;text-align:right;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">'
+    +'<input value="'+esc(r.note||'')+'" placeholder="內容/備註" oninput="_drProgRows['+ri+'].note=this.value" style="flex:1 1 0;min-width:0;font-size:13px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">'
     +(_drProgRows.length>1?'<button type="button" class="btn btn-xs btn-r" onclick="_drProgRows.splice('+ri+',1);drRenderProgRows()" style="flex-shrink:0">✕</button>':'')
     +'</div>'
     +'<div id="dr-hint-'+ri+'" style="font-size:10.5px;color:var(--b4);margin:-2px 0 6px 2px;min-height:12px"></div>';
@@ -21741,7 +21750,7 @@ function addCostRow(cid){
   if(!cc)return;
   var rid=cid+'_'+Date.now().toString(36);
   if(cc.type==='sub'){
-    cc.rows.push({id:rid,linkedItemIdx:-1,desc:'',qty:1,unitPrice:0});
+    cc.rows.push({id:rid,linkedItemIdx:-1,desc:'',qty:0,unitPrice:0});   // v5.403：數量待選工項後自動帶合約量
   } else {
     cc.rows.push({id:rid,subType:'worker',desc:'',reason:'',days:1,dayRate:0,transport:0});
   }
@@ -21870,7 +21879,8 @@ function updCostField(cid,field,val,rid){
     // 選工項時帶入預設數量
     if(field==='linkedItemIdx'&&row.linkedItemIdx>=0){
       var it=(q.items||[])[row.linkedItemIdx];
-      if(it&&!row.qty)row.qty=parseFloat(it.qty)||1;
+      if(it){var _em0=null;try{_em0=_effQtyMap(q);}catch(e){_err('updCostField',e);}
+        row.qty=Math.abs(_em0?_effQty(_em0,it):(parseFloat(it.qty)||0))||0;}   // v5.403：一律帶合約（生效）數量，可再改
     }
     recalcCostAmt(cc);
     // 更新金額顯示（不重繪）
@@ -22653,7 +22663,7 @@ function rCostItems(){
       +(c.mergedInto?`<span style="font-size:10px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;padding:2px 6px;border-radius:8px"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 已合併</span>`:'')
       +(function(){var _cat=c.cat?_costCatNorm(c.cat):_costDefaultCat(c.type);
         return `<select onchange="updCostField('${c.id}','cat',this.value)" title="成本科目（跨案分析用）" style="font-size:10.5px;padding:2px 4px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);color:var(--b5);font-family:inherit">`
-          +COST_CATS.map(function(k){return '<option value="'+k+'"'+(_cat===k?' selected':'')+'>'+k+'</option>';}).join('')
+          +_costCatOpts(_cat)
           +`</select>`
           +`<input type="date" value="${c.date||''}" onchange="updCostField('${c.id}','date',this.value)" title="成本發生日期" style="font-size:10.5px;padding:2px 4px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);color:var(--b4);font-family:inherit;width:118px">`;})()
       +`<button type="button" onclick="delCostItem('${c.id}')" style="margin-left:auto;padding:2px 8px;border:1px solid var(--red);color:var(--red);background:transparent;border-radius:var(--r6);cursor:pointer;font-size:11px">✕</button>`
@@ -22668,7 +22678,7 @@ function rCostItems(){
   // 科目匯總列（v5.279：原「自有/承包/點工/額外」類型列與科目列重複，已移除，僅留科目）
   var _csum={};
   (q.costs||[]).forEach(function(c2){var k=c2.cat?_costCatNorm(c2.cat):_costDefaultCat(c2.type);_csum[k]=(_csum[k]||0)+(parseFloat(c2.amt)||0);});
-  var _catKeys=COST_CATS.filter(function(k){return _csum[k]>0;});
+  var _catKeys=COST_CATS.filter(function(k){return _csum[k]>0;}).concat(Object.keys(_csum).filter(function(k){return COST_CATS.indexOf(k)<0&&_csum[k]>0;}));
   var _catBar2=_catKeys.length?('<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;align-items:center">'
     +'<span style="font-size:10px;color:var(--b3)">科目：</span>'
     +_catKeys.map(function(k){return '<span style="padding:4px 10px;border-radius:99px;background:var(--gl);border:1px solid var(--gm);color:var(--g3);font-weight:700">'+k+' <b style="font-variant-numeric:tabular-nums">'+fmt(Math.round(_csum[k]))+'</b></span>';}).join('')
@@ -25783,10 +25793,10 @@ function _intakeConfirm(r,du){
     var html2='';
     // 成本科目：會建立成本的類型顯示（預設依類型帶入）
     if(ty==='vendor_quote'||ty==='own_material'||ty==='expense'){
-      var defCat=ty==='vendor_quote'?'外包工程':ty==='own_material'?'工項材料':'雜費';
+      var defCat=ty==='vendor_quote'?'打設':ty==='own_material'?'一次性材料購置':'其他';
       var cur=document.getElementById('ik-cat')?gv('ik-cat'):defCat;
       html2+='<div class="f"><label>成本科目</label><select id="ik-cat">'
-        +COST_CATS.map(function(k){return '<option value="'+k+'"'+(cur===k?' selected':'')+'>'+k+'</option>';}).join('')
+        +_costCatOpts(cur)
         +'</select></div>';
     }
     if(ty==='own_material'){
@@ -25904,7 +25914,7 @@ function _intakeRoute(type,qid,r,du){
     if(!q2.costs)q2.costs=[];
     var cid=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
     var cc={id:cid,type:'sub',isAttached:false,attachedTo:'',mergedInto:'',vendor:r.vendor||'',
-      cat:(r._cat||'打設拔除'),date:r.date||today,
+      cat:(r._cat||'打設'),date:r.date||today,
       rows:(r.items||[]).filter(function(it){return it.desc;}).map(function(it,i){return {id:cid+'_'+i,linkedItemIdx:-1,desc:it.desc||'',qty:_aiNum(it.qty)||1,unitPrice:_aiNum(it.price)};}),amt:0};
     if(!cc.rows.length)cc.rows=[{id:cid+'_0',linkedItemIdx:-1,desc:r.note||'',qty:1,unitPrice:_aiNum(r.amount)}];
     recalcCostAmt(cc);
