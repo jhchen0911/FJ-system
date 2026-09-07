@@ -990,6 +990,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <button type="button" class="btn btn-sm desk-only" onclick="newQ()">↺ 清除</button>
       <button type="button" class="btn btn-sm" onclick="openRmkModal()"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 備註填寫</button>
       <button type="button" class="btn btn-sm" onclick="openNegotiateModal()" title="議價：整單等比或逐項調價" style="border-color:#b39ddb;color:#4527a0"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 議價</button>
+      <button type="button" class="btn btn-sm" onclick="openSiteDet(eid)" title="案場細節紀錄表：圖面抓的周長／深度／樁／支撐層等數量，可進版、匯出 PDF、帶入材料估算" style="border-color:var(--gm);color:var(--g3)"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 案場細節</button>
       <button type="button" class="btn btn-sm" onclick="go('quotes')">← 返回</button>
       <button type="button" class="btn btn-sm" onclick="loadQ(eid);go('preview')"><svg class="ic ib" aria-hidden="true"><use href="#i-eye"/></svg> 預覽</button>
       <button type="button" class="btn btn-sm" onclick="bumpQVersion(eid)" title="將目前內容封存為歷史版本並升版" style="border-color:#1a3a6b;color:#1a3a6b"><svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> 進版</button>
@@ -1236,6 +1237,20 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <div class="page" id="page-plan">
   <div class="ph"><div class="ph-l"><div class="ph-t">施工計畫書</div><div class="ph-s">分項工程施工計畫書自動生成：填專案→勾工項→匯圖說→產出 Word／PDF＋自主檢查表</div></div></div>
   <div class="pad" style="max-width:1300px"><div id="plan-root"></div></div>
+</div>
+<div class="page" id="page-sitedet">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-t">案場細節紀錄表</div><div class="ph-s" id="sd-sub">圖面抓下來的數量記在這裡，報價進版不必重抓</div>
+      <div style="font-size:10.5px;color:var(--g3);margin-top:2px">✓ 所有變更即時自動儲存</div></div>
+    <div class="ph-r">
+      <button type="button" class="btn btn-sm" onclick="if(eid)loadQ(eid);else go('quotes')">← 報價</button>
+      <button type="button" class="btn btn-sm" onclick="siteShowVers()" title="歷次進版的紀錄，可檢視／還原"><svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> 版次</button>
+      <button type="button" class="btn btn-sm" onclick="siteBump()" title="把目前內容封存為一版，之後的修改算下一版" style="border-color:#1a3a6b;color:#1a3a6b">進版</button>
+      <button type="button" class="btn btn-sm" onclick="siteExportPDF()"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 匯出 PDF</button>
+      <button type="button" class="btn btn-sm btn-g" onclick="siteToMatEst()" title="把周長／面積／深度／樁／支撐層帶進材料估算">帶入材料估算 →</button>
+    </div>
+  </div>
+  <div class="pad" style="max-width:1100px"><div id="site-root"></div></div>
 </div>
 <div class="page" id="page-matest">
   <div class="ph"><div class="ph-l"><div class="ph-t">材料估算</div><div class="ph-s">擋土支撐材料估算：選專案→輸入條件→計算所需材料</div></div></div>
@@ -2663,7 +2678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.406';
+var APP_VERSION='v5.407';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -3393,6 +3408,7 @@ function go(p){
   if(p==='lifeline'){try{_llRender();}catch(e){_err('top',e);}}
   if(p==='progress'){try{_pgRender();}catch(e){_err('top',e);}}
   if(p==='matest'){try{renderMatEst();}catch(e){_err('top',e);}}
+  if(p==='sitedet'){try{_sdRender();}catch(e){_err('top',e);}}
   if(p==='plan'){try{_plRender();}catch(e){_err('top',e);}}
   if(p==='quotes'){renderList();updateQuoteStats();}
   if(p==='editor'){
@@ -10734,6 +10750,211 @@ function _shBestFit(target,lens){
   var text=Object.keys(combo).sort(function(a,b){return parseFloat(b)-parseFloat(a);}).map(function(l){return l+'M×'+combo[l];}).join(' + ');
   return{total:best/SC,waste:(best-t)/SC,combo:combo,text:text};
 }
+// ══════════ v5.407 案場細節紀錄表 ══════════
+// 掛在報價單 q.site（隨報價同步、隨報價版次封存），歷次進版 q.siteHist[{ver,ts,by,note,data}]。
+// 內容＝圖面抓下來的數量：基地／擋土壁／中間樁／共構樁／構台樁／支撐各層／構台／便梯。
+var SD_WALL_FORMS=['鋼軌樁','鋼板樁','型鋼排樁','預壘樁','基樁','微型樁','CCP','連續壁','擋土板'];
+var SD_METHODS=['直接打設','水刀引孔','氣動槌引孔','鑽掘引孔'];
+var SD_PILE_METHODS=SD_METHODS.concat(['根固處理']);
+var SD_CAP_TYPES=['RC壓樑','H型鋼壓樑','鋼板壓樑','其他'];
+function _sdBlank(){
+  return {ver:1,date:localToday(),drawing:'',memo:'',P:'',A:'',H:'',slabT:'',
+    wall:{form:'',spec:'',method:'',len:'',sp:'',n:'',nAuto:true,cap:false,capType:''},
+    mid:{spec:'',method:'',len:'',n:''},co:{spec:'',method:'',len:'',n:''},gt:{spec:'',method:'',len:'',n:''},
+    layers:0,L:[],plat:{load:'',A:'',P:''},stairs:''};
+}
+function _sdNorm(src){
+  var d=_sdBlank(),m=Object.assign(d,(src&&typeof src==='object')?src:{});
+  ['wall','mid','co','gt','plat'].forEach(function(k){m[k]=Object.assign({},d[k]||{},(m[k]&&typeof m[k]==='object')?m[k]:{});});
+  if(!Array.isArray(m.L))m.L=[];
+  m.L=m.L.map(function(x){return Object.assign({w:'',s:'',d:'',vc:'',vl:'',hc:'',hl:''},(x&&typeof x==='object')?x:{});});
+  var n=Math.max(0,parseInt(m.layers)||0);while(m.L.length<n)m.L.push({w:'',s:'',d:'',vc:'',vl:'',hc:'',hl:''});if(m.L.length>n)m.L=m.L.slice(0,n);
+  m.layers=n;
+  return m;
+}
+function _sdQ(){return Q.find(function(x){return x.id===eid;});}
+function _sdSite(q){if(!q)return null;q.site=_sdNorm(q.site);return q.site;}
+function _sdN(v){var x=parseFloat(v);return isFinite(x)?x:0;}
+// 派生量：擋土壁支數＝ceil(周長÷間距)（可手動覆寫）、各項總長、支撐各層長度
+function _sdCalc(sd){
+  var P=_sdN(sd.P),w=sd.wall,sp=_sdN(w.sp);
+  var nAuto=(P>0&&sp>0)?Math.ceil(P/sp-1e-9):0;
+  var n=(w.nAuto!==false)?nAuto:_sdN(w.n);
+  var out={wallNAuto:nAuto,wallN:n,wallLen:n*_sdN(w.len),
+    midLen:_sdN(sd.mid.n)*_sdN(sd.mid.len),coLen:_sdN(sd.co.n)*_sdN(sd.co.len),gtLen:_sdN(sd.gt.n)*_sdN(sd.gt.len),
+    layers:[],supLen:0,supRoutes:0};
+  (sd.L||[]).forEach(function(l,i){
+    var v=_sdN(l.vc)*_sdN(l.vl),h=_sdN(l.hc)*_sdN(l.hl);
+    out.layers.push({i:i+1,v:v,h:h,len:v+h,routes:_sdN(l.vc)+_sdN(l.hc)});
+    out.supLen+=v+h;out.supRoutes+=_sdN(l.vc)+_sdN(l.hc);
+  });
+  return out;
+}
+function openSiteDet(qid){
+  if(!qid){toast('請先儲存報價單，再填案場細節');return;}
+  if(qid!==eid){try{loadQ(qid);}catch(e){_err('openSiteDet',e);}}
+  go('sitedet');
+}
+function _sdRender(){
+  var root=document.getElementById('site-root');if(!root)return;
+  var q=_sdQ();
+  var sub=document.getElementById('sd-sub');
+  if(!q){
+    var mains=Q.filter(function(x){return !x.parentId;});
+    root.innerHTML='<div class="card"><div class="cb"><div class="f"><label>選擇報價單／案場</label><select onchange="if(this.value)openSiteDet(this.value)" style="width:100%;font-size:14px;padding:9px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit"><option value="">── 選擇 ──</option>'
+      +mains.map(function(x){return '<option value="'+x.id+'">'+esc(x.name||'未命名')+(x.client?'／'+esc(x.client):'')+(x.site?'　▪ v'+(x.site.ver||1):'')+'</option>';}).join('')+'</select></div>'
+      +'<div style="font-size:12px;color:var(--b4);margin-top:6px">也可以從報價編輯工具列「案場細節」或專案卡進入。</div></div></div>';
+    if(sub)sub.textContent='請先選擇報價單';
+    return;
+  }
+  var sd=_sdSite(q),c=_sdCalc(sd);
+  if(sub)sub.textContent=(q.name||'未命名')+(q.client?'　/　'+q.client:'')+'　·　細節 v'+(sd.ver||1)+(sd.date?('　'+sd.date):'')+'　·　報價 v'+(q.ver||1);
+  var IN='width:100%;box-sizing:border-box;font-size:14px;padding:8px 9px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)';
+  var num=function(path,label,unit,ph){return '<div class="f"><label style="font-size:11px">'+label+(unit?' <span style="color:var(--b3)">('+unit+')</span>':'')+'</label><input type="number" inputmode="decimal" step="any" value="'+esc(_sdGet(sd,path))+'" placeholder="'+(ph||'')+'" onchange="_sdSet(\''+path+'\',this.value)" style="'+IN+';text-align:right"></div>';};
+  var txt=function(path,label,ph,list){return '<div class="f"><label style="font-size:11px">'+label+'</label><input value="'+esc(_sdGet(sd,path))+'" placeholder="'+(ph||'')+'"'+(list?' list="'+list+'"':'')+' onchange="_sdSet(\''+path+'\',this.value)" style="'+IN+'"></div>';};
+  var sel=function(path,label,opts,allowEmpty){var cur=_sdGet(sd,path);return '<div class="f"><label style="font-size:11px">'+label+'</label><select onchange="_sdSet(\''+path+'\',this.value)" style="'+IN+'">'+(allowEmpty!==false?'<option value="">－</option>':'')+opts.map(function(o){return '<option value="'+esc(o)+'"'+(cur===o?' selected':'')+'>'+esc(o)+'</option>';}).join('')+(cur&&opts.indexOf(cur)<0?'<option value="'+esc(cur)+'" selected>'+esc(cur)+'</option>':'')+'</select></div>';};
+  var secH=function(t,hint){return '<div class="me-sub" style="margin-top:16px">'+t+(hint?' <span style="font-weight:400;font-size:10.5px;color:var(--b3)">'+hint+'</span>':'')+'</div>';};
+  var pile=function(k,label){return secH(label)+'<div class="me-grid">'+txt(k+'.spec','規格','例：H350×350','sd-spec-list')+sel(k+'.method','工法',SD_PILE_METHODS)+num(k+'.len','長度','M')+num(k+'.n','支數','支')
+    +'<div class="f"><label style="font-size:11px">總長</label><div style="padding:8px 0;font-weight:800;color:var(--g3)">'+(c[k+'Len']?_shR1(c[k+'Len'])+' M':'—')+'</div></div></div>';};
+  var h='<div class="card"><div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 圖面數量</div></div><div class="cb">'
+    +'<datalist id="sd-spec-list">'+SH_SPECS.concat(['H350×350','H400×400','H300×300','SP-II','SP-III','SP-IV','37kg 鋼軌','50kg 鋼軌']).map(function(x){return '<option value="'+esc(x)+'">';}).join('')+'</datalist>'
+    +'<div class="me-grid wide">'+txt('drawing','圖說版本／來源','例：結構圖 S-03 rev.B 2026/08')+'<div class="f"><label style="font-size:11px">紀錄日期</label><input type="date" value="'+esc(sd.date||'')+'" onchange="_sdSet(\'date\',this.value)" style="'+IN+'"></div></div>'
+    +secH('基地')+'<div class="me-grid">'+num('P','基地周長','M')+num('A','開挖面積','m²')+num('H','開挖深度','M')+num('slabT','大底厚度','M','例：0.8')+'</div>'
+    +secH('擋土壁','支數＝周長 ÷ 間距 無條件進位，可手動改')+'<div class="me-grid">'+sel('wall.form','形式',SD_WALL_FORMS)+txt('wall.spec','規格','例：H350×350／SP-IV／37kg','sd-spec-list')+sel('wall.method','工法',SD_METHODS)+num('wall.len','長度','M')+num('wall.sp','間距','M','例：0.6')
+    +'<div class="f"><label style="font-size:11px">支數 <span style="color:var(--b3)">(支)</span>'+(sd.wall.nAuto!==false?' <span style="color:var(--g3)">自動</span>':' <button type="button" onclick="_sdSet(\'wall.nAuto\',true)" style="border:none;background:none;color:var(--g3);cursor:pointer;font-size:11px;padding:0;text-decoration:underline">改回自動 '+c.wallNAuto+'</button>')+'</label><input type="number" inputmode="numeric" value="'+(sd.wall.nAuto!==false?(c.wallN||''):esc(sd.wall.n))+'" placeholder="'+(c.wallNAuto||'')+'" onchange="_sdSet(\'wall.n\',this.value)" style="'+IN+';text-align:right;font-weight:800"></div>'
+    +'<div class="f"><label style="font-size:11px">總長</label><div style="padding:8px 0;font-weight:800;color:var(--g3)">'+(c.wallLen?_shR1(c.wallLen)+' M':'—')+'</div></div>'
+    +'<div class="f"><label style="font-size:11px">壓樑</label><label style="display:flex;align-items:center;gap:8px;padding:8px 0;font-size:13.5px;cursor:pointer"><input type="checkbox"'+(sd.wall.cap?' checked':'')+' onchange="_sdSet(\'wall.cap\',this.checked)" style="width:18px;height:18px;accent-color:var(--g)"> 有壓樑</label></div>'
+    +(sd.wall.cap?sel('wall.capType','壓樑形式',SD_CAP_TYPES):'')+'</div>'
+    +pile('mid','中間樁')+pile('co','共構樁')+pile('gt','構台樁')
+    +secH('支撐','各層規格與縱／橫向路數×長度；層長度＝縱路數×縱長＋橫路數×橫長')
+    +'<div class="me-grid" style="max-width:320px">'+num('layers','支撐層數','層')+'</div>'
+    +(sd.L||[]).map(function(l,i){var lc=c.layers[i]||{};return '<div style="border:1px solid var(--b1);border-radius:var(--r8);padding:8px 10px;margin-top:8px;background:var(--b0)"><div style="font-weight:800;font-size:12.5px;color:var(--g3);margin-bottom:6px">第 '+(i+1)+' 層 <span style="font-weight:400;color:var(--b4)">長度 '+(lc.len?_shR1(lc.len)+' M':'—')+(lc.routes?'（'+lc.routes+' 路）':'')+'</span></div>'
+      +'<div class="me-grid">'+sel('L.'+i+'.w','圍令規格',SH_SPECS)+sel('L.'+i+'.s','支撐規格',SH_SPECS)+sel('L.'+i+'.d','斜撐規格',['無'].concat(SH_SPECS))
+      +num('L.'+i+'.vc','縱向路數','路')+num('L.'+i+'.vl','縱向每路長','M')+num('L.'+i+'.hc','橫向路數','路')+num('L.'+i+'.hl','橫向每路長','M')+'</div></div>';}).join('')
+    +(sd.L.length?'<div style="font-size:12.5px;color:var(--b5);margin-top:8px">支撐合計 <b style="color:var(--g3)">'+_shR1(c.supLen)+' M</b>（'+c.supRoutes+' 路）</div>':'')
+    +secH('施工構台')+'<div class="me-grid">'+txt('plat.load','載重需求','例：吊車 50t／2 t/m²')+num('plat.A','面積','m²')+num('plat.P','周長','M')+'</div>'
+    +secH('施工便梯')+'<div class="me-grid" style="max-width:320px">'+num('stairs','數量','座')+'</div>'
+    +secH('備註')+'<textarea onchange="_sdSet(\'memo\',this.value)" placeholder="圖面上其他要記的：特殊角隅、既有結構物、地質、業主要求…" style="'+IN+';min-height:70px">'+esc(sd.memo||'')+'</textarea>'
+    +'</div></div>'
+    +'<div class="card"><div class="ch green"><div class="cht">摘要</div></div><div class="cb" style="font-size:13px;line-height:1.9">'+_sdSummaryHtml(sd,c,q)+'</div></div>';
+  root.innerHTML=h;
+}
+function _sdGet(sd,path){var o=sd;path.split('.').forEach(function(k){o=(o==null)?undefined:o[k];});return (o==null)?'':String(o);}
+function _sdSet(path,val){
+  var q=_sdQ();if(!q)return;var sd=_sdSite(q);
+  var ks=path.split('.'),o=sd;for(var i=0;i<ks.length-1;i++){if(o[ks[i]]==null||typeof o[ks[i]]!=='object')o[ks[i]]={};o=o[ks[i]];}
+  var k=ks[ks.length-1];
+  if(path==='wall.n'){sd.wall.n=val;sd.wall.nAuto=(val==='');}
+  else if(path==='wall.nAuto'){sd.wall.nAuto=!!val;if(val)sd.wall.n='';}
+  else o[k]=val;
+  if(path==='layers')q.site=_sdNorm(sd);
+  sd.mt=Date.now();
+  _touch(q);try{persist();}catch(e){_err('_sdSet',e);}
+  clearTimeout(window._sdUpT);window._sdUpT=setTimeout(function(){try{_immediateUpload();}catch(e){_err('_sdSet',e);}},1500);
+  _sdRender();
+}
+function _sdSummaryHtml(sd,c,q){
+  var row=function(l,v){return v?('<div style="display:flex;gap:10px"><span style="color:var(--b4);flex:0 0 96px">'+l+'</span><span>'+v+'</span></div>'):'';};
+  var pileTxt=function(k){var p=sd[k];if(!(_sdN(p.n)>0||p.spec))return '';return [p.spec,p.method,(_sdN(p.len)?_sdN(p.len)+'M':''),(_sdN(p.n)?_sdN(p.n)+'支':''),(c[k+'Len']?'共 '+_shR1(c[k+'Len'])+'M':'')].filter(Boolean).join('　');};
+  return row('基地',[(_sdN(sd.P)?'周長 '+_sdN(sd.P)+'M':''),(_sdN(sd.A)?'面積 '+_sdN(sd.A)+'m²':''),(_sdN(sd.H)?'開挖深 '+_sdN(sd.H)+'M':''),(_sdN(sd.slabT)?'大底 '+_sdN(sd.slabT)+'M':'')].filter(Boolean).join('　'))
+    +row('擋土壁',[sd.wall.form,sd.wall.spec,sd.wall.method,(_sdN(sd.wall.len)?_sdN(sd.wall.len)+'M':''),(_sdN(sd.wall.sp)?'@'+_sdN(sd.wall.sp)+'M':''),(c.wallN?c.wallN+'支':''),(c.wallLen?'共 '+_shR1(c.wallLen)+'M':''),(sd.wall.cap?('壓樑：'+(sd.wall.capType||'有')):'')].filter(Boolean).join('　'))
+    +row('中間樁',pileTxt('mid'))+row('共構樁',pileTxt('co'))+row('構台樁',pileTxt('gt'))
+    +row('支撐',sd.L.length?(sd.L.length+' 層　'+c.layers.map(function(l,i){var L=sd.L[i];return 'L'+l.i+'：'+[L.w?'圍令'+L.w:'',L.s?'支撐'+L.s:'',(L.d&&L.d!=='無')?'斜撐'+L.d:'',(l.len?_shR1(l.len)+'M':'')].filter(Boolean).join('/');}).join('；')+'　合計 '+_shR1(c.supLen)+'M'):'')
+    +row('施工構台',[sd.plat.load,(_sdN(sd.plat.A)?_sdN(sd.plat.A)+'m²':''),(_sdN(sd.plat.P)?'周長 '+_sdN(sd.plat.P)+'M':'')].filter(Boolean).join('　'))
+    +row('便梯',_sdN(sd.stairs)?_sdN(sd.stairs)+' 座':'')
+    +row('備註',esc(sd.memo||'').replace(/\n/g,'<br>'))
+    +'<div style="font-size:11px;color:var(--b3);margin-top:6px">工項數量對照：報價單「'+esc(q.name||'')+'」'+((q.items||[]).filter(function(it){return !it.sec;}).length)+' 個工項。改圖面數量後，請自行核對報價工項數量。</div>';
+}
+// ── 進版／版次 ──
+function siteBump(){
+  var q=_sdQ();if(!q){toast('請先選擇報價單');return;}
+  var sd=_sdSite(q);
+  showConfirm('案場細節進版','<div style="font-size:13px;line-height:1.7">將目前內容封存為 <b>v'+(sd.ver||1)+'</b>，之後的修改算 <b>v'+((sd.ver||1)+1)+'</b>。<br><input id="sd-bump-note" placeholder="這版改了什麼（例：業主改深度 13→14M）" style="width:100%;box-sizing:border-box;margin-top:8px;font-size:13px;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit"></div>',function(){
+    if(!Array.isArray(q.siteHist))q.siteHist=[];
+    q.siteHist.unshift({ver:sd.ver||1,ts:Date.now(),by:((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機'),note:(gv('sd-bump-note')||'').trim(),data:JSON.parse(JSON.stringify(sd))});
+    if(q.siteHist.length>30)q.siteHist=q.siteHist.slice(0,30);
+    sd.ver=(sd.ver||1)+1;sd.date=localToday();
+    _touch(q);try{persist();_immediateUpload();}catch(e){_err('siteBump',e);}
+    try{logActivity('案場細節','進版：'+(q.name||'')+' → v'+sd.ver);}catch(e){_err('siteBump',e);}
+    _sdRender();toast('案場細節已進版至 v'+sd.ver);
+  },false);
+}
+function siteShowVers(){
+  var q=_sdQ();if(!q){toast('請先選擇報價單');return;}
+  var hist=q.siteHist||[];
+  var html=hist.length?hist.map(function(h,i){
+    return '<div style="border-bottom:1px solid var(--b1);padding:8px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>v'+h.ver+'</b><span style="font-size:12px;color:var(--b4);flex:1;min-width:0">'+new Date(h.ts).toLocaleString('zh-TW')+(h.note?('　'+esc(h.note)):'')+(h.by?('　'+esc(h.by)):'')+'</span>'
+      +'<span style="white-space:nowrap"><button type="button" class="btn btn-xs" onclick="siteViewVer('+i+')">檢視</button> <button type="button" class="btn btn-xs" onclick="siteRestoreVer('+i+')">還原</button></span></div>';
+  }).join(''):'<div style="color:var(--b3);font-size:12px;padding:10px 0">尚未進版。按「進版」把目前內容封存後，才會出現在這裡。</div>';
+  showConfirm('案場細節版次：'+esc(q.name||''),'<div style="max-height:60vh;overflow-y:auto">'+html+'</div>',function(){},false,null,true);
+}
+function siteViewVer(i){
+  var q=_sdQ();if(!q)return;var h=(q.siteHist||[])[i];if(!h)return;
+  var sd=_sdNorm(h.data),c=_sdCalc(sd);
+  showConfirm('案場細節 v'+h.ver+'（'+new Date(h.ts).toLocaleDateString('zh-TW')+'）','<div style="max-height:60vh;overflow-y:auto;font-size:13px;line-height:1.9">'+_sdSummaryHtml(sd,c,q)+'</div>',function(){setTimeout(siteShowVers,150);},false,function(){setTimeout(siteShowVers,150);},true);
+}
+function siteRestoreVer(i){
+  var q=_sdQ();if(!q)return;var h=(q.siteHist||[])[i];if(!h)return;
+  var cur=_sdSite(q);
+  showConfirm('還原到 v'+h.ver,'目前的內容會先封存為 v'+(cur.ver||1)+'，再把 v'+h.ver+' 的數量還原成新的 v'+((cur.ver||1)+1)+'。',function(){
+    if(!Array.isArray(q.siteHist))q.siteHist=[];
+    q.siteHist.unshift({ver:cur.ver||1,ts:Date.now(),by:((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機'),note:'還原到 v'+h.ver+' 之前的封存',data:JSON.parse(JSON.stringify(cur))});
+    var nd=_sdNorm(JSON.parse(JSON.stringify(h.data)));nd.ver=(cur.ver||1)+1;nd.date=localToday();
+    q.site=nd;_touch(q);try{persist();_immediateUpload();}catch(e){_err('siteRestoreVer',e);}
+    _sdRender();toast('已還原 v'+h.ver+' 的內容為 v'+nd.ver);
+  },true);
+}
+// ── PDF ──
+function _sdDocBody(sd,c,q){
+  var cell=function(v,cls){return '<td'+(cls?' class="'+cls+'"':'')+'>'+(v===''||v==null?'—':esc(String(v)))+'</td>';};
+  var b='<div class="cond">報價 v'+(q.ver||1)+'　案場細節 v'+(sd.ver||1)+(sd.date?('　紀錄日期 '+esc(sd.date)):'')+(sd.drawing?('　圖說：'+esc(sd.drawing)):'')+(q.client?('　業主：'+esc(q.client)):'')+'</div>';
+  b+='<h2>基地</h2><table><thead><tr><th>基地周長 (M)</th><th>開挖面積 (m²)</th><th>開挖深度 (M)</th><th>大底厚度 (M)</th></tr></thead><tbody><tr>'+cell(sd.P)+cell(sd.A)+cell(sd.H)+cell(sd.slabT)+'</tr></tbody></table>';
+  b+='<h2>擋土壁</h2><table><thead><tr><th>形式</th><th>規格</th><th>工法</th><th>長度 (M)</th><th>間距 (M)</th><th>支數</th><th>總長 (M)</th><th>壓樑</th></tr></thead><tbody><tr>'+cell(sd.wall.form)+cell(sd.wall.spec)+cell(sd.wall.method)+cell(sd.wall.len)+cell(sd.wall.sp)+cell(c.wallN||'')+cell(c.wallLen?_shR1(c.wallLen):'')+cell(sd.wall.cap?(sd.wall.capType||'有'):'無')+'</tr></tbody></table>';
+  b+='<h2>樁</h2><table><thead><tr><th>項目</th><th>規格</th><th>工法</th><th>長度 (M)</th><th>支數</th><th>總長 (M)</th></tr></thead><tbody>'
+    +[['中間樁','mid'],['共構樁','co'],['構台樁','gt']].map(function(x){var p=sd[x[1]];return '<tr>'+cell(x[0],'l')+cell(p.spec)+cell(p.method)+cell(p.len)+cell(p.n)+cell(c[x[1]+'Len']?_shR1(c[x[1]+'Len']):'')+'</tr>';}).join('')+'</tbody></table>';
+  b+='<h2>支撐<span class="sub">'+(sd.layers||0)+' 層</span></h2><table><thead><tr><th>層</th><th>圍令</th><th>支撐</th><th>斜撐</th><th>縱向 路數×每路長</th><th>橫向 路數×每路長</th><th>層長度 (M)</th></tr></thead><tbody>'
+    +(sd.L||[]).map(function(l,i){var lc=c.layers[i]||{};return '<tr>'+cell('L'+(i+1))+cell(l.w)+cell(l.s)+cell(l.d)+cell((_sdN(l.vc)||_sdN(l.vl))?(_sdN(l.vc)+' × '+_sdN(l.vl)+' ＝ '+_shR1(lc.v)):'')+cell((_sdN(l.hc)||_sdN(l.hl))?(_sdN(l.hc)+' × '+_sdN(l.hl)+' ＝ '+_shR1(lc.h)):'')+cell(lc.len?_shR1(lc.len):'')+'</tr>';}).join('')
+    +(sd.L.length?'<tr class="tt"><td colspan="6" class="r">支撐合計</td><td>'+_shR1(c.supLen)+'</td></tr>':'<tr><td colspan="7">—</td></tr>')+'</tbody></table>';
+  b+='<h2>施工構台／便梯</h2><table><thead><tr><th>構台載重需求</th><th>構台面積 (m²)</th><th>構台周長 (M)</th><th>施工便梯 (座)</th></tr></thead><tbody><tr>'+cell(sd.plat.load)+cell(sd.plat.A)+cell(sd.plat.P)+cell(sd.stairs)+'</tr></tbody></table>';
+  if(sd.memo)b+='<h2>備註</h2><div style="font-size:11px;white-space:pre-wrap;line-height:1.6">'+esc(sd.memo)+'</div>';
+  return b;
+}
+function siteExportPDF(){
+  var q=_sdQ();if(!q){toast('請先選擇報價單');return;}
+  var sd=_sdSite(q),c=_sdCalc(sd);
+  _toolPrint('案場細節紀錄表',(q.name||''),_sdDocBody(sd,c,q),{fname:_toolFileName('sitedet','案場細節紀錄表_v'+(sd.ver||1),q.name||'')});
+}
+// ── 帶入材料估算 ──
+function matEstFromSite(qid){
+  var q=Q.find(function(x){return x.id===qid;});if(!q||!q.site){toast('此案沒有案場細節紀錄');return;}
+  var sd=_sdNorm(q.site),c=_sdCalc(sd);
+  var m=_matEstNorm(MAT_EST||_shDefaults());
+  var setN=function(k,v){if(_sdN(v)>0)m[k]=_sdN(v);};
+  setN('P',sd.P);setN('A',sd.A);setN('H',sd.H);setN('slabT',sd.slabT);
+  var formMap={'鋼軌樁':'鋼軌樁','鋼板樁':'鋼板樁','型鋼排樁':'型鋼排樁','預壘樁':'預壘樁','基樁':'基樁','微型樁':'微型樁','CCP':'CCP','連續壁':'連續壁'};
+  if(formMap[sd.wall.form])m.method=formMap[sd.wall.form];
+  if(sd.wall.spec){var sp=String(sd.wall.spec).replace(/×.*$/,'').trim();m.pileSpec=SH_SPECS.indexOf(sp)>=0?sp:sd.wall.spec;}
+  setN('pileLen',sd.wall.len);setN('pileSpacing',sd.wall.sp);if(c.wallN>0)m.pileP=c.wallN;
+  m.capType=!sd.wall.cap?'無':(/RC/i.test(sd.wall.capType||'')?'RC壓樑':'H型鋼壓樑(H300)');
+  var pk=function(k,spec,len,n){if(_sdN(n)>0)m['king'+k]=_sdN(n);if(spec){var s2=String(spec).replace(/×.*$/,'').trim();if(SH_SPECS.indexOf(s2)>=0)m[k.toLowerCase()+'Spec']=s2;}if(_sdN(len)>0)m[k.toLowerCase()+'Len']=_sdN(len);};
+  pk('Mid',sd.mid.spec,sd.mid.len,sd.mid.n);pk('Co',sd.co.spec,sd.co.len,sd.co.n);pk('Gt',sd.gt.spec,sd.gt.len,sd.gt.n);
+  if(sd.layers>0){
+    m.layers=sd.layers;m._layers=sd.L.map(function(l){return {w:SH_SPECS.indexOf(l.w)>=0?l.w:'H350',s:SH_SPECS.indexOf(l.s)>=0?l.s:'H350',st:!!(l.d&&l.d!=='無')};});
+    // 材料估算的路數是全案共用（每層相同）：取第一層有填的縱／橫向
+    var L0=sd.L.find(function(l){return _sdN(l.vc)>0||_sdN(l.hc)>0;});
+    if(L0){if(_sdN(L0.vc)>0)m._routesV=[{rc:_sdN(L0.vc),rl:_sdN(L0.vl)}];if(_sdN(L0.hc)>0)m._routesH=[{rc:_sdN(L0.hc),rl:_sdN(L0.hl)}];}
+  }
+  setN('gantaiA',sd.plat.A);setN('gantaiP',sd.plat.P);
+  MAT_EST=m;window._matEstQid=qid;
+  try{renderMatEst();}catch(e){_err('matEstFromSite',e);}
+  try{matEstCalc();}catch(e){_err('matEstFromSite',e);}
+  toast('已帶入「'+(q.name||'')+'」案場細節 v'+(sd.ver||1)+(sd.layers>1?'（支撐路數取第一層，各層不同請自行調整）':''));
+}
+function siteToMatEst(){
+  var q=_sdQ();if(!q){toast('請先選擇報價單');return;}
+  go('matest');
+  setTimeout(function(){matEstFromSite(q.id);},80);
+}
 function _shDefaults(){
   var lys=[];for(var i=0;i<5;i++)lys.push({w:'H350',s:'H350',st:false});
   return {P:130,A:1000,H:13,slabT:0.8,corners:4,irr:0,
@@ -11605,9 +11826,10 @@ function _renderMatEstInner(el){
   var h='';
   // 專案選擇
   h+='<div class="f" style="margin-bottom:4px"><label>綁定工程專案（得標）</label><select onchange="matEstPickProj(this.value)" style="'+selCss+'"><option value="">— 不綁定（純試算）—</option>';
-  Q.filter(function(q){return (q.awarded&&!q.parentId)||q.matEst;}).forEach(function(q){h+='<option value="'+q.id+'"'+(window._matEstQid===q.id?' selected':'')+'>'+esc(q.name||'')+(q.matEst?' ✓已有估算':'')+'</option>';});
+  Q.filter(function(q){return (q.awarded&&!q.parentId)||q.matEst||q.site;}).forEach(function(q){h+='<option value="'+q.id+'"'+(window._matEstQid===q.id?' selected':'')+'>'+esc(q.name||'')+(q.matEst?' ✓已有估算':'')+(q.site?' ▪案場細節':'')+'</option>';});
   h+='</select></div>';
   h+=sec('① 基地尺寸');
+  (function(){var sq=Q.find(function(x){return x.id===window._matEstQid;});if(sq&&sq.site)h+='<div style="margin:2px 0 8px"><button type="button" class="btn btn-xs" onclick="matEstFromSite(window._matEstQid)" style="border-color:var(--gm);color:var(--g3)">↙ 從案場細節紀錄表帶入（v'+(sq.site.ver||1)+'）</button> <span style="font-size:11px;color:var(--b3)">周長／面積／深度／大底、擋土壁、三種樁、支撐各層、構台</span></div>';})();
   h+='<div class="me-grid">'+fN('P','基地周長 (M)')+fN('A','開挖面積 (㎡)')+fN('H','開挖深度 (M)')+fN('slabT','大底厚度 (M)')+fN('corners','角隅數 (個)')+fN('irr','不規則邊 (個)')+'</div>';
   h+=sec('② 擋土壁體（樁）');
   h+='<div class="me-grid">'+fS('method','工法',['鋼板樁','鋼軌樁','型鋼排樁','基樁','預壘樁','微型樁','CCP','連續壁'])
@@ -24973,6 +25195,7 @@ function renderProjects(){
       info:(q.code?esc(q.code)+'　':'')+'NT$ '+fmt(quoteTotal)+(adds.length?'（含 '+adds.length+' 筆追加）':''),
       extra:'<button type="button" onclick="event.stopPropagation();exportQuotePDF(\''+q.id+'\')" title="開啟報價單預覽，預覽內可下載 PDF" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-search"/></svg> 查看報價PDF</button>',
       jump:"loadQ('"+q.id+"')"});
+    steps[steps.length-1].extra+=' <button type="button" onclick="event.stopPropagation();openSiteDet(\''+q.id+'\')" style="border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 案場細節'+(q.site?('（v'+(q.site.ver||1)+'）'):'')+'</button>';
     // 2 合約（可上傳/下載合約檔）
     const _hasCtFile=!!(ct&&(ct.fileData||ct.fileUrl));
     steps.push({label:'合約',done:!!ct,
@@ -28639,6 +28862,7 @@ const ALL_PAGES = [
   {id:'grout',     label:'根固砂漿',  icon:_pgIcon('hardhat'),  grp:'data',  adminOnly:false}, // v5.346
   {id:'backfill',  label:'背填材料',  icon:_pgIcon('wrench'),   grp:'data',  adminOnly:false}, // v5.346
   {id:'lifeline',  label:'安全母索',  icon:_pgIcon('link'),     grp:'data',  adminOnly:false, hidden:true, parent:'matest'}, // v5.393；v5.397 併入材料估算，導覽隱藏
+  {id:'sitedet',   label:'案場細節',  icon:_pgIcon('contract'), grp:'main',  adminOnly:false, hidden:true, parent:'quotes'},  // v5.407 案場細節紀錄表（掛在報價下，由報價編輯／專案卡進入）
   // v5.330 sysOnly：只有「系統管理員」角色能開，其他角色的權限表上是鎖住的
   {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, sysOnly:true},
   {id:'staff',     label:'人員管理',  icon:_pgIcon('users'),    grp:'acct',  adminOnly:true},
