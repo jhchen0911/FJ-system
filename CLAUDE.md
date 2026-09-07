@@ -64,6 +64,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 報價編輯 | `rItems` `calcT` `saveQ` `applyNegotiate`(議價) `backfillEstCosts`；列表預估淨利率 `_quoteEstNetR`（成本單價＞報價 `_COST_ODD_X` 倍視為未填），啟動一次性 `_fixOddCostsAll` 清掉誤套的「式」成本 |
 | 版次 | `bumpQVersion`(進版→封存 V1、V2…永久保留) `showQVersions` `viewQVersion` `restoreQVersion` `compareQVersion`；自動存檔＝每次儲存留一份、只留 10 份，**不是版次** |
 | PDF 匯出 | `exportQuotePDF`(html2canvas 影像版) `exportQuotePDFNative`(瀏覽器原生列印)；`_printViaIframe` 一律先開預覽、按「下載PDF」才存檔（v5.388，所有列印鈕不再一點就下載）；分頁引擎 `_pdfPlanPages`(DOM 量測切點：只切列與列之間、天地各 10mm、續頁重印表頭、末頁過短自動均分) `_pdfAddPaged`(貼頁＋頁碼，**一律原比例、不縮放**；整份放得進一張紙才不分頁)；報價表空的逾期租金／備註欄自動不輸出 |
+| 案場細節紀錄表 | 頁 `sitedet`（導覽隱藏，parent quotes；報價編輯工具列「案場細節」／專案卡進入 `openSiteDet(qid)`）。資料 `q.site`（`_sdNorm` 正規化：基地 P/A/H/slabT、`wall{form,spec,method,len,sp,n,nAuto,cap,capType}`、`mid/co/gt{spec,method,len,n}`、`layers`＋`L[{w,s,d,vc,vl,hc,hl}]`、`plat{load,A,P}`、`stairs`、`drawing`、`memo`），隨報價同步（非敏感）。派生 `_sdCalc`：支數＝ceil(周長÷間距) 可覆寫、各項總長、各層長度。進版 `siteBump` → `q.siteHist[{ver,ts,by,note,data}]`（留 30 版）、`siteShowVers`／`siteViewVer`／`siteRestoreVer`；PDF `siteExportPDF`（`_sdDocBody`＋`_toolPrint`）；`matEstFromSite(qid)` 帶入材料估算（支撐路數取第一層） |
 | 單價分析 UPA | `upaCalc` `applyUPA`（套用時自動帶成本：實績優先、理論為輔）；鋼軌樁／鋼板樁工法含「引孔」時加 `db.drill`×樁長（參數 `cp-r-drill`／`cp-sp-drill`） |
 | 歷史單價庫 | `COST_HIST` `writeCostHist`(結案回寫) `_histCostFor(name,unit)`(報價提示；**限同單位**，「式」實績不套到逐 M 工項) `_costOdd`(成本單價＞報價 3 倍標紅) `_costOddFix`(開單自動改同單位實績／清空) |
 | 請款單 | `rInvItems` `buildInvPreview` `addNextPeriod` `settleInvItem`(工項結算，連動合約金額)；**本期估驗數量與累計一律加權** `_wQty`／`_curW`（打設70%＋拔除30%＝合約量），`_prevCumQty` 於 `loadInvoice` 由各期實績重算 |
@@ -98,7 +99,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 
 ## 測試
 
-`tests/smoke.js`（171 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（177 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
