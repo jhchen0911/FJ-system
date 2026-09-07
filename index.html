@@ -2678,7 +2678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.408';
+var APP_VERSION='v5.409';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -10757,6 +10757,20 @@ var SD_WALL_FORMS=['鋼軌樁','鋼板樁','型鋼排樁','預壘樁','基樁','
 var SD_METHODS=['直接打設','水刀引孔','氣動槌引孔','鑽掘引孔'];
 var SD_PILE_METHODS=SD_METHODS.concat(['根固處理']);
 var SD_CAP_TYPES=['RC壓樑','H型鋼壓樑','鋼板壓樑','其他'];
+// v5.409：規格選單依擋土壁形式只列相應規格；樁一律 H 型鋼系列；都可「自訂」
+var SD_SPECS_BY_FORM={
+  '鋼軌樁':['37kg','50kg','37kg 雙拼','50kg 雙拼'],
+  '鋼板樁':['SP-II','SP-III','SP-IIIA','SP-IV','SP-IVw','SP-VL','SP-VIL'],
+  '型鋼排樁':['H300×300','H350×350','H400×400','H414×405','H428×407'],
+  '預壘樁':['Ø30cm','Ø35cm','Ø40cm','Ø45cm','Ø50cm','Ø60cm','Ø70cm','Ø80cm'],
+  '基樁':['Ø60cm','Ø80cm','Ø100cm','Ø120cm','Ø150cm','Ø200cm'],
+  '微型樁':['Ø15cm','Ø20cm','Ø25cm','Ø30cm'],
+  'CCP':['Ø30cm','Ø40cm','Ø50cm','Ø60cm'],
+  '連續壁':['厚 50cm','厚 60cm','厚 70cm','厚 80cm','厚 90cm','厚 100cm','厚 120cm'],
+  '擋土板':['木擋土板 5cm','木擋土板 7.5cm','鋼擋土板','RC擋土板']
+};
+var SD_PILE_SPECS=['H300×300','H350×350','H400×400','H414×405','H428×407','Ø300 鋼管','Ø400 鋼管'];
+function _sdSpecOpts(form){return SD_SPECS_BY_FORM[form]||[];}
 function _sdBlank(){
   return {ver:1,date:localToday(),drawing:'',memo:'',P:'',A:'',H:'',slabT:'',
     wall:{form:'',spec:'',method:'',len:'',sp:'',n:'',nAuto:true,cap:false,capType:''},
@@ -10814,13 +10828,14 @@ function _sdRender(){
   var txt=function(path,label,ph,list){return '<div class="f"><label style="font-size:11px">'+label+'</label><input value="'+esc(_sdGet(sd,path))+'" placeholder="'+(ph||'')+'"'+(list?' list="'+list+'"':'')+' onchange="_sdSet(\''+path+'\',this.value)" style="'+IN+'"></div>';};
   var sel=function(path,label,opts,allowEmpty){var cur=_sdGet(sd,path);return '<div class="f"><label style="font-size:11px">'+label+'</label><select onchange="_sdSet(\''+path+'\',this.value)" style="'+IN+'">'+(allowEmpty!==false?'<option value="">－</option>':'')+opts.map(function(o){return '<option value="'+esc(o)+'"'+(cur===o?' selected':'')+'>'+esc(o)+'</option>';}).join('')+(cur&&opts.indexOf(cur)<0?'<option value="'+esc(cur)+'" selected>'+esc(cur)+'</option>':'')+'</select></div>';};
   var secH=function(t,hint){return '<div class="me-sub" style="margin-top:16px">'+t+(hint?' <span style="font-weight:400;font-size:10.5px;color:var(--b3)">'+hint+'</span>':'')+'</div>';};
-  var pile=function(k,label){return secH(label)+'<div class="me-grid">'+txt(k+'.spec','規格','例：H350×350','sd-spec-list')+sel(k+'.method','工法',SD_PILE_METHODS)+num(k+'.len','長度','M')+num(k+'.n','支數','支')
+  var selC=function(path,label,opts,hint){var cur=_sdGet(sd,path);return '<div class="f"><label style="font-size:11px">'+label+(hint?' <span style="color:var(--b3)">'+hint+'</span>':'')+'</label><select onchange="if(this.value===\'__c\'){var v=prompt(\'請輸入規格\','+"'"+'+JSON.stringify(cur).replace(/"/g,\'&quot;\')+'+"'"+');if(v!=null)_sdSet(\''+path+'\',v.trim());else _sdRender();}else _sdSet(\''+path+'\',this.value)" style="'+IN+'"><option value="">－</option>'+opts.map(function(o){return '<option value="'+esc(o)+'"'+(cur===o?' selected':'')+'>'+esc(o)+'</option>';}).join('')+(cur&&opts.indexOf(cur)<0?'<option value="'+esc(cur)+'" selected>'+esc(cur)+'（自訂）</option>':'')+'<option value="__c">✎ 自訂…</option></select></div>';};
+  var pile=function(k,label){return secH(label)+'<div class="me-grid">'+selC(k+'.spec','規格',SD_PILE_SPECS)+sel(k+'.method','工法',SD_PILE_METHODS)+num(k+'.len','長度','M')+num(k+'.n','支數','支')
     +'<div class="f"><label style="font-size:11px">總長</label><div style="padding:8px 0;font-weight:800;color:var(--g3)">'+(c[k+'Len']?_shR1(c[k+'Len'])+' M':'—')+'</div></div></div>';};
   var h='<div class="card"><div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 圖面數量</div></div><div class="cb">'
     +'<datalist id="sd-spec-list">'+SH_SPECS.concat(['H350×350','H400×400','H300×300','SP-II','SP-III','SP-IV','37kg 鋼軌','50kg 鋼軌']).map(function(x){return '<option value="'+esc(x)+'">';}).join('')+'</datalist>'
     +'<div class="me-grid wide">'+txt('drawing','圖說版本／來源','例：結構圖 S-03 rev.B 2026/08')+'<div class="f"><label style="font-size:11px">紀錄日期</label><input type="date" value="'+esc(sd.date||'')+'" onchange="_sdSet(\'date\',this.value)" style="'+IN+'"></div></div>'
     +secH('基地')+'<div class="me-grid">'+num('P','基地周長','M')+num('A','開挖面積','m²')+num('H','開挖深度','M')+num('slabT','大底厚度','M','例：0.8')+'</div>'
-    +secH('擋土壁','支數＝周長 ÷ 間距 無條件進位，可手動改')+'<div class="me-grid">'+sel('wall.form','形式',SD_WALL_FORMS)+txt('wall.spec','規格','例：H350×350／SP-IV／37kg','sd-spec-list')+sel('wall.method','工法',SD_METHODS)+num('wall.len','長度','M')+num('wall.sp','間距','M','例：0.6')
+    +secH('擋土壁','支數＝周長 ÷ 間距 無條件進位，可手動改')+'<div class="me-grid">'+sel('wall.form','形式',SD_WALL_FORMS)+(sd.wall.form?selC('wall.spec','規格',_sdSpecOpts(sd.wall.form),''):'<div class="f"><label style="font-size:11px">規格</label><div style="padding:8px 0;font-size:12px;color:var(--b3)">先選形式</div></div>')+sel('wall.method','工法',SD_METHODS)+num('wall.len','長度','M')+num('wall.sp','間距','M','例：0.6')
     +'<div class="f"><label style="font-size:11px">支數 <span style="color:var(--b3)">(支)</span>'+(sd.wall.nAuto!==false?' <span style="color:var(--g3)">自動</span>':' <button type="button" onclick="_sdSet(\'wall.nAuto\',true)" style="border:none;background:none;color:var(--g3);cursor:pointer;font-size:11px;padding:0;text-decoration:underline">改回自動 '+c.wallNAuto+'</button>')+'</label><input type="number" inputmode="numeric" value="'+(sd.wall.nAuto!==false?(c.wallN||''):esc(sd.wall.n))+'" placeholder="'+(c.wallNAuto||'')+'" onchange="_sdSet(\'wall.n\',this.value)" style="'+IN+';text-align:right;font-weight:800"></div>'
     +'<div class="f"><label style="font-size:11px">總長</label><div style="padding:8px 0;font-weight:800;color:var(--g3)">'+(c.wallLen?_shR1(c.wallLen)+' M':'—')+'</div></div>'
     +'<div class="f"><label style="font-size:11px">壓樑</label><label style="display:flex;align-items:center;gap:8px;padding:8px 0;font-size:13.5px;cursor:pointer"><input type="checkbox"'+(sd.wall.cap?' checked':'')+' onchange="_sdSet(\'wall.cap\',this.checked)" style="width:18px;height:18px;accent-color:var(--g)"> 有壓樑</label></div>'
@@ -10845,7 +10860,8 @@ function _sdSet(path,val){
   var q=_sdQ();if(!q)return;var sd=_sdSite(q);
   var ks=path.split('.'),o=sd;for(var i=0;i<ks.length-1;i++){if(o[ks[i]]==null||typeof o[ks[i]]!=='object')o[ks[i]]={};o=o[ks[i]];}
   var k=ks[ks.length-1];
-  if(path==='wall.n'){sd.wall.n=val;sd.wall.nAuto=(val==='');}
+  if(path==='wall.form'){sd.wall.form=val;if(sd.wall.spec&&_sdSpecOpts(val).indexOf(sd.wall.spec)<0)sd.wall.spec='';}
+  else if(path==='wall.n'){sd.wall.n=val;sd.wall.nAuto=(val==='');}
   else if(path==='wall.nAuto'){sd.wall.nAuto=!!val;if(val)sd.wall.n='';}
   else o[k]=val;
   if(path==='layers')q.site=_sdNorm(sd);

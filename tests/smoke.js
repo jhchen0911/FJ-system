@@ -1442,6 +1442,12 @@ async function newPage(browser, width, height) {
       Q[0].awarded = true; go('projects'); out.card = /案場細節（v3）/.test(document.getElementById('projects-list').innerHTML);
       out.editorBtn = /openSiteDet\(eid\)/.test(document.getElementById('page-editor').innerHTML);
       out.sync = !!_stripQuoteSens(Q[0]).site;   // 數量不是敏感資料，隨報價一起同步
+      // v5.409 規格選單依形式：鋼板樁只列 SP 系列、換形式後不在清單的規格清空、可自訂
+      openSiteDet('qX'); _sdSet('wall.form', '鋼板樁'); _sdSet('wall.spec', 'SP-IV');
+      const specSel = [...document.querySelectorAll('#site-root select')].find(el => [...el.options].some(o => o.value === 'SP-IV'));
+      out.specByForm = !!specSel && ![...specSel.options].some(o => /37kg|H350×350/.test(o.value)) && [...specSel.options].some(o => o.value === '__c');
+      _sdSet('wall.form', '鋼軌樁'); out.specCleared = Q[0].site.wall.spec === '';
+      _sdSet('wall.spec', 'SP-X'); out.specCustom = /SP-X（自訂）/.test(document.getElementById('site-root').innerHTML);
       return out;
     });
     check('案場細節：擋土壁支數＝周長÷間距自動換算，可覆寫、可改回自動', r.page && r.autoN && r.override && r.backAuto);
@@ -1449,6 +1455,7 @@ async function newPage(browser, width, height) {
     check('案場細節：進版封存、版次檢視、還原', r.bump && r.vers && r.restore);
     check('案場細節：PDF 內容完整且不含單價；帶入材料估算對應欄位', r.doc && r.me && r.meBtn);
     check('案場細節：報價編輯與專案卡入口，隨報價同步', r.card && r.editorBtn && r.sync);
+    check('案場細節：規格選單依擋土壁形式只列相應規格，可自訂', r.specByForm && r.specCleared && r.specCustom);
     check('v5.407 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
