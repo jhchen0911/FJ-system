@@ -1407,14 +1407,14 @@ async function newPage(browser, width, height) {
       openSiteDet('qX');
       out.page = document.getElementById('page-sitedet').classList.contains('active') && !!document.querySelector('#site-root .me-grid');
       _sdSet('P', '130'); _sdSet('A', '1000'); _sdSet('H', '13'); _sdSet('slabT', '0.8');
-      _sdSet('wall.form', '型鋼排樁'); _sdSet('wall.spec', 'H350×350'); _sdSet('wall.method', '水刀引孔'); _sdSet('wall.len', '13'); _sdSet('wall.sp', '0.6');
+      _sdSet('wall.form', 'H型鋼樁'); _sdSet('wall.spec', 'H350（135kg/m）'); _sdSet('wall.method', '水刀引孔'); _sdSet('wall.len', '13'); _sdSet('wall.sp', '0.6');
       let c = _sdCalc(Q[0].site);
       out.autoN = c.wallN === 217 && c.wallLen === 217 * 13;                     // ceil(130/0.6)=217
       _sdSet('wall.n', '220'); c = _sdCalc(Q[0].site); out.override = Q[0].site.wall.nAuto === false && c.wallN === 220;
       _sdSet('wall.nAuto', true); c = _sdCalc(Q[0].site); out.backAuto = c.wallN === 217;
       _sdSet('wall.cap', true); _sdSet('wall.capType', 'RC壓樑');
-      _sdSet('mid.spec', 'H350×350'); _sdSet('mid.method', '根固處理'); _sdSet('mid.len', '16'); _sdSet('mid.n', '120');
-      _sdSet('gt.spec', 'H400×400'); _sdSet('gt.len', '16'); _sdSet('gt.n', '20');
+      _sdSet('mid.spec', 'H350（135kg/m）'); _sdSet('mid.method', '引孔根固'); _sdSet('mid.len', '16'); _sdSet('mid.n', '120');
+      _sdSet('gt.spec', 'H400（172kg/m）'); _sdSet('gt.len', '16'); _sdSet('gt.n', '20');
       _sdSet('layers', '3');
       out.layers = Q[0].site.L.length === 3;
       _sdSet('L.0.w', 'H350'); _sdSet('L.0.s', 'H400'); _sdSet('L.0.d', 'H300'); _sdSet('L.0.vc', '4'); _sdSet('L.0.vl', '25'); _sdSet('L.0.hc', '5'); _sdSet('L.0.hl', '40');
@@ -1443,10 +1443,12 @@ async function newPage(browser, width, height) {
       out.editorBtn = /openSiteDet\(eid\)/.test(document.getElementById('page-editor').innerHTML);
       out.sync = !!_stripQuoteSens(Q[0]).site;   // 數量不是敏感資料，隨報價一起同步
       // v5.409 規格選單依形式：鋼板樁只列 SP 系列、換形式後不在清單的規格清空、可自訂
-      openSiteDet('qX'); _sdSet('wall.form', '鋼板樁'); _sdSet('wall.spec', 'SP-IV');
-      const specSel = [...document.querySelectorAll('#site-root select')].find(el => [...el.options].some(o => o.value === 'SP-IV'));
-      out.specByForm = !!specSel && ![...specSel.options].some(o => /37kg|H350×350/.test(o.value)) && [...specSel.options].some(o => o.value === '__c');
-      _sdSet('wall.form', '鋼軌樁'); out.specCleared = Q[0].site.wall.spec === '';
+      openSiteDet('qX'); _sdSet('wall.form', '鋼板樁'); _sdSet('wall.spec', 'SP-IV型');
+      const specSel = [...document.querySelectorAll('#site-root select')].find(el => [...el.options].some(o => o.value === 'SP-IV型'));
+      out.specByForm = !!specSel && [...specSel.options].map(o => o.value).filter(v => v && v !== '__c').join() === UPA_ITEMS.retaining.items['鋼板樁'].specs.join()   // 與單價分析同一份
+        && [...specSel.options].some(o => o.value === '__c')
+        && [...document.querySelectorAll('#site-root select')].some(el => [...el.options].some(o => o.value === '鑽堡引孔')) === false;   // 鋼板樁沒有鑽堡引孔
+      _sdSet('wall.form', '鋼軌樁'); out.specCleared = Q[0].site.wall.spec === '' && [...document.querySelectorAll('#site-root select')].some(el => [...el.options].some(o => o.value === '鑽堡引孔'));
       _sdSet('wall.spec', 'SP-X'); out.specCustom = /SP-X（自訂）/.test(document.getElementById('site-root').innerHTML);
       return out;
     });
@@ -1477,8 +1479,8 @@ async function newPage(browser, width, height) {
       INV.length = 0; CONTRACTS.splice(0); PAYABLES.length = 0;
       openSiteDet('qY');
       _sdSet('P', '130'); _sdSet('A', '1000'); _sdSet('H', '13');
-      _sdSet('wall.form', '型鋼排樁'); _sdSet('wall.spec', 'H350×350'); _sdSet('wall.method', '水刀引孔'); _sdSet('wall.len', '13'); _sdSet('wall.sp', '0.6');
-      _sdSet('mid.spec', 'H350'); _sdSet('mid.method', '直接打設'); _sdSet('mid.len', '16'); _sdSet('mid.n', '120');
+      _sdSet('wall.form', 'H型鋼樁'); _sdSet('wall.spec', 'H350（135kg/m）'); _sdSet('wall.method', '水刀引孔'); _sdSet('wall.len', '13'); _sdSet('wall.sp', '0.6');
+      _sdSet('mid.spec', 'H350（135kg/m）'); _sdSet('mid.method', '直接打設'); _sdSet('mid.len', '16'); _sdSet('mid.n', '120');
       _sdSet('layers', '3'); _sdSet('L.0.vc', '4'); _sdSet('L.0.vl', '25'); _sdSet('L.0.hc', '5'); _sdSet('L.0.hl', '40');
       _sdSet('plat.load', '50t'); _sdSet('plat.A', '300'); _sdSet('stairs', '2');
       const sd = Q[0].site, c = _sdCalc(sd), cmp = _sdCompare(sd, c, Q[0]);
