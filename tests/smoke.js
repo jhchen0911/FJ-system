@@ -1396,6 +1396,63 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────── 18. v5.407：案場細節紀錄表（支數自動換算／進版還原／PDF 內容／帶入材料估算） ─────────
+  {
+    const { page, errors } = await newPage(browser, 1400, 1000);
+    const r = await page.evaluate(() => {
+      const out = {};
+      Q = [{ id: 'qX', code: '1180', name: '案場細節案', client: 'K', date: '2026-09-01', ver: 2, awarded: false, exs: [], rmk: {}, _mt: 1,
+        items: [{ desc: 'H型鋼樁 H350 L=13M 打設', unit: 'M', qty: '2800', price: '1000', estCost: '', ot: '', otu: '', sec: false }], costs: [], dailyLogs: [] }];
+      INV.length = 0; CONTRACTS.splice(0); PAYABLES.length = 0;
+      openSiteDet('qX');
+      out.page = document.getElementById('page-sitedet').classList.contains('active') && !!document.querySelector('#site-root .me-grid');
+      _sdSet('P', '130'); _sdSet('A', '1000'); _sdSet('H', '13'); _sdSet('slabT', '0.8');
+      _sdSet('wall.form', '型鋼排樁'); _sdSet('wall.spec', 'H350×350'); _sdSet('wall.method', '水刀引孔'); _sdSet('wall.len', '13'); _sdSet('wall.sp', '0.6');
+      let c = _sdCalc(Q[0].site);
+      out.autoN = c.wallN === 217 && c.wallLen === 217 * 13;                     // ceil(130/0.6)=217
+      _sdSet('wall.n', '220'); c = _sdCalc(Q[0].site); out.override = Q[0].site.wall.nAuto === false && c.wallN === 220;
+      _sdSet('wall.nAuto', true); c = _sdCalc(Q[0].site); out.backAuto = c.wallN === 217;
+      _sdSet('wall.cap', true); _sdSet('wall.capType', 'RC壓樑');
+      _sdSet('mid.spec', 'H350×350'); _sdSet('mid.method', '根固處理'); _sdSet('mid.len', '16'); _sdSet('mid.n', '120');
+      _sdSet('gt.spec', 'H400×400'); _sdSet('gt.len', '16'); _sdSet('gt.n', '20');
+      _sdSet('layers', '3');
+      out.layers = Q[0].site.L.length === 3;
+      _sdSet('L.0.w', 'H350'); _sdSet('L.0.s', 'H400'); _sdSet('L.0.d', 'H300'); _sdSet('L.0.vc', '4'); _sdSet('L.0.vl', '25'); _sdSet('L.0.hc', '5'); _sdSet('L.0.hl', '40');
+      _sdSet('L.1.vc', '4'); _sdSet('L.1.vl', '25'); _sdSet('L.1.hc', '5'); _sdSet('L.1.hl', '40');
+      c = _sdCalc(Q[0].site);
+      out.sup = c.layers[0].len === 300 && c.supLen === 600 && c.midLen === 1920 && c.gtLen === 320;
+      _sdSet('plat.load', '吊車 50t'); _sdSet('plat.A', '300'); _sdSet('plat.P', '80'); _sdSet('stairs', '2');
+      out.touched = Q[0]._mt > 1 && /217支/.test(document.getElementById('site-root').innerHTML);
+      // 進版 → 封存 v1；改值後還原 v1 → 變成 v3，中間封存 v2
+      siteBump(); document.getElementById('sd-bump-note').value = '初版圖'; document.getElementById('gen-confirm-ok').click();
+      out.bump = Q[0].site.ver === 2 && Q[0].siteHist.length === 1 && Q[0].siteHist[0].ver === 1 && Q[0].siteHist[0].note === '初版圖' && Q[0].siteHist[0].data.wall.sp === '0.6';
+      _sdSet('H', '14');
+      siteShowVers(); out.vers = /初版圖/.test(document.getElementById('gen-confirm-modal').innerHTML); document.getElementById('gen-confirm-modal').style.display = 'none';
+      siteRestoreVer(0); document.getElementById('gen-confirm-ok').click();
+      out.restore = Q[0].site.H === '13' && Q[0].site.ver === 3 && Q[0].siteHist.length === 2;
+      // PDF 內容：含數量表，不含任何單價／成本
+      const body = _sdDocBody(Q[0].site, _sdCalc(Q[0].site), Q[0]);
+      out.doc = /擋土壁/.test(body) && /217/.test(body) && /支撐合計/.test(body) && /600/.test(body) && !/estCost|price|單價/.test(body);
+      // 帶入材料估算
+      MAT_EST = _shDefaults(); matEstFromSite('qX');
+      out.me = MAT_EST.P === 130 && MAT_EST.A === 1000 && MAT_EST.H === 13 && MAT_EST.method === '型鋼排樁' && MAT_EST.pileSpec === 'H350' && MAT_EST.pileLen === 13 && MAT_EST.pileSpacing === 0.6 && MAT_EST.pileP === 217
+        && MAT_EST.capType === 'RC壓樑' && MAT_EST.kingMid === 120 && MAT_EST.midLen === 16 && MAT_EST.kingGt === 20 && MAT_EST.gtSpec === 'H400' && MAT_EST.layers === 3 && MAT_EST._layers[0].s === 'H400' && MAT_EST._layers[0].st === true
+        && MAT_EST._routesV[0].rc === 4 && MAT_EST._routesV[0].rl === 25 && MAT_EST._routesH[0].rc === 5 && MAT_EST.gantaiA === 300 && MAT_EST.gantaiP === 80;
+      go('matest'); out.meBtn = /從案場細節紀錄表帶入/.test(document.getElementById('mat-est-form').innerHTML);
+      Q[0].awarded = true; go('projects'); out.card = /案場細節（v3）/.test(document.getElementById('projects-list').innerHTML);
+      out.editorBtn = /openSiteDet\(eid\)/.test(document.getElementById('page-editor').innerHTML);
+      out.sync = !!_stripQuoteSens(Q[0]).site;   // 數量不是敏感資料，隨報價一起同步
+      return out;
+    });
+    check('案場細節：擋土壁支數＝周長÷間距自動換算，可覆寫、可改回自動', r.page && r.autoN && r.override && r.backAuto);
+    check('案場細節：三種樁總長、支撐各層長度與合計、摘要', r.layers && r.sup && r.touched);
+    check('案場細節：進版封存、版次檢視、還原', r.bump && r.vers && r.restore);
+    check('案場細節：PDF 內容完整且不含單價；帶入材料估算對應欄位', r.doc && r.me && r.meBtn);
+    check('案場細節：報價編輯與專案卡入口，隨報價同步', r.card && r.editorBtn && r.sync);
+    check('v5.407 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
