@@ -1453,6 +1453,48 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────── 19. v5.408：案場細節 → 與報價工項對照 ─────────
+  {
+    const { page, errors } = await newPage(browser, 1400, 1000);
+    const r = await page.evaluate(() => {
+      const out = {};
+      Q = [{ id: 'qY', code: '1181', name: '對照案', client: 'K', date: '2026-09-01', ver: 1, awarded: false, exs: [], rmk: {}, _mt: 1,
+        items: [{ desc: 'H型鋼樁 H350×350 L=13M 打設', unit: 'M', qty: '2800', price: '1000', estCost: '', ot: '', otu: '', sec: false },
+                { desc: 'H型鋼樁 H350×350 L=13M 拔除', unit: 'M', qty: '2821', price: '400', estCost: '', ot: '', otu: '', sec: false },
+                { desc: '水刀引孔', unit: 'M', qty: '2600', price: '300', estCost: '', ot: '', otu: '', sec: false },
+                { desc: '中間樁 H350 L=16M 打設拔除', unit: '支', qty: '120', price: '30000', estCost: '', ot: '', otu: '', sec: false },
+                { desc: '水平支撐系統 三層', unit: 'M2', qty: '1000', price: '900', estCost: '', ot: '', otu: '', sec: false },
+                { desc: '施工構台', unit: 'M2', qty: '280', price: '3000', estCost: '', ot: '', otu: '', sec: false },
+                { desc: '動員費', unit: '式', qty: '1', price: '200000', estCost: '', ot: '', otu: '', sec: false },
+                { desc: '安全母索', unit: 'M', qty: '500', price: '50', estCost: '', ot: '', otu: '', sec: false }], costs: [], dailyLogs: [] }];
+      INV.length = 0; CONTRACTS.splice(0); PAYABLES.length = 0;
+      openSiteDet('qY');
+      _sdSet('P', '130'); _sdSet('A', '1000'); _sdSet('H', '13');
+      _sdSet('wall.form', '型鋼排樁'); _sdSet('wall.spec', 'H350×350'); _sdSet('wall.method', '水刀引孔'); _sdSet('wall.len', '13'); _sdSet('wall.sp', '0.6');
+      _sdSet('mid.spec', 'H350'); _sdSet('mid.method', '直接打設'); _sdSet('mid.len', '16'); _sdSet('mid.n', '120');
+      _sdSet('layers', '3'); _sdSet('L.0.vc', '4'); _sdSet('L.0.vl', '25'); _sdSet('L.0.hc', '5'); _sdSet('L.0.hl', '40');
+      _sdSet('plat.load', '50t'); _sdSet('plat.A', '300'); _sdSet('stairs', '2');
+      const sd = Q[0].site, c = _sdCalc(sd), cmp = _sdCompare(sd, c, Q[0]);
+      const by = function (item) { return cmp.rows.find(r => r.item === item); };
+      out.wall = by('H型鋼樁 H350×350 L=13M 打設').st === 'less' && by('H型鋼樁 H350×350 L=13M 打設').diff === -21 && by('H型鋼樁 H350×350 L=13M 拔除').st === 'ok';   // 217支×13M＝2821
+      out.drill = by('水刀引孔').st === 'less' && by('水刀引孔').exp === 2821;          // 擋土壁工法含引孔 → 引孔量＝擋土壁總長
+      out.mid = by('中間樁 H350 L=16M 打設拔除').st === 'ok' && by('中間樁 H350 L=16M 打設拔除').exp === 120;   // 單位「支」比支數
+      out.sup = by('水平支撐系統 三層').st === 'ok';                                     // m² 比開挖面積
+      out.plat = by('施工構台').st === 'less' && by('施工構台').diff === -20;
+      out.none = cmp.rows.some(r => r.label === '施工便梯' && r.st === 'none') && cmp.rows.some(r => /開挖/.test(r.label) && r.st === 'none');
+      out.unmatched = cmp.unmatched.length === 2 && /動員費/.test(cmp.unmatched.join()) && /安全母索/.test(cmp.unmatched.join());
+      const html = document.getElementById('site-root').innerHTML;
+      out.ui = /與報價工項對照/.test(html) && /項與報價工項數量不一致/.test(html) && /報價沒有此工項/.test(html);
+      const body = _sdDocBody(sd, c, Q[0]);
+      out.pdf = /與報價工項對照/.test(body) && /報價少/.test(body) && !/price|單價/.test(body);
+      return out;
+    });
+    check('案場細節對照：長度／支數／面積依單位配對，差異與缺項判定', r.wall && r.drill && r.mid && r.sup && r.plat && r.none);
+    check('案場細節對照：未對照工項另列，畫面與 PDF 都有對照表且無單價', r.unmatched && r.ui && r.pdf);
+    check('v5.408 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
