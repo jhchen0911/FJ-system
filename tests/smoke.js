@@ -1504,6 +1504,60 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.411 施工步驟示意圖引擎上系統 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      out.ready = !!(window.FY_SHEETS && typeof FY_SHEETS.pages === 'function');
+      if (!out.ready) return out;
+      const ids = FY_SHEETS.list().map(s => s.id);
+      out.count = ids.length >= 21;
+      // 工項＋工法 → 圖組對照全部有效
+      const need = {
+        hpile: ['直接打設', '水刀引孔', '氣動槌引孔', '氣動槌＋水刀引孔'],
+        railpile: ['直接打設', '鑽堡引孔', '鑽掘引孔'],
+        sheet: ['直接打設', '吊車排板', '鑽掘引孔'],
+        midpile: ['直接打設', '水刀引孔', '氣動槌引孔', '氣動槌＋水刀引孔', '根固工法', '引孔根固'],
+        prepile: [''], rcbore: [''], rcpile: [''], ccp: [''], anchor: ['']
+      };
+      out.map = Object.keys(need).every(k => need[k].every(m => {
+        const sid = _fySheetId(k, m);
+        return sid && FY_SHEETS.get(sid);
+      }));
+      // 同一工項不同工法 → 不同圖組
+      out.distinct = new Set(need.hpile.map(m => _fySheetId('hpile', m))).size === 4
+        && new Set(need.midpile.map(m => _fySheetId('midpile', m))).size === 6;
+      // 每頁版面大小一致（不因工序多而縮小）
+      const a = FY_SHEETS.pages('mp_drive'), b = FY_SHEETS.pages('mp_root_case');
+      out.samePage = a.length === 1 && b.length >= 3
+        && a[0].w === b[0].w && a[0].h === b[0].h
+        && b.every(x => x.w === b[0].w && x.h === b[0].h);
+      // 流程圖步驟＝示意圖逐格標題
+      const st = _fySteps('hpile', '水刀引孔');
+      out.steps = !!st && st.length === FY_SHEETS.get('wall_h_wjet').panels.length
+        && st.every(x => x.t && x.n1);
+      // 選單已含新工法
+      out.opts = PLAN_WALL_FORMS.find(f => f.id === 'hpile').methods.indexOf('氣動槌＋水刀引孔') >= 0
+        && PLAN_MID_METHODS.indexOf('根固工法') >= 0
+        && !!PLAN_METHOD_TEXT['根固工法'] && !!PLAN_METHOD_TEXT['氣動槌＋水刀引孔'];
+      // 未對應之工項（水平支撐／施工構台）仍走舊圖，不得整個爆掉
+      out.fallback = _fySheetId('strut', '') === null && _fyStoryPages('strut', '') === null;
+      // 著作權聲明與浮水印
+      out.wm = !!FY_SHEETS.wm && FY_SHEETS.wm.on === true;
+      return out;
+    });
+    check('示意圖引擎：載入成功且圖組齊全', r.ready && r.count);
+    check('示意圖引擎：工項＋工法對應到相應圖組，不同工法出不同圖', r.map && r.distinct);
+    check('示意圖引擎：每頁版面大小一致，不因工序多而縮小', r.samePage);
+    check('示意圖引擎：施工流程圖與施工步驟說明取自同一份逐格步驟', r.steps);
+    check('計畫書：新工法選項與工法敘述已補齊', r.opts);
+    check('示意圖引擎：無對應圖組之工項安全退回舊版繪圖', r.fallback);
+    check('示意圖：浮水印開啟（著作權保護）', r.wm);
+    check('v5.411 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
