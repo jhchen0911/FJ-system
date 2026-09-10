@@ -2678,7 +2678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.413';
+var APP_VERSION='v5.414';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -13609,6 +13609,21 @@ var PLAN_FIELDS=[
     {k:'dur',   l:'契約工期',   ph:'例：120 日曆天'},
     {k:'start', l:'預定開工日', ph:'YYYY-MM-DD',type:'date'}
   ]},
+  {g:'監測管理值（依業主原設計圖說／監測計畫填寫）',f:[
+    {k:'mnWallM',l:'擋土壁變位　管理值',ph:'例：20mm'},
+    {k:'mnWallW',l:'擋土壁變位　警戒值',ph:'例：30mm'},
+    {k:'mnWallA',l:'擋土壁變位　行動值',ph:'例：40mm'},
+    {k:'mnStrutM',l:'支撐應力　管理值',ph:'例：設計軸力 60%'},
+    {k:'mnStrutW',l:'支撐應力　警戒值',ph:'例：設計軸力 80%'},
+    {k:'mnStrutA',l:'支撐應力　行動值',ph:'例：設計軸力 90%'},
+    {k:'mnSetM',l:'鄰房沉陷　管理值',ph:'例：15mm'},
+    {k:'mnSetW',l:'鄰房沉陷　警戒值',ph:'例：25mm'},
+    {k:'mnSetA',l:'鄰房沉陷　行動值',ph:'例：40mm 或角變量 1/500'},
+    {k:'mnWaterM',l:'地下水位　管理值',ph:'例：降幅 1.0m'},
+    {k:'mnWaterW',l:'地下水位　警戒值',ph:'例：降幅 2.0m'},
+    {k:'mnWaterA',l:'地下水位　行動值',ph:'例：降幅 3.0m'},
+    {k:'mnFreq',l:'量測頻率',ph:'例：開挖中每週 2 次，異常時每日',w:2}
+  ]},
   {g:'基地與擋土條件',f:[
     {k:'wallType',l:'擋土壁形式',ph:'選擇形式',sel:'wall',req:1},
     {k:'digDepth',l:'開挖深度',  ph:'例：GL-13.5m',req:1},
@@ -14367,7 +14382,7 @@ var PLAN_ITEMS=[
            ['廢漿是否清運完成並取得聯單','查文件','已完成'],
            ['場地是否清理完成','目視','已清理']]}]
 },
-{ id:'upile', name:'RC 基樁（抗浮基樁）', short:'RC基樁',
+{ id:'upile', name:'RC 基樁', short:'RC基樁',
   hazards:[["人工開挖", "坍孔活埋、缺氧", "高", "鋼軌樁護壁配合開挖深度；通風並偵測有害氣體；孔口專人監視"], ["孔口作業", "人員墜落", "高", "開挖線外 1.2m 護欄、孔口護蓋"], ["鋼筋籠吊放", "吊舉物飛落、倒塌", "高", "主鉤＋輔助鉤緩慢吊放；暫置不超過二層並以型鋼枕木阻擋"], ["混凝土澆置", "壓送管噴脫", "中", "管路接頭確實鎖固；上移速度管制"]],
   vars:[{k:'upMeth',l:'工法',d:'全套管鑽掘工法',opts:['全套管鑽掘工法','螺旋鑽掘引孔工法（定位套管）','人工挖掘（鋼軌樁護壁）']},
         {k:'upDia',l:'樁徑',d:'Ø150cm',opts:['Ø60cm','Ø70cm','Ø80cm','Ø100cm','Ø120cm','Ø150cm','Ø200cm']},
@@ -14426,7 +14441,7 @@ var PLAN_ITEMS=[
       ['RC 基樁','拆管時機','埋入混凝土面 >1 倍樁徑','澆置中','量測','逐支','停止拆管'],
       ['RC 基樁','鋼軌樁拔除','隨拔隨灌砂填實','澆置後','目視','逐支','補灌']],
   checks:[
-    {name:'RC 基樁（抗浮基樁）施工自主檢查表',stage:'施工前',
+    {name:'RC 基樁施工自主檢查表',stage:'施工前',
      rows:[['施工圖說及施工計畫是否已送審核可','查文件','已核可'],
            ['地下管線及障礙物是否已清除','查資料、試挖','已完成'],
            ['樁位放樣是否經複核','全站儀','偏心 ≦±7.5cm'],
@@ -14436,7 +14451,7 @@ var PLAN_ITEMS=[
            ['抽水設備是否備妥','目視','已備妥'],
            ['開挖線外 1.2m 安全護欄是否設置','目視、量測','已設置'],
            ['吊車一機三證是否齊備','查證件','齊備有效']]},
-    {name:'RC 基樁（抗浮基樁）施工自主檢查表',stage:'施工中',
+    {name:'RC 基樁施工自主檢查表',stage:'施工中',
      rows:[['鋼軌樁打設深度是否配合開挖深度','量測','配合無超挖'],
            ['開挖是否分階段並適時襯板','目視','已襯板'],
            ['孔內積水是否排除','目視','已排除'],
@@ -14448,7 +14463,7 @@ var PLAN_ITEMS=[
            ['混凝土坍度是否符合','坍度試驗','符合圖說'],
            ['拆管時埋入深度是否 >1 倍樁徑','量測','符合'],
            ['個人防護具是否確實配戴','目視','全數配戴']]},
-    {name:'RC 基樁（抗浮基樁）施工自主檢查表',stage:'施工後',
+    {name:'RC 基樁施工自主檢查表',stage:'施工後',
      rows:[['樁頂高程是否符合設計','水準儀','符合圖說'],
            ['樁位偏心是否在容許範圍','全站儀','≦±7.5cm'],
            ['混凝土試體是否製作送驗','查紀錄','每支或每 100m³ 一組'],
@@ -14756,22 +14771,43 @@ PLAN_ITEMS_WALL.forEach(function(x){PLAN_ITEMS.push(x);});
 // 擋土壁形式設定（形式 → 模組 id ＋ 工法選項 ＋ 規格建議）
 var PLAN_WALL_FORMS=[
   {v:'H型鋼樁',id:'hpile',methods:['直接打設','水刀引孔','氣動槌引孔','氣動槌＋水刀引孔'],specs:['H350×350×12×19＠1.5m　L=13.4m','H400×400×13×21＠1.8m　L=16.0m']},
-  {v:'鋼軌樁',id:'railpile',methods:['直接打設','鑽堡引孔','鑽掘引孔'],specs:['50KG/M＠40cm　L=9.0m']},
-  {v:'鋼板樁',id:'sheet',methods:['直接打設','吊車排板','鑽掘引孔'],specs:['FSP-Ⅲ 型　L=13.0m','FSP-Ⅳ 型　L=15.0m']},
+  {v:'鋼軌樁',id:'railpile',methods:['直接打設','鑽堡引孔＋打設','鑽掘引孔（螺旋鑽桿）＋打設'],specs:['50KG/M＠40cm　L=9.0m']},
+  {v:'鋼板樁',id:'sheet',methods:['直接打設','吊車排板＋逐片壓入','鑽掘引孔＋打設'],specs:['FSP-Ⅲ 型　L=13.0m','FSP-Ⅳ 型　L=15.0m']},
   {v:'預壘樁',id:'prepile',methods:['螺旋鑽掘工法'],specs:['Ø60cm＠60cm　L=23.8m','Ø50cm＠50cm　L=18.0m']},
-  {v:'RC基樁（鑽掘式）',id:'rcbore',methods:['螺旋鑽掘引孔工法（定位套管）'],specs:[]},
-  {v:'RC基樁（全套管式）',id:'rcpile',methods:['全套管鑽掘工法'],specs:['Ø100cm＠120cm　L=25.0m','Ø120cm＠140cm　L=30.0m']}
+  {v:'RC基樁（鑽掘式）',id:'rcbore',methods:['鑽掘式（定位套管）'],specs:[]},
+  {v:'RC基樁（全套管式）',id:'rcpile',methods:['全套管式'],specs:['Ø100cm＠120cm　L=25.0m','Ø120cm＠140cm　L=30.0m']}
 ];
 var PLAN_WALL_IDS=PLAN_WALL_FORMS.map(function(f){return f.id;});
 function _plWallForm(){return PLAN_WALL_FORMS.find(function(f){return f.id===_plState.wallForm;})||null;}
 // 中間樁／共構樁工法選項
-var PLAN_MID_METHODS=['直接打設','水刀引孔','氣動槌引孔','氣動槌＋水刀引孔','根固工法','引孔根固'];
+var PLAN_MID_METHODS=['直接打設','水刀引孔','氣動槌引孔','氣動槌＋水刀引孔','根固工法（螺旋鑽掘・水泥砂漿）','引孔根固（全套管式・鋼筋籠）'];
 // ══ 各工法專屬敘述（v5.363：依採用工法帶入相應之工法說明段落，取代單以（工法：xxx）帶過）══
 var PLAN_METHOD_TEXT={
+  '引孔根固（全套管式・鋼筋籠）':'採全套管搖管機引孔後根固：搖管機對心壓入套管、套管內以鯊魚頭抓斗掘削取土並同步跟進護壁，'
+    +'掘至設計深度並經深度與垂直度檢驗合格後，吊放鋼筋籠並將 H 型鋼吊入籠內以接合筋銲固成一體，'
+    +'整體緩降至設計高程後以特密管由下而上澆置根固混凝土，初凝後拔管至混凝土面以上並以楔形塊假固定型鋼，'
+    +'隔日硬化後拔除全部套管、回填並複測樁頂高程與樁位。本工法適用於卵礫石層或需嚴格控制樁位、垂直度之場合。',
+  '鑽堡引孔＋打設':'採鑽堡機（履帶式鑽機）配合空壓機於樁位引孔破碎卵礫石至設計深度，'
+    +'再吊立樁體插入導孔並以振動錘壓入至設計深度，最後以 200 型破碎機換裝碗公頭逐支敲至設計高程。'
+    +'引孔孔徑以略小於樁體對角寬為原則；引孔壁與樁之間隙以砂或原土回填搗實。',
+  '鑽掘引孔（螺旋鑽桿）＋打設':'採液壓迴轉頭掛螺旋鑽桿於樁位引孔至設計深度，排土隨鑽隨清；'
+    +'引孔完成後吊立樁體插入導孔，以振動錘壓入定位，再以 200 型破碎機碗公頭敲至設計高程。'
+    +'本工法振動與噪音低，適用於市區或鄰房敏感場合。',
+  '吊車排板＋逐片壓入':'採輪式吊車配合高空作業車先行排板：首片以測錘／經緯儀校核垂直後先壓入部分深度定位，'
+    +'其餘各片由人員於高空作業車上導引、鎖口對準前片榫溝卡扣滑入，整排排妥後自一端逐片振動壓入至設計深度。'
+    +'相鄰片高差控制於板長 1/3 以內（階梯狀推進）以防脫榫，可有效控制整列線形與垂直度。',
+  '鑽掘引孔＋打設':'採鑽掘機預先引孔至設計深度後吊立鋼板樁插入導孔，再以振動錘打設至設計深度並逐片鎖口相扣；'
+    +'引孔可大幅降低打設振動與噪音，適用於卵礫石層或鄰房敏感場合。',
+  '鑽掘式（定位套管）':'採螺旋鑽掘引孔工法：表層設定位套管（3~5m）防止孔口崩坍，以螺旋鑽桿鑽掘至設計深度，'
+    +'經檢驗合格後吊放鋼筋籠（分節搭接、保護層墊塊齊全），再以特密管由下而上置換澆置混凝土並逐節拔管，'
+    +'澆置至計畫高程加預留量後拔除定位套管，樁頭鑿除至健全面。',
+  '全套管式':'採全套管鑽掘工法：以全套管搖管機迴轉壓入套管護壁，套管內以抓斗掘削取土並隨掘進同步跟進，'
+    +'掘至設計深度並經深度、垂直度檢驗合格後吊放鋼筋籠，再以特密管由下而上置換澆置混凝土，'
+    +'隨澆置進度逐節拔除套管。本工法孔壁穩定、無需穩定液，適用於卵礫石層及鄰房敏感場合。',
   '氣動槌＋水刀引孔':'採氣動槌引孔搭配水刀輔助打設：先以履帶鑽機裝設氣動衝擊槌（配合空壓機）破碎卵礫石層引孔至設計深度，'
     +'再吊立已於腹板與翼板交角銲設水刀管之樁體插入導孔，邊自樁尖高壓噴射水流軟化孔底土壤、邊以振動錘打設至設計高程。'
     +'適用於上部土層鬆軟、下部為堅硬卵礫石之複合地層；達設計深度前應停止噴水改以振動貫入收尾，回水導入沉澱池處理。',
-  '根固工法':'採預壘式根固：以螺旋鑽桿於樁位鑽掘至根固底深度（根固底通常深於型鋼貫入深度），'
+  '根固工法（螺旋鑽掘・水泥砂漿）':'採預壘式根固：以螺旋鑽桿於樁位鑽掘至根固底深度（根固底通常深於型鋼貫入深度），'
     +'經鑽桿中空管自孔底壓注水泥砂漿並等速提升鑽桿填滿根固段，趁砂漿未凝將 H 型鋼垂直插入，型鋼底端與根固段重疊一段（長度依設計），'
     +'型鋼下方之根固砂漿續留至根固底。型鋼於重疊範圍之腹板兩面預銲剪力釘（一邊兩支），使型鋼與根固砂漿確實握裹；'
     +'孔口以楔形塊雙向假固定防止未凝期間傾斜下沉，隔日砂漿硬化後拆除並複測樁頂高程與樁位。',
@@ -16800,7 +16836,7 @@ function sheetWatermark(g,SW,SH){
 }
 
 // 渲染：固定版面（每頁 2 欄 × 3 列＝6 格），格子大小一律相同，超過就換頁
-const PAGE_ROWS=3, PAGE_N=ENG.COLS*PAGE_ROWS;
+const PAGE_ROWS=4, PAGE_N=ENG.COLS*PAGE_ROWS;
 function _renderPage(sheet,panels,pgNo,pgTot){
   const SW=ENG.MARG*2+ENG.COLS*ENG.PW+(ENG.COLS-1)*ENG.GAP;
   const rows=Math.max(1,Math.min(PAGE_ROWS,Math.ceil(panels.length/ENG.COLS)));
@@ -20125,12 +20161,22 @@ function _plDetailSteps(id,m){ // 細部詳圖（圖面線條取自使用者提�
 // ══ 施工計畫書 ↔ 施工步驟示意圖（v5.411）：工項＋工法 → 對應圖組 ══
 var _FY_MAP={
   hpile:{'直接打設':'wall_h_drive','水刀引孔':'wall_h_wjet','氣動槌引孔':'wall_h_air','氣動槌＋水刀引孔':'wall_h_airwjet'},
-  railpile:{'直接打設':'wall_rail_drive','鑽堡引孔':'wall_rail_baux','鑽掘引孔':'wall_rail_auger'},
-  sheet:{'直接打設':'wall_sheet_drive','吊車排板':'wall_sheet_pitch','鑽掘引孔':'wall_sheet_auger'},
+  railpile:{'直接打設':'wall_rail_drive','鑽堡引孔':'wall_rail_baux','鑽堡引孔＋打設':'wall_rail_baux',
+            '鑽掘引孔':'wall_rail_auger','鑽掘引孔（螺旋鑽桿）＋打設':'wall_rail_auger'},
+  sheet:{'直接打設':'wall_sheet_drive','吊車排板':'wall_sheet_pitch','吊車排板＋逐片壓入':'wall_sheet_pitch',
+         '鑽掘引孔':'wall_sheet_auger','鑽掘引孔＋打設':'wall_sheet_auger'},
   midpile:{'直接打設':'mp_drive','水刀引孔':'mp_wjet','氣動槌引孔':'mp_air',
-           '氣動槌＋水刀引孔':'mp_airwjet','根固工法':'mp_pregrout','引孔根固':'mp_root_case'},
-  prepile:{'':'plg'},rcbore:{'':'rcb_auger'},rcpile:{'':'rcb_case'},
-  ccp:{'':'ccp'},anchor:{'':'anchor'}
+           '氣動槌＋水刀引孔':'mp_airwjet',
+           '根固工法':'mp_pregrout','根固工法（螺旋鑽掘・水泥砂漿）':'mp_pregrout',
+           '引孔根固':'mp_root_case','引孔根固（全套管式・鋼筋籠）':'mp_root_case'},
+  prepile:{'':'plg'},
+  rcbore:{'':'rcb_auger','鑽掘式（定位套管）':'rcb_auger','螺旋鑽掘引孔工法（定位套管）':'rcb_auger'},
+  rcpile:{'':'rcb_case','全套管式':'rcb_case','全套管鑽掘工法':'rcb_case'},
+  ccp:{'':'ccp'},anchor:{'':'anchor'},
+  // RC 基樁（抗浮）依所選工法對應
+  upile:{'全套管鑽掘工法':'rcb_case','全套管式':'rcb_case',
+         '螺旋鑽掘引孔工法（定位套管）':'rcb_auger','鑽掘式（定位套管）':'rcb_auger',
+         '':'rcb_case'}
 };
 function _fySheetId(itId,meth){
   var mp=_FY_MAP[itId];if(!mp)return null;
@@ -21707,7 +21753,28 @@ function _plBuild(){
     ['版次','第 '+_plVer()+' 版'],['編訂日期',localToday()]],[2800,6400]);
   B.push({t:'sect',o:{}});   // ── 封面節結束：無頁首頁尾、無頁碼 ──
 
-  // ══ 前置（目錄；頁碼 I、II…）══
+  // ══ 前置（修訂紀錄＋目錄；頁碼 I、II…）══
+  B.push({t:'fmh',v:'修訂紀錄'});
+  (function(){
+    var proj=_plState.proj||_plState.vars.name||'',hist=[];
+    try{hist=_trList('plan').filter(function(r){return (r.proj||'')===proj;})
+      .sort(function(a,b){return a.ts-b.ts;});}catch(e){_err('_plBuild.hist',e);}
+    var sub=_plFill('{{sub}}',m)||'豐有工程有限公司';
+    var rows=[['版次','修訂日期','修訂章節','修訂事由','編訂','監造核可']];
+    hist.forEach(function(r,i){
+      var d=new Date(r.ts);
+      rows.push(['第 '+(i+1)+' 版',
+        d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),
+        i===0?'—':'　', i===0?'初版發行':'　', sub, '　']);
+    });
+    rows.push(['第 '+_plVer()+' 版',localToday(),
+      hist.length?'　':'—', hist.length?'　':'初版發行，依契約圖說及結構計算書編訂',
+      sub,'　']);
+    B.push({t:'tbl',rows:rows,w:[1100,1500,2400,3400,1400,1400]});
+    rem('每次存檔即產生一個版次；經監造單位審查後如有修正，於本表填列修訂章節與事由，'
+      +'內文修訂處以雲形線標示，舊版收回作廢。表格於預覽畫面可直接點擊填寫。');
+  })();
+  B.push({t:'sp'});
   B.push({t:'toc'});
   B.push({t:'sect',o:{footer:true,fmt:'upperRoman',start:1}});  // ── 前置節：羅馬數字頁碼 ──
 
@@ -22004,6 +22071,19 @@ function _plBuild(){
   h3('常見問題處理一覽表');
   tbl(PLAN_TROUBLE,[1800,2600,3000,2800]);
   h2(7,'監測計畫配合事項');p(PLAN_TXT.monitorNote);tbl(PLAN_TXT.monitor,[1800,1800,2600,1800,2200]);
+  (function(){                                   // v5.414：三級管理值表（依業主原設計圖說／監測計畫填寫）
+    var U=function(v){return String(v||'').trim()||'＿＿＿＿';};
+    B.push({t:'h3',v:'監測系統三級管理值'});
+    p('下列管理值、警戒值及行動值依業主提供之原設計圖說與監測計畫所訂數值填列；'
+     +'量測數據達警戒值即通報監造單位與設計技師會勘，達行動值立即停工並依「支撐應變計畫」辦理。');
+    B.push({t:'tbl',rows:[['監測項目','管理值','警戒值（通報會勘）','行動值（停工應變）','量測頻率'],
+      ['擋土壁變位（傾度管）',U(m.mnWallM),U(m.mnWallW),U(m.mnWallA),U(m.mnFreq)],
+      ['支撐應力（應力計）',U(m.mnStrutM),U(m.mnStrutW),U(m.mnStrutA),U(m.mnFreq)],
+      ['鄰房沉陷（沉陷釘）',U(m.mnSetM),U(m.mnSetW),U(m.mnSetA),U(m.mnFreq)],
+      ['地下水位（觀測井）',U(m.mnWaterM),U(m.mnWaterW),U(m.mnWaterA),U(m.mnFreq)]],
+      w:[2600,1800,2000,2000,1800]});
+    rem('本表數值以技師簽證之結構計算書及核可之監測計畫為準；未填欄位由設計單位填列後併同送審。');
+  })();
 
   // ══ 捌、分項作業安全衛生管理與設施設置措施 ══
   h1('分項作業安全衛生管理與設施設置措施');
@@ -22601,6 +22681,105 @@ function _plSetVarRe(k,v){
     if(el){el.focus();try{el.setSelectionRange(el.value.length,el.value.length);}catch(e){_err('_plSetVarRe',e);}}
   },450);
 }
+
+// ══ v5.414：施工計畫書 ← 案場細節／報價 強關聯連動 ══
+// 掛專案時自動帶入，之後按「重新帶入案場細節」可再同步一次；已手動改過的欄位不覆蓋（force 時才覆蓋）
+var _PL_SITE_FORM={'H型鋼樁':'hpile','鋼軌樁':'railpile','鋼板樁':'sheet',
+  '預壘樁':'prepile','RC基樁（鑽掘式）':'rcbore','RC基樁（全套管式）':'rcpile',
+  'RC 基樁（鑽掘式）':'rcbore','RC 基樁（全套管式）':'rcpile'};
+function _plMethPick(list,v){
+  var t=String(v||'').trim();if(!t||!list||!list.length)return (list&&list[0])||'';
+  var hit=list.find(function(x){return x===t;});if(hit)return hit;
+  hit=list.find(function(x){return x.indexOf(t)>=0||t.indexOf(x)>=0;});
+  return hit||list[0];
+}
+function _plNum(v){var x=parseFloat(String(v||'').replace(/[^\d.\-]/g,''));return isFinite(x)?x:0;}
+function _plSiteOf(name){
+  var q=Q.find(function(x){return x&&x.name===name;});
+  if(!q||!q.site)return null;
+  try{return {q:q,sd:_sdNorm(q.site)};}catch(e){_err('_plSiteOf',e);return null;}
+}
+function _plSyncSite(force,quiet){
+  var got=_plSiteOf(_plState.proj);
+  if(!got){if(!quiet)toast('這個專案還沒有「案場細節」資料，請先到報價單填寫');return false;}
+  var sd=got.sd,c=null;
+  try{c=_sdCalc(sd);}catch(e){_err('_plSyncSite.calc',e);c={wallN:0,layers:[]};}
+  var V=_plState.vars,n=0;
+  function set(k,v){if(v===''||v==null)return;if(force||!String(V[k]||'').trim()){if(V[k]!==String(v)){V[k]=String(v);n++;}}}
+  // 基地條件
+  if(_plNum(sd.H))set('digDepth','GL-'+_plNum(sd.H).toFixed(1)+'m');
+  if(_plNum(sd.A))set('digArea',fmt(_plNum(sd.A))+' m²');
+  if(sd.layers)set('layers',String(sd.layers));
+  if(_plNum(sd.P))set('sitePeri',fmt(_plNum(sd.P))+' m');
+  // 擋土壁：形式／工法／規格／樁長／間距／支數
+  var wid=_PL_SITE_FORM[String(sd.wall.form||'').trim()];
+  if(wid){
+    var ff=PLAN_WALL_FORMS.find(function(x){return x.id===wid;});
+    if(ff){
+      var w0=_plState.walls[0];
+      if(!w0||force||w0.id!==wid){w0={id:wid,meth:'',v:(w0&&w0.id===wid)?w0.v:{}};_plState.walls[0]=w0;n++;}
+      w0.v=w0.v||{};
+      var mm=_plMethPick(ff.methods,sd.wall.method);
+      if(force||!w0.meth){if(w0.meth!==mm){w0.meth=mm;n++;}}
+      var pre={hpile:'hp',railpile:'rl',sheet:'sp',prepile:'pp',rcbore:'rb',rcpile:'rc'}[wid];
+      function setw(k,v){if(v===''||v==null)return;if(force||!String(w0.v[k]||'').trim()){if(w0.v[k]!==String(v)){w0.v[k]=String(v);n++;}}}
+      if(sd.wall.spec)setw(pre+'Spec',sd.wall.spec);
+      if(_plNum(sd.wall.len))setw(pre+(wid==='prepile'||wid==='rcbore'||wid==='rcpile'?'Depth':'Len'),'L='+_plNum(sd.wall.len)+'m');
+      if(_plNum(sd.wall.sp))setw(pre+'Pitch','@'+_plNum(sd.wall.sp)+'m');
+      if(c.wallN)setw(pre+'Count',String(c.wallN));
+      set('wallType',String(sd.wall.form||''));
+    }
+  }
+  // 中間樁／共構樁
+  if(sd.mid.spec||sd.co.spec||_plNum(sd.mid.n)||_plNum(sd.co.n)){
+    if(_plState.items.indexOf('midpile')<0){_plState.items.push('midpile');n++;}
+    if(sd.mid.spec)set('mp1Spec',sd.mid.spec);
+    if(sd.mid.method)set('mp1Meth',_plMethPick(PLAN_MID_METHODS,sd.mid.method));
+    if(_plNum(sd.mid.len))set('mp1Len','L='+_plNum(sd.mid.len)+'m');
+    if(_plNum(sd.mid.n))set('mp1Count',String(_plNum(sd.mid.n)));
+    if(sd.co.spec)set('mp2Spec',sd.co.spec);
+    if(sd.co.method)set('mp2Meth',_plMethPick(PLAN_MID_METHODS,sd.co.method));
+    if(_plNum(sd.co.len))set('mp2Len','L='+_plNum(sd.co.len)+'m');
+    if(_plNum(sd.co.n))set('mp2Count',String(_plNum(sd.co.n)));
+  }
+  // 支撐階數：圍令／支撐／斜撐規格逐層帶入
+  if(sd.layers){
+    var stl=_plStl();
+    (sd.L||[]).forEach(function(L,i){
+      if(!stl[i])return;
+      ['w','s','d'].forEach(function(k){
+        if(L[k]&&(force||!String(stl[i][k]||'').trim())){stl[i][k]=String(L[k]);n++;}
+      });
+    });
+    if(_plState.items.indexOf('strut')<0){_plState.items.push('strut');n++;}
+  }
+  // 施工構台
+  if(sd.plat.load||_plNum(sd.plat.A)){
+    if(_plState.items.indexOf('deck')<0){_plState.items.push('deck');n++;}
+    var tps=_plTps('deck');
+    if(tps&&tps[0]){
+      tps[0].v=tps[0].v||{};
+      if(sd.plat.load&&(force||!tps[0].v.dkLoad)){tps[0].v.dkLoad=String(sd.plat.load);n++;}
+      if(_plNum(sd.plat.A)&&(force||!tps[0].v.dkArea)){tps[0].v.dkArea=fmt(_plNum(sd.plat.A))+' m²';n++;}
+    }
+  }
+  // 施工便梯座數
+  if(_plNum(sd.stairs))set('stairN',String(_plNum(sd.stairs))+' 座');
+  _plState.doc=null;
+  if(!quiet)toast(n?('已從案場細節帶入 '+n+' 個欄位'):'案場細節沒有可帶入的新資料（已填欄位不覆蓋）');
+  _plSave();_plRender();
+  return true;
+}
+function _plSiteHint(){
+  var got=_plSiteOf(_plState.proj);
+  if(!got)return '';
+  var sd=got.sd,bits=[];
+  if(_plNum(sd.H))bits.push('開挖 GL-'+_plNum(sd.H)+'m');
+  if(_plNum(sd.A))bits.push(fmt(_plNum(sd.A))+' m²');
+  if(sd.wall.form)bits.push(sd.wall.form+(sd.wall.method?('／'+sd.wall.method):''));
+  if(sd.layers)bits.push('支撐 '+sd.layers+' 層');
+  return bits.join('　');
+}
 function _plSelProj(v){
   if(v==='__free'){_plState.projFree=true;_plSave();_plRender();return;}
   _plState.projFree=false;
@@ -22617,6 +22796,8 @@ function _plSetProj(v){
     if(q.loc)_plState.vars.loc=q.loc;
     if(!_plState.vars.sub)_plState.vars.sub='豐有工程有限公司';
     _plState.doc=null; // 換專案後需重新產生
+    _plSave();
+    try{if(_plSyncSite(false,true))return;}catch(e){_err('_plSetProj.sync',e);}   // 自動帶入案場細節
   }
   _plSave();_plRender();
 }
@@ -23140,10 +23321,17 @@ function _plRender(){
     +'<button type="button" class="btn btn-xs" onclick="_plSaveRec()"><svg class="ic ib" aria-hidden="true"><use href="#i-save"/></svg> 存檔</button>'
     +'<button type="button" class="btn btn-xs" onclick="_plState.histOpen=!_plState.histOpen;_plRender()"><svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> 版次歷史</button>'
     +'</div></div><div class="cb">';
-  h+='<div style="display:grid;grid-template-columns:1fr auto;gap:9px;align-items:end;margin-bottom:12px">'
-    +'<label style="display:block"><span style="display:block;font-size:11px;color:var(--b4);margin-bottom:3px;font-weight:600">掛專案（下拉選已得標專案，自動帶入業主與地點）</span>'
+  var _sHint=_plSiteHint();
+  h+='<div style="display:grid;grid-template-columns:1fr auto;gap:9px;align-items:end;margin-bottom:'+(_sHint?'6px':'12px')+'">'
+    +'<label style="display:block"><span style="display:block;font-size:11px;color:var(--b4);margin-bottom:3px;font-weight:600">掛專案（下拉選已得標專案，自動帶入業主、地點與案場細節）</span>'
     +'<select onchange="_plSelProj(this.value)" style="width:100%;box-sizing:border-box;font-size:12px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;background:var(--w)">'
-    +_plProjOptions()+'</select></label></div>';
+    +_plProjOptions()+'</select></label>'
+    +'<button type="button" class="btn btn-xs" onclick="_plSyncSite(false)" title="從報價單的「案場細節」帶入開挖深度、面積、支撐層數、擋土壁形式／工法／規格、中間樁、構台等；已填欄位不覆蓋">'
+    +'<svg class="ic ib" aria-hidden="true"><use href="#i-sparkle"/></svg> 帶入案場細節</button></div>';
+  if(_sHint)h+='<div style="font-size:11px;color:var(--g3);background:var(--g1);border:1px solid var(--g2);'
+    +'border-radius:var(--r6);padding:5px 9px;margin-bottom:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+    +'<b>案場細節：</b><span>'+esc(_sHint)+'</span>'
+    +'<button type="button" class="btn btn-xs" style="margin-left:auto" onclick="if(confirm(\'會以案場細節覆蓋目前已填的相關欄位，確定？\'))_plSyncSite(true)">全部覆蓋重帶</button></div>';
   if(_plState.projFree)h+='<label style="display:block;margin:-6px 0 12px"><span style="display:block;font-size:11px;color:var(--b4);margin-bottom:3px;font-weight:600">自行輸入專案名稱</span>'
     +'<input value="'+esc(_plState.proj)+'" placeholder="輸入工程名稱" onchange="_plSetProj(this.value)" '
     +'style="width:100%;box-sizing:border-box;font-size:12px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit"></label>';
