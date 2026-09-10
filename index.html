@@ -2678,7 +2678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.412';
+var APP_VERSION='v5.413';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -21746,6 +21746,20 @@ function _plBuild(){
   tbl(regRows,[1600,4400,3200]);
   h2(4,'基地概況與週邊環境');p(PLAN_TXT.siteDesc);
 
+  h2(5,'介面分工與界面管理');
+  p('本工項與其他承商之界面依契約及工地協調會議決議辦理，開工前召開界面協調會確認下列分工，'
+   +'並將協調結論納入施工日誌備查；界面條件變更時，本公司於變更前 3 個工作天以工程聯絡單提送監造單位確認。');
+  tbl([['界面項目','本公司（擋土支撐承商）','其他承商／業主','管制方式'],
+    ['基準點、結構邊線','依業主提供之基準點放樣樁位並複測','業主（測量公司）提供基準點與結構邊線','放樣紀錄雙方會簽'],
+    ['地下管線調查與遷移','施工前會勘確認，遇管線立即停工通報','業主辦理管線調查、遷移及切結','會勘紀錄、管線圖資存查'],
+    ['鄰房現況鑑定','配合鑑定單位提供施工資訊','業主委託鑑定單位辦理','鑑定報告副本存查'],
+    ['土方開挖與運棄','依支撐架設高程管制開挖深度，逐層會勘','土方承商依步序分層開挖、嚴禁超挖','每層開挖前後會勘簽認'],
+    ['儀器監測','配合支撐應力計安裝並提供施工進度','業主委託監測廠商埋設、量測、判讀','監測報告逐次副知'],
+    ['水電、抽排水','支撐架設範圍內臨時排水配合','業主提供水源、電力與抽排水設施','用電計畫、抽排水設施點交'],
+    ['結構體施作','依樓版強度報告辦理支撐拆除','結構承商提供混凝土抗壓試驗報告','報告核可後始得拆撐']],
+    [1800,3200,3000,2000]);
+  rem('上表為原則性分工；契約另有約定者從其約定。界面爭議由監造單位召開協調會議裁決。');
+
   // ══ 貳、人員組織 ══
   h1('人員組織');
   h2(0,'施工組織系統');
@@ -21895,6 +21909,35 @@ function _plBuild(){
   });
   else p('（尚未勾選工項）');
 
+  // 開挖與支撐施作步序（依支撐階數自動展開；擋土支撐工程送審必備之逐層管制表）
+  (function(){
+    var stl=_plStl();if(!stl.length)return;
+    h2(insts.length,'開挖與支撐施作步序管制表');
+    p('本工程開挖與支撐架設採「先撐後挖」原則逐層辦理：每層開挖至支撐架設高程下方 30~50cm 即停止開挖，'
+     +'完成該層圍令、支撐、斜撐架設並施加預壓力、經監造單位查驗合格後，方得續挖下一層。'
+     +'嚴禁一次挖到底或超挖；土方承商之開挖深度以本表管制。');
+    var rows=[['步序','作業內容','開挖高程','支撐層','管制條件']];
+    rows.push(['1','擋土壁、中間樁／共構樁施作完成','GL±0','—','樁位、垂直度、樁頂高程檢驗合格']);
+    var n=stl.length,k=1;
+    stl.forEach(function(L,j){
+      rows.push([String(++k),'開挖至第 '+PLAN_CN[j]+' 層支撐架設面',
+        L.dg?('GL-'+L.dg+'m'):'＿＿＿','第 '+PLAN_CN[j]+' 層','開挖面平整、無積水；嚴禁超挖']);
+      rows.push([String(++k),'第 '+PLAN_CN[j]+' 層圍令、支撐、斜撐架設並預壓',
+        L.el?('GL-'+L.el+'m'):'＿＿＿','第 '+PLAN_CN[j]+' 層',
+        '預壓力 '+(L.pre||'＿＿')+' T/支，監測應力於誤差值內；查驗合格後續挖']);
+    });
+    rows.push([String(++k),'開挖至坑底、整平並澆置 PC','設計開挖面','—','嚴禁超挖；坑底無積水、無擾動']);
+    rows.push([String(++k),'底版及地下結構體由下而上施作','—','—','各層樓版混凝土抗壓強度達設計 80% 以上']);
+    for(var j2=n-1;j2>=0;j2--){
+      rows.push([String(++k),'拆除第 '+PLAN_CN[j2]+' 層支撐（由下而上）','—','第 '+PLAN_CN[j2]+' 層',
+        '該層樓版強度報告核可、單路分階段解壓、監造同意']);
+    }
+    rows.push([String(++k),'施工構台拆除、共構樁切除、材料清運退場','—','—','拔樁孔以砂或 CLSM 回填；場地復原']);
+    B.push({t:'tbl',rows:_plFillRows(rows,m),w:[700,3400,1500,1200,3400]});
+    rem('本表之開挖高程、支撐高程及預壓力依結構計算書與核可施工圖為準；'
+      +'實際施作前應與土方承商、監造單位召開開挖前協調會確認步序。');
+  })();
+
   // ══ 柒、分項品質計畫（品質管理標準採橫向頁）══
   h1('分項品質計畫');
   p('本章依「公共工程施工品質管理作業要點」及品質計畫製作綱要編訂，內容包含施工要領、品質管理標準、'
@@ -22032,9 +22075,17 @@ function _plBuild(){
   h1('施工圖說');
   var imgs=(_plState.figs||[]).filter(function(f){return f.kind==='img';});
   var docs=(_plState.figs||[]).filter(function(f){return f.kind!=='img';});
-  p('本章圖說（經技師簽證並送監造核可後據以施工）：');
-  li(['擋土支撐系統平面配置圖','各層支撐剖面圖（含高程、圍令、支撐、斜撐、預壓力、設計軸力、容許值、警戒值、行動值附表）',
-    '中間樁／共構樁樁位圖','施工構台覆工板系統平面配置圖及細部圖','零附件接合詳圖','施工工區規劃圖']);
+  p('本章圖說由本公司繪製，經專業技師簽證並送監造單位審查核可後據以施工；'
+   +'圖說之比例及字級須確保列印後數值清晰可辨，修改時以雲形線標示並重新送審。');
+  tbl([['編號','圖說名稱','比例（建議）','簽證','送審時機'],
+    ['S-01','擋土支撐系統平面配置圖','1/200～1/300','技師簽證','開工前'],
+    ['S-02','各層支撐剖面圖（含高程、圍令、支撐、斜撐、預壓力、設計軸力、容許值、警戒值、行動值附表）','1/100～1/200','技師簽證','開工前'],
+    ['S-03','中間樁／共構樁樁位圖','1/200','技師簽證','擋土壁施作前'],
+    ['S-04','施工構台覆工板系統平面配置圖及細部圖','1/100～1/200','技師簽證','構台施作前'],
+    ['S-05','零附件接合詳圖（托架、對接、千斤頂、加勁盒、止水板）','1/10～1/25','—','支撐架設前'],
+    ['S-06','施工工區規劃圖（機具動線、材料堆置、圍籬、出入口）','1/300','—','開工前'],
+    ['S-07','支撐拆除順序圖','1/200','技師簽證','拆撐前']],
+    [900,4600,1500,1200,2000]);
   if(imgs.length){
     imgs.forEach(function(f,i){
       B.push({t:'img',b64:f.b64,ext:f.ext,cx:f.cx,cy:f.cy,name:f.name,cap:'圖 10-'+(i+1)+'　'+(f.cap||f.name)});
@@ -22287,20 +22338,25 @@ var _PL_CSS='.pl-title{font-size:25px;color:#000;text-align:center;padding:22px 
   +'.pl-sub{font-size:19px;color:#000;text-align:center;font-weight:700;padding-bottom:10px;letter-spacing:.5em}'
   +'.pl-fmh{font-size:18px;color:#000;text-align:center;font-weight:800;padding:14px 0 10px;letter-spacing:.5em}'
   +'.pl-spc{height:26px}'
-  +'.pl-h1{font-size:16.5px;color:#000;padding:14px 0 6px;font-weight:800;letter-spacing:.06em;border-bottom:2px solid #000;margin-bottom:4px!important}'
-  +'.pl-h2{font-size:14.5px;color:#000;padding:10px 0 3px;font-weight:700;letter-spacing:.03em}'
-  +'.pl-h3{font-size:13px;color:#000;padding:7px 0 2px;font-weight:700}'
-  +'.pl-p{font-size:12.5px;line-height:1.95;padding:2px 0;text-align:justify;color:#111}'
-  +'.pl-li{font-size:12.5px;line-height:1.9;padding:1px 0 1px 20px;text-indent:-15px;color:#111}'
-  +'.pl-rem{font-size:10.5px;color:#444;padding:2px 0;line-height:1.7}'
+  +'.pl-h1{font-size:16.5px;color:#000;padding:14px 0 6px;font-weight:800;letter-spacing:.06em;border-bottom:2px solid #000;margin-bottom:6px!important;break-after:avoid;page-break-after:avoid}'
+  +'.pl-h2{font-size:14.5px;color:#000;padding:12px 0 4px;font-weight:700;letter-spacing:.03em;border-left:4px solid #000;padding-left:8px;break-after:avoid;page-break-after:avoid}'
+  +'.pl-h3{font-size:13px;color:#000;padding:8px 0 3px;font-weight:700;break-after:avoid;page-break-after:avoid}'
+  +'.pl-p{font-size:12.5px;line-height:1.95;padding:2px 0;text-align:justify;text-justify:inter-ideograph;'
+    +'text-indent:2em;color:#111}'
+  +'.pl-p.noind,.pl-p[style*="center"]{text-indent:0}'
+  +'.pl-li{font-size:12.5px;line-height:1.9;padding:1px 0 1px 24px;text-indent:-16px;color:#111}'
+  +'.pl-rem{font-size:10.5px;color:#444;padding:2px 0 2px 24px;text-indent:-16px;line-height:1.7}'
   +'.pl-tbl{width:100%;border-collapse:collapse}'
   +'.pl-tbl th,.pl-tbl td{border:1px solid #444;padding:4px 6px;font-size:10.5px;line-height:1.65;vertical-align:middle;color:#111}'
   +'.pl-tbl th{background:#f2f2f2;color:#000;text-align:center;font-weight:700}'
   +'.pl-tbl{table-layout:fixed}.pl-tbl td,.pl-tbl th{word-break:break-word}'
+  +'.pl-tbl thead{display:table-header-group}.pl-tbl tr{page-break-inside:avoid;break-inside:avoid}'
+  +'.pl-tbl tbody tr:nth-child(even) td{background:#fafafa}'
+  +'.pl-tbl td:first-child,.pl-tbl th:first-child{text-align:center}'
   +'.pl-tbl.sm th,.pl-tbl.sm td{padding:2px 4px;font-size:9.5px;line-height:1.45}'
-  +'.pl-fig{text-align:center;padding:4px 0}.pl-fig img{max-width:100%}'
+  +'.pl-fig{text-align:center;padding:6px 0;break-inside:avoid;page-break-inside:avoid}.pl-fig img{max-width:100%}'
   +'.pl-edithint{display:inline-block;font-size:10.5px;color:#0e3d22;background:#eaf2ec;border:1px solid #b9c6bd;border-radius:10px;padding:1px 9px;margin-top:3px;cursor:pointer}'
-  +'.pl-fig figcaption{font-size:10.5px;color:#333;padding-top:4px}'
+  +'.pl-fig figcaption{font-size:10.5px;color:#333;padding-top:5px;line-height:1.6;text-align:center}'
   +'.pl-toc1{font-size:13px;font-weight:700;color:#000;margin:8px 0 2px}'
   +'.pl-toc2{font-size:12px;color:#222;margin:2px 0 2px 22px}'
   +'.toc-e{display:flex;align-items:baseline;font-size:12.5px;color:#000;padding:3px 0}'

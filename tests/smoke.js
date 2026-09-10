@@ -1593,6 +1593,17 @@ async function newPage(browser, width, height) {
       out.upile = /RC/.test(up.name) && up.vars.some(v => v.k === 'upMeth' && (v.opts || []).length >= 2);
       // 表格輸出帶 colgroup（欄寬可控）
       out.colg = /<colgroup>/.test(_plBlockHtml({ t: 'tbl', rows: [['a', 'b'], ['1', '2']], w: [3000, 7000] }, 0, false));
+      // v5.413 專業內容補強：介面分工、開挖與支撐步序、應備圖說清單
+      _plState.stl = [{ el: '2.0', dg: '2.5', w: 'H350', s: 'H350', d: 'H350', pre: '30' },
+                      { el: '5.0', dg: '5.5', w: 'H400', s: 'H400', d: 'H400', pre: '40' }];
+      const B2 = _plBuild();
+      const hs = B2.filter(b => b.t === 'h2').map(b => b.v).join('|');
+      out.iface = /介面分工與界面管理/.test(hs);
+      out.seq = /開挖與支撐施作步序管制表/.test(hs);
+      const seqT = B2.find(b => b.t === 'tbl' && (b.rows || [])[0] && b.rows[0].join() === '步序,作業內容,開挖高程,支撐層,管制條件');
+      // 2 層支撐 → 開挖/架設各 2 組 + 首尾 4 列 + 拆撐 2 列
+      out.seqRows = !!seqT && seqT.rows.length === 1 + 1 + 4 + 2 + 2 + 1;
+      out.dwg = B2.some(b => b.t === 'tbl' && (b.rows || []).some(r => r[0] === 'S-02'));
       return out;
     });
     check('計畫書：封面已移除編製／審核／核定欄', r.cover);
@@ -1602,7 +1613,10 @@ async function newPage(browser, width, height) {
     check('計畫書：自主檢查表緊湊排版且欄寬受控', r.chk);
     check('計畫書：抗浮基樁改為 RC 基樁並新增工法選單', r.upile);
     check('計畫書：表格輸出 colgroup，列印欄寬依設定', r.colg);
-    check('v5.412 排版測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('計畫書：新增「介面分工與界面管理」節', r.iface);
+    check('計畫書：新增「開挖與支撐施作步序管制表」並依支撐層數展開', r.seq && r.seqRows);
+    check('計畫書：施工圖說改為應備圖說清單（比例、簽證、送審時機）', r.dwg);
+    check('v5.413 排版測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
