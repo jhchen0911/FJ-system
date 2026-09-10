@@ -1528,11 +1528,13 @@ async function newPage(browser, width, height) {
       // 同一工項不同工法 → 不同圖組
       out.distinct = new Set(need.hpile.map(m => _fySheetId('hpile', m))).size === 4
         && new Set(need.midpile.map(m => _fySheetId('midpile', m))).size === 6;
-      // 每頁版面大小一致（不因工序多而縮小）
+      // 格子大小一律相同：各頁等寬，非末頁一律滿 6 格（同高），末頁依實際列數縮短
       const a = FY_SHEETS.pages('mp_drive'), b = FY_SHEETS.pages('mp_root_case');
-      out.samePage = a.length === 1 && b.length >= 3
-        && a[0].w === b[0].w && a[0].h === b[0].h
-        && b.every(x => x.w === b[0].w && x.h === b[0].h);
+      const w0 = a[0].w;
+      out.samePage = a.length === 1 && b.length === 3
+        && b.every(x => x.w === w0)
+        && b[0].h === b[1].h && b[2].h < b[0].h
+        && a[0].h === b[0].h;                       // 6 格頁高度一致
       // 流程圖步驟＝示意圖逐格標題
       const st = _fySteps('hpile', '水刀引孔');
       out.steps = !!st && st.length === FY_SHEETS.get('wall_h_wjet').panels.length
@@ -1549,12 +1551,58 @@ async function newPage(browser, width, height) {
     });
     check('示意圖引擎：載入成功且圖組齊全', r.ready && r.count);
     check('示意圖引擎：工項＋工法對應到相應圖組，不同工法出不同圖', r.map && r.distinct);
-    check('示意圖引擎：每頁版面大小一致，不因工序多而縮小', r.samePage);
+    check('示意圖：每頁滿 6 格、格子大小一律相同，末頁不留大片空白', r.samePage);
     check('示意圖引擎：施工流程圖與施工步驟說明取自同一份逐格步驟', r.steps);
     check('計畫書：新工法選項與工法敘述已補齊', r.opts);
     check('示意圖引擎：無對應圖組之工項安全退回舊版繪圖', r.fallback);
     check('示意圖：浮水印開啟（著作權保護）', r.wm);
-    check('v5.411 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v5.412 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v5.412 計畫書排版與內容調整 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      _plState.proj = 'T';
+      _plState.walls = [{ id: 'hpile', meth: '氣動槌＋水刀引孔', v: {} }];
+      _plState.items = ['midpile', 'upile'];
+      _plState.vars = Object.assign(_plState.vars || {}, { midMethod: '引孔根固', mp1Meth: '引孔根固' });
+      _plNormalize && _plNormalize();
+      const B = _plBuild();
+      // 封面不再有編製／審核／核定表
+      out.cover = !B.some(b => b.t === 'tbl' && (b.rows || [])[0] && b.rows[0].join().indexOf('編製（品管工程師）') >= 0);
+      // 附件章：作業主管證照、材質證明在千斤頂之前、最後一項為自主檢查表
+      const at = PLAN_ATTS.map(a => a.l);
+      out.atts = at.length === 5 && at[1] === '作業主管證照' && at[2] === '材料材質證明書'
+        && at[3] === '千斤頂校正報告' && at[4] === '自主檢查表'
+        && !at.join().includes('教育訓練') && !at.join().includes('一機三證');
+      // 流程圖：各工項字級一致（畫布寬高皆相同）
+      const fl = B.filter(b => b.t === 'img' && /flow_/.test(b.name || ''));
+      out.flowSame = fl.length >= 2 && fl.every(b => b.cx === fl[0].cx && b.cy === fl[0].cy);
+      // 流程圖每一步都掛得到品質管理標準
+      const ann = _plFlowAnn(_plItem('hpile'), ['材料進場・尺寸檢驗 ☆', '全數完成・☆高程複測'], {},
+        ['材料進場・尺寸檢驗 逐支核對規格長度與外觀', '整列打設完成 複測樁頂高程與壁線偏差']);
+      out.ann = ann.filter(a => a).length === 2;
+      // 自主檢查表：緊湊排版＋欄寬已指定
+      const chk = _plChkBlocks().filter(b => b.t === 'tbl');
+      out.chk = chk.length > 0 && chk.every(b => b.sm === 1) && chk.every(b => !b.w || b.w.length === (b.rows[0] || []).length);
+      // RC 基樁（原抗浮基樁）改名並有工法欄位
+      const up = _plItem('upile');
+      out.upile = /RC/.test(up.name) && up.vars.some(v => v.k === 'upMeth' && (v.opts || []).length >= 2);
+      // 表格輸出帶 colgroup（欄寬可控）
+      out.colg = /<colgroup>/.test(_plBlockHtml({ t: 'tbl', rows: [['a', 'b'], ['1', '2']], w: [3000, 7000] }, 0, false));
+      return out;
+    });
+    check('計畫書：封面已移除編製／審核／核定欄', r.cover);
+    check('計畫書：附件章依指示調整（作業主管、材質證明、千斤頂、自主檢查表）', r.atts);
+    check('計畫書：各工項施工流程圖字級一致（畫布尺寸固定）', r.flowSame);
+    check('計畫書：流程圖逐步對應品質管理標準／自主檢查表', r.ann);
+    check('計畫書：自主檢查表緊湊排版且欄寬受控', r.chk);
+    check('計畫書：抗浮基樁改為 RC 基樁並新增工法選單', r.upile);
+    check('計畫書：表格輸出 colgroup，列印欄寬依設定', r.colg);
+    check('v5.412 排版測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 

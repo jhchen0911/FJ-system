@@ -2678,7 +2678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.411';
+var APP_VERSION='v5.412';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -14367,15 +14367,17 @@ var PLAN_ITEMS=[
            ['廢漿是否清運完成並取得聯單','查文件','已完成'],
            ['場地是否清理完成','目視','已清理']]}]
 },
-{ id:'upile', name:'抗浮基樁', short:'抗浮基樁',
+{ id:'upile', name:'RC 基樁（抗浮基樁）', short:'RC基樁',
   hazards:[["人工開挖", "坍孔活埋、缺氧", "高", "鋼軌樁護壁配合開挖深度；通風並偵測有害氣體；孔口專人監視"], ["孔口作業", "人員墜落", "高", "開挖線外 1.2m 護欄、孔口護蓋"], ["鋼筋籠吊放", "吊舉物飛落、倒塌", "高", "主鉤＋輔助鉤緩慢吊放；暫置不超過二層並以型鋼枕木阻擋"], ["混凝土澆置", "壓送管噴脫", "中", "管路接頭確實鎖固；上移速度管制"]],
-  vars:[{k:'upDia',l:'樁徑',d:'Ø150cm',opts:['Ø60cm','Ø70cm','Ø80cm','Ø100cm','Ø120cm','Ø150cm','Ø200cm']},
+  vars:[{k:'upMeth',l:'工法',d:'全套管鑽掘工法',opts:['全套管鑽掘工法','螺旋鑽掘引孔工法（定位套管）','人工挖掘（鋼軌樁護壁）']},
+        {k:'upDia',l:'樁徑',d:'Ø150cm',opts:['Ø60cm','Ø70cm','Ø80cm','Ø100cm','Ø120cm','Ø150cm','Ø200cm']},
         {k:'upDepth',l:'樁長',d:'8.0m'},{k:'upCount',l:'支數',d:''},
         {k:'upFc',l:'混凝土設計強度',d:"fc'=350 kgf/cm²"},
         {k:'upMain',l:'鋼筋籠主筋',d:'12-D25'},{k:'upHoop',l:'鋼筋籠箍筋',d:'D13（螺旋箍）'},{k:'upHoopSp',l:'箍筋間距',d:'@15cm'},
         {k:'upPipe',l:'壓送管口徑',d:'18cm'}],
-  method:'本工項係以鋼軌樁作為孔壁保護，人工配合機械開挖至設計深度後，吊放鋼筋籠並以特密管（壓送管）'
-    +'澆置混凝土形成場鑄 RC 抗浮基樁。本工程樁徑 {{upDia}}，樁長 {{upDepth}}，數量 {{upCount}} 支，'
+  method:'本工項採 {{upMeth}} 施作場鑄 RC 基樁（抗浮基樁）：依樁位放樣定位後鑽掘（或人工配合機械開挖）'
+    +'至設計深度，經深度與垂直度檢驗合格後吊放鋼筋籠，再以特密管（壓送管）由下而上置換澆置混凝土成樁。'
+    +'本工程樁徑 {{upDia}}，樁長 {{upDepth}}，數量 {{upCount}} 支，'
     +'混凝土設計強度 {{upFc}}，鋼筋籠採 {{upCage}}。\n'
     +'基樁若開挖深度不超過鋼軌樁打設深度則應不致發生坍孔現象，故挖掘深度應與鋼軌樁打設深度密切配合。'
     +'混凝土澆置時，最初之一至二節壓送管雖所灌混凝土數量不多，'
@@ -14411,20 +14413,20 @@ var PLAN_ITEMS=[
           '孔口周邊設置護蓋或護欄，防止人員墜落。',
           '吊放鋼筋籠時作業半徑內淨空，並派專人指揮。',
           '電銲及切割作業須申請動火許可並設監火人員。'],
-  qc:[['抗浮基樁','樁位放樣','偏心 ≦±7.5cm','放樣後','全站儀','逐支','重新放樣'],
-      ['抗浮基樁','鋼軌樁打設','深度配合開挖深度，垂直','打設中','水準儀、垂球','逐支','補打'],
-      ['抗浮基樁','開挖深度','達樁長 {{upDepth}}','開挖中','水尺量測','逐支','續挖'],
-      ['抗浮基樁','垂直度','≦1/300，開挖面偏位 <10cm','開挖後','雷射垂直儀、垂球','逐支','修正孔位'],
-      ['抗浮基樁','鋼筋籠加工','符合 {{upCage}}，無變形','加工後','量測、目視','逐座','重新加工'],
-      ['抗浮基樁','鋼筋搭接','電銲長度 >5db×1.75','加工中','量測','逐處','補銲'],
-      ['抗浮基樁','鋼筋籠吊放高程','符合設計圖說','吊放後','水準儀','逐支','調整'],
-      ['抗浮基樁','壓送管位置','底緣距開挖底約 200cm','澆置前','量測','逐支','調整'],
-      ['抗浮基樁','混凝土坍度','符合圖說','澆置前','坍度試驗','每車','退貨'],
-      ['抗浮基樁','混凝土強度','{{upFc}}','28 天','圓柱試體抗壓試驗','每 100m³ 或每日一組','檢討補強並報監造'],
-      ['抗浮基樁','拆管時機','埋入混凝土面 >1 倍樁徑','澆置中','量測','逐支','停止拆管'],
-      ['抗浮基樁','鋼軌樁拔除','隨拔隨灌砂填實','澆置後','目視','逐支','補灌']],
+  qc:[['RC 基樁','樁位放樣','偏心 ≦±7.5cm','放樣後','全站儀','逐支','重新放樣'],
+      ['RC 基樁','鋼軌樁打設','深度配合開挖深度，垂直','打設中','水準儀、垂球','逐支','補打'],
+      ['RC 基樁','開挖深度','達樁長 {{upDepth}}','開挖中','水尺量測','逐支','續挖'],
+      ['RC 基樁','垂直度','≦1/300，開挖面偏位 <10cm','開挖後','雷射垂直儀、垂球','逐支','修正孔位'],
+      ['RC 基樁','鋼筋籠加工','符合 {{upCage}}，無變形','加工後','量測、目視','逐座','重新加工'],
+      ['RC 基樁','鋼筋搭接','電銲長度 >5db×1.75','加工中','量測','逐處','補銲'],
+      ['RC 基樁','鋼筋籠吊放高程','符合設計圖說','吊放後','水準儀','逐支','調整'],
+      ['RC 基樁','壓送管位置','底緣距開挖底約 200cm','澆置前','量測','逐支','調整'],
+      ['RC 基樁','混凝土坍度','符合圖說','澆置前','坍度試驗','每車','退貨'],
+      ['RC 基樁','混凝土強度','{{upFc}}','28 天','圓柱試體抗壓試驗','每 100m³ 或每日一組','檢討補強並報監造'],
+      ['RC 基樁','拆管時機','埋入混凝土面 >1 倍樁徑','澆置中','量測','逐支','停止拆管'],
+      ['RC 基樁','鋼軌樁拔除','隨拔隨灌砂填實','澆置後','目視','逐支','補灌']],
   checks:[
-    {name:'抗浮基樁施工自主檢查表',stage:'施工前',
+    {name:'RC 基樁（抗浮基樁）施工自主檢查表',stage:'施工前',
      rows:[['施工圖說及施工計畫是否已送審核可','查文件','已核可'],
            ['地下管線及障礙物是否已清除','查資料、試挖','已完成'],
            ['樁位放樣是否經複核','全站儀','偏心 ≦±7.5cm'],
@@ -14434,7 +14436,7 @@ var PLAN_ITEMS=[
            ['抽水設備是否備妥','目視','已備妥'],
            ['開挖線外 1.2m 安全護欄是否設置','目視、量測','已設置'],
            ['吊車一機三證是否齊備','查證件','齊備有效']]},
-    {name:'抗浮基樁施工自主檢查表',stage:'施工中',
+    {name:'RC 基樁（抗浮基樁）施工自主檢查表',stage:'施工中',
      rows:[['鋼軌樁打設深度是否配合開挖深度','量測','配合無超挖'],
            ['開挖是否分階段並適時襯板','目視','已襯板'],
            ['孔內積水是否排除','目視','已排除'],
@@ -14446,7 +14448,7 @@ var PLAN_ITEMS=[
            ['混凝土坍度是否符合','坍度試驗','符合圖說'],
            ['拆管時埋入深度是否 >1 倍樁徑','量測','符合'],
            ['個人防護具是否確實配戴','目視','全數配戴']]},
-    {name:'抗浮基樁施工自主檢查表',stage:'施工後',
+    {name:'RC 基樁（抗浮基樁）施工自主檢查表',stage:'施工後',
      rows:[['樁頂高程是否符合設計','水準儀','符合圖說'],
            ['樁位偏心是否在容許範圍','全站儀','≦±7.5cm'],
            ['混凝土試體是否製作送驗','查紀錄','每支或每 100m³ 一組'],
@@ -14824,14 +14826,12 @@ function _plMidRootSrc(){
 // 附件槽位：上傳的證照／報告圖片自動排版進「相關附件」章；PDF 列入清單標註另冊檢附
 var PLAN_ATTS=[
   {k:'calc', l:'結構計算書（技師簽證）'},
-  {k:'lic',  l:'人員證照（工地主任／作業主管／安衛／品管）',lib:1},
-  {k:'train',l:'教育訓練紀錄與勞保投保資料',lib:1},
-  {k:'mach', l:'機具檢查合格證與操作人員證照（一機三證）',lib:1},
-  {k:'jack', l:'千斤頂校正報告',lib:1},
+  {k:'lic',  l:'作業主管證照',lib:1},
   {k:'mat',  l:'材料材質證明書',lib:1},
-  {k:'other',l:'其他附件'}
+  {k:'jack', l:'千斤頂校正報告',lib:1},
+  {k:'chk',  l:'自主檢查表',ref:'本計畫書「附表　自主檢查表」即為本附件，另備空白表供現場使用。'}
 ];
-// 共用附件庫（v5.363）：附件二～六（證照、勞保、一機三證、校正、材質證明）各工地通用，
+// 共用附件庫（v5.363）：附件二～四（作業主管證照、材質證明、千斤頂校正）各工地通用，
 // 存於獨立鍵 fy_plan_attlib——清空重來、換專案都會自動帶入，仍可逐檔替換或刪除
 function _plAttLibLoad(){
   try{return JSON.parse(localStorage.getItem('fy_plan_attlib')||'{}')||{};}catch(e){return {};}
@@ -15330,15 +15330,48 @@ var _PL_FONT='"Microsoft JhengHei","Noto Sans TC",sans-serif';
 // 施工流程圖（v5.361 強化）：單欄直線由上而下；檢驗停留點雙框＋灰底；
 // opts.ann＝與步驟對齊之品管註記（右側虛線掛「對應品質管理標準／自主檢查表」框）；
 // 檢驗停留點左側繪「不合格 → 改正後重新檢查」迴圈箭頭，關鍵節點一目瞭然
+// v5.412：固定畫布尺寸（W/H 皆常數）→ 不論步驟多寡，列印出來的字級完全一致；
+// 超出高度自動分頁，續頁標「（承前頁）」並以箭頭銜接
+function _plFlowPages(steps,opts){
+  opts=opts||{};
+  var ann=opts.ann||[];
+  var CH=980;                     // 每頁可用高度（與固定畫布寬度成 A4 比例）
+  var mx=document.createElement('canvas').getContext('2d');
+  var fs=15,lh=21,padX=14,padY=10,gap=26,boxW=ann.some(function(a){return !!a;})?400:520;
+  var afs=11.5,alh=17,annW=290;
+  var hs=steps.map(function(t,i){
+    mx.font=fs+'px '+_PL_FONT;
+    var h=_plWrapTx(mx,(i+1)+'. '+t,boxW-padX*2).length*lh+padY*2;
+    var a=ann[i];
+    if(a){
+      mx.font=afs+'px '+_PL_FONT;
+      var n=0;(a.lines||[]).forEach(function(L){n+=_plWrapTx(mx,L,annW-22).length;});
+      h=Math.max(h,n*alh+34);
+    }
+    return h+gap;
+  });
+  var groups=[],cur=[],curH=0;
+  hs.forEach(function(h,i){
+    if(cur.length&&curH+h>CH-40){groups.push(cur);cur=[];curH=0;}
+    cur.push(i);curH+=h;
+  });
+  if(cur.length)groups.push(cur);
+  return groups.map(function(g,gi){
+    return _plFlowPNG(g.map(function(i){return steps[i];}),
+      {ann:g.map(function(i){return ann[i]||null;}),fixH:CH,no0:g[0],
+       cont:gi>0,more:gi<groups.length-1});
+  });
+}
 function _plFlowPNG(steps,opts){
   opts=opts||{};
   var ann=opts.ann||[];
   var hasAnn=ann.some(function(a){return !!a;});
   var SC=2,boxW=hasAnn?400:520,annW=290,fs=15,afs=11.5,lh=21,alh=17,padX=14,padY=10,gap=26;
+  var no0=opts.no0||0;
   var cv=document.createElement('canvas'),mx=cv.getContext('2d');
   var metas=steps.map(function(t,i){
     mx.font=fs+'px '+_PL_FONT;
-    var lines=_plWrapTx(mx,(i+1)+'. '+t,boxW-padX*2);
+    var lines=_plWrapTx(mx,(no0+i+1)+'. '+t,boxW-padX*2);
     var chk=/☆|◎|檢查|查驗|試體|驗收|確認|檢測/.test(t);
     var a=ann[i]||null,aLines=null;
     if(a){
@@ -15353,14 +15386,19 @@ function _plFlowPNG(steps,opts){
     return {lines:lines,h:h,chk:chk,a:a,aLines:aLines,ah:ah,rowH:Math.max(h,ah)};
   });
   var hasLoop=metas.some(function(mt,i){return mt.chk&&i>0;});
-  var LM=hasLoop?66:28;
-  var W=LM+boxW+(hasAnn?(30+annW+14):28);
-  var H=metas.reduce(function(a,mt){return a+mt.rowH+gap;},0)-gap+28;
+  var LM=66;                                  // 固定左邊界，各圖版面一致
+  var W=LM+boxW+(30+annW+14);                 // 固定畫布寬 → 各工項字級一致
+  var natH=metas.reduce(function(a,mt){return a+mt.rowH+gap;},0)-gap+28+(opts.cont?22:0);
+  var H=opts.fixH||natH;
   cv.width=W*SC;cv.height=H*SC;
   var ctx=cv.getContext('2d');ctx.scale(SC,SC);
   ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
   ctx.textBaseline='top';
   var x=LM,y=14,pos=[];
+  if(opts.cont){
+    ctx.fillStyle='#333';ctx.font='11.5px '+_PL_FONT;ctx.textAlign='left';
+    ctx.fillText('（承前頁）',x,y);y+=22;
+  }
   metas.forEach(function(mt){
     var by=y+(mt.rowH-mt.h)/2;
     ctx.fillStyle=mt.chk?'#f2f2f2':'#ffffff';
@@ -15402,24 +15440,41 @@ function _plFlowPNG(steps,opts){
     ctx.font='10.5px '+_PL_FONT;ctx.textAlign='center';ctx.textBaseline='bottom';
     ctx.fillText('不合格：改正後重新檢查',0,0);ctx.restore();
   }
+  if(opts.more&&pos.length){
+    var last=pos[pos.length-1];
+    ctx.strokeStyle='#222';ctx.fillStyle='#222';ctx.lineWidth=1.4;
+    _plArrow(ctx,x+boxW/2,last.y+last.h,x+boxW/2,last.y+last.h+22);
+    ctx.font='11.5px '+_PL_FONT;ctx.textAlign='center';ctx.textBaseline='top';
+    ctx.fillText('（接次頁）',x+boxW/2,last.y+last.h+26);
+  }
   return {b64:cv.toDataURL('image/png'),w:W,h:H};
 }
 // 流程步驟 → 對應品管標準註記（雙字詞比對管理項目；每步驟至多 3 條、全圖不重複）
-function _plFlowAnn(it,steps,m){
-  var qc=_plQcRaw(it,m),used={};
-  return steps.map(function(s){
-    var hit=[];
+function _plFlowAnn(it,steps,m,matchTx){
+  var qc=_plQcRaw(it,m),used={},hits=steps.map(function(){return [];});
+  var mt=(matchTx&&matchTx.length===steps.length)?matchTx:steps;   // 比對用文字（可帶作業說明）
+  steps.forEach(function(s,si){
     qc.forEach(function(r,ri){
-      if(hit.length>=3||used[ri])return;
+      if(hits[si].length>=3||used[ri])return;
       var item=String(r[1]||'');
       for(var k=0;k+2<=item.length;k++){
         var bg=item.substr(k,2);
         if(/施工|作業|工程|設計|符合|規定|情形|狀況|是否|材料|深度/.test(bg))continue;
-        if(s.indexOf(bg)>=0){used[ri]=1;hit.push(r);break;}
+        if(mt[si].indexOf(bg)>=0){used[ri]=1;hits[si].push(r);break;}
       }
     });
-    if(!hit.length)return null;
-    return {lines:hit.map(function(r){return '☆ '+r[1]+'：'+_plFill(r[2],m)+'（'+r[4]+'，記錄於自主檢查表）';})};
+  });
+  // 未被配對的品管項目：平均掛到檢驗停留點（☆）步驟，確保品質管理標準逐項對應得到
+  var rest=qc.filter(function(r,ri){return !used[ri];});
+  if(rest.length){
+    var holds=[];
+    steps.forEach(function(s,si){if(/☆|◎|檢驗|檢查|複測|查驗/.test(s))holds.push(si);});
+    if(!holds.length)holds=[steps.length-1];
+    rest.forEach(function(r,i){hits[holds[i%holds.length]].push(r);});
+  }
+  return hits.map(function(h){
+    if(!h.length)return null;
+    return {lines:h.map(function(r){return '☆ '+r[1]+'：'+_plFill(r[2],m)+'（'+r[4]+'，記錄於自主檢查表）';})};
   });
 }
 // 組織圖：黑白正式版
@@ -16748,7 +16803,8 @@ function sheetWatermark(g,SW,SH){
 const PAGE_ROWS=3, PAGE_N=ENG.COLS*PAGE_ROWS;
 function _renderPage(sheet,panels,pgNo,pgTot){
   const SW=ENG.MARG*2+ENG.COLS*ENG.PW+(ENG.COLS-1)*ENG.GAP;
-  const SH=ENG.HEAD+ENG.MARG+PAGE_ROWS*(ENG.PH+ENG.GAP);
+  const rows=Math.max(1,Math.min(PAGE_ROWS,Math.ceil(panels.length/ENG.COLS)));
+  const SH=ENG.HEAD+ENG.MARG+rows*(ENG.PH+ENG.GAP);
   const cv=document.createElement('canvas');
   cv.width=SW*ENG.SCALE;cv.height=SH*ENG.SCALE;
   const g=cv.getContext('2d');
@@ -16782,9 +16838,8 @@ function _renderPage(sheet,panels,pgNo,pgTot){
 function renderSheetPages(sheet){
   const ps=sheet.panels.map((p,i)=>Object.assign({},p,{_no:i+1}));
   const tot=Math.max(1,Math.ceil(ps.length/PAGE_N));
-  const per=Math.ceil(ps.length/tot);           // 平均分頁，避免最後一頁只有一兩格
   const out=[];
-  for(let k=0;k<tot;k++)out.push(_renderPage(sheet,ps.slice(k*per,(k+1)*per),k+1,tot));
+  for(let k=0;k<tot;k++)out.push(_renderPage(sheet,ps.slice(k*PAGE_N,(k+1)*PAGE_N),k+1,tot));
   return out;
 }
 // 舊介面（單張長圖）——保留給既有腳本使用
@@ -19968,9 +20023,12 @@ window.FY_SHEETS={
   pages:function(id,sc){var s=this.get(id);if(!s)return null;
     var old=ENG.SCALE;if(sc)ENG.SCALE=sc;
     try{
-      var W=(ENG.MARG*2+ENG.COLS*ENG.PW+(ENG.COLS-1)*ENG.GAP)*ENG.SCALE;
-      var H=(ENG.HEAD+ENG.MARG+PAGE_ROWS*(ENG.PH+ENG.GAP))*ENG.SCALE;
-      return renderSheetPages(s).map(function(d){return {b64:d.split(',')[1],w:W,h:H};});
+      var W=(ENG.MARG*2+ENG.COLS*ENG.PW+(ENG.COLS-1)*ENG.GAP)*ENG.SCALE,n=s.panels.length;
+      return renderSheetPages(s).map(function(d,k){
+        var cnt=Math.min(PAGE_N,n-k*PAGE_N);
+        var rows=Math.max(1,Math.min(PAGE_ROWS,Math.ceil(cnt/ENG.COLS)));
+        return {b64:d.split(',')[1],w:W,h:(ENG.HEAD+ENG.MARG+rows*(ENG.PH+ENG.GAP))*ENG.SCALE};
+      });
     }finally{ENG.SCALE=old;}},
   steps:function(id){var s=this.get(id);return s?s.panels.map(function(p){return {t:p.t,n1:p.n1||'',n2:p.n2||''};}):null;},
   wm:WM
@@ -21647,9 +21705,6 @@ function _plBuild(){
     ['承攬廠商','{{main}}'],['協力廠商（編製單位）','{{sub}}'],
     ['契約工期','{{dur}}'],['預定開工日','{{start}}'],
     ['版次','第 '+_plVer()+' 版'],['編訂日期',localToday()]],[2800,6400]);
-  B.push({t:'sp'});
-  tbl([['編製（品管工程師）','審核（工地主任）','核定'],
-    ['\n\n','\n\n','\n\n']],[3066,3066,3068]);
   B.push({t:'sect',o:{}});   // ── 封面節結束：無頁首頁尾、無頁碼 ──
 
   // ══ 前置（目錄；頁碼 I、II…）══
@@ -21713,13 +21768,13 @@ function _plBuild(){
     ['擋土支撐作業主管','{{mgr}}','{{mgrLic}}'],
     ['職業安全衛生業務主管','{{safe}}','{{safeLic}}'],
     ['品管工程師','{{qcp}}','{{qcpLic}}']],[3000,2400,3800]);
-  rem('人員證照影本、6 小時安全衛生教育訓練紀錄及勞保投保資料詳「相關附件」章。');
+  rem('作業主管證照影本詳「相關附件」章；教育訓練紀錄與勞保投保資料由本公司留存備查。');
 
   // ══ 參、施工機具 ══
   h1('施工機具');
   if(insts.length)insts.forEach(function(x,i){h2(i,x.title);B.push({t:'tbl',rows:_plFillRows(x.it.machines,x.m),w:[3600,3400,2200]});});
   else p('（尚未勾選工項）');
-  rem('起重機具進場檢附檢查合格證、操作與吊掛人員證照（一機三證）；千斤頂附半年內校正報告，詳「相關附件」章。');
+  rem('起重機具進場檢附檢查合格證及操作、吊掛人員證照（一機三證）由本公司留存備查；千斤頂校正報告詳「相關附件」章。');
 
   // ══ 肆、使用材料 ══
   h1('使用材料');
@@ -21800,12 +21855,21 @@ function _plBuild(){
     }
     h3('（'+PLAN_CN[no-1]+'）施工流程圖');no++;
     // 流程圖步驟一律與示意圖逐格一致（無對應圖組時才沿用工項內建流程）
-    var fsteps=(fySteps&&fySteps.length?fySteps.map(function(st){return st.t;})
+    var useFy=!!(fySteps&&fySteps.length);
+    var fsteps=(useFy?fySteps.map(function(st){return st.t;})
                 :flowSteps(x)).map(function(t){return _plFill(t,im);});
-    var fblk=_plImgBlock(_plFlowPNG(fsteps,{ann:_plFlowAnn(it,fsteps,im)}),
-      'flow_'+it.id+'_'+i,'圖 6-'+(i+1)+'b　'+x.title+'施工流程圖（雙框灰底＝檢驗停留點，右側註記對應之品質管理標準與自主檢查項目；不合格改正後重新檢查）');
-    fblk.__edit={kind:'flow',steps:fsteps,it:it.id,m:im};
-    B.push(fblk);
+    // 比對品管標準時連作業說明一起看，命中率高、對應更完整
+    var fmatch=useFy?fySteps.map(function(st){return _plFill(st.t+' '+(st.n1||'')+' '+(st.n2||''),im);}):fsteps;
+    var fann=_plFlowAnn(it,fsteps,im,fmatch);
+    var fpgs=_plFlowPages(fsteps,{ann:fann});
+    fpgs.forEach(function(pg,k){
+      var fb=_plImgBlock(pg,'flow_'+it.id+'_'+i+'_'+(k+1),
+        '圖 6-'+(i+1)+'b'+(fpgs.length>1?('-'+(k+1)):'')+'　'+x.title+'施工流程圖'
+        +(fpgs.length>1?('（'+(k+1)+'／'+fpgs.length+'）'):'')
+        +'（雙框灰底＝檢驗停留點，右側註記對應之品質管理標準與自主檢查項目；不合格改正後重新檢查）');
+      if(k===0)fb.__edit={kind:'flow',steps:fsteps,it:it.id,m:im};
+      B.push(fb);
+    });
     var det=_plDetailPNG(it.id,im);
     if(det){
       h3('（'+PLAN_CN[no-1]+'）細部詳圖');no++;
@@ -21991,6 +22055,7 @@ function _plBuild(){
     var list=(_plState.atts[slot.k]||[]);
     attN++;
     h2(attN-1,'附件'+PLAN_CN[attN-1]+'　'+slot.l);
+    if(slot.ref){p(slot.ref);return;}
     if(!list.length){p('（另冊檢附）');return;}
     var aImg=list.filter(function(f){return f.kind==='img';});
     var aDoc=list.filter(function(f){return f.kind!=='img';});
@@ -22014,11 +22079,10 @@ function _plBuild(){
     sheets.forEach(function(sh,i){
       var code='SC-'+String(i+1).padStart(2,'0');
       B.push({t:'h2',v:code+'　'+_plFill(sh.name,m),pb:i>0});
-      B.push({t:'tbl',rows:_plFillRows([
-        ['工程名稱','{{name}}','文件編號',code+'-　　'],
-        ['承攬廠商','{{main}}','施工項目',sh.it.name],
-        ['施工廠商（檢查單位）','{{sub}}','檢查日期','　　年　　月　　日'],
-        ['檢查位置','　','檢查時機','□施工前　□施工中　□施工完成']],m),w:[1700,3500,1500,3500]});
+      B.push({t:'tbl',sm:1,rows:_plFillRows([
+        ['工程名稱','{{name}}','施工項目',sh.it.name,'文件編號',code+'-　　'],
+        ['承攬／施工廠商','{{main}}／{{sub}}','檢查位置','　','檢查日期','　　年　　月　　日'],
+        ['檢查時機','□施工前　□施工中　□施工完成','','','','']],m),w:[1300,2900,1200,2200,1100,1500]});
       var rows=[['項次','檢查階段','檢查項目','檢查標準（定量、定性）','實際檢查情形（檢查值）','檢查結果']];
       var chkN=0;
       sh.stages.forEach(function(c){
@@ -22028,12 +22092,12 @@ function _plBuild(){
           rows.push([String(++chkN),j===0?c.stage:'',r[0],r[2]+'\n（檢查方法：'+r[1]+'）','',res]);
         });
       });
-      B.push({t:'tbl',rows:_plFillRows(rows,m),w:[600,900,2600,3100,2200,800]});
-      B.push({t:'tbl',rows:[['缺失複查結果：□已改善完成　□未改善完成，進行追蹤改善。　複查日期：　　年　　月　　日　　複查人員：　　　　']],w:[10200]});
-      B.push({t:'tbl',rows:[['備註：1. 檢查項目及檢查標準依契約規定量化數據詳列。'
+      B.push({t:'tbl',sm:1,rows:_plFillRows(rows,m),w:[520,820,2750,3610,1800,700]});
+      B.push({t:'tbl',sm:1,rows:[['缺失複查結果：□已改善完成　□未改善完成，進行追蹤改善。　複查日期：　　年　　月　　日　　複查人員：　　　　']],w:[10200]});
+      B.push({t:'tbl',sm:1,rows:[['備註：1. 檢查項目及檢查標準依契約規定量化數據詳列。'
         +'2. 實際檢查情形應明確敘述或量化尺寸，由現場工程師當場填寫並簽名。'
         +'3. 檢查結果合格者註明「○」，不合格者註明「╳」，無需檢查之項目打「／」；不合格者填寫缺失改善並複查。']],w:[10200]});
-      B.push({t:'tbl',rows:[['檢查人員（現場工程師）','工地主任','品管工程師','監造單位'],['\n','\n','\n','\n']],w:[2500,2200,2200,2300]});
+      B.push({t:'tbl',sm:1,rows:[['檢查人員（現場工程師）','工地主任','品管工程師','監造單位'],['\n','\n','\n','\n']],w:[2500,2200,2200,2300]});
     });
   }
 
@@ -22117,7 +22181,12 @@ function _plBlockHtml(b,bi,ed){
     case 'tbl':   {
       var rows=b.rows||[];if(!rows.length)return '';
       function cAttr(ri,ci){return ed?' contenteditable="plaintext-only" spellcheck="false" onblur="_plEditCell('+bi+','+ri+','+ci+',this.innerText)"':'';}
-      return '<table class="pl-tbl"><thead><tr>'+(rows[0]||[]).map(function(c,ci){return '<th'+cAttr(0,ci)+'>'+esc(c)+'</th>';}).join('')+'</tr></thead><tbody>'
+      var cg='';
+      if(b.w&&b.w.length===(rows[0]||[]).length){
+        var tot=b.w.reduce(function(a,x){return a+x;},0)||1;
+        cg='<colgroup>'+b.w.map(function(x){return '<col style="width:'+(Math.round(x/tot*10000)/100)+'%">';}).join('')+'</colgroup>';
+      }
+      return '<table class="pl-tbl'+(b.sm?' sm':'')+'">'+cg+'<thead><tr>'+(rows[0]||[]).map(function(c,ci){return '<th'+cAttr(0,ci)+'>'+esc(c)+'</th>';}).join('')+'</tr></thead><tbody>'
         +rows.slice(1).map(function(r,ri){return '<tr>'+(r||[]).map(function(c,ci){return '<td'+cAttr(ri+1,ci)+'>'+esc(c).replace(/\n/g,'<br>')+'</td>';}).join('')+'</tr>';}).join('')
         +'</tbody></table>';
     }
@@ -22227,6 +22296,8 @@ var _PL_CSS='.pl-title{font-size:25px;color:#000;text-align:center;padding:22px 
   +'.pl-tbl{width:100%;border-collapse:collapse}'
   +'.pl-tbl th,.pl-tbl td{border:1px solid #444;padding:4px 6px;font-size:10.5px;line-height:1.65;vertical-align:middle;color:#111}'
   +'.pl-tbl th{background:#f2f2f2;color:#000;text-align:center;font-weight:700}'
+  +'.pl-tbl{table-layout:fixed}.pl-tbl td,.pl-tbl th{word-break:break-word}'
+  +'.pl-tbl.sm th,.pl-tbl.sm td{padding:2px 4px;font-size:9.5px;line-height:1.45}'
   +'.pl-fig{text-align:center;padding:4px 0}.pl-fig img{max-width:100%}'
   +'.pl-edithint{display:inline-block;font-size:10.5px;color:#0e3d22;background:#eaf2ec;border:1px solid #b9c6bd;border-radius:10px;padding:1px 9px;margin-top:3px;cursor:pointer}'
   +'.pl-fig figcaption{font-size:10.5px;color:#333;padding-top:4px}'
@@ -22262,15 +22333,16 @@ function _plPrintDoc(B,fname,title){
     +'.sheet{width:'+PW+'px;height:'+PH+'px;background:#fff;position:relative;overflow:hidden;margin:14px auto;box-shadow:0 2px 10px rgba(0,0,0,.18)}'
     +'.pc{position:absolute;left:'+MG+'px;top:'+MG+'px;width:'+CW+'px}'
     +'.pc>*{margin:0 0 '+SP+'px!important}'
-    +'.pcl{position:absolute;left:'+(PW-MG)+'px;top:'+MG+'px;width:'+LCW+'px;height:'+LCH+'px;transform:rotate(90deg);transform-origin:0 0}'
+    +'.sheet.land{width:'+PH+'px;height:'+PW+'px;page:landA4}'
+    +'.pcl{position:absolute;left:'+MG+'px;top:'+MG+'px;width:'+LCW+'px;height:'+LCH+'px}'
     +'.pcl>*{margin:0 0 '+SP+'px!important}'
     +'.pfoot{position:absolute;left:0;right:0;bottom:'+(MG-38)+'px;text-align:center;font-size:11.5px;color:#333;font-family:"Times New Roman",serif}'
-    +'.pfootl{position:absolute;left:'+(PW-MG-(LCH+18))+'px;top:'+MG+'px;width:'+LCW+'px;transform:rotate(90deg);transform-origin:0 0;text-align:center;font-size:11.5px;color:#333;font-family:"Times New Roman",serif}'
+    +'.pfootl{position:absolute;left:0;right:0;bottom:'+(MG-38)+'px;text-align:center;font-size:11.5px;color:#333;font-family:"Times New Roman",serif}'
     +'.meas{position:absolute;left:-9999px;top:0;width:'+CW+'px;visibility:hidden}'
     +'.meas>*{margin:0 0 '+SP+'px!important}'
     +'.measL{width:'+LCW+'px}'
     +'@media print{html,body{background:#fff}.sheet{margin:0;box-shadow:none;page-break-after:always}.no-print{display:none!important}}'
-    +'@page{size:A4;margin:0}';
+    +'@page{size:A4;margin:0}@page landA4{size:A4 landscape;margin:0}';
   w.document.write('<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=0.5"><title>'
     +_xlEsc(fname||title)+'</title><style>'+css+'</style></head><body>'
     +_PL_PRINTBAR
@@ -22278,6 +22350,9 @@ function _plPrintDoc(B,fname,title){
     +'</body></html>');
   w.document.close();
   var doc=w.document,pagesEl=doc.getElementById('pages'),meas=doc.getElementById('meas'),measL=doc.getElementById('measL');
+  // v5.412：Chrome／Edge「另存列印輸出」的預設檔名取自 document.title；
+  // document.write 寫入的 <title> 在 about:blank 視窗上不一定生效，這裡再指定一次
+  try{doc.title=String(fname||title||'施工計畫書').replace(/[\\/:*?"<>|]/g,'').slice(0,120);}catch(e){_err('_plPrintDoc.title',e);}
   // 1) 分區（sect 標記）
   var zones=[],cur={blocks:[],o:null};
   (B||[]).forEach(function(b){
@@ -22429,7 +22504,7 @@ function _plPrintDoc(B,fname,title){
     }
     // 4) 組頁
     function emit(pg,footText){
-      var sh=doc.createElement('div');sh.className='sheet';
+      var sh=doc.createElement('div');sh.className='sheet'+(pg.land?' land':'');
       var c=doc.createElement('div');c.className=pg.land?'pcl':'pc';
       pg.els.forEach(function(el){c.appendChild(el);});
       sh.appendChild(c);
@@ -22658,11 +22733,10 @@ function _plChkBlocks(){
   sheets.forEach(function(sh,i){
     var code='SC-'+String(i+1).padStart(2,'0');
     B.push({t:'h2',v:code+'　'+_plFill(sh.name,m),pb:i>0});
-    B.push({t:'tbl',rows:_plFillRows([
-      ['工程名稱','{{name}}','文件編號',code+'-　　'],
-      ['承攬廠商','{{main}}','施工項目',sh.it.name],
-      ['施工廠商（檢查單位）','{{sub}}','檢查日期','　　年　　月　　日'],
-      ['檢查位置','　','檢查時機','□施工前　□施工中　□施工完成']],m),w:[1700,3500,1500,3500]});
+    B.push({t:'tbl',sm:1,rows:_plFillRows([
+      ['工程名稱','{{name}}','施工項目',sh.it.name,'文件編號',code+'-　　'],
+      ['承攬／施工廠商','{{main}}／{{sub}}','檢查位置','　','檢查日期','　　年　　月　　日'],
+      ['檢查時機','□施工前　□施工中　□施工完成','','','','']],m),w:[1300,2900,1200,2200,1100,1500]});
     var rows=[['項次','檢查階段','檢查項目','檢查標準（定量、定性）','實際檢查情形（檢查值）','檢查結果']];
     var chkN=0;
     sh.stages.forEach(function(c){
@@ -22672,9 +22746,9 @@ function _plChkBlocks(){
         rows.push([String(++chkN),j===0?c.stage:'',r[0],r[2]+'\n（檢查方法：'+r[1]+'）','',res]);
       });
     });
-    B.push({t:'tbl',rows:_plFillRows(rows,sh.m),w:[600,900,2600,3100,2200,800]});
-    B.push({t:'tbl',rows:[['缺失複查結果：□已改善完成　□未改善完成，進行追蹤改善。　複查日期：　　年　　月　　日　　複查人員：　　　　']],w:[10200]});
-    B.push({t:'tbl',rows:[['檢查人員（現場工程師）','工地主任','品管工程師','監造單位'],['\n','\n','\n','\n']],w:[2500,2200,2200,2300]});
+    B.push({t:'tbl',sm:1,rows:_plFillRows(rows,sh.m),w:[520,820,2750,3610,1800,700]});
+    B.push({t:'tbl',sm:1,rows:[['缺失複查結果：□已改善完成　□未改善完成，進行追蹤改善。　複查日期：　　年　　月　　日　　複查人員：　　　　']],w:[10200]});
+    B.push({t:'tbl',sm:1,rows:[['檢查人員（現場工程師）','工地主任','品管工程師','監造單位'],['\n','\n','\n','\n']],w:[2500,2200,2200,2300]});
   });
   return B;
 }
@@ -23056,7 +23130,7 @@ function _plRender(){
   h+='<div class="card" style="margin-bottom:12px"><div class="ch green"><div class="cht">'
     +'<svg class="ic ib" aria-hidden="true"><use href="#i-wrench"/></svg> 勾選工項（'
     +(((_plState.walls||[]).length?1:0)+_plState.items.length)+'／'+(PLAN_ITEMS.filter(function(x){return !x.wall;}).length+1)+'）</div></div><div class="cb">'
-    +'<div style="font-size:11px;color:var(--b4);margin-bottom:10px">勾選後展開規格欄位；擋土壁、預力地錨、抗浮基樁、CCP 止水樁、施工構台可按「加 TYPE」輸入多組規格，計畫書會逐一分列。</div>';
+    +'<div style="font-size:11px;color:var(--b4);margin-bottom:10px">勾選後展開規格欄位；擋土壁、預力地錨、RC 基樁、CCP 止水樁、施工構台可按「加 TYPE」輸入多組規格，計畫書會逐一分列。</div>';
   var inCssPl='width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit';
   var selCssPl=inCssPl+';background:var(--w)';
   // 單一實例的規格欄位（支援 opts 下拉、multi 複選；setter 依 scope 分派）
@@ -23219,6 +23293,15 @@ function _plRender(){
     +'<div style="font-size:11px;color:var(--b4);margin-bottom:9px">上傳的<b>圖片（JPG／PNG，含手機拍的證照）</b>會整頁排進 Word／PDF 的「拾壹、相關附件」對應附件編號下（下方標示各分類會排在附件幾）；'
     +'<b>PDF 檔</b>因無法內嵌，改列成「另冊檢附清單表」（檔名＋說明），送審時與計畫書一併裝訂。未上傳的分類在附件章標註「（另冊檢附）」。</div>';
   PLAN_ATTS.forEach(function(slot,si){
+    if(slot.ref){        // 自主檢查表：由系統自動產生，不需上傳
+      h+='<div style="border:1px solid var(--b2);border-radius:var(--r8);margin-bottom:7px;background:var(--w);'
+        +'display:flex;align-items:center;gap:8px;padding:7px 10px">'
+        +'<span style="font-size:11px;color:var(--b3);width:12px">・</span>'
+        +'<span style="font-size:10.5px;font-weight:700;color:#fff;background:var(--g3);border-radius:10px;padding:1px 7px;white-space:nowrap">附件'+PLAN_CN[si]+'</span>'
+        +'<b style="font-size:12px;flex:1;min-width:0">'+esc(slot.l)+'</b>'
+        +'<span style="font-size:10.5px;color:var(--b3)">系統自動產生</span></div>';
+      return;
+    }
     var list=_plState.atts[slot.k]||[];
     var open=!!_plAttOpen[slot.k];
     h+='<div style="border:1px solid var(--b2);border-radius:var(--r8);margin-bottom:7px;background:var(--w)">'
