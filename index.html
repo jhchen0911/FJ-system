@@ -2678,7 +2678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.416';
+var APP_VERSION='v5.417';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -14955,8 +14955,14 @@ var PLAN_REGS={
   upile:[['公共工程施工綱要規範 第02466章「場鑄混凝土基樁」','場鑄 RC 樁'],['CNS 560','鋼筋混凝土用鋼筋'],['CNS 3090','預拌混凝土']]
 };
 // ══ 安全衛生檢查表（v5.363：依勾選工項自動附掛；格式參照規範制式表）══
-var PLAN_CHK_ROWS=25;   // 自主檢查表固定項目列數（滿版一頁；現行內容最多 18 項）
-var PLAN_SAFE_ROWS=42;  // 安全衛生檢查表固定項目列數（滿版一頁；現行內容最多 23 項）
+// v5.417：自主檢查表與安全衛生檢查表各自一套固定格式（不再共用），
+// 列數與表身固定高度都以「最長的一張也放得進一頁」為準，短的用空白列撐滿版
+var PLAN_CHK_ROWS=19;   // 自主檢查表固定項目列數
+var PLAN_CHK_H=700;     // 自主檢查表表身固定高度（px，對應 A4 直式版心）
+var PLAN_CHK_H0=645;    // 同上，章首頁（多一行「附表」章標題）
+var PLAN_SAFE_ROWS=32;  // 安全衛生檢查表固定項目列數
+var PLAN_SAFE_H=810;    // 安全衛生檢查表表身固定高度
+var PLAN_SAFE_H0=695;   // 同上，章首頁（多章標題與使用說明）
 var PLAN_SAFECHK=[
   {k:'general',l:'一般安全檢查表',when:function(ids){return true;},rows:[
     ['門禁管制','人員、車輛進出工區是否指派專人管制'],['門禁管制','人員進出工區是否依規定辦理工作證並配掛胸前以茲識別'],
@@ -15407,6 +15413,23 @@ function _plArrow(ctx,x1,y1,x2,y2){
 }
 var _PL_FONT='"Microsoft JhengHei","Noto Sans TC",sans-serif';
 // 施工流程圖統一版面：依流程步驟最多的工項（16 步）定尺寸，全書一致
+// v5.417：中文句子切分——句號在括號／引號內不算斷句，避免條列出現「）。」這種空條
+function _plSentences(par){
+  var out=[],buf='',dep=0,q=0,t=String(par||'');
+  for(var i=0;i<t.length;i++){
+    var ch=t[i];
+    if(ch==='\uff08'||ch==='(')dep++;
+    else if(ch==='\uff09'||ch===')')dep=Math.max(0,dep-1);
+    else if(ch==='\u300c')q++;
+    else if(ch==='\u300d')q=Math.max(0,q-1);
+    buf+=ch;
+    if(ch==='\u3002'&&dep===0&&q===0){out.push(buf);buf='';}
+  }
+  if(buf)out.push(buf);
+  return out.map(function(x){return x.trim();})
+    .filter(function(x){return x&&/[\u4e00-\u9fa5A-Za-z0-9]/.test(x);})
+    .map(function(x){return /[\u3002\uff09)\u300d]$/.test(x)?x:x+'\u3002';});
+}
 var PL_FLOW=(function(){
   var boxW=380,annW=288,LM=58,gapAnn=24,padR=12;
   var W=LM+boxW+gapAnn+annW+padR;             // 762
@@ -15479,8 +15502,12 @@ function _plFlowPNG(steps,opts){
   });
   var hasLoop=metas.some(function(mt,i){return mt.chk&&i>0;});
   var LM=PL_FLOW.LM;                          // 固定左邊界，各圖版面一致
-  var W=PL_FLOW.W;                            // 固定畫布寬高 → 各工項字級一致
-  var H=PL_FLOW.H;
+  var W=PL_FLOW.W;                            // 固定畫布寬 → 縮放比一致 → 各工項字級一致
+  // v5.417：高度收斂到實際內容（上限仍為一頁），圖下不再留大片空白、圖說緊接圖後
+  var need=14+(opts.cont?22:0);
+  metas.forEach(function(mt){need+=mt.rowH+gap;});
+  need+=opts.more?52:10;
+  var H=Math.min(PL_FLOW.H,Math.max(180,Math.round(need)));
   cv.width=W*SC;cv.height=H*SC;
   var ctx=cv.getContext('2d');ctx.scale(SC,SC);
   ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
@@ -21776,7 +21803,7 @@ function _plBuild(){
   function methLis(x){
     var out=[];
     _plFill(methodText(x),x.m).split('\n').forEach(function(par){
-      par.split('。').forEach(function(sen){sen=sen.trim();if(sen)out.push(sen+'。');});
+      _plSentences(par).forEach(function(sen){out.push(sen);});
     });
     return out;
   }
@@ -21842,7 +21869,7 @@ function _plBuild(){
   if(insts.length){
     tbl([['工項','採用工法','主要規格']].concat(insts.map(function(x){
       var mn=methodName(x);
-      var meth=mn?mn:(_plFill(methodText(x),x.m).split('。')[0].slice(0,55)+'。');
+      var meth=mn?mn:((_plSentences(_plFill(methodText(x),x.m))[0]||'').slice(0,55)+'。');
       var spec=x.it.id==='midpile'
         ?('規格 '+m.mpSpec+'\n樁長 '+m.mpLen+'\n支數 '+m.mpCount)
         :(x.it.vars||[]).slice(0,4).map(function(v){return v.l+' '+(x.m[v.k]||'—');}).join('\n');
@@ -22069,7 +22096,7 @@ function _plBuild(){
     insts.forEach(function(x){
       if(qcDone[x.it.id])return;qcDone[x.it.id]=1;
       B.push({t:'h3',v:x.it.name+'品質管理標準',pb:qcN>0});qcN++;
-      B.push({t:'tbl',land:true,rows:_plFillRows([['施工流程','管理項目','管理標準','檢查時機','檢查方法','檢查頻率','不符合之處置方法','管理紀錄','備註']].concat(_plQcRows(x.it,x.m)),x.m),
+      B.push({t:'tbl',land:true,qc:true,rows:_plFillRows([['施工流程','管理項目','管理標準','檢查時機','檢查方法','檢查頻率','不符合之處置方法','管理紀錄','備註']].concat(_plQcRows(x.it,x.m)),x.m),
         w:[900,1600,3200,1200,1400,1000,2200,1800,500]});
       rem('☆：檢驗停留點　▲：自主檢查點　※：安衛查驗（於備註欄標註）');
     });
@@ -22201,7 +22228,6 @@ function _plBuild(){
   h2(3,'緊急應變處理原則');li(PLAN_TXT.emerPrinciple);
   h2(4,'災害緊急聯絡表');
   tbl(_plState.emer||_plEmerDefault(),[2600,2600,1900,3100]);
-  rem('本表於開工前確認為工區轄區之救援單位，並張貼於工務所明顯處。');
 
   // ══ 拾、施工圖說 ══
   h1('施工圖說');
@@ -22258,7 +22284,6 @@ function _plBuild(){
   // ══ 附表　自主檢查表（規範格式：表頭管制欄＋檢查標準連動品質管理標準）══
   if(sheets.length){
     B.push({t:'h1',v:'附表　自主檢查表',pb:true});
-    rem(PLAN_TXT2.chkLegend);
     sheets.forEach(function(sh,i){
       var code='SC-'+String(i+1).padStart(2,'0');
       B.push({t:'h2',v:code+'　'+_plFill(sh.name,m),pb:i>0});
@@ -22277,7 +22302,7 @@ function _plBuild(){
         });
       });
       while(rows.length<1+PLAN_CHK_ROWS)rows.push([String(++chkN),'　','　','　','　','　']);   // 表單固定長度（滿版）
-      B.push({t:'tbl',sm:1,rows:_plFillRows(rows,m),w:[520,820,2900,3560,1700,700]});
+      B.push({t:'tbl',sm:1,fixH:i?PLAN_CHK_H:PLAN_CHK_H0,rows:_plFillRows(rows,m),w:[520,820,2900,3560,1700,700]});
       B.push({t:'tbl',sm:1,rows:[['缺失複查結果：□已改善完成　□未改善完成，進行追蹤改善。　複查日期：　　年　　月　　日　　複查人員：　　　　']],w:[10200]});
       B.push({t:'tbl',sm:1,rows:[['備註：1. 檢查項目及檢查標準依契約規定量化數據詳列。'
         +'2. 實際檢查情形應明確敘述或量化尺寸，由現場工程師當場填寫並簽名。'
@@ -22304,7 +22329,7 @@ function _plBuild(){
         srows.push([r[0]===last?'':r[0],r[1],'','','']);last=r[0];
       });
       while(srows.length<1+PLAN_SAFE_ROWS)srows.push(['　','　','　','　','　']);            // 表單固定長度（滿版）
-      B.push({t:'tbl',sm:1,rows:srows,w:[1250,4900,760,860,2430]});
+      B.push({t:'tbl',sm:1,fixH:i?PLAN_SAFE_H:PLAN_SAFE_H0,rows:srows,w:[1250,4900,760,860,2430]});
       B.push({t:'tbl',sm:1,rows:[['工地主任','安衛人員','檢查人員'],['\n','\n','\n']],w:[3400,3400,3400]});
     });
   }
@@ -22372,7 +22397,7 @@ function _plBlockHtml(b,bi,ed){
         var tot=b.w.reduce(function(a,x){return a+x;},0)||1;
         cg='<colgroup>'+b.w.map(function(x){return '<col style="width:'+(Math.round(x/tot*10000)/100)+'%">';}).join('')+'</colgroup>';
       }
-      return '<table class="pl-tbl'+(b.sm?' sm':'')+'">'+cg+'<thead><tr>'+(rows[0]||[]).map(function(c,ci){return '<th'+cAttr(0,ci)+'>'+esc(c)+'</th>';}).join('')+'</tr></thead><tbody>'
+      return '<table class="pl-tbl'+(b.sm?' sm':'')+(b.qc?' qc':'')+'"'+(b.fixH?' style="height:'+b.fixH+'px"':'')+'>'+cg+'<thead><tr>'+(rows[0]||[]).map(function(c,ci){return '<th'+cAttr(0,ci)+'>'+esc(c)+'</th>';}).join('')+'</tr></thead><tbody>'
         +rows.slice(1).map(function(r,ri){return '<tr>'+(r||[]).map(function(c,ci){return '<td'+cAttr(ri+1,ci)+'>'+esc(c).replace(/\n/g,'<br>')+'</td>';}).join('')+'</tr>';}).join('')
         +'</tbody></table>';
     }
@@ -22489,6 +22514,7 @@ var _PL_CSS='.pl-title{font-size:25px;color:#000;text-align:center;padding:22px 
   +'.pl-tbl tbody tr:nth-child(even) td{background:#fafafa}'
   +'.pl-tbl td:first-child,.pl-tbl th:first-child{text-align:center}'
   +'.pl-tbl.sm th,.pl-tbl.sm td{padding:2px 4px;font-size:9.5px;line-height:1.45}'
+  +'.pl-tbl.qc th,.pl-tbl.qc td{padding:2.5px 4px;font-size:10px;line-height:1.5}'
   +'.pl-fig{text-align:center;padding:6px 0;break-inside:avoid;page-break-inside:avoid}.pl-fig img{max-width:100%}'
   +'.pl-edithint{display:inline-block;font-size:10.5px;color:#0e3d22;background:#eaf2ec;border:1px solid #b9c6bd;border-radius:10px;padding:1px 9px;margin-top:3px;cursor:pointer}'
   +'.pl-fig figcaption{font-size:10.5px;color:#333;padding-top:5px;line-height:1.6;text-align:center}'
@@ -22521,12 +22547,12 @@ function _plExportPdf(fn){
   (function next(){
     if(i>=sheets.length){
       try{pdf.save(fn+'.pdf');}catch(e){_err('_plExportPdf.save',e);}
-      if(btn){btn.disabled=false;btn.textContent='列印／存 PDF';}
+      if(btn){btn.disabled=false;btn.textContent='影像版 PDF';}
       toast('PDF 已下載：'+fn+'.pdf');
       return;
     }
     var sh=sheets[i],land=sh.classList.contains('land');
-    html2canvas(sh,{scale:2,backgroundColor:'#ffffff',useCORS:true,allowTaint:true,logging:false,
+    html2canvas(sh,{scale:1.6,backgroundColor:'#ffffff',useCORS:true,allowTaint:true,logging:false,
       width:sh.offsetWidth,height:sh.offsetHeight,windowWidth:sh.offsetWidth,scrollX:0,scrollY:0,imageTimeout:0})
     .then(function(cv){
       var pw=land?841.89:595.28,ph=land?595.28:841.89;
@@ -22543,9 +22569,16 @@ function _plPrintNative(fn){
   var old=document.title;
   try{document.title=fn;}catch(e){_err('_plPrintNative',e);}
   var st=document.createElement('style');st.id='_pl_print_only';
-  st.textContent='@media print{body>*{display:none!important}'
-    +'#_pl_print_root{display:block!important;position:static!important;height:auto!important;overflow:visible!important;background:#fff!important}'
-    +'#_pl_print_root .sheet{margin:0!important;box-shadow:none!important;page-break-after:always}}';
+  st.textContent='@page{size:A4 portrait;margin:0}'
+    +'@page fyland{size:A4 landscape;margin:0}'
+    +'@media print{html,body{margin:0!important;padding:0!important;background:#fff!important}'
+    +'body>*{display:none!important}'
+    +'#_pl_print_bar{display:none!important}'
+    +'#_pl_print_root{display:block!important;position:static!important;inset:auto!important;'
+      +'padding:0!important;height:auto!important;overflow:visible!important;background:#fff!important}'
+    +'#_pl_print_root .sheet{margin:0!important;box-shadow:none!important;break-after:page;page-break-after:always}'
+    +'#_pl_print_root .sheet.land{page:fyland}'
+    +'#_pl_print_root .sheet:last-child{break-after:auto;page-break-after:auto}}';
   document.head.appendChild(st);
   setTimeout(function(){
     try{window.print();}catch(e){_err('_plPrintNative.print',e);}
@@ -22589,15 +22622,21 @@ function _plPrintDoc(B,fname,title){
   t.style.cssText='color:#fff;font-size:13px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
   t.textContent='📄 '+fn;
   var b1=document.createElement('button');
-  b1.id='_pl_pdf_btn';
   b1.style.cssText='padding:9px 16px;font-size:14px;border:none;border-radius:8px;background:#fff;color:#0e3d22;font-weight:700;cursor:pointer;white-space:nowrap';
   b1.textContent='列印／存 PDF';
-  b1.addEventListener('click',function(){_plExportPdf(fn);});
+  b1.title='瀏覽器原生輸出：秒出、文字可搜尋、檔案小（目的地選「另存為 PDF」）';
+  b1.addEventListener('click',function(){_plPrintNative(fn);});
+  var b3=document.createElement('button');
+  b3.id='_pl_pdf_btn';
+  b3.style.cssText='padding:9px 14px;font-size:13px;border:1px solid rgba(255,255,255,.4);border-radius:8px;background:rgba(255,255,255,.15);color:#fff;font-weight:700;cursor:pointer;white-space:nowrap';
+  b3.textContent='影像版 PDF';
+  b3.title='把每頁轉成圖片再組成 PDF：版面百分之百一致，但頁數多時較慢';
+  b3.addEventListener('click',function(){_plExportPdf(fn);});
   var b2=document.createElement('button');
   b2.style.cssText='padding:9px 14px;font-size:14px;border:1px solid rgba(255,255,255,.4);border-radius:8px;background:rgba(255,255,255,.15);color:#fff;font-weight:700;cursor:pointer;white-space:nowrap';
   b2.textContent='✕ 關閉';
   b2.addEventListener('click',_plPrintClose);
-  bar.appendChild(t);bar.appendChild(b1);bar.appendChild(b2);
+  bar.appendChild(t);bar.appendChild(b1);bar.appendChild(b3);bar.appendChild(b2);
   var root=document.createElement('div');
   root.id='_pl_print_root';
   root.innerHTML='<style>'+css+'</style><div id="_pl_pages"></div>'
@@ -22652,7 +22691,7 @@ function _plPrintDoc(B,fname,title){
   // 表格跨頁拆列（表頭每頁重複）
   function splitTable(tb,firstAvail,fullH,mcont){
     function shell(){
-      var t=tb.cloneNode(false);
+      var t=tb.cloneNode(false);t.style.height='';
       if(tb.tHead)t.appendChild(tb.tHead.cloneNode(true));
       t.appendChild(doc.createElement('tbody'));
       mcont.appendChild(t);
@@ -22699,7 +22738,7 @@ function _plPrintDoc(B,fname,title){
         nd.els.forEach(function(el){
           var h=oh(el);
           var isHead=/pl-h1|pl-h2|pl-h3|pl-fmh/.test(el.className||'');
-          if(b.pb&&used>0&&(b.t==='h1'||b.t==='h2'||b.t==='h3'||b.t==='fmh'||b.t==='tbl'||b.t==='toc'))breakWithHeads();
+          if(b.pb&&used>0&&(b.t==='h1'||b.t==='h2'||b.t==='h3'||b.t==='fmh'||b.t==='tbl'||b.t==='toc'||b.t==='tocline'))breakWithHeads();
           if(el.tagName==='TABLE'&&h>maxH-used&&h>maxH*0.6){
             if(maxH-used<150&&used>0)breakWithHeads(); // 剩餘空間過小：整表移至次頁起排，避免只切出一兩列
             var parts=splitTable(el,maxH-used-4,maxH-4,mcont);
@@ -22754,7 +22793,8 @@ function _plPrintDoc(B,fname,title){
             });
           });
           d.innerHTML=inner;
-          Array.prototype.slice.call(d.children).forEach(function(el){meas.appendChild(el);fnodes.push({b:{t:'tocline'},els:[el]});});
+          // v5.417：toc 展開成逐行節點時保留 pb，讓目錄與修訂紀錄各自獨立起頁
+          Array.prototype.slice.call(d.children).forEach(function(el,ei){meas.appendChild(el);fnodes.push({b:{t:'tocline',pb:ei===0},els:[el]});});
         }else{
           mkNodes([b],meas).forEach(function(nd){fnodes.push(nd);});
         }
@@ -22784,7 +22824,7 @@ function _plPrintDoc(B,fname,title){
     bodyRes.pages.forEach(function(pg){emit(pg,String(pg.no));});
     meas.innerHTML='';measL.innerHTML='';
     try{meas.remove();measL.remove();}catch(e){_err('_plPrintDoc.clean',e);}
-    toast('預覽已產生，按上方「列印／存 PDF」下載');
+    toast('預覽已產生：按「列印／存 PDF」（快、文字可搜尋），或「影像版 PDF」');
   });
 }
 // ── 檔名：業主簡稱-案名簡稱_豐有工程分項施工計劃書_民國日期_v版次 ──
