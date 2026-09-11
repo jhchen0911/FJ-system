@@ -1734,6 +1734,83 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.416 計畫書排版統一、檔名、備註自訂條款 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      // 2) 報價備註：自訂條款依序接在通用版最後一條之後
+      const base = document.getElementById('prm')?.value || P.rmkBase || '';
+      const n0 = _rmkBaseCount(base);
+      rmkCustom.extra = ['甲條款', '  ', '乙條款'];
+      const t1 = _rmkAppendExtra('原文', rmkCustom);
+      out.rmk = t1 === '原文\n' + (n0 + 1) + '. 甲條款\n' + (n0 + 2) + '. 乙條款';
+      rmkCustom.extra = [];
+      out.rmkNone = _rmkAppendExtra('原文', rmkCustom) === '原文';
+      out.rmkCnt = _rmkBaseCount('1. a\n2. b\n17. c') === 17 && _rmkBaseCount('') === 17;
+      out.rmkApi = ['rmkAddExtra', 'rmkDelExtra', 'rmkRenderExtra'].every(k => typeof window[k] === 'function');
+
+      _plClear();
+      _plState.proj = 'T'; _plState.vars.name = 'T';
+      _plState.walls = [{ id: 'hpile', meth: '水刀引孔', v: {} }];
+      _plState.items = ['midpile', 'upile', 'strut', 'deck'];
+      _plState.vars.layers = '2';
+      _plNormalize && _plNormalize();
+      const B = _plBuild();
+
+      // 7) 施工流程圖：全書統一畫布（字級／框寬一致），且每工項一頁
+      const fl = B.filter(x => /^flow_/.test(x.name || ''));
+      out.flowN = fl.length >= 4;
+      out.flowSame = new Set(fl.map(x => x.cx + 'x' + x.cy)).size === 1;
+      out.flowOnePage = fl.every(x => /_1$/.test(x.name)) && !fl.some(x => /_[2-9]$/.test(x.name));
+      out.flowConst = PL_FLOW.W === PL_FLOW.LM + PL_FLOW.boxW + 24 + PL_FLOW.annW + 12
+        && PL_FLOW.H === Math.round(PL_FLOW.W * 1.30);
+
+      // 8) 修訂紀錄與目錄分頁：目錄一律另起新頁
+      const ti = B.findIndex(x => x.t === 'toc');
+      out.tocPb = ti > 0 && B[ti].pb === true && B[ti - 1].t !== 'toc';
+
+      // 5/6) 自主檢查表／安全衛生檢查表滿版固定列數
+      out.rows = PLAN_CHK_ROWS === 25 && PLAN_SAFE_ROWS === 42;
+
+      // 1/3) 列印改在主文件內（有真實網址 → PDF 檔名不再空白）、橫式頁維持橫式
+      out.api = typeof _plExportPdf === 'function' && typeof _plPrintNative === 'function'
+        && typeof _plPrintClose === 'function';
+      out.noPopup = !/window\.open/.test(_plPrintDoc.toString());
+      _plPrintDoc(B, '檔名測試_v1', '施工計畫書');
+      // 版面在圖片載入後才排（whenImgs），等頁面真的排出來
+      for (let i = 0; i < 80; i++) {
+        if (document.querySelectorAll('#_pl_print_root .sheet').length) break;
+        await new Promise(res => setTimeout(res, 100));
+      }
+      const root = document.getElementById('_pl_print_root');
+      const bar = document.getElementById('_pl_print_bar');
+      out.printRoot = !!root && !!bar && (bar.textContent || '').indexOf('檔名測試_v1') >= 0;
+      const sheets = [].slice.call((root || document).querySelectorAll('#_pl_print_root .sheet'));
+      out.sheets = sheets.length > 10;
+      out.land = sheets.some(s => s.classList.contains('land'));
+      // 4) 標題不孤懸：每頁最後一個元素不得是章節標題（標題要跟著圖走）
+      out.orphan = sheets.every(s => {
+        const c = s.querySelector('.pc,.pcl'); if (!c) return true;
+        const last = c.lastElementChild;
+        return !last || !/pl-h2|pl-h3/.test(last.className || '');
+      });
+      _plPrintClose();
+      out.closed = !document.getElementById('_pl_print_root') && !document.getElementById('_pl_print_bar');
+      return out;
+    });
+    check('報價：自訂備註條款依序接在通用版最後一條之後', r.rmk && r.rmkNone && r.rmkCnt && r.rmkApi);
+    check('計畫書：施工流程圖全書同一畫布尺寸（字級框寬統一）', r.flowN && r.flowSame && r.flowConst);
+    check('計畫書：各工項施工流程圖皆一頁呈現', r.flowOnePage);
+    check('計畫書：目錄／修訂紀錄各自獨立起頁', r.tocPb);
+    check('計畫書：兩張檢查表維持滿版固定列數', r.rows);
+    check('計畫書：列印改在主文件內（PDF 檔名不再空白）', r.api && r.noPopup && r.printRoot && r.closed);
+    check('計畫書：預覽頁數正常且橫式頁仍為橫式', r.sheets && r.land);
+    check('計畫書：章節標題不孤懸頁尾（標題跟著圖走）', r.orphan);
+    check('v5.416 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

@@ -2678,7 +2678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.415';
+var APP_VERSION='v5.416';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -2877,7 +2877,7 @@ var P={
   dpBuH:33,dpBuR:28,dpBuS:32,dpBuB:36
 };
 let items=[],exs=[],costs=[],eid=null;
-let rmkCustom={load:'',walk:'',tech:'',bh:'',br:'',bs:'',bb:'',c2:'',c3:'',ir:'',mob:''};
+let rmkCustom={load:'',walk:'',tech:'',bh:'',br:'',bs:'',bb:'',c2:'',c3:'',ir:'',mob:'',extra:[]};
 
 try{const s=localStorage.getItem('fy6_q');if(s)Q=JSON.parse(s);}catch(e){_err('top',e);}
 // v5.318：應付狀態正規化。status 為空的舊資料在 ==='pending' 與 !=='paid' 兩種寫法下
@@ -5088,7 +5088,8 @@ function loadQ(id){
   }catch(e){_err('loadQ.costFix',e);}
   const map={fc:'code',fcl:'client',fn:'name',fl:'loc',fco:'contact',fp:'phone',fd:'date'};
   Object.entries(map).forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.value=q[k]||'';});
-  if(q.rmk)Object.assign(rmkCustom,q.rmk);else Object.keys(rmkCustom).forEach(k=>rmkCustom[k]='');
+  if(q.rmk){Object.assign(rmkCustom,q.rmk);if(!Array.isArray(rmkCustom.extra))rmkCustom.extra=[];}
+  else{Object.keys(rmkCustom).forEach(k=>{rmkCustom[k]=(k==='extra')?[]:'';});}
   window._qSnap=JSON.stringify(items);
   // v5.375：記下開始編輯時的版本戳記。合併是「一張報價一筆記錄」，
   // 兩人同時改同一張的不同工項，後存的會整份蓋掉先存的、另一人的修改無聲消失。
@@ -5402,10 +5403,50 @@ setTimeout(function(){
 
 // ════════════ REMARKS CUSTOMIZATION ════════════
 
+// v5.416：自訂備註條款（不限筆數，依序接在通用版最後一條之後）
+function _rmkExtraList(){
+  if(!Array.isArray(rmkCustom.extra))rmkCustom.extra=[];
+  return rmkCustom.extra;
+}
+function rmkRenderExtra(){
+  const box=document.getElementById('rmk-extra');if(!box)return;
+  const arr=_rmkExtraList();
+  if(!arr.length){
+    box.innerHTML='<div style="font-size:11px;color:var(--b3);padding:6px 2px">尚未新增自訂條款。按「新增條款」可加入，空白的條款不會出現在報價單。</div>';
+    return;
+  }
+  const base=(document.getElementById('prm')?.value||P.rmkBase||'');
+  const n0=_rmkBaseCount(base);
+  box.innerHTML=arr.map((v,i)=>
+    '<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px">'
+    +'<span style="font-size:11.5px;font-weight:700;color:var(--g3);padding-top:7px;min-width:24px">'+(n0+i+1)+'.</span>'
+    +'<textarea rows="2" oninput="_rmkExtraList()['+i+']=this.value" placeholder="輸入條款內容"'
+    +' style="flex:1;min-width:0;font-size:12px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;resize:vertical">'
+    +esc(v||'')+'</textarea>'
+    +'<button type="button" class="btn btn-xs" onclick="rmkDelExtra('+i+')" style="margin-top:4px">✕</button></div>').join('');
+}
+function rmkAddExtra(){_rmkExtraList().push('');rmkRenderExtra();}
+function rmkDelExtra(i){_rmkExtraList().splice(i,1);rmkRenderExtra();}
+// 通用版條款的最後一個編號（用來接續編號）
+function _rmkBaseCount(base){
+  let n=0;
+  String(base||'').split('\n').forEach(l=>{const mm=l.match(/^\s*(\d+)\s*\./);if(mm)n=Math.max(n,parseInt(mm[1],10));});
+  return n||17;
+}
+// 把自訂條款接在備註文字之後
+function _rmkAppendExtra(txt,c){
+  const arr=(c&&Array.isArray(c.extra))?c.extra:[];
+  const list=arr.map(x=>String(x||'').trim()).filter(Boolean);
+  if(!list.length)return txt;
+  const base=document.getElementById('prm')?.value||P.rmkBase||'';
+  let n=_rmkBaseCount(base);
+  return txt+'\n'+list.map(x=>(++n)+'. '+x).join('\n');
+}
 function openRmkModal(){
   const map={load:'rmk-load',walk:'rmk-walk',tech:'rmk-tech',bh:'rmk-bh',
     br:'rmk-br',bs:'rmk-bs',bb:'rmk-bb',c2:'rmk-c2',c3:'rmk-c3',ir:'rmk-ir',mob:'rmk-mob'};
   Object.entries(map).forEach(([k,id])=>{const e=document.getElementById(id);if(e)e.value=rmkCustom[k]||'';});
+  rmkRenderExtra();
   document.getElementById('rmk-modal').style.display='flex';
 }
 
@@ -5413,6 +5454,7 @@ function applyRmkCustom(){
   ['load','walk','tech','bh','br','bs','bb','c2','c3','ir','mob'].forEach(k=>{
     const e=document.getElementById('rmk-'+k);rmkCustom[k]=e?e.value:'';
   });
+  rmkCustom.extra=_rmkExtraList().map(x=>String(x||'').trim()).filter(Boolean);
   document.getElementById('rmk-modal').style.display='none';
   toast('備註已客製化，預覽時套用');
 }
@@ -5422,7 +5464,7 @@ function buildRmkTextFromQ(q){
   const base=document.getElementById('prm')?.value||P.rmkBase||'';
   const c=q.rmk||{};
   const lines=base.split('\n');
-  return lines.map(line=>{
+  const out=lines.map(line=>{
     if(line.includes('【LOAD】'))
       return c.load?line.replace('【LOAD】',c.load):null;
     if(line.includes('【WALK】')||line.includes('【TECH】')){
@@ -5450,13 +5492,14 @@ function buildRmkTextFromQ(q){
     }
     return line;
   }).filter(l=>l!==null).join('\n');
+  return _rmkAppendExtra(out,c);
 }
 
 function buildRmkText(){
   const base=document.getElementById('prm')?.value||'';
   const c=rmkCustom;
   const lines=base.split('\n');
-  return lines.map(line=>{
+  const out2=lines.map(line=>{
     if(line.includes('【LOAD】'))
       return line.replace('【LOAD】',c.load||'_____');
     if(line.includes('【WALK】')||line.includes('【TECH】')){
@@ -5484,6 +5527,7 @@ function buildRmkText(){
     }
     return line;
   }).filter(l=>l!==null).join('\n');
+  return _rmkAppendExtra(out2,c);
 }
 
 // ════════════════ INVOICE / 請款 ════════════════
@@ -14911,8 +14955,8 @@ var PLAN_REGS={
   upile:[['公共工程施工綱要規範 第02466章「場鑄混凝土基樁」','場鑄 RC 樁'],['CNS 560','鋼筋混凝土用鋼筋'],['CNS 3090','預拌混凝土']]
 };
 // ══ 安全衛生檢查表（v5.363：依勾選工項自動附掛；格式參照規範制式表）══
-var PLAN_CHK_ROWS=18;   // 自主檢查表固定項目列數（現行最多 18 項）
-var PLAN_SAFE_ROWS=23;  // 安全衛生檢查表固定項目列數（現行最多 23 項）
+var PLAN_CHK_ROWS=25;   // 自主檢查表固定項目列數（滿版一頁；現行內容最多 18 項）
+var PLAN_SAFE_ROWS=42;  // 安全衛生檢查表固定項目列數（滿版一頁；現行內容最多 23 項）
 var PLAN_SAFECHK=[
   {k:'general',l:'一般安全檢查表',when:function(ids){return true;},rows:[
     ['門禁管制','人員、車輛進出工區是否指派專人管制'],['門禁管制','人員進出工區是否依規定辦理工作證並配掛胸前以茲識別'],
@@ -15362,6 +15406,14 @@ function _plArrow(ctx,x1,y1,x2,y2){
   ctx.closePath();ctx.fill();
 }
 var _PL_FONT='"Microsoft JhengHei","Noto Sans TC",sans-serif';
+// 施工流程圖統一版面：依流程步驟最多的工項（16 步）定尺寸，全書一致
+var PL_FLOW=(function(){
+  var boxW=380,annW=288,LM=58,gapAnn=24,padR=12;
+  var W=LM+boxW+gapAnn+annW+padR;             // 762
+  var H=Math.round(W*1.30);                   // 991（與文件圖框最大高寬比一致）
+  return {boxW:boxW,annW:annW,LM:LM,W:W,H:H,CH:H,
+    fs:12,lh:16.5,padX:11,padY:7,gap:11,afs:9.5,alh:12.5,annMax:2};
+})();
 // 施工流程圖（v5.361 強化）：單欄直線由上而下；檢驗停留點雙框＋灰底；
 // opts.ann＝與步驟對齊之品管註記（右側虛線掛「對應品質管理標準／自主檢查表」框）；
 // 檢驗停留點左側繪「不合格 → 改正後重新檢查」迴圈箭頭，關鍵節點一目瞭然
@@ -15370,10 +15422,12 @@ var _PL_FONT='"Microsoft JhengHei","Noto Sans TC",sans-serif';
 function _plFlowPages(steps,opts){
   opts=opts||{};
   var ann=opts.ann||[];
-  var CH=980;                     // 每頁可用高度（與固定畫布寬度成 A4 比例）
+  // v5.416：版面依「流程步驟最多的工項」一次定死（PL_FLOW 常數），全書統一字級與框寬，
+  // 16 步以內必定一頁呈現；超過才分頁。各工項字級、框大小完全相同。
+  var CH=PL_FLOW.CH;
   var mx=document.createElement('canvas').getContext('2d');
-  var fs=15,lh=21,padX=14,padY=10,gap=26,boxW=ann.some(function(a){return !!a;})?400:520;
-  var afs=11.5,alh=17,annW=290;
+  var fs=PL_FLOW.fs,lh=PL_FLOW.lh,padX=PL_FLOW.padX,padY=PL_FLOW.padY,gap=PL_FLOW.gap,boxW=PL_FLOW.boxW;
+  var afs=PL_FLOW.afs,alh=PL_FLOW.alh,annW=PL_FLOW.annW;
   var hs=steps.map(function(t,i){
     mx.font=fs+'px '+_PL_FONT;
     var h=_plWrapTx(mx,(i+1)+'. '+t,boxW-padX*2).length*lh+padY*2;
@@ -15381,7 +15435,8 @@ function _plFlowPages(steps,opts){
     if(a){
       mx.font=afs+'px '+_PL_FONT;
       var n=0;(a.lines||[]).forEach(function(L){n+=_plWrapTx(mx,L,annW-22).length;});
-      h=Math.max(h,n*alh+34);
+      n=Math.min(n,PL_FLOW.annMax);
+      h=Math.max(h,n*alh+30);
     }
     return h+gap;
   });
@@ -15401,7 +15456,8 @@ function _plFlowPNG(steps,opts){
   opts=opts||{};
   var ann=opts.ann||[];
   var hasAnn=ann.some(function(a){return !!a;});
-  var SC=2,boxW=hasAnn?400:520,annW=290,fs=15,afs=11.5,lh=21,alh=17,padX=14,padY=10,gap=26;
+  var SC=2,boxW=PL_FLOW.boxW,annW=PL_FLOW.annW,fs=PL_FLOW.fs,afs=PL_FLOW.afs,
+      lh=PL_FLOW.lh,alh=PL_FLOW.alh,padX=PL_FLOW.padX,padY=PL_FLOW.padY,gap=PL_FLOW.gap;
   var no0=opts.no0||0;
   var cv=document.createElement('canvas'),mx=cv.getContext('2d');
   var metas=steps.map(function(t,i){
@@ -15415,16 +15471,16 @@ function _plFlowPNG(steps,opts){
       (a.lines||[]).forEach(function(L){
         _plWrapTx(mx,L,annW-22).forEach(function(x2,xi){aLines.push((xi?'　':'')+x2);});
       });
+      if(aLines.length>PL_FLOW.annMax){aLines=aLines.slice(0,PL_FLOW.annMax);aLines[PL_FLOW.annMax-1]+='…';}
     }
     var h=lines.length*lh+padY*2;
-    var ah=a?(aLines.length*alh+34):0;
+    var ah=a?(aLines.length*alh+30):0;
     return {lines:lines,h:h,chk:chk,a:a,aLines:aLines,ah:ah,rowH:Math.max(h,ah)};
   });
   var hasLoop=metas.some(function(mt,i){return mt.chk&&i>0;});
-  var LM=66;                                  // 固定左邊界，各圖版面一致
-  var W=LM+boxW+(30+annW+14);                 // 固定畫布寬 → 各工項字級一致
-  var natH=metas.reduce(function(a,mt){return a+mt.rowH+gap;},0)-gap+28+(opts.cont?22:0);
-  var H=opts.fixH||natH;
+  var LM=PL_FLOW.LM;                          // 固定左邊界，各圖版面一致
+  var W=PL_FLOW.W;                            // 固定畫布寬高 → 各工項字級一致
+  var H=PL_FLOW.H;
   cv.width=W*SC;cv.height=H*SC;
   var ctx=cv.getContext('2d');ctx.scale(SC,SC);
   ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
@@ -15444,16 +15500,16 @@ function _plFlowPNG(steps,opts){
     mt.lines.forEach(function(l,j){ctx.fillText(l,x+padX,by+padY+j*lh);});
     // 右側品管註記框（虛線連接）
     if(mt.a){
-      var ax=x+boxW+30,ay=y+(mt.rowH-mt.ah)/2,aw=annW,ah=mt.ah;
+      var ax=x+boxW+24,ay=y+(mt.rowH-mt.ah)/2,aw=annW,ah=mt.ah;
       ctx.strokeStyle='#555';ctx.lineWidth=1;
       ctx.setLineDash([4,3]);
       ctx.beginPath();ctx.moveTo(x+boxW,by+mt.h/2);ctx.lineTo(ax,ay+ah/2);ctx.stroke();
       ctx.strokeRect(ax,ay,aw,ah);
       ctx.setLineDash([]);
       ctx.fillStyle='#333';ctx.font='bold '+afs+'px '+_PL_FONT;
-      ctx.fillText(mt.a.title||'對應品質管理標準／自主檢查表',ax+10,ay+7);
+      ctx.fillText(mt.a.title||'對應品質管理標準／自主檢查表',ax+8,ay+5);
       ctx.font=afs+'px '+_PL_FONT;ctx.fillStyle='#222';
-      mt.aLines.forEach(function(l,j){ctx.fillText(l,ax+10,ay+26+j*alh);});
+      mt.aLines.forEach(function(l,j){ctx.fillText(l,ax+8,ay+21+j*alh);});
     }
     pos.push({y:by,h:mt.h,mid:by+mt.h/2,chk:mt.chk});
     y+=mt.rowH+gap;
@@ -21771,8 +21827,7 @@ function _plBuild(){
     rem('每次存檔即產生一個版次；經監造單位審查後如有修正，於本表填列修訂章節與事由，'
       +'內文修訂處以雲形線標示，舊版收回作廢。表格於預覽畫面可直接點擊填寫。');
   })();
-  B.push({t:'sp'});
-  B.push({t:'toc'});
+  B.push({t:'toc',pb:true});
   B.push({t:'sect',o:{footer:true,fmt:'upperRoman',start:1}});  // ── 前置節：羅馬數字頁碼 ──
 
   // ══ 壹、工項概述 ══
@@ -22221,7 +22276,7 @@ function _plBuild(){
           rows.push([String(++chkN),j===0?c.stage:'',r[0],r[2]+'\n（檢查方法：'+r[1]+'）','',res]);
         });
       });
-      while(rows.length<1+PLAN_CHK_ROWS)rows.push([String(++chkN),'','','','','']);   // 表單固定長度
+      while(rows.length<1+PLAN_CHK_ROWS)rows.push([String(++chkN),'　','　','　','　','　']);   // 表單固定長度（滿版）
       B.push({t:'tbl',sm:1,rows:_plFillRows(rows,m),w:[520,820,2900,3560,1700,700]});
       B.push({t:'tbl',sm:1,rows:[['缺失複查結果：□已改善完成　□未改善完成，進行追蹤改善。　複查日期：　　年　　月　　日　　複查人員：　　　　']],w:[10200]});
       B.push({t:'tbl',sm:1,rows:[['備註：1. 檢查項目及檢查標準依契約規定量化數據詳列。'
@@ -22248,8 +22303,8 @@ function _plBuild(){
       c.rows.forEach(function(r){
         srows.push([r[0]===last?'':r[0],r[1],'','','']);last=r[0];
       });
-      while(srows.length<1+PLAN_SAFE_ROWS)srows.push(['','','','','']);            // 表單固定長度
-      B.push({t:'tbl',sm:1,rows:srows,w:[1200,5400,620,700,2280]});
+      while(srows.length<1+PLAN_SAFE_ROWS)srows.push(['　','　','　','　','　']);            // 表單固定長度（滿版）
+      B.push({t:'tbl',sm:1,rows:srows,w:[1250,4900,760,860,2430]});
       B.push({t:'tbl',sm:1,rows:[['工地主任','安衛人員','檢查人員'],['\n','\n','\n']],w:[3400,3400,3400]});
     });
   }
@@ -22445,9 +22500,58 @@ var _PL_CSS='.pl-title{font-size:25px;color:#000;text-align:center;padding:22px 
   +'.toc-e .dots{flex:1;border-bottom:1.5px dotted #888;margin:0 6px;transform:translateY(-3px)}'
   +'.toc-e .pg{font-family:"Times New Roman",serif}';
 // 列印視窗右上角固定工具列（列印時自動隱藏）
-var _PL_PRINTBAR='<div class="no-print" style="position:fixed;top:10px;right:10px;z-index:9999;display:flex;gap:8px">'
-  +'<button onclick="window.print()" style="padding:9px 16px;font-size:14px;border:none;border-radius:8px;background:#0e3d22;color:#fff;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25)">列印／存 PDF</button>'
-  +'<button onclick="window.close()" style="padding:9px 16px;font-size:14px;border:1px solid #b9c6bd;border-radius:8px;background:#fff;color:#333;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.15)">✕ 關閉</button></div>';
+// 把計畫書專用 CSS 收斂到列印容器下（避免污染主畫面）
+function _plScopeCss(css,sel){
+  return String(css).replace(/(^|\})\s*([^{}@]+)\{/g,function(mm,br,sels){
+    return br+sels.split(',').map(function(x){return sel+' '+x.trim();}).join(',')+'{';
+  });
+}
+function _plPrintClose(){
+  ['_pl_print_root','_pl_print_bar'].forEach(function(id){var e=document.getElementById(id);if(e)e.remove();});
+  document.body.style.overflow='';
+}
+// 逐頁截圖 → jsPDF（橫式頁以 landscape 加頁；檔名一律帶入）
+function _plExportPdf(fn){
+  var btn=document.getElementById('_pl_pdf_btn');
+  var jsPDFLib=window.jspdf&&(window.jspdf.jsPDF||window.jspdf);
+  var sheets=[].slice.call(document.querySelectorAll('#_pl_print_root .sheet'));
+  if(!window.html2canvas||!jsPDFLib||!sheets.length){_plPrintNative(fn);return;}
+  if(btn){btn.disabled=true;btn.textContent='產生中 0/'+sheets.length;}
+  var pdf=null,i=0;
+  (function next(){
+    if(i>=sheets.length){
+      try{pdf.save(fn+'.pdf');}catch(e){_err('_plExportPdf.save',e);}
+      if(btn){btn.disabled=false;btn.textContent='列印／存 PDF';}
+      toast('PDF 已下載：'+fn+'.pdf');
+      return;
+    }
+    var sh=sheets[i],land=sh.classList.contains('land');
+    html2canvas(sh,{scale:2,backgroundColor:'#ffffff',useCORS:true,allowTaint:true,logging:false,
+      width:sh.offsetWidth,height:sh.offsetHeight,windowWidth:sh.offsetWidth,scrollX:0,scrollY:0,imageTimeout:0})
+    .then(function(cv){
+      var pw=land?841.89:595.28,ph=land?595.28:841.89;
+      if(!pdf)pdf=new jsPDFLib({orientation:land?'landscape':'portrait',unit:'pt',format:'a4'});
+      else pdf.addPage('a4',land?'landscape':'portrait');
+      pdf.addImage(cv.toDataURL('image/jpeg',0.93),'JPEG',0,0,pw,ph);
+      i++;if(btn)btn.textContent='產生中 '+i+'/'+sheets.length;
+      setTimeout(next,0);
+    }).catch(function(e){_err('_plExportPdf',e);_plPrintNative(fn);});
+  })();
+}
+// 後備：套件未載入時走瀏覽器原生列印（主視窗有真實網址，檔名取得到）
+function _plPrintNative(fn){
+  var old=document.title;
+  try{document.title=fn;}catch(e){_err('_plPrintNative',e);}
+  var st=document.createElement('style');st.id='_pl_print_only';
+  st.textContent='@media print{body>*{display:none!important}'
+    +'#_pl_print_root{display:block!important;position:static!important;height:auto!important;overflow:visible!important;background:#fff!important}'
+    +'#_pl_print_root .sheet{margin:0!important;box-shadow:none!important;page-break-after:always}}';
+  document.head.appendChild(st);
+  setTimeout(function(){
+    try{window.print();}catch(e){_err('_plPrintNative.print',e);}
+    setTimeout(function(){st.remove();document.title=old;},600);
+  },120);
+}
 // 羅馬數字（前置頁碼）
 function _plRoman(n){
   var R=[[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']],s='';
@@ -22457,42 +22561,51 @@ function _plRoman(n){
 // ── 自訂分頁引擎：A4 頁面、封面無頁碼、前置 I/II、本文 1/2/3、品管標準橫向頁、
 //    目錄帶真實頁碼、頁尾置中頁碼；@page margin 0 → 瀏覽器不再印網址與日期頁首 ──
 function _plPrintDoc(B,fname,title){
-  var w=window.open('','_blank');
-  if(!w){toast('瀏覽器阻擋了列印視窗，請允許彈出視窗');return;}
+  var fn=String(fname||title||'施工計畫書').replace(/[\\/:*?"<>|]/g,'').slice(0,120);
+  _plPrintClose();
   var PW=794,PH=1123,MG=57,FOOT=40,SP=10;
   var CW=PW-2*MG,CH=PH-2*MG-FOOT;
   var LCW=PH-2*MG,LCH=PW-2*MG-FOOT;
-  var css='*{margin:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
-    +'html,body{background:#e8e8e8}'
-    +'body{font-family:'+_PL_KAI+'}'
-    +_PL_CSS
-    +'.sheet{width:'+PW+'px;height:'+PH+'px;background:#fff;position:relative;overflow:hidden;margin:14px auto;box-shadow:0 2px 10px rgba(0,0,0,.18)}'
-    +'.pc{position:absolute;left:'+MG+'px;top:'+MG+'px;width:'+CW+'px}'
-    +'.pc>*{margin:0 0 '+SP+'px!important}'
-    +'.sheet.land{width:'+PH+'px;height:'+PW+'px;page:landA4}'
-    +'.pcl{position:absolute;left:'+MG+'px;top:'+MG+'px;width:'+LCW+'px;height:'+LCH+'px}'
-    +'.pcl>*{margin:0 0 '+SP+'px!important}'
-    +'.pfoot{position:absolute;left:0;right:0;bottom:'+(MG-38)+'px;text-align:center;font-size:11.5px;color:#333;font-family:"Times New Roman",serif}'
-    +'.pfootl{position:absolute;left:0;right:0;bottom:'+(MG-38)+'px;text-align:center;font-size:11.5px;color:#333;font-family:"Times New Roman",serif}'
-    +'.meas{position:absolute;left:-9999px;top:0;width:'+CW+'px;visibility:hidden}'
-    +'.meas>*{margin:0 0 '+SP+'px!important}'
-    +'.measL{width:'+LCW+'px}'
-    +'@media print{html,body{background:#fff}.sheet{margin:0;box-shadow:none;page-break-after:always}.no-print{display:none!important}}'
-    +'@page{size:A4;margin:0}@page landA4{size:A4 landscape;margin:0}';
-  w.document.write('<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=0.5"><title>'
-    +_xlEsc(fname||title)+'</title><style>'+css+'</style></head><body>'
-    +_PL_PRINTBAR
-    +'<div id="pages"></div><div class="meas" id="meas"></div><div class="meas measL" id="measL"></div>'
-    +'</body></html>');
-  w.document.close();
-  var doc=w.document,pagesEl=doc.getElementById('pages'),meas=doc.getElementById('meas'),measL=doc.getElementById('measL');
-  // v5.412：Chrome／Edge「另存列印輸出」的預設檔名取自 document.title；
-  // document.write 寫入的 <title> 在 about:blank 視窗上不一定生效，這裡再指定一次
-  // v5.415：Chrome「另存列印輸出」對 about:blank 視窗取不到預設檔名，
-  // 先用 replaceState 給它一個同源網址（路徑即檔名），再指定 document.title
-  var _fn=String(fname||title||'施工計畫書').replace(/[\\/:*?"<>|]/g,'').slice(0,120);
-  try{w.history.replaceState({},_fn,location.pathname.replace(/[^/]*$/,'')+encodeURIComponent(_fn)+'.html');}catch(e){_err('_plPrintDoc.url',e);}
-  try{doc.title=_fn;w.name=_fn;}catch(e){_err('_plPrintDoc.title',e);}
+  var R='#_pl_print_root';
+  var css=R+' *{margin:0;box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
+    +R+'{position:fixed;inset:0;z-index:99990;background:#e8e8e8;overflow-y:auto;-webkit-overflow-scrolling:touch;'
+      +'padding-top:62px;font-family:'+_PL_KAI+'}'
+    +_plScopeCss(_PL_CSS,R)
+    +R+' .sheet{width:'+PW+'px;height:'+PH+'px;background:#fff;position:relative;overflow:hidden;margin:14px auto;box-shadow:0 2px 10px rgba(0,0,0,.18)}'
+    +R+' .sheet.land{width:'+PH+'px;height:'+PW+'px}'
+    +R+' .pc{position:absolute;left:'+MG+'px;top:'+MG+'px;width:'+CW+'px}'
+    +R+' .pc>*{margin:0 0 '+SP+'px!important}'
+    +R+' .pcl{position:absolute;left:'+MG+'px;top:'+MG+'px;width:'+LCW+'px;height:'+LCH+'px}'
+    +R+' .pcl>*{margin:0 0 '+SP+'px!important}'
+    +R+' .pfoot,'+R+' .pfootl{position:absolute;left:0;right:0;bottom:'+(MG-38)+'px;text-align:center;font-size:11.5px;color:#333;font-family:"Times New Roman",serif}'
+    +R+' .meas{position:absolute;left:-9999px;top:0;width:'+CW+'px;visibility:hidden}'
+    +R+' .meas>*{margin:0 0 '+SP+'px!important}'
+    +R+' .measL{width:'+LCW+'px}';
+  var bar=document.createElement('div');
+  bar.id='_pl_print_bar';
+  bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99995;background:#0e3d22;display:flex;align-items:center;gap:8px;'
+    +'padding:10px 14px;padding-top:max(env(safe-area-inset-top,0px),10px);box-shadow:0 2px 8px rgba(0,0,0,.3)';
+  var t=document.createElement('span');
+  t.style.cssText='color:#fff;font-size:13px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+  t.textContent='📄 '+fn;
+  var b1=document.createElement('button');
+  b1.id='_pl_pdf_btn';
+  b1.style.cssText='padding:9px 16px;font-size:14px;border:none;border-radius:8px;background:#fff;color:#0e3d22;font-weight:700;cursor:pointer;white-space:nowrap';
+  b1.textContent='列印／存 PDF';
+  b1.addEventListener('click',function(){_plExportPdf(fn);});
+  var b2=document.createElement('button');
+  b2.style.cssText='padding:9px 14px;font-size:14px;border:1px solid rgba(255,255,255,.4);border-radius:8px;background:rgba(255,255,255,.15);color:#fff;font-weight:700;cursor:pointer;white-space:nowrap';
+  b2.textContent='✕ 關閉';
+  b2.addEventListener('click',_plPrintClose);
+  bar.appendChild(t);bar.appendChild(b1);bar.appendChild(b2);
+  var root=document.createElement('div');
+  root.id='_pl_print_root';
+  root.innerHTML='<style>'+css+'</style><div id="_pl_pages"></div>'
+    +'<div class="meas" id="_pl_meas"></div><div class="meas measL" id="_pl_measL"></div>';
+  document.body.appendChild(bar);document.body.appendChild(root);
+  document.body.style.overflow='hidden';
+  var w=window,doc=document;
+  var pagesEl=doc.getElementById('_pl_pages'),meas=doc.getElementById('_pl_meas'),measL=doc.getElementById('_pl_measL');
   // 1) 分區（sect 標記）
   var zones=[],cur={blocks:[],o:null};
   (B||[]).forEach(function(b){
@@ -22571,18 +22684,28 @@ function _plPrintDoc(B,fname,title){
         pg={land:land,no:no++,els:[]};pages.push(pg);used=0;
       }
       newPage();
+      // v5.416：內容換頁時，把緊鄰其上的章節標題（h2／h3）一起帶走，不讓標題孤懸在前一頁
+      function popHeads(){
+        var c=[];
+        while(pg&&pg.els.length&&/pl-h2|pl-h3/.test(pg.els[pg.els.length-1].className||'')){
+          var last=pg.els.pop();used-=oh(last);c.unshift(last);
+        }
+        return c;
+      }
+      function pushHeads(c){c.forEach(function(e){pg.els.push(e);used+=oh(e);});}
+      function breakWithHeads(){var c=popHeads();newPage();pushHeads(c);}
       set.nodes.forEach(function(nd){
         var b=nd.b;
         nd.els.forEach(function(el){
           var h=oh(el);
           var isHead=/pl-h1|pl-h2|pl-h3|pl-fmh/.test(el.className||'');
-          if(b.pb&&used>0&&(b.t==='h1'||b.t==='h2'||b.t==='h3'||b.t==='fmh'||b.t==='tbl'))newPage();
+          if(b.pb&&used>0&&(b.t==='h1'||b.t==='h2'||b.t==='h3'||b.t==='fmh'||b.t==='tbl'||b.t==='toc'))breakWithHeads();
           if(el.tagName==='TABLE'&&h>maxH-used&&h>maxH*0.6){
-            if(maxH-used<150&&used>0)newPage(); // 剩餘空間過小：整表移至次頁起排，避免只切出一兩列
+            if(maxH-used<150&&used>0)breakWithHeads(); // 剩餘空間過小：整表移至次頁起排，避免只切出一兩列
             var parts=splitTable(el,maxH-used-4,maxH-4,mcont);
             parts.forEach(function(pt,pi){
               var ph=oh(pt);
-              if(ph>maxH-used&&used>0)newPage();
+              if(ph>maxH-used&&used>0){if(pi===0)breakWithHeads();else newPage();}
               pg.els.push(pt);used+=ph;
             });
             return;
@@ -22590,14 +22713,16 @@ function _plPrintDoc(B,fname,title){
           if(el.tagName==='FIGURE'){
             var img=el.querySelector('img');
             if(img&&h>maxH-used){
+              var carry=popHeads();
               if(h<=maxH*0.92&&used>0){newPage();}
               else{img.style.maxHeight=(maxH-70)+'px';img.style.width='auto';}
               h=oh(el);
               if(h>maxH-used&&used>0)newPage();
+              pushHeads(carry);
             }
           }
-          else if(h>maxH-used&&used>0)newPage();
-          if(isHead&&maxH-used-h<150&&used>0)newPage(); // 標題後至少保留一段內容空間（孤行控制）
+          else if(h>maxH-used&&used>0)breakWithHeads();
+          if(isHead&&maxH-used-h<150&&used>0)breakWithHeads(); // 標題後至少保留一段內容空間（孤行控制）
           pg.els.push(el);used+=h;
           if(isHead&&(b.t==='h1'||b.t==='h2')){
             if(b.__hid===undefined)b.__hid='h'+(++_plHidSeq);
@@ -22658,7 +22783,8 @@ function _plPrintDoc(B,fname,title){
     frontPages.forEach(function(pg,i){emit(pg,_plRoman(i+1));});
     bodyRes.pages.forEach(function(pg){emit(pg,String(pg.no));});
     meas.innerHTML='';measL.innerHTML='';
-    setTimeout(function(){try{w.focus();w.print();}catch(e){_err('emit',e);}},350);
+    try{meas.remove();measL.remove();}catch(e){_err('_plPrintDoc.clean',e);}
+    toast('預覽已產生，按上方「列印／存 PDF」下載');
   });
 }
 // ── 檔名：業主簡稱-案名簡稱_豐有工程分項施工計劃書_民國日期_v版次 ──
@@ -22988,7 +23114,7 @@ function _plChkBlocks(){
         rows.push([String(++chkN),j===0?c.stage:'',r[0],r[2]+'\n（檢查方法：'+r[1]+'）','',res]);
       });
     });
-    while(rows.length<1+PLAN_CHK_ROWS)rows.push([String(++chkN),'','','','','']);
+    while(rows.length<1+PLAN_CHK_ROWS)rows.push([String(++chkN),'　','　','　','　','　']);
     B.push({t:'tbl',sm:1,rows:_plFillRows(rows,sh.m),w:[520,820,2900,3560,1700,700]});
     B.push({t:'tbl',sm:1,rows:[['缺失複查結果：□已改善完成　□未改善完成，進行追蹤改善。　複查日期：　　年　　月　　日　　複查人員：　　　　']],w:[10200]});
     B.push({t:'tbl',sm:1,rows:[['檢查人員（現場工程師）','工地主任','品管工程師','監造單位'],['\n','\n','\n','\n']],w:[2500,2200,2200,2300]});
@@ -35598,6 +35724,12 @@ function exportCurrentReportExcel(){
         <div class="f"><label>動員費 ($/次)</label><input type="number" id="rmk-mob" placeholder="選填"></div>
         <div class="f"></div><div class="f"></div><div class="f"></div>
       </div>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <div style="font-size:11px;font-weight:700;color:var(--b4);flex:1">自訂條款（依序接在第 17 條之後）</div>
+        <button type="button" class="btn btn-xs" onclick="rmkAddExtra()"><svg class="ic ib" aria-hidden="true"><use href="#i-plus"/></svg> 新增條款</button>
+      </div>
+      <div id="rmk-extra" style="margin-bottom:12px"></div>
 
       <div style="display:flex;gap:8px">
         <button type="button" class="btn btn-g" onclick="applyRmkCustom()" style="flex:1;justify-content:center;padding:9px">✓ 確認套用</button>
