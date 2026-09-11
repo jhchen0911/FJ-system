@@ -1581,7 +1581,7 @@ async function newPage(browser, width, height) {
         && !at.join().includes('教育訓練') && !at.join().includes('一機三證');
       // 流程圖：各工項字級一致（畫布寬高皆相同）
       const fl = B.filter(b => b.t === 'img' && /flow_/.test(b.name || ''));
-      out.flowSame = fl.length >= 2 && fl.every(b => b.cx === fl[0].cx && b.cy === fl[0].cy);
+      out.flowSame = fl.length >= 2 && fl.every(b => b.cx === fl[0].cx);   // 寬度固定＝縮放比一致＝字級一致（高度隨內容收斂）
       // 流程圖每一步都掛得到品質管理標準
       const ann = _plFlowAnn(_plItem('hpile'), ['材料進場・尺寸檢驗 ☆', '全數完成・☆高程複測'], {},
         ['材料進場・尺寸檢驗 逐支核對規格長度與外觀', '整列打設完成 複測樁頂高程與壁線偏差']);
@@ -1761,7 +1761,8 @@ async function newPage(browser, width, height) {
       // 7) 施工流程圖：全書統一畫布（字級／框寬一致），且每工項一頁
       const fl = B.filter(x => /^flow_/.test(x.name || ''));
       out.flowN = fl.length >= 4;
-      out.flowSame = new Set(fl.map(x => x.cx + 'x' + x.cy)).size === 1;
+      out.flowSame = new Set(fl.map(x => x.cx)).size === 1;          // 寬度（＝縮放比）全書一致
+      out.flowTrim = new Set(fl.map(x => x.cy)).size > 1;             // 高度隨內容收斂，圖下不留大片空白
       out.flowOnePage = fl.every(x => /_1$/.test(x.name)) && !fl.some(x => /_[2-9]$/.test(x.name));
       out.flowConst = PL_FLOW.W === PL_FLOW.LM + PL_FLOW.boxW + 24 + PL_FLOW.annW + 12
         && PL_FLOW.H === Math.round(PL_FLOW.W * 1.30);
@@ -1771,7 +1772,7 @@ async function newPage(browser, width, height) {
       out.tocPb = ti > 0 && B[ti].pb === true && B[ti - 1].t !== 'toc';
 
       // 5/6) 自主檢查表／安全衛生檢查表滿版固定列數
-      out.rows = PLAN_CHK_ROWS === 25 && PLAN_SAFE_ROWS === 42;
+      out.rows = PLAN_CHK_ROWS === 19 && PLAN_SAFE_ROWS === 32;
 
       // 1/3) 列印改在主文件內（有真實網址 → PDF 檔名不再空白）、橫式頁維持橫式
       out.api = typeof _plExportPdf === 'function' && typeof _plPrintNative === 'function'
@@ -1800,7 +1801,7 @@ async function newPage(browser, width, height) {
       return out;
     });
     check('報價：自訂備註條款依序接在通用版最後一條之後', r.rmk && r.rmkNone && r.rmkCnt && r.rmkApi);
-    check('計畫書：施工流程圖全書同一畫布尺寸（字級框寬統一）', r.flowN && r.flowSame && r.flowConst);
+    check('計畫書：施工流程圖全書同一框寬字級、高度隨內容收斂', r.flowN && r.flowSame && r.flowConst && r.flowTrim);
     check('計畫書：各工項施工流程圖皆一頁呈現', r.flowOnePage);
     check('計畫書：目錄／修訂紀錄各自獨立起頁', r.tocPb);
     check('計畫書：兩張檢查表維持滿版固定列數', r.rows);
@@ -1808,6 +1809,81 @@ async function newPage(browser, width, height) {
     check('計畫書：預覽頁數正常且橫式頁仍為橫式', r.sheets && r.land);
     check('計畫書：章節標題不孤懸頁尾（標題跟著圖走）', r.orphan);
     check('v5.416 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v5.417 檢查表各自定版、句子切分、目錄獨立頁、列印提速 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      // 句號切分不可切斷括號／引號內的文字（條列不再出現「）。」殘句）
+      out.sent = JSON.stringify(_plSentences('甲。（乙。）')) === JSON.stringify(['甲。', '（乙。）'])
+        && _plSentences('含「引號。內」的一句。').length === 1
+        && _plSentences('沒有句號的一句')[0] === '沒有句號的一句。';
+
+      _plClear();
+      _plState.proj = 'T'; _plState.vars.name = 'T';
+      _plState.walls = [{ id: 'hpile', meth: '水刀引孔', v: {} }];
+      _plState.items = ['midpile', 'upile', 'strut', 'deck', 'ccp'];
+      _plState.vars.layers = '2';
+      _plNormalize && _plNormalize();
+      const B = _plBuild();
+      // 條列不得以「）」「。」開頭（舊版句號切分會產生只有一個括號的空條）
+      out.badLi = B.filter(x => x.t === 'li' && /^[）)。]/.test(String(x.v || '').trim())).length === 0;
+      // 兩張檢查表各自一套固定格式（列數與表身高度都不同、不共用）
+      const sc = B.filter(x => x.t === 'tbl' && x.fixH && (x.rows || [])[0] && x.rows[0][0] === '項次');
+      const sf = B.filter(x => x.t === 'tbl' && x.fixH && (x.rows || [])[0] && x.rows[0][0] === '分類');
+      out.scFix = sc.length >= 2 && sc.every(x => x.rows.length === 1 + PLAN_CHK_ROWS)
+        && sc.every(x => x.fixH === PLAN_CHK_H || x.fixH === PLAN_CHK_H0);
+      out.sfFix = sf.length >= 1 && sf.every(x => x.rows.length === 1 + PLAN_SAFE_ROWS)
+        && sf.every(x => x.fixH === PLAN_SAFE_H || x.fixH === PLAN_SAFE_H0);
+      out.notShared = PLAN_CHK_ROWS !== PLAN_SAFE_ROWS && PLAN_CHK_H !== PLAN_SAFE_H;
+      // 緊急聯絡表下方那句造成整頁只有一行的註解已移除
+      out.noEmerRem = !B.some(x => /救援單位/.test(x.v || ''));
+
+      _plPrintDoc(B, '檔名測試_v1', '施工計畫書');
+      for (let i = 0; i < 150; i++) {
+        if (document.querySelectorAll('#_pl_print_root .sheet').length) break;
+        await new Promise(res => setTimeout(res, 100));
+      }
+      const sheets = [].slice.call(document.querySelectorAll('#_pl_print_root .sheet'));
+      const pageTx = sheets.map(s => {
+        const c = s.querySelector('.pc,.pcl');
+        return c ? (c.textContent || '').replace(/\s+/g, '') : '';
+      });
+      // 修訂紀錄與目錄各自獨立起頁
+      const rv = pageTx.findIndex(t => /^修訂紀錄/.test(t));
+      const tc = pageTx.findIndex(t => /^目錄/.test(t));
+      out.tocSplit = rv >= 0 && tc === rv + 1 && !/目錄/.test(pageTx[rv]);
+      // 每張自主檢查表／安全衛生檢查表各自一頁（簽名欄不再被擠到次頁）
+      const sign = pageTx.filter(t => /^檢查人員（現場工程師）工地主任|^工地主任安衛人員檢查人員$/.test(t));
+      out.noSignPage = sign.length === 0;
+      // 各表各占一頁（SC-01／SF-01 的頁首為章標題，故以其餘編號檢核）
+      out.codesOnePage = ['SC-02', 'SC-03', 'SC-04', 'SF-02', 'SF-03'].every(c =>
+        pageTx.filter(t => t.indexOf(c) === 0).length === 1)
+        && pageTx.filter(t => /^附表自主檢查表SC-01/.test(t)).length === 1
+        && pageTx.filter(t => /^附表安全衛生檢查表/.test(t) && t.indexOf('SF-01') > 0).length === 1;
+      // 列印工具列：原生列印為主鈕（快、文字可搜尋），影像版 PDF 為備援
+      const btns = [].slice.call(document.querySelectorAll('#_pl_print_bar button')).map(x => x.textContent);
+      out.btns = btns.length === 3 && btns[0] === '列印／存 PDF' && btns[1] === '影像版 PDF';
+      window.print = function () { window.__printed = 1; };
+      _plPrintNative('檔名測試_v1');
+      await new Promise(res => setTimeout(res, 400));
+      const css = document.getElementById('_pl_print_only');
+      out.native = !!window.__printed && document.title === '檔名測試_v1' && !!css
+        && /@page fyland\{size:A4 landscape/.test(css.textContent)
+        && /\.sheet\.land\{page:fyland\}/.test(css.textContent);
+      _plPrintClose();
+      return out;
+    });
+    check('計畫書：句號切分不切斷括號，條列不再出現殘句', r.sent && r.badLi);
+    check('計畫書：自主檢查表與安全衛生檢查表各自定版（列數與表身高度不共用）', r.scFix && r.sfFix && r.notShared);
+    check('計畫書：兩張檢查表每張各一頁，簽名欄不被擠到次頁', r.noSignPage && r.codesOnePage);
+    check('計畫書：修訂紀錄與目錄各自獨立起頁', r.tocSplit);
+    check('計畫書：緊急聯絡表多餘註解已移除（不再產生整頁一行）', r.noEmerRem);
+    check('計畫書：列印主鈕走瀏覽器原生輸出，橫式節以命名頁維持橫式', r.btns && r.native);
+    check('v5.417 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
