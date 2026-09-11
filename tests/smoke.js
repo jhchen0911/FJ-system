@@ -1504,6 +1504,177 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.411 施工步驟示意圖引擎上系統 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      out.ready = !!(window.FY_SHEETS && typeof FY_SHEETS.pages === 'function');
+      if (!out.ready) return out;
+      const ids = FY_SHEETS.list().map(s => s.id);
+      out.count = ids.length >= 21;
+      // 工項＋工法 → 圖組對照全部有效
+      const need = {
+        hpile: ['直接打設', '水刀引孔', '氣動槌引孔', '氣動槌＋水刀引孔'],
+        railpile: ['直接打設', '鑽堡引孔', '鑽掘引孔'],
+        sheet: ['直接打設', '吊車排板', '鑽掘引孔'],
+        midpile: ['直接打設', '水刀引孔', '氣動槌引孔', '氣動槌＋水刀引孔', '根固工法', '引孔根固'],
+        prepile: [''], rcbore: [''], rcpile: [''], ccp: [''], anchor: ['']
+      };
+      out.map = Object.keys(need).every(k => need[k].every(m => {
+        const sid = _fySheetId(k, m);
+        return sid && FY_SHEETS.get(sid);
+      }));
+      // 同一工項不同工法 → 不同圖組
+      out.distinct = new Set(need.hpile.map(m => _fySheetId('hpile', m))).size === 4
+        && new Set(need.midpile.map(m => _fySheetId('midpile', m))).size === 6;
+      // 格子大小一律相同：各頁等寬，非末頁一律滿 8 格（同高），末頁依實際列數縮短
+      const a = FY_SHEETS.pages('wall_h_drive'), b = FY_SHEETS.pages('mp_root_case');
+      const w0 = a[0].w;
+      out.samePage = a.length === 1 && b.length === 2
+        && b.every(x => x.w === w0)
+        && b[1].h < b[0].h
+        && a[0].h === b[0].h;                       // 8 格頁高度一致
+      // 流程圖步驟＝示意圖逐格標題
+      const st = _fySteps('hpile', '水刀引孔');
+      out.steps = !!st && st.length === FY_SHEETS.get('wall_h_wjet').panels.length
+        && st.every(x => x.t && x.n1);
+      // 選單已含新工法
+      out.opts = PLAN_WALL_FORMS.find(f => f.id === 'hpile').methods.indexOf('氣動槌＋水刀引孔') >= 0
+        && PLAN_MID_METHODS.some(x => /根固工法/.test(x))
+        && PLAN_MID_METHODS.every(x => !!PLAN_METHOD_TEXT[x])
+        && !!PLAN_METHOD_TEXT['氣動槌＋水刀引孔'];
+      // 未對應之工項（水平支撐／施工構台）仍走舊圖，不得整個爆掉
+      out.fallback = _fySheetId('strut', '') === null && _fyStoryPages('strut', '') === null;
+      // 著作權聲明與浮水印
+      out.wm = !!FY_SHEETS.wm && FY_SHEETS.wm.on === true;
+      return out;
+    });
+    check('示意圖引擎：載入成功且圖組齊全', r.ready && r.count);
+    check('示意圖引擎：工項＋工法對應到相應圖組，不同工法出不同圖', r.map && r.distinct);
+    check('示意圖：每頁滿 8 格、格子大小一律相同，末頁不留大片空白', r.samePage);
+    check('示意圖引擎：施工流程圖與施工步驟說明取自同一份逐格步驟', r.steps);
+    check('計畫書：新工法選項與工法敘述已補齊', r.opts);
+    check('示意圖引擎：無對應圖組之工項安全退回舊版繪圖', r.fallback);
+    check('示意圖：浮水印開啟（著作權保護）', r.wm);
+    check('v5.412 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v5.412 計畫書排版與內容調整 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      _plState.proj = 'T';
+      _plState.walls = [{ id: 'hpile', meth: '氣動槌＋水刀引孔', v: {} }];
+      _plState.items = ['midpile', 'upile'];
+      _plState.vars = Object.assign(_plState.vars || {}, { midMethod: '引孔根固', mp1Meth: '引孔根固' });
+      _plNormalize && _plNormalize();
+      const B = _plBuild();
+      // 封面不再有編製／審核／核定表
+      out.cover = !B.some(b => b.t === 'tbl' && (b.rows || [])[0] && b.rows[0].join().indexOf('編製（品管工程師）') >= 0);
+      // 附件章：作業主管證照、材質證明在千斤頂之前、最後一項為自主檢查表
+      const at = PLAN_ATTS.map(a => a.l);
+      out.atts = at.length === 5 && at[1] === '作業主管證照' && at[2] === '材料材質證明書'
+        && at[3] === '千斤頂校正報告' && at[4] === '自主檢查表'
+        && !at.join().includes('教育訓練') && !at.join().includes('一機三證');
+      // 流程圖：各工項字級一致（畫布寬高皆相同）
+      const fl = B.filter(b => b.t === 'img' && /flow_/.test(b.name || ''));
+      out.flowSame = fl.length >= 2 && fl.every(b => b.cx === fl[0].cx && b.cy === fl[0].cy);
+      // 流程圖每一步都掛得到品質管理標準
+      const ann = _plFlowAnn(_plItem('hpile'), ['材料進場・尺寸檢驗 ☆', '全數完成・☆高程複測'], {},
+        ['材料進場・尺寸檢驗 逐支核對規格長度與外觀', '整列打設完成 複測樁頂高程與壁線偏差']);
+      out.ann = ann.filter(a => a).length === 2;
+      // 自主檢查表：緊湊排版＋欄寬已指定
+      const chk = _plChkBlocks().filter(b => b.t === 'tbl');
+      out.chk = chk.length > 0 && chk.every(b => b.sm === 1) && chk.every(b => !b.w || b.w.length === (b.rows[0] || []).length);
+      // RC 基樁（原抗浮基樁）改名並有工法欄位
+      const up = _plItem('upile');
+      out.upile = /RC/.test(up.name) && up.vars.some(v => v.k === 'upMeth' && (v.opts || []).length >= 2);
+      // 表格輸出帶 colgroup（欄寬可控）
+      out.colg = /<colgroup>/.test(_plBlockHtml({ t: 'tbl', rows: [['a', 'b'], ['1', '2']], w: [3000, 7000] }, 0, false));
+      // v5.413 專業內容補強：介面分工、開挖與支撐步序、應備圖說清單
+      _plState.stl = [{ el: '2.0', dg: '2.5', w: 'H350', s: 'H350', d: 'H350', pre: '30' },
+                      { el: '5.0', dg: '5.5', w: 'H400', s: 'H400', d: 'H400', pre: '40' }];
+      const B2 = _plBuild();
+      const hs = B2.filter(b => b.t === 'h2').map(b => b.v).join('|');
+      out.iface = /介面分工與界面管理/.test(hs);
+      out.seq = /開挖與支撐施作步序管制表/.test(hs);
+      const seqT = B2.find(b => b.t === 'tbl' && (b.rows || [])[0] && b.rows[0].join() === '步序,作業內容,開挖高程,支撐層,管制條件');
+      // 2 層支撐 → 開挖/架設各 2 組 + 首尾 4 列 + 拆撐 2 列
+      out.seqRows = !!seqT && seqT.rows.length === 1 + 1 + 4 + 2 + 2 + 1;
+      out.dwg = B2.some(b => b.t === 'tbl' && (b.rows || []).some(r => r[0] === 'S-02'));
+      return out;
+    });
+    check('計畫書：封面已移除編製／審核／核定欄', r.cover);
+    check('計畫書：附件章依指示調整（作業主管、材質證明、千斤頂、自主檢查表）', r.atts);
+    check('計畫書：各工項施工流程圖字級一致（畫布尺寸固定）', r.flowSame);
+    check('計畫書：流程圖逐步對應品質管理標準／自主檢查表', r.ann);
+    check('計畫書：自主檢查表緊湊排版且欄寬受控', r.chk);
+    check('計畫書：抗浮基樁改為 RC 基樁並新增工法選單', r.upile);
+    check('計畫書：表格輸出 colgroup，列印欄寬依設定', r.colg);
+    check('計畫書：新增「介面分工與界面管理」節', r.iface);
+    check('計畫書：新增「開挖與支撐施作步序管制表」並依支撐層數展開', r.seq && r.seqRows);
+    check('計畫書：施工圖說改為應備圖說清單（比例、簽證、送審時機）', r.dwg);
+    check('v5.413 排版測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v5.414 案場細節連動、監測管理值、修訂紀錄 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      Q.push({ id: 'qS', name: '測試案場', client: '玄通營造', loc: '新北市', status: '得標', items: [], t: {},
+        site: { P: 130, A: 1000, H: 13, layers: 2,
+          wall: { form: 'H型鋼樁', spec: 'H350×350×12×19', method: '氣動槌引孔', len: 13.4, sp: 1.5, nAuto: true },
+          mid: { spec: 'H300×300×10×15', method: '直接打設', len: 21.5, n: 30 },
+          co: { spec: 'H400×400×13×21', method: '引孔根固', len: 21.5, n: 12 },
+          L: [{ w: 'H350', s: 'H350', d: 'H350' }, { w: 'H400', s: 'H400', d: 'H400' }],
+          plat: { load: '50t', A: 300 }, stairs: 2 } });
+      _plClear(); _plSetProj('測試案場');
+      const out = {}, V = _plState.vars, w0 = _plState.walls[0];
+      out.site = V.digDepth === 'GL-13.0m' && V.digArea === '1,000 m²' && V.layers === '2';
+      out.wall = !!w0 && w0.id === 'hpile' && w0.meth === '氣動槌引孔'
+        && w0.v.hpSpec === 'H350×350×12×19' && w0.v.hpLen === 'L=13.4m'
+        && w0.v.hpPitch === '@1.5m' && w0.v.hpCount === '87';   // ceil(130/1.5)
+      out.mid = V.mp1Spec === 'H300×300×10×15' && V.mp1Count === '30'
+        && /引孔根固/.test(V.mp2Meth || '') && V.mp2Count === '12';
+      out.stl = _plState.stl.length === 2 && _plState.stl[0].w === 'H350' && _plState.stl[1].s === 'H400';
+      out.items = ['midpile', 'strut', 'deck'].every(k => _plState.items.indexOf(k) >= 0);
+      // 已填欄位不被覆蓋
+      V.digDepth = 'GL-99m'; _plSyncSite(false, true);
+      out.keep = V.digDepth === 'GL-99m';
+      _plSyncSite(true, true);
+      out.force = V.digDepth === 'GL-13.0m';
+      const B = _plBuild();
+      out.rev = B.some(x => x.t === 'fmh' && x.v === '修訂紀錄')
+        && B.some(x => x.t === 'tbl' && (x.rows || [])[0] && x.rows[0].join().indexOf('修訂事由') >= 0);
+      out.mon = B.some(x => x.t === 'tbl' && (x.rows || [])[0]
+        && x.rows[0].join().indexOf('行動值（停工應變）') >= 0)
+        && PLAN_FIELDS.some(g => g.f.some(f => f.k === 'mnWallW'));
+      // 工法選單對齊定稿圖組
+      const need = { railpile: ['鑽堡引孔＋打設', '鑽掘引孔（螺旋鑽桿）＋打設'],
+                     sheet: ['吊車排板＋逐片壓入', '鑽掘引孔＋打設'] };
+      out.meth = Object.keys(need).every(k => {
+        const f = PLAN_WALL_FORMS.find(x => x.id === k);
+        return need[k].every(mn => f.methods.indexOf(mn) >= 0 && FY_SHEETS.get(_fySheetId(k, mn)));
+      }) && PLAN_MID_METHODS.every(mn => !!FY_SHEETS.get(_fySheetId('midpile', mn)));
+      out.upile = _plItem('upile').name === 'RC 基樁';
+      return out;
+    });
+    check('計畫書：掛專案自動帶入案場細節（開挖深度／面積／支撐層數）', r.site);
+    check('計畫書：擋土壁形式、工法、規格、樁長、間距、支數自動帶入', r.wall);
+    check('計畫書：中間樁／共構樁與支撐階數規格自動帶入並勾選相關工項', r.mid && r.stl && r.items);
+    check('計畫書：已填欄位不被覆蓋，按「全部覆蓋重帶」才更新', r.keep && r.force);
+    check('計畫書：封面後產生修訂紀錄表', r.rev);
+    check('計畫書：監測三級管理值可輸入並輸出成表', r.mon);
+    check('計畫書：工法選單與定稿示意圖一對一對應', r.meth);
+    check('計畫書：抗浮基樁大標題改為 RC 基樁', r.upile);
+    check('v5.414 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
