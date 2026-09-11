@@ -1651,8 +1651,8 @@ async function newPage(browser, width, height) {
       out.rev = B.some(x => x.t === 'fmh' && x.v === '修訂紀錄')
         && B.some(x => x.t === 'tbl' && (x.rows || [])[0] && x.rows[0].join().indexOf('修訂事由') >= 0);
       out.mon = B.some(x => x.t === 'tbl' && (x.rows || [])[0]
-        && x.rows[0].join().indexOf('行動值（停工應變）') >= 0)
-        && PLAN_FIELDS.some(g => g.f.some(f => f.k === 'mnWallW'));
+        && x.rows[0][0] === '支撐層' && x.rows[0].join().indexOf('行動值（T/支）') >= 0)
+        && ['mv', 'wv', 'av'].every(k => _plStl()[0][k] !== undefined);
       // 工法選單對齊定稿圖組
       const need = { railpile: ['鑽堡引孔＋打設', '鑽掘引孔（螺旋鑽桿）＋打設'],
                      sheet: ['吊車排板＋逐片壓入', '鑽掘引孔＋打設'] };
@@ -1668,10 +1668,69 @@ async function newPage(browser, width, height) {
     check('計畫書：中間樁／共構樁與支撐階數規格自動帶入並勾選相關工項', r.mid && r.stl && r.items);
     check('計畫書：已填欄位不被覆蓋，按「全部覆蓋重帶」才更新', r.keep && r.force);
     check('計畫書：封面後產生修訂紀錄表', r.rev);
-    check('計畫書：監測三級管理值可輸入並輸出成表', r.mon);
+    check('計畫書：監測三級管理值（各層水平支撐）可輸入並輸出成表', r.mon);
     check('計畫書：工法選單與定稿示意圖一對一對應', r.meth);
     check('計畫書：抗浮基樁大標題改為 RC 基樁', r.upile);
     check('v5.414 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v5.415 計畫書修正批次 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      _plClear();
+      _plState.proj = 'T'; _plState.vars.name = 'T';
+      _plState.walls = [{ id: 'hpile', meth: '水刀引孔', v: {} }];
+      _plState.items = ['midpile', 'upile', 'strut'];
+      _plState.vars.layers = '2'; _plState.vars.upMeth = '鑽掘式（定位套管）';
+      _plNormalize && _plNormalize();
+      const B = _plBuild();
+      // 示意圖必須是完整 data URL（否則預覽與 Word 都會變成破圖）
+      const imgs = B.filter(x => x.t === 'img');
+      out.img = imgs.length > 0 && imgs.every(x => /^data:image\//.test(x.b64 || ''));
+      out.story = B.some(x => /story_upile/.test(x.name || ''));
+      // RC 基樁：工法兩項、全文不再出現鋼軌樁護壁／人工挖掘／壓送管
+      const up = _plItem('upile'), opts = up.vars.find(v => v.k === 'upMeth').opts;
+      out.upile = up.name === 'RC 基樁' && opts.length === 2
+        && opts.indexOf('全套管式') >= 0 && opts.indexOf('鑽掘式（定位套管）') >= 0
+        && !/鋼軌樁|人工挖掘|壓送管/.test(JSON.stringify(up));
+      out.upileMap = _fySheetId('upile', '鑽掘式（定位套管）') === 'rcb_auger'
+        && _fySheetId('upile', '全套管式') === 'rcb_case';
+      // 監測三級管理值＝各層水平支撐
+      const mon = B.find(x => x.t === 'tbl' && (x.rows || [])[0] && x.rows[0][0] === '支撐層');
+      out.mon = !!mon && mon.rows.length === 3
+        && mon.rows[0].join().indexOf('行動值（T/支）') >= 0
+        && !PLAN_FIELDS.some(g => g.f.some(f => /^mn/.test(f.k)));
+      out.monStl = ['mv', 'wv', 'av'].every(k => _plStl()[0][k] !== undefined);
+      // 自主檢查表／安全衛生檢查表：表頭回到規範四列、項目列固定長度
+      const hdr = B.find(x => x.t === 'tbl' && (x.rows || [])[0] && x.rows[0][0] === '工程名稱' && x.rows.length === 4);
+      out.chkHdr = !!hdr && hdr.rows[3][2] === '檢查時機';
+      const chk = B.filter(x => x.t === 'tbl' && (x.rows || [])[0] && x.rows[0][0] === '項次' && x.rows.length > 5);
+      out.chkFixed = chk.length >= 2 && chk.every(x => x.rows.length === 1 + PLAN_CHK_ROWS);
+      const sf = B.filter(x => x.t === 'tbl' && (x.rows || [])[0] && x.rows[0][0] === '分類');
+      out.sfFixed = sf.length >= 1 && sf.every(x => x.rows.length === 1 + PLAN_SAFE_ROWS);
+      // 中間樁細部詳圖已移除
+      out.noMidDetail = !B.some(x => /detail_midpile/.test(x.name || '')) && !_plDetailSteps('midpile', {});
+      // 組織圖公司與職稱分兩行
+      const org = B.find(x => x.name === 'orgchart');
+      out.org = !!org && org.__edit.levels.some(lv => lv.some(b => /\n工地主任：/.test(b.b || '')))
+        && org.__edit.levels.some(lv => lv.some(b => /\n擋土支撐作業主管：/.test(b.b || '')));
+      // 版面備註已移除
+      out.noNote = !B.some(x => /橫向編排/.test(x.v || ''));
+      return out;
+    });
+    check('計畫書：施工步驟示意圖為完整 data URL（預覽與 Word 不再破圖）', r.img && r.story);
+    check('計畫書：RC 基樁工法兩項且全文不再出現鋼軌樁護壁／人工挖掘／壓送管', r.upile);
+    check('計畫書：RC 基樁依工法對應全套管／鑽掘式圖組', r.upileMap);
+    check('計畫書：三級管理值改為各層水平支撐，原四項監測欄位已移除', r.mon && r.monStl);
+    check('計畫書：自主檢查表回到規範四列表頭', r.chkHdr);
+    check('計畫書：自主檢查表與安全衛生檢查表項目列固定長度', r.chkFixed && r.sfFixed);
+    check('計畫書：中間樁／共構樁細部詳圖已移除', r.noMidDetail);
+    check('計畫書：組織圖公司名稱與職稱分兩行', r.org);
+    check('計畫書：章節標題移除版面備註', r.noNote);
+    check('v5.415 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
