@@ -1892,6 +1892,57 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.419 Word 與 PDF 共用同一組版面與分頁 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      // 版面單一來源：CSS 的 px 一律由 Word 的半點換算（px = sz ÷ 1.5）
+      out.metric = Object.keys(PL_M.sz).every(k => Math.abs(_PLX[k] - PL_M.sz[k] / 1.5) < 0.002);
+      out.cssFromM = _PL_CSS.indexOf('font-size:' + _PLX.p + 'px') >= 0
+        && _PL_CSS.indexOf('font-size:' + _PLX.tbl + 'px') >= 0;
+      // 內文字級以 Word 現況（12pt）為基準
+      out.body12 = PL_M.sz.p === 24;
+
+      _plClear();
+      _plState.proj = 'T'; _plState.vars.name = 'T';
+      _plState.walls = [{ id: 'hpile', meth: '水刀引孔', v: {} }];
+      _plState.items = ['midpile', 'upile', 'strut', 'ccp'];
+      _plState.vars.layers = '2';
+      _plNormalize && _plNormalize();
+      const B = _plBuild();
+      // Word 版不再把流程圖／組織圖換成表格，用的是與 PDF 相同的圖片
+      out.sameImg = !/t:'chart'/.test(_plDocxOut.toString()) && !/kind==='org'/.test(_plDocxOut.toString());
+
+      _plPrintDoc(B, 'x', 'y', { silent: true, done: function (info) {
+        // 靜默排版：算完即清乾淨，不留預覽層
+        out.clean = !document.getElementById('_pl_print_root') && !document.getElementById('_pl_print_bar');
+        out.pages = info.pages > 20 && info.breaks > 10;
+        // 分頁點與逐列高度都回填到區塊上
+        out.pb = B.filter(x => x.__pb).length === info.breaks;
+        const tb = B.filter(x => x.t === 'tbl' && x.__rowH);
+        out.rowH = tb.length > 5 && tb.every(x => x.__rowH.length === x.rows.length)
+          && tb.every(x => x.__rowH.every(h => h > 0));
+        // 產出的 .docx 帶著同一組版面與硬分頁
+        const xml = new TextDecoder().decode(_docxBytes(B, { header: 'T' }));
+        const mg = Math.round(PL_M.MG * 15), bot = Math.round((PL_M.MG + PL_M.FOOT) * 15);
+        out.docMar = xml.indexOf('w:top="' + mg + '" w:right="' + mg + '" w:bottom="' + bot + '" w:left="' + mg + '"') >= 0;
+        out.docBrk = (xml.match(/<w:pageBreakBefore\/>/g) || []).length >= info.breaks;
+        out.docRowH = (xml.match(/w:trHeight/g) || []).length > 50;
+        out.docLand = xml.indexOf('w:orient="landscape"') >= 0;
+        out.docSz = xml.indexOf('<w:sz w:val="' + PL_M.sz.p + '"/>') >= 0;
+        res(out);
+      } });
+    }));
+    check('計畫書：版面單一來源（CSS px 由 Word 半點換算）', r.metric && r.cssFromM && r.body12);
+    check('計畫書：Word 圖表改用與 PDF 相同的圖片', r.sameImg);
+    check('計畫書：靜默排版可供 Word 借用，且不留預覽層', r.clean && r.pages);
+    check('計畫書：分頁點與逐列高度回填到區塊', r.pb && r.rowH);
+    check('計畫書：.docx 套用同一組邊界、硬分頁、列高與橫式節', r.docMar && r.docBrk && r.docRowH && r.docLand && r.docSz);
+    check('v5.419 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
