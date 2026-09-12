@@ -2678,7 +2678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.417';
+var APP_VERSION='v5.418';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -22532,43 +22532,18 @@ function _plScopeCss(css,sel){
     return br+sels.split(',').map(function(x){return sel+' '+x.trim();}).join(',')+'{';
   });
 }
+var _plOldTitle=null;
 function _plPrintClose(){
   ['_pl_print_root','_pl_print_bar'].forEach(function(id){var e=document.getElementById(id);if(e)e.remove();});
   document.body.style.overflow='';
+  var st=document.getElementById('_pl_print_only');if(st)st.remove();
+  if(_plOldTitle!==null){try{document.title=_plOldTitle;}catch(e){_err('_plPrintClose',e);}_plOldTitle=null;}
 }
-// 逐頁截圖 → jsPDF（橫式頁以 landscape 加頁；檔名一律帶入）
-function _plExportPdf(fn){
-  var btn=document.getElementById('_pl_pdf_btn');
-  var jsPDFLib=window.jspdf&&(window.jspdf.jsPDF||window.jspdf);
-  var sheets=[].slice.call(document.querySelectorAll('#_pl_print_root .sheet'));
-  if(!window.html2canvas||!jsPDFLib||!sheets.length){_plPrintNative(fn);return;}
-  if(btn){btn.disabled=true;btn.textContent='產生中 0/'+sheets.length;}
-  var pdf=null,i=0;
-  (function next(){
-    if(i>=sheets.length){
-      try{pdf.save(fn+'.pdf');}catch(e){_err('_plExportPdf.save',e);}
-      if(btn){btn.disabled=false;btn.textContent='影像版 PDF';}
-      toast('PDF 已下載：'+fn+'.pdf');
-      return;
-    }
-    var sh=sheets[i],land=sh.classList.contains('land');
-    html2canvas(sh,{scale:1.6,backgroundColor:'#ffffff',useCORS:true,allowTaint:true,logging:false,
-      width:sh.offsetWidth,height:sh.offsetHeight,windowWidth:sh.offsetWidth,scrollX:0,scrollY:0,imageTimeout:0})
-    .then(function(cv){
-      var pw=land?841.89:595.28,ph=land?595.28:841.89;
-      if(!pdf)pdf=new jsPDFLib({orientation:land?'landscape':'portrait',unit:'pt',format:'a4'});
-      else pdf.addPage('a4',land?'landscape':'portrait');
-      pdf.addImage(cv.toDataURL('image/jpeg',0.93),'JPEG',0,0,pw,ph);
-      i++;if(btn)btn.textContent='產生中 '+i+'/'+sheets.length;
-      setTimeout(next,0);
-    }).catch(function(e){_err('_plExportPdf',e);_plPrintNative(fn);});
-  })();
-}
-// 後備：套件未載入時走瀏覽器原生列印（主視窗有真實網址，檔名取得到）
+// 匯出：瀏覽器原生列印（主視窗有真實網址，檔名取得到；向量輸出、秒出、檔案小）
 function _plPrintNative(fn){
-  var old=document.title;
-  try{document.title=fn;}catch(e){_err('_plPrintNative',e);}
-  var st=document.createElement('style');st.id='_pl_print_only';
+  _plSetDocTitle(fn);
+  var st=document.getElementById('_pl_print_only');if(st)st.remove();
+  st=document.createElement('style');st.id='_pl_print_only';
   st.textContent='@page{size:A4 portrait;margin:0}'
     +'@page fyland{size:A4 landscape;margin:0}'
     +'@media print{html,body{margin:0!important;padding:0!important;background:#fff!important}'
@@ -22580,10 +22555,14 @@ function _plPrintNative(fn){
     +'#_pl_print_root .sheet.land{page:fyland}'
     +'#_pl_print_root .sheet:last-child{break-after:auto;page-break-after:auto}}';
   document.head.appendChild(st);
-  setTimeout(function(){
-    try{window.print();}catch(e){_err('_plPrintNative.print',e);}
-    setTimeout(function(){st.remove();document.title=old;},600);
-  },120);
+  // 標題不在這裡還原：Chrome 是在按下「存檔」時才依 document.title 取檔名，
+  // 提早還原會讓「另存列印輸出」的檔名變空白。改成關閉預覽時才還原。
+  setTimeout(function(){try{window.print();}catch(e){_err('_plPrintNative.print',e);}},120);
+}
+// 預覽開啟期間把檔名掛在 document.title（瀏覽器存 PDF 的預設檔名來源）
+function _plSetDocTitle(fn){
+  if(_plOldTitle===null)_plOldTitle=document.title;
+  try{document.title=fn;}catch(e){_err('_plSetDocTitle',e);}
 }
 // 羅馬數字（前置頁碼）
 function _plRoman(n){
@@ -22624,25 +22603,20 @@ function _plPrintDoc(B,fname,title){
   var b1=document.createElement('button');
   b1.style.cssText='padding:9px 16px;font-size:14px;border:none;border-radius:8px;background:#fff;color:#0e3d22;font-weight:700;cursor:pointer;white-space:nowrap';
   b1.textContent='列印／存 PDF';
-  b1.title='瀏覽器原生輸出：秒出、文字可搜尋、檔案小（目的地選「另存為 PDF」）';
+  b1.title='目的地選「另存為 PDF」即可存檔（文字可搜尋、檔案小）';
   b1.addEventListener('click',function(){_plPrintNative(fn);});
-  var b3=document.createElement('button');
-  b3.id='_pl_pdf_btn';
-  b3.style.cssText='padding:9px 14px;font-size:13px;border:1px solid rgba(255,255,255,.4);border-radius:8px;background:rgba(255,255,255,.15);color:#fff;font-weight:700;cursor:pointer;white-space:nowrap';
-  b3.textContent='影像版 PDF';
-  b3.title='把每頁轉成圖片再組成 PDF：版面百分之百一致，但頁數多時較慢';
-  b3.addEventListener('click',function(){_plExportPdf(fn);});
   var b2=document.createElement('button');
   b2.style.cssText='padding:9px 14px;font-size:14px;border:1px solid rgba(255,255,255,.4);border-radius:8px;background:rgba(255,255,255,.15);color:#fff;font-weight:700;cursor:pointer;white-space:nowrap';
   b2.textContent='✕ 關閉';
   b2.addEventListener('click',_plPrintClose);
-  bar.appendChild(t);bar.appendChild(b1);bar.appendChild(b3);bar.appendChild(b2);
+  bar.appendChild(t);bar.appendChild(b1);bar.appendChild(b2);
   var root=document.createElement('div');
   root.id='_pl_print_root';
   root.innerHTML='<style>'+css+'</style><div id="_pl_pages"></div>'
     +'<div class="meas" id="_pl_meas"></div><div class="meas measL" id="_pl_measL"></div>';
   document.body.appendChild(bar);document.body.appendChild(root);
   document.body.style.overflow='hidden';
+  _plSetDocTitle(fn);
   var w=window,doc=document;
   var pagesEl=doc.getElementById('_pl_pages'),meas=doc.getElementById('_pl_meas'),measL=doc.getElementById('_pl_measL');
   // 1) 分區（sect 標記）

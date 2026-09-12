@@ -1775,7 +1775,7 @@ async function newPage(browser, width, height) {
       out.rows = PLAN_CHK_ROWS === 19 && PLAN_SAFE_ROWS === 32;
 
       // 1/3) 列印改在主文件內（有真實網址 → PDF 檔名不再空白）、橫式頁維持橫式
-      out.api = typeof _plExportPdf === 'function' && typeof _plPrintNative === 'function'
+      out.api = typeof _plExportPdf === 'undefined' && typeof _plPrintNative === 'function'
         && typeof _plPrintClose === 'function';
       out.noPopup = !/window\.open/.test(_plPrintDoc.toString());
       _plPrintDoc(B, '檔名測試_v1', '施工計畫書');
@@ -1865,8 +1865,11 @@ async function newPage(browser, width, height) {
         && pageTx.filter(t => /^附表自主檢查表SC-01/.test(t)).length === 1
         && pageTx.filter(t => /^附表安全衛生檢查表/.test(t) && t.indexOf('SF-01') > 0).length === 1;
       // 列印工具列：原生列印為主鈕（快、文字可搜尋），影像版 PDF 為備援
+      // 匯出只留一顆鈕（不再有影像版 PDF）
       const btns = [].slice.call(document.querySelectorAll('#_pl_print_bar button')).map(x => x.textContent);
-      out.btns = btns.length === 3 && btns[0] === '列印／存 PDF' && btns[1] === '影像版 PDF';
+      out.btns = btns.length === 2 && btns[0] === '列印／存 PDF' && btns[1] === '✕ 關閉';
+      // 檔名掛在 document.title 上，列印後不還原（還原會讓另存視窗檔名變空白）
+      out.titleKept = document.title === '檔名測試_v1';
       window.print = function () { window.__printed = 1; };
       _plPrintNative('檔名測試_v1');
       await new Promise(res => setTimeout(res, 400));
@@ -1875,6 +1878,7 @@ async function newPage(browser, width, height) {
         && /@page fyland\{size:A4 landscape/.test(css.textContent)
         && /\.sheet\.land\{page:fyland\}/.test(css.textContent);
       _plPrintClose();
+      out.titleRestored = document.title !== '檔名測試_v1' && !document.getElementById('_pl_print_only');
       return out;
     });
     check('計畫書：句號切分不切斷括號，條列不再出現殘句', r.sent && r.badLi);
@@ -1882,7 +1886,8 @@ async function newPage(browser, width, height) {
     check('計畫書：兩張檢查表每張各一頁，簽名欄不被擠到次頁', r.noSignPage && r.codesOnePage);
     check('計畫書：修訂紀錄與目錄各自獨立起頁', r.tocSplit);
     check('計畫書：緊急聯絡表多餘註解已移除（不再產生整頁一行）', r.noEmerRem);
-    check('計畫書：列印主鈕走瀏覽器原生輸出，橫式節以命名頁維持橫式', r.btns && r.native);
+    check('計畫書：匯出只留一顆鈕、走瀏覽器原生輸出，橫式節以命名頁維持橫式', r.btns && r.native);
+    check('計畫書：預覽期間檔名一直掛在 document.title，關閉才還原', r.titleKept && r.titleRestored);
     check('v5.417 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
