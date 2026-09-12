@@ -1773,7 +1773,8 @@ async function newPage(browser, width, height) {
       out.tocPb = ti > 0 && B[ti].pb === true && B[ti - 1].t !== 'toc';
 
       // 5/6) 自主檢查表／安全衛生檢查表滿版固定列數
-      out.rows = PLAN_CHK_ROWS === 18 && PLAN_SAFE_ROWS === 32;
+      out.rows = PLAN_CHK_ROWS === 18 && PLAN_SAFE_ROWS === 25
+        && PLAN_CHK_H === PLAN_CHK_HDRH + PLAN_CHK_ROWS * PLAN_CHK_ROWH;
 
       // 1/3) 列印改在主文件內（有真實網址 → PDF 檔名不再空白）、橫式頁維持橫式
       out.api = typeof _plExportPdf === 'undefined' && typeof _plPrintNative === 'function'
@@ -1863,7 +1864,7 @@ async function newPage(browser, width, height) {
       // v5.421：附表章標題自成一頁，其後每張檢查表各占一頁
       out.codesOnePage = ['SC-01', 'SC-02', 'SC-03', 'SC-04', 'SF-01', 'SF-02'].every(c =>
         pageTx.filter(t => t.indexOf(c) === 0 && /檢查階段|分類檢查項目/.test(t)).length === 1)
-        && pageTx.filter(t => /^附表自主檢查表$/.test(t)).length === 1
+        && pageTx.filter(t => /^附表自主檢查表下列/.test(t)).length === 1
         && pageTx.filter(t => /^附表安全衛生檢查表下列/.test(t)).length === 1;
       // 列印工具列：原生列印為主鈕（快、文字可搜尋），影像版 PDF 為備援
       // 匯出只留一顆鈕（不再有影像版 PDF）
