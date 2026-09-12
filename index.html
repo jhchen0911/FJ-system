@@ -2678,7 +2678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.421';
+var APP_VERSION='v5.422';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -13428,7 +13428,7 @@ function _dxTbl(rows,widths,o){
   var pad=o.qc?PL_M.pad.tblQc:(o.sm?PL_M.pad.tblSm:PL_M.pad.tbl);
   var sz=o.qc?PL_M.sz.tblQc:(o.sm?PL_M.sz.tblSm:PL_M.sz.tbl);
   var lh=o.qc?PL_M.lh.tblQc:(o.sm?PL_M.lh.tblSm:PL_M.lh.tbl);
-  var rowH=o.rowH||null;
+  var rowH=o.__rowH||null;
   var grid=widths?('<w:tblGrid>'+widths.map(function(w){return '<w:gridCol w:w="'+w+'"/>';}).join('')+'</w:tblGrid>'):'';
   return (o.pb?_dxBrk():'')
     +'<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblLayout w:type="fixed"/><w:tblBorders>'
@@ -13438,7 +13438,9 @@ function _dxTbl(rows,widths,o){
     +'<w:left w:w="'+_twOf(pad[1])+'" w:type="dxa"/><w:right w:w="'+_twOf(pad[1])+'" w:type="dxa"/>'
     +'</w:tblCellMar></w:tblPr>'+grid
     +rows.map(function(r,ri){
-      var hh=(rowH&&rowH[ri])?'<w:trHeight w:hRule="atLeast" w:val="'+_twOf(rowH[ri])+'"/>':'';
+      var fh=ri===0?o.hdrH:o.rowH;
+      var hh=fh?'<w:trHeight w:hRule="atLeast" w:val="'+_twOf(fh)+'"/>'
+              :((rowH&&rowH[ri])?'<w:trHeight w:hRule="atLeast" w:val="'+_twOf(rowH[ri])+'"/>':'');
       var kn=(o.keepNextLast&&ri===rows.length-1)?'<w:keepNext/>':'';
       return '<w:tr><w:trPr>'+(ri===0?'<w:tblHeader/>':'')+'<w:cantSplit/>'+hh+'</w:trPr>'+(r||[]).map(function(c,ci){
         var w=widths?widths[ci]:0;
@@ -13584,7 +13586,7 @@ function _docxBytes(blocks,opts){
           +_dxFld('TOC \\o "1-2" \\h \\z \\u','（開啟檔案時按「是」更新功能變數，即自動帶出章節與頁碼；或全選後按 F9。）')
           +'</w:p>';
       }
-      case 'tbl':   return _dxTbl(b.rows,b.w,{sm:!!b.sm,qc:!!b.qc,rowH:b.__rowH,pb:!!(b.pb||b.__pb),
+      case 'tbl':   return _dxTbl(b.rows,b.w,{sm:!!b.sm,qc:!!b.qc,rowH:b.rowH,hdrH:b.hdrH,__rowH:b.__rowH,pb:!!(b.pb||b.__pb),
                       keepNextLast:!!(blocks[bi+1]&&blocks[bi+1].t==='rem')});
       case 'chart': return _dxChart(b);
       case 'img':   {
@@ -15002,10 +15004,14 @@ var PLAN_REGS={
 // ══ 安全衛生檢查表（v5.363：依勾選工項自動附掛；格式參照規範制式表）══
 // v5.417：自主檢查表與安全衛生檢查表各自一套固定格式（不再共用），
 // 列數與表身固定高度都以「最長的一張也放得進一頁」為準，短的用空白列撐滿版
-var PLAN_CHK_ROWS=18;   // 自主檢查表固定項目列數（每張獨占一頁）
-var PLAN_CHK_H=645;     // 自主檢查表表身固定高度（px；留餘裕給 Word 的行高進位差異）
-var PLAN_SAFE_ROWS=32;  // 安全衛生檢查表固定項目列數（每張獨占一頁）
-var PLAN_SAFE_H=755;    // 安全衛生檢查表表身固定高度
+// v5.422：兩張檢查表改為「固定列數＋固定列高」，表格高度與項次多寡無關，
+// 每張表在任何排版引擎下都一定是一頁（含備註與簽名欄）。
+var PLAN_CHK_HDRH=30, PLAN_CHK_ROWH=30;
+var PLAN_CHK_ROWS=18;                                  // 自主檢查表固定項目列數
+var PLAN_CHK_H=PLAN_CHK_HDRH+PLAN_CHK_ROWS*PLAN_CHK_ROWH;
+var PLAN_SAFE_HDRH=30, PLAN_SAFE_ROWH=26;
+var PLAN_SAFE_ROWS=25;                                 // 安全衛生檢查表固定項目列數
+var PLAN_SAFE_H=PLAN_SAFE_HDRH+PLAN_SAFE_ROWS*PLAN_SAFE_ROWH;
 var PLAN_SAFECHK=[
   {k:'general',l:'一般安全檢查表',when:function(ids){return true;},rows:[
     ['門禁管制','人員、車輛進出工區是否指派專人管制'],['門禁管制','人員進出工區是否依規定辦理工作證並配掛胸前以茲識別'],
@@ -19702,7 +19708,7 @@ function rgScene(ctx,names){ scene(ctx,{dim:false,names:names!==false}); }
 function mpPreMat(){
   return {t:'材料加工・根固段腹板剪力釘電銲 ☆',
     n1:'H 型鋼平置，於樁底與根固段重疊之範圍在腹板兩面電銲剪力釘（一邊兩支），使型鋼與根固砂漿確實握裹',
-    n2:'☆ 剪力釘規格與銲道依設計；銲後除渣、無漏銲。剪力釘只銲腹板，不銲翼板',
+    n2:'☆ 剪力釘規格與銲道依設計；銲後除渣、無漏銲',
     draw(ctx){
       scene(ctx,{dim:false,names:false});
       [0,1,2].forEach(i=>{L(ctx,LW.med);rect(ctx,120+i*160,GY-8,26,8);});
@@ -22142,7 +22148,7 @@ function _plBuild(){
       if(qcDone[x.it.id])return;qcDone[x.it.id]=1;
       B.push({t:'h3',v:x.it.name+'品質管理標準',pb:qcN>0});qcN++;
       B.push({t:'tbl',land:true,qc:true,rows:_plFillRows([['施工流程','管理項目','管理標準','檢查時機','檢查方法','檢查頻率','不符合之處置方法','管理紀錄','備註']].concat(_plQcRows(x.it,x.m)),x.m),
-        w:[900,1600,3200,1200,1400,1000,2200,1800,500]});
+        w:[850,1550,3300,1000,1250,850,2050,2450,500]});   // v5.422：加寬「管理標準」與「管理紀錄」減少折行，最多項次的工項也放得進一頁
       rem('☆：檢驗停留點　▲：自主檢查點　※：安衛查驗（於備註欄標註）');
     });
   }else p('（尚未勾選工項）');
@@ -22329,6 +22335,11 @@ function _plBuild(){
   // ══ 附表　自主檢查表（規範格式：表頭管制欄＋檢查標準連動品質管理標準）══
   if(sheets.length){
     B.push({t:'h1',v:'附表　自主檢查表',pb:true});
+    p('下列自主檢查表由本公司現場工程師於各施工階段實地檢查後當場填寫並簽名：'
+      +'檢查結果合格者註明「○」、不合格者註明「╳」、無須檢查之項目註明「／」；'
+      +'不合格者應填具缺失內容與改善方式並辦理複查，複查合格後始得辦理後續作業。'
+      +'完成之檢查表併同查驗照片留存備查，並依契約規定送監造單位查核；'
+      +'本表格式固定，各工項項次不足處留空白供現場增列。');
     sheets.forEach(function(sh,i){
       var code='SC-'+String(i+1).padStart(2,'0');
       B.push({t:'h2',v:code+'　'+_plFill(sh.name,m),pb:true});
@@ -22343,11 +22354,12 @@ function _plBuild(){
         c.rows.forEach(function(r,j){
           var ans=_plState.chkAns[sh.it.id+'|'+c.stage+'|'+j]||'';
           var res=(_plState.chkMode==='fill'&&ans)?({ok:'○',ng:'╳',na:'／'}[ans]||''):'';
-          rows.push([String(++chkN),j===0?c.stage:'',r[0],r[2]+'\n（檢查方法：'+r[1]+'）','',res]);
+          rows.push([String(++chkN),j===0?c.stage:'',r[0],r[2]+'（檢查方法：'+r[1]+'）','',res]);
         });
       });
       while(rows.length<1+PLAN_CHK_ROWS)rows.push([String(++chkN),'　','　','　','　','　']);   // 表單固定長度（滿版）
-      B.push({t:'tbl',sm:1,fixH:PLAN_CHK_H,rows:_plFillRows(rows,m),w:[520,820,2900,3560,1700,700]});
+      B.push({t:'tbl',sm:1,fixH:PLAN_CHK_H,hdrH:PLAN_CHK_HDRH,rowH:PLAN_CHK_ROWH,
+        rows:_plFillRows(rows,m),w:[460,760,2350,4330,1600,700]});   // v5.422：加寬「檢查標準」讓多數列維持兩行
       B.push({t:'tbl',sm:1,rows:[['缺失複查結果：□已改善完成　□未改善完成，進行追蹤改善。　複查日期：　　年　　月　　日　　複查人員：　　　　']],w:[10200]});
       B.push({t:'tbl',sm:1,rows:[['備註：1. 檢查項目及檢查標準依契約規定量化數據詳列。'
         +'2. 實際檢查情形應明確敘述或量化尺寸，由現場工程師當場填寫並簽名。'
@@ -22374,7 +22386,8 @@ function _plBuild(){
         srows.push([r[0]===last?'':r[0],r[1],'','','']);last=r[0];
       });
       while(srows.length<1+PLAN_SAFE_ROWS)srows.push(['　','　','　','　','　']);            // 表單固定長度（滿版）
-      B.push({t:'tbl',sm:1,fixH:PLAN_SAFE_H,rows:srows,w:[1250,4900,760,860,2430]});
+      B.push({t:'tbl',sm:1,fixH:PLAN_SAFE_H,hdrH:PLAN_SAFE_HDRH,rowH:PLAN_SAFE_ROWH,
+        rows:srows,w:[1250,4900,760,860,2430]});
       B.push({t:'tbl',sm:1,rows:[['工地主任','安衛人員','檢查人員'],['\n','\n','\n']],w:[3400,3400,3400]});
     });
   }
@@ -22442,8 +22455,10 @@ function _plBlockHtml(b,bi,ed){
         var tot=b.w.reduce(function(a,x){return a+x;},0)||1;
         cg='<colgroup>'+b.w.map(function(x){return '<col style="width:'+(Math.round(x/tot*10000)/100)+'%">';}).join('')+'</colgroup>';
       }
-      return '<table class="pl-tbl'+(b.sm?' sm':'')+(b.qc?' qc':'')+'"'+(b.fixH?' style="height:'+b.fixH+'px"':'')+'>'+cg+'<thead><tr>'+(rows[0]||[]).map(function(c,ci){return '<th'+cAttr(0,ci)+'>'+esc(c)+'</th>';}).join('')+'</tr></thead><tbody>'
-        +rows.slice(1).map(function(r,ri){return '<tr>'+(r||[]).map(function(c,ci){return '<td'+cAttr(ri+1,ci)+'>'+esc(c).replace(/\n/g,'<br>')+'</td>';}).join('')+'</tr>';}).join('')
+      var rh=b.rowH?' style="height:'+b.rowH+'px"':'';
+      var hh=b.hdrH?' style="height:'+b.hdrH+'px"':'';
+      return '<table class="pl-tbl'+(b.sm?' sm':'')+(b.qc?' qc':'')+'"'+(b.fixH?' style="height:'+b.fixH+'px"':'')+'>'+cg+'<thead><tr'+hh+'>'+(rows[0]||[]).map(function(c,ci){return '<th'+cAttr(0,ci)+'>'+esc(c)+'</th>';}).join('')+'</tr></thead><tbody>'
+        +rows.slice(1).map(function(r,ri){return '<tr'+rh+'>'+(r||[]).map(function(c,ci){return '<td'+cAttr(ri+1,ci)+'>'+esc(c).replace(/\n/g,'<br>')+'</td>';}).join('')+'</tr>';}).join('')
         +'</tbody></table>';
     }
     default:      return '<p class="pl-p"'+ea+(b.bold?' style="font-weight:700;text-align:center"':'')+'>'+v+'</p>';
@@ -23213,11 +23228,12 @@ function _plChkBlocks(){
       c.rows.forEach(function(r,j){
         var ans=_plState.chkAns[sh.it.id+'|'+c.stage+'|'+j]||'';
         var res=(_plState.chkMode==='fill'&&ans)?({ok:'○',ng:'╳',na:'／'}[ans]||''):'';
-        rows.push([String(++chkN),j===0?c.stage:'',r[0],r[2]+'\n（檢查方法：'+r[1]+'）','',res]);
+        rows.push([String(++chkN),j===0?c.stage:'',r[0],r[2]+'（檢查方法：'+r[1]+'）','',res]);
       });
     });
     while(rows.length<1+PLAN_CHK_ROWS)rows.push([String(++chkN),'　','　','　','　','　']);
-    B.push({t:'tbl',sm:1,rows:_plFillRows(rows,sh.m),w:[520,820,2900,3560,1700,700]});
+    B.push({t:'tbl',sm:1,fixH:PLAN_CHK_H,hdrH:PLAN_CHK_HDRH,rowH:PLAN_CHK_ROWH,
+      rows:_plFillRows(rows,sh.m),w:[460,760,2350,4330,1600,700]});
     B.push({t:'tbl',sm:1,rows:[['缺失複查結果：□已改善完成　□未改善完成，進行追蹤改善。　複查日期：　　年　　月　　日　　複查人員：　　　　']],w:[10200]});
     B.push({t:'tbl',sm:1,rows:[['檢查人員（現場工程師）','工地主任','品管工程師','監造單位'],['\n','\n','\n','\n']],w:[2500,2200,2200,2300]});
   });
