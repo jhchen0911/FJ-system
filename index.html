@@ -2678,7 +2678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.422';
+var APP_VERSION='v5.423';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -8896,7 +8896,7 @@ function updateDashTodo(){
     });
   }catch(e){_err('updateDashTodo',e);}
 
-  // 10. v5.381 證照／檢驗合格證效期（讀共用附件庫；到期前 30 天提醒）
+  // 10. v5.381 證照／檢驗合格證效期（讀共用附件庫；v5.423 起到期前 60 天提醒）
   try{
     var _lib=_plAttLibLoad();
     var _slotName={lic:'人員證照',train:'教育訓練／勞保',mach:'機具檢查（一機三證）',jack:'千斤頂校正',mat:'材質證明'};
@@ -8904,8 +8904,8 @@ function updateDashTodo(){
       (_lib[k]||[]).forEach(function(f){
         if(!f||!f.exp)return;
         var dd=_dDiff(today,f.exp);
-        if(dd>30)return;
-        items.push({type:'att_exp',urgent:dd<=7,
+        if(dd>60)return;
+        items.push({type:'att_exp',urgent:dd<=14,
           jump:"go('plan')",
           icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg>',
           color:dd<0?'var(--red)':'#b26a00',
@@ -14805,10 +14805,13 @@ var PLAN_ITEMS_WALL=[
   vars:[{k:'dwT',l:'壁厚',d:'t=60cm'},{k:'dwDepth',l:'壁深',d:'27.0m'},
         {k:'dwPanel',l:'單元寬度',d:'4.5~6.0m'},{k:'dwFc',l:'混凝土設計強度',d:"fc'=280 kgf/cm²（水中混凝土另加 56）"},
         {k:'dwCage',l:'鋼筋籠規格',d:'依結構圖'}],
-  method:'本工法以導牆定位，於穩定液（皂土泥漿）保護下以抓斗（或迴旋鑽掘機）分單元開挖壁溝至設計深度（{{dwDepth}}），'
-    +'經超音波檢測垂直度合格後，吊放鋼筋籠（{{dwCage}}）並以特密管澆置水中混凝土（{{dwFc}}），'
-    +'特密管埋入混凝土 2m 以上；單元間以端板（接頭管）形成接頭，逐單元施作構成連續之地下擋土壁。'
-    +'壁厚 {{dwT}}，單元寬度 {{dwPanel}}。（本模組為通用樣板，連續壁通常由專業廠商施作，送審前請依實際工法覆核。）',
+  method:'※ 本工項非本公司承攬範圍，僅就介面配合需要作原則性敘述，詳細施工方法、品質管理標準與'
+    +'檢驗程序，以連續壁專業廠商所提送並經監造單位核可之施工計畫書為準。\n'
+    +'連續壁以導牆定位，於穩定液保護下分單元開挖壁溝至設計深度（{{dwDepth}}），'
+    +'檢測合格後吊放鋼筋籠（{{dwCage}}）並以特密管澆置水中混凝土（{{dwFc}}），'
+    +'單元間以接頭形成連續之地下擋土壁；壁厚 {{dwT}}，單元寬度 {{dwPanel}}。'
+    +'本公司之支撐系統於連續壁完成並經驗收後接續施作，介面條件（壁頂高程、預埋件、'
+    +'圍令支承位置）依核定圖說及工地協調會議決議辦理。',
   flow:['導牆放樣與施作（RC 導牆，養護）','穩定液拌製與性質檢驗（比重、黏度、pH）',
         '單元劃分與施作順序確認（公母單元）','抓斗開挖壁溝（穩定液面維持於導牆頂下 30cm 內）',
         '開挖至設計深度、清底（沉泥 ≦10cm）','超音波檢測（垂直度 ≦1/300，自主檢查☆／監造查驗◎）',
@@ -14818,37 +14821,22 @@ var PLAN_ITEMS_WALL=[
             ['履帶式吊車','80~120T','1~2 台'],['特密管','Ø25cm','2 套'],['超音波檢測儀','—','1 台']],
   materials:[['材料','規格','說明'],['混凝土','{{dwFc}}，坍度 18±2.5cm','特密管水中澆置'],
              ['鋼筋籠','{{dwCage}}','分節製作'],['皂土','—','穩定液'],['端板／接頭管','依壁厚 {{dwT}}','單元接頭']],
-  notes:['垂直度 ≦1/300；壁溝寬即壁厚 {{dwT}}。','穩定液比重 1.04~1.15、黏度依地層調整，逐單元檢驗記錄。',
-         '清底後沉泥 ≦10cm 方可吊放鋼筋籠。','特密管埋入 ≧2m；澆置曲線逐車記錄防止夾泥。',
-         '單元接頭面清刷，防止接頭漏水。'],
+  notes:['本工項由專業廠商施作，各項管制值依其核定之施工計畫書；本表所列僅供介面協調參考。',
+         '壁體完成後之壁頂高程、垂直度與滲漏情形，於支撐施作前會同確認並作成紀錄。',
+         '支撐圍令支承位置與預埋件，於連續壁施作前提出並納入其施工圖。'],
   safety:['壁溝開口全程圈圍，人員嚴禁跨越。','鋼筋籠雙機抬吊須有吊裝計畫並經核可。','穩定液廢液委託合格機構處理。'],
-  qc:[['連續壁','導牆','位置、淨距（壁厚＋2~4cm）符合圖說','導牆施作','量測','逐段','修正'],
-      ['連續壁','穩定液性質','比重 1.04~1.15、黏度合格','開挖中','比重計、漏斗黏度計','每單元','調整拌製'],
-      ['連續壁','開挖深度','達 {{dwDepth}}','開挖中','測繩','每單元','續挖'],
-      ['連續壁','垂直度','≦1/300','開挖後','超音波檢測','每單元','修壁'],
-      ['連續壁','沉泥厚度','≦10cm','吊籠前','測繩','每單元','再清底'],
-      ['連續壁','鋼筋籠','{{dwCage}}，續接與保護層合格','吊放前','量測','每單元','修正'],
-      ['連續壁','特密管埋入','≧2m','澆置中','量測、澆置曲線','每單元','調整'],
-      ['連續壁','混凝土強度','{{dwFc}}','28 天','抗壓試驗','每單元一組','檢討並報監造']],
+  // 非本公司工項：品質管理標準僅列介面查核，實際管制值以專業廠商核定之計畫書為準
+  qc:[['介面查核','壁體完成確認','壁頂高程、壁面平整與滲漏情形符合圖說','支撐施作前','會同查驗','逐段','通知營造處理後再施作'],
+      ['介面查核','預埋件／支承位置','圍令支承位置與預埋件符合核定施工圖','支撐施作前','量測、目視','逐處','修正或補設'],
+      ['介面查核','移交文件','連續壁竣工測量與品質文件已移交','接續施工前','查文件','1 式','俟文件齊備再施作']],
   checks:[
-    {name:'連續壁工程自主檢查表',stage:'施工前',
-     rows:[['施工圖說及施工計畫是否已送審核可','查文件','已核可'],
-           ['導牆位置與淨距是否符合','量測','壁厚＋2~4cm'],
-           ['穩定液性質是否合格','比重計、黏度計','比重 1.04~1.15'],
-           ['鋼筋籠是否符合圖說','量測','{{dwCage}}'],
-           ['吊裝計畫（雙機抬吊）是否核可','查文件','已核可']]},
-    {name:'連續壁工程自主檢查表',stage:'施工中',
-     rows:[['穩定液面是否維持高度','目視','導牆頂下 30cm 內'],
-           ['開挖深度是否達設計','測繩','{{dwDepth}}'],
-           ['超音波檢測是否合格','檢測報告','垂直度 ≦1/300'],
-           ['沉泥是否 ≦10cm','測繩','合格'],
-           ['特密管埋入是否 ≧2m','量測','符合'],
-           ['澆置曲線是否記錄','查紀錄','逐車記錄']]},
-    {name:'連續壁工程自主檢查表',stage:'施工後',
-     rows:[['壁頂高程與打除是否符合','水準儀','符合圖說'],
-           ['接頭是否無明顯漏水','開挖後目視','無湧水'],
-           ['混凝土強度是否合格','查報告','{{dwFc}}'],
-           ['施工紀錄是否完整','查文件','逐單元填錄']]}]
+    {name:'連續壁介面查核表',stage:'施工前',
+     rows:[['連續壁專業廠商之施工計畫是否已核可','查文件','已核可'],
+           ['圍令支承位置與預埋件是否已納入其施工圖','查圖說','已納入']]},
+    {name:'連續壁介面查核表',stage:'施工後',
+     rows:[['壁頂高程與壁面平整是否符合圖說','水準儀、目視','符合'],
+           ['壁面有無明顯滲漏','開挖後目視','無湧水滲漏'],
+           ['竣工測量與品質文件是否移交','查文件','已移交']]}]
 }
 ];
 PLAN_ITEMS_WALL.forEach(function(x){PLAN_ITEMS.push(x);});
@@ -21817,9 +21805,51 @@ function _plGanttPNG(rows,axis){
   return C.png();
 }
 // 版次＝同專案存檔次數＋1
-function _plVer(){
-  var proj=_plState.proj||_plState.vars.name||'';
-  try{return _trList('plan').filter(function(r){return (r.proj||'')===proj;}).length+1;}catch(e){return 1;}
+// ── 版次與修訂紀錄（v5.423）：按「進版」才產生新版次，修訂章節由系統比對前後差異自動帶出 ──
+function _plRevs(){if(!Array.isArray(_plState.revs))_plState.revs=[];return _plState.revs;}
+function _plVer(){return _plRevs().length+1;}
+// 比對上次進版時的快照，推出這一版動到哪些章節
+function _plRevDiff(){
+  var base=_plState.revBase;if(!base)return [];
+  var cur=_plSnapshot(),out=[];
+  function J(x){try{return JSON.stringify(x==null?'':x);}catch(e){return '';}}
+  [['vars','壹、工項概述'],
+   ['items','陸、施工方法與步驟；柒、分項品質計畫；附表'],
+   ['walls','陸、施工方法與步驟；柒、分項品質計畫；附表'],
+   ['tps','陸、施工方法與步驟'],
+   ['stl','陸、開挖與支撐施作步序；柒、監測計畫配合事項'],
+   ['figs','拾、施工圖說'],
+   ['atts','拾壹、相關附件'],
+   ['emer','玖、緊急應變計畫']].forEach(function(r){
+    if(J(base[r[0]])!==J(cur[r[0]]))out.push(r[1]);
+  });
+  return out.filter(function(v,i,a){return a.indexOf(v)===i;});
+}
+function plBump(){
+  var revs=_plRevs(),first=!revs.length;
+  var auto=_plRevDiff();
+  var sect=first?'—':(auto.join('；')||'　');
+  var reason=first?'初版發行，依契約圖說及結構計算書編訂'
+                  :(auto.length?'依監造單位審查意見修正上列章節':'依監造單位審查意見修正');
+  if(!confirm('進版：把目前內容封存為「第 '+_plVer()+' 版」，之後的修改算下一版。\n\n'
+    +'修訂章節：'+sect+'\n修訂事由：'+reason+'\n\n下一步可修改這兩欄內容。'))return;
+  var s2=prompt('修訂章節（系統已依前後差異帶出，可修改）',sect);if(s2===null)return;
+  var r2=prompt('修訂事由',reason);if(r2===null)return;
+  revs.push({ver:revs.length+1,date:localToday(),
+    sect:(s2||'').trim()||'—',reason:(r2||'').trim()||'　',
+    by:(_plState.vars.sub||'豐有工程有限公司')});
+  _plState.revBase=_plSnapshot();
+  try{_plSave();}catch(e){_err('plBump',e);}
+  try{logActivity('施工計畫書','進版：'+(_plState.vars.name||_plState.proj||'')+' → 第 '+_plVer()+' 版');}catch(e){}
+  _plRender();
+  toast('已進版，目前為第 '+_plVer()+' 版（修訂紀錄已自動填入第 '+(revs.length)+' 版）');
+}
+function plRevDel(i){
+  var revs=_plRevs();if(!revs[i])return;
+  if(!confirm('刪除修訂紀錄「第 '+revs[i].ver+' 版」？版次會往前遞補。'))return;
+  revs.splice(i,1);revs.forEach(function(r,k){r.ver=k+1;});
+  try{_plSave();}catch(e){_err('plRevDel',e);}
+  _plRender();
 }
 // ── 產生計畫書 blocks（依公共工程「施工計畫書製作綱要」分項施工計畫章節）──
 function _plBuild(){
@@ -21886,23 +21916,18 @@ function _plBuild(){
   // ══ 前置（修訂紀錄＋目錄；頁碼 I、II…）══
   B.push({t:'fmh',v:'修訂紀錄'});
   (function(){
-    var proj=_plState.proj||_plState.vars.name||'',hist=[];
-    try{hist=_trList('plan').filter(function(r){return (r.proj||'')===proj;})
-      .sort(function(a,b){return a.ts-b.ts;});}catch(e){_err('_plBuild.hist',e);}
     var sub=_plFill('{{sub}}',m)||'豐有工程有限公司';
+    var revs=_plRevs();
     var rows=[['版次','修訂日期','修訂章節','修訂事由','編訂','監造核可']];
-    hist.forEach(function(r,i){
-      var d=new Date(r.ts);
-      rows.push(['第 '+(i+1)+' 版',
-        d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),
-        i===0?'—':'　', i===0?'初版發行':'　', sub, '　']);
+    revs.forEach(function(r){
+      rows.push(['第 '+r.ver+' 版',r.date||'　',r.sect||'　',r.reason||'　',r.by||sub,'　']);
     });
     rows.push(['第 '+_plVer()+' 版',localToday(),
-      hist.length?'　':'—', hist.length?'　':'初版發行，依契約圖說及結構計算書編訂',
+      revs.length?'　':'—', revs.length?'（本版修訂中）':'初版發行，依契約圖說及結構計算書編訂',
       sub,'　']);
     B.push({t:'tbl',rows:rows,w:[1100,1500,2400,3400,1400,1400]});
-    rem('每次存檔即產生一個版次；經監造單位審查後如有修正，於本表填列修訂章節與事由，'
-      +'內文修訂處以雲形線標示，舊版收回作廢。表格於預覽畫面可直接點擊填寫。');
+    rem('按工具列「進版」即封存一個版次，修訂章節由系統比對前後差異自動帶出，可自行修改；'
+      +'內文修訂處以雲形線標示，舊版收回作廢。表格於預覽畫面亦可直接點擊填寫。');
   })();
   B.push({t:'toc',pb:true});
   // 前置節：修訂紀錄不編頁碼，目錄起算 I
@@ -22135,6 +22160,50 @@ function _plBuild(){
       +'實際施作前應與土方承商、監造單位召開開挖前協調會確認步序。');
   })();
 
+  // ══ 拔除與孔洞回填（僅於有可拔除樁體之工項時輸出）══
+  (function(){
+    var pull=insts.filter(function(x){return ['hpile','railpile','sheet','midpile'].indexOf(x.it.id)>=0;});
+    if(!pull.length)return;
+    h2(insts.length+(_plStl().length?1:0),'樁體拔除與孔洞回填');
+    p('本節適用於施工中屬臨時設施、俟地下結構體完成後須拔除回收之樁體（'
+      +pull.map(function(x){return x.it.name;}).filter(function(v,i,a){return a.indexOf(v)===i;}).join('、')
+      +'）。拔除時機、順序及回填材料經監造單位同意後辦理；'
+      +'永久留置（買斷切除）之樁體不在本節範圍，依核定圖說於指定高程切除並作止水處理。');
+    li(['拔除時機：地下結構體施作完成、各層支撐依序拆除，且該樓層樓版混凝土抗壓強度達設計強度 80% 以上，'
+        +'經監造單位同意後始得拔除；中間樁、共構樁於一樓版完成後於一樓版面施拔。',
+        '拔除順序：由基地內側往外、逐支施拔，同一時間不得於相鄰連續多支同時拔除，'
+        +'避免土壤擾動造成鄰房沉陷；拔除作業避開夜間及雨後土壤飽和時段。',
+        '拔除方法：以振動錘（或油壓拔樁機）夾持樁頂，先小幅振動鬆動樁土握裹力後垂直起拔，'
+        +'嚴禁斜拉；起拔速度均勻，避免瞬間抽拔造成孔壁坍塌。',
+        '孔洞回填：拔除後隨拔隨填，以砂或 CLSM（控制性低強度回填材料）自孔底回填至地表，'
+        +'砂回填時分層搗實；回填材料與方式依監造單位核可者辦理。',
+        '沉陷監測：拔樁期間持續觀測鄰房及路面沉陷，發現異常立即停止作業、回填穩定並通報監造單位會勘。',
+        '樁體整理：拔出之樁材於工區內指定區域清除附著土砂、檢整後分類堆置，'
+        +'變形超出容許者不得再用於本工程；退場前完成數量盤點並作成紀錄。',
+        '地表復原：回填完成後整平夯實，路面及設施依原狀復原，經監造單位驗收後結案。']);
+    rem('拔除數量、回填材料及復原範圍以契約及核定圖說為準；'
+      +'鄰近既有結構物、管線之特殊管制條件，依工地協調會議決議辦理。');
+  })();
+
+  // ══ 支撐拆除與工區退場（僅就本公司承攬範圍敘述）══
+  (function(){
+    if(!insts.length)return;
+    h2(insts.length+(_plStl().length?1:0)+(insts.some(function(x){
+      return ['hpile','railpile','sheet','midpile'].indexOf(x.it.id)>=0;})?1:0),'支撐拆除與工區退場');
+    p('本節僅就本公司承攬之擋土支撐系統敘述；地下結構體、防水、回填及建築工項之竣工事宜，'
+      +'由承攬廠商（營造）依其施工計畫辦理。');
+    li(['拆除條件：各層支撐之拆除，以該層樓版（或支承構造）混凝土抗壓強度達設計強度 80% 以上、'
+        +'經監造單位查驗同意後始得辦理；拆除前確認替代支承已完成。',
+        '拆除順序：由下而上逐層拆除，同層先解除預壓力再拆支撐、斜撐，最後拆圍令；'
+        +'單路分階段解壓，解壓過程持續觀測監測值，異常即停止並通報。',
+        '材料退場：拆下之圍令、支撐、斜撐、托架等材料現場檢整分類，'
+        +'變形或損傷超出容許者不再使用；退場前完成數量盤點，會同確認後運離。',
+        '場地復原：構台拆除、拔樁孔回填、地表整平與臨時設施拆除完成後，'
+        +'將工區交還承攬廠商，並會同確認現況。',
+        '結案文件：本工項之施工紀錄、自主檢查表、材料材質證明、試驗報告、'
+        +'監測配合紀錄及竣工數量，於退場後彙整送承攬廠商併案辦理結算。']);
+  })();
+
   // ══ 柒、分項品質計畫（品質管理標準採橫向頁）══
   h1('分項品質計畫');
   p('本章依「公共工程施工品質管理作業要點」及品質計畫製作綱要編訂，內容包含施工要領、品質管理標準、'
@@ -22149,7 +22218,9 @@ function _plBuild(){
       B.push({t:'h3',v:x.it.name+'品質管理標準',pb:qcN>0});qcN++;
       B.push({t:'tbl',land:true,qc:true,rows:_plFillRows([['施工流程','管理項目','管理標準','檢查時機','檢查方法','檢查頻率','不符合之處置方法','管理紀錄','備註']].concat(_plQcRows(x.it,x.m)),x.m),
         w:[850,1550,3300,1000,1250,850,2050,2450,500]});   // v5.422：加寬「管理標準」與「管理紀錄」減少折行，最多項次的工項也放得進一頁
-      rem('☆：檢驗停留點　▲：自主檢查點　※：安衛查驗（於備註欄標註）');
+      rem('☆：檢驗停留點　▲：自主檢查點　※：安衛查驗（於備註欄標註）。'
+        +'表列檢查頻率為本公司自主檢查之頻率（逐支／逐處全數檢查）；'
+        +'監造單位之抽驗比例依契約規定辦理，契約未訂者，檢驗停留點（☆）項目不低於 10%。');
     });
   }else p('（尚未勾選工項）');
   rem(PLAN_TXT2.qcLegend);
@@ -22201,6 +22272,8 @@ function _plBuild(){
   h3('常見問題處理一覽表');
   tbl(PLAN_TROUBLE,[1800,2600,3000,2800]);
   h2(7,'監測計畫配合事項');p(PLAN_TXT.monitorNote);tbl(PLAN_TXT.monitor,[1800,1800,2600,1800,2200]);
+  rem('本節之三級管理值僅列本公司承攬之各層水平支撐；壁體變位、地下水位、鄰房沉陷及地表沉陷等'
+    +'其餘監測項目之管理值，由承攬廠商（營造）於整體監測計畫中訂定，本公司配合觀測並依其管制值反應。');
   (function(){                                   // v5.415：各層水平支撐之三級管理值
     var stl=_plStl();if(!stl.length)return;
     var U=function(v){return String(v||'').trim()||'＿＿＿';};
@@ -22417,6 +22490,23 @@ function _plAudit(){
   var atts=_plState.atts||{};
   if(!((atts.lic||[]).length))out.push('附件「人員證照」尚未上傳——作業主管／安衛主管證照影本為送審必附（可先產生，附件章會標註另冊檢附）。');
   if(!((atts.calc||[]).length))out.push('附件「結構計算書」尚未上傳（可另冊檢附，附件章將標註）。');
+  // v5.423：自動判斷附件效期——已過期或 60 天內到期者，送審前先提醒更換
+  (function(){
+    var today=localToday(),nm={};
+    PLAN_ATTS.forEach(function(sl){nm[sl.k]=sl.l;});
+    Object.keys(atts||{}).forEach(function(k){
+      (atts[k]||[]).forEach(function(f){
+        if(!f||!f.exp)return;
+        var dd=_dDiff(today,f.exp);
+        if(dd<0)out.push('附件「'+(nm[k]||k)+'：'+(f.cap||f.name||'')+'」已於 '+f.exp+' 過期，'
+          +'過期文件送審必被退件，請更換後再產生計畫書。');
+        else if(dd<=60)out.push('附件「'+(nm[k]||k)+'：'+(f.cap||f.name||'')+'」將於 '+f.exp
+          +'（'+dd+' 天後）到期，審查期間可能失效，建議先行更換。');
+      });
+    });
+    if(!/有效期限|到期|\d{4}-\d{2}-\d{2}/.test(String(m.mgrLic||'')))
+      out.push('作業主管證號未附有效期限（請於欄位一併填寫，例：擋土字第○○號／有效期限 2027-05-31），系統才能提前提醒換證。');
+  })();
   return out;
 }
 // ── blocks → HTML（預覽與列印共用；黑白公文版面）
@@ -23189,7 +23279,17 @@ function _plGen(){
   toast('計畫書已產生，共 '+_plState.doc.length+' 個段落區塊');
 }
 // v5.419：Word 與 PDF 同一份區塊、同一組版面、同一套分頁（圖表也用同一張圖）
+// 匯出前先把送審必填的缺漏攤開來確認（v5.423）
+function _plExportOK(what){
+  var au=[];try{au=_plAudit();}catch(e){_err('_plExportOK',e);}
+  if(!au.length)return true;
+  var head=au.slice(0,8).map(function(x,i){return (i+1)+'. '+x;}).join('\n');
+  return confirm('送審前檢核尚有 '+au.length+' 項待補：\n\n'+head
+    +(au.length>8?('\n…另有 '+(au.length-8)+' 項'):'')
+    +'\n\n仍要繼續'+what+'嗎？（未填處會以＿＿＿＿呈現）');
+}
 function _plDocxOut(){
+  if(!_plExportOK('匯出 Word'))return;
   if(!_plState.doc)_plState.doc=_plBuild();
   var m=_plVarMap(),B=_plState.doc;
   toast('正在計算版面（與列印稿逐頁對齊）…');
@@ -23201,6 +23301,7 @@ function _plDocxOut(){
   }});
 }
 function _plPrintOut(){
+  if(!_plExportOK('列印／存 PDF'))return;
   if(!_plState.doc)_plState.doc=_plBuild();
   _plPrintDoc(_plState.doc,_plFn(),'分項工程施工計畫書');
 }
@@ -23253,7 +23354,8 @@ function _plChkDocx(){
 // ── 存檔／歷史／版次比對 ──
 function _plSnapshot(){
   var s={proj:_plState.proj,vars:_plState.vars,items:_plState.items,walls:_plState.walls,tps:_plState.tps,
-    stl:_plState.stl,figs:_plState.figs,atts:_plState.atts,chkMode:_plState.chkMode,chkAns:_plState.chkAns,emer:_plState.emer};
+    stl:_plState.stl,figs:_plState.figs,atts:_plState.atts,chkMode:_plState.chkMode,chkAns:_plState.chkAns,
+    emer:_plState.emer,revs:_plState.revs||[]};
   var snap=JSON.parse(JSON.stringify(s));
   if(JSON.stringify(snap).length>1400000){
     // 圖檔太大：歷史存檔僅保留檔名（回載後需重新匯入圖檔），避免撐爆瀏覽器儲存空間
@@ -23270,7 +23372,7 @@ function _plSaveRec(){
   var snap=_plSnapshot();
   _trSave('plan','施工計畫書（'+nm+'）',_plState.proj||nm,snap,
     _plState.items.length+' 工項　第 '+_plVer()+' 版');
-  toast('已存檔為第 '+(_plVer()-1)+' 版'+(snap._stripped?'（圖檔過大，此版存檔不含圖檔內容）':''));
+  toast('已存檔（目前第 '+_plVer()+' 版）'+(snap._stripped?'；圖檔過大，此存檔不含圖檔內容':''));
   _plRender();
 }
 function _plApplySnap(v){
@@ -23278,7 +23380,7 @@ function _plApplySnap(v){
   _plState.walls=v.walls||[];_plState.tps=v.tps||{};
   _plState.stl=v.stl||[];_plState.figs=v.figs||[];_plState.atts=v.atts||{};
   _plState.chkMode=v.chkMode||'blank';_plState.chkAns=v.chkAns||{};
-  _plState.emer=v.emer||_plEmerDefault();_plState.doc=null;
+  _plState.emer=v.emer||_plEmerDefault();_plState.revs=Array.isArray(v.revs)?v.revs:[];_plState.doc=null;
   _plNormalize(); // 舊版存檔（擋土壁還在 items 內）自動遷移為 walls
 }
 function _plLoadRec(id){
@@ -23816,10 +23918,10 @@ function _plRender(){
           :'<span style="width:40px;text-align:center"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg></span>')
         +'<input value="'+esc(f.cap||f.name)+'" oninput="_plAttCap(\''+slot.k+'\','+i+',this.value)" '
         +'style="flex:1;min-width:0;font-size:11px;padding:3px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit">'
-        +(function(){   // v5.381 效期：證照／檢驗合格證過期會被排進送審文件，這裡標紅並進待辦
+        +(function(){   // v5.381 效期：證照／檢驗合格證過期會被排進送審文件，這裡標紅並進待辦（v5.423：60 天）
           var expd=f.exp&&f.exp<localToday();
-          var soon=f.exp&&!expd&&_dDiff(localToday(),f.exp)<=30;
-          return '<input type="date" value="'+esc(f.exp||'')+'" title="有效期限（選填）：到期前 30 天會出現在總覽待辦" '
+          var soon=f.exp&&!expd&&_dDiff(localToday(),f.exp)<=60;
+          return '<input type="date" value="'+esc(f.exp||'')+'" title="有效期限（選填）：到期前 60 天會出現在總覽待辦與送審前檢核" '
             +'onchange="_plAttExp(\''+slot.k+'\','+i+',this.value)" '
             +'style="width:118px;font-size:10.5px;padding:3px 4px;border:1px solid '+(expd?'var(--red)':(soon?'#e6a23c':'var(--b2)'))+';border-radius:var(--r6);font-family:inherit'+(expd?';color:var(--red);font-weight:700':'')+'">'
             +(expd?'<span style="font-size:10px;color:var(--red);font-weight:700;white-space:nowrap">已過期</span>':(soon?'<span style="font-size:10px;color:#b26a00;font-weight:700;white-space:nowrap">將到期</span>':''));
@@ -23917,6 +24019,8 @@ function _plRender(){
     +'<button type="button" class="btn btn-g" onclick="_plGen()"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 產生計畫書</button>'
     +'<button type="button" class="btn" onclick="_plDocxOut()"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 匯出 Word（版面同 PDF，可直接改字）</button>'
     +'<button type="button" class="btn" onclick="_plPrintOut()"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 列印／存 PDF</button>'
+    +'<button type="button" class="btn" onclick="plBump()" title="把目前內容封存為一版，之後的修改算下一版；修訂章節由系統比對差異自動帶出"'
+    +' style="border-color:#1a3a6b;color:#1a3a6b">進版（目前第 '+_plVer()+' 版）</button>'
     +'</div>'
     +'<div style="font-size:10.5px;color:var(--b3);margin-top:7px">檔名：'+esc(_plFn())+'</div>'
     +'</div></div>';
