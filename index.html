@@ -2678,7 +2678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.419';
+var APP_VERSION='v5.420';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -13445,10 +13445,12 @@ function _dxTbl(rows,widths,o){
           +(ri===0?'<w:shd w:val="clear" w:fill="F2F2F2"/>':'')
           +'<w:vAlign w:val="center"/></w:tcPr>'
           +'<w:p><w:pPr><w:pStyle w:val="'+(ri===0?'DxTH':'DxTD')+'"/>'
-          +'<w:spacing w:before="0" w:after="0" w:line="'+Math.round(240*lh)+'" w:lineRule="auto"/></w:pPr>'
+          +'<w:spacing w:before="0" w:after="0" w:line="'+Math.round(sz*lh*10)+'" w:lineRule="exact"/></w:pPr>'
           +_dxRunsSz(c,sz,ri===0)+'</w:p></w:tc>';
       }).join('')+'</w:tr>';
-    }).join('')+'</w:tbl>'+_dxP('','DxGap');
+    }).join('')+'</w:tbl>'
+    +'<w:p><w:pPr><w:pStyle w:val="DxGap"/><w:spacing w:before="0" w:after="'+_twOf(10)+'" w:line="20" w:lineRule="exact"/>'
+    +'<w:rPr><w:sz w:val="2"/></w:rPr></w:pPr></w:p>';
 }
 function _dxRunsSz(t,sz,bold){
   var parts=String(t==null?'':t).split('\n');
@@ -13458,7 +13460,10 @@ function _dxRunsSz(t,sz,bold){
 }
 function _dxImg(rid,cx,cy,name){
   var n=String(rid).replace(/\D/g,'');
-  return '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
+  // 圖片段落必須用自動行高：內文為了對齊列印稿採固定行高，會把行內圖片裁成一條線
+  return '<w:p><w:pPr><w:jc w:val="center"/>'
+    +'<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>'
+    +'<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">'
     +'<wp:extent cx="'+cx+'" cy="'+cy+'"/><wp:docPr id="'+n+'" name="'+_dxE(name)+'"/>'
     +'<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
     +'<pic:pic><pic:nvPicPr><pic:cNvPr id="'+n+'" name="'+_dxE(name)+'"/><pic:cNvPicPr/></pic:nvPicPr>'
@@ -13535,9 +13540,7 @@ function _dxChart(b){
 function _dxSectPr(o){
   o=o||{};
   var x='<w:sectPr>';
-  if(o.footer){
-    x+='<w:headerReference w:type="default" r:id="rIdH"/><w:footerReference w:type="default" r:id="rIdF"/>';
-  }
+  if(o.footer)x+='<w:footerReference w:type="default" r:id="rIdF"/>';
   if(o.landscape)x+='<w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>';
   else x+='<w:pgSz w:w="11906" w:h="16838"/>';
   // v5.419：與列印稿同一組數值（四邊 MG、下緣另留頁碼帶 FOOT）
@@ -13590,11 +13593,9 @@ function _docxBytes(blocks,opts){
       default:      return _dxP(b.v,b.bold?null:'DxP',{bold:b.bold,center:!!b.bold});
     }
   }).join('');
+  // v5.420：不放頁首（列印稿沒有頁首，放了兩邊每頁可用高度就不同），只留頁碼
   var useHF=!!o.header||hasSect;
-  if(useHF){
-    rels.push('<Relationship Id="rIdH" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>');
-    rels.push('<Relationship Id="rIdF" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>');
-  }
+  if(useHF)rels.push('<Relationship Id="rIdF" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>');
   var doc='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document '+_DOCX_NS+'><w:body>'+body
     +_dxSectPr({footer:useHF})+'</w:body></w:document>';
   var F='<w:rFonts w:ascii="Times New Roman" w:eastAsia="標楷體" w:hAnsi="Times New Roman"/>';
@@ -13604,26 +13605,26 @@ function _docxBytes(blocks,opts){
     return '<w:style w:type="paragraph" w:styleId="'+id+'"><w:name w:val="'+name+'"/><w:basedOn w:val="Normal"/><w:qFormat/>'
       +'<w:pPr>'+(outline!=null?'<w:outlineLvl w:val="'+outline+'"/>':'')
       +'<w:spacing w:before="'+_twOf(padT)+'" w:after="'+(_twOf(padB)+GAP)+'"'
-      +(line?' w:line="'+Math.round(240*line)+'" w:lineRule="auto"':'')+'/>'+(extraPPr||'')+'</w:pPr>'
+      +(line?' w:line="'+Math.round(sz*line*10)+'" w:lineRule="exact"':'')+'/>'+(extraPPr||'')+'</w:pPr>'
       +'<w:rPr>'+F+(bold?'<w:b/>':'')+'<w:sz w:val="'+sz+'"/>'+(color?'<w:color w:val="'+color+'"/>':'')+'</w:rPr></w:style>';
   }
   var Z=PL_M.sz,LH=PL_M.lh;
   var styles='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
     +'<w:docDefaults><w:rPrDefault><w:rPr>'+F+'<w:sz w:val="24"/></w:rPr></w:rPrDefault></w:docDefaults>'
     +'<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/><w:pPr>'
-      +'<w:spacing w:before="0" w:after="0" w:line="'+Math.round(240*PL_M.lh.p)+'" w:lineRule="auto"/></w:pPr></w:style>'
-    +st('DxTitle','Title',Z.title,1,null,null,22,4,1.3,'<w:jc w:val="center"/>')
-    +st('DxSub','Subtitle',Z.sub,1,null,null,0,10,1.3,'<w:jc w:val="center"/>')
-    +st('DxFmH','FrontHeading',Z.fmh,1,null,null,14,10,1.3,'<w:jc w:val="center"/>')
-    +st('DxH1','heading 1',Z.h1,1,null,0,14,12,1.3,'<w:keepNext/>')
-    +st('DxH2','heading 2',Z.h2,1,null,1,12,4,1.3,'<w:keepNext/>')
-    +st('DxH3','heading 3',Z.h3,1,null,2,8,3,1.3,'<w:keepNext/>')
+      +'<w:spacing w:before="0" w:after="0" w:line="'+Math.round(PL_M.sz.p*PL_M.lh.p*10)+'" w:lineRule="exact"/></w:pPr></w:style>'
+    +st('DxTitle','Title',Z.title,1,null,null,22,4,LH.title,'<w:jc w:val="center"/>')
+    +st('DxSub','Subtitle',Z.sub,1,null,null,0,10,LH.sub,'<w:jc w:val="center"/>')
+    +st('DxFmH','FrontHeading',Z.fmh,1,null,null,14,10,LH.fmh,'<w:jc w:val="center"/>')
+    +st('DxH1','heading 1',Z.h1,1,null,0,14,12,LH.h1,'<w:keepNext/>')
+    +st('DxH2','heading 2',Z.h2,1,null,1,12,4,LH.h2,'<w:keepNext/>')
+    +st('DxH3','heading 3',Z.h3,1,null,2,8,3,LH.h3,'<w:keepNext/>')
     +st('DxP','Body',Z.p,0,null,null,2,2,LH.p,'<w:ind w:firstLine="'+(Z.p*10)+'"/><w:jc w:val="both"/>')
     +st('DxLi','ListPara',Z.li,0,null,null,1,1,LH.li,'<w:ind w:left="360" w:hanging="240"/>')
     +st('DxRem','Remark',Z.rem,0,'444444',null,2,2,LH.rem,'<w:ind w:left="360" w:hanging="240"/>')
-    +st('DxCap','Caption',Z.cap,0,'333333',null,5,6,1.5,'<w:jc w:val="center"/>')
-    +st('DxTH','TableHead',Z.tbl,1,'000000',null,0,0,LH.tbl,'<w:jc w:val="center"/><w:spacing w:before="0" w:after="0" w:line="'+Math.round(240*LH.tbl)+'" w:lineRule="auto"/>')
-    +st('DxTD','TableCell',Z.tbl,0,null,null,0,0,LH.tbl,'<w:spacing w:before="0" w:after="0" w:line="'+Math.round(240*LH.tbl)+'" w:lineRule="auto"/>')
+    +st('DxCap','Caption',Z.cap,0,'333333',null,5,6,LH.cap,'<w:jc w:val="center"/>')
+    +st('DxTH','TableHead',Z.tbl,1,'000000',null,0,0,LH.tbl,'<w:jc w:val="center"/>')
+    +st('DxTD','TableCell',Z.tbl,0,null,null,0,0,LH.tbl)
     +st('DxGap','Gap',2,0,null,null,0,0,0,'<w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/>')
     +st('DxSp','Spacer',Z.p,0,null,null,0,26,1,'<w:spacing w:before="0" w:after="'+_twOf(26)+'" w:line="20" w:lineRule="exact"/>')
     +st('DxTocB','TOC Body',Z.toc2,0,'444444',null,3,3,1.4)
@@ -13637,7 +13638,7 @@ function _docxBytes(blocks,opts){
     +'<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
     +'<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
     +'<Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>'
-    +(useHF?'<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>'
+    +(useHF?''
       +'<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>':'')
     +'</Types>';
   var rr='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
@@ -13650,13 +13651,10 @@ function _docxBytes(blocks,opts){
     {name:'word/styles.xml',data:enc.encode(styles)},
     {name:'word/settings.xml',data:enc.encode(settings)}];
   if(useHF){
-    var hdr='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr '+_DOCX_NS+'>'
-      +'<w:p><w:pPr><w:jc w:val="right"/><w:pBdr><w:bottom w:val="single" w:sz="4" w:color="888888"/></w:pBdr></w:pPr>'
-      +'<w:r><w:rPr><w:sz w:val="16"/><w:color w:val="555555"/></w:rPr><w:t xml:space="preserve">'+_dxE(o.header||'')+'</w:t></w:r></w:p></w:hdr>';
     var ftr='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr '+_DOCX_NS+'>'
-      +'<w:p><w:pPr><w:jc w:val="center"/></w:pPr>'
+      +'<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0"/>'
+      +'<w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman"/><w:sz w:val="'+PL_M.sz.foot+'"/></w:rPr></w:pPr>'
       +_dxFld('PAGE','1')+'</w:p></w:ftr>';
-    files.push({name:'word/header1.xml',data:enc.encode(hdr)});
     files.push({name:'word/footer1.xml',data:enc.encode(ftr)});
   }
   media.forEach(function(m){files.push(m);});
@@ -14993,11 +14991,11 @@ var PLAN_REGS={
 // v5.417：自主檢查表與安全衛生檢查表各自一套固定格式（不再共用），
 // 列數與表身固定高度都以「最長的一張也放得進一頁」為準，短的用空白列撐滿版
 var PLAN_CHK_ROWS=19;   // 自主檢查表固定項目列數
-var PLAN_CHK_H=688;     // 自主檢查表表身固定高度（px，對應 A4 直式版心）
-var PLAN_CHK_H0=626;    // 同上，章首頁（多一行「附表」章標題）
+var PLAN_CHK_H=666;     // 自主檢查表表身固定高度（px，對應 A4 直式版心）
+var PLAN_CHK_H0=606;    // 同上，章首頁（多一行「附表」章標題）
 var PLAN_SAFE_ROWS=32;  // 安全衛生檢查表固定項目列數
-var PLAN_SAFE_H=803;    // 安全衛生檢查表表身固定高度
-var PLAN_SAFE_H0=656;   // 同上，章首頁（多章標題與使用說明）
+var PLAN_SAFE_H=778;    // 安全衛生檢查表表身固定高度
+var PLAN_SAFE_H0=636;   // 同上，章首頁（多章標題與使用說明）
 var PLAN_SAFECHK=[
   {k:'general',l:'一般安全檢查表',when:function(ids){return true;},rows:[
     ['門禁管制','人員、車輛進出工區是否指派專人管制'],['門禁管制','人員進出工區是否依規定辦理工作證並配掛胸前以茲識別'],
@@ -22529,7 +22527,7 @@ function _plTocHtml(B){
   });
   return h;
 }
-var _PL_KAI='"DFKai-SB","標楷體","BiauKai","Kaiti TC","KaiTi","TW-Kai","Noto Serif TC",serif';
+var _PL_KAI='"DFKai-SB","標楷體","BiauKai","Kaiti TC","KaiTi","TW-Kai","TW-MOE-Std-Kai","教育部標準楷書","Noto Serif TC",serif';
 // ══ 版面單一來源（v5.419）：PDF 與 Word 共用同一組數值 ══
 // 字級一律以 Word 的半點（w:sz）為準，CSS 用的 px = sz ÷ 1.5（1px = 0.75pt = 15 twips）。
 // 改這裡就同時改到列印稿與 .docx，兩邊不會再各走各的。
@@ -22537,19 +22535,20 @@ var PL_M={
   PW:794,PH:1123,MG:57,FOOT:40,       // A4 紙張與四邊留白（px；MG 57px = 15mm）
   sz:{p:24,li:24,rem:20,cap:20,tbl:20,tblSm:15,tblQc:15,
       h1:32,h2:28,h3:26,title:44,sub:36,fmh:32,toc1:24,toc2:22,foot:18},
-  lh:{p:1.5,li:1.5,rem:1.4,tbl:1.4,tblSm:1.45,tblQc:1.5},
+  lh:{p:1.5,li:1.5,rem:1.4,cap:1.5,tbl:1.4,tblSm:1.45,tblQc:1.5,
+      h1:1.3,h2:1.3,h3:1.3,title:1.3,sub:1.3,fmh:1.3,toc1:1.5,toc2:1.5},
   pad:{tbl:[4,6],tblSm:[2,4],tblQc:[3,4]}   // 表格內距 [上下,左右]（px）
 };
 function _pxOf(sz){return Math.round(sz/1.5*1000)/1000;}          // 半點 → px
 function _twOf(px){return Math.round(px*15);}                     // px → twips
 var _PLX=(function(){var o={};for(var k in PL_M.sz)o[k]=_pxOf(PL_M.sz[k]);return o;})();
-var _PL_CSS='.pl-title{font-size:'+_PLX.title+'px;color:#000;text-align:center;padding:22px 0 4px;font-weight:800;letter-spacing:.12em}'
-  +'.pl-sub{font-size:'+_PLX.sub+'px;color:#000;text-align:center;font-weight:700;padding-bottom:10px;letter-spacing:.5em}'
-  +'.pl-fmh{font-size:'+_PLX.fmh+'px;color:#000;text-align:center;font-weight:800;padding:14px 0 10px;letter-spacing:.5em}'
+var _PL_CSS='.pl-title{font-size:'+_PLX.title+'px;line-height:'+PL_M.lh.title+';color:#000;text-align:center;padding:22px 0 4px;font-weight:800;letter-spacing:.12em}'
+  +'.pl-sub{font-size:'+_PLX.sub+'px;line-height:'+PL_M.lh.sub+';color:#000;text-align:center;font-weight:700;padding-bottom:10px;letter-spacing:.5em}'
+  +'.pl-fmh{font-size:'+_PLX.fmh+'px;line-height:'+PL_M.lh.fmh+';color:#000;text-align:center;font-weight:800;padding:14px 0 10px;letter-spacing:.5em}'
   +'.pl-spc{height:26px}'
-  +'.pl-h1{font-size:'+_PLX.h1+'px;color:#000;padding:14px 0 6px;font-weight:800;letter-spacing:.06em;border-bottom:2px solid #000;margin-bottom:6px!important;break-after:avoid;page-break-after:avoid}'
-  +'.pl-h2{font-size:'+_PLX.h2+'px;color:#000;padding:12px 0 4px;font-weight:700;letter-spacing:.03em;border-left:4px solid #000;padding-left:8px;break-after:avoid;page-break-after:avoid}'
-  +'.pl-h3{font-size:'+_PLX.h3+'px;color:#000;padding:8px 0 3px;font-weight:700;break-after:avoid;page-break-after:avoid}'
+  +'.pl-h1{font-size:'+_PLX.h1+'px;line-height:'+PL_M.lh.h1+';color:#000;padding:14px 0 6px;font-weight:800;letter-spacing:.06em;border-bottom:2px solid #000;margin-bottom:6px!important;break-after:avoid;page-break-after:avoid}'
+  +'.pl-h2{font-size:'+_PLX.h2+'px;line-height:'+PL_M.lh.h2+';color:#000;padding:12px 0 4px;font-weight:700;letter-spacing:.03em;border-left:4px solid #000;padding-left:8px;break-after:avoid;page-break-after:avoid}'
+  +'.pl-h3{font-size:'+_PLX.h3+'px;line-height:'+PL_M.lh.h3+';color:#000;padding:8px 0 3px;font-weight:700;break-after:avoid;page-break-after:avoid}'
   +'.pl-p{font-size:'+_PLX.p+'px;line-height:'+PL_M.lh.p+';padding:2px 0;text-align:justify;text-justify:inter-ideograph;'
     +'text-indent:2em;color:#111}'
   +'.pl-p.noind,.pl-p[style*="center"]{text-indent:0}'
@@ -22566,10 +22565,10 @@ var _PL_CSS='.pl-title{font-size:'+_PLX.title+'px;color:#000;text-align:center;p
   +'.pl-tbl.qc th,.pl-tbl.qc td{padding:'+PL_M.pad.tblQc[0]+'px '+PL_M.pad.tblQc[1]+'px;font-size:'+_PLX.tblQc+'px;line-height:'+PL_M.lh.tblQc+'}'
   +'.pl-fig{text-align:center;padding:6px 0;break-inside:avoid;page-break-inside:avoid}.pl-fig img{max-width:100%}'
   +'.pl-edithint{display:inline-block;font-size:10.5px;color:#0e3d22;background:#eaf2ec;border:1px solid #b9c6bd;border-radius:10px;padding:1px 9px;margin-top:3px;cursor:pointer}'
-  +'.pl-fig figcaption{font-size:'+_PLX.cap+'px;color:#333;padding-top:5px;line-height:1.5;text-align:center}'
+  +'.pl-fig figcaption{font-size:'+_PLX.cap+'px;color:#333;padding-top:5px;line-height:'+PL_M.lh.cap+';text-align:center}'
   +'.pl-toc1{font-size:'+_PLX.toc1+'px;font-weight:700;color:#000;margin:8px 0 2px}'
   +'.pl-toc2{font-size:'+_PLX.toc2+'px;color:#222;margin:2px 0 2px 22px}'
-  +'.toc-e{display:flex;align-items:baseline;font-size:'+_PLX.toc1+'px;color:#000;padding:3px 0}'
+  +'.toc-e{display:flex;align-items:baseline;font-size:'+_PLX.toc1+'px;line-height:'+PL_M.lh.toc1+';color:#000;padding:3px 0}'
   +'.toc-e.l1{font-weight:700;margin-top:7px}'
   +'.toc-e.l2{margin-left:24px;font-size:'+_PLX.toc2+'px}'
   +'.toc-e .dots{flex:1;border-bottom:1.5px dotted #888;margin:0 6px;transform:translateY(-3px)}'
@@ -22624,18 +22623,12 @@ function _plRoman(n){
 // ══ v5.419：把列印稿的分頁結果與逐列高度回填到區塊上，Word 才能跟 PDF 逐頁對齊 ══
 // __pb＝該區塊是某一頁的第一個元素（Word 於此硬分頁）；__rowH＝表格每一列的實際高度（px）
 function _plPageInfo(B,pages){
-  var prevSect={},i;
-  for(i=0;i<(B||[]).length;i++){
-    if(B[i]){delete B[i].__pb;delete B[i].__rowH;}
-    if(B[i]&&B[i].t==='sect'&&B[i+1])prevSect[i+1]=1;   // 節首不再加硬分頁（分節本身就換頁）
-  }
-  var idx=new Map();(B||[]).forEach(function(b,k){if(b)idx.set(b,k);});
+  for(var i=0;i<(B||[]).length;i++){if(B[i]){delete B[i].__pb;delete B[i].__rowH;}}
   var seen=new Map(),breaks=0;
   (pages||[]).forEach(function(pg,pi){
     (pg.els||[]).forEach(function(el,ei){
       var b=el.__b;if(!b)return;
-      var first=!seen.has(b);if(first)seen.set(b,1);
-      if(first&&ei===0&&pi>0&&!prevSect[idx.get(b)]){b.__pb=true;breaks++;}
+      seen.set(b,1);
       if(el.tagName==='TABLE'&&b.t==='tbl'){
         var hs=b.__rowH||(b.__rowH=[]);
         var trs=Array.prototype.slice.call(el.querySelectorAll('tr'));
@@ -22791,7 +22784,6 @@ function _plPrintDoc(B,fname,title,opts){
           var isHead=/pl-h1|pl-h2|pl-h3|pl-fmh/.test(el.className||'');
           if(b.pb&&used>0&&(b.t==='h1'||b.t==='h2'||b.t==='h3'||b.t==='fmh'||b.t==='tbl'||b.t==='toc'||b.t==='tocline'))breakWithHeads();
           if(el.tagName==='TABLE'&&h>maxH-used&&h>maxH*0.6){
-            if(maxH-used<150&&used>0)breakWithHeads(); // 剩餘空間過小：整表移至次頁起排，避免只切出一兩列
             var parts=splitTable(el,maxH-used-4,maxH-4,mcont);
             parts.forEach(function(pt,pi){
               var ph=oh(pt);
@@ -22804,15 +22796,13 @@ function _plPrintDoc(B,fname,title,opts){
             var img=el.querySelector('img');
             if(img&&h>maxH-used){
               var carry=popHeads();
-              if(h<=maxH*0.92&&used>0){newPage();}
-              else{img.style.maxHeight=(maxH-70)+'px';img.style.width='auto';}
-              h=oh(el);
-              if(h>maxH-used&&used>0)newPage();
+              // Word 的作法：放不下就整張移到次頁，不縮圖（縮了兩邊尺寸就不同）
+              if(used>0)newPage();
+              if(h>maxH){img.style.maxHeight=(maxH-70)+'px';img.style.width='auto';h=oh(el);}
               pushHeads(carry);
             }
           }
           else if(h>maxH-used&&used>0)breakWithHeads();
-          if(isHead&&maxH-used-h<150&&used>0)breakWithHeads(); // 標題後至少保留一段內容空間（孤行控制）
           pg.els.push(el);used+=h;
           if(isHead&&(b.t==='h1'||b.t==='h2')){
             if(b.__hid===undefined)b.__hid='h'+(++_plHidSeq);
