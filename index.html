@@ -2678,7 +2678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.423';
+var APP_VERSION='v5.424';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -14797,7 +14797,7 @@ var PLAN_ITEMS_WALL=[
            ['樁頭打除是否至堅實面','目視','合格'],
            ['施工紀錄是否完整','查文件','逐支填錄']]}]
 },
-{ id:'dwall', name:'連續壁（擋土壁）', short:'連續壁', wall:true, generic:true,
+{ id:'dwall', name:'連續壁（擋土壁）', short:'連續壁', wall:true, generic:true, mentionOnly:true,   // v5.424：非本公司工項，只在「擋土壁形式」帶出名稱，不產生任何章節內容
   hazards:[["導溝與深開挖單元","溝槽坍孔","高","穩定液比重黏度管理、單元長度管制"],
     ["鋼筋籠吊放","超重吊舉物飛落、倒塌","高","雙機抬吊計畫、半徑管制"],
     ["穩定液作業","滑倒、環境污染","中","場地整理、廢液委外處理"],
@@ -14852,7 +14852,8 @@ var PLAN_WALL_FORMS=[
   {v:'鋼板樁',id:'sheet',methods:['直接打設','吊車排板＋逐片壓入','鑽掘引孔＋打設'],specs:['FSP-Ⅲ 型　L=13.0m','FSP-Ⅳ 型　L=15.0m']},
   {v:'預壘樁',id:'prepile',methods:['螺旋鑽掘工法'],specs:['Ø60cm＠60cm　L=23.8m','Ø50cm＠50cm　L=18.0m']},
   {v:'RC基樁（鑽掘式）',id:'rcbore',methods:['鑽掘式（定位套管）'],specs:[]},
-  {v:'RC基樁（全套管式）',id:'rcpile',methods:['全套管式'],specs:['Ø100cm＠120cm　L=25.0m','Ø120cm＠140cm　L=30.0m']}
+  {v:'RC基樁（全套管式）',id:'rcpile',methods:['全套管式'],specs:['Ø100cm＠120cm　L=25.0m','Ø120cm＠140cm　L=30.0m']},
+  {v:'連續壁',id:'dwall',methods:[],specs:[]}   // v5.424：非本公司工項，只在「擋土壁形式」帶出名稱
 ];
 var PLAN_WALL_IDS=PLAN_WALL_FORMS.map(function(f){return f.id;});
 function _plWallForm(){return PLAN_WALL_FORMS.find(function(f){return f.id===_plState.wallForm;})||null;}
@@ -22171,8 +22172,6 @@ function _plBuild(){
       +'永久留置（買斷切除）之樁體不在本節範圍，依核定圖說於指定高程切除並作止水處理。');
     li(['拔除時機：地下結構體施作完成、各層支撐依序拆除，且該樓層樓版混凝土抗壓強度達設計強度 80% 以上，'
         +'經監造單位同意後始得拔除；中間樁、共構樁於一樓版完成後於一樓版面施拔。',
-        '拔除順序：由基地內側往外、逐支施拔，同一時間不得於相鄰連續多支同時拔除，'
-        +'避免土壤擾動造成鄰房沉陷；拔除作業避開夜間及雨後土壤飽和時段。',
         '拔除方法：以振動錘（或油壓拔樁機）夾持樁頂，先小幅振動鬆動樁土握裹力後垂直起拔，'
         +'嚴禁斜拉；起拔速度均勻，避免瞬間抽拔造成孔壁坍塌。',
         '孔洞回填：拔除後隨拔隨填，以砂或 CLSM（控制性低強度回填材料）自孔底回填至地表，'
@@ -22272,8 +22271,6 @@ function _plBuild(){
   h3('常見問題處理一覽表');
   tbl(PLAN_TROUBLE,[1800,2600,3000,2800]);
   h2(7,'監測計畫配合事項');p(PLAN_TXT.monitorNote);tbl(PLAN_TXT.monitor,[1800,1800,2600,1800,2200]);
-  rem('本節之三級管理值僅列本公司承攬之各層水平支撐；壁體變位、地下水位、鄰房沉陷及地表沉陷等'
-    +'其餘監測項目之管理值，由承攬廠商（營造）於整體監測計畫中訂定，本公司配合觀測並依其管制值反應。');
   (function(){                                   // v5.415：各層水平支撐之三級管理值
     var stl=_plStl();if(!stl.length)return;
     var U=function(v){return String(v||'').trim()||'＿＿＿';};
@@ -23574,7 +23571,7 @@ var PLAN_TYPEABLE=['anchor','upile','ccp','deck'];
 function _plInstances(){
   var out=[];
   (_plState.walls||[]).forEach(function(w,i){
-    var it=_plItem(w.id);if(!it)return;
+    var it=_plItem(w.id);if(!it||it.mentionOnly)return;   // 連續壁等非本公司工項：只在擋土壁形式欄出現
     out.push({it:it,v:w.v||{},meth:w.meth||'',
       tag:_plTypeTag(w,i,_plState.walls.length)});
   });
