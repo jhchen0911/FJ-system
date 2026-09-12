@@ -2013,10 +2013,17 @@ async function newPage(browser, width, height) {
     const r = await page.evaluate(() => {
       const out = {};
       // 連續壁非本公司工項：改為介面敘述，移除會誤導的具體管制值
+      // v5.424：連續壁只在「擋土壁形式」帶出名稱，不產生任何章節內容
       const dw = _plItem('dwall');
-      out.dwall = /非本公司承攬範圍/.test(dw.method)
-        && !/1\.04~1\.15|≦1\/300|沉泥/.test(JSON.stringify(dw.qc))
-        && dw.qc.every(r2 => r2[0] === '介面查核');
+      _plClear();
+      _plState.proj = 'T'; _plState.vars.name = 'T';
+      _plState.walls = [{ id: 'dwall', v: {} }]; _plState.items = ['strut']; _plState.vars.layers = '2';
+      _plNormalize && _plNormalize();
+      const Bd = _plBuild();
+      out.dwall = dw.mentionOnly === true
+        && /連續壁/.test(_plWallTypeStr())
+        && !_plInstances().some(x => x.it.id === 'dwall')
+        && !Bd.some(x => (x.t === 'h2' || x.t === 'h3') && /連續壁/.test(x.v || ''));
 
       _plClear();
       _plState.proj = 'T'; _plState.vars.name = 'T';
@@ -2026,7 +2033,8 @@ async function newPage(browser, width, height) {
       _plNormalize && _plNormalize();
       const B = _plBuild();
       const hs = B.filter(x => x.t === 'h2').map(x => x.v).join('|');
-      out.pull = /樁體拔除與孔洞回填/.test(hs);
+      out.pull = /樁體拔除與孔洞回填/.test(hs)
+        && !B.some(x => x.t === 'li' && /不得於相鄰連續多支同時拔除/.test(x.v || ''));
       out.exit = /支撐拆除與工區退場/.test(hs);
       // 拔除章節只在有可拔除樁體的工項時輸出
       _plState.walls = []; _plState.items = ['ccp'];
@@ -2040,7 +2048,7 @@ async function newPage(browser, width, height) {
       const B3 = _plBuild();
       const rems = B3.filter(x => x.t === 'rem').map(x => x.v).join('|');
       out.ratio = /抽驗比例依契約規定辦理/.test(rems) && /不低於 10%/.test(rems);
-      out.monScope = /其餘監測項目之管理值，由承攬廠商（營造）/.test(rems);
+      out.monScope = !/其餘監測項目之管理值/.test(rems);   // v5.424：不再加註
 
       // 進版：版次由 revs 決定，修訂紀錄由系統填
       out.verApi = typeof plBump === 'function' && typeof _plRevDiff === 'function';
@@ -2070,11 +2078,11 @@ async function newPage(browser, width, height) {
       _plState.atts = {};
       return out;
     });
-    check('計畫書：連續壁改為介面敘述，不再列出非本公司的管制值', r.dwall);
+    check('計畫書：連續壁僅於擋土壁形式帶出名稱，不產生章節內容', r.dwall);
     check('計畫書：新增「樁體拔除與孔洞回填」，且僅於有可拔除樁體時輸出', r.pull && r.pullCond);
     check('計畫書：新增「支撐拆除與工區退場」', r.exit);
     check('計畫書：品質管理標準註明監造抽驗比例', r.ratio);
-    check('計畫書：監測三級管理值限本公司工項，其餘由營造訂定', r.monScope);
+    check('計畫書：監測管理值不另加註其餘由營造訂定', r.monScope);
     check('計畫書：進版功能維護版次，修訂紀錄自動帶出', r.verApi && r.ver && r.snap);
     check('計畫書：匯出前先確認送審檢核未補項目', r.exportApi);
     check('計畫書：附件證照過期與即將到期自動進檢核', r.expChk && r.soonChk);
