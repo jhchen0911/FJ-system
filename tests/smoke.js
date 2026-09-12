@@ -1576,8 +1576,9 @@ async function newPage(browser, width, height) {
       out.cover = !B.some(b => b.t === 'tbl' && (b.rows || [])[0] && b.rows[0].join().indexOf('編製（品管工程師）') >= 0);
       // 附件章：作業主管證照、材質證明在千斤頂之前、最後一項為自主檢查表
       const at = PLAN_ATTS.map(a => a.l);
-      out.atts = at.length === 5 && at[1] === '作業主管證照' && at[2] === '材料材質證明書'
-        && at[3] === '千斤頂校正報告' && at[4] === '自主檢查表'
+      // v5.421：附件五（自主檢查表）刪除，本文「附表」已收錄
+      out.atts = at.length === 4 && at[1] === '作業主管證照' && at[2] === '材料材質證明書'
+        && at[3] === '千斤頂校正報告'
         && !at.join().includes('教育訓練') && !at.join().includes('一機三證');
       // 流程圖：各工項字級一致（畫布寬高皆相同）
       const fl = B.filter(b => b.t === 'img' && /flow_/.test(b.name || ''));
@@ -1608,7 +1609,7 @@ async function newPage(browser, width, height) {
       return out;
     });
     check('計畫書：封面已移除編製／審核／核定欄', r.cover);
-    check('計畫書：附件章依指示調整（作業主管、材質證明、千斤頂、自主檢查表）', r.atts);
+    check('計畫書：附件章依指示調整（作業主管、材質證明、千斤頂）', r.atts);
     check('計畫書：各工項施工流程圖字級一致（畫布尺寸固定）', r.flowSame);
     check('計畫書：流程圖逐步對應品質管理標準／自主檢查表', r.ann);
     check('計畫書：自主檢查表緊湊排版且欄寬受控', r.chk);
@@ -1772,7 +1773,7 @@ async function newPage(browser, width, height) {
       out.tocPb = ti > 0 && B[ti].pb === true && B[ti - 1].t !== 'toc';
 
       // 5/6) 自主檢查表／安全衛生檢查表滿版固定列數
-      out.rows = PLAN_CHK_ROWS === 19 && PLAN_SAFE_ROWS === 32;
+      out.rows = PLAN_CHK_ROWS === 18 && PLAN_SAFE_ROWS === 32;
 
       // 1/3) 列印改在主文件內（有真實網址 → PDF 檔名不再空白）、橫式頁維持橫式
       out.api = typeof _plExportPdf === 'undefined' && typeof _plPrintNative === 'function'
@@ -1835,9 +1836,9 @@ async function newPage(browser, width, height) {
       const sc = B.filter(x => x.t === 'tbl' && x.fixH && (x.rows || [])[0] && x.rows[0][0] === '項次');
       const sf = B.filter(x => x.t === 'tbl' && x.fixH && (x.rows || [])[0] && x.rows[0][0] === '分類');
       out.scFix = sc.length >= 2 && sc.every(x => x.rows.length === 1 + PLAN_CHK_ROWS)
-        && sc.every(x => x.fixH === PLAN_CHK_H || x.fixH === PLAN_CHK_H0);
+        && sc.every(x => x.fixH === PLAN_CHK_H);
       out.sfFix = sf.length >= 1 && sf.every(x => x.rows.length === 1 + PLAN_SAFE_ROWS)
-        && sf.every(x => x.fixH === PLAN_SAFE_H || x.fixH === PLAN_SAFE_H0);
+        && sf.every(x => x.fixH === PLAN_SAFE_H);
       out.notShared = PLAN_CHK_ROWS !== PLAN_SAFE_ROWS && PLAN_CHK_H !== PLAN_SAFE_H;
       // 緊急聯絡表下方那句造成整頁只有一行的註解已移除
       out.noEmerRem = !B.some(x => /救援單位/.test(x.v || ''));
@@ -1859,12 +1860,11 @@ async function newPage(browser, width, height) {
       // 每張自主檢查表／安全衛生檢查表各自一頁（簽名欄不再被擠到次頁）
       const sign = pageTx.filter(t => /^檢查人員（現場工程師）工地主任|^工地主任安衛人員檢查人員$/.test(t));
       out.noSignPage = sign.length === 0;
-      // 各表各占一頁（SC-01／SF-01 的頁首為章標題，故以其餘編號檢核；
-      // 「自主檢查表一覽」的表格列也可能以編號開頭，故一併要求頁內有表單表頭）
-      out.codesOnePage = ['SC-02', 'SC-03', 'SC-04', 'SF-02', 'SF-03'].every(c =>
+      // v5.421：附表章標題自成一頁，其後每張檢查表各占一頁
+      out.codesOnePage = ['SC-01', 'SC-02', 'SC-03', 'SC-04', 'SF-01', 'SF-02'].every(c =>
         pageTx.filter(t => t.indexOf(c) === 0 && /檢查階段|分類檢查項目/.test(t)).length === 1)
-        && pageTx.filter(t => /^附表自主檢查表SC-01/.test(t)).length === 1
-        && pageTx.filter(t => /^附表安全衛生檢查表/.test(t) && t.indexOf('SF-01') > 0).length === 1;
+        && pageTx.filter(t => /^附表自主檢查表$/.test(t)).length === 1
+        && pageTx.filter(t => /^附表安全衛生檢查表下列/.test(t)).length === 1;
       // 列印工具列：原生列印為主鈕（快、文字可搜尋），影像版 PDF 為備援
       // 匯出只留一顆鈕（不再有影像版 PDF）
       const btns = [].slice.call(document.querySelectorAll('#_pl_print_bar button')).map(x => x.textContent);
@@ -1933,7 +1933,7 @@ async function newPage(browser, width, height) {
         const brk = (xml.match(/<w:pageBreakBefore\/>/g) || []).length;
         out.docBrk = brk > 0 && brk <= semantic + 4;
         // 圖片段落必須是自動行高，否則會被固定行高裁成一條線
-        out.docImg = /<w:jc w:val="center"\/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"\/><\/w:pPr><w:r><w:drawing>/.test(xml);
+        out.docImg = /<w:jc w:val="center"\/><w:keepNext\/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"\/><\/w:pPr><w:r><w:drawing>/.test(xml);
         // 內文改用固定行高，與列印稿的 font-size × line-height 完全相等
         out.docLine = xml.indexOf('w:line="' + Math.round(PL_M.sz.p * PL_M.lh.p * 10) + '" w:lineRule="exact"') >= 0;
         // 不放頁首（列印稿沒有頁首，放了每頁可用高度就不同）
@@ -1952,6 +1952,57 @@ async function newPage(browser, width, height) {
     check('計畫書：.docx 套用同一組邊界、語意分頁、列高與橫式節', r.docMar && r.docBrk && r.docRowH && r.docLand && r.docSz);
     check('計畫書：.docx 內文固定行高、圖片自動行高（不被裁成一條線）、無頁首', r.docLine && r.docImg && r.docNoHdr);
     check('v5.419 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v5.421 Word 版面依實機回饋修正 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      // 附件五（自主檢查表）刪除：本文「附表」已收錄，附件重複
+      out.noAtt5 = PLAN_ATTS.length === 4 && !PLAN_ATTS.some(x => x.k === 'chk');
+      _plClear();
+      _plState.proj = 'T'; _plState.vars.name = 'T';
+      _plState.walls = [{ id: 'hpile', meth: '水刀引孔', v: {} }];
+      _plState.items = ['midpile', 'upile', 'ccp'];
+      _plState.vars.layers = '2';
+      _plNormalize && _plNormalize();
+      const B = _plBuild();
+      // 品質管理標準：每個工項各自起頁
+      const qc = B.filter(x => x.t === 'h3' && /品質管理標準$/.test(x.v || ''));
+      out.qcPb = qc.length >= 2 && qc.slice(1).every(x => x.pb === true);
+      // 附表：每張檢查表都起新頁（章標題因此自成一頁）
+      const sc = B.filter(x => x.t === 'h2' && /^S[CF]-\d\d/.test(x.v || ''));
+      out.chkPb = sc.length >= 2 && sc.every(x => x.pb === true);
+      // 圖片高度上限＝版心扣掉圖標題與圖說，圖說才不會被推到次頁
+      const img = B.filter(x => x.t === 'img');
+      out.imgCap = img.length > 0 && img.every(x => x.cy <= PL_M.imgMaxH * 9525 + 1)
+        && _PL_CSS.indexOf('max-height:' + PL_M.imgMaxH + 'px') >= 0;
+      // 修訂紀錄不編頁碼：前置節帶 titlePg、頁碼自 0 起（目錄顯示 I）
+      const sect = B.filter(x => x.t === 'sect' && x.o && x.o.fmt === 'upperRoman')[0];
+      out.noRevNo = !!sect && sect.o.titlePg === true && sect.o.start === 0;
+
+      _plPrintDoc(B, 'x', 'y', { silent: true, done: function () {
+        const xml = new TextDecoder().decode(_docxBytes(B, { header: 'T' }));
+        out.docTitlePg = /<w:titlePg\/>/.test(xml) && /w:type="first"/.test(xml)
+          && /w:pgNumType w:fmt="upperRoman" w:start="0"/.test(xml);
+        // 圖片段落 keepNext → 圖說跟著圖走
+        out.docKeepFig = /<w:jc w:val="center"\/><w:keepNext\/>/.test(xml);
+        // 表格註解不脫離表格：最後一列 keepNext
+        out.docKeepNote = /<w:pStyle w:val="DxTD"\/><w:keepNext\/>/.test(xml);
+        // 封面工項列置中，不套內文的首行縮排
+        out.docCover = xml.indexOf('<w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/>') >= 0;
+        res(out);
+      } });
+    }));
+    check('計畫書：附件五（自主檢查表）已刪除', r.noAtt5);
+    check('計畫書：品質管理標準一工項一頁', r.qcPb);
+    check('計畫書：附表章標題自成一頁，每張檢查表各一頁', r.chkPb);
+    check('計畫書：圖片高度設上限，圖說不再被推到次頁', r.imgCap && r.docKeepFig);
+    check('計畫書：修訂紀錄不編頁碼，目錄起算 I', r.noRevNo && r.docTitlePg);
+    check('計畫書：表格註解與表格同頁、封面工項列置中', r.docKeepNote && r.docCover);
+    check('v5.421 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
