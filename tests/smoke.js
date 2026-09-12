@@ -2007,6 +2007,81 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.423 分項計畫書範圍收斂、進版與送審檢核 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      // 連續壁非本公司工項：改為介面敘述，移除會誤導的具體管制值
+      const dw = _plItem('dwall');
+      out.dwall = /非本公司承攬範圍/.test(dw.method)
+        && !/1\.04~1\.15|≦1\/300|沉泥/.test(JSON.stringify(dw.qc))
+        && dw.qc.every(r2 => r2[0] === '介面查核');
+
+      _plClear();
+      _plState.proj = 'T'; _plState.vars.name = 'T';
+      _plState.walls = [{ id: 'hpile', meth: '水刀引孔', v: {} }];
+      _plState.items = ['midpile', 'strut'];
+      _plState.vars.layers = '2';
+      _plNormalize && _plNormalize();
+      const B = _plBuild();
+      const hs = B.filter(x => x.t === 'h2').map(x => x.v).join('|');
+      out.pull = /樁體拔除與孔洞回填/.test(hs);
+      out.exit = /支撐拆除與工區退場/.test(hs);
+      // 拔除章節只在有可拔除樁體的工項時輸出
+      _plState.walls = []; _plState.items = ['ccp'];
+      _plNormalize && _plNormalize();
+      const B2 = _plBuild();
+      out.pullCond = !B2.filter(x => x.t === 'h2').some(x => /樁體拔除/.test(x.v || ''));
+
+      _plState.walls = [{ id: 'hpile', meth: '水刀引孔', v: {} }];
+      _plState.items = ['midpile', 'strut'];
+      _plNormalize && _plNormalize();
+      const B3 = _plBuild();
+      const rems = B3.filter(x => x.t === 'rem').map(x => x.v).join('|');
+      out.ratio = /抽驗比例依契約規定辦理/.test(rems) && /不低於 10%/.test(rems);
+      out.monScope = /其餘監測項目之管理值，由承攬廠商（營造）/.test(rems);
+
+      // 進版：版次由 revs 決定，修訂紀錄由系統填
+      out.verApi = typeof plBump === 'function' && typeof _plRevDiff === 'function';
+      _plState.revs = [];
+      const v1 = _plVer();
+      _plState.revs = [{ ver: 1, date: '2026-09-01', sect: '—', reason: '初版發行', by: '豐有' },
+                       { ver: 2, date: '2026-09-10', sect: '陸', reason: '審查意見修正', by: '豐有' }];
+      const v2 = _plVer();
+      const B4 = _plBuild();
+      const rev = B4.find(x => x.t === 'tbl' && (x.rows || [])[0] && x.rows[0][0] === '版次');
+      out.ver = v1 === 1 && v2 === 3 && !!rev && rev.rows.length === 4
+        && rev.rows[2][3] === '審查意見修正' && rev.rows[3][0] === '第 3 版';
+      // 快照帶得走版次紀錄
+      out.snap = Array.isArray(_plSnapshot().revs) && _plSnapshot().revs.length === 2;
+
+      // 匯出前檢核
+      out.exportApi = typeof _plExportOK === 'function'
+        && /_plExportOK/.test(_plDocxOut.toString()) && /_plExportOK/.test(_plPrintOut.toString());
+      // 附件效期自動判斷（過期／60 天內到期都要進檢核）
+      _plState.atts = { lic: [{ name: 'a.jpg', cap: '作業主管證照', exp: '2020-01-01' }] };
+      const au = _plAudit().join('|');
+      out.expChk = /已於 2020-01-01 過期/.test(au);
+      const d = new Date(); d.setDate(d.getDate() + 30);
+      const soon = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      _plState.atts = { lic: [{ name: 'a.jpg', cap: '作業主管證照', exp: soon }] };
+      out.soonChk = /天後）到期/.test(_plAudit().join('|'));
+      _plState.atts = {};
+      return out;
+    });
+    check('計畫書：連續壁改為介面敘述，不再列出非本公司的管制值', r.dwall);
+    check('計畫書：新增「樁體拔除與孔洞回填」，且僅於有可拔除樁體時輸出', r.pull && r.pullCond);
+    check('計畫書：新增「支撐拆除與工區退場」', r.exit);
+    check('計畫書：品質管理標準註明監造抽驗比例', r.ratio);
+    check('計畫書：監測三級管理值限本公司工項，其餘由營造訂定', r.monScope);
+    check('計畫書：進版功能維護版次，修訂紀錄自動帶出', r.verApi && r.ver && r.snap);
+    check('計畫書：匯出前先確認送審檢核未補項目', r.exportApi);
+    check('計畫書：附件證照過期與即將到期自動進檢核', r.expChk && r.soonChk);
+    check('v5.423 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
