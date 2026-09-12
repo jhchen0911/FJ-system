@@ -1859,9 +1859,10 @@ async function newPage(browser, width, height) {
       // 每張自主檢查表／安全衛生檢查表各自一頁（簽名欄不再被擠到次頁）
       const sign = pageTx.filter(t => /^檢查人員（現場工程師）工地主任|^工地主任安衛人員檢查人員$/.test(t));
       out.noSignPage = sign.length === 0;
-      // 各表各占一頁（SC-01／SF-01 的頁首為章標題，故以其餘編號檢核）
+      // 各表各占一頁（SC-01／SF-01 的頁首為章標題，故以其餘編號檢核；
+      // 「自主檢查表一覽」的表格列也可能以編號開頭，故一併要求頁內有表單表頭）
       out.codesOnePage = ['SC-02', 'SC-03', 'SC-04', 'SF-02', 'SF-03'].every(c =>
-        pageTx.filter(t => t.indexOf(c) === 0).length === 1)
+        pageTx.filter(t => t.indexOf(c) === 0 && /檢查階段|分類檢查項目/.test(t)).length === 1)
         && pageTx.filter(t => /^附表自主檢查表SC-01/.test(t)).length === 1
         && pageTx.filter(t => /^附表安全衛生檢查表/.test(t) && t.indexOf('SF-01') > 0).length === 1;
       // 列印工具列：原生列印為主鈕（快、文字可搜尋），影像版 PDF 為備援
@@ -1917,9 +1918,9 @@ async function newPage(browser, width, height) {
       _plPrintDoc(B, 'x', 'y', { silent: true, done: function (info) {
         // 靜默排版：算完即清乾淨，不留預覽層
         out.clean = !document.getElementById('_pl_print_root') && !document.getElementById('_pl_print_bar');
-        out.pages = info.pages > 20 && info.breaks > 10;
-        // 分頁點與逐列高度都回填到區塊上
-        out.pb = B.filter(x => x.__pb).length === info.breaks;
+        out.pages = info.pages > 20 && info.breaks === 0;
+        // v5.420：不再把瀏覽器算的分頁灌進 Word（Word 自己流排才不會出現半空白頁）
+        out.pb = info.breaks === 0 && B.every(x => !x.__pb);
         const tb = B.filter(x => x.t === 'tbl' && x.__rowH);
         out.rowH = tb.length > 5 && tb.every(x => x.__rowH.length === x.rows.length)
           && tb.every(x => x.__rowH.every(h => h > 0));
@@ -1927,7 +1928,16 @@ async function newPage(browser, width, height) {
         const xml = new TextDecoder().decode(_docxBytes(B, { header: 'T' }));
         const mg = Math.round(PL_M.MG * 15), bot = Math.round((PL_M.MG + PL_M.FOOT) * 15);
         out.docMar = xml.indexOf('w:top="' + mg + '" w:right="' + mg + '" w:bottom="' + bot + '" w:left="' + mg + '"') >= 0;
-        out.docBrk = (xml.match(/<w:pageBreakBefore\/>/g) || []).length >= info.breaks;
+        // 只保留語意分頁（章、附表、目錄、修訂紀錄）
+        const semantic = B.filter(x => x.pb).length;
+        const brk = (xml.match(/<w:pageBreakBefore\/>/g) || []).length;
+        out.docBrk = brk > 0 && brk <= semantic + 4;
+        // 圖片段落必須是自動行高，否則會被固定行高裁成一條線
+        out.docImg = /<w:jc w:val="center"\/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"\/><\/w:pPr><w:r><w:drawing>/.test(xml);
+        // 內文改用固定行高，與列印稿的 font-size × line-height 完全相等
+        out.docLine = xml.indexOf('w:line="' + Math.round(PL_M.sz.p * PL_M.lh.p * 10) + '" w:lineRule="exact"') >= 0;
+        // 不放頁首（列印稿沒有頁首，放了每頁可用高度就不同）
+        out.docNoHdr = xml.indexOf('headerReference') < 0;
         out.docRowH = (xml.match(/w:trHeight/g) || []).length > 50;
         out.docLand = xml.indexOf('w:orient="landscape"') >= 0;
         out.docSz = xml.indexOf('<w:sz w:val="' + PL_M.sz.p + '"/>') >= 0;
@@ -1937,8 +1947,10 @@ async function newPage(browser, width, height) {
     check('計畫書：版面單一來源（CSS px 由 Word 半點換算）', r.metric && r.cssFromM && r.body12);
     check('計畫書：Word 圖表改用與 PDF 相同的圖片', r.sameImg);
     check('計畫書：靜默排版可供 Word 借用，且不留預覽層', r.clean && r.pages);
-    check('計畫書：分頁點與逐列高度回填到區塊', r.pb && r.rowH);
-    check('計畫書：.docx 套用同一組邊界、硬分頁、列高與橫式節', r.docMar && r.docBrk && r.docRowH && r.docLand && r.docSz);
+    check('計畫書：Word 自行流排，不再灌入瀏覽器算出的分頁', r.pb);
+    check('計畫書：逐列高度回填到表格區塊', r.rowH);
+    check('計畫書：.docx 套用同一組邊界、語意分頁、列高與橫式節', r.docMar && r.docBrk && r.docRowH && r.docLand && r.docSz);
+    check('計畫書：.docx 內文固定行高、圖片自動行高（不被裁成一條線）、無頁首', r.docLine && r.docImg && r.docNoHdr);
     check('v5.419 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
