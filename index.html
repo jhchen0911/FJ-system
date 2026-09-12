@@ -2678,7 +2678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.418';
+var APP_VERSION='v5.419';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -13416,21 +13416,45 @@ function _dxFld(instr,placeholder){
     +(placeholder?'<w:r><w:t xml:space="preserve">'+_dxE(placeholder)+'</w:t></w:r>':'')
     +'<w:r><w:fldChar w:fldCharType="end"/></w:r>';
 }
-function _dxTbl(rows,widths){
+// 不留白的分頁段落（表格／圖片前要硬分頁時用）
+function _dxBrk(){
+  return '<w:p><w:pPr><w:pageBreakBefore/><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/>'
+    +'<w:rPr><w:sz w:val="2"/></w:rPr></w:pPr></w:p>';
+}
+// v5.419：內距、行距、列高一律取自列印稿量到的值 → Word 的表格與 PDF 逐列等高
+function _dxTbl(rows,widths,o){
   if(!rows||!rows.length)return '';
+  o=o||{};
+  var pad=o.qc?PL_M.pad.tblQc:(o.sm?PL_M.pad.tblSm:PL_M.pad.tbl);
+  var sz=o.qc?PL_M.sz.tblQc:(o.sm?PL_M.sz.tblSm:PL_M.sz.tbl);
+  var lh=o.qc?PL_M.lh.tblQc:(o.sm?PL_M.lh.tblSm:PL_M.lh.tbl);
+  var rowH=o.rowH||null;
   var grid=widths?('<w:tblGrid>'+widths.map(function(w){return '<w:gridCol w:w="'+w+'"/>';}).join('')+'</w:tblGrid>'):'';
-  return '<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblLayout w:type="fixed"/><w:tblBorders>'
+  return (o.pb?_dxBrk():'')
+    +'<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblLayout w:type="fixed"/><w:tblBorders>'
     +['top','left','bottom','right','insideH','insideV'].map(function(s){return '<w:'+s+' w:val="single" w:sz="6" w:color="444444"/>';}).join('')
-    +'</w:tblBorders></w:tblPr>'+grid
+    +'</w:tblBorders><w:tblCellMar>'
+    +'<w:top w:w="'+_twOf(pad[0])+'" w:type="dxa"/><w:bottom w:w="'+_twOf(pad[0])+'" w:type="dxa"/>'
+    +'<w:left w:w="'+_twOf(pad[1])+'" w:type="dxa"/><w:right w:w="'+_twOf(pad[1])+'" w:type="dxa"/>'
+    +'</w:tblCellMar></w:tblPr>'+grid
     +rows.map(function(r,ri){
-      return '<w:tr>'+(ri===0?'<w:trPr><w:tblHeader/></w:trPr>':'')+(r||[]).map(function(c,ci){
+      var hh=(rowH&&rowH[ri])?'<w:trHeight w:hRule="atLeast" w:val="'+_twOf(rowH[ri])+'"/>':'';
+      return '<w:tr><w:trPr>'+(ri===0?'<w:tblHeader/>':'')+'<w:cantSplit/>'+hh+'</w:trPr>'+(r||[]).map(function(c,ci){
         var w=widths?widths[ci]:0;
         return '<w:tc><w:tcPr><w:tcW w:w="'+(w||0)+'" w:type="'+(w?'dxa':'auto')+'"/>'
           +(ri===0?'<w:shd w:val="clear" w:fill="F2F2F2"/>':'')
           +'<w:vAlign w:val="center"/></w:tcPr>'
-          +'<w:p><w:pPr><w:pStyle w:val="'+(ri===0?'DxTH':'DxTD')+'"/></w:pPr>'+_dxRuns(c)+'</w:p></w:tc>';
+          +'<w:p><w:pPr><w:pStyle w:val="'+(ri===0?'DxTH':'DxTD')+'"/>'
+          +'<w:spacing w:before="0" w:after="0" w:line="'+Math.round(240*lh)+'" w:lineRule="auto"/></w:pPr>'
+          +_dxRunsSz(c,sz,ri===0)+'</w:p></w:tc>';
       }).join('')+'</w:tr>';
     }).join('')+'</w:tbl>'+_dxP('','DxGap');
+}
+function _dxRunsSz(t,sz,bold){
+  var parts=String(t==null?'':t).split('\n');
+  return '<w:r><w:rPr>'+(bold?'<w:b/>':'')+'<w:sz w:val="'+sz+'"/></w:rPr>'+parts.map(function(x,i){
+    return (i?'<w:br/>':'')+'<w:t xml:space="preserve">'+_dxE(x)+'</w:t>';
+  }).join('')+'</w:r>';
 }
 function _dxImg(rid,cx,cy,name){
   var n=String(rid).replace(/\D/g,'');
@@ -13448,7 +13472,7 @@ function _dxB64ToU8(b64){
   var u=new Uint8Array(s.length);for(var i=0;i<s.length;i++)u[i]=s.charCodeAt(i);
   return u;
 }
-// 可編輯圖表（v5.363）：組織圖／流程圖以「表格＋框線」呈現，Word 內可直接改文字。
+// 可編輯圖表（v5.363；v5.419 起計畫書改用與 PDF 相同的圖片，此處保留供舊存檔相容）
 // kind:'org' levels=[[{a,b}..]..]；kind:'flow' steps=[..] ann=[{lines}|null..]
 function _dxChartCell(paras,o){
   o=o||{};
@@ -13516,7 +13540,10 @@ function _dxSectPr(o){
   }
   if(o.landscape)x+='<w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>';
   else x+='<w:pgSz w:w="11906" w:h="16838"/>';
-  x+='<w:pgMar w:top="1134" w:right="1021" w:bottom="1134" w:left="1247" w:header="567" w:footer="567"/>';
+  // v5.419：與列印稿同一組數值（四邊 MG、下緣另留頁碼帶 FOOT）
+  var mg=_twOf(PL_M.MG),bot=_twOf(PL_M.MG+PL_M.FOOT);
+  x+='<w:pgMar w:top="'+mg+'" w:right="'+mg+'" w:bottom="'+bot+'" w:left="'+mg+'"'
+    +' w:header="'+_twOf(PL_M.MG-30)+'" w:footer="'+_twOf(PL_M.MG-38)+'"/>';
   if(o.fmt)x+='<w:pgNumType w:fmt="'+o.fmt+'"'+(o.start?' w:start="'+o.start+'"':'')+'/>';
   x+='</w:sectPr>';
   return x;
@@ -13533,11 +13560,11 @@ function _docxBytes(blocks,opts){
       case 'title': return _dxP(b.v,'DxTitle',{center:true});
       case 'sub':   return _dxP(b.v,'DxSub',{center:true});
       case 'fmh':   return _dxP(b.v,'DxFmH',{center:true,pageBreak:true});
-      case 'h1':    return _dxP(b.v,'DxH1',{pageBreak:!!b.pb});
-      case 'h2':    return _dxP(b.v,'DxH2',{pageBreak:!!b.pb});
-      case 'h3':    return _dxP(b.v,'DxH3');
-      case 'li':    return _dxP(b.v,'DxLi');
-      case 'rem':   return _dxP(b.v,'DxRem');
+      case 'h1':    return _dxP(b.v,'DxH1',{pageBreak:!!(b.pb||b.__pb)});
+      case 'h2':    return _dxP(b.v,'DxH2',{pageBreak:!!(b.pb||b.__pb)});
+      case 'h3':    return _dxP(b.v,'DxH3',{pageBreak:!!b.__pb});
+      case 'li':    return _dxP(b.v,'DxLi',{pageBreak:!!b.__pb});
+      case 'rem':   return _dxP(b.v,'DxRem',{pageBreak:!!b.__pb});
       case 'sp':    return _dxP('','DxSp');
       case 'break': return _dxP('','DxGap',{pageBreak:true});
       case 'sect':  hasSect=true;return '<w:p><w:pPr>'+_dxSectPr(b.o)+'</w:pPr></w:p>';
@@ -13548,17 +13575,19 @@ function _docxBytes(blocks,opts){
           +_dxFld('TOC \\o "1-2" \\h \\z \\u','（開啟檔案時按「是」更新功能變數，即自動帶出章節與頁碼；或全選後按 F9。）')
           +'</w:p>';
       }
-      case 'tbl':   return _dxTbl(b.rows,b.w);
+      case 'tbl':   return _dxTbl(b.rows,b.w,{sm:!!b.sm,qc:!!b.qc,rowH:b.__rowH,pb:!!(b.pb||b.__pb)});
       case 'chart': return _dxChart(b);
       case 'img':   {
         var idx=media.length+1,ext=(b.ext||'png').toLowerCase();exts[ext]=1;
         media.push({name:'word/media/image'+idx+'.'+ext,data:_dxB64ToU8(b.b64)});
         var rid='rId'+(idx+1);
         rels.push('<Relationship Id="'+rid+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image'+idx+'.'+ext+'"/>');
-        return _dxImg(rid,b.cx||5486400,b.cy||3657600,b.name||('image'+idx))
+        return (b.__pb?_dxBrk():'')
+          +_dxImg(rid,b.cx||5486400,b.cy||3657600,b.name||('image'+idx))
           +(b.cap?_dxP(b.cap,'DxCap',{center:true}):'');
       }
-      default:      return _dxP(b.v,null,{bold:b.bold,center:!!b.bold});
+      case 'p':     return _dxP(b.v,'DxP',{pageBreak:!!b.__pb});
+      default:      return _dxP(b.v,b.bold?null:'DxP',{bold:b.bold,center:!!b.bold});
     }
   }).join('');
   var useHF=!!o.header||hasSect;
@@ -13569,29 +13598,35 @@ function _docxBytes(blocks,opts){
   var doc='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document '+_DOCX_NS+'><w:body>'+body
     +_dxSectPr({footer:useHF})+'</w:body></w:document>';
   var F='<w:rFonts w:ascii="Times New Roman" w:eastAsia="標楷體" w:hAnsi="Times New Roman"/>';
-  function st(id,name,sz,bold,color,outline,before,after,extraPPr){
+  // v5.419：before/after 以列印稿的 padding＋區塊間距（10px）換算，line 以 line-height 換算
+  var GAP=_twOf(10);
+  function st(id,name,sz,bold,color,outline,padT,padB,line,extraPPr){
     return '<w:style w:type="paragraph" w:styleId="'+id+'"><w:name w:val="'+name+'"/><w:basedOn w:val="Normal"/><w:qFormat/>'
       +'<w:pPr>'+(outline!=null?'<w:outlineLvl w:val="'+outline+'"/>':'')
-      +'<w:spacing w:before="'+before+'" w:after="'+after+'"/>'+(extraPPr||'')+'</w:pPr>'
+      +'<w:spacing w:before="'+_twOf(padT)+'" w:after="'+(_twOf(padB)+GAP)+'"'
+      +(line?' w:line="'+Math.round(240*line)+'" w:lineRule="auto"':'')+'/>'+(extraPPr||'')+'</w:pPr>'
       +'<w:rPr>'+F+(bold?'<w:b/>':'')+'<w:sz w:val="'+sz+'"/>'+(color?'<w:color w:val="'+color+'"/>':'')+'</w:rPr></w:style>';
   }
+  var Z=PL_M.sz,LH=PL_M.lh;
   var styles='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
     +'<w:docDefaults><w:rPrDefault><w:rPr>'+F+'<w:sz w:val="24"/></w:rPr></w:rPrDefault></w:docDefaults>'
-    +'<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="40" w:after="40" w:line="360" w:lineRule="auto"/></w:pPr></w:style>'
-    +st('DxTitle','Title',44,1,null,null,600,240)
-    +st('DxSub','Subtitle',36,1,null,null,120,400,'<w:spacing w:before="120" w:after="400"/>')
-    +st('DxFmH','FrontHeading',32,1,null,null,320,280)
-    +st('DxH1','heading 1',32,1,null,0,360,180,'<w:keepNext/>')
-    +st('DxH2','heading 2',28,1,null,1,260,130,'<w:keepNext/>')
-    +st('DxH3','heading 3',26,1,null,2,200,100,'<w:keepNext/>')
-    +st('DxLi','ListPara',24,0,null,null,20,20,'<w:ind w:left="480" w:hanging="240"/>')
-    +st('DxRem','Remark',20,0,'444444',null,60,140)
-    +st('DxCap','Caption',20,0,'333333',null,20,180)
-    +st('DxTH','TableHead',20,1,'000000',null,30,30,'<w:jc w:val="center"/>')
-    +st('DxTD','TableCell',20,0,null,null,30,30)
-    +st('DxGap','Gap',12,0,null,null,0,0)
-    +st('DxSp','Spacer',36,0,null,null,120,120)
-    +st('DxTocB','TOC Body',22,0,'444444',null,40,40)
+    +'<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/><w:pPr>'
+      +'<w:spacing w:before="0" w:after="0" w:line="'+Math.round(240*PL_M.lh.p)+'" w:lineRule="auto"/></w:pPr></w:style>'
+    +st('DxTitle','Title',Z.title,1,null,null,22,4,1.3,'<w:jc w:val="center"/>')
+    +st('DxSub','Subtitle',Z.sub,1,null,null,0,10,1.3,'<w:jc w:val="center"/>')
+    +st('DxFmH','FrontHeading',Z.fmh,1,null,null,14,10,1.3,'<w:jc w:val="center"/>')
+    +st('DxH1','heading 1',Z.h1,1,null,0,14,12,1.3,'<w:keepNext/>')
+    +st('DxH2','heading 2',Z.h2,1,null,1,12,4,1.3,'<w:keepNext/>')
+    +st('DxH3','heading 3',Z.h3,1,null,2,8,3,1.3,'<w:keepNext/>')
+    +st('DxP','Body',Z.p,0,null,null,2,2,LH.p,'<w:ind w:firstLine="'+(Z.p*10)+'"/><w:jc w:val="both"/>')
+    +st('DxLi','ListPara',Z.li,0,null,null,1,1,LH.li,'<w:ind w:left="360" w:hanging="240"/>')
+    +st('DxRem','Remark',Z.rem,0,'444444',null,2,2,LH.rem,'<w:ind w:left="360" w:hanging="240"/>')
+    +st('DxCap','Caption',Z.cap,0,'333333',null,5,6,1.5,'<w:jc w:val="center"/>')
+    +st('DxTH','TableHead',Z.tbl,1,'000000',null,0,0,LH.tbl,'<w:jc w:val="center"/><w:spacing w:before="0" w:after="0" w:line="'+Math.round(240*LH.tbl)+'" w:lineRule="auto"/>')
+    +st('DxTD','TableCell',Z.tbl,0,null,null,0,0,LH.tbl,'<w:spacing w:before="0" w:after="0" w:line="'+Math.round(240*LH.tbl)+'" w:lineRule="auto"/>')
+    +st('DxGap','Gap',2,0,null,null,0,0,0,'<w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/>')
+    +st('DxSp','Spacer',Z.p,0,null,null,0,26,1,'<w:spacing w:before="0" w:after="'+_twOf(26)+'" w:line="20" w:lineRule="exact"/>')
+    +st('DxTocB','TOC Body',Z.toc2,0,'444444',null,3,3,1.4)
     +'</w:styles>';
   var settings='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
     +(hasToc?'<w:updateFields w:val="true"/>':'')+'</w:settings>';
@@ -14958,11 +14993,11 @@ var PLAN_REGS={
 // v5.417：自主檢查表與安全衛生檢查表各自一套固定格式（不再共用），
 // 列數與表身固定高度都以「最長的一張也放得進一頁」為準，短的用空白列撐滿版
 var PLAN_CHK_ROWS=19;   // 自主檢查表固定項目列數
-var PLAN_CHK_H=700;     // 自主檢查表表身固定高度（px，對應 A4 直式版心）
-var PLAN_CHK_H0=645;    // 同上，章首頁（多一行「附表」章標題）
+var PLAN_CHK_H=688;     // 自主檢查表表身固定高度（px，對應 A4 直式版心）
+var PLAN_CHK_H0=626;    // 同上，章首頁（多一行「附表」章標題）
 var PLAN_SAFE_ROWS=32;  // 安全衛生檢查表固定項目列數
-var PLAN_SAFE_H=810;    // 安全衛生檢查表表身固定高度
-var PLAN_SAFE_H0=695;   // 同上，章首頁（多章標題與使用說明）
+var PLAN_SAFE_H=803;    // 安全衛生檢查表表身固定高度
+var PLAN_SAFE_H0=656;   // 同上，章首頁（多章標題與使用說明）
 var PLAN_SAFECHK=[
   {k:'general',l:'一般安全檢查表',when:function(ids){return true;},rows:[
     ['門禁管制','人員、車輛進出工區是否指派專人管制'],['門禁管制','人員進出工區是否依規定辦理工作證並配掛胸前以茲識別'],
@@ -21687,8 +21722,9 @@ function _plSchemPNG(id,m){
   return C.png();
 }
 function _plImgBlock(png,name,cap){
-  var maxCx=6299200,cx=Math.min(maxCx,png.w*9525),cy=Math.round(cx*png.h/png.w);
-  var maxCy=8200000;
+  // v5.419：上限＝列印稿版心（寬 PW-2MG、高 PH-2MG-FOOT 扣圖說），Word 與 PDF 同尺寸
+  var maxCx=(PL_M.PW-2*PL_M.MG)*9525,cx=Math.min(maxCx,png.w*9525),cy=Math.round(cx*png.h/png.w);
+  var maxCy=(PL_M.PH-2*PL_M.MG-PL_M.FOOT-40)*9525;
   if(cy>maxCy){cy=maxCy;cx=Math.round(maxCy*png.w/png.h);}
   return {t:'img',b64:png.b64,ext:'png',cx:cx,cy:cy,name:name,cap:cap};
 }
@@ -22494,35 +22530,48 @@ function _plTocHtml(B){
   return h;
 }
 var _PL_KAI='"DFKai-SB","標楷體","BiauKai","Kaiti TC","KaiTi","TW-Kai","Noto Serif TC",serif';
-var _PL_CSS='.pl-title{font-size:25px;color:#000;text-align:center;padding:22px 0 4px;font-weight:800;letter-spacing:.12em}'
-  +'.pl-sub{font-size:19px;color:#000;text-align:center;font-weight:700;padding-bottom:10px;letter-spacing:.5em}'
-  +'.pl-fmh{font-size:18px;color:#000;text-align:center;font-weight:800;padding:14px 0 10px;letter-spacing:.5em}'
+// ══ 版面單一來源（v5.419）：PDF 與 Word 共用同一組數值 ══
+// 字級一律以 Word 的半點（w:sz）為準，CSS 用的 px = sz ÷ 1.5（1px = 0.75pt = 15 twips）。
+// 改這裡就同時改到列印稿與 .docx，兩邊不會再各走各的。
+var PL_M={
+  PW:794,PH:1123,MG:57,FOOT:40,       // A4 紙張與四邊留白（px；MG 57px = 15mm）
+  sz:{p:24,li:24,rem:20,cap:20,tbl:20,tblSm:15,tblQc:15,
+      h1:32,h2:28,h3:26,title:44,sub:36,fmh:32,toc1:24,toc2:22,foot:18},
+  lh:{p:1.5,li:1.5,rem:1.4,tbl:1.4,tblSm:1.45,tblQc:1.5},
+  pad:{tbl:[4,6],tblSm:[2,4],tblQc:[3,4]}   // 表格內距 [上下,左右]（px）
+};
+function _pxOf(sz){return Math.round(sz/1.5*1000)/1000;}          // 半點 → px
+function _twOf(px){return Math.round(px*15);}                     // px → twips
+var _PLX=(function(){var o={};for(var k in PL_M.sz)o[k]=_pxOf(PL_M.sz[k]);return o;})();
+var _PL_CSS='.pl-title{font-size:'+_PLX.title+'px;color:#000;text-align:center;padding:22px 0 4px;font-weight:800;letter-spacing:.12em}'
+  +'.pl-sub{font-size:'+_PLX.sub+'px;color:#000;text-align:center;font-weight:700;padding-bottom:10px;letter-spacing:.5em}'
+  +'.pl-fmh{font-size:'+_PLX.fmh+'px;color:#000;text-align:center;font-weight:800;padding:14px 0 10px;letter-spacing:.5em}'
   +'.pl-spc{height:26px}'
-  +'.pl-h1{font-size:16.5px;color:#000;padding:14px 0 6px;font-weight:800;letter-spacing:.06em;border-bottom:2px solid #000;margin-bottom:6px!important;break-after:avoid;page-break-after:avoid}'
-  +'.pl-h2{font-size:14.5px;color:#000;padding:12px 0 4px;font-weight:700;letter-spacing:.03em;border-left:4px solid #000;padding-left:8px;break-after:avoid;page-break-after:avoid}'
-  +'.pl-h3{font-size:13px;color:#000;padding:8px 0 3px;font-weight:700;break-after:avoid;page-break-after:avoid}'
-  +'.pl-p{font-size:12.5px;line-height:1.95;padding:2px 0;text-align:justify;text-justify:inter-ideograph;'
+  +'.pl-h1{font-size:'+_PLX.h1+'px;color:#000;padding:14px 0 6px;font-weight:800;letter-spacing:.06em;border-bottom:2px solid #000;margin-bottom:6px!important;break-after:avoid;page-break-after:avoid}'
+  +'.pl-h2{font-size:'+_PLX.h2+'px;color:#000;padding:12px 0 4px;font-weight:700;letter-spacing:.03em;border-left:4px solid #000;padding-left:8px;break-after:avoid;page-break-after:avoid}'
+  +'.pl-h3{font-size:'+_PLX.h3+'px;color:#000;padding:8px 0 3px;font-weight:700;break-after:avoid;page-break-after:avoid}'
+  +'.pl-p{font-size:'+_PLX.p+'px;line-height:'+PL_M.lh.p+';padding:2px 0;text-align:justify;text-justify:inter-ideograph;'
     +'text-indent:2em;color:#111}'
   +'.pl-p.noind,.pl-p[style*="center"]{text-indent:0}'
-  +'.pl-li{font-size:12.5px;line-height:1.9;padding:1px 0 1px 24px;text-indent:-16px;color:#111}'
-  +'.pl-rem{font-size:10.5px;color:#444;padding:2px 0 2px 24px;text-indent:-16px;line-height:1.7}'
+  +'.pl-li{font-size:'+_PLX.li+'px;line-height:'+PL_M.lh.li+';padding:1px 0 1px 24px;text-indent:-16px;color:#111}'
+  +'.pl-rem{font-size:'+_PLX.rem+'px;color:#444;padding:2px 0 2px 24px;text-indent:-16px;line-height:'+PL_M.lh.rem+'}'
   +'.pl-tbl{width:100%;border-collapse:collapse}'
-  +'.pl-tbl th,.pl-tbl td{border:1px solid #444;padding:4px 6px;font-size:10.5px;line-height:1.65;vertical-align:middle;color:#111}'
+  +'.pl-tbl th,.pl-tbl td{border:1px solid #444;padding:'+PL_M.pad.tbl[0]+'px '+PL_M.pad.tbl[1]+'px;font-size:'+_PLX.tbl+'px;line-height:'+PL_M.lh.tbl+';vertical-align:middle;color:#111}'
   +'.pl-tbl th{background:#f2f2f2;color:#000;text-align:center;font-weight:700}'
   +'.pl-tbl{table-layout:fixed}.pl-tbl td,.pl-tbl th{word-break:break-word}'
   +'.pl-tbl thead{display:table-header-group}.pl-tbl tr{page-break-inside:avoid;break-inside:avoid}'
   +'.pl-tbl tbody tr:nth-child(even) td{background:#fafafa}'
   +'.pl-tbl td:first-child,.pl-tbl th:first-child{text-align:center}'
-  +'.pl-tbl.sm th,.pl-tbl.sm td{padding:2px 4px;font-size:9.5px;line-height:1.45}'
-  +'.pl-tbl.qc th,.pl-tbl.qc td{padding:2.5px 4px;font-size:10px;line-height:1.5}'
+  +'.pl-tbl.sm th,.pl-tbl.sm td{padding:'+PL_M.pad.tblSm[0]+'px '+PL_M.pad.tblSm[1]+'px;font-size:'+_PLX.tblSm+'px;line-height:'+PL_M.lh.tblSm+'}'
+  +'.pl-tbl.qc th,.pl-tbl.qc td{padding:'+PL_M.pad.tblQc[0]+'px '+PL_M.pad.tblQc[1]+'px;font-size:'+_PLX.tblQc+'px;line-height:'+PL_M.lh.tblQc+'}'
   +'.pl-fig{text-align:center;padding:6px 0;break-inside:avoid;page-break-inside:avoid}.pl-fig img{max-width:100%}'
   +'.pl-edithint{display:inline-block;font-size:10.5px;color:#0e3d22;background:#eaf2ec;border:1px solid #b9c6bd;border-radius:10px;padding:1px 9px;margin-top:3px;cursor:pointer}'
-  +'.pl-fig figcaption{font-size:10.5px;color:#333;padding-top:5px;line-height:1.6;text-align:center}'
-  +'.pl-toc1{font-size:13px;font-weight:700;color:#000;margin:8px 0 2px}'
-  +'.pl-toc2{font-size:12px;color:#222;margin:2px 0 2px 22px}'
-  +'.toc-e{display:flex;align-items:baseline;font-size:12.5px;color:#000;padding:3px 0}'
+  +'.pl-fig figcaption{font-size:'+_PLX.cap+'px;color:#333;padding-top:5px;line-height:1.5;text-align:center}'
+  +'.pl-toc1{font-size:'+_PLX.toc1+'px;font-weight:700;color:#000;margin:8px 0 2px}'
+  +'.pl-toc2{font-size:'+_PLX.toc2+'px;color:#222;margin:2px 0 2px 22px}'
+  +'.toc-e{display:flex;align-items:baseline;font-size:'+_PLX.toc1+'px;color:#000;padding:3px 0}'
   +'.toc-e.l1{font-weight:700;margin-top:7px}'
-  +'.toc-e.l2{margin-left:24px;font-size:12px}'
+  +'.toc-e.l2{margin-left:24px;font-size:'+_PLX.toc2+'px}'
   +'.toc-e .dots{flex:1;border-bottom:1.5px dotted #888;margin:0 6px;transform:translateY(-3px)}'
   +'.toc-e .pg{font-family:"Times New Roman",serif}';
 // 列印視窗右上角固定工具列（列印時自動隱藏）
@@ -22572,10 +22621,38 @@ function _plRoman(n){
 }
 // ── 自訂分頁引擎：A4 頁面、封面無頁碼、前置 I/II、本文 1/2/3、品管標準橫向頁、
 //    目錄帶真實頁碼、頁尾置中頁碼；@page margin 0 → 瀏覽器不再印網址與日期頁首 ──
-function _plPrintDoc(B,fname,title){
+// ══ v5.419：把列印稿的分頁結果與逐列高度回填到區塊上，Word 才能跟 PDF 逐頁對齊 ══
+// __pb＝該區塊是某一頁的第一個元素（Word 於此硬分頁）；__rowH＝表格每一列的實際高度（px）
+function _plPageInfo(B,pages){
+  var prevSect={},i;
+  for(i=0;i<(B||[]).length;i++){
+    if(B[i]){delete B[i].__pb;delete B[i].__rowH;}
+    if(B[i]&&B[i].t==='sect'&&B[i+1])prevSect[i+1]=1;   // 節首不再加硬分頁（分節本身就換頁）
+  }
+  var idx=new Map();(B||[]).forEach(function(b,k){if(b)idx.set(b,k);});
+  var seen=new Map(),breaks=0;
+  (pages||[]).forEach(function(pg,pi){
+    (pg.els||[]).forEach(function(el,ei){
+      var b=el.__b;if(!b)return;
+      var first=!seen.has(b);if(first)seen.set(b,1);
+      if(first&&ei===0&&pi>0&&!prevSect[idx.get(b)]){b.__pb=true;breaks++;}
+      if(el.tagName==='TABLE'&&b.t==='tbl'){
+        var hs=b.__rowH||(b.__rowH=[]);
+        var trs=Array.prototype.slice.call(el.querySelectorAll('tr'));
+        trs.forEach(function(tr,ri){
+          if(ri===0&&hs.length)return;                   // 續頁重印的表頭不重複計
+          hs.push(Math.round(tr.getBoundingClientRect().height));
+        });
+      }
+    });
+  });
+  return {pages:(pages||[]).length,breaks:breaks};
+}
+function _plPrintDoc(B,fname,title,opts){
   var fn=String(fname||title||'施工計畫書').replace(/[\\/:*?"<>|]/g,'').slice(0,120);
+  opts=opts||{};
   _plPrintClose();
-  var PW=794,PH=1123,MG=57,FOOT=40,SP=10;
+  var PW=PL_M.PW,PH=PL_M.PH,MG=PL_M.MG,FOOT=PL_M.FOOT,SP=10;
   var CW=PW-2*MG,CH=PH-2*MG-FOOT;
   var LCW=PH-2*MG,LCH=PW-2*MG-FOOT;
   var R='#_pl_print_root';
@@ -22589,7 +22666,7 @@ function _plPrintDoc(B,fname,title){
     +R+' .pc>*{margin:0 0 '+SP+'px!important}'
     +R+' .pcl{position:absolute;left:'+MG+'px;top:'+MG+'px;width:'+LCW+'px;height:'+LCH+'px}'
     +R+' .pcl>*{margin:0 0 '+SP+'px!important}'
-    +R+' .pfoot,'+R+' .pfootl{position:absolute;left:0;right:0;bottom:'+(MG-38)+'px;text-align:center;font-size:11.5px;color:#333;font-family:"Times New Roman",serif}'
+    +R+' .pfoot,'+R+' .pfootl{position:absolute;left:0;right:0;bottom:'+(MG-38)+'px;text-align:center;font-size:'+_PLX.foot+'px;color:#333;font-family:"Times New Roman",serif}'
     +R+' .meas{position:absolute;left:-9999px;top:0;width:'+CW+'px;visibility:hidden}'
     +R+' .meas>*{margin:0 0 '+SP+'px!important}'
     +R+' .measL{width:'+LCW+'px}';
@@ -22614,9 +22691,9 @@ function _plPrintDoc(B,fname,title){
   root.id='_pl_print_root';
   root.innerHTML='<style>'+css+'</style><div id="_pl_pages"></div>'
     +'<div class="meas" id="_pl_meas"></div><div class="meas measL" id="_pl_measL"></div>';
+  if(opts.silent){root.style.visibility='hidden';root.style.zIndex='-1';bar.style.display='none';}
   document.body.appendChild(bar);document.body.appendChild(root);
-  document.body.style.overflow='hidden';
-  _plSetDocTitle(fn);
+  if(!opts.silent){document.body.style.overflow='hidden';_plSetDocTitle(fn);}
   var w=window,doc=document;
   var pagesEl=doc.getElementById('_pl_pages'),meas=doc.getElementById('_pl_meas'),measL=doc.getElementById('_pl_measL');
   // 1) 分區（sect 標記）
@@ -22643,7 +22720,7 @@ function _plPrintDoc(B,fname,title){
       if(!html)return null;
       var d=doc.createElement('div');d.innerHTML=html;
       var els=Array.prototype.slice.call(d.children);
-      els.forEach(function(el){container.appendChild(el);});
+      els.forEach(function(el){el.__b=b;container.appendChild(el);});
       return {b:b,els:els};
     }).filter(Boolean);
   }
@@ -22665,7 +22742,7 @@ function _plPrintDoc(B,fname,title){
   // 表格跨頁拆列（表頭每頁重複）
   function splitTable(tb,firstAvail,fullH,mcont){
     function shell(){
-      var t=tb.cloneNode(false);t.style.height='';
+      var t=tb.cloneNode(false);t.style.height='';t.__b=tb.__b;
       if(tb.tHead)t.appendChild(tb.tHead.cloneNode(true));
       t.appendChild(doc.createElement('tbody'));
       mcont.appendChild(t);
@@ -22792,6 +22869,14 @@ function _plPrintDoc(B,fname,title){
         sh.appendChild(f);
       }
       pagesEl.appendChild(sh);
+    }
+    if(opts.silent){
+      var info=_plPageInfo(B,[].concat(coverPages,frontPages,bodyRes.pages));
+      meas.innerHTML='';measL.innerHTML='';
+      try{meas.remove();measL.remove();}catch(e){_err('_plPrintDoc.clean',e);}
+      _plPrintClose();
+      if(opts.done)opts.done(info);
+      return;
     }
     coverPages.forEach(function(pg){emit(pg,'');});
     frontPages.forEach(function(pg,i){emit(pg,_plRoman(i+1));});
@@ -23080,22 +23165,17 @@ function _plGen(){
   if(box)box.scrollIntoView({behavior:'smooth',block:'start'});
   toast('計畫書已產生，共 '+_plState.doc.length+' 個段落區塊');
 }
+// v5.419：Word 與 PDF 同一份區塊、同一組版面、同一套分頁（圖表也用同一張圖）
 function _plDocxOut(){
   if(!_plState.doc)_plState.doc=_plBuild();
-  var m=_plVarMap();
-  // 組織圖／流程圖：Word 版改輸出「可編輯表格圖」（業主可直接修改文字）；PDF 版維持繪圖
-  var out=_plState.doc.map(function(b){
-    if(b&&b.t==='img'&&b.__edit){
-      var e=b.__edit;
-      if(e.kind==='org')return {t:'chart',kind:'org',levels:e.levels,cap:b.cap};
-      if(e.kind==='flow'){
-        var it=e.it?_plItem(e.it):null;
-        return {t:'chart',kind:'flow',steps:e.steps,ann:it?_plFlowAnn(it,e.steps,e.m||{}):null,cap:b.cap};
-      }
-    }
-    return b;
-  });
-  docxDownload(_plFn(),out,{header:(m.name||'')+'　分項工程施工計畫書'});
+  var m=_plVarMap(),B=_plState.doc;
+  toast('正在計算版面（與列印稿逐頁對齊）…');
+  _plPrintDoc(B,_plFn(),'施工計畫書',{silent:true,done:function(info){
+    try{
+      docxDownload(_plFn(),B,{header:(m.name||'')+'　分項工程施工計畫書'});
+      toast('已匯出 Word：共 '+info.pages+' 頁，版面與「列印／存 PDF」一致');
+    }catch(e){_err('_plDocxOut',e);toast('匯出 Word 失敗，請查看錯誤日誌');}
+  }});
 }
 function _plPrintOut(){
   if(!_plState.doc)_plState.doc=_plBuild();
@@ -23811,7 +23891,7 @@ function _plRender(){
     : '<div style="font-size:12px;color:var(--g3);padding:8px 10px;background:var(--gl);border-radius:var(--r6)">必填欄位皆已填寫，可產生計畫書送審。</div>';
   h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'
     +'<button type="button" class="btn btn-g" onclick="_plGen()"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 產生計畫書</button>'
-    +'<button type="button" class="btn" onclick="_plDocxOut()"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 匯出 Word（封面＋目錄＋頁碼）</button>'
+    +'<button type="button" class="btn" onclick="_plDocxOut()"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 匯出 Word（版面同 PDF，可直接改字）</button>'
     +'<button type="button" class="btn" onclick="_plPrintOut()"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 列印／存 PDF</button>'
     +'</div>'
     +'<div style="font-size:10.5px;color:var(--b3);margin-top:7px">檔名：'+esc(_plFn())+'</div>'
