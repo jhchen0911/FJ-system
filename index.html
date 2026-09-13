@@ -18284,24 +18284,16 @@ function doubleWalerDetail(ctx,dx,dy,r,label,o){
   o=o||{};
   L(ctx,LW.med);circ(ctx,dx,dy,r,'#fff');
   ctx.save();ctx.beginPath();ctx.arc(dx,dy,r-2,0,Math.PI*2);ctx.clip();
-  const px=dx-34;                                                   // 擋土樁翼面
+  const px=dx-40;                                                   // 擋土樁翼面
   L(ctx,LW.thick);seg(ctx,px,dy-r,px,dy+r);
   L(ctx,LW.hair);seg(ctx,px-4,dy-r,px-4,dy+r);
-  const H=26,gap=30,x=px+1,yT=dy-gap/2-H,yB=dy+gap/2;
-  hSectionV(ctx,x,yT,H);hSectionV(ctx,x,yB,H);                      // H300×300 橫擋斷面（H 形）
-  gussetPlate(ctx,x,yT+H,13,13);gussetPlate(ctx,x,yB+H,18,20);       // 上下三角鈑托架
+  const g=anchorGeom(px+1,dy,28,48,14);
+  walerSet(ctx,g);                                                  // H300×300 雙橫擋＋上下三角鈑托架
   if(o.seat!==false){
-    const x0=x+H,yTop=yT,yBot=yB+H;
-    const fT=[x0+9,yTop],fB=[x0+9+Math.tan(A_ANG)*(yBot-yTop),yBot];
-    const C=[fT[0]+(fB[0]-fT[0])*0.42,fT[1]+(fB[1]-fT[1])*0.42];
-    L(ctx,LW.med);path(ctx,[[x0,yTop],fT,fB,[x0,yBot]],true);ctx.stroke();   // 楔形台座
-    L(ctx,LW.thin);seg(ctx,fT[0],fT[1]+2,x0+2,yBot-2);seg(ctx,x0,dy,x0+14,dy);
-    ctx.save();ctx.translate(C[0],C[1]);ctx.rotate(-A_ANG);
-    L(ctx,LW.med);ctx.strokeRect(0,-16,5,32);ctx.strokeRect(5,-8,11,16);L(ctx,LW.thin);ctx.strokeRect(16,-5,6,10);   // 承壓鈑＋錨具
-    [-3,0,3].forEach(k=>seg(ctx,-70,k,26,k));                        // 鋼絞線沿錨軸穿過台座與橫擋間隙
-    ctx.restore();
+    seatSet(ctx,g,{plate:true,head:true});                          // 台座＋承壓鈑＋錨具
+    strandBundle(ctx,g.C[0]+AU[0]*110,g.C[1]+AU[1]*110,g.hx-AU[0]*22,g.hy-AU[1]*22);   // 鋼絞線沿錨軸穿過橫擋間隙、台座、錨具
   }else{
-    L(ctx,LW.thin);[-3,0,3].forEach(k=>{const c=[x+H+6,dy-2];seg(ctx,c[0]+AU[0]*60,c[1]+AU[1]*60+k,c[0]-AU[0]*28,c[1]-AU[1]*28+k);});   // 外露鋼絞線
+    strandBundle(ctx,g.P0[0]+AU[0]*90,g.P0[1]+AU[1]*90,g.P0[0]-AU[0]*40,g.P0[1]-AU[1]*40);   // 外露鋼絞線
   }
   ctx.restore();
   txt(ctx,label,dx,dy+r+12,{a:'center',s:8.5,b:1});
@@ -18467,18 +18459,26 @@ function waterStopDetail(ctx,dx,dy,sc,label){
 // ── 預力地錨幾何（v5.425）：錨軸自台座承壓鈑向擋土側下斜 20°，穿過兩支橫擋之間進入壁體 ──
 const A_ANG=20*Math.PI/180;
 const AU=[-Math.cos(A_ANG),Math.sin(A_ANG)];             // 沿錨軸指向土內的單位向量
-const SEAT_X0=239;   // ＝WX(210)+29；WX 宣告在後面，這裡寫常數避免 TDZ                                     // 橫擋外翼面（樁翼面 WX+7 ＋ H300 斷面 22）
+const TANA=Math.tan(A_ANG);
+const PIT_A_DEPTH=96;                                    // 地錨各格開挖面：GY+96（錨位下方約 2.5m）
+// 橫擋＋台座幾何（主圖與詳圖共用）：x0＝樁翼面，ay＝兩支橫擋間隙中心，D＝H300 斷面深（畫面），gap＝間隙，t0＝台座頂厚
+// 台座背面貼於兩支橫擋外翼面（sx），自上橫擋頂至下橫擋底；斜面垂直錨軸（上薄下厚）；承壓鈑中心＝錨軸與斜面交點
+function anchorGeom(x0,ay,D,gap,t0){
+  const yTop=ay-gap/2-D,yBot=ay+gap/2+D,sx=x0+D;
+  const fT=[sx+t0,yTop],fB=[sx+t0+TANA*(yBot-yTop),yBot];
+  const P0=[sx,ay+gap*0.1];                              // 錨軸穿過外翼面處（間隙中心略下，避開上托架）
+  const v=[Math.sin(A_ANG),Math.cos(A_ANG)];             // 沿斜面向下的單位向量
+  const d=(P0[0]-fT[0])*v[0]+(P0[1]-fT[1])*v[1];
+  const C=[fT[0]+v[0]*d,fT[1]+v[1]*d];
+  return {x0,ay,D,gap,t0,yTop,yBot,sx,fT,fB,P0,C,hx:C[0]-AU[0]*4,hy:C[1]-AU[1]*4};   // hx,hy＝承壓鈑外面（錨具座）
+}
 function anchorLine(i){
   i=i||0;
-  const ay=GY+36+i*34;                                   // 兩支橫擋之間的中心高
-  const yTop=ay-37,yBot=ay+37;                           // 台座背面自上橫擋頂至下橫擋底
-  const fT=[SEAT_X0+8,yTop],fB=[SEAT_X0+8+Math.tan(A_ANG)*(yBot-yTop),yBot];   // 台座斜面（上薄下厚，面垂直錨軸）
-  const C=[fT[0]+(fB[0]-fT[0])*0.42,fT[1]+(fB[1]-fT[1])*0.42];               // 承壓鈑中心（斜面上段）
-  const s0=(C[0]-(WX+8))/(-AU[0]);                        // 由承壓鈑中心沿錨軸到壁面開挖側
-  const ex=WX+8,ey=C[1]+AU[1]*s0;
+  const g=anchorGeom(WX+7,GY+36+i*34,22,38,10);
+  const ex=WX+8,ey=g.P0[1]+TANA*(g.P0[0]-ex);            // 錨軸穿壁點（開挖側壁面）
   const Lf=88,La=86;                                     // 自由段、錨碇段（畫面長度）
   const fx=ex+AU[0]*Lf,fy=ey+AU[1]*Lf,bx=fx+AU[0]*La,by=fy+AU[1]*La;
-  return {ay,yTop,yBot,fT,fB,C,ex,ey,fx,fy,bx,by,tFree:Lf/(Lf+La),hx:C[0]-AU[0]*5,hy:C[1]-AU[1]*5};   // hx,hy＝承壓鈑外面（錨具座）
+  return Object.assign(g,{ex,ey,fx,fy,bx,by,tFree:Lf/(Lf+La),pitY:GY+PIT_A_DEPTH});
 }
 // 地錨灌漿（覆寫）：自由段 PE 套管雙線、錨碇段等徑灌漿體＋隔件
 function anchorGroutAlong(ctx,x1,y1,x2,y2,rFix,rFree,tFree){
@@ -18496,45 +18496,74 @@ function anchorGroutAlong(ctx,x1,y1,x2,y2,rFix,rFree,tFree){
   L(ctx,LW.thin);
   for(let t=tFree+0.10;t<0.98;t+=0.22){const a=P(t,-rFix),b=P(t,rFix);seg(ctx,a[0],a[1],b[0],b[1]);}   // 隔件
 }
-// H 型鋼斷面（翼板垂直、腹板水平——沿橫擋軸向看過去的 H 形）
-function hSectionV(ctx,x,y,H){
-  const tf=Math.max(3,H*0.16),tw=Math.max(2.5,H*0.13);
-  L(ctx,LW.med);rect(ctx,x,y,tf,H);rect(ctx,x+H-tf,y,tf,H);           // 兩片翼板
-  rect(ctx,x+tf,y+H/2-tw/2,H-2*tf,tw);                               // 腹板
+// H 型鋼斷面（封閉外形；翼板垂直貼樁翼、腹板水平——沿橫擋軸向看過去）
+function hSecI(ctx,x,y,D,B){
+  const tf=Math.max(2.6,B*0.12),tw=Math.max(2,D*0.1),ym=y+B/2;
+  const pts=[[x,y],[x+tf,y],[x+tf,ym-tw/2],[x+D-tf,ym-tw/2],[x+D-tf,y],[x+D,y],[x+D,y+B],[x+D-tf,y+B],[x+D-tf,ym+tw/2],[x+tf,ym+tw/2],[x+tf,y+B],[x,y+B]];
+  L(ctx,LW.med);path(ctx,pts,true);ctx.fillStyle='#fff';ctx.fill();ctx.stroke();ctx.fillStyle='#111';
 }
-// 三角鈑托架：短腳鋼板，水平肢承托橫擋、垂直肢銲於樁翼（不用 L 角鐵三角托架）
-function gussetPlate(ctx,x,y,w,h){
-  L(ctx,LW.med);path(ctx,[[x,y],[x+w,y],[x,y+h]],true);ctx.stroke();
-  L(ctx,LW.hair);seg(ctx,x+2,y+2,x+w-5,y+2);seg(ctx,x+2,y+2,x+2,y+h-5);   // 板厚
-  L(ctx,LW.thin);seg(ctx,x,y,x-3,y-2);seg(ctx,x,y+h,x-3,y+h+2);           // 銲道記號
+// 三角鈑托架：水平承板跨滿 H 型鋼全深（兩片翼板都坐到）＋下方三角鈑銲於樁翼
+function bracketPlate(ctx,x,y,D,h){
+  const w=D+2,t=Math.max(2,D*0.1);
+  L(ctx,LW.med);rect(ctx,x,y,w,t,'#fff');
+  path(ctx,[[x,y+t],[x+w-1,y+t],[x,y+t+h]],true);ctx.fillStyle='#fff';ctx.fill();ctx.stroke();ctx.fillStyle='#111';
+  L(ctx,LW.thin);seg(ctx,x,y+t+h,x-3,y+t+h+2);                          // 銲道記號
 }
-// 雙橫擋（覆寫）：H300×300 上下各一支靠緊樁翼，上下各以三角鈑托架承托，錨頭自兩支之間穿出
-function doubleWaler(ctx,a){
-  const x=WX+7,H=22;
-  hSectionV(ctx,x,a.yTop,H);hSectionV(ctx,x,a.yBot-H,H);
-  gussetPlate(ctx,x,a.yTop+H,12,12);                       // 上橫擋托架（位於兩支之間）
-  gussetPlate(ctx,x,a.yBot,16,18);                         // 下橫擋托架
+// 雙橫擋：H300×300 上下各一支靠緊樁翼，上下各以三角鈑托架承托（上托架短腳、位於間隙內）
+function walerSet(ctx,g){
+  hSecI(ctx,g.x0,g.yTop,g.D,g.D);hSecI(ctx,g.x0,g.yBot-g.D,g.D,g.D);
+  bracketPlate(ctx,g.x0,g.yTop+g.D,g.D,g.D*0.45);
+  bracketPlate(ctx,g.x0,g.yBot,g.D,g.D*0.7);
 }
-// 楔形承壓台座（覆寫）：背面貼於兩支橫擋外翼面，斜面垂直於錨軸（上薄下厚），內有斜肋；承壓鈑置於斜面上段
-function anchorSeat(ctx,a,o){
+function doubleWaler(ctx,a){walerSet(ctx,a);}
+// 台座：背面貼橫擋外翼面、頂板／底板／中隔鈑、斜面垂直錨軸；斜面上置承壓鈑，錨具套於鋼絞線（施拉階段才裝）
+function seatSet(ctx,g,o){
   o=o||{};
-  L(ctx,LW.med);
-  path(ctx,[[SEAT_X0,a.yTop],a.fT,a.fB,[SEAT_X0,a.yBot]],true);ctx.stroke();
-  L(ctx,LW.thin);seg(ctx,a.fT[0],a.fT[1]+2,SEAT_X0+2,a.yBot-2);      // 斜肋
-  seg(ctx,SEAT_X0,a.ay,a.fT[0]+(a.fB[0]-a.fT[0])*0.5,a.ay);           // 中隔鈑
-  if(o.plate!==false){
-    ctx.save();ctx.translate(a.C[0],a.C[1]);ctx.rotate(-A_ANG);
-    L(ctx,LW.med);ctx.strokeRect(0,-15,5,30);                          // 承壓鈑（貼於斜面）
+  L(ctx,LW.med);path(ctx,[[g.sx,g.yTop],g.fT,g.fB,[g.sx,g.yBot]],true);ctx.fillStyle='#fff';ctx.fill();ctx.stroke();ctx.fillStyle='#111';
+  const tp=Math.max(2.5,g.D*0.12),v=[Math.sin(A_ANG),Math.cos(A_ANG)];
+  L(ctx,LW.thin);
+  seg(ctx,g.sx,g.yTop+tp,g.fT[0]+TANA*tp,g.yTop+tp);                   // 頂板
+  seg(ctx,g.sx,g.yBot-tp,g.fB[0]-TANA*tp,g.yBot-tp);                   // 底板
+  seg(ctx,g.sx,g.ay,g.fT[0]+TANA*(g.ay-g.yTop),g.ay);                   // 中隔鈑
+  const i1=[g.fT[0]+AU[0]*tp+v[0]*tp,g.fT[1]+AU[1]*tp+v[1]*tp],i2=[g.fB[0]+AU[0]*tp-v[0]*tp,g.fB[1]+AU[1]*tp-v[1]*tp];
+  seg(ctx,i1[0],i1[1],i2[0],i2[1]);                                    // 斜面面板
+  if(o.plate){
+    ctx.save();ctx.translate(g.C[0],g.C[1]);ctx.rotate(-A_ANG);
+    const D=g.D,pw=D*1.5;
+    L(ctx,LW.med);rect(ctx,0,-pw/2,4,pw,'#fff');                         // 承壓鈑（貼於斜面）
+    if(o.head){rect(ctx,4,-D*0.42,D*0.55,D*0.84,'#fff');L(ctx,LW.thin);rect(ctx,4+D*0.55,-D*0.25,D*0.28,D*0.5,'#fff');}   // 錨具＋楔片座
+    if(o.cap){L(ctx,LW.med);rect(ctx,4+D*0.83,-D*0.48,D*0.4,D*0.96,'#fff');}   // 保護罩
     ctx.restore();
   }
 }
-// 錨具（錨頭＋楔片座）：畫在承壓鈑外面、對準錨軸
-function anchorHead(ctx,a,o){
-  o=o||{};
-  ctx.save();ctx.translate(a.hx,a.hy);ctx.rotate(-A_ANG);
-  L(ctx,LW.med);ctx.strokeRect(0,-8,11,16);L(ctx,LW.thin);ctx.strokeRect(11,-5,6,10);
-  if(o.cap){L(ctx,LW.med);ctx.strokeRect(17,-9,8,18);}               // 保護罩
-  ctx.restore();
+function anchorSeat(ctx,a,o){seatSet(ctx,a,o);}
+// 錨孔鑽機（履帶式）：動力箱在後、短吊臂前端托住長桅桿，桅桿沿錨軸傾角、腳座頂住壁面，旋轉衝擊頭沿桅桿推進鑽桿
+function anchorRig(ctx,x,gy,a){
+  const F=[a.ex+AU[0]*2,a.ey+AU[1]*2];
+  const m=[-AU[0],-AU[1]],n=[m[1],-m[0]],ang=Math.atan2(m[1],m[0]);
+  const ML=185,T=[F[0]+m[0]*ML,F[1]+m[1]*ML];
+  const P=(t,d)=>[F[0]+m[0]*t+n[0]*d,F[1]+m[1]*t+n[1]*d];
+  crawlerTracks(ctx,x-44,gy-16,88,16);
+  L(ctx,LW.med);rect(ctx,x-36,gy-46,72,30,'#fff');                       // 動力箱
+  L(ctx,LW.hair);seg(ctx,x-36,gy-32,x+36,gy-32);seg(ctx,x+4,gy-46,x+4,gy-16);
+  L(ctx,LW.thin);rect(ctx,x+26,gy-56,6,10);rect(ctx,x-46,gy-40,10,8);   // 排氣管、操作盤
+  L(ctx,LW.med);
+  const a1=P(0,5),a2=P(ML,5),b1=P(0,-5),b2=P(ML,-5);
+  path(ctx,[a1,a2,b2,b1],true);ctx.fillStyle='#fff';ctx.fill();ctx.stroke();ctx.fillStyle='#111';   // 桅桿（進給梁）
+  L(ctx,LW.hair);for(let t=8;t<ML-6;t+=10){const p=P(t,5),q=P(t+6,-5);seg(ctx,p[0],p[1],q[0],q[1]);}
+  ctx.save();ctx.translate(F[0],F[1]);ctx.rotate(ang);L(ctx,LW.med);ctx.strokeRect(-4,-9,8,18);ctx.restore();   // 腳座
+  const Bp=[x-30,gy-44],Cr=P(ML*0.74,0),Cy=P(ML*0.88,0);
+  boomSeg(ctx,Bp[0],Bp[1],Cr[0],Cr[1],10,7);                            // 短吊臂
+  cylinder(ctx,x+8,gy-46,Cy[0],Cy[1],4);                                // 桅桿俯仰油壓缸
+  pinDot(ctx,Bp[0],Bp[1],2.6);pinDot(ctx,Cr[0],Cr[1],2.4);pinDot(ctx,Cy[0],Cy[1],2);
+  const H=P(ML*0.42,0);
+  ctx.save();ctx.translate(H[0],H[1]);ctx.rotate(ang);L(ctx,LW.med);ctx.strokeRect(-12,-9,24,18);L(ctx,LW.thin);ctx.strokeRect(-8,-5,16,10);ctx.restore();   // 旋轉衝擊頭
+  const rt=[a.ex+AU[0]*70,a.ey+AU[1]*70];
+  L(ctx,LW.med);seg(ctx,H[0],H[1],rt[0],rt[1]);                          // 鑽桿
+  L(ctx,LW.hair);seg(ctx,H[0]+n[0]*2.5,H[1]+n[1]*2.5,rt[0]+n[0]*2.5,rt[1]+n[1]*2.5);seg(ctx,H[0]-n[0]*2.5,H[1]-n[1]*2.5,rt[0]-n[0]*2.5,rt[1]-n[1]*2.5);
+  ctx.save();ctx.translate(rt[0],rt[1]);ctx.rotate(Math.PI/2-A_ANG);L(ctx,LW.med);path(ctx,[[-6,0],[-8,10],[0,15],[8,10],[6,0]],true);ctx.stroke();ctx.restore();   // 鑽頭
+  L(ctx,LW.thin);ctx.beginPath();ctx.moveTo(H[0]-n[0]*9,H[1]-n[1]*9);ctx.bezierCurveTo(H[0]+20,H[1]+50,x-70,gy-30,x-36,gy-36);ctx.stroke();   // 油壓軟管
+  return {H,T,F,Cr};
 }
 // 油壓幫浦（施拉千斤頂用）
 function jackPump(ctx,x,gy){
@@ -20098,8 +20127,8 @@ function postBrackets(ctx){bracket(ctx,CPX-6.5,GY+42,-1);bracket(ctx,CPX+6.5,GY+
 // ══════ 水平支撐系統（底圖＝豐有自有「安全支撐規劃圖／擋土支撐系統平面圖」） ══════
 // （水平支撐、施工構台待新版重繪，暫不納入）
 const SHEET_ANCHOR={id:'anchor',title:'預力地錨',code:'FY-AN-01',panels:[pPrep(),
-  {t:'鋼絞線加工・組裝 ☆',n1:'於加工場依設計錨長裁切鋼絞線，錨碇段裝導頭、依間距裝隔件（間隔器）並綁紮灌漿管，自由段套 PE 套管；成束綑紮並編號',
-   n2:'☆ 鋼絞線規格、根數、自由段／錨碇段長度依設計；套管無破損、隔件間距正確、編號與孔位對應（承壓鈑與錨具於施拉時裝設）',
+  {t:'鋼絞線加工・組裝 ☆',n1:'依設計錨長裁切鋼絞線，錨碇段裝導頭、隔件並綁紮灌漿管，自由段套 PE 套管，成束編號',
+   n2:'☆ 規格、根數、長度依設計；套管完好、編號與孔位對應',
    draw(ctx){
      scene(ctx,{dim:false,names:false});
      [0,1,2].forEach(k=>{L(ctx,LW.med);rect(ctx,110+k*170,GY-8,22,8);});     // 墊木
@@ -20112,96 +20141,95 @@ const SHEET_ANCHOR={id:'anchor',title:'預力地錨',code:'FY-AN-01',panels:[pPr
      leader(ctx,430,GY+150,440,GY-22,'自由段 PE 套管');
      leader(ctx,560,GY+120,556,GY-34,'鋼絞線（施拉段外露）');
    }},
-  {t:'鑽堡鑽孔（穿壁下斜）',n1:'鑽堡桅桿對準錨軸傾角，穿越壁體向擋土側下斜鑽孔至設計深度',n2:'傾角與孔位依設計；鑽進中記錄地層變化',
+  {t:'鑽孔（穿壁下斜）',n1:'鑽機桅桿對準錨軸傾角，穿越壁體向擋土側下斜鑽孔至設計深度',n2:'傾角、孔位、孔深依設計',
    draw(ctx){
-     scenePit(ctx,{lagging:false});
      const a=anchorLine(0);
-     const tilt=Math.atan2(-AU[0],AU[1]);                                     // 桅桿沿錨軸（自垂直起算）
-     drillRig(ctx,470,PIT_Y,{foot:[a.ex+AU[0]*2,a.ey+AU[1]*2],tilt:tilt,mast:180,headT:0.62,rodTo:[a.ex+AU[0]*70,a.ey+AU[1]*70],bit:'anchor'});
+     scenePit(ctx,{lagging:false,pitY:a.pitY,dimLabel:'開挖深 GL-5.0m'});
+     const r=anchorRig(ctx,430,a.pitY,a);
      L(ctx,LW.thin);dash(ctx,[5,4]);seg(ctx,a.ex+AU[0]*70,a.ey+AU[1]*70,a.bx,a.by);dash(ctx);
-     worker(ctx,580,PIT_Y,'point',true);
-     leader(ctx,340,GY-60,a.ex-AU[0]*90,a.ey-AU[1]*90,'鑽堡桅桿沿錨軸（下斜 15°~30°）',{b:1});
-     leader(ctx,128,GY+170,a.bx+10,a.by-4,'錨碇段（設計深度）');
+     worker(ctx,262,a.pitY,'hold',true);
+     worker(ctx,494,a.pitY,'point',true);
+     leader(ctx,470,GY-90,r.T[0]-16,r.T[1]+2,'錨孔鑽機（桅桿沿錨軸傾角）',{b:1});
+     leader(ctx,128,GY+176,a.bx+10,a.by-4,'錨碇段（設計深度）');
    }},
-  {t:'鋼絞線束置入・整支灌漿・養護',n1:'依編號將已組裝之鋼絞線束置入孔內至設計深度；以雙筒攪拌機拌製水泥漿自孔底整支灌注（全長），回漿正常即停；灌漿後養護，達設計強度才架設橫擋與施拉',
-   n2:'自由段 PE 套管完好、隔件間距正確、外露長度足供施拉；W/C 依設計，回漿正常即停；外露鋼絞線保護、孔口封堵',
+  {t:'鋼絞線束置入・整支灌漿・養護',n1:'鋼絞線束置入孔內至設計深度，以雙筒攪拌機拌漿、自孔底整支灌漿；灌漿後養護',
+   n2:'達設計強度後方可施拉；外露鋼絞線保護',
    draw(ctx){
-     scenePit(ctx,{lagging:false});
      const a=anchorLine(0);
+     scenePit(ctx,{lagging:false,pitY:a.pitY,dimLabel:'開挖深 GL-5.0m'});
      strandBundle(ctx,a.ex-AU[0]*46,a.ey-AU[1]*46,a.bx,a.by);
      anchorGroutAlong(ctx,a.ex,a.ey,a.bx,a.by,10,5,a.tFree);
-     const p=twinMixer(ctx,430,PIT_Y);
-     groutHose(ctx,p.outX,p.outY,WX+30,a.ey-6,PIT_Y);
+     const p=twinMixer(ctx,430,a.pitY);
+     groutHose(ctx,p.outX,p.outY,WX+30,a.ey-6,a.pitY);
      L(ctx,LW.thin);seg(ctx,WX+30,a.ey-6,a.ex+4,a.ey-2);
-     worker(ctx,330,PIT_Y,'pull');
-     holdBox(ctx,392,GY-160,250,['整支灌漿（全長）','達設計強度才施拉']);
+     worker(ctx,330,a.pitY,'pull');
+     holdBox(ctx,392,GY-160,250,['整支灌漿・養護','達設計強度才施拉']);
      leader(ctx,150,GY+176,a.bx+34,a.by+2,'錨碇段灌漿體',{b:1});
      leader(ctx,330,GY+150,a.ex-AU[0]*24,a.ey-AU[1]*24,'外露鋼絞線（待施拉）');
    }},
-  {t:'雙橫擋架設',n1:'上下兩支 H300×300 橫擋各以三角鈑托架承托、靠緊樁翼並墊實，外露鋼絞線自兩支橫擋之間穿出',n2:'橫擋與樁翼靠緊墊實；上下托架水平、間距依錨頭尺寸',
+  {t:'雙橫擋架設',n1:'上下兩支 H300×300 橫擋以三角鈑托架承托、靠緊樁翼，外露鋼絞線自兩支之間穿出',n2:'橫擋與樁翼靠緊；托架位置依錨頭尺寸',
    draw(ctx){
-     scenePit(ctx,{lagging:false});
      const a=anchorLine(0);
+     scenePit(ctx,{lagging:false,pitY:a.pitY,dimLabel:'開挖深 GL-5.0m'});
      strandBundle(ctx,a.ex,a.ey,a.bx,a.by);
      anchorGroutAlong(ctx,a.ex,a.ey,a.bx,a.by,10,5,a.tFree);
      doubleWaler(ctx,a);
      strandBundle(ctx,a.ex,a.ey,a.ex-AU[0]*60,a.ey-AU[1]*60);
-     const tc=teleBoomRig(ctx,330,GY-46,{cx:560,gy:PIT_Y,drop:26});
+     const tc=teleBoomRig(ctx,330,GY-46,{cx:560,gy:a.pitY,drop:26});
      hBeamH(ctx,300,360,GY+9,12);
      slings(ctx,tc.hx,tc.hy,[306,GY+3],[354,GY+3]);
-     L(ctx,LW.thin);circ(ctx,WX+18,a.ay,34);dash(ctx,[4,3]);seg(ctx,WX+40,a.ay-26,292,GY-158);dash(ctx);
-     doubleWalerDetail(ctx,300,GY-166,70,'Ⓐ 雙橫擋 H300×300（H 形斷面）＋上下三角鈑托架',{seat:false});
-     leader(ctx,196,GY+170,WX+18,a.yBot+8,'雙橫擋 H300×300（三角鈑托架承托）',{b:1});
+     L(ctx,LW.thin);circ(ctx,WX+22,a.ay+2,52);dash(ctx,[4,3]);seg(ctx,WX+50,a.ay-42,282,GY-166+76-8);dash(ctx);
+     doubleWalerDetail(ctx,300,GY-166,76,'Ⓐ 雙橫擋 H300×300＋三角鈑托架',{seat:false});
+     leader(ctx,196,GY+176,WX+18,a.yBot+8,'雙橫擋 H300×300（三角鈑托架承托）',{b:1});
      leader(ctx,540,GY-150,466,GY-30,'伸縮臂吊裝機');
    }},
-  {t:'錨件安裝（台座・承壓鈑・錨具）',n1:'於兩支橫擋外翼面裝設楔形承壓台座（斜面垂直於錨軸），台座斜面置承壓鈑，鋼絞線穿過承壓鈑後套上錨具',n2:'台座背面與橫擋密貼；承壓鈑面垂直錨軸、錨具對心',
+  {t:'錨件安裝（台座・承壓鈑・錨具）',n1:'於橫擋外翼面裝設台座，斜面置承壓鈑，鋼絞線穿過後套上錨具',n2:'台座貼合橫擋；承壓鈑面垂直錨軸',
    draw(ctx){
-     scenePit(ctx,{lagging:false});
      const a=anchorLine(0);
+     scenePit(ctx,{lagging:false,pitY:a.pitY,dimLabel:'開挖深 GL-5.0m'});
      strandBundle(ctx,a.ex,a.ey,a.bx,a.by);
      anchorGroutAlong(ctx,a.ex,a.ey,a.bx,a.by,10,5,a.tFree);
      doubleWaler(ctx,a);
-     anchorSeat(ctx,a);
-     strandBundle(ctx,a.ex,a.ey,a.hx-AU[0]*30,a.hy-AU[1]*30);
-     anchorHead(ctx,a);
-     worker(ctx,330,PIT_Y,'hold');
-     L(ctx,LW.thin);circ(ctx,WX+30,a.ay,40);dash(ctx,[4,3]);seg(ctx,WX+58,a.ay-28,292,GY-158);dash(ctx);
-     doubleWalerDetail(ctx,300,GY-166,72,'Ⓑ 楔形台座＋承壓鈑＋錨具（面垂直錨軸）');
+     anchorSeat(ctx,a,{plate:true,head:true});
+     strandBundle(ctx,a.ex,a.ey,a.hx-AU[0]*22,a.hy-AU[1]*22);
+     worker(ctx,340,a.pitY,'hold',true);
+     L(ctx,LW.thin);circ(ctx,WX+36,a.ay+2,58);dash(ctx,[4,3]);seg(ctx,WX+70,a.ay-46,284,GY-166+76-8);dash(ctx);
+     doubleWalerDetail(ctx,300,GY-166,76,'Ⓑ 台座＋承壓鈑＋錨具（面垂直錨軸）');
      leader(ctx,470,GY+150,a.hx+6,a.hy+6,'錨件（台座＋承壓鈑＋錨具）',{b:1});
    }},
-  {t:'施拉預力 ☆',n1:'千斤頂套於錨具分級施拉至設計預力，紀錄荷重－伸長量曲線',n2:'☆ 設計預力值、伸長量於容許範圍；試驗錨依規定作證明試驗',
+  {t:'施拉預力 ☆',n1:'千斤頂套於錨具，分級施拉至設計預力並記錄伸長量',n2:'☆ 預力值、伸長量於容許範圍；試驗錨依規定辦理',
    draw(ctx){
-     scenePit(ctx,{lagging:false});
      const a=anchorLine(0);
+     scenePit(ctx,{lagging:false,pitY:a.pitY,dimLabel:'開挖深 GL-5.0m'});
      strandBundle(ctx,a.ex,a.ey,a.bx,a.by);
      anchorGroutAlong(ctx,a.ex,a.ey,a.bx,a.by,10,5,a.tFree);
      doubleWaler(ctx,a);
-     anchorSeat(ctx,a);
-     anchorHead(ctx,a);
+     anchorSeat(ctx,a,{plate:true,head:true});
      ctx.save();ctx.translate(a.hx,a.hy);ctx.rotate(-A_ANG);
-     L(ctx,LW.med);ctx.strokeRect(17,-7.5,30,15);                    // 施拉千斤頂
-     L(ctx,LW.thin);ctx.strokeRect(47,-4,8,8);                       // 拉桿夾頭
+     L(ctx,LW.med);rect(ctx,19,-8,32,16,'#fff');                     // 施拉千斤頂
+     L(ctx,LW.thin);rect(ctx,51,-4,8,8,'#fff');                      // 拉桿夾頭
      ctx.restore();
-     jackPump(ctx,392,PIT_Y);
-     L(ctx,LW.thin);ctx.beginPath();ctx.moveTo(380,PIT_Y-14);ctx.quadraticCurveTo(330,PIT_Y-30,a.hx+30,a.hy-14);ctx.stroke();
-     worker(ctx,440,PIT_Y,'hold');
-     holdBox(ctx,400,GY-160,250,['分級施拉至設計預力','荷重－伸長量曲線於容許帶']);
-     leader(ctx,330,GY-60,a.hx+32,a.hy-16,'施拉千斤頂＋壓力表',{b:1});
-     leader(ctx,330,GY+170,SEAT_X0+10,a.ay+20,'楔形承壓台座＋承壓鈑');
+     strandBundle(ctx,a.ex,a.ey,a.hx-AU[0]*64,a.hy-AU[1]*64);
+     jackPump(ctx,392,a.pitY);
+     L(ctx,LW.thin);ctx.beginPath();ctx.moveTo(380,a.pitY-14);ctx.quadraticCurveTo(330,a.pitY-30,a.hx-AU[0]*34,a.hy-AU[1]*34+8);ctx.stroke();
+     worker(ctx,440,a.pitY,'hold',true);
+     holdBox(ctx,400,GY-160,250,['分級施拉至設計預力','記錄伸長量']);
+     leader(ctx,330,GY-60,a.hx-AU[0]*36,a.hy-AU[1]*36-8,'施拉千斤頂＋壓力表',{b:1});
+     leader(ctx,330,GY+176,a.sx+12,a.yBot-16,'台座＋承壓鈑');
    }},
-  {t:'鎖定・自由段補灌漿・完成',n1:'達預力後楔片鎖定、餘索截斷，自由段以水灰比 0.5 水泥漿補灌（二次灌漿）填實護管空隙，錨頭加保護罩',n2:'鎖定損失於容許值；補灌最後階段以重力流灌注確保飽滿',
+  {t:'鎖定・自由段補灌漿・完成',n1:'達設計預力後鎖定、截斷餘索，自由段補灌漿，錨頭加保護罩',n2:'鎖定後錨力於容許範圍',
    draw(ctx){
-     scenePit(ctx,{lagging:false});
      const a=anchorLine(0);
+     scenePit(ctx,{lagging:false,pitY:a.pitY,dimLabel:'開挖深 GL-5.0m'});
      strandBundle(ctx,a.ex,a.ey,a.bx,a.by);
      anchorGroutAlong(ctx,a.ex,a.ey,a.bx,a.by,10,5,a.tFree);
      doubleWaler(ctx,a);
-     anchorSeat(ctx,a);
-     anchorHead(ctx,a,{cap:true});
-     leader(ctx,330,GY-40,a.hx+14,a.hy-14,'錨頭楔片鎖定＋保護罩',{b:1});
-     leader(ctx,300,GY+120,a.ex+AU[0]*40,a.ey+AU[1]*40+8,'自由段補灌漿（二次灌漿）');
-     leader(ctx,90,GY+170,a.bx+16,a.by-4,'錨碇段（受力）');
-     worker(ctx,400,PIT_Y,'point');
+     anchorSeat(ctx,a,{plate:true,head:true,cap:true});
+     strandBundle(ctx,a.ex,a.ey,a.hx-AU[0]*16,a.hy-AU[1]*16);
+     leader(ctx,330,GY-40,a.hx-AU[0]*24,a.hy-AU[1]*24-8,'錨頭鎖定＋保護罩',{b:1});
+     leader(ctx,300,GY+130,a.ex+AU[0]*40,a.ey+AU[1]*40+8,'自由段補灌漿');
+     leader(ctx,90,GY+176,a.bx+16,a.by-4,'錨碇段（受力）');
+     worker(ctx,400,a.pitY,'point',true);
    }},
 ]};
 
