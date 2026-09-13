@@ -2106,15 +2106,18 @@ async function newPage(browser, width, height) {
         && /放樣/.test(sh.panels[2].n1) && /背填/.test(sh.panels[4].n1) && /驗收試驗/.test(sh.panels[6].n2)
         && /荷重計/.test(sh.panels[6].n2) && /解錨/.test(sh.panels[7].n1) && /鄰地同意/.test(sh.panels[7].n2);
       // 共用的 ① 準備格不受地錨客製說明影響
-      out.prepDefault = !/鄰地同意/.test(pPrep().n2);
-      // 幾何：台座自頂端起斜、承壓鈑中心在兩支橫擋間隙中心、端部薄
-      const g = anchorGeom(0, 100, 22, 38, 4);
-      out.geom = g.Q0[0] === g.sx + g.t0 && Math.abs(g.C[1] - 100) < 0.01 && g.t0 < 22 * 0.2 && g.Q1[1] > g.C[1];
+      out.prepDefault = !/鄰地同意/.test(FY_SHEETS.get('ccp').panels[0].n2);
+      // 幾何：台座自頂端起斜、承壓鈑對準錨軸、端部薄
+      const g = FY_SHEETS._geom(0, 100, 22, 38, 4);
+      // 斜面自頂端起（Q0＝頂前緣）、承壓鈑中心落在錨軸上（C−P0 與錨軸平行）且略高於間隙中心、端部薄、斜面止點在承壓鈑之下
+      const cx = (g.C[0] - g.P0[0]) * Math.sin(20 * Math.PI / 180) + (g.C[1] - g.P0[1]) * Math.cos(20 * Math.PI / 180);
+      out.geom = Math.abs(g.Q0[0] - (g.sx + g.t0)) < 0.01 && Math.abs(cx) < 0.01 && g.C[1] < 100 && g.C[1] > 100 - 22
+        && g.t0 < 22 * 0.2 && g.Q1[1] > g.C[1];
       // 出圖：單頁、8 格，PNG 有內容
       const pg = FY_SHEETS.pages('anchor', 1);
       out.render = pg.length === 1 && /^data:image\/png/.test(pg[0].b64) && pg[0].b64.length > 20000;
       out.steps = FY_SHEETS.steps('anchor').length === 8;
-      out.leaderFix = /opt\.fix/.test(leader.toString());
+      out.leaderFix = FY_SHEETS._leaderFix();
       return out;
     });
     check('地錨示意圖：固定 8 格、步驟順序正確', r.eight && r.order && r.steps);

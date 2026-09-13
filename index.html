@@ -20340,7 +20340,9 @@ window.FY_SHEETS={
       });
     }finally{ENG.SCALE=old;}},
   steps:function(id){var s=this.get(id);return s?s.panels.map(function(p){return {t:p.t,n1:p.n1||'',n2:p.n2||''};}):null;},
-  wm:WM
+  wm:WM,
+  _geom:function(xp,ay,D,gap,bf){return anchorGeom(xp,ay,D,gap,bf);},          // 測試用：地錨橫擋／台座幾何
+  _leaderFix:function(){return /opt\.fix/.test(leader.toString());}
 };
 })();
 var _PL_VECW={"silo":34.4,"mixpump":107.7,"crane":88.6,"rig_auger":8.2,"rig_body":59.1,"wk0":31.1,"wk1":54.3,"wk2":59.9,"wk3":80.2,"det_bracket":252.4,"det_jack":191.1,"det_splice":129.5,"det_waler":119.5,"det_stair":68.0,"det_wheelstop":146.7,"det_plateplace":173.1,"det_cap":90.2,"det_crossiso":122.5,"det_hsplice":450.1,"det_wplate":78.7,"det_embed":40.9,"det_capiso":75.8,"crane2":76.7,"oscil":254.3,"oscil_plan":38.8,"grab":45.7,"tremie2":35.4,"wk4":50.0,"mixtruck":150.1,"fixjig":118.9,"vibro_head":63.6,"exc_body":130.3};
