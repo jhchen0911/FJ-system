@@ -2090,6 +2090,42 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.425 預力地錨施工步驟示意圖重製 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const sh = FY_SHEETS.get('anchor');
+      const ts = sh.panels.map(p => p.t);
+      out.eight = sh.panels.length === 8;
+      out.order = /鋼絞線加工/.test(ts[1]) && /放樣・鑽孔/.test(ts[2]) && /置入・一次灌漿/.test(ts[3])
+        && /雙橫擋架設/.test(ts[4]) && /錨件安裝/.test(ts[5]) && /施拉預力・鎖定・錨力監測/.test(ts[6]) && /解錨・拆除/.test(ts[7]);
+      const all = sh.panels.map(p => p.t + p.n1 + p.n2).join('|');
+      out.noBad = !/保護罩|二次灌漿|補灌漿|水灰比|三角鈑|養生|必要時以套管/.test(all);
+      out.words = /鄰地同意/.test(sh.panels[0].n2) && /套管/.test(sh.panels[2].n1 + sh.panels[2].n2)
+        && /放樣/.test(sh.panels[2].n1) && /背填/.test(sh.panels[4].n1) && /驗收試驗/.test(sh.panels[6].n2)
+        && /荷重計/.test(sh.panels[6].n2) && /解錨/.test(sh.panels[7].n1) && /鄰地同意/.test(sh.panels[7].n2);
+      // 共用的 ① 準備格不受地錨客製說明影響
+      out.prepDefault = !/鄰地同意/.test(pPrep().n2);
+      // 幾何：台座自頂端起斜、承壓鈑中心在兩支橫擋間隙中心、端部薄
+      const g = anchorGeom(0, 100, 22, 38, 4);
+      out.geom = g.Q0[0] === g.sx + g.t0 && Math.abs(g.C[1] - 100) < 0.01 && g.t0 < 22 * 0.2 && g.Q1[1] > g.C[1];
+      // 出圖：單頁、8 格，PNG 有內容
+      const pg = FY_SHEETS.pages('anchor', 1);
+      out.render = pg.length === 1 && /^data:image\/png/.test(pg[0].b64) && pg[0].b64.length > 20000;
+      out.steps = FY_SHEETS.steps('anchor').length === 8;
+      out.leaderFix = /opt\.fix/.test(leader.toString());
+      return out;
+    });
+    check('地錨示意圖：固定 8 格、步驟順序正確', r.eight && r.order && r.steps);
+    check('地錨示意圖：無保護罩／補灌漿／三角鈑等已刪除敘述', r.noBad);
+    check('地錨示意圖：鄰地同意、套管、放樣、背填、驗收試驗、監測、解錨皆納入', r.words && r.prepDefault);
+    check('地錨示意圖：台座幾何（頂端起斜、承壓鈑對準間隙中心、端部薄）', r.geom);
+    check('地錨示意圖：可出圖且引線支援固定落點', r.render && r.leaderFix);
+    check('v5.425 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
