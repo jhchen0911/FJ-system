@@ -2678,7 +2678,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.426';
+var APP_VERSION='v5.427';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -13441,7 +13441,7 @@ function _dxTbl(rows,widths,o){
       var fh=ri===0?o.hdrH:o.rowH;
       var hh=fh?'<w:trHeight w:hRule="atLeast" w:val="'+_twOf(fh)+'"/>'
               :((rowH&&rowH[ri])?'<w:trHeight w:hRule="atLeast" w:val="'+_twOf(rowH[ri])+'"/>':'');
-      var kn=(o.keepNextLast&&ri===rows.length-1)?'<w:keepNext/>':'';
+      var kn=((o.keepNextLast&&ri===rows.length-1)||o.keep==='all'||(o.keep==='butLast'&&ri<rows.length-1))?'<w:keepNext/>':'';
       return '<w:tr><w:trPr>'+(ri===0?'<w:tblHeader/>':'')+'<w:cantSplit/>'+hh+'</w:trPr>'+(r||[]).map(function(c,ci){
         var w=widths?widths[ci]:0;
         return '<w:tc><w:tcPr><w:tcW w:w="'+(w||0)+'" w:type="'+(w?'dxa':'auto')+'"/>'
@@ -13586,8 +13586,8 @@ function _docxBytes(blocks,opts){
           +_dxFld('TOC \\o "1-2" \\h \\z \\u','（開啟檔案時按「是」更新功能變數，即自動帶出章節與頁碼；或全選後按 F9。）')
           +'</w:p>';
       }
-      case 'tbl':   return _dxTbl(b.rows,b.w,{sm:!!b.sm,qc:!!b.qc,rowH:b.rowH,hdrH:b.hdrH,__rowH:b.__rowH,pb:!!(b.pb||b.__pb),
-                      keepNextLast:!!(blocks[bi+1]&&blocks[bi+1].t==='rem')});
+      case 'tbl':   return _dxTbl(b.rows,b.w,{sm:!!b.sm,qc:!!b.qc,rowH:b.rowH,hdrH:b.hdrH,__rowH:b.__rowH,pb:!!(b.pb||b.__pb),keep:b.keep,
+                      keepNextLast:!!(blocks[bi+1]&&blocks[bi+1].t==='rem')||!!b.keepLast});
       case 'chart': return _dxChart(b);
       case 'img':   {
         var idx=media.length+1,ext=(b.ext||'png').toLowerCase();exts[ext]=1;
@@ -14995,11 +14995,11 @@ var PLAN_REGS={
 // 列數與表身固定高度都以「最長的一張也放得進一頁」為準，短的用空白列撐滿版
 // v5.422：兩張檢查表改為「固定列數＋固定列高」，表格高度與項次多寡無關，
 // 每張表在任何排版引擎下都一定是一頁（含備註與簽名欄）。
-var PLAN_CHK_HDRH=30, PLAN_CHK_ROWH=30;
-var PLAN_CHK_ROWS=18;                                  // 自主檢查表固定項目列數
+var PLAN_CHK_HDRH=30, PLAN_CHK_ROWH=26;
+var PLAN_CHK_ROWS=18;                                  // 自主檢查表固定項目列數（v5.427：列高下修，Word 含簽名列仍一頁）
 var PLAN_CHK_H=PLAN_CHK_HDRH+PLAN_CHK_ROWS*PLAN_CHK_ROWH;
-var PLAN_SAFE_HDRH=30, PLAN_SAFE_ROWH=26;
-var PLAN_SAFE_ROWS=25;                                 // 安全衛生檢查表固定項目列數
+var PLAN_SAFE_HDRH=30, PLAN_SAFE_ROWH=23;
+var PLAN_SAFE_ROWS=25;                                 // 安全衛生檢查表固定項目列數（v5.427：列高下修，Word 含簽名列仍一頁）
 var PLAN_SAFE_H=PLAN_SAFE_HDRH+PLAN_SAFE_ROWS*PLAN_SAFE_ROWH;
 var PLAN_SAFECHK=[
   {k:'general',l:'一般安全檢查表',when:function(ids){return true;},rows:[
@@ -20622,15 +20622,7 @@ function _plDetailSteps(id,m){ // 細部詳圖（圖面線條取自使用者提�
       {c:'圍苓與槽鋼式加勁盒立體詳圖：支撐下方設 C150×75 加勁槽鋼（加勁盒）防止腹板壓皺；圍苓與擋土壁間隙以混凝土背填密實。',d:fit('det_waler')}
     ];
   }
-  if(id==='deck'){
-    return [
-      {c:'構台帽（樁頂托架）與主樑接合詳圖：共構樁頂切平後銲接構台帽（鋼板補強四周滿焊），主樑以螺栓鎖固於樁帽。',d:fit('det_cap')},
-      {c:'主樑・副樑交叉接合立體詳圖：交叉處以連接鈑及高強度螺栓固定，銲道補強。',d:fit('det_crossiso')},
-      {c:'車輪擋與周邊欄杆斷面詳圖：構台周邊設 H300 型鋼車輪擋、GIP 管欄杆（H≧90cm）、護網與踢腳板。',d:fit('det_wheelstop')},
-      {c:'安全支撐施工便梯配置立面詳圖：GIP 管＋萬向接頭（加護套）組立，鋪壓花鐵板，兩側掛 PVC 護網。',d:fit('det_stair')},
-      {c:'覆工板吊放示意：吊車配合人力調整覆工板位置，相鄰板面平整無高差、扣件確實固定。',d:fit('det_plateplace')}
-    ];
-  }
+  // 施工構台細部詳圖已移除（v5.427，改以 FY-GT-01 施工步驟示意圖呈現）
   // 中間樁／共構樁細部詳圖已移除（v5.415，內容不符實際作法）
 
   return null;
@@ -22789,13 +22781,13 @@ function _plBuild(){
         });
       });
       while(rows.length<1+PLAN_CHK_ROWS)rows.push([String(++chkN),'　','　','　','　','　']);   // 表單固定長度（滿版）
-      B.push({t:'tbl',sm:1,fixH:PLAN_CHK_H,hdrH:PLAN_CHK_HDRH,rowH:PLAN_CHK_ROWH,
+      B.push({t:'tbl',sm:1,fixH:PLAN_CHK_H,hdrH:PLAN_CHK_HDRH,rowH:PLAN_CHK_ROWH,keepLast:true,
         rows:_plFillRows(rows,m),w:[460,760,2350,4330,1600,700]});   // v5.422：加寬「檢查標準」讓多數列維持兩行
-      B.push({t:'tbl',sm:1,rows:[['缺失複查結果：□已改善完成　□未改善完成，進行追蹤改善。　複查日期：　　年　　月　　日　　複查人員：　　　　']],w:[10200]});
-      B.push({t:'tbl',sm:1,rows:[['備註：1. 檢查項目及檢查標準依契約規定量化數據詳列。'
+      B.push({t:'tbl',sm:1,keep:'all',rows:[['缺失複查結果：□已改善完成　□未改善完成，進行追蹤改善。　複查日期：　　年　　月　　日　　複查人員：　　　　']],w:[10200]});
+      B.push({t:'tbl',sm:1,keep:'all',rows:[['備註：1. 檢查項目及檢查標準依契約規定量化數據詳列。'
         +'2. 實際檢查情形應明確敘述或量化尺寸，由現場工程師當場填寫並簽名。'
         +'3. 檢查結果合格者註明「○」，不合格者註明「╳」，無需檢查之項目打「／」；不合格者填寫缺失改善並複查。']],w:[10200]});
-      B.push({t:'tbl',sm:1,rows:[['檢查人員（現場工程師）','工地主任','品管工程師','監造單位'],['\n','\n','\n','\n']],w:[2500,2200,2200,2300]});
+      B.push({t:'tbl',sm:1,keep:'butLast',rows:[['檢查人員（現場工程師）','工地主任','品管工程師','監造單位'],['\n','\n','\n','\n']],w:[2500,2200,2200,2300]});
     });
   }
 
@@ -22817,9 +22809,9 @@ function _plBuild(){
         srows.push([r[0]===last?'':r[0],r[1],'','','']);last=r[0];
       });
       while(srows.length<1+PLAN_SAFE_ROWS)srows.push(['　','　','　','　','　']);            // 表單固定長度（滿版）
-      B.push({t:'tbl',sm:1,fixH:PLAN_SAFE_H,hdrH:PLAN_SAFE_HDRH,rowH:PLAN_SAFE_ROWH,
+      B.push({t:'tbl',sm:1,fixH:PLAN_SAFE_H,hdrH:PLAN_SAFE_HDRH,rowH:PLAN_SAFE_ROWH,keepLast:true,
         rows:srows,w:[1250,4900,760,860,2430]});
-      B.push({t:'tbl',sm:1,rows:[['工地主任','安衛人員','檢查人員'],['\n','\n','\n']],w:[3400,3400,3400]});
+      B.push({t:'tbl',sm:1,keep:'butLast',rows:[['工地主任','安衛人員','檢查人員'],['\n','\n','\n']],w:[3400,3400,3400]});
     });
   }
   return B;
@@ -23691,10 +23683,10 @@ function _plChkBlocks(){
       });
     });
     while(rows.length<1+PLAN_CHK_ROWS)rows.push([String(++chkN),'　','　','　','　','　']);
-    B.push({t:'tbl',sm:1,fixH:PLAN_CHK_H,hdrH:PLAN_CHK_HDRH,rowH:PLAN_CHK_ROWH,
+    B.push({t:'tbl',sm:1,fixH:PLAN_CHK_H,hdrH:PLAN_CHK_HDRH,rowH:PLAN_CHK_ROWH,keepLast:true,
       rows:_plFillRows(rows,sh.m),w:[460,760,2350,4330,1600,700]});
-    B.push({t:'tbl',sm:1,rows:[['缺失複查結果：□已改善完成　□未改善完成，進行追蹤改善。　複查日期：　　年　　月　　日　　複查人員：　　　　']],w:[10200]});
-    B.push({t:'tbl',sm:1,rows:[['檢查人員（現場工程師）','工地主任','品管工程師','監造單位'],['\n','\n','\n','\n']],w:[2500,2200,2200,2300]});
+    B.push({t:'tbl',sm:1,keep:'all',rows:[['缺失複查結果：□已改善完成　□未改善完成，進行追蹤改善。　複查日期：　　年　　月　　日　　複查人員：　　　　']],w:[10200]});
+    B.push({t:'tbl',sm:1,keep:'butLast',rows:[['檢查人員（現場工程師）','工地主任','品管工程師','監造單位'],['\n','\n','\n','\n']],w:[2500,2200,2200,2300]});
   });
   return B;
 }
