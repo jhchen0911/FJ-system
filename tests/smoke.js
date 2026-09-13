@@ -2129,6 +2129,38 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.426 施工構台施工步驟示意圖（架設 4 步＋拆除 4 步） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const sh = FY_SHEETS.get('deck');
+      const ts = sh.panels.map(p => p.t);
+      out.eight = sh.panels.length === 8 && sh.code === 'FY-GT-01';
+      out.order = /架設 1／4：構台樁高程測定/.test(ts[0]) && /架設 2／4：構台帽/.test(ts[1]) && /架設 3／4：構台主樑/.test(ts[2])
+        && /架設 4／4：副樑・覆工板/.test(ts[3]) && /拆除 1／4：覆工板/.test(ts[4]) && /拆除 2／4：副樑/.test(ts[5])
+        && /拆除 3／4：主樑/.test(ts[6]) && /拆除 4／4：構台樁切除/.test(ts[7]);
+      const all = sh.panels.map(p => p.t + p.n1 + p.n2).join('|');
+      out.noBad = !/防滑脫|@2\.0|跨於兩支副樑|總高<|套於樁頂）/.test(all);
+      out.words = /L 角鐵/.test(sh.panels[3].n1) && /車輪擋/.test(sh.panels[3].n1) && /移動式鷹架樓梯/.test(sh.panels[4].n1)
+        && /基礎版面切除/.test(sh.panels[7].n1) && /止水板/.test(sh.panels[7].n1) && /預留開口/.test(sh.panels[7].n1);
+      // 工項對應：施工構台改走新圖組；水平支撐仍安全退回
+      out.map = _fySheetId('deck', '') === 'deck' && !!_fyStoryPages('deck', '') && _fySheetId('strut', '') === null;
+      // 幾何：副樑 @2.0m（50px）共 11 支、覆工板每跨一片
+      const dk = FY_SHEETS._deck();
+      out.geom = dk.sbGap === 50 && dk.sbX.length === 11 && Math.abs(dk.sbX[1] - dk.sbX[0] - 50) < 0.01 && dk.plTop < dk.sbTop;
+      const pg = FY_SHEETS.pages('deck', 1);
+      out.render = pg.length === 1 && /^data:image\/png/.test(pg[0].b64) && pg[0].b64.length > 20000;
+      out.steps = FY_SHEETS.steps('deck').length === 8;
+      return out;
+    });
+    check('施工構台示意圖：8 格（架設 4＋拆除 4）、順序正確', r.eight && r.order && r.steps);
+    check('施工構台示意圖：已刪敘述不再出現、L 角鐵／車輪擋／止水板／預留開口納入', r.noBad && r.words);
+    check('施工構台示意圖：工項對應新圖組、副樑 @2.0m 幾何、可出圖', r.map && r.geom && r.render);
+    check('v5.426 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
