@@ -20129,8 +20129,7 @@ function scenePit(ctx,opt){
   hSteelV(ctx,WX,GY-44,SOIL_B-24,14);
   if(opt.lagging!==false)lagging(ctx,WX+7,GY,pitY);
   if(opt.dim!==false)dimV(ctx,ENG.PW-40,GY,pitY,opt.dimLabel||'開挖深 GL-6.0m');
-  txt(ctx,'擋土側',60,GY-14,{s:9,c:'#555'});
-  txt(ctx,'開挖側',ENG.PW-24,pitY-10,{a:'right',s:9,c:'#555'});
+  if(opt.names!==false){txt(ctx,'擋土側',60,GY-14,{s:9,c:'#555'});txt(ctx,'開挖側',ENG.PW-24,pitY-10,{a:'right',s:9,c:'#555'});}
 }
 
 // ── 水平支撐（機具：200 型伸縮臂；含中間樁、圍令背填、上下支撐正交、千斤頂預壓） ──
@@ -20225,14 +20224,14 @@ const SHEET_ANCHOR={id:'anchor',title:'預力地錨',code:'FY-AN-01',panels:[pPr
      leader(ctx,400,GY+8,a.C[0],a.C[1],'承壓鈑');
      leader(ctx,400,GY+40,a.sx+4,a.Q1[1]+8,'台座');
    }},
-  {t:'施拉預力 ☆',n1:'千斤頂套於錨具，分級施拉至設計預力並記錄伸長量',n2:'☆ 全數工作錨作驗收試驗，預力值、伸長量於容許範圍；性能試驗（試驗錨）、確認試驗依規定辦理',
+  {t:'施拉預力・鎖定・錨力監測 ☆',n1:'千斤頂套於錨具，分級施拉至設計預力並記錄伸長量；達設計預力後鎖定、截斷餘索，錨頭作防蝕保護',n2:'☆ 全數工作錨作驗收試驗，預力值、伸長量於容許範圍；性能試驗（試驗錨）、確認試驗依規定辦理；監測錨裝設荷重計定期量測錨力',
    draw(ctx){
      const a=anchorLine(0);
      scenePit(ctx,{lagging:false,pitY:a.pitY,dim:false});
      strandBundle(ctx,a.ex,a.ey,a.bx,a.by);
      anchorGroutAlong(ctx,a.ex,a.ey,a.bx,a.by,10,5,a.tFree);
      doubleWaler(ctx,a);
-     anchorSeat(ctx,a,{plate:true,head:true});
+     anchorSeat(ctx,a,{plate:true,head:true,cell:true});
      ctx.save();ctx.translate(a.headEnd[0],a.headEnd[1]);ctx.rotate(-A_ANG);
      L(ctx,LW.med);rect(ctx,2,-8,32,16,'#fff');                       // 施拉千斤頂
      L(ctx,LW.thin);rect(ctx,34,-4,8,8,'#fff');                       // 拉桿夾頭
@@ -20242,23 +20241,36 @@ const SHEET_ANCHOR={id:'anchor',title:'預力地錨',code:'FY-AN-01',panels:[pPr
      jackPump(ctx,392,a.pitY);
      L(ctx,LW.thin);ctx.beginPath();ctx.moveTo(380,a.pitY-14);ctx.quadraticCurveTo(330,a.pitY-30,jc[0],jc[1]+8);ctx.stroke();
      worker(ctx,560,a.pitY,'hold',true);
-     holdBox(ctx,400,GY-160,250,['全數驗收試驗','分級施拉・記錄伸長量']);
+     holdBox(ctx,400,GY-160,250,['全數驗收試驗','分級施拉・記錄伸長量・鎖定']);
      leader(ctx,330,GY-60,jc[0],jc[1],'施拉千斤頂＋壓力表',{b:1});
+     leader(ctx,330,GY-28,a.cellC[0],a.cellC[1],'荷重計（監測錨）');
      leader(ctx,470,GY+62,a.sx+4,a.Q1[1]+8,'台座＋承壓鈑');
    }},
-  {t:'鎖定・錨頭保護・錨力監測',n1:'達設計預力後鎖定、截斷餘索，錨頭作防蝕保護；選定監測錨裝設荷重計，定期量測錨力',n2:'鎖定後錨力於容許範圍；臨時地錨於地下結構完成後依規定解錨',
+  {t:'解錨・拆除（地下結構完成後）',n1:'地下結構達支撐能力後逐支解錨：退楔解除預力、抽出鋼絞線回收，拆除錨頭、台座與雙橫擋',n2:'越界地錨依鄰地同意條件辦理；解錨順序依設計',
    draw(ctx){
      const a=anchorLine(0);
-     scenePit(ctx,{lagging:false,pitY:a.pitY,dim:false});
+     scenePit(ctx,{lagging:false,pitY:a.pitY,dim:false,names:false});
+     backfillHatch(ctx,WX+30,a.pitY-14,ENG.PW-14-(WX+30),14);          // 基礎版（地下結構）
+     L(ctx,LW.med);seg(ctx,WX+30,a.pitY-14,WX+30,a.pitY);
+     txt(ctx,'擋土側',60,GY-14,{s:9,c:'#555'});txt(ctx,'開挖側',ENG.PW-24,a.pitY-24,{a:'right',s:9,c:'#555'});
      strandBundle(ctx,a.ex,a.ey,a.bx,a.by);
      anchorGroutAlong(ctx,a.ex,a.ey,a.bx,a.by,10,5,a.tFree);
      doubleWaler(ctx,a);
-     anchorSeat(ctx,a,{plate:true,head:true,cell:true});
-     strandBundle(ctx,a.ex,a.ey,a.headEnd[0]-AU[0]*6,a.headEnd[1]-AU[1]*6);
-     leader(ctx,330,GY-60,a.headC[0],a.headC[1],'錨頭鎖定・防蝕保護',{b:1});
-     leader(ctx,330,GY-28,a.cellC[0],a.cellC[1],'荷重計（監測錨）');
-     leader(ctx,90,GY+176,a.mx,a.my,'錨碇段（受力）');
-     worker(ctx,400,a.pitY,'point',true);
+     anchorSeat(ctx,a,{plate:true,head:true});
+     ctx.save();ctx.translate(a.headEnd[0],a.headEnd[1]);ctx.rotate(-A_ANG);
+     L(ctx,LW.med);rect(ctx,2,-8,32,16,'#fff');                       // 千斤頂（退楔）
+     L(ctx,LW.thin);rect(ctx,34,-4,8,8,'#fff');
+     ctx.restore();
+     const e1=[a.headEnd[0]-AU[0]*50,a.headEnd[1]-AU[1]*50],e2=[a.headEnd[0]-AU[0]*118,a.headEnd[1]-AU[1]*118];
+     strandBundle(ctx,a.ex,a.ey,e2[0],e2[1]);                          // 鋼絞線自孔內抽出
+     L(ctx,LW.med);const nx=-AU[1],ny=AU[0];
+     path(ctx,[[e2[0]-AU[0]*10,e2[1]-AU[1]*10],[e2[0]+nx*5,e2[1]+ny*5],[e2[0]-nx*5,e2[1]-ny*5]],true);ctx.fillStyle='#111';ctx.fill();   // 抽出方向箭頭
+     jackPump(ctx,392,a.pitY-14);
+     L(ctx,LW.thin);ctx.beginPath();ctx.moveTo(380,a.pitY-28);ctx.quadraticCurveTo(330,a.pitY-44,e1[0]-30,e1[1]+8);ctx.stroke();
+     worker(ctx,560,a.pitY-14,'pull',true);
+     leader(ctx,330,GY-60,e1[0]-AU[0]*32,e1[1]-AU[1]*32,'退楔解除預力・抽出鋼絞線回收',{b:1});
+     leader(ctx,470,GY+60,a.sx+4,a.Q1[1]+8,'錨頭・台座・橫擋拆除');
+     leader(ctx,560,GY+150,600,a.pitY-7,'地下結構（基礎版）完成');
    }},
 ]};
 
