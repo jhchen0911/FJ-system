@@ -18524,7 +18524,7 @@ function walerSet(ctx,g){
   hSecI(ctx,g.x0,g.yTop,g.D,g.D);hSecI(ctx,g.x0,g.yBot-g.D,g.D,g.D);
   if(g.bf>0){backfillHatch(ctx,g.xp,g.yTop,g.bf,g.D);backfillHatch(ctx,g.xp,g.yBot-g.D,g.bf,g.D);}
   bracketPlate(ctx,g.xp,g.yTop+g.D,g.bf+g.D+2,g.D*0.45);
-  bracketPlate(ctx,g.xp,g.yBot,g.bf+g.D+2,g.D*0.45);
+  bracketPlate(ctx,g.xp,g.yBot+g.th,g.bf+g.D+2,g.D*0.45);   // 下托架承板在下鉤板之下（留鉤板厚）
 }
 function doubleWaler(ctx,a){walerSet(ctx,a);}
 // 台座（＋承壓鈑、錨具、荷重計）：外框依 anchorGeom；上下鉤板鉤住橫擋翼板；承壓鈑貼斜面、錨具套於鋼絞線
@@ -20204,7 +20204,7 @@ const SHEET_ANCHOR={id:'anchor',title:'預力地錨',code:'FY-AN-01',panels:[pPr
      L(ctx,LW.thin);circ(ctx,WX+24,a.ay+4,56);dash(ctx,[4,3]);seg(ctx,WX+54,a.ay-42,282,GY-166+76-8);dash(ctx);
      doubleWalerDetail(ctx,300,GY-166,76,'Ⓐ 雙橫擋 H300×300',{seat:false});
      leader(ctx,196,GY+176,a.x0+a.D/2,a.yBot-a.D/2,'雙橫擋 H300×300',{b:1});
-     leader(ctx,120,GY+150,a.xp+a.bf/2,a.yTop+a.D/2,'背填混凝土');
+     leader(ctx,84,GY-76,a.xp+a.bf/2,a.yTop+a.D/2,'背填混凝土');
      leader(ctx,540,GY-150,540-0.45*210,(a.pitY-37)-0.45*((a.pitY-37)-(GY-46)),'伸縮臂吊裝機');
    }},
   {t:'錨件安裝（台座・承壓鈑・錨具）',n1:'於橫擋外翼面裝設台座，斜面置承壓鈑，鋼絞線穿過後套上錨具',n2:'台座貼合橫擋；承壓鈑面垂直錨軸',
