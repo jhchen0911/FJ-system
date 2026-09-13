@@ -2161,6 +2161,44 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.427 施工構台細部詳圖移除、檢查表 Word 一頁 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      _plClear();
+      _plState.proj = 'T'; _plState.vars.name = 'T';
+      _plState.walls = [{ id: 'hpile', meth: '水刀引孔', v: {} }];
+      _plState.items = ['midpile', 'strut', 'deck']; _plState.vars.layers = '2';
+      _plNormalize && _plNormalize();
+      const B = _plBuild();
+      // 施工構台不再產生細部詳圖，水平支撐仍有
+      out.noDeckDetail = !_plDetailSteps('deck', {}) && !B.some(x => /detail_deck/.test(x.name || ''))
+        && !!_plDetailSteps('strut', {});
+      // 檢查表：主表末列 keepLast、尾端小表 keep 串接，Word 不得把簽名列拆到下一頁
+      const sc = B.filter(x => x.t === 'tbl' && x.fixH === PLAN_CHK_H);
+      const sf = B.filter(x => x.t === 'tbl' && x.fixH === PLAN_SAFE_H);
+      const after = (blk, n) => { const i = B.indexOf(blk); return B.slice(i + 1, i + 1 + n); };
+      out.keep = sc.length >= 2 && sc.every(x => x.keepLast === true && after(x, 3).every(y => y.t === 'tbl' && (y.keep === 'all' || y.keep === 'butLast')) && after(x, 3)[2].keep === 'butLast')
+        && sf.length >= 1 && sf.every(x => x.keepLast === true && after(x, 1)[0].keep === 'butLast');
+      // 列數／列高下修後總高仍照公式
+      out.size = PLAN_CHK_ROWS === 18 && PLAN_CHK_ROWH === 26 && PLAN_SAFE_ROWS === 25 && PLAN_SAFE_ROWH === 23
+        && PLAN_CHK_H === PLAN_CHK_HDRH + PLAN_CHK_ROWS * PLAN_CHK_ROWH && PLAN_SAFE_H === PLAN_SAFE_HDRH + PLAN_SAFE_ROWS * PLAN_SAFE_ROWH;
+      // docx：keep 選項確實輸出 keepNext
+      const xmlA = _dxTbl([['a'], ['b'], ['c']], [1000], { keep: 'all' });
+      const xmlB = _dxTbl([['a'], ['b'], ['c']], [1000], { keep: 'butLast' });
+      const xmlN = _dxTbl([['a'], ['b'], ['c']], [1000], {});
+      const cnt = x => (x.match(/<w:keepNext\/>/g) || []).length;
+      out.docx = cnt(xmlA) === 3 && cnt(xmlB) === 2 && cnt(xmlN) === 0;
+      return out;
+    });
+    check('計畫書：施工構台細部詳圖已移除（改以 FY-GT-01 示意圖）', r.noDeckDetail);
+    check('檢查表：主表與尾端小表以 keepNext 串接，簽名列不得拆頁', r.keep && r.docx);
+    check('檢查表：列高下修、列數維持（Word 含簽名列仍為一頁）', r.size);
+    check('v5.427 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
