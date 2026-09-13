@@ -20324,31 +20324,51 @@ const SHEET_CCP={id:'ccp',title:'CCP 止水樁（高壓旋噴）',code:'FY-CP-01
 ]};
 
 // ══════ 施工構台（v5.426）：架設 4 步＋拆除 4 步，依業主「施工構台架設／拆除流程圖」重繪 ══════
-const DK={px:[150,350,550],pw:14,capT:5,gdH:16,sbH:10,plT:6,x1:90,x2:610};
+// 比例：1m≈25px。樁距 8m、副樑 @2.0m（50px）、覆工板 2M 跨於相鄰兩支副樑之間
+const DK={px:[150,350,550],pw:14,capT:4,gdH:16,sbH:10,plT:6,x1:90,x2:610,sbGap:50};
 DK.pileTop=GY-100;DK.capY=DK.pileTop-DK.capT;DK.gdC=DK.capY-DK.gdH/2;DK.gdTop=DK.capY-DK.gdH;
 DK.sbC=DK.gdTop-DK.sbH/2;DK.sbTop=DK.gdTop-DK.sbH;DK.plTop=DK.sbTop-DK.plT;
-// 場景：原地面＋土層；slab＝地下結構版已完成（拆除階段）
-function sceneDeck(ctx,o){
-  o=o||{};
+DK.sbX=[];for(let x=DK.x1+10;x<=DK.x2-10+0.1;x+=DK.sbGap)DK.sbX.push(x);        // 副樑位置（11 支，10 跨）
+// 場景（架設）：原地面＋土層
+function sceneDeck(ctx){
   soilSection(ctx,14,GY,ENG.PW-28,SOIL_B-GY,LAYERS,{names:false});
   groundLine(ctx,14,ENG.PW-14,GY,44);
   L(ctx,LW.med);seg(ctx,14,SOIL_B,ENG.PW-14,SOIL_B);
-  if(o.slab){backfillHatch(ctx,14,GY,ENG.PW-28,12);txt(ctx,'地下結構版（結構已完成）',ENG.PW-24,GY+24,{a:'right',s:9,c:'#555'});}
 }
-function deckPiles(ctx,tops){(tops||[DK.pileTop,DK.pileTop,DK.pileTop]).forEach((t,i)=>{if(t!=null)hSteelV(ctx,DK.px[i],t,SOIL_B-24,DK.pw);});}
-function pileCap(ctx,cx,y){L(ctx,LW.med);rect(ctx,cx-13,y,26,DK.capT,'#fff');L(ctx,LW.hair);seg(ctx,cx-13,y+2.5,cx+13,y+2.5);}
+// 場景（拆除）：地下結構體已完成——1F／B1F／B2F 樓版、柱、基礎版，基礎版以下才是土層
+function sceneStruct(ctx){
+  const S=[[GY,14],[GY+70,14],[GY+140,24]];
+  soilSection(ctx,14,GY+164,ENG.PW-28,SOIL_B-GY-164,LAYERS.slice(1),{names:false});
+  L(ctx,LW.med);seg(ctx,14,SOIL_B,ENG.PW-14,SOIL_B);
+  [250,450].forEach(cx=>{backfillHatch(ctx,cx-8,GY+14,16,56);backfillHatch(ctx,cx-8,GY+84,16,56);});   // RC 柱
+  S.forEach(([y,t])=>backfillHatch(ctx,14,y,ENG.PW-28,t));                                        // 樓版／基礎版
+  groundLine(ctx,14,ENG.PW-14,GY,44);
+  txt(ctx,'地下結構體（已完成）',ENG.PW-24,GY+40,{a:'right',s:9,c:'#555'});
+  txt(ctx,'基礎版',ENG.PW-24,GY+156,{a:'right',s:8.5,c:'#555'});
+}
+function deckPiles(ctx,tops,botY){(tops||[DK.pileTop,DK.pileTop,DK.pileTop]).forEach((t,i)=>{if(t!=null)hSteelV(ctx,DK.px[i],t,botY||SOIL_B-24,DK.pw);});}
+// 構台帽：頂板＋兩側裙板套住樁頂（螺栓固定）＋中央加勁鈑
+function pileCap(ctx,cx,y){
+  L(ctx,LW.med);rect(ctx,cx-16,y,32,DK.capT,'#fff');                                  // 頂板
+  rect(ctx,cx-DK.pw/2-3,y+DK.capT,3,12,'#fff');rect(ctx,cx+DK.pw/2,y+DK.capT,3,12,'#fff');   // 裙板
+  L(ctx,LW.thin);[cx-DK.pw/2-1.5,cx+DK.pw/2+1.5].forEach(x=>{circ(ctx,x,y+DK.capT+7,1.6);});   // 螺栓
+  seg(ctx,cx-16,y+2,cx+16,y+2);                                                      // 板厚線
+}
 function deckGirder(ctx,x1,x2,yC){hBeamH(ctx,x1,x2,yC,DK.gdH);}
-function deckSubBeams(ctx,x1,x2,yC,gap){for(let x=x1+15;x<x2-8;x+=gap||30)hSection(ctx,x,yC,10,DK.sbH);}
+function deckSubBeams(ctx,yC,skip){DK.sbX.forEach((x,i)=>{if(skip&&skip.indexOf(i)>=0)return;hSection(ctx,x,yC,10,DK.sbH);});}
 function deckPlate(ctx,x,y,w){backfillHatch(ctx,x,y,w,DK.plT);}
-function deckPlates(ctx,x1,x2,y,skip){for(let x=x1,i=0;x<x2-2;x+=60,i++){if(skip&&skip.indexOf(i)>=0)continue;deckPlate(ctx,x,y,Math.min(60,x2-x));}}
-// 防墜網：樁頂之間垂掛的網（下垂弧線＋網目）
-function safetyNet(ctx,x1,x2,y,sag){
-  sag=sag||14;
-  L(ctx,LW.thin);
-  ctx.beginPath();ctx.moveTo(x1,y);ctx.quadraticCurveTo((x1+x2)/2,y+sag*2,x2,y);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(x1,y+4);ctx.quadraticCurveTo((x1+x2)/2,y+4+sag*2,x2,y+4);ctx.stroke();
+function deckPlates(ctx,y,skip){for(let i=0;i<DK.sbX.length-1;i++){if(skip&&skip.indexOf(i)>=0)continue;deckPlate(ctx,DK.sbX[i]+0.8,y,DK.sbGap-1.6);}}   // 每跨一片，端部坐於兩側副樑
+// 防墜網：樁間垂掛的網（上下弦下垂、網目菱形），兩端繫於樁翼
+function safetyNet(ctx,x1,x2,y){
+  const s1=12,s2=22,mx=(x1+x2)/2;
+  ctx.save();ctx.beginPath();ctx.moveTo(x1,y);ctx.quadraticCurveTo(mx,y+s1*2,x2,y);ctx.lineTo(x2,y+3);ctx.quadraticCurveTo(mx,y+3+s2*2,x1,y+3);ctx.closePath();ctx.clip();
   L(ctx,LW.hair);
-  for(let t=0.06;t<0.97;t+=0.06){const x=x1+(x2-x1)*t,yy=y+4*t*(1-t)*sag*1.0;seg(ctx,x-3,yy-2,x+3,yy+6);seg(ctx,x+3,yy-2,x-3,yy+6);}
+  for(let x=x1-40;x<x2+40;x+=5){seg(ctx,x,y-10,x+40,y+60);seg(ctx,x,y+60,x+40,y-10);}
+  ctx.restore();
+  L(ctx,LW.thin);
+  ctx.beginPath();ctx.moveTo(x1,y);ctx.quadraticCurveTo(mx,y+s1*2,x2,y);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(x1,y+3);ctx.quadraticCurveTo(mx,y+3+s2*2,x2,y+3);ctx.stroke();
+  [x1,x2].forEach(x=>{circ(ctx,x,y+1.5,1.8);});
 }
 // 吊鉤（起重機在畫面外）：鋼索自上方垂下
 function craneHook(ctx,x,yTop,yHook){L(ctx,LW.thin);seg(ctx,x,yTop,x,yHook);hookBlock(ctx,x,yHook,0.85);return {hx:x,hy:yHook+12};}
@@ -20357,11 +20377,13 @@ function levelInst(ctx,x,gy){
   L(ctx,LW.thin);seg(ctx,x,gy-38,x-9,gy);seg(ctx,x,gy-38,x+9,gy);seg(ctx,x,gy-38,x+2,gy-2);
   L(ctx,LW.med);rect(ctx,x-7,gy-46,14,8,'#fff');L(ctx,LW.thin);seg(ctx,x-10,gy-42,x+10,gy-42);
 }
-// GIP 欄杆：立柱＋上中橫桿
-function railing(ctx,x1,x2,y,h){
-  h=h||24;L(ctx,LW.med);
-  for(let x=x1;x<=x2+0.1;x+=(x2-x1)/Math.max(1,Math.round((x2-x1)/20)))seg(ctx,x,y,x,y-h);
-  L(ctx,LW.thin);seg(ctx,x1,y-h,x2,y-h);seg(ctx,x1,y-h/2,x2,y-h/2);
+// 車輪擋＋GIP 欄杆：H 型鋼車輪擋置於覆工板上，欄杆底座銲於溝槽內、立柱＋上下橫桿，總高 <120cm
+function wheelStopRail(ctx,x1,x2,y){
+  const wh=8,ph=20;
+  hBeamH(ctx,x1,x2,y-wh/2,wh);                                                     // 車輪擋（H 型鋼）
+  L(ctx,LW.med);
+  for(let x=x1+8;x<=x2-6;x+=24){rect(ctx,x-2.5,y-wh,5,2,'#fff');seg(ctx,x,y-wh,x,y-wh-ph);}   // 底座＋立柱
+  L(ctx,LW.thin);seg(ctx,x1+4,y-wh-ph,x2-2,y-wh-ph);seg(ctx,x1+4,y-wh-ph/2,x2-2,y-wh-ph/2);   // 上下橫桿
 }
 // 鋼製便梯：自構台面斜下至地面（雙桁＋踏板＋扶手）
 function steelStair(ctx,x0,y0,x1,y1){
@@ -20377,14 +20399,14 @@ function scafTower(ctx,x,yTop,yBot,w){
   L(ctx,LW.thin);const lift=(yBot-yTop)/3;
   for(let i=0;i<3;i++){const y=yTop+i*lift;seg(ctx,x,y+lift,x+w,y+lift);seg(ctx,x,y,x+w,y+lift);seg(ctx,x+w,y,x,y+lift);}
 }
-function deckStruct(ctx,o){                       // 已完成的構台（可選擇省略部分）
+function deckStruct(ctx,o){                       // 已完成的構台（可省略部分構件）
   o=o||{};
-  deckPiles(ctx);
+  deckPiles(ctx,null,o.botY);
   DK.px.forEach(cx=>pileCap(ctx,cx,DK.capY));
-  if(o.net!==false){safetyNet(ctx,DK.px[0]+DK.pw/2,DK.px[1]-DK.pw/2,DK.pileTop+4);safetyNet(ctx,DK.px[1]+DK.pw/2,DK.px[2]-DK.pw/2,DK.pileTop+4);}
+  if(o.net!==false){safetyNet(ctx,DK.px[0]+DK.pw/2,DK.px[1]-DK.pw/2,DK.pileTop+6);safetyNet(ctx,DK.px[1]+DK.pw/2,DK.px[2]-DK.pw/2,DK.pileTop+6);}
   if(o.girder!==false)deckGirder(ctx,DK.x1,DK.x2,DK.gdC);
-  if(o.sub!==false)deckSubBeams(ctx,DK.x1,DK.x2,DK.sbC);
-  if(o.plates!==false)deckPlates(ctx,DK.x1,DK.x2,DK.plTop,o.skip);
+  if(o.sub!==false)deckSubBeams(ctx,DK.sbC,o.skipSb);
+  if(o.plates!==false)deckPlates(ctx,DK.plTop,o.skip);
 }
 const SHEET_DECK={id:'deck',title:'施工構台',code:'FY-GT-01',panels:[
   {t:'架設 1／4：構台樁高程測定・切除',n1:'以水準儀測量構台樁（共構樁）樁頂高程，依設計構台高程放樣切除線，切除構台樁至設計高程',n2:'切除面水平；高程誤差依設計容許值',
@@ -20398,17 +20420,17 @@ const SHEET_DECK={id:'deck',title:'施工構台',code:'FY-GT-01',panels:[
      leader(ctx,400,GY-60,300,GY-42,'水準儀視準線',{fix:1});
      leader(ctx,470,GY+70,DK.px[2]-DK.pw/2,GY+70,'共構樁（構台樁）',{fix:1});
    }},
-  {t:'架設 2／4：構台帽安裝',n1:'以移動式起重機或伸縮臂吊裝構台帽，套於切平之樁頂並固定',n2:'構台帽與樁頂密貼、中心對正',
+  {t:'架設 2／4：構台帽安裝',n1:'以移動式起重機或伸縮臂吊裝構台帽，套於切平之樁頂並以螺栓固定',n2:'構台帽與樁頂密貼、中心對正',
    draw(ctx){
      sceneDeck(ctx);
      deckPiles(ctx);
      pileCap(ctx,DK.px[1],DK.capY);pileCap(ctx,DK.px[2],DK.capY);
-     const hk=craneHook(ctx,DK.px[0],GY-240,GY-186);
-     pileCap(ctx,DK.px[0],DK.capY-30);
-     slings(ctx,hk.hx,hk.hy,[DK.px[0]-12,DK.capY-30],[DK.px[0]+12,DK.capY-30]);
+     const hk=craneHook(ctx,DK.px[0],GY-240,GY-190);
+     pileCap(ctx,DK.px[0],DK.capY-34);
+     slings(ctx,hk.hx,hk.hy,[DK.px[0]-14,DK.capY-34],[DK.px[0]+14,DK.capY-34]);
      worker(ctx,DK.px[0]-40,GY,'point');
      leader(ctx,400,GY-230,DK.px[0]+2,GY-220,'移動式起重機或伸縮臂',{fix:1});
-     leader(ctx,400,GY-150,DK.px[1],DK.capY+2,'構台帽（套於樁頂）',{b:1,fix:1});
+     leader(ctx,400,GY-150,DK.px[1]+8,DK.capY+2,'構台帽',{b:1,fix:1});
    }},
   {t:'架設 3／4：構台主樑架設・防墜網',n1:'主樑吊放於構台帽上固定；樁間拉設防墜網',n2:'主樑與構台帽接合確實；防墜網無破損、固定牢靠',
    draw(ctx){
@@ -20419,55 +20441,55 @@ const SHEET_DECK={id:'deck',title:'施工構台',code:'FY-GT-01',panels:[
      worker(ctx,60,GY,'hold');worker(ctx,640,GY,'point',true);
      leader(ctx,470,GY-230,352,GY-220,'移動式起重機或伸縮臂',{fix:1});
      leader(ctx,470,GY-160,470,DK.gdC,'構台主樑',{b:1,fix:1});
-     leader(ctx,470,GY-50,450,DK.pileTop+12,'防墜網',{fix:1});
+     leader(ctx,470,GY-40,450,DK.pileTop+16,'防墜網',{fix:1});
    }},
-  {t:'架設 4／4：副樑・覆工板架設',n1:'副樑架於主樑上固定，鋪設覆工板並固定；開口處及有墜落危險處設置 GIP 欄杆，設置鋼製便梯上下',n2:'覆工板鋪滿無縫隙、固定確實；欄杆高度依規定',
+  {t:'架設 4／4：副樑・覆工板架設',n1:'副樑 @2.0m 架於主樑上固定，覆工板跨於相鄰兩支副樑上鋪設固定；開口處及有墜落危險處於車輪擋上設置 GIP 欄杆，設置鋼製便梯上下',n2:'覆工板鋪滿無縫隙、固定確實；欄杆總高不超過 120cm，避免機具迴轉碰撞',
    draw(ctx){
      sceneDeck(ctx);
      deckStruct(ctx,{skip:[5,6]});
-     const hk=craneHook(ctx,420,GY-240,GY-196);
-     deckPlate(ctx,390,DK.plTop-30,60);
-     slings(ctx,hk.hx,hk.hy,[394,DK.plTop-30],[446,DK.plTop-30]);
-     worker(ctx,372,DK.plTop,'hold');worker(ctx,470,DK.plTop,'hold',true);
-     railing(ctx,DK.x1,DK.x1+40,DK.plTop);
+     const hk=craneHook(ctx,DK.sbX[5]+25,GY-240,GY-196);
+     deckPlate(ctx,DK.sbX[5]+1,DK.plTop-30,DK.sbGap-2);
+     slings(ctx,hk.hx,hk.hy,[DK.sbX[5]+4,DK.plTop-30],[DK.sbX[6]-4,DK.plTop-30]);
+     worker(ctx,DK.sbX[4]+10,DK.plTop,'hold');worker(ctx,DK.sbX[7]+30,DK.plTop,'hold',true);
+     wheelStopRail(ctx,DK.x1+2,DK.x1+80,DK.plTop);
      steelStair(ctx,DK.x2,DK.plTop,DK.x2+70,GY);
-     leader(ctx,540,GY-230,422,GY-220,'移動式起重機或伸縮臂',{fix:1});
-     leader(ctx,180,GY-215,DK.x1+20,DK.plTop-12,'開口處設 GIP 欄杆',{fix:1});
-     leader(ctx,200,GY-185,240,DK.plTop+3,'覆工板',{b:1,fix:1});
-     leader(ctx,200,GY-165,255,DK.sbC,'副樑',{fix:1});
+     leader(ctx,560,GY-230,hk.hx+2,GY-220,'移動式起重機或伸縮臂',{fix:1});
+     leader(ctx,190,GY-215,DK.x1+40,DK.plTop-20,'車輪擋＋GIP 欄杆（總高<120cm）',{fix:1});
+     leader(ctx,200,GY-185,DK.sbX[2]+25,DK.plTop+3,'覆工板 2M（跨於兩支副樑）',{b:1,fix:1});
+     leader(ctx,200,GY-165,DK.sbX[3],DK.sbC,'副樑 @2.0m',{fix:1});
      leader(ctx,640,GY-200,DK.x2+44,GY-52,'鋼製便梯',{fix:1});
    }},
   {t:'拆除 1／4：覆工板拆除',n1:'地下結構完成後，自構台一端依序吊除覆工板；開口處設 GIP 欄杆，人員由鷹架樓梯上下',n2:'吊掛前確認固定件已拆除；作業區下方淨空',
    draw(ctx){
-     sceneDeck(ctx,{slab:true});
-     deckPiles(ctx);
-     deckStruct(ctx,{skip:[5,6,7,8]});
-     const hk=craneHook(ctx,420,GY-240,GY-196);
-     deckPlate(ctx,390,DK.plTop-30,60);
-     slings(ctx,hk.hx,hk.hy,[394,DK.plTop-30],[446,DK.plTop-30]);
-     worker(ctx,372,DK.plTop,'hold');worker(ctx,470,DK.plTop,'hold',true);
-     railing(ctx,DK.x1,DK.x1+40,DK.plTop);
+     sceneStruct(ctx);
+     deckStruct(ctx,{skip:[5,6,7,8,9],botY:GY+160});
+     const hk=craneHook(ctx,DK.sbX[5]+25,GY-240,GY-196);
+     deckPlate(ctx,DK.sbX[5]+1,DK.plTop-30,DK.sbGap-2);
+     slings(ctx,hk.hx,hk.hy,[DK.sbX[5]+4,DK.plTop-30],[DK.sbX[6]-4,DK.plTop-30]);
+     worker(ctx,DK.sbX[4]+10,DK.plTop,'hold');worker(ctx,DK.sbX[3]+20,DK.plTop,'hold',true);
+     wheelStopRail(ctx,DK.x1+2,DK.x1+80,DK.plTop);
      scafTower(ctx,DK.x2+8,DK.plTop-30,GY,34);
-     leader(ctx,540,GY-230,422,GY-220,'移動式起重機或伸縮臂',{fix:1});
-     leader(ctx,200,GY-185,240,DK.plTop+3,'覆工板拆除',{b:1,fix:1});
+     leader(ctx,560,GY-230,hk.hx+2,GY-220,'移動式起重機或伸縮臂',{fix:1});
+     leader(ctx,200,GY-185,DK.sbX[2]+25,DK.plTop+3,'覆工板拆除',{b:1,fix:1});
      leader(ctx,560,GY-160,DK.x2+25,GY-60,'鷹架樓梯',{fix:1});
    }},
   {t:'拆除 2／4：副樑拆除',n1:'覆工板拆畢後依序吊除副樑',n2:'人員於主樑上作業須繫掛安全帶；防墜網保留至主樑拆除前',
    draw(ctx){
-     sceneDeck(ctx,{slab:true});
-     deckStruct(ctx,{plates:false});
-     const hk=craneHook(ctx,350,GY-240,GY-196);
-     hSection(ctx,350,DK.sbC-34,10,DK.sbH);
-     slings(ctx,hk.hx,hk.hy,[345,DK.sbC-39],[355,DK.sbC-39]);
-     worker(ctx,300,DK.gdTop,'hold');worker(ctx,400,DK.gdTop,'hold',true);
+     sceneStruct(ctx);
+     deckStruct(ctx,{plates:false,skipSb:[5],botY:GY+160});
+     const hk=craneHook(ctx,DK.sbX[5],GY-240,GY-196);
+     hSection(ctx,DK.sbX[5],DK.sbC-34,10,DK.sbH);
+     slings(ctx,hk.hx,hk.hy,[DK.sbX[5]-5,DK.sbC-39],[DK.sbX[5]+5,DK.sbC-39]);
+     worker(ctx,DK.sbX[4]-12,DK.gdTop,'hold');worker(ctx,DK.sbX[6]+12,DK.gdTop,'hold',true);
      scafTower(ctx,DK.x2+8,DK.plTop-30,GY,34);
-     leader(ctx,470,GY-230,352,GY-220,'移動式起重機或伸縮臂',{fix:1});
-     leader(ctx,200,GY-185,250,DK.sbC,'副樑拆除',{b:1,fix:1});
+     leader(ctx,470,GY-230,DK.sbX[5]+2,GY-220,'移動式起重機或伸縮臂',{fix:1});
+     leader(ctx,200,GY-185,DK.sbX[2],DK.sbC,'副樑拆除',{b:1,fix:1});
    }},
   {t:'拆除 3／4：主樑拆除',n1:'副樑拆畢後吊除主樑，隨後拆除構台帽與防墜網',n2:'吊點對稱、吊掛平穩；拆下材料分類集中',
    draw(ctx){
-     sceneDeck(ctx,{slab:true});
-     deckPiles(ctx);
+     sceneStruct(ctx);
+     deckPiles(ctx,null,GY+160);
+     DK.px.forEach(cx=>pileCap(ctx,cx,DK.capY));
      const hk=craneHook(ctx,350,GY-240,GY-206);
      deckGirder(ctx,DK.x1,DK.x2,DK.gdC-40);
      slings(ctx,hk.hx,hk.hy,[290,DK.gdTop-40],[410,DK.gdTop-40]);
@@ -20478,15 +20500,15 @@ const SHEET_DECK={id:'deck',title:'施工構台',code:'FY-GT-01',panels:[
    }},
   {t:'拆除 4／4：構台樁切除・吊起',n1:'於結構版面切除構台樁，切除段以起重機吊起運離',n2:'切除前先吊掛固定；切口打磨平整、防鏽處理',
    draw(ctx){
-     sceneDeck(ctx,{slab:true});
-     deckPiles(ctx,[GY-60,null,GY-60]);
+     sceneStruct(ctx);
+     deckPiles(ctx,[GY-60,null,GY-60],GY+160);
      const hk=craneHook(ctx,DK.px[1],GY-240,GY-176);
      hSteelV(ctx,DK.px[1],GY-150,GY-30,DK.pw);
      L(ctx,LW.thin);seg(ctx,hk.hx,hk.hy,DK.px[1],GY-150);
      worker(ctx,DK.px[1]+34,GY,'crouch',true);
      leader(ctx,470,GY-230,DK.px[1]+2,GY-220,'移動式起重機或伸縮臂',{fix:1});
      leader(ctx,470,GY-120,DK.px[1]+DK.pw/2,GY-90,'構台樁切除段吊起',{b:1,fix:1});
-     leader(ctx,470,GY+40,DK.px[2]+DK.pw/2,GY-2,'於結構版面切除',{fix:1});
+     leader(ctx,470,GY-30,DK.px[2]+DK.pw/2,GY-2,'於結構版面切除',{fix:1});
    }},
 ]};
 
