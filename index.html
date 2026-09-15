@@ -1278,6 +1278,14 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         </div>
         <div class="fg fg2" style="margin-bottom:10px">
           <div class="f"><label>日期</label><input id="dr-date" type="date" style="font-size:14px;padding:8px 10px"></div>
+          <div class="f"><label>作業狀態 <span style="font-size:10.5px;color:var(--b3)">— 暫停／停工期間不再提醒補日報</span></label>
+            <select id="dr-status" onchange="_drStatusUI()" style="width:100%;font-size:14px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit">
+              <option value="work">施工中</option><option value="pause">明起暫停（階段性退場）</option><option value="stop">停工（天候／業主／工安…）</option></select></div>
+          <div id="dr-status-more" class="f" style="grid-column:1/-1;display:none">
+            <div class="fg fg2" style="gap:8px">
+              <div class="f"><label>原因／說明</label><input id="dr-stop-reason" placeholder="例：待業主開挖至第二層" style="font-size:13px;padding:8px 10px"></div>
+              <div class="f"><label>預計復工日（可不填）</label><input id="dr-resume-date" type="date" style="font-size:13px;padding:8px 10px"></div>
+            </div></div>
         </div>
         <div class="f" style="margin-bottom:10px">
           <label>今日進度／工作內容 <span style="font-size:10.5px;color:var(--b3)">— 選工項填數量，回報量連動專案施工進度條</span></label>
@@ -1323,8 +1331,12 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <label>對應工項（選填，供成本歸戶）</label>
           <select id="qc-item" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit"><option value="-1">── 不指定 ──</option></select>
         </div>
+        <div class="f" style="margin-bottom:14px">
+          <label>支出人 <span style="font-size:10.5px;color:var(--b3)">— 員工支出先用零用金，用完才是代墊；零用金結算依此彙總</span></label>
+          <select id="qc-payer" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit"></select>
+        </div>
         <button type="button" class="btn btn-g" onclick="submitQuickCost()" style="width:100%;justify-content:center;padding:13px;font-size:15px;font-weight:900">✓ 登錄支出</button>
-        <div style="font-size:10.5px;color:var(--b3);margin-top:8px">登錄後自動列入該專案施工成本（公司自付，不入應付帳款），科目與工項已自動歸戶。</div>
+        <div style="font-size:10.5px;color:var(--b3);margin-top:8px">登錄後自動列入該專案施工成本（不入應付帳款），科目與工項已自動歸戶；支出人為員工者計入其零用金結算。</div>
         <div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px"><div style="flex:1;height:1px;background:var(--b1)"></div><span style="font-size:11px;color:var(--b3)">有發票／收據？</span><div style="flex:1;height:1px;background:var(--b1)"></div></div>
         <button type="button" class="btn" onclick="smartIntake()" style="width:100%;justify-content:center;padding:12px;font-size:14px;font-weight:700;border-color:var(--gm);color:var(--g3)"><svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg> 拍照智慧收件（AI 自動判讀）</button>
         <div style="font-size:10.5px;color:var(--b3);margin-top:6px">拍發票或收據，AI 自動判讀類型與金額，連動寫入施工成本、應付帳款與帳務進項。</div>
@@ -2681,7 +2693,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.430';
+var APP_VERSION='v5.431';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -8953,16 +8965,17 @@ function updateDashTodo(){
     var gap=(P.drGapDays==null||P.drGapDays==='')?3:parseInt(P.drGapDays);
     if(!(gap>0))return;
     (Q||[]).forEach(function(q){
-      if(!q.awarded||q.closed||q.parentId)return;
-      var logs=q.dailyLogs||[];
-      if(!logs.length&&!(q.costs||[]).length)return;
-      var last='';logs.forEach(function(L){var d=String((L&&L.date)||'');if(d>last)last=d;});
-      if(!last)return;
-      var days=_dDiff(last,today);
-      if(!(days>=gap))return;
-      items.push({type:'dr_gap',urgent:days>=gap*2,jump:"go('quickcost')",
-        icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>',color:days>=gap*2?'var(--red)':'#b45309',
-        text:(q.name||'未命名')+' 已 '+days+' 天沒有工作日報',sub:'最近一篇 '+last+'・請工務補填'});
+      var g=_drGapState(q,today,gap);if(!g)return;   // v5.431：暫停／停工中、打設完成待拔除都不催
+      if(g.kind==='resume'){
+        items.push({type:'dr_gap',urgent:true,jump:"drGoReport('"+q.id+"')",
+          icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>',color:'var(--red)',
+          text:(q.name||'未命名')+' 預計復工日 '+g.lastL.resumeDate+' 已過，尚無日報——已復工還是延後？',
+          sub:(g.lastL.status==='pause'?'暫停':'停工')+'自 '+(g.lastL.stopFrom||g.last),extra:_drGapBtns(q.id,g.last)});
+        return;
+      }
+      items.push({type:'dr_gap',urgent:g.days>=gap*2,jump:"drGoReport('"+q.id+"')",
+        icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>',color:g.days>=gap*2?'var(--red)':'#b45309',
+        text:(q.name||'未命名')+' 已 '+g.days+' 天沒有日報——是施工中還是停工？',sub:'最近一篇 '+g.last,extra:_drGapBtns(q.id,g.last)});
     });
   })();
   // ── 以下三類原屬「提醒區」，v5.265 整併入本月待辦 ──
@@ -9120,7 +9133,7 @@ function updateDashTodo(){
     return '<div '+(it.jump?'onclick="'+it.jump.replace(/"/g,'&quot;')+'" ':'')+'style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--b1);'+(it.jump?'cursor:pointer;':'')+(it.urgent?'background:#fff5f5;':'')+'">'
       +'<div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">'
       +'<span style="flex-shrink:0;font-size:15px">'+it.icon+'</span>'
-      +'<div style="font-size:12px;color:var(--b5);line-height:1.5">'+esc(it.text)+'</div>'
+      +'<div style="font-size:12px;color:var(--b5);line-height:1.5">'+esc(it.text)+(it.extra||'')+'</div>'
       +'</div>'
       +'<div style="font-size:12px;font-weight:700;color:'+it.color+';flex-shrink:0;margin-left:10px;white-space:nowrap">'+it.sub+(it.jump?' <span style="color:var(--b3);font-weight:400">›</span>':'')+'</div>'
       +'</div>';
@@ -27488,6 +27501,17 @@ function rQuickCost(){
   const cur=sel.value;
   const mains=Q.filter(q=>q.awarded&&!q.closed&&!q.parentId);
   sel.innerHTML='<option value="">── 選擇專案 ──</option>'+mains.map(q=>'<option value="'+q.id+'"'+(q.id===cur?' selected':'')+'>'+esc(q.name||'未命名')+'</option>').join('');
+  // v5.431 支出人：預設登入者本人；空＝公司付款
+  try{
+    const ps=document.getElementById('qc-payer');
+    if(ps){
+      const pc=ps.value,me=_meName();
+      const names=listStaff().filter(function(x){return x&&x.active!==false&&x.name;}).map(function(x){return x.name;});
+      if(me&&names.indexOf(me)<0)names.unshift(me);
+      const want=pc||me;
+      ps.innerHTML='<option value="">公司付款（不經零用金）</option>'+names.map(function(n){return '<option value="'+esc(n)+'"'+(want===n?' selected':'')+'>'+esc(n)+'</option>';}).join('');
+    }
+  }catch(e){_err('rQuickCost.payer',e);}
   const ch=document.getElementById('qc-chips');
   if(ch)ch.innerHTML=QC_TYPES.map((t,i)=>'<button type="button" onclick="qcPick('+i+')" style="padding:8px 16px;border-radius:99px;border:1.5px solid '+(i===_qcSel?'var(--g3)':'var(--b2)')+';background:'+(i===_qcSel?'var(--gl)':'var(--w)')+';color:'+(i===_qcSel?'var(--g3)':'var(--b4)')+';font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">'+t[0]+'</button>').join('');
   // 工作日報：專案下拉與日期預設
@@ -27523,15 +27547,17 @@ function submitQuickCost(){
   const t=QC_TYPES[_qcSel]||QC_TYPES[0];
   const desc=(document.getElementById('qc-desc')?.value||'').trim()||t[0];
   const linkedIdx=parseInt(document.getElementById('qc-item')?.value);
+  const payer=(gv('qc-payer')||'').trim();   // v5.431：支出人（員工→零用金結算；空＝公司付款）
   if(!q.costs)q.costs=[];
   const cid=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
   q.costs.push({id:cid,type:'extra',vendor:'公司支出（自付）',cat:t[1],date:localToday(),
     linkedItemIdx:(linkedIdx>=0?linkedIdx:-1),isAttached:false,attachedTo:'',mergedInto:'',
+    payer:payer,payBy:payer?'staff':'company',
     rows:[{id:cid+'_0',subType:'worker',desc:desc,reason:'',days:1,dayRate:amt,transport:0}],amt:amt});
   _touch(q);
   try{persist();}catch(e){_err('submitQuickCost',e);}
   try{_immediateUpload();}catch(e){try{_onSave();}catch(e2){_err('submitQuickCost',e2);}}
-  _qcLog.unshift({t:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),proj:(q.name||'').slice(0,14),desc:desc,amt:amt,cat:t[1]});
+  _qcLog.unshift({t:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),proj:(q.name||'').slice(0,14),desc:desc+(payer?('（'+payer+'）'):''),amt:amt,cat:t[1]});
   const ai=document.getElementById('qc-amt');if(ai)ai.value='';
   const di=document.getElementById('qc-desc');if(di)di.value='';
   rQcLog();
@@ -27713,6 +27739,80 @@ function _drPhaseSel(q,r,ri){
     +'<option value="install"'+(ph==='install'?' selected':'')+'>打設</option><option value="remove"'+(ph==='remove'?' selected':'')+'>拔除</option></select>';
 }
 // 把目前表單收成一筆回報（回傳 null＝表單為空）
+// v5.431：作業狀態（施工中／明起暫停／停工）——暫停或停工期間待辦不再催日報；狀態本身就是一筆日報
+const DR_STATUS_LABEL={work:'施工中',pause:'明起暫停（階段性退場）',stop:'停工'};
+function _drStatusUI(){var st=gv('dr-status')||'work';var m=document.getElementById('dr-status-more');if(m)m.style.display=(st==='work')?'none':'';}
+function _drStatusText(L){
+  if(!L||!L.status||L.status==='work')return '';
+  return (L.status==='pause'?'⏸ 明起暫停（階段性退場）':'⛔ 停工')
+    +(L.stopFrom&&L.stopFrom!==L.date?('（'+L.stopFrom+'～'+L.date+'）'):'')
+    +(L.stopReason?('：'+L.stopReason):'')+(L.resumeDate?('　預計復工 '+L.resumeDate):'');
+}
+// 打設類工項全數達合約量、且尚未開始拔除 → 階段完成待拔除（不催日報）
+function _projStageDone(q){
+  var any=false,items=(q&&q.items)||[];
+  for(var i=0;i<items.length;i++){
+    var it=items[i];if(!it||it.sec||_isSpare(it))continue;
+    var c=_itemCat(it);if(!c.install)continue;
+    var t=Math.abs(parseFloat(it.qty)||0);if(t<=0)continue;
+    var pg=_itemProgress(q,i);
+    if(pg.nRemove)return false;
+    if(pg.cum<t-1e-6)return false;
+    any=true;
+  }
+  return any;
+}
+// 待辦「沒日報」判定：null＝不提醒；{kind:'gap'|'resume',days,last,lastL}
+function _drGapState(q,today,gap){
+  if(!q||!q.awarded||q.closed||q.parentId)return null;
+  var logs=q.dailyLogs||[];
+  if(!logs.length&&!(q.costs||[]).length)return null;
+  var lastL=null;logs.forEach(function(L){var d=String((L&&L.date)||'');if(!lastL||d>String(lastL.date||''))lastL=L;});
+  if(!lastL)return null;
+  var last=String(lastL.date||''),days=_dDiff(last,today);
+  if(!(days>=gap))return null;
+  var st=lastL.status||'work';
+  if(st!=='work'){
+    if(!lastL.resumeDate)return null;                       // 暫停／停工中，沒填復工日：安靜
+    if(_dDiff(lastL.resumeDate,today)<gap)return null;      // 過了預計復工日 gap 天才問
+    return {kind:'resume',days:days,last:last,lastL:lastL};
+  }
+  if(_projStageDone(q))return null;                         // 打設完成待拔除
+  return {kind:'gap',days:days,last:last,lastL:lastL};
+}
+function _drGapBtns(qid,last){
+  return '<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">'
+    +'<button type="button" class="btn btn-xs" onclick="event.stopPropagation();drBackfillStop(\''+qid+'\',\''+last+'\')" style="padding:3px 10px">補登停工／暫停</button>'
+    +'<button type="button" class="btn btn-xs" onclick="event.stopPropagation();drGoReport(\''+qid+'\')" style="padding:3px 10px;border-color:var(--gm);color:var(--g3)">補日報</button></div>';
+}
+function drGoReport(qid){
+  go('quickcost');
+  setTimeout(function(){try{rQuickCost();var sel=document.getElementById('dr-proj');if(sel){sel.value=qid;if(sel.onchange)sel.onchange();}}catch(e){_err('drGoReport',e);}},80);
+}
+// 補登停工／暫停：一筆帶起訖日的狀態日報（日期＝停工最後一天），之後有進度日報進來就自動復工
+function drBackfillStop(qid,last){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;
+  var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
+  var from=last?_dAdd(last,1):localToday(),to=localToday();
+  var html='<div class="fg fg2" style="gap:8px">'
+    +'<div class="f"><label>自</label><input id="bs-from" type="date" value="'+esc(from)+'" style="'+IN+'"></div>'
+    +'<div class="f"><label>至（含）</label><input id="bs-to" type="date" value="'+esc(to)+'" style="'+IN+'"></div>'
+    +'<div class="f"><label>狀態</label><select id="bs-status" style="'+IN+'"><option value="stop">停工（天候／業主／工安…）</option><option value="pause">暫停（階段性退場）</option></select></div>'
+    +'<div class="f"><label>預計復工日（可不填）</label><input id="bs-resume" type="date" style="'+IN+'"></div>'
+    +'<div class="f" style="grid-column:1/-1"><label>原因／說明</label><input id="bs-reason" placeholder="例：連日大雨／待業主開挖" style="'+IN+'"></div>'
+    +'</div><div style="font-size:11px;color:var(--b3)">補登後這段期間不再催日報；下一筆有進度的日報送出即視為復工。停工記錄可作租期照算與工期展延的佐證。</div>';
+  showConfirm('補登停工／暫停：'+esc(q.name||''),html,function(){
+    var f=gv('bs-from')||from,t=gv('bs-to')||to;if(t<f){var x=f;f=t;t=x;}
+    if(!q.dailyLogs)q.dailyLogs=[];
+    q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:t,stopFrom:f,
+      status:gv('bs-status')||'stop',stopReason:(gv('bs-reason')||'').trim(),resumeDate:gv('bs-resume')||'',
+      workers:0,subWorkers:0,subVendor:'',crews:[],progress:'',progressRows:[],photos:[],ownEquip:false,equip:[],
+      by:((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||''),ts:Date.now()});
+    _touch(q);try{persist();}catch(e){_err('drBackfillStop',e);}try{_immediateUpload();}catch(e){_err('drBackfillStop',e);}
+    toast('已補登 '+f+'～'+t+' '+(DR_STATUS_LABEL[gv('bs-status')||'stop']));
+    try{updateDashTodo();}catch(e){_err('drBackfillStop',e);}
+  });
+}
 function _drCollect(){
   const qid=document.getElementById('dr-proj')?.value;
   const q=Q.find(x=>x.id===qid);
@@ -27721,15 +27821,18 @@ function _drCollect(){
   const workers=cw.workers,subWorkers=cw.subWorkers,subVendor=cw.subVendor;
   const rows=_drProgRows.filter(r=>(r.itemIdx>=0&&parseFloat(r.qty)>0)||((''+(r.note||'')).trim()!==''));
   const equip=Object.keys(_drEquip).map(function(n){return {name:n,hrs:parseFloat(_drEquip[n])||0};});   // v5.402 只勾機具也算有內容
-  if(!workers&&!subWorkers&&!rows.length&&!_drPhotos.length&&!equip.length)return null;
+  const status=gv('dr-status')||'work',stopReason=(gv('dr-stop-reason')||'').trim(),resumeDate=gv('dr-resume-date')||'';
+  if(!workers&&!subWorkers&&!rows.length&&!_drPhotos.length&&!equip.length&&status==='work')return null;
   const over=[];_drProgRows.forEach(function(_r,ri){const h=_drRowHint(ri);if(h.over)over.push(h.desc+' 累計 '+fmt(h.after)+' ＞ 合約 '+fmt(h.target));});
   const progRows=rows.map(r=>({itemIdx:r.itemIdx,desc:r.itemIdx>=0?((q.items[r.itemIdx]||{}).desc||'').split('\n')[0]:'',qty:parseFloat(r.qty)||0,note:(r.note||'').trim(),ph:_drRowPhase(q,r)}));
   const progressText=progRows.map(r=>(r.desc?(r.desc+(r.qty?(' '+r.qty+((q.items[r.itemIdx]||{}).unit||'')):'')):'')+(r.note?((r.desc?'；':'')+r.note):'')).filter(Boolean).join('\n');
   return {qid:qid,name:q.name||'',workers:workers,subWorkers:subWorkers,subVendor:subVendor,crews:cw.crews,over:over,equip:equip,
+    status:status,stopReason:stopReason,resumeDate:resumeDate,
     ownEquip:!!document.getElementById('dr-own-equip')?.checked||equip.length>0,
     progressRows:progRows,progress:progressText,photos:_drPhotos.slice(0,3)};
 }
 function _drClearForm(){
+  try{var ss=document.getElementById('dr-status');if(ss)ss.value='work';['dr-stop-reason','dr-resume-date'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});_drStatusUI();}catch(e){_err('_drClearForm',e);}
   drRenderCrews(true);
   const oe=document.getElementById('dr-own-equip');if(oe)oe.checked=false;
   _drEquip={};_drRenderEquip();
@@ -27753,7 +27856,7 @@ function drRenderList(){
     +_drList.map(function(e,i){
       return '<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--gm);background:var(--gl);border-radius:var(--r8);margin-bottom:5px;font-size:12.5px">'
       +'<span style="font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(e.name)+'</span>'
-      +'<span style="color:var(--b4);white-space:nowrap">'+(e.workers?('點工'+e.workers):'')+(e.subWorkers?('・承包'+e.subWorkers):'')+(e.ownEquip?('・機具'+((e.equip&&e.equip.length)?(e.equip.length+'台'):'')):'')+(e.photos.length?('・<svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg>'+e.photos.length):'')+'</span>'
+      +'<span style="color:var(--b4);white-space:nowrap">'+(e.status&&e.status!=='work'?('['+DR_STATUS_LABEL[e.status]+']'):'')+(e.workers?('點工'+e.workers):'')+(e.subWorkers?('・承包'+e.subWorkers):'')+(e.ownEquip?('・機具'+((e.equip&&e.equip.length)?(e.equip.length+'台'):'')):'')+(e.photos.length?('・<svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg>'+e.photos.length):'')+'</span>'
       +'<button type="button" class="btn btn-xs btn-r" onclick="drRemoveFromList('+i+')">✕</button></div>';
     }).join('');
 }
@@ -27770,6 +27873,7 @@ function submitDailyReport(){
     q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:date,
       workers:e.workers,subWorkers:e.subWorkers||0,subVendor:e.subVendor||'',crews:e.crews||[],progress:e.progress,progressRows:e.progressRows,photos:e.photos,
       ownEquip:e.ownEquip,equip:e.equip||[],
+      status:e.status||'work',stopReason:e.stopReason||'',resumeDate:e.resumeDate||'',
       by:((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||''),ts:Date.now()});
     if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120);
     _touch(q);
@@ -27795,6 +27899,7 @@ function viewDailyReports(qid){
     return '<div style="border-bottom:1px solid var(--b1);padding:9px 0">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12.5px;flex-wrap:wrap"><b>'+esc(L.date||'')+'</b><span style="color:var(--b4);flex:1;min-width:0">'+_crewsText(L)+((L.equip&&L.equip.length)?('　機具 '+L.equip.map(function(e){return esc(e.name)+(e.hrs?(' '+e.hrs+'h'):'');}).join('、')):(L.ownEquip?'　自有機具':''))+'</span>'
       +'<span style="white-space:nowrap"><button type="button" class="btn btn-xs" onclick="editDailyLog(\''+q.id+'\',\''+L.id+'\')" style="padding:2px 9px">✎ 修改</button> <button type="button" class="btn btn-xs btn-r" onclick="delDailyLog(\''+q.id+'\',\''+L.id+'\')" style="padding:2px 9px">刪除</button></span></div>'
+      +(_drStatusText(L)?'<div style="font-size:12px;font-weight:700;color:'+(L.status==='stop'?'#c62828':'#b26a00')+';margin-top:3px">'+esc(_drStatusText(L))+'</div>':'')
       +(L.progress?'<div style="font-size:12.5px;color:var(--b5);margin-top:3px;white-space:pre-line">'+esc(L.progress)+'</div>':'')
       +((L.photos&&L.photos.length)?('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+L.photos.map(function(p){return '<img src="'+p+'" style="width:86px;height:86px;object-fit:cover;border-radius:8px;border:1px solid var(--b2);cursor:zoom-in" title="點擊查看" onclick="_viewFile(\'日報照片\',this.src)">';}).join('')+'</div>'):'')
       +(L.by?'<div style="font-size:10px;color:var(--b3);margin-top:4px">'+esc(L.by)+'</div>':'')
@@ -27818,6 +27923,9 @@ function editDailyLog(qid,lid){
   const IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   const html='<div class="fg fg2" style="gap:8px">'
     +'<div class="f"><label>日期</label><input id="dle-date" type="date" value="'+esc(L.date||'')+'" style="'+IN+'"></div>'
+    +'<div class="f"><label>作業狀態</label><select id="dle-status" style="'+IN+'">'+['work','pause','stop'].map(function(k){return '<option value="'+k+'"'+((L.status||'work')===k?' selected':'')+'>'+DR_STATUS_LABEL[k]+'</option>';}).join('')+'</select></div>'
+    +'<div class="f"><label>停工／暫停原因</label><input id="dle-stop-reason" value="'+esc(L.stopReason||'')+'" style="'+IN+'"></div>'
+    +'<div class="f"><label>預計復工日</label><input id="dle-resume" type="date" value="'+esc(L.resumeDate||'')+'" style="'+IN+'"></div>'
     +'</div>'
     +'<div style="font-size:12px;font-weight:700;color:var(--b4);margin:8px 0 4px">出工（類型／廠商／人數）</div>'
     +'<div id="dle-crews">'+_crewsOf(L).concat([{type:'sub',vendor:'',n:''}]).map(function(c){return _dleCrewRow(c,IN);}).join('')+'</div>'
@@ -27828,6 +27936,7 @@ function editDailyLog(qid,lid){
     +'<div style="font-size:11px;color:var(--b3)">留空的進度列會自動略過；修改會重算專案進度、逾期租金與數量對照。</div>';
   showConfirm('修改日報：'+esc(q.name||''),html,function(){
     L.date=gv('dle-date')||L.date;
+    L.status=gv('dle-status')||'work';L.stopReason=(gv('dle-stop-reason')||'').trim();L.resumeDate=gv('dle-resume')||'';
     _crewsApply(L,[].slice.call(document.querySelectorAll('#dle-crews .dle-crew')).map(function(el){return {type:el.querySelector('.dle-ct').value,vendor:el.querySelector('.dle-cv').value,n:el.querySelector('.dle-cn').value};}));
     L.ownEquip=!!document.getElementById('dle-eq')?.checked;
     const its=[].slice.call(document.querySelectorAll('.dle-it')),qs=[].slice.call(document.querySelectorAll('.dle-q')),ns=[].slice.call(document.querySelectorAll('.dle-n')),phs=[].slice.call(document.querySelectorAll('.dle-ph'));
@@ -28810,6 +28919,7 @@ function rCostItems(){
         +'</select>'
         +(c.vendor&&c.vendor!=='公司支出（自付）'?'<button type="button" title="產出給廠商的計價單 PDF" onclick="printVendorStatement(\''+c.id+'\')" style="margin-left:auto;border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 計價單</button>':'')
         +_costPayBtn(c)
+        +(c.type==='extra'&&c.payer?'<span style="font-size:11px;color:#4A148C;white-space:nowrap">支出人 '+esc(c.payer)+'</span>':'')
         +'<span style="font-size:11px;color:var(--b4);white-space:nowrap'+(c.vendor&&c.vendor!=='公司支出（自付）'?'':';margin-left:auto')+'">發包 <b id="cost-amt-'+c.id+'" style="color:var(--g3);font-variant-numeric:tabular-nums">'+fmt((function(){try{recalcCostAmt(c);}catch(e){_err('top',e);}return c.amt||0;})())+'</b></span>'
         +'</div>'
         +(c.vendor&&c.vendor!=='公司支出（自付）'?_subContractBar(c,q):'')
@@ -28832,6 +28942,7 @@ function rCostItems(){
         +'</select>'
         +(c.vendor&&c.vendor!=='公司支出（自付）'?'<button type="button" title="產出給廠商的計價單 PDF" onclick="printVendorStatement(\''+c.id+'\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 計價單</button>':'')
         +_costPayBtn(c)
+        +(c.type==='extra'&&c.payer?'<span style="font-size:11px;color:#4A148C;white-space:nowrap">支出人 '+esc(c.payer)+'</span>':'')
         +'<span style="font-size:11px;color:var(--b4);white-space:nowrap">小計 <b id="cost-amt-'+c.id+'" style="color:var(--g3);font-variant-numeric:tabular-nums">'+fmt((function(){try{recalcCostAmt(c);}catch(e){_err('top',e);}return c.amt||0;})())+'</b></span>'
         +'</div>'
         +'<div style="display:flex;gap:5px;align-items:center;margin-bottom:6px">'

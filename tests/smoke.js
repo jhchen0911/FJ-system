@@ -2302,6 +2302,48 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.431 日報作業狀態／停工補登／提醒改問句、支出人 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {}; const today = localToday();
+      const q = { id: 'tq431', name: 'T431', awarded: true, items: [{ desc: 'H型鋼樁打設、拔除', unit: '支', qty: 10, price: 1000 }],
+        dailyLogs: [{ id: 'a', date: _dAdd(today, -10), progressRows: [{ itemIdx: 0, qty: 4 }] }] };
+      out.gap = (_drGapState(q, today, 3) || {}).kind === 'gap';
+      q.dailyLogs.unshift({ id: 'b', date: _dAdd(today, -8), status: 'pause', progressRows: [] });
+      out.paused = _drGapState(q, today, 3) === null;                       // 暫停中不催
+      q.dailyLogs[0].resumeDate = _dAdd(today, -5);
+      out.resume = (_drGapState(q, today, 3) || {}).kind === 'resume';      // 過了預計復工日才問
+      q.dailyLogs = [{ id: 'a', date: _dAdd(today, -10), progressRows: [{ itemIdx: 0, qty: 10 }] }];
+      out.stageDone = _projStageDone(q) === true && _drGapState(q, today, 3) === null;   // 打設完成待拔除不催
+      q.dailyLogs.push({ id: 'c', date: _dAdd(today, -9), progressRows: [{ itemIdx: 0, qty: 2, ph: 'remove' }] });
+      out.stageRemove = _projStageDone(q) === false && !!_drGapState(q, today, 3);
+      out.txt = /⛔ 停工（2026-09-05～2026-09-10）：大雨　預計復工 2026-09-12/.test(_drStatusText({ status: 'stop', date: '2026-09-10', stopFrom: '2026-09-05', stopReason: '大雨', resumeDate: '2026-09-12' }));
+      // 表單：狀態列可單獨成一筆日報；支出人寫進成本記錄
+      Q.push(q); go('quickcost'); rQuickCost();
+      const sel = document.getElementById('dr-proj'); sel.value = 'tq431'; if (sel.onchange) sel.onchange();
+      document.getElementById('dr-status').value = 'stop'; _drStatusUI(); document.getElementById('dr-stop-reason').value = '颱風';
+      const e = _drCollect();
+      out.collect = !!e && e.status === 'stop' && e.stopReason === '颱風' && document.getElementById('dr-status-more').style.display === '';
+      const ps = document.getElementById('qc-payer');
+      document.getElementById('qc-proj').value = 'tq431'; rQuickCostItems();
+      document.getElementById('qc-amt').value = '120'; document.getElementById('qc-desc').value = '涼水';
+      ps.innerHTML += '<option value="測試員">測試員</option>'; ps.value = '測試員'; submitQuickCost();
+      const c = q.costs && q.costs[0];
+      out.payer = !!c && c.payer === '測試員' && c.payBy === 'staff' && c.amt === 120 && c.type === 'extra';
+      out.btns = /補登停工／暫停/.test(_drGapBtns('x', '2026-01-01')) && /補日報/.test(_drGapBtns('x', '2026-01-01'));
+      _drClearForm(); out.cleared = document.getElementById('dr-status').value === 'work';
+      Q = Q.filter(x => x.id !== 'tq431');
+      return out;
+    });
+    check('日報：暫停／停工中不催日報，過預計復工日才問；打設完成待拔除不催', r.gap && r.paused && r.resume && r.stageDone && r.stageRemove);
+    check('日報：作業狀態可單獨成一筆日報，狀態文字含起訖／原因／復工日', r.collect && r.txt && r.cleared);
+    check('待辦：沒日報改問句並附「補登停工／補日報」', r.btns);
+    check('支出：支出人寫進成本記錄（員工→零用金結算依據）', r.payer);
+    check('v5.431 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
