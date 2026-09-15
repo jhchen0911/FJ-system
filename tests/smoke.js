@@ -2256,6 +2256,33 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.429 逐項議價可調備用單價 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      items = [
+        { desc: 'H型鋼樁打設', unit: 'M', qty: '100', price: '500', note: '', ot: '', otu: '$/M/天', sec: false },
+        { desc: '安全走道', unit: 'M', qty: '1', price: '800', note: '備用單價', ot: '', otu: '$/M/天', sec: false, spare: true },
+      ];
+      exs = [];
+      document.querySelector('input[name="ngt-way"][value="items"]').checked = true;
+      buildNgtItems();
+      out.hasInput = !!document.getElementById('ngt-ip-1');
+      document.getElementById('ngt-ip-0').value = '450';
+      document.getElementById('ngt-ip-1').value = '700';
+      updNgtItemsSum();
+      out.sumExcl = /45,000/.test(document.getElementById('ngt-items-sum').innerHTML);   // 備用單價仍不計入
+      applyNegotiate();
+      out.applied = Number(items[0].price) === 450 && Number(items[1].price) === 700 && items[1].origPrice === 800 && items[1].spare === true;
+      out.total = calcT().sub === 45000;
+      return out;
+    });
+    check('議價：逐項調價可調備用單價，且備用單價仍不計入總額', r.hasInput && r.sumExcl && r.applied && r.total);
+    check('v5.429 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
