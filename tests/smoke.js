@@ -1125,9 +1125,9 @@ async function newPage(browser, width, height) {
       out.equipRpt = /自有機具稼動/.test(dl.innerHTML) && /A機/.test(dl.innerHTML) && /2 天/.test(dl.innerHTML) && /12 hr/.test(dl.innerHTML);
       // 待辦：最近一篇日報 5 天前、門檻 3 天 → 提醒
       updateDashTodo();
-      out.todo = /串連二案 已 5 天沒有工作日報/.test(document.getElementById('dash-todo-list').innerHTML);
+      out.todo = /串連二案 已 5 天沒有日報/.test(document.getElementById('dash-todo-list').innerHTML);   // v5.431 改問句
       P.drGapDays = 0; updateDashTodo();
-      out.todoOff = !/沒有工作日報/.test(document.getElementById('dash-todo-list').innerHTML);
+      out.todoOff = !/沒有日報/.test(document.getElementById('dash-todo-list').innerHTML);
       return out;
     });
     check('金流預測：依日報進度推估尚未開單的請款', r.phys && r.cf);
