@@ -2679,7 +2679,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.428';
+var APP_VERSION='v5.429';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -4091,14 +4091,13 @@ function buildNgtItems(){
       return;
     }
     var p=parseFloat(it.price)||0;
-    // 備用單價列不參與議價：不給輸入框，直接標示「不議價」，避免使用者誤以為可調
+    // v5.429：備用單價也可逐項議價（單價可改，仍不計入總額）；整單等比模式才不動它
     var sp=_isSpare(it);
     html+='<tr style="border-top:1px solid var(--b1)'+(sp?';background:#fffdf2':'')+'">'
       +'<td style="padding:4px 6px;word-break:break-all">'+esc((it.desc||'')||('工項'+(i+1)))+(sp?' <span style="font-size:10px;color:#a07800">備用單價</span>':'')+'</td>'
       +'<td style="padding:4px;text-align:right;color:var(--b4);white-space:nowrap">'+(it.qty||0)+' '+esc(_uFix(it.unit||''))+'</td>'
       +'<td style="padding:4px;text-align:right;color:var(--b4)">'+fmt(p)+'</td>'
-      +(sp?'<td style="padding:4px;text-align:right;color:var(--b3);font-size:11px" title="備用單價不列入議價調整">不議價</td>'
-          :'<td style="padding:3px 4px"><input type="number" id="ngt-ip-'+i+'" value="'+p+'" oninput="updNgtItemsSum()" style="width:100%;font-size:12px;height:26px;text-align:right;font-weight:700"></td>')
+      +'<td style="padding:3px 4px"><input type="number" id="ngt-ip-'+i+'" value="'+p+'" oninput="updNgtItemsSum()" title="'+(sp?'備用單價：可議價，不計入總額':'')+'" style="width:100%;font-size:12px;height:26px;text-align:right;font-weight:700'+(sp?';background:#fffdf2':'')+'"></td>'
       +'</tr>';
   });
   html+='</table>';
@@ -4146,12 +4145,12 @@ function updNegotiatePreview(){
   pv.innerHTML='折合原價 <strong>'+pct+'%</strong>（'+(diff<0?'減價':'加價')+' NT$ '+fmt(Math.abs(diff))+'）｜'+other;
 }
 function applyNegotiate(){
-  // ── 逐項調價模式：只改談定的工項單價，不動其他工項、不補尾差 ──
+  // ── 逐項調價模式：只改談定的工項單價（含備用單價，v5.429），不動其他工項、不補尾差 ──
   if(_ngtWay()==='items'){
     const before=calcT();
     let changed=0;
     items.forEach(function(it,i){
-      if(it.sec||_isSpare(it))return;
+      if(it.sec)return;
       const inp=document.getElementById('ngt-ip-'+i);
       if(!inp||inp.value==='')return;
       const np=parseFloat(inp.value);
