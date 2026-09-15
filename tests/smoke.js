@@ -2377,6 +2377,74 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.433 人員薪資（基本資料／薪資設定／薪資條） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      HR.length = 0; PAYSLIPS.length = 0;
+      const a = _acct(); a.__staff.push({ id: 'st433', email: 'a433@x.com', name: '王小明', phone: '0912', roles: [], active: true }); _acctSave(a);
+      HR.push({ id: 'hr_st433', sid: 'st433', name: '王小明', title: '工務', payType: 'month', base: 40000, telAllow: 500, laborGrade: 40100, healthGrade: 40100, dep: 1, _mt: 1 });
+      HR.push({ id: 'hrB433', name: '李大同', title: '點工', payType: 'day', base: 2000, laborGrade: 28590, healthGrade: 28590, dep: 0, active: true, _mt: 1 });
+      // 級距→金額試算：勞保 級距×12.5%×20%（員工）／×70%＋職災 0.5%（雇主）；健保 5.17%×30%×(1+眷口)／×60%×1.57；勞退 6%
+      const ins = _hrCalcIns(40100, 40100, 1);
+      out.ins = ins.laborSelf === 1003 && ins.laborCo === 3709 && ins.healthSelf === 1244 && ins.healthCo === 1953 && ins.pensionCo === 2406;
+      Object.assign(HR[0], ins); Object.assign(HR[1], _hrCalcIns(28590, 28590, 0));
+      go('payroll');
+      const ppl = _hrPeople();
+      out.people = ppl.length === 2 && ppl[0].sid === 'st433' && ppl[0].name === '王小明' && ppl[1].id === 'hrB433' && !ppl[1].st;
+      out.tbl = document.querySelectorAll('#pr-people tbody tr').length === 2 && !/無帳號/.test(document.querySelectorAll('#pr-people tbody tr')[0].innerHTML);
+      document.getElementById('pr-ym').value = '2026-09';
+      psGenerate();
+      const L = () => _psList('2026-09');
+      out.gen = L().length === 2 && L().some(s => s.name === '李大同') && L().find(s => s.hrId === 'hr_st433').net === 40500 - 1003 - 1244;   // 月薪：本薪＋電信津貼－勞健保自付
+      psUpd('ps_hrB433_2026-09', 'days', 22); psUpd('ps_hr_st433_2026-09', 'extra', 3000);
+      const b = L().find(s => s.hrId === 'hrB433'), w = L().find(s => s.hrId === 'hr_st433');
+      out.calc = b.baseAmt === 44000 && b.net === 44000 - b.laborSelf - b.healthSelf && w.gross === 43500 && w._mt > 1;
+      psGenerate(); out.noDup = L().length === 2;
+      psPaid('ps_hrB433_2026-09'); out.paid = b.status === 'paid' && !!b.paidDate;
+      out.sub = /在職 2 人/.test(document.getElementById('pr-sub').textContent) && /人事成本/.test(document.getElementById('pr-sub').textContent);
+      // 匯出：薪資條（直式，含公司負擔、不含身分證字號）、總表（橫式）、Excel（活公式）
+      const printed = []; const orig = _printViaIframe;
+      window._printViaIframe = function (html, fname, land) { printed.push({ fname, land, slip: /薪資條/.test(html) && /實發金額/.test(html), idno: /身分證/.test(html), co: /公司負擔/.test(html) }); };
+      psExportSlipPDF('ps_hr_st433_2026-09'); psExportSlipsPDF(); psExportSummaryPDF(); window._printViaIframe = orig;
+      out.pdf = printed.length === 3 && printed[0].slip && printed[0].co && !printed[0].idno && printed[0].land === false && printed[2].land === true && !printed[2].idno;
+      let xl = null; const ox = xlsxDownload; window.xlsxDownload = function (fn, sh) { xl = { rows: sh[0].rows.length, f: sh[0].rows[1][9].f, tot: sh[0].rows[3][15].f }; }; psExportXlsx(); window.xlsxDownload = ox;
+      out.xlsx = !!xl && xl.rows === 4 && xl.f === 'SUM(F2:I2)' && xl.tot === 'SUM(P2:P3)';
+      // 同步：hr／payslips 走 private（shared 剝掉）、全量備份含、記錄級合併新者勝
+      out.priv = _PRIV_COLLS.indexOf('hr') >= 0 && _PRIV_COLLS.indexOf('payslips') >= 0 && _privatePayload().data.hr.length === 2;
+      const sp = _sharedPayload(); out.stripped = !('hr' in sp.data) && !('payslips' in sp.data) && !!_syncPayload().data.hr;
+      _applySensColls({ hr: [{ id: 'hrB433', name: '李大同', payType: 'day', base: 2100, _mt: Date.now() + 5 }], payslips: [] }, {});
+      out.merged = HR.find(h => h.id === 'hrB433').base === 2100 && HR.length === 2;
+      // 編輯視窗：基本資料＋薪資欄位、依費率試算
+      hrEdit('hr_st433', 'st433');
+      out.modal = !!document.getElementById('hr-emg') && !!document.getElementById('hr-lg') && !!document.getElementById('hr-petty');
+      document.getElementById('hr-lg').value = 28590; document.getElementById('hr-hg').value = 28590; document.getElementById('hr-dep').value = 0; _hrFillIns();
+      out.fill = document.getElementById('hr-lself').value === '715';
+      document.getElementById('hr-emg').value = '王媽媽'; document.getElementById('fy-modal-o').click();
+      out.saved = HR.find(h => h.id === 'hr_st433').emg === '王媽媽' && HR.find(h => h.id === 'hr_st433').laborSelf === 715;
+      // 頁面登記：導覽、權限 adminOnly、手機堆疊清單
+      out.page = ALL_PAGES.some(p => p.id === 'payroll' && p.adminOnly) && !!document.getElementById('sn-payroll');
+      HR.length = 0; PAYSLIPS.length = 0; const a2 = _acct(); a2.__staff = a2.__staff.filter(x => x.id !== 'st433'); _acctSave(a2);
+      return out;
+    });
+    check('人員薪資：名冊人員＋無帳號員工、級距→金額試算、編輯視窗存檔', r.people && r.tbl && r.ins && r.modal && r.fill && r.saved && r.page);
+    check('薪資條：依設定產生（月薪／日薪×天數）、加項扣項即時重算、不重複、發放狀態', r.gen && r.calc && r.noDup && r.paid && r.sub);
+    check('薪資條匯出：PDF 直式／總表橫式（不含身分證）、Excel 活公式', r.pdf && r.xlsx);
+    check('人員薪資同步：hr／payslips 走 private、shared 剝掉、備份含、合併新者勝', r.priv && r.stripped && r.merged);
+    // 手機：人員薪資頁不得左右滑
+    const { page: mp, errors: merr } = await newPage(browser, 390, 844);
+    const mh = await mp.evaluate(() => new Promise(res => {
+      HR.push({ id: 'hrM433', name: '李大同', payType: 'day', base: 2000, active: true, _mt: 1 });
+      go('payroll'); document.getElementById('pr-ym').value = '2026-09'; psGenerate();
+      setTimeout(() => { const ok = document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelectorAll('#page-payroll table.mst').length >= 2; HR.length = 0; PAYSLIPS.length = 0; res(ok); }, 300);
+    }));
+    check('手機：人員薪資頁表格堆疊、無橫向捲動', mh);
+    check('v5.433 測試無 JS 錯誤', errors.length === 0 && merr.length === 0, errors.concat(merr).slice(0, 3).join(' | '));
+    await mp.close();
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

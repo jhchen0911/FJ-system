@@ -682,6 +682,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
   <div class="ssec" style="margin-top:5px">系統</div>
   <button type="button" class="snav" id="sn-staff" onclick="go('staff')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>人員管理</button>
+  <button type="button" class="snav" id="sn-payroll" onclick="go('payroll')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>人員薪資</button>
   <button type="button" class="snav" id="sn-roles" onclick="go('roles')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span>角色權限</button>
   <button type="button" class="snav" id="sn-params" onclick="go('params')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg></span>參數設定</button>
 </nav>
@@ -1740,6 +1741,31 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   </div>
 </div>
 
+<!-- ████ 人員薪資（v5.433）████ -->
+<div class="page" id="page-payroll">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-t">人員薪資</div><div class="ph-s" id="pr-sub">在職 0 人</div></div>
+    <div class="ph-r" style="display:flex;gap:6px;flex-wrap:wrap">
+      <button type="button" class="btn btn-sm btn-g" onclick="hrEdit('','')">＋ 新增人員（無帳號）</button>
+    </div>
+  </div>
+  <div class="pad">
+    <div class="card"><div class="ch" style="flex-wrap:wrap;gap:6px"><div class="cht">人員基本資料與薪資設定</div><div style="font-size:11px;color:var(--b3)">資料存雲端私有節點，僅管理員可讀；身分證字號等敏感欄位不列入任何列印</div></div>
+      <div class="cb" id="pr-people"></div></div>
+    <div class="card"><div class="ch" style="flex-wrap:wrap;gap:6px"><div class="cht">薪資條</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <input type="month" id="pr-ym" onchange="renderPayroll()" style="font-size:12.5px;padding:5px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit">
+        <button type="button" class="btn btn-xs btn-g" onclick="psGenerate()">產生本月薪資條</button>
+        <button type="button" class="btn btn-xs" onclick="psExportSlipsPDF()">列印全部薪資條</button>
+        <button type="button" class="btn btn-xs" onclick="psExportSummaryPDF()">薪資總表 PDF</button>
+        <button type="button" class="btn btn-xs" onclick="psExportXlsx()">匯出 Excel</button>
+      </div></div>
+      <div class="cb" id="pr-slips"></div></div>
+    <div class="card"><div class="ch" style="flex-wrap:wrap;gap:6px"><div class="cht">費率設定</div><div style="font-size:11px;color:var(--b3)">供「依費率試算」用，請依當年公告核對；各人金額仍可手動修改</div></div>
+      <div class="cb"><div class="fg fg3" id="pr-rates"></div></div></div>
+  </div>
+</div>
+
 <div class="page" id="page-params">
   <div class="ph">
     <div class="ph-l"><div class="ph-t">參數設定</div><div class="ph-s">修改後請務必按「儲存」，所有計算將即時連動更新</div></div>
@@ -2693,7 +2719,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.432';
+var APP_VERSION='v5.433';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -3438,6 +3464,7 @@ function go(p){
   if(p==='progress'){try{_pgRender();}catch(e){_err('top',e);}}
   if(p==='matest'){try{renderMatEst();}catch(e){_err('top',e);}}
   if(p==='sitedet'){try{_sdRender();}catch(e){_err('top',e);}}
+  if(p==='payroll'){try{renderPayroll();}catch(e){_err('top',e);}}
   if(p==='plan'){try{_plRender();}catch(e){_err('top',e);}}
   if(p==='quotes'){renderList();updateQuoteStats();}
   if(p==='editor'){
@@ -8252,6 +8279,8 @@ function importData(file){
         if(data.dealHist){DEAL_HIST=arr(data.dealHist);try{localStorage.setItem('fy_deal_hist',JSON.stringify(DEAL_HIST));}catch(e2){_err('importData',e2);}}
         if(data.matStock&&typeof data.matStock==='object'){MAT_STOCK=data.matStock;try{localStorage.setItem('fy_mat_stock',JSON.stringify(MAT_STOCK));}catch(e2){_err('importData',e2);}}
         if(data.matLedger){MAT_LEDGER=arr(data.matLedger);try{localStorage.setItem('fy_mat_ledger',JSON.stringify(MAT_LEDGER));}catch(e2){_err('top',e2);}}
+        if(data.hr){HR=arr(data.hr);try{localStorage.setItem('fy_hr',JSON.stringify(HR));}catch(e2){_err('importData.hr',e2);}}   // v5.433
+        if(data.payslips){PAYSLIPS=arr(data.payslips);try{localStorage.setItem('fy_payslips',JSON.stringify(PAYSLIPS));}catch(e2){_err('importData.ps',e2);}}
         if(data.upaCostDB){try{Object.assign(UPA_COST_DB,data.upaCostDB);localStorage.setItem('fy_upa_cost',JSON.stringify(UPA_COST_DB));}catch(e2){_err('top',e2);}}
         if(data.activityLog)ACTIVITY_LOG=arr(data.activityLog);
         // v5.314 補齊還原：墓碑用「取代」而非合併，否則本機殘留墓碑會把剛還原的資料再殺一次
@@ -10379,7 +10408,7 @@ function _lsUsage(){
     fy_plan_attlib:'計畫書附件庫',fy_q_history:'報價版本歷史',fy_contracts:'合約',
     fy_payables:'應付帳款',fy_expenses:'零星支出',fy_customers:'客戶',fy_vendors:'廠商',
     fy_inv_recs:'發票紀錄',fy_mat_ledger:'材料台帳',fy_mat_stock:'材料庫存',
-    fy_cost_hist:'成本單價庫',fy_deal_hist:'成交單價庫',fy_activity:'活動紀錄',
+    fy_cost_hist:'成本單價庫',fy_deal_hist:'成交單價庫',fy_activity:'活動紀錄',fy_hr:'人員薪資',fy_payslips:'薪資條',
     fy6_uh:'單價分析歷史',fy_tombs:'刪除記錄',fy6_p:'參數設定'};
   try{
     for(var i=0;i<localStorage.length;i++){
@@ -12555,7 +12584,7 @@ var _SYNC_COLLS=['quotes','invoices','upaHistory','params','contracts','vendors'
   'tombs','admins',
   'matStock','toolrecs','planState','qHistory','toolStates'];   // v5.373 新增（planAttLib 純圖檔，只進本機備份不上雲）
 // 敏感集合：只寫 fydata/private
-var _PRIV_COLLS=['payables','expenses','costHist','upaCostDB','shareProfit','matLedger','dealHist'];
+var _PRIV_COLLS=['payables','expenses','costHist','upaCostDB','shareProfit','matLedger','dealHist','hr','payslips'];   // v5.433 人員薪資
 function _collHash(v){ // djb2 於 JSON 字串
   var st;try{st=JSON.stringify(v);}catch(e){st=String(v);}
   var h=5381;for(var i=0;i<st.length;i++){h=((h<<5)+h+st.charCodeAt(i))|0;}
@@ -12607,7 +12636,8 @@ function _privatePayload(){
   return {ts:ts,data:{
     version:'fy-v5p', uploadedAt:ts, uploadedBy:(_fbUser&&_fbUser.email)||'',
     quoteSens:qs, payables:PAYABLES, expenses:EXPENSES, costHist:COST_HIST,
-    upaCostDB:UPA_COST_DB, shareProfit:SHARE_PROFIT, matLedger:MAT_LEDGER, dealHist:DEAL_HIST
+    upaCostDB:UPA_COST_DB, shareProfit:SHARE_PROFIT, matLedger:MAT_LEDGER, dealHist:DEAL_HIST,
+    hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[])   // v5.433
   }};
 }
 function _syncPayload(){
@@ -12622,6 +12652,7 @@ function _syncPayload(){
     invoiceRecs:INVOICE_RECS, expenses:EXPENSES, tombs:TOMBS, activityLog:ACTIVITY_LOG.slice(0,100),
     customers:CUSTOMERS, upaCostDB:UPA_COST_DB, pagePerms:pagePerms, costHist:COST_HIST,
     shareProfit:SHARE_PROFIT, dealHist:DEAL_HIST, matLedger:MAT_LEDGER, admins:admins,
+    hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]),   // v5.433 人員薪資（private；全量備份含）
     // v5.373：六大工具存檔、施工計畫書草稿、共用附件庫、材料庫存、報價版本歷史
     matStock:MAT_STOCK, toolrecs:_trAllSafe(), planState:_planStateSaved(),
     planAttLib:_planAttLibSaved(), qHistory:Q_HISTORY, toolStates:_toolStates()
@@ -12964,6 +12995,8 @@ function _applySensColls(data,tombs){
   var _safeMerge=function(loc,cld,nm){try{return _mergeColl(loc,cld,nm,tombs);}catch(e){console.error('[同步] '+nm+' 合併失敗，改用雲端版',e);return Array.isArray(cld)?cld:(cld?Object.values(cld):loc);}};
   if(data.payables)PAYABLES=_safeMerge(PAYABLES,data.payables,'payables');
   if(data.expenses)EXPENSES=_safeMerge(EXPENSES,data.expenses,'expenses');
+  if(data.hr){HR=_safeMerge(HR,data.hr,'hr');try{_lsSet('fy_hr',JSON.stringify(HR),'人員薪資');}catch(e){_err('_applySensColls.hr',e);}}   // v5.433
+  if(data.payslips){PAYSLIPS=_safeMerge(PAYSLIPS,data.payslips,'payslips');try{_lsSet('fy_payslips',JSON.stringify(PAYSLIPS),'薪資條');}catch(e){_err('_applySensColls.ps',e);}}
   if(data.shareProfit){
     try{
       var _spc=data.shareProfit||{};
@@ -24631,7 +24664,7 @@ function _mstack(root){
 (function(){
   var ids=['rebar-root','grout-root','backfill-root','lifeline-root','progress-root','mat-est-form','mat-est-out','plan-root',
            'page-params',                    // v5.372：參數設定的單價矩陣表
-           'page-staff','page-roles',        // v5.382：人員／角色頁的名冊表（CI 在不同字型環境抓到溢出）
+           'page-staff','page-roles','page-payroll', // v5.382：人員／角色頁的名冊表（CI 在不同字型環境抓到溢出）
            'cost-list'];                     // v5.404：施工成本的分析／勾稽表（手機不得左右滑）
   function _msApply(){ids.forEach(function(id){var el=document.getElementById(id);if(el)_mstack(el);});}
   try{
@@ -34561,6 +34594,7 @@ const ALL_PAGES = [
   // v5.330 sysOnly：只有「系統管理員」角色能開，其他角色的權限表上是鎖住的
   {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, sysOnly:true},
   {id:'staff',     label:'人員管理',  icon:_pgIcon('users'),    grp:'acct',  adminOnly:true},
+  {id:'payroll',   label:'人員薪資',  icon:_pgIcon('wallet'),   grp:'acct',  adminOnly:true}, // v5.433 基本資料／薪資設定／薪資條（fydata/private）
   {id:'roles',     label:'角色權限',  icon:_pgIcon('lock'),     grp:'acct',  adminOnly:true, sysOnly:true},
   {id:'params',    label:'參數設定',  icon:_pgIcon('sliders'),  grp:'sys',   adminOnly:true, sysOnly:true},
 ];
@@ -34978,6 +35012,284 @@ function deptEdit(id){
   });
 }
 // 通用小彈窗：onOk 回傳 false 代表驗證未過、不關閉
+// ══════════ 人員薪資（v5.433 Phase B）══════════
+// 人員基本資料＋薪資設定存 HR、每月薪資條存 PAYSLIPS——兩者都走 fydata/private（僅管理員可讀），
+// 本機鍵 fy_hr／fy_payslips，記錄級合併（id／_mt 新者勝、尊重墓碑）。
+// 名冊（人員管理）只管登入帳號與角色；這裡以 sid 連回名冊，沒有登入帳號的員工也可直接建。
+// 油資／ETC 等實報實銷不列薪資（走日報．支出→零用金結算，Phase C）；電信津貼為固定月津貼列入薪資。
+var HR=[],PAYSLIPS=[];
+try{var _hr0=localStorage.getItem('fy_hr');if(_hr0)HR=JSON.parse(_hr0)||[];}catch(e){_err('HR.load',e);}
+try{var _ps0=localStorage.getItem('fy_payslips');if(_ps0)PAYSLIPS=JSON.parse(_ps0)||[];}catch(e){_err('PAYSLIPS.load',e);}
+if(!Array.isArray(HR))HR=[];if(!Array.isArray(PAYSLIPS))PAYSLIPS=[];
+function saveHR(){_lsSet('fy_hr',JSON.stringify(HR),'人員薪資');try{_autoUpload();}catch(e){_err('saveHR',e);}}
+function savePayslips(){_lsSet('fy_payslips',JSON.stringify(PAYSLIPS),'薪資條');try{_autoUpload();}catch(e){_err('savePayslips',e);}}
+function _hrNum(v,d){var n=parseFloat(v);return isFinite(n)?n:(d||0);}
+// 費率（可在人員薪資頁「費率設定」調整；預設為 2026 年一般口徑，請依當年公告核對）
+var _HR_RATE_DEF={labor:12.5,inj:0.5,health:5.17,pension:6,laborEmp:20,laborCo:70,healthEmp:30,healthCo:60,coDep:1.57};
+var _HR_RATE_LABEL={labor:'勞保費率％（含就保）',inj:'職災費率％（依行業）',health:'健保費率％',pension:'勞退提繳％',laborEmp:'勞保 員工負擔％',laborCo:'勞保 雇主負擔％',healthEmp:'健保 員工負擔％',healthCo:'健保 雇主負擔％',coDep:'健保 雇主平均眷口係數'};
+function _hrRates(){var r=P.hrRates||{},o={};Object.keys(_HR_RATE_DEF).forEach(function(k){o[k]=_hrNum(r[k],_HR_RATE_DEF[k]);});return o;}
+function _hrRateSet(k,v){if(!P.hrRates)P.hrRates={};P.hrRates[k]=_hrNum(v,_HR_RATE_DEF[k]);try{persistP();}catch(e){_err('_hrRateSet',e);}try{_onSave();}catch(e){_err('_hrRateSet',e);}}
+// 級距 → 金額試算（勞保：級距×費率×負擔比＋職災全由雇主；健保：員工含眷口（上限 3 口）、雇主乘平均眷口係數；勞退：健保級距×6%）
+function _hrCalcIns(laborGrade,healthGrade,dep){
+  var R=_hrRates(),lg=_hrNum(laborGrade),hg=_hrNum(healthGrade),dp=Math.max(0,Math.min(3,_hrNum(dep)));
+  return {laborSelf:Math.round(lg*R.labor/100*R.laborEmp/100),
+          laborCo:Math.round(lg*R.labor/100*R.laborCo/100+lg*R.inj/100),
+          healthSelf:Math.round(hg*R.health/100*R.healthEmp/100*(1+dp)),
+          healthCo:Math.round(hg*R.health/100*R.healthCo/100*R.coDep),
+          pensionCo:Math.round(hg*R.pension/100)};
+}
+function _hrOfStaff(sid){return HR.find(function(h){return h&&h.sid===sid;})||null;}
+function _hrById(id){return HR.find(function(h){return h&&h.id===id;})||null;}
+// 人員清單：名冊人員（含尚未建資料者）＋無帳號員工
+function _hrPeople(){
+  var out=[],seen={};
+  listStaff().forEach(function(st){
+    var h=_hrOfStaff(st.id);if(h)seen[h.id]=1;
+    out.push({id:h?h.id:('hr_'+st.id),sid:st.id,st:st,h:h,name:(h&&h.name)||st.name||st.email||'',active:!(st.active===false||(h&&h.active===false))});
+  });
+  HR.forEach(function(h){if(!h||seen[h.id])return;out.push({id:h.id,sid:h.sid||'',st:null,h:h,name:h.name||'',active:h.active!==false});});
+  return out;
+}
+function _hrActive(){return _hrPeople().filter(function(p){return p.active;});}
+function _hrMask(s){s=String(s||'');return s.length>4?(s.slice(0,2)+'＊＊＊＊'+s.slice(-2)):s;}
+var _HR_FIELDS=['name','title','hire','birth','sex','idNo','addr','phone','bank','emg','emgPhone','payType','base','telAllow','otherAllow','laborGrade','laborCo','laborSelf','healthGrade','healthCo','healthSelf','dep','pensionCo','pensionSelf','pettyQuota','memo'];
+var _HR_NUM=['base','telAllow','otherAllow','laborGrade','laborCo','laborSelf','healthGrade','healthCo','healthSelf','dep','pensionCo','pensionSelf','pettyQuota'];
+function hrEdit(id,sid){
+  var h=id?_hrById(id):null;
+  var st=sid?listStaff().find(function(x){return x.id===sid;}):(h&&h.sid?listStaff().find(function(x){return x.id===h.sid;}):null);
+  var v=function(k,d){return (h&&h[k]!=null&&h[k]!=='')?h[k]:(d==null?'':d);};
+  var IN='width:100%;font-size:12.5px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;box-sizing:border-box;background:var(--w)';
+  var f=function(label,fid,val,type){return '<div class="f"><label>'+label+'</label><input id="'+fid+'" type="'+(type||'text')+'" value="'+esc(val==null?'':String(val))+'" style="'+IN+'"'+(type==='number'?' inputmode="decimal"':'')+'></div>';};
+  var sec=function(t,sub){return '<div style="font-size:12px;font-weight:700;color:var(--g3);margin:10px 0 6px;border-left:3px solid var(--g3);padding-left:6px">'+t+(sub?'<span style="font-weight:400;color:var(--b3);font-size:11px;margin-left:6px">'+sub+'</span>':'')+'</div>';};
+  var pt=v('payType','month');
+  var body=sec('基本資料',st?('登入帳號 '+esc(st.email||'')):'無登入帳號')
+   +'<div class="fg fg2">'+f('姓名 <span style="color:var(--red)">*</span>','hr-name',v('name',st?st.name:''))+f('職稱','hr-title',v('title'))+'</div>'
+   +'<div class="fg fg2">'+f('到職日','hr-hire',v('hire'),'date')+f('生日','hr-birth',v('birth'),'date')+'</div>'
+   +'<div class="fg fg2"><div class="f"><label>性別</label><select id="hr-sex" style="'+IN+'"><option value="">－</option><option value="男"'+(v('sex')==='男'?' selected':'')+'>男</option><option value="女"'+(v('sex')==='女'?' selected':'')+'>女</option></select></div>'+f('身分證字號','hr-idno',v('idNo'))+'</div>'
+   +f('通訊地址','hr-addr',v('addr'))
+   +'<div class="fg fg2">'+f('聯絡電話','hr-phone',v('phone',st?st.phone:''))+f('銀行帳號（薪轉）','hr-bank',v('bank'))+'</div>'
+   +'<div class="fg fg2">'+f('緊急聯絡人','hr-emg',v('emg'))+f('緊急聯絡電話','hr-emgphone',v('emgPhone'))+'</div>'
+   +sec('薪資設定','油資／ETC 等實報實銷不列薪資，由日報．支出登錄後走零用金結算')
+   +'<div class="fg fg2"><div class="f"><label>計薪方式</label><select id="hr-paytype" style="'+IN+'" onchange="document.getElementById(\'hr-base-lb\').textContent=this.value===\'day\'?\'日薪\':\'月薪\'"><option value="month"'+(pt==='month'?' selected':'')+'>月薪</option><option value="day"'+(pt==='day'?' selected':'')+'>日薪（依出工天數）</option></select></div>'
+   +'<div class="f"><label id="hr-base-lb">'+(pt==='day'?'日薪':'月薪')+'</label><input id="hr-base" type="number" inputmode="decimal" value="'+esc(String(v('base')))+'" style="'+IN+'"></div></div>'
+   +'<div class="fg fg2">'+f('電信津貼（月，列入薪資）','hr-tel',v('telAllow'),'number')+f('其他固定津貼（月）','hr-other',v('otherAllow'),'number')+'</div>'
+   +'<div class="fg fg3">'+f('勞保投保級距','hr-lg',v('laborGrade'),'number')+f('勞保 公司負擔','hr-lco',v('laborCo'),'number')+f('勞保 個人負擔','hr-lself',v('laborSelf'),'number')+'</div>'
+   +'<div class="fg fg3">'+f('健保投保級距','hr-hg',v('healthGrade'),'number')+f('健保 公司負擔','hr-hco',v('healthCo'),'number')+f('健保 個人負擔','hr-hself',v('healthSelf'),'number')+'</div>'
+   +'<div class="fg fg3">'+f('眷口數（健保）','hr-dep',v('dep',0),'number')+f('勞退 公司提繳','hr-pco',v('pensionCo'),'number')+f('勞退 個人自提','hr-pself',v('pensionSelf'),'number')+'</div>'
+   +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0 0 8px"><button type="button" class="btn btn-xs" onclick="_hrFillIns()">依費率試算（級距→金額）</button><span style="font-size:11px;color:var(--b3)">費率在頁面下方「費率設定」；試算後可再手動修改</span></div>'
+   +'<div class="fg fg2">'+f('零用金定額（月）','hr-petty',v('pettyQuota'),'number')+f('備註','hr-memo',v('memo'))+'</div>'
+   +(st?'':'<label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px"><input type="checkbox" id="hr-active"'+(v('active',true)!==false?' checked':'')+'> 在職</label>');
+  _modal(h?'編輯人員資料':'新增人員資料',body,function(){
+    var g=function(fid){var el=document.getElementById(fid);return el?String(el.value||'').trim():'';};
+    var name=g('hr-name');if(!name){toast('請輸入姓名');return false;}
+    var rec=h||{id:sid?('hr_'+sid):_uid('hr'),sid:sid||''};
+    var map={name:'hr-name',title:'hr-title',hire:'hr-hire',birth:'hr-birth',sex:'hr-sex',idNo:'hr-idno',addr:'hr-addr',phone:'hr-phone',bank:'hr-bank',emg:'hr-emg',emgPhone:'hr-emgphone',payType:'hr-paytype',base:'hr-base',telAllow:'hr-tel',otherAllow:'hr-other',laborGrade:'hr-lg',laborCo:'hr-lco',laborSelf:'hr-lself',healthGrade:'hr-hg',healthCo:'hr-hco',healthSelf:'hr-hself',dep:'hr-dep',pensionCo:'hr-pco',pensionSelf:'hr-pself',pettyQuota:'hr-petty',memo:'hr-memo'};
+    Object.keys(map).forEach(function(k){var val=g(map[k]);rec[k]=_HR_NUM.indexOf(k)>=0?(val===''?'':_hrNum(val)):val;});
+    if(!st){var ac=document.getElementById('hr-active');rec.active=ac?!!ac.checked:true;}
+    _touch(rec);
+    if(!h)HR.push(rec);
+    saveHR();renderPayroll();toast('已儲存人員資料');
+  });
+  var mb=document.querySelector('#fy-modal > div');if(mb){mb.style.maxWidth='660px';mb.style.maxHeight='92vh';mb.style.overflowY='auto';}
+}
+function _hrFillIns(){
+  var g=function(id){return (document.getElementById(id)||{}).value;};
+  var r=_hrCalcIns(g('hr-lg'),g('hr-hg'),g('hr-dep'));
+  var set=function(id,v){var el=document.getElementById(id);if(el)el.value=v;};
+  set('hr-lco',r.laborCo);set('hr-lself',r.laborSelf);set('hr-hco',r.healthCo);set('hr-hself',r.healthSelf);set('hr-pco',r.pensionCo);
+  toast('已依費率試算，可再手動修改');
+}
+function hrDel(id){
+  var h=_hrById(id);if(!h)return;
+  showConfirm('刪除人員資料','確定刪除「'+esc(h.name||'')+'」的基本資料與薪資設定？已產生的薪資條會保留。',function(){
+    _tomb('hr',id);HR=HR.filter(function(x){return x.id!==id;});saveHR();renderPayroll();toast('已刪除');
+  },true);
+}
+// ── 薪資條 ──
+function _psYm(){var el=document.getElementById('pr-ym');var v=el&&el.value;return /^\d{4}-\d{2}$/.test(v||'')?v:localToday().slice(0,7);}
+function _psCalc(s){
+  s.days=_hrNum(s.days);
+  s.baseAmt=s.payType==='day'?Math.round(_hrNum(s.base)*s.days):Math.round(_hrNum(s.base));
+  ['tel','other','extra','laborSelf','healthSelf','pensionSelf','otherDed','laborCo','healthCo','pensionCo'].forEach(function(k){s[k]=Math.round(_hrNum(s[k]));});
+  s.gross=s.baseAmt+s.tel+s.other+s.extra;
+  s.ded=s.laborSelf+s.healthSelf+s.pensionSelf+s.otherDed;
+  s.net=s.gross-s.ded;
+  s.coCost=s.laborCo+s.healthCo+s.pensionCo;
+  return s;
+}
+function _psFromHR(p,ym){
+  var h=p.h||{};
+  return _psCalc({id:'ps_'+p.id+'_'+ym,hrId:p.id,ym:ym,name:p.name,title:h.title||'',payType:h.payType||'month',base:_hrNum(h.base),days:0,
+    tel:_hrNum(h.telAllow),other:_hrNum(h.otherAllow),extra:0,laborSelf:_hrNum(h.laborSelf),healthSelf:_hrNum(h.healthSelf),pensionSelf:_hrNum(h.pensionSelf),otherDed:0,
+    laborCo:_hrNum(h.laborCo),healthCo:_hrNum(h.healthCo),pensionCo:_hrNum(h.pensionCo),status:'draft',paidDate:'',note:''});
+}
+function _psList(ym){return PAYSLIPS.filter(function(s){return s&&s.ym===ym;}).sort(function(a,b){return String(a.name).localeCompare(String(b.name),'zh-Hant');});}
+function psGenerate(){
+  var ym=_psYm(),n=0;
+  _hrActive().forEach(function(p){
+    if(!p.h||!(_hrNum(p.h.base)>0))return;
+    if(PAYSLIPS.some(function(s){return s.hrId===p.id&&s.ym===ym;}))return;
+    PAYSLIPS.push(_touch(_psFromHR(p,ym)));n++;
+  });
+  if(n){savePayslips();toast('已產生 '+n+' 筆薪資條');}
+  else toast(_hrActive().some(function(p){return p.h&&_hrNum(p.h.base)>0;})?'本月薪資條已存在，未重複產生':'尚無設定薪資的在職人員，請先在上方「編輯」填月薪／日薪');
+  renderPayroll();
+}
+function psUpd(id,k,val){
+  var s=PAYSLIPS.find(function(x){return x.id===id;});if(!s)return;
+  s[k]=(k==='note')?String(val||''):_hrNum(val);
+  _psCalc(s);_touch(s);savePayslips();
+  var ym=_psYm();_psRenderTable(ym);
+}
+function psPaid(id){
+  var s=PAYSLIPS.find(function(x){return x.id===id;});if(!s)return;
+  if(s.status==='paid'){s.status='draft';s.paidDate='';}
+  else{s.status='paid';s.paidDate=localToday();}
+  _touch(s);savePayslips();renderPayroll();
+}
+function psDel(id){
+  var s=PAYSLIPS.find(function(x){return x.id===id;});if(!s)return;
+  showConfirm('刪除薪資條','確定刪除 '+esc(s.name||'')+' '+esc(s.ym||'')+' 的薪資條？',function(){
+    _tomb('payslips',id);PAYSLIPS=PAYSLIPS.filter(function(x){return x.id!==id;});savePayslips();renderPayroll();
+  },true);
+}
+function _psSum(list){
+  var t={n:list.length,gross:0,ded:0,net:0,coCost:0,paid:0};
+  list.forEach(function(s){t.gross+=s.gross||0;t.ded+=s.ded||0;t.net+=s.net||0;t.coCost+=s.coCost||0;if(s.status==='paid')t.paid++;});
+  t.total=t.gross+t.coCost;return t;
+}
+function _psYmText(ym){var m=/^(\d{4})-(\d{2})$/.exec(ym||'');return m?(m[1]+' 年 '+parseInt(m[2])+' 月'):(ym||'');}
+// ── 頁面 ──
+function renderPayroll(){
+  var box=document.getElementById('pr-people');if(!box)return;
+  var ymEl=document.getElementById('pr-ym');if(ymEl&&!ymEl.value)ymEl.value=localToday().slice(0,7);
+  var ym=_psYm();
+  var people=_hrPeople();
+  var TD='padding:6px 8px;white-space:nowrap;border-bottom:1px solid var(--b1)';
+  var TH='text-align:left;padding:6px 8px;font-size:11px;color:var(--b4);white-space:nowrap;background:var(--gl)';
+  var sub=document.getElementById('pr-sub');
+  var sm=_psSum(_psList(ym));
+  if(sub)sub.textContent='在職 '+people.filter(function(p){return p.active;}).length+' 人　'+_psYmText(ym)+'：實發 NT$'+fmt(sm.net)+'　公司負擔 NT$'+fmt(sm.coCost)+'　人事成本 NT$'+fmt(sm.total);
+  box.innerHTML=people.length?('<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>'
+    +['姓名','職稱','計薪','月薪／日薪','電信津貼','勞保級距（公／個）','健保級距（公／個）','勞退','零用金定額','聯絡電話','緊急聯絡人','狀態','操作'].map(function(h){return '<th style="'+TH+'">'+h+'</th>';}).join('')
+    +'</tr></thead><tbody>'
+    +people.map(function(p){
+      var h=p.h||{};
+      var ins=function(g,c,s){return g?(fmt(g)+'<span style="color:var(--b3);font-size:11px">（'+fmt(c||0)+'／'+fmt(s||0)+'）</span>'):'<span style="color:var(--b3)">－</span>';};
+      return '<tr>'
+        +'<td style="'+TD+';font-weight:600">'+esc(p.name)+(p.st?'':'<span style="font-size:10px;color:var(--b3);margin-left:4px">無帳號</span>')+'</td>'
+        +'<td style="'+TD+'">'+esc(h.title||'')+'</td>'
+        +'<td style="'+TD+'">'+(p.h?(h.payType==='day'?'日薪':'月薪'):'<span style="color:#c62828;font-size:11px">未設定</span>')+'</td>'
+        +'<td style="'+TD+';text-align:right">'+(h.base?fmt(h.base):'－')+'</td>'
+        +'<td style="'+TD+';text-align:right">'+(h.telAllow?fmt(h.telAllow):'－')+'</td>'
+        +'<td style="'+TD+'">'+ins(h.laborGrade,h.laborCo,h.laborSelf)+'</td>'
+        +'<td style="'+TD+'">'+ins(h.healthGrade,h.healthCo,h.healthSelf)+'</td>'
+        +'<td style="'+TD+';text-align:right">'+(h.pensionCo?fmt(h.pensionCo):'－')+'</td>'
+        +'<td style="'+TD+';text-align:right">'+(h.pettyQuota?fmt(h.pettyQuota):'－')+'</td>'
+        +'<td style="'+TD+'">'+esc(h.phone||(p.st&&p.st.phone)||'')+'</td>'
+        +'<td style="'+TD+'">'+esc(h.emg||'')+(h.emgPhone?('<span style="color:var(--b3);font-size:11px"> '+esc(h.emgPhone)+'</span>'):'')+'</td>'
+        +'<td style="'+TD+'"><span class="bdg '+(p.active?'ok':'warn')+'">'+(p.active?'在職':'離職／停用')+'</span></td>'
+        +'<td style="'+TD+'"><button type="button" class="btn btn-xs" onclick="hrEdit(\''+escq(p.h?p.id:'')+'\',\''+escq(p.sid)+'\')">編輯</button>'
+          +(p.h&&!p.st?' <button type="button" class="btn btn-xs btn-r" onclick="hrDel(\''+escq(p.id)+'\')">刪除</button>':'')+'</td>'
+        +'</tr>';
+    }).join('')+'</tbody></table></div>')
+    :'<div class="empty" style="padding:28px"><p>尚無人員——名冊在「人員管理」建立後會自動列在這裡；沒有登入帳號的員工按「＋ 新增人員」</p></div>';
+  _psRenderTable(ym);
+  _hrRenderRates();
+}
+function _psRenderTable(ym){
+  var box=document.getElementById('pr-slips');if(!box)return;
+  var list=_psList(ym),sm=_psSum(list);
+  var TD='padding:5px 6px;white-space:nowrap;border-bottom:1px solid var(--b1);text-align:right';
+  var TH='padding:6px 6px;font-size:11px;color:var(--b4);white-space:nowrap;background:var(--gl);text-align:right';
+  var IN='width:64px;font-size:12px;padding:3px 5px;border:1px solid var(--b2);border-radius:var(--r6);text-align:right;font-family:inherit';
+  var inp=function(s,k,w){return '<input type="number" inputmode="decimal" value="'+(s[k]||'')+'" placeholder="0" onchange="psUpd(\''+escq(s.id)+'\',\''+k+'\',this.value)" style="'+IN+(w?';width:'+w+'px':'')+'">';};
+  if(!list.length){box.innerHTML='<div style="color:var(--b3);font-size:12.5px;padding:14px 4px">'+_psYmText(ym)+' 尚未產生薪資條——按「產生本月薪資條」依各人薪資設定帶入（日薪者請填出工天數）</div>';return;}
+  box.innerHTML='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>'
+    +['姓名','計薪','出工天數','本薪','津貼','加班／獎金','應發','勞保','健保','勞退自提','其他扣項','實發','公司負擔','狀態','操作'].map(function(h,i){return '<th style="'+TH+(i<2?';text-align:left':'')+'">'+h+'</th>';}).join('')
+    +'</tr></thead><tbody>'
+    +list.map(function(s){
+      return '<tr>'
+        +'<td style="'+TD+';text-align:left;font-weight:600">'+esc(s.name||'')+(s.title?'<span style="color:var(--b3);font-size:11px;margin-left:4px">'+esc(s.title)+'</span>':'')+'</td>'
+        +'<td style="'+TD+';text-align:left">'+(s.payType==='day'?('日薪 '+fmt(s.base)):'月薪')+'</td>'
+        +'<td style="'+TD+'">'+(s.payType==='day'?inp(s,'days',56):'－')+'</td>'
+        +'<td style="'+TD+'">'+fmt(s.baseAmt)+'</td>'
+        +'<td style="'+TD+'">'+fmt(s.tel+s.other)+'</td>'
+        +'<td style="'+TD+'">'+inp(s,'extra')+'</td>'
+        +'<td style="'+TD+';font-weight:600">'+fmt(s.gross)+'</td>'
+        +'<td style="'+TD+'">'+fmt(s.laborSelf)+'</td>'
+        +'<td style="'+TD+'">'+fmt(s.healthSelf)+'</td>'
+        +'<td style="'+TD+'">'+fmt(s.pensionSelf)+'</td>'
+        +'<td style="'+TD+'">'+inp(s,'otherDed')+'</td>'
+        +'<td style="'+TD+';font-weight:700;color:var(--g3)">'+fmt(s.net)+'</td>'
+        +'<td style="'+TD+'">'+fmt(s.coCost)+'</td>'
+        +'<td style="'+TD+';text-align:center"><button type="button" class="btn btn-xs'+(s.status==='paid'?' btn-g':'')+'" onclick="psPaid(\''+escq(s.id)+'\')">'+(s.status==='paid'?('已發放 '+esc(s.paidDate||'')):'未發放')+'</button></td>'
+        +'<td style="'+TD+';text-align:center"><button type="button" class="btn btn-xs" onclick="psExportSlipPDF(\''+escq(s.id)+'\')">薪資條</button> <button type="button" class="btn btn-xs btn-r" onclick="psDel(\''+escq(s.id)+'\')">刪除</button></td>'
+        +'</tr>';
+    }).join('')
+    +'<tr style="background:var(--gl);font-weight:700"><td style="'+TD+';text-align:left" colspan="6">合計 '+sm.n+' 人（已發放 '+sm.paid+'）</td><td style="'+TD+'">'+fmt(sm.gross)+'</td><td style="'+TD+'" colspan="4">扣款 '+fmt(sm.ded)+'</td><td style="'+TD+';color:var(--g3)">'+fmt(sm.net)+'</td><td style="'+TD+'">'+fmt(sm.coCost)+'</td><td style="'+TD+'" colspan="2">人事成本 '+fmt(sm.total)+'</td></tr>'
+    +'</tbody></table></div>';
+}
+function _hrRenderRates(){
+  var box=document.getElementById('pr-rates');if(!box)return;
+  var R=_hrRates();
+  box.innerHTML=Object.keys(_HR_RATE_DEF).map(function(k){
+    return '<div class="f"><label>'+_HR_RATE_LABEL[k]+'</label><input type="number" step="0.01" inputmode="decimal" value="'+R[k]+'" onchange="_hrRateSet(\''+k+'\',this.value)" style="width:100%;font-size:12.5px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;box-sizing:border-box;text-align:right"></div>';
+  }).join('');
+}
+// ── 匯出 ──
+function _psSlipHtml(s){
+  var row=function(a,b,c,d){return '<tr><td class="l">'+a+'</td><td class="r">'+b+'</td><td class="l">'+c+'</td><td class="r">'+d+'</td></tr>';};
+  var add=[['本薪'+(s.payType==='day'?('（日薪 '+fmt(s.base)+' × '+s.days+' 天）'):''),s.baseAmt],['電信津貼',s.tel],['其他津貼',s.other],['加班／獎金',s.extra]];
+  var ded=[['勞保費（自付）',s.laborSelf],['健保費（自付）',s.healthSelf],['勞退自提',s.pensionSelf],['其他扣項',s.otherDed]];
+  var n=Math.max(add.length,ded.length),body='';
+  for(var i=0;i<n;i++){var a=add[i]||['',''],d=ded[i]||['',''];body+=row(_xlEsc(a[0]),a[1]===''?'':fmt(a[1]),_xlEsc(d[0]),d[1]===''?'':fmt(d[1]));}
+  return '<table style="margin-bottom:14px"><thead><tr><th colspan="4" style="text-align:left">薪資條　'+_xlEsc(_psYmText(s.ym))+'　'+_xlEsc(s.name||'')+(s.title?('　'+_xlEsc(s.title)):'')+(s.status==='paid'?('　發放日 '+_xlEsc(s.paidDate||'')):'')+'</th></tr>'
+    +'<tr><th style="width:32%">應發項目</th><th style="width:18%">金額</th><th style="width:32%">應扣項目</th><th style="width:18%">金額</th></tr></thead><tbody>'
+    +body
+    +'<tr class="tt"><td class="l">應發合計</td><td class="r">'+fmt(s.gross)+'</td><td class="l">應扣合計</td><td class="r">'+fmt(s.ded)+'</td></tr>'
+    +'<tr class="tt"><td class="l" colspan="2">實發金額</td><td class="r" colspan="2" style="font-size:13px">NT$ '+fmt(s.net)+'</td></tr>'
+    +'<tr><td class="l" colspan="4" style="color:#555;font-size:9.5px">公司負擔：勞保 '+fmt(s.laborCo)+'、健保 '+fmt(s.healthCo)+'、勞退提繳 '+fmt(s.pensionCo)+'（合計 '+fmt(s.coCost)+'）'+(s.note?('　備註：'+_xlEsc(s.note)):'')+'　　員工簽收：____________</td></tr>'
+    +'</tbody></table>';
+}
+function psExportSlipPDF(id){
+  var s=PAYSLIPS.find(function(x){return x.id===id;});if(!s)return;
+  _toolPrint('薪資條',null,_psSlipHtml(s),{fname:'薪資條_'+(s.name||'')+'_'+String(s.ym||'').replace('-','')});
+}
+function psExportSlipsPDF(){
+  var ym=_psYm(),list=_psList(ym);
+  if(!list.length){toast('本月尚無薪資條');return;}
+  _toolPrint('薪資條',null,list.map(_psSlipHtml).join(''),{fname:'薪資條_'+ym.replace('-','')});
+}
+function psExportSummaryPDF(){
+  var ym=_psYm(),list=_psList(ym),sm=_psSum(list);
+  if(!list.length){toast('本月尚無薪資條');return;}
+  var body='<div class="cond">'+_xlEsc(_psYmText(ym))+'　共 '+sm.n+' 人（已發放 '+sm.paid+' 人）　此表含成本單價與人事資料，僅供內部使用</div>'
+    +'<table><thead><tr><th>姓名</th><th>計薪</th><th>天數</th><th>本薪</th><th>津貼</th><th>加班／獎金</th><th>應發</th><th>勞保</th><th>健保</th><th>勞退自提</th><th>其他扣</th><th>實發</th><th>公司勞保</th><th>公司健保</th><th>勞退提繳</th><th>人事成本</th><th>狀態</th></tr></thead><tbody>'
+    +list.map(function(s){return '<tr><td class="l">'+_xlEsc(s.name||'')+'</td><td>'+(s.payType==='day'?'日薪':'月薪')+'</td><td>'+(s.payType==='day'?s.days:'')+'</td><td class="r">'+fmt(s.baseAmt)+'</td><td class="r">'+fmt(s.tel+s.other)+'</td><td class="r">'+fmt(s.extra)+'</td><td class="r">'+fmt(s.gross)+'</td><td class="r">'+fmt(s.laborSelf)+'</td><td class="r">'+fmt(s.healthSelf)+'</td><td class="r">'+fmt(s.pensionSelf)+'</td><td class="r">'+fmt(s.otherDed)+'</td><td class="r"><b>'+fmt(s.net)+'</b></td><td class="r">'+fmt(s.laborCo)+'</td><td class="r">'+fmt(s.healthCo)+'</td><td class="r">'+fmt(s.pensionCo)+'</td><td class="r">'+fmt(s.gross+s.coCost)+'</td><td>'+(s.status==='paid'?('已發 '+_xlEsc(s.paidDate||'')):'未發')+'</td></tr>';}).join('')
+    +'<tr class="tt"><td class="l" colspan="6">合計</td><td class="r">'+fmt(sm.gross)+'</td><td class="r" colspan="4">'+fmt(sm.ded)+'</td><td class="r">'+fmt(sm.net)+'</td><td class="r" colspan="3">'+fmt(sm.coCost)+'</td><td class="r">'+fmt(sm.total)+'</td><td></td></tr>'
+    +'</tbody></table>';
+  _toolPrint('薪資總表',null,body,{landscape:true,fname:'薪資總表_'+ym.replace('-','')});
+}
+function psExportXlsx(){
+  var ym=_psYm(),list=_psList(ym),sm=_psSum(list);
+  if(!list.length){toast('本月尚無薪資條');return;}
+  var H=['姓名','職稱','計薪','日薪','出工天數','本薪','電信津貼','其他津貼','加班／獎金','應發','勞保自付','健保自付','勞退自提','其他扣項','應扣合計','實發','公司勞保','公司健保','勞退提繳','公司負擔','人事成本','狀態','發放日','備註'];
+  var rows=[H.map(function(x){return {v:x,s:2};})];
+  list.forEach(function(s,i){
+    var r=i+2;
+    rows.push([{v:s.name||'',s:3},{v:s.title||'',s:3},{v:s.payType==='day'?'日薪':'月薪',s:3},{v:s.payType==='day'?s.base:'',s:3},{v:s.payType==='day'?s.days:'',s:3},
+      {v:s.baseAmt,s:3},{v:s.tel,s:3},{v:s.other,s:3},{v:s.extra,s:3},{f:'SUM(F'+r+':I'+r+')',s:3},
+      {v:s.laborSelf,s:3},{v:s.healthSelf,s:3},{v:s.pensionSelf,s:3},{v:s.otherDed,s:3},{f:'SUM(K'+r+':N'+r+')',s:3},{f:'J'+r+'-O'+r,s:3},
+      {v:s.laborCo,s:3},{v:s.healthCo,s:3},{v:s.pensionCo,s:3},{f:'SUM(Q'+r+':S'+r+')',s:3},{f:'J'+r+'+T'+r,s:3},
+      {v:s.status==='paid'?'已發放':'未發放',s:3},{v:s.paidDate||'',s:3},{v:s.note||'',s:3}]);
+  });
+  var last=list.length+1;
+  var tot=H.map(function(_,c){return {v:'',s:4};});tot[0]={v:'合計',s:4};
+  [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].forEach(function(c){var col=String.fromCharCode(65+c);tot[c]={f:'SUM('+col+'2:'+col+last+')',s:4};});
+  rows.push(tot);
+  xlsxDownload('薪資總表_'+ym.replace('-',''),[{name:'薪資總表',widths:[12,10,7,9,9,11,10,10,11,11,10,10,10,10,10,11,10,10,10,11,11,9,11,20],rows:rows}]);
+}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
