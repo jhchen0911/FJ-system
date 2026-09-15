@@ -2199,6 +2199,63 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.428 請款單：報價進版同步、日報自動帶入、逾期租金自動列入 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const q = { id: 'tq428', name: 'T428', ver: 1, client: 'C',
+        items: [{ desc: 'H型鋼樁打設、拔除', unit: '支', qty: 10, price: 1000, note: '含30天租期', ot: '50', otu: '支/天' }, { desc: '油壓千斤頂', unit: '具', qty: 4, price: 500 }],
+        dailyLogs: [{ id: 'a', date: '2026-01-05', progressRows: [{ itemIdx: 0, qty: 6 }] }, { id: 'b', date: '2026-01-08', progressRows: [{ itemIdx: 0, qty: 4 }] },
+          { id: 'c', date: '2026-03-01', progressRows: [{ itemIdx: 0, qty: 5, ph: 'remove' }] }] };
+      // 日報期別：打設／拔除分開累計；租期起算＝打設最後一天次日、結束＝拔除第一天
+      const pg = _itemProgress(q, 0);
+      out.prog = pg.cum === 10 && pg.removeCum === 5 && pg.installLast === '2026-01-08' && pg.removeFirst === '2026-03-01' && pg.doneDate === '2026-01-08';
+      const st = _rentStatus(q, 0, '2026-03-20');
+      out.rent = st.start === '2026-01-09' && st.expiry === '2026-02-07' && st.endDate === '2026-03-01' && st.overDays === 22 && st.amount === 11000;
+      out.dq = _dailyQtyBetween(q, 'H型鋼樁打設、拔除', '', '2026-12-31', 'install') === 10 && _dailyQtyBetween(q, 'H型鋼樁打設、拔除', '', '2026-12-31', 'remove') === 5;
+      // 只拔除的工項沒填 ph 也算拔除；打設兼拔除的舊資料（沒 ph）算打設
+      out.phase = _prPhase({ items: [{ desc: '鋼板樁拔除' }] }, { itemIdx: 0 }) === 'remove' && _prPhase(q, { itemIdx: 0 }) === 'install';
+      // 報價進版 → 請款工項同步（同名保留數量、單價以報價為準、報價已無但有數量者保留在最後）
+      const inv = buildInvFromQuote(q);
+      out.ver = inv.quoteId === 'tq428' && inv.quoteVer === 1;
+      const q2 = JSON.parse(JSON.stringify(q)); q2.ver = 2; q2.items[0].price = 1200; q2.items[1] = { desc: '施工便梯', unit: '座', qty: 1, price: 30000 };
+      const d = _invQuoteDiff(inv, q2);
+      out.diff = d.any && d.added[0] === '施工便梯' && d.removed[0] === '油壓千斤頂' && d.changed[0] === 'H型鋼樁打設、拔除';
+      inv.items[1].curQty = 2;
+      const syn = _invSyncItems(inv.items, q2);
+      out.syn = syn.length === 3 && syn[0].contractPrice === 1200 && syn[1].desc === '施工便梯' && syn[2].desc === '油壓千斤頂' && syn[2].curQty === 2;
+      out.untouched = _invUntouched(buildInvFromQuote(q)) === true && _invUntouched(inv) === false;
+      // 開單：日報數量自動帶入＋逾期租金自動列入
+      const inv2 = buildInvFromQuote(q); inv2.id = 'tinv428'; inv2.date = '2026-03-20';
+      Q.push(q); INV.push(inv2);
+      loadInvoice('tinv428');
+      const rr = invItems.find(x => x.type === 'rental' && x._ovKey);
+      out.auto = invItems[0].curQty === 10 && !!rr && rr.curDays === 22 && rr.curAmt === 11000;
+      // 已填數量＋報價進版 → 不自動改，顯示同步橫幅
+      q.ver = 2; q.items[0].price = 1200; const inv3 = INV.find(x => x.id === 'tinv428'); inv3.items[0].curQty = 3; inv3.quoteVer = 1;
+      loadInvoice('tinv428');
+      out.banner = /同步報價 v2/.test(document.getElementById('inv-sync-banner').innerHTML) && invItems[0].contractPrice === 1000;
+      invSyncQuoteNow();
+      out.synNow = invItems[0].contractPrice === 1200 && invItems[0].curQty === 3 && document.getElementById('inv-sync-banner').innerHTML === '';
+      // 未動過的草稿：進版時直接跟上
+      const inv4 = buildInvFromQuote(q); inv4.id = 'tinv428b'; inv4.quoteVer = 1; inv4.items[0].contractPrice = 999;
+      INV = INV.filter(x => x.id !== 'tinv428'); INV.push(inv4);
+      out.bump = _invSyncUntouched(q) === 1 && INV.find(x => x.id === 'tinv428b').items[0].contractPrice === 1200;
+      INV = INV.filter(x => x.id !== 'tinv428b'); Q = Q.filter(x => x.id !== 'tq428'); invEid = null; invItems = []; window._invSnap = null;
+      // 日報表單：打設兼拔除的工項才有期別選單
+      out.form = typeof _drPhaseSel === 'function' && _drPhaseSel(q, { itemIdx: 1, ph: '' }, 0) === '' && /拔除/.test(_drPhaseSel(q, { itemIdx: 0, ph: '' }, 0));
+      return out;
+    });
+    check('日報：進度列分打設／拔除，租期起算＝打設最後一天次日、結束＝拔除第一天', r.prog && r.rent && r.dq && r.phase);
+    check('請款單：報價進版差異偵測與工項同步（保留數量、單價從報價）', r.ver && r.diff && r.syn && r.untouched);
+    check('請款單：開單自動帶入日報數量並列入逾期租金', r.auto);
+    check('請款單：已填數量者顯示同步橫幅、一鍵同步；未動草稿進版即跟上', r.banner && r.synNow && r.bump);
+    check('日報表單：打設兼拔除工項有期別選單', r.form);
+    check('v5.428 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
