@@ -2344,6 +2344,39 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.432 工作日報篩選＋匯出 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      const q = { id: 'tq432', name: 'T432', awarded: true, items: [{ desc: 'H型鋼樁打設、拔除', unit: '支', qty: 10, price: 1000 }], dailyLogs: [
+        { id: 'a', date: '2026-09-01', crews: [{ type: 'labor', vendor: '', n: 3 }], progressRows: [{ itemIdx: 0, qty: 4 }], progress: 'H型鋼樁打設、拔除 4支' },
+        { id: 'b', date: '2026-09-05', status: 'stop', stopFrom: '2026-09-02', stopReason: '大雨', resumeDate: '2026-09-08', progressRows: [] },
+        { id: 'c', date: '2026-09-09', progressRows: [{ itemIdx: 0, qty: 3, ph: 'remove', note: '第一車' }], progress: 'x' }] };
+      Q.push(q); viewDailyReports('tq432');
+      setTimeout(() => {
+        out.list = document.querySelectorAll('#drv-list > div').length === 3 && /施工 2 天、停工 4 天/.test(document.getElementById('drv-sum').textContent);
+        document.getElementById('drv-st').value = 'stop'; _drvRender(); out.st = document.querySelectorAll('#drv-list > div').length === 1;
+        document.getElementById('drv-st').value = ''; document.getElementById('drv-kw').value = '第一車'; _drvRender(); out.kw = document.querySelectorAll('#drv-list > div').length === 1;
+        document.getElementById('drv-kw').value = ''; document.getElementById('drv-from').value = '2026-09-03'; _drvRender(); out.from = document.querySelectorAll('#drv-list > div').length === 2;
+        const rows = _drFilterLogs(q, {}).map(L => _drLogRow(q, L));
+        out.rows = rows[0].progress === 'H型鋼樁打設、拔除（拔除） 3支；第一車' && rows[1].stopDays === 4 && rows[2].crews === '點工 3 人';
+        // PDF 走統一列印引擎（先預覽）、橫式、含停工列；Excel 有資料列
+        let printed = null; const orig = _printViaIframe;
+        window._printViaIframe = function (html, fname, land) { printed = { land, ok: /工作日報彙整表/.test(html) && /停工/.test(html) && /2026-09-02～2026-09-05（4天）/.test(html) }; };
+        document.getElementById('drv-from').value = ''; _drvRender(); drExportPDF(); window._printViaIframe = orig;
+        out.pdf = !!printed && printed.land === true && printed.ok;
+        let xl = null; const origX = xlsxDownload; window.xlsxDownload = function (fn, sheets) { xl = sheets[0].rows.length; }; drExportXlsx(); window.xlsxDownload = origX;
+        out.xlsx = xl === 5;   // 表頭＋3 筆＋合計
+        Q = Q.filter(x => x.id !== 'tq432'); res(out);
+      }, 200);
+    }));
+    check('日報檢視：期間／狀態／工項／關鍵字篩選，統計施工與停工天數', r.list && r.st && r.kw && r.from && r.rows);
+    check('日報匯出：PDF 走統一引擎（橫式、含停工起訖天數）、Excel', r.pdf && r.xlsx);
+    check('v5.432 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

@@ -2693,7 +2693,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.431';
+var APP_VERSION='v5.432';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -27892,23 +27892,140 @@ function submitDailyReport(){
   if(overAll.length)setTimeout(function(){showConfirm('⚠ 回報量超過合約量','<div style="font-size:13px;line-height:1.7">'+overAll.map(esc).join('<br>')+'<div style="margin-top:8px;color:var(--b4);font-size:12px">日報已送出。請確認是否回報錯誤，或合約需要追加（請款單「追加減」）。</div></div>',function(){},false,null,true);},600);
 }
 // 主管檢視：專案頁「檢視日報」
+// ── 工作日報檢視：篩選＋匯出（v5.432）──
+// 篩選：期間／作業狀態／工項／關鍵字；匯出 PDF（A4 橫式彙整表，可含照片）／Excel。
+// 停工天數依狀態日報起訖累計，供工期展延、租期照算等爭議佐證。
+var _drvQid='';
+function _drvFilter(){
+  return {from:gv('drv-from')||'',to:gv('drv-to')||'',st:gv('drv-st')||'',item:gv('drv-item')||'',kw:(gv('drv-kw')||'').trim()};
+}
+function _drFilterLogs(q,f){
+  f=f||{};
+  return ((q&&q.dailyLogs)||[]).filter(function(L){
+    if(!L)return false;
+    var d=String(L.date||'');
+    if(f.from&&d<f.from)return false;
+    if(f.to&&d>f.to)return false;
+    var st=L.status||'work';
+    if(f.st&&st!==f.st)return false;
+    if(f.item!==''&&f.item!=null&&String(f.item)!==''){
+      var ii=parseInt(f.item);
+      if(!(L.progressRows||[]).some(function(r){return r&&Number(r.itemIdx)===ii;}))return false;
+    }
+    if(f.kw){
+      var txt=[L.progress,L.stopReason,_crewsText(L),(L.equip||[]).map(function(e){return e.name;}).join(' '),(L.progressRows||[]).map(function(r){return r.note;}).join(' ')].join(' ');
+      if(txt.indexOf(f.kw)<0)return false;
+    }
+    return true;
+  }).sort(function(a,b){return String(b.date||'')<String(a.date||'')?-1:1;});
+}
+// 每筆日報整理成一列（畫面、PDF、Excel 共用）
+function _drLogRow(q,L){
+  var st=L.status||'work';
+  var prog=(L.progressRows||[]).filter(function(r){return r&&(Number(r.itemIdx)>=0||r.note);}).map(function(r){
+    var it=(q.items||[])[Number(r.itemIdx)]||{};
+    var nm=String(r.desc||it.desc||'').split('\n')[0];
+    var ph=(Number(r.itemIdx)>=0&&_prPhase(q,r)==='remove'&&_itemCat(it).install)?'（拔除）':'';
+    return (nm?(nm+ph+(r.qty?(' '+fmt(r.qty)+_uFix(it.unit||'')):'')):'')+(r.note?((nm?'；':'')+r.note):'');
+  }).filter(Boolean).join('\n');
+  var eq=(L.equip&&L.equip.length)?L.equip.map(function(e){return e.name+(e.hrs?(' '+e.hrs+'h'):'');}).join('、'):(L.ownEquip?'自有機具':'');
+  var stopDays=0;
+  if(st!=='work'){stopDays=Math.max(1,_dDiff(L.stopFrom||L.date,L.date)+1);}
+  return {date:L.date||'',status:st,statusText:st==='work'?'施工中':(st==='pause'?'暫停（階段性退場）':'停工'),
+    range:(L.stopFrom&&L.stopFrom!==L.date)?(L.stopFrom+'～'+L.date):'',stopDays:stopDays,
+    reason:L.stopReason||'',resume:L.resumeDate||'',
+    crews:_crewsText(L).replace(/<[^>]+>/g,''),equip:eq,progress:prog,photos:(L.photos||[]).length,by:L.by||'',L:L};
+}
+function _drvSummary(rows){
+  var work=0,stop=0,pause=0;
+  rows.forEach(function(r){if(r.status==='work')work++;else if(r.status==='stop')stop+=r.stopDays;else pause+=r.stopDays;});
+  return {n:rows.length,work:work,stop:stop,pause:pause};
+}
 function viewDailyReports(qid){
   const q=Q.find(x=>x.id===qid);if(!q)return;
-  const logs=q.dailyLogs||[];
-  const html=logs.length?logs.map(function(L){
+  _drvQid=qid;
+  const IN='font-size:12px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;background:var(--w)';
+  const itemOpts='<option value="">全部工項</option>'+(q.items||[]).map(function(it,i){return it.sec?'':'<option value="'+i+'">'+esc(String(it.desc||'').split('\n')[0].slice(0,22))+'</option>';}).join('');
+  const bar='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'
+    +'<input id="drv-from" type="date" onchange="_drvRender()" style="'+IN+'" title="起"><span style="font-size:11px;color:var(--b3)">～</span><input id="drv-to" type="date" onchange="_drvRender()" style="'+IN+'" title="迄">'
+    +'<select id="drv-st" onchange="_drvRender()" style="'+IN+'"><option value="">全部狀態</option><option value="work">施工中</option><option value="pause">暫停</option><option value="stop">停工</option></select>'
+    +'<select id="drv-item" onchange="_drvRender()" style="'+IN+';max-width:160px">'+itemOpts+'</select>'
+    +'<input id="drv-kw" placeholder="關鍵字" oninput="_drvRender()" style="'+IN+';width:100px">'
+    +'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">'
+    +'<span id="drv-sum" style="font-size:11.5px;color:var(--b4);flex:1;min-width:160px"></span>'
+    +'<label style="font-size:11.5px;display:flex;align-items:center;gap:4px"><input type="checkbox" id="drv-photo"> PDF 含照片</label>'
+    +'<button type="button" class="btn btn-xs" onclick="drExportPDF()" style="padding:4px 10px">匯出 PDF</button>'
+    +'<button type="button" class="btn btn-xs" onclick="drExportXlsx()" style="padding:4px 10px">匯出 Excel</button>'
+    +'</div>';
+  showConfirm('工作日報：'+esc(q.name||''),bar+'<div id="drv-list" style="max-height:55vh;overflow-y:auto"></div>',function(){},false,null,true);
+  _drvRender();
+}
+function _drvRender(){
+  const q=Q.find(x=>x.id===_drvQid);const box=document.getElementById('drv-list');if(!q||!box)return;
+  const logs=_drFilterLogs(q,_drvFilter());
+  const rows=logs.map(function(L){return _drLogRow(q,L);});
+  const sm=_drvSummary(rows);
+  const se=document.getElementById('drv-sum');
+  if(se)se.textContent='共 '+sm.n+' 筆：施工 '+sm.work+' 天'+(sm.stop?('、停工 '+sm.stop+' 天'):'')+(sm.pause?('、暫停 '+sm.pause+' 天'):'');
+  box.innerHTML=logs.length?logs.map(function(L){
     return '<div style="border-bottom:1px solid var(--b1);padding:9px 0">'
       +'<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12.5px;flex-wrap:wrap"><b>'+esc(L.date||'')+'</b><span style="color:var(--b4);flex:1;min-width:0">'+_crewsText(L)+((L.equip&&L.equip.length)?('　機具 '+L.equip.map(function(e){return esc(e.name)+(e.hrs?(' '+e.hrs+'h'):'');}).join('、')):(L.ownEquip?'　自有機具':''))+'</span>'
       +'<span style="white-space:nowrap"><button type="button" class="btn btn-xs" onclick="editDailyLog(\''+q.id+'\',\''+L.id+'\')" style="padding:2px 9px">✎ 修改</button> <button type="button" class="btn btn-xs btn-r" onclick="delDailyLog(\''+q.id+'\',\''+L.id+'\')" style="padding:2px 9px">刪除</button></span></div>'
       +(_drStatusText(L)?'<div style="font-size:12px;font-weight:700;color:'+(L.status==='stop'?'#c62828':'#b26a00')+';margin-top:3px">'+esc(_drStatusText(L))+'</div>':'')
       +(L.progress?'<div style="font-size:12.5px;color:var(--b5);margin-top:3px;white-space:pre-line">'+esc(L.progress)+'</div>':'')
-      +((L.photos&&L.photos.length)?('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+L.photos.map(function(p){return '<img src="'+p+'" style="width:86px;height:86px;object-fit:cover;border-radius:8px;border:1px solid var(--b2);cursor:zoom-in" title="點擊查看" onclick="_viewFile(\'日報照片\',this.src)">';}).join('')+'</div>'):'')
+      +((L.photos&&L.photos.length)?('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+L.photos.map(function(p){return '<img src="'+p+'" style="width:86px;height:86px;object-fit:cover;border-radius:8px;border:1px solid var(--b1)" onclick="_viewFile(\'現場照片\',this.src)">';}).join('')+'</div>'):'')
       +(L.by?'<div style="font-size:10px;color:var(--b3);margin-top:4px">'+esc(L.by)+'</div>':'')
       +'</div>';
-  }).join(''):'<div style="color:var(--b3);font-size:12px;padding:10px 0">尚無日報——工務可從「日報．支出」頁送出</div>';
-  showConfirm('工作日報：'+esc(q.name||''),'<div style="max-height:60vh;overflow-y:auto">'+html+'</div>',function(){},false,null,true);
+  }).join(''):'<div style="color:var(--b3);font-size:12px;padding:10px 0">'+((q.dailyLogs||[]).length?'沒有符合篩選條件的日報':'尚無日報——工務可從「日報．支出」頁送出')+'</div>';
 }
-// v5.404：日報修改／刪除（專案頁「日報」檢視內）
-// v5.428：修改日報的期別欄（每列都有 .dle-ph，非打設兼拔除工項為隱藏空值）
+function _drvCond(f){
+  var c=[];
+  if(f.from||f.to)c.push('期間 '+(f.from||'…')+'～'+(f.to||'…'));
+  if(f.st)c.push('狀態：'+({work:'施工中',pause:'暫停',stop:'停工'}[f.st]||f.st));
+  if(f.item!==''&&f.item!=null){var q=Q.find(function(x){return x.id===_drvQid;});var it=q&&(q.items||[])[parseInt(f.item)];if(it)c.push('工項：'+String(it.desc||'').split('\n')[0]);}
+  if(f.kw)c.push('關鍵字：'+f.kw);
+  return c.join('；');
+}
+function drExportPDF(){
+  const q=Q.find(x=>x.id===_drvQid);if(!q)return;
+  const f=_drvFilter(),logs=_drFilterLogs(q,f);
+  if(!logs.length){toast('沒有可匯出的日報');return;}
+  const rows=logs.slice().reverse().map(function(L){return _drLogRow(q,L);});   // 匯出依日期正序
+  const sm=_drvSummary(rows),withPhoto=!!document.getElementById('drv-photo')?.checked;
+  var body='<div class="cond">'+_xlEsc(_drvCond(f)||'全部日報')+'　｜　共 '+sm.n+' 筆：施工 '+sm.work+' 天'+(sm.stop?('、停工 '+sm.stop+' 天'):'')+(sm.pause?('、暫停 '+sm.pause+' 天'):'')
+    +'　｜　停工／暫停天數依狀態日報起訖累計；施工日以有日報之日計</div>'
+    +'<table><thead><tr><th style="width:70px">日期</th><th style="width:80px">作業狀態</th><th style="width:130px">出工</th><th style="width:90px">機具</th><th>進度／工作內容</th><th style="width:150px">停工／暫停說明</th><th style="width:70px">填報人</th></tr></thead><tbody>'
+    +rows.map(function(r){
+      var stTxt=r.statusText+(r.range?('<br><span style="font-size:9.5px">'+_xlEsc(r.range)+'（'+r.stopDays+'天）</span>'):'');
+      var note=(r.reason?_xlEsc(r.reason):'')+(r.resume?('<br>預計復工 '+_xlEsc(r.resume)):'');
+      return '<tr'+(r.status!=='work'?' style="background:#fff7e6"':'')+'><td>'+_xlEsc(r.date)+'</td><td>'+stTxt+'</td><td class="l">'+_xlEsc(r.crews||'—')+'</td><td class="l">'+_xlEsc(r.equip||'—')+'</td>'
+        +'<td class="l" style="white-space:pre-line">'+_xlEsc(r.progress||'—')+'</td><td class="l">'+(note||'—')+'</td><td>'+_xlEsc(String(r.by||'').split('@')[0])+'</td></tr>';
+    }).join('')+'</tbody></table>';
+  if(withPhoto){
+    var ph=rows.filter(function(r){return r.L.photos&&r.L.photos.length;});
+    if(ph.length){
+      body+='<h2>現場照片</h2>'+ph.map(function(r){
+        return '<div style="page-break-inside:avoid;margin-bottom:6px"><div style="font-size:11px;font-weight:700;margin:4px 0">'+_xlEsc(r.date)+(r.status!=='work'?('　'+r.statusText):'')+'</div>'
+          +'<div style="display:flex;gap:6px;flex-wrap:wrap">'+r.L.photos.map(function(p){return '<img src="'+p+'" style="width:150px;height:112px;object-fit:cover;border:1px solid #b9c6bd">';}).join('')+'</div></div>';
+      }).join('');
+    }
+  }
+  _toolPrint('工作日報彙整表',(q.name||''),body,{landscape:true,fname:_toolFileName('dailyrep','工作日報彙整表',q.name||'')});
+}
+function drExportXlsx(){
+  const q=Q.find(x=>x.id===_drvQid);if(!q)return;
+  const f=_drvFilter(),logs=_drFilterLogs(q,f);
+  if(!logs.length){toast('沒有可匯出的日報');return;}
+  const rows=logs.slice().reverse().map(function(L){return _drLogRow(q,L);});
+  var data=[['日期','作業狀態','起訖','停工／暫停天數','出工','機具','進度／工作內容','原因／說明','預計復工日','照片張數','填報人'].map(function(x){return {v:x,s:2};})];
+  rows.forEach(function(r){
+    data.push([{v:r.date,s:3},{v:r.statusText,s:3},{v:r.range,s:3},{v:r.stopDays||'',s:3},{v:r.crews,s:3},{v:r.equip,s:3},{v:r.progress.replace(/\n/g,'；'),s:3},{v:r.reason,s:3},{v:r.resume,s:3},{v:r.photos,s:3},{v:String(r.by||'').split('@')[0],s:3}]);
+  });
+  var sm=_drvSummary(rows);
+  data.push([{v:'合計',s:4},{v:'施工 '+sm.work+' 天',s:4},{v:'',s:4},{v:(sm.stop+sm.pause)||'',s:4},{v:'',s:4},{v:'',s:4},{v:'',s:4},{v:'',s:4},{v:'',s:4},{v:'',s:4},{v:'',s:4}]);
+  xlsxDownload('工作日報_'+(q.name||'')+'_'+localToday(),[{name:'工作日報',widths:[11,16,22,10,24,16,48,24,11,8,14],rows:data}]);
+}
 function _dlePhaseSel(q,r,IN){
   var it=q&&(q.items||[])[parseInt(r&&r.itemIdx)];var c=it?_itemCat(it):null;
   if(!(c&&c.install&&c.remove))return '<input type="hidden" class="dle-ph" value="">';
