@@ -1660,6 +1660,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg> 廠商績效</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-labor-btn" onclick="showReport('labor')"
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 出工月結</button>
+      <button type="button" class="btn btn-sm rpt-tab" id="rpt-hr-btn" onclick="showReport('hr')"
+        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg> 人事成本</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-track-btn" onclick="showReport('track')"
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 工程實績</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-log-btn" onclick="showReport('log')"
@@ -1746,6 +1748,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div class="ph">
     <div class="ph-l"><div class="ph-t">薪資．零用金</div><div class="ph-s" id="pr-sub">在職 0 人</div></div>
     <div class="ph-r" style="display:flex;gap:6px;flex-wrap:wrap">
+      <button type="button" class="btn btn-sm" onclick="hrWriteFixedCost()" title="把依薪資設定推估的每月人事成本寫進參數設定的公司固定成本明細（管理費率／營運保留金用）">寫入公司固定成本</button>
       <button type="button" class="btn btn-sm btn-g" onclick="hrEdit('','')">＋ 新增人員（無帳號）</button>
     </div>
   </div>
@@ -2727,7 +2730,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.434';
+var APP_VERSION='v5.435';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -9016,6 +9019,14 @@ function updateDashTodo(){
         text:(q.name||'未命名')+' 已 '+g.days+' 天沒有日報——是施工中還是停工？',sub:'最近一篇 '+g.last,extra:_drGapBtns(q.id,g.last)});
     });
   })();
+  // v5.435 薪資條提醒：有薪資設定的人員，上月薪資條尚未產生（僅看得到薪資頁的人）
+  try{
+    if(typeof _hrActive==='function'&&canAccess('payroll')&&_hrActive().some(function(p){return p.h&&_hrNum(p.h.base)>0;})){
+      var _pm=new Date();_pm.setDate(1);_pm.setMonth(_pm.getMonth()-1);var _pym=_pm.getFullYear()+'-'+String(_pm.getMonth()+1).padStart(2,'0');
+      if(!_psList(_pym).length)items.push({type:'hr_pay',urgent:false,jump:"go('payroll')",icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg>',color:'#b45309',
+        text:_psYmText(_pym)+' 薪資條尚未產生',sub:'到「薪資．零用金」按「產生本月薪資條」，應付與金流預測會自動帶入'});
+    }
+  }catch(e){_err('todo.hr',e);}
   // ── 以下三類原屬「提醒區」，v5.265 整併入本月待辦 ──
   function _du2(dateStr){var _p=dateStr.split('-');return Math.ceil((new Date(parseInt(_p[0]),parseInt(_p[1])-1,parseInt(_p[2])).getTime()-now.getTime())/864e5);}
 
@@ -31258,7 +31269,7 @@ function togglePayVat(pid,on){
 }
 function renderPayables(){
   const el=document.getElementById('payable-list');if(!el)return;
-  const catMap={material:'材料費',labor:'人工費',equipment:'機具費',subcontract:'協力廠商',other:'其他'};
+  const catMap={material:'材料費',labor:'人工費',equipment:'機具費',subcontract:'協力廠商',salary:'薪資／勞健保',petty:'零用金',other:'其他'};
   const srch=(document.getElementById('finance-search')?.value||'').toLowerCase();
   const filtered=PAYABLES.filter(p=>{
     if(!srch)return true;
@@ -31622,12 +31633,23 @@ function renderCashForecast(){
     if(ret>0)events.push({day:90,amt:ret,label:(i.project||'')+' 第'+(i.periodNo||'?')+'期 保留款回收（預估）'});
   });
   // 4) 公司固定成本 → 每月1日 −
-  var mFixed=(P.fixedCosts||[]).reduce(function(a,r){return a+(parseFloat(r.amt)||0);},0);
+  // v5.435：有人員薪資設定時，固定成本明細裡的「薪資／人事」列改由 4b 的推估取代，避免重複扣
+  var _hrEst=0;try{_hrEst=_hrMonthlyCost();}catch(e){_err('renderCashForecast.hr',e);}
+  var mFixed=(P.fixedCosts||[]).reduce(function(a,r){if(_hrEst>0&&/薪|人事/.test(String(r&&r.name||'')))return a;return a+(parseFloat(r.amt)||0);},0);
   if(mFixed>0){
     for(var mi=0;mi<4;mi++){
       var md=new Date(now.getFullYear(),now.getMonth()+1+mi,1);
       var d3=Math.round((md.getTime()-t0)/864e5);
       if(d3>0&&d3<=90)events.push({day:d3,amt:-mFixed,label:'公司固定成本（月）'});
+    }
+  }
+  // 4b) v5.435 薪資＋勞健保：已產生薪資條的月份已是應付（上面 3 已含）；尚未產生者依人員薪資設定推估，排在發放日
+  if(_hrEst>0){
+    for(var hi=0;hi<4;hi++){
+      var hd=new Date(now.getFullYear(),now.getMonth()-1+hi,1);var hym=hd.getFullYear()+'-'+String(hd.getMonth()+1).padStart(2,'0');
+      if(_psList(hym).length)continue;
+      var pd=dayOf(_hrPayDate(hym));if(pd==null||pd<=0||pd>90)continue;
+      events.push({day:pd,amt:-_hrEst,label:'預估薪資＋勞健保（'+_psYmText(hym)+'，依人員薪資設定；產生薪資條後改依實際）',est:true});
     }
   }
   // 逐日水位
@@ -32151,7 +32173,7 @@ function _shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,limitedBy,apPe
 
 function exportFinanceCSV(){
   // 匯出應付帳款
-  const catMap={material:'材料費',labor:'人工費',equipment:'機具費',subcontract:'協力廠商',other:'其他'};
+  const catMap={material:'材料費',labor:'人工費',equipment:'機具費',subcontract:'協力廠商',salary:'薪資／勞健保',petty:'零用金',other:'其他'};
   const headers=['付款對象','金額','日期','類別','工程','狀態','備註'];
   const rows=PAYABLES.map(p=>[p.to||'',p.amount||0,p.date||'',catMap[p.category]||'',
     p.project||'',p.status==='paid'?'已付款':'待付款',p.note||'']);
@@ -32998,7 +33020,7 @@ let _currentReport='monthly';
 
 function showReport(type){
   _currentReport=type;
-  ['monthly','yearly','client','contract','bidrate','vendor','labor','track','log'].forEach(t=>{
+  ['monthly','yearly','client','contract','bidrate','vendor','labor','hr','track','log'].forEach(t=>{
     const btn=document.getElementById('rpt-'+t+'-btn');
     if(btn){
       btn.style.background=t===type?'var(--g)':'';
@@ -33020,6 +33042,7 @@ function renderCurrentReport(){
   else if(_currentReport==='bidrate')renderBidRateReport(el,year,month);
   else if(_currentReport==='vendor')renderVendorReport(el,year,month);
   else if(_currentReport==='labor')renderLaborReport(el,year,month);
+  else if(_currentReport==='hr')renderHrReport(el,year);   // v5.435
   else if(_currentReport==='track')renderTrackReport(el);
   else if(_currentReport==='log')renderLogReport(el);
   try{_cardifyTables(el);}catch(e){_err('renderCurrentReport',e);}
@@ -35149,6 +35172,7 @@ function psUpd(id,k,val){
   var s=PAYSLIPS.find(function(x){return x.id===id;});if(!s)return;
   s[k]=(k==='note')?String(val||''):_hrNum(val);
   _psCalc(s);_touch(s);savePayslips();
+  try{_hrSyncPayables(s.ym);}catch(e){_err('psUpd.sync',e);}
   var ym=_psYm();_psRenderTable(ym);
 }
 function psPaid(id){
@@ -35174,6 +35198,7 @@ function renderPayroll(){
   var box=document.getElementById('pr-people');if(!box)return;
   var ymEl=document.getElementById('pr-ym');if(ymEl&&!ymEl.value)ymEl.value=localToday().slice(0,7);
   var ym=_psYm();
+  try{_hrSyncPayables(ym);}catch(e){_err('renderPayroll.sync',e);}   // v5.435 薪資／零用金 → 應付
   var people=_hrPeople();
   var TD='padding:6px 8px;white-space:nowrap;border-bottom:1px solid var(--b1)';
   var TH='text-align:left;padding:6px 8px;font-size:11px;color:var(--b4);white-space:nowrap;background:var(--gl)';
@@ -35247,7 +35272,10 @@ function _hrRenderRates(){
   var R=_hrRates();
   box.innerHTML=Object.keys(_HR_RATE_DEF).map(function(k){
     return '<div class="f"><label>'+_HR_RATE_LABEL[k]+'</label><input type="number" step="0.01" inputmode="decimal" value="'+R[k]+'" onchange="_hrRateSet(\''+k+'\',this.value)" style="width:100%;font-size:12.5px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;box-sizing:border-box;text-align:right"></div>';
-  }).join('');
+  }).join('')
+  // v5.435：發放日與日薪推估天數（應付到期日／金流預測用）
+  +'<div class="f"><label>薪資發放日（次月幾日）</label><input type="number" inputmode="numeric" value="'+(parseInt(P.salaryPayDay)||5)+'" onchange="P.salaryPayDay=Math.max(1,Math.min(28,parseInt(this.value)||5));_fcSave();renderPayroll()" style="width:100%;font-size:12.5px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;box-sizing:border-box;text-align:right"></div>'
+  +'<div class="f"><label>日薪人員推估天數／月（金流預測）</label><input type="number" inputmode="numeric" value="'+(_hrNum(P.hrDayEst,22)||22)+'" onchange="P.hrDayEst=parseFloat(this.value)||22;_fcSave()" style="width:100%;font-size:12.5px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;box-sizing:border-box;text-align:right"></div>';
 }
 // ── 匯出 ──
 function _psSlipHtml(s){
@@ -35367,7 +35395,9 @@ function _pcList(ym){return PETTY.filter(function(r){return r&&r.ym===ym;}).sort
 function pcUpd(id,k,val){
   var r=PETTY.find(function(x){return x.id===id;});if(!r||r.status==='paid')return;
   r[k]=(k==='note')?String(val||''):_hrNum(val);
-  _pcCalc(r);_touch(r);savePetty();_pcRenderTable(_psYm());
+  _pcCalc(r);_touch(r);savePetty();
+  try{_hrSyncPayables(r.ym);}catch(e){_err('pcUpd.sync',e);}
+  _pcRenderTable(_psYm());
 }
 function pcPaid(id){
   var r=PETTY.find(function(x){return x.id===id;});if(!r)return;
@@ -35459,6 +35489,118 @@ function pcExportXlsx(){
   var det=[['姓名','日期','專案','項目','類別','金額'].map(function(x){return {v:x,s:2};})];
   list.forEach(function(r){(r.items||[]).forEach(function(it){det.push([{v:r.name||'',s:3},{v:it.date,s:3},{v:it.proj,s:3},{v:it.desc,s:3},{v:it.cat,s:3},{v:it.amt,s:3}]);});});
   xlsxDownload('零用金結算_'+ym.replace('-',''),[{name:'零用金結算',widths:[12,10,10,10,10,8,10,10,10,10,9,11,20],rows:rows},{name:'支出明細',widths:[12,11,26,30,10,10],rows:det}]);
+}
+// ══════════ 薪資／零用金 → 應付／金流／固定成本／報表（v5.435 Phase D）══════════
+// 薪資條實發 → 應付 pay_ps_…（發放日＝次月 P.salaryPayDay 日）；勞健保＋勞退（公司負擔＋員工代扣）→ 每月一筆 pay_ins_<ym>（次月底）；
+// 零用金應付（補足＋代墊）→ pay_pc_…。狀態雙向：薪資條／結算標已發放 → 應付 paid；在應付頁標付款 → 回寫薪資條／結算。
+// 應付進了 PAYABLES 就自動進金流 90 天預測、待付統計與應付帳齡；尚未產生薪資條的月份由人員薪資設定推估。
+function _hrPayDate(ym){
+  var m=/^(\d{4})-(\d{2})$/.exec(ym||'');if(!m)return localToday();
+  var day=Math.max(1,Math.min(28,parseInt(P.salaryPayDay)||5));
+  var d=new Date(+m[1],+m[2],day);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function _hrInsDate(ym){
+  var m=/^(\d{4})-(\d{2})$/.exec(ym||'');if(!m)return localToday();
+  var d=new Date(+m[1],+m[2]+1,0);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function _hrUpsertPay(id,fields){
+  var p=PAYABLES.find(function(x){return x.id===id;});
+  if(!p){p={id:id,status:'pending',category:'salary'};PAYABLES.push(p);}
+  Object.keys(fields).forEach(function(k){p[k]=fields[k];});
+  p.vat=false;p.updatedAt=Date.now();_touch(p);return p;
+}
+function _hrRemovePay(id){
+  var n=PAYABLES.length;PAYABLES=PAYABLES.filter(function(p){return p.id!==id;});
+  if(PAYABLES.length!==n)_tomb('payables',id);
+}
+function _hrSyncPayables(ym){
+  try{
+    var chgPs=false,chgPc=false;
+    // 逐人薪資（實發）
+    _psList(ym).forEach(function(s){
+      var id='pay_'+s.id,ex=PAYABLES.find(function(p){return p.id===id;});
+      if(!(s.net>0)){_hrRemovePay(id);return;}
+      if(ex&&ex.status==='paid'&&s.status!=='paid'){s.status='paid';s.paidDate=ex.paidDate||localToday();_touch(s);chgPs=true;}   // 應付頁先標付款 → 回寫
+      _hrUpsertPay(id,{to:s.name||'',amount:s.net,date:_hrPayDate(ym),category:'salary',project:'',note:_psYmText(ym)+' 薪資',itemName:'薪資',hrRef:s.id,
+        status:s.status==='paid'?'paid':'pending',paidDate:s.status==='paid'?(s.paidDate||localToday()):''});
+    });
+    // 本月勞健保＋勞退一筆（公司負擔＋員工代扣）
+    var ins=_psList(ym).reduce(function(a,s){return a+(s.laborSelf||0)+(s.healthSelf||0)+(s.pensionSelf||0)+(s.coCost||0);},0);
+    var iid='pay_ins_'+ym,iex=PAYABLES.find(function(p){return p.id===iid;});
+    if(ins>0)_hrUpsertPay(iid,{to:'勞保局／健保署／勞退',amount:ins,date:(iex&&iex.date)||_hrInsDate(ym),category:'salary',project:'',note:_psYmText(ym)+' 勞健保＋勞退（公司負擔＋員工代扣）',itemName:'勞健保',hrRef:'ins_'+ym,status:(iex&&iex.status)||'pending'});
+    else _hrRemovePay(iid);
+    // 零用金應付（補足＋代墊）
+    _pcList(ym).forEach(function(r){
+      var id='pay_'+r.id,ex=PAYABLES.find(function(p){return p.id===id;});
+      if(!(r.payout>0)){_hrRemovePay(id);return;}
+      if(ex&&ex.status==='paid'&&r.status!=='paid'){r.status='paid';r.paidDate=ex.paidDate||localToday();_touch(r);chgPc=true;}
+      _hrUpsertPay(id,{to:r.name||'',amount:r.payout,date:_hrPayDate(ym),category:'petty',project:'',note:_psYmText(ym)+' 零用金 補足 '+fmt(r.topup)+(r.advance?('＋代墊 '+fmt(r.advance)):''),itemName:'零用金',hrRef:r.id,
+        status:r.status==='paid'?'paid':'pending',paidDate:r.status==='paid'?(r.paidDate||localToday()):''});
+    });
+    // 薪資條／結算已刪 → 應付一併撤掉
+    PAYABLES.slice().forEach(function(p){
+      if(!p||!p.hrRef)return;
+      if(/^ps_/.test(p.hrRef)&&!PAYSLIPS.some(function(s){return s.id===p.hrRef;}))_hrRemovePay(p.id);
+      else if(/^pc_/.test(p.hrRef)&&!PETTY.some(function(r){return r.id===p.hrRef;}))_hrRemovePay(p.id);
+      else if(/^ins_/.test(p.hrRef)&&!_psList(p.hrRef.slice(4)).length)_hrRemovePay(p.id);
+    });
+    savePayables();
+    if(chgPs)savePayslips();if(chgPc)savePetty();
+  }catch(e){_err('_hrSyncPayables',e);}
+}
+// 依人員薪資設定推估每月人事成本（應發＋公司負擔）：月薪直接算；日薪取最近一張薪資條的天數，沒有則用 P.hrDayEst（預設 22 天）
+function _hrMonthlyCost(){
+  var tot=0;
+  _hrActive().forEach(function(p){
+    var h=p.h;if(!h||!(_hrNum(h.base)>0))return;
+    var days=_hrNum(P.hrDayEst,22)||22;
+    if(h.payType==='day'){
+      var last=PAYSLIPS.filter(function(s){return s.hrId===p.id&&s.days>0;}).sort(function(a,b){return String(b.ym).localeCompare(String(a.ym));})[0];
+      if(last)days=last.days;
+    }
+    var gross=(h.payType==='day'?_hrNum(h.base)*days:_hrNum(h.base))+_hrNum(h.telAllow)+_hrNum(h.otherAllow);
+    tot+=gross+_hrNum(h.laborCo)+_hrNum(h.healthCo)+_hrNum(h.pensionCo);
+  });
+  return Math.round(tot);
+}
+// 寫進參數設定的「公司固定成本明細」（供管理費率推算與營運保留金；金流預測會改用這裡的推估，不重複扣）
+function hrWriteFixedCost(){
+  var amt=_hrMonthlyCost();
+  if(!(amt>0)){toast('尚無薪資設定，無法推估');return;}
+  if(!P.fixedCosts)P.fixedCosts=[];
+  var row=P.fixedCosts.find(function(r){return /薪|人事/.test(r&&r.name||'');});
+  if(!row){row={name:'人員薪資（含勞健保）',amt:0};P.fixedCosts.push(row);}
+  row.amt=amt;_fcSave();
+  toast('已寫入公司固定成本「'+row.name+'」NT$'+fmt(amt)+'／月');
+}
+// 報表中心：人事成本（逐月薪資／公司負擔／零用金）
+function renderHrReport(el,year){
+  var y=parseInt(year)||new Date().getFullYear();
+  var rows=[],tot={n:0,gross:0,ded:0,net:0,co:0,total:0,pcSpent:0,pcPay:0};
+  for(var m=1;m<=12;m++){
+    var ym=y+'-'+String(m).padStart(2,'0');
+    var ps=_psList(ym),pc=_pcList(ym);
+    if(!ps.length&&!pc.length)continue;
+    var s=_psSum(ps),c=_pcSum(pc);
+    rows.push({ym:ym,n:s.n,gross:s.gross,ded:s.ded,net:s.net,co:s.coCost,total:s.total,pcSpent:c.spent,pcPay:c.payout,paid:s.paid});
+    tot.n=Math.max(tot.n,s.n);tot.gross+=s.gross;tot.ded+=s.ded;tot.net+=s.net;tot.co+=s.coCost;tot.total+=s.total;tot.pcSpent+=c.spent;tot.pcPay+=c.payout;
+  }
+  var byP={};
+  PAYSLIPS.forEach(function(s){if(String(s.ym||'').slice(0,4)!==String(y))return;var o=byP[s.hrId]||(byP[s.hrId]={name:s.name,months:0,gross:0,net:0,co:0,pc:0});o.months++;o.gross+=s.gross||0;o.net+=s.net||0;o.co+=s.coCost||0;});
+  PETTY.forEach(function(r){if(String(r.ym||'').slice(0,4)!==String(y))return;var o=byP[r.hrId]||(byP[r.hrId]={name:r.name,months:0,gross:0,net:0,co:0,pc:0});o.pc+=r.payout||0;});
+  var TD='padding:6px 8px;border-bottom:1px solid var(--b1);text-align:right;white-space:nowrap',TH='padding:6px 8px;font-size:11px;color:var(--b4);background:var(--gl);text-align:right;white-space:nowrap';
+  if(!rows.length){el.innerHTML='<div class="empty" style="padding:36px"><p>'+y+' 年尚無薪資條或零用金結算——到「薪資．零用金」頁產生後即會彙整於此</p></div>';return;}
+  el.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px"><div style="font-size:13px;font-weight:900;color:var(--g3)">'+y+' 年人事成本</div><span style="font-size:11px;color:var(--b3)">薪資條應發＋公司負擔＝人事成本；零用金支出已在各專案成本內，此處只列應付員工的補足＋代墊</span></div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>'+['月份','人數','應發','扣款','實發','公司負擔','人事成本','零用金支出','零用金應付','已發放'].map(function(h,i){return '<th style="'+TH+(i===0?';text-align:left':'')+'">'+h+'</th>';}).join('')+'</tr></thead><tbody>'
+    +rows.map(function(r){return '<tr><td style="'+TD+';text-align:left">'+r.ym+'</td><td style="'+TD+'">'+r.n+'</td><td style="'+TD+'">'+fmt(r.gross)+'</td><td style="'+TD+'">'+fmt(r.ded)+'</td><td style="'+TD+'">'+fmt(r.net)+'</td><td style="'+TD+'">'+fmt(r.co)+'</td><td style="'+TD+';font-weight:700">'+fmt(r.total)+'</td><td style="'+TD+'">'+fmt(r.pcSpent)+'</td><td style="'+TD+'">'+fmt(r.pcPay)+'</td><td style="'+TD+'">'+r.paid+'／'+r.n+'</td></tr>';}).join('')
+    +'<tr style="background:var(--gl);font-weight:700"><td style="'+TD+';text-align:left">合計</td><td style="'+TD+'"></td><td style="'+TD+'">'+fmt(tot.gross)+'</td><td style="'+TD+'">'+fmt(tot.ded)+'</td><td style="'+TD+'">'+fmt(tot.net)+'</td><td style="'+TD+'">'+fmt(tot.co)+'</td><td style="'+TD+'">'+fmt(tot.total)+'</td><td style="'+TD+'">'+fmt(tot.pcSpent)+'</td><td style="'+TD+'">'+fmt(tot.pcPay)+'</td><td style="'+TD+'"></td></tr>'
+    +'</tbody></table></div>'
+    +'<div style="font-size:13px;font-weight:900;color:var(--g3);margin:16px 0 8px">逐人年度累計</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>'+['姓名','月數','應發','實發','公司負擔','零用金應付'].map(function(h,i){return '<th style="'+TH+(i===0?';text-align:left':'')+'">'+h+'</th>';}).join('')+'</tr></thead><tbody>'
+    +Object.keys(byP).map(function(k){var o=byP[k];return '<tr><td style="'+TD+';text-align:left">'+esc(o.name||'')+'</td><td style="'+TD+'">'+o.months+'</td><td style="'+TD+'">'+fmt(o.gross)+'</td><td style="'+TD+'">'+fmt(o.net)+'</td><td style="'+TD+'">'+fmt(o.co)+'</td><td style="'+TD+'">'+fmt(o.pc)+'</td></tr>';}).join('')
+    +'</tbody></table></div>';
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
@@ -37573,6 +37715,8 @@ function exportCurrentReportExcel(){
             <option value="labor">人工費</option>
             <option value="equipment">機具費</option>
             <option value="subcontract">協力廠商</option>
+            <option value="salary">薪資／勞健保</option>
+            <option value="petty">零用金</option>
             <option value="other">其他</option>
           </select>
         </div>
