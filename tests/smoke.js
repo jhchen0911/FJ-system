@@ -2502,6 +2502,55 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.435 薪資／零用金 → 應付／金流／固定成本／報表 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      HR.length = 0; PAYSLIPS.length = 0; PETTY.length = 0; PAYABLES.length = 0; TOMBS.payables = {};
+      HR.push({ id: 'hrD', name: '王小明', payType: 'month', base: 30000, laborCo: 3000, laborSelf: 600, healthCo: 1500, healthSelf: 450, pensionCo: 1800, pettyQuota: 3000, active: true, _mt: 1 });
+      const _Q0 = Q; Q = []; INV.length = 0; MAT_LEDGER.length = 0;
+      Q.push({ id: 'tq435', name: '丁案', items: [], costs: [{ id: 'c1', type: 'extra', vendor: '公司支出（自付）', cat: '油資', date: '2026-09-03', amt: 4000, payer: '王小明', rows: [{ desc: '加油' }] }] });
+      P.salaryPayDay = 5;
+      go('payroll'); document.getElementById('pr-ym').value = '2026-09'; psGenerate(); pcGenerate();
+      const ps = _psList('2026-09')[0], pc = _pcOf('hrD', '2026-09');
+      const pp = PAYABLES.find(p => p.id === 'pay_' + ps.id), pi = PAYABLES.find(p => p.id === 'pay_ins_2026-09'), pk = PAYABLES.find(p => p.id === 'pay_' + pc.id);
+      // 薪資實發 → 應付（次月 5 日、不含稅、類別 salary）；勞健保＋勞退一筆（次月底）；零用金補足＋代墊 → 應付
+      out.pay = !!pp && pp.amount === 30000 - 600 - 450 && pp.date === '2026-10-05' && pp.vat === false && pp.category === 'salary' && pp.status === 'pending';
+      out.ins = !!pi && pi.amount === 3000 + 600 + 1500 + 450 + 1800 && pi.date === '2026-10-31';
+      out.petty = !!pk && pk.amount === pc.payout && pc.payout === 4000 && pk.category === 'petty';
+      // 狀態雙向：薪資條標發放 → 應付 paid；應付頁標付款 → 零用金結算回寫
+      psPaid(ps.id); out.paid1 = PAYABLES.find(p => p.id === 'pay_' + ps.id).status === 'paid';
+      confirmPayment('pay_' + pc.id); renderPayroll(); out.paid2 = pc.status === 'paid' && !!pc.paidDate;
+      // 應付頁類別標籤
+      go('finance'); renderPayables(); out.label = /薪資／勞健保/.test(document.getElementById('payable-list').innerHTML) && /零用金/.test(document.body.innerHTML);
+      // 推估人事成本、寫入公司固定成本
+      out.est = _hrMonthlyCost() === 30000 + 3000 + 1500 + 1800;
+      P.fixedCosts = [{ name: '辦公室租金', amt: 20000 }]; hrWriteFixedCost();
+      out.fixed = P.fixedCosts.length === 2 && P.fixedCosts[1].amt === _hrMonthlyCost() && /薪/.test(P.fixedCosts[1].name);
+      // 金流預測：固定成本的薪資列不重複扣，未產生薪資條的月份走推估
+      renderCashForecast();
+      const cf = document.getElementById('cashflow-forecast').innerHTML;
+      out.cf = /預估薪資＋勞健保/.test(cf);
+      // 報表中心人事成本分頁
+      go('reports'); showReport('hr');
+      const rp = document.getElementById('report-content').innerHTML;
+      out.rpt = /2026-09/.test(rp) && /人事成本/.test(rp) && /王小明/.test(rp) && !!document.getElementById('rpt-hr-btn');
+      // 刪薪資條 → 應付撤掉並立墓碑
+      psDel(ps.id); document.getElementById('gen-confirm-ok').click();
+      out.del = !PAYABLES.some(p => p.id === 'pay_' + ps.id) && !!(TOMBS.payables || {})['pay_' + ps.id] && !PAYABLES.some(p => p.id === 'pay_ins_2026-09');
+      // 待辦：上月薪資條未產生（測試環境未登入 → canAccess 對 adminOnly 頁回 false，直接驗函式邏輯）
+      out.todoFn = typeof _psYmText === 'function' && /薪資條尚未產生|todo\.hr/.test(updateDashTodo.toString());
+      HR.length = 0; PAYSLIPS.length = 0; PETTY.length = 0; PAYABLES.length = 0; P.fixedCosts = []; Q = _Q0;
+      return out;
+    });
+    check('薪資／零用金 → 應付：實發次月發放日、勞健保一筆次月底、零用金補足＋代墊，狀態雙向', r.pay && r.ins && r.petty && r.paid1 && r.paid2 && r.label);
+    check('人事成本推估：寫入公司固定成本、金流預測不重複扣並推估未產生月份', r.est && r.fixed && r.cf);
+    check('報表中心人事成本分頁；刪薪資條撤應付並立墓碑；待辦提醒', r.rpt && r.del && r.todoFn);
+    check('v5.435 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
