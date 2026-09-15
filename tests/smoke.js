@@ -2283,6 +2283,25 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.430 單價分析小分類順序、日報表單順序 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const ks = Object.keys(UPA_ITEMS.support.items);
+      out.upa = ks.indexOf('圍令背填施作及打除') === ks.indexOf('油壓千斤頂') - 1 && ks.indexOf('切除買斷') === ks.indexOf('止水板') - 1
+        && ks.indexOf('圍令背填施作及打除') > ks.indexOf('施工構台');
+      const prog = document.getElementById('dr-prog-rows'), crews = document.getElementById('dr-crews'), ph = document.getElementById('dr-photos'), dt = document.getElementById('dr-date');
+      const before = (a, b) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+      out.form = before(dt, prog) && before(prog, crews) && before(crews, ph);
+      return out;
+    });
+    check('單價分析：圍令背填在油壓千斤頂之前、切除買斷在止水板之前', r.upa);
+    check('日報表單：日期 → 今日進度 → 出工 → 照片', r.form);
+    check('v5.430 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

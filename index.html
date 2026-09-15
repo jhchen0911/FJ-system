@@ -1278,17 +1278,19 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         </div>
         <div class="fg fg2" style="margin-bottom:10px">
           <div class="f"><label>日期</label><input id="dr-date" type="date" style="font-size:14px;padding:8px 10px"></div>
+        </div>
+        <div class="f" style="margin-bottom:10px">
+          <label>今日進度／工作內容 <span style="font-size:10.5px;color:var(--b3)">— 選工項填數量，回報量連動專案施工進度條</span></label>
+          <div id="dr-prog-rows"></div>
+          <button type="button" class="btn btn-xs" onclick="drAddProgRow()" style="padding:6px 14px;margin-top:4px">＋ 加一列</button>
+        </div>
+        <div class="fg fg2" style="margin-bottom:10px">
           <div class="f" style="grid-column:1/-1"><label>出工 <span style="font-size:10.5px;color:var(--b3)">— 每列一家：點工（進成本勾稽與出工月結）／承包（只記錄，連動廠商績效）</span></label>
             <div id="dr-crews"></div>
             <button type="button" class="btn btn-xs" onclick="drAddCrew()" style="padding:6px 14px;margin-top:2px">＋ 新增出工列</button>
             <datalist id="dr-sub-vendor-list"></datalist><datalist id="dr-labor-vendor-list"></datalist></div>
           <div class="f" style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:6px 0"><input type="checkbox" id="dr-own-equip" style="width:18px;height:18px" onchange="_drRenderEquip()"> <svg class="ic ib" aria-hidden="true"><use href="#i-truck"/></svg> 本日使用自有機具<span style="font-size:10.5px;color:var(--b3)">— 供機具稼動率統計</span></label>
             <div id="dr-equip-box" style="display:none;margin:2px 0 4px 26px"></div></div>
-        </div>
-        <div class="f" style="margin-bottom:10px">
-          <label>今日進度／工作內容 <span style="font-size:10.5px;color:var(--b3)">— 選工項填數量，回報量連動專案施工進度條</span></label>
-          <div id="dr-prog-rows"></div>
-          <button type="button" class="btn btn-xs" onclick="drAddProgRow()" style="padding:6px 14px;margin-top:4px">＋ 加一列</button>
         </div>
         <div class="f" style="margin-bottom:12px">
           <label>現場照片（最多 3 張，自動壓縮）</label>
@@ -2679,7 +2681,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.429';
+var APP_VERSION='v5.430';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -28510,6 +28512,13 @@ var UPA_ITEMS = {
           return `施工構台（共構，${realSpec}；含型鋼車輪檔${m}）`;
         }
       },
+      '圍令背填施作及打除': {
+        unit:'M', hasPeriod:false, hasLen:false, hasSpacing:false, hasLayer:false,
+        specs:['H300','H350','H400','H428'],
+        methods:[{value:'不含運棄', label:'不含運棄（代工不帶料）'}],
+        noteMap:{'':(p)=>'代工不帶料'},
+        descFn:(spec,method)=>`圍令背填施作及打除（${method||'不含運棄'}）`
+      },
       '油壓千斤頂': {
         unit:'具', hasPeriod:true, hasLen:false, hasSpacing:false, hasLayer:false,
         specs:['標準'],
@@ -28523,6 +28532,22 @@ var UPA_ITEMS = {
         methods:[{value:'', label:'依各層租期'}],
         noteMap:{'':(period)=>period?`含${period}天租期`:''},
         descFn:(spec,method,len,spacing,period)=>`軸力計`
+      },
+      '切除買斷': {
+        unit:'支', hasPeriod:false, hasLen:true, hasSpacing:false, hasLayer:false,
+        specs:['中間樁 H300','中間樁 H350','中間樁 H400','共構樁 H300','共構樁 H350','共構樁 H400'],
+        methods:[{value:'', label:'工料（一次性）'}],
+        noteMap:{'':(p)=>'工料（一次性工項）'},
+        descFn:(spec,method,len)=>{
+          var excDep=parseFloat(document.getElementById('upa-excavation-depth')?.value)||0;
+          var baseTk=parseFloat(document.getElementById('upa-base-thickness')?.value)||0;
+          var L=parseFloat(len)||0;
+          var effL=Math.max(0,L-excDep+baseTk);
+          if(excDep||baseTk){
+            return spec+' 切除買斷（'+len+'M－開挖'+excDep+'M＋大底'+baseTk+'M＝'+effL.toFixed(2)+'M）';
+          }
+          return spec+' 切除買斷，L='+(len||'__')+'M';
+        }
       },
       '止水板': {
         unit:'處', hasPeriod:false, hasLen:false, hasSpacing:false, hasLayer:false,
@@ -28558,29 +28583,6 @@ var UPA_ITEMS = {
         methods:[{value:'', label:'（一次性工項）'}],
         noteMap:{'':(p)=>'一次性工項'},
         descFn:()=>'結構應力分析及技師簽證'
-      },
-      '切除買斷': {
-        unit:'支', hasPeriod:false, hasLen:true, hasSpacing:false, hasLayer:false,
-        specs:['中間樁 H300','中間樁 H350','中間樁 H400','共構樁 H300','共構樁 H350','共構樁 H400'],
-        methods:[{value:'', label:'工料（一次性）'}],
-        noteMap:{'':(p)=>'工料（一次性工項）'},
-        descFn:(spec,method,len)=>{
-          var excDep=parseFloat(document.getElementById('upa-excavation-depth')?.value)||0;
-          var baseTk=parseFloat(document.getElementById('upa-base-thickness')?.value)||0;
-          var L=parseFloat(len)||0;
-          var effL=Math.max(0,L-excDep+baseTk);
-          if(excDep||baseTk){
-            return spec+' 切除買斷（'+len+'M－開挖'+excDep+'M＋大底'+baseTk+'M＝'+effL.toFixed(2)+'M）';
-          }
-          return spec+' 切除買斷，L='+(len||'__')+'M';
-        }
-      },
-      '圍令背填施作及打除': {
-        unit:'M', hasPeriod:false, hasLen:false, hasSpacing:false, hasLayer:false,
-        specs:['H300','H350','H400','H428'],
-        methods:[{value:'不含運棄', label:'不含運棄（代工不帶料）'}],
-        noteMap:{'':(p)=>'代工不帶料'},
-        descFn:(spec,method)=>`圍令背填施作及打除（${method||'不含運棄'}）`
       },
     }
   }
