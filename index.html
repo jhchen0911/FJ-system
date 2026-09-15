@@ -682,7 +682,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
   <div class="ssec" style="margin-top:5px">系統</div>
   <button type="button" class="snav" id="sn-staff" onclick="go('staff')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>人員管理</button>
-  <button type="button" class="snav" id="sn-payroll" onclick="go('payroll')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>人員薪資</button>
+  <button type="button" class="snav" id="sn-payroll" onclick="go('payroll')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>薪資．零用金</button>
   <button type="button" class="snav" id="sn-roles" onclick="go('roles')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span>角色權限</button>
   <button type="button" class="snav" id="sn-params" onclick="go('params')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg></span>參數設定</button>
 </nav>
@@ -1744,7 +1744,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <!-- ████ 人員薪資（v5.433）████ -->
 <div class="page" id="page-payroll">
   <div class="ph">
-    <div class="ph-l"><div class="ph-t">人員薪資</div><div class="ph-s" id="pr-sub">在職 0 人</div></div>
+    <div class="ph-l"><div class="ph-t">薪資．零用金</div><div class="ph-s" id="pr-sub">在職 0 人</div></div>
     <div class="ph-r" style="display:flex;gap:6px;flex-wrap:wrap">
       <button type="button" class="btn btn-sm btn-g" onclick="hrEdit('','')">＋ 新增人員（無帳號）</button>
     </div>
@@ -1761,6 +1761,14 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <button type="button" class="btn btn-xs" onclick="psExportXlsx()">匯出 Excel</button>
       </div></div>
       <div class="cb" id="pr-slips"></div></div>
+    <div class="card"><div class="ch" style="flex-wrap:wrap;gap:6px"><div class="cht">零用金結算</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;color:var(--b3)">同上方月份；支出取自日報．支出登錄的員工支出，先用零用金、超過定額才是代墊</span>
+        <button type="button" class="btn btn-xs btn-g" onclick="pcGenerate()">更新零用金結算</button>
+        <button type="button" class="btn btn-xs" onclick="pcExportAllPDF()">結算單 PDF</button>
+        <button type="button" class="btn btn-xs" onclick="pcExportXlsx()">匯出 Excel</button>
+      </div></div>
+      <div class="cb" id="pr-petty"></div></div>
     <div class="card"><div class="ch" style="flex-wrap:wrap;gap:6px"><div class="cht">費率設定</div><div style="font-size:11px;color:var(--b3)">供「依費率試算」用，請依當年公告核對；各人金額仍可手動修改</div></div>
       <div class="cb"><div class="fg fg3" id="pr-rates"></div></div></div>
   </div>
@@ -2719,7 +2727,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.433';
+var APP_VERSION='v5.434';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -8281,6 +8289,7 @@ function importData(file){
         if(data.matLedger){MAT_LEDGER=arr(data.matLedger);try{localStorage.setItem('fy_mat_ledger',JSON.stringify(MAT_LEDGER));}catch(e2){_err('top',e2);}}
         if(data.hr){HR=arr(data.hr);try{localStorage.setItem('fy_hr',JSON.stringify(HR));}catch(e2){_err('importData.hr',e2);}}   // v5.433
         if(data.payslips){PAYSLIPS=arr(data.payslips);try{localStorage.setItem('fy_payslips',JSON.stringify(PAYSLIPS));}catch(e2){_err('importData.ps',e2);}}
+        if(data.petty){PETTY=arr(data.petty);try{localStorage.setItem('fy_petty',JSON.stringify(PETTY));}catch(e2){_err('importData.pc',e2);}}
         if(data.upaCostDB){try{Object.assign(UPA_COST_DB,data.upaCostDB);localStorage.setItem('fy_upa_cost',JSON.stringify(UPA_COST_DB));}catch(e2){_err('top',e2);}}
         if(data.activityLog)ACTIVITY_LOG=arr(data.activityLog);
         // v5.314 補齊還原：墓碑用「取代」而非合併，否則本機殘留墓碑會把剛還原的資料再殺一次
@@ -10408,7 +10417,7 @@ function _lsUsage(){
     fy_plan_attlib:'計畫書附件庫',fy_q_history:'報價版本歷史',fy_contracts:'合約',
     fy_payables:'應付帳款',fy_expenses:'零星支出',fy_customers:'客戶',fy_vendors:'廠商',
     fy_inv_recs:'發票紀錄',fy_mat_ledger:'材料台帳',fy_mat_stock:'材料庫存',
-    fy_cost_hist:'成本單價庫',fy_deal_hist:'成交單價庫',fy_activity:'活動紀錄',fy_hr:'人員薪資',fy_payslips:'薪資條',
+    fy_cost_hist:'成本單價庫',fy_deal_hist:'成交單價庫',fy_activity:'活動紀錄',fy_hr:'人員薪資',fy_payslips:'薪資條',fy_petty:'零用金',
     fy6_uh:'單價分析歷史',fy_tombs:'刪除記錄',fy6_p:'參數設定'};
   try{
     for(var i=0;i<localStorage.length;i++){
@@ -12584,7 +12593,7 @@ var _SYNC_COLLS=['quotes','invoices','upaHistory','params','contracts','vendors'
   'tombs','admins',
   'matStock','toolrecs','planState','qHistory','toolStates'];   // v5.373 新增（planAttLib 純圖檔，只進本機備份不上雲）
 // 敏感集合：只寫 fydata/private
-var _PRIV_COLLS=['payables','expenses','costHist','upaCostDB','shareProfit','matLedger','dealHist','hr','payslips'];   // v5.433 人員薪資
+var _PRIV_COLLS=['payables','expenses','costHist','upaCostDB','shareProfit','matLedger','dealHist','hr','payslips','petty'];   // v5.433 人員薪資、v5.434 零用金
 function _collHash(v){ // djb2 於 JSON 字串
   var st;try{st=JSON.stringify(v);}catch(e){st=String(v);}
   var h=5381;for(var i=0;i<st.length;i++){h=((h<<5)+h+st.charCodeAt(i))|0;}
@@ -12637,7 +12646,7 @@ function _privatePayload(){
     version:'fy-v5p', uploadedAt:ts, uploadedBy:(_fbUser&&_fbUser.email)||'',
     quoteSens:qs, payables:PAYABLES, expenses:EXPENSES, costHist:COST_HIST,
     upaCostDB:UPA_COST_DB, shareProfit:SHARE_PROFIT, matLedger:MAT_LEDGER, dealHist:DEAL_HIST,
-    hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[])   // v5.433
+    hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]), petty:(typeof PETTY!=='undefined'?PETTY:[])   // v5.433／v5.434
   }};
 }
 function _syncPayload(){
@@ -12652,7 +12661,7 @@ function _syncPayload(){
     invoiceRecs:INVOICE_RECS, expenses:EXPENSES, tombs:TOMBS, activityLog:ACTIVITY_LOG.slice(0,100),
     customers:CUSTOMERS, upaCostDB:UPA_COST_DB, pagePerms:pagePerms, costHist:COST_HIST,
     shareProfit:SHARE_PROFIT, dealHist:DEAL_HIST, matLedger:MAT_LEDGER, admins:admins,
-    hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]),   // v5.433 人員薪資（private；全量備份含）
+    hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]), petty:(typeof PETTY!=='undefined'?PETTY:[]),   // v5.433 人員薪資／v5.434 零用金（private；全量備份含）
     // v5.373：六大工具存檔、施工計畫書草稿、共用附件庫、材料庫存、報價版本歷史
     matStock:MAT_STOCK, toolrecs:_trAllSafe(), planState:_planStateSaved(),
     planAttLib:_planAttLibSaved(), qHistory:Q_HISTORY, toolStates:_toolStates()
@@ -12997,6 +13006,7 @@ function _applySensColls(data,tombs){
   if(data.expenses)EXPENSES=_safeMerge(EXPENSES,data.expenses,'expenses');
   if(data.hr){HR=_safeMerge(HR,data.hr,'hr');try{_lsSet('fy_hr',JSON.stringify(HR),'人員薪資');}catch(e){_err('_applySensColls.hr',e);}}   // v5.433
   if(data.payslips){PAYSLIPS=_safeMerge(PAYSLIPS,data.payslips,'payslips');try{_lsSet('fy_payslips',JSON.stringify(PAYSLIPS),'薪資條');}catch(e){_err('_applySensColls.ps',e);}}
+  if(data.petty){PETTY=_safeMerge(PETTY,data.petty,'petty');try{_lsSet('fy_petty',JSON.stringify(PETTY),'零用金');}catch(e){_err('_applySensColls.pc',e);}}   // v5.434
   if(data.shareProfit){
     try{
       var _spc=data.shareProfit||{};
@@ -34594,7 +34604,7 @@ const ALL_PAGES = [
   // v5.330 sysOnly：只有「系統管理員」角色能開，其他角色的權限表上是鎖住的
   {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, sysOnly:true},
   {id:'staff',     label:'人員管理',  icon:_pgIcon('users'),    grp:'acct',  adminOnly:true},
-  {id:'payroll',   label:'人員薪資',  icon:_pgIcon('wallet'),   grp:'acct',  adminOnly:true}, // v5.433 基本資料／薪資設定／薪資條（fydata/private）
+  {id:'payroll',   label:'薪資．零用金',  icon:_pgIcon('wallet'),   grp:'acct',  adminOnly:true}, // v5.433 基本資料／薪資設定／薪資條（fydata/private）
   {id:'roles',     label:'角色權限',  icon:_pgIcon('lock'),     grp:'acct',  adminOnly:true, sysOnly:true},
   {id:'params',    label:'參數設定',  icon:_pgIcon('sliders'),  grp:'sys',   adminOnly:true, sysOnly:true},
 ];
@@ -35169,7 +35179,8 @@ function renderPayroll(){
   var TH='text-align:left;padding:6px 8px;font-size:11px;color:var(--b4);white-space:nowrap;background:var(--gl)';
   var sub=document.getElementById('pr-sub');
   var sm=_psSum(_psList(ym));
-  if(sub)sub.textContent='在職 '+people.filter(function(p){return p.active;}).length+' 人　'+_psYmText(ym)+'：實發 NT$'+fmt(sm.net)+'　公司負擔 NT$'+fmt(sm.coCost)+'　人事成本 NT$'+fmt(sm.total);
+  var pcs=_pcSum(_pcList(ym));
+  if(sub)sub.textContent='在職 '+people.filter(function(p){return p.active;}).length+' 人　'+_psYmText(ym)+'：實發 NT$'+fmt(sm.net)+'　公司負擔 NT$'+fmt(sm.coCost)+'　人事成本 NT$'+fmt(sm.total)+(pcs.n?('　零用金應付 NT$'+fmt(pcs.payout)):'');
   box.innerHTML=people.length?('<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>'
     +['姓名','職稱','計薪','月薪／日薪','電信津貼','勞保級距（公／個）','健保級距（公／個）','勞退','零用金定額','聯絡電話','緊急聯絡人','狀態','操作'].map(function(h){return '<th style="'+TH+'">'+h+'</th>';}).join('')
     +'</tr></thead><tbody>'
@@ -35195,6 +35206,7 @@ function renderPayroll(){
     }).join('')+'</tbody></table></div>')
     :'<div class="empty" style="padding:28px"><p>尚無人員——名冊在「人員管理」建立後會自動列在這裡；沒有登入帳號的員工按「＋ 新增人員」</p></div>';
   _psRenderTable(ym);
+  try{_pcRenderTable(ym);}catch(e){_err('renderPayroll.petty',e);}
   _hrRenderRates();
 }
 function _psRenderTable(ym){
@@ -35289,6 +35301,164 @@ function psExportXlsx(){
   [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20].forEach(function(c){var col=String.fromCharCode(65+c);tot[c]={f:'SUM('+col+'2:'+col+last+')',s:4};});
   rows.push(tot);
   xlsxDownload('薪資總表_'+ym.replace('-',''),[{name:'薪資總表',widths:[12,10,7,9,9,11,10,10,11,11,10,10,10,10,10,11,10,10,10,11,11,9,11,20],rows:rows}]);
+}
+// ══════════ 零用金（v5.434 Phase C）══════════
+// 員工支出先用公司給的零用金，用完才有代墊。支出來源＝日報．支出登錄的額外支出（q.costs type:'extra' 且 payer＝員工姓名），
+// 成本面已在專案成本裡，這裡只管「誰先付的錢」與每月結算：
+//   可用＝上月剩餘＋上月領取；支出＝當月該員工登錄合計；剩餘＝max(0,可用−支出)；代墊＝max(0,支出−可用)；
+//   補足＝定額−剩餘；本次應付＝補足＋代墊（付給員工後下月可用又回到定額）。
+// 結算單存 PETTY（private，本機 fy_petty）；定額取人員薪資設定 pettyQuota。
+var PETTY=[];
+try{var _pc0=localStorage.getItem('fy_petty');if(_pc0)PETTY=JSON.parse(_pc0)||[];}catch(e){_err('PETTY.load',e);}
+if(!Array.isArray(PETTY))PETTY=[];
+function savePetty(){_lsSet('fy_petty',JSON.stringify(PETTY),'零用金');try{_autoUpload();}catch(e){_err('savePetty',e);}}
+function _pcYmPrev(ym){var m=/^(\d{4})-(\d{2})$/.exec(ym||'');if(!m)return '';var y=+m[1],mo=+m[2]-1;if(mo<1){mo=12;y--;}return y+'-'+String(mo).padStart(2,'0');}
+// 某員工某月的支出明細（跨所有專案）
+function _pcItems(name,ym){
+  var out=[];if(!name)return out;
+  Q.forEach(function(q){
+    (q.costs||[]).forEach(function(c){
+      if(!c||c.type!=='extra'||String(c.payer||'')!==String(name))return;
+      if(String(c.date||'').slice(0,7)!==ym)return;
+      var d=(c.rows&&c.rows[0]&&c.rows[0].desc)||c.note||c.cat||'';
+      out.push({qid:q.id,proj:q.name||'',date:c.date||'',desc:d,cat:c.cat||'',amt:_hrNum(c.amt),cid:c.id});
+    });
+  });
+  return out.sort(function(a,b){return String(a.date).localeCompare(String(b.date));});
+}
+function _pcOf(hrId,ym){return PETTY.find(function(r){return r&&r.hrId===hrId&&r.ym===ym;})||null;}
+function _pcCalc(r){
+  r.quota=Math.round(_hrNum(r.quota));r.carry=Math.round(_hrNum(r.carry));r.draw=Math.round(_hrNum(r.draw));r.adj=Math.round(_hrNum(r.adj));
+  r.spent=Math.round((r.items||[]).reduce(function(a,it){return a+_hrNum(it.amt);},0)+r.adj);
+  var avail=r.carry+r.draw;
+  r.remain=Math.max(0,avail-r.spent);
+  r.advance=Math.max(0,r.spent-avail);
+  r.topup=Math.max(0,r.quota-r.remain);
+  r.payout=r.topup+r.advance;
+  return r;
+}
+// 依人員設定與支出建立／刷新某月結算（未發放者支出明細會重抓；已發放者鎖定）
+function _pcBuild(p,ym){
+  var h=p.h||{};var prev=_pcOf(p.id,_pcYmPrev(ym));
+  var r=_pcOf(p.id,ym);
+  if(!r){
+    r={id:'pc_'+p.id+'_'+ym,hrId:p.id,name:p.name,ym:ym,quota:_hrNum(h.pettyQuota),
+       carry:prev?prev.remain:0,draw:prev?prev.topup:_hrNum(h.pettyQuota),adj:0,items:[],status:'draft',paidDate:'',note:''};
+    PETTY.push(r);
+  }
+  if(r.status!=='paid'){
+    r.quota=_hrNum(h.pettyQuota);
+    if(prev){r.carry=prev.remain;r.draw=prev.topup;}
+    r.items=_pcItems(p.name,ym);
+    r.name=p.name;
+  }
+  _pcCalc(r);_touch(r);return r;
+}
+function pcGenerate(){
+  var ym=_psYm(),n=0;
+  _hrActive().forEach(function(p){
+    var has=_hrNum(p.h&&p.h.pettyQuota)>0||_pcItems(p.name,ym).length;
+    if(!has)return;_pcBuild(p,ym);n++;
+  });
+  savePetty();renderPayroll();
+  toast(n?('已更新 '+n+' 人零用金結算'):'沒有設定零用金定額、本月也沒有員工支出');
+}
+function _pcList(ym){return PETTY.filter(function(r){return r&&r.ym===ym;}).sort(function(a,b){return String(a.name).localeCompare(String(b.name),'zh-Hant');});}
+function pcUpd(id,k,val){
+  var r=PETTY.find(function(x){return x.id===id;});if(!r||r.status==='paid')return;
+  r[k]=(k==='note')?String(val||''):_hrNum(val);
+  _pcCalc(r);_touch(r);savePetty();_pcRenderTable(_psYm());
+}
+function pcPaid(id){
+  var r=PETTY.find(function(x){return x.id===id;});if(!r)return;
+  if(r.status==='paid'){r.status='draft';r.paidDate='';}else{r.status='paid';r.paidDate=localToday();}
+  _touch(r);savePetty();renderPayroll();
+}
+function pcDel(id){
+  var r=PETTY.find(function(x){return x.id===id;});if(!r)return;
+  showConfirm('刪除零用金結算','確定刪除 '+esc(r.name||'')+' '+esc(r.ym||'')+' 的結算？',function(){
+    _tomb('petty',id);PETTY=PETTY.filter(function(x){return x.id!==id;});savePetty();renderPayroll();
+  },true);
+}
+function _pcSum(list){var t={n:list.length,spent:0,remain:0,advance:0,topup:0,payout:0,paid:0};list.forEach(function(r){t.spent+=r.spent;t.remain+=r.remain;t.advance+=r.advance;t.topup+=r.topup;t.payout+=r.payout;if(r.status==='paid')t.paid++;});return t;}
+function _pcRenderTable(ym){
+  var box=document.getElementById('pr-petty');if(!box)return;
+  var list=_pcList(ym),sm=_pcSum(list);
+  var TD='padding:5px 6px;white-space:nowrap;border-bottom:1px solid var(--b1);text-align:right';
+  var TH='padding:6px 6px;font-size:11px;color:var(--b4);white-space:nowrap;background:var(--gl);text-align:right';
+  var IN='width:70px;font-size:12px;padding:3px 5px;border:1px solid var(--b2);border-radius:var(--r6);text-align:right;font-family:inherit';
+  var inp=function(r,k){return r.status==='paid'?fmt(r[k]):'<input type="number" inputmode="decimal" value="'+(r[k]||'')+'" placeholder="0" onchange="pcUpd(\''+escq(r.id)+'\',\''+k+'\',this.value)" style="'+IN+'">';};
+  if(!list.length){box.innerHTML='<div style="color:var(--b3);font-size:12.5px;padding:14px 4px">'+_psYmText(ym)+' 尚未結算——按「更新零用金結算」依各人定額與本月日報．支出自動計算</div>';return;}
+  box.innerHTML='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>'
+    +['姓名','定額','上月剩餘','上月領取','本月支出','調整','本月剩餘','代墊金額','補足金額','本次應付','狀態','操作'].map(function(h,i){return '<th style="'+TH+(i<1?';text-align:left':'')+'">'+h+'</th>';}).join('')
+    +'</tr></thead><tbody>'
+    +list.map(function(r){
+      return '<tr>'
+        +'<td style="'+TD+';text-align:left;font-weight:600">'+esc(r.name||'')+'</td>'
+        +'<td style="'+TD+'">'+fmt(r.quota)+'</td>'
+        +'<td style="'+TD+'">'+fmt(r.carry)+'</td>'
+        +'<td style="'+TD+'">'+inp(r,'draw')+'</td>'
+        +'<td style="'+TD+'"><a href="javascript:void(0)" onclick="pcDetail(\''+escq(r.id)+'\')" style="color:var(--g3);text-decoration:underline">'+fmt(r.spent)+'</a><span style="color:var(--b3);font-size:11px"> '+(r.items||[]).length+' 筆</span></td>'
+        +'<td style="'+TD+'">'+inp(r,'adj')+'</td>'
+        +'<td style="'+TD+'">'+fmt(r.remain)+'</td>'
+        +'<td style="'+TD+(r.advance?';color:#c62828;font-weight:700':'')+'">'+fmt(r.advance)+'</td>'
+        +'<td style="'+TD+'">'+fmt(r.topup)+'</td>'
+        +'<td style="'+TD+';font-weight:700;color:var(--g3)">'+fmt(r.payout)+'</td>'
+        +'<td style="'+TD+';text-align:center"><button type="button" class="btn btn-xs'+(r.status==='paid'?' btn-g':'')+'" onclick="pcPaid(\''+escq(r.id)+'\')">'+(r.status==='paid'?('已發放 '+esc(r.paidDate||'')):'未發放')+'</button></td>'
+        +'<td style="'+TD+';text-align:center"><button type="button" class="btn btn-xs" onclick="pcExportPDF(\''+escq(r.id)+'\')">結算單</button> <button type="button" class="btn btn-xs btn-r" onclick="pcDel(\''+escq(r.id)+'\')">刪除</button></td>'
+        +'</tr>';
+    }).join('')
+    +'<tr style="background:var(--gl);font-weight:700"><td style="'+TD+';text-align:left" colspan="4">合計 '+sm.n+' 人（已發放 '+sm.paid+'）</td><td style="'+TD+'">'+fmt(sm.spent)+'</td><td style="'+TD+'"></td><td style="'+TD+'">'+fmt(sm.remain)+'</td><td style="'+TD+'">'+fmt(sm.advance)+'</td><td style="'+TD+'">'+fmt(sm.topup)+'</td><td style="'+TD+';color:var(--g3)">'+fmt(sm.payout)+'</td><td colspan="2"></td></tr>'
+    +'</tbody></table></div>';
+}
+function pcDetail(id){
+  var r=PETTY.find(function(x){return x.id===id;});if(!r)return;
+  var body=(r.items||[]).length?('<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="text-align:left;padding:5px 6px;background:var(--gl)">日期</th><th style="text-align:left;padding:5px 6px;background:var(--gl)">專案</th><th style="text-align:left;padding:5px 6px;background:var(--gl)">項目</th><th style="text-align:right;padding:5px 6px;background:var(--gl)">金額</th></tr></thead><tbody>'
+    +r.items.map(function(it){return '<tr><td style="padding:5px 6px;border-bottom:1px solid var(--b1);white-space:nowrap">'+esc(it.date)+'</td><td style="padding:5px 6px;border-bottom:1px solid var(--b1)">'+esc(it.proj)+'</td><td style="padding:5px 6px;border-bottom:1px solid var(--b1)">'+esc(it.desc)+(it.cat?'<span style="color:var(--b3);font-size:11px"> '+esc(it.cat)+'</span>':'')+'</td><td style="padding:5px 6px;border-bottom:1px solid var(--b1);text-align:right">'+fmt(it.amt)+'</td></tr>';}).join('')
+    +'<tr style="font-weight:700"><td colspan="3" style="padding:5px 6px">合計</td><td style="padding:5px 6px;text-align:right">'+fmt(r.spent-r.adj)+'</td></tr></tbody></table>'):'<div style="color:var(--b3);font-size:12.5px">本月沒有登錄支出</div>';
+  showConfirm(esc(r.name||'')+'　'+_psYmText(r.ym)+' 零用金支出明細',body,function(){},false,null,true);
+}
+function _pcDocHtml(r){
+  var items=(r.items||[]);
+  return '<h2>零用金結算單 <span class="sub">'+_xlEsc(_psYmText(r.ym))+'　'+_xlEsc(r.name||'')+(r.status==='paid'?('　發放日 '+_xlEsc(r.paidDate||'')):'')+'</span></h2>'
+    +'<table><thead><tr><th>定額</th><th>上月剩餘</th><th>上月領取</th><th>本月支出</th><th>本月剩餘</th><th>代墊金額</th><th>補足金額</th><th>本次應付</th></tr></thead><tbody>'
+    +'<tr><td class="r">'+fmt(r.quota)+'</td><td class="r">'+fmt(r.carry)+'</td><td class="r">'+fmt(r.draw)+'</td><td class="r">'+fmt(r.spent)+'</td><td class="r">'+fmt(r.remain)+'</td><td class="r">'+fmt(r.advance)+'</td><td class="r">'+fmt(r.topup)+'</td><td class="r"><b>'+fmt(r.payout)+'</b></td></tr></tbody></table>'
+    +'<table><thead><tr><th style="width:70px">日期</th><th style="width:26%">專案</th><th>項目</th><th style="width:70px">類別</th><th style="width:80px">金額</th></tr></thead><tbody>'
+    +(items.length?items.map(function(it){return '<tr><td>'+_xlEsc(it.date)+'</td><td class="l">'+_xlEsc(it.proj)+'</td><td class="l">'+_xlEsc(it.desc)+'</td><td>'+_xlEsc(it.cat)+'</td><td class="r">'+fmt(it.amt)+'</td></tr>';}).join(''):'<tr><td colspan="5">本月無支出</td></tr>')
+    +(r.adj?('<tr><td></td><td class="l" colspan="3">調整'+(r.note?('（'+_xlEsc(r.note)+'）'):'')+'</td><td class="r">'+fmt(r.adj)+'</td></tr>'):'')
+    +'<tr class="tt"><td class="l" colspan="4">支出合計</td><td class="r">'+fmt(r.spent)+'</td></tr>'
+    +'<tr><td class="l" colspan="5" style="color:#555;font-size:9.5px">代墊＝支出超過可用零用金（上月剩餘＋上月領取）的部分；補足＝回到定額所需金額。　員工簽收：____________　核准：____________</td></tr>'
+    +'</tbody></table>';
+}
+function pcExportPDF(id){
+  var r=PETTY.find(function(x){return x.id===id;});if(!r)return;
+  _toolPrint('零用金結算單',null,_pcDocHtml(r),{fname:'零用金結算單_'+(r.name||'')+'_'+String(r.ym||'').replace('-','')});
+}
+function pcExportAllPDF(){
+  var ym=_psYm(),list=_pcList(ym);if(!list.length){toast('本月尚無零用金結算');return;}
+  var sm=_pcSum(list);
+  var body='<div class="cond">'+_xlEsc(_psYmText(ym))+'　共 '+sm.n+' 人　本次應付合計 NT$'+fmt(sm.payout)+'（補足 '+fmt(sm.topup)+'＋代墊 '+fmt(sm.advance)+'）</div>'
+    +'<table><thead><tr><th>姓名</th><th>定額</th><th>上月剩餘</th><th>上月領取</th><th>本月支出</th><th>本月剩餘</th><th>代墊</th><th>補足</th><th>本次應付</th><th>狀態</th></tr></thead><tbody>'
+    +list.map(function(r){return '<tr><td class="l">'+_xlEsc(r.name||'')+'</td><td class="r">'+fmt(r.quota)+'</td><td class="r">'+fmt(r.carry)+'</td><td class="r">'+fmt(r.draw)+'</td><td class="r">'+fmt(r.spent)+'</td><td class="r">'+fmt(r.remain)+'</td><td class="r">'+fmt(r.advance)+'</td><td class="r">'+fmt(r.topup)+'</td><td class="r"><b>'+fmt(r.payout)+'</b></td><td>'+(r.status==='paid'?('已發 '+_xlEsc(r.paidDate||'')):'未發')+'</td></tr>';}).join('')
+    +'<tr class="tt"><td class="l">合計</td><td></td><td></td><td></td><td class="r">'+fmt(sm.spent)+'</td><td class="r">'+fmt(sm.remain)+'</td><td class="r">'+fmt(sm.advance)+'</td><td class="r">'+fmt(sm.topup)+'</td><td class="r">'+fmt(sm.payout)+'</td><td></td></tr></tbody></table>'
+    +list.map(_pcDocHtml).join('');
+  _toolPrint('零用金結算',null,body,{fname:'零用金結算_'+ym.replace('-','')});
+}
+function pcExportXlsx(){
+  var ym=_psYm(),list=_pcList(ym);if(!list.length){toast('本月尚無零用金結算');return;}
+  var H=['姓名','定額','上月剩餘','上月領取','本月支出','調整','本月剩餘','代墊金額','補足金額','本次應付','狀態','發放日','備註'];
+  var rows=[H.map(function(x){return {v:x,s:2};})];
+  list.forEach(function(r,i){var n=i+2;
+    rows.push([{v:r.name||'',s:3},{v:r.quota,s:3},{v:r.carry,s:3},{v:r.draw,s:3},{v:r.spent-r.adj,s:3},{v:r.adj,s:3},
+      {f:'MAX(0,C'+n+'+D'+n+'-E'+n+'-F'+n+')',s:3},{f:'MAX(0,E'+n+'+F'+n+'-C'+n+'-D'+n+')',s:3},{f:'MAX(0,B'+n+'-G'+n+')',s:3},{f:'H'+n+'+I'+n,s:3},
+      {v:r.status==='paid'?'已發放':'未發放',s:3},{v:r.paidDate||'',s:3},{v:r.note||'',s:3}]);
+  });
+  var last=list.length+1,tot=H.map(function(){return {v:'',s:4};});tot[0]={v:'合計',s:4};
+  [1,2,3,4,5,6,7,8,9].forEach(function(c){var col=String.fromCharCode(65+c);tot[c]={f:'SUM('+col+'2:'+col+last+')',s:4};});
+  rows.push(tot);
+  var det=[['姓名','日期','專案','項目','類別','金額'].map(function(x){return {v:x,s:2};})];
+  list.forEach(function(r){(r.items||[]).forEach(function(it){det.push([{v:r.name||'',s:3},{v:it.date,s:3},{v:it.proj,s:3},{v:it.desc,s:3},{v:it.cat,s:3},{v:it.amt,s:3}]);});});
+  xlsxDownload('零用金結算_'+ym.replace('-',''),[{name:'零用金結算',widths:[12,10,10,10,10,8,10,10,10,10,9,11,20],rows:rows},{name:'支出明細',widths:[12,11,26,30,10,10],rows:det}]);
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

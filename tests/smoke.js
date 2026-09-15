@@ -2445,6 +2445,63 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.434 零用金結算 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      HR.length = 0; PAYSLIPS.length = 0; PETTY.length = 0;
+      HR.push({ id: 'hrP', name: '王小明', payType: 'month', base: 30000, pettyQuota: 5000, active: true, _mt: 1 });
+      HR.push({ id: 'hrQ', name: '李大同', payType: 'day', base: 2000, pettyQuota: 0, active: true, _mt: 1 });
+      Q.push({ id: 'tq434a', name: '甲案', items: [], costs: [
+        { id: 'c1', type: 'extra', vendor: '公司支出（自付）', cat: '油資', date: '2026-09-03', amt: 1200, payer: '王小明', rows: [{ desc: '加油' }] },
+        { id: 'c2', type: 'extra', vendor: '公司支出（自付）', cat: '其他', date: '2026-09-20', amt: 4500, payer: '王小明', rows: [{ desc: '五金' }] },
+        { id: 'c3', type: 'extra', vendor: '公司支出（自付）', cat: '其他', date: '2026-08-28', amt: 800, payer: '王小明', rows: [{ desc: '上月的' }] },
+        { id: 'c4', type: 'extra', vendor: '公司支出（自付）', cat: '油資', date: '2026-09-10', amt: 300, payer: '', rows: [{ desc: '公司付' }] }] });
+      Q.push({ id: 'tq434b', name: '乙案', items: [], costs: [
+        { id: 'c5', type: 'extra', vendor: '公司支出（自付）', cat: 'ETC', date: '2026-09-15', amt: 600, payer: '王小明', rows: [{ desc: '過路費' }] },
+        { id: 'c6', type: 'extra', vendor: '公司支出（自付）', cat: '油資', date: '2026-09-16', amt: 900, payer: '李大同', rows: [{ desc: '加油' }] }] });
+      go('payroll'); document.getElementById('pr-ym').value = '2026-09';
+      // 明細跨專案、只取當月、只取該員工
+      const items = _pcItems('王小明', '2026-09');
+      out.items = items.length === 3 && items.map(i => i.proj).join() === '甲案,乙案,甲案' && items.reduce((a, i) => a + i.amt, 0) === 6300;
+      pcGenerate();
+      const w = _pcOf('hrP', '2026-09'), l = _pcOf('hrQ', '2026-09');
+      // 首月：上月剩餘 0、領取＝定額 5000；支出 6300 → 剩餘 0、代墊 1300、補足 5000、應付 6300
+      out.calc = !!w && w.carry === 0 && w.draw === 5000 && w.spent === 6300 && w.remain === 0 && w.advance === 1300 && w.topup === 5000 && w.payout === 6300;
+      // 沒定額但有支出者也列（全部代墊）
+      out.noQuota = !!l && l.quota === 0 && l.spent === 900 && l.advance === 900 && l.payout === 900;
+      // 調整欄與發放鎖定
+      pcUpd(w.id, 'adj', -300); out.adj = w.spent === 6000 && w.advance === 1000 && w.payout === 6000;
+      pcPaid(w.id); out.paid = w.status === 'paid' && !!w.paidDate;
+      // 次月：上月剩餘＝0、上月領取＝上月補足 5000；本月無支出 → 剩餘 5000、補足 0
+      document.getElementById('pr-ym').value = '2026-10'; pcGenerate();
+      const w2 = _pcOf('hrP', '2026-10');
+      out.next = !!w2 && w2.carry === 0 && w2.draw === 5000 && w2.spent === 0 && w2.remain === 5000 && w2.topup === 0 && w2.payout === 0;
+      out.tbl = document.querySelectorAll('#pr-petty tbody tr').length === 2 && /零用金應付/.test(document.getElementById('pr-sub').textContent);
+      // 明細視窗帶專案
+      pcDetail(w.id); out.detail = /甲案/.test(document.getElementById('gen-confirm-modal').innerHTML) && /乙案/.test(document.getElementById('gen-confirm-modal').innerHTML);
+      document.getElementById('gen-confirm-ok').click();
+      // 匯出
+      document.getElementById('pr-ym').value = '2026-09';
+      const printed = []; const orig = _printViaIframe;
+      window._printViaIframe = function (html, fname, land) { printed.push({ fname, proj: /甲案/.test(html) && /乙案/.test(html), adv: /代墊/.test(html), tot: /6,000/.test(html) }); };
+      pcExportPDF(w.id); pcExportAllPDF(); window._printViaIframe = orig;
+      out.pdf = printed.length === 2 && printed[0].proj && printed[0].adv && printed[0].tot && /零用金結算單_王小明_202609/.test(printed[0].fname);
+      let xl = null; const ox = xlsxDownload; window.xlsxDownload = function (fn, sh) { xl = { n: sh.length, rows: sh[0].rows.length, f: sh[0].rows[1][9].f, det: sh[1].rows.length }; }; pcExportXlsx(); window.xlsxDownload = ox;
+      out.xlsx = !!xl && xl.n === 2 && xl.rows === 4 && xl.f === 'H2+I2' && xl.det === 5;   // 明細：表頭＋王 3 筆＋李 1 筆
+      // 同步：petty 走 private
+      out.priv = _PRIV_COLLS.indexOf('petty') >= 0 && _privatePayload().data.petty.length === 3 && !('petty' in _sharedPayload().data) && !!_syncPayload().data.petty;
+      HR.length = 0; PAYSLIPS.length = 0; PETTY.length = 0; Q = Q.filter(x => !/^tq434/.test(x.id));
+      return out;
+    });
+    check('零用金：支出明細跨專案只取當月該員工', r.items);
+    check('零用金結算：定額／上月剩餘／領取／支出／剩餘／代墊／補足／應付口徑，次月接續', r.calc && r.noQuota && r.adj && r.paid && r.next && r.tbl && r.detail);
+    check('零用金匯出：結算單 PDF 帶專案明細、Excel 兩張表活公式；petty 走 private', r.pdf && r.xlsx && r.priv);
+    check('v5.434 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
