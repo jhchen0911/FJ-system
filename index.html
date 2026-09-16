@@ -2745,7 +2745,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.439';
+var APP_VERSION='v5.440';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -36179,8 +36179,9 @@ function wkFillOwnerForm(){
   var opts=WORKERS.filter(function(w){return w&&w.status!=='left';}).map(function(w){return '<label style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--b2);border-radius:99px;padding:3px 10px;font-size:12.5px;cursor:pointer"><input type="checkbox" class="wkof-w" value="'+escq(w.id)+'"> '+esc(w.name||'')+'</label>';}).join(' ');
   var tpls=Object.keys(P.wkTpl||{});
   showConfirm('業主表格自動填入',
-    '<div style="font-size:12.5px;color:var(--b4);margin-bottom:8px">選業主給的空白表（.xlsx／.docx 會直接填進原檔並保留版面；圖片／PDF 給填表對照清單）</div>'
-    +'<div class="f"><label>業主表格檔</label><input type="file" id="wkof-file" accept=".xlsx,.docx,image/*,application/pdf" style="font-size:12.5px"></div>'
+    '<div style="font-size:12.5px;color:var(--b4);margin-bottom:8px">選業主給的空白表（.xlsx／.docx 會直接填進原檔並保留版面；圖片給填表對照清單）</div>'
+    +'<div class="f"><label>業主表格檔</label><input type="file" id="wkof-file" accept=".xlsx,.docx,.xls,.doc,image/*,application/pdf" style="font-size:12.5px"></div>'
+    +'<div style="font-size:11px;color:var(--b3);margin-top:4px">業主給的是舊版 .xls／.doc？用 Excel／Word 開啟 → 檔案 → 另存新檔 → 類型選「Excel 活頁簿 (*.xlsx)」或「Word 文件 (*.docx)」再上傳，版面不會變。PDF 請先轉成 xlsx／docx 或截圖成圖片。</div>'
     +'<div class="f" style="margin-top:8px"><label>要填入的人員（單人表選 1 位；名冊表可多選）</label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">'+opts+'</div></div>'
     +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;margin-top:8px"><input type="checkbox" id="wkof-fresh"> 重新分析（不用記住的對應）</label>'
     +(tpls.length?'<div style="font-size:11px;color:var(--b3);margin-top:6px">已記住 '+tpls.length+' 份範本：'+tpls.map(function(k){return esc(k.split('|')[0]);}).join('、')+'</div>':''),
@@ -36196,6 +36197,13 @@ function wkFillOwnerForm(){
 async function _wkOFStart(f,ids,fresh){
   var workers=ids.map(_wkById).filter(Boolean);
   var ext=(f.name.match(/\.([a-z0-9]+)$/i)||['',''])[1].toLowerCase();
+  if(ext==='xls'||ext==='doc'){   // v5.440 舊版二進位格式讀不了，講清楚怎麼轉
+    showConfirm('請先另存成新版格式','<div style="font-size:13px;line-height:1.7">「'+esc(f.name)+'」是舊版 '+ext.toUpperCase()+' 格式，系統無法直接讀取。<br><br>'
+      +'請用 '+(ext==='xls'?'Excel':'Word')+' 開啟這個檔 → <b>檔案 → 另存新檔</b> → 檔案類型選「<b>'+(ext==='xls'?'Excel 活頁簿 (*.xlsx)':'Word 文件 (*.docx)')+'</b>」→ 存檔後再上傳。<br>'
+      +'<span style="color:var(--b3);font-size:12px">另存不會改變版面與格式，業主收到的還是同一張表。</span></div>',function(){wkFillOwnerForm();},false,null,false);
+    return;
+  }
+  if(ext==='pdf'){showConfirm('PDF 無法直接填入','<div style="font-size:13px;line-height:1.7">PDF 表格系統寫不進去。請向業主要 Excel／Word 原檔，或把 PDF 截圖成圖片上傳，系統會給「填表對照清單」讓你逐格複製。</div>',function(){wkFillOwnerForm();},false,null,false);return;}
   try{
     if(ext==='xlsx'||ext==='docx'){
       toast('讀取範本中…');
