@@ -2773,6 +2773,21 @@ async function newPage(browser, width, height) {
     check('業主表格：zip 讀寫往返、xlsx 儲存格列出與寫入（改格／插格／新列、欄序）', r.zip && r.parse && r.xw && r.xorder && r.rezip);
     check('業主表格：docx 表格格補值與底線佔位取代；欄位值（民國日期、同上地址、證照）', r.dparse && r.dw && r.val);
     check('業主表格：AI 對應→填入下載、範本記憶、名冊型多列填入、頁面入口', r.ai && r.gen && r.tpl && r.roster && r.btn && r.modal);
+    // v5.440 舊版 .xls／.doc 與 PDF：明確說明怎麼轉，不進解析流程
+    const r2 = await page.evaluate(async () => {
+      const out = {};
+      WORKERS.push({ id: 'wkX', name: '測', status: 'active', docs: {}, certs: [], _mt: 1 });
+      await _wkOFStart({ name: '進場表.xls', size: 5, arrayBuffer: async () => { throw new Error('不該讀'); } }, ['wkX'], false);
+      const m = document.getElementById('gen-confirm-modal').innerHTML;
+      out.xls = /另存成新版格式/.test(m) && /Excel 活頁簿 \(\*\.xlsx\)/.test(m) && /進場表\.xls/.test(m);
+      await _wkOFStart({ name: '表.doc', size: 5, arrayBuffer: async () => { throw new Error('不該讀'); } }, ['wkX'], false);
+      out.doc = /Word 文件 \(\*\.docx\)/.test(document.getElementById('gen-confirm-modal').innerHTML);
+      await _wkOFStart({ name: '表.pdf', size: 5, arrayBuffer: async () => { throw new Error('不該讀'); } }, ['wkX'], false);
+      out.pdf = /PDF 無法直接填入/.test(document.getElementById('gen-confirm-modal').innerHTML);
+      out.accept = /accept="\.xlsx,\.docx,\.xls,\.doc/.test((wkFillOwnerForm(), document.getElementById('gen-confirm-modal').innerHTML)) && /另存新檔/.test(document.getElementById('gen-confirm-modal').innerHTML);
+      WORKERS.length = 0; return out;
+    });
+    check('業主表格：舊版 .xls／.doc 與 PDF 給明確轉檔說明', r2.xls && r2.doc && r2.pdf && r2.accept);
     check('v5.439 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
