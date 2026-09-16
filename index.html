@@ -1234,6 +1234,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div class="ph">
     <div class="ph-l"><div class="ph-t">人員進場資料</div><div class="ph-s" id="wk-sub">在職 0 人</div></div>
     <div class="ph-r" style="display:flex;gap:6px;flex-wrap:wrap">
+      <button type="button" class="btn btn-sm" onclick="wkFillOwnerForm()" title="讀業主給的 xlsx／docx 空白表，AI 判斷欄位位置後直接填進原檔下載；同一份範本會記住對應" style="border-color:var(--gm);color:var(--g3)">業主表格自動填入</button>
       <button type="button" class="btn btn-sm" onclick="wkExportXlsx()">匯出名冊 Excel</button>
       <button type="button" class="btn btn-sm" onclick="wkPrintAll()">列印全部資料表</button>
       <button type="button" class="btn btn-sm btn-g" onclick="wkEdit('')">＋ 新增人員</button>
@@ -2744,7 +2745,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.438';
+var APP_VERSION='v5.439';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -35997,6 +35998,275 @@ function wkExportXlsx(){
       w.certs.map(function(c){return (c.name||'')+(c.exp?('（'+c.exp+'）'):'');}).join('、'),_wkDocCount(w)+'/'+_WK_DOCS.length,w.memo].map(function(v){return {v:v==null?'':String(v),s:3};}));
   });
   xlsxDownload('人員名冊_'+localToday().replace(/-/g,''),[{name:'人員名冊',widths:[10,6,13,12,6,13,36,36,10,8,13,14,12,7,12,12,12,30,9,20],rows:rows}]);
+}
+// ══════════ 業主表格自動填入（v5.439）══════════
+// 每家業主的進場申請表都不一樣：讀進業主給的 .xlsx／.docx 空白表 → 列出儲存格／段落文字 →
+// AI 判斷「哪一格該填哪個欄位」→ 直接寫進原檔（版面、字型、框線都保留）→ 下載。
+// 同一份範本（檔名＋大小）的對應記在 P.wkTpl，下次直接套用不再問 AI；對應可在預覽視窗手動修正。
+// 圖片／PDF 範本無法直接寫入：AI 讀出欄位後給「填表對照清單」供逐格複製。
+// 名冊型（一列一人）範本：選多位人員，從第一資料列往下填。
+
+// ── zip 讀取（store／deflate；用瀏覽器 DecompressionStream）──
+async function _zipRead(buf){
+  var u8=new Uint8Array(buf),dv=new DataView(buf),td=new TextDecoder();
+  var eocd=-1;for(var i=u8.length-22;i>=0&&i>=u8.length-70000;i--){if(dv.getUint32(i,true)===0x06054b50){eocd=i;break;}}
+  if(eocd<0)throw new Error('不是 zip 格式（xlsx／docx）');
+  var n=dv.getUint16(eocd+10,true),p=dv.getUint32(eocd+16,true),out={};
+  for(var k=0;k<n;k++){
+    if(dv.getUint32(p,true)!==0x02014b50)break;
+    var method=dv.getUint16(p+10,true),csz=dv.getUint32(p+20,true);
+    var nl=dv.getUint16(p+28,true),el=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true);
+    var name=td.decode(u8.subarray(p+46,p+46+nl));
+    var lnl=dv.getUint16(lo+26,true),lel=dv.getUint16(lo+28,true);
+    var start=lo+30+lnl+lel,data=u8.subarray(start,start+csz);
+    if(method===8){
+      var ab=await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();
+      out[name]=new Uint8Array(ab);
+    }else if(method===0){out[name]=new Uint8Array(data);}
+    else throw new Error('不支援的壓縮方式 '+method);
+    p+=46+nl+el+cl;
+  }
+  return out;
+}
+function _zipWrite(files){   // {name:Uint8Array} → Uint8Array（store）
+  return _zipStore(Object.keys(files).map(function(n){return {name:n,data:files[n]};}));
+}
+function _xmlUnesc(s){return String(s||'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&#(\d+);/g,function(m,d){return String.fromCharCode(+d);}).replace(/&amp;/g,'&');}
+function _xlColNum(col){var n=0;for(var i=0;i<col.length;i++)n=n*26+(col.charCodeAt(i)-64);return n;}
+// ── xlsx：列出有文字的儲存格 ──
+function _xlsxParse(files){
+  var td=new TextDecoder(),x=function(n){return files[n]?td.decode(files[n]):'';};
+  var ss=[];x('xl/sharedStrings.xml').replace(/<si>([\s\S]*?)<\/si>/g,function(m,inner){ss.push(_xmlUnesc((inner.match(/<t[^>]*>([\s\S]*?)<\/t>/g)||[]).map(function(t){return t.replace(/<[^>]+>/g,'');}).join('')));return '';});
+  var relMap={};x('xl/_rels/workbook.xml.rels').replace(/<Relationship\b[^>]*>/g,function(tag){var id=(tag.match(/\bId="([^"]+)"/)||[])[1],t=(tag.match(/\bTarget="([^"]+)"/)||[])[1];if(id&&t)relMap[id]=t;return '';});
+  var sheets=[];x('xl/workbook.xml').replace(/<sheet\b[^>]*>/g,function(tag){var nm=(tag.match(/\bname="([^"]*)"/)||[])[1]||'',rid=(tag.match(/\br:id="([^"]*)"/)||[])[1];var t=relMap[rid]||'';if(!t)return '';t=t.replace(/^\//,'');if(!/^xl\//.test(t))t='xl/'+t;sheets.push({name:_xmlUnesc(nm),file:t});return '';});
+  var cells=[];
+  sheets.forEach(function(sh){
+    var xml=x(sh.file);if(!xml)return;
+    xml.replace(/<c r="([A-Z]+\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g,function(m,addr,attrs,inner){
+      var t=(attrs.match(/\bt="([^"]+)"/)||[])[1],v='';
+      if(inner){var isv=inner.match(/<is>([\s\S]*?)<\/is>/),vv=inner.match(/<v>([\s\S]*?)<\/v>/);
+        if(t==='s'&&vv)v=ss[parseInt(vv[1])]||'';else if(t==='inlineStr'&&isv)v=isv[1].replace(/<[^>]+>/g,'');else if(vv)v=vv[1];}
+      v=_xmlUnesc(v).trim();if(v!=='')cells.push({sheet:sh.name,cell:addr,text:v});return '';
+    });
+  });
+  return {sheets:sheets,cells:cells};
+}
+// 寫一格（保留樣式 s；沒有那格／那列就依序插入）
+function _xlsxSetCell(xml,addr,value){
+  var m=addr.match(/^([A-Z]+)(\d+)$/);if(!m)return xml;
+  var col=m[1],row=parseInt(m[2]),val=_xlEsc(String(value==null?'':value));
+  var cellRe=new RegExp('<c r="'+addr+'"([^>]*?)(?:/>|>[\\s\\S]*?</c>)');
+  var cm=xml.match(cellRe);
+  if(cm){var attrs=cm[1].replace(/\s+t="[^"]*"/,'');return xml.replace(cellRe,'<c r="'+addr+'"'+attrs+' t="inlineStr"><is><t xml:space="preserve">'+val+'</t></is></c>');}
+  var cellXml='<c r="'+addr+'" t="inlineStr"><is><t xml:space="preserve">'+val+'</t></is></c>';
+  var rowRe=new RegExp('<row r="'+row+'"([^>]*?)(?:/>|>([\\s\\S]*?)</row>)');
+  var rm=xml.match(rowRe);
+  if(rm){
+    var parts=(rm[2]||'').match(/<c r="[A-Z]+\d+"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g)||[],cn=_xlColNum(col),idx=parts.length;
+    for(var i=0;i<parts.length;i++){if(_xlColNum(parts[i].match(/<c r="([A-Z]+)/)[1])>cn){idx=i;break;}}
+    parts.splice(idx,0,cellXml);
+    return xml.replace(rowRe,'<row r="'+row+'"'+(rm[1]||'').replace(/\s+spans="[^"]*"/,'')+'>'+parts.join('')+'</row>');
+  }
+  var rows=[];xml.replace(/<row r="(\d+)"/g,function(m2,r){rows.push(parseInt(r));return '';});
+  var newRow='<row r="'+row+'">'+cellXml+'</row>',after=null;
+  for(var j=0;j<rows.length;j++){if(rows[j]>row){after=rows[j];break;}}
+  if(after!=null)return xml.replace(new RegExp('<row r="'+after+'"'),newRow+'<row r="'+after+'"');
+  if(/<\/sheetData>/.test(xml))return xml.replace('</sheetData>',newRow+'</sheetData>');
+  return xml.replace(/<sheetData\s*\/>/,'<sheetData>'+newRow+'</sheetData>');
+}
+function _xlsxApply(files,sheets,writes){   // writes: [{sheet,cell,value}]
+  var td=new TextDecoder(),te=new TextEncoder(),byFile={};
+  writes.forEach(function(w){var sh=sheets.find(function(s){return s.name===w.sheet;})||sheets[0];if(!sh)return;(byFile[sh.file]=byFile[sh.file]||[]).push(w);});
+  Object.keys(byFile).forEach(function(f){
+    var xml=td.decode(files[f]||new Uint8Array());
+    byFile[f].forEach(function(w){xml=_xlsxSetCell(xml,w.cell,w.value);});
+    files[f]=te.encode(xml);
+  });
+  return files;
+}
+// ── docx：表格儲存格與段落 ──
+function _docxText(frag){return _xmlUnesc((frag.match(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g)||[]).map(function(t){return t.replace(/<[^>]+>/g,'');}).join('')).trim();}
+function _docxParse(files){
+  var xml=new TextDecoder().decode(files['word/document.xml']||new Uint8Array()),items=[];
+  var re=/<w:tc\b[\s\S]*?<\/w:tc>/g,mm;
+  while((mm=re.exec(xml))){items.push({i:items.length,kind:'tc',off:mm.index,len:mm[0].length,text:_docxText(mm[0])});}
+  var pre=/<w:p\b[\s\S]*?<\/w:p>/g,pm;
+  while((pm=pre.exec(xml))){
+    var inTc=items.some(function(it){return it.kind==='tc'&&pm.index>=it.off&&pm.index<it.off+it.len;});
+    if(inTc)continue;
+    var t=_docxText(pm[0]);if(!t)continue;
+    items.push({i:items.length,kind:'p',off:pm.index,len:pm[0].length,text:t});
+  }
+  return {xml:xml,items:items};
+}
+function _docxFill(frag,value){   // 在儲存格／段落的第一個段落尾端補一個 run（沿用第一個 rPr）；段落含底線佔位則直接取代
+  var val=_xlEsc(String(value==null?'':value));
+  var blank=/(＿{2,}|_{3,}|_{2,}\s|　{3,})/;
+  if(blank.test(frag)){var done=false;frag=frag.replace(/<w:t\b([^>]*)>([\s\S]*?)<\/w:t>/g,function(m,a,t){if(done||!blank.test(t))return m;done=true;return '<w:t xml:space="preserve">'+t.replace(blank,val)+'</w:t>';});if(done)return frag;}
+  var rpr=(frag.match(/<w:rPr>[\s\S]*?<\/w:rPr>/)||[''])[0];
+  var run='<w:r>'+rpr+'<w:t xml:space="preserve">'+val+'</w:t></w:r>';
+  var pEnd=frag.indexOf('</w:p>');
+  if(pEnd<0)return frag;
+  return frag.slice(0,pEnd)+run+frag.slice(pEnd);
+}
+function _docxApply(files,parsed,writes){   // writes: [{i,value}]
+  var xml=parsed.xml,items=parsed.items;
+  writes.slice().sort(function(a,b){return items[b.i].off-items[a.i].off;}).forEach(function(w){
+    var it=items[w.i];if(!it)return;
+    var frag=xml.substr(it.off,it.len);
+    xml=xml.slice(0,it.off)+_docxFill(frag,w.value)+xml.slice(it.off+it.len);
+  });
+  files['word/document.xml']=new TextEncoder().encode(xml);
+  return files;
+}
+// ── 可填欄位 ──
+var _WK_FILL_FIELDS=[
+  ['name','姓名'],['sex','性別'],['idNo','身分證字號'],['birth','出生日期（西元 YYYY-MM-DD）'],['birthRoc','出生日期（民國 yy/mm/dd）'],['birthY','出生年（西元）'],['birthM','出生月'],['birthD','出生日'],
+  ['blood','血型'],['phone','聯絡電話'],['regAddr','戶籍地址'],['mailAddr','通訊地址'],['emg','緊急聯絡人'],['emgRel','與緊急聯絡人關係'],['emgPhone','緊急聯絡電話'],
+  ['company','所屬公司'],['title','工種／職稱'],['oshExp','職安卡有效期限'],['healthExp','體檢有效期限'],['drugExp','藥檢有效期限'],['certs','證照名稱（頓號分隔）'],
+  ['today','填表日期（西元）'],['todayRoc','填表日期（民國）'],['ownerCo','公司名稱（豐有工程）']];
+function _wkFieldValue(w,f){
+  w=_wkNorm(w);var roc=function(d){var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||'');return m?((+m[1]-1911)+'/'+m[2]+'/'+m[3]):(d||'');};
+  var ex=function(k){return (w.docs[k]&&w.docs[k].exp)||'';};
+  switch(f){
+    case 'birthRoc':return roc(w.birth);case 'birthY':return (w.birth||'').slice(0,4);case 'birthM':return String(parseInt((w.birth||'').slice(5,7))||'');case 'birthD':return String(parseInt((w.birth||'').slice(8,10))||'');
+    case 'mailAddr':return _wkMailAddr(w);case 'oshExp':return ex('oshF');case 'healthExp':return ex('health');case 'drugExp':return ex('drug');
+    case 'certs':return w.certs.map(function(c){return c.name||'';}).filter(Boolean).join('、');
+    case 'today':return localToday();case 'todayRoc':return roc(localToday());case 'ownerCo':return P.company||'豐有工程有限公司';
+    default:return w[f]==null?'':String(w[f]);
+  }
+}
+// ── 範本記憶 ──
+function _wkTplKey(f){return (f.name||'')+'|'+(f.size||0);}
+function _wkTplGet(key){return ((P.wkTpl||{})[key])||null;}
+function _wkTplSave(key,map,label){if(!P.wkTpl)P.wkTpl={};P.wkTpl[key]={map:map,label:label||'',ts:Date.now()};try{persistP();}catch(e){_err('_wkTplSave',e);}try{_onSave();}catch(e){_err('_wkTplSave',e);}}
+// ── AI 對應 ──
+async function _wkAiMap(kind,entries){
+  if(!_aiKey())throw new Error('請先到參數設定填入 AI 金鑰');
+  var fields=_WK_FILL_FIELDS.map(function(f){return f[0]+'='+f[1];}).join('；');
+  var list=entries.slice(0,400).map(function(e){return kind==='xlsx'?('['+e.sheet+'!'+e.cell+'] '+e.text.slice(0,40)):('['+e.i+':'+e.kind+'] '+e.text.slice(0,60));}).join('\n');
+  var prompt='這是台灣營建業主給協力廠商的「人員進場申請／名冊」空白表格，我列出'+(kind==='xlsx'?'有文字的儲存格（[工作表!位址] 文字）':'表格儲存格（[序號:tc]）與段落（[序號:p]）的文字')+'。\n'
+    +'可填的欄位代碼：'+fields+'。\n'
+    +'請判斷每個標籤旁「該填資料的位置」：'+(kind==='xlsx'?'通常是標籤右邊或下面的空格（例如標籤在 B3，填 C3）。':'表格通常填在標籤的下一格（序號＋1）；段落若含「姓名：＿＿＿」這類底線佔位，填在該段落本身。')+'\n'
+    +'同時判斷表格是「single」（一張表一個人）或「roster」（名冊，一列一人）。roster 時給第一資料列'+(kind==='xlsx'?'的列號與各欄位的欄字母':'第一格的 tc 序號、每列格數、各格對應欄位（無資料填 ""）')+'。\n'
+    +'只回傳 JSON，第一個字元必須是 {：\n'
+    +(kind==='xlsx'
+      ?'{"mode":"single|roster","targets":[{"sheet":"工作表1","cell":"C3","field":"name","label":"姓名"}],"roster":{"sheet":"工作表1","firstRow":5,"cols":{"name":"B","idNo":"C"}}}'
+      :'{"mode":"single|roster","targets":[{"i":12,"field":"name","label":"姓名"}],"roster":{"start":30,"cols":6,"fields":["","name","idNo","birth","phone",""]}}')
+    +'\n不確定或表格上沒有的欄位不要硬填。\n\n'+list;
+  var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+    headers:{'content-type':'application/json','x-api-key':_aiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-sonnet-5',max_tokens:1500,messages:[{role:'user',content:[{type:'text',text:prompt}]}]})});
+  var d=await r.json();
+  if(d.error)throw new Error(d.error.message||'AI 錯誤');
+  return _aiJson((d.content||[]).map(function(b){return b.text||'';}).join(''));
+}
+async function _wkAiReadImage(du){
+  if(!_aiKey())throw new Error('請先到參數設定填入 AI 金鑰');
+  var b64=du.split(',')[1],mt=du.match(/^data:([^;]+)/)[1];
+  var fields=_WK_FILL_FIELDS.map(function(f){return f[0]+'='+f[1];}).join('；');
+  var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+    headers:{'content-type':'application/json','x-api-key':_aiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-sonnet-5',max_tokens:900,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mt,data:b64}},
+      {type:'text',text:'這是台灣營建業主的人員進場申請表。依表格出現順序列出要填寫的欄位，對應到欄位代碼（'+fields+'），表上沒有對應者 field 留空。只回傳 JSON：{"fields":[{"label":"姓名","field":"name"}]}'}]}]})});
+  var d=await r.json();if(d.error)throw new Error(d.error.message||'AI 錯誤');
+  return _aiJson((d.content||[]).map(function(b){return b.text||'';}).join(''));
+}
+// ── 主流程 ──
+var _wkOF=null;   // {file,kind,files,parsed,map,workers}
+function wkFillOwnerForm(){
+  if(!WORKERS.length){toast('請先建立人員資料');return;}
+  var opts=WORKERS.filter(function(w){return w&&w.status!=='left';}).map(function(w){return '<label style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--b2);border-radius:99px;padding:3px 10px;font-size:12.5px;cursor:pointer"><input type="checkbox" class="wkof-w" value="'+escq(w.id)+'"> '+esc(w.name||'')+'</label>';}).join(' ');
+  var tpls=Object.keys(P.wkTpl||{});
+  showConfirm('業主表格自動填入',
+    '<div style="font-size:12.5px;color:var(--b4);margin-bottom:8px">選業主給的空白表（.xlsx／.docx 會直接填進原檔並保留版面；圖片／PDF 給填表對照清單）</div>'
+    +'<div class="f"><label>業主表格檔</label><input type="file" id="wkof-file" accept=".xlsx,.docx,image/*,application/pdf" style="font-size:12.5px"></div>'
+    +'<div class="f" style="margin-top:8px"><label>要填入的人員（單人表選 1 位；名冊表可多選）</label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">'+opts+'</div></div>'
+    +'<label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;margin-top:8px"><input type="checkbox" id="wkof-fresh"> 重新分析（不用記住的對應）</label>'
+    +(tpls.length?'<div style="font-size:11px;color:var(--b3);margin-top:6px">已記住 '+tpls.length+' 份範本：'+tpls.map(function(k){return esc(k.split('|')[0]);}).join('、')+'</div>':''),
+    function(){
+      var inp=document.getElementById('wkof-file');var f=inp&&inp.files&&inp.files[0];
+      var ids=[].slice.call(document.querySelectorAll('.wkof-w:checked')).map(function(c){return c.value;});
+      if(!f){toast('請選擇業主表格檔');return false;}
+      if(!ids.length){toast('請勾選至少一位人員');return false;}
+      var fresh=!!(document.getElementById('wkof-fresh')||{}).checked;
+      setTimeout(function(){_wkOFStart(f,ids,fresh);},50);
+    },false,null,true);
+}
+async function _wkOFStart(f,ids,fresh){
+  var workers=ids.map(_wkById).filter(Boolean);
+  var ext=(f.name.match(/\.([a-z0-9]+)$/i)||['',''])[1].toLowerCase();
+  try{
+    if(ext==='xlsx'||ext==='docx'){
+      toast('讀取範本中…');
+      var files=await _zipRead(await f.arrayBuffer());
+      var parsed=ext==='xlsx'?_xlsxParse(files):_docxParse(files);
+      var key=_wkTplKey(f),map=fresh?null:(_wkTplGet(key)||{}).map;
+      if(!map){toast('AI 分析表格中…');map=await _wkAiMap(ext,ext==='xlsx'?parsed.cells:parsed.items);}
+      _wkOF={file:f,kind:ext,files:files,parsed:parsed,map:map,workers:workers,key:key};
+      _wkOFPreview();
+    }else{
+      var du=await _fileToDataUrl(f,1400);
+      if(!/^data:image\//.test(du)){toast('PDF 範本請先轉成圖片或改用 xlsx／docx');return;}
+      toast('AI 讀表中…');
+      var res=await _wkAiReadImage(du);
+      _wkOFListView(res.fields||[],workers[0]);
+    }
+  }catch(e){_err('_wkOFStart',e);toast('失敗：'+(e.message||'').slice(0,80));}
+}
+function _wkOFPreview(){
+  var o=_wkOF,map=o.map||{},isX=o.kind==='xlsx';
+  var mode=map.mode==='roster'&&map.roster?'roster':'single';
+  var fieldSel=function(cur,idx){return '<select data-idx="'+idx+'" class="wkof-f" style="font-size:12px;padding:3px 5px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;max-width:180px"><option value="">（不填）</option>'+_WK_FILL_FIELDS.map(function(f){return '<option value="'+f[0]+'"'+(cur===f[0]?' selected':'')+'>'+f[1]+'</option>';}).join('')+'</select>';};
+  var body='<div style="font-size:12px;color:var(--b4);margin-bottom:8px">'+(mode==='roster'?'名冊型：一列一人，將填入 '+o.workers.length+' 位':'單人表：填入「'+esc(o.workers[0].name||'')+'」')+'　'+(o.kind==='xlsx'?'儲存格':'表格格／段落')+'對應如下，可修正後再產生</div>';
+  if(mode==='single'){
+    var ts=map.targets||[];
+    body+='<div style="max-height:52vh;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="text-align:left;padding:4px 6px;background:var(--gl)">表格標籤</th><th style="text-align:left;padding:4px 6px;background:var(--gl)">位置</th><th style="text-align:left;padding:4px 6px;background:var(--gl)">填入欄位</th><th style="text-align:left;padding:4px 6px;background:var(--gl)">預覽值</th></tr></thead><tbody>'
+      +ts.map(function(t,i){var v=_wkFieldValue(o.workers[0],t.field);return '<tr><td style="padding:4px 6px;border-bottom:1px solid var(--b1)">'+esc(t.label||(isX?'':(o.parsed.items[t.i]||{}).text||''))+'</td><td style="padding:4px 6px;border-bottom:1px solid var(--b1);white-space:nowrap">'+esc(isX?(t.sheet+'!'+t.cell):('#'+t.i))+'</td><td style="padding:4px 6px;border-bottom:1px solid var(--b1)">'+fieldSel(t.field,i)+'</td><td style="padding:4px 6px;border-bottom:1px solid var(--b1);color:var(--g3)">'+esc(v)+'</td></tr>';}).join('')
+      +'</tbody></table></div>'+(ts.length?'':'<div style="color:#c62828;font-size:12px">AI 沒找到可填的位置——請勾「重新分析」再試，或改用名冊型範本</div>');
+  }else{
+    var r=map.roster;var cols=isX?Object.keys(r.cols||{}).map(function(k){return {k:r.cols[k],f:k};}):(r.fields||[]).map(function(f,j){return {k:'第 '+(j+1)+' 格',f:f};});
+    body+='<div style="font-size:12px">'+(isX?('工作表「'+esc(r.sheet||'')+'」自第 '+r.firstRow+' 列起'):('自第 '+r.start+' 格起，每列 '+r.cols+' 格'))+'</div>'
+      +'<div style="max-height:52vh;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="text-align:left;padding:4px 6px;background:var(--gl)">'+(isX?'欄':'格')+'</th><th style="text-align:left;padding:4px 6px;background:var(--gl)">填入欄位</th></tr></thead><tbody>'
+      +cols.map(function(c,i){return '<tr><td style="padding:4px 6px;border-bottom:1px solid var(--b1)">'+esc(c.k)+'</td><td style="padding:4px 6px;border-bottom:1px solid var(--b1)">'+fieldSel(c.f,i)+'</td></tr>';}).join('')+'</tbody></table></div>';
+  }
+  showConfirm('確認對應並產生',body,function(){
+    var sels=[].slice.call(document.querySelectorAll('.wkof-f'));
+    if(mode==='single'){sels.forEach(function(s){var t=(map.targets||[])[parseInt(s.dataset.idx)];if(t)t.field=s.value;});}
+    else{if(isX){var ks=Object.keys(map.roster.cols||{});var nc={};sels.forEach(function(s,i){var col=map.roster.cols[ks[i]];if(s.value)nc[s.value]=col;});map.roster.cols=nc;}
+         else{sels.forEach(function(s,i){map.roster.fields[i]=s.value;});}}
+    setTimeout(_wkOFGenerate,30);
+  },false,null,true);
+}
+function _wkOFGenerate(){
+  var o=_wkOF;if(!o)return;
+  try{
+    var map=o.map,isX=o.kind==='xlsx',mode=map.mode==='roster'&&map.roster?'roster':'single',files=o.files,n=0;
+    if(isX){
+      var writes=[];
+      if(mode==='single'){(map.targets||[]).forEach(function(t){if(!t.field||!t.cell)return;writes.push({sheet:t.sheet,cell:t.cell,value:_wkFieldValue(o.workers[0],t.field)});});}
+      else{var r=map.roster;o.workers.forEach(function(w,i){Object.keys(r.cols||{}).forEach(function(f){var col=String(r.cols[f]||'').toUpperCase();if(!col||!f)return;writes.push({sheet:r.sheet,cell:col+(parseInt(r.firstRow)+i),value:_wkFieldValue(w,f)});});});}
+      n=writes.length;files=_xlsxApply(files,o.parsed.sheets,writes);
+    }else{
+      var ws=[];
+      if(mode==='single'){(map.targets||[]).forEach(function(t){if(!t.field||t.i==null)return;ws.push({i:parseInt(t.i),value:_wkFieldValue(o.workers[0],t.field)});});}
+      else{var rr=map.roster;o.workers.forEach(function(w,i){(rr.fields||[]).forEach(function(f,j){if(!f)return;ws.push({i:parseInt(rr.start)+i*parseInt(rr.cols)+j,value:_wkFieldValue(w,f)});});});}
+      n=ws.length;files=_docxApply(files,o.parsed,ws);
+    }
+    if(!n){toast('沒有任何欄位被填入，請修正對應');return;}
+    var bytes=_zipWrite(files);
+    var mime=isX?'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    var blob=new Blob([bytes],{type:mime});
+    var base=o.file.name.replace(/\.(xlsx|docx)$/i,'');
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=base+'_'+(mode==='single'?(o.workers[0].name||''):('名冊'+o.workers.length+'人'))+'.'+o.kind;
+    document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},2000);
+    _wkTplSave(o.key,map,o.file.name);
+    toast('已填入 '+n+' 格並下載：'+a.download);
+  }catch(e){_err('_wkOFGenerate',e);toast('產生失敗：'+(e.message||'').slice(0,80));}
+}
+function _wkOFListView(fields,w){
+  var rows=fields.map(function(f){var v=f.field?_wkFieldValue(w,f.field):'';return '<tr><td style="padding:5px 6px;border-bottom:1px solid var(--b1)">'+esc(f.label||'')+'</td><td style="padding:5px 6px;border-bottom:1px solid var(--b1);font-weight:600">'+esc(v)+'</td><td style="padding:5px 6px;border-bottom:1px solid var(--b1)">'+(v?'<button type="button" class="btn btn-xs" onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+escq(v)+'\');toast(\'已複製\')">複製</button>':'<span style="color:var(--b3);font-size:11px">表上有、資料無</span>')+'</td></tr>';}).join('');
+  showConfirm('填表對照清單：'+esc(w.name||''),'<div style="font-size:12px;color:var(--b4);margin-bottom:6px">圖片／PDF 範本無法直接寫入，請依下表逐格填寫（可複製）</div><div style="max-height:56vh;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr><th style="text-align:left;padding:4px 6px;background:var(--gl)">表格欄位</th><th style="text-align:left;padding:4px 6px;background:var(--gl)">要填的值</th><th style="background:var(--gl)"></th></tr></thead><tbody>'+(rows||'<tr><td colspan="3" style="padding:8px;color:var(--b3)">AI 沒讀到欄位</td></tr>')+'</tbody></table></div>',function(){},false,null,true);
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
