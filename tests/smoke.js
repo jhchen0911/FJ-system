@@ -2574,7 +2574,7 @@ async function newPage(browser, width, height) {
       out.opts = [...sel.options].map(o => o.value).join() === 'sub,labor,own';
       changeCostType('s1', 'extra'); out.guard = Q.find(x => x.id === 'tq436').costs.find(c => c.id === 's1').type === 'sub';
       // 頁面提示指向日報．支出；日報．支出登錄後仍會出現在施工成本（同一筆記錄）
-      out.hint = /請由「日報．支出」登錄/.test(document.getElementById('page-costs').innerHTML);
+      out.hint = /額外支出請由日報．支出登錄/.test(document.getElementById('page-costs').innerHTML);   // v5.437 起只留「＋ 新增成本」的提示文字，頁面說明列已移除
       go('quickcost'); rQuickCost();
       const ps = document.getElementById('qc-proj'); ps.value = 'tq436'; if (ps.onchange) ps.onchange();
       document.getElementById('qc-amt').value = '250'; document.getElementById('qc-desc').value = '五金螺絲';
@@ -2589,6 +2589,58 @@ async function newPage(browser, width, height) {
     check('施工成本：類型下拉無「額外支出」、切換被擋、提示指向日報．支出', r.opts && r.guard && r.hint);
     check('日報．支出登錄 → 自動列在該專案施工成本', r.flow && r.flow2);
     check('v5.436 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v5.437 公司費用（不掛專案）＋實報實銷類別 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      EXPENSES.length = 0; HR.length = 0; PETTY.length = 0;
+      const a = _acct(); a.__staff.push({ id: 'st437', email: 'b437@x.com', name: '陳主管', roles: [], active: true }); _acctSave(a);
+      Q.push({ id: 'tq437', name: '己案', awarded: true, items: [{ desc: 'X', unit: 'M', qty: 1, price: 1 }], costs: [] });
+      go('quickcost'); rQuickCost();
+      const sel = document.getElementById('qc-proj');
+      out.opt = [...sel.options].some(o => o.value === '__co__');
+      const chips = [...document.querySelectorAll('#qc-chips button')].map(b => b.textContent.trim());
+      out.chips = chips.includes('禮品交際') && chips.includes('ETC／停車') && chips.includes('加油');
+      // 公司費用：不掛專案 → 進 EXPENSES（含支出人／類別），不建專案成本，工項下拉停用
+      sel.value = '__co__'; rQuickCostItems(); out.dis = document.getElementById('qc-item').disabled;
+      _qcSel = QC_TYPES.findIndex(t => t[0] === '禮品交際');
+      document.getElementById('qc-amt').value = '3600'; document.getElementById('qc-desc').value = '中秋禮盒 3 盒';
+      document.getElementById('qc-payer').value = '陳主管';
+      submitQuickCost();
+      const e = EXPENSES[EXPENSES.length - 1];
+      out.exp = !!e && e.amount === 3600 && e.note === '中秋禮盒 3 盒' && e.cat === '交際費' && e.payer === '陳主管' && e.payBy === 'staff' && e.src === 'quick' && e._mt > 0;
+      out.noCost = Q.find(x => x.id === 'tq437').costs.length === 0 && /公司費用/.test(document.getElementById('qc-log').textContent);
+      // 零用金結算把公司費用一併算進該員工支出（專案欄顯示「公司費用」）
+      HR.push({ id: 'hrM', name: '陳主管', payType: 'month', base: 1, pettyQuota: 2000, active: true, _mt: 1 });
+      const ym = localToday().slice(0, 7);
+      const items = _pcItems('陳主管', ym);
+      out.pc = items.length === 1 && items[0].proj === '公司費用' && items[0].amt === 3600 && items[0].desc === '中秋禮盒 3 盒';
+      go('payroll'); document.getElementById('pr-ym').value = ym; pcGenerate();
+      const r0 = _pcOf('hrM', ym); out.pcCalc = !!r0 && r0.spent === 3600 && r0.advance === 1600 && r0.payout === 3600;
+      // 帳務頁日常費用列出（品名、類別、支出人）
+      go('ledger'); document.getElementById('ledger-month').value = ym; renderLedger();
+      const lg = document.getElementById('ledger-in-exp').innerHTML;
+      out.ledger = /中秋禮盒/.test(lg) && /交際費/.test(lg) && /支出人 陳主管/.test(lg);
+      // 施工成本頁提示已移除；掛專案的實報實銷（ETC）仍進專案成本
+      out.hintGone = !/請由「日報．支出」登錄——選了專案就會自動列在這裡/.test(document.getElementById('page-costs').innerHTML);
+      go('quickcost'); rQuickCost(); sel.value = 'tq437'; rQuickCostItems(); out.en = !document.getElementById('qc-item').disabled;
+      _qcSel = QC_TYPES.findIndex(t => t[0] === 'ETC／停車'); document.getElementById('qc-amt').value = '120'; document.getElementById('qc-desc').value = ''; submitQuickCost();
+      const c = Q.find(x => x.id === 'tq437').costs[0];
+      out.cost = !!c && c.type === 'extra' && c.cat === '交通費' && c.amt === 120 && c.rows[0].desc === 'ETC／停車';
+      // 接力函式存在且非登入狀態不拋錯
+      out.relay = typeof _pushRelayExpenses === 'function' && typeof _pullRelayExpenses === 'function' && (_pushRelayExpenses(), _pullRelayExpenses(), true);
+      Q = Q.filter(x => x.id !== 'tq437'); EXPENSES.length = 0; HR.length = 0; PETTY.length = 0;
+      const a2 = _acct(); a2.__staff = a2.__staff.filter(x => x.id !== 'st437'); _acctSave(a2);
+      return out;
+    });
+    check('支出登錄：公司費用（不掛專案）→ 帳務日常費用，含支出人／類別，不建專案成本', r.opt && r.dis && r.exp && r.noCost && r.ledger);
+    check('零用金結算納入公司費用；實報實銷類別（加油／ETC／禮品交際）掛專案仍進成本', r.chips && r.pc && r.pcCalc && r.en && r.cost);
+    check('施工成本頁提示已移除；公司費用接力函式可用', r.hintGone && r.relay);
+    check('v5.437 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
