@@ -1124,7 +1124,6 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <button type="button" class="btn btn-xs" id="cost-view-qty" onclick="setCostView('qty')" style="flex:1 1 46%;justify-content:center;height:38px" title="合約量 vs 日報回報 vs 發包量 vs 廠商計價累計 vs 業主請款累計"><svg class="ic ib" aria-hidden="true"><use href="#i-scale"/></svg> 數量對照</button>
           <button type="button" class="btn btn-xs" id="cost-view-subs" onclick="setCostView('subs')" style="flex:1 1 46%;justify-content:center;height:38px" title="分包合約總表：發包額／逐期計價／保留款／應付狀態"><svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 分包管理</button>
           <button type="button" class="btn btn-xs btn-g" onclick="addCostItem()" style="flex:1 1 46%;justify-content:center;height:38px;font-size:13px;font-weight:700" title="先建立空白成本，類型（自有/承包/點工）在卡片內再選；額外支出請由日報．支出登錄">＋ 新增成本</button>
-          <div style="width:100%;font-size:10.5px;color:var(--b3)">額外支出（便當、油資、五金等零星支出）請由「日報．支出」登錄——選了專案就會自動列在這裡，並同時記支出人供零用金結算</div>
         </div>
       </div>
       <div style="padding:10px 14px">
@@ -1338,7 +1337,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <select id="qc-payer" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit"></select>
         </div>
         <button type="button" class="btn btn-g" onclick="submitQuickCost()" style="width:100%;justify-content:center;padding:13px;font-size:15px;font-weight:900">✓ 登錄支出</button>
-        <div style="font-size:10.5px;color:var(--b3);margin-top:8px">登錄後自動列入該專案施工成本（不入應付帳款），科目與工項已自動歸戶；支出人為員工者計入其零用金結算。</div>
+        <div style="font-size:10.5px;color:var(--b3);margin-top:8px">選專案 → 列入該專案施工成本；選「公司費用」→ 進帳務日常費用與利潤頁年度費用。油資、ETC 等實報實銷在這裡登錄（不列薪資）；支出人為員工者計入其零用金結算。</div>
         <div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px"><div style="flex:1;height:1px;background:var(--b1)"></div><span style="font-size:11px;color:var(--b3)">有發票／收據？</span><div style="flex:1;height:1px;background:var(--b1)"></div></div>
         <button type="button" class="btn" onclick="smartIntake()" style="width:100%;justify-content:center;padding:12px;font-size:14px;font-weight:700;border-color:var(--gm);color:var(--g3)"><svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg> 拍照智慧收件（AI 自動判讀）</button>
         <div style="font-size:10.5px;color:var(--b3);margin-top:6px">拍發票或收據，AI 自動判讀類型與金額，連動寫入施工成本、應付帳款與帳務進項。</div>
@@ -2731,7 +2730,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.436';
+var APP_VERSION='v5.437';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -13184,6 +13183,7 @@ function _pullPrivate(cb){
       finally{if(!wasApplying)setTimeout(function(){window._applyingCloud=false;},500);}
     }
     try{_pullRelayCosts();}catch(e){_err('_pullPrivate',e);}
+    try{_pullRelayExpenses();}catch(e){_err('_pullPrivate',e);}
     if(cb)cb(true);
   }).catch(function(err){
     _privReadOk=false;
@@ -13234,6 +13234,43 @@ function _pushRelayCosts(){
       console.log('[接力] 已上傳 '+n+' 筆現場支出，待管理員裝置收單');
     }).catch(function(err){console.warn('[接力] 現場支出上傳失敗：',err&&err.message);});
   }catch(e){_err('_pushRelayCosts',e);}
+}
+// v5.437 公司費用（不掛專案）接力：非管理員在「日報．支出」登錄的 EXPENSES 走 fydata/relay/expenses
+function _pushRelayExpenses(){
+  try{
+    if(!_fbUser||!_fbDb)return;
+    if(isAdmin(_fbUser.email))return;
+    var sent={};try{sent=JSON.parse(localStorage.getItem('fy_relay_exp_sent')||'{}');}catch(e){_err('_pushRelayExpenses',e);}
+    var ups={},n=0;
+    (EXPENSES||[]).forEach(function(e){
+      if(!e||!e.id||e.src!=='quick')return;
+      var h=_collHash(e);if(sent[e.id]===h)return;
+      var rec=_cleanEnc(JSON.parse(JSON.stringify(e)));rec._rmt=Date.now();rec._rby=(_fbUser&&_fbUser.email)||'';
+      ups[e.id]=rec;sent[e.id]=h;n++;
+    });
+    if(!n)return;
+    _fbDb.ref('fydata/relay/expenses').update(ups).then(function(){
+      try{localStorage.setItem('fy_relay_exp_sent',JSON.stringify(sent));}catch(e){_err('_pushRelayExpenses',e);}
+    }).catch(function(err){console.warn('[接力] 公司費用上傳失敗：',err&&err.message);});
+  }catch(e){_err('_pushRelayExpenses',e);}
+}
+function _pullRelayExpenses(){
+  try{
+    if(!_fbUser||!_fbDb||!isAdmin(_fbUser.email))return;
+    _fbDb.ref('fydata/relay/expenses').once('value').then(function(sn){
+      var d=sn.val();if(!d)return;
+      var consumed={},merged=0;
+      Object.keys(d).forEach(function(k){
+        var rec=d[k];if(!rec)return;
+        try{rec=_deepDecodeKeys(rec);}catch(e){_err('_pullRelayExpenses',e);}
+        delete rec._rmt;delete rec._rby;
+        if(rec.id&&!(EXPENSES||[]).some(function(e){return e&&e.id===rec.id;})){EXPENSES.push(rec);merged++;}
+        consumed[k]=null;
+      });
+      if(merged){try{saveExpenses();}catch(e){_err('_pullRelayExpenses',e);}toast('已收到 '+merged+' 筆公司費用（支出登錄）');}
+      if(Object.keys(consumed).length){_pushPrivate(function(ok){if(ok)_fbDb.ref('fydata/relay/expenses').update(consumed).catch(function(){});});}
+    }).catch(function(){});
+  }catch(e){_err('_pullRelayExpenses',e);}
 }
 // 管理員側：收接力的成本進 private，成功後清掉接力記錄
 function _pullRelayCosts(){
@@ -13381,6 +13418,7 @@ function _pushCloud(opts){
     // shared 沒變 → 提前 return → 私有集合完全不上雲，還誤報「雲端已是最新」。
     try{_pushPrivate();}catch(e){_err('top',e);}
     try{_pushRelayCosts();}catch(e){_err('top',e);}
+    try{_pushRelayExpenses();}catch(e){_err('top',e);}
     if(!opts.full&&baseHashes&&changed.length===0&&!perRec.hasWork){
       _storeSyncHashes(newHashes);
       localStorage.removeItem('fy_pending_sync');
@@ -13490,6 +13528,7 @@ function _pullPrivateIfNewer(){
         });
       }else if(ct===0){_privReadOk=true;}
       try{_pullRelayCosts();}catch(e){_err('_pullPrivateIfNewer',e);}
+      try{_pullRelayExpenses();}catch(e){_err('_pullPrivateIfNewer',e);}
     }).catch(function(){_privReadOk=false;});
   }catch(e){_err('_pullPrivateIfNewer',e);}
 }
@@ -27570,13 +27609,14 @@ function buildCostAnalysisHtml(q){
 }
 
 // ── 快速支出：工務現場登錄（不顯示成本合計；寫入專案施工成本，自付不入應付）──
-var QC_TYPES=[['涼水','雜費'],['便當','雜費'],['加油','油料耗材'],['五金','五金零件'],['運費','材料運費'],['雜費','雜費'],['其他','其他']];
+var QC_TYPES=[['涼水','雜費'],['便當','雜費'],['加油','油料耗材'],['ETC／停車','交通費'],['五金','五金零件'],['運費','材料運費'],['禮品交際','交際費'],['文具郵電','文具郵電'],['雜費','雜費'],['其他','其他']];   // v5.437 加實報實銷（油資／ETC）與主管交際類
 var _qcSel=0,_qcLog=[];
 function rQuickCost(){
   const sel=document.getElementById('qc-proj');if(!sel)return;
   const cur=sel.value;
   const mains=Q.filter(q=>q.awarded&&!q.closed&&!q.parentId);
-  sel.innerHTML='<option value="">── 選擇專案 ──</option>'+mains.map(q=>'<option value="'+q.id+'"'+(q.id===cur?' selected':'')+'>'+esc(q.name||'未命名')+'</option>').join('');
+  sel.innerHTML='<option value="">── 選擇專案 ──</option>'+mains.map(q=>'<option value="'+q.id+'"'+(q.id===cur?' selected':'')+'>'+esc(q.name||'未命名')+'</option>').join('')
+    +'<option value="__co__"'+(cur==='__co__'?' selected':'')+' style="color:#4A148C;font-weight:700">公司費用（不掛專案：禮品交際、油資、文具…）</option>';   // v5.437
   // v5.431 支出人：預設登入者本人；空＝公司付款
   try{
     const ps=document.getElementById('qc-payer');
@@ -27609,6 +27649,8 @@ function qcPick(i){_qcSel=i;rQuickCost();}
 function rQuickCostItems(){
   const qid=document.getElementById('qc-proj')?.value;
   const isel=document.getElementById('qc-item');if(!isel)return;
+  if(qid==='__co__'){isel.innerHTML='<option value="-1">（公司費用不歸戶工項，進帳務日常費用與利潤頁年度費用）</option>';isel.disabled=true;return;}   // v5.437
+  isel.disabled=false;
   let opts='<option value="-1">── 不指定 ──</option>';
   const q=Q.find(x=>x.id===qid);
   (q&&q.items||[]).forEach((it,i)=>{if(!it.sec)opts+='<option value="'+i+'">'+esc(it.desc||'工項'+(i+1))+'</option>';});
@@ -27617,13 +27659,25 @@ function rQuickCostItems(){
 function submitQuickCost(){
   const qid=document.getElementById('qc-proj')?.value;
   const q=Q.find(x=>x.id===qid);
-  if(!q){toast('請先選擇工程專案');return;}
+  if(!q&&qid!=='__co__'){toast('請先選擇工程專案，或選「公司費用（不掛專案）」');return;}
   const amt=parseFloat(document.getElementById('qc-amt')?.value)||0;
   if(amt<=0){toast('請填寫金額');return;}
   const t=QC_TYPES[_qcSel]||QC_TYPES[0];
   const desc=(document.getElementById('qc-desc')?.value||'').trim()||t[0];
   const linkedIdx=parseInt(document.getElementById('qc-item')?.value);
   const payer=(gv('qc-payer')||'').trim();   // v5.431：支出人（員工→零用金結算；空＝公司付款）
+  if(qid==='__co__'){
+    // v5.437 公司費用（不掛專案）：中秋禮盒、拜訪業主禮品、油資、文具…
+    // 進 EXPENSES（帳務頁日常費用、利潤頁年度費用），支出人為員工者一樣進零用金結算；非管理員經 relay/expenses 接力
+    const e={id:'E'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),seller:'',number:'',date:localToday(),amount:amt,tax:0,note:desc,cat:t[1],payer:payer,payBy:payer?'staff':'company',src:'quick',ts:Date.now()};
+    _touch(e);EXPENSES.push(e);
+    try{saveExpenses();}catch(err){_err('submitQuickCost.co',err);}
+    try{_pushRelayExpenses();}catch(err){_err('submitQuickCost.relay',err);}
+    _qcLog.unshift({t:new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'}),proj:'公司費用',desc:desc+(payer?('（'+payer+'）'):''),amt:amt,cat:t[1]});
+    const ai0=document.getElementById('qc-amt');if(ai0)ai0.value='';
+    const di0=document.getElementById('qc-desc');if(di0)di0.value='';
+    rQcLog();toast('✓ 已登錄公司費用：'+desc+' NT$ '+fmt(amt));return;
+  }
   if(!q.costs)q.costs=[];
   const cid=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
   q.costs.push({id:cid,type:'extra',vendor:'公司支出（自付）',cat:t[1],date:localToday(),
@@ -32286,7 +32340,7 @@ function renderLedger(){
       +'</div>';
   }).join(''):'<div style="color:var(--b3);font-size:12px;padding:8px 0">本月無廠商進項</div>';
   document.getElementById('ledger-in-exp').innerHTML=exps.length?exps.map(function(e){
-    return row('<b>'+esc(e.seller||'')+'</b>　'+esc(e.number||'')+'<div style="font-size:10.5px;color:var(--b3)">'+esc(e.date||'')+'　'+esc(e.note||'')+'</div>',
+    return row('<b>'+esc(e.seller||e.note||'')+'</b>　'+esc(e.number||'')+(e.cat?'<span style="font-size:10.5px;color:var(--b4)">（'+esc(e.cat)+'）</span>':'')+(e.payer?'<span style="font-size:10.5px;color:#4A148C;margin-left:4px">支出人 '+esc(e.payer)+'</span>':'')+'<div style="font-size:10.5px;color:var(--b3)">'+esc(e.date||'')+'　'+(e.seller?esc(e.note||''):(e.src==='quick'?'支出登錄':''))+'</div>',
       'NT$ '+fmt(e.amount||0)+'<div style="font-size:10.5px;color:var(--b3)">稅 '+fmt(e.tax||0)+'</div>'
       +'<a href="javascript:void(0)" onclick="expDel(\''+e.id+'\')" style="font-size:10.5px;color:var(--b3)">刪除</a>');
   }).join(''):(function(){var tot=(EXPENSES||[]).length;return '<div style="color:var(--b3);font-size:12px;padding:8px 0">本月（'+m+'）無費用發票'+(tot?'——其他月份共 '+tot+' 筆，發票以「開立月份」歸帳，請切換上方月份查看':'——加油、五金、文具打統編的都拍進來')+'</div>';})();
@@ -35379,6 +35433,11 @@ function _pcItems(name,ym){
       var d=(c.rows&&c.rows[0]&&c.rows[0].desc)||c.note||c.cat||'';
       out.push({qid:q.id,proj:q.name||'',date:c.date||'',desc:d,cat:c.cat||'',amt:_hrNum(c.amt),cid:c.id});
     });
+  });
+  (typeof EXPENSES!=='undefined'?EXPENSES:[]).forEach(function(e){   // v5.437 公司費用（不掛專案）也算員工支出
+    if(!e||String(e.payer||'')!==String(name))return;
+    if(String(e.date||'').slice(0,7)!==ym)return;
+    out.push({qid:'',proj:'公司費用',date:e.date||'',desc:e.note||e.seller||e.cat||'',cat:e.cat||'',amt:_hrNum(e.amount!=null?e.amount:e.amt),cid:e.id});
   });
   return out.sort(function(a,b){return String(a.date).localeCompare(String(b.date));});
 }
