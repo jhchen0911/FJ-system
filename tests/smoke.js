@@ -2705,6 +2705,78 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.439 業主表格自動填入（zip 讀寫、xlsx／docx 寫入、AI 對應、範本記憶） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      WORKERS.length = 0;
+      WORKERS.push({ id: 'wkA', name: '林阿明', sex: '男', idNo: 'A123456789', birth: '1985-03-05', blood: 'O', phone: '0912345678', regAddr: '桃園市', mailSame: true, emg: '林太太', emgRel: '配偶', emgPhone: '09', company: '豐有工程', title: '鋼構', status: 'active', docs: { oshF: { du: '', exp: '2027-01-31' } }, certs: [{ name: '吊掛作業', exp: '2027-05-01' }], _mt: 1 });
+      WORKERS.push({ id: 'wkB', name: '王小華', sex: '女', idNo: 'B223456789', birth: '1990-12-25', status: 'active', docs: {}, certs: [], _mt: 1 });
+      const te = new TextEncoder(), td = new TextDecoder();
+      // ① 欄位值（民國、通訊地址同上、證照）
+      const w = WORKERS[0];
+      out.val = _wkFieldValue(w, 'birthRoc') === '74/03/05' && _wkFieldValue(w, 'mailAddr') === '桃園市' && _wkFieldValue(w, 'oshExp') === '2027-01-31' && _wkFieldValue(w, 'certs') === '吊掛作業' && _wkFieldValue(w, 'birthM') === '3';
+      // ② zip 往返：用內建 xlsx 產生器做一份「業主空白表」，_zipRead 讀回、_xlsxParse 列出儲存格
+      const bytes = _xlsxBytes([{ name: '進場申請', rows: [['人員進場申請表'], ['姓名', '', '性別', ''], ['身分證字號', '', '出生日期', ''], ['戶籍地址', '', '', ''], [], ['序', '姓名', '身分證', '電話'], [1, '', '', ''], [2, '', '', '']] }]);
+      const files = await _zipRead(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+      out.zip = !!files['xl/workbook.xml'] && !!files['xl/worksheets/sheet1.xml'];
+      const parsed = _xlsxParse(files);
+      out.parse = parsed.sheets.length === 1 && parsed.sheets[0].name === '進場申請' && parsed.cells.some(c => c.cell === 'A2' && c.text === '姓名') && parsed.cells.some(c => c.cell === 'C3' && c.text === '出生日期') && !parsed.cells.some(c => c.cell === 'B2');
+      // ③ xlsx 寫入：既有格改寫、缺格插入、缺列新增；重新讀回驗證，且原有標籤不受影響
+      let f2 = _xlsxApply(JSON.parse(JSON.stringify({ k: 1 })) && Object.assign({}, files), parsed.sheets, [
+        { sheet: '進場申請', cell: 'B2', value: '林阿明' }, { sheet: '進場申請', cell: 'D2', value: '男' }, { sheet: '進場申請', cell: 'B3', value: 'A123456789' }, { sheet: '進場申請', cell: 'F9', value: '新列' }, { sheet: '進場申請', cell: 'A1', value: '改標題' }]);
+      const p2 = _xlsxParse(f2);
+      const g = a => (p2.cells.find(c => c.cell === a) || {}).text;
+      out.xw = g('B2') === '林阿明' && g('D2') === '男' && g('B3') === 'A123456789' && g('F9') === '新列' && g('A1') === '改標題' && g('C3') === '出生日期';
+      const sx = td.decode(f2['xl/worksheets/sheet1.xml']);
+      const row2 = (sx.match(/<row r="2"[^>]*>([\s\S]*?)<\/row>/) || [])[1] || '';
+      out.xorder = (row2.match(/<c r="([A-Z]+)2"/g) || []).join(',') === '<c r="A2",<c r="B2",<c r="C2",<c r="D2"';   // 插入格維持欄序
+      // 重新打包後仍是合法 zip，可再讀回
+      const rebytes = _zipWrite(f2);
+      const f3 = await _zipRead(rebytes.buffer.slice(rebytes.byteOffset, rebytes.byteOffset + rebytes.byteLength));
+      out.rezip = (_xlsxParse(f3).cells.find(c => c.cell === 'B2') || {}).text === '林阿明';
+      // ④ docx 寫入：表格下一格補 run（沿用 rPr）、段落底線佔位取代
+      const docXml = '<?xml version="1.0"?><w:document xmlns:w="x"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:rPr><w:sz w:val="24"/></w:rPr><w:t>姓名</w:t></w:r></w:p></w:tc><w:tc><w:p><w:pPr/></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:t>電話：＿＿＿＿</w:t></w:r></w:p><w:p><w:r><w:t>備註</w:t></w:r></w:p></w:body></w:document>';
+      const dfiles = { 'word/document.xml': te.encode(docXml) };
+      const dp = _docxParse(dfiles);
+      out.dparse = dp.items.length === 4 && dp.items[0].kind === 'tc' && dp.items[0].text === '姓名' && dp.items[1].text === '' && dp.items[2].kind === 'p' && /電話/.test(dp.items[2].text);
+      _docxApply(dfiles, dp, [{ i: 1, value: '林阿明' }, { i: 2, value: '0912345678' }]);
+      const dx = td.decode(dfiles['word/document.xml']);
+      out.dw = /<w:tc><w:p><w:pPr\/><w:r><w:t xml:space="preserve">林阿明<\/w:t><\/w:r><\/w:p><\/w:tc>/.test(dx) && /電話：0912345678/.test(dx) && /<w:t>備註<\/w:t>/.test(dx);
+      // ⑤ AI 對應：stub fetch 回傳 JSON；單人表對應→寫入；範本記憶 P.wkTpl
+      const origFetch = window.fetch; localStorage.setItem('fy_aikey', 'test');
+      window.fetch = async () => ({ json: async () => ({ content: [{ text: '{"mode":"single","targets":[{"sheet":"進場申請","cell":"B2","field":"name","label":"姓名"},{"sheet":"進場申請","cell":"D3","field":"birthRoc","label":"出生日期"}]}' }] }) });
+      const map = await _wkAiMap('xlsx', parsed.cells);
+      out.ai = map.mode === 'single' && map.targets.length === 2 && map.targets[1].field === 'birthRoc';
+      let dl = null; const origA = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { dl = this.download; };
+      const origCU = URL.createObjectURL; URL.createObjectURL = () => 'blob:x';
+      _wkOF = { file: { name: '業主表.xlsx', size: 123 }, kind: 'xlsx', files: Object.assign({}, files), parsed, map, workers: [w], key: '業主表.xlsx|123' };
+      _wkOFGenerate();
+      HTMLAnchorElement.prototype.click = origA; URL.createObjectURL = origCU;
+      const after = _xlsxParse(_wkOF.files);
+      out.gen = dl === '業主表_林阿明.xlsx' && (after.cells.find(c => c.cell === 'B2') || {}).text === '林阿明' && (after.cells.find(c => c.cell === 'D3') || {}).text === '74/03/05';
+      out.tpl = !!(P.wkTpl && P.wkTpl['業主表.xlsx|123'] && P.wkTpl['業主表.xlsx|123'].map.targets.length === 2) && _wkTplGet('業主表.xlsx|123').label === '業主表.xlsx';
+      // ⑥ 名冊型：兩位人員自第 7 列往下填
+      _wkOF = { file: { name: '名冊.xlsx', size: 9 }, kind: 'xlsx', files: Object.assign({}, files), parsed, map: { mode: 'roster', roster: { sheet: '進場申請', firstRow: 7, cols: { name: 'B', idNo: 'C', phone: 'D' } } }, workers: WORKERS.slice(), key: '名冊.xlsx|9' };
+      HTMLAnchorElement.prototype.click = function () { dl = this.download; }; URL.createObjectURL = () => 'blob:x';
+      _wkOFGenerate();
+      HTMLAnchorElement.prototype.click = origA; URL.createObjectURL = origCU;
+      const ro = _xlsxParse(_wkOF.files); const gg = a => (ro.cells.find(c => c.cell === a) || {}).text;
+      out.roster = dl === '名冊_名冊2人.xlsx' && gg('B7') === '林阿明' && gg('C7') === 'A123456789' && gg('B8') === '王小華' && gg('C8') === 'B223456789' && gg('A7') === '1';
+      // ⑦ 入口：按鈕存在、開啟視窗列出人員
+      go('workers'); out.btn = /wkFillOwnerForm/.test(document.getElementById('page-workers').innerHTML);
+      wkFillOwnerForm(); out.modal = document.querySelectorAll('.wkof-w').length === 2 && !!document.getElementById('wkof-file'); document.getElementById('gen-confirm-ok') && document.querySelector('#gen-confirm-modal .btn-cancel, #gen-confirm-cancel')?.click();
+      window.fetch = origFetch; localStorage.removeItem('fy_aikey'); delete P.wkTpl; WORKERS.length = 0; _wkOF = null;
+      return out;
+    });
+    check('業主表格：zip 讀寫往返、xlsx 儲存格列出與寫入（改格／插格／新列、欄序）', r.zip && r.parse && r.xw && r.xorder && r.rezip);
+    check('業主表格：docx 表格格補值與底線佔位取代；欄位值（民國日期、同上地址、證照）', r.dparse && r.dw && r.val);
+    check('業主表格：AI 對應→填入下載、範本記憶、名冊型多列填入、頁面入口', r.ai && r.gen && r.tpl && r.roster && r.btn && r.modal);
+    check('v5.439 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
