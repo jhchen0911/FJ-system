@@ -331,6 +331,7 @@ svg.fj-chart{cursor:zoom-in}
   .kgrid{grid-template-columns:1fr 1fr;gap:6px;padding:10px 12px 0}.kv{font-size:16px}.dash-greet{padding:10px 12px 0;font-size:17px}
   .fg3,.fg4{grid-template-columns:1fr}
   .fg3{grid-template-columns:1fr 1fr}
+  .wk-cert-row{grid-template-columns:1fr 1fr!important}   /* v5.438 手機證照列不得橫向溢出 */
   .fg2{grid-template-columns:1fr 1fr}
   .f input,.f select,.f textarea{font-size:14px;padding:9px 10px;min-height:40px}
   .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -678,6 +679,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-matest" onclick="go('matest')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>材料估算</button>
   <button type="button" class="snav" id="sn-grout" onclick="go('grout')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>根固砂漿</button>
   <button type="button" class="snav" id="sn-backfill" onclick="go('backfill')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span>背填材料</button>
+  <button type="button" class="snav" id="sn-workers" onclick="go('workers')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>人員進場資料</button>
   <button type="button" class="snav" id="sn-lifeline" onclick="go('lifeline')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg></span>安全母索</button>
   <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
   <div class="ssec" style="margin-top:5px">系統</div>
@@ -1226,6 +1228,18 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <div class="page" id="page-backfill">
   <div class="ph"><div class="ph-l"><div class="ph-t">背填材料</div><div class="ph-s">支撐圍令背填：混凝土＋鋼筋用量（逐層計算）</div></div></div>
   <div class="pad" style="max-width:1300px"><div id="backfill-root"></div></div>
+</div>
+<!-- ████ 人員進場資料（v5.438）████ -->
+<div class="page" id="page-workers">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-t">人員進場資料</div><div class="ph-s" id="wk-sub">在職 0 人</div></div>
+    <div class="ph-r" style="display:flex;gap:6px;flex-wrap:wrap">
+      <button type="button" class="btn btn-sm" onclick="wkExportXlsx()">匯出名冊 Excel</button>
+      <button type="button" class="btn btn-sm" onclick="wkPrintAll()">列印全部資料表</button>
+      <button type="button" class="btn btn-sm btn-g" onclick="wkEdit('')">＋ 新增人員</button>
+    </div>
+  </div>
+  <div class="pad" style="max-width:1300px"><div class="card"><div class="cb"><div id="wk-root"></div></div></div></div>
 </div>
 <div class="page" id="page-lifeline">
   <div class="ph"><div class="ph-l"><div class="ph-t">安全母索</div><div class="ph-s">水平安全母索用量：特多龍繩／鋼索兩種形式・分區塊縱橫向逐路計算・路數勾稽・扣除構台下・捲數與配件</div></div></div>
@@ -2730,7 +2744,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.437';
+var APP_VERSION='v5.438';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -3471,6 +3485,7 @@ function go(p){
   if(p==='rebar'){try{_rbRender();}catch(e){_err('top',e);}}
   if(p==='grout'){try{_gtRender();}catch(e){_err('top',e);}}
   if(p==='backfill'){try{_bfRender();}catch(e){_err('top',e);}}
+  if(p==='workers'){try{renderWorkers();}catch(e){_err('top',e);}}
   if(p==='lifeline'){try{_llRender();}catch(e){_err('top',e);}}
   if(p==='progress'){try{_pgRender();}catch(e){_err('top',e);}}
   if(p==='matest'){try{renderMatEst();}catch(e){_err('top',e);}}
@@ -8286,6 +8301,7 @@ function importData(file){
         if(data.invoiceRecs)INVOICE_RECS=arr(data.invoiceRecs);
         if(data.expenses)EXPENSES=arr(data.expenses);
         if(data.customers)CUSTOMERS=arr(data.customers);
+        if(data.workers){WORKERS=arr(data.workers);try{localStorage.setItem('fy_workers',JSON.stringify(WORKERS));}catch(e2){_err('importData.workers',e2);}}
         if(data.costHist){COST_HIST=arr(data.costHist);try{localStorage.setItem('fy_cost_hist',JSON.stringify(COST_HIST));}catch(e2){_err('importData',e2);}}
         if(data.dealHist){DEAL_HIST=arr(data.dealHist);try{localStorage.setItem('fy_deal_hist',JSON.stringify(DEAL_HIST));}catch(e2){_err('importData',e2);}}
         if(data.matStock&&typeof data.matStock==='object'){MAT_STOCK=data.matStock;try{localStorage.setItem('fy_mat_stock',JSON.stringify(MAT_STOCK));}catch(e2){_err('importData',e2);}}
@@ -9142,6 +9158,20 @@ function updateDashTodo(){
         color:r.maxD>14?'var(--red)':'#b26a00',
         text:'「'+r.name+'」'+r.n+' 個工項租期已逾期（最長 '+r.maxD+' 天），尚未開逾期租金請款',
         sub:r.amt?('累計約 NT$ '+fmt(Math.round(r.amt))):''});
+    });
+  }catch(e){_err('updateDashTodo',e);}
+
+  // 10b. v5.438 人員進場資料：職安卡／體檢／藥檢／證照到期前 60 天提醒
+  try{
+    (typeof WORKERS!=='undefined'?WORKERS:[]).forEach(function(w){
+      if(!w||w.status==='left')return;
+      _wkExpiries(w).forEach(function(e){
+        if(e.dd>60)return;
+        items.push({type:'wk_exp',urgent:e.dd<=14,jump:"go('workers');wkEdit('"+w.id+"')",
+          icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg>',color:e.dd<0?'var(--red)':'#b26a00',
+          text:(w.name||'')+'　'+e.label+(e.dd<0?('已於 '+e.exp+' 過期'):(e.dd===0?'今天到期':(e.dd+' 天後到期（'+e.exp+'）'))),
+          sub:'進場申請會被退件，請更新文件'});
+      });
     });
   }catch(e){_err('updateDashTodo',e);}
 
@@ -10428,7 +10458,7 @@ function _lsUsage(){
     fy_plan_attlib:'計畫書附件庫',fy_q_history:'報價版本歷史',fy_contracts:'合約',
     fy_payables:'應付帳款',fy_expenses:'零星支出',fy_customers:'客戶',fy_vendors:'廠商',
     fy_inv_recs:'發票紀錄',fy_mat_ledger:'材料台帳',fy_mat_stock:'材料庫存',
-    fy_cost_hist:'成本單價庫',fy_deal_hist:'成交單價庫',fy_activity:'活動紀錄',fy_hr:'人員薪資',fy_payslips:'薪資條',fy_petty:'零用金',
+    fy_cost_hist:'成本單價庫',fy_deal_hist:'成交單價庫',fy_activity:'活動紀錄',fy_hr:'人員薪資',fy_payslips:'薪資條',fy_petty:'零用金',fy_workers:'人員進場資料',
     fy6_uh:'單價分析歷史',fy_tombs:'刪除記錄',fy6_p:'參數設定'};
   try{
     for(var i=0;i<localStorage.length;i++){
@@ -12600,7 +12630,7 @@ function _mergeQHistory(loc,cloud){
   });
   return out;
 }
-var _SYNC_COLLS=['quotes','invoices','upaHistory','params','contracts','vendors','invoiceRecs','activityLog','customers','pagePerms',
+var _SYNC_COLLS=['quotes','invoices','upaHistory','params','contracts','vendors','invoiceRecs','activityLog','customers','pagePerms','workers',
   'tombs','admins',
   'matStock','toolrecs','planState','qHistory','toolStates'];   // v5.373 新增（planAttLib 純圖檔，只進本機備份不上雲）
 // 敏感集合：只寫 fydata/private
@@ -12671,6 +12701,7 @@ function _syncPayload(){
     contracts:CONTRACTS, vendors:VENDORS, payables:PAYABLES,
     invoiceRecs:INVOICE_RECS, expenses:EXPENSES, tombs:TOMBS, activityLog:ACTIVITY_LOG.slice(0,100),
     customers:CUSTOMERS, upaCostDB:UPA_COST_DB, pagePerms:pagePerms, costHist:COST_HIST,
+    workers:(typeof WORKERS!=='undefined'?WORKERS:[]),   // v5.438
     shareProfit:SHARE_PROFIT, dealHist:DEAL_HIST, matLedger:MAT_LEDGER, admins:admins,
     hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]), petty:(typeof PETTY!=='undefined'?PETTY:[]),   // v5.433 人員薪資／v5.434 零用金（private；全量備份含）
     // v5.373：六大工具存檔、施工計畫書草稿、共用附件庫、材料庫存、報價版本歷史
@@ -12703,7 +12734,7 @@ function _deepDecodeKeys(o){
 // 雲端原本把 quotes 存成陣列（Firebase 會變成 {0:…,1:…} 的數字鍵）。
 // 第一次改用逐筆之前先做一次性遷移：整包改寫成 {報價id:報價}，
 // 之後每次只 update 動過的那幾筆；本機刪掉的則寫 null 真正移除。
-var _REC_COLLS=['quotes','invoices'];
+var _REC_COLLS=['quotes','invoices','workers'];   // v5.438 人員進場資料含影本，逐筆同步
 function _recHashKey(){return 'fy_rec_hashes';}
 function _recHashesOfClean(clean){
   var h={};
@@ -12819,6 +12850,7 @@ function _applyCloud(data){
     }
     if(data.activityLog)ACTIVITY_LOG=data.activityLog;
     if(data.customers)CUSTOMERS=_safeMerge(CUSTOMERS,data.customers,'customers');
+    if(data.workers){WORKERS=_safeMerge(WORKERS,data.workers,'workers');try{_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');}catch(e){_err('_applyCloud.workers',e);}}   // v5.438
     if(data.matStock){
       try{
         var _msc=data.matStock||{};
@@ -13090,7 +13122,7 @@ function _applySensColls(data,tombs){
   try{_lsSet('fy_expenses',JSON.stringify(EXPENSES),'費用');}catch(e){_err('top',e);}
 }
 // 記錄級合併：以 _mt（修改時間）新者勝；墓碑防止刪除復活
-var _MERGE_COLLS=['quotes','invoices','payables','contracts','invoiceRecs','expenses','customers','vendors'];
+var _MERGE_COLLS=['quotes','invoices','payables','contracts','invoiceRecs','expenses','customers','vendors','workers'];
 function _mergeColl(localArr,cloudArr,collName,cloudTombs){
   // Firebase 可能把陣列存成物件；一律轉陣列
   var _arr=function(x){if(Array.isArray(x))return x;if(x&&typeof x==='object')return Object.values(x);return [];};
@@ -24725,7 +24757,7 @@ function _mstack(root){
 (function(){
   var ids=['rebar-root','grout-root','backfill-root','lifeline-root','progress-root','mat-est-form','mat-est-out','plan-root',
            'page-params',                    // v5.372：參數設定的單價矩陣表
-           'page-staff','page-roles','page-payroll', // v5.382：人員／角色頁的名冊表（CI 在不同字型環境抓到溢出）
+           'page-staff','page-roles','page-payroll','wk-root', // v5.382：人員／角色頁的名冊表（CI 在不同字型環境抓到溢出）
            'cost-list'];                     // v5.404：施工成本的分析／勾稽表（手機不得左右滑）
   function _msApply(){ids.forEach(function(id){var el=document.getElementById(id);if(el)_mstack(el);});}
   try{
@@ -34704,6 +34736,7 @@ const ALL_PAGES = [
   {id:'matest',    label:'材料估算',  icon:_pgIcon('box'),      grp:'data',  adminOnly:false}, // v5.352 自材料管理獨立
   {id:'grout',     label:'根固砂漿',  icon:_pgIcon('hardhat'),  grp:'data',  adminOnly:false}, // v5.346
   {id:'backfill',  label:'背填材料',  icon:_pgIcon('wrench'),   grp:'data',  adminOnly:false}, // v5.346
+  {id:'workers',   label:'人員進場資料',icon:_pgIcon('users'),  grp:'data',  adminOnly:false}, // v5.438 進場申請人員資料＋證件影本
   {id:'lifeline',  label:'安全母索',  icon:_pgIcon('link'),     grp:'data',  adminOnly:false, hidden:true, parent:'matest'}, // v5.393；v5.397 併入材料估算，導覽隱藏
   {id:'sitedet',   label:'案場細節',  icon:_pgIcon('contract'), grp:'main',  adminOnly:false, hidden:true, parent:'quotes'},  // v5.407 案場細節紀錄表（掛在報價下，由報價編輯／專案卡進入）
   // v5.330 sysOnly：只有「系統管理員」角色能開，其他角色的權限表上是鎖住的
@@ -35688,6 +35721,282 @@ function renderHrReport(el,year){
     +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>'+['姓名','月數','應發','實發','公司負擔','零用金應付'].map(function(h,i){return '<th style="'+TH+(i===0?';text-align:left':'')+'">'+h+'</th>';}).join('')+'</tr></thead><tbody>'
     +Object.keys(byP).map(function(k){var o=byP[k];return '<tr><td style="'+TD+';text-align:left">'+esc(o.name||'')+'</td><td style="'+TD+'">'+o.months+'</td><td style="'+TD+'">'+fmt(o.gross)+'</td><td style="'+TD+'">'+fmt(o.net)+'</td><td style="'+TD+'">'+fmt(o.co)+'</td><td style="'+TD+'">'+fmt(o.pc)+'</td></tr>';}).join('')
     +'</tbody></table></div>';
+}
+// ══════════ 人員進場資料（v5.438）══════════
+// 工地進場申請用的人員基本資料＋證件影本：姓名／性別／身分證／血型／電話／戶籍與通訊地址／緊急聯絡人，
+// 文件：大頭照、身分證與健保卡正反面、職安卡正反面、體檢、藥檢、簽名檔、各式證照（有效期者自動進待辦提醒）。
+// 存 WORKERS（shared，逐筆同步 _REC_COLLS；本機 fy_workers）。影像以 1000px JPEG 壓縮後內嵌。
+var WORKERS=[];
+try{var _wk0=localStorage.getItem('fy_workers');if(_wk0)WORKERS=JSON.parse(_wk0)||[];}catch(e){_err('WORKERS.load',e);}
+if(!Array.isArray(WORKERS))WORKERS=[];
+function saveWorkers(){_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');try{_autoUpload();}catch(e){_err('saveWorkers',e);}}
+var _WK_DOCS=[
+  {k:'photo',n:'大頭照'},{k:'idF',n:'身分證正面'},{k:'idB',n:'身分證反面'},
+  {k:'nhiF',n:'健保卡正面'},{k:'nhiB',n:'健保卡反面'},
+  {k:'oshF',n:'職安卡正面',exp:true,yrs:3},{k:'oshB',n:'職安卡反面'},
+  {k:'health',n:'體檢報告',exp:true,yrs:1},{k:'drug',n:'藥檢報告',exp:true,yrs:1},
+  {k:'sign',n:'簽名檔'}];
+var _WK_FIELDS=[['name','姓名'],['sex','性別'],['idNo','身分證字號'],['birth','出生日期'],['blood','血型'],['phone','聯絡電話'],
+  ['regAddr','戶籍地址'],['mailAddr','通訊地址'],['emg','緊急聯絡人'],['emgRel','關係'],['emgPhone','緊急聯絡電話'],['company','所屬公司'],['title','工種／職稱']];
+function _wkById(id){return WORKERS.find(function(w){return w&&w.id===id;})||null;}
+function _wkNorm(w){if(!w||typeof w!=='object')w={};if(!w.docs||typeof w.docs!=='object')w.docs={};if(!Array.isArray(w.certs))w.certs=[];return w;}
+function _wkMailAddr(w){return w.mailSame?(w.regAddr||''):(w.mailAddr||'');}
+function _wkVal(w,k){if(k==='mailAddr')return _wkMailAddr(w);return w[k]==null?'':String(w[k]);}
+// 效期清單（文件槽＋證照），依剩餘天數排序
+function _wkExpiries(w){
+  var out=[],today=localToday();w=_wkNorm(w);
+  _WK_DOCS.forEach(function(d){if(!d.exp)return;var f=w.docs[d.k];if(f&&f.exp)out.push({label:d.n,exp:f.exp,dd:_dDiff(today,f.exp)});});
+  w.certs.forEach(function(c){if(c&&c.exp)out.push({label:c.name||'證照',exp:c.exp,dd:_dDiff(today,c.exp)});});
+  return out.sort(function(a,b){return a.dd-b.dd;});
+}
+function _wkDocCount(w){w=_wkNorm(w);var n=0;_WK_DOCS.forEach(function(d){if(w.docs[d.k]&&w.docs[d.k].du)n++;});return n;}
+function _wkExpBadge(w){
+  var ex=_wkExpiries(w);if(!ex.length)return '';
+  var e=ex[0];var c=e.dd<0?'#c62828':(e.dd<=60?'#b26a00':'var(--g3)');
+  return '<span style="font-size:11px;color:'+c+';white-space:nowrap">'+esc(e.label)+' '+(e.dd<0?('已過期 '+esc(e.exp)):(e.dd<=60?(e.dd+' 天後到期'):esc(e.exp)))+'</span>';
+}
+var _wkEditId=null,_wkDraft=null,_wkQ='',_wkSt='active';
+function renderWorkers(){
+  var root=document.getElementById('wk-root');if(!root)return;
+  var sub=document.getElementById('wk-sub');
+  if(sub)sub.textContent='在職 '+WORKERS.filter(function(w){return w&&w.status!=='left';}).length+' 人'+(WORKERS.some(function(w){return w&&w.status==='left';})?('　離職 '+WORKERS.filter(function(w){return w&&w.status==='left';}).length+' 人'):'');
+  if(_wkEditId!==null){_wkRenderEdit(root);return;}
+  _wkRenderList(root);
+}
+function _wkRenderList(root){
+  var IN='font-size:13px;padding:7px 10px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)';
+  var rows=WORKERS.filter(function(w){
+    if(!w)return false;
+    if(_wkSt==='active'&&w.status==='left')return false;
+    if(_wkSt==='left'&&w.status!=='left')return false;
+    if(_wkQ){var q=_wkQ.toLowerCase();if([w.name,w.idNo,w.phone,w.company,w.title].map(function(x){return String(x||'').toLowerCase();}).join(' ').indexOf(q)<0)return false;}
+    return true;
+  }).sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''),'zh-Hant');});
+  var TD='padding:7px 8px;border-bottom:1px solid var(--b1);white-space:nowrap',TH='text-align:left;padding:7px 8px;font-size:11px;color:var(--b4);background:var(--gl);white-space:nowrap';
+  root.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">'
+    +'<input id="wk-q" value="'+esc(_wkQ)+'" placeholder="搜尋 姓名／身分證／電話／公司" oninput="_wkQ=this.value;renderWorkers();var e=document.getElementById(\'wk-q\');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}" style="flex:1;min-width:180px;'+IN+'">'
+    +'<select onchange="_wkSt=this.value;renderWorkers()" style="'+IN+'"><option value="active"'+(_wkSt==='active'?' selected':'')+'>在職</option><option value="left"'+(_wkSt==='left'?' selected':'')+'>離職</option><option value=""'+(_wkSt===''?' selected':'')+'>全部</option></select>'
+    +'</div>'
+    +(rows.length?('<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr>'
+      +['姓名','性別','身分證','電話','所屬／工種','文件','最近效期','操作'].map(function(h){return '<th style="'+TH+'">'+h+'</th>';}).join('')+'</tr></thead><tbody>'
+      +rows.map(function(w){
+        var ph=w.docs&&w.docs.photo&&w.docs.photo.du;
+        return '<tr>'
+          +'<td style="'+TD+';font-weight:700">'+(ph?'<img src="'+ph+'" style="width:28px;height:28px;object-fit:cover;border-radius:50%;vertical-align:middle;margin-right:6px">':'')+esc(w.name||'')+(w.status==='left'?'<span class="bdg warn" style="margin-left:4px">離職</span>':'')+'</td>'
+          +'<td style="'+TD+'">'+esc(w.sex||'')+'</td>'
+          +'<td style="'+TD+'">'+esc(_hrMask(w.idNo||''))+'</td>'
+          +'<td style="'+TD+'">'+esc(w.phone||'')+'</td>'
+          +'<td style="'+TD+'">'+esc(w.company||'')+(w.title?'<span style="color:var(--b3);font-size:11px"> '+esc(w.title)+'</span>':'')+'</td>'
+          +'<td style="'+TD+'">'+_wkDocCount(w)+'／'+_WK_DOCS.length+(w.certs&&w.certs.length?('＋證照 '+w.certs.length):'')+'</td>'
+          +'<td style="'+TD+'">'+(_wkExpBadge(w)||'<span style="color:var(--b3)">－</span>')+'</td>'
+          +'<td style="'+TD+'"><button type="button" class="btn btn-xs" onclick="wkEdit(\''+escq(w.id)+'\')">編輯</button> <button type="button" class="btn btn-xs" onclick="wkPrintSheet(\''+escq(w.id)+'\')">資料表</button> <button type="button" class="btn btn-xs btn-r" onclick="wkDel(\''+escq(w.id)+'\')">刪除</button></td>'
+          +'</tr>';
+      }).join('')+'</tbody></table>')
+    :'<div class="empty" style="padding:32px"><p>'+(WORKERS.length?'沒有符合的人員':'尚無人員——按右上「＋ 新增人員」，或用「拍身分證自動帶入」')+'</p></div>');
+}
+function wkEdit(id){
+  var w=id?_wkById(id):null;
+  _wkDraft=_wkNorm(w?JSON.parse(JSON.stringify(w)):{id:_uid('wk'),status:'active',mailSame:true,docs:{},certs:[]});
+  _wkEditId=_wkDraft.id;
+  renderWorkers();
+  setTimeout(function(){var el=document.getElementById('wk-f-name');if(el&&!el.value)el.focus();},50);
+}
+function _wkRenderEdit(root){
+  var w=_wkDraft;
+  var IN='width:100%;font-size:13px;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;box-sizing:border-box;background:var(--w)';
+  var f=function(k,label,type,extra){return '<div class="f"><label>'+label+'</label><input id="wk-f-'+k+'" type="'+(type||'text')+'" value="'+esc(w[k]==null?'':String(w[k]))+'" style="'+IN+'"'+(extra||'')+'></div>';};
+  var sel=function(k,label,opts){return '<div class="f"><label>'+label+'</label><select id="wk-f-'+k+'" style="'+IN+'">'+opts.map(function(o){return '<option value="'+esc(o)+'"'+(String(w[k]||'')===o?' selected':'')+'>'+(o||'－')+'</option>';}).join('')+'</select></div>';};
+  var sec=function(t,sub){return '<div style="font-size:12.5px;font-weight:700;color:var(--g3);margin:14px 0 8px;border-left:3px solid var(--g3);padding-left:7px">'+t+(sub?'<span style="font-weight:400;color:var(--b3);font-size:11px;margin-left:6px">'+sub+'</span>':'')+'</div>';};
+  var docCard=function(d){
+    var fl=w.docs[d.k]||null;var has=!!(fl&&fl.du);var isPdf=has&&/^data:application\/pdf/.test(fl.du);
+    return '<div style="border:1px solid var(--b1);border-radius:var(--r8);padding:8px;background:var(--w);display:flex;flex-direction:column;gap:6px">'
+      +'<div style="font-size:12px;font-weight:700">'+d.n+(d.exp?'<span style="color:var(--b3);font-weight:400;font-size:10.5px"> 有效期</span>':'')+'</div>'
+      +'<div onclick="'+(has?'wkView(\''+d.k+'\')':'wkUpload(\''+d.k+'\')')+'" style="height:96px;border-radius:6px;background:var(--b0);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;border:1px dashed '+(has?'transparent':'var(--b2)')+'">'
+        +(has?(isPdf?'<span style="font-size:12px;color:var(--b4)">PDF 檔</span>':'<img src="'+fl.du+'" style="max-width:100%;max-height:96px;object-fit:contain">'):'<span style="font-size:11.5px;color:var(--b3)">點擊上傳</span>')+'</div>'
+      +(d.exp?'<div style="display:flex;gap:4px;align-items:center"><input type="date" value="'+esc((fl&&fl.exp)||'')+'" onchange="wkSetExp(\''+d.k+'\',this.value)" style="flex:1;'+IN+';padding:4px 6px;font-size:12px"><button type="button" class="btn btn-xs" onclick="wkExpPlus(\''+d.k+'\','+d.yrs+')" title="自今日起算 '+d.yrs+' 年" style="padding:3px 7px">＋'+d.yrs+'年</button></div>':'')
+      +'<div style="display:flex;gap:4px"><button type="button" class="btn btn-xs" onclick="wkUpload(\''+d.k+'\')" style="flex:1;justify-content:center">'+(has?'重傳':'上傳')+'</button>'+(has?'<button type="button" class="btn btn-xs btn-r" onclick="wkDelDoc(\''+d.k+'\')">刪</button>':'')+'</div>'
+      +'</div>';
+  };
+  root.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+    +'<button type="button" class="btn btn-sm" onclick="wkCancel()">‹ 回清單</button>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn btn-sm" onclick="wkAiFromId()" title="拍身分證或健保卡，AI 讀出姓名／身分證字號／生日／地址自動填入">拍身分證自動帶入</button>'
+    +(_wkById(w.id)?'<button type="button" class="btn btn-sm" onclick="wkSave();wkPrintSheet(\''+escq(w.id)+'\')">存檔並印資料表</button>':'')
+    +'<button type="button" class="btn btn-sm btn-g" onclick="wkSave()">儲存</button></div></div>'
+    +sec('基本資料')
+    +'<div class="fg fg3">'+f('name','姓名 <span style="color:var(--red)">*</span>')+sel('sex','性別',['','男','女'])+f('idNo','身分證字號')+'</div>'
+    +'<div class="fg fg3">'+f('birth','出生日期','date')+sel('blood','血型',['','A','B','O','AB'])+f('phone','聯絡電話','tel')+'</div>'
+    +f('regAddr','戶籍地址')
+    +'<div class="f"><label style="display:flex;align-items:center;gap:8px">通訊地址 <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:400;cursor:pointer"><input type="checkbox" id="wk-f-mailSame"'+(w.mailSame?' checked':'')+' onchange="var m=document.getElementById(\'wk-f-mailAddr\');m.disabled=this.checked;if(this.checked)m.value=document.getElementById(\'wk-f-regAddr\').value"> 同戶籍地址</label></label>'
+    +'<input id="wk-f-mailAddr" value="'+esc(w.mailSame?(w.regAddr||''):(w.mailAddr||''))+'" style="'+IN+'"'+(w.mailSame?' disabled':'')+'></div>'
+    +'<div class="fg fg3">'+f('emg','緊急聯絡人')+f('emgRel','關係')+f('emgPhone','緊急聯絡電話','tel')+'</div>'
+    +'<div class="fg fg3">'+f('company','所屬公司','text',' list="wk-co-list"')+f('title','工種／職稱')+sel('status','狀態',['active','left'])+'</div>'
+    +'<datalist id="wk-co-list"><option value="豐有工程"></option>'+(typeof VENDORS!=='undefined'?VENDORS:[]).map(function(v){return '<option value="'+esc(v.name||'')+'"></option>';}).join('')+'</datalist>'
+    +f('memo','備註')
+    +sec('證件文件','點格子上傳，影像自動壓縮；體檢／藥檢可傳 PDF（3MB 內）')
+    +'<div id="wk-docs" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">'+_WK_DOCS.map(docCard).join('')+'</div>'
+    +sec('各式證照','例：起重機操作、吊掛、高空作業車、乙級技術士…到期前 60 天自動提醒')
+    +'<div id="wk-certs">'+_wkCertsHtml(w,IN)+'</div>'
+    +'<button type="button" class="btn btn-xs" onclick="wkAddCert()" style="margin-top:6px">＋ 新增證照</button>'
+    +'<div style="display:flex;justify-content:flex-end;gap:6px;margin-top:16px"><button type="button" class="btn btn-sm" onclick="wkCancel()">取消</button><button type="button" class="btn btn-sm btn-g" onclick="wkSave()" style="padding:7px 22px">儲存</button></div>';
+  var stSel=document.getElementById('wk-f-status');if(stSel){stSel.innerHTML='<option value="active"'+(w.status!=='left'?' selected':'')+'>在職</option><option value="left"'+(w.status==='left'?' selected':'')+'>離職</option>';}
+}
+function _wkCertsHtml(w,IN){
+  if(!w.certs.length)return '<div style="font-size:12px;color:var(--b3)">尚無證照</div>';
+  return w.certs.map(function(c,i){
+    var has=!!(c.du);
+    return '<div style="display:grid;grid-template-columns:1.4fr 1fr 130px auto auto;gap:6px;align-items:center;margin-bottom:6px" class="wk-cert-row">'
+      +'<input placeholder="證照名稱" value="'+esc(c.name||'')+'" onchange="wkCertField('+i+',\'name\',this.value)" style="'+IN+'">'
+      +'<input placeholder="證號" value="'+esc(c.no||'')+'" onchange="wkCertField('+i+',\'no\',this.value)" style="'+IN+'">'
+      +'<input type="date" value="'+esc(c.exp||'')+'" onchange="wkCertField('+i+',\'exp\',this.value)" title="有效期限" style="'+IN+'">'
+      +'<button type="button" class="btn btn-xs" onclick="'+(has?'_viewFile(\''+escq(c.name||'證照')+'\',_wkDraft.certs['+i+'].du)':'wkCertUpload('+i+')')+'">'+(has?'看影本':'上傳影本')+'</button>'
+      +'<button type="button" class="btn btn-xs btn-r" onclick="wkDelCert('+i+')">✕</button></div>';
+  }).join('');
+}
+function _wkRefreshDocs(){var root=document.getElementById('wk-root');if(root&&_wkDraft)_wkRenderEdit(root);}
+function _wkPickFile(accept,cb){
+  var inp=document.createElement('input');inp.type='file';inp.accept=accept||'image/*';inp.style.display='none';
+  inp.onchange=function(){var f=this.files&&this.files[0];inp.remove();if(!f)return;cb(f);};
+  document.body.appendChild(inp);inp.click();
+}
+function _wkReadDoc(f,cb){
+  if(/pdf/i.test(f.type)){
+    if(f.size>3*1024*1024){toast('PDF 請控制在 3MB 內');return;}
+    var rd=new FileReader();rd.onload=function(){cb(rd.result);};rd.readAsDataURL(f);return;
+  }
+  _fileToDataUrl(f,1000).then(cb).catch(function(e){_err('_wkReadDoc',e);toast('讀取失敗');});
+}
+function wkUpload(k){
+  if(!_wkDraft)return;
+  _wkPickFile('image/*,application/pdf',function(f){
+    _wkReadDoc(f,function(du){
+      var old=_wkDraft.docs[k]||{};
+      _wkDraft.docs[k]={du:du,name:f.name||'',ts:Date.now(),exp:old.exp||''};
+      _wkSnapFields();_wkRefreshDocs();toast('已加入 '+(_WK_DOCS.find(function(d){return d.k===k;})||{}).n);
+    });
+  });
+}
+function wkView(k){var fl=_wkDraft&&_wkDraft.docs[k];if(fl&&fl.du)_viewFile((_WK_DOCS.find(function(d){return d.k===k;})||{}).n||k,fl.du);}
+function wkSetExp(k,v){if(!_wkDraft)return;if(!_wkDraft.docs[k])_wkDraft.docs[k]={du:'',name:'',ts:0};_wkDraft.docs[k].exp=v||'';}
+function wkExpPlus(k,yrs){var d=new Date();d.setFullYear(d.getFullYear()+(yrs||1));d.setDate(d.getDate()-1);var v=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');wkSetExp(k,v);_wkSnapFields();_wkRefreshDocs();}
+function wkDelDoc(k){if(!_wkDraft)return;delete _wkDraft.docs[k];_wkSnapFields();_wkRefreshDocs();}
+function wkAddCert(){if(!_wkDraft)return;_wkSnapFields();_wkDraft.certs.push({id:_uid('ct'),name:'',no:'',exp:'',du:''});_wkRefreshDocs();}
+function wkCertField(i,k,v){if(!_wkDraft||!_wkDraft.certs[i])return;_wkDraft.certs[i][k]=v||'';}
+function wkCertUpload(i){if(!_wkDraft||!_wkDraft.certs[i])return;_wkPickFile('image/*,application/pdf',function(f){_wkReadDoc(f,function(du){_wkDraft.certs[i].du=du;_wkSnapFields();_wkRefreshDocs();});});}
+function wkDelCert(i){if(!_wkDraft)return;_wkSnapFields();_wkDraft.certs.splice(i,1);_wkRefreshDocs();}
+// 把畫面上的欄位值收回草稿（重繪文件區前呼叫，避免打到一半的字被洗掉）
+function _wkSnapFields(){
+  if(!_wkDraft)return;
+  _WK_FIELDS.forEach(function(p){var el=document.getElementById('wk-f-'+p[0]);if(el&&p[0]!=='mailAddr')_wkDraft[p[0]]=String(el.value||'').trim();});
+  var ms=document.getElementById('wk-f-mailSame');if(ms)_wkDraft.mailSame=!!ms.checked;
+  var ma=document.getElementById('wk-f-mailAddr');if(ma)_wkDraft.mailAddr=_wkDraft.mailSame?'':String(ma.value||'').trim();
+  var st=document.getElementById('wk-f-status');if(st)_wkDraft.status=st.value||'active';
+  var me=document.getElementById('wk-f-memo');if(me)_wkDraft.memo=String(me.value||'').trim();
+}
+function wkSave(){
+  if(!_wkDraft)return;
+  _wkSnapFields();
+  if(!_wkDraft.name){toast('請輸入姓名');var el=document.getElementById('wk-f-name');if(el)el.focus();return;}
+  if(_wkDraft.idNo&&!/^[A-Z][12]\d{8}$/i.test(_wkDraft.idNo)&&!/^[A-Z]{2}\d{8}$/i.test(_wkDraft.idNo)){toast('身分證字號格式看起來不對，請再確認（仍已儲存）');}
+  _wkDraft.idNo=String(_wkDraft.idNo||'').toUpperCase();
+  _touch(_wkDraft);
+  var i=WORKERS.findIndex(function(w){return w&&w.id===_wkDraft.id;});
+  if(i>=0)WORKERS[i]=_wkDraft;else WORKERS.push(_wkDraft);
+  saveWorkers();
+  _wkEditId=null;_wkDraft=null;
+  renderWorkers();toast('已儲存人員資料');
+  try{updateDashTodo();}catch(e){_err('wkSave',e);}
+}
+function wkCancel(){_wkEditId=null;_wkDraft=null;renderWorkers();}
+function wkDel(id){
+  var w=_wkById(id);if(!w)return;
+  showConfirm('刪除人員','確定刪除「'+esc(w.name||'')+'」的進場資料與全部證件影本？',function(){
+    _tomb('workers',id);WORKERS=WORKERS.filter(function(x){return x.id!==id;});saveWorkers();renderWorkers();toast('已刪除');
+  },true);
+}
+// ── AI：拍身分證／健保卡自動帶入 ──
+async function wkAiFromId(){
+  if(!_wkDraft)return;
+  if(!_aiKey()){toast('請先到參數設定填入 AI 金鑰');return;}
+  _wkPickFile('image/*',async function(f){
+    var du;try{du=await _fileToDataUrl(f,1200);}catch(e){toast('讀取失敗');return;}
+    toast('辨識中…');
+    try{
+      var b64=du.split(',')[1],mt=du.match(/^data:([^;]+)/)[1];
+      var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+        headers:{'content-type':'application/json','x-api-key':_aiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({model:'claude-sonnet-5',max_tokens:500,messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:mt,data:b64}},
+          {type:'text',text:'這是台灣的身分證或健保卡照片。擷取欄位並只回傳 JSON：{"doc":"id_front|id_back|nhi|other","name":"","idNo":"","birth":"YYYY-MM-DD","sex":"男|女|","regAddr":"","blood":""}。民國年請換算西元；身分證反面才有住址；讀不到的欄位留空字串。回覆第一個字元必須是 {。'}]}]})});
+      var d=await r.json();
+      if(d.error){toast('辨識失敗：'+(d.error.message||'').slice(0,60));return;}
+      var j=_aiJson((d.content||[]).map(function(b){return b.text||'';}).join(''))||{};
+      var set=function(k,v){if(!v)return;var el=document.getElementById('wk-f-'+k);if(el&&!el.value){el.value=v;}};
+      set('name',j.name);set('idNo',String(j.idNo||'').toUpperCase());set('birth',j.birth);set('regAddr',j.regAddr);set('blood',j.blood);
+      if(j.sex){var sx=document.getElementById('wk-f-sex');if(sx&&!sx.value)sx.value=j.sex;}
+      if(!j.sex&&j.idNo&&/^[A-Z][12]/i.test(j.idNo)){var sx2=document.getElementById('wk-f-sex');if(sx2&&!sx2.value)sx2.value=(j.idNo[1]==='1'?'男':'女');}
+      var ms=document.getElementById('wk-f-mailSame'),ma=document.getElementById('wk-f-mailAddr');if(ms&&ms.checked&&ma&&j.regAddr)ma.value=j.regAddr;
+      var slot=j.doc==='id_front'?'idF':(j.doc==='id_back'?'idB':(j.doc==='nhi'?'nhiF':''));
+      _wkSnapFields();
+      if(slot&&!(_wkDraft.docs[slot]&&_wkDraft.docs[slot].du)){_wkDraft.docs[slot]={du:du,name:f.name||'',ts:Date.now(),exp:''};}
+      _wkRefreshDocs();
+      toast('已帶入：'+[j.name,j.idNo,j.birth].filter(Boolean).join('／')+(slot?'，影本已放入'+(_WK_DOCS.find(function(x){return x.k===slot;})||{}).n:''));
+    }catch(e){toast('辨識失敗：'+(e.message||'').slice(0,50));}
+  });
+}
+// ── 匯出 ──
+function _wkSheetHtml(w){
+  w=_wkNorm(w);
+  var ph=w.docs.photo&&w.docs.photo.du;
+  var cell=function(l,v){return '<tr><th style="width:22%;text-align:left">'+l+'</th><td class="l">'+_xlEsc(v||'')+'</td></tr>';};
+  var ex=_wkExpiries(w);
+  var body='<h2>人員進場資料表 <span class="sub">'+_xlEsc(w.name||'')+(w.company?('　'+_xlEsc(w.company)):'')+'</span></h2>'
+    +'<table><tbody><tr><td rowspan="7" style="width:120px;vertical-align:top;padding:6px">'+(ph?'<img src="'+ph+'" style="width:108px;height:140px;object-fit:cover;border:1px solid #999">':'<div style="width:108px;height:140px;border:1px dashed #999;display:flex;align-items:center;justify-content:center;font-size:10px;color:#777">大頭照</div>')+'</td>'
+    +'<th style="width:18%;text-align:left">姓名</th><td class="l">'+_xlEsc(w.name||'')+'</td><th style="width:14%;text-align:left">性別</th><td class="l">'+_xlEsc(w.sex||'')+'</td></tr>'
+    +'<tr><th style="text-align:left">身分證字號</th><td class="l">'+_xlEsc(w.idNo||'')+'</td><th style="text-align:left">出生日期</th><td class="l">'+_xlEsc(w.birth||'')+'</td></tr>'
+    +'<tr><th style="text-align:left">血型</th><td class="l">'+_xlEsc(w.blood||'')+'</td><th style="text-align:left">聯絡電話</th><td class="l">'+_xlEsc(w.phone||'')+'</td></tr>'
+    +'<tr><th style="text-align:left">戶籍地址</th><td class="l" colspan="3">'+_xlEsc(w.regAddr||'')+'</td></tr>'
+    +'<tr><th style="text-align:left">通訊地址</th><td class="l" colspan="3">'+_xlEsc(_wkMailAddr(w))+'</td></tr>'
+    +'<tr><th style="text-align:left">緊急聯絡人</th><td class="l">'+_xlEsc(w.emg||'')+(w.emgRel?('（'+_xlEsc(w.emgRel)+'）'):'')+'</td><th style="text-align:left">緊急聯絡電話</th><td class="l">'+_xlEsc(w.emgPhone||'')+'</td></tr>'
+    +'<tr><th style="text-align:left">所屬公司</th><td class="l">'+_xlEsc(w.company||'')+'</td><th style="text-align:left">工種／職稱</th><td class="l">'+_xlEsc(w.title||'')+'</td></tr>'
+    +'</tbody></table>';
+  if(ex.length||w.certs.length){
+    body+='<table><thead><tr><th>證照／文件</th><th style="width:26%">證號</th><th style="width:22%">有效期限</th></tr></thead><tbody>'
+      +_WK_DOCS.filter(function(d){return d.exp&&w.docs[d.k]&&w.docs[d.k].exp;}).map(function(d){return '<tr><td class="l">'+d.n+'</td><td></td><td>'+_xlEsc(w.docs[d.k].exp)+'</td></tr>';}).join('')
+      +w.certs.map(function(c){return '<tr><td class="l">'+_xlEsc(c.name||'')+'</td><td>'+_xlEsc(c.no||'')+'</td><td>'+_xlEsc(c.exp||'')+'</td></tr>';}).join('')
+      +'</tbody></table>';
+  }
+  var imgs=_WK_DOCS.filter(function(d){return d.k!=='photo'&&w.docs[d.k]&&w.docs[d.k].du&&/^data:image\//.test(w.docs[d.k].du);});
+  var certImgs=w.certs.filter(function(c){return c.du&&/^data:image\//.test(c.du);});
+  if(imgs.length||certImgs.length){
+    var all=imgs.map(function(d){return {n:d.n,du:w.docs[d.k].du};}).concat(certImgs.map(function(c){return {n:c.name||'證照',du:c.du};}));
+    body+='<table><thead><tr><th colspan="2">證件影本</th></tr></thead><tbody>';
+    for(var i=0;i<all.length;i+=2){
+      body+='<tr>'+[all[i],all[i+1]].map(function(x){return x?('<td style="width:50%;padding:6px;vertical-align:top"><div style="font-size:10px;color:#555;margin-bottom:3px">'+_xlEsc(x.n)+'</div><img src="'+x.du+'" style="width:100%;max-height:230px;object-fit:contain;border:1px solid #bbb"></td>'):'<td style="width:50%"></td>';}).join('')+'</tr>';
+    }
+    body+='</tbody></table>';
+  }
+  body+='<div style="font-size:9.5px;color:#555;margin:4px 0 14px">簽名：____________________　日期：____________　　本表內含個人資料，僅供工地進場申請使用。</div>';
+  return body;
+}
+function wkPrintSheet(id){
+  var w=_wkById(id);if(!w){toast('請先儲存');return;}
+  _toolPrint('人員進場資料表',w.company||'',_wkSheetHtml(w),{fname:'人員進場資料表_'+(w.name||'')+'_'+localToday().replace(/-/g,'')});
+}
+function wkPrintAll(){
+  var list=WORKERS.filter(function(w){return w&&w.status!=='left';});
+  if(!list.length){toast('沒有在職人員');return;}
+  _toolPrint('人員進場資料表',null,list.map(_wkSheetHtml).join(''),{fname:'人員進場資料表_全部_'+localToday().replace(/-/g,'')});
+}
+function wkExportXlsx(){
+  var list=WORKERS.filter(function(w){return w&&(_wkSt===''||(_wkSt==='left'?w.status==='left':w.status!=='left'));});
+  if(!list.length){toast('沒有可匯出的人員');return;}
+  var H=['姓名','性別','身分證字號','出生日期','血型','聯絡電話','戶籍地址','通訊地址','緊急聯絡人','關係','緊急聯絡電話','所屬公司','工種／職稱','狀態','職安卡效期','體檢效期','藥檢效期','證照','文件份數','備註'];
+  var rows=[H.map(function(x){return {v:x,s:2};})];
+  list.forEach(function(w){w=_wkNorm(w);var ex=function(k){return (w.docs[k]&&w.docs[k].exp)||'';};
+    rows.push([w.name,w.sex,w.idNo,w.birth,w.blood,w.phone,w.regAddr,_wkMailAddr(w),w.emg,w.emgRel,w.emgPhone,w.company,w.title,w.status==='left'?'離職':'在職',ex('oshF'),ex('health'),ex('drug'),
+      w.certs.map(function(c){return (c.name||'')+(c.exp?('（'+c.exp+'）'):'');}).join('、'),_wkDocCount(w)+'/'+_WK_DOCS.length,w.memo].map(function(v){return {v:v==null?'':String(v),s:3};}));
+  });
+  xlsxDownload('人員名冊_'+localToday().replace(/-/g,''),[{name:'人員名冊',widths:[10,6,13,12,6,13,36,36,10,8,13,14,12,7,12,12,12,30,9,20],rows:rows}]);
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

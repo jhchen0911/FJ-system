@@ -2644,6 +2644,67 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.438 人員進場資料 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      WORKERS.length = 0;
+      const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+      const plus = d => { const x = new Date(); x.setDate(x.getDate() + d); return x.toISOString().slice(0, 10); };
+      out.page = ALL_PAGES.some(p => p.id === 'workers') && !!document.getElementById('sn-workers') && _SYNC_COLLS.includes('workers') && _REC_COLLS.includes('workers');
+      go('workers'); wkEdit('');
+      const set = (k, v) => { const el = document.getElementById('wk-f-' + k); el.value = v; };
+      set('name', '林阿明'); set('sex', '男'); set('idNo', 'a123456789'); set('birth', '1985-03-05'); set('blood', 'O'); set('phone', '0912345678');
+      set('regAddr', '桃園市中壢區中央路 1 號'); set('emg', '林太太'); set('emgRel', '配偶'); set('emgPhone', '0987654321'); set('company', '豐有工程'); set('title', '鋼構');
+      // 通訊地址同上；上傳職安卡（30 天後到期）與大頭照；證照已過期
+      _wkDraft.docs.oshF = { du: PNG, name: 'osh.png', ts: 1, exp: plus(30) };
+      _wkDraft.docs.photo = { du: PNG, name: 'p.png', ts: 1 };
+      wkAddCert(); wkCertField(0, 'name', '吊掛作業'); wkCertField(0, 'exp', plus(-3));
+      wkSave();
+      const w = WORKERS[0];
+      out.saved = WORKERS.length === 1 && w.name === '林阿明' && w.idNo === 'A123456789' && w.mailSame === true && _wkMailAddr(w) === '桃園市中壢區中央路 1 號' && w.emgRel === '配偶' && w._mt > 0 && w.certs.length === 1;
+      const ex = _wkExpiries(w);
+      out.exp = ex.length === 2 && ex[0].label === '吊掛作業' && ex[0].dd === -3 && ex[1].label === '職安卡正面' && ex[1].dd === 30;
+      // 清單：顯示、遮罩身分證、效期標示；離職篩選
+      const html = document.getElementById('wk-root').innerHTML;
+      out.list = /林阿明/.test(html) && /A1＊＊＊＊89/.test(html) && /已過期/.test(html) && /2／10/.test(html);
+      // 待辦提醒（到期前 60 天、已過期）
+      go('dash'); updateDashTodo();
+      const td = document.getElementById('dash-todo-list').innerHTML;
+      out.todo = /林阿明　吊掛作業已於/.test(td) && /職安卡正面30 天後到期|職安卡正面 ?30 天後到期/.test(td.replace(/<[^>]+>/g, ''));
+      // 資料表 PDF（含照片、地址、緊急聯絡、證照）與名冊 Excel
+      let printed = null; const orig = _printViaIframe;
+      window._printViaIframe = function (h, fname) { printed = { ok: /人員進場資料表/.test(h) && /林阿明/.test(h) && /桃園市中壢區/.test(h) && /林太太（配偶）/.test(h) && /吊掛作業/.test(h) && /img src="data:image\/png/.test(h), fname }; };
+      wkPrintSheet(w.id); const p1 = printed; wkPrintAll(); window._printViaIframe = orig;
+      out.pdf = !!p1 && p1.ok && /人員進場資料表_林阿明/.test(p1.fname) && !!printed && printed.ok;
+      let xl = null; const ox = xlsxDownload; window.xlsxDownload = function (fn, sh) { xl = { rows: sh[0].rows.length, cols: sh[0].rows[0].length, name: sh[0].rows[1][0].v, osh: sh[0].rows[1][14].v }; }; go('workers'); wkExportXlsx(); window.xlsxDownload = ox;
+      out.xlsx = !!xl && xl.rows === 2 && xl.cols === 20 && xl.name === '林阿明' && xl.osh === plus(30);
+      // 同步：shared payload 含 workers；記錄級合併新者勝、墓碑
+      out.payload = _syncPayload().data.workers.length === 1;
+      const merged = _mergeColl(WORKERS, { [w.id]: Object.assign({}, w, { title: '雲端改', _mt: Date.now() + 9 }) }, 'workers', {});
+      out.merge = merged.length === 1 && merged[0].title === '雲端改';
+      wkDel(w.id); document.getElementById('gen-confirm-ok').click();
+      out.del = WORKERS.length === 0 && !!(TOMBS.workers || {})[w.id];
+      WORKERS.length = 0; delete TOMBS.workers;
+      return out;
+    });
+    check('人員進場資料：新增／欄位／通訊地址同上／證照，效期計算與清單遮罩', r.page && r.saved && r.exp && r.list);
+    check('人員進場資料：到期待辦提醒、資料表 PDF、名冊 Excel', r.todo && r.pdf && r.xlsx);
+    check('人員進場資料：走 shared 逐筆同步、合併新者勝、刪除立墓碑', r.payload && r.merge && r.del);
+    // 手機：清單堆疊、無橫向捲動
+    const { page: mp, errors: merr } = await newPage(browser, 390, 844);
+    const mh = await mp.evaluate(() => new Promise(res => {
+      WORKERS.push({ id: 'wkM', name: '測試', status: 'active', docs: {}, certs: [], _mt: 1 });
+      go('workers');
+      setTimeout(() => { const ok = document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelectorAll('#wk-root table.mst').length === 1; WORKERS.length = 0; res(ok); }, 300);
+    }));
+    check('手機：人員進場資料清單堆疊、無橫向捲動', mh);
+    check('v5.438 測試無 JS 錯誤', errors.length === 0 && merr.length === 0, errors.concat(merr).slice(0, 3).join(' | '));
+    await mp.close();
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
