@@ -2551,6 +2551,47 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.436 額外支出唯一入口＝日報．支出，施工成本頁唯讀呈現 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      Q.push({ id: 'tq436', name: '戊案', awarded: true, items: [{ desc: 'H型鋼樁打設', unit: 'M', qty: 100, price: 1000 }], costs: [
+        { id: 'x1', type: 'extra', vendor: '公司支出（自付）', cat: '油資', date: '2026-09-03', amt: 1200, payer: '王小明', linkedItemIdx: 0, rows: [{ id: 'x1_0', subType: 'worker', desc: '加油', days: 1, dayRate: 1200, transport: 0 }] },
+        { id: 'x2', type: 'extra', vendor: '公司支出（自付）', cat: '其他', date: '2026-09-04', amt: 0, payer: '', rows: [{ id: 'a', desc: '便當', days: 10, dayRate: 100, transport: 0 }, { id: 'b', desc: '涼水', days: 1, dayRate: 300, transport: 50 }] },
+        { id: 's1', type: 'sub', vendor: '丙承包', cat: '打設', date: '2026-09-05', amt: 50000, rows: [{ id: 'r1', linkedItemIdx: 0, desc: '', qty: 100, unitPrice: 500 }] }] });
+      eid = 'tq436'; go('costs'); rCostItems();
+      const cl = document.getElementById('cost-list');
+      const card = id => cl.querySelector('#cost-amt-' + id).closest('div[style*="border-bottom"]');
+      // 額外支出卡：無金額／品名輸入框（只剩附屬勾選）、顯示支出人／品名／對應工項／小計、可刪、不可切換類型
+      const c1 = card('x1');
+      out.ro = c1.querySelectorAll('input[type="number"],input[type="text"],input[type="date"],select,textarea').length === 0 && !/changeCostType/.test(c1.innerHTML) && /delCostItem/.test(c1.innerHTML);
+      out.show = /支出人 王小明/.test(c1.innerHTML) && /加油/.test(c1.innerHTML) && /H型鋼樁打設/.test(c1.innerHTML) && /到日報．支出/.test(c1.innerHTML);
+      // 舊版多列額外支出：逐列列出、小計重算（10×100＋300＋50）
+      out.legacy = cl.querySelector('#cost-amt-x2').textContent === '1,350' && /公司付款/.test(card('x2').innerHTML) && /×10/.test(card('x2').innerHTML) && /車資 50/.test(card('x2').innerHTML);
+      // 其他成本卡的類型下拉不再有「額外支出」；程式切換到 extra 也被擋
+      const sel = card('s1').querySelector('select[onchange^="changeCostType"]');
+      out.opts = [...sel.options].map(o => o.value).join() === 'sub,labor,own';
+      changeCostType('s1', 'extra'); out.guard = Q.find(x => x.id === 'tq436').costs.find(c => c.id === 's1').type === 'sub';
+      // 頁面提示指向日報．支出；日報．支出登錄後仍會出現在施工成本（同一筆記錄）
+      out.hint = /請由「日報．支出」登錄/.test(document.getElementById('page-costs').innerHTML);
+      go('quickcost'); rQuickCost();
+      const ps = document.getElementById('qc-proj'); ps.value = 'tq436'; if (ps.onchange) ps.onchange();
+      document.getElementById('qc-amt').value = '250'; document.getElementById('qc-desc').value = '五金螺絲';
+      const n0 = Q.find(x => x.id === 'tq436').costs.length; submitQuickCost();
+      const qc = Q.find(x => x.id === 'tq436').costs;
+      out.flow = qc.length === n0 + 1 && qc[qc.length - 1].type === 'extra' && qc[qc.length - 1].amt === 250;
+      go('costs'); rCostItems(); out.flow2 = /五金螺絲/.test(document.getElementById('cost-list').innerHTML);
+      Q = Q.filter(x => x.id !== 'tq436');
+      return out;
+    });
+    check('施工成本：額外支出卡唯讀（支出人／品名／工項／小計、可刪不可改型）', r.ro && r.show && r.legacy);
+    check('施工成本：類型下拉無「額外支出」、切換被擋、提示指向日報．支出', r.opts && r.guard && r.hint);
+    check('日報．支出登錄 → 自動列在該專案施工成本', r.flow && r.flow2);
+    check('v5.436 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
