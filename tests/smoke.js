@@ -2792,6 +2792,52 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.441：連動再生不得重戳 _mt（已付款被舊裝置蓋回待付的根因） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      try {
+        const q = { id: 'q_s441', name: '同步測試案', items: [{ desc: '測試工項', unit: '式', qty: 1, price: 1000 }] };
+        const c = { id: 'c_s441', type: 'sub', vendor: '測試廠商', amt: 1000, date: '2026-09-01', rows: [{ linkedItemIdx: 0, qty: 1 }] };
+        PAYABLES.length = 0;
+        syncCostToPayable(q, c);
+        const p1 = PAYABLES.find(p => p.costId === c.id);
+        out.created = !!p1 && p1.status === 'pending';
+        // 另一台裝置已標付款（較新 _mt）
+        p1.status = 'paid'; p1.paidDate = '2026-09-10'; p1._mt = Date.now() + 1000;
+        const mt1 = p1._mt;
+        // 舊裝置重存同一筆成本（內容沒變）→ 不得把 _mt 推到現在、狀態保持已付
+        syncCostToPayable(q, c);
+        const p2 = PAYABLES.find(p => p.costId === c.id);
+        out.costIdem = !!p2 && p2.status === 'paid' && p2._mt === mt1 && PAYABLES.filter(p => p.costId === c.id).length === 1;
+        // 金額真的變了才戳
+        c.amt = 2000; syncCostToPayable(q, c);
+        const p3 = PAYABLES.find(p => p.costId === c.id);
+        out.costChanged = !!p3 && p3.amount === 2000 && p3.status === 'paid' && p3._mt !== mt1;
+        // 薪資→應付 upsert 兩次同內容
+        const f = { to: '員工A', amount: 30000, date: '2026-10-05', category: 'salary', project: '', note: '2026-09 薪資', itemName: '薪資', hrRef: 'ps_x', status: 'pending', paidDate: '' };
+        const h1 = _hrUpsertPay('pay_ps_x', f); const hm = h1._mt = Date.now() + 5000;
+        _hrUpsertPay('pay_ps_x', f);
+        out.hrIdem = PAYABLES.find(p => p.id === 'pay_ps_x')._mt === hm;
+        _hrUpsertPay('pay_ps_x', Object.assign({}, f, { amount: 31000 }));
+        out.hrChanged = PAYABLES.find(p => p.id === 'pay_ps_x')._mt !== hm;
+        // 雲端與本機都有更新：不再彈「覆蓋／保留」問窗，改逐筆合併後上傳；背景即刻上傳
+        const src = _pullCloudIfNewer.toString();
+        out.noOverwritePrompt = !/雲端與本機都有更新/.test(src) && /_pushCloud\(\{silent:true\}\)/.test(src);
+        out.sig = _recSig({ a: 1, _mt: 1, _by: 'x', updatedAt: 2 }) === _recSig({ a: 1, _mt: 9, _by: 'y', updatedAt: 3 }) && _recSig({ a: 1 }) !== _recSig({ a: 2 });
+        PAYABLES.length = 0;
+      } catch (e) { out.err = e.message; }
+      res(out);
+    }));
+    check('v5.441 成本→應付連動：內容沒變不重戳 _mt、已付狀態保留、只有一筆', r.created && r.costIdem, r.err || JSON.stringify(r));
+    check('v5.441 成本→應付連動：金額變了才更新 _mt', r.costChanged, r.err || '');
+    check('v5.441 薪資→應付 upsert：同內容不重戳、變更才戳', r.hrIdem && r.hrChanged, r.err || '');
+    check('v5.441 兩邊都有更新改逐筆合併上傳（不再問覆蓋）；內容簽章排除時間戳', r.noOverwritePrompt && r.sig, r.err || '');
+    check('v5.441 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
