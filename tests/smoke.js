@@ -1196,9 +1196,11 @@ async function newPage(browser, width, height) {
         costs: [{ id: 'cH', type: 'sub', vendor: '丙承包', cat: '打設', date: '2026-03-05', amt: 50000, rows: [{ id: 'r1', linkedItemIdx: 0, desc: '', qty: 100, unitPrice: 500 }] }],
         dailyLogs: [{ id: 'dH', date: '2026-03-10', workers: 2, subWorkers: 5, subVendor: '', progressRows: [{ itemIdx: 0, desc: 'H型鋼樁 H300 L=9M 打設', qty: 30, note: '' }], progress: 'H型鋼樁 30M', photos: [] }] }];
       PAYABLES.length = 0; INV.length = 0; CONTRACTS.splice(0);
+      P.subPayOnBill = false;   // v5.443 起預設未計價不掛整筆，此處驗到期日口徑
       syncCostToPayable(Q[0], Q[0].costs[0]);
       const pay = PAYABLES.find(p => p.costId === 'cH');
       out.payDue = !!pay && pay.date === '2026-04-25';
+      P.subPayOnBill = true;
       // ③ 報價列表毛利：成本單價 > 報價 3 倍視為未填，不再出現 −N千% 的淨利率
       _recalcQuoteTotals(Q[0]);
       const nr = _quoteEstNetR(Q[0]);
@@ -1265,7 +1267,7 @@ async function newPage(browser, width, height) {
     const { page, errors } = await newPage(browser, 1400, 1000);
     const r = await page.evaluate(() => {
       const out = {};
-      P.vendorPayDay = 25; P.vendorPayDelay = 1;
+      P.vendorPayDay = 25; P.vendorPayDelay = 1; P.subPayOnBill = false;   // v5.443 起預設未計價不掛整筆，此段驗舊口徑
       Q = [{ id: 'qS', code: '1170', name: '分包案', client: 'K', date: '2026-01-01', awarded: true, exs: [], rmk: {}, _mt: 1,
         items: [{ desc: 'H型鋼樁 H300 L=9M 打設', unit: 'M', qty: '100', price: '1000', estCost: '', ot: '', otu: '', sec: false },
                 { desc: 'H型鋼樁 H300 L=9M 拔除', unit: 'M', qty: '100', price: '400', estCost: '', ot: '', otu: '', sec: false }],
@@ -2569,12 +2571,12 @@ async function newPage(browser, width, height) {
       out.show = /支出人 王小明/.test(c1.innerHTML) && /加油/.test(c1.innerHTML) && /H型鋼樁打設/.test(c1.innerHTML) && /到日報．支出/.test(c1.innerHTML);
       // 舊版多列額外支出：逐列列出、小計重算（10×100＋300＋50）
       out.legacy = cl.querySelector('#cost-amt-x2').textContent === '1,350' && /公司付款/.test(card('x2').innerHTML) && /×10/.test(card('x2').innerHTML) && /車資 50/.test(card('x2').innerHTML);
-      // 其他成本卡的類型下拉不再有「額外支出」；程式切換到 extra 也被擋
+      // v5.443：類型下拉恢復「額外支出」（廠商型，例：外調機具）；日報帶入的卡（x1）仍不可改型
       const sel = card('s1').querySelector('select[onchange^="changeCostType"]');
-      out.opts = [...sel.options].map(o => o.value).join() === 'sub,labor,own';
-      changeCostType('s1', 'extra'); out.guard = Q.find(x => x.id === 'tq436').costs.find(c => c.id === 's1').type === 'sub';
+      out.opts = [...sel.options].map(o => o.value).join() === 'sub,labor,extra,own';
+      changeCostType('x1', 'sub'); out.guard = Q.find(x => x.id === 'tq436').costs.find(c => c.id === 'x1').type === 'extra';
       // 頁面提示指向日報．支出；日報．支出登錄後仍會出現在施工成本（同一筆記錄）
-      out.hint = /額外支出請由日報．支出登錄/.test(document.getElementById('page-costs').innerHTML);   // v5.437 起只留「＋ 新增成本」的提示文字，頁面說明列已移除
+      out.hint = /零星支出由日報．支出登錄/.test(document.getElementById('page-costs').innerHTML);   // v5.437 起只留「＋ 新增成本」的提示文字，頁面說明列已移除；v5.443 文案改為零星支出
       go('quickcost'); rQuickCost();
       const ps = document.getElementById('qc-proj'); ps.value = 'tq436'; if (ps.onchange) ps.onchange();
       document.getElementById('qc-amt').value = '250'; document.getElementById('qc-desc').value = '五金螺絲';
@@ -2586,7 +2588,7 @@ async function newPage(browser, width, height) {
       return out;
     });
     check('施工成本：額外支出卡唯讀（支出人／品名／工項／小計、可刪不可改型）', r.ro && r.show && r.legacy);
-    check('施工成本：類型下拉無「額外支出」、切換被擋、提示指向日報．支出', r.opts && r.guard && r.hint);
+    check('施工成本：類型下拉含「額外支出」、日報帶入卡不可改型、提示指向日報．支出', r.opts && r.guard && r.hint);
     check('日報．支出登錄 → 自動列在該專案施工成本', r.flow && r.flow2);
     check('v5.436 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
@@ -2800,7 +2802,7 @@ async function newPage(browser, width, height) {
       try {
         const q = { id: 'q_s441', name: '同步測試案', items: [{ desc: '測試工項', unit: '式', qty: 1, price: 1000 }] };
         const c = { id: 'c_s441', type: 'sub', vendor: '測試廠商', amt: 1000, date: '2026-09-01', rows: [{ linkedItemIdx: 0, qty: 1 }] };
-        PAYABLES.length = 0;
+        PAYABLES.length = 0; P.subPayOnBill = false;   // v5.443 起預設未計價不掛整筆，此處驗連動不重戳
         syncCostToPayable(q, c);
         const p1 = PAYABLES.find(p => p.costId === c.id);
         out.created = !!p1 && p1.status === 'pending';
@@ -2904,6 +2906,109 @@ async function newPage(browser, width, height) {
     check('日報表單：階段完工欄位；同日再送出合併（相同工項覆蓋、其餘新增、累計不重複）', r.ui && r.collect && r.banner && r.merge && r.cum);
     check('日報：載入既有內容修改、檢視內修改含階段完工', r.load && r.edit);
     check('v5.442 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v5.443 分包：未計價不掛應付／計價截止日／預付款抵扣；額外支出（廠商型）；介紹費計價跟隨 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+        const out={};
+        P.vendorPayDay=25;P.vendorPayDelay=1;P.vendorCutDay=25;P.subPayOnBill=true;
+        Q=[{id:'q443',code:'1443',name:'中科案',client:'K',date:'2026-08-01',awarded:true,exs:[],rmk:{},_mt:1,
+          items:[{desc:'H型鋼樁 H300 打設',unit:'M',qty:'1875',price:'1000',estCost:'',ot:'',otu:'',sec:false}],
+          costs:[
+            {id:'cM',type:'sub',vendor:'鴻玉',cat:'打設',date:'2026-09-01',amt:0,invoice:true,entryDate:'2026-09-01',rows:[{id:'m1',linkedItemIdx:0,desc:'',qty:1875,unitPrice:550}]},
+            {id:'cF',type:'sub',vendor:'風哥',cat:'打設',date:'2026-09-01',amt:0,invoice:false,rows:[{id:'f1',linkedItemIdx:0,desc:'',qty:1875,unitPrice:150}]},
+            {id:'cX',type:'extra',vendor:'',cat:'其他',date:'2026-09-10',amt:0,linkedItemIdx:0,rows:[{id:'x0',subType:'machine',desc:'',reason:'',days:1,dayRate:0,transport:0}]}
+          ],
+          dailyLogs:[{id:'d1',date:'2026-09-10',workers:0,progressRows:[{itemIdx:0,desc:'H型鋼樁 H300 打設',qty:100,note:''}],progress:'',photos:[]},
+                     {id:'d2',date:'2026-09-20',workers:0,progressRows:[{itemIdx:0,desc:'H型鋼樁 H300 打設',qty:25,note:''}],progress:'',photos:[]}]}];
+        INV.length=0;CONTRACTS.splice(0);PAYABLES.length=0;
+        openProjectCosts('q443');
+        const q=Q[0],cM=q.costs[0],cF=q.costs[1],cX=q.costs[2];
+        const modal=()=>document.getElementById('gen-confirm-modal');
+        syncCostToPayable(q,cM);syncCostToPayable(q,cF);
+        out.noWhole=!PAYABLES.some(p=>p.costId==='cM'||p.costId==='cF');
+        PAYABLES.push({id:'paycM',costId:'cM',quoteId:'q443',to:'鴻玉',amount:1031250,status:'pending',date:'2026-10-25'});
+        out.prune=_subWholePayPrune()===1&&!PAYABLES.some(p=>p.id==='paycM')&&!!(TOMBS.payables&&TOMBS.payables['paycM']);
+        rCostItems();out.hint=/計價後掛應付/.test(document.getElementById('cost-list').innerHTML);
+        P.subPayOnBill=false;syncCostToPayable(q,cM);out.legacy=PAYABLES.some(p=>p.id==='paycM'&&p.amount===1031250);
+        P.subPayOnBill=true;syncCostToPayable(q,cM);out.legacyOff=!PAYABLES.some(p=>p.id==='paycM');
+        const cl=document.getElementById('cost-list');
+        const card=id=>cl.querySelector('#cost-amt-'+id).closest('div[style*="border-bottom"]');
+        const cardX=card('cX');
+        out.xEdit=!!cardX.querySelector('select[onchange^="changeCostType"]')&&/外調機具/.test(cardX.innerHTML)&&!/到日報．支出/.test(cardX.innerHTML);
+        out.xOpts=[...card('cM').querySelector('select[onchange^="changeCostType"]').options].map(o=>o.value).join()==='sub,labor,extra,own';
+        cX.rows[0].desc='外調 300 怪手';cX.rows[0].dayRate=30000;recalcCostAmt(cX);cX.vendor='經一機械';syncCostToPayable(q,cX);
+        const px=PAYABLES.find(p=>p.costId==='cX');out.xPay=!!px&&px.amount===30000&&px.category==='other'&&px.date===_vendorDueDate('2026-09-10');
+        q.costs.push({id:'cQ',type:'extra',vendor:'公司支出（自付）',cat:'油資',date:'2026-09-03',amt:500,payer:'王小明',src:'quick',rows:[{id:'cQ_0',subType:'worker',desc:'加油',days:1,dayRate:500,transport:0}]});
+        rCostItems();const cardQ=card('cQ');
+        out.qRo=!/changeCostType/.test(cardQ.innerHTML)&&/到日報．支出/.test(cardQ.innerHTML);
+        changeCostType('cQ','sub');out.qGuard=q.costs.find(c=>c.id==='cQ').type==='extra';
+        changeCostType('cX','labor');out.xSwitch=cX.type==='labor';changeCostType('cX','extra');out.xBack=cX.type==='extra';
+        openSubPeriod('cM');
+        const cut=_vendorCutDate(localToday());
+        out.cut=document.getElementById('sp-date').value===cut&&document.getElementById('sp-to').value===cut&&document.getElementById('sp-from').value==='2026-09-01'&&/-25$/.test(cut)&&!document.getElementById('sp-adv');
+        out.cutVal=cut;
+        modal().style.display='none';_spCtx=null;
+        const est=_subCurEstimate(q,cM);out.est=est.est===68750;
+        openSubAdvance('cM');
+        document.getElementById('sa-amt').value='100000';_saOnInput();
+        out.warn=document.getElementById('sa-warn').style.display!=='none';
+        document.getElementById('gen-confirm-ok').click();
+        out.blocked=_subAdvs(cM).length===0&&modal().style.display!=='none'&&document.getElementById('sa-amt').value==='100000';
+        document.getElementById('sa-special').checked=true;document.getElementById('sa-reason').value='廠商材料款需先墊';
+        document.getElementById('gen-confirm-ok').click();
+        const a=_subAdvs(cM)[0];const pa=a&&PAYABLES.find(p=>p.id===_subAdvPayId('cM',a));
+        out.adv=!!a&&a.amt===100000&&a.special===true&&/材料款/.test(a.reason)&&!!pa&&pa.amount===100000&&pa.vat===true&&pa.date===localToday()&&/預付款/.test(pa.note)&&/特殊情況/.test(pa.note);
+        openSubAdvance('cM');document.getElementById('sa-amt').value='20000';_saOnInput();out.noWarn=document.getElementById('sa-warn').style.display==='none';
+        document.getElementById('gen-confirm-ok').click();out.adv2=_subAdvs(cM).length===2&&_subAdvStat(cM).paid===120000;
+        openSubPeriod('cM');
+        document.getElementById('sp-date').value='2026-09-25';document.getElementById('sp-from').value='2026-09-01';document.getElementById('sp-to').value='2026-09-25';_spFillDaily();
+        const advEl=document.getElementById('sp-adv');
+        out.advField=!!advEl&&advEl.value==='68750'&&/預付未抵 NT\$ 120,000/.test(modal().innerHTML);
+        out.tot0=/抵扣預付款[\s\S]*68,750/.test(document.getElementById('sp-tot').innerHTML)&&/應付金額[\s\S]*NT\$ 0</.test(document.getElementById('sp-tot').innerHTML);
+        advEl.value='50000';advEl.dataset.touched='1';_spRecalc();
+        out.tot1=/應付金額[\s\S]*NT\$ 19,688/.test(document.getElementById('sp-tot').innerHTML);
+        advEl.value='99999';_spRecalc();out.cap=advEl.value==='68750';
+        advEl.value='50000';_spRecalc();
+        document.getElementById('gen-confirm-ok').click();
+        const per=cM.periods[0],pp=PAYABLES.find(p=>p.id==='paycM_p1');
+        out.per=!!per&&per.amt===68750&&per.adv===50000&&per.due==='2026-10-25'&&!!pp&&pp.amount===18750&&/抵扣預付款 50,000/.test(pp.note);
+        const stM=_subStat(cM);out.stat=stM.advPaid===120000&&stM.advUsed===50000&&stM.advLeft===70000&&stM.payN===3;
+        delSubAdvance('cM',_subAdvs(cM)[0].id);out.delBlock=_subAdvs(cM).length===2;
+        delSubAdvance('cM',_subAdvs(cM)[1].id);document.getElementById('gen-confirm-ok').click();out.delOk=_subAdvs(cM).length===1&&!PAYABLES.some(p=>p.costAdv&&p.amount===20000);
+        updSubField('cF','followOf','cM');
+        const fp=cF.periods&&cF.periods[0],fpay=PAYABLES.find(p=>p.id==='paycF_p1');
+        out.follow=cF.followOf==='cM'&&!!fp&&fp.no===1&&fp.date==='2026-09-25'&&fp.rows.length===1&&fp.rows[0].rid==='f1'&&fp.rows[0].qty===125&&fp.amt===18750&&!!fpay&&fpay.amount===18750&&fpay.vat===false;
+        q.dailyLogs.push({id:'d3',date:'2026-09-28',workers:0,progressRows:[{itemIdx:0,desc:'H型鋼樁 H300 打設',qty:40,note:''}],progress:'',photos:[]});
+        openSubPeriod('cM');document.getElementById('sp-date').value='2026-10-25';document.getElementById('sp-to').value='2026-10-25';_spFillDaily();
+        out.qty2=document.querySelector('.sp-qty').value==='40';
+        document.getElementById('gen-confirm-ok').click();
+        out.follow2=cF.periods.length===2&&cF.periods[1].rows[0].qty===40&&PAYABLES.find(p=>p.id==='paycF_p2').amount===6000&&!PAYABLES.some(p=>p.id==='paycM_p2');
+        window._costView='list';setCostView('subs');const sh=document.getElementById('cost-list').innerHTML;
+        out.subsView=/預付款/.test(sh)&&/跟隨「鴻玉」計價/.test(sh)&&/合計 700／M/.test(sh)&&/−抵預付 50,000/.test(sh)&&/依主約自動/.test(sh)&&/預付款抵扣完畢/.test(sh);
+        setCostView('list');
+        openSubPeriod('cF');out.followGuard=modal().style.display==='none';
+        delSubPeriod('cM',2);document.getElementById('gen-confirm-ok').click();out.followDel=cM.periods.length===1&&cF.periods.length===1&&!PAYABLES.some(p=>p.id==='paycF_p2');
+        let html='';const _orig=window._printNativeHTML;window._printNativeHTML=function(h){html=h;};
+        printVendorStatement('cM',1);window._printNativeHTML=_orig;
+        out.stmt=/抵扣預付款/.test(html)&&/50,000/.test(html)&&/19,688/.test(html);
+        setCostView('audit');const ah=document.getElementById('cost-list').innerHTML;out.audit=/分期 1 期一致/.test(ah)&&!/缺應付/.test(ah);setCostView('list');
+        // 金流預測：未計價分包推估（扣預付未抵）
+        out.fc=(function(){try{renderCashForecast();}catch(e){return 'err:'+e;}return true;})();
+        Q=Q.filter(x=>x.id!=='q443');PAYABLES.length=0;
+        return out;
+    });
+    check('分包：未計價不掛整筆應付（參數可關）、一次性撤舊整筆、卡片提示', r.noWhole && r.prune && r.hint && r.legacy && r.legacyOff);
+    check('施工成本：廠商型額外支出可建可改型、掛應付；日報帶入的仍唯讀不可改型', r.xEdit && r.xOpts && r.xPay && r.qRo && r.qGuard && r.xSwitch && r.xBack);
+    check('分包：本期計價預設計價日／期間迄＝最近截止日（25 日）', r.cut, r.cutVal);
+    check('預付款：超過本期預估需勾特殊情況＋原因、立即掛應付；未超過免說明', r.est && r.warn && r.blocked && r.adv && r.noWarn && r.adv2);
+    check('預付款：計價預設全額抵扣不超過本期、可改少、應付＝本期−抵扣；統計；已抵扣者不可刪', r.advField && r.tot0 && r.tot1 && r.cap && r.per && r.stat && r.delBlock && r.delOk);
+    check('介紹費：跟隨主約計價自動同期同量、主約新增／刪期連動、跟隨者不自開計價', r.follow && r.qty2 && r.follow2 && r.followGuard && r.followDel);
+    check('分包管理視圖：預付款列／跟隨標記／合計單價；計價單含抵扣；勾稽一致；金流預測不報錯', r.subsView && r.stmt && r.audit && r.fc === true);
+    check('v5.443 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
