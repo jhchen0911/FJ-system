@@ -1067,8 +1067,8 @@ async function newPage(browser, width, height) {
       const rec = _qtyRecon(Q[0]);
       const r0 = rec.find(x => x.idx === 0);
       out.recon = r0 && r0.contract === 100 && r0.reported === 120 && r0.sub === 80
-        && r0.warns.some(w => /回報量超過合約量/.test(w)) && r0.warns.some(w => /發包量低於回報量/.test(w));
-      out.reconHtml = /數量不一致/.test(buildQtyReconHtml(Q[0])) && !!document.getElementById('cost-view-qty');
+        && r0.notes.some(w => /回報量超過合約量/.test(w)) && r0.notes.some(w => /發包量低於回報量/.test(w));   // v5.444 起實作實算的超量改為藍字提示（notes）
+      out.reconHtml = /實作實算/.test(buildQtyReconHtml(Q[0])) && /回報量超過合約量/.test(buildQtyReconHtml(Q[0])) && !!document.getElementById('cost-view-qty');
       // 請款帶入日報量：無上期 → 全部日報量 120；有上期（日期在日報之前）→ 仍 120；上期在日報之後 → 0
       out.between = _dailyQtyBetween(Q[0], 'H型鋼樁打設', '', today) === 120
         && _dailyQtyBetween(Q[0], 'H型鋼樁打設', today, today) === 0;
@@ -1082,7 +1082,7 @@ async function newPage(browser, width, height) {
     });
     check('日報：承包廠商出工另欄記錄，不入點工勾稽', r.vendorList && r.saved && r.auditOnlyOwn);
     check('日報：進度列即時提示超過合約量', r.hintOver);
-    check('施工成本：工項數量四方對照抓出超報／漏發包', r.recon && r.reconHtml);
+    check('施工成本：工項數量四方對照（實作實算超量為提示）', r.recon && r.reconHtml);
     check('請款單：依上期請款日切日報回報量', r.between);
     check('施工進度：從日報回填實際完成量與完工日', r.pgFill);
     check('v5.401 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
@@ -2988,7 +2988,7 @@ async function newPage(browser, width, height) {
         document.getElementById('gen-confirm-ok').click();
         out.follow2=cF.periods.length===2&&cF.periods[1].rows[0].qty===40&&PAYABLES.find(p=>p.id==='paycF_p2').amount===6000&&!PAYABLES.some(p=>p.id==='paycM_p2');
         window._costView='list';setCostView('subs');const sh=document.getElementById('cost-list').innerHTML;
-        out.subsView=/預付款/.test(sh)&&/跟隨「鴻玉」計價/.test(sh)&&/合計 700／M/.test(sh)&&/−抵預付 50,000/.test(sh)&&/依主約自動/.test(sh)&&/預付款抵扣完畢/.test(sh);
+        out.subsView=/預付款/.test(sh)&&/跟隨「鴻玉」計價/.test(sh)&&/成本合計 700/.test(sh)&&/分開付款/.test(sh)&&/−抵預付 50,000/.test(sh)&&/依主約自動/.test(sh)&&/預付款抵扣完畢/.test(sh);
         setCostView('list');
         openSubPeriod('cF');out.followGuard=modal().style.display==='none';
         delSubPeriod('cM',2);document.getElementById('gen-confirm-ok').click();out.followDel=cM.periods.length===1&&cF.periods.length===1&&!PAYABLES.some(p=>p.id==='paycF_p2');
@@ -3009,6 +3009,96 @@ async function newPage(browser, width, height) {
     check('介紹費：跟隨主約計價自動同期同量、主約新增／刪期連動、跟隨者不自開計價', r.follow && r.qty2 && r.follow2 && r.followGuard && r.followDel);
     check('分包管理視圖：預付款列／跟隨標記／合計單價；計價單含抵扣；勾稽一致；金流預測不報錯', r.subsView && r.stmt && r.audit && r.fc === true);
     check('v5.443 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v5.444 施工成本統整：材料機具掛應付／廠商請款實作實算／數量對照提示／請款單廠商量／類型摘要／逾期租金另列 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+        const out={};
+        P.vendorPayDay=25;P.vendorPayDelay=1;P.vendorCutDay=25;P.subPayOnBill=true;
+        Q=[{id:'q444',code:'1444',name:'實作實算案',client:'K',date:'2026-08-01',awarded:true,exs:[],rmk:{},_mt:1,
+          items:[{desc:'H型鋼樁 H300 打設',unit:'M',qty:'1000',price:'1000',estCost:'',ot:'',otu:'',sec:false,note:'含30天租期'}],
+          costs:[
+            {id:'cM',type:'sub',vendor:'鴻玉',cat:'打設',date:'2026-09-01',amt:0,invoice:true,entryDate:'2026-09-01',rows:[{id:'m1',linkedItemIdx:0,desc:'',qty:1000,unitPrice:550}]},
+            {id:'cF',type:'sub',vendor:'風哥',cat:'打設',date:'2026-09-01',amt:0,invoice:false,followOf:'cM',rows:[{id:'f1',linkedItemIdx:0,desc:'',qty:1000,unitPrice:150}]},
+            {id:'cO',type:'own',vendor:'',cat:'材料租金',date:'2026-09-02',amt:0,linkedItemIdx:0,rows:[{id:'o1',preset:'材料租金',desc:'',qty:3,unit:'月',unitPrice:20000}]}
+          ],
+          dailyLogs:[{id:'d1',date:'2026-09-10',workers:0,progressRows:[{itemIdx:0,desc:'H型鋼樁 H300 打設',qty:700,note:''}],progress:'',photos:[]},
+                     {id:'d2',date:'2026-09-20',workers:0,progressRows:[{itemIdx:0,desc:'H型鋼樁 H300 打設',qty:400,note:''}],progress:'',photos:[]}]}];
+        INV.length=0;CONTRACTS.splice(0);PAYABLES.length=0;
+        openProjectCosts('q444');
+        const q=Q[0],cM=q.costs[0],cF=q.costs[1],cO=q.costs[2];
+        const modal=()=>document.getElementById('gen-confirm-modal');
+        const cl=document.getElementById('cost-list');
+        const card=id=>cl.querySelector('#cost-amt-'+id).closest('div[style*="border-bottom"]');
+        // ① 自有成本（材料機具）：沒廠商不入應付；選廠商即掛應付、開發票 +5%、發票號；卡片有廠商／發票欄、租期參考
+        rCostItems();
+        syncCostToPayable(q,cO);out.ownNone=!PAYABLES.some(p=>p.costId==='cO');
+        out.ownCard0=/公司自備/.test(card('cO').innerHTML)&&/租期參考/.test(card('cO').innerHTML)&&/2026-09-10/.test(card('cO').innerHTML);
+        updCostField('cO','vendor','中鋼租賃');
+        let po=PAYABLES.find(p=>p.costId==='cO');out.ownPay=!!po&&po.amount===60000&&po.category==='material'&&_payEff(po)===63000&&po.date===_vendorDueDate('2026-09-02');
+        updCostField('cO','invoice',false);po=PAYABLES.find(p=>p.costId==='cO');out.ownNoInv=po.vat===false&&_payEff(po)===60000;
+        updCostField('cO','invoice',true);updCostField('cO','invNo','ZZ-88889999');po=PAYABLES.find(p=>p.costId==='cO');out.ownInvNo=po.vat===true&&po.invNo==='ZZ-88889999';
+        rCostItems();out.ownCard=/開發票/.test(card('cO').innerHTML)&&/ZZ-88889999/.test(card('cO').innerHTML)&&/應付 63,000/.test(card('cO').innerHTML);
+        updCostField('cO','vendor','');out.ownBack=!PAYABLES.some(p=>p.costId==='cO');updCostField('cO','vendor','中鋼租賃');
+        // ② 類型摘要列
+        rCostItems();const cs=document.getElementById('cost-summary');
+        out.strip=!!cs&&/承包（發包）/.test(cs.innerHTML)&&/日報零星支出/.test(cs.innerHTML)&&/本案應付未付/.test(cs.innerHTML)&&/自有（材料機具）/.test(cs.innerHTML);
+        // ③ 登錄廠商請款：單價可改、與日報差異、超量＝實作實算＋自行吸收、發票號
+        openSubPeriod('cM');
+        out.title=/登錄廠商請款/.test(modal().innerHTML)&&/廠商請款日/.test(modal().innerHTML)&&!!document.getElementById('sp-invno')&&!!document.querySelector('.sp-up');
+        document.getElementById('sp-date').value='2026-09-30';document.getElementById('sp-from').value='2026-09-01';document.getElementById('sp-to').value='2026-09-30';_spFillDaily();
+        const row=document.querySelector('.sp-row');
+        out.daily=row.querySelector('.sp-qty').value==='1100';
+        out.overInfo=row.querySelector('.sp-warn').style.display!=='none'&&/實作實算/.test(row.querySelector('.sp-warn').textContent)&&document.getElementById('sp-absorb-wrap').style.display!=='none'&&/向業主追加請款/.test(document.getElementById('sp-tot').innerHTML);
+        out.diffHidden=row.querySelector('.sp-diff').style.display==='none';
+        row.querySelector('.sp-qty').value='1150';row.querySelector('.sp-qty').dataset.touched='1';_spRecalc();
+        out.diffShown=row.querySelector('.sp-diff').style.display!=='none'&&/多於日報回報 50/.test(row.querySelector('.sp-diff').textContent);
+        row.querySelector('.sp-qty').value='1100';row.querySelector('.sp-up').value='560';_spRecalc();
+        out.amt=row.querySelector('.sp-amt').textContent==='616,000'&&/應付金額[\s\S]*NT\$ 646,800/.test(document.getElementById('sp-tot').innerHTML);
+        document.getElementById('sp-invno').value='AB-12345678';document.getElementById('sp-absorb').checked=true;document.getElementById('sp-absorb-note').value='為後續工作自行吸收';_spRecalc();
+        out.absorbTxt=/已勾自行吸收/.test(document.getElementById('sp-tot').innerHTML);
+        document.getElementById('gen-confirm-ok').click();
+        const per=cM.periods[0],pp=PAYABLES.find(p=>p.id==='paycM_p1');
+        out.per=!!per&&per.rows[0].qty===1100&&per.rows[0].up===560&&per.amt===616000&&per.absorb===true&&/後續/.test(per.absorbNote)&&per.invNo==='AB-12345678'&&!!pp&&pp.amount===616000&&pp.invNo==='AB-12345678';
+        const ov=_subOverStat(cM);out.over=ov.overAmt===56000&&ov.absorbed===56000&&ov.toOwner===0&&ov.absorbQtyByItem[0]===100;
+        // 跟隨者：同量、自己的單價（不套主約覆寫價）
+        out.follow=cF.periods&&cF.periods.length===1&&cF.periods[0].rows[0].qty===1100&&cF.periods[0].rows[0].up==null&&cF.periods[0].amt===165000&&PAYABLES.find(p=>p.id==='paycF_p1').amount===165000;
+        // ④ 分包管理視圖：實作超出（藍字非紅字）、自行吸收、發票、核對單、分開付款
+        window._costView='list';setCostView('subs');const sh=document.getElementById('cost-list').innerHTML;
+        out.subs=/實作超出發包 66,000/.test(sh)&&/自行吸收 56,000/.test(sh)&&/超量自行吸收：為後續工作自行吸收/.test(sh)&&/發票 AB-12345678/.test(sh)&&/核對單/.test(sh)&&!/計價單/.test(sh)&&/分開付款/.test(sh)&&/另付 風哥/.test(sh)&&!/超出發包額/.test(sh);
+        setCostView('list');
+        // ⑤ 數量對照：實作實算為藍字提示、廠商已請未向業主請為紅字
+        const rec=_qtyRecon(q);
+        out.recon=rec.length===1&&rec[0].vb===1100&&rec[0].sub===1000&&rec[0].notes.some(n=>/廠商請款累計超過發包量 100/.test(n)&&/自行吸收/.test(n))&&rec[0].notes.some(n=>/回報量超過合約量 100/.test(n))&&rec[0].warns.length===1&&/廠商已請 1,100（扣自行吸收 100）、業主已請 0，差 1,000/.test(rec[0].warns[0]);
+        setCostView('qty');const qh=document.getElementById('cost-list').innerHTML;out.reconHtml=/實作實算/.test(qh)&&/尚未向業主請款/.test(qh)&&/color:#1565C0/.test(qh);setCostView('list');
+        // ⑥ 勾稽：材料機具（有廠商）也列；成本分析：逾期租金另列
+        setCostView('audit');const ah=document.getElementById('cost-list').innerHTML;out.audit=/材料機具/.test(ah)&&/中鋼租賃/.test(ah)&&!/缺應付/.test(ah);setCostView('list');
+        // 逾期：打設最後一天 09-20 → 起算 09-21，30 天租期到 10-20，今天 09-30 尚未逾期 → 無列；改 ot 與早日期
+        q.dailyLogs[1].date='2026-08-01';q.dailyLogs[0].date='2026-07-20';q.items[0].ot='50';q.items[0].otu='M/天';
+        setCostView('analysis');const an=document.getElementById('cost-list').innerHTML;out.rentLine=/逾期租金（業主端/.test(an)&&/逾 /.test(an);setCostView('list');
+        q.dailyLogs[1].date='2026-09-20';q.dailyLogs[0].date='2026-09-10';
+        // ⑦ 業主請款單：廠商請款量建議
+        const inv2=buildInvFromQuote(q);inv2.id='tinv444';inv2.date='2026-10-05';INV.push(inv2);
+        loadInvoice('tinv444');
+        out.vsug=_invVendorSuggest(0)===1100;
+        const tr=document.getElementById('iamt-0').closest('tr');const inp=tr.querySelector('input[data-f="curQty"]');inp.value='500';invItems[0].curQty=500;updateInvRowAmt(0,tr);
+        out.vchip=/日報＝廠商請款 1,100 ↵/.test(tr.innerHTML);
+        q.dailyLogs.push({id:'d9',date:'2026-10-02',workers:0,progressRows:[{itemIdx:0,desc:'H型鋼樁 H300 打設',qty:30,note:''}],progress:'',photos:[]});invItems[0].curQty=500;updateInvRowAmt(0,tr);out.vchip2=/日報 1,130 ↵/.test(tr.innerHTML)&&/廠商請款 1,100 ↵/.test(tr.innerHTML);q.dailyLogs.pop();
+        invFillVendor(0);out.vfill=invItems[0].curQty===1100;
+        INV=INV.filter(x=>x.id!=='tinv444');invEid=null;invItems=[];window._invSnap=null;
+        Q=Q.filter(x=>x.id!=='q444');PAYABLES.length=0;
+        return out;
+    });
+    check('自有成本（材料機具）：沒廠商不入應付；選廠商掛應付、開發票 +5%、發票號；卡片欄位與租期參考', r.ownNone && r.ownCard0 && r.ownPay && r.ownNoInv && r.ownInvNo && r.ownCard && r.ownBack);
+    check('施工成本頁：類型摘要列（承包／點工／自有／額外／日報零星／應付未付）', r.strip);
+    check('登錄廠商請款：單價可核實覆寫、與日報差異提示、超量＝實作實算＋自行吸收、發票號進應付', r.title && r.daily && r.overInfo && r.diffHidden && r.diffShown && r.amt && r.absorbTxt && r.per && r.over && r.follow);
+    check('分包管理：實作超出以提示呈現、自行吸收／發票／核對單／介紹費分開付款', r.subs);
+    check('數量對照：實作實算藍字提示、廠商已請未向業主請為紅字；勾稽含材料機具；成本分析列逾期租金', r.recon && r.reconHtml && r.audit && r.rentLine);
+    check('業主請款單：本期數量可帶入廠商請款量（與日報並列）', r.vsug && r.vchip && r.vchip2 && r.vfill);
+    check('v5.444 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
