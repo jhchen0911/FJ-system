@@ -2834,7 +2834,76 @@ async function newPage(browser, width, height) {
     check('v5.441 成本→應付連動：金額變了才更新 _mt', r.costChanged, r.err || '');
     check('v5.441 薪資→應付 upsert：同內容不重戳、變更才戳', r.hrIdem && r.hrChanged, r.err || '');
     check('v5.441 兩邊都有更新改逐筆合併上傳（不再問覆蓋）；內容簽章排除時間戳', r.noOverwritePrompt && r.sig, r.err || '');
-    check('v5.441 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v5.442 日報：階段完工狀態＋同日合併 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const q = { id: 'tq441', name: '階段案', awarded: true, items: [
+        { desc: 'H型鋼樁 H300 打設、拔除', unit: '支', qty: 10, price: 1000, ot: '50', otu: '支/天', note: '租期 30 天' },
+        { desc: '中間樁 打設', unit: '支', qty: 4, price: 500 }], dailyLogs: [
+        { id: 'a', date: '2026-09-20', progressRows: [{ itemIdx: 0, qty: 6, ph: 'install' }, { itemIdx: 1, qty: 4 }], progress: '' },
+        { id: 'b', date: '2026-09-25', progressRows: [{ itemIdx: 0, qty: 4, ph: 'install' }], progress: '' }] };
+      Q.push(q);
+      // ① 未宣告階段完工：數量已達合約量 → 起算＝最後一天次日
+      let pg = _itemProgress(q, 0);
+      out.before = pg.installLast === '2026-09-25' && _rentStatus(q, 0, '2026-11-30').start === '2026-09-26' && _projStageDone(q) === true;
+      // ② 階段完工日報（完成日 9/26）→ 起算改 9/27、doneDate 有值（不再是推估）、專案卡有「待拔除」小標
+      q.dailyLogs.unshift({ id: 'c', date: '2026-09-26', status: 'stage', stageOf: 'install', stageDate: '2026-09-26', stopReason: '打設完成', resumeDate: '2026-10-20', progressRows: [], progress: '' });
+      pg = _itemProgress(q, 0);
+      const rs = _rentStatus(q, 0, '2026-11-30');
+      out.stage = pg.installLast === '2026-09-26' && pg.doneDate && rs.start === '2026-09-27' && rs.estimated === false && rs.expiry === '2026-10-26' && rs.overDays === 35;
+      out.stageText = /階段完工：打設／裝設完成（2026-09-26）/.test(_drStatusText(q.dailyLogs[0])) && /預計下階段進場 2026-10-20/.test(_drStatusText(q.dailyLogs[0]));
+      out.chip = /打設完成 待拔除（2026-09-26）/.test(_drProjChip(q));
+      // ③ 提醒：階段完工後不催；過了預計進場日 gap 天才問，且問句是「已進場拔除還是延後」
+      out.quiet = _drGapState(q, '2026-10-15', 3) === null && _projStageDone(q) === true;
+      const g = _drGapState(q, '2026-10-25', 3); out.ask = !!g && g.kind === 'resume' && g.lastL.status === 'stage';
+      const _gd = P.drGapDays; P.drGapDays = 3; q.dailyLogs[0].resumeDate = '2026-09-20';   // 用已過去的預計進場日驗證待辦問句
+      go('dash'); updateDashTodo(); out.todo = /已進場拔除還是延後/.test(document.getElementById('dash-todo-list').textContent);
+      q.dailyLogs[0].resumeDate = '2026-10-20'; P.drGapDays = _gd;
+      // ④ 完成日早於最後一筆數量日報 → 仍以數量日報最後一天為準（不會把起算日往前拉）
+      q.dailyLogs[0].stageDate = '2026-09-22'; out.noPull = _itemProgress(q, 0).installLast === '2026-09-25'; q.dailyLogs[0].stageDate = '2026-09-26';
+      // ⑤ 拔除完成的階段日報（無拔除數量）→ 計租結束＝完成日；全部完工不再視為待拔除
+      q.dailyLogs.unshift({ id: 'd', date: '2026-11-05', status: 'stage', stageOf: 'remove', stageDate: '2026-11-05', progressRows: [], progress: '' });
+      const rs2 = _rentStatus(q, 0, '2026-11-30');
+      out.removeStage = rs2.endDate === '2026-11-05' && rs2.overDays === 10 && _projStageDone(q) === false && /全部完工/.test(_drProjChip(q));
+      q.dailyLogs.shift();
+      // ⑥ 表單：選階段完工顯示階段欄位、完成日預設＝日期；收集含 stageOf／stageDate
+      go('quickcost'); rQuickCost();
+      const sel = document.getElementById('dr-proj'); sel.value = 'tq441'; sel.onchange();
+      document.getElementById('dr-date').value = '2026-09-30';
+      document.getElementById('dr-status').value = 'stage'; _drStatusUI();
+      out.ui = document.getElementById('dr-stage-wrap-of').style.display === '' && document.getElementById('dr-stage-date').value === '2026-09-30' && /下階段進場/.test(document.getElementById('dr-resume-lb').textContent);
+      const e = _drCollect(); out.collect = !!e && e.status === 'stage' && e.stageOf === 'install' && e.stageDate === '2026-09-30';
+      document.getElementById('dr-status').value = 'work'; _drStatusUI();
+      // ⑦ 同日合併：9/25 已有日報（工項0 打設 4）→ 再送 9/25：工項0 打設 8、工項1 2 → 仍一筆，工項0 覆蓋為 8、新增工項1；累計不重複
+      document.getElementById('dr-date').value = '2026-09-25'; _drExistingBanner();
+      out.banner = document.getElementById('dr-exist').style.display === '' && /此日已有日報/.test(document.getElementById('dr-exist').textContent) && /1 列進度/.test(document.getElementById('dr-exist').textContent);
+      _drProgRows = [{ itemIdx: 0, qty: 8, note: '', ph: 'install' }, { itemIdx: 1, qty: 2, note: '' }]; drRenderProgRows();
+      _drCrews = [{ type: 'sub', vendor: '鴻玉', n: 3 }]; drRenderCrews();
+      const n0 = q.dailyLogs.length; submitDailyReport();
+      const L25 = q.dailyLogs.filter(L => L.date === '2026-09-25');
+      out.merge = q.dailyLogs.length === n0 && L25.length === 1 && L25[0].progressRows.length === 2 && L25[0].progressRows[0].qty === 8 && L25[0].progressRows[1].itemIdx === 1 && L25[0].subWorkers === 3 && L25[0].subVendor === '鴻玉' && !!L25[0].editedAt;
+      out.cum = _itemProgress(q, 0).cum === 14 && _itemProgress(q, 1).cum === 6;   // 6+8、4+2（沒有重複的 4）
+      // ⑧ 載入既有內容修改：表單帶回該日的列
+      document.getElementById('dr-date').value = '2026-09-25'; sel.value = 'tq441'; drLoadExisting();
+      out.load = _drProgRows.length === 2 && String(_drProgRows[0].qty) === '8' && _drCrews.some(c => c.vendor === '鴻玉');
+      _drClearForm(); document.getElementById('dr-date').value = localToday();
+      // ⑨ 檢視內修改視窗有「階段完工」選項與完成日欄
+      viewDailyReports('tq441'); editDailyLog('tq441', 'c');
+      out.edit = !!document.getElementById('dle-stage-of') && document.getElementById('dle-status').value === 'stage' && document.getElementById('dle-stage-date').value === '2026-09-26';
+      document.getElementById('gen-confirm-ok').click(); setTimeout(() => { const m = document.getElementById('gen-confirm-modal'); if (m) m.style.display = 'none'; }, 400);
+      Q = Q.filter(x => x.id !== 'tq441');
+      return out;
+    });
+    check('日報階段完工：打設完成日＝租期起算基準、不再推估、專案卡小標', r.before && r.stage && r.stageText && r.chip && r.noPull);
+    check('日報階段完工：完成後不催，過預計進場日才問；拔除完成日＝計租結束', r.quiet && r.ask && r.todo && r.removeStage);
+    check('日報表單：階段完工欄位；同日再送出合併（相同工項覆蓋、其餘新增、累計不重複）', r.ui && r.collect && r.banner && r.merge && r.cum);
+    check('日報：載入既有內容修改、檢視內修改含階段完工', r.load && r.edit);
+    check('v5.442 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
