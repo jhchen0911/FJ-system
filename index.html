@@ -1293,15 +1293,18 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <select id="dr-proj" style="width:100%;font-size:14px;padding:9px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit"></select>
         </div>
         <div class="fg fg2" style="margin-bottom:10px">
-          <div class="f"><label>日期</label><input id="dr-date" type="date" style="font-size:14px;padding:8px 10px"></div>
+          <div class="f"><label>日期</label><input id="dr-date" type="date" onchange="_drExistingBanner()" style="font-size:14px;padding:8px 10px"></div>
           <div class="f"><label>作業狀態 <span style="font-size:10.5px;color:var(--b3)">— 暫停／停工期間不再提醒補日報</span></label>
             <select id="dr-status" onchange="_drStatusUI()" style="width:100%;font-size:14px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit">
-              <option value="work">施工中</option><option value="pause">明起暫停（階段性退場）</option><option value="stop">停工（天候／業主／工安…）</option></select></div>
+              <option value="work">施工中</option><option value="stage">階段完工（本階段完成，待下階段）</option><option value="pause">明起暫停（待業主／天候等，非完工）</option><option value="stop">停工（天候／業主／工安…）</option></select></div>
           <div id="dr-status-more" class="f" style="grid-column:1/-1;display:none">
             <div class="fg fg2" style="gap:8px">
+              <div class="f" id="dr-stage-wrap-of" style="display:none"><label>完成的階段</label><select id="dr-stage-of" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit"><option value="install">打設／裝設完成 → 待拔除／拆除（開始計租）</option><option value="remove">拔除／拆除完成 → 全部完工（計租結束）</option></select></div>
+              <div class="f" id="dr-stage-wrap-date" style="display:none"><label>完成日 <span style="font-size:10.5px;color:var(--b3)">— 租期以此日次日起算</span></label><input id="dr-stage-date" type="date" style="font-size:13px;padding:8px 10px"></div>
               <div class="f"><label>原因／說明</label><input id="dr-stop-reason" placeholder="例：待業主開挖至第二層" style="font-size:13px;padding:8px 10px"></div>
-              <div class="f"><label>預計復工日（可不填）</label><input id="dr-resume-date" type="date" style="font-size:13px;padding:8px 10px"></div>
+              <div class="f"><label id="dr-resume-lb">預計復工日（可不填）</label><input id="dr-resume-date" type="date" style="font-size:13px;padding:8px 10px"></div>
             </div></div>
+          <div id="dr-exist" class="f" style="grid-column:1/-1;display:none"></div>
         </div>
         <div class="f" style="margin-bottom:10px">
           <label>今日進度／工作內容 <span style="font-size:10.5px;color:var(--b3)">— 選工項填數量，回報量連動專案施工進度條</span></label>
@@ -2745,7 +2748,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.441';
+var APP_VERSION='v5.442';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -3142,10 +3145,21 @@ function _itemProgress(q,idx){
   var cum=0,doneDate='';
   ins.forEach(function(r){cum+=r.qty;if(!doneDate&&target>0&&cum>=target-1e-6)doneDate=r.date;});
   var rcum=0;rem.forEach(function(r){rcum+=r.qty;});
+  // v5.442 階段完工日報：打設完成日＝租期起算基準（取數量日報最後一天與完成日較晚者）；拔除完成日＝計租結束（無拔除數量日報時）
+  var catS=_itemCat(it),stIns='',stRem='';
+  ((q&&q.dailyLogs)||[]).forEach(function(L){
+    if(!L||L.status!=='stage')return;var d=L.stageDate||L.date||'';if(!d)return;
+    if(L.stageOf==='remove'){if(catS.remove&&(!stRem||d<stRem))stRem=d;}
+    else if(catS.install&&d>stIns)stIns=d;
+  });
+  var installLast=ins.length?ins[ins.length-1].date:'';
+  if(stIns&&stIns>installLast)installLast=stIns;
+  if(!doneDate&&stIns)doneDate=stIns;
+  var removeFirst=rem.length?rem[0].date:(stRem||'');
   return {n:ins.length+rem.length,nInstall:ins.length,nRemove:rem.length,
     first:ins.length?ins[0].date:'',last:ins.length?ins[ins.length-1].date:'',
-    installLast:ins.length?ins[ins.length-1].date:'',
-    removeFirst:rem.length?rem[0].date:'',removeLast:rem.length?rem[rem.length-1].date:'',
+    installLast:installLast,stageInstall:stIns,stageRemove:stRem,
+    removeFirst:removeFirst,removeLast:rem.length?rem[rem.length-1].date:(stRem||''),
     cum:cum,removeCum:rcum,target:target,doneDate:doneDate};
 }
 // 單一工項的租期／逾期狀態（純函式，不碰 DOM）
@@ -9038,8 +9052,8 @@ function updateDashTodo(){
       if(g.kind==='resume'){
         items.push({type:'dr_gap',urgent:true,jump:"drGoReport('"+q.id+"')",
           icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>',color:'var(--red)',
-          text:(q.name||'未命名')+' 預計復工日 '+g.lastL.resumeDate+' 已過，尚無日報——已復工還是延後？',
-          sub:(g.lastL.status==='pause'?'暫停':'停工')+'自 '+(g.lastL.stopFrom||g.last),extra:_drGapBtns(q.id,g.last)});
+          text:(q.name||'未命名')+(g.lastL.status==='stage'?(' 預計下階段進場日 '+g.lastL.resumeDate+' 已過，尚無日報——已進場拔除還是延後？'):(' 預計復工日 '+g.lastL.resumeDate+' 已過，尚無日報——已復工還是延後？')),
+          sub:(g.lastL.status==='stage'?(_drStageText(g.lastL)):((g.lastL.status==='pause'?'暫停':'停工')+'自 '+(g.lastL.stopFrom||g.last))),extra:_drGapBtns(q.id,g.last)});
         return;
       }
       items.push({type:'dr_gap',urgent:g.days>=gap*2,jump:"drGoReport('"+q.id+"')",
@@ -27684,11 +27698,12 @@ function rQuickCost(){
   if(dsel){
     const dcur=dsel.value;
     dsel.innerHTML='<option value="">── 選擇專案 ──</option>'+mains.map(q=>'<option value="'+q.id+'"'+(q.id===dcur?' selected':'')+'>'+esc(q.name||'未命名')+'</option>').join('');
-    dsel.onchange=function(){drRenderProgRows(true);_drFillVendors();drRenderCrews(true);};
+    dsel.onchange=function(){drRenderProgRows(true);_drFillVendors();drRenderCrews(true);try{_drExistingBanner();}catch(e){_err('dr-proj',e);}};
     _drFillVendors();
   }
   drRenderCrews();
   const dd=document.getElementById('dr-date');if(dd&&!dd.value)dd.value=localToday();
+  try{_drExistingBanner();}catch(e){_err('rQuickCost.exist',e);}
   drRenderPhotos();
   drRenderProgRows();
   drRenderList();
@@ -27919,17 +27934,27 @@ function _drPhaseSel(q,r,ri){
 }
 // 把目前表單收成一筆回報（回傳 null＝表單為空）
 // v5.431：作業狀態（施工中／明起暫停／停工）——暫停或停工期間待辦不再催日報；狀態本身就是一筆日報
-const DR_STATUS_LABEL={work:'施工中',pause:'明起暫停（階段性退場）',stop:'停工'};
-function _drStatusUI(){var st=gv('dr-status')||'work';var m=document.getElementById('dr-status-more');if(m)m.style.display=(st==='work')?'none':'';}
+const DR_STATUS_LABEL={work:'施工中',stage:'階段完工（待下階段）',pause:'明起暫停',stop:'停工'};   // v5.442 加 stage
+function _drStatusUI(){var st=gv('dr-status')||'work';var m=document.getElementById('dr-status-more');if(m)m.style.display=(st==='work')?'none':'';
+  ['dr-stage-wrap-of','dr-stage-wrap-date'].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display=(st==='stage')?'':'none';});
+  var lb=document.getElementById('dr-resume-lb');if(lb)lb.textContent=(st==='stage')?'預計下階段進場日（可不填，到期未進場會提醒）':'預計復工日（可不填）';
+  if(st==='stage'){var sd=document.getElementById('dr-stage-date');if(sd&&!sd.value)sd.value=gv('dr-date')||localToday();}}
 function _drStatusText(L){
   if(!L||!L.status||L.status==='work')return '';
-  return (L.status==='pause'?'⏸ 明起暫停（階段性退場）':'⛔ 停工')
+  if(L.status==='stage')return _drStageText(L);   // v5.442
+  return (L.status==='pause'?'⏸ 明起暫停':'⛔ 停工')
     +(L.stopFrom&&L.stopFrom!==L.date?('（'+L.stopFrom+'～'+L.date+'）'):'')
     +(L.stopReason?('：'+L.stopReason):'')+(L.resumeDate?('　預計復工 '+L.resumeDate):'');
 }
 // 打設類工項全數達合約量、且尚未開始拔除 → 階段完成待拔除（不催日報）
 function _projStageDone(q){
   var any=false,items=(q&&q.items)||[];
+  var stg=_drLatestStage(q);   // v5.442：有階段完工日報以它為準
+  if(stg){
+    if(stg.stageOf==='remove')return false;   // 全部完工
+    var anyRem=false;items.forEach(function(it,i){if(it&&!it.sec&&_itemProgress(q,i).nRemove)anyRem=true;});
+    if(!anyRem)return true;
+  }
   for(var i=0;i<items.length;i++){
     var it=items[i];if(!it||it.sec||_isSpare(it))continue;
     var c=_itemCat(it);if(!c.install)continue;
@@ -27976,8 +28001,9 @@ function drBackfillStop(qid,last){
   var html='<div class="fg fg2" style="gap:8px">'
     +'<div class="f"><label>自</label><input id="bs-from" type="date" value="'+esc(from)+'" style="'+IN+'"></div>'
     +'<div class="f"><label>至（含）</label><input id="bs-to" type="date" value="'+esc(to)+'" style="'+IN+'"></div>'
-    +'<div class="f"><label>狀態</label><select id="bs-status" style="'+IN+'"><option value="stop">停工（天候／業主／工安…）</option><option value="pause">暫停（階段性退場）</option></select></div>'
-    +'<div class="f"><label>預計復工日（可不填）</label><input id="bs-resume" type="date" style="'+IN+'"></div>'
+    +'<div class="f"><label>狀態</label><select id="bs-status" onchange="var e=document.getElementById(\'bs-stage-of\');if(e)e.parentNode.style.display=this.value===\'stage\'?\'\':\'none\'" style="'+IN+'"><option value="stop">停工（天候／業主／工安…）</option><option value="pause">暫停（待業主／天候等）</option><option value="stage">階段完工（打設完成待拔除／全部完工）</option></select></div>'
+    +'<div class="f"><label>預計復工／下階段進場日（可不填）</label><input id="bs-resume" type="date" style="'+IN+'"></div>'
+    +'<div class="f" style="display:none"><label>完成的階段（完成日＝「至」日）</label><select id="bs-stage-of" style="'+IN+'"><option value="install">打設／裝設完成 → 待拔除</option><option value="remove">拔除／拆除完成 → 全部完工</option></select></div>'
     +'<div class="f" style="grid-column:1/-1"><label>原因／說明</label><input id="bs-reason" placeholder="例：連日大雨／待業主開挖" style="'+IN+'"></div>'
     +'</div><div style="font-size:11px;color:var(--b3)">補登後這段期間不再催日報；下一筆有進度的日報送出即視為復工。停工記錄可作租期照算與工期展延的佐證。</div>';
   showConfirm('補登停工／暫停：'+esc(q.name||''),html,function(){
@@ -27985,12 +28011,93 @@ function drBackfillStop(qid,last){
     if(!q.dailyLogs)q.dailyLogs=[];
     q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:t,stopFrom:f,
       status:gv('bs-status')||'stop',stopReason:(gv('bs-reason')||'').trim(),resumeDate:gv('bs-resume')||'',
+      stageOf:(gv('bs-status')==='stage')?(gv('bs-stage-of')||'install'):'',stageDate:(gv('bs-status')==='stage')?t:'',
       workers:0,subWorkers:0,subVendor:'',crews:[],progress:'',progressRows:[],photos:[],ownEquip:false,equip:[],
       by:((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||''),ts:Date.now()});
     _touch(q);try{persist();}catch(e){_err('drBackfillStop',e);}try{_immediateUpload();}catch(e){_err('drBackfillStop',e);}
     toast('已補登 '+f+'～'+t+' '+(DR_STATUS_LABEL[gv('bs-status')||'stop']));
     try{updateDashTodo();}catch(e){_err('drBackfillStop',e);}
   });
+}
+// ══════════ v5.442 日報：階段完工狀態＋同日合併 ══════════
+// 階段完工（status:'stage'）：stageOf 'install'＝打設／裝設完成待拔除、'remove'＝拔除／拆除完成（全部完工）；
+// stageDate＝該階段完成日（租期起算＝打設完成日次日、拔除完成日＝計租結束）。
+// 同日合併：同專案同日期再送出，相同工項（同工項＋同打設／拔除期別）覆蓋數量與備註，其餘工項新增；
+// 出工／機具有填才取代、照片累加、狀態有填才更新——不會再變成兩筆。
+function _drLatestStage(q){
+  var out=null;((q&&q.dailyLogs)||[]).forEach(function(L){
+    if(!L||L.status!=='stage')return;var d=L.stageDate||L.date||'';
+    if(!out||d>(out.stageDate||out.date||''))out=L;
+  });return out;
+}
+function _drStageText(L){
+  if(!L||L.status!=='stage')return '';
+  var d=L.stageDate||L.date||'';
+  return (L.stageOf==='remove'?('✅ 全部完工：拔除／拆除完成（'+d+'）'):('✅ 階段完工：打設／裝設完成（'+d+'），待拔除／拆除'))
+    +(L.stopReason?('：'+L.stopReason):'')+(L.resumeDate?('　預計下階段進場 '+L.resumeDate):'');
+}
+// 專案卡狀態小標：最近一篇日報若為暫停／停工／階段完工，顯示在「日報」鈕旁
+function _drProjChip(q){
+  var last=null;((q&&q.dailyLogs)||[]).forEach(function(L){if(L&&(!last||String(L.date||'')>String(last.date||'')))last=L;});
+  if(!last||!last.status||last.status==='work')return '';
+  var t='',c='#b26a00',bg='#fff8ec',bd='#ffcc80';
+  if(last.status==='stop'){t='⛔ 停工中'+(last.stopFrom?('（自 '+last.stopFrom+'）'):'');c='#c62828';bd='#f5b5b0';bg='#fdecea';}
+  else if(last.status==='pause'){t='⏸ 暫停中'+(last.resumeDate?('　預計復工 '+last.resumeDate):'');}
+  else if(last.status==='stage'){t=(last.stageOf==='remove'?'✅ 全部完工 '+(last.stageDate||last.date||''):'✅ 打設完成 待拔除（'+(last.stageDate||last.date||'')+'）')+(last.resumeDate?('　預計進場 '+last.resumeDate):'');c='#1B5E20';bg='#E8F5E9';bd='#A5D6A7';}
+  return t?('<span style="display:inline-block;border:1px solid '+bd+';background:'+bg+';color:'+c+';border-radius:99px;padding:2px 9px;font-size:11px;margin-right:4px">'+esc(t)+'</span>'):'';
+}
+// 同日已有日報 → 表單提示＋一鍵載入既有內容修改
+function _drExistingLog(){
+  var qid=gv('dr-proj'),date=gv('dr-date')||localToday();
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return null;
+  return ((q.dailyLogs||[]).find(function(L){return L&&L.date===date&&!L.stopFrom;}))||null;
+}
+function _drExistingBanner(){
+  var b=document.getElementById('dr-exist');if(!b)return;
+  var L=_drExistingLog();
+  if(!L){b.style.display='none';b.innerHTML='';return;}
+  var n=(L.progressRows||[]).length,ct=_crewsText(L);
+  b.style.display='';
+  b.innerHTML='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#FFF8E1;border:1px solid #FFE082;border-radius:var(--r8);padding:8px 10px;font-size:12.5px">'
+    +'<span style="flex:1;min-width:180px"><b>此日已有日報</b>：'+n+' 列進度'+(ct?('、'+esc(ct)):'')+(_drStatusText(L)?('、'+esc(_drStatusText(L))):'')
+    +'<span style="display:block;font-size:11px;color:var(--b4);margin-top:2px">直接送出會合併到同一筆：相同工項覆蓋數量、其餘新增，不會變成兩筆</span></span>'
+    +'<button type="button" class="btn btn-xs" onclick="drLoadExisting()" style="padding:5px 12px;border-color:var(--gm);color:var(--g3)">載入既有內容修改</button></div>';
+}
+function drLoadExisting(){
+  var L=_drExistingLog();if(!L){toast('此日沒有日報');return;}
+  _drProgRows=(L.progressRows||[]).map(function(r){return {itemIdx:Number(r.itemIdx),qty:r.qty||'',note:r.note||'',ph:r.ph||''};});
+  if(!_drProgRows.length)_drProgRows=[{itemIdx:-1,qty:'',note:''}];
+  drRenderProgRows();
+  _drCrews=_crewsOf(L).map(function(c){return {type:c.type||'labor',vendor:c.vendor||'',n:c.n||''};});
+  if(_drCrews.length)drRenderCrews();else drRenderCrews(true);
+  _drEquip={};(L.equip||[]).forEach(function(e){if(e&&e.name)_drEquip[e.name]=e.hrs||'';});
+  var oe=document.getElementById('dr-own-equip');if(oe)oe.checked=!!L.ownEquip;
+  var eb=document.getElementById('dr-equip-box');if(eb)eb.style.display=L.ownEquip?'':'none';
+  try{_drRenderEquip();}catch(e){_err('drLoadExisting',e);}
+  _drPhotos=(L.photos||[]).slice(0,3);drRenderPhotos();
+  var set=function(id,v){var el=document.getElementById(id);if(el)el.value=v||'';};
+  set('dr-status',L.status||'work');set('dr-stop-reason',L.stopReason||'');set('dr-resume-date',L.resumeDate||'');set('dr-stage-of',L.stageOf||'install');set('dr-stage-date',L.stageDate||L.date||'');
+  _drStatusUI();
+  toast('已載入 '+L.date+' 的日報，修改後送出即覆蓋');
+}
+// 合併到既有日報；回傳 {rep,add}
+function _drMergeLog(q,L,e){
+  var rows=(L.progressRows||[]).slice(),rep=0,add=0;
+  (e.progressRows||[]).forEach(function(nr){
+    var i=-1;
+    for(var k=0;k<rows.length;k++){var r=rows[k];if(Number(r.itemIdx)!==Number(nr.itemIdx))continue;
+      if(nr.itemIdx<0){if(String(r.note||'')===String(nr.note||'')){i=k;break;}continue;}
+      if(_prPhase(q,r)===_prPhase(q,nr)){i=k;break;}}
+    if(i>=0){rows[i]=Object.assign({},rows[i],nr);rep++;}else{rows.push(nr);add++;}
+  });
+  L.progressRows=rows;
+  L.progress=rows.map(function(r){return (r.desc?(r.desc+(r.qty?(' '+r.qty+((q.items[r.itemIdx]||{}).unit||'')):'')):'')+(r.note?((r.desc?'；':'')+r.note):'');}).filter(Boolean).join('\n');
+  if((e.crews||[]).some(function(c){return (parseFloat(c&&c.n)||0)>0;})){L.crews=e.crews;L.workers=e.workers||0;L.subWorkers=e.subWorkers||0;L.subVendor=e.subVendor||'';}
+  if((e.equip||[]).length){L.equip=e.equip;L.ownEquip=true;}else if(e.ownEquip)L.ownEquip=true;
+  L.photos=L.photos||[];(e.photos||[]).forEach(function(p){if(L.photos.indexOf(p)<0)L.photos.push(p);});L.photos=L.photos.slice(0,6);
+  if(e.status&&e.status!=='work'){L.status=e.status;L.stopReason=e.stopReason||'';L.resumeDate=e.resumeDate||'';L.stageOf=e.stageOf||'';L.stageDate=e.stageDate||'';}
+  L.editedAt=Date.now();L.by=((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||L.by||'');
+  return {rep:rep,add:add};
 }
 function _drCollect(){
   const qid=document.getElementById('dr-proj')?.value;
@@ -28001,22 +28108,24 @@ function _drCollect(){
   const rows=_drProgRows.filter(r=>(r.itemIdx>=0&&parseFloat(r.qty)>0)||((''+(r.note||'')).trim()!==''));
   const equip=Object.keys(_drEquip).map(function(n){return {name:n,hrs:parseFloat(_drEquip[n])||0};});   // v5.402 只勾機具也算有內容
   const status=gv('dr-status')||'work',stopReason=(gv('dr-stop-reason')||'').trim(),resumeDate=gv('dr-resume-date')||'';
+  const stageOf=status==='stage'?(gv('dr-stage-of')||'install'):'',stageDate=status==='stage'?(gv('dr-stage-date')||gv('dr-date')||localToday()):'';   // v5.442
   if(!workers&&!subWorkers&&!rows.length&&!_drPhotos.length&&!equip.length&&status==='work')return null;
   const over=[];_drProgRows.forEach(function(_r,ri){const h=_drRowHint(ri);if(h.over)over.push(h.desc+' 累計 '+fmt(h.after)+' ＞ 合約 '+fmt(h.target));});
   const progRows=rows.map(r=>({itemIdx:r.itemIdx,desc:r.itemIdx>=0?((q.items[r.itemIdx]||{}).desc||'').split('\n')[0]:'',qty:parseFloat(r.qty)||0,note:(r.note||'').trim(),ph:_drRowPhase(q,r)}));
   const progressText=progRows.map(r=>(r.desc?(r.desc+(r.qty?(' '+r.qty+((q.items[r.itemIdx]||{}).unit||'')):'')):'')+(r.note?((r.desc?'；':'')+r.note):'')).filter(Boolean).join('\n');
   return {qid:qid,name:q.name||'',workers:workers,subWorkers:subWorkers,subVendor:subVendor,crews:cw.crews,over:over,equip:equip,
-    status:status,stopReason:stopReason,resumeDate:resumeDate,
+    status:status,stopReason:stopReason,resumeDate:resumeDate,stageOf:stageOf,stageDate:stageDate,
     ownEquip:!!document.getElementById('dr-own-equip')?.checked||equip.length>0,
     progressRows:progRows,progress:progressText,photos:_drPhotos.slice(0,3)};
 }
 function _drClearForm(){
-  try{var ss=document.getElementById('dr-status');if(ss)ss.value='work';['dr-stop-reason','dr-resume-date'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});_drStatusUI();}catch(e){_err('_drClearForm',e);}
+  try{var ss=document.getElementById('dr-status');if(ss)ss.value='work';['dr-stop-reason','dr-resume-date','dr-stage-date'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});_drStatusUI();}catch(e){_err('_drClearForm',e);}
   drRenderCrews(true);
   const oe=document.getElementById('dr-own-equip');if(oe)oe.checked=false;
   _drEquip={};_drRenderEquip();
   _drPhotos=[];drRenderPhotos();
   drRenderProgRows(true);
+  try{_drExistingBanner();}catch(e){_err('_drClearForm',e);}
 }
 function drAddToList(){
   const e=_drCollect();
@@ -28045,14 +28154,17 @@ function submitDailyReport(){
   if(cur)_drList.push(cur);
   if(!_drList.length){toast('請先選擇工程專案並填寫內容');return;}
   const date=document.getElementById('dr-date')?.value||localToday();
-  let okN=0;
+  let okN=0,merged=[];
   _drList.forEach(function(e){
     const q=Q.find(x=>x.id===e.qid);if(!q)return;
     if(!q.dailyLogs)q.dailyLogs=[];
+    // v5.442 同專案同日已有日報 → 合併（相同工項覆蓋、其餘新增），不再產生第二筆
+    const ex=q.dailyLogs.find(function(L){return L&&L.date===date&&!L.stopFrom;});
+    if(ex){const m=_drMergeLog(q,ex,e);merged.push((q.name||'')+'（覆蓋 '+m.rep+' 列、新增 '+m.add+' 列）');_touch(q);okN++;return;}
     q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:date,
       workers:e.workers,subWorkers:e.subWorkers||0,subVendor:e.subVendor||'',crews:e.crews||[],progress:e.progress,progressRows:e.progressRows,photos:e.photos,
       ownEquip:e.ownEquip,equip:e.equip||[],
-      status:e.status||'work',stopReason:e.stopReason||'',resumeDate:e.resumeDate||'',
+      status:e.status||'work',stopReason:e.stopReason||'',resumeDate:e.resumeDate||'',stageOf:e.stageOf||'',stageDate:e.stageDate||'',
       by:((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||''),ts:Date.now()});
     if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120);
     _touch(q);
@@ -28067,7 +28179,8 @@ function submitDailyReport(){
   _drClearForm();
   drRenderList();rQcLog();
   try{renderProjects();}catch(e){_err('submitDailyReport',e);}
-  toast('已送出 '+okN+' 個工地的日報');
+  toast(merged.length?('已合併到 '+date+' 既有日報：'+merged.join('；')):('已送出 '+okN+' 個工地的日報'));
+  try{updateDashTodo();}catch(e){_err('submitDailyReport',e);}
   if(overAll.length)setTimeout(function(){showConfirm('⚠ 回報量超過合約量','<div style="font-size:13px;line-height:1.7">'+overAll.map(esc).join('<br>')+'<div style="margin-top:8px;color:var(--b4);font-size:12px">日報已送出。請確認是否回報錯誤，或合約需要追加（請款單「追加減」）。</div></div>',function(){},false,null,true);},600);
 }
 // 主管檢視：專案頁「檢視日報」
@@ -28219,8 +28332,10 @@ function editDailyLog(qid,lid){
   const IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   const html='<div class="fg fg2" style="gap:8px">'
     +'<div class="f"><label>日期</label><input id="dle-date" type="date" value="'+esc(L.date||'')+'" style="'+IN+'"></div>'
-    +'<div class="f"><label>作業狀態</label><select id="dle-status" style="'+IN+'">'+['work','pause','stop'].map(function(k){return '<option value="'+k+'"'+((L.status||'work')===k?' selected':'')+'>'+DR_STATUS_LABEL[k]+'</option>';}).join('')+'</select></div>'
-    +'<div class="f"><label>停工／暫停原因</label><input id="dle-stop-reason" value="'+esc(L.stopReason||'')+'" style="'+IN+'"></div>'
+    +'<div class="f"><label>作業狀態</label><select id="dle-status" onchange="var s=this.value===\'stage\';[\'dle-stage-of\',\'dle-stage-date\'].forEach(function(id){var e=document.getElementById(id);if(e)e.parentNode.style.display=s?\'\':\'none\';})" style="'+IN+'">'+['work','stage','pause','stop'].map(function(k){return '<option value="'+k+'"'+((L.status||'work')===k?' selected':'')+'>'+DR_STATUS_LABEL[k]+'</option>';}).join('')+'</select></div>'
+    +'<div class="f" style="'+(L.status==='stage'?'':'display:none')+'"><label>完成的階段</label><select id="dle-stage-of" style="'+IN+'"><option value="install"'+(L.stageOf!=='remove'?' selected':'')+'>打設／裝設完成 → 待拔除</option><option value="remove"'+(L.stageOf==='remove'?' selected':'')+'>拔除／拆除完成 → 全部完工</option></select></div>'
+    +'<div class="f" style="'+(L.status==='stage'?'':'display:none')+'"><label>完成日（租期起算基準）</label><input id="dle-stage-date" type="date" value="'+esc(L.stageDate||L.date||'')+'" style="'+IN+'"></div>'
+    +'<div class="f"><label>原因／說明</label><input id="dle-stop-reason" value="'+esc(L.stopReason||'')+'" style="'+IN+'"></div>'
     +'<div class="f"><label>預計復工日</label><input id="dle-resume" type="date" value="'+esc(L.resumeDate||'')+'" style="'+IN+'"></div>'
     +'</div>'
     +'<div style="font-size:12px;font-weight:700;color:var(--b4);margin:8px 0 4px">出工（類型／廠商／人數）</div>'
@@ -28233,6 +28348,7 @@ function editDailyLog(qid,lid){
   showConfirm('修改日報：'+esc(q.name||''),html,function(){
     L.date=gv('dle-date')||L.date;
     L.status=gv('dle-status')||'work';L.stopReason=(gv('dle-stop-reason')||'').trim();L.resumeDate=gv('dle-resume')||'';
+    L.stageOf=L.status==='stage'?(gv('dle-stage-of')||'install'):'';L.stageDate=L.status==='stage'?(gv('dle-stage-date')||L.date):'';
     _crewsApply(L,[].slice.call(document.querySelectorAll('#dle-crews .dle-crew')).map(function(el){return {type:el.querySelector('.dle-ct').value,vendor:el.querySelector('.dle-cv').value,n:el.querySelector('.dle-cn').value};}));
     L.ownEquip=!!document.getElementById('dle-eq')?.checked;
     const its=[].slice.call(document.querySelectorAll('.dle-it')),qs=[].slice.call(document.querySelectorAll('.dle-q')),ns=[].slice.call(document.querySelectorAll('.dle-n')),phs=[].slice.call(document.querySelectorAll('.dle-ph'));
@@ -31096,7 +31212,7 @@ function renderProjects(){
       // 的專案一律顯示施工進度 0%，成本執行率的退路永遠進不去。改判有無日報回報。
       bar:(hasPhysRep&&physBaseV>0)?{pct:physPct,warn:false,label:'施工進度（日報回報數量/合約數量，金額加權）'}
         :((estCostTotal>0&&costNet>0)?{pct:costNet/estCostTotal*100,warn:costNet>estCostTotal,label:'成本執行率（實際/預估成本，均未稅）'}:null),
-      extra:'<button type="button" onclick="event.stopPropagation();viewDailyReports(\''+q.id+'\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 日報'+(drN?('（'+drN+'）'):'')+'</button> '
+      extra:_drProjChip(q)+'<button type="button" onclick="event.stopPropagation();viewDailyReports(\''+q.id+'\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 日報'+(drN?('（'+drN+'）'):'')+'</button> '
         +'<button type="button" onclick="event.stopPropagation();openProjectCosts(\''+q.id+'\')" style="border:1px solid #ffcc80;background:#fff8ec;color:#e65100;border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本</button> '
         +'<button type="button" onclick="event.stopPropagation();openSubMgmt(\''+q.id+'\')" style="border:1px solid #90CAF9;background:#E3F2FD;color:#1565C0;border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 分包管理'+(function(){var n=0,b=0;(q.costs||[]).forEach(function(c){if(c.type==='sub'&&c.vendor&&c.vendor!=='公司支出（自付）'){n++;b+=_subStat(c).n;}});return n?('（'+n+' 家'+(b?'・'+b+' 期':'')+'）'):'';})()+'</button> '
         +'<button type="button" onclick="event.stopPropagation();projUpload(\'confirm\',\''+q.id+'\')" style="border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 上傳確認單</button>'
