@@ -3102,6 +3102,62 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.445 PDF 套件保險：缺就按需補載（三來源），全失敗才退回瀏覽器列印；sw.js 快取套件 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      return (
+      new Promise(res => {
+        const out={};
+        const origLoad=window._loadScriptOnce,origNative=window._printNativeHTML;
+        const loaded=[];
+        // ① 第一來源失敗、第二來源成功 → 補載完成，不退回瀏覽器列印
+        delete window.html2canvas;delete window.jspdf;_pdfLibsP=null;
+        window._loadScriptOnce=function(src){loaded.push(src);return new Promise(function(ok,bad){setTimeout(function(){
+          if(/cdnjs/.test(src))return bad(new Error('load fail'));
+          if(/html2canvas/.test(src))window.html2canvas=function(){return Promise.reject(new Error('stub'));};
+          if(/jspdf/.test(src))window.jspdf={jsPDF:function(){}};
+          ok();},150);});};
+        let nativeCalls=0;window._printNativeHTML=function(){nativeCalls++;};
+        out.ready0=_pdfLibsReady()===false;
+        _ensurePdfLibs().then(function(r){
+          out.ensure=r===true&&_pdfLibsReady()&&loaded.length===4&&/cdnjs.*html2canvas/.test(loaded[0])&&/jsdelivr.*html2canvas/.test(loaded[1])&&/cdnjs.*jspdf/.test(loaded[2])&&/jsdelivr.*jspdf/.test(loaded[3]);
+          // ② 套件缺時按 PDF：overlay 顯示載入中 → 補載後走截圖流程（不是系統列印）
+          delete window.html2canvas;delete window.jspdf;_pdfLibsP=null;loaded.length=0;
+          Q.push({id:'tq445',name:'PDF保險案',client:'K',code:'1445',date:'2026-09-30',items:[{desc:'H型鋼樁',unit:'支',qty:10,price:1000}],exs:[],rmk:{}});
+          exportQuotePDF('tq445');
+          const btn0=document.getElementById('_fy_pdf_btn');out.overlay=!!btn0&&!!document.getElementById('_fy_print_overlay');
+          setTimeout(function(){
+            const btn=document.getElementById('_fy_pdf_btn');
+            out.loadingTxt=!!btn&&/載入 PDF 套件/.test(btn.textContent);
+            setTimeout(function(){
+              const b2=document.getElementById('_fy_pdf_btn');
+              out.ranCapture=!!b2&&/截圖失敗/.test(b2.textContent)&&nativeCalls===0;   // stub 的 html2canvas 會 reject → 走到截圖失敗，代表沒退回系統列印
+              ['_fy_print_frame','_fy_print_overlay'].forEach(function(id){var el=document.getElementById(id);if(el)el.remove();});
+              // ③ 三個來源都失敗 → 才退回瀏覽器列印
+              delete window.html2canvas;delete window.jspdf;_pdfLibsP=null;loaded.length=0;
+              window._loadScriptOnce=function(src){loaded.push(src);return Promise.reject(new Error('load fail'));};
+              exportQuotePDF('tq445');
+              setTimeout(function(){
+                out.fallback=nativeCalls===1&&loaded.length===3&&!document.getElementById('_fy_print_overlay');
+                window._loadScriptOnce=origLoad;window._printNativeHTML=origNative;_pdfLibsP=null;
+                Q=Q.filter(x=>x.id!=='tq445');
+                res(out);
+              },900);
+            },1400);
+          },500);
+        });
+      })
+      );
+    });
+    const sw = require('fs').readFileSync(require('path').join(__dirname, '..', 'sw.js'), 'utf8');
+    const swOk = /LIB_HOSTS/.test(sw) && /html2canvas\|jspdf/.test(sw) && /caches\.match\(e\.request\)\.then\(m => m \|\| fetch/.test(sw) && /res\.type === 'opaque'/.test(sw);
+    check('PDF 套件：缺時依序補載（cdnjs→jsdelivr→unpkg），成功後走標準 PDF 引擎不退回系統列印', r.ready0 && r.ensure && r.overlay && r.loadingTxt && r.ranCapture);
+    check('PDF 套件：三個來源都失敗才退回瀏覽器列印；sw.js 對套件快取優先', r.fallback && swOk);
+    check('v5.445 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
