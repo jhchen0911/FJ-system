@@ -2750,7 +2750,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.445';
+var APP_VERSION='v5.446';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -37699,6 +37699,9 @@ function _pdfContentPx(ls){return Math.round(((ls?297:210)-2*_PDF_MM)*96/25.4);}
 function _pdfPlanPages(cvs,root,renderW,ls){
   var K=cvs.width/(renderW||root.offsetWidth||1);   // css px → canvas px
   var rr=root.getBoundingClientRect(),H=cvs.height;
+  // v5.446：只算到內容底緣——渲染容器若被撐高（min-height／手機直式視窗比橫式紙張高），
+  // 尾端空白不得算進文件高度，否則短文件會被判定超過一頁而硬拆成兩頁（第二頁只剩頁尾）
+  try{var _cb=0;Array.prototype.forEach.call(root.children,function(el){var b=el.getBoundingClientRect().bottom-rr.top;if(b>_cb)_cb=b;});var _HC=Math.round(_cb*K);if(_HC>0&&_HC<H)H=_HC;}catch(e){_err('planPagesH',e);}
   var yT=function(el){return Math.round((el.getBoundingClientRect().top-rr.top)*K);};
   var yB=function(el){return Math.round((el.getBoundingClientRect().bottom-rr.top)*K);};
   // 貼頁比例：canvas 寬 → (A4 寬 − 左右各 10mm)
@@ -37866,7 +37869,7 @@ function _printViaIframe(html,filename,landscape){
   var _bodyContent=_bodyMatch?_bodyMatch[1]:html;
 
   var inner=document.createElement('div');
-  inner.style.cssText='background:#fff;width:'+A4W+'px;min-height:100%;margin:0 auto;box-sizing:border-box;';
+  inner.style.cssText='background:#fff;width:'+A4W+'px;margin:0 auto;box-sizing:border-box;';   // v5.446 不再 min-height:100%（會把短文件撐成兩頁）
   // 把 CSS 注入 inner 的 <style>
   if(_styleContent){
     var _styleEl=document.createElement('style');

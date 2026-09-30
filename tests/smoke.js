@@ -3158,6 +3158,34 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.446 PDF：短文件不再被撐成兩頁（高度只算到內容底、預覽容器不 min-height:100%） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(() => {
+        const out={};
+        // 內容 500px、容器被撐到 900px（模擬手機直式視窗比橫式紙張高）→ 橫式 A4 只該一頁、高度只算到內容底
+        const host=document.createElement('div');host.style.cssText='position:absolute;left:-9999px;top:0;width:1046px;min-height:900px;background:#fff';
+        host.innerHTML='<div class="page-wrap" style="padding:0"><h1 style="margin:0;height:60px">工程實績表</h1><table style="width:100%;border-collapse:collapse"><thead><tr><th style="height:30px">編號</th></tr></thead><tbody>'+Array.from({length:8},(_,i)=>'<tr><td style="height:30px">'+(i+1)+'</td></tr>').join('')+'</tbody></table><div class="foot" style="height:40px;margin-top:14px">本表所列…</div></div>';
+        document.body.appendChild(host);
+        const contentH=host.firstChild.getBoundingClientRect().height;
+        const plan=_pdfPlanPages({width:2092,height:1800},host,1046,true);
+        out.onePage=plan.pages.length===1&&plan.pages[0].s===0&&Math.abs(plan.pages[0].e-Math.round(contentH*2))<=2;
+        out.contentH=contentH;out.e=plan.pages[0].e;
+        host.remove();
+        // 預覽容器不再 min-height:100%
+        Q.push({id:'tq446',name:'實績案',client:'K',code:'1446',date:'2026-09-30',items:[{desc:'H型鋼樁',unit:'支',qty:10,price:1000}],exs:[],rmk:{}});
+        exportQuotePDF('tq446');
+        const inner=document.getElementById('_fy_print_frame')&&document.getElementById('_fy_print_frame').firstChild;
+        out.noMinH=!!inner&&inner.style.minHeight!=='100%';
+        ['_fy_print_frame','_fy_print_overlay'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
+        Q=Q.filter(x=>x.id!=='tq446');
+        return out;
+    });
+    check('PDF 分頁：容器被撐高時高度只算到內容底緣，短文件（如工程實績表）維持一頁', r.onePage && r.noMinH, JSON.stringify({ contentH: r.contentH, e: r.e }));
+    check('v5.446 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
