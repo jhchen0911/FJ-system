@@ -2750,7 +2750,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.444';
+var APP_VERSION='v5.445';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -37789,6 +37789,45 @@ function _pdfAddPaged(pdf,cvs,a4w,a4h,sc,plan,q){
   });
   return n;
 }
+// ══════════ v5.445 PDF 套件保險：載入失敗時按需重試（cdnjs → jsdelivr → unpkg），不再直接退回瀏覽器列印 ══════════
+// 手機網路不穩時 <head> 的 html2canvas／jsPDF 可能沒載進來，以前一按「PDF」就退回系統列印（版面與排版引擎不同）。
+// 現在：按 PDF 時先確認套件，缺就依序從三個來源補載（每個 8 秒），全部失敗才退回瀏覽器列印；sw.js 另把套件快取起來。
+var _PDF_LIB_SRC={
+  h2c:['https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js','https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js','https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js'],
+  jspdf:['https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js','https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js','https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js']
+};
+function _pdfLibsReady(){return !!(window.html2canvas&&window.jspdf&&(window.jspdf.jsPDF||window.jspdf));}
+function _loadScriptOnce(src,ms){
+  return new Promise(function(res,rej){
+    var s=document.createElement('script');s.src=src;s.async=true;
+    var t=setTimeout(function(){try{s.remove();}catch(e){}rej(new Error('timeout'));},ms||8000);
+    s.onload=function(){clearTimeout(t);res();};
+    s.onerror=function(){clearTimeout(t);try{s.remove();}catch(e){}rej(new Error('load fail'));};
+    document.head.appendChild(s);
+  });
+}
+var _pdfLibsP=null;
+function _ensurePdfLibs(onStatus){
+  if(_pdfLibsReady())return Promise.resolve(true);
+  if(_pdfLibsP)return _pdfLibsP;
+  var tryList=function(key,ok){
+    if(ok())return Promise.resolve();
+    var srcs=_PDF_LIB_SRC[key],i=0;
+    var next=function(){
+      if(ok())return Promise.resolve();
+      if(i>=srcs.length)return Promise.reject(new Error(key+' unavailable'));
+      var s=srcs[i++];if(onStatus){try{onStatus(i,key);}catch(e){}}
+      return _loadScriptOnce(s).then(function(){if(!ok())return next();},function(){return next();});
+    };
+    return next();
+  };
+  _pdfLibsP=tryList('h2c',function(){return !!window.html2canvas;})
+    .then(function(){return tryList('jspdf',function(){return !!(window.jspdf&&(window.jspdf.jsPDF||window.jspdf));});})
+    .then(function(){_pdfLibsP=null;return _pdfLibsReady();},function(e){_pdfLibsP=null;_err('_ensurePdfLibs',e);return false;});
+  return _pdfLibsP;
+}
+// 開頁時 <head> 若沒載到，背景先補一次，按 PDF 時就不用等
+setTimeout(function(){try{if(!_pdfLibsReady())_ensurePdfLibs();}catch(e){_err('pdfLibsPreload',e);}},4000);
 function _printViaIframe(html,filename,landscape){
   ['_fy_print_frame','_fy_print_overlay'].forEach(function(id){var el=document.getElementById(id);if(el)el.remove();});
   var isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -37851,13 +37890,14 @@ function _printViaIframe(html,filename,landscape){
     frame.style.top=h+'px';frame.style.height='calc(100vh - '+h+'px)';
   });
 
-  // ── 300ms 後用 html2canvas 截圖 ──
+  // ── 300ms 後用 html2canvas 截圖（v5.445：套件缺就先補載，三個來源都失敗才退回瀏覽器列印）──
   setTimeout(function(){
+    var _run=function(){
     var jsPDFLib=window.jspdf&&(window.jspdf.jsPDF||window.jspdf);
     if(!window.html2canvas||!jsPDFLib){
       // v5.386：只剩一顆「匯出PDF」，套件沒載進來就自動改走瀏覽器原生列印（不需外部套件）
       cleanup();
-      toast('PDF 套件未載入（網路或 CDN 問題），已改用瀏覽器列印，請於對話框選「另存為 PDF」');
+      toast('PDF 套件三個來源都載不進來（網路問題），暫改用瀏覽器列印，請於對話框選「另存為 PDF」；網路恢復後再按一次即為標準版面');
       try{
         var _css=_styleContent+'\n@page{size:A4 '+(landscape?'landscape':'portrait')+';margin:10mm;}'
           +'\n.page-wrap{width:auto;padding:0;}thead{display:table-header-group;}'
@@ -37928,6 +37968,10 @@ function _printViaIframe(html,filename,landscape){
       }
 
     }).catch(function(err){actionBtn.textContent='\u274C 截圖失敗：'+err.message;actionBtn.disabled=false;});
+    };
+    if(_pdfLibsReady()){_run();return;}
+    actionBtn.textContent='\u23F3 載入 PDF 套件...';
+    _ensurePdfLibs(function(i){actionBtn.textContent='\u23F3 載入 PDF 套件（來源 '+i+'/3）...';}).then(function(){if(document.getElementById('_fy_print_overlay'))_run();});
   },300);
 }
 
