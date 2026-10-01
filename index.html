@@ -2751,7 +2751,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.447';
+var APP_VERSION='v5.448';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -36895,9 +36895,9 @@ var _ENV_DEF={size:'k12',dx:0,dy:0,frames:false,
   sZipX:10,sZipY:216,sZipBox:5.5,sZipGap:0.8,sZipHy:3.5, // 寄件人郵遞區號（左下六格）
   senderL:10,senderT:120,senderB:208,                    // 寄件人直書區（左下，郵遞區號框上方）
   chkX:27.5,chkY0:55.5,chkStep:3.9,                      // 寄送方式 ✓（印刷品／限時／平信／掛號／雙掛號）
-  fontAddr:12,fontName:18,fontAttn:13,fontSender:9,fontZip:16};
+  fontAddr:12,fontName:18,fontAttn:13,fontSender:11,fontZip:16};
 var _ENV_METHODS=['印刷品','限時','平信','掛號','雙掛號'];
-function _envCfg(){var c=Object.assign({},_ENV_DEF,(P&&P.env)||{});if(!_ENV_SIZES[c.size])c.size='k12';return c;}
+function _envCfg(){var c=Object.assign({},_ENV_DEF,(P&&P.env)||{});if(!_ENV_SIZES[c.size])c.size='k12';if(c.fontSender===9)c.fontSender=11;/* v5.448 舊存檔的預設 9pt 一律放大 */return c;}
 function _envSaveCfg(c){P.env=c;try{persistP();}catch(e){_err('_envSaveCfg',e);}}
 // 從地址前綴抓郵遞區號（3／5／6 碼），回傳 {zip,addr}
 function _envSplitZip(addr){
@@ -36966,6 +36966,7 @@ function openEnvelope(invId,opt){
     +'<div class="f"><label>寄件郵遞區號 左／上</label><div style="display:flex;gap:4px"><input id="env-sZipX" type="number" step="0.5" value="'+cfg.sZipX+'" oninput="_envPreview()" style="'+IN+'"><input id="env-sZipY" type="number" step="0.5" value="'+cfg.sZipY+'" oninput="_envPreview()" style="'+IN+'"></div></div></div>'
     +'<div class="fg fg3" style="gap:6px"><div class="f"><label>勾選欄 左／首列上</label><div style="display:flex;gap:4px"><input id="env-chkX" type="number" step="0.5" value="'+cfg.chkX+'" oninput="_envPreview()" style="'+IN+'"><input id="env-chkY0" type="number" step="0.5" value="'+cfg.chkY0+'" oninput="_envPreview()" style="'+IN+'"></div></div>'
     +'<div class="f"><label>列距（mm）</label><input id="env-chkStep" type="number" step="0.1" value="'+cfg.chkStep+'" oninput="_envPreview()" style="'+IN+'"></div>'
+    +'<div class="f"><label>字級 寄件人／單位／地址（pt）</label><div style="display:flex;gap:4px"><input id="env-fontSender" type="number" step="0.5" min="7" max="16" value="'+cfg.fontSender+'" oninput="_envPreview()" style="'+IN+'"><input id="env-fontName" type="number" step="0.5" min="10" max="28" value="'+cfg.fontName+'" oninput="_envPreview()" style="'+IN+'"><input id="env-fontAddr" type="number" step="0.5" min="8" max="18" value="'+cfg.fontAddr+'" oninput="_envPreview()" style="'+IN+'"></div></div>'
     +'<div class="f"><label>&nbsp;</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;min-height:36px"><input id="env-frames" type="checkbox"'+(cfg.frames?' checked':'')+' onchange="_envPreview()"> 列印框線（空白信封／校正）</label></div></div>'
     +'<div style="font-size:11px;color:var(--b3);margin-top:4px">第一次請先用一個備用信封試印，對照後調整偏移；設定會記住。印表機請選「信封／自訂紙張 '+_ENV_SIZES[cfg.size].w+'×'+_ENV_SIZES[cfg.size].h+' mm、無邊界、不縮放」。</div>'
     +'</details>'
@@ -36987,7 +36988,7 @@ function _envUseAddr(which){
 function _envRead(){
   var num=function(id,d){var v=parseFloat(gv(id));return isNaN(v)?d:v;};
   var cfg=_envCfg();
-  ['dx','dy','zipX','zipY','colL','colW','sZipX','sZipY','chkX','chkY0','chkStep'].forEach(function(k){cfg[k]=num('env-'+k,cfg[k]);});
+  ['dx','dy','zipX','zipY','colL','colW','sZipX','sZipY','chkX','chkY0','chkStep','fontSender','fontName','fontAddr'].forEach(function(k){cfg[k]=num('env-'+k,cfg[k]);});
   cfg.size=gv('env-size')||cfg.size;if(!_ENV_SIZES[cfg.size])cfg.size='k12';
   var fr=document.getElementById('env-frames');cfg.frames=!!(fr&&fr.checked);
   var title=gv('env-title');

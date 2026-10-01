@@ -3216,10 +3216,12 @@ async function newPage(browser, width, height) {
         document.getElementById('env-dx').value='1.5';document.getElementById('env-frames').checked=true;_envPreview();
         document.getElementById('gen-confirm-ok').click();
         out.print=/@page\{size:120mm 235mm;margin:0\}/.test(printed)&&/rgba\(220,60,60,\.75\)/.test(printed)&&/left:63.5mm/.test(printed);
-        out.saved=P.env&&P.env.dx===1.5&&P.env.frames===true&&P.coZip==='242';
-        const cu=CUSTOMERS.find(c=>c.id==='cu447');out.cust=cu.zip==='30075'&&cu.envAttn==='王大明';
+        out.saved=P.env&&P.env.dx===1.5&&P.env.frames===true&&P.coZip==='242'&&P.env.fontSender===11;   // v5.448 寄件人字級預設 11、可調
+              const cu=CUSTOMERS.find(c=>c.id==='cu447');out.cust=cu.zip==='30075'&&cu.envAttn==='王大明';
+        // 舊存檔 9pt 自動放大為 11；字級欄位存在
+        P.env.fontSender=9;out.legacyFont=_envCfg().fontSender===11;
         // 從客戶卡開啟、15K 規格
-        openEnvelope(null,{custId:'cu447'});out.fromCust=gv('env-co')==='玄通營造股份有限公司'&&gv('env-zip')==='30075';
+        openEnvelope(null,{custId:'cu447'});out.fontUI=!!document.getElementById('env-fontSender')&&document.getElementById('env-fontSender').value==='11';out.fromCust=gv('env-co')==='玄通營造股份有限公司'&&gv('env-zip')==='30075';
         document.getElementById('env-size').value='k15';_envPreview();printed='';document.getElementById('gen-confirm-ok').click();
         out.k15=/@page\{size:105mm 220mm/.test(printed)&&P.env.size==='k15';
         // 沒有收件人 → 擋下
@@ -3234,7 +3236,7 @@ async function newPage(browser, width, height) {
     });
     check('信封：由請款單開啟自動帶業主／收件人／地址／郵遞區號（公司／工地可切）、寄件人帶公司參數', r.open && r.fill && r.prev && r.site);
     check('信封：郵遞區號逐格、直書中欄與寄件人、寄送方式打勾、列印不含框線', r.zip && r.szip && r.check && r.noFrames && r.text);
-    check('信封：原生列印自訂紙張 120×235／105×220、校正與框線記憶、郵遞區號回寫客戶、無收件人擋下', r.print && r.saved && r.cust && r.fromCust && r.k15 && r.guard && r.btnEdit);
+    check('信封：原生列印自訂紙張 120×235／105×220、校正與框線記憶、郵遞區號回寫客戶、無收件人擋下', r.print && r.saved && r.cust && r.fromCust && r.k15 && r.guard && r.btnEdit && r.legacyFont && r.fontUI);
     check('v5.447 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
