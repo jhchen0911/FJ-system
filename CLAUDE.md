@@ -89,6 +89,7 @@ SendUserFile 分批送出，檔名用工項＋工法中文命名。
 | 得標率／廠商績效 | `renderBidRateReport` `renderVendorReport`（報表中心分頁）；得標率口徑＝得標÷全部報價（`_bidStat`，除得標外皆列未得標）；業主往來／得標率／廠商績效整列可點入明細 `openRptClientDetail`／`openRptBidDetail`／`openRptVendorDetail` |
 | 合約請款報表 | `renderContractReport`：同編號同名（即使掛不同報價）的重複建檔合併為一列，⚠×N 可點入 `openCtDupFix` 直接刪除未請款的重複筆 |
 | 統計卡總結 | 全站 KPI 卡皆可點：報價/請款 `openQuoteKpi`/`openInvKpi`、總覽與金流 `openFinKpi`(ar/ap/cash/month)、利潤 `openProfitKpi`(net/est/recv/cost)、佣金 `openCommKpi`、客戶 `openCustKpi`、累積估驗 `openInvCumDetail`（編輯器前期累計欄點入各期組成）；請款每期預計收款日 `_invExpectedDate` 顯示於列表小字與期別 chip（逾期轉紅） |
+| 信封列印 | `openEnvelope(invId|null,{custId|to})`（請款單列表 ✉／請款單編輯「✉ 信封」／客戶卡 ✉）：針對市售預印中式信封（12K 120×235、15K 105×220，`_ENV_SIZES`）只印文字——收件郵遞區號逐格（3／5／6 碼 `_envDigits`）、中欄直書 `_envVert`（每字一格、由右往左換欄，**不用 writing-mode**，字型無直排度量也正確）：地址／單位＋啟／收件人＋稱謂 收、寄件人直書、寄送方式 ✓（`_ENV_METHODS` 印刷品／限時／平信／掛號／雙掛號）；地址前綴郵遞區號 `_envSplitZip`；請款單 `sendMethod` 郵寄工地 → 用 `inv.loc`；列印走 `_printNativeHTML` 自訂 `@page size`、框線預設不印（`cfg.frames` 可印於空白信封／校正）；座標與偏移存 `P.env`（`_envCfg`／`_ENV_DEF`），公司郵遞區號 `P.coZip`，業主郵遞區號／收件人回寫 `CUSTOMERS[].zip|envAttn` |
 | 收款 | `openReceiptModal(invId)`：彈窗內可切換同專案各期；專案管理每期 chip 各自帶收款鈕 |
 | 票據登記 | `inv.receipts[]`（現金/票據、到期日、狀態）`_invTickets` `_cashOf` 登記模式優先；收款彈窗登記 |
 | 保留款總覽 | `_retentionRows` `renderRetention`（金流管理分頁）；已完工未退標紅 |

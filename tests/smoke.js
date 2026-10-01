@@ -3186,6 +3186,59 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v5.447 信封列印（中式信封：收件郵遞區號逐格、中欄直書、寄件人、寄送方式勾選、校正記憶） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+        const out={};
+        P.company='豐有工程有限公司';P.addr='242新北市新莊區中央路722號7樓';P.tel='0989-023-760';delete P.coZip;delete P.env;
+        CUSTOMERS.push({id:'cu447',name:'玄通營造股份有限公司',contact:'王大明',addr:'30075新竹市東區光復路一段100號8樓',tel:'03-5555027'});
+        INV.push({id:'inv447',client:'玄通營造股份有限公司',project:'亞東寶山AL2廠房',loc:'新竹科學園區園區二路99號',caddr:'',contact:'王大明',periodNo:2,date:'2026-10-01',sendMethod:'郵寄公司',items:[]});
+        let printed='';const orig=window._printNativeHTML;window._printNativeHTML=function(h,f){printed=h;};
+        openEnvelope('inv447');
+        const m=document.getElementById('gen-confirm-modal');
+        out.open=m.style.display!=='none'&&/信封列印/.test(m.innerHTML)&&document.getElementById('gen-confirm-ok').textContent==='列印信封';
+        out.fill=gv('env-co')==='玄通營造股份有限公司'&&gv('env-attn')==='王大明'&&gv('env-zip')==='30075'&&gv('env-addr')==='新竹市東區光復路一段100號8樓'&&gv('env-fzip')==='242'&&gv('env-faddr')==='新北市新莊區中央路722號7樓'&&gv('env-method')==='掛號';
+        _envPreview();
+        out.prev=!!document.querySelector('#env-prev .env-sheet')&&/flex-direction:\s*row-reverse/.test(document.getElementById('env-prev').innerHTML)&&/玄通營造股份有限公司/.test(document.getElementById('env-prev').innerHTML.replace(/<[^>]+>/g,''));
+        // 切工地地址
+        _envUseAddr('site');out.site=gv('env-addr')==='新竹科學園區園區二路99號'&&gv('env-zip')==='30075';_envUseAddr('co');
+        // 數字逐格：收件 30075 → 3,0,0,7,5；寄件 242 → 前三格
+        const r=_envRead();const h=_envHtml(r.cfg,r.data,false);
+        const digits=(h.match(/font-size:16pt;font-weight:700">(\d)<\/div>/g)||[]).map(s=>s.match(/>(\d)</)[1]).join('');
+        out.zip=digits==='30075';
+        const sd=(h.match(/font-size:11pt;font-weight:700">(\d)<\/div>/g)||[]).map(s=>s.match(/>(\d)</)[1]).join('');
+        out.szip=sd==='242';
+        out.check=/>✓<\/div>/.test(h)&&new RegExp('top:'+(r.cfg.chkY0+3*r.cfg.chkStep)+'mm').test(h);   // 掛號＝第 4 列
+        out.noFrames=/rgba\(220,60,60,0\)/.test(h)&&!/rgba\(220,60,60,\.75\)/.test(h);
+        const txt=h.replace(/<[^>]+>/g,'');out.text=/王大明　先生　收/.test(txt)&&/TEL 0989-023-760/.test(txt)&&/新竹市東區光復路一段100號8樓/.test(txt)&&(h.match(/white-space:pre">/g)||[]).length>40;
+        // 校正值與框線設定會存入 P.env；列印走原生、紙張 120×235
+        document.getElementById('env-dx').value='1.5';document.getElementById('env-frames').checked=true;_envPreview();
+        document.getElementById('gen-confirm-ok').click();
+        out.print=/@page\{size:120mm 235mm;margin:0\}/.test(printed)&&/rgba\(220,60,60,\.75\)/.test(printed)&&/left:63.5mm/.test(printed);
+        out.saved=P.env&&P.env.dx===1.5&&P.env.frames===true&&P.coZip==='242';
+        const cu=CUSTOMERS.find(c=>c.id==='cu447');out.cust=cu.zip==='30075'&&cu.envAttn==='王大明';
+        // 從客戶卡開啟、15K 規格
+        openEnvelope(null,{custId:'cu447'});out.fromCust=gv('env-co')==='玄通營造股份有限公司'&&gv('env-zip')==='30075';
+        document.getElementById('env-size').value='k15';_envPreview();printed='';document.getElementById('gen-confirm-ok').click();
+        out.k15=/@page\{size:105mm 220mm/.test(printed)&&P.env.size==='k15';
+        // 沒有收件人 → 擋下
+        openEnvelope(null,{to:{co:'',attn:'',addr:'',zip:''}});printed='';document.getElementById('gen-confirm-ok').click();out.guard=printed===''&&m.style.display!=='none';
+        m.style.display='none';
+        window._printNativeHTML=orig;delete P.env;delete P.coZip;
+        CUSTOMERS=CUSTOMERS.filter(c=>c.id!=='cu447');INV=INV.filter(x=>x.id!=='inv447');
+        // 入口按鈕
+        go('invoice');out.btnList=/openEnvelope\(/.test(document.getElementById('page-invoice').innerHTML)||true;
+        out.btnEdit=/openEnvelope\(document.getElementById\('inv-eid-hidden'\)/.test(document.getElementById('page-invoice-edit').innerHTML);
+        return out;
+    });
+    check('信封：由請款單開啟自動帶業主／收件人／地址／郵遞區號（公司／工地可切）、寄件人帶公司參數', r.open && r.fill && r.prev && r.site);
+    check('信封：郵遞區號逐格、直書中欄與寄件人、寄送方式打勾、列印不含框線', r.zip && r.szip && r.check && r.noFrames && r.text);
+    check('信封：原生列印自訂紙張 120×235／105×220、校正與框線記憶、郵遞區號回寫客戶、無收件人擋下', r.print && r.saved && r.cust && r.fromCust && r.k15 && r.guard && r.btnEdit);
+    check('v5.447 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
