@@ -3492,6 +3492,87 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6 材料併入發包：需求（估算帶入）→ 自有調撥（台帳拆列）→ 內部租金攤提（不入應付）→ 歸還／損耗認列 → 租賃／運費掛應付 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+          const out={};
+          P.matRentRate={H300:3,H350:4,H400:5};P.matRentFactor=0.8;P.matLossAccrue=true;
+          MAT_LEDGER.length=0;MAT_LEDGER.push({id:'L1',name:'型鋼',spec:'H350',len:12,qty:30,uw:135,price:20,date:'2026-01-10',kind:'重複性',loc:'公司倉庫',_mt:1});
+          VENDORS.length=0;VENDORS.push({id:'v9',name:'大料場',type:'材料'});
+          Q=[{id:'qM',code:'1150930',name:'材料測試案',client:'業主',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 H350 打設',unit:'支',qty:'40',price:'1000',sec:false}],costs:[],
+              matEst:{items:[{name:'H型鋼 H350 L=12M',unit:'支',quantity:40},{name:'封頭鈑',unit:'片',quantity:10}]}}];
+          PAYABLES.length=0;INV.length=0;
+          out.nav=(ALL_PAGES.find(p=>p.id==='materials')||{}).parent==='rfq';
+          _rfqQid='qM';_rfqTab='mat';go('rfq');
+          return new Promise(res=>setTimeout(()=>{
+            try{
+              const q=Q[0];const root=document.getElementById('rfq-root');
+              out.tab=/需求與自有調撥/.test(root.innerHTML)&&/自有材料在工地/.test(root.innerHTML)&&/租賃／外購與運費/.test(root.innerHTML)&&!/新增詢價單/.test(root.innerHTML);
+              matSeedFromEst('qM');
+              const r=q.mat.rows[0];
+              out.seed=q.mat.rows.length===1&&r.name==='型鋼'&&r.spec==='H350'&&r.len===12&&r.qty===40&&/尚缺/.test(root.innerHTML)&&/>40 支</.test(root.innerHTML);
+              // 調撥 20 支（09-20）
+              matOut('qM',r.id);
+              const md=document.getElementById('fy-modal');out.outModal=!!md&&md.querySelectorAll('.mo-qty').length===1&&md.querySelector('.mo-qty').value==='30';
+              md.querySelector('.mo-qty').value='20';document.getElementById('mo-date').value='2026-09-20';document.getElementById('fy-modal-o').click();
+              const wh=MAT_LEDGER.find(x=>x.id==='L1'),site=MAT_LEDGER.find(x=>x.projQid==='qM');
+              out.out=!document.getElementById('fy-modal')&&wh.qty===10&&wh.loc==='公司倉庫'&&!!site&&site.qty===20&&site.loc==='材料測試案'&&site.outDate==='2026-09-20'&&site.matRowId===r.id;
+              const days=Math.max(1,_dDiff('2026-09-20',localToday()));
+              const am=(q.costs||[]).find(c=>c._fromMat==='amort');
+              out.amort=!!am&&am.type==='own'&&am.vendor===''&&am.cat==='材料租金'&&am.rows.length===1&&am.rows[0].qty===20*days&&Math.abs(am.rows[0].unitPrice-38.4)<1e-9&&Math.round(am.amt)===Math.round(20*days*38.4)&&!PAYABLES.some(p=>p.costId===am.id);
+              out.atTable=/自有材料在工地/.test(root.innerHTML)&&/2026-09-20/.test(root.innerHTML)&&/4×0.8/.test(root.innerHTML)&&new RegExp(fmt(Math.round(20*days*38.4))).test(root.innerHTML);
+              // 歸還 18、損耗 2（單價預設 135×12×20=32,400）
+              matBack('qM',site.id);
+              const mb=document.getElementById('fy-modal');out.backModal=!!mb&&gv('mb-back')==='20'&&gv('mb-uc')==='32400';
+              document.getElementById('mb-date').value=localToday();document.getElementById('mb-back').value='18';document.getElementById('mb-loss').value='2';document.getElementById('fy-modal-o').click();
+              const backRow=MAT_LEDGER.find(x=>x.loc==='公司倉庫'&&x.id!=='L1'&&x.qty===18);
+              out.back=!document.getElementById('fy-modal')&&!!backRow&&!MAT_LEDGER.some(x=>x.projQid==='qM')&&MAT_LEDGER.filter(x=>x.loc==='公司倉庫').reduce((a,x)=>a+x.qty,0)===28
+                &&q.mat.use.length===1&&q.mat.use[0].qty===20&&q.mat.use[0].days===days&&q.mat.use[0].amt===Math.round(20*12*4*0.8*days)
+                &&q.mat.loss.length===1&&q.mat.loss[0].qty===2&&q.mat.loss[0].amt===64800;
+              const ls=(q.costs||[]).find(c=>c._fromMat==='loss'),am2=(q.costs||[]).find(c=>c._fromMat==='amort');
+              out.lossCost=!!ls&&ls.cat==='材料損耗'&&ls.vendor===''&&Math.round(ls.amt)===64800&&!PAYABLES.some(p=>p.costId===ls.id)&&!!am2&&am2.rows.length===1&&/已結算/.test(root.innerHTML)===false||(!!am2&&am2.rows.length===1&&!am2.rows[0].open);
+              out.lossTable=/損耗認列/.test(root.innerHTML)&&/64,800/.test(root.innerHTML)&&/已結算使用段/.test(root.innerHTML);
+              // 租賃：尚缺 40 支 → 大料場 150/支/月 × 2 月 = 12,000 → 掛應付
+              matRentUpd('qM',r.id,'rentVendor','大料場');matRentUpd('qM',r.id,'rentPrice',150);matRentUpd('qM',r.id,'rentMonths',2);
+              out.rentLive=document.getElementById('mrent-amt-'+r.id).textContent==='12,000';
+              matRentApply('qM');
+              const rc=(q.costs||[]).find(c=>c._fromMat==='rent:大料場');
+              const pay=rc&&PAYABLES.find(p=>p.costId===rc.id);
+              out.rent=!!rc&&rc.vendor==='大料場'&&rc.cat==='材料租金'&&Math.round(rc.amt)===12000&&!!pay&&Math.round(parseFloat(pay.amount))===12000;
+              // 運費
+              matTransUpd('qM','vendor','大料場');matTransUpd('qM','trips',4);matTransUpd('qM','price',3500);matRentApply('qM');
+              const tc=(q.costs||[]).find(c=>c._fromMat==='trans');
+              out.trans=!!tc&&tc.cat==='材料運費'&&Math.round(tc.amt)===14000&&PAYABLES.some(p=>p.costId===tc.id);
+              // 敏感欄位：q.mat 走 private
+              out.sens=_stripQuoteSens(q).mat===undefined&&!!_extractQuoteSens(q).mat&&_extractQuoteSens(q).mat.rows.length===1;
+              // 成本總額納入攤提＋損耗＋租賃＋運費
+              out.total=_projCostTotal(q)===Math.round(am2.amt)+64800+12000+14000;
+              // 工程專案頁有「材料」鈕
+              _pjQid='qM';go('proj');out.pjBtn=/_rfqTab='mat'/.test(document.getElementById('proj-root').innerHTML);
+            }catch(e){out.err=String(e.stack||e).slice(0,500);}
+            Q=Q.filter(x=>x.id!=='qM');MAT_LEDGER.length=0;PAYABLES.length=0;VENDORS.length=0;_rfqTab='rfq';
+            res(out);
+          },400));
+    });
+    check('材料：材料管理併入發包分頁、由估算帶入鋼材列、調撥彈窗帶倉庫列與可撥支數、拆列到工地（loc／projQid／outDate）', r.nav && r.tab && r.seed && r.outModal && r.out, r.err || '');
+    check('材料：內部攤提＝支數×單長×日租×折數×天數 → 自有成本（公司自備不入應付）、工地表顯示', r.amort && r.atTable);
+    check('材料：歸還／損耗彈窗預設購置單價、歸還拆回倉庫、結算使用段、損耗認列成本（材料損耗科目、不入應付）', r.backModal && r.back && r.lossCost && r.lossTable);
+    check('材料：租賃尚缺×月租×月數即時金額、更新後依廠商建材料租金成本並掛應付、運費同、成本總額含四者', r.rentLive && r.rent && r.trans && r.total);
+    check('材料：q.mat 走 private（strip／extract）、工程專案表頭與發包區塊有「材料」鈕', r.sens && r.pjBtn);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mob = await page.evaluate(() => {
+        MAT_LEDGER.length=0;MAT_LEDGER.push({id:'L1',name:'型鋼',spec:'H350',len:12,qty:30,uw:135,price:20,date:'2026-01-10',kind:'重複性',loc:'公司倉庫',_mt:1});
+        Q=[{id:'qM2',code:'2',name:'手機材料案',client:'業主',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[],costs:[],mat:{rows:[{id:'r1',name:'型鋼',spec:'H350',len:12,unit:'支',qty:40,rate:'',rentVendor:'',rentPrice:'',rentMonths:''}],use:[],loss:[],trans:{}}}];
+        _rfqQid='qM2';_rfqTab='mat';go('rfq');renderRfq();
+        const out={sw:document.documentElement.scrollWidth,iw:window.innerWidth,ln:!!document.querySelector('#rfq-root table.mst-ln')};
+        Q=Q.filter(x=>x.id!=='qM2');MAT_LEDGER.length=0;_rfqTab='rfq';return out;
+    });
+    check('材料手機版：表格一行一行堆疊、無橫向捲動', mob.sw <= mob.iw + 1 && mob.ln, JSON.stringify(mob));
+    check('v6 材料測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
