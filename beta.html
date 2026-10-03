@@ -2782,7 +2782,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.2-beta';
+var APP_VERSION='v6.0.3-beta';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -37206,7 +37206,9 @@ function rfqEdit(rid){
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   var d7=_dAdd(localToday(),7);
   var itemsHtml=(q.items||[]).map(function(it,i){if(!it||it.sec||_isSpare(it))return '';var qty=picked[i]?picked[i].qty:Math.abs(em?_effQty(em,it):(parseFloat(it.qty)||0));
-    return '<label style="display:flex;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--b1);border-radius:var(--r8);margin-bottom:4px;font-size:12.5px;cursor:pointer"><input type="checkbox" class="rfq-it" data-idx="'+i+'"'+(picked[i]?' checked':'')+' style="width:16px;height:16px"><span style="flex:1;min-width:0">'+esc((it.desc||'').split('\n')[0])+'</span><input type="number" inputmode="decimal" step="any" class="rfq-qty" value="'+qty+'" style="width:84px;text-align:right;'+IN+';padding:5px 6px"><span style="font-size:11px;color:var(--b4);width:28px">'+esc(_uFix(it.unit||''))+'</span></label>';}).join('');
+    return '<label style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;border:1px solid var(--b1);border-radius:var(--r8);margin-bottom:4px;font-size:12.5px;cursor:pointer"><input type="checkbox" class="rfq-it" data-idx="'+i+'"'+(picked[i]?' checked':'')+' style="width:18px;height:18px;flex:0 0 18px;margin-top:2px">'
+      +'<span style="flex:1;min-width:0"><span style="display:block;line-height:1.4;word-break:break-word">'+esc((it.desc||'').split('\n')[0])+'</span>'
+      +'<span style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:var(--b4);white-space:nowrap">預估數量</span><input type="number" inputmode="decimal" step="any" class="rfq-qty" value="'+qty+'" style="'+IN+';flex:0 0 110px;width:110px;text-align:right;padding:6px 8px"><span style="font-size:11px;color:var(--b4)">'+esc(_uFix(it.unit||''))+'</span></span></span></label>';}).join('');
   var html='<div class="fg fg2" style="gap:8px">'
     +'<div class="f"><label>詢價範圍（標題）</label><input id="rfq-scope" value="'+esc(r?r.scope||'':'')+'" placeholder="例：H型鋼樁打設、拔除（含引孔）" style="'+IN+'"></div>'
     +'<div class="f"><label>回覆期限</label><input id="rfq-deadline" type="date" value="'+esc(r?r.deadline||'':d7)+'" style="'+IN+'"></div>'
@@ -37263,7 +37265,7 @@ function _rfqDocHtml(q,r){
     +'table{width:100%;border-collapse:collapse;margin-top:8px}.meta td{padding:3px 6px;border:1px solid #bbb;font-size:11px}.meta td.l{background:#eef3ee;font-weight:700;width:16%;white-space:nowrap}'
     +'th{background:#1a6b3f;color:#fff;padding:6px 5px;font-size:11px;font-weight:700}td{border:1px solid #999;padding:6px 5px;vertical-align:middle}td.c{text-align:center}td.r{text-align:right;font-variant-numeric:tabular-nums}td.blank{background:#fffdf0}tfoot td{font-weight:700;background:#f4f4f4}'
     +'.cond{margin-top:8px;font-size:10.5px;line-height:1.7}.cond b{color:#1a6b3f}.cond ol{margin:2px 0 0;padding-left:18px}.cond li{margin:0}'
-    +'.vt{margin-top:12px}.vt caption{text-align:left;font-weight:700;color:#1a6b3f;font-size:11.5px;padding:0 0 4px}.vt td{border:1px solid #999;padding:0 8px;height:30px;font-size:11px}.vt td.k{background:#eef3ee;font-weight:700;width:13%;white-space:nowrap;text-align:center}.vt td.sig{height:46px}'
+    +'.vt{margin-top:12px}.vt caption{text-align:left;font-weight:700;color:#1a6b3f;font-size:11.5px;padding:0 0 4px}.vt td{border:1px solid #999;padding:0 8px;height:30px;font-size:11px}.vt{table-layout:fixed}.vt td.k{background:#eef3ee;font-weight:700;width:15%;white-space:nowrap;text-align:center}.vt td.v{width:35%}.vt td.sig{height:46px}'
     +'</style></head><body><div class="page-wrap">'
     +'<div class="hd"><div class="co">'+esc(P.company||'豐有工程有限公司')+'<small>'+esc(P.addr||'')+'　TEL '+esc(P.tel||'')+(P.taxid?('　統編 '+esc(P.taxid)):'')+'</small></div>'
     +'<div><h1>分項工程詢價單</h1><div class="no">詢價單號 '+esc(r.no)+'　　詢價日期 '+esc(r.date||'')+'</div></div></div>'
@@ -37272,12 +37274,14 @@ function _rfqDocHtml(q,r){
     +'<tr><td class="l">詢價範圍</td><td>'+esc(r.scope||'')+'</td><td class="l">回覆期限</td><td>'+esc(r.deadline||'')+'</td></tr>'
     +'<tr><td class="l">聯絡人</td><td>'+esc(r.contact||'')+(r.tel?('　'+esc(r.tel)):'')+'</td><td class="l">回傳方式</td><td>LINE 拍照'+(P.email?('、Email '+esc(P.email)):'')+'</td></tr></table>'
     +'<table><thead><tr><th style="width:6%">項次</th><th>工項說明</th><th style="width:7%">單位</th><th style="width:10%">預估數量</th><th style="width:13%">單價（未稅）</th><th style="width:14%">複價</th><th style="width:18%">廠商備註</th></tr></thead>'
-    +'<tbody>'+rows+'</tbody><tfoot><tr><td colspan="5" class="r">合計（未稅）</td><td class="blank"></td><td></td></tr></tfoot></table>'
+    +'<tbody>'+rows+'</tbody><tfoot><tr><td colspan="5" class="r">合計（未稅）</td><td class="blank"></td><td></td></tr>'
+    +'<tr><td colspan="5" class="r">營業稅 '+_taxR()+'%</td><td class="blank"></td><td></td></tr>'
+    +'<tr><td colspan="5" class="r">總計（含稅）</td><td class="blank"></td><td></td></tr></tfoot></table>'
     +'<div class="cond"><b>詢價條件</b>（請依下列條件報價，若有不同請於備註註明）<ol>'+lines.map(function(t){return '<li>'+esc(t)+'</li>';}).join('')+'</ol></div>'
     +'<table class="vt"><caption>廠商報價欄（請填寫後回傳）</caption>'
-    +'<tr><td class="k">公司名稱</td><td style="width:37%"></td><td class="k">統一編號</td><td></td></tr>'
-    +'<tr><td class="k">聯絡人</td><td></td><td class="k">電話</td><td></td></tr>'
-    +'<tr><td class="k">報價日期</td><td></td><td class="k">簽章</td><td class="sig"></td></tr></table>'
+    +'<tr><td class="k">公司名稱</td><td class="v"></td><td class="k">統一編號</td><td class="v"></td></tr>'
+    +'<tr><td class="k">聯絡人</td><td class="v"></td><td class="k">電話</td><td class="v"></td></tr>'
+    +'<tr><td class="k sig">報價日期</td><td class="v sig"></td><td class="k sig">簽章</td><td class="v sig"></td></tr></table>'
     +'</div></body></html>';
 }
 function rfqPrint(rid){
