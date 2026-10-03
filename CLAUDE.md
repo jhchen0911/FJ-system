@@ -40,7 +40,7 @@
   只把這一個檔案放到 `main`（網址 `…/FJ-system/beta.html`）。沙盒：localStorage 鍵全走 `beta:` 前綴（第一次開啟從正式版複製一份）、
   所有上傳雲端函式改空操作（可登入、可拉雲端，不會推回去）、左下角橙色「β 測試版」chip 可一鍵重新複製。
 - 使用者在 beta 驗過的區塊才合併回 main 成為正式版；每個區塊：改 redesign-v6 → 跑 smoke → build beta → 只推 beta.html 到 main。
-- v6 新架構（盤點已確認）：報價（含議價、案場細節、詢價單回填）／工程專案一頁式／發包（分項詢價→比價→得標或點工，`rfq.js` 區塊：`renderRfq` `rfqNew` `rfqFill` `rfqAward` `rfqLabor`，資料 `q.rfqs` 走 private）／日報．支出／計價（業主＋廠商）／帳務（應收應付、零用金、薪資）／報表（內部＋股東版）。施工成本改為工程專案內的統計分頁；材料管理併入發包的材料採購；施工進度併入工程專案（預定＋實際雙層）。
+- v6 新架構（盤點已確認）：報價（含議價、案場細節、詢價單回填）／工程專案一頁式／發包（分項詢價→比價→得標或點工，`rfq.js` 區塊：`renderRfq` `rfqNew` `rfqFill` `rfqAward` `rfqLabor`，資料 `q.rfqs` 走 private）／日報．支出／計價（業主＋廠商）／帳務（應收應付、零用金、薪資）／報表（內部＋股東版）。施工成本改為工程專案內的統計分頁；材料管理併入發包的材料採購；施工進度併入工程專案（預定＋實際雙層）。**工程專案一頁式**（頁 `proj`，`proj.js` 區塊：`renderProj` `_pjStat`（含追加案彙總：合約 base／議價 origPrice／請款／收款／分包 `_subStat`／應付／日報／實體進度）、`_pjTimelineHtml` 8 步、區塊 `_pjItemsHtml`（`_qtyRecon`＋`_itemProgress`）／`_pjInvHtml`／`_pjSubHtml`／`_pjCostHtml`（`_costSummaryStrip`＋`buildCostAnalysisHtml`）／`_pjSchedHtml`（預定取 `_pgState`（專案名稱相同）、實際取日報）／`_pjLogHtml`／`_pjCloseHtml`；`openProj(qid)`；區塊收合記在 `pj_open_<id>`）；舊「專案管理」卡片頁隱藏（parent proj，表頭「舊版卡片」可進，合約檔／工作確認單上傳仍在那裡），手機底部「專案」改開工程專案。
 
 ## 雲端工作階段（claude.ai/code、手機 App）額外規則
 
