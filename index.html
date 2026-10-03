@@ -2751,7 +2751,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v5.448';
+var APP_VERSION='v5.449';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -39016,12 +39016,12 @@ function exportCurrentReportExcel(){
 
 <!-- 通用確認 Modal -->
 <div id="gen-confirm-modal" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:16px">
-  <div id="gen-confirm-box" style="max-width:340px;width:100%;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35)">
+  <div id="gen-confirm-box" style="max-width:340px;width:100%;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);max-height:calc(100dvh - 32px);max-height:calc(100vh - 32px);display:flex;flex-direction:column">
     <div id="gen-confirm-header" style="background:var(--red);padding:12px 18px">
       <span id="gen-confirm-title" style="color:#fff;font-size:14px;font-weight:700"></span>
     </div>
-    <div style="padding:14px 18px">
-      <div id="gen-confirm-msg" style="font-size:13px;color:var(--b5);margin-bottom:16px;line-height:1.6"></div>
+    <div style="padding:14px 18px;flex:1 1 auto;min-height:0;display:flex;flex-direction:column">
+      <div id="gen-confirm-msg" style="font-size:13px;color:var(--b5);margin-bottom:16px;line-height:1.6;flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button type="button" id="gen-confirm-cancel" style="padding:7px 18px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);color:var(--b4);cursor:pointer;font-size:13px">取消</button>
         <button type="button" id="gen-confirm-ok" style="padding:7px 22px;border:none;border-radius:var(--r8);background:var(--red);color:#fff;font-weight:700;cursor:pointer;font-size:13px">確認</button>

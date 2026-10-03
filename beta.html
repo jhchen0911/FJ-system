@@ -2782,7 +2782,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.4-beta';
+var APP_VERSION='v6.0.5-beta';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -37215,10 +37215,12 @@ function rfqEdit(rid){
     +'</div>'
     +'<div style="font-size:12px;font-weight:700;color:var(--g3);margin:8px 0 4px">詢價工項</div>'+(itemsHtml||'<div style="font-size:12px;color:var(--b3)">此工程沒有可詢價的工項</div>')
     +'<div style="font-size:12px;font-weight:700;color:var(--g3);margin:10px 0 4px">付款條件</div>'
-    +'<div class="fg fg3" style="gap:8px">'
-    +'<div class="f"><label>匯款 %</label><input id="rfq-cash" type="number" min="0" max="100" value="'+c.cashPct+'" oninput="var t=document.getElementById(\'rfq-ticket\');if(t)t.value=Math.max(0,100-(parseFloat(this.value)||0))" style="'+IN+'"></div>'
-    +'<div class="f"><label>票期 %／天數</label><div style="display:flex;gap:4px"><input id="rfq-ticket" type="number" min="0" max="100" value="'+c.ticketPct+'" style="'+IN+'"><input id="rfq-tdays" type="number" min="0" value="'+c.ticketDays+'" style="'+IN+'"></div></div>'
-    +'<div class="f"><label>保留款 %／報價有效 天</label><div style="display:flex;gap:4px"><input id="rfq-ret" type="number" min="0" max="100" step="0.5" value="'+c.ret+'" style="'+IN+'"><input id="rfq-valid" type="number" min="0" value="'+c.valid+'" style="'+IN+'"></div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px">'
+    +'<div class="f" style="margin:0"><label style="white-space:nowrap">匯款 %</label><input id="rfq-cash" type="number" inputmode="decimal" min="0" max="100" value="'+c.cashPct+'" oninput="var t=document.getElementById(\'rfq-ticket\');if(t)t.value=Math.max(0,100-(parseFloat(this.value)||0))" style="'+IN+';padding:7px 4px;text-align:center"></div>'
+    +'<div class="f" style="margin:0"><label style="white-space:nowrap">票期 %</label><input id="rfq-ticket" type="number" inputmode="decimal" min="0" max="100" value="'+c.ticketPct+'" style="'+IN+';padding:7px 4px;text-align:center"></div>'
+    +'<div class="f" style="margin:0"><label style="white-space:nowrap">票期天數</label><input id="rfq-tdays" type="number" inputmode="numeric" min="0" value="'+c.ticketDays+'" style="'+IN+';padding:7px 4px;text-align:center"></div>'
+    +'<div class="f" style="margin:0"><label style="white-space:nowrap">保留款 %</label><input id="rfq-ret" type="number" inputmode="decimal" min="0" max="100" step="0.5" value="'+c.ret+'" style="'+IN+';padding:7px 4px;text-align:center"></div>'
+    +'<div class="f" style="margin:0"><label style="white-space:nowrap">有效 天</label><input id="rfq-valid" type="number" inputmode="numeric" min="0" value="'+c.valid+'" style="'+IN+';padding:7px 4px;text-align:center"></div>'
     +'</div>'
     +'<div style="font-size:12px;font-weight:700;color:var(--g3);margin:10px 0 4px">詢價條件</div><div id="rfq-conds">'+_rfqCondRowsHtml(c,IN)+'</div>'
     +'<button type="button" class="btn btn-xs" onclick="_rfqCondAdd()" style="margin-top:4px">＋ 新增條件</button>'
@@ -39344,12 +39346,12 @@ function exportCurrentReportExcel(){
 
 <!-- 通用確認 Modal -->
 <div id="gen-confirm-modal" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:16px">
-  <div id="gen-confirm-box" style="max-width:340px;width:100%;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35)">
+  <div id="gen-confirm-box" style="max-width:340px;width:100%;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35);max-height:calc(100dvh - 32px);max-height:calc(100vh - 32px);display:flex;flex-direction:column">
     <div id="gen-confirm-header" style="background:var(--red);padding:12px 18px">
       <span id="gen-confirm-title" style="color:#fff;font-size:14px;font-weight:700"></span>
     </div>
-    <div style="padding:14px 18px">
-      <div id="gen-confirm-msg" style="font-size:13px;color:var(--b5);margin-bottom:16px;line-height:1.6"></div>
+    <div style="padding:14px 18px;flex:1 1 auto;min-height:0;display:flex;flex-direction:column">
+      <div id="gen-confirm-msg" style="font-size:13px;color:var(--b5);margin-bottom:16px;line-height:1.6;flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button type="button" id="gen-confirm-cancel" style="padding:7px 18px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);color:var(--b4);cursor:pointer;font-size:13px">取消</button>
         <button type="button" id="gen-confirm-ok" style="padding:7px 22px;border:none;border-radius:var(--r8);background:var(--red);color:#fff;font-weight:700;cursor:pointer;font-size:13px">確認</button>
