@@ -3376,7 +3376,7 @@ async function newPage(browser, width, height) {
         _pjQid='';eid=null;renderProj();out.list=/openProj\('qP'\)/.test(root.innerHTML)&&/已請/.test(root.innerHTML);
         openProj('qP');out.open=_pjQid==='qP'&&/合約工項與進度/.test(root.innerHTML);
         // 手機底部「專案」改開工程專案；專案管理頁隱藏但仍可開
-        out.nav=/go\('proj'\)/.test(document.getElementById('mn-projects').getAttribute('onclick'))&&!!ALL_PAGES.find(p=>p.id==='projects'&&p.hidden&&p.parent==='proj');
+        out.nav=/go\('proj'\)/.test(document.getElementById('mn-proj').getAttribute('onclick'))&&document.getElementById('mn-proj').style.display!=='none'&&!!ALL_PAGES.find(p=>p.id==='projects'&&p.hidden&&p.parent==='proj')&&/go\('proj'\)/.test(document.getElementById('dash-shortcuts').innerHTML);
         go('projects');out.old=document.getElementById('page-projects').classList.contains('active');
         _pgState={proj:'',startDate:localToday(),colDays:3,crews:[],rows:[]};
         Q=Q.filter(x=>x.id!=='qP');CONTRACTS.splice(0);INV.length=0;PAYABLES.length=0;VENDORS.length=0;_pjQid='';
