@@ -197,6 +197,30 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
   /* 工項排程「#」欄：序號＋上下移動鈕改橫排大按鈕 */
   table.mst td .mvcol{flex-direction:row!important;gap:5px;margin-left:8px!important}
   table.mst td .mvcol button{border-radius:var(--r6)!important;padding:7px 14px!important;font-size:12px!important;border:1px solid var(--b2)!important}
+  /* v6.0.11 一行一行模式（唯讀報表：工程專案／計價／發包／施工成本分析，_MST_LINE 指定根節點）：
+     每格一列「欄名 ……… 值」，首格當卡片標題、沒欄名的按鈕格靠右一排，合計列同樣逐行 */
+  table.mst.mst-ln tbody tr,table.mst.mst-ln tfoot tr{display:block;padding:6px 11px 8px}
+  table.mst.mst-ln tfoot{display:block}
+  table.mst.mst-ln tfoot tr{border:1px solid var(--b1);border-radius:var(--r8);margin-bottom:9px;background:var(--b0)}
+  table.mst.mst-ln tfoot td{border:none!important;padding:0!important;min-width:0;text-align:left!important;white-space:normal!important;width:auto!important}
+  table.mst.mst-ln tbody td[data-th],table.mst.mst-ln tfoot td[data-th]{display:flex!important;flex-direction:row;flex-wrap:wrap;align-items:baseline;justify-content:flex-end;
+    gap:2px 8px;min-height:0;padding:5px 0!important;font-size:13.5px;font-weight:600;color:var(--b5);border-bottom:1px dotted var(--b1)!important;text-align:right!important;overflow:visible}
+  table.mst.mst-ln tbody td[data-th]::before,table.mst.mst-ln tfoot td[data-th]::before{content:attr(data-th);flex:0 0 auto;display:inline;margin:0 auto 0 0;padding-right:10px;
+    font-size:11.5px;color:var(--b3);font-weight:600;text-align:left;align-items:baseline}
+  table.mst.mst-ln tbody td[data-th]>div{flex:0 0 100%;text-align:right}
+  table.mst.mst-ln tbody td[data-th]>span{text-align:right}
+  table.mst.mst-ln tfoot td:empty{display:none!important}
+  table.mst.mst-ln tbody td select,table.mst.mst-ln tbody td input:not([type=checkbox]):not([type=radio]){height:36px!important;min-height:36px;font-size:13px!important;margin-top:4px;max-width:100%!important}
+  table.mst.mst-ln tbody td:first-child[data-th]{display:block!important;text-align:left!important;font-size:14.5px;font-weight:700;line-height:1.35;
+    padding:0 0 6px!important;margin-bottom:2px;border-bottom:1px dashed var(--b1)!important}
+  table.mst.mst-ln tbody td:first-child[data-th]::before{display:inline;margin:0 6px 0 0;padding:0;font-size:11px}
+  table.mst.mst-ln tbody td:first-child[data-th]>div,table.mst.mst-ln tbody td:first-child[data-th]>span{flex:none;text-align:left;font-weight:500}
+  table.mst.mst-ln tbody td:first-child[data-th]>b{font-weight:800}
+  table.mst.mst-ln tfoot td:first-child[data-th]{font-weight:800;justify-content:flex-start;text-align:left!important}
+  table.mst.mst-ln tfoot td:first-child[data-th]::before{display:none}
+  table.mst.mst-ln tbody td:last-child,table.mst.mst-ln tfoot td:last-child{border-bottom:none!important}
+  table.mst.mst-ln tbody td:not([data-th]):not(:first-child){display:flex!important;flex-wrap:wrap;justify-content:flex-end;gap:4px;padding:8px 0 0!important}
+  table.mst.mst-ln tbody td .btn{height:34px}
 }
 .dbtn{border:none;background:transparent;color:var(--b2);cursor:pointer;padding:3px 5px;border-radius:var(--r4);font-size:14px;line-height:1;transition:var(--transition)}
 .dbtn:hover{background:var(--redl);color:var(--red)}
@@ -2791,7 +2815,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.10-beta';
+var APP_VERSION='v6.0.11-beta';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -24817,6 +24841,7 @@ function _plRender(){
 // 使用者規則：手機版任何表格不得左右滑動。工具頁（施工進度／鋼筋籠檢料／材料估算／
 // 根固砂漿／背填材料／施工計畫書）的寬表格於 ≤767px 自動改為逐列卡片：
 // 掃描有 thead 的表，欄數 ≥4 或 min-width ≥480 者加 .mst，並把表頭文字寫進各格 data-th 當標籤。
+var _MST_LINE={'proj-root':1,'vb-root':1,'rfq-root':1,'cost-list':1};   // v6.0.11 一行一行模式的根節點
 function _mstack(root){
   if(!root)return;
   root.querySelectorAll('table').forEach(function(tb){
@@ -24837,9 +24862,18 @@ function _mstack(root){
     var mm=/min-width:\s*(\d+)/.exec(st);if(mm)mw=parseInt(mm[1],10)||0;
     if(!(ths.length>=4||mw>=480))return;
     tb.__ms=1;tb.classList.add('mst');
+    if(_MST_LINE[root.id])tb.classList.add('mst-ln');
     if(hdRow)hdRow.classList.add('mst-hd');
     tb.querySelectorAll(':scope>tbody>tr').forEach(function(tr){
       if(tr===hdRow)return;
+      var ci=0;
+      Array.prototype.forEach.call(tr.children,function(td){
+        var span=parseInt(td.getAttribute('colspan')||'1',10)||1;
+        if(span===1&&ths[ci])td.setAttribute('data-th',ths[ci]);
+        ci+=span;
+      });
+    });
+    tb.querySelectorAll(':scope>tfoot>tr').forEach(function(tr){   // v6.0.11 合計列也標欄名（一行一行模式用）
       var ci=0;
       Array.prototype.forEach.call(tr.children,function(td){
         var span=parseInt(td.getAttribute('colspan')||'1',10)||1;
@@ -37435,7 +37469,7 @@ function renderProj(){
     +_pjSection('log','工作日報',_pjLogHtml(q,st),'',!st.logs.length)
     +_pjSection('close','完工與結案',_pjCloseHtml(q,st),'',!q.closed&&!st.done&&!st.invs.length);
   root.innerHTML=h;
-  try{if(typeof _mstack==='function')_mstack();}catch(e){_err('renderProj.mstack',e);}
+  try{if(typeof _mstack==='function')_mstack(document.getElementById('proj-root'));}catch(e){_err('renderProj.mstack',e);}
 }
 function _pjBtn(onclick,label,style){return '<button type="button" class="btn btn-xs" onclick="'+onclick.replace(/"/g,'&quot;')+'"'+(style?(' style="'+style+'"'):'')+'>'+label+'</button>';}
 function _pjListHtml(list){
@@ -37806,7 +37840,7 @@ function renderVendorBilling(keepScroll){
   root.innerHTML=h;
   if(keepScroll){var kwEl=document.getElementById('vb-kw');if(kwEl&&document.activeElement!==kwEl){try{kwEl.focus();kwEl.setSelectionRange(kwEl.value.length,kwEl.value.length);}catch(e){}}if(y!=null)window.scrollTo(0,y);}
   try{_vbBadge(rows);}catch(e){_err('renderVendorBilling.badge',e);}
-  try{if(typeof _mstack==='function')_mstack();}catch(e){}
+  try{if(typeof _mstack==='function')_mstack(root);}catch(e){}
 }
 // 脈絡切換：施工成本家族函式都以 eid 為準 → 先 loadQ 切到該專案（內含 go('editor')）再回計價頁廠商分頁
 function _vbCtx(qid){
