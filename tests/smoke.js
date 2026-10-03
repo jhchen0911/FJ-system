@@ -3372,7 +3372,7 @@ async function newPage(browser, width, height) {
         _pgState={proj:'中科台積電F25P3',startDate:'2026-09-01',colDays:3,crews:[],rows:[{crew:'',name:'H型鋼樁 H400 L=13M 打設',qty:400,unit:'支',rate:20,manualDays:null,offset:0,startOverride:'',doneQty:null,actualStart:'',doneAt:''}]};
         renderProj();out.sched1=/預定 2026-09-01～2026-09-20（20 天）/.test(document.getElementById('pj-body-sched').innerHTML);
         // 日報、結案
-        out.log=/2026-09-10/.test(document.getElementById('pj-body-log').innerHTML)&&/鴻玉開發工程行/.test(document.getElementById('pj-body-log').innerHTML);
+        out.log=/2026-09-10/.test(document.getElementById('pj-body-log').innerHTML)&&/鴻玉開發工程行/.test(document.getElementById('pj-body-log').innerHTML)&&/white-space:nowrap;font-weight:700">300\s*支<\/span>/.test(document.getElementById('pj-body-log').innerHTML)&&/class="pj-sched-row"/.test(document.getElementById('pj-body-sched').innerHTML);   // v6.0.12 數量不拆行、排程列單欄 class
         const cl=document.getElementById('pj-body-close').innerHTML;out.close=/竣工總結算/.test(cl)&&/結案前請確認/.test(cl)&&/toggleProjClosed/.test(cl);
           // 介紹費：第二家同工項承包 → 工項表提示、發包區下拉設跟隨 → 發包量不再重複
         Q[0].costs.push({id:'cF',type:'sub',vendor:'風哥',cat:'打設',date:'2026-09-01',amt:0,invoice:false,rows:[{id:'f1',linkedItemIdx:0,desc:'',qty:400,unitPrice:150}]});
