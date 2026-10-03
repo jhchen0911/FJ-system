@@ -3324,6 +3324,72 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6 工程專案一頁式：KPI／流程時間軸／工項進度／業主計價／發包／成本統計／預定 vs 實際／日報／結案 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+        const out={};
+        P.vendorPayDay=25;P.vendorPayDelay=1;P.subPayOnBill=true;
+        VENDORS.length=0;VENDORS.push({id:'v1',name:'鴻玉開發工程行',type:'承包',contact:'鴻哥',phone:'0911-111-111'});
+        Q=[{id:'qP',code:'1150928',name:'中科台積電F25P3',client:'八九企業',date:'2026-08-01',awarded:true,ver:2,exs:[],rmk:{},_mt:1,
+          items:[{desc:'H型鋼樁 H400 L=13M 打設',unit:'支',qty:'400',price:'1000',origPrice:'1100',sec:false,note:'含30天租期',ot:'50',otu:'支/天'},{desc:'H型鋼樁 H400 L=13M 拔除',unit:'支',qty:'400',price:'400',sec:false}],
+          costs:[{id:'cM',type:'sub',vendor:'鴻玉開發工程行',cat:'打設',date:'2026-09-01',amt:0,invoice:true,rows:[{id:'m1',linkedItemIdx:0,desc:'',qty:400,unitPrice:550}],periods:[{no:1,date:'2026-09-25',from:'2026-09-01',to:'2026-09-25',rows:[{rid:'m1',qty:300}],amt:165000,ret:0,net:165000,due:'2026-10-25'}]},
+                 {id:'cO',type:'own',vendor:'',cat:'材料租金',date:'2026-09-02',amt:60000,linkedItemIdx:0,rows:[{id:'o1',preset:'材料租金',desc:'',qty:3,unit:'月',unitPrice:20000}]}],
+          rfqs:[{id:'r1',no:'RFQ-1150928-01',date:'2026-08-20',scope:'打設',status:'awarded',award:{vendor:'鴻玉開發工程行',reason:'最低價'},items:[{idx:0,desc:'打設',unit:'支',qty:400}],vendors:[{name:'鴻玉開發工程行',status:'won',prices:{0:550},neg:{}}]}],
+          dailyLogs:[{id:'d1',date:'2026-09-10',workers:2,crews:[{type:'sub',vendor:'鴻玉開發工程行',n:5}],progressRows:[{itemIdx:0,desc:'H型鋼樁 H400 L=13M 打設',qty:300,note:''}],progress:'',photos:[]}]}];
+        CONTRACTS.splice(0);CONTRACTS.push({id:'ctP',code:'C-1150928',name:'中科台積電F25P3',client:'八九企業',amount:588000,status:'active',linkedQid:'qP',start:'2026-09-01',_mt:1});
+        INV.length=0;INV.push({id:'ivP1',quoteId:'qP',project:'中科台積電F25P3',client:'八九企業',periodNo:1,date:'2026-09-30',items:[{desc:'H型鋼樁 H400 L=13M 打設',unit:'支',contractQty:400,curQty:300,contractPrice:1000}],totals:{curTotal:300000,total:315000,retention:0},received:0,receivedConfirmed:false});
+        PAYABLES.length=0;syncCostToPayable(Q[0],Q[0].costs[0]);
+        _pjQid='';eid='qP';
+        go('proj');
+        const root=document.getElementById('proj-root');
+        out.page=!!root&&document.getElementById('page-proj').classList.contains('active');
+        // 自動選到目前報價（eid）→ 一頁式
+        const h=root.innerHTML;
+        out.head=/中科台積電F25P3/.test(h)&&/合約金額（含稅）/.test(h)&&/588,000/.test(h)&&/累計請款/.test(h)&&/315,000/.test(h)&&/發包總額/.test(h)&&/220,000/.test(h)&&/施工成本（未稅）/.test(h)&&/280,000/.test(h);
+        // 時間軸：8 步、議價有（原 1100→1000）、合約、發包、施工 75%、業主計價、廠商計價、結案
+        out.steps=(h.match(/class="pj-step"/g)||[]).length===8&&/議價/.test(h)&&/原 ?[\d,]+ → [\d,]+/.test(h)&&/分包 1 家/.test(h)&&/日報 1 篇/.test(h)&&/進度 5[0-9]%/.test(h)&&/報價 NT\$ 588,000/.test(h.replace(/<[^>]+>/g,' ').replace(/\s+/g,' '))&&/已請 1 期/.test(h)&&/應付 1 筆/.test(h);
+        // 工項表：合約量／日報回報／進度／發包廠商／發包量／廠商已請／業主已請
+        const sec=document.getElementById('pj-body-items').innerHTML;
+        out.items=/鴻玉開發工程行/.test(sec)&&/>400</.test(sec)&&/>300</.test(sec)&&/75%/.test(sec)&&/未發包/.test(sec);
+        // 業主計價：期別列、待收、估驗進度、逾期租金（打設最後 09-10 → 30 天到 10-10，今天 10-03 尚未逾期→無；改日期）
+        const inv=document.getElementById('pj-body-inv').innerHTML;
+        out.inv=/第1期/.test(inv)&&/待收 315,000/.test(inv)&&/估驗進度/.test(inv)&&/新增請款單/.test(inv)&&/openEnvelope/.test(inv);
+        // 發包：分包列、廠商已請 165,000、未付（含稅）173,250、登錄廠商請款鈕、詢價單 chip
+        const sub=document.getElementById('pj-body-sub').innerHTML;
+        out.sub=/RFQ-1150928-01/.test(sub)&&/165,000/.test(sub)&&/173,250/.test(sub)&&/登錄廠商請款/.test(sub)&&/已發包：鴻玉開發工程行/.test(sub);
+        // 施工成本：摘要列＋工項成本分析
+        const cost=document.getElementById('pj-body-cost').innerHTML;
+        out.cost=/cost-summary/.test(cost)&&/承包（發包）/.test(cost)&&/執行率|毛利/.test(cost);
+        // 進度：實際條有、預定無（提示到施工進度工具）；設 _pgState 後顯示預定
+        const sch=document.getElementById('pj-body-sched').innerHTML;
+        out.sched0=/實際 2026-09-10/.test(sch)&&/尚無預定進度/.test(sch);
+        _pgState={proj:'中科台積電F25P3',startDate:'2026-09-01',colDays:3,crews:[],rows:[{crew:'',name:'H型鋼樁 H400 L=13M 打設',qty:400,unit:'支',rate:20,manualDays:null,offset:0,startOverride:'',doneQty:null,actualStart:'',doneAt:''}]};
+        renderProj();out.sched1=/預定 2026-09-01～2026-09-20（20 天）/.test(document.getElementById('pj-body-sched').innerHTML);
+        // 日報、結案
+        out.log=/2026-09-10/.test(document.getElementById('pj-body-log').innerHTML)&&/鴻玉開發工程行/.test(document.getElementById('pj-body-log').innerHTML);
+        const cl=document.getElementById('pj-body-close').innerHTML;out.close=/竣工總結算/.test(cl)&&/結案前請確認/.test(cl)&&/toggleProjClosed/.test(cl);
+        // 區塊收合記憶
+        document.querySelector('#pj-sec-log .cb > div').click();out.fold=document.getElementById('pj-body-log').style.display==='none'&&localStorage.getItem('pj_open_log')==='0';
+        renderProj();out.foldKeep=document.getElementById('pj-body-log').style.display==='none';localStorage.removeItem('pj_open_log');
+        // 無選擇 → 卡片清單；點卡片進入
+        _pjQid='';eid=null;renderProj();out.list=/openProj\('qP'\)/.test(root.innerHTML)&&/已請/.test(root.innerHTML);
+        openProj('qP');out.open=_pjQid==='qP'&&/合約工項與進度/.test(root.innerHTML);
+        // 手機底部「專案」改開工程專案；專案管理頁隱藏但仍可開
+        out.nav=/go\('proj'\)/.test(document.getElementById('mn-projects').getAttribute('onclick'))&&!!ALL_PAGES.find(p=>p.id==='projects'&&p.hidden&&p.parent==='proj');
+        go('projects');out.old=document.getElementById('page-projects').classList.contains('active');
+        _pgState={proj:'',startDate:localToday(),colDays:3,crews:[],rows:[]};
+        Q=Q.filter(x=>x.id!=='qP');CONTRACTS.splice(0);INV.length=0;PAYABLES.length=0;VENDORS.length=0;_pjQid='';
+        return out;
+    });
+    check('工程專案：頁面、KPI 列（合約／請款／收款／發包／成本／應付／毛利）、8 步時間軸（含議價前後）', r.page && r.head && r.steps);
+    check('工程專案：工項進度表、業主計價期別、發包與廠商計價、施工成本統計', r.items && r.inv && r.sub && r.cost);
+    check('工程專案：預定（施工進度工具）vs 實際（日報）、日報摘要、結案區、區塊收合記憶', r.sched0 && r.sched1 && r.log && r.close && r.fold && r.foldKeep);
+    check('工程專案：未選時卡片清單、點卡進入；手機底部「專案」改開本頁、舊卡片頁隱藏可開', r.list && r.open && r.nav && r.old);
+    check('v6 工程專案測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
