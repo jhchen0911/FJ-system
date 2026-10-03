@@ -711,15 +711,15 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <span class="sc-label">日報．支出</span>
         <span class="sc-sub">工作日報・現場花費</span>
       </button>
-      <button type="button" onclick="go('costs')" class="sc-btn">
-        <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-wrench"/></svg></span>
-        <span class="sc-label">施工成本</span>
-        <span class="sc-sub">成本登錄・分析</span>
+      <button type="button" onclick="go('proj')" class="sc-btn">
+        <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg></span>
+        <span class="sc-label">工程專案</span>
+        <span class="sc-sub">一頁看全案</span>
       </button>
-      <button type="button" onclick="go('materials')" class="sc-btn">
-        <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-box"/></svg></span>
-        <span class="sc-label">材料管理</span>
-        <span class="sc-sub">台帳・估算</span>
+      <button type="button" onclick="go('rfq')" class="sc-btn">
+        <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg></span>
+        <span class="sc-label">發包</span>
+        <span class="sc-sub">詢價・比價</span>
       </button>
       <button type="button" onclick="go('finance')" class="sc-btn">
         <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg></span>
@@ -2753,7 +2753,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <nav class="mob-nav">
   <button type="button" class="mnav active" id="mn-dash" onclick="go('dash')"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg></span>總覽</button>
   <button type="button" class="mnav" id="mn-quotes" onclick="go('quotes')"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span>報價<span class="cnt2" id="qbadge2" style="display:none">0</span></button>
-  <button type="button" class="mnav" id="mn-projects" onclick="go('proj')" style="position:relative">
+  <button type="button" class="mnav" id="mn-proj" onclick="go('proj')" style="position:relative">
     <span style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;background:var(--g);border-radius:50%;margin-top:-16px;box-shadow:0 3px 12px rgba(26,107,63,.4);border:3px solid var(--w)"><svg class="ic" aria-hidden="true" style="width:21px;height:21px;stroke:#fff;stroke-width:2"><use href="#i-contract"/></svg></span>
     <span style="font-size:9px;color:var(--g);font-weight:700;margin-top:1px">專案</span>
   </button>
@@ -2767,7 +2767,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.6-beta';
+var APP_VERSION='v6.0.7-beta';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -8843,9 +8843,9 @@ function updateMobUI(page){
     fab.style.display=showFab&&isMob()?'flex':'none';
   }
   // 底部導航 active
-  ['dash','quotes','invoice','more'].forEach(p=>{
+  ['dash','quotes','proj','invoice','more'].forEach(p=>{
     const btn=document.getElementById('mn-'+p);
-    if(btn)btn.classList.toggle('active',p===page||(p==='quotes'&&page==='editor'));
+    if(btn)btn.classList.toggle('active',p===page||(p==='quotes'&&page==='editor')||(p==='proj'&&page==='projects'));
   });
   // 更多面板裡的 active
   ['contracts','profit','upa','params','permissions'].forEach(p=>{
