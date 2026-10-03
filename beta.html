@@ -221,6 +221,9 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
   table.mst.mst-ln tbody td:last-child,table.mst.mst-ln tfoot td:last-child{border-bottom:none!important}
   table.mst.mst-ln tbody td:not([data-th]):not(:first-child){display:flex!important;flex-wrap:wrap;justify-content:flex-end;gap:4px;padding:8px 0 0!important}
   table.mst.mst-ln tbody td .btn{height:34px}
+  /* v6.0.12 工程專案「進度（預定 vs 實際）」：手機改單欄，工項名整行、進度條在下 */
+  .pj-sched-row{grid-template-columns:1fr!important}
+  table.mst.mst-ln tbody td[data-th]>div>div{text-align:left}
 }
 .dbtn{border:none;background:transparent;color:var(--b2);cursor:pointer;padding:3px 5px;border-radius:var(--r4);font-size:14px;line-height:1;transition:var(--transition)}
 .dbtn:hover{background:var(--redl);color:var(--red)}
@@ -2815,7 +2818,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.11-beta';
+var APP_VERSION='v6.0.12-beta';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -37597,15 +37600,25 @@ function _pjSchedHtml(q,st){
   var span=Math.max(1,_dDiff(minD||localToday(),maxD||localToday())+1);
   var barAt=function(s,e,clr,est){if(!s)return '';var l=_dDiff(minD,s)/span*100,w=Math.max(1,(_dDiff(s,e||s)+1)/span*100);return '<div style="position:absolute;left:'+l+'%;width:'+w+'%;height:6px;border-radius:3px;background:'+clr+(est?';opacity:.55':'')+'"></div>';};
   var h='<div style="font-size:11px;color:var(--b4);margin-bottom:6px"><span style="display:inline-block;width:14px;height:6px;background:#90CAF9;border-radius:3px;vertical-align:middle"></span> 預定（施工進度工具）　<span style="display:inline-block;width:14px;height:6px;background:var(--g);border-radius:3px;vertical-align:middle"></span> 實際（日報）　'+(minD?(esc(minD)+' ～ '+esc(maxD)):'')+(pg?'':'　<span style="color:#b26a00">尚無預定進度：到「施工進度」工具填專案名稱「'+esc(q.name||'')+'」即連動</span>')+'</div>';
-  h+=rows.map(function(r){return '<div style="display:grid;grid-template-columns:minmax(120px,1fr) 2fr;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--b1);font-size:12px"><div>'+esc(r.name)+'<div style="font-size:10.5px;color:var(--b4)">'+(r.pl?('預定 '+r.pl.start+'～'+r.pl.end+'（'+r.pl.days+' 天）'):'預定 —')+'<br>實際 '+(r.aS?(r.aS+'～'+(r.aE||'')+(r.est?'（進行中）':'')):'—')+'</div></div>'
+  h+=rows.map(function(r){return '<div class="pj-sched-row" style="display:grid;grid-template-columns:minmax(200px,1fr) 2fr;gap:4px 8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--b1);font-size:12px"><div>'+esc(r.name)+'<div style="font-size:10.5px;color:var(--b4)">'+(r.pl?('預定 '+r.pl.start+'～'+r.pl.end+'（'+r.pl.days+' 天）'):'預定 —')+'<br>實際 '+(r.aS?(r.aS+'～'+(r.aE||'')+(r.est?'（進行中）':'')):'—')+'</div></div>'
     +'<div style="position:relative;height:18px">'+(r.pl?'<div style="position:absolute;left:0;right:0;top:2px;height:6px">'+barAt(r.pl.start,r.pl.end,'#90CAF9')+'</div>':'')+'<div style="position:absolute;left:0;right:0;top:10px;height:6px">'+barAt(r.aS,r.aE,'var(--g)',r.est)+'</div></div></div>';}).join('');
   return h+'<div style="margin-top:8px">'+_pjBtn("go('progress')",'施工進度工具（預定排程／甘特圖）')+'</div>';
+}
+// v6.0.12 日報進度逐行：工項名靠左、數量靠右且不拆行（手機一行一行模式亦同）
+function _pjProgLines(txt){
+  var lines=String(txt||'').split('\n').filter(Boolean);
+  if(!lines.length)return '<div style="font-size:11.5px">—</div>';
+  return '<div style="font-size:11.5px;text-align:left">'+lines.map(function(ln){
+    var m=/^(.*\S)\s+(\d[\d,.]*\s*[^\d\s；;]{0,4})$/.exec(ln);
+    if(!m)return '<div>'+esc(ln)+'</div>';
+    return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline"><span>'+esc(m[1])+'</span><span style="white-space:nowrap;font-weight:700">'+esc(m[2])+'</span></div>';
+  }).join('')+'</div>';
 }
 function _pjLogHtml(q,st){
   var logs=st.logs.slice(0,6);
   if(!logs.length)return '<div style="font-size:12px;color:var(--b3)">尚無日報</div>'+'<div style="margin-top:8px">'+_pjBtn("go('quickcost')",'填日報')+'</div>';
   var rows=logs.map(function(L){var x=st.all.find(function(y){return (y.dailyLogs||[]).indexOf(L)>=0;})||q;var r=_drLogRow(x,L);var stx=_drStatusText(L)||r.statusText;
-    return [esc(r.date),'<span style="color:'+(L.status&&L.status!=='work'?'#b26a00':'var(--g3)')+';font-weight:700">'+esc(stx)+'</span>',esc(r.crews||'—'),'<div style="white-space:pre-line;font-size:11.5px">'+esc(r.progress||'—')+'</div>'];});
+    return [esc(r.date),'<span style="color:'+(L.status&&L.status!=='work'?'#b26a00':'var(--g3)')+';font-weight:700">'+esc(stx)+'</span>',esc(r.crews||'—'),_pjProgLines(r.progress)];});
   return _pjTable([{t:'日期'},{t:'狀態'},{t:'出工'},{t:'進度'}],rows)+'<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">'+_pjBtn("viewDailyReports('"+q.id+"')",'全部日報（篩選／匯出）')+_pjBtn("go('quickcost')",'填日報')+'</div>';
 }
 function _pjCloseHtml(q,st){
