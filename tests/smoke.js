@@ -2439,7 +2439,7 @@ async function newPage(browser, width, height) {
     const mh = await mp.evaluate(() => new Promise(res => {
       HR.push({ id: 'hrM433', name: '李大同', payType: 'day', base: 2000, active: true, _mt: 1 });
       go('payroll'); document.getElementById('pr-ym').value = '2026-09'; psGenerate();
-      setTimeout(() => { const ok = document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelectorAll('#page-payroll table.mst').length >= 2; HR.length = 0; PAYSLIPS.length = 0; res(ok); }, 300);
+      setTimeout(() => { const ok = document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelectorAll('#page-acct table.mst').length >= 2; HR.length = 0; PAYSLIPS.length = 0; res(ok); }, 300);
     }));
     check('手機：人員薪資頁表格堆疊、無橫向捲動', mh);
     check('v5.433 測試無 JS 錯誤', errors.length === 0 && merr.length === 0, errors.concat(merr).slice(0, 3).join(' | '));
@@ -3570,6 +3570,64 @@ async function newPage(browser, width, height) {
     });
     check('材料手機版：表格一行一行堆疊、無橫向捲動', mob.sw <= mob.iw + 1 && mob.ln, JSON.stringify(mob));
     check('v6 材料測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6 帳務一頁多分頁（金流／帳務管理／薪資零用金併入）＋ 股東報表 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+          const out={};
+          out.pages=(ALL_PAGES.find(p=>p.id==='acct')||{}).grp==='fin'&&(ALL_PAGES.find(p=>p.id==='finance')||{}).parent==='acct'&&(ALL_PAGES.find(p=>p.id==='ledger')||{}).parent==='acct'&&(ALL_PAGES.find(p=>p.id==='payroll')||{}).hidden===true&&(ALL_PAGES.find(p=>p.id==='payroll')||{}).adminOnly===true;
+          out.mount=!!document.getElementById('page-acct')&&!!document.querySelector('#acct-p-ar #finance-ar')&&!!document.querySelector('#acct-p-ap #finance-payable')&&!!document.querySelector('#acct-p-inv #ledger-month')&&!!document.querySelector('#acct-p-inv #finance-invoice')&&!!document.querySelector('#acct-p-pay #pr-people')&&!!document.querySelector('#acct-p-petty #pr-petty')&&!!document.querySelector('#acct-top #finance-kpis');
+          go('finance');
+          out.redirAr=document.getElementById('page-acct').classList.contains('active')&&_acctTab==='ar'&&document.getElementById('acct-p-ar').style.display!=='none'&&document.getElementById('acct-p-ap').style.display==='none';
+          switchFinanceTab('payable');
+          out.syncAp=_acctTab==='ap'&&document.getElementById('acct-p-ap').style.display!=='none'&&document.getElementById('finance-payable').style.display!=='none';
+          go('ledger');out.redirInv=_acctTab==='inv'&&document.getElementById('acct-p-inv').style.display!=='none'&&!!document.getElementById('ledger-month').value;
+          go('payroll');out.redirPay=_acctTab==='pay'&&document.getElementById('acct-p-pay').style.display!=='none';
+          acctTab('petty');out.petty=document.getElementById('acct-p-petty').style.display!=='none'&&document.getElementById('acct-p-pay').style.display==='none';
+          out.tabs=document.querySelectorAll('#acct-tabs button').length===8&&/帳務/.test(document.getElementById('sn-acct').textContent)&&document.getElementById('sn-finance').style.display==='none';
+          // 股東報表
+          P.tax=5;
+          Q=[{id:'qS',code:'1',name:'股東測試案',client:'業主A',date:'2026-03-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 打設',unit:'支',qty:'100',price:'10000',sec:false}],t:{sub:1000000,tax:50000,total:1050000},
+              costs:[{id:'c1',type:'sub',vendor:'甲',cat:'打設',date:'2026-04-01',amt:400000,rows:[{id:'r1',linkedItemIdx:0,qty:100,unitPrice:4000}]},{id:'c2',type:'own',vendor:'',cat:'材料租金',date:'2026-05-01',amt:50000,rows:[{id:'r2',preset:'材料租金',qty:1,unitPrice:50000}]}]},
+             {id:'qL',code:'2',name:'未得標案',client:'業主B',date:'2026-02-01',awarded:false,bidStatus:'lost',exs:[],rmk:{},_mt:1,items:[],t:{total:500000}}];
+          CONTRACTS.splice(0);INV.length=0;INV.push({id:'iS1',quoteId:'qS',project:'股東測試案',client:'業主A',periodNo:1,date:'2026-05-31',items:[],totals:{total:630000,sub:600000},retention:0,received:630000,receivedDate:'2026-06-30'});
+          PAYABLES.length=0;EXPENSES.length=0;EXPENSES.push({id:'E1',date:'2026-03-10',amount:20000,cat:'交際費',note:'禮盒'},{id:'E2',date:'2026-07-10',amount:10000,cat:'文具郵電',note:'紙'});
+          PAYSLIPS.length=0;PAYSLIPS.push({id:'ps_a_2026-04',hrId:'a',ym:'2026-04',name:'王',gross:40000,coCost:5000,net:36000,status:'paid'});
+          SHARE_PROFIT.draws=[{id:'d1',date:'2026-08-01',who:'陳茹軒',amount:100000}];SHARE_PROFIT.cfg={};
+          go('profit');const ys=document.getElementById('rpt-year');if(ys&&![...ys.options].some(o=>o.value==='2026'))ys.insertAdjacentHTML('afterbegin','<option value="2026">2026</option>');ys.value='2026';
+          showReport('shareholder');
+          const d=window._shRptData;
+          out.calc=!!d&&d.revNet===600000&&d.cost===450000&&d.gross===150000&&d.exp===30000&&d.hr===45000&&!d.hrEst&&d.pretax===75000&&d.recv===630000&&d.projs.length===1&&d.projs[0].q.id==='qS'&&d.share.drawn===100000&&d.bid.n===2&&d.bid.won===1;
+          const h=document.getElementById('report-content').innerHTML;
+          out.view=/年度損益摘要/.test(h)&&/600,000/.test(h)&&/450,000/.test(h)&&/150,000/.test(h)&&/各案損益/.test(h)&&/股東測試案/.test(h)&&/財務狀況/.test(h)&&/股東分潤/.test(h)&&/陳茹軒/.test(h)&&/業務/.test(h)&&/匯出 PDF/.test(h)&&/承包（發包）/.test(h)&&/交際費/.test(h);
+          out.btn=!!document.getElementById('rpt-shareholder-btn')&&document.getElementById('rpt-shareholder-btn').style.background==='var(--g)';
+          // PDF：A4 直式、走統一引擎；不含內部單價資料
+          let cap=null;const oP=window._printViaIframe;window._printViaIframe=function(html,fn,land){cap={html,fn,land};};
+          exportCurrentReport();window._printViaIframe=oP;
+          out.pdf=!!cap&&!cap.land&&/股東報表 2026 年度/.test(cap.html)&&/一、年度損益摘要/.test(cap.html)&&/股東測試案/.test(cap.html)&&!/4,000/.test(cap.html)&&cap.fn==='股東報表_2026';
+          // 手機：帳務頁薪資表堆疊觀察器存在、股東報表無橫向捲動（在手機區塊另測）
+          Q=[];INV.length=0;EXPENSES.length=0;PAYSLIPS.length=0;SHARE_PROFIT.draws=[];SHARE_PROFIT.cfg={};
+          return out;
+    });
+    check('帳務：頁面登錄（金流／帳務管理隱藏跟隨、薪資保留權限）、既有面板搬入八個分頁、KPI 與搜尋在頂端', r.pages && r.mount && r.tabs);
+    check('帳務：go(finance|ledger|payroll) 轉到對應分頁、switchFinanceTab 同步分頁外觀、零用金／薪資分頁', r.redirAr && r.syncAp && r.redirInv && r.redirPay && r.petty);
+    check('股東報表：年度損益（營收未稅／成本／毛利／費用／人事／稅前淨利）、各案、分潤提領、得標率口徑', r.calc);
+    check('股東報表：畫面區塊齊全、報表中心分頁鈕、PDF 走統一引擎 A4 直式且不含內部單價', r.view && r.btn && r.pdf);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mob = await page.evaluate(() => {
+        Q=[{id:'qS2',code:'1',name:'手機股東案',client:'業主',date:'2026-03-01',awarded:true,exs:[],rmk:{},_mt:1,items:[],t:{total:1050000},costs:[{id:'c1',type:'sub',vendor:'甲',cat:'打設',date:'2026-04-01',amt:400000,rows:[]}]}];
+        INV.length=0;INV.push({id:'iS2',quoteId:'qS2',project:'手機股東案',client:'業主',periodNo:1,date:'2026-05-31',items:[],totals:{total:630000},received:0});
+        go('reports');const ys=document.getElementById('rpt-year');if(ys&&![...ys.options].some(o=>o.value==='2026'))ys.insertAdjacentHTML('afterbegin','<option value="2026">2026</option>');ys.value='2026';showReport('shareholder');
+        const o1={sw:document.documentElement.scrollWidth,iw:window.innerWidth};
+        go('acct');acctTab('ap');
+        o1.sw2=document.documentElement.scrollWidth;
+        Q=[];INV.length=0;return o1;
+    });
+    check('手機：股東報表與帳務頁無橫向捲動', mob.sw <= mob.iw + 1 && mob.sw2 <= mob.iw + 1, JSON.stringify(mob));
+    check('v6 帳務／股東報表測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
