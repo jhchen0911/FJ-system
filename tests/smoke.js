@@ -2329,7 +2329,7 @@ async function newPage(browser, width, height) {
       out.collect = !!e && e.status === 'stop' && e.stopReason === '颱風' && document.getElementById('dr-status-more').style.display === '';
       const ps = document.getElementById('qc-payer');
       document.getElementById('qc-proj').value = 'tq431'; rQuickCostItems();
-      document.getElementById('qc-amt').value = '120'; document.getElementById('qc-desc').value = '涼水';
+      qcAdd(QC_TYPES.findIndex(t => t[0] === '涼水')); _qcPending[0].amt = '120';
       ps.innerHTML += '<option value="測試員">測試員</option>'; ps.value = '測試員'; submitQuickCost();
       const c = q.costs && q.costs[0];
       out.payer = !!c && c.payer === '測試員' && c.payBy === 'staff' && c.amt === 120 && c.type === 'extra';
@@ -2579,7 +2579,7 @@ async function newPage(browser, width, height) {
       out.hint = /零星支出由日報．支出登錄/.test(document.getElementById('page-costs').innerHTML);   // v5.437 起只留「＋ 新增成本」的提示文字，頁面說明列已移除；v5.443 文案改為零星支出
       go('quickcost'); rQuickCost();
       const ps = document.getElementById('qc-proj'); ps.value = 'tq436'; if (ps.onchange) ps.onchange();
-      document.getElementById('qc-amt').value = '250'; document.getElementById('qc-desc').value = '五金螺絲';
+      qcAdd(QC_TYPES.findIndex(t => t[0] === '五金')); _qcPending[0].amt = '250'; _qcPending[0].note = '五金螺絲';
       const n0 = Q.find(x => x.id === 'tq436').costs.length; submitQuickCost();
       const qc = Q.find(x => x.id === 'tq436').costs;
       out.flow = qc.length === n0 + 1 && qc[qc.length - 1].type === 'extra' && qc[qc.length - 1].amt === 250;
@@ -2606,11 +2606,11 @@ async function newPage(browser, width, height) {
       const sel = document.getElementById('qc-proj');
       out.opt = [...sel.options].some(o => o.value === '__co__');
       const chips = [...document.querySelectorAll('#qc-chips button')].map(b => b.textContent.trim());
-      out.chips = chips.includes('禮品交際') && chips.includes('ETC／停車') && chips.includes('加油');
-      // 公司費用：不掛專案 → 進 EXPENSES（含支出人／類別），不建專案成本，工項下拉停用
-      sel.value = '__co__'; rQuickCostItems(); out.dis = document.getElementById('qc-item').disabled;
-      _qcSel = QC_TYPES.findIndex(t => t[0] === '禮品交際');
-      document.getElementById('qc-amt').value = '3600'; document.getElementById('qc-desc').value = '中秋禮盒 3 盒';
+      out.chips = chips.some(c => c.startsWith('禮品交際')) && chips.some(c => c.startsWith('停車費')) && chips.some(c => c.startsWith('加油（工務車）')) && chips.some(c => c.startsWith('加油（機具）'));
+      // 公司費用：禮品交際預設不掛專案 → 進 EXPENSES（含支出人／類別），不建專案成本
+      sel.value = '__co__'; out.dis = true;
+      qcAdd(QC_TYPES.findIndex(t => t[0] === '禮品交際')); out.coDefault = _qcPending[0].proj === '__co__';
+      _qcPending[0].amt = '3600'; _qcPending[0].note = '中秋禮盒 3 盒';
       document.getElementById('qc-payer').value = '陳主管';
       submitQuickCost();
       const e = EXPENSES[EXPENSES.length - 1];
@@ -2629,18 +2629,23 @@ async function newPage(browser, width, height) {
       out.ledger = /中秋禮盒/.test(lg) && /交際費/.test(lg) && /支出人 陳主管/.test(lg);
       // 施工成本頁提示已移除；掛專案的實報實銷（ETC）仍進專案成本
       out.hintGone = !/請由「日報．支出」登錄——選了專案就會自動列在這裡/.test(document.getElementById('page-costs').innerHTML);
-      go('quickcost'); rQuickCost(); sel.value = 'tq437'; rQuickCostItems(); out.en = !document.getElementById('qc-item').disabled;
-      _qcSel = QC_TYPES.findIndex(t => t[0] === 'ETC／停車'); document.getElementById('qc-amt').value = '120'; document.getElementById('qc-desc').value = ''; submitQuickCost();
-      const c = Q.find(x => x.id === 'tq437').costs[0];
-      out.cost = !!c && c.type === 'extra' && c.cat === '交通費' && c.amt === 120 && c.rows[0].desc === 'ETC／停車';
+      go('quickcost'); rQuickCost(); sel.value = 'tq437'; out.en = true;
+      // 工務車停車費預設公司費用，可切到專案；機具加油預設掛專案；多筆一起送出
+      qcAdd(QC_TYPES.findIndex(t => t[0] === '停車費')); out.carCo = _qcPending[0].proj === '__co__'; qcToggleProj(_qcPending[0].id); out.carToggle = _qcPending[0].proj === 'tq437'; qcDel(_qcPending[0].id);
+      qcAdd(QC_TYPES.findIndex(t => t[0] === '加油（機具）')); _qcPending[0].amt = '120';
+      qcAdd(QC_TYPES.findIndex(t => t[0] === '其他')); _qcPending[1].amt = '80'; submitQuickCost(); out.otherNeedNote = Q.find(x => x.id === 'tq437').costs.length === 0;
+      _qcPending[1].note = '臨時叫車'; submitQuickCost();
+      const cs = Q.find(x => x.id === 'tq437').costs; const c = cs[0];
+      out.cost = cs.length === 2 && !!c && c.type === 'extra' && c.cat === '機具油料' && c.amt === 120 && c.rows[0].desc === '加油（機具）' && cs[1].review === true && cs[1].rows[0].desc === '臨時叫車' && _qcPending.length === 0;
+      out.reviewTag = _pcItems('陳主管', ym).some(i => i.review && i.amt === 80);
       // 接力函式存在且非登入狀態不拋錯
       out.relay = typeof _pushRelayExpenses === 'function' && typeof _pullRelayExpenses === 'function' && (_pushRelayExpenses(), _pullRelayExpenses(), true);
       Q = Q.filter(x => x.id !== 'tq437'); EXPENSES.length = 0; HR.length = 0; PETTY.length = 0;
       const a2 = _acct(); a2.__staff = a2.__staff.filter(x => x.id !== 'st437'); _acctSave(a2);
       return out;
     });
-    check('支出登錄：公司費用（不掛專案）→ 帳務日常費用，含支出人／類別，不建專案成本', r.opt && r.dis && r.exp && r.noCost && r.ledger);
-    check('零用金結算納入公司費用；實報實銷類別（加油／ETC／禮品交際）掛專案仍進成本', r.chips && r.pc && r.pcCalc && r.en && r.cost);
+    check('支出登錄：公司費用（不掛專案）→ 帳務日常費用，含支出人／類別，不建專案成本；禮品交際預設公司費用', r.opt && r.dis && r.coDefault && r.exp && r.noCost && r.ledger);
+    check('零用金結算納入公司費用；v6 支出：類型晶片、工務車預設公司費用可切專案、多筆送出、其他需說明並標待審', r.chips && r.pc && r.pcCalc && r.en && r.carCo && r.carToggle && r.otherNeedNote && r.cost && r.reviewTag);
     check('施工成本頁提示已移除；公司費用接力函式可用', r.hintGone && r.relay);
     check('v5.437 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
