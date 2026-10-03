@@ -720,7 +720,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-quickcost" onclick="go('quickcost');setTimeout(rQuickCost,60)"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></span>日報．支出</button>
   <button type="button" class="snav" id="sn-contracts" onclick="go('contracts')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>合約管理<span class="cnt" id="contractbadge" style="display:none">0</span></button>
   <div class="ssec" style="margin-top:5px">財務流</div>
-  <button type="button" class="snav" id="sn-finance" onclick="go('finance')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>金流管理</button>
+  <button type="button" class="snav" id="sn-acct" onclick="go('acct')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg></span>帳務</button>
+  <button type="button" class="snav" id="sn-finance" onclick="go('finance')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>金流管理</button>
   <button type="button" class="snav" id="sn-profit" onclick="go('profit')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>利潤．報表</button>
   <div class="ssec" style="margin-top:5px">資料與工具</div>
   <button type="button" class="snav" id="sn-intake" onclick="smartIntake()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
@@ -736,7 +737,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
   <div class="ssec" style="margin-top:5px">系統</div>
   <button type="button" class="snav" id="sn-staff" onclick="go('staff')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>人員管理</button>
-  <button type="button" class="snav" id="sn-payroll" onclick="go('payroll')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>薪資．零用金</button>
+  <button type="button" class="snav" id="sn-payroll" onclick="go('payroll')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>薪資．零用金</button>
   <button type="button" class="snav" id="sn-roles" onclick="go('roles')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span>角色權限</button>
   <button type="button" class="snav" id="sn-params" onclick="go('params')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg></span>參數設定</button>
 </nav>
@@ -1740,6 +1741,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg> 人事成本</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-track-btn" onclick="showReport('track')"
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 工程實績</button>
+      <button type="button" class="btn btn-sm rpt-tab" id="rpt-shareholder-btn" onclick="showReport('shareholder')"
+        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg> 股東報表</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-log-btn" onclick="showReport('log')"
         style="border-color:var(--b3);color:var(--b3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 操作記錄</button>
     </div>
@@ -2818,7 +2821,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.13-beta';
+var APP_VERSION='v6.0.14-beta';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -3536,6 +3539,8 @@ function _updMobEditbar(p){
   try{mode==='q'?rTots():rInvTots();}catch(e){_err('_updMobEditbar',e);}
 }
 function go(p){
+  // v6 帳務：金流管理／帳務管理／薪資零用金 併成一頁，舊頁名一律轉到對應分頁
+  if(p==='finance'||p==='ledger'||p==='payroll'){try{if(_acctMount()){_acctTab=({finance:'ar',ledger:'inv',payroll:'pay'})[p];p='acct';}}catch(e){_err('go.acct',e);}}
   // 權限攔截（try/catch 保護避免 TDZ）
   try{
     // params/permissions 頁面：未登入可以進（需要從那裡登入）
@@ -3609,6 +3614,7 @@ function go(p){
   if(p==='preview'){buildQuotePreviewFromPDF();}
   if(p==='projects'){try{renderProjects();}catch(e){_err('top',e);}}
   if(p==='proj'){try{renderProj();}catch(e){_err('top',e);}}
+  if(p==='acct'){try{acctTab(_acctTab);}catch(e){_err('top',e);}}
   if(p==='costs'){try{rCostItems();const _q=Q.find(x=>x.id===eid);const _t=document.getElementById('costs-proj-name');if(_t)_t.textContent=_q?((_q.name||'未命名')+(_q.client?'　/　'+_q.client:'')):'請由專案總覽選擇工程';}catch(e){_err('top',e);}}
   if(p==='invoice'){setTimeout(()=>{renderInvList();updateInvPageBanners();try{updateInvStats();}catch(e){_err('top',e);}try{invTab(_invTab);}catch(e){_err('top',e);}},10);}
   if(p==='invoice-edit'){rInvItems();rInvTots();}
@@ -3620,13 +3626,13 @@ function go(p){
         var nv=document.createElement('div');
         nv.className='statnav';
         nv.style.cssText='display:flex;gap:8px;padding:14px 16px 10px;flex-wrap:wrap;justify-content:center';
-        nv.innerHTML=[['profit','利潤分析'],['reports','報表中心'],['ledger','帳務管理']].map(function(x){
+        nv.innerHTML=[['profit','利潤分析'],['reports','報表中心'],['acct','帳務']].map(function(x){
           return '<button type="button" onclick="go(\''+x[0]+'\')" style="font-family:inherit;font-size:12.5px;flex:1;max-width:130px;height:36px;padding:0 8px;border-radius:99px;border:1px solid '+(x[0]===p?'var(--g3)':'var(--b2)')+';background:'+(x[0]===p?'var(--g3)':'#fff')+';color:'+(x[0]===p?'#fff':'var(--b4)')+';cursor:pointer;font-weight:'+(x[0]===p?'700':'500')+'">'+x[1]+'</button>';
         }).join('');
         pgEl.insertBefore(nv,pgEl.firstChild);
       }else if(pgEl){
         pgEl.querySelectorAll('.statnav button').forEach(function(b){
-          var on=b.textContent==={'profit':'利潤分析','reports':'報表中心','ledger':'帳務管理'}[p];
+          var on=b.textContent==={'profit':'利潤分析','reports':'報表中心','acct':'帳務'}[p];
           b.style.background=on?'var(--g3)':'#fff';b.style.color=on?'#fff':'var(--b4)';b.style.borderColor=on?'var(--g3)':'var(--b2)';
         });
       }
@@ -24846,7 +24852,7 @@ function _plRender(){
 // 使用者規則：手機版任何表格不得左右滑動。工具頁（施工進度／鋼筋籠檢料／材料估算／
 // 根固砂漿／背填材料／施工計畫書）的寬表格於 ≤767px 自動改為逐列卡片：
 // 掃描有 thead 的表，欄數 ≥4 或 min-width ≥480 者加 .mst，並把表頭文字寫進各格 data-th 當標籤。
-var _MST_LINE={'proj-root':1,'vb-root':1,'rfq-root':1,'cost-list':1};   // v6.0.11 一行一行模式的根節點
+var _MST_LINE={'proj-root':1,'vb-root':1,'rfq-root':1,'cost-list':1,'report-content':1};   // v6.0.11 一行一行模式的根節點
 function _mstack(root){
   if(!root)return;
   root.querySelectorAll('table').forEach(function(tb){
@@ -32318,6 +32324,7 @@ function switchFinanceTab(tab){
   if(tab==='payable')renderPayables();
   if(tab==='retention')try{renderRetention();}catch(e){_err('switchFinanceTab',e);}
   if(tab==='share')renderShareProfit();
+  try{_acctSyncFinance(tab);}catch(e){}   // v6 帳務分頁外觀同步
 }
 
 // ══════════ v5.380：保留款總覽 ══════════
@@ -33472,7 +33479,7 @@ let _currentReport='monthly';
 
 function showReport(type){
   _currentReport=type;
-  ['monthly','yearly','client','contract','bidrate','vendor','labor','hr','track','log'].forEach(t=>{
+  ['monthly','yearly','client','contract','bidrate','vendor','labor','hr','track','shareholder','log'].forEach(t=>{
     const btn=document.getElementById('rpt-'+t+'-btn');
     if(btn){
       btn.style.background=t===type?'var(--g)':'';
@@ -33496,6 +33503,7 @@ function renderCurrentReport(){
   else if(_currentReport==='labor')renderLaborReport(el,year,month);
   else if(_currentReport==='hr')renderHrReport(el,year);   // v5.435
   else if(_currentReport==='track')renderTrackReport(el);
+  else if(_currentReport==='shareholder')renderShareholderReport(el,year);   // v6 股東版
   else if(_currentReport==='log')renderLogReport(el);
   try{_cardifyTables(el);}catch(e){_err('renderCurrentReport',e);}
 }
@@ -34395,6 +34403,7 @@ function renderContractReport(el,year){
 
 
 function exportCurrentReport(){
+  if(_currentReport==='shareholder'){exportShareholderPDF();return;}   // v6 股東報表 → A4 直式 PDF
   const year=parseInt(document.getElementById('rpt-year')?.value)||new Date().getFullYear();
   const month=parseInt(document.getElementById('rpt-month')?.value)||0;
   if(_currentReport==='log'){
@@ -35065,9 +35074,10 @@ const ALL_PAGES = [
   {id:'invoice',   label:'計價',      icon:_pgIcon('receipt'),  grp:'main',  adminOnly:false}, // v6 業主請款＋廠商請款兩分頁
   {id:'quickcost', label:'日報．支出',icon:_pgIcon('pencil'),   grp:'main',  adminOnly:false},
   {id:'contracts', label:'合約管理',  icon:_pgIcon('contract'), grp:'main',  adminOnly:false, hidden:true, parent:'projects'}, // v5.294 併入專案總覽，導覽隱藏（頁面與資料保留）
-  {id:'finance',   label:'金流管理',  icon:_pgIcon('coins'),    grp:'fin',   adminOnly:false},
+  {id:'acct',      label:'帳務',      icon:_pgIcon('coins'),    grp:'fin',   adminOnly:false}, // v6 應收／應付／金流預測／保留款／費用發票／零用金／薪資／分潤 一頁多分頁
+  {id:'finance',   label:'金流管理',  icon:_pgIcon('coins'),    grp:'fin',   adminOnly:false, hidden:true, parent:'acct'}, // v6 併入帳務
   {id:'profit',    label:'利潤．報表',icon:_pgIcon('trend'),    grp:'fin',   adminOnly:false},
-  {id:'ledger',    label:'帳務管理',  icon:_pgIcon('wallet'),   grp:'fin',   adminOnly:false},
+  {id:'ledger',    label:'帳務管理',  icon:_pgIcon('wallet'),   grp:'fin',   adminOnly:false, hidden:true, parent:'acct'}, // v6 併入帳務「費用．發票」
   {id:'reports',   label:'報表中心',  icon:_pgIcon('chart'),    grp:'fin',   adminOnly:false, hidden:true, parent:'profit'}, // 由「利潤．報表」頁內分頁進入
   {id:'contacts',  label:'客戶．廠商',icon:_pgIcon('users'),    grp:'data',  adminOnly:false},
   {id:'progress',  label:'施工進度',  icon:_pgIcon('calendar'), grp:'data',  adminOnly:false}, // v5.347
@@ -35082,7 +35092,7 @@ const ALL_PAGES = [
   // v5.330 sysOnly：只有「系統管理員」角色能開，其他角色的權限表上是鎖住的
   {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, sysOnly:true},
   {id:'staff',     label:'人員管理',  icon:_pgIcon('users'),    grp:'acct',  adminOnly:true},
-  {id:'payroll',   label:'薪資．零用金',  icon:_pgIcon('wallet'),   grp:'acct',  adminOnly:true}, // v5.433 基本資料／薪資設定／薪資條（fydata/private）
+  {id:'payroll',   label:'薪資．零用金',  icon:_pgIcon('wallet'),   grp:'acct',  adminOnly:true, hidden:true}, // v6 併入帳務「零用金」「薪資」分頁（權限仍以本頁為準）；v5.433 基本資料／薪資設定／薪資條（fydata/private）
   {id:'roles',     label:'角色權限',  icon:_pgIcon('lock'),     grp:'acct',  adminOnly:true, sysOnly:true},
   {id:'params',    label:'參數設定',  icon:_pgIcon('sliders'),  grp:'sys',   adminOnly:true, sysOnly:true},
 ];
@@ -38152,6 +38162,174 @@ function renderMatTab(q,root){
   root.innerHTML=h;
   try{if(typeof _mstack==='function')_mstack(document.getElementById('rfq-root')||root);}catch(e){}
 }
+// ══════════ v6 帳務：金流管理（應收／應付／金流預測／保留款／分潤）＋帳務管理（費用．發票）＋薪資．零用金 併成一頁多分頁 ══════════
+// 作法：啟動時把原三頁的既有面板 DOM 搬進 page-acct 的分頁容器（元素 id 不變，所有既有 render 函式照常運作），
+// 原頁改隱藏；go('finance'|'ledger'|'payroll') 一律轉到帳務頁對應分頁。零用金／薪資分頁仍受 payroll 權限管制。
+var _acctTab=(function(){try{var t=localStorage.getItem('fy_acctTab');return /^(ar|ap|cash|ret|inv|petty|pay|share)$/.test(t||'')?t:'ar';}catch(e){return 'ar';}})();
+var _ACCT_TABS=[['ar','應收'],['ap','應付'],['cash','金流預測'],['ret','保留款'],['inv','費用．發票'],['petty','零用金'],['pay','薪資'],['share','分潤']];
+function _acctCanPay(){try{return !_fbUser||canAccess('payroll');}catch(e){return true;}}
+function _acctMount(){
+  if(document.getElementById('page-acct'))return true;
+  var fin=document.getElementById('page-finance'),led=document.getElementById('page-ledger'),pay=document.getElementById('page-payroll');
+  if(!fin)return false;
+  var pg=document.createElement('div');pg.className='page';pg.id='page-acct';
+  pg.innerHTML='<div class="ph"><div class="ph-l"><div class="ph-t">帳務</div><div class="ph-s" id="acct-sub">應收・應付・金流預測・費用發票・零用金・薪資・分潤</div></div>'
+    +'<div class="ph-r" id="acct-tools" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button type="button" class="btn btn-sm" onclick="exportFinanceCSV()"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> Excel</button></div></div>'
+    +'<div class="pad"><div id="acct-top"></div><div id="acct-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div><div id="acct-root"></div></div>';
+  fin.parentNode.insertBefore(pg,fin);
+  var top=pg.querySelector('#acct-top'),root=pg.querySelector('#acct-root');
+  var mk=function(id){var d=document.createElement('div');d.id='acct-p-'+id;d.style.display='none';root.appendChild(d);return d;};
+  var P_={};_ACCT_TABS.forEach(function(t){P_[t[0]]=mk(t[0]);});
+  var mv=function(id,into){var el=document.getElementById(id);if(el&&into){into.appendChild(el);return el;}return null;};
+  // 金流管理：KPI 與搜尋列放頂端；各面板進對應分頁
+  mv('finance-kpis',top);
+  var fs=document.getElementById('finance-search');if(fs){var bar=fs.parentElement&&fs.parentElement.parentElement;if(bar)top.appendChild(bar);}
+  mv('finance-ar',P_.ar);mv('finance-payable',P_.ap);mv('finance-cashflow',P_.cash);mv('finance-retention',P_.ret);mv('finance-share',P_.share);
+  // 費用．發票：發票紀錄（銷項登錄）＋ 帳務管理（月份進銷項與稅額、日常費用）
+  var invTool=document.createElement('div');invTool.style.cssText='display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px';
+  if(led){var lr=led.querySelector('.ph-r');if(lr){while(lr.firstChild)invTool.appendChild(lr.firstChild);}}
+  P_.inv.appendChild(invTool);
+  var fi=document.getElementById('finance-invoice');if(fi){var cap=document.createElement('div');cap.style.cssText='font-weight:800;font-size:13.5px;margin:0 0 6px';cap.textContent='銷項發票紀錄（開給業主）';P_.inv.appendChild(cap);P_.inv.appendChild(fi);}
+  if(led){var lp=led.querySelector('.pad');if(lp){var cap2=document.createElement('div');cap2.style.cssText='font-weight:800;font-size:13.5px;margin:14px 0 6px';cap2.textContent='月份進銷項與稅額・日常費用';P_.inv.appendChild(cap2);P_.inv.appendChild(lp);}}
+  // 薪資．零用金：第三張卡（零用金結算）→ 零用金分頁；其餘 → 薪資分頁
+  if(pay){
+    var payTool=document.createElement('div');payTool.style.cssText='display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px';
+    var pr=pay.querySelector('.ph-r');if(pr){while(pr.firstChild)payTool.appendChild(pr.firstChild);}
+    P_.pay.appendChild(payTool);
+    var pp=pay.querySelector('.pad');
+    if(pp){var cards=[].slice.call(pp.children);cards.forEach(function(c){var isPetty=!!c.querySelector('#pr-petty');(isPetty?P_.petty:P_.pay).appendChild(c);});}
+  }
+  try{['pay','petty'].forEach(function(k){var el=P_[k];var mo=new MutationObserver(function(){try{_mstack(el);}catch(e){}});mo.observe(el,{childList:true,subtree:true});});}catch(e){}   // 手機堆疊（原 page-payroll 在觀察清單）
+  return true;
+}
+function _acctTabsHtml(){
+  return _ACCT_TABS.filter(function(t){return (t[0]!=='petty'&&t[0]!=='pay')||_acctCanPay();}).map(function(t){var on=_acctTab===t[0];
+    return '<button type="button" class="btn btn-sm" onclick="acctTab(\''+t[0]+'\')" style="min-width:84px;'+(on?'background:var(--g);color:#fff;border-color:var(--g)':'background:var(--w);color:var(--g3);border-color:var(--gm)')+'">'+t[1]+'</button>';}).join('');
+}
+// 分頁切換；noRender＝只同步外觀（switchFinanceTab 已經渲染過）
+function acctTab(t,noRender){
+  if(!_acctMount())return;
+  if(!/^(ar|ap|cash|ret|inv|petty|pay|share)$/.test(t||''))t='ar';
+  if((t==='petty'||t==='pay')&&!_acctCanPay()){toast('薪資．零用金僅限管理員');t='ar';}
+  _acctTab=t;try{localStorage.setItem('fy_acctTab',t);}catch(e){}
+  var tb=document.getElementById('acct-tabs');if(tb)tb.innerHTML=_acctTabsHtml();
+  _ACCT_TABS.forEach(function(x){var p=document.getElementById('acct-p-'+x[0]);if(p)p.style.display=(x[0]===t)?'':'none';});
+  var fm={ar:'finance-ar',ap:'finance-payable',cash:'finance-cashflow',ret:'finance-retention',share:'finance-share'};
+  if(fm[t]){var fp=document.getElementById(fm[t]);if(fp)fp.style.display='block';}
+  var sub=document.getElementById('acct-sub');if(sub)sub.textContent=({ar:'業主應收・票據・催款',ap:'廠商／薪資／零用金應付・付款確認',cash:'90 天現金水位預測',ret:'押在業主端的保留款',inv:'銷項發票紀錄・月份進銷項稅額・日常費用',petty:'員工零用金結算（支出取自日報．支出）',pay:'人員基本資料・薪資條・勞健保費率',share:'股東分潤額度與提領'})[t]||'';
+  if(noRender)return;
+  try{updateFinanceKPIs();}catch(e){_err('acctTab.kpi',e);}
+  try{
+    if(t==='ar'){renderFinanceAR();}
+    else if(t==='ap'){try{cleanDuplicatePayables();}catch(e){_err('acctTab.dup',e);}renderPayables();}
+    else if(t==='cash'){renderCashflow();}
+    else if(t==='ret'){renderRetention();}
+    else if(t==='inv'){renderInvoiceRecords();renderLedger();}
+    else if(t==='petty'||t==='pay'){renderPayroll();}
+    else if(t==='share'){renderShareProfit();}
+  }catch(e){_err('acctTab.'+t,e);}
+  try{if(typeof _mstack==='function')_mstack(document.getElementById('acct-root'));}catch(e){}
+}
+// switchFinanceTab 仍被各處呼叫（go('finance') 後切分頁）→ 同步帳務分頁外觀
+function _acctSyncFinance(tab){
+  var m={ar:'ar',payable:'ap',cashflow:'cash',retention:'ret',share:'share',invoice:'inv'};
+  if(!m[tab]||!document.getElementById('page-acct'))return;
+  acctTab(m[tab],true);
+}
+// ══════════ v6 股東報表（報表中心分頁 shareholder）：年度損益、各案損益、財務狀況、分潤、業務 ══════════
+function _shRptYear(year){
+  var Y=String(year),tm=_taxM();
+  var revTax=0,ret=0;INV.forEach(function(v){if((v.date||'').slice(0,4)!==Y)return;revTax+=((v.totals&&parseFloat(v.totals.total))||0);ret+=_invRetention(v);});
+  var recv=INV.reduce(function(a,i){return a+(((i.receivedDate||'').slice(0,4)===Y)?(parseFloat(i.received)||0):0);},0);
+  var cost=0,costByCat={};Q.forEach(function(q){(q.costs||[]).forEach(function(c){if((c.date||'').slice(0,4)!==Y)return;var a=parseFloat(c.amt)||0;cost+=a;var k=c.type==='sub'?'承包（發包）':c.type==='labor'?'點工':c.type==='own'?'自有（材料機具）':'額外支出';costByCat[k]=(costByCat[k]||0)+a;});});
+  var exp=0,expByCat={};(EXPENSES||[]).forEach(function(e){if(!e||e.costRef||(e.date||'').slice(0,4)!==Y)return;var a=parseFloat(e.amount!=null?e.amount:e.amt)||0;exp+=a;var k=e.cat||'其他';expByCat[k]=(expByCat[k]||0)+a;});
+  var slips=(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]).filter(function(s){return s&&String(s.ym||'').slice(0,4)===Y;});
+  var hr=slips.reduce(function(a,s){return a+(parseFloat(s.gross)||0)+(parseFloat(s.coCost)||0);},0),hrEst=false;
+  if(!slips.length){try{hr=_shareAutoCalc(Y).salary;hrEst=true;}catch(e){hr=0;}}
+  var revNet=Math.round((revTax+ret)/tm);
+  var gross=revNet-cost,pretax=gross-exp-hr;
+  var monthly=[];for(var m=1;m<=12;m++){var ms=Y+'-'+String(m).padStart(2,'0');
+    var mr=INV.reduce(function(a,i){return a+(((i.date||'').slice(0,7)===ms)?((((i.totals&&parseFloat(i.totals.total))||0)+_invRetention(i))/tm):0);},0);
+    var mc=0;Q.forEach(function(q){(q.costs||[]).forEach(function(c){if((c.date||'').slice(0,7)===ms)mc+=parseFloat(c.amt)||0;});});
+    var mv=INV.reduce(function(a,i){return a+(((i.receivedDate||'').slice(0,7)===ms)?(parseFloat(i.received)||0):0);},0);
+    monthly.push({m:m,rev:Math.round(mr),cost:Math.round(mc),recv:Math.round(mv)});}
+  // 分潤（與分潤頁同口徑：權責上限＝淨利×80% − 保留款增加 − 週轉增加 − 機具自付；本年提領）
+  var sh={cap:0,drawn:0,byWho:{},remain:0,cfg:null};
+  try{var cfg=_shareCfg(Y),a=_shareAutoCalc(Y);var net=a.netProfit;sh.cfg={netProfit:net,retentionAdd:cfg.retentionAdd||0,wcAdd:a.wcAdd||0,machineSelfPay:cfg.machineSelfPay||0};
+    sh.cap=Math.max(0,net-(cfg.retentionAdd||0)-(a.wcAdd||0)-(cfg.machineSelfPay||0));
+    (SHARE_PROFIT.draws||[]).forEach(function(d){if((d.date||'').slice(0,4)!==Y)return;var w=_shareWhoNorm(d.who);var amt=parseFloat(d.amount)||0;sh.drawn+=amt;sh.byWho[w]=(sh.byWho[w]||0)+amt;});
+    sh.remain=sh.cap-sh.drawn;}catch(e){_err('_shRptYear.share',e);}
+  var bid=null;try{bid=_bidStat(_bidRows(parseInt(Y),0));}catch(e){}
+  var fin={ar:0,ret:0,ap:0,cash:0,res:0,mat:0};
+  try{fin.ar=Math.round(_arTotal());fin.ap=Math.round(_apTotal());fin.cash=Math.round(_availableCash());fin.res=Math.round(_opReserve());}catch(e){_err('_shRptYear.fin',e);}
+  try{fin.ret=Math.round(INV.reduce(function(a,i){return a+_invRetention(i);},0));}catch(e){}
+  try{fin.mat=Math.round(MAT_LEDGER.reduce(function(a,r){return a+_matLedAmt(r);},0));}catch(e){}
+  // 各案（本年度有請款／成本／得標者），含追加案彙總
+  var projs=[];(_pjProjects(true)||[]).forEach(function(q){var st;try{st=_pjStat(q);}catch(e){return;}
+    var inY=(q.date||'').slice(0,4)===Y||st.invs.some(function(i){return (i.date||'').slice(0,4)===Y;})||st.all.some(function(x){return (x.costs||[]).some(function(c){return (c.date||'').slice(0,4)===Y;});});
+    if(!inY)return;
+    projs.push({q:q,st:st,gm:st.base>0?(st.profit/st.base*100):0});});
+  projs.sort(function(a,b){return b.st.base-a.st.base;});
+  return {Y:Y,revTax:Math.round(revTax),ret:Math.round(ret),revNet:revNet,recv:Math.round(recv),cost:Math.round(cost),costByCat:costByCat,gross:Math.round(gross),grossR:revNet>0?gross/revNet*100:0,exp:Math.round(exp),expByCat:expByCat,hr:Math.round(hr),hrEst:hrEst,pretax:Math.round(pretax),netR:revNet>0?pretax/revNet*100:0,monthly:monthly,share:sh,bid:bid,fin:fin,projs:projs};
+}
+function _shRptBody(d,forPrint){
+  var pct=function(v){return (Math.round(v*10)/10)+'%';};
+  var tile=function(l,v,clr){return forPrint?'<td class="l" style="width:25%"><div style="font-size:9.5px;color:#555">'+l+'</div><div style="font-size:13px;font-weight:800;color:'+(clr||'#111')+'">'+v+'</div></td>':_pjKpi(l,v,clr);};
+  var tiles=[['營收（請款，未稅）','NT$ '+fmt(d.revNet),'var(--g3)'],['施工成本（未稅）','NT$ '+fmt(d.cost),'#E65100'],['毛利','NT$ '+fmt(d.gross)+' <span style="font-size:11px">'+pct(d.grossR)+'</span>',d.gross>=0?'var(--g3)':'var(--red)'],['公司費用','NT$ '+fmt(d.exp),'#4A148C'],['人事成本'+(d.hrEst?'（推估）':''),'NT$ '+fmt(d.hr),'#8a6d00'],['稅前淨利','NT$ '+fmt(d.pretax)+' <span style="font-size:11px">'+pct(d.netR)+'</span>',d.pretax>=0?'var(--g)':'var(--red)'],['已收款（含稅）','NT$ '+fmt(d.recv),'var(--b5)'],['可分配盈餘（分潤上限）','NT$ '+fmt(d.share.cap),'#1565C0']];
+  var h='';
+  h+=forPrint?'<h2>一、年度損益摘要 <span class="sub">'+d.Y+' 年・權責基礎・金額未稅</span></h2><table><tr>'+tiles.slice(0,4).map(function(t){return tile(t[0],t[1],t[2]);}).join('')+'</tr><tr>'+tiles.slice(4).map(function(t){return tile(t[0],t[1],t[2]);}).join('')+'</tr></table>'
+    :'<div style="font-weight:800;font-size:14px;margin:0 0 6px">一、年度損益摘要 <span style="font-size:11px;font-weight:400;color:var(--b4)">'+d.Y+' 年・權責基礎・金額未稅</span></div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'+tiles.map(function(t){return tile(t[0],t[1],t[2]);}).join('')+'</div>';
+  var T=function(heads,rows,foot){return forPrint?('<table><thead><tr>'+heads.map(function(x){return '<th>'+x.t+'</th>';}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr>'+r.map(function(c,i){return '<td class="'+(heads[i].r?'r':'l')+'">'+(c==null?'':c)+'</td>';}).join('')+'</tr>';}).join('')+(foot?'<tr class="tt">'+foot.map(function(c,i){return '<td class="'+(heads[i].r?'r':'l')+'">'+(c==null?'':c)+'</td>';}).join('')+'</tr>':'')+'</tbody></table>'):_pjTable(heads,rows,foot);};
+  var sec=function(t,s){return forPrint?'<h2>'+t+(s?' <span class="sub">'+s+'</span>':'')+'</h2>':'<div style="font-weight:800;font-size:14px;margin:14px 0 6px">'+t+(s?' <span style="font-size:11px;font-weight:400;color:var(--b4)">'+s+'</span>':'')+'</div>';};
+  // 成本與費用結構
+  var cc=Object.keys(d.costByCat).map(function(k){return [k,fmt(d.costByCat[k]),d.cost?pct(d.costByCat[k]/d.cost*100):'—'];});
+  var ec=Object.keys(d.expByCat).sort(function(a,b){return d.expByCat[b]-d.expByCat[a];}).slice(0,8).map(function(k){return [k,fmt(d.expByCat[k]),d.exp?pct(d.expByCat[k]/d.exp*100):'—'];});
+  h+=sec('二、成本與費用結構');
+  h+=(forPrint?'<table style="width:100%;border:none"><tr><td style="border:none;vertical-align:top;width:50%;padding:0 4px 0 0">':'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px"><div>')
+    +(cc.length?T([{t:'施工成本'},{t:'金額',r:1},{t:'占比',r:1}],cc,['合計',fmt(d.cost),'100%']):'<div style="font-size:12px;color:var(--b3)">本年無施工成本</div>')
+    +(forPrint?'</td><td style="border:none;vertical-align:top;width:50%;padding:0 0 0 4px">':'</div><div>')
+    +(ec.length?T([{t:'公司費用（前 8 類）'},{t:'金額',r:1},{t:'占比',r:1}],ec,['合計',fmt(d.exp),'100%']):'<div style="font-size:12px;color:var(--b3)">本年無公司費用</div>')
+    +(forPrint?'</td></tr></table>':'</div></div>');
+  // 各案損益
+  h+=sec('三、各案損益','本年度有請款或成本的工程（含追加案彙總）；毛利＝合約金額 − 施工成本（含稅口徑）');
+  h+=d.projs.length?T([{t:'工程'},{t:'業主'},{t:'合約金額',r:1},{t:'累計請款',r:1},{t:'已收',r:1},{t:'應收',r:1},{t:'施工成本（未稅）',r:1},{t:'毛利',r:1},{t:'毛利率',r:1},{t:'進度',r:1},{t:'狀態'}],
+    d.projs.map(function(p){var st=p.st;return [esc(p.q.name||''),esc(p.q.client||''),fmt(st.base),fmt(st.billed),fmt(st.recv),fmt(st.ar),fmt(st.costNet),'<span style="color:'+(st.profit>=0?'var(--g3)':'var(--red)')+'">'+fmt(st.profit)+'</span>',pct(p.gm),Math.round(st.physPct)+'%',p.q.closed?'已結案':(st.done?'已完工':'進行中')];}),
+    ['合計','',fmt(d.projs.reduce(function(a,p){return a+p.st.base;},0)),fmt(d.projs.reduce(function(a,p){return a+p.st.billed;},0)),fmt(d.projs.reduce(function(a,p){return a+p.st.recv;},0)),fmt(d.projs.reduce(function(a,p){return a+p.st.ar;},0)),fmt(d.projs.reduce(function(a,p){return a+p.st.costNet;},0)),fmt(d.projs.reduce(function(a,p){return a+p.st.profit;},0)),'','',''])
+    :'<div style="font-size:12px;color:var(--b3)">本年度無工程</div>';
+  // 月別
+  h+=sec('四、月別營收／成本／收款','未稅營收＝當月請款；成本＝當月發生；收款＝當月實收（含稅）');
+  h+=T([{t:'月份'},{t:'營收（未稅）',r:1},{t:'施工成本',r:1},{t:'毛利',r:1},{t:'實收（含稅）',r:1}],d.monthly.filter(function(m){return m.rev||m.cost||m.recv;}).map(function(m){return [m.m+' 月',fmt(m.rev),fmt(m.cost),'<span style="color:'+(m.rev-m.cost>=0?'var(--g3)':'var(--red)')+'">'+fmt(m.rev-m.cost)+'</span>',fmt(m.recv)];}),
+    ['合計',fmt(d.revNet),fmt(d.cost),fmt(d.gross),fmt(d.recv)]);
+  // 財務狀況
+  h+=sec('五、財務狀況','截至 '+localToday());
+  h+=T([{t:'項目'},{t:'金額',r:1},{t:'說明'}],[['應收帳款餘額',fmt(d.fin.ar),'已開請款單尚未收到的款（含稅）'],['保留款在外',fmt(d.fin.ret),'押在業主端、竣工後請退'],['應付帳款未付',fmt(d.fin.ap),'廠商／薪資／零用金應付（含稅）'],['可動用資金',fmt(d.fin.cash),'期初餘額＋依票期可用收款 − 已付 − 已提分潤'],['營運週轉保留',fmt(d.fin.res),'薪資租金等固定支出保留'],['自有材料購置總額',fmt(d.fin.mat),'材料台帳累計']]);
+  // 分潤
+  h+=sec('六、股東分潤','與分潤頁同口徑');
+  var who=Object.keys(d.share.byWho);
+  h+=T([{t:'項目'},{t:'金額',r:1}],[['可分配盈餘（稅前淨利 × 80%）',fmt(d.share.cfg?d.share.cfg.netProfit:0)],['− 保留款增加',fmt(d.share.cfg?d.share.cfg.retentionAdd:0)],['− 營運週轉增加',fmt(d.share.cfg?d.share.cfg.wcAdd:0)],['− 機具自付款',fmt(d.share.cfg?d.share.cfg.machineSelfPay:0)],['＝ 分潤上限（權責）','<b>'+fmt(d.share.cap)+'</b>']].concat(who.map(function(w){return ['本年已提領・'+esc(w),fmt(d.share.byWho[w])];})).concat([['尚可提領','<b style="color:'+(d.share.remain>=0?'var(--g3)':'var(--red)')+'">'+fmt(d.share.remain)+'</b>']]));
+  // 業務
+  if(d.bid)h+=sec('七、業務')+T([{t:'報價件數',r:1},{t:'得標件數',r:1},{t:'得標率',r:1},{t:'得標金額（含稅）',r:1},{t:'報價總額（含稅）',r:1}],[[d.bid.n,d.bid.won,d.bid.rate==null?'—':pct(d.bid.rate),fmt(d.bid.wonAmt),fmt(d.bid.allAmt)]]);
+  return h;
+}
+function renderShareholderReport(el,year){
+  var d;try{d=_shRptYear(year);}catch(e){_err('renderShareholderReport',e);el.innerHTML='<div style="padding:20px;color:var(--red)">股東報表計算失敗：'+esc(e.message)+'</div>';return;}
+  window._shRptData=d;
+  el.innerHTML='<div style="padding:12px 14px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><div style="font-size:12px;color:var(--b4)">股東版：只列經營結果與財務狀況，不含單價、廠商報價等內部資料。匯出 PDF 為 A4 直式。</div><button type="button" class="btn btn-xs btn-g" onclick="exportShareholderPDF()" style="margin-left:auto">匯出 PDF</button></div>'+_shRptBody(d,false)+'</div>';
+  try{if(typeof _mstack==='function')_mstack(el);}catch(e){}
+}
+function exportShareholderPDF(){
+  var year=parseInt(document.getElementById('rpt-year')&&document.getElementById('rpt-year').value)||new Date().getFullYear();
+  var d;try{d=_shRptYear(year);}catch(e){toast('計算失敗：'+e.message);return;}
+  _toolPrint('股東報表 '+d.Y+' 年度',P.company||'',_shRptBody(d,true)+'<div style="font-size:9.5px;color:#777;margin-top:10px">本表依系統登錄之請款、成本、費用、薪資與收付款資料自動產生；金額除註明外為新台幣未稅。</div>',{fname:'股東報表_'+d.Y});
+}
+function exportShareholderCSV(){
+  var year=parseInt(document.getElementById('rpt-year')&&document.getElementById('rpt-year').value)||new Date().getFullYear();
+  var d=_shRptYear(year);
+  var rows=[['營收（未稅）',d.revNet],['施工成本',d.cost],['毛利',d.gross],['公司費用',d.exp],['人事成本'+(d.hrEst?'（推估）':''),d.hr],['稅前淨利',d.pretax],['已收款（含稅）',d.recv],['分潤上限',d.share.cap],['本年已提領',d.share.drawn]].map(function(r){return ['年度損益',r[0],r[1]];});
+  d.projs.forEach(function(p){rows.push(['各案',p.q.name,p.st.base,p.st.billed,p.st.recv,p.st.ar,p.st.costNet,p.st.profit]);});
+  downloadCSV('股東報表_'+d.Y+'_'+fmtDateStr(),['區塊','項目','金額／合約','累計請款','已收','應收','施工成本','毛利'],rows);
+}
+try{_acctMount();}catch(e){_err('acct.mount',e);}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
@@ -39802,6 +39980,7 @@ function buildQuotePreviewFromPDF(){
   }
 }
 function exportCurrentReportExcel(){
+  if(_currentReport==='shareholder'){exportShareholderCSV();return;}   // v6
   const year=parseInt(document.getElementById('rpt-year')?.value)||new Date().getFullYear();
   const month=parseInt(document.getElementById('rpt-month')?.value)||0;
   let rows=[],headers=[],title='報表';
