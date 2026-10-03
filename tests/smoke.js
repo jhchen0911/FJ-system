@@ -3403,6 +3403,92 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6 計價頁：業主請款＋廠商請款兩分頁；支出晶片微調 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+          const out={};
+          P.vendorPayDay=25;P.vendorPayDelay=1;P.subPayOnBill=true;P.vendorCutDay=25;
+          VENDORS.length=0;VENDORS.push({id:'v1',name:'鴻玉開發工程行',type:'承包'},{id:'v2',name:'風哥',type:'承包'});
+          Q=[{id:'qB',code:'1150928',name:'中科台積電F25P3',client:'八九企業',date:'2026-08-01',awarded:true,ver:2,exs:[],rmk:{},_mt:1,
+            items:[{desc:'H型鋼樁 H400 L=13M 打設',unit:'支',qty:'400',price:'1000',sec:false},{desc:'H型鋼樁 H400 L=13M 拔除',unit:'支',qty:'400',price:'400',sec:false}],
+            costs:[{id:'cM',type:'sub',vendor:'鴻玉開發工程行',cat:'打設',date:'2026-09-01',amt:0,invoice:true,retRate:10,rows:[{id:'m1',linkedItemIdx:0,desc:'',qty:400,unitPrice:550}],
+                     periods:[{no:1,date:'2026-08-25',from:'2026-08-01',to:'2026-08-25',rows:[{rid:'m1',qty:100}],amt:55000,ret:5500,net:49500,due:'2026-09-25'}]},
+                   {id:'cF',type:'sub',vendor:'風哥',cat:'打設',date:'2026-09-01',amt:0,invoice:false,followOf:'cM',rows:[{id:'f1',linkedItemIdx:0,desc:'',qty:400,unitPrice:150}],periods:[]}],
+            dailyLogs:[{id:'d1',date:'2026-09-10',workers:2,crews:[{type:'sub',vendor:'鴻玉開發工程行',n:5}],progressRows:[{itemIdx:0,desc:'H型鋼樁 H400 L=13M 打設',qty:200,note:''}],progress:'',photos:[]},
+                       {id:'d2',date:'2026-10-02',workers:2,crews:[],progressRows:[{itemIdx:0,desc:'H型鋼樁 H400 L=13M 打設',qty:50,note:''}],progress:'',photos:[]}]}];
+          CONTRACTS.splice(0);
+          INV.length=0;INV.push({id:'ivB1',quoteId:'qB',project:'中科台積電F25P3',client:'八九企業',periodNo:1,date:'2026-09-30',items:[],totals:{total:100000},received:0});
+          PAYABLES.length=0;syncCostToPayable(Q[0],Q[0].costs[0]);
+          // 導覽名稱
+          out.nav=document.getElementById('sn-invoice').textContent.indexOf('計價')>=0&&document.getElementById('sn-invoice').textContent.indexOf('業主計價')<0&&ALL_PAGES.find(p=>p.id==='invoice').label==='計價';
+          go('invoice');
+          return new Promise(res=>setTimeout(()=>{
+            try{
+              out.tabs=!!document.getElementById('inv-tab-owner')&&!!document.getElementById('inv-tab-vendor');
+              invTab('owner');
+              out.ownerVisible=document.getElementById('inv-owner-wrap').style.display!=='none'&&document.getElementById('inv-vendor-wrap').style.display==='none';
+              const mb=document.getElementById('inv-month-banner');
+              out.monthBanner=mb.style.display==='block'&&/中科台積電F25P3/.test(mb.innerHTML)&&/開下一期/.test(mb.innerHTML)&&/本月日報 1 天/.test(mb.innerHTML);
+              out.badge=document.getElementById('vb-badge').textContent==='1';
+              invTab('vendor');
+              out.vendorVisible=document.getElementById('inv-vendor-wrap').style.display!=='none'&&document.getElementById('inv-owner-wrap').style.display==='none'&&document.getElementById('inv-ph-owner').style.display==='none';
+              const h=document.getElementById('vb-root').innerHTML;
+              // 待登錄：日報 08-25 之後完成 250 支 → min(250, 剩 300)=250×550×0.9=123,750
+              out.pending=/待登錄廠商請款/.test(h)&&/123,750/.test(h)&&/鴻玉開發工程行/.test(h)&&/登錄廠商請款/.test(h);
+              out.kpi=/1 家/.test(h)&&/預估 NT\$ 123,750/.test(h)&&/本期已登錄/.test(h)&&/押保留款/.test(h)&&/5,500/.test(h);
+              out.follow=/跟隨 鴻玉開發工程行/.test(h)&&/介紹費／抽成/.test(h);
+              out.all=/全部分包合約/.test(h)&&/220,000/.test(h)&&/55,000/.test(h)&&/25%/.test(h)&&/第1期 2026-08-25/.test(h);
+              out.cutLine=/本期計價截止 <b>2026-09-25<\/b>/.test(h)&&/放款日 <b>2026-10-25<\/b>/.test(h);
+              // 篩選
+              vbFilter('st','follow');out.filter=/風哥/.test(document.getElementById('vb-root').innerHTML)&&!/>鴻玉開發工程行<\/b>/.test(document.getElementById('vb-root').innerHTML.split('全部分包合約')[1]);
+              vbFilter('st','');vbFilter('kw','不存在');out.filterEmpty=/沒有符合的分包合約/.test(document.getElementById('vb-root').innerHTML);vbFilter('kw','');
+              // 登錄：切換脈絡後回到本頁、開啟計價彈窗
+              eid=null;
+              vbOpenPeriod('qB','cM');
+              out.ctx=eid==='qB'&&document.getElementById('page-invoice').classList.contains('active')&&_invTab==='vendor';
+              const md=(document.getElementById('gen-confirm-modal').style.display==='flex')?document.getElementById('gen-confirm-msg'):null;
+              out.modal=!!md&&md.querySelectorAll('.sp-row').length===1;
+              // 填數量存檔 → 期別出現在「本期已登錄」、應付掛上、畫面重繪
+              const qty=md.querySelector('.sp-row .sp-qty');qty.value='250';
+              const dEl=document.getElementById('sp-date');if(dEl)dEl.value='2026-09-25';
+              document.getElementById('gen-confirm-modal').style.display='none';_spSave();
+              const h2=document.getElementById('vb-root').innerHTML;
+              out.saved=document.getElementById('gen-confirm-modal').style.display!=='flex'&&Q[0].costs[0].periods.length===2&&/第2期/.test(h2)&&/本期已登錄（2026-09-25 起）/.test(h2);
+              const sec2=h2.split('本期已登錄（')[1].split('全部分包合約')[0];
+              out.curTable=/第2期/.test(sec2)&&/137,500/.test(sec2)&&/129,938/.test(sec2)&&/37,500/.test(sec2)&&/核對單/.test(sec2)&&/修改/.test(sec2)&&/待付/.test(sec2)&&/風哥/.test(sec2);
+              // 本期（09-25 起）已登錄 → 不再列待登錄；10-02 之後的日報量屬下一期
+              out.badge0=document.getElementById('vb-badge').style.display==='none'&&/0 家/.test(h2);
+              out.pay=PAYABLES.some(p=>p.id==='paycM_p2')&&PAYABLES.some(p=>p.id==='paycF_p2');
+              // 支出晶片
+              go('quickcost');rQcChips();
+              const ch=document.getElementById('qc-chips').innerHTML;
+              out.chips=!/公司費用/.test(ch)&&/>加油<span[^>]*>（工務車）<\/span>/.test(ch)&&/>維修<span[^>]*>（機具）<\/span>/.test(ch)&&(ch.match(/height:50px/g)||[]).length===QC_TYPES.length;
+            }catch(e){out.err=String(e.stack||e).slice(0,400);}
+            Q=Q.filter(x=>x.id!=='qB');INV.length=0;PAYABLES.length=0;VENDORS.length=0;
+            res(out);
+          },400));
+    });
+    check('計價頁：導覽改「計價」、兩分頁切換、業主分頁本月未開單提醒、廠商分頁待登錄徽章', r.nav && r.tabs && r.ownerVisible && r.monthBanner && r.badge && r.vendorVisible);
+    check('廠商請款：待登錄（日報已完成未計價×單價扣保留）、KPI、跟隨主約、全部分包總表、計價週期列、篩選', r.pending && r.kpi && r.follow && r.all && r.cutLine && r.filter && r.filterEmpty);
+    check('廠商請款：登錄鈕切換脈絡後留在本頁開彈窗、存檔後本期已登錄列（主約＋跟隨）、應付掛上、徽章歸零', r.ctx && r.modal && r.saved && r.curTable && r.pay && r.badge0);
+    check('支出晶片：不顯示「公司費用」、（工務車）（機具）縮小第二行、按鈕等高', r.chips, r.err || '');
+    // 手機：廠商分頁不得左右滑
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mob = await page.evaluate(() => {
+        Q=[{id:'qM',code:'1',name:'手機測試案',client:'業主',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 打設',unit:'支',qty:'100',price:'1000',sec:false}],
+          costs:[{id:'cS',type:'sub',vendor:'鴻玉開發工程行',cat:'打設',date:'2026-09-01',amt:0,invoice:true,rows:[{id:'s1',linkedItemIdx:0,desc:'',qty:100,unitPrice:550}],periods:[{no:1,date:'2026-09-25',from:'2026-09-01',to:'2026-09-25',rows:[{rid:'s1',qty:40}],amt:22000,ret:0,net:22000,due:'2026-10-25'}]}],
+          dailyLogs:[{id:'d',date:'2026-10-01',workers:1,crews:[],progressRows:[{itemIdx:0,desc:'H型鋼樁 打設',qty:30,note:''}],progress:'',photos:[]}]}];
+        go('invoice');invTab('vendor');
+        const ok=document.documentElement.scrollWidth<=window.innerWidth+1&&document.getElementById('vb-root').scrollWidth<=window.innerWidth+1;
+        const out={ok:ok,sw:document.documentElement.scrollWidth,iw:window.innerWidth,rows:document.querySelectorAll('#vb-root table').length};
+        Q=Q.filter(x=>x.id!=='qM');invTab('owner');return out;
+    });
+    check('計價頁手機版：廠商請款表格堆疊、無橫向捲動', mob.ok && mob.rows >= 2, JSON.stringify(mob));
+    check('v6 計價頁測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
