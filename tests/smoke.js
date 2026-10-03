@@ -3631,6 +3631,47 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6 參數設定分組精簡：六分頁、稅務設定拆三張、單價分析小節收合、跨分頁搜尋、材料內部租金參數 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+          const out={};
+          go('params');
+          const pg=document.getElementById('page-params');
+          out.tabs=document.querySelectorAll('#prm-tabs button').length===6&&!!document.getElementById('prm-q');
+          out.co=document.getElementById('prm-g-co').style.display!=='none'&&!!document.querySelector('#prm-g-co #pc')&&document.getElementById('prm-g-cost').style.display==='none';
+          prmTab('cost');
+          out.cost=document.getElementById('prm-g-cost').style.display!=='none'&&!!document.querySelector('#prm-g-cost #pvcutday')&&!!document.querySelector('#prm-g-cost #pmat-h350')&&!!document.querySelector('#prm-g-cost #plabor')&&!document.querySelector('#prm-g-cost #ptax');
+          out.bill=!!document.querySelector('#prm-g-bill #ptax')&&!!document.querySelector('#prm-g-bill #fixed-cost-rows')&&!!document.querySelector('#prm-g-bill #prm');
+          out.cash=!!document.querySelector('#prm-g-cash #popen')&&!!document.querySelector('#prm-g-cash #popresamt');
+          out.sys=!!document.querySelector('#prm-g-sys #fb-sync-card')&&!!document.querySelector('#prm-g-sys #storage-usage-body');
+          out.taxGone=![].some.call(pg.querySelectorAll('.cht'),h=>/稅務設定/.test(h.textContent));
+          const secs=pg.querySelectorAll('#prm-g-upa details.prm-sec');
+          out.upa=secs.length>=10&&!!document.querySelector('#prm-g-upa #cp-r-drive')&&[...secs].some(d=>d.querySelector('#cp-r-drive'))&&!!document.querySelector('#prm-g-upa #cp-site-s');
+          // 搜尋：跨分頁、只留命中欄位、小節自動展開
+          prmSearch('放款');
+          const vis=id=>{const f=document.getElementById(id).closest('.f');return f.style.display!=='none'&&f.closest('.prm-g').style.display!=='none'&&f.closest('.card').style.display!=='none';};
+          out.search=vis('pvpayday')&&vis('pvpaydelay')&&!vis('ptax')&&document.getElementById('prm-g-bill').style.display!=='none';
+          prmSearch('引孔');const d=document.getElementById('cp-r-drill').closest('details');out.search2=!!d&&d.open&&d.style.display!=='none'&&vis('cp-r-drill');
+          prmSearch('');out.clear=document.getElementById('prm-g-cost').style.display!=='none'&&document.getElementById('prm-g-bill').style.display==='none'&&vis('pvpayday');
+          // 儲存材料參數
+          document.getElementById('pmat-h350').value='4.5';document.getElementById('pmat-factor').value='0.9';document.getElementById('pmat-loss').value='0';
+          const oT=window.toast;window.toast=function(){};try{doSaveP();}catch(e){out.saveErr=String(e).slice(0,100);}window.toast=oT;
+          out.save=P.matRentRate.H350===4.5&&P.matRentRate.H300===3&&P.matRentFactor===0.9&&P.matLossAccrue===false;
+          P.matRentRate={H300:3,H350:4,H400:5};P.matRentFactor=0.8;P.matLossAccrue=true;syncParamsUI();
+          out.sync=document.getElementById('pmat-h350').value==='4'&&document.getElementById('pmat-loss').value==='1';
+          return out;
+    });
+    check('參數設定：六個分頁與搜尋框、公司／計價與報價／成本與廠商／資金／系統各自有對應欄位、稅務設定卡拆掉', r.tabs && r.co && r.cost && r.bill && r.cash && r.sys && r.taxGone);
+    check('參數設定：單價分析小節收合（≥10 節、欄位 id 不變）、搜尋跨分頁只留命中欄位並展開小節、清除還原', r.upa && r.search && r.search2 && r.clear);
+    check('參數設定：自有材料內部日租／折數／損耗認列可存可讀', r.save && r.sync, r.saveErr || '');
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mob = await page.evaluate(() => { go('params'); prmTab('cost'); return { sw: document.documentElement.scrollWidth, iw: window.innerWidth }; });
+    check('手機：參數設定分頁無橫向捲動', mob.sw <= mob.iw + 1, JSON.stringify(mob));
+    check('v6 參數設定測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
