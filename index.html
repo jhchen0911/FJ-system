@@ -2767,7 +2767,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.7-beta';
+var APP_VERSION='v6.0.8-beta';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -37442,13 +37442,13 @@ function renderProj(){
   if(!q){root.innerHTML=top+_pjListHtml(list);return;}
   var st;try{st=_pjStat(q);}catch(e){_err('renderProj',e);root.innerHTML=top+'<div style="padding:20px;color:var(--red)">彙總失敗：'+esc(e.message)+'</div>';return;}
   var h=top+_pjHeadHtml(q,st)+_pjTimelineHtml(q,st)
-    +_pjSection('items','合約工項與進度',_pjItemsHtml(q,st))
-    +_pjSection('inv','業主計價',_pjInvHtml(q,st))
-    +_pjSection('sub','發包與廠商計價',_pjSubHtml(q,st))
-    +_pjSection('cost','施工成本統計',_pjCostHtml(q,st))
-    +_pjSection('sched','進度（預定 vs 實際）',_pjSchedHtml(q,st))
-    +_pjSection('log','工作日報',_pjLogHtml(q,st))
-    +_pjSection('close','完工與結案',_pjCloseHtml(q,st));
+    +_pjSection('items','合約工項與進度',_pjItemsHtml(q,st),'',!(q.items||[]).some(function(it){return it&&!it.sec;}))
+    +_pjSection('inv','業主計價',_pjInvHtml(q,st),'',!st.invs.length&&!st.rent.length)
+    +_pjSection('sub','發包與廠商計價',_pjSubHtml(q,st),'',!st.subs.length&&!st.rfqs.length)
+    +_pjSection('cost','施工成本統計',_pjCostHtml(q,st),'',!st.all.some(function(x){return (x.costs||[]).length;}))
+    +_pjSection('sched','進度（預定 vs 實際）',_pjSchedHtml(q,st),'',!st.logs.length&&!_pjHasPlan(q))
+    +_pjSection('log','工作日報',_pjLogHtml(q,st),'',!st.logs.length)
+    +_pjSection('close','完工與結案',_pjCloseHtml(q,st),'',!q.closed&&!st.done&&!st.invs.length);
   root.innerHTML=h;
   try{if(typeof _mstack==='function')_mstack();}catch(e){_err('renderProj.mstack',e);}
 }
@@ -37506,10 +37506,10 @@ function _pjTimelineHtml(q,st){
   return '<div class="card" style="margin-top:10px"><div class="cb"><div class="pj-steps" style="display:flex;gap:2px">'+cells+'</div></div></div>'
     +'<style>@media(max-width:767px){.pj-steps{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))}}</style>';
 }
-function _pjSection(id,title,body,extra){
-  var key='pj_open_'+id;var open=localStorage.getItem(key)!=='0';
+function _pjSection(id,title,body,extra,empty){
+  var key='pj_open_'+id,saved=localStorage.getItem(key);var open=saved?saved!=='0':!empty;
   return '<div class="card" style="margin-top:10px" id="pj-sec-'+id+'"><div class="cb">'
-    +'<div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="var b=document.getElementById(\'pj-body-'+id+'\');var o=b.style.display===\'none\';b.style.display=o?\'\':\'none\';this.querySelector(\'.ar\').textContent=o?\'▾\':\'▸\';localStorage.setItem(\''+key+'\',o?\'1\':\'0\')"><b style="font-size:13.5px;color:var(--g3)">'+title+'</b>'+(extra||'')+'<span class="ar" style="margin-left:auto;color:var(--b3)">'+(open?'▾':'▸')+'</span></div>'
+    +'<div style="display:flex;align-items:center;gap:8px;cursor:pointer" onclick="var b=document.getElementById(\'pj-body-'+id+'\');var o=b.style.display===\'none\';b.style.display=o?\'\':\'none\';this.querySelector(\'.ar\').textContent=o?\'▾\':\'▸\';localStorage.setItem(\''+key+'\',o?\'1\':\'0\')"><b style="font-size:13.5px;color:var(--g3)">'+title+'</b>'+(extra||'')+(empty?'<span style="font-size:11px;color:var(--b3)">尚無資料</span>':'')+'<span class="ar" style="margin-left:auto;color:var(--b3)">'+(open?'▾':'▸')+'</span></div>'
     +'<div id="pj-body-'+id+'" style="margin-top:8px'+(open?'':';display:none')+'">'+body+'</div></div></div>';
 }
 function _pjTable(heads,rows,foot){
@@ -37524,9 +37524,11 @@ function _pjItemsHtml(q,st){
     if(!it||it.sec||_isSpare(it))return;
     var qy=Math.abs(_effQty(em,it))||0,pg=_itemProgress(q,i),r=rec[i]||{},pct=qy>0?Math.min(100,pg.cum/qy*100):0;
     var vendor=_itemSubVendor(q,i);
+    var dupV=st.subs.filter(function(x){return !x.c.followOf&&(x.c.rows||[]).some(function(rw){return parseInt(rw.linkedItemIdx)===i;});});
+    var dupHint=(dupV.length>=2&&qy>0&&(r.sub||0)>qy*1.5)?'<div style="color:#b26a00;font-size:10.5px">⚠ 此工項掛了 '+dupV.length+' 家承包（'+dupV.map(function(x){return esc(x.c.vendor);}).join('、')+'），發包量被重複加總；若其中一家是介紹人，請在下方「發包與廠商計價」把它設為計價跟隨</div>':'';
     var warn=(r.warns||[]).length?'<div style="color:var(--red);font-size:10.5px;font-weight:700">'+r.warns.map(esc).join('<br>')+'</div>':'';
     var note=(r.notes||[]).length?'<div style="color:#1565C0;font-size:10.5px">'+r.notes.map(esc).join('<br>')+'</div>':'';
-    rows.push([esc(String(it.desc||'').split('\n')[0])+warn+note,esc(_uFix(it.unit||'')),fmt(qy),(pg.n?fmt(Math.round(pg.cum*100)/100):'—'),
+    rows.push([esc(String(it.desc||'').split('\n')[0])+warn+note+dupHint,esc(_uFix(it.unit||'')),fmt(qy),(pg.n?fmt(Math.round(pg.cum*100)/100):'—'),
       '<div style="display:flex;align-items:center;gap:5px;justify-content:flex-end"><div style="width:60px;height:6px;background:var(--b1);border-radius:6px;overflow:hidden"><div style="width:'+Math.round(pct)+'%;height:100%;background:'+(pct>=99.5?'var(--g)':'#1565C0')+'"></div></div><span style="min-width:34px;text-align:right">'+(pg.n?Math.round(pct)+'%':'—')+'</span></div>',
       vendor?esc(vendor):'<span style="color:var(--b3)">未發包</span>',(r.sub?fmt(r.sub):'—'),(r.vb?fmt(r.vb):'—'),(r.bill?fmt(r.bill):'—')]);
   });
@@ -37547,7 +37549,9 @@ function _pjInvHtml(q,st){
 function _pjSubHtml(q,st){
   var rfq=st.rfqs.length?'<div style="margin-bottom:8px;font-size:12px">'+st.rfqs.map(function(r){var clr=r.status==='awarded'?'#1B5E20':r.status==='labor'?'#E65100':'#1565C0';return '<span style="display:inline-block;border:1px solid '+clr+';color:'+clr+';border-radius:99px;padding:2px 9px;margin:0 4px 4px 0;font-size:11px">'+esc(r.no)+'　'+esc(r.scope||'')+'　'+esc(_rfqStatusTxt(r))+'</span>';}).join('')+'</div>':'';
   var rows=st.subs.map(function(x){var s=x.s,c=x.c;var ov=_subOverStat(c);var items=(c.rows||[]).map(function(r){var it=(r.linkedItemIdx>=0&&x.q.items)?x.q.items[r.linkedItemIdx]:null;return it?String(it.desc||'').split('\n')[0].slice(0,16):(r.desc||'');}).filter(Boolean).join('、');
-    return [esc(c.vendor)+(c.followOf?'<div style="font-size:10.5px;color:#1565C0">介紹費（跟隨計價）</div>':'')+'<div style="font-size:10.5px;color:var(--b4)">'+esc(items)+'</div>',fmt(s.total),fmt(s.billed)+(s.n?('<div style="font-size:10.5px;color:var(--b4)">'+s.n+' 期</div>'):'')+(ov.toOwner>0?'<div style="font-size:10.5px;color:#1565C0">超量應向業主追加 '+fmt(ov.toOwner)+'</div>':''),fmt(s.paid),'<span style="color:'+(s.unpaid>0?'#b45309':'var(--b5)')+'">'+fmt(s.unpaid)+'</span>',(s.retHeld>0?fmt(s.retHeld):'—')+(s.advLeft>0?('<div style="font-size:10.5px;color:#1565C0">預付未抵 '+fmt(s.advLeft)+'</div>'):''),
+    var others=st.subs.filter(function(o){return o.c!==c&&!o.c.followOf&&o.q===x.q;});
+    var followSel=(others.length&&!q.closed)?'<div style="margin-top:3px"><select onchange="pjSetFollow(\''+x.q.id+'\',\''+c.id+'\',this.value)" title="介紹人／抽成：跟隨主約每期計價，數量不重複計" style="font-size:10.5px;padding:2px 4px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);max-width:160px"><option value="">自行計價</option>'+others.map(function(o){return '<option value="'+o.c.id+'"'+(c.followOf===o.c.id?' selected':'')+'>介紹費・跟隨 '+esc(o.c.vendor)+'</option>';}).join('')+'</select></div>':'';
+    return [esc(c.vendor)+(c.followOf?'<div style="font-size:10.5px;color:#1565C0">介紹費（跟隨 '+esc(((x.q.costs||[]).find(function(o){return o.id===c.followOf;})||{}).vendor||'')+' 計價，數量不重複計）</div>':'')+'<div style="font-size:10.5px;color:var(--b4)">'+esc(items)+'</div>'+followSel,fmt(s.total),fmt(s.billed)+(s.n?('<div style="font-size:10.5px;color:var(--b4)">'+s.n+' 期</div>'):'')+(ov.toOwner>0?'<div style="font-size:10.5px;color:#1565C0">超量應向業主追加 '+fmt(ov.toOwner)+'</div>':''),fmt(s.paid),'<span style="color:'+(s.unpaid>0?'#b45309':'var(--b5)')+'">'+fmt(s.unpaid)+'</span>',(s.retHeld>0?fmt(s.retHeld):'—')+(s.advLeft>0?('<div style="font-size:10.5px;color:#1565C0">預付未抵 '+fmt(s.advLeft)+'</div>'):''),
       '<span style="white-space:nowrap">'+_pjBtn("openProjectCosts('"+x.q.id+"');setTimeout(function(){openSubPeriod('"+c.id+"')},300)",'登錄廠商請款','border-color:#1565C0;color:#1565C0')+'</span>'];});
   var foot=['合計',fmt(st.subTotal),fmt(st.subBilled),fmt(st.subs.reduce(function(a,x){return a+x.s.paid;},0)),fmt(st.subs.reduce(function(a,x){return a+x.s.unpaid;},0)),fmt(st.subs.reduce(function(a,x){return a+Math.max(0,x.s.retHeld);},0)),''];
   return rfq+(rows.length?_pjTable([{t:'廠商／工項'},{t:'發包額（未稅）',r:1},{t:'廠商已請',r:1},{t:'已付（含稅）',r:1},{t:'未付（含稅）',r:1},{t:'押保留款',r:1},{t:''}],rows,foot):'<div style="font-size:12px;color:var(--b3)">尚未發包</div>')
@@ -37560,6 +37564,7 @@ function _pjCostHtml(q,st){
   if(st.adds.length)h+='<div style="font-size:11px;color:var(--b4);margin-top:4px">追加案的成本另計於各追加案；上方 KPI 已合併。</div>';
   return h+'<div style="margin-top:8px">'+_pjBtn("openProjectCosts('"+q.id+"')",'施工成本明細（編輯）','border-color:#e65100;color:#e65100')+'</div>';
 }
+function _pjHasPlan(q){try{return typeof _pgState!=='undefined'&&String(_pgState.proj||'').trim()===String(q.name||'').trim()&&(_pgState.rows||[]).length>0;}catch(e){return false;}}
 function _pjSchedHtml(q,st){
   var pg=null;try{if(typeof _pgState!=='undefined'&&String(_pgState.proj||'').trim()===String(q.name||'').trim())pg=_pgState;}catch(e){}
   var norm=function(t){return String(t||'').split('\n')[0].replace(/\s+/g,'').toLowerCase();};
@@ -37597,6 +37602,17 @@ function _pjCloseHtml(q,st){
     +'</div>';
   if(!q.closed&&(st.ar>0||st.payTotal-st.payPaid>0))h+='<div style="font-size:11px;color:#b26a00;margin-top:6px">結案前請確認：待收 '+fmt(st.ar)+'、應付未付 '+fmt(st.payTotal-st.payPaid)+'。</div>';
   return h;
+}
+// 工程專案內直接設定介紹費（計價跟隨）
+function pjSetFollow(qid,cid,mainId){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;
+  var c=(q.costs||[]).find(function(x){return x.id===cid;});if(!c)return;
+  if(mainId&&mainId!==cid&&(q.costs||[]).some(function(o){return o.id===mainId&&o.type==='sub'&&!o.followOf;}))c.followOf=mainId;else delete c.followOf;
+  _touch(q);
+  var m=_subFollowMain(q,c);if(m){try{_subFollowApply(q,m);}catch(e){_err('pjSetFollow',e);}}
+  try{syncCostToPayable(q,c);}catch(e){_err('pjSetFollow',e);}
+  try{persist();_immediateUpload();}catch(e){_err('pjSetFollow',e);}
+  renderProj();toast(c.followOf?(c.vendor+' 已設為介紹費，跟隨 '+(m?m.vendor:'')+' 計價'):(c.vendor+' 改回自行計價'));
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

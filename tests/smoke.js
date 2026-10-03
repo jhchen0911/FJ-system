@@ -3369,6 +3369,14 @@ async function newPage(browser, width, height) {
         // 日報、結案
         out.log=/2026-09-10/.test(document.getElementById('pj-body-log').innerHTML)&&/鴻玉開發工程行/.test(document.getElementById('pj-body-log').innerHTML);
         const cl=document.getElementById('pj-body-close').innerHTML;out.close=/竣工總結算/.test(cl)&&/結案前請確認/.test(cl)&&/toggleProjClosed/.test(cl);
+          // 介紹費：第二家同工項承包 → 工項表提示、發包區下拉設跟隨 → 發包量不再重複
+        Q[0].costs.push({id:'cF',type:'sub',vendor:'風哥',cat:'打設',date:'2026-09-01',amt:0,invoice:false,rows:[{id:'f1',linkedItemIdx:0,desc:'',qty:400,unitPrice:150}]});
+        renderProj();out.dupHint=/發包量被重複加總/.test(document.getElementById('pj-body-items').innerHTML)&&/pjSetFollow/.test(document.getElementById('pj-body-sub').innerHTML);
+        pjSetFollow('qP','cF','cM');out.follow=Q[0].costs.find(c=>c.id==='cF').followOf==='cM'&&!/發包量被重複加總/.test(document.getElementById('pj-body-items').innerHTML)&&/介紹費（跟隨 鴻玉開發工程行/.test(document.getElementById('pj-body-sub').innerHTML)&&_qtyRecon(Q[0])[0].sub===400&&(Q[0].costs.find(c=>c.id==='cF').periods||[]).length===1;
+        // 空區塊預設收合：日報清空 → 工作日報區收合並標「尚無資料」；有資料的區塊展開
+        const savedLogs=Q[0].dailyLogs;Q[0].dailyLogs=[];localStorage.removeItem('pj_open_log');renderProj();
+        out.emptyFold=document.getElementById('pj-body-log').style.display==='none'&&/尚無資料/.test(document.getElementById('pj-sec-log').innerHTML)&&document.getElementById('pj-body-inv').style.display!=='none';
+        Q[0].dailyLogs=savedLogs;renderProj();
         // 區塊收合記憶
         document.querySelector('#pj-sec-log .cb > div').click();out.fold=document.getElementById('pj-body-log').style.display==='none'&&localStorage.getItem('pj_open_log')==='0';
         renderProj();out.foldKeep=document.getElementById('pj-body-log').style.display==='none';localStorage.removeItem('pj_open_log');
@@ -3384,7 +3392,7 @@ async function newPage(browser, width, height) {
     });
     check('工程專案：頁面、KPI 列（合約／請款／收款／發包／成本／應付／毛利）、8 步時間軸（含議價前後）', r.page && r.head && r.steps);
     check('工程專案：工項進度表、業主計價期別、發包與廠商計價、施工成本統計', r.items && r.inv && r.sub && r.cost);
-    check('工程專案：預定（施工進度工具）vs 實際（日報）、日報摘要、結案區、區塊收合記憶', r.sched0 && r.sched1 && r.log && r.close && r.fold && r.foldKeep);
+    check('工程專案：預定 vs 實際、日報摘要、結案區、介紹費跟隨設定、空區塊預設收合、收合記憶', r.sched0 && r.sched1 && r.log && r.close && r.dupHint && r.follow && r.emptyFold && r.fold && r.foldKeep);
     check('工程專案：未選時卡片清單、點卡進入；手機底部「專案」改開本頁、舊卡片頁隱藏可開', r.list && r.open && r.nav && r.old);
     check('v6 工程專案測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
