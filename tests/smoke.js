@@ -3241,7 +3241,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ───────────── v6 發包：分項詢價單→廠商回填比價→議價→得標／改點工 ─────────────
+  // ───────────── v6 發包：分項詢價單（統一格式）→ 回傳廠商填價比價 → 議價 → 得標／改點工 ─────────────
   {
     const { page, errors } = await newPage(browser, 1440, 900);
     const r = await page.evaluate(() => {
@@ -3262,24 +3262,28 @@ async function newPage(browser, width, height) {
         document.getElementById('rfq-scope').value='H型鋼樁打設、拔除';document.getElementById('rfq-deadline').value='2026-10-10';document.getElementById('rfq-entry').value='2026-11-01';
         document.getElementById('rfq-cash').value='40';document.getElementById('rfq-cash').dispatchEvent(new Event('input'));out.cashLink=document.getElementById('rfq-ticket').value==='60';
         document.getElementById('rfq-tdays').value='60';document.getElementById('rfq-ret').value='5';
-        document.querySelectorAll('.rfq-v').forEach(cb=>cb.checked=true);document.getElementById('rfq-vnew').value='風哥工程, 鴻玉開發工程行';
         document.getElementById('gen-confirm-ok').click();
         const q=Q[0],r=(q.rfqs||[])[0];
-        out.saved=!!r&&r.no==='RFQ-1150928-01'&&r.items.length===2&&r.items[1].qty===400&&r.vendors.length===3&&r.vendors[0].tel==='0911-111-111'&&r.cond.cashPct===40&&r.cond.ticketPct===60&&r.status==='open';
+        out.saved=!!r&&r.no==='RFQ-1150928-01'&&r.items.length===2&&r.items[1].qty===400&&r.vendors.length===0&&!document.querySelector('.rfq-v')&&r.cond.cashPct===40&&r.cond.ticketPct===60&&r.status==='open';
         // 條件條列：計價方式句含放款拆分與保留款；PDF 走預覽、含廠商名、無頁尾字
         const lines=_rfqCondLines(r);
         out.cond=lines.length>=6&&/每月 25 日計價，次月 25 日放款（40% 匯款、60% 60 天票期）；保留款 5%/.test(lines[2])&&/報價有效期 30 天/.test(lines.join(''))&&!/開立發票/.test(lines.join(''));
-        const html=_rfqDocHtml(q,r,r.vendors[1]);
-        out.doc=/分項工程詢價單/.test(html)&&/RFQ-1150928-01 \/ 02/.test(html)&&/大成基礎/.test(html)&&/<ol>/.test(html)&&!/本詢價單由/.test(html)&&!/豐有內部使用/.test(html)&&(html.match(/class="blank"/g)||[]).length===7;
-        rfqPrint(r.id,0);out.prev=!!document.getElementById('_fy_print_overlay');['_fy_print_frame','_fy_print_overlay'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
+        const html=_rfqDocHtml(q,r);
+        out.doc=/分項工程詢價單/.test(html)&&/RFQ-1150928-01　/.test(html)&&!/鴻玉/.test(html)&&/<ol>/.test(html)&&/class="vt"/.test(html)&&/統一編號/.test(html)&&!/本詢價單由/.test(html)&&!/豐有內部使用/.test(html)&&(html.match(/class="blank"/g)||[]).length===7;
+        rfqPrint(r.id);out.prev=!!document.getElementById('_fy_print_overlay');['_fy_print_frame','_fy_print_overlay'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
         // 填價：鴻玉 550/150、大成 600/160（議後 560）、風哥未回
-        rfqFill(r.id,0);document.querySelectorAll('.rf-p')[0].value='550';document.querySelectorAll('.rf-p')[1].value='150';_rfRecalc();
+        // 回傳廠商：名冊內的自動帶聯絡人；名冊外的手打
+        rfqFill(r.id,-1);out.newForm=!!document.getElementById('rf-name')&&!!document.getElementById('rf-vdl');
+        document.getElementById('rf-name').value='鴻玉開發工程行';_rfVendorPick('鴻玉開發工程行');out.pick=document.getElementById('rf-contact').value==='鴻哥'&&document.getElementById('rf-tel').value==='0911-111-111';
+        document.querySelectorAll('.rf-p')[0].value='550';document.querySelectorAll('.rf-p')[1].value='150';_rfRecalc();
         out.fillTot=/報價合計[\s\S]*NT\$ 284,400/.test(document.getElementById('rf-tot').innerHTML);
         document.getElementById('gen-confirm-ok').click();
-        rfqFill(r.id,1);document.querySelectorAll('.rf-p')[0].value='600';document.querySelectorAll('.rf-p')[1].value='160';document.querySelectorAll('.rf-n')[0].value='560';_rfRecalc();
+        rfqFill(r.id,-1);document.getElementById('rf-name').value='大成基礎';_rfVendorPick('大成基礎');document.querySelectorAll('.rf-p')[0].value='600';document.querySelectorAll('.rf-p')[1].value='160';document.querySelectorAll('.rf-n')[0].value='560';_rfRecalc();
         out.negTxt=/議價省下 NT\$ 16,320/.test(document.getElementById('rf-tot').innerHTML);
         document.getElementById('gen-confirm-ok').click();
-        out.status=r.vendors[0].status==='quoted'&&r.vendors[1].status==='quoted'&&r.vendors[2].status==='sent'&&r.vendors[1].neg[0]===560;
+        rfqFill(r.id,-1);document.getElementById('rf-name').value='風哥工程';document.getElementById('rf-tel').value='0933-333-333';document.getElementById('gen-confirm-ok').click();
+        rfqFill(r.id,-1);document.getElementById('gen-confirm-ok').click();out.nameReq=r.vendors.length===3&&m.style.display!=='none';m.style.display='none';
+        out.status=r.vendors.length===3&&r.vendors[0].status==='quoted'&&r.vendors[0].tel==='0911-111-111'&&r.vendors[1].status==='quoted'&&r.vendors[2].status==='sent'&&r.vendors[2].tel==='0933-333-333'&&r.vendors[1].neg[0]===560;
         // 比價表：最低價標綠、議後劃掉原價、合計
         renderRfq();const h=root.innerHTML;
         out.compare=/比價中/.test(h)&&/284,400/.test(h)&&/292,480/.test(h)&&/line-through/.test(h)&&/#E8F5E9/.test(h);
@@ -3310,9 +3314,9 @@ async function newPage(browser, width, height) {
         Q=Q.filter(x=>x.id!=='qR');VENDORS.length=0;_rfqQid='';
         return out;
     });
-    check('發包：新增詢價單（合約工項勾選、數量帶生效量、備用不列、付款條件、多家廠商）', r.page && r.form && r.cashLink && r.saved);
-    check('發包：詢價單 PDF（條件條列、每家一張帶廠商名、單價留白、無內部欄與頁尾）', r.cond && r.doc && r.prev);
-    check('發包：填價／議價合計、比價表最低價標示、議後劃掉原價', r.fillTot && r.negTxt && r.status && r.compare);
+    check('發包：新增詢價單（合約工項勾選、數量帶生效量、備用不列、付款條件；不預選廠商）', r.page && r.form && r.cashLink && r.saved);
+    check('發包：詢價單 PDF 統一格式（條件條列、廠商欄表格、單價留白、無內部欄與頁尾）', r.cond && r.doc && r.prev);
+    check('發包：回傳廠商（名冊自動帶聯絡人、名冊外可手打、名稱必填）、填價／議價合計、比價表', r.newForm && r.pick && r.nameReq && r.fillTot && r.negTxt && r.status && r.compare);
     check('發包：得標需原因→建立分包合約（單價＝議後價、保留款、進場日、付款條件）、其餘未得標、未計價不掛應付', r.awardPre && r.needReason && r.award && r.others && r.doneUi && r.crew);
     check('發包：改點工建立點工卡；已發包不可刪；rfqs 走 private；專案卡入口', r.no2 && r.labor && r.delGuard && r.strip && r.apply && r.card);
     check('v6 發包測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));

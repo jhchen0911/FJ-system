@@ -2759,7 +2759,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.1-beta';
+var APP_VERSION='v6.0.2-beta';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -37122,7 +37122,7 @@ function renderRfq(){
     +mains.map(function(x){return '<option value="'+x.id+'"'+(q&&q.id===x.id?' selected':'')+'>'+esc((x.name||'未命名').slice(0,24))+(x.client?('／'+esc(x.client.slice(0,8))):'')+'</option>';}).join('')+'</select>';
   var h='<div class="card"><div class="cb"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+sel
     +(q?'<button type="button" class="btn btn-sm btn-g" onclick="rfqNew()">＋ 新增詢價單</button>':'')+'</div>'
-    +'<div style="font-size:11.5px;color:var(--b3);margin-top:6px">流程：勾合約工項 → 匯出詢價單給廠商（單價留白）→ 廠商回傳後填入單價 → 議價 → 評估得標或改點工。得標即建立分包合約（施工成本承包卡），日報自動帶出該工項的廠商。</div></div></div>';
+    +'<div style="font-size:11.5px;color:var(--b3);margin-top:6px">流程：勾合約工項 → 匯出詢價單（統一格式、不指定廠商）→ 廠商回傳後按「＋ 回傳廠商」填入廠商資訊與單價 → 議價 → 評估得標或改點工。得標即建立分包合約（施工成本承包卡），日報自動帶出該工項的廠商。</div></div></div>';
   if(!q){root.innerHTML=h+'<div style="padding:24px;text-align:center;color:var(--b3);font-size:12.5px">請先選擇工程</div>';return;}
   var list=_rfqs(q).slice().sort(function(a,b){return String(b.date||'').localeCompare(String(a.date||''));});
   if(!list.length)h+='<div style="padding:24px;text-align:center;color:var(--b3);font-size:12.5px">此工程尚無詢價單，按「＋ 新增詢價單」開始</div>';
@@ -37139,21 +37139,22 @@ function _rfqCardHtml(q,r){
     +'<b style="font-size:14px">'+esc(r.no||'')+'</b><span style="font-size:11.5px;color:var(--b4)">'+esc(r.date||'')+(r.deadline?('　回覆期限 '+esc(r.deadline)):'')+(r.entry?('　預定進場 '+esc(r.entry)):'')+'</span>'
     +'<span style="font-size:11.5px;font-weight:700;color:'+stClr+';border:1px solid '+stClr+';border-radius:99px;padding:1px 9px">'+esc(_rfqStatusTxt(r))+'</span>'
     +'<span style="margin-left:auto;display:flex;gap:4px;flex-wrap:wrap">'
-    +(done?'':'<button type="button" class="btn btn-xs" onclick="rfqEdit(\''+r.id+'\')">編輯</button><button type="button" class="btn btn-xs" onclick="rfqAddVendor(\''+r.id+'\')">＋ 廠商</button>')
+    +'<button type="button" class="btn btn-xs" title="匯出詢價單（統一格式，不指定廠商）" onclick="rfqPrint(\''+r.id+'\')">詢價單 PDF</button>'
+    +(done?'':'<button type="button" class="btn btn-xs" onclick="rfqEdit(\''+r.id+'\')">編輯</button><button type="button" class="btn btn-xs" style="border-color:#90CAF9;color:#1565C0" onclick="rfqFill(\''+r.id+'\',-1)">＋ 回傳廠商</button>')
     +(done?'':'<button type="button" class="btn btn-xs btn-g" onclick="rfqAward(\''+r.id+'\')">評估得標</button><button type="button" class="btn btn-xs" style="border-color:#f0c4a0;color:#b45309" onclick="rfqLabor(\''+r.id+'\')">改點工</button>')
     +'<button type="button" class="btn btn-xs btn-r" onclick="rfqDel(\''+r.id+'\')">刪除</button>'
     +'</span></div>'
     +(r.scope?'<div style="font-size:12.5px;margin-top:4px">詢價範圍：'+esc(r.scope)+'</div>':'')
     +(r.award&&r.award.reason?'<div style="font-size:12px;color:'+stClr+';margin-top:4px">'+(r.status==='labor'?'改點工原因：':'得標原因：')+esc(r.award.reason)+'</div>':'');
   var vh='';
-  if(!vendors.length)vh='<div style="font-size:12px;color:var(--b3);margin-top:8px">尚未加入廠商，按「＋ 廠商」選擇要詢價的對象</div>';
+  if(!vendors.length)vh='<div style="font-size:12px;color:var(--b3);margin-top:8px">尚無廠商回傳。先按「詢價單 PDF」匯出傳給廠商；收到回傳後按「＋ 回傳廠商」填入廠商資訊與單價</div>';
   else if(mob){
     vh=vendors.map(function(v,vi){var tq=_rfqVendorTotal(r,v,false),tn=_rfqVendorTotal(r,v,true);
       return '<div style="border:1px solid var(--b1);border-radius:var(--r8);padding:8px 10px;margin-top:8px;font-size:12.5px">'
         +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b>'+esc(v.name||'')+'</b>'+_rfqVStatus(v)+'</div>'
         +(v.contact||v.tel?'<div style="font-size:11.5px;color:var(--b4)">'+esc(v.contact||'')+(v.tel?('　'+esc(v.tel)):'')+'</div>':'')
         +'<div style="margin-top:4px">報價 <b>'+(tq.n?fmt(tq.total):'—')+'</b>'+(tn.total!==tq.total&&tn.n?('　議後 <b style="color:var(--g3)">'+fmt(tn.total)+'</b>'):'')+(tq.n&&!tq.full?' <span style="color:#b26a00">（未填齊）</span>':'')+'</div>'
-        +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px"><button type="button" class="btn btn-xs" onclick="rfqPrint(\''+r.id+'\','+vi+')">詢價單 PDF</button>'+(done?'':'<button type="button" class="btn btn-xs btn-g" onclick="rfqFill(\''+r.id+'\','+vi+')">填入報價／議價</button><button type="button" class="btn btn-xs" onclick="rfqRemoveVendor(\''+r.id+'\','+vi+')">移除</button>')+'</div></div>';}).join('');
+        +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">'+(done?'':'<button type="button" class="btn btn-xs btn-g" onclick="rfqFill(\''+r.id+'\','+vi+')">修改報價／議價</button><button type="button" class="btn btn-xs" onclick="rfqRemoveVendor(\''+r.id+'\','+vi+')">移除</button>')+'</div></div>';}).join('');
   }else{
     vh='<div style="margin-top:8px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--gl);color:var(--b5);font-size:11px">'
       +'<th style="padding:5px 6px;text-align:left">工項</th><th style="padding:5px 6px;text-align:right">數量</th>'
@@ -37164,11 +37165,11 @@ function _rfqCardHtml(q,r){
       +'</tbody><tfoot><tr style="background:var(--b0);font-weight:700"><td style="padding:5px 6px" colspan="2">合計（未稅）</td>'
       +vendors.map(function(v){var t=_rfqVendorTotal(r,v,true);return '<td style="padding:5px 6px;text-align:right;font-variant-numeric:tabular-nums">'+(t.n?fmt(t.total):'—')+(t.n&&!t.full?'<div style="font-size:10px;color:#b26a00;font-weight:400">未填齊</div>':'')+'</td>';}).join('')+'</tr>'
       +'<tr><td colspan="2" style="padding:5px 6px;font-size:11px;color:var(--b4)">狀態／操作</td>'
-      +vendors.map(function(v,vi){return '<td style="padding:5px 6px;text-align:right;white-space:nowrap">'+_rfqVStatus(v)+'<div style="margin-top:4px;display:flex;gap:3px;justify-content:flex-end;flex-wrap:wrap"><button type="button" class="btn btn-xs" title="匯出給此廠商的詢價單" onclick="rfqPrint(\''+r.id+'\','+vi+')">PDF</button>'+(done?'':'<button type="button" class="btn btn-xs btn-g" onclick="rfqFill(\''+r.id+'\','+vi+')">填價</button><button type="button" class="btn btn-xs" onclick="rfqRemoveVendor(\''+r.id+'\','+vi+')">✕</button>')+'</div>'+(v.contact||v.tel?'<div style="font-size:10.5px;color:var(--b4);margin-top:3px">'+esc(v.contact||'')+(v.tel?(' '+esc(v.tel)):'')+'</div>':'')+'</td>';}).join('')+'</tr></tfoot></table></div>';
+      +vendors.map(function(v,vi){return '<td style="padding:5px 6px;text-align:right;white-space:nowrap">'+_rfqVStatus(v)+'<div style="margin-top:4px;display:flex;gap:3px;justify-content:flex-end;flex-wrap:wrap">'+(done?'':'<button type="button" class="btn btn-xs btn-g" onclick="rfqFill(\''+r.id+'\','+vi+')">修改</button><button type="button" class="btn btn-xs" onclick="rfqRemoveVendor(\''+r.id+'\','+vi+')">✕</button>')+'</div>'+(v.contact||v.tel?'<div style="font-size:10.5px;color:var(--b4);margin-top:3px">'+esc(v.contact||'')+(v.tel?(' '+esc(v.tel)):'')+'</div>':'')+'</td>';}).join('')+'</tr></tfoot></table></div>';
   }
   return '<div class="card" style="margin-top:10px"><div class="cb">'+head+vh+'</div></div>';
 }
-function _rfqVStatus(v){var m={sent:['已寄出','var(--b4)'],quoted:['已回價','#1565C0'],won:['得標','#1B5E20'],lost:['未得標','var(--b3)']}[v.status||'sent']||['',''];return '<span style="font-size:11px;color:'+m[1]+';font-weight:700">'+m[0]+'</span>';}
+function _rfqVStatus(v){var m={sent:['未回價','var(--b4)'],quoted:['已回價','#1565C0'],won:['得標','#1B5E20'],lost:['未得標','var(--b3)']}[v.status||'sent']||['',''];return '<span style="font-size:11px;color:'+m[1]+';font-weight:700">'+m[0]+'</span>';}
 // ── 新增／編輯詢價單 ──
 var _rfqEditId=null;
 function rfqNew(){rfqEdit(null);}
@@ -37197,9 +37198,7 @@ function rfqEdit(rid){
     +'<div class="f"><label>保留款 %／報價有效 天</label><div style="display:flex;gap:4px"><input id="rfq-ret" type="number" min="0" max="100" step="0.5" value="'+c.ret+'" style="'+IN+'"><input id="rfq-valid" type="number" min="0" value="'+c.valid+'" style="'+IN+'"></div></div>'
     +'</div>'
     +'<div class="f" style="margin-top:4px"><label>其他條件（一行一條；計價方式與有效期由上方欄位自動產生）</label><textarea id="rfq-extra" rows="5" style="'+IN+';resize:vertical">'+esc((c.extra||[]).join('\n'))+'</textarea></div>'
-    +(r?'':'<div style="font-size:12px;font-weight:700;color:var(--g3);margin:10px 0 4px">詢價對象（可多選，之後也能再加）</div><div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +(VENDORS||[]).map(function(v){return '<label style="border:1px solid var(--b2);border-radius:99px;padding:4px 10px;font-size:12px;cursor:pointer;display:inline-flex;gap:5px;align-items:center"><input type="checkbox" class="rfq-v" value="'+esc(v.name||'')+'">'+esc(v.name||'')+'</label>';}).join('')
-      +'<input id="rfq-vnew" placeholder="其他廠商（逗號分隔）" style="'+IN+';width:auto;flex:1;min-width:160px"></div>');
+;
   showConfirm((r?'編輯詢價單 ':'新增詢價單 ')+esc(r?r.no:_rfqNextNo(q)),html,function(){_rfqSave();},false,null,true);
 }
 function _rfqSave(){
@@ -37211,31 +37210,13 @@ function _rfqSave(){
   var r=_rfqEditId?q.rfqs.find(function(x){return x.id===_rfqEditId;}):null;
   if(!r){r={id:'rfq'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),no:_rfqNextNo(q),date:localToday(),vendors:[],status:'open',ts:Date.now()};q.rfqs.push(r);}
   r.scope=(gv('rfq-scope')||'').trim();r.deadline=gv('rfq-deadline')||'';r.entry=gv('rfq-entry')||'';r.contact=(gv('rfq-contact')||'').trim();r.tel=(gv('rfq-tel')||'').trim();r.cond=cond;r.items=items;r.mt=Date.now();
-  if(!_rfqEditId){
-    var names=[];document.querySelectorAll('.rfq-v:checked').forEach(function(cb){names.push(cb.value);});
-    String(gv('rfq-vnew')||'').split(/[,，、\n]/).map(function(s){return s.trim();}).filter(Boolean).forEach(function(n){if(names.indexOf(n)<0)names.push(n);});
-    names.forEach(function(n){_rfqPushVendor(r,n);});
-  }
   _touch(q);try{persist();_immediateUpload();}catch(e){_err('_rfqSave',e);}
-  _rfqEditId=null;renderRfq();toast(r.no+' 已儲存'+(r.vendors.length?('，'+r.vendors.length+' 家廠商，可匯出詢價單 PDF'):''));
+  _rfqEditId=null;renderRfq();toast(r.no+' 已儲存，按「詢價單 PDF」匯出給廠商；廠商回傳後按「＋ 回傳廠商」填入');
 }
 function _rfqPushVendor(r,name){
   if(!name||(r.vendors||[]).some(function(v){return v.name===name;}))return;
   var vd=(VENDORS||[]).find(function(v){return (v.name||'')===name;})||{};
   r.vendors.push({name:name,contact:vd.contact||'',tel:vd.phone||'',recv:'',prices:{},neg:{},note:'',status:'sent'});
-}
-function rfqAddVendor(rid){
-  var q=_rfqQ();if(!q)return;var r=_rfqs(q).find(function(x){return x.id===rid;});if(!r)return;
-  var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
-  var have={};(r.vendors||[]).forEach(function(v){have[v.name]=1;});
-  var html='<div style="display:flex;gap:6px;flex-wrap:wrap">'+(VENDORS||[]).filter(function(v){return !have[v.name];}).map(function(v){return '<label style="border:1px solid var(--b2);border-radius:99px;padding:4px 10px;font-size:12px;cursor:pointer;display:inline-flex;gap:5px;align-items:center"><input type="checkbox" class="rfq-v" value="'+esc(v.name||'')+'">'+esc(v.name||'')+'</label>';}).join('')+'</div>'
-    +'<div class="f" style="margin-top:8px"><label>其他廠商（逗號分隔）</label><input id="rfq-vnew" style="'+IN+'"></div>';
-  showConfirm('加入詢價廠商：'+esc(r.no),html,function(){
-    var names=[];document.querySelectorAll('.rfq-v:checked').forEach(function(cb){names.push(cb.value);});
-    String(gv('rfq-vnew')||'').split(/[,，、\n]/).map(function(s){return s.trim();}).filter(Boolean).forEach(function(n){if(names.indexOf(n)<0)names.push(n);});
-    if(!names.length){toast('沒有選擇廠商');return;}
-    names.forEach(function(n){_rfqPushVendor(r,n);});r.mt=Date.now();_touch(q);try{persist();_immediateUpload();}catch(e){_err('rfqAddVendor',e);}renderRfq();
-  },false,null,true);
 }
 function rfqRemoveVendor(rid,vi){
   var q=_rfqQ();if(!q)return;var r=_rfqs(q).find(function(x){return x.id===rid;});if(!r||!r.vendors[vi])return;
@@ -37247,10 +37228,9 @@ function rfqDel(rid){
   showConfirm('刪除詢價單','確定刪除 '+esc(r.no)+'？',function(){q.rfqs=q.rfqs.filter(function(x){return x.id!==rid;});_touch(q);try{persist();_immediateUpload();}catch(e){_err('rfqDel',e);}renderRfq();toast('已刪除');},true);
 }
 // ── 詢價單 PDF（每家一張）──
-function _rfqDocHtml(q,r,v){
+function _rfqDocHtml(q,r){
   var lines=_rfqCondLines(r);
   var rows=(r.items||[]).map(function(it,i){return '<tr><td class="c">'+(i+1)+'</td><td>'+esc(it.desc||'')+'</td><td class="c">'+esc(it.unit||'')+'</td><td class="r">'+fmt(parseFloat(it.qty)||0)+'</td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>';}).join('');
-  var vendorNo=v?(' / '+String((r.vendors||[]).indexOf(v)+1).padStart(2,'0')):'';
   return '<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>'+esc(r.no)+'</title><style>'
     +'body{margin:0;font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;color:#111;font-size:11.5px}'
     +'.page-wrap{width:190mm;margin:0 auto}'
@@ -37260,11 +37240,10 @@ function _rfqDocHtml(q,r,v){
     +'table{width:100%;border-collapse:collapse;margin-top:8px}.meta td{padding:3px 6px;border:1px solid #bbb;font-size:11px}.meta td.l{background:#eef3ee;font-weight:700;width:16%;white-space:nowrap}'
     +'th{background:#1a6b3f;color:#fff;padding:6px 5px;font-size:11px;font-weight:700}td{border:1px solid #999;padding:6px 5px;vertical-align:middle}td.c{text-align:center}td.r{text-align:right;font-variant-numeric:tabular-nums}td.blank{background:#fffdf0}tfoot td{font-weight:700;background:#f4f4f4}'
     +'.cond{margin-top:8px;font-size:10.5px;line-height:1.7}.cond b{color:#1a6b3f}.cond ol{margin:2px 0 0;padding-left:18px}.cond li{margin:0}'
-    +'.box{border:1px solid #999;padding:8px 10px;font-size:11px;margin-top:10px}.box .t{font-weight:700;color:#1a6b3f;margin-bottom:4px}'
-    +'.line{display:flex;gap:8px;margin:9px 0;align-items:flex-end}.line .k{white-space:nowrap;color:#444;padding-left:6px}.line .k:first-child{padding-left:0}.line .u{flex:1 1 60px;min-width:60px;border-bottom:1px solid #999;height:14px;font-size:11px}'
+    +'.vt{margin-top:12px}.vt caption{text-align:left;font-weight:700;color:#1a6b3f;font-size:11.5px;padding:0 0 4px}.vt td{border:1px solid #999;padding:0 8px;height:30px;font-size:11px}.vt td.k{background:#eef3ee;font-weight:700;width:13%;white-space:nowrap;text-align:center}.vt td.sig{height:46px}'
     +'</style></head><body><div class="page-wrap">'
     +'<div class="hd"><div class="co">'+esc(P.company||'豐有工程有限公司')+'<small>'+esc(P.addr||'')+'　TEL '+esc(P.tel||'')+(P.taxid?('　統編 '+esc(P.taxid)):'')+'</small></div>'
-    +'<div><h1>分項工程詢價單</h1><div class="no">詢價單號 '+esc(r.no)+vendorNo+'　　詢價日期 '+esc(r.date||'')+'</div></div></div>'
+    +'<div><h1>分項工程詢價單</h1><div class="no">詢價單號 '+esc(r.no)+'　　詢價日期 '+esc(r.date||'')+'</div></div></div>'
     +'<table class="meta"><tr><td class="l">工程名稱</td><td colspan="3">'+esc(q.name||'')+'</td></tr>'
     +'<tr><td class="l">工程地點</td><td>'+esc(q.loc||'')+'</td><td class="l">預定進場</td><td>'+esc(r.entry||'依業主通知')+'</td></tr>'
     +'<tr><td class="l">詢價範圍</td><td>'+esc(r.scope||'')+'</td><td class="l">回覆期限</td><td>'+esc(r.deadline||'')+'</td></tr>'
@@ -37272,24 +37251,26 @@ function _rfqDocHtml(q,r,v){
     +'<table><thead><tr><th style="width:6%">項次</th><th>工項說明</th><th style="width:7%">單位</th><th style="width:10%">預估數量</th><th style="width:13%">單價（未稅）</th><th style="width:14%">複價</th><th style="width:18%">廠商備註</th></tr></thead>'
     +'<tbody>'+rows+'</tbody><tfoot><tr><td colspan="5" class="r">合計（未稅）</td><td class="blank"></td><td></td></tr></tfoot></table>'
     +'<div class="cond"><b>詢價條件</b>（請依下列條件報價，若有不同請於備註註明）<ol>'+lines.map(function(t){return '<li>'+esc(t)+'</li>';}).join('')+'</ol></div>'
-    +'<div class="box"><div class="t">廠商報價欄（請填寫後回傳）</div>'
-    +'<div class="line"><span class="k">公司名稱</span><span class="u">'+esc(v?v.name:'')+'</span><span class="k">統一編號</span><span class="u" style="flex:0 0 130px"></span></div>'
-    +'<div class="line"><span class="k">聯絡人</span><span class="u">'+esc(v?(v.contact||''):'')+'</span><span class="k">電話</span><span class="u" style="flex:0 0 170px">'+esc(v?(v.tel||''):'')+'</span></div>'
-    +'<div class="line"><span class="k">報價日期</span><span class="u" style="flex:0 0 150px"></span><span class="k">簽章</span><span class="u"></span></div></div>'
+    +'<table class="vt"><caption>廠商報價欄（請填寫後回傳）</caption>'
+    +'<tr><td class="k">公司名稱</td><td style="width:37%"></td><td class="k">統一編號</td><td></td></tr>'
+    +'<tr><td class="k">聯絡人</td><td></td><td class="k">電話</td><td></td></tr>'
+    +'<tr><td class="k">報價日期</td><td></td><td class="k">簽章</td><td class="sig"></td></tr></table>'
     +'</div></body></html>';
 }
-function rfqPrint(rid,vi){
+function rfqPrint(rid){
   var q=_rfqQ();if(!q)return;var r=_rfqs(q).find(function(x){return x.id===rid;});if(!r)return;
-  var v=(vi!=null&&r.vendors[vi])?r.vendors[vi]:null;
-  _printViaIframe(_rfqDocHtml(q,r,v),r.no+(v?('_'+v.name):'')+'_詢價單');
+  _printViaIframe(_rfqDocHtml(q,r),r.no+'_詢價單');
 }
 // ── 填入廠商報價／議價 ──
 var _rfqFillCtx=null;
 function rfqFill(rid,vi){
-  var q=_rfqQ();if(!q)return;var r=_rfqs(q).find(function(x){return x.id===rid;});if(!r)return;var v=r.vendors[vi];if(!v)return;
-  _rfqFillCtx={rid:rid,vi:vi};
+  var q=_rfqQ();if(!q)return;var r=_rfqs(q).find(function(x){return x.id===rid;});if(!r)return;
+  var isNew=!(vi>=0&&r.vendors[vi]);var v=isNew?{name:'',contact:'',tel:'',recv:'',prices:{},neg:{},note:'',status:'sent'}:r.vendors[vi];
+  _rfqFillCtx={rid:rid,vi:isNew?-1:vi};
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
-  var html='<div class="fg fg3" style="gap:8px"><div class="f"><label>收到日期</label><input id="rf-recv" type="date" value="'+esc(v.recv||localToday())+'" style="'+IN+'"></div>'
+  var html='<div class="fg fg2" style="gap:8px"><div class="f"><label>廠商名稱</label><input id="rf-name" list="rf-vdl" value="'+esc(v.name||'')+'" placeholder="輸入或從名冊選" oninput="_rfVendorPick(this.value)" style="'+IN+'"'+(isNew?'':' readonly')+'><datalist id="rf-vdl">'+(VENDORS||[]).map(function(x){return '<option value="'+esc(x.name||'')+'">';}).join('')+'</datalist></div>'
+    +'<div class="f"><label>收到日期</label><input id="rf-recv" type="date" value="'+esc(v.recv||localToday())+'" style="'+IN+'"></div></div>'
+    +'<div class="fg fg2" style="gap:8px">'
     +'<div class="f"><label>聯絡人</label><input id="rf-contact" value="'+esc(v.contact||'')+'" style="'+IN+'"></div><div class="f"><label>電話</label><input id="rf-tel" value="'+esc(v.tel||'')+'" style="'+IN+'"></div></div>'
     +'<div style="font-size:11.5px;color:var(--b3);margin:4px 0 6px">左欄填廠商請款單上的單價；議價後單價有變再填右欄（空＝照報價）。合計即時更新。</div>'
     +'<div id="rf-rows">'+(r.items||[]).map(function(it){var p=(v.prices||{})[it.idx],n=(v.neg||{})[it.idx];
@@ -37297,9 +37278,10 @@ function rfqFill(rid,vi){
         +'<div style="display:flex;gap:6px;align-items:center;margin-top:4px"><input class="rf-p" type="number" inputmode="decimal" step="any" placeholder="報價單價" value="'+(p!=null?p:'')+'" oninput="_rfRecalc()" style="flex:1;min-width:0;text-align:right;'+IN+'"><span style="font-size:11px;color:var(--b4)">議後</span><input class="rf-n" type="number" inputmode="decimal" step="any" placeholder="同報價" value="'+(n!=null?n:'')+'" oninput="_rfRecalc()" style="flex:1;min-width:0;text-align:right;'+IN+'"><b class="rf-amt" style="flex:0 0 84px;text-align:right;color:var(--g3);font-variant-numeric:tabular-nums">0</b></div></div>';}).join('')+'</div>'
     +'<div class="f"><label>備註（廠商條件差異、產能、機具）</label><input id="rf-note" value="'+esc(v.note||'')+'" style="'+IN+'"></div>'
     +'<div id="rf-tot" style="background:var(--b0);border-radius:var(--r8);padding:8px 10px;font-size:12.5px;line-height:1.8"></div>';
-  showConfirm('填入報價：'+esc(v.name)+'（'+esc(r.no)+'）',html,function(){_rfSave();},false,null,true);
+  showConfirm((isNew?'回傳廠商：':'修改報價：'+esc(v.name)+'　')+esc(r.no),html,function(){_rfSave();},false,null,true);
   _rfRecalc();
 }
+function _rfVendorPick(name){var vd=(VENDORS||[]).find(function(x){return (x.name||'')===String(name||'').trim();});if(!vd)return;var c=document.getElementById('rf-contact'),t=document.getElementById('rf-tel');if(c&&!c.value)c.value=vd.contact||'';if(t&&!t.value)t.value=vd.phone||'';}
 function _rfRecalc(){
   var tq=0,tn=0,n=0;
   document.querySelectorAll('.rf-row').forEach(function(el){var qty=parseFloat(el.getAttribute('data-qty'))||0,p=parseFloat(el.querySelector('.rf-p').value),nn=parseFloat(el.querySelector('.rf-n').value);
@@ -37307,13 +37289,20 @@ function _rfRecalc(){
   var t=document.getElementById('rf-tot');if(t)t.innerHTML='報價合計（未稅）<b style="float:right">NT$ '+fmt(Math.round(tq))+'</b><br>議價後合計<b style="float:right;color:var(--g3)">NT$ '+fmt(Math.round(tn))+'</b>'+(tq>tn?('<br><span style="color:#1565C0">議價省下 NT$ '+fmt(Math.round(tq-tn))+'（'+(tq?Math.round((tq-tn)/tq*1000)/10:0)+'%）</span>'):'');
 }
 function _rfSave(){
-  var q=_rfqQ();if(!q||!_rfqFillCtx)return;var r=_rfqs(q).find(function(x){return x.id===_rfqFillCtx.rid;});if(!r)return;var v=r.vendors[_rfqFillCtx.vi];if(!v)return;
+  var q=_rfqQ();if(!q||!_rfqFillCtx)return;var r=_rfqs(q).find(function(x){return x.id===_rfqFillCtx.rid;});if(!r)return;
+  var v;
+  if(_rfqFillCtx.vi<0){
+    var nm=(gv('rf-name')||'').trim();if(!nm){toast('請填廠商名稱');rfqFill(r.id,-1);return;}
+    if(!Array.isArray(r.vendors))r.vendors=[];
+    v=r.vendors.find(function(x){return x.name===nm;});
+    if(!v){v={name:nm,contact:'',tel:'',recv:'',prices:{},neg:{},note:'',status:'sent'};r.vendors.push(v);}
+  }else{v=r.vendors[_rfqFillCtx.vi];if(!v)return;}
   v.prices={};v.neg={};var any=false;
   document.querySelectorAll('.rf-row').forEach(function(el){var idx=parseInt(el.getAttribute('data-idx'));var p=el.querySelector('.rf-p').value,n=el.querySelector('.rf-n').value;if(p!=='' &&!isNaN(parseFloat(p))){v.prices[idx]=parseFloat(p);any=true;}if(n!==''&&!isNaN(parseFloat(n)))v.neg[idx]=parseFloat(n);});
   v.recv=gv('rf-recv')||'';v.contact=(gv('rf-contact')||'').trim();v.tel=(gv('rf-tel')||'').trim();v.note=(gv('rf-note')||'').trim();
   if(any&&v.status==='sent')v.status='quoted';if(!any&&v.status==='quoted')v.status='sent';
   r.mt=Date.now();_touch(q);try{persist();_immediateUpload();}catch(e){_err('_rfSave',e);}
-  _rfqFillCtx=null;renderRfq();toast('已記錄 '+v.name+' 的報價');
+  _rfqFillCtx=null;renderRfq();toast('已記錄 '+v.name+' 的回傳報價');
 }
 // ── 評估得標 → 建立分包合約（承包卡）──
 function rfqAward(rid){
