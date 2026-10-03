@@ -3269,7 +3269,7 @@ async function newPage(browser, width, height) {
         const lines=_rfqCondLines(r);
         out.cond=lines.length>=6&&/每月 25 日計價，次月 25 日放款（40% 匯款、60% 60 天票期）；保留款 5%/.test(lines[2])&&/報價有效期 30 天/.test(lines.join(''))&&!/開立發票/.test(lines.join(''));
         const html=_rfqDocHtml(q,r);
-        out.doc=/分項工程詢價單/.test(html)&&/RFQ-1150928-01　/.test(html)&&!/鴻玉/.test(html)&&/<ol>/.test(html)&&/class="vt"/.test(html)&&/統一編號/.test(html)&&!/本詢價單由/.test(html)&&!/豐有內部使用/.test(html)&&(html.match(/class="blank"/g)||[]).length===7;
+        out.doc=/分項工程詢價單/.test(html)&&/RFQ-1150928-01　/.test(html)&&!/鴻玉/.test(html)&&/<ol>/.test(html)&&/class="vt"/.test(html)&&/統一編號/.test(html)&&!/本詢價單由/.test(html)&&!/豐有內部使用/.test(html)&&(html.match(/class="blank"/g)||[]).length===9&&/營業稅 5%/.test(html)&&/總計（含稅）/.test(html)&&/class="k sig"/.test(html);
         rfqPrint(r.id);out.prev=!!document.getElementById('_fy_print_overlay');['_fy_print_frame','_fy_print_overlay'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
         // 填價：鴻玉 550/150、大成 600/160（議後 560）、風哥未回
         // 回傳廠商：名冊內的自動帶聯絡人；名冊外的手打
