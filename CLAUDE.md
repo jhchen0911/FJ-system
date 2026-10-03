@@ -33,6 +33,15 @@
    逐列卡片：`_mstack()` 會自動處理工具頁根節點下有 thead 的表（加 `.mst`＋`data-th`），
    新工具頁把根節點 id 加進 `_mstack` 的觀察清單即可；例外只有甘特圖等時間軸類圖表
 
+## 大改造（v6）進行方式（2026-10-03 起）
+
+- **正式版不動**：`main` 的 `index.html` 維持 v5.448（備份分支 `stable-v5.448`）。大改造全部在分支 `redesign-v6` 進行，`APP_VERSION` 為 `v6.0.N-beta`。
+- **測試版 `beta.html`**：由 `python3 tools/build-beta.py index.html beta.html` 從 redesign-v6 的 index.html 產生，
+  只把這一個檔案放到 `main`（網址 `…/FJ-system/beta.html`）。沙盒：localStorage 鍵全走 `beta:` 前綴（第一次開啟從正式版複製一份）、
+  所有上傳雲端函式改空操作（可登入、可拉雲端，不會推回去）、左下角橙色「β 測試版」chip 可一鍵重新複製。
+- 使用者在 beta 驗過的區塊才合併回 main 成為正式版；每個區塊：改 redesign-v6 → 跑 smoke → build beta → 只推 beta.html 到 main。
+- v6 新架構（盤點已確認）：報價（含議價、案場細節、詢價單回填）／工程專案一頁式／發包（分項詢價→比價→得標或點工，`rfq.js` 區塊：`renderRfq` `rfqNew` `rfqFill` `rfqAward` `rfqLabor`，資料 `q.rfqs` 走 private）／日報．支出／計價（業主＋廠商）／帳務（應收應付、零用金、薪資）／報表（內部＋股東版）。施工成本改為工程專案內的統計分頁；材料管理併入發包的材料採購；施工進度併入工程專案（預定＋實際雙層）。
+
 ## 雲端工作階段（claude.ai/code、手機 App）額外規則
 
 部署＝push 到 `main` 後 GitHub Pages 自動上線（約 1 分鐘）。
