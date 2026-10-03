@@ -3481,10 +3481,13 @@ async function newPage(browser, width, height) {
           dailyLogs:[{id:'d',date:'2026-10-01',workers:1,crews:[],progressRows:[{itemIdx:0,desc:'H型鋼樁 打設',qty:30,note:''}],progress:'',photos:[]}]}];
         go('invoice');invTab('vendor');
         const ok=document.documentElement.scrollWidth<=window.innerWidth+1&&document.getElementById('vb-root').scrollWidth<=window.innerWidth+1;
-        const out={ok:ok,sw:document.documentElement.scrollWidth,iw:window.innerWidth,rows:document.querySelectorAll('#vb-root table').length};
+        const td=document.querySelector('#vb-root table.mst tbody td[data-th]:not(:first-child)');
+        const cs=td?getComputedStyle(td):null;
+        const line=!!cs&&cs.display==='flex'&&cs.flexDirection==='row'&&!!document.querySelector('#vb-root table.mst-ln')&&!!document.querySelector('#vb-root table.mst tfoot td[data-th]');
+        const out={ok:ok,line:line,sw:document.documentElement.scrollWidth,iw:window.innerWidth,rows:document.querySelectorAll('#vb-root table').length};
         Q=Q.filter(x=>x.id!=='qM');invTab('owner');return out;
     });
-    check('計價頁手機版：廠商請款表格堆疊、無橫向捲動', mob.ok && mob.rows >= 2, JSON.stringify(mob));
+    check('計價頁手機版：廠商請款表格堆疊成一行一行（欄名｜值、合計列亦同）、無橫向捲動', mob.ok && mob.line && mob.rows >= 2, JSON.stringify(mob));
     check('v6 計價頁測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
