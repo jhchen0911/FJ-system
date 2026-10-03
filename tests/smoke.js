@@ -51,7 +51,7 @@ async function newPage(browser, width, height) {
       pages.forEach(id => { try { go(id); } catch (e) { bad.push(id + ': ' + e.message); } });
       return { version: APP_VERSION, pageCount: pages.length, bad };
     });
-    check('版本號存在且為 v5.x', /^v5\.\d+$/.test(info.version), info.version);
+    check('版本號存在（v5.x 或 v6.x-beta）', /^v(5\.\d+|6\.\d+\.\d+(-beta)?)$/.test(info.version), info.version);
     check('23 個頁面全部可切換', info.pageCount >= 23 && info.bad.length === 0, info.bad.join('; '));
     check('載入與切頁無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
@@ -3238,6 +3238,84 @@ async function newPage(browser, width, height) {
     check('信封：郵遞區號逐格、直書中欄與寄件人、寄送方式打勾、列印不含框線', r.zip && r.szip && r.check && r.noFrames && r.text);
     check('信封：原生列印自訂紙張 120×235／105×220、校正與框線記憶、郵遞區號回寫客戶、無收件人擋下', r.print && r.saved && r.cust && r.fromCust && r.k15 && r.guard && r.btnEdit && r.legacyFont && r.fontUI);
     check('v5.447 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6 發包：分項詢價單→廠商回填比價→議價→得標／改點工 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+        const out={};
+        P.vendorPayDay=25;P.vendorPayDelay=1;P.vendorCutDay=25;P.subPayOnBill=true;P.contact='陳茹軒';P.tel='0989-023-760';P.company='豐有工程有限公司';
+        VENDORS.length=0;VENDORS.push({id:'v1',name:'鴻玉開發工程行',type:'承包',contact:'鴻哥',phone:'0911-111-111'},{id:'v2',name:'大成基礎',type:'承包',contact:'大成',phone:'0922-222-222'});
+        Q=[{id:'qR',code:'1150928',name:'中科台積電F25P3',client:'八九企業',loc:'臺中市大雅區',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,
+          items:[{desc:'H型鋼樁 H400 L=13M 打設',unit:'支',qty:'408',price:'86300',sec:false},{desc:'H型鋼樁 H400 L=13M 拔除',unit:'支',qty:'408',price:'20000',sec:false},{desc:'備用：止水鈑',unit:'片',qty:'10',price:'500',spare:true}],costs:[],dailyLogs:[]}];
+        PAYABLES.length=0;eid='qR';_rfqQid='';
+        go('rfq');
+        const root=document.getElementById('rfq-root');
+        out.page=!!root&&/新增詢價單/.test(root.innerHTML)&&/中科台積電/.test(root.innerHTML);
+        // 新增詢價單：工項勾選（備用單價不列）、數量帶合約、條件
+        rfqNew();
+        const m=document.getElementById('gen-confirm-modal');
+        out.form=m.style.display!=='none'&&document.querySelectorAll('.rfq-it').length===2&&document.querySelectorAll('.rfq-qty')[0].value==='408'&&document.getElementById('rfq-cash').value==='50'&&/RFQ-1150928-01/.test(m.innerHTML);
+        document.querySelectorAll('.rfq-it').forEach(cb=>cb.checked=true);document.querySelectorAll('.rfq-qty')[1].value='400';
+        document.getElementById('rfq-scope').value='H型鋼樁打設、拔除';document.getElementById('rfq-deadline').value='2026-10-10';document.getElementById('rfq-entry').value='2026-11-01';
+        document.getElementById('rfq-cash').value='40';document.getElementById('rfq-cash').dispatchEvent(new Event('input'));out.cashLink=document.getElementById('rfq-ticket').value==='60';
+        document.getElementById('rfq-tdays').value='60';document.getElementById('rfq-ret').value='5';
+        document.querySelectorAll('.rfq-v').forEach(cb=>cb.checked=true);document.getElementById('rfq-vnew').value='風哥工程, 鴻玉開發工程行';
+        document.getElementById('gen-confirm-ok').click();
+        const q=Q[0],r=(q.rfqs||[])[0];
+        out.saved=!!r&&r.no==='RFQ-1150928-01'&&r.items.length===2&&r.items[1].qty===400&&r.vendors.length===3&&r.vendors[0].tel==='0911-111-111'&&r.cond.cashPct===40&&r.cond.ticketPct===60&&r.status==='open';
+        // 條件條列：計價方式句含放款拆分與保留款；PDF 走預覽、含廠商名、無頁尾字
+        const lines=_rfqCondLines(r);
+        out.cond=lines.length>=6&&/每月 25 日計價，次月 25 日放款（40% 匯款、60% 60 天票期）；保留款 5%/.test(lines[2])&&/報價有效期 30 天/.test(lines.join(''))&&!/開立發票/.test(lines.join(''));
+        const html=_rfqDocHtml(q,r,r.vendors[1]);
+        out.doc=/分項工程詢價單/.test(html)&&/RFQ-1150928-01 \/ 02/.test(html)&&/大成基礎/.test(html)&&/<ol>/.test(html)&&!/本詢價單由/.test(html)&&!/豐有內部使用/.test(html)&&(html.match(/class="blank"/g)||[]).length===7;
+        rfqPrint(r.id,0);out.prev=!!document.getElementById('_fy_print_overlay');['_fy_print_frame','_fy_print_overlay'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
+        // 填價：鴻玉 550/150、大成 600/160（議後 560）、風哥未回
+        rfqFill(r.id,0);document.querySelectorAll('.rf-p')[0].value='550';document.querySelectorAll('.rf-p')[1].value='150';_rfRecalc();
+        out.fillTot=/報價合計[\s\S]*NT\$ 284,400/.test(document.getElementById('rf-tot').innerHTML);
+        document.getElementById('gen-confirm-ok').click();
+        rfqFill(r.id,1);document.querySelectorAll('.rf-p')[0].value='600';document.querySelectorAll('.rf-p')[1].value='160';document.querySelectorAll('.rf-n')[0].value='560';_rfRecalc();
+        out.negTxt=/議價省下 NT\$ 16,320/.test(document.getElementById('rf-tot').innerHTML);
+        document.getElementById('gen-confirm-ok').click();
+        out.status=r.vendors[0].status==='quoted'&&r.vendors[1].status==='quoted'&&r.vendors[2].status==='sent'&&r.vendors[1].neg[0]===560;
+        // 比價表：最低價標綠、議後劃掉原價、合計
+        renderRfq();const h=root.innerHTML;
+        out.compare=/比價中/.test(h)&&/284,400/.test(h)&&/292,480/.test(h)&&/line-through/.test(h)&&/#E8F5E9/.test(h);
+        // 得標：預選最低（鴻玉），需原因；建立承包卡、應付不立即掛（未計價）、其餘未得標、廠商名冊補建風哥不會（風哥未得標）
+        rfqAward(r.id);
+        out.awardPre=document.querySelector('input[name="rfq-win"]:checked').value==='0'&&!/風哥/.test(m.innerHTML);
+        document.getElementById('gen-confirm-ok').click();out.needReason=r.status==='open';
+        document.getElementById('gen-confirm-reason')||0;
+        const el=document.querySelector('input[name="rfq-win"][value="0"]');if(el)el.checked=true;document.getElementById('rfq-reason').value='最低價且可配合 11/1 進場';document.getElementById('rfq-entry2').value='2026-11-01';
+        document.getElementById('gen-confirm-ok').click();
+        const c=q.costs.find(x=>x.rfqId===r.id);
+        out.award=r.status==='awarded'&&r.award.vendor==='鴻玉開發工程行'&&!!c&&c.type==='sub'&&c.vendor==='鴻玉開發工程行'&&c.rows.length===2&&c.rows[0].linkedItemIdx===0&&c.rows[0].qty===408&&c.rows[0].unitPrice===550&&c.rows[1].unitPrice===150&&c.amt===284400&&c.retRate===5&&c.entryDate==='2026-11-01'&&c.payTerm.ticketDays===60;
+        out.others=r.vendors[0].status==='won'&&r.vendors[1].status==='lost'&&r.vendors[2].status==='lost'&&!PAYABLES.some(p=>p.costId===c.id);
+        renderRfq();out.doneUi=/已發包：鴻玉開發工程行/.test(root.innerHTML)&&/得標原因/.test(root.innerHTML)&&!/rfqAward\(/.test(root.innerHTML);
+        // 日報提示帶工班聯絡資訊
+        const ci=_itemCrewInfo(q,0);out.crew=!!ci&&ci.name==='鴻玉開發工程行'&&ci.contact==='鴻哥'&&ci.tel==='0911-111-111';
+        // 第二張：改點工（需原因）→ 點工卡
+        rfqNew();document.querySelectorAll('.rfq-it')[1].checked=true;document.getElementById('rfq-scope').value='拔除';document.getElementById('gen-confirm-ok').click();
+        const r2=q.rfqs[1];out.no2=r2.no==='RFQ-1150928-02';
+        rfqLabor(r2.id);document.getElementById('rfq-lreason').value='報價皆超過預算';document.getElementById('gen-confirm-ok').click();
+        const lc=q.costs.find(x=>x.rfqId===r2.id);out.labor=r2.status==='labor'&&!!lc&&lc.type==='labor'&&lc.linkedItemIdx===1&&/報價皆超過預算/.test(lc.rows[0].reason);
+        // 已發包不能刪；private 抽離：shared 版本不含 rfqs，private 含
+        rfqDel(r.id);out.delGuard=q.rfqs.length===2&&m.style.display==='none';
+        out.strip=!JSON.stringify(_stripQuoteSens(q)).includes('rfqs')&&Array.isArray(_extractQuoteSens(q).rfqs)&&_extractQuoteSens(q).rfqs.length===2;
+        const q2={id:'qR',items:q.items};_applyQuoteSens(q2,_extractQuoteSens(q),false);out.apply=Array.isArray(q2.rfqs)&&q2.rfqs.length===2;
+        // 專案卡入口
+        go('projects');out.card=/go\('rfq'\)/.test(document.getElementById('projects-list').innerHTML);
+        Q=Q.filter(x=>x.id!=='qR');VENDORS.length=0;_rfqQid='';
+        return out;
+    });
+    check('發包：新增詢價單（合約工項勾選、數量帶生效量、備用不列、付款條件、多家廠商）', r.page && r.form && r.cashLink && r.saved);
+    check('發包：詢價單 PDF（條件條列、每家一張帶廠商名、單價留白、無內部欄與頁尾）', r.cond && r.doc && r.prev);
+    check('發包：填價／議價合計、比價表最低價標示、議後劃掉原價', r.fillTot && r.negTxt && r.status && r.compare);
+    check('發包：得標需原因→建立分包合約（單價＝議後價、保留款、進場日、付款條件）、其餘未得標、未計價不掛應付', r.awardPre && r.needReason && r.award && r.others && r.doneUi && r.crew);
+    check('發包：改點工建立點工卡；已發包不可刪；rfqs 走 private；專案卡入口', r.no2 && r.labor && r.delGuard && r.strip && r.apply && r.card);
+    check('v6 發包測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
