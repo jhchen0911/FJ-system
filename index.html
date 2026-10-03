@@ -2759,7 +2759,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.3-beta';
+var APP_VERSION='v6.0.4-beta';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -37098,11 +37098,9 @@ function _rfqCondLines(r){
   var split=[];if(c.cashPct>0)split.push(c.cashPct+'% 匯款');if(c.ticketPct>0)split.push(c.ticketPct+'% '+c.ticketDays+' 天票期');
   if(split.length)pay+='（'+split.join('、')+'）';
   pay+='；'+(c.ret>0?('保留款 '+c.ret+'%，完工驗收後退還。'):'無保留款。');
-  var out=[];var ex=(c.extra||[]).slice();
-  out.push(ex[0]||_RFQ_EXTRA_DEF[0]);out.push(ex[1]||_RFQ_EXTRA_DEF[1]);out.push('計價方式：'+pay);
-  ex.slice(2).forEach(function(t){if(t&&t.trim())out.push(t.trim());});
-  if(c.valid>0)out.splice(Math.min(4,out.length),0,'報價有效期 '+c.valid+' 天。');
-  return out;
+  var ex=(c.extra||[]).map(function(t){return String(t||'').trim();}).filter(Boolean);
+  var out=ex.slice(0,2);out.push('計價方式：'+pay);if(c.valid>0)out.push('報價有效期 '+c.valid+' 天。');
+  return out.concat(ex.slice(2));
 }
 function _rfqVendorTotal(r,v,useNeg){
   var t=0,n=0;(r.items||[]).forEach(function(it){var p=null;if(useNeg&&v.neg&&v.neg[it.idx]!=null&&v.neg[it.idx]!=='')p=parseFloat(v.neg[it.idx]);else if(v.prices&&v.prices[it.idx]!=null&&v.prices[it.idx]!=='')p=parseFloat(v.prices[it.idx]);if(p==null||isNaN(p))return;t+=p*(parseFloat(it.qty)||0);n++;});
@@ -37187,27 +37185,45 @@ function rfqEdit(rid){
       +'<span style="flex:1;min-width:0"><span style="display:block;line-height:1.4;word-break:break-word">'+esc((it.desc||'').split('\n')[0])+'</span>'
       +'<span style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:var(--b4);white-space:nowrap">預估數量</span><input type="number" inputmode="decimal" step="any" class="rfq-qty" value="'+qty+'" style="'+IN+';flex:0 0 110px;width:110px;text-align:right;padding:6px 8px"><span style="font-size:11px;color:var(--b4)">'+esc(_uFix(it.unit||''))+'</span></span></span></label>';}).join('');
   var html='<div class="fg fg2" style="gap:8px">'
-    +'<div class="f"><label>詢價範圍（標題）</label><input id="rfq-scope" value="'+esc(r?r.scope||'':'')+'" placeholder="例：H型鋼樁打設、拔除（含引孔）" style="'+IN+'"></div>'
+    +'<div class="f"><label>詢價範圍</label><input id="rfq-scope" value="'+esc(r?r.scope||'':'')+'" placeholder="例：H型鋼樁打設、拔除（含引孔）" style="'+IN+'"></div>'
     +'<div class="f"><label>回覆期限</label><input id="rfq-deadline" type="date" value="'+esc(r?r.deadline||'':d7)+'" style="'+IN+'"></div>'
     +'<div class="f"><label>預定進場</label><input id="rfq-entry" type="date" value="'+esc(r?r.entry||'':'')+'" style="'+IN+'"></div>'
     +'<div class="f"><label>我方聯絡人／電話</label><div style="display:flex;gap:4px"><input id="rfq-contact" value="'+esc(r?r.contact||'':(P.contact||''))+'" style="'+IN+'"><input id="rfq-tel" value="'+esc(r?r.tel||'':(P.tel||''))+'" style="'+IN+'"></div></div>'
     +'</div>'
-    +'<div style="font-size:12px;font-weight:700;color:var(--g3);margin:8px 0 4px">詢價工項（數量取自合約生效量，可改）</div>'+(itemsHtml||'<div style="font-size:12px;color:var(--b3)">此工程沒有可詢價的工項</div>')
+    +'<div style="font-size:12px;font-weight:700;color:var(--g3);margin:8px 0 4px">詢價工項</div>'+(itemsHtml||'<div style="font-size:12px;color:var(--b3)">此工程沒有可詢價的工項</div>')
     +'<div style="font-size:12px;font-weight:700;color:var(--g3);margin:10px 0 4px">付款條件</div>'
     +'<div class="fg fg3" style="gap:8px">'
     +'<div class="f"><label>匯款 %</label><input id="rfq-cash" type="number" min="0" max="100" value="'+c.cashPct+'" oninput="var t=document.getElementById(\'rfq-ticket\');if(t)t.value=Math.max(0,100-(parseFloat(this.value)||0))" style="'+IN+'"></div>'
     +'<div class="f"><label>票期 %／天數</label><div style="display:flex;gap:4px"><input id="rfq-ticket" type="number" min="0" max="100" value="'+c.ticketPct+'" style="'+IN+'"><input id="rfq-tdays" type="number" min="0" value="'+c.ticketDays+'" style="'+IN+'"></div></div>'
     +'<div class="f"><label>保留款 %／報價有效 天</label><div style="display:flex;gap:4px"><input id="rfq-ret" type="number" min="0" max="100" step="0.5" value="'+c.ret+'" style="'+IN+'"><input id="rfq-valid" type="number" min="0" value="'+c.valid+'" style="'+IN+'"></div></div>'
     +'</div>'
-    +'<div class="f" style="margin-top:4px"><label>其他條件（一行一條；計價方式與有效期由上方欄位自動產生）</label><textarea id="rfq-extra" rows="5" style="'+IN+';resize:vertical">'+esc((c.extra||[]).join('\n'))+'</textarea></div>'
+    +'<div style="font-size:12px;font-weight:700;color:var(--g3);margin:10px 0 4px">詢價條件</div><div id="rfq-conds">'+_rfqCondRowsHtml(c,IN)+'</div>'
+    +'<button type="button" class="btn btn-xs" onclick="_rfqCondAdd()" style="margin-top:4px">＋ 新增條件</button>'
 ;
   showConfirm((r?'編輯詢價單 ':'新增詢價單 ')+esc(r?r.no:_rfqNextNo(q)),html,function(){_rfqSave();},false,null,true);
+}
+function _rfqCondRowsHtml(c,IN){
+  var ex=(c.extra||[]).map(function(t){return String(t||'').trim();}).filter(Boolean);
+  var row=function(t){return '<div class="rfq-cond-row" style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><input class="rfq-cond" value="'+esc(t)+'" style="'+IN+';flex:1;min-width:0"><button type="button" onclick="this.parentNode.remove()" style="flex:0 0 32px;height:34px;border:1px solid #f0c4c4;color:var(--red);background:var(--w);border-radius:var(--r8);cursor:pointer">✕</button></div>';};
+  var auto=function(t){return '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><div style="'+IN+';flex:1;min-width:0;background:var(--b0);color:var(--b4);border-style:dashed">'+esc(t)+'</div><span style="flex:0 0 32px;text-align:center;font-size:10.5px;color:var(--b3)">自動</span></div>';};
+  var h=ex.slice(0,2).map(row).join('');
+  h+=auto('計價方式：依上方付款條件自動產生');
+  h+=auto('報價有效期：依上方天數自動產生');
+  h+=ex.slice(2).map(row).join('');
+  return h;
+}
+function _rfqCondAdd(){
+  var box=document.getElementById('rfq-conds');if(!box)return;
+  var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
+  var d=document.createElement('div');d.className='rfq-cond-row';d.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:4px';
+  d.innerHTML='<input class="rfq-cond" placeholder="輸入條件內容" style="'+IN+';flex:1;min-width:0"><button type="button" onclick="this.parentNode.remove()" style="flex:0 0 32px;height:34px;border:1px solid #f0c4c4;color:var(--red);background:var(--w);border-radius:var(--r8);cursor:pointer">✕</button>';
+  box.appendChild(d);var i=d.querySelector('input');if(i)i.focus();
 }
 function _rfqSave(){
   var q=_rfqQ();if(!q)return;
   var items=[];document.querySelectorAll('.rfq-it').forEach(function(cb){if(!cb.checked)return;var i=parseInt(cb.getAttribute('data-idx'));var it=q.items[i];if(!it)return;var qty=parseFloat(cb.parentNode.querySelector('.rfq-qty').value)||0;items.push({idx:i,desc:(it.desc||'').split('\n')[0],unit:_uFix(it.unit||''),qty:qty});});
   if(!items.length){toast('請至少勾選一個工項');return;}
-  var cond={cashPct:parseFloat(gv('rfq-cash'))||0,ticketPct:parseFloat(gv('rfq-ticket'))||0,ticketDays:parseInt(gv('rfq-tdays'))||0,ret:parseFloat(gv('rfq-ret'))||0,valid:parseInt(gv('rfq-valid'))||0,extra:String(gv('rfq-extra')||'').split('\n').map(function(s){return s.trim();}).filter(Boolean)};
+  var cond={cashPct:parseFloat(gv('rfq-cash'))||0,ticketPct:parseFloat(gv('rfq-ticket'))||0,ticketDays:parseInt(gv('rfq-tdays'))||0,ret:parseFloat(gv('rfq-ret'))||0,valid:parseInt(gv('rfq-valid'))||0,extra:Array.prototype.map.call(document.querySelectorAll('.rfq-cond'),function(i){return String(i.value||'').trim();}).filter(Boolean)};
   if(!Array.isArray(q.rfqs))q.rfqs=[];
   var r=_rfqEditId?q.rfqs.find(function(x){return x.id===_rfqEditId;}):null;
   if(!r){r={id:'rfq'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),no:_rfqNextNo(q),date:localToday(),vendors:[],status:'open',ts:Date.now()};q.rfqs.push(r);}

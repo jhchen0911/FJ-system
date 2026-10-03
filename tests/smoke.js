@@ -3262,12 +3262,13 @@ async function newPage(browser, width, height) {
         document.getElementById('rfq-scope').value='H型鋼樁打設、拔除';document.getElementById('rfq-deadline').value='2026-10-10';document.getElementById('rfq-entry').value='2026-11-01';
         document.getElementById('rfq-cash').value='40';document.getElementById('rfq-cash').dispatchEvent(new Event('input'));out.cashLink=document.getElementById('rfq-ticket').value==='60';
         document.getElementById('rfq-tdays').value='60';document.getElementById('rfq-ret').value='5';
+        out.condUi=document.querySelectorAll('.rfq-cond').length===5&&!/一行一條/.test(m.innerHTML)&&!/數量取自合約生效量/.test(m.innerHTML);_rfqCondAdd();document.querySelectorAll('.rfq-cond')[5].value='引孔泥漿處理費請另列。';document.querySelectorAll('.rfq-cond-row')[4].remove();
         document.getElementById('gen-confirm-ok').click();
         const q=Q[0],r=(q.rfqs||[])[0];
         out.saved=!!r&&r.no==='RFQ-1150928-01'&&r.items.length===2&&r.items[1].qty===400&&r.vendors.length===0&&!document.querySelector('.rfq-v')&&r.cond.cashPct===40&&r.cond.ticketPct===60&&r.status==='open';
         // 條件條列：計價方式句含放款拆分與保留款；PDF 走預覽、含廠商名、無頁尾字
         const lines=_rfqCondLines(r);
-        out.cond=lines.length>=6&&/每月 25 日計價，次月 25 日放款（40% 匯款、60% 60 天票期）；保留款 5%/.test(lines[2])&&/報價有效期 30 天/.test(lines.join(''))&&!/開立發票/.test(lines.join(''));
+        out.cond=lines.length===7&&r.cond.extra.length===5&&/每月 25 日計價，次月 25 日放款（40% 匯款、60% 60 天票期）；保留款 5%/.test(lines[2])&&/^報價有效期 30 天/.test(lines[3])&&lines[6]==='引孔泥漿處理費請另列。'&&!/開立發票/.test(lines.join(''));
         const html=_rfqDocHtml(q,r);
         out.doc=/分項工程詢價單/.test(html)&&/RFQ-1150928-01　/.test(html)&&!/鴻玉/.test(html)&&/<ol>/.test(html)&&/class="vt"/.test(html)&&/統一編號/.test(html)&&!/本詢價單由/.test(html)&&!/豐有內部使用/.test(html)&&(html.match(/class="blank"/g)||[]).length===9&&/營業稅 5%/.test(html)&&/總計（含稅）/.test(html)&&/class="k sig"/.test(html);
         rfqPrint(r.id);out.prev=!!document.getElementById('_fy_print_overlay');['_fy_print_frame','_fy_print_overlay'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
@@ -3314,7 +3315,7 @@ async function newPage(browser, width, height) {
         Q=Q.filter(x=>x.id!=='qR');VENDORS.length=0;_rfqQid='';
         return out;
     });
-    check('發包：新增詢價單（合約工項勾選、數量帶生效量、備用不列、付款條件；不預選廠商）', r.page && r.form && r.cashLink && r.saved);
+    check('發包：新增詢價單（合約工項勾選、數量帶生效量、備用不列、付款條件、條件逐列可增刪；不預選廠商）', r.page && r.form && r.cashLink && r.saved && r.condUi);
     check('發包：詢價單 PDF 統一格式（條件條列、廠商欄表格、單價留白、無內部欄與頁尾）', r.cond && r.doc && r.prev);
     check('發包：回傳廠商（名冊自動帶聯絡人、名冊外可手打、名稱必填）、填價／議價合計、比價表', r.newForm && r.pick && r.nameReq && r.fillTot && r.negTxt && r.status && r.compare);
     check('發包：得標需原因→建立分包合約（單價＝議後價、保留款、進場日、付款條件）、其餘未得標、未計價不掛應付', r.awardPre && r.needReason && r.award && r.others && r.doneUi && r.crew);
