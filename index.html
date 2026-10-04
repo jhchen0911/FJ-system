@@ -700,7 +700,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div class="ssec" style="margin-top:5px">財務流</div>
   <button type="button" class="snav" id="sn-acct" onclick="go('acct')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg></span>帳務</button>
   <button type="button" class="snav" id="sn-finance" onclick="go('finance')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>金流管理</button>
-  <button type="button" class="snav" id="sn-profit" onclick="go('profit')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>利潤．報表</button>
+  <button type="button" class="snav" id="sn-reports" onclick="go('reports')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>經營報表</button>
   <div class="ssec" style="margin-top:5px">資料與工具</div>
   <button type="button" class="snav" id="sn-intake" onclick="smartIntake()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
   <button type="button" class="snav" id="sn-contacts" onclick="go('contacts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>客戶．廠商</button>
@@ -1702,11 +1702,13 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <!-- ████ 報表頁 ████ -->
 <div class="page" id="page-reports">
   <div class="ph">
-    <div class="ph-l"><div class="ph-t">報表中心</div><div class="ph-s">月報・年報・往來明細</div></div>
+    <div class="ph-l"><div class="ph-t">經營報表</div><div class="ph-s">總覽・各案損益・年度／月報・業主／廠商／得標率・出工／人事・工程實績・股東版</div></div>
   </div>
   <div class="pad">
     <!-- 報表類型選擇：等寬格狀，尺寸統一 -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin-bottom:10px">
+      <button type="button" class="btn btn-sm rpt-tab" id="rpt-overview-btn" onclick="showReport('overview')"
+        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-trend"/></svg> 總覽</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-monthly-btn" onclick="showReport('monthly')"
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 月報表</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-yearly-btn" onclick="showReport('yearly')"
@@ -2805,7 +2807,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.16-beta';
+var APP_VERSION='v6.0.17-beta';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -3525,6 +3527,7 @@ function _updMobEditbar(p){
 function go(p){
   // v6 帳務：金流管理／帳務管理／薪資零用金 併成一頁，舊頁名一律轉到對應分頁
   if(p==='finance'||p==='ledger'||p==='payroll'){try{if(_acctMount()){_acctTab=({finance:'ar',ledger:'inv',payroll:'pay'})[p];p='acct';}}catch(e){_err('go.acct',e);}}
+  if(p==='profit'){p='reports';_currentReport='overview';}   // v6.0.17 利潤分析併入經營報表
   // 權限攔截（try/catch 保護避免 TDZ）
   try{
     // params/permissions 頁面：未登入可以進（需要從那裡登入）
@@ -3603,20 +3606,20 @@ function go(p){
   if(p==='invoice'){setTimeout(()=>{renderInvList();updateInvPageBanners();try{updateInvStats();}catch(e){_err('top',e);}try{invTab(_invTab);}catch(e){_err('top',e);}},10);}
   if(p==='invoice-edit'){rInvItems();rInvTots();}
   if(p==='invoice-prev')buildInvPreview();
-  if(['profit','reports','ledger'].includes(p)){
+  if(['reports'].includes(p)){
     try{
       var pgEl=document.getElementById('page-'+p);
       if(pgEl&&!pgEl.querySelector('.statnav')){
         var nv=document.createElement('div');
         nv.className='statnav';
         nv.style.cssText='display:flex;gap:8px;padding:14px 16px 10px;flex-wrap:wrap;justify-content:center';
-        nv.innerHTML=[['profit','利潤分析'],['reports','報表中心'],['acct','帳務']].map(function(x){
+        nv.innerHTML=[['reports','經營報表'],['acct','帳務']].map(function(x){
           return '<button type="button" onclick="go(\''+x[0]+'\')" style="font-family:inherit;font-size:12.5px;flex:1;max-width:130px;height:36px;padding:0 8px;border-radius:99px;border:1px solid '+(x[0]===p?'var(--g3)':'var(--b2)')+';background:'+(x[0]===p?'var(--g3)':'#fff')+';color:'+(x[0]===p?'#fff':'var(--b4)')+';cursor:pointer;font-weight:'+(x[0]===p?'700':'500')+'">'+x[1]+'</button>';
         }).join('');
         pgEl.insertBefore(nv,pgEl.firstChild);
       }else if(pgEl){
         pgEl.querySelectorAll('.statnav button').forEach(function(b){
-          var on=b.textContent==={'profit':'利潤分析','reports':'報表中心','acct':'帳務'}[p];
+          var on=b.textContent==={'reports':'經營報表','acct':'帳務'}[p];
           b.style.background=on?'var(--g3)':'#fff';b.style.color=on?'#fff':'var(--b4)';b.style.borderColor=on?'var(--g3)':'var(--b2)';
         });
       }
@@ -33466,7 +33469,7 @@ let _currentReport='monthly';
 
 function showReport(type){
   _currentReport=type;
-  ['monthly','yearly','client','contract','bidrate','vendor','labor','hr','track','shareholder','log'].forEach(t=>{
+  ['overview','monthly','yearly','client','contract','bidrate','vendor','labor','hr','track','shareholder','log'].forEach(t=>{
     const btn=document.getElementById('rpt-'+t+'-btn');
     if(btn){
       btn.style.background=t===type?'var(--g)':'';
@@ -33481,7 +33484,8 @@ function renderCurrentReport(){
   const el=document.getElementById('report-content');if(!el)return;
   const year=parseInt(document.getElementById('rpt-year')?.value)||new Date().getFullYear();
   const month=parseInt(document.getElementById('rpt-month')?.value)||0;
-  if(_currentReport==='monthly')renderMonthlyReport(el,year,month);
+  if(_currentReport==='overview')renderOverviewReport(el,year);   // v6.0.17 利潤分析＋口徑列
+  else if(_currentReport==='monthly')renderMonthlyReport(el,year,month);
   else if(_currentReport==='yearly')renderYearlyReport(el,year);
   else if(_currentReport==='client')renderClientReport(el,year,month);
   else if(_currentReport==='contract')renderContractReport(el,year);
@@ -34059,7 +34063,8 @@ function renderYearlyReport(el,year){
     const yCost=Q.reduce((a,q)=>a+(q.costs||[]).reduce((b,c)=>b+(((c.date||'').startsWith(String(y)))?(parseFloat(c.amt)||0):0),0),0);
     const yExp=(EXPENSES||[]).reduce((a,e)=>a+((e&&!e.costRef&&(e.date||'').startsWith(String(y)))?(parseFloat(e.amount!=null?e.amount:e.amt)||0):0),0);
     const actNet=Math.round(rAmt/_taxM()-yCost-yExp);
-    yearly.push({y,qAmt,iAmt,rAmt,pAmt,pAccrual,net:rAmt-pAmt,estNet:netQ,wonN,wonAmt,actNet});
+    let pretax=0;try{pretax=_shRptYear(y).pretax;}catch(e){_err('renderYearlyReport.pretax',e);}   // v6.0.17 權責口徑（與股東報表同）
+    yearly.push({y,qAmt,iAmt,rAmt,pAmt,pAccrual,net:rAmt-pAmt,estNet:netQ,wonN,wonAmt,actNet,pretax});
   }
   // Monthly breakdown for selected year
   const monthlyData=[];
@@ -34093,8 +34098,9 @@ function renderYearlyReport(el,year){
           <th style="padding:6px 8px;text-align:right">請款金額</th>
           <th style="padding:6px 8px;text-align:right">實收金額</th>
           <th style="padding:6px 8px;text-align:right">已付支出（現金）</th>
-          <th style="padding:6px 8px;text-align:right;font-weight:900">淨現金流</th>
-          <th style="padding:6px 8px;text-align:right">實際淨利</th>
+          <th style="padding:6px 8px;text-align:right;font-weight:900">淨現金流（現金口徑）</th>
+          <th style="padding:6px 8px;text-align:right" title="實收÷稅率 − 當年成本 − 當年費用（舊口徑，供對照）">淨利（實收基礎）</th>
+          <th style="padding:6px 8px;text-align:right;font-weight:900" title="請款未稅 − 施工成本 − 公司費用 − 人事（全站主口徑，與股東報表同）">稅前淨利（權責）</th>
         </tr></thead>
         <tbody>${yearly.map(r=>`<tr style="border-bottom:1px solid var(--b1);${r.y===year?'background:#f0f7f4;font-weight:700':''}">
           <td style="padding:6px 8px">${r.y}年${r.y===year?' ◀':''}  </td>
@@ -34105,7 +34111,8 @@ function renderYearlyReport(el,year){
           <td style="padding:6px 8px;text-align:right">${fmt(r.rAmt)}</td>
           <td style="padding:6px 8px;text-align:right;color:var(--red)">${fmt(r.pAmt)}</td>
           <td style="padding:6px 8px;text-align:right;font-weight:700;color:${r.net>=0?'var(--g3)':'var(--red)'}">NT$ ${fmt(r.net)}</td>
-          <td style="padding:6px 8px;text-align:right;font-weight:700;color:${r.actNet>=0?'var(--g3)':'var(--red)'}">${fmt(r.actNet)}</td>
+          <td style="padding:6px 8px;text-align:right;color:${r.actNet>=0?'var(--g3)':'var(--red)'}">${fmt(r.actNet)}</td>
+          <td style="padding:6px 8px;text-align:right;font-weight:900;color:${r.pretax>=0?'var(--g)':'var(--red)'}">${fmt(r.pretax)}</td>
         </tr>`).join('')}</tbody>
       </table>
     </div>
@@ -34390,6 +34397,7 @@ function renderContractReport(el,year){
 
 
 function exportCurrentReport(){
+  if(_currentReport==='overview'){exportShareholderPDF();return;}   // v6.0.17 總覽匯出＝股東版 PDF（同口徑）
   if(_currentReport==='shareholder'){exportShareholderPDF();return;}   // v6 股東報表 → A4 直式 PDF
   const year=parseInt(document.getElementById('rpt-year')?.value)||new Date().getFullYear();
   const month=parseInt(document.getElementById('rpt-month')?.value)||0;
@@ -34513,8 +34521,7 @@ function _goExtra(p){
   if(p==='finance'){updateFinanceKPIs();renderFinanceAR();switchFinanceTab('ar');}
   // v5.318：進利潤頁只初始化年度下拉，不再強制把報表重設回月報
   //（原本每次進頁都覆蓋使用者選的報表；且 reports 那行重複了一次）
-  if(p==='profit'){initReportYears();if(!window._currentReportInited){window._currentReportInited=true;showReport('monthly');}}
-  if(p==='reports'){initReportYears();showReport('monthly');}
+  if(p==='reports'){initReportYears();showReport(_currentReport||'overview');}   // v6.0.17 保留使用者上次選的報表，預設總覽
   if(p==='permissions'){initPermissionsPage();}
 }
 
@@ -35063,9 +35070,9 @@ const ALL_PAGES = [
   {id:'contracts', label:'合約管理',  icon:_pgIcon('contract'), grp:'main',  adminOnly:false, hidden:true, parent:'projects'}, // v5.294 併入專案總覽，導覽隱藏（頁面與資料保留）
   {id:'acct',      label:'帳務',      icon:_pgIcon('coins'),    grp:'fin',   adminOnly:false}, // v6 應收／應付／金流預測／保留款／費用發票／零用金／薪資／分潤 一頁多分頁
   {id:'finance',   label:'金流管理',  icon:_pgIcon('coins'),    grp:'fin',   adminOnly:false, hidden:true, parent:'acct'}, // v6 併入帳務
-  {id:'profit',    label:'利潤．報表',icon:_pgIcon('trend'),    grp:'fin',   adminOnly:false},
+  {id:'profit',    label:'利潤分析',  icon:_pgIcon('trend'),    grp:'fin',   adminOnly:false, hidden:true, parent:'reports'}, // v6.0.17 併入經營報表「總覽」分頁
   {id:'ledger',    label:'帳務管理',  icon:_pgIcon('wallet'),   grp:'fin',   adminOnly:false, hidden:true, parent:'acct'}, // v6 併入帳務「費用．發票」
-  {id:'reports',   label:'報表中心',  icon:_pgIcon('chart'),    grp:'fin',   adminOnly:false, hidden:true, parent:'profit'}, // 由「利潤．報表」頁內分頁進入
+  {id:'reports',   label:'經營報表',  icon:_pgIcon('trend'),    grp:'fin',   adminOnly:false}, // v6.0.17 總覽（利潤分析）／各案／年度／月報／業主／廠商／得標率／出工／人事／實績／股東版／操作記錄
   {id:'contacts',  label:'客戶．廠商',icon:_pgIcon('users'),    grp:'data',  adminOnly:false},
   {id:'progress',  label:'施工進度',  icon:_pgIcon('calendar'), grp:'data',  adminOnly:false, hidden:true, parent:'proj'}, // v6 併入工程專案（預定排程由專案頁「施工進度工具」進）；v5.347
   {id:'plan',      label:'施工計畫書',icon:_pgIcon('contract'), grp:'data',  adminOnly:false}, // v5.353 分項工程施工計畫書自動生成
@@ -38232,7 +38239,7 @@ function _shRptYear(year){
   var exp=0,expByCat={};(EXPENSES||[]).forEach(function(e){if(!e||e.costRef||(e.date||'').slice(0,4)!==Y)return;var a=parseFloat(e.amount!=null?e.amount:e.amt)||0;exp+=a;var k=e.cat||'其他';expByCat[k]=(expByCat[k]||0)+a;});
   var slips=(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]).filter(function(s){return s&&String(s.ym||'').slice(0,4)===Y;});
   var hr=slips.reduce(function(a,s){return a+(parseFloat(s.gross)||0)+(parseFloat(s.coCost)||0);},0),hrEst=false;
-  if(!slips.length){try{hr=_shareAutoCalc(Y).salary;hrEst=true;}catch(e){hr=0;}}
+  if(!slips.length){if(revTax>0||cost>0||exp>0){try{hr=_shareAutoCalc(Y).salary;hrEst=true;}catch(e){hr=0;}}else hr=0;}   // 無任何營運活動的年度不推估
   var revNet=Math.round((revTax+ret)/tm);
   var gross=revNet-cost,pretax=gross-exp-hr;
   var monthly=[];for(var m=1;m<=12;m++){var ms=Y+'-'+String(m).padStart(2,'0');
@@ -38415,7 +38422,7 @@ try{_prmMount();}catch(e){_err('prm.mount',e);}
 function _v6PermMigrate(){
   try{
     if(!_fbUser||!_fbUser.email||!_isSysUser(_fbUser.email))return false;
-    var p=_acct();if(p.__v6perm)return false;
+    var p=_acct();if(p.__v6perm&&p.__v6perm>=2)return false;   // 版本 2：含經營報表
     var changed=0;
     (p.__roles||[]).forEach(function(r){
       if(!r||r.sys||!r.pages)return;var pg=r.pages,c0=changed;
@@ -38423,9 +38430,10 @@ function _v6PermMigrate(){
       set('proj',pg.projects||pg.costs||pg.contracts||pg.progress);
       set('rfq',pg.materials||pg.costs||pg.projects);
       set('acct',pg.finance||pg.ledger);
+      set('reports',pg.profit||pg.reports);   // v6.0.17 經營報表
       if(changed>c0)_touch(r);
     });
-    p.__v6perm=Date.now();_acctSave(p);
+    p.__v6perm=2;_acctSave(p);
     return changed;
   }catch(e){_err('_v6PermMigrate',e);return false;}
 }
@@ -38454,6 +38462,35 @@ function _v6TodoItems(items){
         text:'自有材料在工地：'+(q.name||'')+' '+fmt(qty)+' 支，最久 '+days+' 天'+(days>=120?'（請確認是否該歸還）':''),sub:'攤提 NT$ '+fmt(amt)});
     });
   }catch(e){_err('_v6TodoItems.mat',e);}
+}
+// ══════════ v6.0.17 經營報表：利潤分析併入報表中心（總覽分頁）、口徑統一（權責為主、現金為輔）、共用年度篩選 ══════════
+// 權責口徑＝請款（未稅）− 施工成本 − 公司費用 − 人事（與股東報表 _shRptYear 同一函式）；現金口徑＝實收 − 實付（同年度損益的淨現金流）。
+function _rptCashYear(year){
+  var Y=String(year);
+  var recv=INV.reduce(function(a,i){return a+(((i.receivedDate||'').slice(0,4)===Y)?(parseFloat(i.received)||0):0);},0);
+  var paid=PAYABLES.filter(function(p){return p.status==='paid'&&String(p.paidDate||p.date||'').slice(0,4)===Y;}).reduce(function(a,p){return a+_payEff(p);},0);
+  return {recv:Math.round(recv),paid:Math.round(paid),net:Math.round(recv-paid)};
+}
+function _rptBasisStrip(year){
+  var d=null,c=null;try{d=_shRptYear(year);}catch(e){_err('_rptBasisStrip',e);}try{c=_rptCashYear(year);}catch(e){}
+  if(!d)return '';
+  var pct=function(v){return (Math.round(v*10)/10)+'%';};
+  return '<div style="padding:12px 14px 0"><div style="display:flex;gap:6px;flex-wrap:wrap;align-items:stretch">'
+    +_pjKpi(year+' 年稅前淨利（權責口徑）','NT$ '+fmt(d.pretax)+' <span style="font-size:11px">'+pct(d.netR)+'</span>',d.pretax>=0?'var(--g)':'var(--red)',"showReport('shareholder')")
+    +_pjKpi('營收（請款未稅）','NT$ '+fmt(d.revNet),'var(--g3)',"showReport('yearly')")
+    +_pjKpi('施工成本','NT$ '+fmt(d.cost),'#E65100',"showReport('yearly')")
+    +_pjKpi('公司費用＋人事','NT$ '+fmt(d.exp+d.hr),'#8a6d00',"showReport('shareholder')")
+    +(c?_pjKpi(year+' 年淨現金流（現金口徑）','NT$ '+fmt(c.net)+'<div style="font-size:10.5px;font-weight:400;color:var(--b4)">實收 '+fmt(c.recv)+' − 實付 '+fmt(c.paid)+'</div>',c.net>=0?'var(--b5)':'var(--red)',"showReport('yearly')"):'')
+    +'</div><div style="font-size:11px;color:var(--b4);margin-top:6px">口徑說明：全站以<b>權責</b>（請款未稅 − 施工成本 − 公司費用 − 人事）為主，股東報表、年度損益皆同此數；<b>現金口徑</b>（實收 − 實付）另列作資金參考。下方「各案淨利」為專案層級：已收款換算未稅 − 成本 − 管理費 − 獎金。</div></div>';
+}
+var _profBodyRef=null;
+function renderOverviewReport(el,year){
+  var pb=_profBodyRef||document.getElementById('profbody');
+  if(!pb){el.innerHTML='<div style="padding:20px;color:var(--b3)">利潤分析區塊不存在</div>';return;}
+  _profBodyRef=pb;
+  el.innerHTML=_rptBasisStrip(year);
+  el.appendChild(pb);pb.style.display='';
+  try{rProfit();}catch(e){_err('renderOverviewReport',e);el.insertAdjacentHTML('beforeend','<div style="padding:16px;color:var(--red)">利潤分析載入失敗：'+esc(e.message)+'</div>');}
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
@@ -40106,7 +40143,7 @@ function buildQuotePreviewFromPDF(){
   }
 }
 function exportCurrentReportExcel(){
-  if(_currentReport==='shareholder'){exportShareholderCSV();return;}   // v6
+  if(_currentReport==='shareholder'||_currentReport==='overview'){exportShareholderCSV();return;}   // v6
   const year=parseInt(document.getElementById('rpt-year')?.value)||new Date().getFullYear();
   const month=parseInt(document.getElementById('rpt-month')?.value)||0;
   let rows=[],headers=[],title='報表';

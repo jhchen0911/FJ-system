@@ -3730,6 +3730,56 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.17 經營報表：利潤分析併入總覽、口徑列（權責為主、現金為輔）、年度損益加權責欄、權限遷移 v2 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+          const out={};
+          const pg=id=>ALL_PAGES.find(p=>p.id===id)||{};
+          out.pages=!pg('reports').hidden&&pg('reports').label==='經營報表'&&pg('profit').hidden&&pg('profit').parent==='reports'&&!!document.getElementById('sn-reports')&&!document.getElementById('sn-profit');
+          P.tax=5;
+          Q=[{id:'qR',code:'1',name:'報表測試案',client:'業主A',date:'2026-03-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 打設',unit:'支',qty:'100',price:'10000',sec:false}],t:{sub:1000000,tax:50000,total:1050000},
+              costs:[{id:'c1',type:'sub',vendor:'甲',cat:'打設',date:'2026-04-01',amt:400000,rows:[{id:'r1',linkedItemIdx:0,qty:100,unitPrice:4000}]}]}];
+          INV.length=0;INV.push({id:'iR1',quoteId:'qR',project:'報表測試案',client:'業主A',periodNo:1,date:'2026-05-31',items:[],totals:{total:630000,sub:600000},retention:0,received:630000,receivedDate:'2026-06-30'});
+          PAYABLES.length=0;PAYABLES.push({id:'pR',quoteId:'qR',vendor:'甲',amount:100000,vat:false,status:'paid',date:'2026-07-01',paidDate:'2026-07-05'});
+          EXPENSES.length=0;EXPENSES.push({id:'E1',date:'2026-03-10',amount:20000,cat:'交際費',note:'禮盒'});PAYSLIPS.length=0;PAYSLIPS.push({id:'ps_a_2026-04',hrId:'a',ym:'2026-04',name:'王',gross:40000,coCost:5000,net:36000,status:'paid'});
+          // go('profit') → 經營報表 總覽
+          go('profit');
+          const ys=document.getElementById('rpt-year');if(ys&&![...ys.options].some(o=>o.value==='2026'))ys.insertAdjacentHTML('afterbegin','<option value="2026">2026</option>');ys.value='2026';showReport('overview');
+          const rc=document.getElementById('report-content');
+          out.redir=document.getElementById('page-reports').classList.contains('active')&&_currentReport==='overview'&&document.getElementById('rpt-overview-btn').style.background==='var(--g)';
+          out.overview=!!rc.querySelector('#profbody')&&/實際淨利（已收款案件）/.test(rc.innerHTML)&&/稅前淨利（權責口徑）/.test(rc.innerHTML)&&/135,000/.test(rc.innerHTML)&&/淨現金流（現金口徑）/.test(rc.innerHTML)&&/530,000/.test(rc.innerHTML)&&/口徑說明/.test(rc.innerHTML);
+          // 切到年度損益再切回總覽，利潤區塊仍在
+          showReport('yearly');
+          const yh=rc.innerHTML;
+          out.yearly=/稅前淨利（權責）/.test(yh)&&/淨現金流（現金口徑）/.test(yh)&&/淨利（實收基礎）/.test(yh)&&!rc.querySelector('#profbody')&&new RegExp('>135,000<').test(yh);
+          showReport('overview');out.back=!!rc.querySelector('#profbody')&&/實際淨利（已收款案件）/.test(rc.innerHTML);
+          // 頁內切換列：經營報表／帳務，無利潤分析
+          const sn=document.querySelector('#page-reports .statnav');out.statnav=!!sn&&/經營報表/.test(sn.textContent)&&/帳務/.test(sn.textContent)&&!/利潤分析/.test(sn.textContent);
+          // 總覽匯出＝股東版 PDF
+          let cap=null;const oP=window._printViaIframe;window._printViaIframe=function(html,fn,land){cap={html,fn,land};};exportCurrentReport();window._printViaIframe=oP;
+          out.pdf=!!cap&&/股東報表 2026 年度/.test(cap.html);
+          // 權限遷移 v2：profit → reports
+          const p=_acct();const keep=JSON.stringify({r:p.__roles,s:p.__staff,v:p.__v6perm});
+          p.__roles.push({id:'r617',name:'會計測試',enabled:true,pages:{profit:true,finance:true},_mt:1});p.__v6perm=1;_acctSave(p);
+          const oU=_fbUser,oT=window.toast;window.toast=function(){};_fbUser={email:BOOTSTRAP_DEV[0]};
+          const n=_v6PermMigrate();const r=_acct().__roles.find(x=>x.id==='r617');
+          out.perm=n>=2&&r.pages.reports===true&&r.pages.acct===true&&_acct().__v6perm===2&&_v6PermMigrate()===false;
+          const k=JSON.parse(keep);const p2=_acct();p2.__roles=k.r;p2.__staff=k.s;if(k.v)p2.__v6perm=k.v;else delete p2.__v6perm;_acctSave(p2);_fbUser=oU;window.toast=oT;
+          Q=[];INV.length=0;PAYABLES.length=0;EXPENSES.length=0;PAYSLIPS.length=0;
+          return out;
+    });
+    check('經營報表：reports 成為可見頁、利潤分析隱藏跟隨、go(profit) 轉到總覽、側欄與頁內切換列', r.pages && r.redir && r.statnav);
+    check('經營報表總覽：利潤分析區塊搬入＋口徑列（權責稅前淨利／營收／成本／費用人事／現金淨流）、切換後仍在', r.overview && r.back);
+    check('年度損益：新增「稅前淨利（權責）」欄與股東報表同數、現金欄標明口徑；總覽匯出＝股東版 PDF', r.yearly && r.pdf);
+    check('權限遷移 v2：profit → reports、旗標升到 2 後不重跑', r.perm);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mob = await page.evaluate(() => { Q=[{id:'qM7',code:'1',name:'手機報表案',client:'業主',date:'2026-03-01',awarded:true,exs:[],rmk:{},_mt:1,items:[],t:{total:1050000},costs:[]}]; go('reports'); showReport('overview'); const o={sw:document.documentElement.scrollWidth,iw:window.innerWidth}; showReport('yearly'); o.sw2=document.documentElement.scrollWidth; Q=[]; return o; });
+    check('手機：經營報表總覽／年度損益無橫向捲動', mob.sw <= mob.iw + 1 && mob.sw2 <= mob.iw + 1, JSON.stringify(mob));
+    check('v6.0.17 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
