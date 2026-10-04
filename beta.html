@@ -2830,7 +2830,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.17-beta';
+var APP_VERSION='v6.0.18-beta';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -4734,7 +4734,7 @@ function rItems(){
         // 成本單價（內部）＋毛利率（v5.298 自報價編輯移除顯示：成本由系統自動維護）
         const costRow=document.createElement('div');
         costRow.style.cssText='display:none';
-        const costInp=mkInput('number',it.estCost,'(內部，不印)','right');costInp.inputMode='decimal';
+        const costInp=mkInput('number',it.estCost,'(內部，不印)','right');costInp.inputMode='decimal';if(it.estCostSrc)costInp.title='成本單價來源：'+it.estCostSrc;   // v6.0.18
         const mgnBox=document.createElement('div');
         mgnBox.style.cssText='display:flex;align-items:flex-end;padding-bottom:7px;font-size:13px;font-weight:900';
         function updMgnM(){
@@ -4926,7 +4926,7 @@ function rItems(){
         }
         // 成本單價（內部）＋單項毛利率（v5.298 自報價編輯移除顯示：成本由得標回寫/UPA/歷史庫自動維護）
         const tdCost=mkTd('background:#fffdf5;display:none');
-        const costInp=mkTblInp('number',it.estCost,'成本','right');
+        const costInp=mkTblInp('number',it.estCost,'成本','right');if(it.estCostSrc)costInp.title='成本單價來源：'+it.estCostSrc;   // v6.0.18
         costInp.title='內部預估成本單價（未稅），不印在報價單上';
         const mgnSpan=document.createElement('div');
         mgnSpan.style.cssText='font-size:10px;text-align:right;font-weight:700;line-height:1.3;min-height:12px';
@@ -37206,7 +37206,7 @@ function _rfqCardHtml(q,r){
     +'<button type="button" class="btn btn-xs btn-r" onclick="rfqDel(\''+r.id+'\')">刪除</button>'
     +'</span></div>'
     +(r.scope?'<div style="font-size:12.5px;margin-top:4px">詢價範圍：'+esc(r.scope)+'</div>':'')
-    +(r.award&&r.award.reason?'<div style="font-size:12px;color:'+stClr+';margin-top:4px">'+(r.status==='labor'?'改點工原因：':'得標原因：')+esc(r.award.reason)+'</div>':'');
+    +(r.award&&r.award.reason?'<div style="font-size:12px;color:'+stClr+';margin-top:4px">'+(r.status==='labor'?'改點工原因：':'得標原因：')+esc(r.award.reason)+(r.award.backfilled?'　<span style="font-size:11px;color:var(--b4)">✓ 已回填 '+r.award.backfilled+' 個工項成本單價</span>':'')+'</div>':'');
   var vh='';
   if(!vendors.length)vh='<div style="font-size:12px;color:var(--b3);margin-top:8px">尚無廠商回傳。先按「詢價單 PDF」匯出傳給廠商；收到回傳後按「＋ 回傳廠商」填入廠商資訊與單價</div>';
   else if(mob){
@@ -37399,6 +37399,7 @@ function rfqAward(rid){
   var html='<div style="font-size:12px;color:var(--b4);margin-bottom:6px">選擇得標廠商並說明原因（價格、產能、配合度、品質…）。確認後自動建立分包合約（施工成本承包卡），其餘廠商標為未得標。</div>'
     +cands.map(function(v){var t=_rfqVendorTotal(r,v,true),i=r.vendors.indexOf(v);return '<label style="display:flex;gap:8px;align-items:center;border:1px solid var(--b1);border-radius:var(--r8);padding:8px 10px;margin-bottom:5px;cursor:pointer"><input type="radio" name="rfq-win" value="'+i+'"'+(t.total===minT?' checked':'')+' style="width:16px;height:16px"><span style="flex:1"><b>'+esc(v.name)+'</b>'+(v.note?'<div style="font-size:11px;color:var(--b4)">'+esc(v.note)+'</div>':'')+'</span><b style="font-variant-numeric:tabular-nums;color:'+(t.total===minT?'#1B5E20':'var(--b5)')+'">NT$ '+fmt(t.total)+'</b>'+(t.full?'':'<span style="font-size:10.5px;color:#b26a00">未填齊</span>')+'</label>';}).join('')
     +'<div class="fg fg2" style="gap:8px;margin-top:6px"><div class="f"><label>簽約日</label><input id="rfq-sign" type="date" value="'+localToday()+'" style="'+IN+'"></div><div class="f"><label>進場日</label><input id="rfq-entry2" type="date" value="'+esc(r.entry||'')+'" style="'+IN+'"></div></div>'
+    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin:4px 0 8px"><input type="checkbox" id="rfq-backfill" checked style="width:16px;height:16px"> 得標單價回填報價工項的成本單價（更新預估淨利；原值會被覆蓋）</label>'
     +'<div class="f"><label>得標原因</label><textarea id="rfq-reason" rows="2" placeholder="例：最低價且可配合 11/1 進場、兩台打樁機" style="'+IN+';resize:vertical"></textarea></div>';
   showConfirm('評估得標：'+esc(r.no),html,function(){
     var sel=document.querySelector('input[name="rfq-win"]:checked');if(!sel){toast('請選擇廠商');return;}
@@ -37411,10 +37412,11 @@ function rfqAward(rid){
     if(!Array.isArray(q.costs))q.costs=[];q.costs.push(cost);
     r.vendors.forEach(function(x){x.status=(x===v)?'won':'lost';});
     r.status='awarded';r.award={vendor:v.name,reason:reason,date:localToday(),costId:cid};r.mt=Date.now();
+    try{var _bf=document.getElementById('rfq-backfill');if(_bf&&_bf.checked){r.award.backfilled=_rfqBackfillEst(q,r,v);}}catch(e){_err('rfqAward.backfill',e);}   // v6.0.18 回填成本單價
     // 廠商不在名冊 → 建檔，日報與聯絡才查得到
     try{if(!(VENDORS||[]).some(function(x){return (x.name||'')===v.name;})){VENDORS.push({id:'v'+Date.now().toString(36),name:v.name,type:'承包',contact:v.contact||'',phone:v.tel||'',_mt:Date.now()});if(typeof saveVendors==='function')saveVendors();}}catch(e){_err('rfqAward.vendor',e);}
     _touch(q);try{syncCostToPayable(q,cost);}catch(e){_err('rfqAward',e);}try{persist();_immediateUpload();}catch(e){_err('rfqAward',e);}
-    renderRfq();toast('已發包給 '+v.name+'，分包合約建立於施工成本（NT$ '+fmt(cost.amt||0)+'）');
+    renderRfq();toast('已發包給 '+v.name+'，分包合約建立於施工成本（NT$ '+fmt(cost.amt||0)+'）'+(r.award.backfilled?('；已回填 '+r.award.backfilled+' 個工項的成本單價'):''));
   },false,null,true);
 }
 function rfqLabor(rid){
@@ -38514,6 +38516,19 @@ function renderOverviewReport(el,year){
   el.innerHTML=_rptBasisStrip(year);
   el.appendChild(pb);pb.style.display='';
   try{rProfit();}catch(e){_err('renderOverviewReport',e);el.insertAdjacentHTML('beforeend','<div style="padding:16px;color:var(--red)">利潤分析載入失敗：'+esc(e.message)+'</div>');}
+}
+// ══════════ v6.0.18 報價環節：詢價得標單價回填報價工項成本單價（estCost）→ 報價列表預估淨利率、編輯器毛利即時反映 ══════════
+function _rfqBackfillEst(q,r,v){
+  var n=0;
+  (r.items||[]).forEach(function(it){
+    var idx=parseInt(it.idx);if(!(idx>=0))return;
+    var qi=(q.items||[])[idx];if(!qi||qi.sec)return;
+    var p=_rfqVendorPrice(r,v,idx);if(p==null||!(p>0))return;
+    qi.estCost=String(p);qi.estCostSrc='發包 '+(r.no||'')+'・'+(v.name||'');n++;
+    try{if(typeof eid!=='undefined'&&eid===q.id&&Array.isArray(items)&&items[idx]){items[idx].estCost=String(p);items[idx].estCostSrc=qi.estCostSrc;}}catch(e){}
+  });
+  if(n){_touch(q);try{if(typeof eid!=='undefined'&&eid===q.id&&typeof rItems==='function')rItems();}catch(e){_err('_rfqBackfillEst.rItems',e);}}
+  return n;
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
