@@ -3508,7 +3508,7 @@ async function newPage(browser, width, height) {
           return new Promise(res=>setTimeout(()=>{
             try{
               const q=Q[0];const root=document.getElementById('rfq-root');
-              out.tab=/需求與自有調撥/.test(root.innerHTML)&&/自有材料在工地/.test(root.innerHTML)&&/租賃／外購與運費/.test(root.innerHTML)&&!/新增詢價單/.test(root.innerHTML);
+              out.tab=/需求與自有調撥/.test(root.innerHTML)&&/自有材料在工地/.test(root.innerHTML)&&/材料租賃/.test(root.innerHTML)&&/設備租賃/.test(root.innerHTML)&&!/新增詢價單/.test(root.innerHTML);
               matSeedFromEst('qM');
               const r=q.mat.rows[0];
               out.seed=q.mat.rows.length===1&&r.name==='型鋼'&&r.spec==='H350'&&r.len===12&&r.qty===40&&/尚缺/.test(root.innerHTML)&&/>40 支</.test(root.innerHTML);
@@ -3533,21 +3533,19 @@ async function newPage(browser, width, height) {
               const ls=(q.costs||[]).find(c=>c._fromMat==='loss'),am2=(q.costs||[]).find(c=>c._fromMat==='amort');
               out.lossCost=!!ls&&ls.cat==='材料損耗'&&ls.vendor===''&&Math.round(ls.amt)===64800&&!PAYABLES.some(p=>p.costId===ls.id)&&!!am2&&am2.rows.length===1&&/已結算/.test(root.innerHTML)===false||(!!am2&&am2.rows.length===1&&!am2.rows[0].open);
               out.lossTable=/損耗認列/.test(root.innerHTML)&&/64,800/.test(root.innerHTML)&&/已結算使用段/.test(root.innerHTML);
-              // 租賃：尚缺 40 支 → 大料場 150/支/月 × 2 月 = 12,000 → 掛應付
-              matRentUpd('qM',r.id,'rentVendor','大料場');matRentUpd('qM',r.id,'rentPrice',150);matRentUpd('qM',r.id,'rentMonths',2);
-              out.rentLive=document.getElementById('mrent-amt-'+r.id).textContent==='12,000';
+              // 租賃（v6.0.19）：尚缺 40 支 → 大料場 40 支、日租 50、09-01 進場 → 至今預估＝40×天數×50；建合約卡（未請款前金額 0、不掛應付）、運費為同卡趟數列
+              matRentUpd('qM',r.id,'rentVendor','大料場');matRentUpd('qM',r.id,'rentQty',40);matRentUpd('qM',r.id,'rentFrom','2026-09-01');matRentUpd('qM',r.id,'rentRate',50);matRentUpd('qM',r.id,'rentTrans',3500);
+              const rdays=Math.max(0,_dDiff('2026-09-01',localToday()));
+              out.rentLive=document.getElementById('mrent-est-'+r.id).textContent===fmt(40*rdays*50);
               matRentApply('qM');
               const rc=(q.costs||[]).find(c=>c._fromMat==='rent:大料場');
-              const pay=rc&&PAYABLES.find(p=>p.costId===rc.id);
-              out.rent=!!rc&&rc.vendor==='大料場'&&rc.cat==='材料租金'&&Math.round(rc.amt)===12000&&!!pay&&Math.round(parseFloat(pay.amount))===12000;
-              // 運費
-              matTransUpd('qM','vendor','大料場');matTransUpd('qM','trips',4);matTransUpd('qM','price',3500);matRentApply('qM');
-              const tc=(q.costs||[]).find(c=>c._fromMat==='trans');
-              out.trans=!!tc&&tc.cat==='材料運費'&&Math.round(tc.amt)===14000&&PAYABLES.some(p=>p.costId===tc.id);
+              out.rent=!!rc&&rc.vendor==='大料場'&&rc.cat==='材料租金'&&rc.rental===true&&rc.amt===0&&rc.rows.length===2&&rc.rows[0].per==='day'&&rc.rows[0].qty===40&&rc.rows[0].unitPrice===50&&!PAYABLES.some(p=>p.costId===rc.id);
+              const tc=rc&&rc.rows.find(x=>x.per==='trip');
+              out.trans=!!tc&&tc.unitPrice===3500&&tc.preset==='材料運費'&&!(q.costs||[]).some(c=>c._fromMat==='trans');
               // 敏感欄位：q.mat 走 private
               out.sens=_stripQuoteSens(q).mat===undefined&&!!_extractQuoteSens(q).mat&&_extractQuoteSens(q).mat.rows.length===1;
               // 成本總額納入攤提＋損耗＋租賃＋運費
-              out.total=_projCostTotal(q)===Math.round(am2.amt)+64800+12000+14000;
+              out.total=_projCostTotal(q)===Math.round(am2.amt)+64800;
               // 工程專案頁有「材料」鈕
               _pjQid='qM';go('proj');out.pjBtn=/_rfqTab='mat'/.test(document.getElementById('proj-root').innerHTML);
             }catch(e){out.err=String(e.stack||e).slice(0,500);}
@@ -3558,7 +3556,7 @@ async function newPage(browser, width, height) {
     check('材料：材料管理併入發包分頁、由估算帶入鋼材列、調撥彈窗帶倉庫列與可撥支數、拆列到工地（loc／projQid／outDate）', r.nav && r.tab && r.seed && r.outModal && r.out, r.err || '');
     check('材料：內部攤提＝支數×單長×日租×折數×天數 → 自有成本（公司自備不入應付）、工地表顯示', r.amort && r.atTable);
     check('材料：歸還／損耗彈窗預設購置單價、歸還拆回倉庫、結算使用段、損耗認列成本（材料損耗科目、不入應付）', r.backModal && r.back && r.lossCost && r.lossTable);
-    check('材料：租賃尚缺×月租×月數即時金額、更新後依廠商建材料租金成本並掛應付、運費同、成本總額含四者', r.rentLive && r.rent && r.trans && r.total);
+    check('材料：租賃列即時「至今預估」＝支數×天數×日租、建立合約卡（未請款前 0、不掛應付）、運費為同卡趟數列、成本總額＝攤提＋損耗', r.rentLive && r.rent && r.trans && r.total);
     check('材料：q.mat 走 private（strip／extract）、工程專案表頭與發包區塊有「材料」鈕', r.sens && r.pjBtn);
     await page.setViewportSize({ width: 390, height: 844 });
     const mob = await page.evaluate(() => {
@@ -3820,6 +3818,87 @@ async function newPage(browser, width, height) {
     check('回填：未勾不動；編輯器已載入同一報價時 items 同步更新', r.noBackfill && r.editor);
     check('v6.0.18 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
+  }
+
+  // ───────────── v6.0.19 施工成本：材料／設備租賃合約與逐期請款 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+
+          const out={};
+          P.vendorPayDay=25;P.vendorPayDelay=1;P.vendorCutDay=25;P.matRentRate={H300:3,H350:4,H400:5};P.matRentFactor=0.8;P.tax=5;
+          VENDORS.length=0;VENDORS.push({id:'v1',name:'大料場',type:'材料'},{id:'v2',name:'宏達機具',type:'機具'});
+          MAT_LEDGER.length=0;PAYABLES.length=0;INV.length=0;
+          Q=[{id:'qZ',code:'1150940',name:'租賃測試案',client:'業主',date:'2026-08-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 H350 打設',unit:'支',qty:'40',price:'1000',sec:false}],costs:[],
+          mat:{rows:[{id:'r1',name:'型鋼',spec:'H350',len:12,unit:'支',qty:40,rate:'',rentVendor:'大料場',rentQty:20,rentFrom:'2026-09-01',rentTo:'',rentRate:48,rentTrans:3500}],use:[],loss:[],trans:{},
+          equip:[{id:'e1',name:'SH490 打樁機',vendor:'宏達機具',qty:1,from:'2026-09-10',to:'',per:'month',rate:150000,transPrice:20000}]}}];
+          out.cats=COST_CATS.indexOf('設備租金')>=0&&COST_CATS.indexOf('設備運費')>=0;
+          _rfqQid='qZ';_rfqTab='mat';go('rfq');
+          const root=document.getElementById('rfq-root');
+          out.section=/材料租賃/.test(root.innerHTML)&&/設備租賃/.test(root.innerHTML)&&/SH490 打樁機/.test(root.innerHTML)&&/建立／更新租賃合約/.test(root.innerHTML);
+          const oT=window.toast;window.toast=function(){};
+          matRentApply('qZ');
+          const q=Q[0];const cR=q.costs.find(c=>c._fromMat==='rent:大料場'),cE=q.costs.find(c=>c._fromMat==='erent:宏達機具');
+          out.cards=!!cR&&cR.type==='own'&&cR.rental===true&&cR.cat==='材料租金'&&cR.vendor==='大料場'&&cR.rows.length===2&&cR.rows[0].per==='day'&&cR.rows[0].qty===20&&cR.rows[0].unitPrice===48&&cR.rows[0].from==='2026-09-01'&&cR.rows[1].per==='trip'&&cR.rows[1].unitPrice===3500
+          &&!!cE&&cE.rental&&cE.cat==='設備租金'&&cE.rows[0].per==='month'&&cE.rows[0].unitPrice===150000&&cE.rows[1].preset==='設備運費';
+          out.noPay=cR.amt===0&&cE.amt===0&&!PAYABLES.some(p=>p.costId===cR.id||p.costId===cE.id);
+          // 計價頁：待登錄（租賃）
+          const vb=_vbRows().filter(r=>r.rental);
+          const days0=Math.max(0,_dDiff('2026-09-01',localToday()));
+          out.vb=vb.length===2&&vb.every(r=>r.status==='pending')&&vb.find(r=>r.c.id===cR.id).est.est===20*days0*48;
+          go('invoice');invTab('vendor');
+          out.vbHtml=/租賃/.test(document.getElementById('vb-root').innerHTML)&&/大料場/.test(document.getElementById('vb-root').innerHTML)&&/依期請款/.test(document.getElementById('vb-root').innerHTML);
+          // 登錄第 1 期：期間 09-01～09-25（24 天）：日租 20×24×48、運費 2 趟、損耗賠償 5,000
+          vbOpenPeriod('qZ',cR.id);
+          const md=document.getElementById('gen-confirm-modal');
+          out.modal=md.style.display==='flex'&&document.querySelectorAll('.rp-row').length===2&&gv('rp-from')==='2026-09-01'&&gv('rp-to')==='2026-09-25';
+          _rpSuggest();   // 開窗後 30ms 才自動帶入，測試直接呼叫
+          const dayRow=document.querySelector('.rp-row[data-per="day"]'),tripRow=document.querySelector('.rp-row[data-per="trip"]');
+          out.suggest=dayRow.querySelector('.rp-qty').value==='480';
+          tripRow.querySelector('.rp-qty').value='2';_rpAddExtra('損耗賠償');document.querySelector('.rp-x-desc').value='H350 彎曲 1 支';document.querySelector('.rp-x-amt').value='5000';_rpRecalc();
+          out.total=document.getElementById('rp-total').textContent==='35,040';
+          document.getElementById('rp-invno').value='AB11223344';
+          md.style.display='none';_rpSave();
+          const per=cR.periods&&cR.periods[0];
+          out.saved=!!per&&per.no===1&&per.rows.length===3&&per.amt===35040&&per.invNo==='AB11223344'&&per.due==='2026-10-25'&&cR.rows.length===3&&cR.rows[2].preset==='損耗賠償'&&cR.amt===35040;
+          const pay=PAYABLES.find(p=>p.id==='pay'+cR.id+'_p1');
+          out.pay=!!pay&&Math.round(parseFloat(pay.amount))===35040&&pay.vat===true&&pay.category==='material'&&/租金請款/.test(pay.note)&&pay.date==='2026-10-25'&&PAYABLES.filter(p=>p.costId===cR.id).length===1;
+          out.estAfter=_rentEstimate(q,cR).from==='2026-09-25'&&_rentEstimate(q,cR).est===20*Math.max(0,_dDiff('2026-09-25',localToday()))*48;
+          out.status=_vbRows().find(r=>r.c&&r.c.id===cR.id).status==='billed';
+          out.costTotal=_projCostTotal(q)===35040;
+          // 自有卡區塊、核對單
+          out.card=/租賃合約・逐期請款/.test(_ownRentHint(q,cR))&&/已登錄 1 期/.test(_ownRentHint(q,cR))&&/35,040/.test(_ownRentHint(q,cR));
+          let cap=null;const oP=window._printNativeHTML;window._printNativeHTML=function(h){cap=h;};eid='qZ';printVendorStatement(cR.id,1);window._printNativeHTML=oP;
+          out.stmt=!!cap&&/損耗賠償/.test(cap)&&/租賃/.test(cap);
+          // 重新套用合約（退場日）：列 id 不變、期別保留
+          q.mat.rows[0].rentTo='2026-10-01';matRentApply('qZ');
+          out.reapply=cR.rows[0].id==='rt_r1'&&cR.rows[0].to==='2026-10-01'&&cR.periods.length===1&&cR.rows.length===3&&cR.amt===35040;
+          // 修改第 1 期：帶回原數量
+          openRentPeriod(cR.id,1);_rpRecalc();out.edit=document.querySelector('.rp-row[data-per="day"] .rp-qty').value==='480'&&gv('rp-invno')==='AB11223344';document.getElementById('gen-confirm-modal').style.display='none';_rpCtx=null;
+          // 總覽待辦出現租賃待登錄（設備卡仍待登錄）
+          go('dash');out.todo=/待登錄廠商請款：/.test(document.getElementById('dash-todo-list').innerHTML)&&/宏達機具/.test(document.getElementById('dash-todo-list').innerHTML);
+          window.toast=oT;Q=[];PAYABLES.length=0;VENDORS.length=0;eid=null;
+          return out;
+    });
+    check('租賃：科目含設備租金／設備運費；材料分頁有材料租賃／設備租賃／建立租賃合約', r.cats && r.section);
+    check('租賃：建立合約卡（自有・rental、日租／趟／月租／設備運費列）、未計價前金額 0 且不掛應付', r.cards && r.noPay);
+    check('租賃：計價頁廠商分頁列為待登錄（租賃 chip、依期請款）、預估＝在場×天數×日租', r.vb && r.vbHtml);
+    check('租賃：登錄租金請款視窗（期間預設至計價截止日、自動帶 480 支・天、運費趟數、損耗賠償加項、合計 35,040）', r.modal && r.suggest && r.total);
+    check('租賃：存檔＝第 1 期（發票號、到期次月 25）、應付逐期一筆含稅、下期預估自截止日起、狀態已登錄、成本＝實際請款合計', r.saved && r.pay && r.estAfter && r.status && r.costTotal);
+    check('租賃：自有成本卡顯示租賃合約區塊、核對單可印（含損耗賠償）、重套合約保留期別、修改期別帶回原值、總覽待辦提醒', r.card && r.stmt && r.reapply && r.edit && r.todo);
+    check('v6.0.19 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+    // 手機 390px：材料分頁租賃區塊不得橫向捲動、表格堆疊
+    const { page: mp, errors: merr } = await newPage(browser, 390, 844);
+    const mok = await mp.evaluate(() => new Promise(res => {
+      P.matRentRate={H300:3,H350:4,H400:5};VENDORS.length=0;VENDORS.push({id:'v1',name:'大料場',type:'材料'});
+      Q=[{id:'qZm',code:'1150941',name:'租賃手機',client:'業主',date:'2026-08-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 H350 打設',unit:'支',qty:'40',price:'1000',sec:false}],costs:[],
+          mat:{rows:[{id:'r1',name:'型鋼',spec:'H350',len:12,unit:'支',qty:40,rate:'',rentVendor:'大料場',rentQty:20,rentFrom:'2026-09-01',rentTo:'',rentRate:48,rentTrans:3500}],use:[],loss:[],trans:{},equip:[{id:'e1',name:'打樁機',vendor:'大料場',qty:1,from:'2026-09-10',to:'',per:'month',rate:150000,transPrice:0}]}}];
+      _rfqQid='qZm';_rfqTab='mat';go('rfq');
+      setTimeout(() => { const ok = document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelectorAll('#rfq-root table.mst').length >= 2; Q=[];VENDORS.length=0; res(ok); }, 300);
+    }));
+    check('手機版：材料分頁租賃區塊不橫向捲動、表格逐列堆疊', mok && merr.length === 0, merr.slice(0, 2).join(' | '));
+    await mp.close();
   }
 
   await browser.close();
