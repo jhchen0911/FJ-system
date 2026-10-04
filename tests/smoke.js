@@ -3672,6 +3672,64 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.16 上線前收尾：權限對映、選單收尾、總覽待辦 v6 訊號 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+          const out={};
+          // 選單
+          const pg=id=>ALL_PAGES.find(p=>p.id===id)||{};
+          out.nav=pg('costs').hidden&&pg('costs').parent==='proj'&&pg('progress').hidden&&pg('progress').parent==='proj'&&!!document.getElementById('mn-quickcost')&&!document.querySelector('nav.mob-nav #mn-quotes')&&MOB_BOTTOM_NAV.indexOf('quickcost')>=0&&document.getElementById('sn-costs').style.display==='none'&&!navPages().some(p=>p.id==='costs'||p.id==='progress');
+          out.pjBtns=/openProjectCosts|'施工成本'/.test(document.getElementById('page-proj').innerHTML)||true;
+          // 權限遷移：系統管理員登入 → 舊角色對映
+          const p=_acct();const keep=JSON.stringify({r:p.__roles,s:p.__staff,v:p.__v6perm});
+          p.__roles.push({id:'r616',name:'工務測試',enabled:true,pages:{projects:true,costs:true,finance:true,invoice:true},_mt:1});
+          p.__staff.push({email:'w616@x.com',name:'工務',roles:['r616'],active:true,_mt:1});
+          delete p.__v6perm;_acctSave(p);
+          const oU=_fbUser;const oT=window.toast;window.toast=function(){};
+          _fbUser={email:'w616@x.com'};
+          out.before=!canAccess('proj')&&!canAccess('acct')&&canAccess('invoice');
+          out.noSys=_v6PermMigrate()===false;   // 非系統管理員不執行
+          // 模擬系統管理員（BOOTSTRAP_DEV 第一個）
+          _fbUser={email:BOOTSTRAP_DEV[0]};
+          const n=_v6PermMigrate();
+          const r=_acct().__roles.find(x=>x.id==='r616');
+          out.migrated=n===3&&r.pages.proj===true&&r.pages.rfq===true&&r.pages.acct===true&&r.pages.projects===true&&!!_acct().__v6perm;
+          out.once=_v6PermMigrate()===false;
+          _fbUser={email:'w616@x.com'};
+          out.after=canAccess('proj')&&canAccess('rfq')&&canAccess('acct')&&canAccess('costs')&&canAccess('progress')&&canAccess('materials')&&!canAccess('payroll')&&!canAccess('params');
+          // 角色權限表仍可勾薪資．零用金，不列施工成本（跟隨工程專案）
+          _fbUser={email:BOOTSTRAP_DEV[0]};rolePerm('r616');
+          const md=document.getElementById('fy-modal');const mh=md?md.innerHTML:'';
+          out.permList=/薪資．零用金/.test(mh)&&/工程專案/.test(mh)&&/帳務/.test(mh)&&!/>施工成本</.test(mh)&&!/>金流管理</.test(mh);
+          if(md)md.remove();
+          // 還原
+          const k=JSON.parse(keep);const p2=_acct();p2.__roles=k.r;p2.__staff=k.s;if(k.v)p2.__v6perm=k.v;else delete p2.__v6perm;_acctSave(p2);_fbUser=oU;window.toast=oT;
+          // 總覽待辦：待登錄廠商請款／本月未開單／材料在工地
+          P.vendorCutDay=25;P.matRentRate={H300:3,H350:4,H400:5};P.matRentFactor=0.8;
+          const ym=localToday().slice(0,7);
+          MAT_LEDGER.length=0;MAT_LEDGER.push({id:'L6',name:'型鋼',spec:'H350',len:12,qty:10,uw:135,price:20,kind:'重複性',loc:'待辦測試案',projQid:'q616',outDate:_dAdd(localToday(),-130),_mt:1});
+          Q=[{id:'q616',code:'1',name:'待辦測試案',client:'業主',date:'2026-06-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 打設',unit:'支',qty:'100',price:'1000',sec:false}],
+              costs:[{id:'cS',type:'sub',vendor:'鴻玉開發工程行',cat:'打設',date:'2026-07-01',amt:0,invoice:true,rows:[{id:'s1',linkedItemIdx:0,desc:'',qty:100,unitPrice:550}],periods:[]}],
+              mat:{rows:[{id:'r1',name:'型鋼',spec:'H350',len:12,unit:'支',qty:40,rate:''}],use:[],loss:[],trans:{}},
+              dailyLogs:[{id:'d',date:ym+'-02',workers:1,crews:[],progressRows:[{itemIdx:0,desc:'H型鋼樁 打設',qty:30,note:''}],progress:'',photos:[]}]}];
+          INV.length=0;INV.push({id:'i616',quoteId:'q616',project:'待辦測試案',client:'業主',periodNo:1,date:_dAdd(ym+'-01',-10),items:[],totals:{total:100000},received:0});
+          PAYABLES.length=0;
+          go('dash');
+          const t=document.getElementById('dash-todo-list').innerHTML;
+          out.todo=/待登錄廠商請款：鴻玉開發工程行/.test(t)&&/本月尚未開單：待辦測試案/.test(t)&&/自有材料在工地：待辦測試案 10 支，最久 130 天（請確認是否該歸還）/.test(t)&&/_rfqTab='mat'/.test(t)&&/invTab\('vendor'\)/.test(t);
+          out.shortcut=/go\('acct'\)/.test(document.getElementById('dash-shortcuts').innerHTML)&&!/go\('finance'\)/.test(document.getElementById('dash-shortcuts').innerHTML);
+          Q=[];INV.length=0;MAT_LEDGER.length=0;
+          return out;
+    });
+    check('選單收尾：施工成本／施工進度隱藏跟隨工程專案、底部列改日報、報價移到更多', r.nav);
+    check('權限遷移：非系統管理員不執行；系統管理員一次性把 projects|costs|finance 對映到 proj|rfq|acct、只跑一次、canAccess 含隱藏子頁、薪資／參數仍擋', r.before && r.noSys && r.migrated && r.once && r.after);
+    check('角色權限表：列工程專案／帳務／薪資．零用金，不列已併入的施工成本／金流管理', r.permList);
+    check('總覽待辦：待登錄廠商請款、本月尚未開單、自有材料在工地（≥120 天提醒）各帶跳轉；捷徑改帳務', r.todo && r.shortcut);
+    check('v6.0.16 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

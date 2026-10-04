@@ -692,7 +692,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-proj" onclick="go('proj')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>工程專案</button>
   <button type="button" class="snav" id="sn-projects" onclick="go('projects')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>專案管理</button>
   <button type="button" class="snav" id="sn-rfq" onclick="go('rfq')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>發包</button>
-  <button type="button" class="snav" id="sn-costs" onclick="go('costs')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span>施工成本</button>
+  <button type="button" class="snav" id="sn-costs" onclick="go('costs')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span>施工成本</button>
   <button type="button" class="snav" id="sn-materials" onclick="go('materials')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>材料管理</button>
   <button type="button" class="snav" id="sn-invoice" onclick="go('invoice')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>計價 <span class="cnt" id="invbadge" style="display:none">0</span></button>
   <button type="button" class="snav" id="sn-quickcost" onclick="go('quickcost');setTimeout(rQuickCost,60)"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></span>日報．支出</button>
@@ -704,7 +704,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div class="ssec" style="margin-top:5px">資料與工具</div>
   <button type="button" class="snav" id="sn-intake" onclick="smartIntake()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
   <button type="button" class="snav" id="sn-contacts" onclick="go('contacts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>客戶．廠商</button>
-  <button type="button" class="snav" id="sn-progress" onclick="go('progress')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg></span>施工進度</button>
+  <button type="button" class="snav" id="sn-progress" onclick="go('progress')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg></span>施工進度</button>
   <button type="button" class="snav" id="sn-plan" onclick="go('plan')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>施工計畫書</button>
   <button type="button" class="snav" id="sn-rebar" onclick="go('rebar')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-scale"/></svg></span>鋼筋籠檢料</button>
   <button type="button" class="snav" id="sn-matest" onclick="go('matest')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>材料估算</button>
@@ -750,10 +750,10 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <span class="sc-label">發包</span>
         <span class="sc-sub">詢價・比價</span>
       </button>
-      <button type="button" onclick="go('finance')" class="sc-btn">
+      <button type="button" onclick="go('acct')" class="sc-btn">
         <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg></span>
-        <span class="sc-label">金流管理</span>
-        <span class="sc-sub">應收・應付</span>
+        <span class="sc-label">帳務</span>
+        <span class="sc-sub">應收・應付・金流</span>
       </button>
     </div>
 
@@ -2790,7 +2790,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 
 <nav class="mob-nav">
   <button type="button" class="mnav active" id="mn-dash" onclick="go('dash')"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg></span>總覽</button>
-  <button type="button" class="mnav" id="mn-quotes" onclick="go('quotes')"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span>報價<span class="cnt2" id="qbadge2" style="display:none">0</span></button>
+  <button type="button" class="mnav" id="mn-quickcost" onclick="go('quickcost')"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></span>日報</button>
   <button type="button" class="mnav" id="mn-proj" onclick="go('proj')" style="position:relative">
     <span style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;background:var(--g);border-radius:50%;margin-top:-16px;box-shadow:0 3px 12px rgba(26,107,63,.4);border:3px solid var(--w)"><svg class="ic" aria-hidden="true" style="width:21px;height:21px;stroke:#fff;stroke-width:2"><use href="#i-contract"/></svg></span>
     <span style="font-size:9px;color:var(--g);font-weight:700;margin-top:1px">專案</span>
@@ -2805,7 +2805,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.15-beta';
+var APP_VERSION='v6.0.16-beta';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -9302,6 +9302,7 @@ function updateDashTodo(){
     });
   }catch(e){_err('updateDashTodo',e);}
 
+  try{_v6TodoItems(items);}catch(e){_err('updateDashTodo.v6',e);}   // v6：待登錄廠商請款／本月未開單／自有材料在工地
   // 按緊急度排序
   items.sort(function(a,b){return (b.urgent?1:0)-(a.urgent?1:0);});
 
@@ -35054,7 +35055,7 @@ const ALL_PAGES = [
   {id:'quotes',    label:'報價管理',  icon:_pgIcon('doc'),      grp:'main',  adminOnly:false},
   {id:'proj',      label:'工程專案',  icon:_pgIcon('hardhat'),  grp:'main',  adminOnly:false}, // v6 一頁式：報價→議價→合約→發包→施工→計價→結案
   {id:'projects',  label:'專案管理',  icon:_pgIcon('hardhat'),  grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v6 舊卡片頁，由工程專案進
-  {id:'costs',     label:'施工成本',  icon:_pgIcon('wrench'),   grp:'main',  adminOnly:false},
+  {id:'costs',     label:'施工成本',  icon:_pgIcon('wrench'),   grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v6 併入工程專案（由專案頁「施工成本」進）
   {id:'rfq',       label:'發包',      icon:_pgIcon('contract'), grp:'main',  adminOnly:false}, // v6 分項詢價單→比價→得標／點工
   {id:'materials', label:'材料管理',  icon:_pgIcon('box'),      grp:'main',  adminOnly:false, hidden:true, parent:'rfq'}, // v6 併入發包「材料」分頁（台帳／庫存仍在此）
   {id:'invoice',   label:'計價',      icon:_pgIcon('receipt'),  grp:'main',  adminOnly:false}, // v6 業主請款＋廠商請款兩分頁
@@ -35066,7 +35067,7 @@ const ALL_PAGES = [
   {id:'ledger',    label:'帳務管理',  icon:_pgIcon('wallet'),   grp:'fin',   adminOnly:false, hidden:true, parent:'acct'}, // v6 併入帳務「費用．發票」
   {id:'reports',   label:'報表中心',  icon:_pgIcon('chart'),    grp:'fin',   adminOnly:false, hidden:true, parent:'profit'}, // 由「利潤．報表」頁內分頁進入
   {id:'contacts',  label:'客戶．廠商',icon:_pgIcon('users'),    grp:'data',  adminOnly:false},
-  {id:'progress',  label:'施工進度',  icon:_pgIcon('calendar'), grp:'data',  adminOnly:false}, // v5.347
+  {id:'progress',  label:'施工進度',  icon:_pgIcon('calendar'), grp:'data',  adminOnly:false, hidden:true, parent:'proj'}, // v6 併入工程專案（預定排程由專案頁「施工進度工具」進）；v5.347
   {id:'plan',      label:'施工計畫書',icon:_pgIcon('contract'), grp:'data',  adminOnly:false}, // v5.353 分項工程施工計畫書自動生成
   {id:'rebar',     label:'鋼筋籠檢料',icon:_pgIcon('scale'),    grp:'data',  adminOnly:false}, // v5.343
   {id:'matest',    label:'材料估算',  icon:_pgIcon('box'),      grp:'data',  adminOnly:false}, // v5.352 自材料管理獨立
@@ -35078,7 +35079,7 @@ const ALL_PAGES = [
   // v5.330 sysOnly：只有「系統管理員」角色能開，其他角色的權限表上是鎖住的
   {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, sysOnly:true},
   {id:'staff',     label:'人員管理',  icon:_pgIcon('users'),    grp:'acct',  adminOnly:true},
-  {id:'payroll',   label:'薪資．零用金',  icon:_pgIcon('wallet'),   grp:'acct',  adminOnly:true, hidden:true}, // v6 併入帳務「零用金」「薪資」分頁（權限仍以本頁為準）；v5.433 基本資料／薪資設定／薪資條（fydata/private）
+  {id:'payroll',   label:'薪資．零用金',  icon:_pgIcon('wallet'),   grp:'acct',  adminOnly:true, hidden:true, permListed:true}, // v6 併入帳務「零用金」「薪資」分頁（權限仍以本頁為準）；v5.433 基本資料／薪資設定／薪資條（fydata/private）
   {id:'roles',     label:'角色權限',  icon:_pgIcon('lock'),     grp:'acct',  adminOnly:true, sysOnly:true},
   {id:'params',    label:'參數設定',  icon:_pgIcon('sliders'),  grp:'sys',   adminOnly:true, sysOnly:true},
 ];
@@ -35191,7 +35192,7 @@ function newInvFromContract(contractId){
 // 手機「更多」面板：同樣由 navPages 產生。原本是寫死清單，
 // 金流管理／施工成本／材料管理／日報．支出 四個常用模組完全不在任何選單裡，
 // 工務只能先回總覽點捷徑卡才進得去。
-const MOB_BOTTOM_NAV=['dash','quotes','projects','proj','invoice'];   // 已在底部導覽，不重複列出
+const MOB_BOTTOM_NAV=['dash','quickcost','projects','proj','invoice'];   // v6.0.16 底部列：總覽／日報／專案／計價／更多（報價在「更多」）   // 已在底部導覽，不重複列出
 function renderMobMore(){
   var box=document.getElementById('mob-more-body');if(!box)return;
   var pages=navPages().filter(function(p){return MOB_BOTTOM_NAV.indexOf(p.id)<0;});
@@ -35457,7 +35458,7 @@ function roleDel(id){
 // 逐頁勾選：sysOnly 的頁面鎖住，只有系統管理員角色有
 function rolePerm(id){
   var r=_roleById(id);if(!r)return;
-  var pages=ALL_PAGES.filter(function(p){return !p.hidden;});
+  var pages=ALL_PAGES.filter(function(p){return !p.hidden||p.permListed;});   // v6 薪資．零用金隱藏在帳務分頁內，但權限仍要能勾
   var body='<div style="font-size:11.5px;color:var(--b4);margin-bottom:9px">勾選「'+esc(r.name)+'」看得到的頁面。</div>'
     +'<div style="display:flex;flex-direction:column;gap:5px;max-height:52vh;overflow:auto">'
     +pages.map(function(pg){
@@ -38408,6 +38409,52 @@ function prmSearch(q){
   return hit;
 }
 try{_prmMount();}catch(e){_err('prm.mount',e);}
+// ══════════ v6.0.16 上線前收尾：舊頁權限對映到 v6 新頁、選單收尾、總覽待辦接上 v6 訊號 ══════════
+// 權限：既有角色的 pages 只勾了舊頁 id（projects／costs／materials／finance／ledger），v6 新頁（proj／rfq／acct）沒勾 → 非系統管理員會被擋。
+// 系統管理員登入時一次性對映（不刪舊鍵，隱藏頁的 parent 鏈仍可用），記 __v6perm 不重跑。
+function _v6PermMigrate(){
+  try{
+    if(!_fbUser||!_fbUser.email||!_isSysUser(_fbUser.email))return false;
+    var p=_acct();if(p.__v6perm)return false;
+    var changed=0;
+    (p.__roles||[]).forEach(function(r){
+      if(!r||r.sys||!r.pages)return;var pg=r.pages,c0=changed;
+      var set=function(k,v){if(v&&pg[k]!==true){pg[k]=true;changed++;}};
+      set('proj',pg.projects||pg.costs||pg.contracts||pg.progress);
+      set('rfq',pg.materials||pg.costs||pg.projects);
+      set('acct',pg.finance||pg.ledger);
+      if(changed>c0)_touch(r);
+    });
+    p.__v6perm=Date.now();_acctSave(p);
+    return changed;
+  }catch(e){_err('_v6PermMigrate',e);return false;}
+}
+// 總覽待辦：待登錄廠商請款／本月尚未開單／自有材料在工地
+function _v6TodoItems(items){
+  var ic=function(h){return '<svg class="ic ib" aria-hidden="true"><use href="#'+h+'"/></svg>';};
+  try{
+    var pend=_vbRows().filter(function(r){return r.status==='pending';});
+    if(pend.length){var est=pend.reduce(function(a,r){return a+r.est.est;},0);
+      items.push({type:'vb_pending',urgent:false,jump:"go('invoice');setTimeout(function(){invTab('vendor')},60)",icon:ic('i-receipt'),color:'#E65100',
+        text:'待登錄廠商請款：'+pend.map(function(r){return r.c.vendor;}).filter(function(v,i,a){return a.indexOf(v)===i;}).slice(0,3).join('、')+(pend.length>3?' 等 '+pend.length+' 家':'')+'（日報已完成未計價）',sub:'預估 NT$ '+fmt(est)});}
+  }catch(e){_err('_v6TodoItems.vb',e);}
+  try{
+    _invMonthGaps().forEach(function(g){
+      items.push({type:'inv_month',urgent:false,jump:"go('invoice');setTimeout(function(){invTab('owner')},60)",icon:ic('i-contract'),color:'#0D47A1',
+        text:'本月尚未開單：'+(g.q.name||'')+'（上次 '+(g.last.date||'')+'・本月日報 '+g.n+' 天）',sub:'開下一期'});
+    });
+  }catch(e){_err('_v6TodoItems.inv',e);}
+  try{
+    (Q||[]).forEach(function(q){
+      if(!q||q.parentId||q.closed||!q.mat)return;
+      var at=_matLedAt(q).filter(function(r){return r.kind!=='一次性';});if(!at.length)return;
+      var qty=at.reduce(function(a,r){return a+(parseFloat(r.qty)||0);},0),days=at.reduce(function(a,r){return Math.max(a,_matDays(r.outDate,localToday()));},0);
+      var amt=0;try{amt=_matAmortRows(q).filter(function(r){return r.open;}).reduce(function(a,r){return a+r.amt;},0);}catch(e){}
+      items.push({type:'mat_site',urgent:days>=120,jump:"_rfqQid='"+q.id+"';_rfqTab='mat';go('rfq')",icon:ic('i-box'),color:days>=120?'var(--red)':'#8a6d00',
+        text:'自有材料在工地：'+(q.name||'')+' '+fmt(qty)+' 支，最久 '+days+' 天'+(days>=120?'（請確認是否該歸還）':''),sub:'攤提 NT$ '+fmt(amt)});
+    });
+  }catch(e){_err('_v6TodoItems.mat',e);}
+}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
@@ -38550,6 +38597,7 @@ function renderDashGreet(){
 
 function applyRoleUI(){
   try{_migrateDepts();}catch(e){_err('applyRoleUI',e);}
+  try{var _n6=_v6PermMigrate();if(_n6)toast('已把舊頁面權限對映到 v6 新頁（工程專案／發包／帳務）');}catch(e){_err('applyRoleUI.v6',e);}
   const perms=getPagePerms();
   try{renderTopNav();renderMobMore();}catch(e){_err('applyRoleUI',e);}   // 權限變動後重建導覽
   ALL_PAGES.forEach(page=>{
