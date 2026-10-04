@@ -3780,6 +3780,48 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.18 報價環節：詢價得標單價回填報價工項成本單價 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+          const out={};
+          P.vendorPayDay=25;P.vendorPayDelay=1;P.subPayOnBill=true;VENDORS.length=0;
+          Q=[{id:'qF',code:'1150930',name:'回填測試案',client:'業主',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,
+              items:[{desc:'H型鋼樁 H400 L=13M 打設',unit:'支',qty:'400',price:'1000',estCost:'',sec:false},{desc:'H型鋼樁 H400 L=13M 拔除',unit:'支',qty:'400',price:'400',estCost:'300',sec:false}],costs:[],
+              rfqs:[{id:'rF',no:'RFQ-1150930-01',date:'2026-09-02',scope:'打設',status:'open',cond:{},items:[{idx:0,desc:'打設',unit:'支',qty:400},{idx:1,desc:'拔除',unit:'支',qty:400}],
+                     vendors:[{name:'鴻玉開發工程行',contact:'鴻哥',tel:'',status:'quoted',prices:{0:550,1:120},neg:{0:530}},{name:'大明工程',contact:'',tel:'',status:'quoted',prices:{0:600,1:150},neg:{}}]}]}];
+          PAYABLES.length=0;
+          const r0=_quoteEstNetR(Q[0]);
+          _rfqQid='qF';go('rfq');rfqTab('rfq');
+          rfqAward('rF');
+          const md=document.getElementById('gen-confirm-modal');
+          out.modal=md.style.display==='flex'&&!!document.getElementById('rfq-backfill')&&document.getElementById('rfq-backfill').checked;
+          const radio=document.querySelector('input[name="rfq-win"][value="0"]');radio.checked=true;document.getElementById('rfq-reason').value='最低價';
+          document.getElementById('gen-confirm-ok').click();
+          const q=Q[0],it0=q.items[0],it1=q.items[1],r=q.rfqs[0];
+          out.award=r.status==='awarded'&&r.award.vendor==='鴻玉開發工程行'&&q.costs.length===1&&q.costs[0].type==='sub';
+          out.backfill=it0.estCost==='530'&&/發包 RFQ-1150930-01・鴻玉開發工程行/.test(it0.estCostSrc||'')&&it1.estCost==='120'&&r.award.backfilled===2;
+          out.netR=_quoteEstNetR(q)!==r0&&_quoteEstNetR(q)>0;
+          out.card=/已回填 2 個工項成本單價/.test(document.getElementById('rfq-root').innerHTML);
+          // 未勾回填 → 不動
+          q.rfqs.push({id:'rG',no:'RFQ-1150930-02',date:'2026-09-03',scope:'拔除',status:'open',cond:{},items:[{idx:1,desc:'拔除',unit:'支',qty:400}],vendors:[{name:'大明工程',status:'quoted',prices:{1:200},neg:{}}]});
+          renderRfq();rfqAward('rG');document.getElementById('rfq-backfill').checked=false;document.querySelector('input[name="rfq-win"][value="0"]').checked=true;document.getElementById('rfq-reason').value='配合度';document.getElementById('gen-confirm-ok').click();
+          out.noBackfill=q.items[1].estCost==='120'&&!q.rfqs[1].award.backfilled;
+          // 編輯器已載入同一報價時，items 同步更新並重繪
+          loadQ('qF');items[0].estCost='';
+          q.rfqs.push({id:'rH',no:'RFQ-1150930-03',date:'2026-09-04',scope:'打設',status:'open',cond:{},items:[{idx:0,desc:'打設',unit:'支',qty:400}],vendors:[{name:'丙',status:'quoted',prices:{0:500},neg:{}}]});
+          _rfqQid='qF';go('rfq');renderRfq();rfqAward('rH');document.querySelector('input[name="rfq-win"][value="0"]').checked=true;document.getElementById('rfq-reason').value='x';document.getElementById('gen-confirm-ok').click();
+          out.editor=items[0].estCost==='500'&&q.items[0].estCost==='500';
+          Q=[];PAYABLES.length=0;eid=null;
+          return out;
+    });
+    check('發包得標：評估視窗有「回填成本單價」勾選（預設勾）、得標建分包合約', r.modal && r.award);
+    check('回填：議價優先的得標單價寫進對應工項 estCost（含來源）、預估淨利率更新、詢價卡顯示已回填 N 項', r.backfill && r.netR && r.card);
+    check('回填：未勾不動；編輯器已載入同一報價時 items 同步更新', r.noBackfill && r.editor);
+    check('v6.0.18 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
