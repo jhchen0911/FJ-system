@@ -3050,7 +3050,7 @@ async function newPage(browser, width, height) {
         updCostField('cO','vendor','');out.ownBack=!PAYABLES.some(p=>p.costId==='cO');updCostField('cO','vendor','中鋼租賃');
         // ② 類型摘要列
         rCostItems();const cs=document.getElementById('cost-summary');
-        out.strip=!!cs&&/承包（發包）/.test(cs.innerHTML)&&/日報零星支出/.test(cs.innerHTML)&&/本案應付未付/.test(cs.innerHTML)&&/自有（材料機具）/.test(cs.innerHTML);
+        out.strip=!!cs&&/承包（發包）/.test(cs.innerHTML)&&/日報零星支出/.test(cs.innerHTML)&&/本案應付未付/.test(cs.innerHTML)&&/自有材料攤提／購置/.test(cs.innerHTML)&&/租金（材料＋設備，已請款）/.test(cs.innerHTML);
         // ③ 登錄廠商請款：單價可改、與日報差異、超量＝實作實算＋自行吸收、發票號
         openSubPeriod('cM');
         out.title=/登錄廠商請款/.test(modal().innerHTML)&&/廠商請款日/.test(modal().innerHTML)&&!!document.getElementById('sp-invno')&&!!document.querySelector('.sp-up');
@@ -3098,7 +3098,7 @@ async function newPage(browser, width, height) {
         return out;
     });
     check('自有成本（材料機具）：沒廠商不入應付；選廠商掛應付、開發票 +5%、發票號；卡片欄位與租期參考', r.ownNone && r.ownCard0 && r.ownPay && r.ownNoInv && r.ownInvNo && r.ownCard && r.ownBack);
-    check('施工成本頁：類型摘要列（承包／點工／自有／額外／日報零星／應付未付）', r.strip);
+    check('施工成本頁：類型摘要列（承包／點工／自有攤提／租金／額外／日報零星／應付未付）', r.strip);
     check('登錄廠商請款：單價可核實覆寫、與日報差異提示、超量＝實作實算＋自行吸收、發票號進應付', r.title && r.daily && r.overInfo && r.diffHidden && r.diffShown && r.amt && r.absorbTxt && r.per && r.over && r.follow);
     check('分包管理：實作超出以提示呈現、自行吸收／發票／核對單／介紹費分開付款', r.subs);
     check('數量對照：實作實算藍字提示、廠商已請未向業主請為紅字；勾稽含材料機具；成本分析列逾期租金', r.recon && r.reconHtml && r.audit && r.rentLine);
@@ -3899,6 +3899,76 @@ async function newPage(browser, width, height) {
     }));
     check('手機版：材料分頁租賃區塊不橫向捲動、表格逐列堆疊', mok && merr.length === 0, merr.slice(0, 2).join(' | '));
     await mp.close();
+  }
+
+  // ───────────── v6.0.20 租賃成本管控層：登錄差異提示／預估 vs 實際／單位成本比較／專案頁分列 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+
+          const out={};
+          P.vendorPayDay=25;P.vendorPayDelay=1;P.vendorCutDay=25;P.matRentRate={H300:3,H350:4,H400:5};P.matRentFactor=0.8;P.tax=5;
+          VENDORS.length=0;VENDORS.push({id:'v1',name:'大料場',type:'材料'});
+          MAT_LEDGER.length=0;MAT_LEDGER.push({id:'L1',name:'型鋼',spec:'H350',len:12,qty:30,uw:135,price:20,date:'2026-01-10',kind:'重複性',loc:'公司倉庫',_mt:1},
+          {id:'L2',name:'型鋼',spec:'H350',len:12,qty:10,uw:135,price:20,date:'2026-09-01',kind:'重複性',loc:'管控測試案',projQid:'qK',outDate:'2026-09-01',matRowId:'r1',_mt:1});
+          PAYABLES.length=0;INV.length=0;
+          Q=[{id:'qK',code:'1150950',name:'管控測試案',client:'業主',date:'2026-08-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 H350 打設',unit:'支',qty:'40',price:'1000',estCost:'500',sec:false}],costs:[],
+          mat:{rows:[{id:'r1',name:'型鋼',spec:'H350',len:12,unit:'支',qty:40,rate:'',rentVendor:'大料場',rentQty:20,rentFrom:'2026-09-01',rentTo:'2026-10-31',rentRate:48,rentTrans:3500}],use:[],loss:[],trans:{},equip:[]}}];
+          const oT=window.toast;window.toast=function(){};
+          _rfqQid='qK';_rfqTab='mat';go('rfq');
+          matRentApply('qK');
+          const q=Q[0];const cR=q.costs.find(c=>c._fromMat==='rent:大料場');
+          // 預估合約：20 支 × 60 天（09-01→10-31）× 48 ＋ 2 趟 × 3500 ＝ 57,600＋7,000
+          const pl=_rentPlan(q,cR);
+          out.plan=pl.amt===20*60*48+7000&&pl.src==='退場日'&&!pl.open&&pl.billed===0&&pl.rate!==null;
+          // 單位成本比較：自有 12×4×0.8＝38.4、料場 48 → +9.6（+25%）、租 ... 天＝買 1 支（32,400/48=675）
+          const root=document.getElementById('rfq-root');
+          out.cmp=/單位成本比較/.test(root.innerHTML)&&/38\.4/.test(root.innerHTML)&&/\+9\.6/.test(root.innerHTML)&&/\+25%/.test(root.innerHTML)&&/租 675 天＝買 1 支/.test(root.innerHTML)&&/預估合約/.test(root.innerHTML)&&/執行率/.test(root.innerHTML);
+          // 登錄：系統 480（20×24），廠商請 520 → 差 +40（+1,920）
+          vbOpenPeriod('qK',cR.id);
+          _rpSuggest();
+          const dayRow=document.querySelector('.rp-row[data-per="day"]');
+          out.sysOk=dayRow.getAttribute('data-sys')==='480'&&/與系統一致/.test(dayRow.querySelector('.rp-hint').innerHTML);
+          dayRow.querySelector('.rp-qty').value='520';_rpRecalc();
+          out.diffHint=/差 \+40（\+1,920）/.test(dayRow.querySelector('.rp-hint').innerHTML)&&/系統 480/.test(dayRow.querySelector('.rp-hint').innerHTML);
+          document.querySelector('.rp-row[data-per="trip"] .rp-qty').value='1';_rpRecalc();
+          out.total=document.getElementById('rp-total').textContent==='28,460';
+          document.getElementById('gen-confirm-modal').style.display='none';_rpSave();
+          const per=cR.periods[0];
+          out.saved=!!per&&per.rows.find(r=>r.rid==='rt_r1').sys===480&&per.rows.find(r=>r.rid==='rt_r1').qty===520&&per.amt===28460;
+          const df=_rentPeriodDiff(cR,per);
+          out.diff=df.n===1&&df.qty===40&&df.amt===1920;
+          // 卡片：差異 chip、預估 vs 實際
+          const card=_ownRentHint(q,cR);
+          out.card=/rent-diff/.test(card)&&/差 \+40（\+1,920）/.test(card)&&/預估合約/.test(card)&&/64,600/.test(card)&&/執行率/.test(card)&&/預計退場日/.test(card);
+          // 核對單印系統數量與差
+          let cap=null;const oP=window._printNativeHTML;window._printNativeHTML=function(h){cap=h;};eid='qK';printVendorStatement(cR.id,1);window._printNativeHTML=oP;
+          out.stmt=!!cap&&/系統 480（差 \+40）/.test(cap)&&/在場 20/.test(cap);
+          // 預計退場日覆寫 → 預估改變
+          rentPlanEnd(cR.id,'2026-11-30');
+          out.planEnd=cR.planEnd==='2026-11-30'&&_rentPlan(q,cR).src==='退場日';   // 列退場日優先於卡預計退場日
+          q.mat.rows[0].rentTo='';matRentApply('qK');
+          out.planEnd2=_rentPlan(q,cR).src==='預計退場日'&&_rentPlan(q,cR).amt===20*90*48+7000;
+          // 專案頁成本區塊：租金分列、攤提分列（L2 在工地 10 支）
+          _matAmortSync(q);
+          const strip=_costSummaryStrip(q,q.costs);
+          out.strip=/租金（材料＋設備，已請款）/.test(strip)&&/24,960/.test(strip)&&/自有材料攤提／購置/.test(strip)&&/運費/.test(strip)&&/3,500/.test(strip);
+          const an=buildCostAnalysisHtml(q);
+          const att=_costByItem(q);
+          out.analysis=/材料／設備租金（租賃合約，已請款）/.test(an)&&/材料自有攤提（內部租金法）/.test(an)&&/材料／設備運費/.test(an)&&!/未歸戶成本（未關聯工項）/.test(an)&&new RegExp(fmt(Math.round(att.unassigned))).test(an);
+          _pjQid='qK';go('proj');
+          out.proj=/租金（材料＋設備，已請款）/.test(document.getElementById('proj-root').innerHTML);
+          // 手機
+          window.toast=oT;Q=[];PAYABLES.length=0;VENDORS.length=0;MAT_LEDGER.length=0;eid=null;
+          return out;
+    });
+    check('管控：預估合約＝在場量×預計天數×單價＋運費進退場 2 趟（退場日 → 卡預計退場日 → 預定進度 → 至今）', r.plan && r.planEnd && r.planEnd2);
+    check('管控：材料分頁單位成本比較（自有攤提 38.4 vs 料場 48、+25%、租 675 天＝買 1 支）、租賃合約表有預估合約／執行率', r.cmp);
+    check('管控：登錄視窗系統數量（在場×天數）vs 廠商數量即時差異提示、存入期別 sys、期別差異金額', r.sysOk && r.diffHint && r.total && r.saved && r.diff);
+    check('管控：合約卡差異 chip＋預估／已請款／結餘／執行率＋預計退場日；核對單印系統數量與差', r.card && r.stmt);
+    check('管控：成本摘要與工項成本分析把攤提／租金（預估＝預估合約）／運費／損耗分列，不再混入未歸戶；工程專案頁同', r.strip && r.analysis && r.proj);
+    check('v6.0.20 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
   }
 
   await browser.close();
