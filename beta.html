@@ -715,6 +715,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <button type="button" class="snav" id="sn-proj" onclick="go('proj')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>工程專案</button>
   <button type="button" class="snav" id="sn-projects" onclick="go('projects')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>專案管理</button>
   <button type="button" class="snav" id="sn-rfq" onclick="go('rfq')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>發包</button>
+  <button type="button" class="snav" id="sn-mat6" onclick="go('mat6')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>材料．租賃</button>
   <button type="button" class="snav" id="sn-costs" onclick="go('costs')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span>施工成本</button>
   <button type="button" class="snav" id="sn-materials" onclick="go('materials')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>材料管理</button>
   <button type="button" class="snav" id="sn-invoice" onclick="go('invoice')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>計價 <span class="cnt" id="invbadge" style="display:none">0</span></button>
@@ -1164,10 +1165,17 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <!-- ████ COSTS PAGE（施工成本，自專案脈絡進入）████ -->
 <div class="page" id="page-rfq">
   <div class="ph">
-    <div class="ph-l"><div class="ph-t">發包</div><div class="ph-s">分項詢價單 → 廠商比價 → 議價 → 得標／改點工；材料：自有調撥 → 內部攤提／租賃外購</div></div>
-    <div class="ph-r"><button type="button" class="btn btn-sm" onclick="go('projects')">← 專案管理</button><button type="button" class="btn btn-sm" onclick="go('costs')">施工成本 →</button></div>
+    <div class="ph-l"><div class="ph-t">發包</div><div class="ph-s">分項詢價單 → 廠商比價 → 議價 → 得標／改點工（材料、租賃、運輸在「材料．租賃」頁）</div></div>
+    <div class="ph-r"><button type="button" class="btn btn-sm" onclick="go('projects')">← 專案管理</button><button type="button" class="btn btn-sm" onclick="_m6Qid=_rfqQid||_m6Qid;go('mat6')">材料．租賃</button><button type="button" class="btn btn-sm" onclick="go('costs')">施工成本 →</button></div>
   </div>
   <div id="rfq-root" style="padding:0 14px 20px"></div>
+</div>
+<div class="page" id="page-mat6">
+  <div class="ph">
+    <div class="ph-l"><div class="ph-t">材料．租賃</div><div class="ph-s">材料需求 → 比對公司庫存（調撥／接切樁）→ 不足再租賃；材料／設備租賃、運輸填好自動進施工成本，廠商請款單到了再核實轉應付</div></div>
+    <div class="ph-r"><button type="button" class="btn btn-sm" onclick="go('rfq')">← 發包</button><button type="button" class="btn btn-sm" onclick="if(_m6Qid)openProjectCosts(_m6Qid);else go('costs')">施工成本 →</button></div>
+  </div>
+  <div id="mat6-root" style="padding:0 14px 20px"></div>
 </div>
 <div class="page" id="page-costs">
   <div class="ph">
@@ -2834,7 +2842,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.24';
+var APP_VERSION='v6.0.25';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -3555,6 +3563,7 @@ function go(p){
   // v6 帳務：金流管理／帳務管理／薪資零用金 併成一頁，舊頁名一律轉到對應分頁
   if(p==='finance'||p==='ledger'||p==='payroll'){try{if(_acctMount()){_acctTab=({finance:'ar',ledger:'inv',payroll:'pay'})[p];p='acct';}}catch(e){_err('go.acct',e);}}
   if(p==='profit'){p='reports';_currentReport='overview';}   // v6.0.17 利潤分析併入經營報表
+  try{if(p==='rfq'&&typeof _rfqTab!=='undefined'&&_rfqTab==='mat'){_rfqTab='rfq';if(_rfqQid)_m6Qid=_rfqQid;p='mat6';}}catch(e){}   // v6.0.25 材料移出發包
   // 權限攔截（try/catch 保護避免 TDZ）
   try{
     // params/permissions 頁面：未登入可以進（需要從那裡登入）
@@ -3602,6 +3611,7 @@ function go(p){
   if(p==='backfill'){try{_bfRender();}catch(e){_err('top',e);}}
   if(p==='workers'){try{renderWorkers();}catch(e){_err('top',e);}}
   if(p==='rfq'){try{renderRfq();}catch(e){_err('top',e);}}
+  if(p==='mat6'){try{renderMat6();}catch(e){_err('renderMat6',e);}}
   if(p==='lifeline'){try{_llRender();}catch(e){_err('top',e);}}
   if(p==='progress'){try{_pgRender();}catch(e){_err('top',e);}}
   if(p==='matest'){try{renderMatEst();}catch(e){_err('top',e);}}
@@ -24895,7 +24905,7 @@ function _plRender(){
 // 使用者規則：手機版任何表格不得左右滑動。工具頁（施工進度／鋼筋籠檢料／材料估算／
 // 根固砂漿／背填材料／施工計畫書）的寬表格於 ≤767px 自動改為逐列卡片：
 // 掃描有 thead 的表，欄數 ≥4 或 min-width ≥480 者加 .mst，並把表頭文字寫進各格 data-th 當標籤。
-var _MST_LINE={'proj-root':1,'vb-root':1,'rfq-root':1,'cost-list':1,'report-content':1};   // v6.0.11 一行一行模式的根節點
+var _MST_LINE={'proj-root':1,'vb-root':1,'rfq-root':1,'mat6-root':1,'cost-list':1,'report-content':1};   // v6.0.11 一行一行模式的根節點
 function _mstack(root){
   if(!root)return;
   root.querySelectorAll('table').forEach(function(tb){
@@ -24941,7 +24951,7 @@ function _mstack(root){
   var ids=['rebar-root','grout-root','backfill-root','lifeline-root','progress-root','mat-est-form','mat-est-out','plan-root',
            'page-params',                    // v5.372：參數設定的單價矩陣表
            'page-staff','page-roles','page-payroll','wk-root', // v5.382：人員／角色頁的名冊表（CI 在不同字型環境抓到溢出）
-           'cost-list','rfq-root','proj-root','vb-root'];   // v5.404：施工成本的分析／勾稽表（手機不得左右滑）；v6 發包比價表、工程專案
+           'cost-list','rfq-root','mat6-root','proj-root','vb-root'];   // v5.404：施工成本的分析／勾稽表（手機不得左右滑）；v6 發包比價表、工程專案
   function _msApply(){ids.forEach(function(id){var el=document.getElementById(id);if(el)_mstack(el);});}
   try{
     var mo=new MutationObserver(_msApply);
@@ -35123,6 +35133,7 @@ const ALL_PAGES = [
   {id:'projects',  label:'專案管理',  icon:_pgIcon('hardhat'),  grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v6 舊卡片頁，由工程專案進
   {id:'costs',     label:'施工成本',  icon:_pgIcon('wrench'),   grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v6 併入工程專案（由專案頁「施工成本」進）
   {id:'rfq',       label:'發包',      icon:_pgIcon('contract'), grp:'main',  adminOnly:false}, // v6 分項詢價單→比價→得標／點工
+  {id:'mat6',      label:'材料．租賃', icon:_pgIcon('box'),      grp:'main',  adminOnly:false, parent:'rfq'}, // v6.0.25 自發包移出：需求比對／接切樁／租賃（按 M）／設備／運輸；權限跟發包
   {id:'materials', label:'材料管理',  icon:_pgIcon('box'),      grp:'main',  adminOnly:false, hidden:true, parent:'rfq'}, // v6 併入發包「材料」分頁（台帳／庫存仍在此）
   {id:'invoice',   label:'計價',      icon:_pgIcon('receipt'),  grp:'main',  adminOnly:false}, // v6 業主請款＋廠商請款兩分頁
   {id:'quickcost', label:'日報．支出',icon:_pgIcon('pencil'),   grp:'main',  adminOnly:false},
@@ -35524,7 +35535,7 @@ function roleDel(id){
 // 逐頁勾選：sysOnly 的頁面鎖住，只有系統管理員角色有
 function rolePerm(id){
   var r=_roleById(id);if(!r)return;
-  var pages=ALL_PAGES.filter(function(p){return !p.hidden||p.permListed;});   // v6 薪資．零用金隱藏在帳務分頁內，但權限仍要能勾
+  var pages=ALL_PAGES.filter(function(p){return (!p.hidden&&!p.parent)||p.permListed;});   // v6.0.25 跟隨母頁權限的頁不另列   // v6 薪資．零用金隱藏在帳務分頁內，但權限仍要能勾
   var body='<div style="font-size:11.5px;color:var(--b4);margin-bottom:9px">勾選「'+esc(r.name)+'」看得到的頁面。</div>'
     +'<div style="display:flex;flex-direction:column;gap:5px;max-height:52vh;overflow:auto">'
     +pages.map(function(pg){
@@ -38046,7 +38057,7 @@ function matRowEdit(qid,rid){
     +'<label>需求支數<input id="mx-qty" type="number" inputmode="numeric" value="'+esc(String(r.qty==null?'':r.qty))+'" style="'+IN+'"></label>'
     +'<label>內部日租（$/m/天，空＝參數 '+esc(String((P.matRentRate||{})[r.spec]||'—'))+'）<input id="mx-rate" type="number" inputmode="decimal" value="'+esc(String(r.rate==null?'':r.rate))+'" style="'+IN+'"></label>'
     +'<label>備註<input id="mx-note" value="'+esc(r.note||'')+'" style="'+IN+'"></label>'
-    +'</div><div style="font-size:11px;color:var(--b4);margin-top:8px">自有部分到下方「調撥」從公司倉庫撥到工地；不足的在「租賃／外購」填廠商與單價。</div>';
+    +'</div><div style="font-size:11px;color:var(--b4);margin-top:8px">存檔後系統會比對公司庫存：同長度閒置先調撥、同規格其他長度問是否接樁／切樁，都沒有再問租賃。</div>';
   _modal(rid?'編輯材料列':'新增材料列',html,function(){
     var row=rid?r:null;
     var v={name:gv('mx-name'),spec:gv('mx-spec'),len:gv('mx-len')===''?'':(parseFloat(gv('mx-len'))||0),qty:Math.round(parseFloat(gv('mx-qty'))||0),rate:gv('mx-rate')===''?'':(parseFloat(gv('mx-rate'))||0),note:gv('mx-note')};
@@ -38055,6 +38066,7 @@ function matRowEdit(qid,rid){
     Object.assign(row,v);
     _touch(m);_touch(q);try{persist();_immediateUpload();}catch(e){_err('matRowEdit',e);}
     renderRfq();
+    if(!rid){var _nr=row;setTimeout(function(){try{m6Decide(qid,_nr.id);}catch(e){_err('matRowEdit.decide',e);}},80);}   // v6.0.25 新增需求自動比對公司庫存
   });
 }
 function matRowDel(qid,rid){
@@ -38613,13 +38625,13 @@ function openRentPeriod(cid,editNo){
     +'<div class="f"><label>廠商請款日</label><input id="rp-date" type="date" value="'+esc(date)+'" style="'+IN+'"></div>'
     +'<div class="f"><label>期間起（不含）</label><input id="rp-from" type="date" value="'+esc(from)+'" onchange="_rpSuggest()" style="'+IN+'"></div>'
     +'<div class="f"><label>期間迄</label><input id="rp-to" type="date" value="'+esc(to)+'" onchange="_rpSuggest()" style="'+IN+'"></div></div>'
-    +'<div style="font-size:11px;color:var(--b3);margin:4px 0 8px">依料場／機具商送來的請款單核實：日租列預設帶入「在場數量 × 期間天數」，運費填本期趟數，損耗賠償或其他加項用下方「＋ 加項」。單價可改。</div>'
+    +'<div style="font-size:11px;color:var(--b3);margin:4px 0 8px">依料場／機具商／運輸商送來的請款單核實：租金列預設帶入「在場 M 數（或台數）× 期間月數（天數）」，運費帶入尚未請的趟數，損耗賠償或其他加項用下方「＋ 加項」。單價可改，確認後轉應付。</div>'
     +'<div id="rp-rows">'+(c.rows||[]).map(function(r){
       var per=r.per||'day';var cur=editing?((editing.rows||[]).find(function(pr){return pr.rid===r.id;})||{}):{};
       var sug=cur.qty!=null?cur.qty:'';
-      return '<div class="rp-row" data-rid="'+r.id+'" data-per="'+per+'" data-qty="'+(parseFloat(r.qty)||0)+'" data-price="'+(parseFloat(r.unitPrice)||0)+'" data-from="'+esc(r.from||'')+'" data-to="'+esc(r.to||'')+'" style="border:1px solid var(--b1);border-radius:var(--r8);padding:7px 9px;margin-bottom:6px;background:var(--w)">'
-        +'<div style="font-size:12.5px;font-weight:700">'+esc(r.desc||r.preset||'')+' <span style="font-weight:400;color:var(--b4);font-size:11px">'+esc(r.preset||'')+'・'+(per==='day'?('在場 '+fmt(r.qty)+' '+esc(r.unit||'')+'，$'+fmt(r.unitPrice)+'/'+esc(r.unit||'')+'/天'):per==='month'?('在場 '+fmt(r.qty)+' '+esc(r.unit||'')+'，$'+fmt(r.unitPrice)+'/'+esc(r.unit||'')+'/月'):per==='trip'?('$'+fmt(r.unitPrice)+'/趟'):('$'+fmt(r.unitPrice)))+(r.from?('・進場 '+esc(r.from)):'')+(r.to?('・退場 '+esc(r.to)):'')+'</span></div>'
-        +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px"><span style="font-size:11px;color:var(--b4);white-space:nowrap">本期 '+(per==='day'?esc(r.unit||'')+'・天':per==='month'?esc(r.unit||'')+'・月':per==='trip'?'趟數':'數量')+'</span>'
+      return '<div class="rp-row" data-rid="'+r.id+'" data-per="'+per+'" data-qty="'+(parseFloat(r.qty)||0)+'" data-price="'+(parseFloat(r.unitPrice)||0)+'" data-from="'+esc(r.from||'')+'" data-to="'+esc(r.to||'')+'" data-mr="'+esc(r.mround||'')+'" data-left="'+_rpLeft(c,r,editing?editNo:null)+'" style="border:1px solid var(--b1);border-radius:var(--r8);padding:7px 9px;margin-bottom:6px;background:var(--w)">'
+        +'<div style="font-size:12.5px;font-weight:700">'+esc(r.desc||r.preset||'')+' <span style="font-weight:400;color:var(--b4);font-size:11px">'+esc(r.preset||'')+'・'+(per==='mmonth'?('在場 '+_rfmt(r.qty)+' M，$'+_rfmt(r.unitPrice)+'/M/月'+(r.mround==='month'?'（未滿月以月計）':'')):per==='day'?('在場 '+fmt(r.qty)+' '+esc(r.unit||'')+'，$'+fmt(r.unitPrice)+'/'+esc(r.unit||'')+'/天'):per==='month'?('在場 '+fmt(r.qty)+' '+esc(r.unit||'')+'，$'+fmt(r.unitPrice)+'/'+esc(r.unit||'')+'/月'):per==='trip'?('$'+fmt(r.unitPrice)+'/趟'):('$'+fmt(r.unitPrice)))+(r.from?('・進場 '+esc(r.from)):'')+(r.to?('・退場 '+esc(r.to)):'')+'</span></div>'
+        +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px"><span style="font-size:11px;color:var(--b4);white-space:nowrap">本期 '+(per==='mmonth'?'M・月':per==='day'?esc(r.unit||'')+'・天':per==='month'?esc(r.unit||'')+'・月':per==='trip'?'趟數':'數量')+'</span>'
         +'<input class="rp-qty" type="number" inputmode="decimal" step="any" value="'+(sug!==''?sug:'')+'" oninput="_rpRecalc()" style="flex:1;min-width:70px;text-align:right;'+IN+'">'
         +'<span style="font-size:11px;color:var(--b4);white-space:nowrap">＠</span><input class="rp-up" type="number" inputmode="decimal" step="any" placeholder="'+(parseFloat(r.unitPrice)||0)+'" value="'+((cur.up!=null&&cur.up!=='')?cur.up:'')+'" oninput="_rpRecalc()" style="flex:0 0 96px;text-align:right;'+IN+'">'
         +'<b class="rp-amt" style="flex:0 0 90px;text-align:right;font-variant-numeric:tabular-nums;color:var(--g3)">0</b></div>'
@@ -38629,7 +38641,7 @@ function openRentPeriod(cid,editNo){
     +'<div class="fg fg2" style="gap:8px"><div class="f"><label>廠商發票號</label><input id="rp-invno" value="'+esc(editing&&editing.invNo||'')+'" placeholder="AB12345678" style="'+IN+'"></div><div class="f"><label>備註</label><input id="rp-note" value="'+esc(editing&&editing.note||'')+'" style="'+IN+'"></div></div>'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:13px"><span style="color:var(--b4)">本期合計（未稅）</span><b id="rp-total" style="font-size:16px;color:var(--g3)">0</b></div>'
     +'<div style="font-size:11px;color:var(--b4)">開發票 '+(_subInvoice(c)?'是（應付＋5%）':'否')+'・應付到期 '+_vendorDueDate(date)+'（參數：廠商放款日）</div>';
-  showConfirm((editing?'修改第'+editNo+'期租金請款：':'登錄租金請款：')+esc(c.vendor)+'（'+esc(q.name||'')+'）',html,function(){_rpSave();},false,null,true);
+  showConfirm((editing?'修改第'+editNo+'期請款：':'核對廠商請款單：')+esc(c.vendor)+'（'+esc(q.name||'')+'）',html,function(){_rpSave();},false,null,true);
   setTimeout(function(){if(!editing)_rpSuggest();else _rpRecalc();},30);
 }
 function _rpSuggest(){
@@ -38896,22 +38908,22 @@ function rentPlanEnd(cid,v){
 function _rentCardHtml(q,c){
   var st=_rentStat(c),est=_rentEstimate(q,c),pl=_rentPlan(q,c);
   var h='<div style="background:#eef5fd;border:1px solid #bcd8f5;border-radius:var(--r8);padding:7px 10px;margin-bottom:6px;font-size:11.5px">'
-    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="color:#1565C0">租賃合約・逐期請款</b><span style="color:var(--b4)">已登錄 '+st.n+' 期・累計 NT$ '+fmt(st.billed)+(st.unpaid?('・待付 '+fmt(st.unpaid)):'')+(est.est?('・本期預估 '+fmt(est.est)):'')+'</span>'
-    +'<span style="margin-left:auto;display:flex;gap:4px">'+(c.vendor?'<button type="button" class="btn btn-xs" style="border-color:#1565C0;color:#1565C0" onclick="openRentPeriod(\''+c.id+'\')">登錄租金請款</button>':'<span style="color:var(--red)">請先選廠商</span>')+'</span></div>';
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="color:#1565C0">'+(/運費/.test(c.cat||'')?'運輸':'租賃')+'・依廠商請款單核實</b><span style="color:var(--b4)">已登錄 '+st.n+' 期・累計 NT$ '+fmt(st.billed)+(st.unpaid?('・待付 '+fmt(st.unpaid)):'')+(est.est?('・本期預估 '+fmt(est.est)):'')+'</span>'
+    +'<span style="margin-left:auto;display:flex;gap:4px">'+(c.vendor?'<button type="button" class="btn btn-xs" style="border-color:#1565C0;color:#1565C0;font-weight:700" onclick="openRentPeriod(\''+c.id+'\')">核對請款單</button>':'<span style="color:var(--red)">請先選廠商</span>')+'</span></div>';
   // 預估 vs 實際
   var over=pl.rate!=null&&pl.rate>100,warn=pl.rate!=null&&pl.rate>85;
   h+='<div class="rent-plan" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:5px;padding:5px 8px;background:var(--w);border:1px solid '+(over?'#f0c4c4':'#bcd8f5')+';border-radius:var(--r6)">'
-    +'<span><span style="color:var(--b4)">預估合約</span> <b>'+(pl.amt?('NT$ '+fmt(pl.amt)):'—')+'</b>'+(pl.open?'<span style="color:#b26a00"> （無預計退場日，以至今計）</span>':(pl.src?('<span style="color:var(--b4)"> 至 '+esc(pl.end||'')+'・'+esc(pl.src)+'</span>'):''))+'</span>'
+    +'<span><span style="color:var(--b4)">預估合約</span> <b>'+(pl.amt?('NT$ '+fmt(pl.amt)):'—')+'</b>'+(pl.open?'<span style="color:#b26a00"> （無預計退場日，以至今計）</span>':(pl.src?('<span style="color:var(--b4)"> '+(pl.end?('至 '+esc(pl.end)+'・'):'')+esc(pl.src)+'</span>'):''))+'</span>'
     +'<span><span style="color:var(--b4)">已請款＋本期預估</span> <b>NT$ '+fmt(pl.toDate)+'</b></span>'
     +'<span><span style="color:var(--b4)">結餘</span> <b style="color:'+(pl.left<0?'var(--red)':'var(--g3)')+'">'+(pl.amt?((pl.left<0?'−':'')+'NT$ '+fmt(Math.abs(pl.left))):'—')+'</b>'+(pl.rate!=null?('<span style="font-weight:700;color:'+(over?'var(--red)':warn?'#e65100':'var(--g3)')+'"> 執行率 '+pl.rate+'%</span>'):'')+'</span>'
-    +'<label style="margin-left:auto;display:inline-flex;gap:4px;align-items:center;color:var(--b4)">預計退場日 <input type="date" value="'+esc(c.planEnd||'')+'" onchange="rentPlanEnd(\''+c.id+'\',this.value)" style="font-size:11px;padding:2px 4px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit"></label></div>';
+    +((parseFloat(c.planAmt)||0)>0?'':'<label style="margin-left:auto;display:inline-flex;gap:4px;align-items:center;color:var(--b4)">預計退場日 <input type="date" value="'+esc(c.planEnd||'')+'" onchange="rentPlanEnd(\''+c.id+'\',this.value)" style="font-size:11px;padding:2px 4px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit"></label>')+'</div>';
   var pers=_subPeriods(c).filter(function(p){return !p.isRet;}).slice().sort(function(a,b){return (b.no||0)-(a.no||0);});
   if(pers.length)h+='<div style="margin-top:5px">'+pers.map(function(p){var k=_subPeriodCalc(c,p);var pb=PAYABLES.find(function(x){return x.id===_subPayId(c.id,p);});var paid=pb&&pb.status==='paid';var df=_rentPeriodDiff(c,p);
     return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:3px 0;border-top:1px dotted #bcd8f5">第'+p.no+'期 '+esc(p.date||'')+' <span style="color:var(--b4)">'+esc((p.from||'')+'～'+(p.to||''))+'</span><b>NT$ '+fmt(k.amt)+'</b>'
       +(df.n?('<span class="rent-diff" style="color:#b26a00;font-weight:700" title="廠商請款數量與系統（在場×天數）的差">差 '+(df.qty>0?'+':'')+fmt(df.qty)+'（'+(df.amt>0?'+':'')+fmt(df.amt)+'）</span>'):'')
       +(p.invNo?'<span style="color:var(--b4)">發票 '+esc(p.invNo)+'</span>':'')+'<span style="color:'+(paid?'var(--g)':'var(--red)')+';font-weight:700">'+(paid?'已付':'待付 '+esc(p.due||''))+'</span>'
       +'<span style="margin-left:auto;display:flex;gap:3px"><button type="button" class="btn btn-xs" onclick="printVendorStatement(\''+c.id+'\','+p.no+')">核對單</button>'+(paid?'':'<button type="button" class="btn btn-xs" onclick="openRentPeriod(\''+c.id+'\','+p.no+')">修改</button><button type="button" class="btn btn-xs" style="color:var(--red);border-color:#f0c4c4" onclick="delSubPeriod(\''+c.id+'\','+p.no+')">刪除</button>')+'</span></div>';}).join('')+'</div>';
-  h+='<div style="color:var(--b4);margin-top:4px">成本金額＝已登錄各期合計；預估合約＝在場量×預計天數×單價（運費進退場各 1 趟）；下方列為計價基準，由發包→材料分頁維護。</div></div>';
+  h+='<div style="color:var(--b4);margin-top:4px">成本金額＝已核實的請款合計（未請款前為 0）；預估＝合約租期（或預計趟數）的預估金額；下方列為計價基準，由「材料．租賃」頁維護。廠商請款單到了按「核對請款單」，確認後轉應付。</div></div>';
   return h;
 }
 // 3) 材料分頁：單位成本比較（同規格 自有攤提 vs 料場日租、本案至今各花多少、租幾天等於買一支）
@@ -38955,7 +38967,8 @@ function _costOwnBreak(q,onlyUn){
     if(c.rental){b.rentN++;
       _subPeriods(c).forEach(function(p){if(p.isRet)return;(p.rows||[]).forEach(function(pr){var r=(c.rows||[]).find(function(x){return x.id===pr.rid;});if(!r)return;var a=Math.round((parseFloat(pr.qty)||0)*_subRowPrice(r,pr));var ps=String(r.preset||'')+String(r.per==='trip'?'運費':'');
         if(/運費/.test(ps))b.trans+=a;else if(/損耗|賠償/.test(ps))b.loss+=a;else b.rent+=a;});});
-      try{b.rentEst+=_rentEstimate(q,c).est;}catch(e){}try{var _pl=_rentPlan(q,c);b.rentPlan+=_pl.amt;if(_pl.open)b.rentOpen++;}catch(e){}
+      var _isTp=/運費/.test(c.cat||'');   // v6.0.25 運輸卡不算進租金預估
+      if(!_isTp){try{b.rentEst+=_rentEstimate(q,c).est;}catch(e){}try{var _pl=_rentPlan(q,c);b.rentPlan+=_pl.amt;if(_pl.open)b.rentOpen++;}catch(e){}}
     }else{var a=parseFloat(c.amt)||0;
       if(c._fromMat==='amort')b.amort+=a;else if(c._fromMat==='loss'||c.cat==='材料損耗')b.loss+=a;else if(c._fromMat==='trans'||/運費/.test(c.cat||''))b.trans+=a;else if(/租金/.test(c.cat||''))b.rent+=a;else b.buy+=a;}
   });
@@ -39226,6 +39239,388 @@ function _subEarlyRowsHtml(c,per){
     return '<tr class="sub-early" style="border-bottom:1px solid var(--b1);background:#f5faff"><td style="padding:3px 6px 3px 16px;white-space:nowrap;color:#1565C0;font-size:11.5px">↳ 提前放款</td><td style="padding:3px 6px;font-size:11px;color:var(--b4)">'+esc(e.date||'')+'</td><td style="padding:3px 6px;text-align:right">'+fmt(amt)+'</td><td style="padding:3px 6px;text-align:right;font-weight:700">'+fmt(eff)+'</td><td style="padding:3px 6px;font-size:11px">'+esc((p&&p.date)||e.date||'')+'</td><td style="padding:3px 6px;font-size:11.5px;font-weight:700">'+stTxt+(e.note?'<div style="font-weight:400;color:var(--b4);font-size:10.5px">'+esc(e.note)+'</div>':'')+'</td><td style="padding:3px 6px;text-align:right">'+(p&&p.status==='paid'?'':'<button type="button" onclick="delSubEarly(\''+c.id+'\','+per.no+',\''+e.id+'\')" style="font-size:11px;padding:2px 8px;border:1px solid #f0c4c4;background:var(--w);color:var(--red);border-radius:99px;cursor:pointer;font-family:inherit">刪除</button>')+'</td></tr>';}).join('');
 }
 function vbEarly(qid,cid,no){if(!_vbCtx(qid))return;openSubEarly(cid,no);}
+
+// ══════════ v6.0.25 材料．租賃獨立頁（自發包移出）══════════
+// 流程：新增材料需求 → 比對公司庫存（同規格同長度閒置 → 調撥；同規格其他長度閒置 → 詢問接樁／切樁；都沒有 → 詢問租賃）
+// 資料（q.mat，private）：
+//   rows[]  需求 {id,name,spec,len,unit,qty,rate,note}
+//   rents[] 材料租賃（按 M、分批進場、月租）{id,vendor,rowId,name,spec,len,rate($/M/月),cm(合約 M 數),pf,pt(預計進／退場),mode:'day'(按日折算)|'month'(未滿月以一月計),note,batches:[{id,d(進場),m(M數),n(支數),o(退場)}]}
+//   equip[] 設備租賃 {id,name,vendor,qty,from,to,pt(預計退場),per:'month'|'day',rate}
+//   tps[]   運輸（另一家運輸廠商，與租賃分開）{id,date,vendor,cat:'材料運費'|'設備運費',desc,trips,price}
+// 不必「建立合約」：輸入即自動同步成施工成本自有卡（rental:true，未請款前金額 0），廠商請款單到了在施工成本卡「核對請款單」→ 確認轉應付
+// 台帳接／切樁：調撥列帶 matRowId、adapt:'cut'|'splice'、adaptPer（每支台帳料可抵幾支需求）
+var _m6Qid='';
+function _m6Q(){var q=Q.find(function(x){return x.id===_m6Qid;});if(!q&&typeof _rfqQid!=='undefined'&&_rfqQid){q=Q.find(function(x){return x.id===_rfqQid&&x.awarded;});if(q)_m6Qid=q.id;}return q||null;}
+function _m6Id(p){return p+Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
+function _m6Arr(m,k){if(!Array.isArray(m[k]))m[k]=[];return m[k];}
+function _m6Months(from,to,mode){if(!from||!to)return 0;var d=Math.max(0,_dDiff(from,to));if(!d)return 0;return mode==='month'?Math.ceil(d/30):d/30;}
+function _m6RentPlan(rt){var cm=parseFloat(rt.cm)||0,rate=parseFloat(rt.rate)||0;if(!(cm>0&&rate>0&&rt.pf&&rt.pt))return 0;return Math.round(cm*_m6Months(rt.pf,rt.pt,rt.mode)*rate);}
+function _m6RentToDate(rt){var t=0,rate=parseFloat(rt.rate)||0,today=localToday();(rt.batches||[]).forEach(function(b){var to=b.o||today;if(!b.d||b.d>today)return;if(to>today)to=today;t+=(parseFloat(b.m)||0)*_m6Months(b.d,to,rt.mode)*rate;});return Math.round(t);}
+function _m6RentIn(rt){var today=localToday();return (rt.batches||[]).filter(function(b){return b.d&&b.d<=today&&(!b.o||b.o>today);}).reduce(function(a,b){return a+(parseFloat(b.m)||0);},0);}
+function _m6RentArrived(rt){return (rt.batches||[]).reduce(function(a,b){return a+(parseFloat(b.m)||0);},0);}
+function _m6EquipPlan(e){var qn=parseFloat(e.qty)||0,rate=parseFloat(e.rate)||0;if(!(e.from&&e.pt&&qn>0&&rate>0))return 0;var d=Math.max(0,_dDiff(e.from,e.pt));return Math.round(qn*(e.per==='day'?d:d/30)*rate);}
+function _m6EquipToDate(e){var qn=parseFloat(e.qty)||0,rate=parseFloat(e.rate)||0,today=localToday();if(!e.from||e.from>today)return 0;var to=e.to&&e.to<today?e.to:today;var d=Math.max(0,_dDiff(e.from,to));return Math.round(qn*(e.per==='day'?d:d/30)*rate);}
+function _m6RentPcs(q,row){var len=parseFloat(row.len)||0,m=_matQ(q);if(!(len>0))return 0;return _m6Arr(m,'rents').filter(function(rt){return rt.rowId===row.id;}).reduce(function(a,rt){return a+Math.floor((parseFloat(rt.cm)||0)/len+1e-6);},0);}
+// 自有在工地（含接／切樁抵用的料）
+function _matAtQty(q,row){return _matLedAt(q).reduce(function(a,r){var qn=parseFloat(r.qty)||0;if(r.adapt&&r.matRowId===row.id)return a+qn*(parseFloat(r.adaptPer)||1);if(!r.adapt&&_matMatch(r,row))return a+qn;return a;},0);}
+function _matShort(q,r){return Math.max(0,(parseFloat(r.qty)||0)-Math.floor(_matAtQty(q,r)+1e-6)-_m6RentPcs(q,r));}
+function _m6Alt(row){var tl=String(parseFloat(row.len)||'');return MAT_LEDGER.filter(function(r){return r&&r.name===row.name&&String(r.spec||'')===String(row.spec||'')&&!r.projQid&&(!r.loc||r.loc==='公司倉庫')&&(parseFloat(r.qty)||0)>0&&r.kind!=='一次性'&&String(parseFloat(r.len)||'')!==tl;});}
+// 舊版（v6.0.13／v6.0.19）租賃欄位一次性轉入新結構
+function _m6Migrate(q){
+  var m=_matQ(q);if(!m||m._m6)return false;
+  var rents=_m6Arr(m,'rents'),tps=_m6Arr(m,'tps'),eq=_m6Arr(m,'equip');
+  m.rows.forEach(function(r){
+    var v=(r.rentVendor||'').trim(),len=parseFloat(r.len)||0;
+    if(v&&!rents.some(function(x){return x.rowId===r.id;})){
+      var n=parseFloat(r.rentQty)||0,rate=0,note='';
+      if(n>0){var d=parseFloat(r.rentRate)||0;rate=len>0?Math.round(d*30/len*100)/100:0;note='由舊版轉入（原 $'+d+'/支/天）';}
+      else if((parseFloat(r.rentPrice)||0)>0){n=_matShort(q,r);var mp=parseFloat(r.rentPrice)||0;rate=len>0?Math.round(mp/len*100)/100:0;note='由舊版轉入（原 $'+mp+'/支/月）';}
+      if(n>0){var id=_m6Id('rn');rents.push({id:id,vendor:v,rowId:r.id,name:r.name,spec:r.spec,len:r.len,rate:rate,cm:Math.round(n*len*100)/100,pf:r.rentFrom||'',pt:r.rentTo||'',mode:'day',note:note,batches:r.rentFrom?[{id:id+'b',d:r.rentFrom,m:Math.round(n*len*100)/100,n:n,o:r.rentTo||''}]:[]});}
+    }
+    if((parseFloat(r.rentTrans)||0)>0&&!r._tpMig){tps.push({id:_m6Id('tp'),date:r.rentFrom||localToday(),vendor:'',cat:'材料運費',desc:_matLabel(r)+' 運費',trips:'',price:parseFloat(r.rentTrans)||0});r._tpMig=1;}
+  });
+  eq.forEach(function(e){if((parseFloat(e.transPrice)||0)>0&&!e._tpMig){tps.push({id:_m6Id('tp'),date:e.from||localToday(),vendor:e.vendor||'',cat:'設備運費',desc:(e.name||'設備')+' 運費',trips:2,price:parseFloat(e.transPrice)||0});e._tpMig=1;}});
+  if(m.trans&&(parseFloat(m.trans.price)||0)>0&&!m.trans._mig){tps.push({id:_m6Id('tp'),date:localToday(),vendor:m.trans.vendor||'',cat:'材料運費',desc:'材料運輸',trips:parseFloat(m.trans.trips)||'',price:parseFloat(m.trans.price)||0});m.trans._mig=1;}
+  m._m6=1;_touch(m);_touch(q);return true;
+}
+// 成本卡同步（內容沒變不戳 _mt；已請款引用的列保留並標結束）
+function _matSyncCost(q,kind,cat,rows,vendor,opts){
+  if(!q.costs)q.costs=[];
+  var rental=!!(opts&&opts.rental),planAmt=(opts&&opts.planAmt!=null)?Math.round(opts.planAmt):null;
+  var c=q.costs.find(function(x){return x._fromMat===kind;});
+  var sig=JSON.stringify(rows.map(function(r){return [r.id,r.preset||'',r.desc,r.qty,r.unitPrice,r.per||'',r.from||'',r.to||'',r.planTo||'',r.mround||'',r.planned?1:0];}))+'|'+(vendor||'')+'|'+cat+'|'+(planAmt==null?'':planAmt);
+  var used={};if(c)_subPeriods(c).forEach(function(p){(p.rows||[]).forEach(function(pr){used[pr.rid]=1;});});
+  if(!rows.length||(!rental&&!rows.some(function(r){return r.amt>0;}))){
+    if(!c)return false;
+    if(Object.keys(used).length){var chg=false;(c.rows||[]).forEach(function(r){if(!r.to&&r.per!=='trip'&&r.per!=='once'){r.to=localToday();chg=true;}});if(c._matSig!=='ended'){c._matSig='ended';chg=true;}if(chg)_touch(q);return chg;}
+    q.costs=q.costs.filter(function(x){return x!==c;});try{syncCostToPayable(q,{id:c.id,type:'own',vendor:'',amt:0,rows:[]});}catch(e){}_touch(q);return true;
+  }
+  if(!c){c={id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),type:'own',isAttached:false,attachedTo:'',mergedInto:'',date:localToday(),vendor:vendor||'',linkedItemIdx:-1,cat:cat,rows:[],amt:0,_fromMat:kind,invoice:true};if(rental)c.rental=true;q.costs.push(c);}
+  if(c._matSig===sig&&c.vendor===(vendor||''))return false;
+  c.vendor=vendor||'';c.cat=cat;c._matSig=sig;if(rental)c.rental=true;if(planAmt!=null)c.planAmt=planAmt;else delete c.planAmt;
+  var byId={};(c.rows||[]).forEach(function(r){byId[r.id]=r;});
+  var out=[];
+  rows.forEach(function(r){var o=byId[r.id]||{id:r.id};o.preset=r.preset||'材料租金';o.desc=r.desc;o.qty=r.qty;o.unit=r.unit||'';o.unitPrice=r.unitPrice;
+    ['per','from','to','planTo','mround'].forEach(function(k){if(r[k]!=null&&r[k]!=='')o[k]=r[k];else delete o[k];});
+    if(r.planned)o.planned=true;else delete o.planned;out.push(o);delete byId[r.id];});
+  Object.keys(byId).forEach(function(id){if(used[id]){var o=byId[id];if(!o.to&&o.per!=='trip'&&o.per!=='once')o.to=localToday();out.push(o);}});
+  c.rows=out;
+  try{recalcCostAmt(c);}catch(e){_err('_matSyncCost',e);}
+  try{syncCostToPayable(q,c);}catch(e){_err('_matSyncCost.pay',e);}
+  _touch(q);return true;
+}
+function _m6Sync(q){
+  var m=_matQ(q);if(!m)return false;var ch=_m6Migrate(q);
+  var rents=_m6Arr(m,'rents'),eq=_m6Arr(m,'equip'),tps=_m6Arr(m,'tps');
+  var byV={};
+  rents.forEach(function(rt){var v=(rt.vendor||'').trim();if(!v)return;var lab=_matLabel(rt);var g=byV[v]=byV[v]||{rows:[],plan:0};g.plan+=_m6RentPlan(rt);
+    var bs=rt.batches||[];
+    if(!bs.length){if((parseFloat(rt.cm)||0)>0)g.rows.push({id:'rp_'+rt.id,preset:'材料租金',desc:lab+' 租賃（預計 '+_rfmt(rt.cm)+'M，尚未進場）',qty:parseFloat(rt.cm)||0,unit:'M',unitPrice:parseFloat(rt.rate)||0,per:'mmonth',from:rt.pf||'',planTo:rt.pt||'',mround:rt.mode||'day',planned:true});}
+    else bs.forEach(function(b,i){g.rows.push({id:'rb_'+b.id,preset:'材料租金',desc:lab+' 租賃 第'+(i+1)+'批 '+_rfmt(b.m)+'M'+(b.n?('（'+b.n+' 支）'):''),qty:parseFloat(b.m)||0,unit:'M',unitPrice:parseFloat(rt.rate)||0,per:'mmonth',from:b.d||'',to:b.o||'',planTo:rt.pt||'',mround:rt.mode||'day'});});
+  });
+  Object.keys(byV).forEach(function(v){if(_matSyncCost(q,'rent:'+v,'材料租金',byV[v].rows,v,{rental:true,planAmt:byV[v].plan}))ch=true;});
+  (q.costs||[]).filter(function(c){return /^rent:/.test(c._fromMat||'')&&!byV[c._fromMat.slice(5)];}).forEach(function(c){if(_matSyncCost(q,c._fromMat,'材料租金',[],'',{rental:true}))ch=true;});
+  var byE={};
+  eq.forEach(function(e){var v=(e.vendor||'').trim(),n=parseFloat(e.qty)||0;if(!v||!e.name||n<=0)return;var g=byE[v]=byE[v]||{rows:[],plan:0};g.plan+=_m6EquipPlan(e);
+    g.rows.push({id:'eq_'+e.id,preset:'設備租金',desc:e.name+' 租賃',qty:n,unit:'台',unitPrice:parseFloat(e.rate)||0,per:e.per==='day'?'day':'month',from:e.from||'',to:e.to||'',planTo:e.pt||''});});
+  Object.keys(byE).forEach(function(v){if(_matSyncCost(q,'erent:'+v,'設備租金',byE[v].rows,v,{rental:true,planAmt:byE[v].plan}))ch=true;});
+  (q.costs||[]).filter(function(c){return /^erent:/.test(c._fromMat||'')&&!byE[c._fromMat.slice(6)];}).forEach(function(c){if(_matSyncCost(q,c._fromMat,'設備租金',[],'',{rental:true}))ch=true;});
+  var byT={};
+  tps.forEach(function(t){var v=(t.vendor||'').trim();if(!v)return;var cat=t.cat==='設備運費'?'設備運費':'材料運費',k=v+':'+cat;var g=byT[k]=byT[k]||{v:v,cat:cat,rows:[],plan:0};var tr=parseFloat(t.trips)||0,pr=parseFloat(t.price)||0;g.plan+=tr*pr;
+    g.rows.push({id:'tp_'+t.id,preset:cat,desc:(t.desc||cat)+(t.date?(' '+t.date):''),qty:tr,unit:'趟',unitPrice:pr,per:'trip',from:t.date||''});});
+  Object.keys(byT).forEach(function(k){var g=byT[k];if(_matSyncCost(q,'trans:'+k,g.cat,g.rows,g.v,{rental:true,planAmt:g.plan}))ch=true;});
+  (q.costs||[]).filter(function(c){return /^trans:/.test(c._fromMat||'')&&!byT[c._fromMat.slice(6)];}).forEach(function(c){if(_matSyncCost(q,c._fromMat,c.cat||'材料運費',[],'',{rental:true}))ch=true;});
+  (q.costs||[]).filter(function(c){return c._fromMat==='trans'&&!_subPeriods(c).length;}).forEach(function(c){if(_matSyncCost(q,'trans','材料運費',[],''))ch=true;});
+  return ch;
+}
+function _m6Save(q,noSync){if(!noSync){try{_m6Sync(q);}catch(e){_err('_m6Save.sync',e);}}_touch(_matQ(q));_touch(q);try{persist();_immediateUpload();}catch(e){_err('_m6Save',e);}}
+function _m6Re(){var pg=document.querySelector('.page.active');if(pg&&pg.id==='page-mat6')renderMat6();else if(pg&&pg.id==='page-rfq')_m6RenderRfq0();}
+var _m6RenderRfq0=renderRfq;
+renderRfq=function(){var pg=document.querySelector('.page.active');if(pg&&pg.id==='page-mat6')return renderMat6();return _m6RenderRfq0.apply(this,arguments);};
+function _rfqTabBar(){return '';}
+function rfqTab(t){if(t==='mat'){_m6Qid=_rfqQid||_m6Qid;go('mat6');return;}_rfqTab='rfq';renderRfq();}
+// ── 比對：同長調撥 → 同規格其他長度接／切樁 → 租賃 ──
+function _m6Close(){var md=document.getElementById('gen-confirm-modal');if(md)md.style.display='none';}
+function m6Decide(qid,rid){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;var m=_matQ(q);var row=m.rows.find(function(x){return x.id===rid;});if(!row)return;
+  var need=_matShort(q,row),ex=_matLedStock(row).reduce(function(a,r){return a+(parseFloat(r.qty)||0);},0),alt=_m6Alt(row);
+  var byLen={};alt.forEach(function(r){var k=parseFloat(r.len)||0;byLen[k]=(byLen[k]||0)+(parseFloat(r.qty)||0);});
+  var altTxt=Object.keys(byLen).sort(function(a,b){return a-b;}).map(function(k){return 'L='+_rfmt(k)+'M '+fmt(byLen[k])+' 支';}).join('、');
+  var B=function(lbl,js,clr){return '<button type="button" class="btn btn-sm" onclick="_m6Close();'+js+'" style="margin:4px 6px 0 0;border-color:'+clr+';color:'+clr+'">'+lbl+'</button>';};
+  var h='<div style="font-size:13px;line-height:1.7"><b>'+esc(_matLabel(row))+'</b>　需求 '+fmt(row.qty)+' 支・工地自有 '+fmt(Math.floor(_matAtQty(q,row)))+' 支・已租 '+fmt(_m6RentPcs(q,row))+' 支<br>';
+  var primary=null,okLbl='確認';
+  if(need<=0){h+='<span style="color:var(--g3);font-weight:700">需求已足，不需再調撥或租賃。</span>';}
+  else if(ex>0){h+='公司倉庫有<b>同規格同長度</b>閒置 <b>'+fmt(ex)+'</b> 支，尚缺 '+fmt(need)+' 支 → 先調撥。';primary=function(){matOut(qid,rid);};okLbl='調撥到工地';
+    if(alt.length)h+='<br><span style="font-size:12px;color:var(--b4)">另有同規格其他長度：'+esc(altTxt)+'</span><br>'+B('接樁／切樁','m6Adapt(\''+qid+'\',\''+rid+'\')','#8a6d00');
+    h+=B('改租賃','m6RentEdit(\''+qid+'\',\'\',\''+rid+'\')','#1565C0');}
+  else if(alt.length){h+='公司倉庫沒有 L='+_rfmt(row.len)+'M，但有<b>同規格其他長度閒置</b>：'+esc(altTxt)+'。<br><b>要接樁或切樁使用嗎？</b>';primary=function(){m6Adapt(qid,rid);};okLbl='是，選擇接／切樁';
+    h+='<br>'+B('否，租賃 '+fmt(need)+' 支','m6RentEdit(\''+qid+'\',\'\',\''+rid+'\')','#1565C0');}
+  else{h+='公司倉庫沒有可用的 '+esc((row.name||'')+' '+(row.spec||''))+'（同長度、其他長度都沒有閒置）。<br><b>要租賃 '+fmt(need)+' 支嗎？</b>';primary=function(){m6RentEdit(qid,'',rid);};okLbl='租賃';}
+  h+='</div>';
+  showConfirm('比對公司材料：'+_matLabel(row),h,function(){if(primary)primary();},false,null,false);
+  var ok=document.getElementById('gen-confirm-ok');if(ok)ok.textContent=okLbl;
+}
+var _m6AdCtx=null;
+function m6Adapt(qid,rid){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;var m=_matQ(q);var row=m.rows.find(function(x){return x.id===rid;});if(!row)return;
+  var alt=_m6Alt(row);if(!alt.length){toast('公司倉庫沒有同規格其他長度的閒置材料');return;}
+  var tl=parseFloat(row.len)||0,need=_matShort(q,row);_m6AdCtx={qid:qid,rid:rid};
+  var IN='box-sizing:border-box;font-size:13px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)';
+  var h='<div style="font-size:12px;color:var(--b4);margin-bottom:6px">需求 '+esc(_matLabel(row))+'，尚缺 <b>'+fmt(need)+'</b> 支。選擇要動用的公司料：長料可<b>切樁</b>、短料可<b>接樁</b>，填「可做成幾支」計入需求。台帳長度不自動改，實際切／接後可到材料台帳調整。</div>'
+    +'<div style="margin-bottom:6px;font-size:12px"><label>調撥日 <input id="ad-date" type="date" value="'+localToday()+'" style="'+IN+'"></label></div>'
+    +alt.map(function(r){var len=parseFloat(r.len)||0,cut=len>tl,per=tl>0?(cut?1:Math.floor(len/tl*100)/100):1;
+      return '<div class="ad-row" data-lid="'+r.id+'" data-len="'+len+'" style="border:1px solid var(--b1);border-radius:var(--r8);padding:7px 9px;margin-bottom:6px"><div style="font-size:12.5px;font-weight:700">'+esc(_matLabel(r))+' <span style="font-weight:400;color:var(--b4);font-size:11px">倉庫 '+fmt(r.qty)+' 支'+(r.date?('・進貨 '+esc(r.date)):'')+'</span></div>'
+        +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:5px"><select class="ad-kind" onchange="_m6AdHint(this)" style="'+IN+'"><option value="cut"'+(cut?' selected':'')+'>切樁</option><option value="splice"'+(cut?'':' selected')+'>接樁</option></select>'
+        +'<span style="font-size:11.5px">動用</span><input class="ad-qty" type="number" inputmode="numeric" min="0" max="'+(parseFloat(r.qty)||0)+'" oninput="_m6AdHint(this)" style="'+IN+';width:76px;text-align:right"><span style="font-size:11.5px">支 → 可做成</span><input class="ad-pcs" type="number" inputmode="numeric" min="0" style="'+IN+';width:76px;text-align:right"><span style="font-size:11.5px">支 '+esc(_rfmt(tl))+'M</span></div>'
+        +'<div class="ad-hint" style="font-size:11px;color:#8a6d00;margin-top:3px">'+(cut?('切樁：每支 '+_rfmt(len)+'M 切成 '+_rfmt(tl)+'M，餘料 '+_rfmt(Math.round((len-tl)*100)/100)+'M'):('接樁：'+_rfmt(len)+'M 約 '+Math.ceil(tl/len*100)/100+' 支接成一支 '+_rfmt(tl)+'M'))+'</div></div>';}).join('');
+  showConfirm('接樁／切樁：'+_matLabel(row),h,function(){_m6AdSave();},false,null,true);
+}
+function _m6AdHint(el){var box=el.closest('.ad-row');if(!box)return;var q=Q.find(function(x){return x.id===_m6AdCtx.qid;});var row=_matQ(q).rows.find(function(x){return x.id===_m6AdCtx.rid;});var tl=parseFloat(row.len)||0,len=parseFloat(box.getAttribute('data-len'))||0,k=box.querySelector('.ad-kind').value,n=parseFloat(box.querySelector('.ad-qty').value)||0;
+  var pcs=k==='cut'?(len>=tl?n:0):(tl>0?Math.floor(n*len/tl):0);var pi=box.querySelector('.ad-pcs');if(el.classList.contains('ad-qty')||el.classList.contains('ad-kind'))pi.value=pcs||'';
+  box.querySelector('.ad-hint').textContent=k==='cut'?(len>=tl?('切樁：每支 '+_rfmt(len)+'M 切成 '+_rfmt(tl)+'M，餘料 '+_rfmt(Math.round((len-tl)*100)/100)+'M／支'):'長度不足，不能切成需求長度'):('接樁：'+fmt(n)+' 支 × '+_rfmt(len)+'M ＝ '+_rfmt(n*len)+'M，約可接成 '+fmt(pcs)+' 支 '+_rfmt(tl)+'M');}
+function _m6AdSave(){
+  if(!_m6AdCtx)return;var q=Q.find(function(x){return x.id===_m6AdCtx.qid;});if(!q)return;var m=_matQ(q);var row=m.rows.find(function(x){return x.id===_m6AdCtx.rid;});if(!row)return;
+  var date=gv('ad-date')||localToday(),tot=0,pcsTot=0;
+  document.querySelectorAll('.ad-row').forEach(function(box){var n=Math.round(parseFloat(box.querySelector('.ad-qty').value)||0),pcs=Math.round(parseFloat(box.querySelector('.ad-pcs').value)||0),k=box.querySelector('.ad-kind').value;if(n<=0||pcs<=0)return;
+    var lr=MAT_LEDGER.find(function(x){return x.id===box.getAttribute('data-lid');});if(!lr)return;n=Math.min(n,parseFloat(lr.qty)||0);if(n<=0)return;
+    _matLedSplit(lr,n,{loc:q.name||'工地',projQid:q.id,outDate:date,matRowId:row.id,adapt:k,adaptPer:Math.round(pcs/n*1000)/1000,adaptNote:(k==='cut'?'切樁 ':'接樁 ')+_rfmt(lr.len)+'M→'+_rfmt(row.len)+'M'});tot+=n;pcsTot+=pcs;});
+  if(!tot){toast('請填動用支數與可做成支數');m6Adapt(_m6AdCtx.qid,_m6AdCtx.rid);return;}
+  saveMatLedger();try{_matAmortSync(q);}catch(e){_err('_m6AdSave.amort',e);}_m6Save(q,true);
+  _m6AdCtx=null;_m6Re();
+  var left=_matShort(q,row);toast('已調撥 '+tot+' 支做接／切樁，抵 '+pcsTot+' 支需求'+(left>0?('；仍缺 '+left+' 支'):''));
+  if(left>0)setTimeout(function(){m6Decide(q.id,row.id);},80);
+}
+// ── 材料租賃：按 M、分批進場、月租 ──
+var _m6RtCtx=null;
+function m6RentEdit(qid,id,rowId){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;var m=_matQ(q);var rents=_m6Arr(m,'rents');
+  var rt=id?rents.find(function(x){return x.id===id;}):null;if(id&&!rt)return;
+  var row=m.rows.find(function(x){return x.id===(rt?rt.rowId:rowId);})||null;
+  var len=parseFloat((rt&&rt.len)||(row&&row.len))||0,need=row?_matShort(q,row):0;
+  var d=rt||{vendor:'',rowId:row?row.id:'',name:row?row.name:'型鋼',spec:row?row.spec:'',len:row?row.len:'',rate:'',cm:need&&len?Math.round(need*len*100)/100:'',pf:localToday(),pt:'',mode:'day',note:''};
+  _m6RtCtx={qid:qid,id:id||''};
+  var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)';
+  var vs=(VENDORS||[]).map(function(v){return '<option value="'+esc(v.name||'')+'">';}).join('');
+  var rowOpts='<option value="">（不對應需求列）</option>'+m.rows.map(function(r){return '<option value="'+r.id+'"'+(d.rowId===r.id?' selected':'')+'>'+esc(_matLabel(r))+'</option>';}).join('');
+  var h='<div class="fg fg2" style="gap:8px"><div class="f"><label>租賃廠商（料場）</label><input id="rt-vendor" list="rt-vdl" value="'+esc(d.vendor||'')+'" style="'+IN+'"><datalist id="rt-vdl">'+vs+'</datalist></div>'
+    +'<div class="f"><label>對應材料需求</label><select id="rt-row" onchange="_m6RtRow(this.value)" style="'+IN+'">'+rowOpts+'</select></div></div>'
+    +'<div class="fg fg3" style="gap:8px"><div class="f"><label>品項</label><input id="rt-name" value="'+esc(d.name||'')+'" style="'+IN+'"></div><div class="f"><label>規格</label><input id="rt-spec" value="'+esc(d.spec||'')+'" style="'+IN+'"></div><div class="f"><label>需求單長（M）</label><input id="rt-len" type="number" inputmode="decimal" value="'+esc(String(d.len==null?'':d.len))+'" oninput="_m6RtCalc()" style="'+IN+'"></div></div>'
+    +'<div class="fg fg3" style="gap:8px"><div class="f"><label>月租（$/M/月）</label><input id="rt-rate" type="number" inputmode="decimal" step="any" value="'+esc(String(d.rate==null?'':d.rate))+'" oninput="_m6RtCalc()" style="'+IN+'"></div>'
+    +'<div class="f"><label>合約數量（M）</label><input id="rt-cm" type="number" inputmode="decimal" step="any" value="'+esc(String(d.cm==null?'':d.cm))+'" oninput="_m6RtCalc()" style="'+IN+'"></div>'
+    +'<div class="f"><label>計算方式</label><select id="rt-mode" onchange="_m6RtCalc()" style="'+IN+'"><option value="day"'+(d.mode!=='month'?' selected':'')+'>按日折算（天數÷30）</option><option value="month"'+(d.mode==='month'?' selected':'')+'>未滿月以一月計</option></select></div></div>'
+    +'<div class="fg fg2" style="gap:8px"><div class="f"><label>預計進場</label><input id="rt-pf" type="date" value="'+esc(d.pf||'')+'" onchange="_m6RtCalc()" style="'+IN+'"></div><div class="f"><label>預計退場（合約租期）</label><input id="rt-pt" type="date" value="'+esc(d.pt||'')+'" onchange="_m6RtCalc()" style="'+IN+'"></div></div>'
+    +(id?'':'<label style="display:flex;gap:6px;align-items:center;font-size:12px;margin:2px 0 6px"><input id="rt-batch1" type="checkbox" style="width:16px;height:16px"> 合約數量於預計進場日一次進場（分批進場請之後按「＋ 進場」逐批登記）</label>')
+    +'<div class="f"><label>備註</label><input id="rt-note" value="'+esc(d.note||'')+'" style="'+IN+'"></div>'
+    +'<div id="rt-pv" style="background:var(--b0);border-radius:var(--r8);padding:8px 10px;font-size:12px;line-height:1.7;margin-top:6px"></div>';
+  showConfirm((id?'編輯':'新增')+'材料租賃',h,function(){_m6RtSave();},false,null,true);
+  _m6RtCalc();
+}
+function _m6RtRow(rid){var q=Q.find(function(x){return x.id===_m6RtCtx.qid;});var row=_matQ(q).rows.find(function(x){return x.id===rid;});if(!row)return;['name','spec','len'].forEach(function(k){var el=document.getElementById('rt-'+k);if(el)el.value=row[k]==null?'':row[k];});var cm=document.getElementById('rt-cm');if(cm&&!cm.value){var n=_matShort(q,row),len=parseFloat(row.len)||0;if(n&&len)cm.value=Math.round(n*len*100)/100;}_m6RtCalc();}
+function _m6RtCalc(){var el=document.getElementById('rt-pv');if(!el)return;var rt={rate:parseFloat(gv('rt-rate'))||0,cm:parseFloat(gv('rt-cm'))||0,pf:gv('rt-pf'),pt:gv('rt-pt'),mode:gv('rt-mode')};var len=parseFloat(gv('rt-len'))||0;var mo=_m6Months(rt.pf,rt.pt,rt.mode),plan=_m6RentPlan(rt);
+  el.innerHTML='合約 <b>'+_rfmt(rt.cm)+' M</b>'+(len>0?('（約 '+fmt(Math.floor(rt.cm/len+1e-6))+' 支 × '+_rfmt(len)+'M）'):'')+'・月租 $'+_rfmt(rt.rate)+'/M<br>'
+    +'預計租期 '+(rt.pf&&rt.pt?(rt.pf+' ～ '+rt.pt+'（'+_dDiff(rt.pf,rt.pt)+' 天 ≈ '+_rfmt(mo)+' 月）'):'<span style="color:#b26a00">請填預計進場與退場日</span>')
+    +'<br>預估租金（合約租期）<b style="color:#1565C0;font-size:14px">NT$ '+fmt(plan)+'</b>　<span style="color:var(--b4)">＝ M 數 × 月數 × 月租；寫進施工成本當預估，先看得到毛利</span>';}
+function _m6RtSave(){
+  var x=_m6RtCtx;if(!x)return;var q=Q.find(function(y){return y.id===x.qid;});if(!q)return;var m=_matQ(q);var rents=_m6Arr(m,'rents');
+  var v={vendor:(gv('rt-vendor')||'').trim(),rowId:gv('rt-row')||'',name:(gv('rt-name')||'').trim(),spec:(gv('rt-spec')||'').trim(),len:gv('rt-len')===''?'':(parseFloat(gv('rt-len'))||0),rate:parseFloat(gv('rt-rate'))||0,cm:parseFloat(gv('rt-cm'))||0,pf:gv('rt-pf')||'',pt:gv('rt-pt')||'',mode:gv('rt-mode')==='month'?'month':'day',note:(gv('rt-note')||'').trim()};
+  if(!v.vendor||!(v.cm>0)||!(v.rate>0)){toast('請填租賃廠商、合約數量（M）與月租');m6RentEdit(x.qid,x.id,v.rowId);return;}
+  var rt=x.id?rents.find(function(y){return y.id===x.id;}):null;
+  if(!rt){rt={id:_m6Id('rn'),batches:[]};rents.push(rt);var b1=document.getElementById('rt-batch1');if(b1&&b1.checked&&v.pf)rt.batches.push({id:_m6Id('b'),d:v.pf,m:v.cm,n:(v.len>0?Math.floor(v.cm/v.len+1e-6):''),o:''});}
+  Object.assign(rt,v);
+  if(!(VENDORS||[]).some(function(y){return (y.name||'')===v.vendor;})){VENDORS.push({id:'v'+Date.now().toString(36),name:v.vendor,type:'材料',_mt:Date.now()});try{saveVendors();}catch(e){}}
+  _m6Save(q);_m6RtCtx=null;_m6Re();toast('已'+(x.id?'更新':'新增')+'材料租賃，已同步到施工成本（預估租金 NT$ '+fmt(_m6RentPlan(rt))+'）');
+}
+function m6RentDel(qid,id){var q=Q.find(function(x){return x.id===qid;});if(!q)return;var m=_matQ(q);var rt=_m6Arr(m,'rents').find(function(x){return x.id===id;});if(!rt)return;
+  showConfirm('刪除材料租賃','確定刪除「'+esc(rt.vendor)+'　'+esc(_matLabel(rt))+'」？已登錄的請款期別會保留在施工成本。',function(){m.rents=m.rents.filter(function(x){return x.id!==id;});_m6Save(q);_m6Re();},true);}
+var _m6BtCtx=null;
+function m6Batch(qid,rid,bid){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;var rt=_m6Arr(_matQ(q),'rents').find(function(x){return x.id===rid;});if(!rt)return;
+  var b=bid?(rt.batches||[]).find(function(x){return x.id===bid;}):null;var arrived=_m6RentArrived(rt),len=parseFloat(rt.len)||0;
+  _m6BtCtx={qid:qid,rid:rid,bid:bid||''};
+  var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)';
+  var left=Math.max(0,(parseFloat(rt.cm)||0)-arrived+(b?(parseFloat(b.m)||0):0));
+  var h='<div style="font-size:12px;color:var(--b4);margin-bottom:6px">'+esc(rt.vendor)+'　'+esc(_matLabel(rt))+'・合約 '+_rfmt(rt.cm)+' M・已進場 '+_rfmt(arrived)+' M・月租 $'+_rfmt(rt.rate)+'/M。料場送來的料長短不一，請填這批實際 M 數（租金依進料日起算）。</div>'
+    +'<div class="fg fg2" style="gap:8px"><div class="f"><label>進場日</label><input id="bt-d" type="date" value="'+esc(b?b.d:localToday())+'" style="'+IN+'"></div><div class="f"><label>本批 M 數</label><input id="bt-m" type="number" inputmode="decimal" step="any" value="'+(b?b.m:(left||''))+'" style="'+IN+'"></div></div>'
+    +'<div class="fg fg2" style="gap:8px"><div class="f"><label>支數（選填）</label><input id="bt-n" type="number" inputmode="numeric" value="'+(b?(b.n||''):(left&&len?Math.floor(left/len+1e-6):''))+'" style="'+IN+'"></div><div class="f"><label>退場日（還料後填）</label><input id="bt-o" type="date" value="'+esc(b?b.o||'':'')+'" style="'+IN+'"></div></div>';
+  showConfirm((b?'修改':'登記')+'進場批次',h,function(){_m6BtSave();},false,null,false);
+}
+function _m6BtSave(){
+  var x=_m6BtCtx;if(!x)return;var q=Q.find(function(y){return y.id===x.qid;});if(!q)return;var rt=_m6Arr(_matQ(q),'rents').find(function(y){return y.id===x.rid;});if(!rt)return;
+  var v={d:gv('bt-d')||'',m:parseFloat(gv('bt-m'))||0,n:gv('bt-n')===''?'':(parseInt(gv('bt-n'))||0),o:gv('bt-o')||''};
+  if(!v.d||!(v.m>0)){toast('請填進場日與 M 數');m6Batch(x.qid,x.rid,x.bid);return;}
+  if(v.o&&v.o<v.d){toast('退場日不可早於進場日');m6Batch(x.qid,x.rid,x.bid);return;}
+  if(!Array.isArray(rt.batches))rt.batches=[];
+  var b=x.bid?rt.batches.find(function(y){return y.id===x.bid;}):null;if(!b){b={id:_m6Id('b')};rt.batches.push(b);}
+  Object.assign(b,v);rt.batches.sort(function(a,c){return String(a.d).localeCompare(String(c.d));});
+  _m6Save(q);_m6BtCtx=null;_m6Re();toast('已登記進場 '+_rfmt(v.m)+' M（'+v.d+' 起計租）');
+}
+function m6BatchDel(qid,rid,bid){var q=Q.find(function(x){return x.id===qid;});if(!q)return;var rt=_m6Arr(_matQ(q),'rents').find(function(x){return x.id===rid;});if(!rt)return;
+  showConfirm('刪除進場批次','確定刪除此批進場紀錄？',function(){rt.batches=(rt.batches||[]).filter(function(x){return x.id!==bid;});_m6Save(q);_m6Re();},true);}
+// ── 設備租賃、運輸（行內編輯，變更即同步施工成本）──
+function m6EquipAdd(qid){var q=Q.find(function(x){return x.id===qid;});if(!q)return;_m6Arr(_matQ(q),'equip').push({id:_m6Id('me'),name:'',vendor:'',qty:1,from:localToday(),to:'',pt:'',per:'month',rate:''});_m6Save(q,true);_m6Re();}
+function m6EquipUpd(qid,id,f,v){var q=Q.find(function(x){return x.id===qid;});if(!q)return;var e=_m6Arr(_matQ(q),'equip').find(function(x){return x.id===id;});if(!e)return;e[f]=(['name','vendor','from','to','pt','per'].indexOf(f)>=0)?v:(v===''?'':(parseFloat(v)||0));_m6Save(q);if(f==='vendor'||f==='per')_m6Re();else _m6Kpi(q);}
+function m6EquipDel(qid,id){var q=Q.find(function(x){return x.id===qid;});if(!q)return;var m=_matQ(q);showConfirm('刪除設備租賃','確定刪除？已登錄的請款期別會保留在施工成本。',function(){m.equip=_m6Arr(m,'equip').filter(function(x){return x.id!==id;});_m6Save(q);_m6Re();},true);}
+function m6TpAdd(qid,cat){var q=Q.find(function(x){return x.id===qid;});if(!q)return;_m6Arr(_matQ(q),'tps').push({id:_m6Id('tp'),date:localToday(),vendor:'',cat:cat==='設備運費'?'設備運費':'材料運費',desc:'',trips:'',price:''});_m6Save(q,true);_m6Re();}
+function m6TpUpd(qid,id,f,v){var q=Q.find(function(x){return x.id===qid;});if(!q)return;var t=_m6Arr(_matQ(q),'tps').find(function(x){return x.id===id;});if(!t)return;t[f]=(['date','vendor','cat','desc'].indexOf(f)>=0)?v:(v===''?'':(parseFloat(v)||0));_m6Save(q);if(f==='vendor'||f==='cat')_m6Re();else{var a=document.getElementById('m6tp-amt-'+id);if(a)a.textContent=fmt(Math.round((parseFloat(t.trips)||0)*(parseFloat(t.price)||0)));_m6Kpi(q);}}
+function m6TpDel(qid,id){var q=Q.find(function(x){return x.id===qid;});if(!q)return;var m=_matQ(q);showConfirm('刪除運輸','確定刪除？已登錄的請款期別會保留在施工成本。',function(){m.tps=_m6Arr(m,'tps').filter(function(x){return x.id!==id;});_m6Save(q);_m6Re();},true);}
+// ── 單位成本比較（$/M 口徑）──
+function _m6BuyPerM(name,spec){var sum=0,n=0;MAT_LEDGER.forEach(function(r){if(!r||r.name!==name||String(r.spec||'')!==String(spec||''))return;var uw=parseFloat(r.uw)||0;if(!uw){var t=MAT_UNIT_W[name]||MAT_UNIT_W['型鋼']||{};uw=parseFloat(t[spec])||0;}var pr=parseFloat(r.price)||0;if(!(uw>0&&pr>0))return;var qn=Math.max(1,parseFloat(r.qty)||0);sum+=uw*pr*qn;n+=qn;});return n?Math.round(sum/n):0;}
+function _matUnitCmpHtml(q,m){
+  var keys={},order=[];
+  var add=function(nm,sp){if(!sp)return;var k=nm+'|'+sp;if(!keys[k]){keys[k]={name:nm,spec:sp};order.push(k);}};
+  m.rows.forEach(function(r){add(r.name,r.spec);});_m6Arr(m,'rents').forEach(function(r){add(r.name,r.spec);});
+  if(!order.length)return '';
+  var am=[];try{am=_matAmortRows(q);}catch(e){_err('_matUnitCmpHtml',e);}
+  var rows=order.map(function(k){var s=keys[k];
+    var row0=m.rows.find(function(r){return r.name===s.name&&r.spec===s.spec;})||{spec:s.spec,rate:''};
+    var own=Math.round(_matRateOf(row0)*_matFactor()*100)/100;
+    var rs=_m6Arr(m,'rents').filter(function(r){return r.name===s.name&&r.spec===s.spec&&(parseFloat(r.rate)||0)>0;});
+    var rentM=rs.length?Math.round(rs.reduce(function(a,r){return a+(parseFloat(r.rate)||0);},0)/rs.length*100)/100:0,rentD=Math.round(rentM/30*100)/100;
+    var buy=_m6BuyPerM(s.name,s.spec);
+    var ownA=am.filter(function(a){return String(a.spec||'')===s.spec;}).reduce(function(a,r){return a+(r.amt||0);},0);
+    var rentA=rs.reduce(function(a,r){return a+_m6RentToDate(r);},0);
+    var planD=rs.reduce(function(a,r){return Math.max(a,(r.pf&&r.pt)?_dDiff(r.pf,r.pt):0);},0);
+    var be=(buy>0&&rentD>0)?Math.round(buy/rentD):0;
+    var v=[];
+    if(be){v.push('租 '+fmt(be)+' 天的租金＝買 1 M');if(planD)v.push(planD>=be?('<b style="color:var(--red)">本案預計租 '+planD+' 天，已超過購置成本 → 考慮自購或用公司料接／切</b>'):('<span style="color:var(--g3)">本案預計租 '+planD+' 天，約購置價 '+Math.round(planD/be*100)+'% → 租賃較划算</span>'));}
+    if(own&&rentD)v.push(rentD>own?('租金每 M 每天比自有攤提多 $'+_rfmt(Math.round((rentD-own)*100)/100)+'（自有閒置時先用自有）'):'租金低於自有攤提');
+    return ['<b>'+esc(s.name+' '+s.spec)+'</b>',own?_rfmt(own):'—',rentM?(_rfmt(rentM)+'<div style="font-size:10px;color:var(--b4)">≈ '+_rfmt(rentD)+'／天</div>'):'—',buy?fmt(buy):'<span style="color:var(--b4)">台帳無單價</span>',be?(fmt(be)+' 天'):'—',ownA?fmt(ownA):'—',rentA?fmt(rentA):'—',v.join('<br>')||'—'];});
+  return '<div class="card" style="padding:12px 14px"><div style="font-weight:800;font-size:14px;margin-bottom:6px">單位成本比較 <span style="font-size:11px;font-weight:400;color:var(--b4)">每 M 口徑：自有攤提（參數日租×折數）vs 料場月租 vs 購置價（台帳 單位重×每公斤單價）；損益兩平＝購置每 M ÷ 租金每 M 每天</span></div>'
+    +_pjTable([{t:'規格'},{t:'自有攤提 $/M/天',r:1},{t:'租金 $/M/月',r:1},{t:'購置 $/M',r:1},{t:'損益兩平',r:1},{t:'本案自有至今',r:1},{t:'本案租金至今',r:1},{t:'判讀'}],rows)+'</div>';
+}
+// ── 頁面 ──
+function _m6Kpi(q){var el=document.getElementById('m6-kpi');if(el)el.innerHTML=_m6KpiHtml(q);}
+function _m6KpiHtml(q){
+  var m=_matQ(q),at=_matLedAt(q),atQty=at.reduce(function(a,r){return a+(parseFloat(r.qty)||0);},0);
+  var amort=_matAmortTotal(q),lossAmt=m.loss.reduce(function(a,l){return a+(l.amt||0);},0);
+  var plan=_m6Arr(m,'rents').reduce(function(a,r){return a+_m6RentPlan(r);},0)+_m6Arr(m,'equip').reduce(function(a,e){return a+_m6EquipPlan(e);},0);
+  var toDate=_m6Arr(m,'rents').reduce(function(a,r){return a+_m6RentToDate(r);},0)+_m6Arr(m,'equip').reduce(function(a,e){return a+_m6EquipToDate(e);},0);
+  var tp=_m6Arr(m,'tps').reduce(function(a,t){return a+Math.round((parseFloat(t.trips)||0)*(parseFloat(t.price)||0));},0);
+  var billed=(q.costs||[]).filter(function(c){return c.type==='own'&&c.rental;}).reduce(function(a,c){return a+(parseFloat(c.amt)||0);},0);
+  return _pjKpi('自有在工地',fmt(atQty)+' 支','var(--g3)')+_pjKpi('內部攤提（不入應付）','NT$ '+fmt(amort),'#8a6d00')+_pjKpi('租賃預估（合約租期）','NT$ '+fmt(plan),'#1565C0')+_pjKpi('租金至今（估）','NT$ '+fmt(toDate),'#1565C0')+_pjKpi('運輸（預計）','NT$ '+fmt(tp),'#8a6d00')+_pjKpi('廠商已請款','NT$ '+fmt(billed),'var(--g3)')+(lossAmt?_pjKpi('損耗認列','NT$ '+fmt(lossAmt),'var(--red)'):'');
+}
+function renderMat6(){
+  var root=document.getElementById('mat6-root');if(!root)return;
+  var mains=Q.filter(function(q){return !q.parentId&&q.awarded&&!q.closed;});
+  if(!_m6Qid&&typeof eid!=='undefined'&&mains.some(function(q){return q.id===eid;}))_m6Qid=eid;
+  if(!_m6Qid&&mains.length===1)_m6Qid=mains[0].id;
+  var q=_m6Q();
+  var sel='<select onchange="_m6Qid=this.value;renderMat6()" style="width:100%;max-width:420px;font-size:13px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w)"><option value="">── 選擇工程（得標案）──</option>'
+    +mains.map(function(x){return '<option value="'+x.id+'"'+(q&&q.id===x.id?' selected':'')+'>'+esc((x.name||'未命名').slice(0,24))+(x.client?('／'+esc(x.client.slice(0,8))):'')+'</option>';}).join('')+'</select>';
+  var h='<div class="card"><div class="cb"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+sel+(q?(_pjBtn("matRowEdit('"+q.id+"','')",'＋ 新增材料需求','border-color:var(--g);color:var(--g3);font-weight:700')+_pjBtn("matSeedFromEst('"+q.id+"')",'由材料估算帶入')+_pjBtn("matEstPickProj('"+q.id+"');go('matest')",'材料估算')+_pjBtn("go('materials')",'材料台帳／庫存')+_pjBtn("openProjectCosts('"+q.id+"')",'施工成本 →')):'')+'</div>'
+    +'<div style="font-size:11.5px;color:var(--b3);margin-top:6px">流程：新增材料需求 → 系統比對公司庫存（同長度閒置先調撥；同規格其他長度閒置問是否接樁／切樁；都沒有再問租賃）。租賃、設備、運輸填好即自動進施工成本（未請款前金額 0、預估租金先算毛利），廠商請款單到了到施工成本卡按「核對請款單」，確認後轉應付。</div></div></div>';
+  if(!q){root.innerHTML=h+'<div style="padding:24px;text-align:center;color:var(--b3);font-size:12.5px">請先選擇工程</div>';return;}
+  var m=_matQ(q),ch=false;
+  try{ch=_m6Migrate(q)||ch;_matAmortSync(q);_matLossSync(q);ch=_m6Sync(q)||ch;}catch(e){_err('renderMat6.sync',e);}
+  if(ch){try{persist();}catch(e){}}
+  var rr=P.matRentRate||{};
+  h+='<div class="card" style="padding:12px 14px"><div id="m6-kpi" style="display:flex;gap:6px;flex-wrap:wrap">'+_m6KpiHtml(q)+'</div><div style="font-size:11px;color:var(--b4);margin-top:6px">內部日租 H300 '+(rr.H300||0)+'／H350 '+(rr.H350||0)+'／H400 '+(rr.H400||0)+' $/M/天 × 折數 '+_matFactor()+'（參數設定）</div></div>';
+  // 1 需求與比對
+  h+='<div class="card" style="padding:12px 14px"><div style="font-weight:800;font-size:14px;margin-bottom:6px">材料需求與比對</div>';
+  if(!m.rows.length)h+='<div style="font-size:12px;color:var(--b3)">尚無材料需求。按「＋ 新增材料需求」或「由材料估算帶入」。</div>';
+  else h+=_pjTable([{t:'材料'},{t:'需求',r:1},{t:'自有在工地',r:1},{t:'已租',r:1},{t:'尚缺',r:1},{t:'比對結果'},{t:''}],m.rows.map(function(r){
+    var atq=Math.floor(_matAtQty(q,r)+1e-6),rp=_m6RentPcs(q,r),sh=_matShort(q,r),ex=_matLedStock(r).reduce(function(a,x){return a+(parseFloat(x.qty)||0);},0),alt=_m6Alt(r);
+    var hint=sh<=0?'<span style="color:var(--g3);font-weight:700">已足</span>':(ex>0?('<span style="color:var(--g3)">倉庫同長閒置 '+fmt(ex)+' 支 → 調撥</span>'):(alt.length?'<span style="color:#8a6d00">同規格其他長度閒置 → 接／切樁？</span>':'<span style="color:#E65100">公司無料 → 租賃</span>'));
+    var ad=_matLedAt(q).filter(function(x){return x.adapt&&x.matRowId===r.id;});
+    return ['<b>'+esc(_matLabel(r))+'</b>'+(r.note?'<div style="font-size:10.5px;color:var(--b4)">'+esc(r.note)+'</div>':'')+(ad.length?'<div style="font-size:10.5px;color:#8a6d00">'+ad.map(function(x){return esc(x.adaptNote||'')+' ×'+fmt(x.qty);}).join('、')+'</div>':''),fmt(r.qty)+' '+esc(r.unit||'支'),'<span style="color:var(--g3);font-weight:700">'+fmt(atq)+'</span>',rp?fmt(rp):'—','<span style="color:'+(sh>0?'#E65100':'var(--b4)')+';font-weight:'+(sh>0?700:400)+'">'+fmt(sh)+'</span>',hint,
+      '<span style="white-space:nowrap">'+(sh>0?_pjBtn("m6Decide('"+q.id+"','"+r.id+"')",'比對處理','border-color:#1565C0;color:#1565C0;font-weight:700'):'')+_pjBtn("matRowEdit('"+q.id+"','"+r.id+"')",'編輯')+_pjBtn("matRowDel('"+q.id+"','"+r.id+"')",'刪','color:var(--red);border-color:#f0c4c4')+'</span>'];}));
+  h+='</div>';
+  // 2 自有在工地（沒有就不顯示）
+  var at=_matLedAt(q),lossAmt=m.loss.reduce(function(a,l){return a+(l.amt||0);},0);
+  if(at.length||m.use.length||m.loss.length){
+    h+='<div class="card" style="padding:12px 14px"><div style="font-weight:800;font-size:14px;margin-bottom:6px">自有材料在工地 <span style="font-size:11px;font-weight:400;color:var(--b4)">內部攤提＝支數 × 單長 × 日租 × 折數 × 天數，自調撥日起算到歸還日（未歸還算到今天）；不入應付</span></div>';
+    if(at.length)h+=_pjTable([{t:'材料'},{t:'支數',r:1},{t:'調撥日'},{t:'天數',r:1},{t:'日租×折數',r:1},{t:'攤提至今',r:1},{t:''}],at.map(function(lr){var row=m.rows.find(function(x){return x.id===lr.matRowId;})||m.rows.find(function(x){return _matMatch(x,lr);})||{spec:lr.spec,rate:''};var d=_matDays(lr.outDate,localToday()),rate=_matRateOf(row),a=Math.round((parseFloat(lr.qty)||0)*(parseFloat(lr.len)||0)*rate*_matFactor()*d);
+      return [esc(_matLabel(lr))+(lr.adapt?'<div style="font-size:10.5px;color:#8a6d00">'+esc(lr.adaptNote||'')+'</div>':'')+(lr.kind==='一次性'?'<div style="font-size:10.5px;color:#b26a00">一次性（不攤提）</div>':''),fmt(lr.qty),esc(lr.outDate||'—'),d,rate?(rate+'×'+_matFactor()):'<span style="color:var(--red)">未設日租</span>',lr.kind==='一次性'?'—':fmt(a),_pjBtn("matBack('"+q.id+"','"+lr.id+"')",'歸還／損耗','border-color:#8a6d00;color:#8a6d00')];}));
+    if(m.use.length)h+='<div style="font-weight:700;font-size:12.5px;margin:10px 0 4px">已結算使用段</div>'+_pjTable([{t:'材料'},{t:'支數',r:1},{t:'期間'},{t:'天數',r:1},{t:'金額',r:1}],m.use.slice().reverse().map(function(u){return [esc(_matLabel(u)),fmt(u.qty),esc(u.from+'～'+u.to),u.days,fmt(u.amt)];}));
+    if(m.loss.length)h+='<div style="font-weight:700;font-size:12.5px;margin:10px 0 4px;color:var(--red)">損耗認列</div>'+_pjTable([{t:'材料'},{t:'日期'},{t:'支數',r:1},{t:'單價',r:1},{t:'金額',r:1}],m.loss.slice().reverse().map(function(l){return [esc(_matLabel(l)),esc(l.date),fmt(l.qty),fmt(l.unitCost),fmt(l.amt)];}),['合計','',fmt(m.loss.reduce(function(a,l){return a+l.qty;},0)),'',fmt(lossAmt)]);
+    h+='</div>';
+  }
+  // 3 材料租賃
+  var rents=_m6Arr(m,'rents');
+  h+='<div class="card" style="padding:12px 14px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><div style="font-weight:800;font-size:14px">材料租賃 <span style="font-size:11px;font-weight:400;color:var(--b4)">料場按 M 計、月租；料可分批進場，租金依各批進料日起算</span></div>'+_pjBtn("m6RentEdit('"+q.id+"','','')",'＋ 材料租賃','border-color:#1565C0;color:#1565C0')+'</div>';
+  if(!rents.length)h+='<div style="font-size:12px;color:var(--b3)">尚無材料租賃。需求比對顯示「公司無料」時，按「比對處理 → 租賃」或這裡新增。</div>';
+  else h+=_pjTable([{t:'廠商／材料'},{t:'月租 $/M',r:1},{t:'合約 M',r:1},{t:'預計租期'},{t:'預估租金',r:1},{t:'已進場 M',r:1},{t:'租金至今',r:1},{t:'進場批次'},{t:''}],rents.map(function(rt){
+    var bs=(rt.batches||[]).map(function(b,i){return '<div style="font-size:11px;white-space:nowrap">第'+(i+1)+'批 '+esc(b.d||'')+' '+_rfmt(b.m)+'M'+(b.n?('（'+b.n+'支）'):'')+(b.o?(' <span style="color:var(--b4)">退 '+esc(b.o)+'</span>'):'')+' <a href="javascript:void(0)" onclick="m6Batch(\''+q.id+'\',\''+rt.id+'\',\''+b.id+'\')" style="color:#1565C0">改</a> <a href="javascript:void(0)" onclick="m6BatchDel(\''+q.id+'\',\''+rt.id+'\',\''+b.id+'\')" style="color:var(--red)">刪</a></div>';}).join('');
+    var plan=_m6RentPlan(rt);
+    return ['<b>'+esc(rt.vendor||'（未填廠商）')+'</b><div style="font-size:11px">'+esc(_matLabel(rt))+'</div>'+(rt.note?'<div style="font-size:10.5px;color:var(--b4)">'+esc(rt.note)+'</div>':''),_rfmt(rt.rate),_rfmt(rt.cm),(rt.pf||'—')+'<br>～ '+(rt.pt||'<span style="color:#b26a00">未填</span>')+(rt.mode==='month'?'<div style="font-size:10px;color:var(--b4)">未滿月以月計</div>':''),plan?('<b style="color:#1565C0">'+fmt(plan)+'</b>'):'<span style="color:#b26a00">缺租期</span>',_rfmt(_m6RentArrived(rt)),fmt(_m6RentToDate(rt)),bs||'<span style="font-size:11px;color:var(--b3)">尚未進場</span>',
+      '<span style="white-space:nowrap">'+_pjBtn("m6Batch('"+q.id+"','"+rt.id+"','')",'＋ 進場','border-color:var(--g);color:var(--g3)')+_pjBtn("m6RentEdit('"+q.id+"','"+rt.id+"','')",'編輯')+_pjBtn("m6RentDel('"+q.id+"','"+rt.id+"')",'刪','color:var(--red);border-color:#f0c4c4')+'</span>'];}),
+    ['合計','',_rfmt(rents.reduce(function(a,r){return a+(parseFloat(r.cm)||0);},0)),'',fmt(rents.reduce(function(a,r){return a+_m6RentPlan(r);},0)),_rfmt(rents.reduce(function(a,r){return a+_m6RentArrived(r);},0)),fmt(rents.reduce(function(a,r){return a+_m6RentToDate(r);},0)),'','']);
+  h+='</div>';
+  // 4 設備租賃
+  var IN='box-sizing:border-box;font-size:13px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)';
+  var vopts=function(cur){return '<option value="">── 選廠商 ──</option>'+(VENDORS||[]).map(function(v){return '<option value="'+esc(v.name||'')+'"'+(cur===(v.name||'')?' selected':'')+'>'+esc(v.name||'')+'</option>';}).join('')+(cur&&!(VENDORS||[]).some(function(v){return (v.name||'')===cur;})?'<option value="'+esc(cur)+'" selected>'+esc(cur)+'</option>':'');};
+  var eq=_m6Arr(m,'equip');
+  h+='<div class="card" style="padding:12px 14px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><div style="font-weight:800;font-size:14px">設備租賃 <span style="font-size:11px;font-weight:400;color:var(--b4)">打樁機、挖土機、發電機等；運費請記在下方運輸</span></div>'+_pjBtn("m6EquipAdd('"+q.id+"')",'＋ 設備','border-color:var(--g);color:var(--g3)')+'</div>';
+  if(!eq.length)h+='<div style="font-size:12px;color:var(--b3)">尚無設備租賃。</div>';
+  else h+=_pjTable([{t:'設備'},{t:'台數',r:1},{t:'廠商'},{t:'進場日'},{t:'預計退場'},{t:'實際退場'},{t:'計價'},{t:'單價',r:1},{t:'預估租金',r:1},{t:''}],eq.map(function(e){
+    var on=function(f){return 'onchange="m6EquipUpd(\''+q.id+'\',\''+e.id+'\',\''+f+'\',this.value)"';};
+    return ['<input value="'+esc(e.name||'')+'" placeholder="例：SH490 打樁機" '+on('name')+' style="'+IN+';min-width:130px">','<input type="number" inputmode="numeric" value="'+esc(String(e.qty==null?'':e.qty))+'" '+on('qty')+' style="'+IN+';width:60px;text-align:right">',
+      '<select '+on('vendor')+' style="'+IN+';min-width:120px">'+vopts(e.vendor||'')+'</select>','<input type="date" value="'+esc(e.from||'')+'" '+on('from')+' style="'+IN+'">','<input type="date" value="'+esc(e.pt||'')+'" '+on('pt')+' style="'+IN+'">','<input type="date" value="'+esc(e.to||'')+'" '+on('to')+' style="'+IN+'">',
+      '<select '+on('per')+' style="'+IN+'"><option value="month"'+(e.per!=='day'?' selected':'')+'>月租</option><option value="day"'+(e.per==='day'?' selected':'')+'>日租</option></select>','<input type="number" inputmode="decimal" value="'+esc(String(e.rate==null?'':e.rate))+'" '+on('rate')+' style="'+IN+';width:92px;text-align:right">',
+      _m6EquipPlan(e)?fmt(_m6EquipPlan(e)):'<span style="font-size:10.5px;color:#b26a00">填預計退場</span>',_pjBtn("m6EquipDel('"+q.id+"','"+e.id+"')",'刪','color:var(--red);border-color:#f0c4c4')];}));
+  h+='</div>';
+  // 5 運輸
+  var tps=_m6Arr(m,'tps');
+  h+='<div class="card" style="padding:12px 14px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><div style="font-weight:800;font-size:14px">運輸 <span style="font-size:11px;font-weight:400;color:var(--b4)">運輸廠商另計，不掛在租賃廠商上</span></div>'+_pjBtn("m6TpAdd('"+q.id+"','材料運費')",'＋ 材料運輸','border-color:#8a6d00;color:#8a6d00')+_pjBtn("m6TpAdd('"+q.id+"','設備運費')",'＋ 設備運輸','border-color:#8a6d00;color:#8a6d00')+'</div>';
+  if(!tps.length)h+='<div style="font-size:12px;color:var(--b3)">尚無運輸。</div>';
+  else h+=_pjTable([{t:'日期'},{t:'運輸廠商'},{t:'類別'},{t:'說明'},{t:'趟數',r:1},{t:'單價／趟',r:1},{t:'金額',r:1},{t:''}],tps.map(function(t){
+    var on=function(f){return 'onchange="m6TpUpd(\''+q.id+'\',\''+t.id+'\',\''+f+'\',this.value)"';};
+    return ['<input type="date" value="'+esc(t.date||'')+'" '+on('date')+' style="'+IN+'">','<select '+on('vendor')+' style="'+IN+';min-width:120px">'+vopts(t.vendor||'')+'</select>'+(t.vendor?'':'<div style="font-size:10px;color:var(--red)">選廠商後才進施工成本</div>'),
+      '<select '+on('cat')+' style="'+IN+'"><option'+(t.cat!=='設備運費'?' selected':'')+'>材料運費</option><option'+(t.cat==='設備運費'?' selected':'')+'>設備運費</option></select>','<input value="'+esc(t.desc||'')+'" placeholder="例：H300 進場" '+on('desc')+' style="'+IN+';min-width:120px">',
+      '<input type="number" inputmode="decimal" value="'+esc(String(t.trips==null?'':t.trips))+'" '+on('trips')+' style="'+IN+';width:60px;text-align:right">','<input type="number" inputmode="decimal" value="'+esc(String(t.price==null?'':t.price))+'" '+on('price')+' style="'+IN+';width:92px;text-align:right">',
+      '<b id="m6tp-amt-'+t.id+'">'+fmt(Math.round((parseFloat(t.trips)||0)*(parseFloat(t.price)||0)))+'</b>',_pjBtn("m6TpDel('"+q.id+"','"+t.id+"')",'刪','color:var(--red);border-color:#f0c4c4')];}));
+  h+='</div>';
+  // 6 單位成本比較
+  try{h+=_matUnitCmpHtml(q,m);}catch(e){_err('renderMat6.cmp',e);}
+  root.innerHTML=h;
+  try{if(typeof _mstack==='function')_mstack(root);}catch(e){}
+}
+// ── 計費引擎：按 M 月租（mmonth）與運輸趟數 ──
+function _rentPerLabel(p){return ({day:'天',month:'月',mmonth:'月',trip:'趟',once:'式'})[p||'day']||'天';}
+function _rentEstimate(q,c,toDate){
+  var lastTo='';_subPeriods(c).forEach(function(p){if(!p.isRet&&(p.to||p.date||'')>lastTo)lastTo=p.to||p.date||'';});
+  var billed={};_subPeriods(c).forEach(function(p){if(!p.isRet)(p.rows||[]).forEach(function(pr){billed[pr.rid]=(billed[pr.rid]||0)+(parseFloat(pr.qty)||0);});});
+  var to=toDate||localToday(),today=localToday(),est=0,lines=[],active=false;
+  (c.rows||[]).forEach(function(r){
+    var per=r.per||'day',qty=parseFloat(r.qty)||0,up=parseFloat(r.unitPrice)||0,sug=0;
+    if(per==='day'){sug=qty*_rentDays(r,lastTo||r.from,to);}
+    else if(per==='month'){sug=Math.round(qty*_rentDays(r,lastTo||r.from,to)/30*10)/10;}
+    else if(per==='mmonth'){if(!r.planned){var d=_rentDays(r,lastTo||r.from,to);sug=Math.round(qty*(r.mround==='month'?Math.ceil(d/30):d/30)*100)/100;}}
+    else if(per==='trip'){sug=Math.max(0,qty-(billed[r.id]||0));}
+    if((per==='day'||per==='month'||(per==='mmonth'&&!r.planned))&&!(r.to&&r.to<today))active=true;
+    if(per==='trip'&&sug>0)active=true;
+    var a=Math.round(sug*up);est+=a;lines.push({row:r,sug:sug,amt:a});
+  });
+  return {est:Math.round(est),from:lastTo,lines:lines,active:active};
+}
+function _rpLeft(c,r,editNo){if((r.per||'')!=='trip')return '';var b=0;_subPeriods(c).forEach(function(p){if(p.isRet||(editNo!=null&&p.no===editNo))return;(p.rows||[]).forEach(function(pr){if(pr.rid===r.id)b+=parseFloat(pr.qty)||0;});});return Math.max(0,(parseFloat(r.qty)||0)-b);}
+function _rpSysCalc(el,from,to){
+  var per=el.getAttribute('data-per'),qty=parseFloat(el.getAttribute('data-qty'))||0;
+  var row={from:el.getAttribute('data-from'),to:el.getAttribute('data-to')};
+  var d=_rentDays(row,from,to);
+  if(per==='day')return {d:d,sys:qty*d,txt:'期間 '+d+' 天 × 在場 '+fmt(qty)+' ＝ '+fmt(qty*d)};
+  if(per==='month'){var mth=Math.round(d/30*10)/10;return {d:d,sys:Math.round(qty*mth*10)/10,txt:'期間 '+d+' 天 ≈ '+mth+' 月 × '+fmt(qty)+' 台'};}
+  if(per==='mmonth'){var mr=el.getAttribute('data-mr')==='month',mo=mr?Math.ceil(d/30):d/30;return {d:d,sys:Math.round(qty*mo*100)/100,txt:'期間 '+d+' 天 ≈ '+(mr?(mo+' 月（未滿月以月計）'):(_rfmt(Math.round(d/30*100)/100)+' 月'))+' × '+_rfmt(qty)+' M'};}
+  if(per==='trip'){var lf=parseFloat(el.getAttribute('data-left'));return {d:d,sys:isNaN(lf)?null:lf,txt:isNaN(lf)?'依請款單填本期趟數':('預計尚有 '+_rfmt(lf)+' 趟未請')};}
+  return {d:d,sys:null,txt:''};
+}
+function _rentPlan(q,c){
+  var st=_rentStat(c),est=_rentEstimate(q,c),toDate=st.billed+(/運費/.test(c.cat||'')?0:est.est);   // 運輸：執行率只看已請款
+  if((parseFloat(c.planAmt)||0)>0){var pa=Math.round(parseFloat(c.planAmt));var end='';(c.rows||[]).forEach(function(r){if(r.planTo&&r.planTo>end)end=r.planTo;});return {amt:pa,open:false,src:/運費/.test(c.cat||'')?'預計趟數':'合約租期',end:end,lines:[],billed:st.billed,est:est.est,toDate:toDate,left:pa-toDate,rate:Math.round(toDate/pa*100)};}
+  var pe=_rentPlanEnd(q),amt=0,lines=[],open=false,src='',endMax='';
+  (c.rows||[]).forEach(function(r){
+    var per=r.per||'day',qty=parseFloat(r.qty)||0,up=parseFloat(r.unitPrice)||0,a=0,note='';
+    if(per==='day'||per==='month'||per==='mmonth'){
+      var to=r.to||r.planTo||c.planEnd||(pe&&pe.date)||'',s=r.to?'退場日':(r.planTo||c.planEnd)?'預計退場日':(pe?pe.src:'');
+      if(!to||!r.from){to=localToday();s='至今';open=true;}
+      var d=Math.max(0,_dDiff(r.from||to,to));
+      a=per==='day'?qty*d*up:per==='month'?qty*(Math.round(d/30*10)/10)*up:qty*(r.mround==='month'?Math.ceil(d/30):d/30)*up;note=d+' 天（'+s+'）';if(!src)src=s;if(s!=='至今'&&to>endMax)endMax=to;
+    }else if(per==='trip'){a=qty*up;note='預計 '+qty+' 趟';}
+    a=Math.round(a);amt+=a;lines.push({row:r,amt:a,note:note});
+  });
+  return {amt:amt,open:open,src:src,end:endMax,lines:lines,billed:st.billed,est:est.est,toDate:toDate,left:amt-toDate,rate:amt>0?Math.round(toDate/amt*100):null};
+}
+function _vbCtxRent(qid,cid){var q=_vbCtx(qid);if(!q)return;openRentPeriod(cid);}
 
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
