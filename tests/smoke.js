@@ -3971,6 +3971,51 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.22 請款單：印計算式說明＋手機卡片備註 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+
+          const out={};const PV=(src)=>{buildInvPreview(src);return document.getElementById('inv-prev-html').innerHTML;};
+          P.tax=5;INV.length=0;
+          Q=[{id:'qC',code:'1150960',name:'計算式測試案',client:'業主',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 H300，L=15M@80cm 打設、拔除（含水刀引孔）',unit:'支',qty:'40',price:'40500',sec:false,note:'含180天租期'},{desc:'結構檢力分析及技師簽證',unit:'式',qty:'1',price:'80000',sec:false}]}];
+          const inv=buildInvFromQuote(Q[0]);inv.id='invC1';inv.date='2026-10-05';inv.periodNo=1;INV.push(inv);
+          loadInvoice('invC1');
+          invItems[0].curQty=133;invItems[0].payRate=70;invItems[0].contractPrice=40500;invItems[1].curQty=1;invItems[1].contractPrice=80000;
+          updateInvRowAmt(0);updateInvRowAmt(1);
+          out.fn=_invCalcText(invItems[0],invItems[0].curAmt)==='133 支 × 70% ＝ 93.1 支；93.1 支 × 40,500 ＝ 3,770,550'&&_invCalcText(invItems[1],invItems[1].curAmt)==='1 式 × 80,000 ＝ 80,000';
+          const cb=document.getElementById('inv-calc');out.cb=!!cb;
+          cb.checked=false;const h0=PV();out.off=!/本期估驗計算式/.test(h0);
+          cb.checked=true;const h1=PV();
+          out.on=/本期估驗計算式/.test(h1)&&/133 支 × 70% ＝ 93.1 支；93.1 支 × 40,500 ＝ 3,770,550/.test(h1)&&/（含180天租期）/.test(h1)&&/1 式 × 80,000 ＝ 80,000/.test(h1);
+          // 桌機列備註可編輯；存檔帶 calc 與 note；壓縮可逆；指定記錄列印也印
+          const ni=document.querySelector('#inv-body input[data-field="note"]');out.noteInp=!!ni;
+          ni.value='依工地簽認單 10/01';ni.dispatchEvent(new Event('input'));out.noteSet=invItems[0].note==='依工地簽認單 10/01';
+          saveInvoice();const rec=INV.find(x=>x.id==='invC1');
+          out.saved=rec.calc===true&&rec.items[0].note==='依工地簽認單 10/01';
+          const back=_invUnpack(_invPack(JSON.parse(JSON.stringify(rec))));out.pack=back.calc===true&&back.items[0].note==='依工地簽認單 10/01';
+          const h2=PV(rec);out.src=/本期估驗計算式/.test(h2)&&/依工地簽認單 10\/01/.test(h2);
+          rec.calc=false;out.srcOff=!/本期估驗計算式/.test(PV(rec));
+          // 內部欄位不外洩
+          out.noSens=!/estCost|毛利/.test(h1);
+          INV.length=0;Q=[];invEid=null;invItems=[];
+          return out;
+    });
+    check('請款單計算式：_invCalcText（數量×請款%＝計價量；計價量×單價＝金額）、勾「印計算式」才印、接工項備註', r.fn && r.cb && r.off && r.on);
+    check('請款單計算式：列備註可編輯、存檔帶 calc／note、壓縮可逆、指定記錄列印依記錄的 calc', r.noteInp && r.noteSet && r.saved && r.pack && r.src && r.srcOff && r.noSens);
+    check('v6.0.22 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+    const { page: mp, errors: merr } = await newPage(browser, 390, 844);
+    const mok = await mp.evaluate(() => new Promise(res => {
+      INV.length=0;Q=[{id:'qCm',code:'1150961',name:'計算式手機',client:'業主',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 H300 打設',unit:'支',qty:'40',price:'40500',sec:false}]}];
+      const inv=buildInvFromQuote(Q[0]);inv.id='invCm';INV.push(inv);loadInvoice('invCm');
+      setTimeout(() => { const ni=document.querySelector('.inv-m-note');let ok=!!ni;if(ni){ni.value='手機備註';ni.dispatchEvent(new Event('input'));ok=ok&&invItems[0].note==='手機備註';}
+        ok=ok&&document.documentElement.scrollWidth<=document.documentElement.clientWidth; INV.length=0;Q=[];invEid=null;invItems=[]; res(ok); }, 300);
+    }));
+    check('手機版：請款單工項卡片有備註欄、不橫向捲動', mok && merr.length === 0, merr.slice(0, 2).join(' | '));
+    await mp.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

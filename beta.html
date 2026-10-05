@@ -2674,6 +2674,10 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
                 <input type="checkbox" id="inv-doc-receipt" onclick="event.stopPropagation()" style="width:16px;height:16px;cursor:pointer;accent-color:var(--g);flex-shrink:0">
                 <span style="font-size:12.5px;user-select:none">發票</span>
               </div>
+              <div style="display:flex;align-items:center;gap:5px;cursor:pointer;margin-left:6px;padding-left:10px;border-left:1px solid var(--b2)" onclick="var c=document.getElementById('inv-calc');c.checked=!c.checked;try{autoSaveInv();}catch(e){}" title="v6.0.22：表格下方加印「本期估驗計算式」——每個工項列出 數量 × 請款% ＝ 計價量；計價量（× 天數）× 單價 ＝ 金額，後面接該工項的備註，讓業主看得懂數字怎麼來">
+                <input type="checkbox" id="inv-calc" onclick="event.stopPropagation()" style="width:16px;height:16px;cursor:pointer;accent-color:var(--g);flex-shrink:0">
+                <span style="font-size:12.5px;user-select:none">印計算式</span>
+              </div>
             </div>
           </div>
           <div class="f"><label>寄送方式</label>
@@ -2830,7 +2834,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.21';
+var APP_VERSION='v6.0.22';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -5975,6 +5979,7 @@ function loadInvoice(id){
   Object.entries(map).forEach(([elId,k])=>{const e=document.getElementById(elId);if(e)e.value=inv[k]||'';});
   // v5.389：寄送方式此前從未存進記錄，指定記錄列印永遠印「☑ —」
   try{var _se=document.getElementById('inv-send');if(_se)_se.value=inv.sendMethod||'親送';}catch(e){_err('loadInvoice.send',e);}
+  try{var _ce=document.getElementById('inv-calc');if(_ce)_ce.checked=!!inv.calc;}catch(e){_err('loadInvoice.calc',e);}   // v6.0.22
   // v5.387：估驗日期沒填就帶當天（開單當日），使用者仍可手動改
   try{
     const _dEl=document.getElementById('inv-date');
@@ -6573,6 +6578,12 @@ function rInvItems(){
       });
       pw.appendChild(pl);pw.appendChild(ps);grid.appendChild(pw);
       card.appendChild(grid);
+      // v6.0.22 備註（印在請款單備註欄；勾「印計算式」時接在計算式後）——原本只有桌機列有
+      const _mn=document.createElement('input');
+      _mn.value=it.note||'';_mn.placeholder='備註（印給業主，例：含180天租期）';_mn.className='inv-m-note';
+      _mn.style.cssText='width:100%;font-size:12.5px;border:1px solid var(--b2);border-radius:6px;padding:7px 8px;box-sizing:border-box;margin-bottom:7px;font-family:inherit;text-align:left';
+      _mn.addEventListener('input',function(){invItems[i].note=this.value;});
+      card.appendChild(_mn);
       // 本期金額
       const amt=document.createElement('div');
       amt.style.cssText='display:flex;justify-content:space-between;align-items:center;background:var(--gl);border-radius:6px;padding:7px 10px';
@@ -6957,6 +6968,7 @@ function saveInvoice(){
       document.getElementById('inv-doc-invoice')?.checked||false,
       document.getElementById('inv-doc-receipt')?.checked||false
     ],
+    calc:document.getElementById('inv-calc')?.checked||false,   // v6.0.22 列印計算式說明
     items:JSON.parse(JSON.stringify(invItems)),
     totals:t
   };
@@ -7567,6 +7579,8 @@ function buildInvPreview(srcInv){
   const _DOC_LBL=['工作確認單','統一發票','收據'];
   // 備註同理：指定記錄時讀該筆記錄，不讀編輯器畫面
   const _noteStr=_stripInternalNote(_src?(Array.isArray(_src.note)?_src.note.join('\n'):String(_src.note||'')):getInvNote());
+  const _calcOn=_src?!!_src.calc:!!(document.getElementById('inv-calc')&&document.getElementById('inv-calc').checked);   // v6.0.22 計算式說明
+  const _calcLines=[];
   const docs=[];
   if(_src&&Array.isArray(_src.docs)){
     _src.docs.forEach((on,i)=>{if(on&&_DOC_LBL[i])docs.push(_DOC_LBL[i]);});
@@ -7670,6 +7684,7 @@ function buildInvPreview(srcInv){
       _totalCum  += cumAmtCalc||0;
     }
 
+    if(_calcOn){try{const _ct=_invCalcText(it,curAmt);if(_ct)_calcLines.push({li:li,desc:String(it.desc||'').split('\n')[0],txt:_ct,note:_stripInternalNote(it.note)});}catch(e){_err('invCalc',e);}}
     rows+=`<tr>
       <td style="text-align:center;padding:3px 2px;border-bottom:1px solid #f0f0f0">${li}</td>
       <td style="padding:3px 6px;border-bottom:1px solid #f0f0f0">${esc(it.desc)}</td>
@@ -7808,6 +7823,7 @@ function buildInvPreview(srcInv){
         <td></td>
       </tr>
     </table>
+    ${_calcLines.length?('<table class="inv-calc-tbl" style="width:100%;border-collapse:collapse;font-size:10px;margin-top:6px"><thead><tr><th colspan="2" style="text-align:left;padding:4px 6px;color:#1a6b3f;border-bottom:1px solid #cfe3d6;font-size:10.5px">本期估驗計算式</th></tr></thead><tbody>'+_calcLines.map(function(l){return '<tr><td style="width:3%;padding:2px 6px;color:#555;vertical-align:top;text-align:center">'+l.li+'</td><td style="padding:2px 6px;line-height:1.5">'+esc(l.desc)+'：'+esc(l.txt)+(l.note?('　<span style="color:#555">（'+esc(l.note)+'）</span>'):'')+'</td></tr>';}).join('')+'</tbody></table>'):''}
 
     <!-- 頁尾資訊（固定底部） -->
     <table style="width:100%;border-collapse:collapse;font-size:10px;margin-top:8px;border-top:1px solid #e0e0e0;padding-top:6px">
@@ -9656,6 +9672,17 @@ function _wQty(qty,rate){
   return (parseFloat(qty)||0)*r/100;
 }
 function _curW(it){return it?_wQty(it.curQty,it.payRate):0;}
+// v6.0.22 計算式說明（印給業主）：數量 × 請款% ＝ 計價量；計價量（× 天數）× 單價 ＝ 金額
+function _invCalcText(it,curAmt){
+  if(!it||it.type==='sec')return '';
+  var q=parseFloat(it.curQty)||0,p=parseFloat(it.contractPrice)||0,d=parseFloat(it.curDays)||0,rate=(it.payRate!=null&&it.payRate!=='')?parseFloat(it.payRate):100;
+  if(!(q>0&&p>0))return '';
+  var u=_uFix(it.unit||''),w=_wQty(q,rate),parts=[];
+  var amt=(curAmt!=null)?curAmt:Math.round(p*q*(d||1)*rate/100);
+  if(rate!==100&&rate!==0)parts.push(_qfmt(q)+' '+u+' × '+rate+'% ＝ '+_qfmt(w)+' '+u);
+  parts.push(_qfmt(w)+' '+u+(d?(' × '+_qfmt(d)+' 天'):'')+' × '+fmt(p)+' ＝ '+fmt(amt));
+  return parts.join('；');
+}
 // v5.389：數量顯示保留至 2 位小數（fmt 會整數化，17.1 印成 17、與金額對不上）
 function _qfmt(v){v=Math.round((parseFloat(v)||0)*100)/100;return v?v.toLocaleString('en-US',{maximumFractionDigits:2}):'';}
 // 由同專案「期別較小」的請款單重算前期加權累計數量。
@@ -39999,8 +40026,14 @@ function _printViaIframe(html,filename,landscape){
       }catch(e2){toast('匯出失敗：'+e2.message);}
       return;
     }
+    // v6.0.22 解析度：原 scale 2（約 192dpi）印出來偏軟像翻拍；改以 scale 3（約 288dpi）為目標，
+    // 受裝置 canvas 像素上限約束（iOS／Android 約 1,600 萬像素）自動降，最低維持原本的 2
+    var _pxBudget=(isIOS||/Android/i.test(navigator.userAgent))?14.5e6:60e6;
+    var _cssW=Math.max(A4W,inner.scrollWidth),_cssH=Math.max(1,inner.scrollHeight||inner.offsetHeight||1);
+    var _scale=Math.max(2,Math.min(3,Math.floor(Math.sqrt(_pxBudget/(_cssW*_cssH))*100)/100));
+    window._pdfLastScale=_scale;
     html2canvas(inner,{
-      scale:2,useCORS:true,allowTaint:true,backgroundColor:'#ffffff',
+      scale:_scale,useCORS:true,allowTaint:true,backgroundColor:'#ffffff',
       width:Math.max(A4W,inner.scrollWidth),windowWidth:A4W,scrollX:0,scrollY:0,imageTimeout:0,logging:false,
       onclone:function(doc){
         doc.querySelectorAll('img').forEach(function(img){
