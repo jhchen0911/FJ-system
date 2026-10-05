@@ -4329,6 +4329,63 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.27 階段完工＝實作數量；施工成本頁精簡 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(
+      () => new Promise(res => {
+        const out={};
+        P.tax=5;VENDORS.length=0;['鴻玉開發','英洲','大昌運輸'].forEach((n,i)=>VENDORS.push({id:'v'+i,name:n}));
+        MAT_LEDGER.length=0;PAYABLES.length=0;INV.length=0;CONTRACTS.length=0;
+        const oT=window.toast;window.toast=function(){};
+        Q=[{id:'qA',code:'115100101',name:'階段完工測試案',client:'甲',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,
+          items:[{desc:'H型鋼樁 H300，L=15M 打設、拔除',unit:'支',qty:'133',price:'40000',estCost:'30000',sec:false},{desc:'支撐 H300 架設',unit:'M',qty:'100',price:'1000',estCost:'800',sec:false}],
+          dailyLogs:[{id:'d1',date:'2026-09-25',progressRows:[{itemIdx:0,qty:60}]},{id:'d2',date:'2026-10-02',progressRows:[{itemIdx:0,qty:60},{itemIdx:1,qty:40}]}],
+          costs:[{id:'cH',type:'sub',vendor:'鴻玉開發',cat:'打設',date:'2026-09-20',rows:[{id:'cH_0',linkedItemIdx:0,qty:133,unitPrice:8250}],amt:0,invoice:true,retRate:0,periods:[{no:1,date:'2026-10-05',from:'2026-09-23',to:'2026-10-05',rows:[{rid:'cH_0',qty:120}]}]},
+            {id:'cX',type:'sub',vendor:'',cat:'打設',date:'2026-09-20',rows:[{id:'cX_0',linkedItemIdx:-1,qty:1,unitPrice:0}],amt:0}],
+          mat:{rows:[{id:'r1',name:'型鋼',spec:'H300',len:15,unit:'支',qty:133}],use:[],loss:[],rents:[{id:'rn1',vendor:'英洲',rowId:'r1',name:'型鋼',spec:'H300',len:15,rate:60,cm:1995,pf:'2026-09-23',pt:'2027-03-22',mode:'day',batches:[{id:'b1',d:'2026-09-23',m:1995,n:133,o:''}]}],equip:[],tps:[],_m6:1}}];
+        const q=Q[0];_m6Sync(q);
+        // 7 階段完工前：進度 90%（120/133）
+        const s0=_pjStat(q);out.before=_itemActual(q,0)===null&&Math.round(s0.physPct)===Math.round((120*40000+40*1000)/(133*40000+100*1000)*100);
+        q.dailyLogs.push({id:'d3',date:'2026-10-03',status:'stage',stageOf:'install',stageDate:'2026-10-03',progressRows:[]});
+        const a0=_itemActual(q,0),a1=_itemActual(q,1);
+        out.actual=!!a0&&a0.qty===120&&a0.date==='2026-10-03'&&!!a1&&a1.qty===40;   // 架設（非打設／拔除關鍵字）也以階段完工計
+        const m=_actQtyMap(q);out.map=m['H型鋼樁 H300，L=15M 打設、拔除']===120&&_effQtyMap(q)['H型鋼樁 H300，L=15M 打設、拔除']===undefined&&q.items[0].qty==='133';
+        const s1=_pjStat(q);out.phys=Math.round(s1.physPct)===100;
+        const ih=_pjItemsHtml(q,s1);out.items=/>133</.test(ih)&&/階段完工 2026-10-03：實作 120（合約 133，-13，應向業主追減）/.test(ih)&&/100%/.test(ih)&&/進度、預估成本、毛利改以實作數量計/.test(ih);
+        const an=buildCostAnalysisHtml(q);out.analysis=an.indexOf(fmt(120*40000))>=0&&an.indexOf(fmt(133*40000))<0;
+        // 施工成本頁：分區、材料卡唯讀、常用下拉、類型鎖定、附屬隱藏、科目列移除
+        openProjectCosts('qA');window._costView='list';rCostItems();
+        const cl=document.getElementById('cost-list'),h=cl.innerHTML;
+        out.secs=/發包（承包合約）/.test(h)&&/材料．租賃．運輸（由「材料．租賃」頁自動同步/.test(h)&&h.indexOf('發包（承包合約）')<h.indexOf('材料．租賃．運輸');
+        const mc=cl.querySelector('.cost-mat-card');
+        out.matRo=!!mc&&!mc.querySelector('select')&&!/addOwnRow|changeCostType|delCostItem/.test(mc.innerHTML)&&/核對請款單/.test(mc.innerHTML)&&/計價基準/.test(mc.innerHTML)&&!/成本金額＝已核實/.test(mc.innerHTML);
+        out.noChips=!/常用：/.test(h)&&!/科目：/.test(h)&&!/附屬，併入報價工項/.test(h);
+        const card=id=>cl.querySelector('#cost-amt-'+id).closest('div[style*="border-bottom"]');
+        out.lock=!card('cH').querySelector('select[onchange^="changeCostType"]')&&/類型不可切換/.test(card('cH').innerHTML)&&!!card('cX').querySelector('select[onchange^="changeCostType"]');
+        // 自有卡：常用改下拉
+        addCostItem('own');const co=q.costs[q.costs.length-1];
+        const sel=card(co.id).querySelector('select.cost-add-sel');out.ownSel=!!sel&&[...sel.options].some(o=>o.value==='止水鈑|片');
+        sel.value='止水鈑|片';sel.dispatchEvent(new Event('change'));out.ownAdd=co.rows.length===1&&co.rows[0].preset==='止水鈑';
+        // 分頁列
+        setCostView('audit');out.tab=document.getElementById('cost-view-audit').classList.contains('on')&&!document.getElementById('cost-view-list').classList.contains('on');
+        setCostView('list');out.tab=out.tab&&document.getElementById('cost-view-list').classList.contains('on');
+        // 新增成本：先選類型；確認鈕隱藏，下次對話框恢復
+        costAddPick();const msg=document.getElementById('gen-confirm-msg').innerHTML;
+        out.pick=/點工/.test(msg)&&/自有材料購置/.test(msg)&&/材料租賃／設備租賃／運輸/.test(msg)&&document.getElementById('gen-confirm-ok').style.display==='none';
+        const n0=q.costs.length;[...document.querySelectorAll('#gen-confirm-msg button')].find(b=>/點工/.test(b.textContent)).click();
+        out.pickAdd=q.costs.length===n0+1&&q.costs[n0].type==='labor';
+        showConfirm('x','y',function(){});out.okBack=document.getElementById('gen-confirm-ok').style.display==='';document.getElementById('gen-confirm-modal').style.display='none';
+        window.toast=oT;Q=[];VENDORS.length=0;PAYABLES.length=0;eid=null;res(out);
+      })
+    );
+    check('階段完工＝實作數量：日報累計 120 為實作（合約 133 不動、提示應向業主追減），進度 100%、工項分析／毛利改以實作數量計', r.before && r.actual && r.map && r.phys && r.items && r.analysis);
+    check('施工成本頁分區（發包／自有點工額外／材料租賃運輸）、材料．租賃同步卡唯讀（核對請款單、計價基準）', r.secs && r.matRo);
+    check('施工成本頁精簡：常用快捷鍵改下拉、科目列與附屬列移除、已計價發包類型鎖定、分頁列、新增成本先選類型', r.noChips && r.lock && r.ownSel && r.ownAdd && r.tab && r.pick && r.pickAdd && r.okBack);
+    check('v6.0.27 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
