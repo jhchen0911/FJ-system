@@ -416,7 +416,7 @@ async function newPage(browser, width, height) {
       out.iBtns = [...document.querySelectorAll('#page-invoice-prev .prev-act button')].map(b => b.textContent.trim()).join('|');
       return out;
     });
-    await page.evaluate(() => go('projects'));
+    await page.evaluate(() => renderProjects());   // v6.0.26 舊版卡片頁已不能導覽，函式仍保留
     await page.waitForTimeout(700);
     const r2 = await page.evaluate(() => {
       const h = document.getElementById('page-projects').innerHTML;
@@ -578,7 +578,7 @@ async function newPage(browser, width, height) {
       out.deleted = CONTRACTS.length === n0 - 1 && !CONTRACTS.some(c => c.id === 'CT88b');
       return out;
     });
-    await page.evaluate(() => go('projects'));
+    await page.evaluate(() => renderProjects());   // v6.0.26 舊版卡片頁已不能導覽，函式仍保留
     await page.waitForTimeout(700);
     const r3 = await page.evaluate(() => ({
       viewQuote: document.body.innerHTML.includes('查看報價PDF'),
@@ -1326,7 +1326,7 @@ async function newPage(browser, width, height) {
       window._costView = 'list'; setCostView('subs');
       const sh = document.getElementById('cost-list').innerHTML;
       out.subs = /發包總額/.test(sh) && /丙承包/.test(sh) && /保留款退還/.test(sh) && /第2期/.test(sh) && !/releaseSubRet\(/.test(sh);
-      go('projects');
+      renderProjects();
       out.card = /分包管理（1 家・1 期）/.test(document.getElementById('projects-list').innerHTML);
       // 業主列印不受影響：報價單列印不含 periods／costs
       out.strip = !JSON.stringify(_stripQuoteSens(Q[0])).includes('periods');
@@ -1442,7 +1442,7 @@ async function newPage(browser, width, height) {
         && MAT_EST.capType === 'RC壓樑' && MAT_EST.kingMid === 120 && MAT_EST.midLen === 16 && MAT_EST.kingGt === 20 && MAT_EST.gtSpec === 'H400' && MAT_EST.layers === 3 && MAT_EST._layers[0].s === 'H400' && MAT_EST._layers[0].st === true
         && MAT_EST._routesV[0].rc === 4 && MAT_EST._routesV[0].rl === 25 && MAT_EST._routesH[0].rc === 5 && MAT_EST.gantaiA === 300 && MAT_EST.gantaiP === 80;
       go('matest'); out.meBtn = /從案場細節紀錄表帶入/.test(document.getElementById('mat-est-form').innerHTML);
-      Q[0].awarded = true; go('projects'); out.card = /案場細節（v3）/.test(document.getElementById('projects-list').innerHTML);
+      Q[0].awarded = true; renderProjects(); out.card = /案場細節（v3）/.test(document.getElementById('projects-list').innerHTML);
       out.editorBtn = /openSiteDet\(eid\)/.test(document.getElementById('page-editor').innerHTML);
       out.sync = !!_stripQuoteSens(Q[0]).site;   // 數量不是敏感資料，隨報價一起同步
       // v5.409 規格選單依形式：鋼板樁只列 SP 系列、換形式後不在清單的規格清空、可自訂
@@ -3318,7 +3318,7 @@ async function newPage(browser, width, height) {
         out.strip=!JSON.stringify(_stripQuoteSens(q)).includes('rfqs')&&Array.isArray(_extractQuoteSens(q).rfqs)&&_extractQuoteSens(q).rfqs.length===2;
         const q2={id:'qR',items:q.items};_applyQuoteSens(q2,_extractQuoteSens(q),false);out.apply=Array.isArray(q2.rfqs)&&q2.rfqs.length===2;
         // 專案卡入口
-        go('projects');out.card=/go\('rfq'\)/.test(document.getElementById('projects-list').innerHTML);
+        renderProjects();out.card=/go\('rfq'\)/.test(document.getElementById('projects-list').innerHTML);
         Q=Q.filter(x=>x.id!=='qR');VENDORS.length=0;_rfqQid='';
         return out;
     });
@@ -3361,7 +3361,7 @@ async function newPage(browser, width, height) {
         out.items=/鴻玉開發工程行/.test(sec)&&/>400</.test(sec)&&/>300</.test(sec)&&/75%/.test(sec)&&/未發包/.test(sec);
         // 業主計價：期別列、待收、估驗進度、逾期租金（打設最後 09-10 → 30 天到 10-10，今天 10-03 尚未逾期→無；改日期）
         const inv=document.getElementById('pj-body-inv').innerHTML;
-        out.inv=/第1期/.test(inv)&&/待收 315,000/.test(inv)&&/估驗進度/.test(inv)&&/新增請款單/.test(inv)&&/openEnvelope/.test(inv);
+        out.inv=/第1期/.test(inv)&&/待收 315,000/.test(inv)&&/估驗進度/.test(inv)&&/新增下一期請款單/.test(inv)&&/openEnvelope/.test(inv);
         // 發包：分包列、廠商已請 165,000、未付（含稅）173,250、登錄廠商請款鈕、詢價單 chip
         const sub=document.getElementById('pj-body-sub').innerHTML;
         out.sub=/RFQ-1150928-01/.test(sub)&&/165,000/.test(sub)&&/173,250/.test(sub)&&/登錄廠商請款/.test(sub)&&/已發包：鴻玉開發工程行/.test(sub);
@@ -3392,7 +3392,7 @@ async function newPage(browser, width, height) {
         openProj('qP');out.open=_pjQid==='qP'&&/合約工項與進度/.test(root.innerHTML);
         // 手機底部「專案」改開工程專案；專案管理頁隱藏但仍可開
         out.nav=/go\('proj'\)/.test(document.getElementById('mn-proj').getAttribute('onclick'))&&document.getElementById('mn-proj').style.display!=='none'&&!!ALL_PAGES.find(p=>p.id==='projects'&&p.hidden&&p.parent==='proj')&&/go\('proj'\)/.test(document.getElementById('dash-shortcuts').innerHTML);
-        go('projects');out.old=document.getElementById('page-projects').classList.contains('active');
+        go('projects');out.old=document.getElementById('page-proj').classList.contains('active');   // v6.0.26 舊版卡片頁移除 → 轉工程專案
         _pgState={proj:'',startDate:localToday(),colDays:3,crews:[],rows:[]};
         Q=Q.filter(x=>x.id!=='qP');CONTRACTS.splice(0);INV.length=0;PAYABLES.length=0;VENDORS.length=0;_pjQid='';
         return out;
@@ -3400,7 +3400,7 @@ async function newPage(browser, width, height) {
     check('工程專案：頁面、KPI 列（合約／請款／收款／發包／成本／應付／毛利）、8 步時間軸（含議價前後）', r.page && r.head && r.steps);
     check('工程專案：工項進度表、業主計價期別、發包與廠商計價、施工成本統計', r.items && r.inv && r.sub && r.cost);
     check('工程專案：預定 vs 實際、日報摘要、結案區、介紹費跟隨設定、空區塊預設收合、收合記憶', r.sched0 && r.sched1 && r.log && r.close && r.dupHint && r.follow && r.emptyFold && r.fold && r.foldKeep);
-    check('工程專案：未選時卡片清單、點卡進入；手機底部「專案」改開本頁、舊卡片頁隱藏可開', r.list && r.open && r.nav && r.old);
+    check('工程專案：未選時卡片清單、點卡進入；手機底部「專案」改開本頁、舊卡片頁改轉本頁', r.list && r.open && r.nav && r.old);
     check('v6 工程專案測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -4204,7 +4204,7 @@ async function newPage(browser, width, height) {
           // 預估：合約租期；運輸不算進租金預估
           const pl=_rentPlan(q,cR);out.plan=pl.amt===534600&&pl.src==='合約租期';
           const b=_costOwnBreak(q,false);out.brk=b.rentPlan===534600+450000&&b.trans===14000;
-          renderMat6();const kh=document.getElementById('m6-kpi').innerHTML;out.kpi=/984,600/.test(kh)&&/14,000/.test(kh);
+          renderMat6();const kh=document.getElementById('m6-kpi').innerHTML;out.kpi=/984,600/.test(kh)&&_m6TransPlan(q).plan>14000&&kh.indexOf(fmt(_m6TransPlan(q).plan))>=0;   // v6.0.26 運輸＝已填＋噸數預估
           out.cmp=/單位成本比較/.test(root.innerHTML)&&/損益兩平/.test(root.innerHTML);
           // 舊資料轉換
           _m6Qid='qO';renderMat6();const mo=Q[1].mat;
@@ -4222,6 +4222,110 @@ async function newPage(browser, width, height) {
     check('核對請款單：按 M 月租帶入系統量（640／708）、差異、轉應付；運輸帶入未請趟數；預估＝合約租期、運輸不算租金預估', r.sys && r.billed && r.tripSys && r.tripBill && r.plan && r.brk && r.kpi && r.cmp);
     check('舊版租賃欄位轉入新結構（$/支/天 → $/M/月、運費改運輸列）', r.mig);
     check('v6.0.25 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.26 已付統計／預付款轉提前放款／介紹人補建／業主已請原數量／新增下一期／合約租期／運費預估／舊版卡片移除 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(
+      () => new Promise(res => {
+        const out={};
+        P.tax=5;P.vendorPayDay=25;P.vendorPayDelay=1;P.vendorCutDay=25;P.subPayOnBill=true;delete P.matTransRate;
+        VENDORS.length=0;VENDORS.push({id:'v1',name:'鴻玉開發'},{id:'v2',name:'果實工程'});
+        MAT_LEDGER.length=0;PAYABLES.length=0;INV.length=0;CONTRACTS.length=0;
+        Q=[{id:'qM',code:'115090501',name:'中科台積電F25P1',client:'八九企業有限公司',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,
+            items:[{desc:'H型鋼樁 H300，L=15M@80cm 打設、拔除',note:'含180天租期',unit:'支',qty:'133',price:'40500',sec:false}],
+            costs:[{id:'cH',type:'sub',vendor:'鴻玉開發',cat:'打設',rows:[{id:'cH_0',linkedItemIdx:0,qty:133,unitPrice:8250}],amt:0,invoice:true,retRate:0,
+                    periods:[{no:1,date:'2026-10-05',from:'2026-09-23',to:'2026-10-05',rows:[{rid:'cH_0',qty:133}],adv:548625}],advances:[{id:'a1',date:'2026-10-05',amt:548625,ts:1}]},
+                   {id:'cG',type:'sub',vendor:'果實工程',cat:'打設',rows:[{id:'cG_0',linkedItemIdx:0,qty:133,unitPrice:1000}],amt:0,invoice:true,retRate:0}]}];
+        const oT=window.toast;let lastToast='';window.toast=function(m){lastToast=m;};
+        const q=Q[0],cH=q.costs[0],cG=q.costs[1];
+        // 1 已付統計：應付管理手動連結此發包（costSourceId）→ 計入已付
+        PAYABLES.push({id:'pman1',to:'果實工程',amount:100000,vat:true,status:'paid',paidDate:'2026-10-01',quoteId:'qM',costSourceId:'cG',_mt:1});
+        const sG=_subStat(cG);
+        out.paidLink=sG.paid===105000&&sG.otherPaid===105000;
+        // 5 鴻玉：預付款＝提前放款（預付款應付遺失）→ 轉為第 1 期提前放款
+        syncCostToPayable(q,cH);
+        const pAdv=PAYABLES.find(p=>p.id==='pay'+'cH'+'_a'+'a1');
+        out.advPay=!!pAdv&&pAdv.amount===548625;
+        PAYABLES.splice(PAYABLES.indexOf(pAdv),1);   // 模擬缺應付
+        eid='qM';
+        const rowsH=_subAdvRowsHtml(cH);
+        out.advRow=/缺應付/.test(rowsH)&&/補建應付/.test(rowsH)&&/轉為提前放款/.test(rowsH)&&/已抵扣：第1期 548,625/.test(rowsH);
+        subAdvToEarly('cH','a1');
+        out.a2eDlg=/改為第 <b>1<\/b> 期/.test(document.getElementById('gen-confirm-msg').innerHTML)&&document.getElementById('a2e-paid').checked;
+        document.getElementById('gen-confirm-ok').click();
+        const per=cH.periods[0],e=(per.early||[])[0];
+        const pMain=PAYABLES.find(p=>p.id==='paycH_p1'),pE=e&&PAYABLES.find(p=>p.id==='paycH_p1_e'+e.id);
+        out.a2e=!cH.advances.length&&per.adv===0&&!!e&&e.amt===548625&&e.date==='2026-10-05'&&!!pMain&&pMain.amount===548625&&_payEff(pMain)===576056&&!!pE&&pE.status==='paid'&&pE.paidDate==='2026-10-05'&&!PAYABLES.some(p=>/_a/.test(p.id));
+        const sH=_subStat(cH);out.a2eStat=sH.paid===576056&&sH.unpaid===576056&&sH.advLeft===0;
+        // 修改預付款
+        cH.advances=[{id:'a2',date:'2026-10-05',amt:50000,ts:2}];syncCostToPayable(q,cH);
+        editSubAdvance('cH','a2');document.getElementById('sa-amt').value='40000';document.getElementById('gen-confirm-ok').click();
+        out.advEdit=cH.advances.length===1&&cH.advances[0].amt===40000&&PAYABLES.find(p=>p.id==='paycH_aa2').amount===40000;
+        cH.advances=[];syncCostToPayable(q,cH);
+        // 1 介紹人：得標後補加（單支長從報價工項 L=15M 帶入）→ 跟隨第 1 期、立刻有應付
+        pjIntroEdit('qM','cH','');
+        out.piLen=document.querySelector('.pi-len').value==='15';
+        document.getElementById('pi-name').value='風哥';document.getElementById('pi-amt').value='150';_piCalc();
+        out.piPv=/2,250／支/.test(document.querySelector('.pi-up').textContent)&&/299,250/.test(document.getElementById('pi-tot').textContent);
+        document.getElementById('gen-confirm-ok').click();
+        const f=q.costs.find(c=>c.isIntro);
+        out.intro=!!f&&f.followOf==='cH'&&f.vendor==='風哥'&&f.rows[0].unitPrice===2250&&f.amt===299250&&f.periods.length===1&&f.periods[0].rows[0].qty===133&&!!PAYABLES.find(p=>p.id==='pay'+f.id+'_p1'&&p.amount===299250&&p.vat===false);
+        const st=_pjStat(q),sh=_pjSubHtml(q,st);
+        out.pjSub=/↳ <\/span>風哥/.test(sh)&&/修改介紹費/.test(sh)&&/＋ 預付介紹費/.test(sh)&&sh.indexOf('鴻玉開發')<sh.indexOf('風哥')&&!/＋ 介紹人/.test(sh.slice(sh.indexOf('鴻玉開發'),sh.indexOf('風哥')));
+        // 修改介紹費 → 單價、應付跟著改，列 id 不變
+        pjIntroEdit('qM','cH',f.id);document.getElementById('pi-amt').value='200';document.getElementById('gen-confirm-ok').click();
+        out.introEdit=f.rows[0].id===f.id+'_0'&&f.rows[0].unitPrice===3000&&PAYABLES.find(p=>p.id==='pay'+f.id+'_p1').amount===399000;
+        // 9 業主已請：133 請 70% → 顯示 133
+        INV.push({id:'i1',quoteId:'qM',project:q.name,periodNo:'1',date:'2026-10-05',items:[{desc:'H型鋼樁 H300，L=15M@80cm 打設、拔除',unit:'支',qty:133,curQty:133,payRate:70,price:40500}],totals:{total:100}});
+        const rc=_qtyRecon(q)[0];
+        out.bill=Math.round(rc.bill*100)/100===93.1&&rc.billQ===133&&rc.billBy[70]===133&&!rc.warns.some(w=>/尚未向業主請款/.test(w));
+        const ih=_pjItemsHtml(q,_pjStat(q));out.billCell=/<b>133<\/b>/.test(ih)&&/請 70%/.test(ih)&&/計價量 93\.1/.test(ih);
+        // 8 新增請款單 → 下一期
+        const n0=INV.length;pjNewInv('qM');
+        out.nextInv=INV.length===n0+1&&INV[0].periodNo==='2'&&document.querySelector('.page.active').id==='page-invoice-edit';
+        window._invSnap=null;
+        // 2 預計退場＝進場＋合約租期（報價 含180天租期）
+        q.mat={rows:[{id:'r1',name:'型鋼',spec:'H300',len:15,unit:'支',qty:133}],use:[],loss:[],rents:[],equip:[],tps:[],_m6:1};
+        _m6Qid='qM';go('mat6');
+        m6RentEdit('qM','','r1');
+        out.ptHint=/合約租期 180 天/.test(document.getElementById('rt-pt-hint').textContent)&&gv('rt-pt')===_dAdd(localToday(),180);
+        document.getElementById('rt-pf').value='2026-09-23';_m6RtPf();
+        out.pt=gv('rt-pt')==='2027-03-22';
+        document.getElementById('rt-vendor').value='英洲';document.getElementById('rt-rate').value='60';document.getElementById('rt-cm').value='1995';
+        document.getElementById('gen-confirm-ok').click();
+        const rt=q.mat.rents[0];out.ptSave=!!rt&&rt.pt==='2027-03-22'&&rt.ptAuto===true;
+        // 沒填退場的舊資料 → 同步時自動補
+        q.mat.rents.push({id:'rx',vendor:'英洲',rowId:'r1',name:'型鋼',spec:'H300',len:15,rate:60,cm:150,pf:'2026-10-01',pt:'',mode:'day',batches:[]});
+        _m6Sync(q);out.ptFill=q.mat.rents[1].pt==='2027-03-30';
+        q.mat.rents.pop();_m6Sync(q);
+        // 3 運費預估：93×15÷1000×450×2＝1255.5／支
+        const te=_m6TransEst(q);
+        out.trans=te.rows.length===1&&te.rows[0].perPc===1255.5&&te.rows[0].pcs===133&&te.total===Math.round(93*1995/1000*450*2)&&te.rate===450;
+        renderMat6();const mh=document.getElementById('mat6-root').innerHTML;
+        out.transHtml=/材料運費預估 NT\$ 166,982/.test(mh)&&/1,255\.5/.test(mh)&&/運輸（預估）/.test(mh);
+        const b=_costOwnBreak(q,false);out.transPlan=b.transPlan===166982&&/預估 166,982/.test(_costSummaryStrip(q,q.costs));
+        P.matTransRate=500;out.transParam=_m6TransEst(q).rows[0].perPc===1395;delete P.matTransRate;
+        // 6 舊版卡片移除 → 工程專案「合約與文件」
+        CONTRACTS.push({id:'ct1',name:q.name,linkedQid:'qM',code:'C-1',amount:5000000,_mt:1});
+        go('projects');
+        out.oldGone=document.querySelector('.page.active').id==='page-proj'&&!/舊版卡片/.test(document.getElementById('page-proj').innerHTML);
+        openProj('qM');const ph=document.getElementById('proj-root').innerHTML;
+        out.docs=/合約與文件/.test(ph)&&/上傳合約檔/.test(ph)&&/上傳確認單/.test(ph)&&/✎ 合約資料/.test(ph)&&/新增下一期請款單/.test(ph);
+        window.toast=oT;Q=[];PAYABLES.length=0;VENDORS.length=0;INV.length=0;CONTRACTS.length=0;eid=null;res(out);
+      })
+    );
+    check('已付統計：應付管理手動連結此發包（costSourceId）、整筆應付一併計入已付', r.paidLink);
+    check('預付款＝某期提前放款：缺應付可補建、轉為第 1 期提前放款（該期不再抵扣、應付總額不變、標記已付）；預付款可修改金額', r.advPay && r.advRow && r.a2eDlg && r.a2e && r.a2eStat && r.advEdit);
+    check('介紹人：得標後可補加（單支長取報價 L=15M，$150/M → $2,250／支）、跟隨主約已登錄期別立即產生應付；專案頁列在主約下方、可修改', r.piLen && r.piPv && r.intro && r.pjSub && r.introEdit);
+    check('業主已請顯示實際數量（打設 133 請 70%，計價量 93.1），與廠商已請比對不誤報', r.bill && r.billCell);
+    check('工程專案「＋ 新增下一期請款單」＝最新一期的下一期', r.nextInv);
+    check('材料租賃預計退場＝預計進場＋報價合約租期天數（180 天），改進場日自動重算、舊資料自動補', r.ptHint && r.pt && r.ptSave && r.ptFill);
+    check('運費預估：單位重 × 長度 ÷ 1000 × $450/噸 × 2（H300 L=15M 每支 1,255.5）、進成本預估、參數可改', r.trans && r.transHtml && r.transPlan && r.transParam);
+    check('舊版卡片頁移除：go(projects) 轉工程專案，合約檔／確認單改在「合約與文件」', r.oldGone && r.docs);
+    check('v6.0.26 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
