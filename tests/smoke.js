@@ -3264,6 +3264,7 @@ async function newPage(browser, width, height) {
         rfqNew();
         const m=document.getElementById('gen-confirm-modal');
         out.form=m.style.display!=='none'&&document.querySelectorAll('.rfq-it').length===2&&document.querySelectorAll('.rfq-qty')[0].value==='408'&&document.getElementById('rfq-cash').value==='50'&&/RFQ-1150928-01/.test(m.innerHTML);
+        out.perDef=[...document.querySelectorAll('.rfq-per')].every(s=>s.value==='m');document.querySelectorAll('.rfq-per').forEach(s=>s.value='pc');   // v6.0.24 有 L=…M 預設依 M；此測試驗證依支流程
         document.querySelectorAll('.rfq-it').forEach(cb=>cb.checked=true);document.querySelectorAll('.rfq-qty')[1].value='400';
         document.getElementById('rfq-scope').value='H型鋼樁打設、拔除';document.getElementById('rfq-deadline').value='2026-10-10';document.getElementById('rfq-entry').value='2026-11-01';
         document.getElementById('rfq-cash').value='40';document.getElementById('rfq-cash').dispatchEvent(new Event('input'));out.cashLink=document.getElementById('rfq-ticket').value==='60';
@@ -3321,7 +3322,7 @@ async function newPage(browser, width, height) {
         Q=Q.filter(x=>x.id!=='qR');VENDORS.length=0;_rfqQid='';
         return out;
     });
-    check('發包：新增詢價單（合約工項勾選、數量帶生效量、備用不列、付款條件、條件逐列可增刪；不預選廠商）', r.page && r.form && r.cashLink && r.saved && r.condUi);
+    check('發包：新增詢價單（合約工項勾選、數量帶生效量、備用不列、付款條件、條件逐列可增刪；不預選廠商）', r.page && r.form && r.cashLink && r.saved && r.condUi && r.perDef);
     check('發包：詢價單 PDF 統一格式（條件條列、廠商欄表格、單價留白、無內部欄與頁尾）', r.cond && r.doc && r.prev);
     check('發包：回傳廠商（名冊自動帶聯絡人、名冊外可手打、名稱必填）、填價／議價合計、比價表', r.newForm && r.pick && r.nameReq && r.fillTot && r.negTxt && r.status && r.compare);
     check('發包：得標需原因→建立分包合約（單價＝議後價、保留款、進場日、付款條件）、其餘未得標、未計價不掛應付', r.awardPre && r.needReason && r.award && r.others && r.doneUi && r.crew);
@@ -4055,6 +4056,86 @@ async function newPage(browser, width, height) {
     check('分頁：8 列＋計算式＋頁尾的請款單在列印正規化後為一頁（不再多一張空白頁）', r.onePage && r.cbLtH, 'H=' + r.H + ' pages=' + r.pages);
     check('分頁：外框下內距不算文件高度（內容 600px＋內距 200px → 一頁）；真正超過仍分頁且續頁重印表頭', r.padOne && r.twoPages);
     check('v6.0.23 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.24 發包：M 計價、介紹人費用、提前放款、詢價單欄高 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+
+          const out={};
+          P.vendorPayDay=25;P.vendorPayDelay=1;P.vendorCutDay=25;P.subPayOnBill=true;P.tax=5;
+          VENDORS.length=0;PAYABLES.length=0;
+          Q=[{id:'qR',code:'1150990',name:'M計價測試案',client:'業主',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,
+          items:[{desc:'H型鋼樁 H300，L=15M@80cm 打設、拔除（含水刀引孔）',unit:'支',qty:'133',price:'40500',estCost:'',sec:false}],costs:[]}];
+          const oT=window.toast;window.toast=function(){};
+          _rfqQid='qR';_rfqTab='rfq';go('rfq');
+          rfqNew();
+          const per=document.querySelector('.rfq-per'),len=document.querySelector('.rfq-len');
+          out.editDef=!!per&&per.value==='m'&&!!len&&len.value==='15';
+          document.querySelector('.rfq-it').checked=true;document.getElementById('gen-confirm-ok').click();
+          const q=Q[0],r=q.rfqs[0];
+          out.saved=r.items[0].per==='m'&&r.items[0].len===15&&r.items[0].qty===133;
+          const doc=_rfqDocHtml(q,r);
+          out.doc=/1,995/.test(doc)&&/<td class="c">M<\/td>/.test(doc)&&/133 支 × 單支 15 M/.test(doc)&&/\.vt td\{[^}]*height:36px/.test(doc)&&/\.vt td\.sig\{height:36px\}/.test(doc);
+          // 廠商回傳：$/M
+          rfqFill(r.id,-1);document.getElementById('rf-name').value='鴻玉開發工程行';
+          const row=document.querySelector('.rf-row');row.querySelector('.rf-p').value='600';_rfRecalc();
+          out.fill=row.getAttribute('data-qty')==='1995'&&row.querySelector('.rf-amt').textContent==='1,197,000'&&/每支 9,000/.test(row.querySelector('.rf-pc').textContent)&&/報價 \$\/M/.test(row.querySelector('.rf-p').placeholder);
+          document.getElementById('gen-confirm-ok').click();
+          out.total=_rfqVendorTotal(r,r.vendors[0],true).total===1197000;
+          renderRfq();out.card=/1,995 M/.test(document.getElementById('rfq-root').innerHTML)&&/＝9,000／支/.test(document.getElementById('rfq-root').innerHTML);
+          // 得標＋介紹人 150/M、不開發票
+          rfqAward(r.id);
+          document.getElementById('rfq-reason').value='最低價';
+          document.getElementById('rfq-intro-name').value='風哥';document.getElementById('rfq-intro-amt').value='150';document.getElementById('rfq-intro-per').value='m';_rfqIntroPreview(r.id);
+          out.introPv=/150\/M × 15M ＝ <b>2,250／支<\/b>/.test(document.getElementById('rfq-intro-pv').innerHTML)&&/299,250/.test(document.getElementById('rfq-intro-pv').innerHTML);
+          document.getElementById('gen-confirm-ok').click();
+          const c=q.costs.find(x=>x.type==='sub'&&!x.isIntro),f=q.costs.find(x=>x.isIntro);
+          out.award=!!c&&c.rows[0].unitPrice===9000&&c.rows[0].ppm===600&&c.rows[0].len===15&&c.amt===1197000&&/\$600\/M × 15M/.test(c.rows[0].desc)&&q.items[0].estCost==='9000'&&/600\/M × 15M/.test(q.items[0].estCostSrc);
+          out.intro=!!f&&f.followOf===c.id&&f.vendor==='風哥'&&f.invoice===false&&f.rows[0].unitPrice===2250&&f.rows[0].ppm===150&&f.amt===299250&&r.award.intro==='風哥'&&VENDORS.some(v=>v.name==='風哥'&&v.type==='介紹');
+          // 第 1 期：40 支 → 主約 360,000；介紹費跟隨 90,000（不開發票）
+          eid='qR';
+          const per1={no:1,date:'2026-10-25',from:'2026-09-25',to:'2026-10-25',rows:[{rid:c.rows[0].id,qty:40}],ts:1,mt:1};
+          const k1=_subPeriodCalc(c,per1);per1.amt=k1.amt;per1.ret=k1.ret;per1.net=k1.net;per1.adv=0;per1.due='2026-11-25';c.periods=[per1];
+          syncCostToPayable(q,c);_subFollowApply(q,c);
+          const pMain=()=>PAYABLES.find(p=>p.id==='pay'+c.id+'_p1');
+          out.base=!!pMain()&&pMain().amount===k1.pay&&PAYABLES.find(p=>p.id==='pay'+f.id+'_p1').amount===90000&&PAYABLES.find(p=>p.id==='pay'+f.id+'_p1').vat===false;
+          // 提前放款 100,000（未稅）
+          openSubEarly(c.id,1);document.getElementById('se-amt').value='100000';_seOnInput();
+          out.seHint=/含稅實付 NT\$ 105,000/.test(document.getElementById('se-hint').textContent);
+          document.getElementById('gen-confirm-ok').click();
+          const pe=PAYABLES.find(p=>p.costEarly&&p.costId===c.id);
+          out.early=!!pe&&pe.amount===100000&&pe.vat===true&&pe.date===localToday()&&/第1期提前放款/.test(pe.note)&&pMain().amount===k1.pay-100000&&/已提前放款 100,000/.test(pMain().note)&&pMain().date==='2026-11-25';
+          const st=_subStat(c);out.stat=st.unpaid===Math.round((k1.pay)*1.05);
+          // 超過可提前金額 → 擋下
+          openSubEarly(c.id,1);document.getElementById('se-amt').value=String(k1.pay);document.getElementById('gen-confirm-ok').click();
+          out.over=c.periods[0].early.length===1;document.getElementById('gen-confirm-modal').style.display='none';
+          // 分包管理視圖顯示提前放款列
+          const sh=buildSubMgmtHtml(q);out.mgmt=/↳ 提前放款/.test(sh)&&/預付介紹費/.test(sh)&&/預支（未請款）/.test(sh);
+          // 介紹費先付 200,000（超過本期預估也不必勾特殊情況）→ 跟隨期別自動抵扣
+          openSubAdvance(f.id);document.getElementById('sa-amt').value='200000';_saOnInput();
+          out.saNoWarn=document.getElementById('sa-warn').style.display==='none';
+          document.getElementById('gen-confirm-ok').click();
+          const pa=PAYABLES.find(p=>p.costAdv&&p.costId===f.id);
+          _subFollowApply(q,c);
+          out.introAdv=!!pa&&pa.amount===200000&&/預付介紹費/.test(pa.note)&&!PAYABLES.some(p=>p.id==='pay'+f.id+'_p1')&&f.periods[0].adv===90000;
+          // 刪除提前放款 → 回到原期
+          delSubEarly(c.id,1,c.periods[0].early[0].id);document.getElementById('gen-confirm-ok').click();
+          out.del=!PAYABLES.some(p=>p.costEarly)&&pMain().amount===k1.pay;
+          // 介紹費期別提前放款，主約再存檔（重建跟隨期別）後仍保留
+          f.periods.find(p=>p.no===1).early=[{id:'ef',date:localToday(),amt:10000}];_subFollowApply(q,c);
+          out.followKeep=(f.periods.find(p=>p.no===1).early||[]).length===1;
+          window.toast=oT;Q=[];PAYABLES.length=0;VENDORS.length=0;eid=null;
+          return out;
+    });
+    check('詢價單：工項有 L=…M 預設「依 M」計價（可改依支）、匯出數量＝支數×單支長、單位 M、廠商報價欄列高一致', r.editDef && r.saved && r.doc);
+    check('詢價回傳：$/M × 總 M 數＝複價、即時顯示每支單價；比價表顯示 M 數與每支換算', r.fill && r.total && r.card);
+    check('得標：合約單價換算為每支（600/M×15M＝9,000）、回填成本單價；介紹人 150/M → 2,250/支、不開發票、跟隨計價', r.introPv && r.award && r.intro && r.base);
+    check('提前放款：已登錄期別拆一筆應付（到期＝放款日）、原期扣除、不得超過、統計含之、可刪回原期；管理表列出', r.seHint && r.early && r.stat && r.over && r.mgmt && r.del);
+    check('介紹費先付：不受本期預估限制、跟隨期別自動抵扣；介紹費期別的提前放款於主約重算後保留', r.saNoWarn && r.introAdv && r.followKeep);
+    check('v6.0.24 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
