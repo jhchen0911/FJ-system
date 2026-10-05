@@ -808,7 +808,8 @@ async function newPage(browser, width, height) {
       out.marg = plan.marg > 40;                      // 10mm@2x ≈ 76px
       out.noOverflow = plan.pages.every((p, i) =>
         (p.e - p.s) + (i === 0 ? 0 : plan.marg) + plan.marg + (p.hd ? plan.hd.e - plan.hd.s : 0) <= plan.PAGE + 1);
-      out.contiguous = plan.pages[0].s === 0 && plan.pages[plan.pages.length - 1].e === H
+      const _cbH = Math.round(_pdfContentBottom(root) * 2);   // v6.0.23 文件高度＝內容底緣（.page-wrap 的下內距不算）
+      out.contiguous = plan.pages[0].s === 0 && Math.abs(plan.pages[plan.pages.length - 1].e - _cbH) <= 2 && _cbH <= H
         && plan.pages.every((p, i) => i === 0 || p.s === plan.pages[i - 1].e);
       out.repeatHead = plan.pages.slice(1).some(p => p.hd === true);
       // 切點必須是某一列的下緣（±2px 容差）
@@ -4014,6 +4015,47 @@ async function newPage(browser, width, height) {
     }));
     check('手機版：請款單工項卡片有備註欄、不橫向捲動', mok && merr.length === 0, merr.slice(0, 2).join(' | '));
     await mp.close();
+  }
+
+  // ───────────── v6.0.23 請款單表頭（LOGO 左置、留白縮小）＋分頁引擎內容底緣（第二頁空白） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+
+          const out={};
+          P.tax=5;INV.length=0;
+          const items=[];for(let k=0;k<8;k++)items.push({desc:'H型鋼樁 H300，L='+(10+k)+'M@80cm 打設、拔除（含水刀引孔）',unit:'支',qty:'40',price:String(26500+k*1000),sec:false,note:'含180天租期'});
+          Q=[{id:'qH',code:'1150970',name:'中科台積電F25P1',client:'八九企業有限公司',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:items}];
+          const inv=buildInvFromQuote(Q[0]);inv.id='invH1';inv.date='2026-10-05';INV.push(inv);loadInvoice('invH1');
+          invItems[2].curQty=133;invItems[2].payRate=70;invItems[2].contractPrice=40500;invItems[4].curQty=1;invItems[4].contractPrice=80000;invItems[7].curQty=27;invItems[7].contractPrice=1500;
+          [2,4,7].forEach(i=>updateInvRowAmt(i));document.getElementById('inv-calc').checked=true;buildInvPreview();
+          const html=document.getElementById('inv-prev-html').innerHTML;
+          // 表頭：LOGO 與公司名同一列（flex）
+          const doc=document.getElementById('inv-doc');out.id=!!doc;
+          const hd=doc&&doc.querySelector('.inv-hd');out.hd=!!hd&&getComputedStyle(hd).display==='flex'&&hd.children.length===2&&hd.children[0].tagName==='IMG'&&/豐有|公司/.test(hd.children[1].textContent||'')&&parseFloat(getComputedStyle(hd.children[0]).height)<=34;
+          // 列印：內距歸零 ＋ 內容底緣只算有內容的元素 → 8 列＋計算式＋頁尾仍是一頁（原本第二頁整張空白）
+          const host=document.createElement('div');host.style.cssText='position:absolute;left:-9999px;top:0;width:1046px;background:#fff';
+          host.innerHTML='<style>#inv-doc{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}</style>'+html;document.body.appendChild(host);
+          const H=host.scrollHeight;const plan=_pdfPlanPages({width:2092,height:Math.round(H*2)},host,1046,true);
+          out.onePage=plan.pages.length===1;out.H=H;out.pages=plan.pages.length;
+          const cb=_pdfContentBottom(host);out.cbLtH=cb>0&&cb<=H;
+          host.remove();
+          // 尾端內距不算文件高度：內容 600px＋外框下內距 200px → 一頁（舊邏輯算 800px 會拆成兩頁）
+          const h2=document.createElement('div');h2.style.cssText='position:absolute;left:-9999px;top:0;width:1046px;background:#fff';
+          h2.innerHTML='<div style="padding:0 0 200px"><table style="width:100%;border-collapse:collapse"><tbody>'+Array.from({length:20},(_,i)=>'<tr><td style="height:30px">列 '+(i+1)+'</td></tr>').join('')+'</tbody></table></div>';document.body.appendChild(h2);
+          const p2=_pdfPlanPages({width:2092,height:Math.round(h2.scrollHeight*2)},h2,1046,true);out.padOne=p2.pages.length===1&&h2.scrollHeight>=800&&Math.abs(p2.pages[0].e-1200)<=4;h2.remove();
+          // 真正超過一頁仍要分頁（不是把分頁關掉）
+          const h3=document.createElement('div');h3.style.cssText='position:absolute;left:-9999px;top:0;width:1046px;background:#fff';
+          h3.innerHTML='<table style="width:100%;border-collapse:collapse"><thead><tr><th style="height:30px">表頭</th></tr></thead><tbody>'+Array.from({length:40},(_,i)=>'<tr><td style="height:30px">列 '+(i+1)+'</td></tr>').join('')+'</tbody></table>';document.body.appendChild(h3);
+          const p3=_pdfPlanPages({width:2092,height:Math.round(h3.scrollHeight*2)},h3,1046,true);out.twoPages=p3.pages.length===2&&p3.pages[1].hd===true;h3.remove();
+          INV.length=0;Q=[];invEid=null;invItems=[];
+          return out;
+    });
+    check('請款單表頭：外框 #inv-doc、LOGO 與公司名同一列（flex、LOGO ≤34px）', r.id && r.hd);
+    check('分頁：8 列＋計算式＋頁尾的請款單在列印正規化後為一頁（不再多一張空白頁）', r.onePage && r.cbLtH, 'H=' + r.H + ' pages=' + r.pages);
+    check('分頁：外框下內距不算文件高度（內容 600px＋內距 200px → 一頁）；真正超過仍分頁且續頁重印表頭', r.padOne && r.twoPages);
+    check('v6.0.23 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
   }
 
   await browser.close();
