@@ -34,6 +34,7 @@ async function newPage(browser, width, height) {
   });
   await page.goto(INDEX);
   await page.waitForTimeout(2500);
+  await page.evaluate(() => { window._costEditAll = true; });   // v6.0.29 施工成本頁測試時全展開
   return { page, errors };
 }
 
@@ -626,7 +627,7 @@ async function newPage(browser, width, height) {
       openCustKpi(); out.custBox = grab();
       // 獎金改未稅基底
       out.commUntaxed = /q\.t\?\.sub/.test(String(confirmAward))
-        && /不含稅/.test(document.getElementById('award-ref-mode').innerHTML);
+        && !document.getElementById('award-ref-mode');   // v6.0.29 得標視窗獎金區塊已移除（改介紹人）
       // 工程實績表：渲染＋勾選排除
       const el = document.createElement('div');
       renderTrackReport(el);
@@ -1094,9 +1095,9 @@ async function newPage(browser, width, height) {
       document.getElementById('dr-own-equip').checked = true; _drRenderEquip(); _drToggleEquip('A機');
       out.equipUI = /✓ A機/.test(document.getElementById('dr-equip-box').innerHTML);
       const col = _drCollect();
-      out.equipCollect = !!col && col.ownEquip && col.equip.length === 1 && col.equip[0].name === 'A機' && col.equip[0].hrs === 8;
+      out.equipCollect = !!col && col.ownEquip && col.equip.length === 1 && col.equip[0].name === 'A機' && col.equip[0].hrs === 1;   // v6.0.29 填天數
       const dl = document.createElement('div'); renderLaborReport(dl, year, null);
-      out.equipRpt = /自有機具稼動/.test(dl.innerHTML) && /A機/.test(dl.innerHTML) && /2 天/.test(dl.innerHTML) && /12 hr/.test(dl.innerHTML);
+      out.equipRpt = /自有機具稼動/.test(dl.innerHTML) && /A機/.test(dl.innerHTML) && /2 天/.test(dl.innerHTML) && /12 天/.test(dl.innerHTML);
       // 待辦：最近一篇日報 5 天前、門檻 3 天 → 提醒
       updateDashTodo();
       out.todo = /串連二案 已 5 天沒有日報/.test(document.getElementById('dash-todo-list').innerHTML);   // v5.431 改問句
@@ -3237,7 +3238,7 @@ async function newPage(browser, width, height) {
         renderProj();out.sched1=/預定 2026-09-01～2026-09-20（20 天）/.test(document.getElementById('pj-body-sched').innerHTML);
         // 日報、結案
         out.log=/2026-09-10/.test(document.getElementById('pj-body-log').innerHTML)&&/鴻玉開發工程行/.test(document.getElementById('pj-body-log').innerHTML)&&/white-space:nowrap;font-weight:700">300\s*支<\/span>/.test(document.getElementById('pj-body-log').innerHTML)&&/class="pj-sched-row"/.test(document.getElementById('pj-body-sched').innerHTML);   // v6.0.12 數量不拆行、排程列單欄 class
-        const cl=document.getElementById('pj-body-close').innerHTML;out.close=/竣工總結算/.test(cl)&&/結案前請確認/.test(cl)&&/toggleProjClosed/.test(cl);
+        const cl=document.getElementById('pj-body-close').innerHTML;out.close=/pjCloseAll\('/.test(cl)&&/結案＝最後一期請款單送出後按一次/.test(cl)&&!/settleContract\(/.test(cl);   // v6.0.29 結案一鈕
           // 介紹費：第二家同工項承包 → 工項表提示、發包區下拉設跟隨 → 發包量不再重複
         Q[0].costs.push({id:'cF',type:'sub',vendor:'風哥',cat:'打設',date:'2026-09-01',amt:0,invoice:false,rows:[{id:'f1',linkedItemIdx:0,desc:'',qty:400,unitPrice:150}]});
         renderProj();out.dupHint=/發包量被重複加總/.test(document.getElementById('pj-body-items').innerHTML)&&/pjSetFollow/.test(document.getElementById('pj-body-sub').innerHTML);
@@ -3968,14 +3969,14 @@ async function newPage(browser, width, height) {
           openSubEarly(c.id,1);document.getElementById('se-amt').value=String(k1.pay);document.getElementById('gen-confirm-ok').click();
           out.over=c.periods[0].early.length===1;document.getElementById('gen-confirm-modal').style.display='none';
           // 分包管理視圖顯示提前放款列
-          const sh=buildSubMgmtHtml(q);out.mgmt=/↳ 提前放款/.test(sh)&&/預付介紹費/.test(sh)&&/預支（未請款）/.test(sh);
+          const sh=buildSubMgmtHtml(q);out.mgmt=/↳ 提前放款/.test(sh)&&/openPrepay\('/.test(sh)&&!/openSubAdvance\(|openSubEarly\(/.test(sh);   // v6.0.29 預付款一鈕
           // 介紹費先付 200,000（超過本期預估也不必勾特殊情況）→ 跟隨期別自動抵扣
           openSubAdvance(f.id);document.getElementById('sa-amt').value='200000';_saOnInput();
           out.saNoWarn=document.getElementById('sa-warn').style.display==='none';
           document.getElementById('gen-confirm-ok').click();
           const pa=PAYABLES.find(p=>p.costAdv&&p.costId===f.id);
           _subFollowApply(q,c);
-          out.introAdv=!!pa&&pa.amount===200000&&/預付介紹費/.test(pa.note)&&!PAYABLES.some(p=>p.id==='pay'+f.id+'_p1')&&f.periods[0].adv===90000;
+          out.introAdv=!!pa&&pa.amount===200000&&/預付款（介紹費）/.test(pa.note)&&!PAYABLES.some(p=>p.id==='pay'+f.id+'_p1')&&f.periods[0].adv===90000;
           // 刪除提前放款 → 回到原期
           delSubEarly(c.id,1,c.periods[0].early[0].id);document.getElementById('gen-confirm-ok').click();
           out.del=!PAYABLES.some(p=>p.costEarly)&&pMain().amount===k1.pay;
@@ -4136,7 +4137,7 @@ async function newPage(browser, width, height) {
         const f=q.costs.find(c=>c.isIntro);
         out.intro=!!f&&f.followOf==='cH'&&f.vendor==='風哥'&&f.rows[0].unitPrice===2250&&f.amt===299250&&f.periods.length===1&&f.periods[0].rows[0].qty===133&&!!PAYABLES.find(p=>p.id==='pay'+f.id+'_p1'&&p.amount===299250&&p.vat===false);
         const st=_pjStat(q),sh=_pjSubHtml(q,st);
-        out.pjSub=/↳ <\/span>風哥/.test(sh)&&/修改介紹費/.test(sh)&&/＋ 預付介紹費/.test(sh)&&sh.indexOf('鴻玉開發')<sh.indexOf('風哥')&&!/＋ 介紹人/.test(sh.slice(sh.indexOf('鴻玉開發'),sh.indexOf('風哥')));
+        out.pjSub=/↳ <\/span>風哥/.test(sh)&&/修改介紹費/.test(sh)&&/openPrepay\('/.test(sh)&&sh.indexOf('鴻玉開發')<sh.indexOf('風哥')&&!/＋ 介紹人/.test(sh.slice(sh.indexOf('鴻玉開發'),sh.indexOf('風哥')));
         // 修改介紹費 → 單價、應付跟著改，列 id 不變
         pjIntroEdit('qM','cH',f.id);document.getElementById('pi-amt').value='200';document.getElementById('gen-confirm-ok').click();
         out.introEdit=f.rows[0].id===f.id+'_0'&&f.rows[0].unitPrice===3000&&PAYABLES.find(p=>p.id==='pay'+f.id+'_p1').amount===399000;
@@ -4311,6 +4312,97 @@ async function newPage(browser, width, height) {
     check('單一入口：報價列表無 PDF／請款鈕、請款單列表無下期／收款鈕、未開單橫幅導向工程專案、計價廠商分頁只剩開啟工程、專案頂部只剩編輯報價、核對單鈕移除', r.qlist && r.ilist && r.banner && r.vb && r.top && r.noStmt);
     check('說明改「？」：每頁一顆、點開顯示說明、取消鈕之後恢復', r.help && r.helpTxt && r.cancelBack);
     check('v6.0.28 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.29 第二批：預付款一鈕、介紹費算法×時機、階段完工自動結算、結案一鈕、施工成本唯讀、日報支出廠商型額外支出、機具天數、狀態三選一 ──
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(
+      () => new Promise(res => {
+        const out={};const oT=window.toast;window.toast=function(){};
+        P.tax=5;VENDORS.length=0;['鴻玉開發','風哥','外調吊車行'].forEach((n,i)=>VENDORS.push({id:'v'+i,name:n}));
+        MAT_LEDGER.length=0;PAYABLES.length=0;INV.length=0;CONTRACTS.length=0;EXPENSES.length=0;
+        const D='H型鋼樁 H300，L=15M 打設、拔除';
+        Q=[{id:'qA',code:'115100201',name:'第二批測試案',client:'甲',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,
+          items:[{desc:D,unit:'支',qty:'133',price:'40000',estCost:'30000',sec:false},{desc:'支撐 H300 架設',unit:'M',qty:'100',price:'1000',estCost:'800',sec:false}],
+          t:{sub:133*40000+100*1000,total:Math.round((133*40000+100*1000)*1.05)},
+          dailyLogs:[{id:'d1',date:'2026-09-25',progressRows:[{itemIdx:0,qty:60}]},{id:'d2',date:'2026-10-02',progressRows:[{itemIdx:0,qty:60},{itemIdx:1,qty:40}]}],
+          costs:[{id:'cH',type:'sub',vendor:'鴻玉開發',cat:'打設',date:'2026-09-20',rows:[{id:'cH_0',linkedItemIdx:0,qty:133,unitPrice:8250}],amt:0,invoice:true,retRate:0,periods:[{no:1,date:'2026-10-05',from:'2026-09-23',to:'2026-10-05',rows:[{rid:'cH_0',qty:120}]}]}]}];
+        const q=Q[0],c=q.costs[0];
+        CONTRACTS.push({id:'ct1',code:'C-001',name:q.name,linkedQid:'qA',amount:Math.round((133*40000+100*1000)*1.05),status:'active',_mt:1});
+        INV.push({id:'i1',quoteId:'qA',project:q.name,client:'甲',periodNo:'1',date:'2026-09-30',items:[{type:'item',desc:D,unit:'支',contractQty:133,contractPrice:40000,price:40000,qty:133,curQty:60,payRate:70,prevQty:0}],totals:{total:Math.round(60*0.7*40000*1.05),retention:0},received:'0',_mt:1});
+        eid='qA';syncCostToPayable(q,c);
+        // 1 預付款一鈕：有已登錄未付期別 → 提前放款；沒有 → 預付款（未請款）
+        out.btn=/openPrepay\('cH'\)/.test(_prepayBtn(c))&&_subEarlyBtn(c)===''&&_subEarlyRowBtn(c,{})==='';
+        openPrepay('cH');out.early=!!document.getElementById('se-amt');document.getElementById('gen-confirm-modal').style.display='none';
+        const c2={id:'cN',type:'sub',vendor:'鴻玉開發',cat:'打設',date:'2026-09-20',rows:[{id:'cN_0',linkedItemIdx:1,qty:100,unitPrice:500}],amt:50000,invoice:true,retRate:0,periods:[]};q.costs.push(c2);
+        openPrepay('cN');out.adv=!!document.getElementById('sa-amt')&&/預付款（未請款）/.test(document.getElementById('gen-confirm-modal').innerHTML);document.getElementById('gen-confirm-modal').style.display='none';
+        const sh=buildSubMgmtHtml(q);out.mgmt=/openPrepay\(/.test(sh)&&!/openSubAdvance\('cH'\)|＋ 預支（未請款）|＋ 預付介紹費|openSubEarly\(/.test(sh);
+        // 2 介紹費：合約金額 % ＋ 第一期請款後 → 一筆應付（第一期請款日）、不跟隨期別
+        pjIntroEdit('qA','cH','',{});out.piUI=!!document.getElementById('pi-per')&&!!document.getElementById('pi-pay');
+        document.getElementById('pi-name').value='風哥';document.getElementById('pi-per').value='pct';_piMode();document.getElementById('pi-amt').value='2';document.getElementById('pi-pay').value='first';_piCalc();
+        out.piPrev=/預估介紹費 NT\$ 108,400/.test(document.getElementById('pi-tot').textContent);   // 5,420,000×2%
+        document.getElementById('gen-confirm-ok').click();
+        const f=q.costs.find(x=>x.isIntro);
+        out.pct=!!f&&f.introCalc==='pct'&&f.introPay==='first'&&f.introAmt===2&&f.amt===108400&&!(f.periods||[]).length&&f.followOf==='cH';
+        const pi=PAYABLES.find(p=>p.id==='pay'+f.id+'_intro');
+        out.piPay=!!pi&&pi.amount===108400&&pi.date==='2026-09-30'&&pi.to==='風哥'&&!PAYABLES.some(p=>p.id==='pay'+f.id+'_p1');
+        // 主約再登錄一期：跟隨不套用到「第一期請款後」的介紹費
+        c.periods.push({no:2,date:'2026-11-05',from:'2026-10-06',to:'2026-11-05',rows:[{rid:'cH_0',qty:13}]});_subFollowApply(q,c);out.noFollow=!(f.periods||[]).length;
+        // 改成「結案後」→ 未結案不掛；拔除完成 → 日報階段完工日
+        f.introPay='done';_introSync(q);out.doneWait=!PAYABLES.some(p=>p.id==='pay'+f.id+'_intro');
+        q.dailyLogs.push({id:'d3',date:'2026-10-03',status:'stage',stageOf:'remove',stageDate:'2026-10-03',progressRows:[]});
+        f.introPay='remove';_introSync(q);const pr=PAYABLES.find(p=>p.id==='pay'+f.id+'_intro');out.removeTrig=!!pr&&pr.date==='2026-10-03';
+        f.introPay='first';_introSync(q);
+        // 每 M × 實作量：預付 20,000 後應付扣掉
+        // 3 階段完工自動結算：合約數量＝實作 120、合約金額追減 13×40000×1.05、請款單合約量同步、建單取結算量
+        q.dailyLogs.push({id:'d4',date:'2026-10-04',status:'stage',stageOf:'install',stageDate:'2026-10-04',progressRows:[]});
+        const ct=CONTRACTS[0],amt0=ct.amount;
+        out.settle=_autoSettle(q)===true&&q.items[0].settledQty===120&&q.items[0].qty==='133'&&ct.amount===amt0-Math.round(13*40000*1.05)-Math.round(60*1000*1.05)&&ct.originalAmount===amt0&&INV[0].items[0].contractQty===120&&INV[0].items[0].origContractQty===133;
+        out.effMap=_effQtyMap(q)[D]===120&&_autoSettle(q)===false;
+        const ih=_pjItemsHtml(q,_pjStat(q));out.itemsTxt=/合約量已自動改為實作量（原 133，追減 13）/.test(ih)&&/>120</.test(ih);
+        out.noStlBtn=!/settleInvItem/.test(String(rInvItems));
+        // 4 結案一鈕：竣工總結算＋結案＋回寫
+        const s0=_pjStat(q),ch=_pjCloseHtml(q,s0);out.closeUI=/pjCloseAll\('qA'\)/.test(ch)&&!/settleContract\(|writeCostHist\(/.test(ch);
+        COST_HIST.length=0;pjCloseAll('qA');out.closeAsk=/結案：/.test(document.getElementById('gen-confirm-modal').innerHTML);document.getElementById('gen-confirm-ok').click();
+        const billed=INV.reduce((a,i)=>a+(i.totals.total||0)+(i.totals.retention||0),0);
+        out.closed=q.closed===true&&!!q.closedAt&&ct.status==='completed'&&ct.amount===billed&&COST_HIST.length>0&&/恢復進行中/.test(_pjCloseHtml(q,_pjStat(q)));
+        // 5 施工成本頁預設唯讀卡，按「編輯明細」才展開
+        window._costEditAll=false;window._costEditId=null;openProjectCosts('qA');window._costView='list';rCostItems();
+        const cl=document.getElementById('cost-list').innerHTML;
+        out.ro=document.querySelectorAll('#cost-list .cost-ro').length===3&&!document.getElementById('cost-rows-cH')&&/costEdit\('cH'\)/.test(cl)&&/openPrepay\('cH'\)/.test(cl)&&/openSubPeriod\('cH'\)/.test(cl)&&/來自 /.test(cl)&&/介紹費・合約金額 %・第一期請款後/.test(cl);
+        costEdit('cH');out.edit=!!document.getElementById('cost-rows-cH')&&/正在編輯明細/.test(document.getElementById('cost-list').innerHTML)&&document.querySelectorAll('#cost-list .cost-ro').length===2;
+        window._costEditId=null;rCostItems();out.back=document.querySelectorAll('#cost-list .cost-ro').length===3;
+        costAddPick();out.pickExtra=/go\('quickcost'\)/.test(document.getElementById('gen-confirm-modal').innerHTML)&&!/addCostItem\('extra'\)/.test(document.getElementById('gen-confirm-modal').innerHTML);document.getElementById('gen-confirm-modal').style.display='none';
+        window._costEditAll=true;
+        // 6 日報．支出：額外支出（廠商）→ 填廠商 → 成本卡掛廠商、應付；狀態無「明起暫停」；機具填天數
+        q.closed=false;go('quickcost');rQuickCost();
+        const sel=document.getElementById('dr-proj');if(sel){sel.value='qA';if(sel.onchange)sel.onchange();}
+        const ps=document.getElementById('qc-proj');ps.value='qA';
+        const vi=QC_TYPES.findIndex(t=>t[4]==='vendor');out.chip=vi>0&&/額外支出/.test(document.getElementById('qc-chips').innerHTML);
+        _qcPending=[];qcAdd(vi);const e=_qcPending[0];out.pendUI=!!e&&!!document.querySelector('[data-qcid="'+e.id+'"] input[list="qc-vdl"]');
+        qcUpd(e.id,'amt','12000');qcUpd(e.id,'note','外調吊車 1 天');
+        submitQuickCost();out.needVendor=_qcPending.length===1;
+        qcUpd(e.id,'vendor','外調吊車行');submitQuickCost();
+        const xc=q.costs.find(x=>x.type==='extra'&&x.vendor==='外調吊車行');
+        out.vendorCost=!!xc&&xc.amt===12000&&xc.src==='quick'&&xc.invoice===true&&!xc.review&&_qcPending.length===0;
+        const xp=PAYABLES.find(p=>p.costId===(xc||{}).id);out.vendorPay=!!xp&&xp.to==='外調吊車行'&&xp.amount===12000&&xp.status!=='paid';
+        out.noPause=![...document.querySelectorAll('#dr-status option')].some(o=>o.value==='pause')&&document.querySelectorAll('#dr-status option').length>=3;
+        P.equipList=['A機'];document.getElementById('dr-own-equip').checked=true;_drRenderEquip();_drToggleEquip('A機');
+        out.equipDay=_drEquip['A機']===1&&/使用天數/.test(document.getElementById('dr-equip-box').innerHTML)&&!/使用時數/.test(document.getElementById('dr-equip-box').innerHTML);
+        // 7 得標視窗：專案獎金區塊移除、既有 referral 不被清掉
+        out.award=!document.getElementById('award-ref-name')&&!document.getElementById('award-ref-mode')&&/＋ 介紹人/.test(document.getElementById('award-modal').innerHTML)&&/award-ref-name'\)\)\{/.test(String(confirmAward));
+        window.toast=oT;Q=[];INV.length=0;VENDORS.length=0;PAYABLES.length=0;CONTRACTS.length=0;COST_HIST.length=0;EXPENSES.length=0;eid=null;_qcPending=[];window._costEditId=null;res(out);
+      })
+    );
+    check('預付款一鈕：有已登錄未付期別開提前放款、沒有開預付款（未請款）；舊「預支」「＋ 預付介紹費」「提前放款」鈕消失', r.btn && r.early && r.adv && r.mgmt, JSON.stringify(r));
+    check('介紹費：計算方式（合約金額 %）× 付款時機（第一期請款後）→ 一筆應付掛第一期請款日、不跟隨期別；結案前不掛、拔除完成取階段完工日', r.piUI && r.piPrev && r.pct && r.piPay && r.noFollow && r.doneWait && r.removeTrig, JSON.stringify(r));
+    check('階段完工自動結算：合約數量改實作量（報價原數量不動）、合約金額追加減、請款單合約量同步、_effQtyMap 取結算量、請款單編輯器結算鈕移除', r.settle && r.effMap && r.itemsTxt && r.noStlBtn, JSON.stringify(r));
+    check('結案一鈕：竣工總結算＋標結案＋回寫單價庫一次完成', r.closeUI && r.closeAsk && r.closed, JSON.stringify(r));
+    check('施工成本頁預設唯讀卡（來源、登錄廠商請款、預付款、編輯明細），按編輯明細才展開、完成收回；新增成本的額外支出導向日報．支出', r.ro && r.edit && r.back && r.pickExtra, JSON.stringify(r));
+    check('日報．支出「額外支出（廠商）」：填廠商才能送出、成本卡掛廠商開發票並掛應付；狀態無「明起暫停」；自有機具改填天數（預設 1 天）；得標視窗專案獎金區塊移除且既有設定不清', r.chip && r.pendUI && r.needVendor && r.vendorCost && r.vendorPay && r.noPause && r.equipDay && r.award, JSON.stringify(r));
+    check('v6.0.29 第二批流程無 Console 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
