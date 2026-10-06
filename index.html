@@ -225,6 +225,14 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
   #prm-head #prm-q{max-width:100%;margin-left:0}
   .pj-sched-row{grid-template-columns:1fr!important}
   table.mst.mst-ln tbody td[data-th]>div>div{text-align:left}
+  /* v6.0.35 工項成本分析（工程專案›施工成本統計）：手機改「標題一行＋數字三欄格狀」，一個工項一張矮卡 */
+  table.mst.mst-ln.cost-anal tbody tr,table.mst.mst-ln.cost-anal tfoot tr{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 8px;padding:8px 11px 9px}
+  table.mst.mst-ln.cost-anal tbody td:first-child[data-th],table.mst.mst-ln.cost-anal tfoot td:first-child[data-th]{grid-column:1/-1;font-size:13.5px}
+  table.mst.mst-ln.cost-anal tbody td[data-th]:not(:first-child),table.mst.mst-ln.cost-anal tfoot td[data-th]:not(:first-child){display:flex!important;flex-direction:column;align-items:flex-start;gap:1px;padding:0!important;border-bottom:none!important;font-size:13px;text-align:left!important;min-width:0;overflow:hidden}
+  table.mst.mst-ln.cost-anal tbody td[data-th]:not(:first-child)::before,table.mst.mst-ln.cost-anal tfoot td[data-th]:not(:first-child)::before{font-size:10.5px;padding:0;margin:0;color:var(--b3)}
+  table.mst.mst-ln.cost-anal tbody td[data-th]>div,table.mst.mst-ln.cost-anal tbody td[data-th]>span{text-align:left;flex:none;max-width:100%}
+  table.mst.mst-ln.cost-anal tbody td:last-child[data-th],table.mst.mst-ln.cost-anal tfoot td:last-child[data-th]{grid-column:span 2}
+  table.mst.mst-ln.cost-anal tfoot td:empty{display:none!important}
 }
 .dbtn{border:none;background:transparent;color:var(--b2);cursor:pointer;padding:3px 5px;border-radius:var(--r4);font-size:14px;line-height:1;transition:var(--transition)}
 .dbtn:hover{background:var(--redl);color:var(--red)}
@@ -1095,14 +1103,14 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <!-- ████ COSTS PAGE（施工成本，自專案脈絡進入）████ -->
 <div class="page" id="page-rfq">
   <div class="ph">
-    <div class="ph-l"><div class="ph-t">發包</div><div class="ph-s">分項詢價單 → 廠商比價 → 議價 → 得標／改點工（材料、租賃、運輸在「材料．租賃」頁）</div></div>
-    <div class="ph-r"><button type="button" class="btn btn-sm" onclick="go('proj')">← 工程專案</button><button type="button" class="btn btn-sm" onclick="_m6Qid=_rfqQid||_m6Qid;go('mat6')">材料．租賃</button><button type="button" class="btn btn-sm" onclick="go('costs')">施工成本 →</button></div>
+    <div class="ph-l"><div class="ph-t">發包</div><div class="ph-s">分項詢價單 → 廠商比價 → 議價 → 得標／改點工（材料、租賃、運輸在「材料．運輸」頁）</div></div>
+    <div class="ph-r"><button type="button" class="btn btn-sm" onclick="go('proj')">← 工程專案</button><button type="button" class="btn btn-sm" onclick="_m6Qid=_rfqQid||_m6Qid;go('mat6')">材料．運輸</button><button type="button" class="btn btn-sm" onclick="go('costs')">施工成本 →</button></div>
   </div>
   <div id="rfq-root" style="padding:0 14px 20px"></div>
 </div>
 <div class="page" id="page-mat6">
   <div class="ph">
-    <div class="ph-l"><div class="ph-t">材料．租賃</div><div class="ph-s">材料需求 → 比對公司庫存（調撥／接切樁）→ 不足再租賃；材料／設備租賃、運輸填好自動進施工成本，廠商請款單到了再核實轉應付</div></div>
+    <div class="ph-l"><div class="ph-t">材料．運輸</div><div class="ph-s">材料需求 → 比對公司庫存（調撥／接切樁）→ 不足再租賃；材料／設備租賃、運輸填好自動進施工成本，廠商請款單到了再核實轉應付</div></div>
     <div class="ph-r"><button type="button" class="btn btn-sm" onclick="go('rfq')">← 發包</button><button type="button" class="btn btn-sm" onclick="if(_m6Qid)openProjectCosts(_m6Qid);else go('costs')">施工成本 →</button></div>
   </div>
   <div id="mat6-root" style="padding:0 14px 20px"></div>
@@ -1123,7 +1131,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <div class="cht" style="white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本記錄</div>
         </div>
         <div class="cost-tabs"><button type="button" class="cost-tab on" id="cost-view-list" onclick="setCostView('list')">成本清單</button><button type="button" class="cost-tab" id="cost-view-analysis" onclick="setCostView('analysis')">工項分析</button><button type="button" class="cost-tab" id="cost-view-audit" onclick="setCostView('audit')">勾稽</button><button type="button" class="cost-tab" id="cost-view-qty" onclick="setCostView('qty')">數量對照</button><button type="button" class="cost-tab" id="cost-view-subs" onclick="setCostView('subs')">分包</button></div>
-        <button type="button" class="btn btn-g" onclick="costAddPick()" title="先選類型：承包／點工／自有材料購置／額外支出（廠商）；材料租賃、運輸到「材料．租賃」頁；便當油資等零星支出由日報．支出登錄" style="width:100%;justify-content:center;height:38px;font-size:13px;font-weight:700">＋ 新增成本</button>
+        <button type="button" class="btn btn-g" onclick="costAddPick()" title="先選類型：承包／點工／自有材料購置／額外支出（廠商）；材料租賃、運輸到「材料．運輸」頁；便當油資等零星支出由日報．支出登錄" style="width:100%;justify-content:center;height:38px;font-size:13px;font-weight:700">＋ 新增成本</button>
       </div>
       <div style="padding:10px 14px">
         <div id="cost-list"><div style="text-align:center;padding:20px;color:var(--b3);font-size:12px">尚無成本記錄，點上方按鈕新增</div></div>
@@ -2748,7 +2756,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.34" defer></script>
+<script src="app.js?v=6.0.35" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">

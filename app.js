@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.34';
+var APP_VERSION='v6.0.35';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -6273,6 +6273,8 @@ function renderBizGates(){
 }
 
 //
+// v6.0.35 待辦右側只放金額／短字；長說明（如薪資條提醒）改放標題下方，否則標題會被擠成一字一行
+function _todoLongSub(it){var s=String((it&&it.sub)||'').replace(/<[^>]+>/g,'');return s.length>14&&!/^NT\$/.test(s);}
 function updateDashTodo(){
   var el=document.getElementById('dash-todo-list');
   var badge=document.getElementById('dash-todo-badge');
@@ -6529,9 +6531,9 @@ function updateDashTodo(){
     return '<div '+(it.jump?'onclick="'+it.jump.replace(/"/g,'&quot;')+'" ':'')+'style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--b1);'+(it.jump?'cursor:pointer;':'')+(it.urgent?'background:#fff5f5;':'')+'">'
       +'<div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">'
       +'<span style="flex-shrink:0;font-size:15px">'+it.icon+'</span>'
-      +'<div style="font-size:12px;color:var(--b5);line-height:1.5">'+esc(it.text)+(it.extra||'')+'</div>'
+      +'<div style="font-size:12px;color:var(--b5);line-height:1.5;min-width:0">'+esc(it.text)+(it.extra||'')+(_todoLongSub(it)?'<div style="font-size:11px;color:var(--b3);font-weight:400;margin-top:2px;white-space:normal">'+it.sub+'</div>':'')+'</div>'
       +'</div>'
-      +'<div style="font-size:12px;font-weight:700;color:'+it.color+';flex-shrink:0;margin-left:10px;white-space:nowrap">'+it.sub+(it.jump?' <span style="color:var(--b3);font-weight:400">›</span>':'')+'</div>'
+      +'<div style="font-size:12px;font-weight:700;color:'+it.color+';flex-shrink:0;margin-left:10px;white-space:nowrap">'+(_todoLongSub(it)?'':it.sub)+(it.jump?' <span style="color:var(--b3);font-weight:400">›</span>':'')+'</div>'
       +'</div>';
   }).join('');
 }
@@ -25089,7 +25091,7 @@ function buildCostAnalysisHtml(q){
   var unRow='';try{unRow=_costUnRowsHtml(q,att);}catch(e){_err('buildCostAnalysisHtml.un',e);unRow=att.unassigned>0?'<tr style="border-bottom:1px solid var(--b1);background:#fff8ec"><td style="padding:5px 8px;font-size:12px;color:#b26a00">未歸戶成本（未關聯工項）</td><td></td><td></td><td style="padding:5px 8px;text-align:right;font-weight:700;color:#b26a00">'+fmt(Math.round(att.unassigned))+'</td><td colspan="2"></td></tr>':'';}   // v6.0.20 攤提／租金／運費／損耗分列
   var totMgn=totQuote-totAct-att.unassigned;
   var totMgnR=totQuote>0?Math.round(totMgn/totQuote*1000)/10:0;
-  return _costRentLine(q)+'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;min-width:640px">'
+  return _costRentLine(q)+'<div style="overflow-x:auto"><table class="cost-anal" style="width:100%;border-collapse:collapse;font-size:12px;min-width:640px">'
     +'<thead><tr style="background:var(--gl);color:var(--b5);font-size:11px">'
     +'<th style="padding:6px 8px;text-align:left">報價工項</th>'
     +'<th style="padding:6px 8px;text-align:right">報價複價</th>'
@@ -32288,7 +32290,7 @@ const ALL_PAGES = [
   {id:'proj',      label:'工程專案',  icon:_pgIcon('hardhat'),  grp:'main',  adminOnly:false}, // v6 一頁式：報價→議價→合約→發包→施工→計價→結案
   {id:'costs',     label:'施工成本',  icon:_pgIcon('wrench'),   grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v6 併入工程專案（由專案頁「施工成本」進）
   {id:'rfq',       label:'發包',      icon:_pgIcon('contract'), grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v6 分項詢價單→比價→得標／點工
-  {id:'mat6',      label:'材料．租賃', icon:_pgIcon('box'),      grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v6.0.25 自發包移出：需求比對／接切樁／租賃（按 M）／設備／運輸；權限跟發包
+  {id:'mat6',      label:'材料．運輸', icon:_pgIcon('box'),      grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v6.0.25 自發包移出：需求比對／接切樁／租賃（按 M）／設備／運輸；權限跟發包
   {id:'materials', label:'材料管理',  icon:_pgIcon('box'),      grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v6 併入發包「材料」分頁（台帳／庫存仍在此）
   {id:'invoice',   label:'計價',      icon:_pgIcon('receipt'),  grp:'fin',   adminOnly:false, hidden:true, parent:'acct'},   // v6.0.30 併入帳務 // v6 業主請款＋廠商請款兩分頁
   {id:'quickcost', label:'日報．支出',icon:_pgIcon('pencil'),   grp:'main',  adminOnly:false},
@@ -36124,7 +36126,7 @@ function _rentCardHtml(q,c){
       +(df.n?('<span class="rent-diff" style="color:#b26a00;font-weight:700" title="廠商請款數量與系統（在場×天數）的差">差 '+(df.qty>0?'+':'')+fmt(df.qty)+'（'+(df.amt>0?'+':'')+fmt(df.amt)+'）</span>'):'')
       +(p.invNo?'<span style="color:var(--b4)">發票 '+esc(p.invNo)+'</span>':'')+'<span style="color:'+(paid?'var(--g)':'var(--red)')+';font-weight:700">'+(paid?'已付':'待付 '+esc(p.due||''))+'</span>'
       +'<span style="margin-left:auto;display:flex;gap:3px">'+(paid?'':'<button type="button" class="btn btn-xs" onclick="openRentPeriod(\''+c.id+'\','+p.no+')">修改</button><button type="button" class="btn btn-xs" style="color:var(--red);border-color:#f0c4c4" onclick="delSubPeriod(\''+c.id+'\','+p.no+')">刪除</button>')+'</span></div>';}).join('')+'</div>';
-  h+='<div style="color:var(--b4);margin-top:4px">成本金額＝已核實的請款合計（未請款前為 0）；預估＝合約租期（或預計趟數）的預估金額；下方列為計價基準，由「材料．租賃」頁維護。廠商請款單到了按「核對請款單」，確認後轉應付。</div></div>';
+  h+='<div style="color:var(--b4);margin-top:4px">成本金額＝已核實的請款合計（未請款前為 0）；預估＝合約租期（或預計趟數）的預估金額；下方列為計價基準，由「材料．運輸」頁維護。廠商請款單到了按「核對請款單」，確認後轉應付。</div></div>';
   return h;
 }
 // 3) 材料分頁：單位成本比較（同規格 自有攤提 vs 料場日租、本案至今各花多少、租幾天等於買一支）
@@ -36445,7 +36447,7 @@ function _subEarlyRowsHtml(c,per){
 }
 function vbEarly(qid,cid,no){if(!_vbCtx(qid))return;openSubEarly(cid,no);}
 
-// ══════════ v6.0.25 材料．租賃獨立頁（自發包移出）══════════
+// ══════════ v6.0.25 材料．運輸獨立頁（自發包移出）══════════
 // 流程：新增材料需求 → 比對公司庫存（同規格同長度閒置 → 調撥；同規格其他長度閒置 → 詢問接樁／切樁；都沒有 → 詢問租賃）
 // 資料（q.mat，private）：
 //   rows[]  需求 {id,name,spec,len,unit,qty,rate,note}
@@ -37006,7 +37008,7 @@ function _pjSubHtml(q,st){
       '<span style="white-space:nowrap">'+acts+'</span>'];});
   var foot=['合計',fmt(st.subTotal),fmt(st.subBilled),fmt(st.subs.reduce(function(a,x){return a+x.s.paid;},0)),fmt(st.subs.reduce(function(a,x){return a+x.s.unpaid;},0)),fmt(st.subs.reduce(function(a,x){return a+Math.max(0,x.s.retHeld);},0)),''];
   return rfq+(rows.length?_pjTable([{t:'廠商／工項'},{t:'發包額（未稅）',r:1},{t:'廠商已請',r:1},{t:'已付（含稅）',r:1},{t:'未付（含稅）',r:1},{t:'押保留款',r:1},{t:''}],rows,foot):'<div style="font-size:12px;color:var(--b3)">尚未發包</div>')
-    +'<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">'+_pjBtn("_rfqQid='"+q.id+"';_rfqTab='rfq';go('rfq')",'發包（詢價／比價）','border-color:#1565C0;color:#1565C0')+_pjBtn("_m6Qid='"+q.id+"';go('mat6')",'材料．租賃','border-color:#8a6d00;color:#8a6d00')+_pjBtn("openSubMgmt('"+q.id+"')",'分包管理明細')+'</div>';
+    +'<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">'+_pjBtn("_rfqQid='"+q.id+"';_rfqTab='rfq';go('rfq')",'發包（詢價／比價）','border-color:#1565C0;color:#1565C0')+_pjBtn("_m6Qid='"+q.id+"';go('mat6')",'材料．運輸','border-color:#8a6d00;color:#8a6d00')+_pjBtn("openSubMgmt('"+q.id+"')",'分包管理明細')+'</div>';
 }
 // ── 工程專案：業主計價「＋ 新增請款單」＝此合約下一期（沒有請款單才從報價建第 1 期）──
 function pjNewInv(qid){
@@ -37130,7 +37132,7 @@ function _pjItemsHtml(q,st){
     +'';
 }
 // ── 施工成本頁：分區 ──
-var _COST_SEC={sub:'發包（承包合約）',own:'自有材料購置・點工・額外支出',mat:'材料．租賃．運輸（由「材料．租賃」頁自動同步；成本＝已核實的廠商請款，預估先算毛利）',quick:'日報零星支出（日報．支出登錄）'};
+var _COST_SEC={sub:'發包（承包合約）',own:'自有材料購置・點工・額外支出',mat:'材料．運輸．運輸（由「材料．運輸」頁自動同步；成本＝已核實的廠商請款，預估先算毛利）',quick:'日報零星支出（日報．支出登錄）'};
 function _costSecOf(c){if(c.type==='sub')return 'sub';if(c.type==='own'&&c._fromMat)return 'mat';if(_isQuickExtra(c))return 'quick';return 'own';}
 function _costSecSort(costs){
   var out=[],order=['sub','own','mat','quick'];
@@ -37143,10 +37145,10 @@ function _costSecSort(costs){
 }
 function _costSecHead(sec,costs){
   var cs=costs.filter(function(c){return _costSecOf(c)===sec;}),sum=cs.reduce(function(a,c){return a+(parseFloat(c.amt)||0);},0);
-  var btn=sec==='mat'?' <a href="javascript:void(0)" onclick="_m6Qid=eid;go(\'mat6\')" style="font-size:11px;font-weight:400;color:#8a6d00">到材料．租賃編輯 ›</a>':(sec==='quick'?' <a href="javascript:void(0)" onclick="go(\'quickcost\')" style="font-size:11px;font-weight:400;color:var(--g3)">日報．支出 ›</a>':(sec==='sub'?' <a href="javascript:void(0)" onclick="_rfqQid=eid;_rfqTab=\'rfq\';go(\'rfq\')" style="font-size:11px;font-weight:400;color:#1565C0">發包（詢價／比價）›</a>':''));
+  var btn=sec==='mat'?' <a href="javascript:void(0)" onclick="_m6Qid=eid;go(\'mat6\')" style="font-size:11px;font-weight:400;color:#8a6d00">到材料．運輸編輯 ›</a>':(sec==='quick'?' <a href="javascript:void(0)" onclick="go(\'quickcost\')" style="font-size:11px;font-weight:400;color:var(--g3)">日報．支出 ›</a>':(sec==='sub'?' <a href="javascript:void(0)" onclick="_rfqQid=eid;_rfqTab=\'rfq\';go(\'rfq\')" style="font-size:11px;font-weight:400;color:#1565C0">發包（詢價／比價）›</a>':''));
   return '<div class="cost-sec-h" style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;font-weight:800;font-size:13px;color:var(--g3);margin:14px 0 2px;border-bottom:2px solid var(--gm);padding-bottom:3px">'+_COST_SEC[sec]+'<span style="font-size:11px;font-weight:400;color:var(--b4)">'+cs.length+' 筆・NT$ '+fmt(Math.round(sum))+'</span>'+btn+'</div>';
 }
-// 材料．租賃頁同步來的卡片：唯讀精簡（計價基準由材料．租賃頁維護；廠商請款單到了按「核對請款單」）
+// 材料．運輸頁同步來的卡片：唯讀精簡（計價基準由材料．運輸頁維護；廠商請款單到了按「核對請款單」）
 function _costMatKind(c){var f=c._fromMat||'';return f==='amort'?'自有材料攤提':f==='loss'?'材料損耗':/^rent:/.test(f)?'材料租金':/^erent:/.test(f)?'設備租金':/^trans/.test(f)?(c.cat||'運費'):(c.cat||'材料');}
 var _COST_PER_LBL={mmonth:'/M/月',day:'/天',month:'/月',trip:'/趟',once:''};
 function _costMatCardHtml(q,c){
@@ -37158,7 +37160,7 @@ function _costMatCardHtml(q,c){
     +'<span style="margin-left:auto;font-size:11px;color:var(--b4);white-space:nowrap">'+(c.rental?'已核實請款 ':'成本 ')+'<b id="cost-amt-'+c.id+'" style="color:var(--g3);font-variant-numeric:tabular-nums">'+fmt(Math.round(amt))+'</b></span></div>';
   if(c.rental){try{h+=_rentCardHtml(q,c).replace(/<div style="color:var\(--b4\);margin-top:4px">成本金額＝[\s\S]*?<\/div>/,'');}catch(e){_err('_costMatCardHtml.rent',e);}}
   var rows=(c.rows||[]).filter(function(r){return r&&!r.ended;});
-  if(rows.length)h+='<div style="font-size:11px;color:var(--b4);line-height:1.6">'+(c.rental?'<b>計價基準</b>（材料．租賃頁）：':'')+rows.map(function(r){var per=_COST_PER_LBL[r.per]!=null?_COST_PER_LBL[r.per]:'';return '<div>・'+esc(r.desc||r.preset||'')+'　'+_rfmt(r.qty)+' '+esc(r.unit||'')+' × $'+_rfmt(r.unitPrice)+per+(r.planned?' <span style="color:#b26a00">（尚未進場）</span>':'')+(r.from?('　'+esc(r.from)+(r.to?('～'+esc(r.to)):'')):'')+'</div>';}).join('')+'</div>';
+  if(rows.length)h+='<div style="font-size:11px;color:var(--b4);line-height:1.6">'+(c.rental?'<b>計價基準</b>（材料．運輸頁）：':'')+rows.map(function(r){var per=_COST_PER_LBL[r.per]!=null?_COST_PER_LBL[r.per]:'';return '<div>・'+esc(r.desc||r.preset||'')+'　'+_rfmt(r.qty)+' '+esc(r.unit||'')+' × $'+_rfmt(r.unitPrice)+per+(r.planned?' <span style="color:#b26a00">（尚未進場）</span>':'')+(r.from?('　'+esc(r.from)+(r.to?('～'+esc(r.to)):'')):'')+'</div>';}).join('')+'</div>';
   return h+'</div></div>';
 }
 // 常用明細改下拉（取代一排快捷鍵）
@@ -37167,7 +37169,7 @@ function _ownAddSel(c){
   var opt=function(p){return '<option value="'+esc(p[0]+'|'+p[1])+'">'+esc(p[0])+'</option>';};
   return '<select class="cost-add-sel" onchange="if(this.value){var v=this.value.split(\'|\');addOwnRow(\''+c.id+'\',v[0]==\'__\'?\'\':v[0],v[1]||\'\');}this.value=\'\'" style="font-size:11.5px;padding:4px 6px;border:1px dashed var(--gm);border-radius:var(--r6);background:var(--gl);color:var(--g3);margin-bottom:6px;font-family:inherit"><option value="">＋ 新增明細…</option><option value="__|">自訂一列</option>'
     +'<optgroup label="材料購置">'+OWN_PRESETS.filter(function(p){return mat.indexOf(p[0])<0;}).map(opt).join('')+'</optgroup>'
-    +'<optgroup label="租賃／運費（建議改到「材料．租賃」頁）">'+OWN_PRESETS.filter(function(p){return mat.indexOf(p[0])>=0;}).map(opt).join('')+'</optgroup></select>';
+    +'<optgroup label="租賃／運費（建議改到「材料．運輸」頁）">'+OWN_PRESETS.filter(function(p){return mat.indexOf(p[0])>=0;}).map(opt).join('')+'</optgroup></select>';
 }
 function _extraAddSel(c){
   return '<select class="cost-add-sel" onchange="if(this.value)addCostQuickRow(\''+c.id+'\',this.value);this.value=\'\'" style="font-size:11.5px;padding:4px 6px;border:1px dashed #CE93D8;border-radius:var(--r6);background:#F9F1FB;color:#4A148C;margin-bottom:6px;font-family:inherit"><option value="">＋ 快速新增…</option>'+['外調機具','加班費','追加材料','運費','油資','雜費'].map(function(n){return '<option>'+n+'</option>';}).join('')+'</select>';
@@ -37184,7 +37186,7 @@ function costAddPick(){
     +B("addCostItem('labor')",'點工','臨時人員／機具，依天數計','#E65100')
     +B("addCostItem('own')",'自有材料購置','止水鈑、鋼索、五金等前置購置；選廠商即掛應付','#8a6d00')
     +B("go('quickcost')",'額外支出（廠商）→ 日報．支出','業主不給錢的追加成本（外調機具、加班、追加材料…）到日報．支出點「額外支出（廠商）」，填廠商即掛應付','#4A148C')
-    +B("_m6Qid=eid;go('mat6')",'材料租賃／設備租賃／運輸 →','到「材料．租賃」頁輸入，會自動同步到這裡','#2e7d32')
+    +B("_m6Qid=eid;go('mat6')",'材料租賃／設備租賃／運輸 →','到「材料．運輸」頁輸入，會自動同步到這裡','#2e7d32')
     +'<div style="font-size:11px;color:var(--b4)">便當、油資等零星支出請在「日報．支出」登錄。</div>',function(){},false,null,true);
   var ok=document.getElementById('gen-confirm-ok');if(ok)ok.style.display='none';
 }
