@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.35';
+var APP_VERSION='v6.0.36';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -35680,7 +35680,7 @@ var _HELP={
  contacts:'業主與廠商名冊。發包、租賃、支出選廠商時從這裡帶。',
  params:'稅率、管理費率、廠商計價截止日（25）與放款日（次月 25）、自有材料內部日租與折數、運費每噸單價都在這裡。'
 };
-function showHelp(id){var t=_HELP[id];if(!t)return;showConfirm('說明：'+((ALL_PAGES.find(function(p){return p.id===id;})||{}).label||id),'<div style="font-size:13px;line-height:1.8">'+esc(t)+'</div>',function(){},false,null,false);var c=document.getElementById('gen-confirm-cancel');if(c)c.style.display='none';var o=document.getElementById('gen-confirm-ok');if(o)o.textContent='知道了';}
+function showHelp(id){var t=_HELP[id];if(!t)return;showConfirm('說明：'+((ALL_PAGES.find(function(p){return p.id===id;})||{}).label||id),'<div style="font-size:13px;line-height:1.8">'+esc(t)+'</div><div style="margin-top:10px"><a href="docs/使用導覽.mp4" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--g3);text-decoration:none;border:1px solid var(--gm);border-radius:999px;padding:5px 12px">▶ 系統使用導覽影片（8 分鐘）</a></div>',function(){},false,null,false);var c=document.getElementById('gen-confirm-cancel');if(c)c.style.display='none';var o=document.getElementById('gen-confirm-ok');if(o)o.textContent='知道了';}
 function _helpMount(){
   document.querySelectorAll('.page').forEach(function(pg){
     var id=(pg.id||'').replace(/^page-/,'');if(!_HELP[id])return;
