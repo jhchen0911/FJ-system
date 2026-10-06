@@ -3245,7 +3245,7 @@ async function newPage(browser, width, height) {
         pjSetFollow('qP','cF','cM');out.follow=Q[0].costs.find(c=>c.id==='cF').followOf==='cM'&&!/發包量被重複加總/.test(document.getElementById('pj-body-items').innerHTML)&&/介紹費（跟隨 鴻玉開發工程行/.test(document.getElementById('pj-body-sub').innerHTML)&&_qtyRecon(Q[0])[0].sub===400&&(Q[0].costs.find(c=>c.id==='cF').periods||[]).length===1;
         // 空區塊預設收合：日報清空 → 工作日報區收合並標「尚無資料」；有資料的區塊展開
         const savedLogs=Q[0].dailyLogs;Q[0].dailyLogs=[];localStorage.removeItem('pj_open_log');renderProj();
-        out.emptyFold=document.getElementById('pj-body-log').style.display==='none'&&/尚無資料/.test(document.getElementById('pj-sec-log').innerHTML)&&document.getElementById('pj-body-inv').style.display!=='none';
+        out.emptyFold=document.getElementById('pj-body-log').style.display==='none'&&/尚無資料/.test(document.getElementById('pj-sec-log').innerHTML)&&document.getElementById('pj-body-items').style.display!=='none';   // v6.0.30 只有目前階段相關區塊預設展開（工項表除結案外都開）
         Q[0].dailyLogs=savedLogs;renderProj();
         // 區塊收合記憶
         document.querySelector('#pj-sec-log .cb > div').click();out.fold=document.getElementById('pj-body-log').style.display==='none'&&localStorage.getItem('pj_open_log')==='0';
@@ -3286,7 +3286,7 @@ async function newPage(browser, width, height) {
           INV.length=0;INV.push({id:'ivB1',quoteId:'qB',project:'中科台積電F25P3',client:'八九企業',periodNo:1,date:'2026-09-30',items:[],totals:{total:100000},received:0});
           PAYABLES.length=0;syncCostToPayable(Q[0],Q[0].costs[0]);
           // 導覽名稱
-          out.nav=document.getElementById('sn-invoice').textContent.indexOf('計價')>=0&&document.getElementById('sn-invoice').textContent.indexOf('業主計價')<0&&ALL_PAGES.find(p=>p.id==='invoice').label==='計價';
+          out.nav=!document.getElementById('sn-invoice')&&ALL_PAGES.find(p=>p.id==='invoice').hidden===true&&ALL_PAGES.find(p=>p.id==='invoice').parent==='acct';   // v6.0.30 計價併入帳務
           go('invoice');
           return new Promise(res=>setTimeout(()=>{
             try{
@@ -3311,7 +3311,7 @@ async function newPage(browser, width, height) {
               // 登錄：切換脈絡後回到本頁、開啟計價彈窗
               eid=null;
               vbOpenPeriod('qB','cM');
-              out.ctx=eid==='qB'&&document.getElementById('page-invoice').classList.contains('active')&&_invTab==='vendor';
+              out.ctx=eid==='qB'&&document.getElementById('page-acct').classList.contains('active')&&_acctTab==='vb'&&_invTab==='vendor';   // v6.0.30
               const md=(document.getElementById('gen-confirm-modal').style.display==='flex')?document.getElementById('gen-confirm-msg'):null;
               out.modal=!!md&&md.querySelectorAll('.sp-row').length===1;
               // 填數量存檔 → 期別出現在「本期已登錄」、應付掛上、畫面重繪
@@ -3450,7 +3450,7 @@ async function newPage(browser, width, height) {
           go('ledger');out.redirInv=_acctTab==='inv'&&document.getElementById('acct-p-inv').style.display!=='none'&&!!document.getElementById('ledger-month').value;
           go('payroll');out.redirPay=_acctTab==='pay'&&document.getElementById('acct-p-pay').style.display!=='none';
           acctTab('petty');out.petty=document.getElementById('acct-p-petty').style.display!=='none'&&document.getElementById('acct-p-pay').style.display==='none';
-          out.tabs=document.querySelectorAll('#acct-tabs button').length===8&&/帳務/.test(document.getElementById('sn-acct').textContent)&&!document.getElementById('sn-finance');
+          out.tabs=document.querySelectorAll('#acct-tabs button').length===10&&/帳務/.test(document.getElementById('sn-acct').textContent)&&!document.getElementById('sn-finance');
           // 股東報表
           P.tax=5;
           Q=[{id:'qS',code:'1',name:'股東測試案',client:'業主A',date:'2026-03-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 打設',unit:'支',qty:'100',price:'10000',sec:false}],t:{sub:1000000,tax:50000,total:1050000},
@@ -3551,7 +3551,7 @@ async function newPage(browser, width, height) {
           delete p.__v6perm;_acctSave(p);
           const oU=_fbUser;const oT=window.toast;window.toast=function(){};
           _fbUser={email:'w616@x.com'};
-          out.before=!canAccess('proj')&&!canAccess('acct')&&canAccess('invoice');
+          out.before=!canAccess('proj')&&!canAccess('acct')&&!canAccess('invoice');   // v6.0.30 計價跟帳務權限
           out.noSys=_v6PermMigrate()===false;   // 非系統管理員不執行
           // 模擬系統管理員（BOOTSTRAP_DEV 第一個）
           _fbUser={email:BOOTSTRAP_DEV[0]};
@@ -3627,7 +3627,7 @@ async function newPage(browser, width, height) {
           p.__roles.push({id:'r617',name:'會計測試',enabled:true,pages:{profit:true,finance:true},_mt:1});p.__v6perm=1;_acctSave(p);
           const oU=_fbUser,oT=window.toast;window.toast=function(){};_fbUser={email:BOOTSTRAP_DEV[0]};
           const n=_v6PermMigrate();const r=_acct().__roles.find(x=>x.id==='r617');
-          out.perm=n>=2&&r.pages.reports===true&&r.pages.acct===true&&_acct().__v6perm===2&&_v6PermMigrate()===false;
+          out.perm=n>=2&&r.pages.reports===true&&r.pages.acct===true&&_acct().__v6perm===3&&_v6PermMigrate()===false;   // v6.0.30 版本 3
           const k=JSON.parse(keep);const p2=_acct();p2.__roles=k.r;p2.__staff=k.s;if(k.v)p2.__v6perm=k.v;else delete p2.__v6perm;_acctSave(p2);_fbUser=oU;window.toast=oT;
           Q=[];INV.length=0;PAYABLES.length=0;EXPENSES.length=0;PAYSLIPS.length=0;
           return out;
@@ -4258,7 +4258,7 @@ async function newPage(browser, width, height) {
         const oT=window.toast;window.toast=function(){};
         const sn=id=>document.getElementById('sn-'+id);
         // 側欄：四組、工具收合、拆掉的入口不存在
-        out.side=['dash','proj','quotes','quickcost','invoice','acct','reports','contacts','tools-more','upa','staff','roles','params'].every(id=>!!sn(id))
+        out.side=['dash','proj','quotes','quickcost','acct','reports','contacts','tools-more','upa','staff','roles','params'].every(id=>!!sn(id))&&!sn('invoice')
           &&['rfq','mat6','intake','projects','contracts','finance','ledger','payroll','costs','materials','progress','lifeline'].every(id=>!sn(id))
           &&['backfill','plan','rebar','grout','workers','matest'].every(id=>!!document.querySelector('#sn-tools-wrap #sn-'+id));
         toggleToolsNav(false);out.fold0=document.getElementById('sn-tools-wrap').style.display==='none'&&localStorage.getItem('fy_tools_open')==='0';
@@ -4266,7 +4266,7 @@ async function newPage(browser, width, height) {
         const ssec=[...document.querySelectorAll('.sidebar .ssec')].map(e=>e.textContent.trim()).join('|');out.groups=ssec==='帳務|工具|系統';
         // 手機底部：總覽／日報／工程專案／報價／更多
         out.mob=!!document.querySelector('nav.mob-nav #mn-quotes')&&!document.querySelector('nav.mob-nav #mn-invoice')&&MOB_BOTTOM_NAV.join()==='dash,quickcost,proj,quotes';
-        renderMobMore();const mm=document.getElementById('mob-more-body').innerHTML;out.more=/mn-invoice/.test(mm)&&!/openGlobalSearch|intakeHistory/.test(mm)&&/>工作</.test(mm)&&!/常用功能/.test(mm);
+        renderMobMore();const mm=document.getElementById('mob-more-body').innerHTML;out.more=!/mn-invoice/.test(mm)&&/mn-acct/.test(mm)&&!/openGlobalSearch|intakeHistory/.test(mm)&&/>帳務</.test(mm)&&!/常用功能/.test(mm);   // v6.0.30 工作組全在底部列，更多面板從帳務起
         // 頁面註冊：拆掉的頁不在；發包／材料改由工程專案進（隱藏、跟母頁權限）
         const pg=id=>ALL_PAGES.find(p=>p.id===id);
         out.pages=!pg('projects')&&!pg('sitedet')&&pg('rfq').hidden&&pg('rfq').parent==='proj'&&pg('mat6').hidden&&pg('mat6').parent==='proj'&&!document.getElementById('page-projects')&&!document.getElementById('page-sitedet');
@@ -4403,6 +4403,74 @@ async function newPage(browser, width, height) {
     check('施工成本頁預設唯讀卡（來源、登錄廠商請款、預付款、編輯明細），按編輯明細才展開、完成收回；新增成本的額外支出導向日報．支出', r.ro && r.edit && r.back && r.pickExtra, JSON.stringify(r));
     check('日報．支出「額外支出（廠商）」：填廠商才能送出、成本卡掛廠商開發票並掛應付；狀態無「明起暫停」；自有機具改填天數（預設 1 天）；得標視窗專案獎金區塊移除且既有設定不清', r.chip && r.pendUI && r.needVendor && r.vendorCost && r.vendorPay && r.noPause && r.equipDay && r.award, JSON.stringify(r));
     check('v6.0.29 第二批流程無 Console 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.30 第三批：計價併入帳務、工程專案待辦式首屏、預定進度直接排、公司倉庫併入材料、歸還問實際長度 ──
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(
+      () => new Promise(res => {
+        const out={};const oT=window.toast;window.toast=function(){};
+        P.tax=5;VENDORS.length=0;['鴻玉開發','英洲'].forEach((n,i)=>VENDORS.push({id:'v'+i,name:n}));
+        MAT_LEDGER.length=0;PAYABLES.length=0;INV.length=0;CONTRACTS.length=0;
+        ['items','inv','sub','cost','sched','log','docs','close'].forEach(k=>localStorage.removeItem('pj_open_'+k));
+        const D='H型鋼樁 H300，L=15M 打設、拔除';
+        Q=[{id:'qA',code:'115100301',name:'第三批測試案',client:'甲',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,
+          items:[{desc:D,unit:'支',qty:'133',price:'40000',estCost:'30000',sec:false},{desc:'支撐 H300 架設',unit:'M',qty:'100',price:'1000',estCost:'800',sec:false}],t:{sub:5420000,total:5691000},
+          dailyLogs:[{id:'d1',date:'2026-09-25',progressRows:[{itemIdx:0,qty:60}]},{id:'d2',date:'2026-09-28',progressRows:[{itemIdx:0,qty:60}]}],
+          costs:[{id:'cH',type:'sub',vendor:'鴻玉開發',cat:'打設',date:'2026-09-20',rows:[{id:'cH_0',linkedItemIdx:0,qty:133,unitPrice:8250}],amt:0,invoice:true,retRate:0,periods:[]}],
+          mat:{rows:[{id:'r1',name:'型鋼',spec:'H300',len:15,unit:'支',qty:133}],use:[],loss:[],rents:[],equip:[],tps:[],_m6:1}}];
+        const q=Q[0];
+        // 1 計價併入帳務：側欄無計價、go('invoice') 轉帳務 own 分頁、業主請款列表照常、vendor → vb
+        out.nav=!document.getElementById('sn-invoice')&&!!document.getElementById('sn-acct')&&ALL_PAGES.find(p=>p.id==='invoice').hidden===true&&ALL_PAGES.find(p=>p.id==='invoice').parent==='acct';
+        INV.push({id:'i1',quoteId:'qA',project:q.name,client:'甲',periodNo:'1',date:'2026-08-30',expectedRecvDate:'2026-09-30',items:[{type:'item',desc:D,unit:'支',contractQty:133,contractPrice:40000,price:40000,qty:133,curQty:60,payRate:70,prevQty:0}],totals:{total:1764000,retention:0},received:'0',_mt:1});
+        go('invoice');
+        out.ownTab=document.querySelector('.page.active').id==='page-acct'&&_acctTab==='own'&&!!document.querySelector('#acct-p-own #inv-list')&&document.getElementById('acct-p-own').style.display!=='none'&&/第三批測試案/.test(document.getElementById('inv-list').innerHTML);
+        invTab('vendor');out.vbTab=_acctTab==='vb'&&!!document.querySelector('#acct-p-vb #vb-root')&&document.getElementById('acct-p-vb').style.display!=='none'&&document.getElementById('acct-p-own').style.display==='none'&&/鴻玉開發/.test(document.getElementById('vb-root').innerHTML);
+        out.tabs=/業主請款/.test(document.getElementById('acct-tabs').innerHTML)&&/廠商請款/.test(document.getElementById('acct-tabs').innerHTML);
+        renderMobMore();out.more=!/mn-invoice/.test(document.getElementById('mob-more-body').innerHTML)&&/mn-acct/.test(document.getElementById('mob-more-body').innerHTML);
+        // 2 工程專案待辦式首屏：現在該做（本月未開單、廠商待登錄、逾期待收、沒日報、材料在工地）＋目前階段預設展開
+        q.dailyLogs.push({id:'d3',date:localToday(),progressRows:[{itemIdx:0,qty:5}]});
+        MAT_LEDGER.push({id:'L1',name:'型鋼',spec:'H300',len:15,qty:34,uw:93,price:20,date:'2026-01-10',kind:'重複性',loc:q.name,projQid:'qA',outDate:_dAdd(localToday(),-130),matRowId:'r1',_mt:1});
+        MAT_LEDGER.push({id:'L2',name:'型鋼',spec:'H300',len:12,qty:30,uw:93,price:20,date:'2026-01-10',kind:'重複性',loc:'公司倉庫',_mt:1});
+        MAT_LEDGER.push({id:'L3',name:'型鋼',spec:'H300',len:15,qty:20,uw:93,price:20,date:'2026-02-10',kind:'重複性',loc:'公司倉庫',_mt:1});
+        openProj('qA');
+        const td=document.getElementById('pj-todo').innerHTML;
+        out.todo=/現在該做/.test(td)&&/本月請款單尚未開/.test(td)&&/pjNewInv\('qA'\)/.test(td)&&/鴻玉開發 本期請款待登錄/.test(td)&&/openSubPeriod\('cH'\)/.test(td)&&/第 1 期待收 NT\$ 1,764,000/.test(td)&&/openReceiptModal\('i1'\)/.test(td)&&/自有材料在工地最久 130 天/.test(td)&&/目前階段：<b[^>]*>合約</.test(td);
+        out.open0=document.getElementById('pj-body-items').style.display===''&&document.getElementById('pj-body-sub').style.display==='none'&&document.getElementById('pj-body-inv').style.display==='none';
+        CONTRACTS.push({id:'ct1',code:'C-001',name:q.name,linkedQid:'qA',amount:5691000,status:'active',_mt:1});
+        renderProj();out.open1=/目前階段：<b[^>]*>施工</.test(document.getElementById('pj-todo').innerHTML)&&document.getElementById('pj-body-items').style.display===''&&document.getElementById('pj-body-log').style.display===''&&document.getElementById('pj-body-docs').style.display==='none';
+        localStorage.setItem('pj_open_docs','1');renderProj();out.openKeep=document.getElementById('pj-body-docs').style.display==='';localStorage.removeItem('pj_open_docs');
+        // 3 預定進度直接排：每列填起訖日 → q.plan、租料預計退場引用、無預定提示消失
+        const s0=document.getElementById('pj-body-sched').innerHTML;
+        out.sched0=/尚無預定進度：在每列填/.test(s0)&&/pjPlanSet\('qA'/.test(s0)&&/type="date"/.test(s0);
+        const key=_pjPlanKey(q.items[0]);pjPlanSet('qA',key,'s','2026-10-01');pjPlanSet('qA',key,'e','2026-10-20');
+        out.plan=q.plan[key].s==='2026-10-01'&&q.plan[key].e==='2026-10-20'&&/預定 2026-10-01～2026-10-20（20 天）/.test(document.getElementById('pj-body-sched').innerHTML)&&!/尚無預定進度/.test(document.getElementById('pj-body-sched').innerHTML)&&_pjHasPlan(q)&&_rentPlanEnd(q).date==='2026-10-20'&&_rentPlanEnd(q).src==='預定進度';
+        pjPlanSet('qA',key,'s','2026-10-25');out.planFix=q.plan[key].e==='2026-10-25';   // 起日晚於迄日 → 迄日跟上
+        // 4 公司倉庫併入材料頁：台帳列、調撥到本案、建立需求、進貨、刪除
+        _m6Qid='qA';go('mat6');
+        const mh=document.getElementById('mat6-root').innerHTML;
+        out.wh=/公司倉庫（台帳）/.test(mh)&&/m6LedEdit\('qA',''\)/.test(mh)&&/matOut\('qA','r1'\)/.test(mh)&&/尚缺 99 支/.test(mh)&&/m6LedNeed\('qA','L2'\)/.test(mh)&&/無此需求/.test(mh)&&/工程專案 › 第三批測試案/.test(document.querySelector('#page-mat6 .ph-s').textContent);
+        m6LedEdit('qA','');document.getElementById('ml-name').value='型鋼';document.getElementById('ml-spec').value='H400';document.getElementById('ml-len').value='9';document.getElementById('ml-qty').value='12';document.getElementById('ml-price').value='25';document.getElementById('gen-confirm-ok').click();
+        const nl=MAT_LEDGER.find(r=>r.spec==='H400');out.ledAdd=!!nl&&nl.qty===12&&nl.len===9&&nl.uw===172&&nl.loc==='公司倉庫'&&/H400 L=9M/.test(document.getElementById('mat6-root').innerHTML);
+        m6LedDel('qA',nl.id);document.getElementById('gen-confirm-ok').click();out.ledDel=!MAT_LEDGER.some(r=>r.id===nl.id)&&!!(TOMBS.matLedger||{})[nl.id];
+        // 5 歸還問實際長度：切過的料以新長度回倉庫
+        matBack('qA','L1');out.lenUI=!!document.getElementById('mb-len')&&document.getElementById('mb-len').value==='15';
+        document.getElementById('mb-back').value='10';document.getElementById('mb-loss').value='0';document.getElementById('mb-len').value='12';document.getElementById('fy-modal-o').click();
+        const back=MAT_LEDGER.filter(r=>r.loc==='公司倉庫'&&r.len===12&&/切樁自 15M/.test(r.note||''));const site=MAT_LEDGER.find(r=>r.id==='L1');
+        out.cut=back.length===1&&back[0].qty===10&&!!site&&site.qty===24&&site.len===15&&q.mat.use.length===1&&q.mat.use[0].qty===10&&q.mat.use[0].len===15;
+        // 6 發包頁標題帶工程名；工程專案進度區在手機不橫向捲
+        _rfqQid='qA';go('rfq');out.rfqHead=/工程專案 › 第三批測試案/.test(document.querySelector('#page-rfq .ph-s').textContent);
+        window.toast=oT;Q=[];INV.length=0;VENDORS.length=0;PAYABLES.length=0;CONTRACTS.length=0;MAT_LEDGER.length=0;eid=null;_m6Qid='';_rfqQid='';res(out);
+      })
+    );
+    check('計價併入帳務：側欄無計價、go(\'invoice\') 轉帳務「業主請款」分頁（列表照常）、invTab(vendor) 轉「廠商請款」分頁、手機更多無計價', r.nav && r.ownTab && r.vbTab && r.tabs && r.more, JSON.stringify(r));
+    check('工程專案待辦式首屏：「現在該做」列本月未開單／廠商待登錄／逾期待收／材料在工地過久並附按鈕；只有目前階段的區塊預設展開、手動開合仍記住', r.todo && r.open0 && r.open1 && r.openKeep, JSON.stringify(r));
+    check('預定進度直接排：每列填起訖日寫 q.plan、顯示「預定 起～迄（N 天）」、租料預計退場引用、起日晚於迄日自動修正', r.sched0 && r.plan && r.planFix, JSON.stringify(r));
+    check('公司倉庫併入材料頁：台帳列（尚缺／調撥到本案／建立需求）、進貨（單位重自動帶）、刪除立墓碑；發包／材料頁標題帶工程名', r.wh && r.ledAdd && r.ledDel && r.rfqHead, JSON.stringify(r));
+    check('歸還問實際長度：切過的料以新長度回倉庫（備註記原長度）、工地剩量與使用段仍以原長度結算', r.lenUI && r.cut, JSON.stringify(r));
+    check('v6.0.30 第三批流程無 Console 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
