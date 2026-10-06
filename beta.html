@@ -703,8 +703,6 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <div><div class="brand-name">豐有工程</div><div class="brand-sub">管理系統 <span id="brand-ver" style="color:var(--y);font-weight:700"></span></div></div>
   </div>
   <nav class="top-nav" id="top-nav"></nav>
-  <button type="button" onclick="openGlobalSearch()" title="全域搜尋（報價／請款／合約／客戶／廠商）"
-    style="flex-shrink:0;margin-right:6px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;line-height:1"><svg class="ic ib" aria-hidden="true"><use href="#i-search"/></svg></button>
   <div id="user-chip" style="position:relative;flex-shrink:0;margin-right:8px"></div>
   </div>
 </header>
@@ -712,35 +710,27 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <div class="shell">
 <nav class="sidebar">
   <button type="button" class="snav active" id="sn-dash" onclick="go('dash')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg></span>總覽</button>
-  <button type="button" class="snav" id="sn-quotes" onclick="go('quotes')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span>報價管理 <span class="cnt" id="qbadge">0</span></button>
   <button type="button" class="snav" id="sn-proj" onclick="go('proj')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>工程專案</button>
-  <button type="button" class="snav" id="sn-projects" onclick="go('projects')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-hardhat"/></svg></span>專案管理</button>
-  <button type="button" class="snav" id="sn-rfq" onclick="go('rfq')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>發包</button>
-  <button type="button" class="snav" id="sn-mat6" onclick="go('mat6')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>材料．租賃</button>
-  <button type="button" class="snav" id="sn-costs" onclick="go('costs')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span>施工成本</button>
-  <button type="button" class="snav" id="sn-materials" onclick="go('materials')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>材料管理</button>
-  <button type="button" class="snav" id="sn-invoice" onclick="go('invoice')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>計價 <span class="cnt" id="invbadge" style="display:none">0</span></button>
+  <button type="button" class="snav" id="sn-quotes" onclick="go('quotes')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span>報價 <span class="cnt" id="qbadge">0</span></button>
   <button type="button" class="snav" id="sn-quickcost" onclick="go('quickcost');setTimeout(rQuickCost,60)"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></span>日報．支出</button>
-  <button type="button" class="snav" id="sn-contracts" onclick="go('contracts')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>合約管理<span class="cnt" id="contractbadge" style="display:none">0</span></button>
-  <div class="ssec" style="margin-top:5px">財務流</div>
+  <div class="ssec" style="margin-top:5px">帳務</div>
+  <button type="button" class="snav" id="sn-invoice" onclick="go('invoice')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>計價 <span class="cnt" id="invbadge" style="display:none">0</span></button>
   <button type="button" class="snav" id="sn-acct" onclick="go('acct')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-coins"/></svg></span>帳務</button>
-  <button type="button" class="snav" id="sn-finance" onclick="go('finance')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>金流管理</button>
   <button type="button" class="snav" id="sn-reports" onclick="go('reports')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-trend"/></svg></span>經營報表</button>
-  <div class="ssec" style="margin-top:5px">資料與工具</div>
-  <button type="button" class="snav" id="sn-intake" onclick="smartIntake()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg></span>智慧收件</button>
+  <div class="ssec" style="margin-top:5px">工具</div>
   <button type="button" class="snav" id="sn-contacts" onclick="go('contacts')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>客戶．廠商</button>
-  <button type="button" class="snav" id="sn-progress" onclick="go('progress')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg></span>施工進度</button>
+  <button type="button" class="snav" id="sn-tools-more" onclick="toggleToolsNav()"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></span>更多工具 <span id="sn-tools-arrow" style="margin-left:auto;font-size:11px">▾</span></button>
+  <div id="sn-tools-wrap" style="display:none">
+  <button type="button" class="snav" id="sn-backfill" onclick="go('backfill')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span>背填材料</button>
   <button type="button" class="snav" id="sn-plan" onclick="go('plan')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-contract"/></svg></span>施工計畫書</button>
   <button type="button" class="snav" id="sn-rebar" onclick="go('rebar')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-scale"/></svg></span>鋼筋籠檢料</button>
-  <button type="button" class="snav" id="sn-matest" onclick="go('matest')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>材料估算</button>
   <button type="button" class="snav" id="sn-grout" onclick="go('grout')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>根固砂漿</button>
-  <button type="button" class="snav" id="sn-backfill" onclick="go('backfill')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span>背填材料</button>
   <button type="button" class="snav" id="sn-workers" onclick="go('workers')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>人員進場資料</button>
-  <button type="button" class="snav" id="sn-lifeline" onclick="go('lifeline')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-link"/></svg></span>安全母索</button>
-  <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
+  <button type="button" class="snav" id="sn-matest" onclick="go('matest')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-box"/></svg></span>材料估算</button>
+  </div>
   <div class="ssec" style="margin-top:5px">系統</div>
+  <button type="button" class="snav" id="sn-upa" onclick="go('upa')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg></span>單價分析</button>
   <button type="button" class="snav" id="sn-staff" onclick="go('staff')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span>人員管理</button>
-  <button type="button" class="snav" id="sn-payroll" onclick="go('payroll')" style="display:none"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg></span>薪資．零用金</button>
   <button type="button" class="snav" id="sn-roles" onclick="go('roles')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span>角色權限</button>
   <button type="button" class="snav" id="sn-params" onclick="go('params')"><span class="sic"><svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg></span>參數設定</button>
 </nav>
@@ -769,11 +759,6 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg></span>
         <span class="sc-label">工程專案</span>
         <span class="sc-sub">一頁看全案</span>
-      </button>
-      <button type="button" onclick="go('rfq')" class="sc-btn">
-        <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg></span>
-        <span class="sc-label">發包</span>
-        <span class="sc-sub">詢價・比價</span>
       </button>
       <button type="button" onclick="go('acct')" class="sc-btn">
         <span class="sc-icon"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg></span>
@@ -1049,7 +1034,6 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <button type="button" class="btn btn-sm desk-only" onclick="newQ()">↺ 清除</button>
       <button type="button" class="btn btn-sm" onclick="openRmkModal()"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 備註填寫</button>
       <button type="button" class="btn btn-sm" onclick="openNegotiateModal()" title="議價：整單等比或逐項調價" style="border-color:#b39ddb;color:#4527a0"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 議價</button>
-      <button type="button" class="btn btn-sm" onclick="openSiteDet(eid)" title="案場細節紀錄表：圖面抓的周長／深度／樁／支撐層等數量，可進版、匯出 PDF、帶入材料估算" style="border-color:var(--gm);color:var(--g3)"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 案場細節</button>
       <button type="button" class="btn btn-sm" onclick="go('quotes')">← 返回</button>
       <button type="button" class="btn btn-sm" onclick="loadQ(eid);go('preview')"><svg class="ic ib" aria-hidden="true"><use href="#i-eye"/></svg> 預覽</button>
       <button type="button" class="btn btn-sm" onclick="bumpQVersion(eid)" title="將目前內容封存為歷史版本並升版" style="border-color:#1a3a6b;color:#1a3a6b"><svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> 進版</button>
@@ -1153,16 +1137,6 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   </div>
   <div id="proj-root" style="padding:0 14px 20px"></div>
 </div>
-<div class="page" id="page-projects">
-  <div class="ph">
-    <div class="ph-l"><div class="ph-t">專案管理</div><div class="ph-s" id="proj-sub">以工程為中心的全生命週期視圖</div></div>
-    <div class="ph-r">
-      <button type="button" class="btn btn-sm" onclick="renderProjects()"><svg class="ic ib" aria-hidden="true"><use href="#i-refresh"/></svg> 重新整理</button>
-    </div>
-  </div>
-  <div class="pad"><div id="projects-list"></div></div>
-</div>
-
 <!-- ████ COSTS PAGE（施工成本，自專案脈絡進入）████ -->
 <div class="page" id="page-rfq">
   <div class="ph">
@@ -1182,12 +1156,9 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div class="ph">
     <div class="ph-l"><div class="ph-t">施工成本</div><div class="ph-s" id="costs-proj-name">請選擇工程</div>
       <select id="costs-proj-select" onchange="if(this.value)openProjectCosts(this.value)" style="margin-top:4px;font-size:13px;padding:6px 10px;border:1.5px solid var(--gm);border-radius:var(--r8);background:var(--gl);color:var(--g3);font-family:inherit;font-weight:700;max-width:100%;width:auto"></select>
-      <div style="font-size:10.5px;color:var(--g3);margin-top:2px">✓ 所有變更即時自動儲存</div></div>
+      </div>
     <div class="ph-r">
       <button type="button" class="btn btn-sm" onclick="go('proj')">← 工程專案</button>
-      <button type="button" class="btn btn-sm" onclick="go('invoice')" title="本專案應收請款">業主計價</button>
-      <button type="button" class="btn btn-sm" onclick="go('finance');setTimeout(function(){switchFinanceTab('payable');},250)" title="廠商請款管理">廠商請款</button>
-      <button type="button" class="btn btn-sm" onclick="if(eid)loadQ(eid)"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯報價</button>
     </div>
   </div>
   <div class="pad">
@@ -1195,7 +1166,6 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <div class="ch green" style="flex-wrap:wrap;row-gap:8px">
         <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:8px">
           <div class="cht" style="white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 施工成本記錄</div>
-          <select id="cost-group-mode" onchange="rCostItems()" style="font-size:12px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);font-family:inherit"><option value="none">依建立順序</option><option value="vendor">依廠商分組</option></select>
         </div>
         <div class="cost-tabs"><button type="button" class="cost-tab on" id="cost-view-list" onclick="setCostView('list')">成本清單</button><button type="button" class="cost-tab" id="cost-view-analysis" onclick="setCostView('analysis')">工項分析</button><button type="button" class="cost-tab" id="cost-view-audit" onclick="setCostView('audit')">勾稽</button><button type="button" class="cost-tab" id="cost-view-qty" onclick="setCostView('qty')">數量對照</button><button type="button" class="cost-tab" id="cost-view-subs" onclick="setCostView('subs')">分包</button></div>
         <button type="button" class="btn btn-g" onclick="costAddPick()" title="先選類型：承包／點工／自有材料購置／額外支出（廠商）；材料租賃、運輸到「材料．租賃」頁；便當油資等零星支出由日報．支出登錄" style="width:100%;justify-content:center;height:38px;font-size:13px;font-weight:700">＋ 新增成本</button>
@@ -1332,20 +1302,6 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div class="ph"><div class="ph-l"><div class="ph-t">施工計畫書</div><div class="ph-s">分項工程施工計畫書自動生成：填專案→勾工項→匯圖說→產出 Word／PDF＋自主檢查表</div></div></div>
   <div class="pad" style="max-width:1300px"><div id="plan-root"></div></div>
 </div>
-<div class="page" id="page-sitedet">
-  <div class="ph">
-    <div class="ph-l"><div class="ph-t">案場細節紀錄表</div><div class="ph-s" id="sd-sub">圖面抓下來的數量記在這裡，報價進版不必重抓</div>
-      <div style="font-size:10.5px;color:var(--g3);margin-top:2px">✓ 所有變更即時自動儲存</div></div>
-    <div class="ph-r">
-      <button type="button" class="btn btn-sm" onclick="if(eid)loadQ(eid);else go('quotes')">← 報價</button>
-      <button type="button" class="btn btn-sm" onclick="siteShowVers()" title="歷次進版的紀錄，可檢視／還原"><svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> 版次</button>
-      <button type="button" class="btn btn-sm" onclick="siteBump()" title="把目前內容封存為一版，之後的修改算下一版" style="border-color:#1a3a6b;color:#1a3a6b">進版</button>
-      <button type="button" class="btn btn-sm" onclick="siteExportPDF()"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 匯出 PDF</button>
-      <button type="button" class="btn btn-sm btn-g" onclick="siteToMatEst()" title="把周長／面積／深度／樁／支撐層帶進材料估算">帶入材料估算 →</button>
-    </div>
-  </div>
-  <div class="pad" style="max-width:1100px"><div id="site-root"></div></div>
-</div>
 <div class="page" id="page-matest">
   <div class="ph"><div class="ph-l"><div class="ph-t">材料估算</div><div class="ph-s">擋土支撐材料估算：選專案→輸入條件→計算所需材料</div></div></div>
   <div class="pad" style="max-width:1300px">
@@ -1426,9 +1382,6 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         </div>
         <div id="qc-pending" style="margin-bottom:8px"></div>
         <button type="button" id="qc-submit" class="btn btn-g" onclick="submitQuickCost()" style="width:100%;justify-content:center;padding:13px;font-size:15px;font-weight:900">✓ 送出</button>
-        <div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px"><div style="flex:1;height:1px;background:var(--b1)"></div><span style="font-size:11px;color:var(--b3)">有發票／收據？</span><div style="flex:1;height:1px;background:var(--b1)"></div></div>
-        <button type="button" class="btn" onclick="smartIntake()" style="width:100%;justify-content:center;padding:12px;font-size:14px;font-weight:700;border-color:var(--gm);color:var(--g3)"><svg class="ic ib" aria-hidden="true"><use href="#i-camera"/></svg> 拍照智慧收件（AI 自動判讀）</button>
-        <div style="font-size:10.5px;color:var(--b3);margin-top:6px">拍發票或收據，AI 自動判讀類型與金額，連動寫入施工成本、應付帳款與帳務進項。</div>
       </div>
     </div>
     <div class="card" style="margin-top:12px">
@@ -2828,7 +2781,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <span style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;background:var(--g);border-radius:50%;margin-top:-16px;box-shadow:0 3px 12px rgba(26,107,63,.4);border:3px solid var(--w)"><svg class="ic" aria-hidden="true" style="width:21px;height:21px;stroke:#fff;stroke-width:2"><use href="#i-contract"/></svg></span>
     <span style="font-size:9px;color:var(--g);font-weight:700;margin-top:1px">專案</span>
   </button>
-  <button type="button" class="mnav" id="mn-invoice" onclick="go('invoice')"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg></span>計價<span class="cnt2" id="invbadge3" style="display:none">0</span></button>
+  <button type="button" class="mnav" id="mn-quotes" onclick="go('quotes')"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span>報價</button>
   <button type="button" class="mnav" id="mn-more" onclick="toggleMobMore()"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></span>更多</button>
 </nav>
 <!-- 手機端「更多」展開選單 -->
@@ -2838,7 +2791,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.27';
+var APP_VERSION='v6.0.28';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -5226,7 +5179,6 @@ function saveQ(){
       }
     }
   }catch(e){_err('top',e);}
-  try{const _q=Q.find(x=>x.id===(eid||''));if(_q)saveQVersion(_q.id,_q);}catch(e){_err('top',e);}
   // 業主不在客戶清單 → 自動新增到客戶管理（免手動維護）
   try{
     if(q.client&&q.client.trim()&&!CUSTOMERS.find(c=>c.name===q.client.trim())){
@@ -5485,8 +5437,7 @@ function qlHTML(q,clickable){
       '<div style="display:flex;align-items:center;gap:8px">'+infoHtml+'</div>'+
       '<div class="ql-actions">'+
         '<button type="button" class="btn mob-btn" style="background:var(--g);color:#fff;border-color:var(--g);flex:2" onclick="event.stopPropagation();loadQ(\''+qid+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯</button>'+
-        '<button type="button" class="btn mob-btn" style="flex:1.5;background:#e8f5e9;color:#1B5E20;border-color:var(--gm)" onclick="event.stopPropagation();exportQuotePDF(this.dataset.id)" data-id="'+qid+'" ><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> PDF</button>'+
-        (awarded?'<button type="button" class="btn mob-btn" style="background:#e8f0fb;color:#1a3a6b;border-color:#b5d4f4;flex:1.5" onclick="event.stopPropagation();goQuoteInvoice(\''+qid+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 請款</button>':'<button type="button" class="btn mob-btn" style="border-color:#1a3a6b;color:#1a3a6b;flex:1.5" onclick="event.stopPropagation();awardQuote(\''+qid+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 得標</button>')+
+        (awarded?'':'<button type="button" class="btn mob-btn" style="border-color:#1a3a6b;color:#1a3a6b;flex:1.5" onclick="event.stopPropagation();awardQuote(\''+qid+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 得標</button>')+
                 '<div style="position:relative">'+
           '<button type="button" class="btn mob-btn-icon" onclick="event.stopPropagation();toggleQMenu(\''+menuId+'\',this)" style="color:var(--b4);border-color:var(--b2)">⋯</button>'+
           menuBtns+
@@ -5504,8 +5455,6 @@ function qlHTML(q,clickable){
       '<div style="display:flex;gap:4px;margin-left:10px;flex-shrink:0;align-items:center">'+
         '<button type="button" class="btn btn-xs btn-g" onclick="event.stopPropagation();loadQ(\''+qid+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯</button>'+
         awardBtn+
-        (awarded?'<button type="button" class="btn btn-xs" style="background:#e8f0fb;color:#1a3a6b;border-color:#b5d4f4" title="開啟關聯請款單" onclick="event.stopPropagation();goQuoteInvoice(\''+qid+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 請款</button>':'')+
-        '<button type="button" class="btn btn-xs" onclick="event.stopPropagation();exportQuotePDF(this.dataset.id)" data-id="'+qid+'" title="匯出PDF"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> PDF</button>'+
         '<button type="button" class="btn btn-xs" style="color:var(--b3);border-color:var(--b2)" title="複製報價單" onclick="event.stopPropagation();copyQ(\''+qid+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg></button>'+
         (awarded?'<button type="button" class="btn btn-xs" style="color:var(--b3);border-color:var(--b2)" title="新增追加合約" onclick="event.stopPropagation();addAddendum(\''+qid+'\')">＋</button>':'')+
         '<button type="button" class="btn btn-xs" style="color:#1a3a6b;border-color:#b5d4f4" title="進版：封存目前內容為新版次（V1、V2…）" onclick="event.stopPropagation();bumpQVersion(\''+qid+'\')">↑ 進版</button>'+
@@ -7462,8 +7411,6 @@ function renderInvList(){
     var mobBtns='<div class="ql-actions mob-only">'
       +'<button type="button" class="btn mob-btn" style="background:var(--g);color:#fff;border-color:var(--g);flex:2" onclick="event.stopPropagation();loadInvoice(\''+id+'\');go(\'invoice-edit\')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯</button>'
       +'<button type="button" class="btn mob-btn" style="flex:2;background:#1B5E20;color:#fff;border-color:#1B5E20" onclick="event.stopPropagation();printInvById(this.dataset.id)" data-id="'+id+'"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> PDF</button>'
-      +'<button type="button" class="btn mob-btn" style="flex:2;background:#e8f0fb;color:#1a3a6b;border-color:#b5d4f4" onclick="event.stopPropagation();addNextPeriod(\''+id+'\')" title="複製為下一期"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 下期</button>'
-      +(canConfirm?'<button type="button" class="btn mob-btn" style="flex:2;background:#e8f5e9;color:#1B5E20;border-color:var(--gm)" onclick="event.stopPropagation();openReceiptModal(\''+id+'\')">✓ 收款</button>':'')
       +'<button type="button" class="btn mob-btn btn-r" onclick="event.stopPropagation();delInvoice(\''+id+'\',event)" style="flex:0.8"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button>'
       +'</div>';
     var deskBtns='<div class="ql-desk-actions desk-only">'
@@ -7471,8 +7418,6 @@ function renderInvList(){
       +(!_einv?'<button type="button" class="btn btn-xs" title="確認無誤後開立發票" style="border-color:#1a3a6b;color:#1a3a6b" onclick="event.stopPropagation();go(\'finance\');setTimeout(function(){switchFinanceTab(\'invoice\');issueInvoiceForInv(\''+id+'\');},250)"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg></button>':'')
       +'<button type="button" class="btn btn-xs btn-g" title="查看／匯出 PDF（預覽內下載）" onclick="event.stopPropagation();printInvById(this.dataset.id)" data-id="'+id+'"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg></button>'
       +'<button type="button" class="btn btn-xs" title="列印信封（寄請款單／發票給業主）" onclick="event.stopPropagation();openEnvelope(\''+id+'\')">✉</button>'
-      +'<button type="button" class="btn btn-xs" style="background:#e8f0fb;color:#1a3a6b;border-color:#b5d4f4" onclick="event.stopPropagation();addNextPeriod(\''+id+'\')" title="複製為下一期"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg></button>'
-      +(canConfirm?'<button type="button" class="btn btn-xs" title="確認收款" style="background:#e8f5e9;color:#1B5E20;border-color:var(--gm)" onclick="event.stopPropagation();openReceiptModal(\''+id+'\')">✓</button>':'')
       +(hasRetention?'<button type="button" class="btn btn-xs" style="background:#fff3e0;color:#c62828;border-color:#ffccbc" onclick="event.stopPropagation();openRetentionModal()" title="保留款"><svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg></button>':'')
       +'<button type="button" class="btn btn-xs btn-r" title="刪除" onclick="event.stopPropagation();delInvoice(\''+id+'\',event)"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button>'
       +'</div>';
@@ -8915,7 +8860,7 @@ function mobScrollTo(id){
 // FAB 動作（依當前頁面決定）
 var _currentPage='dash';
 function mobFabAction(){
-  if(_currentPage==='dash'){smartIntake();return;}
+  if(_currentPage==='dash'){go('quickcost');return;}   // v6.0.28 智慧收件移除
   if(_currentPage==='quotes')newQ();
   else if(_currentPage==='invoice')go('invoice-edit');
   else if(_currentPage==='contracts')newQ();
@@ -9313,7 +9258,7 @@ function updateDashTodo(){
     }
     _rs.forEach(function(r){
       items.push({type:'rent_over',urgent:r.maxD>14,
-        jump:"goQuoteInvoice('"+r.qid+"')",
+        jump:"openProj('"+r.qid+"')",
         icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg>',
         color:r.maxD>14?'var(--red)':'#b26a00',
         text:'「'+r.name+'」'+r.n+' 個工項租期已逾期（最長 '+r.maxD+' 天），尚未開逾期租金請款',
@@ -12425,7 +12370,6 @@ function _renderMatEstInner(el){
   Q.filter(function(q){return (q.awarded&&!q.parentId)||q.matEst||q.site;}).forEach(function(q){h+='<option value="'+q.id+'"'+(window._matEstQid===q.id?' selected':'')+'>'+esc(q.name||'')+(q.matEst?' ✓已有估算':'')+(q.site?' ▪案場細節':'')+'</option>';});
   h+='</select></div>';
   h+=sec('① 基地尺寸');
-  (function(){var sq=Q.find(function(x){return x.id===window._matEstQid;});if(sq&&sq.site)h+='<div style="margin:2px 0 8px"><button type="button" class="btn btn-xs" onclick="matEstFromSite(window._matEstQid)" style="border-color:var(--gm);color:var(--g3)">↙ 從案場細節紀錄表帶入（v'+(sq.site.ver||1)+'）</button> <span style="font-size:11px;color:var(--b3)">周長／面積／深度／大底、擋土壁、三種樁、支撐各層、構台</span></div>';})();
   h+='<div class="me-grid">'+fN('P','基地周長 (M)')+fN('A','開挖面積 (㎡)')+fN('H','開挖深度 (M)')+fN('slabT','大底厚度 (M)')+fN('corners','角隅數 (個)')+fN('irr','不規則邊 (個)')+'</div>';
   h+=sec('② 擋土壁體（樁）');
   h+='<div class="me-grid">'+fS('method','工法',['鋼板樁','鋼軌樁','型鋼排樁','基樁','預壘樁','微型樁','CCP','連續壁'])
@@ -27402,7 +27346,7 @@ function buildSubMgmtHtml(q){
         +'<td style="padding:4px 6px;font-size:11px;white-space:nowrap">'+esc((p&&p.date)||per.due||'')+'</td>'
         +'<td style="padding:4px 6px;font-size:11.5px;font-weight:700">'+stTxt+(per.note?'<div style="font-weight:400;color:var(--b4);font-size:10.5px">'+esc(per.note)+'</div>':'')+absorbTag+'</td>'
         +'<td style="padding:4px 6px;text-align:right;white-space:nowrap">'
-        +(per.isRet?'':'<button type="button" title="內部核對／簽收用（廠商自送請款單時對照）" onclick="printVendorStatement(\''+c.id+'\','+per.no+')" style="font-size:11px;padding:2px 8px;border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;cursor:pointer;font-family:inherit">核對單</button> '
+        +(per.isRet?'':''
           +(fm?'':'<button type="button" onclick="openSubPeriod(\''+c.id+'\','+per.no+')" style="font-size:11px;padding:2px 8px;border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;cursor:pointer;font-family:inherit">修改</button> '))
         +_subEarlyRowBtn(c,per)+(fm&&!per.isRet?'<span style="font-size:10.5px;color:var(--b3)">依主約自動</span>':'<button type="button" onclick="delSubPeriod(\''+c.id+'\','+per.no+')" style="font-size:11px;padding:2px 8px;border:1px solid #f0c4c4;background:var(--w);color:var(--red);border-radius:99px;cursor:pointer;font-family:inherit">刪除</button>')
         +'</td></tr>'+_subEarlyRowsHtml(c,per);
@@ -29498,8 +29442,7 @@ function rCostItems(){
   html+=`<datalist id="${vendorListId}">${vendorOpts}</datalist>`;
 
   // 施工成本廠商分組模式
-  var _costGroupBtn=document.getElementById('cost-group-mode');
-  var _costGroupMode=_costGroupBtn?_costGroupBtn.value:'none';
+  var _costGroupMode='none';   // v6.0.28 依廠商分組已移除
   // <svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> 工項成本分析視圖：報價複價 vs 預估成本 vs 實際成本 vs 毛利（獨立按鈕切換）
   if(window._costView==='analysis'){
     el.innerHTML=_costViewBack()+buildCostAnalysisHtml(q);
@@ -29592,8 +29535,7 @@ function rCostItems(){
         +(VENDORS||[]).map(function(v){return '<option value="'+esc(v.name||'')+'"'+(c.vendor===(v.name||'')?' selected':'')+'>'+esc(v.name||'')+'</option>';}).join('')
         +'<option value="__manual__"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 手動輸入...</option>'
         +'</select>'
-        +(c.vendor&&c.vendor!=='公司支出（自付）'?'<button type="button" title="廠商請款核對單 PDF（內部核對／簽收用；廠商通常自送請款單）" onclick="printVendorStatement(\''+c.id+'\')" style="margin-left:auto;border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 核對單</button>':'')
-        +_costPayBtn(c)
+                +_costPayBtn(c)
         +(c.type==='extra'&&c.payer?'<span style="font-size:11px;color:#4A148C;white-space:nowrap">支出人 '+esc(c.payer)+'</span>':'')
         +'<span style="font-size:11px;color:var(--b4);white-space:nowrap'+(c.vendor&&c.vendor!=='公司支出（自付）'?'':';margin-left:auto')+'">發包 <b id="cost-amt-'+c.id+'" style="color:var(--g3);font-variant-numeric:tabular-nums">'+fmt((function(){try{recalcCostAmt(c);}catch(e){_err('top',e);}return c.amt||0;})())+'</b></span>'
         +'</div>'
@@ -29617,8 +29559,7 @@ function rCostItems(){
         +(VENDORS||[]).map(function(v){return '<option value="'+esc(v.name||'')+'"'+(c.vendor===(v.name||'')?' selected':'')+'>'+esc(v.name||'')+'</option>';}).join('')
         +'<option value="__manual__"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 手動輸入...</option>'
         +'</select>'
-        +(c.vendor&&c.vendor!=='公司支出（自付）'?'<button type="button" title="廠商請款核對單 PDF（內部核對／簽收用；廠商通常自送請款單）" onclick="printVendorStatement(\''+c.id+'\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 核對單</button>':'')
-        +_costPayBtn(c)
+                +_costPayBtn(c)
         +(c.type==='extra'&&c.payer?'<span style="font-size:11px;color:#4A148C;white-space:nowrap">支出人 '+esc(c.payer)+'</span>':'')
         +'<span style="font-size:11px;color:var(--b4);white-space:nowrap">小計 <b id="cost-amt-'+c.id+'" style="color:var(--g3);font-variant-numeric:tabular-nums">'+fmt((function(){try{recalcCostAmt(c);}catch(e){_err('top',e);}return c.amt||0;})())+'</b></span>'
         +'</div>'
@@ -29665,14 +29606,7 @@ function rCostItems(){
         +'</div>'
         +'</div>';
     }
-    const attRow=(c.mergedInto||!isAtt)?'':(   // v6.0.27 附屬（舊功能）只在已勾選時顯示
-      `<div style="margin-top:6px;font-size:11px">`
-      +`<label style="display:flex;align-items:center;gap:5px;cursor:pointer;color:var(--b3)">`
-      +`<input type="checkbox" ${attChecked} onchange="toggleCostAttached('${c.id}',this.checked)" style="cursor:pointer;accent-color:var(--g)">`
-      +`<span>附屬，併入報價工項</span></label>`
-      +attOptsHtml
-      +`</div>`
-    );
+    const attRow='';   // v6.0.28 附屬功能已移除
 
     // 廠商分組標題
     var _vname=c.vendor||'（未填廠商）';
@@ -34938,6 +34872,12 @@ function toggleRetentionReturn(invId, btn){
 
 
 // ── 手機「更多」展開選單 ──
+function toggleToolsNav(force){
+  var w=document.getElementById('sn-tools-wrap'),a=document.getElementById('sn-tools-arrow');if(!w)return;
+  var open=(force!==undefined)?!!force:w.style.display==='none';
+  w.style.display=open?'':'none';if(a)a.textContent=open?'▴':'▾';
+  try{localStorage.setItem('fy_tools_open',open?'1':'0');}catch(e){}
+}
 function toggleMobMore(){
   const panel=document.getElementById('mob-more-panel');
   if(!panel)return;
@@ -35117,14 +35057,13 @@ const ALL_PAGES = [
   {id:'dash',      label:'總覽',      icon:_pgIcon('home'),     grp:'main',  adminOnly:false},
   {id:'quotes',    label:'報價管理',  icon:_pgIcon('doc'),      grp:'main',  adminOnly:false},
   {id:'proj',      label:'工程專案',  icon:_pgIcon('hardhat'),  grp:'main',  adminOnly:false}, // v6 一頁式：報價→議價→合約→發包→施工→計價→結案
-  {id:'projects',  label:'專案管理',  icon:_pgIcon('hardhat'),  grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v6 舊卡片頁，由工程專案進
   {id:'costs',     label:'施工成本',  icon:_pgIcon('wrench'),   grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v6 併入工程專案（由專案頁「施工成本」進）
-  {id:'rfq',       label:'發包',      icon:_pgIcon('contract'), grp:'main',  adminOnly:false}, // v6 分項詢價單→比價→得標／點工
-  {id:'mat6',      label:'材料．租賃', icon:_pgIcon('box'),      grp:'main',  adminOnly:false, parent:'rfq'}, // v6.0.25 自發包移出：需求比對／接切樁／租賃（按 M）／設備／運輸；權限跟發包
-  {id:'materials', label:'材料管理',  icon:_pgIcon('box'),      grp:'main',  adminOnly:false, hidden:true, parent:'rfq'}, // v6 併入發包「材料」分頁（台帳／庫存仍在此）
+  {id:'rfq',       label:'發包',      icon:_pgIcon('contract'), grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v6 分項詢價單→比價→得標／點工
+  {id:'mat6',      label:'材料．租賃', icon:_pgIcon('box'),      grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v6.0.25 自發包移出：需求比對／接切樁／租賃（按 M）／設備／運輸；權限跟發包
+  {id:'materials', label:'材料管理',  icon:_pgIcon('box'),      grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v6 併入發包「材料」分頁（台帳／庫存仍在此）
   {id:'invoice',   label:'計價',      icon:_pgIcon('receipt'),  grp:'main',  adminOnly:false}, // v6 業主請款＋廠商請款兩分頁
   {id:'quickcost', label:'日報．支出',icon:_pgIcon('pencil'),   grp:'main',  adminOnly:false},
-  {id:'contracts', label:'合約管理',  icon:_pgIcon('contract'), grp:'main',  adminOnly:false, hidden:true, parent:'projects'}, // v5.294 併入專案總覽，導覽隱藏（頁面與資料保留）
+  {id:'contracts', label:'合約管理',  icon:_pgIcon('contract'), grp:'main',  adminOnly:false, hidden:true, parent:'proj'}, // v5.294 併入專案總覽，導覽隱藏（頁面與資料保留）
   {id:'acct',      label:'帳務',      icon:_pgIcon('coins'),    grp:'fin',   adminOnly:false}, // v6 應收／應付／金流預測／保留款／費用發票／零用金／薪資／分潤 一頁多分頁
   {id:'finance',   label:'金流管理',  icon:_pgIcon('coins'),    grp:'fin',   adminOnly:false, hidden:true, parent:'acct'}, // v6 併入帳務
   {id:'profit',    label:'利潤分析',  icon:_pgIcon('trend'),    grp:'fin',   adminOnly:false, hidden:true, parent:'reports'}, // v6.0.17 併入經營報表「總覽」分頁
@@ -35139,7 +35078,6 @@ const ALL_PAGES = [
   {id:'backfill',  label:'背填材料',  icon:_pgIcon('wrench'),   grp:'data',  adminOnly:false}, // v5.346
   {id:'workers',   label:'人員進場資料',icon:_pgIcon('users'),  grp:'data',  adminOnly:false}, // v5.438 進場申請人員資料＋證件影本
   {id:'lifeline',  label:'安全母索',  icon:_pgIcon('link'),     grp:'data',  adminOnly:false, hidden:true, parent:'matest'}, // v5.393；v5.397 併入材料估算，導覽隱藏
-  {id:'sitedet',   label:'案場細節',  icon:_pgIcon('contract'), grp:'main',  adminOnly:false, hidden:true, parent:'quotes'},  // v5.407 案場細節紀錄表（掛在報價下，由報價編輯／專案卡進入）
   // v5.330 sysOnly：只有「系統管理員」角色能開，其他角色的權限表上是鎖住的
   {id:'upa',       label:'單價分析',  icon:_pgIcon('calc'),     grp:'data',  adminOnly:true, sysOnly:true},
   {id:'staff',     label:'人員管理',  icon:_pgIcon('users'),    grp:'acct',  adminOnly:true},
@@ -35147,7 +35085,7 @@ const ALL_PAGES = [
   {id:'roles',     label:'角色權限',  icon:_pgIcon('lock'),     grp:'acct',  adminOnly:true, sysOnly:true},
   {id:'params',    label:'參數設定',  icon:_pgIcon('sliders'),  grp:'sys',   adminOnly:true, sysOnly:true},
 ];
-const PAGE_GRP_LABEL={main:'主功能',fin:'財務流',data:'資料與工具',acct:'帳號權限管理',sys:'系統'};
+const PAGE_GRP_LABEL={main:'工作',fin:'帳務',data:'工具',acct:'系統',sys:'系統'};   // v6.0.28 與側欄同名
 // 導覽可見頁面（排除隱藏與無權限者）
 function navPages(){
   return ALL_PAGES.filter(function(p){return !p.hidden&&canAccess(p.id);});
@@ -35256,7 +35194,7 @@ function newInvFromContract(contractId){
 // 手機「更多」面板：同樣由 navPages 產生。原本是寫死清單，
 // 金流管理／施工成本／材料管理／日報．支出 四個常用模組完全不在任何選單裡，
 // 工務只能先回總覽點捷徑卡才進得去。
-const MOB_BOTTOM_NAV=['dash','quickcost','projects','proj','invoice'];   // v6.0.16 底部列：總覽／日報／專案／計價／更多（報價在「更多」）   // 已在底部導覽，不重複列出
+const MOB_BOTTOM_NAV=['dash','quickcost','proj','quotes'];   // v6.0.28 底部列：總覽／日報／工程專案／報價／更多   // v6.0.16 底部列：總覽／日報／專案／計價／更多（報價在「更多」）   // 已在底部導覽，不重複列出
 function renderMobMore(){
   var box=document.getElementById('mob-more-body');if(!box)return;
   var pages=navPages().filter(function(p){return MOB_BOTTOM_NAV.indexOf(p.id)<0;});
@@ -35270,14 +35208,12 @@ function renderMobMore(){
   ['main','fin','data','acct','sys'].forEach(function(g){
     var ps=pages.filter(function(p){return p.grp===g;});
     if(!ps.length)return;
-    h+=title(g==='main'?'常用功能':PAGE_GRP_LABEL[g])+grid(ps.map(btn).join(''));
+    h+=title(PAGE_GRP_LABEL[g])+grid(ps.map(btn).join(''));
   });
   // 非頁面類動作
   // 智慧收件不列在此（v5.311 使用者指示：總覽的相機鈕已是入口，更多選單不重複）
   h+=title('工具')+grid(
-      '<button type="button" class="mob-more-btn" onclick="toggleMobMore();openGlobalSearch()"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></span><span>全域搜尋</span></button>'
-     +'<button type="button" class="mob-more-btn" onclick="toggleMobMore();intakeHistory()"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span><span>收件記錄</span></button>'
-     +'<button type="button" id="mn-sync" class="mob-more-btn mob-more-btn-accent" onclick="fbUploadWithConflictCheck();toggleMobMore()"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-cloud"/></svg></span><span>同步</span></button>');
+      '<button type="button" id="mn-sync" class="mob-more-btn mob-more-btn-accent" onclick="fbUploadWithConflictCheck();toggleMobMore()"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-cloud"/></svg></span><span>同步</span></button>');
   box.innerHTML=h;
 }
 
@@ -37534,7 +37470,7 @@ function renderProj(){
     +list.map(function(x){return '<option value="'+x.id+'"'+(q&&q.id===x.id?' selected':'')+'>'+esc((x.name||'未命名').slice(0,26))+(x.client?('／'+esc(x.client.slice(0,8))):'')+(x.closed?'（已結案）':'')+'</option>';}).join('')+'</select>';
   var top='<div class="card"><div class="cb" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+sel
     +'<label style="font-size:11.5px;color:var(--b4);display:flex;align-items:center;gap:4px"><input type="checkbox"'+(window._pjShowClosed?' checked':'')+' onchange="window._pjShowClosed=this.checked;renderProj()"> 含已結案</label>'
-    +(q?'<span style="margin-left:auto;display:flex;gap:4px;flex-wrap:wrap">'+_pjBtn("loadQ('"+q.id+"')",'編輯報價')+_pjBtn("openSiteDet('"+q.id+"')",'案場細節')+_pjBtn("_rfqQid='"+q.id+"';_rfqTab='rfq';go('rfq')",'發包')+_pjBtn("_rfqQid='"+q.id+"';_rfqTab='mat';go('rfq')",'材料')+_pjBtn("openProjectCosts('"+q.id+"')",'施工成本')+_pjBtn("go('invoice')",'業主計價')+_pjBtn("viewDailyReports('"+q.id+"')",'日報')+'</span>':'')
+    +(q?'<span style="margin-left:auto">'+_pjBtn("loadQ('"+q.id+"')",'編輯報價')+'</span>':'')   // v6.0.28 頂部只留編輯報價，其餘在各區塊
     +'</div></div>';
   if(!q){root.innerHTML=top+_pjListHtml(list);return;}
   try{if(q.mat){_matAmortSync(q);_matLossSync(q);}}catch(e){_err('renderProj.mat',e);}   // v6 內部攤提天數每日變動 → 開頁先同步
@@ -37641,7 +37577,7 @@ function _pjInvHtml(q,st){
     return ['第'+esc(String(v.periodNo||'?'))+'期',esc(v.date||''),fmt((v.totals&&v.totals.total)||0),(_invRetention(v)?fmt(_invRetention(v)):'—'),stTxt,
       '<span style="white-space:nowrap">'+_pjBtn("printInvById('"+v.id+"')",'查看')+(paid?'':_pjBtn("openReceiptModal('"+v.id+"')",'收款','border-color:var(--gm);color:var(--g3)'))+_pjBtn("openEnvelope('"+v.id+"')",'✉')+'</span>'];});
   var rent=st.rent.length?'<div style="font-size:11.5px;color:#b26a00;background:#fff8ec;border:1px solid #ffd699;border-radius:var(--r6);padding:6px 9px;margin-bottom:8px"><b>逾期租金可請款：'+st.rent.length+' 項・NT$ '+fmt(st.rent.reduce(function(a,s){return a+s.amount;},0))+'（未稅）</b>　'+st.rent.slice(0,3).map(function(s){return esc(String(s.desc).slice(0,14))+' 逾 '+s.overDays+' 天';}).join('、')+'</div>':'';
-  var bar=st.base>0?'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11.5px;color:var(--b4)"><span>估驗進度</span><div style="flex:1;max-width:360px;height:8px;background:var(--b1);border-radius:6px;overflow:hidden"><div style="width:'+Math.round(Math.min(100,(st.billed+st.retHeld)/st.base*100))+'%;height:100%;background:var(--g)"></div></div><b style="color:var(--g3)">'+Math.round((st.billed+st.retHeld)/st.base*100)+'%</b><span>（累計請款＋保留款 ÷ 合約金額）</span></div>':'';
+  var bar=st.base>0?'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11.5px;color:var(--b4)"><span>估驗進度</span><div style="flex:1;max-width:360px;height:8px;background:var(--b1);border-radius:6px;overflow:hidden"><div style="width:'+Math.round(Math.min(100,(st.billed+st.retHeld)/st.base*100))+'%;height:100%;background:var(--g)"></div></div><b style="color:var(--g3)">'+Math.round((st.billed+st.retHeld)/st.base*100)+'%</b></div>':'';
   return rent+bar+(rows.length?_pjTable([{t:'期別'},{t:'請款日'},{t:'本期（含稅）',r:1},{t:'保留款',r:1},{t:'收款'},{t:''}],rows,['合計','',fmt(st.billed),fmt(st.retHeld),'已收 '+fmt(st.recv)+'／待收 '+fmt(st.ar),'']):'<div style="font-size:12px;color:var(--b3)">尚未請款</div>')
     +'<div style="margin-top:8px">'+_pjBtn("pjNewInv('"+q.id+"')",'＋ 新增下一期請款單','border-color:var(--gm);color:var(--g3)')+'</div>';
 }
@@ -37907,7 +37843,7 @@ function renderVendorBilling(keepScroll){
   if(!pend.length)h+='<div style="font-size:12px;color:var(--b3)">目前沒有日報已完成而未計價的分包。廠商送請款單時，到下方總表按「登錄」即可。</div>';
   else h+=_pjTable([{t:'專案'},{t:'廠商／工項'},{t:'上期迄'},{t:'預估本期',r:1},{t:'尚未請款',r:1},{t:''}],pend.map(function(r){
     return [esc(r.pname),'<b>'+esc(r.c.vendor)+'</b><div style="font-size:10.5px;color:var(--b4)">'+esc(_vbItems(r))+'</div>',esc(r.est.from||r.c.entryDate||'進場起'),'<b style="color:#E65100">'+fmt(r.est.est)+'</b>',fmt(Math.max(0,r.st.remain)),
-      '<span style="white-space:nowrap">'+_pjBtn("vbOpenPeriod('"+r.q.id+"','"+r.c.id+"')",'登錄廠商請款','border-color:#E65100;color:#E65100')+_pjBtn("vbAdvance('"+r.q.id+"','"+r.c.id+"')",'預支')+'</span>'];}));
+      _pjBtn("openProj('"+r.q.id+"')",'開啟工程','border-color:#E65100;color:#E65100')];}));   // v6.0.28 登錄只在工程專案
   h+='</div>';
   // 2) 本期已登錄
   h+='<div class="card" style="margin-bottom:12px;padding:12px 14px"><div style="font-weight:800;font-size:14px;margin-bottom:6px;color:var(--g3)">本期已登錄（'+cut+' 起）</div>';
@@ -37917,7 +37853,7 @@ function renderVendorBilling(keepScroll){
     var pb=PAYABLES.find(function(y){return y.id===_subPayId(r.c.id,p);});var paid=pb&&pb.status==='paid';
     return [esc(r.pname),esc(r.c.vendor),p.isRet?'保留款退還':'第'+p.no+'期',p.isRet?'':esc((p.from||'')+'～'+(p.to||'')),fmt(k.amt),p.isRet?'':fmt(k.ret),k.adv?fmt(k.adv):'',fmt(pay),esc(p.due||''),esc(p.invNo||''),
       '<span style="font-weight:700;color:'+(paid?'var(--g)':'var(--red)')+'">'+(paid?'已付':'待付')+'</span>',
-      '<span style="white-space:nowrap">'+_pjBtn("vbPrint('"+r.q.id+"','"+r.c.id+"',"+p.no+")",'核對單')+(p.isRet||r.c.followOf?'':_pjBtn("vbOpenPeriod('"+r.q.id+"','"+r.c.id+"',"+p.no+")",'修改'))+(paid||p.isRet||(k.pay-_subEarlySum(p))<=0?'':_pjBtn("vbEarly('"+r.q.id+"','"+r.c.id+"',"+p.no+")",'提前放款','border-color:#90CAF9;color:#1565C0'))+(paid?'':_pjBtn("vbDelPeriod('"+r.q.id+"','"+r.c.id+"',"+p.no+")",'刪除','color:var(--red);border-color:#f0c4c4'))+'</span>'];}),
+      _pjBtn("openProj('"+r.q.id+"')",'開啟工程')];}),
     ['合計','','','',fmt(sumCur),'','',fmt(curPers.reduce(function(a,x){var k=_subPeriodCalc(x.r.c,x.p);return a+(_subInvoice(x.r.c)?Math.round(k.pay*_taxM()):k.pay);},0)),'','','','']);
   h+='</div>';
   // 3) 全部分包合約
@@ -37933,7 +37869,7 @@ function renderVendorBilling(keepScroll){
     return [esc(r.pname),'<b>'+esc(r.c.vendor)+'</b><div style="font-size:10.5px;color:var(--b4)">'+(r.rental?esc((r.c.rows||[]).map(function(x){return x.desc||x.preset||'';}).filter(Boolean).slice(0,3).join('、')):esc(_vbItems(r)))+(r.c.followOf?'<div style="color:#1565C0">介紹費／抽成，跟隨主約同期同量</div>':'')+'</div>',r.rental?'<span style="color:var(--b4)">依期請款</span>':fmt(r.st.total),
       fmt(r.st.billed)+'<div style="font-size:10.5px;color:'+(pct>100?'#1565C0':'var(--b4)')+'">'+pct+'%'+(over.overAmt?('・實作超量 '+fmt(over.overAmt)):'')+'</div>',fmt(r.st.paid),'<span style="color:'+(r.st.unpaid?'var(--red)':'var(--b5)')+'">'+fmt(r.st.unpaid)+'</span>',fmt(Math.max(0,r.st.retHeld)),
       r.last?('第'+r.last.no+'期 '+esc(r.last.date||'')+'<div style="font-size:10.5px;color:var(--b4)">到期 '+esc(r.last.due||'')+'</div>'):'<span style="color:var(--b3)">—</span>',_vbStatusChip(r),
-      '<span style="white-space:nowrap">'+(r.c.followOf?'':_pjBtn("vbOpenPeriod('"+r.q.id+"','"+r.c.id+"')",'登錄','border-color:#1565C0;color:#1565C0'))+(r.last?_pjBtn("vbPrint('"+r.q.id+"','"+r.c.id+"',"+r.last.no+")",'核對單'):'')+(r.st.retHeld>0&&r.status==='done'?_pjBtn("vbRelease('"+r.q.id+"','"+r.c.id+"')",'退保留款','color:#7c5700'):'')+_pjBtn("openSubMgmt('"+r.q.id+"')",'明細')+'</span>'];}),
+      _pjBtn("openProj('"+r.q.id+"')",'開啟工程','border-color:#1565C0;color:#1565C0')];}),
     ['合計','',fmt(list.reduce(function(a,r){return a+r.st.total;},0)),fmt(list.reduce(function(a,r){return a+r.st.billed;},0)),fmt(list.reduce(function(a,r){return a+r.st.paid;},0)),fmt(list.reduce(function(a,r){return a+r.st.unpaid;},0)),fmt(list.reduce(function(a,r){return a+Math.max(0,r.st.retHeld);},0)),'','','']);
   h+='</div>';
   var y=keepScroll?window.scrollY:null;
@@ -37984,7 +37920,7 @@ function _invMonthBanner(){
   box.style.display='block';
   box.innerHTML='<div style="font-weight:700;font-size:13px;color:#0D47A1;margin-bottom:6px"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 本月尚未開單（日報本月有回報數量）</div>'
     +gaps.map(function(g){return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;padding:3px 0">・<b>'+esc(g.q.name||'')+'</b>'+(g.q.client?'（'+esc(g.q.client)+'）':'')+'　上次 '+esc(g.last.date||'')+(g.last.period?' 第'+esc(String(g.last.period))+'期':'')+'・本月日報 '+g.n+' 天'
-      +'<button type="button" class="btn btn-xs" onclick="addNextPeriod(\''+g.last.id+'\')" style="border-color:#1565C0;color:#1565C0">開下一期</button></div>';}).join('');
+      +'<button type="button" class="btn btn-xs" onclick="openProj(\''+g.q.id+'\')" style="border-color:#1565C0;color:#1565C0">開啟工程 › 開下一期</button></div>';}).join('');   // v6.0.28 開單只在工程專案
 }
 // ══════════ v6 材料併入發包：需求 → 自有調撥（台帳位置）→ 內部租金攤提 → 租賃／外購（掛應付）→ 歸還／損耗認列 ══════════
 // 資料：q.mat={rows:[{id,name,spec,len,unit,qty,rate,rentVendor,rentPrice,rentMonths,note}],use:[已結束的自有使用段],loss:[損耗認列],trans:{vendor,trips,price}}（private，隨報價敏感欄位走）
@@ -38480,6 +38416,35 @@ function prmSearch(q){
   return hit;
 }
 try{_prmMount();}catch(e){_err('prm.mount',e);}
+// ══════════ v6.0.28 說明改「？」：各頁右上角一顆，點開才顯示 ══════════
+var _HELP={
+ dash:'今天該做的事（跨所有工程）＋進行中工程。點事項旁的按鈕直接去處理。',
+ proj:'工程專案是唯一主畫面。選工程後：合約工項與進度（合約量／日報累計／發包量／廠商已請／業主已請，紅字要處理、藍字是實作實算提示；日報標「階段完工」後實作量即為該工項數量）、業主計價（＋開下一期、收款）、發包與廠商計價（登錄廠商請款、介紹人、預付款）、材料、成本統計、進度、日報、合約與文件、結案。',
+ quotes:'報價單是全系統的根。工項、數量、單價往下流到合約、請款、發包、成本分析。得標後報價不再改，追加減走請款單。',
+ editor:'成本單價來源：歷史實績（同單位）／單價分析理論值／發包得標回填。備註寫「含 N 天租期」逾期租金會自動起算。',
+ quickcost:'日報：工項數量（打設／拔除分開）、出工（點工人數、自有機具天數）、狀態（施工中／停工／階段完工）、照片。支出：點類型 → 金額 → 支出人，掛工程或公司費用。同日再送出會合併。',
+ rfq:'分項詢價 → 填廠商報價 → 比價 → 評估得標建分包合約（可同時填介紹人）。依 M 報價的工項，合約單價自動換成每支。',
+ mat6:'新增材料需求 → 系統比對公司庫存：同長閒置先調撥；同規格其他長度問接／切樁；都沒有再租。租賃、設備、運輸填好自動進施工成本（未請款前 0，先用預估算毛利）。內部攤提＝支數×單長×日租×0.8×天數，不入應付。',
+ costs:'這裡是統計與核對：承包來自發包、材料來自材料頁、零星支出來自日報．支出。廠商請款單到了按「登錄廠商請款」或「核對請款單」，確認即轉應付（次月 25 日到期）。',
+ invoice:'業主請款：一期一張，打設請 70%、拔除請 30% 由每列「請款 %」決定。廠商請款：全公司分包工作台，登錄動作到工程專案做。',
+ acct:'應收來自請款單、應付來自分包計價／材料核對／薪資／零用金。這裡標記收付、登票據、看 90 天金流。',
+ reports:'主口徑＝權責：請款未稅 − 施工成本 − 公司費用 − 人事。現金口徑另列。',
+ contacts:'業主與廠商名冊。發包、租賃、支出選廠商時從這裡帶。',
+ params:'稅率、管理費率、廠商計價截止日（25）與放款日（次月 25）、自有材料內部日租與折數、運費每噸單價都在這裡。'
+};
+function showHelp(id){var t=_HELP[id];if(!t)return;showConfirm('說明：'+((ALL_PAGES.find(function(p){return p.id===id;})||{}).label||id),'<div style="font-size:13px;line-height:1.8">'+esc(t)+'</div>',function(){},false,null,false);var c=document.getElementById('gen-confirm-cancel');if(c)c.style.display='none';var o=document.getElementById('gen-confirm-ok');if(o)o.textContent='知道了';}
+function _helpMount(){
+  document.querySelectorAll('.page').forEach(function(pg){
+    var id=(pg.id||'').replace(/^page-/,'');if(!_HELP[id])return;
+    var ph=pg.querySelector('.ph');if(!ph||ph.querySelector('.help-btn'))return;
+    var r=ph.querySelector('.ph-r');if(!r){r=document.createElement('div');r.className='ph-r';ph.appendChild(r);}
+    var b=document.createElement('button');b.type='button';b.className='btn btn-sm help-btn';b.title='說明';b.textContent='？';b.style.cssText='min-width:30px;padding:4px 9px;font-weight:900;color:var(--b4)';b.onclick=function(){showHelp(id);};
+    r.appendChild(b);
+  });
+  try{var o=localStorage.getItem('fy_tools_open')==='1';toggleToolsNav(o);}catch(e){}
+}
+try{_helpMount();}catch(e){_err('help.mount',e);}
+
 // ══════════ v6.0.16 上線前收尾：舊頁權限對映到 v6 新頁、選單收尾、總覽待辦接上 v6 訊號 ══════════
 // 權限：既有角色的 pages 只勾了舊頁 id（projects／costs／materials／finance／ledger），v6 新頁（proj／rfq／acct）沒勾 → 非系統管理員會被擋。
 // 系統管理員登入時一次性對映（不刪舊鍵，隱藏頁的 parent 鏈仍可用），記 __v6perm 不重跑。
@@ -38691,7 +38656,7 @@ function _rentCardHtml(q,c){
   var pers=_subPeriods(c).filter(function(p){return !p.isRet;}).slice().sort(function(a,b){return (b.no||0)-(a.no||0);});
   if(pers.length)h+='<div style="margin-top:5px">'+pers.map(function(p){var k=_subPeriodCalc(c,p);var pb=PAYABLES.find(function(x){return x.id===_subPayId(c.id,p);});var paid=pb&&pb.status==='paid';
     return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:3px 0;border-top:1px dotted #bcd8f5">第'+p.no+'期 '+esc(p.date||'')+' <span style="color:var(--b4)">'+esc((p.from||'')+'～'+(p.to||''))+'</span><b>NT$ '+fmt(k.amt)+'</b>'+(p.invNo?'<span style="color:var(--b4)">發票 '+esc(p.invNo)+'</span>':'')+'<span style="color:'+(paid?'var(--g)':'var(--red)')+';font-weight:700">'+(paid?'已付':'待付 '+esc(p.due||''))+'</span>'
-      +'<span style="margin-left:auto;display:flex;gap:3px"><button type="button" class="btn btn-xs" onclick="printVendorStatement(\''+c.id+'\','+p.no+')">核對單</button>'+(paid?'':'<button type="button" class="btn btn-xs" onclick="openRentPeriod(\''+c.id+'\','+p.no+')">修改</button><button type="button" class="btn btn-xs" style="color:var(--red);border-color:#f0c4c4" onclick="delSubPeriod(\''+c.id+'\','+p.no+')">刪除</button>')+'</span></div>';}).join('')+'</div>';
+      +'<span style="margin-left:auto;display:flex;gap:3px">'+(paid?'':'<button type="button" class="btn btn-xs" onclick="openRentPeriod(\''+c.id+'\','+p.no+')">修改</button><button type="button" class="btn btn-xs" style="color:var(--red);border-color:#f0c4c4" onclick="delSubPeriod(\''+c.id+'\','+p.no+')">刪除</button>')+'</span></div>';}).join('')+'</div>';
   h+='<div style="color:var(--b4);margin-top:4px">成本金額＝已登錄各期合計；下方列為計價基準（在場數量、單價、進退場日），由發包→材料分頁維護。</div></div>';
   return h;
 }
@@ -38912,7 +38877,7 @@ function _rentCardHtml(q,c){
     return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:3px 0;border-top:1px dotted #bcd8f5">第'+p.no+'期 '+esc(p.date||'')+' <span style="color:var(--b4)">'+esc((p.from||'')+'～'+(p.to||''))+'</span><b>NT$ '+fmt(k.amt)+'</b>'
       +(df.n?('<span class="rent-diff" style="color:#b26a00;font-weight:700" title="廠商請款數量與系統（在場×天數）的差">差 '+(df.qty>0?'+':'')+fmt(df.qty)+'（'+(df.amt>0?'+':'')+fmt(df.amt)+'）</span>'):'')
       +(p.invNo?'<span style="color:var(--b4)">發票 '+esc(p.invNo)+'</span>':'')+'<span style="color:'+(paid?'var(--g)':'var(--red)')+';font-weight:700">'+(paid?'已付':'待付 '+esc(p.due||''))+'</span>'
-      +'<span style="margin-left:auto;display:flex;gap:3px"><button type="button" class="btn btn-xs" onclick="printVendorStatement(\''+c.id+'\','+p.no+')">核對單</button>'+(paid?'':'<button type="button" class="btn btn-xs" onclick="openRentPeriod(\''+c.id+'\','+p.no+')">修改</button><button type="button" class="btn btn-xs" style="color:var(--red);border-color:#f0c4c4" onclick="delSubPeriod(\''+c.id+'\','+p.no+')">刪除</button>')+'</span></div>';}).join('')+'</div>';
+      +'<span style="margin-left:auto;display:flex;gap:3px">'+(paid?'':'<button type="button" class="btn btn-xs" onclick="openRentPeriod(\''+c.id+'\','+p.no+')">修改</button><button type="button" class="btn btn-xs" style="color:var(--red);border-color:#f0c4c4" onclick="delSubPeriod(\''+c.id+'\','+p.no+')">刪除</button>')+'</span></div>';}).join('')+'</div>';
   h+='<div style="color:var(--b4);margin-top:4px">成本金額＝已核實的請款合計（未請款前為 0）；預估＝合約租期（或預計趟數）的預估金額；下方列為計價基準，由「材料．租賃」頁維護。廠商請款單到了按「核對請款單」，確認後轉應付。</div></div>';
   return h;
 }
@@ -39503,13 +39468,13 @@ function renderMat6(){
   var sel='<select onchange="_m6Qid=this.value;renderMat6()" style="width:100%;max-width:420px;font-size:13px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w)"><option value="">── 選擇工程（得標案）──</option>'
     +mains.map(function(x){return '<option value="'+x.id+'"'+(q&&q.id===x.id?' selected':'')+'>'+esc((x.name||'未命名').slice(0,24))+(x.client?('／'+esc(x.client.slice(0,8))):'')+'</option>';}).join('')+'</select>';
   var h='<div class="card"><div class="cb"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+sel+(q?(_pjBtn("matRowEdit('"+q.id+"','')",'＋ 新增材料需求','border-color:var(--g);color:var(--g3);font-weight:700')+_pjBtn("matSeedFromEst('"+q.id+"')",'由材料估算帶入')+_pjBtn("matEstPickProj('"+q.id+"');go('matest')",'材料估算')+_pjBtn("go('materials')",'材料台帳／庫存')+_pjBtn("openProjectCosts('"+q.id+"')",'施工成本 →')):'')+'</div>'
-    +'<div style="font-size:11.5px;color:var(--b3);margin-top:6px">流程：新增材料需求 → 系統比對公司庫存（同長度閒置先調撥；同規格其他長度閒置問是否接樁／切樁；都沒有再問租賃）。租賃、設備、運輸填好即自動進施工成本（未請款前金額 0、預估租金先算毛利），廠商請款單到了到施工成本卡按「核對請款單」，確認後轉應付。</div></div></div>';
+    ;
   if(!q){root.innerHTML=h+'<div style="padding:24px;text-align:center;color:var(--b3);font-size:12.5px">請先選擇工程</div>';return;}
   var m=_matQ(q),ch=false;
   try{ch=_m6Migrate(q)||ch;_matAmortSync(q);_matLossSync(q);ch=_m6Sync(q)||ch;}catch(e){_err('renderMat6.sync',e);}
   if(ch){try{persist();}catch(e){}}
   var rr=P.matRentRate||{};
-  h+='<div class="card" style="padding:12px 14px"><div id="m6-kpi" style="display:flex;gap:6px;flex-wrap:wrap">'+_m6KpiHtml(q)+'</div><div style="font-size:11px;color:var(--b4);margin-top:6px">內部日租 H300 '+(rr.H300||0)+'／H350 '+(rr.H350||0)+'／H400 '+(rr.H400||0)+' $/M/天 × 折數 '+_matFactor()+'（參數設定）</div></div>';
+  h+='<div class="card" style="padding:12px 14px"><div id="m6-kpi" style="display:flex;gap:6px;flex-wrap:wrap">'+_m6KpiHtml(q)+'</div></div>';
   // 1 需求與比對
   h+='<div class="card" style="padding:12px 14px"><div style="font-weight:800;font-size:14px;margin-bottom:6px">材料需求與比對</div>';
   if(!m.rows.length)h+='<div style="font-size:12px;color:var(--b3)">尚無材料需求。按「＋ 新增材料需求」或「由材料估算帶入」。</div>';
@@ -39913,7 +39878,7 @@ function _pjItemsHtml(q,st){
   });
   if(!rows.length)return '<div style="font-size:12px;color:var(--b3)">此工程沒有工項</div>';
   return _pjTable([{t:'工項'},{t:'單位'},{t:'合約量',r:1},{t:'日報回報',r:1},{t:'進度',r:1},{t:'發包廠商'},{t:'發包量',r:1},{t:'廠商已請',r:1},{t:'業主已請',r:1}],rows)
-    +'<div style="font-size:10.5px;color:var(--b3);margin-top:4px">合約量＝報價（或請款單工項結算後）的數量，不隨施工變動；日報填了「階段完工」後，該工項的日報累計即為<b>實作數量</b>，進度、預估成本、毛利改以實作數量計'+(nAct?('（本案 '+nAct+' 項已階段完工）'):'')+'。紅字為需處理的不一致，藍字為實作實算的正常提示。</div>';
+    +'';
 }
 // ── 施工成本頁：分區 ──
 var _COST_SEC={sub:'發包（承包合約）',own:'自有材料購置・點工・額外支出',mat:'材料．租賃．運輸（由「材料．租賃」頁自動同步；成本＝已核實的廠商請款，預估先算毛利）',quick:'日報零星支出（日報．支出登錄）'};
@@ -40222,7 +40187,7 @@ function showConfirm(title, msg, onOk, danger, onCancel, wide){
   modal.style.display='flex';
   if(okBtn){
     const newOk=okBtn.cloneNode(true);
-    newOk.textContent='確認';newOk.style.display='';   // v5.381：有些呼叫端會改按鈕文字（如催款的「複製」），每次開啟先還原
+    newOk.textContent='確認';newOk.style.display='';if(cancelBtn)cancelBtn.style.display='';   // v5.381：有些呼叫端會改按鈕文字（如催款的「複製」），每次開啟先還原
     okBtn.parentNode.replaceChild(newOk,okBtn);
     newOk.onclick=function(){modal.style.display='none';onOk();};
   }
@@ -40363,73 +40328,9 @@ function openDunning(invId){
 // ══════════ v5.382：全域搜尋 ══════════
 // 找「三年前那個中和的案子」原本要先想起它在報價、合約還是請款，
 // 再進該模組搜。這裡一次搜五種資料的名稱／編號／業主，點結果直接跳轉。
-function openGlobalSearch(){
-  var m=document.getElementById('gsearch-modal');if(!m)return;
-  m.style.display='flex';
-  var inp=document.getElementById('gsearch-inp');
-  if(inp){inp.value='';setTimeout(function(){inp.focus();},80);}
-  var body=document.getElementById('gsearch-body');
-  if(body)body.innerHTML='<div style="padding:16px;font-size:12px;color:var(--b3)">輸入兩個字以上開始搜尋。涵蓋：報價單、請款單、合約、客戶、廠商。</div>';
-}
-function closeGlobalSearch(){var m=document.getElementById('gsearch-modal');if(m)m.style.display='none';}
-function _gsRow(icon,title,sub,right,onclick){
-  return '<div onclick="closeGlobalSearch();'+onclick+'" '
-    +'style="display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--b0)" '
-    +'onmouseover="this.style.background=\'var(--gl)\'" onmouseout="this.style.background=\'\'">'
-    +'<span style="flex-shrink:0;width:26px;height:26px;border-radius:6px;background:var(--gl);color:var(--g3);display:flex;align-items:center;justify-content:center">'+icon+'</span>'
-    +'<span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:700;color:var(--b5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+title+'</span>'
-    +(sub?('<span style="display:block;font-size:11px;color:var(--b3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+sub+'</span>'):'')+'</span>'
-    +(right?('<span style="flex-shrink:0;font-size:11px;color:var(--b4);font-variant-numeric:tabular-nums">'+right+'</span>'):'')+'</div>';
-}
-function runGlobalSearch(){
-  var body=document.getElementById('gsearch-body');if(!body)return;
-  var kw=(document.getElementById('gsearch-inp')||{}).value||'';
-  kw=kw.trim().toLowerCase();
-  if(kw.length<2){body.innerHTML='<div style="padding:16px;font-size:12px;color:var(--b3)">輸入兩個字以上開始搜尋。</div>';return;}
-  var hit=function(){for(var i=0;i<arguments.length;i++){if(String(arguments[i]||'').toLowerCase().indexOf(kw)>=0)return true;}return false;};
-  var IC={q:'<svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg>',
-    v:'<svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg>',
-    c:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>',
-    u:'<svg class="ic ib" aria-hidden="true"><use href="#i-user"/></svg>',
-    ven:'<svg class="ic ib" aria-hidden="true"><use href="#i-truck"/></svg>'};
-  var sec=[],total=0,CAP=8;
-  var qs=(Q||[]).filter(function(q){return q&&!q.parentId&&hit(q.name,q.code,q.client,q.loc);}).slice(0,CAP);
-  if(qs.length)sec.push('<div style="padding:7px 14px 3px;font-size:10.5px;font-weight:700;color:var(--b3);letter-spacing:.06em">報價單（'+qs.length+'）</div>'
-    +qs.map(function(q){total++;
-      return _gsRow(IC.q,esc(q.name||'未命名')+(q.awarded?'　<span style="font-size:10px;color:var(--g3)">得標</span>':''),
-        esc((q.code||'')+(q.client?('　'+q.client):'')+(q.date?('　'+q.date):'')),
-        'NT$ '+fmt((q.t&&q.t.total)||0),"loadQ('"+escq(q.id)+"')");
-    }).join(''));
-  var vs=(INV||[]).filter(function(v){return v&&hit(v.project,v.client,v.month);}).slice(0,CAP);
-  if(vs.length)sec.push('<div style="padding:7px 14px 3px;font-size:10.5px;font-weight:700;color:var(--b3);letter-spacing:.06em">請款單（'+vs.length+'）</div>'
-    +vs.map(function(v){total++;
-      return _gsRow(IC.v,esc(v.project||'未命名')+' 第'+(v.periodNo||'?')+'期',
-        esc((v.client||'')+(v.date?('　'+v.date):'')),
-        'NT$ '+fmt((v.totals&&v.totals.total)||0),"loadInvoice('"+escq(v.id)+"');go('invoice-edit')");
-    }).join(''));
-  var cs=(CONTRACTS||[]).filter(function(c){return c&&hit(c.name,c.code,c.client);}).slice(0,CAP);
-  if(cs.length)sec.push('<div style="padding:7px 14px 3px;font-size:10.5px;font-weight:700;color:var(--b3);letter-spacing:.06em">合約（'+cs.length+'）</div>'
-    +cs.map(function(c){total++;
-      return _gsRow(IC.c,esc(c.name||'未命名'),
-        esc((c.client||'')+(c.date?('　'+c.date):'')+(c.status==='completed'?'　已完成':'')),
-        'NT$ '+fmt(c.amount||0),"go('contracts')");
-    }).join(''));
-  var us=(CUSTOMERS||[]).filter(function(c){return c&&hit(c.name,c.taxid,c.contact);}).slice(0,CAP);
-  if(us.length)sec.push('<div style="padding:7px 14px 3px;font-size:10.5px;font-weight:700;color:var(--b3);letter-spacing:.06em">客戶（'+us.length+'）</div>'
-    +us.map(function(c){total++;
-      return _gsRow(IC.u,esc(c.name||''),esc((c.contact||'')+(c.tel?('　'+c.tel):'')),'',"go('contacts')");
-    }).join(''));
-  var ws=(VENDORS||[]).filter(function(v){return v&&hit(v.name,v.contact,v.taxid);}).slice(0,CAP);
-  if(ws.length)sec.push('<div style="padding:7px 14px 3px;font-size:10.5px;font-weight:700;color:var(--b3);letter-spacing:.06em">廠商（'+ws.length+'）</div>'
-    +ws.map(function(v){total++;
-      return _gsRow(IC.ven,esc(v.name||''),esc((v.contact||'')+(v.phone?('　'+v.phone):'')),'',"go('contacts')");
-    }).join(''));
-  body.innerHTML=total?sec.join(''):'<div style="padding:16px;font-size:12px;color:var(--b3)">找不到符合「'+esc(kw)+'」的資料</div>';
-}
 // Esc 關閉搜尋；Ctrl/Cmd+K 開啟（桌機習慣）
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape')closeGlobalSearch();
-  if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){e.preventDefault();openGlobalSearch();}
 });
 // ── 權限管理頁初始化 ──
 function initPermissionsPage(){
@@ -42260,17 +42161,6 @@ function exportCurrentReportExcel(){
 </div>
 <!-- 確認收款 Modal -->
 <!-- v5.382 全域搜尋 -->
-<div id="gsearch-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:flex-start;justify-content:center" onclick="if(event.target===this)closeGlobalSearch()">
-  <div style="max-width:560px;width:100%;margin-top:8vh;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-    <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--b1)">
-      <svg class="ic ib" aria-hidden="true" style="color:var(--b3)"><use href="#i-search"/></svg>
-      <input id="gsearch-inp" placeholder="搜尋 案名／編號／業主／廠商／客戶…" oninput="runGlobalSearch()"
-        style="flex:1;border:none;outline:none;font-size:15px;font-family:inherit;background:transparent;min-width:0">
-      <button type="button" onclick="closeGlobalSearch()" style="border:none;background:transparent;color:var(--b3);font-size:20px;cursor:pointer;padding:0 4px;line-height:1">✕</button>
-    </div>
-    <div id="gsearch-body" style="max-height:60vh;overflow-y:auto;padding:6px 0"></div>
-  </div>
-</div>
 <div id="receipt-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeReceiptModal()">
   <div style="max-width:420px;width:100%;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="background:var(--g3);padding:13px 18px;display:flex;justify-content:space-between;align-items:center">
