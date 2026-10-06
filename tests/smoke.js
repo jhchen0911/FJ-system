@@ -3958,18 +3958,18 @@ async function newPage(browser, width, height) {
           syncCostToPayable(q,c);_subFollowApply(q,c);
           const pMain=()=>PAYABLES.find(p=>p.id==='pay'+c.id+'_p1');
           out.base=!!pMain()&&pMain().amount===k1.pay&&PAYABLES.find(p=>p.id==='pay'+f.id+'_p1').amount===90000&&PAYABLES.find(p=>p.id==='pay'+f.id+'_p1').vat===false;
-          // 提前放款 100,000（未稅）
-          openSubEarly(c.id,1);document.getElementById('se-amt').value='100000';_seOnInput();
-          out.seHint=/含稅實付 NT\$ 105,000/.test(document.getElementById('se-hint').textContent);
+          // v6.0.38 預付款＝提前放款：已登錄未付的第 1 期立刻扣 100,000（未稅）
+          openSubAdvance(c.id);document.getElementById('sa-amt').value='100000';_saOnInput();
+          out.seHint=/已登錄未付/.test(document.getElementById('gen-confirm-msg').innerHTML)&&_saCtx.est>=k1.pay&&document.getElementById('sa-warn').style.display==='none';
           document.getElementById('gen-confirm-ok').click();
-          const pe=PAYABLES.find(p=>p.costEarly&&p.costId===c.id);
-          out.early=!!pe&&pe.amount===100000&&pe.vat===true&&pe.date===localToday()&&/第1期提前放款/.test(pe.note)&&pMain().amount===k1.pay-100000&&/已提前放款 100,000/.test(pMain().note)&&pMain().date==='2026-11-25';
+          const pe=PAYABLES.find(p=>p.costAdv&&p.costId===c.id);
+          out.early=!!pe&&pe.amount===100000&&pe.vat===true&&pe.date===localToday()&&/預付款/.test(pe.note)&&pMain().amount===k1.pay-100000&&/抵扣預付款 100,000/.test(pMain().note)&&pMain().date==='2026-11-25'&&c.periods[0].adv===100000;
           const st=_subStat(c);out.stat=st.unpaid===Math.round((k1.pay)*1.05);
-          // 超過可提前金額 → 擋下
-          openSubEarly(c.id,1);document.getElementById('se-amt').value=String(k1.pay);document.getElementById('gen-confirm-ok').click();
-          out.over=c.periods[0].early.length===1;document.getElementById('gen-confirm-modal').style.display='none';
-          // 分包管理視圖顯示提前放款列
-          const sh=buildSubMgmtHtml(q);out.mgmt=/↳ 提前放款/.test(sh)&&/openPrepay\('/.test(sh)&&!/openSubAdvance\(|openSubEarly\(/.test(sh);   // v6.0.29 預付款一鈕
+          // 超過可扣回金額（已登錄未付＋本期預估）→ 需勾特殊情況，否則擋下
+          openSubAdvance(c.id);document.getElementById('sa-amt').value=String(_saCtx.est+1);_saOnInput();out.over=document.getElementById('sa-warn').style.display!=='none';document.getElementById('gen-confirm-ok').click();
+          out.over=out.over&&_subAdvs(c).length===1;document.getElementById('gen-confirm-modal').style.display='none';
+          // 分包管理視圖：預付款列顯示扣在第 1 期；沒有「提前放款」列
+          const sh=buildSubMgmtHtml(q);out.mgmt=/扣在：第1期 100,000/.test(sh)&&!/↳ 提前放款/.test(sh)&&/openPrepay\('/.test(sh)&&!/openSubAdvance\(|openSubEarly\(/.test(sh);   // v6.0.29 預付款一鈕
           // 介紹費先付 200,000（超過本期預估也不必勾特殊情況）→ 跟隨期別自動抵扣
           openSubAdvance(f.id);document.getElementById('sa-amt').value='200000';_saOnInput();
           out.saNoWarn=document.getElementById('sa-warn').style.display==='none';
@@ -3977,20 +3977,20 @@ async function newPage(browser, width, height) {
           const pa=PAYABLES.find(p=>p.costAdv&&p.costId===f.id);
           _subFollowApply(q,c);
           out.introAdv=!!pa&&pa.amount===200000&&/預付款（介紹費）/.test(pa.note)&&!PAYABLES.some(p=>p.id==='pay'+f.id+'_p1')&&f.periods[0].adv===90000;
-          // 刪除提前放款 → 回到原期
-          delSubEarly(c.id,1,c.periods[0].early[0].id);document.getElementById('gen-confirm-ok').click();
-          out.del=!PAYABLES.some(p=>p.costEarly)&&pMain().amount===k1.pay;
-          // 介紹費期別提前放款，主約再存檔（重建跟隨期別）後仍保留
-          f.periods.find(p=>p.no===1).early=[{id:'ef',date:localToday(),amt:10000}];_subFollowApply(q,c);
-          out.followKeep=(f.periods.find(p=>p.no===1).early||[]).length===1;
+          // 刪除預付款 → 第 1 期應付加回
+          delSubAdvance(c.id,_subAdvs(c)[0].id);document.getElementById('gen-confirm-ok').click();
+          out.del=!PAYABLES.some(p=>p.costAdv&&p.costId===c.id)&&pMain().amount===k1.pay&&c.periods[0].adv===0;
+          // 舊資料的提前放款（跟隨卡期別）→ 轉成預付款
+          f.periods.find(p=>p.no===1).early=[{id:'ef',date:localToday(),amt:10000}];_earlyToAdv(q,f);
+          out.followKeep=!f.periods.find(p=>p.no===1).early&&_subAdvs(f).some(a=>a.id==='eef'&&a.fromPeriod===1);
           window.toast=oT;Q=[];PAYABLES.length=0;VENDORS.length=0;eid=null;
           return out;
     });
     check('詢價單：工項有 L=…M 預設「依 M」計價（可改依支）、匯出數量＝支數×單支長、單位 M、廠商報價欄列高一致', r.editDef && r.saved && r.doc);
     check('詢價回傳：$/M × 總 M 數＝複價、即時顯示每支單價；比價表顯示 M 數與每支換算', r.fill && r.total && r.card);
     check('得標：合約單價換算為每支（600/M×15M＝9,000）、回填成本單價；介紹人 150/M → 2,250/支、不開發票、跟隨計價', r.introPv && r.award && r.intro && r.base);
-    check('提前放款：已登錄期別拆一筆應付（到期＝放款日）、原期扣除、不得超過、統計含之、可刪回原期；管理表列出', r.seHint && r.early && r.stat && r.over && r.mgmt && r.del);
-    check('介紹費先付：不受本期預估限制、跟隨期別自動抵扣；介紹費期別的提前放款於主約重算後保留', r.saNoWarn && r.introAdv && r.followKeep);
+    check('預付款（統一提前放款）：已登錄未付期別立刻扣、另掛一筆應付（到期＝付款日）、超過可扣回金額要勾特殊情況、統計含之、刪除即加回；管理表列出扣在哪期', r.seHint && r.early && r.stat && r.over && r.mgmt && r.del);
+    check('介紹費先付：不受本期預估限制、跟隨期別自動抵扣；舊提前放款資料轉成預付款', r.saNoWarn && r.introAdv && r.followKeep);
     check('v6.0.24 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -4115,13 +4115,13 @@ async function newPage(browser, width, height) {
         PAYABLES.splice(PAYABLES.indexOf(pAdv),1);   // 模擬缺應付
         eid='qM';
         const rowsH=_subAdvRowsHtml(cH);
-        out.advRow=/缺應付/.test(rowsH)&&/補建應付/.test(rowsH)&&/轉為提前放款/.test(rowsH)&&/已抵扣：第1期 548,625/.test(rowsH);
-        subAdvToEarly('cH','a1');
-        out.a2eDlg=/改為第 <b>1<\/b> 期/.test(document.getElementById('gen-confirm-msg').innerHTML)&&document.getElementById('a2e-paid').checked;
-        document.getElementById('gen-confirm-ok').click();
-        const per=cH.periods[0],e=(per.early||[])[0];
-        const pMain=PAYABLES.find(p=>p.id==='paycH_p1'),pE=e&&PAYABLES.find(p=>p.id==='paycH_p1_e'+e.id);
-        out.a2e=!cH.advances.length&&per.adv===0&&!!e&&e.amt===548625&&e.date==='2026-10-05'&&!!pMain&&pMain.amount===548625&&_payEff(pMain)===576056&&!!pE&&pE.status==='paid'&&pE.paidDate==='2026-10-05'&&!PAYABLES.some(p=>/_a/.test(p.id));
+        out.advRow=/缺應付/.test(rowsH)&&/補建應付/.test(rowsH)&&!/轉為提前放款/.test(rowsH)&&/扣在：第1期 548,625/.test(rowsH);
+        subPayResync('cH');   // v6.0.38 補建應付 → 標記已付（不再「轉為提前放款」）
+        const pAdv2=PAYABLES.find(p=>p.id==='paycH_aa1');out.a2eDlg=!!pAdv2&&pAdv2.status==='pending';
+        payMarkPaid('paycH_aa1','2026-10-05');document.getElementById('pmp-date').value='2026-10-05';document.getElementById('gen-confirm-ok').click();
+        const per=cH.periods[0];
+        const pMain=PAYABLES.find(p=>p.id==='paycH_p1');
+        out.a2e=cH.advances.length===1&&per.adv===548625&&!!pMain&&pMain.amount===548625&&_payEff(pMain)===576056&&pAdv2.status==='paid'&&pAdv2.paidDate==='2026-10-05'&&!(per.early||[]).length;
         const sH=_subStat(cH);out.a2eStat=sH.paid===576056&&sH.unpaid===576056&&sH.advLeft===0;
         // 修改預付款
         cH.advances=[{id:'a2',date:'2026-10-05',amt:50000,ts:2}];syncCostToPayable(q,cH);
@@ -4181,7 +4181,7 @@ async function newPage(browser, width, height) {
       })
     );
     check('已付統計：應付管理手動連結此發包（costSourceId）、整筆應付一併計入已付', r.paidLink);
-    check('預付款＝某期提前放款：缺應付可補建、轉為第 1 期提前放款（該期不再抵扣、應付總額不變、標記已付）；預付款可修改金額', r.advPay && r.advRow && r.a2eDlg && r.a2e && r.a2eStat && r.advEdit);
+    check('預付款：缺應付可補建、可標記已付（扣在第 1 期、應付總額不變）；預付款可修改金額', r.advPay && r.advRow && r.a2eDlg && r.a2e && r.a2eStat && r.advEdit);
     check('介紹人：得標後可補加（單支長取報價 L=15M，$150/M → $2,250／支）、跟隨主約已登錄期別立即產生應付；專案頁列在主約下方、可修改', r.piLen && r.piPv && r.intro && r.pjSub && r.introEdit);
     check('業主已請顯示實際數量（打設 133 請 70%，計價量 93.1），與廠商已請比對不誤報', r.bill && r.billCell);
     check('工程專案「＋ 新增下一期請款單」＝最新一期的下一期', r.nextInv);
@@ -4335,9 +4335,9 @@ async function newPage(browser, width, height) {
         eid='qA';syncCostToPayable(q,c);
         // 1 預付款一鈕：有已登錄未付期別 → 提前放款；沒有 → 預付款（未請款）
         out.btn=/openPrepay\('cH'\)/.test(_prepayBtn(c))&&_subEarlyBtn(c)===''&&_subEarlyRowBtn(c,{})==='';
-        openPrepay('cH');out.early=!!document.getElementById('se-amt');document.getElementById('gen-confirm-modal').style.display='none';
+        openPrepay('cH');out.early=!!document.getElementById('sa-amt')&&/已登錄未付 <b/.test(document.getElementById('gen-confirm-msg').innerHTML);document.getElementById('gen-confirm-modal').style.display='none';   // v6.0.38 統一：一律預付款視窗
         const c2={id:'cN',type:'sub',vendor:'鴻玉開發',cat:'打設',date:'2026-09-20',rows:[{id:'cN_0',linkedItemIdx:1,qty:100,unitPrice:500}],amt:50000,invoice:true,retRate:0,periods:[]};q.costs.push(c2);
-        openPrepay('cN');out.adv=!!document.getElementById('sa-amt')&&/預付款（未請款）/.test(document.getElementById('gen-confirm-modal').innerHTML);document.getElementById('gen-confirm-modal').style.display='none';
+        openPrepay('cN');out.adv=!!document.getElementById('sa-amt')&&/預付款：/.test(document.getElementById('gen-confirm-modal').innerHTML)&&!/已登錄未付 <b/.test(document.getElementById('gen-confirm-msg').innerHTML);document.getElementById('gen-confirm-modal').style.display='none';
         const sh=buildSubMgmtHtml(q);out.mgmt=/openPrepay\(/.test(sh)&&!/openSubAdvance\('cH'\)|＋ 預支（未請款）|＋ 預付介紹費|openSubEarly\(/.test(sh);
         // 2 介紹費：合約金額 % ＋ 第一期請款後 → 一筆應付（第一期請款日）、不跟隨期別
         pjIntroEdit('qA','cH','',{});out.piUI=!!document.getElementById('pi-per')&&!!document.getElementById('pi-pay');
@@ -4396,7 +4396,7 @@ async function newPage(browser, width, height) {
         window.toast=oT;Q=[];INV.length=0;VENDORS.length=0;PAYABLES.length=0;CONTRACTS.length=0;COST_HIST.length=0;EXPENSES.length=0;eid=null;_qcPending=[];window._costEditId=null;res(out);
       })
     );
-    check('預付款一鈕：有已登錄未付期別開提前放款、沒有開預付款（未請款）；舊「預支」「＋ 預付介紹費」「提前放款」鈕消失', r.btn && r.early && r.adv && r.mgmt, JSON.stringify(r));
+    check('預付款一鈕：一律開預付款視窗（有已登錄未付期別時顯示可扣的期別）；舊「預支」「＋ 預付介紹費」「提前放款」鈕消失', r.btn && r.early && r.adv && r.mgmt, JSON.stringify(r));
     check('介紹費：計算方式（合約金額 %）× 付款時機（第一期請款後）→ 一筆應付掛第一期請款日、不跟隨期別；結案前不掛、拔除完成取階段完工日', r.piUI && r.piPrev && r.pct && r.piPay && r.noFollow && r.doneWait && r.removeTrig, JSON.stringify(r));
     check('階段完工自動結算：合約數量改實作量（報價原數量不動）、合約金額追加減、請款單合約量同步、_effQtyMap 取結算量、請款單編輯器結算鈕移除', r.settle && r.effMap && r.itemsTxt && r.noStlBtn, JSON.stringify(r));
     check('結案一鈕：竣工總結算＋標結案＋回寫單價庫一次完成', r.closeUI && r.closeAsk && r.closed, JSON.stringify(r));
@@ -4838,8 +4838,8 @@ async function newPage(browser, width, height) {
     PAYABLES.push({id:'payDup',costId:'cGONE',quoteId:'q7',to:'鴻玉',project:'對帳案',amount:548625,vat:true,date:d(-1),status:'paid',paidDate:d(-1),note:'第1期提前放款：由預付款轉入'});
     PAYABLES.push({id:'pay_ps_h1_2026-09',to:'陳茹軒',project:'',amount:70000,vat:false,date:d(5),status:'pending',category:'salary',note:'2026 年 9 月 薪資'});
     PAYABLES.push({id:'payOld',costId:'cA',quoteId:'q7',to:'鴻玉',project:'對帳案',amount:1000,vat:true,date:d(-20),status:'paid',paidDate:d(-20),note:'舊的已付'});
-    // 把 e1 的應付刪掉模擬「缺應付」
-    PAYABLES=PAYABLES.filter(p=>p.id!=='paycA_p1_ee1');
+    // 把 e1（已轉成預付款 ee1）的應付刪掉模擬「缺應付」
+    PAYABLES=PAYABLES.filter(p=>p.id!=='paycA_aee1');
     const ids=PAYABLES.map(p=>p.id);
     out.ids=ids.filter(i=>/^paycA/.test(i)||/^paycB/.test(i)||/^paycX/.test(i));
     const pMain=PAYABLES.find(p=>p.id==='paycA_p1');out.mainAmt=pMain&&pMain.amount;   // 1,097,250 − 369,512 = 727,738
@@ -4848,19 +4848,18 @@ async function newPage(browser, width, height) {
     const root=document.getElementById('cost-list')||document.getElementById('page-costs');
     const html=root.innerHTML;
     out.dupWarn=/同一廠商有兩張發包卡掛同一工項/.test(html)&&/鴻玉/.test(html);
-    out.earlyBtns=/補建應付/.test(html)&&/標記已付/.test(html)&&/openSubEarlyEdit/.test(html);
+    out.earlyBtns=/補建應付/.test(html)&&/標記已付/.test(html)&&/editSubAdvance/.test(html)&&!/↳ 提前放款/.test(html);
     out.audit=/應付對帳/.test(html)&&/無對應/.test(html)&&/沒掛在任何成本卡/.test(html)&&/payUnmark/.test(html);
-    // 補建應付 → e1 回來
-    subPayResync('cA');out.resync=!!PAYABLES.find(p=>p.id==='paycA_p1_ee1');
-    // 標記已付
-    window.showConfirm=function(t,m,ok){document.body.insertAdjacentHTML('beforeend','<input id="sem-date" value="'+d(-30)+'">');ok();document.getElementById('sem-date').remove();};
-    subEarlyMarkPaid('cA',1,'e1');const pe1=PAYABLES.find(p=>p.id==='paycA_p1_ee1');out.marked=pe1&&pe1.status==='paid'&&pe1.paidDate===d(-30);
-    // 修改提前放款金額 → 應付同步
-    window.showConfirm=function(t,m,ok){document.body.insertAdjacentHTML('beforeend','<input id="see-date" value="'+d(-29)+'"><input id="see-amt" value="150000"><input id="see-note" value="改">');ok();['see-date','see-amt','see-note'].forEach(i=>document.getElementById(i).remove());};
-    openSubEarlyEdit('cA',1,'e1');const e1=Q[0].costs[0].periods[0].early[0];const pe1b=PAYABLES.find(p=>p.id==='paycA_p1_ee1');
-    out.edited=e1.amt===150000&&e1.date===d(-29)&&pe1b&&pe1b.amount===150000&&PAYABLES.find(p=>p.id==='paycA_p1').amount===1097250-150000-169512;
-    // 改回未付
-    window.showConfirm=function(t,m,ok){ok();};payUnmark('paycA_p1_ee1');out.unmarked=PAYABLES.find(p=>p.id==='paycA_p1_ee1').status==='pending';
+    // 補建應付 → ee1 回來
+    subPayResync('cA');out.resync=!!PAYABLES.find(p=>p.id==='paycA_aee1');
+    // 修改預付款金額（200,000 → 150,000）→ 該期抵扣與應付同步
+    window.showConfirm=function(t,m,ok){document.body.insertAdjacentHTML('beforeend','<input id="sa-date" value="'+d(-29)+'"><input id="sa-amt" value="150000"><input id="sa-note" value="改">');ok();['sa-date','sa-amt','sa-note'].forEach(i=>{const e=document.getElementById(i);if(e)e.remove();});};
+    editSubAdvance('cA','ee1');const e1=_subAdvs(Q[0].costs[0]).find(a=>a.id==='ee1');const pe1b=PAYABLES.find(p=>p.id==='paycA_aee1');
+    out.edited=e1.amt===150000&&e1.date===d(-29)&&pe1b&&pe1b.amount===150000&&Q[0].costs[0].periods[0].adv===150000+169512&&PAYABLES.find(p=>p.id==='paycA_p1').amount===1097250-150000-169512;
+    // 標記已付 → 改回未付
+    window.showConfirm=function(t,m,ok){document.body.insertAdjacentHTML('beforeend','<input id="pmp-date" value="'+d(-30)+'">');ok();document.getElementById('pmp-date').remove();};
+    payMarkPaid('paycA_aee1',d(-30));const pe1=PAYABLES.find(p=>p.id==='paycA_aee1');out.marked=pe1&&pe1.status==='paid'&&pe1.paidDate===d(-30);
+    window.showConfirm=function(t,m,ok){ok();};payUnmark('paycA_aee1');out.unmarked=PAYABLES.find(p=>p.id==='paycA_aee1').status==='pending';
     // 健檢
     const H=_healthRows();out.health={dupCard:H.some(r=>/兩張發包卡/.test(r.msg)),orphan:H.some(r=>/對應不到期別/.test(r.msg)),dupPay:H.some(r=>/同廠商同工程同金額/.test(r.msg))||true};
     // 應付頁：分組與已付收合、類別
@@ -4878,12 +4877,73 @@ async function newPage(browser, width, height) {
   }catch(e){out.err=String(e&&e.stack||e).slice(0,500);}
   Q=[];PAYABLES.length=0;eid=null;res(out);
 }));
-    check('v6.0.37 分包：提前放款列有 補建應付／標記已付／修改／刪除；期別缺應付可補建；同廠商重複發包卡提示', r.earlyBtns && r.dupWarn && r.resync && r.marked && r.mainAmt===727738, JSON.stringify(r));
-    check('v6.0.37 分包：修改提前放款金額同步應付並重算原期；改回未付', r.edited && r.unmarked, JSON.stringify(r));
+    check('v6.0.37 分包：預付款列有 補建應付／標記已付／修改／刪除；期別缺應付可補建；同廠商重複發包卡提示', r.earlyBtns && r.dupWarn && r.resync && r.marked && r.mainAmt===727738, JSON.stringify(r));
+    check('v6.0.37 分包：修改預付款金額同步應付並重算原期；改回未付', r.edited && r.unmarked, JSON.stringify(r));
     check('v6.0.37 分包：應付對帳列出對應不到的多餘應付（含同廠商未掛卡），健檢同步列出重複發包卡／多餘應付', r.audit && r.health.dupCard && r.health.orphan, JSON.stringify(r));
     check('v6.0.37 應付頁：薪資歸「公司支出」組、已付款預設收合一列可展開、額外支出類別顯示', r.companyGroup && r.paidCollapsed && r.paidOpened && r.extraCat, JSON.stringify(r));
     check('v6.0.37 施工成本統計：等寬格狀磚＋合計磚', r.tiles, JSON.stringify(r));
     check('v6.0.37 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.38 預付款＝提前放款統一 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    const d=n=>{const x=new Date();x.setDate(x.getDate()+n);return x.toISOString().slice(0,10);};
+    const mk=()=>({id:'q8',code:'8',name:'統一案',client:'業主',date:d(-60),awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 H300，L=15M@80cm 打設、拔除',unit:'支',qty:'133',price:'10000',estCost:'8250',len:15,sec:false,_uid:'y1'}],t:{sub:1330000,tax:66500,total:1396500},dailyLogs:[],
+      costs:[{id:'cU',type:'sub',vendor:'鴻玉',cat:'打設',date:d(-50),invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'r1',linkedItemIdx:0,qty:133,unitPrice:8250}],amt:1097250,
+        periods:[{no:1,date:d(-10),from:d(-40),to:d(-10),rows:[{rid:'r1',qty:133}],amt:1097250,ret:0,net:1097250,due:d(10),adv:0,early:[{id:'e1',date:d(-30),amt:200000,note:'由預付款轉入'},{id:'e2',date:d(-1),amt:169512,note:'週轉'}]}]}]});
+    // ① 遷移：舊提前放款 → 預付款，應付改 id 並保留已付
+    Q=[mk()];eid='q8';PAYABLES.length=0;
+    PAYABLES.push({id:'paycU_p1_ee2',costId:'cU',costPeriod:1,costEarly:'e2',quoteId:'q8',to:'鴻玉',amount:169512,vat:true,date:d(-1),status:'paid',paidDate:d(-1),note:'第1期提前放款：週轉',project:'統一案'});
+    const n=_earlyToAdv(Q[0],Q[0].costs[0]);syncCostToPayable(Q[0],Q[0].costs[0]);
+    const c=Q[0].costs[0],per=c.periods[0];
+    out.mig={n:n,noEarly:!per.early,advs:_subAdvs(c).map(a=>a.id+':'+a.amt+':'+a.fromPeriod),perAdv:per.adv};
+    const pA1=PAYABLES.find(p=>p.id==='paycU_aee1'),pA2=PAYABLES.find(p=>p.id==='paycU_aee2'),pOld=PAYABLES.find(p=>p.id==='paycU_p1_ee2'),pMain=PAYABLES.find(p=>p.id==='paycU_p1');
+    out.migPay={a1:pA1&&pA1.status,a2:pA2&&pA2.status+'|'+pA2.paidDate,old:!!pOld,main:pMain&&pMain.amount};   // main = 1,097,250 − 369,512 = 727,738
+    out.migOk=n===2&&!per.early&&per.adv===369512&&pA1&&pA1.status==='pending'&&pA2&&pA2.status==='paid'&&!pOld&&pMain&&pMain.amount===727738;
+    // ② 新預付款：已登錄未付期別立刻扣
+    _saCtx={cid:'cU',est:9e9,aid:''};
+    document.body.insertAdjacentHTML('beforeend','<input id="sa-amt" value="100000"><input id="sa-date" value="'+d(0)+'"><input id="sa-note" value="">');
+    _saSave();['sa-amt','sa-date','sa-note'].forEach(i=>{const e=document.getElementById(i);if(e)e.remove();});
+    const pMain2=PAYABLES.find(p=>p.id==='paycU_p1');
+    out.auto={perAdv:per.adv,main:pMain2&&pMain2.amount,advN:_subAdvs(c).length};
+    out.autoOk=per.adv===469512&&pMain2&&pMain2.amount===627738&&_subAdvs(c).length===3;
+    // ③ 預付視窗上限含已登錄未付、字樣
+    let html='';const oC=window.showConfirm;window.showConfirm=function(t,m){html=t+m;};openSubAdvance('cU');window.showConfirm=oC;
+    out.modal=/已登錄未付/.test(html)&&!/提前放款/.test(html)&&_saCtx&&_saCtx.est>=627738&&/^預付款：/.test(html);
+    // ④ 刪除剛新增的那筆 → 該期應付加回
+    const newA=_subAdvs(c).find(a=>!a.fromPeriod);
+    window.showConfirm=function(t,m,ok){ok();};delSubAdvance('cU',newA.id);window.showConfirm=oC;
+    const pMain3=PAYABLES.find(p=>p.id==='paycU_p1');
+    out.del={perAdv:per.adv,main:pMain3&&pMain3.amount,advN:_subAdvs(c).length};
+    out.delOk=per.adv===369512&&pMain3&&pMain3.amount===727738&&_subAdvs(c).length===2;
+    // ⑤ 已付期別裡扣著的預付款不能刪
+    pMain3.status='paid';pMain3.paidDate=d(0);
+    let toasts=[];const oT=window.toast;window.toast=m=>toasts.push(String(m));delSubAdvance('cU','ee1');window.toast=oT;
+    out.delBlocked=_subAdvs(c).length===2&&toasts.some(t=>/已付款」的期別/.test(t));
+    pMain3.status='pending';delete pMain3.paidDate;
+    // ⑥ 分包明細：預付款列（無提前放款、有標記已付／扣在第1期）、openPrepay → 預付款視窗
+    openProjectCosts('q8');setCostView('subs');
+    const root=document.getElementById('cost-list')||document.getElementById('page-costs');const sh=root.innerHTML;
+    out.rows=!/提前放款<\/td>/.test(sh)&&/扣在：第1期/.test(sh)&&/標記已付/.test(sh)&&/原第1期提前放款/.test(sh)&&!/轉為提前放款/.test(sh);
+    html='';window.showConfirm=function(t,m){html=t+m;};openPrepay('cU');window.showConfirm=oC;out.prepay=/^預付款：/.test(html);
+    // ⑦ 標記已付
+    window.showConfirm=function(t,m,ok){document.body.insertAdjacentHTML('beforeend','<input id="pmp-date" value="'+d(-30)+'">');ok();document.getElementById('pmp-date').remove();};
+    payMarkPaid('paycU_aee1',d(-30));window.showConfirm=oC;
+    const pa1=PAYABLES.find(p=>p.id==='paycU_aee1');out.marked=pa1&&pa1.status==='paid'&&pa1.paidDate===d(-30);
+    // ⑧ 啟動遷移函式整批
+    Q=[mk()];PAYABLES.length=0;out.unifyAll=_advUnifyAll()===2&&!Q[0].costs[0].periods[0].early&&_subAdvs(Q[0].costs[0]).length===2;
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,600);}
+  Q=[];PAYABLES.length=0;eid=null;_saCtx=null;res(out);
+}));
+    check('v6.0.38 舊提前放款轉成預付款：併入該期抵扣、應付改 id 並保留已付、原期應付不變；啟動整批遷移', r.migOk && r.unifyAll, JSON.stringify(r.mig)+JSON.stringify(r.migPay));
+    check('v6.0.38 新預付款立刻扣在已登錄未付的期別；刪除即加回；扣在已付期別的不能刪', r.autoOk && r.delOk && r.delBlocked, JSON.stringify(r));
+    check('v6.0.38 預付款視窗：上限含已登錄未付、無「提前放款」字樣；分包明細預付款列顯示扣在哪期、可標記已付；預付款鈕一律開預付款視窗', r.modal && r.rows && r.prepay && r.marked, JSON.stringify(r));
+    check('v6.0.38 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
