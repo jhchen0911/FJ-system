@@ -7,12 +7,16 @@ on:
   pull_request:
     paths:
       - 'index.html'
+      - 'app.js'
+      - 'sw.js'
       - 'tests/**'
       - '.github/workflows/smoke.yml'
   push:
     branches: [main]
     paths:
       - 'index.html'
+      - 'app.js'
+      - 'sw.js'
       - 'tests/**'
   workflow_dispatch:
 

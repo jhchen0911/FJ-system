@@ -1,11 +1,12 @@
-/* 豐有工程管理系統 Service Worker — v6.0.33
+/* 豐有工程管理系統 Service Worker — v6.0.34
  * 策略：
- *  - index.html／導覽請求：快取優先（開頁不等網路），同時背景抓最新版；抓到不同版本（ETag／Last-Modified／長度不同）
- *    就通知頁面顯示「系統有新版本」，使用者按重新整理即更新。（v6.0.33 以前是網路優先，每次開頁都要先下載 2.9MB）
+ *  - 應用殼（index.html／導覽請求、app.js 主程式）：快取優先（開頁不等網路），同時背景以 no-cache 重新驗證；
+ *    抓到不同版本（ETag／Last-Modified／長度不同）就先把 index.html 與 app.js 都更新到快取，再通知頁面
+ *    顯示「系統有新版本」，使用者按重新整理即更新（兩個檔一起換，不會新 index 配舊 app.js）。
  *  - 其他同源 GET：網路優先，失敗退回快取（工地無訊號也能開）。
  *  - PDF 套件 html2canvas／jsPDF（版本固定）：快取優先。Firebase／其他 CDN 不攔截。
  */
-const CACHE = 'fy-app-v2';
+const CACHE = 'fy-app-v3';
 const LIB_HOSTS = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'unpkg.com'];
 const LIB_RE = /html2canvas|jspdf/i;
 
@@ -27,7 +28,22 @@ function notifyUpdate() {
     .then(cs => cs.forEach(c => c.postMessage({ type: 'fy-update' }))).catch(() => {});
 }
 function isAppShell(req, url) {
-  return req.mode === 'navigate' || /\/index\.html$/.test(url.pathname) || /\/$/.test(url.pathname);
+  return req.mode === 'navigate' || /\/index\.html$/.test(url.pathname) || /\/$/.test(url.pathname) || /\/app\.js$/.test(url.pathname);
+}
+// 快取鍵：去掉查詢字串（app.js?v=… 版本不同仍對到同一份），目錄請求視同 index.html
+function shellKey(url) {
+  return url.origin + url.pathname.replace(/\/$/, '/index.html');
+}
+function appJsKey(url) {
+  return url.origin + url.pathname.replace(/\/$/, '/index.html').replace(/\/index\.html$/, '/app.js');
+}
+// 背景重新驗證：no-cache 一律向伺服器確認；回傳是否與快取不同
+function revalidate(key, cached) {
+  return fetch(new Request(key, { cache: 'no-cache' })).then(res => {
+    if (!res || !res.ok) return false;
+    const clone = res.clone();
+    return caches.open(CACHE).then(c => c.put(key, clone)).catch(() => {}).then(() => !!cached && sig(cached) !== sig(res));
+  }).catch(() => false);
 }
 
 self.addEventListener('fetch', e => {
@@ -49,18 +65,22 @@ self.addEventListener('fetch', e => {
   }
 
   if (isAppShell(e.request, url)) {
+    const isJs = /\/app\.js$/.test(url.pathname);
+    const key = shellKey(url);
     e.respondWith(
-      caches.match(e.request, { ignoreSearch: true }).then(cached => {
-        const net = fetch(e.request).then(res => {
-          if (res && res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE).then(c => c.put(e.request, clone)).catch(() => {});
-            if (cached && sig(cached) !== sig(res)) notifyUpdate();
-          }
-          return res;
-        }).catch(() => null);
+      caches.match(key).then(cached => {
+        const net = revalidate(key, cached).then(changed => {
+          if (!changed) return;
+          // index.html 變了 → app.js 一起換新再通知；app.js 變了（通常同時）→ 直接通知
+          if (isJs) { notifyUpdate(); return; }
+          const jk = appJsKey(url);
+          return caches.match(jk).then(jc => revalidate(jk, jc)).then(() => notifyUpdate());
+        });
         if (cached) { e.waitUntil(net); return cached; }
-        return net.then(r => r || caches.match('./index.html'));
+        return fetch(e.request).then(res => {
+          if (res && res.ok) { const clone = res.clone(); caches.open(CACHE).then(c => c.put(key, clone)).catch(() => {}); }
+          return res;
+        }).catch(() => caches.match(key).then(m => m || (isJs ? Response.error() : caches.match('./index.html'))));
       })
     );
     return;
