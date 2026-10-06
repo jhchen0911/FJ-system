@@ -3254,7 +3254,7 @@ async function newPage(browser, width, height) {
         _pjQid='';eid=null;renderProj();out.list=/openProj\('qP'\)/.test(root.innerHTML)&&/已請/.test(root.innerHTML);
         openProj('qP');out.open=_pjQid==='qP'&&/合約工項與進度/.test(root.innerHTML);
         // 手機底部「專案」改開工程專案；專案管理頁隱藏但仍可開
-        out.nav=/go\('proj'\)/.test(document.getElementById('mn-proj').getAttribute('onclick'))&&document.getElementById('mn-proj').style.display!=='none'&&!ALL_PAGES.find(p=>p.id==='projects')&&/go\('proj'\)/.test(document.getElementById('dash-shortcuts').innerHTML);
+        out.nav=/go\('proj'\)/.test(document.getElementById('mn-proj').getAttribute('onclick'))&&document.getElementById('mn-proj').style.display!=='none'&&!ALL_PAGES.find(p=>p.id==='projects')&&!document.getElementById('dash-shortcuts');
         go('projects');out.old=document.getElementById('page-proj').classList.contains('active');   // v6.0.26 舊版卡片頁移除 → 轉工程專案
         _pgState={proj:'',startDate:localToday(),colDays:3,crews:[],rows:[]};
         Q=Q.filter(x=>x.id!=='qP');CONTRACTS.splice(0);INV.length=0;PAYABLES.length=0;VENDORS.length=0;_pjQid='';
@@ -3581,7 +3581,7 @@ async function newPage(browser, width, height) {
           go('dash');
           const t=document.getElementById('dash-todo-list').innerHTML;
           out.todo=/待登錄廠商請款：鴻玉開發工程行/.test(t)&&/本月尚未開單：待辦測試案/.test(t)&&/自有材料在工地：待辦測試案 10 支，最久 130 天（請確認是否該歸還）/.test(t)&&/_rfqTab='mat'/.test(t)&&/invTab\('vendor'\)/.test(t);
-          out.shortcut=/go\('acct'\)/.test(document.getElementById('dash-shortcuts').innerHTML)&&!/go\('finance'\)/.test(document.getElementById('dash-shortcuts').innerHTML);
+          out.shortcut=!document.getElementById('dash-shortcuts');   // v6.0.33 總覽捷徑卡移除（底部列／側欄已有）
           Q=[];INV.length=0;MAT_LEDGER.length=0;
           return out;
     });
@@ -4591,18 +4591,14 @@ async function newPage(browser, width, height) {
         Q.push({id:'qM',code:'115100503',name:'月表單測試案',client:'丙',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:D,unit:'支',qty:'133',price:'40000',sec:false},{desc:'支撐 H300 架設',unit:'M',qty:'100',price:'1000',sec:false}],
           dailyLogs:[{id:'d1',date:'2026-10-03',workers:2,progressRows:[{itemIdx:0,desc:D,qty:60}]}],costs:[{id:'c1',type:'extra',vendor:'公司支出（自付）',cat:'雜費',date:'2026-10-05',src:'quick',rows:[{id:'c1_0',desc:'便當',days:1,dayRate:300}],amt:300}]});
         const qm=Q.find(x=>x.id==='qM');go('quickcost');rQuickCost();_dmQid='qM';_dmYm='2026-10';document.getElementById('dr-month-card').style.display='none';drMonthToggle();
+        // v6.0.33 月表單只留支出：已登錄顯示、同日同類同額去重、寫入
         const tb=document.getElementById('dr-month-tbl');const row=d=>tb.querySelector('tr[data-d="2026-10-'+String(d).padStart(2,'0')+'"]');
-        out.grid=!!tb&&tb.querySelectorAll('tbody tr').length===31&&row(3).querySelector('.dm-q[data-i="0"]').getAttribute('data-old')==='60'&&row(3).querySelector('.dm-q[data-i="0"]').value==='60'&&/已有：便當 300/.test(row(5).innerHTML)&&document.getElementById('dr-month-card').style.display!=='none';
-        row(3).querySelector('.dm-q[data-i="0"]').value='70';row(4).querySelector('.dm-q[data-i="0"]').value='50';row(4).querySelector('.dm-w').value='3';
+        out.grid=!!tb&&tb.querySelectorAll('tbody tr').length===31&&!tb.querySelector('.dm-q')&&/便當 300/.test(row(5).innerHTML)&&document.getElementById('dr-month-card').style.display!=='none';
         row(5).querySelector('.dm-ct').value=String(QC_TYPES.findIndex(t=>t[0]==='便當'));row(5).querySelector('.dm-ca').value='300';
         row(6).querySelector('.dm-ct').value=String(QC_TYPES.findIndex(t=>t[0]==='涼水'));row(6).querySelector('.dm-ca').value='200';row(6).querySelector('.dm-cn').value='飲料';
-        drMonthSubmit();out.conf=document.getElementById('gen-confirm-modal').style.display==='flex'&&/2026-10-03/.test(document.getElementById('gen-confirm-msg').innerHTML)&&/60 → 70/.test(document.getElementById('gen-confirm-msg').innerHTML);
-        document.getElementById('gen-confirm-ok').click();
-        const L3=qm.dailyLogs.find(L=>L.date==='2026-10-03'),L4=qm.dailyLogs.find(L=>L.date==='2026-10-04');
-        out.applied2=!!L3&&L3.progressRows[0].qty===70&&!!L4&&L4.progressRows[0].qty===50&&L4.workers===3&&L4.src==='month'&&qm.costs.filter(c=>c.cat==='雜費'&&c.amt===300&&c.date==='2026-10-05').length===1&&qm.costs.some(c=>c.date==='2026-10-06'&&c.amt===200&&c.rows[0].desc==='飲料');
-        const tb2=document.getElementById('dr-month-tbl');tb2.querySelector('tr[data-d="2026-10-04"] .dm-q[data-i="0"]').value='55';drMonthSubmit();
-        out.skip=document.getElementById('gen-confirm-modal').style.display==='flex';document.getElementById('gen-confirm-cancel').click();
-        out.skipped=qm.dailyLogs.find(L=>L.date==='2026-10-04').progressRows[0].qty===50&&document.getElementById('gen-confirm-modal').style.display!=='flex';
+        drMonthSubmit();out.conf=document.getElementById('gen-confirm-modal').style.display!=='flex';
+        out.applied2=qm.costs.filter(c=>c.cat==='雜費'&&c.amt===300&&c.date==='2026-10-05').length===1&&qm.costs.some(c=>c.date==='2026-10-06'&&c.amt===200&&c.rows[0].desc==='飲料');
+        out.skip=true;out.skipped=true;
         // 6 跨案購租分析
         MAT_LEDGER.push({id:'L1',name:'型鋼',spec:'H300',len:12,qty:30,uw:93,price:20,date:'2026-01-10',kind:'重複性',loc:'公司倉庫',_mt:1});
         qm.mat={rows:[],use:[],loss:[],rents:[{id:'rn1',vendor:'英洲',rowId:'',name:'型鋼',spec:'H300',len:15,rate:60,cm:1995,pf:_dAdd(localToday(),-30),pt:_dAdd(localToday(),150),mode:'day',batches:[{id:'b1',d:_dAdd(localToday(),-30),m:1995,n:133,o:''}]}],equip:[],tps:[],_m6:1};
@@ -4616,9 +4612,84 @@ async function newPage(browser, width, height) {
     check('匯入業主詢價單（xlsx）：表頭自動辨識、工項帶入（單位／數量／單支長）、條款唯讀、合計列；儲存連結原檔', r.map && r.preview && r.applied && r.saved, JSON.stringify(r));
     check('回填匯出：單價、複價、小計／稅／總計寫回原格並加本公司備註；docx 表格辨識、回填與備註段落；移除連結', r.exported && r.dmap && r.dexp && r.removed, JSON.stringify(r));
     check('單位清單＋單支長欄位＋換算檢查（不一致／缺單支長／單位不在清單），_rfqLen 優先用明確單支長', r.unitUI && r.check && r.lenOf, JSON.stringify(r));
-    check('月表單：已填灰底帶值、同日同項不同值問覆蓋／略過、新增日報與點工、支出同日同類同額視為重複', r.grid && r.conf && r.applied2 && r.skip && r.skipped, JSON.stringify(r));
+    check('月表單（支出）：已登錄顯示、同日同類同額視為重複、新支出寫入', r.grid && r.conf && r.applied2 && r.skip && r.skipped, JSON.stringify(r));
     check('跨案購租分析：每規格購置 $/M、平均月租、回本月數、近 12 個月租金、在租／自有支數', r.cross && r.crossUI, JSON.stringify(r));
     check('v6.0.32 第五批流程無 Console 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.33 回饋修正：總覽捷徑移除、預付款逐筆與付款、同廠商一併付款、帳務分頁等寬、天氣與補登先前、月表單只留支出、PDF 逐頁高解析 ──
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(
+      () => new Promise(res => {
+        const out={};const oT=window.toast;window.toast=function(){};
+        P.tax=5;VENDORS.length=0;VENDORS.push({id:'v0',name:'鴻玉開發'});PAYABLES.length=0;INV.length=0;CONTRACTS.length=0;
+        const D='H型鋼樁 H300，L=15M 打設、拔除';
+        // 1 總覽捷徑卡移除；帳務分頁等寬置中；材料頁「材料估算」鈕移除
+        out.dash=!document.getElementById('dash-shortcuts');
+        _acctMount();acctTab('ar');out.tabs=/justify-content:center/.test(document.getElementById('acct-tabs').getAttribute('style'))&&[...document.querySelectorAll('#acct-tabs button')].every(b=>/flex:1 1 0/.test(b.getAttribute('style')))&&!!document.getElementById('acct-tabs')&&[...document.styleSheets].some(ss=>{try{return [...ss.cssRules].some(r=>/acct-tabs button/.test(r.cssText));}catch(e){return false;}});
+        // 2 預付款：專案列逐筆列出、未付可直接付款；預付款視窗快速帶入
+        Q=[{id:'qA',code:'115100601',name:'回饋測試案',client:'甲',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:D,unit:'支',qty:'100',price:'10000',sec:false}],t:{sub:1000000,total:1050000},dailyLogs:[],
+          costs:[{id:'cH',type:'sub',vendor:'鴻玉開發',cat:'打設',date:'2026-09-20',rows:[{id:'cH_0',linkedItemIdx:0,qty:100,unitPrice:5000}],amt:500000,invoice:true,retRate:0,periods:[],advances:[{id:'a1',date:'2026-09-09',amt:190476,note:'進場'},{id:'a2',date:'2026-10-05',amt:150000,note:''}]}]}];
+        const q=Q[0],c=q.costs[0];eid='qA';syncCostToPayable(q,c);
+        const p1=PAYABLES.find(p=>p.id===_subAdvPayId('cH',c.advances[0])),p2=PAYABLES.find(p=>p.id===_subAdvPayId('cH',c.advances[1]));
+        out.advPay=!!p1&&!!p2&&p1.status!=='paid';
+        openProj('qA');const sh=document.getElementById('pj-body-sub').innerHTML;
+        out.advRows=/2026-09-09 預付 190,476/.test(sh)&&/2026-10-05 預付 150,000/.test(sh)&&(sh.match(/pjPayAdv\(/g)||[]).length===2;
+        pjPayAdv(p1.id);document.getElementById('pja-date').value='2026-09-10';document.getElementById('gen-confirm-ok').click();
+        out.paid=p1.status==='paid'&&p1.paidDate==='2026-09-10'&&/✓ 已付 2026-09-10/.test(document.getElementById('pj-body-sub').innerHTML)&&(document.getElementById('pj-body-sub').innerHTML.match(/pjPayAdv\(/g)||[]).length===1;
+        openProjectCosts('qA');openSubAdvance('cH');const sm=document.getElementById('gen-confirm-msg').innerHTML;
+        out.chips=/餘額一半 79,762/.test(sm)&&/餘額全部 159,524/.test(sm)&&/已預付 340,476/.test(sm);
+        document.querySelector('#gen-confirm-msg button.btn').click();out.chipSet=document.getElementById('sa-amt').value==='79762';document.getElementById('gen-confirm-modal').style.display='none';
+        // 3 同廠商一併付款：介紹費＋額外支出同一天付清
+        PAYABLES.push({id:'pX1',to:'風哥',project:'回饋測試案',amount:299250,vat:false,status:'pending',date:'2026-10-25',note:'介紹費',_mt:1},{id:'pX2',to:'風哥',project:'回饋測試案',amount:29000,vat:false,status:'pending',date:'2026-10-25',note:'司機＋挖土機',_mt:1},{id:'pX3',to:'風哥',project:'別案',amount:100,vat:false,status:'pending',date:'2026-10-25',_mt:1});
+        go('finance');switchFinanceTab('payable');renderPayables();const ph=document.getElementById('finance-payable').innerHTML;
+        out.allBtn=/payVendorAll\('pX1'\)/.test(ph)&&/全付 2 筆/.test(ph);
+        payVendorAll('pX1');out.allAsk=/合計 NT\$ 328,250/.test(document.getElementById('gen-confirm-msg').innerHTML);document.getElementById('pva-date').value='2026-10-05';document.getElementById('gen-confirm-ok').click();
+        out.allPaid=PAYABLES.find(p=>p.id==='pX1').status==='paid'&&PAYABLES.find(p=>p.id==='pX2').paidDate==='2026-10-05'&&PAYABLES.find(p=>p.id==='pX3').status!=='paid';
+        // 4 日報：作業狀態說明文字移除、天氣欄、補登先前 → 日報欄位、工項首日、列表顯示
+        go('quickcost');rQuickCost();
+        out.form=!/暫停／停工期間不再提醒補日報/.test(document.getElementById('page-quickcost').innerHTML)&&!!document.getElementById('dr-weather')&&!!document.getElementById('dr-backfill')&&document.getElementById('dr-backfill-from').style.display==='none';
+        const sel=document.getElementById('dr-proj');sel.value='qA';if(sel.onchange)sel.onchange();
+        document.getElementById('dr-date').value='2026-10-06';document.getElementById('dr-weather').value='雨';
+        drAddProgRow();const pr=document.querySelector('#dr-prog-rows select');pr.value='0';if(pr.onchange)pr.onchange();const pq=document.querySelector('#dr-prog-rows input[type=number]');pq.value='40';if(pq.oninput)pq.oninput();
+        document.getElementById('dr-backfill').checked=true;document.getElementById('dr-backfill').onchange();document.getElementById('dr-backfill-from').value='2026-10-01';
+        const col=_drCollect();out.collect=!!col&&col.weather==='雨'&&col.backfillFrom==='2026-10-01'&&col.progressRows.length===1&&col.progressRows[0].qty===40;
+        _drList=[col];submitDailyReport();const L=q.dailyLogs.find(x=>x.date==='2026-10-06');
+        out.log=!!L&&L.weather==='雨'&&L.backfillFrom==='2026-10-01'&&_itemProgress(q,0).first==='2026-10-01'&&_itemProgress(q,0).last==='2026-10-06'&&_itemProgress(q,0).cum===40;
+        const r=_drLogRow(q,L);out.row=r.weather==='雨'&&/補登：自 2026-10-01 起累計/.test(r.progress);
+        out.cleared=document.getElementById('dr-backfill').checked===false&&document.getElementById('dr-weather').value===''&&document.getElementById('dr-backfill-from').style.display==='none';
+        openProj('qA');out.pjLog=/>雨</.test(document.getElementById('pj-body-log').innerHTML)&&/補登：自 2026-10-01/.test(document.getElementById('pj-body-log').innerHTML);
+        // 5 月表單只留支出：去重與寫入
+        q.costs.push({id:'c1',type:'extra',vendor:'公司支出（自付）',cat:'雜費',date:'2026-10-05',src:'quick',rows:[{id:'c1_0',desc:'便當',days:1,dayRate:300}],amt:300});
+        go('quickcost');rQuickCost();_dmQid='qA';_dmYm='2026-10';document.getElementById('dr-month-card').style.display='none';drMonthToggle();
+        const tb=document.getElementById('dr-month-tbl');const row=d=>tb.querySelector('tr[data-d="2026-10-'+String(d).padStart(2,'0')+'"]');
+        out.grid=!!tb&&tb.querySelectorAll('tbody tr').length===31&&!tb.querySelector('.dm-q')&&!tb.querySelector('.dm-w')&&/便當 300/.test(row(5).innerHTML)&&/支出月表單/.test(document.getElementById('dr-month-card').innerHTML);
+        row(5).querySelector('.dm-ct').value=String(QC_TYPES.findIndex(t=>t[0]==='便當'));row(5).querySelector('.dm-ca').value='300';
+        row(6).querySelector('.dm-ct').value=String(QC_TYPES.findIndex(t=>t[0]==='涼水'));row(6).querySelector('.dm-ca').value='200';row(6).querySelector('.dm-cn').value='飲料';
+        drMonthSubmit();
+        out.month=q.costs.filter(x=>x.cat==='雜費'&&x.amt===300&&x.date==='2026-10-05').length===1&&q.costs.some(x=>x.date==='2026-10-06'&&x.amt===200&&x.rows[0].desc==='飲料')&&document.getElementById('gen-confirm-modal').style.display!=='flex';
+        // 6 材料頁按鈕、PDF 引擎：逐頁影像優先、_toolPrint 字級
+        _m6Qid='qA';go('mat6');out.matBtn=!/go\('matest'\)/.test(document.getElementById('mat6-root').innerHTML)&&/matSeedFromEst\(/.test(document.getElementById('mat6-root').innerHTML);
+        const calls=[];const fakePdf={addPage(){calls.push('P');},addImage(img,t,x,y,w,h){calls.push(['I',String(img).slice(0,12),Math.round(w),Math.round(h),String(img)]);},setFontSize(){},setTextColor(){},text(){}};const _pdfAddPagedImgs=()=>calls[0][4]==='data:image/jpeg;base64,AAAA'&&calls[2][4]==='data:image/jpeg;base64,HHHH'&&calls[3][4].length>40;
+        const cv=document.createElement('canvas');cv.width=718;cv.height=2000;
+        const plan={pages:[{s:0,e:1000,hd:false,img:'data:image/jpeg;base64,AAAA'},{s:1000,e:2000,hd:true}],hd:{s:0,e:40},hdImg:'data:image/jpeg;base64,HHHH'};
+        const n=_pdfAddPaged(fakePdf,cv,595.28,841.89,1,plan,0.9);
+        out.paged=n===2&&calls.length===4&&calls[0][1]==='data:image/j'&&calls[2][1]==='data:image/j'&&calls[3][1].startsWith('data:image/j')&&_pdfAddPagedImgs()&&Math.round(calls[0][2])===Math.round(595.28-2*_pdfMargPt());
+        let capHtml='';const oP=window._printViaIframe;window._printViaIframe=function(h){capHtml=h;};_toolPrint('測試','案',' <table><tr><td>x</td></tr></table>',{});window._printViaIframe=oP;
+        out.toolCss=/font-size:12\.5px/.test(capHtml)&&/th,td\{[^}]*font-size:11\.5px/.test(capHtml)&&/height:36px/.test(capHtml);
+        out.engine=typeof _pdfCapturePages==='function'&&_PDF_PAGE_SCALE===3&&/_pdfCapturePages\(inner,canvas,_plan,_h2cOpts/.test(String(_printViaIframe))&&/fy-update/.test(document.documentElement.innerHTML);
+        window.toast=oT;Q=[];PAYABLES.length=0;VENDORS.length=0;eid=null;_drList=[];res(out);
+      })
+    );
+    check('總覽捷徑卡移除；帳務分頁等寬置中（手機每列 4 顆）；材料頁重複的「材料估算」鈕移除', r.dash && r.tabs && r.matBtn, JSON.stringify(r));
+    check('預付款：專案分包列逐筆列出（日期／金額／已付或付款鈕）、付款即標記應付；預付款視窗快速帶入餘額一半／全部', r.advPay && r.advRows && r.paid && r.chips && r.chipSet, JSON.stringify(r));
+    check('應付：同廠商同工程待付「全付 N 筆」一併標記付款，別案不受影響', r.allBtn && r.allAsk && r.allPaid, JSON.stringify(r));
+    check('日報：作業狀態說明移除、天氣欄、補登先前（起日）→ 日報欄位、工項首日取補登起日、列表與工程專案顯示、送出後表單重置', r.form && r.collect && r.log && r.row && r.cleared && r.pjLog, JSON.stringify(r));
+    check('月表單只留支出：去重與寫入', r.grid && r.month, JSON.stringify(r));
+    check('PDF：逐頁影像優先貼頁（_pdfAddPaged 用 pg.img／hdImg）、_toolPrint 字級與留白調整、_printViaIframe 逐頁 scale 3 擷取、sw 新版通知接線', r.paged && r.toolCss && r.engine, JSON.stringify(r));
+    check('v6.0.33 回饋修正流程無 Console 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
