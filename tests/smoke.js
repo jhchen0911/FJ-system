@@ -4947,6 +4947,50 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.39 預付款抵扣自我修正、重算抵扣、手動應付標示、附件鈕併入同列 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    const d=n=>{const x=new Date();x.setDate(x.getDate()+n);return x.toISOString().slice(0,10);};
+    Q=[{id:'q9',code:'9',name:'中科案',client:'業主',date:d(-60),awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 H300，L=15M@80cm 打設、拔除',unit:'支',qty:'133',price:'10000',estCost:'8250',len:15,sec:false,_uid:'z1'}],t:{sub:1330000,tax:66500,total:1396500},dailyLogs:[],
+      costs:[{id:'cH',type:'sub',vendor:'鴻玉',cat:'打設',date:d(-50),invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'r1',linkedItemIdx:0,qty:133,unitPrice:8250}],amt:1097250,
+        advances:[{id:'a1',date:d(-1),amt:548625,note:''}],
+        periods:[{no:1,date:d(-5),from:d(-30),to:d(-5),rows:[{rid:'r1',qty:133}],amt:1097250,ret:0,net:1097250,due:d(19),adv:1097250}]}]}];
+    eid='q9';PAYABLES.length=0;
+    PAYABLES.push({id:'paycH_aa1',costId:'cH',costAdv:'a1',quoteId:'q9',to:'鴻玉',project:'中科案',amount:548625,vat:true,date:d(-1),status:'paid',paidDate:d(-1),note:'預付款'});
+    PAYABLES.push({id:'manual1',to:'鴻玉',project:'中科案',amount:1097250,vat:true,date:d(19),status:'pending',costSourceId:'cH',note:''});
+    // 健檢先抓到「抵扣超過預付款」
+    const H0=_healthRows();out.healthOver=H0.some(r=>/抵扣預付款合計 1,097,250 超過預付款總額 548,625/.test(r.msg));
+    // 同步 → 夾回 → 第 1 期應付出現（另一半 10/25）
+    syncCostToPayable(Q[0],Q[0].costs[0]);
+    const c=Q[0].costs[0],per=c.periods[0],pMain=PAYABLES.find(p=>p.id==='paycH_p1');
+    out.clamp=per.adv===548625&&!!pMain&&pMain.amount===548625&&_payEff(pMain)===576056&&pMain.status==='pending';
+    // 重算抵扣：亂改後回到正確分配
+    per.adv=100;subAdvRealloc('cH');
+    out.realloc=per.adv===548625&&PAYABLES.find(p=>p.id==='paycH_p1').amount===548625;
+    // 分包明細：重算抵扣鈕、應付對帳標出手動應付
+    openProjectCosts('q9');setCostView('subs');
+    const root=document.getElementById('cost-list')||document.getElementById('page-costs');const sh=root.innerHTML;
+    out.mgmt=/subAdvRealloc\('cH'\)/.test(sh)&&/手動建立並連結此發包的應付/.test(sh)&&/無對應/.test(sh);
+    // 應付頁：附件鈕併入動作列
+    go('acct');acctTab('ap');renderPayables();
+    const pl=document.getElementById('payable-list');
+    const row=[...pl.querySelectorAll('.ql')].find(x=>/manual1|1,152,113/.test(x.innerHTML));
+    const actionDiv=row&&[...row.querySelectorAll('div')].find(dv=>dv.querySelector('button[onclick*="delPayable"]'));
+    out.inline=!!actionDiv&&!!actionDiv.querySelector('button[onclick*="_payUpload"]')&&!/請款單\/發票/.test(pl.innerHTML)&&/發票<\/button>/.test(pl.innerHTML)&&/匯款<\/button>/.test(pl.innerHTML);
+    out.noFilesRow=!/border-radius:0 0 12px 12px/.test(pl.innerHTML);
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,600);}
+  Q=[];PAYABLES.length=0;eid=null;res(out);
+}));
+    check('v6.0.39 抵扣超過預付款總額：健檢列出、同步時自動夾回（期別應付回來＝另一半）、重算抵扣', r.healthOver && r.clamp && r.realloc, JSON.stringify(r));
+    check('v6.0.39 分包明細：重算抵扣鈕、應付對帳標出手動建立的整筆應付', r.mgmt, JSON.stringify(r));
+    check('v6.0.39 應付卡：發票／匯款上傳鈕併入動作列，不再另起一列', r.inline && r.noFilesRow, JSON.stringify(r));
+    check('v6.0.39 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

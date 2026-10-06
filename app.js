@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.38';
+var APP_VERSION='v6.0.39';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -24580,7 +24580,7 @@ function buildSubMgmtHtml(q){
       +'<span style="margin-left:auto;display:flex;gap:4px;flex-wrap:wrap">'
       +(self?'':(fm?'<button type="button" onclick="subFollowSync(\''+c.id+'\')" style="font-size:11px;padding:3px 10px;border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;cursor:pointer;font-family:inherit">同步計價</button>'+_prepayBtn(c)+''
         :'<button type="button" onclick="openSubPeriod(\''+c.id+'\')" style="font-size:11px;padding:3px 10px;border:1px solid #1565C0;background:#E3F2FD;color:#1565C0;border-radius:99px;cursor:pointer;font-family:inherit;font-weight:700">＋ 登錄廠商請款</button>'
-        +_prepayBtn(c)))
+        +_prepayBtn(c)+_reallocBtn(c)))
       +(st.retHeld>0?'<button type="button" onclick="releaseSubRet(\''+c.id+'\')" style="font-size:11px;padding:3px 10px;border:1px solid #ffcc80;background:#fff8ec;color:#b26a00;border-radius:99px;cursor:pointer;font-family:inherit">退保留款</button>':'')
       +'<button type="button" onclick="setCostView(\'list\');setTimeout(function(){var el=document.getElementById(\'cost-rows-'+c.id+'\');if(el)el.scrollIntoView({block:\'center\'});},80)" style="font-size:11px;padding:3px 10px;border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;cursor:pointer;font-family:inherit">明細</button>'
       +'</span></div>'
@@ -29031,13 +29031,12 @@ function renderPayables(){
         +(p.vat!==false?'<div style="font-size:10px;color:var(--b3)">未稅 '+fmt(p.amount||0)+'＋5%稅 '+fmt(_payVatAmt(p))+'</div>':'')
         +'<label style="font-size:10px;color:var(--b4);display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" '+(p.vat!==false?'checked':'')+' onchange="togglePayVat(\''+p.id+'\',this.checked)" style="width:13px;height:13px;min-width:13px">5%稅</label>'
           +'<span class="bdg '+(p.status==='paid'?'ok':'warn')+'">'+(p.status==='paid'?'✓ 已付款':'待付款')+'</span></div>'
-          +'<div style="display:flex;gap:4px;margin-left:8px">'
+          +'<div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">'
           +(p.status!=='paid'?'<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="confirmPayment(\''+p.id+'\')">✓ 付款</button>'+_payVendorAllBtn(p):'')
         +(p.quoteId?'<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts(\''+p.quoteId+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>':'')
           +'<button type="button" class="btn btn-xs" title="編輯付款記錄" onclick="editPayable(\''+p.id+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg></button>'
           +'<button type="button" class="btn btn-xs btn-r" title="刪除" onclick="delPayable(\''+p.id+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button>'
-          +'</div>'
-      +_payFilesRow(p)
+          +_payFilesInline(p)+'</div>'   // v6.0.39 附件鈕併入同列
       +'</div>' 
       );};
         // v6.0.37 已付款預設收合成一列（篩「已付」時展開）
@@ -29072,13 +29071,14 @@ function renderPayables(){
         <label style="font-size:10px;color:var(--b4);display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" ${p.vat!==false?'checked':''} onchange="togglePayVat('${p.id}',this.checked)" style="width:13px;height:13px;min-width:13px">5%稅</label>
         <span class="bdg ${p.status==='paid'?'ok':'warn'}">${p.status==='paid'?'✓ 已付款':'待付款'}</span>
       </div>
-      <div style="display:flex;gap:4px;margin-left:8px">
+      <div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">
         ${p.status!=='paid'?`<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="confirmPayment('${p.id}')">✓ 付款</button>`:''}
               ${p.quoteId?`<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts('${p.quoteId}')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>`:''}
         <button type="button" class="btn btn-xs" title="編輯付款記錄" onclick="editPayable('${p.id}')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg></button>
         <button type="button" class="btn btn-xs btn-r" title="刪除" onclick="delPayable('${p.id}')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button>
+        ${_payFilesInline(p)}
       </div>
-    ${_payFilesRow(p)}</div>`).join('');
+    </div>`).join('');
   }
 }
 
@@ -38497,7 +38497,7 @@ function _subPayAuditHtml(q,c){
   if(!open)return h+'</div>';
   h+='<table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-top:6px"><thead><tr style="background:var(--gl);color:var(--b5);font-size:11px"><th style="padding:3px 6px;text-align:left">對應</th><th style="padding:3px 6px;text-align:left">說明</th><th style="padding:3px 6px;text-align:left">到期／實付</th><th style="padding:3px 6px;text-align:right">金額</th><th style="padding:3px 6px">狀態</th><th style="padding:3px 6px"></th></tr></thead><tbody>'
     +rows.map(function(r){var p=r.p;
-      var mapTxt=r.orphan?'<span style="color:var(--red);font-weight:700">無對應</span><div style="font-size:10px;color:var(--b4)">'+(r.mine?'這張卡沒有這筆的來源':'同廠商同工程，但沒掛在任何成本卡')+'</div>':esc(r.map);
+      var mapTxt=r.orphan?'<span style="color:var(--red);font-weight:700">無對應</span><div style="font-size:10px;color:var(--b4)">'+(r.mine?'這張卡沒有這筆的來源':(r.p.costSourceId===c.id?'手動建立並連結此發包的應付（與分期應付重複）':'同廠商同工程，但沒掛在任何成本卡'))+'</div>':esc(r.map);
       var ops=(p.status==='paid'?_pbtn("payUnmark('"+p.id+"')",'改回未付','#b45309','#ffcc80'):_pbtn("confirmPayment('"+p.id+"');try{rCostItems();}catch(e){}",'付款','#1B5E20','#a5d6a7'))
         +_pbtn("delPayable('"+p.id+"');setTimeout(function(){try{rCostItems();}catch(e){}},300)",'刪除','var(--red)','#f0c4c4');
       return '<tr style="border-bottom:1px solid var(--b1);'+(r.orphan?'background:#fff5f5':'')+'"><td style="padding:3px 6px">'+mapTxt+'</td><td style="padding:3px 6px;color:var(--b4)">'+esc((p.note||'').slice(0,60))+'</td><td style="padding:3px 6px;white-space:nowrap">'+esc(p.status==='paid'?('實付 '+(p.paidDate||'')):('到期 '+(p.date||'')))+'</td><td style="padding:3px 6px;text-align:right;font-weight:700;white-space:nowrap">'+fmt(_payEff(p))+(p.vat===false?'':'<div style="font-size:10px;font-weight:400;color:var(--b4)">未稅 '+fmt(p.amount||0)+'</div>')+'</td><td style="padding:3px 6px;text-align:center;white-space:nowrap;color:'+(p.status==='paid'?'#1B5E20':'#b45309')+'">'+(p.status==='paid'?'✓ 已付':'待付')+'</td><td style="padding:3px 6px;text-align:right;white-space:nowrap">'+ops+'</td></tr>';
@@ -38665,6 +38665,52 @@ function editSubAdvance(cid,aid){
   openSubAdvance(cid,{aid:aid,date:a.date,amt:a.amt,note:a.note,special:a.special,reason:a.reason});
 }
 function subAdvToEarly(cid,aid){toast('預付款與提前放款已合併：預付款會自動扣在已登錄未付的期別，不需要轉換');}
+
+
+// ══════════════ v6.0.39：預付款抵扣自我修正、重算抵扣、手動應付標示、應付卡附件鈕併入同列（v639.js 區塊）══════════════
+// ① 同步時先 _subAdvClamp：各期抵扣總額不得超過預付款總額（只從未付期別往回收），避免期別被扣到 0 而「消失」
+var _syncSubPeriodPayables639=_syncSubPeriodPayables;
+_syncSubPeriodPayables=function(q,c){try{if(c&&c.type==='sub'&&!c.followOf)_subAdvClamp(c);}catch(e){_err('_subAdvClamp',e);}return _syncSubPeriodPayables639(q,c);};
+// ② 重算抵扣：未付期別的抵扣歸零後，用全部預付款（扣掉已付期別已扣的）由早到晚重新分配
+function subAdvRealloc(cid){
+  var q=Q.find(function(x){return x.id===eid;});if(!q)return;var c=(q.costs||[]).find(function(x){return x.id===cid;});if(!c)return;
+  var tot=_subAdvs(c).reduce(function(s,a){return s+Math.round(parseFloat(a.amt)||0);},0),held=0;
+  var ps=_subPeriods(c).filter(function(p){return !p.isRet;}).slice().sort(function(a,b){return (a.no||0)-(b.no||0);});
+  var unpaid=[];
+  ps.forEach(function(per){var pp=PAYABLES.find(function(x){return x.id===_subPayId(c.id,per);});if(pp&&pp.status==='paid')held+=_subPeriodCalc(c,per).adv;else{per.adv=0;unpaid.push(per);}});
+  var pool=Math.max(0,tot-held);
+  unpaid.forEach(function(per){if(pool<=0)return;var k=_subPeriodCalc(c,per);var t=Math.min(pool,k.net);per.adv=t;per.mt=Date.now();pool-=t;});
+  _touch(q);
+  try{syncCostToPayable(q,c);}catch(e){_err('subAdvRealloc',e);}
+  try{persist();_immediateUpload();}catch(e){_err('subAdvRealloc',e);}
+  try{rCostItems();}catch(e){}
+  toast('已重算：預付款 '+fmt(tot)+'，扣在各期 '+fmt(tot-pool)+(pool>0?('，尚未扣回 '+fmt(pool)):''));
+}
+function _reallocBtn(c){if(!_subAdvs(c).length||c.followOf)return '';return '<button type="button" onclick="subAdvRealloc(\''+c.id+'\')" title="各期的抵扣金額依預付款由早到晚重新分配（已付的期別不動）" style="font-size:11px;padding:3px 10px;border:1px solid #90CAF9;background:var(--w);color:#1565C0;border-radius:99px;cursor:pointer;font-family:inherit">重算抵扣</button>';}
+// ③ 健檢：抵扣總額超過預付款總額
+var _healthRows639=_healthRows;
+_healthRows=function(){
+  var R=_healthRows639();
+  try{(Q||[]).forEach(function(q){(q&&q.costs||[]).forEach(function(c){if(!c||c.type!=='sub'||c.mergedInto||c.followOf)return;
+    var tot=_subAdvs(c).reduce(function(s,a){return s+Math.round(parseFloat(a.amt)||0);},0),used=_subPeriods(c).filter(function(p){return !p.isRet;}).reduce(function(s,p){return s+_subPeriodCalc(c,p).adv;},0);
+    if(used>tot+1)R.push({sev:'warn',area:'發包',msg:(q.name||'')+'：'+(c.vendor||'')+' 各期抵扣預付款合計 '+fmt(used)+' 超過預付款總額 '+fmt(tot)+'（期別應付會被扣少或扣到 0）',fix:'分包管理明細 › 重算抵扣'});
+  });});}catch(e){_err('_healthRows.v639',e);}
+  return R;
+};
+// ④ 應付卡：附件鈕併入動作列（省手機高度）
+function _payFilesInline(p){
+  var fs=p.files||[];
+  var chips=fs.map(function(f,i){
+    var ic=f.kind==='pay'?'<svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg>':'<svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg>';
+    return '<span style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--b2);border-radius:99px;padding:2px 8px;font-size:10.5px;background:var(--w)">'
+      +'<a href="javascript:void(0)" onclick="_payOpenFile(\''+p.id+'\','+i+')" title="點擊查看" style="color:var(--g3);text-decoration:none;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+ic+' '+esc((f.name||'單據').slice(0,16))+'</a>'
+      +'<a href="javascript:void(0)" onclick="_payDelFile(\''+p.id+'\','+i+')" style="color:var(--b3);text-decoration:none">✕</a></span>';
+  }).join('');
+  return (p.invNo?'<span class="bdg" style="font-size:10.5px;background:#e8f0fb;color:#1a3a6b;border:1px solid #b5d4f4" title="廠商發票號碼"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> '+esc(p.invNo)+'</span>':'')
+    +'<button type="button" class="btn btn-xs" title="拍照或上傳廠商請款單與發票；照片會自動辨識發票號碼與金額" onclick="_payUpload(\''+p.id+'\',\'inv\')" style="border-color:#1a3a6b;color:#1a3a6b"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 發票</button>'
+    +'<button type="button" class="btn btn-xs" title="拍照或上傳匯款紀錄／轉帳截圖" onclick="_payUpload(\''+p.id+'\',\'pay\')" style="border-color:var(--b3);color:var(--b4)"><svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg> 匯款</button>'
+    +chips;
+}
 
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
