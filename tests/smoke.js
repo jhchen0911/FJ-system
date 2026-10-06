@@ -4546,6 +4546,82 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.32 第五批：匯入業主詢價單＋回填匯出、單位清單與單支長＋換算檢查、月表單＋去重、跨案購租分析 ──
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(
+      () => new Promise(res => { (async()=>{
+        const out={};const oT=window.toast;window.toast=function(){};
+        P.tax=5;P.company='豐有工程有限公司';VENDORS.length=0;PAYABLES.length=0;INV.length=0;CONTRACTS.length=0;MAT_LEDGER.length=0;
+        const D='H型鋼樁 H300，L=15M 打設、拔除';
+        Q=[{id:'qX',code:'115100501',name:'匯入測試案',client:'甲',date:'2026-10-01',items:[],exs:[],rmk:{},_mt:1},
+           {id:'qY',code:'115100502',name:'匯入測試案二',client:'乙',date:'2026-10-01',items:[],exs:[],rmk:{},_mt:1}];
+        // 1 xlsx 詢價單：表頭自動辨識、工項帶入（單位／數量／單支長）、條款唯讀、合計列
+        const bytes=_xlsxBytes([{name:'詢價單',rows:[['甲建設　擋土支撐工程詢價單'],[],['項次','工程項目','單位','數量','單價','複價','備註'],[1,D,'支',133,'','',''],[2,'支撐 H300 架設','M',100,'','',''],['','小計','','','','',''],['','營業稅 5%','','','','',''],['','總計','','','','',''],['備註：1. 本工程不含回填砂。'],['2. 請於 10 日內回覆報價。']]}]);
+        const files=await _zipRead(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
+        loadQ('qX');
+        const map=_qiFromFiles(files,'xlsx',{name:'甲建設詢價單.xlsx',size:bytes.length,b64:_u8b64(bytes)});
+        out.map=!!map&&map.nItems===2&&map.cols.desc===2&&map.cols.price===5&&map.cols.amt===6&&map.totals.length===3&&map.totals.map(t=>t.kind).join()==='sub,tax,total'&&map.terms.length===2&&/回填砂/.test(map.terms[0]);
+        out.preview=document.getElementById('gen-confirm-modal').style.display==='flex'&&/讀到 <b>2<\/b> 個工項/.test(document.getElementById('gen-confirm-msg').innerHTML);
+        document.getElementById('gen-confirm-ok').click();
+        out.applied=items.length===2&&items[0].desc===D&&items[0].unit==='支'&&items[0].qty==='133'&&items[0].oKey===4&&items[0].len===15&&items[1].unit==='M'&&items[1].oKey===5&&!!document.getElementById('q-owner-box')&&/回填匯出/.test(document.getElementById('q-owner-box').innerHTML)&&/回填砂/.test(document.getElementById('q-owner-box').innerHTML);
+        items[0].price='40000';items[1].price='1000';saveQ();
+        const qx=Q.find(x=>x.id==='qX');
+        out.saved=!!qx.ownerDoc&&qx.ownerDoc.kind==='xlsx'&&qx.ownerDoc.rows.length===2&&qx.items[0].oKey===4&&qx.items[0].len===15&&_qOwnerDraft===null;
+        // 2 回填匯出：單價、複價、小計／稅／總計寫回原格，表格下方加本公司備註
+        const ef=await quoteExportOwnerDoc();
+        const cells=_xlsxParse(ef).cells,cv=a=>(cells.find(c=>c.cell===a)||{}).text;
+        out.exported=!!ef&&cv('E4')==='40000'&&cv('F4')==='5320000'&&cv('E5')==='1000'&&cv('F5')==='100000'&&cv('F6')==='5420000'&&cv('F7')==='271000'&&cv('F8')==='5691000'&&cv('A12')==='本公司備註（豐有工程有限公司）'&&!!cv('A13')&&cv('B4')===D;
+        // 3 docx 詢價單：表格列辨識、回填單價、加備註段落
+        const tc=t=>'<w:tc><w:p><w:r><w:t>'+t+'</w:t></w:r></w:p></w:tc>';
+        const dx='<?xml version="1.0"?><w:document xmlns:w="x"><w:body><w:p><w:r><w:t>乙建設 詢價單</w:t></w:r></w:p><w:tbl><w:tr>'+['項次','品名','單位','數量','單價','金額'].map(tc).join('')+'</w:tr><w:tr>'+['1','H型鋼樁 H400 L=12M 打設','支','40','',''].map(tc).join('')+'</w:tr><w:tr>'+['','合計','','','',''].map(tc).join('')+'</w:tr></w:tbl><w:p><w:r><w:t>一、報價含稅。</w:t></w:r></w:p><w:sectPr/></w:body></w:document>';
+        const dfiles={'word/document.xml':new TextEncoder().encode(dx)};const dz=_zipWrite(dfiles);
+        loadQ('qY');const dmap=_qiFromFiles(await _zipRead(dz.buffer.slice(dz.byteOffset,dz.byteOffset+dz.byteLength)),'docx',{name:'乙建設詢價單.docx',size:dz.length,b64:_u8b64(dz)});
+        out.dmap=!!dmap&&dmap.nItems===1&&dmap.items[0].priceRef===10&&dmap.items[0].amtRef===11&&dmap.totals.length===1&&dmap.totals[0].kind==='total'&&dmap.terms.some(t=>/報價含稅/.test(t));
+        document.getElementById('gen-confirm-ok').click();items[0].price='9000';saveQ();
+        const df=await quoteExportOwnerDoc();const dxml=new TextDecoder().decode(df['word/document.xml']);
+        out.dexp=/<w:t xml:space="preserve">9000<\/w:t>/.test(dxml)&&/<w:t xml:space="preserve">360000<\/w:t>/.test(dxml)&&/<w:t xml:space="preserve">378000<\/w:t>/.test(dxml)&&/本公司備註/.test(dxml)&&dxml.indexOf('本公司備註')<dxml.indexOf('<w:sectPr')&&/報價含稅/.test(dxml);
+        quoteOwnerDocRemove();out.removed=!Q.find(x=>x.id==='qY').ownerDoc&&!document.getElementById('q-owner-box');
+        // 4 單位清單、單支長、換算檢查
+        loadQ('qX');
+        out.unitUI=!!document.getElementById('unit-dl')&&document.querySelectorAll('#itbody input[list="unit-dl"]').length===2&&document.querySelectorAll('#itbody input[placeholder="單支長M"]').length===2&&document.querySelectorAll('#itbody .it-ucheck').length===2;
+        out.check=/不一致/.test(_itemUnitCheck({desc:D,unit:'支',len:12}))&&/單支長/.test(_itemUnitCheck({desc:'H型鋼樁 H300 打設',unit:'支'}))&&/不在清單/.test(_itemUnitCheck({desc:'x',unit:'箱'}))&&_itemUnitCheck({desc:D,unit:'支',len:15})===''&&_itemUnitCheck({desc:'止水鈑',unit:'式'})==='';
+        qx.items[0].len=18;qx.items[0].desc='H型鋼樁 H300 打設、拔除';eid='qX';out.lenOf=_itemLenOf(qx.items[0])===18&&_rfqLen('H型鋼樁 H300 打設、拔除')===18&&_rfqLen('XX L=9M')===9;
+        // 5 月表單：已填灰底、覆蓋／略過、新增日報與點工、支出去重
+        Q.push({id:'qM',code:'115100503',name:'月表單測試案',client:'丙',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:D,unit:'支',qty:'133',price:'40000',sec:false},{desc:'支撐 H300 架設',unit:'M',qty:'100',price:'1000',sec:false}],
+          dailyLogs:[{id:'d1',date:'2026-10-03',workers:2,progressRows:[{itemIdx:0,desc:D,qty:60}]}],costs:[{id:'c1',type:'extra',vendor:'公司支出（自付）',cat:'雜費',date:'2026-10-05',src:'quick',rows:[{id:'c1_0',desc:'便當',days:1,dayRate:300}],amt:300}]});
+        const qm=Q.find(x=>x.id==='qM');go('quickcost');rQuickCost();_dmQid='qM';_dmYm='2026-10';document.getElementById('dr-month-card').style.display='none';drMonthToggle();
+        const tb=document.getElementById('dr-month-tbl');const row=d=>tb.querySelector('tr[data-d="2026-10-'+String(d).padStart(2,'0')+'"]');
+        out.grid=!!tb&&tb.querySelectorAll('tbody tr').length===31&&row(3).querySelector('.dm-q[data-i="0"]').getAttribute('data-old')==='60'&&row(3).querySelector('.dm-q[data-i="0"]').value==='60'&&/已有：便當 300/.test(row(5).innerHTML)&&document.getElementById('dr-month-card').style.display!=='none';
+        row(3).querySelector('.dm-q[data-i="0"]').value='70';row(4).querySelector('.dm-q[data-i="0"]').value='50';row(4).querySelector('.dm-w').value='3';
+        row(5).querySelector('.dm-ct').value=String(QC_TYPES.findIndex(t=>t[0]==='便當'));row(5).querySelector('.dm-ca').value='300';
+        row(6).querySelector('.dm-ct').value=String(QC_TYPES.findIndex(t=>t[0]==='涼水'));row(6).querySelector('.dm-ca').value='200';row(6).querySelector('.dm-cn').value='飲料';
+        drMonthSubmit();out.conf=document.getElementById('gen-confirm-modal').style.display==='flex'&&/2026-10-03/.test(document.getElementById('gen-confirm-msg').innerHTML)&&/60 → 70/.test(document.getElementById('gen-confirm-msg').innerHTML);
+        document.getElementById('gen-confirm-ok').click();
+        const L3=qm.dailyLogs.find(L=>L.date==='2026-10-03'),L4=qm.dailyLogs.find(L=>L.date==='2026-10-04');
+        out.applied2=!!L3&&L3.progressRows[0].qty===70&&!!L4&&L4.progressRows[0].qty===50&&L4.workers===3&&L4.src==='month'&&qm.costs.filter(c=>c.cat==='雜費'&&c.amt===300&&c.date==='2026-10-05').length===1&&qm.costs.some(c=>c.date==='2026-10-06'&&c.amt===200&&c.rows[0].desc==='飲料');
+        const tb2=document.getElementById('dr-month-tbl');tb2.querySelector('tr[data-d="2026-10-04"] .dm-q[data-i="0"]').value='55';drMonthSubmit();
+        out.skip=document.getElementById('gen-confirm-modal').style.display==='flex';document.getElementById('gen-confirm-cancel').click();
+        out.skipped=qm.dailyLogs.find(L=>L.date==='2026-10-04').progressRows[0].qty===50&&document.getElementById('gen-confirm-modal').style.display!=='flex';
+        // 6 跨案購租分析
+        MAT_LEDGER.push({id:'L1',name:'型鋼',spec:'H300',len:12,qty:30,uw:93,price:20,date:'2026-01-10',kind:'重複性',loc:'公司倉庫',_mt:1});
+        qm.mat={rows:[],use:[],loss:[],rents:[{id:'rn1',vendor:'英洲',rowId:'',name:'型鋼',spec:'H300',len:15,rate:60,cm:1995,pf:_dAdd(localToday(),-30),pt:_dAdd(localToday(),150),mode:'day',batches:[{id:'b1',d:_dAdd(localToday(),-30),m:1995,n:133,o:''}]}],equip:[],tps:[],_m6:1};
+        const cr=_m6CrossRows().find(o=>o.spec==='H300');
+        out.cross=!!cr&&cr.buyPerM===1860&&cr.rate===60&&Math.round(cr.payback)===31&&cr.nCases===1&&cr.rent12===_m6RentToDate(qm.mat.rents[0])&&cr.openPcs===133&&cr.ownPcs===30;
+        _m6Qid='qM';go('mat6');out.crossUI=/購租分析（跨案）/.test(document.getElementById('mat6-root').innerHTML)&&/>H300</.test(document.getElementById('mat6-root').innerHTML);
+        window.toast=oT;Q=[];MAT_LEDGER.length=0;eid=null;_qOwnerDraft=null;window._qSnap=null;res(out);
+        })().catch(e=>res({err:String(e.stack||e).slice(0,500)}));
+      })
+    );
+    check('匯入業主詢價單（xlsx）：表頭自動辨識、工項帶入（單位／數量／單支長）、條款唯讀、合計列；儲存連結原檔', r.map && r.preview && r.applied && r.saved, JSON.stringify(r));
+    check('回填匯出：單價、複價、小計／稅／總計寫回原格並加本公司備註；docx 表格辨識、回填與備註段落；移除連結', r.exported && r.dmap && r.dexp && r.removed, JSON.stringify(r));
+    check('單位清單＋單支長欄位＋換算檢查（不一致／缺單支長／單位不在清單），_rfqLen 優先用明確單支長', r.unitUI && r.check && r.lenOf, JSON.stringify(r));
+    check('月表單：已填灰底帶值、同日同項不同值問覆蓋／略過、新增日報與點工、支出同日同類同額視為重複', r.grid && r.conf && r.applied2 && r.skip && r.skipped, JSON.stringify(r));
+    check('跨案購租分析：每規格購置 $/M、平均月租、回本月數、近 12 個月租金、在租／自有支數', r.cross && r.crossUI, JSON.stringify(r));
+    check('v6.0.32 第五批流程無 Console 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
