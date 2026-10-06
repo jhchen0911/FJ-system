@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.37';
+var APP_VERSION='v6.0.38';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -33896,8 +33896,8 @@ function openSubAdvance(cid,pre){
   var c=(q.costs||[]).find(function(x){return x.id===cid;});if(!c||c.type!=='sub')return;
   if(!c.vendor||c.vendor==='公司支出（自付）'){toast('請先選擇承包廠商');return;}
   pre=pre||{};
-  var e=_subCurEstimate(q,c),as=_subAdvStat(c);
-  _saCtx={cid:cid,est:(c.isIntro||c.followOf)?Infinity:(e.est+(pre.aid?Math.round(parseFloat(pre.amt)||0):0)),aid:pre.aid||''};   // v6.0.26 可修改   // v6.0.24 介紹費先付不受本期預估限制
+  var e=_subCurEstimate(q,c),as=_subAdvStat(c),_ub=_subUnpaidBilled(c);   // v6.0.38 已登錄未付的期別可直接扣
+  _saCtx={cid:cid,est:(c.isIntro||c.followOf)?Infinity:(e.est+_ub.sum+(pre.aid?Math.round(parseFloat(pre.amt)||0):0)),aid:pre.aid||''};   // v6.0.26 可修改   // v6.0.24 介紹費先付不受本期預估限制
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   var html='<div class="fg fg2" style="gap:8px">'
     +'<div class="f"><label>預付日期（應付到期日）</label><input id="sa-date" type="date" value="'+esc(pre.date||localToday())+'" style="'+IN+'"></div>'
@@ -33906,15 +33906,16 @@ function openSubAdvance(cid,pre){
     +(pre.aid?'':'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:11.5px;color:var(--b4);margin-top:4px">快速帶入：'+_saQuickChips(c)+'</div>')
     +'<div class="f" style="margin-top:4px"><label>備註</label><input id="sa-note" value="'+esc(pre.note||'')+'" placeholder="例：進場前材料款" style="'+IN+'"></div>'
     +'<div style="background:var(--b0);border-radius:var(--r8);padding:8px 10px;font-size:12px;line-height:1.8;margin-top:6px">'
+    +(_ub.sum>0?('已登錄未付 <b style="color:#1565C0">NT$ '+fmt(_ub.sum)+'</b><span style="color:var(--b4);font-size:11px">（'+_ub.rows.map(function(r){return '第'+r.per.no+'期 '+fmt(r.room);}).join('、')+'，預付款會先從這裡扣）</span><br>'):'')
     +'本期預估款項 <b>NT$ '+fmt(e.est)+'</b><span style="color:var(--b4);font-size:11px">（'+(e.anyDaily?('日報已完成未計價量 × 發包單價，扣保留款'):'期間內尚無日報回報')+'）</span><br>'
-    +'預付未抵 <b style="color:#1565C0">NT$ '+fmt(as.left)+'</b>　發包未計價 <b>NT$ '+fmt(e.remain)+'</b><br>'
-    +'<span style="color:var(--b4);font-size:11px">預付款立即掛應付（到期＝預付日期）；之後各期計價預設全額抵扣，應付＝本期金額−保留款−抵扣預付款</span></div>'
+    +'預付未扣回 <b style="color:#1565C0">NT$ '+fmt(as.left)+'</b>　發包未計價 <b>NT$ '+fmt(e.remain)+'</b><br>'
+    +'<span style="color:var(--b4);font-size:11px">預付款立即掛一筆應付（到期＝付款日）。已登錄未付的期別立刻扣掉這筆；不夠扣的留到下期登錄請款時扣，應付＝本期金額−保留款−預付款</span></div>'
     +'<div id="sa-warn" style="display:none;margin-top:8px;background:#fdecea;border:1px solid #f5b5ae;border-radius:var(--r8);padding:8px 10px;font-size:12px">'
-    +'<div style="color:var(--red);font-weight:700">⚠ 預付款超過本期預估款項 NT$ '+fmt(e.est)+'</div>'
+    +'<div style="color:var(--red);font-weight:700">⚠ 預付款超過可扣回的金額 NT$ '+fmt(e.est+_ub.sum)+'（已登錄未付＋本期預估）</div>'
     +'<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12.5px"><input id="sa-special" type="checkbox"'+(pre.special?' checked':'')+' style="width:16px;height:16px"> 特殊情況（仍要預付）</label>'
     +'<textarea id="sa-reason" rows="2" placeholder="請說明原因，例：廠商材料款需先墊、業主同意…" style="'+IN+';margin-top:6px;resize:vertical">'+esc(pre.reason||'')+'</textarea></div>';
   var _ep=pre.aid?null:_subEarlyPick(c);if(_ep)html='<div style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:var(--r8);padding:7px 10px;font-size:12px;margin-bottom:8px;color:#0d47a1">第 '+_ep.no+' 期已登錄請款、尚未付款：如果是這期的錢先放一部分，請改用 <a href="javascript:void(0)" onclick="document.getElementById(\'gen-confirm-modal\').style.display=\'none\';openSubEarly(\''+c.id+'\','+_ep.no+')" style="color:#1565C0;font-weight:700">提前放款</a>（預支＝還沒請款就先給的錢，下期請款再扣回）</div>'+html;
-  showConfirm((pre.aid?'修改預付款：':'預付款（未請款）：')+esc(c.vendor)+'（'+esc(q.name||'')+'）',html,function(){_saSave();},false,null,false);
+  showConfirm((pre.aid?'修改預付款：':'預付款：')+esc(c.vendor)+'（'+esc(q.name||'')+'）',html,function(){_saSave();},false,null,false);
   _saOnInput();
 }
 function _saOnInput(){
@@ -33934,7 +33935,8 @@ function _saSave(){
   if(!Array.isArray(c.advances))c.advances=[];
   var a={id:Date.now().toString(36)+Math.random().toString(36).slice(2,4),date:date,amt:amt,note:note,ts:Date.now()};
   if(amt>_saCtx.est){a.special=true;a.reason=reason;a.est=_saCtx.est;}
-  if(_saCtx.aid){var _oa=_subAdvs(c).find(function(x){return x.id===_saCtx.aid;});if(_oa){_oa.date=date;_oa.amt=amt;_oa.note=note;if(a.special){_oa.special=true;_oa.reason=a.reason;_oa.est=a.est;}_oa.mt=Date.now();}_subAdvClamp(c);}else c.advances.push(a);   // v6.0.26 修改
+  if(_saCtx.aid){var _oa=_subAdvs(c).find(function(x){return x.id===_saCtx.aid;});var _old=_oa?Math.round(parseFloat(_oa.amt)||0):0;if(_oa){_oa.date=date;_oa.amt=amt;_oa.note=note;if(a.special){_oa.special=true;_oa.reason=a.reason;_oa.est=a.est;}_oa.mt=Date.now();}_subAdvClamp(c);if(!c.followOf&&amt>_old)_subAdvAutoApply(c,amt-_old);}   // v6.0.26 修改；v6.0.38 加碼的部分先扣未付期別
+  else{c.advances.push(a);if(!c.followOf)_subAdvAutoApply(c,amt);}   // v6.0.38 統一：已登錄未付的期別立刻扣（原提前放款）
   _touch(q);
   try{var _fm=_subFollowMain(q,c);if(_fm)_subFollowApply(q,_fm);}catch(e){_err('_saSave.follow',e);}   // v6.0.24 介紹費先付 → 跟隨期別立即抵扣
   try{syncCostToPayable(q,c);}catch(e){_err('_saSave',e);}
@@ -36388,7 +36390,7 @@ function _syncSubPeriodPayables(q,c){
     var idx=find(pid),old=idx>=0?PAYABLES[idx]:null;
     var p={id:pid,costId:c.id,costAdv:a.id,quoteId:q.id,to:vendor,amount:amt,vat:_subInvoice(c),
       date:(old&&old.date)||a.date||localToday(),category:'subcontract',project:q.name||'',status:(old&&old.status)||'pending',
-      note:(c.isIntro?'預付款（介紹費）':'預付款（未請款）')+(a.note?('：'+a.note):'')+(a.special?('（特殊情況：'+(a.reason||'')+'）'):'')+(itemName?('　'+itemName):''),itemName:itemName,updatedAt:Date.now()};
+      note:(c.isIntro?'預付款（介紹費）':'預付款')+(a.note?('：'+a.note):'')+(a.fromPeriod?('（第'+a.fromPeriod+'期）'):'')+(a.special?('（特殊情況：'+(a.reason||'')+'）'):'')+(itemName?('　'+itemName):''),itemName:itemName,updatedAt:Date.now()};
     put(p,old,idx);
   });
   savePayables();
@@ -37207,7 +37209,7 @@ function setCostView(v){
 // ══════════ v6.0.29 第二批：預付款一鈕、結案一鈕、介紹費合併（算法×時機）、階段完工自動結算、施工成本唯讀、日報支出擴充 ══════════
 // ── 預付款：有已登錄未付的期別 → 該期先放一部分（到期＝放款日）；沒有 → 預先給、之後各期扣回 ──
 function openPrepay(cid){var q=Q.find(function(x){return x.id===eid;});if(!q){toast('請先開啟工程');return;}var c=(q.costs||[]).find(function(x){return x.id===cid;});if(!c)return;var p=_subEarlyPick(c);if(p)openSubEarly(cid,p.no);else openSubAdvance(cid);}
-function _prepayBtn(c){return '<button type="button" onclick="openPrepay(\''+c.id+'\')" title="有已登錄未付的期別→該期先放一部分（到期＝放款日）；沒有→預先給、之後各期請款扣回" style="font-size:11px;padding:3px 10px;border:1px solid #90CAF9;background:#E3F2FD;color:#1565C0;border-radius:99px;cursor:pointer;font-family:inherit;font-weight:700">預付款</button>';}
+function _prepayBtn(c){return '<button type="button" onclick="openPrepay(\''+c.id+'\')" title="先匯一筆給廠商（到期＝付款日）：已登錄未付的期別立刻扣，不夠扣的下期請款時扣" style="font-size:11px;padding:3px 10px;border:1px solid #90CAF9;background:#E3F2FD;color:#1565C0;border-radius:99px;cursor:pointer;font-family:inherit;font-weight:700">預付款</button>';}
 function _subEarlyBtn(){return '';}
 function _subEarlyRowBtn(){return '';}
 // ── 結案：最後一期請款單送出後按一次＝竣工總結算＋標結案＋回寫單價庫 ──
@@ -38537,6 +38539,132 @@ _healthRows=function(){
   }catch(e){_err('_healthRows.v637',e);}
   return R;
 };
+
+
+// ══════════════ v6.0.38：預付款＝提前放款，統一成一個邏輯（v638.js 區塊）══════════════
+// 一筆「預付款」＝在正常放款日之前先匯給廠商的錢：立即掛一筆應付（到期＝付款日），
+// 之後從這家的請款裡扣回——已登錄未付的期別立刻扣（原「提前放款」）、沒有就等下期登錄時扣（原「預付款（未請款）」）。
+// 舊的 per.early[] 一律轉成預付款（_earlyToAdv：金額併進該期 per.adv、應付改 id 並保留已付狀態），介面不再出現「提前放款」。
+function _earlyToAdv(q,c){
+  if(!c||c.type!=='sub')return 0;
+  var n=0;
+  _subPeriods(c).forEach(function(per){
+    if(per.isRet||!Array.isArray(per.early)||!per.early.length)return;
+    if(!Array.isArray(c.advances))c.advances=[];
+    per.early.forEach(function(e){
+      var amt=Math.round(parseFloat(e.amt)||0);
+      var a={id:'e'+e.id,date:e.date||per.date||localToday(),amt:amt,note:(e.note&&e.note!=='由預付款轉入')?e.note:'',fromPeriod:per.no,ts:e.ts||Date.now()};
+      c.advances.push(a);
+      per.adv=Math.round(parseFloat(per.adv)||0)+amt;
+      var oldId='pay'+c.id+'_p'+per.no+'_e'+e.id,newId=_subAdvPayId(c.id,a);
+      var oi=-1;PAYABLES.forEach(function(p,i){if(p&&p.id===oldId&&oi<0)oi=i;});
+      if(oi>=0){var op=PAYABLES[oi];if(!PAYABLES.some(function(p){return p&&p.id===newId;})){var np=Object.assign({},op,{id:newId,costAdv:a.id,note:'預付款'+(a.note?('：'+a.note):'')+'（第'+per.no+'期）'});delete np.costEarly;_touch(np);PAYABLES.splice(oi,1,np);}else PAYABLES.splice(oi,1);_tomb('payables',oldId);}
+      n++;
+    });
+    delete per.early;per.mt=Date.now();
+  });
+  if(n){_touch(q);}
+  return n;
+}
+function _advUnifyAll(){
+  var n=0;
+  (Q||[]).forEach(function(q){(q&&q.costs||[]).forEach(function(c){try{var k=_earlyToAdv(q,c);if(k){n+=k;try{syncCostToPayable(q,c);}catch(e){_err('_advUnifyAll.sync',e);}}}catch(e){_err('_advUnifyAll',e);}});});
+  if(n){try{persist();savePayables();_markDirty();}catch(e){_err('_advUnifyAll.save',e);}console.info('[FY] 提前放款併入預付款：'+n+' 筆');}
+  return n;
+}
+try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{_advUnifyAll();}catch(e){_err('advUnify',e);}},3500);});setInterval(function(){try{_advUnifyAll();}catch(e){}},120000);}catch(e){}
+var _syncSubPeriodPayables638=_syncSubPeriodPayables;
+_syncSubPeriodPayables=function(q,c){try{_earlyToAdv(q,c);}catch(e){_err('_earlyToAdv',e);}return _syncSubPeriodPayables638(q,c);};
+
+// 已登錄、應付未付的期別（可以直接扣預付款的地方）
+function _subUnpaidBilled(c){
+  var out=[],sum=0;
+  _subPeriods(c).filter(function(p){return !p.isRet;}).slice().sort(function(a,b){return (a.no||0)-(b.no||0);}).forEach(function(per){
+    var p=PAYABLES.find(function(x){return x.id===_subPayId(c.id,per);});if(p&&p.status==='paid')return;
+    var k=_subPeriodCalc(c,per);if(k.pay<=0)return;
+    out.push({per:per,room:k.pay});sum+=k.pay;
+  });
+  return {rows:out,sum:sum};
+}
+// 新增／加碼的預付款：先從已登錄未付的期別扣（由早到晚），扣不完的留到下期登錄時扣
+function _subAdvAutoApply(c,amt){
+  var left=Math.round(amt)||0;if(left<=0)return 0;
+  var ub=_subUnpaidBilled(c),used=0;
+  ub.rows.forEach(function(r){if(left<=0)return;var t=Math.min(left,r.room);r.per.adv=Math.round(parseFloat(r.per.adv)||0)+t;r.per.mt=Date.now();left-=t;used+=t;});
+  return used;
+}
+// 抵扣總額不得超過預付款總額：超過的從最晚的「未付」期別往回扣（已付的期別不動）
+function _subAdvClamp(c){
+  var tot=_subAdvs(c).reduce(function(a,x){return a+Math.round(parseFloat(x.amt)||0);},0);
+  var ps=_subPeriods(c).filter(function(p){return !p.isRet;}).slice().sort(function(a,b){return (b.no||0)-(a.no||0);});
+  var used=ps.reduce(function(a,p){return a+_subPeriodCalc(c,p).adv;},0),over=used-tot;
+  ps.forEach(function(p){if(over<=0)return;var pp=PAYABLES.find(function(x){return x.id===_subPayId(c.id,p);});if(pp&&pp.status==='paid')return;var k=_subPeriodCalc(c,p);var cut=Math.min(k.adv,over);if(cut>0){p.adv=k.adv-cut;p.mt=Date.now();over-=cut;}});
+  return over;   // >0＝已付期別裡還扣著比預付總額多的錢（刪不得）
+}
+function _subEarlyPick(){return null;}
+function openSubEarly(cid){openSubAdvance(cid);}
+function _subEarlyRowBtn(){return '';}
+// 應付：標記已付（填實付日）
+function payMarkPaid(pid,defDate,after){
+  var p=PAYABLES.find(function(x){return x.id===pid;});if(!p)return;
+  var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
+  showConfirm('標記已付：'+esc(p.to||''),'<div style="font-size:12.5px;line-height:1.8">'+esc((p.note||'').slice(0,60))+'<br>應付 NT$ <b>'+fmt(_payEff(p))+'</b>（'+(p.vat===false?'不含稅':'含稅')+'）</div><div class="f" style="margin-top:6px"><label>實付日</label><input id="pmp-date" type="date" value="'+esc(p.paidDate||defDate||p.date||localToday())+'" style="'+IN+'"></div>',function(){
+    p.status='paid';p.paidDate=gv('pmp-date')||defDate||localToday();p.paidAt=Date.now();_touch(p);
+    try{savePayables();_onSave();}catch(er){_err('payMarkPaid',er);}
+    try{rCostItems();}catch(er){}try{if(typeof after==='function')after();}catch(er){}toast('已標記已付');
+  },false,null,false);
+}
+// 分包管理表：預付款列（統一後：顯示扣在哪幾期、可標記已付／改回未付／修改／刪除）
+function _subAdvRowsHtml(c){
+  var B=function(js,lbl,clr,bd){return '<button type="button" onclick="'+js+'" style="font-size:11px;padding:2px 8px;border:1px solid '+(bd||'var(--b2)')+';background:var(--w);color:'+(clr||'var(--b5)')+';border-radius:99px;cursor:pointer;font-family:inherit;margin-left:3px">'+lbl+'</button>';};
+  return _subAdvs(c).slice().sort(function(a,b){return String(a.date||'')<String(b.date||'')?-1:1;}).map(function(a){
+    var amt=Math.round(parseFloat(a.amt)||0),p=PAYABLES.find(function(x){return x.id===_subAdvPayId(c.id,a);});
+    var eff=p?_payEff(p):(amt+(_subInvoice(c)?Math.round(amt*_taxR()/100):0));
+    var used=_subAdvUsedBy(c,a);
+    var stTxt=!p?('<span style="color:var(--red)">缺應付</span>'+B("subPayResync('"+c.id+"')",'補建應付','var(--red)','#f0c4c4')):(p.status==='paid'?'<span style="color:#1B5E20">✓ 已付 '+esc(p.paidDate||'')+'</span>':('<span style="color:#b45309">未付</span>'+(p.date&&p.date<localToday()?' <span style="color:var(--red);font-weight:700">逾期</span>':'')));
+    var usedSum=used.reduce(function(s,u){return s+u.amt;},0);
+    var usedTxt=used.length?('<div style="font-weight:400;color:#1565C0;font-size:10.5px">扣在：'+used.map(function(u){return '第'+u.per.no+'期 '+fmt(u.amt);}).join('、')+(usedSum<amt?('；餘 '+fmt(amt-usedSum)+' 下期扣'):'')+'</div>'):'<div style="font-weight:400;color:var(--b4);font-size:10.5px">尚未扣回（下期登錄請款時自動扣）</div>';
+    var acts=(p?(p.status==='paid'?B("payUnmark('"+p.id+"')",'改回未付','#b45309','#ffcc80'):B("payMarkPaid('"+p.id+"','"+esc(a.date||'')+"')",'標記已付','#1B5E20','#a5d6a7')):'')
+      +((p&&p.status==='paid')?'':B("editSubAdvance('"+c.id+"','"+a.id+"')",'修改'))+((p&&p.status==='paid')?'':B("delSubAdvance('"+c.id+"','"+a.id+"')",'刪除','var(--red)','#f0c4c4'));
+    return '<tr style="border-bottom:1px solid var(--b1);background:#eef5fd">'
+      +'<td style="padding:4px 6px;white-space:nowrap;color:#1565C0;font-weight:700">'+(c.isIntro?'預付款（介紹費）':'預付款')+(a.fromPeriod?'<div style="font-weight:400;font-size:10px;color:var(--b4)">原第'+a.fromPeriod+'期提前放款</div>':'')+'</td>'
+      +'<td style="padding:4px 6px;font-size:11px;color:var(--b4);white-space:nowrap">'+esc(a.date||'')+'</td>'
+      +'<td style="padding:4px 6px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(amt)+'</td>'
+      +'<td style="padding:4px 6px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">'+fmt(eff)+'</td>'
+      +'<td style="padding:4px 6px;font-size:11px;white-space:nowrap">'+esc((p&&p.date)||a.date||'')+'</td>'
+      +'<td style="padding:4px 6px;font-size:11.5px;font-weight:700">'+stTxt+usedTxt+(a.note?'<div style="font-weight:400;color:var(--b4);font-size:10.5px">'+esc(a.note)+'</div>':'')+(a.special?'<div style="font-weight:400;color:var(--red);font-size:10.5px">特殊情況：'+esc(a.reason||'')+'（超過本期預估 '+fmt(a.est||0)+'）</div>':'')+'</td>'
+      +'<td style="padding:4px 6px;text-align:right;white-space:nowrap">'+acts+'</td></tr>';
+  }).join('');
+}
+// 刪除預付款：先把它扣在未付期別的部分收回；扣在已付期別的才擋
+function delSubAdvance(cid,aid){
+  var q=Q.find(function(x){return x.id===eid;});if(!q)return;
+  var c=(q.costs||[]).find(function(x){return x.id===cid;});if(!c)return;
+  var a=_subAdvs(c).find(function(x){return x.id===aid;});if(!a)return;
+  var p=PAYABLES.find(function(x){return x.id===_subAdvPayId(cid,a);});
+  if(p&&p.status==='paid'){toast('此預付款已付款，不能刪除；請先按「改回未付」');return;}
+  var amt=Math.round(parseFloat(a.amt)||0);
+  var tot=_subAdvs(c).reduce(function(s,x){return s+Math.round(parseFloat(x.amt)||0);},0);
+  var usedPaid=0;_subPeriods(c).forEach(function(per){if(per.isRet)return;var pp=PAYABLES.find(function(x){return x.id===_subPayId(c.id,per);});if(pp&&pp.status==='paid')usedPaid+=_subPeriodCalc(c,per).adv;});
+  if(!c.followOf&&usedPaid>tot-amt+1e-6){toast('這筆預付款已扣在「已付款」的期別裡，不能刪除');return;}
+  showConfirm('刪除預付款','確定刪除 '+esc(a.date||'')+' 的預付款 NT$ '+fmt(amt)+'？對應的應付會移除，已扣在未付期別的金額會加回該期應付。',function(){
+    c.advances=_subAdvs(c).filter(function(x){return x.id!==aid;});
+    try{_subAdvClamp(c);}catch(e){_err('delSubAdvance.clamp',e);}
+    _touch(q);
+    try{var _fm=_subFollowMain(q,c);if(_fm)_subFollowApply(q,_fm);}catch(e){_err('delSubAdvance.follow',e);}
+    try{syncCostToPayable(q,c);}catch(e){_err('delSubAdvance',e);}
+    try{persist();_immediateUpload();}catch(e){_err('delSubAdvance',e);}
+    rCostItems();toast('已刪除');
+  },true);
+}
+function editSubAdvance(cid,aid){
+  var q=Q.find(function(x){return x.id===eid;});if(!q)return;var c=(q.costs||[]).find(function(x){return x.id===cid;});if(!c)return;
+  var a=_subAdvs(c).find(function(x){return x.id===aid;});if(!a)return;
+  var p=PAYABLES.find(function(x){return x.id===_subAdvPayId(cid,a);});
+  if(p&&p.status==='paid'){toast('此預付款已付款，金額不能改；要改請先按「改回未付」');return;}
+  openSubAdvance(cid,{aid:aid,date:a.date,amt:a.amt,note:a.note,special:a.special,reason:a.reason});
+}
+function subAdvToEarly(cid,aid){toast('預付款與提前放款已合併：預付款會自動扣在已登錄未付的期別，不需要轉換');}
 
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
