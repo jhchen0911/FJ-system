@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.41';
+var APP_VERSION='v6.0.42';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -29029,13 +29029,12 @@ function renderPayables(){
           +'</div></div>'
           +'<div class="qr"><div class="qa" style="color:var(--red)">NT$ '+fmt(_payEff(p))+'</div>'
         +(p.vat!==false?'<div style="font-size:10px;color:var(--b3)">未稅 '+fmt(p.amount||0)+'＋5%稅 '+fmt(_payVatAmt(p))+'</div>':'')
-        +'<label style="font-size:10px;color:var(--b4);display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" '+(p.vat!==false?'checked':'')+' onchange="togglePayVat(\''+p.id+'\',this.checked)" style="width:13px;height:13px;min-width:13px">5%稅</label>'
+        +_payVatCtl(p)   // v6.0.42 自動產生的不給改稅別
           +'<span class="bdg '+(p.status==='paid'?'ok':'warn')+'">'+(p.status==='paid'?'✓ 已付款':'待付款')+'</span></div>'
           +'<div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">'
           +(p.status!=='paid'?'<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="confirmPayment(\''+p.id+'\')">✓ 付款</button>'+_payVendorAllBtn(p):'')
         +(p.quoteId?'<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts(\''+p.quoteId+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>':'')
-          +'<button type="button" class="btn btn-xs" title="編輯付款記錄" onclick="editPayable(\''+p.id+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg></button>'
-          +'<button type="button" class="btn btn-xs btn-r" title="刪除" onclick="delPayable(\''+p.id+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button>'
+          +_payEditBtns(p)   // v6.0.42 自動產生的唯讀
           +_payFilesInline(p)+'</div>'   // v6.0.39 附件鈕併入同列
       +'</div>' 
       );};
@@ -29049,10 +29048,10 @@ function renderPayables(){
         +'</div>'
       );
     });
-    el.innerHTML=_agingBar+_rows.join('');
+    el.innerHTML=_agingBar+_payAutoHint()+_rows.join('');
   } else {
     if(!sorted.length){el.innerHTML=_agingBar+'<div class="empty" style="padding:20px"><p style="font-size:12.5px;color:var(--b3)">此分類目前沒有項目</p></div>';return;}
-    el.innerHTML=_agingBar+sorted.map(p=>`
+    el.innerHTML=_agingBar+_payAutoHint()+sorted.map(p=>`
     <div class="ql" style="cursor:default">
       <div class="qdot" style="background:${p.status==='paid'?'var(--g)':'var(--red)'}"></div>
       <div class="qm" style="flex:1;min-width:0">
@@ -29068,14 +29067,13 @@ function renderPayables(){
       <div class="qr">
         <div class="qa" style="color:var(--red)">NT$ ${fmt(_payEff(p))}</div>
         ${p.vat!==false?`<div style="font-size:10px;color:var(--b3)">未稅 ${fmt(p.amount||0)}＋5%稅 ${fmt(_payVatAmt(p))}</div>`:''}
-        <label style="font-size:10px;color:var(--b4);display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" ${p.vat!==false?'checked':''} onchange="togglePayVat('${p.id}',this.checked)" style="width:13px;height:13px;min-width:13px">5%稅</label>
+        ${_payVatCtl(p)}
         <span class="bdg ${p.status==='paid'?'ok':'warn'}">${p.status==='paid'?'✓ 已付款':'待付款'}</span>
       </div>
       <div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">
         ${p.status!=='paid'?`<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="confirmPayment('${p.id}')">✓ 付款</button>`:''}
               ${p.quoteId?`<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts('${p.quoteId}')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>`:''}
-        <button type="button" class="btn btn-xs" title="編輯付款記錄" onclick="editPayable('${p.id}')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg></button>
-        <button type="button" class="btn btn-xs btn-r" title="刪除" onclick="delPayable('${p.id}')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button>
+        ${_payEditBtns(p)}
         ${_payFilesInline(p)}
       </div>
     </div>`).join('');
@@ -38499,7 +38497,7 @@ function _subPayAuditHtml(q,c){
     +rows.map(function(r){var p=r.p;
       var mapTxt=r.orphan?'<span style="color:var(--red);font-weight:700">無對應</span><div style="font-size:10px;color:var(--b4)">'+(r.mine?'這張卡沒有這筆的來源':(r.p.costSourceId===c.id?'手動建立並連結此發包的應付（與分期應付重複）':'同廠商同工程，但沒掛在任何成本卡'))+'</div>':esc(r.map);
       var ops=(p.status==='paid'?_pbtn("payUnmark('"+p.id+"')",'改回未付','#b45309','#ffcc80'):_pbtn("confirmPayment('"+p.id+"');try{rCostItems();}catch(e){}",'付款','#1B5E20','#a5d6a7'))
-        +_pbtn("delPayable('"+p.id+"');setTimeout(function(){try{rCostItems();}catch(e){}},300)",'刪除','var(--red)','#f0c4c4');
+        +(r.orphan?_pbtn("delPayable('"+p.id+"');setTimeout(function(){try{rCostItems();}catch(e){}},300)",'刪除','var(--red)','#f0c4c4'):'');   // v6.0.42 對得上的不給刪
       return '<tr style="border-bottom:1px solid var(--b1);'+(r.orphan?'background:#fff5f5':'')+'"><td style="padding:3px 6px">'+mapTxt+'</td><td style="padding:3px 6px;color:var(--b4)">'+esc((p.note||'').slice(0,60))+'</td><td style="padding:3px 6px;white-space:nowrap">'+esc(p.status==='paid'?('實付 '+(p.paidDate||'')):('到期 '+(p.date||'')))+'</td><td style="padding:3px 6px;text-align:right;font-weight:700;white-space:nowrap">'+fmt(_payEff(p))+(p.vat===false?'':'<div style="font-size:10px;font-weight:400;color:var(--b4)">未稅 '+fmt(p.amount||0)+'</div>')+'</td><td style="padding:3px 6px;text-align:center;white-space:nowrap;color:'+(p.status==='paid'?'#1B5E20':'#b45309')+'">'+(p.status==='paid'?'✓ 已付':'待付')+'</td><td style="padding:3px 6px;text-align:right;white-space:nowrap">'+ops+'</td></tr>';
     }).join('')+'</tbody></table></div>';
   return h;
@@ -38823,6 +38821,72 @@ try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(
 // 工程專案分包列：預付款列尾加「重算抵扣」
 var _pjAdvRowsHtml640=_pjAdvRowsHtml;
 _pjAdvRowsHtml=function(c){var h=_pjAdvRowsHtml640(c);if(!h||!c||c.followOf)return h;return h.replace(/<\/div>$/,'<div style="text-align:right;margin-top:2px">'+_reallocBtn(c).replace('font-size:11px;padding:3px 10px','font-size:10.5px;padding:1px 8px')+'</div></div>');};
+
+
+// ══════════════ v6.0.42：自動產生的應付一律唯讀（v642.js 區塊）══════════════
+// 由來源連動產生的應付（發包期別／預付款／介紹費／自有或額外成本卡／薪資／勞健保／零用金／專案獎金）
+// 不給修改、刪除、改稅別的按鈕，只能付款或上傳附件；要改請到來源。對應不到來源的（孤兒）才可刪。
+function _subExpectedPayIds(c){
+  var exp={};
+  _subPeriods(c).forEach(function(per){exp[_subPayId(c.id,per)]=per.isRet?'保留款退還':('第'+per.no+'期計價');});
+  _subAdvs(c).forEach(function(a){exp[_subAdvPayId(c.id,a)]='預付款';});
+  exp['pay'+c.id+'_intro']='介紹費';
+  if(!_subPeriods(c).length)exp['pay'+c.id]='發包整筆';
+  return exp;
+}
+function _paySource(p){
+  if(!p)return {auto:false};
+  var id=String(p.id||'');
+  var acct=function(t){return "go('acct');setTimeout(function(){acctTab('"+t+"');},200)";};
+  if(/^pay_ps_/.test(id))return {auto:true,label:'薪資條',go:acct('pay')};
+  if(/^pay_ins_/.test(id))return {auto:true,label:'勞健保／勞退（薪資）',go:acct('pay')};
+  if(/^pay_pc_/.test(id))return {auto:true,label:'零用金結算',go:acct('petty')};
+  if(/^comm_/.test(id))return {auto:true,label:'專案獎金（得標設定）',go:p.quoteId?("openProj('"+p.quoteId+"')"):''};
+  if(p.costId){
+    var found=null,qq=null;
+    (Q||[]).some(function(q){var c=(q&&q.costs||[]).find(function(x){return x&&x.id===p.costId;});if(c){found=c;qq=q;return true;}return false;});
+    if(found){
+      if(found.type==='sub'){var exp=_subExpectedPayIds(found);if(!exp[id])return {auto:false,orphan:true};return {auto:true,label:(found.isIntro?'介紹費・':'發包・')+exp[id],go:"openProjectCosts('"+qq.id+"');setTimeout(function(){setCostView('subs');},300)"};}
+      return {auto:true,label:found.type==='extra'?'額外支出':(found.rental?'租賃卡（材料．運輸）':'自有成本卡'),go:"openProjectCosts('"+qq.id+"')"};
+    }
+    return {auto:false,orphan:true};
+  }
+  return {auto:false};
+}
+function _payVatCtl(p){
+  var s=_paySource(p);
+  if(s.auto)return '<span style="font-size:10px;color:var(--b4)">'+(p.vat!==false?'含 5% 稅':'不含稅')+'</span>';
+  return '<label style="font-size:10px;color:var(--b4);display:inline-flex;align-items:center;gap:3px;cursor:pointer"><input type="checkbox" '+(p.vat!==false?'checked':'')+' onchange="togglePayVat(\''+p.id+'\',this.checked)" style="width:13px;height:13px;min-width:13px">5%稅</label>';
+}
+function _payEditBtns(p){
+  var s=_paySource(p);
+  if(s.auto)return '<span title="由「'+esc(s.label)+'」自動產生：金額、稅別、日期請到來源改" style="display:inline-flex;align-items:center;gap:3px;font-size:10.5px;color:var(--b4);border:1px dashed var(--b2);border-radius:99px;padding:3px 8px">🔒 '+esc(s.label)+'</span>'
+    +(s.go&&!p.quoteId?'<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源" onclick="'+s.go+'">來源</button>':'');
+  return '<button type="button" class="btn btn-xs" title="編輯付款記錄" onclick="editPayable(\''+p.id+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg></button>'
+    +'<button type="button" class="btn btn-xs btn-r" title="刪除" onclick="delPayable(\''+p.id+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg></button>';
+}
+function _payAutoHint(){return '<div style="font-size:11px;color:var(--b4);margin:-6px 0 10px;text-align:center">廠商發包、預付款、租金、薪資、零用金的應付都由來源自動產生（🔒），這裡只能付款與上傳附件；要改金額或稅別請到來源。「新增」只用於雜項（房租、保險、規費…）。</div>';}
+// ★ 修正：舊的 cleanDuplicatePayables 以 costId 去重，會把同一張發包卡的期別／預付款應付只留一筆（其餘直接丟掉）——
+//   這是「第 1 期餘款不見、只剩已付預付款」的根本原因（開應付分頁就觸發）。改為：只清「同 id 重複」，
+//   以及「同 costId 的多筆整筆應付」（沒有期別／預付／介紹標記的舊式整筆），期別／預付款／介紹費一律保留。
+function cleanDuplicatePayables(){
+  var seenId={},whole={},out=[],n=0;
+  var isWhole=function(p){return !p.costPeriod&&!p.costAdv&&!p.costEarly&&!/_(p|r|a|e)\w*$|_intro$/.test(String(p.id||''));};
+  var sorted=PAYABLES.slice().sort(function(a,b){return (b.updatedAt||b._mt||0)-(a.updatedAt||a._mt||0);});
+  var keep=[];
+  sorted.forEach(function(p){
+    if(!p)return;
+    if(p.id){if(seenId[p.id]){n++;return;}seenId[p.id]=1;}
+    if(p.costId&&isWhole(p)){if(whole[p.costId]){n++;return;}whole[p.costId]=1;}
+    keep.push(p);
+  });
+  if(n){var set=new Set(keep);PAYABLES=PAYABLES.filter(function(p){return set.has(p);});savePayables();}
+  return n;
+}
+var _delPayable642=delPayable,_editPayable642=editPayable,_togglePayVat642=togglePayVat;
+delPayable=function(id){var p=(PAYABLES||[]).find(function(x){return x&&x.id===id;});var s=_paySource(p);if(s.auto){toast('這筆由「'+s.label+'」自動產生，請到來源修改或刪除');return;}return _delPayable642.apply(this,arguments);};
+editPayable=function(id){var p=(PAYABLES||[]).find(function(x){return x&&x.id===id;});var s=_paySource(p);if(s.auto){toast('這筆由「'+s.label+'」自動產生，請到來源修改');return;}return _editPayable642.apply(this,arguments);};
+togglePayVat=function(pid,on){var p=(PAYABLES||[]).find(function(x){return x&&x.id===pid;});var s=_paySource(p);if(s.auto){toast('稅別跟著來源的「開發票」設定，請到來源改');try{renderPayables();}catch(e){}return;}return _togglePayVat642.apply(this,arguments);};
 
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
