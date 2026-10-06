@@ -5066,6 +5066,58 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.42 自動產生的應付唯讀；去重不再砍期別／預付款應付 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    const d=n=>{const x=new Date();x.setDate(x.getDate()+n);return x.toISOString().slice(0,10);};
+    Q=[{id:'qR',code:'R',name:'唯讀案',client:'業主',date:d(-60),awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁',unit:'支',qty:'100',price:'1000',sec:false,_uid:'r1'}],t:{sub:100000,tax:5000,total:105000},dailyLogs:[],
+      costs:[{id:'cS',type:'sub',vendor:'甲',cat:'打設',date:d(-50),invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'r1',linkedItemIdx:0,qty:100,unitPrice:500}],amt:50000,advances:[{id:'a1',date:d(-3),amt:10000}],periods:[{no:1,date:d(-5),rows:[{rid:'r1',qty:60}],amt:30000,ret:0,net:30000,adv:10000}]},
+             {id:'cX',type:'extra',vendor:'乙',cat:'其他',date:d(-2),amt:5000,invoice:false,rows:[]}]}];
+    eid='qR';PAYABLES.length=0;Q[0].costs.forEach(c=>syncCostToPayable(Q[0],c));
+    PAYABLES.push({id:'pay_ps_h1_2026-09',to:'小明',project:'',amount:40000,vat:false,date:d(5),status:'pending',category:'salary',note:'薪資'});
+    PAYABLES.push({id:'manualRent',to:'房東',project:'',amount:20000,vat:false,date:d(10),status:'pending',category:'other',note:'房租'});
+    PAYABLES.push({id:'orphanS',costId:'cS',to:'甲',project:'唯讀案',amount:999,vat:true,date:d(1),status:'pending',note:'孤兒'});
+    // 去重不得砍掉同一張卡的期別／預付款應付；同 id 重複與多筆整筆才清
+    PAYABLES.push({id:'paycS_p1',costId:'cS',to:'甲',project:'唯讀案',amount:1,vat:true,status:'pending'});
+    PAYABLES.push({id:'wholeOld1',costId:'cX',to:'乙',project:'唯讀案',amount:5000,vat:false,status:'pending',updatedAt:1});
+    const nDup=cleanDuplicatePayables();
+    out.dedupe=nDup===2&&PAYABLES.filter(p=>p.id==='paycS_p1').length===1&&!!PAYABLES.find(p=>p.id==='paycS_aa1')&&PAYABLES.filter(p=>p.costId==='cX').length===1&&!PAYABLES.some(p=>p.id==='wholeOld1');
+    const src=id=>_paySource(PAYABLES.find(p=>p.id===id));
+    out.cls={per:src('paycS_p1').auto&&/第1期/.test(src('paycS_p1').label),adv:src('paycS_aa1').auto,extra:src(PAYABLES.find(p=>p.costId==='cX').id).auto,ps:src('pay_ps_h1_2026-09').auto,manual:!src('manualRent').auto&&!src('manualRent').orphan,orphan:!src('orphanS').auto&&src('orphanS').orphan};
+    out.clsOk=Object.keys(out.cls).every(k=>out.cls[k]);
+    // 應付頁：自動產生的沒有修改／刪除／稅別勾選；手動的有
+    go('acct');acctTab('ap');renderPayables();
+    const pl=document.getElementById('payable-list');
+    const row=id=>[...pl.querySelectorAll('.ql')].find(x=>x.innerHTML.includes("'"+id+"'")||x.innerHTML.includes(id));
+    const r1=row('paycS_p1'),rm=row('manualRent'),rs=row('pay_ps_h1_2026-09');
+    out.autoRow=!!r1&&!r1.querySelector('button[onclick*="delPayable"]')&&!r1.querySelector('button[onclick*="editPayable"]')&&!r1.querySelector('input[type=checkbox]')&&/🔒/.test(r1.innerHTML)&&!!r1.querySelector('button[onclick*="confirmPayment"]')&&!!r1.querySelector('button[onclick*="_payUpload"]');
+    out.manualRow=!!rm&&!!rm.querySelector('button[onclick*="delPayable"]')&&!!rm.querySelector('button[onclick*="editPayable"]')&&!!rm.querySelector('input[type=checkbox]');
+    out.psRow=!!rs&&/薪資條/.test(rs.innerHTML)&&!!rs.querySelector('button[onclick*="acctTab"]')&&!rs.querySelector('button[onclick*="delPayable"]');
+    out.hint=/由來源自動產生/.test(pl.innerHTML);
+    // 守門：自動產生的刪不掉、改不了稅別；手動的可以
+    let toasts=[];const oT=window.toast;window.toast=m=>toasts.push(String(m));const oC=window.showConfirm;window.showConfirm=function(t,m,ok){ok();};
+    delPayable('paycS_p1');out.delBlocked=PAYABLES.some(p=>p.id==='paycS_p1')&&toasts.some(t=>/自動產生/.test(t));
+    togglePayVat('paycS_p1',false);out.vatBlocked=PAYABLES.find(p=>p.id==='paycS_p1').vat!==false;
+    delPayable('manualRent');out.delManual=!PAYABLES.some(p=>p.id==='manualRent');
+    window.toast=oT;window.showConfirm=oC;
+    // 應付對帳：對得上的沒有刪除鈕，孤兒有
+    openProjectCosts('qR');setCostView('subs');
+    const sh=(document.getElementById('cost-list')||document.getElementById('page-costs')).innerHTML;
+    out.audit=/delPayable\('orphanS'\)/.test(sh)&&!/delPayable\('paycS_p1'\)/.test(sh)&&!/delPayable\('paycS_aa1'\)/.test(sh);
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,600);}
+  Q=[];PAYABLES.length=0;eid=null;res(out);
+}));
+    check('v6.0.42 應付去重只清同 id 與多筆整筆，期別／預付款應付不再被砍（開應付分頁即觸發的舊 bug）', r.dedupe, JSON.stringify(r));
+    check('v6.0.42 來源判定：期別／預付款／額外成本／薪資＝自動；手動雜項＝可改；對不上來源＝孤兒', r.clsOk, JSON.stringify(r.cls));
+    check('v6.0.42 應付頁：自動產生的沒有修改／刪除／稅別勾選，有 🔒 來源與付款、附件；手動的照舊；薪資可跳來源；頁首提示', r.autoRow && r.manualRow && r.psRow && r.hint, JSON.stringify(r));
+    check('v6.0.42 守門：自動產生的刪除／改稅別被擋，手動的可刪；應付對帳只有孤兒才有刪除', r.delBlocked && r.vatBlocked && r.delManual && r.audit, JSON.stringify(r));
+    check('v6.0.42 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
