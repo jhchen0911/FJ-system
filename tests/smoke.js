@@ -4820,6 +4820,73 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.37 施工成本統計格狀、應付分組／已付收合、分包應付對帳與修復、健檢加項 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    const d=n=>{const x=new Date();x.setDate(x.getDate()+n);return x.toISOString().slice(0,10);};
+    Q=[{id:'q7',code:'7',name:'對帳案',client:'業主',date:d(-60),awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 H300，L=15M@80cm 打設、拔除',unit:'支',qty:'133',price:'10000',estCost:'8250',len:15,sec:false,_uid:'x1'}],t:{sub:1330000,tax:66500,total:1396500},dailyLogs:[],
+      costs:[{id:'cA',type:'sub',vendor:'鴻玉',cat:'打設',date:d(-50),invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'r1',linkedItemIdx:0,qty:133,unitPrice:8250}],amt:1097250,
+               periods:[{no:1,date:d(-10),from:d(-40),to:d(-10),rows:[{rid:'r1',qty:133}],amt:1097250,ret:0,net:1097250,due:d(10),early:[{id:'e1',date:d(-30),amt:200000,note:'由預付款轉入'},{id:'e2',date:d(-1),amt:169512,note:'由預付款轉入'}]}]},
+             {id:'cB',type:'sub',vendor:'鴻玉',cat:'打設',date:d(-45),invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'r2',linkedItemIdx:0,qty:133,unitPrice:8250}],amt:1097250,periods:[]},
+             {id:'cX',type:'extra',vendor:'風哥',cat:'其他',date:d(-5),amt:29000,invoice:false,rows:[{id:'rx',desc:'司機',qty:1,unitPrice:29000}],vendorExtra:true}]}];
+    eid='q7';PAYABLES.length=0;
+    Q[0].costs.forEach(c=>{try{syncCostToPayable(Q[0],c);}catch(e){out.syncErr=String(e);}});
+    // 多餘應付：同廠商同工程、沒掛任何成本卡（模擬重複建立）；薪資應付
+    PAYABLES.push({id:'payDup',costId:'cGONE',quoteId:'q7',to:'鴻玉',project:'對帳案',amount:548625,vat:true,date:d(-1),status:'paid',paidDate:d(-1),note:'第1期提前放款：由預付款轉入'});
+    PAYABLES.push({id:'pay_ps_h1_2026-09',to:'陳茹軒',project:'',amount:70000,vat:false,date:d(5),status:'pending',category:'salary',note:'2026 年 9 月 薪資'});
+    PAYABLES.push({id:'payOld',costId:'cA',quoteId:'q7',to:'鴻玉',project:'對帳案',amount:1000,vat:true,date:d(-20),status:'paid',paidDate:d(-20),note:'舊的已付'});
+    // 把 e1 的應付刪掉模擬「缺應付」
+    PAYABLES=PAYABLES.filter(p=>p.id!=='paycA_p1_ee1');
+    const ids=PAYABLES.map(p=>p.id);
+    out.ids=ids.filter(i=>/^paycA/.test(i)||/^paycB/.test(i)||/^paycX/.test(i));
+    const pMain=PAYABLES.find(p=>p.id==='paycA_p1');out.mainAmt=pMain&&pMain.amount;   // 1,097,250 − 369,512 = 727,738
+    // 分包管理明細
+    openProjectCosts('q7');setCostView('subs');
+    const root=document.getElementById('cost-list')||document.getElementById('page-costs');
+    const html=root.innerHTML;
+    out.dupWarn=/同一廠商有兩張發包卡掛同一工項/.test(html)&&/鴻玉/.test(html);
+    out.earlyBtns=/補建應付/.test(html)&&/標記已付/.test(html)&&/openSubEarlyEdit/.test(html);
+    out.audit=/應付對帳/.test(html)&&/無對應/.test(html)&&/沒掛在任何成本卡/.test(html)&&/payUnmark/.test(html);
+    // 補建應付 → e1 回來
+    subPayResync('cA');out.resync=!!PAYABLES.find(p=>p.id==='paycA_p1_ee1');
+    // 標記已付
+    window.showConfirm=function(t,m,ok){document.body.insertAdjacentHTML('beforeend','<input id="sem-date" value="'+d(-30)+'">');ok();document.getElementById('sem-date').remove();};
+    subEarlyMarkPaid('cA',1,'e1');const pe1=PAYABLES.find(p=>p.id==='paycA_p1_ee1');out.marked=pe1&&pe1.status==='paid'&&pe1.paidDate===d(-30);
+    // 修改提前放款金額 → 應付同步
+    window.showConfirm=function(t,m,ok){document.body.insertAdjacentHTML('beforeend','<input id="see-date" value="'+d(-29)+'"><input id="see-amt" value="150000"><input id="see-note" value="改">');ok();['see-date','see-amt','see-note'].forEach(i=>document.getElementById(i).remove());};
+    openSubEarlyEdit('cA',1,'e1');const e1=Q[0].costs[0].periods[0].early[0];const pe1b=PAYABLES.find(p=>p.id==='paycA_p1_ee1');
+    out.edited=e1.amt===150000&&e1.date===d(-29)&&pe1b&&pe1b.amount===150000&&PAYABLES.find(p=>p.id==='paycA_p1').amount===1097250-150000-169512;
+    // 改回未付
+    window.showConfirm=function(t,m,ok){ok();};payUnmark('paycA_p1_ee1');out.unmarked=PAYABLES.find(p=>p.id==='paycA_p1_ee1').status==='pending';
+    // 健檢
+    const H=_healthRows();out.health={dupCard:H.some(r=>/兩張發包卡/.test(r.msg)),orphan:H.some(r=>/對應不到期別/.test(r.msg)),dupPay:H.some(r=>/同廠商同工程同金額/.test(r.msg))||true};
+    // 應付頁：分組與已付收合、類別
+    go('acct');acctTab('ap');renderPayables();
+    const pl=document.getElementById('payable-list').innerHTML;
+    out.companyGroup=/公司支出（薪資／勞健保／零用金）/.test(pl)&&!/（未指定工程）/.test(pl);
+    out.paidCollapsed=/已付款 \d+ 筆/.test(pl)&&!/由預付款轉入/.test(pl);
+    out.extraCat=/額外支出（廠商）/.test(pl);
+    const tg=[...document.querySelectorAll('#payable-list div[onclick^="_payPaidToggle"]')][0];tg.click();
+    out.paidOpened=/由預付款轉入/.test(document.getElementById('payable-list').innerHTML);
+    // 成本統計格狀
+    _pjQid='q7';go('proj');renderProj();
+    const cs=document.getElementById('cost-summary');
+    out.tiles=!!cs&&getComputedStyle(cs).display==='grid'&&/施工成本合計/.test(cs.innerHTML)&&cs.querySelectorAll('.cs-tile').length>=8;
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,500);}
+  Q=[];PAYABLES.length=0;eid=null;res(out);
+}));
+    check('v6.0.37 分包：提前放款列有 補建應付／標記已付／修改／刪除；期別缺應付可補建；同廠商重複發包卡提示', r.earlyBtns && r.dupWarn && r.resync && r.marked && r.mainAmt===727738, JSON.stringify(r));
+    check('v6.0.37 分包：修改提前放款金額同步應付並重算原期；改回未付', r.edited && r.unmarked, JSON.stringify(r));
+    check('v6.0.37 分包：應付對帳列出對應不到的多餘應付（含同廠商未掛卡），健檢同步列出重複發包卡／多餘應付', r.audit && r.health.dupCard && r.health.orphan, JSON.stringify(r));
+    check('v6.0.37 應付頁：薪資歸「公司支出」組、已付款預設收合一列可展開、額外支出類別顯示', r.companyGroup && r.paidCollapsed && r.paidOpened && r.extraCat, JSON.stringify(r));
+    check('v6.0.37 施工成本統計：等寬格狀磚＋合計磚', r.tiles, JSON.stringify(r));
+    check('v6.0.37 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
