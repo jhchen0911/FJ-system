@@ -3418,7 +3418,7 @@ async function newPage(browser, width, height) {
             res(out);
           },400));
     });
-    check('材料：材料．租賃獨立頁（舊發包材料分頁連結轉來）、由估算帶入鋼材列、調撥彈窗帶倉庫列與可撥支數、拆列到工地（loc／projQid／outDate）', r.nav && r.tab && r.seed && r.outModal && r.out, r.err || '');
+    check('材料：材料．運輸獨立頁（舊發包材料分頁連結轉來）、由估算帶入鋼材列、調撥彈窗帶倉庫列與可撥支數、拆列到工地（loc／projQid／outDate）', r.nav && r.tab && r.seed && r.outModal && r.out, r.err || '');
     check('材料：內部攤提＝支數×單長×日租×折數×天數 → 自有成本（公司自備不入應付）、工地表顯示', r.amort && r.atTable);
     check('材料：歸還／損耗彈窗預設購置單價、歸還拆回倉庫、結算使用段、損耗認列成本（材料損耗科目、不入應付）', r.backModal && r.back && r.lossCost && r.lossTable);
     check('材料：租賃按 M 月租「租金至今」、輸入即同步成本卡（未請款前 0、不掛應付、預估＝合約租期）、運輸另一張卡、成本總額＝攤提＋損耗', r.rentLive && r.rent && r.trans && r.total);
@@ -3742,7 +3742,7 @@ async function newPage(browser, width, height) {
           window.toast=oT;Q=[];PAYABLES.length=0;VENDORS.length=0;eid=null;
           return out;
     });
-    check('租賃：科目含設備租金／設備運費；材料．租賃頁有材料租賃／設備租賃／運輸、不需建立合約', r.cats && r.section);
+    check('租賃：科目含設備租金／設備運費；材料．運輸頁有材料租賃／設備租賃／運輸、不需建立合約', r.cats && r.section);
     check('租賃：輸入即同步成本卡（材料按 M 月租、設備月租、運輸另一家廠商趟數）、未請款前金額 0 且不掛應付', r.cards && r.noPay);
     check('租賃：計價頁廠商分頁列為待登錄（租賃、依期請款）、預估＝在場 M 數×天數÷30×月租', r.vb && r.vbHtml);
     check('租賃：核對請款單視窗（期間預設至計價截止日、自動帶 192 M・月、損耗賠償加項、合計 28,040）', r.modal && r.suggest && r.total);
@@ -3759,7 +3759,7 @@ async function newPage(browser, width, height) {
       _m6Qid='qZm';go('mat6');
       setTimeout(() => { const ok = document.documentElement.scrollWidth <= document.documentElement.clientWidth && document.querySelectorAll('#mat6-root table.mst').length >= 3; Q=[];VENDORS.length=0; res(ok); }, 300);
     }));
-    check('手機版：材料．租賃頁不橫向捲動、表格逐列堆疊', mok && merr.length === 0, merr.slice(0, 2).join(' | '));
+    check('手機版：材料．運輸頁不橫向捲動、表格逐列堆疊', mok && merr.length === 0, merr.slice(0, 2).join(' | '));
     await mp.close();
   }
 
@@ -3995,7 +3995,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ───────────── v6.0.25 材料．租賃獨立頁：需求比對（調撥／接切樁／租賃）、按 M 分批月租、設備、運輸分開、免建合約 ─────────────
+  // ───────────── v6.0.25 材料．運輸獨立頁：需求比對（調撥／接切樁／租賃）、按 M 分批月租、設備、運輸分開、免建合約 ─────────────
   {
     const { page, errors } = await newPage(browser, 1440, 900);
     const r = await page.evaluate(
@@ -4078,7 +4078,7 @@ async function newPage(browser, width, height) {
         res(out);},160);
       })
     );
-    check('材料．租賃頁：導覽獨立（權限跟發包、角色權限表不另列）、舊發包材料連結轉來、沒有自有在工地不顯示該區', r.nav && r.redirect && r.empty, r.err || '');
+    check('材料．運輸頁：導覽獨立（權限跟發包、角色權限表不另列）、舊發包材料連結轉來、沒有自有在工地不顯示該區', r.nav && r.redirect && r.empty, r.err || '');
     check('比對：新增需求自動比對，同規格其他長度閒置 → 詢問接樁／切樁（預設長料切、短料接）、可做成支數計入需求', r.decide && r.adDef && r.adPcs && r.adapt);
     check('材料租賃：按 M、月租、合約租期預估（1,485M × 6 月 × 60 ＝ 534,600）、分批進場依進料日起算、輸入即進施工成本（未請款前 0）', r.rtDef && r.rtPv && r.rent && r.btLeft && r.batch);
     check('設備租賃與運輸分開：設備卡預估、運輸另一家廠商卡（預計趟數）、計價頁待登錄', r.equip && r.trans && r.vbPend);
@@ -4220,7 +4220,7 @@ async function newPage(browser, width, height) {
         // 施工成本頁：分區、材料卡唯讀、常用下拉、類型鎖定、附屬隱藏、科目列移除
         openProjectCosts('qA');window._costView='list';rCostItems();
         const cl=document.getElementById('cost-list'),h=cl.innerHTML;
-        out.secs=/發包（承包合約）/.test(h)&&/材料．租賃．運輸（由「材料．租賃」頁自動同步/.test(h)&&h.indexOf('發包（承包合約）')<h.indexOf('材料．租賃．運輸');
+        out.secs=/發包（承包合約）/.test(h)&&/材料．運輸．運輸（由「材料．運輸」頁自動同步/.test(h)&&h.indexOf('發包（承包合約）')<h.indexOf('材料．運輸．運輸');
         const mc=cl.querySelector('.cost-mat-card');
         out.matRo=!!mc&&!mc.querySelector('select')&&!/addOwnRow|changeCostType|delCostItem/.test(mc.innerHTML)&&/核對請款單/.test(mc.innerHTML)&&/計價基準/.test(mc.innerHTML)&&!/成本金額＝已核實/.test(mc.innerHTML);
         out.noChips=!/常用：/.test(h)&&!/科目：/.test(h)&&!/附屬，併入報價工項/.test(h);
@@ -4243,7 +4243,7 @@ async function newPage(browser, width, height) {
       })
     );
     check('階段完工＝實作數量：日報累計 120 為實作（合約 133 不動、提示應向業主追減），進度 100%、工項分析／毛利改以實作數量計', r.before && r.actual && r.map && r.phys && r.items && r.analysis);
-    check('施工成本頁分區（發包／自有點工額外／材料租賃運輸）、材料．租賃同步卡唯讀（核對請款單、計價基準）', r.secs && r.matRo);
+    check('施工成本頁分區（發包／自有點工額外／材料租賃運輸）、材料．運輸同步卡唯讀（核對請款單、計價基準）', r.secs && r.matRo);
     check('施工成本頁精簡：常用快捷鍵改下拉、科目列與附屬列移除、已計價發包類型鎖定、分頁列、新增成本先選類型', r.noChips && r.lock && r.ownSel && r.ownAdd && r.tab && r.pick && r.pickAdd && r.okBack);
     check('v6.0.27 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
@@ -4708,7 +4708,7 @@ async function newPage(browser, width, height) {
   const out={};
   try{
     out.ver=APP_VERSION;
-    out.extJs=!!document.querySelector('script[src^="app.js?v=6.0.34"]')&&!/APP_VERSION='v6/.test(document.documentElement.outerHTML.slice(0,400000));
+    out.extJs=!!document.querySelector('script[src^="app.js?v="]')&&!/APP_VERSION='v6/.test(document.documentElement.outerHTML.slice(0,400000));
     out.nav=!!document.getElementById('sn-acct')&&!!document.getElementById('sn-proj');
     // ① 帳務分頁
     go('acct');acctTab('ar');
@@ -4784,7 +4784,7 @@ async function newPage(browser, width, height) {
     },600);
   }catch(e){out.err=String(e&&e.stack||e).slice(0,400);res(out);}
 }));
-    check('v6.0.34 開頁：app.js 以 defer 載入後導覽正常、版本正確', r.ver==='v6.0.34' && r.extJs && r.nav, JSON.stringify(r));
+    check('v6.0.34 開頁：app.js 以 defer 載入後導覽正常、版本正確', /^v6\.0\.\d+$/.test(r.ver) && r.extJs && r.nav, JSON.stringify(r));
     check('v6.0.34 帳務分頁 8 顆靠左；保留款面板併入應收（acctTab(\'ret\')／switchFinanceTab(\'retention\') 皆到應收）', r.tabs && r.noRet && r.retInAr && r.retRedirect && r.syncRet, JSON.stringify(r));
     check('v6.0.34 分潤移到經營報表（其他報表下拉；面板原地搬進報表內容區、切走再切回仍在）', r.shareRpt && r.moreSel && r.shareDetached && r.shareBack, JSON.stringify(r));
     check('v6.0.34 資料健檢：日報／成本／詢價工項對應失效、跟隨主約消失、得標無成本卡、未建合約、請款單／合約／應付斷鏈、重複應付、名冊缺漏、缺單位、照片待搬', r.healthAll && r.healthRender, JSON.stringify(r.health));
@@ -4792,6 +4792,31 @@ async function newPage(browser, width, height) {
     check('v6.0.34 工項索引重定位：搬移工項後日報／成本／詢價單索引一起跟上', r.remap, JSON.stringify(r));
     check('v6.0.34 日報照片分離：新照片存 IndexedDB 回參照並排隊上雲、顯示有快取直出否則佔位後補圖、未登入不搬移、匯出 PDF 前先取回', r.ref && r.attrCached && r.attrPlaceholder && r.drBox && r.hydrated && r.migrateNoLogin && r.exportPre, JSON.stringify(r));
     check('v6.0.34 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.35 總覽待辦長說明換行、施工成本分析手機格狀、材料．運輸改名 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(() => {
+      const out={};
+      out.longSub=_todoLongSub({sub:'到「薪資．零用金」按「產生本月薪資條」，應付與金流預測會自動帶入'})&&!_todoLongSub({sub:'NT$ 1,234,567'})&&!_todoLongSub({sub:''});
+      Q=[{id:'qZ',code:'Z1',name:'格狀案',client:'業主',date:'2026-05-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 H300 打設、拔除',unit:'支',qty:'100',price:'10600',estCost:'8323',sec:false}],t:{sub:1060000,tax:53000,total:1113000},
+        costs:[{id:'c1',type:'sub',vendor:'甲',cat:'打設',date:'2026-06-01',rows:[{id:'r1',linkedItemIdx:0,qty:100,unitPrice:5000}],amt:500000,linkedItemIdx:0}],dailyLogs:[]}];
+      _pjQid='qZ';localStorage.setItem('pj_open_cost','1');go('proj');renderProj();
+      const t=document.querySelector('#proj-root table.cost-anal');
+      out.cls=!!t&&/mst-ln/.test(t.className);
+      const tr=t&&t.querySelector('tbody tr');
+      out.grid=!!tr&&getComputedStyle(tr).display==='grid'&&getComputedStyle(tr).gridTemplateColumns.split(' ').length===3;
+      const td2=tr&&tr.querySelectorAll('td')[1];out.col=!!td2&&getComputedStyle(td2).flexDirection==='column';
+      out.noScroll=document.documentElement.scrollWidth<=window.innerWidth+1;
+      out.rename=(ALL_PAGES.find(p=>p.id==='mat6')||{}).label==='材料．運輸'&&/材料．運輸/.test(document.querySelector('#page-mat6 .ph-t').textContent)&&!/材料．租賃/.test(document.getElementById('proj-root').innerHTML);
+      Q=[];return out;
+    });
+    check('v6.0.35 總覽待辦：長說明放標題下方（金額仍在右側）', r.longSub, JSON.stringify(r));
+    check('v6.0.35 施工成本統計手機版：工項卡改三欄格狀、不橫向捲動', r.cls && r.grid && r.col && r.noScroll, JSON.stringify(r));
+    check('v6.0.35 「材料．租賃」改名「材料．運輸」（導覽／頁首／工程專案按鈕）', r.rename, JSON.stringify(r));
+    check('v6.0.35 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
