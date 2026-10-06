@@ -4991,6 +4991,56 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.40 中科台積電 F25P1 一次性資料修正、工程專案分包列重算抵扣 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    localStorage.removeItem('fy_fix_f25p1');
+    const D='H型鋼樁 H300，L=15M@80cm 打設、拔除（含水刀引孔）';
+    Q=[{id:'qF',code:'F',name:'中科台積電F25P1',client:'業主',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:D,unit:'支',qty:'133',price:'10000',sec:false,_uid:'f1'}],t:{sub:1330000,tax:66500,total:1396500},dailyLogs:[],
+      costs:[
+        {id:'cA',type:'sub',vendor:'鴻玉開發工程行',cat:'打設',date:'2026-09-20',invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'cA_0',linkedItemIdx:0,qty:133,unitPrice:8250,desc:'$550/M × 15M',ppm:550,len:15}],amt:1097250,
+          advances:[{id:'x1',date:'2026-10-05',amt:548625,note:''},{id:'x2',date:'2026-09-09',amt:200000,note:''}],
+          periods:[{no:1,date:'2026-09-25',from:'2026-09-23',to:'2026-09-25',rows:[{rid:'cA_0',qty:133}],amt:1097250,ret:0,net:1097250,due:'2026-10-25',adv:1097250}]},
+        {id:'cB',type:'sub',vendor:'鴻玉開發工程行',cat:'打設',date:'2026-09-22',invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'cB_0',linkedItemIdx:0,qty:133,unitPrice:8250}],amt:1097250,periods:[]},
+        {id:'cI',type:'sub',vendor:'鍾文芳（風哥）',cat:'打設',date:'2026-09-20',invoice:true,isIntro:true,followOf:'cA',introCalc:'pc',introAmt:150,rows:[{id:'cI_0',linkedItemIdx:0,qty:133,unitPrice:150,desc:'介紹費'}],amt:19950,periods:[]},
+        {id:'cX',type:'extra',vendor:'鍾文芳（風哥）',cat:'其他',date:'2026-10-05',invoice:true,amt:29000,rows:[{id:'cX_0',desc:'司機＋挖土機',qty:1,unitPrice:29000}]}]}];
+    eid='qF';PAYABLES.length=0;
+    PAYABLES.push({id:'paycA_ax1',costId:'cA',costAdv:'x1',quoteId:'qF',to:'鴻玉開發工程行',project:'中科台積電F25P1',amount:548625,vat:true,date:'2026-10-05',status:'paid',paidDate:'2026-10-05',note:'預付款'});
+    PAYABLES.push({id:'paycA_ax2',costId:'cA',costAdv:'x2',quoteId:'qF',to:'鴻玉開發工程行',project:'中科台積電F25P1',amount:200000,vat:true,date:'2026-09-09',status:'pending',note:'預付款'});
+    PAYABLES.push({id:'manualHY',to:'鴻玉開發工程行',project:'中科台積電F25P1',amount:1097250,vat:true,date:'2026-10-25',status:'pending',costSourceId:'cA',note:''});
+    PAYABLES.push({id:'paycB',costId:'cB',quoteId:'qF',to:'鴻玉開發工程行',project:'中科台積電F25P1',amount:1097250,vat:true,date:'2026-10-25',status:'pending',note:''});
+    PAYABLES.push({id:'paycI_p1',costId:'cI',costPeriod:1,quoteId:'qF',to:'鍾文芳（風哥）',project:'中科台積電F25P1',amount:38250,vat:true,date:'2026-10-25',status:'pending',note:'第1期計價'});
+    PAYABLES.push({id:'fgPaid',to:'鍾文芳（風哥）',project:'中科台積電F25P1',amount:299250,vat:false,date:'2026-10-05',status:'paid',paidDate:'2026-10-06',note:'介紹費'});
+    PAYABLES.push({id:'paycX',costId:'cX',quoteId:'qF',to:'鍾文芳（風哥）',project:'中科台積電F25P1',amount:29000,vat:true,date:'2026-11-25',status:'pending',note:''});
+    const log=_fixF25P1(true);out.log=log;
+    const q=Q[0],cA=q.costs.find(c=>c.id==='cA'),cI=q.costs.find(c=>c.id==='cI');
+    out.cardB=!q.costs.some(c=>c.id==='cB')&&!PAYABLES.some(p=>p.id==='paycB');
+    out.adv=cA.advances.length===1&&cA.advances[0].amt===548625&&cA.periods[0].adv===548625;
+    const pa=PAYABLES.find(p=>p.id==='paycA_af25hy'),pm=PAYABLES.find(p=>p.id==='paycA_p1');
+    out.advPay=!!pa&&pa.status==='paid'&&pa.paidDate==='2026-10-05'&&_payEff(pa)===576056&&!PAYABLES.some(p=>p.id==='paycA_ax1'||p.id==='paycA_ax2');
+    out.rest=!!pm&&pm.status==='pending'&&_payEff(pm)===576056&&pm.date==='2026-10-25'&&!PAYABLES.some(p=>p.id==='manualHY');
+    out.intro=cI.introCalc==='m'&&cI.invoice===false&&cI.rows[0].unitPrice===2250&&cI.periods.length===1&&_subPeriodCalc(cI,cI.periods[0]).amt===299250;
+    const fp=PAYABLES.find(p=>p.id==='paycI_p1');
+    out.introPay=!!fp&&fp.status==='paid'&&fp.paidDate==='2026-10-06'&&fp.vat===false&&_payEff(fp)===299250&&!PAYABLES.some(p=>p.id==='fgPaid');
+    const ep=PAYABLES.find(p=>p.costId==='cX');out.extra=!!ep&&ep.vat===false&&ep.status==='paid'&&_payEff(ep)===29000;
+    out.hyCount=PAYABLES.filter(p=>/鴻玉/.test(p.to)).length;   // 2
+    out.again=_fixF25P1()===null;   // 已跑過不再跑
+    // 工程專案分包列有重算抵扣
+    _pjQid='qF';go('proj');renderProj();const b=document.getElementById('pj-body-sub');if(b)b.style.display='';
+    out.reallocBtn=/subAdvRealloc\('cA'\)/.test(document.getElementById('proj-root').innerHTML);
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,600);}
+  localStorage.removeItem('fy_fix_f25p1');Q=[];PAYABLES.length=0;eid=null;res(out);
+}));
+    check('v6.0.40 F25P1 修正：鴻玉重複卡刪除、預付款只留 548,625（已付 10/05）、第 1 期餘款 576,056（10/25 未付）、手動整筆應付刪除', r.cardB && r.adv && r.advPay && r.rest && r.hyCount===2, JSON.stringify(r));
+    check('v6.0.40 F25P1 修正：風哥介紹費改每 M 150×15M → 299,250 不含稅、沿用已付、重複刪除；額外支出 29,000 不含稅已付；只跑一次', r.intro && r.introPay && r.extra && r.again, JSON.stringify(r));
+    check('v6.0.40 工程專案分包列預付款下方有「重算抵扣」', r.reallocBtn, JSON.stringify(r));
+    check('v6.0.40 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.39';
+var APP_VERSION='v6.0.40';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -38711,6 +38711,100 @@ function _payFilesInline(p){
     +'<button type="button" class="btn btn-xs" title="拍照或上傳匯款紀錄／轉帳截圖" onclick="_payUpload(\''+p.id+'\',\'pay\')" style="border-color:var(--b3);color:var(--b4)"><svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg> 匯款</button>'
     +chips;
 }
+
+
+// ══════════════ v6.0.40：中科台積電 F25P1 資料一次性修正、工程專案分包列「重算抵扣」（v640.js 區塊）══════════════
+// 使用者口述事實（2026-10-06）：鴻玉 H300 L=15M $550/M × 133 支（1,097,250 未稅）、10/5 預付一半（含稅 576,056＝未稅 548,625）、餘款 10/25；
+// 風哥介紹費 每 M 150 × 15M × 133 ＝ 299,250 不開發票 10/5 已付；風哥額外支出 29,000 不開發票 10/5 已付。
+// 只在工程名稱符合、金額對得上時動手；每一步都記錄，做完一次就不再跑（fy_fix_f25p1）。
+function _fixF25P1(force){
+  if(!force&&localStorage.getItem('fy_fix_f25p1'))return null;
+  var q=(Q||[]).find(function(x){return x&&x.awarded&&/中科台積電\s*F25P1/i.test(x.name||'');});
+  if(!q)return null;
+  var log=[],today=localToday();
+  var tomb=function(id){try{_tomb('payables',id);}catch(e){}};
+  var dropPay=function(pred,why){var n=0;PAYABLES=PAYABLES.filter(function(p){if(p&&pred(p)){tomb(p.id);n++;return false;}return true;});if(n)log.push(why+'：刪除 '+n+' 筆應付');};
+  var isHY=function(s){return /鴻玉/.test(String(s||''));},isFG=function(s){return /風哥|鍾文芳/.test(String(s||''));};
+  var itemIdx=(q.items||[]).findIndex(function(it){return it&&!it.sec&&/H300/.test(it.desc||'')&&/15\s*M/i.test(it.desc||'');});
+  // ── 鴻玉發包卡
+  var hy=(q.costs||[]).filter(function(c){return c&&c.type==='sub'&&!c.isIntro&&!c.followOf&&isHY(c.vendor);});
+  var main=hy.find(function(c){return _subPeriods(c).length;})||hy[0]||null;
+  if(main){
+    hy.forEach(function(c){if(c===main)return;
+      var paidTied=(PAYABLES||[]).some(function(p){return p&&(p.costId===c.id)&&p.status==='paid';});
+      if(paidTied){log.push('鴻玉重複發包卡（'+(c.date||'')+'）掛有已付應付，保留請人工確認');return;}
+      q.costs=q.costs.filter(function(x){return x!==c;});dropPay(function(p){return p.costId===c.id;},'鴻玉重複發包卡的應付');log.push('刪除鴻玉重複發包卡（'+(c.date||'')+'）');
+    });
+    var row=(main.rows||[]).find(function(r){return itemIdx>=0&&parseInt(r.linkedItemIdx)===itemIdx;})||(main.rows||[])[0];
+    if(!row){row={id:main.id+'_0',linkedItemIdx:itemIdx,desc:''};main.rows=[row];}
+    if(itemIdx>=0)row.linkedItemIdx=itemIdx;
+    row.qty=133;row.unitPrice=8250;row.ppm=550;row.len=15;if(!/550/.test(row.desc||''))row.desc='$550/M × 15M';
+    main.invoice=true;main.retRate=0;
+    var per=_subPeriods(main).filter(function(p){return !p.isRet;}).sort(function(a,b){return (a.no||0)-(b.no||0);})[0];
+    if(!per){per={no:1,date:'2026-10-01',from:'2026-09-01',to:'2026-10-01',rows:[],ts:Date.now()};main.periods=(main.periods||[]).concat([per]);log.push('鴻玉：建立第 1 期');}
+    per.rows=[{rid:row.id,qty:133}];per.due='2026-10-25';per.mt=Date.now();
+    var extraPer=_subPeriods(main).filter(function(p){return !p.isRet&&p!==per;});
+    if(extraPer.length){main.periods=main.periods.filter(function(p){return p.isRet||p===per;});extraPer.forEach(function(p){dropPay(function(x){return x.id===_subPayId(main.id,p);},'鴻玉多餘期別');});log.push('鴻玉：移除多餘期別 '+extraPer.length+' 個');}
+    delete per.early;
+    var k=_subPeriodCalc(main,per);per.amt=k.amt;per.ret=k.ret;per.net=k.net;
+    // 預付款：只留一筆 548,625（10/5）
+    var canon='f25hy',a={id:canon,date:'2026-10-05',amt:548625,note:'預付一半（含稅 576,056）',ts:Date.now()};
+    var oldAdvPays=(PAYABLES||[]).filter(function(p){return p&&p.costId===main.id&&(p.costAdv||/_a/.test(String(p.id)));});
+    var paidAdv=oldAdvPays.find(function(p){return p.status==='paid'&&Math.round(p.amount)===548625;})||oldAdvPays.find(function(p){return p.status==='paid';});
+    main.advances=[a];per.adv=548625;
+    var newId=_subAdvPayId(main.id,a);
+    oldAdvPays.forEach(function(p){if(p.id!==newId){PAYABLES=PAYABLES.filter(function(x){return x!==p;});tomb(p.id);}});
+    if(paidAdv&&paidAdv.id!==newId){var np=Object.assign({},paidAdv,{id:newId,costAdv:canon,amount:548625,vat:true,date:'2026-10-05',paidDate:paidAdv.paidDate||'2026-10-05',note:'預付款：預付一半（含稅 576,056）'});_touch(np);PAYABLES.unshift(np);log.push('鴻玉預付款應付改掛新編號（保留已付 '+np.paidDate+'）');}
+    try{recalcCostAmt(main);}catch(e){}
+    _touch(q);
+    try{syncCostToPayable(q,main);}catch(e){_err('_fixF25P1.hy',e);}
+    var pa=PAYABLES.find(function(p){return p.id===newId;});
+    if(pa&&pa.status!=='paid'){pa.status='paid';pa.paidDate='2026-10-05';pa.paidAt=Date.now();_touch(pa);log.push('鴻玉預付款 576,056 標記已付 10/05');}
+    var pm=PAYABLES.find(function(p){return p.id===_subPayId(main.id,per);});
+    if(pm){if(pm.date!=='2026-10-25'){pm.date='2026-10-25';_touch(pm);}log.push('鴻玉第 1 期餘款 '+fmt(_payEff(pm))+'（10/25，'+(pm.status==='paid'?'已付':'未付')+'）');}
+    // 同廠商同工程、不屬於這張卡的應付：未付的刪掉，已付的保留提醒
+    var keepIds={};keepIds[newId]=1;keepIds[_subPayId(main.id,per)]=1;
+    dropPay(function(p){return isHY(p.to)&&(p.project||'')===(q.name||'')&&!keepIds[p.id]&&p.status!=='paid';},'鴻玉其他未付應付（手動整筆／舊資料）');
+    (PAYABLES||[]).forEach(function(p){if(p&&isHY(p.to)&&(p.project||'')===(q.name||'')&&!keepIds[p.id])log.push('鴻玉另有已付應付 '+fmt(_payEff(p))+'（'+(p.paidDate||'')+'）未動，請確認是否重複');});
+  }else log.push('找不到鴻玉發包卡');
+  // ── 風哥介紹費
+  var intro=(q.costs||[]).find(function(c){return c&&c.type==='sub'&&c.isIntro&&isFG(c.vendor);})||(main&&(q.costs||[]).find(function(c){return c&&c.type==='sub'&&c.followOf===main.id;}));
+  if(intro&&main){
+    intro.followOf=main.id;intro.isIntro=true;intro.introCalc='m';intro.introAmt=150;intro.introPay='follow';intro.invoice=false;
+    var mrow=(main.rows||[])[0];
+    var frow=(intro.rows||[]).find(function(r){return parseInt(r.linkedItemIdx)===parseInt(mrow.linkedItemIdx);})||(intro.rows||[])[0];
+    if(!frow){frow={id:intro.id+'_0'};intro.rows=[frow];}
+    frow.linkedItemIdx=mrow.linkedItemIdx;frow.qty=133;frow.unitPrice=2250;frow.ppm=150;frow.len=15;frow.desc='介紹費 $150/M × 15M';
+    intro.rows=[frow];
+    delete (intro.advances);
+    try{_subFollowApply(q,main);}catch(e){_err('_fixF25P1.intro',e);}
+    try{recalcCostAmt(intro);}catch(e){}
+    var fid=_subPayId(intro.id,{no:1}),fp=PAYABLES.find(function(p){return p.id===fid;});
+    var others=(PAYABLES||[]).filter(function(p){return p&&p.id!==fid&&isFG(p.to)&&(p.project||'')===(q.name||'')&&(p.costId===intro.id||Math.round(p.amount)===299250);});
+    var paidO=others.find(function(p){return p.status==='paid';});
+    if(fp){fp.vat=false;fp.amount=299250;if(paidO||fp.status==='paid'){fp.status='paid';fp.paidDate=(paidO&&paidO.paidDate)||fp.paidDate||'2026-10-05';fp.paidAt=fp.paidAt||Date.now();}_touch(fp);log.push('風哥介紹費 299,250（不含稅）'+(fp.status==='paid'?'已付 '+fp.paidDate:'未付'));}
+    others.forEach(function(p){PAYABLES=PAYABLES.filter(function(x){return x!==p;});tomb(p.id);});if(others.length)log.push('風哥介紹費重複應付：刪除 '+others.length+' 筆');
+  }else log.push('找不到風哥介紹費卡'+(main?'':'（因無鴻玉主約）'));
+  // ── 風哥額外支出 29,000
+  var ex=(q.costs||[]).find(function(c){return c&&c.type==='extra'&&isFG(c.vendor)&&Math.round(parseFloat(c.amt)||0)===29000;});
+  if(ex){
+    ex.invoice=false;ex.vendorExtra=true;_touch(q);
+    try{syncCostToPayable(q,ex);}catch(e){_err('_fixF25P1.ex',e);}
+    var ep=PAYABLES.find(function(p){return p.costId===ex.id;});
+    var dupE=(PAYABLES||[]).filter(function(p){return p&&p!==ep&&isFG(p.to)&&(p.project||'')===(q.name||'')&&Math.round(p.amount)===29000;});
+    var paidE=dupE.find(function(p){return p.status==='paid';});
+    if(ep){ep.vat=false;ep.amount=29000;if(ep.status!=='paid'){ep.status='paid';ep.paidDate=(paidE&&paidE.paidDate)||'2026-10-05';ep.paidAt=Date.now();}_touch(ep);log.push('風哥額外支出 29,000（不含稅）已付 '+ep.paidDate);}
+    dupE.forEach(function(p){PAYABLES=PAYABLES.filter(function(x){return x!==p;});tomb(p.id);});if(dupE.length)log.push('風哥額外支出重複應付：刪除 '+dupE.length+' 筆');
+  }else log.push('找不到風哥 29,000 額外支出');
+  try{persist();savePayables();_markDirty();}catch(e){_err('_fixF25P1.save',e);}
+  try{localStorage.setItem('fy_fix_f25p1',String(Date.now()));}catch(e){}
+  try{window._fixF25P1Log=log;console.info('[FY] F25P1 修正：\n'+log.join('\n'));}catch(e){}
+  return log;
+}
+try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{var r=_fixF25P1();if(r&&r.length)showConfirm('已套用「中科台積電 F25P1」資料修正','<div style="font-size:12.5px;line-height:1.8">'+r.map(esc).join('<br>')+'<div style="margin-top:8px;color:var(--b4)">請到工程專案 › 發包與廠商計價 › 分包管理明細核對。</div></div>',function(){try{var pg=document.querySelector('.page.active');if(pg&&pg.id==='page-proj')renderProj();}catch(e){}},false,null,true);}catch(e){_err('fixF25P1',e);}},7000);});}catch(e){}
+// 工程專案分包列：預付款列尾加「重算抵扣」
+var _pjAdvRowsHtml640=_pjAdvRowsHtml;
+_pjAdvRowsHtml=function(c){var h=_pjAdvRowsHtml640(c);if(!h||!c||c.followOf)return h;return h.replace(/<\/div>$/,'<div style="text-align:right;margin-top:2px">'+_reallocBtn(c).replace('font-size:11px;padding:3px 10px','font-size:10.5px;padding:1px 8px')+'</div></div>');};
 
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
