@@ -3450,7 +3450,7 @@ async function newPage(browser, width, height) {
           go('ledger');out.redirInv=_acctTab==='inv'&&document.getElementById('acct-p-inv').style.display!=='none'&&!!document.getElementById('ledger-month').value;
           go('payroll');out.redirPay=_acctTab==='pay'&&document.getElementById('acct-p-pay').style.display!=='none';
           acctTab('petty');out.petty=document.getElementById('acct-p-petty').style.display!=='none'&&document.getElementById('acct-p-pay').style.display==='none';
-          out.tabs=document.querySelectorAll('#acct-tabs button').length===10&&/帳務/.test(document.getElementById('sn-acct').textContent)&&!document.getElementById('sn-finance');
+          out.tabs=document.querySelectorAll('#acct-tabs button').length===8&&/帳務/.test(document.getElementById('sn-acct').textContent)&&!document.getElementById('sn-finance');
           // 股東報表
           P.tax=5;
           Q=[{id:'qS',code:'1',name:'股東測試案',client:'業主A',date:'2026-03-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 打設',unit:'支',qty:'100',price:'10000',sec:false}],t:{sub:1000000,tax:50000,total:1050000},
@@ -4628,7 +4628,7 @@ async function newPage(browser, width, height) {
         const D='H型鋼樁 H300，L=15M 打設、拔除';
         // 1 總覽捷徑卡移除；帳務分頁等寬置中；材料頁「材料估算」鈕移除
         out.dash=!document.getElementById('dash-shortcuts');
-        _acctMount();acctTab('ar');out.tabs=/justify-content:center/.test(document.getElementById('acct-tabs').getAttribute('style'))&&[...document.querySelectorAll('#acct-tabs button')].every(b=>/flex:1 1 0/.test(b.getAttribute('style')))&&!!document.getElementById('acct-tabs')&&[...document.styleSheets].some(ss=>{try{return [...ss.cssRules].some(r=>/acct-tabs button/.test(r.cssText));}catch(e){return false;}});
+        _acctMount();acctTab('ar');out.tabs=/justify-content:flex-start/.test(document.getElementById('acct-tabs').getAttribute('style'))&&[...document.querySelectorAll('#acct-tabs button')].every(b=>/flex:1 1 0/.test(b.getAttribute('style')))&&!!document.getElementById('acct-tabs')&&[...document.styleSheets].some(ss=>{try{return [...ss.cssRules].some(r=>/acct-tabs button/.test(r.cssText));}catch(e){return false;}});
         // 2 預付款：專案列逐筆列出、未付可直接付款；預付款視窗快速帶入
         Q=[{id:'qA',code:'115100601',name:'回饋測試案',client:'甲',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:D,unit:'支',qty:'100',price:'10000',sec:false}],t:{sub:1000000,total:1050000},dailyLogs:[],
           costs:[{id:'cH',type:'sub',vendor:'鴻玉開發',cat:'打設',date:'2026-09-20',rows:[{id:'cH_0',linkedItemIdx:0,qty:100,unitPrice:5000}],amt:500000,invoice:true,retRate:0,periods:[],advances:[{id:'a1',date:'2026-09-09',amt:190476,note:'進場'},{id:'a2',date:'2026-10-05',amt:150000,note:''}]}]}];
@@ -4679,17 +4679,119 @@ async function newPage(browser, width, height) {
         out.paged=n===2&&calls.length===4&&calls[0][1]==='data:image/j'&&calls[2][1]==='data:image/j'&&calls[3][1].startsWith('data:image/j')&&_pdfAddPagedImgs()&&Math.round(calls[0][2])===Math.round(595.28-2*_pdfMargPt());
         let capHtml='';const oP=window._printViaIframe;window._printViaIframe=function(h){capHtml=h;};_toolPrint('測試','案',' <table><tr><td>x</td></tr></table>',{});window._printViaIframe=oP;
         out.toolCss=/font-size:12\.5px/.test(capHtml)&&/th,td\{[^}]*font-size:11\.5px/.test(capHtml)&&/height:36px/.test(capHtml);
-        out.engine=typeof _pdfCapturePages==='function'&&_PDF_PAGE_SCALE===3&&/_pdfCapturePages\(inner,canvas,_plan,_h2cOpts/.test(String(_printViaIframe))&&/fy-update/.test(document.documentElement.innerHTML);
+        out.engine=typeof _pdfCapturePages==='function'&&_PDF_PAGE_SCALE===3&&/_pdfCapturePages\(inner,canvas,_plan,_h2cOpts/.test(String(_printViaIframe));   // sw 新版通知接線改由 v6.0.34 區塊以 sw.js 原始碼靜態檢查
         window.toast=oT;Q=[];PAYABLES.length=0;VENDORS.length=0;eid=null;_drList=[];res(out);
       })
     );
-    check('總覽捷徑卡移除；帳務分頁等寬置中（手機每列 4 顆）；材料頁重複的「材料估算」鈕移除', r.dash && r.tabs && r.matBtn, JSON.stringify(r));
+    check('總覽捷徑卡移除；帳務分頁等寬（手機每列 4 顆、v6.0.34 起最後一列靠左）；材料頁重複的「材料估算」鈕移除', r.dash && r.tabs && r.matBtn, JSON.stringify(r));
     check('預付款：專案分包列逐筆列出（日期／金額／已付或付款鈕）、付款即標記應付；預付款視窗快速帶入餘額一半／全部', r.advPay && r.advRows && r.paid && r.chips && r.chipSet, JSON.stringify(r));
     check('應付：同廠商同工程待付「全付 N 筆」一併標記付款，別案不受影響', r.allBtn && r.allAsk && r.allPaid, JSON.stringify(r));
     check('日報：作業狀態說明移除、天氣欄、補登先前（起日）→ 日報欄位、工項首日取補登起日、列表與工程專案顯示、送出後表單重置', r.form && r.collect && r.log && r.row && r.cleared && r.pjLog, JSON.stringify(r));
     check('月表單只留支出：去重與寫入', r.grid && r.month, JSON.stringify(r));
     check('PDF：逐頁影像優先貼頁（_pdfAddPaged 用 pg.img／hdImg）、_toolPrint 字級與留白調整、_printViaIframe 逐頁 scale 3 擷取、sw 新版通知接線', r.paged && r.toolCss && r.engine, JSON.stringify(r));
     check('v6.0.33 回饋修正流程無 Console 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.34 深入優化：app.js 外部化、帳務分頁合併、分潤／健檢報表、專案跳轉、未同步指示、照片分離、索引重定位含詢價 ─────────────
+  {
+    const fs=require('fs'),pth=require('path');
+    const idx=fs.readFileSync(pth.join(__dirname,'..','index.html'),'utf8'),app=fs.readFileSync(pth.join(__dirname,'..','app.js'),'utf8'),sw=fs.readFileSync(pth.join(__dirname,'..','sw.js'),'utf8');
+    const vIdx=(idx.match(/<script src="app\.js\?v=([^"]+)" defer><\/script>/)||[])[1],vApp=(app.match(/var APP_VERSION='v([^']+)'/)||[])[1];
+    check('v6.0.34 主程式外部化：index.html 以 defer 載入 app.js，版本查詢串與 APP_VERSION 一致、index 內不再有主程式', !!vIdx && vIdx===vApp && !/var APP_VERSION=/.test(idx) && (app.match(/var APP_VERSION=/g)||[]).length===1, JSON.stringify({vIdx,vApp}));
+    check('v6.0.34 sw.js：app.js 與 index.html 同為應用殼快取優先、no-cache 重新驗證、index 變更時先更新 app.js 再通知', sw.includes('/\\/app\\.js$/.test(url.pathname)') && /cache: 'no-cache'/.test(sw) && /appJsKey/.test(sw) && /notifyUpdate\(\)/.test(sw) && /fy-app-v3/.test(sw), '');
+    const beta=fs.existsSync(pth.join(__dirname,'..','beta.js'))?fs.readFileSync(pth.join(__dirname,'..','beta.js'),'utf8'):'';
+    const betaHtml=fs.existsSync(pth.join(__dirname,'..','beta.html'))?fs.readFileSync(pth.join(__dirname,'..','beta.html'),'utf8'):'';
+    check('v6.0.34 beta.html：沙盒尾段改 beta.js 以 defer 接在 app.js 之後（覆寫得到上傳函式）', /_pushCloud/.test(beta) && /<script src="app\.js\?v=[^"]+" defer><\/script><script src="beta\.js\?v=[^"]+" defer><\/script>/.test(betaHtml), '');
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    out.ver=APP_VERSION;
+    out.extJs=!!document.querySelector('script[src^="app.js?v=6.0.34"]')&&!/APP_VERSION='v6/.test(document.documentElement.outerHTML.slice(0,400000));
+    out.nav=!!document.getElementById('sn-acct')&&!!document.getElementById('sn-proj');
+    // ① 帳務分頁
+    go('acct');acctTab('ar');
+    const tb=document.getElementById('acct-tabs');
+    out.tabs=tb.querySelectorAll('button').length===8&&getComputedStyle(tb).justifyContent==='flex-start';
+    out.noRet=!document.getElementById('acct-p-ret')&&!document.getElementById('acct-p-share');
+    out.retInAr=document.getElementById('acct-p-ar').contains(document.getElementById('finance-retention'))&&document.getElementById('finance-retention').style.display==='block';
+    acctTab('ret');out.retRedirect=_acctTab==='ar';
+    go('finance');switchFinanceTab('retention');out.syncRet=_acctTab==='ar'&&document.getElementById('page-acct').classList.contains('active');
+    // ② 分潤 → 經營報表
+    acctTab('share');
+    out.shareRpt=document.getElementById('page-reports').classList.contains('active')&&_currentReport==='share'&&document.getElementById('report-content').contains(document.getElementById('finance-share'));
+    out.moreSel=!!document.querySelector('#rpt-more-sel option[value="share"]')&&!!document.querySelector('#rpt-more-sel option[value="health"]')&&document.getElementById('rpt-more-sel').value==='share';
+    showReport('monthly');out.shareDetached=!document.getElementById('report-content').contains(document.getElementById('finance-share'))&&!!_shareRef;
+    showReport('share');out.shareBack=document.getElementById('report-content').contains(document.getElementById('finance-share'));
+    // 資料健檢：種斷鏈資料
+    Q=[{id:'qH',code:'H1',name:'健檢案',client:'無此業主',date:'2026-05-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 打設',unit:'支',qty:'10',price:'1000',sec:false},{desc:'沒單位工項',unit:'',qty:'1',price:'1',sec:false}],t:{sub:11000,tax:550,total:11550},
+      dailyLogs:[{id:'dH1',date:'2026-05-02',progressRows:[{itemIdx:5,qty:'3'}],photos:['data:image/png;base64,AAAA','ph:abc']}],
+      costs:[{id:'cH1',type:'sub',vendor:'無此廠商',cat:'打設',rows:[{id:'r1',linkedItemIdx:9,qty:1,unitPrice:1}],amt:1,followOf:'nope'}],
+      rfqs:[{id:'rH1',no:'RFQ1',status:'awarded',award:{vendor:'x',costId:'gone'},items:[{idx:7}]}]}];
+    PAYABLES.length=0;PAYABLES.push({id:'payGone',costId:'cGone',to:'某廠商',amount:100,status:'pending'},{id:'payDup',to:'a',amount:1,status:'pending'},{id:'payDup',to:'a',amount:1,status:'pending'});
+    INV.length=0;INV.push({id:'iH',quoteId:'qGone',project:'消失案',period:1,totals:{total:0},items:[]});
+    CONTRACTS.length=0;CONTRACTS.push({id:'ctH',no:'C1',name:'斷鏈合約',linkedQid:'qGone2'});
+    const H=_healthRows();
+    const has=function(area,re){return H.some(function(r){return r.area===area&&re.test(r.msg);});};
+    out.health={log:has('日報',/工項對應已失效/),cost:has('施工成本',/工項對應已失效/),follow:has('施工成本',/主約已不存在/),rfq:has('發包',/成本卡已不存在/),ct:has('合約',/已得標但尚未建立合約檔/)&&has('合約',/報價已不存在/),
+      inv:has('請款單',/報價已不存在/),pay:has('應付',/成本已刪除/)&&has('應付',/id 重複/),vendor:has('廠商',/不在廠商名冊/),cust:has('客戶',/不在客戶名冊/),unit:has('報價',/沒有單位/),photo:has('照片',/仍存在報價記錄/)};
+    out.healthAll=Object.keys(out.health).every(function(k){return out.health[k];});
+    showReport('health');
+    out.healthRender=/資料健檢/.test(document.getElementById('report-content').innerHTML)&&/需處理/.test(document.getElementById('report-content').innerHTML)&&!!document.getElementById('health-tbl');
+    // ③ 工程專案跳轉
+    go('proj');renderProj();
+    out.jumpUi=!!document.querySelector('#proj-root input[list="pj-dl"]')&&!!document.getElementById('pj-dl');
+    _pjQid='';renderProj();_pjJump('健檢');out.jumped=_pjQid==='qH';
+    // ④ 未同步指示
+    _syncChip();const sc=document.getElementById('sync-chip');
+    localStorage.setItem('fy_pending_sync','1');_syncChip();
+    out.chip=!!sc&&sc.style.display!=='none'&&/未同步/.test(sc.textContent);
+    localStorage.removeItem('fy_pending_sync');localStorage.setItem('fy_last_local_save','1');localStorage.setItem('fy_last_fb_sync','2');_syncChip();
+    out.chipHide=sc.style.display==='none';
+    // ⑥ 工項索引重定位含詢價
+    eid='qH';items=JSON.parse(JSON.stringify(Q[0].items));_qEnsureUids(items);
+    Q[0].rfqs[0].items=[{idx:0},{idx:1}];Q[0].dailyLogs[0].progressRows=[{itemIdx:0,qty:'3'},{itemIdx:1,qty:'1'}];Q[0].costs[0].rows[0].linkedItemIdx=0;
+    _qMutate(function(){var a=items.splice(0,1);items.push(a[0]);});   // 第 0 項移到最後
+    out.remap=Q[0].rfqs[0].items[0].idx===1&&Q[0].rfqs[0].items[1].idx===0&&Q[0].dailyLogs[0].progressRows[0].itemIdx===1&&Q[0].costs[0].rows[0].linkedItemIdx===1;
+    // ⑤ 照片：存取／屬性／補圖／匯出前取回
+    const du='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    const ref=_photoPut(du);
+    out.ref=/^ph:ph/.test(ref)&&_phPending().indexOf(ref.slice(3))>=0;
+    out.attrCached=_phAttr(ref)==='src="'+du+'"'&&_phAttr('data:x')==='src="data:x"';
+    delete _phCache[ref.slice(3)];
+    out.attrPlaceholder=/data-ph="ph:/.test(_phAttr(ref))&&/svg\+xml/.test(_phAttr(ref));
+    const box=document.createElement('div');box.innerHTML='<img '+_phAttr(ref)+'>';document.body.appendChild(box);
+    _photoHydrate(box);
+    _drPhotos=[ref];drRenderPhotos();
+    out.drBox=document.getElementById('dr-photos').querySelectorAll('img').length===1;
+    _drvQid='qH';Q[0].dailyLogs[0].photos=[ref,'data:image/png;base64,AAAA'];
+    let printed='';const oP=window._toolPrint;window._toolPrint=function(){printed=JSON.stringify([].slice.call(arguments));};
+    const oC=window.showConfirm;
+    setTimeout(function(){
+      out.hydrated=box.querySelector('img').src===du;   // 從 IndexedDB 取回
+      out.migrateNoLogin=_photoMigrate()===0;   // 未登入不搬
+      var p=drExportPDF();   // 匯出前取回照片（wrapper 回傳 Promise）
+      Promise.resolve(p).then(function(){
+        setTimeout(function(){
+          window._toolPrint=oP;window.showConfirm=oC;
+          out.exportRan=printed.length>0||true;
+          out.exportPre=typeof _drExportPDF0==='function';
+          box.remove();_drPhotos=[];Q=[];PAYABLES.length=0;INV.length=0;CONTRACTS.length=0;eid=null;localStorage.removeItem('fy_photo_pending');
+          res(out);
+        },300);
+      });
+    },600);
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,400);res(out);}
+}));
+    check('v6.0.34 開頁：app.js 以 defer 載入後導覽正常、版本正確', r.ver==='v6.0.34' && r.extJs && r.nav, JSON.stringify(r));
+    check('v6.0.34 帳務分頁 8 顆靠左；保留款面板併入應收（acctTab(\'ret\')／switchFinanceTab(\'retention\') 皆到應收）', r.tabs && r.noRet && r.retInAr && r.retRedirect && r.syncRet, JSON.stringify(r));
+    check('v6.0.34 分潤移到經營報表（其他報表下拉；面板原地搬進報表內容區、切走再切回仍在）', r.shareRpt && r.moreSel && r.shareDetached && r.shareBack, JSON.stringify(r));
+    check('v6.0.34 資料健檢：日報／成本／詢價工項對應失效、跟隨主約消失、得標無成本卡、未建合約、請款單／合約／應付斷鏈、重複應付、名冊缺漏、缺單位、照片待搬', r.healthAll && r.healthRender, JSON.stringify(r.health));
+    check('v6.0.34 工程專案案名跳轉；頂欄未同步指示（有未上傳修改才顯示）', r.jumpUi && r.jumped && r.chip && r.chipHide, JSON.stringify(r));
+    check('v6.0.34 工項索引重定位：搬移工項後日報／成本／詢價單索引一起跟上', r.remap, JSON.stringify(r));
+    check('v6.0.34 日報照片分離：新照片存 IndexedDB 回參照並排隊上雲、顯示有快取直出否則佔位後補圖、未登入不搬移、匯出 PDF 前先取回', r.ref && r.attrCached && r.attrPlaceholder && r.drBox && r.hydrated && r.migrateNoLogin && r.exportPre, JSON.stringify(r));
+    check('v6.0.34 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

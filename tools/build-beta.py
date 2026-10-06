@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-# 由 index.html（redesign-v6）產生 beta.html：
+# 由 index.html 產生 beta.html（＋ beta.js）：
 #  ‧ localStorage 鍵全部改走 beta: 前綴（第一次開啟時從正式版複製一份），正式資料絕不被改到
 #  ‧ 所有上傳雲端的函式改為空操作（可登入、可拉雲端資料，但不會推回去）
 #  ‧ 畫面左下角標示「測試版」，可一鍵重新從正式版複製資料
+#  ‧ v6.0.34 起主程式在 app.js（defer）：沙盒尾段改成 beta.js，以 defer 接在 app.js 之後載入，
+#    確保覆寫上傳函式時主程式已經定義（寫在 index 內的行內 script 會先於 defer 執行，蓋不到）
 import sys,io,re
 src=io.open(sys.argv[1],encoding='utf-8').read()
 out=sys.argv[2]
@@ -30,8 +32,7 @@ shim_head = r'''<script>
 })();
 </script>
 '''
-shim_tail = r'''<script>
-/* ── 測試版沙盒：不上傳雲端 ── */
+shim_tail = r'''/* ── 測試版沙盒：不上傳雲端（beta.js，defer 接在 app.js 之後）── */
 (function(){
   ['_autoUpload','_immediateUpload','_pushPrivate','_pushRelayCosts','_pushRelayExpenses','fbUpload','fbUploadWithConflictCheck','_pushCloud'].forEach(function(nm){
     if(typeof window[nm]==='function'){window[nm]=function(){var cb=null;for(var i=0;i<arguments.length;i++){if(typeof arguments[i]==='function'){cb=arguments[i];break;}}if(cb){try{cb(false);}catch(e){}}return false;};}
@@ -45,10 +46,14 @@ shim_tail = r'''<script>
   function mount(){document.body.appendChild(d);if(window.innerWidth<=767)d.style.bottom='calc(env(safe-area-inset-bottom,0px) + 78px)';}
   if(document.body)mount();else document.addEventListener('DOMContentLoaded',mount);
 })();
-</script>
 '''
+import os
 i=src.index('</head>');src=src[:i]+shim_head+src[i:]
-j=src.rindex('</body>');src=src[:j]+shim_tail+src[j:]
+m=re.search(r'<script src="app\.js\?v=([^"]+)" defer></script>',src)
+if not m: raise SystemExit('找不到 app.js 載入標籤')
+betajs=os.path.join(os.path.dirname(os.path.abspath(out)),'beta.js')
+src=src[:m.end()]+'<script src="beta.js?v='+m.group(1)+'" defer></script>'+src[m.end():]
 src=src.replace('<title>','<title>β ',1)
 io.open(out,'w',encoding='utf-8').write(src)
-print('beta.html written',len(src))
+io.open(betajs,'w',encoding='utf-8').write(shim_tail)
+print('beta.html written',len(src),'beta.js',len(shim_tail))
