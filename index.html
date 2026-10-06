@@ -233,6 +233,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
   table.mst.mst-ln.cost-anal tbody td[data-th]>div,table.mst.mst-ln.cost-anal tbody td[data-th]>span{text-align:left;flex:none;max-width:100%}
   table.mst.mst-ln.cost-anal tbody td:last-child[data-th],table.mst.mst-ln.cost-anal tfoot td:last-child[data-th]{grid-column:span 2}
   table.mst.mst-ln.cost-anal tfoot td:empty{display:none!important}
+  #cost-summary{grid-template-columns:1fr 1fr!important}   /* v6.0.37 施工成本統計手機兩欄等寬 */
 }
 .dbtn{border:none;background:transparent;color:var(--b2);cursor:pointer;padding:3px 5px;border-radius:var(--r4);font-size:14px;line-height:1;transition:var(--transition)}
 .dbtn:hover{background:var(--redl);color:var(--red)}
@@ -2756,7 +2757,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.36" defer></script>
+<script src="app.js?v=6.0.37" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
