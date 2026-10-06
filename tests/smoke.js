@@ -4474,6 +4474,78 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.31 第四批：業主扣款設定、清潔費、收款折讓＋折讓證明單、保留款廠商端、薪資 4 欄、報表下拉 ──
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(
+      () => new Promise(res => {
+        const out={};const oT=window.toast;window.toast=function(){};
+        P.tax=5;VENDORS.length=0;VENDORS.push({id:'v0',name:'鴻玉開發'});PAYABLES.length=0;INV.length=0;CONTRACTS.length=0;EXPENSES.length=0;CUSTOMERS.length=0;CUSTOMERS.push({id:'c1',name:'甲',taxid:'12345678'});
+        const D='H型鋼樁 H300，L=15M 打設、拔除';
+        Q=[{id:'qA',code:'115100401',name:'第四批測試案',client:'甲',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,
+          items:[{desc:D,unit:'支',qty:'100',price:'10000',estCost:'8000',sec:false}],t:{sub:1000000,total:1050000},dailyLogs:[],
+          costs:[{id:'cH',type:'sub',vendor:'鴻玉開發',cat:'打設',date:'2026-09-20',rows:[{id:'cH_0',linkedItemIdx:0,qty:100,unitPrice:5000}],amt:0,invoice:true,retRate:10,periods:[{no:1,date:'2026-10-05',from:'2026-09-01',to:'2026-10-05',rows:[{rid:'cH_0',qty:100}]}]}]}];
+        const q=Q[0];eid='qA';syncCostToPayable(q,q.costs[0]);
+        // 1 業主扣款設定：工程專案顯示，存進 q.deduct，新開請款單自動帶保留款 % 與清潔費 ‰
+        openProj('qA');const ih=document.getElementById('pj-body-inv').innerHTML;
+        out.ui=/業主扣款設定/.test(ih)&&/pjDeductSet\('qA','ret'/.test(ih)&&/pjDeductSet\('qA','clean'/.test(ih)&&/cleanMode/.test(ih);
+        pjDeductSet('qA','ret','10');pjDeductSet('qA','clean','3');pjDeductSet('qA','cleanMode','allow');
+        out.saved=q.deduct.ret==='10'&&q.deduct.clean==='3'&&q.deduct.cleanMode==='allow';
+        const inv=buildInvFromQuote(q);
+        out.built=inv.retention===true&&inv.retentionPct===10&&inv.cleanPermil===3&&inv.cleanMode==='allow';
+        // 2 清潔費：未稅 × ‰，含稅自總計扣；請款總計＝(未稅+稅)−保留款−清潔費含稅；列印有清潔費列
+        inv.items.forEach(it=>{if(it.type!=='sec'){it.curQty=100;it.payRate=100;}});_recalcInvAmounts(inv);
+        const t=inv.totals;   // 未稅 1,000,000 → 稅 50,000 → 保留 105,000 → 清潔 3,000 ×1.05＝3,150
+        out.tot=t.curTotal===1000000&&t.clean===3000&&t.cleanGross===3150&&t.total===1050000-105000-3150;
+        INV.push(inv);inv.periodNo='1';inv.date='2026-10-05';
+        loadInvoice(inv.id);
+        out.editor=document.getElementById('inv-clean-permil').value==='3'&&document.getElementById('inv-clean-mode').value==='allow'&&document.getElementById('inv-clean-row').style.display!=='none'&&/3‰/.test(document.getElementById('inv-clean-label').textContent)&&document.getElementById('inv-total-amt').textContent===fmt(941850);
+        buildInvPreview(inv);const ph=document.getElementById('inv-prev-html').innerHTML;
+        out.preview=/清潔費 \(3‰，含稅\)/.test(ph)&&/- 3,150/.test(ph)&&/941,850/.test(ph)&&!/estCost|毛利/.test(ph);
+        // 3 收款折讓：必填原發票號碼與原因；存 inv.allow（未稅／稅額拆）；抵銷後結清；折讓證明單含清潔費＋折讓兩列
+        openReceiptModal(inv.id);
+        document.getElementById('receipt-amount').value='940000';document.getElementById('receipt-allow').value='1850';_receiptCalc();
+        out.calc=/折讓 1,850/.test(document.getElementById('receipt-diff-txt').textContent)&&/已對平/.test(document.getElementById('receipt-diff-txt').textContent);
+        confirmReceipt();out.needInv=!inv.receivedConfirmed&&document.getElementById('receipt-modal').style.display==='flex';
+        document.getElementById('receipt-allow-inv').value='AB-12345678';document.getElementById('receipt-allow-reason').value='尾數折讓';document.getElementById('receipt-allow-date').value='2026-11-05';
+        confirmReceipt();
+        out.allow=inv.receivedConfirmed===true&&!!inv.allow&&inv.allow.amt===1850&&inv.allow.net===1762&&inv.allow.tax===88&&inv.allow.invNo==='AB-12345678'&&inv.allow.reason==='尾數折讓'&&_invAR(inv)===0&&_invOffset(inv)===1850;
+        let cap=null;const oP=window._toolPrint;window._toolPrint=function(title,proj,body,opts){cap={title,proj,body,opts};};
+        printAllowance(inv.id);window._toolPrint=oP;
+        out.doc=!!cap&&/折讓證明單/.test(cap.title)&&/清潔費（3‰）/.test(cap.body)&&/尾數折讓/.test(cap.body)&&/AB-12345678/.test(cap.body)&&/12345678/.test(cap.body)&&new RegExp(fmt(3000+1762)).test(cap.body)&&new RegExp(fmt(150+88)).test(cap.body)&&new RegExp(fmt(5000)).test(cap.body);
+        // 清潔費改「業主開發票」→ 收款結清後自動進公司費用（一筆），改回折讓則撤
+        inv.cleanMode='exp';_cleanExpenseSync(inv);const ex=EXPENSES.find(e=>e.id==='E_clean_'+inv.id);
+        out.exp=!!ex&&ex.amount===3000&&ex.tax===150&&ex.cat==='清潔費'&&ex.seller==='甲';
+        inv.cleanMode='allow';_cleanExpenseSync(inv);out.expGone=!EXPENSES.some(e=>e.id==='E_clean_'+inv.id);
+        // 下一期：折讓不帶到下期，扣款設定沿用
+        const n0=INV.length;addNextPeriod(inv.id);const nx=INV.find(x=>x.id!==inv.id&&x.quoteId==='qA');
+        out.next=INV.length===n0+1&&!!nx&&!nx.allow&&nx.cleanPermil===3&&nx.retentionPct===10;
+        // 4 保留款廠商端：帳務 › 保留款列出我方押廠商的保留款（鴻玉 10%＝50,000）與退保留款鈕
+        go('finance');switchFinanceTab('retention');renderRetention();const rh=document.getElementById('finance-retention-list').innerHTML;
+        out.vendorRet=/我方押廠商的保留款/.test(rh)&&/鴻玉開發/.test(rh)&&/50,000/.test(rh)&&/releaseSubRet\('cH'\)/.test(rh);
+        // 5 薪資 4 欄：姓名／月薪／投保薪資／眷口，保險金額自動算；舊欄位在「更多欄位」仍在
+        HR.length=0;hrEdit('','');
+        out.hrUI=!!document.getElementById('hr-ig')&&!!document.getElementById('hr-dep')&&!!document.querySelector('#fy-modal details')&&!!document.getElementById('hr-lg')&&!!document.getElementById('hr-emg');
+        document.getElementById('hr-name').value='測試員';document.getElementById('hr-base').value='40000';document.getElementById('hr-ig').value='40100';_hrIgSync();document.getElementById('hr-dep').value='1';_hrIgSync();
+        const pv=document.getElementById('hr-ins-pv').textContent;const ins=_hrCalcIns(40100,40100,1);
+        out.hrPv=new RegExp(fmt(ins.laborCo+ins.healthCo+ins.pensionCo)).test(pv)&&new RegExp(fmt(ins.laborSelf+ins.healthSelf)).test(pv);
+        document.getElementById('fy-modal-o').click();const hr=HR[0];
+        out.hrSaved=!!hr&&hr.name==='測試員'&&hr.base===40000&&hr.laborGrade===40100&&hr.healthGrade===40100&&hr.dep===1&&hr.laborSelf===ins.laborSelf&&hr.healthCo===ins.healthCo&&hr.pensionCo===ins.pensionCo;
+        // 6 報表：少用的進「其他報表」下拉，主按鈕剩 6 顆；選下拉切換
+        go('reports');out.rptTabs=document.querySelectorAll('#page-reports .rpt-tab').length===6&&!document.getElementById('rpt-client-btn')&&!!document.getElementById('rpt-more-sel');
+        showReport('bidrate');out.rptMore=document.getElementById('rpt-more-sel').value==='bidrate'&&_currentReport==='bidrate';showReport('overview');out.rptBack=document.getElementById('rpt-more-sel').value==='';
+        window.toast=oT;Q=[];INV.length=0;VENDORS.length=0;PAYABLES.length=0;CONTRACTS.length=0;EXPENSES.length=0;HR.length=0;CUSTOMERS.length=0;eid=null;window._invSnap=null;res(out);
+      })
+    );
+    check('業主扣款設定：工程專案設保留款 %／清潔費 ‰／清潔費處理，新開請款單自動帶入；清潔費＝未稅 × ‰、含稅自總計扣，編輯器與列印有清潔費列', r.ui && r.saved && r.built && r.tot && r.editor && r.preview, JSON.stringify(r));
+    check('收款折讓：必填原發票號碼與原因、存未稅／稅額、算入抵銷結清；折讓證明單含清潔費與折讓兩列、買受人統編；清潔費「業主開發票」結清後自動進公司費用；下一期不帶折讓', r.calc && r.needInv && r.allow && r.doc && r.exp && r.expGone && r.next, JSON.stringify(r));
+    check('保留款廠商端：帳務 › 保留款列出我方押廠商的保留款與退保留款鈕', r.vendorRet, JSON.stringify(r));
+    check('薪資 4 欄：姓名／月薪／投保薪資／眷口，勞健保勞退依費率自動算並存入，舊欄位收在「更多欄位」', r.hrUI && r.hrPv && r.hrSaved, JSON.stringify(r));
+    check('報表合併：少用的報表進「其他報表」下拉、主按鈕 6 顆、下拉切換同步', r.rptTabs && r.rptMore && r.rptBack, JSON.stringify(r));
+    check('v6.0.31 第四批流程無 Console 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

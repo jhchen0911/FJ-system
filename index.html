@@ -1669,24 +1669,14 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 月報表</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-yearly-btn" onclick="showReport('yearly')"
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 年度損益</button>
-      <button type="button" class="btn btn-sm rpt-tab" id="rpt-client-btn" onclick="showReport('client')"
-        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-user"/></svg> 業主往來</button>
-      <button type="button" class="btn btn-sm rpt-tab" id="rpt-contract-btn" onclick="showReport('contract')"
-        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 合約請款</button>
-      <button type="button" class="btn btn-sm rpt-tab" id="rpt-bidrate-btn" onclick="showReport('bidrate')"
-        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 得標率</button>
-      <button type="button" class="btn btn-sm rpt-tab" id="rpt-vendor-btn" onclick="showReport('vendor')"
-        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg> 廠商績效</button>
-      <button type="button" class="btn btn-sm rpt-tab" id="rpt-labor-btn" onclick="showReport('labor')"
-        style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 出工月結</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-hr-btn" onclick="showReport('hr')"
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg> 人事成本</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-track-btn" onclick="showReport('track')"
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 工程實績</button>
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-shareholder-btn" onclick="showReport('shareholder')"
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg> 股東報表</button>
-      <button type="button" class="btn btn-sm rpt-tab" id="rpt-log-btn" onclick="showReport('log')"
-        style="border-color:var(--b3);color:var(--b3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 操作記錄</button>
+      <select id="rpt-more-sel" onchange="if(this.value)showReport(this.value)" title="較少用的報表" style="border:1px solid var(--g3);color:var(--g3);height:40px;font-size:13px;font-family:inherit;background:var(--w);border-radius:var(--r8);padding:0 8px">
+        <option value="">其他報表 ▾</option><option value="client">業主往來</option><option value="contract">合約請款</option><option value="bidrate">得標率</option><option value="vendor">廠商績效</option><option value="labor">出工月結</option><option value="log">操作記錄</option></select>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr 1fr;gap:8px;margin-bottom:14px">
       <select id="rpt-year" style="height:40px;padding:0 8px;border:1px solid var(--b2);border-radius:var(--r8);font-size:13px;font-family:inherit;background:var(--w)" onchange="renderCurrentReport()"></select>
@@ -2632,6 +2622,15 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
               <span style="font-size:13px;color:var(--b5)">%（業主扣留）</span>
             </label>
           </div>
+          <div class="f">
+            <label style="display:flex;align-items:center;gap:6px;margin-top:18px;flex-wrap:wrap">
+              <span style="font-size:13px;color:var(--b5)">清潔費</span>
+              <input type="number" id="inv-clean-permil" min="0" step="any" placeholder="0" oninput="rInvTots()" title="每期以未稅工程款 × ‰ 計，含稅自請款總計扣除（在工程專案「業主扣款設定」設定即每期自動帶入）"
+                style="width:52px;text-align:center;padding:4px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px;font-family:inherit">
+              <span style="font-size:13px;color:var(--b5)">‰</span>
+              <select id="inv-clean-mode" style="font-size:12px;padding:4px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;background:var(--w)"><option value="exp">業主開發票（當費用）</option><option value="allow">我方開折讓單</option></select>
+            </label>
+          </div>
         </div>
         <!-- 天數計算工具 -->
         <div class="card" style="background:var(--yl);border:1px solid var(--ym);margin-bottom:0">
@@ -2732,6 +2731,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="trow"><label>本期估驗小計</label><span id="inv-sub-amt">0</span></div>
         <div class="trow"><label id="inv-tax-lbl">5% 營業稅</label><span id="inv-tax-amt">0</span></div>
         <div class="trow" id="inv-retention-row" style="display:none;color:var(--red)"><label id='inv-retention-label'>保留款 (10%)</label><span style="color:var(--red)">- 0</span></div>
+        <div class="trow" id="inv-clean-row" style="display:none;color:var(--red)"><label id='inv-clean-label'>清潔費</label><span style="color:var(--red)">- 0</span></div>
         <div class="trow grand"><label>本期請款總計</label><span id="inv-total-amt">0</span></div>
       </div>
     </div>
@@ -2767,7 +2767,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 </div>
 
 <script>
-var APP_VERSION='v6.0.30';
+var APP_VERSION='v6.0.31';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -5925,6 +5925,7 @@ function loadInvoice(id){
   const cte=document.getElementById('inv-claim-type');if(cte&&inv.claimType)cte.value=inv.claimType;
   const re2=document.getElementById('inv-retention');if(re2)re2.checked=!!inv.retention;
   const rp2=document.getElementById('inv-retention-pct');if(rp2)rp2.value=inv.retentionPct!=null?inv.retentionPct:10;
+  const cp2=document.getElementById('inv-clean-permil');if(cp2)cp2.value=inv.cleanPermil||'';const cm2=document.getElementById('inv-clean-mode');if(cm2)cm2.value=inv.cleanMode==='allow'?'allow':'exp';   // v6.0.31
   document.getElementById('inv-edit-title').textContent='編輯請款單 #'+inv.periodNo;
   const pdp2=document.getElementById('inv-period-display');
   if(pdp2)pdp2.textContent='第 '+(inv.periodNo||1)+' 期';
@@ -6327,7 +6328,8 @@ function _recalcInvAmounts(inv){
   const tax=curTotal*_taxR()/100;
   const beforeRetention=curTotal+tax;
   const retention=inv.retention?beforeRetention*((parseFloat(inv.retentionPct)||10)/100):0;
-  inv.totals={curTotal,tax,total:beforeRetention-retention,retention,baseTotal:curTotal,claimRatio:1};
+  const _cpm=parseFloat(inv.cleanPermil)||0,clean=Math.round(curTotal*_cpm/1000),cleanGross=Math.round(clean*_taxM());   // v6.0.31
+  inv.totals={curTotal,tax,total:beforeRetention-retention-cleanGross,retention,clean,cleanGross,cleanPermil:_cpm,baseTotal:curTotal,claimRatio:1};
 }
 
 function updateInvRowAmt(i, tr){
@@ -6740,7 +6742,10 @@ function rInvTots(srcInv){
         return (_v==null||_v==='')?10:(parseFloat(_v)||0);})())/100;
   const _retOn=_rec?!!_rec.retention:!!document.getElementById('inv-retention')?.checked;
   const retention=_retOn?beforeRetention*_retPct:0;
-  const total=beforeRetention-retention;
+  // v6.0.31 清潔費：未稅工程款 × ‰，含稅自總計扣除（業主開發票當費用，或我方開折讓單）
+  const _cleanPm=_rec?(parseFloat(_rec.cleanPermil)||0):(parseFloat(document.getElementById('inv-clean-permil')?.value)||0);
+  const clean=Math.round(curTotal*_cleanPm/1000),cleanGross=Math.round(clean*_taxM());
+  const total=beforeRetention-retention-cleanGross;
   if(!_rec){
   // Display
   st('inv-sub-amt',fmt(curTotal));
@@ -6755,6 +6760,8 @@ function rInvTots(srcInv){
     var rl=document.getElementById('inv-retention-label');
     if(rl)rl.textContent='保留款 ('+(Math.round(_retPct*100))+'%)';
   }
+  const cleanBox=document.getElementById('inv-clean-row');
+  if(cleanBox){cleanBox.style.display=cleanGross?'flex':'none';cleanBox.querySelector('span:last-child').textContent='- '+fmt(cleanGross);var cl=document.getElementById('inv-clean-label');if(cl)cl.textContent='清潔費 ('+_rfmt(_cleanPm)+'‰，含稅)';}
   }
   // ── 施工數量統計 ──
   // 打設面板：「合約數量 vs 打設累積」→ 待施 = 合約 - 打設累積
@@ -6843,7 +6850,7 @@ function rInvTots(srcInv){
   }
   // 待施 = 打設累積合計 - 拔除累積合計
   // 已打未拔面板已整合至拔除面板的「待拔」欄，無需額外顯示
-  return{curTotal,tax,total,retention,baseTotal:curTotal,claimRatio:1};
+  return{curTotal,tax,total,retention,clean,cleanGross,cleanPermil:_cleanPm,baseTotal:curTotal,claimRatio:1};
 }
 
 function calcInvTotals(){return rInvTots();}
@@ -6886,6 +6893,7 @@ function saveInvoice(){
     cashPct:parseInt(gv('inv-cash-pct'))||0,ticketDays:parseInt(gv('inv-ticket-days'))||0,payMonthDelay:parseInt(gv('inv-pay-month-delay'))||0,recvDay:parseInt(gv('inv-recv-day'))||0,expectedRecvDate:gv('inv-expected-recv-date'),claimType:gv('inv-claim-type'),claimPct:gv('inv-claim-pct'),retention:document.getElementById('inv-retention')?.checked||false,
     retentionPct:(function(){var _v=document.getElementById('inv-retention-pct')?.value;
       return (_v==null||_v==='')?10:(parseFloat(_v)||0);})(),   // v5.319：0% 是合法值，原本 ||10 會存成 10
+    cleanPermil:parseFloat(document.getElementById('inv-clean-permil')?.value)||0,cleanMode:(document.getElementById('inv-clean-mode')?.value)||'exp',   // v6.0.31 清潔費
     docs:[
       document.getElementById('inv-doc-confirm')?.checked||false,
       document.getElementById('inv-doc-invoice')?.checked||false,
@@ -7229,7 +7237,7 @@ function addNextPeriod(id){
   // v5.336 健檢G：抵銷欄位屬單期對帳結果，不得帶到下一期
   //（原本新期繼承上期的匯費／扣款／保留款，應收短計、保留款提醒逐期翻倍）
   next.partialConfirmed=false;
-  next.recvFee=0;next.recvDeduct=0;next.recvHold=0;
+  next.recvFee=0;next.recvDeduct=0;next.recvHold=0;delete next.allow;
   _touch(next);
   // v5.336 健檢G：逾期租金列是「該期時段」的一次性計費，下一期直接剔除
   //（原本照抄整列並把逾期金額滾進 prevQty/prevAmt，前期累計混入非合約項目、
@@ -7738,6 +7746,7 @@ function buildInvPreview(srcInv){
         <td></td>
       </tr>
       ${t.retention?'<tr style="background:#fff4f4"><td colspan="10" style="text-align:right;padding:5px 10px;color:#c0392b;font-weight:700">保留款 ('+_retPctShow+'%)</td><td style="text-align:right;padding:5px 10px;font-weight:700;color:#c0392b;font-variant-numeric:tabular-nums">- '+fmt(t.retention)+'</td><td></td></tr>':''}
+      ${t.cleanGross?'<tr style="background:#fff4f4"><td colspan="10" style="text-align:right;padding:5px 10px;color:#c0392b;font-weight:700">清潔費 ('+_rfmt(t.cleanPermil)+'‰，含稅)</td><td style="text-align:right;padding:5px 10px;font-weight:700;color:#c0392b;font-variant-numeric:tabular-nums">- '+fmt(t.cleanGross)+'</td><td></td></tr>':''}
       <tr style="background:#0e3d22;color:#fff">
         <td colspan="10" style="text-align:right;padding:8px 10px;font-weight:900;font-size:14px;letter-spacing:2px">本&nbsp;期&nbsp;請&nbsp;款&nbsp;總&nbsp;計</td>
         <td style="text-align:right;padding:8px 10px;font-weight:900;font-size:15px;font-variant-numeric:tabular-nums">${fmt(t.total)}</td>
@@ -9800,6 +9809,7 @@ function openReceiptModal(invId, ev){
   document.getElementById('receipt-fee').value=parseFloat(inv.recvFee)||'';
   document.getElementById('receipt-deduct').value=parseFloat(inv.recvDeduct)||'';
   document.getElementById('receipt-hold').value=parseFloat(inv.recvHold)||'';
+  (function(){var a=inv.allow||{};var s=function(id,v){var e=document.getElementById(id);if(e)e.value=v==null?'':v;};s('receipt-allow',a.amt||'');s('receipt-allow-inv',a.invNo||inv.invNo||'');s('receipt-allow-date',a.date||'');s('receipt-allow-reason',a.reason||'');var hint=document.getElementById('receipt-allow-hint');if(hint){var cg=(inv.totals&&inv.totals.cleanGross)||0;hint.textContent=(inv.cleanMode==='allow'&&cg>0)?('本期清潔費 '+fmt(cg)+'（含稅）已在請款總計扣除，證明單會列入，這裡不必再填'):'';}})();   // v6.0.31 折讓
   document.getElementById('receipt-amount').oninput=_receiptCalc;
   // v5.337：既有業主保留款 → 顯示退還動線（原本這筆錢從應收消失後就沒有任何出口）
   (function(){
@@ -9897,6 +9907,7 @@ function _receiptCalc(){
   if(off.fee)parts.push('匯費 '+fmt(off.fee));
   if(off.deduct)parts.push('扣款 '+fmt(off.deduct));
   if(off.hold)parts.push('保留款 '+fmt(off.hold));
+  if(off.allow)parts.push('折讓 '+fmt(off.allow));
   const detail=parts.length?('（實收 '+fmt(amt)+' ＋ '+parts.join(' ＋ ')+'）'):'';
   if(Math.abs(gap)<1){
     row.style.background='var(--gl)';row.style.border='1px solid var(--gm)';
@@ -9940,6 +9951,7 @@ function confirmReceipt(){
   const dt=document.getElementById('receipt-date').value;
   const note=document.getElementById('receipt-note').value.trim();
   const off=_receiptOffsets();
+  if(off.allow>0&&(!(gv('receipt-allow-inv')||'').trim()||!(gv('receipt-allow-reason')||'').trim())){toast('折讓必須填原發票號碼與原因（折讓證明單要用）');const _ae=document.getElementById('receipt-allow-inv');if(_ae)_ae.focus();return;}   // v6.0.31
   if(amt<=0&&off.sum<=0){toast('請填實收金額，或填入抵銷項');const el=document.getElementById('receipt-amount');if(el)el.focus();return;}
   // v5.315：部分收款不再標記為「已結清」。原本收一半也設 receivedConfirmed=true，
   // 使該期整張單從應收與逾期提醒中消失，剩餘未收的錢就此不見。
@@ -9953,6 +9965,7 @@ function confirmReceipt(){
   inv.recvFee=off.fee||0;
   inv.recvDeduct=off.deduct||0;
   inv.recvHold=off.hold||0;
+  if(off.allow>0){var _an=Math.round(off.allow/_taxM());inv.allow={amt:Math.round(off.allow),net:_an,tax:Math.round(off.allow)-_an,date:gv('receipt-allow-date')||dt,invNo:(gv('receipt-allow-inv')||'').trim(),reason:(gv('receipt-allow-reason')||'').trim()};}else delete inv.allow;   // v6.0.31 折讓
   inv.receivedConfirmed=_full;      // 足額（含抵銷）才算結清
   inv.partialConfirmed=!_full;      // 部分收款：已對帳但仍在應收
   // v5.379：收款明細寫回（去掉沒填金額的空列）
@@ -9960,12 +9973,13 @@ function confirmReceipt(){
   if(!inv.receipts.length)delete inv.receipts;
   _touch(inv);
   saveInv();
+  try{_cleanExpenseSync(inv);}catch(e){_err('confirmReceipt.clean',e);}   // v6.0.31 清潔費（業主開發票）→ 公司費用
   renderInvList();
   try{updateDashTodo();}catch(e){_err('confirmReceipt',e);}
   try{updateFinanceKPIs();}catch(e){_err('confirmReceipt',e);}
   closeReceiptModal();
   const _offTxt=off.sum>0?('（抵銷 '+fmt(off.sum)+'：'
-    +[off.fee?'匯費'+fmt(off.fee):'',off.deduct?'扣款'+fmt(off.deduct):'',off.hold?'保留款'+fmt(off.hold):'']
+    +[off.fee?'匯費'+fmt(off.fee):'',off.deduct?'扣款'+fmt(off.deduct):'',off.hold?'保留款'+fmt(off.hold):'',off.allow?'折讓'+fmt(off.allow):'']
       .filter(Boolean).join('、')+'）'):'';
   if(_full)toast('收款已確認'+_offTxt+(note?' — '+note:''));
   else toast('已登錄部分收款 NT$ '+fmt(amt)+_offTxt+'，尚差 NT$ '+fmt(_due-_settled)+' 仍列入應收');
@@ -33439,6 +33453,7 @@ function showReport(type){
       btn.style.borderColor=t===type?'var(--g)':(t==='log'?'var(--b3)':'var(--g3)');
     }
   });
+  var ms=document.getElementById('rpt-more-sel');if(ms){var inMore=['client','contract','bidrate','vendor','labor','log'].indexOf(type)>=0;ms.value=inMore?type:'';ms.style.background=inMore?'var(--g)':'var(--w)';ms.style.color=inMore?'#fff':'var(--g3)';}   // v6.0.31
   renderCurrentReport();
 }
 
@@ -37549,7 +37564,7 @@ function _pjInvHtml(q,st){
   var rows=st.invs.map(function(v){var paid=!!v.receivedConfirmed,ar=_invAR(v),due='';if(!paid&&ar>0){try{var e=_invExpectedDate(v);due=(e&&e.date)||'';}catch(e2){}}var od=due&&due<localToday();
     var stTxt=paid?'<span style="color:#1B5E20;font-weight:700">✓ 已收</span>':('<span style="color:'+(od?'var(--red)':'#b26a00')+';font-weight:700">待收 '+fmt(ar)+'</span>'+(due?('<div style="font-size:10.5px;color:'+(od?'var(--red)':'var(--b4)')+'">預計 '+esc(due)+(od?'（逾期）':'')+'</div>'):''));
     return ['第'+esc(String(v.periodNo||'?'))+'期',esc(v.date||''),fmt((v.totals&&v.totals.total)||0),(_invRetention(v)?fmt(_invRetention(v)):'—'),stTxt,
-      '<span style="white-space:nowrap">'+_pjBtn("printInvById('"+v.id+"')",'查看')+(paid?'':_pjBtn("openReceiptModal('"+v.id+"')",'收款','border-color:var(--gm);color:var(--g3)'))+_pjBtn("openEnvelope('"+v.id+"')",'✉')+'</span>'];});
+      '<span style="white-space:nowrap">'+_pjBtn("printInvById('"+v.id+"')",'查看')+(paid?'':_pjBtn("openReceiptModal('"+v.id+"')",'收款','border-color:var(--gm);color:var(--g3)'))+_pjBtn("openEnvelope('"+v.id+"')",'✉')+(_allowRows(v).length?_pjBtn("printAllowance('"+v.id+"')",'折讓單','border-color:#b26a00;color:#b26a00'):'')+'</span>'];});
   var rent=st.rent.length?'<div style="font-size:11.5px;color:#b26a00;background:#fff8ec;border:1px solid #ffd699;border-radius:var(--r6);padding:6px 9px;margin-bottom:8px"><b>逾期租金可請款：'+st.rent.length+' 項・NT$ '+fmt(st.rent.reduce(function(a,s){return a+s.amount;},0))+'（未稅）</b>　'+st.rent.slice(0,3).map(function(s){return esc(String(s.desc).slice(0,14))+' 逾 '+s.overDays+' 天';}).join('、')+'</div>':'';
   var bar=st.base>0?'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11.5px;color:var(--b4)"><span>估驗進度</span><div style="flex:1;max-width:360px;height:8px;background:var(--b1);border-radius:6px;overflow:hidden"><div style="width:'+Math.round(Math.min(100,(st.billed+st.retHeld)/st.base*100))+'%;height:100%;background:var(--g)"></div></div><b style="color:var(--g3)">'+Math.round((st.billed+st.retHeld)/st.base*100)+'%</b></div>':'';
   return rent+bar+(rows.length?_pjTable([{t:'期別'},{t:'請款日'},{t:'本期（含稅）',r:1},{t:'保留款',r:1},{t:'收款'},{t:''}],rows,['合計','',fmt(st.billed),fmt(st.retHeld),'已收 '+fmt(st.recv)+'／待收 '+fmt(st.ar),'']):'<div style="font-size:12px;color:var(--b3)">尚未請款</div>')
@@ -40297,6 +40312,154 @@ renderRfq=function(){var r=_renderRfq630.apply(this,arguments);try{var q=_rfqQ()
 var _renderMat6_630=renderMat6;
 renderMat6=function(){var r=_renderMat6_630.apply(this,arguments);try{var q=_m6Q();var s=document.querySelector('#page-mat6 .ph-s');if(s)s.textContent=q?('工程專案 › '+(q.name||'')+'　需求比對 → 調撥／接切／租賃；公司倉庫台帳在本頁'):'請先選擇工程';}catch(e){}return r;};
 
+// ══════════ v6.0.31 第四批：業主扣款設定＋收款折讓證明單、保留款廠商端、薪資 4 欄、報表合併 ══════════
+// ── 1 業主扣款設定（工程層級，每期自動套）：q.deduct={ret:保留款%, clean:清潔費‰, cleanMode:'exp'|'allow'} ──
+function _pjDeduct(q){var d=(q&&q.deduct)||{};return {ret:d.ret!=null&&d.ret!==''?parseFloat(d.ret)||0:null,clean:parseFloat(d.clean)||0,cleanMode:d.cleanMode==='allow'?'allow':'exp'};}
+function pjDeductSet(qid,k,v){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;
+  if(!q.deduct||typeof q.deduct!=='object')q.deduct={};
+  q.deduct[k]=v;_touch(q);try{persist();}catch(e){_err('pjDeductSet',e);}
+  toast('已更新扣款設定，下一期請款單起自動套用');
+}
+function _pjDeductHtml(q){
+  var d=_pjDeduct(q),IN='font-size:12px;padding:3px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;background:var(--w);box-sizing:border-box';
+  return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r8);padding:7px 10px;margin-bottom:8px">'
+    +'<b style="color:var(--b5)">業主扣款設定</b><span style="color:var(--b4);font-size:11px">每期請款單自動套用（已開的單不改）</span>'
+    +'<label style="display:flex;align-items:center;gap:4px">保留款 <input type="number" inputmode="decimal" step="any" min="0" max="50" value="'+(d.ret==null?'':d.ret)+'" placeholder="不扣" onchange="pjDeductSet(\''+q.id+'\',\'ret\',this.value)" style="'+IN+';width:58px;text-align:right"> %</label>'
+    +'<label style="display:flex;align-items:center;gap:4px">清潔費 <input type="number" inputmode="decimal" step="any" min="0" value="'+(d.clean||'')+'" placeholder="0" onchange="pjDeductSet(\''+q.id+'\',\'clean\',this.value)" style="'+IN+';width:58px;text-align:right"> ‰（未稅工程款）</label>'
+    +'<label style="display:flex;align-items:center;gap:4px">清潔費處理 <select onchange="pjDeductSet(\''+q.id+'\',\'cleanMode\',this.value)" style="'+IN+'"><option value="exp"'+(d.cleanMode==='exp'?' selected':'')+'>業主開發票給我方（當費用）</option><option value="allow"'+(d.cleanMode==='allow'?' selected':'')+'>我方開折讓單</option></select></label>'
+    +'</div>';
+}
+var _pjInvHtml0=_pjInvHtml;
+_pjInvHtml=function(q,st){var h='';try{h=_pjDeductHtml(q);}catch(e){_err('_pjDeductHtml',e);}return h+_pjInvHtml0.apply(this,arguments);};
+var _buildInvFromQuote0=buildInvFromQuote;
+buildInvFromQuote=function(q){var inv=_buildInvFromQuote0.apply(this,arguments);try{var d=_pjDeduct(q);if(d.ret!=null){inv.retention=d.ret>0;inv.retentionPct=d.ret;}if(d.clean>0){inv.cleanPermil=d.clean;inv.cleanMode=d.cleanMode;}}catch(e){_err('buildInvFromQuote.deduct',e);}return inv;};
+// ── 2 收款折讓：原發票號碼、折讓金額（未稅＋稅額）、折讓單日期、原因 → inv.allow；折讓證明單 PDF ──
+function _invAllowAmt(inv){return (inv&&inv.allow)?(parseFloat(inv.allow.amt)||0):0;}
+function _invOffset(inv){
+  if(!inv)return 0;
+  return (parseFloat(inv.recvFee)||0)+(parseFloat(inv.recvDeduct)||0)+(parseFloat(inv.recvHold)||0)+_invAllowAmt(inv);
+}
+function _receiptOffsets(){
+  const g=id=>parseFloat(document.getElementById(id)?.value)||0;
+  const fee=g('receipt-fee'),ded=g('receipt-deduct'),hold=g('receipt-hold'),allow=g('receipt-allow');
+  return {fee:fee,deduct:ded,hold:hold,allow:allow,sum:fee+ded+hold+allow};
+}
+function _allowRows(inv){
+  var rows=[],t=inv.totals||{};
+  if(inv.cleanMode==='allow'&&(parseFloat(t.cleanGross)||0)>0)rows.push({name:'清潔費（'+_rfmt(t.cleanPermil||0)+'‰）',net:Math.round(t.clean||0),tax:Math.round(t.cleanGross)-Math.round(t.clean||0),gross:Math.round(t.cleanGross)});
+  if(inv.allow&&(parseFloat(inv.allow.amt)||0)>0)rows.push({name:inv.allow.reason||'收款折讓',net:Math.round(inv.allow.net||0),tax:Math.round(inv.allow.tax||0),gross:Math.round(inv.allow.amt||0)});
+  return rows;
+}
+function printAllowance(invId){
+  var inv=INV.find(function(x){return x.id===invId;});if(!inv)return;
+  var rows=_allowRows(inv);
+  if(!rows.length){toast('此期沒有折讓：收款時填「折讓」，或扣款設定的清潔費改「我方開折讓單」');return;}
+  var cust=(CUSTOMERS||[]).find(function(c){return c.name===inv.client;})||{};
+  var invNo=(inv.allow&&inv.allow.invNo)||inv.invNo||'',date=(inv.allow&&inv.allow.date)||inv.receivedDate||localToday();
+  var net=rows.reduce(function(a,r){return a+r.net;},0),tax=rows.reduce(function(a,r){return a+r.tax;},0),gross=rows.reduce(function(a,r){return a+r.gross;},0);
+  var cell=function(v,cls){return '<td class="'+(cls||'')+'">'+v+'</td>';};
+  var body='<div class="cond">依統一發票使用辦法第 20 條，營業人銷貨後因折讓而退還買受人之款項，應取得買受人出具之證明單。本單一式二聯：第一聯買受人（'+esc(inv.client||'')+'）留存作為進項憑證，第二聯本公司留存。</div>'
+    +'<table><tr><th style="width:14%">買受人</th>'+cell(esc(inv.client||''),'l')+'<th style="width:14%">統一編號</th>'+cell(esc(inv.taxid||cust.taxid||''),'l')+'</tr>'
+    +'<tr><th>營業人（開立人）</th>'+cell(esc(P.company||'豐有工程有限公司'),'l')+'<th>統一編號</th>'+cell(esc(P.taxid||''),'l')+'</tr>'
+    +'<tr><th>工程</th>'+cell(esc(inv.project||'')+'　第 '+esc(String(inv.periodNo||''))+' 期（估驗 '+esc(inv.date||'')+'）','l')+'<th>折讓單日期</th>'+cell('<span contenteditable="true">'+esc(date)+'</span>','l')+'</tr></table>'
+    +'<table><thead><tr><th>原發票日期</th><th>原發票字軌號碼</th><th>品名（折讓原因）</th><th>數量</th><th>單價</th><th>金額（未稅）</th><th>營業稅額</th><th>合計</th></tr></thead><tbody>'
+    +rows.map(function(r,i){return '<tr>'+cell(i===0?'<span contenteditable="true">'+esc(inv.date||'')+'</span>':'')+cell(i===0?'<span contenteditable="true">'+(esc(invNo)||'（請填）')+'</span>':'')+cell(esc(r.name),'l')+cell('1')+cell(fmt(r.net),'r')+cell(fmt(r.net),'r')+cell(fmt(r.tax),'r')+cell(fmt(r.gross),'r')+'</tr>';}).join('')
+    +'<tr class="tt"><td colspan="5" class="r">合計</td>'+cell(fmt(net),'r')+cell(fmt(tax),'r')+cell(fmt(gross),'r')+'</tr></tbody></table>'
+    +'<div style="font-size:10.5px;color:#555;margin:4px 0 14px">合計新臺幣 '+fmt(gross)+' 元整。本折讓金額已於第 '+esc(String(inv.periodNo||''))+' 期工程款中扣抵，不另退款。</div>'
+    +'<table><tr><th style="width:50%;height:70px;vertical-align:top;background:#fff;color:#0e3d22;text-align:left">買受人簽章（'+esc(inv.client||'')+'）<br><span style="font-weight:400;font-size:10px;color:#777">統一發票專用章</span></th><th style="background:#fff;color:#0e3d22;text-align:left;vertical-align:top">營業人簽章（'+esc(P.company||'')+'）<br><span style="font-weight:400;font-size:10px;color:#777">統一發票專用章</span></th></tr></table>';
+  _toolPrint('營業人銷貨退回進貨退出或折讓證明單',inv.project||'',body,{fname:'折讓證明單_'+(inv.project||'')+'_第'+(inv.periodNo||'')+'期'});
+}
+// 清潔費「業主開發票給我方」：收款結清時自動成為公司費用（進項），同一張單只建一筆
+function _cleanExpenseSync(inv){
+  if(!inv)return;var id='E_clean_'+inv.id,t=inv.totals||{},clean=Math.round(t.clean||0),gross=Math.round(t.cleanGross||0);
+  var i=-1;(EXPENSES||[]).forEach(function(e,k){if(e&&e.id===id&&i<0)i=k;});
+  var want=inv.cleanMode!=='allow'&&clean>0&&!!(inv.receivedConfirmed||inv.partialConfirmed);
+  if(!want){if(i>=0){EXPENSES.splice(i,1);try{_tomb('expenses',id);}catch(e){}try{saveExpenses();}catch(e){}}return;}
+  var e=i>=0?EXPENSES[i]:{id:id,src:'clean',invId:inv.id,ts:Date.now()};
+  var old=JSON.stringify([e.seller,e.date,e.amount,e.tax,e.note,e.cat]);
+  e.seller=inv.client||'';e.date=inv.receivedDate||localToday();e.amount=clean;e.tax=gross-clean;e.cat='清潔費';e.note='清潔費 '+(inv.project||'')+' 第'+(inv.periodNo||'')+'期（業主開立）';e.payBy='offset';
+  if(JSON.stringify([e.seller,e.date,e.amount,e.tax,e.note,e.cat])!==old)_touch(e);
+  if(i<0)EXPENSES.push(e);
+  try{saveExpenses();}catch(err){_err('_cleanExpenseSync',err);}
+}
+// ── 3 保留款廠商端：帳務 › 保留款 加「我方押廠商的保留款」──
+var _renderRetention0=renderRetention;
+renderRetention=function(){
+  _renderRetention0.apply(this,arguments);
+  var el=document.getElementById('finance-retention-list');if(!el)return;
+  var rows=[];
+  (Q||[]).forEach(function(q){(q.costs||[]).forEach(function(c){if(!c||c.type!=='sub'||c.isIntro)return;var s;try{s=_subStat(c);}catch(e){return;}if(!(s.ret>0||s.released>0))return;rows.push({q:q,c:c,s:s});});});
+  var tot=rows.reduce(function(a,r){return a+Math.max(0,r.s.retHeld);},0);
+  var h='<div style="margin-top:18px;font-weight:800;font-size:13.5px">我方押廠商的保留款 <span style="font-size:11px;font-weight:400;color:var(--b4)">分包合約保留款％ 逐期扣下，完工後按「退保留款」建立應付</span></div>';
+  if(!rows.length){el.insertAdjacentHTML('beforeend',h+'<div style="font-size:12px;color:var(--b3);margin-top:6px">目前沒有押廠商的保留款。</div>');return;}
+  rows.sort(function(a,b){return b.s.retHeld-a.s.retHeld;});
+  h+='<div style="font-size:12px;color:var(--b4);margin:4px 0 8px">未退合計 <b style="color:#b26a00">NT$ '+fmt(tot)+'</b></div>'
+    +_pjTable([{t:'工程'},{t:'廠商'},{t:'累計保留',r:1},{t:'已退',r:1},{t:'未退',r:1},{t:'狀態'},{t:''}],rows.map(function(r){var done=!!r.q.closed||_projStageDone(r.q);
+      return [esc(r.q.name||''),esc(r.c.vendor||''),fmt(r.s.ret),fmt(r.s.released),'<b style="color:'+(r.s.retHeld>0?(done?'var(--red)':'#b26a00'):'var(--b3)')+'">'+fmt(Math.max(0,r.s.retHeld))+'</b>',done?(r.s.retHeld>0?'<span style="color:var(--red);font-weight:700">完工・該退</span>':'已退清'):'進行中',
+        r.s.retHeld>0?_pjBtn("openProjectCosts('"+r.q.id+"');setTimeout(function(){releaseSubRet('"+r.c.id+"')},300)",'退保留款','border-color:#b26a00;color:#b26a00'):''];}));
+  el.insertAdjacentHTML('beforeend',h);
+};
+// ── 4 薪資只填 4 欄：姓名、月薪／日薪、投保薪資（勞保＝健保級距）、眷口；勞健保勞退金額依費率自動算，其餘收在「更多欄位」──
+function hrEdit(id,sid){
+  var h=id?_hrById(id):null;
+  var st=sid?listStaff().find(function(x){return x.id===sid;}):(h&&h.sid?listStaff().find(function(x){return x.id===h.sid;}):null);
+  var v=function(k,d){return (h&&h[k]!=null&&h[k]!=='')?h[k]:(d==null?'':d);};
+  var IN='width:100%;font-size:12.5px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;box-sizing:border-box;background:var(--w)';
+  var f=function(label,fid,val,type,extra){return '<div class="f"><label>'+label+'</label><input id="'+fid+'" type="'+(type||'text')+'" value="'+esc(val==null?'':String(val))+'" style="'+IN+'"'+(type==='number'?' inputmode="decimal"':'')+(extra||'')+'></div>';};
+  var sec=function(t,sub){return '<div style="font-size:12px;font-weight:700;color:var(--g3);margin:10px 0 6px;border-left:3px solid var(--g3);padding-left:6px">'+t+(sub?'<span style="font-weight:400;color:var(--b3);font-size:11px;margin-left:6px">'+sub+'</span>':'')+'</div>';};
+  var pt=v('payType','month'),ig=v('laborGrade')||v('healthGrade');
+  var body='<div class="fg fg2">'+f('姓名 <span style="color:var(--red)">*</span>','hr-name',v('name',st?st.name:''))
+   +'<div class="f"><label>計薪方式</label><select id="hr-paytype" style="'+IN+'" onchange="document.getElementById(\'hr-base-lb\').textContent=this.value===\'day\'?\'日薪\':\'月薪\'"><option value="month"'+(pt==='month'?' selected':'')+'>月薪</option><option value="day"'+(pt==='day'?' selected':'')+'>日薪</option></select></div></div>'
+   +'<div class="fg fg2"><div class="f"><label id="hr-base-lb">'+(pt==='day'?'日薪':'月薪')+'</label><input id="hr-base" type="number" inputmode="decimal" value="'+esc(String(v('base')))+'" style="'+IN+'"></div>'
+   +f('投保薪資（勞保＝健保級距）','hr-ig',ig,'number',' oninput="_hrIgSync()"')+'</div>'
+   +'<div class="fg fg2">'+f('眷口數（健保）','hr-dep',v('dep',0),'number',' oninput="_hrIgSync()"')+'<div class="f"><label>勞健保勞退（依費率自動算）</label><div id="hr-ins-pv" style="font-size:12px;line-height:1.7;padding:4px 0;color:var(--b5)">—</div></div></div>'
+   +'<details class="prm-sec" style="margin-top:6px"><summary style="cursor:pointer;font-size:12px;color:var(--g3);font-weight:700">更多欄位（基本資料、津貼、保險金額明細、零用金定額）</summary>'
+   +sec('基本資料',st?('登入帳號 '+esc(st.email||'')):'無登入帳號')
+   +'<div class="fg fg2">'+f('職稱','hr-title',v('title'))+f('到職日','hr-hire',v('hire'),'date')+'</div>'
+   +'<div class="fg fg2">'+f('生日','hr-birth',v('birth'),'date')+'<div class="f"><label>性別</label><select id="hr-sex" style="'+IN+'"><option value="">－</option><option value="男"'+(v('sex')==='男'?' selected':'')+'>男</option><option value="女"'+(v('sex')==='女'?' selected':'')+'>女</option></select></div></div>'
+   +'<div class="fg fg2">'+f('身分證字號','hr-idno',v('idNo'))+f('通訊地址','hr-addr',v('addr'))+'</div>'
+   +'<div class="fg fg2">'+f('聯絡電話','hr-phone',v('phone',st?st.phone:''))+f('銀行帳號（薪轉）','hr-bank',v('bank'))+'</div>'
+   +'<div class="fg fg2">'+f('緊急聯絡人','hr-emg',v('emg'))+f('緊急聯絡電話','hr-emgphone',v('emgPhone'))+'</div>'
+   +sec('津貼與保險明細','油資／ETC 等實報實銷不列薪資；保險金額依投保薪資自動算，有特殊情況才手動改')
+   +'<div class="fg fg2">'+f('電信津貼（月，列入薪資）','hr-tel',v('telAllow'),'number')+f('其他固定津貼（月）','hr-other',v('otherAllow'),'number')+'</div>'
+   +'<div class="fg fg3">'+f('勞保投保級距','hr-lg',v('laborGrade'),'number')+f('勞保 公司負擔','hr-lco',v('laborCo'),'number')+f('勞保 個人負擔','hr-lself',v('laborSelf'),'number')+'</div>'
+   +'<div class="fg fg3">'+f('健保投保級距','hr-hg',v('healthGrade'),'number')+f('健保 公司負擔','hr-hco',v('healthCo'),'number')+f('健保 個人負擔','hr-hself',v('healthSelf'),'number')+'</div>'
+   +'<div class="fg fg2">'+f('勞退 公司提繳','hr-pco',v('pensionCo'),'number')+f('勞退 個人自提','hr-pself',v('pensionSelf'),'number')+'</div>'
+   +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:0 0 8px"><button type="button" class="btn btn-xs" onclick="_hrFillIns()">依費率重算（級距→金額）</button><span style="font-size:11px;color:var(--b3)">費率在頁面下方「費率設定」</span></div>'
+   +'<div class="fg fg2">'+f('零用金定額（月）','hr-petty',v('pettyQuota'),'number')+f('備註','hr-memo',v('memo'))+'</div></details>'
+   +(st?'':'<label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;margin-top:8px"><input type="checkbox" id="hr-active"'+(v('active',true)!==false?' checked':'')+'> 在職</label>');
+  _modal(h?'編輯人員資料':'新增人員資料',body,function(){
+    var g=function(fid){var el=document.getElementById(fid);return el?String(el.value||'').trim():'';};
+    var name=g('hr-name');if(!name){toast('請輸入姓名');return false;}
+    var rec=h||{id:sid?('hr_'+sid):_uid('hr'),sid:sid||''};
+    // 投保薪資 → 兩個級距；保險金額空白就依費率自動算
+    var igv=g('hr-ig');if(igv){['hr-lg','hr-hg'].forEach(function(fid){var el=document.getElementById(fid);if(el&&(!el.value||el.getAttribute('data-auto')==='1'))el.value=igv;});}
+    var needCalc=['hr-lco','hr-lself','hr-hco','hr-hself','hr-pco'].some(function(fid){return !g(fid);});if(needCalc)_hrFillIns(true);
+    var map={name:'hr-name',title:'hr-title',hire:'hr-hire',birth:'hr-birth',sex:'hr-sex',idNo:'hr-idno',addr:'hr-addr',phone:'hr-phone',bank:'hr-bank',emg:'hr-emg',emgPhone:'hr-emgphone',payType:'hr-paytype',base:'hr-base',telAllow:'hr-tel',otherAllow:'hr-other',laborGrade:'hr-lg',laborCo:'hr-lco',laborSelf:'hr-lself',healthGrade:'hr-hg',healthCo:'hr-hco',healthSelf:'hr-hself',dep:'hr-dep',pensionCo:'hr-pco',pensionSelf:'hr-pself',pettyQuota:'hr-petty',memo:'hr-memo'};
+    Object.keys(map).forEach(function(k){var val=g(map[k]);rec[k]=_HR_NUM.indexOf(k)>=0?(val===''?'':_hrNum(val)):val;});
+    if(!st){var ac=document.getElementById('hr-active');rec.active=ac?!!ac.checked:true;}
+    _touch(rec);
+    if(!h)HR.push(rec);
+    saveHR();renderPayroll();toast('已儲存人員資料');
+  });
+  var mb=document.querySelector('#fy-modal > div');if(mb){mb.style.maxWidth='660px';mb.style.maxHeight='92vh';mb.style.overflowY='auto';}
+  _hrIgSync(true);
+}
+function _hrIgSync(keep){
+  var g=function(id){return (document.getElementById(id)||{}).value;};var ig=g('hr-ig');
+  if(ig&&!keep){['hr-lg','hr-hg'].forEach(function(id){var el=document.getElementById(id);if(el){el.value=ig;el.setAttribute('data-auto','1');}});_hrFillIns(true);}
+  var r=_hrCalcIns(g('hr-lg')||ig,g('hr-hg')||ig,g('hr-dep')),pv=document.getElementById('hr-ins-pv');
+  if(pv)pv.innerHTML=(g('hr-lg')||g('hr-hg')||ig)?('公司負擔 <b>'+fmt(r.laborCo+r.healthCo+r.pensionCo)+'</b>／月（勞保 '+fmt(r.laborCo)+'、健保 '+fmt(r.healthCo)+'、勞退 '+fmt(r.pensionCo)+'）<br>個人負擔 <b>'+fmt(r.laborSelf+r.healthSelf)+'</b>／月（勞保 '+fmt(r.laborSelf)+'、健保 '+fmt(r.healthSelf)+'）'):'<span style="color:var(--b3)">填投保薪資後自動算</span>';
+}
+function _hrFillIns(silent){
+  var g=function(id){return (document.getElementById(id)||{}).value;};
+  var r=_hrCalcIns(g('hr-lg'),g('hr-hg'),g('hr-dep'));
+  var set=function(id,v){var el=document.getElementById(id);if(el)el.value=v;};
+  set('hr-lco',r.laborCo);set('hr-lself',r.laborSelf);set('hr-hco',r.healthCo);set('hr-hself',r.healthSelf);set('hr-pco',r.pensionCo);
+  if(silent!==true)toast('已依費率試算，可再手動修改');
+}
+
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
@@ -42549,6 +42712,17 @@ function exportCurrentReportExcel(){
           <div class="f" style="min-width:0"><label style="font-size:10.5px">業主扣款</label><input type="number" id="receipt-deduct" placeholder="0" style="width:100%;font-size:13px;text-align:right" oninput="_receiptCalc()"></div>
           <div class="f" style="min-width:0"><label style="font-size:10.5px">業主保留款</label><input type="number" id="receipt-hold" placeholder="0" style="width:100%;font-size:13px;text-align:right" oninput="_receiptCalc()"></div>
         </div>
+      </div>
+      <!-- v6.0.31 折讓：原發票號碼、折讓單日期、原因、金額（含稅，未稅與稅額自動拆） -->
+      <div style="border:1px dashed #ffcc80;background:#fffbf0;border-radius:var(--r8);padding:9px 11px;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:700;color:#7c5700;margin-bottom:7px">折讓（我方開折讓證明單，業主少付）<span style="font-weight:400;color:var(--b4)">　保留款不是折讓；清潔費若設「我方開折讓單」會一併印在證明單</span></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:7px">
+          <div class="f" style="min-width:0"><label style="font-size:10.5px">折讓金額（含稅）</label><input type="number" id="receipt-allow" placeholder="0" style="width:100%;font-size:13px;text-align:right" oninput="_receiptCalc()"></div>
+          <div class="f" style="min-width:0"><label style="font-size:10.5px">原發票號碼 *</label><input type="text" id="receipt-allow-inv" placeholder="AB-12345678" style="width:100%;font-size:13px"></div>
+          <div class="f" style="min-width:0"><label style="font-size:10.5px">折讓單日期</label><input type="date" id="receipt-allow-date" style="width:100%;font-size:13px"></div>
+          <div class="f" style="min-width:0"><label style="font-size:10.5px">原因 *</label><input type="text" id="receipt-allow-reason" placeholder="例：尾數折讓" style="width:100%;font-size:13px"></div>
+        </div>
+        <div style="margin-top:6px"><button type="button" class="btn btn-xs" onclick="printAllowance(document.getElementById('receipt-inv-id').value)">折讓證明單 PDF</button><span id="receipt-allow-hint" style="font-size:11px;color:var(--b4);margin-left:6px"></span></div>
       </div>
       <!-- 備註說明 -->
       <div class="f" style="margin-bottom:12px">
