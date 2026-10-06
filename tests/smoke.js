@@ -5041,6 +5041,31 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.41 F25P1 第二次收尾：重複已付預付款刪除、第 1 期餘款補建 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    localStorage.removeItem('fy_fix_f25p1b');
+    Q=[{id:'qF',code:'F',name:'中科台積電F25P1',client:'業主',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 H300，L=15M@80cm 打設、拔除',unit:'支',qty:'133',price:'10000',sec:false,_uid:'f1'}],t:{sub:1330000,tax:66500,total:1396500},dailyLogs:[],
+      costs:[{id:'cA',type:'sub',vendor:'鴻玉開發工程行',cat:'打設',date:'2026-09-20',invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'cA_0',linkedItemIdx:0,qty:133,unitPrice:8250}],amt:1097250,
+        advances:[{id:'f25hy',date:'2026-10-05',amt:548625,note:''}],periods:[{no:1,date:'2026-09-25',from:'2026-09-23',to:'2026-09-25',rows:[{rid:'cA_0',qty:133}],amt:1097250,ret:0,net:1097250,due:'2026-10-25',adv:548625}]}]}];
+    eid='qF';PAYABLES.length=0;
+    PAYABLES.push({id:'paycA_af25hy',costId:'cA',costAdv:'f25hy',quoteId:'qF',to:'鴻玉開發工程行',project:'中科台積電F25P1',amount:548625,vat:true,date:'2026-10-05',status:'paid',paidDate:'2026-10-05',note:'預付款：預付一半'});
+    PAYABLES.push({id:'payOLD_aeX',costId:'cGONE',to:'鴻玉開發工程行',project:'中科台積電F25P1',amount:548625,vat:true,date:'2026-10-05',status:'paid',paidDate:'2026-10-05',note:'預付款（第1期）'});
+    const log=_fixF25P1b(true);out.log=log;
+    out.dupGone=!PAYABLES.some(p=>p.id==='payOLD_aeX')&&PAYABLES.filter(p=>/鴻玉/.test(p.to)&&p.status==='paid').length===1;
+    const pm=PAYABLES.find(p=>p.id==='paycA_p1');out.rest=!!pm&&pm.status==='pending'&&_payEff(pm)===576056&&pm.date==='2026-10-25';
+    out.again=_fixF25P1b()===null;
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,500);}
+  localStorage.removeItem('fy_fix_f25p1b');Q=[];PAYABLES.length=0;eid=null;res(out);
+}));
+    check('v6.0.41 F25P1 第二次收尾：非正式編號的重複已付預付款刪除、第 1 期餘款 576,056（10/25 未付）補建、只跑一次', r.dupGone && r.rest && r.again, JSON.stringify(r));
+    check('v6.0.41 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

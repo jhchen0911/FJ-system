@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.40';
+var APP_VERSION='v6.0.41';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -38802,6 +38802,24 @@ function _fixF25P1(force){
   return log;
 }
 try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{var r=_fixF25P1();if(r&&r.length)showConfirm('已套用「中科台積電 F25P1」資料修正','<div style="font-size:12.5px;line-height:1.8">'+r.map(esc).join('<br>')+'<div style="margin-top:8px;color:var(--b4)">請到工程專案 › 發包與廠商計價 › 分包管理明細核對。</div></div>',function(){try{var pg=document.querySelector('.page.active');if(pg&&pg.id==='page-proj')renderProj();}catch(e){}},false,null,true);}catch(e){_err('fixF25P1',e);}},7000);});}catch(e){}
+// v6.0.41 第二次收尾：同一筆預付款（鴻玉 548,625 已付）若還有別的編號的重複已付應付 → 刪掉非正式編號那筆；第 1 期餘款若缺應付 → 補建
+function _fixF25P1b(force){
+  if(!force&&localStorage.getItem('fy_fix_f25p1b'))return null;
+  var q=(Q||[]).find(function(x){return x&&x.awarded&&/中科台積電\s*F25P1/i.test(x.name||'');});if(!q)return null;
+  var main=(q.costs||[]).find(function(c){return c&&c.type==='sub'&&!c.isIntro&&!c.followOf&&/鴻玉/.test(c.vendor||'')&&_subPeriods(c).length;});if(!main)return null;
+  var log=[],adv=_subAdvs(main)[0];if(!adv)return null;
+  var canon=_subAdvPayId(main.id,adv);
+  var dups=(PAYABLES||[]).filter(function(p){return p&&p.id!==canon&&/鴻玉/.test(p.to||'')&&(p.project||'')===(q.name||'')&&Math.round(parseFloat(p.amount)||0)===Math.round(parseFloat(adv.amt)||0)&&p.status==='paid';});
+  if(dups.length){var hasCanon=PAYABLES.some(function(p){return p.id===canon;});
+    if(!hasCanon){var keep=dups.shift();keep.id=canon;keep.costId=main.id;keep.costAdv=adv.id;keep.quoteId=q.id;_touch(keep);log.push('鴻玉預付款已付應付改掛正式編號');}
+    dups.forEach(function(p){PAYABLES=PAYABLES.filter(function(x){return x!==p;});try{_tomb('payables',p.id);}catch(e){}});if(dups.length)log.push('刪除重複的鴻玉預付款已付應付 '+dups.length+' 筆');}
+  var per=_subPeriods(main).filter(function(p){return !p.isRet;})[0];
+  if(per){var pid=_subPayId(main.id,per);if(!PAYABLES.some(function(p){return p.id===pid;})){try{syncCostToPayable(q,main);}catch(e){}var pm=PAYABLES.find(function(p){return p.id===pid;});if(pm){pm.date='2026-10-25';_touch(pm);log.push('補建鴻玉第 1 期餘款 '+fmt(_payEff(pm))+'（10/25 未付）');}}}
+  if(log.length){try{persist();savePayables();_markDirty();}catch(e){}}
+  try{localStorage.setItem('fy_fix_f25p1b',String(Date.now()));}catch(e){}
+  return log;
+}
+try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{var r=_fixF25P1b();if(r&&r.length)showConfirm('F25P1 資料修正（第二次）','<div style="font-size:12.5px;line-height:1.8">'+r.map(esc).join('<br>')+'</div>',function(){try{if(document.getElementById('page-acct')&&document.getElementById('page-acct').classList.contains('active'))renderPayables();}catch(e){}},false,null,true);}catch(e){_err('fixF25P1b',e);}},9000);});}catch(e){}
 // 工程專案分包列：預付款列尾加「重算抵扣」
 var _pjAdvRowsHtml640=_pjAdvRowsHtml;
 _pjAdvRowsHtml=function(c){var h=_pjAdvRowsHtml640(c);if(!h||!c||c.followOf)return h;return h.replace(/<\/div>$/,'<div style="text-align:right;margin-top:2px">'+_reallocBtn(c).replace('font-size:11px;padding:3px 10px','font-size:10.5px;padding:1px 8px')+'</div></div>');};
