@@ -5291,6 +5291,28 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.46 報價列表「查看 PDF」眼睛鈕；編輯頁預覽鈕移除 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    Q=[{id:'qV',code:'V',name:'眼睛測試案',client:'業主',date:'2026-10-01',exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁',unit:'支',qty:'10',price:'1000',sec:false}],t:{sub:10000,tax:500,total:10500}}];
+    go('quotes');try{rList();}catch(e){}
+    const lh=document.getElementById('qlist')?document.getElementById('qlist').innerHTML:document.getElementById('page-quotes').innerHTML;
+    out.listBtn=/quoteViewPdf\('qV'\)/.test(lh)&&/#i-eye/.test(lh);
+    out.editorNoPreview=!/go\('preview'\)/.test(document.querySelector('#page-editor .ph-r').innerHTML);
+    quoteViewPdf('qV');
+    out.opened=document.querySelector('.page.active').id==='page-preview'&&/眼睛測試案/.test(document.getElementById('page-preview').innerHTML)&&/exportQuotePDF/.test(document.getElementById('page-preview').innerHTML);
+    _prevBack('quotes');out.back=document.querySelector('.page.active').id==='page-quotes';
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,400);}
+  Q=[];eid=null;res(out);
+}));
+    check('v6.0.46 報價列表每筆有「查看 PDF」眼睛鈕 → 開預覽頁（可匯出PDF），返回回列表；編輯頁預覽鈕已移除', r.listBtn && r.editorNoPreview && r.opened && r.back, JSON.stringify(r));
+    check('v6.0.46 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

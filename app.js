@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.45';
+var APP_VERSION='v6.0.46';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -2648,6 +2648,7 @@ function qlHTML(q,clickable){
     return '<div class="ql" style="position:relative" '+(clickable?'onclick="loadQ(\''+qid+'\')"':'')+'>'+
       '<div style="display:flex;align-items:center;gap:8px">'+infoHtml+'</div>'+
       '<div class="ql-actions">'+
+        '<button type="button" class="btn mob-btn-icon" title="查看 PDF" style="color:var(--g3);border-color:var(--gm)" onclick="event.stopPropagation();quoteViewPdf(\''+qid+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-eye"/></svg></button>'+   // v6.0.46
         '<button type="button" class="btn mob-btn" style="background:var(--g);color:#fff;border-color:var(--g);flex:2" onclick="event.stopPropagation();loadQ(\''+qid+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯</button>'+
         (awarded?'':'<button type="button" class="btn mob-btn" style="border-color:#1a3a6b;color:#1a3a6b;flex:1.5" onclick="event.stopPropagation();awardQuote(\''+qid+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 得標</button>')+
                 '<div style="position:relative">'+
@@ -2665,6 +2666,7 @@ function qlHTML(q,clickable){
     return'<div class="ql" '+(clickable?'onclick="loadQ(\''+qid+'\')""':'')+'>'+
       infoHtml+
       '<div style="display:flex;gap:4px;margin-left:10px;flex-shrink:0;align-items:center">'+
+        '<button type="button" class="btn btn-xs" title="查看 PDF" style="color:var(--g3);border-color:var(--gm)" onclick="event.stopPropagation();quoteViewPdf(\''+qid+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-eye"/></svg></button>'+   // v6.0.46
         '<button type="button" class="btn btn-xs btn-g" onclick="event.stopPropagation();loadQ(\''+qid+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯</button>'+
         awardBtn+
         '<button type="button" class="btn btn-xs" style="color:var(--b3);border-color:var(--b2)" title="複製報價單" onclick="event.stopPropagation();copyQ(\''+qid+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg></button>'+
@@ -39411,6 +39413,14 @@ function _prevBack(def){
   var p=window._goPrev;
   if(p&&p!=='preview'&&p!=='invoice-prev'&&document.getElementById('page-'+p))return go(p);
   return go(def);
+}
+
+
+// ══════════════ v6.0.46：報價列表「查看 PDF」眼睛鈕（v646.js 區塊）══════════════
+// 列表卡片直接開報價單預覽（可按「匯出PDF」下載）；返回回到列表。編輯頁的「預覽」鈕移除。
+function quoteViewPdf(qid){
+  var q=Q.find(function(x){return x.id===qid;});if(!q){toast('找不到報價單');return;}
+  loadQ(qid);go('preview');window._goPrev='quotes';
 }
 
 function _modal(title,bodyHtml,onOk){

@@ -999,7 +999,6 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <button type="button" class="btn btn-sm" onclick="openNegotiateModal()" title="議價：整單等比或逐項調價" style="border-color:#b39ddb;color:#4527a0"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 議價</button>
       <button type="button" class="btn btn-sm" onclick="go('quotes')">← 返回</button>
       <button type="button" class="btn btn-sm" onclick="quoteImportOwner()" title="把業主的 Excel／Word 詢價單讀進來：工項帶入、條款唯讀保留；填完單價可寫回原檔" style="border-color:#1565C0;color:#1565C0">匯入詢價單</button>
-      <button type="button" class="btn btn-sm" onclick="loadQ(eid);go('preview')"><svg class="ic ib" aria-hidden="true"><use href="#i-eye"/></svg> 預覽</button>
       <button type="button" class="btn btn-sm" onclick="bumpQVersion(eid)" title="將目前內容封存為歷史版本並升版" style="border-color:#1a3a6b;color:#1a3a6b"><svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg> 進版</button>
       <button type="button" class="btn btn-sm btn-y" onclick="saveQ()"><svg class="ic ib" aria-hidden="true"><use href="#i-save"/></svg> 儲存</button>
     </div>
@@ -2757,7 +2756,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.45" defer></script>
+<script src="app.js?v=6.0.46" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
