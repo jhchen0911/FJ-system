@@ -2619,7 +2619,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
               <input type="number" id="inv-clean-permil" min="0" step="any" placeholder="0" oninput="rInvTots()" title="每期以未稅工程款 × ‰ 計，含稅自請款總計扣除（在工程專案「業主扣款設定」設定即每期自動帶入）"
                 style="width:52px;text-align:center;padding:4px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px;font-family:inherit">
               <span style="font-size:13px;color:var(--b5)">‰</span>
-              <select id="inv-clean-mode" style="font-size:12px;padding:4px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;background:var(--w)"><option value="exp">業主開發票（當費用）</option><option value="allow">我方開折讓單</option></select>
+              <select id="inv-clean-mode" style="font-size:12px;padding:4px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;background:var(--w)"><option value="net">直接扣除（發票開扣後金額）</option><option value="exp">業主另開發票（當費用）</option><option value="allow">我方開折讓單</option></select>
             </label>
           </div>
         </div>
@@ -2757,7 +2757,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.43" defer></script>
+<script src="app.js?v=6.0.44" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
