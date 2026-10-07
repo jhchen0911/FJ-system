@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.44';
+var APP_VERSION='v6.0.45';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -39400,6 +39400,17 @@ function _payAdvInfo(p){
   var line=function(u){var a=u.a,pp=u.pay,paid=pp&&pp.status==='paid';
     return '<div>預付款 '+esc(a.date||'')+'　NT$ '+fmt(Math.round(u.amt*tm))+(paid?' <span style="color:var(--g3)">✓ 已付 '+esc(pp.paidDate||a.date||'')+'</span>':(pp?' <span style="color:var(--red)">待付</span> <a href="javascript:void(0)" onclick="payMarkPaid(\''+pp.id+'\',\''+esc(a.date||'')+'\',renderPayables)" style="color:#1565C0">標記已付</a>':' <span style="color:#b26a00">缺應付</span> <a href="javascript:void(0)" onclick="_advPayFix(\''+q.id+'\',\''+c.id+'\')" style="color:#1565C0">補建</a>'))+'</div>';};
   return '<div style="margin-top:4px;padding:6px 8px;background:var(--b0);border-radius:var(--r8);font-size:11px;line-height:1.6;color:var(--b5)">本期計價（'+(p.vat===false?'未稅':'含稅')+'）NT$ '+fmt(Math.round(k.net*tm))+' － 預付款抵扣 NT$ '+fmt(Math.round(k.adv*tm))+' ＝ <b>本期應付 NT$ '+fmt(Math.round(k.pay*tm))+'</b>'+us.map(line).join('')+'</div>';
+}
+
+
+// ══════════════ v6.0.45：預覽頁「返回」回到上一頁（不走瀏覽器歷史）（v645.js 區塊）══════════════
+// 本系統是單頁應用、換頁不寫瀏覽器歷史，預覽頁按 history.back() 會離開整個網站。改記上一個頁面 id。
+var _go0_645=go;
+go=function(p){try{var cur=document.querySelector('.page.active');if(cur&&cur.id){var id=cur.id.replace(/^page-/,'');if(id!==p)window._goPrev=id;}}catch(e){}return _go0_645.apply(this,arguments);};
+function _prevBack(def){
+  var p=window._goPrev;
+  if(p&&p!=='preview'&&p!=='invoice-prev'&&document.getElementById('page-'+p))return go(p);
+  return go(def);
 }
 
 function _modal(title,bodyHtml,onOk){
