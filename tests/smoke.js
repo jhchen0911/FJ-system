@@ -5272,6 +5272,25 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.45 預覽頁「返回」回上一頁，不走瀏覽器歷史 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    go('quotes');go('editor');go('preview');
+    out.prev=window._goPrev==='editor';
+    out.btn=!/history\.back/.test(document.getElementById('page-preview').innerHTML)&&/_prevBack\('quotes'\)/.test(document.getElementById('page-preview').innerHTML)&&/_prevBack\('invoice'\)/.test(document.getElementById('page-invoice-prev').innerHTML);
+    _prevBack('quotes');out.back=document.querySelector('.page.active').id==='page-editor';
+    go('preview');window._goPrev=null;_prevBack('quotes');out.def=document.querySelector('.page.active').id==='page-quotes';
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,400);}
+  res(out);
+}));
+    check('v6.0.45 預覽頁返回：記上一頁並回到該頁（編輯器），沒有上一頁才回列表；不再呼叫 history.back', r.prev && r.btn && r.back && r.def, JSON.stringify(r));
+    check('v6.0.45 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

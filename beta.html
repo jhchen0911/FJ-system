@@ -1109,7 +1109,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <!-- ████ PREVIEW ████ -->
 <div class="page" id="page-preview">
   <div class="prev-act">
-    <button type="button" class="btn btn-sm" onclick="history.length>1?history.back():go('quotes')">← 返回</button>
+    <button type="button" class="btn btn-sm" onclick="_prevBack('quotes')">← 返回</button>
     <button type="button" class="btn btn-sm btn-y" onclick="exportQuotePDF(eid)" style="padding:8px 20px;font-size:14px"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 匯出PDF</button>
   </div>
   <div class="pad"><div id="prevhtml"></div></div>
@@ -2756,7 +2756,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <!-- ████ INVOICE PREVIEW PAGE ████ -->
 <div class="page" id="page-invoice-prev">
   <div class="prev-act">
-    <button type="button" class="btn btn-sm" onclick="history.length>1?history.back():go('invoice')">← 返回</button>
+    <button type="button" class="btn btn-sm" onclick="_prevBack('invoice')">← 返回</button>
     <button type="button" class="btn btn-sm btn-y" onclick="printInvoice()" style="padding:8px 20px;font-size:14px"><svg class="ic ib" aria-hidden="true"><use href="#i-download"/></svg> 匯出PDF</button>
   </div>
   <div class="pad" style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div id="inv-prev-html"></div></div>
@@ -2780,7 +2780,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.44" defer></script><script src="beta.js?v=6.0.44" defer></script>
+<script src="app.js?v=6.0.45" defer></script><script src="beta.js?v=6.0.45" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
