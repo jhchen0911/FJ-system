@@ -5199,6 +5199,79 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.44 應付自我修復（墓碑豁免／孤兒改掛／補建）、清潔費直接扣除、PDF 詢價單匯入 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(async res => {
+  const out={};
+  try{
+    const d=n=>{const x=new Date();x.setDate(x.getDate()+n);return x.toISOString().slice(0,10);};
+    // A 應付自我修復
+    Q=[{id:'qH',code:'H',name:'經一綠能測試',client:'業主',date:d(-90),awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 H300，L=9M@80cm 打設、拔除',unit:'支',qty:'300',price:'3000',sec:false,_uid:'h1'}],t:{sub:900000,tax:45000,total:945000},dailyLogs:[],
+      costs:[{id:'cH',type:'sub',vendor:'鴻玉',cat:'打設',date:d(-60),invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'r1',linkedItemIdx:0,qty:300,unitPrice:1755}],amt:526500,
+        advances:[{id:'a1',date:d(-28),amt:200000},{id:'a2',date:d(-2),amt:177988}],periods:[{no:1,date:d(-12),from:d(-50),to:d(-12),rows:[{rid:'r1',qty:300}],adv:359988}]}]}];
+    eid='qH';PAYABLES.length=0;
+    const q=Q[0],c=q.costs[0];
+    // 只有期別應付＋一筆孤兒（舊的 9/9 預付款 20 萬，無 costId）；a2 的正式編號被墓碑擋住
+    PAYABLES.push({id:'paycH_p1',costId:'cH',costPeriod:1,quoteId:'qH',to:'鴻玉',project:q.name,amount:166512,vat:true,date:d(13),status:'pending',note:'第1期計價'});
+    PAYABLES.push({id:'orph1',to:'鴻玉',project:q.name,amount:200000,vat:false,date:d(-28),status:'pending',note:'預付款　H型鋼樁'});
+    TOMBS.payables=TOMBS.payables||{};TOMBS.payables['paycH_aa2']=Date.now()-1000;
+    const n=_advPayHeal(q,c);
+    const a1=PAYABLES.find(p=>p.id==='paycH_aa1'),a2=PAYABLES.find(p=>p.id==='paycH_aa2');
+    out.heal={n:n,a1:!!a1,a1Rekey:!!a1&&a1.amount===200000&&a1.costAdv==='a1'&&!PAYABLES.some(p=>p.id==='orph1'),a2:!!a2&&a2.amount===177988,tomb:!(TOMBS.payables&&TOMBS.payables['paycH_aa2'])};
+    out.healOk=out.heal.a1Rekey&&out.heal.a2&&out.heal.tomb;
+    // 雲端墓碑合併也不會再把它刪掉
+    const merged=_mergeColl(PAYABLES.slice(),[],'payables',{payables:{'paycH_aa2':Date.now()}});
+    out.mergeKeep=merged.some(p=>p.id==='paycH_aa2');
+    _mergeTombs({payables:{'paycH_aa2':Date.now()}});out.tombGone=!(TOMBS.payables&&TOMBS.payables['paycH_aa2']);
+    // 應付頁：期別卡不再「缺應付」，有標記已付
+    go('acct');acctTab('ap');window._payAging='all';renderPayables();
+    const pl=document.getElementById('payable-list');const pr=[...pl.querySelectorAll('.ql')].find(x=>x.innerHTML.includes('paycH_p1'));
+    out.card=!!pr&&!/缺應付/.test(pr.innerHTML)&&(pr.innerHTML.match(/標記已付/g)||[]).length===2&&/預付款抵扣/.test(pr.innerHTML);
+    // 缺應付 → 補建連結（刪掉 a2 應付再畫）
+    PAYABLES=PAYABLES.filter(p=>p.id!=='paycH_aa2');renderPayables();
+    const pr2=[...document.querySelectorAll('#payable-list .ql')].find(x=>x.innerHTML.includes('paycH_p1'));
+    out.fixLink=!!pr2&&/缺應付/.test(pr2.innerHTML)&&/_advPayFix\('qH','cH'\)/.test(pr2.innerHTML);
+    _advPayFix('qH','cH');out.fixed=PAYABLES.some(p=>p.id==='paycH_aa2');
+    // B 清潔費預設直接扣除
+    out.cleanDef=_pjDeduct({}).cleanMode==='net'&&_pjDeduct({deduct:{cleanMode:'exp'}}).cleanMode==='exp';
+    const dh=_pjDeductHtml(q);out.cleanUi=/value="net"[^>]*selected/.test(dh)&&/直接自請款扣除/.test(dh)&&/value="allow"/.test(dh);
+    const sel=document.getElementById('inv-clean-mode');out.cleanSel=!!sel&&sel.options[0].value==='net';
+    EXPENSES.length=0;const inv={id:'iX',client:'業主',project:q.name,periodNo:1,cleanMode:'net',receivedConfirmed:true,receivedDate:d(0),totals:{clean:3000,cleanGross:3150}};
+    _cleanExpenseSync(inv);out.cleanNoExp=!EXPENSES.some(e=>e.id==='E_clean_iX');
+    inv.cleanMode='exp';_cleanExpenseSync(inv);out.cleanExp=EXPENSES.some(e=>e.id==='E_clean_iX');
+    inv.cleanMode='net';_cleanExpenseSync(inv);out.cleanExpGone=!EXPENSES.some(e=>e.id==='E_clean_iX');
+    // C PDF 匯入：以假 pdf.js 餵文字片段（表頭＋兩工項＋小計＋條款）
+    const T=(x,y,s,w)=>({str:s,transform:[10,0,0,10,x,y],width:w||s.length*9});
+    const itemsPdf=[T(40,700,'XX 公司 工程詢價單'),T(40,680,'項次'),T(80,680,'工程項目'),T(300,680,'單位'),T(360,680,'數量'),T(420,680,'單價'),T(480,680,'複價'),
+      T(40,660,'1'),T(80,660,'H型鋼樁 H300，L=15M'),T(300,660,'支'),T(360,660,'133'),
+      T(40,640,'2'),T(80,640,'水平支撐系統'),T(170,640,'H350 一層'),T(300,640,'式'),T(360,640,'1'),
+      T(300,620,'小計'),T(480,620,''),T(40,600,'一、本工程含稅。'),T(40,585,'二、付款方式：月結 60 天。')];
+    window.pdfjsLib={GlobalWorkerOptions:{},getDocument:()=>({promise:Promise.resolve({numPages:1,getPage:()=>Promise.resolve({getTextContent:()=>Promise.resolve({items:itemsPdf})})})})};
+    let html='',title='';const oC=window.showConfirm;window.showConfirm=function(t,h){title=t;html=h;};
+    await _qiStart({name:'業主詢價單.pdf',size:1234,arrayBuffer:async()=>new ArrayBuffer(8)});
+    out.pdf={title:title,n:(html.match(/<tr /g)||[]).length,has:/H型鋼樁 H300，L=15M/.test(html)&&/水平支撐系統 H350 一層/.test(html),terms:/付款方式：月結 60 天/.test(html),warn:/PDF 只讀進工項/.test(html)};
+    out.pdfOk=/匯入業主詢價單/.test(title)&&out.pdf.has&&out.pdf.terms&&/讀到 <b>2<\/b> 個工項/.test(html);
+    window.showConfirm=oC;
+    // 非 pdf/xlsx/docx 提示文字
+    let h2='';window.showConfirm=function(t,h){h2=h;};await _qiStart({name:'x.doc',size:1,arrayBuffer:async()=>new ArrayBuffer(1)});out.docHint=/PDF 只能讀進工項/.test(h2);window.showConfirm=oC;
+    // PDF 不能回填
+    _qOwnerDraft={kind:'pdf',name:'x.pdf'};let tt=[];const oT=window.toast;window.toast=m=>tt.push(String(m));await quoteExportOwnerDoc();out.pdfNoExport=tt.some(t=>/無法回填/.test(t));window.toast=oT;_qOwnerDraft=null;
+    // 表頭含空格（業主 Excel 常見「項 次／單 位／數 量／單 價」）也要認得
+    const sp=_qiMapRows([{key:1,cells:[{col:1,text:'項 次'},{col:2,text:'項  目  及  說  明'},{col:3,text:'單 位'},{col:4,text:'數 量'},{col:5,text:'單 價'},{col:6,text:'複 價'},{col:7,text:'編碼(備註)'}]},{key:2,cells:[{col:1,text:'甲.壹.二'},{col:2,text:'地工工程'}]},{key:3,cells:[{col:1,text:'甲.壹.二.7'},{col:2,text:'30CMφCCP止水樁 L=16m'},{col:3,text:'支'},{col:4,text:'384'},{col:6,text:'0'}]}],[]);
+    out.hdrSpace=!!sp&&sp.nItems===1&&sp.items.some(x=>x.sec&&x.desc==='地工工程')&&sp.items.some(x=>!x.sec&&x.unit==='支'&&x.qty===384);
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,700);}
+  Q=[];PAYABLES.length=0;EXPENSES.length=0;eid=null;delete TOMBS.payables;res(out);
+}));
+    check('v6.0.44 預付款應付自我修復：孤兒依金額／日期改掛正式編號、缺的補建、本機墓碑移除；雲端墓碑合併不再刪掉成本卡仍需要的應付', r.healOk && r.mergeKeep && r.tombGone, JSON.stringify({heal:r.heal,err:r.err}));
+    check('v6.0.44 應付卡：期別卡列出各筆預付款「標記已付」；缺應付時有「補建」一鍵修復', r.card && r.fixLink && r.fixed, JSON.stringify(r.err||''));
+    check('v6.0.44 清潔費預設「直接自請款扣除」：不建費用、不開折讓單；另開發票模式仍建費用；請款單編輯器選單含直接扣除', r.cleanDef && r.cleanUi && r.cleanSel && r.cleanNoExp && r.cleanExp && r.cleanExpGone, JSON.stringify(r.err||''));
+    check('v6.0.44 匯入 PDF 詢價單：文字層分列分欄 → 工項／條款；提示無法回填；回填匯出攔下', r.pdfOk && r.pdf.warn && r.docHint && r.pdfNoExport, JSON.stringify({pdf:r.pdf,err:r.err}));
+    check('v6.0.44 詢價單表頭含空格（單 位／數 量／單 價）也能辨識', r.hdrSpace, JSON.stringify(r.err||''));
+    check('v6.0.44 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

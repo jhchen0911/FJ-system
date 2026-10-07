@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.43';
+var APP_VERSION='v6.0.44';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -3160,7 +3160,7 @@ function loadInvoice(id){
   const cte=document.getElementById('inv-claim-type');if(cte&&inv.claimType)cte.value=inv.claimType;
   const re2=document.getElementById('inv-retention');if(re2)re2.checked=!!inv.retention;
   const rp2=document.getElementById('inv-retention-pct');if(rp2)rp2.value=inv.retentionPct!=null?inv.retentionPct:10;
-  const cp2=document.getElementById('inv-clean-permil');if(cp2)cp2.value=inv.cleanPermil||'';const cm2=document.getElementById('inv-clean-mode');if(cm2)cm2.value=inv.cleanMode==='allow'?'allow':'exp';   // v6.0.31
+  const cp2=document.getElementById('inv-clean-permil');if(cp2)cp2.value=inv.cleanPermil||'';const cm2=document.getElementById('inv-clean-mode');if(cm2)cm2.value=inv.cleanMode==='allow'?'allow':(inv.cleanMode==='exp'?'exp':'net');   // v6.0.31／v6.0.44 預設直接扣除
   document.getElementById('inv-edit-title').textContent='編輯請款單 #'+inv.periodNo;
   const pdp2=document.getElementById('inv-period-display');
   if(pdp2)pdp2.textContent='第 '+(inv.periodNo||1)+' 期';
@@ -4128,7 +4128,7 @@ function saveInvoice(){
     cashPct:parseInt(gv('inv-cash-pct'))||0,ticketDays:parseInt(gv('inv-ticket-days'))||0,payMonthDelay:parseInt(gv('inv-pay-month-delay'))||0,recvDay:parseInt(gv('inv-recv-day'))||0,expectedRecvDate:gv('inv-expected-recv-date'),claimType:gv('inv-claim-type'),claimPct:gv('inv-claim-pct'),retention:document.getElementById('inv-retention')?.checked||false,
     retentionPct:(function(){var _v=document.getElementById('inv-retention-pct')?.value;
       return (_v==null||_v==='')?10:(parseFloat(_v)||0);})(),   // v5.319：0% 是合法值，原本 ||10 會存成 10
-    cleanPermil:parseFloat(document.getElementById('inv-clean-permil')?.value)||0,cleanMode:(document.getElementById('inv-clean-mode')?.value)||'exp',   // v6.0.31 清潔費
+    cleanPermil:parseFloat(document.getElementById('inv-clean-permil')?.value)||0,cleanMode:(document.getElementById('inv-clean-mode')?.value)||'net',   // v6.0.31 清潔費／v6.0.44 預設直接扣除
     docs:[
       document.getElementById('inv-doc-confirm')?.checked||false,
       document.getElementById('inv-doc-invoice')?.checked||false,
@@ -10368,7 +10368,7 @@ function _mergeAcctList(loc,cld,tombKey,uniqField){
   var dead=(TOMBS&&TOMBS[tombKey])||{};
   var map={};
   var put=function(r){
-    if(!r||!r.id||dead[r.id]!=null)return;
+    if(!r||!r.id||(dead[r.id]!=null&&!(typeof _tombExempt==='function'&&_tombExempt(tombKey,r.id))))return;   // v6.0.44
     var ex=map[r.id];
     if(!ex||((r._mt||0)>=(ex._mt||0)))map[r.id]=r;
   };
@@ -10471,7 +10471,7 @@ function _mergeColl(localArr,cloudArr,collName,cloudTombs){
   var _arr=function(x){if(Array.isArray(x))return x;if(x&&typeof x==='object')return Object.values(x);return [];};
   localArr=_arr(localArr);cloudArr=_arr(cloudArr);
   var lt=(TOMBS[collName]||{});var ct=(cloudTombs&&cloudTombs[collName])||{};
-  var dead=function(id){return lt[id]!=null||ct[id]!=null;};
+  var dead=function(id){var d=lt[id]!=null||ct[id]!=null;if(d&&typeof _tombExempt==='function'&&_tombExempt(collName,id))return false;return d;};   // v6.0.44 成本卡仍需要的應付不受墓碑影響
   var mt=function(r){return r._mt||r.ts||r.updatedAt||0;};
   var map={},noId=[];
   cloudArr.forEach(function(r){if(!r)return;if(!r.id){noId.push(r);return;}if(!dead(r.id))map[r.id]=r;});
@@ -10495,6 +10495,7 @@ function _mergeTombs(cloudTombs){
       if(!TOMBS[c][id]||cloudTombs[c][id]>TOMBS[c][id])TOMBS[c][id]=cloudTombs[c][id];
     });
   });
+  try{if(TOMBS.payables&&typeof _liveExpectedPayIds==='function'){var live=_liveExpectedPayIds();Object.keys(TOMBS.payables).forEach(function(id){if(live[id])delete TOMBS.payables[id];});}}catch(e){_err('_mergeTombs.live',e);}   // v6.0.44 成本卡仍需要的應付不留墓碑
   try{_tombPrune();}catch(e){_err('_mergeTombs',e);}          // v5.375：合併完順手清掉過期墓碑
   try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e){_err('_mergeTombs',e);}
 }
@@ -37727,7 +37728,7 @@ var _QI_H={desc:/工程項目|工作項目|項目名稱|工項|品名|名稱|項
 // 通用列結構 rows=[{key,cells:[{col,text,ref}]}] → 表頭／欄位／工項列／合計列／條款
 function _qiMapRows(rows,texts){
   var hdr=-1,cols={};
-  for(var r=0;r<rows.length;r++){var cs=rows[r].cells,hit={};cs.forEach(function(c){var t=c.text;if(!t||t.length>12)return;Object.keys(_QI_H).forEach(function(k){if(hit[k]!=null)return;if(k==='desc'&&/項次|序號|編號/.test(t))return;if(k==='note'&&/^(說明)$/.test(t)&&hit.desc==null)return;if(_QI_H[k].test(t))hit[k]=c.col;});});
+  for(var r=0;r<rows.length;r++){var cs=rows[r].cells,hit={};cs.forEach(function(c){var t=String(c.text||'').replace(/[\s\u3000]/g,'');if(!t||t.length>12)return;/* v6.0.44 表頭「單 位」「數 量」有空格也要認得 */Object.keys(_QI_H).forEach(function(k){if(hit[k]!=null)return;if(k==='desc'&&/項次|序號|編號/.test(t))return;if(k==='note'&&/^(說明)$/.test(t)&&hit.desc==null)return;if(_QI_H[k].test(t))hit[k]=c.col;});});
     if(hit.desc!=null&&hit.qty!=null&&(hit.unit!=null||hit.price!=null)){hdr=r;cols=hit;if(hit.note===hit.desc)delete hit.note;break;}}
   if(hdr<0)return null;
   var items=[],totals=[],last=hdr,sec=0;
@@ -39255,6 +39256,151 @@ var _shRptYear0_643=_shRptYear;
 _shRptYear=function(year){var d=_shRptYear0_643.apply(this,arguments);try{var vat=Math.round(d.expByCat['營業稅']||0),inc=Math.round(d.expByCat['營所稅']||0);d.vat=vat;d.inctax=inc;if(vat||inc){d.exp-=vat+inc;d.pretax+=vat+inc;d.netR=d.revNet>0?d.pretax/d.revNet*100:0;}d.afterTax=d.pretax-inc;}catch(e){_err('_shRptYear.tax',e);}return d;};
 var _rptBasisStrip0_643=_rptBasisStrip;
 _rptBasisStrip=function(year){var h=_rptBasisStrip0_643.apply(this,arguments);try{var d=_shRptYear(year);if(d&&(d.vat||d.inctax))h+='<div style="padding:4px 14px 0;font-size:11px;color:var(--b4)">'+(d.vat?('營業稅（代收代付，不計費用）NT$ '+fmt(d.vat)+'　'):'')+(d.inctax?('營所稅 NT$ '+fmt(d.inctax)+' → 稅後淨利 <b>NT$ '+fmt(d.afterTax)+'</b>'):'')+'</div>';}catch(e){}return h;};
+
+
+// ══════════════ v6.0.44：匯入 PDF 詢價單、清潔費直接扣款、預付款應付自我修復（v644.js 區塊）══════════════
+// 1. 業主詢價單 PDF：pdf.js（CDN 按需載入）抽文字 → 依 y 分列、x 分欄 → 同一套 _qiMapRows；只能讀進工項，不能回填（PDF 無法改寫）。
+// 2. 清潔費處理新增「直接自請款扣除（發票開扣後金額）」＝預設：請款單總計已扣，不建費用、不開折讓單。
+// 3. 預付款／期別應付「缺應付」自我修復：墓碑豁免（成本卡仍需要的應付 id 不再被雲端合併刪除）、
+//    孤兒應付依金額／日期自動改掛正式編號、缺的補建；應付卡「缺應付」可一鍵補建。
+
+// ── 1 PDF 匯入 ──
+var _PDFJS_SRC=['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js','https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js','https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js'];
+var _PDFJS_WORKER=['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js','https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js','https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js'];
+var _pdfjsP=null;
+function _ensurePdfJs(){
+  if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+  if(_pdfjsP)return _pdfjsP;
+  var i=0,next=function(){if(window.pdfjsLib)return Promise.resolve();if(i>=_PDFJS_SRC.length)return Promise.reject(new Error('pdf.js unavailable'));var k=i++;return _loadScriptOnce(_PDFJS_SRC[k],9000).then(function(){if(window.pdfjsLib){try{window.pdfjsLib.GlobalWorkerOptions.workerSrc=_PDFJS_WORKER[k];}catch(e){}}else return next();},function(){return next();});};
+  _pdfjsP=next().then(function(){_pdfjsP=null;return window.pdfjsLib;},function(e){_pdfjsP=null;throw e;});
+  return _pdfjsP;
+}
+// 文字片段 → 列（y 相近）→ 欄（x 間距大於 1.2 個字高即換欄）
+async function _qiPdfRows(buf){
+  var lib=await _ensurePdfJs();
+  var doc=await lib.getDocument({data:buf}).promise,rows=[],texts=[],key=0;
+  for(var p=1;p<=doc.numPages;p++){
+    var page=await doc.getPage(p),tc=await page.getTextContent();
+    var its=tc.items.filter(function(it){return it&&String(it.str||'').trim();}).map(function(it){var h=Math.abs(it.transform[3])||Math.abs(it.transform[0])||10;return {x:it.transform[4],y:it.transform[5],w:it.width||0,h:h,s:String(it.str)};});
+    its.sort(function(a,b){return (b.y-a.y)||(a.x-b.x);});
+    var lines=[];its.forEach(function(it){var L=lines.length?lines[lines.length-1]:null;if(L&&Math.abs(L.y-it.y)<=Math.max(2,it.h*0.45)){L.items.push(it);}else lines.push({y:it.y,items:[it]});});
+    lines.forEach(function(L){L.items.sort(function(a,b){return a.x-b.x;});var cells=[],cur=null;
+      L.items.forEach(function(it){if(cur&&(it.x-cur.end)<=Math.max(3,it.h*1.2)){cur.text+=(it.x-cur.end>it.h*0.3?' ':'')+it.s;cur.end=it.x+it.w;}else{cur={x:it.x,end:it.x+it.w,text:it.s};cells.push(cur);}});
+      rows.push({key:'p'+p+'_'+(key++),page:p,cells:cells.map(function(c){return {x:c.x,text:c.text.replace(/\s+/g,' ').trim(),ref:null};})});});
+  }
+  // 欄位編號：以表頭列（含數量／單位）的各欄 x 當錨點，其餘列的格子就近歸欄
+  var hdr=rows.find(function(r){return r.cells.some(function(c){return /數量/.test(c.text);})&&r.cells.some(function(c){return /單位|單價/.test(c.text);})&&r.cells.length>=3;});
+  var anchors=hdr?hdr.cells.map(function(c){return c.x;}):null;
+  rows.forEach(function(r){r.cells.forEach(function(c,i){if(!anchors){c.col=i;return;}var best=0,bd=1e9;anchors.forEach(function(ax,k){var d=Math.abs(c.x-ax);if(d<bd){bd=d;best=k;}});c.col=best;});
+    // 同欄多格合併（同一欄被切成兩段）
+    var m={};r.cells.forEach(function(c){if(m[c.col])m[c.col].text+=' '+c.text;else m[c.col]=c;});r.cells=Object.keys(m).map(function(k){return m[k];}).sort(function(a,b){return a.col-b.col;});});
+  return {rows:rows,texts:texts,pages:doc.numPages};
+}
+async function _qiStart(f){
+  var ext=(f.name.match(/\.([a-z0-9]+)$/i)||['',''])[1].toLowerCase();
+  if(ext!=='xlsx'&&ext!=='docx'&&ext!=='pdf'){showConfirm('請用 xlsx／docx／pdf','<div style="font-size:13px;line-height:1.7">業主詢價單請提供 Excel（.xlsx）、Word（.docx）或 PDF 原檔。<br>xlsx／docx 可在填完單價後回填寫回同一份檔；PDF 只能讀進工項（無法回填，改用本公司報價單 PDF）。<br>舊版 .xls／.doc 請先「另存新檔」成新格式。</div>',function(){},false,null,false);return;}
+  try{toast('讀取詢價單中…');var buf=await f.arrayBuffer();
+    if(ext==='pdf'){var r=await _qiPdfRows(buf);var map=_qiMapRows(r.rows,r.texts);
+      if(!map||!map.nItems){showConfirm('找不到工項表','<div style="font-size:13px;line-height:1.7">「'+esc(f.name)+'」裡找不到含「工項／品名＋數量＋單位或單價」表頭的文字表格。<br>掃描檔（圖片型 PDF）沒有文字層，請改用 Excel／Word 原檔，或請業主提供可選取文字的 PDF。</div>',function(){},false,null,false);return;}
+      var draft={name:f.name,size:f.size,kind:'pdf',b64:'',sheet:'',cols:map.cols,colL:{},maxRow:0,totals:[],terms:map.terms,head:map.head,rows:map.items.map(function(it){return {key:it.key,sec:!!it.sec};}),ts:Date.now(),readOnly:true};
+      _qiPreview(map,draft);return;}
+    var files=await _zipRead(buf);
+    _qiFromFiles(files,ext,{name:f.name,size:f.size,b64:_u8b64(new Uint8Array(buf))});
+  }catch(e){_err('_qiStart',e);toast('讀取失敗：'+(e.message||'').slice(0,80));}
+}
+var _qiPreview0_644=_qiPreview;
+_qiPreview=function(map,draft){
+  if(draft&&draft.kind==='pdf'){
+    var note='<div style="font-size:12px;color:#b26a00;margin-bottom:6px">PDF 只讀進工項與條款；填完單價請用本公司報價單 PDF 回覆業主（PDF 無法回填）。欄位若對不準，請改用 Excel／Word 原檔。</div>';
+    var sc=window.showConfirm;window.showConfirm=function(t,h){var a=[].slice.call(arguments);a[1]=note+String(h||'');window.showConfirm=sc;return sc.apply(this,a);};
+    try{_qiPreview0_644(map,draft);}finally{window.showConfirm=sc;}
+    return;
+  }
+  return _qiPreview0_644.apply(this,arguments);
+};
+var _quoteExportOwnerDoc0_644=quoteExportOwnerDoc;
+quoteExportOwnerDoc=function(){var q=Q.find(function(x){return x.id===eid;}),doc=_qOwnerDraft||(q&&q.ownerDoc);if(doc&&doc.kind==='pdf'){toast('PDF 詢價單無法回填，請用「預覽 → 匯出 PDF」出本公司報價單');return;}return _quoteExportOwnerDoc0_644.apply(this,arguments);};
+
+// ── 2 清潔費：直接自請款扣除 ──
+function _pjDeduct(q){var d=(q&&q.deduct)||{};var cm=d.cleanMode==='allow'?'allow':(d.cleanMode==='exp'?'exp':'net');return {ret:d.ret!=null&&d.ret!==''?parseFloat(d.ret)||0:null,clean:parseFloat(d.clean)||0,cleanMode:cm};}
+var _CLEAN_MODES=[['net','直接自請款扣除（發票開扣後金額）'],['exp','業主另開發票給我方（當費用）'],['allow','我方開折讓單']];
+function _pjDeductHtml(q){
+  var d=_pjDeduct(q),IN='font-size:12px;padding:3px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;background:var(--w);box-sizing:border-box';
+  return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r8);padding:7px 10px;margin-bottom:8px">'
+    +'<b style="color:var(--b5)">業主扣款設定</b><span style="color:var(--b4);font-size:11px">每期請款單自動套用（已開的單不改）</span>'
+    +'<label style="display:flex;align-items:center;gap:4px">保留款 <input type="number" inputmode="decimal" step="any" min="0" max="50" value="'+(d.ret==null?'':d.ret)+'" placeholder="不扣" onchange="pjDeductSet(\''+q.id+'\',\'ret\',this.value)" style="'+IN+';width:58px;text-align:right"> %</label>'
+    +'<label style="display:flex;align-items:center;gap:4px">清潔費 <input type="number" inputmode="decimal" step="any" min="0" value="'+(d.clean||'')+'" placeholder="0" onchange="pjDeductSet(\''+q.id+'\',\'clean\',this.value)" style="'+IN+';width:58px;text-align:right"> ‰（未稅工程款）</label>'
+    +'<label style="display:flex;align-items:center;gap:4px">清潔費處理 <select onchange="pjDeductSet(\''+q.id+'\',\'cleanMode\',this.value)" style="'+IN+'">'+_CLEAN_MODES.map(function(m){return '<option value="'+m[0]+'"'+(d.cleanMode===m[0]?' selected':'')+'>'+m[1]+'</option>';}).join('')+'</select></label>'
+    +'<span style="color:var(--b4);font-size:11px">保留款與清潔費都直接列在請款單扣款列，總計＝扣除後金額</span>'
+    +'</div>';
+}
+var _cleanExpenseSync0_644=_cleanExpenseSync;
+_cleanExpenseSync=function(inv){if(inv&&inv.cleanMode!=='exp'){var id='E_clean_'+inv.id,i=-1;(EXPENSES||[]).forEach(function(e,k){if(e&&e.id===id&&i<0)i=k;});if(i>=0){EXPENSES.splice(i,1);try{_tomb('expenses',id);}catch(e){}try{saveExpenses();}catch(e){}}return;}return _cleanExpenseSync0_644.apply(this,arguments);};
+// 請款單編輯器的清潔費處理下拉補上「直接扣除」
+try{(function(){var s=document.getElementById('inv-clean-mode');if(s&&![].some.call(s.options,function(o){return o.value==='net';})){s.insertAdjacentHTML('afterbegin','<option value="net">直接扣除（發票開扣後金額）</option>');}})();}catch(e){}
+
+// ── 3 應付自我修復 ──
+var _livePayCache={t:0,ids:null};
+function _liveExpectedPayIds(){
+  var now=Date.now();if(_livePayCache.ids&&now-_livePayCache.t<1500)return _livePayCache.ids;
+  var ids={};
+  try{(Q||[]).forEach(function(q){(q&&q.costs||[]).forEach(function(c){if(!c||!c.id)return;
+    if(c.type==='sub'||c.rental||(_subPeriods(c).length)){var ex=_subExpectedPayIds(c);Object.keys(ex).forEach(function(k){ids[k]=1;});}
+    ids['pay'+c.id]=1;});});}catch(e){_err('_liveExpectedPayIds',e);}
+  _livePayCache={t:now,ids:ids};return ids;
+}
+// 墓碑豁免：成本卡現在仍需要的應付 id，就算曾被刪除（舊版去重 bug）也不得在合併時被丟掉；順手把本機墓碑拿掉
+function _tombExempt(coll,id){
+  if(coll!=='payables')return false;
+  var live=_liveExpectedPayIds();if(!live[id])return false;
+  try{if(TOMBS&&TOMBS.payables&&TOMBS.payables[id]!=null){delete TOMBS.payables[id];localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}}catch(e){}
+  return true;
+}
+var _healBusy=false;
+function _advPayHeal(q,c){
+  if(!q||!c||c.type!=='sub'||_healBusy)return 0;
+  var n=0,exp=_subExpectedPayIds(c),vendor=c.vendor||'';
+  var has=function(id){return PAYABLES.some(function(p){return p&&p.id===id;});};
+  var rekey=function(p,pid,patch){var old=p.id;Object.assign(p,patch,{id:pid});_touch(p);try{_tomb('payables',old);}catch(e){}n++;};
+  _subAdvs(c).forEach(function(a){
+    var pid=_subAdvPayId(c.id,a);if(has(pid))return;
+    var amt=Math.round(parseFloat(a.amt)||0);
+    var cand=PAYABLES.filter(function(p){if(!p||!p.id||exp[p.id])return false;if(/^(pay_ps_|pay_ins_|pay_pc_|pay_tax_|comm_)/.test(p.id))return false;
+      var mine=p.costId===c.id||(p.to===vendor&&(p.project||'')===(q.name||''));if(!mine)return false;
+      var near=Math.abs((parseFloat(p.amount)||0)-amt)<=1||Math.abs(_payEff(p)-amt)<=1||Math.abs(_payEff(p)-Math.round(amt*_taxM()))<=1;if(!near)return false;
+      if(p.date&&a.date&&Math.abs(_dDiff(p.date,a.date))>60)return false;
+      return (p.costId===c.id)||p.costAdv||/預付|提前放款/.test(String(p.note||''))||!p.costId;});
+    if(cand.length){cand.sort(function(x,y){return (x.costAdv===a.id?-1:0)-(y.costAdv===a.id?-1:0)||(x.costId===c.id?-1:0)-(y.costId===c.id?-1:0);});rekey(cand[0],pid,{costId:c.id,costAdv:a.id,quoteId:q.id});}
+  });
+  var missing=Object.keys(exp).filter(function(id){return !/_intro$/.test(id)&&id!=='pay'+c.id&&!has(id);});
+  // 期別應付：本期應付 0（全額抵扣）者本來就不掛，不算缺
+  missing=missing.filter(function(id){var per=_subPeriods(c).find(function(p){return _subPayId(c.id,p)===id;});if(!per)return true;var k=_subPeriodCalc(c,per);return per.isRet?k.amt>0:Math.max(0,k.pay-_subEarlySum(per))>0;});
+  if(missing.length){_healBusy=true;try{missing.forEach(function(id){_tombExempt('payables',id);});syncCostToPayable(q,c);n+=missing.filter(has).length;}catch(e){_err('_advPayHeal.sync',e);}_healBusy=false;}
+  return n;
+}
+function _advPayHealAll(){
+  var n=0;(Q||[]).forEach(function(q){(q&&q.costs||[]).forEach(function(c){try{n+=_advPayHeal(q,c);}catch(e){_err('_advPayHealAll',e);}});});
+  if(n){try{savePayables();persist();_markDirty();}catch(e){}console.info('[FY] 應付自我修復：'+n+' 筆');}
+  return n;
+}
+var _advUnifyAll0_644=_advUnifyAll;
+_advUnifyAll=function(){var n=_advUnifyAll0_644.apply(this,arguments);try{n+=_advPayHealAll();}catch(e){_err('_advUnifyAll.heal',e);}return n;};
+var _syncSubPeriodPayables0_644=_syncSubPeriodPayables;
+_syncSubPeriodPayables=function(q,c){try{if(!_healBusy&&c&&c.type==='sub')_advPayHeal(q,c);}catch(e){_err('_syncSubPeriodPayables.heal',e);}return _syncSubPeriodPayables0_644.apply(this,arguments);};
+function _advPayFix(qid,cid){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;var c=(q.costs||[]).find(function(x){return x.id===cid;});if(!c)return;
+  var n=0;try{n=_advPayHeal(q,c);_healBusy=true;syncCostToPayable(q,c);_healBusy=false;savePayables();persist();_immediateUpload();}catch(e){_healBusy=false;_err('_advPayFix',e);}
+  try{renderPayables();}catch(e){}toast(n?('已補建／改掛 '+n+' 筆應付；已付款的請按「標記已付」'):'已重新同步此發包的應付');
+}
+// 應付卡預付款列：缺應付 → 一鍵補建
+function _payAdvInfo(p){
+  var ctx=null;try{ctx=_payPeriodCtx(p);}catch(e){_err('_payAdvInfo',e);}
+  if(!ctx||!(ctx.k.adv>0))return '';
+  var k=ctx.k,tm=p.vat===false?1:_taxM(),us=_payAdvUsed(ctx.c,ctx.per),q=ctx.q,c=ctx.c;
+  var line=function(u){var a=u.a,pp=u.pay,paid=pp&&pp.status==='paid';
+    return '<div>預付款 '+esc(a.date||'')+'　NT$ '+fmt(Math.round(u.amt*tm))+(paid?' <span style="color:var(--g3)">✓ 已付 '+esc(pp.paidDate||a.date||'')+'</span>':(pp?' <span style="color:var(--red)">待付</span> <a href="javascript:void(0)" onclick="payMarkPaid(\''+pp.id+'\',\''+esc(a.date||'')+'\',renderPayables)" style="color:#1565C0">標記已付</a>':' <span style="color:#b26a00">缺應付</span> <a href="javascript:void(0)" onclick="_advPayFix(\''+q.id+'\',\''+c.id+'\')" style="color:#1565C0">補建</a>'))+'</div>';};
+  return '<div style="margin-top:4px;padding:6px 8px;background:var(--b0);border-radius:var(--r8);font-size:11px;line-height:1.6;color:var(--b5)">本期計價（'+(p.vat===false?'未稅':'含稅')+'）NT$ '+fmt(Math.round(k.net*tm))+' － 預付款抵扣 NT$ '+fmt(Math.round(k.adv*tm))+' ＝ <b>本期應付 NT$ '+fmt(Math.round(k.pay*tm))+'</b>'+us.map(line).join('')+'</div>';
+}
 
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
