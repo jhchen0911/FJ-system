@@ -4021,7 +4021,7 @@ async function newPage(browser, width, height) {
         const q=Q[0],m=q.mat,row=m.rows[0];
         setTimeout(()=>{try{
           const msg=document.getElementById('gen-confirm-msg').innerHTML;
-          out.decide=document.getElementById('gen-confirm-modal').style.display==='flex'&&/同規格其他長度閒置/.test(msg)&&/L=12M 30 支、L=18M 10 支/.test(msg)&&/接樁或切樁/.test(msg)&&document.getElementById('gen-confirm-ok').textContent==='是，選擇接／切樁';
+          out.decide=document.getElementById('gen-confirm-modal').style.display==='flex'&&/可代用的公司料/.test(msg)&&/L=12M 30 支、L=18M 10 支/.test(msg)&&/接樁／切樁／代用/.test(msg)&&document.getElementById('gen-confirm-ok').textContent==='是，選擇公司料';   // v6.0.43 文案
           document.getElementById('gen-confirm-ok').click();   // → 接／切樁
           const rows=[...document.querySelectorAll('.ad-row')];
           const r18=rows.find(x=>x.getAttribute('data-len')==='18'),r12=rows.find(x=>x.getAttribute('data-len')==='12');
@@ -4034,7 +4034,7 @@ async function newPage(browser, width, height) {
           // 公司無料 → 租賃：按 M、月租
           m6RentEdit('qM','',row.id);
           out.rtDef=gv('rt-cm')==='1485'&&gv('rt-name')==='型鋼'&&gv('rt-spec')==='H300';
-          document.getElementById('rt-vendor').value='英洲工程股份有限公司';document.getElementById('rt-rate').value='60';document.getElementById('rt-pf').value='2026-09-23';document.getElementById('rt-pt').value='2027-03-22';_m6RtCalc();
+          document.getElementById('rt-vendor').value='英洲工程股份有限公司';document.querySelector('input[name="rt-bmode"][value="multi"]').checked=true;document.getElementById('rt-rated').value='2';/* v6.0.43 改填日租 $2/M/天（＝月租 60）*/document.getElementById('rt-pf').value='2026-09-23';document.getElementById('rt-pt').value='2027-03-22';_m6RtCalc();
           out.rtPv=/534,600/.test(document.getElementById('rt-pv').innerHTML)&&/180 天/.test(document.getElementById('rt-pv').innerHTML);
           document.getElementById('gen-confirm-ok').click();
           const rt=m.rents[0];let cR=q.costs.find(c=>c._fromMat==='rent:英洲工程股份有限公司');
@@ -4157,7 +4157,7 @@ async function newPage(browser, width, height) {
         out.ptHint=/合約租期 180 天/.test(document.getElementById('rt-pt-hint').textContent)&&gv('rt-pt')===_dAdd(localToday(),180);
         document.getElementById('rt-pf').value='2026-09-23';_m6RtPf();
         out.pt=gv('rt-pt')==='2027-03-22';
-        document.getElementById('rt-vendor').value='英洲';document.getElementById('rt-rate').value='60';document.getElementById('rt-cm').value='1995';
+        document.getElementById('rt-vendor').value='英洲';document.querySelector('input[name="rt-bmode"][value="multi"]').checked=true;document.getElementById('rt-rated').value='2';/* v6.0.43 改填日租 $2/M/天（＝月租 60）*/document.getElementById('rt-cm').value='1995';
         document.getElementById('gen-confirm-ok').click();
         const rt=q.mat.rents[0];out.ptSave=!!rt&&rt.pt==='2027-03-22'&&rt.ptAuto===true;
         // 沒填退場的舊資料 → 同步時自動補
@@ -4451,7 +4451,7 @@ async function newPage(browser, width, height) {
         // 4 公司倉庫併入材料頁：台帳列、調撥到本案、建立需求、進貨、刪除
         _m6Qid='qA';go('mat6');
         const mh=document.getElementById('mat6-root').innerHTML;
-        out.wh=/公司倉庫（台帳）/.test(mh)&&/m6LedEdit\('qA',''\)/.test(mh)&&/matOut\('qA','r1'\)/.test(mh)&&/尚缺 99 支/.test(mh)&&/m6LedNeed\('qA','L2'\)/.test(mh)&&/無此需求/.test(mh)&&/工程專案 › 第三批測試案/.test(document.querySelector('#page-mat6 .ph-s').textContent);
+        out.wh=/公司倉庫（台帳）/.test(mh)&&/m6LedEdit\('qA',''\)/.test(mh)&&/matOut\('qA','r1'\)/.test(mh)&&/尚缺 99 支/.test(mh)&&/可代用：/.test(mh)&&/m6Adapt\('qA','r1'\)/.test(mh)&&/工程專案 › 第三批測試案/.test(document.querySelector('#page-mat6 .ph-s').textContent);
         m6LedEdit('qA','');document.getElementById('ml-name').value='型鋼';document.getElementById('ml-spec').value='H400';document.getElementById('ml-len').value='9';document.getElementById('ml-qty').value='12';document.getElementById('ml-price').value='25';document.getElementById('gen-confirm-ok').click();
         const nl=MAT_LEDGER.find(r=>r.spec==='H400');out.ledAdd=!!nl&&nl.qty===12&&nl.len===9&&nl.uw===172&&nl.loc==='公司倉庫'&&/H400 L=9M/.test(document.getElementById('mat6-root').innerHTML);
         m6LedDel('qA',nl.id);document.getElementById('gen-confirm-ok').click();out.ledDel=!MAT_LEDGER.some(r=>r.id===nl.id)&&!!(TOMBS.matLedger||{})[nl.id];
@@ -4977,7 +4977,7 @@ async function newPage(browser, width, height) {
     // 應付頁：附件鈕併入動作列
     go('acct');acctTab('ap');renderPayables();
     const pl=document.getElementById('payable-list');
-    const row=[...pl.querySelectorAll('.ql')].find(x=>/manual1|1,152,113/.test(x.innerHTML));
+    const row=[...pl.querySelectorAll('.ql')].find(x=>/manual1/.test(x.innerHTML));
     const actionDiv=row&&[...row.querySelectorAll('div')].find(dv=>dv.querySelector('button[onclick*="delPayable"]'));
     out.inline=!!actionDiv&&!!actionDiv.querySelector('button[onclick*="_payUpload"]')&&!/請款單\/發票/.test(pl.innerHTML)&&/發票<\/button>/.test(pl.innerHTML)&&/匯款<\/button>/.test(pl.innerHTML);
     out.noFilesRow=!/border-radius:0 0 12px 12px/.test(pl.innerHTML);
@@ -5093,7 +5093,7 @@ async function newPage(browser, width, height) {
     const pl=document.getElementById('payable-list');
     const row=id=>[...pl.querySelectorAll('.ql')].find(x=>x.innerHTML.includes("'"+id+"'")||x.innerHTML.includes(id));
     const r1=row('paycS_p1'),rm=row('manualRent'),rs=row('pay_ps_h1_2026-09');
-    out.autoRow=!!r1&&!r1.querySelector('button[onclick*="delPayable"]')&&!r1.querySelector('button[onclick*="editPayable"]')&&!r1.querySelector('input[type=checkbox]')&&/🔒/.test(r1.innerHTML)&&!!r1.querySelector('button[onclick*="confirmPayment"]')&&!!r1.querySelector('button[onclick*="_payUpload"]');
+    out.autoRow=!!r1&&!r1.querySelector('button[onclick*="delPayable"]')&&!r1.querySelector('button[onclick*="editPayable"]')&&!r1.querySelector('input[type=checkbox]')&&!/🔒/.test(r1.innerHTML)&&!!r1.querySelector('button[onclick*="confirmPayment"]')&&!!r1.querySelector('button[onclick*="_payUpload"]');
     out.manualRow=!!rm&&!!rm.querySelector('button[onclick*="delPayable"]')&&!!rm.querySelector('button[onclick*="editPayable"]')&&!!rm.querySelector('input[type=checkbox]');
     out.psRow=!!rs&&/薪資條/.test(rs.innerHTML)&&!!rs.querySelector('button[onclick*="acctTab"]')&&!rs.querySelector('button[onclick*="delPayable"]');
     out.hint=/由來源自動產生/.test(pl.innerHTML);
@@ -5112,9 +5112,90 @@ async function newPage(browser, width, height) {
 }));
     check('v6.0.42 應付去重只清同 id 與多筆整筆，期別／預付款應付不再被砍（開應付分頁即觸發的舊 bug）', r.dedupe, JSON.stringify(r));
     check('v6.0.42 來源判定：期別／預付款／額外成本／薪資＝自動；手動雜項＝可改；對不上來源＝孤兒', r.clsOk, JSON.stringify(r.cls));
-    check('v6.0.42 應付頁：自動產生的沒有修改／刪除／稅別勾選，有 🔒 來源與付款、附件；手動的照舊；薪資可跳來源；頁首提示', r.autoRow && r.manualRow && r.psRow && r.hint, JSON.stringify(r));
+    check('v6.0.42 應付頁：自動產生的沒有修改／刪除／稅別勾選，無 🔒、有付款、附件；手動的照舊；薪資可跳來源；頁首提示', r.autoRow && r.manualRow && r.psRow && r.hint, JSON.stringify(r));
     check('v6.0.42 守門：自動產生的刪除／改稅別被擋，手動的可刪；應付對帳只有孤兒才有刪除', r.delBlocked && r.vatBlocked && r.delManual && r.audit, JSON.stringify(r));
     check('v6.0.42 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.43 預付款併入期別應付卡、材料流程優化、稅費科目 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    const d=n=>{const x=new Date();x.setDate(x.getDate()+n);return x.toISOString().slice(0,10);};
+    Q=[{id:'qM',code:'M',name:'材料案',client:'業主',date:d(-60),awarded:true,exs:[],rmk:{},_mt:1,site:{P:100,A:1000,layers:1,L:[{w:'H350',s:'H350'}]},
+      items:[{desc:'H型鋼樁 H300, L=15M@80cm（含30天租期）',unit:'支',qty:'40',price:'1000',sec:false,_uid:'m1'},{desc:'水平支撐系統 H350（含90天租期）',unit:'式',qty:'1',price:'500000',sec:false,_uid:'m2'}],t:{sub:100000,tax:5000,total:105000},dailyLogs:[],
+      costs:[{id:'cM',type:'sub',vendor:'甲',cat:'打設',date:d(-50),invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'r1',linkedItemIdx:0,qty:40,unitPrice:1000}],amt:40000,advances:[{id:'a1',date:d(-10),amt:10000}],periods:[{no:1,date:d(-5),rows:[{rid:'r1',qty:40}],adv:10000}]}]}];
+    eid='qM';PAYABLES.length=0;Q[0].costs.forEach(c=>syncCostToPayable(Q[0],c));
+    const adv=PAYABLES.find(p=>p.id==='paycM_aa1'),per=PAYABLES.find(p=>p.id==='paycM_p1');
+    if(adv){adv.status='paid';adv.paidDate=d(-10);}
+    out.pay={advAmt:adv&&adv.amount,perAmt:per&&per.amount,ids:PAYABLES.map(p=>p.id)};
+    go('acct');acctTab('ap');window._payAging='all';renderPayables();
+    const pl=document.getElementById('payable-list');
+    const row=id=>[...pl.querySelectorAll('.ql')].find(x=>x.innerHTML.includes(id));
+    out.advHidden=!row('paycM_aa1');
+    const pr=row('paycM_p1');
+    out.perCard=!!pr&&/預付款抵扣/.test(pr.innerHTML)&&/本期應付 NT\$ 31,500/.test(pr.innerHTML)&&/✓ 已付/.test(pr.innerHTML);
+    out.perCardHtml=pr?pr.innerText.replace(/\s+/g,' ').slice(0,300):'';
+    out.noLock=!/🔒/.test(pl.innerHTML)&&!!pr&&!!pr.querySelector('button[onclick*="openProjectCosts"]')&&!pr.querySelector('button[onclick*="delPayable"]');
+    // 預付款尚未抵扣（無期別）→ 仍獨立一筆
+    const pers=Q[0].costs[0].periods;Q[0].costs[0].periods=[];out.advShown=_payHiddenAdv(adv)===false;Q[0].costs[0].periods=pers;
+    // 材料：規格較大可代用
+    MAT_LEDGER.length=0;MAT_LEDGER.push({id:'L1',name:'型鋼',spec:'H350',len:15,qty:20,uw:135,price:18,loc:'公司倉庫',date:d(-100),kind:'重複性'});
+    out.altUp=_m6Alt({name:'型鋼',spec:'H300',len:15}).length===1&&_m6Alt({name:'型鋼',spec:'H400',len:15}).length===0;
+    _m6Qid='qM';go('mat6');renderMat6();
+    matRowEdit('qM','');
+    const sel=document.getElementById('mx-item');
+    out.needForm=!!sel&&!document.getElementById('mx-rate')&&!!document.getElementById('mx-strut');
+    sel.value='qM:0';_mxPick('qM:0');
+    out.pick={spec:gv('mx-spec'),len:gv('mx-len'),qty:gv('mx-qty')};
+    out.pickOk=out.pick.spec==='H300'&&String(out.pick.len)==='15'&&String(out.pick.qty)==='40';
+    sel.value='qM:1';_mxPick('qM:1');
+    out.strutShown=document.getElementById('mx-strut').style.display!=='none';
+    const st=_mxStrutCalc();out.strut={wM:st.wM,sM:st.sM,dN:st.dN,wP:st.wP,sP:st.sP};
+    out.strutOk=st.wM===100&&st.sM===300&&st.dN===4&&st.wP===9;
+    const oC=window.showConfirm;window.showConfirm=function(){};
+    document.getElementById('fy-modal-o').click();
+    const rows=_matQ(Q[0]).rows;out.strutRows=rows.length===3&&rows[0].qty===9&&rows[0].m===100&&rows[1].qty===25&&rows[2].qty===4;
+    out.rowsDump=rows.map(r=>[r.spec,r.len,r.qty,r.m,r.note]);
+    window.showConfirm=oC;
+    rows.length=0;rows.push({id:'mrA',name:'型鋼',spec:'H300',len:15,unit:'支',qty:40,rate:''});
+    let html='';window.showConfirm=function(t,h){html=h;};
+    m6Decide('qM','mrA');out.decideAlt=/可代用的公司料/.test(html)&&/H350 L=15M 20 支/.test(html)&&/購置 vs 租賃/.test(html);
+    MAT_LEDGER.length=0;m6Decide('qM','mrA');out.decideBuy=/購置或租賃哪個划算/.test(html)&&/br-rate/.test(html);
+    window.showConfirm=oC;
+    MAT_LEDGER.push({id:'L1',name:'型鋼',spec:'H350',len:15,qty:20,uw:135,price:18,loc:'公司倉庫',date:d(-100),kind:'重複性'});
+    const wh=_m6WarehouseHtml(Q[0]);out.whAlt=/可代用：/.test(wh)&&/m6Adapt\('qM','mrA'\)/.test(wh);
+    m6RentEdit('qM','','mrA');
+    out.rentForm=!!document.getElementById('rt-rated')&&!document.getElementById('rt-rate')&&!!document.querySelector('input[name="rt-bmode"]')&&!!document.getElementById('rt-item');
+    document.getElementById('rt-vendor').value='料場A';document.getElementById('rt-rated').value='5';document.getElementById('rt-cm').value='600';
+    _m6RtSave();
+    const rt=_matQ(Q[0]).rents[0];out.rent={rate:rt&&rt.rate,rateD:rt&&rt.rateD,b:rt&&rt.batches.length};
+    out.rentOk=!!rt&&rt.rate===150&&rt.rateD===5&&rt.batches.length===1&&rt.batches[0].m===600;
+    out.rentTable=/日租 \$\/M\/天/.test(document.getElementById('mat6-root').innerHTML);
+    EXPENSES.length=0;_expForm();
+    out.expForm=!!document.getElementById('ex-cat')&&!!document.getElementById('ex-pay');
+    document.getElementById('ex-cat').value='營所稅';document.getElementById('ex-cat').onchange();
+    document.getElementById('ex-amount').value='20000';document.getElementById('ex-date').value=d(0);document.getElementById('ex-due').value=d(30);
+    document.getElementById('gen-confirm-ok').click();
+    const ex=EXPENSES[0],tp=PAYABLES.find(p=>/^pay_tax_/.test(p.id));
+    out.exp={cat:ex&&ex.cat,pay:!!tp,to:tp&&tp.to,vat:tp&&tp.vat,auto:tp&&_paySource(tp).auto,n:EXPENSES.length};
+    out.expOk=!!ex&&ex.cat==='營所稅'&&!!tp&&tp.vat===false&&tp.amount===20000&&_paySource(tp).auto&&_payIsCompany(tp);
+    const y=_shRptYear(new Date().getFullYear());out.rpt={inc:y.inctax,exp:y.exp,after:y.afterTax,pre:y.pretax};
+    out.rptOk=y.inctax===20000&&y.exp===0&&y.afterTax===y.pretax-20000;
+    window.showConfirm=function(t,m,ok){ok();};expDel(ex.id);out.expDel=!EXPENSES.length&&!PAYABLES.some(p=>/^pay_tax_/.test(p.id));window.showConfirm=oC;
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,700);}
+  Q=[];PAYABLES.length=0;EXPENSES.length=0;MAT_LEDGER.length=0;eid=null;res(out);
+}));
+    check('v6.0.43 應付頁：已全數抵扣的預付款不另列，期別卡載明「本期計價 − 預付款抵扣 ＝ 本期應付」與預付款日期／付款狀態；未抵扣的預付款仍獨立一筆', r.advHidden && r.perCard && r.advShown, JSON.stringify({pay:r.pay,perCardHtml:r.perCardHtml,err:r.err}));
+    check('v6.0.43 自動產生的應付不再顯示 🔒 chip，只留成本／來源鈕', r.noLock, JSON.stringify(r.err||''));
+    check('v6.0.43 材料需求：勾工項自動帶規格／長度／支數、無內部日租欄；水平支撐依周長／面積／角隅算圍令 100M／支撐 300M／斜撐 4 支並建三列', r.needForm && r.pickOk && r.strutShown && r.strutOk && r.strutRows, JSON.stringify({pick:r.pick,strut:r.strut,rows:r.rowsDump,err:r.err}));
+    check('v6.0.43 公司料規格較大可代用（較小不行）；比對視窗列出可代用料與購 vs 租分析；倉庫卡標可代用', r.altUp && r.decideAlt && r.decideBuy && r.whAlt, JSON.stringify({altUp:r.altUp,decideAlt:r.decideAlt,decideBuy:r.decideBuy,whAlt:r.whAlt,err:r.err}));
+    check('v6.0.43 材料租賃：日租（$/M/天）＋工項帶入＋進場方式；存檔 rate＝日租×30、一次進場自動建批次；表格日租口徑', r.rentForm && r.rentOk && r.rentTable, JSON.stringify({rent:r.rent,err:r.err}));
+    check('v6.0.43 費用：科目＋掛應付（pay_tax_ 自動唯讀、公司支出組）；報表營所稅列稅後不計費用；刪費用連同應付', r.expForm && r.expOk && r.rptOk && r.expDel, JSON.stringify({exp:r.exp,rpt:r.rpt,err:r.err}));
+    check('v6.0.43 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
