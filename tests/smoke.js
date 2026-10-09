@@ -2250,7 +2250,8 @@ async function newPage(browser, width, height) {
     const r = await page.evaluate(() => {
       const out = {};
       HR.length = 0; PAYSLIPS.length = 0;
-      const a = _acct(); a.__staff.push({ id: 'st433', email: 'a433@x.com', name: '王小明', phone: '0912', roles: [], active: true }); _acctSave(a);
+      const a = _acct(); a.__staff = a.__staff.filter(x => BOOTSTRAP_DEV.indexOf(String(x.email || '').toLowerCase()) < 0);   /* v6.0.49 開機會建預設管理員 */
+      a.__staff.push({ id: 'st433', email: 'a433@x.com', name: '王小明', phone: '0912', roles: [], active: true }); _acctSave(a);
       HR.push({ id: 'hr_st433', sid: 'st433', name: '王小明', title: '工務', payType: 'month', base: 40000, telAllow: 500, laborGrade: 40100, healthGrade: 40100, dep: 1, _mt: 1 });
       HR.push({ id: 'hrB433', name: '李大同', title: '點工', payType: 'day', base: 2000, laborGrade: 28590, healthGrade: 28590, dep: 0, active: true, _mt: 1 });
       // 級距→金額試算：勞保 級距×12.5%×20%（員工）／×70%＋職災 0.5%（雇主）；健保 5.17%×30%×(1+眷口)／×60%×1.57；勞退 6%
@@ -3546,6 +3547,7 @@ async function newPage(browser, width, height) {
           out.pjBtns=/openProjectCosts|'施工成本'/.test(document.getElementById('page-proj').innerHTML)||true;
           // 權限遷移：系統管理員登入 → 舊角色對映
           const p=_acct();const keep=JSON.stringify({r:p.__roles,s:p.__staff,v:p.__v6perm});
+          p.__roles=p.__roles.filter(x=>x.sys);   /* v6.0.49 開機 applyRoleUI 會建預設角色，測試只留系統角色＋測試角色 */
           p.__roles.push({id:'r616',name:'工務測試',enabled:true,pages:{projects:true,costs:true,finance:true,invoice:true},_mt:1});
           p.__staff.push({email:'w616@x.com',name:'工務',roles:['r616'],active:true,_mt:1});
           delete p.__v6perm;_acctSave(p);
@@ -5409,6 +5411,40 @@ async function newPage(browser, width, height) {
     }));
     check('v6.0.48 手機 390px：案場細節彈窗與材料估算（綁定）無橫向捲動', r.sw<=r.iw && r.bsw<=r.bcw && r.msw<=r.iw, JSON.stringify(r));
     check('v6.0.48 手機測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.49 健檢第 3 步：覆寫鏈併成單一函式、刪除被遮蔽的重複宣告；開機錯誤清零 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    // 開機錯誤日誌：清掉 TDZ（ALL_PAGES）與空字串 JSON.parse
+    const log=JSON.parse(localStorage.getItem('fy_errlog')||'[]');
+    out.bootLog=log.filter(x=>/ALL_PAGES|Unexpected end of JSON|MAT_LEDGER|forEach/.test(String(x.m||'')+String(x.s||''))).length===0;
+    out.allPagesEarly=Array.isArray(ALL_PAGES)&&ALL_PAGES.some(p=>p.id==='dash');
+    // 覆寫鏈：單一函式（原始碼不再呼叫舊捕捉名）
+    const src=String(_syncSubPeriodPayables);
+    out.syncFold=/_advPayHeal\(q,c\)/.test(src)&&/_subAdvClamp\(c\)/.test(src)&&/_earlyToAdv\(q,c\)/.test(src)&&typeof window._syncSubPeriodPayables638==='undefined'&&typeof window._syncSubPeriodPayables0_644==='undefined';
+    out.rfqFold=/_renderRfqBase/.test(String(renderRfq))&&/page-mat6/.test(String(renderRfq))&&typeof window._m6RenderRfq0==='undefined';
+    out.matFold=/_renderMat6Base/.test(String(renderMat6))&&/_m6CrossHtml/.test(String(renderMat6));
+    // 健檢加項仍在：重複發包卡、抵扣超過預付款
+    Q=[{id:'qH',code:'H',name:'健檢案',client:'業主',date:'2026-10-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁',unit:'支',qty:'10',price:'1000',sec:false}],t:{sub:1,tax:0,total:1},
+      costs:[{id:'c1',type:'sub',vendor:'甲',linkedItemIdx:0,rows:[{id:'r1',linkedItemIdx:0,qty:10,unitPrice:100}],amt:1000,advances:[{id:'a1',date:'2026-10-01',amt:100}],periods:[{no:1,date:'2026-10-02',rows:[{rid:'r1',qty:10}],adv:900}]},
+             {id:'c2',type:'sub',vendor:'甲',linkedItemIdx:0,rows:[{id:'r2',linkedItemIdx:0,qty:10,unitPrice:100}],amt:1000}]}];
+    const rows=_healthRows();
+    out.health=rows.some(x=>/兩張發包卡/.test(x.msg))&&rows.some(x=>/超過預付款總額/.test(x.msg));
+    // 預付款抵扣上限仍在同步時套用
+    PAYABLES.length=0;_syncSubPeriodPayables(Q[0],Q[0].costs[0]);out.clamp=Q[0].costs[0].periods[0].adv===100;
+    // 材料頁副標＋跨案購租
+    _m6Qid='qH';go('mat6');out.matSub=/工程專案 › 健檢案/.test((document.querySelector('#page-mat6 .ph-s')||{}).textContent||'');
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,600);}
+  Q=[];PAYABLES.length=0;res(out);
+}));
+    check('v6.0.49 開機錯誤日誌清零：ALL_PAGES 提前宣告、工具存檔空值不再 JSON 錯、首繪台帳未載入有防護', r.bootLog && r.allPagesEarly, JSON.stringify(r));
+    check('v6.0.49 覆寫鏈併成單一函式：應付同步（修復→抵扣上限→轉換）、發包頁、材料頁；健檢加項與抵扣上限照常', r.syncFold && r.rfqFold && r.matFold && r.health && r.clamp && r.matSub, JSON.stringify(r));
+    check('v6.0.49 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
