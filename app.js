@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.58';
+var APP_VERSION='v6.0.59';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -30956,15 +30956,19 @@ function _envPrint(){
     if(cust&&((r.data.zip&&cust.zip!==r.data.zip)||(r.data.attn&&cust.envAttn!==r.data.attn)||(r.data.tel&&cust.envTel!==r.data.tel))){cust.zip=r.data.zip||cust.zip;cust.envAttn=r.data.attn||cust.envAttn;cust.envTel=r.data.tel||cust.envTel;cust._mt=Date.now();saveCustomers();}
   }catch(e){_err('_envPrint.cust',e);}
   var ios=_isIOS(),cal=ios?_envIosCal():null;
-  var html=_envDocHtml(S,'信封_'+(r.data.co||r.data.attn),_envIosWrap(_envHtml(r.cfg,r.data,!!r.cfg.frames),cal));
+  var html=_envDocHtml(S,'信封_'+(r.data.co||r.data.attn),_envIosWrap(_envHtml(r.cfg,r.data,!!r.cfg.frames),cal),ios);
   _printNativeHTML(html,'信封_'+(r.data.co||r.data.attn));
-  toast(ios?(cal?'信封已送列印（已套用手機列印校正）':'信封已送列印。iPhone 會自動縮放，第一次請先做下方「手機列印校正」')
+  toast(ios?(cal?'信封已送列印（A4 置中＋已套用手機列印校正）':'信封已送列印（A4 置中）：信封置中放入手動進紙口、郵遞區號那端先進')
     :('信封已送列印：印表機請選自訂紙張 '+S.w+'×'+S.h+' mm、不縮放'));
 }
 // 信封列印文件骨架（信封與校正十字共用，頁面結構相同 → iPhone 縮放行為相同，校正才準）
-function _envDocHtml(S,title,body){
+// v6.0.59：iPhone 紙張只能選 A4，且會把頁面等比放大塞滿 A4、左右置中；印表機手動進紙也是置中 →
+// iOS 改產生 A4 頁面，信封內容排在 A4 水平正中、對齊上緣（＝信封送進印表機時的實際位置），A4 印 A4 不再縮放。
+function _envDocHtml(S,title,body,a4){
+  var pw=a4?210:S.w,ph=a4?296:S.h;   // A4 高度留 1mm，避免四捨五入多出空白第二頁
+  if(a4)body='<div class="env-a4" style="position:absolute;left:'+((210-S.w)/2)+'mm;top:0;width:'+S.w+'mm;height:'+S.h+'mm">'+body+'</div>';
   return '<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>'
-    +'@page{size:'+S.w+'mm '+S.h+'mm;margin:0}html,body{margin:0;padding:0;width:'+S.w+'mm;height:'+S.h+'mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    +'@page{size:'+(a4?'A4':(S.w+'mm '+S.h+'mm'))+';margin:0}html,body{margin:0;padding:0;width:'+pw+'mm;height:'+ph+'mm;position:relative;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
     +'</style></head><body>'+body+'</body></html>';
 }
 // ── v6.0.57 手機（iPhone／iPad）列印校正 ──
@@ -30973,7 +30977,7 @@ function _envDocHtml(S,title,body){
 // 列印時反向套用（先縮 1/倍率、再移 −位移/倍率）。校正值與裝置＋印表機有關 → 存本機（localStorage fy_env_ioscal），不同步。
 // v6.0.58：改 3×3 九個十字（A～I），iPhone 縮放／位移不確定時總有幾個落在信封上；任選兩個（橫、直都要錯開）量測即可
 var _ENV_CAL_PTS={A:[25,25],B:[55,25],C:[85,25],D:[25,85],E:[55,85],F:[85,85],G:[25,145],H:[55,145],I:[85,145]};
-function _envIosCal(){try{var c=JSON.parse(localStorage.getItem('fy_env_ioscal')||'null');return (c&&c.sx>0&&c.sy>0)?c:null;}catch(e){_err('_envIosCal',e);return null;}}
+function _envIosCal(){try{var c=JSON.parse(localStorage.getItem('fy_env_ioscal')||'null');return (c&&c.v===2&&c.sx>0&&c.sy>0)?c:null;}catch(e){_err('_envIosCal',e);return null;}}   // v:2＝A4 置中版面（v6.0.59）；舊的作廢
 function _envIosWrap(inner,cal){
   if(!cal)return inner;
   var kx=1/cal.sx,ky=1/cal.sy,tx=-cal.ox/cal.sx,ty=-cal.oy/cal.sy,r=function(v){return Math.round(v*100000)/100000;};
@@ -30993,8 +30997,8 @@ function _envCalPrint(){
       +'<div style="position:absolute;left:'+(x-0.15)+'mm;top:'+(y-5)+'mm;width:0.3mm;height:10mm;background:#000"></div>'
       +'<div style="position:absolute;left:'+(x+1.2)+'mm;top:'+(y+1.2)+'mm;font:bold 13pt sans-serif">'+k+'</div>';};
   var body='<div class="env-sheet" style="position:relative;width:'+S.w+'mm;height:'+S.h+'mm;background:#fff;overflow:hidden">'+Object.keys(_ENV_CAL_PTS).map(mark).join('')+'</div>';
-  _printNativeHTML(_envDocHtml(S,'信封列印校正',body),'信封列印校正');
-  toast('已送出校正十字（不套用校正）：請用全新的備用信封，紙張大小選得和列印信封時一樣');
+  _printNativeHTML(_envDocHtml(S,'信封列印校正',body,_isIOS()),'信封列印校正');
+  toast('已送出校正十字（不套用校正）：請用全新的備用信封，置中放入、郵遞區號那端先進');
 }
 function _envCalSave(){
   var n=function(id){var v=parseFloat(gv(id));return isNaN(v)?null:v;};
@@ -31003,7 +31007,7 @@ function _envCalSave(){
   var P1=_ENV_CAL_PTS[m.p1],P2=_ENV_CAL_PTS[m.p2];
   if(!P1||!P2||P1[0]===P2[0]||P1[1]===P2[1]){toast('兩個十字要左右、上下都錯開（例如 A 與 I、C 與 G、B 與 G）');return;}
   var c=_envCalSolve(m);if(!c){toast('量測值不合理，請確認十字代號與量測方向（左緣、上緣）');return;}
-  c.m=m;c.ts=Date.now();
+  c.m=m;c.ts=Date.now();c.v=2;
   try{localStorage.setItem('fy_env_ioscal',JSON.stringify(c));}catch(e){_err('_envCalSave',e);}
   var st=document.getElementById('env-cal-st');if(st)st.innerHTML=_envCalStatus();
   toast('已儲存手機列印校正：倍率 '+c.sx.toFixed(3)+'×'+c.sy.toFixed(3));
@@ -31012,7 +31016,7 @@ function _envCalClear(){try{localStorage.removeItem('fy_env_ioscal');}catch(e){_
 function _envCalStatus(){
   var c=_envIosCal();
   return c?('✓ 已校正：縮放 '+(100/c.sx).toFixed(1)+'%／'+(100/c.sy).toFixed(1)+'%、位移 '+c.ox.toFixed(1)+'／'+c.oy.toFixed(1)+' mm（只存在這支手機）')
-    :'尚未校正（iPhone 列印會被自動放大約 1.4～1.5 倍）';
+    :'尚未校正（已自動改用 A4 置中版面；印一次試試，若仍有偏差再校正）';
 }
 function _envCalHtml(IN){
   var c=_envIosCal(),m=(c&&c.m)||{},v=function(k){return m[k]!=null?m[k]:'';};
@@ -31022,7 +31026,7 @@ function _envCalHtml(IN){
     +'<div class="f"><label>距左緣 mm</label><input id="env-cal-'+kx+'" type="number" step="0.5" inputmode="decimal" value="'+v(kx)+'" style="'+IN+'"></div>'
     +'<div class="f"><label>距上緣 mm</label><input id="env-cal-'+ky+'" type="number" step="0.5" inputmode="decimal" value="'+v(ky)+'" style="'+IN+'"></div></div>';};
   return '<details id="env-cal-box" style="margin-top:6px"'+(_isIOS()&&!c?' open':'')+'><summary style="font-size:12px;color:var(--g3);font-weight:700;cursor:pointer">手機（iPhone／iPad）列印校正</summary>'
-    +'<div style="font-size:11.5px;color:var(--b4);line-height:1.6;margin:6px 0">iPhone 列印會依「紙張大小」自動縮放。第一次請：① 放一個<b>全新</b>的備用信封 → ② 按「列印校正十字」（iPhone 紙張大小請選得和平常列印信封時<b>一樣</b>）→ ③ 信封上會印出 A～I 九個十字，挑兩個<b>左右、上下都錯開</b>且完整印出的（例如 A 與 I），用尺量十字中心離<b>信封左緣</b>與<b>上緣</b>各幾 mm（上緣＝郵遞區號那一端）→ ④ 選好代號、填入後按「計算並儲存」。</div>'
+    +'<div style="font-size:11.5px;color:var(--b4);line-height:1.6;margin:6px 0">iPhone 紙張固定 A4，系統已自動把信封排在 A4 正中央、對齊上緣（信封置中、郵遞區號那端先進紙）。若印出仍有偏差：① 放一個<b>全新</b>的備用信封 → ② 按「列印校正十字」→ ③ 信封上會印出 A～I 九個十字，挑兩個<b>左右、上下都錯開</b>且完整印出的（例如 A 與 I），用尺量十字中心離<b>信封左緣</b>與<b>上緣</b>各幾 mm（上緣＝郵遞區號那一端）→ ④ 選好代號、填入後按「計算並儲存」。</div>'
     +'<button type="button" onclick="_envCalPrint()" style="width:100%;min-height:36px;border:1px solid var(--b2);background:var(--w);border-radius:var(--r8);font-family:inherit;cursor:pointer">列印校正十字（A～I）</button>'
     +row(1,'env-cal-p1',m.p1||'A','ax','ay')
     +row(2,'env-cal-p2',m.p2||'I','bx','by')
