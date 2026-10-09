@@ -5448,6 +5448,32 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.50 健檢第 4 步：空 catch 改接錯誤日誌 ─────────────
+  {
+    const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    const a = src.indexOf('// ══ 施工步驟示意圖（v5.362'), b = src.indexOf('function _plStorySteps(');
+    const outside = src.slice(0, a) + src.slice(b);
+    const empty = outside.split('\n').filter(l => !/^\s*\/\//.test(l) && /catch\s*\(\s*[A-Za-z_$][\w$]*\s*\)\s*\{\s*\}/.test(l));
+    check('v6.0.50 空 catch 歸零（施工計畫書圖庫除外）：一律寫錯誤日誌或標「可忽略」', a > 0 && b > a && empty.length === 0, empty.slice(0, 3).join(' ⏎ ').slice(0, 300));
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        localStorage.setItem('fy_errlog', '[]');
+        const o = window._vbBadge; window._vbBadge = function () { throw new Error('測試_vbBadge'); };
+        go('acct'); acctTab('vb'); window._vbBadge = o;
+        const log = JSON.parse(localStorage.getItem('fy_errlog') || '[]');
+        out.logged = log.some(x => x.w === 'acctTab' && /測試_vbBadge/.test(x.m));
+        out.page = document.getElementById('page-acct').classList.contains('active');
+        localStorage.setItem('fy_errlog', '[]');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.50 被攔下的錯誤會寫進錯誤日誌（位置＝函式名），頁面照常', r.logged && r.page, JSON.stringify(r));
+    check('v6.0.50 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
