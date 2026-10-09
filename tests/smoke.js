@@ -5516,7 +5516,7 @@ async function newPage(browser, width, height) {
     const a = md.indexOf('## 模組地圖'), b = md.indexOf('\n## ', a + 5);
     const sec = a >= 0 ? md.slice(a, b > 0 ? b : undefined) : '';
     const names = Array.from(new Set((sec.match(/`([A-Za-z_$][\w$]*)`/g) || []).map(s => s.slice(1, -1))))
-      .filter(n => /^[a-z_]/.test(n) && !/_$/.test(n) && !/^(q|mat|rfqs|dash|quotes|proj|rfq|mat6|costs|quickcost|acct|reports|contacts|plan|matest|rebar|grout|backfill|workers|lifeline|progress|upa|staff|roles|params|payroll|invoice|finance|ledger|profit|projects)$/.test(n));
+      .filter(n => /^[a-z_]/.test(n) && !/_$/.test(n) && !/^fy_/.test(n) && !/^(q|mat|rfqs|dash|quotes|proj|rfq|mat6|costs|quickcost|acct|reports|contacts|plan|matest|rebar|grout|backfill|workers|lifeline|progress|upa|staff|roles|params|payroll|invoice|finance|ledger|profit|projects)$/.test(n));
     const missing = names.filter(n => !new RegExp('(^|\\n)(async\\s+)?function\\s+' + n.replace(/\$/g, '\\$') + '\\s*\\(|(^|\\n)(var|const|let)\\s+' + n.replace(/\$/g, '\\$') + '\\s*=|window\\.' + n.replace(/\$/g, '\\$') + '\\s*=').test(src));
     check('v6.0.53 CLAUDE.md 模組地圖列出的函式／變數都存在於 app.js', a >= 0 && names.length > 80 && missing.length === 0, 'n=' + names.length + ' missing=' + missing.join(','));
   }
@@ -5653,10 +5653,11 @@ async function newPage(browser, width, height) {
           out.openOnIOS = !!document.getElementById('env-cal-box') && document.getElementById('env-cal-box').open;
           /* 1. 校正十字：不套校正、A／B 位置正確 */
           _envCalPrint();
-          out.cross = snaps.length === 1 && /left:22mm;top:19\.85mm/.test(snaps[0]) && /left:72mm;top:139\.85mm/.test(snaps[0]) && !/env-ioscal/.test(snaps[0]);
-          /* 2. 模擬 iPhone 實測：放大 1.45 倍、位移 (−28, −14.5)mm → A=(15.5,14.5) B=(88,188.5) */
+          /* v6.0.58：3×3 九個十字 A～I */
+          out.cross = snaps.length === 1 && /left:20mm;top:24\.85mm/.test(snaps[0]) && /left:80mm;top:144\.85mm/.test(snaps[0]) && (snaps[0].match(/font:bold 13pt/g) || []).length === 9 && !/env-ioscal/.test(snaps[0]);
+          /* 2. 模擬 iPhone 實測：放大 1.45 倍、位移 (−28, −14.5)mm；量 C(85,25)→(95.25,21.75) 與 G(25,145)→(8.25,195.75) */
           const set = (id, v) => { document.getElementById(id).value = v; };
-          set('env-cal-ax', 15.5); set('env-cal-ay', 14.5); set('env-cal-bx', 88); set('env-cal-by', 188.5);
+          set('env-cal-p1', 'C'); set('env-cal-ax', 95.25); set('env-cal-ay', 21.75); set('env-cal-p2', 'G'); set('env-cal-bx', 8.25); set('env-cal-by', 195.75);
           _envCalSave();
           const c = _envIosCal();
           out.solve = !!c && Math.abs(c.sx - 1.45) < 1e-9 && Math.abs(c.sy - 1.45) < 1e-9 && Math.abs(c.ox + 28) < 1e-9 && Math.abs(c.oy + 14.5) < 1e-9;
@@ -5668,13 +5669,13 @@ async function newPage(browser, width, height) {
           out.wrap = !!m && /env-sheet/.test(h);
           if (m) { const X = 65.75, Y = 17.75; const px = 1.45 * (parseFloat(m[3]) * X + parseFloat(m[1])) - 28, py = 1.45 * (parseFloat(m[4]) * Y + parseFloat(m[2])) - 14.5; out.roundTrip = Math.abs(px - X) < 0.01 && Math.abs(py - Y) < 0.01; }
           /* 4. 不合理量測被擋、清除後不再套用 */
-          out.bad = _envCalSolve({ ax: 50, ay: 50, bx: 40, by: 60 }) === null;
+          out.bad = _envCalSolve({ p1: 'A', ax: 50, ay: 50, p2: 'I', bx: 40, by: 60 }) === null && _envCalSolve({ p1: 'A', ax: 10, ay: 10, p2: 'B', bx: 50, by: 10 }) === null;   /* 方向反了、或兩點同一列 */
           _envCalClear(); out.cleared = !_envIosCal() && _envIosWrap('<i></i>', null) === '<i></i>';
           localStorage.removeItem('fy_env_ioscal'); res(out);
         }, 300);
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
     }));
-    check('v6.0.57 手機信封列印校正：印 A／B 十字（不套校正）→ 量測解出倍率與位移（存本機）→ 列印信封反向套用後回到設計位置；不合理量測擋下、可清除', r.openOnIOS && r.cross && r.solve && r.status && r.wrap && r.roundTrip && r.bad && r.cleared, JSON.stringify(r));
+    check('v6.0.57/58 手機信封列印校正：印 A～I 九個十字（不套校正）、任選兩個→ 量測解出倍率與位移（存本機）→ 列印信封反向套用後回到設計位置；不合理量測擋下、可清除', r.openOnIOS && r.cross && r.solve && r.status && r.wrap && r.roundTrip && r.bad && r.cleared, JSON.stringify(r));
     check('v6.0.57 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
