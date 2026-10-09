@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.46';
+var APP_VERSION='v6.0.47';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -132,10 +132,6 @@ setTimeout(function(){
 
 
 // 若未登入，隱藏所有非公開功能
-function applyGuestUI(){
-  _isAdminUser=false;
-  applyRoleUI();
-}
 
 const FB_CONFIG = {
   apiKey: "AIzaSyA5BjG97tVVE2Ud4rZvGXW5rDTPWPNVFcM",
@@ -541,9 +537,6 @@ function _afterOpening(dateStr){
 // inv.receipts=[{id,kind:'cash'|'ticket',amt,date,ticketNo,bank,dueDate,status:'hold'|'cleared'|'bounced',clearedDate,note}]
 function _invReceipts(inv){return Array.isArray(inv&&inv.receipts)?inv.receipts.filter(function(r){return r&&(parseFloat(r.amt)||0)>0;}):[];}
 function _invTickets(inv){return _invReceipts(inv).filter(function(r){return r.kind==='ticket';});}
-function _rcptValidSum(inv){   // 有效收款合計（退票不算）
-  return _invReceipts(inv).reduce(function(a,r){return a+(r.status==='bounced'?0:(parseFloat(r.amt)||0));},0);
-}
 function _cashOf(inv,atTs){
   // ── 登記模式：有收款明細就逐筆計，現金看收款日、票據看到期日／兌現狀態 ──
   var _rc=_invReceipts(inv);
@@ -652,8 +645,6 @@ function _aiNum(v){
   var n=parseFloat(String(v).replace(/[,\s，]/g,''));
   return isFinite(n)?n:0;
 }
-function _datePlus(n){var d=new Date();d.setDate(d.getDate()+(n||0));
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function localToday(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 const fmtD=d=>d?d.replace(/-/g,'/'):'' ;
 const gv=id=>{const e=document.getElementById(id);return e?e.value:''};
@@ -1112,130 +1103,18 @@ function getProcessFromParams(type, meth, len){
   return P.dpProcess||900;
 }
 
-function resolvePreset(arr){
-  const t=gv('up-type'),sp=gv('up-spec'),me=gv('up-meth'),len=parseFloat(gv('up-len'))||9;
-  return arr.map(v=>{
-    if(v==='AUTO_FREIGHT') return getFreightFromParams(t,sp,len);
-    if(v==='AUTO_PROCESS') return getProcessFromParams(t,me,len);
-    if(v==='AUTO_RENT_R'){
-      // Look up rent by actual length input
-      const rentByLen={3:P.dpRentR3,4:P.dpRentR4,5:P.dpRentR5,6:P.dpRentR6,
-        7:P.dpRentR7,8:P.dpRentR8,9:P.dpRentR9,10:P.dpRentR10,11:P.dpRentR11,
-        12:P.dpRentR12,12.5:P.dpRentR125,13:P.dpRentR13,14:P.dpRentR14,15:P.dpRentR15};
-      return rentByLen[len]||P.dpRentR6||4.5;
-    }
-    if(typeof v==='string'&&v.startsWith('P.')) return P[v.slice(2)]||0;
-    return v;
-  });
-}
 
 // upaTypeChange 已由新版 UPA 取代
 
-function upaSpecChange(){upaFill();syncUPAFromParams();upaCalc();}
 
 // upaFill 已由新版 UPA 取代
 
-function updateFreightHint(){
-  const freightM=parseFloat(gv('up-freight'))||0;
-  const regionC=parseFloat(gv('up-region'))||1;
-  const len=parseFloat(gv('up-len'))||0;
-  const hint=document.getElementById('up-freight-hint');
-  if(!hint)return;
-  if(!freightM||!len){hint.textContent='';return;}
-  const regionLabel=document.getElementById('up-region')?.selectedOptions[0]?.text?.split(' ')[0]||'';
-  const totalPerUnit=freightM*len*regionC*2;
-  if(regionC===1){
-    hint.textContent=`北部基準，來回合計 NT$${Math.round(freightM*len*2)}/支`;
-  }else{
-    hint.textContent=`${regionLabel}基準 ${freightM} × ${regionC} × ${len}M × 來回2 = NT$${Math.round(totalPerUnit)}/支`;
-  }
-}
 
 // upaCalc 已由新版 UPA 取代
 
-function upaRACalc(){
-  const item=gv('up-ra-item'),qty=parseFloat(gv('up-ra-qty'))||0;
-  const vp=parseFloat(gv('up-ra-price'))||0,mult=parseFloat(gv('up-ra-mult'))||1.4;
-  const D={'beam-rc':{p:2500,u:'M',n:'壓樑（RC）'},'beam-h300':{p:1390,u:'M',n:'壓樑（H300型鋼）'},
-    'beam-rail':{p:1000,u:'M',n:'壓樑（鋼軌樁）'},
-    'board-5':{p:550,u:'m²',n:'襯板 5分'},'board-6':{p:650,u:'m²',n:'襯板 6分'},
-    'board-8':{p:750,u:'m²',n:'襯板 8分'},'board-10':{p:850,u:'m²',n:'襯板 10分'},
-    'canvas-2':{p:220,u:'m²',n:'夾板帆布 2分（型鋼/鋼軌樁）'},
-    'canvas-sp':{p:370,u:'m²',n:'夾板帆布（鋼板樁）'},
-    'drill-400':{p:400,u:'M',n:'鑽堡引孔 φ400'},'drill-700':{p:700,u:'M',n:'鑽堡引孔 φ700'},
-    'shear':{p:150,u:'只',n:'剪力釘加工'},
-    'buyout-h':{p:P.dpBuH||33,u:'KG',n:'H型鋼買斷'},
-    'buyout-r':{p:P.dpBuR||28,u:'KG',n:'鋼軌樁買斷'},
-    'buyout-s':{p:P.dpBuS||32,u:'KG',n:'鋼板樁買斷'},
-    'buyout-b':{p:P.dpBuB||36,u:'KG',n:'支撐料買斷'}};
-  const d=D[item]||{p:0,u:'式',n:item};
-  const ue=document.getElementById('up-ra-unit');if(ue)ue.value=d.u;
-  const pe=document.getElementById('up-ra-price');if(pe&&!(vp>0))pe.value=d.p;
-  const ep=vp||d.p,cost=ep*qty,final=cost*mult;
-  const bd=document.getElementById('up-breakdown');
-  if(bd)bd.innerHTML=`<div class="upa-ln"><span class="upa-lb">廠商報價 (/${d.u})</span><span class="upa-vl">NT$ ${fmt(ep)}</span></div>
-    <div class="upa-ln"><span class="upa-lb">數量 ${qty} ${d.u}</span><span class="upa-vl">NT$ ${fmt(cost)}</span></div>
-    <div class="upa-ln"><span class="upa-lb">× 加成 ${mult}x</span><span class="upa-vl">NT$ ${fmt(final)}</span></div>`;
-  const fe=document.getElementById('up-final');if(fe)fe.textContent='NT$ '+fmt(final);
-  st('up-per-m','');st('up-total-est','');
-  const cc=document.getElementById('up-coeffs');if(cc)cc.innerHTML='<span class="cbdg off">廠商報價加成</span>';
-  updateApplyPreview(d.n,d.u,qty,final,'廠商報價加成');
-  return{final,qty,costUnit:cost,quoted:final};
-}
-function upaRAItemChange(){const pe=document.getElementById('up-ra-price');if(pe)pe.value='';}
-
-function upaPCCalc(){
-  const pt=gv('up-pc-type'),len=parseFloat(gv('up-pc-len'))||10;
-  const qty=parseFloat(gv('up-pc-qty'))||1,vp=parseFloat(gv('up-pc-price'))||0;
-  const mult=parseFloat(gv('up-pc-mult'))||1.4,rc=parseFloat(gv('up-pc-region'))||1;
-  // Build custom label for custom-diameter options
-  const customDia=parseFloat(gv('up-pc-dia'))||80;
-  const D={
-    'pc-30':{p:2000,n:'預壘樁 φ30cm'},'pc-40':{p:2500,n:'預壘樁 φ40cm'},
-    'pc-50':{p:4000,n:'預壘樁 φ50cm'},'pc-60':{p:3750,n:'預壘樁 φ60cm'},
-    'pc-custom':{p:3000,n:'預壘樁 φ'+customDia+'cm'},
-    'ccp-30':{p:600,n:'CCP止水樁 φ30cm'},'micro':{p:375,n:'微型樁 φ15cm'},
-    'dp-drill-80':{p:8000,n:'基樁(鑽掘式) φ80cm'},
-    'dp-drill-100':{p:10000,n:'基樁(鑽掘式) φ100cm'},
-    'dp-drill-120':{p:12000,n:'基樁(鑽掘式) φ120cm'},
-    'dp-drill-150':{p:15000,n:'基樁(鑽掘式) φ150cm'},
-    'dp-drill-custom':{p:10000,n:'基樁(鑽掘式) φ'+customDia+'cm'},
-    'dp-case-80':{p:9000,n:'基樁(全套管式) φ80cm'},
-    'dp-case-100':{p:11000,n:'基樁(全套管式) φ100cm'},
-    'dp-case-120':{p:13000,n:'基樁(全套管式) φ120cm'},
-    'dp-case-150':{p:16000,n:'基樁(全套管式) φ150cm'},
-    'dp-case-custom':{p:11000,n:'基樁(全套管式) φ'+customDia+'cm'}
-  };
-  const d=D[pt]||{p:2500,n:'預壘樁'};
-  const pe=document.getElementById('up-pc-price');if(pe&&!(vp>0))pe.value=d.p;
-  const ep=vp||d.p,cu=ep*len*rc,final=cu*mult,tf=final*qty;
-  const bd=document.getElementById('up-breakdown');
-  if(bd)bd.innerHTML=`<div class="upa-ln"><span class="upa-lb">廠商報價 ($/M)</span><span class="upa-vl">NT$ ${fmt(ep)}</span></div>
-    <div class="upa-ln"><span class="upa-lb">樁長 ${len}M × 地區 ×${rc}</span><span class="upa-vl">NT$ ${fmt(cu)}</span></div>
-    <div class="upa-ln"><span class="upa-lb">× 加成 ${mult}x → 報價/支</span><span class="upa-vl">NT$ ${fmt(final)}</span></div>`;
-  const fe=document.getElementById('up-final');if(fe)fe.textContent='NT$ '+fmt(final);
-  st('up-per-m','= NT$ '+fmt(Math.round(ep*mult*rc))+' / M');
-  st('up-total-est',qty>1?`預估總報價：NT$ ${fmt(tf)}`:'');
-  const cc=document.getElementById('up-coeffs');if(cc)cc.innerHTML=`<span class="cbdg ${rc!==1?'on':'off'}">地區 ×${rc.toFixed(1)}</span>`;
-  updateApplyPreview(`${d.n} L=${len}M`,'支',qty,final,`地區×${rc}`);
-  return{final,qty,costUnit:cu,quoted:final};
-}
-function upaPCChange(){
-  const pe=document.getElementById('up-pc-price');if(pe)pe.value='';
-  const pt=gv('up-pc-type');
-  const diaWrap=document.getElementById('up-pc-dia-wrap');
-  if(diaWrap)diaWrap.style.display=(pt&&pt.includes('custom'))?'':'none';
-  upaCalc();
-}
 
 
-function clearUPA(){
-  document.getElementById('up-desc').value='';
-  document.getElementById('up-site').value='s2';
-  const soil=document.getElementById('up-soil');if(soil)soil.value='1.0';
-  const mc=document.getElementById('up-mcoeff');if(mc)mc.value='1.0';
-  syncUPAFromParams();upaFill();upaCalc();
-}
+
 
 function updateApplyPreview(desc,unit,qty,price,note){
   // Always update the live preview
@@ -1299,16 +1178,6 @@ function applyUPA(){
   setTimeout(()=>upaReset(), 300);
 }
 
-function saveUPAHistory(){
-  const r=upaCalc();if(!r||!r.final){toast('請先填寫參數');return;}
-  const t=gv('up-type'),sp=gv('up-spec'),me=gv('up-meth'),len=gv('up-len');
-  const tLabel={H:'H型鋼',R:'鋼軌樁',S:'鋼板樁',B:'水平支撐',BS:'支撐附屬'}[t]||t;
-  const mLabel={water:'水刀',air:'氣動槌',root:'引孔根固'}[me]||'—';
-  UH.unshift({id:Date.now().toString(),type:tLabel,spec:sp,meth:t==='BS'?gv('up-bs-item'):mLabel,len,
-    cost:Math.round(r.costUnit||0),quoted:Math.round(r.quoted||0),final:Math.round(r.final),
-    siteC:r.siteC||1,soilC:r.soilC||1,methC:r.methC||1,period:gv('up-period'),desc:gv('up-desc')});
-  if(UH.length>20)UH.pop();saveUH();rUPAHist();toast('分析已儲存！');
-}
 
 function rUPAHist(){
   const card=document.getElementById('upa-hist-card');if(!card)return;
@@ -1344,18 +1213,6 @@ function clearUPAHistory(){
 
 // ════════════════════ EDITOR ════════════════════
 // 實績回填：把歷史單價庫的實績均價，回推寫入尚未填成本的工項（手動新增／舊報價皆適用）
-function backfillEstCosts(){
-  let n=0,miss=0;
-  items.forEach(function(it){
-    if(it.sec)return;
-    if(parseFloat(it.estCost)>0)return;   // 已填的不動（快照原則）
-    const h=_histCostFor(it.desc,it.unit);
-    if(h&&h.avg>0){it.estCost=String(h.avg);n++;}
-    else if((it.desc||'').trim())miss++;
-  });
-  if(n){rItems();rTots();toast('⟲ 已回填 '+n+' 個工項的實績成本'+(miss?('；'+miss+' 項單價庫無同名實績'):''));}
-  else toast(miss?('單價庫找不到同名實績（'+miss+' 項）——結案回寫累積後再試'):'所有工項都已有成本，無需回填');
-}
 // 單項毛利率（%）：price/estCost 皆為未稅單價；任一為 0 回傳 null
 function _mgnPct(price,cost){price=parseFloat(price)||0;cost=parseFloat(cost)||0;if(price<=0||cost<=0)return null;return Math.round((price-cost)/price*1000)/10;}
 // v5.395：成本單價高於報價單價 3 倍以上視為異常（多半是單位對不上或單價庫誤帶），列表標紅、合計區列出
@@ -2208,24 +2065,6 @@ function rItems(){
   }
   rTots();
 }
-function upRow(i){
-  const amt=(parseFloat(items[i].qty)||0)*(parseFloat(items[i].price)||0);
-  const el=document.getElementById('ra'+i);
-  if(el){el.textContent=items[i].qty&&items[i].price?'NT$ '+fmt(amt):'—';el.style.color=amt>0?'var(--g)':'var(--b3)';}
-  rTots();
-}
-function rFoot(){
-  const foot=document.getElementById('itfoot');if(!foot)return;
-  const t=calcT();
-  foot.innerHTML=`
-    <tr class="sub-tr"><td colspan="5" style="text-align:right;color:var(--b4)">小計</td>
-      <td class="r">NT$ ${fmt(t.sub)}</td><td colspan="4"></td></tr>
-    <tr class="sub-tr"><td colspan="5" style="text-align:right;color:var(--b4)">${_taxR()}% 營業稅</td>
-      <td class="r">NT$ ${fmt(t.tax)}</td><td colspan="4"></td></tr>
-    <tr class="tot-tr"><td colspan="5" style="text-align:right">總計</td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums">NT$ ${fmt(t.total)}</td>
-      <td colspan="4"></td></tr>`;
-}
 function _qInsAt(pos,obj,unfoldSec){
   const _idxSnap=_qIdxSnapshot();   // v5.320：中間插入會讓後方索引位移，需重定位
   items.splice(pos,0,obj);
@@ -2259,7 +2098,6 @@ function upEx(){
   st('exsum','NT$ '+fmt(s));
   const el=document.getElementById('extotal');if(el)el.style.display=exs.length?'flex':'none';
 }
-function addEx(){exs.push({label:'',amt:'',note:''});rExs();}
 
 // ════════════════════ SAVE/LOAD ════════════════════
 function saveQ(){
@@ -2475,8 +2313,6 @@ function loadQ(id){
   go('editor');
   try{migrateCostRows(q);rCostItems();}catch(e){_err('loadQ',e);}
 }
-function confirmDelQ(id){_tomb('quotes',id);Q=Q.filter(q=>q.id!==id);persist();renderList();rDash();updBadge();toast('已刪除');}
-function confirmDelInv(id){_tomb('invoices',id);INV=INV.filter(x=>x.id!==id);saveInv();renderInvList();toast('已刪除');}
 
 function delQ(id,ev){
   if(ev&&ev.stopPropagation)ev.stopPropagation();
@@ -2527,47 +2363,6 @@ function _delQDo(id){
 }
 
 // （原 buildPrev 螢幕預覽為無呼叫點之死程式碼，已於 v5.218 移除；預覽統一走 buildQuotePreviewFromPDF）
-function doPrint(){
-  const h=document.getElementById('prevhtml').innerHTML;
-  const _o='\x3c',_c='\x3e';
-  const css=[
-    ':root{--g:#1a6b3f;--g2:#145730;--g3:#0e3d22;--gl:#e8f5ee;--gm:#c3e6d0;',
-    '--y:#f5a623;--y2:#e8941a;--yl:#fef8ec;--ym:#fde4a8;--yd:#7a4800;',
-    '--w:#fff;--b0:#f7f8fa;--b1:#eef0f3;--b2:#dde0e6;--b3:#b0b5bf;--b4:#737a87;--b5:#3a3f4a;',
-    '--red:#c0392b;--redl:#fdf0ef;}',
-    '*{box-sizing:border-box;margin:0;padding:0}',
-    'body{padding:0;font-family:\'Microsoft JhengHei\',\'Noto Sans TC\',\'PingFang TC\',sans-serif;font-size:11px;color:#111;background:#fff;}',
-    'table{border-collapse:collapse;}',
-    'img{max-width:100%;}',
-    '@media print{body{padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}@page{size:A4 portrait;margin:10mm;}}',
-    '.no-print{display:none!important}'
-  ].join('');
-  const html='<!DOCTYPE html>'+_o+'html lang="zh-TW"'+_c+_o+'head'+_c
-    +'<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-    +_o+'title'+_c+'報價單'+_o+'/title'+_c
-    +'<style>'+css+'</style>'
-    +_o+'/head'+_c+_o+'body'+_c
-    +h
-    +_o+'/body'+_c+_o+'/html'+_c;
-  // Open print window — works on both desktop and iOS Safari
-  // Show print overlay within current page (iOS Claude App blocks window.open)
-  // 直接開新視窗列印（用系統列印對話框 → 另存為PDF）
-  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const w=window.open(url,'_blank');
-  if(w){
-    w.onload=function(){
-      setTimeout(function(){w.print();setTimeout(function(){URL.revokeObjectURL(url);},3000);},400);
-    };
-  } else {
-    // fallback: inject print CSS and use window.print()
-    const ps=document.getElementById('print-style-inject')||document.createElement('style');
-    ps.id='print-style-inject';
-    ps.textContent='@page{size:A4 portrait;margin:8mm}@media print{body>*{display:none!important}#prevhtml{display:block!important;position:static!important}}';
-    document.head.appendChild(ps);
-    window.print();
-  }
-}
 
 
 
@@ -3201,26 +2996,6 @@ function delInvoice(id,ev){
 }
 
 // ── 報價單（得標）→ 跳轉關聯請款單：有就開最新一期，被刪光則提示重建第1期 ──
-function goQuoteInvoice(qid){
-  const q=Q.find(x=>x.id===qid);if(!q)return;
-  let list=INV.filter(x=>x.sourceQid===qid);
-  if(!list.length)list=INV.filter(x=>x.project===q.name);
-  if(list.length){
-    const latest=list.slice().sort((a,b)=>(parseInt(b.periodNo)||0)-(parseInt(a.periodNo)||0))[0];
-    loadInvoice(latest.id);
-    go('invoice-edit');
-  }else{
-    showConfirm('建立請款單',
-      '此得標案目前沒有任何請款單（可能已被刪除）。<br><br>要從報價單重新建立第 1 期請款單嗎？',
-      ()=>{
-        const autoInv=buildInvFromQuote(q);
-        INV.unshift(autoInv);saveInv();
-        loadInvoice(autoInv.id);
-        go('invoice-edit');
-        toast('已從報價單重新建立第 1 期請款單');
-      },false);
-  }
-}
 
 // ── Item management ──
 function addInvItem(){
@@ -4090,7 +3865,6 @@ function rInvTots(srcInv){
   return{curTotal,tax,total,retention,clean,cleanGross,cleanPermil:_cleanPm,baseTotal:curTotal,claimRatio:1};
 }
 
-function calcInvTotals(){return rInvTots();}
 
 // ── Save ──
 function saveInvoice(){
@@ -4189,20 +3963,6 @@ function autoSaveInv(){
 // v5.386：報價列表的「存至客戶清單」按鈕已移除（改放「進版」）——
 // 報價／請款單儲存時本來就會自動把不在名單內的業主加進客戶管理，這顆按鈕沒有存在必要。
 // 函式保留：智慧收件等流程仍可能需要以程式方式建客戶。
-function saveClientFromRecord(name,taxid,tel,fax,contact,addr){
-  if(!name){toast('無業主名稱，無法儲存');return;}
-  const exists=CUSTOMERS.find(c=>c.name===name);
-  if(exists){toast('「'+name+'」已在客戶清單中');return;}
-  const obj={
-    id:Date.now().toString(),
-    name:name||'',taxid:taxid||'',
-    tel:tel||'',fax:fax||'',
-    contact:contact||'',siteTel:'',
-    companyContact:'',addr:addr||'',note:'',_mt:Date.now()
-  };
-  CUSTOMERS.unshift(obj);saveCustomers();
-  toast('✓ 已儲存「'+name+'」至客戶清單');
-}
 
 // ════════════ 客戶管理 ════════════
 function renderCustomers(){
@@ -4376,13 +4136,6 @@ function applyCustomerToInvoice(id){
 }
 
 // 報價/請款單的客戶選擇器
-function getCustomerSelectHtml(selectedName){
-  if(!CUSTOMERS.length)return '';
-  const opts=CUSTOMERS.map(c=>`<option value="${esc(c.name)}"${c.name===selectedName?' selected':''}>${esc(c.name)}</option>`).join('');
-  return `<select onchange="applyCustomerByName(this.value,'quote')" style="font-family:inherit;font-size:11px;padding:3px 6px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--gl);color:var(--g3);margin-bottom:4px">
-    <option value="">── 從客戶清單帶入 ──</option>${opts}
-  </select>`;
-}
 
 function applyCustomerByName(name, type){
   if(!name)return;
@@ -5675,16 +5428,6 @@ function importData(file){
 
 // ══════ 施工成本 (發包/點工/額外支出) ══════
 // 取得報價工項列表（for 下拉選單）
-function getCostItemOptions(selectedVal){
-  const opts=[('<option value="">-- 選擇工項 --</option>')];
-  items.forEach((it,i)=>{
-    if(it.sec)return;
-    const label=(it.desc||'未命名工項')+(it.unit?' ('+_uFix(it.unit)+')':'');
-    const sel=(selectedVal&&selectedVal===it.desc)?'selected':'';
-    opts.push('<option value="'+esc(it.desc)+'" '+sel+'>'+esc(label)+'</option>');
-  });
-  return opts.join('');
-}
 
 
 
@@ -7226,14 +6969,6 @@ function confirmReceipt(){
 
 // ── 跳轉到得標案件篩選 ──
 // _awardedFilter 已在頂部宣告
-function goAwarded(){
-  _awardedFilter=true;
-  go('quotes');
-  renderList();
-  // 高亮提示
-  const btn=document.getElementById('awarded-filter-btn');
-  if(btn)btn.style.background='#1a3a6b',btn.style.color='#fff';
-}
 function toggleAwardedFilter(){
   _awardedFilter=!_awardedFilter;
   renderList();
@@ -7945,11 +7680,6 @@ function isAdmin(email){
   return _rolesOf(email).some(function(r){return r.sys||r.cloudCost;});
 }
 function isOwner(email){return _isSysUser(email);}
-function getOwnerEmails(){
-  return listStaff().filter(function(s){return (s.roles||[]).some(function(id){var r=_roleById(id);return r&&r.sys;});})
-    .map(function(s){return String(s.email||'').toLowerCase();})
-    .concat(BOOTSTRAP_DEV).filter(function(e,i,a){return e&&a.indexOf(e)===i;});
-}
 // fy_admins 決定登入時要不要登記 adminUids（雲端成本節點）→ 由角色推導
 function _syncAdminEmailsFromDepts(){
   var list=listStaff().filter(function(s){return s.active!==false&&isAdmin(s.email);})
@@ -21526,7 +21256,6 @@ function _plFieldRow(f){
     +'<input type="'+(f.type||'text')+'"'+_plDlAttr(f.dl)+' data-vk="'+f.k+'" value="'+esc(v)+'" placeholder="'+esc(f.ph||'')+'" '
     +'oninput="'+(f.re?'_plSetVarRe':'_plSetVar')+'(\''+f.k+'\',this.value)" style="width:100%;box-sizing:border-box;font-size:12px;padding:5px 7px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit"></label>';
 }
-function _plWallOn(){return (_plState.walls||[]).length>0;}
 // 擋土壁形式綜合字串（多 TYPE 時逐一列出）→ 帶入基地條件的「擋土壁形式」欄
 function _plWallTypeStr(){
   var ws=_plState.walls||[];
@@ -21572,16 +21301,6 @@ function _plTpDel(id,i){_plTps(id).splice(i,1);if(!_plState.tps[id].length)delet
 function _plSetTpVar(id,i,k,v){_plTps(id)[i].v[k]=v;_plState.doc=null;_plSave();}
 function _plSetWallVar(i,k,v){var w=_plState.walls[i];if(w){w.v=w.v||{};w.v[k]=v;_plState.doc=null;_plSave();}}
 // 覆工板等複選欄位
-function _plToggleMulti(scope,i,k,opt,on){
-  var tgt=scope==='wall'?_plState.walls[i].v:(scope==='tp'?null:_plState.vars);
-  if(scope==='tp')tgt=_plTps(i.id)[i.idx].v;
-  var cur=String(tgt[k]||'').split('、').filter(Boolean);
-  var ix=cur.indexOf(opt);
-  if(on&&ix<0)cur.push(opt);
-  if(!on&&ix>=0)cur.splice(ix,1);
-  tgt[k]=cur.join('、');
-  _plState.doc=null;_plSave();_plRender();
-}
 // TYPE 標籤：可自訂名稱（未填時多組才自動編 TYPE A/B/…）
 function _plTypeTag(o,i,n){
   if(o&&o.name)return o.name;
@@ -23964,7 +23683,6 @@ function _fbWriteAll(onDone, onFail){
   _pushCloud({silent:true, onDone:function(ok){ if(ok){if(onDone)onDone();} else {if(onFail)onFail(new Error('upload failed'));else if(onDone)onDone();} }});
 }
 
-function _doUpload(){ _pushCloud({silent:true}); }
 
 // 從合約管理跳到報價單施工成本
 
@@ -26106,28 +25824,6 @@ function updCostField(cid,field,val,rid){
   try{persist();}catch(e){_err('top',e);}
 }
 
-function openMergeCost(){
-  const q=Q.find(x=>x.id===eid);
-  if(!q||!q.costs||!q.costs.length){toast('尚無施工成本可合併');return;}
-  const el=document.getElementById('merge-cost-list');
-  if(!el)return;
-  // 只顯示承包(sub)類型的成本
-  const subCosts=q.costs.filter(c=>c.type==='sub'&&(c.vendor||c.desc));
-  if(!subCosts.length){toast('尚無承包工項可合併');return;}
-  el.innerHTML=subCosts.map(c=>`
-    <label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);margin-bottom:6px;cursor:pointer;background:var(--w)">
-      <input type="checkbox" data-cid="${c.id}" data-vendor="${esc(c.vendor||'')}" data-amt="${c.amt||0}"
-        onchange="updateMergeTotal()" style="margin-top:2px;width:15px;height:15px;accent-color:var(--g);cursor:pointer">
-      <div style="flex:1">
-        <div style="font-size:12px;font-weight:700;color:var(--b5)">${esc(c.vendor||'未填廠商')}</div>
-        <div style="font-size:11px;color:var(--b4)">${esc(c.desc||c.linkedItemIdx>=0?((q.items[c.linkedItemIdx]?.desc||'').split('\n')[0].slice(0,30)):'')}</div>
-      </div>
-      <div style="font-size:13px;font-weight:700;color:var(--b5);white-space:nowrap">NT$ ${fmt(c.amt||0)}</div>
-    </label>`).join('');
-  document.getElementById('merge-vendor-name').value='';
-  document.getElementById('merge-total-display').textContent='NT$ 0';
-  document.getElementById('merge-cost-modal').style.display='flex';
-}
 
 function updateMergeTotal(){
   const checks=document.querySelectorAll('#merge-cost-list input[type=checkbox]:checked');
@@ -26935,13 +26631,6 @@ function upaGetSPValue(type, field, len){
 }
 
 // 施工便梯單價計算
-function upaLadderCost(layers){
-  const l=parseInt(layers)||1;
-  const db=UPA_COST_DB.ladder;
-  if(l<=1)return db.layer1;
-  if(l<=4)return db.layer2to4;
-  return db.layer5plus_base+(l-4)*db.layer5plus_each;
-}
 
 // 計算代工不帶料樁種建議單價
 function upaCalcSubcontract(itemType, spec, len){
@@ -27856,30 +27545,8 @@ function fbUploadWithConflictCheck(){
 // ══════════════════════════════════════════════════════════════
 let _advSearch={minAmt:'',maxAmt:'',dateFrom:'',dateTo:'',status:''};
 
-function showAdvSearch(){
-  const panel=document.getElementById('adv-search-panel');
-  if(panel)panel.style.display=panel.style.display==='none'?'block':'none';
-}
 
-function applyAdvSearch(){
-  _advSearch={
-    minAmt:parseFloat(document.getElementById('as-min-amt')?.value)||0,
-    maxAmt:parseFloat(document.getElementById('as-max-amt')?.value)||Infinity,
-    dateFrom:document.getElementById('as-date-from')?.value||'',
-    dateTo:document.getElementById('as-date-to')?.value||'',
-    status:document.getElementById('as-status')?.value||''
-  };
-  renderList();
-  renderInvList();
-}
 
-function clearAdvSearch(){
-  _advSearch={minAmt:0,maxAmt:Infinity,dateFrom:'',dateTo:'',status:''};
-  ['as-min-amt','as-max-amt','as-date-from','as-date-to','as-status'].forEach(id=>{
-    const el=document.getElementById(id);if(el)el.value='';
-  });
-  renderList();renderInvList();
-}
 
 // ══════════════════════════════════════════════════════════════
 // 2. 合約管理
@@ -29640,20 +29307,6 @@ function _shareAutoCalc(y){
   var wcAdd=Math.max(0,Math.round((curMo-prevMo)*23/30));
   return {rev:Math.round(rev),cost:Math.round(cost),exp:Math.round(exp),salary:salary,months:months,
     wcAdd:wcAdd,netProfit:Math.round(Math.max(0,pretax)*0.8)};
-}
-function shareAutoCalc(){
-  var y=_shareYear();
-  var a=_shareAutoCalc(y);
-  var c=SHARE_PROFIT.cfg[y]||{netProfit:0,retentionAdd:0,wcAdd:0,machineSelfPay:0};
-  c.netProfit=a.netProfit;
-  c.retentionAdd=shareSuggestRetention();
-  c.wcAdd=a.wcAdd;
-  // 機具自付款無資料來源，保留手動值
-  _touch(c);
-  SHARE_PROFIT.cfg[y]=c;
-  saveShareProfit();
-  renderShareProfit();
-  toast('已自動試算：請款 '+fmt(a.rev)+'－成本 '+fmt(a.cost)+'－費用 '+fmt(a.exp)+'－股東薪資 '+fmt(a.salary)+'（'+a.months+'個月×2人×15萬）→ 稅後淨利估 NT$ '+fmt(a.netProfit)+'，可手動修正');
 }
 function _shareYear(){return window._shareY||String(new Date().getFullYear());}
 // v5.321：無設定時建立並存回 cfg（原本回傳暫時物件，對它的寫入會遺失）
@@ -32375,9 +32028,6 @@ function canAccess(pageId){
   return roles.some(r=>r.pages&&r.pages[pid]===true);
 }
 // 已登入但沒有任何生效角色 → 尚未指派
-function _noRoleYet(){
-  return !!(_fbUser&&_fbUser.email)&&_rolesOf(_fbUser.email).length===0;
-}
 
 // 目前使用者是否被設定「隱藏利潤數據」
 // v5.329：不再有「隱藏利潤」勾選欄。讀不到雲端成本的部門（工務部）本來就沒有
@@ -33326,7 +32976,6 @@ var _WK_FIELDS=[['name','姓名'],['sex','性別'],['idNo','身分證字號'],['
 function _wkById(id){return WORKERS.find(function(w){return w&&w.id===id;})||null;}
 function _wkNorm(w){if(!w||typeof w!=='object')w={};if(!w.docs||typeof w.docs!=='object')w.docs={};if(!Array.isArray(w.certs))w.certs=[];return w;}
 function _wkMailAddr(w){return w.mailSame?(w.regAddr||''):(w.mailAddr||'');}
-function _wkVal(w,k){if(k==='mailAddr')return _wkMailAddr(w);return w[k]==null?'':String(w[k]);}
 // 效期清單（文件槽＋證照），依剩餘天數排序
 function _wkExpiries(w){
   var out=[],today=localToday();w=_wkNorm(w);
@@ -34235,9 +33884,11 @@ function openEnvelope(invId,opt){
   }else if(opt.to){Object.assign(to,opt.to);}
   if(!to.zip&&cust&&cust.zip)to.zip=cust.zip;
   if(cust&&cust.envAttn&&!to.attn)to.attn=cust.envAttn;
+  if(!to.zip){to.zip=_zipLookup(to.addr);to.zipAuto=!!to.zip;}   // v6.0.47 由地址自動查郵遞區號
+  if(!to.tel)to.tel=(cust&&cust.envTel)||(inv&&inv.tel)||(cust&&cust.tel)||'';
   var cfg=_envCfg();
   var coSp=_envSplitZip(P.addr||'');
-  var fromZip=P.coZip||coSp.zip||'';
+  var fromZip=P.coZip||coSp.zip||_zipLookup(P.addr||'')||'';
   _envCtx={invId:invId||null,custName:(cust&&cust.name)||to.co||'',inv:inv};
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   var sizeOpts=Object.keys(_ENV_SIZES).map(function(k){return '<option value="'+k+'"'+(cfg.size===k?' selected':'')+'>'+_ENV_SIZES[k].label+'</option>';}).join('');
@@ -34248,8 +33899,9 @@ function openEnvelope(invId,opt){
     +'<div class="f"><label>單位（公司）</label><input id="env-co" value="'+esc(to.co)+'" oninput="_envPreview()" style="'+IN+'"></div>'
     +'<div class="fg fg2" style="gap:6px"><div class="f"><label>收件人</label><input id="env-attn" value="'+esc(to.attn)+'" placeholder="可空" oninput="_envPreview()" style="'+IN+'"></div>'
     +'<div class="f"><label>稱謂</label><select id="env-title" onchange="_envPreview()" style="'+IN+'"><option>先生</option><option>小姐</option><option>經理</option><option>主任</option><option>工地主任</option><option value="">（無）</option></select></div></div>'
-    +'<div class="f"><label>地址</label><input id="env-addr" value="'+esc(to.addr)+'" oninput="_envPreview()" style="'+IN+'"></div>'
-    +'<div class="fg fg2" style="gap:6px"><div class="f"><label>郵遞區號</label><input id="env-zip" value="'+esc(to.zip)+'" inputmode="numeric" placeholder="3 或 5／6 碼" oninput="_envPreview()" style="'+IN+'"></div>'
+    +'<div class="f"><label>收件人電話</label><input id="env-tel" value="'+esc(to.tel||'')+'" placeholder="可空" oninput="_envPreview()" style="'+IN+'"></div>'
+    +'<div class="f"><label>地址</label><input id="env-addr" value="'+esc(to.addr)+'" oninput="_envAddrIn()" style="'+IN+'"></div>'
+    +'<div class="fg fg2" style="gap:6px"><div class="f"><label>郵遞區號 <span style="font-weight:400;color:var(--b4)">（依地址自動帶）</span></label><input id="env-zip" value="'+esc(to.zip)+'" data-auto="'+(to.zipAuto?'1':'')+'" inputmode="numeric" placeholder="3 或 5／6 碼" oninput="this.removeAttribute(\'data-auto\');_envPreview()" style="'+IN+'"></div>'
     +'<div class="f"><label>寄送方式</label><select id="env-method" onchange="_envPreview()" style="'+IN+'">'+_ENV_METHODS.map(function(m){return '<option'+(m==='掛號'?' selected':'')+'>'+m+'</option>';}).join('')+'<option value="">不勾</option></select></div></div>'
     +'<div style="font-size:11.5px;font-weight:700;color:var(--g3);margin:8px 0 4px">寄件人</div>'
     +'<div class="fg fg2" style="gap:6px"><div class="f"><label>公司</label><input id="env-fco" value="'+esc(P.company||'')+'" oninput="_envPreview()" style="'+IN+'"></div>'
@@ -34281,7 +33933,7 @@ function _envUseAddr(which){
   var cust=(CUSTOMERS||[]).find(function(c){return c.name===inv.client;});
   var sp=_envSplitZip(which==='site'?(inv.loc||''):(inv.caddr||(cust&&cust.addr)||''));
   var a=document.getElementById('env-addr'),z=document.getElementById('env-zip');
-  if(a)a.value=sp.addr;if(z&&sp.zip)z.value=sp.zip;
+  if(a)a.value=sp.addr;if(z){var zz=sp.zip||_zipLookup(sp.addr);if(zz){z.value=zz;z.setAttribute('data-auto',sp.zip?'':'1');}}
   _envPreview();
 }
 function _envRead(){
@@ -34519,11 +34171,6 @@ function _rfqSave(){
   r.scope=(gv('rfq-scope')||'').trim();r.deadline=gv('rfq-deadline')||'';r.entry=gv('rfq-entry')||'';r.contact=(gv('rfq-contact')||'').trim();r.tel=(gv('rfq-tel')||'').trim();r.cond=cond;r.items=items;r.mt=Date.now();
   _touch(q);try{persist();_immediateUpload();}catch(e){_err('_rfqSave',e);}
   _rfqEditId=null;renderRfq();toast(r.no+' 已儲存，按「詢價單 PDF」匯出給廠商；廠商回傳後按「＋ 回傳廠商」填入');
-}
-function _rfqPushVendor(r,name){
-  if(!name||(r.vendors||[]).some(function(v){return v.name===name;}))return;
-  var vd=(VENDORS||[]).find(function(v){return (v.name||'')===name;})||{};
-  r.vendors.push({name:name,contact:vd.contact||'',tel:vd.phone||'',recv:'',prices:{},neg:{},note:'',status:'sent'});
 }
 function rfqRemoveVendor(rid,vi){
   var q=_rfqQ();if(!q)return;var r=_rfqs(q).find(function(x){return x.id===rid;});if(!r||!r.vendors[vi])return;
@@ -34920,7 +34567,6 @@ var QC_TYPES=[
   ['電話費','文具郵電',false],['禮品交際','交際費',false],['其他','其他',true,true],['額外支出（廠商）','其他',true,true,'vendor']
 ];
 var _qcSel=0,_qcLog=[],_qcPending=[];
-function qcPick(i){qcAdd(i);}
 function rQcChips(){
   var ch=document.getElementById('qc-chips');if(!ch)return;
   ch.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px;width:100%">'+QC_TYPES.map(function(t,i){
@@ -34968,7 +34614,6 @@ function qcToggleProj(id){
   else e.proj='__co__';
   rQcPending();
 }
-function qcClearPending(){_qcPending=[];rQcPending();}
 // 寫入一筆：專案 → q.costs（type extra, src quick）；公司費用 → EXPENSES。其他 → review:true
 function _qcCommit(e){
   var t=QC_TYPES[e.ti]||QC_TYPES[0];
@@ -35138,10 +34783,6 @@ function _vbCtx(qid){
   return q||null;
 }
 function vbOpenPeriod(qid,cid,no){var q=_vbCtx(qid);if(!q)return;var c=(q.costs||[]).find(function(x){return x.id===cid;});if(c&&c.rental)openRentPeriod(cid,no==null?undefined:no);else openSubPeriod(cid,no==null?undefined:no);}
-function vbAdvance(qid,cid){if(!_vbCtx(qid))return;openSubAdvance(cid);}
-function vbPrint(qid,cid,no){if(!_vbCtx(qid))return;printVendorStatement(cid,no);}
-function vbDelPeriod(qid,cid,no){if(!_vbCtx(qid))return;delSubPeriod(cid,no);}
-function vbRelease(qid,cid){if(!_vbCtx(qid))return;releaseSubRet(cid);}
 // 施工成本家族存檔後都會呼叫 rCostItems() → 若正停在計價頁廠商分頁就順手重繪
 function _vbRefresh(){
   var pg=document.getElementById('page-invoice'),pa=document.getElementById('page-acct');   // v6.0.30 計價併入帳務：停在帳務「廠商請款」分頁也重繪
@@ -35358,7 +34999,6 @@ function _matLossSync(q){if(!q||!q.mat)return;var m=_matQ(q);_matSyncCost(q,'los
 function _matAmortTotal(q){return _matAmortRows(q).reduce(function(a,r){return a+r.amt;},0);}
 // ── 租賃／外購＋運費：填廠商、單價 → 更新成本（有廠商即掛應付）──
 function matRentUpd(qid,rid,f,v){var q=Q.find(function(x){return x.id===qid;});if(!q)return;var m=_matQ(q);var r=m.rows.find(function(x){return x.id===rid;});if(!r)return;r[f]=(f==='rentVendor')?v:(v===''?'':(parseFloat(v)||0));_touch(m);_touch(q);try{persist();}catch(e){}var el=document.getElementById('mrent-amt-'+rid);if(el)el.textContent=fmt(_matRentAmt(q,r));var t=document.getElementById('mrent-total');if(t)t.textContent=fmt(m.rows.reduce(function(a,x){return a+_matRentAmt(q,x);},0));}
-function matTransUpd(qid,f,v){var q=Q.find(function(x){return x.id===qid;});if(!q)return;var m=_matQ(q);m.trans[f]=(f==='vendor')?v:(v===''?'':(parseFloat(v)||0));_touch(m);_touch(q);try{persist();}catch(e){}var el=document.getElementById('mtrans-amt');if(el)el.textContent=fmt(Math.round((parseFloat(m.trans.trips)||0)*(parseFloat(m.trans.price)||0)));}
 function _matShort(q,r){return Math.max(0,(parseFloat(r.qty)||0)-_matAtQty(q,r));}
 function _matRentAmt(q,r){var n=_matShort(q,r);return Math.round(n*(parseFloat(r.rentPrice)||0)*(parseFloat(r.rentMonths)||0));}
 function matRentApply(qid){
@@ -36459,7 +36099,6 @@ function _subEarlyRowsHtml(c,per){
     var stTxt=!p?'<span style="color:var(--red)">缺應付</span>':(p.status==='paid'?'<span style="color:#1B5E20">✓ 已付 '+esc(p.paidDate||'')+'</span>':'<span style="color:#b45309">未付</span>');
     return '<tr class="sub-early" style="border-bottom:1px solid var(--b1);background:#f5faff"><td style="padding:3px 6px 3px 16px;white-space:nowrap;color:#1565C0;font-size:11.5px">↳ 提前放款</td><td style="padding:3px 6px;font-size:11px;color:var(--b4)">'+esc(e.date||'')+'</td><td style="padding:3px 6px;text-align:right">'+fmt(amt)+'</td><td style="padding:3px 6px;text-align:right;font-weight:700">'+fmt(eff)+'</td><td style="padding:3px 6px;font-size:11px">'+esc((p&&p.date)||e.date||'')+'</td><td style="padding:3px 6px;font-size:11.5px;font-weight:700">'+stTxt+(e.note?'<div style="font-weight:400;color:var(--b4);font-size:10.5px">'+esc(e.note)+'</div>':'')+'</td><td style="padding:3px 6px;text-align:right">'+(p&&p.status==='paid'?'':'<button type="button" onclick="delSubEarly(\''+c.id+'\','+per.no+',\''+e.id+'\')" style="font-size:11px;padding:2px 8px;border:1px solid #f0c4c4;background:var(--w);color:var(--red);border-radius:99px;cursor:pointer;font-family:inherit">刪除</button>')+'</td></tr>';}).join('');
 }
-function vbEarly(qid,cid,no){if(!_vbCtx(qid))return;openSubEarly(cid,no);}
 
 // ══════════ v6.0.25 材料．運輸獨立頁（自發包移出）══════════
 // 流程：新增材料需求 → 比對公司庫存（同規格同長度閒置 → 調撥；同規格其他長度閒置 → 詢問接樁／切樁；都沒有 → 詢問租賃）
@@ -36477,7 +36116,6 @@ function _m6Arr(m,k){if(!Array.isArray(m[k]))m[k]=[];return m[k];}
 function _m6Months(from,to,mode){if(!from||!to)return 0;var d=Math.max(0,_dDiff(from,to));if(!d)return 0;return mode==='month'?Math.ceil(d/30):d/30;}
 function _m6RentPlan(rt){var cm=parseFloat(rt.cm)||0,rate=parseFloat(rt.rate)||0;if(!(cm>0&&rate>0&&rt.pf&&rt.pt))return 0;return Math.round(cm*_m6Months(rt.pf,rt.pt,rt.mode)*rate);}
 function _m6RentToDate(rt){var t=0,rate=parseFloat(rt.rate)||0,today=localToday();(rt.batches||[]).forEach(function(b){var to=b.o||today;if(!b.d||b.d>today)return;if(to>today)to=today;t+=(parseFloat(b.m)||0)*_m6Months(b.d,to,rt.mode)*rate;});return Math.round(t);}
-function _m6RentIn(rt){var today=localToday();return (rt.batches||[]).filter(function(b){return b.d&&b.d<=today&&(!b.o||b.o>today);}).reduce(function(a,b){return a+(parseFloat(b.m)||0);},0);}
 function _m6RentArrived(rt){return (rt.batches||[]).reduce(function(a,b){return a+(parseFloat(b.m)||0);},0);}
 function _m6EquipPlan(e){var qn=parseFloat(e.qty)||0,rate=parseFloat(e.rate)||0;if(!(e.from&&e.pt&&qn>0&&rate>0))return 0;var d=Math.max(0,_dDiff(e.from,e.pt));return Math.round(qn*(e.per==='day'?d:d/30)*rate);}
 function _m6EquipToDate(e){var qn=parseFloat(e.qty)||0,rate=parseFloat(e.rate)||0,today=localToday();if(!e.from||e.from>today)return 0;var to=e.to&&e.to<today?e.to:today;var d=Math.max(0,_dDiff(e.from,to));return Math.round(qn*(e.per==='day'?d:d/30)*rate);}
@@ -39423,6 +39061,78 @@ function quoteViewPdf(qid){
   loadQ(qid);go('preview');window._goPrev='quotes';
 }
 
+
+// ══════════════ v6.0.47：信封郵遞區號自動帶入＋收件人電話（v647.js 區塊）══════════════
+// 台灣 3 碼郵遞區號（縣市 → 鄉鎮市區）；地址寫「台」或「臺」都認得
+var _TW_ZIP={
+ '臺北市':{'中正區':'100','大同區':'103','中山區':'104','松山區':'105','大安區':'106','萬華區':'108','信義區':'110','士林區':'111','北投區':'112','內湖區':'114','南港區':'115','文山區':'116'},
+ '基隆市':{'仁愛區':'200','信義區':'201','中正區':'202','中山區':'203','安樂區':'204','暖暖區':'205','七堵區':'206'},
+ '新北市':{'萬里區':'207','金山區':'208','板橋區':'220','汐止區':'221','深坑區':'222','石碇區':'223','瑞芳區':'224','平溪區':'226','雙溪區':'227','貢寮區':'228','新店區':'231','坪林區':'232','烏來區':'233','永和區':'234','中和區':'235','土城區':'236','三峽區':'237','樹林區':'238','鶯歌區':'239','三重區':'241','新莊區':'242','泰山區':'243','林口區':'244','蘆洲區':'247','五股區':'248','八里區':'249','淡水區':'251','三芝區':'252','石門區':'253'},
+ '宜蘭縣':{'宜蘭市':'260','頭城鎮':'261','礁溪鄉':'262','壯圍鄉':'263','員山鄉':'264','羅東鎮':'265','三星鄉':'266','大同鄉':'267','五結鄉':'268','冬山鄉':'269','蘇澳鎮':'270','南澳鄉':'272','釣魚臺':'290'},
+ '新竹市':{'東區':'300','北區':'300','香山區':'300'},
+ '新竹縣':{'竹北市':'302','湖口鄉':'303','新豐鄉':'304','新埔鎮':'305','關西鎮':'306','芎林鄉':'307','寶山鄉':'308','竹東鎮':'310','五峰鄉':'311','橫山鄉':'312','尖石鄉':'313','北埔鄉':'314','峨眉鄉':'315'},
+ '桃園市':{'中壢區':'320','平鎮區':'324','龍潭區':'325','楊梅區':'326','新屋區':'327','觀音區':'328','桃園區':'330','龜山區':'333','八德區':'334','大溪區':'335','復興區':'336','大園區':'337','蘆竹區':'338'},
+ '苗栗縣':{'竹南鎮':'350','頭份市':'351','三灣鄉':'352','南庄鄉':'353','獅潭鄉':'354','後龍鎮':'356','通霄鎮':'357','苑裡鎮':'358','苗栗市':'360','造橋鄉':'361','頭屋鄉':'362','公館鄉':'363','大湖鄉':'364','泰安鄉':'365','銅鑼鄉':'366','三義鄉':'367','西湖鄉':'368','卓蘭鎮':'369'},
+ '臺中市':{'中區':'400','東區':'401','南區':'402','西區':'403','北區':'404','北屯區':'406','西屯區':'407','南屯區':'408','太平區':'411','大里區':'412','霧峰區':'413','烏日區':'414','豐原區':'420','后里區':'421','石岡區':'422','東勢區':'423','和平區':'424','新社區':'426','潭子區':'427','大雅區':'428','神岡區':'429','大肚區':'432','沙鹿區':'433','龍井區':'434','梧棲區':'435','清水區':'436','大甲區':'437','外埔區':'438','大安區':'439'},
+ '彰化縣':{'彰化市':'500','芬園鄉':'502','花壇鄉':'503','秀水鄉':'504','鹿港鎮':'505','福興鄉':'506','線西鄉':'507','和美鎮':'508','伸港鄉':'509','員林市':'510','社頭鄉':'511','永靖鄉':'512','埔心鄉':'513','溪湖鎮':'514','大村鄉':'515','埔鹽鄉':'516','田中鎮':'520','北斗鎮':'521','田尾鄉':'522','埤頭鄉':'523','溪州鄉':'524','竹塘鄉':'525','二林鎮':'526','大城鄉':'527','芳苑鄉':'528','二水鄉':'530'},
+ '南投縣':{'南投市':'540','中寮鄉':'541','草屯鎮':'542','國姓鄉':'544','埔里鎮':'545','仁愛鄉':'546','名間鄉':'551','集集鎮':'552','水里鄉':'553','魚池鄉':'555','信義鄉':'556','竹山鎮':'557','鹿谷鄉':'558'},
+ '嘉義市':{'東區':'600','西區':'600'},
+ '嘉義縣':{'番路鄉':'602','梅山鄉':'603','竹崎鄉':'604','阿里山鄉':'605','中埔鄉':'606','大埔鄉':'607','水上鄉':'608','鹿草鄉':'611','太保市':'612','朴子市':'613','東石鄉':'614','六腳鄉':'615','新港鄉':'616','民雄鄉':'621','大林鎮':'622','溪口鄉':'623','義竹鄉':'624','布袋鎮':'625'},
+ '雲林縣':{'斗南鎮':'630','大埤鄉':'631','虎尾鎮':'632','土庫鎮':'633','褒忠鄉':'634','東勢鄉':'635','臺西鄉':'636','崙背鄉':'637','麥寮鄉':'638','斗六市':'640','林內鄉':'643','古坑鄉':'646','莿桐鄉':'647','西螺鎮':'648','二崙鄉':'649','北港鎮':'651','水林鄉':'652','口湖鄉':'653','四湖鄉':'654','元長鄉':'655'},
+ '臺南市':{'中西區':'700','東區':'701','南區':'702','北區':'704','安平區':'708','安南區':'709','永康區':'710','歸仁區':'711','新化區':'712','左鎮區':'713','玉井區':'714','楠西區':'715','南化區':'716','仁德區':'717','關廟區':'718','龍崎區':'719','官田區':'720','麻豆區':'721','佳里區':'722','西港區':'723','七股區':'724','將軍區':'725','學甲區':'726','北門區':'727','新營區':'730','後壁區':'731','白河區':'732','東山區':'733','六甲區':'734','下營區':'735','柳營區':'736','鹽水區':'737','善化區':'741','大內區':'742','山上區':'743','新市區':'744','安定區':'745'},
+ '高雄市':{'新興區':'800','前金區':'801','苓雅區':'802','鹽埕區':'803','鼓山區':'804','旗津區':'805','前鎮區':'806','三民區':'807','楠梓區':'811','小港區':'812','左營區':'813','仁武區':'814','大社區':'815','岡山區':'820','路竹區':'821','阿蓮區':'822','田寮區':'823','燕巢區':'824','橋頭區':'825','梓官區':'826','彌陀區':'827','永安區':'828','湖內區':'829','鳳山區':'830','大寮區':'831','林園區':'832','鳥松區':'833','大樹區':'840','旗山區':'842','美濃區':'843','六龜區':'844','內門區':'845','杉林區':'846','甲仙區':'847','桃源區':'848','那瑪夏區':'849','茂林區':'851','茄萣區':'852'},
+ '屏東縣':{'屏東市':'900','三地門鄉':'901','霧臺鄉':'902','瑪家鄉':'903','九如鄉':'904','里港鄉':'905','高樹鄉':'906','鹽埔鄉':'907','長治鄉':'908','麟洛鄉':'909','竹田鄉':'911','內埔鄉':'912','萬丹鄉':'913','潮州鎮':'920','泰武鄉':'921','來義鄉':'922','萬巒鄉':'923','崁頂鄉':'924','新埤鄉':'925','南州鄉':'926','林邊鄉':'927','東港鎮':'928','琉球鄉':'929','佳冬鄉':'931','新園鄉':'932','枋寮鄉':'940','枋山鄉':'941','春日鄉':'942','獅子鄉':'943','車城鄉':'944','牡丹鄉':'945','恆春鎮':'946','滿州鄉':'947'},
+ '臺東縣':{'臺東市':'950','綠島鄉':'951','蘭嶼鄉':'952','延平鄉':'953','卑南鄉':'954','鹿野鄉':'955','關山鎮':'956','海端鄉':'957','池上鄉':'958','東河鄉':'959','成功鎮':'961','長濱鄉':'962','太麻里鄉':'963','金峰鄉':'964','大武鄉':'965','達仁鄉':'966'},
+ '花蓮縣':{'花蓮市':'970','新城鄉':'971','秀林鄉':'972','吉安鄉':'973','壽豐鄉':'974','鳳林鎮':'975','光復鄉':'976','豐濱鄉':'977','瑞穗鄉':'978','萬榮鄉':'979','玉里鎮':'981','卓溪鄉':'982','富里鄉':'983'},
+ '澎湖縣':{'馬公市':'880','西嶼鄉':'881','望安鄉':'882','七美鄉':'883','白沙鄉':'884','湖西鄉':'885'},
+ '金門縣':{'金沙鎮':'890','金湖鎮':'891','金寧鄉':'892','金城鎮':'893','烈嶼鄉':'894','烏坵鄉':'896'},
+ '連江縣':{'南竿鄉':'209','北竿鄉':'210','莒光鄉':'211','東引鄉':'212'}
+};
+// 地址 → 3 碼郵遞區號（找不到回空字串）。縣市名「台／臺」互通；縣市可省略時以鄉鎮市區唯一者為準
+function _zipLookup(addr){
+  var s=String(addr||'').replace(/\s/g,'').replace(/台/g,'臺');
+  if(!s)return '';
+  var m=/^(\d{3})/.exec(s);if(m)return m[1];
+  var cities=Object.keys(_TW_ZIP);
+  var find=function(c,ci,allowAll){var dists=_TW_ZIP[c];var rest=s.slice(ci);var best='';Object.keys(dists).forEach(function(d){if(rest.indexOf(d)>=0&&d.length>best.length)best=d;});
+    if(best)return dists[best];
+    if(allowAll){var vals=Object.keys(dists).map(function(d){return dists[d];});if(vals.every(function(v){return vals[0]===v;}))return vals[0];}   // 新竹市／嘉義市：區可省略
+    return '';};
+  // 第一輪：縣市全名（新竹縣／新竹市分得開）
+  for(var i=0;i<cities.length;i++){var ci=s.indexOf(cities[i]);if(ci>=0){var z1=find(cities[i],ci,true);if(z1)return z1;}}
+  // 第二輪：只寫「新竹」「台中」沒寫市縣 → 只認鄉鎮市區
+  for(var k=0;k<cities.length;k++){var c2=cities[k].replace(/[市縣]$/,'');var ck=s.indexOf(c2);if(ck>=0){var z2=find(cities[k],ck,false);if(z2)return z2;}}
+  // 沒寫縣市：鄉鎮市區在全台唯一才回
+  var hits=[];cities.forEach(function(c){Object.keys(_TW_ZIP[c]).forEach(function(d){if(s.indexOf(d)>=0)hits.push(_TW_ZIP[c][d]);});});
+  hits=hits.filter(function(v,i,a){return a.indexOf(v)===i;});
+  return hits.length===1?hits[0]:'';
+}
+// 收件地址輸入時：郵遞區號空白或是自動帶的 → 重新查
+function _envAddrIn(){
+  var z=document.getElementById('env-zip'),a=document.getElementById('env-addr');
+  if(z&&a&&(!z.value||z.getAttribute('data-auto')==='1')){var zip=_zipLookup(a.value);if(zip){z.value=zip;z.setAttribute('data-auto','1');}}
+  _envPreview();
+}
+var _envRead0_647=_envRead;
+_envRead=function(){var r=_envRead0_647.apply(this,arguments);r.data.tel=(gv('env-tel')||'').trim();return r;};
+var _envHtml0_647=_envHtml;
+_envHtml=function(cfg,data,showFrames){
+  var h=_envHtml0_647.apply(this,arguments);
+  if(data&&data.tel){
+    // 收件人電話：中欄底部橫書小字（直書欄位不夠放時仍看得到）
+    var S=_ENV_SIZES[cfg.size]||_ENV_SIZES.k12,dx=cfg.dx||0,dy=cfg.dy||0;
+    var tel='<div style="position:absolute;left:'+(cfg.colL+dx)+'mm;top:'+(cfg.colB-5+dy)+'mm;width:'+cfg.colW+'mm;text-align:center;font-size:'+(cfg.fontSender||11)+'pt;letter-spacing:0.3mm;line-height:1">TEL '+esc(data.tel)+'</div>';
+    h=h.replace(/<\/div>\s*$/,tel+'</div>');
+  }
+  return h;
+};
+var _envPrint0_647=_envPrint;
+_envPrint=function(){
+  try{var r=_envRead();var cust=(CUSTOMERS||[]).find(function(c){return c.name===(r.data.co||(_envCtx&&_envCtx.custName));});
+    if(cust&&r.data.tel&&cust.envTel!==r.data.tel){cust.envTel=r.data.tel;cust._mt=Date.now();saveCustomers();}}catch(e){_err('_envPrint.tel',e);}
+  return _envPrint0_647.apply(this,arguments);
+};
+
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
@@ -40157,10 +39867,6 @@ function _printNativeHTML(html,filename){   // v5.392：一律不縮放（移除
   setTimeout(go,1500); // 逾時保險
 }
 
-function _openPrintWindow(html,filename){
-  // 電腦版與手機版統一使用 html2canvas+jsPDF，確保輸出完全一致
-  _printViaIframe(html,filename);
-}
 // ── 分頁規劃（DOM 量測）──
 // 舊版靠掃描像素找空白線，切點會貼齊紙張邊緣、看起來像被裁掉。
 // 改為直接量測 DOM：切點只落在「列與列之間」等區塊邊界，
@@ -40487,10 +40193,6 @@ function _printViaIframe(html,filename,landscape){
   },300);
 }
 
-function _generatePdfFromHtml(html,filename,cb,landscape){
-  _printViaIframe(html,filename,landscape);
-  if(cb)cb(true);
-}
 
 function _buildBarChart(data, options){
   const {width=600,height=180,colorFn,labelFn,valueFn,title=''}=options||{};

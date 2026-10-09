@@ -5313,6 +5313,36 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.47 信封郵遞區號自動帶入＋收件人電話；刪除 49 個無入口舊函式 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    out.zip={a:_zipLookup('新竹縣寶山鄉有謙一路5巷6號'),b:_zipLookup('台北市信義區吳興街18號1樓'),c:_zipLookup('新竹市光明六路150-1號4樓'),d:_zipLookup('竹北市光明六路150號'),e:_zipLookup('東區中正路1號'),f:_zipLookup('302 新竹縣竹北市'),g:_zipLookup('臺中市西屯區台灣大道'),h:_zipLookup('高雄市那瑪夏區')};
+    out.zipOk=out.zip.a==='308'&&out.zip.b==='110'&&out.zip.c==='300'&&out.zip.d==='302'&&out.zip.e===''&&out.zip.f==='302'&&out.zip.g==='407'&&out.zip.h==='849';
+    CUSTOMERS.length=0;CUSTOMERS.push({id:'cuE',name:'八九企業有限公司',contact:'謝',tel:'03-5551234',addr:'新竹縣寶山鄉有謙一路5巷6號',_mt:1});
+    openEnvelope(null,{custId:'cuE'});
+    out.form={zip:gv('env-zip'),auto:document.getElementById('env-zip').getAttribute('data-auto'),tel:gv('env-tel')};
+    out.formOk=out.form.zip==='308'&&out.form.auto==='1'&&out.form.tel==='03-5551234';
+    document.getElementById('env-addr').value='臺北市大安區復興南路一號';_envAddrIn();out.addrChange=gv('env-zip')==='106';
+    document.getElementById('env-zip').value='999';document.getElementById('env-zip').removeAttribute('data-auto');document.getElementById('env-addr').value='新北市板橋區';_envAddrIn();out.manualKept=gv('env-zip')==='999';
+    const r=_envRead();out.readTel=r.data.tel==='03-5551234';
+    const h=_envHtml(r.cfg,r.data,true);out.telPrinted=/TEL 03-5551234/.test(h)&&/env-sheet/.test(h);
+    // 刪掉的舊函式都不存在；保留的還在
+    out.gone=['resolvePreset','upaPCCalc','confirmDelQ','goQuoteInvoice','showAdvSearch','vbAdvance','_rfqPushVendor','_generatePdfFromHtml'].every(n=>typeof window[n]==='undefined');
+    out.kept=['smartIntake','settleInvItem','printVendorStatement','exportQuotePDFNative','vbOpenPeriod','clearUPAHistory','_subEarlyBtn','openSiteDet'].every(n=>typeof window[n]==='function');
+    document.getElementById('gen-confirm-cancel').click();
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,500);}
+  CUSTOMERS.length=0;res(out);
+}));
+    check('v6.0.47 郵遞區號查表：縣市＋鄉鎮市區（台／臺互通、新竹縣／市分得開、區可省略的市、只寫鄉鎮市區且唯一）', r.zipOk, JSON.stringify(r.zip));
+    check('v6.0.47 信封視窗：郵遞區號依地址自動帶（改地址重查、手改後不覆蓋）、收件人電話欄預帶客戶電話並印在中欄底部', r.formOk && r.addrChange && r.manualKept && r.readTel && r.telPrinted, JSON.stringify({form:r.form,err:r.err}));
+    check('v6.0.47 健檢第 2 步：49 個無入口舊函式已刪，保留備用與測試用的仍在', r.gone && r.kept, JSON.stringify(r.err||''));
+    check('v6.0.47 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
