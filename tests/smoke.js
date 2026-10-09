@@ -5474,6 +5474,37 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.51 健檢第 5 步：施工計畫書圖庫去重複、刪未用圖函式（出圖逐張比對相同） ─────────────
+  {
+    const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    const L = src.split('\n');
+    const empty = L.filter(l => !/^\s*\/\//.test(l) && /catch\s*\(\s*[A-Za-z_$][\w$]*\s*\)\s*\{\s*\}/.test(l));
+    const seen = {}, dup = [];
+    L.forEach(l => { const m = l.match(/^function\s+([A-Za-z_$][\w$]*)\s*\(/); if (m) { if (seen[m[1]]) dup.push(m[1]); seen[m[1]] = 1; } });
+    check('v6.0.51 全檔無空 catch、頂層（含圖庫）無同名函式重複宣告', empty.length === 0 && dup.length === 0, (empty[0] || '') + ' ' + dup.slice(0, 5).join(','));
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const list = FY_SHEETS.list();
+        out.sheets = list.length;
+        out.pagesOk = list.every(s => { const pg = FY_SHEETS.pages(s.id, 1); return pg && pg.length && pg.every(x => /^data:image\/png/.test(x.b64)); });
+        const bad = [];
+        PLAN_ITEMS.forEach(it => {
+          if (it.id === 'dwall') return;
+          const m = {}; (it.vars || []).forEach(v => { m[v.k] = v.d || ''; });
+          const s = _plStoryPNG(it.id, m, ''); if (!s) bad.push(it.id);
+        });
+        out.storyBad = bad;
+        out.detail = !!_plDetailPNG('strut', {});
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.51 施工步驟示意圖組（22 組）各頁、各工項步驟圖、水平支撐詳圖照常產出', r.sheets === 22 && r.pagesOk && r.storyBad && r.storyBad.length === 0 && r.detail, JSON.stringify(r));
+    check('v6.0.51 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
