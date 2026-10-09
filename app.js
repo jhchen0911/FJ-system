@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.54';
+var APP_VERSION='v6.0.55';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -30808,6 +30808,12 @@ function openEnvelope(invId,opt){
     cust=(CUSTOMERS||[]).find(function(c){return c.id===opt.custId;})||null;
     if(cust){to.co=cust.name||'';to.attn=cust.contact||'';var sp2=_envSplitZip(cust.addr||'');to.addr=sp2.addr;to.zip=sp2.zip;}
   }else if(opt.to){Object.assign(to,opt.to);}
+  // v6.0.55 信封通訊錄：同一收件單位上次填的收件人／稱謂／電話／地址／郵遞區號／寄送方式自動帶入（郵寄工地時地址仍用工地）
+  var bk=_envBookGet(to.co);
+  if(bk){
+    ['attn','title','tel','method'].forEach(function(k){if(bk[k]!=null&&bk[k]!=='')to[k]=bk[k];});
+    if(src!=='site'&&bk.addr){to.addr=bk.addr;to.zip=bk.zip||'';}
+  }
   if(!to.zip&&cust&&cust.zip)to.zip=cust.zip;
   if(cust&&cust.envAttn&&!to.attn)to.attn=cust.envAttn;
   if(!to.zip){to.zip=_zipLookup(to.addr);to.zipAuto=!!to.zip;}   // v6.0.47 由地址自動查郵遞區號
@@ -30824,11 +30830,11 @@ function openEnvelope(invId,opt){
     +(inv&&inv.loc&&inv.caddr?('<div style="display:flex;gap:6px;margin-bottom:6px;font-size:12px"><label><input type="radio" name="env-src" value="co"'+(src==='co'?' checked':'')+' onchange="_envUseAddr(\'co\')"> 公司地址</label><label><input type="radio" name="env-src" value="site"'+(src==='site'?' checked':'')+' onchange="_envUseAddr(\'site\')"> 工地地址</label></div>'):'')
     +'<div class="f"><label>單位（公司）</label><input id="env-co" value="'+esc(to.co)+'" oninput="_envPreview()" style="'+IN+'"></div>'
     +'<div class="fg fg2" style="gap:6px"><div class="f"><label>收件人</label><input id="env-attn" value="'+esc(to.attn)+'" placeholder="可空" oninput="_envPreview()" style="'+IN+'"></div>'
-    +'<div class="f"><label>稱謂</label><select id="env-title" onchange="_envPreview()" style="'+IN+'"><option>先生</option><option>小姐</option><option>經理</option><option>主任</option><option>工地主任</option><option value="">（無）</option></select></div></div>'
+    +'<div class="f"><label>稱謂</label><select id="env-title" onchange="_envPreview()" style="'+IN+'">'+['先生','小姐','經理','主任','工地主任'].map(function(o){return '<option'+(to.title===o?' selected':'')+'>'+o+'</option>';}).join('')+'<option value=""'+(to.title===''?' selected':'')+'>（無）</option></select></div></div>'
     +'<div class="f"><label>收件人電話</label><input id="env-tel" value="'+esc(to.tel||'')+'" placeholder="可空" oninput="_envPreview()" style="'+IN+'"></div>'
     +'<div class="f"><label>地址</label><input id="env-addr" value="'+esc(to.addr)+'" oninput="_envAddrIn()" style="'+IN+'"></div>'
     +'<div class="fg fg2" style="gap:6px"><div class="f"><label>郵遞區號 <span style="font-weight:400;color:var(--b4)">（依地址自動帶）</span></label><input id="env-zip" value="'+esc(to.zip)+'" data-auto="'+(to.zipAuto?'1':'')+'" inputmode="numeric" placeholder="3 或 5／6 碼" oninput="this.removeAttribute(\'data-auto\');_envPreview()" style="'+IN+'"></div>'
-    +'<div class="f"><label>寄送方式</label><select id="env-method" onchange="_envPreview()" style="'+IN+'">'+_ENV_METHODS.map(function(m){return '<option'+(m==='掛號'?' selected':'')+'>'+m+'</option>';}).join('')+'<option value="">不勾</option></select></div></div>'
+    +'<div class="f"><label>寄送方式</label><select id="env-method" onchange="_envPreview()" style="'+IN+'">'+_ENV_METHODS.map(function(m){return '<option'+(m===(to.method||'掛號')?' selected':'')+'>'+m+'</option>';}).join('')+'<option value="">不勾</option></select></div></div>'
     +'<div style="font-size:11.5px;font-weight:700;color:var(--g3);margin:8px 0 4px">寄件人</div>'
     +'<div class="fg fg2" style="gap:6px"><div class="f"><label>公司</label><input id="env-fco" value="'+esc(P.company||'')+'" oninput="_envPreview()" style="'+IN+'"></div>'
     +'<div class="f"><label>郵遞區號</label><input id="env-fzip" value="'+esc(fromZip)+'" inputmode="numeric" oninput="_envPreview()" style="'+IN+'"></div></div>'
@@ -30849,11 +30855,14 @@ function openEnvelope(invId,opt){
     +'</details>'
     +'</div>'
     +'<div><div style="font-size:11.5px;font-weight:700;color:var(--g3);margin-bottom:4px">預覽（淡紅框＝信封印好的框，實際列印只印黑字）</div><div id="env-prev" style="background:#e9e9e9;border-radius:var(--r8);padding:8px;display:flex;justify-content:center;overflow:hidden"></div>'
-    +'<button type="button" id="env-pdf-btn" onclick="_envPdf()" style="margin-top:8px;width:100%;min-height:40px;border:1px solid var(--g3);background:var(--w);color:var(--g3);border-radius:var(--r8);font-weight:700;font-family:inherit;cursor:pointer">存成 PDF（信封尺寸）</button>'
+    +'<button type="button" id="env-pdf-btn" onclick="_envPdf()" style="margin-top:8px;width:100%;min-height:40px;border:1px solid var(--g3);background:var(--w);color:var(--g3);border-radius:var(--r8);font-weight:700;font-family:inherit;cursor:pointer">存成 PDF（信封尺寸）</button><div id="env-pdf-out"></div>'
     +'<div style="font-size:11px;color:var(--b3);margin-top:4px">手機（iPhone／iPad）無法指定自訂紙張時，可存成 PDF 後用 Brother 等印表機 App 選信封尺寸列印。</div></div>'
     +'</div>';
   showConfirm('信封列印'+(inv?('：'+esc(inv.client||'')+(inv.periodNo?('　第 '+inv.periodNo+' 期請款單'):'')):''),html,function(){_envPrint();},false,null,true);
   var okBtn=document.getElementById('gen-confirm-ok');if(okBtn)okBtn.textContent='列印信封';
+  // 使用者一修改就記進信封通訊錄（掛在這次的 env-grid 上，不影響其他確認視窗）
+  var grid=document.querySelector('#gen-confirm-msg .env-grid');
+  if(grid){var f=function(e){var id=(e.target&&e.target.id)||'';if(/^env-(co|attn|title|tel|addr|zip|method)$/.test(id))_envBookSaveSoon();};grid.addEventListener('input',f);grid.addEventListener('change',f);}
   setTimeout(_envPreview,30);
 }
 function _envUseAddr(which){
@@ -30872,7 +30881,8 @@ function _envRead(){
   var fr=document.getElementById('env-frames');cfg.frames=!!(fr&&fr.checked);
   var title=gv('env-title');
   var data={co:(gv('env-co')||'').trim(),attn:(gv('env-attn')||'').trim(),title:title==null?'先生':title,addr:(gv('env-addr')||'').trim(),zip:_envDigits(gv('env-zip')),method:gv('env-method')||'',
-    fco:(gv('env-fco')||'').trim(),fzip:_envDigits(gv('env-fzip')),faddr:(gv('env-faddr')||'').trim(),ftel:(gv('env-ftel')||'').trim()};
+    fco:(gv('env-fco')||'').trim(),fzip:_envDigits(gv('env-fzip')),faddr:(gv('env-faddr')||'').trim(),ftel:(gv('env-ftel')||'').trim(),
+    tel:(gv('env-tel')||'').trim()};
   return {cfg:cfg,data:data};
 }
 // 信封 HTML（mm 絕對定位）；showFrames＝畫出信封預印框（預覽／空白信封）
@@ -30921,6 +30931,8 @@ function _envHtml(cfg,data,showFrames){
     if(fc)h+='<div style="position:absolute;left:'+(sx+dx)+'mm;top:'+(cfg.sZipY+dy)+'mm;width:'+cfg.sZipBox+'mm;height:'+cfg.sZipBox+'mm;display:flex;align-items:center;justify-content:center;font-size:'+(cfg.fontZip-5)+'pt;font-weight:700">'+fc+'</div>';
   }
   if(showFrames)h+='<div style="position:absolute;left:'+(cfg.sZipX+dx)+'mm;top:'+(cfg.sZipY+cfg.sZipBox+0.8+dy)+'mm;width:'+(6*(cfg.sZipBox+cfg.sZipGap)+cfg.sZipHy)+'mm;text-align:center;font-size:6pt;color:rgba(220,60,60,.75)">寄件人郵遞區號</div>';
+  // 收件人電話：中欄底部橫書小字（直書欄位不夠放時仍看得到）
+  if(data.tel)h+='<div style="position:absolute;left:'+(cfg.colL+dx)+'mm;top:'+(cfg.colB-5+dy)+'mm;width:'+cfg.colW+'mm;text-align:center;font-size:'+(cfg.fontSender||11)+'pt;letter-spacing:0.3mm;line-height:1">TEL '+esc(data.tel)+'</div>';
   return '<div class="env-sheet" style="position:relative;width:'+W+'mm;height:'+H+'mm;background:#fff;overflow:hidden;font-family:\'Microsoft JhengHei\',\'Noto Sans TC\',sans-serif;color:#111">'+h+'</div>';
 }
 function _envPreview(){
@@ -30937,9 +30949,10 @@ function _envPrint(){
   _envSaveCfg(r.cfg);
   // 記住：公司郵遞區號、此業主的郵遞區號／收件人
   if(r.data.fzip&&r.data.fzip!==P.coZip){P.coZip=r.data.fzip;try{persistP();}catch(e){_err('_envPrint',e);}}
+  _envBookSave(r.data);
   try{
     var cust=(CUSTOMERS||[]).find(function(c){return c.name===(r.data.co||(_envCtx&&_envCtx.custName));});
-    if(cust&&((r.data.zip&&cust.zip!==r.data.zip)||(r.data.attn&&cust.envAttn!==r.data.attn))){cust.zip=r.data.zip||cust.zip;cust.envAttn=r.data.attn||cust.envAttn;cust._mt=Date.now();saveCustomers();}
+    if(cust&&((r.data.zip&&cust.zip!==r.data.zip)||(r.data.attn&&cust.envAttn!==r.data.attn)||(r.data.tel&&cust.envTel!==r.data.tel))){cust.zip=r.data.zip||cust.zip;cust.envAttn=r.data.attn||cust.envAttn;cust.envTel=r.data.tel||cust.envTel;cust._mt=Date.now();saveCustomers();}
   }catch(e){_err('_envPrint.cust',e);}
   var html='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>信封_'+esc(r.data.co||r.data.attn)+'</title><style>'
     +'@page{size:'+S.w+'mm '+S.h+'mm;margin:0}html,body{margin:0;padding:0;width:'+S.w+'mm;height:'+S.h+'mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
@@ -30948,27 +30961,49 @@ function _envPrint(){
   toast(_isIOS()?('信封已送列印：紙張請選信封或 '+S.w+'×'+S.h+' mm；印表機若沒有此尺寸，請改用「存成 PDF」以 Brother App 列印')
     :('信封已送列印：印表機請選自訂紙張 '+S.w+'×'+S.h+' mm、不縮放'));
 }
-// v6.0.54 信封存成 PDF：頁面＝信封實際尺寸（mm），手機可用印表機 App／檔案 App 列印
+// v6.0.55 信封通訊錄：P.envBook[收件單位]={attn,title,tel,addr,zip,method,ts}（隨參數同步）
+function _envBookKey(co){return String(co||'').replace(/\s+/g,'');}
+function _envBookGet(co){var k=_envBookKey(co);return (k&&P.envBook&&P.envBook[k])||null;}
+function _envBookSave(d){
+  try{
+    if(!d){var r=_envRead();d=r.data;}
+    var k=_envBookKey(d.co);if(!k)return;
+    if(!P.envBook||typeof P.envBook!=='object')P.envBook={};
+    var nv={attn:d.attn||'',title:d.title==null?'先生':d.title,tel:d.tel||'',addr:d.addr||'',zip:d.zip||'',method:d.method||''};
+    var ov=P.envBook[k]||{};
+    if(['attn','title','tel','addr','zip','method'].every(function(x){return (ov[x]||'')===(nv[x]||'');}))return;
+    nv.ts=Date.now();P.envBook[k]=nv;persistP();
+  }catch(e){_err('_envBookSave',e);}
+}
+var _envBookT=null;
+function _envBookSaveSoon(){clearTimeout(_envBookT);_envBookT=setTimeout(function(){_envBookSave();},500);}
+// v6.0.54 信封存成 PDF：頁面＝信封實際尺寸（mm）；v6.0.55 iOS 下載必須由使用者點按觸發 → 產生後在視窗內給「開啟信封 PDF」連結
 function _envPdf(){
   var r=_envRead(),S=_ENV_SIZES[r.cfg.size]||_ENV_SIZES.k12;
   if(!r.data.co&&!r.data.attn){toast('請填收件單位或收件人');return;}
-  _envSaveCfg(r.cfg);
+  _envSaveCfg(r.cfg);_envBookSave(r.data);
   var fname='信封_'+String(r.data.co||r.data.attn).replace(/[\\/:*?"<>|]/g,'')+'.pdf';
-  toast('產生信封 PDF…');
+  var btn=document.getElementById('env-pdf-btn'),slot=document.getElementById('env-pdf-out');
+  if(btn){btn.disabled=true;btn.textContent='產生中…';}
+  if(slot)slot.innerHTML='';
+  var reset=function(){if(btn){btn.disabled=false;btn.textContent='存成 PDF（信封尺寸）';}};
   _ensurePdfLibs().then(function(ok){
-    if(!ok){toast('PDF 套件載入失敗，請確認網路後再試');return;}
+    if(!ok){reset();toast('PDF 套件載入失敗，請確認網路後再試');return;}
     var host=document.createElement('div');host.id='_fy_env_pdf';
     host.style.cssText='position:fixed;left:-10000px;top:0;background:#fff;';
     host.innerHTML=_envHtml(r.cfg,r.data,!!r.cfg.frames);document.body.appendChild(host);
-    var el=host.firstElementChild;
-    return window.html2canvas(el,{scale:4,backgroundColor:'#fff',useCORS:true,logging:false}).then(function(cv){
+    return window.html2canvas(host.firstElementChild,{scale:4,backgroundColor:'#fff',useCORS:true,logging:false}).then(function(cv){
       var J=(window.jspdf&&(window.jspdf.jsPDF||window.jspdf));
       var pdf=new J({unit:'mm',format:[S.w,S.h],orientation:S.w>S.h?'landscape':'portrait'});
       pdf.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,0,S.w,S.h);
-      pdf.save(fname);
-      toast('已存成信封 PDF（'+S.w+'×'+S.h+' mm），列印時請選相同尺寸、不縮放');
+      reset();
+      if(_isIOS()&&slot){
+        var url=URL.createObjectURL(pdf.output('blob'));
+        slot.innerHTML='<a href="'+url+'" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;margin-top:6px;min-height:40px;border-radius:var(--r8);background:var(--g);color:#fff;font-weight:700;text-decoration:none">開啟信封 PDF（'+S.w+'×'+S.h+' mm）</a>'
+          +'<div style="font-size:11px;color:var(--b3);margin-top:4px">開啟後點「分享」→「列印」或存到檔案，用印表機 App 選相同尺寸、不縮放。</div>';
+      }else{pdf.save(fname);toast('已存成信封 PDF（'+S.w+'×'+S.h+' mm），列印時請選相同尺寸、不縮放');}
     }).finally(function(){host.remove();});
-  }).catch(function(e){_err('_envPdf',e);toast('信封 PDF 產生失敗：'+((e&&e.message)||e));});
+  }).catch(function(e){reset();_err('_envPdf',e);toast('信封 PDF 產生失敗：'+((e&&e.message)||e));});
 }
 // ══════════ v6 發包：分項工程詢價單 → 廠商回填比價 → 議價 → 得標／改點工 ══════════
 // 資料：q.rfqs[]（成本面資料，隨 costs 走 private）
@@ -35273,25 +35308,7 @@ function _envAddrIn(){
   if(z&&a&&(!z.value||z.getAttribute('data-auto')==='1')){var zip=_zipLookup(a.value);if(zip){z.value=zip;z.setAttribute('data-auto','1');}}
   _envPreview();
 }
-var _envRead0_647=_envRead;
-_envRead=function(){var r=_envRead0_647.apply(this,arguments);r.data.tel=(gv('env-tel')||'').trim();return r;};
-var _envHtml0_647=_envHtml;
-_envHtml=function(cfg,data,showFrames){
-  var h=_envHtml0_647.apply(this,arguments);
-  if(data&&data.tel){
-    // 收件人電話：中欄底部橫書小字（直書欄位不夠放時仍看得到）
-    var S=_ENV_SIZES[cfg.size]||_ENV_SIZES.k12,dx=cfg.dx||0,dy=cfg.dy||0;
-    var tel='<div style="position:absolute;left:'+(cfg.colL+dx)+'mm;top:'+(cfg.colB-5+dy)+'mm;width:'+cfg.colW+'mm;text-align:center;font-size:'+(cfg.fontSender||11)+'pt;letter-spacing:0.3mm;line-height:1">TEL '+esc(data.tel)+'</div>';
-    h=h.replace(/<\/div>\s*$/,tel+'</div>');
-  }
-  return h;
-};
-var _envPrint0_647=_envPrint;
-_envPrint=function(){
-  try{var r=_envRead();var cust=(CUSTOMERS||[]).find(function(c){return c.name===(r.data.co||(_envCtx&&_envCtx.custName));});
-    if(cust&&r.data.tel&&cust.envTel!==r.data.tel){cust.envTel=r.data.tel;cust._mt=Date.now();saveCustomers();}}catch(e){_err('_envPrint.tel',e);}
-  return _envPrint0_647.apply(this,arguments);
-};
+// v6.0.55：原 v6.0.47 的 _envRead／_envHtml／_envPrint 包裝已併回本體
 
 
 // ══════════════ v6.0.48：案場細節改彈窗＋材料估算讀案場細節（v648.js 區塊）══════════════
@@ -36159,8 +36176,8 @@ function _printMainHTML(html){
   var done=false;
   var cleanup=function(){if(done)return;done=true;window.removeEventListener('afterprint',cleanup);['_fy_print_main','_fy_print_main_css'].forEach(function(id){var el=document.getElementById(id);if(el)el.remove();});};
   window.addEventListener('afterprint',function(){setTimeout(cleanup,500);});
-  var imgs=[].slice.call(box.querySelectorAll('img')),go=function(){try{window.print();}catch(e){_err('_printMainHTML',e);toast('此瀏覽器不支援列印，請改用「存成 PDF」');}};
-  Promise.all(imgs.map(function(im){return im.complete?0:new Promise(function(r){im.onload=im.onerror=r;setTimeout(r,1500);});})).then(function(){setTimeout(go,150);});
+  // v6.0.55：iOS 只允許在使用者點按的當下呼叫 print()，延遲（等圖片、setTimeout）會被靜默擋掉 → 同步呼叫（文件內圖片皆為 base64）
+  try{window.print();}catch(e){_err('_printMainHTML',e);toast('此瀏覽器不支援列印，請改用「存成 PDF」');}
 }
 function _printNativeHTML(html,filename){   // v5.392：一律不縮放（移除 fitPageHpx）
   if(_isIOS()){_printMainHTML(html);return;}

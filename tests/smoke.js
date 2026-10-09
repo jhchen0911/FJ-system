@@ -5551,12 +5551,14 @@ async function newPage(browser, width, height) {
               /* 存成 PDF：以假套件驗證頁面尺寸與存檔 */
               let saved = null;
               window.html2canvas = el => Promise.resolve({ toDataURL: () => 'data:image/jpeg;base64,AA', w: el.offsetWidth });
-              window.jspdf = { jsPDF: function (o) { this.o = o; this.addImage = function (d, f, x, y, w, h) { this.img = [x, y, w, h]; }; this.save = function (n) { saved = { o: this.o, img: this.img, n }; }; } };
+              window.jspdf = { jsPDF: function (o) { this.o = o; this.addImage = function (d, f, x, y, w, h) { this.img = [x, y, w, h]; }; this.save = function (n) { saved = { o: this.o, img: this.img, n }; }; this.output = function () { saved = { o: this.o, img: this.img, n: '信封_八九企業有限公司.pdf', blob: true }; return new Blob(['%PDF'], { type: 'application/pdf' }); }; } };
               openEnvelope(null, { to: { co: '八九企業有限公司', attn: '劉書瑋' } });
               setTimeout(() => {
                 _envPdf();
                 setTimeout(() => {
-                  out.pdf = !!saved && saved.o.unit === 'mm' && saved.o.format[0] === 120 && saved.o.format[1] === 235 && saved.img.join(',') === '0,0,120,235' && /^信封_八九企業有限公司\.pdf$/.test(saved.n) && !document.getElementById('_fy_env_pdf');
+                  const a = document.querySelector('#env-pdf-out a');
+                  out.pdf = !!saved && saved.o.unit === 'mm' && saved.o.format[0] === 120 && saved.o.format[1] === 235 && saved.img.join(',') === '0,0,120,235' && !document.getElementById('_fy_env_pdf')
+                    && saved.blob && !!a && /^blob:/.test(a.getAttribute('href')) && a.target === '_blank';   /* v6.0.55：iOS 產生後給連結（下載須由點按觸發） */
                   res(out);
                 }, 400);
               }, 100);
@@ -5566,9 +5568,50 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
     }));
     check('v6.0.54 iPhone 列印信封：改由主畫面列印（列印時只顯示信封、@page 120×235mm、螢幕不顯示、印完清除）', r.ios && r.snap && r.page && r.hiddenOnScreen && r.cleaned, JSON.stringify(r));
-    check('v6.0.54 信封存成 PDF：頁面＝信封實際尺寸（mm）、滿版貼圖、檔名', r.pdfBtn && r.pdf, JSON.stringify(r));
+    check('v6.0.54/55 信封存成 PDF：頁面＝信封實際尺寸（mm）、滿版貼圖；iPhone 產生後給「開啟信封 PDF」連結', r.pdfBtn && r.pdf, JSON.stringify(r));
     check('v6.0.54 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await ctx.close();
+  }
+
+  // ───────────── v6.0.55 信封通訊錄：同一收件單位填一次自動記住；iOS 列印同步呼叫；提示訊息在視窗之上 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      try {
+        P.envBook = {}; let printed = 0; window.print = function () { printed++; };
+        openEnvelope(null, { to: { co: '八九企業有限公司' } });
+        setTimeout(() => {
+          const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })); };
+          set('env-attn', '謝'); set('env-title', '小姐'); set('env-tel', '0977316802'); set('env-addr', '新竹縣寶山鄉有謙一路5巷6號'); set('env-method', '限時');
+          setTimeout(() => {
+            const b = (P.envBook || {})['八九企業有限公司'] || {};
+            out.saved = b.attn === '謝' && b.title === '小姐' && b.tel === '0977316802' && /寶山鄉/.test(b.addr) && b.zip === '308' && b.method === '限時';
+            document.getElementById('gen-confirm-cancel').click();
+            openEnvelope(null, { to: { co: '八九企業有限公司' } });
+            setTimeout(() => {
+              const g = id => document.getElementById(id).value;
+              out.prefill = g('env-attn') === '謝' && g('env-title') === '小姐' && g('env-tel') === '0977316802' && /寶山鄉/.test(g('env-addr')) && g('env-zip') === '308' && g('env-method') === '限時';
+              set('env-attn', '謝雅婷');
+              document.getElementById('gen-confirm-ok').click();
+              out.printSaved = (P.envBook['八九企業有限公司'] || {}).attn === '謝雅婷';
+              out.other = !_envBookGet('別家公司');
+              /* 提示訊息在確認視窗之上 */
+              out.toastZ = parseInt(getComputedStyle((toast('x'), document.querySelector('.toast'))).zIndex) > parseInt(getComputedStyle(document.getElementById('gen-confirm-modal')).zIndex);
+              /* iOS 列印同步呼叫（不再等 setTimeout） */
+              const src = String(_printMainHTML);
+              out.sync = /try\{window\.print\(\);\}/.test(src) && !/setTimeout\(go/.test(src);
+              out.noWrap = typeof window._envRead0_647 === 'undefined' && /env-tel/.test(String(_envRead)) && /TEL /.test(String(_envHtml));
+              P.envBook = {}; res(out);
+            }, 200);
+          }, 700);
+        }, 200);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
+    }));
+    check('v6.0.55 信封通訊錄：修改即記住收件人／稱謂／電話／地址／郵遞區號／寄送方式，下次同一單位自動帶入、可再改', r.saved && r.prefill && r.printSaved && r.other, JSON.stringify(r));
+    check('v6.0.55 iOS 列印在點按當下同步呼叫；提示訊息顯示在信封視窗之上；信封包裝併回本體', r.sync && r.toastZ && r.noWrap, JSON.stringify(r));
+    check('v6.0.55 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
   }
 
   await browser.close();

@@ -323,7 +323,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
 .prev-act{display:flex;gap:6px;justify-content:flex-end;padding:10px 16px;background:var(--w);border-bottom:1px solid var(--b1);position:sticky;top:0;z-index:9;flex-wrap:wrap;box-shadow:var(--shadow-sm)}
 
 /* ═══ Toast 通知 ═══ */
-.toast{position:fixed;top:60px;right:16px;z-index:9999;background:var(--b5);color:#fff;border-left:3px solid var(--y);padding:10px 16px 10px 12px;border-radius:var(--r10);font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:7px;animation:slideIn .2s var(--transition);box-shadow:var(--shadow-lg);max-width:340px}
+.toast{position:fixed;top:60px;right:16px;z-index:100002;background:var(--b5);color:#fff;border-left:3px solid var(--y);padding:10px 16px 10px 12px;border-radius:var(--r10);font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:7px;animation:slideIn .2s var(--transition);box-shadow:var(--shadow-lg);max-width:340px}
 @keyframes slideIn{from{transform:translateX(12px);opacity:0}to{transform:translateX(0);opacity:1}}
 /* v5.317 手機：toast 移到底部導覽上方，不再壓住頁首 KPI 卡 */
 @media(max-width:768px){
@@ -2780,7 +2780,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.54" defer></script><script src="beta.js?v=6.0.54" defer></script>
+<script src="app.js?v=6.0.55" defer></script><script src="beta.js?v=6.0.55" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
