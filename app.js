@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.52';
+var APP_VERSION='v6.0.53';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -1062,42 +1062,8 @@ function syncSiteLabels(){
 
 // syncUPAFromParams 已由新版 UPA 取代
 
-function getFreightFromParams(type, spec, len){
-  const regionC = parseFloat(gv('up-region'))||1;
-  len = parseFloat(len)||0;
-  if(type==='H'){
-    const base = spec==='H300'?(P.dpFrH300||23):spec==='H350'?(P.dpFrH350||34):(P.dpFrH400||43);
-    // For 13M+: add dpFrLong13 to base freight rate per M
-    const longAdj = len>=13?(P.dpFrLong13||3):0;
-    return (base + longAdj) * regionC; // $/M after region
-  }
-  if(type==='R'){
-    const base = len>12?(P.dpFrR2||15):(P.dpFrR1||14);
-    const perUnit = len>12?(base*len+20):base*len; // +$20/支 for 12M+
-    return len>0 ? perUnit/len * regionC : base * regionC;
-  }
-  if(type==='S'){
-    // Map spec to freight per piece
-    const spMap={'7m':P.dpFrSP7||90,'9m':P.dpFrSP9||110,
-                 '13m':P.dpFrSP13||180,'16m':P.dpFrSP16||300,
-                 '19m':P.dpFrSP19||500,'21m':P.dpFrSP19||500};
-    const perPiece = spMap[spec]||110;
-    return len>0 ? perPiece/len * regionC : 0; // convert to $/M
-  }
-  if(type==='B'){
-    const base = spec==='H300'?(P.dpFrH300||23):spec==='H350'?(P.dpFrH350||34):(P.dpFrH400||43);
-    return base * regionC;
-  }
-  return 27 * regionC; // fallback
-}
 
 // Calculate auto process fee based on type, method, length
-function getProcessFromParams(type, meth, len){
-  len = parseFloat(len)||0;
-  if(type==='H'&&(meth==='water'||meth==='root')) return Math.max(0,len-1)*100;
-  if(type==='H'&&meth==='air') return 700;
-  return P.dpProcess||900;
-}
 
 
 // upaTypeChange 已由新版 UPA 取代
@@ -1112,22 +1078,6 @@ function getProcessFromParams(type, meth, len){
 
 
 
-function updateApplyPreview(desc,unit,qty,price,note){
-  // Always update the live preview
-  const autoDesc=desc;
-  const autoUnit=unit||'支';
-  // Update preview display
-  const pd=document.getElementById('up-prev-desc');
-  const pu=document.getElementById('up-prev-unit');
-  const pq=document.getElementById('up-prev-qty');
-  const pp=document.getElementById('up-prev-price');
-  const pn=document.getElementById('up-prev-note');
-  if(pd)pd.textContent=autoDesc;
-  if(pu)pu.textContent=autoUnit;
-  if(pq)pq.textContent=qty?`× ${fmt(qty)} ${autoUnit}`:'';
-  if(pp)pp.textContent=price?'NT$ '+fmt(price):'NT$ —';
-  if(pn)pn.textContent=note||'';
-}
 
 function applyUPA(){
   const cat1=document.getElementById('upa-cat1')?.value;
@@ -9394,20 +9344,7 @@ function _shPanelHtml(title,rows,chCls){
   });
   return h+'</tbody></table></div></div></div>';
 }
-function _matEstProjName(){var q=Q.find(function(x){return x.id===window._matEstQid;});return q?String(q.name||''):'';}
 // v5.395：綁定專案有安全母索工具的計算時，母索改引用工具結果（含分區塊、扣構台下、端部預留、損耗）
-function _matEstApplyLL(res){
-  var ll=_llLinkFor(_matEstProjName());res.ll=ll||null;if(!ll)return res;
-  res.back=res.back.filter(function(r){return !(r.k&&/^安全母索(總長|折捲)$/.test(r.k));});
-  var at=res.back.findIndex(function(r){return r.sec==='安全母索';});
-  var rows=[{k:'安全母索總長（工具，扣構台下後）',v:_shR1(ll.net),u:'M'}];
-  ll.forms.forEach(function(f){
-    rows.push({k:f.label+' '+f.spec+' 需求長度（含預留／損耗）',v:_shR1(f.need),u:'M'});
-    rows.push({k:f.label+' 折捲',v:_shR0(f.reels),u:'捲（每捲 '+f.reel+'M）'});
-  });
-  if(at>=0)res.back.splice.apply(res.back,[at+1,0].concat(rows));else res.back=res.back.concat([{sec:'安全母索'}]).concat(rows);
-  return res;
-}
 // v5.397：安全母索用量表（單獨列印，供業主核算數量）
 function matEstRopePDF(){
   if(!window._matEstRes)matEstCalc();
@@ -13057,14 +12994,6 @@ function _plHatch(ctx,x,y,w,h,step){
     ctx.beginPath();ctx.moveTo(x+i,y+h);ctx.lineTo(x+i+h,y);ctx.stroke();
   }
   ctx.restore();
-}
-function _plGround(ctx,x1,x2,y){
-  ctx.strokeStyle='#111';ctx.lineWidth=1.8;
-  ctx.beginPath();ctx.moveTo(x1,y);ctx.lineTo(x2,y);ctx.stroke();
-  ctx.lineWidth=0.9;
-  for(var x=x1;x<x2-8;x+=16){
-    ctx.beginPath();ctx.moveTo(x+10,y);ctx.lineTo(x,y+9);ctx.stroke();
-  }
 }
 function _plDimV(ctx,x,y1,y2,text){ // 垂直尺寸線
   ctx.strokeStyle='#333';ctx.fillStyle='#333';ctx.lineWidth=1;
@@ -20069,11 +19998,6 @@ function _llLinkFor(projName){
       forms:r.used.map(function(T){return {label:T.label,spec:T.spec,need:T.need,reels:T.reels,reel:T.reel,net:T.net};})};
   }catch(e){_err('_llLinkFor',e);return null;}
 }
-function _llOpenFor(projName){
-  projName=String(projName||'').trim();
-  if(projName&&!String(_llState.proj||'').trim()){_llState.proj=projName;_llSave();}
-  go('lifeline');
-}
 function _llR(x){return _llM(x).replace(/\.00$/,'');}
 // ── 畫面 ──
 function _llDirHtml(i,key,label,z,r){
@@ -23023,20 +22947,6 @@ function updCostField(cid,field,val,rid){
 }
 
 
-function updateMergeTotal(){
-  const checks=document.querySelectorAll('#merge-cost-list input[type=checkbox]:checked');
-  let total=0;
-  const vendors=new Set();
-  checks.forEach(cb=>{
-    total+=parseFloat(cb.dataset.amt)||0;
-    if(cb.dataset.vendor)vendors.add(cb.dataset.vendor);
-  });
-  document.getElementById('merge-total-display').textContent='NT$ '+fmt(total);
-  // 自動填入廠商名稱（若只有一個廠商）
-  const vnEl=document.getElementById('merge-vendor-name');
-  if(vendors.size===1&&!vnEl._userEdited)vnEl.value=[...vendors][0];
-  else if(vendors.size>1&&!vnEl._userEdited)vnEl.value=[...vendors].join(' / ');
-}
 
 function confirmMergeCost(){
   const q=Q.find(x=>x.id===eid);if(!q)return;
@@ -31851,7 +31761,6 @@ function _matAmortSync(q){if(!q||!q.mat)return;_matSyncCost(q,'amort','材料租
 function _matLossSync(q){if(!q||!q.mat)return;var m=_matQ(q);_matSyncCost(q,'loss','材料損耗',m.loss.map(function(l){return {id:'ls_'+l.id,preset:'',desc:'材料損耗 '+_matLabel(l)+' '+l.date+(l.note?('・'+l.note):''),qty:l.qty,unit:'支',unitPrice:l.unitCost,amt:l.qty*l.unitCost};}),'');}
 function _matAmortTotal(q){return _matAmortRows(q).reduce(function(a,r){return a+r.amt;},0);}
 // ── 租賃／外購＋運費：填廠商、單價 → 更新成本（有廠商即掛應付）──
-function _matRentAmt(q,r){var n=_matShort(q,r);return Math.round(n*(parseFloat(r.rentPrice)||0)*(parseFloat(r.rentMonths)||0));}
 // ── 畫面：發包頁「材料」分頁 ──
 function renderMatTab(q,root){
   var m=_matQ(q);
@@ -32452,14 +32361,6 @@ function _rentCardHtml(q,c){
 }
 // 3) 材料分頁：單位成本比較（同規格 自有攤提 vs 料場日租、本案至今各花多少、租幾天等於買一支）
 function _rfmt(v){v=parseFloat(v)||0;return Number.isInteger(v)?fmt(v):(Math.round(v*100)/100).toLocaleString('en-US',{maximumFractionDigits:2});}
-function _matBuyPerPc(name,spec,len){
-  var ks=MAT_LEDGER.filter(function(r){return r&&!r._del&&String(r.spec||'')===String(spec||'')&&(parseFloat(r.len)||0)===(parseFloat(len)||0)&&(parseFloat(r.price)||0)>0;});
-  var uw=0;ks.forEach(function(r){if(!uw&&parseFloat(r.uw))uw=parseFloat(r.uw);});
-  if(!uw){var t=MAT_UNIT_W[name]||MAT_UNIT_W['型鋼']||{};uw=parseFloat(t[spec])||0;}
-  if(!ks.length||!uw)return 0;
-  var sum=0,n=0;ks.forEach(function(r){var qn=Math.max(1,parseFloat(r.qty)||0);sum+=(parseFloat(r.price)||0)*qn;n+=qn;});
-  return Math.round(uw*(parseFloat(len)||0)*(sum/n));
-}
 // 4) 自有成本拆項（攤提／購置／租金／運費／損耗）＋租賃預估；onlyUn＝只算未歸戶（成本分析表用）
 function _costOwnBreak(q,onlyUn){
   var b={amort:0,buy:0,rent:0,trans:0,loss:0,rentEst:0,rentPlan:0,rentN:0,rentOpen:0,transPlan:0};
@@ -32660,7 +32561,6 @@ function _syncSubPeriodPayables(q,c){
   savePayables();
 }
 var _seCtx=null;
-function _seOnInput(){var h=document.getElementById('se-hint');if(!h||!_seCtx)return;var a=Math.round(parseFloat(gv('se-amt'))||0);h.textContent=a>0?((_seCtx.tm>1?('含稅實付 NT$ '+fmt(Math.round(a*_seCtx.tm))+'；'):'')+'原期剩 NT$ '+fmt(Math.max(0,_seCtx.left-a))+(a>_seCtx.left?'（超過可提前金額）':'')):'';}
 function _seSave(){
   if(!_seCtx)return;var x=_seCtx;
   var q=Q.find(function(y){return y.id===eid;});if(!q)return;var c=(q.costs||[]).find(function(y){return y.id===x.cid;});if(!c)return;
@@ -33849,9 +33749,6 @@ try{if(!document.getElementById('unit-dl')){var _udl=document.createElement('dat
 // ── 3 月表單（日報＋支出）：一次填整個月，已填的格子灰底帶值，同日同項不同值問覆蓋／略過；支出同日同類同額視為重複 ──
 var _dmQid='',_dmYm='';
 function drMonthToggle(){var c=document.getElementById('dr-month-card');if(!c)return;if(c.style.display==='none'){c.style.display='';if(!_dmQid)_dmQid=gv('dr-proj')||'';if(!_dmYm)_dmYm=localToday().slice(0,7);drMonthRender();c.scrollIntoView({behavior:'smooth',block:'start'});}else c.style.display='none';}
-function _dmItems(q){var out=[];(q.items||[]).forEach(function(it,i){if(!it||it.sec||_isSpare(it))return;out.push({i:i,it:it});});return out.slice(0,8);}
-function _dmLog(q,d){return (q.dailyLogs||[]).find(function(L){return L&&L.date===d&&!L.stopFrom;})||null;}
-function _dmOldQty(q,L,idx){if(!L)return null;var t=0,has=false;(L.progressRows||[]).forEach(function(r){if(Number(r.itemIdx)===idx&&(parseFloat(r.qty)||0)>0){t+=parseFloat(r.qty)||0;has=true;}});return has?t:null;}
 // ── 4 跨案購租分析：每種規格 購置 vs 各案租金，回本月數 ──
 function _m6CrossRows(){
   var today=localToday(),from=_dAdd(today,-365),specs={};
@@ -34566,7 +34463,6 @@ function editSubAdvance(cid,aid){
   if(p&&p.status==='paid'){toast('此預付款已付款，金額不能改；要改請先按「改回未付」');return;}
   openSubAdvance(cid,{aid:aid,date:a.date,amt:a.amt,note:a.note,special:a.special,reason:a.reason});
 }
-function subAdvToEarly(cid,aid){toast('預付款與提前放款已合併：預付款會自動扣在已登錄未付的期別，不需要轉換');}
 
 
 // ══════════════ v6.0.39：預付款抵扣自我修正、重算抵扣、手動應付標示、應付卡附件鈕併入同列（v639.js 區塊）══════════════
