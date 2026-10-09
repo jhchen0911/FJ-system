@@ -5508,6 +5508,19 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.53 健檢第 6 步：CLAUDE.md 模組地圖與程式一致 ─────────────
+  {
+    const fs = require('fs'), pth = require('path');
+    const md = fs.readFileSync(pth.join(__dirname, '..', 'CLAUDE.md'), 'utf8');
+    const src = fs.readFileSync(pth.join(__dirname, '..', 'app.js'), 'utf8');
+    const a = md.indexOf('## 模組地圖'), b = md.indexOf('\n## ', a + 5);
+    const sec = a >= 0 ? md.slice(a, b > 0 ? b : undefined) : '';
+    const names = Array.from(new Set((sec.match(/`([A-Za-z_$][\w$]*)`/g) || []).map(s => s.slice(1, -1))))
+      .filter(n => /^[a-z_]/.test(n) && !/_$/.test(n) && !/^(q|mat|rfqs|dash|quotes|proj|rfq|mat6|costs|quickcost|acct|reports|contacts|plan|matest|rebar|grout|backfill|workers|lifeline|progress|upa|staff|roles|params|payroll|invoice|finance|ledger|profit|projects)$/.test(n));
+    const missing = names.filter(n => !new RegExp('(^|\\n)(async\\s+)?function\\s+' + n.replace(/\$/g, '\\$') + '\\s*\\(|(^|\\n)(var|const|let)\\s+' + n.replace(/\$/g, '\\$') + '\\s*=|window\\.' + n.replace(/\$/g, '\\$') + '\\s*=').test(src));
+    check('v6.0.53 CLAUDE.md 模組地圖列出的函式／變數都存在於 app.js', a >= 0 && names.length > 80 && missing.length === 0, 'n=' + names.length + ' missing=' + missing.join(','));
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
