@@ -601,6 +601,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   #mob-editbar .meb-tot .meb-v{font-size:15px;font-weight:900;color:var(--g3);font-variant-numeric:tabular-nums;white-space:nowrap}
   body.has-editbar .content{padding-bottom:calc(var(--mob) + max(env(safe-area-inset-bottom),4px) + 64px)}
 }
+/* v6.0.57 信封列印視窗：手機改單欄、預覽在上 */
+@media(max-width:767px){.env-grid{grid-template-columns:1fr!important}.env-grid>div:nth-child(2){order:-1}}
 </style>
 
   <!-- Firebase SDK -->
@@ -2780,7 +2782,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.56" defer></script><script src="beta.js?v=6.0.56" defer></script>
+<script src="app.js?v=6.0.57" defer></script><script src="beta.js?v=6.0.57" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
