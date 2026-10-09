@@ -5521,6 +5521,56 @@ async function newPage(browser, width, height) {
     check('v6.0.53 CLAUDE.md 模組地圖列出的函式／變數都存在於 app.js', a >= 0 && names.length > 80 && missing.length === 0, 'n=' + names.length + ' missing=' + missing.join(','));
   }
 
+  // ───────────── v6.0.54 手機（iOS）列印信封：改由主畫面列印＋信封尺寸 PDF ─────────────
+  {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
+    const page = await ctx.newPage(); const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.goto(INDEX); await page.waitForTimeout(1500);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      try {
+        out.ios = _isIOS();
+        let snap = null;
+        window.print = function () {
+          const box = document.getElementById('_fy_print_main');
+          snap = { box: !!box, sheet: !!(box && box.querySelector('.env-sheet')), co: !!(box && /八九企業/.test(box.textContent)), noFrame: !document.getElementById('_fy_native_print'),
+            css: (document.getElementById('_fy_print_main_css') || {}).textContent || '' };
+        };
+        openEnvelope(null, { to: { co: '八九企業有限公司', attn: '劉書瑋', addr: '' } });
+        setTimeout(() => {
+          out.pdfBtn = !!document.getElementById('env-pdf-btn');
+          document.getElementById('gen-confirm-ok').click();
+          setTimeout(() => {
+            out.snap = snap && snap.box && snap.sheet && snap.co && snap.noFrame;
+            out.page = !!snap && /@page\s*\{size:120mm 235mm/.test(snap.css) && /body>\*:not\(#_fy_print_main\)\{display:none!important\}/.test(snap.css);
+            out.hiddenOnScreen = getComputedStyle(document.getElementById('_fy_print_main')).display === 'none';
+            window.dispatchEvent(new Event('afterprint'));
+            setTimeout(() => {
+              out.cleaned = !document.getElementById('_fy_print_main') && !document.getElementById('_fy_print_main_css');
+              /* 存成 PDF：以假套件驗證頁面尺寸與存檔 */
+              let saved = null;
+              window.html2canvas = el => Promise.resolve({ toDataURL: () => 'data:image/jpeg;base64,AA', w: el.offsetWidth });
+              window.jspdf = { jsPDF: function (o) { this.o = o; this.addImage = function (d, f, x, y, w, h) { this.img = [x, y, w, h]; }; this.save = function (n) { saved = { o: this.o, img: this.img, n }; }; } };
+              openEnvelope(null, { to: { co: '八九企業有限公司', attn: '劉書瑋' } });
+              setTimeout(() => {
+                _envPdf();
+                setTimeout(() => {
+                  out.pdf = !!saved && saved.o.unit === 'mm' && saved.o.format[0] === 120 && saved.o.format[1] === 235 && saved.img.join(',') === '0,0,120,235' && /^信封_八九企業有限公司\.pdf$/.test(saved.n) && !document.getElementById('_fy_env_pdf');
+                  res(out);
+                }, 400);
+              }, 100);
+            }, 700);
+          }, 600);
+        }, 200);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
+    }));
+    check('v6.0.54 iPhone 列印信封：改由主畫面列印（列印時只顯示信封、@page 120×235mm、螢幕不顯示、印完清除）', r.ios && r.snap && r.page && r.hiddenOnScreen && r.cleaned, JSON.stringify(r));
+    check('v6.0.54 信封存成 PDF：頁面＝信封實際尺寸（mm）、滿版貼圖、檔名', r.pdfBtn && r.pdf, JSON.stringify(r));
+    check('v6.0.54 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await ctx.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

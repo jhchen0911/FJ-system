@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.53';
+var APP_VERSION='v6.0.54';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -30848,7 +30848,9 @@ function openEnvelope(invId,opt){
     +'<div style="font-size:11px;color:var(--b3);margin-top:4px">第一次請先用一個備用信封試印，對照後調整偏移；設定會記住。印表機請選「信封／自訂紙張 '+_ENV_SIZES[cfg.size].w+'×'+_ENV_SIZES[cfg.size].h+' mm、無邊界、不縮放」。</div>'
     +'</details>'
     +'</div>'
-    +'<div><div style="font-size:11.5px;font-weight:700;color:var(--g3);margin-bottom:4px">預覽（淡紅框＝信封印好的框，實際列印只印黑字）</div><div id="env-prev" style="background:#e9e9e9;border-radius:var(--r8);padding:8px;display:flex;justify-content:center;overflow:hidden"></div></div>'
+    +'<div><div style="font-size:11.5px;font-weight:700;color:var(--g3);margin-bottom:4px">預覽（淡紅框＝信封印好的框，實際列印只印黑字）</div><div id="env-prev" style="background:#e9e9e9;border-radius:var(--r8);padding:8px;display:flex;justify-content:center;overflow:hidden"></div>'
+    +'<button type="button" id="env-pdf-btn" onclick="_envPdf()" style="margin-top:8px;width:100%;min-height:40px;border:1px solid var(--g3);background:var(--w);color:var(--g3);border-radius:var(--r8);font-weight:700;font-family:inherit;cursor:pointer">存成 PDF（信封尺寸）</button>'
+    +'<div style="font-size:11px;color:var(--b3);margin-top:4px">手機（iPhone／iPad）無法指定自訂紙張時，可存成 PDF 後用 Brother 等印表機 App 選信封尺寸列印。</div></div>'
     +'</div>';
   showConfirm('信封列印'+(inv?('：'+esc(inv.client||'')+(inv.periodNo?('　第 '+inv.periodNo+' 期請款單'):'')):''),html,function(){_envPrint();},false,null,true);
   var okBtn=document.getElementById('gen-confirm-ok');if(okBtn)okBtn.textContent='列印信封';
@@ -30943,7 +30945,30 @@ function _envPrint(){
     +'@page{size:'+S.w+'mm '+S.h+'mm;margin:0}html,body{margin:0;padding:0;width:'+S.w+'mm;height:'+S.h+'mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
     +'</style></head><body>'+_envHtml(r.cfg,r.data,!!r.cfg.frames)+'</body></html>';
   _printNativeHTML(html,'信封_'+(r.data.co||r.data.attn));
-  toast('信封已送列印：印表機請選自訂紙張 '+S.w+'×'+S.h+' mm、不縮放');
+  toast(_isIOS()?('信封已送列印：紙張請選信封或 '+S.w+'×'+S.h+' mm；印表機若沒有此尺寸，請改用「存成 PDF」以 Brother App 列印')
+    :('信封已送列印：印表機請選自訂紙張 '+S.w+'×'+S.h+' mm、不縮放'));
+}
+// v6.0.54 信封存成 PDF：頁面＝信封實際尺寸（mm），手機可用印表機 App／檔案 App 列印
+function _envPdf(){
+  var r=_envRead(),S=_ENV_SIZES[r.cfg.size]||_ENV_SIZES.k12;
+  if(!r.data.co&&!r.data.attn){toast('請填收件單位或收件人');return;}
+  _envSaveCfg(r.cfg);
+  var fname='信封_'+String(r.data.co||r.data.attn).replace(/[\\/:*?"<>|]/g,'')+'.pdf';
+  toast('產生信封 PDF…');
+  _ensurePdfLibs().then(function(ok){
+    if(!ok){toast('PDF 套件載入失敗，請確認網路後再試');return;}
+    var host=document.createElement('div');host.id='_fy_env_pdf';
+    host.style.cssText='position:fixed;left:-10000px;top:0;background:#fff;';
+    host.innerHTML=_envHtml(r.cfg,r.data,!!r.cfg.frames);document.body.appendChild(host);
+    var el=host.firstElementChild;
+    return window.html2canvas(el,{scale:4,backgroundColor:'#fff',useCORS:true,logging:false}).then(function(cv){
+      var J=(window.jspdf&&(window.jspdf.jsPDF||window.jspdf));
+      var pdf=new J({unit:'mm',format:[S.w,S.h],orientation:S.w>S.h?'landscape':'portrait'});
+      pdf.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,0,S.w,S.h);
+      pdf.save(fname);
+      toast('已存成信封 PDF（'+S.w+'×'+S.h+' mm），列印時請選相同尺寸、不縮放');
+    }).finally(function(){host.remove();});
+  }).catch(function(e){_err('_envPdf',e);toast('信封 PDF 產生失敗：'+((e&&e.message)||e));});
 }
 // ══════════ v6 發包：分項工程詢價單 → 廠商回填比價 → 議價 → 得標／改點工 ══════════
 // 資料：q.rfqs[]（成本面資料，隨 costs 走 private）
@@ -36116,7 +36141,29 @@ function exportQuotePDFNative(qid){
   _printNativeHTML(html,fname);
 }
 // 隱藏 iframe + window.print()：使用者於列印對話框選「另存為 PDF」
+// v6.0.54：iOS／iPadOS 的 Safari 會忽略隱藏 iframe 的 print()，改印整個主畫面（整頁空白）。
+// 改把文件放進主畫面的列印專用容器，螢幕上不顯示，列印時只印它。
+function _isIOS(){return /iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);}
+function _printMainHTML(html){
+  ['_fy_print_main','_fy_print_main_css'].forEach(function(id){var el=document.getElementById(id);if(el)el.remove();});
+  var doc=new DOMParser().parseFromString(html,'text/html');
+  var css=[].map.call(doc.querySelectorAll('style'),function(s){return s.textContent;}).join('\n');
+  var pageRules=(css.match(/@page\s*\{[^}]*\}/g)||[]).join('\n');   // @page 放最外層，部分瀏覽器不吃 @media 內的 @page
+  css=css.replace(/@page\s*\{[^}]*\}/g,'');
+  var st=document.createElement('style');st.id='_fy_print_main_css';
+  st.textContent='#_fy_print_main{display:none}'+pageRules
+    +'@media print{body>*:not(#_fy_print_main){display:none!important}html,body{margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important;height:auto!important}'
+    +'#_fy_print_main{display:block!important;position:static!important}'+css+'}';
+  var box=document.createElement('div');box.id='_fy_print_main';box.innerHTML=doc.body?doc.body.innerHTML:'';
+  document.head.appendChild(st);document.body.appendChild(box);
+  var done=false;
+  var cleanup=function(){if(done)return;done=true;window.removeEventListener('afterprint',cleanup);['_fy_print_main','_fy_print_main_css'].forEach(function(id){var el=document.getElementById(id);if(el)el.remove();});};
+  window.addEventListener('afterprint',function(){setTimeout(cleanup,500);});
+  var imgs=[].slice.call(box.querySelectorAll('img')),go=function(){try{window.print();}catch(e){_err('_printMainHTML',e);toast('此瀏覽器不支援列印，請改用「存成 PDF」');}};
+  Promise.all(imgs.map(function(im){return im.complete?0:new Promise(function(r){im.onload=im.onerror=r;setTimeout(r,1500);});})).then(function(){setTimeout(go,150);});
+}
 function _printNativeHTML(html,filename){   // v5.392：一律不縮放（移除 fitPageHpx）
+  if(_isIOS()){_printMainHTML(html);return;}
   var old=document.getElementById('_fy_native_print');if(old)old.remove();
   var f=document.createElement('iframe');
   f.id='_fy_native_print';
