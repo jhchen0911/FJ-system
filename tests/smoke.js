@@ -4274,7 +4274,7 @@ async function newPage(browser, width, height) {
         go('rfq');out.rfqOk=document.querySelector('.page.active').id==='page-rfq';
         // 刪掉的功能：入口不存在
         out.gone=typeof openGlobalSearch==='undefined'&&!document.getElementById('gsearch-modal')&&!/openGlobalSearch/.test(document.querySelector('header').innerHTML)
-          &&!/smartIntake\(\)/.test(document.getElementById('page-dash').innerHTML)&&!document.getElementById('cost-group-mode')&&!/openSiteDet/.test(document.getElementById('page-editor').innerHTML);
+          &&!/smartIntake\(\)/.test(document.getElementById('page-dash').innerHTML)&&!document.getElementById('cost-group-mode')&&/openSiteDet\(eid\)/.test(document.getElementById('page-editor').innerHTML);   // v6.0.48 案場細節改彈窗、編輯頁有入口
         // 報價存檔不再留自動存檔
         Q=[{id:'qA',code:'1',name:'自動存檔測試',client:'甲',date:'2026-10-01',items:[{desc:'A',unit:'支',qty:'1',price:'10',sec:false}],exs:[],rmk:{},_mt:1}];Q_HISTORY={};
         loadQ('qA');items[0].price='11';saveQ();
@@ -4295,7 +4295,7 @@ async function newPage(browser, width, height) {
         out.vb=/openProj\('qA'\)/.test(vb)&&!/vbOpenPeriod\(|vbPrint\(|vbAdvance\(|vbEarly\(|vbDelPeriod\(/.test(vb);
         // 工程專案頂部只剩編輯報價；核對單鈕消失
         openProj('qA');const ph=document.getElementById('proj-root').innerHTML;
-        out.top=/編輯報價/.test(ph)&&!/'案場細節'|>發包<|>材料<|>施工成本<|>業主計價<|>日報</.test(ph.split('<div class="card" style="margin-top:10px">')[0]);
+        out.top=/編輯報價/.test(ph)&&!/>發包<|>材料<|>施工成本<|>業主計價<|>日報</.test(ph.split('<div class="card" style="margin-top:10px">')[0]);
         eid='qA';openProjectCosts('qA');window._costView='list';setCostView('subs');out.noStmt=!/printVendorStatement\(/.test(document.getElementById('cost-list').innerHTML);
         // 說明「？」：每頁一顆、點開有文字
         out.help=document.querySelectorAll('.help-btn').length>=10&&!!document.querySelector('#page-proj .help-btn');
@@ -5340,6 +5340,75 @@ async function newPage(browser, width, height) {
     check('v6.0.47 信封視窗：郵遞區號依地址自動帶（改地址重查、手改後不覆蓋）、收件人電話欄預帶客戶電話並印在中欄底部', r.formOk && r.addrChange && r.manualKept && r.readTel && r.telPrinted, JSON.stringify({form:r.form,err:r.err}));
     check('v6.0.47 健檢第 2 步：49 個無入口舊函式已刪，保留備用與測試用的仍在', r.gone && r.kept, JSON.stringify(r.err||''));
     check('v6.0.47 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.48 案場細節改彈窗；材料估算綁定工程時讀案場細節（單一來源）；舊估算一次性轉入 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    Q=[{id:'qS',code:'S',name:'案場測試',client:'業主',date:'2026-10-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 H350，L=13M',unit:'支',qty:'87',price:'1000',sec:false}],t:{sub:1,tax:0,total:1}},
+       {id:'qM',code:'M',name:'舊估算案',client:'業主',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[],t:{sub:1,tax:0,total:1},
+        matEst:{date:'2026-09-10',inputs:{P:100,A:800,H:12,slabT:0.8,corners:6,irr:1,method:'型鋼排樁',pileSpec:'H350',pileLen:14,pileP:0,pileSpacing:1.5,capType:'RC壓樑',kingMid:30,kingCo:0,kingGt:4,midSpec:'H350',midLen:16,gtSpec:'H400',gtLen:18,layers:2,_layers:[{w:'H350',s:'H350',st:true},{w:'2H400',s:'H400',st:false}],_routesV:[{rc:3,rl:20},{rc:1,rl:24}],_routesH:[{rc:2,rl:30}],gantaiA:200,gantaiP:60,stiff:'main'}}}];
+    // 1 彈窗
+    eid='qS';openSiteDet('qS');
+    const md=document.getElementById('sd-modal');
+    out.modal=!!md&&md.style.display==='flex'&&!!document.querySelector('#sd-modal #site-root input')&&/基地周長/.test(document.getElementById('site-root').innerHTML)&&/正角隅數/.test(document.getElementById('site-root').innerHTML);
+    _sdSet('P','120');_sdSet('A','900');_sdSet('H','13');_sdSet('wall.form','H型鋼樁');_sdSet('wall.len','13');_sdSet('wall.sp','1.5');_sdSet('layers','2');_sdSet('L.0.w','H350');_sdSet('L.0.s','H350');_sdSet('L.0.vc','4');_sdSet('L.0.vl','25');_sdSet('L.0.hc','3');_sdSet('L.0.hl','30');_sdSet('mid.n','20');_sdSet('mid.len','16');_sdSet('corners','5');
+    out.saved=Q[0].site.P==='120'&&Q[0].site.layers===2&&Q[0].site.corners==='5';
+    _sdClose();out.closed=md.style.display==='none'&&!window._sdQid;
+    // 2 材料估算綁定：讀案場細節、不再有幾何輸入
+    go('matest');matEstPickProj('qS');
+    const fh=document.getElementById('mat-est-form').innerHTML;
+    out.bound=/取自案場細節/.test(fh)&&/openSiteDet\('qS'\)/.test(fh)&&!/matEstU\('P'/.test(fh)&&!/matEstRowU\('_routesV'/.test(fh)&&/matEstLy\(0,'st'/.test(fh)&&/matEstU\('stiff'/.test(fh);
+    out.mapped={P:MAT_EST.P,A:MAT_EST.A,H:MAT_EST.H,method:MAT_EST.method,pileLen:MAT_EST.pileLen,corners:MAT_EST.corners,kingMid:MAT_EST.kingMid,kingCo:MAT_EST.kingCo,layers:MAT_EST.layers,rv:MAT_EST._routesV,rh:MAT_EST._routesH,pileP:MAT_EST.pileP};
+    out.mapOk=MAT_EST.P===120&&MAT_EST.A===900&&MAT_EST.method==='型鋼排樁'&&MAT_EST.corners===5&&MAT_EST.kingMid===20&&MAT_EST.kingCo===0&&MAT_EST.layers===2&&MAT_EST._routesV[0].rc===4&&MAT_EST._routesH[0].rl===30&&MAT_EST.pileP===0;
+    out.calc=!!window._matEstRes;
+    // 改案場細節 → 計算前自動同步
+    window._sdQid='qS';_sdSet('P','150');_sdSet('wall.n','50');window._sdQid=null;matEstCalc();
+    out.live=MAT_EST.P===150&&MAT_EST.pileP===75;   // 手動 50 支 × 1.5M
+    // 3 遷移：舊估算案沒有案場細節 → 自動建立
+    matEstPickProj('qM');const s=Q[1].site;
+    out.mig=!!s&&s.fromMatEst===1&&String(s.P)==='100'&&s.wall.form==='H型鋼樁'&&String(s.wall.len)==='14'&&s.wall.cap===true&&String(s.mid.n)==='30'&&String(s.gt.n)==='4'&&s.layers===2&&String(s.L[0].vc)==='4'&&String(s.L[0].vl)==='21'&&String(s.L[1].w)==='2H400'&&String(s.plat.A)==='200'&&String(s.corners)==='6';
+    out.migKeep=MAT_EST.stiff==='main'&&MAT_EST._layers[0].st===true&&MAT_EST._layers[1].w==='2H400'&&MAT_EST.P===100;
+    // 已有案場細節的不覆蓋
+    const before=JSON.stringify(Q[0].site);_sdEnsure(Q[0]);out.noOverwrite=JSON.stringify(Q[0].site)===before;
+    // 綁定但沒有案場細節：仍可輸入；存入專案即建立案場細節
+    Q.push({id:'qN',code:'N',name:'無細節案',client:'業主',date:'2026-10-01',awarded:true,exs:[],rmk:{},_mt:1,items:[],t:{sub:1,tax:0,total:1}});
+    matEstPickProj('qN');const nh=document.getElementById('mat-est-form').innerHTML;
+    out.noSite=/還沒有案場細節/.test(nh)&&/matEstU\('P'/.test(nh);
+    MAT_EST.P=88;MAT_EST.A=400;matEstCalc();matEstSave();
+    const qn=Q.find(x=>x.id==='qN');out.saveSite=!!qn.site&&String(qn.site.P)==='88'&&/取自案場細節/.test(document.getElementById('mat-est-form').innerHTML);
+    // 4 不綁定＝純試算，幾何欄位回來
+    matEstPickProj('');out.unbound=/matEstU\('P'/.test(document.getElementById('mat-est-form').innerHTML);
+    // 5 入口
+    out.editorBtn=/openSiteDet\(eid\)/.test(document.querySelector('#page-editor .ph-r').innerHTML);
+    openProj('qS');out.projBtn=/openSiteDet\('qS'\)/.test(document.getElementById('proj-root').innerHTML);
+    // 6 材料需求水平支撐預帶角隅數
+    matRowEdit('qS','');out.strutCorner=(document.getElementById('mx-sc')||{}).value==='5';
+    const x=document.getElementById('fy-modal');if(x)x.remove();
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,700);}
+  Q=[];eid=null;window._matEstQid='';res(out);
+}));
+    check('v6.0.48 案場細節彈窗：開啟、填寫自動存檔（含正角隅數）、關閉', r.modal && r.saved && r.closed, JSON.stringify({modal:r.modal,saved:r.saved,err:r.err}));
+    check('v6.0.48 材料估算綁定工程：不再有幾何輸入（周長／路數），改顯示案場細節摘要＋編輯鈕；只留加勁盒等參數；幾何正確帶入並可計算', r.bound && r.mapOk && r.calc, JSON.stringify({mapped:r.mapped,err:r.err}));
+    check('v6.0.48 改案場細節後計算前自動同步；手動支數換算壁體周長（修正舊版把支數當周長的錯）', r.live, JSON.stringify(r.err||''));
+    check('v6.0.48 遷移：有材料估算存檔、沒有案場細節的工程自動轉入（基地／擋土壁／樁／各層／路數／構台），既有案場細節不覆蓋，估算參數保留；綁定但沒細節的仍可輸入、存入專案即建立案場細節', r.mig && r.migKeep && r.noOverwrite && r.noSite && r.saveSite, JSON.stringify(r.err||''));
+    check('v6.0.48 入口：報價編輯工具列、工程專案頂部有案場細節；不綁定＝純試算仍可輸入幾何；材料需求水平支撐預帶角隅數', r.unbound && r.editorBtn && r.projBtn && r.strutCorner, JSON.stringify(r));
+    check('v6.0.48 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(() => new Promise(res => {
+      Q=[{id:'qS',code:'S',name:'手機',client:'業主',date:'2026-10-01',awarded:true,exs:[],rmk:{},_mt:1,items:[],t:{sub:1,tax:0,total:1},site:{P:120,A:900,H:13,layers:2,L:[{w:'H350',s:'H350',vc:4,vl:25,hc:3,hl:30},{w:'H400',s:'H400'}],wall:{form:'H型鋼樁',len:13,sp:1.5},mid:{n:20,len:16},co:{},gt:{},plat:{}}}];
+      eid='qS';openSiteDet('qS');const bd=document.getElementById('sd-body');const a={sw:document.documentElement.scrollWidth,iw:innerWidth,bsw:bd.scrollWidth,bcw:bd.clientWidth};
+      _sdClose();go('matest');matEstPickProj('qS');a.msw=document.documentElement.scrollWidth;Q=[];eid=null;window._matEstQid='';res(a);
+    }));
+    check('v6.0.48 手機 390px：案場細節彈窗與材料估算（綁定）無橫向捲動', r.sw<=r.iw && r.bsw<=r.bcw && r.msw<=r.iw, JSON.stringify(r));
+    check('v6.0.48 手機測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

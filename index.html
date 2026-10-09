@@ -996,6 +996,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
     <div class="ph-r">
       <button type="button" class="btn btn-sm desk-only" onclick="newQ()">↺ 清除</button>
       <button type="button" class="btn btn-sm" onclick="openRmkModal()"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 備註填寫</button>
+      <button type="button" class="btn btn-sm" onclick="openSiteDet(eid)" title="圖面數量：基地、擋土壁、樁、支撐各層、構台；材料估算與材料需求都讀這裡"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 案場細節</button>
       <button type="button" class="btn btn-sm" onclick="openNegotiateModal()" title="議價：整單等比或逐項調價" style="border-color:#b39ddb;color:#4527a0"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 議價</button>
       <button type="button" class="btn btn-sm" onclick="go('quotes')">← 返回</button>
       <button type="button" class="btn btn-sm" onclick="quoteImportOwner()" title="把業主的 Excel／Word 詢價單讀進來：工項帶入、條款唯讀保留；填完單價可寫回原檔" style="border-color:#1565C0;color:#1565C0">匯入詢價單</button>
@@ -2756,7 +2757,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.47" defer></script>
+<script src="app.js?v=6.0.48" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">

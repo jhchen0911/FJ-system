@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.47';
+var APP_VERSION='v6.0.48';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -8165,7 +8165,7 @@ function _sdPlatLoads(){var it=_sdUpa('support','施工構台');return ((it&&it.
 // v5.409：規格選單依擋土壁形式只列相應規格；樁一律 H 型鋼系列；都可「自訂」
 function _sdSpecOpts(form){var it=_sdUpa('retaining',form);return (it&&it.specs)?it.specs.slice():[];}
 function _sdBlank(){
-  return {ver:1,date:localToday(),drawing:'',memo:'',P:'',A:'',H:'',slabT:'',
+  return {ver:1,date:localToday(),drawing:'',memo:'',P:'',A:'',H:'',slabT:'',corners:'',irr:'',
     wall:{form:'',spec:'',method:'',len:'',sp:'',n:'',nAuto:true,cap:false,capType:''},
     mid:{spec:'',method:'',len:'',n:''},co:{spec:'',method:'',len:'',n:''},gt:{spec:'',method:'',len:'',n:''},
     layers:0,L:[],plat:{load:'',A:'',P:''},stairs:''};
@@ -8227,7 +8227,7 @@ function _sdRender(){
   var h='<div class="card"><div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 圖面數量</div></div><div class="cb">'
     +'<datalist id="sd-spec-list">'+SH_SPECS.concat(['H350×350','H400×400','H300×300','SP-II','SP-III','SP-IV','37kg 鋼軌','50kg 鋼軌']).map(function(x){return '<option value="'+esc(x)+'">';}).join('')+'</datalist>'
     +'<div class="me-grid wide">'+txt('drawing','圖說版本／來源','例：結構圖 S-03 rev.B 2026/08')+'<div class="f"><label style="font-size:11px">紀錄日期</label><input type="date" value="'+esc(sd.date||'')+'" onchange="_sdSet(\'date\',this.value)" style="'+IN+'"></div></div>'
-    +secH('基地')+'<div class="me-grid">'+num('P','基地周長','M')+num('A','開挖面積','m²')+num('H','開挖深度','M')+num('slabT','大底厚度','M','例：0.8')+'</div>'
+    +secH('基地')+'<div class="me-grid">'+num('P','基地周長','M')+num('A','開挖面積','m²')+num('H','開挖深度','M')+num('slabT','大底厚度','M','例：0.8')+num('corners','正角隅數','個','4')+num('irr','不規則邊','個','0')+'</div>'
     +secH('擋土壁','支數＝周長 ÷ 間距 無條件進位，可手動改')+'<div class="me-grid">'+sel('wall.form','形式',_sdWallForms())+(sd.wall.form?selC('wall.spec','規格',_sdSpecOpts(sd.wall.form),''):'<div class="f"><label style="font-size:11px">規格</label><div style="padding:8px 0;font-size:12px;color:var(--b3)">先選形式</div></div>')+sel('wall.method','工法',_sdMethodOpts(sd.wall.form))+num('wall.len','長度','M')+num('wall.sp','間距','M','例：0.6')
     +'<div class="f"><label style="font-size:11px">支數 <span style="color:var(--b3)">(支)</span>'+(sd.wall.nAuto!==false?' <span style="color:var(--g3)">自動</span>':' <button type="button" onclick="_sdSet(\'wall.nAuto\',true)" style="border:none;background:none;color:var(--g3);cursor:pointer;font-size:11px;padding:0;text-decoration:underline">改回自動 '+c.wallNAuto+'</button>')+'</label><input type="number" inputmode="numeric" value="'+(sd.wall.nAuto!==false?(c.wallN||''):esc(sd.wall.n))+'" placeholder="'+(c.wallNAuto||'')+'" onchange="_sdSet(\'wall.n\',this.value)" style="'+IN+';text-align:right;font-weight:800"></div>'
     +'<div class="f"><label style="font-size:11px">總長</label><div style="padding:8px 0;font-weight:800;color:var(--g3)">'+(c.wallLen?_shR1(c.wallLen)+' M':'—')+'</div></div>'
@@ -8266,7 +8266,7 @@ function _sdSet(path,val){
 function _sdSummaryHtml(sd,c,q){
   var row=function(l,v){return v?('<div style="display:flex;gap:10px"><span style="color:var(--b4);flex:0 0 96px">'+l+'</span><span>'+v+'</span></div>'):'';};
   var pileTxt=function(k){var p=sd[k];if(!(_sdN(p.n)>0||p.spec))return '';return [p.spec,p.method,(_sdN(p.len)?_sdN(p.len)+'M':''),(_sdN(p.n)?_sdN(p.n)+'支':''),(c[k+'Len']?'共 '+_shR1(c[k+'Len'])+'M':'')].filter(Boolean).join('　');};
-  return row('基地',[(_sdN(sd.P)?'周長 '+_sdN(sd.P)+'M':''),(_sdN(sd.A)?'面積 '+_sdN(sd.A)+'m²':''),(_sdN(sd.H)?'開挖深 '+_sdN(sd.H)+'M':''),(_sdN(sd.slabT)?'大底 '+_sdN(sd.slabT)+'M':'')].filter(Boolean).join('　'))
+  return row('基地',[(_sdN(sd.P)?'周長 '+_sdN(sd.P)+'M':''),(_sdN(sd.A)?'面積 '+_sdN(sd.A)+'m²':''),(_sdN(sd.H)?'開挖深 '+_sdN(sd.H)+'M':''),(_sdN(sd.slabT)?'大底 '+_sdN(sd.slabT)+'M':''),((sd.corners!==''&&sd.corners!=null)?'角隅 '+_sdN(sd.corners):''),(_sdN(sd.irr)?'不規則邊 '+_sdN(sd.irr):'')].filter(Boolean).join('　'))
     +row('擋土壁',[sd.wall.form,sd.wall.spec,sd.wall.method,(_sdN(sd.wall.len)?_sdN(sd.wall.len)+'M':''),(_sdN(sd.wall.sp)?'@'+_sdN(sd.wall.sp)+'M':''),(c.wallN?c.wallN+'支':''),(c.wallLen?'共 '+_shR1(c.wallLen)+'M':''),(sd.wall.cap?('壓樑：'+(sd.wall.capType||'有')):'')].filter(Boolean).join('　'))
     +row('中間樁',pileTxt('mid'))+row('共構樁',pileTxt('co'))+row('構台樁',pileTxt('gt'))
     +row('支撐',sd.L.length?(sd.L.length+' 層　'+c.layers.map(function(l,i){var L=sd.L[i];return 'L'+l.i+'：'+[L.w?'圍令'+L.w:'',L.s?'支撐'+L.s:'',(L.d&&L.d!=='無')?'斜撐'+L.d:'',(l.len?_shR1(l.len)+'M':'')].filter(Boolean).join('/');}).join('；')+'　合計 '+_shR1(c.supLen)+'M'):'')
@@ -9315,10 +9315,13 @@ function _renderMatEstInner(el){
   var sec=function(t,hint){return '<div style="font-weight:700;color:var(--g3);font-size:13px;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--b1)">'+t+(hint?' <span style="font-weight:400;font-size:10.5px;color:var(--b3)">'+hint+'</span>':'')+'</div>';};
   var g=function(inner,min){return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax('+(min||110)+'px,1fr));gap:8px">'+inner+'</div>';};
   var h='';
+  var _sq=null;try{_sq=_matEstSiteQ();if(_sq)_sdToMatEst(_sdNorm(_sq.site),m);}catch(e){_err('matEst.site',e);_sq=null;}   // v6.0.48 綁定工程＝幾何讀案場細節
   // 專案選擇
-  h+='<div class="f" style="margin-bottom:4px"><label>綁定工程專案（得標）</label><select onchange="matEstPickProj(this.value)" style="'+selCss+'"><option value="">— 不綁定（純試算）—</option>';
+  h+='<div class="f" style="margin-bottom:4px"><label>綁定工程專案（綁定後圖面數量讀案場細節；不綁定＝純試算）</label><select onchange="matEstPickProj(this.value)" style="'+selCss+'"><option value="">— 不綁定（純試算）—</option>';
   Q.filter(function(q){return (q.awarded&&!q.parentId)||q.matEst||q.site;}).forEach(function(q){h+='<option value="'+q.id+'"'+(window._matEstQid===q.id?' selected':'')+'>'+esc(q.name||'')+(q.matEst?' ✓已有估算':'')+(q.site?' ▪案場細節':'')+'</option>';});
   h+='</select></div>';
+  if(_sq){h+=_sdMatEstGeoHtml(_sq,m);}else{
+  h+=_matEstNoSiteHint();
   h+=sec('① 基地尺寸');
   h+='<div class="me-grid">'+fN('P','基地周長 (M)')+fN('A','開挖面積 (㎡)')+fN('H','開挖深度 (M)')+fN('slabT','大底厚度 (M)')+fN('corners','角隅數 (個)')+fN('irr','不規則邊 (個)')+'</div>';
   h+=sec('② 擋土壁體（樁）');
@@ -9331,6 +9334,8 @@ function _renderMatEstInner(el){
   h+='<div class="me-grid" style="margin-top:8px">'+fS('midSpec','中間樁規格',SH_SPECS)+fN('midLen','中間樁長 (M)')
     +fS('coSpec','共構樁規格',SH_SPECS)+fN('coLen','共構樁長 (M)')
     +fS('gtSpec','構台樁規格',SH_SPECS)+fN('gtLen','構台樁長 (M)')+'</div>';
+  }
+  if(_sq){h+=_sdMatEstLayerHtml(_sq,m,sec,fS,fN);}else{
   h+=sec('④ 支撐系統（逐層）');
   h+='<div class="me-grid">'+fN('layers','支撐層數')+fN('autoRouteSpace','路數自動間距 (M)')
     +fS('stiff','加勁盒模式',[['0','不加'],['main','主撐×2/路'],['both','主撐及斜撐×6/路']])
@@ -9349,6 +9354,7 @@ function _renderMatEstInner(el){
       +'<td style="text-align:center"><input type="checkbox"'+(ly.st?' checked':'')+' onchange="matEstLy('+i+',\'st\',this.checked)" style="width:18px;height:18px"></td></tr>';
   }
   h+='</tbody></table></div>';
+  }
   // 路數
   var routeTbl=function(arr,title){
     var hh='<div style="font-size:12px;font-weight:700;margin:8px 0 4px">'+title+' <span style="font-weight:400;font-size:10px;color:var(--b3)">全空＝自動</span></div>';
@@ -9361,7 +9367,7 @@ function _renderMatEstInner(el){
     hh+='</tbody></table></div><button type="button" class="btn btn-xs" onclick="matEstRowAdd(\''+arr+'\')" style="font-size:12px;margin-top:4px">＋ 加一列</button>';
     return hh;
   };
-  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">'
+  if(!_sq)h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">'
     +'<div>'+routeTbl('_routesV','縱向路數（沿長邊）')+'</div>'
     +'<div>'+routeTbl('_routesH','橫向路數（沿短邊）')+'</div></div>';
   // v5.397：安全母索併入材料估算（範圍＝各層圍令周圍＋縱橫支撐路；第一層扣構台下方）
@@ -34364,7 +34370,7 @@ function renderProj(){
     +list.map(function(x){return '<option value="'+x.id+'"'+(q&&q.id===x.id?' selected':'')+'>'+esc((x.name||'未命名').slice(0,26))+(x.client?('／'+esc(x.client.slice(0,8))):'')+(x.closed?'（已結案）':'')+'</option>';}).join('')+'</select>';
   var top='<div class="card"><div class="cb" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+sel+_pjJumpHtml(list)
     +'<label style="font-size:11.5px;color:var(--b4);display:flex;align-items:center;gap:4px"><input type="checkbox"'+(window._pjShowClosed?' checked':'')+' onchange="window._pjShowClosed=this.checked;renderProj()"> 含已結案</label>'
-    +(q?'<span style="margin-left:auto">'+_pjBtn("loadQ('"+q.id+"')",'編輯報價')+'</span>':'')   // v6.0.28 頂部只留編輯報價，其餘在各區塊
+    +(q?'<span style="margin-left:auto">'+_pjBtn("openSiteDet('"+q.id+"')",'案場細節')+_pjBtn("loadQ('"+q.id+"')",'編輯報價')+'</span>':'')   // v6.0.28 頂部只留編輯報價，其餘在各區塊
     +'</div></div>';
   if(!q){root.innerHTML=top+_pjListHtml(list);return;}
   try{if(q.mat){_matAmortSync(q);_matLossSync(q);}}catch(e){_err('renderProj.mat',e);}   // v6 內部攤提天數每日變動 → 開頁先同步
@@ -38627,7 +38633,7 @@ function matRowEdit(qid,rid){
       +'<label>支撐層數<input id="mx-sl" type="number" inputmode="numeric" value="'+esc(String((site&&site.layers)||1))+'" oninput="_mxStrut()" style="'+IN+'"></label>'
       +'<label>圍令規格'+SP('mx-sw',_matSpecOf(L0.w)||'H350')+'</label>'
       +'<label>支撐規格'+SP('mx-ss',_matSpecOf(L0.s)||'H350')+'</label>'
-      +'<label>正角隅數<input id="mx-sc" type="number" inputmode="numeric" value="4" oninput="_mxStrut()" style="'+IN+'"></label>'
+      +'<label>正角隅數<input id="mx-sc" type="number" inputmode="numeric" value="'+esc(String((site&&site.corners!==''&&site.corners!=null)?site.corners:4))+'" oninput="_mxStrut()" style="'+IN+'"></label>'
       +'<label>圍令／支撐單長（M）<input id="mx-slen" type="number" inputmode="decimal" value="12" oninput="_mxStrut()" style="'+IN+'"></label>'
       +'<label>斜撐單長（M）<input id="mx-sdl" type="number" inputmode="decimal" value="6" oninput="_mxStrut()" style="'+IN+'"></label>'
       +'<label style="display:flex;align-items:flex-end;gap:6px;padding-bottom:6px"><input id="mx-sdb" type="checkbox" onchange="_mxStrut()" style="width:16px;height:16px"> 雙拼</label>'
@@ -39132,6 +39138,151 @@ _envPrint=function(){
     if(cust&&r.data.tel&&cust.envTel!==r.data.tel){cust.envTel=r.data.tel;cust._mt=Date.now();saveCustomers();}}catch(e){_err('_envPrint.tel',e);}
   return _envPrint0_647.apply(this,arguments);
 };
+
+
+// ══════════════ v6.0.48：案場細節改彈窗＋材料估算讀案場細節（v648.js 區塊）══════════════
+// 案場細節（q.site）＝工地幾何的唯一輸入來源：基地、擋土壁、三種樁、支撐各層、構台。
+// 材料估算綁定工程時不再問幾何，改讀案場細節（每次開頁／計算前覆蓋 MAT_EST 的幾何欄位），只留配件／加工／損耗參數。
+// 一次性遷移：已有材料估算存檔但沒有案場細節的工程，第一次打開時由 q.matEst.inputs 反推建立 q.site（不覆蓋既有案場細節）。
+function _sdQ(){var id=window._sdQid||eid;return Q.find(function(x){return x.id===id;});}
+function _sdHasGeo(sd){if(!sd)return false;var n=_sdN;return n(sd.P)>0||n(sd.A)>0||n(sd.wall&&sd.wall.len)>0||(parseInt(sd.layers)||0)>0||n(sd.mid&&sd.mid.n)>0||n(sd.plat&&sd.plat.A)>0;}
+function _sdSpCore(x){return String(x||'').replace(/^2/,'').replace(/[（(×\s].*$/,'').trim();}
+function _sdSpLy(x,def){var s=String(x||''),dbl=/^2H|雙拼/.test(s),core=_sdSpCore(s);return SH_SPECS.indexOf(core)>=0?((dbl?'2':'')+core):(def||'H350');}
+var _SD_FORM_MAP={'鋼軌樁':'鋼軌樁','鋼板樁':'鋼板樁','H型鋼樁':'型鋼排樁','型鋼排樁':'型鋼排樁','預壘樁':'預壘樁','基樁':'基樁','微型樁':'微型樁','CCP固結樁':'CCP','CCP':'CCP','連續壁':'連續壁'};
+var _SD_FORM_REV={'型鋼排樁':'H型鋼樁','鋼軌樁':'鋼軌樁','鋼板樁':'鋼板樁','預壘樁':'預壘樁','基樁':'基樁','微型樁':'微型樁','CCP':'CCP固結樁','連續壁':'連續壁'};
+// 案場細節 → 材料估算輸入（幾何欄位一律以案場細節為準，空白＝0；配件參數不動）
+function _sdToMatEst(sd,m){
+  var n=_sdN,c=_sdCalc(sd);
+  m.P=n(sd.P);m.A=n(sd.A);m.H=n(sd.H);m.slabT=n(sd.slabT);
+  m.corners=(sd.corners===''||sd.corners==null)?4:n(sd.corners);m.irr=n(sd.irr);
+  if(_SD_FORM_MAP[sd.wall.form])m.method=_SD_FORM_MAP[sd.wall.form];
+  if(sd.wall.spec){var sp=_sdSpCore(sd.wall.spec);m.pileSpec=SH_SPECS.indexOf(sp)>=0?sp:sd.wall.spec;}
+  m.pileLen=n(sd.wall.len);if(n(sd.wall.sp)>0)m.pileSpacing=n(sd.wall.sp);
+  // 手動指定支數 → 換算成壁體周長（引擎以 周長÷間距 算支數）；自動支數＝用基地周長
+  var spc=n(sd.wall.sp)||(m.method==='鋼板樁'?0.4:(n(m.pileSpacing)||1.5));
+  m.pileP=(sd.wall.nAuto===false&&n(sd.wall.n)>0)?Math.round(n(sd.wall.n)*spc*100)/100:0;
+  m.capType=!sd.wall.cap?'無':(/RC/i.test(sd.wall.capType||'')?'RC壓樑':'H型鋼壓樑(H300)');
+  [['Mid','mid'],['Co','co'],['Gt','gt']].forEach(function(x){var p=sd[x[1]];m['king'+x[0]]=n(p.n);var s=_sdSpCore(p.spec);if(SH_SPECS.indexOf(s)>=0)m[x[1]+'Spec']=s;if(n(p.len)>0)m[x[1]+'Len']=n(p.len);});
+  var ly=parseInt(sd.layers)||0;
+  if(ly>0){var old=m._layers||[];m.layers=ly;m._layers=sd.L.map(function(l,i){return {w:_sdSpLy(l.w),s:_sdSpLy(l.s),d:(l.d&&l.d!=='無')?_sdSpLy(l.d):_sdSpLy(l.s),st:!!(old[i]&&old[i].st)};});}
+  var L0=(sd.L||[]).find(function(l){return n(l.vc)>0||n(l.hc)>0;});
+  m._routesV=(L0&&n(L0.vc)>0)?[{rc:n(L0.vc),rl:n(L0.vl)}]:[];
+  m._routesH=(L0&&n(L0.hc)>0)?[{rc:n(L0.hc),rl:n(L0.hl)}]:[];
+  m.gantaiA=n(sd.plat.A);m.gantaiP=n(sd.plat.P);
+  return m;
+}
+// 材料估算存檔 → 案場細節（一次性遷移用）
+function _sdFromMatEst(inp,date){
+  var m=_matEstNorm(JSON.parse(JSON.stringify(inp||{}))),sd=_sdBlank(),r=function(v){return v===0||v==null?'':v;};
+  sd.P=r(m.P);sd.A=r(m.A);sd.H=r(m.H);sd.slabT=r(m.slabT);sd.corners=r(m.corners);sd.irr=r(m.irr);
+  sd.wall.form=_SD_FORM_REV[m.method]||'';sd.wall.spec=m.pileSpec||'';sd.wall.len=r(m.pileLen);sd.wall.sp=r(m.pileSpacing);
+  if(_shNum(m.pileP)>0){var spc=m.method==='鋼板樁'?0.4:(_shNum(m.pileSpacing)||1.5);sd.wall.nAuto=false;sd.wall.n=Math.ceil(_shNum(m.pileP)/spc-1e-9);}
+  sd.wall.cap=m.capType&&m.capType!=='無';sd.wall.capType=sd.wall.cap?(/RC/.test(m.capType)?'RC壓樑':'型鋼壓樑'):'';
+  [['Mid','mid'],['Co','co'],['Gt','gt']].forEach(function(x){sd[x[1]]={spec:m[x[1]+'Spec']||'',method:'',len:r(m[x[1]+'Len']),n:r(m['king'+x[0]])};if(!_shNum(m['king'+x[0]]))sd[x[1]].len='';});
+  var sum=function(rows){var c=0,l=0;(rows||[]).forEach(function(x){c+=_shNum(x.rc);l+=_shNum(x.rc)*_shNum(x.rl);});return {c:c,l:c?Math.round(l/c*100)/100:''};};
+  var V=sum(m._routesV),H=sum(m._routesH);
+  sd.layers=Math.max(0,parseInt(m.layers)||0);
+  sd.L=(m._layers||[]).slice(0,sd.layers).map(function(l){return {w:l.w||'',s:l.s||'',d:l.d||'',vc:V.c||'',vl:V.l,hc:H.c||'',hl:H.l};});
+  sd.plat={load:'',A:r(m.gantaiA),P:r(m.gantaiP)};
+  sd.memo='由材料估算存檔轉入'+(date?('（'+date+'）'):'')+'，請核對圖面。';sd.fromMatEst=1;
+  return _sdNorm(sd);
+}
+function _sdEnsure(q){
+  if(!q||_sdHasGeo(q.site))return false;
+  var inp=q.matEst&&q.matEst.inputs;if(!inp)return false;
+  q.site=_sdFromMatEst(inp,q.matEst.date);_touch(q);try{persist();}catch(e){_err('_sdEnsure',e);}
+  return true;
+}
+// ── 彈窗 ──
+function _sdModalEnsure(){
+  var m=document.getElementById('sd-modal');if(m)return m;
+  m=document.createElement('div');m.id='sd-modal';
+  m.style.cssText='position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.45);display:none;align-items:stretch;justify-content:center;padding:max(10px,env(safe-area-inset-top)) 8px 10px';
+  var B=function(js,lbl,extra){return '<button type="button" onclick="'+js+'" style="font-family:inherit;font-size:12.5px;padding:6px 11px;border-radius:99px;border:1px solid rgba(255,255,255,.55);background:'+(extra||'transparent')+';color:#fff;cursor:pointer;white-space:nowrap">'+lbl+'</button>';};
+  m.innerHTML='<div style="background:var(--b0);width:100%;max-width:980px;border-radius:var(--r14);overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+    +'<div style="background:var(--g3);color:#fff;padding:10px 14px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
+    +'<div style="flex:1 1 200px;min-width:0"><div style="font-weight:800;font-size:15px">案場細節</div><div id="sd-sub" style="font-size:11.5px;opacity:.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div></div>'
+    +B('siteBump()','進版')+B('siteShowVers()','版次')+B('siteExportPDF()','PDF')+B('siteToMatEst()','材料估算 →')+B('_sdClose()','✕ 關閉','rgba(255,255,255,.15)')
+    +'</div><div id="sd-body" style="flex:1;overflow-y:auto;padding:10px"><div style="font-size:11.5px;color:var(--b4);margin:0 2px 8px">圖面數量的唯一來源：材料估算、材料需求（水平支撐）、與報價工項對照都讀這裡。改完直接關閉即可（自動存檔）。</div><div id="site-root"></div></div></div>';
+  m.addEventListener('click',function(e){if(e.target===m)_sdClose();});
+  document.body.appendChild(m);return m;
+}
+function openSiteDet(qid){
+  if(!qid){toast('請先儲存報價單，再填案場細節');return;}
+  var q=Q.find(function(x){return x.id===qid;});if(!q){toast('找不到報價單');return;}
+  window._sdQid=qid;
+  try{if(_sdEnsure(q))toast('已由材料估算存檔建立案場細節，請核對');}catch(e){_err('openSiteDet.ensure',e);}
+  var m=_sdModalEnsure();m.style.display='flex';document.body.style.overflow='hidden';
+  try{_sdRender();}catch(e){_err('openSiteDet',e);}
+  var b=document.getElementById('sd-body');if(b)b.scrollTop=0;
+}
+function _sdClose(){
+  var m=document.getElementById('sd-modal');if(m)m.style.display='none';document.body.style.overflow='';
+  window._sdQid=null;
+  try{var pg=document.querySelector('.page.active');if(pg&&pg.id==='page-matest'){renderMatEst();try{if(window._matEstRes)matEstCalc();}catch(e){}}}catch(e){_err('_sdClose',e);}
+}
+function siteToMatEst(){
+  var q=_sdQ();if(!q){toast('請先選擇報價單');return;}
+  var id=q.id;_sdClose();go('matest');
+  setTimeout(function(){matEstFromSite(id);},80);
+}
+// ── 材料估算：綁定工程＝讀案場細節 ──
+function _matEstSiteQ(){
+  var id=window._matEstQid;if(!id)return null;
+  var q=Q.find(function(x){return x.id===id;});if(!q)return null;
+  try{_sdEnsure(q);}catch(e){_err('_matEstSiteQ',e);}
+  return _sdHasGeo(q.site)?(q.site=_sdNorm(q.site),q):null;   // 沒有案場細節的工程仍可在估算裡輸入，存入專案時建立案場細節
+}
+// 綁定工程但還沒有案場細節：提示；存入專案後由估算數量建立案場細節（之後即以案場細節為準）
+function _matEstNoSiteHint(){
+  var id=window._matEstQid;if(!id)return '';
+  return '<div style="border:1px solid #ffcc80;background:#fff8e1;border-radius:var(--r8);padding:9px 12px;margin:10px 0;font-size:12.5px;line-height:1.7">此工程還沒有案場細節。可以直接在下方輸入圖面數量，按「存入專案」時系統會用這些數量建立案場細節，之後改數量請到案場細節。'
+    +' <button type="button" class="btn btn-xs" onclick="openSiteDet(\''+id+'\')" style="margin-left:4px">改到案場細節填</button></div>';
+}
+var _matEstSave0_648=matEstSave;
+matEstSave=function(){var r=_matEstSave0_648.apply(this,arguments);try{var q=Q.find(function(x){return x.id===window._matEstQid;});if(q&&_sdEnsure(q)){toast('已存入專案，並用這些數量建立案場細節');renderMatEst();}}catch(e){_err('matEstSave.site',e);}return r;};
+function _matEstLoadFor(q){MAT_EST=(q&&q.matEst&&q.matEst.inputs)?_matEstNorm(JSON.parse(JSON.stringify(q.matEst.inputs))):_shDefaults();window._matEstRes=null;}
+function matEstPickProj(qid){
+  window._matEstQid=qid||'';
+  var o=document.getElementById('mat-est-out');if(o)o.innerHTML='';
+  if(!qid){renderMatEst();return;}
+  var q=Q.find(function(x){return x.id===qid;});if(!q){renderMatEst();return;}
+  _matEstLoadFor(q);renderMatEst();
+  if(_sdHasGeo(_sdNorm(q.site))){try{matEstCalc();}catch(e){_err('matEstPickProj',e);}}
+  toast(q.matEst?('已載入「'+q.name+'」估算參數；圖面數量取自案場細節'):('「'+q.name+'」圖面數量取自案場細節'));
+}
+function matEstFromSite(qid){matEstPickProj(qid);}
+function _sdMatEstGeoHtml(q,m){
+  var sd=_sdNorm(q.site),c=_sdCalc(sd),ok=_sdHasGeo(sd);
+  var warn=[];if(!(_sdN(sd.P)>0))warn.push('基地周長');if(!(_sdN(sd.A)>0))warn.push('開挖面積');if(!(_sdN(sd.H)>0))warn.push('開挖深度');if(!(parseInt(sd.layers)>0))warn.push('支撐層數');
+  return '<div style="border:1px solid var(--gm);background:var(--gl);border-radius:var(--r8);padding:10px 12px;margin:10px 0">'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><b style="color:var(--g3);font-size:13.5px">①～③ 圖面數量（取自案場細節 v'+(sd.ver||1)+'）</b><span style="flex:1"></span>'
+    +'<button type="button" class="btn btn-xs btn-g" onclick="openSiteDet(\''+q.id+'\')" style="font-weight:700">編輯案場細節</button></div>'
+    +(ok?'':'<div style="color:var(--red);font-size:12.5px;font-weight:700;margin-bottom:4px">此工程還沒填案場細節，請先按「編輯案場細節」。</div>')
+    +(ok&&warn.length?'<div style="color:#b26a00;font-size:12px;margin-bottom:4px">案場細節尚缺：'+warn.join('、')+'</div>':'')
+    +'<div style="font-size:12.5px;line-height:1.8">'+_sdSummaryHtml(sd,c,q).replace(/<div style="font-size:11px;color:var\(--b3\);margin-top:6px">報價單[\s\S]*$/,'')+'</div>'
+    +'<div style="font-size:11px;color:var(--b4);margin-top:4px">角隅數 '+(sd.corners===''||sd.corners==null?'4（未填，以矩形計）':_sdN(sd.corners))+(_sdN(sd.irr)?('、不規則邊 '+_sdN(sd.irr)):'')+'　·　材料估算不再重複輸入這些數量，改案場細節即同步。</div></div>';
+}
+function _sdMatEstLayerHtml(q,m,sec,fS,fN){
+  var sd=_sdNorm(q.site),n=_sdN;
+  var h=sec('④ 支撐系統（逐層）','規格與路數取自案場細節；這裡只設加勁盒與橫擋');
+  var auto=!(m._routesV&&m._routesV.length)&&!(m._routesH&&m._routesH.length);
+  h+='<div class="me-grid">'+fS('stiff','加勁盒模式',[['0','不加'],['main','主撐×2/路'],['both','主撐及斜撐×6/路']])+fS('heng','轉換橫擋',[['0','無'],['1','有']])+fN('zones','分區數')+(auto?fN('autoRouteSpace','路數自動間距 (M)'):'')+'</div>';
+  if(!(parseInt(sd.layers)>0))return h+'<div style="font-size:12px;color:#b26a00;margin-top:6px">案場細節未填支撐層數。</div>';
+  h+='<table class="tbl" style="margin-top:8px;width:100%"><thead><tr><th>層</th><th>圍令</th><th>支撐</th><th>斜撐</th><th style="text-align:center">加勁盒</th></tr></thead><tbody>';
+  for(var i=0;i<m.layers;i++){var ly=m._layers[i]||{};var L=sd.L[i]||{};
+    h+='<tr><td style="font-weight:700;white-space:nowrap">第'+(i+1)+'層</td><td>'+esc(ly.w||'')+'</td><td>'+esc(ly.s||'')+'</td><td>'+esc(L.d&&L.d!=='無'?ly.d:'無')+'</td><td style="text-align:center"><input type="checkbox"'+(ly.st?' checked':'')+' onchange="matEstLy('+i+',\'st\',this.checked)" style="width:18px;height:18px"></td></tr>';}
+  h+='</tbody></table>';
+  var L0i=(sd.L||[]).findIndex(function(l){return n(l.vc)>0||n(l.hc)>0;});
+  var diff=(sd.L||[]).some(function(l){return L0i>=0&&(n(l.vc)!==n(sd.L[L0i].vc)||n(l.vl)!==n(sd.L[L0i].vl)||n(l.hc)!==n(sd.L[L0i].hc)||n(l.hl)!==n(sd.L[L0i].hl));});
+  var rv=(m._routesV||[])[0],rh=(m._routesH||[])[0];
+  h+='<div style="font-size:12px;margin-top:6px">路數：'+(auto?('自動（依基地長寬、間距 '+_shNum(m.autoRouteSpace||6)+' M）'):(['縱向 '+(rv?(rv.rc+' 路 × '+_shR1(rv.rl)+' M'):'自動'),'橫向 '+(rh?(rh.rc+' 路 × '+_shR1(rh.rl)+' M'):'自動')].join('　')))
+    +(diff?'<span style="color:#b26a00">　各層路數不同，估算以第 '+(L0i+1)+' 層計</span>':'')
+    +((rv&&!(_shNum(rv.rl)>0))||(rh&&!(_shNum(rh.rl)>0))?'<span style="color:var(--red)">　有路數但沒填每路長，請到案場細節補上</span>':'')+'</div>';
+  return h;
+}
+var _matEstCalc0_648=matEstCalc;
+matEstCalc=function(){try{var q=_matEstSiteQ();if(q){MAT_EST=_matEstNorm(MAT_EST);_sdToMatEst(_sdNorm(q.site),MAT_EST);}}catch(e){_err('matEstCalc.site',e);}return _matEstCalc0_648.apply(this,arguments);};
 
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
