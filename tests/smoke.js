@@ -5489,18 +5489,21 @@ async function newPage(browser, width, height) {
         const list = FY_SHEETS.list();
         out.sheets = list.length;
         out.pagesOk = list.every(s => { const pg = FY_SHEETS.pages(s.id, 1); return pg && pg.length && pg.every(x => /^data:image\/png/.test(x.b64)); });
+        /* v6.0.52：各工項一律用圖組，舊的逐工法步驟圖只剩水平支撐（尚無圖組）；施工示意圖移除 */
         const bad = [];
         PLAN_ITEMS.forEach(it => {
-          if (it.id === 'dwall') return;
-          const m = {}; (it.vars || []).forEach(v => { m[v.k] = v.d || ''; });
-          const s = _plStoryPNG(it.id, m, ''); if (!s) bad.push(it.id);
+          if (it.id === 'dwall' || it.id === 'strut') return;
+          if (!_fySheetId(it.id, '')) bad.push(it.id);
         });
+        if (!_plStoryPNG('strut', {}, '')) bad.push('strut');
+        if (_plStoryPNG('hpile', {}, '直接打設') !== null) bad.push('hpile-old');
+        if (typeof window._plSchemPNG !== 'undefined') bad.push('schem');
         out.storyBad = bad;
         out.detail = !!_plDetailPNG('strut', {});
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.51 施工步驟示意圖組（22 組）各頁、各工項步驟圖、水平支撐詳圖照常產出', r.sheets === 22 && r.pagesOk && r.storyBad && r.storyBad.length === 0 && r.detail, JSON.stringify(r));
+    check('v6.0.51/52 施工步驟示意圖組（22 組）各頁照常產出、各工項（除水平支撐）皆有圖組、舊逐工法步驟圖只留水平支撐、施工示意圖移除、水平支撐詳圖照常', r.sheets === 22 && r.pagesOk && r.storyBad && r.storyBad.length === 0 && r.detail, JSON.stringify(r));
     check('v6.0.51 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
