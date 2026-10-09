@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.57';
+var APP_VERSION='v6.0.58';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -30971,15 +30971,17 @@ function _envDocHtml(S,title,body){
 // iOS Safari 列印網頁會依手機畫面寬度自動縮放（實測約 1.4～1.5 倍）並位移，網頁無法關掉。
 // 做法：印兩個十字（A、B，已知設計座標），量它們實際落在信封上的位置 → 每軸解「實際＝倍率×設計＋位移」，
 // 列印時反向套用（先縮 1/倍率、再移 −位移/倍率）。校正值與裝置＋印表機有關 → 存本機（localStorage fy_env_ioscal），不同步。
-var _ENV_CAL_PTS={A:[30,20],B:[80,140]};
+// v6.0.58：改 3×3 九個十字（A～I），iPhone 縮放／位移不確定時總有幾個落在信封上；任選兩個（橫、直都要錯開）量測即可
+var _ENV_CAL_PTS={A:[25,25],B:[55,25],C:[85,25],D:[25,85],E:[55,85],F:[85,85],G:[25,145],H:[55,145],I:[85,145]};
 function _envIosCal(){try{var c=JSON.parse(localStorage.getItem('fy_env_ioscal')||'null');return (c&&c.sx>0&&c.sy>0)?c:null;}catch(e){_err('_envIosCal',e);return null;}}
 function _envIosWrap(inner,cal){
   if(!cal)return inner;
   var kx=1/cal.sx,ky=1/cal.sy,tx=-cal.ox/cal.sx,ty=-cal.oy/cal.sy,r=function(v){return Math.round(v*100000)/100000;};
   return '<div class="env-ioscal" style="transform:translate('+r(tx)+'mm,'+r(ty)+'mm) scale('+r(kx)+','+r(ky)+');transform-origin:0 0">'+inner+'</div>';
 }
-function _envCalSolve(m){   // m={ax,ay,bx,by}（實際量到的 mm）→ {sx,sy,ox,oy}
-  var A=_ENV_CAL_PTS.A,B=_ENV_CAL_PTS.B;
+function _envCalSolve(m){   // m={p1,ax,ay,p2,bx,by}：兩個十字的代號與實際量到的 mm → {sx,sy,ox,oy}
+  var A=_ENV_CAL_PTS[m.p1||'A'],B=_ENV_CAL_PTS[m.p2||'I'];
+  if(!A||!B||A[0]===B[0]||A[1]===B[1])return null;   // 兩點必須左右、上下都錯開
   var sx=(m.bx-m.ax)/(B[0]-A[0]),sy=(m.by-m.ay)/(B[1]-A[1]);
   if(!(sx>0.3&&sx<3&&sy>0.3&&sy<3))return null;
   return {sx:sx,sy:sy,ox:m.ax-sx*A[0],oy:m.ay-sy*A[1]};
@@ -30987,18 +30989,20 @@ function _envCalSolve(m){   // m={ax,ay,bx,by}（實際量到的 mm）→ {sx,sy
 function _envCalPrint(){
   var r=_envRead(),S=_ENV_SIZES[r.cfg.size]||_ENV_SIZES.k12;
   var mark=function(k){var x=_ENV_CAL_PTS[k][0],y=_ENV_CAL_PTS[k][1];
-    return '<div style="position:absolute;left:'+(x-8)+'mm;top:'+(y-0.15)+'mm;width:16mm;height:0.3mm;background:#000"></div>'
-      +'<div style="position:absolute;left:'+(x-0.15)+'mm;top:'+(y-8)+'mm;width:0.3mm;height:16mm;background:#000"></div>'
-      +'<div style="position:absolute;left:'+(x+1.5)+'mm;top:'+(y+1.5)+'mm;font:bold 16pt sans-serif">'+k+'</div>';};
-  var body='<div class="env-sheet" style="position:relative;width:'+S.w+'mm;height:'+S.h+'mm;background:#fff;overflow:hidden">'+mark('A')+mark('B')+'</div>';
+    return '<div style="position:absolute;left:'+(x-5)+'mm;top:'+(y-0.15)+'mm;width:10mm;height:0.3mm;background:#000"></div>'
+      +'<div style="position:absolute;left:'+(x-0.15)+'mm;top:'+(y-5)+'mm;width:0.3mm;height:10mm;background:#000"></div>'
+      +'<div style="position:absolute;left:'+(x+1.2)+'mm;top:'+(y+1.2)+'mm;font:bold 13pt sans-serif">'+k+'</div>';};
+  var body='<div class="env-sheet" style="position:relative;width:'+S.w+'mm;height:'+S.h+'mm;background:#fff;overflow:hidden">'+Object.keys(_ENV_CAL_PTS).map(mark).join('')+'</div>';
   _printNativeHTML(_envDocHtml(S,'信封列印校正',body),'信封列印校正');
-  toast('已送出校正十字（不套用校正）：用備用信封印，印完量 A、B 十字中心的位置');
+  toast('已送出校正十字（不套用校正）：請用全新的備用信封，紙張大小選得和列印信封時一樣');
 }
 function _envCalSave(){
   var n=function(id){var v=parseFloat(gv(id));return isNaN(v)?null:v;};
-  var m={ax:n('env-cal-ax'),ay:n('env-cal-ay'),bx:n('env-cal-bx'),by:n('env-cal-by')};
-  if([m.ax,m.ay,m.bx,m.by].some(function(v){return v==null;})){toast('請填 A、B 十字中心離信封左緣、上緣各幾 mm');return;}
-  var c=_envCalSolve(m);if(!c){toast('量測值不合理（B 應在 A 的右下方），請再確認');return;}
+  var m={p1:gv('env-cal-p1')||'A',ax:n('env-cal-ax'),ay:n('env-cal-ay'),p2:gv('env-cal-p2')||'I',bx:n('env-cal-bx'),by:n('env-cal-by')};
+  if([m.ax,m.ay,m.bx,m.by].some(function(v){return v==null;})){toast('請填兩個十字中心離信封左緣、上緣各幾 mm');return;}
+  var P1=_ENV_CAL_PTS[m.p1],P2=_ENV_CAL_PTS[m.p2];
+  if(!P1||!P2||P1[0]===P2[0]||P1[1]===P2[1]){toast('兩個十字要左右、上下都錯開（例如 A 與 I、C 與 G、B 與 G）');return;}
+  var c=_envCalSolve(m);if(!c){toast('量測值不合理，請確認十字代號與量測方向（左緣、上緣）');return;}
   c.m=m;c.ts=Date.now();
   try{localStorage.setItem('fy_env_ioscal',JSON.stringify(c));}catch(e){_err('_envCalSave',e);}
   var st=document.getElementById('env-cal-st');if(st)st.innerHTML=_envCalStatus();
@@ -31012,15 +31016,16 @@ function _envCalStatus(){
 }
 function _envCalHtml(IN){
   var c=_envIosCal(),m=(c&&c.m)||{},v=function(k){return m[k]!=null?m[k]:'';};
-  var A=_ENV_CAL_PTS.A,B=_ENV_CAL_PTS.B;
+  var keys=Object.keys(_ENV_CAL_PTS),sel=function(id,cur){return '<select id="'+id+'" style="'+IN+'">'+keys.map(function(k){return '<option'+(k===cur?' selected':'')+'>'+k+'</option>';}).join('')+'</select>';};
+  var row=function(n,pid,cur,kx,ky){return '<div style="display:grid;grid-template-columns:64px 1fr 1fr;gap:6px;align-items:end;margin-top:6px">'
+    +'<div class="f"><label>十字 '+n+'</label>'+sel(pid,cur)+'</div>'
+    +'<div class="f"><label>距左緣 mm</label><input id="env-cal-'+kx+'" type="number" step="0.5" inputmode="decimal" value="'+v(kx)+'" style="'+IN+'"></div>'
+    +'<div class="f"><label>距上緣 mm</label><input id="env-cal-'+ky+'" type="number" step="0.5" inputmode="decimal" value="'+v(ky)+'" style="'+IN+'"></div></div>';};
   return '<details id="env-cal-box" style="margin-top:6px"'+(_isIOS()&&!c?' open':'')+'><summary style="font-size:12px;color:var(--g3);font-weight:700;cursor:pointer">手機（iPhone／iPad）列印校正</summary>'
-    +'<div style="font-size:11.5px;color:var(--b4);line-height:1.6;margin:6px 0">iPhone 列印會自動縮放，第一次請：① 放一個備用信封 → ② 按「列印校正十字」→ ③ 用尺量 A、B 兩個十字中心離<b>信封左緣</b>與<b>上緣</b>各幾 mm → ④ 填入後按「計算並儲存」。之後在這支手機列印信封都會自動修正。（設計位置：A 距左 '+A[0]+'、距上 '+A[1]+'；B 距左 '+B[0]+'、距上 '+B[1]+' mm）</div>'
-    +'<button type="button" onclick="_envCalPrint()" style="width:100%;min-height:36px;border:1px solid var(--b2);background:var(--w);border-radius:var(--r8);font-family:inherit;cursor:pointer">列印校正十字</button>'
-    +'<div class="fg fg2" style="gap:6px;margin-top:6px">'
-    +'<div class="f"><label>A 距左緣（mm）</label><input id="env-cal-ax" type="number" step="0.5" inputmode="decimal" value="'+v('ax')+'" style="'+IN+'"></div>'
-    +'<div class="f"><label>A 距上緣（mm）</label><input id="env-cal-ay" type="number" step="0.5" inputmode="decimal" value="'+v('ay')+'" style="'+IN+'"></div>'
-    +'<div class="f"><label>B 距左緣（mm）</label><input id="env-cal-bx" type="number" step="0.5" inputmode="decimal" value="'+v('bx')+'" style="'+IN+'"></div>'
-    +'<div class="f"><label>B 距上緣（mm）</label><input id="env-cal-by" type="number" step="0.5" inputmode="decimal" value="'+v('by')+'" style="'+IN+'"></div></div>'
+    +'<div style="font-size:11.5px;color:var(--b4);line-height:1.6;margin:6px 0">iPhone 列印會依「紙張大小」自動縮放。第一次請：① 放一個<b>全新</b>的備用信封 → ② 按「列印校正十字」（iPhone 紙張大小請選得和平常列印信封時<b>一樣</b>）→ ③ 信封上會印出 A～I 九個十字，挑兩個<b>左右、上下都錯開</b>且完整印出的（例如 A 與 I），用尺量十字中心離<b>信封左緣</b>與<b>上緣</b>各幾 mm（上緣＝郵遞區號那一端）→ ④ 選好代號、填入後按「計算並儲存」。</div>'
+    +'<button type="button" onclick="_envCalPrint()" style="width:100%;min-height:36px;border:1px solid var(--b2);background:var(--w);border-radius:var(--r8);font-family:inherit;cursor:pointer">列印校正十字（A～I）</button>'
+    +row(1,'env-cal-p1',m.p1||'A','ax','ay')
+    +row(2,'env-cal-p2',m.p2||'I','bx','by')
     +'<div style="display:flex;gap:6px;margin-top:6px"><button type="button" onclick="_envCalSave()" style="flex:1;min-height:36px;border:0;background:var(--g);color:#fff;font-weight:700;border-radius:var(--r8);font-family:inherit;cursor:pointer">計算並儲存</button>'
     +'<button type="button" onclick="_envCalClear()" style="min-height:36px;border:1px solid var(--b2);background:var(--w);border-radius:var(--r8);font-family:inherit;cursor:pointer;padding:0 12px">清除</button></div>'
     +'<div id="env-cal-st" style="font-size:11.5px;color:var(--g3);margin-top:4px">'+_envCalStatus()+'</div>'
