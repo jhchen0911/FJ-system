@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.56';
+var APP_VERSION='v6.0.57';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -30853,6 +30853,7 @@ function openEnvelope(invId,opt){
     +'<div class="f"><label>&nbsp;</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;min-height:36px"><input id="env-frames" type="checkbox"'+(cfg.frames?' checked':'')+' onchange="_envPreview()"> 列印框線（空白信封／校正）</label></div></div>'
     +'<div style="font-size:11px;color:var(--b3);margin-top:4px">第一次請先用一個備用信封試印，對照後調整偏移；設定會記住。印表機請選「信封／自訂紙張 '+_ENV_SIZES[cfg.size].w+'×'+_ENV_SIZES[cfg.size].h+' mm、無邊界、不縮放」。</div>'
     +'</details>'
+    +_envCalHtml(IN)
     +'</div>'
     +'<div><div style="font-size:11.5px;font-weight:700;color:var(--g3);margin-bottom:4px">預覽（淡紅框＝信封印好的框，實際列印只印黑字）</div><div id="env-prev" style="background:#e9e9e9;border-radius:var(--r8);padding:8px;display:flex;justify-content:center;overflow:hidden"></div>'
     +'<button type="button" id="env-pdf-btn" onclick="_envPdf()" style="margin-top:8px;width:100%;min-height:40px;border:1px solid var(--g3);background:var(--w);color:var(--g3);border-radius:var(--r8);font-weight:700;font-family:inherit;cursor:pointer">存成 PDF（信封尺寸）</button><div id="env-pdf-out"></div>'
@@ -30939,7 +30940,7 @@ function _envPreview(){
   var box=document.getElementById('env-prev');if(!box)return;
   var r=_envRead(),S=_ENV_SIZES[r.cfg.size];
   var pxW=S.w*96/25.4,pxH=S.h*96/25.4;
-  var avail=Math.max(160,box.clientWidth-16),maxH=Math.min(520,window.innerHeight*0.6);
+  var avail=Math.max(160,box.clientWidth-16),maxH=Math.min(520,window.innerHeight*(window.innerWidth<768?0.38:0.6));   // v6.0.57 手機單欄：預覽矮一點，輸入欄位不被擠到下面
   var sc=Math.min(avail/pxW,maxH/pxH,1);
   box.innerHTML='<div style="width:'+(pxW*sc)+'px;height:'+(pxH*sc)+'px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.2)"><div style="transform:scale('+sc+');transform-origin:0 0">'+_envHtml(r.cfg,r.data,true)+'</div></div>';
 }
@@ -30954,12 +30955,76 @@ function _envPrint(){
     var cust=(CUSTOMERS||[]).find(function(c){return c.name===(r.data.co||(_envCtx&&_envCtx.custName));});
     if(cust&&((r.data.zip&&cust.zip!==r.data.zip)||(r.data.attn&&cust.envAttn!==r.data.attn)||(r.data.tel&&cust.envTel!==r.data.tel))){cust.zip=r.data.zip||cust.zip;cust.envAttn=r.data.attn||cust.envAttn;cust.envTel=r.data.tel||cust.envTel;cust._mt=Date.now();saveCustomers();}
   }catch(e){_err('_envPrint.cust',e);}
-  var html='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>信封_'+esc(r.data.co||r.data.attn)+'</title><style>'
-    +'@page{size:'+S.w+'mm '+S.h+'mm;margin:0}html,body{margin:0;padding:0;width:'+S.w+'mm;height:'+S.h+'mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
-    +'</style></head><body>'+_envHtml(r.cfg,r.data,!!r.cfg.frames)+'</body></html>';
+  var ios=_isIOS(),cal=ios?_envIosCal():null;
+  var html=_envDocHtml(S,'信封_'+(r.data.co||r.data.attn),_envIosWrap(_envHtml(r.cfg,r.data,!!r.cfg.frames),cal));
   _printNativeHTML(html,'信封_'+(r.data.co||r.data.attn));
-  toast(_isIOS()?('信封已送列印：紙張請選信封或 '+S.w+'×'+S.h+' mm；印表機若沒有此尺寸，請改用「存成 PDF」以 Brother App 列印')
+  toast(ios?(cal?'信封已送列印（已套用手機列印校正）':'信封已送列印。iPhone 會自動縮放，第一次請先做下方「手機列印校正」')
     :('信封已送列印：印表機請選自訂紙張 '+S.w+'×'+S.h+' mm、不縮放'));
+}
+// 信封列印文件骨架（信封與校正十字共用，頁面結構相同 → iPhone 縮放行為相同，校正才準）
+function _envDocHtml(S,title,body){
+  return '<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>'+esc(title)+'</title><style>'
+    +'@page{size:'+S.w+'mm '+S.h+'mm;margin:0}html,body{margin:0;padding:0;width:'+S.w+'mm;height:'+S.h+'mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+    +'</style></head><body>'+body+'</body></html>';
+}
+// ── v6.0.57 手機（iPhone／iPad）列印校正 ──
+// iOS Safari 列印網頁會依手機畫面寬度自動縮放（實測約 1.4～1.5 倍）並位移，網頁無法關掉。
+// 做法：印兩個十字（A、B，已知設計座標），量它們實際落在信封上的位置 → 每軸解「實際＝倍率×設計＋位移」，
+// 列印時反向套用（先縮 1/倍率、再移 −位移/倍率）。校正值與裝置＋印表機有關 → 存本機（localStorage fy_env_ioscal），不同步。
+var _ENV_CAL_PTS={A:[30,20],B:[80,140]};
+function _envIosCal(){try{var c=JSON.parse(localStorage.getItem('fy_env_ioscal')||'null');return (c&&c.sx>0&&c.sy>0)?c:null;}catch(e){_err('_envIosCal',e);return null;}}
+function _envIosWrap(inner,cal){
+  if(!cal)return inner;
+  var kx=1/cal.sx,ky=1/cal.sy,tx=-cal.ox/cal.sx,ty=-cal.oy/cal.sy,r=function(v){return Math.round(v*100000)/100000;};
+  return '<div class="env-ioscal" style="transform:translate('+r(tx)+'mm,'+r(ty)+'mm) scale('+r(kx)+','+r(ky)+');transform-origin:0 0">'+inner+'</div>';
+}
+function _envCalSolve(m){   // m={ax,ay,bx,by}（實際量到的 mm）→ {sx,sy,ox,oy}
+  var A=_ENV_CAL_PTS.A,B=_ENV_CAL_PTS.B;
+  var sx=(m.bx-m.ax)/(B[0]-A[0]),sy=(m.by-m.ay)/(B[1]-A[1]);
+  if(!(sx>0.3&&sx<3&&sy>0.3&&sy<3))return null;
+  return {sx:sx,sy:sy,ox:m.ax-sx*A[0],oy:m.ay-sy*A[1]};
+}
+function _envCalPrint(){
+  var r=_envRead(),S=_ENV_SIZES[r.cfg.size]||_ENV_SIZES.k12;
+  var mark=function(k){var x=_ENV_CAL_PTS[k][0],y=_ENV_CAL_PTS[k][1];
+    return '<div style="position:absolute;left:'+(x-8)+'mm;top:'+(y-0.15)+'mm;width:16mm;height:0.3mm;background:#000"></div>'
+      +'<div style="position:absolute;left:'+(x-0.15)+'mm;top:'+(y-8)+'mm;width:0.3mm;height:16mm;background:#000"></div>'
+      +'<div style="position:absolute;left:'+(x+1.5)+'mm;top:'+(y+1.5)+'mm;font:bold 16pt sans-serif">'+k+'</div>';};
+  var body='<div class="env-sheet" style="position:relative;width:'+S.w+'mm;height:'+S.h+'mm;background:#fff;overflow:hidden">'+mark('A')+mark('B')+'</div>';
+  _printNativeHTML(_envDocHtml(S,'信封列印校正',body),'信封列印校正');
+  toast('已送出校正十字（不套用校正）：用備用信封印，印完量 A、B 十字中心的位置');
+}
+function _envCalSave(){
+  var n=function(id){var v=parseFloat(gv(id));return isNaN(v)?null:v;};
+  var m={ax:n('env-cal-ax'),ay:n('env-cal-ay'),bx:n('env-cal-bx'),by:n('env-cal-by')};
+  if([m.ax,m.ay,m.bx,m.by].some(function(v){return v==null;})){toast('請填 A、B 十字中心離信封左緣、上緣各幾 mm');return;}
+  var c=_envCalSolve(m);if(!c){toast('量測值不合理（B 應在 A 的右下方），請再確認');return;}
+  c.m=m;c.ts=Date.now();
+  try{localStorage.setItem('fy_env_ioscal',JSON.stringify(c));}catch(e){_err('_envCalSave',e);}
+  var st=document.getElementById('env-cal-st');if(st)st.innerHTML=_envCalStatus();
+  toast('已儲存手機列印校正：倍率 '+c.sx.toFixed(3)+'×'+c.sy.toFixed(3));
+}
+function _envCalClear(){try{localStorage.removeItem('fy_env_ioscal');}catch(e){_err('_envCalClear',e);}var st=document.getElementById('env-cal-st');if(st)st.innerHTML=_envCalStatus();toast('已清除手機列印校正');}
+function _envCalStatus(){
+  var c=_envIosCal();
+  return c?('✓ 已校正：縮放 '+(100/c.sx).toFixed(1)+'%／'+(100/c.sy).toFixed(1)+'%、位移 '+c.ox.toFixed(1)+'／'+c.oy.toFixed(1)+' mm（只存在這支手機）')
+    :'尚未校正（iPhone 列印會被自動放大約 1.4～1.5 倍）';
+}
+function _envCalHtml(IN){
+  var c=_envIosCal(),m=(c&&c.m)||{},v=function(k){return m[k]!=null?m[k]:'';};
+  var A=_ENV_CAL_PTS.A,B=_ENV_CAL_PTS.B;
+  return '<details id="env-cal-box" style="margin-top:6px"'+(_isIOS()&&!c?' open':'')+'><summary style="font-size:12px;color:var(--g3);font-weight:700;cursor:pointer">手機（iPhone／iPad）列印校正</summary>'
+    +'<div style="font-size:11.5px;color:var(--b4);line-height:1.6;margin:6px 0">iPhone 列印會自動縮放，第一次請：① 放一個備用信封 → ② 按「列印校正十字」→ ③ 用尺量 A、B 兩個十字中心離<b>信封左緣</b>與<b>上緣</b>各幾 mm → ④ 填入後按「計算並儲存」。之後在這支手機列印信封都會自動修正。（設計位置：A 距左 '+A[0]+'、距上 '+A[1]+'；B 距左 '+B[0]+'、距上 '+B[1]+' mm）</div>'
+    +'<button type="button" onclick="_envCalPrint()" style="width:100%;min-height:36px;border:1px solid var(--b2);background:var(--w);border-radius:var(--r8);font-family:inherit;cursor:pointer">列印校正十字</button>'
+    +'<div class="fg fg2" style="gap:6px;margin-top:6px">'
+    +'<div class="f"><label>A 距左緣（mm）</label><input id="env-cal-ax" type="number" step="0.5" inputmode="decimal" value="'+v('ax')+'" style="'+IN+'"></div>'
+    +'<div class="f"><label>A 距上緣（mm）</label><input id="env-cal-ay" type="number" step="0.5" inputmode="decimal" value="'+v('ay')+'" style="'+IN+'"></div>'
+    +'<div class="f"><label>B 距左緣（mm）</label><input id="env-cal-bx" type="number" step="0.5" inputmode="decimal" value="'+v('bx')+'" style="'+IN+'"></div>'
+    +'<div class="f"><label>B 距上緣（mm）</label><input id="env-cal-by" type="number" step="0.5" inputmode="decimal" value="'+v('by')+'" style="'+IN+'"></div></div>'
+    +'<div style="display:flex;gap:6px;margin-top:6px"><button type="button" onclick="_envCalSave()" style="flex:1;min-height:36px;border:0;background:var(--g);color:#fff;font-weight:700;border-radius:var(--r8);font-family:inherit;cursor:pointer">計算並儲存</button>'
+    +'<button type="button" onclick="_envCalClear()" style="min-height:36px;border:1px solid var(--b2);background:var(--w);border-radius:var(--r8);font-family:inherit;cursor:pointer;padding:0 12px">清除</button></div>'
+    +'<div id="env-cal-st" style="font-size:11.5px;color:var(--g3);margin-top:4px">'+_envCalStatus()+'</div>'
+    +'</details>';
 }
 // v6.0.55 信封通訊錄：P.envBook[收件單位]={attn,title,tel,addr,zip,method,ts}（隨參數同步）
 function _envBookKey(co){return String(co||'').replace(/\s+/g,'');}

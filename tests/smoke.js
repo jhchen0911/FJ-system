@@ -5637,6 +5637,48 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.57 手機（iPhone）信封列印校正：印十字→量→解倍率與位移→列印反向套用 ─────────────
+  {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
+    const page = await ctx.newPage(); const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.goto(INDEX); await page.waitForTimeout(1500);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      try {
+        localStorage.removeItem('fy_env_ioscal');
+        const snaps = []; window.print = function () { const b = document.getElementById('_fy_print_main'); snaps.push(b ? b.innerHTML : ''); };
+        openEnvelope(null, { to: { co: '八九企業有限公司', attn: '謝' } });
+        setTimeout(() => {
+          out.openOnIOS = !!document.getElementById('env-cal-box') && document.getElementById('env-cal-box').open;
+          /* 1. 校正十字：不套校正、A／B 位置正確 */
+          _envCalPrint();
+          out.cross = snaps.length === 1 && /left:22mm;top:19\.85mm/.test(snaps[0]) && /left:72mm;top:139\.85mm/.test(snaps[0]) && !/env-ioscal/.test(snaps[0]);
+          /* 2. 模擬 iPhone 實測：放大 1.45 倍、位移 (−28, −14.5)mm → A=(15.5,14.5) B=(88,188.5) */
+          const set = (id, v) => { document.getElementById(id).value = v; };
+          set('env-cal-ax', 15.5); set('env-cal-ay', 14.5); set('env-cal-bx', 88); set('env-cal-by', 188.5);
+          _envCalSave();
+          const c = _envIosCal();
+          out.solve = !!c && Math.abs(c.sx - 1.45) < 1e-9 && Math.abs(c.sy - 1.45) < 1e-9 && Math.abs(c.ox + 28) < 1e-9 && Math.abs(c.oy + 14.5) < 1e-9;
+          out.status = /已校正/.test(document.getElementById('env-cal-st').textContent);
+          /* 3. 列印信封套用反向轉換：設計座標 X 經 (縮 1/1.45、移 28/1.45) 再被 iPhone 放大 1.45、位移 −28 → 回到 X */
+          document.getElementById('gen-confirm-ok').click();
+          const h = snaps[1] || '';
+          const m = h.match(/translate\(([-\d.]+)mm,([-\d.]+)mm\) scale\(([-\d.]+),([-\d.]+)\)/);
+          out.wrap = !!m && /env-sheet/.test(h);
+          if (m) { const X = 65.75, Y = 17.75; const px = 1.45 * (parseFloat(m[3]) * X + parseFloat(m[1])) - 28, py = 1.45 * (parseFloat(m[4]) * Y + parseFloat(m[2])) - 14.5; out.roundTrip = Math.abs(px - X) < 0.01 && Math.abs(py - Y) < 0.01; }
+          /* 4. 不合理量測被擋、清除後不再套用 */
+          out.bad = _envCalSolve({ ax: 50, ay: 50, bx: 40, by: 60 }) === null;
+          _envCalClear(); out.cleared = !_envIosCal() && _envIosWrap('<i></i>', null) === '<i></i>';
+          localStorage.removeItem('fy_env_ioscal'); res(out);
+        }, 300);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
+    }));
+    check('v6.0.57 手機信封列印校正：印 A／B 十字（不套校正）→ 量測解出倍率與位移（存本機）→ 列印信封反向套用後回到設計位置；不合理量測擋下、可清除', r.openOnIOS && r.cross && r.solve && r.status && r.wrap && r.roundTrip && r.bad && r.cleared, JSON.stringify(r));
+    check('v6.0.57 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await ctx.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
