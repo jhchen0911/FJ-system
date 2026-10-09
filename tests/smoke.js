@@ -5614,6 +5614,29 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.56 請款單列印「請款文件」文字與編輯頁一致 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const lbl = id => { const el = document.getElementById(id); return el ? el.parentElement.textContent.trim() : ''; };
+        out.editor = [lbl('inv-doc-confirm'), lbl('inv-doc-invoice'), lbl('inv-doc-receipt')].join('/');
+        INV.push({ id: 'iv656', client: '業主', project: 'P', periodNo: 1, date: '2026-10-01', items: [{ desc: '工項', unit: '式', contractQty: 1, contractPrice: 100, curQty: 1, otPrice: 100, prevQty: 0 }], docs: [true, true, true], totals: { total: 105 } });
+        const keep = invItems; invItems = JSON.parse(JSON.stringify(INV.find(x => x.id === 'iv656').items));
+        buildInvPreview(INV.find(x => x.id === 'iv656'));
+        const h = (document.getElementById('inv-prev-html') || {}).innerHTML || '';
+        const m = h.match(/請款文件[\s\S]{0,1200}/); const seg = m ? m[0] : '';
+        out.print = /工作確認單/.test(seg) && /請款單/.test(seg) && /發票/.test(seg) && !/統一發票/.test(seg) && !/收據/.test(seg);
+        invItems = keep; INV.splice(INV.findIndex(x => x.id === 'iv656'), 1);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.56 請款單列印的請款文件＝編輯頁勾選文字（工作確認單／請款單／發票），不再印統一發票／收據', r.editor === '工作確認單/請款單/發票' && r.print, JSON.stringify(r));
+    check('v6.0.56 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
