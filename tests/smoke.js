@@ -5534,7 +5534,7 @@ async function newPage(browser, width, height) {
         let snap = null;
         window.print = function () {
           const box = document.getElementById('_fy_print_main');
-          snap = { box: !!box, sheet: !!(box && box.querySelector('.env-sheet')), co: !!(box && /八九企業/.test(box.textContent)), noFrame: !document.getElementById('_fy_native_print'),
+          snap = { html: box ? box.innerHTML : '', box: !!box, sheet: !!(box && box.querySelector('.env-sheet')), co: !!(box && /八九企業/.test(box.textContent)), noFrame: !document.getElementById('_fy_native_print'),
             css: (document.getElementById('_fy_print_main_css') || {}).textContent || '' };
         };
         openEnvelope(null, { to: { co: '八九企業有限公司', attn: '劉書瑋', addr: '' } });
@@ -5543,7 +5543,7 @@ async function newPage(browser, width, height) {
           document.getElementById('gen-confirm-ok').click();
           setTimeout(() => {
             out.snap = snap && snap.box && snap.sheet && snap.co && snap.noFrame;
-            out.page = !!snap && /@page\s*\{size:120mm 235mm/.test(snap.css) && /body>\*:not\(#_fy_print_main\)\{display:none!important\}/.test(snap.css);
+            out.page = !!snap && /@page\s*\{size:A4/.test(snap.css) && /class="env-a4" style="position:absolute;left:45mm;top:0;width:120mm;height:235mm"/.test(document.getElementById('_fy_print_main') ? document.getElementById('_fy_print_main').innerHTML : snap.html || '') && /body>\*:not\(#_fy_print_main\)\{display:none!important\}/.test(snap.css);
             out.hiddenOnScreen = getComputedStyle(document.getElementById('_fy_print_main')).display === 'none';
             window.dispatchEvent(new Event('afterprint'));
             setTimeout(() => {
@@ -5567,7 +5567,7 @@ async function newPage(browser, width, height) {
         }, 200);
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
     }));
-    check('v6.0.54 iPhone 列印信封：改由主畫面列印（列印時只顯示信封、@page 120×235mm、螢幕不顯示、印完清除）', r.ios && r.snap && r.page && r.hiddenOnScreen && r.cleaned, JSON.stringify(r));
+    check('v6.0.54/59 iPhone 列印信封：改由主畫面列印（列印時只顯示信封、A4 頁面且信封置中對齊上緣、螢幕不顯示、印完清除）', r.ios && r.snap && r.page && r.hiddenOnScreen && r.cleaned, JSON.stringify(r));
     check('v6.0.54/55 信封存成 PDF：頁面＝信封實際尺寸（mm）、滿版貼圖；iPhone 產生後給「開啟信封 PDF」連結', r.pdfBtn && r.pdf, JSON.stringify(r));
     check('v6.0.54 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await ctx.close();
