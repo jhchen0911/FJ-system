@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.55';
+var APP_VERSION='v6.0.56';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -4450,7 +4450,7 @@ function buildInvPreview(srcInv){
   // v5.319：①原本第二個 id 拼成 inv-doc-claim（實際是 inv-doc-receipt），「收據」永遠不會印出；
   // ②指定記錄列印時，檢附文件必須讀該筆記錄，否則會印出編輯器停留那張單的勾選狀態。
   const _DOC_IDS=['inv-doc-confirm','inv-doc-invoice','inv-doc-receipt'];
-  const _DOC_LBL=['工作確認單','統一發票','收據'];
+  const _DOC_LBL=['工作確認單','請款單','發票'];   // v6.0.55→56：與編輯頁勾選框文字一致（原印「統一發票／收據」）
   // 備註同理：指定記錄時讀該筆記錄，不讀編輯器畫面
   const _noteStr=_stripInternalNote(_src?(Array.isArray(_src.note)?_src.note.join('\n'):String(_src.note||'')):getInvNote());
   const _calcOn=_src?!!_src.calc:!!(document.getElementById('inv-calc')&&document.getElementById('inv-calc').checked);   // v6.0.22 計算式說明
