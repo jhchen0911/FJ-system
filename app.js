@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.50';
+var APP_VERSION='v6.0.51';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -13207,28 +13207,6 @@ function _plUpper(ctx,x,gy,sc,dir){
   return {rootX:x+dir*4*sc,rootY:top-H*0.35,aX:ax,aY:ay,top:top};
 }
 // 格子臂（雙弦＋斜腹桿＋橫繫）
-function _plLattice(ctx,x1,y1,x2,y2,w1,w2){
-  w1=w1||6;w2=(w2==null?w1*0.55:w2);
-  var dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy)||1;
-  var nx=-dy/L,ny=dx/L;
-  function P(t,s,w){return [x1+dx*t+nx*s*w,y1+dy*t+ny*s*w];}
-  function wAt(t){return w1+(w2-w1)*t;}
-  ctx.strokeStyle='#111';ctx.lineWidth=_PL_LW.thin;
-  var a=P(0,1,w1),b=P(1,1,w2),c=P(0,-1,w1),d=P(1,-1,w2);
-  ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.moveTo(c[0],c[1]);ctx.lineTo(d[0],d[1]);ctx.stroke();
-  ctx.lineWidth=_PL_LW.hair;
-  var n=Math.max(6,Math.round(L/12));
-  for(var i=0;i<n;i++){
-    var t1=i/n,t2=(i+1)/n,s=(i%2?1:-1);
-    var p1=P(t1,s,wAt(t1)),p2=P(t2,-s,wAt(t2));
-    ctx.beginPath();ctx.moveTo(p1[0],p1[1]);ctx.lineTo(p2[0],p2[1]);ctx.stroke();
-    if(i%2===0){
-      var q1=P(t1,1,wAt(t1)),q2=P(t1,-1,wAt(t1));
-      ctx.beginPath();ctx.moveTo(q1[0],q1[1]);ctx.lineTo(q2[0],q2[1]);ctx.stroke();
-    }
-  }
-  ctx.lineWidth=_PL_LW.thin;
-}
 // 吊鉤組（滑車＋吊鉤）
 function _plHook(ctx,x,y){
   ctx.strokeStyle='#111';ctx.lineWidth=_PL_LW.thin;
@@ -13321,25 +13299,6 @@ function _plCasingTube(ctx,x,y1,y2,w){
   ctx.beginPath();ctx.moveTo(x-w/2-3,y2-7);ctx.lineTo(x-w/2,y2);ctx.moveTo(x+w/2+3,y2-7);ctx.lineTo(x+w/2,y2);ctx.stroke();
 }
 // 全套管搖管機（油壓夾＋迴轉環）
-function _plCasingRig(ctx,cx,gy,cw){
-  cw=cw||34;
-  ctx.strokeStyle='#111';ctx.lineWidth=_PL_LW.med;
-  ctx.strokeRect(cx-cw/2-30,gy-14,30,14);ctx.strokeRect(cx+cw/2,gy-14,30,14);       // 底座
-  _plHatch(ctx,cx-cw/2-30,gy-14,30,14,6);_plHatch(ctx,cx+cw/2,gy-14,30,14,6);
-  ctx.strokeRect(cx-cw/2-10,gy-26,cw+20,12);                                        // 迴轉環
-  ctx.lineWidth=_PL_LW.thin;
-  ctx.beginPath();ctx.moveTo(cx-cw/2-10,gy-20);ctx.lineTo(cx+cw/2+10,gy-20);ctx.stroke();
-  // 油壓缸（左右各一）
-  [[-1],[1]].forEach(function(s){
-    var d=s[0];
-    ctx.lineWidth=_PL_LW.thin;
-    ctx.strokeRect(cx+d*(cw/2+8),gy-42,d*18,9);
-    ctx.beginPath();ctx.moveTo(cx+d*(cw/2+8),gy-37.5);ctx.lineTo(cx+d*(cw/2+2),gy-31);ctx.stroke();
-  });
-  // 夾爪
-  ctx.lineWidth=_PL_LW.med;
-  ctx.strokeRect(cx-cw/2-5,gy-33,5,9);ctx.strokeRect(cx+cw/2,gy-33,5,9);
-}
 // 混凝土攪拌車
 function _plMixer(ctx,x,gy){
   ctx.strokeStyle='#111';ctx.lineWidth=_PL_LW.med;
@@ -13420,16 +13379,6 @@ function _plHV(ctx,x,y1,y2,w){
   ctx.beginPath();ctx.moveTo(x-w/2,y1);ctx.lineTo(x+w/2,y1);ctx.moveTo(x-w/2,y2);ctx.lineTo(x+w/2,y2);ctx.stroke();
 }
 // 鋼板樁（波形斷面立面）
-function _plSheetV(ctx,x,y1,y2){
-  ctx.strokeStyle='#111';ctx.lineWidth=_PL_LW.med;
-  ctx.beginPath();
-  for(var y=y1;y<=y2;y+=1.6){var d=Math.sin(y/8)*4.5;if(y===y1)ctx.moveTo(x+d,y);else ctx.lineTo(x+d,y);}
-  ctx.stroke();
-  ctx.lineWidth=_PL_LW.hair;
-  ctx.beginPath();
-  for(var y2b=y1;y2b<=y2;y2b+=1.6){var d2=Math.sin(y2b/8)*4.5;if(y2b===y1)ctx.moveTo(x+d2+5,y2b);else ctx.lineTo(x+d2+5,y2b);}
-  ctx.stroke();
-}
 // 鋼筋籠（主筋＋螺旋箍）
 function _plCage(ctx,x,y1,y2,w){
   w=w||28;
@@ -13607,14 +13556,6 @@ function dimV(ctx,x,y1,y2,label){
 }
 
 // ── 引出標註：折線＋端點＋文字 ──
-function leader(ctx,tx,ty,px,py,label,opt){
-  opt=opt||{};
-  L(ctx,LW.thin);
-  const midx=px+(tx-px)*.4;
-  ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(midx,ty);ctx.lineTo(tx,ty);ctx.stroke();
-  ctx.beginPath();ctx.arc(px,py,1.6,0,Math.PI*2);ctx.fill();
-  txt(ctx,label,tx+(tx>px?3:-3),ty+3.5,{a:tx>px?'left':'right',s:opt.s||10,b:opt.b});
-}
 
 // ══════════════ 機具元件（全新繪製） ══════════════
 
@@ -13735,27 +13676,6 @@ function slings(ctx,hx,hy,p1,p2){
 }
 
 // 全套管搖管機（油壓夾管環＋撐座＋油壓缸）
-function oscillator(ctx,cx,gy,o){
-  o=Object.assign({w:96,h:34},o||{});
-  const w=o.w,h=o.h;
-  L(ctx,LW.med);
-  rect(ctx,cx-w/2,gy-h,w,h*0.42);                 // 上夾環座
-  rect(ctx,cx-w/2+8,gy-h*0.5,w-16,h*0.5-3);       // 底座
-  L(ctx,LW.thin);
-  // 左右外伸撐腳＋油壓缸
-  [[-1,0],[1,0]].forEach(([sd])=>{
-    const ox=cx+sd*w/2;
-    seg(ctx,ox,gy-h+4,ox+sd*16,gy-3);
-    rect(ctx,ox+sd*16-3,gy-3,6,3);
-    // 迴轉油壓缸（斜置）
-    path(ctx,[[ox+sd*4,gy-h+2],[ox+sd*22,gy-h+13]]);ctx.stroke();
-    circ(ctx,ox+sd*22,gy-h+13,2.2);
-  });
-  // 夾管環螺栓
-  ctx.fillStyle='#111';
-  for(let i=0;i<4;i++)ctx.fillRect(cx-w/2+8+i*(w-16)/3,gy-h+3,2.2,2.2);
-  ctx.fillStyle='#111';
-}
 
 // 鋼套管（雙壁＋管節接頭；topY..botY）
 function casing(ctx,cx,topY,botY,r){
@@ -13774,25 +13694,6 @@ function casing(ctx,cx,topY,botY,r){
 }
 
 // 抓斗（Hammer grab，開/合）
-function hammerGrab(ctx,cx,y,o){
-  o=Object.assign({open:false,s:1},o||{});
-  const s=o.s;
-  L(ctx,LW.med);
-  rect(ctx,cx-7*s,y,14*s,26*s);                        // 錘體
-  L(ctx,LW.hair);
-  seg(ctx,cx-7*s,y+7*s,cx+7*s,y+7*s);
-  seg(ctx,cx-7*s,y+14*s,cx+7*s,y+14*s);
-  L(ctx,LW.med);
-  const oy=y+26*s, spread=o.open?12*s:4*s;
-  // 兩片斗瓣
-  path(ctx,[[cx-6*s,oy],[cx-spread,oy+11*s],[cx-spread*0.55,oy+18*s],[cx-1.5*s,oy+9*s]],true);ctx.stroke();
-  path(ctx,[[cx+6*s,oy],[cx+spread,oy+11*s],[cx+spread*0.55,oy+18*s],[cx+1.5*s,oy+9*s]],true);ctx.stroke();
-  // 斗齒
-  L(ctx,LW.thin);
-  [[-1,0],[1,0]].forEach(([sd])=>{
-    for(let i=0;i<3;i++)seg(ctx,cx+sd*(spread*0.55+i*2.4*s),oy+18*s-i*2.6*s,cx+sd*(spread*0.55+i*2.4*s+2*s),oy+20*s-i*2.6*s);
-  });
-}
 
 // H 型鋼（立面：翼板雙線＋腹板中線；水平或垂直）
 function hSteelV(ctx,cx,topY,botY,w){
@@ -13816,23 +13717,6 @@ function theodolite(ctx,x,gy,s){
 }
 
 // 工程人員（帶安全帽，多姿勢）
-function worker(ctx,x,gy,pose,flip){
-  const f=flip?-1:1;
-  ctx.save();ctx.translate(x,gy);ctx.scale(f,1);
-  L(ctx,LW.med);
-  circ(ctx,0,-30,4.6);                                    // 頭
-  L(ctx,LW.thin);
-  ctx.beginPath();ctx.arc(0,-31.4,5.6,Math.PI,0);ctx.stroke(); // 安全帽
-  seg(ctx,-6.4,-31.4,6.4,-31.4);
-  L(ctx,LW.med);
-  seg(ctx,0,-25,0,-11);                                   // 身
-  if(pose==='point'){ seg(ctx,0,-22,11,-27); seg(ctx,0,-20,-6,-13); }
-  else if(pose==='hold'){ seg(ctx,0,-22,9,-18); seg(ctx,0,-22,10,-24); }
-  else if(pose==='pull'){ seg(ctx,0,-22,10,-16); seg(ctx,0,-20,8,-12); }
-  else { seg(ctx,0,-22,7,-15); seg(ctx,0,-22,-7,-15); }
-  seg(ctx,0,-11,5,0); seg(ctx,0,-11,-5,0);                // 腳
-  ctx.restore();
-}
 
 // 測錘（垂直度檢測）
 function plumb(ctx,x,topY,botY){
@@ -13850,35 +13734,6 @@ function tremie(ctx,cx,topY,botY){
 }
 
 // 灌漿設備組：儲料槽（Silo）＋攪拌機＋灌漿泵＋壓送管
-function groutPlant(ctx,x,gy){
-  // Silo
-  L(ctx,LW.med);
-  rect(ctx,x,gy-64,26,38);
-  path(ctx,[[x,gy-26],[x+13,gy-8],[x+26,gy-26]],true);ctx.stroke();
-  seg(ctx,x+3,gy-8,x+3,gy);seg(ctx,x+23,gy-8,x+23,gy);
-  L(ctx,LW.hair);seg(ctx,x,gy-52,x+26,gy-52);
-  txt(ctx,'水泥槽',x+13,gy-70,{a:'center',s:8.5});
-  // 攪拌機（雙筒）
-  const mx=x+40;
-  L(ctx,LW.med);
-  rect(ctx,mx,gy-30,34,22);
-  circ(ctx,mx+9,gy-19,6.5);circ(ctx,mx+25,gy-19,6.5);
-  L(ctx,LW.thin);
-  seg(ctx,mx+9,gy-25.5,mx+9,gy-12.5);seg(ctx,mx+2.5,gy-19,mx+15.5,gy-19);
-  seg(ctx,mx+25,gy-25.5,mx+25,gy-12.5);seg(ctx,mx+18.5,gy-19,mx+31.5,gy-19);
-  seg(ctx,mx+4,gy-8,mx+4,gy);seg(ctx,mx+30,gy-8,mx+30,gy);
-  txt(ctx,'拌漿機',mx+17,gy-36,{a:'center',s:8.5});
-  // 灌漿泵
-  const px=mx+46;
-  L(ctx,LW.med);
-  rect(ctx,px,gy-24,30,16);
-  circ(ctx,px+8,gy-16,5);
-  L(ctx,LW.thin);
-  seg(ctx,px+8,gy-21,px+8,gy-11);
-  seg(ctx,px+4,gy-8,px+4,gy);seg(ctx,px+26,gy-8,px+26,gy);
-  txt(ctx,'灌漿泵',px+15,gy-30,{a:'center',s:8.5});
-  return {outX:px+30,outY:gy-18};
-}
 // 壓送管（沿地面低垂再上立管）
 function groutHose(ctx,x1,y1,x2,y2,gy){
   L(ctx,LW.thin);
@@ -13890,263 +13745,33 @@ function groutHose(ctx,x1,y1,x2,y2,gy){
 }
 
 // 面板：外框＋步驟編號圓標＋標題欄＋說明帶
-function panelFrame(ctx,W,H,no,title,notes){
-  L(ctx,LW.thick);
-  ctx.strokeRect(6,6,W-12,H-12);
-  L(ctx,LW.thin);
-  ctx.strokeRect(9,9,W-18,H-18);
-  // 標題欄（頂）
-  const th=30;
-  L(ctx,LW.thin);seg(ctx,9,9+th,W-9,9+th);
-  L(ctx,LW.med);circ(ctx,28,9+th/2,10);
-  txt(ctx,String(no),28,9+th/2+0.5,{a:'center',bl:'middle',s:13,b:1,bg:false});
-  txt(ctx,title,44,9+th/2+1,{bl:'middle',s:13.5,b:1,bg:false});
-  // 說明帶（底）
-  const nh=notes.length*15+12;
-  L(ctx,LW.thin);seg(ctx,9,H-9-nh,W-9,H-9-nh);
-  notes.forEach((s,i)=>txt(ctx,'· '+s,18,H-9-nh+16+i*15,{s:10.5,bg:false,c:'#222'}));
-  return {top:9+th,bot:H-9-nh};
-}
 if(typeof module!=='undefined')module.exports={};
 
 // ══════════════ 機具庫 v2 追加（打設／引孔／灌注／支撐／構台／地錨／CCP） ══════════════
 
 // 振動樁錘（吊車懸吊式）：避振彈簧箱＋偏心機體＋油壓夾頭，夾住樁頂
-function vibroHammer(ctx,cx,topY,o){
-  o=Object.assign({s:1},o||{});
-  const s=o.s;
-  // 吊耳＋避振彈簧箱
-  L(ctx,LW.med);
-  rect(ctx,cx-16*s,topY,32*s,10*s);
-  L(ctx,LW.thin);
-  for(let i=0;i<4;i++){       // 彈簧（鋸齒）
-    const sx=cx-12*s+i*8*s;
-    path(ctx,[[sx,topY+10*s],[sx+2*s,topY+13*s],[sx-2*s,topY+16*s],[sx+2*s,topY+19*s],[sx,topY+22*s]]);ctx.stroke();
-  }
-  // 偏心振動機體
-  L(ctx,LW.med);
-  rect(ctx,cx-20*s,topY+22*s,40*s,22*s);
-  L(ctx,LW.thin);
-  circ(ctx,cx-9*s,topY+33*s,6*s);circ(ctx,cx+9*s,topY+33*s,6*s);   // 偏心輪
-  circ(ctx,cx-9*s,topY+33*s,1.6*s,'#111');circ(ctx,cx+9*s,topY+33*s,1.6*s,'#111');
-  L(ctx,LW.hair);seg(ctx,cx-20*s,topY+27*s,cx+20*s,topY+27*s);
-  // 油壓夾頭
-  L(ctx,LW.med);
-  rect(ctx,cx-12*s,topY+44*s,24*s,8*s);
-  path(ctx,[[cx-9*s,topY+52*s],[cx-5*s,topY+58*s]]);ctx.stroke();
-  path(ctx,[[cx+9*s,topY+52*s],[cx+5*s,topY+58*s]]);ctx.stroke();
-  // 振動符號
-  L(ctx,LW.thin);
-  [[-27,0],[27,0]].forEach(([dx])=>{
-    for(let i=0;i<3;i++)seg(ctx,cx+dx*s-4*s,topY+28*s+i*5*s,cx+dx*s+4*s,topY+28*s+i*5*s);
-  });
-  return topY+58*s;   // 夾頭底（樁頂位置）
-}
 
 // 高壓幫浦（水刀用）：引擎＋三缸泵＋壓力表
-function waterPump(ctx,x,gy){
-  L(ctx,LW.med);
-  rect(ctx,x,gy-26,44,20);                       // 底座機體
-  L(ctx,LW.thin);
-  rect(ctx,x+3,gy-23,16,12);                     // 引擎
-  seg(ctx,x+5,gy-19,x+17,gy-19);
-  rect(ctx,x+24,gy-22,16,12);                    // 泵頭
-  for(let i=0;i<3;i++)seg(ctx,x+27+i*5,gy-22,x+27+i*5,gy-10);
-  circ(ctx,x+40,gy-28,3.4);                      // 壓力表
-  seg(ctx,x+40,gy-28,x+42,gy-30);
-  seg(ctx,x+40,gy-25,x+40,gy-22);
-  L(ctx,LW.thin);
-  seg(ctx,x+4,gy-6,x+4,gy);seg(ctx,x+40,gy-6,x+40,gy);
-  txt(ctx,'高壓幫浦',x+22,gy-32,{a:'center',s:8.5});
-}
 // 水刀管（綁樁側）＋噴射扇形
-function waterJetPipe(ctx,px,topY,botY,side){
-  const d=side||1;
-  L(ctx,LW.thin);
-  seg(ctx,px+d*4,topY,px+d*4,botY-4);
-  for(let y=topY+26;y<botY-10;y+=42)seg(ctx,px,y,px+d*4,y);     // 綁紮
-  // 噴嘴扇形水花
-  L(ctx,LW.hair);
-  for(let i=-2;i<=2;i++){
-    ctx.beginPath();ctx.moveTo(px+d*4,botY-4);
-    ctx.lineTo(px+d*4+i*4,botY+8);ctx.stroke();
-  }
-}
 
 // 空壓機（拖車式）＋風管
-function airComp(ctx,x,gy){
-  L(ctx,LW.med);
-  rect(ctx,x,gy-30,52,22);
-  ctx.beginPath();ctx.arc(x+10,gy-4,4,0,Math.PI*2);ctx.stroke();  // 輪
-  ctx.beginPath();ctx.arc(x+42,gy-4,4,0,Math.PI*2);ctx.stroke();
-  L(ctx,LW.thin);
-  seg(ctx,x+4,gy-24,x+48,gy-24);                 // 面板縫
-  rect(ctx,x+6,gy-21,10,8);                      // 儀表面板
-  circ(ctx,x+11,gy-17,2.2);
-  for(let i=0;i<5;i++)seg(ctx,x+24+i*5,gy-30,x+24+i*5,gy-24);   // 散熱柵
-  txt(ctx,'空壓機',x+26,gy-35,{a:'center',s:8.5});
-}
 // 氣動槌頭（樁底鑿）
-function airHammerTip(ctx,px,y){
-  L(ctx,LW.med);
-  rect(ctx,px-6,y,12,16);
-  path(ctx,[[px-6,y+16],[px,y+26],[px+6,y+16]],true);ctx.stroke();
-  L(ctx,LW.hair);
-  for(let i=-1;i<=1;i++)seg(ctx,px+i*5,y+27,px+i*6,y+33);        // 破碎線
-}
 
 // 鑽堡（履帶＋導桿＋簇狀潛孔錘）
-function clusterDrill(ctx,cx,gy,o){
-  o=Object.assign({depth:70,s:1},o||{});
-  const s=o.s;
-  crawlerTracks(ctx,cx+26*s,gy-20*s,84*s,20*s);
-  L(ctx,LW.med);
-  rect(ctx,cx+34*s,gy-44*s,58*s,24*s);                 // 機體
-  L(ctx,LW.thin);rect(ctx,cx+74*s,gy-40*s,14*s,12*s,'#fff');  // 駕駛室窗
-  // 導桿（貼樁位）
-  L(ctx,LW.med);
-  seg(ctx,cx-8*s,gy-176*s,cx-8*s,gy);seg(ctx,cx+8*s,gy-176*s,cx+8*s,gy);
-  L(ctx,LW.hair);
-  for(let y=gy-170*s;y<gy-6*s;y+=12*s)seg(ctx,cx-8*s,y,cx+8*s,y+8*s);
-  L(ctx,LW.med);
-  path(ctx,[[cx+10*s,gy-120*s],[cx+40*s,gy-42*s]]);ctx.stroke(); // 斜撐
-  // 迴轉頭＋鑽桿＋簇狀潛孔錘
-  rect(ctx,cx-12*s,gy-150*s,24*s,16*s);
-  seg(ctx,cx,gy-134*s,cx,gy+o.depth);
-  rect(ctx,cx-11*s,gy+o.depth,22*s,14*s);
-  L(ctx,LW.thin);
-  for(let i=-1;i<=1;i++){circ(ctx,cx+i*7*s,gy+o.depth+14*s,3.4*s);}  // 簇狀鑽頭
-  L(ctx,LW.hair);
-  for(let i=-2;i<=2;i++)seg(ctx,cx+i*4*s,gy+o.depth+19*s,cx+i*5*s,gy+o.depth+25*s);
-}
 
 // 履帶式鑽掘機（導桿＋迴轉動力頭＋螺旋鑽桿）
-function crawlerAuger(ctx,cx,gy,o){
-  o=Object.assign({depth:100,augerTop:null,s:1,mastH:210},o||{});
-  const s=o.s;
-  crawlerTracks(ctx,cx+28*s,gy-20*s,88*s,20*s);
-  L(ctx,LW.med);
-  rect(ctx,cx+34*s,gy-46*s,62*s,26*s);
-  L(ctx,LW.thin);rect(ctx,cx+78*s,gy-42*s,14*s,13*s,'#fff');
-  // 導桿
-  L(ctx,LW.med);
-  seg(ctx,cx-9*s,gy-o.mastH*s,cx-9*s,gy);seg(ctx,cx+9*s,gy-o.mastH*s,cx+9*s,gy);
-  seg(ctx,cx-9*s,gy-o.mastH*s,cx+9*s,gy-o.mastH*s);
-  L(ctx,LW.hair);
-  for(let y=gy-(o.mastH-8)*s;y<gy-8*s;y+=13*s)seg(ctx,cx-9*s,y,cx+9*s,y+9*s);
-  L(ctx,LW.med);
-  path(ctx,[[cx+11*s,gy-(o.mastH-64)*s],[cx+44*s,gy-44*s]]);ctx.stroke();
-  circ(ctx,cx,gy-(o.mastH+6)*s,4*s);                       // 頂部滑輪
-  // 迴轉動力頭
-  const hdY=(o.augerTop!=null?o.augerTop:gy-o.mastH*s+34*s);
-  rect(ctx,cx-13*s,hdY,26*s,18*s);
-  L(ctx,LW.hair);seg(ctx,cx-13*s,hdY+9*s,cx+13*s,hdY+9*s);
-  // 螺旋鑽桿
-  auger(ctx,cx,hdY+18*s,gy+o.depth,9*s);
-  return hdY;
-}
 // 螺旋鑽桿（螺葉）
-function auger(ctx,cx,topY,botY,r){
-  L(ctx,LW.med);
-  seg(ctx,cx,topY,cx,botY);
-  L(ctx,LW.thin);
-  for(let y=topY+8;y<botY-10;y+=12){
-    ctx.beginPath();ctx.moveTo(cx-r,y+6);
-    ctx.quadraticCurveTo(cx,y-3,cx+r,y+6);ctx.stroke();
-  }
-  path(ctx,[[cx-4,botY],[cx,botY+8],[cx+4,botY]],true);ctx.stroke();  // 鑽尖
-}
 
 // 混凝土攪拌車
-function mixerTruck(ctx,x,gy,o){
-  o=Object.assign({flip:false,s:1},o||{});
-  const s=o.s,f=o.flip?-1:1;
-  ctx.save();ctx.translate(x,gy);ctx.scale(f*s,s);
-  L(ctx,LW.med);
-  rect(ctx,-56,-26,26,20);                        // 車頭
-  L(ctx,LW.thin);rect(ctx,-52,-22,10,9,'#fff');
-  L(ctx,LW.med);
-  rect(ctx,-30,-18,86,12);                        // 車架
-  [ -44,-16, 12, 30, 44 ].forEach(wx=>{circ(ctx,wx,-2,7);circ(ctx,wx,-2,2.6);});
-  // 攪拌鼓（斜置橢圓）
-  ctx.save();ctx.translate(12,-38);ctx.rotate(-0.18);
-  ctx.beginPath();ctx.ellipse(0,0,34,17,0,0,Math.PI*2);ctx.stroke();
-  L(ctx,LW.hair);
-  for(let i=-2;i<=2;i++){ctx.beginPath();ctx.ellipse(i*11,0,5,16.2,0,-1.2,1.2);ctx.stroke();}
-  ctx.restore();
-  L(ctx,LW.thin);
-  path(ctx,[[44,-44],[58,-34],[64,-22]]);ctx.stroke();   // 卸料槽
-  ctx.restore();
-}
 
 // 鋼筋籠（主筋＋螺旋箍）
-function rebarCage(ctx,cx,topY,botY,r){
-  L(ctx,LW.med);
-  seg(ctx,cx-r,topY,cx-r,botY);seg(ctx,cx+r,topY,cx+r,botY);
-  L(ctx,LW.hair);
-  seg(ctx,cx-r*0.4,topY,cx-r*0.4,botY);seg(ctx,cx+r*0.4,topY,cx+r*0.4,botY);
-  L(ctx,LW.thin);
-  for(let y=topY+4;y<botY-4;y+=9){
-    ctx.beginPath();ctx.moveTo(cx-r,y);
-    ctx.quadraticCurveTo(cx,y+4.5,cx+r,y);ctx.stroke();
-  }
-}
 
 // 鋼板樁（立面：板面＋兩側鎖口）
-function sheetPileV(ctx,cx,topY,botY,w){
-  L(ctx,LW.med);
-  seg(ctx,cx-w/2,topY,cx-w/2,botY);seg(ctx,cx+w/2,topY,cx+w/2,botY);
-  seg(ctx,cx-w/2,topY,cx+w/2,topY);seg(ctx,cx-w/2,botY,cx+w/2,botY);
-  L(ctx,LW.hair);
-  seg(ctx,cx-w/2+3,topY,cx-w/2+3,botY);seg(ctx,cx+w/2-3,topY,cx+w/2-3,botY);  // 鎖口
-  L(ctx,LW.thin);dash(ctx,[5,3]);seg(ctx,cx,topY,cx,botY);dash(ctx);
-}
 // 鋼軌樁（立面：軌頭寬、腹窄）
-function railPileV(ctx,cx,topY,botY,w){
-  L(ctx,LW.med);
-  seg(ctx,cx-w/2,topY,cx-w/2,botY);seg(ctx,cx+w/2,topY,cx+w/2,botY);
-  seg(ctx,cx-w/2,topY,cx+w/2,topY);seg(ctx,cx-w/2,botY,cx+w/2,botY);
-  L(ctx,LW.hair);
-  seg(ctx,cx-w/6,topY,cx-w/6,botY);seg(ctx,cx+w/6,topY,cx+w/6,botY);  // 腹板
-  L(ctx,LW.thin);dash(ctx,[5,3]);seg(ctx,cx,topY,cx,botY);dash(ctx);
-}
 
 // 挖土機（開挖／吊裝配合）
-function excavator(ctx,x,gy,o){
-  o=Object.assign({s:1,flip:false,reach:120,dig:40},o||{});
-  const s=o.s,f=o.flip?-1:1;
-  ctx.save();ctx.translate(x,gy);ctx.scale(f*s,s);
-  crawlerTracks(ctx,-40,-18,80,18);
-  L(ctx,LW.med);
-  rect(ctx,-36,-27,72,9);
-  rect(ctx,-38,-52,40,25);                        // 機房
-  L(ctx,LW.thin);rect(ctx,-12,-48,12,12,'#fff');  // 窗
-  L(ctx,LW.med);rect(ctx,-52,-46,14,16);          // 配重
-  ctx.restore();
-  // 大臂＋小臂＋鏟斗（未翻轉座標計算）
-  const bx=x+f*6*o.s, by=gy-44*o.s;
-  const ex=x+f*o.reach*o.s, ey=gy+o.dig;
-  const mx=(bx+ex)/2+f*10*o.s, my=Math.min(by,ey)-52*o.s;
-  L(ctx,LW.med);
-  path(ctx,[[bx,by],[mx,my]]);ctx.stroke();
-  path(ctx,[[mx,my],[ex,ey]]);ctx.stroke();
-  L(ctx,LW.thin);
-  path(ctx,[[bx+f*8*o.s,by-6*o.s],[(bx+mx)/2,(by+my)/2-8]]);ctx.stroke();   // 油壓缸
-  // 鏟斗
-  L(ctx,LW.med);
-  path(ctx,[[ex,ey],[ex-f*4*o.s,ey+14*o.s],[ex+f*14*o.s,ey+16*o.s],[ex+f*12*o.s,ey+2*o.s]],true);ctx.stroke();
-  for(let i=0;i<3;i++)seg(ctx,ex+f*(2+i*5)*o.s,ey+16*o.s,ex+f*(3+i*5)*o.s,ey+20*o.s);
-}
 
 // 三角托架（銲於樁側，托圍令）
-function bracket(ctx,wx,y,d){
-  L(ctx,LW.med);
-  seg(ctx,wx,y,wx+d*22,y);
-  path(ctx,[[wx,y+20],[wx+d*22,y]]);ctx.stroke();
-  seg(ctx,wx,y,wx,y+20);
-  L(ctx,LW.thin);
-  circ(ctx,wx+d*8,y-3,1.6);circ(ctx,wx+d*16,y-3,1.6);   // U型螺栓孔
-}
 // H 型鋼水平構件（圍令／支撐，立面）
 function hBeamH(ctx,x1,x2,y,h){
   L(ctx,LW.med);
@@ -14157,45 +13782,9 @@ function hBeamH(ctx,x1,x2,y,h){
   L(ctx,LW.med);seg(ctx,x1,y-h/2,x1,y+h/2);seg(ctx,x2,y-h/2,x2,y+h/2);
 }
 // 油壓千斤頂（支撐預壓）＋壓力表
-function strutJack(ctx,x,y,h){
-  L(ctx,LW.med);
-  rect(ctx,x,y-h/2,16,h);                          // 缸體
-  rect(ctx,x+16,y-h/2+3,8,h-6);                    // 活塞
-  seg(ctx,x+24,y-h/2+3,x+24,y+h/2-3);
-  L(ctx,LW.thin);
-  circ(ctx,x+8,y-h/2-8,4);seg(ctx,x+8,y-h/2-8,x+10.5,y-h/2-10.5);   // 壓力表
-  seg(ctx,x+8,y-h/2-4,x+8,y-h/2);
-}
 // 覆工板（構台面）
-function deckPlanks(ctx,x1,x2,y){
-  L(ctx,LW.med);
-  seg(ctx,x1,y,x2,y);seg(ctx,x1,y-6,x2,y-6);
-  L(ctx,LW.thin);
-  for(let px=x1;px<x2;px+=26)seg(ctx,px,y-6,px,y);
-}
 
 // 地錨鑽機（斜導桿）
-function anchorRig(ctx,x,gy,o){
-  o=Object.assign({ang:-0.42,s:1,rodLen:150},o||{});   // ang：向下傾角（弧度）
-  const s=o.s;
-  crawlerTracks(ctx,x-44*s,gy-18*s,88*s,18*s);
-  L(ctx,LW.med);
-  rect(ctx,x-38*s,gy-44*s,58*s,26*s);
-  L(ctx,LW.thin);rect(ctx,x+2*s,gy-40*s,14*s,12*s,'#fff');
-  // 斜導桿（自機身前緣朝壁面下斜）
-  const mx=x-46*s,my=gy-30*s;
-  const dx=Math.cos(o.ang),dy=Math.sin(o.ang);
-  L(ctx,LW.med);
-  seg(ctx,mx-dx*0,my-dy*0,mx-dx*o.rodLen*s,my-dy*o.rodLen*s);
-  seg(ctx,mx-dx*0,my-dy*0+8*s,mx-dx*o.rodLen*s,my-dy*o.rodLen*s+8*s);
-  L(ctx,LW.thin);
-  path(ctx,[[mx-dx*30*s,my-dy*30*s+8*s],[x-24*s,gy-18*s]]);ctx.stroke();  // 斜撐
-  // 迴轉頭
-  L(ctx,LW.med);
-  ctx.save();ctx.translate(mx-dx*24*s,my-dy*24*s+4*s);ctx.rotate(o.ang);
-  ctx.strokeRect(-10*s,-8*s,20*s,16*s);ctx.restore();
-  return {mx:mx,my:my+4*s};
-}
 // 鋼絞線束（斜向）
 function strandBundle(ctx,x1,y1,x2,y2){
   L(ctx,LW.thin);
@@ -14267,14 +13856,6 @@ function grout(ctx,cx,r,topY,botY){
   L(ctx,LW.thin);seg(ctx,cx-r,topY,cx+r,topY);
 }
 // 已完成樁列（背景，畫在樁位左側）
-function doneRow(ctx,kind,n,x0,sp,topY){
-  for(let i=0;i<n;i++){
-    const px=x0+i*sp;
-    if(kind==='sheet')sheetPileV(ctx,px,topY,SOIL_B-30,12);
-    else if(kind==='rail')railPileV(ctx,px,topY,SOIL_B-30,11);
-    else hSteelV(ctx,px,topY,SOIL_B-30,12);
-  }
-}
 function pileV(ctx,kind,cx,topY,botY,w){
   if(kind==='sheet')sheetPileV(ctx,cx,topY,botY,w);
   else if(kind==='rail')railPileV(ctx,cx,topY,botY,w);
@@ -14366,40 +13947,6 @@ function renderSheetPages(sheet){
 }
 // 舊介面（單張長圖）——保留給既有腳本使用
 // 渲染一張圖（sheet={title,code,panels:[{t,n1,n2,draw}]}），回傳 dataURL
-function renderSheet(sheet){
-  const N=sheet.panels.length;
-  const ROWS=Math.ceil(N/ENG.COLS);
-  const SW=ENG.MARG*2+ENG.COLS*ENG.PW+(ENG.COLS-1)*ENG.GAP;
-  const SH=ENG.HEAD+ENG.MARG+ROWS*(ENG.PH+ENG.GAP);
-  const cv=document.createElement('canvas');
-  cv.width=SW*ENG.SCALE;cv.height=SH*ENG.SCALE;
-  const g=cv.getContext('2d');
-  g.scale(ENG.SCALE,ENG.SCALE);
-  g.fillStyle='#fff';g.fillRect(0,0,SW,SH);
-  ctxInit(g);
-  // 圖紙標題欄
-  L(g,LW.heavy);g.strokeRect(ENG.MARG,14,SW-2*ENG.MARG,ENG.HEAD-26);
-  L(g,LW.thin);seg(g,ENG.MARG,14+34,SW-ENG.MARG,14+34);
-  txt(g,'施工步驟示意圖　—　'+sheet.title,SW/2,14+23,{a:'center',s:17,b:1,bg:false});
-  txt(g,'豐有工程有限公司　FONG-YOU ENGINEERING',ENG.MARG+12,14+52,{s:10.5,c:'#333',bg:false});
-  txt(g,'圖號 '+(sheet.code||''),SW-ENG.MARG-12,14+52,{a:'right',s:10.5,c:'#333',bg:false});
-  txt(g,'本圖著作權屬豐有工程有限公司所有，未經書面同意不得重製、散布或作為投標／施工文件使用',
-      SW/2,14+52,{a:'center',s:10,c:'#555',bg:false});
-  sheet.panels.forEach((p,i)=>{
-    const col=i%ENG.COLS,row=(i/ENG.COLS)|0;
-    const ox=ENG.MARG+col*(ENG.PW+ENG.GAP),oy=ENG.HEAD+row*(ENG.PH+ENG.GAP);
-    g.save();g.translate(ox,oy);
-    g.fillStyle='#fff';g.fillRect(0,0,ENG.PW,ENG.PH);
-    ctxInit(g);
-    const fr=panelFrame(g,i+1,p.t,[p.n1||'',p.n2||''].filter(Boolean));
-    g.save();
-    g.beginPath();g.rect(10,fr.top+1,ENG.PW-20,fr.bot-fr.top-2);g.clip();
-    p.draw(g);
-    g.restore();g.restore();
-  });
-  sheetWatermark(g,SW,SH);
-  return cv.toDataURL('image/png');
-}
 
 /* ── lib_cad.js ── */
 // ══════ 機具改用豐有自有 CAD 圖庫（PL_VEC，取自使用者 DXF／施工流程圖）＋依工地實照重繪 ══════
@@ -14422,14 +13969,8 @@ function vec(ctx,name,x,y,h,o){
 const WK_POSE={hold:'wk0',point:'wk1',pull:'wk1',hammer:'wk2',crouch:'wk3',look:'wk4'};
 function worker(ctx,x,gy,pose,flip){vec(ctx,WK_POSE[pose]||'wk4',x,gy,36,{flip:!!flip});}
 // 全套管搖管機（立面，套管中心對齊 cx）
-function oscillator(ctx,cx,gy,o){
-  const H=(o&&o.H)||88,k=H/100;
-  vec(ctx,'oscil',cx+78*k,gy,H);
-}
 // 抓斗（頂點＝吊索末端 y）
-function hammerGrab(ctx,cx,y,o){const s=(o&&o.s)||1;vec(ctx,'grab',cx,y,72*s,{anchor:'top'});}
 // 混凝土攪拌車
-function mixerTruck(ctx,x,gy,o){o=o||{};vec(ctx,'mixtruck',x,gy,74*(o.s||1),{flip:!o.flip});}
 // 灌漿設備組：散裝水泥槽＋拌漿泵送機（豐有機具圖）
 function groutPlant(ctx,x,gy){
   vec(ctx,'silo',x-30,gy,92);vec(ctx,'mixpump',x+46,gy,32);
@@ -14460,25 +14001,6 @@ function cylinder(ctx,x1,y1,x2,y2,w){          // 油壓缸（缸體＋活塞桿
   path(ctx,[[x1+nx*w/2,y1+ny*w/2],[x1+ux*cl+nx*w/2,y1+uy*cl+ny*w/2],[x1+ux*cl-nx*w/2,y1+uy*cl-ny*w/2],[x1-nx*w/2,y1-ny*w/2]],true);ctx.stroke();
   L(ctx,LW.med);seg(ctx,x1+ux*cl,y1+uy*cl,x2,y2);
   L(ctx,LW.thin);circ(ctx,x1,y1,1.6);circ(ctx,x2,y2,1.6);
-}
-function excVibro(ctx,pileX,pileTopY,o){
-  o=o||{};const h=o.h||112,gy=o.gy||GY;
-  const headH=50,hy=pileTopY-headH/2;            // 振動頭中心
-  const bw=130*h/100,cx=pileX-bw*0.50-h*0.55;    // 機身中心（樁位左側）
-  vec(ctx,'exc_body',cx,gy,h,{flip:true,skip:[-65,0,-40,24]});   // 機身（略去原短臂）
-  // 大臂樞軸（機身前緣迴轉座上方）→ 中折點 → 小臂端（振動頭吊耳）
-  const px=cx+bw*0.22,py=gy-h*0.56;
-  const ex=pileX+8,ey=hy-headH*0.62;
-  const reach=Math.hypot(ex-px,ey-py);
-  const mx=(px+ex)/2-reach*0.08,my=Math.min(py,ey)-reach*0.42;
-  boomSeg(ctx,px,py,mx,my,12,9);                 // 大臂
-  boomSeg(ctx,mx,my,ex,ey,9,6);                  // 小臂
-  L(ctx,LW.med);circ(ctx,px,py,3);circ(ctx,mx,my,3);circ(ctx,ex,ey,2.4);
-  cylinder(ctx,px+18,py-2,(px+mx)/2+4,(py+my)/2+6,5);          // 大臂缸
-  cylinder(ctx,(px+mx)/2+4,(py+my)/2-8,mx+8,my+6,4);          // 小臂缸
-  vec(ctx,'vibro_head',pileX,hy+headH/2,headH);
-  L(ctx,LW.thin);[[-24,0],[24,0]].forEach(([dx])=>{for(let i=0;i<3;i++)seg(ctx,pileX+dx-4,hy-6+i*5,pileX+dx+4,hy-6+i*5);});
-  return hy;
 }
 // 空壓機（拖車式，Atlas Copco 型）
 function airComp(ctx,x,gy){
@@ -14519,31 +14041,7 @@ function clusterDrill(ctx,cx,gy,o){
   L(ctx,LW.thin);ctx.beginPath();ctx.moveTo(cx+9,top+6);ctx.bezierCurveTo(cx+40,top-10,cx+60,top+30,cx+64,gy-20);ctx.stroke();
 }
 // 移動式（卡車）吊車：豐有支撐／構台吊裝實機（伸縮臂；資產吊臂頭在 x=-44、頂端 y=0）
-function craneTruck(ctx,x,gy,o){
-  o=o||{};const H=o.H||230,k=H/100;
-  const overX=(o.overX!=null)?o.overX:x-44*k;
-  vec(ctx,'crane',overX+44*k,gy,H);
-  return {hx:overX,hy:gy-H+3*k};
-}
 // 地錨鑽機：履帶底盤＋機身＋可調斜向鑽架（進給樑＋迴轉頭＋鑽桿）
-function anchorRig(ctx,x,gy,o){
-  o=Object.assign({ang:-0.42,rodLen:150},o||{});
-  vec(ctx,'exc_body',x+24,gy,84,{flip:true,skip:[-65,0,-40,24]});
-  const dx=Math.cos(o.ang),dy=Math.sin(o.ang),nx=-dy,ny=dx;
-  const mx=x-40,my=gy-24;                                    // 鑽架下端（近壁）
-  const tx=mx-dx*o.rodLen,ty=my-dy*o.rodLen;                  // 鑽架上端
-  L(ctx,LW.med);
-  seg(ctx,mx+nx*5,my+ny*5,tx+nx*5,ty+ny*5);seg(ctx,mx-nx*5,my-ny*5,tx-nx*5,ty-ny*5);   // 進給樑雙軌
-  L(ctx,LW.hair);for(let t=0;t<o.rodLen;t+=10){const px=mx-dx*t,py=my-dy*t;seg(ctx,px+nx*5,py+ny*5,px-dx*6-nx*5,py-dy*6-ny*5);}
-  // 迴轉頭（滑座）
-  const hx=mx-dx*o.rodLen*0.55,hy=my-dy*o.rodLen*0.55;
-  ctx.save();ctx.translate(hx,hy);ctx.rotate(o.ang);L(ctx,LW.med);ctx.strokeRect(-12,-9,24,18);L(ctx,LW.thin);ctx.strokeRect(-8,-5,16,10);ctx.restore();
-  // 支臂與油壓缸（機身→鑽架中段）
-  L(ctx,LW.med);path(ctx,[[x-10,gy-46],[mx-dx*o.rodLen*0.35,my-dy*o.rodLen*0.35]]);ctx.stroke();
-  cylinder(ctx,x+2,gy-30,mx-dx*o.rodLen*0.15+nx*8,my-dy*o.rodLen*0.15+ny*8,5);
-  L(ctx,LW.thin);circ(ctx,x-10,gy-46,2.4);
-  return {mx:mx,my:my+4};
-}
 
 /* ── lib_v2.js ── */
 // ══════ v2：依使用者回饋重繪的機具與構件（載入於 lib_cad.js 之後，覆寫同名函式） ══════
@@ -14567,20 +14065,6 @@ function weldMarks(ctx,x,y1,y2,side,step){   // 電銲焊道記號（沿垂直�
 }
 
 // ── 挖土機底盤＋兩段臂（豐有 CAD 機身；原圖自帶的短臂略去，臂依末端銷位反解） ──
-function excArm(ctx,cx,gy,h,pin,o){
-  o=o||{};const k=h/100,f=o.faceLeft?1:-1,uS=o.faceLeft?-1:1;
-  vec(ctx,'exc_body',cx,gy,h,{flip:!o.faceLeft,skipFn:b=>b.minx<-36&&b.miny<60});
-  const P=[cx-f*22*k,gy-38*k];
-  const M=elbowPt(P,pin,o.Lb||150*k,o.Ls||120*k);
-  boomSeg(ctx,P[0],P[1],M[0],M[1],12*k,9*k);
-  boomSeg(ctx,M[0],M[1],pin[0],pin[1],9*k,6*k);
-  const s1=[cx-f*10*k,gy-26*k],e1=offN(P,M,0.5,uS*7*k);
-  cylinder(ctx,s1[0],s1[1],e1[0],e1[1],5*k);
-  const s2=offN(P,M,0.62,-uS*8*k),e2=offN(M,pin,0.3,-uS*5*k);
-  cylinder(ctx,s2[0],s2[1],e2[0],e2[1],4*k);
-  pinDot(ctx,P[0],P[1],3*k);pinDot(ctx,M[0],M[1],3*k);pinDot(ctx,pin[0],pin[1],2.4*k);
-  return {P,M};
-}
 // 震動機：長臂挖土機（SH490 LHD）＋振動樁錘，夾頭中心對正樁心、小臂端銷接於頭部吊耳
 function excVibro(ctx,pileX,pileTopY,o){
   o=o||{};const gy=o.gy||GY,h=o.h||104,HH=o.HH||50,kh=HH/100;
@@ -14594,34 +14078,7 @@ function excVibro(ctx,pileX,pileTopY,o){
   return pileTopY-HH;
 }
 // 200 型挖土機＋直立箱型臂：end='cup' 碗公頭（罩住樁頂加壓）／'hook' 伸縮臂吊鉤（支撐吊裝）
-function armRig(ctx,tipX,tipY,o){
-  o=Object.assign({end:'cup',rod:100,h:92,gy:GY,faceLeft:true,cupW:30},o||{});
-  const gy=o.gy;
-  const cx=(o.cx!=null)?o.cx:(o.faceLeft?tipX+150:tipX-150);
-  const rodBot=tipY-(o.end==='cup'?12:20);
-  const topY=rodBot-o.rod,pin=[tipX,topY];
-  excArm(ctx,cx,gy,o.h,pin,{faceLeft:o.faceLeft,Lb:o.Lb||150,Ls:o.Ls||120});
-  L(ctx,LW.med);rect(ctx,tipX-7,topY,14,o.rod*0.6);
-  rect(ctx,tipX-5,topY+o.rod*0.6,10,o.rod*0.4);
-  L(ctx,LW.hair);seg(ctx,tipX,topY+4,tipX,topY+o.rod*0.6-2);
-  if(o.end==='cup'){
-    const w=o.cupW;L(ctx,LW.med);
-    path(ctx,[[tipX-w/2,tipY+8],[tipX-w/2,tipY-12],[tipX+w/2,tipY-12],[tipX+w/2,tipY+8]]);ctx.stroke();
-    L(ctx,LW.thin);seg(ctx,tipX-w/2+3,tipY-8,tipX+w/2-3,tipY-8);
-  }else{
-    hookBlock(ctx,tipX,tipY-20,.9);
-  }
-  return pin;
-}
 // 挖土機開挖（鏟斗）
-function excDig(ctx,cx,gy,tip,o){
-  o=o||{};const h=o.h||92;
-  excArm(ctx,cx,gy,h,tip,{faceLeft:o.faceLeft!==false,Lb:140,Ls:110});
-  const f=o.faceLeft===false?1:-1,[ex,ey]=tip;
-  L(ctx,LW.med);
-  path(ctx,[[ex,ey],[ex-f*4,ey+14],[ex+f*14,ey+16],[ex+f*12,ey+2]],true);ctx.stroke();
-  for(let i=0;i<3;i++)seg(ctx,ex+f*(2+i*5),ey+16,ex+f*(3+i*5),ey+20);
-}
 
 // ── 鑽堡（履帶式鑽機）：鑽軌可直立或傾斜；用於鋼軌樁引孔、地錨鑽孔、CCP ──
 function drillRig(ctx,x,gy,o){
@@ -14665,21 +14122,6 @@ function drillRig(ctx,x,gy,o){
 }
 
 // ── 高空作業車（自走式）＋工作籃內人員 ──
-function boomLift(ctx,x,gy,basket,o){
-  o=o||{};
-  L(ctx,LW.med);rect(ctx,x-30,gy-14,60,9);
-  circ(ctx,x-20,gy-4,4.5);circ(ctx,x+20,gy-4,4.5);L(ctx,LW.hair);circ(ctx,x-20,gy-4,1.6);circ(ctx,x+20,gy-4,1.6);
-  L(ctx,LW.med);rect(ctx,x-14,gy-24,28,10);
-  const P=[x,gy-24],dir=basket[0]>x?1:-1;
-  const end=[basket[0]-dir*14,basket[1]-6];
-  const M=elbowPt(P,end,o.Lb||120,o.Ls||110);
-  boomSeg(ctx,P[0],P[1],M[0],M[1],8,7);boomSeg(ctx,M[0],M[1],end[0],end[1],7,5);
-  pinDot(ctx,P[0],P[1],2.6);pinDot(ctx,M[0],M[1],2.6);
-  L(ctx,LW.med);rect(ctx,basket[0]-14,basket[1]-6,28,6);
-  L(ctx,LW.thin);[-14,14].forEach(dx=>seg(ctx,basket[0]+dx,basket[1]-6,basket[0]+dx,basket[1]-30));
-  seg(ctx,basket[0]-14,basket[1]-30,basket[0]+14,basket[1]-30);seg(ctx,basket[0]-14,basket[1]-18,basket[0]+14,basket[1]-18);
-  vec(ctx,'wk1',basket[0],basket[1]-6,34,{flip:dir>0});
-}
 
 // ── 全套管搖管機（依豐有工地實照重繪：底座框＋左右機體塔＋夾管環＋迴轉／壓拔油壓缸） ──
 function oscillator(ctx,cx,gy,o){
@@ -14703,16 +14145,7 @@ function oscillator(ctx,cx,gy,o){
   ctx.fillStyle='#111';
 }
 // ── 取泥桶（套管內掘削取土；吊索垂吊） ──
-function mudBucket(ctx,cx,y,r){
-  const w=2*r-6,h=48;
-  L(ctx,LW.med);rect(ctx,cx-w/2,y,w,h);
-  L(ctx,LW.thin);seg(ctx,cx-w/2,y+6,cx+w/2,y+6);circ(ctx,cx-w/4,y+3,1.4);circ(ctx,cx+w/4,y+3,1.4);
-  seg(ctx,cx-w/2,y+h-6,cx+w/2,y+h-6);
-  for(let i=-1;i<=1;i++)seg(ctx,cx+i*5,y+h,cx+i*5,y+h+4);
-  L(ctx,LW.med);seg(ctx,cx-4,y,cx,y-8);seg(ctx,cx+4,y,cx,y-8);
-}
 // ── 混凝土攪拌車（flip=true 車尾朝左） ──
-function mixerTruck(ctx,x,gy,o){o=o||{};vec(ctx,'mixtruck',x,gy,74*(o.s||1),{flip:!!o.flip});}
 
 // ── 樁材：H 型鋼／鋼軌樁／鋼板樁 各自樣式 ──
 function railPileV(ctx,cx,topY,botY,w){     // 鋼軌：一側軌頭（雙線）、一側軌底（單線）、中央腹板
@@ -14731,23 +14164,6 @@ function sheetPileV(ctx,cx,topY,botY,w){    // 鋼板樁：板面＋兩側鎖口
   seg(ctx,cx-w/2+2,topY,cx-w/2+2,botY);seg(ctx,cx+w/2-2,topY,cx+w/2-2,botY);
   for(let y=topY+10;y<botY-4;y+=22){seg(ctx,cx-w/2,y,cx-w/2+2,y);seg(ctx,cx+w/2-2,y,cx+w/2,y);}
 }
-function sheetInterlockDetail(ctx,x,y,label){   // 兩片鋼板樁榫溝（鎖口）相扣平面示意
-  L(ctx,LW.med);circ(ctx,x,y,46,'#fff');
-  ctx.save();ctx.translate(x,y);
-  L(ctx,LW.med);
-  path(ctx,[[-38,0],[-30,14],[-9,14],[-2,0]]);ctx.stroke();
-  path(ctx,[[2,0],[9,-14],[30,-14],[38,0]]);ctx.stroke();
-  L(ctx,LW.hair);
-  path(ctx,[[-38,3],[-31,17],[-8,17],[-2,4]]);ctx.stroke();
-  path(ctx,[[2,-4],[8,-17],[31,-17],[38,-3]]);ctx.stroke();
-  L(ctx,LW.med);
-  ctx.beginPath();ctx.arc(-1,0,4.5,Math.PI*0.25,Math.PI*1.55);ctx.stroke();
-  ctx.beginPath();ctx.arc(1,0,4.5,Math.PI*1.25,Math.PI*2.55);ctx.stroke();
-  txt(ctx,'鎖口相扣',0,-28,{a:'center',s:8.5,bg:false});
-  txt(ctx,'前片',-22,28,{a:'center',s:8.5,bg:false});txt(ctx,'次片',22,28,{a:'center',s:8.5,bg:false});
-  ctx.restore();
-  txt(ctx,label,x,y+60,{a:'center',s:10,b:1});
-}
 // ── 鋼筋籠：頂端預留段（劣質段）不設箍筋 ──
 function rebarCage(ctx,cx,topY,botY,r,free){
   free=free||0;
@@ -14759,35 +14175,9 @@ function rebarCage(ctx,cx,topY,botY,r,free){
   for(let y=topY+free+4;y<botY-4;y+=9){ctx.beginPath();ctx.moveTo(cx-r,y);ctx.quadraticCurveTo(cx,y+4.5,cx+r,y);ctx.stroke();}
 }
 // ── 水刀管：電銲固定於樁側（焊道記號），樁尖噴射 ──
-function waterJetPipe(ctx,px,topY,botY,side){
-  const d=side||1;
-  L(ctx,LW.thin);
-  seg(ctx,px+d*4,topY+10,px+d*4,botY-4);
-  weldMarks(ctx,px+d*2,topY+30,botY-16,d,40);
-  L(ctx,LW.hair);
-  for(let i=-2;i<=2;i++){ctx.beginPath();ctx.moveTo(px+d*4,botY-4);ctx.lineTo(px+d*4+i*4,botY+8);ctx.stroke();}
-}
 // ── 構台帽：套入樁頂之箱型帽＋頂板（主樑擱置其上） ──
-function pileCap(ctx,px,topY,w){
-  L(ctx,LW.med);
-  rect(ctx,px-w/2-7,topY-10,w+14,20);
-  rect(ctx,px-w/2-11,topY-14,w+22,4);
-  L(ctx,LW.hair);seg(ctx,px-w/2-7,topY,px+w/2+7,topY);
-  return topY-14;
-}
 
 // ══════ v3 追加：螺旋鑽（長臂機掛迴轉頭）、鯊魚頭、高空作業車重繪、構台帽、擋土板、H 斷面、CAD 詳圖圈 ══════
-function excAuger(ctx,pileX,gy,o){   // 長臂挖土機掛液壓螺旋鑽：迴轉頭吊於小臂端銷，鑽桿徑＝引孔徑
-  o=Object.assign({depth:130,r:11,headY:gy-70,cx:pileX+165,h:104},o||{});
-  const pin=[pileX,o.headY];
-  excArm(ctx,o.cx,gy,o.h,pin,{faceLeft:true,Lb:168,Ls:142});
-  L(ctx,LW.med);rect(ctx,pileX-13,o.headY,26,22);
-  L(ctx,LW.thin);rect(ctx,pileX-9,o.headY+4,18,14);
-  L(ctx,LW.hair);seg(ctx,pileX-13,o.headY+11,pileX+13,o.headY+11);
-  L(ctx,LW.thin);ctx.beginPath();ctx.moveTo(pileX+13,o.headY+8);ctx.bezierCurveTo(pileX+36,o.headY+4,pileX+40,o.headY-30,pileX+22,o.headY-36);ctx.stroke();
-  auger(ctx,pileX,o.headY+22,gy+o.depth,o.r);
-  return o.headY;
-}
 function sharkGrab(ctx,cx,y,r){        // 鯊魚頭（重錘式抓斗）：錘體＋雙瓣斗＋斗齒
   const w=2*r-6;
   L(ctx,LW.med);rect(ctx,cx-w/2,y,w,40);
@@ -14821,14 +14211,6 @@ function boomLift(ctx,x,gy,basket){    // 自走式高空作業車：四輪底�
   L(ctx,LW.hair);seg(ctx,bx-16,by-19,bx+16,by-6);seg(ctx,bx+16,by-19,bx-16,by-6);
   vec(ctx,'wk1',bx,by-6,34,{flip:dir>0});
 }
-function pileCap(ctx,px,topY,w){       // 構台帽：箱型帽套入樁頂＋頂板＋側肋
-  L(ctx,LW.med);
-  rect(ctx,px-w/2-8,topY-12,w+16,22);
-  rect(ctx,px-w/2-12,topY-16,w+24,4);
-  L(ctx,LW.thin);seg(ctx,px-w/2-4,topY-12,px-w/2-4,topY+10);seg(ctx,px+w/2+4,topY-12,px+w/2+4,topY+10);
-  L(ctx,LW.hair);seg(ctx,px-w/2-8,topY,px+w/2+8,topY);
-  return topY-16;
-}
 function lagging(ctx,x,y1,y2){         // 擋土板（橫向木板堆疊於樁翼後）
   L(ctx,LW.thin);
   for(let y=y1+2;y<y2-7;y+=8)rect(ctx,x,y,9,6);
@@ -14837,31 +14219,6 @@ function hSection(ctx,x,y,w,h){        // H 型鋼斷面（翼板粗線＋腹板
   L(ctx,LW.med);seg(ctx,x-w/2,y-h/2,x+w/2,y-h/2);seg(ctx,x-w/2,y+h/2,x+w/2,y+h/2);
   L(ctx,LW.thin);seg(ctx,x,y-h/2,x,y+h/2);
   L(ctx,LW.hair);seg(ctx,x-w/2,y-h/2+2.2,x+w/2,y-h/2+2.2);seg(ctx,x-w/2,y+h/2-2.2,x+w/2,y+h/2-2.2);
-}
-function uBolt(ctx,x,y,w,h,down){      // U 型螺栓：開口朝上（down=false）或朝下
-  const d=down?-1:1;
-  L(ctx,LW.thin);
-  seg(ctx,x-w/2,y,x-w/2,y+d*h);seg(ctx,x+w/2,y,x+w/2,y+d*h);
-  ctx.beginPath();ctx.arc(x,y+d*h,w/2,down?Math.PI:0,down?Math.PI*2:Math.PI);ctx.stroke();
-  ctx.fillStyle='#111';ctx.fillRect(x-w/2-1.5,y-1.5,3,3);ctx.fillRect(x+w/2-1.5,y-1.5,3,3);
-}
-function detailCircle(ctx,dx,dy,r,asset,h,label,o){   // CAD 詳圖圈：白底圓＋資產＋圖名
-  o=o||{};
-  L(ctx,LW.med);circ(ctx,dx,dy,r,'#fff');
-  ctx.save();ctx.beginPath();ctx.arc(dx,dy,r-2,0,Math.PI*2);ctx.clip();
-  vec(ctx,asset,dx+(o.ox||0),dy-h/2+(o.oy||0),h,{anchor:'top',lw:LW.hair});
-  ctx.restore();
-  txt(ctx,label,dx,dy+r+14,{a:'center',s:10,b:1});
-}
-function excDig(ctx,cx,gy,tip,o){      // 挖土機開挖：機身＋兩段臂＋弧形鏟斗（斗齒）
-  o=o||{};const h=o.h||92;
-  excArm(ctx,cx,gy,h,tip,{faceLeft:o.faceLeft!==false,Lb:140,Ls:110});
-  const f=o.faceLeft===false?1:-1,[ex,ey]=tip;
-  L(ctx,LW.med);
-  ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(ex-f*3,ey+6);
-  ctx.quadraticCurveTo(ex-f*2,ey+22,ex+f*14,ey+22);ctx.lineTo(ex+f*16,ey+4);ctx.closePath();ctx.stroke();
-  L(ctx,LW.thin);for(let i=0;i<3;i++)seg(ctx,ex+f*(3+i*5),ey+22,ex+f*(4+i*5),ey+27);
-  L(ctx,LW.hair);seg(ctx,ex-f*1,ey+10,ex+f*15,ey+10);
 }
 
 /* ── lib_v3.js ── */
@@ -14900,32 +14257,8 @@ function waterJetPipeIn(ctx,cx,topY,botY,o){
     for(let i=-1;i<=1;i++){ctx.beginPath();ctx.arc(px+i*7,botY+16,2,0,7);ctx.stroke();}}
 }
 // H 斷面詳圖：水刀管在腹板／翼板交角（電焊固定）
-function hSectionPipeDetail(ctx,dx,dy,label){
-  L(ctx,LW.med);circ(ctx,dx,dy,40,'#fff');
-  const w=34,h=34;
-  hSection(ctx,dx,dy,w,h);
-  L(ctx,LW.med);circ(ctx,dx+5.2,dy-h/2+6,3.6);L(ctx,LW.hair);circ(ctx,dx+5.2,dy-h/2+6,1.4);
-  L(ctx,LW.hair);seg(ctx,dx+1.6,dy-h/2+8.5,dx+3,dy-h/2+11.5);seg(ctx,dx+8.5,dy-h/2+3,dx+11,dy-h/2+5);   // 焊道
-  txt(ctx,'翼板',dx+w/2+4,dy-h/2+4,{s:7.5,bg:false});txt(ctx,'腹板',dx+2,dy+h/2-2,{s:7.5,bg:false});
-  txt(ctx,label,dx,dy+54,{a:'center',s:10,b:1});
-  leader(ctx,dx-50,dy-56,dx+4,dy-h/2+4,'水刀管（電焊於交角）',{s:9});
-}
 
 // ── 液壓迴轉頭（螺旋鑽／氣動槌共用）：吊架＋齒輪箱＋側掛馬達＋油管＋輸出軸 ──
-function augerHead(ctx,x,y){
-  L(ctx,LW.med);
-  path(ctx,[[x-5,y],[x-13,y+9],[x+13,y+9],[x+5,y]],true);ctx.stroke();      // 吊架（連小臂端銷）
-  rect(ctx,x-17,y+9,34,22);                                                   // 齒輪箱
-  L(ctx,LW.thin);rect(ctx,x-13,y+13,26,14);seg(ctx,x-17,y+20,x-13,y+20);seg(ctx,x+13,y+20,x+17,y+20);
-  L(ctx,LW.med);rect(ctx,x+17,y+11,11,17);                                    // 液壓馬達
-  L(ctx,LW.hair);for(let i=0;i<5;i++)seg(ctx,x+18.5,y+14+i*3,x+26.5,y+14+i*3);
-  L(ctx,LW.med);rect(ctx,x-7,y+31,14,7);                                      // 輸出軸座
-  L(ctx,LW.thin);seg(ctx,x-4,y+38,x-4,y+43);seg(ctx,x+4,y+38,x+4,y+43);       // 連接套
-  L(ctx,LW.thin);
-  ctx.beginPath();ctx.moveTo(x+28,y+15);ctx.bezierCurveTo(x+40,y+12,x+36,y-8,x+22,y-18);ctx.stroke();   // 油管×2（接小臂）
-  ctx.beginPath();ctx.moveTo(x+28,y+21);ctx.bezierCurveTo(x+46,y+16,x+42,y-10,x+27,y-22);ctx.stroke();
-  return y+43;
-}
 // 簇狀潛孔錘頭（氣動槌頭）：本體＋三顆錘＋破碎線
 function clusterHead(ctx,cx,y,w){
   L(ctx,LW.med);rect(ctx,cx-w/2,y,w,14);
@@ -14961,32 +14294,9 @@ function airHoseTo(ctx,x1,y1,x2,y2,gy){
 }
 
 // ── 鋼筋籠與 H 型鋼假固定詳圖（孔口）：套管口橫擔吊住鋼筋籠、H 型鋼以短鋼筋焊接於籠 ──
-function cageFixDetail(ctx,dx,dy,r,label){
-  L(ctx,LW.med);circ(ctx,dx,dy,r,'#fff');
-  ctx.save();ctx.beginPath();ctx.arc(dx,dy,r-2,0,Math.PI*2);ctx.clip();
-  const R=22;                                     // 套管半徑（詳圖比例）
-  L(ctx,LW.med);seg(ctx,dx-R,dy-10,dx-R,dy+r);seg(ctx,dx+R,dy-10,dx+R,dy+r);            // 套管
-  L(ctx,LW.hair);seg(ctx,dx-R+3,dy-10,dx-R+3,dy+r);seg(ctx,dx+R-3,dy-10,dx+R-3,dy+r);
-  L(ctx,LW.med);seg(ctx,dx-R-14,dy-10,dx+R+14,dy-10);                                     // 套管口環
-  rebarCage(ctx,dx,dy-4,dy+r,R-7,0);                                                       // 鋼筋籠
-  L(ctx,LW.med);rect(ctx,dx-R-12,dy-16,2*R+24,6);                                          // 橫擔（吊住籠頂）
-  L(ctx,LW.thin);seg(ctx,dx-R+7,dy-16,dx-R+7,dy-4);seg(ctx,dx+R-7,dy-16,dx+R-7,dy-4);    // 吊耳
-  hSteelV(ctx,dx,dy-r+4,dy+r,10);                                                           // H 型鋼（籠內）
-  L(ctx,LW.thin);[[-1,dy+4],[1,dy+4],[-1,dy+22],[1,dy+22]].forEach(([s,y])=>{seg(ctx,dx+s*5,y,dx+s*(R-7),y);weldMarks(ctx,dx+s*5,y-3,y+3,s,20);});  // 連接短筋＋焊道
-  ctx.restore();
-  txt(ctx,label,dx,dy+r+14,{a:'center',s:10,b:1});
-}
 
 // ══════ 第五輪追加：水平攪拌車（無行架）、迴轉頭吊籠、更真實鏟斗、擋土壁立面（樁＋擋土板）、延滲漏止水板詳圖 ══════
 // 攪拌車（不上行架，車身放平）：略去資產內建的行架，並繞前輪觸地點旋轉至水平
-function mixerTruckLevel(ctx,x,gy,o){
-  o=o||{};const s=o.s||1,k=0.74*s,fl=o.rearLeft!==false,f=fl?-1:1;   // rearLeft：車尾（卸料口）朝左＝朝向孔口
-  const px=x+f*(-49)*k,py=gy;                                          // 前輪觸地點（旋轉樞軸）
-  ctx.save();ctx.translate(px,py);ctx.rotate(f*0.228);ctx.translate(-px,-py);
-  vec(ctx,'mixtruck',x,gy,74*s,{flip:fl,skipFn:b=>b.maxy>=99&&b.minx>-23});
-  ctx.restore();
-  return {chuteX:x+f*62*k,chuteY:gy-32*k};                             // 卸料口約略位置（放平後）
-}
 // 卸料溜槽：從攪拌車卸料口到漏斗（兩線槽身＋端板）
 function chute(ctx,x1,y1,x2,y2){
   const dx=x2-x1,dy=y2-y1,l=Math.hypot(dx,dy)||1,nx=-dy/l*3,ny=dx/l*3;
@@ -15004,61 +14314,8 @@ function excAugerLift(ctx,pileX,gy,o){
   return {hx:pileX,hy:rodTop+22};
 }
 // 挖土機開挖（第五輪：短臂＋更真實鏟斗——弧形斗背、平口刃、四齒、斗耳連桿）
-function excDig(ctx,cx,gy,tip,o){
-  o=o||{};const h=o.h||92;
-  excArm(ctx,cx,gy,h,tip,{faceLeft:o.faceLeft!==false,Lb:o.Lb||108,Ls:o.Ls||88});
-  const f=o.faceLeft===false?1:-1,[ex,ey]=tip;
-  L(ctx,LW.med);
-  ctx.beginPath();ctx.moveTo(ex,ey);                               // 斗耳（銷點）
-  ctx.lineTo(ex-f*5,ey+4);
-  ctx.bezierCurveTo(ex-f*10,ey+14,ex-f*6,ey+26,ex+f*6,ey+29);      // 弧形斗背
-  ctx.lineTo(ex+f*22,ey+27);                                       // 斗底至刃口
-  ctx.lineTo(ex+f*20,ey+8);                                        // 斗口上緣
-  ctx.lineTo(ex+f*4,ey+2);ctx.closePath();ctx.stroke();
-  L(ctx,LW.hair);seg(ctx,ex-f*4,ey+10,ex+f*19,ey+12);seg(ctx,ex-f*5,ey+18,ex+f*20,ey+20);   // 側板加勁
-  L(ctx,LW.thin);for(let i=0;i<4;i++)seg(ctx,ex+f*(8+i*4.5),ey+27.5,ex+f*(9.5+i*4.5),ey+33);   // 斗齒
-  L(ctx,LW.thin);seg(ctx,ex,ey,ex-f*9,ey-4);seg(ctx,ex-f*9,ey-4,ex-f*3,ey+3);              // 斗連桿
-  pinDot(ctx,ex,ey,2);
-}
 // 擋土壁立面（由開挖側看）：H 型鋼樁翼板面＋樁間橫向擋土板，板由地表逐層往下掛至開挖面
-function wallElevation(ctx,x0,n,sp,topY,gy,pitY,o){
-  o=o||{};const w=14;
-  for(let i=0;i<n;i++){
-    const px=x0+i*sp;
-    hSteelV(ctx,px,topY,pitY+6,w);
-    L(ctx,LW.thin);dash(ctx,[5,4]);seg(ctx,px-w/2,pitY+6,px-w/2,SOIL_B-24);seg(ctx,px+w/2,pitY+6,px+w/2,SOIL_B-24);dash(ctx);   // 開挖面以下（埋於土中）
-  }
-  for(let i=0;i<n-1;i++){
-    const xa=x0+i*sp+w/2,xb=x0+(i+1)*sp-w/2;
-    for(let y=gy+2;y<pitY-1;y+=9){
-      const hh=Math.min(7,pitY-2-y);if(hh<3)break;
-      L(ctx,LW.thin);rect(ctx,xa,y,xb-xa,hh);
-      L(ctx,LW.hair);seg(ctx,xa+4,y+hh/2,xb-4,y+hh/2+0.6);      // 木紋
-    }
-  }
-}
 // 延滲漏止水板詳圖（依業主 CAD 剖面 A）：H 斷面兩側各一片 6mm 鋼板抵於翼板端，接合處上緣滿焊
-function waterStopDetail(ctx,dx,dy,r,label){
-  L(ctx,LW.med);circ(ctx,dx,dy,r,'#fff');
-  const w=30,h=30,X=18,Y=46;
-  hSection(ctx,dx,dy,w,h);
-  L(ctx,LW.med);rect(ctx,dx-w/2-X-1,dy-Y/2,X,Y);rect(ctx,dx+w/2+1,dy-Y/2,X,Y);      // 兩片止水板（X×Y）
-  L(ctx,LW.hair);
-  for(let y=dy-Y/2+4;y<dy+Y/2-2;y+=6){seg(ctx,dx-w/2-2,y,dx-w/2-6,y+3);seg(ctx,dx+w/2+2,y,dx+w/2+6,y+3);}   // 接合處滿焊
-  L(ctx,LW.thin);
-  [[dx-w/2-X-8,dy],[dx+w/2+X+8,dy]].forEach(([px,py],i)=>{const d=i?-1:1;seg(ctx,px,py,px+d*7,py);seg(ctx,px+d*7,py,px+d*4,py-2);seg(ctx,px+d*7,py,px+d*4,py+2);});   // 抵緊方向
-  txt(ctx,'t=6mm',dx-w/2-X-1,dy-Y/2-5,{s:7.5,bg:false});
-  txt(ctx,'接合處上緣滿焊',dx,dy+Y/2+9,{a:'center',s:7.5,bg:false});
-  txt(ctx,label,dx,dy+r+14,{a:'center',s:10,b:1});
-}
-function waterStopTable(ctx,x,y){
-  const cols=[['型鋼柱尺寸',92],['X(mm)',44],['Y(mm)',44],['厚度(mm)',52],['數量',36]],vals=['H350×350×12×19','250','500','6','2 片'];
-  const W=cols.reduce((a,c)=>a+c[1],0);
-  L(ctx,LW.med);rect(ctx,x,y,W,42,'#fff');
-  txt(ctx,'延滲漏止水板規格',x+W/2,y+10,{a:'center',s:9.5,b:1,bg:false});
-  L(ctx,LW.thin);seg(ctx,x,y+14,x+W,y+14);seg(ctx,x,y+28,x+W,y+28);
-  let cx=x;cols.forEach((c,i)=>{if(i)seg(ctx,cx,y+14,cx,y+42);txt(ctx,c[0],cx+c[1]/2,y+24,{a:'center',s:8,bg:false});txt(ctx,vals[i],cx+c[1]/2,y+38,{a:'center',s:8,bg:false});cx+=c[1];});
-}
 
 // ══════ 第六輪：水平支撐——彎臂挖土機、伸縮臂吊裝機、三角托架（L75／L65／M22）、圍令背填、對接連接板、上下支撐連接詳圖 ══════
 // 挖土機兩段臂（覆寫）：大臂改鵝頸彎臂（上緣圓弧）、小臂直臂；大臂缸一對、小臂缸在大臂上緣
@@ -15098,105 +14355,13 @@ function teleBoomRig(ctx,tipX,tipY,o){
   return {hx:T[0],hy:T[1]+o.drop+12};
 }
 // 三角托架（覆寫，依業主 CAD）：L75 水平角鐵＋L65 斜撐＋2-M22 螺栓鎖於樁翼
-function bracket(ctx,wx,y,d){
-  L(ctx,LW.med);
-  seg(ctx,wx,y,wx+d*24,y);seg(ctx,wx+d*24,y,wx+d*24,y+4);seg(ctx,wx,y,wx,y+4);           // L75（水平肢＋短垂直肢）
-  L(ctx,LW.thin);seg(ctx,wx,y+2.5,wx+d*24,y+2.5);
-  L(ctx,LW.med);seg(ctx,wx+d*22,y+4,wx,y+19);L(ctx,LW.thin);seg(ctx,wx+d*20,y+6,wx+d*1,y+19);   // L65 斜撐
-  L(ctx,LW.thin);[y+2,y+17].forEach(by=>{rect(ctx,wx-d*4,by-1.6,d*4,3.2);seg(ctx,wx-d*4,by,wx-d*7,by);});   // M22 螺栓（穿樁翼）
-}
 // 三角托架詳圖（依業主 CAD：擋土 H 型鋼樁面、圍令、3000psi 混凝土填實、L75、L65、M22）
-function bracketDetail(ctx,dx,dy,r,label){
-  L(ctx,LW.med);circ(ctx,dx,dy,r,'#fff');
-  const px=dx+26;                                                     // 樁面
-  L(ctx,LW.thick);seg(ctx,px,dy-r+8,px,dy+r-8);
-  L(ctx,LW.med);seg(ctx,px+3,dy-r+8,px+3,dy+r-8);
-  // 圍令（腹板水平、翼板抵樁）
-  const wy=dy-22;L(ctx,LW.med);seg(ctx,dx-34,wy-16,dx-34,wy+16);seg(ctx,px-12,wy-16,px-12,wy+16);seg(ctx,dx-34,wy,px-12,wy);
-  L(ctx,LW.hair);seg(ctx,dx-31,wy-16,dx-31,wy+16);seg(ctx,px-15,wy-16,px-15,wy+16);
-  ctx.fillStyle='#444';for(let y=wy-14;y<wy+16;y+=4)for(let x=px-11;x<px;x+=4)ctx.fillRect(x+((y/4|0)%2)*2,y,1.2,1.2);ctx.fillStyle='#111';   // 混凝土填實
-  // 托架
-  const by=wy+18;L(ctx,LW.med);seg(ctx,dx-40,by,px,by);seg(ctx,dx-40,by,dx-40,by+5);seg(ctx,px,by,px,by+5);L(ctx,LW.thin);seg(ctx,dx-40,by+3,px,by+3);
-  L(ctx,LW.med);seg(ctx,dx-34,by+5,px,by+30);L(ctx,LW.thin);seg(ctx,dx-31,by+8,px-2,by+30);
-  L(ctx,LW.thin);[by+3,by+27].forEach(y=>{rect(ctx,px+3,y-2,5,4);seg(ctx,px+8,y,px+12,y);});
-  // 標註
-  txt(ctx,'擋土H型鋼樁面',px+6,dy-r+22,{s:7.5,bg:false});txt(ctx,'3000psi',px-58,wy-24,{s:7,bg:false});txt(ctx,'混凝土填實',px-58,wy-16,{s:7,bg:false});
-  txt(ctx,'圍令',dx-56,wy+3,{s:7.5,bg:false});txt(ctx,'L75',dx-58,by+4,{s:7.5,bg:false});txt(ctx,'L65',dx-58,by+22,{s:7.5,bg:false});txt(ctx,'M22',px+9,by+40,{s:7.5,bg:false});
-  txt(ctx,label,dx,dy+r+14,{a:'center',s:10,b:1});
-}
 // 圍令背填詳圖：圍令下方焊 #4 鋼筋托底、縫隙鋪竹片＋帆布、3000psi 混凝土填實
-function walerBackfillDetail(ctx,dx,dy,r,label){
-  L(ctx,LW.med);circ(ctx,dx,dy,r,'#fff');
-  const px=dx+24;L(ctx,LW.thick);seg(ctx,px,dy-r+8,px,dy+r-8);L(ctx,LW.med);seg(ctx,px+3,dy-r+8,px+3,dy+r-8);
-  const wy=dy-6;L(ctx,LW.med);seg(ctx,dx-36,wy-18,dx-36,wy+18);seg(ctx,px-14,wy-18,px-14,wy+18);seg(ctx,dx-36,wy,px-14,wy);
-  L(ctx,LW.hair);seg(ctx,dx-33,wy-18,dx-33,wy+18);seg(ctx,px-17,wy-18,px-17,wy+18);
-  L(ctx,LW.thin);for(let i=0;i<3;i++)seg(ctx,px-2-i*1.5,wy-18,px-2-i*1.5,wy+18);                  // 竹片
-  L(ctx,LW.hair);ctx.beginPath();for(let y=wy-18;y<=wy+18;y+=2){const x=px-6+Math.sin(y*1.3)*0.8;y===wy-18?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.stroke();   // 帆布
-  ctx.fillStyle='#444';for(let y=wy-16;y<wy+18;y+=4)for(let x=px-13;x<px-7;x+=3)ctx.fillRect(x+((y/4|0)%2)*1.5,y,1.2,1.2);ctx.fillStyle='#111';
-  L(ctx,LW.med);circ(ctx,px-8,wy+21,2.4);L(ctx,LW.hair);seg(ctx,px-11,wy+19,px-13,wy+16);seg(ctx,px-5,wy+19,px-3,wy+22);   // #4 托底筋＋焊道
-  txt(ctx,'圍令',dx-58,wy+3,{s:7.5,bg:false});txt(ctx,'竹片＋帆布',px-64,wy-26,{s:7,bg:false});txt(ctx,'3000psi 混凝土',px-64,wy+34,{s:7,bg:false});
-  txt(ctx,'#4 鋼筋托底（焊）',px-64,wy+44,{s:7,bg:false});txt(ctx,'樁面',px+6,dy-r+22,{s:7.5,bg:false});
-  txt(ctx,label,dx,dy+r+14,{a:'center',s:10,b:1});
-}
 // 支撐對接詳圖（依業主 CAD）：PL12 連接板上下翼各 12-M22、封頭板 4-M22
-function spliceDetail(ctx,dx,dy,r,label){
-  L(ctx,LW.med);circ(ctx,dx,dy,r,'#fff');
-  const h=30,x1=dx-r+10,x2=dx+r-10;
-  L(ctx,LW.med);seg(ctx,x1,dy-h/2,x2,dy-h/2);seg(ctx,x1,dy+h/2,x2,dy+h/2);
-  L(ctx,LW.hair);seg(ctx,x1,dy-h/2+2.5,x2,dy-h/2+2.5);seg(ctx,x1,dy+h/2-2.5,x2,dy+h/2-2.5);
-  L(ctx,LW.thin);dash(ctx,[5,3]);seg(ctx,x1,dy,dx-3,dy);seg(ctx,dx+3,dy,x2,dy);dash(ctx);
-  L(ctx,LW.med);rect(ctx,dx-3,dy-h/2,2.5,h);rect(ctx,dx+0.5,dy-h/2,2.5,h);                       // 封頭板×2
-  rect(ctx,dx-40,dy-h/2-3,80,3);rect(ctx,dx-40,dy+h/2,80,3);                                    // 連接板（上下翼）
-  L(ctx,LW.thin);for(let i=0;i<6;i++){const bx=dx-34+i*7+(i>2?6:0);rect(ctx,bx-1.5,dy-h/2-7,3,4);seg(ctx,bx,dy-h/2-3,bx,dy-h/2+4);rect(ctx,bx-1.5,dy+h/2+3,3,4);seg(ctx,bx,dy+h/2-4,dy?bx:bx,dy+h/2);}   // 螺栓
-  [-1,1].forEach(s=>{[dy-8,dy+8].forEach(y=>{rect(ctx,dx+s*6-1.5,y-1.5,3,3);seg(ctx,dx+s*3,y,dx+s*9,y);});});   // 封頭板 4-M22
-  txt(ctx,'12-M22 BOLT（連接板處）',dx,dy-h/2-14,{a:'center',s:7,bg:false});
-  txt(ctx,'PL12 連接板',dx,dy+h/2+16,{a:'center',s:7,bg:false});
-  txt(ctx,'4-M22（封頭板處）',dx,dy+h/2+26,{a:'center',s:7,bg:false});
-  txt(ctx,label,dx,dy+r+14,{a:'center',s:10,b:1});
-}
 // 上下支撐與中間樁連接詳圖（依業主 CAD 剖面）：三角托架 L75×75＋2-M22、下排支撐＋U-Bolts(大)、上排支撐＋固定角鐵 L75×75＋U-Bolts(小)
-function postJunctionDetail(ctx,dx,dy,r,label){
-  L(ctx,LW.med);circ(ctx,dx,dy,r,'#fff');
-  const px=dx-30;                                                     // 中間支柱
-  hSteelV(ctx,px,dy-r+8,dy+r-8,12);
-  const ly=dy+12,lh=14;                                               // 下排支撐（立面）
-  L(ctx,LW.med);seg(ctx,px+6,ly-lh/2,dx+r-10,ly-lh/2);seg(ctx,px+6,ly+lh/2,dx+r-10,ly+lh/2);L(ctx,LW.hair);seg(ctx,px+6,ly-lh/2+2,dx+r-10,ly-lh/2+2);seg(ctx,px+6,ly+lh/2-2,dx+r-10,ly+lh/2-2);
-  L(ctx,LW.med);seg(ctx,px+6,ly+lh/2,px+26,ly+lh/2);seg(ctx,px+24,ly+lh/2+2,px+6,ly+lh/2+14);   // 三角托架
-  L(ctx,LW.thin);[ly+lh/2+2,ly+lh/2+12].forEach(y=>{rect(ctx,px+2,y-1.5,4,3);});
-  uBolt(ctx,px+12,ly-lh/2-2,10,lh+4,false);                         // U-Bolts(大)：下排支撐箍於支柱
-  const ux=dx+14;hSection(ctx,ux,ly-lh/2-7,14,12);                   // 上排支撐（正交斷面）
-  uBolt(ctx,ux,ly-lh/2-13,18,12,false);                              // U-Bolts(小)
-  L(ctx,LW.med);seg(ctx,ux-12,ly-lh/2,ux-12,ly-lh/2-6);seg(ctx,ux-12,ly-lh/2-6,ux-6,ly-lh/2-6);   // 固定角鐵
-  txt(ctx,'中間支柱',px-14,dy+r-12,{a:'center',s:7,bg:false});
-  txt(ctx,'下排支撐',dx+r-14,ly+3,{a:'right',s:7,bg:false});
-  txt(ctx,'上排支撐',ux+10,ly-lh/2-20,{s:7,bg:false});
-  txt(ctx,'固定角鐵 L75×75',ux+10,ly-lh/2-11,{s:6.5,bg:false});
-  txt(ctx,'U-Bolts(小)',ux+14,ly-lh/2-2,{s:6.5,bg:false});
-  txt(ctx,'U-Bolts(大)',px+16,ly-lh/2-10,{s:6.5,bg:false});
-  txt(ctx,'三角托架 L75×75',px+28,ly+lh/2+10,{s:6.5,bg:false});
-  txt(ctx,'2-M22',px+28,ly+lh/2+19,{s:6.5,bg:false});
-  txt(ctx,label,dx,dy+r+14,{a:'center',s:10,b:1});
-}
 
 // ══════ 第六輪：SEWOOMIC 型迴轉頭與螺旋鑽桿、DXF 依據的型鋼／鋼筋籠接合與假固定、圍令接合與支撐搭接詳圖、止水板剖面 ══════
 // 液壓迴轉頭（覆寫，依實機照片：頂吊耳＋直立方形機身＋環帶＋下錐形殼＋方軸；側面油管接小臂）
-function augerHead(ctx,x,y){
-  const W=26,H=44;
-  L(ctx,LW.med);
-  ctx.beginPath();ctx.arc(x,y+3,5,Math.PI,0);ctx.stroke();                         // 頂吊耳
-  L(ctx,LW.thin);ctx.beginPath();ctx.arc(x,y+3,2.2,Math.PI,0);ctx.stroke();
-  L(ctx,LW.med);rect(ctx,x-W/2,y+6,W,H);                                            // 機身
-  L(ctx,LW.thin);seg(ctx,x-W/2,y+13,x+W/2,y+13);seg(ctx,x-W/2,y+H+1,x+W/2,y+H+1);   // 上下環帶
-  rect(ctx,x-7,y+18,14,10);                                                          // 銘牌
-  L(ctx,LW.hair);for(let i=0;i<6;i++)seg(ctx,x-W/2+2+i*4,y+H-8,x-W/2+2+i*4,y+H-2);   // 散熱齒
-  L(ctx,LW.med);
-  path(ctx,[[x-W/2,y+H+6],[x-8,y+H+16],[x+8,y+H+16],[x+W/2,y+H+6]],true);ctx.stroke();  // 下錐形殼
-  rect(ctx,x-4,y+H+16,8,7);                                                          // 方軸
-  L(ctx,LW.thin);
-  ctx.beginPath();ctx.moveTo(x+W/2,y+16);ctx.bezierCurveTo(x+30,y+12,x+28,y-6,x+16,y-14);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(x+W/2,y+22);ctx.bezierCurveTo(x+36,y+18,x+34,y-8,x+21,y-17);ctx.stroke();
-  return y+H+23;
-}
 // 螺旋鑽桿（覆寫）：連續螺旋葉片（雙線）＋底端切削齒＋導向尖
 function auger(ctx,cx,topY,botY,r){
   L(ctx,LW.med);seg(ctx,cx-2.5,topY,cx-2.5,botY-10);seg(ctx,cx+2.5,topY,cx+2.5,botY-10);   // 中心管
@@ -15251,167 +14416,19 @@ function pileTempFixDetail(ctx,dx,dy,r,label){
   txt(ctx,label,dx,dy+r+14,{a:'center',s:10,b:1});
 }
 // 圍令上下層接合詳圖（依業主 CAD）：三角板滿焊＋4-M22 A307＋上3下2-M22（或 2-焊道15cm）＋2-M22（封頭）
-function walerJoinDetail(ctx,dx,dy,r,label){
-  L(ctx,LW.med);circ(ctx,dx,dy,r,'#fff');
-  const h=22,x1=dx-r+12,x2=dx+r-12,y1=dy-14,y2=dy+16;
-  [[y1],[y2]].forEach(([yy])=>{                                                   // 上下層圍令
-    L(ctx,LW.med);seg(ctx,x1,yy-h/2,x2,yy-h/2);seg(ctx,x1,yy+h/2,x2,yy+h/2);
-    L(ctx,LW.hair);seg(ctx,x1,yy-h/2+2,x2,yy-h/2+2);seg(ctx,x1,yy+h/2-2,x2,yy+h/2-2);
-    L(ctx,LW.thin);dash(ctx,[5,3]);seg(ctx,x1,yy,x2,yy);dash(ctx);
-  });
-  L(ctx,LW.med);path(ctx,[[dx-16,y1+h/2],[dx-16,y2-h/2],[dx+6,y1+h/2]],true);ctx.stroke();     // 三角板
-  L(ctx,LW.hair);for(let i=0;i<5;i++)seg(ctx,dx-17,y1+h/2+3+i*3.6,dx-14,y1+h/2+5+i*3.6);        // 滿焊
-  L(ctx,LW.thin);
-  for(let i=0;i<4;i++){const bx=dx+12+i*7;rect(ctx,bx-1.4,y1-h/2-4,2.8,3.5);seg(ctx,bx,y1-h/2,bx,y1+h/2);}   // 4-M22
-  for(let i=0;i<3;i++){const bx=dx-30+i*6;rect(ctx,bx-1.2,y2-h/2-4,2.4,3.2);}                    // 上3
-  for(let i=0;i<2;i++){const bx=dx-27+i*6;rect(ctx,bx-1.2,y2+h/2+1,2.4,3.2);}                    // 下2
-  txt(ctx,'三角板滿焊',dx-6,y1-h/2-9,{a:'center',s:6.5,bg:false});
-  txt(ctx,'4-M22 A307',dx+26,y1-h/2-9,{a:'center',s:6.5,bg:false});
-  txt(ctx,'上3下2-M22（或 2-焊道15cm）',dx-16,y2+h/2+13,{a:'center',s:6.5,bg:false});
-  txt(ctx,label,dx,dy+r+14,{a:'center',s:10,b:1});
-}
 // 上下層支撐搭接詳圖（單支撐，依業主 CAD）：中間樁＋三角托架＋下排支撐＋M22 U型BOLT(大)／上排支撐＋U型BOLT(小)
-function postJunctionDetail(ctx,dx,dy,r,label){
-  L(ctx,LW.med);circ(ctx,dx,dy,r,'#fff');
-  ctx.save();ctx.beginPath();ctx.arc(dx,dy,r-2,0,Math.PI*2);ctx.clip();
-  const px=dx-26;
-  hSteelV(ctx,px,dy-r+6,dy+r-6,14);                                              // 中間樁
-  const ly=dy+14,lh=15;                                                           // 下排支撐（立面）
-  L(ctx,LW.med);seg(ctx,px+7,ly-lh/2,dx+r,ly-lh/2);seg(ctx,px+7,ly+lh/2,dx+r,ly+lh/2);
-  L(ctx,LW.hair);seg(ctx,px+7,ly-lh/2+2,dx+r,ly-lh/2+2);seg(ctx,px+7,ly+lh/2-2,dx+r,ly+lh/2-2);
-  L(ctx,LW.med);seg(ctx,px+7,ly+lh/2,px+30,ly+lh/2);seg(ctx,px+28,ly+lh/2+2,px+7,ly+lh/2+16);   // 三角托架
-  L(ctx,LW.thin);[ly+lh/2+3,ly+lh/2+13].forEach(y=>rect(ctx,px+3,y-1.5,4,3));                    // 2-M22
-  uBolt(ctx,px+16,ly-lh/2-2,11,lh+4,false);                                                       // U 型 BOLT（大）
-  const ux=dx+16;hSection(ctx,ux,ly-lh/2-8,15,13);                                                // 上排支撐（正交斷面）
-  uBolt(ctx,ux,ly-lh/2-14.5,19,13,false);                                                          // U 型 BOLT（小）
-  ctx.restore();
-  txt(ctx,'中間樁',px-16,dy-r+16,{a:'center',s:7,bg:false});
-  txt(ctx,'下排支撐',dx+r-16,ly+3,{a:'right',s:7,bg:false});
-  txt(ctx,'上排支撐',ux+12,ly-lh/2-22,{s:7,bg:false});
-  txt(ctx,'M22 U型BOLT(小)',ux+12,ly-lh/2-13,{s:6.5,bg:false});
-  txt(ctx,'M22 U型BOLT(大)',px+22,ly-lh/2-9,{s:6.5,bg:false});
-  txt(ctx,'三角托架',px+32,ly+lh/2+12,{s:6.5,bg:false});
-  txt(ctx,'※ 支撐嚴禁載重（如：負載鋼筋等重物）',dx,dy+r-6,{a:'center',s:6.5,bg:false});
-  txt(ctx,label,dx,dy+r+14,{a:'center',s:10,b:1});
-}
 // 延滲漏止水板 剖面（依業主 CAD 剖面A）：H 型鋼兩側各一片 6mm 板抵於翼板，接合處上緣滿焊
-function waterStopDetail(ctx,dx,dy,r,label){
-  L(ctx,LW.med);circ(ctx,dx,dy,r,'#fff');
-  const bw=26,bh=34;                                                     // H 斷面
-  hSection(ctx,dx,dy,bw,bh);
-  const X=20,Y=46;
-  L(ctx,LW.med);
-  rect(ctx,dx-bw/2-X,dy-Y/2,X,Y);rect(ctx,dx+bw/2,dy-Y/2,X,Y);           // 兩片止水板
-  L(ctx,LW.hair);
-  seg(ctx,dx-bw/2-X,dy-Y/2+2,dx-bw/2,dy-Y/2+2);seg(ctx,dx+bw/2,dy-Y/2+2,dx+bw/2+X,dy-Y/2+2);
-  L(ctx,LW.med);                                                          // 接合處上緣滿焊
-  [-1,1].forEach(s=>{const jx=dx+s*bw/2;L(ctx,LW.hair);for(let i=0;i<4;i++)seg(ctx,jx-s*1.5,dy-Y/2+i*2.6,jx+s*2.5,dy-Y/2+2+i*2.6);});
-  L(ctx,LW.thin);                                                         // 抵緊方向箭頭
-  [[dx-bw/2-X-13,-1],[dx+bw/2+X+13,1]].forEach(([ax,s])=>{seg(ctx,ax,dy,ax-s*9,dy);path(ctx,[[ax-s*9,dy],[ax-s*5,dy-2.5],[ax-s*5,dy+2.5]],true);ctx.fill();});
-  txt(ctx,'厚度6mm鋼板',dx,dy-Y/2-8,{a:'center',s:7,bg:false});
-  txt(ctx,'X=250',dx-bw/2-X/2,dy+Y/2+9,{a:'center',s:6.5,bg:false});
-  txt(ctx,'X=250',dx+bw/2+X/2,dy+Y/2+9,{a:'center',s:6.5,bg:false});
-  txt(ctx,'Y=500',dx+bw/2+X+16,dy+4,{a:'center',s:6.5,bg:false});
-  txt(ctx,'接合處上緣滿焊',dx,dy+Y/2+20,{a:'center',s:7,bg:false});
-  txt(ctx,label,dx,dy+r+14,{a:'center',s:10,b:1});
-}
 
 /* ── lib_v4.js ── */
 // ══════ 第七輪：平面配置圖（依業主 CAD 慣例）、碗公頭／破碎機、鏟斗、伸縮臂、止水板、地錨灌漿 ══════
 
 // ── 通用：平面圖用「H 型鋼雙線」與中間樁記號 ──
-function plBeamH(ctx,x1,x2,y,w){                 // 平面圖中的水平構材（雙線）
-  w=w||5;L(ctx,LW.med);seg(ctx,x1,y-w/2,x2,y-w/2);seg(ctx,x1,y+w/2,x2,y+w/2);
-  L(ctx,LW.hair);seg(ctx,x1,y,x2,y);
-}
-function plBeamV(ctx,y1,y2,x,w){
-  w=w||5;L(ctx,LW.med);seg(ctx,x-w/2,y1,x-w/2,y2);seg(ctx,x+w/2,y1,x+w/2,y2);
-  L(ctx,LW.hair);seg(ctx,x,y1,x,y2);
-}
-function plPostMark(ctx,x,y,r){                  // 中間樁（平面）：圓內 H 斷面
-  r=r||4.6;L(ctx,LW.thin);circ(ctx,x,y,r);
-  L(ctx,LW.med);seg(ctx,x-r*0.62,y-r*0.6,x-r*0.62,y+r*0.6);seg(ctx,x+r*0.62,y-r*0.6,x+r*0.62,y+r*0.6);
-  L(ctx,LW.hair);seg(ctx,x-r*0.62,y,x+r*0.62,y);
-}
-function plJackMark(ctx,x,y,d){                  // 千斤頂（平面）：短粗塊＋兩側箭頭
-  d=d||1;L(ctx,LW.med);rect(ctx,x-5,y-4,10,8);
-  L(ctx,LW.hair);seg(ctx,x-5,y-4,x+5,y+4);seg(ctx,x-5,y+4,x+5,y-4);
-}
-function plWallBox(ctx,x1,y1,x2,y2,t){           // 擋土壁（平面雙線）
-  t=t||6;L(ctx,LW.thick);ctx.strokeRect(x1,y1,x2-x1,y2-y1);
-  L(ctx,LW.med);ctx.strokeRect(x1+t,y1+t,x2-x1-2*t,y2-y1-2*t);
-}
 
 // ── 支撐系統平面配置圖（依業主「擋土支撐系統平面圖（單撐）」慣例） ──
 // 圍令沿擋土壁內側一圈；主撐單向等距跨越；四角設角撐；中央一道剪力斜撐帶；主撐一端設千斤頂
-function strutPlan(ctx,x1,y1,x2,y2,opt){
-  opt=opt||{};
-  const nS=opt.n||9;                                  // 主撐路數
-  plWallBox(ctx,x1,y1,x2,y2,7);                       // 擋土壁
-  const wx1=x1+7,wy1=y1+7,wx2=x2-7,wy2=y2-7;          // 圍令內緣
-  plBeamH(ctx,wx1,wx2,wy1+5,7);plBeamH(ctx,wx1,wx2,wy2-5,7);   // 上下圍令
-  plBeamV(ctx,wy1,wy2,wx1+5,7);plBeamV(ctx,wy1,wy2,wx2-5,7);   // 左右圍令
-  const iy1=wy1+9,iy2=wy2-9,ix1=wx1+9,ix2=wx2-9;
-  const sp=(ix2-ix1)/(nS+1);
-  const braceI=Math.round(nS/2);                      // 剪力斜撐帶位置（第 n 路旁）
-  for(let i=1;i<=nS;i++){
-    const sx=ix1+i*sp;
-    plBeamV(ctx,iy1,iy2,sx,6);                        // 主撐
-    for(let k=1;k<=4;k++)plPostMark(ctx,sx,iy1+(iy2-iy1)*k/5);   // 中間樁
-    plJackMark(ctx,sx,iy1+16);                        // 千斤頂（靠一端、交錯）
-    // 支撐對接接頭：逐路錯開（不在同一直線上）
-    const jy=iy1+(iy2-iy1)*(0.30+0.18*(i%3));
-    L(ctx,LW.med);rect(ctx,sx-5,jy-4,10,8);L(ctx,LW.hair);seg(ctx,sx-5,jy,sx+5,jy);
-    // 水平繫材（防挫曲）：相鄰主撐間
-    if(i<nS){const ty=iy1+(iy2-iy1)*0.5;L(ctx,LW.thin);seg(ctx,sx+3,ty,sx+sp-3,ty);
-      const ty2=iy1+(iy2-iy1)*0.82;seg(ctx,sx+3,ty2,sx+sp-3,ty2);}
-  }
-  // 剪力斜撐帶（兩路主撐間的 X 型斜撐）
-  const bx1=ix1+braceI*sp,bx2=bx1+sp;
-  L(ctx,LW.thin);
-  for(let k=0;k<5;k++){const ya=iy1+(iy2-iy1)*k/5,yb=iy1+(iy2-iy1)*(k+1)/5;seg(ctx,bx1,ya,bx2,yb);seg(ctx,bx2,ya,bx1,yb);}
-  // 四角角撐（斜撐）：兩向圍令間 45° 斜材（雙線），端部不越過圍令
-  const cw=52;
-  [[ix1,iy1,1,1],[ix2,iy1,-1,1],[ix1,iy2,1,-1],[ix2,iy2,-1,-1]].forEach(([cx,cy,fx,fy])=>{
-    const d=cw,o=4.2;
-    L(ctx,LW.med);
-    seg(ctx,cx+fx*(d-o),cy,cx,cy+fy*(d-o));
-    seg(ctx,cx+fx*(d+o),cy+fy*o*2,cx+fx*o*2,cy+fy*(d+o));
-    L(ctx,LW.hair);seg(ctx,cx+fx*d,cy+fy*o,cx+fx*o,cy+fy*d);
-    L(ctx,LW.thin);seg(ctx,cx+fx*(d-o),cy,cx+fx*(d+o),cy+fy*o*2);seg(ctx,cx,cy+fy*(d-o),cx+fx*o*2,cy+fy*(d+o));
-  });
-  if(opt.dim!==false){
-    txt(ctx,'圍令（沿擋土壁一圈）',x1+4,y1-20,{s:9.5,b:1});
-    leader(ctx,x1-4,y1-6,wx1+5,(wy1+wy2)/2,'');
-  }
-  return {ix1,ix2,iy1,iy2,sp,nS};
-}
 
 // ── 構台配置平面圖（依業主「構台配置平面圖／大樑配置平面圖」慣例） ──
 // 構台覆蓋開挖區一側；大樑沿樁列方向、小樑正交；出入引道接臨路；樁位＝中間樁／共構樁格點
-function platPlan(ctx,x1,y1,x2,y2,opt){
-  opt=opt||{};
-  plWallBox(ctx,x1,y1,x2,y2,7);
-  const gx1=x1+26,gx2=x2-26,gy1=y1+26,gy2=y2-26;
-  const nc=8,nr=5,dx=(gx2-gx1)/(nc-1),dy=(gy2-gy1)/(nr-1);
-  const deckR=opt.rows||3;                                   // 構台覆蓋列數（自上而下）
-  const deckY2=gy1+(deckR-1)*dy+dy*0.5;
-  if(opt.deck!==false){                                      // 構台範圍（點鏈線框）
-    L(ctx,LW.med);dash(ctx,[10,4,2,4]);
-    ctx.strokeRect(x1+8,gy1-dy*0.5,(x2-8)-(x1+8),deckY2-gy1+dy*0.5);dash(ctx);
-  }
-  const bl=x1+8,br=x2-8;                                                                          // 構材不越過擋土壁
-  if(opt.main!==false)for(let r=0;r<deckR;r++)plBeamH(ctx,bl,br,gy1+r*dy,7);                       // 大樑
-  if(opt.sub)for(let c=0;c<nc;c++)plBeamV(ctx,gy1-dy*0.5,deckY2,gx1+c*dx,4);                       // 小樑
-  for(let r=0;r<nr;r++)for(let c=0;c<nc;c++)plPostMark(ctx,gx1+c*dx,gy1+r*dy,4.4);                 // 樁位
-  if(opt.ramp!==false){                                      // 出入引道（自構台向下延伸接臨路）
-    const rx=gx2-dx*1.8,ry=deckY2+dy*0.5;L(ctx,LW.med);
-    seg(ctx,rx,ry,rx,y2-10);seg(ctx,rx+dx*1.8,ry,rx+dx*1.8,y2-10);
-    L(ctx,LW.hair);for(let y=ry+8;y<y2-10;y+=9)seg(ctx,rx,y,rx+dx*1.8,y);
-    txt(ctx,'出土引道',rx+dx*0.9,y2+18,{a:'center',s:9.5});
-  }
-  return {gx1,gx2,gy1,gy2,dx,dy,deckY2};
-}
 
 // ── 碗公頭（覆寫）：厚壁鐘形罩＋頂蓋厚板＋外側加勁肋 ──
 function cupHead(ctx,x,y,w){
@@ -15458,95 +14475,11 @@ function augerHead(ctx,x,y){
 }
 
 // ── 挖土機鏟斗（覆寫，再優化：斗背弧、側刃、5 齒、H 連桿＋斗缸） ──
-function excDig(ctx,cx,gy,tip,o){
-  o=o||{};const h=o.h||92;
-  excArm(ctx,cx,gy,h,tip,{faceLeft:o.faceLeft!==false,Lb:o.Lb||108,Ls:o.Ls||88});
-  const f=o.faceLeft===false?1:-1,[ex,ey]=tip,k=(o.bk||0.78);
-  const B=(x,y)=>[ex+f*x*k,ey+y*k];
-  L(ctx,LW.med);
-  ctx.beginPath();
-  let p=B(0,0);ctx.moveTo(p[0],p[1]);
-  p=B(-5,4);ctx.lineTo(p[0],p[1]);
-  ctx.bezierCurveTo(...B(-11,15),...B(-7,27),...B(5,31));        // 斗背弧
-  p=B(26,28);ctx.lineTo(p[0],p[1]);                              // 斗底 → 刃口
-  p=B(25,9);ctx.lineTo(p[0],p[1]);                               // 斗口上緣
-  p=B(5,2);ctx.lineTo(p[0],p[1]);ctx.closePath();ctx.stroke();
-  L(ctx,LW.hair);
-  {const a=B(-4,11),b=B(24,12);seg(ctx,a[0],a[1],b[0],b[1]);}     // 側板加勁
-  {const a=B(-5,20),b=B(25,21);seg(ctx,a[0],a[1],b[0],b[1]);}
-  {const a=B(22,9),b=B(23,28);seg(ctx,a[0],a[1],b[0],b[1]);}      // 側刃板
-  L(ctx,LW.thin);
-  for(let i=0;i<5;i++){const a=B(9+i*3.6,28.5),b=B(10.4+i*3.6,33.5),c=B(11.8+i*3.6,28.8);
-    path(ctx,[a,b,c],true);ctx.stroke();}
-  L(ctx,LW.thin);
-  {const a=B(0,0),b=B(-10,-6),c=B(-3,3);seg(ctx,a[0],a[1],b[0],b[1]);seg(ctx,b[0],b[1],c[0],c[1]);
-   const d=B(-10,-6),e=B(-2,-13);cylinder(ctx,e[0],e[1],d[0],d[1],3*k);}
-  pinDot(ctx,ex,ey,2);
-}
 // ── 延滲漏止水板詳圖（覆寫；依業主「止水板施作詳圖」三階段） ──
 // ① 兩片 PL6 止水板由型鋼兩側抵入 → ② 兩片合併成封閉箱型 → ③ 接合處四角滿銲
-function waterStopDetail(ctx,dx,dy,sc,label){
-  sc=sc||1;
-  const bw=40*sc,bh=30*sc,tf=4*sc,tw=4*sc;      // H：翼板寬 bw、斷面深 bh、翼板厚 tf、腹板厚 tw
-  const mx=11*sc,my=9*sc;                        // 止水板外緣較 H 外伸
-  const RW=bw+2*mx,RH=bh+2*my,SP=(RW+50*sc);
-  // 半片止水板（sg=-1 左片／+1 右片）：矩形鋼板，內緣切出「半個 H 斷面」的凹槽
-  const half=(sx,sg)=>{
-    const X=(v)=>sx+sg*v;
-    L(ctx,LW.med);
-    path(ctx,[
-      [X(RW/2),dy-RH/2],[X(0),dy-RH/2],                       // 外緣：上邊（外端→接縫）
-      [X(0),dy-bh/2],[X(bw/2),dy-bh/2],                       // 凹槽：上翼板上緣
-      [X(bw/2),dy-bh/2+tf],[X(tw/2),dy-bh/2+tf],              // 上翼板下緣 → 腹板
-      [X(tw/2),dy+bh/2-tf],[X(bw/2),dy+bh/2-tf],              // 腹板側面 → 下翼板上緣
-      [X(bw/2),dy+bh/2],[X(0),dy+bh/2],                       // 下翼板下緣 → 接縫
-      [X(0),dy+RH/2],[X(RW/2),dy+RH/2]                        // 外緣：下邊
-    ],true);ctx.stroke();
-  };
-  const Hsec=(sx)=>{                              // H 型鋼（平面．粗線）
-    L(ctx,LW.thick);
-    rect(ctx,sx-bw/2,dy-bh/2,bw,tf);rect(ctx,sx-bw/2,dy+bh/2-tf,bw,tf);
-    rect(ctx,sx-tw/2,dy-bh/2+tf,tw,bh-2*tf);
-  };
-  const weldRun=(sx)=>{                           // 沿 H 型鋼周邊連續銲
-    L(ctx,LW.med);
-    const pts=[];
-    for(let g=-1;g<=1;g+=2){
-      pts.push([sx+g*bw/2,dy-bh/2],[sx+g*bw/2,dy-bh/2+tf],[sx+g*tw/2,dy-bh/2+tf],
-               [sx+g*tw/2,dy+bh/2-tf],[sx+g*bw/2,dy+bh/2-tf],[sx+g*bw/2,dy+bh/2]);
-    }
-    pts.forEach(([wx,wy])=>{ctx.beginPath();ctx.arc(wx,wy,1.2*sc,0,Math.PI*2);ctx.stroke();});
-    [dy-RH/2+4*sc,dy+RH/2-4*sc].forEach(wy=>{ctx.beginPath();ctx.arc(sx,wy,1.2*sc,0,Math.PI*2);ctx.stroke();});
-  };
-  // ① 兩片分開＋抵入箭頭
-  const s1=dx-SP,g1=22*sc;
-  half(s1-g1,-1);half(s1+g1,1);Hsec(s1);
-  [-1,1].forEach(sg=>{
-    const ax=s1+sg*(RW/2+g1+20*sc);
-    L(ctx,LW.thin);seg(ctx,ax,dy,ax-sg*10*sc,dy);
-    path(ctx,[[ax-sg*10*sc,dy],[ax-sg*5*sc,dy-3*sc],[ax-sg*5*sc,dy+3*sc]],true);ctx.stroke();
-  });
-  // ② 合攏（吻合）
-  half(dx,-1);half(dx,1);Hsec(dx);
-  L(ctx,LW.hair);seg(ctx,dx,dy-RH/2,dx,dy-bh/2);seg(ctx,dx,dy+bh/2,dx,dy+RH/2);   // 接縫
-  // ③ 沿 H 型鋼電銲
-  const s3=dx+SP;
-  half(s3,-1);half(s3,1);Hsec(s3);weldRun(s3);
-  L(ctx,LW.thin);[[dx-(SP+RW/2+g1+RW/2)/2+RW/4,'合攏'],[dx+(SP-RW/2+RW/2)/2+6*sc,'電銲']].forEach(([ax,tl])=>{
-    seg(ctx,ax-10*sc,dy,ax+10*sc,dy);path(ctx,[[ax+10*sc,dy],[ax+4*sc,dy-3.4*sc],[ax+4*sc,dy+3.4*sc]],true);ctx.stroke();
-    txt(ctx,tl,ax,dy-9*sc,{a:'center',s:9});
-  });
-  txt(ctx,'① 左右各一片',s1,dy+RH/2+22,{a:'center',s:9});
-  txt(ctx,'② 合起吻合 H 型鋼',dx,dy+RH/2+22,{a:'center',s:9});
-  txt(ctx,'③ 沿 H 型鋼電銲',s3,dy+RH/2+22,{a:'center',s:9});
-  txt(ctx,'H 型鋼',dx,dy-RH/2-26,{a:'center',s:8.5,c:'#555'});
-  L(ctx,LW.hair);seg(ctx,dx,dy-RH/2-22,dx,dy-bh/2);
-  if(label)txt(ctx,label,dx,dy+RH/2+40,{a:'center',s:9.5,b:1});
-}
 
 // ── 攪拌車（覆寫）：刪除車尾原生溜槽支架方塊 ──
 const _MTSKIP=b=>(b.minx>=45&&b.miny>=65)||(b.miny<=4&&b.minx>=60);
-function mixerTruck(ctx,x,gy,o){o=o||{};vec(ctx,'mixtruck',x,gy,74*(o.s||1),{flip:!o.flip,skipFn:_MTSKIP});}
 function mixerTruckLevel(ctx,x,gy,o){
   o=o||{};const s=o.s||1,k=0.74*s,fl=o.rearLeft!==false,f=fl?-1:1;
   const px=x+f*(-49)*k,py=gy;
@@ -15575,58 +14508,10 @@ function rampPlatform(ctx,x1,x2,topY,gy,o){
 }
 
 // ── 雙層橫擋（覆寫）：上下兩層三角托架各承一支 H 型鋼，兩層淨距 30~35cm，錨頭自兩層間穿出 ──
-function doubleWaler(ctx,a){
-  const x=WX+7,gapH=34;                                    // 兩層 H 型鋼中心距（示意 30~35cm）
-  [a.ay-gapH/2-10,a.ay+gapH/2-10].forEach(y=>{
-    bracket(ctx,x,y+20,1);                                 // 三角托架（銲於樁翼）
-    L(ctx,LW.med);rect(ctx,x+2,y,16,20);                   // 橫擋 H 型鋼（斷面）
-    L(ctx,LW.hair);seg(ctx,x+5,y,x+5,y+20);seg(ctx,x+15,y,x+15,y+20);
-    L(ctx,LW.thin);seg(ctx,x+2,y+10,x+18,y+10);
-  });
-  L(ctx,LW.thin);seg(ctx,x+1,a.ay-gapH/2-16,x+1,a.ay+gapH/2+14);            // 繫栓
-  seg(ctx,x+19,a.ay-gapH/2-16,x+19,a.ay+gapH/2+14);
-}
 // ── 地錨：固定段沿鋼絞線灌漿（覆寫呈現） ──
 // 灌漿體包覆鋼絞線成柱狀（固定段），自由段以套管隔離
-function anchorGroutAlong(ctx,x1,y1,x2,y2,rFix,rFree,tFree){
-  const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
-  const P=(t,d)=>[x1+ux*len*t+nx*d,y1+uy*len*t+ny*d];
-  L(ctx,LW.thin);                                                   // 自由段 PE 套管（雙線）
-  [[-rFree,-rFree],[rFree,rFree]].forEach(([a,b])=>{const s2=P(0,a),e=P(tFree,b);seg(ctx,s2[0],s2[1],e[0],e[1]);});
-  L(ctx,LW.med);                                                    // 錨碇段灌漿體＝等徑圓柱（＝鑽孔徑），端部平封
-  const A=P(tFree,-rFix),B=P(1,-rFix),C=P(1,rFix),D=P(tFree,rFix);
-  path(ctx,[A,B,C,D],true);ctx.stroke();
-  L(ctx,LW.hair);                                                   // 灌漿紋
-  for(let t=tFree+0.015;t<1;t+=0.03){const a=P(t,-rFix+1),b=P(t,rFix-1);seg(ctx,a[0],a[1],b[0],b[1]);}
-  L(ctx,LW.thin);                                                   // 隔件（間隔器）
-  for(let t=tFree+0.10;t<0.98;t+=0.22){const a=P(t,-rFix),b=P(t,rFix);L(ctx,LW.thin);seg(ctx,a[0],a[1],b[0],b[1]);}
-}
 
 // ── 角撐（斜撐）與圍令接頭放大平面（單角） ──
-function cornerBraceEnlarge(ctx,cx,cy,s){
-  const t=9;                                    // 圍令寬（放大後）
-  // 兩向圍令（沿壁）
-  L(ctx,LW.thick);seg(ctx,cx-8,cy-8,cx-8,cy+s);seg(ctx,cx-8,cy-8,cx+s,cy-8);
-  plBeamV(ctx,cy-4,cy+s,cx+4,t);plBeamH(ctx,cx-4,cx+s,cy+4,t);
-  txt(ctx,'圍令',cx+4,cy+s+16,{a:'center',s:9});
-  txt(ctx,'圍令',cx+s+8,cy+4,{bl:'middle',s:9});
-  // 角撐（雙線斜材）
-  const d=s*0.62,ax=cx+4+d*0.72,ay=cy+4+d*0.72;
-  const ux=Math.SQRT1_2,uy=Math.SQRT1_2,nx=-uy*5,ny=ux*5;
-  L(ctx,LW.med);
-  seg(ctx,cx+10+nx,cy+10+ny,ax+nx,ay+ny);seg(ctx,cx+10-nx,cy+10-ny,ax-nx,ay-ny);
-  L(ctx,LW.hair);seg(ctx,cx+10,cy+10,ax,ay);
-  // 端板（斜切）＋加勁板＋螺栓
-  [[cx+10,cy+10,-1],[ax,ay,1]].forEach(([ex,ey,sg])=>{
-    L(ctx,LW.med);seg(ctx,ex+nx*1.5-ux*3*sg,ey+ny*1.5-uy*3*sg,ex-nx*1.5-ux*3*sg,ey-ny*1.5-uy*3*sg);
-    L(ctx,LW.hair);
-    for(let i=-1;i<=1;i+=2)circ(ctx,ex+nx*i*0.8-ux*7*sg,ey+ny*i*0.8-uy*7*sg,1.6);
-  });
-  // 加勁板（圍令背面對位）
-  L(ctx,LW.thin);seg(ctx,cx+4-t/2,cy+16,cx+4+t/2,cy+16);seg(ctx,cx+16,cy+4-t/2,cx+16,cy+4+t/2);
-  txt(ctx,'45°',cx+26,cy+30,{s:8.5,c:'#555'});
-  return {ax,ay};
-}
 
 
 // ── 輪式吊車（覆寫：支援左右向） ──
@@ -15637,10 +14522,6 @@ function craneTruck(ctx,x,gy,o){
   return {hx:overX,hy:gy-H+3*k};
 }
 // ── 折斷符號（構材延伸未畫完） ──
-function breakMark(ctx,x,y,h){
-  L(ctx,LW.thin);
-  ctx.beginPath();ctx.moveTo(x,y-h/2);ctx.lineTo(x+4,y-h/6);ctx.lineTo(x-4,y+h/6);ctx.lineTo(x,y+h/2);ctx.stroke();
-}
 
 // ── 雙層橫擋詳圖：上下兩層三角托架各承一支 H 型鋼，兩層淨距 30~35cm，錨頭自兩層間穿出 ──
 function doubleWalerDetail(ctx,dx,dy,r,label,o){
@@ -15663,10 +14544,6 @@ function doubleWalerDetail(ctx,dx,dy,r,label,o){
 }
 
 // ── CAD 底圖標註：水平引線（ty＝目標 y，永不交叉） ──
-function cadLab(ctx,r,fx,fy,tx,text,o){
-  if(!r)return;const p=r.U(fx,fy);
-  leader(ctx,tx,p[1]+((o&&o.dy)||0),p[0],p[1],text,o);
-}
 
 // ══════ 第八輪：軋製 H 型鋼斷面（圓角）、U 型鋼板樁斷面、地錨整支灌漿與雙層橫擋 ══════
 
@@ -16114,14 +14991,6 @@ function fyMarkOn(ctx,A,B,t0,s0,fb){
 }
 // 包裝：畫完原機具後補上「豐有」
 function _fyWrap(){}
-function _fyWrapOff(name,at){
-  const o=globalThis[name];if(typeof o!=='function')return;
-  globalThis[name]=function(){
-    const r=o.apply(this,arguments);
-    try{at.apply(null,[].slice.call(arguments).concat([r]));}catch(e){}
-    return r;
-  };
-}
 // 挖土機大臂（震動機／碗公頭／螺旋鑽／鏟斗共用）：貼在第一節大臂上
 _fyWrap('excArm',function(ctx,cx,gy,h,pin,o,r){
   if(!r||!r.P||!r.M)return;
@@ -16175,38 +15044,9 @@ _fyWrap('clusterDrill',function(ctx,cx,gy){
 });
 
 // ── 鋼板樁平面：一段連續板樁（互扣） ──
-function sheetRunPlan(ctx,x,y,n,W,h,t,ang,startUp){
-  ctx.save();ctx.translate(x,y);if(ang)ctx.rotate(ang);
-  for(let i=0;i<n;i++)uSheetProfile(ctx,i*W,0,W,h,(i%2?-1:1)*(startUp||1),t);
-  ctx.restore();
-}
 // 轉角片（90° 彎折異形片，平面）
-function sheetCornerPiece(ctx,x,y,a,t){
-  const P=[[x-a,y],[x,y],[x,y+a]];
-  const A=_offPts(P,t/2),B=_offPts(P,-t/2);
-  L(ctx,LW.thick);_roundPoly(ctx,A,3);_roundPoly(ctx,B,3);
-  L(ctx,LW.hair);seg(ctx,A[0][0],A[0][1],B[0][1]!==undefined?B[0][0]:B[0][0],B[0][1]);
-  seg(ctx,A[A.length-1][0],A[A.length-1][1],B[B.length-1][0],B[B.length-1][1]);
-}
 // 轉角詳圖（平面）：兩道壁面 90° 交會，以轉角片銜接
-function sheetCornerDetail(ctx,cx,cy){
-  const W=36,h=18,t=h*0.20,a=16;
-  sheetRunPlan(ctx,cx-a-3*W,cy,3,W,h,t,0,-1);              // 往左的一道（翼板朝下＝基地內側）
-  sheetCornerPiece(ctx,cx,cy,a,t*1.6);                      // 轉角片（90° 彎折）
-  sheetRunPlan(ctx,cx,cy+a,3,W,h,t,Math.PI/2,-1);           // 往下的一道（翼板朝左）
-}
 // 合攏片詳圖（平面）：兩端逼近後，最後以實測寬度之合攏片補齊
-function sheetCloseDetail(ctx,cx,cy){
-  const W=36,h=18,t=h*0.20,g=20;
-  sheetRunPlan(ctx,cx-2*W-g/2,cy,2,W,h,t,0,1);
-  sheetRunPlan(ctx,cx+g/2,cy,2,W,h,t,0,-1);
-  L(ctx,LW.med);                                           // 合攏片（窄幅異形片）
-  const x0=cx-g/2+2,x1=cx+g/2-2;
-  path(ctx,[[x0,cy],[x0,cy-h*0.7],[x1,cy-h*0.7],[x1,cy]]);ctx.stroke();
-  L(ctx,LW.hair);
-  path(ctx,[[x0+t,cy],[x0+t,cy-h*0.7+t],[x1-t,cy-h*0.7+t],[x1-t,cy]]);ctx.stroke();
-  weldMarks(ctx,x0,cy-h*0.62,cy-1,1,4);weldMarks(ctx,x1,cy-h*0.62,cy-1,1,4);
-}
 // 腹板剪力釘（立面：正對腹板面，以小圓表示；一邊兩支）
 function shearStudsV(ctx,cx,y1,y2,w){
   L(ctx,LW.thin);
@@ -16478,55 +15318,6 @@ function pAirBore(kind){
       leader(ctx,CX+150,GY-140,CX+18,GY-58,'液壓迴轉頭（接風管）');
       leader(ctx,CX-40,GY+150,CX-12,SOIL_B-56,'氣動槌頭破碎引孔',{b:1});
       leader(ctx,CX+184,GY+60,CX+11,GY+40,'螺旋鑽桿排土');
-    }};
-}
-function pAirPrep(kind){
-  return {t:'空壓設備定位・風管連接',
-    n1:'空壓機定位，風管沿樁固定至樁尖氣動槌頭，暖機測試',
-    n2:'風壓正常、槌頭作動確認後才吊立打設',
-    draw(ctx){
-      scene(ctx,{dim:false,names:false});
-      [0,1].forEach(i=>{L(ctx,LW.med);rect(ctx,130+i*150,GY-8,26,8);});
-      pileHz(ctx,kind,90,330,GY-16);
-      airHammerTip(ctx,74,GY-30);
-      L(ctx,LW.thin);
-      seg(ctx,86,GY-24,330,GY-24);
-      for(let x=120;x<320;x+=52)seg(ctx,x,GY-24,x,GY-16);
-      airComp(ctx,440,GY);
-      groutHose(ctx,440,GY-22,322,GY-22,GY);
-      worker(ctx,560,GY,'hold');
-      leader(ctx,110,GY-72,80,GY-32,'氣動槌頭（樁尖）',{b:1});
-      leader(ctx,390,GY-70,458,GY-36,'空壓機暖機測試');
-    }};
-}
-function pAirDrive(kind){
-  return pDrive(kind,function(ctx,top){
-    airHammerTip(ctx,CX,top+PL);
-    airComp(ctx,548,GY);
-    groutHose(ctx,548,GY-22,CX+KIND_W[kind]/2+5,top+12,GY);
-    L(ctx,LW.thin);seg(ctx,CX+KIND_W[kind]/2+5,top+12,CX+KIND_W[kind]/2+5,top+PL-6);
-    leader(ctx,CX-40,GY+150,CX-6,top+PL+12,'氣動槌破碎引孔');
-  },'☆ 垂直度 ≤ 1/200；氣動槌破碎硬層輔助貫入');
-}
-function pAirWaterPrep(kind){
-  return {t:'水刀管電銲・氣動槌頭與風管連接',
-    n1:'水刀管電銲於樁側、氣動槌頭裝於樁尖並接風管；高壓幫浦與空壓機同時暖機試運轉',
-    n2:'噴嘴通暢、風壓正常才吊立打設',
-    draw(ctx){
-      scene(ctx,{dim:false,names:false});
-      [0,1].forEach(i=>{L(ctx,LW.med);rect(ctx,130+i*150,GY-8,26,8);});
-      pileHz(ctx,kind,90,330,GY-16);
-      airHammerTip(ctx,74,GY-30);
-      L(ctx,LW.thin);
-      seg(ctx,90,GY-24,330,GY-24);
-      L(ctx,LW.hair);for(let x=112;x<320;x+=44)for(let i=0;i<3;i++)seg(ctx,x+i*3,GY-25,x+i*3+2.5,GY-20);
-      L(ctx,LW.thin);seg(ctx,86,GY-8,330,GY-8);for(let x=120;x<320;x+=52)seg(ctx,x,GY-10,x,GY-8);
-      waterPump(ctx,400,GY);
-      groutHose(ctx,403,GY-18,322,GY-22,GY);
-      airComp(ctx,540,GY);
-      L(ctx,LW.thin);ctx.beginPath();ctx.moveTo(540,GY-22);ctx.quadraticCurveTo(520,GY-4,500,GY-4);ctx.lineTo(346,GY-4);ctx.quadraticCurveTo(334,GY-4,330,GY-8);ctx.stroke();
-      leader(ctx,300,GY-84,200,GY-24,'水刀管（電銲固定）',{b:1});
-      leader(ctx,110,GY-72,80,GY-32,'氣動槌頭（樁尖）＋風管');
     }};
 }
 function pAirWaterDrive(kind,boreBot){
@@ -17045,43 +15836,6 @@ function mpConc(){
       worker(ctx,150,GY,'point');
     }};
 }
-function mpInsert(){
-  return {t:'吊放 H 型鋼樁',n1:'吊車兩點吊緩降吊入，對正套管中心，吊放至設計高程',n2:'樁體防碰撞套管；高程以水準儀控制',
-    draw(ctx){
-      scene(ctx);
-      bore(ctx,CX,CR,GY,SOIL_B-26);
-      casing(ctx,CX,GY-40,SOIL_B-28,CR);
-      oscillator(ctx,CX,GY,{w:118,h:36});
-      const c=craneLattice(ctx,520,GY,{s:.98,boomLen:335,overX:CX,flip:true});
-      hoistFall(ctx,c.hx,c.hy,GY-238);
-      hookBlock(ctx,c.hx,GY-238,.95);
-      hSteelV(ctx,CX,GY-206,GY+150,15);
-      slings(ctx,c.hx,GY-219,[CX-7.5,GY-200],[CX+7.5,GY-200]);
-      worker(ctx,CX-64,GY,'pull');
-      L(ctx,LW.thin);seg(ctx,CX-56,GY-16,CX-8,GY-60);
-      leader(ctx,CX+160,GY-120,CX+8,GY-110,'H400×400 中間樁緩降吊入',{b:1});
-      leader(ctx,CX+176,SOIL_B-64,CX+7,SOIL_B-52,'吊放至設計高程');
-    }};
-}
-function mpGrout(){
-  return {t:'根固漿體澆置',n1:'特密管離孔底 20cm 起灌，由下而上置換澆置根固段',n2:'灌漿中斷不得逾 3 分鐘',
-    draw(ctx){
-      scene(ctx,{names:false});
-      bore(ctx,CX,CR,GY,SOIL_B-26);
-      casing(ctx,CX,GY-40,SOIL_B-28,CR);
-      grout(ctx,CX,CR-3,SOIL_B-120,SOIL_B-26);
-      hSteelV(ctx,CX,GY-46,SOIL_B-30,15);
-      oscillator(ctx,CX,GY,{w:118,h:36});
-      tremie(ctx,CX+17,GY-92,SOIL_B-46);
-      const p=groutPlant(ctx,430,GY);
-      groutHose(ctx,p.outX,p.outY,CX+34,GY-80,GY);
-      dimV(ctx,CX-52,SOIL_B-120,SOIL_B-26,'根固段 3.0 m');
-      leader(ctx,CX+150,GY-120,CX+21,GY-86,'特密管（離孔底 20cm 起灌）');
-      leader(ctx,CX+178,SOIL_B-96,CX+CR-6,SOIL_B-70,'根固水泥砂漿 fc’=140kgf/cm²');
-      worker(ctx,560,GY,'hold');
-      L(ctx,LW.thin);
-    }};
-}
 function mpPull(){
   return {t:'初凝後套管拔至混凝土面以上・型鋼假固定',n1:'混凝土初凝後，套管拔至根固混凝土面以上，孔口以楔形塊雙向假固定 H 型鋼，防止型鋼傾斜下沉',n2:'拔管緩速、只拔到混凝土面上；假固定待隔日混凝土硬化後拆除',
     draw(ctx){
@@ -17137,24 +15891,6 @@ function mpDone(){
 }
 
 // ── 中間樁 直接打設（振動樁錘＋止水鋼板） ──
-function mpPlateChk(){
-  return {t:'止水鋼板銲固檢驗 ☆',
-    n1:'中間樁穿越擋土壁處預銲止水鋼板（t=6mm 滿焊）',
-    n2:'☆ 檢驗停留點：鋼板規格、焊道連續無氣孔',
-    draw(ctx){
-      scene(ctx,{dim:false,names:false});
-      [0,1].forEach(i=>{L(ctx,LW.med);rect(ctx,150+i*140,GY-8,26,8);});
-      pileHz(ctx,'h',110,340,GY-16);
-      // 止水鋼板（樁身上一段矩形板）
-      L(ctx,LW.med);rect(ctx,200,GY-30,60,8);
-      L(ctx,LW.hair);
-      for(let x=203;x<258;x+=6)seg(ctx,x,GY-30,x+3,GY-22);       // 焊道
-      worker(ctx,430,GY,'hold',true);
-      L(ctx,LW.thin);seg(ctx,422,GY-22,342,GY-20);
-      holdBox(ctx,400,GY-190,246,['止水鋼板 PL t=6mm・雙面滿焊','焊道連續、無氣孔夾渣（外觀檢查）']);
-      leader(ctx,150,GY-72,226,GY-30,'止水鋼板（穿壁處）',{b:1});
-    }};
-}
 function mpWaterStop(){
   return {t:'開挖至最終面・延滲漏止水板 ☆',
     n1:'整個基地開挖至最終開挖面、澆置 PC 後，於中間樁及共構樁穿越大底版處銲固延滲漏止水板（左右兩片鋼板夾合）',
@@ -17497,20 +16233,7 @@ function scenePit(ctx,opt){
 
 // ── 水平支撐（機具：200 型伸縮臂；含中間樁、圍令背填、上下支撐正交、千斤頂預壓） ──
 const CPX=470, SY=GY+36;                     // 中間樁位置、下層支撐中心高程
-function centerPost(ctx,pitY){hSteelV(ctx,CPX,GY-30,SOIL_B-20,13);}
-function walerBackfill(ctx){                 // 圍令背填（圍令與樁翼間隙以混凝土墊實）
-  ctx.save();ctx.beginPath();ctx.rect(WX+7,SY-8,7,16);ctx.clip();
-  L(ctx,LW.hair);for(let i=-16;i<20;i+=4)seg(ctx,WX+7+i,SY-8,WX+7+i+16,SY+8);
-  ctx.restore();
-}
-function lowerStrut(ctx,x2){hBeamH(ctx,WX+34,x2||650,SY,11);}
-function upperStruts(ctx,xs){(xs||[330,CPX+40,600]).forEach(x=>{hSection(ctx,x,SY-11.5,14,12);uBolt(ctx,x,SY-5.5,20,12,false);});}
-function splicePlate(ctx,x){
-  L(ctx,LW.med);rect(ctx,x-4,SY-9,8,18);rect(ctx,x+8,SY-9,8,18);
-  L(ctx,LW.thin);[x-1,x+11].forEach(px=>{circ(ctx,px,SY-5,1.4);circ(ctx,px,SY+5,1.4);});
-}
 const PITY1=GY+58;                            // 第一層開挖面：下支撐三角托架面（GY+42）下 60~80cm
-function postBrackets(ctx){bracket(ctx,CPX-6.5,GY+42,-1);bracket(ctx,CPX+6.5,GY+42,1);}
 // ══════ 水平支撐系統（底圖＝豐有自有「安全支撐規劃圖／擋土支撐系統平面圖」） ══════
 // （水平支撐、施工構台待新版重繪，暫不納入）
 const SHEET_ANCHOR={id:'anchor',title:'預力地錨',code:'FY-AN-01',panels:[pPrep({n2:'交通維持、管線遷移、鄰房鑑定由業主辦理；地錨穿越鄰地者先取得鄰地同意書；本公司配合勘查，提報施工計畫'}),
@@ -17933,14 +16656,6 @@ function _plVec(ctx,name,x,y,h,o){
     }
     ctx.stroke();
   }
-}
-function _plVecTip(name,x,y,h,o){ // 資產最高點（吊臂端）之畫布座標
-  o=o||{};var d=_PL_VEC[name];if(!d)return null;
-  var k=(h||100)/100,sx=(o.sx!=null?o.sx:k),sy=(o.sy!=null?o.sy:k),f=o.flip?-1:1;
-  var dy=(o.anchor==='top')?0:100,bx=0,by=1e9;
-  for(var p=0;p<d.length;p++){var pl=d[p];
-    for(var i=0;i<pl.length;i+=2){if(pl[i+1]<by){by=pl[i+1];bx=pl[i];}}}
-  return {tx:x+f*bx*sx,ty:y+(by-dy)*sy};
 }
 function _plVecFit(ctx,name,cx,cy,maxW,maxH,lw){ // 等比縮放置中（細部詳圖用）
   var w=_PL_VECW[name]||100;
