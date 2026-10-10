@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.59';
+var APP_VERSION='v6.0.60';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -30771,8 +30771,43 @@ var _ENV_DEF={size:'k12',dx:0,dy:0,frames:false,
   chkX:27.5,chkY0:55.5,chkStep:3.9,                      // 寄送方式 ✓（印刷品／限時／平信／掛號／雙掛號）
   fontAddr:12,fontName:18,fontAttn:13,fontSender:11,fontZip:16};
 var _ENV_METHODS=['印刷品','限時','平信','掛號','雙掛號'];
-function _envCfg(){var c=Object.assign({},_ENV_DEF,(P&&P.env)||{});if(!_ENV_SIZES[c.size])c.size='k12';if(c.fontSender===9)c.fontSender=11;/* v5.448 舊存檔的預設 9pt 一律放大 */return c;}
-function _envSaveCfg(c){P.env=c;try{persistP();}catch(e){_err('_envSaveCfg',e);}}
+// v6.0.60：版面座標依信封規格分開（P.env.by[規格]）；15K 版面依使用者實際信封（紅框位置以照片中印出的校正十字為尺量得）
+var _ENV_COORD_KEYS=['zipX','zipY','zipBox','zipH','zipGap','zipHy','colL','colW','colT','colB','sZipX','sZipY','sZipBox','sZipH','sZipGap','sZipHy','senderL','senderT','senderB','chkX','chkY0','chkStep','chkL','chkW','stX','stY','stW','stH'];
+var _ENV_SIZE_DEF={
+  k12:{zipH:7.5,sZipH:5.5,chkL:10,chkW:21,stX:10,stY:10,stW:22,stH:24},
+  k15:{zipX:43.9,zipY:9.2,zipBox:6.5,zipH:9.1,zipGap:1.35,zipHy:3.75,
+       colL:33,colW:30,colT:31.3,colB:206.6,
+       sZipX:4.4,sZipY:204,sZipBox:4,sZipH:6.8,sZipGap:0.6,sZipHy:1.5,
+       senderL:4,senderT:100,senderB:198,
+       chkX:24.75,chkY0:45.1,chkStep:3.96,chkL:7.6,chkW:19.4,
+       stX:7,stY:15.6,stW:19,stH:21.4}
+};
+function _envCfg(size){
+  var pe=(P&&P.env)||{};
+  var sz=size||pe.size||'k12';if(!_ENV_SIZES[sz])sz='k12';
+  var c=Object.assign({},_ENV_DEF,_ENV_SIZE_DEF[sz]||{});
+  Object.keys(pe).forEach(function(k){if(k!=='by'&&_ENV_COORD_KEYS.indexOf(k)<0)c[k]=pe[k];});
+  // 座標：該規格存過的 → 用；舊存檔（無 by，座標在最上層）一律視為 12K
+  var saved=(pe.by&&pe.by[sz])||(!pe.by&&sz==='k12'?pe:null);
+  if(saved)_ENV_COORD_KEYS.forEach(function(k){if(saved[k]!=null&&saved[k]!=='')c[k]=saved[k];});
+  c.size=sz;
+  if(c.fontSender===9)c.fontSender=11;/* v5.448 舊存檔的預設 9pt 一律放大 */
+  return c;
+}
+function _envSaveCfg(c){
+  var pe=(P&&P.env)||{},by=Object.assign({},pe.by||{});
+  if(!pe.by){var old={};_ENV_COORD_KEYS.forEach(function(k){if(pe[k]!=null)old[k]=pe[k];});if(Object.keys(old).length)by.k12=old;}   // 舊存檔搬進 by.k12
+  var nv={by:by};
+  Object.keys(c).forEach(function(k){if(_ENV_COORD_KEYS.indexOf(k)<0)nv[k]=c[k];});
+  var co={};_ENV_COORD_KEYS.forEach(function(k){if(c[k]!=null)co[k]=c[k];});by[c.size||'k12']=co;
+  P.env=nv;try{persistP();}catch(e){_err('_envSaveCfg',e);}
+}
+// 切換規格：校正欄位改帶該規格的版面座標
+function _envSizeSwitch(){
+  var sz=gv('env-size')||'k12',c=_envCfg(sz);
+  ['zipX','zipY','colL','colW','sZipX','sZipY','chkX','chkY0','chkStep'].forEach(function(k){var el=document.getElementById('env-'+k);if(el)el.value=c[k];});
+  _envPreview();
+}
 // 從地址前綴抓郵遞區號（3／5／6 碼），回傳 {zip,addr}
 function _envSplitZip(addr){
   var s=String(addr||'').trim();
@@ -30841,7 +30876,7 @@ function openEnvelope(invId,opt){
     +'<div class="f"><label>地址</label><input id="env-faddr" value="'+esc(coSp.addr||P.addr||'')+'" oninput="_envPreview()" style="'+IN+'"></div>'
     +'<div class="f"><label>電話</label><input id="env-ftel" value="'+esc(P.tel||'')+'" oninput="_envPreview()" style="'+IN+'"></div>'
     +'<details style="margin-top:6px"><summary style="font-size:12px;color:var(--b4);cursor:pointer">信封規格與校正（印表機進紙有偏差時調整）</summary>'
-    +'<div class="fg fg3" style="gap:6px;margin-top:6px"><div class="f"><label>規格</label><select id="env-size" onchange="_envPreview()" style="'+IN+'">'+sizeOpts+'</select></div>'
+    +'<div class="fg fg3" style="gap:6px;margin-top:6px"><div class="f"><label>規格</label><select id="env-size" onchange="_envSizeSwitch()" style="'+IN+'">'+sizeOpts+'</select></div>'
     +'<div class="f"><label>整體左右（mm）</label><input id="env-dx" type="number" step="0.5" value="'+cfg.dx+'" oninput="_envPreview()" style="'+IN+'"></div>'
     +'<div class="f"><label>整體上下（mm）</label><input id="env-dy" type="number" step="0.5" value="'+cfg.dy+'" oninput="_envPreview()" style="'+IN+'"></div></div>'
     +'<div class="fg fg3" style="gap:6px"><div class="f"><label>收件郵遞區號 左／上</label><div style="display:flex;gap:4px"><input id="env-zipX" type="number" step="0.5" value="'+cfg.zipX+'" oninput="_envPreview()" style="'+IN+'"><input id="env-zipY" type="number" step="0.5" value="'+cfg.zipY+'" oninput="_envPreview()" style="'+IN+'"></div></div>'
@@ -30876,7 +30911,7 @@ function _envUseAddr(which){
 }
 function _envRead(){
   var num=function(id,d){var v=parseFloat(gv(id));return isNaN(v)?d:v;};
-  var cfg=_envCfg();
+  var cfg=_envCfg(gv('env-size')||undefined);
   ['dx','dy','zipX','zipY','colL','colW','sZipX','sZipY','chkX','chkY0','chkStep','fontSender','fontName','fontAddr'].forEach(function(k){cfg[k]=num('env-'+k,cfg[k]);});
   cfg.size=gv('env-size')||cfg.size;if(!_ENV_SIZES[cfg.size])cfg.size='k12';
   var fr=document.getElementById('env-frames');cfg.frames=!!(fr&&fr.checked);
@@ -30892,21 +30927,22 @@ function _envHtml(cfg,data,showFrames){
   var box=function(x,y,w,h,extra){return '<div style="position:absolute;left:'+(x+dx)+'mm;top:'+(y+dy)+'mm;width:'+w+'mm;height:'+h+'mm;'+(extra||'')+'"></div>';};
   var frameCss='border:0.25mm solid rgba(220,60,60,'+(showFrames?'.75':'0')+');box-sizing:border-box;';
   var h='';
-  // 郵票框
-  h+=box(10,10,22,24,frameCss);
+  // 郵票框（只畫在預覽）
+  h+=box(cfg.stX!=null?cfg.stX:10,cfg.stY!=null?cfg.stY:10,cfg.stW||22,cfg.stH||24,frameCss);
+  var zH=cfg.zipH||cfg.zipBox,szH=cfg.sZipH||cfg.sZipBox,cL=cfg.chkL!=null?cfg.chkL:10,cW=cfg.chkW||21;
   // 收件人郵遞區號六格＋數字
   var zd=data.zip||'';
   for(var i=0;i<6;i++){
     var x=cfg.zipX+i*(cfg.zipBox+cfg.zipGap)+(i>=3?cfg.zipHy:0);
-    h+=box(x,cfg.zipY,cfg.zipBox,cfg.zipBox,frameCss);
+    h+=box(x,cfg.zipY,cfg.zipBox,zH,frameCss);
     var ch=zd.length===3?(i<3?zd[i]:''):zd.length===5?(i<3?zd[i]:(i<5?zd[i]:'')):(zd[i]||'');
-    if(ch)h+='<div style="position:absolute;left:'+(x+dx)+'mm;top:'+(cfg.zipY+dy)+'mm;width:'+cfg.zipBox+'mm;height:'+cfg.zipBox+'mm;display:flex;align-items:center;justify-content:center;font-size:'+cfg.fontZip+'pt;font-weight:700">'+ch+'</div>';
+    if(ch)h+='<div style="position:absolute;left:'+(x+dx)+'mm;top:'+(cfg.zipY+dy)+'mm;width:'+cfg.zipBox+'mm;height:'+zH+'mm;display:flex;align-items:center;justify-content:center;font-size:'+cfg.fontZip+'pt;font-weight:700">'+ch+'</div>';
   }
-  if(showFrames)h+='<div style="position:absolute;left:'+(cfg.zipX+dx)+'mm;top:'+(cfg.zipY+cfg.zipBox+1+dy)+'mm;width:'+(6*(cfg.zipBox+cfg.zipGap)+cfg.zipHy)+'mm;text-align:center;font-size:7pt;color:rgba(220,60,60,.75)">請寫收件人郵遞區號</div>';
+  if(showFrames)h+='<div style="position:absolute;left:'+(cfg.zipX+dx)+'mm;top:'+(cfg.zipY+zH+1+dy)+'mm;width:'+(6*(cfg.zipBox+cfg.zipGap)+cfg.zipHy)+'mm;text-align:center;font-size:7pt;color:rgba(220,60,60,.75)">請寫收件人郵遞區號</div>';
   // 寄送方式勾選表
   if(showFrames){
-    h+='<div style="position:absolute;left:'+(10+dx)+'mm;top:'+(cfg.chkY0-5+dy)+'mm;font-size:6.5pt;color:rgba(220,60,60,.75)">請註明✓方式</div>';
-    _ENV_METHODS.forEach(function(m,i){h+=box(10,cfg.chkY0+i*cfg.chkStep,21,cfg.chkStep,frameCss+'font-size:6.5pt;color:rgba(220,60,60,.75);padding-left:0.8mm;line-height:'+cfg.chkStep+'mm;letter-spacing:'+(m.length===2?'3mm':m.length===3?'0.8mm':'0')+'').replace('></div>','>'+m+'</div>');h+=box(cfg.chkX-1.5,cfg.chkY0+i*cfg.chkStep,4,cfg.chkStep,frameCss);});
+    h+='<div style="position:absolute;left:'+(cL+dx)+'mm;top:'+(cfg.chkY0-5+dy)+'mm;font-size:6.5pt;color:rgba(220,60,60,.75)">請註明✓方式</div>';
+    _ENV_METHODS.forEach(function(m,i){h+=box(cL,cfg.chkY0+i*cfg.chkStep,cW,cfg.chkStep,frameCss+'font-size:6.5pt;color:rgba(220,60,60,.75);padding-left:0.8mm;line-height:'+cfg.chkStep+'mm;letter-spacing:'+(m.length===2?'3mm':m.length===3?'0.8mm':'0')+'').replace('></div>','>'+m+'</div>');h+=box(cfg.chkX-1.5,cfg.chkY0+i*cfg.chkStep,4,cfg.chkStep,frameCss);});
   }
   var mi=_ENV_METHODS.indexOf(data.method);
   if(mi>=0)h+='<div style="position:absolute;left:'+(cfg.chkX-1.5+dx)+'mm;top:'+(cfg.chkY0+mi*cfg.chkStep+dy)+'mm;width:4mm;height:'+cfg.chkStep+'mm;display:flex;align-items:center;justify-content:center;font-size:11pt;font-weight:900;line-height:1">✓</div>';
@@ -30927,13 +30963,16 @@ function _envHtml(cfg,data,showFrames){
   var fz=data.fzip||'';
   for(var j=0;j<6;j++){
     var sx=cfg.sZipX+j*(cfg.sZipBox+cfg.sZipGap)+(j>=3?cfg.sZipHy:0);
-    h+=box(sx,cfg.sZipY,cfg.sZipBox,cfg.sZipBox,frameCss);
+    h+=box(sx,cfg.sZipY,cfg.sZipBox,szH,frameCss);
     var fc=fz.length===3?(j<3?fz[j]:''):fz.length===5?(j<3?fz[j]:(j<5?fz[j]:'')):(fz[j]||'');
-    if(fc)h+='<div style="position:absolute;left:'+(sx+dx)+'mm;top:'+(cfg.sZipY+dy)+'mm;width:'+cfg.sZipBox+'mm;height:'+cfg.sZipBox+'mm;display:flex;align-items:center;justify-content:center;font-size:'+(cfg.fontZip-5)+'pt;font-weight:700">'+fc+'</div>';
+    if(fc)h+='<div style="position:absolute;left:'+(sx+dx)+'mm;top:'+(cfg.sZipY+dy)+'mm;width:'+cfg.sZipBox+'mm;height:'+szH+'mm;display:flex;align-items:center;justify-content:center;font-size:'+(cfg.fontZip-5)+'pt;font-weight:700">'+fc+'</div>';
   }
-  if(showFrames)h+='<div style="position:absolute;left:'+(cfg.sZipX+dx)+'mm;top:'+(cfg.sZipY+cfg.sZipBox+0.8+dy)+'mm;width:'+(6*(cfg.sZipBox+cfg.sZipGap)+cfg.sZipHy)+'mm;text-align:center;font-size:6pt;color:rgba(220,60,60,.75)">寄件人郵遞區號</div>';
+  if(showFrames)h+='<div style="position:absolute;left:'+(cfg.sZipX+dx)+'mm;top:'+(cfg.sZipY+szH+0.8+dy)+'mm;width:'+(6*(cfg.sZipBox+cfg.sZipGap)+cfg.sZipHy)+'mm;text-align:center;font-size:6pt;color:rgba(220,60,60,.75)">寄件人郵遞區號</div>';
   // 收件人電話：中欄底部橫書小字（直書欄位不夠放時仍看得到）
-  if(data.tel)h+='<div style="position:absolute;left:'+(cfg.colL+dx)+'mm;top:'+(cfg.colB-5+dy)+'mm;width:'+cfg.colW+'mm;text-align:center;font-size:'+(cfg.fontSender||11)+'pt;letter-spacing:0.3mm;line-height:1">TEL '+esc(data.tel)+'</div>';
+  if(data.tel){   // v6.0.60 不折行：字級依中欄寬自動縮小（15K 中欄較窄）
+    var telTxt='TEL '+data.tel,telPt=Math.min(cfg.fontSender||11,Math.floor((cfg.colW-2)/(telTxt.length*0.62*0.3528)*10)/10);
+    h+='<div style="position:absolute;left:'+(cfg.colL+dx)+'mm;top:'+(cfg.colB-5+dy)+'mm;width:'+cfg.colW+'mm;text-align:center;white-space:nowrap;font-size:'+telPt+'pt;letter-spacing:0.2mm;line-height:1">'+esc(telTxt)+'</div>';
+  }
   return '<div class="env-sheet" style="position:relative;width:'+W+'mm;height:'+H+'mm;background:#fff;overflow:hidden;font-family:\'Microsoft JhengHei\',\'Noto Sans TC\',sans-serif;color:#111">'+h+'</div>';
 }
 function _envPreview(){
@@ -30956,7 +30995,7 @@ function _envPrint(){
     if(cust&&((r.data.zip&&cust.zip!==r.data.zip)||(r.data.attn&&cust.envAttn!==r.data.attn)||(r.data.tel&&cust.envTel!==r.data.tel))){cust.zip=r.data.zip||cust.zip;cust.envAttn=r.data.attn||cust.envAttn;cust.envTel=r.data.tel||cust.envTel;cust._mt=Date.now();saveCustomers();}
   }catch(e){_err('_envPrint.cust',e);}
   var ios=_isIOS(),cal=ios?_envIosCal():null;
-  var html=_envDocHtml(S,'信封_'+(r.data.co||r.data.attn),_envIosWrap(_envHtml(r.cfg,r.data,!!r.cfg.frames),cal),ios);
+  var html=_envDocHtml(S,'信封_'+(r.data.co||r.data.attn),_envIosWrap(_envHtml(r.cfg,r.data,!!r.cfg.frames),cal,S.w),ios);
   _printNativeHTML(html,'信封_'+(r.data.co||r.data.attn));
   toast(ios?(cal?'信封已送列印（A4 置中＋已套用手機列印校正）':'信封已送列印（A4 置中）：信封置中放入手動進紙口、郵遞區號那端先進')
     :('信封已送列印：印表機請選自訂紙張 '+S.w+'×'+S.h+' mm、不縮放'));
@@ -30978,9 +31017,11 @@ function _envDocHtml(S,title,body,a4){
 // v6.0.58：改 3×3 九個十字（A～I），iPhone 縮放／位移不確定時總有幾個落在信封上；任選兩個（橫、直都要錯開）量測即可
 var _ENV_CAL_PTS={A:[25,25],B:[55,25],C:[85,25],D:[25,85],E:[55,85],F:[85,85],G:[25,145],H:[55,145],I:[85,145]};
 function _envIosCal(){try{var c=JSON.parse(localStorage.getItem('fy_env_ioscal')||'null');return (c&&c.v===2&&c.sx>0&&c.sy>0)?c:null;}catch(e){_err('_envIosCal',e);return null;}}   // v:2＝A4 置中版面（v6.0.59）；舊的作廢
-function _envIosWrap(inner,cal){
+function _envIosWrap(inner,cal,W){
   if(!cal)return inner;
-  var kx=1/cal.sx,ky=1/cal.sy,tx=-cal.ox/cal.sx,ty=-cal.oy/cal.sy,r=function(v){return Math.round(v*100000)/100000;};
+  // 內容左緣在 A4 上＝(210−寬)/2；校正時與現在的信封寬不同 → 位移換算：ox＋倍率×(校正寬−現在寬)/2
+  var ox=cal.ox+(W?cal.sx*((cal.w||120)-W)/2:0);
+  var kx=1/cal.sx,ky=1/cal.sy,tx=-ox/cal.sx,ty=-cal.oy/cal.sy,r=function(v){return Math.round(v*100000)/100000;};
   return '<div class="env-ioscal" style="transform:translate('+r(tx)+'mm,'+r(ty)+'mm) scale('+r(kx)+','+r(ky)+');transform-origin:0 0">'+inner+'</div>';
 }
 function _envCalSolve(m){   // m={p1,ax,ay,p2,bx,by}：兩個十字的代號與實際量到的 mm → {sx,sy,ox,oy}
@@ -31007,7 +31048,7 @@ function _envCalSave(){
   var P1=_ENV_CAL_PTS[m.p1],P2=_ENV_CAL_PTS[m.p2];
   if(!P1||!P2||P1[0]===P2[0]||P1[1]===P2[1]){toast('兩個十字要左右、上下都錯開（例如 A 與 I、C 與 G、B 與 G）');return;}
   var c=_envCalSolve(m);if(!c){toast('量測值不合理，請確認十字代號與量測方向（左緣、上緣）');return;}
-  c.m=m;c.ts=Date.now();c.v=2;
+  c.m=m;c.ts=Date.now();c.v=2;c.w=(_ENV_SIZES[gv('env-size')]||_ENV_SIZES.k12).w;
   try{localStorage.setItem('fy_env_ioscal',JSON.stringify(c));}catch(e){_err('_envCalSave',e);}
   var st=document.getElementById('env-cal-st');if(st)st.innerHTML=_envCalStatus();
   toast('已儲存手機列印校正：倍率 '+c.sx.toFixed(3)+'×'+c.sy.toFixed(3));
@@ -36247,9 +36288,11 @@ function _printMainHTML(html){
     +'#_fy_print_main{display:block!important;position:static!important}'+css+'}';
   var box=document.createElement('div');box.id='_fy_print_main';box.innerHTML=doc.body?doc.body.innerHTML:'';
   document.head.appendChild(st);document.body.appendChild(box);
+  // v6.0.60：iOS 有時在預覽產生前就發 afterprint，原本 0.5 秒後清除 → 預覽改印整個畫面。
+  // 改為 afterprint 之後、使用者下一次點畫面（列印對話框已關）才清；下次列印開頭也會先清。
   var done=false;
-  var cleanup=function(){if(done)return;done=true;window.removeEventListener('afterprint',cleanup);['_fy_print_main','_fy_print_main_css'].forEach(function(id){var el=document.getElementById(id);if(el)el.remove();});};
-  window.addEventListener('afterprint',function(){setTimeout(cleanup,500);});
+  var cleanup=function(){if(done)return;done=true;document.removeEventListener('pointerdown',cleanup,true);['_fy_print_main','_fy_print_main_css'].forEach(function(id){var el=document.getElementById(id);if(el)el.remove();});};
+  window.addEventListener('afterprint',function ap(){window.removeEventListener('afterprint',ap);setTimeout(function(){document.addEventListener('pointerdown',cleanup,true);},300);});
   // v6.0.55：iOS 只允許在使用者點按的當下呼叫 print()，延遲（等圖片、setTimeout）會被靜默擋掉 → 同步呼叫（文件內圖片皆為 base64）
   try{window.print();}catch(e){_err('_printMainHTML',e);toast('此瀏覽器不支援列印，請改用「存成 PDF」');}
 }

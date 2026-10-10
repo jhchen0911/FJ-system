@@ -5547,7 +5547,9 @@ async function newPage(browser, width, height) {
             out.hiddenOnScreen = getComputedStyle(document.getElementById('_fy_print_main')).display === 'none';
             window.dispatchEvent(new Event('afterprint'));
             setTimeout(() => {
-              out.cleaned = !document.getElementById('_fy_print_main') && !document.getElementById('_fy_print_main_css');
+              out.keptAfterPrint = !!document.getElementById('_fy_print_main');   /* v6.0.60：afterprint 後先保留（iOS 可能還在產生預覽） */
+              document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+              out.cleaned = out.keptAfterPrint && !document.getElementById('_fy_print_main') && !document.getElementById('_fy_print_main_css');
               /* 存成 PDF：以假套件驗證頁面尺寸與存檔 */
               let saved = null;
               window.html2canvas = el => Promise.resolve({ toDataURL: () => 'data:image/jpeg;base64,AA', w: el.offsetWidth });
@@ -5677,6 +5679,46 @@ async function newPage(browser, width, height) {
     }));
     check('v6.0.57/58 手機信封列印校正：印 A～I 九個十字（不套校正）、任選兩個→ 量測解出倍率與位移（存本機）→ 列印信封反向套用後回到設計位置；不合理量測擋下、可清除', r.openOnIOS && r.cross && r.solve && r.status && r.wrap && r.roundTrip && r.bad && r.cleared, JSON.stringify(r));
     check('v6.0.57 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await ctx.close();
+  }
+
+  // ───────────── v6.0.60 信封版面依規格分開（15K 依實際信封）、校正換規格自動換算、iOS 列印區清除時機 ─────────────
+  {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
+    const page = await ctx.newPage(); const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
+    await page.goto(INDEX); await page.waitForTimeout(1500);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      try {
+        /* 舊存檔（座標在最上層）視為 12K；切到 15K 用 15K 版面、12K 座標保留 */
+        P.env = { size: 'k12', dx: 1, zipX: 61, colL: 37 };
+        out.old12 = _envCfg('k12').zipX === 61 && _envCfg('k12').dx === 1 && _envCfg('k15').zipX === 43.9 && _envCfg('k15').dx === 1;
+        openEnvelope(null, { to: { co: '八九企業有限公司', attn: '謝' } });
+        setTimeout(() => {
+          const sel = document.getElementById('env-size'); sel.value = 'k15'; sel.dispatchEvent(new Event('change'));
+          out.switched = document.getElementById('env-zipX').value === '43.9' && document.getElementById('env-colL').value === '33';
+          _envSaveCfg(_envRead().cfg);
+          out.saved = P.env.size === 'k15' && P.env.by && P.env.by.k15.zipX === 43.9 && P.env.by.k12.zipX === 61 && P.env.by.k12.colL === 37 && P.env.dx === 1 && !('zipX' in P.env);
+          /* 15K 版面：郵遞區號框高 9.1、郵票框、勾選表框位置 */
+          const h = _envHtml(Object.assign(_envCfg('k15'), { dx: 0, dy: 0 }), { zip: '308', fzip: '242', method: '掛號', co: '甲' }, true);
+          out.k15 = /width:105mm;height:220mm/.test(h) && /left:43.9mm;top:9.2mm;width:6.5mm;height:9.1mm/.test(h) && /left:7mm;top:15.6mm;width:19mm;height:21.4mm/.test(h) && /left:7.6mm;top:45.1mm;width:19.4mm/.test(h);
+          /* 校正記錄當時信封寬；換規格時位移換算：ox＋倍率×(校正寬−現在寬)/2 */
+          const cal = { v: 2, sx: 0.9, sy: 0.9, ox: -3, oy: -4, w: 120 };
+          const m = _envIosWrap('<i></i>', cal, 105).match(/translate\(([-\d.]+)mm,([-\d.]+)mm\) scale/);
+          out.wAdj = !!m && Math.abs(parseFloat(m[1]) - (-(-3 + 0.9 * 7.5) / 0.9)) < 1e-3 && Math.abs(parseFloat(m[2]) - 4 / 0.9) < 1e-3;
+          localStorage.removeItem('fy_env_ioscal');
+          document.getElementById('env-cal-ax').value = 19; document.getElementById('env-cal-ay').value = 18;
+          document.getElementById('env-cal-bx').value = 71; document.getElementById('env-cal-by').value = 124;
+          _envCalSave(); const c = _envIosCal();
+          out.calW = !!c && c.w === 105 && Math.abs(c.sx - 52 / 60) < 1e-9;
+          localStorage.removeItem('fy_env_ioscal'); P.env = null; res(out);
+        }, 300);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
+    }));
+    check('v6.0.60 信封版面依規格分開：舊存檔視為 12K、切 15K 帶 15K 版面（依實際信封）且 12K 座標保留；15K 郵遞區號框／郵票框／勾選表位置', r.old12 && r.switched && r.saved && r.k15, JSON.stringify(r));
+    check('v6.0.60 手機校正記錄信封寬，換規格時位移自動換算', r.wAdj && r.calW, JSON.stringify(r));
+    check('v6.0.60 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await ctx.close();
   }
 
