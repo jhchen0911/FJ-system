@@ -97,7 +97,7 @@
 | 人員／角色／參數 | `staff` `roles` `params` | `renderStaffPage` `renderRolesPage` `rolePerm` `canAccess` `_v6PermMigrate` `doSaveP` `syncParamsUI` `prmTab` | pagePerms、params（shared） |
 | 同步／備份／錯誤 | 頂欄 `#sync-chip` | `_sharedPayload` `_privatePayload` `_mergeColl` `_perRecordDelta` `_touch` `exportData`／`importData` `_err`／`renderErrLog` `_syncChip` | 見「架構」 |
 | 列印／PDF | — | `_printViaIframe`（PDF 預覽下載）`_pdfPlanPages` `_pdfAddPaged` `_toolPrint`；原生列印 `_printNativeHTML`（iOS 改走主畫面 `_printMainHTML`，`_isIOS`）；手機表格 `_mstack` | — |
-| 信封列印 | 請款單列表／編輯器／客戶卡 ✉ | `openEnvelope` `_envHtml` `_envPrint` `_envPdf`（信封實際尺寸 PDF；iOS 產生後給連結）`_zipLookup` `_envBookGet`／`_envBookSave`（信封通訊錄）`_envCalPrint`／`_envCalSave`／`_envIosWrap`（iPhone 列印校正，存本機 `fy_env_ioscal`） | 版面 `P.env`（座標依規格存 `P.env.by[k12|k15]`，`_envCfg(size)`／`_ENV_SIZE_DEF`）、通訊錄 `P.envBook[收件單位]`、`CUSTOMERS[].zip|envAttn|envTel` |
+| 信封列印 | 請款單列表／編輯器／客戶卡 ✉ | `openEnvelope` `_envHtml` `_envPrint` `_envPdf`（信封實際尺寸 PDF；iOS 產生後給連結）`_zipLookup` `_envBookGet`／`_envBookSave`（信封通訊錄）`_envUseA4`（列印方式：A4 置中預設／自訂紙張 `P.env.mode`）`_envCalPrint`／`_envCalSave`／`_envIosWrap`（每台裝置列印校正，存本機 `fy_env_ioscal`） | 版面 `P.env`（座標依規格存 `P.env.by[k12|k15]`，`_envCfg(size)`／`_ENV_SIZE_DEF`）、通訊錄 `P.envBook[收件單位]`、`CUSTOMERS[].zip|envAttn|envTel` |
 
 **應付 id 規則**：分包期別 `pay<cid>_p<no>`／保留款退還 `_r<no>`、預付款 `pay<cid>_a<id>`、介紹費 `pay<cid>_intro`、整筆 `pay<cid>`、薪資 `pay_ps_`、勞健保 `pay_ins_`、零用金 `pay_pc_`、稅費 `pay_tax_<eid>`、佣金 `comm_<qid>`。前述皆為自動產生（`_paySource` 判定、唯讀），只能從來源修改。
 
@@ -105,7 +105,7 @@
 
 ## 測試
 
-`tests/smoke.js`（573 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（575 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、

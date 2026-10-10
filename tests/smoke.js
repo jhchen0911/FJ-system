@@ -3084,7 +3084,7 @@ async function newPage(browser, width, height) {
         out.noFrames=/rgba\(220,60,60,0\)/.test(h)&&!/rgba\(220,60,60,\.75\)/.test(h);
         const txt=h.replace(/<[^>]+>/g,'');out.text=/王大明　先生　收/.test(txt)&&/TEL 0989-023-760/.test(txt)&&/新竹市東區光復路一段100號8樓/.test(txt)&&(h.match(/white-space:pre">/g)||[]).length>40;
         // 校正值與框線設定會存入 P.env；列印走原生、紙張 120×235
-        document.getElementById('env-dx').value='1.5';document.getElementById('env-frames').checked=true;_envPreview();
+        document.getElementById('env-dx').value='1.5';document.getElementById('env-frames').checked=true;document.getElementById('env-mode').value='custom';_envPreview();   /* v6.0.61 起預設 A4 置中，本測試驗自訂紙張 */
         document.getElementById('gen-confirm-ok').click();
         out.print=/@page\{size:120mm 235mm;margin:0\}/.test(printed)&&/rgba\(220,60,60,\.75\)/.test(printed)&&/left:63.5mm/.test(printed);
         out.saved=P.env&&P.env.dx===1.5&&P.env.frames===true&&P.coZip==='242'&&P.env.fontSender===11;   // v5.448 寄件人字級預設 11、可調
@@ -5720,6 +5720,39 @@ async function newPage(browser, width, height) {
     check('v6.0.60 手機校正記錄信封寬，換規格時位移自動換算', r.wAdj && r.calW, JSON.stringify(r));
     check('v6.0.60 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await ctx.close();
+  }
+
+  // ───────────── v6.0.61 電腦版信封預設 A4 置中（自訂紙張可選）、校正電腦也可用 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      try {
+        P.env = null; localStorage.removeItem('fy_env_ioscal');
+        let printed = ''; const o = window._printNativeHTML; window._printNativeHTML = function (h) { printed = h; };
+        openEnvelope(null, { to: { co: '八九企業有限公司', attn: '謝' } });
+        setTimeout(() => {
+          out.modeSel = document.getElementById('env-mode').value === 'a4' && !document.querySelector('#env-mode option[value=custom]').disabled;
+          out.calBox = !!document.getElementById('env-cal-box') && /這台手機／電腦/.test(document.getElementById('env-cal-box').textContent);
+          document.getElementById('gen-confirm-ok').click();
+          out.a4 = /@page\{size:A4;margin:0\}/.test(printed) && /class="env-a4" style="position:absolute;left:45mm;top:0/.test(printed);
+          openEnvelope(null, { to: { co: '八九企業有限公司', attn: '謝' } });
+          setTimeout(() => {
+            document.getElementById('env-mode').value = 'custom'; printed = '';
+            document.getElementById('gen-confirm-ok').click();
+            out.custom = /@page\{size:120mm 235mm;margin:0\}/.test(printed) && !/env-a4/.test(printed) && P.env.mode === 'custom';
+            /* 電腦 A4 模式也套用本機校正 */
+            localStorage.setItem('fy_env_ioscal', JSON.stringify({ v: 2, sx: 1.1, sy: 1.1, ox: 2, oy: 3, w: 120 }));
+            P.env.mode = 'a4'; openEnvelope(null, { to: { co: '八九企業有限公司', attn: '謝' } });
+            setTimeout(() => { printed = ''; document.getElementById('gen-confirm-ok').click(); out.calApplied = /env-ioscal/.test(printed);
+              localStorage.removeItem('fy_env_ioscal'); window._printNativeHTML = o; P.env = null; res(out); }, 200);
+          }, 200);
+        }, 200);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
+    }));
+    check('v6.0.61 電腦版信封預設 A4 置中（可改自訂紙張）、校正區塊電腦也可用並套用本機校正', r.modeSel && r.calBox && r.a4 && r.custom && r.calApplied, JSON.stringify(r));
+    check('v6.0.61 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
   }
 
   await browser.close();
