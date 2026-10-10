@@ -3094,7 +3094,7 @@ async function newPage(browser, width, height) {
         // 從客戶卡開啟、15K 規格
         openEnvelope(null,{custId:'cu447'});out.fontUI=!!document.getElementById('env-fontSender')&&document.getElementById('env-fontSender').value==='11';out.fromCust=gv('env-co')==='玄通營造股份有限公司'&&gv('env-zip')==='30075';
         document.getElementById('env-size').value='k15';_envPreview();printed='';document.getElementById('gen-confirm-ok').click();
-        out.k15=/@page\{size:105mm 220mm/.test(printed)&&P.env.size==='k15';
+        out.k15=/@page\{size:99mm 221mm/.test(printed)&&P.env.size==='k15';
         // 沒有收件人 → 擋下
         openEnvelope(null,{to:{co:'',attn:'',addr:'',zip:''}});printed='';document.getElementById('gen-confirm-ok').click();out.guard=printed===''&&m.style.display!=='none';
         m.style.display='none';
@@ -5702,7 +5702,7 @@ async function newPage(browser, width, height) {
           out.saved = P.env.size === 'k15' && P.env.by && P.env.by.k15.zipX === 43.9 && P.env.by.k12.zipX === 61 && P.env.by.k12.colL === 37 && P.env.dx === 1 && !('zipX' in P.env);
           /* 15K 版面：郵遞區號框高 9.1、郵票框、勾選表框位置 */
           const h = _envHtml(Object.assign(_envCfg('k15'), { dx: 0, dy: 0 }), { zip: '308', fzip: '242', method: '掛號', co: '甲' }, true);
-          out.k15 = /width:105mm;height:220mm/.test(h) && /left:43.9mm;top:9.2mm;width:6.5mm;height:9.1mm/.test(h) && /left:7mm;top:15.6mm;width:19mm;height:21.4mm/.test(h) && /left:7.6mm;top:45.1mm;width:19.4mm/.test(h);
+          out.k15 = /width:99mm;height:221mm/.test(h) && /left:43.9mm;top:9.2mm;width:6.5mm;height:9.1mm/.test(h) && /left:7mm;top:15.6mm;width:19mm;height:21.4mm/.test(h) && /left:7.6mm;top:45.1mm;width:19.4mm/.test(h);
           /* 校正記錄當時信封寬；換規格時位移換算：ox＋倍率×(校正寬−現在寬)/2 */
           const cal = { v: 2, sx: 0.9, sy: 0.9, ox: -3, oy: -4, w: 120 };
           const m = _envIosWrap('<i></i>', cal, 105).match(/translate\(([-\d.]+)mm,([-\d.]+)mm\) scale/);
@@ -5711,7 +5711,7 @@ async function newPage(browser, width, height) {
           document.getElementById('env-cal-ax').value = 19; document.getElementById('env-cal-ay').value = 18;
           document.getElementById('env-cal-bx').value = 71; document.getElementById('env-cal-by').value = 124;
           _envCalSave(); const c = _envIosCal();
-          out.calW = !!c && c.w === 105 && Math.abs(c.sx - 52 / 60) < 1e-9;
+          out.calW = !!c && c.w === 99 && Math.abs(c.sx - 52 / 60) < 1e-9;
           localStorage.removeItem('fy_env_ioscal'); P.env = null; res(out);
         }, 300);
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }

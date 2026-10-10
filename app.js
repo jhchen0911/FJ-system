@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.61';
+var APP_VERSION='v6.0.62';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -30762,7 +30762,7 @@ function _costRentLine(q){
 // 針對市售預印好的「中式信封」（右上 收件人郵遞區號框、中間直式紅框、左下 寄件人郵遞區號框、左側 寄送方式勾選表）
 // 只印文字到對應位置：收件郵遞區號逐格、中欄直書地址＋單位＋收件人、寄件人直書、寄送方式打 ✓。
 // 位置以 mm 絕對定位，所有座標可在 P.env 校正（印表機進紙差異），預覽畫出淡紅框線對位；勾「列印框線」可印在空白信封。
-var _ENV_SIZES={k12:{w:120,h:235,label:'中式 12K（12 × 23.5 cm）'},k15:{w:105,h:220,label:'中式 15K（10.5 × 22 cm）'}};
+var _ENV_SIZES={k12:{w:120,h:235,label:'中式 12K（12 × 23.5 cm）'},k15:{w:99,h:221,label:'中式小信封（9.9 × 22.1 cm）'}};
 var _ENV_DEF={size:'k12',dx:0,dy:0,frames:false,
   zipX:62,zipY:14,zipBox:7.5,zipGap:1,zipHy:5,          // 收件人郵遞區號（右上六格）
   colL:38,colW:40,colT:44,colB:200,                      // 中欄紅框
