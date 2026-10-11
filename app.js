@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.62';
+var APP_VERSION='v6.0.63';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -30763,7 +30763,8 @@ function _costRentLine(q){
 // 只印文字到對應位置：收件郵遞區號逐格、中欄直書地址＋單位＋收件人、寄件人直書、寄送方式打 ✓。
 // 位置以 mm 絕對定位，所有座標可在 P.env 校正（印表機進紙差異），預覽畫出淡紅框線對位；勾「列印框線」可印在空白信封。
 var _ENV_SIZES={k12:{w:120,h:235,label:'中式 12K（12 × 23.5 cm）'},k15:{w:99,h:221,label:'中式小信封（9.9 × 22.1 cm）'}};
-var _ENV_DEF={size:'k12',dx:0,dy:0,frames:false,
+var _ENV_DEF={size:'k15',dx:0,dy:0,frames:false,   // v6.0.63 預設＝公司實際用的中式小信封 99×221
+ 
   zipX:62,zipY:14,zipBox:7.5,zipGap:1,zipHy:5,          // 收件人郵遞區號（右上六格）
   colL:38,colW:40,colT:44,colB:200,                      // 中欄紅框
   sZipX:10,sZipY:216,sZipBox:5.5,sZipGap:0.8,sZipHy:3.5, // 寄件人郵遞區號（左下六格）
@@ -30784,7 +30785,7 @@ var _ENV_SIZE_DEF={
 };
 function _envCfg(size){
   var pe=(P&&P.env)||{};
-  var sz=size||pe.size||'k12';if(!_ENV_SIZES[sz])sz='k12';
+  var sz=size||pe.size||_ENV_DEF.size;if(!_ENV_SIZES[sz])sz=_ENV_DEF.size;
   var c=Object.assign({},_ENV_DEF,_ENV_SIZE_DEF[sz]||{});
   Object.keys(pe).forEach(function(k){if(k!=='by'&&_ENV_COORD_KEYS.indexOf(k)<0)c[k]=pe[k];});
   // 座標：該規格存過的 → 用；舊存檔（無 by，座標在最上層）一律視為 12K
@@ -30853,6 +30854,8 @@ function openEnvelope(invId,opt){
   if(cust&&cust.envAttn&&!to.attn)to.attn=cust.envAttn;
   if(!to.zip){to.zip=_zipLookup(to.addr);to.zipAuto=!!to.zip;}   // v6.0.47 由地址自動查郵遞區號
   if(!to.tel)to.tel=(cust&&cust.envTel)||(inv&&inv.tel)||(cust&&cust.tel)||'';
+  // v6.0.63 一次性：之前停在 12K（預設值）的設定改為小信封；之後使用者自己選 12K 不再強改
+  try{if(P.env&&!P.env.k15mig){if(!P.env.size||P.env.size==='k12')P.env.size='k15';P.env.k15mig=1;persistP();}}catch(e){_err('openEnvelope.k15mig',e);}
   var cfg=_envCfg();
   var coSp=_envSplitZip(P.addr||'');
   var fromZip=P.coZip||coSp.zip||_zipLookup(P.addr||'')||'';
@@ -30876,9 +30879,7 @@ function openEnvelope(invId,opt){
     +'<div class="f"><label>地址</label><input id="env-faddr" value="'+esc(coSp.addr||P.addr||'')+'" oninput="_envPreview()" style="'+IN+'"></div>'
     +'<div class="f"><label>電話</label><input id="env-ftel" value="'+esc(P.tel||'')+'" oninput="_envPreview()" style="'+IN+'"></div>'
     +'<details style="margin-top:6px"><summary style="font-size:12px;color:var(--b4);cursor:pointer">信封規格與校正（印表機進紙有偏差時調整）</summary>'
-    +'<div class="fg fg3" style="gap:6px;margin-top:6px"><div class="f"><label>規格</label><select id="env-size" onchange="_envSizeSwitch()" style="'+IN+'">'+sizeOpts+'</select></div>'
-    +'<div class="f"><label>列印方式</label><select id="env-mode" onchange="_envPreview()" style="'+IN+'"><option value="a4"'+(cfg.mode!=='custom'?' selected':'')+'>A4 置中（建議）</option><option value="custom"'+(cfg.mode==='custom'?' selected':'')+(_isIOS()?' disabled':'')+'>自訂信封紙張</option></select></div>'
-    +'<div class="f"><label>整體左右（mm）</label><input id="env-dx" type="number" step="0.5" value="'+cfg.dx+'" oninput="_envPreview()" style="'+IN+'"></div>'
+    +'<div class="fg fg3" style="gap:6px;margin-top:6px"><div class="f"><label>整體左右（mm）</label><input id="env-dx" type="number" step="0.5" value="'+cfg.dx+'" oninput="_envPreview()" style="'+IN+'"></div>'
     +'<div class="f"><label>整體上下（mm）</label><input id="env-dy" type="number" step="0.5" value="'+cfg.dy+'" oninput="_envPreview()" style="'+IN+'"></div></div>'
     +'<div class="fg fg3" style="gap:6px"><div class="f"><label>收件郵遞區號 左／上</label><div style="display:flex;gap:4px"><input id="env-zipX" type="number" step="0.5" value="'+cfg.zipX+'" oninput="_envPreview()" style="'+IN+'"><input id="env-zipY" type="number" step="0.5" value="'+cfg.zipY+'" oninput="_envPreview()" style="'+IN+'"></div></div>'
     +'<div class="f"><label>中欄 左／寬</label><div style="display:flex;gap:4px"><input id="env-colL" type="number" step="0.5" value="'+cfg.colL+'" oninput="_envPreview()" style="'+IN+'"><input id="env-colW" type="number" step="0.5" value="'+cfg.colW+'" oninput="_envPreview()" style="'+IN+'"></div></div>'
@@ -30891,7 +30892,9 @@ function openEnvelope(invId,opt){
     +'</details>'
     +_envCalHtml(IN)
     +'</div>'
-    +'<div><div style="font-size:11.5px;font-weight:700;color:var(--g3);margin-bottom:4px">預覽（淡紅框＝信封印好的框，實際列印只印黑字）</div><div id="env-prev" style="background:#e9e9e9;border-radius:var(--r8);padding:8px;display:flex;justify-content:center;overflow:hidden"></div>'
+    +'<div><div class="fg fg2" style="gap:6px;margin-bottom:6px"><div class="f"><label>信封規格</label><select id="env-size" onchange="_envSizeSwitch()" style="'+IN+'">'+sizeOpts+'</select></div>'
+    +'<div class="f"><label>列印方式</label><select id="env-mode" onchange="_envPreview()" style="'+IN+'"><option value="a4"'+(cfg.mode!=='custom'?' selected':'')+'>A4 置中（建議）</option><option value="custom"'+(cfg.mode==='custom'?' selected':'')+(_isIOS()?' disabled':'')+'>自訂信封紙張</option></select></div>'+'</div>'   // v6.0.63 規格／列印方式移到預覽上方（原本收在折疊區，容易沒切到）
+    +'<div style="font-size:11.5px;font-weight:700;color:var(--g3);margin-bottom:4px">預覽（淡紅框＝信封印好的框，實際列印只印黑字）</div><div id="env-prev" style="background:#e9e9e9;border-radius:var(--r8);padding:8px;display:flex;justify-content:center;overflow:hidden"></div>'
     +'<button type="button" id="env-pdf-btn" onclick="_envPdf()" style="margin-top:8px;width:100%;min-height:40px;border:1px solid var(--g3);background:var(--w);color:var(--g3);border-radius:var(--r8);font-weight:700;font-family:inherit;cursor:pointer">存成 PDF（信封尺寸）</button><div id="env-pdf-out"></div>'
     +'<div style="font-size:11px;color:var(--b3);margin-top:4px">手機（iPhone／iPad）無法指定自訂紙張時，可存成 PDF 後用 Brother 等印表機 App 選信封尺寸列印。</div></div>'
     +'</div>';
