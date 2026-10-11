@@ -5693,16 +5693,16 @@ async function newPage(browser, width, height) {
       try {
         /* 舊存檔（座標在最上層）視為 12K；切到 15K 用 15K 版面、12K 座標保留 */
         P.env = { size: 'k12', dx: 1, zipX: 61, colL: 37 };
-        out.old12 = _envCfg('k12').zipX === 61 && _envCfg('k12').dx === 1 && _envCfg('k15').zipX === 43.9 && _envCfg('k15').dx === 1;
+        out.old12 = _envCfg('k12').zipX === 61 && _envCfg('k12').dx === 1 && _envCfg('k15').zipX === 45.6 && _envCfg('k15').dx === 1;
         openEnvelope(null, { to: { co: '庚辛企業有限公司', attn: '謝' } });
         setTimeout(() => {
           const sel = document.getElementById('env-size'); sel.value = 'k15'; sel.dispatchEvent(new Event('change'));
-          out.switched = document.getElementById('env-zipX').value === '43.9' && document.getElementById('env-colL').value === '33';
+          out.switched = document.getElementById('env-zipX').value === '45.6' && document.getElementById('env-colL').value === '33';
           _envSaveCfg(_envRead().cfg);
-          out.saved = P.env.size === 'k15' && P.env.by && P.env.by.k15.zipX === 43.9 && P.env.by.k12.zipX === 61 && P.env.by.k12.colL === 37 && P.env.dx === 1 && !('zipX' in P.env);
+          out.saved = P.env.size === 'k15' && P.env.by && P.env.by.k15.zipX === 45.6 && P.env.by.k15.lv === 2 && P.env.by.k12.zipX === 61 && P.env.by.k12.colL === 37 && P.env.dx === 1 && !('zipX' in P.env);
           /* 15K 版面：郵遞區號框高 9.1、郵票框、勾選表框位置 */
           const h = _envHtml(Object.assign(_envCfg('k15'), { dx: 0, dy: 0 }), { zip: '308', fzip: '242', method: '掛號', co: '甲' }, true);
-          out.k15 = /width:99mm;height:221mm/.test(h) && /left:43.9mm;top:9.2mm;width:6.5mm;height:9.1mm/.test(h) && /left:7mm;top:15.6mm;width:19mm;height:21.4mm/.test(h) && /left:7.6mm;top:45.1mm;width:19.4mm/.test(h);
+          out.k15 = /width:99mm;height:221mm/.test(h) && /left:45.6mm;top:11.65mm;width:6.77mm;height:9.17mm/.test(h) && /left:7mm;top:15.6mm;width:19mm;height:21.4mm/.test(h) && /left:7.6mm;top:45.1mm;width:19.4mm/.test(h);
           /* 校正記錄當時信封寬；換規格時位移換算：ox＋倍率×(校正寬−現在寬)/2 */
           const cal = { v: 2, sx: 0.9, sy: 0.9, ox: -3, oy: -4, w: 120 };
           const m = _envIosWrap('<i></i>', cal, 105).match(/translate\(([-\d.]+)mm,([-\d.]+)mm\) scale/);
@@ -5779,6 +5779,30 @@ async function newPage(browser, width, height) {
     }));
     check('v6.0.63 信封預設小信封 99×221；舊 12K 設定一次性改小信封（之後自選 12K 不再強改）；規格／列印方式在預覽上方、不在折疊區', r.mig && r.visible && r.prev && r.keep12 && r.def, JSON.stringify(r));
     check('v6.0.63 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.64 小信封郵遞區號座標修正（版面版本 lv，舊的自動存檔改用新預設） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        /* v6.0.60～63 自動存下的 15K 舊座標（無 lv）→ 改用新預設；12K 存檔不受影響 */
+        P.env = { size: 'k15', k15mig: 1, dx: 0.5, by: { k15: { zipX: 43.9, zipY: 9.2, sZipX: 4.4 }, k12: { zipX: 61 } } };
+        const c = _envCfg('k15');
+        out.mig = c.zipX === 45.6 && c.zipY === 11.65 && c.sZipX === 3.45 && c.sZipY === 203 && c.dx === 0.5 && _envCfg('k12').zipX === 61;
+        /* 新版存檔（lv 2）照用 */
+        P.env.by.k15 = Object.assign({}, c, { zipX: 46 }); out.keepNew = _envCfg('k15').zipX === 46;
+        /* 收件區號三字中心＝框中心，間距 8.18 */
+        const h = _envHtml(Object.assign(_envCfg('k15'), { dx: 0, dy: 0, zipX: 45.6 }), { zip: '308', fzip: '242' }, false);
+        out.pitch = /left:45.6mm;top:11.65mm;width:6.77mm;height:9.17mm/.test(h) && /left:53.78mm/.test(h);
+        P.env = null;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.64 小信封郵遞區號座標修正：舊自動存檔（無版面版本）改用新預設、12K 不受影響、新存檔照用', r.mig && r.keepNew && r.pitch, JSON.stringify(r));
+    check('v6.0.64 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

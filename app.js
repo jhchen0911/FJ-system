@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.63';
+var APP_VERSION='v6.0.64';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -30773,12 +30773,13 @@ var _ENV_DEF={size:'k15',dx:0,dy:0,frames:false,   // v6.0.63 預設＝公司實
   fontAddr:12,fontName:18,fontAttn:13,fontSender:11,fontZip:16};
 var _ENV_METHODS=['印刷品','限時','平信','掛號','雙掛號'];
 // v6.0.60：版面座標依信封規格分開（P.env.by[規格]）；15K 版面依使用者實際信封（紅框位置以照片中印出的校正十字為尺量得）
-var _ENV_COORD_KEYS=['zipX','zipY','zipBox','zipH','zipGap','zipHy','colL','colW','colT','colB','sZipX','sZipY','sZipBox','sZipH','sZipGap','sZipHy','senderL','senderT','senderB','chkX','chkY0','chkStep','chkL','chkW','stX','stY','stW','stH'];
+var _ENV_COORD_KEYS=['lv','zipX','zipY','zipBox','zipH','zipGap','zipHy','colL','colW','colT','colB','sZipX','sZipY','sZipBox','sZipH','sZipGap','sZipHy','senderL','senderT','senderB','chkX','chkY0','chkStep','chkL','chkW','stX','stY','stW','stH'];
 var _ENV_SIZE_DEF={
   k12:{zipH:7.5,sZipH:5.5,chkL:10,chkW:21,stX:10,stY:10,stW:22,stH:24},
-  k15:{zipX:43.9,zipY:9.2,zipBox:6.5,zipH:9.1,zipGap:1.35,zipHy:3.75,
+  // lv＝版面版本：v6.0.64 依實印照片（以紅框為尺）修正收件區號（右移約 1.8、下移約 2.5、間距 7.85→8.18）與寄件區號（左移 1、上移 0.7）
+  k15:{lv:2,zipX:45.6,zipY:11.65,zipBox:6.77,zipH:9.17,zipGap:1.41,zipHy:4.16,
        colL:33,colW:30,colT:31.3,colB:206.6,
-       sZipX:4.4,sZipY:204,sZipBox:4,sZipH:6.8,sZipGap:0.6,sZipHy:1.5,
+       sZipX:3.45,sZipY:203,sZipBox:3.9,sZipH:7.36,sZipGap:0.7,sZipHy:2.07,
        senderL:4,senderT:100,senderB:198,
        chkX:24.75,chkY0:45.1,chkStep:3.96,chkL:7.6,chkW:19.4,
        stX:7,stY:15.6,stW:19,stH:21.4}
@@ -30790,6 +30791,8 @@ function _envCfg(size){
   Object.keys(pe).forEach(function(k){if(k!=='by'&&_ENV_COORD_KEYS.indexOf(k)<0)c[k]=pe[k];});
   // 座標：該規格存過的 → 用；舊存檔（無 by，座標在最上層）一律視為 12K
   var saved=(pe.by&&pe.by[sz])||(!pe.by&&sz==='k12'?pe:null);
+  // 存檔的版面版本比預設舊（例如 v6.0.60～63 自動存下的 15K 舊座標）→ 改用新預設
+  var dv=(_ENV_SIZE_DEF[sz]&&_ENV_SIZE_DEF[sz].lv)||0;if(saved&&dv&&(saved.lv||1)<dv)saved=null;
   if(saved)_ENV_COORD_KEYS.forEach(function(k){if(saved[k]!=null&&saved[k]!=='')c[k]=saved[k];});
   c.size=sz;
   if(c.fontSender===9)c.fontSender=11;/* v5.448 舊存檔的預設 9pt 一律放大 */
@@ -30896,7 +30899,7 @@ function openEnvelope(invId,opt){
     +'<div class="f"><label>列印方式</label><select id="env-mode" onchange="_envPreview()" style="'+IN+'"><option value="a4"'+(cfg.mode!=='custom'?' selected':'')+'>A4 置中（建議）</option><option value="custom"'+(cfg.mode==='custom'?' selected':'')+(_isIOS()?' disabled':'')+'>自訂信封紙張</option></select></div>'+'</div>'   // v6.0.63 規格／列印方式移到預覽上方（原本收在折疊區，容易沒切到）
     +'<div style="font-size:11.5px;font-weight:700;color:var(--g3);margin-bottom:4px">預覽（淡紅框＝信封印好的框，實際列印只印黑字）</div><div id="env-prev" style="background:#e9e9e9;border-radius:var(--r8);padding:8px;display:flex;justify-content:center;overflow:hidden"></div>'
     +'<button type="button" id="env-pdf-btn" onclick="_envPdf()" style="margin-top:8px;width:100%;min-height:40px;border:1px solid var(--g3);background:var(--w);color:var(--g3);border-radius:var(--r8);font-weight:700;font-family:inherit;cursor:pointer">存成 PDF（信封尺寸）</button><div id="env-pdf-out"></div>'
-    +'<div style="font-size:11px;color:var(--b3);margin-top:4px">手機（iPhone／iPad）無法指定自訂紙張時，可存成 PDF 後用 Brother 等印表機 App 選信封尺寸列印。</div></div>'
+    +'<div style="font-size:11px;color:var(--b3);margin-top:4px">一般請直接按「列印信封」（A4 置中、會套用本機校正）。「存成 PDF」是信封實際尺寸的檔案，給能直接選信封紙張的電腦或印表機 App 使用，不套用校正。</div></div>'
     +'</div>';
   showConfirm('信封列印'+(inv?('：'+esc(inv.client||'')+(inv.periodNo?('　第 '+inv.periodNo+' 期請款單'):'')):''),html,function(){_envPrint();},false,null,true);
   var okBtn=document.getElementById('gen-confirm-ok');if(okBtn)okBtn.textContent='列印信封';
