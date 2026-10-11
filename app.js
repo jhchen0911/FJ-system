@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.64';
+var APP_VERSION='v6.0.65';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -31514,14 +31514,26 @@ function _pjTable(heads,rows,foot){
     +rows.map(function(r){return '<tr style="border-bottom:1px solid var(--b1)">'+r.map(function(c,i){return '<td style="padding:5px 6px;'+(heads[i]&&heads[i].r?'text-align:right;font-variant-numeric:tabular-nums;':'')+'">'+(c==null?'':c)+'</td>';}).join('')+'</tr>';}).join('')
     +'</tbody>'+(foot?('<tfoot><tr style="background:var(--b0);font-weight:700">'+foot.map(function(c,i){return '<td style="padding:5px 6px;'+(heads[i]&&heads[i].r?'text-align:right;font-variant-numeric:tabular-nums;':'')+'">'+(c==null?'':c)+'</td>';}).join('')+'</tr></tfoot>'):'')+'</table></div>';
 }
+// v6.0.65：已收清的期別預設收合成一條摘要，點開才顯示（待收／逾期照常顯示），狀態記在 window._pjInvPaidOpen[qid]
+function _pjInvSettled(v){return !!v.receivedConfirmed&&!(_invAR(v)>0);}
+function pjInvPaidToggle(qid){
+  window._pjInvPaidOpen=window._pjInvPaidOpen||{};window._pjInvPaidOpen[qid]=!window._pjInvPaidOpen[qid];
+  try{var q=Q.find(function(x){return x.id===qid;});var b=document.getElementById('pj-body-inv');if(q&&b)b.innerHTML=_pjInvHtml(q,_pjStat(q));}catch(e){_err('pjInvPaidToggle',e);}
+}
 function _pjInvHtml(q,st){
-  var rows=st.invs.map(function(v){var paid=!!v.receivedConfirmed,ar=_invAR(v),due='';if(!paid&&ar>0){try{var e=_invExpectedDate(v);due=(e&&e.date)||'';}catch(e2){_err('_pjInvHtml',e2);}}var od=due&&due<localToday();
+  var openPaid=!!(window._pjInvPaidOpen&&window._pjInvPaidOpen[q.id]);
+  var settled=st.invs.filter(_pjInvSettled);
+  var shown=openPaid?st.invs:st.invs.filter(function(v){return !_pjInvSettled(v);});
+  var paidBar=settled.length?('<div onclick="pjInvPaidToggle(\''+q.id+'\')" style="display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;background:#f1f8f3;border:1px solid #cfe6d6;border-radius:var(--r6);padding:7px 10px;margin-bottom:8px;font-size:12px;color:#1B5E20">'
+    +'<span><b>✓ 已收款 '+settled.length+' 期</b>（第 '+settled.map(function(v){return esc(String(v.periodNo||'?'));}).join('、')+' 期）合計 NT$ '+fmt(settled.reduce(function(a,v){return a+((v.totals&&v.totals.total)||0);},0))+'</span>'
+    +'<span style="white-space:nowrap;font-weight:700">'+(openPaid?'收合 ▴':'展開 ▾')+'</span></div>'):'';
+  var rows=shown.map(function(v){var paid=!!v.receivedConfirmed,ar=_invAR(v),due='';if(!paid&&ar>0){try{var e=_invExpectedDate(v);due=(e&&e.date)||'';}catch(e2){_err('_pjInvHtml',e2);}}var od=due&&due<localToday();
     var stTxt=paid?'<span style="color:#1B5E20;font-weight:700">✓ 已收</span>':('<span style="color:'+(od?'var(--red)':'#b26a00')+';font-weight:700">待收 '+fmt(ar)+'</span>'+(due?('<div style="font-size:10.5px;color:'+(od?'var(--red)':'var(--b4)')+'">預計 '+esc(due)+(od?'（逾期）':'')+'</div>'):''));
     return ['第'+esc(String(v.periodNo||'?'))+'期',esc(v.date||''),fmt((v.totals&&v.totals.total)||0),(_invRetention(v)?fmt(_invRetention(v)):'—'),stTxt,
       '<span style="white-space:nowrap">'+_pjBtn("printInvById('"+v.id+"')",'查看')+(paid?'':_pjBtn("openReceiptModal('"+v.id+"')",'收款','border-color:var(--gm);color:var(--g3)'))+_pjBtn("openEnvelope('"+v.id+"')",'✉')+(_allowRows(v).length?_pjBtn("printAllowance('"+v.id+"')",'折讓單','border-color:#b26a00;color:#b26a00'):'')+'</span>'];});
   var rent=st.rent.length?'<div style="font-size:11.5px;color:#b26a00;background:#fff8ec;border:1px solid #ffd699;border-radius:var(--r6);padding:6px 9px;margin-bottom:8px"><b>逾期租金可請款：'+st.rent.length+' 項・NT$ '+fmt(st.rent.reduce(function(a,s){return a+s.amount;},0))+'（未稅）</b>　'+st.rent.slice(0,3).map(function(s){return esc(String(s.desc).slice(0,14))+' 逾 '+s.overDays+' 天';}).join('、')+'</div>':'';
   var bar=st.base>0?'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11.5px;color:var(--b4)"><span>估驗進度</span><div style="flex:1;max-width:360px;height:8px;background:var(--b1);border-radius:6px;overflow:hidden"><div style="width:'+Math.round(Math.min(100,(st.billed+st.retHeld)/st.base*100))+'%;height:100%;background:var(--g)"></div></div><b style="color:var(--g3)">'+Math.round((st.billed+st.retHeld)/st.base*100)+'%</b></div>':'';
-  return rent+bar+(rows.length?_pjTable([{t:'期別'},{t:'請款日'},{t:'本期（含稅）',r:1},{t:'保留款',r:1},{t:'收款'},{t:''}],rows,['合計','',fmt(st.billed),fmt(st.retHeld),'已收 '+fmt(st.recv)+'／待收 '+fmt(st.ar),'']):'<div style="font-size:12px;color:var(--b3)">尚未請款</div>')
+  return rent+bar+paidBar+(rows.length?_pjTable([{t:'期別'},{t:'請款日'},{t:'本期（含稅）',r:1},{t:'保留款',r:1},{t:'收款'},{t:''}],rows,['合計','',fmt(st.billed),fmt(st.retHeld),'已收 '+fmt(st.recv)+'／待收 '+fmt(st.ar),'']):(settled.length?'':'<div style="font-size:12px;color:var(--b3)">尚未請款</div>'))
     +'<div style="margin-top:8px">'+_pjBtn("pjNewInv('"+q.id+"')",'＋ 新增下一期請款單','border-color:var(--gm);color:var(--g3)')+'</div>';
 }
 function _pjCostHtml(q,st){

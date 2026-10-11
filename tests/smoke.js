@@ -5806,6 +5806,45 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.65 工程專案業主計價：已收清的期別收合成摘要、點開才顯示 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      try {
+        Q = [{ id: 'q665', code: '665', name: '收合測試案', client: '業主', date: '2026-06-01', awarded: true, exs: [], rmk: {}, _mt: 1, items: [{ desc: '工項', unit: '式', qty: '1', price: '9000000', sec: false }], t: { sub: 9000000, tax: 450000, total: 9450000 } }];
+        INV.length = 0;
+        INV.push({ id: 'i1', quoteId: 'q665', project: '收合測試案', client: '業主', periodNo: 1, date: '2026-06-25', items: [], totals: { total: 2934750 }, received: 2934750, receivedConfirmed: true });
+        INV.push({ id: 'i2', quoteId: 'q665', project: '收合測試案', client: '業主', periodNo: 2, date: '2026-07-20', items: [], totals: { total: 1511370 }, received: 1511370, receivedConfirmed: true });
+        INV.push({ id: 'i3', quoteId: 'q665', project: '收合測試案', client: '業主', periodNo: 3, date: '2026-08-20', items: [], totals: { total: 800000 }, received: 0 });
+        window._pjInvPaidOpen = {};
+        const q = Q[0], st = _pjStat(q);
+        const h = _pjInvHtml(q, st);
+        out.bar = /✓ 已收款 2 期<\/b>（第 1、2 期）合計 NT\$ 4,446,120/.test(h) && /展開 ▾/.test(h);
+        out.onlyPending = /第3期/.test(h) && !/第1期/.test(h) && !/第2期/.test(h);
+        window._pjInvPaidOpen.q665 = true;
+        const h2 = _pjInvHtml(q, _pjStat(q));
+        out.expanded = /第1期/.test(h2) && /第2期/.test(h2) && /第3期/.test(h2) && /收合 ▴/.test(h2);
+        /* 全部收清：只剩摘要，不顯示「尚未請款」 */
+        INV.splice(2, 1); window._pjInvPaidOpen = {};
+        const h3 = _pjInvHtml(q, _pjStat(q));
+        out.allPaid = /✓ 已收款 2 期/.test(h3) && !/尚未請款/.test(h3) && !/第1期/.test(h3);
+        /* 實際頁面點擊切換 */
+        openProj('q665');
+        setTimeout(() => {
+          const body = document.getElementById('pj-body-inv');
+          out.inPage = !!body && /已收款 2 期/.test(body.innerHTML);
+          pjInvPaidToggle('q665');
+          out.toggled = /第1期/.test(document.getElementById('pj-body-inv').innerHTML);
+          Q = []; INV.length = 0; res(out);
+        }, 300);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
+    }));
+    check('v6.0.65 工程專案業主計價：已收清期別收成「已收款 N 期」摘要（待收照常）、點開展開、全部收清不顯示尚未請款', r.bar && r.onlyPending && r.expanded && r.allPaid && r.inPage && r.toggled, JSON.stringify(r));
+    check('v6.0.65 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
