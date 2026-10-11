@@ -3062,7 +3062,7 @@ async function newPage(browser, width, height) {
     const { page, errors } = await newPage(browser, 1440, 900);
     const r = await page.evaluate(() => {
         const out={};
-        P.company='豐有工程有限公司';P.addr='242新北市新莊區中央路722號7樓';P.tel='0989-023-760';delete P.coZip;delete P.env;
+        P.company='豐有工程有限公司';P.addr='242新北市新莊區中央路722號7樓';P.tel='0989-023-760';delete P.coZip;P.env={size:'k12',k15mig:1};   /* v6.0.63 起預設小信封，本測試驗 12K 版面 */
         CUSTOMERS.push({id:'cu447',name:'玄通營造股份有限公司',contact:'王大明',addr:'30075新竹市東區光復路一段100號8樓',tel:'03-5555027'});
         INV.push({id:'inv447',client:'玄通營造股份有限公司',project:'亞東寶山AL2廠房',loc:'新竹科學園區園區二路99號',caddr:'',contact:'王大明',periodNo:2,date:'2026-10-01',sendMethod:'郵寄公司',items:[]});
         let printed='';const orig=window._printNativeHTML;window._printNativeHTML=function(h,f){printed=h;};
@@ -5543,7 +5543,7 @@ async function newPage(browser, width, height) {
           document.getElementById('gen-confirm-ok').click();
           setTimeout(() => {
             out.snap = snap && snap.box && snap.sheet && snap.co && snap.noFrame;
-            out.page = !!snap && /@page\s*\{size:A4/.test(snap.css) && /class="env-a4" style="position:absolute;left:45mm;top:0;width:120mm;height:235mm"/.test(document.getElementById('_fy_print_main') ? document.getElementById('_fy_print_main').innerHTML : snap.html || '') && /body>\*:not\(#_fy_print_main\)\{display:none!important\}/.test(snap.css);
+            out.page = !!snap && /@page\s*\{size:A4/.test(snap.css) && /class="env-a4" style="position:absolute;left:55.5mm;top:0;width:99mm;height:221mm"/.test(document.getElementById('_fy_print_main') ? document.getElementById('_fy_print_main').innerHTML : snap.html || '') && /body>\*:not\(#_fy_print_main\)\{display:none!important\}/.test(snap.css);
             out.hiddenOnScreen = getComputedStyle(document.getElementById('_fy_print_main')).display === 'none';
             window.dispatchEvent(new Event('afterprint'));
             setTimeout(() => {
@@ -5559,7 +5559,7 @@ async function newPage(browser, width, height) {
                 _envPdf();
                 setTimeout(() => {
                   const a = document.querySelector('#env-pdf-out a');
-                  out.pdf = !!saved && saved.o.unit === 'mm' && saved.o.format[0] === 120 && saved.o.format[1] === 235 && saved.img.join(',') === '0,0,120,235' && !document.getElementById('_fy_env_pdf')
+                  out.pdf = !!saved && saved.o.unit === 'mm' && saved.o.format[0] === 99 && saved.o.format[1] === 221 && saved.img.join(',') === '0,0,99,221'   /* v6.0.63 預設小信封 */ && !document.getElementById('_fy_env_pdf')
                     && saved.blob && !!a && /^blob:/.test(a.getAttribute('href')) && a.target === '_blank';   /* v6.0.55：iOS 產生後給連結（下載須由點按觸發） */
                   res(out);
                 }, 400);
@@ -5735,12 +5735,12 @@ async function newPage(browser, width, height) {
           out.modeSel = document.getElementById('env-mode').value === 'a4' && !document.querySelector('#env-mode option[value=custom]').disabled;
           out.calBox = !!document.getElementById('env-cal-box') && /這台手機／電腦/.test(document.getElementById('env-cal-box').textContent);
           document.getElementById('gen-confirm-ok').click();
-          out.a4 = /@page\{size:A4;margin:0\}/.test(printed) && /class="env-a4" style="position:absolute;left:45mm;top:0/.test(printed);
+          out.a4 = /@page\{size:A4;margin:0\}/.test(printed) && /class="env-a4" style="position:absolute;left:55.5mm;top:0/.test(printed);
           openEnvelope(null, { to: { co: '八九企業有限公司', attn: '謝' } });
           setTimeout(() => {
             document.getElementById('env-mode').value = 'custom'; printed = '';
             document.getElementById('gen-confirm-ok').click();
-            out.custom = /@page\{size:120mm 235mm;margin:0\}/.test(printed) && !/env-a4/.test(printed) && P.env.mode === 'custom';
+            out.custom = /@page\{size:99mm 221mm;margin:0\}/.test(printed) && !/env-a4/.test(printed) && P.env.mode === 'custom';
             /* 電腦 A4 模式也套用本機校正 */
             localStorage.setItem('fy_env_ioscal', JSON.stringify({ v: 2, sx: 1.1, sy: 1.1, ox: 2, oy: 3, w: 120 }));
             P.env.mode = 'a4'; openEnvelope(null, { to: { co: '八九企業有限公司', attn: '謝' } });
@@ -5752,6 +5752,33 @@ async function newPage(browser, width, height) {
     }));
     check('v6.0.61 電腦版信封預設 A4 置中（可改自訂紙張）、校正區塊電腦也可用並套用本機校正', r.modeSel && r.calBox && r.a4 && r.custom && r.calApplied, JSON.stringify(r));
     check('v6.0.61 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.63 信封預設小信封、舊 12K 設定一次性改為小信封、規格選單移到預覽上方 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      try {
+        P.env = { size: 'k12', dx: 0, by: { k12: { zipX: 62 } } };
+        openEnvelope(null, { to: { co: '八九企業有限公司', attn: '謝' } });
+        setTimeout(() => {
+          out.mig = P.env.size === 'k15' && P.env.k15mig === 1 && document.getElementById('env-size').value === 'k15';
+          const sel = document.getElementById('env-size');
+          out.visible = !sel.closest('details') && sel.offsetParent !== null && !!document.getElementById('env-mode') && !document.getElementById('env-mode').closest('details');
+          out.prev = /width:99mm;height:221mm/.test(document.getElementById('env-prev').innerHTML);
+          /* 使用者之後自己選 12K → 不再被強改 */
+          sel.value = 'k12'; sel.dispatchEvent(new Event('change')); _envSaveCfg(_envRead().cfg);
+          document.getElementById('gen-confirm-cancel').click();
+          openEnvelope(null, { to: { co: '八九企業有限公司' } });
+          setTimeout(() => { out.keep12 = document.getElementById('env-size').value === 'k12' && P.env.size === 'k12';
+            P.env = null; out.def = _envCfg().size === 'k15'; res(out); }, 200);
+        }, 300);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
+    }));
+    check('v6.0.63 信封預設小信封 99×221；舊 12K 設定一次性改小信封（之後自選 12K 不再強改）；規格／列印方式在預覽上方、不在折疊區', r.mig && r.visible && r.prev && r.keep12 && r.def, JSON.stringify(r));
+    check('v6.0.63 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
