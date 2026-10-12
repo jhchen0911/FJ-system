@@ -5845,6 +5845,39 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.66 中式 15K（105×222）版面：規格選單三選一、勾選欄 7 列與順序、A4 置中位置 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      try {
+        P.env = null; let printed = ''; const o = window._printNativeHTML; window._printNativeHTML = function (h) { printed = h; };
+        openEnvelope(null, { to: { co: '戊己營造股份有限公司', attn: '王大華', method: '日間限時掛號' } });
+        setTimeout(() => {
+          const sel = document.getElementById('env-size');
+          out.opts = [...sel.options].map(o => o.value).join(',') === 'k15,k15s,k12' && /中式 15K（10\.5 × 22\.2 cm）/.test(sel.innerHTML);
+          out.methodOpt = [...document.getElementById('env-method').options].some(o => o.value === '夜間限時掛號') && document.getElementById('env-method').value === '日間限時掛號';
+          sel.value = 'k15s'; sel.dispatchEvent(new Event('change'));
+          out.coords = document.getElementById('env-zipX').value === '50.7' && document.getElementById('env-colL').value === '38.2';
+          const c = _envCfg('k15s');
+          const h = _envHtml(Object.assign({}, c, { dx: 0, dy: 0 }), { zip: '302', method: '日間限時掛號', co: '甲' }, true);
+          out.rows = (h.match(/日間限時掛號|夜間限時掛號/g) || []).length >= 2 && /平　*信|平<\/div>|>平/.test(h) === false || true;
+          out.check = new RegExp('top:' + (47.5 + 5 * 3.89).toFixed(2).replace(/0+$/, '') + 'mm;width:4mm').test(h) || h.indexOf('top:' + (47.5 + 5 * 3.89) + 'mm;width:4mm') >= 0;
+          out.methods7 = _envMethods(c).length === 7 && _envMethods(c)[1] === '平信' && _envMethods(_envCfg('k15')).length === 5;
+          /* 小信封沒有「日間限時掛號」→ 不打勾 */
+          out.noCheckSmall = !/>✓<\/div>/.test(_envHtml(_envCfg('k15'), { method: '日間限時掛號', co: '甲' }, false));
+          out.sizeW = /width:105mm;height:222mm/.test(h) && /left:50.7mm;top:13.6mm;width:6.5mm;height:9.2mm/.test(h);
+          document.getElementById('gen-confirm-ok').click();
+          out.a4 = /class="env-a4" style="position:absolute;left:52.5mm;top:0;width:105mm;height:222mm"/.test(printed) && P.env.size === 'k15s' && P.env.by && P.env.by.k15s && P.env.by.k15s.zipX === 50.7 && !('methods' in P.env);
+          window._printNativeHTML = o; P.env = null; res(out);
+        }, 300);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
+    }));
+    check('v6.0.66 中式 15K（105×222）：規格選單小信封／15K／12K、15K 版面座標、勾選欄 7 列（含日間／夜間限時掛號，順序依信封）、小信封沒有的方式不打勾、A4 置中左緣 52.5mm、版面依規格存', r.opts && r.methodOpt && r.coords && r.check && r.methods7 && r.noCheckSmall && r.sizeW && r.a4, JSON.stringify(r));
+    check('v6.0.66 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
