@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.66';
+var APP_VERSION='v6.0.67';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -10114,9 +10114,30 @@ function _mergeColl(localArr,cloudArr,collName,cloudTombs){
       return;
     }
     if(dead(r.id))return;
-    if(!map[r.id]||mt(r)>=mt(map[r.id]))map[r.id]=r;
+    var o=map[r.id];
+    if(!o||mt(r)>=mt(o))map[r.id]=r;
+    if(o&&collName==='payables')map[r.id]=_payStatusReconcile(map[r.id],map[r.id]===r?o:r);   // v6.0.67
   });
   return Object.values(map).concat(noId);
+}
+// v6.0.67：應付「已付」狀態不被舊裝置蓋回待付。
+// 自動應付（分包期別／預付款／薪資…）每台裝置都會依本機舊狀態重新產生並戳新 _mt；尚未收到「已付」的裝置
+// 重算後 _mt 較新、整筆勝出 → 已付被改回待付。改為：兩版付款狀態不同時，以「付款動作」的時間決定——
+// 待付版要有 unpaidAt（真的按了「改回未付」）且晚於已付版的 paidAt 才算數，否則沿用已付版的付款欄位。
+function _payStatusReconcile(win,other){
+  if(!win||!other)return win;
+  var wp=win.status==='paid',op=other.status==='paid';
+  if(wp===op)return win;
+  var paid=wp?win:other,unpaid=wp?other:win;
+  if((unpaid.unpaidAt||0)>(paid.paidAt||0)){   // 改回未付在後 → 待付
+    if(!wp)return win;
+    var u=Object.assign({},win);u.status=unpaid.status||'pending';delete u.paidDate;delete u.paidAt;u.unpaidAt=unpaid.unpaidAt;return u;
+  }
+  if(wp)return win;
+  var r=Object.assign({},win);r.status='paid';
+  ['paidDate','paidAt'].forEach(function(k){if(paid[k]!=null)r[k]=paid[k];else delete r[k];});
+  if(paid.unpaidAt!=null)r.unpaidAt=paid.unpaidAt;else delete r.unpaidAt;
+  return r;
 }
 function _mergeTombs(cloudTombs){
   cloudTombs=cloudTombs||{};
@@ -21572,6 +21593,7 @@ function syncCostToPayable(q, cost){
   if(existP){
     if(existP.paidDate)p.paidDate=existP.paidDate;
     if(existP.paidAt)p.paidAt=existP.paidAt;
+    if(existP.unpaidAt)p.unpaidAt=existP.unpaidAt;   // v6.0.67
     if(existP.payDue)p.payDue=existP.payDue;
     if(existP.note&&!itemName)p.note=existP.note;
     if(existP.files)p.files=existP.files;           // 已上傳的請款單/發票/匯款紀錄不可遺失
@@ -29842,9 +29864,10 @@ function _hrUpsertPay(id,fields){
   var p=PAYABLES.find(function(x){return x.id===id;});
   var isNew=!p;
   if(!p){p={id:id,status:'pending',category:'salary'};PAYABLES.push(p);}
-  var before=_recSig(p);
+  var before=_recSig(p),wasPaid=p.status==='paid';
   Object.keys(fields).forEach(function(k){p[k]=fields[k];});
   p.vat=false;
+  if(!isNew&&wasPaid!==(p.status==='paid')){if(p.status==='paid'){p.paidAt=Date.now();}else{p.unpaidAt=Date.now();delete p.paidAt;}}   // v6.0.67 付款狀態轉換留時間，供同步合併判斷
   if(isNew||_recSig(p)!==before){p.updatedAt=Date.now();_touch(p);}   // v5.441 內容沒變不戳 _mt
   return p;
 }
@@ -30787,13 +30810,14 @@ var _ENV_SIZE_DEF={
        chkX:24.75,chkY0:45.1,chkStep:3.96,chkL:7.6,chkW:19.4,
        stX:7,stY:15.6,stW:19,stH:21.4},
   // v6.0.66 中式 15K（官方 105×222）：依使用者空白信封正面照片量測（信封邊為尺，每 mm 約 9.7 像素）；寄送方式 7 列、順序與小信封不同
-  k15s:{lv:1,methods:['印刷品','平信','限時','掛號','雙掛號','日間限時掛號','夜間限時掛號'],
-       zipX:50.7,zipY:13.6,zipBox:6.5,zipH:9.2,zipGap:1.27,zipHy:2.43,
-       colL:38.2,colW:32.4,colT:40.3,colB:204.7,
-       sZipX:3.8,sZipY:206.6,sZipBox:3.83,sZipH:6.4,sZipGap:1.35,sZipHy:0.93,
-       senderL:4,senderT:104,senderB:202,
-       chkX:24.8,chkY0:47.5,chkStep:3.89,chkL:6.2,chkW:22,
-       stX:7.6,stY:13.4,stW:20.1,stH:19.3}
+  // v6.0.67 依實印照片修正（數字對各自的紅框量偏移）：收件區號偏右 3.7／偏上 0.6、寄件區號偏右 2.85／偏下 0.9、中欄與勾選欄偏右約 3.2 mm
+  k15s:{lv:2,methods:['印刷品','平信','限時','掛號','雙掛號','日間限時掛號','夜間限時掛號'],
+       zipX:47,zipY:14.2,zipBox:6.5,zipH:9.2,zipGap:1.27,zipHy:2.43,
+       colL:35,colW:32.4,colT:40.3,colB:204.7,
+       sZipX:0.95,sZipY:205.7,sZipBox:3.83,sZipH:6.4,sZipGap:1.35,sZipHy:0.93,
+       senderL:3,senderT:104,senderB:202,
+       chkX:21.6,chkY0:47.5,chkStep:3.89,chkL:3,chkW:22,
+       stX:4.4,stY:13.4,stW:20.1,stH:19.3}
 };
 function _envCfg(size){
   var pe=(P&&P.env)||{};
@@ -32731,7 +32755,7 @@ function _syncSubPeriodPayables(q,c){
   var itemName='';
   if(c.rows&&c.rows.length&&c.rows[0].linkedItemIdx>=0&&q.items&&q.items[c.rows[0].linkedItemIdx])itemName=(q.items[c.rows[0].linkedItemIdx].desc||'').split('\n')[0];
   var put=function(p,old,idx){
-    if(old){['paidDate','paidAt','payDue','files','invNo','costSourceId','retentionPct'].forEach(function(f){if(old[f]!=null)p[f]=old[f];});if(old.vat!=null&&old.vatManual)p.vat=old.vat;}
+    if(old){['paidDate','paidAt','unpaidAt','payDue','files','invNo','costSourceId','retentionPct'].forEach(function(f){if(old[f]!=null)p[f]=old[f];});if(old.vat!=null&&old.vatManual)p.vat=old.vat;}
     if(old&&_recSame(old,p)){_keepStamp(p,old);}else _touch(p);
     if(idx>=0)PAYABLES[idx]=p;else PAYABLES.unshift(p);
   };
@@ -33417,7 +33441,7 @@ function _introSyncCard(q,f){
   if(!trig||amt<=0||!f.vendor){if(old&&old.status!=='paid'){PAYABLES.splice(idx,1);_tomb('payables',pid);savePayables();}return;}
   var p={id:pid,costId:f.id,quoteId:q.id,to:f.vendor,amount:amt,vat:_subInvoice(f),date:(old&&old.date)||trig,category:'subcontract',project:q.name||'',status:(old&&old.status)||'pending',
     note:'介紹費（'+(_INTRO_PAY[f.introPay]||'')+'・'+(_INTRO_CALC[_introCalcOf(f)]||'')+'）'+(adv?('，已扣預付 '+fmt(adv)):''),updatedAt:Date.now()};
-  if(old){['paidDate','paidAt','payDue','files','invNo'].forEach(function(k){if(old[k]!=null)p[k]=old[k];});if(old.vat!=null&&old.vatManual)p.vat=old.vat;}
+  if(old){['paidDate','paidAt','unpaidAt','payDue','files','invNo'].forEach(function(k){if(old[k]!=null)p[k]=old[k];});if(old.vat!=null&&old.vatManual)p.vat=old.vat;}
   if(old&&_recSame(old,p))_keepStamp(p,old);else _touch(p);
   if(idx>=0)PAYABLES[idx]=p;else PAYABLES.unshift(p);savePayables();
 }
@@ -34445,7 +34469,7 @@ function subEarlyMarkPaid(cid,no,id){
 function payUnmark(pid){
   var p=PAYABLES.find(function(x){return x.id===pid;});if(!p)return;
   showConfirm('改回未付','確定把「'+esc(p.to||'')+' NT$ '+fmt(_payEff(p))+'」改回待付款？',function(){
-    p.status='pending';delete p.paidDate;delete p.paidAt;_touch(p);
+    p.status='pending';delete p.paidDate;delete p.paidAt;p.unpaidAt=Date.now();_touch(p);   // v6.0.67 unpaidAt：同步合併時判斷「改回未付」是否晚於付款
     try{savePayables();_onSave();}catch(er){_err('payUnmark',er);}
     try{rCostItems();}catch(er){_err('payUnmark',er);}try{if(document.getElementById('page-acct')&&document.getElementById('page-acct').classList.contains('active'))renderPayables();}catch(er){_err('payUnmark',er);}toast('已改回待付款');
   },true);

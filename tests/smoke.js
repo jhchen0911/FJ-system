@@ -5858,7 +5858,7 @@ async function newPage(browser, width, height) {
           out.opts = [...sel.options].map(o => o.value).join(',') === 'k15,k15s,k12' && /中式 15K（10\.5 × 22\.2 cm）/.test(sel.innerHTML);
           out.methodOpt = [...document.getElementById('env-method').options].some(o => o.value === '夜間限時掛號') && document.getElementById('env-method').value === '日間限時掛號';
           sel.value = 'k15s'; sel.dispatchEvent(new Event('change'));
-          out.coords = document.getElementById('env-zipX').value === '50.7' && document.getElementById('env-colL').value === '38.2';
+          out.coords = document.getElementById('env-zipX').value === '47' && document.getElementById('env-colL').value === '35';
           const c = _envCfg('k15s');
           const h = _envHtml(Object.assign({}, c, { dx: 0, dy: 0 }), { zip: '302', method: '日間限時掛號', co: '甲' }, true);
           out.rows = (h.match(/日間限時掛號|夜間限時掛號/g) || []).length >= 2 && /平　*信|平<\/div>|>平/.test(h) === false || true;
@@ -5866,15 +5866,65 @@ async function newPage(browser, width, height) {
           out.methods7 = _envMethods(c).length === 7 && _envMethods(c)[1] === '平信' && _envMethods(_envCfg('k15')).length === 5;
           /* 小信封沒有「日間限時掛號」→ 不打勾 */
           out.noCheckSmall = !/>✓<\/div>/.test(_envHtml(_envCfg('k15'), { method: '日間限時掛號', co: '甲' }, false));
-          out.sizeW = /width:105mm;height:222mm/.test(h) && /left:50.7mm;top:13.6mm;width:6.5mm;height:9.2mm/.test(h);
+          out.sizeW = /width:105mm;height:222mm/.test(h) && /left:47mm;top:14.2mm;width:6.5mm;height:9.2mm/.test(h);
           document.getElementById('gen-confirm-ok').click();
-          out.a4 = /class="env-a4" style="position:absolute;left:52.5mm;top:0;width:105mm;height:222mm"/.test(printed) && P.env.size === 'k15s' && P.env.by && P.env.by.k15s && P.env.by.k15s.zipX === 50.7 && !('methods' in P.env);
+          out.a4 = /class="env-a4" style="position:absolute;left:52.5mm;top:0;width:105mm;height:222mm"/.test(printed) && P.env.size === 'k15s' && P.env.by && P.env.by.k15s && P.env.by.k15s.zipX === 47 && !('methods' in P.env);
           window._printNativeHTML = o; P.env = null; res(out);
         }, 300);
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
     }));
     check('v6.0.66 中式 15K（105×222）：規格選單小信封／15K／12K、15K 版面座標、勾選欄 7 列（含日間／夜間限時掛號，順序依信封）、小信封沒有的方式不打勾、A4 置中左緣 52.5mm、版面依規格存', r.opts && r.methodOpt && r.coords && r.check && r.methods7 && r.noCheckSmall && r.sizeW && r.a4, JSON.stringify(r));
     check('v6.0.66 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.67 應付「已付」不被舊裝置重算蓋回待付；15K 信封座標依實印修正 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const T = 1760000000000;
+        const paid = { id: 'payX_a1', status: 'paid', paidDate: '2026-10-05', paidAt: T, amount: 177988, _mt: T };
+        const stale = { id: 'payX_a1', status: 'pending', amount: 177988, note: '預付款（重算）', _mt: T + 5000 };
+        /* 舊裝置重算的待付版 _mt 較新（雲端），本機是已付 → 保留已付，其他欄位取新版 */
+        let m = _mergeColl([paid], [stale], 'payables', {})[0];
+        out.keepPaid1 = m.status === 'paid' && m.paidDate === '2026-10-05' && m.paidAt === T && m.note === '預付款（重算）';
+        /* 反方向：本機是舊裝置待付、雲端已付 */
+        m = _mergeColl([stale], [paid], 'payables', {})[0];
+        out.keepPaid2 = m.status === 'paid' && m.paidDate === '2026-10-05';
+        /* 真的按了「改回未付」（unpaidAt 晚於 paidAt）→ 待付 */
+        const unm = { id: 'payX_a1', status: 'pending', unpaidAt: T + 3000, amount: 177988, _mt: T + 3000 };
+        m = _mergeColl([paid], [unm], 'payables', {})[0];
+        out.unmark1 = m.status === 'pending' && !m.paidDate;
+        m = _mergeColl([unm], [paid], 'payables', {})[0];
+        out.unmark2 = m.status === 'pending';
+        /* 改回未付之後又標已付（paidAt 較晚）→ 已付 */
+        const repaid = { id: 'payX_a1', status: 'paid', paidDate: '2026-10-12', paidAt: T + 9000, unpaidAt: T + 3000, _mt: T + 9000 };
+        m = _mergeColl([repaid], [Object.assign({}, unm, { _mt: T + 20000 })], 'payables', {})[0];
+        out.repaid = m.status === 'paid' && m.paidDate === '2026-10-12';
+        /* 其他集合不受影響 */
+        m = _mergeColl([{ id: 'i1', status: 'paid', _mt: 1 }], [{ id: 'i1', status: 'pending', _mt: 2 }], 'invoices', {})[0];
+        out.otherColl = m.status === 'pending';
+        /* payUnmark 會寫 unpaidAt */
+        const bak = PAYABLES; PAYABLES = [{ id: 'payY', status: 'paid', paidDate: '2026-10-01', paidAt: T, to: '甲乙', amount: 100 }];
+        payUnmark('payY'); document.getElementById('gen-confirm-ok').click();
+        out.unpaidAt = PAYABLES[0].status === 'pending' && PAYABLES[0].unpaidAt > T && !PAYABLES[0].paidAt;
+        /* 薪資應付：付款狀態轉換留時間 */
+        PAYABLES = [{ id: 'pay_ps_t', status: 'paid', paidAt: T, category: 'salary' }];
+        _hrUpsertPay('pay_ps_t', { status: 'pending', paidDate: '' });
+        out.hr = PAYABLES[0].unpaidAt > T && !PAYABLES[0].paidAt;
+        PAYABLES = bak;
+        /* 15K 座標 lv:2，舊的 lv:1 存檔作廢 */
+        P.env = { size: 'k15s', by: { k15s: Object.assign({}, _ENV_SIZE_DEF.k15s, { lv: 1, zipX: 50.7 }) } };
+        out.k15s = _envCfg('k15s').zipX === 47 && _envCfg('k15s').colL === 35 && _ENV_SIZE_DEF.k15s.lv === 2;
+        P.env = null;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.67 應付已付不被舊裝置重算蓋回待付（雙向）、改回未付以 unpaidAt／paidAt 先後為準、薪資應付轉換留時間、其他集合照舊', r.keepPaid1 && r.keepPaid2 && r.unmark1 && r.unmark2 && r.repaid && r.otherColl && r.unpaidAt && r.hr, JSON.stringify(r));
+    check('v6.0.67 中式 15K 座標依實印修正（lv:2 取代舊存檔）', r.k15s, JSON.stringify(r));
+    check('v6.0.67 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
