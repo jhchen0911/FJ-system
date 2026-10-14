@@ -6078,6 +6078,29 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.71 廠商編輯彈窗：欄位變多後視窗內可捲動、儲存鈕在小螢幕也按得到 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 620);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        VENDORS.length = 0; VENDORS.push({ id: 'vS', name: '捲動測試商', type: 'material' });
+        go('contacts'); editVendor('vS');
+        const m = document.getElementById('vendor-modal'), box = m.firstElementChild, btn = [...m.querySelectorAll('button')].find(b => /儲存/.test(b.textContent));
+        out.shown = getComputedStyle(m).display === 'flex';
+        out.scrollable = /auto|scroll/.test(getComputedStyle(box).overflowY) && box.scrollHeight > box.clientHeight && box.getBoundingClientRect().bottom <= window.innerHeight + 1;
+        btn.scrollIntoView(); const rc = btn.getBoundingClientRect(); out.btnVisible = rc.top >= 0 && rc.bottom <= window.innerHeight;
+        out.label = /聯絡人/.test(m.innerHTML) && !/<label>客戶<\/label>/.test(m.innerHTML);
+        document.getElementById('v-bankacct').value = '123-456'; btn.click();
+        out.saved = VENDORS[0].bankAcct === '123-456' && getComputedStyle(m).display === 'none';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.71 廠商編輯彈窗在矮視窗可捲動、儲存鈕捲得到並能存、聯絡人欄名修正', r.shown && r.scrollable && r.btnVisible && r.label && r.saved, JSON.stringify(r));
+    check('v6.0.71 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

@@ -2759,7 +2759,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.70" defer></script>
+<script src="app.js?v=6.0.71" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
@@ -3079,7 +3079,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 
 <!-- 廠商編輯 Modal -->
 <div id="vendor-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeVendorModal()">
-  <div style="max-width:520px;width:100%;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+  <div style="max-width:520px;width:100%;max-height:calc(100vh - 32px);overflow:auto;background:var(--w);border-radius:var(--r14);box-shadow:0 20px 60px rgba(0,0,0,.3)">
     <div style="background:var(--g3);padding:13px 18px;display:flex;justify-content:space-between;align-items:center">
       <span id="vendor-modal-title" style="color:#fff;font-size:14px;font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 新增廠商</span>
       <button type="button" onclick="closeVendorModal()" style="border:none;background:transparent;color:rgba(255,255,255,.75);font-size:20px;cursor:pointer">✕</button>
@@ -3098,7 +3098,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         </div>
       </div>
       <div class="fg fg2" style="margin-bottom:10px">
-        <div class="f"><label>客戶</label><input id="v-contact" placeholder="聯絡人姓名"></div>
+        <div class="f"><label>聯絡人</label><input id="v-contact" placeholder="聯絡人姓名"></div>
         <div class="f"><label>電話</label><input id="v-phone" placeholder="電話"></div>
       </div>
       <div class="fg fg2" style="margin-bottom:10px">
