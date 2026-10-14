@@ -5928,6 +5928,62 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.68 自有卡標籤／科目自動歸類、氧氣乙炔品項、廠商匯款帳戶一鍵複製 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        VENDORS.length = 0; VENDORS.push({ id: 'vG', name: '丙丁企業有限公司', type: 'material', bank: '國泰世華 新莊分行', bankAcct: '0123-4567-8901', bankHolder: '丙丁企業有限公司' }, { id: 'vN', name: '無帳號商', type: 'other' });
+        Q.length = 0; Q.push({ id: 'q68', name: '歸類案', client: '甲', date: '2026-09-01', items: [{ desc: 'H型鋼樁 H300 打設', qty: 100, unit: 'M', price: 1000 }], costs: [] });
+        PAYABLES.length = 0;
+        openProjectCosts('q68');
+        addCostItem('own'); const c = Q[0].costs[0]; window._costEditId = c.id; rCostItems();
+        const card = () => document.getElementById('cost-list').innerHTML;
+        /* 標籤沒有「（材料機具）」、沒有科目下拉（COST_CATS 選項不出現在自有卡）、日期仍在 */
+        out.label = /<option value="own" selected(="")?>自有成本<\/option>/.test(card()) && !/材料機具/.test(card());
+        out.noCatSel = !/<option value="一次性材料購置"/.test(card()) && !/<option value="材料租金"/.test(card()) && /type="date"/.test(card());
+        out.defCat = c.cat === '一次性材料購置' && _costDefaultCat('own') === '一次性材料購置';
+        /* 新增明細下拉有氧氣／乙炔；加列後出現規格欄 */
+        out.preset = OWN_PRESETS.some(p => p[0] === '氧氣' && p[1] === '支') && OWN_PRESETS.some(p => p[0] === '乙炔') && /<option value="氧氣\|支">氧氣<\/option>/.test(card());
+        addOwnRow(c.id, '氧氣', '支'); addOwnRow(c.id, '乙炔', '支');
+        const rows = c.rows; updOwnRow(c.id, rows[0].id, 'desc', '10M'); updOwnRow(c.id, rows[0].id, 'qty', 2); updOwnRow(c.id, rows[0].id, 'unitPrice', 400);
+        updOwnRow(c.id, rows[1].id, 'desc', '瑞'); updOwnRow(c.id, rows[1].id, 'qty', 2); updOwnRow(c.id, rows[1].id, 'unitPrice', 900);
+        rCostItems();
+        out.rows = /規格（例：10M）/.test(card()) && Math.round(c.amt) === 2600 && c.cat === '一次性材料購置';
+        /* 加一列設備租金 5,000 → 金額最大者歸類為設備租金；刪掉回到購置 */
+        addOwnRow(c.id, '設備租金', '月'); const rr = c.rows[2]; updOwnRow(c.id, rr.id, 'unitPrice', 5000);
+        out.autoCat = c.cat === '設備租金'; delOwnRow(c.id, rr.id); out.autoCat2 = c.cat === '一次性材料購置';
+        /* 材料．運輸同步卡（_fromMat／rental）不受自動歸類影響 */
+        const cm = { type: 'own', _fromMat: 'erent:x', rental: true, cat: '設備租金', rows: [{ preset: '止水鈑', qty: 1, unitPrice: 1 }] }; _ownAutoCat(cm); out.matKeep = cm.cat === '設備租金';
+        /* 廠商匯款帳戶：選廠商 → 掛應付；應付列有「複製帳號」、無帳號廠商沒有 */
+        updCostField(c.id, 'vendor', '丙丁企業有限公司'); updCostField(c.id, 'invNo', 'EC37934314');
+        const po = PAYABLES.find(p => p.costId === c.id); out.pay = !!po && _payEff(po) === 2730;
+        go('finance'); switchFinanceTab('payable'); renderPayables();
+        const ph = document.getElementById('finance-payable').innerHTML;
+        out.copyBtn = /複製帳號/.test(ph) && /_bankCopy\(/.test(ph);
+        out.noBtn = !_bankBtn('無帳號商') && !_bankBtn('') && _bankBtn('丙丁企業有限公司').indexOf('複製帳號') > 0;
+        /* 標記已付彈窗顯示銀行＋帳號 */
+        payMarkPaid(po.id); const mh = document.getElementById('gen-confirm-modal').innerHTML;
+        out.dlg = /國泰世華 新莊分行/.test(mh) && /0123-4567-8901/.test(mh) && /複製帳號/.test(mh); document.getElementById('gen-confirm-ok').click();
+        /* 複製：只留數字 */
+        let copied = ''; const nc = navigator.clipboard; try { Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { copied = t; return Promise.resolve(); } }, configurable: true }); } catch (e) { out.clipErr = String(e); }
+        _bankCopy('丙丁企業有限公司'); out.copied = copied === '012345678901';
+        try { Object.defineProperty(navigator, 'clipboard', { value: nc, configurable: true }); } catch (e) { /* 可忽略 */ }
+        /* 廠商卡顯示帳戶；編輯／儲存往返 */
+        go('contacts'); renderVendors(); try { renderVendors2(); } catch (e) { out.rv2 = String(e); } const vh = document.getElementById('vendor-list').innerHTML + (document.getElementById('vendor-list-inner') || {}).innerHTML; out.vcard = /0123-4567-8901/.test(vh) && /複製帳號/.test(vh);
+        editVendor('vG'); out.edit = document.getElementById('v-bankacct').value === '0123-4567-8901' && document.getElementById('v-bank').value === '國泰世華 新莊分行';
+        document.getElementById('v-bankacct').value = '999-888'; saveVendor(); out.save = VENDORS.find(v => v.id === 'vG').bankAcct === '999-888' && _vendorBank('丙丁企業有限公司').bankHolder === '丙丁企業有限公司';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.68 自有卡：標籤「自有成本」無科目下拉、預設一次性購置、科目依明細自動歸類（金額最大者）、材料頁同步卡不動', r.label && r.noCatSel && r.defCat && r.autoCat && r.autoCat2 && r.matKeep, JSON.stringify(r));
+    check('v6.0.68 明細品項新增氧氣／乙炔（可填規格），兩列合計 2,600、應付含稅 2,730', r.preset && r.rows && r.pay, JSON.stringify(r));
+    check('v6.0.68 廠商匯款帳戶：廠商卡欄位往返、應付列與標記已付彈窗有「複製帳號」（只複製數字）、無帳號廠商不顯示', r.copyBtn && r.noBtn && r.dlg && r.copied && r.vcard && r.edit && r.save, JSON.stringify(r));
+    check('v6.0.68 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

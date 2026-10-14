@@ -2759,7 +2759,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.67" defer></script>
+<script src="app.js?v=6.0.68" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
@@ -3107,6 +3107,11 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       </div>
       <div class="f" style="margin-bottom:10px"><label>地址</label><input id="v-addr" placeholder="地址"></div>
       <div class="f" style="margin-bottom:10px"><label>供應品項</label><input id="v-items" placeholder="如：H型鋼、打樁機具…"></div>
+      <div class="fg fg3" style="margin-bottom:10px">
+        <div class="f"><label>匯款銀行／分行</label><input id="v-bank" placeholder="例：國泰世華 新莊分行"></div>
+        <div class="f"><label>匯款帳號</label><input id="v-bankacct" inputmode="numeric" placeholder="例：0123-4567-8901"></div>
+        <div class="f"><label>戶名</label><input id="v-bankholder" placeholder="例：丙丁企業有限公司"></div>
+      </div>
       <div class="f" style="margin-bottom:10px">
         <label>常規付款方式 <span style="font-size:10px;color:var(--b3)">（可連動至應付帳款）</span></label>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">

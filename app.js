@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.67';
+var APP_VERSION='v6.0.68';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -20964,13 +20964,13 @@ function openContractCosts(qid){
 
 // 同步施工成本到應付帳款
 // 自有成本：豐有常用品項（點即帶入）
-var OWN_PRESETS=[['材料租金','月'],['材料運費','趟'],['設備租金','月'],['設備運費','趟'],['機具租金','月'],['機具運費','趟'],['損耗賠償','式'],['止水鈑','片'],['3分鋼索','條'],['5分母索','條'],['五金零件','式']]   // v6.0.19 設備／損耗賠償;
+var OWN_PRESETS=[['材料租金','月'],['材料運費','趟'],['設備租金','月'],['設備運費','趟'],['機具租金','月'],['機具運費','趟'],['損耗賠償','式'],['止水鈑','片'],['3分鋼索','條'],['5分母索','條'],['氧氣','支'],['乙炔','支'],['五金零件','式']]   // v6.0.19 設備／損耗賠償；v6.0.68 氧氣／乙炔
 function addOwnRow(cid,preset,unit){
   const q=Q.find(x=>x.id===eid);if(!q)return;
   const cc=(q.costs||[]).find(x=>x.id===cid);if(!cc)return;
   if(!cc.rows)cc.rows=[];
   cc.rows.push({id:cid+'_'+Date.now(),preset:preset||'',desc:'',qty:1,unit:unit||'',unitPrice:0});
-  recalcCostAmt(cc);_touch(q);try{persist();}catch(e){_err('addOwnRow',e);}
+  _ownAutoCat(cc);recalcCostAmt(cc);_touch(q);try{persist();}catch(e){_err('addOwnRow',e);}
   rCostItems();
   setTimeout(function(){
     var wrap=document.getElementById('cost-rows-'+cid);
@@ -20984,7 +20984,7 @@ function updOwnRow(cid,rid,field,val){
   const cc=(q.costs||[]).find(x=>x.id===cid);if(!cc)return;
   const r=(cc.rows||[]).find(x=>x.id===rid);if(!r)return;
   r[field]=(field==='qty'||field==='unitPrice')?(parseFloat(val)||0):val;
-  recalcCostAmt(cc);_touch(q);try{persist();}catch(e){_err('updOwnRow',e);}
+  _ownAutoCat(cc);recalcCostAmt(cc);_touch(q);try{persist();}catch(e){_err('updOwnRow',e);}
   // 局部更新金額顯示
   var amtEl=document.getElementById('ownamt-'+rid);
   if(amtEl)amtEl.textContent=fmt((parseFloat(r.qty)||0)*(parseFloat(r.unitPrice)||0));
@@ -20995,12 +20995,12 @@ function delOwnRow(cid,rid){
   const q=Q.find(x=>x.id===eid);if(!q)return;
   const cc=(q.costs||[]).find(x=>x.id===cid);if(!cc)return;
   cc.rows=(cc.rows||[]).filter(x=>x.id!==rid);
-  recalcCostAmt(cc);_touch(q);try{persist();}catch(e){_err('delOwnRow',e);}
+  _ownAutoCat(cc);recalcCostAmt(cc);_touch(q);try{persist();}catch(e){_err('delOwnRow',e);}
   rCostItems();
 }
 function buildOwnRowsHtml(cc){
   var rows=(cc.rows||[]).map(function(r){
-    var needName=r.preset==='五金零件'||r.preset==='';
+    var needName=r.preset==='五金零件'||r.preset===''||r.preset==='氧氣'||r.preset==='乙炔';   // v6.0.68 氧氣／乙炔可填規格（10M、瑞）
     return '<div style="background:#fff;border:1px solid var(--b1);border-radius:var(--r6);padding:6px 8px;margin-bottom:5px">'
       // 第一行：品項＋品名＋刪除
       +'<div style="display:flex;gap:5px;align-items:center;margin-bottom:5px">'
@@ -21008,7 +21008,7 @@ function buildOwnRowsHtml(cc){
       +'<option value="">自訂…</option>'
       +OWN_PRESETS.map(function(p2){return '<option value="'+p2[0]+'"'+(r.preset===p2[0]?' selected':'')+'>'+p2[0]+'</option>';}).join('')
       +'</select>'
-      +(needName?'<input placeholder="品名" value="'+esc(r.desc||'')+'" oninput="updOwnRow(\''+cc.id+'\',\''+r.id+'\',\'desc\',this.value)" style="flex:1;min-width:0;font-size:12px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6)">':'')
+      +(needName?'<input placeholder="'+(r.preset==='氧氣'||r.preset==='乙炔'?'規格（例：10M）':'品名')+'" value="'+esc(r.desc||'')+'" oninput="updOwnRow(\''+cc.id+'\',\''+r.id+'\',\'desc\',this.value)" style="flex:1;min-width:0;font-size:12px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6)">':'')
       +'<button type="button" onclick="delOwnRow(\''+cc.id+'\',\''+r.id+'\')" style="flex:0 0 28px;border:1px solid #f0c4c4;color:var(--red);background:#fff;border-radius:var(--r6);height:30px;cursor:pointer;font-size:12px">✕</button>'
       +'</div>'
       // 第二行：數量 × 單位 @ 單價 ＝ 金額
@@ -21898,7 +21898,7 @@ function _histCostFor(name,unit){
 // v5.293：科目對齊十年規劃的六大成本類別（＋「其他」承接無法歸類的雜項）
 var COST_CATS=['動員費','打設','拔除','裝設','拆除','材料租金','材料運費','設備租金','設備運費','一次性材料購置','材料損耗','其他'];   // v6.0.19 設備租金／運費   // v6.0.13 材料損耗（自有重複性材料歸還時認列）   // v5.403：打設／拔除、裝設／拆除分開
 var _COST_CATS_LEGACY=['打設拔除','裝設拆除'];   // 舊科目：既有記錄照舊顯示，新建不再提供
-function _costDefaultCat(type){return({own:'材料租金',sub:'打設',labor:'裝設',extra:'其他'})[type]||'其他';}
+function _costDefaultCat(type){return({own:'一次性材料購置',sub:'打設',labor:'裝設',extra:'其他'})[type]||'其他';}   // v6.0.68 自有卡預設改購置（租賃走材料．運輸）
 function _costCatOpts(cur){var ks=COST_CATS.slice();if(cur&&ks.indexOf(cur)<0)ks.unshift(cur);return ks.map(function(k){return '<option value="'+k+'"'+(cur===k?' selected':'')+'>'+k+(COST_CATS.indexOf(k)<0?'（舊）':'')+'</option>';}).join('');}
 // 舊科目名稱對應（歷代舊值自動歸入新六大類）
 function _costCatNorm(cat){var m={
@@ -23482,7 +23482,7 @@ function rCostItems(){
   const vendorListId='cost-vendor-dl-'+eid;
   const vendorOpts=(VENDORS||[]).map(v=>`<option value="${esc(v.name||'')}"></option>`).join('');
 
-  const typeLabel={own:'自有成本（材料機具）',sub:'承包',labor:'點工',extra:'額外支出'};
+  const typeLabel={own:'自有成本',sub:'承包',labor:'點工',extra:'額外支出'};   // v6.0.68 去掉「（材料機具）」
   const typeColor={own:'#8a6d00',sub:'#1565C0',labor:'#E65100',extra:'#4A148C'};
   const typeBg={own:'#FFFDE7',sub:'#E3F2FD',labor:'#FFF3E0',extra:'#F3E5F5'};
   // 已合併的項目顯示標記
@@ -23689,6 +23689,7 @@ function rCostItems(){
         +`</select>`)
       +(c.mergedInto?`<span style="font-size:10px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;padding:2px 6px;border-radius:8px"><svg class="ic ib" aria-hidden="true"><use href="#i-link"/></svg> 已合併</span>`:'')
       +(function(){var _cat=c.cat?_costCatNorm(c.cat):_costDefaultCat(c.type);
+        if(c.type==='own'&&!c.rental&&!c._fromMat)return `<input type="date" value="${c.date||''}" onchange="updCostField('${c.id}','date',this.value)" title="進貨／請款單日期" style="font-size:10.5px;padding:2px 4px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);color:var(--b4);font-family:inherit;width:118px">`;   // v6.0.68 自有卡科目由明細列自動歸類（_ownAutoCat），不顯示下拉
         if(_isQuickExtra(c))return `<span style="font-size:10.5px;color:var(--b5);padding:2px 6px;border:1px solid var(--b1);border-radius:var(--r6);background:var(--b0)">${esc(_cat)}</span><span style="font-size:10.5px;color:var(--b4)">${esc(c.date||'')}</span>`;
         return `<select onchange="updCostField('${c.id}','cat',this.value)" title="成本科目（跨案分析用）" style="font-size:10.5px;padding:2px 4px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);color:var(--b5);font-family:inherit">`
           +_costCatOpts(_cat)
@@ -24911,6 +24912,7 @@ function editVendor(id){
   document.getElementById('v-addr').value=v.addr||'';
   document.getElementById('v-items').value=v.items||'';
   document.getElementById('v-note').value=v.note||'';
+  ['v-bank','v-bankacct','v-bankholder'].forEach(function(id,i){var el=document.getElementById(id);if(el)el.value=v[['bank','bankAcct','bankHolder'][i]]||'';});   // v6.0.68 匯款帳戶
   const vPayCashEl=document.getElementById('v-pay-cash');
   const vPayTicketEl=document.getElementById('v-pay-ticket');
   if(vPayCashEl)vPayCashEl.value=v.payTermCash!=null?v.payTermCash:'';
@@ -24925,6 +24927,7 @@ function saveVendor(){
   const v={id,name:gv('v-name'),type:gv('v-type'),contact:gv('v-contact'),
     phone:gv('v-phone'),taxid:gv('v-taxid'),email:gv('v-email'),
     addr:gv('v-addr'),items:gv('v-items'),note:gv('v-note'),
+    bank:(gv('v-bank')||'').trim(),bankAcct:(gv('v-bankacct')||'').trim(),bankHolder:(gv('v-bankholder')||'').trim(),   // v6.0.68
     payTermCash:_vPayCash!==''?parseInt(_vPayCash)||0:null,
     payTermTicket:_vPayTicket!==''?parseInt(_vPayTicket)||0:null,
     updatedAt:Date.now(),_mt:Date.now()};
@@ -24967,6 +24970,7 @@ function renderVendors(){
         <div class="qt">${esc(v.name||'未命名')} <span style="font-size:11px;color:${typeClr[v.type]}">${typeMap[v.type]||''}</span></div>
         <div class="qsb">${v.contact?'聯絡人：'+esc(v.contact):''}${v.phone?' ／ '+esc(v.phone):''}${v.taxid?' ／ 統編：'+esc(v.taxid):''}</div>
         ${v.items?`<div style="font-size:11px;color:var(--b4)">供應：${esc(v.items)}</div>`:''}
+        ${v.bankAcct?'<div class="qsb">'+_bankLine(v.name)+'</div>':''}
         ${vUnpaid>0?`<div style="font-size:11px;margin-top:3px;color:var(--red);font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 待付 NT$ ${fmt(vUnpaid)}</div>`:''}
         ${vTotal>0&&vUnpaid<=0?`<div style="font-size:11px;margin-top:2px;color:var(--g3)">✓ 累積交易 NT$ ${fmt(vTotal)}，已全付</div>`:''}
         ${v.note?`<div style="font-size:10px;color:var(--b3)"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> ${esc(v.note)}</div>`:''}
@@ -25799,7 +25803,7 @@ function renderPayables(){
           '<div class="ql" style="cursor:default;margin-left:8px;margin-bottom:2px">'
           +'<div class="qdot" style="background:'+(p.status==='paid'?'var(--g)':'var(--red)')+'"></div>'
           +'<div class="qm" style="flex:1;min-width:0">'
-          +'<div class="qt">'+esc(p.to||'未知')+' <span style="font-size:11px;color:var(--b3)">'+_payCatTxt(p,catMap)+'</span></div>'
+          +'<div class="qt">'+esc(p.to||'未知')+' <span style="font-size:11px;color:var(--b3)">'+_payCatTxt(p,catMap)+'</span>'+_bankBtn(p.to)+'</div>'
           +'<div style="font-size:11px;color:var(--b4);margin-top:2px;line-height:1.6">'
           +'<div>'+(p.status==='paid'&&p.paidDate?'<svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 實付：'+p.paidDate:'<svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 預計：'+(p.date||'—'))+'</div>'
           +(p.project?'<div><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> '+esc(p.project)+'</div>':'')
@@ -25835,7 +25839,7 @@ function renderPayables(){
     <div class="ql" style="cursor:default">
       <div class="qdot" style="background:${p.status==='paid'?'var(--g)':'var(--red)'}"></div>
       <div class="qm" style="flex:1;min-width:0">
-        <div class="qt">${esc(p.to||'未知')} <span style="font-size:11px;color:var(--b3)">${_payCatTxt(p,catMap)}</span></div>
+        <div class="qt">${esc(p.to||'未知')} <span style="font-size:11px;color:var(--b3)">${_payCatTxt(p,catMap)}</span>${_bankBtn(p.to)}</div>
         <div style="font-size:11px;color:var(--b4);margin-top:2px;line-height:1.6">
           <div>${p.status==='paid'&&p.paidDate?'<svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 實付：'+p.paidDate:'<svg class="ic ib" aria-hidden="true"><use href="#i-calendar"/></svg> 預計：'+(p.date||'—')}</div>
           ${p.project?`<div><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> ${esc(p.project)}</div>`:''}
@@ -28990,6 +28994,7 @@ function renderVendors2(){
       <div class="qm">
         <div class="qt">${esc(v.name||'未命名')} <span style="font-size:11px;color:${typeClr[v.type]}">${typeMap[v.type]||''}</span></div>
         <div class="qsb">${v.contact?esc(v.contact):''}${v.phone?' ／ '+esc(v.phone):''}${v.items?' ／ '+esc(v.items):''}${v.payTermCash!=null?' ／ <svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg>'+v.payTermCash+'%'+(v.payTermTicket?'+票'+v.payTermTicket+'天':''):''}</div>
+        ${v.bankAcct?'<div class="qsb">'+_bankLine(v.name)+'</div>':''}
       </div>
       <div style="display:flex;gap:4px;margin-left:8px">
         ${v.phone?`<a href="tel:${v.phone}" class="btn btn-xs" style="text-decoration:none"><svg class="ic ib" aria-hidden="true"><use href="#i-phone"/></svg></a>`:''}
@@ -33547,7 +33552,7 @@ function _costSrcOf(q,c){
 function _costRoCard(q,c){
   try{recalcCostAmt(c);}catch(e){_err('_costRoCard',e);}
   var isIntro=!!(c.isIntro||c.followOf);
-  var L={own:'材料與機具',sub:isIntro?'介紹費':'承包',labor:'點工',extra:'額外支出'},C={own:'#8a6d00',sub:'#1565C0',labor:'#E65100',extra:'#4A148C'},B={own:'#FFFDE7',sub:'#E3F2FD',labor:'#FFF3E0',extra:'#F3E5F5'};
+  var L={own:'自有成本',sub:isIntro?'介紹費':'承包',labor:'點工',extra:'額外支出'},C={own:'#8a6d00',sub:'#1565C0',labor:'#E65100',extra:'#4A148C'},B={own:'#FFFDE7',sub:'#E3F2FD',labor:'#FFF3E0',extra:'#F3E5F5'};
   var it=(c.linkedItemIdx>=0&&q.items&&q.items[c.linkedItemIdx])?String(q.items[c.linkedItemIdx].desc||'').split('\n')[0].slice(0,20):'';
   var src=_costSrcOf(q,c),amt=Math.round(parseFloat(c.amt)||0);
   var B2=function(js,l,clr){return '<button type="button" onclick="'+js.replace(/"/g,'&quot;')+'" style="font-size:11px;padding:3px 10px;border:1px solid '+(clr||'var(--b2)')+';background:var(--w);color:'+(clr||'var(--b5)')+';border-radius:99px;cursor:pointer;font-family:inherit;white-space:nowrap">'+l+'</button>';};
@@ -34030,7 +34035,7 @@ function _payVendorAllBtn(p){var n=_payVendorOthers(p).length;return n?'<button 
 function payVendorAll(pid){
   var p=(PAYABLES||[]).find(function(x){return x.id===pid;});if(!p)return;
   var all=[p].concat(_payVendorOthers(p)),tot=all.reduce(function(a,x){return a+_payEff(x);},0);
-  var html='<div style="font-size:12.5px;line-height:1.8">'+esc(p.to||'')+(p.project?('　'+esc(p.project)):'')+'<br>'+all.map(function(x){return '・'+esc(x.note||x.itemName||x.category||'')+'　NT$ '+fmt(_payEff(x));}).join('<br>')+'<br><b>合計 NT$ '+fmt(tot)+'</b><br>付款日 <input id="pva-date" type="date" value="'+localToday()+'" style="font-size:13px;padding:4px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit"></div>';
+  var html='<div style="font-size:12.5px;line-height:1.8">'+esc(p.to||'')+(p.project?('　'+esc(p.project)):'')+'<br>'+all.map(function(x){return '・'+esc(x.note||x.itemName||x.category||'')+'　NT$ '+fmt(_payEff(x));}).join('<br>')+'<br><b>合計 NT$ '+fmt(tot)+'</b>'+(_vendorBank(p.to)?'<br>'+_bankLine(p.to):'')+'<br>付款日 <input id="pva-date" type="date" value="'+localToday()+'" style="font-size:13px;padding:4px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit"></div>';
   showConfirm('同廠商一併付款（'+all.length+' 筆）',html,function(){var d=gv('pva-date')||localToday();all.forEach(function(x){x.status='paid';x.paidAt=Date.now();x.paidDate=d;_touch(x);});savePayables();try{renderPayables();updateFinanceKPIs();}catch(e){_err('payVendorAll',e);}try{_onSave();}catch(e){_err('payVendorAll',e);}toast('已標記 '+all.length+' 筆付款，合計 NT$ '+fmt(tot));},false);
 }
 // ── 3 帳務分頁等寬：手機每列 4 顆、最後一列置中 ──
@@ -34640,7 +34645,7 @@ function _subEarlyRowBtn(){return '';}
 function payMarkPaid(pid,defDate,after){
   var p=PAYABLES.find(function(x){return x.id===pid;});if(!p)return;
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
-  showConfirm('標記已付：'+esc(p.to||''),'<div style="font-size:12.5px;line-height:1.8">'+esc((p.note||'').slice(0,60))+'<br>應付 NT$ <b>'+fmt(_payEff(p))+'</b>（'+(p.vat===false?'不含稅':'含稅')+'）</div><div class="f" style="margin-top:6px"><label>實付日</label><input id="pmp-date" type="date" value="'+esc(p.paidDate||defDate||p.date||localToday())+'" style="'+IN+'"></div>',function(){
+  showConfirm('標記已付：'+esc(p.to||''),'<div style="font-size:12.5px;line-height:1.8">'+esc((p.note||'').slice(0,60))+'<br>應付 NT$ <b>'+fmt(_payEff(p))+'</b>（'+(p.vat===false?'不含稅':'含稅')+'）'+(_vendorBank(p.to)?'<br>'+_bankLine(p.to):'')+'</div><div class="f" style="margin-top:6px"><label>實付日</label><input id="pmp-date" type="date" value="'+esc(p.paidDate||defDate||p.date||localToday())+'" style="'+IN+'"></div>',function(){
     p.status='paid';p.paidDate=gv('pmp-date')||defDate||localToday();p.paidAt=Date.now();_touch(p);
     try{savePayables();_onSave();}catch(er){_err('payMarkPaid',er);}
     try{rCostItems();}catch(er){_err('payMarkPaid',er);}try{if(typeof after==='function')after();}catch(er){_err('payMarkPaid',er);}toast('已標記已付');
@@ -35628,6 +35633,39 @@ function _sdMatEstLayerHtml(q,m,sec,fS,fN){
 var _matEstCalc0_648=matEstCalc;
 matEstCalc=function(){try{var q=_matEstSiteQ();if(q){MAT_EST=_matEstNorm(MAT_EST);_sdToMatEst(_sdNorm(q.site),MAT_EST);}}catch(e){_err('matEstCalc.site',e);}return _matEstCalc0_648.apply(this,arguments);};
 
+// ══════════ v6.0.68 自有卡科目自動歸類／廠商匯款帳戶（放款時一鍵複製帳號） ══════════
+// 自有成本卡（手動建立的購置卡）不再顯示科目下拉：依明細列的品項自動歸入 COST_CATS（租金／運費／損耗／一次性購置），取金額最大者
+function _ownAutoCat(c){
+  if(!c||c.type!=='own'||c.rental||c._fromMat)return c&&c.cat;
+  var sum={};
+  (c.rows||[]).forEach(function(r){
+    var k=String(r.preset||'')+String(r.desc||''),cat=/材料租金/.test(k)?'材料租金':/租金/.test(k)?'設備租金':/材料運費/.test(k)?'材料運費':/運費/.test(k)?'設備運費':/損耗/.test(k)?'材料損耗':'一次性材料購置';
+    sum[cat]=(sum[cat]||0)+Math.abs((parseFloat(r.qty)||0)*(parseFloat(r.unitPrice)||0))+1e-6;   // +ε：金額 0 的列也算一票
+  });
+  var best='',bv=-1;Object.keys(sum).forEach(function(k){if(sum[k]>bv){bv=sum[k];best=k;}});
+  c.cat=best||'一次性材料購置';return c.cat;
+}
+// 廠商匯款帳戶：VENDORS[].bank（銀行／分行）、bankAcct（帳號）、bankHolder（戶名）
+function _vendorBank(name){
+  if(!name)return null;
+  var v=(VENDORS||[]).find(function(x){return x&&(x.name||'')===name;});
+  return (v&&v.bankAcct)?v:null;
+}
+function _bankLine(name){   // 顯示用：🏦 銀行 帳號 戶名 ＋ 複製鈕
+  var v=_vendorBank(name);if(!v)return '';
+  return '<span style="font-size:11px;color:var(--b4);white-space:nowrap">'+(v.bank?esc(v.bank)+' ':'')+'<b style="font-variant-numeric:tabular-nums;letter-spacing:.3px;color:var(--b5)">'+esc(v.bankAcct)+'</b>'+(v.bankHolder?' '+esc(v.bankHolder):'')+'</span>'+_bankBtn(name);
+}
+function _bankBtn(name){
+  var v=_vendorBank(name);if(!v)return '';
+  return '<button type="button" class="bank-copy" onclick="event.stopPropagation();_bankCopy(\''+esc(String(name)).replace(/'/g,'\\\'')+'\')" title="複製匯款帳號'+(v.bank?'（'+esc(v.bank)+'）':'')+'" style="margin-left:5px;font-size:10.5px;padding:1px 7px;border:1px solid #90CAF9;background:#E3F2FD;color:#1565C0;border-radius:99px;cursor:pointer;font-family:inherit;vertical-align:middle">複製帳號</button>';
+}
+function _bankCopy(name){
+  var v=_vendorBank(name);if(!v){toast('此廠商尚未登錄匯款帳號');return;}
+  var txt=String(v.bankAcct).replace(/[^\d]/g,'')||String(v.bankAcct);   // 網銀只收數字：去掉空格與「-」
+  var done=function(){toast('已複製 '+esc(v.name||'')+' 帳號 '+txt+(v.bank?'（'+esc(v.bank)+'）':''));};
+  var fallback=function(){try{var ta=document.createElement('textarea');ta.value=txt;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);done();}catch(e){_err('_bankCopy',e);toast('無法複製，帳號：'+txt);}};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done,fallback);}else fallback();
+}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');

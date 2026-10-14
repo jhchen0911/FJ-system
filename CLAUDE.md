@@ -90,7 +90,7 @@
 | 帳務 | `acct`（分頁 ar／ap／cash／inv／petty／pay／own／vb；`go('finance'|'ledger'|'payroll')` 轉來） | `acctTab` `_acctMount`（搬入舊頁元素）`renderPayables` `renderCashForecast` `renderRetention` `_expForm`（費用．發票） | `PAYABLES`、`EXPENSES`（private） |
 | 薪資．零用金 | `acct` › pay／petty（權限看 `payroll`） | `hrEdit` `psGenerate` `_hrSyncPayables` `pcGenerate` `_pcCalc` | `HR`／`PAYSLIPS`／`PETTY`（private） |
 | 經營報表 | `reports`（`go('profit')` 轉來） | `showReport` `renderOverviewReport` `_shRptYear`（**權責口徑單一來源**）`_rptBasisStrip` `renderShareholderReport` `renderHealthReport`／`_healthRows`（資料健檢） | 讀各集合 |
-| 客戶．廠商 | `contacts` | `renderContactsAll` `renderCustomersContact` `renderVendors2` | customers、vendors（shared） |
+| 客戶．廠商 | `contacts` | `renderContactsAll` `renderCustomersContact` `renderVendors2`；廠商匯款帳戶 `_vendorBank`／`_bankCopy`（應付列與付款彈窗「複製帳號」） | customers、vendors（shared；廠商記錄含匯款銀行／帳號／戶名欄位） |
 | 施工計畫書 | `plan` | `_plBuild` `_plRender`；圖：`FY_SHEETS`（施工步驟示意圖組，`_fySheetId` 工項＋工法→圖組）、`_plStorySteps`（只剩水平支撐）、`_plDetailSteps`（水平支撐詳圖）、`_plFlowPages`（施工流程圖） | planState（shared） |
 | 工具 | `matest` `rebar` `grout` `backfill` `workers`；`lifeline`、`progress` 隱藏 | `renderMatEst` `matEstCalc`（綁定工程時幾何讀案場細節）`renderWorkers` | toolStates、workers（逐筆） |
 | 單價分析／單價庫 | `upa`（sysOnly） | `upaCalc` `applyUPA` `writeCostHist`（結案回寫） | upaHistory（shared）、upaCostDB／costHist（private） |
@@ -105,7 +105,7 @@
 
 ## 測試
 
-`tests/smoke.js`（586 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（590 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
