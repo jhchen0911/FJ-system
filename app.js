@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.68';
+var APP_VERSION='v6.0.69';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -20983,7 +20983,8 @@ function updOwnRow(cid,rid,field,val){
   const q=Q.find(x=>x.id===eid);if(!q)return;
   const cc=(q.costs||[]).find(x=>x.id===cid);if(!cc)return;
   const r=(cc.rows||[]).find(x=>x.id===rid);if(!r)return;
-  r[field]=(field==='qty'||field==='unitPrice')?(parseFloat(val)||0):val;
+  r[field]=(field==='qty'||field==='unitPrice'||field==='ret')?(parseFloat(val)||0):val;
+  if(field==='ret'){try{var gb=document.getElementById('gas-onsite-'+cid);if(gb)gb.outerHTML=_gasOnSiteHtml(q,cc);}catch(e){_err('updOwnRow.gas',e);}}   // v6.0.69
   _ownAutoCat(cc);recalcCostAmt(cc);_touch(q);try{persist();}catch(e){_err('updOwnRow',e);}
   // 局部更新金額顯示
   var amtEl=document.getElementById('ownamt-'+rid);
@@ -21020,6 +21021,8 @@ function buildOwnRowsHtml(cc){
       +'<span style="color:var(--b3);font-size:11px">＝</span>'
       +'<span id="ownamt-'+r.id+'" style="flex:0 0 70px;font-size:12.5px;font-weight:800;text-align:right;color:var(--g3)">'+fmt((parseFloat(r.qty)||0)*(parseFloat(r.unitPrice)||0))+'</span>'
       +'</div>'
+      // v6.0.69 氣瓶：瓶子是廠商的，買的只有氣體 → 每列記「退回空瓶」數，卡片彙總在場瓶數
+      +(_gasRow(r)?'<div style="display:flex;gap:5px;align-items:center;margin-top:4px;font-size:11px;color:#8a6d00"><span>氣瓶：送來 '+_rfmt(r.qty)+' 支（＝購買數）・退回空瓶</span><input type="number" inputmode="numeric" min="0" value="'+(r.ret!=null?r.ret:'')+'" placeholder="0" oninput="updOwnRow(\''+cc.id+'\',\''+r.id+'\',\'ret\',this.value)" style="width:56px;font-size:12px;padding:4px 5px;text-align:right;border:1px solid var(--b2);border-radius:var(--r6)"><span>支</span></div>':'')
       +'</div>';
   }).join('');
   return rows||'<div style="font-size:11px;color:var(--b3);padding:4px 2px">點上方品項快速新增，或「＋自訂一列」</div>';
@@ -23582,7 +23585,8 @@ function rCostItems(){
         +_ownAddSel(c)   // v6.0.27 常用改下拉
         +'<div id="cost-rows-'+c.id+'" style="background:var(--b0);border-radius:var(--r8);padding:4px 6px;margin-bottom:4px">'
         +buildOwnRowsHtml(c)
-        +'</div>';
+        +'</div>'
+        +_gasOnSiteHtml(q,c);   // v6.0.69 氣瓶在場
     } else if(c.type==='sub'){
       fieldsHtml=
         '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'
@@ -33403,6 +33407,7 @@ function pjCloseAll(qid){
     +(ct?('合約 <b>'+esc(ct.code||'')+'</b>　原金額 NT$ <b>'+fmt(orig)+'</b><br>'+(willSettle?('結算金額（請款累計，含保留款 '+fmt(ret)+'）NT$ <b>'+fmt(billed)+'</b>　'+(billed<orig?'追減 ':'追加 ')+fmt(Math.abs(billed-orig))+'<br>'):'合約已完成結算。<br>')):'此工程沒有合約記錄，只標記結案。<br>')
     +(st.ar>0?'<span style="color:#b26a00">待收 NT$ '+fmt(st.ar)+'，結案後仍可在業主計價收款。</span><br>':'')
     +((st.payTotal-st.payPaid)>0?'<span style="color:#b26a00">應付未付 NT$ '+fmt(st.payTotal-st.payPaid)+'，結案後仍可在帳務付款。</span><br>':'')
+    +(function(){try{var g=_gasVendors(q).filter(function(x){return x.total>0;});return g.length?'<span style="color:#b26a00">氣瓶尚未退還：'+g.map(function(x){return esc(x.vendor)+' '+x.txt;}).join('；')+'（廠商財產，請先退瓶）</span><br>':'';}catch(e){_err('pjCloseAll.gas',e);return '';}})()   // v6.0.69
     +'<span style="color:var(--b4)">結案後從進行中清單隱藏，資料完整保留；各工項實際成本單價回寫單價庫。</span></div>';
   showConfirm('結案：'+esc(q.name||''),html,function(){
     if(willSettle){try{_settleContractDo(ct.id,orig,billed,ret);}catch(e){_err('pjCloseAll.settle',e);}}
@@ -33565,7 +33570,7 @@ function _costRoCard(q,c){
     if(st.n)acts+=B2("window._costView='list';setCostView('subs')",'計價紀錄');
   }else{
     var rows=(c.rows||[]).slice(0,4).map(function(r){if(c.type==='own')return esc((r.desc||r.preset||'')+' '+_rfmt(r.qty)+' '+(r.unit||'')+'×'+_rfmt(r.unitPrice));return esc((r.desc||'')+(r.days?(' '+_rfmt(r.days)+'天×'+_rfmt(r.dayRate)):''));}).filter(Boolean).join('、');
-    body='<div style="font-size:11.5px;color:var(--b4)">'+(it?('工項 '+esc(it)+'　'):'')+rows+((c.rows||[]).length>4?'…':'')+'</div>';
+    body='<div style="font-size:11.5px;color:var(--b4)">'+(it?('工項 '+esc(it)+'　'):'')+rows+((c.rows||[]).length>4?'…':'')+'</div>'+(c.type==='own'?_gasOnSiteHtml(q,c):'');   // v6.0.69
   }
   acts+=B2("costEdit('"+c.id+"')",'編輯明細')+B2("delCostItem('"+c.id+"')",'刪除','var(--red)');
   return '<div class="cost-ro" data-cid="'+c.id+'" style="padding:8px 0;border-bottom:1px solid var(--b1)"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;border:1.5px solid '+C[c.type]+';background:'+B[c.type]+';color:'+C[c.type]+'">'+L[c.type]+'</span><b style="font-size:13px">'+esc(c.vendor&&c.vendor!=='公司支出（自付）'?c.vendor:(it||'公司自備'))+'</b><span style="font-size:11px;color:var(--b4)">'+esc(_costCatNorm(c.cat||'')||'')+'　'+esc(c.date||'')+'　來自 '+(src.js?('<a href="javascript:void(0)" onclick="'+src.js.replace(/"/g,'&quot;')+'" style="color:var(--g3)">'+esc(src.t)+' ›</a>'):esc(src.t))+'</span><span style="margin-left:auto;font-size:11px;color:var(--b4)">'+(c.type==='sub'?'發包 ':'小計 ')+'<b id="cost-amt-'+c.id+'" style="color:var(--g3);font-variant-numeric:tabular-nums">'+fmt(amt)+'</b></span></div>'+body+'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px">'+acts+'</div></div>';
@@ -33617,6 +33622,8 @@ function _pjTodoItems(q,st){
   // 材料：自有在工地太久、租料將到期
   try{var at=_matLedAt(q).filter(function(r){return r.kind!=='一次性';});if(at.length){var days=at.reduce(function(a,r){return Math.max(a,_matDays(r.outDate,today));},0);if(days>=120)add('自有材料在工地最久 '+days+' 天，確認是否歸還','',"_m6Qid='"+q.id+"';go('mat6')",'看材料',true);}
     (q.mat&&q.mat.rents||[]).forEach(function(rt){if(!rt.pt||!(rt.batches||[]).some(function(b){return b.d&&!b.o;}))return;var d=_dDiff(today,rt.pt);if(d<=14)add((rt.vendor||'')+' 租料 '+esc(_matLabel(rt))+(d<0?('預計退場 '+rt.pt+' 已過 '+(-d)+' 天'):('預計 '+rt.pt+' 退場（'+d+' 天後）')),'',"_m6Qid='"+q.id+"';go('mat6')",'看材料',d<0);});}catch(e){_err('_pjTodoItems',e);}
+  // 氣瓶（v6.0.69）：完工後仍有廠商氣瓶在場 → 提醒退瓶
+  try{var _fin=st.done;try{_fin=_fin||(_projStageDone(q)&&_drLatestStage(q)&&_drLatestStage(q).stageOf==='remove');}catch(e){/* 可忽略 */}if(_fin){_gasVendors(q).forEach(function(g){if(g.total>0)add(g.vendor+' 氣瓶尚未退還：'+g.txt,'瓶子是廠商財產，結案前退回空瓶並核對廠商瓶數',"openProjectCosts('"+q.id+"')",'看成本卡',true);});}}catch(e){_err('_pjTodoItems.gas',e);}
   // 保留款／結案
   try{if(st.done&&st.retHeld>0)add('業主保留款 NT$ '+fmt(st.retHeld)+' 尚未退還','',"go('finance');setTimeout(function(){switchFinanceTab('retention')},150)",'看保留款');
     if(!st.ct&&st.base>0)add('尚未建立合約（金額、工期、付款條件）','',scroll('docs'),'合約與文件');
@@ -35633,6 +35640,23 @@ function _sdMatEstLayerHtml(q,m,sec,fS,fN){
 var _matEstCalc0_648=matEstCalc;
 matEstCalc=function(){try{var q=_matEstSiteQ();if(q){MAT_EST=_matEstNorm(MAT_EST);_sdToMatEst(_sdNorm(q.site),MAT_EST);}}catch(e){_err('matEstCalc.site',e);}return _matEstCalc0_648.apply(this,arguments);};
 
+// ── v6.0.69 氣瓶（氧氣／乙炔）：瓶子是廠商的、買的只有氣體 ──
+// 明細列 preset 氧氣／乙炔：qty＝本次送來的瓶數（＝購買數），ret＝退回空瓶數；在場＝Σqty−Σret（依廠商彙總，跨同專案所有自有卡）
+function _gasRow(r){return !!r&&(r.preset==='氧氣'||r.preset==='乙炔');}
+function _gasVendors(q){   // → [{vendor,by:{氧氣:n,乙炔:n},total,txt}]
+  var by={};
+  (q&&q.costs||[]).forEach(function(c){
+    if(!c||c.type!=='own'||c._fromMat||c.mergedInto)return;
+    (c.rows||[]).forEach(function(r){if(!_gasRow(r))return;var v=c.vendor||'（未填廠商）';by[v]=by[v]||{氧氣:0,乙炔:0};by[v][r.preset]+=(parseFloat(r.qty)||0)-(parseFloat(r.ret)||0);});
+  });
+  return Object.keys(by).map(function(v){var b=by[v],t=b.氧氣+b.乙炔;return {vendor:v,by:b,total:t,txt:['氧氣','乙炔'].filter(function(k){return b[k];}).map(function(k){return k+' '+_rfmt(b[k])+' 支';}).join('、')};});
+}
+function _gasOnSiteHtml(q,c){
+  if(!c||!(c.rows||[]).some(_gasRow))return '<span id="gas-onsite-'+c.id+'"></span>';
+  var g=_gasVendors(q).find(function(x){return x.vendor===(c.vendor||'（未填廠商）');});
+  var t=g?g.total:0;
+  return '<div id="gas-onsite-'+c.id+'" style="font-size:11px;margin:2px 0 4px;padding:3px 8px;border-radius:var(--r6);border:1px solid '+(t>0?'#f0da7a':'#A5D6A7')+';background:'+(t>0?'#FFFDE7':'#E8F5E9')+';color:'+(t>0?'#8a6d00':'#1B5E20')+'">氣瓶在場（'+esc(c.vendor||'未填廠商')+'，本案所有請款單合計）：'+(t>0?(g.txt+'　瓶子是廠商財產，退回空瓶時在該列填「退回空瓶」'):'已全數退回')+'</div>';
+}
 // ══════════ v6.0.68 自有卡科目自動歸類／廠商匯款帳戶（放款時一鍵複製帳號） ══════════
 // 自有成本卡（手動建立的購置卡）不再顯示科目下拉：依明細列的品項自動歸入 COST_CATS（租金／運費／損耗／一次性購置），取金額最大者
 function _ownAutoCat(c){

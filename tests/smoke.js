@@ -5984,6 +5984,59 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.69 氣瓶追蹤：氧氣／乙炔列記退回空瓶、卡片彙總在場瓶數、完工未退瓶提醒、結案提示 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        VENDORS.length = 0; VENDORS.push({ id: 'vG', name: '丙丁企業有限公司', type: 'material' });
+        Q.length = 0; Q.push({ id: 'q69', name: '氣瓶案', client: '甲', date: '2026-09-01', items: [{ desc: 'H型鋼樁 H300 打設', qty: 100, unit: 'M', price: 1000 }], costs: [] });
+        PAYABLES.length = 0; CONTRACTS.splice(0); INV.length = 0;
+        openProjectCosts('q69');
+        addCostItem('own'); const c = Q[0].costs[0]; window._costEditId = c.id; updCostField(c.id, 'vendor', '丙丁企業有限公司');
+        addOwnRow(c.id, '氧氣', '支'); addOwnRow(c.id, '乙炔', '支'); addOwnRow(c.id, '止水鈑', '片');
+        updOwnRow(c.id, c.rows[0].id, 'qty', 2); updOwnRow(c.id, c.rows[1].id, 'qty', 2); updOwnRow(c.id, c.rows[2].id, 'qty', 5);
+        rCostItems();
+        const card = () => document.getElementById('cost-list').innerHTML;
+        /* 氧氣／乙炔列有「退回空瓶」欄、止水鈑沒有；卡片彙總在場 氧氣 2、乙炔 2 */
+        out.retInput = (card().match(/退回空瓶<\/span><input/g) || []).length === 2;
+        out.onsite = /氣瓶在場（丙丁企業有限公司[^<]*：氧氣 2 支、乙炔 2 支/.test(card());
+        /* 第二張請款單：再送 2 支氧氣、退 2 支空瓶 → 在場仍 2；乙炔退 1 → 在場 1 */
+        addCostItem('own'); const c2 = Q[0].costs[1]; updCostField(c2.id, 'vendor', '丙丁企業有限公司');
+        addOwnRow(c2.id, '氧氣', '支'); updOwnRow(c2.id, c2.rows[0].id, 'qty', 2); updOwnRow(c2.id, c2.rows[0].id, 'ret', 2);
+        addOwnRow(c2.id, '乙炔', '支'); updOwnRow(c2.id, c2.rows[1].id, 'qty', 0); updOwnRow(c2.id, c2.rows[1].id, 'ret', 1);
+        const g = _gasVendors(Q[0]); out.sum = g.length === 1 && g[0].by.氧氣 === 2 && g[0].by.乙炔 === 1 && g[0].total === 3 && g[0].txt === '氧氣 2 支、乙炔 1 支';
+        /* 退瓶數即時改在場文字（不重繪整頁） */
+        window._costEditId = c2.id; rCostItems(); updOwnRow(c2.id, c2.rows[1].id, 'ret', 2);
+        out.live = /氧氣 2 支<\/div>|氣瓶在場（丙丁企業有限公司[^<]*：氧氣 2 支　/.test(document.getElementById('gas-onsite-' + c2.id).outerHTML) && !/乙炔/.test(document.getElementById('gas-onsite-' + c2.id).textContent.replace('氣瓶在場', ''));
+        /* 唯讀卡也顯示；全部退回顯示綠色「已全數退回」 */
+        window._costEditId = null; rCostItems(); out.ro = /氣瓶在場/.test(card());
+        updOwnRow(c2.id, c2.rows[0].id, 'ret', 4); rCostItems(); out.allBack = /已全數退回/.test(card()) && _gasVendors(Q[0])[0].total === 0;
+        updOwnRow(c2.id, c2.rows[0].id, 'ret', 2);
+        /* 材料．運輸同步卡的列不算 */
+        Q[0].costs.push({ id: 'cm', type: 'own', _fromMat: 'erent:x', vendor: '丙丁企業有限公司', rows: [{ preset: '氧氣', qty: 9 }] });
+        out.skipMat = _gasVendors(Q[0])[0].total === 2; Q[0].costs.pop();
+        /* 完工（合約 done）後待辦出現退瓶提醒；未完工不出現 */
+        let st = _pjStat(Q[0]); out.todoNo = !_pjTodoItems(Q[0], st).some(x => /氣瓶尚未退還/.test(x.text));
+        CONTRACTS.push({ id: 'ct69', linkedQid: 'q69', name: '氣瓶案', code: 'C69', amount: 105000, status: 'done', _mt: 1 });
+        st = _pjStat(Q[0]); const td = _pjTodoItems(Q[0], st).find(x => /氣瓶尚未退還/.test(x.text));
+        out.todo = !!td && /丙丁企業有限公司 氣瓶尚未退還：氧氣 2 支/.test(td.text) && td.urgent === true;
+        /* 結案視窗提示 */
+        pjCloseAll('q69'); const mh = document.getElementById('gen-confirm-modal').innerHTML; out.close = /氣瓶尚未退還：丙丁企業有限公司 氧氣 2 支/.test(mh);
+        document.getElementById('gen-confirm-cancel') ? document.getElementById('gen-confirm-cancel').click() : (document.getElementById('gen-confirm-modal').style.display = 'none');
+        out.notClosed = !Q[0].closed;
+        /* 自動歸類不受影響：氧氣＋止水鈑 → 一次性材料購置 */
+        out.cat = c.cat === '一次性材料購置';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.69 氣瓶追蹤：氧氣／乙炔列「退回空瓶」、卡片依廠商彙總在場瓶數（跨請款單、即時更新、唯讀卡同顯、全退變綠）、材料頁同步卡不算', r.retInput && r.onsite && r.sum && r.live && r.ro && r.allBack && r.skipMat && r.cat, JSON.stringify(r));
+    check('v6.0.69 完工後仍有氣瓶在場 → 工程專案待辦（緊急）與結案視窗提醒；未完工不提醒', r.todoNo && r.todo && r.close && r.notClosed, JSON.stringify(r));
+    check('v6.0.69 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
