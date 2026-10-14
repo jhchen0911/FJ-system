@@ -81,8 +81,8 @@
 | 案場細節 | 彈窗 `openSiteDet(qid)`（報價編輯、工程專案、材料估算、施工計畫書） | `_sdRender` `_sdCalc` `_sdToMatEst` `_sdEnsure` `siteBump` | `q.site`／`q.siteHist`（shared）；**圖面數量唯一來源** |
 | 工程專案 | `proj`（`openProj(qid)`；`go('projects')` 轉來） | `renderProj` `_pjStat` `_pjTodoItems` `_pjSection` `_pj*Html` 各區塊（業主計價已收清期別收合 `_pjInvSettled`／`pjInvPaidToggle`） `pjCloseAll`（結案）`_autoSettle`（階段完工自動結算）`_introSync` | 以報價 `q` 為主體 |
 | 發包 | `rfq`（hidden，parent `proj`） | `renderRfq` `rfqNew` `rfqFill` `rfqAward` `_rfqBackfillEst` `pjIntroEdit`（介紹費） | `q.rfqs`（private） |
-| 材料．運輸 | `mat6`（hidden，parent `proj`） | `renderMat6` `matRowEdit` `m6Decide` `m6RentEdit` `matOut` `matBack` `_m6Sync` `_matAmortRows` | `q.mat`（private）、`MAT_LEDGER`（matLedger，private） |
-| 施工成本／分包 | `costs`（hidden，parent `proj`；`openProjectCosts`） | `rCostItems` `_ownAutoCat`（自有卡科目自動歸類）`_gasVendors`／`_gasOnSiteHtml`（氣瓶在場）`openSubPeriod`／`_spSave`（廠商請款期別）`openSubAdvance`／`_saSave`（預付款）`openRentPeriod`（租賃）`_subFollowApply`（跟隨計價）`_subStat` `buildSubMgmtHtml` | `q.costs`（private） |
+| 材料．運輸 | `mat6`（hidden，parent `proj`） | `renderMat6`（含氣瓶在場 `_m6GasHtml`）`matRowEdit` `m6Decide` `m6RentEdit` `matOut` `matBack` `_m6Sync` `_matAmortRows` | `q.mat`（private）、`MAT_LEDGER`（matLedger，private） |
+| 施工成本／分包 | `costs`（hidden，parent `proj`；`openProjectCosts`） | `rCostItems` `_ownAutoCat`（自有卡科目自動歸類）`_gasVendors`／`_gasOnSiteHtml`（氣瓶在場）`_vendorEnsure`（手動廠商進名冊）`openSubPeriod`／`_spSave`（廠商請款期別）`openSubAdvance`／`_saSave`（預付款）`openRentPeriod`（租賃）`_subFollowApply`（跟隨計價）`_subStat` `buildSubMgmtHtml` | `q.costs`（private） |
 | 成本→應付 | — | `syncCostToPayable` `_syncSubPeriodPayables`（開頭依序 `_advPayHeal`→`_subAdvClamp`→`_earlyToAdv`）`_paySource`（自動應付唯讀）`cleanDuplicatePayables` `_tombExempt` | `PAYABLES`（payables，private）；id 規則見下 |
 | 日報．支出 | `quickcost` | `submitDailyReport` `_drMergeLog` `submitQuickCost`（`QC_TYPES`）`drMonthRender`（月表單）`viewDailyReports` `_photoPut`（照片另存）`_itemProgress` `_qtyRecon` | `q.dailyLogs`（隨報價）、照片 `fydata/relay/photos`、公司費用 `EXPENSES` |
 | 業主請款 | `acct` › 業主請款（`go('invoice')` 轉來） | `renderInvList` `loadInvoice` `rInvItems` `buildInvPreview` `buildInvFromQuote` `addNextPeriod` `openReceiptModal` `printAllowance` `openEnvelope` | `INV`（invoices，逐筆同步） |
@@ -105,7 +105,7 @@
 
 ## 測試
 
-`tests/smoke.js`（593 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（596 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、

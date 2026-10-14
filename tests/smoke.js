@@ -6037,6 +6037,47 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.70 先選廠商再加明細也要掛應付、手動輸入廠商進名冊、材料．運輸頁氣瓶在場 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        VENDORS.length = 0; Q.length = 0; PAYABLES.length = 0; CONTRACTS.splice(0); INV.length = 0;
+        Q.push({ id: 'q70', name: '順序案', client: '甲', date: '2026-09-01', items: [{ desc: 'H型鋼樁 H300 打設', qty: 100, unit: 'M', price: 1000 }], costs: [] });
+        openProjectCosts('q70');
+        /* 使用者實際順序：建卡 → 手動輸入廠商（名冊沒有）→ 再加明細 */
+        addCostItem('own'); const c = Q[0].costs[0]; window._costEditId = c.id;
+        const pr = window.prompt; window.prompt = () => '丙丁企業有限公司'; onVendorChange(c.id, '__manual__'); window.prompt = pr;
+        out.vendorAdded = VENDORS.length === 1 && VENDORS[0].name === '丙丁企業有限公司' && VENDORS[0].type === 'material' && !!VENDORS[0]._mt;
+        out.noPay0 = !PAYABLES.some(p => p.costId === c.id) && /小計 0，填明細後掛應付/.test(document.getElementById('cost-list').innerHTML);
+        addOwnRow(c.id, '氧氣', '支'); updOwnRow(c.id, c.rows[0].id, 'qty', 2); updOwnRow(c.id, c.rows[0].id, 'unitPrice', 400);
+        let po = PAYABLES.find(p => p.costId === c.id); out.payAfterRow = !!po && po.amount === 800 && po.to === '丙丁企業有限公司' && po.status === 'pending';
+        addOwnRow(c.id, '乙炔', '支'); updOwnRow(c.id, c.rows[1].id, 'qty', 2); updOwnRow(c.id, c.rows[1].id, 'unitPrice', 900);
+        po = PAYABLES.find(p => p.costId === c.id); out.payUpd = !!po && po.amount === 2600 && _payEff(po) === 2730;
+        /* 退瓶數不動應付；刪列會減 */
+        updOwnRow(c.id, c.rows[1].id, 'ret', 1); out.retNoPay = PAYABLES.find(p => p.costId === c.id).amount === 2600;
+        delOwnRow(c.id, c.rows[1].id); out.delSync = PAYABLES.find(p => p.costId === c.id).amount === 800;
+        /* 已付的不會被重算改狀態 */
+        PAYABLES.find(p => p.costId === c.id).status = 'paid'; addOwnRow(c.id, '止水鈑', '片'); updOwnRow(c.id, c.rows[1].id, 'unitPrice', 100);
+        out.keepPaid = PAYABLES.find(p => p.costId === c.id).status === 'paid';
+        /* 名冊已有同名不重複；公司支出（自付）不建 */
+        updCostField(c.id, 'vendor', '丙丁企業有限公司'); updCostField(c.id, 'vendor', '公司支出（自付）'); out.noDup = VENDORS.length === 1;
+        updCostField(c.id, 'vendor', '丙丁企業有限公司');
+        /* 材料．運輸頁氣瓶在場卡 */
+        _m6Qid = 'q70'; go('mat6'); renderMat6(); const mh = document.getElementById('mat6-root').innerHTML;
+        out.m6 = /氣瓶在場/.test(mh) && /丙丁企業有限公司/.test(mh) && /2 支/.test(mh) && /到施工成本登錄／退瓶/.test(mh);
+        updOwnRow(c.id, c.rows[0].id, 'ret', 2); renderMat6(); out.m6Back = /已全數退回/.test(document.getElementById('mat6-root').innerHTML);
+        Q[0].costs = []; renderMat6(); out.m6None = /尚無氣瓶記錄/.test(document.getElementById('mat6-root').innerHTML);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.70 自有卡先選廠商再加明細：加列／改列／刪列即同步應付（退瓶不動、已付不改）、小計 0 顯示提示', r.noPay0 && r.payAfterRow && r.payUpd && r.retNoPay && r.delSync && r.keepPaid, JSON.stringify(r));
+    check('v6.0.70 手動輸入廠商自動進名冊（不重複、自付不建）；材料．運輸頁氣瓶在場卡（有在場／全退／無記錄）', r.vendorAdded && r.noDup && r.m6 && r.m6Back && r.m6None, JSON.stringify(r));
+    check('v6.0.70 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

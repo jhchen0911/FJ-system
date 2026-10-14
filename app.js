@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.69';
+var APP_VERSION='v6.0.70';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -20970,7 +20970,7 @@ function addOwnRow(cid,preset,unit){
   const cc=(q.costs||[]).find(x=>x.id===cid);if(!cc)return;
   if(!cc.rows)cc.rows=[];
   cc.rows.push({id:cid+'_'+Date.now(),preset:preset||'',desc:'',qty:1,unit:unit||'',unitPrice:0});
-  _ownAutoCat(cc);recalcCostAmt(cc);_touch(q);try{persist();}catch(e){_err('addOwnRow',e);}
+  _ownAutoCat(cc);recalcCostAmt(cc);_touch(q);try{syncCostToPayable(q,cc);}catch(e){_err('addOwnRow.pay',e);}try{persist();}catch(e){_err('addOwnRow',e);}   // v6.0.70 明細變動即同步應付
   rCostItems();
   setTimeout(function(){
     var wrap=document.getElementById('cost-rows-'+cid);
@@ -20985,7 +20985,7 @@ function updOwnRow(cid,rid,field,val){
   const r=(cc.rows||[]).find(x=>x.id===rid);if(!r)return;
   r[field]=(field==='qty'||field==='unitPrice'||field==='ret')?(parseFloat(val)||0):val;
   if(field==='ret'){try{var gb=document.getElementById('gas-onsite-'+cid);if(gb)gb.outerHTML=_gasOnSiteHtml(q,cc);}catch(e){_err('updOwnRow.gas',e);}}   // v6.0.69
-  _ownAutoCat(cc);recalcCostAmt(cc);_touch(q);try{persist();}catch(e){_err('updOwnRow',e);}
+  _ownAutoCat(cc);recalcCostAmt(cc);_touch(q);if(field!=='ret'){try{syncCostToPayable(q,cc);}catch(e){_err('updOwnRow.pay',e);}}try{persist();}catch(e){_err('updOwnRow',e);}   // v6.0.70 明細變動即同步應付
   // 局部更新金額顯示
   var amtEl=document.getElementById('ownamt-'+rid);
   if(amtEl)amtEl.textContent=fmt((parseFloat(r.qty)||0)*(parseFloat(r.unitPrice)||0));
@@ -20996,7 +20996,7 @@ function delOwnRow(cid,rid){
   const q=Q.find(x=>x.id===eid);if(!q)return;
   const cc=(q.costs||[]).find(x=>x.id===cid);if(!cc)return;
   cc.rows=(cc.rows||[]).filter(x=>x.id!==rid);
-  _ownAutoCat(cc);recalcCostAmt(cc);_touch(q);try{persist();}catch(e){_err('delOwnRow',e);}
+  _ownAutoCat(cc);recalcCostAmt(cc);_touch(q);try{syncCostToPayable(q,cc);}catch(e){_err('delOwnRow.pay',e);}try{persist();}catch(e){_err('delOwnRow',e);}   // v6.0.70
   rCostItems();
 }
 function buildOwnRowsHtml(cc){
@@ -21193,6 +21193,7 @@ function _costPayBtn(c){
     return '<button type="button" title="分期計價：已付 '+fmt(st.paid)+'／未付 '+fmt(st.unpaid)+'（含稅）'+(st.advPaid?('；預付 '+fmt(st.advPaid)+'／未抵 '+fmt(st.advLeft)):'')+'" onclick="'+jump+'" style="'+css(st.unpaid<=0)+'">'+(st.unpaid<=0?'✓ 各期已付':'→ 應付 '+fmt(st.unpaid)+'（'+st.payN+' 筆）')+'</button>';
   }
   var pp=PAYABLES.find(function(x){return x.costId===c.id;});
+  if(!pp&&c.type==='own'&&!c.rental&&c.vendor&&c.vendor!=='公司支出（自付）'&&!((parseFloat(c.amt)||0)>0))return '<span style="font-size:10.5px;color:var(--b3);white-space:nowrap" title="小計為 0 不掛應付；加明細列填金額後自動掛">小計 0，填明細後掛應付</span>';   // v6.0.70
   if(!pp&&c.type==='sub'&&P.subPayOnBill!==false&&c.vendor&&c.vendor!=='公司支出（自付）')return '<span style="font-size:10.5px;color:var(--b3);white-space:nowrap" title="廠商月底計價、次月放款：按「本期計價」後才產生應付">計價後掛應付</span>';   // v5.443
   if(!pp)return '';
   var paid=pp.status==='paid';
@@ -22961,6 +22962,7 @@ function updCostField(cid,field,val,rid){
     // 更新頂層欄位（vendor / linkedItemIdx for labor）
     var numTop=['linkedItemIdx'];
     cc[field]=numTop.includes(field)?(parseFloat(val)||0):val;
+    if(field==='vendor'){try{_vendorEnsure(val,cc.type);}catch(e){_err('updCostField.vendor',e);}}   // v6.0.70 手動輸入的廠商自動進名冊
     if(['vendor','desc','reason'].includes(field)){
       try{syncCostToPayable(q,cc);}catch(e){_err('top',e);}
       try{persist();}catch(e){_err('top',e);} return;
@@ -33076,6 +33078,7 @@ function _renderMat6Base(){
       '<input type="number" inputmode="decimal" value="'+esc(String(t.trips==null?'':t.trips))+'" '+on('trips')+' style="'+IN+';width:60px;text-align:right">','<input type="number" inputmode="decimal" value="'+esc(String(t.price==null?'':t.price))+'" '+on('price')+' style="'+IN+';width:92px;text-align:right">',
       '<b id="m6tp-amt-'+t.id+'">'+fmt(Math.round((parseFloat(t.trips)||0)*(parseFloat(t.price)||0)))+'</b>',_pjBtn("m6TpDel('"+q.id+"','"+t.id+"')",'刪','color:var(--red);border-color:#f0c4c4')];}));
   h+='</div>';
+  try{h+=_m6GasHtml(q);}catch(e){_err('renderMat6.gas',e);}   // v6.0.70 氣瓶在場
   // 6 單位成本比較
   try{h+=_matUnitCmpHtml(q,m);}catch(e){_err('renderMat6.cmp',e);}
   root.innerHTML=h;
@@ -35640,6 +35643,25 @@ function _sdMatEstLayerHtml(q,m,sec,fS,fN){
 var _matEstCalc0_648=matEstCalc;
 matEstCalc=function(){try{var q=_matEstSiteQ();if(q){MAT_EST=_matEstNorm(MAT_EST);_sdToMatEst(_sdNorm(q.site),MAT_EST);}}catch(e){_err('matEstCalc.site',e);}return _matEstCalc0_648.apply(this,arguments);};
 
+// ── v6.0.70 氣瓶在場（材料．運輸頁）／手動輸入廠商進名冊 ──
+function _m6GasHtml(q){
+  var gs=_gasVendors(q),on=gs.filter(function(g){return g.total>0;});
+  var h='<div class="card" style="padding:12px 14px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><div style="font-weight:800;font-size:14px">氣瓶在場 <span style="font-size:11px;font-weight:400;color:var(--b4)">氧氣／乙炔的瓶子是廠商財產；數量來自施工成本自有卡的氧氣／乙炔明細列（送來 − 退回空瓶）</span></div>'+_pjBtn("openProjectCosts('"+q.id+"')",'到施工成本登錄／退瓶','border-color:var(--g);color:var(--g3)')+'</div>';
+  if(!gs.length)h+='<div style="font-size:12px;color:var(--b3)">尚無氣瓶記錄。</div>';
+  else if(!on.length)h+='<div style="font-size:12px;color:#1B5E20">'+gs.map(function(g){return esc(g.vendor);}).join('、')+'：已全數退回。</div>';
+  else h+=_pjTable([{t:'廠商'},{t:'氧氣',r:1},{t:'乙炔',r:1},{t:'在場合計',r:1}],gs.map(function(g){return ['<b>'+esc(g.vendor)+'</b>',_rfmt(g.by.氧氣)+' 支',_rfmt(g.by.乙炔)+' 支','<b style="color:'+(g.total>0?'#8a6d00':'#1B5E20')+'">'+_rfmt(g.total)+' 支</b>'];}));
+  return h+'</div>';
+}
+// 施工成本卡手動輸入的廠商名稱：名冊沒有就自動新增（類型依成本類型），客戶．廠商頁才看得到
+function _vendorEnsure(name,costType){
+  name=String(name||'').trim();
+  if(!name||name==='公司支出（自付）'||name==='__manual__')return null;
+  var ex=(VENDORS||[]).find(function(v){return v&&(v.name||'')===name;});if(ex)return ex;
+  var v={id:'v'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:name,type:({own:'material',sub:'subcontract',labor:'subcontract',extra:'other'})[costType]||'other',contact:'',phone:'',taxid:'',email:'',addr:'',items:'',note:'由施工成本手動輸入自動建立',updatedAt:Date.now(),_mt:Date.now()};
+  VENDORS.unshift(v);try{saveVendors();}catch(e){_err('_vendorEnsure',e);}
+  try{toast('已將「'+esc(name)+'」加入廠商名冊，可到客戶．廠商補統編與帳戶');}catch(e){/* 可忽略 */}
+  return v;
+}
 // ── v6.0.69 氣瓶（氧氣／乙炔）：瓶子是廠商的、買的只有氣體 ──
 // 明細列 preset 氧氣／乙炔：qty＝本次送來的瓶數（＝購買數），ret＝退回空瓶數；在場＝Σqty−Σret（依廠商彙總，跨同專案所有自有卡）
 function _gasRow(r){return !!r&&(r.preset==='氧氣'||r.preset==='乙炔');}
