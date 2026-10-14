@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.71';
+var APP_VERSION='v6.0.72';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -25822,7 +25822,7 @@ function renderPayables(){
         +_payVatCtl(p)   // v6.0.42 自動產生的不給改稅別
           +'<span class="bdg '+(p.status==='paid'?'ok':'warn')+'">'+(p.status==='paid'?'✓ 已付款':'待付款')+'</span></div>'
           +'<div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">'
-          +(p.status!=='paid'?'<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="confirmPayment(\''+p.id+'\')">✓ 付款</button>'+_payVendorAllBtn(p):'')
+          +(p.status!=='paid'?'<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid(\''+p.id+'\',null,_payAfterMark)">✓ 付款</button>'+_payVendorAllBtn(p):'<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark(\''+p.id+'\')">改回未付</button>')   // v6.0.72 付款先問實付日；已付可改回
         +(p.quoteId?'<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts(\''+p.quoteId+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>':'')
           +_payEditBtns(p)   // v6.0.42 自動產生的唯讀
           +_payFilesInline(p)+'</div>'   // v6.0.39 附件鈕併入同列
@@ -25862,7 +25862,7 @@ function renderPayables(){
         <span class="bdg ${p.status==='paid'?'ok':'warn'}">${p.status==='paid'?'✓ 已付款':'待付款'}</span>
       </div>
       <div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">
-        ${p.status!=='paid'?`<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="confirmPayment('${p.id}')">✓ 付款</button>`:''}
+        ${p.status!=='paid'?`<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid('${p.id}',null,_payAfterMark)">✓ 付款</button>`:`<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark('${p.id}')">改回未付</button>`}
               ${p.quoteId?`<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts('${p.quoteId}')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>`:''}
         ${_payEditBtns(p)}
         ${_payFilesInline(p)}
@@ -35643,6 +35643,8 @@ function _sdMatEstLayerHtml(q,m,sec,fS,fN){
 var _matEstCalc0_648=matEstCalc;
 matEstCalc=function(){try{var q=_matEstSiteQ();if(q){MAT_EST=_matEstNorm(MAT_EST);_sdToMatEst(_sdNorm(q.site),MAT_EST);}}catch(e){_err('matEstCalc.site',e);}return _matEstCalc0_648.apply(this,arguments);};
 
+// v6.0.72 應付列「✓ 付款」改走 payMarkPaid（先問實付日、按確定才標已付，避免誤觸）；標完重繪應付與 KPI
+function _payAfterMark(){try{renderPayables();}catch(e){_err('_payAfterMark',e);}try{updateFinanceKPIs();}catch(e){_err('_payAfterMark.kpi',e);}}
 // ── v6.0.70 氣瓶在場（材料．運輸頁）／手動輸入廠商進名冊 ──
 function _m6GasHtml(q){
   var gs=_gasVendors(q),on=gs.filter(function(g){return g.total>0;});

@@ -5095,7 +5095,7 @@ async function newPage(browser, width, height) {
     const pl=document.getElementById('payable-list');
     const row=id=>[...pl.querySelectorAll('.ql')].find(x=>x.innerHTML.includes("'"+id+"'")||x.innerHTML.includes(id));
     const r1=row('paycS_p1'),rm=row('manualRent'),rs=row('pay_ps_h1_2026-09');
-    out.autoRow=!!r1&&!r1.querySelector('button[onclick*="delPayable"]')&&!r1.querySelector('button[onclick*="editPayable"]')&&!r1.querySelector('input[type=checkbox]')&&!/🔒/.test(r1.innerHTML)&&!!r1.querySelector('button[onclick*="confirmPayment"]')&&!!r1.querySelector('button[onclick*="_payUpload"]');
+    out.autoRow=!!r1&&!r1.querySelector('button[onclick*="delPayable"]')&&!r1.querySelector('button[onclick*="editPayable"]')&&!r1.querySelector('input[type=checkbox]')&&!/🔒/.test(r1.innerHTML)&&!!r1.querySelector('button[onclick*="payMarkPaid"]')&&!!r1.querySelector('button[onclick*="_payUpload"]');
     out.manualRow=!!rm&&!!rm.querySelector('button[onclick*="delPayable"]')&&!!rm.querySelector('button[onclick*="editPayable"]')&&!!rm.querySelector('input[type=checkbox]');
     out.psRow=!!rs&&/薪資條/.test(rs.innerHTML)&&!!rs.querySelector('button[onclick*="acctTab"]')&&!rs.querySelector('button[onclick*="delPayable"]');
     out.hint=/由來源自動產生/.test(pl.innerHTML);
@@ -6098,6 +6098,36 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.71 廠商編輯彈窗在矮視窗可捲動、儲存鈕捲得到並能存、聯絡人欄名修正', r.shown && r.scrollable && r.btnVisible && r.label && r.saved, JSON.stringify(r));
     check('v6.0.71 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.72 應付列：付款先問實付日（不再一點就標已付）、已付列有「改回未付」 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        PAYABLES.length = 0;
+        PAYABLES.push({ id: 'payA', to: '丙丁企業有限公司', project: '中科', amount: 2600, vat: true, date: '2026-10-25', status: 'pending', category: 'material', _mt: 1 },
+                      { id: 'payB', to: '丙丁企業有限公司', project: '中科', amount: 1000, vat: false, date: '2026-10-25', status: 'paid', paidDate: '2026-10-14', paidAt: 5, category: 'material', _mt: 1 });
+        window._payAging = 'all'; go('finance'); switchFinanceTab('payable'); renderPayables();
+        /* 已付款列預設收合 → 點群組的「已付款 N 筆」展開 */
+        const tg = document.querySelector('#payable-list [onclick*="_payPaidToggle"]'); if (tg) tg.click();
+        const el = () => document.getElementById('payable-list').innerHTML;
+        out.btns = /payMarkPaid\('payA'/.test(el()) && !/confirmPayment\('payA'/.test(el()) && /payUnmark\('payB'/.test(el()) && /改回未付/.test(el());
+        /* 付款：點了只開視窗，按確定才標 */
+        payMarkPaid('payA', null, _payAfterMark); out.dlg = getComputedStyle(document.getElementById('gen-confirm-modal')).display !== 'none' && PAYABLES[0].status === 'pending';
+        document.getElementById('pmp-date').value = '2026-10-20'; document.getElementById('gen-confirm-ok').click();
+        out.paid = PAYABLES[0].status === 'paid' && PAYABLES[0].paidDate === '2026-10-20' && PAYABLES[0].paidAt > 0 && /payUnmark\('payA'/.test(el());
+        /* 改回未付：問一次，確定後待付＋unpaidAt，列表重繪回到「付款」 */
+        payUnmark('payB'); out.ask = /改回未付/.test(document.getElementById('gen-confirm-modal').innerHTML) && PAYABLES[1].status === 'paid';
+        document.getElementById('gen-confirm-ok').click();
+        out.unmarked = PAYABLES[1].status === 'pending' && !PAYABLES[1].paidDate && PAYABLES[1].unpaidAt > 0 && /payMarkPaid\('payB'/.test(el()); window._payPaidOpen = {};
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.72 應付列「✓ 付款」先問實付日、已付列「改回未付」問一次後回待付並記 unpaidAt', r.btns && r.dlg && r.paid && r.ask && r.unmarked, JSON.stringify(r));
+    check('v6.0.72 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
