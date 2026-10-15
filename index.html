@@ -1025,8 +1025,6 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
             <input id="fcl" placeholder="業主名稱">
           </div>
           <div class="f"><label>客戶</label><input id="fco" placeholder="姓名"></div>
-          <div class="f"><label>業務 <span style="font-size:10px;color:var(--b3)">（績效統計）</span></label><select id="fsales" onchange="_salesSelChange()" style="font-family:inherit;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px;background:var(--w)"><option value="">── 未指定 ──</option></select></div>
-          <div class="f" id="fcomm-wrap"><label>抽成 <span style="font-size:10px;color:var(--b3)">（得標後計，內部）</span></label><div style="display:flex;gap:4px"><select id="fcommMode" style="font-family:inherit;padding:7px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px;background:var(--w);flex:0 0 76px"><option value="pct">%</option><option value="amt">固定額</option></select><input id="fcommVal" type="number" inputmode="decimal" min="0" step="0.1" placeholder="例：2" style="flex:1;min-width:0"></div></div>
         </div>
         <div class="fg fg3">
           <div class="f"><label>工程名稱 <span style="color:var(--red)">*</span></label><input id="fn" placeholder="例：漢陽營區新建工程擋土支撐工程"></div>
@@ -2761,7 +2759,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.74" defer></script>
+<script src="app.js?v=6.0.75" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">

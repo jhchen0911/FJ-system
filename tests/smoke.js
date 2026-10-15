@@ -6166,6 +6166,10 @@ async function newPage(browser, width, height) {
         buildInvPreview(); const html = document.getElementById('inv-prev-html').innerHTML;
         out.print = /13−5<br>＝8/.test(html) && /25,760/.test(html) && !/30 天/.test(html.replace(/含30天租期/g, '')) && !/工務協商/.test(html);
         out.calcTxt = /逾期 13 天 − 折讓 5 天 ＝ 8 天/.test(_invCalcText(r2, r2.curAmt));
+        /* v6.0.75 備註列同步折讓：「（13天，折讓5天，計8天）」；再算天數仍保留 */
+        const noteVal = () => [...document.querySelectorAll('#inv-note-rows .inv-note-input')].map(x => x.value).join('|');
+        out.note = /逾期租金：8\/10～8\/22（13天，折讓5天，計8天）/.test(noteVal());
+        calcInvDays(); out.noteKeep = /（13天，折讓5天，計8天）/.test(noteVal()) && !/（13天）/.test(noteVal());
         /* 存檔往返（壓縮鍵 dd／da／dn）後欄位還在 */
         autoSaveInv(); const saved = INV.find(x => x.id === 'SMKI73'); const sr = (saved.items || []).find(x => x.type === 'rental');
         const packed = _invPackItem(r2); out.pack = packed.dd === 5 && packed.da === 30 && packed.dn === '10/15 與工務協商' && !!sr && sr.discDays === 5;
@@ -6184,7 +6188,7 @@ async function newPage(browser, width, height) {
       res(out);
     }));
     check('v6.0.73 逾期租金折讓：視窗預覽、套用後計費天數 13−5＝8、金額 25,760、按鈕顯示折讓天數、重算保留、取消回全額、超過逾期天數夾在上限', r.base && r.btn && r.prev && r.applied && r.btnTxt && r.total && r.recalcKeep && r.undo && r.cap, JSON.stringify(r));
-    check('v6.0.73 列印天數欄「13−5／＝8」、計算式含折讓、業主要求與議價說明不印；存檔壓縮往返；跨期已請至不變', r.print && r.calcTxt && r.pack && r.billedUntil, JSON.stringify(r));
+    check('v6.0.73 列印天數欄「13−5／＝8」、計算式含折讓、業主要求與議價說明不印；備註列寫「折讓5天，計8天」（v6.0.75）；存檔壓縮往返；跨期已請至不變', r.print && r.calcTxt && r.pack && r.billedUntil && r.note && r.noteKeep, JSON.stringify(r));
     check('v6.0.73 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
@@ -6204,12 +6208,16 @@ async function newPage(browser, width, height) {
         document.getElementById('gen-confirm-ok').click();
         out.book = P.sales.length === 2 && P.sales[0].name === '王小明' && P.sales[0].defRate === 2 && P.sales[1].active === false && !!P.sales[0]._mt && _salesList().length === 1 && _salesList(true).length === 2;
         const sid = P.sales[0].id, sid2 = P.sales[1].id;
-        /* 報價編輯頁：業務下拉只列在職、選業務帶預設抽成、存檔寫 salesId／comm */
-        newQ(); out.sel = [...document.getElementById('fsales').options].map(o => o.value).join(',') === ',' + sid && document.getElementById('fcomm-wrap').style.display !== 'none';
-        document.getElementById('fsales').value = sid; _salesSelChange(); out.defRate = document.getElementById('fcommVal').value === '2' && document.getElementById('fcommMode').value === 'pct';
-        document.getElementById('fn').value = '業務案A'; document.getElementById('fcl').value = '甲'; document.getElementById('fd').value = '2026-09-10';
+        /* v6.0.75 業務／抽成改在報價列表的狀態 chip 旁：編輯頁不再有欄位 */
+        newQ(); document.getElementById('fn').value = '業務案A'; document.getElementById('fcl').value = '甲'; document.getElementById('fd').value = '2026-09-10';
         items = [{ desc: 'H型鋼樁', unit: 'M', qty: 100, price: 1000, note: '', sec: false }]; saveQ();
-        const qa = Q.find(x => x.name === '業務案A'); out.saved = !!qa && qa.salesId === sid && qa.comm && qa.comm.mode === 'pct' && qa.comm.rate === 2 && qa.t.sub === 100000;
+        const qa = Q.find(x => x.name === '業務案A'); go('quotes'); renderList();
+        out.sel = !document.getElementById('fsales') && /＋業務/.test(document.getElementById('qlist').innerHTML) && /openSalesPick\('/.test(document.getElementById('qlist').innerHTML);
+        openSalesPick(qa.id);
+        out.defRate = [...document.getElementById('sp-sales').options].map(o => o.value).join(',') === ',' + sid && (document.getElementById('sp-sales').value = sid, _spSelChange(), document.getElementById('sp-val').value === '2' && document.getElementById('sp-mode').value === 'pct');
+        document.getElementById('gen-confirm-ok').click();
+        out.saved = qa.salesId === sid && qa.comm && qa.comm.mode === 'pct' && qa.comm.rate === 2 && qa.t.sub === 100000 && /業務 王小明・2%/.test(document.getElementById('qlist').innerHTML);
+
         /* 未得標 → 不建應付；得標 → pay_sales_ 2,000（不含稅） */
         out.noPay = !PAYABLES.some(p => p.id === 'pay_sales_' + qa.id);
         qa.awarded = true; _touch(qa); _salesCommSync(qa);
@@ -6250,13 +6258,15 @@ async function newPage(browser, width, height) {
         out.csv = csv && /業務績效_2026/.test(csv.fn) && csv.hd.length === 12 && csv.rows.length === 4 && csv.rows.some(r => r[1] === '業務案C' && r[8] === 5000 && /已付/.test(r[11]));
         /* 墓碑豁免：抽成應付在成本卡以外也算「仍需要」 */
         out.live = !!_liveExpectedPayIds()['pay_sales_' + qa.id];
+        /* 存報價單不會洗掉業務／抽成／得標（saveQ 以展開保留） */
+        loadQ(qa.id); saveQ(); const qk = Q.find(x => x.id === qa.id); out.keep = qk.salesId === sid && qk.comm.rate === 2 && qk.awarded === true && PAYABLES.some(p => p.id === 'pay_sales_' + qa.id);
         /* 取消得標／抽成清空 → 未付應付撤掉 */
-        qa.comm = null; _salesCommSync(qa); out.drop = !PAYABLES.some(p => p.id === 'pay_sales_' + qa.id);
+        delete qk.comm; _salesCommSync(qk); out.drop = !PAYABLES.some(p => p.id === 'pay_sales_' + qa.id);
         P.sales = [];
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
       return out;
     });
-    check('v6.0.74 業務名冊（新增／預設抽成／離職）、報價頁掛業務＋抽成（存 salesId／comm，comm 走 private）、得標自動建抽成應付（不含稅、已付不改、取消即撤）', r.book && r.sel && r.defRate && r.saved && r.noPay && r.pay && r.payC && r.rcv && r.keepPaid && r.sens && r.sensBack && r.live && r.drop, JSON.stringify(r));
+    check('v6.0.74 業務名冊（新增／預設抽成／離職）、報價列表 chip 設業務＋抽成（v6.0.75；存 salesId／comm，comm 走 private，存報價不洗掉）、得標自動建抽成應付（不含稅、已付不改、取消即撤）', r.book && r.sel && r.defRate && r.saved && r.keep && r.noPay && r.pay && r.payC && r.rcv && r.keepPaid && r.sens && r.sensBack && r.live && r.drop, JSON.stringify(r));
     check('v6.0.74 業務績效報表：件數／得標／抽成／已計提／已付未付、依業務與明細表、業務／狀態／月份篩選、付款鈕、PDF（橫式）與 CSV 匯出', r.inMore && r.stat && r.tiles && r.filter && r.filterSt && r.month && r.payBtn && r.pdf && r.csv, JSON.stringify(r));
     check('v6.0.74 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();

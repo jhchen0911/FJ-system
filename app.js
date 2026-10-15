@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.74';
+var APP_VERSION='v6.0.75';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -835,7 +835,6 @@ function genQuoteCode(){
 function newQ(){
   eid=null;items=[{desc:'',unit:'',qty:'',price:'',note:'',ot:'',otu:'$/M/天',sec:false}];exs=[];costs=[];
   ['fcl','fn','fl','fco','fp'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
-  try{_salesFormFill(null);}catch(e){_err('newQ.sales',e);}   // v6.0.74
   const fc=document.getElementById('fc');if(fc)fc.value=genQuoteCode();
   const fd=document.getElementById('fd');if(fd)fd.value=localToday();
   window._qSnap=JSON.stringify(items);
@@ -2054,7 +2053,6 @@ function saveQ(){
     parentId:existingQ?.parentId||'',
     code:gv('fc'),client:gv('fcl'),name:gv('fn'),loc:gv('fl'),
     contact:gv('fco'),phone:gv('fp'),date:gv('fd'),
-    salesId:gv('fsales')||'',comm:_commRead(existingQ),   // v6.0.74 業務／抽成
     rmkText:buildRmkText(),
     items:JSON.parse(JSON.stringify(items)),exs:JSON.parse(JSON.stringify(exs)),t};
   const idx=Q.findIndex(x=>x.id===q.id);
@@ -2222,7 +2220,6 @@ function loadQ(id){
   }catch(e){_err('loadQ.costFix',e);}
   const map={fc:'code',fcl:'client',fn:'name',fl:'loc',fco:'contact',fp:'phone',fd:'date'};
   Object.entries(map).forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.value=q[k]||'';});
-  try{_salesFormFill(q);}catch(e){_err('loadQ.sales',e);}   // v6.0.74
   if(q.rmk){Object.assign(rmkCustom,q.rmk);if(!Array.isArray(rmkCustom.extra))rmkCustom.extra=[];}
   else{Object.keys(rmkCustom).forEach(k=>{rmkCustom[k]=(k==='extra')?[]:'';});}
   window._qSnap=JSON.stringify(items);
@@ -2340,7 +2337,7 @@ function qlHTML(q,clickable){
     +'<div class="qm" style="min-width:0;flex:1">'
     +'<div class="qt" style="font-size:'+(mob?'14px':'13px')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(q.name||'未命名')+'</div>'
     +'<div class="qsb">'+(q.client||'')+(q.code?' ／ '+q.code:'')+(q.date?' ／ '+fmtD(q.date):'')+'</div>'
-    +(awardedBdg?'<div style="margin-top:3px">'+awardedBdg+'</div>':'')
+    +'<div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap;align-items:center">'+awardedBdg+_salesChip(q)+'</div>'   // v6.0.75 業務 chip（原在編輯頁）
     +'</div>'
     +'<div class="qr" style="flex-shrink:0;align-items:flex-end;text-align:right">'
     +'<div class="qa" style="font-size:14px;font-weight:900;white-space:nowrap">NT$ '+fmt(t.total||0)+'</div>'
@@ -5616,7 +5613,8 @@ function calcInvDays(){
 
   // 底部備註：只動「該工項的逾期租金」那一行，其他備註不重建
   if(billDays>0){
-    const line=(selDesc?selDesc+'  ':'')+'逾期租金：'+fmtMD(billStart)+'～'+fmtMD(claimDate)+'（'+billDays+'天）'
+    const _exDisc=(function(){var x=invItems.find(function(r){return r&&r.type==='rental'&&r._ovKey===selDesc;});return x?(parseFloat(x.discDays)||0):0;})();   // v6.0.75 既有折讓一併寫進備註
+    const line=(selDesc?selDesc+'  ':'')+'逾期租金：'+fmtMD(billStart)+'～'+fmtMD(claimDate)+_rentDaysNote(billDays,_exDisc)
       +(prevBilled.until?'　※第'+(prevBilled.period||'?')+'期已請至 '+prevBilled.until.slice(5).replace('-','/'):'');
     _upsertInvNote(line,(selDesc||'')+'  逾期租金');
   }
@@ -35667,28 +35665,34 @@ function _salesList(all){var a=(P&&Array.isArray(P.sales))?P.sales:[];return all
 function _salesById(id){return id?(_salesList(true).find(function(x){return x&&x.id===id;})||null):null;}
 function _salesName(id){var x=_salesById(id);return x?(x.name||''):'';}
 function _salesCommVis(){var em=_meEmail();return !em||isAdmin(em);}   // 抽成設定：管理員（未登入＝本機模式）才看得到
-function _salesFormFill(q){
-  var sel=document.getElementById('fsales');if(!sel)return;
-  var cur=(q&&q.salesId)||'';
-  var list=_salesList().slice();if(cur&&!list.some(function(x){return x.id===cur;})){var o=_salesById(cur);if(o)list.push(o);}
-  sel.innerHTML='<option value="">── 未指定 ──</option>'+list.map(function(x){return '<option value="'+esc(x.id)+'"'+(x.id===cur?' selected':'')+'>'+esc(x.name||'')+'</option>';}).join('');
-  var wrap=document.getElementById('fcomm-wrap'),m=document.getElementById('fcommMode'),v=document.getElementById('fcommVal');
-  if(wrap)wrap.style.display=_salesCommVis()?'':'none';
-  var c=(q&&q.comm)||{};
-  if(m)m.value=c.mode==='amt'?'amt':'pct';
-  if(v)v.value=c.mode==='amt'?(c.amt||''):(c.rate||'');
+// v6.0.75 業務／抽成改在報價列表的狀態 chip 旁設定（不在編輯頁）：chip → openSalesPick(qid)
+function _salesChip(q){
+  if(!q||q.parentId)return '';
+  var nm=_salesName(q.salesId),c=q.comm,ct=(c&&_salesCommVis())?(c.mode==='amt'?('・固定 '+fmt(c.amt||0)):('・'+(parseFloat(c.rate)||0)+'%')):'';
+  return '<span class="bdg sales-chip" onclick="event.stopPropagation();openSalesPick(\''+q.id+'\')" title="業務（績效統計）／抽成設定" style="cursor:pointer;font-size:10px;background:var(--w);border:1px dashed '+(nm?'#6a1b9a':'var(--b2)')+';color:'+(nm?'#6a1b9a':'var(--b3)')+'">'+(nm?('業務 '+esc(nm)+ct):'＋業務')+'</span>';
 }
-function _salesSelChange(){   // 選了業務、抽成還空白 → 帶預設抽成%
-  var x=_salesById(gv('fsales')),v=document.getElementById('fcommVal'),m=document.getElementById('fcommMode');
-  if(x&&v&&!v.value&&(parseFloat(x.defRate)||0)>0){v.value=x.defRate;if(m)m.value='pct';}
+function openSalesPick(qid){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;
+  var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)';
+  var cur=q.salesId||'',list=_salesList().slice();if(cur&&!list.some(function(x){return x.id===cur;})){var o=_salesById(cur);if(o)list.push(o);}
+  var c=q.comm||{},vis=_salesCommVis();
+  var html='<div style="font-size:12.5px;color:var(--b4);margin-bottom:8px">'+esc(q.name||'')+'　'+esc(q.client||'')+'</div>'
+    +'<div class="f"><label>業務 <span style="font-size:10px;color:var(--b3)">（經營報表 › 業務績效 統計用）</span></label><select id="sp-sales" onchange="_spSelChange()" style="'+IN+'"><option value="">── 未指定 ──</option>'+list.map(function(x){return '<option value="'+esc(x.id)+'"'+(x.id===cur?' selected':'')+'>'+esc(x.name||'')+(x.active===false?'（離職）':'')+'</option>';}).join('')+'</select></div>'
+    +(vis?('<div class="f" style="margin-top:8px"><label>抽成 <span style="font-size:10px;color:var(--b3)">（得標後依未稅合約計，內部）</span></label><div style="display:flex;gap:6px"><select id="sp-mode" style="'+IN+';flex:0 0 96px"><option value="pct"'+(c.mode!=='amt'?' selected':'')+'>%</option><option value="amt"'+(c.mode==='amt'?' selected':'')+'>固定額</option></select><input id="sp-val" type="number" inputmode="decimal" min="0" step="0.1" value="'+(c.mode==='amt'?(c.amt||''):(c.rate||''))+'" placeholder="例：2" style="'+IN+'"></div></div>'):'')
+    +(!list.length?'<div style="font-size:12px;color:#b26a00;margin-top:8px">還沒有業務資料，請先按「業務名冊」建立。</div>':'')
+    +'<div style="margin-top:10px"><button type="button" class="btn btn-xs" onclick="document.getElementById(\'gen-confirm-modal\').style.display=\'none\';openSalesBook()">業務名冊（新增／編輯業務）</button></div>';
+  showConfirm('業務／抽成',html,function(){
+    var sid=gv('sp-sales')||'';
+    q.salesId=sid;
+    if(vis){var mode=gv('sp-mode')==='amt'?'amt':'pct',val=parseFloat(gv('sp-val'))||0;q.comm=val>0?(mode==='amt'?{mode:'amt',amt:Math.round(val)}:{mode:'pct',rate:val}):null;if(!q.comm)delete q.comm;}
+    _touch(q);try{persist();}catch(e){_err('openSalesPick',e);}
+    try{_salesCommSync(q);}catch(e){_err('openSalesPick.sync',e);}
+    try{renderList();}catch(e){_err('openSalesPick.list',e);}
+    try{if(_currentReport==='sales'&&document.getElementById('page-reports')&&document.getElementById('page-reports').classList.contains('active'))renderCurrentReport();}catch(e){_err('openSalesPick.rpt',e);}
+    toast(sid?('業務：'+_salesName(sid)+(q.comm?('　抽成 '+(q.comm.mode==='amt'?('固定 '+fmt(q.comm.amt)):(q.comm.rate+'%'))):'')):'已取消業務指定');
+  },false,null,false);
 }
-function _commRead(existingQ){
-  if(!document.getElementById('fcommVal'))return existingQ?existingQ.comm:undefined;
-  if(!_salesCommVis())return existingQ?existingQ.comm:undefined;   // 看不到的人不改
-  var mode=gv('fcommMode')==='amt'?'amt':'pct',val=parseFloat(gv('fcommVal'))||0;
-  if(!(val>0))return undefined;
-  return mode==='amt'?{mode:'amt',amt:Math.round(val)}:{mode:'pct',rate:val};
-}
+function _spSelChange(){var x=_salesById(gv('sp-sales')),v=document.getElementById('sp-val'),m=document.getElementById('sp-mode');if(x&&v&&!v.value&&(parseFloat(x.defRate)||0)>0){v.value=x.defRate;if(m)m.value='pct';}}
 function _salesBase(q){   // 抽成基礎：主案＋追加案未稅
   var all=[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;}));
   return all.reduce(function(a,x){return a+((x.t&&parseFloat(x.t.sub))||0);},0);
@@ -35764,7 +35768,7 @@ function _salesBookSave(){
   });
   P.sales=out;_salesSave();
   try{_salesCommSyncAll();}catch(e){_err('_salesBookSave',e);}
-  try{if(document.getElementById('fsales'))_salesFormFill(Q.find(function(x){return x.id===eid;})||null);}catch(e){_err('_salesBookSave.form',e);}
+  try{if(document.getElementById('qlist'))renderList();}catch(e){_err('_salesBookSave.list',e);}
   try{if(_currentReport==='sales')renderCurrentReport();}catch(e){_err('_salesBookSave.rpt',e);}
   toast('業務名冊已儲存（'+out.length+' 人）');
 }
@@ -35884,12 +35888,21 @@ function invRentDisc(i){
     var ask=parseFloat(gv('rd-ask')),dd=parseFloat(gv('rd-days'));
     if(isFinite(dd)&&dd>d){toast('折讓天數不能超過逾期天數，已改為 '+_qfmt(d)+' 天');dd=d;}   // 視窗按確定即關，超過就夾在逾期天數
     it.discAsk=isFinite(ask)&&ask>0?ask:0;it.discDays=isFinite(dd)&&dd>0?dd:0;it.discNote=(gv('rd-note')||'').trim();
+    try{_rentDiscNoteSync(it);}catch(e){_err('invRentDisc.note',e);}   // v6.0.75 備註列同步「折讓 N 天，計 M 天」
     try{updateInvRowAmt(i);}catch(e){_err('invRentDisc',e);}
     try{rInvItems();rInvTots();}catch(e){_err('invRentDisc.re',e);}
     try{autoSaveInv();}catch(e){_err('invRentDisc.save',e);}
     toast(it.discDays>0?('已折讓 '+_qfmt(it.discDays)+' 天，計費 '+_qfmt(_invBillDays(it))+' 天'):'已取消折讓');
   },false,null,false);
   setTimeout(_rdPreview,30);
+}
+// v6.0.75 備註列天數文字：無折讓「（51天）」、有折讓「（51天，折讓15天，計36天）」；折讓後同步改既有備註列
+function _rentDaysNote(days,disc){disc=parseFloat(disc)||0;return disc>0?('（'+_qfmt(days)+'天，折讓'+_qfmt(disc)+'天，計'+_qfmt(Math.max(0,days-disc))+'天）'):('（'+_qfmt(days)+'天）');}
+function _rentDiscNoteSync(it){
+  var box=document.getElementById('inv-note-rows');if(!box||!it||!it._ovKey)return;
+  var key=it._ovKey+'  逾期租金',inputs=[].slice.call(box.querySelectorAll('.inv-note-input'));
+  var hit=inputs.find(function(inp){return String(inp.value||'').indexOf(key)>=0;});if(!hit)return;
+  hit.value=String(hit.value).replace(/（\d+(?:\.\d+)?天[^）]*）/,_rentDaysNote(parseFloat(it.curDays)||0,it.discDays));
 }
 var _rdCur=null;   // 折讓視窗目前的逾期列
 function _rdPreview(){
