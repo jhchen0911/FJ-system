@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.73';
+var APP_VERSION='v6.0.74';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -835,6 +835,7 @@ function genQuoteCode(){
 function newQ(){
   eid=null;items=[{desc:'',unit:'',qty:'',price:'',note:'',ot:'',otu:'$/M/天',sec:false}];exs=[];costs=[];
   ['fcl','fn','fl','fco','fp'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  try{_salesFormFill(null);}catch(e){_err('newQ.sales',e);}   // v6.0.74
   const fc=document.getElementById('fc');if(fc)fc.value=genQuoteCode();
   const fd=document.getElementById('fd');if(fd)fd.value=localToday();
   window._qSnap=JSON.stringify(items);
@@ -2053,11 +2054,13 @@ function saveQ(){
     parentId:existingQ?.parentId||'',
     code:gv('fc'),client:gv('fcl'),name:gv('fn'),loc:gv('fl'),
     contact:gv('fco'),phone:gv('fp'),date:gv('fd'),
+    salesId:gv('fsales')||'',comm:_commRead(existingQ),   // v6.0.74 業務／抽成
     rmkText:buildRmkText(),
     items:JSON.parse(JSON.stringify(items)),exs:JSON.parse(JSON.stringify(exs)),t};
   const idx=Q.findIndex(x=>x.id===q.id);
   if(idx>=0)Q[idx]=q;else Q.unshift(q);
   persist();
+  try{_salesCommSync(q);}catch(e){_err('saveQ.sales',e);}   // v6.0.74 得標＋有抽成 → 應付
   // v5.375：persist() 會再把目前編輯中報價的 _mt 推到現在，所以基準必須在它之後才更新，
   // 否則下一次儲存會誤判成「編輯期間被別人改過」。
   window._qEditBase={id:q.id,mt:(Q.find(function(x){return x.id===q.id;})||q)._mt};
@@ -2219,6 +2222,7 @@ function loadQ(id){
   }catch(e){_err('loadQ.costFix',e);}
   const map={fc:'code',fcl:'client',fn:'name',fl:'loc',fco:'contact',fp:'phone',fd:'date'};
   Object.entries(map).forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.value=q[k]||'';});
+  try{_salesFormFill(q);}catch(e){_err('loadQ.sales',e);}   // v6.0.74
   if(q.rmk){Object.assign(rmkCustom,q.rmk);if(!Array.isArray(rmkCustom.extra))rmkCustom.extra=[];}
   else{Object.keys(rmkCustom).forEach(k=>{rmkCustom[k]=(k==='extra')?[]:'';});}
   window._qSnap=JSON.stringify(items);
@@ -4973,6 +4977,7 @@ function confirmAward(){
     }
   }catch(e){_err('top',e);}
   _touch(q); // 跨裝置同步：新狀態必須獲勝
+  try{_salesCommSync(q);}catch(e){_err('confirmAward.sales',e);}   // v6.0.74
   persist();
   document.getElementById('award-modal').style.display='none';
   _fbWriteAll(
@@ -9930,7 +9935,7 @@ function _stripQuoteSens(q){
   delete c.costs;
   // v5.335 健檢F：referral（分潤約定）、matEst（材料估算含租金單價/運費）、
   // exs（舊版額外支出）也是成本面資料，一併抽走
-  delete c.referral;delete c.matEst;delete c.exs;delete c.rfqs;delete c.mat;   // v6 詢價單含廠商報價、材料調撥／攤提 → private
+  delete c.referral;delete c.matEst;delete c.exs;delete c.rfqs;delete c.mat;delete c.comm;   // v6 詢價單含廠商報價、材料調撥／攤提 → private；v6.0.74 業務抽成
   if(Array.isArray(c.items))c.items.forEach(function(it){if(it)delete it.estCost;});
   if(c.t){_Q_SENS_T.forEach(function(k){delete c.t[k];});delete c.t.ext;}
   return c;
@@ -9948,6 +9953,7 @@ function _extractQuoteSens(q){
   if(Array.isArray(q.exs)&&q.exs.length)out.exs=q.exs;
   if(Array.isArray(q.rfqs)&&q.rfqs.length)out.rfqs=q.rfqs;   // v6
   if(q.mat&&typeof q.mat==='object')out.mat=q.mat;   // v6 材料
+  if(q.comm&&typeof q.comm==='object')out.comm=q.comm;   // v6.0.74 業務抽成
   return out;
 }
 // 把敏感欄位貼回報價（fill=true 時只補空缺，不覆蓋既有值）
@@ -9974,6 +9980,7 @@ function _applyQuoteSens(q,s,fill){
   if(Array.isArray(s.exs)&&s.exs.length&&(!fill||!Array.isArray(q.exs)||!q.exs.length))q.exs=s.exs;
   if(Array.isArray(s.rfqs)&&s.rfqs.length&&(!fill||!Array.isArray(q.rfqs)||!q.rfqs.length))q.rfqs=s.rfqs;   // v6
   if(s.mat&&typeof s.mat==='object'&&(!fill||q.mat==null))q.mat=s.mat;   // v6 材料
+  if(s.comm&&typeof s.comm==='object'&&(!fill||q.comm==null))q.comm=s.comm;   // v6.0.74 業務抽成
 }
 function _applyQuoteSensAll(map){
   if(!map)return;
@@ -27460,7 +27467,7 @@ function showReport(type){
       btn.style.borderColor=t===type?'var(--g)':(t==='log'?'var(--b3)':'var(--g3)');
     }
   });
-  var ms=document.getElementById('rpt-more-sel');if(ms){var inMore=['client','contract','bidrate','vendor','labor','share','health','log'].indexOf(type)>=0;ms.value=inMore?type:'';ms.style.background=inMore?'var(--g)':'var(--w)';ms.style.color=inMore?'#fff':'var(--g3)';}   // v6.0.31
+  var ms=document.getElementById('rpt-more-sel');if(ms){var inMore=['client','contract','bidrate','sales','vendor','labor','share','health','log'].indexOf(type)>=0;ms.value=inMore?type:'';ms.style.background=inMore?'var(--g)':'var(--w)';ms.style.color=inMore?'#fff':'var(--g3)';}   // v6.0.31
   renderCurrentReport();
 }
 
@@ -27474,6 +27481,7 @@ function renderCurrentReport(){
   else if(_currentReport==='client')renderClientReport(el,year,month);
   else if(_currentReport==='contract')renderContractReport(el,year);
   else if(_currentReport==='bidrate')renderBidRateReport(el,year,month);
+  else if(_currentReport==='sales')renderSalesReport(el,year,month);   // v6.0.74 業務績效
   else if(_currentReport==='vendor')renderVendorReport(el,year,month);
   else if(_currentReport==='labor')renderLaborReport(el,year,month);
   else if(_currentReport==='hr')renderHrReport(el,year);   // v5.435
@@ -28385,6 +28393,7 @@ function renderContractReport(el,year){
 function exportCurrentReport(){
   if(_currentReport==='overview'){exportShareholderPDF();return;}   // v6.0.17 總覽匯出＝股東版 PDF（同口徑）
   if(_currentReport==='shareholder'){exportShareholderPDF();return;}   // v6 股東報表 → A4 直式 PDF
+  if(_currentReport==='sales'){_salesPdf();return;}   // v6.0.74 業務績效 → PDF
   const year=parseInt(document.getElementById('rpt-year')?.value)||new Date().getFullYear();
   const month=parseInt(document.getElementById('rpt-month')?.value)||0;
   if(_currentReport==='log'){
@@ -34893,6 +34902,7 @@ function _paySource(p){
   if(/^pay_ins_/.test(id))return {auto:true,label:'勞健保／勞退（薪資）',go:acct('pay')};
   if(/^pay_pc_/.test(id))return {auto:true,label:'零用金結算',go:acct('petty')};
   if(/^comm_/.test(id))return {auto:true,label:'專案獎金（得標設定）',go:p.quoteId?("openProj('"+p.quoteId+"')"):''};
+  if(/^pay_sales_/.test(id))return {auto:true,label:'業務抽成（報價單）',go:p.quoteId?("loadQ('"+p.quoteId+"')"):''};   // v6.0.74
   if(p.costId){
     var found=null,qq=null;
     (Q||[]).some(function(q){var c=(q&&q.costs||[]).find(function(x){return x&&x.id===p.costId;});if(c){found=c;qq=q;return true;}return false;});
@@ -35377,7 +35387,8 @@ function _liveExpectedPayIds(){
   var ids={};
   try{(Q||[]).forEach(function(q){(q&&q.costs||[]).forEach(function(c){if(!c||!c.id)return;
     if(c.type==='sub'||c.rental||(_subPeriods(c).length)){var ex=_subExpectedPayIds(c);Object.keys(ex).forEach(function(k){ids[k]=1;});}
-    ids['pay'+c.id]=1;});});}catch(e){_err('_liveExpectedPayIds',e);}
+    ids['pay'+c.id]=1;});
+    if(q&&q.awarded&&_salesCommAmt(q)>0)ids['pay_sales_'+q.id]=1;});}catch(e){_err('_liveExpectedPayIds',e);}   // v6.0.74 業務抽成
   _livePayCache={t:now,ids:ids};return ids;
 }
 // 墓碑豁免：成本卡現在仍需要的應付 id，就算曾被刪除（舊版去重 bug）也不得在合併時被丟掉；順手把本機墓碑拿掉
@@ -35649,6 +35660,198 @@ function _sdMatEstLayerHtml(q,m,sec,fS,fN){
 var _matEstCalc0_648=matEstCalc;
 matEstCalc=function(){try{var q=_matEstSiteQ();if(q){MAT_EST=_matEstNorm(MAT_EST);_sdToMatEst(_sdNorm(q.site),MAT_EST);}}catch(e){_err('matEstCalc.site',e);}return _matEstCalc0_648.apply(this,arguments);};
 
+// ══════════ v6.0.74 業務績效：業務名冊（P.sales）、報價掛業務＋抽成（q.salesId shared／q.comm private）、抽成應付 pay_sales_<qid>、報表 ══════════
+// 口徑：報價件數＝該年（月）報價日落在期間的主案（追加案不算獨立件）；得標＝q.awarded；
+// 抽成基礎＝得標案未稅合約金額（主案＋追加案 t.sub）；依實收進度計提（同專案獎金）；應付整筆一次、付款狀態在帳務。
+function _salesList(all){var a=(P&&Array.isArray(P.sales))?P.sales:[];return all?a:a.filter(function(x){return x&&x.active!==false;});}
+function _salesById(id){return id?(_salesList(true).find(function(x){return x&&x.id===id;})||null):null;}
+function _salesName(id){var x=_salesById(id);return x?(x.name||''):'';}
+function _salesCommVis(){var em=_meEmail();return !em||isAdmin(em);}   // 抽成設定：管理員（未登入＝本機模式）才看得到
+function _salesFormFill(q){
+  var sel=document.getElementById('fsales');if(!sel)return;
+  var cur=(q&&q.salesId)||'';
+  var list=_salesList().slice();if(cur&&!list.some(function(x){return x.id===cur;})){var o=_salesById(cur);if(o)list.push(o);}
+  sel.innerHTML='<option value="">── 未指定 ──</option>'+list.map(function(x){return '<option value="'+esc(x.id)+'"'+(x.id===cur?' selected':'')+'>'+esc(x.name||'')+'</option>';}).join('');
+  var wrap=document.getElementById('fcomm-wrap'),m=document.getElementById('fcommMode'),v=document.getElementById('fcommVal');
+  if(wrap)wrap.style.display=_salesCommVis()?'':'none';
+  var c=(q&&q.comm)||{};
+  if(m)m.value=c.mode==='amt'?'amt':'pct';
+  if(v)v.value=c.mode==='amt'?(c.amt||''):(c.rate||'');
+}
+function _salesSelChange(){   // 選了業務、抽成還空白 → 帶預設抽成%
+  var x=_salesById(gv('fsales')),v=document.getElementById('fcommVal'),m=document.getElementById('fcommMode');
+  if(x&&v&&!v.value&&(parseFloat(x.defRate)||0)>0){v.value=x.defRate;if(m)m.value='pct';}
+}
+function _commRead(existingQ){
+  if(!document.getElementById('fcommVal'))return existingQ?existingQ.comm:undefined;
+  if(!_salesCommVis())return existingQ?existingQ.comm:undefined;   // 看不到的人不改
+  var mode=gv('fcommMode')==='amt'?'amt':'pct',val=parseFloat(gv('fcommVal'))||0;
+  if(!(val>0))return undefined;
+  return mode==='amt'?{mode:'amt',amt:Math.round(val)}:{mode:'pct',rate:val};
+}
+function _salesBase(q){   // 抽成基礎：主案＋追加案未稅
+  var all=[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;}));
+  return all.reduce(function(a,x){return a+((x.t&&parseFloat(x.t.sub))||0);},0);
+}
+function _salesCommAmt(q){
+  var c=q&&q.comm;if(!c)return 0;
+  if(c.mode==='amt')return Math.round(parseFloat(c.amt)||0);
+  return Math.round(_salesBase(q)*(parseFloat(c.rate)||0)/100);
+}
+function _salesCommTxt(q){var c=q&&q.comm;if(!c)return '';return c.mode==='amt'?('固定 NT$ '+fmt(c.amt||0)):((parseFloat(c.rate)||0)+'% × 未稅 '+fmt(_salesBase(q)));}
+function _salesRcvRate(q){   // 收款進度＝已收 ÷ 合約含稅（主案＋追加）
+  var all=[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;}));
+  var ctT=all.reduce(function(a,x){return a+((x.t&&x.t.total)||0);},0),rcv=0;
+  (INV||[]).forEach(function(i){if(!i)return;var same=(i.quoteId&&all.some(function(x){return x.id===i.quoteId;}))||String(i.project||'').trim()===String(q.name||'').trim();if(same)rcv+=parseFloat(i.received)||0;});
+  return ctT>0?Math.min(1,rcv/ctT):0;
+}
+function _salesPayId(q){return 'pay_sales_'+q.id;}
+function _salesCommSync(q){   // 得標＋業務＋抽成>0 → 一筆應付（固定 id；保留付款狀態）；否則撤未付
+  if(!q||!q.id||q.parentId)return;
+  var id=_salesPayId(q),amt=q.awarded?_salesCommAmt(q):0,who=_salesName(q.salesId);
+  var p=(PAYABLES||[]).find(function(x){return x&&x.id===id;});
+  if(amt>0&&who){
+    var isNew=!p;if(!p){p={id:id,status:'pending',createdAt:Date.now()};PAYABLES.unshift(p);}
+    var before=_recSig(p);
+    p.kind='sales';p.to=who;p.project=q.name||'';p.quoteId=q.id;p.amount=amt;p.vat=false;p.category='other';
+    p.note='業務抽成・'+_salesCommTxt(q)+'・依實收款進度支付';
+    if(!p.date)p.date=_vendorDueDate(q.date||localToday());
+    if(isNew||_recSig(p)!==before){_touch(p);savePayables();}
+  }else if(p&&p.status!=='paid'){
+    _tomb('payables',id);PAYABLES=PAYABLES.filter(function(x){return x.id!==id;});savePayables();
+  }
+}
+function _salesCommSyncAll(){(Q||[]).forEach(function(q){try{if(q&&!q.parentId&&(q.salesId||q.comm))_salesCommSync(q);}catch(e){_err('_salesCommSyncAll',e);}});}
+// ── 名冊 ──
+function _salesSave(){try{persistP();}catch(e){_err('_salesSave',e);}try{_onSave();}catch(e){_err('_salesSave.sync',e);}}
+function openSalesBook(){
+  var IN='box-sizing:border-box;font-size:12.5px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;width:100%';
+  var rows=_salesList(true).map(function(x,i){
+    return '<tr data-id="'+esc(x.id)+'" style="border-bottom:1px solid var(--b1)'+(x.active===false?';opacity:.55':'')+'">'
+      +'<td style="padding:4px"><input class="sb-name" value="'+esc(x.name||'')+'" placeholder="姓名" style="'+IN+';min-width:90px"></td>'
+      +'<td style="padding:4px"><input class="sb-phone" value="'+esc(x.phone||'')+'" placeholder="電話" style="'+IN+';min-width:100px"></td>'
+      +'<td style="padding:4px"><input class="sb-email" value="'+esc(x.email||'')+'" placeholder="Email" style="'+IN+';min-width:120px"></td>'
+      +'<td style="padding:4px"><input class="sb-rate" type="number" inputmode="decimal" step="0.1" value="'+(x.defRate!=null&&x.defRate!==''?x.defRate:'')+'" placeholder="%" style="'+IN+';width:64px;text-align:right"></td>'
+      +'<td style="padding:4px"><input class="sb-join" type="date" value="'+esc(x.joinDate||'')+'" style="'+IN+';width:138px"></td>'
+      +'<td style="padding:4px"><input class="sb-note" value="'+esc(x.note||'')+'" placeholder="備註" style="'+IN+';min-width:100px"></td>'
+      +'<td style="padding:4px;text-align:center"><input class="sb-active" type="checkbox"'+(x.active!==false?' checked':'')+' title="在職"></td>'
+      +'<td style="padding:4px;text-align:center"><button type="button" class="btn btn-xs btn-r" onclick="this.closest(\'tr\').remove()" title="刪除（已掛在報價上的業務建議改為離職）">✕</button></td></tr>';
+  }).join('');
+  var html='<div style="font-size:11.5px;color:var(--b4);margin-bottom:6px">業務基本資料隨參數同步到所有裝置。「預設抽成%」：報價選了這位業務、抽成還空白時自動帶入；離職取消勾選即不出現在報價下拉，歷史統計照算。</div>'
+    +'<div class="sb-wrap" style="overflow-x:auto"><table id="sb-table" style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--gl);color:var(--b5)"><th style="padding:5px;text-align:left">姓名</th><th style="padding:5px;text-align:left">電話</th><th style="padding:5px;text-align:left">Email</th><th style="padding:5px;text-align:right">預設抽成%</th><th style="padding:5px;text-align:left">到職日</th><th style="padding:5px;text-align:left">備註</th><th style="padding:5px">在職</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'<div style="margin-top:8px"><button type="button" class="btn btn-sm" onclick="_salesBookAddRow()">＋ 新增業務</button></div>';
+  showConfirm('業務名冊',html,function(){_salesBookSave();},false,null,true);
+  if(!_salesList(true).length)setTimeout(_salesBookAddRow,30);
+}
+function _salesBookAddRow(){
+  var tb=document.querySelector('#sb-table tbody');if(!tb)return;
+  var IN='box-sizing:border-box;font-size:12.5px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;width:100%';
+  var tr=document.createElement('tr');tr.setAttribute('data-id','');tr.style.borderBottom='1px solid var(--b1)';
+  tr.innerHTML='<td style="padding:4px"><input class="sb-name" placeholder="姓名" style="'+IN+';min-width:90px"></td><td style="padding:4px"><input class="sb-phone" placeholder="電話" style="'+IN+';min-width:100px"></td><td style="padding:4px"><input class="sb-email" placeholder="Email" style="'+IN+';min-width:120px"></td><td style="padding:4px"><input class="sb-rate" type="number" inputmode="decimal" step="0.1" placeholder="%" style="'+IN+';width:64px;text-align:right"></td><td style="padding:4px"><input class="sb-join" type="date" value="'+localToday()+'" style="'+IN+';width:138px"></td><td style="padding:4px"><input class="sb-note" placeholder="備註" style="'+IN+';min-width:100px"></td><td style="padding:4px;text-align:center"><input class="sb-active" type="checkbox" checked></td><td style="padding:4px;text-align:center"><button type="button" class="btn btn-xs btn-r" onclick="this.closest(\'tr\').remove()">✕</button></td>';
+  tb.appendChild(tr);var f=tr.querySelector('.sb-name');if(f)f.focus();
+}
+function _salesBookSave(){
+  var trs=[].slice.call(document.querySelectorAll('#sb-table tbody tr')),old=_salesList(true),out=[],now=Date.now();
+  trs.forEach(function(tr){
+    var g=function(c){var e=tr.querySelector(c);return e?String(e.value||'').trim():'';};
+    var name=g('.sb-name');if(!name)return;
+    var id=tr.getAttribute('data-id')||('sl'+now.toString(36)+Math.random().toString(36).slice(2,5));
+    var prev=old.find(function(x){return x.id===id;})||{};
+    var rec={id:id,name:name,phone:g('.sb-phone'),email:g('.sb-email'),defRate:g('.sb-rate')!==''?(parseFloat(g('.sb-rate'))||0):'',joinDate:g('.sb-join'),note:g('.sb-note'),active:!!(tr.querySelector('.sb-active')||{}).checked};
+    var changed=['name','phone','email','defRate','joinDate','note','active'].some(function(k){return String(prev[k]==null?'':prev[k])!==String(rec[k]==null?'':rec[k]);});
+    rec._mt=changed||!prev._mt?now:prev._mt;
+    out.push(rec);
+  });
+  P.sales=out;_salesSave();
+  try{_salesCommSyncAll();}catch(e){_err('_salesBookSave',e);}
+  try{if(document.getElementById('fsales'))_salesFormFill(Q.find(function(x){return x.id===eid;})||null);}catch(e){_err('_salesBookSave.form',e);}
+  try{if(_currentReport==='sales')renderCurrentReport();}catch(e){_err('_salesBookSave.rpt',e);}
+  toast('業務名冊已儲存（'+out.length+' 人）');
+}
+// ── 統計 ──
+var _rptSalesF={sales:'',st:''};
+function _salesRows(year,month,salesId,st){
+  var mF=month?String(month).padStart(2,'0'):'';
+  return (Q||[]).filter(function(q){
+    if(!q||q.parentId)return false;
+    var d=String(q.date||'');if(!d.startsWith(String(year))||(mF&&d.slice(5,7)!==mF))return false;
+    if(salesId==='__none')return !q.salesId;
+    if(salesId&&q.salesId!==salesId)return false;
+    if(st==='won')return !!q.awarded;
+    if(st==='lost')return !q.awarded&&q.bidStatus==='lost';
+    if(st==='open')return !q.awarded&&(!q.bidStatus||q.bidStatus==='nego');
+    return true;
+  }).sort(function(a,b){return String(b.date||'').localeCompare(String(a.date||''));});
+}
+function _salesStat(list){
+  var s=_bidStat(list);s.comm=0;s.accr=0;s.paid=0;s.unpaid=0;s.wonNet=0;
+  list.forEach(function(q){if(!q.awarded)return;var a=_salesCommAmt(q);if(!(a>0))return;s.comm+=a;s.accr+=Math.round(a*_salesRcvRate(q));
+    var p=(PAYABLES||[]).find(function(x){return x&&x.id===_salesPayId(q);});if(p&&p.status==='paid')s.paid+=a;else s.unpaid+=a;s.wonNet+=_salesBase(q);});
+  return s;
+}
+function _salesStTxt(q){return q.awarded?'<span style="color:var(--g3);font-weight:700">✓ 得標</span>':(q.bidStatus==='lost'?'<span style="color:var(--red)">未得標</span>':q.bidStatus==='void'?'<span style="color:var(--b3)">流標</span>':'<span style="color:#e65100">洽談中</span>');}
+function _salesPayTxt(q,withBtn){
+  var a=_salesCommAmt(q);if(!q.awarded||!(a>0))return '<span style="color:var(--b3)">—</span>';
+  var p=(PAYABLES||[]).find(function(x){return x&&x.id===_salesPayId(q);});
+  if(!p)return withBtn?'<button type="button" class="btn btn-xs" onclick="event.stopPropagation();_salesCommSync(Q.find(function(x){return x.id===\''+q.id+'\'}));renderCurrentReport()">建應付</button>':'未建應付';
+  if(p.status==='paid')return '<span style="color:var(--g3);font-weight:700">已付 '+esc(p.paidDate||'')+'</span>'+(withBtn?' <button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" onclick="event.stopPropagation();payUnmark(\''+p.id+'\')">改回</button>':'');
+  return '<span style="color:#b45309">待付</span>'+(withBtn?' <button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="event.stopPropagation();payMarkPaid(\''+p.id+'\',null,function(){renderCurrentReport();})">付款</button>':'');
+}
+function _salesTables(list,opts){   // 畫面與 PDF 共用：依業務彙總表＋抽成明細表
+  var pr=!!(opts&&opts.print),th=function(t,r){return '<th style="padding:6px 8px;text-align:'+(r?'right':'left')+'">'+t+'</th>';},td=function(t,r,ex){return '<td style="padding:5px 8px;text-align:'+(r?'right':'left')+';'+(ex||'')+'">'+t+'</td>';};
+  var by={};list.forEach(function(q){var k=q.salesId||'__none';(by[k]=by[k]||[]).push(q);});
+  var keys=Object.keys(by).sort(function(a,b){return by[b].length-by[a].length;});
+  var h='<div style="font-weight:900;font-size:12.5px;color:var(--g3);margin:4px 0 6px">依業務</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:var(--gl);color:var(--b5)">'+th('業務')+th('報價',1)+th('得標',1)+th('得標率',1)+th('報價金額',1)+th('得標金額',1)+th('抽成總額',1)+th('已計提',1)+th('已付',1)+th('未付',1)+'</tr></thead><tbody>';
+  var tot=_salesStat(list);
+  keys.forEach(function(k){var s=_salesStat(by[k]),nm=k==='__none'?'（未指定業務）':esc(_salesName(k)||'（已刪除）');
+    h+='<tr style="border-bottom:1px solid var(--b1)'+(pr?'':';cursor:pointer')+'"'+(pr?'':' onclick="_rptSalesF.sales=\''+(k==='__none'?'__none':k)+'\';renderCurrentReport()" title="只看這位業務"')+'>'+td('<b>'+nm+'</b>')+td(s.n,1)+td(s.won,1)+td(_rateCell(s.rate),1)+td(fmt(s.allAmt),1)+td(fmt(s.wonAmt),1)+td('<b>'+fmt(s.comm)+'</b>',1)+td(fmt(s.accr),1)+td('<span style="color:var(--g3)">'+fmt(s.paid)+'</span>',1)+td('<span style="color:'+(s.unpaid>0?'#b45309':'var(--b3)')+'">'+fmt(s.unpaid)+'</span>',1)+'</tr>';});
+  h+='<tr class="tt" style="background:var(--b0);font-weight:800">'+td('合計')+td(tot.n,1)+td(tot.won,1)+td(_rateCell(tot.rate),1)+td(fmt(tot.allAmt),1)+td(fmt(tot.wonAmt),1)+td(fmt(tot.comm),1)+td(fmt(tot.accr),1)+td(fmt(tot.paid),1)+td(fmt(tot.unpaid),1)+'</tr></tbody></table></div>';
+  h+='<div style="font-weight:900;font-size:12.5px;color:var(--g3);margin:14px 0 6px">報價與抽成明細 <span style="font-size:11px;font-weight:400;color:var(--b4)">抽成只計得標案；已計提＝抽成 × 收款進度</span></div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--gl);color:var(--b5)">'+th('報價日')+th('工程')+th('業主')+th('業務')+th('狀態')+th('報價（含稅）',1)+th('抽成設定')+th('抽成金額',1)+th('收款',1)+th('已計提',1)+th('付款')+'</tr></thead><tbody>';
+  list.forEach(function(q){var a=q.awarded?_salesCommAmt(q):0,rr=q.awarded?_salesRcvRate(q):0;
+    h+='<tr style="border-bottom:1px solid var(--b1)'+(pr?'':';cursor:pointer')+'"'+(pr?'':' onclick="loadQ(\''+q.id+'\')"')+'>'+td(esc(q.date||''))+td(esc(q.name||'未命名'))+td(esc(q.client||''))+td(esc(_salesName(q.salesId)||'—'))+td(_salesStTxt(q))+td(fmt((q.t&&q.t.total)||0),1)+td(q.awarded?esc(_salesCommTxt(q)):(q.comm?esc(_salesCommTxt(q)):'—'))+td(a>0?('<b>'+fmt(a)+'</b>'):'—',1)+td(q.awarded?(Math.round(rr*100)+'%'):'—',1)+td(a>0?fmt(Math.round(a*rr)):'—',1)+td(_salesPayTxt(q,!pr))+'</tr>';});
+  if(!list.length)h+='<tr><td colspan="11" style="padding:14px;text-align:center;color:var(--b3)">沒有符合條件的報價</td></tr>';
+  return h+'</tbody></table></div>';
+}
+function _salesPeriodTxt(year,month){var f=_rptSalesF;return year+(month?('年'+month+'月'):'年')+(f.sales?('・'+(f.sales==='__none'?'未指定業務':_salesName(f.sales))):'')+(f.st?('・'+({won:'得標',lost:'未得標',open:'洽談中'})[f.st]):'');}
+function renderSalesReport(el,year,month){
+  try{_salesCommSyncAll();}catch(e){_err('renderSalesReport.sync',e);}
+  var f=_rptSalesF,list=_salesRows(year,month,f.sales,f.st),s=_salesStat(list);
+  var tile=function(k,v,sub,clr){return '<div style="background:var(--w);border:1px solid var(--b2);border-radius:var(--r8);padding:10px 12px"><div style="font-size:11px;color:var(--b3);font-weight:700;margin-bottom:4px">'+k+'</div><div style="font-size:19px;font-weight:900;color:'+(clr||'var(--b5)')+';font-variant-numeric:tabular-nums">'+v+'</div>'+(sub?'<div style="font-size:11px;color:var(--b4);margin-top:3px">'+sub+'</div>':'')+'</div>';};
+  var opts='<option value="">全部業務</option>'+_salesList(true).map(function(x){return '<option value="'+esc(x.id)+'"'+(f.sales===x.id?' selected':'')+'>'+esc(x.name||'')+(x.active===false?'（離職）':'')+'</option>';}).join('')+'<option value="__none"'+(f.sales==='__none'?' selected':'')+'>未指定業務</option>';
+  var SEL='height:34px;padding:0 8px;border:1px solid var(--b2);border-radius:var(--r8);font-size:12.5px;font-family:inherit;background:var(--w)';
+  var html='<div class="cb">'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><div style="font-size:13px;font-weight:900;color:var(--g3)">'+esc(_salesPeriodTxt(year,month))+' 業務績效</div>'
+    +'<select id="rpt-sales-f" onchange="_rptSalesF.sales=this.value;renderCurrentReport()" style="'+SEL+'">'+opts+'</select>'
+    +'<select id="rpt-sales-st" onchange="_rptSalesF.st=this.value;renderCurrentReport()" style="'+SEL+'"><option value="">全部狀態</option><option value="won"'+(f.st==='won'?' selected':'')+'>得標</option><option value="lost"'+(f.st==='lost'?' selected':'')+'>未得標</option><option value="open"'+(f.st==='open'?' selected':'')+'>洽談中</option></select>'
+    +'<button type="button" class="btn btn-sm" onclick="openSalesBook()" style="height:34px">業務名冊（'+_salesList().length+'）</button>'
+    +'<span style="font-size:11px;color:var(--b4)">上方「匯出」＝PDF、「Excel」＝CSV；報價頁「業務／抽成」欄位掛業務</span></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:8px;margin-bottom:6px">'
+    +tile('報價件數',s.n,'洽談中 '+s.open+'　未得標 '+s.lost)
+    +tile('得標件數',s.won,'得標率 '+(s.rate==null?'—':(Math.round(s.rate*10)/10+'%')),'var(--g3)')
+    +tile('得標金額','NT$ '+fmt(s.wonAmt),'全部報價 NT$ '+fmt(s.allAmt))
+    +tile('抽成總額','NT$ '+fmt(s.comm),'依實收已計提 NT$ '+fmt(s.accr),'#4527a0')
+    +tile('抽成已付','NT$ '+fmt(s.paid),'未付 NT$ '+fmt(s.unpaid),s.unpaid>0?'#b45309':'var(--g3)')
+    +'</div><div style="font-size:11px;color:var(--b3);margin-bottom:12px">報價件數＝報價日在期間內的主案（追加案併入主案）；得標率＝得標 ÷ 報價件數；抽成＝得標案未稅合約（含追加）× 抽成%（或固定額），應付在帳務 › 應付帳款（id pay_sales_）。</div>'
+    +_salesTables(list)+'</div>';
+  el.innerHTML=html;
+}
+function _salesPdf(){
+  var year=parseInt((document.getElementById('rpt-year')||{}).value)||new Date().getFullYear(),month=parseInt((document.getElementById('rpt-month')||{}).value)||0;
+  var list=_salesRows(year,month,_rptSalesF.sales,_rptSalesF.st),s=_salesStat(list);
+  var body='<div class="cond">期間 '+esc(_salesPeriodTxt(year,month))+'　報價 '+s.n+' 件・得標 '+s.won+' 件（'+(s.rate==null?'—':(Math.round(s.rate*10)/10+'%'))+'）・得標金額 NT$ '+fmt(s.wonAmt)+'・抽成總額 NT$ '+fmt(s.comm)+'（已付 '+fmt(s.paid)+'／未付 '+fmt(s.unpaid)+'）</div>'
+    +_salesTables(list,{print:true}).replace(/style="overflow-x:auto"/g,'')
+    +'<div style="font-size:9.5px;color:#777;margin-top:10px">抽成＝得標案未稅合約金額（含追加）× 抽成%或固定額；已計提＝抽成 × 收款進度。內部文件。</div>';
+  _toolPrint('業務績效 '+_salesPeriodTxt(year,month),P.company||'',body,{landscape:true,fname:'業務績效_'+year+(month?('_'+month):'')});
+}
+function _salesCsv(){
+  var year=parseInt((document.getElementById('rpt-year')||{}).value)||new Date().getFullYear(),month=parseInt((document.getElementById('rpt-month')||{}).value)||0;
+  var list=_salesRows(year,month,_rptSalesF.sales,_rptSalesF.st);
+  var rows=list.map(function(q){var a=q.awarded?_salesCommAmt(q):0,rr=q.awarded?_salesRcvRate(q):0,p=(PAYABLES||[]).find(function(x){return x&&x.id===_salesPayId(q);});
+    return [q.date||'',q.name||'',q.client||'',_salesName(q.salesId)||'',q.awarded?'得標':(q.bidStatus==='lost'?'未得標':q.bidStatus==='void'?'流標':'洽談中'),(q.t&&q.t.total)||0,q.awarded?_salesBase(q):'',_salesCommTxt(q),a||'',q.awarded?Math.round(rr*100)+'%':'',a?Math.round(a*rr):'',p?(p.status==='paid'?('已付 '+(p.paidDate||'')):'待付'):''];});
+  downloadCSV('業務績效_'+year+(month?('_'+month):'')+'_'+fmtDateStr(),['報價日','工程','業主','業務','狀態','報價金額（含稅）','得標未稅金額','抽成設定','抽成金額','收款進度','已計提','付款'],rows);
+}
 // ── v6.0.73 逾期租金折讓（議價）：業主要求折 N 天、談定折 M 天 → 計費天數＝逾期天數 − 折讓天數 ──
 // 資料在請款單該逾期列：discDays（談定折讓天數）、discAsk（業主要求天數，內部紀錄）、discNote（說明，內部紀錄）。
 // 跨期不重複計費的「已請至」日期（_ovEnd）不變——折讓只少收錢，不改天數區間。
@@ -37401,6 +37604,7 @@ function buildQuotePreviewFromPDF(){
 }
 function exportCurrentReportExcel(){
   if(_currentReport==='shareholder'||_currentReport==='overview'){exportShareholderCSV();return;}   // v6
+  if(_currentReport==='sales'){_salesCsv();return;}   // v6.0.74
   const year=parseInt(document.getElementById('rpt-year')?.value)||new Date().getFullYear();
   const month=parseInt(document.getElementById('rpt-month')?.value)||0;
   let rows=[],headers=[],title='報表';

@@ -6189,6 +6189,79 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.74 業務績效：名冊、報價掛業務＋抽成（private）、抽成應付、報表篩選／PDF／CSV ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        P.sales = []; Q.length = 0; INV.length = 0; PAYABLES.length = 0; CONTRACTS.splice(0);
+        /* 名冊：開視窗新增兩位 */
+        openSalesBook(); _salesBookAddRow(); _salesBookAddRow();
+        const trs = document.querySelectorAll('#sb-table tbody tr');
+        trs[0].querySelector('.sb-name').value = '王小明'; trs[0].querySelector('.sb-rate').value = '2'; trs[0].querySelector('.sb-phone').value = '0911';
+        trs[1].querySelector('.sb-name').value = '李大華'; trs[1].querySelector('.sb-active').checked = false;
+        document.getElementById('gen-confirm-ok').click();
+        out.book = P.sales.length === 2 && P.sales[0].name === '王小明' && P.sales[0].defRate === 2 && P.sales[1].active === false && !!P.sales[0]._mt && _salesList().length === 1 && _salesList(true).length === 2;
+        const sid = P.sales[0].id, sid2 = P.sales[1].id;
+        /* 報價編輯頁：業務下拉只列在職、選業務帶預設抽成、存檔寫 salesId／comm */
+        newQ(); out.sel = [...document.getElementById('fsales').options].map(o => o.value).join(',') === ',' + sid && document.getElementById('fcomm-wrap').style.display !== 'none';
+        document.getElementById('fsales').value = sid; _salesSelChange(); out.defRate = document.getElementById('fcommVal').value === '2' && document.getElementById('fcommMode').value === 'pct';
+        document.getElementById('fn').value = '業務案A'; document.getElementById('fcl').value = '甲'; document.getElementById('fd').value = '2026-09-10';
+        items = [{ desc: 'H型鋼樁', unit: 'M', qty: 100, price: 1000, note: '', sec: false }]; saveQ();
+        const qa = Q.find(x => x.name === '業務案A'); out.saved = !!qa && qa.salesId === sid && qa.comm && qa.comm.mode === 'pct' && qa.comm.rate === 2 && qa.t.sub === 100000;
+        /* 未得標 → 不建應付；得標 → pay_sales_ 2,000（不含稅） */
+        out.noPay = !PAYABLES.some(p => p.id === 'pay_sales_' + qa.id);
+        qa.awarded = true; _touch(qa); _salesCommSync(qa);
+        const pp = PAYABLES.find(p => p.id === 'pay_sales_' + qa.id); out.pay = !!pp && pp.amount === 2000 && pp.vat === false && pp.to === '王小明' && pp.quoteId === qa.id && _paySource(pp).auto && /業務抽成/.test(_paySource(pp).label);
+        /* 第二張：同業務未得標；第三張：李大華固定額 5,000 得標、已收一半 */
+        Q.push({ id: 'qB', name: '業務案B', client: '乙', date: '2026-09-20', salesId: sid, bidStatus: 'lost', items: [], t: { sub: 50000, total: 52500 } });
+        Q.push({ id: 'qC', name: '業務案C', client: '丙', date: '2026-10-01', salesId: sid2, awarded: true, comm: { mode: 'amt', amt: 5000 }, items: [], t: { sub: 200000, total: 210000 } });
+        Q.push({ id: 'qD', name: '無業務案', client: '丁', date: '2026-10-02', items: [], t: { sub: 1000, total: 1050 } });
+        Q.push({ id: 'qC2', name: '業務案C 追加', client: '丙', parentId: 'qC', date: '2026-10-05', items: [], t: { sub: 10000, total: 10500 } });
+        INV.push({ id: 'iC', quoteId: 'qC', project: '業務案C', client: '丙', date: '2026-10-10', items: [], totals: { total: 110250 }, received: 110250, receivedDate: '2026-10-12' });
+        _salesCommSyncAll(); const pc = PAYABLES.find(p => p.id === 'pay_sales_qC'); out.payC = !!pc && pc.amount === 5000 && pc.to === '李大華';
+        out.rcv = Math.round(_salesRcvRate(Q.find(x => x.id === 'qC')) * 100) === 50 && _salesBase(Q.find(x => x.id === 'qC')) === 210000;
+        /* 已付狀態：重算不改 */
+        pc.status = 'paid'; pc.paidDate = '2026-10-14'; pc.paidAt = Date.now(); _salesCommSyncAll(); out.keepPaid = PAYABLES.find(p => p.id === 'pay_sales_qC').status === 'paid';
+        /* 敏感欄位：comm 不進 shared、進 private、貼回 */
+        const st = _stripQuoteSens(qa), ex = _extractQuoteSens(qa); out.sens = !('comm' in st) && st.salesId === sid && ex.comm && ex.comm.rate === 2;
+        const q2 = { id: qa.id, items: [] }; _applyQuoteSens(q2, ex); out.sensBack = q2.comm && q2.comm.rate === 2;
+        /* 報表：2026 全年 */
+        document.getElementById('rpt-year').value = '2026'; document.getElementById('rpt-month').value = '';
+        _rptSalesF.sales = ''; _rptSalesF.st = ''; go('reports'); showReport('sales');
+        const el = document.getElementById('report-content'), ht = () => el.innerHTML;
+        out.inMore = document.getElementById('rpt-more-sel').value === 'sales';
+        const s = _salesStat(_salesRows(2026, 0, '', ''));
+        out.stat = s.n === 4 && s.won === 2 && s.comm === 7000 && s.paid === 5000 && s.unpaid === 2000 && s.accr === 2500 && s.wonNet === 310000;
+        out.tiles = /報價件數/.test(ht()) && /抽成總額/.test(ht()) && /7,000/.test(ht()) && /王小明/.test(ht()) && /李大華/.test(ht()) && /（未指定業務）/.test(ht()) && /業務名冊（1）/.test(ht());
+        /* 篩選：只看王小明 → 2 件 1 得標 50% */
+        _rptSalesF.sales = sid; renderCurrentReport(); const sw = _salesStat(_salesRows(2026, 0, sid, ''));
+        out.filter = sw.n === 2 && sw.won === 1 && Math.round(sw.rate) === 50 && sw.comm === 2000 && !/李大華/.test(ht().split('報價與抽成明細')[1]) && /業務案B/.test(ht());
+        _rptSalesF.st = 'won'; renderCurrentReport(); out.filterSt = /業務案A/.test(ht()) && !/業務案B/.test(ht());
+        /* 月篩選：9 月 → A、B */
+        _rptSalesF.sales = ''; _rptSalesF.st = ''; out.month = _salesRows(2026, 9, '', '').length === 2 && _salesRows(2026, 10, '__none', '').length === 1;
+        /* 明細有付款鈕；PDF／CSV 匯出 */
+        renderCurrentReport(); out.payBtn = /payMarkPaid\('pay_sales_/.test(ht()) && /payUnmark\('pay_sales_qC'/.test(ht());
+        let printed = '', csv = ''; const o1 = window._printViaIframe, o2 = window.downloadCSV;
+        window._printViaIframe = function (h) { printed = h; }; window.downloadCSV = function (fn, hd, rows) { csv = { fn, hd, rows }; };
+        exportCurrentReport(); exportCurrentReportExcel(); window._printViaIframe = o1; window.downloadCSV = o2;
+        out.pdf = /業務績效/.test(printed) && /王小明/.test(printed) && /7,000/.test(printed) && /size:A4 landscape/.test(printed) && !/payMarkPaid/.test(printed);
+        out.csv = csv && /業務績效_2026/.test(csv.fn) && csv.hd.length === 12 && csv.rows.length === 4 && csv.rows.some(r => r[1] === '業務案C' && r[8] === 5000 && /已付/.test(r[11]));
+        /* 墓碑豁免：抽成應付在成本卡以外也算「仍需要」 */
+        out.live = !!_liveExpectedPayIds()['pay_sales_' + qa.id];
+        /* 取消得標／抽成清空 → 未付應付撤掉 */
+        qa.comm = null; _salesCommSync(qa); out.drop = !PAYABLES.some(p => p.id === 'pay_sales_' + qa.id);
+        P.sales = [];
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('v6.0.74 業務名冊（新增／預設抽成／離職）、報價頁掛業務＋抽成（存 salesId／comm，comm 走 private）、得標自動建抽成應付（不含稅、已付不改、取消即撤）', r.book && r.sel && r.defRate && r.saved && r.noPay && r.pay && r.payC && r.rcv && r.keepPaid && r.sens && r.sensBack && r.live && r.drop, JSON.stringify(r));
+    check('v6.0.74 業務績效報表：件數／得標／抽成／已計提／已付未付、依業務與明細表、業務／狀態／月份篩選、付款鈕、PDF（橫式）與 CSV 匯出', r.inMore && r.stat && r.tiles && r.filter && r.filterSt && r.month && r.payBtn && r.pdf && r.csv, JSON.stringify(r));
+    check('v6.0.74 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
