@@ -91,7 +91,7 @@
 | 薪資．零用金 | `acct` › pay／petty（權限看 `payroll`） | `hrEdit` `psGenerate` `_hrSyncPayables` `pcGenerate` `_pcCalc` | `HR`／`PAYSLIPS`／`PETTY`（private） |
 | 經營報表 | `reports`（`go('profit')` 轉來） | `showReport` `renderOverviewReport` `_shRptYear`（**權責口徑單一來源**）`_rptBasisStrip` `renderShareholderReport` `renderHealthReport`／`_healthRows`（資料健檢） | 讀各集合 |
 | 客戶．廠商 | `contacts` | `renderContactsAll` `renderCustomersContact` `renderVendors2`；廠商匯款帳戶 `_vendorBank`／`_bankCopy`（應付列與付款彈窗「複製帳號」） | customers、vendors（shared；廠商記錄含匯款銀行／帳號／戶名欄位） |
-| 業務績效 | `reports` › 其他報表 › 業務績效（`showReport('sales')`） | `renderSalesReport` `_salesRows`／`_salesStat`（篩選：年月＋`_rptSalesF` 業務／狀態）`_salesTables`（畫面與 PDF 共用）`_salesPdf`／`_salesCsv`；名冊 `openSalesBook`／`_salesBookSave`；報價列表狀態 chip 旁 `_salesChip`／`openSalesPick`（設業務＋抽成，抽成 `_salesCommVis` 管理員才見）；抽成四種方式 `_SALES_MODES`（營收%／毛利%／固定額／每單位×實作量 `_salesUnitQty`；名冊預設，個案另訂 `q.comm`）`_salesCommAccr``_salesCommCfg`／`_salesCommAmt`／`_salesBase`／`_salesProfitBase`／`_salesRcvRate`；應付 `_salesCommSync`／`_salesCommSyncAll` | `P.sales[]`（params，shared）、`q.salesId`（shared）、`q.comm`（private，隨 quoteSens）、`PAYABLES` id `pay_sales_<qid>` |
+| 業務績效 | `reports` › 其他報表 › 業務績效（`showReport('sales')`） | `renderSalesReport` `_salesRows`／`_salesStat`（篩選：年月＋`_rptSalesF` 業務／狀態）`_salesTables`（畫面與 PDF 共用）`_salesPdf`／`_salesCsv`；名冊 `openSalesBook`／`_salesBookSave`；報價列表狀態 chip 旁 `_salesChip`／`openSalesPick`（設業務＋抽成，抽成 `_salesCommVis` 管理員才見）；抽成四種方式 `_SALES_MODES`（營收%／毛利%／固定額／每單位×實作量 `_salesUnitQty`；名冊預設，個案另訂 `q.comm`）`_salesCommAccr``_salesCommCfg`／`_salesCommAmt`／`_salesBase`／`_salesProfitBase`／`_salesRcvRate`；應付 `_salesCommSync`／`_salesCommSyncAll`；介紹費併入報表 `_introRows`／`_introStat`／`_introDlOpts`（名冊類型 staff／intro） | `P.sales[]`（params，shared）、`q.salesId`（shared）、`q.comm`（private，隨 quoteSens）、`PAYABLES` id `pay_sales_<qid>` |
 | 施工計畫書 | `plan` | `_plBuild` `_plRender`；圖：`FY_SHEETS`（施工步驟示意圖組，`_fySheetId` 工項＋工法→圖組）、`_plStorySteps`（只剩水平支撐）、`_plDetailSteps`（水平支撐詳圖）、`_plFlowPages`（施工流程圖） | planState（shared） |
 | 工具 | `matest` `rebar` `grout` `backfill` `workers`；`lifeline`、`progress` 隱藏 | `renderMatEst` `matEstCalc`（綁定工程時幾何讀案場細節）`renderWorkers` | toolStates、workers（逐筆） |
 | 單價分析／單價庫 | `upa`（sysOnly） | `upaCalc` `applyUPA` `writeCostHist`（結案回寫） | upaHistory（shared）、upaCostDB／costHist（private） |
@@ -106,7 +106,7 @@
 
 ## 測試
 
-`tests/smoke.js`（611 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（613 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、

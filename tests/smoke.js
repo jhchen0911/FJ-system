@@ -6367,6 +6367,45 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.78 介紹費併入業務績效（名冊類型、介紹人下拉帶名冊、報表並列、名冊外介紹人） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        P.sales = [{ id: 'sF', name: '王大明（大明哥）', kind: 'intro', commMode: 'unit', commVal: 50, commUnit: '支', active: true }, { id: 'sW', name: '王小明', kind: 'staff', commMode: 'rev', commVal: 2, active: true }];
+        Q.length = 0; PAYABLES.length = 0; INV.length = 0; VENDORS.length = 0; VENDORS.push({ id: 'vA', name: '甲工程行' });
+        Q.push({ id: 'q78', name: '介紹案', client: '業主A', date: '2026-10-01', awarded: true, salesId: 'sW', items: [{ desc: 'H型鋼樁', unit: '支', qty: 133, price: 3000 }], t: { sub: 399000, total: 418950 },
+          costs: [{ id: 'cA', type: 'sub', vendor: '甲工程行', cat: '打設', date: '2026-09-20', invoice: true, rows: [{ id: 'cA_0', linkedItemIdx: 0, qty: 133, unitPrice: 2000 }], amt: 266000, periods: [] },
+                  { id: 'cI', type: 'sub', vendor: '王大明（大明哥）', cat: '打設', date: '2026-09-20', invoice: false, isIntro: true, followOf: 'cA', introCalc: 'pc', introAmt: 150, rows: [{ id: 'cI_0', linkedItemIdx: 0, qty: 133, unitPrice: 150, desc: '介紹費' }], amt: 19950, periods: [] },
+                  { id: 'cX', type: 'sub', vendor: '路人甲', cat: '打設', date: '2026-09-21', invoice: false, isIntro: true, followOf: 'cA', introCalc: 'lump', rows: [{ id: 'cX_0', linkedItemIdx: 0, qty: 1, unitPrice: 5000, desc: '介紹費' }], amt: 5000, periods: [] }] });
+        /* 介紹費列：大明哥對到名冊 sF、路人甲為名冊外 */
+        const ir = _introRows(2026, 0, ''); out.rows = ir.length === 2 && ir.find(x => x.person === '王大明（大明哥）').key === 'sF' && ir.find(x => x.person === '路人甲').key === '__ext:路人甲' && ir[0].main === '甲工程行' && ir.find(x => x.key === 'sF').total === 19950 && /每支/.test(ir.find(x => x.key === 'sF').calc);
+        out.filt = _introRows(2026, 0, 'sF').length === 1 && _introRows(2026, 0, '__ext:路人甲').length === 1 && _introRows(2026, 0, '__none').length === 0 && _introRows(2026, 9, '').length === 0;
+        /* 報表：tile 介紹費 24,950、依業務表有大明哥（介紹費 19,950）、路人甲（名冊外）、王小明（抽成 7,980）；介紹費明細表 */
+        document.getElementById('rpt-year').value = '2026'; document.getElementById('rpt-month').value = ''; _rptSalesF.sales = ''; _rptSalesF.st = '';
+        go('reports'); showReport('sales'); const ht = () => document.getElementById('report-content').innerHTML;
+        out.tiles = /介紹費<\/div><div[^>]*>NT\$ 24,950/.test(ht()) && /抽成＋介紹費已付/.test(ht());
+        out.table = /王大明（大明哥）<\/b>/.test(ht()) && /路人甲 <span[^>]*>（名冊外介紹人）/.test(ht()) && /介紹費明細/.test(ht()) && /主約廠商/.test(ht()) && /甲工程行/.test(ht()) && /7,980/.test(ht());
+        /* 篩名冊外介紹人 */
+        _rptSalesF.sales = '__ext:路人甲'; renderCurrentReport(); out.extFilter = /路人甲/.test(ht()) && !/王大明（大明哥）<\/b>/.test(ht()) && /・路人甲 業務績效/.test(ht());
+        _rptSalesF.sales = '';
+        /* PDF／CSV 含介紹費 */
+        let printed = '', csv = null; const o1 = window._printViaIframe, o2 = window.downloadCSV; window._printViaIframe = h => { printed = h; }; window.downloadCSV = (fn, hd, rows) => { csv = { hd, rows }; };
+        renderCurrentReport(); exportCurrentReport(); exportCurrentReportExcel(); window._printViaIframe = o1; window.downloadCSV = o2;
+        out.pdf = /介紹費 NT\$ 24,950/.test(printed) && /介紹費明細/.test(printed); out.csv = csv && csv.hd[3] === '業務／介紹人' && csv.rows.some(rw => rw[3] === '王大明（大明哥）' && /介紹費（主約 甲工程行）/.test(rw[4]) && rw[8] === 19950);
+        /* 名冊：類型欄；介紹人 datalist 帶名冊（在職）＋廠商 */
+        openSalesBook(); out.kind = document.querySelector('#sb-table tr[data-id="sF"] .sb-kind').value === 'intro' && document.querySelector('#sb-table tr[data-id="sW"] .sb-kind').value === 'staff'; document.getElementById('gen-confirm-cancel').click();
+        out.dl = /<option value="王大明（大明哥）">/.test(_introDlOpts()) && /<option value="甲工程行">/.test(_introDlOpts()) && _introDlOpts().indexOf('王大明') < _introDlOpts().indexOf('甲工程行');
+        P.sales = [];
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('v6.0.78 介紹費併入業務績效：介紹費卡依介紹人對名冊（名冊外另列）、年月／人篩選、tile 與依業務表並列、介紹費明細、PDF／CSV、名冊類型欄、介紹人下拉帶名冊', r.rows && r.filt && r.tiles && r.table && r.extFilter && r.pdf && r.csv && r.kind && r.dl, JSON.stringify(r));
+    check('v6.0.78 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
