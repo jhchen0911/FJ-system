@@ -6206,7 +6206,7 @@ async function newPage(browser, width, height) {
         trs[0].querySelector('.sb-name').value = '王小明'; trs[0].querySelector('.sb-rate').value = '2'; trs[0].querySelector('.sb-phone').value = '0911';
         trs[1].querySelector('.sb-name').value = '李大華'; trs[1].querySelector('.sb-active').checked = false;
         document.getElementById('gen-confirm-ok').click();
-        out.book = P.sales.length === 2 && P.sales[0].name === '王小明' && P.sales[0].defRate === 2 && P.sales[1].active === false && !!P.sales[0]._mt && _salesList().length === 1 && _salesList(true).length === 2;
+        out.book = P.sales.length === 2 && P.sales[0].name === '王小明' && P.sales[0].commMode === 'rev' && P.sales[0].commVal === 2 && P.sales[1].active === false && !!P.sales[0]._mt && _salesList().length === 1 && _salesList(true).length === 2;
         const sid = P.sales[0].id, sid2 = P.sales[1].id;
         /* v6.0.75 業務／抽成改在報價列表的狀態 chip 旁：編輯頁不再有欄位 */
         newQ(); document.getElementById('fn').value = '業務案A'; document.getElementById('fcl').value = '甲'; document.getElementById('fd').value = '2026-09-10';
@@ -6214,9 +6214,9 @@ async function newPage(browser, width, height) {
         const qa = Q.find(x => x.name === '業務案A'); go('quotes'); renderList();
         out.sel = !document.getElementById('fsales') && /＋業務/.test(document.getElementById('qlist').innerHTML) && /openSalesPick\('/.test(document.getElementById('qlist').innerHTML);
         openSalesPick(qa.id);
-        out.defRate = [...document.getElementById('sp-sales').options].map(o => o.value).join(',') === ',' + sid && (document.getElementById('sp-sales').value = sid, _spSelChange(), document.getElementById('sp-val').value === '2' && document.getElementById('sp-mode').value === 'pct');
+        out.defRate = [...document.getElementById('sp-sales').options].map(o => o.value).join(',') === ',' + sid && (document.getElementById('sp-sales').value = sid, _spSelChange(), /名冊預設：<b>營收 % 2%/.test(document.getElementById('sp-def').innerHTML) && !document.getElementById('sp-ovr').checked);
         document.getElementById('gen-confirm-ok').click();
-        out.saved = qa.salesId === sid && qa.comm && qa.comm.mode === 'pct' && qa.comm.rate === 2 && qa.t.sub === 100000 && /業務 王小明・2%/.test(document.getElementById('qlist').innerHTML);
+        out.saved = qa.salesId === sid && !qa.comm && _salesCommCfg(qa).src === 'default' && _salesCommCfg(qa).val === 2 && qa.t.sub === 100000 && /業務 王小明・營收 2%/.test(document.getElementById('qlist').innerHTML);
 
         /* 未得標 → 不建應付；得標 → pay_sales_ 2,000（不含稅） */
         out.noPay = !PAYABLES.some(p => p.id === 'pay_sales_' + qa.id);
@@ -6233,8 +6233,8 @@ async function newPage(browser, width, height) {
         /* 已付狀態：重算不改 */
         pc.status = 'paid'; pc.paidDate = '2026-10-14'; pc.paidAt = Date.now(); _salesCommSyncAll(); out.keepPaid = PAYABLES.find(p => p.id === 'pay_sales_qC').status === 'paid';
         /* 敏感欄位：comm 不進 shared、進 private、貼回 */
-        const st = _stripQuoteSens(qa), ex = _extractQuoteSens(qa); out.sens = !('comm' in st) && st.salesId === sid && ex.comm && ex.comm.rate === 2;
-        const q2 = { id: qa.id, items: [] }; _applyQuoteSens(q2, ex); out.sensBack = q2.comm && q2.comm.rate === 2;
+        qa.comm = { mode: 'rev', val: 3 }; const st = _stripQuoteSens(qa), ex = _extractQuoteSens(qa); out.sens = !('comm' in st) && st.salesId === sid && ex.comm && ex.comm.val === 3;
+        const q2 = { id: qa.id, items: [] }; _applyQuoteSens(q2, ex); out.sensBack = q2.comm && q2.comm.val === 3; delete qa.comm; _salesCommSync(qa);
         /* 報表：2026 全年 */
         document.getElementById('rpt-year').value = '2026'; document.getElementById('rpt-month').value = '';
         _rptSalesF.sales = ''; _rptSalesF.st = ''; go('reports'); showReport('sales');
@@ -6259,9 +6259,9 @@ async function newPage(browser, width, height) {
         /* 墓碑豁免：抽成應付在成本卡以外也算「仍需要」 */
         out.live = !!_liveExpectedPayIds()['pay_sales_' + qa.id];
         /* 存報價單不會洗掉業務／抽成／得標（saveQ 以展開保留） */
-        loadQ(qa.id); saveQ(); const qk = Q.find(x => x.id === qa.id); out.keep = qk.salesId === sid && qk.comm.rate === 2 && qk.awarded === true && PAYABLES.some(p => p.id === 'pay_sales_' + qa.id);
-        /* 取消得標／抽成清空 → 未付應付撤掉 */
-        delete qk.comm; _salesCommSync(qk); out.drop = !PAYABLES.some(p => p.id === 'pay_sales_' + qa.id);
+        loadQ(qa.id); saveQ(); const qk = Q.find(x => x.id === qa.id); out.keep = qk.salesId === sid && _salesCommAmt(qk) === 2000 && qk.awarded === true && PAYABLES.some(p => p.id === 'pay_sales_' + qa.id);
+        /* 取消業務指定 → 未付應付撤掉 */
+        qk.salesId = ''; _salesCommSync(qk); out.drop = !PAYABLES.some(p => p.id === 'pay_sales_' + qa.id);
         P.sales = [];
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
       return out;
@@ -6269,6 +6269,60 @@ async function newPage(browser, width, height) {
     check('v6.0.74 業務名冊（新增／預設抽成／離職）、報價列表 chip 設業務＋抽成（v6.0.75；存 salesId／comm，comm 走 private，存報價不洗掉）、得標自動建抽成應付（不含稅、已付不改、取消即撤）', r.book && r.sel && r.defRate && r.saved && r.keep && r.noPay && r.pay && r.payC && r.rcv && r.keepPaid && r.sens && r.sensBack && r.live && r.drop, JSON.stringify(r));
     check('v6.0.74 業務績效報表：件數／得標／抽成／已計提／已付未付、依業務與明細表、業務／狀態／月份篩選、付款鈕、PDF（橫式）與 CSV 匯出', r.inMore && r.stat && r.tiles && r.filter && r.filterSt && r.month && r.payBtn && r.pdf && r.csv, JSON.stringify(r));
     check('v6.0.74 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.76 抽成三種方式（名冊預設／個案另訂）＋ 分包工程承攬合約書 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        P.sales = [{ id: 'sP', name: '毛利人', commMode: 'profit', commVal: 10, active: true }, { id: 'sA', name: '固定人', commMode: 'amt', commVal: 8000, active: true }, { id: 'sL', name: '舊格式', defRate: 2, active: true }];
+        Q.length = 0; PAYABLES.length = 0; INV.length = 0;
+        const q = { id: 'q76', name: '合約案', client: '大業主', loc: '新北市新莊區中央路', code: '115101501', date: '2026-10-15', awarded: true, salesId: 'sP',
+          items: [{ desc: 'H型鋼樁 H300 打設、拔除', unit: '支', qty: 100, price: 3000 }, { desc: '水平支撐安裝、拆除', unit: 'm²', qty: 500, price: 800 }], t: { sub: 700000, total: 735000, cost: 400000 },
+          costs: [{ id: 'cS', type: 'sub', vendor: '甲乙工程行', invoice: true, retRate: 10, entryDate: '2026-11-01', rows: [{ id: 'r1', linkedItemIdx: 0, qty: 100, unitPrice: 2000, unit: '支' }, { id: 'r2', linkedItemIdx: 1, qty: 500, unitPrice: 300, unit: 'm²', desc: '含焊接' }] }] };
+        const costsBak = q.costs; q.costs = []; Q.push(q);
+        /* 毛利%：尚無實際成本 → 以預估成本：(700,000 − 400,000) × 10% = 30,000；固定額；舊格式 defRate → 營收 2% */
+        out.profit = _salesCommAmt(q) === 30000 && /毛利/.test(_salesCommTxt(q)) && _salesCommShort(q) === '毛利 10%'; q.costs = costsBak;
+        q.salesId = 'sA'; out.amt = _salesCommAmt(q) === 8000 && _salesCommShort(q) === '固定 8,000';
+        q.salesId = 'sL'; out.legacy = _salesCommAmt(q) === 14000 && _salesCommCfg(q).mode === 'rev';
+        /* 實際成本登錄後毛利改用實際：成本卡 2000×100+300×500=350,000 → (700,000−350,000)×10% */
+        q.salesId = 'sP'; migrateCostRows(q); recalcCostAmt(q.costs[0]); out.profitAct = _salesCommAmt(q) === 35000;
+        /* 個案另訂：chip 視窗勾「此案另訂」營收 1% → 7,000；取消勾選 → 回名冊預設 */
+        go('quotes'); renderList(); openSalesPick('q76'); document.getElementById('sp-ovr').checked = true; document.getElementById('sp-mode').value = 'rev'; document.getElementById('sp-val').value = '1'; document.getElementById('gen-confirm-ok').click();
+        out.ovr = q.comm && q.comm.mode === 'rev' && q.comm.val === 1 && _salesCommAmt(q) === 7000 && /此案另訂/.test(_salesCommTxt(q)) && PAYABLES.find(p => p.id === 'pay_sales_q76').amount === 7000;
+        openSalesPick('q76'); document.getElementById('sp-ovr').checked = false; document.getElementById('gen-confirm-ok').click();
+        out.unovr = !q.comm && _salesCommAmt(q) === 35000 && PAYABLES.find(p => p.id === 'pay_sales_q76').amount === 35000;
+        /* 名冊視窗有抽成方式欄 */
+        openSalesBook(); out.bookUi = document.querySelectorAll('#sb-table .sb-mode').length === 3 && document.querySelector('#sb-table tr[data-id="sP"] .sb-mode').value === 'profit'; document.getElementById('gen-confirm-cancel').click();
+        /* 合約書：入口鈕 */
+        P.company = '豐有工程有限公司'; P.boss = '陳韋宏'; P.addr = '新北市新莊區中央路722號7樓'; P.taxid = '83224961'; P.tel = '(03)1234567'; P.vendorCutDay = 25; P.vendorPayDay = 20; P.vendorPayDelay = 1; P.subCt = null;
+        VENDORS.length = 0; VENDORS.push({ id: 'vH', name: '甲乙工程行', contact: '李小華', phone: '0912-345-678', taxid: '12345678', addr: '桃園市' });
+        openProjectCosts('q76'); window._costEditId = null; window._costEditAll = false; rCostItems(); out.btnRo = /openSubContractDoc\('cS'\)/.test(document.getElementById('cost-list').innerHTML);
+        openProj('q76'); out.btnPj = /openSubContractDoc\('cS'\)/.test(document.getElementById('page-proj').innerHTML);
+        /* 開視窗 → 填罰金 0.5‰、保險 5000、特約 → 列印 */
+        let printed = ''; const o = window._printViaIframe; window._printViaIframe = function (h) { printed = h; };
+        openProjectCosts('q76'); openSubContractDoc('cS');
+        out.dlg = /甲乙工程行/.test(document.getElementById('gen-confirm-modal').innerHTML) && document.getElementById('sct-no').value === '115101501-S01' && /預估未稅 NT\$ 350,000/.test(document.getElementById('gen-confirm-modal').innerHTML);
+        document.getElementById('sct-fine').value = '0.5'; document.getElementById('sct-ins').value = '5000'; document.getElementById('sct-special').value = '乙方應於開工前提交施工計畫'; document.getElementById('sct-date').value = '2026-10-15';
+        document.getElementById('gen-confirm-ok').click(); window._printViaIframe = o;
+        out.print = /工程承攬合約書/.test(printed) && /定作人：豐有工程有限公司（以下簡稱甲方）/.test(printed) && /承攬人：甲乙工程行（以下簡稱乙方）/.test(printed)
+          && /H型鋼樁 H300 打設、拔除/.test(printed) && /含焊接/.test(printed) && /350,000/.test(printed) && /每月 25 日前檢附估驗請款單及統一發票/.test(printed) && /次月 20 日放款/.test(printed) && /保留 10%/.test(printed)
+          && /千分之 0.5/.test(printed) && /分擔保險費新臺幣 5,000 元整/.test(printed) && /特約條款：<\/b>乙方應於開工前提交施工計畫/.test(printed) && /臺灣新北地方法院/.test(printed)
+          && /李小華/.test(printed) && /12345678/.test(printed) && /陳韋宏/.test(printed) && /83224961/.test(printed) && /中華民國 115 年 10 月 15 日/.test(printed) && /@page\{size:A4 portrait;margin:10mm\}/.test(printed) && /預定進場日 2026-11-01/.test(printed);
+        out.saved = P.subCt && P.subCt.fine === 0.5 && P.subCt.ins === 5000 && P.subCt.special === '乙方應於開工前提交施工計畫' && q.costs[0].signDate === '2026-10-15';
+        /* 不開發票、無保留款：文字跟著變；無廠商資料留空格 */
+        q.costs[0].invoice = false; q.costs[0].retRate = 0; VENDORS.length = 0;
+        const h2 = _subContractHtml(q, q.costs[0], _sctCfg()); out.variant = /以收據請款/.test(h2) && !/保留 /.test(h2) && /統一編號：<\/span>＿＿＿＿＿＿/.test(h2);
+        P.sales = []; P.subCt = null;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('v6.0.76 抽成三種方式：毛利%（實際成本→預估成本代）／固定額／營收%（舊 defRate 相容）、名冊預設 vs 個案另訂（勾選與取消）、名冊視窗抽成方式欄', r.profit && r.amt && r.legacy && r.profitAct && r.ovr && r.unovr && r.bookUi, JSON.stringify(r));
+    check('v6.0.76 分包工程承攬合約書：承包卡與工程專案有「合約書」鈕、視窗帶入編號／預估、列印含雙方資料、工項表、付款辦法（計價日／放款日／保留款／發票）、罰金、保險、特約、民國日期、A4 10mm；空格變體', r.btnRo && r.btnPj && r.dlg && r.print && r.saved && r.variant, JSON.stringify(r));
+    check('v6.0.76 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

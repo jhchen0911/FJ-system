@@ -82,7 +82,7 @@
 | 工程專案 | `proj`（`openProj(qid)`；`go('projects')` 轉來） | `renderProj` `_pjStat` `_pjTodoItems` `_pjSection` `_pj*Html` 各區塊（業主計價已收清期別收合 `_pjInvSettled`／`pjInvPaidToggle`） `pjCloseAll`（結案）`_autoSettle`（階段完工自動結算）`_introSync` | 以報價 `q` 為主體 |
 | 發包 | `rfq`（hidden，parent `proj`） | `renderRfq` `rfqNew` `rfqFill` `rfqAward` `_rfqBackfillEst` `pjIntroEdit`（介紹費） | `q.rfqs`（private） |
 | 材料．運輸 | `mat6`（hidden，parent `proj`） | `renderMat6`（含氣瓶在場 `_m6GasHtml`）`matRowEdit` `m6Decide` `m6RentEdit` `matOut` `matBack` `_m6Sync` `_matAmortRows` | `q.mat`（private）、`MAT_LEDGER`（matLedger，private） |
-| 施工成本／分包 | `costs`（hidden，parent `proj`；`openProjectCosts`） | `rCostItems` `_ownAutoCat`（自有卡科目自動歸類）`_gasVendors`／`_gasOnSiteHtml`（氣瓶在場）`_vendorEnsure`（手動廠商進名冊）`openSubPeriod`／`_spSave`（廠商請款期別）`openSubAdvance`／`_saSave`（預付款）`openRentPeriod`（租賃）`_subFollowApply`（跟隨計價）`_subStat` `buildSubMgmtHtml` | `q.costs`（private） |
+| 施工成本／分包 | `costs`（hidden，parent `proj`；`openProjectCosts`） | `rCostItems` `_ownAutoCat`（自有卡科目自動歸類）`_gasVendors`／`_gasOnSiteHtml`（氣瓶在場）`_vendorEnsure`（手動廠商進名冊）`openSubPeriod`／`_spSave`（廠商請款期別）`openSubAdvance`／`_saSave`（預付款）`openRentPeriod`（租賃）`_subFollowApply`（跟隨計價）`_subStat` `buildSubMgmtHtml`；分包合約書 `openSubContractDoc`／`_subContractHtml`（條款見 `docs/分包工程承攬合約書_通用範本.md`，空格預設 `P.subCt`） | `q.costs`（private） |
 | 成本→應付 | — | `syncCostToPayable` `_syncSubPeriodPayables`（開頭依序 `_advPayHeal`→`_subAdvClamp`→`_earlyToAdv`）`_paySource`（自動應付唯讀）`cleanDuplicatePayables` `_tombExempt` | `PAYABLES`（payables，private）；id 規則見下 |
 | 日報．支出 | `quickcost` | `submitDailyReport` `_drMergeLog` `submitQuickCost`（`QC_TYPES`）`drMonthRender`（月表單）`viewDailyReports` `_photoPut`（照片另存）`_itemProgress` `_qtyRecon` | `q.dailyLogs`（隨報價）、照片 `fydata/relay/photos`、公司費用 `EXPENSES` |
 | 業主請款 | `acct` › 業主請款（`go('invoice')` 轉來） | `renderInvList` `loadInvoice` `rInvItems` `buildInvPreview` `buildInvFromQuote` `addNextPeriod` `invRentDisc`／`_invBillDays`（逾期租金折讓）`openReceiptModal` `printAllowance` `openEnvelope` | `INV`（invoices，逐筆同步） |
@@ -91,7 +91,7 @@
 | 薪資．零用金 | `acct` › pay／petty（權限看 `payroll`） | `hrEdit` `psGenerate` `_hrSyncPayables` `pcGenerate` `_pcCalc` | `HR`／`PAYSLIPS`／`PETTY`（private） |
 | 經營報表 | `reports`（`go('profit')` 轉來） | `showReport` `renderOverviewReport` `_shRptYear`（**權責口徑單一來源**）`_rptBasisStrip` `renderShareholderReport` `renderHealthReport`／`_healthRows`（資料健檢） | 讀各集合 |
 | 客戶．廠商 | `contacts` | `renderContactsAll` `renderCustomersContact` `renderVendors2`；廠商匯款帳戶 `_vendorBank`／`_bankCopy`（應付列與付款彈窗「複製帳號」） | customers、vendors（shared；廠商記錄含匯款銀行／帳號／戶名欄位） |
-| 業務績效 | `reports` › 其他報表 › 業務績效（`showReport('sales')`） | `renderSalesReport` `_salesRows`／`_salesStat`（篩選：年月＋`_rptSalesF` 業務／狀態）`_salesTables`（畫面與 PDF 共用）`_salesPdf`／`_salesCsv`；名冊 `openSalesBook`／`_salesBookSave`；報價列表狀態 chip 旁 `_salesChip`／`openSalesPick`（設業務＋抽成，抽成 `_salesCommVis` 管理員才見）；抽成 `_salesCommAmt`／`_salesBase`／`_salesRcvRate`；應付 `_salesCommSync`／`_salesCommSyncAll` | `P.sales[]`（params，shared）、`q.salesId`（shared）、`q.comm`（private，隨 quoteSens）、`PAYABLES` id `pay_sales_<qid>` |
+| 業務績效 | `reports` › 其他報表 › 業務績效（`showReport('sales')`） | `renderSalesReport` `_salesRows`／`_salesStat`（篩選：年月＋`_rptSalesF` 業務／狀態）`_salesTables`（畫面與 PDF 共用）`_salesPdf`／`_salesCsv`；名冊 `openSalesBook`／`_salesBookSave`；報價列表狀態 chip 旁 `_salesChip`／`openSalesPick`（設業務＋抽成，抽成 `_salesCommVis` 管理員才見）；抽成三種方式 `_SALES_MODES`（名冊預設 `commMode`／`commVal`，個案另訂 `q.comm`）`_salesCommCfg`／`_salesCommAmt`／`_salesBase`／`_salesProfitBase`／`_salesRcvRate`；應付 `_salesCommSync`／`_salesCommSyncAll` | `P.sales[]`（params，shared）、`q.salesId`（shared）、`q.comm`（private，隨 quoteSens）、`PAYABLES` id `pay_sales_<qid>` |
 | 施工計畫書 | `plan` | `_plBuild` `_plRender`；圖：`FY_SHEETS`（施工步驟示意圖組，`_fySheetId` 工項＋工法→圖組）、`_plStorySteps`（只剩水平支撐）、`_plDetailSteps`（水平支撐詳圖）、`_plFlowPages`（施工流程圖） | planState（shared） |
 | 工具 | `matest` `rebar` `grout` `backfill` `workers`；`lifeline`、`progress` 隱藏 | `renderMatEst` `matEstCalc`（綁定工程時幾何讀案場細節）`renderWorkers` | toolStates、workers（逐筆） |
 | 單價分析／單價庫 | `upa`（sysOnly） | `upaCalc` `applyUPA` `writeCostHist`（結案回寫） | upaHistory（shared）、upaCostDB／costHist（private） |
@@ -106,7 +106,7 @@
 
 ## 測試
 
-`tests/smoke.js`（606 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（609 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
