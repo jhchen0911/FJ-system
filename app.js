@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.72';
+var APP_VERSION='v6.0.73';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -2668,7 +2668,7 @@ function buildRmkText(){
 var _INV_K={type:'t',desc:'d',unit:'u',contractPrice:'cp',contractQty:'cq',prevQty:'pq',prevAmt:'pa',
   curQty:'q',curDays:'cd',curAmt:'a',note:'n',cumQty:'mq',cumAmt:'ma',payRate:'r',
   installCum:'ic',removeCum:'rc',prevPayRate:'pr',otPrice:'op',otUnit:'ou',
-  cat:'ct',phase:'ph'};   // v5.377 類別／期別
+  cat:'ct',phase:'ph',discDays:'dd',discAsk:'da',discNote:'dn'};   // v5.377 類別／期別；v6.0.73 逾期租金折讓
 var _INV_KR=(function(){var r={};Object.keys(_INV_K).forEach(function(k){r[_INV_K[k]]=k;});return r;})();
 // 可省略的欄位：全部的取用點都走 parseFloat(x)||0 或 x||''，「沒有」與「0／空字串」等價。
 // 刻意不列入的三個：
@@ -2679,7 +2679,7 @@ var _INV_KR=(function(){var r={};Object.keys(_INV_K).forEach(function(k){r[_INV_
 // 這三個一律照原樣保留（有就有、沒有就沒有），只做欄位名縮短。
 var _INV_OMIT={desc:'',unit:'',contractPrice:0,contractQty:0,prevQty:0,prevAmt:0,
   curQty:0,curDays:0,curAmt:0,note:'',cumQty:0,cumAmt:0,installCum:0,removeCum:0,otPrice:0,otUnit:'',
-  cat:'',phase:''};   // v5.377：空字串＝自動判斷，與「沒有這個欄位」等價，可安全省略
+  cat:'',phase:'',discDays:0,discAsk:0,discNote:''};   // v5.377：空字串＝自動判斷，與「沒有這個欄位」等價，可安全省略；v6.0.73 折讓
 function _invPackItem(it){
   if(!it||typeof it!=='object')return it;
   var o={};
@@ -3286,7 +3286,7 @@ function _recalcInvAmounts(inv){
     const _q=parseFloat(it.curQty)||0,_p=parseFloat(it.contractPrice)||0;
     let baseAmt=0;
     if(_q>0&&_p>0){
-      const days=parseFloat(it.curDays)||0;
+      const days=_invBillDays(it);   // v6.0.73 逾期租金折讓後的計費天數
       if(it.type==='rental')baseAmt=_p*_q*(days||1);
       else if(days)baseAmt=_p*_q*days;
       else baseAmt=_p*_q;
@@ -3310,7 +3310,7 @@ function updateInvRowAmt(i, tr){
   const _q=parseFloat(it.curQty)||0, _p=parseFloat(it.contractPrice)||0;
   if(_q>0&&_p>0){
     const isRentalItem=(it.type==='rental');
-    const days=parseFloat(it.curDays)||0;
+    const days=_invBillDays(it);   // v6.0.73
     if(isRentalItem)
       baseAmt=_p*_q*(days||1); // rental 至少1天
     else if(days)
@@ -3438,7 +3438,9 @@ function rInvItems(){
         w.appendChild(l2);w.appendChild(ip);return w;
       }
       grid.appendChild(numBox('本期數量','curQty',it.curQty));
-      grid.appendChild(numBox('天數','curDays',it.curDays));
+      const _dBox=numBox('天數','curDays',it.curDays);
+      if(it.type==='rental'){_dBox.appendChild(_invDiscBtn(i,it));}   // v6.0.73
+      grid.appendChild(_dBox);
       // 請款%
       const rw=document.createElement('div');rw.style.cssText='flex:1;min-width:0';
       const rl=document.createElement('label');rl.textContent='請款%';
@@ -3515,8 +3517,9 @@ function rInvItems(){
       let curAmt=0;
       const _rq=parseFloat(it.curQty)||0, _rp=parseFloat(it.contractPrice)||0;
       if(_rq>0&&_rp>0){
-        const baseAmt=it.curDays
-          ?_rp*_rq*it.curDays
+        const _bd=_invBillDays(it);   // v6.0.73 折讓後天數
+        const baseAmt=_bd
+          ?_rp*_rq*_bd
           :_rp*_rq;
         curAmt=Math.round(baseAmt*_rate);
       }
@@ -3569,7 +3572,9 @@ function rInvItems(){
       tr.appendChild(_cqTd);
 
       // 所有工項都可以輸入天數（rental 必填，其他選填）
-      tr.appendChild(mkNumTd('#ecf8ec','curDays',it.curDays,'天數（租用型必填）'));
+      const _dTd=mkNumTd('#ecf8ec','curDays',it.curDays,'天數（租用型必填）');
+      if(isRental){_dTd.appendChild(_invDiscBtn(i,it));}   // v6.0.73 逾期租金折讓（議價）
+      tr.appendChild(_dTd);
 
       const amtTd=mkDispTd('#ecf8ec',curAmt?'NT\$ '+fmt(curAmt):'','color:var(--g);font-weight:700');
       amtTd.id='iamt-'+i;tr.appendChild(amtTd);
@@ -4508,7 +4513,7 @@ function buildInvPreview(srcInv){
     const _previewPr=(it.payRate!=null?it.payRate:100)/100;
     let curAmt=0;
     if(isRental&&it.curQty&&it.contractPrice){
-      const _days=parseFloat(it.curDays)||1;
+      const _days=_invBillDays(it)||1;   // v6.0.73
       curAmt=Math.round(it.contractPrice*it.curQty*_days*_previewPr);
     } else if(!isRental&&it.curQty&&it.contractPrice){
       curAmt=Math.round(it.contractPrice*it.curQty*_previewPr);
@@ -4527,7 +4532,7 @@ function buildInvPreview(srcInv){
     // 若 curAmt=0 但有 curQty 和 contractPrice，補算
     if(!curAmt && it.curQty && _cpEff2){
       curAmt = isRental
-        ? Math.round(_cpEff2 * it.curQty * (it.curDays||1) * _pr)
+        ? Math.round(_cpEff2 * it.curQty * (_invBillDays(it)||1) * _pr)
         : Math.round(_cpEff2 * it.curQty * _pr);
     }
 
@@ -4568,7 +4573,7 @@ function buildInvPreview(srcInv){
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#f0faf4">${_qfmt(prevQtyShow)}</td>
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#f0faf4;color:#555">${prevAmt}</td>
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8f5e8">${_qfmt(_curW(it))}</td>
-      <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8f5e8">${it.curDays||''}</td>
+      <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8f5e8;white-space:nowrap">${_invDaysCell(it)}</td>
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8f5e8;font-weight:700;color:#1a6b3f">${curAmt?fmt(curAmt):''}</td>
       <td style="padding:3px 5px;border-bottom:1px solid #f0f0f0;font-size:9.5px;color:#555;max-width:100px;word-break:break-all">${(()=>{const rate=it.payRate!=null?it.payRate:100;const rateTxt=(rate!==100&&rate!==0)?(rate+'%請款'):'';const raw=_stripInternalNote(it.note);const noteTxt=esc(raw).replace(/\n/g,'<br>').replace(/工料（一次性工項）/g,'工料(一次性)').replace(/工料\(一次性工項\)/g,'工料(一次性)');const sep=(rateTxt&&noteTxt)?'<br>':'';return(rateTxt?('<span style="color:#1a6b3f;font-weight:700">'+rateTxt+'</span>'):'')+(sep||'')+noteTxt;})()}</td>
       <td style="text-align:right;padding:3px 5px;border-bottom:1px solid #f0f0f0;background:#e8eef8">${_qfmt(cumQtyShow)}</td>
@@ -6544,10 +6549,11 @@ function _curW(it){return it?_wQty(it.curQty,it.payRate):0;}
 // v6.0.22 計算式說明（印給業主）：數量 × 請款% ＝ 計價量；計價量（× 天數）× 單價 ＝ 金額
 function _invCalcText(it,curAmt){
   if(!it||it.type==='sec')return '';
-  var q=parseFloat(it.curQty)||0,p=parseFloat(it.contractPrice)||0,d=parseFloat(it.curDays)||0,rate=(it.payRate!=null&&it.payRate!=='')?parseFloat(it.payRate):100;
+  var q=parseFloat(it.curQty)||0,p=parseFloat(it.contractPrice)||0,d=_invBillDays(it),rate=(it.payRate!=null&&it.payRate!=='')?parseFloat(it.payRate):100,dd=parseFloat(it.discDays)||0;
   if(!(q>0&&p>0))return '';
   var u=_uFix(it.unit||''),w=_wQty(q,rate),parts=[];
   var amt=(curAmt!=null)?curAmt:Math.round(p*q*(d||1)*rate/100);
+  if(dd>0)parts.push('逾期 '+_qfmt(it.curDays)+' 天 − 折讓 '+_qfmt(dd)+' 天 ＝ '+_qfmt(d)+' 天');   // v6.0.73
   if(rate!==100&&rate!==0)parts.push(_qfmt(q)+' '+u+' × '+rate+'% ＝ '+_qfmt(w)+' '+u);
   parts.push(_qfmt(w)+' '+u+(d?(' × '+_qfmt(d)+' 天'):'')+' × '+fmt(p)+' ＝ '+fmt(amt));
   return parts.join('；');
@@ -35643,6 +35649,53 @@ function _sdMatEstLayerHtml(q,m,sec,fS,fN){
 var _matEstCalc0_648=matEstCalc;
 matEstCalc=function(){try{var q=_matEstSiteQ();if(q){MAT_EST=_matEstNorm(MAT_EST);_sdToMatEst(_sdNorm(q.site),MAT_EST);}}catch(e){_err('matEstCalc.site',e);}return _matEstCalc0_648.apply(this,arguments);};
 
+// ── v6.0.73 逾期租金折讓（議價）：業主要求折 N 天、談定折 M 天 → 計費天數＝逾期天數 − 折讓天數 ──
+// 資料在請款單該逾期列：discDays（談定折讓天數）、discAsk（業主要求天數，內部紀錄）、discNote（說明，內部紀錄）。
+// 跨期不重複計費的「已請至」日期（_ovEnd）不變——折讓只少收錢，不改天數區間。
+function _invBillDays(it){var d=parseFloat(it&&it.curDays)||0,x=parseFloat(it&&it.discDays)||0;return x>0?Math.max(0,d-x):d;}
+function _invDaysCell(it){   // 列印用天數欄：有折讓印「51−15」換行「＝36」
+  var d=parseFloat(it&&it.curDays)||0,x=parseFloat(it&&it.discDays)||0;
+  if(!d)return '';
+  if(!(x>0))return _qfmt(d);
+  return _qfmt(d)+'−'+_qfmt(x)+'<br>＝'+_qfmt(Math.max(0,d-x));
+}
+function _invDiscBtn(i,it){
+  var x=parseFloat(it&&it.discDays)||0;
+  var b=document.createElement('button');b.type='button';b.className='btn btn-xs';
+  b.textContent=x>0?('折讓 '+_qfmt(x)+' 天'):'折讓';b.title='逾期租金議價：業主要求折讓幾天、談定折讓幾天；計費天數＝逾期天數 − 折讓天數';
+  b.style.cssText='margin-top:3px;width:100%;padding:2px 4px;font-size:10.5px;'+(x>0?'border-color:#ffcc80;color:#b45309;background:#FFF8E1':'color:var(--b4)');
+  b.addEventListener('click',function(){invRentDisc(i);});
+  return b;
+}
+function invRentDisc(i){
+  var it=invItems[i];if(!it||it.type!=='rental'){toast('只有逾期租金列可以折讓');return;}
+  _rdCur=it;
+  var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
+  var d=parseFloat(it.curDays)||0,p=parseFloat(it.contractPrice)||0,q=parseFloat(it.curQty)||0;
+  var html='<div style="font-size:12.5px;line-height:1.8;margin-bottom:6px">'+esc(String(it.desc||'').split('\n')[0])+'<br>本期逾期 <b>'+_qfmt(d)+'</b> 天　單價 '+fmt(p)+' × '+_qfmt(q)+' '+esc(_uFix(it.unit||''))+'</div>'
+    +'<div class="fg fg2" style="gap:8px"><div class="f"><label>業主要求折讓（天）<span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-ask" type="number" inputmode="decimal" min="0" value="'+(it.discAsk!=null&&it.discAsk!==0?it.discAsk:'')+'" placeholder="例：30" style="'+IN+'"></div>'
+    +'<div class="f"><label>談定折讓（天）<span style="font-size:10px;color:var(--b3)">印在請款單</span></label><input id="rd-days" type="number" inputmode="decimal" min="0" max="'+d+'" value="'+(it.discDays!=null&&it.discDays!==0?it.discDays:'')+'" placeholder="例：15" oninput="_rdPreview()" style="'+IN+'"></div></div>'
+    +'<div class="f" style="margin-top:6px"><label>議價說明 <span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-note" value="'+esc(it.discNote||'')+'" placeholder="例：10/15 與業主工務協商，原要求 30 天，談成 15 天" style="'+IN+'"></div>'
+    +'<div id="rd-prev" style="margin-top:8px;font-size:12px;color:var(--g3)"></div>';
+  showConfirm('逾期租金折讓（議價）',html,function(){
+    var ask=parseFloat(gv('rd-ask')),dd=parseFloat(gv('rd-days'));
+    if(isFinite(dd)&&dd>d){toast('折讓天數不能超過逾期天數，已改為 '+_qfmt(d)+' 天');dd=d;}   // 視窗按確定即關，超過就夾在逾期天數
+    it.discAsk=isFinite(ask)&&ask>0?ask:0;it.discDays=isFinite(dd)&&dd>0?dd:0;it.discNote=(gv('rd-note')||'').trim();
+    try{updateInvRowAmt(i);}catch(e){_err('invRentDisc',e);}
+    try{rInvItems();rInvTots();}catch(e){_err('invRentDisc.re',e);}
+    try{autoSaveInv();}catch(e){_err('invRentDisc.save',e);}
+    toast(it.discDays>0?('已折讓 '+_qfmt(it.discDays)+' 天，計費 '+_qfmt(_invBillDays(it))+' 天'):'已取消折讓');
+  },false,null,false);
+  setTimeout(_rdPreview,30);
+}
+var _rdCur=null;   // 折讓視窗目前的逾期列
+function _rdPreview(){
+  var el=document.getElementById('rd-prev'),row=_rdCur;if(!el||!row)return;
+  var dd=parseFloat(gv('rd-days'))||0;
+  var d=parseFloat(row.curDays)||0,p=parseFloat(row.contractPrice)||0,q=parseFloat(row.curQty)||0,rate=(row.payRate!=null&&row.payRate!=='')?parseFloat(row.payRate):100;
+  var bd=Math.max(0,d-dd),amt=Math.round(p*q*(bd||1)*rate/100),full=Math.round(p*q*(d||1)*rate/100);
+  el.innerHTML=dd>0?('計費 '+_qfmt(d)+' − '+_qfmt(dd)+' ＝ <b>'+_qfmt(bd)+' 天</b>　金額 NT$ <b>'+fmt(amt)+'</b>（原 '+fmt(full)+'，少收 '+fmt(full-amt)+'）'):('未折讓：'+_qfmt(d)+' 天　NT$ '+fmt(full));
+}
 // v6.0.72 應付列「✓ 付款」改走 payMarkPaid（先問實付日、按確定才標已付，避免誤觸）；標完重繪應付與 KPI
 function _payAfterMark(){try{renderPayables();}catch(e){_err('_payAfterMark',e);}try{updateFinanceKPIs();}catch(e){_err('_payAfterMark.kpi',e);}}
 // ── v6.0.70 氣瓶在場（材料．運輸頁）／手動輸入廠商進名冊 ──

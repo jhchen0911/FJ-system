@@ -6131,6 +6131,64 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.73 逾期租金折讓（議價）：計費天數＝逾期 − 折讓、列印 51−15／＝36、跨期已請至不變 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      try {
+        const qid = 'SMK73';
+        Q.length = 0; INV.length = 0;
+        Q.push({ id: qid, name: '折讓案', client: '範例案場', date: '2026-06-06', status: 'won',
+          items: [{ desc: '第2層水平支撐 W=H400；S=H350', unit: 'M2', qty: '460', price: '1100', note: '含30天租期', ot: '7$/M2/天', otu: '$/M2/天' }],
+          dailyLogs: [{ date: '2026-07-10', progressRows: [{ itemIdx: 0, qty: 460 }] }], t: {} });
+        INV.push({ id: 'SMKI73', quoteId: qid, project: '折讓案', client: '範例案場', periodNo: 1, date: '2026-08-22',
+          items: [{ type: 'item', desc: '第2層水平支撐 W=H400；S=H350', unit: 'M2', contractPrice: 1100, contractQty: 460, curQty: 0, curAmt: 0, payRate: 100, otPrice: 7, otUnit: '$/M2/天' }] });
+        loadInvoice('SMKI73');
+        document.getElementById('inv-rental-item').value = '第2層水平支撐 W=H400；S=H350'; invRentalPick();
+        document.getElementById('inv-claim-date').value = '2026-08-22'; calcInvDays();
+        const ri = invItems.findIndex(x => x.type === 'rental'), rent = invItems[ri];
+        out.base = rent.curDays === 13 && rent.curAmt === 41860;
+        /* 編輯器有「折讓」鈕 → 開視窗 → 業主要求 30、談定 5 */
+        out.btn = !!document.querySelector('#inv-body button[title*="逾期租金議價"]');
+        invRentDisc(ri);
+        document.getElementById('rd-ask').value = '30'; document.getElementById('rd-days').value = '5'; _rdPreview();
+        out.prev = /13 − 5 ＝ <b>8 天<\/b>/.test(document.getElementById('rd-prev').innerHTML) && /25,760/.test(document.getElementById('rd-prev').innerHTML);
+        document.getElementById('rd-note').value = '10/15 與工務協商';
+        document.getElementById('gen-confirm-ok').click();
+        const r2 = invItems[ri];
+        out.applied = r2.discDays === 5 && r2.discAsk === 30 && r2.discNote === '10/15 與工務協商' && r2.curDays === 13 && _invBillDays(r2) === 8 && r2.curAmt === 7 * 460 * 8;
+        out.btnTxt = /折讓 5 天/.test(document.getElementById('inv-body').innerHTML);
+        /* 離頁重算（不依賴 DOM）也走折讓後天數 */
+        const tmp = { items: JSON.parse(JSON.stringify(invItems)) }; _recalcInvAmounts(tmp);
+        out.total = tmp.items.find(x => x.type === 'rental').curAmt === 25760 && tmp.totals.curTotal === 25760;
+        /* 列印：天數欄 13−5／＝8、金額 25,760、計算式有折讓；內部紀錄（要求 30、說明）不印 */
+        buildInvPreview(); const html = document.getElementById('inv-prev-html').innerHTML;
+        out.print = /13−5<br>＝8/.test(html) && /25,760/.test(html) && !/30 天/.test(html.replace(/含30天租期/g, '')) && !/工務協商/.test(html);
+        out.calcTxt = /逾期 13 天 − 折讓 5 天 ＝ 8 天/.test(_invCalcText(r2, r2.curAmt));
+        /* 存檔往返（壓縮鍵 dd／da／dn）後欄位還在 */
+        autoSaveInv(); const saved = INV.find(x => x.id === 'SMKI73'); const sr = (saved.items || []).find(x => x.type === 'rental');
+        const packed = _invPackItem(r2); out.pack = packed.dd === 5 && packed.da === 30 && packed.dn === '10/15 與工務協商' && !!sr && sr.discDays === 5;
+        /* 再按一次計算天數：折讓保留、金額仍為折讓後 */
+        calcInvDays(); const r3 = invItems.find(x => x.type === 'rental'); out.recalcKeep = r3.discDays === 5 && r3.curAmt === 25760;
+        /* 跨期：第 2 期從 8/23 起算（已請至不受折讓影響） */
+        out.billedUntil = _rentBilledUntil({ id: 'other', quoteId: qid }, '第2層水平支撐 W=H400；S=H350').until === '2026-08-22';
+        /* 取消折讓 → 回全額 */
+        invRentDisc(invItems.indexOf(r3)); document.getElementById('rd-days').value = ''; document.getElementById('gen-confirm-ok').click();
+        out.undo = invItems.find(x => x.type === 'rental').curAmt === 41860 && !(invItems.find(x => x.type === 'rental').discDays > 0);
+        /* 超過逾期天數擋下 */
+        invRentDisc(invItems.indexOf(invItems.find(x => x.type === 'rental'))); document.getElementById('rd-days').value = '99'; document.getElementById('gen-confirm-ok').click();
+        const rc = invItems.find(x => x.type === 'rental'); out.cap = rc.discDays === 13 && _invBillDays(rc) === 0;
+        invRentDisc(invItems.indexOf(rc)); document.getElementById('rd-days').value = ''; document.getElementById('gen-confirm-ok').click();
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      res(out);
+    }));
+    check('v6.0.73 逾期租金折讓：視窗預覽、套用後計費天數 13−5＝8、金額 25,760、按鈕顯示折讓天數、重算保留、取消回全額、超過逾期天數夾在上限', r.base && r.btn && r.prev && r.applied && r.btnTxt && r.total && r.recalcKeep && r.undo && r.cap, JSON.stringify(r));
+    check('v6.0.73 列印天數欄「13−5／＝8」、計算式含折讓、業主要求與議價說明不印；存檔壓縮往返；跨期已請至不變', r.print && r.calcTxt && r.pack && r.billedUntil, JSON.stringify(r));
+    check('v6.0.73 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
