@@ -6326,6 +6326,47 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.77 抽成第四種「每單位 × 實作量」（介紹人按支抽成模式） ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        P.sales = [{ id: 'sU', name: '大明哥', commMode: 'unit', commVal: 50, commUnit: '支', active: true }];
+        Q.length = 0; PAYABLES.length = 0; INV.length = 0;
+        const q = { id: 'q77', name: '每支案', client: '甲', date: '2026-10-15', awarded: true, salesId: 'sU',
+          items: [{ desc: 'H型鋼樁 H300 打設、拔除', unit: '支', qty: 100, price: 3000 }, { desc: '中間樁 H350 打設、切除', unit: '支', qty: 20, price: 3500 }, { desc: '水平支撐', unit: 'M2', qty: 500, price: 800 }], t: { sub: 770000, total: 808500 }, costs: [] };
+        Q.push(q); Q.push({ id: 'q77b', parentId: 'q77', name: '每支案 追加', client: '甲', date: '2026-10-20', items: [{ desc: 'H型鋼樁 H300 打設、拔除 追加', unit: '支', qty: 10, price: 3000 }], t: { sub: 30000, total: 31500 } });
+        /* 合約量＝100＋20＋10（追加，單位 支）＝130 支 → 總額 6,500；m² 的不算 */
+        const k = _salesUnitQty(q, '支'); out.qty = k.contract === 130 && k.billed === 0 && k.unit === '支';
+        out.amt = _salesCommAmt(q) === 6500 && _salesCommShort(q) === '每支 50' && /每支 50 × 合約 130 支（已請 0）/.test(_salesCommTxt(q));
+        /* 未請款 → 應付不建（金額 0）；請款 60 支（其中 30% 請款率 → 計價量 18 支）＋全額收款 → 應付 900 */
+        _salesCommSync(q); out.noPay = !PAYABLES.some(p => p.id === 'pay_sales_q77');
+        INV.push({ id: 'i77', quoteId: 'q77', project: '每支案', client: '甲', date: '2026-10-25', items: [{ type: 'item', desc: 'H型鋼樁 H300 打設、拔除', unit: '支', contractPrice: 3000, contractQty: 100, curQty: 60, payRate: 30, curAmt: 54000 }, { type: 'item', desc: '水平支撐', unit: 'm²', contractPrice: 800, contractQty: 500, curQty: 500, payRate: 100, curAmt: 400000 }], totals: { total: 476700 }, received: 476700, receivedDate: '2026-11-20' });
+        const k2 = _salesUnitQty(q, '支'); out.billed = k2.billed === 18;
+        _salesCommSync(q); const p = PAYABLES.find(x => x.id === 'pay_sales_q77'); out.pay = !!p && p.amount === 900 && /實作實算/.test(p.note) && p.to === '大明哥';
+        out.accr = _salesCommAccr(q) === 900 && _salesCommAmt(q) === 6500;
+        /* 收款一半 → 計提減半；總額不變 */
+        INV[0].received = 238350; out.accrHalf = _salesCommAccr(q) === 450 && _salesCommAmt(q) === 6500;
+        /* 報表：抽成總額 6,500、已計提 450 */
+        document.getElementById('rpt-year').value = '2026'; document.getElementById('rpt-month').value = ''; _rptSalesF.sales = ''; _rptSalesF.st = '';
+        go('reports'); showReport('sales'); const ht = document.getElementById('report-content').innerHTML;
+        const st = _salesStat(_salesRows(2026, 0, '', '')); out.rpt = st.comm === 6500 && st.accr === 450 && /每支 50 × 合約 130 支/.test(ht);
+        /* 個案另訂：每 M 20（本案無 M 工項 → 0）；名冊視窗有單位欄、chip 視窗列本案單位 */
+        go('quotes'); renderList(); openSalesPick('q77'); _spSelChange(); out.units = /本案工項單位：支、m²/.test(document.getElementById('gen-confirm-modal').innerHTML) && /名冊預設：<b>每單位 × 實作量 每支 50 元/.test(document.getElementById('sp-def').innerHTML);
+        document.getElementById('sp-ovr').checked = true; document.getElementById('sp-mode').value = 'unit'; document.getElementById('sp-val').value = '20'; document.getElementById('sp-unit').value = 'M'; document.getElementById('gen-confirm-ok').click();
+        out.ovr = q.comm && q.comm.mode === 'unit' && q.comm.unit === 'M' && _salesCommAmt(q) === 0;
+        document.getElementById('sp-ovr') && 0; openSalesPick('q77'); document.getElementById('sp-ovr').checked = false; document.getElementById('gen-confirm-ok').click(); out.back = !q.comm && _salesCommAmt(q) === 6500;
+        openSalesBook(); out.bookUi = !!document.querySelector('#sb-table tr[data-id="sU"] .sb-unit') && document.querySelector('#sb-table tr[data-id="sU"] .sb-unit').value === '支'; document.getElementById('gen-confirm-cancel').click();
+        P.sales = [];
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('v6.0.77 每單位 × 實作量：合約量含追加、只算同單位工項、已請量依請款%、應付＝已請量×單價（未請不建）、計提依收款比例、報表與個案另訂（單位欄）', r.qty && r.amt && r.noPay && r.billed && r.pay && r.accr && r.accrHalf && r.rpt && r.units && r.ovr && r.back && r.bookUi, JSON.stringify(r));
+    check('v6.0.77 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
