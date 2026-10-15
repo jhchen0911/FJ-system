@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.78';
+var APP_VERSION='v6.0.79';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -35783,7 +35783,7 @@ function openSalesPick(qid){
   showConfirm('業務／抽成',html,function(){
     var sid=gv('sp-sales')||'';
     q.salesId=sid;
-    if(vis){var ovr=!!(document.getElementById('sp-ovr')||{}).checked,mode=gv('sp-mode')||'rev',val=parseFloat(gv('sp-val'))||0;if(ovr&&val>0&&_SALES_MODES[mode]){q.comm={mode:mode,val:val};if(mode==='unit')q.comm.unit=(gv('sp-unit')||'支').trim();}else delete q.comm;}
+    if(vis){var ovr=!!(document.getElementById('sp-ovr')||{}).checked,mode=gv('sp-mode')||'rev',val=parseFloat(gv('sp-val'))||0;if(sid&&ovr&&val>0&&_SALES_MODES[mode]){q.comm={mode:mode,val:val};if(mode==='unit')q.comm.unit=(gv('sp-unit')||'支').trim();}else delete q.comm;}   // v6.0.79 沒選業務就不留抽成設定
     _touch(q);try{persist();}catch(e){_err('openSalesPick',e);}
     try{_salesCommSync(q);}catch(e){_err('openSalesPick.sync',e);}
     try{renderList();}catch(e){_err('openSalesPick.list',e);}
@@ -35806,7 +35806,8 @@ function _salesBase(q){   // 抽成基礎：主案＋追加案未稅
 // 預設寫在業務名冊（commMode／commVal），個案要不同才在報價列表 chip「此案另訂」→ q.comm={mode,val}；舊格式 {mode:'pct',rate}／{mode:'amt',amt} 照讀。
 var _SALES_MODES={rev:'營收 %',profit:'毛利 %',amt:'每案固定額',unit:'每單位 × 實作量'};   // v6.0.77 unit＝介紹人按支抽成模式：每支／每 M × 業主請款數量（同介紹費「每支 × 實作量」）
 function _salesCommNorm(c){if(!c||typeof c!=='object')return null;var mode=c.mode==='pct'?'rev':c.mode,val=c.val!=null?parseFloat(c.val):(c.mode==='amt'?parseFloat(c.amt):parseFloat(c.rate));if(!_SALES_MODES[mode]||!(val>0))return null;var o={mode:mode,val:val};if(mode==='unit')o.unit=_uFix(String(c.unit||'支').trim()||'支');return o;}
-function _salesCommCfg(q){   // → {mode,val,src:'case'|'default'}｜null
+function _salesCommCfg(q){   // → {mode,val,src:'case'|'default'}｜null；v6.0.79 沒掛業務的案（公司自接）一律沒有抽成，就算留有個案設定
+  if(!q||!q.salesId)return null;
   var o=_salesCommNorm(q&&q.comm);if(o){o.src='case';return o;}
   var sp=_salesById(q&&q.salesId);if(!sp)return null;
   var d=_salesCommNorm({mode:sp.commMode||(sp.defRate>0?'rev':''),val:sp.commVal!=null&&sp.commVal!==''?sp.commVal:sp.defRate,unit:sp.commUnit});
@@ -35950,7 +35951,7 @@ function _salesTables(list,opts,intro){   // 畫面與 PDF 共用：依業務彙
   var h='<div style="font-weight:900;font-size:12.5px;color:var(--g3);margin:4px 0 6px">依業務／介紹人</div>'
     +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:var(--gl);color:var(--b5)">'+th('業務／介紹人')+th('報價',1)+th('得標',1)+th('得標率',1)+th('報價金額',1)+th('得標金額',1)+th('抽成總額',1)+th('已計提',1)+th('介紹費',1)+th('已付',1)+th('未付',1)+'</tr></thead><tbody>';
   var tot=_salesStat(list),itot=_introStat(intro);
-  keys.forEach(function(k){var s=_salesStat(by[k]),is=_introStat(iby[k]||[]),nm=k==='__none'?'（未指定業務）':(k.indexOf('__ext:')===0?esc(k.slice(6))+' <span style="font-size:10px;color:var(--b3)">（名冊外介紹人）</span>':esc(_salesName(k)||'（已刪除）'));
+  keys.forEach(function(k){var s=_salesStat(by[k]),is=_introStat(iby[k]||[]),nm=k==='__none'?'（公司自接／未掛業務）':(k.indexOf('__ext:')===0?esc(k.slice(6))+' <span style="font-size:10px;color:var(--b3)">（名冊外介紹人）</span>':esc(_salesName(k)||'（已刪除）'));
     h+='<tr style="border-bottom:1px solid var(--b1)'+(pr?'':';cursor:pointer')+'"'+(pr?'':' onclick="_rptSalesF.sales=\''+esc(k)+'\';renderCurrentReport()" title="只看這位"')+'>'+td('<b>'+nm+'</b>')+td(s.n,1)+td(s.won,1)+td(_rateCell(s.rate),1)+td(fmt(s.allAmt),1)+td(fmt(s.wonAmt),1)+td('<b>'+fmt(s.comm)+'</b>',1)+td(fmt(s.accr),1)+td(is.total?('<b>'+fmt(is.total)+'</b>'):'—',1)+td('<span style="color:var(--g3)">'+fmt(s.paid+is.paid)+'</span>',1)+td('<span style="color:'+((s.unpaid+is.unpaid)>0?'#b45309':'var(--b3)')+'">'+fmt(s.unpaid+is.unpaid)+'</span>',1)+'</tr>';});
   h+='<tr class="tt" style="background:var(--b0);font-weight:800">'+td('合計')+td(tot.n,1)+td(tot.won,1)+td(_rateCell(tot.rate),1)+td(fmt(tot.allAmt),1)+td(fmt(tot.wonAmt),1)+td(fmt(tot.comm),1)+td(fmt(tot.accr),1)+td(fmt(itot.total),1)+td(fmt(tot.paid+itot.paid),1)+td(fmt(tot.unpaid+itot.unpaid),1)+'</tr></tbody></table></div>';
   h+='<div style="font-weight:900;font-size:12.5px;color:var(--g3);margin:14px 0 6px">報價與抽成明細 <span style="font-size:11px;font-weight:400;color:var(--b4)">抽成只計得標案；已計提＝抽成 × 收款進度</span></div>'
@@ -35987,12 +35988,12 @@ function _introRows(year,month,salesId){
   return out;
 }
 function _introStat(rows){var s={n:rows.length,total:0,billed:0,paid:0,unpaid:0};rows.forEach(function(r){s.total+=r.total;s.billed+=r.billed;s.paid+=r.paid;s.unpaid+=r.unpaid;});return s;}
-function _salesPeriodTxt(year,month){var f=_rptSalesF;return year+(month?('年'+month+'月'):'年')+(f.sales?('・'+(f.sales==='__none'?'未指定業務':f.sales.indexOf('__ext:')===0?f.sales.slice(6):_salesName(f.sales))):'')+(f.st?('・'+({won:'得標',lost:'未得標',open:'洽談中'})[f.st]):'');}
+function _salesPeriodTxt(year,month){var f=_rptSalesF;return year+(month?('年'+month+'月'):'年')+(f.sales?('・'+(f.sales==='__none'?'公司自接':f.sales.indexOf('__ext:')===0?f.sales.slice(6):_salesName(f.sales))):'')+(f.st?('・'+({won:'得標',lost:'未得標',open:'洽談中'})[f.st]):'');}
 function renderSalesReport(el,year,month){
   try{_salesCommSyncAll();}catch(e){_err('renderSalesReport.sync',e);}
   var f=_rptSalesF,list=_salesRows(year,month,f.sales,f.st),s=_salesStat(list),intro=_introRows(year,month,f.sales),is=_introStat(intro);
   var tile=function(k,v,sub,clr){return '<div style="background:var(--w);border:1px solid var(--b2);border-radius:var(--r8);padding:10px 12px"><div style="font-size:11px;color:var(--b3);font-weight:700;margin-bottom:4px">'+k+'</div><div style="font-size:19px;font-weight:900;color:'+(clr||'var(--b5)')+';font-variant-numeric:tabular-nums">'+v+'</div>'+(sub?'<div style="font-size:11px;color:var(--b4);margin-top:3px">'+sub+'</div>':'')+'</div>';};
-  var opts='<option value="">全部業務</option>'+_salesList(true).map(function(x){return '<option value="'+esc(x.id)+'"'+(f.sales===x.id?' selected':'')+'>'+esc(x.name||'')+(x.active===false?'（離職）':'')+'</option>';}).join('')+'<option value="__none"'+(f.sales==='__none'?' selected':'')+'>未指定業務</option>'+(function(){var ext={};_introRows(year,month,'').forEach(function(r){if(r.key.indexOf('__ext:')===0)ext[r.key]=r.person;});return Object.keys(ext).map(function(k){return '<option value="'+esc(k)+'"'+(f.sales===k?' selected':'')+'>'+esc(ext[k])+'（名冊外介紹人）</option>';}).join('');})();
+  var opts='<option value="">全部業務</option>'+_salesList(true).map(function(x){return '<option value="'+esc(x.id)+'"'+(f.sales===x.id?' selected':'')+'>'+esc(x.name||'')+(x.active===false?'（離職）':'')+'</option>';}).join('')+'<option value="__none"'+(f.sales==='__none'?' selected':'')+'>公司自接／未掛業務</option>'+(function(){var ext={};_introRows(year,month,'').forEach(function(r){if(r.key.indexOf('__ext:')===0)ext[r.key]=r.person;});return Object.keys(ext).map(function(k){return '<option value="'+esc(k)+'"'+(f.sales===k?' selected':'')+'>'+esc(ext[k])+'（名冊外介紹人）</option>';}).join('');})();
   var SEL='height:34px;padding:0 8px;border:1px solid var(--b2);border-radius:var(--r8);font-size:12.5px;font-family:inherit;background:var(--w)';
   var html='<div class="cb">'
     +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><div style="font-size:13px;font-weight:900;color:var(--g3)">'+esc(_salesPeriodTxt(year,month))+' 業務績效</div>'
@@ -36007,7 +36008,7 @@ function renderSalesReport(el,year,month){
     +tile('抽成總額','NT$ '+fmt(s.comm),'依實收已計提 NT$ '+fmt(s.accr),'#4527a0')
     +tile('介紹費','NT$ '+fmt(is.total),is.n+' 筆・已付 '+fmt(is.paid)+'／未付 '+fmt(is.unpaid),'#1565C0')
     +tile('抽成＋介紹費已付','NT$ '+fmt(s.paid+is.paid),'未付 NT$ '+fmt(s.unpaid+is.unpaid),(s.unpaid+is.unpaid)>0?'#b45309':'var(--g3)')
-    +'</div><div style="font-size:11px;color:var(--b3);margin-bottom:12px">報價件數＝報價日在期間內的主案（追加案併入主案）；得標率＝得標 ÷ 報價件數；抽成＝得標案未稅合約（含追加）× 抽成%（或固定額），應付在帳務 › 應付帳款（id pay_sales_）。介紹費（外部介紹人，跟隨分包計價）在此並列彙總，設定與付款仍在工程專案 › 分包。</div>'
+    +'</div><div style="font-size:11px;color:var(--b3);margin-bottom:12px">報價件數＝報價日在期間內的主案（追加案併入主案）；得標率＝得標 ÷ 報價件數；不是每案都要掛業務——既有客戶、公司自接的列在「公司自接／未掛業務」，只算件數與金額、沒有抽成；抽成＝得標案未稅合約（含追加）× 抽成%（或固定額），應付在帳務 › 應付帳款（id pay_sales_）。介紹費（外部介紹人，跟隨分包計價）在此並列彙總，設定與付款仍在工程專案 › 分包。</div>'
     +_salesTables(list,null,intro)+'</div>';
   el.innerHTML=html;
 }

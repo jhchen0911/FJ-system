@@ -6242,7 +6242,7 @@ async function newPage(browser, width, height) {
         out.inMore = document.getElementById('rpt-more-sel').value === 'sales';
         const s = _salesStat(_salesRows(2026, 0, '', ''));
         out.stat = s.n === 4 && s.won === 2 && s.comm === 7000 && s.paid === 5000 && s.unpaid === 2000 && s.accr === 2500 && s.wonNet === 310000;
-        out.tiles = /報價件數/.test(ht()) && /抽成總額/.test(ht()) && /7,000/.test(ht()) && /王小明/.test(ht()) && /李大華/.test(ht()) && /（未指定業務）/.test(ht()) && /業務名冊（1）/.test(ht());
+        out.tiles = /報價件數/.test(ht()) && /抽成總額/.test(ht()) && /7,000/.test(ht()) && /王小明/.test(ht()) && /李大華/.test(ht()) && /（公司自接／未掛業務）/.test(ht()) && /業務名冊（1）/.test(ht());
         /* 篩選：只看王小明 → 2 件 1 得標 50% */
         _rptSalesF.sales = sid; renderCurrentReport(); const sw = _salesStat(_salesRows(2026, 0, sid, ''));
         out.filter = sw.n === 2 && sw.won === 1 && Math.round(sw.rate) === 50 && sw.comm === 2000 && !/李大華/.test(ht().split('報價與抽成明細')[1]) && /業務案B/.test(ht());
@@ -6403,6 +6403,35 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.78 介紹費併入業務績效：介紹費卡依介紹人對名冊（名冊外另列）、年月／人篩選、tile 與依業務表並列、介紹費明細、PDF／CSV、名冊類型欄、介紹人下拉帶名冊', r.rows && r.filt && r.tiles && r.table && r.extFilter && r.pdf && r.csv && r.kind && r.dl, JSON.stringify(r));
     check('v6.0.78 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.79 公司自接（未掛業務）的案沒有抽成 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        P.sales = [{ id: 'sW', name: '王小明', commMode: 'rev', commVal: 5, active: true }]; Q.length = 0; PAYABLES.length = 0; INV.length = 0;
+        /* 留有個案抽成設定但沒掛業務（例如試點過又把業務取消）→ 抽成 0、不建應付 */
+        Q.push({ id: 'q79', name: '自接案', client: '老客戶', date: '2026-10-10', awarded: true, salesId: '', comm: { mode: 'rev', val: 5 }, items: [], t: { sub: 1000000, total: 1050000 } });
+        out.noComm = _salesCommCfg(Q[0]) === null && _salesCommAmt(Q[0]) === 0 && _salesCommTxt(Q[0]) === '' && !_salesChip(Q[0]).includes('營收');
+        _salesCommSync(Q[0]); out.noPay = !PAYABLES.some(p => p.id === 'pay_sales_q79');
+        /* 掛上業務 → 依名冊 5% 50,000；再取消 → 回 0 */
+        Q[0].salesId = 'sW'; out.withSales = _salesCommAmt(Q[0]) === 50000; Q[0].salesId = ''; out.again = _salesCommAmt(Q[0]) === 0;
+        /* chip 視窗：沒選業務但勾另訂 → 不留 comm */
+        go('quotes'); renderList(); openSalesPick('q79'); document.getElementById('sp-sales').value = ''; document.getElementById('sp-ovr').checked = true; document.getElementById('sp-val').value = '9'; document.getElementById('gen-confirm-ok').click();
+        out.chipClear = !Q[0].comm && !Q[0].salesId;
+        /* 報表列名 */
+        document.getElementById('rpt-year').value = '2026'; document.getElementById('rpt-month').value = ''; _rptSalesF.sales = ''; _rptSalesF.st = ''; go('reports'); showReport('sales');
+        const ht = document.getElementById('report-content').innerHTML; const st = _salesStat(_salesRows(2026, 0, '', ''));
+        out.rpt = /（公司自接／未掛業務）/.test(ht) && st.comm === 0 && st.won === 1 && /公司自接／未掛業務<\/option>/.test(ht) && /不是每案都要掛業務/.test(ht);
+        P.sales = [];
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.79 公司自接／未掛業務：件數金額照算、抽成一律 0 且不建應付（即使殘留個案設定）、chip 沒選業務不留設定、報表列名', r.noComm && r.noPay && r.withSales && r.again && r.chipClear && r.rpt, JSON.stringify(r));
+    check('v6.0.79 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
