@@ -6470,6 +6470,42 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.81 工程專案流程列點開＝唯讀檢視 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        Q.length = 0; CONTRACTS.splice(0); INV.length = 0; PAYABLES.length = 0;
+        Q.push({ id: 'q81', name: '流程案', client: '甲', code: '115101601', date: '2026-10-01', awarded: true, items: [{ desc: 'H型鋼樁', unit: '支', qty: 100, price: 2800, origPrice: 3000 }], t: { sub: 280000, total: 294000 },
+          rfqs: [{ id: 'r1', no: 'RFQ-01', date: '2026-10-02', vendors: [{ name: '甲工程行', status: 'quoted' }], status: 'awarded', award: { vendor: '甲工程行' } }],
+          costs: [{ id: 'cS', type: 'sub', vendor: '甲工程行', rows: [{ id: 'r1', linkedItemIdx: 0, qty: 100, unitPrice: 2000 }], amt: 200000, rfqId: 'r1', periods: [] }] });
+        CONTRACTS.push({ id: 'ct81', linkedQid: 'q81', name: '流程案', client: '甲', code: 'C-81', amount: 294000, date: '2026-10-03', start: '2026-10-10', end: '2026-12-31', status: 'active', note: '測試' });
+        openProj('q81'); const tl = document.getElementById('page-proj').innerHTML;
+        /* 流程按鈕不再指向編輯 */
+        const steps = [...document.querySelectorAll('#page-proj .pj-step button')].map(b => b.getAttribute('onclick') || '');
+        out.jumps = steps.length === 8 && /quoteViewPdf\('q81'\)/.test(steps[0]) && /_pjNegView\('q81'\)/.test(steps[1]) && /_pjCtView\('ct81'\)/.test(steps[2]) && /_pjRfqView\('q81'\)/.test(steps[3]) && !steps.some(x => /loadQ\(|editContract\(/.test(x));
+        const modal = () => document.getElementById('gen-confirm-modal');
+        /* 議價檢視：原 315,000 → 294,000；工項列；確認鈕隱藏、關閉；前往編輯鈕 */
+        _pjNegView('q81'); let mh = modal().innerHTML;
+        out.neg = /315,000/.test(mh) && /294,000/.test(mh) && /−21,000/.test(mh) && /H型鋼樁/.test(mh) && /前往報價編輯/.test(mh) && getComputedStyle(document.getElementById('gen-confirm-ok')).display === 'none' && document.getElementById('gen-confirm-cancel').textContent === '關閉';
+        document.getElementById('gen-confirm-cancel').click(); out.closedNoEdit = !document.getElementById('page-editor').classList.contains('active');
+        /* 合約檢視 */
+        _pjCtView('ct81'); mh = modal().innerHTML; out.ct = /C-81/.test(mh) && /294,000/.test(mh) && /2026-10-10 ～ 2026-12-31/.test(mh) && /進行中/.test(mh) && /editContract\('ct81'\)/.test(mh); document.getElementById('gen-confirm-cancel').click();
+        /* 發包檢視 */
+        _pjRfqView('q81'); mh = modal().innerHTML; out.rfq = /RFQ-01/.test(mh) && /已發包：甲工程行/.test(mh) && /分包 1 家/.test(mh) && /200,000/.test(mh) && /前往發包頁/.test(mh); document.getElementById('gen-confirm-cancel').click();
+        out.stillProj = document.getElementById('page-proj').classList.contains('active');
+        /* 前往編輯鈕才會進編輯 */
+        _pjCtView('ct81'); [...modal().querySelectorAll('button')].find(b => /編輯合約/.test(b.textContent)).click(); out.goEdit = getComputedStyle(document.getElementById('ct-modal') || document.getElementById('contract-modal') || { display: 'flex' }).display !== 'none';
+        try { (document.getElementById('ct-modal') || document.getElementById('contract-modal')).style.display = 'none'; } catch (e) { /* 可忽略 */ }
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.81 工程專案流程列：報價→預覽、議價／合約／發包→唯讀摘要視窗（確認鈕隱藏、關閉不進編輯），要改要按「前往編輯」', r.jumps && r.neg && r.closedNoEdit && r.ct && r.rfq && r.stillProj && r.goEdit, JSON.stringify(r));
+    check('v6.0.81 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

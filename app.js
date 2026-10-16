@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.80';
+var APP_VERSION='v6.0.81';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -31547,10 +31547,10 @@ function _pjHeadHtml(q,st){
 function _pjTimelineHtml(q,st){
   var last=st.logs[0];
   var steps=[
-    {l:'報價',done:true,info:'NT$ '+fmt(st.quoteTotal)+((q.ver||1)>1?('　v'+q.ver):''),jump:"loadQ('"+q.id+"')"},
-    {l:'議價',done:st.neg,info:st.neg?('原 '+fmt(st.origTotal)+' → '+fmt(st.curTotal)+'（−'+fmt(st.origTotal-st.curTotal)+'）'):'未議價（照報價）',jump:"loadQ('"+q.id+"')",skip:!st.neg},
-    {l:'合約',done:!!st.ct,info:st.ct?(esc(st.ct.code||'')+' NT$ '+fmt(st.ct.amount||0)+(st.ct.start?('　'+esc(st.ct.start)):'')):'尚未建立合約',jump:st.ct?"editContract('"+st.ct.id+"')":"go('projects')"},
-    {l:'發包',done:st.subs.length>0,info:(st.rfqs.length?('詢價 '+st.rfqs.length+' 張　'):'')+(st.subs.length?('分包 '+st.subs.length+' 家 NT$ '+fmt(st.subTotal)):'尚未發包'),jump:"_rfqQid='"+q.id+"';go('rfq')"},
+    {l:'報價',done:true,info:'NT$ '+fmt(st.quoteTotal)+((q.ver||1)>1?('　v'+q.ver):''),jump:"quoteViewPdf('"+q.id+"')"},   // v6.0.81 流程點開一律唯讀檢視，不進編輯
+    {l:'議價',done:st.neg,info:st.neg?('原 '+fmt(st.origTotal)+' → '+fmt(st.curTotal)+'（−'+fmt(st.origTotal-st.curTotal)+'）'):'未議價（照報價）',jump:"_pjNegView('"+q.id+"')",skip:!st.neg},
+    {l:'合約',done:!!st.ct,info:st.ct?(esc(st.ct.code||'')+' NT$ '+fmt(st.ct.amount||0)+(st.ct.start?('　'+esc(st.ct.start)):'')):'尚未建立合約',jump:st.ct?"_pjCtView('"+st.ct.id+"')":"document.getElementById('pj-sec-docs')&&document.getElementById('pj-sec-docs').scrollIntoView({behavior:'smooth',block:'start'})"},
+    {l:'發包',done:st.subs.length>0,info:(st.rfqs.length?('詢價 '+st.rfqs.length+' 張　'):'')+(st.subs.length?('分包 '+st.subs.length+' 家 NT$ '+fmt(st.subTotal)):'尚未發包'),jump:"_pjRfqView('"+q.id+"')"},
     {l:'施工',done:_projStageDone(q)||st.physPct>=99.5,info:st.logs.length?('日報 '+st.logs.length+' 篇・最近 '+esc(last.date||'')+(st.hasRep?('・進度 '+Math.round(st.physPct)+'%'):'')):'尚無日報',jump:"viewDailyReports('"+q.id+"')"},
     {l:'業主計價',done:st.invs.length>0&&st.base>0&&st.billed+st.retHeld>=st.base*0.995,info:st.invs.length?('已請 '+st.invs.length+' 期 NT$ '+fmt(st.billed)+(st.ar>0?('・待收 '+fmt(st.ar)):'')):'尚未請款',jump:"go('invoice')"},
     {l:'廠商計價',done:st.pays.length>0&&st.payTotal-st.payPaid<=0,info:st.pays.length?('應付 '+st.pays.length+' 筆・已付 '+fmt(st.payPaid)+'／未付 '+fmt(st.payTotal-st.payPaid)):'尚無應付',jump:"go('finance');setTimeout(function(){switchFinanceTab('payable')},150)"},
@@ -35659,6 +35659,46 @@ function _sdMatEstLayerHtml(q,m,sec,fS,fN){
 var _matEstCalc0_648=matEstCalc;
 matEstCalc=function(){try{var q=_matEstSiteQ();if(q){MAT_EST=_matEstNorm(MAT_EST);_sdToMatEst(_sdNorm(q.site),MAT_EST);}}catch(e){_err('matEstCalc.site',e);}return _matEstCalc0_648.apply(this,arguments);};
 
+// ══════════ v6.0.81 工程專案流程列：點開＝唯讀檢視（報價→預覽頁、議價／合約／發包→摘要視窗），要改要再按一次「前往編輯」 ══════════
+function _pjViewBox(title,html,goLabel,goJs){
+  showConfirm(title,html+(goJs?('<div style="margin-top:10px;text-align:right"><button type="button" class="btn btn-sm" onclick="document.getElementById(\'gen-confirm-modal\').style.display=\'none\';'+goJs.replace(/"/g,'&quot;')+'" style="border-color:#e65100;color:#e65100">'+goLabel+'</button></div>'):''),function(){},false,null,true);
+  var ok=document.getElementById('gen-confirm-ok');if(ok)ok.style.display='none';
+  var cc=document.getElementById('gen-confirm-cancel');if(cc)cc.textContent='關閉';
+}
+function _pjNegView(qid){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;
+  var all=[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;})),rows=[],oSub=0,cSub=0;
+  all.forEach(function(x){(x.items||[]).forEach(function(it){if(!it||it.sec||_isSpare(it))return;var qn=Math.abs(parseFloat(it.qty)||0),p=parseFloat(it.price)||0,op=(it.origPrice!=null&&it.origPrice!=='')?parseFloat(it.origPrice):p;oSub+=qn*op;cSub+=qn*p;if(Math.abs(op-p)>1e-9)rows.push({d:String(it.desc||'').split('\n')[0],u:it.unit||'',q:qn,op:op,p:p,add:x!==q});});});
+  var h='<div style="font-size:12.5px;line-height:1.8">原報價（含稅）NT$ <b>'+fmt(Math.round(oSub*_taxM()))+'</b> → 議價後 NT$ <b style="color:var(--g3)">'+fmt(Math.round(cSub*_taxM()))+'</b>　差額 <b style="color:var(--red)">−'+fmt(Math.round((oSub-cSub)*_taxM()))+'</b></div>'
+    +(rows.length?('<div style="overflow-x:auto;margin-top:6px"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--gl);color:var(--b5)"><th style="padding:5px 8px;text-align:left">工項</th><th style="padding:5px 8px;text-align:right">數量</th><th style="padding:5px 8px;text-align:right">原單價</th><th style="padding:5px 8px;text-align:right">議價後</th><th style="padding:5px 8px;text-align:right">差額</th></tr></thead><tbody>'
+      +rows.map(function(r){return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:4px 8px">'+esc(r.d)+(r.add?' <span style="font-size:10px;color:var(--b3)">追加</span>':'')+'</td><td style="padding:4px 8px;text-align:right">'+_qfmt(r.q)+' '+esc(_uFix(r.u))+'</td><td style="padding:4px 8px;text-align:right">'+fmt(r.op)+'</td><td style="padding:4px 8px;text-align:right;color:var(--g3)">'+fmt(r.p)+'</td><td style="padding:4px 8px;text-align:right;color:var(--red)">'+fmt(Math.round((r.p-r.op)*r.q))+'</td></tr>';}).join('')
+      +'</tbody></table></div>'):'<div style="font-size:12px;color:var(--b3);margin-top:6px">尚未議價（各工項單價＝原報價）</div>')
+    +'<div style="font-size:11px;color:var(--b3);margin-top:6px">此視窗只看不改；要議價請按下方「前往報價編輯 › 議價」。</div>';
+  _pjViewBox('議價紀錄：'+esc(q.name||''),h,'前往報價編輯',"loadQ('"+q.id+"')");
+}
+function _pjCtView(ctId){
+  var c=(CONTRACTS||[]).find(function(x){return x.id===ctId;});if(!c){toast('找不到合約');return;}
+  var row=function(k,v){return '<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px dashed var(--b1)"><span style="flex:0 0 84px;color:var(--b4)">'+k+'</span><span style="flex:1;min-width:0;word-break:break-all">'+(v||'—')+'</span></div>';};
+  var stTxt=({active:'進行中',done:'已完工',completed:'已完工結算',pending:'待簽'})[c.status]||esc(c.status||'');
+  var h='<div style="font-size:12.5px;line-height:1.7">'+row('合約編號',esc(c.code||''))+row('工程名稱',esc(c.name||''))+row('業主',esc(c.client||''))+row('合約金額','NT$ '+fmt(c.amount||0)+'（含稅）')+row('簽約日',esc(c.date||''))+row('工期',(c.start||c.end)?(esc(c.start||'？')+' ～ '+esc(c.end||'？')):'')+row('狀態',stTxt)+row('備註',esc(c.note||''))
+    +(c.attachment?row('合約檔','<a href="#" onclick="event.preventDefault();viewContractAttachment(\''+c.id+'\')">'+esc(c.attachmentName||'開啟附件')+'</a>'):'')+'</div>'
+    +'<div style="font-size:11px;color:var(--b3);margin-top:6px">此視窗只看不改；要修改請按下方「編輯合約」。</div>';
+  _pjViewBox('合約：'+esc(c.code||c.name||''),h,'編輯合約',"editContract('"+c.id+"')");
+}
+function _pjRfqView(qid){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;
+  var st;try{st=_pjStat(q);}catch(e){_err('_pjRfqView',e);return;}
+  var th=function(t,r){return '<th style="padding:5px 8px;text-align:'+(r?'right':'left')+'">'+t+'</th>';},td=function(t,r){return '<td style="padding:4px 8px;text-align:'+(r?'right':'left')+'">'+t+'</td>';};
+  var h='';
+  if(st.rfqs.length)h+='<div style="font-weight:800;font-size:12.5px;color:var(--g3);margin:2px 0 4px">詢價單 '+st.rfqs.length+' 張</div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--gl);color:var(--b5)">'+th('單號')+th('日期')+th('回報廠商',1)+th('狀態')+'</tr></thead><tbody>'
+    +st.rfqs.map(function(r){return '<tr style="border-bottom:1px solid var(--b1)">'+td(esc(r.no||''))+td(esc(r.date||''))+td(String((r.vendors||[]).length),1)+td(esc(_rfqStatusTxt(r)))+'</tr>';}).join('')+'</tbody></table></div>';
+  h+='<div style="font-weight:800;font-size:12.5px;color:var(--g3);margin:10px 0 4px">分包 '+st.subs.length+' 家　發包合計 NT$ '+fmt(st.subTotal)+'</div>';
+  if(st.subs.length)h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--gl);color:var(--b5)">'+th('廠商')+th('發包',1)+th('已請',1)+th('已付',1)+th('未付',1)+'</tr></thead><tbody>'
+    +st.subs.map(function(x){return '<tr style="border-bottom:1px solid var(--b1)">'+td('<b>'+esc(x.c.vendor||'')+'</b>'+(x.c.isIntro||x.c.followOf?' <span style="font-size:10px;color:#1565C0">介紹費</span>':'')+(x.q!==q?' <span style="font-size:10px;color:var(--b3)">追加</span>':''))+td(fmt(x.s.total),1)+td(fmt(x.s.billed),1)+td('<span style="color:var(--g3)">'+fmt(x.s.paid)+'</span>',1)+td('<span style="color:'+(x.s.unpaid>0?'#b45309':'var(--b3)')+'">'+fmt(x.s.unpaid)+'</span>',1)+'</tr>';}).join('')+'</tbody></table></div>';
+  else h+='<div style="font-size:12px;color:var(--b3)">尚未發包。</div>';
+  h+='<div style="font-size:11px;color:var(--b3);margin-top:6px">此視窗只看不改；要詢價、比價、得標請按下方「前往發包頁」。</div>';
+  _pjViewBox('發包：'+esc(q.name||''),h,'前往發包頁',"_rfqQid='"+q.id+"';_rfqTab='rfq';go('rfq')");
+}
 // ══════════ v6.0.80 電話自動格式：只打數字，離開欄位自動排版 ══════════
 // 手機 09xx-xxx-xxx；市話 (0X)XXXXXXX／(0X)XXXX-XXXX（區碼 02～08；3 碼區碼 037／049／082／089；馬祖 0836）；0800-XXX-XXX；
 // 分機（# 或「轉」後）原樣接在後面。非台灣格式／已含字母者不動。
