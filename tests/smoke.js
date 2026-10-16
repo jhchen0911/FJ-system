@@ -6435,6 +6435,41 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.80 總覽應付總結含稅、客戶帶入以窗口／聯絡人電話為主、電話自動格式、介紹人提示 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        /* ① 總覽應付總結：列＝含稅，與總額一致 */
+        PAYABLES.length = 0; PAYABLES.push({ id: 'pA', to: '甲乙', project: 'F25P1', amount: 548625, vat: true, date: '2026-10-25', status: 'pending' }, { id: 'pB', to: '丙丁', project: 'F25P1', amount: 2600, vat: true, date: '2026-10-25', status: 'pending' }, { id: 'pC', to: '蔡', project: 'X', amount: 164400, vat: false, date: '2026-10-30', status: 'pending' });
+        openFinKpi('ap'); const mh = document.getElementById('gen-confirm-modal').innerHTML;
+        out.kpi = /576,056/.test(mh) && /2,730/.test(mh) && /164,400/.test(mh) && /743,186/.test(mh) && !/>NT\$ 548,625</.test(mh) && /未稅 548,625/.test(mh);
+        document.getElementById('gen-confirm-cancel').click();
+        /* ② 客戶帶入報價：窗口＋聯絡人電話為主，缺則退公司欄 */
+        CUSTOMERS.length = 0; CUSTOMERS.push({ id: 'cu1', name: '午未科技', tel: '(03)1234567', contact: '張三 經理', siteTel: '0923-456-789', companyContact: '王總' }, { id: 'cu2', name: '只有公司', tel: '(02)12345678', companyContact: '李經理' });
+        newQ(); applyCustomerByName('午未科技', 'quote'); out.fill1 = gv('fco') === '張三 經理' && gv('fp') === '0923-456-789';
+        newQ(); applyCustomerByName('只有公司', 'quote'); out.fill2 = gv('fco') === '李經理' && gv('fp') === '(02)1234-5678';
+        /* ③ 電話格式 */
+        out.fmt = _fmtPhoneTW('0923456789') === '0923-456-789' && _fmtPhoneTW('031234567') === '(03)1234567' && _fmtPhoneTW('0223456789') === '(02)2345-6789' && _fmtPhoneTW('0223456789#177') === '(02)2345-6789 #177'
+          && _fmtPhoneTW('0492345678') === '(049)2345678' && _fmtPhoneTW('0800123456') === '0800-123-456' && _fmtPhoneTW('(03) 1234567') === '(03)1234567' && _fmtPhoneTW('王先生 0912') === '王先生 0912' && _fmtPhoneTW('12345') === '12345' && _fmtPhoneTW('') === '';
+        /* 欄位 change 事件自動排版（客戶公司電話、報價聯絡電話、廠商電話） */
+        const ev = el => { el.dispatchEvent(new Event('change', { bubbles: true })); return el.value; };
+        const fp = document.getElementById('fp'); fp.value = '0989023760'; out.evFp = ev(fp) === '0989-023-760';
+        const ct = document.getElementById('cust-tel'); ct.value = '0312345678'; out.evCt = ev(ct) === '(03)1234-5678';
+        const vp = document.getElementById('v-phone'); vp.value = '0287654321'; out.evVp = ev(vp) === '(02)8765-4321';
+        /* ④ 介紹人提示 */
+        P.sales = [{ id: 'sF', name: '王大明', kind: 'intro', commMode: 'rev', commVal: 5, active: true }]; Q.length = 0; Q.push({ id: 'q80', name: '案', client: '甲', date: '2026-10-10', items: [], t: {} });
+        go('quotes'); renderList(); openSalesPick('q80'); document.getElementById('sp-sales').value = 'sF'; _spSelChange(); out.hint = /外部介紹人：若他介紹的是<b>分包廠商<\/b>/.test(document.getElementById('sp-def').innerHTML); document.getElementById('gen-confirm-cancel').click();
+        P.sales = []; CUSTOMERS.length = 0; PAYABLES.length = 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.80 總覽應付總結列改含稅（與總額一致）；客戶帶入報價以工地窗口／聯絡人電話為主；電話自動格式（手機／市話／分機／0800，欄位離開即排版）；外部介紹人提示', r.kpi && r.fill1 && r.fill2 && r.fmt && r.evFp && r.evCt && r.evVp && r.hint, JSON.stringify(r));
+    check('v6.0.80 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

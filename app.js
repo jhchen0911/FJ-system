@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.79';
+var APP_VERSION='v6.0.80';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -4105,7 +4105,7 @@ function applyCustomerByName(name, type){
   const c=CUSTOMERS.find(x=>x.name===name);if(!c)return;
   if(type==='quote'){
     // 工程地點(fl)不帶客戶公司地址——工地與公司地址是兩回事，由使用者自行填寫
-    const qmap={'fcl':c.name,'fco':c.contact,'fp':c.tel};
+    const qmap={'fcl':c.name,'fco':c.contact||c.companyContact||'','fp':_fmtPhoneTW(c.siteTel||c.tel||'')};   // v6.0.80 客戶＝工地窗口（無則公司聯絡人）、電話＝聯絡人電話（無則公司電話）
     Object.entries(qmap).forEach(([eid,val])=>{const e=document.getElementById(eid);if(e&&val)e.value=val;});
   } else {
     const fields={'inv-client':c.name,'inv-taxid':c.taxid,'inv-tel':c.tel,'inv-fax':c.fax,'inv-site-contact':c.contact,'inv-site-tel':c.siteTel||c.tel,'inv-company-contact':c.companyContact||'','inv-caddr':c.addr||''};
@@ -7195,9 +7195,10 @@ function openFinKpi(kind){
   if(kind==='ap'){
     var ap=_apList();
     var sum2=_rptTile('應付帳款','NT$ '+fmt(_apTotal()),'var(--red)')+_rptTile('筆數',ap.length+' 筆');
-    var rows2=ap.slice().sort(function(a,b){return (parseFloat(b.amount)||0)-(parseFloat(a.amount)||0);}).map(function(p){
-      return _rptRow(esc(p.to||'—'),esc(p.project||p.note||'')+(p.due?('　到期 '+p.due):''),
-        'NT$ '+fmt(Math.round(parseFloat(p.amount)||0)),(p.due&&p.due<localToday())?'<span style="color:var(--red)">已逾期</span>':'','var(--b5)',
+    var rows2=ap.slice().sort(function(a,b){return _payEff(b)-_payEff(a);}).map(function(p){   // v6.0.80 列與總額同口徑（含稅 _payEff），原本列印未稅 amount 對不上
+      var _dd=p.due||p.date||'';
+      return _rptRow(esc(p.to||'—'),esc(p.project||p.note||'')+(_dd?('　到期 '+_dd):''),
+        'NT$ '+fmt(_payEff(p)),(_dd&&_dd<localToday())?'<span style="color:var(--red)">已逾期</span>':(p.vat!==false?'<span style="font-size:10px;color:var(--b3)">未稅 '+fmt(p.amount||0)+'＋稅</span>':''),'var(--b5)',
         "_qvClose();go('finance');setTimeout(function(){switchFinanceTab('payable');},150)");
     }).join('');
     _rptBox('應付帳款總結',sum2,rows2,'目前沒有待付款項');return;
@@ -35658,6 +35659,32 @@ function _sdMatEstLayerHtml(q,m,sec,fS,fN){
 var _matEstCalc0_648=matEstCalc;
 matEstCalc=function(){try{var q=_matEstSiteQ();if(q){MAT_EST=_matEstNorm(MAT_EST);_sdToMatEst(_sdNorm(q.site),MAT_EST);}}catch(e){_err('matEstCalc.site',e);}return _matEstCalc0_648.apply(this,arguments);};
 
+// ══════════ v6.0.80 電話自動格式：只打數字，離開欄位自動排版 ══════════
+// 手機 09xx-xxx-xxx；市話 (0X)XXXXXXX／(0X)XXXX-XXXX（區碼 02～08；3 碼區碼 037／049／082／089；馬祖 0836）；0800-XXX-XXX；
+// 分機（# 或「轉」後）原樣接在後面。非台灣格式／已含字母者不動。
+function _fmtPhoneTW(v){
+  var s=String(v==null?'':v).trim();if(!s)return s;
+  var ext='';var m=s.match(/^(.*?)(?:\s*(?:#|ext\.?|分機|轉)\s*)(\d+)\s*$/i);if(m){s=m[1];ext=' #'+m[2];}
+  if(/[A-Za-z一-鿿]/.test(s))return v;   // 有字母／中文（例：王先生 0912…）不動
+  var d=s.replace(/\D/g,'');if(!d||d.charAt(0)!=='0')return v;
+  if(/^09\d{8}$/.test(d))return d.slice(0,4)+'-'+d.slice(4,7)+'-'+d.slice(7)+ext;
+  if(/^0800\d{6}$/.test(d))return '0800-'+d.slice(4,7)+'-'+d.slice(7)+ext;
+  var area='';
+  if(d.indexOf('0836')===0)area='0836';else if(/^0(37|49|82|89)/.test(d))area=d.slice(0,3);else if(/^0[2-8]/.test(d))area=d.slice(0,2);
+  if(!area)return v;
+  var loc=d.slice(area.length);
+  if(loc.length===8)return '('+area+')'+loc.slice(0,4)+'-'+loc.slice(4)+ext;
+  if(loc.length===7||loc.length===6)return '('+area+')'+loc+ext;
+  return v;
+}
+var _PHONE_SEL='#fp,#cust-tel,#cust-fax,#cust-site-tel,#v-phone,#inv-tel,#inv-fax,#inv-site-tel,#ptel,.sb-phone,#env-tel,#env-ftel';
+function _phoneAutoFmt(e){
+  var t=e&&e.target;if(!t||t.tagName!=='INPUT')return;
+  try{if(!t.matches(_PHONE_SEL))return;}catch(err){return;}
+  var nv=_fmtPhoneTW(t.value);
+  if(nv!==t.value){t.value=nv;try{t.dispatchEvent(new Event('input',{bubbles:true}));}catch(err){_err('_phoneAutoFmt',err);}}
+}
+try{document.addEventListener('change',_phoneAutoFmt,true);}catch(e){_err('_phoneAutoFmt.bind',e);}
 // ══════════ v6.0.76 分包工程承攬合約書（豐有＝甲方、廠商＝乙方）：由分包成本卡自動帶入，列印給廠商簽 ══════════
 // 條款以 docs/分包工程承攬合約書_通用範本.md 為準（源自 docs/參考合約 業主端版，角色對調、付款與罰則改成本公司口徑）。
 // 可調的空格存 P.subCt（特約條款、逾期罰金‰、保險分擔、保固、管轄法院、付款補充），隨參數同步；每份合約的工期／備註只存這次列印。
@@ -35796,7 +35823,8 @@ function _spSelChange(){   // 顯示名冊預設抽成
   var el=document.getElementById('sp-def');if(!el)return;
   var x=_salesById(gv('sp-sales'));if(!x){el.textContent='';return;}
   var d=_salesCommNorm({mode:x.commMode||(x.defRate>0?'rev':''),val:x.commVal!=null&&x.commVal!==''?x.commVal:x.defRate,unit:x.commUnit});
-  el.innerHTML=d?('名冊預設：<b>'+_SALES_MODES[d.mode]+' '+(d.mode==='unit'?('每'+d.unit+' '+fmt(d.val)+' 元'):(d.val+(d.mode==='amt'?' 元':'%')))+'</b>（沒勾「此案另訂」就用這個）'):'<span style="color:#b26a00">名冊未設定預設抽成，請在業務名冊填，或勾「此案另訂」</span>';
+  el.innerHTML=(d?('名冊預設：<b>'+_SALES_MODES[d.mode]+' '+(d.mode==='unit'?('每'+d.unit+' '+fmt(d.val)+' 元'):(d.val+(d.mode==='amt'?' 元':'%')))+'</b>（沒勾「此案另訂」就用這個）'):'<span style="color:#b26a00">名冊未設定預設抽成，請在業務名冊填，或勾「此案另訂」</span>')
+    +(x.kind==='intro'?'<div style="margin-top:4px;padding:5px 8px;border-radius:var(--r6);background:#FFF8E1;border:1px solid #f0da7a;color:#8a6d00;font-size:11.5px">外部介紹人：若他介紹的是<b>分包廠商</b>（跟著廠商計價每支給），請到 發包得標／工程專案分包列 填「介紹人」，不要掛在這裡；只有他帶來<b>業主案源</b>、照業主請款數量計酬時，才在這裡掛業務（名冊抽成選「每單位 × 實作量」）。</div>':'');   // v6.0.80
 }
 function _salesBase(q){   // 抽成基礎：主案＋追加案未稅
   var all=[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;}));
