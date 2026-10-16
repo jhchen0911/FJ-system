@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.81';
+var APP_VERSION='v6.0.82';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -37853,8 +37853,29 @@ function buildQuotePreviewFromPDF(){
       document.head.appendChild(st2);
     }
     prevEl.innerHTML=html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi,'');
+    try{_prevFitApply();}catch(e){_err('buildQuotePreviewFromPDF.fit',e);}   // v6.0.82 手機：A4 版面等比縮放
   }
 }
+// v6.0.82 手機版報價預覽：原本把 A4 表格硬塞進手機寬度，工項名稱被擠成一字一行。改為版面固定 A4 寬（794px）
+// 等比縮到螢幕寬（看整體；可雙指放大），右上「100%」切原尺寸、只在預覽框內左右滑（頁面本身不橫向捲動）。桌機不變。
+var _prevZoom='fit';
+function _prevFitApply(){
+  var prevEl=document.getElementById('prevhtml');if(!prevEl)return;
+  var wrap=prevEl.querySelector('.page-wrap'),btn=document.getElementById('prev-zoom-btn');if(!wrap)return;
+  if(!isMob()){wrap.style.cssText='';prevEl.style.cssText='';if(btn)btn.style.display='none';return;}
+  if(btn){btn.style.display='';btn.textContent=_prevZoom==='fit'?'100%':'符合寬度';btn.title=_prevZoom==='fit'?'切到原尺寸，在預覽框內左右滑動':'縮到符合螢幕寬';}
+  var W=794;
+  wrap.style.width=W+'px';wrap.style.maxWidth='none';wrap.style.margin='0';wrap.style.boxSizing='border-box';
+  if(_prevZoom==='fit'){
+    var avail=prevEl.clientWidth||(window.innerWidth-32),sc=Math.min(1,avail/W);
+    wrap.style.transform='scale('+sc+')';wrap.style.transformOrigin='0 0';
+    prevEl.style.overflow='hidden';prevEl.style.height=Math.ceil(wrap.offsetHeight*sc)+'px';
+  }else{
+    wrap.style.transform='';prevEl.style.overflowX='auto';prevEl.style.overflowY='hidden';prevEl.style.height='';prevEl.style.webkitOverflowScrolling='touch';
+  }
+}
+function _prevZoomToggle(){_prevZoom=_prevZoom==='fit'?'100':'fit';_prevFitApply();}
+try{window.addEventListener('resize',function(){try{var pg=document.getElementById('page-preview');if(pg&&pg.classList.contains('active'))_prevFitApply();}catch(e){_err('_prevFitApply.resize',e);}});}catch(e){_err('_prevFitApply.bind',e);}
 function exportCurrentReportExcel(){
   if(_currentReport==='shareholder'||_currentReport==='overview'){exportShareholderCSV();return;}   // v6
   if(_currentReport==='sales'){_salesCsv();return;}   // v6.0.74

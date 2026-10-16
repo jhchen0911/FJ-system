@@ -403,7 +403,7 @@ async function newPage(browser, width, height) {
                    && document.getElementById('receipt-inv-id').value === 'I386_2';
       closeReceiptModal();
       // 預覽頁只留一顆匯出鈕
-      out.qBtns = [...document.querySelectorAll('#page-preview .prev-act button')].map(b => b.textContent.trim()).join('|');
+      out.qBtns = [...document.querySelectorAll('#page-preview .prev-act button')].filter(b => b.style.display !== 'none').map(b => b.textContent.trim()).join('|');   /* v6.0.82 手機縮放鈕桌機隱藏，不算 */
       out.iBtns = [...document.querySelectorAll('#page-invoice-prev .prev-act button')].map(b => b.textContent.trim()).join('|');
       return out;
     });
@@ -6503,6 +6503,48 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.81 工程專案流程列：報價→預覽、議價／合約／發包→唯讀摘要視窗（確認鈕隱藏、關閉不進編輯），要改要按「前往編輯」', r.jumps && r.neg && r.closedNoEdit && r.ct && r.rfq && r.stillProj && r.goEdit, JSON.stringify(r));
     check('v6.0.81 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.82 手機版報價預覽：A4 等比縮放、100% 切換、頁面不橫向捲動 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      try {
+        Q.length = 0; Q.push({ id: 'q82', name: '預覽案', client: '甲', code: '115101602', date: '2026-10-16', items: [{ desc: 'H型鋼樁 H300，L=10M@80cm 打設、拔除（含水刀引孔）', unit: '支', qty: 40, price: 26500, note: '含180天租期', ot: '45', otu: '$/支/天' }], t: { sub: 1060000, tax: 53000, total: 1113000 } });
+        quoteViewPdf('q82');
+        setTimeout(() => {
+          const prev = document.getElementById('prevhtml'), wrap = prev.querySelector('.page-wrap'), btn = document.getElementById('prev-zoom-btn');
+          const sc = parseFloat((wrap.style.transform.match(/scale\(([\d.]+)\)/) || [])[1]);
+          out.fit = _prevZoom === 'fit' && sc > 0.3 && sc < 0.6 && wrap.style.width === '794px' && prev.style.overflow === 'hidden' && parseInt(prev.style.height) > 100;
+          out.noPageScroll = document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1;
+          out.btn = btn.style.display !== 'none' && btn.textContent === '100%';
+          /* 工項名稱不再一字一行：第一個工項儲存格寬度 > 150px（未縮放前的版面寬） */
+          const cell = [...wrap.querySelectorAll('td')].find(td => /H型鋼樁/.test(td.textContent)); out.wide = !!cell && cell.getBoundingClientRect().width / sc > 150;
+          /* 切 100%：無 transform、預覽框內可橫向滑、頁面仍不橫向捲 */
+          _prevZoomToggle();
+          out.full = _prevZoom === '100' && !wrap.style.transform && prev.style.overflowX === 'auto' && prev.scrollWidth > prev.clientWidth && document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1 && btn.textContent === '符合寬度';
+          _prevZoomToggle(); out.back = _prevZoom === 'fit' && /scale\(/.test(wrap.style.transform);
+          res(out);
+        }, 400);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
+    }));
+    check('v6.0.82 手機版報價預覽：A4 版面等比縮到螢幕寬（工項不再一字一行）、頁面不橫向捲動、「100%」切原尺寸只在預覽框內滑', r.fit && r.noPageScroll && r.btn && r.wide && r.full && r.back, JSON.stringify(r));
+    check('v6.0.82 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      try {
+        Q.length = 0; Q.push({ id: 'q82d', name: '桌機預覽', client: '甲', date: '2026-10-16', items: [{ desc: 'H型鋼樁', unit: '支', qty: 1, price: 1 }], t: { sub: 1, tax: 0, total: 1 } });
+        quoteViewPdf('q82d');
+        setTimeout(() => { const wrap = document.querySelector('#prevhtml .page-wrap'); out.desk = !!wrap && !wrap.style.transform && document.getElementById('prev-zoom-btn').style.display === 'none'; res(out); }, 300);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); res(out); }
+    }));
+    check('v6.0.82 桌機預覽不縮放、無縮放鈕', r.desk, JSON.stringify(r));
     await page.close();
   }
 

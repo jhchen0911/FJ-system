@@ -1112,6 +1112,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 <div class="page" id="page-preview">
   <div class="prev-act">
     <button type="button" class="btn btn-sm" onclick="_prevBack('quotes')">← 返回</button>
+    <button type="button" id="prev-zoom-btn" class="btn btn-sm" onclick="_prevZoomToggle()" style="display:none" title="切換預覽縮放">100%</button>
     <button type="button" class="btn btn-sm btn-y" onclick="exportQuotePDF(eid)" style="padding:8px 20px;font-size:14px"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 匯出PDF</button>
   </div>
   <div class="pad"><div id="prevhtml"></div></div>
@@ -2782,7 +2783,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.81" defer></script><script src="beta.js?v=6.0.81" defer></script>
+<script src="app.js?v=6.0.82" defer></script><script src="beta.js?v=6.0.82" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">

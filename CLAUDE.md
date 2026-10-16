@@ -77,7 +77,7 @@
 | 模組 | 頁面 id（入口） | 主要函式 | 資料（同步節點） |
 |---|---|---|---|
 | 總覽 | `dash` | `updateDashTodo` `_v6TodoItems` `_todoLongSub` | 讀各集合 |
-| 報價 | `quotes`（列表 `renderList`）→ 編輯頁 | `rItems` `calcT` `saveQ` `loadQ` `applyNegotiate`（議價）`bumpQVersion`（版次）`quoteViewPdf` `exportQuotePDF` `quoteImportOwner`／`_qiStart`（匯入業主詢價單 xlsx／docx／pdf）`quoteExportOwnerDoc`（回填） | `Q`（quotes，逐筆同步；`costs`／`items[].estCost`／`t.cost|gross|net`／`rfqs`／`mat` 由 `_stripQuoteSens` 抽到 private） |
+| 報價 | `quotes`（列表 `renderList`）→ 編輯頁 | `rItems` `calcT` `saveQ` `loadQ` `applyNegotiate`（議價）`bumpQVersion`（版次）`quoteViewPdf`（手機預覽等比縮放 `_prevFitApply`／`_prevZoomToggle`）`exportQuotePDF` `quoteImportOwner`／`_qiStart`（匯入業主詢價單 xlsx／docx／pdf）`quoteExportOwnerDoc`（回填） | `Q`（quotes，逐筆同步；`costs`／`items[].estCost`／`t.cost|gross|net`／`rfqs`／`mat` 由 `_stripQuoteSens` 抽到 private） |
 | 案場細節 | 彈窗 `openSiteDet(qid)`（報價編輯、工程專案、材料估算、施工計畫書） | `_sdRender` `_sdCalc` `_sdToMatEst` `_sdEnsure` `siteBump` | `q.site`／`q.siteHist`（shared）；**圖面數量唯一來源** |
 | 工程專案 | `proj`（`openProj(qid)`；`go('projects')` 轉來） | `renderProj` `_pjStat` `_pjTodoItems` `_pjSection` `_pj*Html` 各區塊（業主計價已收清期別收合 `_pjInvSettled`／`pjInvPaidToggle`） `pjCloseAll`（結案）`_autoSettle`（階段完工自動結算）`_introSync`；流程列唯讀檢視 `_pjNegView`／`_pjCtView`／`_pjRfqView`（`_pjViewBox`） | 以報價 `q` 為主體 |
 | 發包 | `rfq`（hidden，parent `proj`） | `renderRfq` `rfqNew` `rfqFill` `rfqAward` `_rfqBackfillEst` `pjIntroEdit`（介紹費） | `q.rfqs`（private） |
@@ -106,7 +106,7 @@
 
 ## 測試
 
-`tests/smoke.js`（619 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（622 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
