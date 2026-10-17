@@ -6548,6 +6548,34 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.83 備註第16條：施作數量不足門檻可填 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        newQ(); openRmkModal();
+        out.field = !!document.getElementById('rmk-minqty');
+        document.getElementById('rmk-mob').value = '35000'; document.getElementById('rmk-minqty').value = '20 支'; applyRmkCustom();
+        const txt = buildRmkText(); const line = txt.split('\n').find(l => /動員費/.test(l)) || '';
+        out.line = /施作數量不足 20 支 時/.test(line) && /\$35000元/.test(line) && !/【MOB】/.test(line);
+        /* 清空門檻 → 回原文 */
+        openRmkModal(); document.getElementById('rmk-minqty').value = ''; applyRmkCustom();
+        const l2 = (buildRmkText().split('\n').find(l => /動員費/.test(l)) || ''); out.plain = /施作數量不足時/.test(l2) && !/不足 /.test(l2);
+        /* 從報價物件建文字（列印用）同樣套用；沒填動員費時整條不出 */
+        out.fromQ = /施作數量不足 15 支 時/.test(buildRmkTextFromQ({ rmk: { mob: '30000', minQty: '15 支' } })) && !/動員費/.test(buildRmkTextFromQ({ rmk: { minQty: '15 支' } }));
+        /* 存檔往返：rmkCustom.minQty 隨 q.rmk 存 */
+        document.getElementById('fn').value = '門檻案'; items = [{ desc: 'A', unit: '支', qty: 1, price: 1, note: '', sec: false }];
+        openRmkModal(); document.getElementById('rmk-minqty').value = '30 支'; applyRmkCustom(); saveQ();
+        const q = Q.find(x => x.name === '門檻案'); out.saved = !!q && q.rmk && q.rmk.minQty === '30 支'; loadQ(q.id); out.loaded = rmkCustom.minQty === '30 支';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.83 備註填寫第16條多「施作數量不足（門檻）」：填 20 支 → 「施作數量不足 20 支 時」，空白回原文，列印同套用、隨報價存檔', r.field && r.line && r.plain && r.fromQ && r.saved && r.loaded, JSON.stringify(r));
+    check('v6.0.83 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

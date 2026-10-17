@@ -2760,7 +2760,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.82" defer></script>
+<script src="app.js?v=6.0.83" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
@@ -2834,7 +2834,8 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <div style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:5px">第16條：動員費</div>
       <div class="fg fg4" style="margin-bottom:12px">
         <div class="f"><label>動員費 ($/次)</label><input type="number" id="rmk-mob" placeholder="選填"></div>
-        <div class="f"></div><div class="f"></div><div class="f"></div>
+        <div class="f"><label>施作數量不足（門檻）</label><input id="rmk-minqty" placeholder="例：20 支／200 M"></div>
+        <div class="f"></div><div class="f"></div>
       </div>
 
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">

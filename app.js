@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.82';
+var APP_VERSION='v6.0.83';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -208,7 +208,7 @@ var P={
   dpBuH:33,dpBuR:28,dpBuS:32,dpBuB:36
 };
 let items=[],exs=[],costs=[],eid=null;
-let rmkCustom={load:'',walk:'',tech:'',bh:'',br:'',bs:'',bb:'',c2:'',c3:'',ir:'',mob:'',extra:[]};
+let rmkCustom={load:'',walk:'',tech:'',bh:'',br:'',bs:'',bb:'',c2:'',c3:'',ir:'',mob:'',minQty:'',extra:[]};   // v6.0.83 minQty：第16條「施作數量不足 N 時」
 
 try{const s=localStorage.getItem('fy6_q');if(s)Q=JSON.parse(s);}catch(e){_err('top',e);}
 // v5.318：應付狀態正規化。status 為空的舊資料在 ==='pending' 與 !=='paid' 兩種寫法下
@@ -2570,7 +2570,7 @@ function _rmkAppendExtra(txt,c){
 }
 function openRmkModal(){
   const map={load:'rmk-load',walk:'rmk-walk',tech:'rmk-tech',bh:'rmk-bh',
-    br:'rmk-br',bs:'rmk-bs',bb:'rmk-bb',c2:'rmk-c2',c3:'rmk-c3',ir:'rmk-ir',mob:'rmk-mob'};
+    br:'rmk-br',bs:'rmk-bs',bb:'rmk-bb',c2:'rmk-c2',c3:'rmk-c3',ir:'rmk-ir',mob:'rmk-mob',minQty:'rmk-minqty'};
   Object.entries(map).forEach(([k,id])=>{const e=document.getElementById(id);if(e)e.value=rmkCustom[k]||'';});
   rmkRenderExtra();
   document.getElementById('rmk-modal').style.display='flex';
@@ -2580,6 +2580,7 @@ function applyRmkCustom(){
   ['load','walk','tech','bh','br','bs','bb','c2','c3','ir','mob'].forEach(k=>{
     const e=document.getElementById('rmk-'+k);rmkCustom[k]=e?e.value:'';
   });
+  rmkCustom.minQty=(document.getElementById('rmk-minqty')||{}).value||'';   // v6.0.83
   rmkCustom.extra=_rmkExtraList().map(x=>String(x||'').trim()).filter(Boolean);
   document.getElementById('rmk-modal').style.display='none';
   toast('備註已客製化，預覽時套用');
@@ -2614,13 +2615,15 @@ function buildRmkTextFromQ(q){
     }
     if(line.includes('【MOB】')){
       if(!c.mob)return null;
-      return line.replace('【MOB】',c.mob);
+      return _rmkMinQty(line.replace('【MOB】',c.mob),c);
     }
     return line;
   }).filter(l=>l!==null).join('\n');
   return _rmkAppendExtra(out,c);
 }
 
+// v6.0.83 第16條「施作數量不足時」→ 有填最低數量就寫成「施作數量不足 20 支時」（條款母本不必改，舊參數也適用）
+function _rmkMinQty(line,c){var m=String((c&&c.minQty)||'').trim();if(!m)return line;return line.replace(/施作數量不足(?!\s*\d)/,'施作數量不足 '+m+' ');}
 function buildRmkText(){
   const base=document.getElementById('prm')?.value||'';
   const c=rmkCustom;
@@ -2648,8 +2651,8 @@ function buildRmkText(){
       return '12. 如因甲方因素或要求買斷：'+items.join('、')+'（未稅）計。';
     }
     if(line.includes('【MOB】')){
-      if(!c.mob)return line.replace('$【MOB】元','$______元');
-      return line.replace('【MOB】',c.mob);
+      if(!c.mob)return _rmkMinQty(line.replace('$【MOB】元','$______元'),c);
+      return _rmkMinQty(line.replace('【MOB】',c.mob),c);
     }
     return line;
   }).filter(l=>l!==null).join('\n');
