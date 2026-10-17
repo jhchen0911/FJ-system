@@ -6576,6 +6576,32 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.84 備註填寫視窗條號依參數條款即時計算；門檻可多條件 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const prm = document.getElementById('prm'); const bak = prm.value;
+        newQ(); openRmkModal();
+        out.t16 = document.getElementById('rmk-t-mob').textContent === '第16條：動員費' && /第 17 條之後/.test(document.getElementById('rmk-extra-hint').textContent) && document.getElementById('rmk-t-load').textContent === '第8條：施工構台設計載重';
+        document.getElementById('rmk-modal').style.display = 'none';
+        /* 參數最前面插一條 → 動員費變第 17 條、自訂接第 19 條後；多條件門檻 */
+        prm.value = '1. 新增第一條。\n' + bak.split('\n').map(l => l.replace(/^(\d+)\./, (m, n) => (parseInt(n, 10) + 1) + '.')).join('\n');
+        openRmkModal(); out.shift = document.getElementById('rmk-t-mob').textContent === '第17條：動員費' && /第 18 條之後/.test(document.getElementById('rmk-extra-hint').textContent);
+        document.getElementById('rmk-mob').value = '40000'; document.getElementById('rmk-minqty').value = 'H型鋼樁 20 支或水平支撐 200 M'; applyRmkCustom(); rmkCustom.extra = ['自訂甲條款'];
+        const txt = buildRmkText(); out.multi = /施作數量不足 H型鋼樁 20 支或水平支撐 200 M 時/.test(txt) && /^19\. 自訂甲條款$/m.test(txt);
+        /* 參數拿掉動員費條 → 標題提示找不到 */
+        prm.value = bak.split('\n').filter(l => !/【MOB】/.test(l)).join('\n'); openRmkModal(); out.missing = /找不到 【MOB】/.test(document.getElementById('rmk-t-mob').textContent);
+        document.getElementById('rmk-modal').style.display = 'none'; prm.value = bak; rmkCustom.extra = [];
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.84 備註填寫視窗：各區「第 N 條」與自訂條款起號依參數條款即時計算（插入即位移、刪除則提示）、門檻可寫多條件', r.t16 && r.shift && r.multi && r.missing, JSON.stringify(r));
+    check('v6.0.84 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

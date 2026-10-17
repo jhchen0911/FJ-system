@@ -2760,7 +2760,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.83" defer></script>
+<script src="app.js?v=6.0.84" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
@@ -2801,20 +2801,20 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 僅填入有金額的項目，未填寫欄位將<strong>不顯示於報價單備註</strong>中。
       </div>
 
-      <div style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:5px">第8條：施工構台設計載重</div>
+      <div id="rmk-t-load" style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:5px">第8條：施工構台設計載重</div>
       <div class="fg fg4" style="margin-bottom:10px">
         <div class="f"><label>載重 (T)</label><input type="number" id="rmk-load" placeholder="例：50"></div>
         <div class="f"></div><div class="f"></div><div class="f"></div>
       </div>
 
-      <div style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:5px">第11條：備用單價</div>
+      <div id="rmk-t-spare" style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:5px">第11條：備用單價</div>
       <div class="fg fg4" style="margin-bottom:10px">
         <div class="f"><label>a. 安全走道 ($/M)</label><input type="number" id="rmk-walk" placeholder="選填"></div>
         <div class="f"><label>b. 技術工 ($/天)</label><input type="number" id="rmk-tech" placeholder="選填"></div>
         <div class="f"></div><div class="f"></div>
       </div>
 
-      <div style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:5px">第12條：買斷單價（未稅）</div>
+      <div id="rmk-t-buy" style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:5px">第12條：買斷單價（未稅）</div>
       <div style="font-size:10px;color:var(--b3);margin-bottom:4px">型鋼材料 ($/KG)</div>
       <div class="fg fg2" style="margin-bottom:6px">
         <div class="f"><label>型鋼 ($/KG)</label><input type="number" id="rmk-bh" placeholder="選填"></div>
@@ -2831,15 +2831,15 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="f"><label>鋪路鐵板</label><input type="number" id="rmk-ir" placeholder="選填"></div>
       </div>
 
-      <div style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:5px">第16條：動員費</div>
+      <div id="rmk-t-mob" style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:5px">第16條：動員費</div>
       <div class="fg fg4" style="margin-bottom:12px">
         <div class="f"><label>動員費 ($/次)</label><input type="number" id="rmk-mob" placeholder="選填"></div>
-        <div class="f"><label>施作數量不足（門檻）</label><input id="rmk-minqty" placeholder="例：20 支／200 M"></div>
-        <div class="f"></div><div class="f"></div>
+        <div class="f" style="grid-column:span 2"><label>施作數量不足（門檻，可寫多個條件）</label><input id="rmk-minqty" placeholder="例：20 支；多條件：H型鋼樁 20 支或水平支撐 200 M"></div>
+        <div class="f"></div>
       </div>
 
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-        <div style="font-size:11px;font-weight:700;color:var(--b4);flex:1">自訂條款（依序接在第 17 條之後）</div>
+        <div id="rmk-extra-hint" style="font-size:11px;font-weight:700;color:var(--b4);flex:1">自訂條款（依序接在最後一條之後）</div>
         <button type="button" class="btn btn-xs" onclick="rmkAddExtra()"><svg class="ic ib" aria-hidden="true"><use href="#i-plus"/></svg> 新增條款</button>
       </div>
       <div id="rmk-extra" style="margin-bottom:12px"></div>

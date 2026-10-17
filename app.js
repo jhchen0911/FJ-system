@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.83';
+var APP_VERSION='v6.0.84';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -2554,6 +2554,14 @@ function rmkRenderExtra(){
 function rmkAddExtra(){_rmkExtraList().push('');rmkRenderExtra();}
 function rmkDelExtra(i){_rmkExtraList().splice(i,1);rmkRenderExtra();}
 // 通用版條款的最後一個編號（用來接續編號）
+// v6.0.84 備註填寫視窗的「第 N 條」標題依參數條款現況計算：找含該佔位符的那一行的編號；自訂條款接在最後一條之後
+function _rmkClauseNo(base,token){var n=0;String(base||'').split('\n').forEach(function(l){if(n||l.indexOf(token)<0)return;var m=l.match(/^\s*(\d+)\s*\./);if(m)n=parseInt(m[1],10);});return n;}
+function _rmkModalTitles(){
+  var base=document.getElementById('prm')?.value||P.rmkBase||'';
+  var set=function(id,tok,label){var el=document.getElementById(id);if(!el)return;var n=_rmkClauseNo(base,tok);el.textContent=(n?('第'+n+'條：'):'')+label+(n?'':'（參數條款中找不到 '+tok+'，此欄不會套用）');};
+  set('rmk-t-load','【LOAD】','施工構台設計載重');set('rmk-t-spare','【WALK】','備用單價');set('rmk-t-buy','【BUY_H】','買斷單價（未稅）');set('rmk-t-mob','【MOB】','動員費');
+  var hint=document.getElementById('rmk-extra-hint');if(hint)hint.textContent='自訂條款（依序接在第 '+_rmkBaseCount(base)+' 條之後；條號隨參數「預設備註條款」自動變）';
+}
 function _rmkBaseCount(base){
   let n=0;
   String(base||'').split('\n').forEach(l=>{const mm=l.match(/^\s*(\d+)\s*\./);if(mm)n=Math.max(n,parseInt(mm[1],10));});
@@ -2572,6 +2580,7 @@ function openRmkModal(){
   const map={load:'rmk-load',walk:'rmk-walk',tech:'rmk-tech',bh:'rmk-bh',
     br:'rmk-br',bs:'rmk-bs',bb:'rmk-bb',c2:'rmk-c2',c3:'rmk-c3',ir:'rmk-ir',mob:'rmk-mob',minQty:'rmk-minqty'};
   Object.entries(map).forEach(([k,id])=>{const e=document.getElementById(id);if(e)e.value=rmkCustom[k]||'';});
+  try{_rmkModalTitles();}catch(e){_err('openRmkModal.titles',e);}   // v6.0.84 條號依參數「預設備註條款」即時算
   rmkRenderExtra();
   document.getElementById('rmk-modal').style.display='flex';
 }
