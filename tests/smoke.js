@@ -2908,12 +2908,12 @@ async function newPage(browser, width, height) {
         rCostItems();
         syncCostToPayable(q,cO);out.ownNone=!PAYABLES.some(p=>p.costId==='cO');
         out.ownCard0=/公司自備/.test(card('cO').innerHTML)&&/租期參考/.test(card('cO').innerHTML)&&/2026-09-10/.test(card('cO').innerHTML);
-        updCostField('cO','vendor','辰巳租賃');
+        updCostField('cO','vendor','壬癸租賃');
         let po=PAYABLES.find(p=>p.costId==='cO');out.ownPay=!!po&&po.amount===60000&&po.category==='material'&&_payEff(po)===63000&&po.date===_vendorDueDate('2026-09-02');
         updCostField('cO','invoice',false);po=PAYABLES.find(p=>p.costId==='cO');out.ownNoInv=po.vat===false&&_payEff(po)===60000;
         updCostField('cO','invoice',true);updCostField('cO','invNo','ZZ-88889999');po=PAYABLES.find(p=>p.costId==='cO');out.ownInvNo=po.vat===true&&po.invNo==='ZZ-88889999';
         rCostItems();out.ownCard=/開發票/.test(card('cO').innerHTML)&&/ZZ-88889999/.test(card('cO').innerHTML)&&/應付 63,000/.test(card('cO').innerHTML);
-        updCostField('cO','vendor','');out.ownBack=!PAYABLES.some(p=>p.costId==='cO');updCostField('cO','vendor','辰巳租賃');
+        updCostField('cO','vendor','');out.ownBack=!PAYABLES.some(p=>p.costId==='cO');updCostField('cO','vendor','壬癸租賃');
         // ② 類型摘要列
         rCostItems();const cs=document.getElementById('cost-summary');
         out.strip=!!cs&&/承包（發包）/.test(cs.innerHTML)&&/日報零星支出/.test(cs.innerHTML)&&/本案應付未付/.test(cs.innerHTML)&&/自有材料攤提／購置/.test(cs.innerHTML)&&/租金（材料＋設備，已請款）/.test(cs.innerHTML);
@@ -2946,7 +2946,7 @@ async function newPage(browser, width, height) {
         out.recon=rec.length===1&&rec[0].vb===1100&&rec[0].sub===1000&&rec[0].notes.some(n=>/廠商請款累計超過發包量 100/.test(n)&&/自行吸收/.test(n))&&rec[0].notes.some(n=>/回報量超過合約量 100/.test(n))&&rec[0].warns.length===1&&/廠商已請 1,100（扣自行吸收 100）、業主已請 0，差 1,000/.test(rec[0].warns[0]);
         setCostView('qty');const qh=document.getElementById('cost-list').innerHTML;out.reconHtml=/實作實算/.test(qh)&&/尚未向業主請款/.test(qh)&&/color:#1565C0/.test(qh);setCostView('list');
         // ⑥ 勾稽：材料機具（有廠商）也列；成本分析：逾期租金另列
-        setCostView('audit');const ah=document.getElementById('cost-list').innerHTML;out.audit=/材料機具/.test(ah)&&/辰巳租賃/.test(ah)&&!/缺應付/.test(ah);setCostView('list');
+        setCostView('audit');const ah=document.getElementById('cost-list').innerHTML;out.audit=/材料機具/.test(ah)&&/壬癸租賃/.test(ah)&&!/缺應付/.test(ah);setCostView('list');
         // 逾期：打設最後一天 09-20 → 起算 09-21，30 天租期到 10-20，今天 09-30 尚未逾期 → 無列；改 ot 與早日期
         q.dailyLogs[1].date='2026-08-01';q.dailyLogs[0].date='2026-07-20';q.items[0].ot='50';q.items[0].otu='M/天';
         setCostView('analysis');const an=document.getElementById('cost-list').innerHTML;out.rentLine=/逾期租金（業主端/.test(an)&&/逾 /.test(an);setCostView('list');
@@ -4993,82 +4993,6 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ───────────── v6.0.40 範例科技廠 F25P1 一次性資料修正、工程專案分包列重算抵扣 ─────────────
-  {
-    const { page, errors } = await newPage(browser, 1200, 900);
-    const r = await page.evaluate(() => new Promise(res => {
-  const out={};
-  try{
-    localStorage.removeItem('fy_fix_f25p1');
-    const D='H型鋼樁 H300，L=15M@80cm 打設、拔除（含水刀引孔）';
-    Q=[{id:'qF',code:'F',name:'範例科技廠A區',client:'業主',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:D,unit:'支',qty:'133',price:'10000',sec:false,_uid:'f1'}],t:{sub:1330000,tax:66500,total:1396500},dailyLogs:[],
-      costs:[
-        {id:'cA',type:'sub',vendor:'甲乙工程行',cat:'打設',date:'2026-09-20',invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'cA_0',linkedItemIdx:0,qty:133,unitPrice:8250,desc:'$550/M × 15M',ppm:550,len:15}],amt:1097250,
-          advances:[{id:'x1',date:'2026-10-05',amt:548625,note:''},{id:'x2',date:'2026-09-09',amt:200000,note:''}],
-          periods:[{no:1,date:'2026-09-25',from:'2026-09-23',to:'2026-09-25',rows:[{rid:'cA_0',qty:133}],amt:1097250,ret:0,net:1097250,due:'2026-10-25',adv:1097250}]},
-        {id:'cB',type:'sub',vendor:'甲乙工程行',cat:'打設',date:'2026-09-22',invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'cB_0',linkedItemIdx:0,qty:133,unitPrice:8250}],amt:1097250,periods:[]},
-        {id:'cI',type:'sub',vendor:'王大明（大明哥）',cat:'打設',date:'2026-09-20',invoice:true,isIntro:true,followOf:'cA',introCalc:'pc',introAmt:150,rows:[{id:'cI_0',linkedItemIdx:0,qty:133,unitPrice:150,desc:'介紹費'}],amt:19950,periods:[]},
-        {id:'cX',type:'extra',vendor:'王大明（大明哥）',cat:'其他',date:'2026-10-05',invoice:true,amt:29000,rows:[{id:'cX_0',desc:'司機＋挖土機',qty:1,unitPrice:29000}]}]}];
-    eid='qF';PAYABLES.length=0;
-    PAYABLES.push({id:'paycA_ax1',costId:'cA',costAdv:'x1',quoteId:'qF',to:'甲乙工程行',project:'範例科技廠A區',amount:548625,vat:true,date:'2026-10-05',status:'paid',paidDate:'2026-10-05',note:'預付款'});
-    PAYABLES.push({id:'paycA_ax2',costId:'cA',costAdv:'x2',quoteId:'qF',to:'甲乙工程行',project:'範例科技廠A區',amount:200000,vat:true,date:'2026-09-09',status:'pending',note:'預付款'});
-    PAYABLES.push({id:'manualHY',to:'甲乙工程行',project:'範例科技廠A區',amount:1097250,vat:true,date:'2026-10-25',status:'pending',costSourceId:'cA',note:''});
-    PAYABLES.push({id:'paycB',costId:'cB',quoteId:'qF',to:'甲乙工程行',project:'範例科技廠A區',amount:1097250,vat:true,date:'2026-10-25',status:'pending',note:''});
-    PAYABLES.push({id:'paycI_p1',costId:'cI',costPeriod:1,quoteId:'qF',to:'王大明（大明哥）',project:'範例科技廠A區',amount:38250,vat:true,date:'2026-10-25',status:'pending',note:'第1期計價'});
-    PAYABLES.push({id:'fgPaid',to:'王大明（大明哥）',project:'範例科技廠A區',amount:299250,vat:false,date:'2026-10-05',status:'paid',paidDate:'2026-10-06',note:'介紹費'});
-    PAYABLES.push({id:'paycX',costId:'cX',quoteId:'qF',to:'王大明（大明哥）',project:'範例科技廠A區',amount:29000,vat:true,date:'2026-11-25',status:'pending',note:''});
-    const log=_fixF25P1(true);out.log=log;
-    const q=Q[0],cA=q.costs.find(c=>c.id==='cA'),cI=q.costs.find(c=>c.id==='cI');
-    out.cardB=!q.costs.some(c=>c.id==='cB')&&!PAYABLES.some(p=>p.id==='paycB');
-    out.adv=cA.advances.length===1&&cA.advances[0].amt===548625&&cA.periods[0].adv===548625;
-    const pa=PAYABLES.find(p=>p.id==='paycA_af25hy'),pm=PAYABLES.find(p=>p.id==='paycA_p1');
-    out.advPay=!!pa&&pa.status==='paid'&&pa.paidDate==='2026-10-05'&&_payEff(pa)===576056&&!PAYABLES.some(p=>p.id==='paycA_ax1'||p.id==='paycA_ax2');
-    out.rest=!!pm&&pm.status==='pending'&&_payEff(pm)===576056&&pm.date==='2026-10-25'&&!PAYABLES.some(p=>p.id==='manualHY');
-    out.intro=cI.introCalc==='m'&&cI.invoice===false&&cI.rows[0].unitPrice===2250&&cI.periods.length===1&&_subPeriodCalc(cI,cI.periods[0]).amt===299250;
-    const fp=PAYABLES.find(p=>p.id==='paycI_p1');
-    out.introPay=!!fp&&fp.status==='paid'&&fp.paidDate==='2026-10-06'&&fp.vat===false&&_payEff(fp)===299250&&!PAYABLES.some(p=>p.id==='fgPaid');
-    const ep=PAYABLES.find(p=>p.costId==='cX');out.extra=!!ep&&ep.vat===false&&ep.status==='paid'&&_payEff(ep)===29000;
-    out.hyCount=PAYABLES.filter(p=>/甲乙/.test(p.to)).length;   // 2
-    out.again=_fixF25P1()===null;   // 已跑過不再跑
-    // 工程專案分包列有重算抵扣
-    _pjQid='qF';go('proj');renderProj();const b=document.getElementById('pj-body-sub');if(b)b.style.display='';
-    out.reallocBtn=/subAdvRealloc\('cA'\)/.test(document.getElementById('proj-root').innerHTML);
-  }catch(e){out.err=String(e&&e.stack||e).slice(0,600);}
-  localStorage.removeItem('fy_fix_f25p1');Q=[];PAYABLES.length=0;eid=null;res(out);
-}));
-    check('v6.0.40 F25P1 修正：甲乙重複卡刪除、預付款只留 548,625（已付 10/05）、第 1 期餘款 576,056（10/25 未付）、手動整筆應付刪除', r.cardB && r.adv && r.advPay && r.rest && r.hyCount===2, JSON.stringify(r));
-    check('v6.0.40 F25P1 修正：大明哥介紹費改每 M 150×15M → 299,250 不含稅、沿用已付、重複刪除；額外支出 29,000 不含稅已付；只跑一次', r.intro && r.introPay && r.extra && r.again, JSON.stringify(r));
-    check('v6.0.40 工程專案分包列預付款下方有「重算抵扣」', r.reallocBtn, JSON.stringify(r));
-    check('v6.0.40 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
-    await page.close();
-  }
-
-  // ───────────── v6.0.41 F25P1 第二次收尾：重複已付預付款刪除、第 1 期餘款補建 ─────────────
-  {
-    const { page, errors } = await newPage(browser, 1200, 900);
-    const r = await page.evaluate(() => new Promise(res => {
-  const out={};
-  try{
-    localStorage.removeItem('fy_fix_f25p1b');
-    Q=[{id:'qF',code:'F',name:'範例科技廠A區',client:'業主',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 H300，L=15M@80cm 打設、拔除',unit:'支',qty:'133',price:'10000',sec:false,_uid:'f1'}],t:{sub:1330000,tax:66500,total:1396500},dailyLogs:[],
-      costs:[{id:'cA',type:'sub',vendor:'甲乙工程行',cat:'打設',date:'2026-09-20',invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'cA_0',linkedItemIdx:0,qty:133,unitPrice:8250}],amt:1097250,
-        advances:[{id:'f25hy',date:'2026-10-05',amt:548625,note:''}],periods:[{no:1,date:'2026-09-25',from:'2026-09-23',to:'2026-09-25',rows:[{rid:'cA_0',qty:133}],amt:1097250,ret:0,net:1097250,due:'2026-10-25',adv:548625}]}]}];
-    eid='qF';PAYABLES.length=0;
-    PAYABLES.push({id:'paycA_af25hy',costId:'cA',costAdv:'f25hy',quoteId:'qF',to:'甲乙工程行',project:'範例科技廠A區',amount:548625,vat:true,date:'2026-10-05',status:'paid',paidDate:'2026-10-05',note:'預付款：預付一半'});
-    PAYABLES.push({id:'payOLD_aeX',costId:'cGONE',to:'甲乙工程行',project:'範例科技廠A區',amount:548625,vat:true,date:'2026-10-05',status:'paid',paidDate:'2026-10-05',note:'預付款（第1期）'});
-    const log=_fixF25P1b(true);out.log=log;
-    out.dupGone=!PAYABLES.some(p=>p.id==='payOLD_aeX')&&PAYABLES.filter(p=>/甲乙/.test(p.to)&&p.status==='paid').length===1;
-    const pm=PAYABLES.find(p=>p.id==='paycA_p1');out.rest=!!pm&&pm.status==='pending'&&_payEff(pm)===576056&&pm.date==='2026-10-25';
-    out.again=_fixF25P1b()===null;
-  }catch(e){out.err=String(e&&e.stack||e).slice(0,500);}
-  localStorage.removeItem('fy_fix_f25p1b');Q=[];PAYABLES.length=0;eid=null;res(out);
-}));
-    check('v6.0.41 F25P1 第二次收尾：非正式編號的重複已付預付款刪除、第 1 期餘款 576,056（10/25 未付）補建、只跑一次', r.dupGone && r.rest && r.again, JSON.stringify(r));
-    check('v6.0.41 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
-    await page.close();
-  }
-
-  // ───────────── v6.0.42 自動產生的應付唯讀；去重不再砍期別／預付款應付 ─────────────
   {
     const { page, errors } = await newPage(browser, 1200, 900);
     const r = await page.evaluate(() => new Promise(res => {
@@ -6447,8 +6371,8 @@ async function newPage(browser, width, height) {
         out.kpi = /576,056/.test(mh) && /2,730/.test(mh) && /164,400/.test(mh) && /743,186/.test(mh) && !/>NT\$ 548,625</.test(mh) && /未稅 548,625/.test(mh);
         document.getElementById('gen-confirm-cancel').click();
         /* ② 客戶帶入報價：窗口＋聯絡人電話為主，缺則退公司欄 */
-        CUSTOMERS.length = 0; CUSTOMERS.push({ id: 'cu1', name: '午未科技', tel: '(03)1234567', contact: '張三 經理', siteTel: '0923-456-789', companyContact: '王總' }, { id: 'cu2', name: '只有公司', tel: '(02)12345678', companyContact: '李經理' });
-        newQ(); applyCustomerByName('午未科技', 'quote'); out.fill1 = gv('fco') === '張三 經理' && gv('fp') === '0923-456-789';
+        CUSTOMERS.length = 0; CUSTOMERS.push({ id: 'cu1', name: '子丑科技', tel: '(03)1234567', contact: '張三 經理', siteTel: '0923-456-789', companyContact: '王總' }, { id: 'cu2', name: '只有公司', tel: '(02)12345678', companyContact: '李經理' });
+        newQ(); applyCustomerByName('子丑科技', 'quote'); out.fill1 = gv('fco') === '張三 經理' && gv('fp') === '0923-456-789';
         newQ(); applyCustomerByName('只有公司', 'quote'); out.fill2 = gv('fco') === '李經理' && gv('fp') === '(02)1234-5678';
         /* ③ 電話格式 */
         out.fmt = _fmtPhoneTW('0923456789') === '0923-456-789' && _fmtPhoneTW('031234567') === '(03)1234567' && _fmtPhoneTW('0223456789') === '(02)2345-6789' && _fmtPhoneTW('0223456789#177') === '(02)2345-6789 #177'
@@ -6641,6 +6565,35 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.85 付款帳本：標記即入帳、重建成待付自動校正回已付、雲端整包待付／本機無帳本都補回、改回未付後不誤回、刪除清帳本、隨私有節點上傳', r.harvest && r.restored && r.cloudStale && r.fromCloudLog && r.unmark && r.stayUnpaid && r.staleRePaid && r.rePaid && r.tombClear && r.rebuildPending && r.payload, JSON.stringify(r));
     check('v6.0.85 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.86 安全整理：一次性資料修正移除、自助註冊改為聯絡管理員、重算抵扣仍在 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    out.fixGone=typeof _fixF25P1==='undefined'&&typeof _fixF25P1b==='undefined';
+    // 「申請帳號」不再呼叫 createUserWithEmailAndPassword，只顯示請聯絡管理員
+    let created=0;_fbAuth={createUserWithEmailAndPassword(){created++;return Promise.resolve();}};
+    document.getElementById('fb-email').value='a@b.c';document.getElementById('fb-password').value='123456';
+    fbRegister();const err=document.getElementById('fb-auth-error');
+    out.reg=created===0&&err.style.display==='block'&&/管理員/.test(err.textContent);
+    out.btn=/申請帳號/.test(document.body.innerHTML)&&!/註冊新帳號/.test(document.body.innerHTML);
+    out.msg=/管理員/.test(_fbErrMsg('auth/admin-restricted-operation'))&&!/註冊/.test(_fbErrMsg('auth/user-not-found'));
+    // 工程專案分包列預付款仍有「重算抵扣」（原 v6.0.40 檢查搬到這裡）
+    Q=[{id:'qR86',code:'R86',name:'範例工程',client:'業主',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:[{desc:'H型鋼樁 打設',unit:'支',qty:'10',price:'10000',sec:false,_uid:'r1'}],t:{sub:100000,tax:5000,tot:105000,total:105000},
+      costs:[{id:'cR',type:'sub',vendor:'甲乙工程行',cat:'打設',date:'2026-09-20',invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'cR_0',linkedItemIdx:0,qty:10,unitPrice:8000}],amt:80000,
+        advances:[{id:'a1',date:'2026-10-05',amt:40000,note:''}],periods:[]}]}];
+    eid=null;_pjQid='qR86';go('proj');renderProj();const b=document.getElementById('pj-body-sub');if(b)b.style.display='';
+    out.reallocBtn=/subAdvRealloc\('cR'\)/.test(document.getElementById('proj-root').innerHTML);
+  }catch(e){out.err=String(e&&e.stack||e).slice(0,600);}
+  Q=[];_fbAuth=null;res(out);
+}));
+    check('v6.0.86 一次性資料修正 _fixF25P1／_fixF25P1b 已移除；「申請帳號」改顯示請聯絡管理員、不再自助建立帳號', r.fixGone && r.reg && r.btn && r.msg, JSON.stringify(r));
+    check('v6.0.86 工程專案分包列預付款下方仍有「重算抵扣」', r.reallocBtn, JSON.stringify(r));
+    check('v6.0.86 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

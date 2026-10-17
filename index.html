@@ -1818,7 +1818,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           </div>
           <div style="display:flex;gap:8px">
             <button type="button" onclick="fbSignIn()" class="btn btn-sm btn-g" style="flex:1;justify-content:center"><svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg> 登入</button>
-            <button type="button" onclick="fbRegister()" class="btn btn-sm" style="flex:1;justify-content:center;border-color:#1a73e8;color:#1a73e8"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 註冊新帳號</button>
+            <button type="button" onclick="fbRegister()" class="btn btn-sm" style="flex:1;justify-content:center;border-color:#1a73e8;color:#1a73e8"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 申請帳號</button>
           </div>
           <div id="fb-auth-error" style="font-size:11px;color:var(--red);margin-top:6px;text-align:center;display:none"></div>
         </div>
@@ -2445,7 +2445,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="fg fg4" style="margin-bottom:8px">
           <div class="f"><label>業主名稱</label>
             <div style="display:flex;gap:6px;align-items:center">
-              <input id="inv-client" placeholder="戊己營造股份有限公司" style="flex:1">
+              <input id="inv-client" placeholder="○○營造股份有限公司" style="flex:1">
               <button type="button" class="btn btn-xs" onclick="pullInvFromCustomer()" title="從客戶管理拉取資料" style="white-space:nowrap;flex-shrink:0"><svg class="ic ib" aria-hidden="true"><use href="#i-user"/></svg> 帶入</button>
             </div>
           </div>
@@ -2760,7 +2760,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.85" defer></script>
+<script src="app.js?v=6.0.86" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
@@ -3112,7 +3112,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <div class="fg fg3" style="margin-bottom:10px">
         <div class="f"><label>匯款銀行／分行</label><input id="v-bank" placeholder="例：國泰世華 新莊分行"></div>
         <div class="f"><label>匯款帳號</label><input id="v-bankacct" inputmode="numeric" placeholder="例：0123-4567-8901"></div>
-        <div class="f"><label>戶名</label><input id="v-bankholder" placeholder="例：丙丁企業有限公司"></div>
+        <div class="f"><label>戶名</label><input id="v-bankholder" placeholder="例：○○企業有限公司"></div>
       </div>
       <div class="f" style="margin-bottom:10px">
         <label>常規付款方式 <span style="font-size:10px;color:var(--b3)">（可連動至應付帳款）</span></label>

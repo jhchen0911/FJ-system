@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.85';
+var APP_VERSION='v6.0.86';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -7932,21 +7932,9 @@ function fbSignIn(){
     });
 }
 
-function fbRegister(){
-  const email=document.getElementById('fb-email')?.value?.trim();
-  const pw=document.getElementById('fb-password')?.value;
+function fbRegister(){   // v6.0.86：Firebase 主控台已關閉自助註冊，帳號一律由系統管理員在主控台建立
   const errEl=document.getElementById('fb-auth-error');
-  if(!email||!pw){if(errEl){errEl.textContent='請輸入電子郵件和密碼';errEl.style.display='block';}return;}
-  if(pw.length<6){if(errEl){errEl.textContent='密碼至少6個字元';errEl.style.display='block';}return;}
-  if(!_fbAuth){
-    initGoogleSignIn();
-    if(errEl){errEl.textContent='正在連線 Firebase，請稍候再試…';errEl.style.display='block';}
-    return;
-  }
-  _setFbLoading(true);
-  _fbAuth.createUserWithEmailAndPassword(email,pw)
-    .then(()=>{_setFbLoading(false);toast('帳號建立成功！');if(errEl)errEl.style.display='none';})
-    .catch(err=>{_setFbLoading(false);if(errEl){errEl.textContent=_fbErrMsg(err.code);errEl.style.display='block';}});
+  if(errEl){errEl.textContent='帳號由系統管理員建立，請聯絡管理員開通後再登入';errEl.style.display='block';}
 }
 function fbSignOut(){
   try{localStorage.removeItem('fy_sync_hashes');}catch(e){_err('fbSignOut',e);}   // v5.319：換帳號時基準必須重置，否則新帳號雲端會永遠是空的
@@ -7983,10 +7971,11 @@ function _setFbLoading(on){
   }
 }
 function _fbErrMsg(code){
-  const m={'auth/user-not-found':'找不到此帳號，請先註冊','auth/wrong-password':'密碼錯誤',
+  const m={'auth/user-not-found':'找不到此帳號，請聯絡系統管理員建立','auth/wrong-password':'密碼錯誤',
     'auth/invalid-email':'電子郵件格式有誤','auth/email-already-in-use':'此Email已被使用',
     'auth/weak-password':'密碼太簡單（至少6字元）','auth/invalid-credential':'帳號或密碼錯誤',
-    'auth/too-many-requests':'嘗試次數過多，請稍後再試'};
+    'auth/too-many-requests':'嘗試次數過多，請稍後再試',
+    'auth/admin-restricted-operation':'帳號由系統管理員建立，請聯絡管理員'};
   return m[code]||('錯誤：'+code);
 }
 
@@ -11044,7 +11033,7 @@ var PLAN_FIELDS=[
     {k:'agency',l:'主辦機關',   ph:'公共工程填寫，民間工程可留空'},
     {k:'design',l:'設計監造',   ph:'例：○○建築師事務所'},
     {k:'pm',    l:'專案管理',   ph:'例：○○工程顧問股份有限公司'},
-    {k:'main',  l:'承攬廠商（營造）',ph:'例：戊己營造股份有限公司（掛專案自動帶入）',req:1},
+    {k:'main',  l:'承攬廠商（營造）',ph:'例：○○營造股份有限公司（掛專案自動帶入）',req:1},
     {k:'sub',   l:'協力廠商（本公司）',ph:'豐有工程有限公司'},
     {k:'amount',l:'承攬金額',   ph:'例：新臺幣 12,800,000 元整'},
     {k:'dur',   l:'契約工期',   ph:'例：120 日曆天'},
@@ -30657,8 +30646,8 @@ function _subWholePayPrune(){
   return n;
 }
 // ── 介紹費／抽成：計價跟隨（c.followOf＝主約成本 id）──
-// 例：中科發包 550/M 給甲乙，大明哥另收 150/M → 大明哥建一筆承包（同工項、單價 150）並設「計價跟隨：甲乙」，
-// 甲乙每期計價儲存時，大明哥自動產生同期別、同期間、同數量的計價與應付（金額＝數量×150）。
+// 例：某案發包 550/M 給甲廠商，介紹人另收 150/M → 介紹人建一筆承包（同工項、單價 150）並設「計價跟隨：甲廠商」，
+// 甲廠商每期計價儲存時，介紹人自動產生同期別、同期間、同數量的計價與應付（金額＝數量×150）。
 function _subFollowers(q,c){return ((q&&q.costs)||[]).filter(function(f){return f&&f.type==='sub'&&!f.mergedInto&&f.followOf===c.id;});}
 function _subFollowMain(q,c){return (c&&c.followOf)?((q&&q.costs)||[]).find(function(o){return o.id===c.followOf;}):null;}
 function _subFollowRowFor(main,mr,f){
@@ -30707,7 +30696,7 @@ function subFollowSync(cid){
   try{persist();_immediateUpload();}catch(e){_err('subFollowSync',e);}
   rCostItems();toast('已依「'+(m.vendor||'')+'」的計價同步');
 }
-// 主約卡上的介紹費摘要：「大明哥 ＋150／M（合計 700／M）」
+// 主約卡上的介紹費摘要：「介紹人 ＋150／M（合計 700／M）」
 function _subFollowSummary(q,c){
   var fs=_subFollowers(q,c);if(!fs.length)return '';
   var r0=(c.rows||[])[0],unit='';
@@ -34786,113 +34775,7 @@ function _payFilesInline(p){
 }
 
 
-// ══════════════ v6.0.40：範例科技廠 F25P1 資料一次性修正、工程專案分包列「重算抵扣」（v640.js 區塊）══════════════
-// 使用者口述事實（2026-10-06）：甲乙 H300 L=15M $550/M × 133 支（1,097,250 未稅）、10/5 預付一半（含稅 576,056＝未稅 548,625）、餘款 10/25；
-// 大明哥介紹費 每 M 150 × 15M × 133 ＝ 299,250 不開發票 10/5 已付；大明哥額外支出 29,000 不開發票 10/5 已付。
-// 只在工程名稱符合、金額對得上時動手；每一步都記錄，做完一次就不再跑（fy_fix_f25p1）。
-function _fixF25P1(force){
-  if(!force&&localStorage.getItem('fy_fix_f25p1'))return null;
-  var q=(Q||[]).find(function(x){return x&&x.awarded&&/範例科技廠\s*F25P1/i.test(x.name||'');});
-  if(!q)return null;
-  var log=[],today=localToday();
-  var tomb=function(id){try{_tomb('payables',id);}catch(e){_err('_fixF25P1',e);}};
-  var dropPay=function(pred,why){var n=0;PAYABLES=PAYABLES.filter(function(p){if(p&&pred(p)){tomb(p.id);n++;return false;}return true;});if(n)log.push(why+'：刪除 '+n+' 筆應付');};
-  var isHY=function(s){return /甲乙/.test(String(s||''));},isFG=function(s){return /大明哥|王大明/.test(String(s||''));};
-  var itemIdx=(q.items||[]).findIndex(function(it){return it&&!it.sec&&/H300/.test(it.desc||'')&&/15\s*M/i.test(it.desc||'');});
-  // ── 甲乙發包卡
-  var hy=(q.costs||[]).filter(function(c){return c&&c.type==='sub'&&!c.isIntro&&!c.followOf&&isHY(c.vendor);});
-  var main=hy.find(function(c){return _subPeriods(c).length;})||hy[0]||null;
-  if(main){
-    hy.forEach(function(c){if(c===main)return;
-      var paidTied=(PAYABLES||[]).some(function(p){return p&&(p.costId===c.id)&&p.status==='paid';});
-      if(paidTied){log.push('甲乙重複發包卡（'+(c.date||'')+'）掛有已付應付，保留請人工確認');return;}
-      q.costs=q.costs.filter(function(x){return x!==c;});dropPay(function(p){return p.costId===c.id;},'甲乙重複發包卡的應付');log.push('刪除甲乙重複發包卡（'+(c.date||'')+'）');
-    });
-    var row=(main.rows||[]).find(function(r){return itemIdx>=0&&parseInt(r.linkedItemIdx)===itemIdx;})||(main.rows||[])[0];
-    if(!row){row={id:main.id+'_0',linkedItemIdx:itemIdx,desc:''};main.rows=[row];}
-    if(itemIdx>=0)row.linkedItemIdx=itemIdx;
-    row.qty=133;row.unitPrice=8250;row.ppm=550;row.len=15;if(!/550/.test(row.desc||''))row.desc='$550/M × 15M';
-    main.invoice=true;main.retRate=0;
-    var per=_subPeriods(main).filter(function(p){return !p.isRet;}).sort(function(a,b){return (a.no||0)-(b.no||0);})[0];
-    if(!per){per={no:1,date:'2026-10-01',from:'2026-09-01',to:'2026-10-01',rows:[],ts:Date.now()};main.periods=(main.periods||[]).concat([per]);log.push('甲乙：建立第 1 期');}
-    per.rows=[{rid:row.id,qty:133}];per.due='2026-10-25';per.mt=Date.now();
-    var extraPer=_subPeriods(main).filter(function(p){return !p.isRet&&p!==per;});
-    if(extraPer.length){main.periods=main.periods.filter(function(p){return p.isRet||p===per;});extraPer.forEach(function(p){dropPay(function(x){return x.id===_subPayId(main.id,p);},'甲乙多餘期別');});log.push('甲乙：移除多餘期別 '+extraPer.length+' 個');}
-    delete per.early;
-    var k=_subPeriodCalc(main,per);per.amt=k.amt;per.ret=k.ret;per.net=k.net;
-    // 預付款：只留一筆 548,625（10/5）
-    var canon='f25hy',a={id:canon,date:'2026-10-05',amt:548625,note:'預付一半（含稅 576,056）',ts:Date.now()};
-    var oldAdvPays=(PAYABLES||[]).filter(function(p){return p&&p.costId===main.id&&(p.costAdv||/_a/.test(String(p.id)));});
-    var paidAdv=oldAdvPays.find(function(p){return p.status==='paid'&&Math.round(p.amount)===548625;})||oldAdvPays.find(function(p){return p.status==='paid';});
-    main.advances=[a];per.adv=548625;
-    var newId=_subAdvPayId(main.id,a);
-    oldAdvPays.forEach(function(p){if(p.id!==newId){PAYABLES=PAYABLES.filter(function(x){return x!==p;});tomb(p.id);}});
-    if(paidAdv&&paidAdv.id!==newId){var np=Object.assign({},paidAdv,{id:newId,costAdv:canon,amount:548625,vat:true,date:'2026-10-05',paidDate:paidAdv.paidDate||'2026-10-05',note:'預付款：預付一半（含稅 576,056）'});_touch(np);PAYABLES.unshift(np);log.push('甲乙預付款應付改掛新編號（保留已付 '+np.paidDate+'）');}
-    try{recalcCostAmt(main);}catch(e){_err('_fixF25P1',e);}
-    _touch(q);
-    try{syncCostToPayable(q,main);}catch(e){_err('_fixF25P1.hy',e);}
-    var pa=PAYABLES.find(function(p){return p.id===newId;});
-    if(pa&&pa.status!=='paid'){pa.status='paid';pa.paidDate='2026-10-05';pa.paidAt=Date.now();_touch(pa);log.push('甲乙預付款 576,056 標記已付 10/05');}
-    var pm=PAYABLES.find(function(p){return p.id===_subPayId(main.id,per);});
-    if(pm){if(pm.date!=='2026-10-25'){pm.date='2026-10-25';_touch(pm);}log.push('甲乙第 1 期餘款 '+fmt(_payEff(pm))+'（10/25，'+(pm.status==='paid'?'已付':'未付')+'）');}
-    // 同廠商同工程、不屬於這張卡的應付：未付的刪掉，已付的保留提醒
-    var keepIds={};keepIds[newId]=1;keepIds[_subPayId(main.id,per)]=1;
-    dropPay(function(p){return isHY(p.to)&&(p.project||'')===(q.name||'')&&!keepIds[p.id]&&p.status!=='paid';},'甲乙其他未付應付（手動整筆／舊資料）');
-    (PAYABLES||[]).forEach(function(p){if(p&&isHY(p.to)&&(p.project||'')===(q.name||'')&&!keepIds[p.id])log.push('甲乙另有已付應付 '+fmt(_payEff(p))+'（'+(p.paidDate||'')+'）未動，請確認是否重複');});
-  }else log.push('找不到甲乙發包卡');
-  // ── 大明哥介紹費
-  var intro=(q.costs||[]).find(function(c){return c&&c.type==='sub'&&c.isIntro&&isFG(c.vendor);})||(main&&(q.costs||[]).find(function(c){return c&&c.type==='sub'&&c.followOf===main.id;}));
-  if(intro&&main){
-    intro.followOf=main.id;intro.isIntro=true;intro.introCalc='m';intro.introAmt=150;intro.introPay='follow';intro.invoice=false;
-    var mrow=(main.rows||[])[0];
-    var frow=(intro.rows||[]).find(function(r){return parseInt(r.linkedItemIdx)===parseInt(mrow.linkedItemIdx);})||(intro.rows||[])[0];
-    if(!frow){frow={id:intro.id+'_0'};intro.rows=[frow];}
-    frow.linkedItemIdx=mrow.linkedItemIdx;frow.qty=133;frow.unitPrice=2250;frow.ppm=150;frow.len=15;frow.desc='介紹費 $150/M × 15M';
-    intro.rows=[frow];
-    delete (intro.advances);
-    try{_subFollowApply(q,main);}catch(e){_err('_fixF25P1.intro',e);}
-    try{recalcCostAmt(intro);}catch(e){_err('_fixF25P1',e);}
-    var fid=_subPayId(intro.id,{no:1}),fp=PAYABLES.find(function(p){return p.id===fid;});
-    var others=(PAYABLES||[]).filter(function(p){return p&&p.id!==fid&&isFG(p.to)&&(p.project||'')===(q.name||'')&&(p.costId===intro.id||Math.round(p.amount)===299250);});
-    var paidO=others.find(function(p){return p.status==='paid';});
-    if(fp){fp.vat=false;fp.amount=299250;if(paidO||fp.status==='paid'){fp.status='paid';fp.paidDate=(paidO&&paidO.paidDate)||fp.paidDate||'2026-10-05';fp.paidAt=fp.paidAt||Date.now();}_touch(fp);log.push('大明哥介紹費 299,250（不含稅）'+(fp.status==='paid'?'已付 '+fp.paidDate:'未付'));}
-    others.forEach(function(p){PAYABLES=PAYABLES.filter(function(x){return x!==p;});tomb(p.id);});if(others.length)log.push('大明哥介紹費重複應付：刪除 '+others.length+' 筆');
-  }else log.push('找不到大明哥介紹費卡'+(main?'':'（因無甲乙主約）'));
-  // ── 大明哥額外支出 29,000
-  var ex=(q.costs||[]).find(function(c){return c&&c.type==='extra'&&isFG(c.vendor)&&Math.round(parseFloat(c.amt)||0)===29000;});
-  if(ex){
-    ex.invoice=false;ex.vendorExtra=true;_touch(q);
-    try{syncCostToPayable(q,ex);}catch(e){_err('_fixF25P1.ex',e);}
-    var ep=PAYABLES.find(function(p){return p.costId===ex.id;});
-    var dupE=(PAYABLES||[]).filter(function(p){return p&&p!==ep&&isFG(p.to)&&(p.project||'')===(q.name||'')&&Math.round(p.amount)===29000;});
-    var paidE=dupE.find(function(p){return p.status==='paid';});
-    if(ep){ep.vat=false;ep.amount=29000;if(ep.status!=='paid'){ep.status='paid';ep.paidDate=(paidE&&paidE.paidDate)||'2026-10-05';ep.paidAt=Date.now();}_touch(ep);log.push('大明哥額外支出 29,000（不含稅）已付 '+ep.paidDate);}
-    dupE.forEach(function(p){PAYABLES=PAYABLES.filter(function(x){return x!==p;});tomb(p.id);});if(dupE.length)log.push('大明哥額外支出重複應付：刪除 '+dupE.length+' 筆');
-  }else log.push('找不到大明哥 29,000 額外支出');
-  try{persist();savePayables();_markDirty();}catch(e){_err('_fixF25P1.save',e);}
-  try{localStorage.setItem('fy_fix_f25p1',String(Date.now()));}catch(e){_err('_fixF25P1',e);}
-  try{window._fixF25P1Log=log;console.info('[FY] F25P1 修正：\n'+log.join('\n'));}catch(e){_err('_fixF25P1',e);}
-  return log;
-}
-try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{var r=_fixF25P1();if(r&&r.length)showConfirm('已套用「範例科技廠 F25P1」資料修正','<div style="font-size:12.5px;line-height:1.8">'+r.map(esc).join('<br>')+'<div style="margin-top:8px;color:var(--b4)">請到工程專案 › 發包與廠商計價 › 分包管理明細核對。</div></div>',function(){try{var pg=document.querySelector('.page.active');if(pg&&pg.id==='page-proj')renderProj();}catch(e){_err('_fixF25P1',e);}},false,null,true);}catch(e){_err('fixF25P1',e);}},7000);});}catch(e){_err('_fixF25P1',e);}
-// v6.0.41 第二次收尾：同一筆預付款（甲乙 548,625 已付）若還有別的編號的重複已付應付 → 刪掉非正式編號那筆；第 1 期餘款若缺應付 → 補建
-function _fixF25P1b(force){
-  if(!force&&localStorage.getItem('fy_fix_f25p1b'))return null;
-  var q=(Q||[]).find(function(x){return x&&x.awarded&&/範例科技廠\s*F25P1/i.test(x.name||'');});if(!q)return null;
-  var main=(q.costs||[]).find(function(c){return c&&c.type==='sub'&&!c.isIntro&&!c.followOf&&/甲乙/.test(c.vendor||'')&&_subPeriods(c).length;});if(!main)return null;
-  var log=[],adv=_subAdvs(main)[0];if(!adv)return null;
-  var canon=_subAdvPayId(main.id,adv);
-  var dups=(PAYABLES||[]).filter(function(p){return p&&p.id!==canon&&/甲乙/.test(p.to||'')&&(p.project||'')===(q.name||'')&&Math.round(parseFloat(p.amount)||0)===Math.round(parseFloat(adv.amt)||0)&&p.status==='paid';});
-  if(dups.length){var hasCanon=PAYABLES.some(function(p){return p.id===canon;});
-    if(!hasCanon){var keep=dups.shift();keep.id=canon;keep.costId=main.id;keep.costAdv=adv.id;keep.quoteId=q.id;_touch(keep);log.push('甲乙預付款已付應付改掛正式編號');}
-    dups.forEach(function(p){PAYABLES=PAYABLES.filter(function(x){return x!==p;});try{_tomb('payables',p.id);}catch(e){_err('_fixF25P1b',e);}});if(dups.length)log.push('刪除重複的甲乙預付款已付應付 '+dups.length+' 筆');}
-  var per=_subPeriods(main).filter(function(p){return !p.isRet;})[0];
-  if(per){var pid=_subPayId(main.id,per);if(!PAYABLES.some(function(p){return p.id===pid;})){try{syncCostToPayable(q,main);}catch(e){_err('_fixF25P1b',e);}var pm=PAYABLES.find(function(p){return p.id===pid;});if(pm){pm.date='2026-10-25';_touch(pm);log.push('補建甲乙第 1 期餘款 '+fmt(_payEff(pm))+'（10/25 未付）');}}}
-  if(log.length){try{persist();savePayables();_markDirty();}catch(e){_err('_fixF25P1b',e);}}
-  try{localStorage.setItem('fy_fix_f25p1b',String(Date.now()));}catch(e){_err('_fixF25P1b',e);}
-  return log;
-}
-try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{var r=_fixF25P1b();if(r&&r.length)showConfirm('F25P1 資料修正（第二次）','<div style="font-size:12.5px;line-height:1.8">'+r.map(esc).join('<br>')+'</div>',function(){try{if(document.getElementById('page-acct')&&document.getElementById('page-acct').classList.contains('active'))renderPayables();}catch(e){_err('_fixF25P1b',e);}},false,null,true);}catch(e){_err('fixF25P1b',e);}},9000);});}catch(e){_err('_fixF25P1b',e);}
+// ══════════════ v6.0.40：工程專案分包列「重算抵扣」（v640.js 區塊；原本同區的一次性資料修正 _fixF25P1／_fixF25P1b 已於 v6.0.86 移除）═════════════
 // 工程專案分包列：預付款列尾加「重算抵扣」
 var _pjAdvRowsHtml640=_pjAdvRowsHtml;
 _pjAdvRowsHtml=function(c){var h=_pjAdvRowsHtml640(c);if(!h||!c||c.followOf)return h;return h.replace(/<\/div>$/,'<div style="text-align:right;margin-top:2px">'+_reallocBtn(c).replace('font-size:11px;padding:3px 10px','font-size:10.5px;padding:1px 8px')+'</div></div>');};
@@ -35780,7 +35663,7 @@ function _phoneAutoFmt(e){
 }
 try{document.addEventListener('change',_phoneAutoFmt,true);}catch(e){_err('_phoneAutoFmt.bind',e);}
 // ══════════ v6.0.76 分包工程承攬合約書（豐有＝甲方、廠商＝乙方）：由分包成本卡自動帶入，列印給廠商簽 ══════════
-// 條款以 docs/分包工程承攬合約書_通用範本.md 為準（源自 docs/參考合約 業主端版，角色對調、付款與罰則改成本公司口徑）。
+// 條款以 docs/分包工程承攬合約書_通用範本.md 為準（源自業主端承攬合約的條款結構，角色對調、付款與罰則改成本公司口徑）。
 // 可調的空格存 P.subCt（特約條款、逾期罰金‰、保險分擔、保固、管轄法院、付款補充），隨參數同步；每份合約的工期／備註只存這次列印。
 var _SCT_DEF={fine:0.3,ins:0,court:'臺灣新北地方法院',warranty:'',special:'',payExtra:''};
 function _sctCfg(){var o=Object.assign({},_SCT_DEF,(P&&P.subCt)||{});return o;}
@@ -36004,7 +35887,7 @@ function openSalesBook(){
       +'<td style="padding:4px;text-align:center"><input class="sb-active" type="checkbox"'+(x.active!==false?' checked':'')+' title="在職"></td>'
       +'<td style="padding:4px;text-align:center"><button type="button" class="btn btn-xs btn-r" onclick="this.closest(\'tr\').remove()" title="刪除（已掛在報價上的業務建議改為離職）">✕</button></td></tr>';
   }).join('');
-  var html='<div style="font-size:11.5px;color:var(--b4);margin-bottom:6px">業務基本資料隨參數同步到所有裝置。<b>抽成方式</b>四選一：營收 %（未稅合約 × %）、毛利 %（(未稅合約 − 施工成本) × %，尚無成本時以預估成本代）、每案固定額、每單位 × 實作量（介紹人按支抽成模式：填單價與單位，例如每支 50，套用在報價中單位為「支」的工項，依業主請款數量實作實算）——這是該業務的預設，個案例外才在報價列表的業務 chip 勾「此案另訂」。離職取消勾選即不出現在報價下拉，歷史統計照算。<b>類型</b>「外部介紹人」：發包填介紹人時會從這裡帶姓名，其介紹費（跟隨分包計價）在業務績效報表與抽成並列統計。</div>'
+  var html='<div style="font-size:11.5px;color:var(--b4);margin-bottom:6px">業務基本資料隨參數同步到所有裝置。<b>抽成方式</b>四選一：營收 %（未稅合約 × %）、毛利 %（(未稅合約 − 施工成本) × %，尚無成本時以預估成本代）、每案固定額、每單位 × 實作量（介紹人按支抽成：填單價與單位，例如每支 50，套用在報價中單位為「支」的工項，依業主請款數量實作實算）——這是該業務的預設，個案例外才在報價列表的業務 chip 勾「此案另訂」。離職取消勾選即不出現在報價下拉，歷史統計照算。<b>類型</b>「外部介紹人」：發包填介紹人時會從這裡帶姓名，其介紹費（跟隨分包計價）在業務績效報表與抽成並列統計。</div>'
     +'<div class="sb-wrap" style="overflow-x:auto"><table id="sb-table" style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--gl);color:var(--b5)"><th style="padding:5px;text-align:left">姓名／類型</th><th style="padding:5px;text-align:left">電話</th><th style="padding:5px;text-align:left">Email</th><th style="padding:5px;text-align:left">抽成方式</th><th style="padding:5px;text-align:right">%／元</th><th style="padding:5px;text-align:left">到職日</th><th style="padding:5px;text-align:left">備註</th><th style="padding:5px">在職</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
     +'<div style="margin-top:8px"><button type="button" class="btn btn-sm" onclick="_salesBookAddRow()">＋ 新增業務</button></div>';
   showConfirm('業務名冊',html,function(){_salesBookSave();},false,null,true);
