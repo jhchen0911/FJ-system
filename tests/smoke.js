@@ -6602,6 +6602,48 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.85 付款帳本：已付不被任何重建／整包上傳蓋回 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const T = 1760000000000; Object.keys(PAID_LOG).forEach(k => delete PAID_LOG[k]); PAYABLES.length = 0;
+        /* ① 標記已付 → 存檔即進帳本 */
+        PAYABLES.push({ id: 'payL1', to: '甲乙', amount: 200000, status: 'pending', date: '2026-09-09' });
+        payMarkPaid('payL1'); document.getElementById('pmp-date').value = '2026-09-09'; document.getElementById('gen-confirm-ok').click();
+        out.harvest = PAID_LOG.payL1 && PAID_LOG.payL1.paidAt > 0 && PAID_LOG.payL1.paidDate === '2026-09-09';
+        /* ② 模擬舊裝置重建成待付（整筆換掉、沒有 paidAt）→ savePayables 時帳本校正回已付 */
+        const paidAt = PAID_LOG.payL1.paidAt;
+        PAYABLES[0] = { id: 'payL1', to: '甲乙', amount: 200000, status: 'pending', date: '2026-09-09', note: '預付款（重算）', _mt: Date.now() + 1000 };
+        savePayables(); out.restored = PAYABLES[0].status === 'paid' && PAYABLES[0].paidAt === paidAt && PAYABLES[0].paidDate === '2026-09-09' && PAYABLES[0].note === '預付款（重算）';
+        /* ③ 雲端整包是待付、本機帳本有已付 → 套用後仍已付；雲端帳本聯集 */
+        _applySensColls({ payables: [{ id: 'payL1', to: '甲乙', amount: 200000, status: 'pending', date: '2026-09-09', _mt: Date.now() + 5000 }], paidLog: { payL2: { paidAt: T, paidDate: '2026-10-01' } } }, {});
+        out.cloudStale = PAYABLES.find(p => p.id === 'payL1').status === 'paid' && PAID_LOG.payL2 && PAID_LOG.payL2.paidAt === T;
+        /* ④ 本機沒帳本、雲端帳本有 → 待付記錄被補成已付 */
+        delete PAID_LOG.payL1; PAYABLES[0].status = 'pending'; delete PAYABLES[0].paidAt; delete PAYABLES[0].paidDate;
+        _applySensColls({ payables: [], paidLog: { payL1: { paidAt: paidAt, paidDate: '2026-09-09' } } }, {});
+        out.fromCloudLog = PAYABLES.find(p => p.id === 'payL1').status === 'paid' && PAYABLES.find(p => p.id === 'payL1').paidDate === '2026-09-09';
+        /* ⑤ 真的改回未付 → 帳本 unpaidAt 較晚 → 之後重建仍待付；再標已付 → 已付 */
+        payUnmark('payL1'); document.getElementById('gen-confirm-ok').click(); out.unmark = PAYABLES[0].status === 'pending' && PAID_LOG.payL1.unpaidAt > PAID_LOG.payL1.paidAt;
+        PAYABLES[0] = { id: 'payL1', to: '甲乙', amount: 200000, status: 'pending', date: '2026-09-09' }; savePayables(); out.stayUnpaid = PAYABLES[0].status === 'pending';
+        /* 舊裝置還拿著「已付（舊 paidAt）」的版本進來 → 帳本的 unpaidAt 較新 → 改成待付 */
+        _applySensColls({ payables: [{ id: 'payL1', to: '甲乙', amount: 200000, status: 'paid', paidAt: paidAt, paidDate: '2026-09-09', date: '2026-09-09', _mt: Date.now() + 9000 }] }, {});
+        out.staleRePaid = PAYABLES.find(p => p.id === 'payL1').status === 'pending';
+        payMarkPaid('payL1'); document.getElementById('gen-confirm-ok').click(); out.rePaid = PAYABLES[0].status === 'paid' && PAID_LOG.payL1.paidAt > PAID_LOG.payL1.unpaidAt;
+        /* ⑥ 刪除應付（墓碑）→ 帳本清掉；同 id 重建不會被誤判已付 */
+        _tomb('payables', 'payL1'); out.tombClear = !PAID_LOG.payL1; PAYABLES[0] = { id: 'payL1', to: '甲乙', amount: 1, status: 'pending' }; savePayables(); out.rebuildPending = PAYABLES[0].status === 'pending';
+        /* ⑦ 私有上傳內容含帳本 */
+        out.payload = !!_privatePayload().data.paidLog;
+        Object.keys(PAID_LOG).forEach(k => delete PAID_LOG[k]); PAYABLES.length = 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.85 付款帳本：標記即入帳、重建成待付自動校正回已付、雲端整包待付／本機無帳本都補回、改回未付後不誤回、刪除清帳本、隨私有節點上傳', r.harvest && r.restored && r.cloudStale && r.fromCloudLog && r.unmark && r.stayUnpaid && r.staleRePaid && r.rePaid && r.tombClear && r.rebuildPending && r.payload, JSON.stringify(r));
+    check('v6.0.85 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

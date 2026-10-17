@@ -83,7 +83,7 @@
 | 發包 | `rfq`（hidden，parent `proj`） | `renderRfq` `rfqNew` `rfqFill` `rfqAward` `_rfqBackfillEst` `pjIntroEdit`（介紹費） | `q.rfqs`（private） |
 | 材料．運輸 | `mat6`（hidden，parent `proj`） | `renderMat6`（含氣瓶在場 `_m6GasHtml`）`matRowEdit` `m6Decide` `m6RentEdit` `matOut` `matBack` `_m6Sync` `_matAmortRows` | `q.mat`（private）、`MAT_LEDGER`（matLedger，private） |
 | 施工成本／分包 | `costs`（hidden，parent `proj`；`openProjectCosts`） | `rCostItems` `_ownAutoCat`（自有卡科目自動歸類）`_gasVendors`／`_gasOnSiteHtml`（氣瓶在場）`_vendorEnsure`（手動廠商進名冊）`openSubPeriod`／`_spSave`（廠商請款期別）`openSubAdvance`／`_saSave`（預付款）`openRentPeriod`（租賃）`_subFollowApply`（跟隨計價）`_subStat` `buildSubMgmtHtml`；分包合約書 `openSubContractDoc`／`_subContractHtml`（條款見 `docs/分包工程承攬合約書_通用範本.md`，空格預設 `P.subCt`） | `q.costs`（private） |
-| 成本→應付 | — | `syncCostToPayable` `_syncSubPeriodPayables`（開頭依序 `_advPayHeal`→`_subAdvClamp`→`_earlyToAdv`）`_paySource`（自動應付唯讀）`cleanDuplicatePayables` `_tombExempt` | `PAYABLES`（payables，private）；id 規則見下 |
+| 成本→應付 | — | `syncCostToPayable` `_syncSubPeriodPayables`（開頭依序 `_advPayHeal`→`_subAdvClamp`→`_earlyToAdv`）`_paySource`（自動應付唯讀）`cleanDuplicatePayables` `_tombExempt` | `PAYABLES`（payables，private）、付款帳本 `PAID_LOG`（private `paidLog`，本機 `fy_paidlog`）；id 規則見下 |
 | 日報．支出 | `quickcost` | `submitDailyReport` `_drMergeLog` `submitQuickCost`（`QC_TYPES`）`drMonthRender`（月表單）`viewDailyReports` `_photoPut`（照片另存）`_itemProgress` `_qtyRecon` | `q.dailyLogs`（隨報價）、照片 `fydata/relay/photos`、公司費用 `EXPENSES` |
 | 業主請款 | `acct` › 業主請款（`go('invoice')` 轉來） | `renderInvList` `loadInvoice` `rInvItems` `buildInvPreview` `buildInvFromQuote` `addNextPeriod` `invRentDisc`／`_invBillDays`（逾期租金折讓）`openReceiptModal` `printAllowance` `openEnvelope` | `INV`（invoices，逐筆同步） |
 | 廠商請款 | `acct` › 廠商請款 | `renderVendorBilling` `_vbRows` `vbOpenPeriod` | 讀 `q.costs` |
@@ -96,7 +96,7 @@
 | 工具 | `matest` `rebar` `grout` `backfill` `workers`；`lifeline`、`progress` 隱藏 | `renderMatEst` `matEstCalc`（綁定工程時幾何讀案場細節）`renderWorkers` | toolStates、workers（逐筆） |
 | 單價分析／單價庫 | `upa`（sysOnly） | `upaCalc` `applyUPA` `writeCostHist`（結案回寫） | upaHistory（shared）、upaCostDB／costHist（private） |
 | 人員／角色／參數 | `staff` `roles` `params` | `renderStaffPage` `renderRolesPage` `rolePerm` `canAccess` `_v6PermMigrate` `doSaveP` `syncParamsUI` `prmTab` | pagePerms、params（shared） |
-| 同步／備份／錯誤 | 頂欄 `#sync-chip` | `_sharedPayload` `_privatePayload` `_mergeColl`（應付另以 `_payStatusReconcile` 依 paidAt／unpaidAt 先後決定付款狀態）`_perRecordDelta` `_touch` `exportData`／`importData` `_err`／`renderErrLog` `_syncChip` | 見「架構」 |
+| 同步／備份／錯誤 | 頂欄 `#sync-chip` | `_sharedPayload` `_privatePayload` `_mergeColl`（應付另以 `_payStatusReconcile` 依 paidAt／unpaidAt 先後決定付款狀態；付款帳本 `PAID_LOG`／`_paidLogSync`／`_paidLogMerge` 為已付最後防線，`savePayables` 先對帳）`_perRecordDelta` `_touch` `exportData`／`importData` `_err`／`renderErrLog` `_syncChip` | 見「架構」 |
 | 列印／PDF | — | `_printViaIframe`（PDF 預覽下載）`_pdfPlanPages` `_pdfAddPaged` `_toolPrint`；原生列印 `_printNativeHTML`（iOS 改走主畫面 `_printMainHTML`，`_isIOS`）；手機表格 `_mstack` | — |
 | 信封列印 | 請款單列表／編輯器／客戶卡 ✉ | `openEnvelope` `_envHtml` `_envPrint` `_envPdf`（信封實際尺寸 PDF；iOS 產生後給連結）`_zipLookup` `_envBookGet`／`_envBookSave`（信封通訊錄）`_envUseA4`（列印方式：A4 置中預設／自訂紙張 `P.env.mode`）`_envCalPrint`／`_envCalSave`／`_envIosWrap`（每台裝置列印校正，存本機 `fy_env_ioscal`） | 版面 `P.env`（座標依規格存 `P.env.by[k15|k15s|k12]`（k15＝中式小信封 99×221、k15s＝中式 15K 105×222、k12＝12K；勾選欄列序 `cfg.methods`／`_envMethods`），`_envCfg(size)`／`_ENV_SIZE_DEF`）、通訊錄 `P.envBook[收件單位]`、`CUSTOMERS[].zip|envAttn|envTel` |
 
@@ -106,7 +106,7 @@
 
 ## 測試
 
-`tests/smoke.js`（626 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（628 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、

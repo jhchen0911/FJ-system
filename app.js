@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.84';
+var APP_VERSION='v6.0.85';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -8036,10 +8036,12 @@ function _adminUidHint(){
 try{const x=localStorage.getItem('fy_contracts');if(x)CONTRACTS=JSON.parse(x);}catch(e){_err('_adminUidHint',e);}
 try{const x=localStorage.getItem('fy_vendors');if(x)VENDORS=JSON.parse(x);}catch(e){_err('_adminUidHint',e);}
 try{const x=localStorage.getItem('fy_payables');if(x)PAYABLES=JSON.parse(x);}catch(e){_err('_adminUidHint',e);}
+var PAID_LOG={};try{var _plx=localStorage.getItem('fy_paidlog');if(_plx)PAID_LOG=JSON.parse(_plx)||{};}catch(e){_err('paidLog.load',e);PAID_LOG={};}   // v6.0.85 付款帳本（應付 id → paidAt／paidDate／unpaidAt），只增不減、跨裝置取聯集
 try{const x=localStorage.getItem('fy_inv_recs');if(x)INVOICE_RECS=JSON.parse(x);}catch(e){_err('_adminUidHint',e);}
 var TOMBS={};try{TOMBS=JSON.parse(localStorage.getItem('fy_tombs')||'{}');}catch(e){_err('_adminUidHint',e);}
 function _tomb(coll,id){
   if(!id)return;
+  if(coll==='payables'){try{if(typeof PAID_LOG!=='undefined'&&PAID_LOG[id]){delete PAID_LOG[id];localStorage.setItem('fy_paidlog',JSON.stringify(PAID_LOG));}}catch(e){_err('_tomb.paidLog',e);}}   // v6.0.85
   TOMBS[coll]=TOMBS[coll]||{};TOMBS[coll][id]=Date.now();
   try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e){_err('_tomb',e);}
 }
@@ -9679,7 +9681,8 @@ function _privatePayload(){
     version:'fy-v5p', uploadedAt:ts, uploadedBy:(_fbUser&&_fbUser.email)||'',
     quoteSens:qs, payables:PAYABLES, expenses:EXPENSES, costHist:COST_HIST,
     upaCostDB:UPA_COST_DB, shareProfit:SHARE_PROFIT, matLedger:MAT_LEDGER, dealHist:DEAL_HIST,
-    hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]), petty:(typeof PETTY!=='undefined'?PETTY:[])   // v5.433／v5.434
+    hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]), petty:(typeof PETTY!=='undefined'?PETTY:[]),   // v5.433／v5.434
+    paidLog:(typeof PAID_LOG!=='undefined'?PAID_LOG:{})   // v6.0.85
   }};
 }
 function _syncPayload(){
@@ -10043,6 +10046,7 @@ function _mergeAcctList(loc,cld,tombKey,uniqField){
 function _applySensColls(data,tombs){
   if(!data)return;
   var _safeMerge=function(loc,cld,nm){try{return _mergeColl(loc,cld,nm,tombs);}catch(e){console.error('[同步] '+nm+' 合併失敗，改用雲端版',e);return Array.isArray(cld)?cld:(cld?Object.values(cld):loc);}};
+  try{_paidLogMerge(data.paidLog);}catch(e){_err('_applySensColls.paidLog',e);}   // v6.0.85 先取帳本聯集
   if(data.payables)PAYABLES=_safeMerge(PAYABLES,data.payables,'payables');
   if(data.expenses)EXPENSES=_safeMerge(EXPENSES,data.expenses,'expenses');
   if(data.hr){HR=_safeMerge(HR,data.hr,'hr');try{_lsSet('fy_hr',JSON.stringify(HR),'人員薪資');}catch(e){_err('_applySensColls.hr',e);}}   // v5.433
@@ -10190,14 +10194,14 @@ function _pushPrivate(cb){
     var pp=_privatePayload();
     clean=_cleanEnc(pp.data);
     h=_collHash({q:clean.quoteSens,p:clean.payables,e:clean.expenses,c:clean.costHist,
-      u:clean.upaCostDB,s:clean.shareProfit,m:clean.matLedger,d:clean.dealHist});
+      u:clean.upaCostDB,s:clean.shareProfit,m:clean.matLedger,d:clean.dealHist,l:clean.paidLog});
   }catch(e){if(cb)cb(false);return;}
   if(localStorage.getItem(_privHashKey())===h){if(cb)cb(true);return;}   // 無變更不空推
   var doPush=function(){
     var clean2,h2;
     try{var pp2=_privatePayload();clean2=_cleanEnc(pp2.data);
       h2=_collHash({q:clean2.quoteSens,p:clean2.payables,e:clean2.expenses,c:clean2.costHist,
-        u:clean2.upaCostDB,s:clean2.shareProfit,m:clean2.matLedger,d:clean2.dealHist});
+        u:clean2.upaCostDB,s:clean2.shareProfit,m:clean2.matLedger,d:clean2.dealHist,l:clean2.paidLog});
     }catch(e){if(cb)cb(false);return;}
     ref.update(clean2).then(function(){
       try{localStorage.setItem(_privHashKey(),h2);}catch(e){_err('_pushPrivate',e);}
@@ -23055,7 +23059,7 @@ function closeMergeCost(){
 }
 
 function saveVendors(){_lsSet('fy_vendors',JSON.stringify(VENDORS),'廠商'); try{_autoUpload();}catch(e){_err('saveVendors',e);}}
-function savePayables(){_lsSet('fy_payables',JSON.stringify(PAYABLES),'應付帳款'); try{_autoUpload();}catch(e){_err('savePayables',e);}}
+function savePayables(){try{_paidLogSync();}catch(e){_err('savePayables.paidLog',e);}_lsSet('fy_payables',JSON.stringify(PAYABLES),'應付帳款'); try{_autoUpload();}catch(e){_err('savePayables',e);}}   // v6.0.85 存檔前先與付款帳本對帳
 function saveInvoiceRecs(){_lsSet('fy_inv_recs',JSON.stringify(INVOICE_RECS),'發票紀錄'); try{_autoUpload();}catch(e){_err('saveInvoiceRecs',e);}}
 function saveExpenses(){_lsSet('fy_expenses',JSON.stringify(EXPENSES),'費用'); try{_autoUpload();}catch(e){_err('saveExpenses',e);}}
 function saveActivityLog(){_lsSet('fy_activity',JSON.stringify(ACTIVITY_LOG.slice(0,500)),'活動紀錄');}
@@ -25100,7 +25104,7 @@ function savePayable(){
 
 function confirmPayment(id){
   const p=PAYABLES.find(x=>x.id===id);if(!p)return;
-  p.status='paid';p.paidAt=Date.now();_touch(p);
+  p.status='paid';p.paidAt=_payStamp(p);_touch(p);
   if(!p.paidDate)p.paidDate=localToday();
   savePayables();renderPayables();updateFinanceKPIs();toast('已標記為付款完成');
   _onSave();
@@ -29904,7 +29908,7 @@ function _hrUpsertPay(id,fields){
   var before=_recSig(p),wasPaid=p.status==='paid';
   Object.keys(fields).forEach(function(k){p[k]=fields[k];});
   p.vat=false;
-  if(!isNew&&wasPaid!==(p.status==='paid')){if(p.status==='paid'){p.paidAt=Date.now();}else{p.unpaidAt=Date.now();delete p.paidAt;}}   // v6.0.67 付款狀態轉換留時間，供同步合併判斷
+  if(!isNew&&wasPaid!==(p.status==='paid')){if(p.status==='paid'){p.paidAt=_payStamp(p);}else{p.unpaidAt=_payStamp(p);delete p.paidAt;}}   // v6.0.67 付款狀態轉換留時間，供同步合併判斷
   if(isNew||_recSig(p)!==before){p.updatedAt=Date.now();_touch(p);}   // v5.441 內容沒變不戳 _mt
   return p;
 }
@@ -34072,7 +34076,7 @@ function payVendorAll(pid){
   var p=(PAYABLES||[]).find(function(x){return x.id===pid;});if(!p)return;
   var all=[p].concat(_payVendorOthers(p)),tot=all.reduce(function(a,x){return a+_payEff(x);},0);
   var html='<div style="font-size:12.5px;line-height:1.8">'+esc(p.to||'')+(p.project?('　'+esc(p.project)):'')+'<br>'+all.map(function(x){return '・'+esc(x.note||x.itemName||x.category||'')+'　NT$ '+fmt(_payEff(x));}).join('<br>')+'<br><b>合計 NT$ '+fmt(tot)+'</b>'+(_vendorBank(p.to)?'<br>'+_bankLine(p.to):'')+'<br>付款日 <input id="pva-date" type="date" value="'+localToday()+'" style="font-size:13px;padding:4px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit"></div>';
-  showConfirm('同廠商一併付款（'+all.length+' 筆）',html,function(){var d=gv('pva-date')||localToday();all.forEach(function(x){x.status='paid';x.paidAt=Date.now();x.paidDate=d;_touch(x);});savePayables();try{renderPayables();updateFinanceKPIs();}catch(e){_err('payVendorAll',e);}try{_onSave();}catch(e){_err('payVendorAll',e);}toast('已標記 '+all.length+' 筆付款，合計 NT$ '+fmt(tot));},false);
+  showConfirm('同廠商一併付款（'+all.length+' 筆）',html,function(){var d=gv('pva-date')||localToday();all.forEach(function(x){x.status='paid';x.paidAt=_payStamp(x);x.paidDate=d;_touch(x);});savePayables();try{renderPayables();updateFinanceKPIs();}catch(e){_err('payVendorAll',e);}try{_onSave();}catch(e){_err('payVendorAll',e);}toast('已標記 '+all.length+' 筆付款，合計 NT$ '+fmt(tot));},false);
 }
 // ── 3 帳務分頁等寬：手機每列 4 顆、最後一列置中 ──
 try{var _st633=document.createElement('style');_st633.textContent='#acct-tabs button{min-width:0;flex:1 1 0;padding-left:4px;padding-right:4px}@media(max-width:767px){#acct-tabs button{flex:0 0 calc(25% - 5px)!important}}';document.head.appendChild(_st633);}catch(e){_err('payVendorAll',e);}
@@ -34502,7 +34506,7 @@ function subEarlyMarkPaid(cid,no,id){
   var p=PAYABLES.find(function(x){return x.id===_subEarlyId(cid,per,e);});if(!p){toast('先按「補建應付」');return;}
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   showConfirm('標記已付：'+esc(c.vendor||'')+' 第'+no+'期提前放款','<div style="font-size:12.5px;line-height:1.8">應付 NT$ <b>'+fmt(_payEff(p))+'</b>（'+(p.vat===false?'不含稅':'含稅')+'）</div><div class="f" style="margin-top:6px"><label>實付日</label><input id="sem-date" type="date" value="'+esc(p.paidDate||e.date||localToday())+'" style="'+IN+'"></div>',function(){
-    p.status='paid';p.paidDate=gv('sem-date')||e.date||localToday();p.paidAt=Date.now();_touch(p);
+    p.status='paid';p.paidDate=gv('sem-date')||e.date||localToday();p.paidAt=_payStamp(p);_touch(p);
     try{savePayables();_onSave();}catch(er){_err('subEarlyMarkPaid',er);}
     try{rCostItems();}catch(er){_err('subEarlyMarkPaid',er);}toast('已標記已付');
   },false,null,false);
@@ -34510,7 +34514,7 @@ function subEarlyMarkPaid(cid,no,id){
 function payUnmark(pid){
   var p=PAYABLES.find(function(x){return x.id===pid;});if(!p)return;
   showConfirm('改回未付','確定把「'+esc(p.to||'')+' NT$ '+fmt(_payEff(p))+'」改回待付款？',function(){
-    p.status='pending';delete p.paidDate;delete p.paidAt;p.unpaidAt=Date.now();_touch(p);   // v6.0.67 unpaidAt：同步合併時判斷「改回未付」是否晚於付款
+    var _ua=_payStamp(p);p.status='pending';delete p.paidDate;delete p.paidAt;p.unpaidAt=_ua;_touch(p);   // v6.0.67 unpaidAt：同步合併時判斷「改回未付」是否晚於付款
     try{savePayables();_onSave();}catch(er){_err('payUnmark',er);}
     try{rCostItems();}catch(er){_err('payUnmark',er);}try{if(document.getElementById('page-acct')&&document.getElementById('page-acct').classList.contains('active'))renderPayables();}catch(er){_err('payUnmark',er);}toast('已改回待付款');
   },true);
@@ -34682,7 +34686,7 @@ function payMarkPaid(pid,defDate,after){
   var p=PAYABLES.find(function(x){return x.id===pid;});if(!p)return;
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   showConfirm('標記已付：'+esc(p.to||''),'<div style="font-size:12.5px;line-height:1.8">'+esc((p.note||'').slice(0,60))+'<br>應付 NT$ <b>'+fmt(_payEff(p))+'</b>（'+(p.vat===false?'不含稅':'含稅')+'）'+(_vendorBank(p.to)?'<br>'+_bankLine(p.to):'')+'</div><div class="f" style="margin-top:6px"><label>實付日</label><input id="pmp-date" type="date" value="'+esc(p.paidDate||defDate||p.date||localToday())+'" style="'+IN+'"></div>',function(){
-    p.status='paid';p.paidDate=gv('pmp-date')||defDate||localToday();p.paidAt=Date.now();_touch(p);
+    p.status='paid';p.paidDate=gv('pmp-date')||defDate||localToday();p.paidAt=_payStamp(p);_touch(p);
     try{savePayables();_onSave();}catch(er){_err('payMarkPaid',er);}
     try{rCostItems();}catch(er){_err('payMarkPaid',er);}try{if(typeof after==='function')after();}catch(er){_err('payMarkPaid',er);}toast('已標記已付');
   },false,null,false);
@@ -35671,6 +35675,44 @@ function _sdMatEstLayerHtml(q,m,sec,fS,fN){
 var _matEstCalc0_648=matEstCalc;
 matEstCalc=function(){try{var q=_matEstSiteQ();if(q){MAT_EST=_matEstNorm(MAT_EST);_sdToMatEst(_sdNorm(q.site),MAT_EST);}}catch(e){_err('matEstCalc.site',e);}return _matEstCalc0_648.apply(this,arguments);};
 
+// ══════════ v6.0.85 付款帳本 PAID_LOG：已付狀態的最後防線 ══════════
+// 問題：自動應付（分包期別／預付款／薪資／抽成）每台裝置都會依「本機舊狀態」重建；舊裝置在同步完成前重建、或本機記錄一時不在，
+// 就會做出一筆「待付」並以整包上傳蓋掉雲端（私有節點是整包 update）。v6.0.67 的 _payStatusReconcile 只在兩版同時在手時有效。
+// 現在把「付了」這件事另外記在帳本：PAID_LOG[payId]={paidAt,paidDate,unpaidAt}，跨裝置取聯集（各欄位取最大時間），
+// 每次 savePayables 先「收割」（有付款／改回動作的寫進帳本）再「套用」（帳本說已付而記錄是待付 → 改回已付，反之亦然）。
+// 應付真的被刪（_tomb）才清帳本；同 id 之後重建就是新的一筆。
+// 付款／改回的時間戳：一定比該筆既有的 paidAt／unpaidAt 大（同一毫秒內連按也分得出先後）
+function _payStamp(p){return Math.max(Date.now(),((p&&p.paidAt)||0)+1,((p&&p.unpaidAt)||0)+1);}
+function _paidLogMerge(remote){
+  if(!remote||typeof remote!=='object')return;
+  Object.keys(remote).forEach(function(id){
+    var r=remote[id];if(!r||typeof r!=='object')return;var l=PAID_LOG[id]||{};
+    if((r.paidAt||0)>(l.paidAt||0)){l.paidAt=r.paidAt;if(r.paidDate)l.paidDate=r.paidDate;}
+    if((r.unpaidAt||0)>(l.unpaidAt||0))l.unpaidAt=r.unpaidAt;
+    if(l.paidAt||l.unpaidAt)PAID_LOG[id]=l;
+  });
+}
+function _paidLogSync(){
+  if(typeof PAID_LOG==='undefined'||!Array.isArray(PAYABLES))return 0;
+  var changed=false,fixed=0;
+  // 收割
+  PAYABLES.forEach(function(p){
+    if(!p||!p.id)return;var l=PAID_LOG[p.id]||{};
+    if(p.status==='paid'){var at=p.paidAt||p._mt||Date.now();if(at>(l.paidAt||0)){l.paidAt=at;if(p.paidDate)l.paidDate=p.paidDate;changed=true;}}
+    if((p.unpaidAt||0)>(l.unpaidAt||0)){l.unpaidAt=p.unpaidAt;changed=true;}
+    if(l.paidAt||l.unpaidAt)PAID_LOG[p.id]=l;
+  });
+  // 套用
+  PAYABLES.forEach(function(p){
+    if(!p||!p.id)return;var l=PAID_LOG[p.id];if(!l)return;
+    var paidWins=(l.paidAt||0)>(l.unpaidAt||0);
+    if(paidWins&&p.status!=='paid'&&!((p.unpaidAt||0)>l.paidAt)){p.status='paid';p.paidAt=l.paidAt;if(!p.paidDate&&l.paidDate)p.paidDate=l.paidDate;_touch(p);fixed++;}
+    else if(!paidWins&&l.unpaidAt&&p.status==='paid'&&(p.paidAt||0)<l.unpaidAt){p.status='pending';delete p.paidDate;delete p.paidAt;p.unpaidAt=l.unpaidAt;_touch(p);fixed++;}
+  });
+  if(changed||fixed){try{localStorage.setItem('fy_paidlog',JSON.stringify(PAID_LOG));}catch(e){_err('_paidLogSync',e);}}
+  if(fixed)console.info('[FY] 付款帳本校正 '+fixed+' 筆應付狀態');
+  return fixed;
+}
 // ══════════ v6.0.81 工程專案流程列：點開＝唯讀檢視（報價→預覽頁、議價／合約／發包→摘要視窗），要改要再按一次「前往編輯」 ══════════
 function _pjViewBox(title,html,goLabel,goJs){
   showConfirm(title,html+(goJs?('<div style="margin-top:10px;text-align:right"><button type="button" class="btn btn-sm" onclick="document.getElementById(\'gen-confirm-modal\').style.display=\'none\';'+goJs.replace(/"/g,'&quot;')+'" style="border-color:#e65100;color:#e65100">'+goLabel+'</button></div>'):''),function(){},false,null,true);
