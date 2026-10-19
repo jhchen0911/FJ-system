@@ -612,7 +612,7 @@ async function newPage(browser, width, height) {
       // 利潤分析：KPI 一排可點＋佣金卡＋總結
       rProfit();
       out.profitClick = document.querySelectorAll('[onclick^="openProfitKpi"]').length >= 4;
-      out.profitComm = document.body.innerHTML.includes('專案獎金（佣金）');
+      out.profitComm = document.body.innerHTML.includes('業主端佣金');   // v6.0.88 改名
       openProfitKpi('net'); out.profitBox = grab();
       openCommKpi(); out.commBox = grab();
       // 金流／總覽／客戶 KPI 可點
@@ -621,7 +621,7 @@ async function newPage(browser, width, height) {
       openFinKpi('ar'); out.arBox = grab();
       rDash();
       out.dashClick = document.querySelectorAll('#dash-kpis .kpi[onclick]').length >= 4
-        && document.getElementById('dash-kpis').innerHTML.includes('專案獎金');
+        && document.getElementById('dash-kpis').innerHTML.includes('業主端佣金');   // v6.0.88 改名
       updateCustomerStats();
       out.custClick = document.querySelectorAll('#customer-stats-grid .kpi[onclick]').length >= 3;
       openCustKpi(); out.custBox = grab();
@@ -652,9 +652,9 @@ async function newPage(browser, width, height) {
     check('累積估驗可點出各期組成明細', /累積估驗明細/.test(r.cumBox) && /17\.1/.test(r.cumBox), r.cumBox.slice(0, 60));
     check('利潤分析 KPI 一排可點＋佣金卡', r.profitClick && r.profitComm);
     check('實際淨利點擊出各案明細', /實際淨利——各案明細/.test(r.profitBox), r.profitBox.slice(0, 60));
-    check('佣金總結：總額／已計提／已付', /專案獎金（佣金）總結/.test(r.commBox) && /依實收已計提 NT\$ 1,500/.test(r.commBox), r.commBox.slice(0, 80));
+    check('佣金總結：總額／已計提／已付', /業主端佣金總結/.test(r.commBox) && /依實收已計提 NT\$ 1,500/.test(r.commBox), r.commBox.slice(0, 80));
     check('金流 KPI 可點、應收出明細', r.finClick && /應收帳款總結/.test(r.arBox), r.arBox.slice(0, 60));
-    check('總覽 KPI 可點＋專案獎金卡', r.dashClick);
+    check('總覽 KPI 可點＋業主端佣金卡', r.dashClick);
     check('客戶統計卡可點出業主總結', r.custClick && /業主往來總結/.test(r.custBox), r.custBox.slice(0, 60));
     check('專案獎金改以未稅合約金額計', r.commUntaxed);
     check('工程實績表：渲染＋勾選＋匯出鈕', r.track && r.trackTog && r.trackFns);
@@ -6594,6 +6594,85 @@ async function newPage(browser, width, height) {
     check('v6.0.86 一次性資料修正 _fixF25P1／_fixF25P1b 已移除；「申請帳號」改顯示請聯絡管理員、不再自助建立帳號', r.fixGone && r.reg && r.btn && r.msg, JSON.stringify(r));
     check('v6.0.86 工程專案分包列預付款下方仍有「重算抵扣」', r.reallocBtn, JSON.stringify(r));
     check('v6.0.86 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ───────────── v6.0.88 業主端佣金：與業務分開、一案多位收款人、應付／報表／KPI、舊專案獎金轉換 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        P.sales = []; Q.length = 0; INV.length = 0; PAYABLES.length = 0; CONTRACTS.splice(0);
+        Q.push({ id: 'qK', name: '佣金案K', client: '甲營造', date: '2026-10-01', awarded: true, items: [{ desc: 'H型鋼樁 打設', unit: '支', qty: 100, price: 1000, sec: false }], exs: [], rmk: {}, t: { sub: 100000, total: 105000 } });
+        Q.push({ id: 'qK2', name: '佣金案K 追加', client: '甲營造', parentId: 'qK', date: '2026-10-05', items: [], t: { sub: 20000, total: 21000 } });
+        Q.push({ id: 'qR', name: '舊獎金案R', client: '乙營造', date: '2026-09-01', awarded: true, items: [], t: { sub: 300000, total: 315000 }, referral: { name: '老張', who: '中間人', mode: 'pct', rate: 2, cap: null, amount: 6000 } });
+        PAYABLES.push({ id: 'comm_qR', kind: 'commission', to: '老張', project: '舊獎金案R', quoteId: 'qR', amount: 6000, status: 'paid', paidDate: '2026-09-20', paidAt: 1 });
+        go('quotes'); renderList();
+        const lh = document.getElementById('qlist').innerHTML;
+        out.chip = /＋佣金/.test(lh) && /openCommPick\('qK'\)/.test(lh) && /佣金 老張・6,000/.test(lh);
+        /* 舊 referral 轉 comms；應付 id 不變、已付保留 */
+        const qR = Q.find(x => x.id === 'qR');
+        out.mig = !qR.referral && qR.comms.length === 1 && qR.comms[0].id === 'ref' && qR.comms[0].mode === 'rev' && qR.comms[0].val === 2 && qR.comms[0].role === '其他' && _commPayId(qR, qR.comms[0]) === 'comm_qR' && _commAmt(qR, qR.comms[0]) === 6000;
+        _commSync(qR); out.migPay = PAYABLES.filter(p => /^comm_qR/.test(p.id)).length === 1 && PAYABLES.find(p => p.id === 'comm_qR').status === 'paid';
+        /* 設定兩位：工地主任 每支 50、負責人 營收 1% */
+        const qK = Q.find(x => x.id === 'qK'); openCommPick('qK'); _commAddRow(); _commAddRow();
+        const rows = document.querySelectorAll('#cp-rows .cp-row'); out.rows = rows.length === 2 && !!document.getElementById('cp-role-dl');
+        rows[0].querySelector('.cp-name').value = '王主任'; rows[0].querySelector('.cp-role').value = '工地主任'; rows[0].querySelector('.cp-mode').value = 'unit'; _commRowMode(rows[0].querySelector('.cp-mode')); rows[0].querySelector('.cp-val').value = '50'; rows[0].querySelector('.cp-unit').value = '支';
+        rows[1].querySelector('.cp-name').value = '陳老闆'; rows[1].querySelector('.cp-role').value = '負責人'; rows[1].querySelector('.cp-mode').value = 'rev'; rows[1].querySelector('.cp-val').value = '1'; rows[1].querySelector('.cp-note').value = '完工付';
+        out.unitShown = rows[0].querySelector('.cp-unit').style.display === '' && rows[1].querySelector('.cp-unit').style.display === 'none';
+        document.getElementById('gen-confirm-ok').click();
+        out.saved = qK.comms.length === 2 && qK.comms[0].mode === 'unit' && qK.comms[0].unit === '支' && qK.comms[0].val === 50 && qK.comms[1].val === 1 && qK.comms[1].note === '完工付' && !!qK._mt && /佣金 王主任、陳老闆・6,200/.test(document.getElementById('qlist').innerHTML);
+        /* 金額：每支 50 × 合約 100 支＝5,000；1% × 未稅 120,000（含追加）＝1,200 */
+        out.amt = _commAmt(qK, qK.comms[0]) === 5000 && _commAmt(qK, qK.comms[1]) === 1200 && _commTotal(qK) === 6200;
+        /* 應付：unit 模式未請款 → 0 不建；rev 建 1,200 不含稅 */
+        const p1 = PAYABLES.find(p => p.id === 'comm_qK_' + qK.comms[1].id), p0 = PAYABLES.find(p => p.id === 'comm_qK_' + qK.comms[0].id);
+        out.pay = !!p1 && p1.amount === 1200 && p1.vat === false && p1.kind === 'commission' && p1.to === '陳老闆' && /業主端佣金（負責人）/.test(p1.note) && !p0 && _paySource(p1).auto && /業主端佣金/.test(_paySource(p1).label);
+        const id1 = p1.id;
+        /* 業主請款 40 支、收款一半 → unit 應付 2,000；已計提＝40×50×50%＝1,000 */
+        INV.push({ id: 'iK', quoteId: 'qK', project: '佣金案K', client: '甲營造', date: '2026-10-10', items: [{ desc: 'H型鋼樁 打設', unit: '支', curQty: 40, payRate: 100, qty: 100, price: 1000 }], totals: { total: 42000 }, received: 21000 });
+        _commSync(qK);
+        const p0b = PAYABLES.find(p => p.id === 'comm_qK_' + qK.comms[0].id);
+        out.unitPay = !!p0b && p0b.amount === 2000 && _commAccr(qK, qK.comms[0]) === 1000;
+        out.liveIds = !!_liveExpectedPayIds()[id1];
+        /* 業務抽成與佣金分開：掛業務不影響佣金、抽成不含佣金、各自的應付 */
+        P.sales = [{ id: 's1', name: '小美', kind: 'staff', commMode: 'rev', commVal: 2, active: true }]; qK.salesId = 's1'; _salesCommSync(qK);
+        out.separate = _salesCommAmt(qK) === 2400 && _commTotal(qK) === 6200 && PAYABLES.some(p => p.id === 'pay_sales_qK') && PAYABLES.filter(p => /^comm_qK_/.test(p.id)).length === 2;
+        openSalesPick('qK'); out.spHint = /請改用旁邊的「佣金」chip/.test(document.getElementById('gen-confirm-box').innerHTML); document.getElementById('gen-confirm-ok').click();
+        /* 敏感欄位：comms 不進 shared、進 private、貼回；舊 referral 不再輸出 */
+        const st = _stripQuoteSens(qK), ex = _extractQuoteSens(qK); const q2 = { id: 'qK', items: [] }; _applyQuoteSens(q2, ex);
+        out.sens = !('comms' in st) && Array.isArray(ex.comms) && ex.comms.length === 2 && q2.comms.length === 2 && !('referral' in _extractQuoteSens(qR)) && Array.isArray(_extractQuoteSens(qR).comms);
+        /* 刪一位（未付）→ 應付撤掉 */
+        openCommPick('qK'); document.querySelectorAll('#cp-rows .cp-row')[1].remove(); document.getElementById('gen-confirm-ok').click();
+        out.removed = qK.comms.length === 1 && qK.comms[0].name === '王主任' && !PAYABLES.some(p => p.id === id1) && PAYABLES.some(p => p.id === 'comm_qK_' + qK.comms[0].id);
+        /* 報表：2026 全年 */
+        document.getElementById('rpt-year').value = '2026'; document.getElementById('rpt-month').value = ''; _rptCommF.who = '';
+        go('reports'); showReport('comm');
+        const el = document.getElementById('report-content'), ht = () => el.innerHTML;
+        out.inMore = document.getElementById('rpt-more-sel').value === 'comm';
+        const s2 = _commStat(_commRows(2026, 0, ''));
+        out.stat = s2.n === 2 && s2.total === 11000 && s2.paid === 6000 && s2.unpaid === 5000 && s2.accr === 1000;
+        out.tiles = /有佣金案件/.test(ht()) && /11,000/.test(ht()) && /王主任/.test(ht()) && /老張/.test(ht()) && /工地主任/.test(ht()) && !/小美/.test(ht());
+        _rptCommF.who = '王主任'; renderCurrentReport(); out.filter = /佣金案K/.test(ht()) && !/舊獎金案R/.test(ht()) && /payMarkPaid\('comm_qK_/.test(ht());
+        _rptCommF.who = '';
+        let printed = '', csv = ''; const o1 = window._printViaIframe, o2 = window.downloadCSV;
+        window._printViaIframe = function (h) { printed = h; }; window.downloadCSV = function (fn, hd, rows) { csv = { fn, hd, rows }; };
+        exportCurrentReport(); exportCurrentReportExcel(); window._printViaIframe = o1; window.downloadCSV = o2;
+        out.pdf = /業主端佣金/.test(printed) && /王主任/.test(printed) && /size:A4 landscape/.test(printed) && !/payMarkPaid/.test(printed);
+        out.csv = csv && /業主端佣金_2026/.test(csv.fn) && csv.hd.length === 11 && csv.rows.length === 2 && csv.rows.some(r => r[3] === '老張' && /已付/.test(r[9]));
+        /* 總覽／利潤 KPI 總結 */
+        openCommKpi(); const mb = document.getElementById('gen-confirm-box').innerHTML; out.kpi = /業主端佣金總結/.test(mb) && /王主任・工地主任/.test(mb) && /openCommPick\('qK'\)/.test(mb); document.getElementById('gen-confirm-ok').click();
+        /* 非管理員：看不到佣金 chip */
+        const ov = _salesCommVis; _salesCommVis = function () { return false; }; go('quotes'); renderList();
+        out.hidden = !/佣金/.test(document.getElementById('qlist').innerHTML.replace(/佣金案K/g, '')); _salesCommVis = ov; renderList();
+        out.shown = /佣金 王主任/.test(document.getElementById('qlist').innerHTML);
+        P.sales = []; Q.length = 0; INV.length = 0; PAYABLES.length = 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    check('v6.0.88 業主端佣金：報價列表「佣金」chip（管理員才見）設多位收款人＋身分，與業務抽成分開；每人一筆應付（不含稅、unit 依已請量）、刪除即撤未付；comms 走 private；舊專案獎金 referral 自動轉換、應付 id 與已付不變', r.chip && r.mig && r.migPay && r.rows && r.unitShown && r.saved && r.amt && r.pay && r.unitPay && r.liveIds && r.separate && r.spHint && r.sens && r.removed && r.hidden && r.shown, JSON.stringify(r));
+    check('v6.0.88 業主端佣金報表：件數／總額／已計提／已付未付、依收款人與明細、收款人篩選、付款鈕、PDF（橫式）與 CSV；總覽 KPI 總結改讀 comms', r.inMore && r.stat && r.tiles && r.filter && r.pdf && r.csv && r.kpi, JSON.stringify(r));
+    check('v6.0.88 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.87';
+var APP_VERSION='v6.0.88';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -2059,6 +2059,7 @@ function saveQ(){
   if(idx>=0)Q[idx]=q;else Q.unshift(q);
   persist();
   try{_salesCommSync(q);}catch(e){_err('saveQ.sales',e);}   // v6.0.74 得標＋有抽成 → 應付
+  try{_commSync(q);}catch(e){_err('saveQ.comm',e);}   // v6.0.88 業主端佣金
   // v5.375：persist() 會再把目前編輯中報價的 _mt 推到現在，所以基準必須在它之後才更新，
   // 否則下一次儲存會誤判成「編輯期間被別人改過」。
   window._qEditBase={id:q.id,mt:(Q.find(function(x){return x.id===q.id;})||q)._mt};
@@ -2337,7 +2338,7 @@ function qlHTML(q,clickable){
     +'<div class="qm" style="min-width:0;flex:1">'
     +'<div class="qt" style="font-size:'+(mob?'14px':'13px')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(q.name||'未命名')+'</div>'
     +'<div class="qsb">'+(q.client||'')+(q.code?' ／ '+q.code:'')+(q.date?' ／ '+fmtD(q.date):'')+'</div>'
-    +'<div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap;align-items:center">'+awardedBdg+_salesChip(q)+'</div>'   // v6.0.75 業務 chip（原在編輯頁）
+    +'<div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap;align-items:center">'+awardedBdg+_salesChip(q)+_commChip(q)+'</div>'   // v6.0.75 業務 chip（原在編輯頁）；v6.0.88 業主端佣金 chip
     +'</div>'
     +'<div class="qr" style="flex-shrink:0;align-items:flex-end;text-align:right">'
     +'<div class="qa" style="font-size:14px;font-weight:900;white-space:nowrap">NT$ '+fmt(t.total||0)+'</div>'
@@ -4987,6 +4988,7 @@ function confirmAward(){
   }catch(e){_err('top',e);}
   _touch(q); // 跨裝置同步：新狀態必須獲勝
   try{_salesCommSync(q);}catch(e){_err('confirmAward.sales',e);}   // v6.0.74
+  try{_commSync(q);}catch(e){_err('confirmAward.comm',e);}   // v6.0.88 業主端佣金
   persist();
   document.getElementById('award-modal').style.display='none';
   _fbWriteAll(
@@ -5858,14 +5860,14 @@ function rDash(){
         _apT=_apTotal();_apN=_apList().length;
       }catch(e){_err('rDash',e);}
       // v5.389：四張卡全部點得出總結彈窗；有設定獎金時多一張佣金卡
-      var _commQ=Q.filter(function(q){return q&&q.awarded&&!q.parentId&&q.referral&&(parseFloat(q.referral.amount)||0)>0;});
-      var _commT=_commQ.reduce(function(a,q){return a+(parseFloat(q.referral.amount)||0);},0);
+      var _commQ=Q.filter(function(q){return q&&q.awarded&&!q.parentId&&_commTotal(q)>0;});   // v6.0.88 業主端佣金（原專案獎金）
+      var _commT=_commQ.reduce(function(a,q){return a+_commTotal(q);},0);
       kgrid.innerHTML=
         '<div class="kpi" style="flex:1;min-width:120px;cursor:pointer" title="點擊查看各報價單金額" onclick="openQuoteKpi(\'amt\')"><div class="kl">總報價金額</div><div class="kv" style="font-size:18px">NT$ '+fmt(totalAmt)+'</div><div class="ks">共 '+totalQ+' 件</div></div>'+
         '<div class="kpi hi" style="flex:1;min-width:120px;cursor:pointer" title="點擊查看得標案明細" onclick="openQuoteKpi(\'won\')"><div class="kl">得標金額'+(_diffs?'（合約現值）':'')+'</div><div class="kv" style="font-size:18px;color:var(--g3)">NT$ '+fmt(awardedAmt)+'</div><div class="ks">'+awardedQ+' 件得標'+(_diffs?'　·　原始得標 NT$ '+fmt(awardedOrig):'')+'</div></div>'+
         '<div class="kpi" style="flex:1;min-width:120px;cursor:pointer" title="點擊查看待收明細" onclick="openFinKpi(\'ar\')"><div class="kl">應收帳款</div><div class="kv" style="font-size:18px;color:#b26a00">NT$ '+fmt(_arT)+'</div><div class="ks">'+_arN+' 件待收</div></div>'+
         '<div class="kpi" style="flex:1;min-width:120px;cursor:pointer" title="點擊查看待付明細" onclick="openFinKpi(\'ap\')"><div class="kl">應付帳款</div><div class="kv" style="font-size:18px;color:#c62828">NT$ '+fmt(_apT)+'</div><div class="ks">待付 '+_apN+' 筆</div></div>'+
-        (_commQ.length?('<div class="kpi" style="flex:1;min-width:120px;cursor:pointer;background:#f4f0fb" title="點擊查看各案獎金與支付狀態" onclick="openCommKpi()"><div class="kl">專案獎金</div><div class="kv" style="font-size:18px;color:#4527a0">NT$ '+fmt(_commT)+'</div><div class="ks">'+_commQ.length+' 件・依實收進度分期支付</div></div>'):'');
+        (_commQ.length?('<div class="kpi" style="flex:1;min-width:120px;cursor:pointer;background:#f4f0fb" title="點擊查看各案業主端佣金與支付狀態" onclick="openCommKpi()"><div class="kl">業主端佣金</div><div class="kv" style="font-size:18px;color:#4527a0">NT$ '+fmt(_commT)+'</div><div class="ks">'+_commQ.length+' 件・依實收進度分期支付</div></div>'):'');
     }
     // 最近報價
     const dl=document.getElementById('dash-list');
@@ -7161,35 +7163,22 @@ function openProfitKpi(kind){
   }).join('');
   _rptBox(titles[kind]||'利潤總結',sum,rows,'目前沒有得標案件');
 }
-// v5.389：專案獎金（佣金）總結——各案獎金、依實收進度計提、應付支付狀態
+// v5.389 專案獎金總結 → v6.0.88 業主端佣金總結：各案各收款人、依實收進度計提、應付支付狀態
 function openCommKpi(){
-  var list=(Q||[]).filter(function(q){return q&&!q.parentId&&q.awarded&&q.referral&&(parseFloat(q.referral.amount)||0)>0;});
-  var rows='',totFull=0,totAccr=0,totPaid=0;
-  list.forEach(function(q){
-    var full=parseFloat(q.referral.amount)||0;
-    var all=[q].concat(Q.filter(function(x){return x.parentId===q.id;}));
-    var ctT=all.reduce(function(a,x){return a+((x.t&&x.t.total)||0);},0);
-    var rcv=0;
-    (INV||[]).forEach(function(i){
-      if(!i)return;
-      var same=(i.quoteId&&i.quoteId===q.id)||String(i.project||'').trim()===String(q.name||'').trim();
-      if(same)rcv+=parseFloat(i.received)||0;
-    });
-    var rate=ctT>0?Math.min(1,rcv/ctT):0;
-    var accr=Math.round(full*rate);
-    var cp=(PAYABLES||[]).find(function(p){return p&&p.id==='comm_'+q.id;});
-    var paid=(cp&&cp.status==='paid')?(parseFloat(cp.amount)||0):0;
-    totFull+=full;totAccr+=accr;totPaid+=paid;
-    rows+=_rptRow(esc(q.name||'未命名'),esc((q.referral.who||'')+'・'+(q.referral.name||''))+'　收款進度 '+Math.round(rate*100)+'%',
+  var rows=[];(Q||[]).forEach(function(q){if(q&&!q.parentId&&q.awarded)_commList(q).forEach(function(c){if(_commAmt(q,c)>0)rows.push({q:q,c:c});});});
+  var s=_commStat(rows),html='';
+  rows.forEach(function(r){
+    var full=_commAmt(r.q,r.c),accr=_commAccr(r.q,r.c),p=_commPay(r.q,r.c),paid=(p&&p.status==='paid')?(parseFloat(p.amount)||0):0;
+    html+=_rptRow(esc(r.q.name||'未命名'),esc(r.c.name||'')+(r.c.role?('・'+esc(r.c.role)):'')+'　收款進度 '+Math.round(_salesRcvRate(r.q)*100)+'%',
       'NT$ '+fmt(full),paid?('已付 '+fmt(paid)):('依實收已計提 '+fmt(accr)),paid?'var(--g3)':'#4527a0',
-      "_qvClose();loadQ('"+q.id+"')");
+      "_qvClose();openCommPick('"+r.q.id+"')");
   });
-  var sum=_rptTile('有獎金案件',list.length+' 件')
-    +_rptTile('獎金總額','NT$ '+fmt(totFull),'#4527a0')
-    +_rptTile('依實收已計提','NT$ '+fmt(totAccr))
-    +_rptTile('已付','NT$ '+fmt(totPaid),'var(--g3)')
-    +_rptTile('未付','NT$ '+fmt(totFull-totPaid),(totFull-totPaid)>0?'#c8890a':'var(--b3)');
-  _rptBox('專案獎金（佣金）總結',sum,rows,'目前沒有設定專案獎金的得標案（得標設定視窗裡可填）');
+  var sum=_rptTile('有佣金案件',s.n+' 件')
+    +_rptTile('佣金總額','NT$ '+fmt(s.total),'#4527a0')
+    +_rptTile('依實收已計提','NT$ '+fmt(s.accr))
+    +_rptTile('已付','NT$ '+fmt(s.paid),'var(--g3)')
+    +_rptTile('未付','NT$ '+fmt(s.unpaid),s.unpaid>0?'#c8890a':'var(--b3)');
+  _rptBox('業主端佣金總結',sum,html,'目前沒有設定業主端佣金的得標案（報價列表狀態旁「佣金」chip 可設）');
 }
 // v5.389：金流 KPI 總結（應收／應付／資金組成／本月實收）
 function openFinKpi(kind){
@@ -9938,7 +9927,7 @@ function _stripQuoteSens(q){
   delete c.costs;
   // v5.335 健檢F：referral（分潤約定）、matEst（材料估算含租金單價/運費）、
   // exs（舊版額外支出）也是成本面資料，一併抽走
-  delete c.referral;delete c.matEst;delete c.exs;delete c.rfqs;delete c.mat;delete c.comm;   // v6 詢價單含廠商報價、材料調撥／攤提 → private；v6.0.74 業務抽成
+  delete c.referral;delete c.matEst;delete c.exs;delete c.rfqs;delete c.mat;delete c.comm;delete c.comms;   // v6 詢價單含廠商報價、材料調撥／攤提 → private；v6.0.74 業務抽成；v6.0.88 業主端佣金
   if(Array.isArray(c.items))c.items.forEach(function(it){if(it)delete it.estCost;});
   if(c.t){_Q_SENS_T.forEach(function(k){delete c.t[k];});delete c.t.ext;}
   return c;
@@ -9951,7 +9940,8 @@ function _extractQuoteSens(q){
   });
   var t={};if(q.t){_Q_SENS_T.forEach(function(k){if(q.t[k]!=null)t[k]=q.t[k];});if(q.t.ext!=null)t.ext=q.t.ext;}
   var out={costs:Array.isArray(q.costs)?q.costs:[],est:est,t:t,_mt:q._mt||0};
-  if(q.referral)out.referral=q.referral;
+  if(Array.isArray(q.comms)&&q.comms.length)out.comms=q.comms;   // v6.0.88 業主端佣金（取代 referral）
+  else if(q.referral)out.referral=q.referral;
   if(q.matEst)out.matEst=q.matEst;
   if(Array.isArray(q.exs)&&q.exs.length)out.exs=q.exs;
   if(Array.isArray(q.rfqs)&&q.rfqs.length)out.rfqs=q.rfqs;   // v6
@@ -9978,7 +9968,8 @@ function _applyQuoteSens(q,s,fill){
     q.t[k]=s.t[k];
   });}
   // v5.335：referral／matEst／exs 同步補回（fill 模式只補空缺）
-  if(s.referral&&(!fill||q.referral==null))q.referral=s.referral;
+  if(Array.isArray(s.comms)&&s.comms.length&&(!fill||!Array.isArray(q.comms)||!q.comms.length)){q.comms=s.comms;delete q.referral;}   // v6.0.88
+  if(s.referral&&!(Array.isArray(q.comms)&&q.comms.length)&&(!fill||q.referral==null))q.referral=s.referral;
   if(s.matEst&&(!fill||q.matEst==null))q.matEst=s.matEst;
   if(Array.isArray(s.exs)&&s.exs.length&&(!fill||!Array.isArray(q.exs)||!q.exs.length))q.exs=s.exs;
   if(Array.isArray(s.rfqs)&&s.rfqs.length&&(!fill||!Array.isArray(q.rfqs)||!q.rfqs.length))q.rfqs=s.rfqs;   // v6
@@ -27471,7 +27462,7 @@ function showReport(type){
       btn.style.borderColor=t===type?'var(--g)':(t==='log'?'var(--b3)':'var(--g3)');
     }
   });
-  var ms=document.getElementById('rpt-more-sel');if(ms){var inMore=['client','contract','bidrate','sales','vendor','labor','share','health','log'].indexOf(type)>=0;ms.value=inMore?type:'';ms.style.background=inMore?'var(--g)':'var(--w)';ms.style.color=inMore?'#fff':'var(--g3)';}   // v6.0.31
+  var ms=document.getElementById('rpt-more-sel');if(ms){var inMore=['client','contract','bidrate','sales','comm','vendor','labor','share','health','log'].indexOf(type)>=0;ms.value=inMore?type:'';ms.style.background=inMore?'var(--g)':'var(--w)';ms.style.color=inMore?'#fff':'var(--g3)';}   // v6.0.31
   renderCurrentReport();
 }
 
@@ -27486,6 +27477,7 @@ function renderCurrentReport(){
   else if(_currentReport==='contract')renderContractReport(el,year);
   else if(_currentReport==='bidrate')renderBidRateReport(el,year,month);
   else if(_currentReport==='sales')renderSalesReport(el,year,month);   // v6.0.74 業務績效
+  else if(_currentReport==='comm')renderCommReport(el,year,month);   // v6.0.88 業主端佣金
   else if(_currentReport==='vendor')renderVendorReport(el,year,month);
   else if(_currentReport==='labor')renderLaborReport(el,year,month);
   else if(_currentReport==='hr')renderHrReport(el,year);   // v5.435
@@ -28398,6 +28390,7 @@ function exportCurrentReport(){
   if(_currentReport==='overview'){exportShareholderPDF();return;}   // v6.0.17 總覽匯出＝股東版 PDF（同口徑）
   if(_currentReport==='shareholder'){exportShareholderPDF();return;}   // v6 股東報表 → A4 直式 PDF
   if(_currentReport==='sales'){_salesPdf();return;}   // v6.0.74 業務績效 → PDF
+  if(_currentReport==='comm'){_commPdf();return;}   // v6.0.88
   const year=parseInt(document.getElementById('rpt-year')?.value)||new Date().getFullYear();
   const month=parseInt(document.getElementById('rpt-month')?.value)||0;
   if(_currentReport==='log'){
@@ -34799,7 +34792,7 @@ function _paySource(p){
   if(/^pay_ps_/.test(id))return {auto:true,label:'薪資條',go:acct('pay')};
   if(/^pay_ins_/.test(id))return {auto:true,label:'勞健保／勞退（薪資）',go:acct('pay')};
   if(/^pay_pc_/.test(id))return {auto:true,label:'零用金結算',go:acct('petty')};
-  if(/^comm_/.test(id))return {auto:true,label:'專案獎金（得標設定）',go:p.quoteId?("openProj('"+p.quoteId+"')"):''};
+  if(/^comm_/.test(id))return {auto:true,label:'業主端佣金（報價列表）',go:p.quoteId?("openCommPick('"+p.quoteId+"')"):''};   // v6.0.88
   if(/^pay_sales_/.test(id))return {auto:true,label:'業務抽成（報價單）',go:p.quoteId?("loadQ('"+p.quoteId+"')"):''};   // v6.0.74
   if(p.costId){
     var found=null,qq=null;
@@ -35286,7 +35279,8 @@ function _liveExpectedPayIds(){
   try{(Q||[]).forEach(function(q){(q&&q.costs||[]).forEach(function(c){if(!c||!c.id)return;
     if(c.type==='sub'||c.rental||(_subPeriods(c).length)){var ex=_subExpectedPayIds(c);Object.keys(ex).forEach(function(k){ids[k]=1;});}
     ids['pay'+c.id]=1;});
-    if(q&&q.awarded&&_salesCommAmt(q)>0)ids['pay_sales_'+q.id]=1;});}catch(e){_err('_liveExpectedPayIds',e);}   // v6.0.74 業務抽成
+    if(q&&q.awarded&&_salesCommAmt(q)>0)ids['pay_sales_'+q.id]=1;
+    if(q&&q.awarded&&!q.parentId)_commList(q).forEach(function(c){if(_commAmt(q,c)>0)ids[_commPayId(q,c)]=1;});});}catch(e){_err('_liveExpectedPayIds',e);}   // v6.0.74 業務抽成；v6.0.88 業主端佣金
   _livePayCache={t:now,ids:ids};return ids;
 }
 // 墓碑豁免：成本卡現在仍需要的應付 id，就算曾被刪除（舊版去重 bug）也不得在合併時被丟掉；順手把本機墓碑拿掉
@@ -35778,6 +35772,7 @@ function openSalesPick(qid){
   var cur=q.salesId||'',list=_salesList().slice();if(cur&&!list.some(function(x){return x.id===cur;})){var o=_salesById(cur);if(o)list.push(o);}
   var c=_salesCommNorm(q.comm),vis=_salesCommVis();
   var html='<div style="font-size:12.5px;color:var(--b4);margin-bottom:8px">'+esc(q.name||'')+'　'+esc(q.client||'')+'</div>'
+    +'<div style="font-size:11.5px;color:#8a6d00;background:#FFF8E1;border:1px solid #f0da7a;border-radius:var(--r6);padding:5px 8px;margin-bottom:8px">這裡只掛<b>公司業務</b>（績效統計與抽成）。業主那邊要收佣金的人（工地主任、採購、負責人…）請改用旁邊的「佣金」chip，兩者分開列帳。</div>'
     +'<div class="f"><label>業務 <span style="font-size:10px;color:var(--b3)">（經營報表 › 業務績效 統計用）</span></label><select id="sp-sales" onchange="_spSelChange()" style="'+IN+'"><option value="">── 未指定 ──</option>'+list.map(function(x){return '<option value="'+esc(x.id)+'"'+(x.id===cur?' selected':'')+'>'+esc(x.name||'')+(x.active===false?'（離職）':'')+'</option>';}).join('')+'</select></div>'
     +(vis?('<div id="sp-def" style="margin-top:8px;font-size:12px;color:var(--b4)"></div>'
       +'<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12.5px"><input type="checkbox" id="sp-ovr"'+(c?' checked':'')+' onchange="document.getElementById(\'sp-ovr-box\').style.display=this.checked?\'\':\'none\'" style="width:15px;height:15px"> 此案另訂抽成（不用名冊預設）</label>'
@@ -36160,6 +36155,215 @@ function _bankCopy(name){
   var fallback=function(){try{var ta=document.createElement('textarea');ta.value=txt;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);done();}catch(e){_err('_bankCopy',e);toast('無法複製，帳號：'+txt);}};
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done,fallback);}else fallback();
 }
+// ══════════ v6.0.88 業主端佣金：收款人在業主那邊（工地主任／採購／負責人…），與公司業務抽成分開 ══════════
+// 資料 q.comms=[{id,name,role,mode,val,unit,note}]（private，隨 quoteSens 抽到 private）；一案可多位；計算方式沿用 _SALES_MODES 四種（營收%／毛利%／固定額／每單位×實作量）。
+// 應付 comm_<qid>_<cid>（kind:'commission'、不含稅、依實收款進度支付；每單位模式＝業主已請量×單價）。
+// 舊「專案獎金」q.referral（v5.389，v6.0.29 已無輸入介面）第一次讀到就轉成 comms[0]={id:'ref'}，應付 id 仍為 comm_<qid>、付款狀態不變。
+// 入口：報價列表狀態 chip 旁「佣金」（管理員才見，_salesCommVis）→ openCommPick(qid)；報表：經營報表 › 其他報表 › 業主端佣金；總覽／利潤 KPI「業主端佣金」→ openCommKpi。
+var _COMM_ROLES=['工地主任','工務','採購','負責人','經理／主任','其他'];
+function _commFromReferral(ref){
+  if(!ref||!ref.name)return null;
+  var cap=parseFloat(ref.cap)||0,rate=parseFloat(ref.rate)||0,amt=parseFloat(ref.amount)||parseFloat(ref.fixAmt)||0;
+  var fixed=ref.mode==='amt'||cap>0||!(rate>0);
+  var c={id:'ref',name:String(ref.name),role:(ref.who&&ref.who!=='中間人')?String(ref.who):'其他',mode:fixed?'amt':'rev',val:fixed?Math.round(amt):rate,note:''};
+  if(cap>0&&ref.mode!=='amt')c.note='原專案獎金 '+rate+'%、上限 '+fmt(cap)+'，轉為固定額';
+  return c;
+}
+function _commList(q){   // 讀取（含舊 referral 一次性轉換）
+  if(!q)return [];
+  if(q.referral&&!(Array.isArray(q.comms)&&q.comms.length)){var c=_commFromReferral(q.referral);q.comms=c?[c]:[];delete q.referral;_touch(q);}
+  return Array.isArray(q.comms)?q.comms.filter(function(c){return c&&c.name;}):[];
+}
+function _commMigrateAll(){var n=0;(Q||[]).forEach(function(q){if(q&&q.referral){_commList(q);n++;}});if(n){try{persist();}catch(e){_err('_commMigrateAll',e);}}return n;}
+function _commPayId(q,c){return c.id==='ref'?('comm_'+q.id):('comm_'+q.id+'_'+c.id);}
+// 共用計算（與業務抽成同口徑）：cfg={mode,val,unit}
+function _commAmtFor(q,cfg){
+  if(!cfg)return 0;
+  if(cfg.mode==='amt')return Math.round(cfg.val);
+  if(cfg.mode==='profit')return Math.round(_salesProfitBase(q)*cfg.val/100);
+  if(cfg.mode==='unit')return Math.round(_salesUnitQty(q,cfg.unit).contract*cfg.val);
+  return Math.round(_salesBase(q)*cfg.val/100);
+}
+function _commAccrFor(q,cfg){   // 已計提：unit＝已請量×單價×收款比例；其他＝總額×收款進度
+  if(!cfg)return 0;
+  if(cfg.mode==='unit'){var k=_salesUnitQty(q,cfg.unit);return Math.round(k.billed*cfg.val*_salesRcvRate(q,true));}
+  return Math.round(_commAmtFor(q,cfg)*_salesRcvRate(q));
+}
+function _commDueFor(q,cfg){   // 應付金額：unit＝已請量×單價（隨請款增加），其他＝總額
+  if(!cfg)return 0;
+  if(cfg.mode==='unit')return Math.round(_salesUnitQty(q,cfg.unit).billed*cfg.val);
+  return _commAmtFor(q,cfg);
+}
+function _commTxtFor(q,cfg){
+  if(!cfg)return '';
+  if(cfg.mode==='amt')return '固定 NT$ '+fmt(cfg.val);
+  if(cfg.mode==='profit')return cfg.val+'% × 毛利 '+fmt(_salesProfitBase(q));
+  if(cfg.mode==='unit'){var k=_salesUnitQty(q,cfg.unit);return '每'+k.unit+' '+fmt(cfg.val)+' × 合約 '+(_qfmt(k.contract)||'0')+' '+k.unit+'（已請 '+(_qfmt(k.billed)||'0')+'）';}
+  return cfg.val+'% × 未稅 '+fmt(_salesBase(q));
+}
+function _commAmt(q,c){return _commAmtFor(q,_salesCommNorm(c));}
+function _commAccr(q,c){return _commAccrFor(q,_salesCommNorm(c));}
+function _commTotal(q){return _commList(q).reduce(function(a,c){return a+_commAmt(q,c);},0);}
+function _commPay(q,c){var id=_commPayId(q,c);return (PAYABLES||[]).find(function(p){return p&&p.id===id;})||null;}
+function _commSync(q){   // 得標＋佣金>0 → 每位收款人一筆應付（固定 id；保留付款狀態）；刪掉的收款人撤未付
+  if(!q||!q.id||q.parentId)return;
+  var keep={},changed=false;
+  _commList(q).forEach(function(c){
+    var cfg=_salesCommNorm(c),id=_commPayId(q,c),amt=q.awarded?_commDueFor(q,cfg):0;
+    var p=(PAYABLES||[]).find(function(x){return x&&x.id===id;});
+    if(amt>0){
+      keep[id]=1;var isNew=!p;if(!p){p={id:id,status:'pending',createdAt:Date.now()};PAYABLES.unshift(p);}
+      var before=_recSig(p);
+      p.kind='commission';p.to=c.name;p.project=q.name||'';p.quoteId=q.id;p.amount=amt;p.vat=false;p.category='other';
+      p.note='業主端佣金（'+(c.role||'')+'）・'+_commTxtFor(q,cfg)+(cfg.mode==='unit'?'・依業主請款數量實作實算':'・依實收款進度支付')+(c.note?('・'+c.note):'');
+      if(!p.date)p.date=_vendorDueDate(q.date||localToday());
+      if(isNew||_recSig(p)!==before){_touch(p);changed=true;}
+    }else if(p&&p.status==='paid')keep[id]=1;
+  });
+  var pre='comm_'+q.id;
+  (PAYABLES||[]).slice().forEach(function(p){
+    if(!p||!p.id||keep[p.id])return;
+    if(p.id!==pre&&String(p.id).indexOf(pre+'_')!==0)return;
+    if(p.status==='paid')return;
+    _tomb('payables',p.id);PAYABLES=PAYABLES.filter(function(x){return x!==p;});changed=true;
+  });
+  if(changed)savePayables();
+}
+function _commSyncAll(){(Q||[]).forEach(function(q){try{if(q&&!q.parentId&&(q.referral||(Array.isArray(q.comms)&&q.comms.length)))_commSync(q);}catch(e){_err('_commSyncAll',e);}});}
+try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{if(_commMigrateAll())_commSyncAll();}catch(e){_err('_commMigrate',e);}},5000);});}catch(e){_err('_commMigrate',e);}
+// ── 報價列表 chip ──
+function _commChip(q){
+  if(!q||q.parentId||!_salesCommVis())return '';
+  var L=_commList(q),on=L.length>0,tot=_commTotal(q);
+  return '<span class="bdg comm-chip" onclick="event.stopPropagation();openCommPick(\''+q.id+'\')" title="業主端佣金（工地主任／採購／負責人…）——與公司業務抽成分開" style="cursor:pointer;font-size:10px;background:var(--w);border:1px dashed '+(on?'#b45309':'var(--b2)')+';color:'+(on?'#b45309':'var(--b3)')+'">'+(on?('佣金 '+L.map(function(c){return esc(c.name);}).join('、')+(tot>0?('・'+fmt(tot)):'')):'＋佣金')+'</span>';
+}
+function _commNameDl(){var names={};(Q||[]).forEach(function(q){(Array.isArray(q&&q.comms)?q.comms:[]).forEach(function(c){if(c&&c.name)names[c.name]=1;});});return Object.keys(names).map(function(n){return '<option value="'+esc(n)+'">';}).join('');}
+function _commRowHtml(q,c){
+  c=c||{};var IN='width:100%;box-sizing:border-box;font-size:12.5px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;background:var(--w)';
+  var cfg=_salesCommNorm(c),p=(q&&c.id)?_commPay(q,c):null;
+  var st=p?(p.status==='paid'?'<span style="color:var(--g3);font-weight:700">已付 '+esc(p.paidDate||'')+'</span>':'<span style="color:#b45309">應付待付 '+fmt(p.amount)+'</span>'):'';
+  return '<div class="cp-row" data-id="'+esc(c.id||'')+'" style="border:1px solid var(--b2);border-radius:var(--r8);padding:8px;margin-bottom:6px;background:var(--b0)">'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+    +'<div class="f"><label>收款人</label><input class="cp-name" list="cp-name-dl" value="'+esc(c.name||'')+'" placeholder="姓名" style="'+IN+'"></div>'
+    +'<div class="f"><label>身分</label><input class="cp-role" list="cp-role-dl" value="'+esc(c.role||'')+'" placeholder="工地主任／採購…" style="'+IN+'"></div>'
+    +'<div class="f"><label>計算方式</label><select class="cp-mode" onchange="_commRowMode(this)" style="'+IN+'">'+Object.keys(_SALES_MODES).map(function(k){return '<option value="'+k+'"'+((cfg?cfg.mode:'rev')===k?' selected':'')+'>'+_SALES_MODES[k]+'</option>';}).join('')+'</select></div>'
+    +'<div class="f"><label>% 或金額</label><div style="display:flex;gap:4px"><input class="cp-val" type="number" inputmode="decimal" step="0.1" value="'+(cfg?cfg.val:'')+'" style="'+IN+';text-align:right"><input class="cp-unit" value="'+esc(cfg&&cfg.unit?cfg.unit:(c.unit||'支'))+'" placeholder="單位" style="'+IN+';width:56px;flex:0 0 56px;display:'+(cfg&&cfg.mode==='unit'?'':'none')+'"></div></div>'
+    +'</div>'
+    +'<div style="display:flex;gap:6px;align-items:center;margin-top:6px"><input class="cp-note" value="'+esc(c.note||'')+'" placeholder="備註（例：開工先付一半）" style="'+IN+';flex:1">'
+    +'<span style="font-size:11px;white-space:nowrap">'+st+'</span>'
+    +'<button type="button" class="btn btn-xs btn-r" onclick="this.closest(\'.cp-row\').remove()" title="移除（已付的應付會保留）">✕</button></div>'
+    +'</div>';
+}
+function _commRowMode(sel){var u=sel.closest('.cp-row').querySelector('.cp-unit');if(u)u.style.display=sel.value==='unit'?'':'none';}
+function _commAddRow(){var box=document.getElementById('cp-rows');if(!box)return;var d=document.createElement('div');d.innerHTML=_commRowHtml(null,{});box.appendChild(d.firstChild);var f=box.lastChild.querySelector('.cp-name');if(f)f.focus();}
+function openCommPick(qid){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;
+  if(!_salesCommVis()){toast('佣金設定僅管理員可見');return;}
+  var L=_commList(q);
+  var html='<div style="font-size:12.5px;color:var(--b4);margin-bottom:6px">'+esc(q.name||'')+'　'+esc(q.client||'')+'</div>'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-bottom:8px">業主那邊要收佣金的人（工地主任、採購、負責人…），一案可多位，<b>與「業務」分開</b>——公司業務的抽成請用旁邊「業務」chip。得標後每位各建一筆應付（不含稅，依實收款進度支付；每單位模式依業主已請數量實作實算）。</div>'
+    +'<datalist id="cp-role-dl">'+_COMM_ROLES.map(function(r){return '<option value="'+esc(r)+'">';}).join('')+'</datalist>'
+    +'<datalist id="cp-name-dl">'+_commNameDl()+'</datalist>'
+    +'<div id="cp-rows">'+L.map(function(c){return _commRowHtml(q,c);}).join('')+'</div>'
+    +'<div style="margin-top:8px"><button type="button" class="btn btn-xs" onclick="_commAddRow()">＋ 新增收款人</button></div>';
+  showConfirm('業主端佣金',html,function(){_commPickSave(q);},false,null,true);
+  if(!L.length)setTimeout(_commAddRow,30);
+}
+function _commPickSave(q){
+  var rows=[].slice.call(document.querySelectorAll('#cp-rows .cp-row')),out=[],now=Date.now();
+  rows.forEach(function(r){
+    var g=function(c){var e=r.querySelector(c);return e?String(e.value||'').trim():'';};
+    var name=g('.cp-name');if(!name)return;
+    var id=r.getAttribute('data-id')||('cm'+now.toString(36)+Math.random().toString(36).slice(2,5));
+    var mode=g('.cp-mode')||'rev',c={id:id,name:name,role:g('.cp-role'),mode:_SALES_MODES[mode]?mode:'rev',val:parseFloat(g('.cp-val'))||0,note:g('.cp-note')};
+    if(c.mode==='unit')c.unit=_uFix(g('.cp-unit')||'支');
+    out.push(c);
+  });
+  q.comms=out;delete q.referral;_touch(q);
+  try{persist();}catch(e){_err('_commPickSave',e);}
+  try{_commSync(q);}catch(e){_err('_commPickSave.sync',e);}
+  try{renderList();}catch(e){_err('_commPickSave.list',e);}
+  try{if(_currentReport==='comm'&&document.getElementById('page-reports')&&document.getElementById('page-reports').classList.contains('active'))renderCurrentReport();}catch(e){_err('_commPickSave.rpt',e);}
+  toast(out.length?('業主端佣金：'+out.map(function(c){return c.name;}).join('、')+'　合計 '+fmt(_commTotal(q))):'已清除業主端佣金');
+}
+// ── 報表：經營報表 › 其他報表 › 業主端佣金 ──
+var _rptCommF={who:''};
+function _commRows(year,month,who){   // 得標主案、報價日在期間內、有佣金設定 → [{q,c}]
+  var mF=month?String(month).padStart(2,'0'):'',rows=[];
+  (Q||[]).forEach(function(q){
+    if(!q||q.parentId||!q.awarded)return;
+    var d=String(q.date||'');if(!d.startsWith(String(year))||(mF&&d.slice(5,7)!==mF))return;
+    _commList(q).forEach(function(c){if(who&&c.name!==who)return;rows.push({q:q,c:c});});
+  });
+  return rows.sort(function(a,b){return String(b.q.date||'').localeCompare(String(a.q.date||''));});
+}
+function _commStat(rows){
+  var s={n:0,total:0,accr:0,paid:0,unpaid:0},cases={};
+  rows.forEach(function(r){var a=_commAmt(r.q,r.c);cases[r.q.id]=1;s.total+=a;s.accr+=_commAccr(r.q,r.c);var p=_commPay(r.q,r.c);if(p&&p.status==='paid')s.paid+=(parseFloat(p.amount)||0);});
+  s.n=Object.keys(cases).length;s.unpaid=Math.max(0,s.total-s.paid);return s;
+}
+function _commPayTxt(r,withBtn){
+  var a=_commAmt(r.q,r.c);if(!(a>0))return '<span style="color:var(--b3)">—</span>';
+  var p=_commPay(r.q,r.c);
+  if(!p)return withBtn?'<button type="button" class="btn btn-xs" onclick="event.stopPropagation();_commSync(Q.find(function(x){return x.id===\''+r.q.id+'\'}));renderCurrentReport()">建應付</button>':'未建應付';
+  if(p.status==='paid')return '<span style="color:var(--g3);font-weight:700">已付 '+esc(p.paidDate||'')+'</span>'+(withBtn?' <button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" onclick="event.stopPropagation();payUnmark(\''+p.id+'\')">改回</button>':'');
+  return '<span style="color:#b45309">待付 '+fmt(p.amount)+'</span>'+(withBtn?' <button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="event.stopPropagation();payMarkPaid(\''+p.id+'\',null,function(){renderCurrentReport();})">付款</button>':'');
+}
+function _commTables(rows,opts){   // 畫面與 PDF 共用：依收款人彙總＋明細
+  var pr=!!(opts&&opts.print),th=function(t,r){return '<th style="padding:6px 8px;text-align:'+(r?'right':'left')+'">'+t+'</th>';},td=function(t,r){return '<td style="padding:5px 8px;text-align:'+(r?'right':'left')+'">'+t+'</td>';};
+  var by={};rows.forEach(function(r){var k=r.c.name;(by[k]=by[k]||[]).push(r);});
+  var keys=Object.keys(by).sort(function(a,b){return _commStat(by[b]).total-_commStat(by[a]).total;});
+  var h='<div style="font-weight:900;font-size:12.5px;color:var(--g3);margin:4px 0 6px">依收款人</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:var(--gl);color:var(--b5)">'+th('收款人')+th('身分')+th('案件',1)+th('佣金總額',1)+th('依實收已計提',1)+th('已付',1)+th('未付',1)+'</tr></thead><tbody>';
+  keys.forEach(function(k){var s=_commStat(by[k]),roles=[];by[k].forEach(function(r){if(r.c.role&&roles.indexOf(r.c.role)<0)roles.push(r.c.role);});
+    h+='<tr style="border-bottom:1px solid var(--b1)'+(pr?'':';cursor:pointer')+'"'+(pr?'':' onclick="_rptCommF.who=\''+esc(k)+'\';renderCurrentReport()" title="只看這位"')+'>'+td('<b>'+esc(k)+'</b>')+td(esc(roles.join('／')))+td(s.n,1)+td('<b>'+fmt(s.total)+'</b>',1)+td(fmt(s.accr),1)+td('<span style="color:var(--g3)">'+fmt(s.paid)+'</span>',1)+td('<span style="color:'+(s.unpaid>0?'#b45309':'var(--b3)')+'">'+fmt(s.unpaid)+'</span>',1)+'</tr>';});
+  var tot=_commStat(rows);
+  h+='<tr class="tt" style="background:var(--b0);font-weight:800">'+td('合計')+td('')+td(tot.n,1)+td(fmt(tot.total),1)+td(fmt(tot.accr),1)+td(fmt(tot.paid),1)+td(fmt(tot.unpaid),1)+'</tr></tbody></table></div>';
+  h+='<div style="font-weight:900;font-size:12.5px;color:var(--g3);margin:14px 0 6px">佣金明細 <span style="font-size:11px;font-weight:400;color:var(--b4)">已計提＝佣金 × 收款進度；點列可改設定</span></div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--gl);color:var(--b5)">'+th('報價日')+th('工程')+th('業主')+th('收款人')+th('身分')+th('計算方式')+th('佣金',1)+th('收款',1)+th('已計提',1)+th('付款')+'</tr></thead><tbody>';
+  rows.forEach(function(r){var cfg=_salesCommNorm(r.c),a=_commAmt(r.q,r.c),rr=_salesRcvRate(r.q),ac=_commAccr(r.q,r.c);
+    h+='<tr style="border-bottom:1px solid var(--b1)'+(pr?'':';cursor:pointer')+'"'+(pr?'':' onclick="openCommPick(\''+r.q.id+'\')"')+'>'+td(esc(r.q.date||''))+td(esc(r.q.name||'未命名'))+td(esc(r.q.client||''))+td(esc(r.c.name||''))+td(esc(r.c.role||''))+td(esc(_commTxtFor(r.q,cfg))+(r.c.note?'<div style="font-size:10.5px;color:var(--b3)">'+esc(r.c.note)+'</div>':''))+td(a>0?('<b>'+fmt(a)+'</b>'):'—',1)+td(Math.round(rr*100)+'%',1)+td(fmt(ac),1)+td(_commPayTxt(r,!pr))+'</tr>';});
+  if(!rows.length)h+='<tr><td colspan="10" style="padding:14px;text-align:center;color:var(--b3)">期間內沒有設定業主端佣金的得標案</td></tr>';
+  h+='</tbody></table></div>';
+  return h;
+}
+function _commPeriodTxt(year,month){return year+(month?('年'+month+'月'):'年')+(_rptCommF.who?('・'+_rptCommF.who):'');}
+function renderCommReport(el,year,month){
+  try{_commSyncAll();}catch(e){_err('renderCommReport.sync',e);}
+  var f=_rptCommF,rows=_commRows(year,month,f.who),s=_commStat(rows);
+  var tile=function(k,v,sub,clr){return '<div style="background:var(--w);border:1px solid var(--b2);border-radius:var(--r8);padding:10px 12px"><div style="font-size:11px;color:var(--b3);font-weight:700;margin-bottom:4px">'+k+'</div><div style="font-size:19px;font-weight:900;color:'+(clr||'var(--b5)')+';font-variant-numeric:tabular-nums">'+v+'</div>'+(sub?'<div style="font-size:11px;color:var(--b4);margin-top:3px">'+sub+'</div>':'')+'</div>';};
+  var names={};_commRows(year,month,'').forEach(function(r){names[r.c.name]=1;});
+  var opts='<option value="">全部收款人</option>'+Object.keys(names).map(function(n){return '<option value="'+esc(n)+'"'+(f.who===n?' selected':'')+'>'+esc(n)+'</option>';}).join('');
+  var SEL='height:34px;padding:0 8px;border:1px solid var(--b2);border-radius:var(--r8);font-size:12.5px;font-family:inherit;background:var(--w)';
+  var html='<div class="cb">'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><div style="font-size:13px;font-weight:900;color:var(--g3)">'+esc(_commPeriodTxt(year,month))+' 業主端佣金</div>'
+    +'<select id="rpt-comm-f" onchange="_rptCommF.who=this.value;renderCurrentReport()" style="'+SEL+'">'+opts+'</select>'
+    +'<span style="font-size:11px;color:var(--b4)">上方「匯出」＝PDF、「Excel」＝CSV；設定在報價列表狀態旁「佣金」chip；公司業務抽成另見「業務績效」</span></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:8px;margin-bottom:6px">'
+    +tile('有佣金案件',s.n+' 件','得標主案（依報價日）')
+    +tile('佣金總額','NT$ '+fmt(s.total),rows.length+' 位次','#4527a0')
+    +tile('依實收已計提','NT$ '+fmt(s.accr))
+    +tile('已付','NT$ '+fmt(s.paid),'','var(--g3)')
+    +tile('未付','NT$ '+fmt(s.unpaid),'',s.unpaid>0?'#b45309':'var(--g3)')
+    +'</div><div style="font-size:11px;color:var(--b3);margin-bottom:12px">業主端佣金＝付給業主那邊的人（工地主任、採購、負責人…）的費用，與公司業務抽成、分包介紹費分開列帳。營收%／毛利%以未稅合約（含追加）計；每單位 × 實作量依業主已請數量實作實算；應付不含稅、依實收款進度支付。內部資料，只有管理員看得到。</div>'
+    +_commTables(rows,null)+'</div>';
+  el.innerHTML=html;
+}
+function _commPdf(){
+  var year=parseInt((document.getElementById('rpt-year')||{}).value)||new Date().getFullYear(),month=parseInt((document.getElementById('rpt-month')||{}).value)||0;
+  var rows=_commRows(year,month,_rptCommF.who),s=_commStat(rows);
+  var body='<div class="cond">期間 '+esc(_commPeriodTxt(year,month))+'　'+s.n+' 件・佣金總額 NT$ '+fmt(s.total)+'（依實收已計提 '+fmt(s.accr)+'・已付 '+fmt(s.paid)+'／未付 '+fmt(s.unpaid)+'）</div>'
+    +_commTables(rows,{print:true}).replace(/style="overflow-x:auto"/g,'')
+    +'<div style="font-size:9.5px;color:#777;margin-top:10px">業主端佣金；已計提＝佣金 × 收款進度。內部文件。</div>';
+  _toolPrint('業主端佣金 '+_commPeriodTxt(year,month),P.company||'',body,{landscape:true,fname:'業主端佣金_'+year+(month?('_'+month):'')});
+}
+function _commCsv(){
+  var year=parseInt((document.getElementById('rpt-year')||{}).value)||new Date().getFullYear(),month=parseInt((document.getElementById('rpt-month')||{}).value)||0;
+  var rows=_commRows(year,month,_rptCommF.who).map(function(r){var cfg=_salesCommNorm(r.c),a=_commAmt(r.q,r.c),p=_commPay(r.q,r.c);
+    return [r.q.date||'',r.q.name||'',r.q.client||'',r.c.name||'',r.c.role||'',_commTxtFor(r.q,cfg),a||'',Math.round(_salesRcvRate(r.q)*100)+'%',a?_commAccr(r.q,r.c):'',p?(p.status==='paid'?('已付 '+(p.paidDate||'')):('待付 '+(p.amount||0))):'',r.c.note||''];});
+  downloadCSV('業主端佣金_'+year+(month?('_'+month):'')+'_'+fmtDateStr(),['報價日','工程','業主','收款人','身分','計算方式','佣金','收款進度','已計提','付款','備註'],rows);
+}
+
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
@@ -37368,7 +37572,7 @@ function rProfit(){
     const overhead=actualRevenuePre*((P.overheadPct||0)/100);
     // 專案獎金：依實收進度比例認列（應付說明也是「依實收款進度分期支付」）。
     // 原本一次扣全額，收款初期淨利被大幅低估。
-    const bonusFull=_all.reduce((a,x)=>a+((x.referral&&parseFloat(x.referral.amount))||0),0);
+    const bonusFull=_all.reduce((a,x)=>a+_commTotal(x),0);   // v6.0.88 業主端佣金（原 referral）
     const _contractTotal=_all.reduce((a,x)=>a+(x.t?.total||0),0);
     const _recvRate=_contractTotal>0?Math.min(1,totalReceived/_contractTotal):0;
     const bonus=Math.round(bonusFull*_recvRate);
@@ -37453,8 +37657,8 @@ function rProfit(){
         <div class="kv" style="font-size:18px;color:var(--red)">NT$ ${fmt(totActualCost)}</div>
         <div class="ks">預估 NT$ ${fmt(cases.reduce((a,r)=>a+r.estCostQ,0))}</div>
       </div>
-      <div class="kpi" style="background:#f4f0fb;cursor:pointer" title="點擊查看各案獎金、依實收計提與支付狀態" onclick="openCommKpi()">
-        <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 專案獎金（佣金）</div>
+      <div class="kpi" style="background:#f4f0fb;cursor:pointer" title="點擊查看各案業主端佣金、依實收計提與支付狀態" onclick="openCommKpi()">
+        <div class="kl"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 業主端佣金</div>
         <div class="kv" style="font-size:18px;color:#4527a0">NT$ ${fmt(totBonusFull)}</div>
         <div class="ks">依實收已計提 ${fmt(totBonusAccr)}・已付 ${fmt(totBonusPaid)}</div>
       </div>
@@ -37816,6 +38020,7 @@ try{window.addEventListener('resize',function(){try{var pg=document.getElementBy
 function exportCurrentReportExcel(){
   if(_currentReport==='shareholder'||_currentReport==='overview'){exportShareholderCSV();return;}   // v6
   if(_currentReport==='sales'){_salesCsv();return;}   // v6.0.74
+  if(_currentReport==='comm'){_commCsv();return;}   // v6.0.88
   const year=parseInt(document.getElementById('rpt-year')?.value)||new Date().getFullYear();
   const month=parseInt(document.getElementById('rpt-month')?.value)||0;
   let rows=[],headers=[],title='報表';
