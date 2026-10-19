@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.89';
+var APP_VERSION='v6.0.91';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -31205,13 +31205,14 @@ function _envPdf(){
 var _RFQ_EXTRA_DEF=['數量為預估量，實作實算，依現場丈量及工作日報為準。','單價為未稅，另加 5% 營業稅。','工期與進場日依業主通知，請註明可配合之機具數量與日產能。','含工安、保險、機具油料與操作人員。','本詢價單不構成訂購，發包以雙方簽訂之分項合約為準。'];
 function _rfqs(q){return (q&&Array.isArray(q.rfqs))?q.rfqs:[];}
 function _rfqNextNo(q){var n=_rfqs(q).length+1;return 'RFQ-'+String(q.code||'').replace(/[^0-9A-Za-z]/g,'').slice(0,12)+'-'+String(n).padStart(2,'0');}
-function _rfqCond(r){return Object.assign({cashPct:50,ticketPct:50,ticketDays:60,ret:(P.subRetDef!=null?P.subRetDef:5),valid:30,extra:_RFQ_EXTRA_DEF.slice()},(r&&r.cond)||{});}
+function _rfqCond(r){var bb=(r&&r.cond)?null:_b2bDefCond(_rfqQ());   // v6.0.91 新詢價單預設跟營造廠付款條件背對背（已存的條件不動）
+  return Object.assign({cashPct:50,ticketPct:50,ticketDays:60,ret:(P.subRetDef!=null?P.subRetDef:5),valid:30,retWhen:'',extra:_RFQ_EXTRA_DEF.slice()},bb||{},(r&&r.cond)||{});}
 function _rfqCondLines(r){
   var c=_rfqCond(r),day=P.vendorPayDay||25,delay=(P.vendorPayDelay==null)?1:P.vendorPayDelay;
   var pay='每月 '+(P.vendorCutDay||25)+' 日計價，'+(delay===0?'當月':delay===1?'次月':('隔 '+delay+' 個月'))+' '+day+' 日放款';
   var split=[];if(c.cashPct>0)split.push(c.cashPct+'% 匯款');if(c.ticketPct>0)split.push(c.ticketPct+'% '+c.ticketDays+' 天票期');
   if(split.length)pay+='（'+split.join('、')+'）';
-  pay+='；'+(c.ret>0?('保留款 '+c.ret+'%，完工驗收後退還。'):'無保留款。');
+  pay+='；'+(c.ret>0?('保留款 '+c.ret+'%，'+(String(c.retWhen||'').trim()||'完工驗收後退還')+'。'):'無保留款。');
   var ex=(c.extra||[]).map(function(t){return String(t||'').trim();}).filter(Boolean);
   var out=ex.slice(0,2);out.push('計價方式：'+pay);if(c.valid>0)out.push('報價有效期 '+c.valid+' 天。');
   return out.concat(ex.slice(2));
@@ -31254,6 +31255,7 @@ function _rfqCardHtml(q,r){
     +'<button type="button" class="btn btn-xs btn-r" onclick="rfqDel(\''+r.id+'\')">刪除</button>'
     +'</span></div>'
     +(r.scope?'<div style="font-size:12.5px;margin-top:4px">詢價範圍：'+esc(r.scope)+'</div>':'')
+    +_b2bWarnHtml(q,_rfqCond(r))
     +(r.award&&r.award.reason?'<div style="font-size:12px;color:'+stClr+';margin-top:4px">'+(r.status==='labor'?'改點工原因：':'得標原因：')+esc(r.award.reason)+(r.award.backfilled?'　<span style="font-size:11px;color:var(--b4)">✓ 已回填 '+r.award.backfilled+' 個工項成本單價</span>':'')+'</div>':'');
   var vh='';
   if(!vendors.length)vh='<div style="font-size:12px;color:var(--b3);margin-top:8px">尚無廠商回傳。先按「詢價單 PDF」匯出傳給廠商；收到回傳後按「＋ 回傳廠商」填入廠商資訊與單價</div>';
@@ -31310,10 +31312,13 @@ function rfqEdit(rid){
     +'<div class="f" style="margin:0"><label style="white-space:nowrap">保留款 %</label><input id="rfq-ret" type="number" inputmode="decimal" min="0" max="100" step="0.5" value="'+c.ret+'" style="'+IN+';padding:7px 4px;text-align:center"></div>'
     +'<div class="f" style="margin:0"><label style="white-space:nowrap">有效 天</label><input id="rfq-valid" type="number" inputmode="numeric" min="0" value="'+c.valid+'" style="'+IN+';padding:7px 4px;text-align:center"></div>'
     +'</div>'
+    +'<div class="f" style="margin:6px 0 0"><label>保留款退還時點</label><input id="rfq-retwhen" value="'+esc(c.retWhen||'')+'" placeholder="完工驗收後退還" oninput="_rfqB2bLive()" style="'+IN+'"></div>'
+    +'<div id="rfq-b2b">'+_b2bWarnHtml(q,c)+'</div>'
     +'<div style="font-size:12px;font-weight:700;color:var(--g3);margin:10px 0 4px">詢價條件</div><div id="rfq-conds">'+_rfqCondRowsHtml(c,IN)+'</div>'
     +'<button type="button" class="btn btn-xs" onclick="_rfqCondAdd()" style="margin-top:4px">＋ 新增條件</button>'
 ;
   showConfirm((r?'編輯詢價單 ':'新增詢價單 ')+esc(r?r.no:_rfqNextNo(q)),html,function(){_rfqSave();},false,null,true);
+  try{['rfq-cash','rfq-ticket','rfq-tdays','rfq-ret'].forEach(function(id){var e=document.getElementById(id);if(e)e.addEventListener('input',_rfqB2bLive);});}catch(e){_err('rfqEdit.b2b',e);}
 }
 function _rfqCondRowsHtml(c,IN){
   var ex=(c.extra||[]).map(function(t){return String(t||'').trim();}).filter(Boolean);
@@ -31336,7 +31341,7 @@ function _rfqSave(){
   var q=_rfqQ();if(!q)return;
   var items=[];document.querySelectorAll('.rfq-it').forEach(function(cb){if(!cb.checked)return;var i=parseInt(cb.getAttribute('data-idx'));var it=q.items[i];if(!it)return;var qty=parseFloat(cb.parentNode.querySelector('.rfq-qty').value)||0;var _lb=cb.closest('label'),_pe=_lb&&_lb.querySelector('.rfq-per'),_le=_lb&&_lb.querySelector('.rfq-len');var _per=_pe?_pe.value:'pc',_len=_le?(parseFloat(_le.value)||0):0;if(_per==='m'&&!(_len>0))_per='pc';items.push({idx:i,desc:(it.desc||'').split('\n')[0],unit:_uFix(it.unit||''),qty:qty,per:_per,len:_per==='m'?_len:0});});
   if(!items.length){toast('請至少勾選一個工項');return;}
-  var cond={cashPct:parseFloat(gv('rfq-cash'))||0,ticketPct:parseFloat(gv('rfq-ticket'))||0,ticketDays:parseInt(gv('rfq-tdays'))||0,ret:parseFloat(gv('rfq-ret'))||0,valid:parseInt(gv('rfq-valid'))||0,extra:Array.prototype.map.call(document.querySelectorAll('.rfq-cond'),function(i){return String(i.value||'').trim();}).filter(Boolean)};
+  var cond={cashPct:parseFloat(gv('rfq-cash'))||0,ticketPct:parseFloat(gv('rfq-ticket'))||0,ticketDays:parseInt(gv('rfq-tdays'))||0,ret:parseFloat(gv('rfq-ret'))||0,valid:parseInt(gv('rfq-valid'))||0,retWhen:(gv('rfq-retwhen')||'').trim(),extra:Array.prototype.map.call(document.querySelectorAll('.rfq-cond'),function(i){return String(i.value||'').trim();}).filter(Boolean)};
   if(!Array.isArray(q.rfqs))q.rfqs=[];
   var r=_rfqEditId?q.rfqs.find(function(x){return x.id===_rfqEditId;}):null;
   if(!r){r={id:'rfq'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),no:_rfqNextNo(q),date:localToday(),vendors:[],status:'open',ts:Date.now()};q.rfqs.push(r);}
@@ -32739,7 +32744,7 @@ function rfqAward(rid){
     var cid=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
     var rows=(r.items||[]).map(function(it,i){var p=_rfqPcPrice(r,v,it),pm=_rfqVendorPrice(r,v,it.idx);var row={id:cid+'_'+i,linkedItemIdx:it.idx,desc:_rfqIsM(it)&&pm!=null?('$'+fmt(pm)+'/M × '+_rfmt(it.len)+'M'):'',qty:parseFloat(it.qty)||0,unitPrice:p==null?0:p};if(_rfqIsM(it)){row.ppm=pm;row.len=parseFloat(it.len)||0;}return row;});
     var sd=gv('rfq-sign')||localToday();
-    var cost={id:cid,type:'sub',isAttached:false,attachedTo:'',mergedInto:'',cat:'打設',date:sd,vendor:v.name,rows:rows,amt:0,signDate:sd,entryDate:gv('rfq-entry2')||r.entry||'',invoice:true,retRate:c.ret||0,rfqId:r.id,payTerm:{cashPct:c.cashPct,ticketPct:c.ticketPct,ticketDays:c.ticketDays}};
+    var cost={id:cid,type:'sub',isAttached:false,attachedTo:'',mergedInto:'',cat:'打設',date:sd,vendor:v.name,rows:rows,amt:0,signDate:sd,entryDate:gv('rfq-entry2')||r.entry||'',invoice:true,retRate:c.ret||0,retWhen:c.retWhen||'',rfqId:r.id,payTerm:{cashPct:c.cashPct,ticketPct:c.ticketPct,ticketDays:c.ticketDays}};
     try{recalcCostAmt(cost);}catch(e){_err('rfqAward',e);}
     if(!Array.isArray(q.costs))q.costs=[];q.costs.push(cost);
     var fCost=null;
@@ -33737,7 +33742,7 @@ function pjDeductSet(qid,k,v){
   toast('已更新扣款設定，下一期請款單起自動套用');
 }
 var _pjInvHtml0=_pjInvHtml;
-_pjInvHtml=function(q,st){var h='';try{h=_pjDeductHtml(q);}catch(e){_err('_pjDeductHtml',e);}return h+_pjInvHtml0.apply(this,arguments);};
+_pjInvHtml=function(q,st){var h='';try{h=_pjDeductHtml(q)+_pjOwnerPayHtml(q);}catch(e){_err('_pjDeductHtml',e);}return h+_pjInvHtml0.apply(this,arguments);};
 var _buildInvFromQuote0=buildInvFromQuote;
 buildInvFromQuote=function(q){var inv=_buildInvFromQuote0.apply(this,arguments);try{var d=_pjDeduct(q);if(d.ret!=null){inv.retention=d.ret>0;inv.retentionPct=d.ret;}if(d.clean>0){inv.cleanPermil=d.clean;inv.cleanMode=d.cleanMode;}}catch(e){_err('buildInvFromQuote.deduct',e);}return inv;};
 // ── 2 收款折讓：原發票號碼、折讓金額（未稅＋稅額）、折讓單日期、原因 → inv.allow；折讓證明單 PDF ──
@@ -35270,6 +35275,7 @@ function _pjDeductHtml(q){
     +'<label style="display:flex;align-items:center;gap:4px">保留款 <input type="number" inputmode="decimal" step="any" min="0" max="50" value="'+(d.ret==null?'':d.ret)+'" placeholder="不扣" onchange="pjDeductSet(\''+q.id+'\',\'ret\',this.value)" style="'+IN+';width:58px;text-align:right"> %</label>'
     +'<label style="display:flex;align-items:center;gap:4px">清潔費 <input type="number" inputmode="decimal" step="any" min="0" value="'+(d.clean||'')+'" placeholder="0" onchange="pjDeductSet(\''+q.id+'\',\'clean\',this.value)" style="'+IN+';width:58px;text-align:right"> ‰（未稅工程款）</label>'
     +'<label style="display:flex;align-items:center;gap:4px">清潔費處理 <select onchange="pjDeductSet(\''+q.id+'\',\'cleanMode\',this.value)" style="'+IN+'">'+_CLEAN_MODES.map(function(m){return '<option value="'+m[0]+'"'+(d.cleanMode===m[0]?' selected':'')+'>'+m[1]+'</option>';}).join('')+'</select></label>'
+    +'<label style="display:flex;align-items:center;gap:4px;flex:1 1 260px">保留款退還條件 <input value="'+esc(String(((q.deduct||{}).retCond)||''))+'" placeholder="例：拆除拔除完成、驗收後 30 日內一次無息退還" onchange="pjDeductSet(\''+q.id+'\',\'retCond\',this.value.trim())" style="'+IN+';flex:1;min-width:0"></label>'
     +'<span style="color:var(--b4);font-size:11px">保留款與清潔費都直接列在請款單扣款列，總計＝扣除後金額</span>'
     +'</div>';
 }
@@ -35677,11 +35683,15 @@ function _sctRows(q,c){   // 承攬內容：成本卡明細列 → 工項／單�
     return {desc:desc,unit:_uFix(r.unit||(it&&it.unit)||'式'),qty:qty,up:up,amt:Math.round(qty*up)};
   }).filter(function(r){return r.desc||r.amt;});
 }
-function _sctPayTxt(c,f){
+function _sctPayTxt(c,f,q){
   var day=parseInt(P.vendorCutDay)||25,pd=parseInt(P.vendorPayDay)||25,delay=(P.vendorPayDelay==null)?1:(parseInt(P.vendorPayDelay)||0);
   var ret=parseFloat(c.retRate)||0;
-  var t='依實作數量按月計價：乙方應會同甲方工地人員辦理計價後，於每月 '+day+' 日前檢附估驗請款單'+(_subInvoice(c)?'及統一發票':'')+'向甲方請款，甲方於'+(delay===0?'當月':delay===1?'次月':('次 '+delay+' 月'))+' '+pd+' 日放款。'
-    +(ret>0?('每期工程款保留 '+ret+'% 作為保留款，於工程全部完成（含拆除、拔除、場地清理）且經甲方驗收後無息退還。'):'')
+  // v6.0.91 背對背：本案有營造廠付款條件時，寫出匯款／票期比例；保留款退還時點跟營造廠同步（舊資料無營造廠條件＝原文）
+  var own=q?_ownerTerms(q):null,pt=c.payTerm||null,split='';
+  if(own&&pt){var sp=[];if((parseFloat(pt.cashPct)||0)>0)sp.push(pt.cashPct+'% 現金匯款');if((parseFloat(pt.ticketPct)||0)>0)sp.push(pt.ticketPct+'% 開立 '+(parseInt(pt.ticketDays)||0)+' 天期票');if(sp.length)split='（'+sp.join('、')+'）';}
+  var rw=String(c.retWhen||'').trim()||(own&&own.retCond?_b2bRetWhen(own):'');
+  var t='依實作數量按月計價：乙方應會同甲方工地人員辦理計價後，於每月 '+day+' 日前檢附估驗請款單'+(_subInvoice(c)?'及統一發票':'')+'向甲方請款，甲方於'+(delay===0?'當月':delay===1?'次月':('次 '+delay+' 月'))+' '+pd+' 日放款'+split+'。'
+    +(ret>0?('每期工程款保留 '+ret+'% 作為保留款，'+(rw?(rw+'。'):'於工程全部完成（含拆除、拔除、場地清理）且經甲方驗收後無息退還。')):'')
     +(_subInvoice(c)?'工程款含 '+_taxR()+'% 營業稅，乙方應開立統一發票。':'本工程款不含營業稅，乙方以收據請款。')
     +(f.payExtra?('　'+f.payExtra):'');
   return t;
@@ -35701,10 +35711,10 @@ function _subContractHtml(q,c,f){
     +rows.map(function(r,i){return '<tr><td>'+(i+1)+'</td><td class="l">'+E(r.desc)+'</td><td>'+E(r.unit)+'</td><td class="r">'+_qfmt(r.qty)+'</td><td class="r">'+fmt(r.up)+'</td><td class="r">'+fmt(r.amt)+'</td></tr>';}).join('')
     +'<tr class="tt"><td colspan="5" class="r">預估承攬總價（未稅）</td><td class="r">'+fmt(tot)+'</td></tr></tbody></table>'
     +'<div class="sm">以上數量為預估，實際以甲方會同乙方現場計價之數量為準；單價於合約期間固定不變。</div>');
-  art('付款辦法',E(_sctPayTxt(c,f)));
+  art('付款辦法',E(_sctPayTxt(c,f,q)));
   art('工程期限','乙方應於甲方通知之日期進場施工'+(c.entryDate?('（預定進場日 '+E(c.entryDate)+'）'):'')+(f.period?('，'+E(f.period)):'')+'；各階段進度須依甲方指定之日期進場、完工，並配合本工地其他工種之施工進度，不得無故停工或延誤。');
   art('逾期罰款','乙方如無故不進場、未依甲方指定進度施作或逾期完工，每逾一日應給付甲方承攬總價千分之 '+E(f.fine)+' 之違約金，甲方得自當期或任一期工程款中逕行扣抵。');
-  art('安全衛生及環保','乙方應督導所僱人員遵守職業安全衛生法令、本工地安全衛生規定及環保法令，並自備個人防護具。如因乙方或其人員違反前述規定致甲方或業主遭主管機關裁罰，罰鍰及衍生損失由乙方負擔，甲方得自工程款中直接扣除。');
+  art('安全衛生及環保','乙方應督導所僱人員遵守職業安全衛生法令、本工地安全衛生規定及環保法令，並自備個人防護具。如因乙方或其人員違反前述規定致甲方或業主遭主管機關裁罰，罰鍰及衍生損失由乙方負擔，甲方得自工程款中直接扣除。營造廠依其工地安全衛生罰則對乙方人員所開立之罰款，由乙方負擔，甲方得自當期工程款扣除。');
   art('工程保險','乙方所僱施工人員均應投保勞工保險及團體意外險，施工期間所生之人員傷亡與財物損失概由乙方負責。'+((parseFloat(f.ins)||0)>0?('本工地營造綜合保險由甲方投保，乙方分擔保險費新臺幣 '+fmt(f.ins)+' 元整，同意由甲方於乙方第一期工程款中扣除。'):'本工地營造綜合保險由甲方投保；乙方施工所生之事故仍由乙方負完全責任。'));
   art('清潔責任','乙方每日收工前應將當日施工所生之殘料、廢棄物清理乾淨並運離工地；未清理者甲方得僱工代為處理，費用自乙方工程款中優先扣除，乙方不得異議。');
   art('工程變更','甲方得視實際需要變更或增減工程數量，增減部分依本合約單價計算；本合約未列之新增項目，由雙方另行議價書面確認後施作。');
@@ -36452,6 +36462,84 @@ function _healthAdd689(R){   // 健檢：帳本記載已付但待付、近 14 �
 }
 try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{if(_paidLogSync())savePayables();else _payAuditLoadSnap();}catch(e){_err('paidLog.boot',e);}},1500);});}catch(e){_err('paidLog.boot',e);}
 
+// ── 分包背對背（v6.0.91）：營造廠付款條件 → 詢價單／分包合約預設與提醒 ──
+// 營造廠（業主）付款條件記在報價／專案層級 q.ownerPay={cut 計價日, delay 放款月（0 當月／1 次月…）, day 放款日, cashPct 現金%, ticketDays 期票天數}，
+// 空白欄位沿用客戶資料的付款規則（CUSTOMERS：payDue／payMonthDelay／recvDay／payTermCash／payTermTicket）；
+// 保留款%＝業主扣款設定 q.deduct.ret（空白＝客戶 retentionPct），退還條件＝q.deduct.retCond。全部沒有＝null，照公司預設（P.vendor*／P.subRetDef）運作。
+// 收款時點以「計價月月初起算的天數」比較（月＝30 天）：現金部分＝放款月×30＋放款日，期票部分再加票期天數。
+function _ownerCust(q){var n=String((q&&q.client)||'').trim();return n?((CUSTOMERS||[]).find(function(c){return c&&c.name===n;})||null):null;}
+function _ownerTerms(q){
+  if(!q)return null;
+  var o=q.ownerPay||{},c=_ownerCust(q)||{},d=q.deduct||{};
+  var pick=function(a,b){var x=(a==null||a==='')?NaN:parseFloat(a);if(!isNaN(x))return x;x=(b==null||b==='')?NaN:parseFloat(b);return isNaN(x)?null:x;};
+  var t={cut:pick(o.cut,c.payDue),delay:pick(o.delay,c.payMonthDelay),day:pick(o.day,c.recvDay),cashPct:pick(o.cashPct,c.payTermCash),ticketDays:pick(o.ticketDays,c.payTermTicket),ret:pick(d.ret,c.retentionPct),retCond:String(d.retCond||'').trim()};
+  if(t.day==null&&t.cashPct==null&&t.ticketDays==null&&t.ret==null&&!t.retCond)return null;
+  if(t.cut==null)t.cut=25;if(t.delay==null)t.delay=1;if(t.day==null)t.day=t.cut;
+  if(t.cashPct==null)t.cashPct=(t.ticketDays>0)?0:100;
+  t.cashPct=Math.max(0,Math.min(100,t.cashPct));if(t.ticketDays==null)t.ticketDays=0;
+  return t;
+}
+function _payProf(delay,day,cash,td){cash=Math.max(0,Math.min(100,parseFloat(cash)||0));return {t:(parseFloat(delay)||0)*30+(parseFloat(day)||0),cash:cash,td:cash>=100?0:(parseFloat(td)||0)};}
+function _payAt(p,x){return x<=p.cash?p.t:p.t+p.td;}
+function _ownerProf(o){return _payProf(o.delay,o.day,o.cashPct,o.ticketDays);}
+function _subProf(c){var delay=(P.vendorPayDelay==null)?1:(parseInt(P.vendorPayDelay)||0),day=parseInt(P.vendorPayDay)||25;
+  var cash=(c.cashPct!=null)?c.cashPct:(100-(parseFloat(c.ticketPct)||0));return _payProf(delay,day,cash,c.ticketDays);}
+// 包商最多比營造廠早幾天拿到錢（逐比例比較：第 x% 的錢誰先到）
+function _b2bEarly(own,sub){var xs=[0.01,own.cash,own.cash+0.01,sub.cash,sub.cash+0.01,100],m=0;
+  xs.forEach(function(x){if(!(x>0&&x<=100))return;var d=_payAt(own,x)-_payAt(sub,x);if(d>m)m=d;});return Math.round(m);}
+function _b2bRetWhen(o){return '於營造廠退還本工程保留款予甲方後 7 日內無息退還（同步營造廠退還時點'+(o.retCond?('：'+o.retCond):'')+'）';}
+// 新詢價單的預設條件：現金部分不早於營造廠放款、期票部分到期不早於營造廠期票到期（票期進位到 30 天）、保留款不低於營造廠
+function _b2bDefCond(q){
+  var o=_ownerTerms(q);if(!o)return null;
+  var own=_ownerProf(o),sub=_subProf({cashPct:100,ticketDays:0});
+  var cash=o.cashPct;if(cash>0&&sub.t<own.t)cash=0;   // 本公司放款日比營造廠早 → 全開期票
+  var need=Math.max(own.t+own.td,cash>0?0:own.t)-sub.t;
+  var td=cash>=100?0:Math.max(0,Math.ceil(need/30)*30);
+  if(cash<100&&o.ticketDays>td)td=Math.ceil(o.ticketDays/30)*30;
+  var defRet=(P.subRetDef!=null?parseFloat(P.subRetDef):5);
+  var r={cashPct:cash,ticketPct:100-cash,ticketDays:td,ret:Math.max(defRet,o.ret||0)};
+  if(o.retCond||o.ret>0)r.retWhen=_b2bRetWhen(o);
+  return r;
+}
+// 發包畫面提醒（不擋）：包商比營造廠早收款、保留款低於營造廠、退還時點未同步
+function _b2bIssues(q,c){
+  var o=_ownerTerms(q);if(!o||!c)return [];
+  var out=[],e=_b2bEarly(_ownerProf(o),_subProf(c));
+  if(e>0)out.push('包商比營造廠早 '+e+' 天收款');
+  var sr=parseFloat(c.ret)||0;if((o.ret||0)>sr)out.push('包商保留款 '+sr+'% 低於營造廠扣我方的 '+o.ret+'%');
+  if((o.ret||0)>0&&sr>0&&o.retCond&&!String(c.retWhen||'').trim())out.push('包商保留款退還時點未與營造廠同步（營造廠：'+o.retCond+'）');
+  return out;
+}
+function _b2bWarnHtml(q,c){
+  var o=_ownerTerms(q);if(!o)return '';
+  var is=_b2bIssues(q,c);
+  var own='營造廠：每月 '+o.cut+' 日計價、'+(o.delay===0?'當月':o.delay===1?'次月':('隔 '+o.delay+' 月'))+' '+o.day+' 日放款、'+(o.cashPct>=100?'全額現金':(o.cashPct>0?(o.cashPct+'% 現金＋'):'')+(o.cashPct<100?((100-o.cashPct)+'% '+o.ticketDays+' 天期票'):''))+(o.ret>0?('、保留 '+o.ret+'%'):'');
+  return '<div style="margin-top:6px;font-size:11.5px;border-radius:var(--r8);padding:6px 9px;'+(is.length?'background:#FFF8E1;border:1px solid #FFE082;color:#8a5a00':'background:var(--b0);border:1px solid var(--b1);color:var(--b4)')+'">'
+    +(is.length?('⚠ 背對背提醒：'+is.map(esc).join('；')+'<br>'):'✓ 與營造廠付款條件背對背<br>')+'<span style="color:var(--b4)">'+esc(own)+'</span></div>';
+}
+function _rfqB2bLive(){
+  var box=document.getElementById('rfq-b2b');if(!box)return;
+  var c={cashPct:parseFloat(gv('rfq-cash'))||0,ticketPct:parseFloat(gv('rfq-ticket'))||0,ticketDays:parseInt(gv('rfq-tdays'))||0,ret:parseFloat(gv('rfq-ret'))||0,retWhen:(gv('rfq-retwhen')||'').trim()};
+  try{box.innerHTML=_b2bWarnHtml(_rfqQ(),c);}catch(e){_err('_rfqB2bLive',e);}
+}
+// 專案頁「營造廠付款條件」列（業主扣款設定下方）；空白＝沿用客戶資料
+function _pjOwnerPayHtml(q){
+  var o=q.ownerPay||{},c=_ownerCust(q)||{},IN='font-size:12px;padding:3px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;background:var(--w);box-sizing:border-box;width:54px;text-align:right';
+  var f=function(k,label,ck,unit,max){var ph=(c[ck]!=null&&c[ck]!=='')?String(c[ck]):'';
+    return '<label style="display:flex;align-items:center;gap:4px">'+label+' <input type="number" inputmode="decimal" min="0"'+(max?(' max="'+max+'"'):'')+' value="'+(o[k]==null?'':esc(String(o[k])))+'" placeholder="'+esc(ph)+'" onchange="pjOwnerPaySet(\''+q.id+'\',\''+k+'\',this.value)" style="'+IN+'">'+unit+'</label>';};
+  return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r8);padding:7px 10px;margin-bottom:8px">'
+    +'<b style="color:var(--b5)">營造廠付款條件</b><span style="color:var(--b4);font-size:11px">發包時詢價單／分包合約背對背預設（空白＝沿用客戶資料'+(c.name?'「'+esc(c.name)+'」':'')+'）</span>'
+    +f('cut','每月','payDue','日計價',31)+f('delay','放款','payMonthDelay','個月後',12)+f('day','','recvDay','日放款',31)
+    +f('cashPct','現金','payTermCash','%',100)+f('ticketDays','期票','payTermTicket','天',365)
+    +'<span style="color:var(--b4);font-size:11px">保留款％與退還條件見上方「業主扣款設定」</span></div>';
+}
+function pjOwnerPaySet(qid,k,v){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;
+  if(!q.ownerPay||typeof q.ownerPay!=='object')q.ownerPay={};
+  var x=String(v==null?'':v).trim();q.ownerPay[k]=x===''?null:(parseFloat(x)||0);
+  _touch(q);try{persist();}catch(e){_err('pjOwnerPaySet',e);}
+  toast('已更新營造廠付款條件，新詢價單起預設背對背');
+}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');

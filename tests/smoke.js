@@ -6739,6 +6739,55 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.91 分包背對背：營造廠付款條件 → 詢價單／分包合約 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const oP = { cut: P.vendorCutDay, day: P.vendorPayDay, delay: P.vendorPayDelay, ret: P.subRetDef };
+      try {
+        P.vendorCutDay = 25; P.vendorPayDay = 25; P.vendorPayDelay = 1; P.subRetDef = 5;
+        CUSTOMERS.push({ id: 'cB2B', name: '元昱測試營造', payDue: 25, payMonthDelay: 1, recvDay: 20, payTermCash: 0, payTermTicket: 30, retentionPct: 10 });
+        const q = { id: 'qB2B', name: '背對背測試案', client: '元昱測試營造', awarded: true, items: [{ desc: 'H型鋼樁打設', unit: 'M', qty: 100, price: 500 }], deduct: { retCond: '拆除拔除完成、驗收後 30 日內一次無息退還' } };
+        const q0 = { id: 'qB2B0', name: '舊案', client: '無條件業主', awarded: true, items: [] };
+        Q.push(q, q0);
+        /* 客戶資料帶入：100% 30 天期票、次月 20 日放款、保留 10% */
+        _rfqQid = 'qB2B'; const c = _rfqCond(null);
+        out.def = c.cashPct === 0 && c.ticketPct === 100 && c.ticketDays === 30 && c.ret === 10 && /營造廠退還本工程保留款/.test(c.retWhen) && /拆除拔除完成/.test(c.retWhen);
+        out.noIssue = _b2bIssues(q, c).length === 0;
+        /* 寬鬆條件提醒：全現金次月 25 日 → 早 25 天；保留 5% 低於 10% */
+        const loose = { cashPct: 100, ticketPct: 0, ticketDays: 0, ret: 5, retWhen: '' };
+        const is = _b2bIssues(q, loose); out.warn = is.some(x => /包商比營造廠早 25 天收款/.test(x)) && is.some(x => /低於營造廠扣我方的 10%/.test(x));
+        out.warnHtml = /背對背提醒/.test(_b2bWarnHtml(q, loose)) && /✓ 與營造廠付款條件背對背/.test(_b2bWarnHtml(q, c));
+        /* 專案欄位覆寫客戶資料 */
+        q.ownerPay = { day: 10, delay: 1 }; out.override = _ownerTerms(q).day === 10 && _ownerTerms(q).ticketDays === 30; q.ownerPay = {};
+        /* 已存條件的詢價單不被改 */
+        out.keep = _rfqCond({ cond: { cashPct: 50, ticketPct: 50, ticketDays: 60, ret: 3 } }).ret === 3;
+        /* 分包合約：比例＋同步退還、第九條罰款轉嫁 */
+        const cost = { id: 'cs1', type: 'sub', vendor: '甲包商', rows: [], retRate: 10, retWhen: c.retWhen, invoice: true, payTerm: { cashPct: 0, ticketPct: 100, ticketDays: 30 } };
+        const t = _sctPayTxt(cost, _sctCfg(), q); out.sct = /100% 開立 30 天期票/.test(t) && /營造廠退還本工程保留款予甲方後 7 日內/.test(t);
+        out.art9 = /營造廠依其工地安全衛生罰則對乙方人員所開立之罰款，由乙方負擔，甲方得自當期工程款扣除/.test(_subContractHtml(q, cost, _sctCfg()));
+        /* 舊資料：沒有任何營造廠條件 → 照公司預設、合約原文 */
+        _rfqQid = 'qB2B0'; const c0 = _rfqCond(null);
+        out.legacy = _ownerTerms(q0) === null && c0.cashPct === 50 && c0.ticketDays === 60 && c0.ret === 5 && !c0.retWhen
+          && _sctPayTxt(Object.assign({}, cost, { retWhen: '' }), _sctCfg(), q0) === _sctPayTxt(Object.assign({}, cost, { retWhen: '' }), _sctCfg())
+          && /經甲方驗收後無息退還/.test(_sctPayTxt(Object.assign({}, cost, { retWhen: '' }), _sctCfg(), q0)) && _b2bWarnHtml(q0, c0) === '';
+        /* 專案頁輸入列 */
+        out.ui = /營造廠付款條件/.test(_pjOwnerPayHtml(q)) && /保留款退還條件/.test(_pjDeductHtml(q));
+        pjOwnerPaySet('qB2B', 'cashPct', '20'); out.set = q.ownerPay.cashPct === 20 && q._mt > 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      Q = Q.filter(x => x.id !== 'qB2B' && x.id !== 'qB2B0'); CUSTOMERS = CUSTOMERS.filter(x => x.id !== 'cB2B'); _rfqQid = '';
+      P.vendorCutDay = oP.cut; P.vendorPayDay = oP.day; P.vendorPayDelay = oP.delay; P.subRetDef = oP.ret;
+      return out;
+    });
+    check('v6.0.91 背對背：營造廠條件（客戶資料／專案覆寫）→ 新詢價單預設 100% 30 天期票、保留 10%、退還同步；已存條件不動', r.def && r.noIssue && r.override && r.keep, JSON.stringify(r));
+    check('v6.0.91 背對背提醒：包商早收款天數、保留款低於營造廠（不擋）', r.warn && r.warnHtml, JSON.stringify(r));
+    check('v6.0.91 分包合約：付款比例＋保留款同步退還、第九條營造廠罰款轉嫁；舊案無條件＝公司預設原文', r.sct && r.art9 && r.legacy, JSON.stringify(r));
+    check('v6.0.91 專案頁營造廠付款條件列與退還條件欄', r.ui && r.set, JSON.stringify(r));
+    check('v6.0.91 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
