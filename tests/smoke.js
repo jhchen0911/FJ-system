@@ -6788,6 +6788,7 @@ async function newPage(browser, width, height) {
           && !/分段計價/.test(_sctPayTxt(Object.assign({}, cost, { b2b: 0, payTerm: { cashPct: 0, ticketPct: 100, ticketDays: 30, instPct: 80 } }), _sctCfg(), q)) && /裝設請款/.test(_pjOwnerPayHtml(q));
         q.ownerPay = {};
         out.art9 = /業主依其工地安全衛生罰則對乙方人員所開立之罰款，由乙方負擔，甲方得自當期工程款扣除/.test(_subContractHtml(q, cost, _sctCfg()));
+        out.art9 = out.art9 && !/業主依其工地安全衛生罰則/.test(_subContractHtml(q, Object.assign({}, cost, { b2b: 0 }), _sctCfg())) && !/ 0 天期票/.test(_b2bWarnHtml({ id: 'z0', client: '', ownerPay: { cashPct: 0, ticketDays: 0, day: 20 } }, { cashPct: 0, ticketPct: 100, ticketDays: 30 }));
         /* 舊資料：沒有任何營造廠條件 → 照公司預設、合約原文 */
         _rfqQid = 'qB2B0'; const c0 = _rfqCond(null);
         out.legacy = _ownerTerms(q0) === null && c0.cashPct === 50 && c0.ticketDays === 60 && c0.ret === 5 && !c0.retWhen
