@@ -85,7 +85,7 @@
 | 施工成本／分包 | `costs`（hidden，parent `proj`；`openProjectCosts`） | `rCostItems` `_ownAutoCat`（自有卡科目自動歸類）`_gasVendors`／`_gasOnSiteHtml`（氣瓶在場）`_vendorEnsure`（手動廠商進名冊）`openSubPeriod`／`_spSave`（廠商請款期別）`openSubAdvance`／`_saSave`（預付款）`openRentPeriod`（租賃）`_subFollowApply`（跟隨計價）`_subStat` `buildSubMgmtHtml`；分包合約書 `openSubContractDoc`／`_subContractHtml`（條款見 `docs/分包工程承攬合約書_通用範本.md`，空格預設 `P.subCt`） | `q.costs`（private） |
 | 成本→應付 | — | `syncCostToPayable` `_syncSubPeriodPayables`（開頭依序 `_advPayHeal`→`_subAdvClamp`→`_earlyToAdv`）`_paySource`（自動應付唯讀）`cleanDuplicatePayables` `_tombExempt`；付款狀態稽核 `_payAuditDiff`（`savePayables` 內比對快照）／`openPayAudit`（列上「歷程」）／`_payLedgerWarn`（帳本已付但待付的紅色警示）／`exportPayDiag`（診斷檔）／`_healthAdd689`（健檢）；已付應付不被任何自動重建刪除 | `PAYABLES`（payables，private）、付款帳本 `PAID_LOG`（private 節點 paidLog，本機 `fy_paidlog`）、稽核 `PAY_AUDIT`（private 節點 payAudit，本機 `fy_payaudit`）；id 規則見下 |
 | 日報．支出 | `quickcost` | `submitDailyReport` `_drMergeLog` `submitQuickCost`（`QC_TYPES`）`drMonthRender`（月表單）`viewDailyReports` `_photoPut`（照片另存）`_itemProgress` `_qtyRecon` | `q.dailyLogs`（隨報價）、照片 `fydata/relay/photos`、公司費用 `EXPENSES` |
-| 業主請款 | `acct` › 業主請款（`go('invoice')` 轉來） | `renderInvList` `loadInvoice` `rInvItems` `buildInvPreview` `buildInvFromQuote` `addNextPeriod` `invRentDisc`／`_invBillDays`（逾期租金折讓）`openReceiptModal` `printAllowance` `openEnvelope` | `INV`（invoices，逐筆同步） |
+| 業主請款 | `acct` › 業主請款（`go('invoice')` 轉來） | `renderInvList` `loadInvoice` `rInvItems` `buildInvPreview` `buildInvFromQuote` `addNextPeriod` `invRentDisc`／`_invBillDays`（逾期租金折讓）`openReceiptModal` `printAllowance` `openEnvelope`；保留款（v6.0.92）`_retPctOf`（空白＝專案 `q.deduct.ret`，無＝0）`_retWarn`（>10% 提醒）`_retCum`（累計含本期／已退）`retReturnCreate`／`openRetReturnDoc`／`retReturnReceive`（退還請款單，收款走 `_retMarkReturned`＝`toggleRetentionReturn` 同一入帳） | `INV`（invoices，逐筆同步；退還請款單 `kind:'retReturn'`、`retRet`，totals 為 0）；`q.deduct.retCond`／`retDue` |
 | 廠商請款 | `acct` › 廠商請款 | `renderVendorBilling` `_vbRows` `vbOpenPeriod` | 讀 `q.costs` |
 | 帳務 | `acct`（分頁 ar／ap／cash／inv／petty／pay／own／vb；`go('finance'|'ledger'|'payroll')` 轉來） | `acctTab` `_acctMount`（搬入舊頁元素）`renderPayables` `renderCashForecast` `renderRetention` `_expForm`（費用．發票） | `PAYABLES`、`EXPENSES`（private） |
 | 薪資．零用金 | `acct` › pay／petty（權限看 `payroll`） | `hrEdit` `psGenerate` `_hrSyncPayables` `pcGenerate` `_pcCalc` | `HR`／`PAYSLIPS`／`PETTY`（private） |
@@ -107,7 +107,7 @@
 
 ## 測試
 
-`tests/smoke.js`（631 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（637 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、

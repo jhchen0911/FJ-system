@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.89';
+var APP_VERSION='v6.0.92';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -296,7 +296,10 @@ function _isRemovePeriod(it){
 // 稅率／保留款%：0 是合法值（免稅案、不留保留款），不可被 || 預設值吃掉
 function _taxR(){var v=(P&&P.tax);return (v==null||v==='')?5:(parseFloat(v)||0);}
 function _taxM(){return 1+_taxR()/100;}
-function _retPctOf(inv){var v=inv&&inv.retentionPct;return (v==null||v==='')?10:(parseFloat(v)||0);}
+// v6.0.92：請款單沒填保留款% → 跟隨專案「業主扣款設定」q.deduct.ret；專案也沒設定＝0（合約沒寫＝不扣）。明確填 0 就是 0
+function _retPctOf(inv){var v=inv&&inv.retentionPct;if(v!=null&&v!=='')return parseFloat(v)||0;return _retProjPct(_retQOf(inv));}
+function _retQOf(inv){if(!inv||typeof Q==='undefined')return null;var id=inv.quoteId||inv.sourceQid;return (id&&Q.find(function(x){return x.id===id;}))||(inv.project?Q.find(function(x){return !x.parentId&&x.name===inv.project;}):null)||null;}
+function _retProjPct(q){var r=q&&q.deduct&&q.deduct.ret;return (r!=null&&r!=='')?(parseFloat(r)||0):0;}
 
 // 業主保留款（含稅基礎；已退還者不計）
 function _invRetention(inv){
@@ -2841,6 +2844,7 @@ function renderInvPrevSummary(){
 }
 function loadInvoice(id){
   const inv=INV.find(x=>x.id===id);if(!inv)return;
+  if(inv.kind==='retReturn'){openRetReturnDoc(id);setTimeout(function(){if(document.getElementById('page-invoice-edit')&&document.getElementById('page-invoice-edit').classList.contains('active'))go('invoice');},0);return;}   // v6.0.92 保留款退還請款單另有版面
   invEid=inv.id;
   // 清洗存量資料：數量或單價為 0 的工項，本期金額歸零（修正歷史殘留金額）
   try{(inv.items||[]).forEach(function(it){
@@ -2927,7 +2931,7 @@ function loadInvoice(id){
   });
   const cte=document.getElementById('inv-claim-type');if(cte&&inv.claimType)cte.value=inv.claimType;
   const re2=document.getElementById('inv-retention');if(re2)re2.checked=!!inv.retention;
-  const rp2=document.getElementById('inv-retention-pct');if(rp2)rp2.value=inv.retentionPct!=null?inv.retentionPct:10;
+  const rp2=document.getElementById('inv-retention-pct');if(rp2){rp2.value=(inv.retentionPct!=null&&inv.retentionPct!=='')?inv.retentionPct:'';rp2.placeholder=String(_retProjPct(_retQOf(inv)));}   // v6.0.92 空白＝跟隨專案
   const cp2=document.getElementById('inv-clean-permil');if(cp2)cp2.value=inv.cleanPermil||'';const cm2=document.getElementById('inv-clean-mode');if(cm2)cm2.value=inv.cleanMode==='allow'?'allow':(inv.cleanMode==='exp'?'exp':'net');   // v6.0.31／v6.0.44 預設直接扣除
   document.getElementById('inv-edit-title').textContent='編輯請款單 #'+inv.periodNo;
   const pdp2=document.getElementById('inv-period-display');
@@ -3310,7 +3314,8 @@ function _recalcInvAmounts(inv){
   inv.items.forEach(it=>{if(it.type!=='sec')curTotal+=parseFloat(it.curAmt)||0;});
   const tax=curTotal*_taxR()/100;
   const beforeRetention=curTotal+tax;
-  const retention=inv.retention?beforeRetention*((parseFloat(inv.retentionPct)||10)/100):0;
+  if(inv.retention&&inv.kind!=='retReturn'&&(inv.retentionPct==null||inv.retentionPct===''))inv.retentionPct=10;   // v6.0.92 舊單勾保留款但比例空白＝原本的 10%（見 _retPctMig）
+  const retention=inv.retention?beforeRetention*(_retPctOf(inv)/100):0;
   const _cpm=parseFloat(inv.cleanPermil)||0,clean=Math.round(curTotal*_cpm/1000),cleanGross=Math.round(clean*_taxM());   // v6.0.31
   inv.totals={curTotal,tax,total:beforeRetention-retention-cleanGross,retention,clean,cleanGross,cleanPermil:_cpm,baseTotal:curTotal,claimRatio:1};
 }
@@ -3727,7 +3732,7 @@ function rInvTots(srcInv){
   // Apply retention
   const _retPct=(_rec?_retPctOf(_rec)
       :(function(){var _v=document.getElementById('inv-retention-pct')?.value;
-        return (_v==null||_v==='')?10:(parseFloat(_v)||0);})())/100;
+        return (_v==null||_v==='')?_invEdRetDef():(parseFloat(_v)||0);})())/100;
   const _retOn=_rec?!!_rec.retention:!!document.getElementById('inv-retention')?.checked;
   const retention=_retOn?beforeRetention*_retPct:0;
   // v6.0.31 清潔費：未稅工程款 × ‰，含稅自總計扣除（業主開發票當費用，或我方開折讓單）
@@ -3746,8 +3751,12 @@ function rInvTots(srcInv){
     retBox.style.display=retention?'flex':'none';
     retBox.querySelector('span:last-child').textContent='- '+fmt(retention);
     var rl=document.getElementById('inv-retention-label');
-    if(rl)rl.textContent='保留款 ('+(Math.round(_retPct*100))+'%)';
+    if(rl)rl.textContent='保留款 ('+(Math.round(_retPct*10000)/100)+'%)';
   }
+  // v6.0.92 累計保留款（含本期）／已退
+  const cumBox=document.getElementById('inv-retention-cum');
+  if(cumBox){var _cm=retention?_retCum({id:invEid,quoteId:(INV.find(function(x){return x.id===invEid;})||{}).quoteId,project:gv('inv-project'),periodNo:gv('inv-period-no')},retention):null;
+    cumBox.style.display=_cm?'flex':'none';if(_cm)cumBox.querySelector('span').textContent=_retCumTxt(_cm);}
   const cleanBox=document.getElementById('inv-clean-row');
   if(cleanBox){cleanBox.style.display=cleanGross?'flex':'none';cleanBox.querySelector('span:last-child').textContent='- '+fmt(cleanGross);var cl=document.getElementById('inv-clean-label');if(cl)cl.textContent='清潔費 ('+_rfmt(_cleanPm)+'‰，含稅)';}
   }
@@ -3879,7 +3888,7 @@ function saveInvoice(){
     received:giv('inv-received'),payDue:gv('inv-paydue'),sendMethod:gv('inv-send')||'',
     cashPct:parseInt(gv('inv-cash-pct'))||0,ticketDays:parseInt(gv('inv-ticket-days'))||0,payMonthDelay:parseInt(gv('inv-pay-month-delay'))||0,recvDay:parseInt(gv('inv-recv-day'))||0,expectedRecvDate:gv('inv-expected-recv-date'),claimType:gv('inv-claim-type'),claimPct:gv('inv-claim-pct'),retention:document.getElementById('inv-retention')?.checked||false,
     retentionPct:(function(){var _v=document.getElementById('inv-retention-pct')?.value;
-      return (_v==null||_v==='')?10:(parseFloat(_v)||0);})(),   // v5.319：0% 是合法值，原本 ||10 會存成 10
+      return (_v==null||_v==='')?_invEdRetDef():(parseFloat(_v)||0);})(),   // v5.319：0% 是合法值；v6.0.92 空白＝專案設定（無＝0），存成數字
     cleanPermil:parseFloat(document.getElementById('inv-clean-permil')?.value)||0,cleanMode:(document.getElementById('inv-clean-mode')?.value)||'net',   // v6.0.31 清潔費／v6.0.44 預設直接扣除
     docs:[
       document.getElementById('inv-doc-confirm')?.checked||false,
@@ -4265,6 +4274,7 @@ function renderInvList(){
     if(parsed){
       INV=parsed;
       migrateInvQuoteIds();
+      try{_retPctMig();}catch(e){_err('renderInvList',e);}
     }
   }catch(e){_err('renderInvList',e);}
   const el=document.getElementById('inv-list');if(!el)return;
@@ -4320,6 +4330,7 @@ function renderInvList(){
 
   // 卡片 HTML 輔助（共用）
   function _invCardHTML(inv){
+    if(inv.kind==='retReturn')return _retReturnCard(inv);
     var t=inv.totals||{};
     var received=parseFloat(inv.received)||0;
     var confirmed=inv.receivedConfirmed;
@@ -4463,9 +4474,9 @@ function buildInvPreview(srcInv){
   }
   const t=rInvTots(_src);
   // 列印用保留款百分比：以記錄為準，其次畫面，預設 10（原本標籤寫死 10%，5% 的案子標籤與金額矛盾）
-  const _retPctShow=Math.round((_src
-    ?((_src.retentionPct!=null&&_src.retentionPct!=='')?parseFloat(_src.retentionPct):10)
-    :(parseFloat(document.getElementById('inv-retention-pct')?.value)||10))*100)/100;
+  const _retPctShow=Math.round((_src?_retPctOf(_src)
+    :(function(){var _v=document.getElementById('inv-retention-pct')?.value;return (_v==null||_v==='')?_invEdRetDef():(parseFloat(_v)||0);})())*100)/100;
+  const _retCm=t.retention?_retCum(_src||{id:invEid,quoteId:(INV.find(function(x){return x.id===invEid;})||{}).quoteId,project:gv('inv-project'),periodNo:gv('inv-period-no')},t.retention):null;
   // v5.319：①原本第二個 id 拼成 inv-doc-claim（實際是 inv-doc-receipt），「收據」永遠不會印出；
   // ②指定記錄列印時，檢附文件必須讀該筆記錄，否則會印出編輯器停留那張單的勾選狀態。
   const _DOC_IDS=['inv-doc-confirm','inv-doc-invoice','inv-doc-receipt'];
@@ -4712,6 +4723,7 @@ function buildInvPreview(srcInv){
         <td></td>
       </tr>
       ${t.retention?'<tr style="background:#fff4f4"><td colspan="10" style="text-align:right;padding:5px 10px;color:#c0392b;font-weight:700">保留款 ('+_retPctShow+'%)</td><td style="text-align:right;padding:5px 10px;font-weight:700;color:#c0392b;font-variant-numeric:tabular-nums">- '+fmt(t.retention)+'</td><td></td></tr>':''}
+      ${_retCm?'<tr style="background:#fff4f4"><td colspan="11" style="text-align:right;padding:2px 10px 5px;color:#8a3a30;font-size:10.5px">'+esc(_retCumTxt(_retCm))+'</td><td></td></tr>':''}
       ${t.cleanGross?'<tr style="background:#fff4f4"><td colspan="10" style="text-align:right;padding:5px 10px;color:#c0392b;font-weight:700">清潔費 ('+_rfmt(t.cleanPermil)+'‰，含稅)</td><td style="text-align:right;padding:5px 10px;font-weight:700;color:#c0392b;font-variant-numeric:tabular-nums">- '+fmt(t.cleanGross)+'</td><td></td></tr>':''}
       <tr style="background:#0e3d22;color:#fff">
         <td colspan="10" style="text-align:right;padding:8px 10px;font-weight:900;font-size:14px;letter-spacing:2px">本&nbsp;期&nbsp;請&nbsp;款&nbsp;總&nbsp;計</td>
@@ -4851,6 +4863,7 @@ function printInvNative(){
 function printInvById(id){
   var _inv=INV.find(function(x){return x.id===id;});
   if(!_inv){toast('找不到請款單');return;}
+  if(_inv.kind==='retReturn'){openRetReturnDoc(id);return;}
   var _savedEid=invEid,_savedItems=invItems?JSON.parse(JSON.stringify(invItems)):[];
   invEid=_inv.id;invItems=JSON.parse(JSON.stringify(_inv.items||[]));
   buildInvPreview(_inv);   // 保留款等設定以該筆記錄為準，不讀編輯器畫面
@@ -6741,6 +6754,7 @@ function removeInvNote(btn){
 function openReceiptModal(invId, ev){
   if(ev){ev.stopPropagation();ev.preventDefault();}
   const inv=INV.find(x=>x.id===invId);if(!inv)return;
+  if(inv.kind==='retReturn'){retReturnReceive(invId);return;}
   const t=inv.totals||{};
   const total=t.total||0;
   document.getElementById('receipt-inv-id').value=invId;
@@ -26360,7 +26374,8 @@ function _retentionRows(){
     var holdRet=parseFloat(inv.holdRetAmt)||0;                     // 已退還的當場扣款
     if(!retAll&&!hold&&!holdRet)return;
     var k=inv.project||'（未命名）';
-    var o=byProj[k]=byProj[k]||{proj:k,client:inv.client||'',accr:0,returned:0,pending:0,hold:0,invIds:[]};
+    var o=byProj[k]=byProj[k]||{proj:k,client:inv.client||'',accr:0,returned:0,pending:0,hold:0,invIds:[],q:null};
+    if(!o.q)o.q=_retQOf(inv);
     o.accr+=retAll;
     if(inv.retentionReturned)o.returned+=retAll;else o.pending+=held;
     o.hold+=hold;o.returned+=holdRet;
@@ -26372,6 +26387,9 @@ function _retentionRows(){
     r.status=ct?(ct.status==='completed'||ct.status==='done'?'completed':'active'):'';
     r.end=(ct&&ct.end)||'';
     r.due=r.status==='completed'&&(r.pending+r.hold)>0;            // 已完工還押著 → 該請退
+    var dd=(r.q&&r.q.deduct)||{};r.cond=String(dd.retCond||'');r.retDue=String(dd.retDue||'');   // v6.0.92 退還條件／預計退還日
+    r.overdue=!!(r.retDue&&r.retDue<localToday()&&(r.pending+r.hold)>0);
+    if(r.overdue)r.due=true;
   });
   rows.sort(function(a,b){return ((b.due?1:0)-(a.due?1:0))||((b.pending+b.hold)-(a.pending+a.hold));});
   return rows;
@@ -26394,15 +26412,17 @@ function renderRetention(){
     +rows.map(function(r){
       var pend=r.pending+r.hold;
       return '<tr style="border-bottom:1px solid var(--b1)'+(r.due?';background:#fdecea':'')+'">'
-        +'<td style="padding:6px 8px"><b>'+esc(r.proj)+'</b>'+(r.client?('<br><span style="font-size:10.5px;color:var(--b3)">'+esc(r.client)+'</span>'):'')+'</td>'
+        +'<td style="padding:6px 8px"><b>'+esc(r.proj)+'</b>'+(r.client?('<br><span style="font-size:10.5px;color:var(--b3)">'+esc(r.client)+'</span>'):'')
+          +(r.cond?('<br><span style="font-size:10.5px;color:var(--b4)">退還條件：'+esc(r.cond)+'</span>'):'')
+          +(r.retDue?('<br><span style="font-size:10.5px;'+(r.overdue?'color:var(--red);font-weight:700':'color:var(--b4)')+'">預計退還 '+esc(r.retDue)+(r.overdue?'（已過期未退）':'')+'</span>'):'')+'</td>'
         +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(r.accr)+'</td>'
         +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;color:var(--g3)">'+fmt(r.returned)+'</td>'
         +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:'+(pend?(r.due?'var(--red)':'#b26a00'):'var(--b3)')+'">'+fmt(pend)+'</td>'
         +'<td style="padding:6px 8px;text-align:center;font-size:11px;color:'+(r.status==='completed'?'var(--g3)':'var(--b4)')+'">'
-          +(r.status==='completed'?('已完工'+(r.due?'<br><b style="color:var(--red)">該請退</b>':'')):(r.status==='active'?'進行中':'—'))+'</td>'
-        +'<td style="padding:6px 8px;text-align:right"><button type="button" class="btn btn-xs" onclick="loadInvoice(\''+escq(r.invIds[r.invIds.length-1])+'\')">開請款單</button></td></tr>';
+          +(r.overdue?'<b style="color:var(--red)">逾期未退</b>':r.status==='completed'?('已完工'+(r.due?'<br><b style="color:var(--red)">該請退</b>':'')):(r.status==='active'?'進行中':'—'))+'</td>'
+        +'<td style="padding:6px 8px;text-align:right;white-space:nowrap">'+(r.q?_retReturnBtn(r.q):'')+' <button type="button" class="btn btn-xs" onclick="loadInvoice(\''+escq(r.invIds[r.invIds.length-1])+'\');go(\'invoice-edit\')">開請款單</button></td></tr>';
     }).join('')+'</tbody></table></div>'
-    +'<div style="font-size:11px;color:var(--b3);margin-top:8px;line-height:1.7">「累計保留」＝請款時預扣的保留款；「未退」另含收款時業主當場扣下的可請退款項。'
+    +'<div style="font-size:11px;color:var(--b3);margin-top:8px;line-height:1.7">「累計保留」＝請款時預扣的保留款；「未退」另含收款時業主當場扣下的可請退款項。退還條件與預計退還日在工程專案「業主扣款設定」填寫，過期未退標紅並列入總覽待辦。'
     +'退還後請到該案請款單登錄：預扣保留款按「退還」旗標、當場扣款用收款彈窗的「登錄已退還」。</div>';
   el.innerHTML=html;
 }
@@ -28827,7 +28847,7 @@ function openRetentionModal(){
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--b1)">
       <div>
         <div style="font-size:13px;font-weight:700">${esc(i.project||'?')} 第${i.periodNo||'?'}期</div>
-        <div style="font-size:11px;color:var(--b4)">${i.date||'—'} ／ 保留款${i.retentionPct||10}%</div>
+        <div style="font-size:11px;color:var(--b4)">${i.date||'—'} ／ 保留款${_retPctOf(i)}%</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <div style="font-size:14px;font-weight:700;color:var(--red)">NT$ ${fmt(retAmt)}</div>
@@ -28858,17 +28878,7 @@ function toggleRetentionReturn(invId, btn){
   // v5.319：退還＝業主把押著的保留款付給我們，必須有現金入帳。
   // 原本只翻旗標，那筆錢從應收（本來就不在）、保留款池、可動用資金三處同時消失。
   const _ret=_invRetention(inv);
-  inv.retentionReturned=!inv.retentionReturned;
-  if(inv.retentionReturned&&_ret>0){
-    inv.received=String((parseFloat(inv.received)||0)+_ret);
-    inv.retentionReceivedAmt=_ret;
-    inv.retentionReturnedDate=localToday();
-    if(!inv.receivedDate)inv.receivedDate=inv.retentionReturnedDate;
-  }else if(!inv.retentionReturned&&parseFloat(inv.retentionReceivedAmt)>0){
-    inv.received=String(Math.max(0,(parseFloat(inv.received)||0)-(parseFloat(inv.retentionReceivedAmt)||0)));
-    inv.retentionReceivedAmt=0;inv.retentionReturnedDate='';
-  }
-  _touch(inv);
+  _retMarkReturned(inv,!inv.retentionReturned,localToday());
   try{saveInv();}catch(e){try{_invStoreWrite();}catch(e2){_err('toggleRetentionReturn',e2);}}
   btn.textContent=inv.retentionReturned?'✓ 已退還':'標記退還';
   btn.style.borderColor=inv.retentionReturned?'var(--g)':'var(--b2)';
@@ -32347,6 +32357,12 @@ function _v6PermMigrate(){
 function _v6TodoItems(items){
   var ic=function(h){return '<svg class="ic ib" aria-hidden="true"><use href="#'+h+'"/></svg>';};
   try{
+    _retentionRows().filter(function(r){return r.overdue;}).forEach(function(r){
+      items.push({type:'ret_due',urgent:true,jump:"go('finance');setTimeout(function(){switchFinanceTab('retention')},150)",icon:ic('i-lock'),color:'var(--red)',
+        text:'保留款逾期未退：'+r.proj+'（預計 '+r.retDue+' 退還）',sub:'NT$ '+fmt(r.pending+r.hold)});
+    });
+  }catch(e){_err('_v6TodoItems.ret',e);}
+  try{
     var pend=_vbRows().filter(function(r){return r.status==='pending';});
     if(pend.length){var est=pend.reduce(function(a,r){return a+r.est.est;},0);
       items.push({type:'vb_pending',urgent:false,jump:"go('invoice');setTimeout(function(){invTab('vendor')},60)",icon:ic('i-receipt'),color:'#E65100',
@@ -33735,6 +33751,7 @@ function pjDeductSet(qid,k,v){
   if(!q.deduct||typeof q.deduct!=='object')q.deduct={};
   q.deduct[k]=v;_touch(q);try{persist();}catch(e){_err('pjDeductSet',e);}
   toast('已更新扣款設定，下一期請款單起自動套用');
+  if(k==='ret')_retWarn(v);
 }
 var _pjInvHtml0=_pjInvHtml;
 _pjInvHtml=function(q,st){var h='';try{h=_pjDeductHtml(q);}catch(e){_err('_pjDeductHtml',e);}return h+_pjInvHtml0.apply(this,arguments);};
@@ -35270,6 +35287,9 @@ function _pjDeductHtml(q){
     +'<label style="display:flex;align-items:center;gap:4px">保留款 <input type="number" inputmode="decimal" step="any" min="0" max="50" value="'+(d.ret==null?'':d.ret)+'" placeholder="不扣" onchange="pjDeductSet(\''+q.id+'\',\'ret\',this.value)" style="'+IN+';width:58px;text-align:right"> %</label>'
     +'<label style="display:flex;align-items:center;gap:4px">清潔費 <input type="number" inputmode="decimal" step="any" min="0" value="'+(d.clean||'')+'" placeholder="0" onchange="pjDeductSet(\''+q.id+'\',\'clean\',this.value)" style="'+IN+';width:58px;text-align:right"> ‰（未稅工程款）</label>'
     +'<label style="display:flex;align-items:center;gap:4px">清潔費處理 <select onchange="pjDeductSet(\''+q.id+'\',\'cleanMode\',this.value)" style="'+IN+'">'+_CLEAN_MODES.map(function(m){return '<option value="'+m[0]+'"'+(d.cleanMode===m[0]?' selected':'')+'>'+m[1]+'</option>';}).join('')+'</select></label>'
+    +'<label style="display:flex;align-items:center;gap:4px;flex:1 1 260px">保留款退還條件 <input value="'+esc(String(((q.deduct||{}).retCond)||''))+'" placeholder="例：拆除拔除完成、驗收後 30 日內一次無息退還" onchange="pjDeductSet(\''+q.id+'\',\'retCond\',this.value.trim())" style="'+IN+';flex:1;min-width:0"></label>'
+    +'<label style="display:flex;align-items:center;gap:4px">預計退還日 <input type="date" value="'+esc(String(((q.deduct||{}).retDue)||''))+'" onchange="pjDeductSet(\''+q.id+'\',\'retDue\',this.value)" style="'+IN+'"></label>'
+    +_retReturnBtn(q)
     +'<span style="color:var(--b4);font-size:11px">保留款與清潔費都直接列在請款單扣款列，總計＝扣除後金額</span>'
     +'</div>';
 }
@@ -36452,6 +36472,138 @@ function _healthAdd689(R){   // 健檢：帳本記載已付但待付、近 14 �
 }
 try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{if(_paidLogSync())savePayables();else _payAuditLoadSnap();}catch(e){_err('paidLog.boot',e);}},1500);});}catch(e){_err('paidLog.boot',e);}
 
+// ── 業主保留款規則（v6.0.92）──
+// 合約保留 ≦10% 照業主；>10% 提醒去談（不擋）；合約沒寫＝不扣。請款單保留款% 空白＝專案 q.deduct.ret（無＝0），存檔時寫成數字。
+// 專案扣款設定另有 retCond（退還條件文字）／retDue（預計退還日）：保留款總覽顯示，過期未退標紅並進總覽待辦。
+function _invEdRetDef(){var inv=INV.find(function(x){return x.id===invEid;})||{};return _retProjPct(_retQOf({quoteId:inv.quoteId||inv.sourceQid,project:gv('inv-project')||inv.project}));}
+function _retWarn(v){var x=parseFloat(v);if(x>10)showConfirm('保留款超過 10%','保留款 '+x+'%：超過 10%，請確認已與業主談過。<br><span style="font-size:12px;color:var(--b4)">（已照填入的比例儲存，不影響存檔）</span>',function(){},false);}
+// 一張請款單的保留款（不論退還與否）；與 _retentionRows 同口徑
+function _invRetAll(inv){if(!inv||!inv.retention||inv.kind==='retReturn')return 0;var b=(inv.totals&&parseFloat(inv.totals.curTotal))||0;return b?Math.round(b*_taxM()*_retPctOf(inv)/100):((inv.totals&&parseFloat(inv.totals.retention))||0);}
+function _retSameProj(a,b){var qa=a.quoteId||a.sourceQid,qb=b.quoteId||b.sourceQid;if(qa&&qb)return qa===qb;return String(a.project||'')===String(b.project||'');}
+// 累計保留款（含本期）與已退：同專案、期別 ≦ 本期；本期金額用畫面／記錄當下算出的 cur
+function _retCum(inv,cur){
+  if(!inv)return null;var no=parseInt(inv.periodNo)||0,acc=Math.round(parseFloat(cur)||0),back=0;
+  INV.forEach(function(x){
+    if(!x||x.id===inv.id||x.kind==='retReturn'||!_retSameProj(x,inv))return;
+    var pn=parseInt(x.periodNo)||0;if(no&&pn>no)return;
+    var a=_invRetAll(x);acc+=a;if(x.retentionReturned)back+=a;
+  });
+  var me=inv.id?INV.find(function(x){return x.id===inv.id;}):null;if(me&&me.retentionReturned)back+=Math.round(parseFloat(cur)||0);
+  return {acc:acc,back:back};
+}
+function _retCumTxt(c){return '累計保留款（含本期）NT$ '+fmt(c.acc)+'，已退 NT$ '+fmt(c.back);}
+// ── 保留款退還請款單：最後一期之後一鍵產生，本期金額＝累計未退保留款 ──
+// 記錄存在 INV（kind:'retReturn'，totals 一律 0：不算營收、不重複列應收；保留款仍在保留款池直到收款）。
+// 收款＝對各來源期別套用與 toggleRetentionReturn 相同的入帳（_retMarkReturned，現金記在來源期別），本單只記完成與日期——不重複入帳。
+function _retMarkReturned(inv,on,date,byId){
+  var amt=_invRetention(inv);
+  inv.retentionReturned=!!on;
+  if(on&&amt>0){
+    inv.received=String((parseFloat(inv.received)||0)+amt);
+    inv.retentionReceivedAmt=amt;
+    inv.retentionReturnedDate=date||localToday();
+    if(!inv.receivedDate)inv.receivedDate=inv.retentionReturnedDate;
+    if(byId)inv.retentionReturnedBy=byId;
+  }else if(!on&&parseFloat(inv.retentionReceivedAmt)>0){
+    inv.received=String(Math.max(0,(parseFloat(inv.received)||0)-(parseFloat(inv.retentionReceivedAmt)||0)));
+    inv.retentionReceivedAmt=0;inv.retentionReturnedDate='';
+  }
+  if(!on)delete inv.retentionReturnedBy;
+  _touch(inv);
+  return amt;
+}
+function _retPendInvs(q){return INV.filter(function(x){return x&&x.kind!=='retReturn'&&_retSameProj(x,{quoteId:q.id,project:q.name})&&_invRetention(x)>0;})
+  .sort(function(a,b){return (parseInt(a.periodNo)||0)-(parseInt(b.periodNo)||0);});}
+function _retOpenDoc(q){return INV.find(function(x){return x&&x.kind==='retReturn'&&!(x.retRet&&x.retRet.done)&&_retSameProj(x,{quoteId:q.id,project:q.name});})||null;}
+function _retReturnBtn(q){
+  if(!q)return '';var od=_retOpenDoc(q);
+  if(od)return '<button type="button" class="btn btn-xs" style="border-color:#ffccbc;color:#c62828" onclick="openRetReturnDoc(\''+escq(od.id)+'\')">保留款退還請款單</button>';
+  var n=_retPendInvs(q).length;if(!n)return '';
+  return '<button type="button" class="btn btn-xs" style="border-color:#ffccbc;color:#c62828" onclick="retReturnCreate(\''+escq(q.id)+'\')">產生保留款退還請款單</button>';
+}
+function retReturnCreate(qid){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;
+  var od=_retOpenDoc(q);if(od){openRetReturnDoc(od.id);return;}
+  var src=_retPendInvs(q);if(!src.length){toast('此工程沒有未退還的保留款');return;}
+  var rows=src.map(function(x){return {id:x.id,periodNo:x.periodNo||'',date:x.date||'',pct:_retPctOf(x),amt:_invRetention(x)};});
+  var amt=rows.reduce(function(a,r){return a+r.amt;},0),last=src[src.length-1];
+  var inv={id:'ir'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),kind:'retReturn',project:q.name||last.project||'',client:last.client||q.client||'',quoteId:q.id,
+    date:localToday(),periodNo:'退',items:[],retention:false,retentionPct:0,received:'0',receivedConfirmed:false,
+    totals:{curTotal:0,tax:0,total:0,retention:0,clean:0,cleanGross:0,cleanPermil:0,baseTotal:0,claimRatio:1},
+    retRet:{amt:amt,rows:rows,cond:String((q.deduct&&q.deduct.retCond)||''),done:false,doneDate:''}};
+  _touch(inv);INV.unshift(inv);
+  try{saveInv();}catch(e){_err('retReturnCreate',e);}
+  try{if(document.getElementById('inv-list'))renderInvList();}catch(e){_err('retReturnCreate',e);}
+  try{renderRetention();}catch(e){_err('retReturnCreate',e);}
+  toast('已產生保留款退還請款單 NT$ '+fmt(amt)+'（第 '+rows.map(function(r){return r.periodNo;}).join('、')+' 期）');
+  openRetReturnDoc(inv.id);
+}
+function _retReturnDocHtml(inv){
+  var R=inv.retRet||{rows:[]},E=function(t){return esc(t==null?'':String(t));};
+  var rows=(R.rows||[]).map(function(r,i){return '<tr><td class="c">'+(i+1)+'</td><td class="c">第 '+E(r.periodNo)+' 期</td><td class="c">'+E(r.date)+'</td><td class="c">'+E(r.pct)+'%</td><td class="r">'+fmt(r.amt)+'</td></tr>';}).join('');
+  return '<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>保留款退還請款單</title><style>'
+    +'body{margin:0;font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;color:#111;font-size:12px}'
+    +'.hd{display:flex;align-items:flex-end;justify-content:space-between;border-bottom:2px solid #0e3d22;padding-bottom:6px}'
+    +'.co{font-size:17px;font-weight:900;color:#0e3d22}.co small{display:block;font-size:10px;color:#555;font-weight:400}'
+    +'h1{font-size:20px;letter-spacing:6px;margin:0}table{width:100%;border-collapse:collapse;margin-top:10px}'
+    +'.meta td{border:1px solid #bbb;padding:4px 7px}.meta td.l{background:#eef3ee;font-weight:700;width:16%;white-space:nowrap}'
+    +'th{background:#0e3d22;color:#fff;padding:6px;font-size:11.5px}td{border:1px solid #999;padding:6px}td.c{text-align:center}td.r{text-align:right;font-variant-numeric:tabular-nums}'
+    +'tr.tt td{background:#f2f5f3;font-weight:900}.note{margin-top:10px;font-size:11px;line-height:1.8}'
+    +'@page{size:A4 portrait;margin:10mm}</style></head><body>'
+    +'<div class="hd"><div class="co">'+E(P.company||'')+'<small>'+E(P.addr||'')+(P.tel?('　TEL '+E(P.tel)):'')+'</small></div><h1>保留款退還請款單</h1></div>'
+    +'<table class="meta"><tr><td class="l">業主</td><td>'+E(inv.client)+'</td><td class="l">請款日期</td><td>'+E(inv.date)+'</td></tr>'
+    +'<tr><td class="l">工程名稱</td><td colspan="3">'+E(inv.project)+'</td></tr>'
+    +'<tr><td class="l">退還條件</td><td colspan="3">'+(R.cond?E(R.cond):'依合約約定')+'</td></tr></table>'
+    +'<table><thead><tr><th style="width:8%">項次</th><th>估驗期別</th><th>請款日期</th><th style="width:14%">保留比例</th><th style="width:22%">保留款金額（含稅）</th></tr></thead><tbody>'+rows
+    +'<tr class="tt"><td colspan="4" class="r">本期請款金額（累計未退保留款）</td><td class="r">NT$ '+fmt(R.amt||0)+'</td></tr></tbody></table>'
+    +'<div class="note">一、本期請款金額為上列各期估驗時依合約扣留之保留款，請依退還條件辦理無息退還。<br>二、上列各期發票均已依估驗金額足額開立，本次退還不另開立發票。</div>'
+    +'</body></html>';
+}
+function openRetReturnDoc(id){var inv=INV.find(function(x){return x.id===id;});if(!inv)return;_printViaIframe(_retReturnDocHtml(inv),'保留款退還請款單_'+(inv.project||''));}
+function retReturnReceive(id){
+  var inv=INV.find(function(x){return x.id===id;});if(!inv||inv.kind!=='retReturn')return;
+  var R=inv.retRet||{rows:[]};
+  if(R.done){toast('此保留款已於 '+(R.doneDate||'')+' 登錄退還');return;}
+  showConfirm('登錄保留款退還收款','工程：'+esc(inv.project||'')+'<br>退還金額 NT$ '+fmt(R.amt||0)+'（第 '+(R.rows||[]).map(function(r){return esc(String(r.periodNo));}).join('、')+' 期）'
+    +'<div class="f" style="margin-top:8px"><label>收款日期</label><input id="rr-date" type="date" value="'+localToday()+'"></div>'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-top:6px">確定後各期保留款標記為已退還並入帳（與「標記退還」相同，現金記在原期別，不重複入帳）。</div>',function(){
+    var d=(document.getElementById('rr-date')||{}).value||localToday(),got=0;
+    (R.rows||[]).forEach(function(r){var x=INV.find(function(v){return v.id===r.id;});if(x&&!x.retentionReturned)got+=_retMarkReturned(x,true,d,inv.id);});
+    R.done=true;R.doneDate=d;R.got=got;inv.retRet=R;inv.receivedDate=d;inv.receivedConfirmed=true;_touch(inv);
+    try{saveInv();}catch(e){_err('retReturnReceive',e);}
+    try{renderInvList();}catch(e){_err('retReturnReceive',e);}try{renderRetention();}catch(e){_err('retReturnReceive',e);}try{updateInvStats();}catch(e){_err('retReturnReceive',e);}
+    toast('保留款已退還並入帳 NT$ '+fmt(got));
+  },false);
+}
+function retReturnUndo(id){
+  var inv=INV.find(function(x){return x.id===id;});if(!inv||inv.kind!=='retReturn'||!(inv.retRet&&inv.retRet.done))return;
+  showConfirm('取消退還登錄','確定取消此筆保留款退還？各期的入帳會同步沖回。',function(){
+    (inv.retRet.rows||[]).forEach(function(r){var x=INV.find(function(v){return v.id===r.id;});if(x&&x.retentionReturned&&x.retentionReturnedBy===inv.id)_retMarkReturned(x,false);});
+    inv.retRet.done=false;inv.retRet.doneDate='';inv.receivedConfirmed=false;inv.receivedDate='';_touch(inv);
+    try{saveInv();}catch(e){_err('retReturnUndo',e);}try{renderInvList();}catch(e){_err('retReturnUndo',e);}try{renderRetention();}catch(e){_err('retReturnUndo',e);}
+    toast('已取消退還登錄');
+  },true);
+}
+function _retReturnCard(inv){
+  var R=inv.retRet||{},id=escq(inv.id||'');
+  return '<div class="ql" onclick="openRetReturnDoc(\''+id+'\')">'
+    +'<div class="qleft"><div class="qdot" style="background:'+(R.done?'var(--g)':'var(--ym)')+'"></div></div>'
+    +'<div class="qmain"><div class="qtitle">'+esc(inv.project||'')+' — 保留款退還請款單</div>'
+    +'<div class="qsub">'+esc(inv.client||'')+' / '+esc(inv.date||'')+' / 第 '+(R.rows||[]).map(function(r){return esc(String(r.periodNo));}).join('、')+' 期'+(R.cond?(' / 退還條件：'+esc(R.cond)):'')+'</div></div>'
+    +'<div class="qr"><div class="qa" style="font-size:17px;font-weight:900">NT$ '+fmt(R.amt||0)+'</div>'
+    +(R.done?'<span class="bdg ok" style="font-size:11px">✓ 已退還 '+esc(R.doneDate||'')+'</span>':'<span class="bdg warn" style="font-size:11px">待退還</span>')
+    +'<div style="display:flex;gap:4px;margin-top:4px;justify-content:flex-end">'
+    +(R.done?'<button type="button" class="btn btn-xs" onclick="event.stopPropagation();retReturnUndo(\''+id+'\')">取消退還</button>'
+      :'<button type="button" class="btn btn-xs btn-g" onclick="event.stopPropagation();retReturnReceive(\''+id+'\')">登錄收款</button>')
+    +'<button type="button" class="btn btn-xs btn-r" onclick="event.stopPropagation();delInvoice(\''+id+'\',event)">刪除</button></div></div></div>';
+}
+// 一次性：舊版請款單勾了保留款但比例空白，原本一律以 10% 計 → 補成 10，數值不變（其餘舊單已有數值不動）
+function _retPctMig(){
+  var n=0;(INV||[]).forEach(function(inv){if(inv&&inv.retention&&inv.kind!=='retReturn'&&(inv.retentionPct==null||inv.retentionPct==='')){inv.retentionPct=10;_touch(inv);n++;}});
+  if(n){try{saveInv();}catch(e){_err('_retPctMig',e);}}
+  return n;
+}
+try{setTimeout(function(){try{_retPctMig();}catch(e){_err('_retPctMig',e);}},1200);}catch(e){_err('_retPctMig',e);}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');

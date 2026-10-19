@@ -6739,6 +6739,71 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.92 業主保留款規則：預設 0／跟隨專案、>10% 提醒、退還條件與預計退還日、累計說明、退還請款單 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const oQ = Q.slice(), oI = INV.slice();
+      try {
+        const q = { id: 'qRT', name: '保留款測試案', client: '元昱測試', awarded: true, items: [], deduct: { ret: 5, retCond: '拆除拔除完成、驗收後 30 日內一次無息退還', retDue: '2020-01-01' } };
+        const q2 = { id: 'qRT2', name: '無扣款案', client: '乙', awarded: true, items: [] };
+        Q.push(q, q2);
+        /* 3-1 預設：空白跟隨專案、專案無＝0、明確 0＝0、舊數值不動 */
+        out.pct = _retPctOf({ quoteId: 'qRT' }) === 5 && _retPctOf({ quoteId: 'qRT2' }) === 0 && _retPctOf({ project: '查無此案' }) === 0
+          && _retPctOf({ quoteId: 'qRT', retentionPct: 0 }) === 0 && _retPctOf({ quoteId: 'qRT', retentionPct: '' }) === 5 && _retPctOf({ retentionPct: 10 }) === 10;
+        const leg = { id: 'L1', project: '舊案', retention: true, items: [{ type: 'item', curQty: 1, contractPrice: 1000, payRate: 100 }] };
+        _recalcInvAmounts(leg); out.legacy = leg.retentionPct === 10 && Math.round(leg.totals.retention) === 105;
+        const z = { id: 'Z1', project: '零', retention: true, retentionPct: 0, items: [{ type: 'item', curQty: 1, contractPrice: 1000, payRate: 100 }] };
+        _recalcInvAmounts(z); out.zero = z.totals.retention === 0;
+        /* 3-2 超過 10% 提醒（不擋） */
+        _retWarn(12); const bx = document.getElementById('gen-confirm-box'); out.warn = !!bx && /超過 10%，請確認已與業主談過/.test(bx.innerHTML);
+        try { document.getElementById('gen-confirm-cancel').click(); } catch (e) { }
+        pjDeductSet('qRT2', 'ret', '15'); out.warnSaved = q2.deduct.ret === '15' && /超過 10%/.test(document.getElementById('gen-confirm-box').innerHTML);
+        try { document.getElementById('gen-confirm-cancel').click(); } catch (e) { }
+        q2.deduct = {};
+        /* 3-3 扣款設定欄位、總覽顯示、逾期標紅＋待辦 */
+        const dh = _pjDeductHtml(q); out.bar = /保留款退還條件/.test(dh) && /預計退還日/.test(dh);
+        const mk = (id, no, ret) => ({ id, quoteId: 'qRT', project: q.name, client: q.client, periodNo: no, date: '2026-0' + no + '-25', retention: true, retentionPct: ret, items: [], totals: { curTotal: 100000, tax: 5000, total: 100000, retention: 0 }, received: '0', _mt: 1 });
+        INV.push(mk('RT1', 1, 5), mk('RT2', 2, 5), mk('RT3', 3, 5));
+        const row = _retentionRows().find(x => x.proj === q.name);
+        out.over = !!row && row.overdue && row.cond === q.deduct.retCond && row.pending === 15750;
+        renderRetention(); const rl = document.getElementById('finance-retention-list'); out.ovHtml = !rl || (/已過期未退/.test(rl.innerHTML) && /拆除拔除完成/.test(rl.innerHTML) && /產生保留款退還請款單/.test(rl.innerHTML));
+        const items = []; _v6TodoItems(items); out.todo = items.some(x => x.type === 'ret_due' && /保留款測試案/.test(x.text));
+        /* 3-4 累計（含本期）／已退 */
+        INV.find(x => x.id === 'RT1').retentionReturned = true;
+        const cm = _retCum(INV.find(x => x.id === 'RT3'), 5250); out.cum = cm.acc === 15750 && cm.back === 5250 && _retCumTxt(cm) === '累計保留款（含本期）NT$ 15,750，已退 NT$ 5,250';
+        INV.find(x => x.id === 'RT1').retentionReturned = false;
+        /* 3-5 退還請款單：累計未退、條件、本單不算營收／應收；收款＝各期與 toggleRetentionReturn 相同入帳，不重複 */
+        retReturnCreate('qRT'); const rd = INV.find(x => x.kind === 'retReturn' && x.quoteId === 'qRT');
+        out.doc = !!rd && rd.retRet.amt === 15750 && rd.retRet.rows.length === 3 && rd.totals.total === 0 && /拆除拔除完成/.test(_retReturnDocHtml(rd)) && /NT\$ 15,750/.test(_retReturnDocHtml(rd));
+        out.card = /保留款退還請款單/.test(_retReturnCard(rd)) && /登錄收款/.test(_retReturnCard(rd));
+        out.reuse = (retReturnCreate('qRT'), INV.filter(x => x.kind === 'retReturn' && x.quoteId === 'qRT').length === 1);
+        retReturnReceive(rd.id); document.getElementById('rr-date').value = '2026-10-19'; document.getElementById('gen-confirm-ok').click();
+        const srcs = ['RT1', 'RT2', 'RT3'].map(id => INV.find(x => x.id === id));
+        out.recv = rd.retRet.done && srcs.every(x => x.retentionReturned && parseFloat(x.received) === 5250 && x.retentionReturnedDate === '2026-10-19') && parseFloat(rd.received) === 0
+          && _retentionRows().every(x => x.proj !== q.name || x.pending === 0);
+        /* toggleRetentionReturn 同一入帳邏輯 */
+        const t1 = mk('RT9', 9, 5); INV.push(t1); const b = document.createElement('button'); toggleRetentionReturn('RT9', b);
+        out.toggle = t1.retentionReturned && parseFloat(t1.received) === 5250; toggleRetentionReturn('RT9', b); out.toggle = out.toggle && !t1.retentionReturned && parseFloat(t1.received) === 0;
+        retReturnUndo(rd.id); document.getElementById('gen-confirm-ok').click();
+        /* renderInvList 會從儲存重讀 INV → 重新取物件 */
+        const rd2 = INV.find(x => x.id === rd.id), srcs2 = ['RT1', 'RT2', 'RT3'].map(id => INV.find(x => x.id === id));
+        out.undo = !rd2.retRet.done && srcs2.every(x => !x.retentionReturned && parseFloat(x.received) === 0);
+        out.fns = typeof openRetReturnDoc === 'function' && typeof _retPctMig === 'function';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 700); }
+      Q.length = 0; oQ.forEach(x => Q.push(x)); INV.length = 0; oI.forEach(x => INV.push(x));
+      return out;
+    });
+    check('v6.0.92 保留款預設：空白跟隨專案扣款設定、專案無＝0（不扣）、明確 0＝0、舊單勾選空白維持 10%', r.pct && r.legacy && r.zero, JSON.stringify(r));
+    check('v6.0.92 保留款超過 10% 提醒（請款單／專案扣款設定），照存不擋', r.warn && r.warnSaved, JSON.stringify(r));
+    check('v6.0.92 退還條件／預計退還日：扣款設定欄位、保留款總覽顯示、過期未退標紅並進待辦', r.bar && r.over && r.ovHtml && r.todo, JSON.stringify(r));
+    check('v6.0.92 請款單累計保留款（含本期）／已退說明', r.cum, JSON.stringify(r));
+    check('v6.0.92 保留款退還請款單：一鍵產生累計未退、收款後各期自動標已退並入帳一次、可取消', r.doc && r.card && r.reuse && r.recv && r.toggle && r.undo && r.fns, JSON.stringify(r));
+    check('v6.0.92 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
