@@ -6779,6 +6779,13 @@ async function newPage(browser, width, height) {
         q.ownerPay = {}; out.td0 = _b2bIssues(q, { cashPct: 50, ticketPct: 50, ticketDays: 0, ret: 10, retWhen: 'x' }).some(x => /票期天數未填/.test(x))
           && !/0 天期票/.test(_sctPayTxt(Object.assign({}, cost, { payTerm: { cashPct: 50, ticketPct: 50, ticketDays: 0 } }), _sctCfg(), q));
         q.ownerPay = { delay: 3, day: 1, cashPct: 50, ticketDays: 0 }; out.noZero = _rfqCond(null).ticketDays > 0 || _rfqCond(null).cashPct === 100;
+        /* v6.0.96 裝設請款％：營造廠 80 → 包商預設 80；包商 90 提醒先墊 10%；空白＝公司預設 90；合約與詢價單寫出分段 */
+        q.ownerPay = { instPct: 80 }; const ci = _rfqCond(null);
+        out.inst = ci.instPct === 80 && _b2bIssues(q, Object.assign({}, ci, { instPct: 90 })).some(x => /包商裝設完成先拿 90%，比營造廠的 80% 多 10%（豐有先墊）/.test(x)) && !_b2bIssues(q, ci).some(x => /裝設/.test(x))
+          && _b2bIssues(q, Object.assign({}, ci, { instPct: null })).some(x => /先拿 90%/.test(x)) && /裝設（打設）完成請款 80%，拆除（拔除）完成請款 20%/.test(_rfqCondLines({ cond: ci }).join(''));
+        q.ownerPay = {}; out.instDef = _ownerTerms(q).instPct === 90 && _ownerTerms({ id: 'z', client: '無', ownerPay: { instPct: 80 } }).instPct === 80;
+        out.instSct = /裝設（打設）完成時計價 80%，拆除（拔除）完成時計價其餘 20%/.test(_sctPayTxt(Object.assign({}, cost, { payTerm: { cashPct: 0, ticketPct: 100, ticketDays: 30, instPct: 80 } }), _sctCfg(), q))
+          && !/分段計價/.test(_sctPayTxt(Object.assign({}, cost, { b2b: 0, payTerm: { cashPct: 0, ticketPct: 100, ticketDays: 30, instPct: 80 } }), _sctCfg(), q)) && /裝設請款/.test(_pjOwnerPayHtml(q));
         q.ownerPay = {};
         out.art9 = /業主依其工地安全衛生罰則對乙方人員所開立之罰款，由乙方負擔，甲方得自當期工程款扣除/.test(_subContractHtml(q, cost, _sctCfg()));
         /* 舊資料：沒有任何營造廠條件 → 照公司預設、合約原文 */
@@ -6798,6 +6805,7 @@ async function newPage(browser, width, height) {
     check('v6.0.91 背對背提醒：包商早收款天數、保留款低於營造廠（不擋）', r.warn && r.warnHtml, JSON.stringify(r));
     check('v6.0.91 分包合約：付款比例＋保留款同步退還、第九條營造廠罰款轉嫁；舊案無條件＝公司預設原文', r.sct && r.art9 && r.legacy, JSON.stringify(r));
     check('v6.0.94 背對背審查修正：舊卡（客戶有付款規則）合約不變、退還時點清空兩邊一致、實際日曆日、計價日提醒、不產生 0 天期票', r.oldCard && r.blankRet && r.cal && r.cut && r.td0 && r.noZero, JSON.stringify(r));
+    check('v6.0.96 裝設請款％：營造廠付款條件可填（空白＝90）、包商預設不高於營造廠、較高時提醒先墊、詢價單與合約寫出分段比例（舊卡不變）', r.inst && r.instDef && r.instSct, JSON.stringify(r));
     check('v6.0.91 專案頁營造廠付款條件列與退還條件欄', r.ui && r.set, JSON.stringify(r));
     check('v6.0.91 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
