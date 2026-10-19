@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.101';
+var APP_VERSION='v6.0.102';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -4227,6 +4227,7 @@ function addNextPeriod(id){
   //（原本新期繼承上期的匯費／扣款／保留款，應收短計、保留款提醒逐期翻倍）
   next.partialConfirmed=false;
   next.recvFee=0;next.recvDeduct=0;next.recvHold=0;delete next.allow;
+  delete next.receipts;next.holdRetAmt=0;next.holdRetDate='';   // v6.0.102 收款明細與當場扣款退還屬該期，不帶到下一期（原本 _cashOf 會多算）
   _touch(next);
   // v5.336 健檢G：逾期租金列是「該期時段」的一次性計費，下一期直接剔除
   //（原本照抄整列並把逾期金額滾進 prevQty/prevAmt，前期累計混入非合約項目、
@@ -6352,7 +6353,7 @@ function renderClientReport(el,year,month){
         <td style="padding:6px 8px;text-align:right;color:var(--g3);font-weight:700">${fmt(wonAmt)}</td>
         <td style="padding:6px 8px;text-align:right">${fmt(iAmt)}</td>
         <td style="padding:6px 8px;text-align:right;color:var(--g3)">${fmt(rAmt)}</td>
-        <td style="padding:6px 8px;text-align:right;color:${iAmt-rAmt>0?'#c8890a':'var(--b3)'}">${fmt(iAmt-rAmt)}</td>
+        <td style="padding:6px 8px;text-align:right;color:${_arSum(data.invs)>0?'#c8890a':'var(--b3)'}">${fmt(_arSum(data.invs))}</td>
         <td style="padding:6px 8px;text-align:right;font-weight:700;color:${actNet>=0?'var(--g3)':'var(--red)'}">${fmt(actNet)}</td>
       </tr>`;
     }).join('')+'</tbody></table></div>';
@@ -6403,7 +6404,7 @@ function openRptClientDetail(client){
     +_rptTile('得標',won.length+' 件<br><span style="font-size:11px;font-weight:700">NT$ '+fmt(wonAmt)+'</span>','var(--g3)')
     +_rptTile('請款','NT$ '+fmt(iAmt))
     +_rptTile('已收','NT$ '+fmt(rAmt),'var(--g3)')
-    +_rptTile('應收餘額','NT$ '+fmt(iAmt-rAmt),(iAmt-rAmt)>0?'#c8890a':'var(--b3)');
+    +_rptTile('應收餘額','NT$ '+fmt(_arSum(iv)),_arSum(iv)>0?'#c8890a':'var(--b3)');
   var rows='';
   if(qs.length){
     rows+='<div style="padding:6px 10px;background:var(--b0);font-size:11px;font-weight:700;color:var(--b4)">報價（'+qs.length+' 件）</div>';
@@ -7460,11 +7461,11 @@ function exportQuotesExcel(){
 function exportInvExcel(){
   // v5.318：原本『請款總額』取 t.sub（totals 根本沒這欄，永遠輸出 0）；『含稅總額』其實是已扣保留款後的金額，標題誤導
   const headers=['工程名稱','業主','期數','月份','估驗日期','未稅請款額','保留款','應收含稅額','已收款','待收款','收款狀態','備註'];
-  const rows=INV.map(inv=>{
+  const rows=INV.filter(inv=>inv&&inv.kind!=='retReturn').map(inv=>{   // v6.0.102 保留款退還單不列（金額已在各期保留款）
     const t=inv.totals||{};
-    const received=parseFloat(inv.received)||0;
+    const received=_invRcv(inv);   // 含另記的保留款退還，與 KPI 已收款一致
     const unpaid=_invAR(inv);
-    const status=inv.receivedConfirmed?'已結清':received>=(t.total||0)?'已收款':'未收款';
+    const status=inv.receivedConfirmed?'已結清':unpaid<=0?'已收款':'未收款';
     const notes=Array.isArray(inv.note)?inv.note.join(' / '):(inv.note||'');
     return [inv.project||'',inv.client||'',inv.periodNo||'',inv.month||'',inv.date||'',
       t.curTotal||0,_invRetention(inv),t.total||0,received,unpaid,status,notes];
@@ -28020,7 +28021,7 @@ function renderMonthlyReport(el,year,month){
   const rows=months.map(m=>{
     const mStr=year+'-'+String(m).padStart(2,'0');
     const quotes=Q.filter(q=>q.date&&q.date.startsWith(mStr));
-    const invs=INV.filter(i=>i.date&&i.date.startsWith(mStr));
+    const invs=INV.filter(i=>i.date&&i.date.startsWith(mStr)&&i.kind!=='retReturn');
     const recv=INV.filter(i=>i.receivedDate&&i.receivedDate.startsWith(mStr));
     const qAmt=quotes.reduce((a,q)=>a+(q.t?.total||0),0);
     const iAmt=invs.reduce((a,i)=>a+(i.totals?.total||0),0);
@@ -28402,7 +28403,7 @@ function renderContractReport(el,year){
     const ctAmt=ct.amount||0;
     const invRate=ctAmt>0?totalInv/ctAmt:0;
     const rcvRate=totalInv>0?totalRcv/totalInv:0;
-    const outstanding=totalInv-totalRcv;
+    const outstanding=_arSum(relInvs);   // v6.0.102 逐張應收加總（保留款退還後不變負數）
     return{ct,ctAmt,totalInv,totalRcv,outstanding,invRate,rcvRate,dupN,dupIds,
       periodCount:relInvs.length,lastInv:relInvs[relInvs.length-1]};
   });
@@ -28415,7 +28416,7 @@ function renderContractReport(el,year){
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px;border-bottom:1px solid var(--b1)">
       <div class="kpi"><div class="kl">合約總額</div><div class="kv">NT$ ${fmt(totCtAmt)}</div><div class="ks">${rows.length} 份合約${rows.reduce((a,r)=>a+r.dupN,0)?('　<span style="color:#c62828">已合併 '+rows.reduce((a,r)=>a+r.dupN,0)+' 筆重複建檔</span>'):''}</div></div>
       <div class="kpi"><div class="kl">累積請款</div><div class="kv">NT$ ${fmt(totInv)}</div><div class="ks">請款率 ${totCtAmt>0?(totInv/totCtAmt*100).toFixed(1):0}%</div></div>
-      <div class="kpi hi"><div class="kl">累積收款</div><div class="kv" style="color:var(--g3)">NT$ ${fmt(totRcv)}</div><div class="ks">應收餘額 NT$ ${fmt(totInv-totRcv)}</div></div>
+      <div class="kpi hi"><div class="kl">累積收款</div><div class="kv" style="color:var(--g3)">NT$ ${fmt(totRcv)}</div><div class="ks">應收餘額 NT$ ${fmt(rows.reduce((a,r)=>a+r.outstanding,0))}</div></div>
     </div>
     <!-- Contract list -->
     <div style="overflow-x:auto;padding:0 14px 14px">
@@ -28464,7 +28465,7 @@ function renderContractReport(el,year){
           <td style="padding:6px 8px;text-align:right">${fmt(totInv)}</td>
           <td style="padding:6px 8px;text-align:center">${totCtAmt>0?(totInv/totCtAmt*100).toFixed(1):0}%</td>
           <td style="padding:6px 8px;text-align:right;color:var(--g3)">${fmt(totRcv)}</td>
-          <td style="padding:6px 8px;text-align:right;color:#c8890a">${fmt(totInv-totRcv)}</td>
+          <td style="padding:6px 8px;text-align:right;color:#c8890a">${fmt(rows.reduce((a,r)=>a+r.outstanding,0))}</td>
           <td colspan="2" style="padding:6px 8px"></td>
         </tfoot>
       </table>
@@ -28499,7 +28500,7 @@ function exportCurrentReport(){
       const wq2=d.q.filter(q=>q.awarded&&!q.parentId);
       const wA2=wq2.reduce((a2,q)=>a2+(q.t?.total||0)+Q.filter(x=>x.parentId===q.id).reduce((b2,x)=>b2+(x.t?.total||0),0),0);
       const cA2=wq2.reduce((a2,q)=>a2+[q].concat(Q.filter(x=>x.parentId===q.id)).reduce((b2,x)=>b2+(x.costs||[]).reduce((c3,c)=>c3+(parseFloat(c.amt)||0),0),0),0);
-      return [c,d.q.length,qA,wq2.length,wA2,iA,rA,iA-rA,Math.round(rA/_taxM()-cA2)];
+      return [c,d.q.length,qA,wq2.length,wA2,iA,rA,_arSum(d.i),Math.round(rA/_taxM()-cA2)];
     });
     downloadCSV('業主往來_'+year+(mF?'_'+mF:'')+'_'+fmtDateStr(),headers,rows);
   } else if(_currentReport==='yearly'){
@@ -28530,7 +28531,7 @@ function exportCurrentReport(){
         const tI=rel.reduce((a,i)=>a+(i.totals?.total||0),0);
         const tR=rel.reduce((a,i)=>a+_invRcv(i),0);
         const cA=parseFloat(ct.amount)||0;
-        return [ct.name||'',ct.client||'',cA,tI,tR,tI-tR,
+        return [ct.name||'',ct.client||'',cA,tI,tR,_arSum(rel),
           cA>0?Math.round(tI/cA*100):0,tI>0?Math.round(tR/tI*100):0,rel.length];
       });
     downloadCSV('合約請款_'+year+'_'+fmtDateStr(),headers,rows);
@@ -28540,8 +28541,7 @@ function exportCurrentReport(){
     const rows=months.map(m=>{
       const mStr=year+'-'+String(m).padStart(2,'0');
       const quotes=Q.filter(q=>q.date&&q.date.startsWith(mStr));
-      const invs=INV.filter(i=>i.date&&i.date.startsWith(mStr));
-      const recv=INV.filter(i=>i.receivedDate&&i.receivedDate.startsWith(mStr));
+      const invs=INV.filter(i=>i.date&&i.date.startsWith(mStr)&&i.kind!=='retReturn');
       return[`${year}/${String(m).padStart(2,'0')}`,quotes.length,
         quotes.reduce((a,q)=>a+(q.t?.total||0),0),invs.length,
         invs.reduce((a,i)=>a+(i.totals?.total||0),0),
@@ -36744,9 +36744,12 @@ function _retMarkReturned(inv,on,date,byId){
 function _retSepCash(inv){return (inv&&inv.retentionSep&&inv.retentionReturned)?{amt:parseFloat(inv.retentionReceivedAmt)||0,date:String(inv.retentionReturnedDate||'')}:{amt:0,date:''};}
 // 某月（YYYY-MM）收到的保留款退還現金
 // 實收（含另記的保留款退還）：總額 _invRcv、某期間（'YYYY' 或 'YYYY-MM'）_invRcvIn——全站「已收／實收」報表共用（應收 _invAR 仍只看 received）
-function _invRcv(inv){return (parseFloat(inv&&inv.received)||0)+_retSepCash(inv).amt;}
-function _invRcvIn(inv,pre){if(!inv)return 0;var a=0,n=pre.length;if(String(inv.receivedDate||'').slice(0,n)===pre)a+=parseFloat(inv.received)||0;var c=_retSepCash(inv);if(c.amt&&c.date.slice(0,n)===pre)a+=c.amt;return a;}
-function _retCashOn(ym){return (INV||[]).reduce(function(a,i){var c=_retSepCash(i);return a+((c.amt&&c.date.slice(0,ym.length)===ym)?c.amt:0);},0);}
+function _holdRetCash(inv){var a=parseFloat(inv&&inv.holdRetAmt)||0;return {amt:a,date:a?String(inv.holdRetDate||''):''};}   // 業主當場扣款的退還（receiptHoldReturn／退還請款單）
+function _invRcv(inv){return (parseFloat(inv&&inv.received)||0)+_retSepCash(inv).amt+_holdRetCash(inv).amt;}
+function _invRcvIn(inv,pre){if(!inv)return 0;var a=0,n=pre.length;if(String(inv.receivedDate||'').slice(0,n)===pre)a+=parseFloat(inv.received)||0;var c=_retSepCash(inv);if(c.amt&&c.date.slice(0,n)===pre)a+=c.amt;var h=_holdRetCash(inv);if(h.amt&&h.date.slice(0,n)===pre)a+=h.amt;return a;}
+function _retCashOn(ym){return (INV||[]).reduce(function(a,i){var c=_retSepCash(i),h=_holdRetCash(i),n=ym.length;return a+((c.amt&&c.date.slice(0,n)===ym)?c.amt:0)+((h.amt&&h.date.slice(0,n)===ym)?h.amt:0);},0);}   // 某月收到的保留款退還（預扣＋當場扣款）
+// 應收餘額：逐張 _invAR 加總（已扣保留款、扣抵銷項、已結清＝0），保留款退還後不會變負數
+function _arSum(list){return (list||[]).reduce(function(a,i){return a+_invAR(i);},0);}
 function _retPendInvs(q){return INV.filter(function(x){return x&&x.kind!=='retReturn'&&_retSameProj(x,{quoteId:q.id,project:q.name})&&(_invRetention(x)>0||_invHold(x)>0);})
   .sort(function(a,b){return (parseInt(a.periodNo)||0)-(parseInt(b.periodNo)||0);});}
 // 當下該案未退的保留款：兩段——預扣保留款（請款時扣）、業主當場扣款（收款時扣，_invHold）；合計＝保留款總覽「未退」
@@ -38561,7 +38564,7 @@ function exportCurrentReportExcel(){
         const qInvs=INV.filter(i=>i.sourceQid===q.id||i.project===q.name);
         const iAmt=qInvs.reduce((a,i)=>a+(i.totals?.total||0),0);
         const rAmt=qInvs.reduce((a,i)=>a+_invRcv(i),0);
-        rows.push([client,q.name||'—',q.t?.total||0,iAmt,rAmt,iAmt-rAmt,q.awarded?'得標':'報價中']);
+        rows.push([client,q.name||'—',q.t?.total||0,iAmt,rAmt,_arSum(qInvs),q.awarded?'得標':'報價中']);
       });
     });
   } else if(_currentReport==='contract'){

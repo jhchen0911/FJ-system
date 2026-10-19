@@ -6958,7 +6958,7 @@ async function newPage(browser, width, height) {
         out.recv = rdN.retRet.done && rdN.retRet.amt === 23000 && srcs.every(x => x.retentionReturned && parseFloat(x.received) === 0 && x.retentionReceivedAmt === 5250 && x.retentionReturnedDate === '2026-10-19')
           && INV.find(x => x.id === 'RT2').holdRetAmt === 2000 && _retentionRows().every(x => x.proj !== q.name || (x.pending + x.hold) === 0);
         /* 應收不被少算、現金依退還日、月報實收依退還月 */
-        out.ar = _invAR(INV.find(x => x.id === 'RT3')) === ar0 && _retCashOn('2026-10') === 21000 && _retCashOn('2026-03') === 0;
+        out.ar = _invAR(INV.find(x => x.id === 'RT3')) === ar0 && _retCashOn('2026-10') === 23000 && _retCashOn('2026-03') === 0;   /* v6.0.102 起含當場扣款退還 2,000 */
         /* v6.0.100 實收報表含另記退還：_invRcv／_invRcvIn、股東與現金口徑年度實收 */
         const r3 = INV.find(x => x.id === 'RT3'); out.rcvAll = _invRcv(r3) === 5250 && _invRcvIn(r3, '2026-10') === 5250 && _invRcvIn(r3, '2026') === 5250 && _invRcvIn(r3, '2025') === 0
           && _rptCashYear(2026).recv >= 21000;
@@ -7002,6 +7002,29 @@ async function newPage(browser, width, height) {
     check('v6.0.95 保留款審查修正：退還另記現金（應收不少算、依退還日歸月）、含當場扣款、收款時重算並提示差異、已收款不可刪、退還單不算一期、舊記錄沖回、客戶%提醒', r.diffMsg && r.ar && r.delBlock && r.notPeriod && r.toggleLegacy && r.custWarn && r.rcvAll && r.legEdit && r.nextClean, JSON.stringify(r));
     check('v6.0.95 發票做法：每期開扣保留款後金額（未稅／稅額／合計，總計區與列印）、退還另開發票', r.einv && r.prevEinv, JSON.stringify(r));
     check('v6.0.92 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.102 上線後小修：實收含當場扣款退還、下一期不帶收款明細、報表排除退還單、應收餘額不為負 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {}; const oI = INV.slice();
+      try {
+        const a = { id: 'F1', project: '小修案', client: '甲', periodNo: 1, date: '2026-05-25', retention: true, retentionPct: 10, totals: { curTotal: 100000, tax: 5000, total: 94500 }, received: '94500', receivedDate: '2026-06-20', receivedConfirmed: true, recvHold: 3000, holdRetAmt: 3000, holdRetDate: '2026-10-05', retentionReturned: true, retentionSep: 1, retentionReceivedAmt: 10500, retentionReturnedDate: '2026-10-10', items: [], _mt: 1 };
+        INV.push(a, { id: 'F2', kind: 'retReturn', project: '小修案', client: '甲', periodNo: '退', date: '2026-10-01', totals: { curTotal: 0, tax: 0, total: 0 }, items: [], retRet: { amt: 1 } });
+        out.rcv = _invRcv(a) === 108000 && _invRcvIn(a, '2026-10') === 13500 && _invRcvIn(a, '2026-06') === 94500 && _retCashOn('2026-10') === 13500;
+        out.ar = _arSum([a]) === 0 && _arSum(INV.filter(x => x.project === '小修案')) === 0;
+        out.next = /delete next\.receipts;next\.holdRetAmt=0;next\.holdRetDate=''/.test(addNextPeriod.toString());
+        let csv = null; const od = window.downloadCSV; window.downloadCSV = (n, h, rows) => { csv = rows; };
+        exportInvExcel(); window.downloadCSV = od;
+        const row = csv && csv.find(x => x[0] === '小修案'); out.xls = !!row && csv.filter(x => x[0] === '小修案').length === 1 && row[8] === 108000 && row[9] === 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      INV.length = 0; oI.forEach(x => INV.push(x));
+      return out;
+    });
+    check('v6.0.102 實收含當場扣款退還（依退還日）、應收餘額逐張加總不為負、下一期不帶收款明細、請款單匯出排除退還單且已收款含退還', r.rcv && r.ar && r.next && r.xls, JSON.stringify(r));
+    check('v6.0.102 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
