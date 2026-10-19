@@ -7059,6 +7059,35 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.104 任務 6：業主類型與依類型統計 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {}; const oQ = Q.slice(), oI = INV.slice(), oC = CUSTOMERS.slice();
+      try {
+        Q.length = 0; INV.length = 0;
+        CUSTOMERS.push({ id: 'oc1', name: '甲營造', ownerType: '營造廠', payTermCash: 0, payTermTicket: 30, payMonthDelay: 1, recvDay: 20, zip: '100' }, { id: 'oc2', name: '乙建設', ownerType: '建設公司', payTermCash: 100 }, { id: 'oc3', name: '丙不明' });
+        Q.push({ id: 'oq1', name: 'A', client: '甲營造', date: '2026-03-01', awarded: true, t: { total: 1050000 }, deduct: { ret: 10 } }, { id: 'oq2', name: 'B', client: '甲營造', date: '2026-04-01', awarded: false, bidStatus: 'lost', t: { total: 500000 } },
+          { id: 'oq3', name: 'C', client: '乙建設', date: '2026-05-01', awarded: true, t: { total: 300000 } }, { id: 'oq4', name: 'D', client: '丙不明', date: '2026-05-02', awarded: false, t: { total: 1 } });
+        INV.push({ id: 'oi1', client: '甲營造', project: 'A', date: '2026-06-25', totals: { curTotal: 200000, total: 189000 }, received: '189000', receivedDate: '2026-07-20', items: [] });
+        const rows = _otRows(2026, 0), g = k => rows.find(x => x.k === k);
+        out.rows = g('營造廠').n === 2 && g('營造廠').won === 1 && g('營造廠').rate === 50 && g('營造廠').rev === 200000 && g('營造廠').tk === 30 && g('營造廠').lag === 50 && g('營造廠').retAvg === 10
+          && g('建設公司').won === 1 && g('建設公司').retAvg === 0 && g('未分類').n === 1 && !!g('大包');
+        const rc = document.getElementById('report-content') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'report-content' })); renderOwnerTypeReport(rc, 2026, 0); const h = rc.innerHTML; out.h = h.slice(0, 120); out.render = /依業主類型/.test(h) && /營造廠/.test(h) && /尚未設定業主類型/.test(h);
+        let csv = null; const od = window.downloadCSV; window.downloadCSV = (n, hd, rw) => { csv = { n, hd, rw }; }; _otCsv(); window.downloadCSV = od; out.csv = !!csv && csv.hd[0] === '業主類型' && csv.rw.length >= 4;
+        /* 客戶表單：業主類型存檔、保留其他欄位 */
+        editCustomer('oc1'); document.getElementById('cust-otype').value = '大包'; saveCustomer();
+        const c1 = CUSTOMERS.find(x => x.id === 'oc1'); out.form = c1.ownerType === '大包' && c1.zip === '100';
+        try { document.getElementById('gen-confirm-cancel').click(); } catch (e) { }
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      Q.length = 0; oQ.forEach(x => Q.push(x)); INV.length = 0; oI.forEach(x => INV.push(x)); CUSTOMERS.length = 0; oC.forEach(x => CUSTOMERS.push(x));
+      return out;
+    });
+    check('v6.0.104 業主類型：客戶資料可設定（存檔不丟其他欄位）、依類型統計得標率／營收／實收／付款條件／保留款、報表與 CSV', r.rows && r.render && r.csv && r.form, JSON.stringify(r));
+    check('v6.0.104 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

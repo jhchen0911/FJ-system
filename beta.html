@@ -1436,6 +1436,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
         <div class="f"><label>業主名稱 *</label><input id="cust-name" placeholder="○○營造股份有限公司"></div>
         <div class="f"><label>統一編號</label><input id="cust-taxid" placeholder="97630399"></div>
       </div>
+      <div class="f" style="margin-bottom:8px"><label>業主類型</label><select id="cust-otype" style="font-size:13px;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)"><option value="">（未設定）</option><option>營造廠</option><option>大包</option><option>建設公司</option><option>其他</option></select></div>
       <div class="fg fg2" style="margin-bottom:8px">
         <div class="f"><label>公司電話</label><input id="cust-tel" placeholder="(03)1234567"></div>
         <div class="f"><label>公司傳真</label><input id="cust-fax" placeholder="(03)1234568"></div>
@@ -1694,7 +1695,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
       <button type="button" class="btn btn-sm rpt-tab" id="rpt-shareholder-btn" onclick="showReport('shareholder')"
         style="border-color:var(--g3);color:var(--g3);justify-content:center;height:40px;font-size:13px"><svg class="ic ib" aria-hidden="true"><use href="#i-users"/></svg> 股東報表</button>
       <select id="rpt-more-sel" onchange="if(this.value)showReport(this.value)" title="較少用的報表" style="border:1px solid var(--g3);color:var(--g3);height:40px;font-size:13px;font-family:inherit;background:var(--w);border-radius:var(--r8);padding:0 8px">
-        <option value="">其他報表 ▾</option><option value="client">業主往來</option><option value="contract">合約請款</option><option value="bidrate">得標率</option><option value="sales">業務績效</option><option value="comm">業主端佣金</option><option value="vendor">廠商績效</option><option value="labor">出工月結</option><option value="share">分潤</option><option value="health">資料健檢</option><option value="log">操作記錄</option></select>
+        <option value="">其他報表 ▾</option><option value="client">業主往來</option><option value="contract">合約請款</option><option value="bidrate">得標率</option><option value="sales">業務績效</option><option value="comm">業主端佣金</option><option value="otype">業主類型</option><option value="vendor">廠商績效</option><option value="labor">出工月結</option><option value="share">分潤</option><option value="health">資料健檢</option><option value="log">操作記錄</option></select>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr 1fr;gap:8px;margin-bottom:14px">
       <select id="rpt-year" style="height:40px;padding:0 8px;border:1px solid var(--b2);border-radius:var(--r8);font-size:13px;font-family:inherit;background:var(--w)" onchange="renderCurrentReport()"></select>
@@ -2787,7 +2788,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.103" defer></script><script src="beta.js?v=6.0.103" defer></script>
+<script src="app.js?v=6.0.104" defer></script><script src="beta.js?v=6.0.104" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">

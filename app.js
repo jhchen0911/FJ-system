@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.103';
+var APP_VERSION='v6.0.104';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -3999,7 +3999,7 @@ function renderCustomers(){
 function addCustomer(){
   document.getElementById('customer-edit-id').value='';
   document.getElementById('customer-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 新增客戶';
-  ['cust-name','cust-taxid','cust-contact','cust-tel','cust-fax','cust-addr','cust-note','cust-paydue','cust-pay-month-delay','cust-recv-day','cust-pay-cash','cust-pay-ticket','cust-retention'].forEach(id=>{
+  ['cust-name','cust-taxid','cust-contact','cust-tel','cust-fax','cust-addr','cust-note','cust-paydue','cust-pay-month-delay','cust-recv-day','cust-pay-cash','cust-pay-ticket','cust-retention','cust-otype'].forEach(id=>{
     const e=document.getElementById(id);if(e)e.value='';
   });
   document.getElementById('customer-modal').style.display='flex';
@@ -4026,6 +4026,7 @@ function editCustomer(id){
   if(recvDayEl2)recvDayEl2.value=c.recvDay!=null?c.recvDay:'';
   var custRetEl=document.getElementById('cust-retention');
   if(custRetEl)custRetEl.value=c.retentionPct!=null?c.retentionPct:'';
+  var custOt=document.getElementById('cust-otype');if(custOt)custOt.value=c.ownerType||'';
   document.getElementById('customer-modal').style.display='flex';
 }
 
@@ -4050,11 +4051,12 @@ function saveCustomer(){
     payTermCash:document.getElementById('cust-pay-cash')?.value!==''?parseInt(document.getElementById('cust-pay-cash')?.value)||0:null,
     payTermTicket:document.getElementById('cust-pay-ticket')?.value!==''?parseInt(document.getElementById('cust-pay-ticket')?.value)||0:null,
     retentionPct:document.getElementById('cust-retention')?.value!==''?parseFloat(document.getElementById('cust-retention')?.value)||0:null
+    ,ownerType:document.getElementById('cust-otype')?.value||''   // v6.0.104 業主類型
     ,_mt:Date.now()
   };
   if(id){
     const idx=CUSTOMERS.findIndex(x=>x.id===id);
-    if(idx>=0)CUSTOMERS[idx]=obj;
+    if(idx>=0)CUSTOMERS[idx]=Object.assign({},CUSTOMERS[idx],obj);   // v6.0.104 保留表單以外的欄位（信封郵遞區號／收件人等）
   } else {
     CUSTOMERS.unshift(obj);
   }
@@ -19169,7 +19171,7 @@ function _mstack(root){
   var ids=['rebar-root','grout-root','backfill-root','lifeline-root','progress-root','mat-est-form','mat-est-out','plan-root',
            'page-params',                    // v5.372：參數設定的單價矩陣表
            'page-staff','page-roles','page-payroll','wk-root', // v5.382：人員／角色頁的名冊表（CI 在不同字型環境抓到溢出）
-           'cost-list','rfq-root','mat6-root','proj-root','vb-root'];   // v5.404：施工成本的分析／勾稽表（手機不得左右滑）；v6 發包比價表、工程專案
+           'cost-list','rfq-root','mat6-root','proj-root','vb-root','rpt-otype-root'];   // v6.0.104 業主類型報表   // v5.404：施工成本的分析／勾稽表（手機不得左右滑）；v6 發包比價表、工程專案
   function _msApply(){ids.forEach(function(id){var el=document.getElementById(id);if(el)_mstack(el);});}
   try{
     var mo=new MutationObserver(_msApply);
@@ -27551,7 +27553,7 @@ function showReport(type){
       btn.style.borderColor=t===type?'var(--g)':(t==='log'?'var(--b3)':'var(--g3)');
     }
   });
-  var ms=document.getElementById('rpt-more-sel');if(ms){var inMore=['client','contract','bidrate','sales','comm','vendor','labor','share','health','log'].indexOf(type)>=0;ms.value=inMore?type:'';ms.style.background=inMore?'var(--g)':'var(--w)';ms.style.color=inMore?'#fff':'var(--g3)';}   // v6.0.31
+  var ms=document.getElementById('rpt-more-sel');if(ms){var inMore=['client','contract','bidrate','sales','comm','otype','vendor','labor','share','health','log'].indexOf(type)>=0;ms.value=inMore?type:'';ms.style.background=inMore?'var(--g)':'var(--w)';ms.style.color=inMore?'#fff':'var(--g3)';}   // v6.0.31
   renderCurrentReport();
 }
 
@@ -27567,6 +27569,7 @@ function renderCurrentReport(){
   else if(_currentReport==='bidrate')renderBidRateReport(el,year,month);
   else if(_currentReport==='sales')renderSalesReport(el,year,month);   // v6.0.74 業務績效
   else if(_currentReport==='comm')renderCommReport(el,year,month);   // v6.0.88 業主端佣金
+  else if(_currentReport==='otype')renderOwnerTypeReport(el,year,month);   // v6.0.104 業主類型
   else if(_currentReport==='vendor')renderVendorReport(el,year,month);
   else if(_currentReport==='labor')renderLaborReport(el,year,month);
   else if(_currentReport==='hr')renderHrReport(el,year);   // v5.435
@@ -28480,6 +28483,7 @@ function exportCurrentReport(){
   if(_currentReport==='shareholder'){exportShareholderPDF();return;}   // v6 股東報表 → A4 直式 PDF
   if(_currentReport==='sales'){_salesPdf();return;}   // v6.0.74 業務績效 → PDF
   if(_currentReport==='comm'){_commPdf();return;}   // v6.0.88
+  if(_currentReport==='otype'){_otCsv();return;}   // v6.0.104
   const year=parseInt(document.getElementById('rpt-year')?.value)||new Date().getFullYear();
   const month=parseInt(document.getElementById('rpt-month')?.value)||0;
   if(_currentReport==='log'){
@@ -36899,6 +36903,56 @@ function _retReturnCard(inv){
       :'<button type="button" class="btn btn-xs btn-g" onclick="event.stopPropagation();retReturnReceive(\''+id+'\')">登錄收款</button>')
     +'<button type="button" class="btn btn-xs btn-r" onclick="event.stopPropagation();delInvoice(\''+id+'\',event)">刪除</button></div></div></div>';
 }
+// ── 業主類型統計（v6.0.104）：客戶資料 ownerType（營造廠／大包／建設公司／其他），報表 › 其他報表 › 業主類型 ──
+var _OWNER_TYPES=['營造廠','大包','建設公司','其他'];
+function _custOf(name){var n=String(name||'').trim();return n?((CUSTOMERS||[]).find(function(c){return c&&String(c.name||'').trim()===n;})||null):null;}
+function _ownerTypeOf(name){var c=_custOf(name),t=c&&c.ownerType;return _OWNER_TYPES.indexOf(t)>=0?t:'未分類';}
+function _otRows(year,month){
+  var keys=_OWNER_TYPES.concat(['未分類']),by={};keys.forEach(function(k){by[k]={k:k,qs:[],invs:[],custs:{}};});
+  _bidRows(year,month).forEach(function(q){by[_ownerTypeOf(q.client)].qs.push(q);});
+  var pre=String(year)+(month?('-'+String(month).padStart(2,'0')):'');
+  (INV||[]).forEach(function(i){if(!i||i.kind==='retReturn'||String(i.date||'').slice(0,pre.length)!==pre)return;by[_ownerTypeOf(i.client)].invs.push(i);});
+  return keys.map(function(k){
+    var g=by[k],st=_bidStat(g.qs);
+    var rev=g.invs.reduce(function(a,i){return a+((i.totals&&parseFloat(i.totals.curTotal))||0);},0);   // 營收＝請款未稅（權責口徑）
+    var rcv=g.invs.reduce(function(a,i){return a+_invRcv(i);},0);
+    // 付款條件：該類型業主（有報價或請款者）客戶資料的平均現金％、平均票期、平均放款天數（次月 N 日＝月數×30＋N）
+    var names={};g.qs.forEach(function(q){if(q.client)names[String(q.client).trim()]=1;});g.invs.forEach(function(i){if(i.client)names[String(i.client).trim()]=1;});
+    var cash=[],tk=[],lag=[];Object.keys(names).forEach(function(n){var c=_custOf(n);if(!c)return;
+      if(c.payTermCash!=null&&c.payTermCash!=='')cash.push(parseFloat(c.payTermCash)||0);
+      if(c.payTermTicket!=null&&c.payTermTicket!=='')tk.push(parseFloat(c.payTermTicket)||0);
+      if(c.recvDay!=null&&c.recvDay!=='')lag.push((c.payMonthDelay!=null&&c.payMonthDelay!==''?parseFloat(c.payMonthDelay)||0:1)*30+(parseFloat(c.recvDay)||0));});
+    var avg=function(a){return a.length?Math.round(a.reduce(function(x,y){return x+y;},0)/a.length):null;};
+    // 保留款：得標案的專案扣款設定（_ownerRetPct，與請款同口徑）
+    var won=g.qs.filter(function(q){return q.awarded;}),rets=won.map(function(q){return _ownerRetPct(q);});
+    var retN=rets.filter(function(v){return v>0;}).length;
+    return {k:k,n:st.n,won:st.won,rate:st.rate,wonAmt:st.wonAmt,rev:Math.round(rev),rcv:Math.round(rcv),nCust:Object.keys(names).length,
+      cash:avg(cash),tk:avg(tk),lag:avg(lag),retAvg:rets.length?Math.round(rets.reduce(function(a,b){return a+b;},0)/rets.length*10)/10:null,retN:retN,retOf:rets.length,over10:rets.filter(function(v){return v>10;}).length};
+  }).filter(function(r){return r.n||r.rev||r.k!=='未分類';});
+}
+function renderOwnerTypeReport(el,year,month){
+  var rows=_otRows(year,month),period=year+(month?('年'+month+'月'):'年');
+  var unc=(CUSTOMERS||[]).filter(function(c){return c&&_OWNER_TYPES.indexOf(c.ownerType)<0;}).length;
+  var f=function(v,suf){return v==null?'—':(v+(suf||''));};
+  el.innerHTML='<div class="cb" id="rpt-otype-root">'
+    +'<div style="font-size:13px;font-weight:900;color:var(--g3);margin-bottom:6px">'+esc(period)+' 依業主類型</div>'
+    +(unc?'<div style="font-size:11.5px;color:#b26a00;margin-bottom:8px">有 '+unc+' 家客戶尚未設定業主類型（客戶．廠商 → 編輯業主 → 業主類型），歸在「未分類」。</div>':'')
+    +'<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="background:var(--gl);color:var(--b5);font-size:11px">'
+    +['業主類型','業主數','報價件數','得標','得標率','得標金額','營收（請款未稅）','實收','平均現金％','平均票期','平均放款','保留款（得標案）']
+      .map(function(h,i){return '<th style="padding:6px 8px;text-align:'+(i?'right':'left')+';white-space:nowrap">'+h+'</th>';}).join('')+'</tr></thead><tbody>'
+    +rows.map(function(r){return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:6px 8px;font-weight:700">'+esc(r.k)+'</td>'
+      +[r.nCust,r.n,r.won,r.rate==null?'—':(Math.round(r.rate*10)/10+'%'),fmt(r.wonAmt),fmt(r.rev),fmt(r.rcv),f(r.cash,'%'),f(r.tk,' 天'),r.lag==null?'—':('約 '+r.lag+' 天'),
+        r.retOf?('平均 '+r.retAvg+'%（'+r.retN+'／'+r.retOf+' 案有扣'+(r.over10?('，'+r.over10+' 案 >10%'):'')+'）'):'—']
+        .map(function(v){return '<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">'+v+'</td>';}).join('')+'</tr>';}).join('')
+    +'</tbody></table>'
+    +'<div style="font-size:11px;color:var(--b3);margin-top:8px;line-height:1.7">得標率口徑同「得標率」報表（得標 ÷ 全部報價）；營收＝期間內請款單本期估驗小計（未稅），實收含另記的保留款退還；付款條件取客戶資料的付款規則平均（放款天數＝計價月起算約略天數）；保留款取得標案的專案「業主扣款設定」。</div></div>';
+  try{_mstack(document.getElementById('rpt-otype-root'));}catch(e){_err('renderOwnerTypeReport',e);}
+}
+function _otCsv(){
+  var year=parseInt(document.getElementById('rpt-year')?.value)||new Date().getFullYear(),month=parseInt(document.getElementById('rpt-month')?.value)||0;
+  var rows=_otRows(year,month).map(function(r){return [r.k,r.nCust,r.n,r.won,r.rate==null?'':(Math.round(r.rate*10)/10),r.wonAmt,r.rev,r.rcv,r.cash==null?'':r.cash,r.tk==null?'':r.tk,r.lag==null?'':r.lag,r.retAvg==null?'':r.retAvg,r.retN,r.retOf];});
+  downloadCSV('業主類型_'+year+(month?('-'+month):'')+'_'+fmtDateStr(),['業主類型','業主數','報價件數','得標件數','得標率%','得標金額','營收未稅','實收','平均現金%','平均票期天','平均放款天','平均保留款%','有扣保留款案數','得標案數'],rows);
+}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
@@ -38556,6 +38610,7 @@ function exportCurrentReportExcel(){
   if(_currentReport==='shareholder'||_currentReport==='overview'){exportShareholderCSV();return;}   // v6
   if(_currentReport==='sales'){_salesCsv();return;}   // v6.0.74
   if(_currentReport==='comm'){_commCsv();return;}   // v6.0.88
+  if(_currentReport==='otype'){_otCsv();return;}   // v6.0.104
   const year=parseInt(document.getElementById('rpt-year')?.value)||new Date().getFullYear();
   const month=parseInt(document.getElementById('rpt-month')?.value)||0;
   let rows=[],headers=[],title='報表';

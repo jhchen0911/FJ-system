@@ -92,6 +92,7 @@
 | 經營報表 | `reports`（`go('profit')` 轉來） | `showReport` `renderOverviewReport` `_shRptYear`（**權責口徑單一來源**）`_rptBasisStrip` `renderShareholderReport` `renderHealthReport`／`_healthRows`（資料健檢） | 讀各集合 |
 | 客戶．廠商 | `contacts` | `renderContactsAll` `renderCustomersContact` `renderVendors2`；電話自動格式 `_fmtPhoneTW`／`_phoneAutoFmt`（全站電話欄離開即排版）；廠商匯款帳戶 `_vendorBank`／`_bankCopy`（應付列與付款彈窗「複製帳號」） | customers、vendors（shared；廠商記錄含匯款銀行／帳號／戶名欄位） |
 | 業務績效 | `reports` › 其他報表 › 業務績效（`showReport('sales')`） | `renderSalesReport` `_salesRows`／`_salesStat`（篩選：年月＋`_rptSalesF` 業務／狀態）`_salesTables`（畫面與 PDF 共用）`_salesPdf`／`_salesCsv`；名冊 `openSalesBook`／`_salesBookSave`；報價列表狀態 chip 旁 `_salesChip`／`openSalesPick`（設業務＋抽成，抽成 `_salesCommVis` 管理員才見）；抽成四種方式 `_SALES_MODES`（營收%／毛利%／固定額／每單位×實作量 `_salesUnitQty`；名冊預設，個案另訂 `q.comm`）`_salesCommAccr``_salesCommCfg`／`_salesCommAmt`／`_salesBase`／`_salesProfitBase`／`_salesRcvRate`；應付 `_salesCommSync`／`_salesCommSyncAll`；介紹費併入報表 `_introRows`／`_introStat`／`_introDlOpts`（名冊類型 staff／intro） | `P.sales[]`（params，shared）、`q.salesId`（shared）、`q.comm`（private，隨 quoteSens）、`PAYABLES` id `pay_sales_<qid>` |
+| 業主類型統計 | `reports` › 其他報表 › 業主類型（`showReport('otype')`） | `_OWNER_TYPES` `_ownerTypeOf` `_otRows`（得標率同 `_bidStat`、營收＝請款未稅、實收 `_invRcv`、付款條件取客戶資料平均、保留款取得標案 `_ownerRetPct`）`renderOwnerTypeReport` `_otCsv` | `CUSTOMERS[].ownerType`（營造廠／大包／建設公司／其他） |
 | 業主端佣金 | 報價列表狀態 chip 旁「佣金」（`openCommPick`，管理員才見）；`reports` › 其他報表 › 業主端佣金（`renderCommReport`） | `_commList`（含舊 referral 一次性轉換 `_commFromReferral`）`_commAmtFor`／`_commAccrFor`／`_commDueFor`（與業務抽成同口徑、不互含）`_commSync`／`_commSyncAll`（應付）`_commChip` `_commPickSave` `_commTables` `_commPdf`／`_commCsv` `openCommKpi`（總覽／利潤 KPI 總結） | `q.comms[]`（private，隨 quoteSens）、`PAYABLES` id `comm_<qid>_<cid>` |
 | 施工計畫書 | `plan` | `_plBuild` `_plRender`；圖：`FY_SHEETS`（施工步驟示意圖組，`_fySheetId` 工項＋工法→圖組）、`_plStorySteps`（只剩水平支撐）、`_plDetailSteps`（水平支撐詳圖）、`_plFlowPages`（施工流程圖） | planState（shared） |
 | 工具 | `matest` `rebar` `grout` `backfill` `workers`；`lifeline`、`progress` 隱藏 | `renderMatEst` `matEstCalc`（綁定工程時幾何讀案場細節）`renderWorkers` | toolStates、workers（逐筆） |
@@ -107,7 +108,7 @@
 
 ## 測試
 
-`tests/smoke.js`（657 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（659 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
