@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.91';
+var APP_VERSION='v6.0.94';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -32744,7 +32744,7 @@ function rfqAward(rid){
     var cid=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
     var rows=(r.items||[]).map(function(it,i){var p=_rfqPcPrice(r,v,it),pm=_rfqVendorPrice(r,v,it.idx);var row={id:cid+'_'+i,linkedItemIdx:it.idx,desc:_rfqIsM(it)&&pm!=null?('$'+fmt(pm)+'/M × '+_rfmt(it.len)+'M'):'',qty:parseFloat(it.qty)||0,unitPrice:p==null?0:p};if(_rfqIsM(it)){row.ppm=pm;row.len=parseFloat(it.len)||0;}return row;});
     var sd=gv('rfq-sign')||localToday();
-    var cost={id:cid,type:'sub',isAttached:false,attachedTo:'',mergedInto:'',cat:'打設',date:sd,vendor:v.name,rows:rows,amt:0,signDate:sd,entryDate:gv('rfq-entry2')||r.entry||'',invoice:true,retRate:c.ret||0,retWhen:c.retWhen||'',rfqId:r.id,payTerm:{cashPct:c.cashPct,ticketPct:c.ticketPct,ticketDays:c.ticketDays}};
+    var cost={id:cid,type:'sub',isAttached:false,attachedTo:'',mergedInto:'',cat:'打設',date:sd,vendor:v.name,rows:rows,amt:0,signDate:sd,entryDate:gv('rfq-entry2')||r.entry||'',invoice:true,retRate:c.ret||0,retWhen:c.retWhen||'',b2b:_ownerTerms(q)?1:0,rfqId:r.id,payTerm:{cashPct:c.cashPct,ticketPct:c.ticketPct,ticketDays:c.ticketDays}};
     try{recalcCostAmt(cost);}catch(e){_err('rfqAward',e);}
     if(!Array.isArray(q.costs))q.costs=[];q.costs.push(cost);
     var fCost=null;
@@ -35687,9 +35687,10 @@ function _sctPayTxt(c,f,q){
   var day=parseInt(P.vendorCutDay)||25,pd=parseInt(P.vendorPayDay)||25,delay=(P.vendorPayDelay==null)?1:(parseInt(P.vendorPayDelay)||0);
   var ret=parseFloat(c.retRate)||0;
   // v6.0.91 背對背：本案有營造廠付款條件時，寫出匯款／票期比例；保留款退還時點跟營造廠同步（舊資料無營造廠條件＝原文）
-  var own=q?_ownerTerms(q):null,pt=c.payTerm||null,split='';
-  if(own&&pt){var sp=[];if((parseFloat(pt.cashPct)||0)>0)sp.push(pt.cashPct+'% 現金匯款');if((parseFloat(pt.ticketPct)||0)>0)sp.push(pt.ticketPct+'% 開立 '+(parseInt(pt.ticketDays)||0)+' 天期票');if(sp.length)split='（'+sp.join('、')+'）';}
-  var rw=String(c.retWhen||'').trim()||(own&&own.retCond?_b2bRetWhen(own):'');
+  // v6.0.94：只有得標時帶背對背標記的分包卡（c.b2b）才改文字，舊卡重印一字不變；退還時點空白＝原文
+  var pt=(c.b2b&&c.payTerm)||null,split='';
+  if(pt){var sp=[];if((parseFloat(pt.cashPct)||0)>0)sp.push(pt.cashPct+'% 現金匯款');var td=parseInt(pt.ticketDays)||0;if((parseFloat(pt.ticketPct)||0)>0)sp.push(pt.ticketPct+'% 開立'+(td>0?(' '+td+' 天'):'')+'期票');if(sp.length)split='（'+sp.join('、')+'）';}
+  var rw=c.b2b?String(c.retWhen||'').trim().replace(/本公司/g,'甲方'):'';
   var t='依實作數量按月計價：乙方應會同甲方工地人員辦理計價後，於每月 '+day+' 日前檢附估驗請款單'+(_subInvoice(c)?'及統一發票':'')+'向甲方請款，甲方於'+(delay===0?'當月':delay===1?'次月':('次 '+delay+' 月'))+' '+pd+' 日放款'+split+'。'
     +(ret>0?('每期工程款保留 '+ret+'% 作為保留款，'+(rw?(rw+'。'):'於工程全部完成（含拆除、拔除、場地清理）且經甲方驗收後無息退還。')):'')
     +(_subInvoice(c)?'工程款含 '+_taxR()+'% 營業稅，乙方應開立統一發票。':'本工程款不含營業稅，乙方以收據請款。')
@@ -35714,7 +35715,7 @@ function _subContractHtml(q,c,f){
   art('付款辦法',E(_sctPayTxt(c,f,q)));
   art('工程期限','乙方應於甲方通知之日期進場施工'+(c.entryDate?('（預定進場日 '+E(c.entryDate)+'）'):'')+(f.period?('，'+E(f.period)):'')+'；各階段進度須依甲方指定之日期進場、完工，並配合本工地其他工種之施工進度，不得無故停工或延誤。');
   art('逾期罰款','乙方如無故不進場、未依甲方指定進度施作或逾期完工，每逾一日應給付甲方承攬總價千分之 '+E(f.fine)+' 之違約金，甲方得自當期或任一期工程款中逕行扣抵。');
-  art('安全衛生及環保','乙方應督導所僱人員遵守職業安全衛生法令、本工地安全衛生規定及環保法令，並自備個人防護具。如因乙方或其人員違反前述規定致甲方或業主遭主管機關裁罰，罰鍰及衍生損失由乙方負擔，甲方得自工程款中直接扣除。營造廠依其工地安全衛生罰則對乙方人員所開立之罰款，由乙方負擔，甲方得自當期工程款扣除。');
+  art('安全衛生及環保','乙方應督導所僱人員遵守職業安全衛生法令、本工地安全衛生規定及環保法令，並自備個人防護具。如因乙方或其人員違反前述規定致甲方或業主遭主管機關裁罰，罰鍰及衍生損失由乙方負擔，甲方得自工程款中直接扣除。業主依其工地安全衛生罰則對乙方人員所開立之罰款，由乙方負擔，甲方得自當期工程款扣除。');
   art('工程保險','乙方所僱施工人員均應投保勞工保險及團體意外險，施工期間所生之人員傷亡與財物損失概由乙方負責。'+((parseFloat(f.ins)||0)>0?('本工地營造綜合保險由甲方投保，乙方分擔保險費新臺幣 '+fmt(f.ins)+' 元整，同意由甲方於乙方第一期工程款中扣除。'):'本工地營造綜合保險由甲方投保；乙方施工所生之事故仍由乙方負完全責任。'));
   art('清潔責任','乙方每日收工前應將當日施工所生之殘料、廢棄物清理乾淨並運離工地；未清理者甲方得僱工代為處理，費用自乙方工程款中優先扣除，乙方不得異議。');
   art('工程變更','甲方得視實際需要變更或增減工程數量，增減部分依本合約單價計算；本合約未列之新增項目，由雙方另行議價書面確認後施作。');
@@ -36479,33 +36480,45 @@ function _ownerTerms(q){
   t.cashPct=Math.max(0,Math.min(100,t.cashPct));if(t.ticketDays==null)t.ticketDays=0;
   return t;
 }
-function _payProf(delay,day,cash,td){cash=Math.max(0,Math.min(100,parseFloat(cash)||0));return {t:(parseFloat(delay)||0)*30+(parseFloat(day)||0),cash:cash,td:cash>=100?0:(parseFloat(td)||0)};}
-function _payAt(p,x){return x<=p.cash?p.t:p.t+p.td;}
+function _payProf(delay,day,cash,td){cash=Math.max(0,Math.min(100,parseFloat(cash)||0));return {delay:parseInt(delay)||0,day:parseInt(day)||1,cash:cash,td:cash>=100?0:(parseInt(td)||0)};}
+// 實際日曆日（v6.0.94，原本月一律 30 天）：計價月 m（0 起算）→ 放款日（月底不足取月底）、期票到期＝放款日＋票期天數
+function _payDay(p,y,m){var d=new Date(y,m+p.delay,1),last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();return new Date(d.getFullYear(),d.getMonth(),Math.min(p.day,last));}
+function _payAt(p,x,y,m){var d=_payDay(p,y,m);return x<=p.cash?d:new Date(d.getTime()+p.td*86400000);}
+function _b2bMonths(){var y=new Date().getFullYear(),a=[];for(var i=0;i<24;i++)a.push([y+Math.floor(i/12),i%12]);return a;}   // 今明兩年每個計價月都算，取最差
+function _dayDiff(a,b){return Math.round((a.getTime()-b.getTime())/86400000);}
 function _ownerProf(o){return _payProf(o.delay,o.day,o.cashPct,o.ticketDays);}
 function _subProf(c){var delay=(P.vendorPayDelay==null)?1:(parseInt(P.vendorPayDelay)||0),day=parseInt(P.vendorPayDay)||25;
   var cash=(c.cashPct!=null)?c.cashPct:(100-(parseFloat(c.ticketPct)||0));return _payProf(delay,day,cash,c.ticketDays);}
-// 包商最多比營造廠早幾天拿到錢（逐比例比較：第 x% 的錢誰先到）
+// 包商最多比營造廠早幾天拿到錢（逐比例比較：第 x% 的錢誰先到；逐計價月取最大）
 function _b2bEarly(own,sub){var xs=[0.01,own.cash,own.cash+0.01,sub.cash,sub.cash+0.01,100],m=0;
-  xs.forEach(function(x){if(!(x>0&&x<=100))return;var d=_payAt(own,x)-_payAt(sub,x);if(d>m)m=d;});return Math.round(m);}
-function _b2bRetWhen(o){return '於營造廠退還本工程保留款予甲方後 7 日內無息退還（同步營造廠退還時點'+(o.retCond?('：'+o.retCond):'')+'）';}
-// 新詢價單的預設條件：現金部分不早於營造廠放款、期票部分到期不早於營造廠期票到期（票期進位到 30 天）、保留款不低於營造廠
+  _b2bMonths().forEach(function(ym){xs.forEach(function(x){if(!(x>0&&x<=100))return;var d=_dayDiff(_payAt(own,x,ym[0],ym[1]),_payAt(sub,x,ym[0],ym[1]));if(d>m)m=d;});});return m;}
+// 保留款退還時點（詢價單用「本公司」，合約列印時換成「甲方」）；不引用業主原文，避免被讀成第二個期限
+var _B2B_RETWHEN='依業主退還本公司保留款之時點，於收到後 7 日內無息退還';
+function _b2bRetWhen(o){return _B2B_RETWHEN;}
+// 新詢價單的預設條件：現金部分不早於營造廠放款、期票到期不早於營造廠最後一筆款到帳（票期進位到 30 天）、保留款不低於營造廠
 function _b2bDefCond(q){
   var o=_ownerTerms(q);if(!o)return null;
-  var own=_ownerProf(o),sub=_subProf({cashPct:100,ticketDays:0});
-  var cash=o.cashPct;if(cash>0&&sub.t<own.t)cash=0;   // 本公司放款日比營造廠早 → 全開期票
-  var need=Math.max(own.t+own.td,cash>0?0:own.t)-sub.t;
+  var own=_ownerProf(o),sub=_subProf({cashPct:100,ticketDays:0}),cash=o.cashPct,need=0;
+  _b2bMonths().forEach(function(ym){
+    var sp=_payDay(sub,ym[0],ym[1]),op=_payDay(own,ym[0],ym[1]);
+    if(cash>0&&sp<op)cash=0;   // 本公司放款日比營造廠早 → 全開期票
+    var last=own.cash<100?_payAt(own,100,ym[0],ym[1]):op;need=Math.max(need,_dayDiff(last,sp));
+  });
   var td=cash>=100?0:Math.max(0,Math.ceil(need/30)*30);
   if(cash<100&&o.ticketDays>td)td=Math.ceil(o.ticketDays/30)*30;
+  if(cash<100&&td<=0)td=60;   // 不產生「0 天期票」：本公司放款已晚於營造廠到帳時沿用公司預設票期
   var defRet=(P.subRetDef!=null?parseFloat(P.subRetDef):5);
   var r={cashPct:cash,ticketPct:100-cash,ticketDays:td,ret:Math.max(defRet,o.ret||0)};
   if(o.retCond||o.ret>0)r.retWhen=_b2bRetWhen(o);
   return r;
 }
-// 發包畫面提醒（不擋）：包商比營造廠早收款、保留款低於營造廠、退還時點未同步
+// 發包畫面提醒（不擋）：包商比營造廠早收款、計價日晚於營造廠、保留款低於營造廠、退還時點未同步、期票未填天數
 function _b2bIssues(q,c){
   var o=_ownerTerms(q);if(!o||!c)return [];
   var out=[],e=_b2bEarly(_ownerProf(o),_subProf(c));
   if(e>0)out.push('包商比營造廠早 '+e+' 天收款');
+  var sc=parseInt(P.vendorCutDay)||25;if(o.cut<sc)out.push('營造廠每月 '+o.cut+' 日計價，早於本公司向包商計價的 '+sc+' 日（中間幾天的施工量要先付給包商）');
+  var tp=(c.ticketPct!=null)?parseFloat(c.ticketPct):(100-(parseFloat(c.cashPct)||0));if(tp>0&&!(parseInt(c.ticketDays)>0))out.push('期票比例 '+tp+'% 但票期天數未填');
   var sr=parseFloat(c.ret)||0;if((o.ret||0)>sr)out.push('包商保留款 '+sr+'% 低於營造廠扣我方的 '+o.ret+'%');
   if((o.ret||0)>0&&sr>0&&o.retCond&&!String(c.retWhen||'').trim())out.push('包商保留款退還時點未與營造廠同步（營造廠：'+o.retCond+'）');
   return out;

@@ -6753,7 +6753,7 @@ async function newPage(browser, width, height) {
         Q.push(q, q0);
         /* 客戶資料帶入：100% 30 天期票、次月 20 日放款、保留 10% */
         _rfqQid = 'qB2B'; const c = _rfqCond(null);
-        out.def = c.cashPct === 0 && c.ticketPct === 100 && c.ticketDays === 30 && c.ret === 10 && /營造廠退還本工程保留款/.test(c.retWhen) && /拆除拔除完成/.test(c.retWhen);
+        out.def = c.cashPct === 0 && c.ticketPct === 100 && c.ticketDays === 30 && c.ret === 10 && c.retWhen === '依業主退還本公司保留款之時點，於收到後 7 日內無息退還';
         out.noIssue = _b2bIssues(q, c).length === 0;
         /* 寬鬆條件提醒：全現金次月 25 日 → 早 25 天；保留 5% 低於 10% */
         const loose = { cashPct: 100, ticketPct: 0, ticketDays: 0, ret: 5, retWhen: '' };
@@ -6764,9 +6764,23 @@ async function newPage(browser, width, height) {
         /* 已存條件的詢價單不被改 */
         out.keep = _rfqCond({ cond: { cashPct: 50, ticketPct: 50, ticketDays: 60, ret: 3 } }).ret === 3;
         /* 分包合約：比例＋同步退還、第九條罰款轉嫁 */
-        const cost = { id: 'cs1', type: 'sub', vendor: '甲包商', rows: [], retRate: 10, retWhen: c.retWhen, invoice: true, payTerm: { cashPct: 0, ticketPct: 100, ticketDays: 30 } };
-        const t = _sctPayTxt(cost, _sctCfg(), q); out.sct = /100% 開立 30 天期票/.test(t) && /營造廠退還本工程保留款予甲方後 7 日內/.test(t);
-        out.art9 = /營造廠依其工地安全衛生罰則對乙方人員所開立之罰款，由乙方負擔，甲方得自當期工程款扣除/.test(_subContractHtml(q, cost, _sctCfg()));
+        const cost = { id: 'cs1', type: 'sub', vendor: '甲包商', rows: [], retRate: 10, retWhen: c.retWhen, b2b: 1, invoice: true, payTerm: { cashPct: 0, ticketPct: 100, ticketDays: 30 } };
+        const t = _sctPayTxt(cost, _sctCfg(), q); out.sct = /100% 開立 30 天期票/.test(t) && /依業主退還甲方保留款之時點，於收到後 7 日內無息退還/.test(t) && !/本公司|營造廠/.test(t);
+        /* 舊卡（無 b2b 標記、有 payTerm）＋客戶有填付款規則＋專案後來填退還條件 → 合約文字一字不變 */
+        const oldCard = { id: 'cs0', type: 'sub', vendor: '乙包商', rows: [], retRate: 5, invoice: true, payTerm: { cashPct: 50, ticketPct: 50, ticketDays: 60 } };
+        out.oldCard = _sctPayTxt(oldCard, _sctCfg(), q) === _sctPayTxt(oldCard, _sctCfg()) && !/現金匯款|期票/.test(_sctPayTxt(oldCard, _sctCfg(), q));
+        /* 退還時點清空：詢價單與合約都用原文 */
+        out.blankRet = /保留款 10%，完工驗收後退還/.test(_rfqCondLines({ cond: Object.assign({}, c, { retWhen: '' }) }).join('')) && /經甲方驗收後無息退還/.test(_sctPayTxt(Object.assign({}, cost, { retWhen: '' }), _sctCfg(), q));
+        /* 實際日曆日：營造廠隔 2 月 25 日全現金、包商次月 25 日＋30 天票 → 大月時早 1 天要提醒 */
+        q.ownerPay = { delay: 2, day: 25, cashPct: 100, ticketDays: 0 };
+        out.cal = _b2bIssues(q, { cashPct: 0, ticketPct: 100, ticketDays: 30, ret: 10, retWhen: 'x' }).some(x => /早 1 天收款/.test(x)) && _rfqCond(null).ticketDays === 60;
+        /* 計價日早於本公司、期票未填天數 → 提醒；不產生 0 天期票 */
+        q.ownerPay = { cut: 20 }; out.cut = _b2bIssues(q, c).some(x => /營造廠每月 20 日計價，早於本公司/.test(x));
+        q.ownerPay = {}; out.td0 = _b2bIssues(q, { cashPct: 50, ticketPct: 50, ticketDays: 0, ret: 10, retWhen: 'x' }).some(x => /票期天數未填/.test(x))
+          && !/0 天期票/.test(_sctPayTxt(Object.assign({}, cost, { payTerm: { cashPct: 50, ticketPct: 50, ticketDays: 0 } }), _sctCfg(), q));
+        q.ownerPay = { delay: 3, day: 1, cashPct: 50, ticketDays: 0 }; out.noZero = _rfqCond(null).ticketDays > 0 || _rfqCond(null).cashPct === 100;
+        q.ownerPay = {};
+        out.art9 = /業主依其工地安全衛生罰則對乙方人員所開立之罰款，由乙方負擔，甲方得自當期工程款扣除/.test(_subContractHtml(q, cost, _sctCfg()));
         /* 舊資料：沒有任何營造廠條件 → 照公司預設、合約原文 */
         _rfqQid = 'qB2B0'; const c0 = _rfqCond(null);
         out.legacy = _ownerTerms(q0) === null && c0.cashPct === 50 && c0.ticketDays === 60 && c0.ret === 5 && !c0.retWhen
@@ -6783,6 +6797,7 @@ async function newPage(browser, width, height) {
     check('v6.0.91 背對背：營造廠條件（客戶資料／專案覆寫）→ 新詢價單預設 100% 30 天期票、保留 10%、退還同步；已存條件不動', r.def && r.noIssue && r.override && r.keep, JSON.stringify(r));
     check('v6.0.91 背對背提醒：包商早收款天數、保留款低於營造廠（不擋）', r.warn && r.warnHtml, JSON.stringify(r));
     check('v6.0.91 分包合約：付款比例＋保留款同步退還、第九條營造廠罰款轉嫁；舊案無條件＝公司預設原文', r.sct && r.art9 && r.legacy, JSON.stringify(r));
+    check('v6.0.94 背對背審查修正：舊卡（客戶有付款規則）合約不變、退還時點清空兩邊一致、實際日曆日、計價日提醒、不產生 0 天期票', r.oldCard && r.blankRet && r.cal && r.cut && r.td0 && r.noZero, JSON.stringify(r));
     check('v6.0.91 專案頁營造廠付款條件列與退還條件欄', r.ui && r.set, JSON.stringify(r));
     check('v6.0.91 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
