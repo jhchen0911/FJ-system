@@ -1,13 +1,20 @@
 rules_version = '2';
-// Firebase Storage 安全規則（v6.0.93 起放在 repo；改完必須到 Firebase 主控台 Storage → 規則 貼上發布才生效）
-// Storage 規則讀不到 Realtime Database，所以唯讀帳號清單要寫死在這裡，
-// 與 RTDB 的 fydata/readers 名冊保持同一批信箱（新增／移除唯讀帳號時兩邊都要改）。
+// Firebase Storage 安全規則（repo 原始碼；改完必須到 Firebase 主控台 Storage → 規則 貼上發布才生效）
+// v6.0.97：明確列出 app 用到的資料夾——Storage 規則只要任一條允許就放行，原本 /{allPaths=**} 會蓋過 backups。
+// app 用到的全部路徑（v5 起至今相同）：
+//   fydata/backups/<日期>.json      每日／每月雲端快照（含 private 敏感資料）→ 只給擁有者
+//   fydata/projfiles/<qid>/<類型>/…  工程專案附件、工作確認單
+//   fydata/payfiles/<pid>/…          應付附件（廠商請款單、匯款單）
+//   fydata/einv/…                    發票影像
+//   contracts/<uid>/…                合約附件
+// 其餘路徑一律拒絕。新版與舊版（v5／v6 各版）app 都只用以上路徑，可不等程式合併先發布。
+// Storage 規則讀不到 Realtime Database：唯讀帳號清單要與 RTDB fydata/readers 名冊手動保持一致。
 service firebase.storage {
   match /b/{bucket}/o {
     function signedIn() {
       return request.auth != null && request.auth.token.email != null;
     }
-    function isAdmin() {
+    function isOwner() {
       return signedIn() && request.auth.token.email.lower() in ['jhchen0911@gmail.com'];
     }
     // 唯讀帳號（AI 助理）：可讀，不可寫入／覆蓋／刪除任何檔案
@@ -15,11 +22,15 @@ service firebase.storage {
       return signedIn() && request.auth.token.email.lower() in ['hsuanchen911@gmail.com'];
     }
     match /fydata/backups/{file=**} {
-      allow read, write: if isAdmin();
+      allow read, write: if isOwner();
     }
-    match /{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && !isReader();
+    match /fydata/{folder}/{rest=**} {
+      allow read: if signedIn() && folder in ['projfiles', 'payfiles', 'einv'];
+      allow write: if signedIn() && !isReader() && folder in ['projfiles', 'payfiles', 'einv'];
+    }
+    match /contracts/{rest=**} {
+      allow read: if signedIn();
+      allow write: if signedIn() && !isReader();
     }
   }
 }

@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.93';
+var APP_VERSION='v6.0.97';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -167,6 +167,7 @@ var _isReaderUser=false;   // v6.0.90：唯讀帳號（fydata/readers 名冊，A
 var _roState='';   // v6.0.93：唯讀判定 ''未登入／'pending' 查詢中或失敗／'rw' 確認非唯讀／'reader'
 var _RULES_OWNER='jhchen0911@gmail.com';   // 與 database.rules.json／storage.rules 的擁有者信箱一致（唯一豁免唯讀檢查的帳號）
 // Storage 寫入／刪除一律 fail-closed：唯讀判定確認為一般帳號後才做（RTDB 寫入另有安全規則擋）
+function _isRulesOwner(){return !!(_fbUser&&String(_fbUser.email||'').toLowerCase()===_RULES_OWNER);}
 function _stOk(){return !!(_fbUser&&_fbStorage&&_roState==='rw');}
 function _stDel(path){if(!path||!_stOk())return false;try{_fbStorage.ref(path).delete().catch(function(){/* 可忽略 */});return true;}catch(e){_err('_stDel',e);return false;}}
 var _awardedFilter=false;
@@ -20940,7 +20941,7 @@ var _SNAP_MONTH_RE=/^\d{4}-\d{2}-M\.json$/;
 function _snapPrune(){
   // v5.373：兩種快照分開輪替。原本 listAll 一律砍最舊的 30 份之外，
   // 加了月存以後會把長期槽一起砍掉，等於白做。
-  if(!_stOk())return;   // v6.0.93 fail-closed
+  if(!_stOk()||!_isRulesOwner())return;   // v6.0.93 fail-closed；v6.0.97 只有擁有者
   _fbStorage.ref('fydata/backups').listAll().then(function(res){
     var all=res.items.map(function(i){return i.name;});
     var daily=all.filter(function(n){return _SNAP_DAILY_RE.test(n);}).sort();
@@ -20953,7 +20954,7 @@ function _snapPrune(){
 }
 function _dailyBackup(){
   try{
-    if(!_stOk())return;   // v6.0.93 fail-closed
+    if(!_stOk()||!_isRulesOwner())return;   // v6.0.93 fail-closed；v6.0.97 Storage 規則 backups 只給擁有者 → 其他管理員不跑（避免靜默失敗）
     var today=localToday();   // v5.318 本地日期
     var month=today.slice(0,7);
     var needDaily=localStorage.getItem('fy_snap_date')!==today;
@@ -20983,6 +20984,7 @@ function _autoUpload(){
   if(!_fbUser||!_fbDb)return;
   if(window._applyingCloud)return; // 正在套用雲端資料，不要反向上傳
   _markDirty();
+  if(_roState!=='rw')return;   // v6.0.97：唯讀判定未確認前不推（與 _immediateUpload 一致，確認後由定時同步補上）
   clearTimeout(_autoUploadTimer);
   _autoUploadTimer=setTimeout(function(){ if(!window._applyingCloud)_pushCloud({silent:true}); },3000);
 }
@@ -36554,6 +36556,7 @@ function readerAdd(){
       toast('此信箱已在人員名冊中，請先移除人員再設為唯讀');return false;}
     _fbDb.ref('fydata/readers/'+_encEmailKey(em)).set(true).then(function(){
       toast('已加入唯讀帳號 '+em);logActivity('權限','新增唯讀帳號 '+em);_readersLoad();
+      showConfirm('還要改 Storage 規則','Storage 規則讀不到這份名冊：請到 Firebase 主控台 Storage → 規則，把 <b>'+esc(em)+'</b> 加進 <code>isReader()</code> 的信箱清單後發布（repo 的 storage.rules 同步改）。<br>沒加的話，這個帳號在 Storage 仍可上傳／刪除檔案。',function(){},false);
     }).catch(function(e){toast('新增失敗：'+((e&&e.message)||'')+'（需先發布新版安全規則）');});
   });
 }

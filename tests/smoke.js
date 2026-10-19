@@ -6783,6 +6783,8 @@ async function newPage(browser, width, height) {
         _fbUser = { email: 'ai@x.com', uid: 'uAI' }; await new Promise(res => _readerCheck(res));
         _stDel('a/b'); _dailyBackup(); _snapPrune(); _immediateUpload();
         out.stReader = st.length === 0 && _stOk() === false && _roState === 'reader';
+        _fbUser = { email: 'admin2@x.com', uid: 'uA2' }; _roState = 'rw'; const n0 = st.length; _dailyBackup(); _snapPrune(); out.ownerOnlyBackup = st.length === n0;
+        _fbUser = { email: 'ai@x.com', uid: 'uAI' }; _roState = 'reader';
         _fbUser = { email: 'net@x.com', uid: 'uN' }; const odb = _fbDb;
         _fbDb = { ref: p => ({ once: () => Promise.reject({ code: 'NETWORK_ERROR', message: 'offline' }) }) };
         out.pendCb = await new Promise(res => _readerCheck(res)) === false; _stDel('c/d');
@@ -6814,9 +6816,16 @@ async function newPage(browser, width, height) {
       const L = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8').split('\n');
       const dels = L.filter(l => /_fbStorage\.ref\([^)]*\)\.delete\(\)/.test(l));
       const puts = L.map((l, i) => /_fbStorage\.ref\(.*\)\.put(String)?\(|ref\.put\(file\)/.test(l) ? i : -1).filter(i => i >= 0);
+      const SR = require('fs').readFileSync(require('path').join(__dirname, '..', 'storage.rules'), 'utf8');
+      const src = L.join('\n'); const used = [...new Set((src.match(/(?:path=|_fbStorage\.ref\()'((?:fydata\/)?[a-z]+)\//g) || []).map(x => x.replace(/^(?:path=|_fbStorage\.ref\()'/, '').replace(/\/$/, '')))];
+      const usedF = used.filter(u => u !== 'fydata'); r.srUsed = usedF.join(',');
+      r.sr = !/match \/\{allPaths/.test(SR) && /match \/fydata\/backups\/\{file=\*\*\} \{\s*allow read, write: if isOwner\(\);/.test(SR)
+        && usedF.length >= 5 && usedF.every(u => u === 'fydata/backups' || (u.startsWith('fydata/') ? new RegExp("'" + u.split('/')[1] + "'").test(SR) : new RegExp('match /' + u + '/').test(SR)))
+        && /hsuanchen911@gmail\.com/.test(SR) && (SR.match(/!isReader\(\)/g) || []).length === 2;
       r.static = dels.length === 2 && dels.every(l => /function _stDel|kill\.forEach/.test(l)) && puts.length >= 4 && puts.every(i => L.slice(Math.max(0, i - 40), i).some(x => /_stOk\(\)/.test(x)));
     }
-    check('v6.0.93 唯讀 Storage fail-closed：唯讀／未確認／離線不上傳不刪檔、舊規則被拒＝一般帳號、只豁免擁有者、刪檔只經 _stDel', r.stReader && r.pendCb && r.stPending && r.oldRules && r.stRw && r.ownerSkip && r.static && r.inputCheck, JSON.stringify(r));
+    check('v6.0.93 唯讀 Storage fail-closed：唯讀／未確認／離線不上傳不刪檔、舊規則被拒＝一般帳號、只豁免擁有者、刪檔只經 _stDel', r.stReader && r.pendCb && r.stPending && r.oldRules && r.stRw && r.ownerSkip && r.static && r.inputCheck && r.ownerOnlyBackup, JSON.stringify(r));
+    check('v6.0.97 storage.rules：明確列出 app 用到的全部 Storage 資料夾、backups 只給擁有者（不再被萬用規則蓋過）、唯讀帳號不可寫', r.sr, JSON.stringify({ used: r.srUsed, sr: r.sr }));
     check('v6.0.90 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
