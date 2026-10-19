@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.90';
+var APP_VERSION='v6.0.93';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -164,6 +164,11 @@ window.addEventListener('unhandledrejection', function(e){
 var _fbApp=null,_fbAuth=null,_fbDb=null,_fbUser=null,_fbStorage=null;
 var _isAdminUser=false;
 var _isReaderUser=false;   // v6.0.90：唯讀帳號（fydata/readers 名冊，AI 助理用）——只下載 shared、一律不寫雲端
+var _roState='';   // v6.0.93：唯讀判定 ''未登入／'pending' 查詢中或失敗／'rw' 確認非唯讀／'reader'
+var _RULES_OWNER='jhchen0911@gmail.com';   // 與 database.rules.json／storage.rules 的擁有者信箱一致（唯一豁免唯讀檢查的帳號）
+// Storage 寫入／刪除一律 fail-closed：唯讀判定確認為一般帳號後才做（RTDB 寫入另有安全規則擋）
+function _stOk(){return !!(_fbUser&&_fbStorage&&_roState==='rw');}
+function _stDel(path){if(!path||!_stOk())return false;try{_fbStorage.ref(path).delete().catch(function(){/* 可忽略 */});return true;}catch(e){_err('_stDel',e);return false;}}
 var _awardedFilter=false;
 var _gToken=null,_gUser=null,_gFileId=null,_gTokenClient=null;
 var CONTRACTS=[],VENDORS=[],PAYABLES=[],INVOICE_RECS=[],ACTIVITY_LOG=[];
@@ -2257,7 +2262,7 @@ function _delQDo(id){
   // 連同雲端工作確認單檔案（best-effort，不阻擋刪除）
   try{
     if(_fbStorage)Q.filter(q=>_delIds.includes(q.id)).forEach(q=>{
-      (q.confirmFiles||[]).forEach(f=>{if(f.path){try{_fbStorage.ref(f.path).delete().catch(function(){});}catch(e){_err('_delQDo',e);}}});
+      (q.confirmFiles||[]).forEach(f=>{if(f.path)_stDel(f.path);});   // v6.0.93 唯讀／未確認不刪雲端檔
     });
   }catch(e){_err('_delQDo',e);}
   Q=Q.filter(q=>q.id!==id&&q.parentId!==id);
@@ -7808,7 +7813,7 @@ function initFirebase(){
     _fbUser = user;
     _updateFbUI(!!user);
     if(user) _autoSyncOnLogin();
-    else { _isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
+    else { _isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
   });
 }
 function initGoogleSignIn(){
@@ -7978,10 +7983,7 @@ function _autoSyncOnLogin(){
   // v6.0.90：先查唯讀名冊（fydata/readers）。唯讀帳號只下載 shared，不登記 uid、不讀 private、不上傳。
   _readerCheck(function(ro){
     if(ro){
-      _privReadOk=false;_privFailAt=Date.now();
-      try{localStorage.removeItem('fy_pending_sync');}catch(e){/* 可忽略 */}
-      try{_syncChip();}catch(e){/* 可忽略 */}
-      toast('唯讀帳號：只下載雲端資料，本機修改不會上傳');
+      _readerApply();
       _pullCloudIfNewer({interactive:false});
       return;
     }
@@ -7993,16 +7995,35 @@ function _autoSyncOnLogin(){
     });
   });
 }
-// v6.0.90：本帳號是否在唯讀名冊。查詢失敗（舊規則尚無此節點、離線）視同一般帳號——
-// 規則端另有「不在 readers 名冊」的寫入條件把關，前端判斷只是避免唯讀者一直撞拒絕。
+// v6.0.90：本帳號是否在唯讀名冊（只讀自己那一筆 key，新規則允許本人讀）。
+// v6.0.93 fail-closed：結果出來前與查詢失敗時 _roState='pending' → 不做 Storage 寫入／刪除、每日備份、立即上傳；
+// 被拒（PERMISSION_DENIED）＝舊規則尚無此節點 → 視同一般帳號；其他錯誤（離線）30 秒後重查。
+// 只豁免擁有者信箱（與安全規則同一個），其他系統管理員照樣查名冊。
 function _readerCheck(cb){
-  _isReaderUser=false;
+  _isReaderUser=false;_roState='pending';
+  var done=function(ro){_isReaderUser=!!ro;_roState=ro?'reader':'rw';if(cb){var c=cb;cb=null;c(!!ro);}};
   try{
-    if(!_fbUser||!_fbDb||!_fbUser.email||_isSysUser(_fbUser.email)){cb(false);return;}
+    if(!_fbUser||!_fbDb||!_fbUser.email){_roState='';if(cb)cb(false);return;}
+    if(String(_fbUser.email).toLowerCase()===_RULES_OWNER){done(false);return;}
+    var me=_fbUser.uid;
     _fbDb.ref('fydata/readers/'+_encEmailKey(_fbUser.email)).once('value').then(function(s){
-      _isReaderUser=s.val()===true;cb(_isReaderUser);
-    }).catch(function(){cb(false);});
-  }catch(e){_err('_readerCheck',e);cb(false);}
+      if(!_fbUser||_fbUser.uid!==me)return;
+      done(s.val()===true);
+    }).catch(function(err){
+      if(!_fbUser||_fbUser.uid!==me)return;
+      var denied=/permission/i.test(String((err&&(err.code||err.message))||''));
+      if(denied){done(false);return;}
+      if(cb){var c=cb;cb=null;c(false);}   // RTDB 照常同步（規則擋唯讀者寫入），Storage 維持關閉
+      setTimeout(function(){if(_fbUser&&_fbUser.uid===me&&_roState==='pending')_readerCheck(function(ro){if(ro)_readerApply();});},30000);
+    });
+  }catch(e){_err('_readerCheck',e);if(cb)cb(false);}
+}
+// 重查後才發現是唯讀帳號：補上唯讀模式
+function _readerApply(){
+  _privReadOk=false;_privFailAt=Date.now();
+  try{localStorage.removeItem('fy_pending_sync');}catch(e){/* 可忽略 */}
+  try{_syncChip();}catch(e){/* 可忽略 */}
+  toast('唯讀帳號：只下載雲端資料，本機修改不會上傳');
 }
 // 安全規則不能對 email 做字串處理（含「.」不能當 key），所以名冊改記 uid。
 // 只有本機判定為管理員的帳號才會寫入；規則允許名冊空的時候由第一個人建立（首次啟用用）。
@@ -20919,6 +20940,7 @@ var _SNAP_MONTH_RE=/^\d{4}-\d{2}-M\.json$/;
 function _snapPrune(){
   // v5.373：兩種快照分開輪替。原本 listAll 一律砍最舊的 30 份之外，
   // 加了月存以後會把長期槽一起砍掉，等於白做。
+  if(!_stOk())return;   // v6.0.93 fail-closed
   _fbStorage.ref('fydata/backups').listAll().then(function(res){
     var all=res.items.map(function(i){return i.name;});
     var daily=all.filter(function(n){return _SNAP_DAILY_RE.test(n);}).sort();
@@ -20931,7 +20953,7 @@ function _snapPrune(){
 }
 function _dailyBackup(){
   try{
-    if(!_fbUser||!_fbStorage||_isReaderUser)return;
+    if(!_stOk())return;   // v6.0.93 fail-closed
     var today=localToday();   // v5.318 本地日期
     var month=today.slice(0,7);
     var needDaily=localStorage.getItem('fy_snap_date')!==today;
@@ -20964,7 +20986,7 @@ function _autoUpload(){
   clearTimeout(_autoUploadTimer);
   _autoUploadTimer=setTimeout(function(){ if(!window._applyingCloud)_pushCloud({silent:true}); },3000);
 }
-function _immediateUpload(){ _markDirty(); _pushCloud({silent:true}); try{_dailyBackup();}catch(e){_err('_immediateUpload',e);} }
+function _immediateUpload(){ _markDirty(); if(_fbUser&&_roState!=='rw')return;   /* v6.0.93：唯讀判定未確認前不上傳（留待同步，確認後自動補） */ _pushCloud({silent:true}); try{_dailyBackup();}catch(e){_err('_immediateUpload',e);} }
 setTimeout(function(){try{_dailyBackup();}catch(e){_err('_immediateUpload',e);}},12000);
 
 // 寫入 Firebase 並在完成後執行 callback（委派到統一上傳）
@@ -25258,7 +25280,7 @@ function projUpload(type,qid){
       if(!f||!_projFileCtx)return;
       var ctx={type:_projFileCtx.type,qid:_projFileCtx.qid};
       // ── 正規路徑：Firebase Storage（登入且服務可用；上限 20MB；唯讀帳號不上傳）──
-      if(_fbUser&&_fbStorage&&!_isReaderUser){
+      if(_stOk()){
         if(f.size>20*1024*1024){toast('檔案過大（雲端上限 20MB）');return;}
         var safe=(f.name||'file').replace(/[^\w.\-\u4e00-\u9fff（）()]/g,'_');
         var path='fydata/projfiles/'+ctx.qid+'/'+ctx.type+'/'+Date.now()+'_'+safe;
@@ -25298,7 +25320,7 @@ function _projAttachMeta(qid,type,name,url,path){
     var ct=(CONTRACTS||[]).find(c=>c.linkedQid===qid)||(CONTRACTS||[]).find(c=>c.name===q.name);
     if(!ct){toast('尚未建立合約（報價標記得標時會自動建立）');return;}
     // 汰換舊雲端檔（best-effort）
-    if(ct.filePath&&_fbStorage){try{_fbStorage.ref(ct.filePath).delete().catch(function(){});}catch(e){_err('_projAttachMeta',e);}}
+    if(ct.filePath)_stDel(ct.filePath);
     ct.fileName=name;ct.fileUrl=url;ct.filePath=path;ct.fileTs=Date.now();
     delete ct.fileData;   // 移除舊內嵌，避免資料庫肥大
     _touch(ct);ct.updatedAt=Date.now();   // v5.314：漏戳會讓剛上傳的合約檔被其他裝置的舊資料蓋掉
@@ -25319,7 +25341,7 @@ function _projAttachFile(qid,type,name,dataUrl){
   if(type==='contract'){
     var ct=(CONTRACTS||[]).find(c=>c.linkedQid===qid)||(CONTRACTS||[]).find(c=>c.name===q.name);
     if(!ct){toast('尚未建立合約（報價標記得標時會自動建立）');return;}
-    if(ct.filePath&&_fbStorage){try{_fbStorage.ref(ct.filePath).delete().catch(function(){});}catch(e){_err('_projAttachFile',e);}}
+    if(ct.filePath)_stDel(ct.filePath);
     ct.fileName=name;ct.fileData=dataUrl;ct.fileTs=Date.now();
     delete ct.fileUrl;delete ct.filePath;
     _touch(ct);ct.updatedAt=Date.now();
@@ -25352,7 +25374,7 @@ function projDelConfirmFile(qid,idx){
   var q=Q.find(x=>x.id===qid);if(!q||!q.confirmFiles)return;
   showConfirm('刪除附件','確定刪除「'+esc(q.confirmFiles[idx]?.name||'')+'」？',()=>{
     var f=q.confirmFiles[idx];
-    if(f&&f.path&&_fbStorage){try{_fbStorage.ref(f.path).delete().catch(function(){});}catch(e){_err('projDelConfirmFile',e);}}
+    if(f&&f.path)_stDel(f.path);
     q.confirmFiles.splice(idx,1);_touch(q);persist();renderProjects();
     var el=document.getElementById('proj-detail-'+qid);if(el)el.style.display='block';
   });
@@ -25617,7 +25639,7 @@ function _payUpload(pid,kind){
           });
         });
       }
-      if(_fbUser&&_fbStorage&&!_isReaderUser){
+      if(_stOk()){
         if(f.size>20*1024*1024){toast('檔案過大（上限 20MB）');return;}
         var safe=(f.name||'file').replace(/[^\w.\-\u4e00-\u9fff（）()]/g,'_');
         var path='fydata/payfiles/'+pid2+'/'+Date.now()+'_'+safe;
@@ -25689,7 +25711,7 @@ function _payOpenFile(pid,idx){
 function _payDelFile(pid,idx){
   var p=PAYABLES.find(x=>x.id===pid);var f=p&&p.files&&p.files[idx];if(!f)return;
   showConfirm('刪除單據','刪除「'+esc(f.name||'')+'」？',function(){
-    if(f.path&&_fbStorage){try{_fbStorage.ref(f.path).delete().catch(function(){});}catch(e){_err('_payDelFile',e);}}
+    if(f.path)_stDel(f.path);
     p.files.splice(idx,1);
     try{savePayables();}catch(e){_err('_payDelFile',e);}
     renderPayables();
@@ -27164,7 +27186,7 @@ function _irUpload(f){
     rd.onload=function(){_irSetFile(nm,'',rd.result);toast('已附上發票影像（內嵌）');};
     rd.readAsDataURL(f);
   };
-  if(_fbUser&&_fbStorage&&!_isReaderUser){
+  if(_stOk()){
     if(f.size>20*1024*1024){toast('檔案過大（雲端上限 20MB）');return;}
     var safe=nm.replace(/[^\w.\-一-鿿（）()]/g,'_');
     var path='fydata/einv/'+Date.now()+'_'+safe;
@@ -36512,7 +36534,7 @@ function renderReadersBox(){
     +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
     +'<div style="font-weight:700;font-size:13.5px;flex:1">唯讀帳號（AI 助理）</div>'
     +'<button type="button" class="btn btn-xs btn-g" onclick="readerAdd()">＋ 新增唯讀帳號</button></div>'
-    +'<div style="font-size:11.5px;color:var(--b4);margin-bottom:8px">名冊內帳號只能讀取一般營運資料（報價、得標狀態等），不能寫入，也讀不到成本／毛利／單價庫等敏感資料。請勿把同一信箱加進人員名冊。</div>'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-bottom:8px">名冊內帳號可讀取雲端一般資料（fydata/shared）的全部內容：報價、請款、合約、客戶、廠商、人員名冊與角色、附件下載網址等；不能寫入任何資料，也讀不到成本／毛利／應付／分潤／單價庫等敏感資料（fydata/private）。Storage 檔案寫入另需在 storage.rules 的唯讀清單加入同一信箱。請勿把同一信箱加進人員名冊。</div>'
     +body+'</div></div>';
 }
 function _readersLoad(){
@@ -36526,8 +36548,8 @@ function readerAdd(){
   _modal('新增唯讀帳號','<div class="f"><label>登入信箱 <span style="color:var(--red)">*</span></label>'
     +'<input id="rdr-email" type="email" placeholder="AI 助理專用的 Google／Email 帳號"></div>',function(){
     var em=String((document.getElementById('rdr-email')||{}).value||'').trim().toLowerCase();
-    if(!em||em.indexOf('@')<0){toast('請輸入正確的登入信箱');return false;}
-    if(BOOTSTRAP_DEV.indexOf(em)>=0){toast('系統管理員帳號不能設為唯讀');return false;}
+    if(!/^[a-z0-9._%+\-]+@[a-z0-9\-]+(\.[a-z0-9\-]+)*\.[a-z]{2,}$/.test(em)){toast('信箱格式不正確（不可含空白或 # $ [ ] / 等字元）');return false;}
+    if(BOOTSTRAP_DEV.indexOf(em)>=0||em===_RULES_OWNER){toast('系統管理員帳號不能設為唯讀');return false;}
     if(listStaff().some(function(x){return String(x.email||'').toLowerCase()===em;})){
       toast('此信箱已在人員名冊中，請先移除人員再設為唯讀');return false;}
     _fbDb.ref('fydata/readers/'+_encEmailKey(em)).set(true).then(function(){
@@ -36969,7 +36991,7 @@ function uploadContractFile(file){
   if(progress)progress.style.display='block';
 
   // Storage 未初始化（專案未開通）或唯讀帳號 → 直接用本機儲存
-  if(!_fbStorage||_isReaderUser){toast('雲端儲存未開通，改用本機儲存');_saveFileAsBase64(file);return;}
+  if(!_stOk()){toast(_isReaderUser?'唯讀帳號不上傳雲端，改用本機儲存':'雲端儲存未開通，改用本機儲存');_saveFileAsBase64(file);return;}
 
   // 上傳路徑：contracts/{userId}/{timestamp}_{filename}
   const path='contracts/'+_fbUser.uid+'/'+Date.now()+'_'+file.name;

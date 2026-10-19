@@ -6745,7 +6745,7 @@ async function newPage(browser, width, height) {
     const RD = "root.child('fydata/readers')";
     const wr = [rules.shared['.write'], rules.relay['.write'], rules.relay['.read'], rules.private['.write'], rules.private['.read'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.backups['.write'], rules.logs['$uid']['.write']];
     check('v6.0.90 規則：readers 可讀 shared、所有寫入與 private／relay／backups 皆排除 readers 名冊、名冊僅管理員可寫',
-      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.private['.read'].includes('|| ' + RD) && rules.readers['.read'] === 'auth != null' && !rules.readers['.write'].includes('fydata/access'),
+      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.private['.read'].includes('|| ' + RD) && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
       '');
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -6778,12 +6778,45 @@ async function newPage(browser, width, height) {
         _fbUser = { email: 'other@x.com', uid: 'u2' };
         out.normal = (await new Promise(res => _readerCheck(res))) === false && _isReaderUser === false;
         out.fns = typeof readerAdd === 'function' && typeof readerDel === 'function';
+        /* v6.0.93 Storage fail-closed：唯讀／判定未確認／查詢失敗都不 put、不 delete；被拒（舊規則）＝一般帳號 */
+        const st = []; _fbStorage = { ref: p => ({ delete: () => { st.push('del ' + p); return Promise.resolve(); }, put: () => { st.push('put ' + p); return { on() { } }; }, putString: () => { st.push('putS ' + p); return Promise.resolve(); }, listAll: () => { st.push('list ' + p); return Promise.resolve({ items: [] }); } }) };
+        _fbUser = { email: 'ai@x.com', uid: 'uAI' }; await new Promise(res => _readerCheck(res));
+        _stDel('a/b'); _dailyBackup(); _snapPrune(); _immediateUpload();
+        out.stReader = st.length === 0 && _stOk() === false && _roState === 'reader';
+        _fbUser = { email: 'net@x.com', uid: 'uN' }; const odb = _fbDb;
+        _fbDb = { ref: p => ({ once: () => Promise.reject({ code: 'NETWORK_ERROR', message: 'offline' }) }) };
+        out.pendCb = await new Promise(res => _readerCheck(res)) === false; _stDel('c/d');
+        out.stPending = st.length === 0 && _roState === 'pending' && _stOk() === false;
+        _fbDb = { ref: p => ({ once: () => Promise.reject({ code: 'PERMISSION_DENIED', message: 'permission_denied' }) }) };
+        await new Promise(res => _readerCheck(res)); out.oldRules = _roState === 'rw';
+        _stDel('e/f'); out.stRw = st.join(',') === 'del e/f';
+        _fbDb = odb; _fbStorage = null;
+        /* 豁免只有擁有者：其他系統管理員照查名冊 */
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'uO' }; let asked = false; const odb2 = _fbDb;
+        _fbDb = { ref: p => ({ once: () => { asked = true; return Promise.resolve({ val: () => null }); } }) };
+        await new Promise(res => _readerCheck(res)); out.ownerSkip = !asked && _roState === 'rw'; _fbDb = odb2;
+        /* 靜態：Storage 刪檔只經 _stDel（備份輪替在 _snapPrune 內已擋）、每個上傳點前面都有 _stOk() */
+        /* 名冊輸入檢查 */
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'uO' }; _isReaderUser = false;
+        const wr2 = []; const odb3 = _fbDb; _fbDb = { ref: p => ({ set: v => { wr2.push(p); return Promise.resolve(); }, once: () => Promise.resolve({ val: () => ({}) }) }) };
+        readerAdd(); document.getElementById('rdr-email').value = 'a#b@x.com'; document.getElementById('fy-modal-o').click();
+        const still = !!document.getElementById('fy-modal');
+        document.getElementById('rdr-email').value = 'Good.AI@Example.com'; document.getElementById('fy-modal-o').click();
+        out.inputCheck = still && wr2.length === 1 && wr2[0] === 'fydata/readers/good,ai@example,com' && !document.getElementById('fy-modal');
+        _fbDb = odb3;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
       _fbUser = ou; _fbDb = od; _fbStorage = os; _isReaderUser = false; _readersCache = null; localStorage.removeItem('fy_pending_sync');
       return out;
     });
     check('v6.0.90 唯讀帳號：名冊判定、不上傳 shared／private／接力／名冊／動態／照片、不累積待同步、狀態列顯示「唯讀」', r.flag === true && r.notDirty && r.noWrite && r.photo && r.chip && r.normal, JSON.stringify(r));
     check('v6.0.90 唯讀名冊管理介面：僅管理員可見、列出名冊、唯讀者看不到', r.hideForReader && r.adminBox && r.fns, JSON.stringify(r));
+    {
+      const L = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8').split('\n');
+      const dels = L.filter(l => /_fbStorage\.ref\([^)]*\)\.delete\(\)/.test(l));
+      const puts = L.map((l, i) => /_fbStorage\.ref\(.*\)\.put(String)?\(|ref\.put\(file\)/.test(l) ? i : -1).filter(i => i >= 0);
+      r.static = dels.length === 2 && dels.every(l => /function _stDel|kill\.forEach/.test(l)) && puts.length >= 4 && puts.every(i => L.slice(Math.max(0, i - 40), i).some(x => /_stOk\(\)/.test(x)));
+    }
+    check('v6.0.93 唯讀 Storage fail-closed：唯讀／未確認／離線不上傳不刪檔、舊規則被拒＝一般帳號、只豁免擁有者、刪檔只經 _stDel', r.stReader && r.pendCb && r.stPending && r.oldRules && r.stRw && r.ownerSkip && r.static && r.inputCheck, JSON.stringify(r));
     check('v6.0.90 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

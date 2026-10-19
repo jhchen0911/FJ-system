@@ -1,0 +1,25 @@
+rules_version = '2';
+// Firebase Storage 安全規則（v6.0.93 起放在 repo；改完必須到 Firebase 主控台 Storage → 規則 貼上發布才生效）
+// Storage 規則讀不到 Realtime Database，所以唯讀帳號清單要寫死在這裡，
+// 與 RTDB 的 fydata/readers 名冊保持同一批信箱（新增／移除唯讀帳號時兩邊都要改）。
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null;
+    }
+    function isAdmin() {
+      return signedIn() && request.auth.token.email.lower() in ['jhchen0911@gmail.com'];
+    }
+    // 唯讀帳號（AI 助理）：可讀，不可寫入／覆蓋／刪除任何檔案
+    function isReader() {
+      return signedIn() && request.auth.token.email.lower() in ['hsuanchen911@gmail.com'];
+    }
+    match /fydata/backups/{file=**} {
+      allow read, write: if isAdmin();
+    }
+    match /{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && !isReader();
+    }
+  }
+}
