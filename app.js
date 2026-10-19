@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.89';
+var APP_VERSION='v6.0.90';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -163,6 +163,7 @@ window.addEventListener('unhandledrejection', function(e){
 // ═══ 前置宣告（避免 temporal dead zone）═══
 var _fbApp=null,_fbAuth=null,_fbDb=null,_fbUser=null,_fbStorage=null;
 var _isAdminUser=false;
+var _isReaderUser=false;   // v6.0.90：唯讀帳號（fydata/readers 名冊，AI 助理用）——只下載 shared、一律不寫雲端
 var _awardedFilter=false;
 var _gToken=null,_gUser=null,_gFileId=null,_gTokenClient=null;
 var CONTRACTS=[],VENDORS=[],PAYABLES=[],INVOICE_RECS=[],ACTIVITY_LOG=[];
@@ -7807,7 +7808,7 @@ function initFirebase(){
     _fbUser = user;
     _updateFbUI(!!user);
     if(user) _autoSyncOnLogin();
-    else { _isOwnerUser=false;_isAdminUser=false;try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
+    else { _isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
   });
 }
 function initGoogleSignIn(){
@@ -7974,19 +7975,41 @@ function _fbErrMsg(code){
 // v5.329：舊的「帳號管理」卡已移除——管理員資格改由部門推導（見 setDept／_syncAdminEmailsFromDepts），
 // 再放一份手動清單只會與部門互相覆蓋。相關的 renderAdminPanel／addAdmin／removeAdmin 一併刪除。
 function _autoSyncOnLogin(){
-  // v5.324：先確保管理員名冊有自己的 uid（安全規則靠 uid 判斷能否讀寫 fydata/private），
-  // 再開始同步——順序反了會先吃到一次拒絕，整個工作階段都以為自己沒權限。
-  _seedAdminUid(function(){
-    _privReadOk=null;
-    _pullCloudIfNewer({interactive:true});
+  // v6.0.90：先查唯讀名冊（fydata/readers）。唯讀帳號只下載 shared，不登記 uid、不讀 private、不上傳。
+  _readerCheck(function(ro){
+    if(ro){
+      _privReadOk=false;_privFailAt=Date.now();
+      try{localStorage.removeItem('fy_pending_sync');}catch(e){/* 可忽略 */}
+      try{_syncChip();}catch(e){/* 可忽略 */}
+      toast('唯讀帳號：只下載雲端資料，本機修改不會上傳');
+      _pullCloudIfNewer({interactive:false});
+      return;
+    }
+    // v5.324：先確保管理員名冊有自己的 uid（安全規則靠 uid 判斷能否讀寫 fydata/private），
+    // 再開始同步——順序反了會先吃到一次拒絕，整個工作階段都以為自己沒權限。
+    _seedAdminUid(function(){
+      _privReadOk=null;
+      _pullCloudIfNewer({interactive:true});
+    });
   });
+}
+// v6.0.90：本帳號是否在唯讀名冊。查詢失敗（舊規則尚無此節點、離線）視同一般帳號——
+// 規則端另有「不在 readers 名冊」的寫入條件把關，前端判斷只是避免唯讀者一直撞拒絕。
+function _readerCheck(cb){
+  _isReaderUser=false;
+  try{
+    if(!_fbUser||!_fbDb||!_fbUser.email||_isSysUser(_fbUser.email)){cb(false);return;}
+    _fbDb.ref('fydata/readers/'+_encEmailKey(_fbUser.email)).once('value').then(function(s){
+      _isReaderUser=s.val()===true;cb(_isReaderUser);
+    }).catch(function(){cb(false);});
+  }catch(e){_err('_readerCheck',e);cb(false);}
 }
 // 安全規則不能對 email 做字串處理（含「.」不能當 key），所以名冊改記 uid。
 // 只有本機判定為管理員的帳號才會寫入；規則允許名冊空的時候由第一個人建立（首次啟用用）。
 function _seedAdminUid(done){
   var fin=function(){if(done)done();};
   try{
-    if(!_fbUser||!_fbDb||!isAdmin(_fbUser.email)){fin();return;}
+    if(!_fbUser||!_fbDb||_isReaderUser||!isAdmin(_fbUser.email)){fin();return;}
     // v5.335 健檢F：改以 email 名冊（fydata/access／adminEmails）為主——set 整包覆蓋，
     // 移除人員／降級即時生效。adminUids 自我登記保留作舊規則過渡相容。
     _syncAccessLists(function(){
@@ -9780,13 +9803,14 @@ function _syncDropGuard(clean){
   return {msg:'即將上傳的資料量比上次少很多：<br><br>'+bad.join('<br>')};
 }
 function _isDirty(){
+  if(_isReaderUser)return false;   // v6.0.90：唯讀帳號永遠以雲端為準
   if(localStorage.getItem('fy_pending_sync')==='1')return true;
   var ls=parseInt(localStorage.getItem('fy_last_local_save')||'0');
   var lt=parseInt(localStorage.getItem('fy_last_fb_sync')||'0');
   return ls>lt;
 }
 function _markDirty(){
-  if(window._applyingCloud)return;
+  if(window._applyingCloud||_isReaderUser)return;   // v6.0.90：唯讀帳號不累積待上傳
   try{localStorage.setItem('fy_last_local_save',Date.now().toString());localStorage.setItem('fy_pending_sync','1');}catch(e){_err('_markDirty',e);}
 }
 function _applyCloud(data){
@@ -10171,7 +10195,7 @@ function _privRef(){return (_fbDb&&_fbUser)?_fbDb.ref('fydata/private'):null;}
 function _privHashKey(){return 'fy_priv_hash';}
 function _pushPrivate(cb){
   var ref=_privRef();
-  if(!ref){if(cb)cb(false);return;}
+  if(!ref||_isReaderUser){if(cb)cb(false);return;}
   if(_privReadOk===false&&Date.now()-_privFailAt<60000){if(cb)cb(false);return;}
   var clean,h;
   try{
@@ -10212,7 +10236,7 @@ function _pushPrivate(cb){
 }
 function _pullPrivate(cb){
   var ref=_privRef();
-  if(!ref){if(cb)cb(false);return;}
+  if(!ref||_isReaderUser){if(cb)cb(false);return;}   // v6.0.90：唯讀帳號讀不到 private，不必試
   ref.once('value').then(function(snap){
     _privReadOk=true;
     var d=snap.val();
@@ -10237,7 +10261,7 @@ function _purgeLegacySensitive(){
     // v5.335：原本一裝置只清一次；若還有裝置跑 v5.323 以前的版本，敏感資料會被
     // 寫回 shared 且沒人再清。改為每天清一次，直到全部裝置升級為止。
     if(localStorage.getItem('fy_priv_purged_d')===localToday())return;
-    if(!_fbDb||!_fbUser)return;
+    if(!_fbDb||!_fbUser||_isReaderUser)return;
     var nul={};_PRIV_COLLS.forEach(function(k){nul[k]=null;});
     _fbDb.ref('fydata/shared').update(nul).then(function(){
       try{localStorage.setItem('fy_priv_purged_d',localToday());}catch(e){_err('_purgeLegacySensitive',e);}
@@ -10252,7 +10276,7 @@ function _purgeLegacySensitive(){
 // 非管理員上傳自己新增的成本 → 管理員裝置同步時收進 private → 刪除接力記錄。
 function _pushRelayCosts(){
   try{
-    if(!_fbUser||!_fbDb)return;
+    if(!_fbUser||!_fbDb||_isReaderUser)return;
     if(isAdmin(_fbUser.email))return;            // 管理員直接走 private，不用接力
     var sent={};try{sent=JSON.parse(localStorage.getItem('fy_relay_sent')||'{}');}catch(e){_err('_pushRelayCosts',e);}
     var ups={},n=0;
@@ -10278,7 +10302,7 @@ function _pushRelayCosts(){
 // v5.437 公司費用（不掛專案）接力：非管理員在「日報．支出」登錄的 EXPENSES 走 fydata/relay/expenses
 function _pushRelayExpenses(){
   try{
-    if(!_fbUser||!_fbDb)return;
+    if(!_fbUser||!_fbDb||_isReaderUser)return;
     if(isAdmin(_fbUser.email))return;
     var sent={};try{sent=JSON.parse(localStorage.getItem('fy_relay_exp_sent')||'{}');}catch(e){_err('_pushRelayExpenses',e);}
     var ups={},n=0;
@@ -10355,7 +10379,7 @@ function _pullRelayCosts(){
 function _encEmailKey(e){return String(e||'').toLowerCase().replace(/\./g,',');}
 function _syncAccessLists(cb){
   try{
-    if(!_fbUser||!_fbDb||!isAdmin(_fbUser.email)){if(cb)cb(false);return;}
+    if(!_fbUser||!_fbDb||_isReaderUser||!isAdmin(_fbUser.email)){if(cb)cb(false);return;}
     var access={},admins={};
     listStaff().forEach(function(st){
       if(!st||st.active===false)return;
@@ -10375,6 +10399,13 @@ function _syncAccessLists(cb){
 
 function _pushCloud(opts){
   opts=opts||{};
+  // v6.0.90：唯讀帳號一律不上傳（shared／private／接力全部略過；規則端同樣拒絕 readers 寫入）
+  if(_isReaderUser){
+    try{localStorage.removeItem('fy_pending_sync');}catch(e){/* 可忽略 */}
+    if(!opts.silent)toast('唯讀帳號：不上傳雲端');
+    if(opts.onDone)opts.onDone(false);
+    return;
+  }
   // 他人更新偵測：雲端 ts 比本機新 → 先拉回合併再推，防止互相覆蓋
   if(_fbUser&&_fbDb&&!opts._merged&&!window._applyingCloud){
     try{
@@ -20900,7 +20931,7 @@ function _snapPrune(){
 }
 function _dailyBackup(){
   try{
-    if(!_fbUser||!_fbStorage)return;
+    if(!_fbUser||!_fbStorage||_isReaderUser)return;
     var today=localToday();   // v5.318 本地日期
     var month=today.slice(0,7);
     var needDaily=localStorage.getItem('fy_snap_date')!==today;
@@ -24651,8 +24682,8 @@ function logActivity(action, detail){
   ACTIVITY_LOG.unshift(entry);
   if(ACTIVITY_LOG.length>500)ACTIVITY_LOG=ACTIVITY_LOG.slice(0,500);
   saveActivityLog();
-  // 即時寫入 Firebase（讓所有用戶都看到）
-  if(_fbUser&&_fbDb){
+  // 即時寫入 Firebase（讓所有用戶都看到）；唯讀帳號不寫
+  if(_fbUser&&_fbDb&&!_isReaderUser){
     try{
       var uid=(_fbUser.uid||_fbUser.email||'unknown').replace(/[.#$\[\]@]/g,'_');
       _fbDb.ref('fydata/activity/'+uid+'/'+entry.id).set({
@@ -25226,8 +25257,8 @@ function projUpload(type,qid){
       var f=this.files&&this.files[0];this.value='';
       if(!f||!_projFileCtx)return;
       var ctx={type:_projFileCtx.type,qid:_projFileCtx.qid};
-      // ── 正規路徑：Firebase Storage（登入且服務可用；上限 20MB）──
-      if(_fbUser&&_fbStorage){
+      // ── 正規路徑：Firebase Storage（登入且服務可用；上限 20MB；唯讀帳號不上傳）──
+      if(_fbUser&&_fbStorage&&!_isReaderUser){
         if(f.size>20*1024*1024){toast('檔案過大（雲端上限 20MB）');return;}
         var safe=(f.name||'file').replace(/[^\w.\-\u4e00-\u9fff（）()]/g,'_');
         var path='fydata/projfiles/'+ctx.qid+'/'+ctx.type+'/'+Date.now()+'_'+safe;
@@ -25586,7 +25617,7 @@ function _payUpload(pid,kind){
           });
         });
       }
-      if(_fbUser&&_fbStorage){
+      if(_fbUser&&_fbStorage&&!_isReaderUser){
         if(f.size>20*1024*1024){toast('檔案過大（上限 20MB）');return;}
         var safe=(f.name||'file').replace(/[^\w.\-\u4e00-\u9fff（）()]/g,'_');
         var path='fydata/payfiles/'+pid2+'/'+Date.now()+'_'+safe;
@@ -27133,7 +27164,7 @@ function _irUpload(f){
     rd.onload=function(){_irSetFile(nm,'',rd.result);toast('已附上發票影像（內嵌）');};
     rd.readAsDataURL(f);
   };
-  if(_fbUser&&_fbStorage){
+  if(_fbUser&&_fbStorage&&!_isReaderUser){
     if(f.size>20*1024*1024){toast('檔案過大（雲端上限 20MB）');return;}
     var safe=nm.replace(/[^\w.\-一-鿿（）()]/g,'_');
     var path='fydata/einv/'+Date.now()+'_'+safe;
@@ -29196,6 +29227,7 @@ function _staffRoleNames(st){
   return (st.roles||[]).map(_roleById).filter(Boolean);
 }
 function renderStaffPage(){
+  try{renderReadersBox();}catch(e){_err('renderStaffPage',e);}
   var box=document.getElementById('staff-table');if(!box)return;
   var all=listStaff().slice();
   // 角色篩選下拉
@@ -34289,7 +34321,8 @@ function _syncChip(){
   var off=!navigator.onLine,dirty=false;try{dirty=_isDirty();}catch(e){_err('_syncChip',e);}
   var logged=(typeof _fbUser!=='undefined'&&!!_fbUser);
   var txt='',bg='';
-  if(off){txt='離線'+(dirty?'・未同步':'');bg='#c62828';}
+  if(logged&&_isReaderUser){txt='唯讀';bg='#546e7a';}
+  else if(off){txt='離線'+(dirty?'・未同步':'');bg='#c62828';}
   else if(dirty&&logged){txt='未同步';bg='#ff8f00';}
   else if(dirty&&!logged){txt='未登入・未同步';bg='#78909c';}
   if(txt){el.textContent=txt;el.style.background=bg;el.style.color='#fff';el.style.display='';}
@@ -34329,7 +34362,7 @@ function _photoPut(du){
   setTimeout(_phFlush,50);
   return 'ph:'+id;
 }
-function _phCanCloud(){return typeof _fbDb!=='undefined'&&!!_fbDb&&typeof _fbUser!=='undefined'&&!!_fbUser&&navigator.onLine!==false&&!window.FY_BETA;}
+function _phCanCloud(){return typeof _fbDb!=='undefined'&&!!_fbDb&&typeof _fbUser!=='undefined'&&!!_fbUser&&navigator.onLine!==false&&!window.FY_BETA&&!_isReaderUser;}
 function _phFlush(){
   if(window._phFlushing||!_phCanCloud())return;
   var q=_phPending();if(!q.length)return;
@@ -36452,6 +36485,64 @@ function _healthAdd689(R){   // 健檢：帳本記載已付但待付、近 14 �
 }
 try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{if(_paidLogSync())savePayables();else _payAuditLoadSnap();}catch(e){_err('paidLog.boot',e);}},1500);});}catch(e){_err('paidLog.boot',e);}
 
+// ── 唯讀帳號名冊（v6.0.90，AI 助理用）──
+// 名冊只存在雲端 fydata/readers（key＝_encEmailKey(email)，值 true），不進人員名冊／角色：
+// 安全規則讓名冊內帳號只能讀 fydata/shared，所有寫入規則都排除名冊內帳號。
+// 只有管理員看得到、也只有管理員（規則：擁有者／adminEmails）寫得進去。
+var _readersCache=null;
+function renderReadersBox(){
+  var box=document.getElementById('readers-box');if(!box)return;
+  var me=(_fbUser&&_fbUser.email)||'';
+  if(!me||!isAdmin(me)||_isReaderUser){box.style.display='none';return;}
+  box.style.display='';
+  var list=_readersCache;
+  var body;
+  if(list===null){body='<div style="font-size:12px;color:var(--b4)">讀取中…</div>';_readersLoad();}
+  else if(list===false){body='<div style="font-size:12px;color:#c62828">讀不到雲端名冊（新版安全規則尚未發布，或未連線）</div>';}
+  else{
+    var ks=Object.keys(list).filter(function(k){return list[k]===true;}).sort();
+    body=ks.length?ks.map(function(k){
+      var em=k.replace(/,/g,'.');
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--b1);font-size:12.5px">'
+        +'<span style="flex:1;word-break:break-all">'+esc(em)+'</span>'
+        +'<button type="button" class="btn btn-xs btn-r" onclick="readerDel(\''+escq(k)+'\')">移除</button></div>';
+    }).join(''):'<div style="font-size:12px;color:var(--b4)">尚無唯讀帳號</div>';
+  }
+  box.innerHTML='<div class="card"><div class="cb">'
+    +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
+    +'<div style="font-weight:700;font-size:13.5px;flex:1">唯讀帳號（AI 助理）</div>'
+    +'<button type="button" class="btn btn-xs btn-g" onclick="readerAdd()">＋ 新增唯讀帳號</button></div>'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-bottom:8px">名冊內帳號只能讀取一般營運資料（報價、得標狀態等），不能寫入，也讀不到成本／毛利／單價庫等敏感資料。請勿把同一信箱加進人員名冊。</div>'
+    +body+'</div></div>';
+}
+function _readersLoad(){
+  if(!_fbUser||!_fbDb){_readersCache=false;return;}
+  _fbDb.ref('fydata/readers').once('value').then(function(s){
+    _readersCache=s.val()||{};renderReadersBox();
+  }).catch(function(e){_err('_readersLoad',e);_readersCache=false;renderReadersBox();});
+}
+function readerAdd(){
+  if(!_fbUser||!_fbDb){toast('請先登入');return;}
+  _modal('新增唯讀帳號','<div class="f"><label>登入信箱 <span style="color:var(--red)">*</span></label>'
+    +'<input id="rdr-email" type="email" placeholder="AI 助理專用的 Google／Email 帳號"></div>',function(){
+    var em=String((document.getElementById('rdr-email')||{}).value||'').trim().toLowerCase();
+    if(!em||em.indexOf('@')<0){toast('請輸入正確的登入信箱');return false;}
+    if(BOOTSTRAP_DEV.indexOf(em)>=0){toast('系統管理員帳號不能設為唯讀');return false;}
+    if(listStaff().some(function(x){return String(x.email||'').toLowerCase()===em;})){
+      toast('此信箱已在人員名冊中，請先移除人員再設為唯讀');return false;}
+    _fbDb.ref('fydata/readers/'+_encEmailKey(em)).set(true).then(function(){
+      toast('已加入唯讀帳號 '+em);logActivity('權限','新增唯讀帳號 '+em);_readersLoad();
+    }).catch(function(e){toast('新增失敗：'+((e&&e.message)||'')+'（需先發布新版安全規則）');});
+  });
+}
+function readerDel(k){
+  var em=String(k||'').replace(/,/g,'.');
+  showConfirm('移除唯讀帳號','確定移除 <b>'+esc(em)+'</b>？移除後該帳號立即無法讀取雲端資料。',function(){
+    _fbDb.ref('fydata/readers/'+k).remove().then(function(){
+      toast('已移除 '+em);logActivity('權限','移除唯讀帳號 '+em);_readersLoad();
+    }).catch(function(e){toast('移除失敗：'+((e&&e.message)||''));});
+  });
+}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
@@ -36877,8 +36968,8 @@ function uploadContractFile(file){
   const label=document.getElementById('c-attachment-label');
   if(progress)progress.style.display='block';
 
-  // Storage 未初始化（專案未開通）→ 直接用本機儲存
-  if(!_fbStorage){toast('雲端儲存未開通，改用本機儲存');_saveFileAsBase64(file);return;}
+  // Storage 未初始化（專案未開通）或唯讀帳號 → 直接用本機儲存
+  if(!_fbStorage||_isReaderUser){toast('雲端儲存未開通，改用本機儲存');_saveFileAsBase64(file);return;}
 
   // 上傳路徑：contracts/{userId}/{timestamp}_{filename}
   const path='contracts/'+_fbUser.uid+'/'+Date.now()+'_'+file.name;

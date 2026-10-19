@@ -6739,6 +6739,55 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.90 唯讀帳號（AI 助理）：規則與前端唯讀模式 ──
+  {
+    const rules = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    const RD = "root.child('fydata/readers')";
+    const wr = [rules.shared['.write'], rules.relay['.write'], rules.relay['.read'], rules.private['.write'], rules.private['.read'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.backups['.write'], rules.logs['$uid']['.write']];
+    check('v6.0.90 規則：readers 可讀 shared、所有寫入與 private／relay／backups 皆排除 readers 名冊、名冊僅管理員可寫',
+      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.private['.read'].includes('|| ' + RD) && rules.readers['.read'] === 'auth != null' && !rules.readers['.write'].includes('fydata/access'),
+      '');
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const ou = _fbUser, od = _fbDb, os = _fbStorage;
+      try {
+        const writes = [];
+        const mk = path => ({
+          once: () => Promise.resolve({ val: () => (path === 'fydata/readers/ai@x,com' ? true : null) }),
+          set: v => { writes.push('set ' + path); return Promise.resolve(); },
+          update: v => { writes.push('update ' + path); return Promise.resolve(); },
+          remove: () => { writes.push('remove ' + path); return Promise.resolve(); },
+          child: c => mk(path + '/' + c)
+        });
+        _fbDb = { ref: mk }; _fbUser = { email: 'ai@x.com', uid: 'uAI' }; _fbStorage = null;
+        out.flag = await new Promise(res => _readerCheck(res));
+        localStorage.setItem('fy_pending_sync', '1');
+        out.notDirty = _isDirty() === false;
+        _markDirty(); _pushCloud({ silent: true }); _pushPrivate(); _pushRelayCosts(); _pushRelayExpenses(); _purgeLegacySensitive(); _syncAccessLists(); logActivity('測試', '唯讀'); _seedAdminUid();
+        await new Promise(r => setTimeout(r, 300));
+        out.noWrite = writes.length === 0; out.writes = writes.join(',');
+        out.photo = _phCanCloud() === false;
+        _syncChip(); const ch = document.getElementById('sync-chip'); out.chip = !ch || ch.textContent === '唯讀';
+        /* 管理員看得到名冊區塊、唯讀者看不到 */
+        go('staff'); out.hideForReader = document.getElementById('readers-box').style.display === 'none';
+        _isReaderUser = false; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'uOwn' };
+        _readersCache = { 'ai@x,com': true }; renderReadersBox();
+        const bx = document.getElementById('readers-box'); out.adminBox = bx.style.display !== 'none' && /ai@x\.com/.test(bx.innerHTML) && /唯讀帳號（AI 助理）/.test(bx.innerHTML);
+        /* 一般帳號（不在名冊）不受影響 */
+        _fbUser = { email: 'other@x.com', uid: 'u2' };
+        out.normal = (await new Promise(res => _readerCheck(res))) === false && _isReaderUser === false;
+        out.fns = typeof readerAdd === 'function' && typeof readerDel === 'function';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      _fbUser = ou; _fbDb = od; _fbStorage = os; _isReaderUser = false; _readersCache = null; localStorage.removeItem('fy_pending_sync');
+      return out;
+    });
+    check('v6.0.90 唯讀帳號：名冊判定、不上傳 shared／private／接力／名冊／動態／照片、不累積待同步、狀態列顯示「唯讀」', r.flag === true && r.notDirty && r.noWrite && r.photo && r.chip && r.normal, JSON.stringify(r));
+    check('v6.0.90 唯讀名冊管理介面：僅管理員可見、列出名冊、唯讀者看不到', r.hideForReader && r.adminBox && r.fns, JSON.stringify(r));
+    check('v6.0.90 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
