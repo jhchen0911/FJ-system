@@ -6959,10 +6959,18 @@ async function newPage(browser, width, height) {
           && INV.find(x => x.id === 'RT2').holdRetAmt === 2000 && _retentionRows().every(x => x.proj !== q.name || (x.pending + x.hold) === 0);
         /* 應收不被少算、現金依退還日、月報實收依退還月 */
         out.ar = _invAR(INV.find(x => x.id === 'RT3')) === ar0 && _retCashOn('2026-10') === 21000 && _retCashOn('2026-03') === 0;
+        /* v6.0.100 實收報表含另記退還：_invRcv／_invRcvIn、股東與現金口徑年度實收 */
+        const r3 = INV.find(x => x.id === 'RT3'); out.rcvAll = _invRcv(r3) === 5250 && _invRcvIn(r3, '2026-10') === 5250 && _invRcvIn(r3, '2026') === 5250 && _invRcvIn(r3, '2025') === 0
+          && _rptCashYear(2026).recv >= 21000;
+        /* 舊單已勾空白：編輯器填入 10、存檔不變 0 */
+        const lg = { id: 'LG1', quoteId: 'qRT', project: q.name, periodNo: 7, retention: true, items: [{ type: 'item', desc: 'x', unit: '式', contractQty: 1, contractPrice: 1000, curQty: 1, curAmt: 1000, payRate: 100 }], totals: { curTotal: 1000 }, received: '0' };
+        INV.push(lg); loadInvoice('LG1'); out.legEdit = document.getElementById('inv-retention-pct').value === '10';
+        /* 下一期不帶退還紀錄 */
+        out.nextClean = typeof addNextPeriod === 'function' && /delete next\.retentionSep/.test(addNextPeriod.toString());
         /* 已收款的退還單不可刪 */
         delInvoice(rd.id); out.delBlock = !!INV.find(x => x.id === rd.id);
         /* 發票做法 B：退還單另開發票（未稅＋稅額）、一般請款單總計區與列印列出扣保留款後發票金額 */
-        out.einv = /本次退還保留款另開立統一發票/.test(_retReturnDocHtml(rdN)) && /未稅/.test(_retReturnDocHtml(rdN)) && _einvSplit(23000).net === 21905 && _einvSplit(23000).tax === 1095
+        out.einv = /本次退還保留款另開立統一發票/.test(_retReturnDocHtml(rdN)) && /未稅/.test(_retReturnDocHtml(rdN)) && _einvSplit(21000).net === 20000 && _einvSplit(21000).tax === 1000 && /本次發票應開金額（僅預扣保留款 NT\$ 21,000）：未稅<\/td><td class="r">NT\$ 20,000/.test(_retReturnDocHtml(rdN)) && /業主當場扣款 NT\$ 2,000：該期已開立發票，本次不另開/.test(_retReturnDocHtml(rdN))
           && /當場扣款/.test(_retReturnDocHtml(rdN));
         const pv = { id: 'PV1', quoteId: 'qRT', project: q.name, periodNo: 9, retention: true, retentionPct: 5, items: [{ type: 'item', desc: '打設', unit: 'M', contractQty: 10, contractPrice: 1000, curQty: 10, curAmt: 10000, payRate: 100 }], cleanMode: 'net' };
         invItems = JSON.parse(JSON.stringify(pv.items)); invEid = 'PV1'; buildInvPreview(pv);
@@ -6991,7 +6999,7 @@ async function newPage(browser, width, height) {
     check('v6.0.92 退還條件／預計退還日：扣款設定欄位、保留款總覽顯示、過期未退標紅並進待辦', r.bar && r.over && r.ovHtml && r.todo, JSON.stringify(r));
     check('v6.0.92 請款單累計保留款（含本期）／已退說明', r.cum, JSON.stringify(r));
     check('v6.0.92 保留款退還請款單：一鍵產生累計未退、收款後各期自動標已退並入帳一次、可取消', r.doc && r.card && r.reuse && r.recv && r.toggle && r.undo && r.fns, JSON.stringify(r));
-    check('v6.0.95 保留款審查修正：退還另記現金（應收不少算、依退還日歸月）、含當場扣款、收款時重算並提示差異、已收款不可刪、退還單不算一期、舊記錄沖回、客戶%提醒', r.diffMsg && r.ar && r.delBlock && r.notPeriod && r.toggleLegacy && r.custWarn, JSON.stringify(r));
+    check('v6.0.95 保留款審查修正：退還另記現金（應收不少算、依退還日歸月）、含當場扣款、收款時重算並提示差異、已收款不可刪、退還單不算一期、舊記錄沖回、客戶%提醒', r.diffMsg && r.ar && r.delBlock && r.notPeriod && r.toggleLegacy && r.custWarn && r.rcvAll && r.legEdit && r.nextClean, JSON.stringify(r));
     check('v6.0.95 發票做法：每期開扣保留款後金額（未稅／稅額／合計，總計區與列印）、退還另開發票', r.einv && r.prevEinv, JSON.stringify(r));
     check('v6.0.92 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
