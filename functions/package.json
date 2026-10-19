@@ -1,0 +1,11 @@
+{
+  "name": "fj-system-functions",
+  "private": true,
+  "description": "豐有工程管理系統：依人員名冊自動設定 Firebase Auth custom claims（Storage 規則用）。部署：firebase deploy --only functions",
+  "main": "index.js",
+  "engines": { "node": "20" },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1"
+  }
+}

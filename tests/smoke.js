@@ -7088,6 +7088,34 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.105 任務 7：Storage 規則產生器（人員／唯讀清單＋custom claim）──
+  {
+    const fn = require('fs').readFileSync(require('path').join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    const fnOk = /fydata\/readers/.test(fn) && /fydata\/adminEmails/.test(fn) && /fydata\/access/.test(fn) && /setCustomUserClaims/.test(fn) && /'reader'/.test(fn) && /delete claims\.fy/.test(fn);
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const txt = _storageRulesText(['jhchen0911@gmail.com', 'a.b@x.com'], ['hsuanchen911@gmail.com']);
+        out.txt = /em\(\) in \['jhchen0911@gmail\.com', 'a\.b@x\.com'\]/.test(txt) && /'hsuanchen911@gmail\.com'/.test(txt) && !/match \/\{allPaths/.test(txt)
+          && /match \/fydata\/backups\/\{file=\*\*\} \{\s*allow read, write: if isOwner\(\);/.test(txt) && /get\('fy', ''\) in \['staff', 'admin'\]/.test(txt)
+          && (txt.match(/allow write: if isStaff\(\)/g) || []).length === 2 && /'projfiles', 'payfiles', 'einv'/.test(txt) && !/allow (read|write): if signedIn\(\)/.test(txt);
+        /* 名冊：停用人員不列、唯讀帳號從人員剔除、擁有者一定在 */
+        const p = _acct(); const o = p.__staff.slice();
+        p.__staff.push({ id: 'sx1', email: 'Work@X.com', active: true, roles: [] }, { id: 'sx2', email: 'gone@x.com', active: false, roles: [] }, { id: 'sx3', email: 'hsuanchen911@gmail.com', active: true, roles: [] });
+        _acctSave(p);
+        _readersCache = { 'hsuanchen911@gmail,com': true };
+        const L = _storageRulesLists();
+        out.lists = L.staff.indexOf('work@x.com') >= 0 && L.staff.indexOf('gone@x.com') < 0 && L.staff.indexOf('hsuanchen911@gmail.com') < 0 && L.staff.indexOf('jhchen0911@gmail.com') >= 0 && L.readers[0] === 'hsuanchen911@gmail.com';
+        p.__staff.length = 0; o.forEach(x => p.__staff.push(x)); _acctSave(p); _readersCache = null;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('v6.0.105 Storage 規則產生器：只放行人員名冊（claim 或清單）、唯讀只讀、陌生帳號全擋、backups 只給擁有者；functions 依三份名冊設定 claim', r.txt && r.lists && fnOk, JSON.stringify(r));
+    check('v6.0.105 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

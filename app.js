@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.104';
+var APP_VERSION='v6.0.105';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -8004,6 +8004,7 @@ function _fbErrMsg(code){
 // 再放一份手動清單只會與部門互相覆蓋。相關的 renderAdminPanel／addAdmin／removeAdmin 一併刪除。
 function _autoSyncOnLogin(){
   // v6.0.90：先查唯讀名冊（fydata/readers）。唯讀帳號只下載 shared，不登記 uid、不讀 private、不上傳。
+  try{if(_fbUser&&_fbUser.getIdToken)_fbUser.getIdToken(true).catch(function(){/* 可忽略：離線時沿用舊 token */});}catch(e){_err('_autoSyncOnLogin.token',e);}   // v6.0.105 取得最新 custom claims（Storage 規則用）
   _readerCheck(function(ro){
     if(ro){
       _readerApply();
@@ -36578,6 +36579,7 @@ function renderReadersBox(){
   box.innerHTML='<div class="card"><div class="cb">'
     +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
     +'<div style="font-weight:700;font-size:13.5px;flex:1">唯讀帳號（AI 助理）</div>'
+    +'<button type="button" class="btn btn-xs" onclick="openStorageRulesGen()" title="依目前人員名冊與唯讀名冊產生 Storage 規則全文">產生 Storage 規則</button> '
     +'<button type="button" class="btn btn-xs btn-g" onclick="readerAdd()">＋ 新增唯讀帳號</button></div>'
     +'<div style="font-size:11.5px;color:var(--b4);margin-bottom:8px">名冊內帳號可讀取雲端一般資料（fydata/shared）的全部內容：報價、請款、合約、客戶、廠商、人員名冊與角色、附件下載網址等；不能寫入任何資料，也讀不到成本／毛利／應付／分潤／單價庫等敏感資料（fydata/private）。Storage 檔案寫入另需在 storage.rules 的唯讀清單加入同一信箱。請勿把同一信箱加進人員名冊。</div>'
     +body+'</div></div>';
@@ -36953,6 +36955,70 @@ function _otCsv(){
   var rows=_otRows(year,month).map(function(r){return [r.k,r.nCust,r.n,r.won,r.rate==null?'':(Math.round(r.rate*10)/10),r.wonAmt,r.rev,r.rcv,r.cash==null?'':r.cash,r.tk==null?'':r.tk,r.lag==null?'':r.lag,r.retAvg==null?'':r.retAvg,r.retN,r.retOf];});
   downloadCSV('業主類型_'+year+(month?('-'+month):'')+'_'+fmtDateStr(),['業主類型','業主數','報價件數','得標件數','得標率%','得標金額','營收未稅','實收','平均現金%','平均票期天','平均放款天','平均保留款%','有扣保留款案數','得標案數'],rows);
 }
+// ── Storage 權限（v6.0.105 任務 7）：短期＝規則內寫明人員／唯讀信箱清單（由此產生，名冊變動後重新產生發布）；
+// 長期＝functions/index.js 依名冊設定 custom claim `fy`（staff／admin／reader），規則先看 claim、再看清單。
+var _ST_FOLDERS=['projfiles','payfiles','einv'];
+function _storageRulesText(staff,readers){
+  var q=function(a){return a.map(function(e){return "'"+String(e).toLowerCase().replace(/[^a-z0-9._%+\-@]/g,'')+"'";}).join(', ');};
+  var fl=q(_ST_FOLDERS);
+  return ["rules_version = '2';",
+    '// 由 FJ-system「人員管理 → 唯讀帳號卡 → 產生 Storage 規則」於 '+localToday()+' 產生（人員 '+staff.length+' 位、唯讀 '+readers.length+' 位）',
+    '// 人員或唯讀名冊有增減時請重新產生並到 Firebase 主控台 Storage → 規則 發布。',
+    '// 部署 functions（custom claims）後，claim fy 會自動跟著名冊，清單只當後備。',
+    'service firebase.storage {',
+    '  match /b/{bucket}/o {',
+    '    function signedIn() {',
+    '      return request.auth != null && request.auth.token.email != null;',
+    '    }',
+    '    function em() {',
+    '      return request.auth.token.email.lower();',
+    '    }',
+    '    function isOwner() {',
+    "      return signedIn() && em() in ['"+_RULES_OWNER+"'];",
+    '    }',
+    '    function isReader() {',
+    "      return signedIn() && (request.auth.token.get('fy', '') == 'reader' || em() in ["+q(readers)+"]);",
+    '    }',
+    '    function isStaff() {',
+    "      return signedIn() && !isReader() && (request.auth.token.get('fy', '') in ['staff', 'admin'] || em() in ["+q(staff)+"]);",
+    '    }',
+    '    match /fydata/backups/{file=**} {',
+    '      allow read, write: if isOwner();',
+    '    }',
+    '    match /fydata/{folder}/{rest=**} {',
+    '      allow read: if (isStaff() || isReader()) && folder in ['+fl+'];',
+    '      allow write: if isStaff() && folder in ['+fl+'];',
+    '    }',
+    '    match /contracts/{rest=**} {',
+    '      allow read: if isStaff() || isReader();',
+    '      allow write: if isStaff();',
+    '    }',
+    '  }',
+    '}',''].join('\n');
+}
+function _storageRulesLists(){
+  var staff=listStaff().filter(function(st){return st&&st.active!==false&&st.email;}).map(function(st){return String(st.email).toLowerCase();})
+    .concat(BOOTSTRAP_DEV,[_RULES_OWNER]).filter(function(e,i,a){return e&&a.indexOf(e)===i;});
+  var rc=(_readersCache&&typeof _readersCache==='object')?_readersCache:{};
+  var readers=Object.keys(rc).filter(function(k){return rc[k]===true;}).map(function(k){return k.replace(/,/g,'.');});
+  staff=staff.filter(function(e){return readers.indexOf(e)<0;});   // 唯讀帳號不會同時是人員
+  return {staff:staff,readers:readers};
+}
+function openStorageRulesGen(){
+  if(!_isRulesOwner()&&!(_fbUser&&isAdmin(_fbUser.email))){toast('只有管理員可產生');return;}
+  var go=function(){
+    var L=_storageRulesLists(),txt=_storageRulesText(L.staff,L.readers);
+    window._stRulesTxt=txt;
+    showConfirm('Storage 規則（人員 '+L.staff.length+' 位、唯讀 '+L.readers.length+' 位）',
+      '<div style="font-size:12px;color:var(--b4);margin-bottom:6px">只有下列人員能讀寫工程／應付／發票／合約附件；唯讀帳號只能讀；不在名冊的帳號一律擋下。複製全文 → Firebase 主控台 Storage → 規則 → 貼上 → 發布。人員有增減時請重新產生。</div>'
+      +'<textarea readonly style="width:100%;height:260px;font-family:monospace;font-size:11px;box-sizing:border-box">'+esc(txt)+'</textarea>'
+      +'<div style="margin-top:6px"><button type="button" class="btn btn-xs btn-g" onclick="_dlTextCopy(window._stRulesTxt)">複製全文</button></div>',function(){},false,null,true);
+  };
+  if(_readersCache===null&&_fbUser&&_fbDb){_fbDb.ref('fydata/readers').once('value').then(function(s){_readersCache=s.val()||{};go();}).catch(function(e){_err('openStorageRulesGen',e);go();});}
+  else go();
+}
+function _dlTextCopy(t){var done=function(){toast('已複製');};var fb=function(){try{var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();done();}catch(e){_err('_dlTextCopy',e);toast('複製失敗，請手動選取');}};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(done,fb);else fb();}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');

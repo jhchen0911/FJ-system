@@ -108,7 +108,7 @@
 
 ## 測試
 
-`tests/smoke.js`（659 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（661 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
@@ -121,7 +121,7 @@
 ## Firebase 安全規則
 
 `database.rules.json` 是原始碼，**改完必須到 Firebase 主控台手動發布才會生效**。
-Storage 規則同理放在 `storage.rules`（v6.0.93 起；主控台 Storage → 規則 貼上發布）。Storage 規則讀不到 RTDB，唯讀帳號清單 `isReader()` 要與 `fydata/readers` 名冊手動同步。
+Storage 規則同理放在 `storage.rules`（v6.0.93 起；主控台 Storage → 規則 貼上發布）。Storage 規則讀不到 RTDB，唯讀帳號清單 `isReader()` 要與 `fydata/readers` 名冊手動同步。v6.0.105 起人員管理頁「產生 Storage 規則」（`openStorageRulesGen`／`_storageRulesText`）依人員與唯讀名冊產生只放行名冊的規則；長期由 `functions/index.js`（custom claim `fy`）自動同步，部署步驟見 `docs/Storage權限_部署步驟.md`（`firebase deploy --only functions`）。
 目前規則：`fydata/shared`（名冊內可讀寫；`fydata/readers` 唯讀名冊只可讀）／`fydata/private`（僅管理員），readers 名冊內帳號一律不得寫入任何節點，兩者都不得整包清空，
 並要求 `version`／`uploadedAt` 的基本形態。
 
