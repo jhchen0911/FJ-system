@@ -6839,7 +6839,7 @@ async function newPage(browser, width, height) {
       try {
         P.vendorCutDay = 25; P.vendorPayDay = 25; P.vendorPayDelay = 1; P.subRetDef = 5;
         CUSTOMERS.push({ id: 'cB2B', name: '元昱測試營造', payDue: 25, payMonthDelay: 1, recvDay: 20, payTermCash: 0, payTermTicket: 30, retentionPct: 10 });
-        const q = { id: 'qB2B', name: '背對背測試案', client: '元昱測試營造', awarded: true, items: [{ desc: 'H型鋼樁打設', unit: 'M', qty: 100, price: 500 }], deduct: { retCond: '拆除拔除完成、驗收後 30 日內一次無息退還' } };
+        const q = { id: 'qB2B', name: '背對背測試案', client: '元昱測試營造', awarded: true, items: [{ desc: 'H型鋼樁打設', unit: 'M', qty: 100, price: 500 }], deduct: { ret: 10, retCond: '拆除拔除完成、驗收後 30 日內一次無息退還' } };
         const q0 = { id: 'qB2B0', name: '舊案', client: '無條件業主', awarded: true, items: [] };
         Q.push(q, q0);
         /* 客戶資料帶入：100% 30 天期票、次月 20 日放款、保留 10% */
@@ -6873,7 +6873,9 @@ async function newPage(browser, width, height) {
         /* v6.0.96 裝設請款％：營造廠 80 → 包商預設 80；包商 90 提醒先墊 10%；空白＝公司預設 90；合約與詢價單寫出分段 */
         q.ownerPay = { instPct: 80 }; const ci = _rfqCond(null);
         out.inst = ci.instPct === 80 && _b2bIssues(q, Object.assign({}, ci, { instPct: 90 })).some(x => /包商裝設完成先拿 90%，比營造廠的 80% 多 10%（豐有先墊）/.test(x)) && !_b2bIssues(q, ci).some(x => /裝設/.test(x))
-          && _b2bIssues(q, Object.assign({}, ci, { instPct: null })).some(x => /先拿 90%/.test(x)) && /裝設（打設）完成請款 80%，拆除（拔除）完成請款 20%/.test(_rfqCondLines({ cond: ci }).join(''));
+          && !_b2bIssues(q, Object.assign({}, ci, { instPct: null })).some(x => /裝設/.test(x)) && /裝設（打設）完成請款 80%，拆除（拔除）完成請款 20%/.test(_rfqCondLines({ cond: ci }).join(''));
+        out.retB = _ownerTerms({ id: 'zr', client: '元昱測試營造', ownerPay: { day: 20 } }).ret === null && _ownerTerms(q).ret === 10;
+        out.b2bFlag = !_ownerPaySet({ deduct: { ret: 10 } }) && !_ownerPaySet({ ownerPay: { day: null } }) && _ownerPaySet({ ownerPay: { day: 20 } });
         q.ownerPay = {}; out.instDef = _ownerTerms(q).instPct === 90 && _ownerTerms({ id: 'z', client: '無', ownerPay: { instPct: 80 } }).instPct === 80;
         out.instSct = /裝設（打設）完成時計價 80%，拆除（拔除）完成時計價其餘 20%/.test(_sctPayTxt(Object.assign({}, cost, { payTerm: { cashPct: 0, ticketPct: 100, ticketDays: 30, instPct: 80 } }), _sctCfg(), q))
           && !/分段計價/.test(_sctPayTxt(Object.assign({}, cost, { b2b: 0, payTerm: { cashPct: 0, ticketPct: 100, ticketDays: 30, instPct: 80 } }), _sctCfg(), q)) && /裝設請款/.test(_pjOwnerPayHtml(q));
@@ -6898,8 +6900,100 @@ async function newPage(browser, width, height) {
     check('v6.0.91 分包合約：付款比例＋保留款同步退還、第九條營造廠罰款轉嫁；舊案無條件＝公司預設原文', r.sct && r.art9 && r.legacy, JSON.stringify(r));
     check('v6.0.94 背對背審查修正：舊卡（客戶有付款規則）合約不變、退還時點清空兩邊一致、實際日曆日、計價日提醒、不產生 0 天期票', r.oldCard && r.blankRet && r.cal && r.cut && r.td0 && r.noZero, JSON.stringify(r));
     check('v6.0.96 裝設請款％：營造廠付款條件可填（空白＝90）、包商預設不高於營造廠、較高時提醒先墊、詢價單與合約寫出分段比例（舊卡不變）', r.inst && r.instDef && r.instSct, JSON.stringify(r));
+    check('v6.0.100 合併口徑：背對背保留款只看專案（客戶資料不帶入）、只有填營造廠付款條件才標背對背卡', r.retB && r.b2bFlag, JSON.stringify(r));
     check('v6.0.91 專案頁營造廠付款條件列與退還條件欄', r.ui && r.set, JSON.stringify(r));
     check('v6.0.91 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.92 業主保留款規則：預設 0／跟隨專案、>10% 提醒、退還條件與預計退還日、累計說明、退還請款單 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const oQ = Q.slice(), oI = INV.slice();
+      try {
+        const q = { id: 'qRT', name: '保留款測試案', client: '元昱測試', awarded: true, items: [], deduct: { ret: 5, retCond: '拆除拔除完成、驗收後 30 日內一次無息退還', retDue: '2020-01-01' } };
+        const q2 = { id: 'qRT2', name: '無扣款案', client: '乙', awarded: true, items: [] };
+        Q.push(q, q2);
+        /* 3-1 預設：空白跟隨專案、專案無＝0、明確 0＝0、舊數值不動 */
+        out.pct = _retPctOf({ quoteId: 'qRT' }) === 5 && _retPctOf({ quoteId: 'qRT2' }) === 0 && _retPctOf({ project: '查無此案' }) === 0
+          && _retPctOf({ quoteId: 'qRT', retentionPct: 0 }) === 0 && _retPctOf({ quoteId: 'qRT', retentionPct: '' }) === 5 && _retPctOf({ retentionPct: 10 }) === 10;
+        const leg = { id: 'L1', project: '舊案', retention: true, items: [{ type: 'item', curQty: 1, contractPrice: 1000, payRate: 100 }] };
+        _recalcInvAmounts(leg); out.legacy = leg.retentionPct === undefined && Math.round(leg.totals.retention) === 105 && _retPctOf({ quoteId: 'qRT', retention: true }) === 10 && leg._mt === undefined;
+        CUSTOMERS.push({ id: 'cRT', name: '丙業主', retentionPct: 3 }); out.cust = _ownerRetPct({ client: '丙業主' }) === 0 && _ownerRetPct({ client: '丙業主', deduct: { ret: '' } }) === 0 && _ownerRetPct({ client: '丙業主', deduct: { ret: 7 } }) === 7 && _retPctOf({ client: '丙業主', project: '查無' }) === 0 && !/c\.retentionPct/.test(applyCustomerByName.toString()); CUSTOMERS = CUSTOMERS.filter(x => x.id !== 'cRT');
+        const z = { id: 'Z1', project: '零', retention: true, retentionPct: 0, items: [{ type: 'item', curQty: 1, contractPrice: 1000, payRate: 100 }] };
+        _recalcInvAmounts(z); out.zero = z.totals.retention === 0;
+        /* 3-2 超過 10% 提醒（不擋） */
+        _retWarn(12); const bx = document.getElementById('gen-confirm-box'); out.warn = !!bx && /超過 10%，請確認已與業主談過/.test(bx.innerHTML);
+        try { document.getElementById('gen-confirm-cancel').click(); } catch (e) { }
+        pjDeductSet('qRT2', 'ret', '15'); out.warnSaved = q2.deduct.ret === '15' && /超過 10%/.test(document.getElementById('gen-confirm-box').innerHTML);
+        try { document.getElementById('gen-confirm-cancel').click(); } catch (e) { }
+        q2.deduct = {};
+        /* 3-3 扣款設定欄位、總覽顯示、逾期標紅＋待辦 */
+        const dh = _pjDeductHtml(q); out.bar = /保留款退還條件/.test(dh) && /預計退還日/.test(dh);
+        const mk = (id, no, ret) => ({ id, quoteId: 'qRT', project: q.name, client: q.client, periodNo: no, date: '2026-0' + no + '-25', retention: true, retentionPct: ret, items: [], totals: { curTotal: 100000, tax: 5000, total: 100000, retention: 0 }, received: '0', _mt: 1 });
+        INV.push(mk('RT1', 1, 5), mk('RT2', 2, 5), mk('RT3', 3, 5));
+        const row = _retentionRows().find(x => x.proj === q.name);
+        out.over = !!row && row.overdue && row.cond === q.deduct.retCond && row.pending === 15750;
+        renderRetention(); const rl = document.getElementById('finance-retention-list'); out.ovHtml = !rl || (/已過期未退/.test(rl.innerHTML) && /拆除拔除完成/.test(rl.innerHTML) && /產生保留款退還請款單/.test(rl.innerHTML));
+        const items = []; _v6TodoItems(items); out.todo = items.some(x => x.type === 'ret_due' && /保留款測試案/.test(x.text));
+        /* 3-4 累計（含本期）／已退 */
+        INV.find(x => x.id === 'RT1').retentionReturned = true;
+        const cm = _retCum(INV.find(x => x.id === 'RT3'), 5250); out.cum = cm.acc === 15750 && cm.back === 5250 && _retCumTxt(cm) === '累計保留款（含本期）NT$ 15,750，已退 NT$ 5,250';
+        INV.find(x => x.id === 'RT1').retentionReturned = false;
+        /* 3-5 退還請款單：累計未退、條件、本單不算營收／應收；收款＝各期與 toggleRetentionReturn 相同入帳，不重複 */
+        retReturnCreate('qRT'); const rd = INV.find(x => x.kind === 'retReturn' && x.quoteId === 'qRT');
+        out.doc = !!rd && rd.retRet.amt === 15750 && rd.retRet.rows.length === 3 && rd.totals.total === 0 && /拆除拔除完成/.test(_retReturnDocHtml(rd)) && /NT\$ 15,750/.test(_retReturnDocHtml(rd));
+        out.card = /保留款退還請款單/.test(_retReturnCard(rd)) && /登錄收款/.test(_retReturnCard(rd));
+        out.reuse = (retReturnCreate('qRT'), INV.filter(x => x.kind === 'retReturn' && x.quoteId === 'qRT').length === 1);
+        /* 業主當場扣款併入（第 2 期收款時扣 2,000）；之後新增第 4 期 → 收款時以當下金額重算並提示差異 */
+        INV.find(x => x.id === 'RT2').recvHold = 2000; INV.push(mk('RT4', 4, 5));
+        const ar0 = _invAR(INV.find(x => x.id === 'RT3'));
+        out.delBlock0 = true;
+        retReturnReceive(rd.id); out.diffMsg = /差 NT\$ 7,250/.test(document.getElementById('gen-confirm-box').innerHTML);
+        document.getElementById('rr-date').value = '2026-10-19'; document.getElementById('gen-confirm-ok').click();
+        const srcs = ['RT1', 'RT2', 'RT3', 'RT4'].map(id => INV.find(x => x.id === id));
+        const rdN = INV.find(x => x.id === rd.id);
+        out.recv = rdN.retRet.done && rdN.retRet.amt === 23000 && srcs.every(x => x.retentionReturned && parseFloat(x.received) === 0 && x.retentionReceivedAmt === 5250 && x.retentionReturnedDate === '2026-10-19')
+          && INV.find(x => x.id === 'RT2').holdRetAmt === 2000 && _retentionRows().every(x => x.proj !== q.name || (x.pending + x.hold) === 0);
+        /* 應收不被少算、現金依退還日、月報實收依退還月 */
+        out.ar = _invAR(INV.find(x => x.id === 'RT3')) === ar0 && _retCashOn('2026-10') === 21000 && _retCashOn('2026-03') === 0;
+        /* 已收款的退還單不可刪 */
+        delInvoice(rd.id); out.delBlock = !!INV.find(x => x.id === rd.id);
+        /* 發票做法 B：退還單另開發票（未稅＋稅額）、一般請款單總計區與列印列出扣保留款後發票金額 */
+        out.einv = /本次退還保留款另開立統一發票/.test(_retReturnDocHtml(rdN)) && /未稅/.test(_retReturnDocHtml(rdN)) && _einvSplit(23000).net === 21905 && _einvSplit(23000).tax === 1095
+          && /當場扣款/.test(_retReturnDocHtml(rdN));
+        const pv = { id: 'PV1', quoteId: 'qRT', project: q.name, periodNo: 9, retention: true, retentionPct: 5, items: [{ type: 'item', desc: '打設', unit: 'M', contractQty: 10, contractPrice: 1000, curQty: 10, curAmt: 10000, payRate: 100 }], cleanMode: 'net' };
+        invItems = JSON.parse(JSON.stringify(pv.items)); invEid = 'PV1'; buildInvPreview(pv);
+        const ph = document.getElementById('inv-prev-html').innerHTML; out.prevEinv = /本期發票應開金額（扣保留款後）：未稅 NT\$ 9,500、稅額 NT\$ 475、合計 NT\$ 9,975/.test(ph) && /累計保留款（含本期）/.test(ph);
+        /* 客戶資料保留款% 超過 10% 也提醒 */
+        out.custWarn = typeof saveCustomer === 'function' && /_retWarn\(obj\.retentionPct\)/.test(saveCustomer.toString());
+        /* toggleRetentionReturn 同一入帳邏輯 */
+        const t1 = mk('RT9', 9, 5); INV.push(t1); const b = document.createElement('button'); toggleRetentionReturn('RT9', b);
+        out.toggle = t1.retentionReturned && parseFloat(t1.received) === 0 && t1.retentionReceivedAmt === 5250 && t1.retentionSep === 1; toggleRetentionReturn('RT9', b); out.toggle = out.toggle && !t1.retentionReturned && !t1.retentionReceivedAmt;
+        /* 舊記錄（v6.0.94 以前已加進 received）取消時照舊沖回 */
+        const t2 = Object.assign(mk('RT8', 8, 5), { retentionReturned: true, retentionReceivedAmt: 5250, received: '105250' }); INV.push(t2); toggleRetentionReturn('RT8', b);
+        out.toggleLegacy = parseFloat(t2.received) === 100000 && !t2.retentionReturned;
+        retReturnUndo(rd.id); document.getElementById('gen-confirm-ok').click();
+        /* renderInvList 會從儲存重讀 INV → 重新取物件 */
+        const rd2 = INV.find(x => x.id === rd.id), srcs2 = ['RT1', 'RT2', 'RT3', 'RT4'].map(id => INV.find(x => x.id === id));
+        out.undo = !rd2.retRet.done && srcs2.every(x => !x.retentionReturned && !x.retentionReceivedAmt && parseFloat(x.received) === 0) && !INV.find(x => x.id === 'RT2').holdRetAmt;
+        out.fns = typeof openRetReturnDoc === 'function';
+        /* 退還單不算一期：專案期別、本月未開單、共 N 期 */
+        out.notPeriod = !_invsOfQuoteAll(q).some(x => x.kind === 'retReturn');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 700); }
+      Q.length = 0; oQ.forEach(x => Q.push(x)); INV.length = 0; oI.forEach(x => INV.push(x));
+      return out;
+    });
+    check('v6.0.92 保留款預設：空白跟隨專案扣款設定、專案無＝0（不扣）、明確 0＝0、舊單勾選空白維持 10%', r.pct && r.legacy && r.zero && r.cust, JSON.stringify(r));
+    check('v6.0.92 保留款超過 10% 提醒（請款單／專案扣款設定），照存不擋', r.warn && r.warnSaved, JSON.stringify(r));
+    check('v6.0.92 退還條件／預計退還日：扣款設定欄位、保留款總覽顯示、過期未退標紅並進待辦', r.bar && r.over && r.ovHtml && r.todo, JSON.stringify(r));
+    check('v6.0.92 請款單累計保留款（含本期）／已退說明', r.cum, JSON.stringify(r));
+    check('v6.0.92 保留款退還請款單：一鍵產生累計未退、收款後各期自動標已退並入帳一次、可取消', r.doc && r.card && r.reuse && r.recv && r.toggle && r.undo && r.fns, JSON.stringify(r));
+    check('v6.0.95 保留款審查修正：退還另記現金（應收不少算、依退還日歸月）、含當場扣款、收款時重算並提示差異、已收款不可刪、退還單不算一期、舊記錄沖回、客戶%提醒', r.diffMsg && r.ar && r.delBlock && r.notPeriod && r.toggleLegacy && r.custWarn, JSON.stringify(r));
+    check('v6.0.95 發票做法：每期開扣保留款後金額（未稅／稅額／合計，總計區與列印）、退還另開發票', r.einv && r.prevEinv, JSON.stringify(r));
+    check('v6.0.92 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
