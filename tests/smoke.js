@@ -6754,7 +6754,7 @@ async function newPage(browser, width, height) {
           && _retPctOf({ quoteId: 'qRT', retentionPct: 0 }) === 0 && _retPctOf({ quoteId: 'qRT', retentionPct: '' }) === 5 && _retPctOf({ retentionPct: 10 }) === 10;
         const leg = { id: 'L1', project: '舊案', retention: true, items: [{ type: 'item', curQty: 1, contractPrice: 1000, payRate: 100 }] };
         _recalcInvAmounts(leg); out.legacy = leg.retentionPct === undefined && Math.round(leg.totals.retention) === 105 && _retPctOf({ quoteId: 'qRT', retention: true }) === 10 && leg._mt === undefined;
-        CUSTOMERS.push({ id: 'cRT', name: '丙業主', retentionPct: 3 }); out.cust = _ownerRetPct({ client: '丙業主' }) === 3 && _ownerRetPct({ client: '丙業主', deduct: { ret: '' } }) === 3 && _ownerRetPct({ client: '丙業主', deduct: { ret: 0 } }) === 0; CUSTOMERS = CUSTOMERS.filter(x => x.id !== 'cRT');
+        CUSTOMERS.push({ id: 'cRT', name: '丙業主', retentionPct: 3 }); out.cust = _ownerRetPct({ client: '丙業主' }) === 0 && _ownerRetPct({ client: '丙業主', deduct: { ret: '' } }) === 0 && _ownerRetPct({ client: '丙業主', deduct: { ret: 7 } }) === 7 && _retPctOf({ client: '丙業主', project: '查無' }) === 0 && !/c\.retentionPct/.test(applyCustomerByName.toString()); CUSTOMERS = CUSTOMERS.filter(x => x.id !== 'cRT');
         const z = { id: 'Z1', project: '零', retention: true, retentionPct: 0, items: [{ type: 'item', curQty: 1, contractPrice: 1000, payRate: 100 }] };
         _recalcInvAmounts(z); out.zero = z.totals.retention === 0;
         /* 3-2 超過 10% 提醒（不擋） */

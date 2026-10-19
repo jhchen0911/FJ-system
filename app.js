@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.95';
+var APP_VERSION='v6.0.99';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -300,12 +300,9 @@ function _taxM(){return 1+_taxR()/100;}
 // 記錄上空白＋已勾保留款＝v6.0.92 以前的舊單（舊版存檔一律寫數字，空白只出現在更早的資料），照原本 10% 計，金額不變
 function _retPctOf(inv){var v=inv&&inv.retentionPct;if(v!=null&&v!=='')return parseFloat(v)||0;if(inv&&inv.retention&&inv.kind!=='retReturn')return 10;return _ownerRetPct(_retQOf(inv));}
 function _retQOf(inv){if(!inv||typeof Q==='undefined')return null;var id=inv.quoteId||inv.sourceQid;return (id&&Q.find(function(x){return x.id===id;}))||(inv.project?Q.find(function(x){return !x.parentId&&x.name===inv.project;}):null)||null;}
-// 業主扣保留款%（全站單一口徑，業主請款與分包背對背共用）：專案「業主扣款設定」→ 客戶資料保留款% → 0（都沒寫＝不扣）
-function _ownerRetPct(q){
-  var r=q&&q.deduct&&q.deduct.ret;if(r!=null&&r!=='')return parseFloat(r)||0;
-  var n=String((q&&q.client)||'').trim(),c=n&&typeof CUSTOMERS!=='undefined'?(CUSTOMERS||[]).find(function(x){return x&&x.name===n;}):null;
-  var cr=c&&c.retentionPct;return (cr!=null&&cr!=='')?(parseFloat(cr)||0):0;
-}
+// 業主扣保留款%（全站單一口徑，業主請款與分包背對背共用）：只看專案「業主扣款設定」，沒有＝0（合約沒寫＝不扣）。
+// v6.0.99 Lotion 定案：客戶資料的保留款% 僅供參考、不自動帶入（合約條件之後由合約自動帶入專案）
+function _ownerRetPct(q){var r=q&&q.deduct&&q.deduct.ret;return (r!=null&&r!=='')?(parseFloat(r)||0):0;}
 
 // 業主保留款（含稅基礎；已退還者不計）
 function _invRetention(inv){
@@ -4055,12 +4052,12 @@ function saveCustomer(){
   }
   saveCustomers();
   document.getElementById('customer-modal').style.display='none';
-  if(obj.retentionPct!=null)_retWarn(obj.retentionPct);   // v6.0.95 客戶資料保留款% 也提醒
+  if(obj.retentionPct!=null)_retWarn(obj.retentionPct);   // v6.0.95 客戶資料保留款% 也提醒（僅供參考）
   renderCustomers();
   toast('✓ 客戶資料已儲存');
   // ── 連動：付款規則同步至該業主的合約與請款單（個別修改過的之後仍以個別設定為準）──
   try{
-    const hasRule=obj.payDue!=null||obj.payMonthDelay!=null||obj.recvDay!=null||obj.payTermCash!=null||obj.payTermTicket!=null||obj.retentionPct!=null;
+    const hasRule=obj.payDue!=null||obj.payMonthDelay!=null||obj.recvDay!=null||obj.payTermCash!=null||obj.payTermTicket!=null;   // v6.0.99 保留款% 不同步
     const relC=CONTRACTS.filter(c=>c.client===name);
     const relI=INV.filter(v=>v.client===name&&!v.receivedConfirmed);
     if(id&&hasRule&&(relC.length||relI.length)){
@@ -4069,7 +4066,7 @@ function saveCustomer(){
       showConfirm('同步付款規則',
         '要將「'+esc(name)+'」的付款規則同步到關聯資料嗎？<br><br>'
         +'・合約 '+relC.length+' 份（現金%／票期）<br>'
-        +'・未收款請款單 '+relI.length+' 張（計價日／付款月／付款日／現金%／票期／保留款%）<br><br>'
+        +'・未收款請款單 '+relI.length+' 張（計價日／付款月／付款日／現金%／票期；保留款% 僅供參考、不同步）<br><br>'
         +'同步後，個別合約或請款單仍可單獨修改，之後以個別設定為準。',
         function(){
         relC.forEach(c=>{
@@ -4083,7 +4080,6 @@ function saveCustomer(){
           if(obj.recvDay!=null)v.recvDay=obj.recvDay;
           if(obj.payTermCash!=null)v.cashPct=obj.payTermCash;
           if(obj.payTermTicket!=null)v.ticketDays=obj.payTermTicket;
-          if(obj.retentionPct!=null)v.retentionPct=obj.retentionPct;
           _touch(v);
         });
         saveContracts();saveInv();
@@ -4153,12 +4149,7 @@ function applyCustomerByName(name, type){
     _applyIfEmpty('inv-recv-day',c.recvDay);
     _applyIfEmpty('inv-cash-pct',c.payTermCash);
     _applyIfEmpty('inv-ticket-days',c.payTermTicket);
-    // 帶入保留款%（若有設定）
-    if(c.retentionPct!=null&&c.retentionPct>0){
-      var retEl=document.getElementById('inv-retention');if(retEl&&!retEl.checked)retEl.checked=true;
-      var retPctEl=document.getElementById('inv-retention-pct');if(retPctEl&&!retPctEl.value)retPctEl.value=c.retentionPct;
-      try{rInvTots();}catch(e2){_err('applyCustomerByName',e2);}
-    }
+    // v6.0.99：客戶資料的保留款% 不再帶入請款單（僅供參考）；保留款一律跟專案「業主扣款設定」
     try{calcExpectedRecvDate();}catch(e2){_err('applyCustomerByName',e2);}
   }
   var _termDesc='';
