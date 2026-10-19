@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.105';
+var APP_VERSION='v6.0.106';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -10525,7 +10525,10 @@ function _pushCloud(opts){
     // 兩三個人用很容易踩線。改成 fydata/shared/quotes/{id} 逐筆 update 之後，
     // 同一次存檔只送那一張（幾十 KB），順帶把衝突面縮到單筆。
     var perRec=_perRecordDelta(delta,clean,newHashes,baseHashes,opts);
-    var okWrap=function(){_storeSyncHashes(newHashes);_storeRecHashes(perRec.recHashes);ok();};
+    // v6.0.106 材料位置清單（不含成本）：只有讀得到 private 台帳的管理員裝置產生並上傳到 shared/matLoc，給唯讀帳號讀
+    var mlWork=false,mlHash='';
+    try{if(_fbUser&&isAdmin(_fbUser.email)&&_privReadOk===true){var _ml=_cleanEnc({v:_matLocList()}).v||[];mlHash=_collHash(_ml);if(opts.full||localStorage.getItem('fy_matloc_hash')!==mlHash){delta.matLoc=_ml;mlWork=true;}}}catch(e){_err('_pushCloud.matLoc',e);}
+    var okWrap=function(){_storeSyncHashes(newHashes);_storeRecHashes(perRec.recHashes);if(mlWork){try{localStorage.setItem('fy_matloc_hash',mlHash);}catch(e){/* 可忽略 */}}ok();};
     // v5.314：完全沒有變動時不要空推 uploadedAt，否則會害其他裝置誤判「雲端有更新」而跳覆蓋提示
     // v5.319：無變更時不謊報「已上傳雲端」，也不推進 fy_last_fb_sync
     //（推進了會讓本機 watermark 超前雲端，之後他人的真實上傳會被誤判為「不是更新」而永遠拉不下來）
@@ -10535,7 +10538,7 @@ function _pushCloud(opts){
     try{_pushPrivate();}catch(e){_err('top',e);}
     try{_pushRelayCosts();}catch(e){_err('top',e);}
     try{_pushRelayExpenses();}catch(e){_err('top',e);}
-    if(!opts.full&&baseHashes&&changed.length===0&&!perRec.hasWork){
+    if(!opts.full&&baseHashes&&changed.length===0&&!perRec.hasWork&&!mlWork){
       _storeSyncHashes(newHashes);
       localStorage.removeItem('fy_pending_sync');
       if(!opts.silent){_setFbLoading(false);toast('無新變更，雲端已是最新');}
@@ -37019,6 +37022,16 @@ function openStorageRulesGen(){
 }
 function _dlTextCopy(t){var done=function(){toast('已複製');};var fb=function(){try{var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();done();}catch(e){_err('_dlTextCopy',e);toast('複製失敗，請手動選取');}};
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(done,fb);else fb();}
+// ── 材料位置清單（v6.0.106 任務 8）：MAT_LEDGER（private）派生、不含單價／成本，放 shared/matLoc 供唯讀帳號（AI 助理）讀 ──
+// 每列：名稱、規格、長度、支數、所在位置（工程名或公司倉庫）、調出日、預計退場日（台帳 planBack → 該案業主合約預計完工日）
+function _matLocList(){
+  return (MAT_LEDGER||[]).filter(function(r){return r&&r.name&&(parseFloat(r.qty)||0)>0;}).map(function(r){
+    var q=r.projQid?Q.find(function(x){return x.id===r.projQid;}):null,ct=null;try{ct=q?_ownerCt(q):null;}catch(e){_err('_matLocList',e);}
+    return {id:String(r.id||''),name:String(r.name||''),spec:String(r.spec||''),len:(r.len!=null&&r.len!=='')?(parseFloat(r.len)||0):null,qty:parseFloat(r.qty)||0,
+      loc:r.projQid?String((q&&q.name)||r.loc||'工地'):String(r.loc||'公司倉庫'),qid:String(r.projQid||''),outDate:String(r.outDate||''),
+      planBack:String(r.planBack||(ct&&ct.end)||''),kind:String(r.kind||'')};
+  }).sort(function(a,b){return (a.loc+a.name).localeCompare(b.loc+b.name,'zh-TW');});
+}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');

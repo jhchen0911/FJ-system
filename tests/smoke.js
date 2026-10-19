@@ -7116,6 +7116,35 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.106 任務 8：材料位置清單（不含成本）放 shared ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const oL = MAT_LEDGER.slice(), oQ = Q.slice(), oC = CONTRACTS.slice(), ou = _fbUser, od = _fbDb, opr = _privReadOk;
+      try {
+        Q.push({ id: 'qML', name: '材料案', awarded: true, items: [] }); CONTRACTS.push({ id: 'cML', linkedQid: 'qML', name: '材料案', end: '2027-03-31' });
+        MAT_LEDGER.length = 0;
+        MAT_LEDGER.push({ id: 'L1', name: 'H型鋼', spec: '300×300', len: 12, qty: 40, price: 25000, uw: 94, loc: '材料案', projQid: 'qML', outDate: '2026-09-01' },
+          { id: 'L2', name: 'H型鋼', spec: '350×350', len: 9, qty: 10, price: 30000, loc: '公司倉庫' }, { id: 'L3', name: '鋼板', qty: 0, loc: '公司倉庫' });
+        const L = _matLocList(); const s = JSON.stringify(L);
+        out.list = L.length === 2 && !/price|uw|cost|25000|30000/.test(s) && L.find(x => x.id === 'L1').loc === '材料案' && L.find(x => x.id === 'L1').planBack === '2027-03-31' && L.find(x => x.id === 'L1').outDate === '2026-09-01' && L.find(x => x.id === 'L2').loc === '公司倉庫';
+        /* 只有讀得到 private 的管理員才上傳 matLoc；非管理員不上傳 */
+        const ups = [];
+        const mk = p => ({ once: () => Promise.resolve({ val: () => (p === 'fydata/readers/jhchen0911@gmail,com' ? null : 0) }), update: v => { ups.push(Object.keys(v)); return Promise.resolve(); }, set: () => Promise.resolve(), child: c => mk(p + '/' + c) });
+        _fbDb = { ref: mk }; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'uO' }; _roState = 'rw'; _privReadOk = true; localStorage.removeItem('fy_matloc_hash');
+        _pushCloud({ silent: true, _merged: true }); await new Promise(r => setTimeout(r, 200));
+        out.adminUp = ups.some(k => k.indexOf('matLoc') >= 0);
+        ups.length = 0; _privReadOk = false; localStorage.removeItem('fy_matloc_hash'); _pushCloud({ silent: true, _merged: true }); await new Promise(r => setTimeout(r, 200));
+        out.noPriv = !ups.some(k => k.indexOf('matLoc') >= 0);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      _fbUser = ou; _fbDb = od; _privReadOk = opr; _roState = ''; MAT_LEDGER.length = 0; oL.forEach(x => MAT_LEDGER.push(x)); Q.length = 0; oQ.forEach(x => Q.push(x)); CONTRACTS.length = 0; oC.forEach(x => CONTRACTS.push(x));
+      return out;
+    });
+    check('v6.0.106 材料位置清單：規格／長度／支數／所在位置／調出日／預計退場日、不含單價成本；只有讀得到台帳的管理員裝置上傳到 shared/matLoc', r.list && r.adminUp && r.noPriv, JSON.stringify(r));
+    check('v6.0.106 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
