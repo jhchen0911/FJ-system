@@ -2764,7 +2764,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.102" defer></script>
+<script src="app.js?v=6.0.103" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
@@ -3052,6 +3052,10 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <input type="number" id="c-pay-ticket" min="0" max="365" placeholder="30" style="width:64px;text-align:center;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px;font-family:inherit">
           <span style="font-size:13px;color:var(--b4)">天</span>
         </div>
+      </div>
+      <div class="f" style="margin-bottom:10px">
+        <label>分段計價：裝設（打設）完成請款 % <span style="font-size:10px;color:var(--b3)">（其餘於拆除／拔除完成請款；空白＝公司請款設定）</span></label>
+        <input type="number" id="c-inst-pct" min="0" max="100" placeholder="例：80" style="width:80px;text-align:center;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px;font-family:inherit">
       </div>
       <div class="f" style="margin-bottom:10px"><label>備註</label><input id="c-note" placeholder="備註"></div>
       <div class="f" style="margin-bottom:14px">

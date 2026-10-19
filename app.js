@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.102';
+var APP_VERSION='v6.0.103';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -24779,7 +24779,7 @@ let _advSearch={minAmt:'',maxAmt:'',dateFrom:'',dateTo:'',status:''};
 function newContract(){
   document.getElementById('contract-edit-id').value='';
   document.getElementById('contract-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 新增合約';
-  ['c-code','c-date','c-name','c-client','c-amount','c-start','c-end','c-note','c-pay-cash','c-pay-ticket'].forEach(id=>{
+  ['c-code','c-date','c-name','c-client','c-amount','c-start','c-end','c-note','c-pay-cash','c-pay-ticket','c-inst-pct'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
   document.getElementById('c-status').value='active';
@@ -24816,6 +24816,7 @@ function editContract(id){
   var cPayTicket=document.getElementById('c-pay-ticket');
   if(cPayCash)cPayCash.value=c.payTermCash!=null?c.payTermCash:'';
   if(cPayTicket)cPayTicket.value=c.payTermTicket!=null?c.payTermTicket:'';
+  var cInst=document.getElementById('c-inst-pct');if(cInst)cInst.value=(c.instPct!=null&&c.instPct!=='')?c.instPct:'';
   refreshContractClientList();
   document.getElementById('contract-modal').style.display='flex';
 }
@@ -24830,11 +24831,12 @@ function saveContract(){
     note:gv('c-note'),
     payTermCash:document.getElementById('c-pay-cash')?.value!==''?parseInt(document.getElementById('c-pay-cash')?.value)||0:null,
     payTermTicket:document.getElementById('c-pay-ticket')?.value!==''?parseInt(document.getElementById('c-pay-ticket')?.value)||0:null,
+    instPct:(document.getElementById('c-inst-pct')?.value||'')!==''?Math.max(0,Math.min(100,parseFloat(document.getElementById('c-inst-pct').value)||0)):null,   // v6.0.103 分段計價：裝設完成請款 %
     attachment:gv('c-attachment'),
     attachmentName:document.getElementById('c-file-input')?.files[0]?.name||'', updatedAt:Date.now()
   };
   const idx=CONTRACTS.findIndex(x=>x.id===id);
-  if(idx>=0)CONTRACTS[idx]=c;else CONTRACTS.unshift(c);
+  if(idx>=0)CONTRACTS[idx]=Object.assign({},CONTRACTS[idx],c);else CONTRACTS.unshift(c);   // v6.0.103 保留表單以外的欄位（竣工結算、匯入條件等）
   saveContracts();
   logActivity('合約', (idx>=0?'修改':'新增')+'合約：'+c.name);
   closeContractModal();
@@ -36617,9 +36619,9 @@ function _ownerTerms(q){
   if(!q)return null;
   var o=q.ownerPay||{},c=_ownerCust(q)||{},d=q.deduct||{};
   var pick=function(a,b){var x=(a==null||a==='')?NaN:parseFloat(a);if(!isNaN(x))return x;x=(b==null||b==='')?NaN:parseFloat(b);return isNaN(x)?null:x;};
-  var t={cut:pick(o.cut,c.payDue),delay:pick(o.delay,c.payMonthDelay),day:pick(o.day,c.recvDay),cashPct:pick(o.cashPct,c.payTermCash),ticketDays:pick(o.ticketDays,c.payTermTicket),ret:(d.ret!=null&&d.ret!=='')?_ownerRetPct(q):null,retCond:String(d.retCond||'').trim(),instPct:pick(o.instPct,null)};
+  var t={cut:pick(o.cut,c.payDue),delay:pick(o.delay,c.payMonthDelay),day:pick(o.day,c.recvDay),cashPct:pick(o.cashPct,c.payTermCash),ticketDays:pick(o.ticketDays,c.payTermTicket),ret:(d.ret!=null&&d.ret!=='')?_ownerRetPct(q):null,retCond:String(d.retCond||'').trim(),instPct:pick(o.instPct,_ownerCtInst(q))};
   if(t.day==null&&t.cashPct==null&&t.ticketDays==null&&t.ret==null&&!t.retCond&&t.instPct==null)return null;
-  if(t.instPct==null)t.instPct=_INST_DEF;t.instPct=Math.max(0,Math.min(100,t.instPct));
+  var ir=_ownerInstRef(q);t.instSrc=(o.instPct!=null&&o.instPct!=='')?'手動調整':ir.src;if(t.instPct==null)t.instPct=ir.pct;t.instPct=Math.max(0,Math.min(100,t.instPct));
   if(t.cut==null)t.cut=25;if(t.delay==null)t.delay=1;if(t.day==null)t.day=t.cut;
   if(t.cashPct==null)t.cashPct=(t.ticketDays>0)?0:100;
   t.cashPct=Math.max(0,Math.min(100,t.cashPct));if(t.ticketDays==null)t.ticketDays=0;
@@ -36641,6 +36643,10 @@ function _b2bEarly(own,sub){var xs=[0.01,own.cash,own.cash+0.01,sub.cash,sub.cas
 var _B2B_RETWHEN='依業主退還本公司保留款之時點，於收到後 7 日內無息退還';
 // 裝設請款％（v6.0.96）：分段計價工項（構台、支撐等）裝設（打設）完成先請 N%、拆除（拔除）完成再請其餘；公司預設 90（報價條件 90／10）
 var _INST_DEF=90;
+// v6.0.103 裝設請款％參照：業主合約（CONTRACTS 關聯此案、合約欄「裝設請款 %」）→ 公司請款設定（100 − 拆除請款比例 P.removeRate）
+function _ownerCt(q){if(!q)return null;return (CONTRACTS||[]).find(function(c){return c&&c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return c&&c.name&&c.name===q.name;})||null;}
+function _ownerCtInst(q){var c=_ownerCt(q),v=c&&c.instPct;return (v==null||v==='')?null:Math.max(0,Math.min(100,parseFloat(v)||0));}
+function _ownerInstRef(q){var v=_ownerCtInst(q);if(v!=null)return {pct:v,src:'業主合約「'+(_ownerCt(q).name||'')+'」'};var rr=_removeRate();return {pct:Math.max(0,100-rr),src:'公司請款設定（拆除請款 '+rr+'%）'};}
 function _instOf(c){var v=c&&c.instPct;return (v==null||v==='')?_INST_DEF:Math.max(0,Math.min(100,parseFloat(v)||0));}
 function _b2bRetWhen(o){return _B2B_RETWHEN;}
 // 新詢價單的預設條件：現金部分不早於營造廠放款、期票到期不早於營造廠最後一筆款到帳（票期進位到 30 天）、保留款不低於營造廠
@@ -36693,8 +36699,39 @@ function _pjOwnerPayHtml(q){
     +'<b style="color:var(--b5)">營造廠付款條件</b><span style="color:var(--b4);font-size:11px">發包時詢價單／分包合約背對背預設（空白＝沿用客戶資料'+(c.name?'「'+esc(c.name)+'」':'')+'）</span>'
     +f('cut','每月','payDue','日計價',31)+f('delay','放款','payMonthDelay','個月後',12)+f('day','','recvDay','日放款',31)
     +f('cashPct','現金','payTermCash','%',100)+f('ticketDays','期票','payTermTicket','天',365)
-    +f('instPct','裝設請款','','%',100,String(_INST_DEF))
+    +_pjInstHtml(q,IN)
     +'<span style="color:var(--b4);font-size:11px">保留款％與退還條件見上方「業主扣款設定」</span></div>';
+}
+function _pjInstHtml(q,IN){
+  var o=q.ownerPay||{},ref=_ownerInstRef(q),man=(o.instPct!=null&&o.instPct!=='');
+  var log=Array.isArray(o.instLog)?o.instLog:[];
+  return '<label style="display:flex;align-items:center;gap:4px">裝設請款 <input type="number" inputmode="decimal" min="0" max="100" value="'+(man?esc(String(o.instPct)):'')+'" placeholder="'+ref.pct+'" onchange="pjOwnerInstSet(\''+q.id+'\',this.value)" style="'+IN+'">%</label>'
+    +'<span style="font-size:11px;color:'+(man?'#b45309':'var(--b4)')+'">'+(man?('手動調整（原因：'+esc(o.instReason||'')+'；參照值 '+ref.pct+'%，來源 '+esc(ref.src)+'）'):('自動參照 '+esc(ref.src)))+'</span>'
+    +(log.length?'<button type="button" class="btn btn-xs" onclick="pjOwnerInstLog(\''+q.id+'\')">調整紀錄 '+log.length+'</button>':'');
+}
+// 手動調整裝設請款％：必須填原因，留紀錄（清空＝回到自動參照，也要原因）
+function pjOwnerInstSet(qid,v){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;
+  var o=q.ownerPay&&typeof q.ownerPay==='object'?q.ownerPay:{};
+  var x=String(v==null?'':v).trim(),nv=x===''?null:Math.max(0,Math.min(100,parseFloat(x)||0));
+  var ref=_ownerInstRef(q),old=(o.instPct!=null&&o.instPct!=='')?parseFloat(o.instPct):null;
+  if(nv===old){return;}
+  _modal('裝設請款％調整原因','<div style="font-size:12.5px;margin-bottom:8px">'+(nv==null?('清除手動值，改回自動參照 '+ref.pct+'%（'+esc(ref.src)+'）'):('改為 '+nv+'%（自動參照 '+ref.pct+'%，來源 '+esc(ref.src)+'）'))+'</div>'
+    +'<div class="f"><label>原因 <span style="color:var(--red)">*</span></label><input id="inst-reason" placeholder="例：業主來函同意改為 85／15"></div>',function(){
+    var rs=String((document.getElementById('inst-reason')||{}).value||'').trim();
+    if(!rs){toast('請填寫調整原因');return false;}
+    if(!q.ownerPay||typeof q.ownerPay!=='object')q.ownerPay={};
+    var L=Array.isArray(q.ownerPay.instLog)?q.ownerPay.instLog:[];
+    L.push({at:Date.now(),by:(typeof _meEmail==='function'?_meEmail():''),from:old!=null?old:('自動 '+ref.pct),to:nv!=null?nv:('自動 '+ref.pct),reason:rs});
+    q.ownerPay.instLog=L.slice(-50);q.ownerPay.instPct=nv;q.ownerPay.instReason=nv==null?'':rs;
+    _touch(q);try{persist();}catch(e){_err('pjOwnerInstSet',e);}
+    toast('已更新裝設請款％');try{renderProj();}catch(e){_err('pjOwnerInstSet',e);}
+  });
+  setTimeout(function(){try{var c=document.getElementById('fy-modal-c');if(c)c.addEventListener('click',function(){try{renderProj();}catch(e){_err('pjOwnerInstSet',e);}});}catch(e){_err('pjOwnerInstSet',e);}},0);   // 取消＝輸入框還原
+}
+function pjOwnerInstLog(qid){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return;var L=((q.ownerPay||{}).instLog)||[];
+  showConfirm('裝設請款％調整紀錄',L.slice().reverse().map(function(r){return '<div style="font-size:12px;border-bottom:1px solid var(--b1);padding:4px 0">'+esc(new Date(r.at).toLocaleString('zh-TW'))+'　'+esc(r.by||'')+'<br>'+esc(String(r.from))+' → <b>'+esc(String(r.to))+'</b>　原因：'+esc(r.reason||'')+'</div>';}).join('')||'（無）',function(){},false);
 }
 function pjOwnerPaySet(qid,k,v){
   var q=Q.find(function(x){return x.id===qid;});if(!q)return;

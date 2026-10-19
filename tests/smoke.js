@@ -6876,7 +6876,7 @@ async function newPage(browser, width, height) {
           && !_b2bIssues(q, Object.assign({}, ci, { instPct: null })).some(x => /裝設/.test(x)) && /裝設（打設）完成請款 80%，拆除（拔除）完成請款 20%/.test(_rfqCondLines({ cond: ci }).join(''));
         out.retB = _ownerTerms({ id: 'zr', client: '元昱測試營造', ownerPay: { day: 20 } }).ret === null && _ownerTerms(q).ret === 10;
         out.b2bFlag = !_ownerPaySet({ deduct: { ret: 10 } }) && !_ownerPaySet({ ownerPay: { day: null } }) && _ownerPaySet({ ownerPay: { day: 20 } });
-        q.ownerPay = {}; out.instDef = _ownerTerms(q).instPct === 90 && _ownerTerms({ id: 'z', client: '無', ownerPay: { instPct: 80 } }).instPct === 80;
+        q.ownerPay = {}; out.instDef = _ownerTerms(q).instPct === 100 - _removeRate() && _ownerTerms({ id: 'z', client: '無', ownerPay: { instPct: 80 } }).instPct === 80;
         out.instSct = /裝設（打設）完成時計價 80%，拆除（拔除）完成時計價其餘 20%/.test(_sctPayTxt(Object.assign({}, cost, { payTerm: { cashPct: 0, ticketPct: 100, ticketDays: 30, instPct: 80 } }), _sctCfg(), q))
           && !/分段計價/.test(_sctPayTxt(Object.assign({}, cost, { b2b: 0, payTerm: { cashPct: 0, ticketPct: 100, ticketDays: 30, instPct: 80 } }), _sctCfg(), q)) && /裝設請款/.test(_pjOwnerPayHtml(q));
         q.ownerPay = {};
@@ -7025,6 +7025,37 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.102 實收含當場扣款退還（依退還日）、應收餘額逐張加總不為負、下一期不帶收款明細、請款單匯出排除退還單且已收款含退還', r.rcv && r.ar && r.next && r.xls, JSON.stringify(r));
     check('v6.0.102 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.103 任務 4：裝設請款％自動參照業主合約、手動調整必填原因並留紀錄 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {}; const oQ = Q.slice(), oC = CONTRACTS.slice();
+      try {
+        const q = { id: 'qI4', name: '裝設案', client: '元昱', awarded: true, items: [], ownerPay: { day: 20 } };
+        Q.push(q);
+        out.fallback = _ownerInstRef(q).pct === 100 - _removeRate() && /公司請款設定/.test(_ownerInstRef(q).src);
+        CONTRACTS.push({ id: 'ctI4', name: '裝設案', linkedQid: 'qI4', instPct: 80, amount: 1 });
+        out.fromCt = _ownerTerms(q).instPct === 80 && /業主合約「裝設案」/.test(_ownerTerms(q).instSrc) && /自動參照 業主合約/.test(_pjInstHtml(q, ''));
+        /* 手動調整：沒填原因不准存 */
+        pjOwnerInstSet('qI4', '85'); document.getElementById('fy-modal-o').click();
+        out.needReason = !!document.getElementById('fy-modal') && q.ownerPay.instPct == null;
+        document.getElementById('inst-reason').value = '業主來函同意 85／15'; document.getElementById('fy-modal-o').click();
+        out.manual = q.ownerPay.instPct === 85 && q.ownerPay.instReason === '業主來函同意 85／15' && q.ownerPay.instLog.length === 1 && q.ownerPay.instLog[0].from === '自動 80' && _ownerTerms(q).instPct === 85 && _ownerTerms(q).instSrc === '手動調整' && /手動調整（原因：業主來函同意 85／15/.test(_pjInstHtml(q, ''));
+        /* 清除手動值＝回到自動，也要原因、留紀錄 */
+        pjOwnerInstSet('qI4', ''); document.getElementById('inst-reason').value = '回到合約'; document.getElementById('fy-modal-o').click();
+        out.clear = q.ownerPay.instPct == null && q.ownerPay.instLog.length === 2 && _ownerTerms(q).instPct === 80;
+        /* 合約表單欄位：存檔保留其他欄位 */
+        CONTRACTS.find(x => x.id === 'ctI4').settled = 1; editContract('ctI4'); document.getElementById('c-inst-pct').value = '75'; saveContract();
+        const ct = CONTRACTS.find(x => x.id === 'ctI4'); out.ctForm = ct.instPct === 75 && ct.settled === 1;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      Q.length = 0; oQ.forEach(x => Q.push(x)); CONTRACTS.length = 0; oC.forEach(x => CONTRACTS.push(x));
+      return out;
+    });
+    check('v6.0.103 裝設請款％：自動參照業主合約（無則公司請款設定）、手動調整與清除都必填原因並留紀錄、合約表單可填且存檔不丟其他欄位', r.fallback && r.fromCt && r.needReason && r.manual && r.clear && r.ctForm, JSON.stringify(r));
+    check('v6.0.103 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

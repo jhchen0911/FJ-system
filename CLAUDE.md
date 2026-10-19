@@ -80,7 +80,7 @@
 | 報價 | `quotes`（列表 `renderList`）→ 編輯頁 | `rItems` `calcT` `saveQ` `loadQ` `applyNegotiate`（議價）`bumpQVersion`（版次）`quoteViewPdf`（手機預覽等比縮放 `_prevFitApply`／`_prevZoomToggle`）`exportQuotePDF` `quoteImportOwner`／`_qiStart`（匯入業主詢價單 xlsx／docx／pdf）`quoteExportOwnerDoc`（回填） | `Q`（quotes，逐筆同步；`costs`／`items[].estCost`／`t.cost|gross|net`／`rfqs`／`mat` 由 `_stripQuoteSens` 抽到 private） |
 | 案場細節 | 彈窗 `openSiteDet(qid)`（報價編輯、工程專案、材料估算、施工計畫書） | `_sdRender` `_sdCalc` `_sdToMatEst` `_sdEnsure` `siteBump` | `q.site`／`q.siteHist`（shared）；**圖面數量唯一來源** |
 | 工程專案 | `proj`（`openProj(qid)`；`go('projects')` 轉來） | `renderProj` `_pjStat` `_pjTodoItems` `_pjSection` `_pj*Html` 各區塊（業主計價已收清期別收合 `_pjInvSettled`／`pjInvPaidToggle`） `pjCloseAll`（結案）`_autoSettle`（階段完工自動結算）`_introSync`；流程列唯讀檢視 `_pjNegView`／`_pjCtView`／`_pjRfqView`（`_pjViewBox`） | 以報價 `q` 為主體 |
-| 發包 | `rfq`（hidden，parent `proj`） | `renderRfq` `rfqNew` `rfqFill` `rfqAward` `_rfqBackfillEst` `pjIntroEdit`（介紹費）；背對背（v6.0.91）`_ownerTerms`（營造廠付款條件；保留款走 `_ownerRetPct`）`_ownerPaySet`（有填才標 `c.b2b`）`_b2bDefCond`（新詢價單預設）`_b2bIssues`／`_b2bWarnHtml`（提醒不擋）`_pjOwnerPayHtml`／`pjOwnerPaySet`（專案頁輸入）`_instOf`（裝設請款％，預設 `_INST_DEF`＝90） | `q.rfqs`（private）、`q.ownerPay`（shared）、`q.deduct.retCond` |
+| 發包 | `rfq`（hidden，parent `proj`） | `renderRfq` `rfqNew` `rfqFill` `rfqAward` `_rfqBackfillEst` `pjIntroEdit`（介紹費）；背對背（v6.0.91）`_ownerTerms`（營造廠付款條件；保留款走 `_ownerRetPct`）`_ownerPaySet`（有填才標 `c.b2b`）`_b2bDefCond`（新詢價單預設）`_b2bIssues`／`_b2bWarnHtml`（提醒不擋）`_pjOwnerPayHtml`／`pjOwnerPaySet`（專案頁輸入）`_instOf`（裝設請款％）`_ownerInstRef`（業主合約 `ct.instPct` → 公司請款設定 100−`P.removeRate`）`pjOwnerInstSet`（手動調整必填原因、`q.ownerPay.instLog`） | `q.rfqs`（private）、`q.ownerPay`（shared）、`q.deduct.retCond` |
 | 材料．運輸 | `mat6`（hidden，parent `proj`） | `renderMat6`（含氣瓶在場 `_m6GasHtml`）`matRowEdit` `m6Decide` `m6RentEdit` `matOut` `matBack` `_m6Sync` `_matAmortRows` | `q.mat`（private）、`MAT_LEDGER`（matLedger，private） |
 | 施工成本／分包 | `costs`（hidden，parent `proj`；`openProjectCosts`） | `rCostItems` `_ownAutoCat`（自有卡科目自動歸類）`_gasVendors`／`_gasOnSiteHtml`（氣瓶在場）`_vendorEnsure`（手動廠商進名冊）`openSubPeriod`／`_spSave`（廠商請款期別）`openSubAdvance`／`_saSave`（預付款）`openRentPeriod`（租賃）`_subFollowApply`（跟隨計價）`_subStat` `buildSubMgmtHtml`；分包合約書 `openSubContractDoc`／`_subContractHtml`（條款見 `docs/分包工程承攬合約書_通用範本.md`，空格預設 `P.subCt`） | `q.costs`（private） |
 | 成本→應付 | — | `syncCostToPayable` `_syncSubPeriodPayables`（開頭依序 `_advPayHeal`→`_subAdvClamp`→`_earlyToAdv`）`_paySource`（自動應付唯讀）`cleanDuplicatePayables` `_tombExempt`；付款狀態稽核 `_payAuditDiff`（`savePayables` 內比對快照）／`openPayAudit`（列上「歷程」）／`_payLedgerWarn`（帳本已付但待付的紅色警示）／`exportPayDiag`（診斷檔）／`_healthAdd689`（健檢）；已付應付不被任何自動重建刪除 | `PAYABLES`（payables，private）、付款帳本 `PAID_LOG`（private 節點 paidLog，本機 `fy_paidlog`）、稽核 `PAY_AUDIT`（private 節點 payAudit，本機 `fy_payaudit`）；id 規則見下 |
@@ -107,7 +107,7 @@
 
 ## 測試
 
-`tests/smoke.js`（655 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（657 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
