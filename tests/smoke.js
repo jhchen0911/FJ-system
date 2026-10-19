@@ -6830,6 +6830,79 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.91 分包背對背：營造廠付款條件 → 詢價單／分包合約 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const oP = { cut: P.vendorCutDay, day: P.vendorPayDay, delay: P.vendorPayDelay, ret: P.subRetDef };
+      try {
+        P.vendorCutDay = 25; P.vendorPayDay = 25; P.vendorPayDelay = 1; P.subRetDef = 5;
+        CUSTOMERS.push({ id: 'cB2B', name: '元昱測試營造', payDue: 25, payMonthDelay: 1, recvDay: 20, payTermCash: 0, payTermTicket: 30, retentionPct: 10 });
+        const q = { id: 'qB2B', name: '背對背測試案', client: '元昱測試營造', awarded: true, items: [{ desc: 'H型鋼樁打設', unit: 'M', qty: 100, price: 500 }], deduct: { retCond: '拆除拔除完成、驗收後 30 日內一次無息退還' } };
+        const q0 = { id: 'qB2B0', name: '舊案', client: '無條件業主', awarded: true, items: [] };
+        Q.push(q, q0);
+        /* 客戶資料帶入：100% 30 天期票、次月 20 日放款、保留 10% */
+        _rfqQid = 'qB2B'; const c = _rfqCond(null);
+        out.def = c.cashPct === 0 && c.ticketPct === 100 && c.ticketDays === 30 && c.ret === 10 && c.retWhen === '依業主退還本公司保留款之時點，於收到後 7 日內無息退還';
+        out.noIssue = _b2bIssues(q, c).length === 0;
+        /* 寬鬆條件提醒：全現金次月 25 日 → 早 25 天；保留 5% 低於 10% */
+        const loose = { cashPct: 100, ticketPct: 0, ticketDays: 0, ret: 5, retWhen: '' };
+        const is = _b2bIssues(q, loose); out.warn = is.some(x => /包商比營造廠早 25 天收款/.test(x)) && is.some(x => /低於營造廠扣我方的 10%/.test(x));
+        out.warnHtml = /背對背提醒/.test(_b2bWarnHtml(q, loose)) && /✓ 與營造廠付款條件背對背/.test(_b2bWarnHtml(q, c));
+        /* 專案欄位覆寫客戶資料 */
+        q.ownerPay = { day: 10, delay: 1 }; out.override = _ownerTerms(q).day === 10 && _ownerTerms(q).ticketDays === 30; q.ownerPay = {};
+        /* 已存條件的詢價單不被改 */
+        out.keep = _rfqCond({ cond: { cashPct: 50, ticketPct: 50, ticketDays: 60, ret: 3 } }).ret === 3;
+        /* 分包合約：比例＋同步退還、第九條罰款轉嫁 */
+        const cost = { id: 'cs1', type: 'sub', vendor: '甲包商', rows: [], retRate: 10, retWhen: c.retWhen, b2b: 1, invoice: true, payTerm: { cashPct: 0, ticketPct: 100, ticketDays: 30 } };
+        const t = _sctPayTxt(cost, _sctCfg(), q); out.sct = /100% 開立 30 天期票/.test(t) && /依業主退還甲方保留款之時點，於收到後 7 日內無息退還/.test(t) && !/本公司|營造廠/.test(t);
+        /* 舊卡（無 b2b 標記、有 payTerm）＋客戶有填付款規則＋專案後來填退還條件 → 合約文字一字不變 */
+        const oldCard = { id: 'cs0', type: 'sub', vendor: '乙包商', rows: [], retRate: 5, invoice: true, payTerm: { cashPct: 50, ticketPct: 50, ticketDays: 60 } };
+        out.oldCard = _sctPayTxt(oldCard, _sctCfg(), q) === _sctPayTxt(oldCard, _sctCfg()) && !/現金匯款|期票/.test(_sctPayTxt(oldCard, _sctCfg(), q));
+        /* 退還時點清空：詢價單與合約都用原文 */
+        out.blankRet = /保留款 10%，完工驗收後退還/.test(_rfqCondLines({ cond: Object.assign({}, c, { retWhen: '' }) }).join('')) && /經甲方驗收後無息退還/.test(_sctPayTxt(Object.assign({}, cost, { retWhen: '' }), _sctCfg(), q));
+        /* 實際日曆日：營造廠隔 2 月 25 日全現金、包商次月 25 日＋30 天票 → 大月時早 1 天要提醒 */
+        q.ownerPay = { delay: 2, day: 25, cashPct: 100, ticketDays: 0 };
+        out.cal = _b2bIssues(q, { cashPct: 0, ticketPct: 100, ticketDays: 30, ret: 10, retWhen: 'x' }).some(x => /早 1 天收款/.test(x)) && _rfqCond(null).ticketDays === 60;
+        /* 計價日早於本公司、期票未填天數 → 提醒；不產生 0 天期票 */
+        q.ownerPay = { cut: 20 }; out.cut = _b2bIssues(q, c).some(x => /營造廠每月 20 日計價，早於本公司/.test(x));
+        q.ownerPay = {}; out.td0 = _b2bIssues(q, { cashPct: 50, ticketPct: 50, ticketDays: 0, ret: 10, retWhen: 'x' }).some(x => /票期天數未填/.test(x))
+          && !/0 天期票/.test(_sctPayTxt(Object.assign({}, cost, { payTerm: { cashPct: 50, ticketPct: 50, ticketDays: 0 } }), _sctCfg(), q));
+        q.ownerPay = { delay: 3, day: 1, cashPct: 50, ticketDays: 0 }; out.noZero = _rfqCond(null).ticketDays > 0 || _rfqCond(null).cashPct === 100;
+        /* v6.0.96 裝設請款％：營造廠 80 → 包商預設 80；包商 90 提醒先墊 10%；空白＝公司預設 90；合約與詢價單寫出分段 */
+        q.ownerPay = { instPct: 80 }; const ci = _rfqCond(null);
+        out.inst = ci.instPct === 80 && _b2bIssues(q, Object.assign({}, ci, { instPct: 90 })).some(x => /包商裝設完成先拿 90%，比營造廠的 80% 多 10%（豐有先墊）/.test(x)) && !_b2bIssues(q, ci).some(x => /裝設/.test(x))
+          && _b2bIssues(q, Object.assign({}, ci, { instPct: null })).some(x => /先拿 90%/.test(x)) && /裝設（打設）完成請款 80%，拆除（拔除）完成請款 20%/.test(_rfqCondLines({ cond: ci }).join(''));
+        q.ownerPay = {}; out.instDef = _ownerTerms(q).instPct === 90 && _ownerTerms({ id: 'z', client: '無', ownerPay: { instPct: 80 } }).instPct === 80;
+        out.instSct = /裝設（打設）完成時計價 80%，拆除（拔除）完成時計價其餘 20%/.test(_sctPayTxt(Object.assign({}, cost, { payTerm: { cashPct: 0, ticketPct: 100, ticketDays: 30, instPct: 80 } }), _sctCfg(), q))
+          && !/分段計價/.test(_sctPayTxt(Object.assign({}, cost, { b2b: 0, payTerm: { cashPct: 0, ticketPct: 100, ticketDays: 30, instPct: 80 } }), _sctCfg(), q)) && /裝設請款/.test(_pjOwnerPayHtml(q));
+        q.ownerPay = {};
+        out.art9 = /業主依其工地安全衛生罰則對乙方人員所開立之罰款，由乙方負擔，甲方得自當期工程款扣除/.test(_subContractHtml(q, cost, _sctCfg()));
+        out.art9 = out.art9 && !/業主依其工地安全衛生罰則/.test(_subContractHtml(q, Object.assign({}, cost, { b2b: 0 }), _sctCfg())) && !/ 0 天期票/.test(_b2bWarnHtml({ id: 'z0', client: '', ownerPay: { cashPct: 0, ticketDays: 0, day: 20 } }, { cashPct: 0, ticketPct: 100, ticketDays: 30 }));
+        /* 舊資料：沒有任何營造廠條件 → 照公司預設、合約原文 */
+        _rfqQid = 'qB2B0'; const c0 = _rfqCond(null);
+        out.legacy = _ownerTerms(q0) === null && c0.cashPct === 50 && c0.ticketDays === 60 && c0.ret === 5 && !c0.retWhen
+          && _sctPayTxt(Object.assign({}, cost, { retWhen: '' }), _sctCfg(), q0) === _sctPayTxt(Object.assign({}, cost, { retWhen: '' }), _sctCfg())
+          && /經甲方驗收後無息退還/.test(_sctPayTxt(Object.assign({}, cost, { retWhen: '' }), _sctCfg(), q0)) && _b2bWarnHtml(q0, c0) === '';
+        /* 專案頁輸入列 */
+        out.ui = /營造廠付款條件/.test(_pjOwnerPayHtml(q)) && /保留款退還條件/.test(_pjDeductHtml(q));
+        pjOwnerPaySet('qB2B', 'cashPct', '20'); out.set = q.ownerPay.cashPct === 20 && q._mt > 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      Q = Q.filter(x => x.id !== 'qB2B' && x.id !== 'qB2B0'); CUSTOMERS = CUSTOMERS.filter(x => x.id !== 'cB2B'); _rfqQid = '';
+      P.vendorCutDay = oP.cut; P.vendorPayDay = oP.day; P.vendorPayDelay = oP.delay; P.subRetDef = oP.ret;
+      return out;
+    });
+    check('v6.0.91 背對背：營造廠條件（客戶資料／專案覆寫）→ 新詢價單預設 100% 30 天期票、保留 10%、退還同步；已存條件不動', r.def && r.noIssue && r.override && r.keep, JSON.stringify(r));
+    check('v6.0.91 背對背提醒：包商早收款天數、保留款低於營造廠（不擋）', r.warn && r.warnHtml, JSON.stringify(r));
+    check('v6.0.91 分包合約：付款比例＋保留款同步退還、第九條營造廠罰款轉嫁；舊案無條件＝公司預設原文', r.sct && r.art9 && r.legacy, JSON.stringify(r));
+    check('v6.0.94 背對背審查修正：舊卡（客戶有付款規則）合約不變、退還時點清空兩邊一致、實際日曆日、計價日提醒、不產生 0 天期票', r.oldCard && r.blankRet && r.cal && r.cut && r.td0 && r.noZero, JSON.stringify(r));
+    check('v6.0.96 裝設請款％：營造廠付款條件可填（空白＝90）、包商預設不高於營造廠、較高時提醒先墊、詢價單與合約寫出分段比例（舊卡不變）', r.inst && r.instDef && r.instSct, JSON.stringify(r));
+    check('v6.0.91 專案頁營造廠付款條件列與退還條件欄', r.ui && r.set, JSON.stringify(r));
+    check('v6.0.91 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
