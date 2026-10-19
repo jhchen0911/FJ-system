@@ -6676,6 +6676,69 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ───────────── v6.0.89 付款狀態稽核：歷程／帳本警示／已付不被自動重建刪除／健檢／診斷檔 ─────────────
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        Q.length = 0; INV.length = 0; PAYABLES.length = 0; PAY_AUDIT.length = 0; Object.keys(PAID_LOG).forEach(k => delete PAID_LOG[k]); localStorage.removeItem('fy_paystat'); localStorage.removeItem('fy_priv_last_up'); _payStatSnap = null;
+        out.dev = /^d[0-9a-z]+$/.test(_devId()) && _devId() === _devId();
+        /* 分包卡：兩筆預付款 */
+        Q.push({ id: 'qA', name: '稽核案', client: '甲', date: '2026-09-01', awarded: true, items: [{ desc: 'H型鋼樁', unit: '支', qty: 100, price: 1000 }], t: { sub: 100000, total: 105000 },
+          costs: [{ id: 'cA', type: 'sub', vendor: '甲乙工程行', cat: '打設', date: '2026-09-01', invoice: true, retRate: 0, linkedItemIdx: 0, rows: [{ id: 'cA_0', linkedItemIdx: 0, qty: 100, unitPrice: 800 }], amt: 80000,
+            advances: [{ id: 'a1', date: '2026-09-09', amt: 20000, note: '' }, { id: 'a2', date: '2026-10-05', amt: 10000, note: '' }], periods: [] }] });
+        eid = 'qA'; const q = Q[0], c = q.costs[0];
+        syncCostToPayable(q, c);
+        const p1 = PAYABLES.find(p => p.id === 'paycA_aa1'), p2 = PAYABLES.find(p => p.id === 'paycA_aa2');
+        out.built = !!p1 && !!p2 && p1.status === 'pending' && PAY_AUDIT.length === 0;
+        /* 標記已付 → 記一筆 pending→paid（裝置／版本／程式路徑） */
+        p1.status = 'paid'; p1.paidDate = '2026-09-09'; p1.paidAt = _payStamp(p1); _touch(p1); savePayables();
+        out.audit1 = PAY_AUDIT.length === 1 && PAY_AUDIT[0].id === 'paycA_aa1' && PAY_AUDIT[0].from === 'pending' && PAY_AUDIT[0].to === 'paid' && PAY_AUDIT[0].dev === _devId() && PAY_AUDIT[0].ver === APP_VERSION && typeof PAY_AUDIT[0].src === 'string' && !/_payAuditDiff/.test(PAY_AUDIT[0].src) && PAY_AUDIT[0].pd === '2026-09-09';
+        /* 被重建成待付（沒有 unpaidAt）→ 存檔時帳本救回 → 不算變動 */
+        p1.status = 'pending'; delete p1.paidAt; savePayables();
+        out.restored = p1.status === 'paid' && p1.paidDate === '2026-09-09' && PAY_AUDIT.length === 1;
+        /* 真的改回未付 → 記 paid→pending；帳本 unpaidAt 較新 → 沒有警示 */
+        const ua = _payStamp(p1); p1.status = 'pending'; delete p1.paidDate; delete p1.paidAt; p1.unpaidAt = ua; _touch(p1); savePayables();
+        out.audit2 = PAY_AUDIT.length === 2 && PAY_AUDIT[0].from === 'paid' && PAY_AUDIT[0].to === 'pending' && PAY_AUDIT[0].amt === 21000 && PAY_AUDIT[0].who === '甲乙工程行' && _payLedgerWarn(p1) === '';
+        /* 帳本記載已付、記錄待付、沒有 unpaidAt → 紅色警示；顯示前先對帳救回 */
+        PAID_LOG['paycA_aa2'] = { paidAt: Date.now(), paidDate: '2026-10-05' };
+        out.warn = /帳本記載已付 2026-10-05/.test(_payLedgerWarn(p2)) && /openPayAudit\('paycA_aa2'\)/.test(_payLedgerWarn(p2));
+        go('acct'); acctTab('ap'); renderPayables();
+        const p2b = PAYABLES.find(p => p.id === 'paycA_aa2'), lh = document.getElementById('payable-list').innerHTML;
+        out.renderFix = p2b.status === 'paid' && p2b.paidDate === '2026-10-05' && PAY_AUDIT[0].id === 'paycA_aa2' && PAY_AUDIT[0].to === 'paid';
+        out.btn = /openPayAudit\('paycA_aa1'\)/.test(lh) && />歷程</.test(lh);
+        openPayAudit('paycA_aa1'); const mb = document.getElementById('gen-confirm-box').innerHTML; out.modal = /付款狀態歷程/.test(mb) && /paid → pending/.test(mb) && /pending → paid/.test(mb) && /裝置 d/.test(mb) && /exportPayDiag/.test(mb); document.getElementById('gen-confirm-cancel').click();
+        /* 已付的應付不被自動重建刪除：a2 從卡上拿掉 → 已付 paycA_aa2 仍在、帳本仍在；a1 待付拿掉 → 撤 */
+        c.advances = c.advances.filter(a => a.id !== 'a1'); syncCostToPayable(q, c);
+        out.dropPending = !PAYABLES.some(p => p.id === 'paycA_aa1') && PAYABLES.some(p => p.id === 'paycA_aa2' && p.status === 'paid');
+        c.advances = []; syncCostToPayable(q, c); c.advances = [{ id: 'a3', date: '2026-10-08', amt: 5000, note: '' }]; syncCostToPayable(q, c);
+        out.keepPaid = PAYABLES.some(p => p.id === 'paycA_aa2' && p.status === 'paid') && !!PAID_LOG['paycA_aa2'] && PAYABLES.some(p => p.id === 'paycA_aa3' && p.status === 'pending');
+        /* 同編號重複：已付優先 */
+        PAYABLES.push({ id: 'paycA_aa2', costId: 'cA', costAdv: 'a2', to: '甲乙工程行', amount: 10000, status: 'pending', updatedAt: Date.now() + 5000 });
+        cleanDuplicatePayables(); out.dup = PAYABLES.filter(p => p.id === 'paycA_aa2').length === 1 && PAYABLES.find(p => p.id === 'paycA_aa2').status === 'paid';
+        /* 雲端套用：稽核聯集、記住上傳者版本／裝置；健檢列出舊版裝置與近期改回 */
+        _applySensColls({ uploadedAt: Date.now(), uploadedBy: 'old@x.com', uploadedVer: 'v6.0.80', uploadedDev: 'dOLD', payAudit: [{ k: 'x@1@pending', id: 'x', from: 'paid', to: 'pending', at: Date.now() - 1000, dev: 'dOLD', ver: 'v6.0.80', amt: 5, who: '某', proj: '某案', src: 'put ← _syncSubPeriodPayables' }] });
+        out.merge = PAY_AUDIT.some(a => a.k === 'x@1@pending') && _privLastUploader().ver === 'v6.0.80' && _privLastUploader().dev === 'dOLD';
+        const H = _healthRows(); out.health = H.some(x => /以 v6\.0\.80 上傳/.test(x.msg) && /dOLD/.test(x.msg)) && H.some(x => /已付應付被改回待付或刪除/.test(x.msg) && /稽核案 甲乙工程行|某案 某/.test(x.msg));
+        PAYABLES.push({ id: 'pZ', to: '乙', project: 'Z案', amount: 100, vat: false, status: 'pending', unpaidAt: 1 }); PAID_LOG['pZ'] = { paidAt: 5, unpaidAt: 1, paidDate: '2026-10-01' };
+        out.healthLedger = _healthRows().some(x => /Z案：乙 NT\$ 100 付款帳本記載已付（2026-10-01）/.test(x.msg));
+        /* 診斷檔與全量備份含帳本／稽核 */
+        let dl = ''; const oc = URL.createObjectURL, ok = HTMLAnchorElement.prototype.click; URL.createObjectURL = () => 'blob:x'; HTMLAnchorElement.prototype.click = function () { dl = this.download; };
+        exportPayDiag(); out.diag = /^付款診斷_/.test(dl);
+        let saved = ''; const ob = window.Blob; window.Blob = function (parts) { saved = parts.join(''); }; exportData(); window.Blob = ob; URL.createObjectURL = oc; HTMLAnchorElement.prototype.click = ok;
+        const bj = JSON.parse(saved); out.backup = !!bj.paidLog && Array.isArray(bj.payAudit) && bj.devId === _devId() && bj.appVersion === APP_VERSION;
+        out.fns = typeof _payAuditBtn === 'function' && typeof _healthAdd689 === 'function' && typeof _verNum === 'function' && _verNum('v6.0.89') > _verNum('v6.0.9');
+        PAYABLES.length = 0; PAY_AUDIT.length = 0; Object.keys(PAID_LOG).forEach(k => delete PAID_LOG[k]); Q.length = 0; eid = null; localStorage.removeItem('fy_paystat'); localStorage.removeItem('fy_priv_last_up'); localStorage.removeItem('fy_payaudit'); _payStatSnap = null;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    check('v6.0.89 付款狀態稽核：已付↔待付每次變動記錄裝置／版本／程式路徑、帳本救回不算變動、列上「歷程」與紅色「帳本記載已付」警示、顯示前先對帳', r.dev && r.built && r.audit1 && r.restored && r.audit2 && r.warn && r.renderFix && r.btn && r.modal, JSON.stringify(r));
+    check('v6.0.89 已付的應付不被自動重建刪除（待付照撤）、同編號重複已付優先、雲端稽核聯集＋上傳者版本、健檢列舊版裝置／帳本已付但待付／近期改回、診斷檔與全量備份含帳本', r.keepPaid && r.dropPending && r.dup && r.merge && r.health && r.healthLedger && r.diag && r.backup && r.fns, JSON.stringify(r));
+    check('v6.0.89 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

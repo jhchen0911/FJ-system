@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.88';
+var APP_VERSION='v6.0.89';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -7561,6 +7561,7 @@ function exportData(){
     // v5.373 起另含六大工具存檔、施工計畫書草稿與共用附件庫、材料庫存、報價版本歷史
     const data=_syncPayload().data;
     data.exportDate=new Date().toISOString();
+    try{data.paidLog=PAID_LOG;data.payAudit=PAY_AUDIT;data.devId=_devId();data.appVersion=APP_VERSION;}catch(e){_err('exportData.audit',e);}   // v6.0.89
     const json=JSON.stringify(data,null,2);
     const blob=new Blob([json],{type:'application/json'});
     const url=URL.createObjectURL(blob);
@@ -9660,7 +9661,8 @@ function _privatePayload(){
     quoteSens:qs, payables:PAYABLES, expenses:EXPENSES, costHist:COST_HIST,
     upaCostDB:UPA_COST_DB, shareProfit:SHARE_PROFIT, matLedger:MAT_LEDGER, dealHist:DEAL_HIST,
     hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]), petty:(typeof PETTY!=='undefined'?PETTY:[]),   // v5.433／v5.434
-    paidLog:(typeof PAID_LOG!=='undefined'?PAID_LOG:{})   // v6.0.85
+    paidLog:(typeof PAID_LOG!=='undefined'?PAID_LOG:{}),   // v6.0.85
+    payAudit:(typeof PAY_AUDIT!=='undefined'?PAY_AUDIT.slice(0,1000):[]), uploadedVer:APP_VERSION, uploadedDev:(typeof _devId==='function'?_devId():'')   // v6.0.89 付款狀態稽核＋上傳者版本／裝置
   }};
 }
 function _syncPayload(){
@@ -10027,6 +10029,8 @@ function _applySensColls(data,tombs){
   if(!data)return;
   var _safeMerge=function(loc,cld,nm){try{return _mergeColl(loc,cld,nm,tombs);}catch(e){console.error('[同步] '+nm+' 合併失敗，改用雲端版',e);return Array.isArray(cld)?cld:(cld?Object.values(cld):loc);}};
   try{_paidLogMerge(data.paidLog);}catch(e){_err('_applySensColls.paidLog',e);}   // v6.0.85 先取帳本聯集
+  try{_payAuditMerge(data.payAudit);}catch(e){_err('_applySensColls.audit',e);}   // v6.0.89
+  try{if(data.uploadedAt)localStorage.setItem('fy_priv_last_up',JSON.stringify({by:data.uploadedBy||'',ver:data.uploadedVer||'',dev:data.uploadedDev||'',at:parseInt(data.uploadedAt)||0}));}catch(e){_err('_applySensColls.uploader',e);}   // v6.0.89 雲端最後由誰／哪版上傳
   if(data.payables)PAYABLES=_safeMerge(PAYABLES,data.payables,'payables');
   if(data.expenses)EXPENSES=_safeMerge(EXPENSES,data.expenses,'expenses');
   if(data.hr){HR=_safeMerge(HR,data.hr,'hr');try{_lsSet('fy_hr',JSON.stringify(HR),'人員薪資');}catch(e){_err('_applySensColls.hr',e);}}   // v5.433
@@ -23039,7 +23043,7 @@ function closeMergeCost(){
 }
 
 function saveVendors(){_lsSet('fy_vendors',JSON.stringify(VENDORS),'廠商'); try{_autoUpload();}catch(e){_err('saveVendors',e);}}
-function savePayables(){try{_paidLogSync();}catch(e){_err('savePayables.paidLog',e);}_lsSet('fy_payables',JSON.stringify(PAYABLES),'應付帳款'); try{_autoUpload();}catch(e){_err('savePayables',e);}}   // v6.0.85 存檔前先與付款帳本對帳
+function savePayables(){try{_paidLogSync();}catch(e){_err('savePayables.paidLog',e);}try{_payAuditDiff();}catch(e){_err('savePayables.audit',e);}_lsSet('fy_payables',JSON.stringify(PAYABLES),'應付帳款'); try{_autoUpload();}catch(e){_err('savePayables',e);}}   // v6.0.85 存檔前先與付款帳本對帳
 function saveInvoiceRecs(){_lsSet('fy_inv_recs',JSON.stringify(INVOICE_RECS),'發票紀錄'); try{_autoUpload();}catch(e){_err('saveInvoiceRecs',e);}}
 function saveExpenses(){_lsSet('fy_expenses',JSON.stringify(EXPENSES),'費用'); try{_autoUpload();}catch(e){_err('saveExpenses',e);}}
 function saveActivityLog(){_lsSet('fy_activity',JSON.stringify(ACTIVITY_LOG.slice(0,500)),'活動紀錄');}
@@ -25730,6 +25734,7 @@ function togglePayVat(pid,on){
   try{rDash();}catch(e){_err('togglePayVat',e);}
 }
 function renderPayables(){
+  try{if(_paidLogSync())savePayables();}catch(e){_err('renderPayables.paidLog',e);}   // v6.0.89 顯示前先與付款帳本對帳
   const el=document.getElementById('payable-list');if(!el)return;
   const catMap={material:'材料費',labor:'人工費',equipment:'機具費',subcontract:'協力廠商',salary:'薪資／勞健保',petty:'零用金',other:'其他'};
   const srch=(document.getElementById('finance-search')?.value||'').toLowerCase();
@@ -25828,9 +25833,10 @@ function renderPayables(){
           +'<div class="qr"><div class="qa" style="color:var(--red)">NT$ '+fmt(_payEff(p))+'</div>'
         +(p.vat!==false?'<div style="font-size:10px;color:var(--b3)">未稅 '+fmt(p.amount||0)+'＋5%稅 '+fmt(_payVatAmt(p))+'</div>':'')
         +_payVatCtl(p)   // v6.0.42 自動產生的不給改稅別
-          +'<span class="bdg '+(p.status==='paid'?'ok':'warn')+'">'+(p.status==='paid'?'✓ 已付款':'待付款')+'</span></div>'
+          +'<span class="bdg '+(p.status==='paid'?'ok':'warn')+'">'+(p.status==='paid'?'✓ 已付款':'待付款')+'</span>'+_payLedgerWarn(p)+'</div>'
           +'<div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">'
-          +(p.status!=='paid'?'<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid(\''+p.id+'\',null,_payAfterMark)">✓ 付款</button>'+_payVendorAllBtn(p):'<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark(\''+p.id+'\')">改回未付</button>')   // v6.0.72 付款先問實付日；已付可改回
+          +(p.status!=='paid'?'<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid(\''+p.id+'\',null,_payAfterMark)">✓ 付款</button>'+_payVendorAllBtn(p):'<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark(\''+p.id+'\')">改回未付</button>')   // v6
+          +_payAuditBtn(p)   // v6.0.89.0.72 付款先問實付日；已付可改回
         +(p.quoteId?'<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts(\''+p.quoteId+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>':'')
           +_payEditBtns(p)   // v6.0.42 自動產生的唯讀
           +_payFilesInline(p)+'</div>'   // v6.0.39 附件鈕併入同列
@@ -25867,10 +25873,10 @@ function renderPayables(){
         <div class="qa" style="color:var(--red)">NT$ ${fmt(_payEff(p))}</div>
         ${p.vat!==false?`<div style="font-size:10px;color:var(--b3)">未稅 ${fmt(p.amount||0)}＋5%稅 ${fmt(_payVatAmt(p))}</div>`:''}
         ${_payVatCtl(p)}
-        <span class="bdg ${p.status==='paid'?'ok':'warn'}">${p.status==='paid'?'✓ 已付款':'待付款'}</span>
+        <span class="bdg ${p.status==='paid'?'ok':'warn'}">${p.status==='paid'?'✓ 已付款':'待付款'}</span>${_payLedgerWarn(p)}
       </div>
       <div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">
-        ${p.status!=='paid'?`<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid('${p.id}',null,_payAfterMark)">✓ 付款</button>`:`<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark('${p.id}')">改回未付</button>`}
+        ${p.status!=='paid'?`<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid('${p.id}',null,_payAfterMark)">✓ 付款</button>`:`<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark('${p.id}')">改回未付</button>`}${_payAuditBtn(p)}
               ${p.quoteId?`<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts('${p.quoteId}')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>`:''}
         ${_payEditBtns(p)}
         ${_payFilesInline(p)}
@@ -31485,6 +31491,7 @@ function _pjStat(q){
   return st;
 }
 function renderProj(){
+  try{if(_paidLogSync())savePayables();}catch(e){_err('renderProj.paidLog',e);}   // v6.0.89
   var root=document.getElementById('proj-root');if(!root)return;
   if(window._pjShowClosed===undefined)window._pjShowClosed=false;
   var list=_pjProjects(window._pjShowClosed);
@@ -32769,10 +32776,10 @@ function _syncSubPeriodPayables(q,c){
   var keep={};periods.forEach(function(per){keep[_subPayId(c.id,per)]=per;_subEarly(per).forEach(function(e){keep[_subEarlyId(c.id,per,e)]=e;});});
   _subAdvs(c).forEach(function(a){keep[_subAdvPayId(c.id,a)]=a;});keep['pay'+c.id+'_intro']=1;
   var removed=[];
-  PAYABLES=PAYABLES.filter(function(p){if(p.costId!==c.id)return true;if(keep[p.id])return true;removed.push(p.id);return false;});
+  PAYABLES=PAYABLES.filter(function(p){if(p.costId!==c.id)return true;if(keep[p.id])return true;if(p.status==='paid')return true;removed.push(p.id);return false;});   // v6.0.89 已付的不動（錢已匯出去，留著對帳）
   removed.forEach(function(pid){_tomb('payables',pid);});
   if(!vendor||vendor==='公司支出（自付）'){
-    PAYABLES=PAYABLES.filter(function(p){if(p.costId===c.id){_tomb('payables',p.id);return false;}return true;});
+    PAYABLES=PAYABLES.filter(function(p){if(p.costId===c.id&&p.status!=='paid'){_tomb('payables',p.id);return false;}return true;});
     savePayables();return;
   }
   var itemName='';
@@ -34037,7 +34044,7 @@ function _pjAdvRowsHtml(c){
   var as=_subAdvs(c);if(!as.length)return '';
   return '<div style="font-size:10.5px;margin-top:2px">'+as.map(function(a){var pid=_subAdvPayId(c.id,a),p=(PAYABLES||[]).find(function(x){return x.id===pid;}),paid=p&&p.status==='paid';
     return '<div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;white-space:nowrap"><span style="color:var(--b4)">'+esc(a.date||'')+' 預付 '+fmt(Math.round(parseFloat(a.amt)||0))+(p&&p.vat!==false?'<span style="color:var(--b3)">（含稅 '+fmt(_payEff(p))+'）</span>':'')+'</span>'
-      +(paid?'<span style="color:var(--g3);font-weight:700">✓ 已付'+(p.paidDate?(' '+esc(p.paidDate)):'')+'</span>':(p?'<button type="button" class="btn btn-xs" style="padding:1px 8px;font-size:10.5px;border-color:var(--g);color:var(--g)" onclick="pjPayAdv(\''+pid+'\')">付款</button>':'<span style="color:var(--b3)">無應付</span>'))+'</div>';}).join('')+'</div>';
+      +(paid?'<span style="color:var(--g3);font-weight:700">✓ 已付'+(p.paidDate?(' '+esc(p.paidDate)):'')+'</span>':(p?_payLedgerWarn(p)+'<button type="button" class="btn btn-xs" style="padding:1px 8px;font-size:10.5px;border-color:var(--g);color:var(--g)" onclick="pjPayAdv(\''+pid+'\')">付款</button>':'<span style="color:var(--b3)">無應付</span>'))+'</div>';}).join('')+'</div>';
 }
 function pjPayAdv(pid){
   var p=(PAYABLES||[]).find(function(x){return x.id===pid;});if(!p)return;
@@ -34588,7 +34595,7 @@ buildSubMgmtHtml=function(q){var h=_buildSubMgmtHtml0(q);if(q&&typeof h==='strin
 
 // ── ④ 資料健檢加項 ──
 // v6.0.49 健檢＝本體＋兩段加項（原兩層包裝）
-function _healthRows(){var R=_healthRowsBase();try{R=_healthAdd637(R)||R;}catch(e){_err('_healthRows.637',e);}try{R=_healthAdd639(R)||R;}catch(e){_err('_healthRows.639',e);}return R;}
+function _healthRows(){var R=_healthRowsBase();try{R=_healthAdd637(R)||R;}catch(e){_err('_healthRows.637',e);}try{R=_healthAdd639(R)||R;}catch(e){_err('_healthRows.639',e);}try{R=_healthAdd689(R)||R;}catch(e){_err('_healthRows.689',e);}return R;}
 function _healthAdd637(R){   // v6.0.37 加項：重複發包卡、重複應付、多餘應付
   var add=function(sev,area,msg,fix){R.push({sev:sev,area:area,msg:msg,fix:fix||''});};
   try{
@@ -34619,7 +34626,7 @@ function _earlyToAdv(q,c){
       per.adv=Math.round(parseFloat(per.adv)||0)+amt;
       var oldId='pay'+c.id+'_p'+per.no+'_e'+e.id,newId=_subAdvPayId(c.id,a);
       var oi=-1;PAYABLES.forEach(function(p,i){if(p&&p.id===oldId&&oi<0)oi=i;});
-      if(oi>=0){var op=PAYABLES[oi];if(!PAYABLES.some(function(p){return p&&p.id===newId;})){var np=Object.assign({},op,{id:newId,costAdv:a.id,note:'預付款'+(a.note?('：'+a.note):'')+'（第'+per.no+'期）'});delete np.costEarly;_touch(np);PAYABLES.splice(oi,1,np);}else PAYABLES.splice(oi,1);_tomb('payables',oldId);}
+      if(oi>=0){var op=PAYABLES[oi];var ex2=PAYABLES.find(function(p){return p&&p.id===newId;});if(!ex2){var np=Object.assign({},op,{id:newId,costAdv:a.id,note:'預付款'+(a.note?('：'+a.note):'')+'（第'+per.no+'期）'});delete np.costEarly;_touch(np);PAYABLES.splice(oi,1,np);}else{if(op.status==='paid'&&ex2.status!=='paid'){ex2.status='paid';ex2.paidDate=op.paidDate;ex2.paidAt=op.paidAt||_payStamp(ex2);_touch(ex2);}PAYABLES.splice(oi,1);}_tomb('payables',oldId);}   // v6.0.89 舊提前放款已付 → 新編號也要是已付
       n++;
     });
     delete per.early;per.mt=Date.now();
@@ -34683,7 +34690,7 @@ function _subAdvRowsHtml(c){
     var stTxt=!p?('<span style="color:var(--red)">缺應付</span>'+B("subPayResync('"+c.id+"')",'補建應付','var(--red)','#f0c4c4')):(p.status==='paid'?'<span style="color:#1B5E20">✓ 已付 '+esc(p.paidDate||'')+'</span>':('<span style="color:#b45309">未付</span>'+(p.date&&p.date<localToday()?' <span style="color:var(--red);font-weight:700">逾期</span>':'')));
     var usedSum=used.reduce(function(s,u){return s+u.amt;},0);
     var usedTxt=used.length?('<div style="font-weight:400;color:#1565C0;font-size:10.5px">扣在：'+used.map(function(u){return '第'+u.per.no+'期 '+fmt(u.amt);}).join('、')+(usedSum<amt?('；餘 '+fmt(amt-usedSum)+' 下期扣'):'')+'</div>'):'<div style="font-weight:400;color:var(--b4);font-size:10.5px">尚未扣回（下期登錄請款時自動扣）</div>';
-    var acts=(p?(p.status==='paid'?B("payUnmark('"+p.id+"')",'改回未付','#b45309','#ffcc80'):B("payMarkPaid('"+p.id+"','"+esc(a.date||'')+"')",'標記已付','#1B5E20','#a5d6a7')):'')
+    var acts=(p?(p.status==='paid'?B("payUnmark('"+p.id+"')",'改回未付','#b45309','#ffcc80'):B("payMarkPaid('"+p.id+"','"+esc(a.date||'')+"')",'標記已付','#1B5E20','#a5d6a7'))+B("openPayAudit('"+p.id+"')",'歷程','var(--b4)'):'')
       +((p&&p.status==='paid')?'':B("editSubAdvance('"+c.id+"','"+a.id+"')",'修改'))+((p&&p.status==='paid')?'':B("delSubAdvance('"+c.id+"','"+a.id+"')",'刪除','var(--red)','#f0c4c4'));
     return '<tr style="border-bottom:1px solid var(--b1);background:#eef5fd">'
       +'<td style="padding:4px 6px;white-space:nowrap;color:#1565C0;font-weight:700">'+(c.isIntro?'預付款（介紹費）':'預付款')+(a.fromPeriod?'<div style="font-weight:400;font-size:10px;color:var(--b4)">原第'+a.fromPeriod+'期提前放款</div>':'')+'</td>'
@@ -34816,7 +34823,7 @@ function _payVatCtl(p){
 function cleanDuplicatePayables(){
   var seenId={},whole={},out=[],n=0;
   var isWhole=function(p){return !p.costPeriod&&!p.costAdv&&!p.costEarly&&!/_(p|r|a|e)\w*$|_intro$/.test(String(p.id||''));};
-  var sorted=PAYABLES.slice().sort(function(a,b){return (b.updatedAt||b._mt||0)-(a.updatedAt||a._mt||0);});
+  var sorted=PAYABLES.slice().sort(function(a,b){return ((b.status==='paid')-(a.status==='paid'))||((b.updatedAt||b._mt||0)-(a.updatedAt||a._mt||0));});   // v6.0.89 同編號重複時已付優先
   var keep=[];
   sorted.forEach(function(p){
     if(!p)return;
@@ -35330,7 +35337,7 @@ function _payAdvInfo(p){
   if(!ctx||!(ctx.k.adv>0))return '';
   var k=ctx.k,tm=p.vat===false?1:_taxM(),us=_payAdvUsed(ctx.c,ctx.per),q=ctx.q,c=ctx.c;
   var line=function(u){var a=u.a,pp=u.pay,paid=pp&&pp.status==='paid';
-    return '<div>預付款 '+esc(a.date||'')+'　NT$ '+fmt(Math.round(u.amt*tm))+(paid?' <span style="color:var(--g3)">✓ 已付 '+esc(pp.paidDate||a.date||'')+'</span>':(pp?' <span style="color:var(--red)">待付</span> <a href="javascript:void(0)" onclick="payMarkPaid(\''+pp.id+'\',\''+esc(a.date||'')+'\',renderPayables)" style="color:#1565C0">標記已付</a>':' <span style="color:#b26a00">缺應付</span> <a href="javascript:void(0)" onclick="_advPayFix(\''+q.id+'\',\''+c.id+'\')" style="color:#1565C0">補建</a>'))+'</div>';};
+    return '<div>預付款 '+esc(a.date||'')+'　NT$ '+fmt(Math.round(u.amt*tm))+(paid?' <span style="color:var(--g3)">✓ 已付 '+esc(pp.paidDate||a.date||'')+'</span>':(pp?' <span style="color:var(--red)">待付</span> '+_payLedgerWarn(pp)+' <a href="javascript:void(0)" onclick="payMarkPaid(\''+pp.id+'\',\''+esc(a.date||'')+'\',renderPayables)" style="color:#1565C0">標記已付</a> <a href="javascript:void(0)" onclick="openPayAudit(\''+pp.id+'\')" style="color:var(--b4)">歷程</a>':' <span style="color:#b26a00">缺應付</span> <a href="javascript:void(0)" onclick="_advPayFix(\''+q.id+'\',\''+c.id+'\')" style="color:#1565C0">補建</a>'))+'</div>';};
   return '<div style="margin-top:4px;padding:6px 8px;background:var(--b0);border-radius:var(--r8);font-size:11px;line-height:1.6;color:var(--b5)">本期計價（'+(p.vat===false?'未稅':'含稅')+'）NT$ '+fmt(Math.round(k.net*tm))+' － 預付款抵扣 NT$ '+fmt(Math.round(k.adv*tm))+' ＝ <b>本期應付 NT$ '+fmt(Math.round(k.pay*tm))+'</b>'+us.map(line).join('')+'</div>';
 }
 
@@ -36363,6 +36370,87 @@ function _commCsv(){
     return [r.q.date||'',r.q.name||'',r.q.client||'',r.c.name||'',r.c.role||'',_commTxtFor(r.q,cfg),a||'',Math.round(_salesRcvRate(r.q)*100)+'%',a?_commAccr(r.q,r.c):'',p?(p.status==='paid'?('已付 '+(p.paidDate||'')):('待付 '+(p.amount||0))):'',r.c.note||''];});
   downloadCSV('業主端佣金_'+year+(month?('_'+month):'')+'_'+fmtDateStr(),['報價日','工程','業主','收款人','身分','計算方式','佣金','收款進度','已計提','付款','備註'],rows);
 }
+
+// ══════════ v6.0.89 付款狀態稽核：每筆應付「已付↔待付／刪除」的每一次變動都留下紀錄（哪台裝置、哪個版本、哪段程式、是否套用雲端時），
+// 列上有「歷程」可查；付款帳本說已付而記錄是待付 → 列上紅色警示，不讓人再匯一次；已付的應付不再被任何自動重建刪除。 ══════════
+// 資料：PAY_AUDIT（本機 fy_payaudit、private 節點 payAudit，跨裝置以 k 聯集，最多 1000 筆）；快照 fy_paystat（id→status）在 savePayables 比對。
+// 私有 payload 多 uploadedVer／uploadedDev，套用時記在 fy_priv_last_up → 健檢可看出「哪台裝置還在舊版」。
+function _devId(){var k='fy_dev_id',v='';try{v=localStorage.getItem(k)||'';if(!v){v='d'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);localStorage.setItem(k,v);}}catch(e){/* 可忽略 */}return v||'d?';}
+var PAY_AUDIT=[];try{var _pax=localStorage.getItem('fy_payaudit');if(_pax)PAY_AUDIT=JSON.parse(_pax)||[];if(!Array.isArray(PAY_AUDIT))PAY_AUDIT=[];}catch(e){_err('payAudit.load',e);PAY_AUDIT=[];}
+var _payStatSnap=null;
+function _payAuditCaller(){   // 從呼叫堆疊抓出是哪段程式改的（最多 5 層，略過稽核與存檔本身）
+  try{var names=String(new Error().stack||'').split('\n').map(function(l){var m=l.match(/at\s+(?:new\s+)?([\w$.<>]+)/)||l.match(/^([\w$.<>]+)@/);return m?m[1]:'';}).filter(function(n){return n&&!/^(Error|_payAudit|savePayables|Array\.|Object\.|<anonymous>)/.test(n);});
+    var out=[];names.forEach(function(n){if(out.indexOf(n)<0)out.push(n);});return out.slice(0,5).join(' ← ');}catch(e){return '';}
+}
+function _payAuditLoadSnap(){
+  if(_payStatSnap)return;_payStatSnap={};
+  try{var sv=JSON.parse(localStorage.getItem('fy_paystat')||'null');if(sv&&typeof sv==='object'){_payStatSnap=sv;return;}}catch(e){_err('_payAuditLoadSnap',e);}
+  (PAYABLES||[]).forEach(function(p){if(p&&p.id)_payStatSnap[p.id]=p.status||'pending';});
+}
+function _payAuditDiff(){   // savePayables 時比對快照，狀態有變就記一筆（含已付被刪除）
+  _payAuditLoadSnap();
+  var now=Date.now(),src=null,cur={},n=0;
+  var push=function(p,id,from,to){
+    if(src===null)src=_payAuditCaller();var l=(typeof PAID_LOG!=='undefined'&&PAID_LOG[id])||{};
+    PAY_AUDIT.unshift({k:id+'@'+now+'@'+to,id:id,from:from,to:to,at:now,dev:_devId(),ver:APP_VERSION,by:_meEmail()||'本機',src:src,who:p?(p.to||''):'',proj:p?(p.project||''):'',amt:p?_payEff(p):0,pd:p?(p.paidDate||''):'',lp:l.paidAt||0,lu:l.unpaidAt||0,cloud:!!window._applyingCloud});n++;
+  };
+  (PAYABLES||[]).forEach(function(p){if(!p||!p.id)return;var st=p.status||'pending';cur[p.id]=st;var prev=_payStatSnap[p.id];if(prev===undefined){if(st==='paid')push(p,p.id,'（新建）','paid');}else if(prev!==st)push(p,p.id,prev,st);});
+  Object.keys(_payStatSnap).forEach(function(id){if(cur[id]===undefined&&_payStatSnap[id]==='paid')push(null,id,'paid','（已刪除）');});
+  _payStatSnap=cur;
+  if(n){if(PAY_AUDIT.length>1000)PAY_AUDIT.length=1000;try{localStorage.setItem('fy_payaudit',JSON.stringify(PAY_AUDIT));}catch(e){_err('_payAuditDiff',e);}}
+  try{localStorage.setItem('fy_paystat',JSON.stringify(cur));}catch(e){_err('_payAuditDiff.snap',e);}
+  return n;
+}
+function _payAuditMerge(remote){   // 跨裝置聯集（以 k 去重）
+  if(remote&&!Array.isArray(remote)&&typeof remote==='object')remote=Object.values(remote);
+  if(!Array.isArray(remote)||!remote.length)return 0;
+  var seen={};PAY_AUDIT.forEach(function(a){if(a&&a.k)seen[a.k]=1;});var add=0;
+  remote.forEach(function(a){if(a&&a.k&&!seen[a.k]){PAY_AUDIT.push(a);seen[a.k]=1;add++;}});
+  if(add){PAY_AUDIT.sort(function(a,b){return (b.at||0)-(a.at||0);});if(PAY_AUDIT.length>1000)PAY_AUDIT.length=1000;try{localStorage.setItem('fy_payaudit',JSON.stringify(PAY_AUDIT));}catch(e){_err('_payAuditMerge',e);}}
+  return add;
+}
+function _payAuditOf(id){return PAY_AUDIT.filter(function(a){return a&&a.id===id;});}
+function _payLedgerWarn(p){   // 帳本記載已付、記錄卻待付 → 紅色警示（確認前不要再匯）
+  if(!p||!p.id||p.status==='paid'||typeof PAID_LOG==='undefined')return '';
+  var l=PAID_LOG[p.id];if(!l||!((l.paidAt||0)>(l.unpaidAt||0)))return '';
+  return '<span class="bdg pay-ledger-warn" style="background:#fdecea;color:#c62828;border:1px solid #f5b5ae;font-size:10px;cursor:pointer" onclick="event.stopPropagation();openPayAudit(\''+p.id+'\')" title="付款帳本記載這筆已標記已付，但目前記錄是待付；點開看歷程，確認前不要再匯款">⚠ 帳本記載已付'+(l.paidDate?(' '+esc(l.paidDate)):'')+'</span>';
+}
+function _payAuditBtn(p){return p&&p.id?'<button type="button" class="btn btn-xs" style="border-color:var(--b2);color:var(--b4)" title="付款狀態變動歷程（哪台裝置、哪個版本、哪段程式改的）" onclick="openPayAudit(\''+p.id+'\')">歷程</button>':'';}
+function _privLastUploader(){try{return JSON.parse(localStorage.getItem('fy_priv_last_up')||'null');}catch(e){return null;}}
+function _verNum(v){var m=String(v||'').match(/(\d+)\.(\d+)\.(\d+)/);return m?(parseInt(m[1])*1000000+parseInt(m[2])*1000+parseInt(m[3])):0;}
+function openPayAudit(pid){
+  var p=(PAYABLES||[]).find(function(x){return x&&x.id===pid;}),rows=_payAuditOf(pid),l=(typeof PAID_LOG!=='undefined'&&PAID_LOG[pid])||{};
+  var tomb=(TOMBS&&TOMBS.payables&&TOMBS.payables[pid])||0;
+  var f=function(t){return t?new Date(t).toLocaleString('zh-TW',{hour12:false}):'—';};
+  var h='<div style="font-size:12.5px;line-height:1.8">'+(p?('<b>'+esc(p.to||'')+'</b>　'+esc(p.project||'')+'<br>'+esc((p.note||'').slice(0,80))+'<br>金額 NT$ '+fmt(_payEff(p))+'　目前 <b>'+(p.status==='paid'?('已付 '+esc(p.paidDate||'')):'待付')+'</b>'+(p.status!=='paid'&&(l.paidAt||0)>(l.unpaidAt||0)?'　<span style="color:#c62828;font-weight:700">⚠ 帳本記載已付</span>':'')):'（這筆應付目前不存在）')
+    +'<div style="margin-top:4px;font-size:11.5px;color:var(--b4)">編號 '+esc(pid)+'<br>付款帳本：標記已付 '+f(l.paidAt)+(l.paidDate?('（實付日 '+esc(l.paidDate)+'）'):'')+'　改回未付 '+f(l.unpaidAt)+(tomb?('<br><span style="color:#c62828">墓碑：'+f(tomb)+'（曾被刪除）</span>'):'')+'<br>本裝置 '+esc(_devId())+'　'+esc(APP_VERSION)+'</div></div>';
+  h+='<div style="font-weight:800;font-size:12px;margin:8px 0 4px">狀態變動歷程（新→舊）</div>';
+  if(!rows.length)h+='<div style="font-size:12px;color:var(--b3)">尚無紀錄（v6.0.89 起才開始記錄；之後每次已付↔待付的變動都會留下裝置、版本與程式路徑）</div>';
+  else h+='<div style="max-height:320px;overflow:auto;border:1px solid var(--b1);border-radius:var(--r8)">'+rows.map(function(a){return '<div style="padding:6px 8px;border-bottom:1px solid var(--b1);font-size:11.5px;line-height:1.6"><b>'+esc(a.from)+' → '+esc(a.to)+'</b>　'+f(a.at)+(a.cloud?'　<span style="color:#1565C0">（套用雲端資料時）</span>':'')+(a.pd?('　實付日 '+esc(a.pd)):'')+'<br><span style="color:var(--b4)">'+esc(a.by||'')+'　裝置 '+esc(a.dev||'')+'　'+esc(a.ver||'')+'<br>程式：'+esc(a.src||'')+'</span></div>';}).join('')+'</div>';
+  h+='<div style="margin-top:8px"><button type="button" class="btn btn-xs" onclick="exportPayDiag()">匯出付款診斷檔</button> <span style="font-size:11px;color:var(--b4)">只含應付、付款帳本、墓碑、歷程與預付款設定，不含報價內容；查問題時把這個檔傳給開發者</span></div>';
+  showConfirm('付款狀態歷程',h,function(){},false,null,true);
+  var ok=document.getElementById('gen-confirm-ok');if(ok)ok.style.display='none';var cc=document.getElementById('gen-confirm-cancel');if(cc)cc.textContent='關閉';
+}
+function exportPayDiag(){
+  try{
+    var d={exportDate:new Date().toISOString(),ver:APP_VERSION,dev:_devId(),user:_meEmail()||'',lastPrivUploader:_privLastUploader(),payables:PAYABLES,paidLog:(typeof PAID_LOG!=='undefined'?PAID_LOG:{}),tombsPayables:(TOMBS&&TOMBS.payables)||{},payAudit:PAY_AUDIT,
+      subCards:(Q||[]).map(function(q){return {q:q.id,name:q.name,costs:(q.costs||[]).filter(function(c){return c&&c.type==='sub';}).map(function(c){return {id:c.id,vendor:c.vendor,followOf:c.followOf||'',advances:c.advances||[],periods:(c.periods||[]).map(function(x){return {no:x.no,date:x.date,from:x.from,to:x.to,adv:x.adv,early:x.early||null,isRet:!!x.isRet};})};})};}).filter(function(x){return x.costs.length;})};
+    var blob=new Blob([JSON.stringify(d,null,1)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='付款診斷_'+fmtDateStr()+'.json';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(url);a.remove();},1000);toast('已匯出付款診斷檔');
+  }catch(e){_err('exportPayDiag',e);toast('匯出失敗：'+e.message);}
+}
+function _healthAdd689(R){   // 健檢：帳本記載已付但待付、近 14 天已付被改回／刪除、有裝置仍在舊版
+  if(!R)R=[];
+  try{
+    (PAYABLES||[]).forEach(function(p){if(!p||!p.id||p.status==='paid')return;var l=PAID_LOG[p.id];if(l&&(l.paidAt||0)>(l.unpaidAt||0))R.push({sev:'warn',area:'應付',msg:(p.project||'')+'：'+(p.to||'')+' NT$ '+fmt(_payEff(p))+' 付款帳本記載已付（'+(l.paidDate||'')+'）但目前是待付——確認前不要再匯款',fix:'應付列「歷程」看是哪台裝置改的；確認已匯就按「付款」'});});
+    var since=Date.now()-14*86400000,bad=PAY_AUDIT.filter(function(a){return a&&a.at>=since&&a.from==='paid'&&(a.to==='pending'||a.to==='（已刪除）');});
+    if(bad.length){var a0=bad[0];R.push({sev:'warn',area:'應付',msg:'近 14 天有 '+bad.length+' 筆已付應付被改回待付或刪除（最近：'+(a0.proj||'')+' '+(a0.who||'')+' NT$ '+fmt(a0.amt||0)+'，'+new Date(a0.at).toLocaleString('zh-TW',{hour12:false})+'，裝置 '+(a0.dev||'')+' '+(a0.ver||'')+'，程式 '+(a0.src||'').split(' ← ')[0]+'）',fix:'應付列「歷程」逐筆看；不是自己按「改回未付」的，把診斷檔傳給開發者'});}
+    var up=_privLastUploader();
+    if(up&&up.ver!==undefined){var old=!up.ver||_verNum(up.ver)<_verNum(APP_VERSION);if(old&&up.at&&Date.now()-up.at<7*86400000)R.push({sev:'warn',area:'同步',msg:'雲端成本／應付資料最後一次是由 '+(up.by||'某帳號')+' 的裝置'+(up.dev?('（'+up.dev+'）'):'')+' 以 '+(up.ver||'v6.0.88 以前的版本')+' 上傳（'+new Date(up.at).toLocaleString('zh-TW',{hour12:false})+'）；該裝置仍在舊版，重建應付時沒有付款帳本保護',fix:'到那台裝置重新整理兩次到 '+APP_VERSION});}
+  }catch(e){_err('_healthAdd689',e);}
+  return R;
+}
+try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{if(_paidLogSync())savePayables();else _payAuditLoadSnap();}catch(e){_err('paidLog.boot',e);}},1500);});}catch(e){_err('paidLog.boot',e);}
 
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
