@@ -7015,7 +7015,16 @@ async function newPage(browser, width, height) {
         INV.push(a, { id: 'F2', kind: 'retReturn', project: '小修案', client: '甲', periodNo: '退', date: '2026-10-01', totals: { curTotal: 0, tax: 0, total: 0 }, items: [], retRet: { amt: 1 } });
         out.rcv = _invRcv(a) === 108000 && _invRcvIn(a, '2026-10') === 13500 && _invRcvIn(a, '2026-06') === 94500 && _retCashOn('2026-10') === 13500;
         out.ar = _arSum([a]) === 0 && _arSum(INV.filter(x => x.project === '小修案')) === 0;
-        out.next = /delete next\.receipts;next\.holdRetAmt=0;next\.holdRetDate=''/.test(addNextPeriod.toString());
+        out.next = /delete next\.receipts;delete next\.holdRetLog;next\.holdRetAmt=0;next\.holdRetDate=''/.test(addNextPeriod.toString());
+        /* 舊資料：holdRetAmt 被抄到沒有當場扣款的下一期 → 不算實收、健檢列出；同案重複收款明細也列出 */
+        const b = { id: 'F3', project: '小修案', client: '甲', periodNo: 2, date: '2026-06-25', totals: { curTotal: 1000, total: 1050 }, received: '0', recvHold: 0, holdRetAmt: 3000, holdRetDate: '2026-10-05', receipts: [{ id: 'rc1', kind: 'cash', amt: 500, date: '2026-07-01' }], items: [] };
+        a.receipts = [{ id: 'rc1', kind: 'cash', amt: 500, date: '2026-07-01' }]; INV.push(b);
+        out.cap = _invRcv(b) === 0 && _invRcvIn(b, '2026-10') === 0;
+        const H = _healthRows(); out.health = H.some(x => /當場扣款已退還」NT\$ 3,000 大於/.test(x.msg)) && H.some(x => /與同案另一期相同/.test(x.msg));
+        /* 分次退還保留每次日期 */
+        const c = { id: 'F4', recvHold: 1000, holdRetAmt: 400, holdRetDate: '2026-08-01' }; _holdRetPush(c, 600, '2026-09-01', 'x');
+        INV.splice(INV.indexOf(b), 1); delete a.receipts;
+        out.split = c.holdRetLog.length === 2 && c.holdRetAmt === 1000 && _invRcvIn(c, '2026-08') === 400 && _invRcvIn(c, '2026-09') === 600;
         let csv = null; const od = window.downloadCSV; window.downloadCSV = (n, h, rows) => { csv = rows; };
         exportInvExcel(); window.downloadCSV = od;
         const row = csv && csv.find(x => x[0] === '小修案'); out.xls = !!row && csv.filter(x => x[0] === '小修案').length === 1 && row[8] === 108000 && row[9] === 0;
@@ -7023,7 +7032,7 @@ async function newPage(browser, width, height) {
       INV.length = 0; oI.forEach(x => INV.push(x));
       return out;
     });
-    check('v6.0.102 實收含當場扣款退還（依退還日）、應收餘額逐張加總不為負、下一期不帶收款明細、請款單匯出排除退還單且已收款含退還', r.rcv && r.ar && r.next && r.xls, JSON.stringify(r));
+    check('v6.0.102 實收含當場扣款退還（依退還日）、應收餘額逐張加總不為負、下一期不帶收款明細、請款單匯出排除退還單且已收款含退還', r.rcv && r.ar && r.next && r.xls && r.cap && r.health && r.split, JSON.stringify(r));
     check('v6.0.102 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
