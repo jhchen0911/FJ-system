@@ -98,7 +98,7 @@
 | 工具 | `matest` `rebar` `grout` `backfill` `workers`；`lifeline`、`progress` 隱藏 | `renderMatEst` `matEstCalc`（綁定工程時幾何讀案場細節）`renderWorkers` | toolStates、workers（逐筆） |
 | 單價分析／單價庫 | `upa`（sysOnly） | `upaCalc` `applyUPA` `writeCostHist`（結案回寫） | upaHistory（shared）、upaCostDB／costHist（private） |
 | 人員／角色／參數 | `staff` `roles` `params` | `renderStaffPage` `renderRolesPage` `rolePerm` `canAccess` `_v6PermMigrate` `doSaveP` `syncParamsUI` `prmTab` | pagePerms、params（shared） |
-| 同步／備份／錯誤 | 頂欄 `#sync-chip` | `_sharedPayload` `_privatePayload` `_mergeColl`（應付另以 `_payStatusReconcile` 依 paidAt／unpaidAt 先後決定付款狀態；付款帳本 `PAID_LOG`／`_paidLogSync`／`_paidLogMerge` 為已付最後防線，`savePayables` 先對帳）`_perRecordDelta` `_touch` `exportData`／`importData` `_err`／`renderErrLog` `_syncChip`；唯讀帳號 `_readerCheck`／`_isReaderUser`（所有上傳略過）、名冊管理 `renderReadersBox`／`readerAdd`／`readerDel`（人員管理頁） | 見「架構」；唯讀名冊 `fydata/readers`（只讀 shared） |
+| 同步／備份／錯誤 | 頂欄 `#sync-chip` | `_sharedPayload` `_privatePayload` `_mergeColl`（應付另以 `_payStatusReconcile` 依 paidAt／unpaidAt 先後決定付款狀態；付款帳本 `PAID_LOG`／`_paidLogSync`／`_paidLogMerge` 為已付最後防線，`savePayables` 先對帳）`_perRecordDelta` `_touch` `exportData`／`importData` `_err`／`renderErrLog` `_syncChip`；唯讀帳號 `_readerCheck`／`_isReaderUser`（所有上傳略過；v6.0.108 起下載 shared＋private、看得到全部頁面（人員／角色權限／備份還原除外），介面層 `_roInit`／`_roScan`／`_RO_DENY` 隱藏寫入按鈕、停用輸入、捕獲階段攔截，資料層 `_roDeny`）、名冊管理 `renderReadersBox`／`readerAdd`／`readerRename`（顯示名稱）／`readerDel`（人員管理頁） | 見「架構」；唯讀名冊 `fydata/readers`（值 true 或 `{name}`；可讀 shared＋private、不可寫） |
 | 列印／PDF | — | `_printViaIframe`（PDF 預覽下載）`_pdfPlanPages` `_pdfAddPaged` `_toolPrint`；原生列印 `_printNativeHTML`（iOS 改走主畫面 `_printMainHTML`，`_isIOS`）；手機表格 `_mstack` | — |
 | 信封列印 | 請款單列表／編輯器／客戶卡 ✉ | `openEnvelope` `_envHtml` `_envPrint` `_envPdf`（信封實際尺寸 PDF；iOS 產生後給連結）`_zipLookup` `_envBookGet`／`_envBookSave`（信封通訊錄）`_envUseA4`（列印方式：A4 置中預設／自訂紙張 `P.env.mode`）`_envCalPrint`／`_envCalSave`／`_envIosWrap`（每台裝置列印校正，存本機 `fy_env_ioscal`） | 版面 `P.env`（座標依規格存 `P.env.by[k15|k15s|k12]`（k15＝中式小信封 99×221、k15s＝中式 15K 105×222、k12＝12K；勾選欄列序 `cfg.methods`／`_envMethods`），`_envCfg(size)`／`_ENV_SIZE_DEF`）、通訊錄 `P.envBook[收件單位]`、`CUSTOMERS[].zip|envAttn|envTel` |
 
@@ -108,7 +108,7 @@
 
 ## 測試
 
-`tests/smoke.js`（669 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（673 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
@@ -122,7 +122,7 @@
 
 `database.rules.json` 是原始碼，**改完必須到 Firebase 主控台手動發布才會生效**。
 Storage 規則同理放在 `storage.rules`（v6.0.93 起；主控台 Storage → 規則 貼上發布）。Storage 規則讀不到 RTDB，唯讀帳號清單 `isReader()` 要與 `fydata/readers` 名冊手動同步。v6.0.105 起人員管理頁「產生 Storage 規則」（`openStorageRulesGen`／`_storageRulesText`）依人員與唯讀名冊產生只放行名冊的規則；長期由 `functions/index.js`（custom claim `fy`）自動同步，部署步驟見 `docs/Storage權限_部署步驟.md`（`firebase deploy --only functions`）。
-目前規則：`fydata/shared`（名冊內可讀寫；`fydata/readers` 唯讀名冊只可讀）／`fydata/private`（僅管理員），readers 名冊內帳號一律不得寫入任何節點，兩者都不得整包清空，
+目前規則：`fydata/shared`（名冊內可讀寫；`fydata/readers` 唯讀名冊只可讀）／`fydata/private`（僅管理員），readers 名冊內帳號可讀 shared 與 private（v6.0.108）、一律不得寫入任何節點，兩者都不得整包清空，
 並要求 `version`／`uploadedAt` 的基本形態。
 
 ## 語言

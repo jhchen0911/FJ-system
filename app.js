@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.107';
+var APP_VERSION='v6.0.108';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -163,7 +163,8 @@ window.addEventListener('unhandledrejection', function(e){
 // ═══ 前置宣告（避免 temporal dead zone）═══
 var _fbApp=null,_fbAuth=null,_fbDb=null,_fbUser=null,_fbStorage=null;
 var _isAdminUser=false;
-var _isReaderUser=false;   // v6.0.90：唯讀帳號（fydata/readers 名冊，AI 助理用）——只下載 shared、一律不寫雲端
+var _isReaderUser=false;   // v6.0.90：唯讀帳號（fydata/readers 名冊，AI 助理用）——下載 shared＋private（v6.0.108）、一律不寫雲端
+var _readerName='';   // v6.0.108：唯讀帳號顯示名稱（fydata/readers/<key>.name）
 var _roState='';   // v6.0.93：唯讀判定 ''未登入／'pending' 查詢中或失敗／'rw' 確認非唯讀／'reader'
 var _RULES_OWNER='jhchen0911@gmail.com';   // 與 database.rules.json／storage.rules 的擁有者信箱一致（唯一豁免唯讀檢查的帳號）
 // Storage 寫入／刪除一律 fail-closed：唯讀判定確認為一般帳號後才做（RTDB 寫入另有安全規則擋）
@@ -894,6 +895,7 @@ function newQ(){
 // ════════════════════ PARAMS SYNC ════════════════════
 // Sync param UI → P object and propagate everywhere
 function doSaveP(){
+  if(_roDeny())return;   // v6.0.108 唯讀帳號
   P.company=gv('pc');P.taxid=gv('pt');P.boss=gv('pb');P.contact=gv('pco');
   try{localStorage.setItem('fy_aikey',(gv('paikey')||'').trim());}catch(e){_err('doSaveP',e);}
   delete P.aiKey; // Key 僅存本機，絕不上雲
@@ -2069,6 +2071,7 @@ function upEx(){
 
 // ════════════════════ SAVE/LOAD ════════════════════
 function saveQ(){
+  if(_roDeny())return;   // v6.0.108 唯讀帳號
   // 儲存驗證（最低限度）：必填與數值合理性
   if(!(gv('fn')||'').trim()){toast('請填寫「工程名稱」再儲存');const el=document.getElementById('fn');if(el)el.focus();return;}
   for(const it of (items||[])){
@@ -3907,6 +3910,7 @@ function rInvTots(srcInv){
 
 // ── Save ──
 function saveInvoice(){
+  if(_roDeny())return;   // v6.0.108 唯讀帳號
   // 儲存驗證：必填與數值合理性；超請僅警告（業主可能同意直接請，不阻擋）
   if(!(gv('inv-project')||'').trim()){toast('請填寫「工程名稱」再儲存');const el=document.getElementById('inv-project');if(el)el.focus();return;}
   let _overN=0;
@@ -3973,6 +3977,7 @@ function saveInvoice(){
 
 // 自動存款（不跳頁，供 blur 事件使用）
 function autoSaveInv(){
+  if(_isReaderUser)return;   // v6.0.108 唯讀帳號
   try{
     const inv_id=document.getElementById('inv-eid-hidden')?.value||invEid;
     if(!inv_id)return;
@@ -7694,6 +7699,7 @@ function _staffOf(email){
 // 某人生效的角色（人員停用或角色停用都不算）
 function _rolesOf(email){
   var e=String(email||'').toLowerCase();
+  if(_isReaderUser&&e&&_fbUser&&String(_fbUser.email||'').toLowerCase()===e)return [_RO_ROLE];   // v6.0.108：唯讀帳號（不在人員名冊）
   if(BOOTSTRAP_DEV.indexOf(e)>=0){
     var sr=_roleById(SYS_ROLE_ID);
     return sr?[sr]:[{id:SYS_ROLE_ID,name:'系統管理員',sys:true,enabled:true,pages:{},cloudCost:true}];
@@ -8043,7 +8049,7 @@ function _fbErrMsg(code){
 // v5.329：舊的「帳號管理」卡已移除——管理員資格改由部門推導（見 setDept／_syncAdminEmailsFromDepts），
 // 再放一份手動清單只會與部門互相覆蓋。相關的 renderAdminPanel／addAdmin／removeAdmin 一併刪除。
 function _autoSyncOnLogin(){
-  // v6.0.90：先查唯讀名冊（fydata/readers）。唯讀帳號只下載 shared，不登記 uid、不讀 private、不上傳。
+  // v6.0.90：先查唯讀名冊（fydata/readers）。唯讀帳號下載 shared＋private（v6.0.108），不登記 uid、不上傳。
   try{if(_fbUser&&_fbUser.getIdToken)_fbUser.getIdToken(true).catch(function(){/* 可忽略：離線時沿用舊 token */});}catch(e){_err('_autoSyncOnLogin.token',e);}   // v6.0.105 取得最新 custom claims（Storage 規則用）
   _readerCheck(function(ro){
     if(ro){
@@ -8063,8 +8069,10 @@ function _autoSyncOnLogin(){
 // v6.0.93 fail-closed：結果出來前與查詢失敗時 _roState='pending' → 不做 Storage 寫入／刪除、每日備份、立即上傳；
 // 被拒（PERMISSION_DENIED）＝舊規則尚無此節點 → 視同一般帳號；其他錯誤（離線）30 秒後重查。
 // 只豁免擁有者信箱（與安全規則同一個），其他系統管理員照樣查名冊。
+// v6.0.108：名冊值可為 true 或 {name:'顯示名稱'}（皆＝唯讀）
+function _readerOn(v){return v===true||!!(v&&typeof v==='object'&&!Array.isArray(v));}
 function _readerCheck(cb){
-  _isReaderUser=false;_roState='pending';
+  _isReaderUser=false;_readerName='';_roState='pending';
   var done=function(ro){_isReaderUser=!!ro;_roState=ro?'reader':'rw';if(cb){var c=cb;cb=null;c(!!ro);}};
   try{
     if(!_fbUser||!_fbDb||!_fbUser.email){_roState='';if(cb)cb(false);return;}
@@ -8072,7 +8080,8 @@ function _readerCheck(cb){
     var me=_fbUser.uid;
     _fbDb.ref('fydata/readers/'+_encEmailKey(_fbUser.email)).once('value').then(function(s){
       if(!_fbUser||_fbUser.uid!==me)return;
-      done(s.val()===true);
+      var v=s.val();_readerName=(v&&typeof v==='object'&&typeof v.name==='string')?v.name.trim().slice(0,40):'';
+      done(_readerOn(v));
     }).catch(function(err){
       if(!_fbUser||_fbUser.uid!==me)return;
       var denied=/permission/i.test(String((err&&(err.code||err.message))||''));
@@ -8084,10 +8093,11 @@ function _readerCheck(cb){
 }
 // 重查後才發現是唯讀帳號：補上唯讀模式
 function _readerApply(){
-  _privReadOk=false;_privFailAt=Date.now();
+  _privReadOk=null;   // v6.0.108：唯讀帳號可讀 private（規則已放行），一樣不寫
   try{localStorage.removeItem('fy_pending_sync');}catch(e){/* 可忽略 */}
   try{_syncChip();}catch(e){/* 可忽略 */}
-  toast('唯讀帳號：只下載雲端資料，本機修改不會上傳');
+  try{applyRoleUI();}catch(e){_err('_readerApply',e);}
+  toast('唯讀帳號：可查看全部資料，不能新增／修改／刪除，也不會上傳');
 }
 // 安全規則不能對 email 做字串處理（含「.」不能當 key），所以名冊改記 uid。
 // 只有本機判定為管理員的帳號才會寫入；規則允許名冊空的時候由第一個人建立（首次啟用用）。
@@ -10321,7 +10331,7 @@ function _pushPrivate(cb){
 }
 function _pullPrivate(cb){
   var ref=_privRef();
-  if(!ref||_isReaderUser){if(cb)cb(false);return;}   // v6.0.90：唯讀帳號讀不到 private，不必試
+  if(!ref){if(cb)cb(false);return;}   // v6.0.108：唯讀帳號也下載 private（只讀；_pushPrivate 仍擋）
   ref.once('value').then(function(snap){
     _privReadOk=true;
     var d=snap.val();
@@ -10405,7 +10415,7 @@ function _pushRelayExpenses(){
 }
 function _pullRelayExpenses(){
   try{
-    if(!_fbUser||!_fbDb||!isAdmin(_fbUser.email))return;
+    if(!_fbUser||!_fbDb||_isReaderUser||!isAdmin(_fbUser.email))return;
     _fbDb.ref('fydata/relay/expenses').once('value').then(function(sn){
       var d=sn.val();if(!d)return;
       var consumed={},merged=0;
@@ -10424,7 +10434,7 @@ function _pullRelayExpenses(){
 // 管理員側：收接力的成本進 private，成功後清掉接力記錄
 function _pullRelayCosts(){
   try{
-    if(!_fbUser||!_fbDb)return;
+    if(!_fbUser||!_fbDb||_isReaderUser)return;
     if(!isAdmin(_fbUser.email))return;
     _fbDb.ref('fydata/relay/costs').once('value').then(function(sn){
       var d=sn.val();if(!d)return;
@@ -22562,6 +22572,7 @@ function drRenderList(){
     }).join('');
 }
 function submitDailyReport(){
+  if(_roDeny())return;   // v6.0.108 唯讀帳號
   // 表單上還有內容 → 自動先收進清單
   const cur=_drCollect();
   if(cur)_drList.push(cur);
@@ -29216,6 +29227,7 @@ function canAccess(pageId){
   // 未登入＝本機資料模式（資料只在這台裝置上，雲端規則才是真正的防線）：
   // 一般頁面照常使用，帳號／參數／單價分析等管理頁不開。與 v5.326 以前一致。
   if(!em)return !page.adminOnly;
+  if(_isReaderUser)return _RO_PAGES_OFF.indexOf(page.parent||pageId)<0;   // v6.0.108：唯讀帳號看得到全部頁面，人員／角色權限除外
   const roles=_rolesOf(em);
   if(roles.some(r=>r.sys))return true;          // 系統管理員：全部
   if(page.sysOnly)return false;                 // 單價分析／參數設定／人員／角色：系統管理員限定
@@ -29230,7 +29242,7 @@ function canAccess(pageId){
 // v5.329：不再有「隱藏利潤」勾選欄。讀不到雲端成本的部門（工務部）本來就沒有
 // 成本資料可算毛利，直接依部門判斷即可，不需要另一個手動開關。
 function _permHideProfit(){
-  try{return !isAdmin((_fbUser&&_fbUser.email)||'');}catch(e){return true;}
+  try{return !_isReaderUser&&!isAdmin((_fbUser&&_fbUser.email)||'');}catch(e){return true;}   // v6.0.108：唯讀帳號看得到毛利
 }
 
 // 從合約管理查看原始報價單
@@ -31850,6 +31862,7 @@ function _qcCommit(e){
   return {proj:(q.name||'').slice(0,14),desc:desc,amt:amt,cat:t[1],payer:payer};
 }
 function submitQuickCost(){
+  if(_roDeny())return;   // v6.0.108 唯讀帳號
   if(!_qcPending.length){toast('請先點支出類型新增一筆');return;}
   for(var i=0;i<_qcPending.length;i++){var e=_qcPending[i],t=QC_TYPES[e.ti]||QC_TYPES[0];
     if(!(parseFloat(e.amt)>0)){toast('「'+t[0]+'」請填金額');var el=document.querySelector('[data-qcid="'+e.id+'"] .qc-amt');if(el)el.focus();return;}
@@ -35912,7 +35925,7 @@ function openSubContractDoc(cid){
 function _salesList(all){var a=(P&&Array.isArray(P.sales))?P.sales:[];return all?a:a.filter(function(x){return x&&x.active!==false;});}
 function _salesById(id){return id?(_salesList(true).find(function(x){return x&&x.id===id;})||null):null;}
 function _salesName(id){var x=_salesById(id);return x?(x.name||''):'';}
-function _salesCommVis(){var em=_meEmail();return !em||isAdmin(em);}   // 抽成設定：管理員（未登入＝本機模式）才看得到
+function _salesCommVis(){var em=_meEmail();return !em||_isReaderUser||isAdmin(em);}   // 抽成設定：管理員（未登入＝本機模式）才看得到
 // v6.0.75 業務／抽成改在報價列表的狀態 chip 旁設定（不在編輯頁）：chip → openSalesPick(qid)
 function _salesChip(q){
   if(!q||q.parentId)return '';
@@ -36611,8 +36624,8 @@ function _healthAdd689(R){   // 健檢：帳本記載已付但待付、近 14 �
 try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{if(_paidLogSync())savePayables();else _payAuditLoadSnap();}catch(e){_err('paidLog.boot',e);}},1500);});}catch(e){_err('paidLog.boot',e);}
 
 // ── 唯讀帳號名冊（v6.0.90，AI 助理用）──
-// 名冊只存在雲端 fydata/readers（key＝_encEmailKey(email)，值 true），不進人員名冊／角色：
-// 安全規則讓名冊內帳號只能讀 fydata/shared，所有寫入規則都排除名冊內帳號。
+// 名冊只存在雲端 fydata/readers（key＝_encEmailKey(email)，值 true 或 {name:顯示名稱}（v6.0.108）），不進人員名冊／角色：
+// 安全規則讓名冊內帳號可讀 fydata/shared 與 fydata/private（v6.0.108），所有寫入規則都排除名冊內帳號。
 // 只有管理員看得到、也只有管理員（規則：擁有者／adminEmails）寫得進去。
 var _readersCache=null;
 function renderReadersBox(){
@@ -36625,11 +36638,12 @@ function renderReadersBox(){
   if(list===null){body='<div style="font-size:12px;color:var(--b4)">讀取中…</div>';_readersLoad();}
   else if(list===false){body='<div style="font-size:12px;color:#c62828">讀不到雲端名冊（新版安全規則尚未發布，或未連線）</div>';}
   else{
-    var ks=Object.keys(list).filter(function(k){return list[k]===true;}).sort();
+    var ks=Object.keys(list).filter(function(k){return _readerOn(list[k]);}).sort();
     body=ks.length?ks.map(function(k){
-      var em=k.replace(/,/g,'.');
+      var em=k.replace(/,/g,'.'),nm=(list[k]&&typeof list[k]==='object'&&list[k].name)||'';
       return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--b1);font-size:12.5px">'
-        +'<span style="flex:1;word-break:break-all">'+esc(em)+'</span>'
+        +'<span style="flex:1;word-break:break-all">'+(nm?'<b>'+esc(nm)+'</b>　':'')+esc(em)+'</span>'
+        +'<button type="button" class="btn btn-xs" onclick="readerRename(\''+escq(k)+'\')">顯示名稱</button>'
         +'<button type="button" class="btn btn-xs btn-r" onclick="readerDel(\''+escq(k)+'\')">移除</button></div>';
     }).join(''):'<div style="font-size:12px;color:var(--b4)">尚無唯讀帳號</div>';
   }
@@ -36638,7 +36652,7 @@ function renderReadersBox(){
     +'<div style="font-weight:700;font-size:13.5px;flex:1">唯讀帳號（AI 助理）</div>'
     +'<button type="button" class="btn btn-xs" onclick="openStorageRulesGen()" title="依目前人員名冊與唯讀名冊產生 Storage 規則全文">產生 Storage 規則</button> '
     +'<button type="button" class="btn btn-xs btn-g" onclick="readerAdd()">＋ 新增唯讀帳號</button></div>'
-    +'<div style="font-size:11.5px;color:var(--b4);margin-bottom:8px">名冊內帳號可讀取雲端一般資料（fydata/shared）的全部內容：報價、請款、合約、客戶、廠商、人員名冊與角色、附件下載網址等；不能寫入任何資料，也讀不到成本／毛利／應付／分潤／單價庫等敏感資料（fydata/private）。Storage 檔案寫入另需在 storage.rules 的唯讀清單加入同一信箱。請勿把同一信箱加進人員名冊。</div>'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-bottom:8px">名冊內帳號可查看全部資料（含成本／毛利／應付／分潤／單價庫等 fydata/private 敏感資料）與全部頁面（人員管理、角色權限、備份還原除外）；所有新增／修改／刪除／儲存／上傳一律停用，安全規則也拒絕其寫入任何節點。Storage 檔案寫入另需在 storage.rules 的唯讀清單加入同一信箱。請勿把同一信箱加進人員名冊。</div>'
     +body+'</div></div>';
 }
 function _readersLoad(){
@@ -36650,16 +36664,29 @@ function _readersLoad(){
 function readerAdd(){
   if(!_fbUser||!_fbDb){toast('請先登入');return;}
   _modal('新增唯讀帳號','<div class="f"><label>登入信箱 <span style="color:var(--red)">*</span></label>'
-    +'<input id="rdr-email" type="email" placeholder="AI 助理專用的 Google／Email 帳號"></div>',function(){
+    +'<input id="rdr-email" type="email" placeholder="AI 助理專用的 Google／Email 帳號"></div>'
+    +'<div class="f"><label>顯示名稱（選填，40 字內）</label><input id="rdr-name" maxlength="40" placeholder="例：陳軒（AI 助理）"></div>',function(){
     var em=String((document.getElementById('rdr-email')||{}).value||'').trim().toLowerCase();
+    var nm=String((document.getElementById('rdr-name')||{}).value||'').trim().slice(0,40);
     if(!/^[a-z0-9._%+\-]+@[a-z0-9\-]+(\.[a-z0-9\-]+)*\.[a-z]{2,}$/.test(em)){toast('信箱格式不正確（不可含空白或 # $ [ ] / 等字元）');return false;}
     if(BOOTSTRAP_DEV.indexOf(em)>=0||em===_RULES_OWNER){toast('系統管理員帳號不能設為唯讀');return false;}
     if(listStaff().some(function(x){return String(x.email||'').toLowerCase()===em;})){
       toast('此信箱已在人員名冊中，請先移除人員再設為唯讀');return false;}
-    _fbDb.ref('fydata/readers/'+_encEmailKey(em)).set(true).then(function(){
+    _fbDb.ref('fydata/readers/'+_encEmailKey(em)).set(nm?{name:nm}:true).then(function(){
       toast('已加入唯讀帳號 '+em);logActivity('權限','新增唯讀帳號 '+em);_readersLoad();
       showConfirm('還要改 Storage 規則','Storage 規則讀不到這份名冊：請到 Firebase 主控台 Storage → 規則，把 <b>'+esc(em)+'</b> 加進 <code>isReader()</code> 的信箱清單後發布（repo 的 storage.rules 同步改）。<br>沒加的話，這個帳號在 Storage 仍可上傳／刪除檔案。',function(){},false);
     }).catch(function(e){toast('新增失敗：'+((e&&e.message)||'')+'（需先發布新版安全規則）');});
+  });
+}
+// v6.0.108：唯讀帳號顯示名稱（空白＝改回 true）；只有管理員寫得進去（規則）
+function readerRename(k){
+  if(!_fbUser||!_fbDb){toast('請先登入');return;}
+  var cur=(_readersCache&&_readersCache[k]&&typeof _readersCache[k]==='object'&&_readersCache[k].name)||'';
+  _modal('唯讀帳號顯示名稱','<div style="font-size:12px;color:var(--b4);margin-bottom:6px">'+esc(String(k).replace(/,/g,'.'))+'</div>'
+    +'<div class="f"><label>顯示名稱（空白＝不顯示）</label><input id="rdr-rename" maxlength="40" value="'+esc(cur)+'"></div>',function(){
+    var nm=String((document.getElementById('rdr-rename')||{}).value||'').trim().slice(0,40);
+    _fbDb.ref('fydata/readers/'+k).set(nm?{name:nm}:true).then(function(){toast('已更新');logActivity('權限','唯讀帳號 '+String(k).replace(/,/g,'.')+' 顯示名稱：'+(nm||'（無）'));_readersLoad();})
+      .catch(function(e){toast('更新失敗：'+((e&&e.message)||'')+'（需先發布新版資料庫規則）');});
   });
 }
 function readerDel(k){
@@ -37079,7 +37106,7 @@ function _storageRulesLists(){
     .concat(BOOTSTRAP_DEV,[_RULES_OWNER]).filter(function(e,i,a){return e&&a.indexOf(e)===i;});
   var rc=(_readersCache&&typeof _readersCache==='object')?_readersCache:null;
   if(!rc)return null;   // v6.0.105 讀不到唯讀名冊就不產生（否則唯讀帳號會被當成人員或漏擋）
-  var readers=Object.keys(rc).filter(function(k){return rc[k]===true;}).map(function(k){return k.replace(/,/g,'.');})
+  var readers=Object.keys(rc).filter(function(k){return _readerOn(rc[k]);}).map(function(k){return k.replace(/,/g,'.');})
     .concat(_ST_READERS_FIXED).filter(function(e,i,a){return a.indexOf(e)===i;});
   staff=staff.filter(function(e){return readers.indexOf(e)<0;});   // 唯讀帳號不會同時是人員
   return {staff:staff,readers:readers};
@@ -37109,6 +37136,84 @@ function _matLocList(){
       loc:r.projQid?String((q&&q.name)||r.loc||'工地'):String(r.loc||'公司倉庫'),qid:String(r.projQid||''),outDate:String(r.outDate||''),
       planBack:String(r.planBack||(ct&&ct.end)||''),kind:String(r.kind||'')};
   }).sort(function(a,b){return (a.loc+a.name).localeCompare(b.loc+b.name,'zh-TW');});
+}
+// ── 唯讀帳號介面（v6.0.108）──
+// 唯讀帳號（fydata/readers）看得到全部頁面與資料（含 private），人員管理／角色權限／備份還原除外；
+// 介面層：凡呼叫新增／修改／刪除／儲存／上傳類函式的按鈕一律隱藏、輸入欄停用，點擊／變更在捕獲階段攔下；
+// 資料層：saveQ／saveInvoice／doSaveP／submitDailyReport／submitQuickCost 開頭 _roDeny()；_pushCloud／_pushPrivate／Storage 一律不寫；規則端拒絕寫入。
+var _RO_PAGES_OFF=['staff','roles'];
+var _RO_ROLE={id:'__reader',name:'唯讀',reader:true,enabled:true,sys:false,cloudCost:false,pages:{}};
+var _RO_DENY=new RegExp('^(?:save|del|delete|remove|add|new|edit|create|submit|import|upload|restore|reset|clear|clean|confirm|apply|award|revoke|bump|settle|release|recalc|fix|merge'
+  +'|toggle(?:RetentionReturn|PaidDateField|PayVat|AutoSync|CumFix)|pay(?:MarkPaid|Unmark|VendorAll)|ps(?:Paid|Generate|Upd|Del)|pc(?:Paid|Generate|Upd|Del)|hr(?:Edit|Del|WriteFixedCost)'
+  +'|staff(?:Edit|Del|Import|Template)|role(?:Edit|Del|Toggle|Perm)|dept|reader(?:Add|Del|Rename)|rfq(?:New|Labor|Edit|Del|Award|RemoveVendor|Fill)'
+  +'|mat(?:Led|Rent|Equip|Trans|Alloc|RowEdit|Out|Back|EstSave|EstApplyCost|EstPickProj)|m6(?:Decide|Rent|Batch|TpUpd|EquipUpd)'
+  +'|open(?:SubPeriod|SubAdvance|RentPeriod|Prepay|NegotiateModal|ReceiptModal|InvClauseModal|CommPick|SalesPick|SalesBook|RmkModal|StorageRulesGen|Dunning)'
+  +'|pj(?:DeductSet|OwnerPaySet|OwnerInstSet|RentEndSet|SetFollow|PayAdv|PlanSet|CloseAll|IntroEdit)|sub(?:AdvRealloc|FollowSync)'
+  +'|upd(?:CostField|OwnRow|SubField|NgtItemsSum|NgtWay|CostAttachTarget)|qc(?:Upd|Del|Add)|dr(?:AddToList|RemoveFromList|AddProgRow|AddPhoto|AddCrew|MonthSubmit|LoadExisting)'
+  +'|wk(?:Save|Edit|Upload|Del|AddCert|CertField|SetExp|AiFromId|ExpPlus)|inv(?:SyncQuoteNow|ScanRent|RentalPick|RentApply|FillVendor|FillDaily)'
+  +'|pullInvFromCustomer|receiptHoldReturn|retReturn|ledgerRegInvNo|exp(?:Scan|Manual|Del)|fc(?:AddRow|DelRow|ApplySuggest)|cfSetDelay|shareCfgInput'
+  +'|costAddPick|changeCostType|onVendorChange|onLaborItemChange|calcPayableAmt|intake|siteRestoreVer|siteBump|plBump|rentPlanEnd|quoteOwnerDocRemove|quoteImportOwner'
+  +'|projDelConfirmFile|irPickFile|irClearFile|handleContractFileSelect|loadSealImage|contactAddRole|newContactItem|fbUploadWithConflictCheck|gdriveSync'
+  +'|rescue(?:Restore|LoadFile|Load)|rmk(?:AddExtra|DelExtra)|ctDupDelete|doSave|copyQ|cycleBidStatus|autoSaveInv|projUpload|writeCostHist|fcQuick|drBackfillStop'
+  +'|_(?:commSync|salesCommSync|einvScan|pay(?:Upload|DelFile|PaidToggle)|sp(?:Recalc|FillDaily|SelChange|OnDate)|saOnInput|rcpt|receiptCalc|salesBookAddRow|comm(?:AddRow|RowMode)|advPayFix|costOddFix|trDelUI'
+  +'|rfq(?:Cond|B2bLive)|rfVendorPick|rfRecalc|dr(?:ProgRows|Crews|ToggleEquip|Photos|Equip)|m6Rt|sdSet|hr(?:RateSet|FillIns|IgSync)|qiStart|ikRenderExtra|[A-Za-z0-9]*?(?:Save|Del|Add|Restore|Clear)))');
+// 處理器字串裡呼叫到的函式名（略過 a.b() 的方法呼叫）
+function _roCalls(src){
+  var out=[],re=/(^|[^.\w$])([A-Za-z_$][\w$]*)\s*\(/g,m;src=String(src||'');
+  while((m=re.exec(src))){out.push(m[2]);re.lastIndex=m.index+m[0].length;}
+  return out;
+}
+var _RO_ALLOW=/^(?:clearTimeout|clearInterval)$/;
+function _roIsWriteSrc(src){return _roCalls(src).some(function(n){return _RO_DENY.test(n)&&!_RO_ALLOW.test(n);});}
+function _roIsWrite(el,evs){
+  if(!el||el.nodeType!==1)return false;
+  return (evs||['onclick']).some(function(ev){var a=el.getAttribute&&el.getAttribute(ev);if(a&&_roIsWriteSrc(a))return true;var f=el[ev];return typeof f==='function'&&!a&&_roIsWriteSrc(f.toString());});
+}
+var _roLastToast=0;
+function _roDeny(){
+  if(!_isReaderUser)return false;
+  if(Date.now()-_roLastToast>2500){_roLastToast=Date.now();try{toast('唯讀帳號：不能新增、修改或刪除資料');}catch(e){/* 可忽略 */}}
+  return true;
+}
+var _RO_FORM_ROOTS='#page-editor,#page-invoice-edit,#page-params';
+function _roScan(root){
+  if(!_isReaderUser)return;
+  root=root||document.body;if(!root||!root.querySelectorAll)return;
+  root.querySelectorAll('[onclick]').forEach(function(el){if(el._roChk)return;el._roChk=1;if(_roIsWrite(el))el.classList.add('fy-ro-x');});
+  root.querySelectorAll('input,select,textarea').forEach(function(el){
+    if(el._roChk||el.disabled||el.type==='hidden')return;el._roChk=1;
+    if(_roIsWrite(el,['onchange','oninput','onblur'])||el.type==='file'||(el.closest&&el.closest(_RO_FORM_ROOTS))){el.disabled=true;el.classList.add('fy-ro-d');}
+  });
+}
+var _roObs=null,_roRaf=0;
+function _roInit(){
+  var b=document.body;if(!b)return;
+  b.classList.toggle('fy-ro',!!_isReaderUser);
+  if(!_isReaderUser){
+    if(_roObs){_roObs.disconnect();_roObs=null;}
+    document.querySelectorAll('.fy-ro-x').forEach(function(el){el.classList.remove('fy-ro-x');});
+    document.querySelectorAll('.fy-ro-d').forEach(function(el){el.disabled=false;el.classList.remove('fy-ro-d');});
+    document.querySelectorAll('[onclick],input,select,textarea').forEach(function(el){el._roChk=0;});
+    return;
+  }
+  _roScan(b);
+  if(!_roObs&&typeof MutationObserver==='function'){
+    _roObs=new MutationObserver(function(){if(_roRaf)return;_roRaf=setTimeout(function(){_roRaf=0;_roScan(document.body);},60);});
+    _roObs.observe(b,{childList:true,subtree:true});
+  }
+  if(!window._roCapOn){
+    window._roCapOn=true;
+    // 捕獲階段攔截：漏掉的寫入按鈕（含 JS 綁定的 onclick）一律擋下
+    document.addEventListener('click',function(e){
+      if(!_isReaderUser)return;
+      var el=e.target&&e.target.closest?e.target.closest('[onclick],button,a'):null;
+      for(var n=el;n&&n!==document.body;n=n.parentElement){if(_roIsWrite(n)){e.preventDefault();e.stopImmediatePropagation();_roDeny();return;}}
+    },true);
+    ['change','input'].forEach(function(ev){document.addEventListener(ev,function(e){
+      if(!_isReaderUser)return;var t=e.target;
+      if(t&&_roIsWrite(t,['on'+ev])){e.stopImmediatePropagation();_roDeny();}
+    },true);});
+  }
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
@@ -37142,10 +37247,12 @@ function _dlText(name,text){
 function _meName(){
   var em=(_fbUser&&_fbUser.email)||'';
   if(!em)return '';
+  if(_isReaderUser&&_readerName)return _readerName;   // v6.0.108
   var st=_staffOf(em);
   return (st&&st.name)||(_fbUser&&_fbUser.displayName)||em.split('@')[0];
 }
 function _meRoleLabel(){
+  if(_isReaderUser)return '唯讀';
   var rs=_rolesOf((_fbUser&&_fbUser.email)||'');
   if(!rs.length)return '尚未指派角色';
   return rs.map(function(r){return r.name;}).join('、');
@@ -37279,18 +37386,19 @@ function applyRoleUI(){
   // v5.338 健檢I：智慧收件（寫入報價／費用／應付）僅開給可讀成本資料的角色
   try{
     var _si=document.getElementById('sn-intake');
-    if(_si)_si.style.display=(_fbUser&&!isAdmin(_fbUser.email))?'none':'';
+    if(_si)_si.style.display=(_fbUser&&(_isReaderUser||!isAdmin(_fbUser.email)))?'none':'';
   }catch(e){_err('applyRoleUI',e);}
   // v5.325：參數設定頁裡的「單價分析成本參數」＝報價的成本模型，僅擁有者可見；
   // 該頁其他區塊（稅率、期初現金、固定成本）負責人仍需要，所以只隱藏這張卡。
   try{
     var _upc=document.getElementById('upa-cost-param-card');
-    if(_upc)_upc.style.display=_isSysUser((_fbUser&&_fbUser.email)||'')?'':'none';
+    if(_upc)_upc.style.display=(_isReaderUser||_isSysUser((_fbUser&&_fbUser.email)||''))?'':'none';
   }catch(e){_err('applyRoleUI',e);}
   try{renderStaffPage();}catch(e){_err('applyRoleUI',e);}
   try{renderRolesPage();}catch(e){_err('applyRoleUI',e);}
   try{renderUserChip();}catch(e){_err('top',e);}
   try{renderDashGreet();}catch(e){_err('top',e);}
+  try{_roInit();}catch(e){_err('applyRoleUI.ro',e);}
 }
 
 // 渲染頁面權限設定面板（在帳號管理卡片下方）

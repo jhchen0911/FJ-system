@@ -6743,9 +6743,9 @@ async function newPage(browser, width, height) {
   {
     const rules = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const RD = "root.child('fydata/readers')";
-    const wr = [rules.shared['.write'], rules.relay['.write'], rules.relay['.read'], rules.private['.write'], rules.private['.read'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.backups['.write'], rules.logs['$uid']['.write']];
-    check('v6.0.90 規則：readers 可讀 shared、所有寫入與 private／relay／backups 皆排除 readers 名冊、名冊僅管理員可寫',
-      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.private['.read'].includes('|| ' + RD) && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
+    const wr = [rules.shared['.write'], rules.relay['.write'], rules.relay['.read'], rules.private['.write'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.backups['.write'], rules.logs['$uid']['.write']];
+    check('v6.0.90 規則：readers 可讀 shared（v6.0.108 起也可讀 private）、所有寫入與 relay／backups 皆排除 readers 名冊、名冊僅管理員可寫',
+      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && rules.private['.read'].includes('|| ' + RD) /* v6.0.108 Lotion：唯讀帳號可讀 private */ && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
       '');
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -7247,6 +7247,70 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.107 請款單版面：明細合計列對齊前期／本期／累積金額、右下本期請款計算（小計→保留款→營業稅→總計）、無保留款不顯示「扣保留款後」', r.row && r.order && r.einvRet && r.noRet && r.ed, JSON.stringify(r));
     check('v6.0.107 請款單版面測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.108 唯讀帳號：看得到全部（含 private）、介面與資料層都不能寫、規則放行讀 private 但拒寫 ──
+  {
+    const fs = require('fs'), pth = require('path');
+    const rules = JSON.parse(fs.readFileSync(pth.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    const RK = "root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()";
+    const rr = {};
+    rr.privRead = rules.private['.read'].indexOf('|| ' + RK) > 0;
+    const writes = [];
+    (function walk(o, path) { Object.keys(o).forEach(k => { if (k === '.write') writes.push([path, o[k]]); else if (o[k] && typeof o[k] === 'object') walk(o[k], path + '/' + k); }); })(rules, 'fydata');
+    rr.writes = writes.length >= 9 && writes.every(([p, w]) => w.indexOf('!' + RK) >= 0 || (p === 'fydata/logs/$uid' && w.indexOf("!root.child('fydata/readers')") >= 0));
+    rr.badW = writes.filter(([p, w]) => !(w.indexOf('!' + RK) >= 0 || p === 'fydata/logs/$uid')).map(x => x[0]);
+    const rv = rules.readers.$email['.validate']; rr.nameRule = /newData\.val\(\) === true/.test(rv) && /hasChildren\(\['name'\]\)/.test(rv) && rules.readers.$email.$other['.validate'] === false;
+    rr.backups = rules.backups['.read'].indexOf('!' + RK) > 0 && rules.backups['.write'].indexOf('!' + RK) > 0;
+    const fn = fs.readFileSync(pth.join(__dirname, '..', 'functions', 'index.js'), 'utf8'); rr.fn = /readers: set\(rdr, on\)/.test(fn);
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        _fbUser = { email: 'ai.reader@example.com', uid: 'uR', displayName: '' }; _isReaderUser = true; _roState = 'reader'; _readerName = '陳軒（AI）';
+        out.on = _readerOn(true) && _readerOn({ name: 'x' }) && !_readerOn(null) && !_readerOn(false);
+        out.pages = ['dash', 'quotes', 'proj', 'acct', 'reports', 'upa', 'params', 'payroll', 'costs', 'rfq', 'contacts'].every(canAccess) && !canAccess('staff') && !canAccess('roles');
+        out.profit = _permHideProfit() === false && _salesCommVis() === true && !isAdmin(_fbUser.email);
+        out.me = _meName() === '陳軒（AI）' && _meRoleLabel() === '唯讀';
+        /* 讀 private：_pullPrivate 不再對唯讀帳號提前返回（模擬資料庫） */
+        let asked = '';
+        _fbDb = { ref: p => ({ once: () => { asked = p; return Promise.resolve({ val: () => null }); }, update: () => { out.wrote = true; return Promise.resolve(); }, set: () => { out.wrote = true; return Promise.resolve(); } }) };
+        return new Promise(res => {
+          _pullPrivate(ok => {
+            out.priv = ok === true && asked === 'fydata/private';
+            /* 資料層：上傳一律擋 */
+            let pushed = null; _pushCloud({ silent: true, onDone: v => { pushed = v; } }); out.push = pushed === false;
+            _pushPrivate(v => { out.pushPriv = v === false; });
+            const nQ = Q.length; out.save = _roDeny() === true; saveQ(); out.saveQ = Q.length === nQ;
+            /* 介面層：寫入按鈕隱藏、輸入停用、點擊攔截、備份卡隱藏 */
+            go('quotes'); applyRoleUI();
+            const host = document.createElement('div'); host.id = 'ro-test';
+            host.innerHTML = '<button id="rb1" onclick="saveQ()">存</button><button id="rb2" onclick="go(\'dash\')">看</button><button id="rb3" onclick="document.title=\'x\';delQ(\'z\')">刪</button>'
+              + '<input id="ri1" onchange="updCostField(1)"><select id="ri2" onchange="renderList()"><option>1</option></select><button id="rb4">js</button>';
+            document.body.appendChild(host);
+            let hit = 0; document.getElementById('rb4').onclick = function () { hit++; savePayable(); };
+            _roScan(host);
+            out.hide = document.getElementById('rb1').classList.contains('fy-ro-x') && !document.getElementById('rb2').classList.contains('fy-ro-x') && document.getElementById('rb3').classList.contains('fy-ro-x');
+            out.dis = document.getElementById('ri1').disabled === true && document.getElementById('ri2').disabled === false;
+            document.getElementById('rb4').click(); out.cap = hit === 0;
+            out.backup = getComputedStyle(document.getElementById('prm-backup-card')).display === 'none' && getComputedStyle(document.getElementById('prm-rescue-card')).display === 'none' && document.body.classList.contains('fy-ro');
+            const nb = Array.from(document.querySelectorAll('#page-quotes [onclick*="newQ"]')); out.newQ = nb.length > 0 && nb.every(b => b.classList.contains('fy-ro-x'));
+            out.edDis = Array.from(document.querySelectorAll('#page-editor input:not([type=hidden])')).every(i => i.disabled);
+            out.noWrite = !out.wrote;
+            /* 還原：一般帳號全部恢復 */
+            _isReaderUser = false; _roState = ''; _readerName = ''; _fbUser = null; _fbDb = null; applyRoleUI();
+            out.restore = !document.body.classList.contains('fy-ro') && !document.getElementById('rb1').classList.contains('fy-ro-x') && document.getElementById('ri1').disabled === false;
+            host.remove();
+            res(out);
+          });
+        });
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); return out; }
+    });
+    check('v6.0.108 唯讀帳號：全部頁面（人員／角色除外）、看得到毛利與 private、顯示名稱與「唯讀」', r.on && r.pages && r.profit && r.me && r.priv, JSON.stringify(r));
+    check('v6.0.108 唯讀帳號：上傳／儲存全擋、寫入按鈕隱藏、輸入停用、點擊攔截、備份還原卡隱藏、還原後恢復', r.push && r.pushPriv && r.save && r.saveQ && r.hide && r.dis && r.cap && r.backup && r.newQ && r.edDis && r.noWrite && r.restore, JSON.stringify(r));
+    check('v6.0.108 RTDB 規則：private 放行唯讀帳號讀取、所有寫入規則排除唯讀帳號、名冊可存顯示名稱、Functions 認得 {name}', rr.privRead && rr.writes && rr.nameRule && rr.backups && rr.fn, JSON.stringify(rr));
+    check('v6.0.108 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

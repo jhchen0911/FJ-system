@@ -21,8 +21,10 @@ async function lists() {
   const db = admin.database();
   const [acc, adm, rdr] = await Promise.all(['fydata/access', 'fydata/adminEmails', 'fydata/readers']
     .map((p) => db.ref(p).once('value').then((s) => s.val() || {})));
-  const set = (o) => new Set(Object.keys(o).filter((k) => o[k] === true).map(dec));
-  return { access: set(acc), admins: set(adm), readers: set(rdr) };
+  // v6.0.108：readers 名冊值可為 true 或 {name}（唯讀帳號顯示名稱）
+  const on = (v) => v === true || (!!v && typeof v === 'object' && !Array.isArray(v));
+  const set = (o, f) => new Set(Object.keys(o).filter((k) => (f || ((v) => v === true))(o[k])).map(dec));
+  return { access: set(acc), admins: set(adm), readers: set(rdr, on) };
 }
 function roleOf(email, L) {
   const e = String(email || '').toLowerCase();

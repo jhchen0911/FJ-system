@@ -32,7 +32,7 @@
         ".write": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || ((root.child('fydata/access').child(auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists()) && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()))"
       },
       "private": {
-        ".read": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()))",
+        ".read": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()) || root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())",
         ".write": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())) && (newData.exists() || !data.exists())",
         ".validate": "newData.hasChild('version') && newData.child('version').isString()",
         "$other": {
@@ -53,7 +53,13 @@
         ".validate": "newData.hasChildren()",
         "$email": {
           ".read": "auth != null && auth.token.email != null && $email === auth.token.email.toLowerCase().replace('.', ',')",
-          ".validate": "newData.val() === true"
+          ".validate": "newData.val() === true || (newData.hasChildren(['name']) && newData.child('name').isString() && newData.child('name').val().length <= 40)",
+          "name": {
+            ".validate": "newData.isString()"
+          },
+          "$other": {
+            ".validate": false
+          }
         }
       },
       "adminUids": {
