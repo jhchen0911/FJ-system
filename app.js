@@ -3627,7 +3627,7 @@ function rInvItems(){
         const cum=Math.round(((parseFloat(invItems[i].prevQty)||0)+_curW(invItems[i]))*100)/100;
         const inp2=tr.querySelector('input[data-f="curQty"]');
         if(!inp2)return;
-        if(!invItems[i]._qRetired&&cq>0&&cum>cq+1e-9){
+        if(cq>0&&cum>cq+1e-9){   // _qRetired 只影響「仍是舊版」判斷，不關超請警示
           inp2.style.borderColor='var(--red)';inp2.style.background='#fdecea';inp2.style.color='var(--red)';inp2.style.fontWeight='700';
           inp2.title='累計 '+cum+' 已超過合約數量 '+cq+'（超請 '+(Math.round((cum-cq)*100)/100)+'，仍可出單）';
           pqTd.style.color='var(--red)';pqTd.style.fontWeight='700';pqTd.title='含本期累計 '+cum+'／合約 '+cq;
@@ -3880,7 +3880,7 @@ function saveInvoice(){
     if(it.type==='sec')continue;
     if((parseFloat(it.curQty)||0)<0||(parseFloat(it.contractPrice)||0)<0){toast('數量／單價不可為負數');return;}
     const cq=parseFloat(it.contractQty)||0;
-    if(!it._qRetired&&cq>0&&((parseFloat(it.prevQty)||0)+_curW(it))>cq+1e-9)_overN++;   // v6.0.102 報價已刪的保留列不算超請
+    if(cq>0&&((parseFloat(it.prevQty)||0)+_curW(it))>cq+1e-9)_overN++;   // 審查修正：_qRetired 不關超請警示
   }
   const t=rInvTots();
   // P1：儲存時回填 quoteId（依工程名稱對應主報價單）
@@ -5141,8 +5141,10 @@ function _invSyncItems(items,q){
     const oi=old.findIndex((x,i)=>!used[i]&&x&&x.type==='item'&&_invKey(x.desc)===k);
     if(oi<0)return f;
     used[oi]=1;const o=old[oi];
-    return Object.assign({},o,{desc:f.desc,unit:f.unit,contractPrice:f.contractPrice,contractQty:f.contractQty,cat:f.cat,
+    const m=Object.assign({},o,{desc:f.desc,unit:f.unit,contractPrice:f.contractPrice,contractQty:f.contractQty,cat:f.cat,
       note:o.note||f.note,otPrice:f.otPrice,otUnit:f.otUnit});
+    delete m._qRetired;   // 審查修正：同名工項重新出現在報價 → 清掉「已刪」標記
+    return m;
   });
   old.forEach((x,i)=>{
     if(used[i]||!x||x.type==='sec')return;
