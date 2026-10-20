@@ -7145,6 +7145,32 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.107 任務 9：租期結束日口徑（拔除第一天／拔除完成日）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const mk = mode => ({ id: 'qR9', name: '租期案', rentEnd: mode, items: [{ desc: '中間樁（打設、拔除）30天租期', unit: '支', qty: 10, price: 1000, ot: '50', cat: 'both' }],
+          dailyLogs: [{ date: '2026-01-10', progressRows: [{ itemIdx: 0, qty: 10, ph: 'install' }] }, { date: '2026-03-01', progressRows: [{ itemIdx: 0, qty: 4, ph: 'remove' }] }, { date: '2026-03-10', progressRows: [{ itemIdx: 0, qty: 6, ph: 'remove' }] }] });
+        const a = _rentStatus(mk(undefined), 0, '2026-04-01'), b = _rentStatus(mk('removeDone'), 0, '2026-04-01');
+        out.a = a && a.endMode === 'removeFirst' && a.endDate === '2026-03-01';
+        out.b = b && b.endMode === 'removeDone' && b.endDate === '2026-03-10' && b.overDays - a.overDays === 9 && b.amount - a.amount === 50 * 10 * 9;
+        /* 拔除未完成＝仍在場：算到結束日 */
+        const c = mk('removeDone'); c.dailyLogs.pop(); const cs = _rentStatus(c, 0, '2026-04-01'); out.c = cs.endDate === '2026-04-01';
+        /* 計算式說明印出口徑；專案頁可選；新報價預設完成日 */
+        out.calc = /租期結束日口徑：拔除（拆除）完成日/.test(_invCalcText({ type: 'rental', _ovKey: 'x', _ovBasis: 'removeDone', curQty: 10, contractPrice: 50, curDays: 9, payRate: 100, unit: '支' }))
+          && /租期結束日口徑：拔除（拆除）第一天/.test(_invCalcText({ type: 'rental', _ovKey: 'x', curQty: 10, contractPrice: 50, curDays: 9, payRate: 100, unit: '支' }))
+          && !/租期結束日口徑/.test(_invCalcText({ type: 'item', curQty: 1, contractPrice: 5, unit: '式' }));
+        out.ui1 = /租期結束日/.test(_pjDeductHtml({ id: 'z', deduct: {} })); out.ui2 = (typeof _saveQ632 === 'function' ? _saveQ632 : saveQ).toString().indexOf("q.rentEnd='removeDone'") >= 0; out.ui = out.ui1 && out.ui2;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('v6.0.107 租期結束日口徑：舊案拔除第一天、新案拔除完成日（未完成算到結束日）、逾期租金依此計算、計算式說明印出口徑、專案可切換', r.a && r.b && r.c && r.calc && r.ui, JSON.stringify(r));
+    check('v6.0.107 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

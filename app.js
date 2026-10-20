@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.106';
+var APP_VERSION='v6.0.107';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -403,7 +403,8 @@ function _itemProgress(q,idx){
   var target=Math.abs(parseFloat(it.qty)||0);
   var cum=0,doneDate='';
   ins.forEach(function(r){cum+=r.qty;if(!doneDate&&target>0&&cum>=target-1e-6)doneDate=r.date;});
-  var rcum=0;rem.forEach(function(r){rcum+=r.qty;});
+  var rcum=0,remDone='';rem.forEach(function(r){rcum+=r.qty;});
+  var remTarget=cum>0?cum:target;if(remTarget>0){var rc2=0;rem.forEach(function(r){rc2+=r.qty;if(!remDone&&rc2>=remTarget-1e-6)remDone=r.date;});}   // v6.0.107 拔除累計達打設量那天＝拔除完成日
   // v5.442 階段完工日報：打設完成日＝租期起算基準（取數量日報最後一天與完成日較晚者）；拔除完成日＝計租結束（無拔除數量日報時）
   var catS=_itemCat(it),stIns='',stRem='';
   ((q&&q.dailyLogs)||[]).forEach(function(L){
@@ -418,7 +419,7 @@ function _itemProgress(q,idx){
   return {n:ins.length+rem.length,nInstall:ins.length,nRemove:rem.length,
     first:ins.length?(ins[0].from&&ins[0].from<ins[0].date?ins[0].from:ins[0].date):'',last:ins.length?ins[ins.length-1].date:'',
     installLast:installLast,stageInstall:stIns,stageRemove:stRem,
-    removeFirst:removeFirst,removeLast:rem.length?rem[rem.length-1].date:(stRem||''),
+    removeFirst:removeFirst,removeLast:rem.length?rem[rem.length-1].date:(stRem||''),removeDone:remDone||stRem||'',
     cum:cum,removeCum:rcum,target:target,doneDate:doneDate};
 }
 // 單一工項的租期／逾期狀態（純函式，不碰 DOM）
@@ -439,15 +440,21 @@ function _rentStatus(q,idx,endDate){
   var end=endDate||((q&&q.closed&&q.closedAt)?_dAdd(new Date(q.closedAt).getFullYear()+'-'
     +String(new Date(q.closedAt).getMonth()+1).padStart(2,'0')+'-'
     +String(new Date(q.closedAt).getDate()).padStart(2,'0'),0):localToday());
-  if(pg.removeFirst&&pg.removeFirst<end)end=pg.removeFirst;   // v5.428：拔除／拆除第一天即結束計租
+  var mode=_rentEndMode(q);
+  if(mode==='removeDone'){if(pg.removeDone&&pg.removeDone<end)end=pg.removeDone;}   // v6.0.107 新合約：拆除（拔除）完成日結束計租；未完成＝仍在場
+  else if(pg.removeFirst&&pg.removeFirst<end)end=pg.removeFirst;   // v5.428：拔除／拆除第一天即結束計租（舊合約）
   var over=Math.max(0,_dDiff(expiry,end));
   var price=parseFloat((String(it.ot||'').match(/[\d.]+/)||[0])[0])||0;
   var qty=Math.abs(parseFloat(it.qty)||0);
   return {idx:idx,desc:String(it.desc||'').split('\n')[0],unit:it.unit||'',
     days:days,installDate:base,removeFirst:pg.removeFirst||'',estimated:!pg.doneDate,cum:pg.cum,target:pg.target,
-    start:start,expiry:expiry,endDate:end,overDays:over,
+    start:start,expiry:expiry,endDate:end,overDays:over,endMode:mode,removeDone:pg.removeDone||'',
     otPrice:price,otUnit:it.otu||'',qty:qty,amount:Math.round(price*qty*over)};
 }
+// v6.0.107 租期結束日口徑（報價條件第 14 條）：q.rentEnd＝'removeFirst' 拔除（拆除）第一天（舊案預設）／'removeDone' 拔除（拆除）完成日（新報價預設）
+var _RENT_END_LBL={removeFirst:'拔除（拆除）第一天',removeDone:'拔除（拆除）完成日'};
+function _rentEndMode(q){return (q&&q.rentEnd==='removeDone')?'removeDone':'removeFirst';}
+function pjRentEndSet(qid,v){var q=Q.find(function(x){return x.id===qid;});if(!q)return;q.rentEnd=(v==='removeDone')?'removeDone':'removeFirst';_touch(q);try{persist();}catch(e){_err('pjRentEndSet',e);}toast('租期結束日改為「'+_RENT_END_LBL[q.rentEnd]+'」，逾期租金依此計算');}
 // 全案掃描：回傳所有「有租期約定且日報已登錄」的工項狀態（逾期者排前）
 function _rentScan(q,endDate){
   var out=[];
@@ -2071,6 +2078,7 @@ function saveQ(){
     contact:gv('fco'),phone:gv('fp'),date:gv('fd'),
     rmkText:buildRmkText(),
     items:JSON.parse(JSON.stringify(items)),exs:JSON.parse(JSON.stringify(exs)),t};
+  if(!existingQ&&!q.rentEnd)q.rentEnd='removeDone';   // v6.0.107 新報價：報價條件第 14 條租期結束日＝拆除（拔除）完成日；舊案沒有此欄＝拔除第一天
   const idx=Q.findIndex(x=>x.id===q.id);
   if(idx>=0)Q[idx]=q;else Q.unshift(q);
   persist();
@@ -5700,7 +5708,7 @@ function calcInvDays(){
         prevQty:0,prevAmt:0,
         curQty:srcQty,curDays:billDays,curAmt:overAmt,
         payRate:100,note:'逾期租金',otPrice:0,otUnit:'',
-        _ovKey:selDesc,_ovStart:_isoD(billStart),_ovEnd:_isoD(claimDate)};
+        _ovKey:selDesc,_ovStart:_isoD(billStart),_ovEnd:_isoD(claimDate),_ovBasis:_rentEndMode(_invQuote())};   // v6.0.107 租期結束日口徑
       if(existIdx>=0){
         Object.keys(_ow).forEach(function(k){invItems[existIdx][k]=_ow[k];});
       } else {
@@ -6600,6 +6608,7 @@ function _invCalcText(it,curAmt){
   if(dd>0)parts.push('逾期 '+_qfmt(it.curDays)+' 天 − 折讓 '+_qfmt(dd)+' 天 ＝ '+_qfmt(d)+' 天');   // v6.0.73
   if(rate!==100&&rate!==0)parts.push(_qfmt(q)+' '+u+' × '+rate+'% ＝ '+_qfmt(w)+' '+u);
   parts.push(_qfmt(w)+' '+u+(d?(' × '+_qfmt(d)+' 天'):'')+' × '+fmt(p)+' ＝ '+fmt(amt));
+  if(it._ovKey!=null&&it.type==='rental')parts.push('租期結束日口徑：'+(_RENT_END_LBL[it._ovBasis]||_RENT_END_LBL.removeFirst));   // v6.0.107
   return parts.join('；');
 }
 // v5.389：數量顯示保留至 2 位小數（fmt 會整數化，17.1 印成 17、與金額對不上）
@@ -35367,6 +35376,7 @@ function _pjDeductHtml(q){
     +'<label style="display:flex;align-items:center;gap:4px;flex:1 1 260px">保留款退還條件 <input value="'+esc(String(((q.deduct||{}).retCond)||''))+'" placeholder="例：拆除拔除完成、驗收後 30 日內一次無息退還" onchange="pjDeductSet(\''+q.id+'\',\'retCond\',this.value.trim())" style="'+IN+';flex:1;min-width:0"></label>'
     +'<label style="display:flex;align-items:center;gap:4px">預計退還日 <input type="date" value="'+esc(String(((q.deduct||{}).retDue)||''))+'" onchange="pjDeductSet(\''+q.id+'\',\'retDue\',this.value)" style="'+IN+'"></label>'
     +_retReturnBtn(q)
+    +'<label style="display:flex;align-items:center;gap:4px">租期結束日 <select onchange="pjRentEndSet(\''+q.id+'\',this.value)" style="'+IN+'">'+['removeFirst','removeDone'].map(function(m){return '<option value="'+m+'"'+(_rentEndMode(q)===m?' selected':'')+'>'+_RENT_END_LBL[m]+(m==='removeFirst'?'（舊合約）':'（新合約）')+'</option>';}).join('')+'</select></label>'
     +'<span style="color:var(--b4);font-size:11px">保留款與清潔費都直接列在請款單扣款列，總計＝扣除後金額</span>'
     +'</div>';
 }
