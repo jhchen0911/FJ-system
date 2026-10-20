@@ -7180,11 +7180,12 @@ async function newPage(browser, width, height) {
         out.calc = /租期結束日口徑：拔除（拆除）完成日/.test(_invCalcText({ type: 'rental', _ovKey: 'x', _ovBasis: 'removeDone', curQty: 10, contractPrice: 50, curDays: 9, payRate: 100, unit: '支' }))
           && /租期結束日口徑：拔除（拆除）第一天/.test(_invCalcText({ type: 'rental', _ovKey: 'x', curQty: 10, contractPrice: 50, curDays: 9, payRate: 100, unit: '支' }))
           && !/租期結束日口徑/.test(_invCalcText({ type: 'item', curQty: 1, contractPrice: 5, unit: '式' }));
-        out.ui1 = /租期結束日/.test(_pjDeductHtml({ id: 'z', deduct: {} })); out.ui2 = (typeof _saveQ632 === 'function' ? _saveQ632 : saveQ).toString().indexOf("q.rentEnd='removeDone'") >= 0; out.ui = out.ui1 && out.ui2;
+        out.ui1 = /租期結束日/.test(_pjDeductHtml({ id: 'z', deduct: {} }));
+        out.scanTxt = invScanRent.toString().indexOf("_rentEndMode(q)==='removeDone'") >= 0; out.ui2 = (typeof _saveQ632 === 'function' ? _saveQ632 : saveQ).toString().indexOf("q.rentEnd='removeDone'") >= 0; out.ui = out.ui1 && out.ui2;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
       return out;
     });
-    check('v6.0.107 租期結束日口徑：舊案拔除第一天、新案拔除完成日（未完成算到結束日）、逾期租金依此計算、計算式說明印出口徑、專案可切換', r.a && r.b && r.c && r.calc && r.ui, JSON.stringify(r));
+    check('v6.0.107 租期結束日口徑：舊案拔除第一天、新案拔除完成日（未完成算到結束日）、逾期租金依此計算、計算式說明印出口徑、專案可切換', r.a && r.b && r.c && r.calc && r.ui && r.scanTxt, JSON.stringify(r));
     check('v6.0.107 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

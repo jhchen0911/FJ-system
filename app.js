@@ -5542,7 +5542,7 @@ function invScanRent(){
   box.innerHTML='<div style="background:rgba(255,255,255,.75);border-radius:var(--r8);padding:8px 10px">'
     +'<div style="font-size:11.5px;font-weight:800;color:var(--yd)">租期掃描結果（共 '+list.length+' 項'
     +(totOver.length?('，其中 '+totOver.length+' 項逾期，合計 NT$ '+fmt(totAmt)+'　未稅'):'，皆未逾期')+'）</div>'
-    +'<div style="font-size:10px;color:var(--b3);margin-top:2px">起算＝日報打設／裝設最後一天的次日；到期＝起算＋租期−1；結束日＝日報拔除／拆除第一天，尚未拔除者取'
+    +'<div style="font-size:10px;color:var(--b3);margin-top:2px">起算＝日報打設／裝設最後一天的次日；到期＝起算＋租期−1；結束日＝'+(_rentEndMode(q)==='removeDone'?'日報拔除／拆除完成日（拔除累計達打設量或階段完工；未完成視為仍在場）':'日報拔除／拆除第一天')+'，尚未拔除者取'
     +(q.closed?'結案日':'本期估驗日')+'。天數與單價一律以報價單為準。</div>'
     +rows+'</div>';
 }
