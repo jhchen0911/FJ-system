@@ -3446,6 +3446,7 @@ function rInvItems(){
       ta.style.cssText='width:100%;font-size:13px;font-weight:600;border:1px solid var(--b2);border-radius:6px;padding:6px 8px;font-family:inherit;resize:none;line-height:1.4;margin-bottom:6px';
       ta.addEventListener('input',function(){invItems[i].desc=this.value;});
       card.appendChild(ta);
+      if(it._qRetired){const tg=document.createElement('div');tg.style.cssText='font-size:11px;color:#b26a00;margin:-2px 0 6px';tg.textContent='報價 v'+it._qRetired+' 已刪除此工項，保留歷史數量';card.appendChild(tg);}
       // 合約資訊列
       const info=document.createElement('div');
       info.style.cssText='font-size:11px;color:var(--b4);margin-bottom:7px;display:flex;gap:10px;flex-wrap:wrap';
@@ -3594,6 +3595,7 @@ function rInvItems(){
       tdIdx.textContent='⠿ '+li;
       tr.appendChild(tdIdx);
       tr.appendChild(mkTxtTd('desc',it.desc,'工程項目','120px'));
+      if(it._qRetired){const _dtd=tr.lastChild;const tg=document.createElement('div');tg.style.cssText='font-size:10.5px;color:#b26a00;margin-top:2px';tg.textContent='報價 v'+it._qRetired+' 已刪，保留歷史數量';_dtd.appendChild(tg);}   // v6.0.102
       tr.appendChild(mkTxtTd('unit',_uFix(it.unit),isRental?'片/天':'支'));
       tr.appendChild(mkNumTd('#f5faf7','contractPrice',it.contractPrice,'合約單價'));
       tr.appendChild(mkNumTd('#f5faf7','contractQty',it.contractQty,'合約數量'));
@@ -3625,7 +3627,7 @@ function rInvItems(){
         const cum=Math.round(((parseFloat(invItems[i].prevQty)||0)+_curW(invItems[i]))*100)/100;
         const inp2=tr.querySelector('input[data-f="curQty"]');
         if(!inp2)return;
-        if(cq>0&&cum>cq+1e-9){
+        if(!invItems[i]._qRetired&&cq>0&&cum>cq+1e-9){
           inp2.style.borderColor='var(--red)';inp2.style.background='#fdecea';inp2.style.color='var(--red)';inp2.style.fontWeight='700';
           inp2.title='累計 '+cum+' 已超過合約數量 '+cq+'（超請 '+(Math.round((cum-cq)*100)/100)+'，仍可出單）';
           pqTd.style.color='var(--red)';pqTd.style.fontWeight='700';pqTd.title='含本期累計 '+cum+'／合約 '+cq;
@@ -3878,7 +3880,7 @@ function saveInvoice(){
     if(it.type==='sec')continue;
     if((parseFloat(it.curQty)||0)<0||(parseFloat(it.contractPrice)||0)<0){toast('數量／單價不可為負數');return;}
     const cq=parseFloat(it.contractQty)||0;
-    if(cq>0&&((parseFloat(it.prevQty)||0)+_curW(it))>cq+1e-9)_overN++;
+    if(!it._qRetired&&cq>0&&((parseFloat(it.prevQty)||0)+_curW(it))>cq+1e-9)_overN++;   // v6.0.102 報價已刪的保留列不算超請
   }
   const t=rInvTots();
   // P1：儲存時回填 quoteId（依工程名稱對應主報價單）
@@ -5120,13 +5122,17 @@ function _invQuoteDiff(inv,q){
   const cm={},qm={};
   cur.forEach(x=>{cm[_invKey(x.desc)]=x;});qi.forEach(x=>{qm[_invKey(x.desc)]=x;});
   const added=qi.filter(x=>!cm[_invKey(x.desc)]).map(x=>_invKey(x.desc));
-  const removed=cur.filter(x=>_invKey(x.desc)&&!qm[_invKey(x.desc)]).map(x=>_invKey(x.desc));
+  // v6.0.102 hotfix：同步時刻意保留的舊工項（報價已刪、但有數量）不算「仍是舊版」——
+  // 有 _qRetired 標記，或本單已同步到目前版次（quoteVer＝q.ver）且有數量者，一律視為已保留的歷史列
+  const synced=!!(inv&&(inv.quoteVer||null)===(q.ver||1));
+  const removed=cur.filter(x=>_invKey(x.desc)&&!qm[_invKey(x.desc)]&&!(x._qRetired||(synced&&_invHasQty(x)))).map(x=>_invKey(x.desc));
   const changed=qi.filter(x=>{const c=cm[_invKey(x.desc)];
     return c&&((parseFloat(c.contractPrice)||0)!==x.contractPrice||(parseFloat(c.contractQty)||0)!==x.contractQty||_uFix(c.unit||'')!==_uFix(x.unit||''));}).map(x=>_invKey(x.desc));
   return {added,removed,changed,any:!!(added.length||removed.length||changed.length),ver:q.ver||1,invVer:inv?(inv.quoteVer||null):null};
 }
 // 以報價現行工項重建請款明細：同名工項保留已填的前期／本期數量與請款類型，
 // 單價／合約量／單位／類別／逾期單價以報價為準；報價已無但已有數量的舊工項、逾期租金列、手動列保留在最後
+function _invHasQty(x){return (parseFloat(x&&x.curQty)||0)>0||(parseFloat(x&&x.prevQty)||0)>0||(parseFloat(x&&x.prevAmt)||0)>0||(parseFloat(x&&x.curAmt)||0)>0;}
 function _invSyncItems(items,q){
   const fresh=_invItemsFromQuote(q),old=(items||[]).slice(),used={};
   const out=fresh.map(f=>{
@@ -5140,8 +5146,9 @@ function _invSyncItems(items,q){
   });
   old.forEach((x,i)=>{
     if(used[i]||!x||x.type==='sec')return;
-    const hasQty=(parseFloat(x.curQty)||0)>0||(parseFloat(x.prevQty)||0)>0||(parseFloat(x.prevAmt)||0)>0||(parseFloat(x.curAmt)||0)>0;
-    if(x.type!=='item'||hasQty)out.push(x);
+    const hasQty=_invHasQty(x);
+    if(x.type!=='item'){out.push(x);return;}
+    if(hasQty)out.push(Object.assign({},x,{_qRetired:x._qRetired||(q.ver||1)}));   // v6.0.102：標記為「報價已刪、保留歷史數量」
   });
   return out;
 }
@@ -31388,7 +31395,7 @@ function rfqEdit(rid){
     +'<div class="f" style="margin:0"><label style="white-space:nowrap">保留款 %</label><input id="rfq-ret" type="number" inputmode="decimal" min="0" max="100" step="0.5" value="'+c.ret+'" style="'+IN+';padding:7px 4px;text-align:center"></div>'
     +'<div class="f" style="margin:0"><label style="white-space:nowrap">有效 天</label><input id="rfq-valid" type="number" inputmode="numeric" min="0" value="'+c.valid+'" style="'+IN+';padding:7px 4px;text-align:center"></div>'
     +'</div>'
-    +'<div class="f" style="margin:6px 0 0"><label>分段計價：裝設（打設）完成請款 %（其餘於拆除／拔除完成請款）</label><input id="rfq-inst" type="number" inputmode="decimal" min="0" max="100" value="'+(c.instPct!=null&&c.instPct!==''?esc(String(c.instPct)):'')+'" placeholder="'+_INST_DEF+'" oninput="_rfqB2bLive()" style="'+IN+';max-width:120px;text-align:center"></div>'
+    +'<div class="f" style="margin:6px 0 0"><label>分段計價：裝設（打設）完成請款 %（其餘於拆除／拔除完成請款）</label><input id="rfq-inst" type="number" inputmode="decimal" min="0" max="100" value="'+(c.instPct!=null&&c.instPct!==''?esc(String(c.instPct)):'')+'" placeholder="'+_instDef()+'" oninput="_rfqB2bLive()" style="'+IN+';max-width:120px;text-align:center"></div>'
     +'<div class="f" style="margin:6px 0 0"><label>保留款退還時點</label><input id="rfq-retwhen" value="'+esc(c.retWhen||'')+'" placeholder="完工驗收後退還" oninput="_rfqB2bLive()" style="'+IN+'"></div>'
     +'<div id="rfq-b2b">'+_b2bWarnHtml(q,c)+'</div>'
     +'<div style="font-size:12px;font-weight:700;color:var(--g3);margin:10px 0 4px">詢價條件</div><div id="rfq-conds">'+_rfqCondRowsHtml(c,IN)+'</div>'
@@ -36658,13 +36665,14 @@ function _b2bEarly(own,sub){var xs=[0.01,own.cash,own.cash+0.01,sub.cash,sub.cas
 // 保留款退還時點（詢價單用「本公司」，合約列印時換成「甲方」）；不引用業主原文，避免被讀成第二個期限
 var _B2B_RETWHEN='依業主退還本公司保留款之時點，於收到後 7 日內無息退還';
 // 裝設請款％（v6.0.96）：分段計價工項（構台、支撐等）裝設（打設）完成先請 N%、拆除（拔除）完成再請其餘；公司預設 90（報價條件 90／10）
-var _INST_DEF=90;
+// v6.0.103 Lotion 定：沒有合約時默契＝裝設 70％、拆除 30％ → 預設＝100−拆除請款比例（P.removeRate，預設 30）；報價條件第 3 條 90／10 是談判用文字，不改
+function _instDef(){return Math.max(0,100-_removeRate());}
 // v6.0.103 裝設請款％參照：業主合約（CONTRACTS 關聯此案、合約欄「裝設請款 %」）→ 公司請款設定（100 − 拆除請款比例 P.removeRate）
 function _ownerCt(q){if(!q)return null;var a=(CONTRACTS||[]).find(function(c){return c&&c.linkedQid===q.id;});if(a)return a;
   var byName=(CONTRACTS||[]).filter(function(c){return c&&!c.linkedQid&&c.name&&c.name===q.name;});return byName.length===1?byName[0]:null;}   // 沒有關聯時，只有恰好一份未關聯的同名合約才採用
 function _ownerCtInst(q){var c=_ownerCt(q),v=c&&c.instPct;return (v==null||v==='')?null:Math.max(0,Math.min(100,parseFloat(v)||0));}
-function _ownerInstRef(q){var v=_ownerCtInst(q);if(v!=null)return {pct:v,src:'業主合約「'+(_ownerCt(q).name||'')+'」'};var rr=_removeRate();return {pct:Math.max(0,100-rr),src:'公司請款設定（拆除請款 '+rr+'%）'};}
-function _instOf(c){var v=c&&c.instPct;return (v==null||v==='')?_INST_DEF:Math.max(0,Math.min(100,parseFloat(v)||0));}
+function _ownerInstRef(q){var v=_ownerCtInst(q);if(v!=null)return {pct:v,src:'業主合約「'+(_ownerCt(q).name||'')+'」'};return {pct:_instDef(),src:'公司請款設定（拆除請款 '+_removeRate()+'%）'};}
+function _instOf(c){var v=c&&c.instPct;return (v==null||v==='')?_instDef():Math.max(0,Math.min(100,parseFloat(v)||0));}   // 包商空白＝與業主同一個預設
 function _b2bRetWhen(o){return _B2B_RETWHEN;}
 // 新詢價單的預設條件：現金部分不早於營造廠放款、期票到期不早於營造廠最後一筆款到帳（票期進位到 30 天）、保留款不低於營造廠
 function _b2bDefCond(q){
