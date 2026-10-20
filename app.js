@@ -296,8 +296,9 @@ function _itemCat(it){
 function _isRemovePeriod(it){
   if(it&&it.phase==='remove')return true;
   if(it&&it.phase==='install')return false;
-  var rate=(it&&it.payRate!=null)?it.payRate:100;
-  return parseFloat(rate)===_removeRate();
+  var rate=(it&&it.payRate!=null)?it.payRate:100,rr=_removeRate();
+  if(rr===0)return false;   // 審查：拆除比例設 0 時，「0% 不請款」不可被當成拔除期
+  return parseFloat(rate)===rr;
 }
 // v5.318 口徑統一：同一個指標全站只有一套算法，避免各頁數字對不上
 // ══════════════════════════════════════════════════════════════
@@ -3699,7 +3700,7 @@ function rInvItems(){
         rateOpts.forEach(([v,t])=>{
           const o=document.createElement('option');
           o.value=v;o.textContent=t;
-          if((it.payRate||100)==parseInt(v))o.selected=true;
+          if((it.payRate!=null&&it.payRate!==''?it.payRate:100)==parseInt(v))o.selected=true;   // 審查：0% 不可顯示成 100%
           rateSel.appendChild(o);
         });
         rateSel.addEventListener('change',function(){
@@ -6665,7 +6666,7 @@ function _invCalcText(it,curAmt){
   if(it._ovKey!=null&&it.type==='rental'&&Array.isArray(it._ovBatches)&&it._ovBatches.length){   // v6.0.107 分批明細
     var bu=String(it.unit||'').replace(/·天$/,''),md=function(d){return d?String(d).slice(5).replace('-','/'):'';};
     parts=[it._ovBatches.filter(function(b){return b.days>0||b.open;}).map(function(b){   /* 審查：完成日早於本期起算的批次（0 天）不印 */ return '第'+b.no+'批 '+(b.open?'尚未拔除（計到本期截止）':(md(b.date)+' 拔除完成'))+' '+_qfmt(b.qty)+' '+bu+' × '+b.days+' 天 ＝ '+_qfmt(b.qty*b.days)+' '+bu+'·天'+(p?('（NT$ '+fmt(Math.round(b.qty*b.days*p))+'）'):'');}).join('；')
-      +'；合計 '+_qfmt(q)+' '+bu+'·天'+((parseFloat(it.discQd)||0)>0?(' − 折讓 '+_qfmt(it.discQd)+' '+bu+'·天 ＝ '+_qfmt(_invRentQ(it))+' '+bu+'·天'):'')+' × '+fmt(p)+' ＝ '+fmt(amt)];
+      +(it._ovBatches.some(function(b){return !(b.days>0||b.open);})?'（其餘批次完成日早於本期起算，已於前期計價）':'')+'；合計 '+_qfmt(q)+' '+bu+'·天'+((parseFloat(it.discQd)||0)>0?(' − 折讓 '+_qfmt(it.discQd)+' '+bu+'·天 ＝ '+_qfmt(_invRentQ(it))+' '+bu+'·天'):'')+' × '+fmt(p)+' ＝ '+fmt(amt)];
   }
   if(it._ovKey!=null&&it.type==='rental')parts.push('租期結束日口徑：'+(_RENT_END_LBL[it._ovBasis]||_RENT_END_LBL.removeFirst));   // v6.0.107
   return parts.join('；');
