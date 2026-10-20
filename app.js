@@ -10527,7 +10527,7 @@ function _pushCloud(opts){
     var perRec=_perRecordDelta(delta,clean,newHashes,baseHashes,opts);
     // v6.0.106 材料位置清單（不含成本）：只有讀得到 private 台帳的管理員裝置產生並上傳到 shared/matLoc，給唯讀帳號讀
     var mlWork=false,mlHash='';
-    try{if(_fbUser&&isAdmin(_fbUser.email)&&_privReadOk===true){var _ml=_cleanEnc({v:_matLocList()}).v||[];mlHash=_collHash(_ml);if(opts.full||localStorage.getItem('fy_matloc_hash')!==mlHash){delta.matLoc=_ml;mlWork=true;}}}catch(e){_err('_pushCloud.matLoc',e);}
+    try{if(_fbUser&&isAdmin(_fbUser.email)&&_privReadOk===true&&Array.isArray(MAT_LEDGER)&&MAT_LEDGER.length>0){var _ml=_cleanEnc({v:_matLocList()}).v||[];mlHash=_collHash(_ml);if(opts.full||localStorage.getItem('fy_matloc_hash')!==mlHash){delta.matLoc=_ml;mlWork=true;}}}catch(e){_err('_pushCloud.matLoc',e);}
     var okWrap=function(){_storeSyncHashes(newHashes);_storeRecHashes(perRec.recHashes);if(mlWork){try{localStorage.setItem('fy_matloc_hash',mlHash);}catch(e){/* 可忽略 */}}ok();};
     // v5.314：完全沒有變動時不要空推 uploadedAt，否則會害其他裝置誤判「雲端有更新」而跳覆蓋提示
     // v5.319：無變更時不謊報「已上傳雲端」，也不推進 fy_last_fb_sync

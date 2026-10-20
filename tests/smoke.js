@@ -7152,11 +7152,13 @@ async function newPage(browser, width, height) {
         out.adminUp = ups.some(k => k.indexOf('matLoc') >= 0);
         ups.length = 0; _privReadOk = false; localStorage.removeItem('fy_matloc_hash'); _pushCloud({ silent: true, _merged: true }); await new Promise(r => setTimeout(r, 200));
         out.noPriv = !ups.some(k => k.indexOf('matLoc') >= 0);
+        ups.length = 0; _privReadOk = true; const keep = MAT_LEDGER.slice(); MAT_LEDGER.length = 0; localStorage.removeItem('fy_matloc_hash'); _pushCloud({ silent: true, _merged: true }); await new Promise(r => setTimeout(r, 200));
+        out.noEmpty = !ups.some(k => k.indexOf('matLoc') >= 0); keep.forEach(x => MAT_LEDGER.push(x));
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
       _fbUser = ou; _fbDb = od; _privReadOk = opr; _roState = ''; MAT_LEDGER.length = 0; oL.forEach(x => MAT_LEDGER.push(x)); Q.length = 0; oQ.forEach(x => Q.push(x)); CONTRACTS.length = 0; oC.forEach(x => CONTRACTS.push(x));
       return out;
     });
-    check('v6.0.106 材料位置清單：規格／長度／支數／所在位置／調出日／預計退場日、不含單價成本；只有讀得到台帳的管理員裝置上傳到 shared/matLoc', r.list && r.adminUp && r.noPriv, JSON.stringify(r));
+    check('v6.0.106 材料位置清單：規格／長度／支數／所在位置／調出日／預計退場日、不含單價成本；只有讀得到台帳的管理員裝置上傳到 shared/matLoc', r.list && r.adminUp && r.noPriv && r.noEmpty, JSON.stringify(r));
     check('v6.0.106 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
