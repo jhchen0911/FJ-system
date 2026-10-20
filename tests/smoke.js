@@ -7557,6 +7557,11 @@ async function newPage(browser, width, height) {
         out.rent = bq.qtyDays === 50 * 9 + 30 * 24 && bq.rows.length === 2 && !bq.rows.some(x => x.open);
         const bq2 = _rentBatchQtyDays({ cum: 80, remLogs: [{ date: '2026-11-10', qty: 50, done: true }] }, 100, '2026-11-01', '2026-11-30');
         out.rentOpen = bq2.qtyDays === 50 * 9 + 30 * 30 && bq2.rows[1].qty === 30;
+        /* 審查第 2 輪：有勾批次、最後一批沒勾但已拔完 → 最後一批計到拔除完成日（不漏收） */
+        const bq3 = _rentBatchQtyDays({ cum: 100, removeDone: '2026-11-25', remLogs: [{ date: '2026-11-10', qty: 60, done: true }, { date: '2026-11-25', qty: 40 }] }, 100, '2026-11-01', '2026-11-30');
+        out.lastUntick = bq3.qtyDays === 60 * 9 + 40 * 24 && bq3.rows.length === 2;
+        out.dleKeep = /dle-bd/.test(editDailyLog.toString()) && /batchDone=true/.test(editDailyLog.toString());
+        out.unitKept = calcInvDays.toString().indexOf(":overLabel,unit:_bq?(srcUnit+'·天'):srcUnit") >= 0;
         /* 分批折讓（支·天）＋列標題 */
         const bit = { type: 'rental', curQty: 1170, contractPrice: 50, payRate: 100, _ovKey: 'x', _ovBatches: bq.rows, unit: '支·天', discQd: 170 };
         out.disc = _invRentQ(bit) === 1000 && /折讓 170 支·天 ＝ 1,000 支·天/.test(_invCalcText(bit));
@@ -7578,7 +7583,7 @@ async function newPage(browser, width, height) {
       return out;
     });
     check('批次 B 審查：當場扣款退還以該期扣款為上限（可動用資金／保留款總覽／可請退）、健檢列出抄到下一期的退還', r.cash && r.ret && r.health, JSON.stringify(r));
-    check('批次 B 審查：逾期租金在場量上限＝實際打設（打設量＜合約量）、拔完歸零、分批可折讓支·天', r.rent && r.rentOpen && r.disc, JSON.stringify(r));
+    check('批次 B 審查：逾期租金在場量上限＝實際打設（打設量＜合約量）、拔完未勾最後一批不漏收、修改日報保留本批完成、分批列單位不漏、可折讓支·天', r.rent && r.rentOpen && r.disc && r.lastUntick && r.dleKeep && r.unitKept, JSON.stringify(r));
     check('批次 B 審查：包商裝設％空白＝業主參照、請款計算照發票規則 B、唯讀可開佣金／業務但不能存', r.inst && r.ruleB && r.prev && r.roOpen && r.roSave, JSON.stringify(r));
     check('批次 B 審查測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
