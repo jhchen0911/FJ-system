@@ -31384,7 +31384,7 @@ function rfqEdit(rid){
     +'<div class="f" style="margin:0"><label style="white-space:nowrap">保留款 %</label><input id="rfq-ret" type="number" inputmode="decimal" min="0" max="100" step="0.5" value="'+c.ret+'" style="'+IN+';padding:7px 4px;text-align:center"></div>'
     +'<div class="f" style="margin:0"><label style="white-space:nowrap">有效 天</label><input id="rfq-valid" type="number" inputmode="numeric" min="0" value="'+c.valid+'" style="'+IN+';padding:7px 4px;text-align:center"></div>'
     +'</div>'
-    +'<div class="f" style="margin:6px 0 0"><label>分段計價：裝設（打設）完成請款 %（其餘於拆除／拔除完成請款）</label><input id="rfq-inst" type="number" inputmode="decimal" min="0" max="100" value="'+(c.instPct!=null&&c.instPct!==''?esc(String(c.instPct)):'')+'" placeholder="'+_INST_DEF+'" oninput="_rfqB2bLive()" style="'+IN+';max-width:120px;text-align:center"></div>'
+    +'<div class="f" style="margin:6px 0 0"><label>分段計價：裝設（打設）完成請款 %（其餘於拆除／拔除完成請款）</label><input id="rfq-inst" type="number" inputmode="decimal" min="0" max="100" value="'+(c.instPct!=null&&c.instPct!==''?esc(String(c.instPct)):'')+'" placeholder="'+_instDef()+'" oninput="_rfqB2bLive()" style="'+IN+';max-width:120px;text-align:center"></div>'
     +'<div class="f" style="margin:6px 0 0"><label>保留款退還時點</label><input id="rfq-retwhen" value="'+esc(c.retWhen||'')+'" placeholder="完工驗收後退還" oninput="_rfqB2bLive()" style="'+IN+'"></div>'
     +'<div id="rfq-b2b">'+_b2bWarnHtml(q,c)+'</div>'
     +'<div style="font-size:12px;font-weight:700;color:var(--g3);margin:10px 0 4px">詢價條件</div><div id="rfq-conds">'+_rfqCondRowsHtml(c,IN)+'</div>'
@@ -36654,13 +36654,14 @@ function _b2bEarly(own,sub){var xs=[0.01,own.cash,own.cash+0.01,sub.cash,sub.cas
 // 保留款退還時點（詢價單用「本公司」，合約列印時換成「甲方」）；不引用業主原文，避免被讀成第二個期限
 var _B2B_RETWHEN='依業主退還本公司保留款之時點，於收到後 7 日內無息退還';
 // 裝設請款％（v6.0.96）：分段計價工項（構台、支撐等）裝設（打設）完成先請 N%、拆除（拔除）完成再請其餘；公司預設 90（報價條件 90／10）
-var _INST_DEF=90;
+// v6.0.103 Lotion 定：沒有合約時默契＝裝設 70％、拆除 30％ → 預設＝100−拆除請款比例（P.removeRate，預設 30）；報價條件第 3 條 90／10 是談判用文字，不改
+function _instDef(){return Math.max(0,100-_removeRate());}
 // v6.0.103 裝設請款％參照：業主合約（CONTRACTS 關聯此案、合約欄「裝設請款 %」）→ 公司請款設定（100 − 拆除請款比例 P.removeRate）
 function _ownerCt(q){if(!q)return null;var a=(CONTRACTS||[]).find(function(c){return c&&c.linkedQid===q.id;});if(a)return a;
   var byName=(CONTRACTS||[]).filter(function(c){return c&&!c.linkedQid&&c.name&&c.name===q.name;});return byName.length===1?byName[0]:null;}   // 沒有關聯時，只有恰好一份未關聯的同名合約才採用
 function _ownerCtInst(q){var c=_ownerCt(q),v=c&&c.instPct;return (v==null||v==='')?null:Math.max(0,Math.min(100,parseFloat(v)||0));}
-function _ownerInstRef(q){var v=_ownerCtInst(q);if(v!=null)return {pct:v,src:'業主合約「'+(_ownerCt(q).name||'')+'」'};var rr=_removeRate();return {pct:Math.max(0,100-rr),src:'公司請款設定（拆除請款 '+rr+'%）'};}
-function _instOf(c){var v=c&&c.instPct;return (v==null||v==='')?_INST_DEF:Math.max(0,Math.min(100,parseFloat(v)||0));}
+function _ownerInstRef(q){var v=_ownerCtInst(q);if(v!=null)return {pct:v,src:'業主合約「'+(_ownerCt(q).name||'')+'」'};return {pct:_instDef(),src:'公司請款設定（拆除請款 '+_removeRate()+'%）'};}
+function _instOf(c){var v=c&&c.instPct;return (v==null||v==='')?_instDef():Math.max(0,Math.min(100,parseFloat(v)||0));}   // 包商空白＝與業主同一個預設
 function _b2bRetWhen(o){return _B2B_RETWHEN;}
 // 新詢價單的預設條件：現金部分不早於營造廠放款、期票到期不早於營造廠最後一筆款到帳（票期進位到 30 天）、保留款不低於營造廠
 function _b2bDefCond(q){

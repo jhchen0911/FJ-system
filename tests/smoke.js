@@ -6873,7 +6873,7 @@ async function newPage(browser, width, height) {
         /* v6.0.96 裝設請款％：營造廠 80 → 包商預設 80；包商 90 提醒先墊 10%；空白＝公司預設 90；合約與詢價單寫出分段 */
         q.ownerPay = { instPct: 80 }; const ci = _rfqCond(null);
         out.inst = ci.instPct === 80 && _b2bIssues(q, Object.assign({}, ci, { instPct: 90 })).some(x => /包商裝設完成先拿 90%，比營造廠的 80% 多 10%（豐有先墊）/.test(x)) && !_b2bIssues(q, ci).some(x => /裝設/.test(x))
-          && !_b2bIssues(q, Object.assign({}, ci, { instPct: null })).some(x => /裝設/.test(x)) && /裝設（打設）完成請款 80%，拆除（拔除）完成請款 20%/.test(_rfqCondLines({ cond: ci }).join(''));
+          && !_b2bIssues(q, Object.assign({}, ci, { instPct: null })).some(x => /裝設/.test(x)) && _instOf({}) === 100 - _removeRate() && /裝設（打設）完成請款 80%，拆除（拔除）完成請款 20%/.test(_rfqCondLines({ cond: ci }).join(''));
         out.retB = _ownerTerms({ id: 'zr', client: '元昱測試營造', ownerPay: { day: 20 } }).ret === null && _ownerTerms(q).ret === 10;
         out.b2bFlag = !_ownerPaySet({ deduct: { ret: 10 } }) && !_ownerPaySet({ ownerPay: { day: null } }) && _ownerPaySet({ ownerPay: { day: 20 } });
         q.ownerPay = {}; out.instDef = _ownerTerms(q).instPct === 100 - _removeRate() && _ownerTerms({ id: 'z', client: '無', ownerPay: { instPct: 80 } }).instPct === 80;
