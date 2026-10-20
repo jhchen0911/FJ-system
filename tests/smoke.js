@@ -7682,6 +7682,32 @@ async function newPage(browser, width, height) {
       return out;
     });
     check('批次 C 審查第 1 輪：一式列數量對照分攤、介紹費跟隨一式、廠商核對單一式／分段金額同口徑、一式累計不超過 100%', r2.recon && r2.follow && r2.stmtLump && r2.stmtStage && r2.clampUi && r2.clamp, JSON.stringify(r2));
+    const r3 = await page.evaluate(() => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = function () {};
+        const q = { id: 'qR3', name: '帶入案', awarded: true, items: [{ desc: '中間樁', unit: '支', qty: 100 }, { desc: '共構樁', unit: '支', qty: 50 }], dailyLogs: [], costs: [] };
+        q.costs.push({ id: 'cR3', type: 'sub', vendor: '甲', rows: [{ id: 'cR3_L', lump: true, linkedItemIdx: 0, qty: 1, unitPrice: 300000, lumpItems: [{ idx: 0, q0: 100, u0: '支' }, { idx: 1, q0: 50, u0: '支' }] }], periods: [{ no: 1, date: '2026-10-25', to: '2026-10-25', rows: [{ rid: 'cR3_L', qty: 0.3 }] }] });
+        Q = [q]; INV.length = 0;
+        const inv = { id: 'iR3', quoteId: 'qR3', project: '帶入案', periodNo: 1, date: '2026-10-31', items: [{ type: 'item', desc: '中間樁', unit: '支', contractQty: 100, contractPrice: 1 }, { type: 'item', desc: '共構樁', unit: '支', contractQty: 50, contractPrice: 1 }] };
+        INV.push(inv); loadInvoice('iR3');
+        out.sug = _invVendorSuggest(0) === 30 && _invVendorSuggest(1) === 15;
+        out.mixed = _subLumpDaily(q, { lumpItems: [{ idx: 0, q0: 100, u0: '支' }, { idx: 1, q0: 50, u0: 'M3' }] }, '', '') === 0;
+        const qo = { ownerPay: { itemOv: [{ itemMatch: '根固', removePct: 0 }] } };
+        out.ovLine = !_ownerItemOv(qo, '鋼軌樁打設及拔除\n（含根固灌漿）') && !!_ownerItemOv(qo, '中間樁根固處理');
+        const rr = { vendors: [{ prices: { 0: 10, 1: 20, 2: 30, 3: 40 } }] }; _rfqRemapIdx(rr, { 0: 0, 2: 3 });
+        out.remap = JSON.stringify(rr.vendors[0].prices) === JSON.stringify({ 0: 10, 3: 30 });
+        const F = _cardParse({ schema: 'fj-contract-card/1', billing: { payDay: { value: null, source: 'contract' } } }); out.nullDef = F['billing.payDay'].value === 20 && F['billing.payDay'].source === 'default';
+        const qc = { id: 'qC3', name: 'C3', client: '', ownerCard: { fields: { 'billing.cutoffDay': { value: 15, source: 'contract', evidence: { clause: '六' }, applied: true } }, log: [] } };
+        Q.push(qc); _cardCtx = { qid: 'qC3', card: { schema: 'fj-contract-card/1' }, F: { 'billing.payDay': { value: 10, source: 'contract' } }, fname: 'b.json' };
+        document.body.insertAdjacentHTML('beforeend', '<input type="checkbox" class="cc-pick" data-k="billing.payDay" checked id="ccTmp">');
+        _cardApply(); document.getElementById('ccTmp').remove();
+        out.merge = qc.ownerCard.fields['billing.cutoffDay'].applied === true && qc.ownerCard.fields['billing.payDay'].applied === true && qc.ownerPay.day === 10;
+        window.toast = oT; Q = []; INV.length = 0; invEid = null; invItems = [];
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    check('批次 C 審查第 2 輪：業主請款帶入廠商一式量、單位不同不推算完成％、合約例外只比工項名稱、重定位丟掉已刪單價、條件卡空值補預設、重複匯入保留來源', r3.sug && r3.mixed && r3.ovLine && r3.remap && r3.nullDef && r3.merge, JSON.stringify(r3));
     check('批次 C 審查測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

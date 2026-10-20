@@ -28909,10 +28909,11 @@ function recalcAllExpected(){
         if(e&&e.src!=='rule'&&e.src!=='manual'){v.expectedRecvDate=e.date;_touch(v);n++;}   // 審查修正：放款規則算的日期只顯示、不寫回
         else v.expectedRecvDate=bak;
       });
+      var _rs=targets.filter(function(v){var e=_invExpectedDate(v);return e&&(e.src==='rule'||e.src==='manual');}).length;
       try{saveInv();}catch(e){_err('recalcAllExpected',e);}
       try{renderInvList();}catch(e){_err('recalcAllExpected',e);}
       try{rDash();}catch(e){_err('recalcAllExpected',e);}
-      toast('已重算 '+n+' 筆收款日');
+      toast('已重算 '+n+' 筆收款日'+(_rs?('；另 '+_rs+' 筆依放款規則或手動日期顯示，不寫回'):''));
     },false,null,true);
 }
 // 一次性資料修復：v5.256 之前自動算出的「估驗當月收款日」不可能正確，開機自動重推
@@ -31008,6 +31009,7 @@ function _invVendorSuggest(i){
       if(rg.from&&d<=rg.from)return;if(d>rg.to)return;
       (per.rows||[]).forEach(function(pr){
         var row=(c.rows||[]).find(function(r){return r.id===pr.rid;});if(!row)return;
+        if(row.lump){(row.lumpItems||[]).forEach(function(x){if(x.del)return;var it2=(rg.q.items||[])[x.idx];if(it2&&String(it2.desc||'').split('\n')[0].trim()===name)sum+=(parseFloat(pr.qty)||0)*(parseFloat(x.q0)||0);});return;}   // 審查第 2 輪：一式＝完成比例 × 該工項數量
         var li=parseInt(row.linkedItemIdx);var lit=(li>=0&&rg.q.items)?rg.q.items[li]:null;
         var rn=lit?String(lit.desc||'').split('\n')[0].trim():String(row.desc||'').split('\n')[0].trim();
         if(rn===name)sum+=parseFloat(pr.qty)||0;
@@ -37583,7 +37585,7 @@ function _rfqChgHtml(q,r){
 function _rfqRemapIdx(r,m){
   var ks=Object.keys(m||{}).filter(function(k){return Number(k)!==Number(m[k]);});if(!ks.length)return;
   var mv=function(k){return Object.prototype.hasOwnProperty.call(m,k)?m[k]:Number(k);};
-  (r.vendors||[]).forEach(function(v){['prices','neg'].forEach(function(k){var o=v[k];if(!o||typeof o!=='object')return;var nb={};Object.keys(o).forEach(function(x){nb[mv(x)]=o[x];});v[k]=nb;});
+  (r.vendors||[]).forEach(function(v){['prices','neg'].forEach(function(k){var o=v[k];if(!o||typeof o!=='object')return;var nb={};Object.keys(o).forEach(function(x){if(!Object.prototype.hasOwnProperty.call(m,x))return;nb[m[x]]=o[x];});v[k]=nb;});   // 審查第 2 輪：已刪工項的單價丟掉，不與位移後的鍵相撞
     if(v.lump&&Array.isArray(v.lump.idxs))v.lump.idxs=v.lump.idxs.map(function(x){return mv(String(x));});});
 }
 function _rfqMoveIdx(r,from,to){
@@ -37666,6 +37668,7 @@ function _rfqVerTodo(items){
 }
 // 一式分包列：完成百分比（日報涵蓋工項回報量 ÷ 各工項報價數量合計）
 function _subLumpDaily(q,row,from,to){
+  var us={};(row.lumpItems||[]).forEach(function(li){if(!li.del)us[li.u0||li.unit||'']=1;});if(Object.keys(us).length>1)return 0;   // 審查第 2 輪：涵蓋工項單位不同不推算（改人工輸入）
   var tq=0,dq=0;(row.lumpItems||[]).forEach(function(li){if(li.del)return;var it=(q.items||[])[li.idx];if(!it)return;tq+=parseFloat(li.q0)||0;dq+=_dailyQtyBetween(q,it.desc,from,to);});
   return tq>0?Math.min(1,dq/tq):0;
 }
@@ -37757,7 +37760,7 @@ function _cardParse(card){
   if(!card||typeof card!=='object')throw new Error('不是 JSON 物件');
   if(card.schema&&card.schema!=='fj-contract-card/1')throw new Error('格式版本 '+card.schema+' 不支援（需要 fj-contract-card/1）');
   var out={};_CARD_FIELDS.forEach(function(f){var n=_cardNorm(_cardPath(card,f.k));if(n)out[f.k]=n;});
-  Object.keys(_CARD_DEF).forEach(function(k){if(!out[k])out[k]={value:_CARD_DEF[k],source:'default',evidence:{clause:'',quote:'合約未載明'},note:'卡片缺此欄，照豐有預設'};});   // 審查修正：缺欄補 Lotion 預設（黃底）
+  Object.keys(_CARD_DEF).forEach(function(k){if(!out[k]||out[k].value==null||out[k].value==='')out[k]={value:_CARD_DEF[k],source:'default',evidence:{clause:'',quote:'合約未載明'},note:'卡片缺此欄，照豐有預設'};});   // 審查修正：缺欄補 Lotion 預設（黃底）
   return out;
 }
 function _cardValTxt(k,v){
@@ -37774,7 +37777,7 @@ function _ovOf(o){if(!o)return null;return {match:String(o.itemMatch||o.match||'
 function _ovIsGrout(ov){return !!ov&&((ov.remove!=null&&ov.remove!==''&&parseFloat(ov.remove)===0)||/根固/.test(ov.match||''));}
 function _ownerItemOv(q,desc){
   var L=(q&&q.ownerPay&&Array.isArray(q.ownerPay.itemOv))?q.ownerPay.itemOv:[];if(!L.length)return null;
-  var d=String(desc||'').replace(/\s+/g,'');
+  var d=String(desc||'').split('\n')[0].replace(/\s+/g,'');   // 審查第 2 輪：只比對工項名稱（第一行），不比括號說明
   for(var i=0;i<L.length;i++){var ov=_ovOf(L[i]);if(ov&&ov.match&&d.indexOf(ov.match.replace(/\s+/g,''))>=0)return ov;}
   return null;
 }
@@ -37839,7 +37842,8 @@ function _cardApply(){
   var picked=Array.prototype.map.call(document.querySelectorAll('.cc-pick'),function(c){return c.checked?c.getAttribute('data-k'):null;}).filter(Boolean);
   if(!picked.length){toast('沒有勾選任何欄位，未寫入');_cardCtx=null;return;}
   var by=(typeof _meEmail==='function'?_meEmail():'')||'';
-  var fields={};Object.keys(cx.F).forEach(function(k){fields[k]=Object.assign({},cx.F[k],{applied:picked.indexOf(k)>=0});});
+  var old=(q.ownerCard&&q.ownerCard.fields)||{},fields={};Object.keys(old).forEach(function(k){fields[k]=old[k];});   // 審查第 2 輪：重複匯入時保留上次已寫入欄位的來源與證據
+  Object.keys(cx.F).forEach(function(k){if(picked.indexOf(k)>=0)fields[k]=Object.assign({},cx.F[k],{applied:true});else if(!fields[k])fields[k]=Object.assign({},cx.F[k],{applied:false});});
   picked.forEach(function(k){if(_CARD_APPLY[k])_cardSetOne(q,k,cx.F[k].value,'合約條件卡匯入（'+(cx.F[k].evidence&&cx.F[k].evidence.clause||cx.F[k].source)+'）');});
   var log=(q.ownerCard&&Array.isArray(q.ownerCard.log))?q.ownerCard.log:[];
   log.push({at:Date.now(),by:by,act:'import',file:cx.fname,n:picked.length});
