@@ -3129,7 +3129,7 @@ async function newPage(browser, width, height) {
         rfqNew();
         const m=document.getElementById('gen-confirm-modal');
         out.form=m.style.display!=='none'&&document.querySelectorAll('.rfq-it').length===2&&document.querySelectorAll('.rfq-qty')[0].value==='408'&&document.getElementById('rfq-cash').value==='50'&&/RFQ-1150928-01/.test(m.innerHTML);
-        out.perDef=[...document.querySelectorAll('.rfq-per')].every(s=>s.value==='m');document.querySelectorAll('.rfq-per').forEach(s=>s.value='pc');   // v6.0.24 有 L=…M 預設依 M；此測試驗證依支流程
+        out.perDef=[...document.querySelectorAll('.rfq-per')].every(s=>s.value==='pc');   // v6.0.109 預設照報價原單位（原 v6.0.24 有 L=…M 自動依 M 已取消）
         document.querySelectorAll('.rfq-it').forEach(cb=>cb.checked=true);document.querySelectorAll('.rfq-qty')[1].value='400';
         document.getElementById('rfq-scope').value='H型鋼樁打設、拔除';document.getElementById('rfq-deadline').value='2026-10-10';document.getElementById('rfq-entry').value='2026-11-01';
         document.getElementById('rfq-cash').value='40';document.getElementById('rfq-cash').dispatchEvent(new Event('input'));out.cashLink=document.getElementById('rfq-ticket').value==='60';
@@ -3140,7 +3140,7 @@ async function newPage(browser, width, height) {
         out.saved=!!r&&r.no==='RFQ-1150928-01'&&r.items.length===2&&r.items[1].qty===400&&r.vendors.length===0&&!document.querySelector('.rfq-v')&&r.cond.cashPct===40&&r.cond.ticketPct===60&&r.status==='open';
         // 條件條列：計價方式句含放款拆分與保留款；PDF 走預覽、含廠商名、無頁尾字
         const lines=_rfqCondLines(r);
-        out.cond=lines.length===7&&r.cond.extra.length===5&&/每月 25 日計價，次月 25 日放款（40% 匯款、60% 60 天票期）；保留款 5%/.test(lines[2])&&/^報價有效期 30 天/.test(lines[3])&&lines[6]==='引孔泥漿處理費請另列。'&&!/開立發票/.test(lines.join(''));
+        out.cond=lines.length===8&&/一式/.test(lines[7])&&r.cond.extra.length===5&&/每月 25 日計價，次月 25 日放款（40% 匯款、60% 60 天票期）；保留款 5%/.test(lines[2])&&/^報價有效期 30 天/.test(lines[3])&&lines[6]==='引孔泥漿處理費請另列。'&&!/開立發票/.test(lines.join(''));
         const html=_rfqDocHtml(q,r);
         out.doc=/分項工程詢價單/.test(html)&&/RFQ-1150928-01　/.test(html)&&!/甲乙/.test(html)&&/<ol>/.test(html)&&/class="vt"/.test(html)&&/統一編號/.test(html)&&!/本詢價單由/.test(html)&&!/豐有內部使用/.test(html)&&(html.match(/class="blank"/g)||[]).length===9&&/營業稅 5%/.test(html)&&/總計（含稅）/.test(html)&&/class="k sig"/.test(html);
         rfqPrint(r.id);out.prev=!!document.getElementById('_fy_print_overlay');['_fy_print_frame','_fy_print_overlay'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
@@ -3931,7 +3931,8 @@ async function newPage(browser, width, height) {
           _rfqQid='qR';_rfqTab='rfq';go('rfq');
           rfqNew();
           const per=document.querySelector('.rfq-per'),len=document.querySelector('.rfq-len');
-          out.editDef=!!per&&per.value==='m'&&!!len&&len.value==='15';
+          out.editDef=!!per&&per.value==='pc'&&!!len&&len.value==='15';   // v6.0.109 預設照報價原單位（支），依 M 由使用者手動選
+          per.value='m';
           document.querySelector('.rfq-it').checked=true;document.getElementById('gen-confirm-ok').click();
           const q=Q[0],r=q.rfqs[0];
           out.saved=r.items[0].per==='m'&&r.items[0].len===15&&r.items[0].qty===133;
@@ -7311,6 +7312,89 @@ async function newPage(browser, width, height) {
     check('v6.0.108 唯讀帳號：上傳／儲存全擋、寫入按鈕隱藏、輸入停用、點擊攔截、備份還原卡隱藏、還原後恢復', r.push && r.pushPriv && r.save && r.saveQ && r.hide && r.dis && r.cap && r.backup && r.newQ && r.edDis && r.noWrite && r.restore, JSON.stringify(r));
     check('v6.0.108 RTDB 規則：private 放行唯讀帳號讀取、所有寫入規則排除唯讀帳號、名冊可存顯示名稱、Functions 認得 {name}', rr.privRead && rr.writes && rr.nameRule && rr.backups && rr.fn, JSON.stringify(rr));
     check('v6.0.108 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.109 發包：完整工項說明／原單位、拆分範圍、一式報價、材料／隱藏成本、工項付款樣板、報價進版連動 ──
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = function () {};
+        P.vendorPayDay = 25; P.vendorPayDelay = 1; P.vendorCutDay = 25; P.subPayOnBill = true; P.tax = 5;
+        VENDORS.length = 0; PAYABLES.length = 0; Q_HISTORY = {};
+        const D1 = '中間樁 H350，L=14.5M 打設、切除\n（根固處理 D=80cm GL-11.45m～21.5m）（不含水泥、砂及溢漿劣質打除、廢土運棄）';
+        const D2 = '共構樁 H350，L=14.5M 打設、切除\n（根固處理 D=80cm GL-11.45m～21.5m）（不含水泥、砂及溢漿劣質打除、廢土運棄）';
+        Q = [{ id: 'qH', code: '115091403', name: '和平東路199巷', client: '營造廠', date: '2026-09-14', awarded: true, ver: 1, exs: [], rmk: {}, _mt: 1,
+          items: [{ desc: D1, unit: '支', qty: '2', price: '60000', sec: false }, { desc: D2, unit: '支', qty: '4', price: '60000', sec: false }], costs: [], dailyLogs: [] }];
+        const q = Q[0]; eid = 'qH'; _rfqQid = 'qH'; _rfqTab = 'rfq'; go('rfq');
+        const ok = () => document.getElementById('gen-confirm-ok').click();
+        /* ① 打設、切除範圍：完整說明、原單位、預設不換算 */
+        rfqNew();
+        out.form = [...document.querySelectorAll('.rfq-per')].every(x => x.value === 'pc') && /根固處理 D=80cm/.test(document.getElementById('gen-confirm-modal').innerHTML);
+        document.querySelectorAll('.rfq-it').forEach(cb => cb.checked = true); document.querySelectorAll('.rfq-sc').forEach(x => x.value = '打設、切除');
+        ok(); const r1 = q.rfqs[0];
+        out.r1 = r1.quoteVer === 1 && r1.items.length === 2 && r1.items[0].desc === D1 && r1.items[0].unit === '支' && r1.items[0].per === 'pc' && r1.items[0].qty === 2 && r1.items[0].oq === 2 && r1.items[0].scope === '打設、切除' && r1.items[0].tpl === 'gen';
+        const doc = _rfqDocHtml(q, r1); out.doc = /根固處理 D=80cm GL-11\.45m～21\.5m/.test(doc) && /<td class="c">支<\/td>/.test(doc) && /發包範圍：打設、切除/.test(doc) && /一式/.test(doc);
+        /* ② 拆分：根固另一張，範圍含「根固」自動帶根固樣板；提醒涵蓋 */
+        rfqNew();
+        out.cover = /此工項另在 RFQ-115091403-01（打設、切除）\s?詢價/.test(document.getElementById('gen-confirm-modal').innerHTML);
+        document.querySelectorAll('.rfq-it').forEach(cb => cb.checked = true);
+        document.querySelectorAll('.rfq-sc').forEach(x => { x.value = '根固'; x.dispatchEvent(new Event('input')); });
+        ok(); const r2 = q.rfqs[1];
+        out.r2 = r2.items.every(it => it.tpl === 'grout' && it.scope === '根固') && /第 1、2 項付款樣板：根固/.test(_rfqCondLines(r2).join('|'));
+        renderRfq(); out.split = /拆分發包/.test(document.getElementById('rfq-root').innerHTML) && /請確認各發包範圍合起來涵蓋原工項全部內容/.test(document.getElementById('rfq-root').innerHTML);
+        /* ③ 一式：協漾 一式 380,000 涵蓋兩項、水泥砂豐有提供 50,000；另一家單價 */
+        rfqFill(r2.id, -1); document.getElementById('rf-name').value = '協漾工程';
+        document.getElementById('rf-mode').value = 'lump'; _rfModeUI(); document.getElementById('rf-lump').value = '380000'; _rfExAdd();
+        document.querySelector('.rf-ex-n').value = '水泥、砂'; document.querySelector('.rf-ex-a').value = '50000'; _rfRecalc();
+        out.fillUi = /換算 63,333／支/.test(document.getElementById('rf-rows').innerHTML) && /比價合計（同口徑）[\s\S]*430,000/.test(document.getElementById('rf-tot').innerHTML);
+        ok(); const vA = r2.vendors[0];
+        rfqFill(r2.id, -1); document.getElementById('rf-name').value = '乙基礎'; document.querySelectorAll('.rf-p')[0].value = '70000'; document.querySelectorAll('.rf-p')[1].value = '70000'; ok();
+        const vB = r2.vendors[1];
+        out.lump = !!vA.lump && vA.lump.idxs.length === 2 && _rfqVendorTotal(r2, vA, true).total === 380000 && _rfqVendorPrice(r2, vA, 0) === 63333.33 && _rfqCmpTotal(r2, vA) === 430000 && _rfqCmpTotal(r2, vB) === 420000 && !vB.lump && vA.extras[0].by === 'fy';
+        renderRfq(); const h = document.getElementById('rfq-root').innerHTML;
+        out.card = /換算/.test(h) && /比價合計（同口徑）/.test(h) && /430,000/.test(h) && /420,000/.test(h) && /其中一式總價/.test(h);
+        /* 舊資料（只有單價）照舊 */
+        const legacy = { items: [{ idx: 0, qty: 2 }, { idx: 1, qty: 4 }] }, lv = { prices: { 0: 100, 1: 200 } };
+        out.legacy = _rfqVendorTotal(legacy, lv, true).total === 1000 && _rfqCmpTotal(legacy, lv) === 1000 && _rfqVendorPrice(legacy, lv, 1) === 200;
+        /* ④ 得標協漾：一式一列、根固樣板（保留 10%、退還條件）、材料進合約 */
+        rfqAward(r2.id); document.querySelector('input[name="rfq-win"][value="0"]').checked = true; document.getElementById('rfq-reason').value = '實際範圍含根固'; ok();
+        const c = q.costs.find(x => x.rfqId === r2.id), lr = c && c.rows[0];
+        out.award = !!c && c.rows.length === 1 && lr.lump === true && lr.qty === 1 && lr.unitPrice === 380000 && lr.tpl === 'grout' && lr.ret === 10 && lr.retCond === '開挖確認無問題' && c.amt === 380000 && c.matBy[0].name === '水泥、砂';
+        const ct = _subContractHtml(q, c, _sctCfg());
+        out.ct = /一式計價/.test(ct) && /數量不同時/.test(ct) && /63,333 元／支/.test(ct) && /材料提供/.test(ct) && /水泥、砂由甲方提供/.test(ct) && /（根固）：施作完成時計價 100%，其中 10% 為保留款/.test(ct) && !/每期工程款保留 5%/.test(ct) && /開挖確認無問題後無息退還；無拆除段/.test(ct);
+        /* ⑤ 廠商請款：完成 50% → 190,000、保留 19,000 */
+        openSubPeriod(c.id); const sq = document.querySelector('.sp-row[data-lump="1"] .sp-qty'); sq.value = '50'; sq.dataset.touched = '1'; _spRecalc();
+        out.spUi = /開挖確認無問題後退還/.test(document.getElementById('gen-confirm-modal').innerHTML);
+        ok(); const per = c.periods[0];
+        out.sp = !!per && per.rows[0].qty === 0.5 && per.amt === 190000 && per.ret === 19000;
+        /* ⑥ 報價進版：共構樁改 GL-22.0m → 提醒、差異、待辦；已簽約 → 變更草稿（不改價）；未回價 → 直接同步 */
+        saveQVersion(q.id, q, { formal: true }); q.ver = 2; q.items[1].desc = q.items[1].desc.replace('GL-11.45m～21.5m', 'GL-11.45m～22.0m'); q.items[0].qty = '3';
+        const d2 = _rfqQuoteDiff(q, r2);
+        out.diff = d2.any && d2.base === 1 && d2.ver === 2 && d2.diffs.some(x => x.t === 'depth' && /22\.0m/.test(x.to)) && d2.diffs.some(x => x.t === 'qty' && x.from === 2 && x.to === 3);
+        renderRfq(); out.warn = /報價已進版至 v2，本單工項仍是舊版/.test(document.getElementById('rfq-root').innerHTML) && /同步報價 v2 工項/.test(document.getElementById('rfq-root').innerHTML);
+        const todo = []; _v6TodoItems(todo); out.todo = todo.some(t => t.type === 'rfq_ver' && /和平東路199巷 報價已進版至 v2，有 2 張詢價／分包尚未同步/.test(t.text));
+        out.subWarn = /報價已進版至 v2，本分包工項仍是舊版/.test(_subVerWarn(q, c));
+        rfqQuoteSync(r2.id); out.draft = !!r2.chg && r2.chg.from === 1 && r2.chg.to === 2 && r2.quoteVer === 1;
+        rfqChgConfirm(r2.id); out.needBy = !!r2.chg;
+        rfqChgSet(r2.id, 'by', 'LINE'); rfqChgSet(r2.id, 'on', '2026-10-20'); rfqChgConfirm(r2.id); ok();
+        out.chg = !r2.chg && r2.quoteVer === 2 && !_rfqQuoteDiff(q, r2).any && /22\.0m/.test(r2.items[1].desc) && r2.items[0].qty === 3 && vA.lump.total === 380000 && c.rows[0].unitPrice === 380000 && c.chgLog.length === 1 && c.chgLog[0].by === 'LINE' && c.rows[0].lumpItems[0].q0 === 3;
+        rfqQuoteSync(r1.id); ok(); out.sync1 = r1.quoteVer === 2 && r1.items[0].qty === 3 && /22\.0m/.test(r1.items[1].desc) && !_rfqQuoteDiff(q, r1).any;
+        /* 舊詢價單沒記版次：依建立時間對照正式版次推定 */
+        const old = { id: 'rold', no: 'RFQ-OLD', ts: 1, status: 'open', vendors: [], items: [{ idx: 1, desc: '共構樁 H350，L=14.5M 打設、切除', unit: '支', qty: 4 }] };
+        const ob = _rfqBaseVer(q, old); out.infer = ob.ver === 1 && ob.inferred === true && _rfqQuoteDiff(q, old).diffs.some(x => x.t === 'depth');
+        window.toast = oT; Q = []; eid = null; _rfqQid = ''; VENDORS.length = 0; PAYABLES.length = 0; Q_HISTORY = {};
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    check('v6.0.109 詢價單：完整帶入工項說明（含括號）、原單位與報價數量、預設不換算 M、記錄報價版次', r.form && r.r1 && r.doc, JSON.stringify(r));
+    check('v6.0.109 拆分發包範圍：範圍說明、根固自動帶付款樣板、涵蓋提醒', r.cover && r.r2 && r.split, JSON.stringify(r));
+    check('v6.0.109 一式報價：涵蓋工項、換算參考單價（灰字）、豐有提供材料計入同口徑比價、舊資料照舊', r.fillUi && r.lump && r.card && r.legacy, JSON.stringify(r));
+    check('v6.0.109 得標：一式一列、根固保留 10%＋退還條件、材料與數量變更條文進合約；廠商請款依完成百分比', r.award && r.ct && r.spUi && r.sp, JSON.stringify(r));
+    check('v6.0.109 報價進版連動：差異（深度／數量）、提醒、總覽待辦、已簽約產生變更草稿（需確認方式與日期、不改價）、未回價直接同步、舊單推定版次', r.diff && r.warn && r.todo && r.subWarn && r.draft && r.needBy && r.chg && r.sync1 && r.infer, JSON.stringify(r));
+    check('v6.0.109 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

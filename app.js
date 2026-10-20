@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.108';
+var APP_VERSION='v6.0.109';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -21347,7 +21347,8 @@ function _costPayBtn(c){
 function _subContractBar(c,q){
   var st=_subStat(c);
   var IN='font-size:11px;padding:3px 5px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);color:var(--b5);font-family:inherit';
-  var h='<div class="sub-bar" style="background:#f4f8fb;border:1px solid #d5e3ee;border-radius:var(--r8);padding:6px 8px;margin-bottom:6px">'
+  var h='<div class="sub-bar" style="background:#f4f8fb;border:1px solid #d5e3ee;border-radius:var(--r8);padding:6px 8px;margin-bottom:6px">'+_subVerWarn(q,c)
+    +(Array.isArray(c.matBy)&&c.matBy.length?'<div style="font-size:11px;color:var(--b4);margin-bottom:3px">材料：'+esc(c.matBy.map(_rfqExtraTxt).join('、'))+'</div>':'')
     +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'
     +'<span style="font-size:11px;font-weight:700;color:#1565C0;white-space:nowrap">分包合約</span>'
     +'<label style="font-size:10.5px;color:var(--b4);display:flex;align-items:center;gap:3px">簽約<input type="date" value="'+esc(c.signDate||'')+'" onchange="updSubField(\''+c.id+'\',\'signDate\',this.value)" style="'+IN+';width:118px"></label>'
@@ -21410,7 +21411,7 @@ function openSubPeriod(cid,editNo){
   if(!editing&&from&&to<=from){date=localToday();to=date;}
   _spCtx={cid:cid,editNo:editing?editNo:null};
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
-  var html='<div class="fg fg3" style="gap:8px">'
+  var html=_subVerWarn(q,c)+'<div class="fg fg3" style="gap:8px">'
     +'<div class="f"><label>廠商請款日</label><input id="sp-date" type="date" value="'+esc(date)+'" onchange="_spOnDate()" style="'+IN+'"></div>'
     +'<div class="f"><label>期間起（不含）</label><input id="sp-from" type="date" value="'+esc(from)+'" onchange="_spFillDaily()" style="'+IN+'"></div>'
     +'<div class="f"><label>期間迄</label><input id="sp-to" type="date" value="'+esc(to)+'" onchange="_spFillDaily()" style="'+IN+'"></div>'
@@ -21421,12 +21422,13 @@ function openSubPeriod(cid,editNo){
       var it=(r.linkedItemIdx>=0&&q.items)?q.items[r.linkedItemIdx]:null;
       var name=(it?(it.desc||'').split('\n')[0]:'')||r.desc||'工項';
       var unit=it?_uFix(it.unit||''):'';
+      if(r.lump)return _spLumpRowHtml(q,c,r,st,editing,IN);   // v6.0.109 一式：完成百分比
       var prev=(st.byRow[r.id]||0)-(editing?((editing.rows||[]).filter(function(pr){return pr.rid===r.id;}).reduce(function(a,pr){return a+(parseFloat(pr.qty)||0);},0)):0);
       var curPr=editing?((editing.rows||[]).find(function(pr){return pr.rid===r.id;})||{}):{};
       var cur=curPr.qty,curUp=(curPr.up!=null&&curPr.up!=='')?curPr.up:'';
       return '<div class="sp-row" data-rid="'+r.id+'" data-total="'+(parseFloat(r.qty)||0)+'" data-prev="'+prev+'" data-price="'+(parseFloat(r.unitPrice)||0)+'" data-ret="'+_subRetRate(c,r)+'" data-desc="'+esc(name)+'" style="border:1px solid var(--b1);border-radius:var(--r8);padding:7px 9px;margin-bottom:6px;background:var(--w)">'
         +'<div style="font-size:12.5px;font-weight:700">'+esc(name)+(r.desc&&it?' <span style="font-weight:400;color:var(--b4);font-size:11px">'+esc(r.desc)+'</span>':'')+'</div>'
-        +'<div style="font-size:11px;color:var(--b4);margin:2px 0 5px">發包 '+fmt(parseFloat(r.qty)||0)+' '+esc(unit)+'｜已計價 '+fmt(Math.round(prev*100)/100)+'｜單價 '+fmt(parseFloat(r.unitPrice)||0)+(_subRetRate(c,r)?('｜保留 '+_subRetRate(c,r)+'%'):'')+'　<span class="sp-daily" style="color:var(--g3)"></span></div>'
+        +'<div style="font-size:11px;color:var(--b4);margin:2px 0 5px">發包 '+fmt(parseFloat(r.qty)||0)+' '+esc(unit)+'｜已計價 '+fmt(Math.round(prev*100)/100)+'｜單價 '+fmt(parseFloat(r.unitPrice)||0)+(_subRetRate(c,r)?('｜保留 '+_subRetRate(c,r)+'%'+(r.retCond?('（'+esc(r.retCond)+'後退還）'):'')):'')+(r.tpl==='grout'?'｜根固：施作完成全額計價、無拆除段':'')+(r.scope?('｜範圍：'+esc(r.scope)):'')+'　<span class="sp-daily" style="color:var(--g3)"></span></div>'
         +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;color:var(--b4);white-space:nowrap">廠商請款量</span>'
         +'<input class="sp-qty" type="number" inputmode="decimal" step="any" value="'+(cur!=null&&cur!==''?cur:'')+'" oninput="_spRecalc()" style="flex:1;min-width:70px;text-align:right;'+IN+'">'
         +'<span style="font-size:11px;color:var(--b4)">'+esc(unit)+'</span>'
@@ -21453,11 +21455,31 @@ function openSubPeriod(cid,editNo){
   showConfirm((editing?'修改第'+editNo+'期廠商請款：':'登錄廠商請款：')+esc(c.vendor)+'（'+esc(q.name||'')+'）',html,function(){_spSave();},false,null,true);
   if(!editing)_spFillDaily();else _spRecalc();
 }
+function _spLumpRowHtml(q,c,r,st,editing,IN){
+  var prev=(st.byRow[r.id]||0)-(editing?((editing.rows||[]).filter(function(pr){return pr.rid===r.id;}).reduce(function(a,pr){return a+(parseFloat(pr.qty)||0);},0)):0);
+  var curPr=editing?((editing.rows||[]).find(function(pr){return pr.rid===r.id;})||{}):{};
+  var cur=(curPr.qty!=null&&curPr.qty!=='')?Math.round(parseFloat(curPr.qty)*1000)/10:'',curUp=(curPr.up!=null&&curPr.up!=='')?curPr.up:'';
+  var rr=_subRetRate(c,r);
+  return '<div class="sp-row" data-lump="1" data-rid="'+r.id+'" data-total="1" data-prev="'+prev+'" data-price="'+(parseFloat(r.unitPrice)||0)+'" data-ret="'+rr+'" data-desc="" style="border:1px solid #90CAF9;border-radius:var(--r8);padding:7px 9px;margin-bottom:6px;background:#f5faff">'
+    +'<div style="font-size:12.5px;font-weight:700">'+esc(r.desc||'一式')+'</div>'
+    +'<div style="font-size:11px;color:var(--b4);margin:2px 0 5px">一式總價 '+fmt(parseFloat(r.unitPrice)||0)+'｜已計價 '+_rfmt(Math.round(prev*1000)/10)+'%'+(rr?('｜保留 '+rr+'%'+(r.retCond?('（'+esc(r.retCond)+'後退還）'):'')):'')+(r.ref!=null?('｜換算 '+fmt(r.ref)+'／'+esc(((r.lumpItems||[])[0]||{}).unit||'')):'')+'　<span class="sp-daily" style="color:var(--g3)"></span></div>'
+    +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;color:var(--b4);white-space:nowrap">本期完成</span>'
+    +'<input class="sp-qty" type="number" inputmode="decimal" step="any" min="0" max="100" value="'+cur+'" oninput="_spRecalc()" style="flex:1;min-width:70px;text-align:right;'+IN+'"><span style="font-size:11px;color:var(--b4)">%</span>'
+    +'<span style="font-size:11px;color:var(--b4);white-space:nowrap">× 總價</span><input class="sp-up" type="number" inputmode="decimal" step="any" placeholder="'+(parseFloat(r.unitPrice)||0)+'" value="'+curUp+'" oninput="_spRecalc()" style="flex:0 0 96px;text-align:right;'+IN+'">'
+    +'<b class="sp-amt" style="flex:0 0 84px;text-align:right;font-variant-numeric:tabular-nums;color:var(--g3)">0</b></div>'
+    +'<div class="sp-diff" style="display:none"></div><div class="sp-warn" style="font-size:11px;font-weight:700;margin-top:3px;display:none"></div></div>';
+}
 function _spOnDate(){var d=gv('sp-date');var t=document.getElementById('sp-to');if(t&&d&&(!t.value||t.value<d)){t.value=d;}_spFillDaily();}
 function _spFillDaily(){
   var q=Q.find(function(x){return x.id===eid;});if(!q||!_spCtx)return;
   var from=gv('sp-from')||'',to=gv('sp-to')||gv('sp-date')||'';
+  var _c=(q.costs||[]).find(function(x){return x.id===_spCtx.cid;});
   document.querySelectorAll('.sp-row').forEach(function(el){
+    if(el.getAttribute('data-lump')==='1'){   // v6.0.109 一式：日報涵蓋工項回報量 ÷ 報價數量合計 → 完成百分比（扣已計價）
+      var row=_c&&(_c.rows||[]).find(function(x){return x.id===el.getAttribute('data-rid');});var fr=row?_subLumpDaily(q,row,from,to):0;
+      var pc=Math.round(fr*1000)/10,lb=el.querySelector('.sp-daily');if(lb)lb.textContent=pc>0?('日報推算本期完成 '+pc+'%'):'（期間無日報回報）';
+      el.setAttribute('data-daily',fr>0?fr:0);var li=el.querySelector('.sp-qty');if(li&&!li.dataset.touched)li.value=pc>0?pc:'';return;
+    }
     var d=_dailyQtyBetween(q,el.getAttribute('data-desc'),from,to);
     var lab=el.querySelector('.sp-daily');if(lab)lab.textContent=d>0?('日報回報 '+fmt(d)):'（期間無日報回報）';
     el.setAttribute('data-daily',d>0?d:0);   // v5.444
@@ -21475,14 +21497,17 @@ function _spRecalc(){
     var cprice=parseFloat(el.getAttribute('data-price'))||0,upEl=el.querySelector('.sp-up');
     var price=(upEl&&upEl.value!=='')?(parseFloat(upEl.value)||0):cprice;   // v5.444 廠商請款單價可核實覆寫
     if(upEl)upEl.style.borderColor=(upEl.value!==''&&Math.abs(price-cprice)>1e-6)?'#b26a00':'';
-    var qn=parseFloat(inp.value)||0,rr=parseFloat(el.getAttribute('data-ret'))||0;
+    var lumpR=el.getAttribute('data-lump')==='1';
+    var qn=(parseFloat(inp.value)||0)/(lumpR?100:1),rr=parseFloat(el.getAttribute('data-ret'))||0;   // v6.0.109 一式以完成 % 輸入
     var a=qn*price;amt+=a;ret+=a*rr/100;
     el.querySelector('.sp-amt').textContent=fmt(Math.round(a));
     var dl=parseFloat(el.getAttribute('data-daily'))||0,df=el.querySelector('.sp-diff');
-    if(df){if(qn>0&&Math.abs(qn-dl)>1e-6){df.style.display='';df.style.color=qn>dl?'#b26a00':'var(--b4)';df.textContent=qn>dl?('⚠ 多於日報回報 '+fmt(Math.round((qn-dl)*100)/100)+'，請核實廠商請款單'):('少於日報回報 '+fmt(Math.round((dl-qn)*100)/100));}else df.style.display='none';}
+    if(df&&lumpR){df.style.display='none';}
+    else if(df){if(qn>0&&Math.abs(qn-dl)>1e-6){df.style.display='';df.style.color=qn>dl?'#b26a00':'var(--b4)';df.textContent=qn>dl?('⚠ 多於日報回報 '+fmt(Math.round((qn-dl)*100)/100)+'，請核實廠商請款單'):('少於日報回報 '+fmt(Math.round((dl-qn)*100)/100));}else df.style.display='none';}
     var total=parseFloat(el.getAttribute('data-total'))||0,prev=parseFloat(el.getAttribute('data-prev'))||0;
     var w=el.querySelector('.sp-warn');
-    if(total>0&&prev+qn>total+1e-6){over++;var ex=Math.max(0,prev+qn-total)-Math.max(0,prev-total);overAmt+=ex*price;w.style.display='';w.textContent='累計 '+fmt(Math.round((prev+qn)*100)/100)+' 超過發包量 '+fmt(total)+'（實作實算：本期超出 '+fmt(Math.round(ex*100)/100)+'，向業主追加請款）';}
+    if(lumpR&&prev+qn>1+1e-6){w.style.display='';w.style.color='var(--red)';w.textContent='累計完成 '+_rfmt(Math.round((prev+qn)*1000)/10)+'% 超過 100%：一式以總價為限，數量變更請走分包變更（追加減）';}
+    else if(total>0&&prev+qn>total+1e-6){over++;var ex=Math.max(0,prev+qn-total)-Math.max(0,prev-total);overAmt+=ex*price;w.style.display='';w.textContent='累計 '+fmt(Math.round((prev+qn)*100)/100)+' 超過發包量 '+fmt(total)+'（實作實算：本期超出 '+fmt(Math.round(ex*100)/100)+'，向業主追加請款）';}
     else{w.style.display='none';}
   });
   var aw=document.getElementById('sp-absorb-wrap');if(aw)aw.style.display=over?'':'none';
@@ -21510,8 +21535,8 @@ function _spSave(){
   var c=(q.costs||[]).find(function(x){return x.id===_spCtx.cid;});if(!c)return;
   var rows=[];
   document.querySelectorAll('.sp-row').forEach(function(el){
-    var qn=parseFloat(el.querySelector('.sp-qty').value)||0;if(!(qn>0))return;
-    var pr={rid:el.getAttribute('data-rid'),qty:qn};
+    var qn=(parseFloat(el.querySelector('.sp-qty').value)||0)/(el.getAttribute('data-lump')==='1'?100:1);if(!(qn>0))return;   // v6.0.109 一式：完成 % → 數量（1＝100%）
+    var pr={rid:el.getAttribute('data-rid'),qty:Math.round(qn*10000)/10000};
     var upEl=el.querySelector('.sp-up'),cp=parseFloat(el.getAttribute('data-price'))||0;
     if(upEl&&upEl.value!==''&&Math.abs((parseFloat(upEl.value)||0)-cp)>1e-6)pr.up=parseFloat(upEl.value)||0;   // v5.444 單價覆寫只在與合約價不同時存
     rows.push(pr);
@@ -21556,7 +21581,8 @@ function releaseSubRet(cid){
   var st=_subStat(c);
   if(st.retHeld<=0){toast('目前沒有押著的保留款');return;}
   var today=localToday();
-  showConfirm('退還保留款：'+esc(c.vendor||''),'<div style="font-size:13px;line-height:1.8">累計保留款 NT$ '+fmt(st.ret)+'，已退 NT$ '+fmt(st.released)+'。<br>本次退還 <b>NT$ '+fmt(st.retHeld)+'</b>（未稅'+(_subInvoice(c)?('，應付另加 '+_taxR()+'% 稅'):'')+'），到期日 '+_vendorDueDate(today)+'。</div>',function(){
+  var _rc=(c.rows||[]).filter(function(r){return r&&r.retCond;}).map(function(r){return (r.lump?'一式':((q.items&&q.items[r.linkedItemIdx]&&String(q.items[r.linkedItemIdx].desc||'').split('\n')[0].slice(0,16))||r.desc||''))+'：'+r.retCond+'後退還';});   // v6.0.109 工項退還條件
+  showConfirm('退還保留款：'+esc(c.vendor||''),'<div style="font-size:13px;line-height:1.8">'+(_rc.length?('<div style="color:#8a6d00">退還條件：'+esc(_rc.join('；'))+'（請確認已達成）</div>'):'')+'累計保留款 NT$ '+fmt(st.ret)+'，已退 NT$ '+fmt(st.released)+'。<br>本次退還 <b>NT$ '+fmt(st.retHeld)+'</b>（未稅'+(_subInvoice(c)?('，應付另加 '+_taxR()+'% 稅'):'')+'），到期日 '+_vendorDueDate(today)+'。</div>',function(){
     if(!Array.isArray(c.periods))c.periods=[];
     c.periods.push({no:_subNextNo(c),isRet:true,date:today,amt:st.retHeld,ret:0,net:st.retHeld,due:_vendorDueDate(today),note:'保留款退還',ts:Date.now(),mt:Date.now()});
     _touch(q);
@@ -30702,6 +30728,7 @@ function _subCurEstimate(q,c){
   _subPeriods(c).forEach(function(per){if(!per.isRet&&(per.to||per.date||'')>lastTo)lastTo=per.to||per.date||'';});
   var est=0,anyDaily=false;
   (c.rows||[]).forEach(function(r){
+    if(r.lump){var fr=_subLumpDaily(q,r,lastTo,'');if(fr>0)anyDaily=true;est+=Math.min(fr,Math.max(0,1-(st.byRow[r.id]||0)))*(parseFloat(r.unitPrice)||0)*(1-_subRetRate(c,r)/100);return;}   // v6.0.109 一式：完成比例 × 總價
     var it=(r.linkedItemIdx>=0&&q&&q.items)?q.items[r.linkedItemIdx]:null;if(!it)return;
     var done=_dailyQtyBetween(q,it.desc,lastTo,'');if(done>0)anyDaily=true;
     var left=Math.max(0,(parseFloat(r.qty)||0)-(st.byRow[r.id]||0));
@@ -31348,9 +31375,16 @@ function _rfqCondLines(r){
   if(c.instPct!=null&&c.instPct!=='')pay+='分段計價工項：裝設（打設）完成請款 '+_instOf(c)+'%，拆除（拔除）完成請款 '+(100-_instOf(c))+'%。';
   var ex=(c.extra||[]).map(function(t){return String(t||'').trim();}).filter(Boolean);
   var out=ex.slice(0,2);out.push('計價方式：'+pay);if(c.valid>0)out.push('報價有效期 '+c.valid+' 天。');
-  return out.concat(ex.slice(2));
+  out=out.concat(ex.slice(2));
+  if(r&&r.quoteVer){   // v6.0.109 新詢價單才加（舊單重印一字不變）
+    var gi=(r.items||[]).map(function(it,i){return it.tpl==='grout'?(i+1):0;}).filter(Boolean);
+    if(gi.length)out.push('第 '+gi.join('、')+' 項付款樣板：'+_payTplTxt('grout')+'。');
+    out.push('可依單價或「一式」總價報價；一式請註明涵蓋的項次。需本公司提供之材料（如水泥、砂）請於備註註明品項與數量。');
+  }
+  return out;
 }
-function _rfqVendorPrice(r,v,idx){var p=(v.neg&&v.neg[idx]!=null&&v.neg[idx]!=='')?parseFloat(v.neg[idx]):((v.prices&&v.prices[idx]!=null&&v.prices[idx]!=='')?parseFloat(v.prices[idx]):NaN);return isNaN(p)?null:p;}
+function _rfqVendorPrice(r,v,idx){if(_rfqLumpOn(v,idx))return _rfqLumpRef(r,v,true);   // v6.0.109 一式涵蓋的工項：換算參考單價
+  var p=(v.neg&&v.neg[idx]!=null&&v.neg[idx]!=='')?parseFloat(v.neg[idx]):((v.prices&&v.prices[idx]!=null&&v.prices[idx]!=='')?parseFloat(v.prices[idx]):NaN);return isNaN(p)?null:p;}
 function _rfqStatusTxt(r){return r.status==='awarded'?('✓ 已發包：'+((r.award&&r.award.vendor)||'')):r.status==='labor'?'改點工施作':((r.vendors||[]).some(function(v){return v.status==='quoted';})?'比價中':'詢價中');}
 var _rfqQid='';
 function _rfqQ(){var q=Q.find(function(x){return x.id===_rfqQid;});if(!q&&typeof eid!=='undefined'){q=Q.find(function(x){return x.id===eid&&x.awarded;});if(q)_rfqQid=q.id;}return q||null;}
@@ -31376,10 +31410,11 @@ function _rfqCardHtml(q,r){
   var done=r.status==='awarded'||r.status==='labor';
   var stClr=r.status==='awarded'?'#1B5E20':r.status==='labor'?'#E65100':'#1565C0';
   var vendors=r.vendors||[];
-  var best={};(r.items||[]).forEach(function(it){var m=null;vendors.forEach(function(v){var p=_rfqVendorPrice(r,v,it.idx);if(p!=null&&(m==null||p<m))m=p;});best[it.idx]=m;});
+  var best={};(r.items||[]).forEach(function(it){var m=null;vendors.forEach(function(v){if(_rfqLumpOn(v,it.idx))return;var p=_rfqVendorPrice(r,v,it.idx);if(p!=null&&(m==null||p<m))m=p;});best[it.idx]=m;});   // 一式換算價只供參考，不比最低
+  var vw=_rfqVerWarnHtml(q,r),anyLump=vendors.some(function(v){return !!_rfqLump(v);}),anyEx=vendors.some(function(v){return _rfqExtras(v).length>0;});
   var mob=window.innerWidth<=767;
   var head='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
-    +'<b style="font-size:14px">'+esc(r.no||'')+'</b><span style="font-size:11.5px;color:var(--b4)">'+esc(r.date||'')+(r.deadline?('　回覆期限 '+esc(r.deadline)):'')+(r.entry?('　預定進場 '+esc(r.entry)):'')+'</span>'
+    +'<b style="font-size:14px">'+esc(r.no||'')+'</b><span style="font-size:11.5px;color:var(--b4)">'+esc(r.date||'')+(r.deadline?('　回覆期限 '+esc(r.deadline)):'')+(r.entry?('　預定進場 '+esc(r.entry)):'')+'</span>'+vw.tag
     +'<span style="font-size:11.5px;font-weight:700;color:'+stClr+';border:1px solid '+stClr+';border-radius:99px;padding:1px 9px">'+esc(_rfqStatusTxt(r))+'</span>'
     +'<span style="margin-left:auto;display:flex;gap:4px;flex-wrap:wrap">'
     +'<button type="button" class="btn btn-xs" title="匯出詢價單（統一格式，不指定廠商）" onclick="rfqPrint(\''+r.id+'\')">詢價單 PDF</button>'
@@ -31388,7 +31423,7 @@ function _rfqCardHtml(q,r){
     +'<button type="button" class="btn btn-xs btn-r" onclick="rfqDel(\''+r.id+'\')">刪除</button>'
     +'</span></div>'
     +(r.scope?'<div style="font-size:12.5px;margin-top:4px">詢價範圍：'+esc(r.scope)+'</div>':'')
-    +_b2bWarnHtml(q,_rfqCond(r))
+    +_b2bWarnHtml(q,_rfqCond(r))+vw.html+_rfqSplitHtml(q,r)
     +(r.award&&r.award.reason?'<div style="font-size:12px;color:'+stClr+';margin-top:4px">'+(r.status==='labor'?'改點工原因：':'得標原因：')+esc(r.award.reason)+(r.award.backfilled?'　<span style="font-size:11px;color:var(--b4)">✓ 已回填 '+r.award.backfilled+' 個工項成本單價</span>':'')+'</div>':'');
   var vh='';
   if(!vendors.length)vh='<div style="font-size:12px;color:var(--b3);margin-top:8px">尚無廠商回傳。先按「詢價單 PDF」匯出傳給廠商；收到回傳後按「＋ 回傳廠商」填入廠商資訊與單價</div>';
@@ -31398,16 +31433,23 @@ function _rfqCardHtml(q,r){
         +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b>'+esc(v.name||'')+'</b>'+_rfqVStatus(v)+'</div>'
         +(v.contact||v.tel?'<div style="font-size:11.5px;color:var(--b4)">'+esc(v.contact||'')+(v.tel?('　'+esc(v.tel)):'')+'</div>':'')
         +'<div style="margin-top:4px">報價 <b>'+(tq.n?fmt(tq.total):'—')+'</b>'+(tn.total!==tq.total&&tn.n?('　議後 <b style="color:var(--g3)">'+fmt(tn.total)+'</b>'):'')+(tq.n&&!tq.full?' <span style="color:#b26a00">（未填齊）</span>':'')+'</div>'
+        +(_rfqLump(v)?'<div style="font-size:11.5px;color:var(--b4)">一式 NT$ '+fmt(_rfqLumpEff(v,true))+'（涵蓋 '+(v.lump.idxs||[]).length+' 項，換算 <span style="color:var(--b3)">'+fmt(_rfqLumpRef(r,v,true)||0)+'</span>）</div>':'')
+        +(_rfqExtras(v).length?'<div style="font-size:11.5px;color:var(--b4)">材料／隱藏成本：'+esc(_rfqExtras(v).map(_rfqExtraTxt).join('、'))+'</div><div>比價合計（同口徑） <b style="color:var(--g3)">'+fmt(_rfqCmpTotal(r,v))+'</b></div>':'')
         +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">'+(done?'':'<button type="button" class="btn btn-xs btn-g" onclick="rfqFill(\''+r.id+'\','+vi+')">修改報價／議價</button><button type="button" class="btn btn-xs" onclick="rfqRemoveVendor(\''+r.id+'\','+vi+')">移除</button>')+'</div></div>';}).join('');
   }else{
     vh='<div style="margin-top:8px;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--gl);color:var(--b5);font-size:11px">'
       +'<th style="padding:5px 6px;text-align:left">工項</th><th style="padding:5px 6px;text-align:right">數量</th>'
       +vendors.map(function(v){return '<th style="padding:5px 6px;text-align:right;white-space:nowrap">'+esc(v.name||'')+'</th>';}).join('')+'</tr></thead><tbody>'
-      +(r.items||[]).map(function(it){return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:4px 6px">'+esc(it.desc||'')+'</td><td style="padding:4px 6px;text-align:right;white-space:nowrap">'+_rfqQtyTxt(it)+'</td>'
-        +vendors.map(function(v){var p=_rfqVendorPrice(r,v,it.idx),q0=(v.prices||{})[it.idx];var isBest=p!=null&&best[it.idx]!=null&&p<=best[it.idx]+1e-9&&vendors.length>1;
+      +(r.items||[]).map(function(it){return '<tr style="border-bottom:1px solid var(--b1)"><td style="padding:4px 6px">'+_rfqDescHtml(it)+'</td><td style="padding:4px 6px;text-align:right;white-space:nowrap">'+_rfqQtyTxt(it)+'</td>'
+        +vendors.map(function(v){var p=_rfqVendorPrice(r,v,it.idx),q0=(v.prices||{})[it.idx];
+          if(_rfqLumpOn(v,it.idx))return '<td style="padding:4px 6px;text-align:right;font-variant-numeric:tabular-nums;color:var(--b3)" title="一式總價依數量比例換算，只供參考"><span style="font-size:10px;border:1px solid var(--b2);border-radius:4px;padding:0 3px;margin-right:3px">換算</span>'+(p==null?'—':fmt(p))+'<div style="font-size:10px">一式涵蓋</div></td>';
+          var isBest=p!=null&&best[it.idx]!=null&&p<=best[it.idx]+1e-9&&vendors.length>1;
           return '<td style="padding:4px 6px;text-align:right;font-variant-numeric:tabular-nums;'+(isBest?'color:#1B5E20;font-weight:700;background:#E8F5E9':'')+'">'+(p==null?'<span style="color:var(--b3)">—</span>':(fmt(p)+_rfqPcHint(it,p)))+(p!=null&&q0!=null&&q0!==''&&parseFloat(q0)!==p?'<div style="font-size:10px;color:var(--b3);text-decoration:line-through">'+fmt(parseFloat(q0))+'</div>':'')+'</td>';}).join('')+'</tr>';}).join('')
       +'</tbody><tfoot><tr style="background:var(--b0);font-weight:700"><td style="padding:5px 6px" colspan="2">合計（未稅）</td>'
       +vendors.map(function(v){var t=_rfqVendorTotal(r,v,true);return '<td style="padding:5px 6px;text-align:right;font-variant-numeric:tabular-nums">'+(t.n?fmt(t.total):'—')+(t.n&&!t.full?'<div style="font-size:10px;color:#b26a00;font-weight:400">未填齊</div>':'')+'</td>';}).join('')+'</tr>'
+      +(anyLump?'<tr style="font-size:11px;color:var(--b4)"><td style="padding:3px 6px" colspan="2">其中一式總價（議後）</td>'+vendors.map(function(v){var L=_rfqLump(v);return '<td style="padding:3px 6px;text-align:right">'+(L?(fmt(_rfqLumpEff(v,true))+(L.neg!=null&&L.neg!==''&&parseFloat(L.neg)!==parseFloat(L.total)?'<div style="text-decoration:line-through;color:var(--b3)">'+fmt(parseFloat(L.total)||0)+'</div>':'')):'—')+'</td>';}).join('')+'</tr>':'')
+      +(anyEx?'<tr style="font-size:11px;color:var(--b4)"><td style="padding:3px 6px" colspan="2">豐有提供材料／隱藏成本</td>'+vendors.map(function(v){var ex=_rfqExtras(v);return '<td style="padding:3px 6px;text-align:right" title="'+esc(ex.map(_rfqExtraTxt).join('、'))+'">'+(ex.length?('+ '+fmt(_rfqExtraAmt(v))+(ex.some(function(x){return x.by==='owner';})?'<div style="font-size:10px">含業主提供</div>':'')):'—')+'</td>';}).join('')+'</tr>'
+        +'<tr style="background:#E8F5E9;font-weight:700"><td style="padding:5px 6px" colspan="2">比價合計（同口徑）</td>'+vendors.map(function(v){var t=_rfqVendorTotal(r,v,true);return '<td style="padding:5px 6px;text-align:right;font-variant-numeric:tabular-nums">'+(t.n?fmt(_rfqCmpTotal(r,v)):'—')+'</td>';}).join('')+'</tr>':'')
       +'<tr><td colspan="2" style="padding:5px 6px;font-size:11px;color:var(--b4)">狀態／操作</td>'
       +vendors.map(function(v,vi){return '<td style="padding:5px 6px;text-align:right;white-space:nowrap">'+_rfqVStatus(v)+'<div style="margin-top:4px;display:flex;gap:3px;justify-content:flex-end;flex-wrap:wrap">'+(done?'':'<button type="button" class="btn btn-xs btn-g" onclick="rfqFill(\''+r.id+'\','+vi+')">修改</button><button type="button" class="btn btn-xs" onclick="rfqRemoveVendor(\''+r.id+'\','+vi+')">✕</button>')+'</div>'+(v.contact||v.tel?'<div style="font-size:10.5px;color:var(--b4);margin-top:3px">'+esc(v.contact||'')+(v.tel?(' '+esc(v.tel)):'')+'</div>':'')+'</td>';}).join('')+'</tr></tfoot></table></div>';
   }
@@ -31427,9 +31469,15 @@ function rfqEdit(rid){
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   var d7=_dAdd(localToday(),7);
   var itemsHtml=(q.items||[]).map(function(it,i){if(!it||it.sec||_isSpare(it))return '';var qty=picked[i]?picked[i].qty:Math.abs(em?_effQty(em,it):(parseFloat(it.qty)||0));
+    var pk=picked[i]||null,cov=_rfqCoverOf(q,i,rid),ls=String(it.desc||'').split('\n'),tpl=pk?(pk.tpl||'gen'):'gen';   // v6.0.109 完整說明、拆分範圍、付款樣板
     return '<label style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;border:1px solid var(--b1);border-radius:var(--r8);margin-bottom:4px;font-size:12.5px;cursor:pointer"><input type="checkbox" class="rfq-it" data-idx="'+i+'"'+(picked[i]?' checked':'')+' style="width:18px;height:18px;flex:0 0 18px;margin-top:2px">'
-      +'<span style="flex:1;min-width:0"><span style="display:block;line-height:1.4;word-break:break-word">'+esc((it.desc||'').split('\n')[0])+'</span>'
-      +'<span style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:var(--b4);white-space:nowrap">預估數量</span><input type="number" inputmode="decimal" step="any" class="rfq-qty" value="'+qty+'" style="'+IN+';flex:0 0 110px;width:110px;text-align:right;padding:6px 8px"><span style="font-size:11px;color:var(--b4)">'+esc(_uFix(it.unit||''))+'</span></span>'+_rfqPerHtml(it,picked[i],IN)+'</span></label>';}).join('');
+      +'<span style="flex:1;min-width:0"><span style="display:block;line-height:1.4;word-break:break-word">'+esc(ls[0])+'</span>'
+      +(ls.length>1?'<span style="display:block;font-size:11px;color:var(--b4);line-height:1.45;white-space:pre-wrap;word-break:break-word">'+esc(ls.slice(1).join('\n').trim())+'</span>':'')
+      +'<span style="display:flex;gap:6px;align-items:center;margin-top:5px"><span style="font-size:11px;color:var(--b4);white-space:nowrap">預估數量</span><input type="number" inputmode="decimal" step="any" class="rfq-qty" value="'+qty+'" style="'+IN+';flex:0 0 110px;width:110px;text-align:right;padding:6px 8px"><span style="font-size:11px;color:var(--b4)">'+esc(_uFix(it.unit||''))+'</span><span style="font-size:10.5px;color:var(--b3)">（報價 '+_rfmt(parseFloat(it.qty)||0)+' '+esc(_uFix(it.unit||''))+'）</span></span>'+_rfqPerHtml(it,pk,IN)
+      +'<span style="display:flex;gap:6px;align-items:center;margin-top:5px;flex-wrap:wrap"><input class="rfq-sc" value="'+esc(pk?(pk.scope||''):'')+'" placeholder="發包範圍說明（拆分時填，例：打設、切除／根固）" oninput="var t=this.parentNode.querySelector(\'.rfq-tpl\');if(t&&!t.dataset.touched&&/根固/.test(this.value))t.value=\'grout\'" style="'+IN+';flex:1;min-width:160px;padding:6px 8px">'
+      +'<select class="rfq-tpl" onchange="this.dataset.touched=1" title="工項付款樣板" style="'+IN+';flex:0 0 auto;width:auto;padding:6px 8px"><option value="gen"'+(tpl!=='grout'?' selected':'')+'>一般（背對背）</option><option value="grout"'+(tpl==='grout'?' selected':'')+'>根固（保留 10%）</option></select></span>'
+      +(cov.length?'<span style="display:block;font-size:11px;color:#b26a00;margin-top:4px">此工項另在 '+cov.map(function(x){return esc(x.no)+(x.scope?('（'+esc(x.scope)+'）'):'');}).join('、')+' 詢價：拆成多個發包範圍時請寫範圍說明，並確認各範圍合起來涵蓋原工項全部內容</span>':'')
+      +'</span></label>';}).join('');
   var html='<div class="fg fg2" style="gap:8px">'
     +'<div class="f"><label>詢價範圍</label><input id="rfq-scope" value="'+esc(r?r.scope||'':'')+'" placeholder="例：H型鋼樁打設、拔除（含引孔）" style="'+IN+'"></div>'
     +'<div class="f"><label>回覆期限</label><input id="rfq-deadline" type="date" value="'+esc(r?r.deadline||'':d7)+'" style="'+IN+'"></div>'
@@ -31473,12 +31521,15 @@ function _rfqCondAdd(){
 }
 function _rfqSave(){
   var q=_rfqQ();if(!q)return;
-  var items=[];document.querySelectorAll('.rfq-it').forEach(function(cb){if(!cb.checked)return;var i=parseInt(cb.getAttribute('data-idx'));var it=q.items[i];if(!it)return;var qty=parseFloat(cb.parentNode.querySelector('.rfq-qty').value)||0;var _lb=cb.closest('label'),_pe=_lb&&_lb.querySelector('.rfq-per'),_le=_lb&&_lb.querySelector('.rfq-len');var _per=_pe?_pe.value:'pc',_len=_le?(parseFloat(_le.value)||0):0;if(_per==='m'&&!(_len>0))_per='pc';items.push({idx:i,desc:(it.desc||'').split('\n')[0],unit:_uFix(it.unit||''),qty:qty,per:_per,len:_per==='m'?_len:0});});
+  var items=[];document.querySelectorAll('.rfq-it').forEach(function(cb){if(!cb.checked)return;var i=parseInt(cb.getAttribute('data-idx'));var it=q.items[i];if(!it)return;var qty=parseFloat(cb.parentNode.querySelector('.rfq-qty').value)||0;var _lb=cb.closest('label'),_pe=_lb&&_lb.querySelector('.rfq-per'),_le=_lb&&_lb.querySelector('.rfq-len');var _per=_pe?_pe.value:'pc',_len=_le?(parseFloat(_le.value)||0):0;if(_per==='m'&&!(_len>0))_per='pc';
+    var _sc=_lb&&_lb.querySelector('.rfq-sc'),_tp=_lb&&_lb.querySelector('.rfq-tpl');
+    items.push({idx:i,desc:String(it.desc||'').trim(),unit:_uFix(it.unit||''),qty:qty,per:_per,len:_per==='m'?_len:0,qd:String(it.desc||'').trim(),oq:parseFloat(it.qty)||0,scope:_sc?String(_sc.value||'').trim():'',tpl:(_tp&&_tp.value==='grout')?'grout':'gen'});});   // v6.0.109 完整說明（含括號）、報價數量、發包範圍、付款樣板
   if(!items.length){toast('請至少勾選一個工項');return;}
   var cond={cashPct:parseFloat(gv('rfq-cash'))||0,ticketPct:parseFloat(gv('rfq-ticket'))||0,ticketDays:parseInt(gv('rfq-tdays'))||0,ret:parseFloat(gv('rfq-ret'))||0,valid:parseInt(gv('rfq-valid'))||0,retWhen:(gv('rfq-retwhen')||'').trim(),instPct:(gv('rfq-inst')||'')===''?null:(parseFloat(gv('rfq-inst'))||0),extra:Array.prototype.map.call(document.querySelectorAll('.rfq-cond'),function(i){return String(i.value||'').trim();}).filter(Boolean)};
   if(!Array.isArray(q.rfqs))q.rfqs=[];
   var r=_rfqEditId?q.rfqs.find(function(x){return x.id===_rfqEditId;}):null;
   if(!r){r={id:'rfq'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),no:_rfqNextNo(q),date:localToday(),vendors:[],status:'open',ts:Date.now()};q.rfqs.push(r);}
+  r.quoteVer=q.ver||1;   // v6.0.109 記錄依據的報價版次
   r.scope=(gv('rfq-scope')||'').trim();r.deadline=gv('rfq-deadline')||'';r.entry=gv('rfq-entry')||'';r.contact=(gv('rfq-contact')||'').trim();r.tel=(gv('rfq-tel')||'').trim();r.cond=cond;r.items=items;r.mt=Date.now();
   _touch(q);try{persist();_immediateUpload();}catch(e){_err('_rfqSave',e);}
   _rfqEditId=null;renderRfq();toast(r.no+' 已儲存，按「詢價單 PDF」匯出給廠商；廠商回傳後按「＋ 回傳廠商」填入');
@@ -31495,7 +31546,7 @@ function rfqDel(rid){
 // ── 詢價單 PDF（每家一張）──
 function _rfqDocHtml(q,r){
   var lines=_rfqCondLines(r);
-  var rows=(r.items||[]).map(function(it,i){return '<tr><td class="c">'+(i+1)+'</td><td>'+esc(it.desc||'')+_rfqDocNote(it)+'</td><td class="c">'+esc(_rfqUnitU(it))+'</td><td class="r">'+_rfqQtyFmt(it)+'</td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>';}).join('');
+  var rows=(r.items||[]).map(function(it,i){var ls=String(it.desc||'').split('\n');return '<tr><td class="c">'+(i+1)+'</td><td>'+esc(ls[0])+(ls.length>1?'<div style="font-size:9.5px;color:#444;white-space:pre-wrap">'+esc(ls.slice(1).join('\n').trim())+'</div>':'')+(it.scope?'<div style="font-size:9.5px;color:#0d47a1">發包範圍：'+esc(it.scope)+'</div>':'')+(it.tpl==='grout'?'<div style="font-size:9.5px;color:#7a5a00">付款：'+esc(_payTplTxt('grout'))+'</div>':'')+_rfqDocNote(it)+'</td><td class="c">'+esc(_rfqUnitU(it))+'</td><td class="r">'+_rfqQtyFmt(it)+'</td><td class="blank"></td><td class="blank"></td><td class="blank"></td></tr>';}).join('');
   return '<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>'+esc(r.no)+'</title><style>'
     +'body{margin:0;font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;color:#111;font-size:11.5px}'
     +'.page-wrap{width:190mm;margin:0 auto}'
@@ -31540,14 +31591,31 @@ function rfqFill(rid,vi){
     +'<div class="fg fg2" style="gap:8px">'
     +'<div class="f"><label>聯絡人</label><input id="rf-contact" value="'+esc(v.contact||'')+'" style="'+IN+'"></div><div class="f"><label>電話</label><input id="rf-tel" value="'+esc(v.tel||'')+'" style="'+IN+'"></div></div>'
     +'<div style="font-size:11.5px;color:var(--b3);margin:4px 0 6px">左欄填廠商請款單上的單價；議價後單價有變再填右欄（空＝照報價）。合計即時更新。</div>'
-    +'<div id="rf-rows">'+(r.items||[]).map(function(it){var p=(v.prices||{})[it.idx],n=(v.neg||{})[it.idx];
-      return '<div class="rf-row" data-idx="'+it.idx+'" data-qty="'+_rfqQtyU(it)+'" data-mul="'+_rfqMul(it)+'" style="border:1px solid var(--b1);border-radius:var(--r8);padding:7px 9px;margin-bottom:5px"><div style="font-size:12.5px;font-weight:700">'+esc(it.desc||'')+' <span style="font-weight:400;color:var(--b4);font-size:11px">'+_rfqQtyTxt(it)+'</span></div>'
+    +(function(){var L=_rfqLump(v);   // v6.0.109 計價方式：單價／一式
+      return '<div class="f" style="margin:0 0 6px"><label>計價方式</label><select id="rf-mode" onchange="_rfModeUI()" style="'+IN+'"><option value="unit"'+(L?'':' selected')+'>單價</option><option value="lump"'+(L?' selected':'')+'>一式（可只包部分工項）</option></select></div>'
+        +'<div id="rf-lump-box" style="display:'+(L?'':'none')+';border:1px dashed #90CAF9;background:#f5faff;border-radius:var(--r8);padding:7px 9px;margin-bottom:6px"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:12px;font-weight:700;color:#1565C0">一式總價</span>'
+        +'<input id="rf-lump" type="number" inputmode="decimal" step="any" placeholder="例：380000" value="'+(L?esc(String(L.total)):'')+'" oninput="_rfRecalc()" style="'+IN+';flex:1;min-width:100px;text-align:right"><span style="font-size:11px;color:var(--b4)">議後</span>'
+        +'<input id="rf-lump-n" type="number" inputmode="decimal" step="any" placeholder="同報價" value="'+(L&&L.neg!=null&&L.neg!==''?esc(String(L.neg)):'')+'" oninput="_rfRecalc()" style="'+IN+';flex:1;min-width:100px;text-align:right"></div>'
+        +'<div style="font-size:11px;color:var(--b4);margin-top:3px">下方勾「一式涵蓋」的工項不必填單價；系統依數量比例換算參考單價（灰字「換算」），比價以總價為準。</div></div>';})()
+    +'<div id="rf-rows">'+(r.items||[]).map(function(it){var p=(v.prices||{})[it.idx],n=(v.neg||{})[it.idx],lc=_rfqLump(v)?_rfqLumpOn(v,it.idx):true;
+      return '<div class="rf-row" data-idx="'+it.idx+'" data-qty="'+_rfqQtyU(it)+'" data-mul="'+_rfqMul(it)+'" data-unit="'+esc(_rfqUnitU(it))+'" style="border:1px solid var(--b1);border-radius:var(--r8);padding:7px 9px;margin-bottom:5px"><div style="font-size:12.5px;font-weight:700">'+_rfqDescHtml(it)+' <span style="font-weight:400;color:var(--b4);font-size:11px">'+_rfqQtyTxt(it)+'</span></div>'
+        +'<label class="rf-lcw" style="display:'+(_rfqLump(v)?'flex':'none')+';align-items:center;gap:5px;font-size:11.5px;color:#1565C0;margin-top:3px"><input type="checkbox" class="rf-lc"'+(lc?' checked':'')+' onchange="_rfRecalc()" style="width:15px;height:15px"> 一式涵蓋</label>'
         +'<div style="display:flex;gap:6px;align-items:center;margin-top:4px"><input class="rf-p" type="number" inputmode="decimal" step="any" placeholder="'+(_rfqIsM(it)?'報價 $/M':'報價單價')+'" value="'+(p!=null?p:'')+'" oninput="_rfRecalc()" style="flex:1;min-width:0;text-align:right;'+IN+'"><span style="font-size:11px;color:var(--b4)">議後</span><input class="rf-n" type="number" inputmode="decimal" step="any" placeholder="同報價" value="'+(n!=null?n:'')+'" oninput="_rfRecalc()" style="flex:1;min-width:0;text-align:right;'+IN+'"><b class="rf-amt" style="flex:0 0 84px;text-align:right;color:var(--g3);font-variant-numeric:tabular-nums">0</b></div><div class="rf-pc" style="font-size:11px;color:#1565C0;text-align:right;margin-top:2px"></div></div>';}).join('')+'</div>'
-    +'<div class="f"><label>備註（廠商條件差異、產能、機具）</label><input id="rf-note" value="'+esc(v.note||'')+'" style="'+IN+'"></div>'
+ +'<div style="font-size:12px;font-weight:700;color:var(--g3);margin:8px 0 4px">業主提供材料／其他隱藏成本 <span style="font-weight:400;font-size:11px;color:var(--b4)">（例：水泥、砂由豐有提供，填估算金額，比價合計會加進去；由業主（營造廠）提供＝豐有成本 0）</span></div>'
+    +'<div id="rf-ex">'+_rfqExtras(v).map(function(x){return _rfExRowHtml(x,IN);}).join('')+'</div><button type="button" class="btn btn-xs" onclick="_rfExAdd()">＋ 新增材料／隱藏成本</button>'
+    +'<div class="f" style="margin-top:8px"><label>備註（廠商條件差異、產能、機具）</label><input id="rf-note" value="'+esc(v.note||'')+'" style="'+IN+'"></div>'
     +'<div id="rf-tot" style="background:var(--b0);border-radius:var(--r8);padding:8px 10px;font-size:12.5px;line-height:1.8"></div>';
   showConfirm((isNew?'回傳廠商：':'修改報價：'+esc(v.name)+'　')+esc(r.no),html,function(){_rfSave();},false,null,true);
   _rfRecalc();
 }
+function _rfExRowHtml(x,IN){x=x||{};IN=IN||'width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
+  return '<div class="rf-ex-row" style="display:flex;gap:5px;align-items:center;margin-bottom:4px;flex-wrap:wrap"><input class="rf-ex-n" value="'+esc(x.name||'')+'" placeholder="品項（水泥、砂…）" style="'+IN+';flex:2;min-width:110px">'
+    +'<select class="rf-ex-b" onchange="_rfRecalc()" style="'+IN+';flex:0 0 auto;width:auto"><option value="fy"'+(x.by!=='owner'?' selected':'')+'>豐有提供</option><option value="owner"'+(x.by==='owner'?' selected':'')+'>由業主（營造廠）提供</option></select>'
+    +'<input class="rf-ex-a" type="number" inputmode="decimal" step="any" value="'+((parseFloat(x.amt)||0)>0?x.amt:'')+'" placeholder="估算金額" oninput="_rfRecalc()" style="'+IN+';flex:1;min-width:90px;text-align:right">'
+    +'<button type="button" onclick="this.parentNode.remove();_rfRecalc()" style="flex:0 0 32px;height:34px;border:1px solid #f0c4c4;color:var(--red);background:var(--w);border-radius:var(--r8);cursor:pointer">✕</button></div>';}
+function _rfExAdd(){var b=document.getElementById('rf-ex');if(!b)return;var d=document.createElement('div');d.innerHTML=_rfExRowHtml({});b.appendChild(d.firstChild);}
+function _rfModeUI(){var lump=gv('rf-mode')==='lump';var bx=document.getElementById('rf-lump-box');if(bx)bx.style.display=lump?'':'none';document.querySelectorAll('.rf-lcw').forEach(function(el){el.style.display=lump?'flex':'none';});_rfRecalc();}
+function _rfExRead(){var out=[];document.querySelectorAll('.rf-ex-row').forEach(function(el){var n=String(el.querySelector('.rf-ex-n').value||'').trim(),a=parseFloat(el.querySelector('.rf-ex-a').value)||0,b=el.querySelector('.rf-ex-b').value==='owner'?'owner':'fy';if(n||a>0)out.push({name:n,amt:b==='owner'?0:a,by:b});});return out;}
 function _rfVendorPick(name){var vd=(VENDORS||[]).find(function(x){return (x.name||'')===String(name||'').trim();});if(!vd)return;var c=document.getElementById('rf-contact'),t=document.getElementById('rf-tel');if(c&&!c.value)c.value=vd.contact||'';if(t&&!t.value)t.value=vd.phone||'';}
 function _rfSave(){
   var q=_rfqQ();if(!q||!_rfqFillCtx)return;var r=_rfqs(q).find(function(x){return x.id===_rfqFillCtx.rid;});if(!r)return;
@@ -31559,7 +31627,10 @@ function _rfSave(){
     if(!v){v={name:nm,contact:'',tel:'',recv:'',prices:{},neg:{},note:'',status:'sent'};r.vendors.push(v);}
   }else{v=r.vendors[_rfqFillCtx.vi];if(!v)return;}
   v.prices={};v.neg={};var any=false;
-  document.querySelectorAll('.rf-row').forEach(function(el){var idx=parseInt(el.getAttribute('data-idx'));var p=el.querySelector('.rf-p').value,n=el.querySelector('.rf-n').value;if(p!=='' &&!isNaN(parseFloat(p))){v.prices[idx]=parseFloat(p);any=true;}if(n!==''&&!isNaN(parseFloat(n)))v.neg[idx]=parseFloat(n);});
+  var lump=gv('rf-mode')==='lump',lt=parseFloat(gv('rf-lump'))||0,lnv=gv('rf-lump-n'),lidx=[];   // v6.0.109 一式
+  document.querySelectorAll('.rf-row').forEach(function(el){var idx=parseInt(el.getAttribute('data-idx'));var cb=el.querySelector('.rf-lc');if(lump&&lt>0&&cb&&cb.checked){lidx.push(idx);return;}var p=el.querySelector('.rf-p').value,n=el.querySelector('.rf-n').value;if(p!=='' &&!isNaN(parseFloat(p))){v.prices[idx]=parseFloat(p);any=true;}if(n!==''&&!isNaN(parseFloat(n)))v.neg[idx]=parseFloat(n);});
+  if(lump&&lt>0&&lidx.length){v.lump={idxs:lidx,total:lt,neg:(lnv!==''&&!isNaN(parseFloat(lnv)))?parseFloat(lnv):null};any=true;}else delete v.lump;
+  var ex=_rfExRead();if(ex.length)v.extras=ex;else delete v.extras;
   v.recv=gv('rf-recv')||'';v.contact=(gv('rf-contact')||'').trim();v.tel=(gv('rf-tel')||'').trim();v.note=(gv('rf-note')||'').trim();
   if(any&&v.status==='sent')v.status='quoted';if(!any&&v.status==='quoted')v.status='sent';
   r.mt=Date.now();_touch(q);try{persist();_immediateUpload();}catch(e){_err('_rfSave',e);}
@@ -31928,7 +31999,7 @@ function _vbStatusChip(r){
   var m={pending:['待登錄','#E65100','#FFF3E0'],billed:['本期已登錄','#1B5E20','#E8F5E9'],follow:['跟隨 '+((r.main&&r.main.vendor)||'主約'),'#1565C0','#E3F2FD'],done:['已請完','#616161','#F5F5F5'],idle:['本期無新量','#616161','#FAFAFA']}[r.status];
   return (r.rental?'<span style="display:inline-block;border-radius:99px;padding:1px 7px;font-size:10px;font-weight:700;color:#8a6d00;background:#FFF8E1;margin-right:3px">租賃</span>':'')+'<span style="display:inline-block;border-radius:99px;padding:1px 8px;font-size:10.5px;font-weight:700;color:'+m[1]+';background:'+m[2]+';white-space:nowrap">'+esc(m[0])+'</span>';
 }
-function _vbItems(r){return (r.c.rows||[]).map(function(x){var it=(x.linkedItemIdx>=0&&r.q.items)?r.q.items[x.linkedItemIdx]:null;return it?String(it.desc||'').split('\n')[0].slice(0,16):(x.desc||'');}).filter(Boolean).join('、');}
+function _vbItems(r){return (r.c.rows||[]).map(function(x){if(x.lump)return '一式';var it=(x.linkedItemIdx>=0&&r.q.items)?r.q.items[x.linkedItemIdx]:null;return it?String(it.desc||'').split('\n')[0].slice(0,16):(x.desc||'');}).filter(Boolean).join('、')+(function(){try{var rq=r.c.rfqId&&_rfqs(r.q).find(function(y){return y.id===r.c.rfqId;});var d=rq&&_rfqQuoteDiff(r.q,rq);return d&&d.any?('　⚠ 報價已進版至 v'+d.ver+'，本分包工項仍是舊版'):'';}catch(e){_err('_vbItems',e);return '';}})();}
 function renderVendorBilling(keepScroll){
   var root=document.getElementById('vb-root');if(!root)return;
   var rows=_vbRows(),cut=_vendorCutDate(localToday()),due=_vendorDueDate(cut);
@@ -32486,6 +32557,7 @@ function _v6PermMigrate(){
 // 總覽待辦：待登錄廠商請款／本月尚未開單／自有材料在工地
 function _v6TodoItems(items){
   var ic=function(h){return '<svg class="ic ib" aria-hidden="true"><use href="#'+h+'"/></svg>';};
+  try{_rfqVerTodo(items);}catch(e){_err('_v6TodoItems.rfqVer',e);}   // v6.0.109 報價進版、詢價／分包未同步
   try{
     _retentionRows().filter(function(r){return r.overdue&&!r.due;}).forEach(function(r){   // 已完工的由「保留款可請退」待辦涵蓋，不重複
       items.push({type:'ret_due',urgent:true,jump:"go('finance');setTimeout(function(){switchFinanceTab('retention')},150)",icon:ic('i-lock'),color:'var(--red)',
@@ -32815,21 +32887,31 @@ function _rfqDocNote(it){return _rfqIsM(it)?('<div style="font-size:9.5px;color:
 function _rfqPcHint(it,p){return (_rfqIsM(it)&&p!=null)?('<div style="font-size:10px;color:#1565C0">＝'+fmt(Math.round(p*_rfqMul(it)))+'／支</div>'):'';}
 function _rfqPerHtml(it,pk,IN){
   var len=(pk&&parseFloat(pk.len)>0)?parseFloat(pk.len):_rfqLen(it.desc);
-  var per=pk?(pk.per||'pc'):((len>0&&/支/.test(String(it.unit||'')))?'m':'pc');
+  var per=pk?(pk.per||'pc'):'pc';   // v6.0.109 預設照報價原單位；要依 M 計價由使用者手動選（原本「支＋有 L=…M」自動改依 M）
   return '<span style="display:flex;gap:6px;align-items:center;margin-top:5px;flex-wrap:wrap"><span style="font-size:11px;color:var(--b4);white-space:nowrap">廠商計價</span>'
     +'<select class="rfq-per" onchange="var w=this.parentNode.querySelector(\'.rfq-lenw\');if(w)w.style.display=this.value===\'m\'?\'inline-flex\':\'none\'" style="'+IN+';flex:0 0 auto;width:auto;padding:6px 8px"><option value="pc"'+(per!=='m'?' selected':'')+'>依'+esc(_uFix(it.unit||'單位'))+'（$／'+esc(_uFix(it.unit||'單位'))+'）</option><option value="m"'+(per==='m'?' selected':'')+'>依 M（$/M × 單支長）</option></select>'
     +'<span class="rfq-lenw" style="display:'+(per==='m'?'inline-flex':'none')+';gap:4px;align-items:center"><input type="number" inputmode="decimal" step="any" class="rfq-len" value="'+(len||'')+'" placeholder="單支長" style="'+IN+';width:76px;text-align:right;padding:6px 8px"><span style="font-size:11px;color:var(--b4);white-space:nowrap">M／支</span></span></span>';
 }
 function _rfqVendorTotal(r,v,useNeg){
-  var t=0,n=0;(r.items||[]).forEach(function(it){var p=null;if(useNeg&&v.neg&&v.neg[it.idx]!=null&&v.neg[it.idx]!=='')p=parseFloat(v.neg[it.idx]);else if(v.prices&&v.prices[it.idx]!=null&&v.prices[it.idx]!=='')p=parseFloat(v.prices[it.idx]);if(p==null||isNaN(p))return;t+=p*_rfqQtyU(it);n++;});
+  var t=0,n=0,L=_rfqLump(v);(r.items||[]).forEach(function(it){if(L&&_rfqLumpOn(v,it.idx)){n++;return;}var p=null;if(useNeg&&v.neg&&v.neg[it.idx]!=null&&v.neg[it.idx]!=='')p=parseFloat(v.neg[it.idx]);else if(v.prices&&v.prices[it.idx]!=null&&v.prices[it.idx]!=='')p=parseFloat(v.prices[it.idx]);if(p==null||isNaN(p))return;t+=p*_rfqQtyU(it);n++;});
+  if(L)t+=_rfqLumpEff(v,useNeg);   // v6.0.109 一式總價（議後優先）
   return {total:Math.round(t),n:n,full:n===(r.items||[]).length&&n>0};
 }
 function _rfRecalc(){
   var tq=0,tn=0;
+  var lump=gv('rf-mode')==='lump',lt=parseFloat(gv('rf-lump'))||0,ln=parseFloat(gv('rf-lump-n')),le=isNaN(ln)?lt:ln,lq=0;   // v6.0.109 一式
+  if(lump)document.querySelectorAll('.rf-row').forEach(function(el){var cb=el.querySelector('.rf-lc');if(cb&&cb.checked)lq+=parseFloat(el.getAttribute('data-qty'))||0;});
+  var ref=(lump&&lq>0&&le>0)?Math.round(le/lq*100)/100:null;
+  if(lump&&lt>0){tq+=lt;tn+=le;}
   document.querySelectorAll('.rf-row').forEach(function(el){var qty=parseFloat(el.getAttribute('data-qty'))||0,mul=parseFloat(el.getAttribute('data-mul'))||1,p=parseFloat(el.querySelector('.rf-p').value),nn=parseFloat(el.querySelector('.rf-n').value);
+    var cb=el.querySelector('.rf-lc'),cov=lump&&cb&&cb.checked;el.querySelectorAll('.rf-p,.rf-n').forEach(function(i){i.disabled=!!cov;i.style.opacity=cov?'.45':'';});
+    if(cov){el.querySelector('.rf-amt').textContent='一式';var pc0=el.querySelector('.rf-pc');if(pc0)pc0.innerHTML=ref!=null?('<span style="color:var(--b3)">換算 '+fmt(ref)+'／'+esc(el.getAttribute('data-unit')||'')+'（只供參考）</span>'):'';return;}
     if(!isNaN(p))tq+=p*qty;var eff=!isNaN(nn)?nn:(!isNaN(p)?p:NaN);if(!isNaN(eff))tn+=eff*qty;el.querySelector('.rf-amt').textContent=isNaN(eff)?'—':fmt(Math.round(eff*qty));
     var pc=el.querySelector('.rf-pc');if(pc)pc.textContent=(mul>1&&!isNaN(eff))?('每 M '+fmt(eff)+' × '+_rfmt(mul)+' M ＝ 每支 '+fmt(Math.round(eff*mul))):'';});
-  var t=document.getElementById('rf-tot');if(t)t.innerHTML='報價合計（未稅）<b style="float:right">NT$ '+fmt(Math.round(tq))+'</b><br>議價後合計<b style="float:right;color:var(--g3)">NT$ '+fmt(Math.round(tn))+'</b>'+(tq>tn?('<br><span style="color:#1565C0">議價省下 NT$ '+fmt(Math.round(tq-tn))+'（'+(tq?Math.round((tq-tn)/tq*1000)/10:0)+'%）</span>'):'');
+  var ex=_rfExRead(),exA=ex.reduce(function(a,x){return a+(x.by==='owner'?0:x.amt);},0);
+  var t=document.getElementById('rf-tot');if(t)t.innerHTML='報價合計（未稅）<b style="float:right">NT$ '+fmt(Math.round(tq))+'</b><br>議價後合計<b style="float:right;color:var(--g3)">NT$ '+fmt(Math.round(tn))+'</b>'+(tq>tn?('<br><span style="color:#1565C0">議價省下 NT$ '+fmt(Math.round(tq-tn))+'（'+(tq?Math.round((tq-tn)/tq*1000)/10:0)+'%）</span>'):'')
+    +(ex.length?('<br>豐有提供材料／隱藏成本<b style="float:right">+ NT$ '+fmt(Math.round(exA))+'</b><br><span style="font-weight:900">比價合計（同口徑）</span><b style="float:right;color:var(--g3)">NT$ '+fmt(Math.round(tn+exA))+'</b>'):'')
+    +(lump&&lt>0&&!(lq>0)?'<br><span style="color:var(--red)">一式：請勾選涵蓋的工項</span>':'');
 }
 // 每支單價（發包合約、回填成本用）
 function _rfqPcPrice(r,v,it){var p=_rfqVendorPrice(r,v,it.idx);return p==null?null:Math.round(p*_rfqMul(it)*100)/100;}
@@ -32862,10 +32944,10 @@ function rfqAward(rid){
   var cands=(r.vendors||[]).filter(function(v){return _rfqVendorTotal(r,v,true).n>0;});
   if(!cands.length){toast('還沒有任何廠商的報價，請先「填價」');return;}
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
-  var minT=Math.min.apply(null,cands.map(function(v){return _rfqVendorTotal(r,v,true).total;}));
+  var minT=Math.min.apply(null,cands.map(function(v){return _rfqCmpTotal(r,v);}));   // v6.0.109 同口徑（含豐有提供材料／隱藏成本）
   var anyM=(r.items||[]).some(function(it){return _rfqIsM(it)||_rfqLen(it.desc)>0;});
   var html='<div style="font-size:12px;color:var(--b4);margin-bottom:6px">選擇得標廠商並說明原因（價格、產能、配合度、品質…）。確認後自動建立分包合約（施工成本承包卡），其餘廠商標為未得標。依 M 報價的工項，合約單價自動換算成每支（$/M × 單支長）。</div>'
-    +cands.map(function(v){var t=_rfqVendorTotal(r,v,true),i=r.vendors.indexOf(v);return '<label style="display:flex;gap:8px;align-items:center;border:1px solid var(--b1);border-radius:var(--r8);padding:8px 10px;margin-bottom:5px;cursor:pointer"><input type="radio" name="rfq-win" value="'+i+'"'+(t.total===minT?' checked':'')+' style="width:16px;height:16px"><span style="flex:1"><b>'+esc(v.name)+'</b>'+(v.note?'<div style="font-size:11px;color:var(--b4)">'+esc(v.note)+'</div>':'')+'</span><b style="font-variant-numeric:tabular-nums;color:'+(t.total===minT?'#1B5E20':'var(--b5)')+'">NT$ '+fmt(t.total)+'</b>'+(t.full?'':'<span style="font-size:10.5px;color:#b26a00">未填齊</span>')+'</label>';}).join('')
+    +cands.map(function(v){var t=_rfqVendorTotal(r,v,true),ct=_rfqCmpTotal(r,v),i=r.vendors.indexOf(v);return '<label style="display:flex;gap:8px;align-items:center;border:1px solid var(--b1);border-radius:var(--r8);padding:8px 10px;margin-bottom:5px;cursor:pointer"><input type="radio" name="rfq-win" value="'+i+'"'+(ct===minT?' checked':'')+' style="width:16px;height:16px"><span style="flex:1"><b>'+esc(v.name)+'</b>'+(v.note?'<div style="font-size:11px;color:var(--b4)">'+esc(v.note)+'</div>':'')+(_rfqLump(v)?'<div style="font-size:11px;color:#1565C0">一式 NT$ '+fmt(_rfqLumpEff(v,true))+'（涵蓋 '+v.lump.idxs.length+' 項）</div>':'')+(_rfqExtras(v).length?'<div style="font-size:11px;color:var(--b4)">材料／隱藏成本：'+esc(_rfqExtras(v).map(_rfqExtraTxt).join('、'))+'（比價已計入 '+fmt(_rfqExtraAmt(v))+'）</div>':'')+'</span><b style="font-variant-numeric:tabular-nums;color:'+(ct===minT?'#1B5E20':'var(--b5)')+'">NT$ '+fmt(ct)+(ct!==t.total?'<div style="font-size:10.5px;font-weight:400;color:var(--b4)">發包 '+fmt(t.total)+'</div>':'')+'</b>'+(t.full?'':'<span style="font-size:10.5px;color:#b26a00">未填齊</span>')+'</label>';}).join('')
     +'<div class="fg fg2" style="gap:8px;margin-top:6px"><div class="f"><label>簽約日</label><input id="rfq-sign" type="date" value="'+localToday()+'" style="'+IN+'"></div><div class="f"><label>進場日</label><input id="rfq-entry2" type="date" value="'+esc(r.entry||'')+'" style="'+IN+'"></div></div>'
     +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin:4px 0 8px"><input type="checkbox" id="rfq-backfill" checked style="width:16px;height:16px"> 得標單價回填報價工項的成本單價（更新預估淨利；原值會被覆蓋）</label>'
     +'<div class="f"><label>得標原因</label><textarea id="rfq-reason" rows="2" placeholder="例：最低價且可配合 11/1 進場、兩台打樁機" style="'+IN+';resize:vertical"></textarea></div>'
@@ -32883,9 +32965,20 @@ function rfqAward(rid){
     var intro={name:(gv('rfq-intro-name')||'').trim(),k:_rfqIntroCalc(r),inv:!!(document.getElementById('rfq-intro-inv')||{}).checked};
     var v=r.vendors[parseInt(sel.value)];var c=_rfqCond(r);
     var cid=Date.now().toString(36)+Math.random().toString(36).slice(2,5);
-    var rows=(r.items||[]).map(function(it,i){var p=_rfqPcPrice(r,v,it),pm=_rfqVendorPrice(r,v,it.idx);var row={id:cid+'_'+i,linkedItemIdx:it.idx,desc:_rfqIsM(it)&&pm!=null?('$'+fmt(pm)+'/M × '+_rfmt(it.len)+'M'):'',qty:parseFloat(it.qty)||0,unitPrice:p==null?0:p};if(_rfqIsM(it)){row.ppm=pm;row.len=parseFloat(it.len)||0;}return row;});
+    var L=_rfqLump(v),rows=[];
+    (r.items||[]).forEach(function(it,i){if(L&&_rfqLumpOn(v,it.idx))return;var p=_rfqPcPrice(r,v,it),pm=_rfqVendorPrice(r,v,it.idx);var row={id:cid+'_'+i,linkedItemIdx:it.idx,desc:_rfqIsM(it)&&pm!=null?('$'+fmt(pm)+'/M × '+_rfmt(it.len)+'M'):'',qty:parseFloat(it.qty)||0,unitPrice:p==null?0:p};if(_rfqIsM(it)){row.ppm=pm;row.len=parseFloat(it.len)||0;}
+      if(it.scope)row.scope=it.scope;if(it.tpl==='grout'){var tg=_payTpl('grout');row.tpl='grout';row.ret=tg.ret;row.retCond=tg.retCond;}   // v6.0.109 工項付款樣板
+      rows.push(row);});
+    if(L){   // v6.0.109 一式：一列總價，請款依完成百分比（數量 1＝100%）
+      var cov=(r.items||[]).filter(function(it){return _rfqLumpOn(v,it.idx);}),ref=_rfqLumpRef(r,v,true);
+      var lr={id:cid+'_L',linkedItemIdx:cov.length?cov[0].idx:-1,lump:true,lumpIdxs:cov.map(function(it){return it.idx;}),
+        lumpItems:cov.map(function(it){return {idx:it.idx,desc:String(it.desc||'').split('\n')[0],scope:it.scope||'',unit:_rfqUnitU(it),qty:_rfqQtyU(it),q0:parseFloat(it.qty)||0,u0:_uFix(it.unit||'')};}),
+        desc:'一式（涵蓋：'+cov.map(function(it){return String(it.desc||'').split('\n')[0]+(it.scope?('〔'+it.scope+'〕'):'')+' '+_rfmt(_rfqQtyU(it))+_rfqUnitU(it);}).join('；')+'）',unit:'式',qty:1,unitPrice:_rfqLumpEff(v,true),ref:ref};
+      if(cov.length&&cov.every(function(it){return it.tpl==='grout';})){var tg2=_payTpl('grout');lr.tpl='grout';lr.ret=tg2.ret;lr.retCond=tg2.retCond;}
+      rows.push(lr);
+    }
     var sd=gv('rfq-sign')||localToday();
-    var cost={id:cid,type:'sub',isAttached:false,attachedTo:'',mergedInto:'',cat:'打設',date:sd,vendor:v.name,rows:rows,amt:0,signDate:sd,entryDate:gv('rfq-entry2')||r.entry||'',invoice:true,retRate:c.ret||0,retWhen:c.retWhen||'',b2b:_ownerPaySet(q)?1:0,rfqId:r.id,payTerm:{cashPct:c.cashPct,ticketPct:c.ticketPct,ticketDays:c.ticketDays,instPct:(c.instPct!=null&&c.instPct!=='')?c.instPct:null}};
+    var cost={id:cid,type:'sub',isAttached:false,attachedTo:'',mergedInto:'',cat:'打設',date:sd,vendor:v.name,rows:rows,amt:0,signDate:sd,entryDate:gv('rfq-entry2')||r.entry||'',invoice:true,retRate:c.ret||0,retWhen:c.retWhen||'',b2b:_ownerPaySet(q)?1:0,rfqId:r.id,matBy:_rfqExtras(v).length?_rfqExtras(v).map(function(x){return {name:x.name,amt:x.by==='owner'?0:(parseFloat(x.amt)||0),by:x.by==='owner'?'owner':'fy'};}):undefined,payTerm:{cashPct:c.cashPct,ticketPct:c.ticketPct,ticketDays:c.ticketDays,instPct:(c.instPct!=null&&c.instPct!=='')?c.instPct:null}};
     try{recalcCostAmt(cost);}catch(e){_err('rfqAward',e);}
     if(!Array.isArray(q.costs))q.costs=[];q.costs.push(cost);
     var fCost=null;
@@ -34562,7 +34655,12 @@ function _qRemapAfter(oldUids){
       (c.rows||[]).forEach(function(r){if(r&&r.linkedItemIdx!=null){var nv2=mv(r.linkedItemIdx);if(nv2!==r.linkedItemIdx){r.linkedItemIdx=nv2;changed=true;}}});
     });
     (q.dailyLogs||[]).forEach(function(L){(L&&L.progressRows||[]).forEach(function(r){if(r&&r.itemIdx!=null){var nv3=mv(r.itemIdx);if(nv3!==r.itemIdx){r.itemIdx=nv3;changed=true;}}});});
-    (q.rfqs||[]).forEach(function(r){(r&&r.items||[]).forEach(function(it){if(it&&it.idx!=null){var nv4=mv(it.idx);if(nv4!==it.idx){it.idx=nv4;changed=true;}}});});   // v6.0.34
+    (q.rfqs||[]).forEach(function(r){(r&&r.items||[]).forEach(function(it){if(it&&it.idx!=null){var nv4=mv(it.idx);if(nv4!==it.idx){it.idx=nv4;changed=true;}}});   // v6.0.34
+      (r&&r.vendors||[]).forEach(function(v){   // v6.0.109 廠商單價／議價／一式涵蓋也以工項 idx 為鍵，一起重定位（原本漏掉，工項換位後單價會對錯列）
+        ['prices','neg'].forEach(function(k){var o=v&&v[k];if(!o||typeof o!=='object')return;var nb={},ch=false;Object.keys(o).forEach(function(key){var nk=mv(key);if(nk!==parseInt(key))ch=true;if(nk>=0)nb[nk]=o[key];});if(ch){v[k]=nb;changed=true;}});
+        if(v&&v.lump&&Array.isArray(v.lump.idxs)){var li=v.lump.idxs.map(mv).filter(function(x){return x>=0;});if(li.join()!==v.lump.idxs.join()){v.lump.idxs=li;changed=true;}}
+      });});
+    (q.costs||[]).forEach(function(c){(c&&c.rows||[]).forEach(function(r){if(!r||!r.lump)return;if(Array.isArray(r.lumpIdxs))r.lumpIdxs=r.lumpIdxs.map(mv);(r.lumpItems||[]).forEach(function(li){var n5=mv(li.idx);if(n5!==li.idx){li.idx=n5;changed=true;}});});});
     if(changed){_touch(q);try{persist();}catch(e){_err('_qRemapAfter',e);}}
   }catch(e){console.warn('[FY] 工項索引重定位失敗',e&&e.message);}
 }
@@ -35825,13 +35923,15 @@ function _sctRows(q,c){   // 承攬內容：成本卡明細列 → 工項／單�
   return (c.rows||[]).map(function(r){
     var it=(r.linkedItemIdx>=0&&q.items)?q.items[r.linkedItemIdx]:null;
     var desc=(it?String(it.desc||'').split('\n')[0]:'')||r.desc||'';if(it&&r.desc&&r.desc!==desc)desc+='　'+r.desc;
+    if(r.lump)desc=r.desc||'一式';else if(r.scope)desc+='〔發包範圍：'+r.scope+'〕';   // v6.0.109
     var qty=parseFloat(r.qty)||0,up=parseFloat(r.unitPrice)||0;
-    return {desc:desc,unit:_uFix(r.unit||(it&&it.unit)||'式'),qty:qty,up:up,amt:Math.round(qty*up)};
+    return {desc:desc,unit:r.lump?'式':_uFix(r.unit||(it&&it.unit)||'式'),qty:qty,up:up,amt:Math.round(qty*up),row:r};
   }).filter(function(r){return r.desc||r.amt;});
 }
 function _sctPayTxt(c,f,q){
   var day=parseInt(P.vendorCutDay)||25,pd=parseInt(P.vendorPayDay)||25,delay=(P.vendorPayDelay==null)?1:(parseInt(P.vendorPayDelay)||0);
   var ret=parseFloat(c.retRate)||0;
+  if((c.rows||[]).length&&(c.rows||[]).every(function(r){return r&&r.tpl&&r.ret!=null&&r.ret!=='';}))ret=0;   // v6.0.109 每列都有付款樣板保留款（根固）→ 不再寫整張卡的保留款句，改由樣板句說明
   // v6.0.91 背對背：本案有營造廠付款條件時，寫出匯款／票期比例；保留款退還時點跟營造廠同步（舊資料無營造廠條件＝原文）
   // v6.0.94：只有得標時帶背對背標記的分包卡（c.b2b）才改文字，舊卡重印一字不變；退還時點空白＝原文
   var pt=(c.b2b&&c.payTerm)||null,split='';
@@ -35841,6 +35941,8 @@ function _sctPayTxt(c,f,q){
   var t='依實作數量按月計價：乙方應會同甲方工地人員辦理計價後，於每月 '+day+' 日前檢附估驗請款單'+(_subInvoice(c)?'及統一發票':'')+'向甲方請款，甲方於'+(delay===0?'當月':delay===1?'次月':('次 '+delay+' 月'))+' '+pd+' 日放款'+split+'。'
     +(inst!=null?('分段計價工項（施工構台、支撐等）於裝設（打設）完成時計價 '+inst+'%，拆除（拔除）完成時計價其餘 '+(100-inst)+'%。'):'')
     +(ret>0?('每期工程款保留 '+ret+'% 作為保留款，'+(rw?(rw+'。'):'於工程全部完成（含拆除、拔除、場地清理）且經甲方驗收後無息退還。')):'')
+    +(function(){var rs=_sctRows(q,c),g=[];rs.forEach(function(x,i){if(x.row&&x.row.tpl==='grout')g.push(i+1);});var lp=rs.some(function(x){return x.row&&x.row.lump;});   // v6.0.109 工項付款樣板（舊卡無＝不加）
+      return (g.length?('第 '+g.join('、')+' 項（根固）：施作完成時計價 100%，其中 10% 為保留款（實領 90%），於開挖確認無問題後無息退還；無拆除段。'):'')+(lp?'一式工項依完成百分比計價。':'');})()
     +(_subInvoice(c)?'工程款含 '+_taxR()+'% 營業稅，乙方應開立統一發票。':'本工程款不含營業稅，乙方以收據請款。')
     +(f.payExtra?('　'+f.payExtra):'');
   return t;
@@ -35860,6 +35962,10 @@ function _subContractHtml(q,c,f){
     +rows.map(function(r,i){return '<tr><td>'+(i+1)+'</td><td class="l">'+E(r.desc)+'</td><td>'+E(r.unit)+'</td><td class="r">'+_qfmt(r.qty)+'</td><td class="r">'+fmt(r.up)+'</td><td class="r">'+fmt(r.amt)+'</td></tr>';}).join('')
     +'<tr class="tt"><td colspan="5" class="r">預估承攬總價（未稅）</td><td class="r">'+fmt(tot)+'</td></tr></tbody></table>'
     +'<div class="sm">以上數量為預估，實際以甲方會同乙方現場計價之數量為準；單價於合約期間固定不變。</div>');
+  var _lr=(c.rows||[]).filter(function(r){return r&&r.lump;});   // v6.0.109 一式範圍與數量變更調整（舊卡無此列＝不加條文）
+  if(_lr.length)art('一式計價','下列工項以一式總價承攬：'+_lr.map(function(r){return E(r.desc||'')+'，總價新臺幣 '+fmt(parseFloat(r.unitPrice)||0)+' 元（未稅）';}).join('；')+'。一式總價涵蓋上列工項之全部工作（含動員），依完成百分比按月計價，累計以 100% 為限。'
+    +'實作數量與上列數量不同時，按增減數量依換算單價'+_lr.map(function(r){return r.ref!=null?('新臺幣 '+fmt(r.ref)+' 元／'+E(((r.lumpItems||[])[0]||{}).unit||'單位')):'';}).filter(Boolean).join('、')+'（一式總價 ÷ 上列數量合計）辦理追加減；工作範圍變更另行議價，以書面或 LINE 確認後施作。');
+  if(Array.isArray(c.matBy)&&c.matBy.length)art('材料提供',c.matBy.map(function(x){return E(x.name||'')+(x.by==='owner'?'由業主（營造廠）提供，甲方不負擔費用':'由甲方提供'+((parseFloat(x.amt)||0)>0?('（甲方估算新臺幣 '+fmt(parseFloat(x.amt)||0)+' 元，不計入本合約總價）'):''));}).join('；')+'。除上列材料外，施工所需其他材料均由乙方自備。');
   art('付款辦法',E(_sctPayTxt(c,f,q)));
   art('工程期限','乙方應於甲方通知之日期進場施工'+(c.entryDate?('（預定進場日 '+E(c.entryDate)+'）'):'')+(f.period?('，'+E(f.period)):'')+'；各階段進度須依甲方指定之日期進場、完工，並配合本工地其他工種之施工進度，不得無故停工或延誤。');
   art('逾期罰款','乙方如無故不進場、未依甲方指定進度施作或逾期完工，每逾一日應給付甲方承攬總價千分之 '+E(f.fine)+' 之違約金，甲方得自當期或任一期工程款中逕行扣抵。');
@@ -37145,7 +37251,7 @@ var _RO_PAGES_OFF=['staff','roles'];
 var _RO_ROLE={id:'__reader',name:'唯讀',reader:true,enabled:true,sys:false,cloudCost:false,pages:{}};
 var _RO_DENY=new RegExp('^(?:save|del|delete|remove|add|new|edit|create|submit|import|upload|restore|reset|clear|clean|confirm|apply|award|revoke|bump|settle|release|recalc|fix|merge'
   +'|toggle(?:RetentionReturn|PaidDateField|PayVat|AutoSync|CumFix)|pay(?:MarkPaid|Unmark|VendorAll)|ps(?:Paid|Generate|Upd|Del)|pc(?:Paid|Generate|Upd|Del)|hr(?:Edit|Del|WriteFixedCost)'
-  +'|staff(?:Edit|Del|Import|Template)|role(?:Edit|Del|Toggle|Perm)|dept|reader(?:Add|Del|Rename)|rfq(?:New|Labor|Edit|Del|Award|RemoveVendor|Fill)'
+  +'|staff(?:Edit|Del|Import|Template)|role(?:Edit|Del|Toggle|Perm)|dept|reader(?:Add|Del|Rename)|rfq(?:New|Labor|Edit|Del|Award|RemoveVendor|Fill|QuoteSync|Chg)'
   +'|mat(?:Led|Rent|Equip|Trans|Alloc|RowEdit|Out|Back|EstSave|EstApplyCost|EstPickProj)|m6(?:Decide|Rent|Batch|TpUpd|EquipUpd)'
   +'|open(?:SubPeriod|SubAdvance|RentPeriod|Prepay|NegotiateModal|ReceiptModal|InvClauseModal|CommPick|SalesPick|SalesBook|RmkModal|StorageRulesGen|Dunning)'
   +'|pj(?:DeductSet|OwnerPaySet|OwnerInstSet|RentEndSet|SetFollow|PayAdv|PlanSet|CloseAll|IntroEdit)|sub(?:AdvRealloc|FollowSync)'
@@ -37214,6 +37320,200 @@ function _roInit(){
       if(t&&_roIsWrite(t,['on'+ev])){e.stopImmediatePropagation();_roDeny();}
     },true);});
   }
+}
+// ── v6.0.109 發包：一式報價、豐有／業主提供材料、工項付款樣板、拆分發包範圍、報價進版連動 ──
+// 一式：廠商 v.lump={idxs:[報價工項 idx…],total 一式總價,neg 議後一式總價}；涵蓋的工項不填單價，換算參考單價＝一式總價 ÷ 涵蓋工項數量合計（依數量比例分攤，只供參考），比價用總價。
+// 材料／隱藏成本：v.extras=[{name,amt,by:'fy' 豐有提供（計入比價）|'owner' 由業主（營造廠）提供（豐有成本 0）}]，得標帶進分包卡 c.matBy 與合約條文。
+// 付款樣板：詢價工項 it.tpl＝'gen' 一般（背對背：裝設／拆除分段、保留款照卡片）／'grout' 根固（施作完成全額計價、保留 10%、開挖確認無問題後退還、無拆除段），得標寫進分包列 row.tpl／row.ret／row.retCond。
+// 報價版次：新詢價單記 r.quoteVer 與每列 qd／oq（當時的完整說明／報價數量）；舊單由建立時間對照正式版次推定（_rfqBaseVer）。
+var _PAY_TPLS={gen:{id:'gen',label:'一般工項（背對背）'},grout:{id:'grout',label:'根固',ret:10,retCond:'開挖確認無問題'}};
+var _RFQ_EXBY={fy:'豐有提供',owner:'由業主（營造廠）提供'};
+function _payTpl(id){return _PAY_TPLS[id]||_PAY_TPLS.gen;}
+function _payTplTxt(id,c){
+  if(_payTpl(id).id==='grout')return '根固：施作完成計價 100%，其中 10% 為保留款（實領 90%），開挖確認無問題後退還；無拆除段';
+  c=c||{};var inst=(c.instPct!=null&&c.instPct!=='')?_instOf(c):_instDef(),ret=parseFloat(c.ret)||0;
+  return '一般工項（背對背）：裝設（打設）完成請款 '+inst+'%、拆除（拔除）完成請款 '+(100-inst)+'%'+(ret>0?('，保留款 '+ret+'%'):'');
+}
+function _rfqLump(v){var L=v&&v.lump;return (L&&Array.isArray(L.idxs)&&L.idxs.length&&(parseFloat(L.total)||0)>0)?L:null;}
+function _rfqLumpOn(v,idx){var L=_rfqLump(v);return !!L&&L.idxs.some(function(x){return Number(x)===Number(idx);});}
+function _rfqLumpEff(v,useNeg){var L=_rfqLump(v);if(!L)return 0;var n=(L.neg==null||L.neg==='')?NaN:parseFloat(L.neg);return (useNeg&&!isNaN(n))?n:(parseFloat(L.total)||0);}
+function _rfqLumpQty(r,v){return (r.items||[]).filter(function(it){return _rfqLumpOn(v,it.idx);}).reduce(function(a,it){return a+_rfqQtyU(it);},0);}
+function _rfqLumpRef(r,v,useNeg){var tq=_rfqLumpQty(r,v);return tq>0?Math.round(_rfqLumpEff(v,useNeg)/tq*100)/100:null;}
+function _rfqExtras(v){return (v&&Array.isArray(v.extras))?v.extras.filter(function(x){return x&&(String(x.name||'').trim()||(parseFloat(x.amt)||0)>0);}):[];}
+function _rfqExtraAmt(v){return Math.round(_rfqExtras(v).reduce(function(a,x){return a+(x.by==='owner'?0:(parseFloat(x.amt)||0));},0));}
+function _rfqCmpTotal(r,v){return _rfqVendorTotal(r,v,true).total+_rfqExtraAmt(v);}   // 同口徑比價：議後總價＋豐有提供材料／隱藏成本
+function _rfqExtraTxt(x){return String(x.name||'').trim()+'（'+(_RFQ_EXBY[x.by]||_RFQ_EXBY.fy)+(x.by==='owner'?'，豐有成本 0':((parseFloat(x.amt)||0)>0?('，估 NT$ '+fmt(parseFloat(x.amt)||0)):''))+'）';}
+// 詢價工項說明：第一行＋其餘說明（括號說明）＋發包範圍＋付款樣板
+function _rfqDescHtml(it){
+  var ls=String((it&&it.desc)||'').split('\n'),h=esc(ls[0]);
+  if(ls.length>1)h+='<div style="font-size:10.5px;color:var(--b4);white-space:pre-wrap;line-height:1.45">'+esc(ls.slice(1).join('\n').trim())+'</div>';
+  if(it&&it.scope)h+='<div style="font-size:11px;color:#1565C0">發包範圍：'+esc(it.scope)+'</div>';
+  if(it&&it.tpl==='grout')h+='<div style="font-size:10.5px;color:#8a6d00">付款樣板：根固（保留 10%，開挖確認無問題後退還）</div>';
+  return h;
+}
+// 同一報價工項被拆成幾個發包範圍（其他詢價單）
+function _rfqCoverOf(q,idx,exceptRid){var out=[];_rfqs(q).forEach(function(r){if(!r||r.id===exceptRid)return;(r.items||[]).forEach(function(it){if(Number(it.idx)===Number(idx))out.push({no:r.no||'',scope:it.scope||r.scope||''});});});return out;}
+function _rfqSplitHtml(q,r){
+  var lines=[];(r.items||[]).forEach(function(it){var o=_rfqCoverOf(q,it.idx,r.id);if(!o.length)return;
+    lines.push('「'+esc(String(it.desc||'').split('\n')[0].slice(0,26))+'」另在 '+o.map(function(x){return esc(x.no)+(x.scope?('（'+esc(x.scope)+'）'):'');}).join('、')+(it.scope?'':'　<b>本單未寫範圍說明</b>'));});
+  return lines.length?'<div style="margin-top:6px;background:#fff8e1;border:1px solid #ffe08a;border-radius:var(--r8);padding:6px 9px;font-size:11.5px;color:#7a5a00;line-height:1.6">拆分發包：'+lines.join('<br>')+'<br>請確認各發包範圍合起來涵蓋原工項全部內容（含括號說明）。</div>':'';
+}
+// ── 報價版次連動 ──
+function _rfqKey(d){return String(d||'').split('\n')[0].replace(/[（(][^）)]*[）)]/g,'').replace(/\s+/g,'');}
+function _rfqGL(d){return (String(d||'').match(/GL\s*[-－]?\s*[\d.]+\s*m?(?:\s*[～~至\-－]\s*[-－]?\s*[\d.]+\s*m?)?/gi)||[]).map(function(x){return x.replace(/\s+/g,'');}).join('、');}
+function _qSnapOf(q,ver){var e=(Q_HISTORY[q.id]||[]).find(function(x){return x&&x.formal&&(x.ver||1)===ver&&x.snapshot;});return e?e.snapshot:null;}
+function _rfqBaseVer(q,r){
+  if(r&&r.quoteVer)return {ver:parseInt(r.quoteVer)||1,inferred:false};
+  var t=(r&&(r.ts||Date.parse(String(r.date||'')+'T23:59:59')))||0;
+  var hs=(Q_HISTORY[q&&q.id]||[]).filter(function(e){return e&&e.formal&&(e.savedAt||0)>t;});
+  return {ver:hs.length?Math.min.apply(null,hs.map(function(e){return e.ver||1;})):((q&&q.ver)||1),inferred:true};
+}
+function _rfqQuoteDiff(q,r){
+  var cur=(q&&q.ver)||1,b=_rfqBaseVer(q,r),out={ver:cur,base:b.ver,inferred:b.inferred,diffs:[],added:[],map:{},any:false};
+  if(!q||!r||r.status==='labor'||b.ver>=cur)return out;
+  var snap=_qSnapOf(q,b.ver),sItems=(snap&&Array.isArray(snap.items))?snap.items:null,qi=q.items||[];
+  var findK=function(arr,k){for(var j=0;j<arr.length;j++){var x=arr[j];if(x&&!x.sec&&_rfqKey(x.desc)===k)return j;}return -1;};
+  (r.items||[]).forEach(function(it){
+    var idx=parseInt(it.idx),bi=null;
+    if(it.qd!=null)bi={desc:it.qd,unit:it.unit,qty:it.oq};
+    else if(sItems){var k0=_rfqKey(it.desc),bj=(sItems[idx]&&_rfqKey(sItems[idx].desc)===k0)?idx:findK(sItems,k0);if(bj>=0)bi={desc:sItems[bj].desc,unit:sItems[bj].unit,qty:sItems[bj].qty};}
+    if(!bi)bi={desc:it.desc,unit:it.unit,qty:null,legacy:true};
+    var k=_rfqKey(bi.desc),ni=(qi[idx]&&!qi[idx].sec&&_rfqKey(qi[idx].desc)===k)?idx:findK(qi,k),nm=String(bi.desc||'').split('\n')[0];
+    if(ni<0){out.diffs.push({t:'del',idx:idx,desc:nm});return;}
+    out.map[idx]=ni;var ci=qi[ni];
+    var d0=String(bi.desc||'').trim(),d1=String(ci.desc||'').trim();if(bi.legacy){d0=d0.split('\n')[0];d1=d1.split('\n')[0];}
+    var g0=_rfqGL(d0),g1=_rfqGL(d1);
+    if(g0!==g1)out.diffs.push({t:'depth',idx:idx,ni:ni,desc:nm,from:g0||'—',to:g1||'—'});
+    else if(d0.replace(/\s+/g,'')!==d1.replace(/\s+/g,''))out.diffs.push({t:'desc',idx:idx,ni:ni,desc:nm,from:d0,to:d1});
+    if(bi.qty!=null&&bi.qty!==''&&Math.abs((parseFloat(bi.qty)||0)-(parseFloat(ci.qty)||0))>1e-9)out.diffs.push({t:'qty',idx:idx,ni:ni,desc:nm,from:parseFloat(bi.qty)||0,to:parseFloat(ci.qty)||0,unit:_uFix(ci.unit||'')});
+    if(bi.unit&&_uFix(bi.unit||'')!==_uFix(ci.unit||''))out.diffs.push({t:'unit',idx:idx,ni:ni,desc:nm,from:_uFix(bi.unit||''),to:_uFix(ci.unit||'')});
+  });
+  if(sItems){var allK={};_rfqs(q).forEach(function(x){(x.items||[]).forEach(function(it){allK[_rfqKey(it.desc)]=1;});});
+    qi.forEach(function(x){if(!x||x.sec||_isSpare(x)||!String(x.desc||'').trim())return;var k=_rfqKey(x.desc);if(findK(sItems,k)<0&&!allK[k])out.added.push(String(x.desc||'').split('\n')[0]);});}
+  out.any=out.diffs.length>0;
+  return out;
+}
+var _RFQ_DIFF_LBL={del:'刪除',qty:'數量',desc:'說明',depth:'深度',unit:'單位'};
+function _rfqDiffTxt(x){
+  if(x.t==='del')return '刪除：'+x.desc;
+  if(x.t==='qty')return '數量：'+x.desc+'　'+_rfmt(x.from)+' → '+_rfmt(x.to)+' '+(x.unit||'');
+  if(x.t==='depth')return '深度：'+x.desc+'　'+x.from+' → '+x.to;
+  if(x.t==='unit')return '單位：'+x.desc+'　'+x.from+' → '+x.to;
+  return '說明：'+x.desc+'　→ '+String(x.to||'').replace(/\s*\n\s*/g,' ').slice(0,80);
+}
+// 進版變更的預估追加減（只供參考，不改包商價格）：數量差 × 本單得標（或最低）廠商單價
+function _rfqChgAmt(q,r,diffs){
+  var v=(r.vendors||[]).find(function(x){return x.status==='won';})||null;
+  if(!v){var best=null;(r.vendors||[]).forEach(function(x){var t=_rfqVendorTotal(r,x,true);if(t.n&&(best==null||t.total<best.t))best={v:x,t:t.total};});v=best&&best.v;}
+  if(!v)return null;
+  var a=0;(diffs||[]).forEach(function(x){var it=(r.items||[]).find(function(y){return Number(y.idx)===Number(x.idx);});if(!it)return;var p=_rfqVendorPrice(r,v,it.idx);if(p==null)return;
+    if(x.t==='qty')a+=(x.to-x.from)*_rfqMul(it)*p;else if(x.t==='del')a-=_rfqQtyU(it)*p;});
+  return {vendor:v.name||'',amt:Math.round(a)};
+}
+function _rfqVerWarnHtml(q,r){
+  var d=_rfqQuoteDiff(q,r);
+  var tag='<span title="'+(d.inferred?'舊詢價單沒有記錄版次，依建立日期對照報價正式版次推定':'建立／最後同步時的報價版次')+'" style="font-size:11px;color:var(--b4)">依報價 v'+d.base+(d.inferred?'（推定）':'')+(d.ver>d.base?('／最新 v'+d.ver):'')+'</span>';
+  if(!d.any)return {tag:tag,html:'',d:d};
+  var quoted=r.status==='awarded'||(r.vendors||[]).some(function(v){return v.status==='quoted'||v.status==='won';});
+  var h='<div style="margin-top:6px;background:#fff8e1;border:1px solid #f0c040;border-radius:var(--r8);padding:7px 10px;font-size:12px;color:#6d4c00;line-height:1.6">'
+    +'<b>報價已進版至 v'+d.ver+'，本單工項仍是舊版（依 v'+d.base+(d.inferred?'，推定':'')+'）</b>'
+    +'<div>'+d.diffs.map(function(x){return '・'+esc(_rfqDiffTxt(x));}).join('<br>')+'</div>'
+    +(d.added.length?('<div style="color:var(--b4)">報價新增工項（尚未在任何詢價單）：'+esc(d.added.slice(0,4).join('、'))+(d.added.length>4?' 等':'')+'</div>'):'');
+  if(r.chg)h+=_rfqChgHtml(q,r);
+  else h+='<div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button type="button" class="btn btn-xs btn-y" onclick="rfqQuoteSync(\''+r.id+'\')">同步報價 v'+d.ver+' 工項</button>'
+    +'<span style="font-size:11px;color:var(--b4)">'+(quoted?'已回價／已簽約：不改包商價格，產生「分包變更（追加減）草稿」待確認':'尚未回價：直接改成新版工項')+'</span></div>';
+  return {tag:tag,html:h+'</div>',d:d};
+}
+function _rfqChgHtml(q,r){
+  var g=r.chg,IN='font-size:12px;padding:4px 6px;border:1px solid var(--b2);border-radius:var(--r6);background:var(--w);font-family:inherit';
+  var am=g.amt;
+  return '<div style="margin-top:6px;border-top:1px dashed #e0b84a;padding-top:6px"><b>分包變更（追加減）草稿</b>　v'+g.from+' → v'+g.to+'（'+esc(g.date||'')+' 建立）'
+    +(am?('<div>預估追加減（'+esc(am.vendor)+' 原單價，未稅）：<b>'+(am.amt>=0?'+':'−')+' NT$ '+fmt(Math.abs(am.amt))+'</b>（只供參考，不改包商價格）</div>'):'')
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px"><label>包商確認方式 <select onchange="rfqChgSet(\''+r.id+'\',\'by\',this.value)" style="'+IN+'"><option value="">—</option>'
+    +['LINE','書面'].map(function(x){return '<option'+(g.by===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></label>'
+    +'<label>確認日期 <input type="date" value="'+esc(g.on||'')+'" onchange="rfqChgSet(\''+r.id+'\',\'on\',this.value)" style="'+IN+'"></label>'
+    +'<button type="button" class="btn btn-xs btn-g" onclick="rfqChgConfirm(\''+r.id+'\')">確認變更</button><button type="button" class="btn btn-xs" onclick="rfqChgDrop(\''+r.id+'\')">刪除草稿</button></div></div>';
+}
+function _rfqMoveIdx(r,from,to){
+  if(Number(from)===Number(to))return;
+  (r.vendors||[]).forEach(function(v){['prices','neg'].forEach(function(k){var o=v[k];if(o&&o[from]!=null){o[to]=o[from];delete o[from];}});
+    var L=v.lump;if(L&&Array.isArray(L.idxs))L.idxs=L.idxs.map(function(x){return Number(x)===Number(from)?to:x;});});
+}
+// 套用報價現行工項到詢價單（不動任何單價）：說明／單位／報價數量跟新版；預估數量照差額調整；報價已刪的工項移除
+function _rfqApplyQuote(q,r){
+  var d=_rfqQuoteDiff(q,r),qi=q.items||[];
+  r.items=(r.items||[]).filter(function(it){
+    var oi=parseInt(it.idx),ni=d.map[oi];if(ni==null)return !d.diffs.some(function(x){return x.t==='del'&&x.idx===oi;});
+    var ci=qi[ni];if(!ci)return false;
+    var qd=d.diffs.find(function(x){return x.t==='qty'&&x.idx===oi;});
+    if(qd)it.qty=Math.max(0,Math.round(((parseFloat(it.qty)||0)+(qd.to-qd.from))*100)/100);
+    _rfqMoveIdx(r,oi,ni);it.idx=ni;it.desc=String(ci.desc||'').trim();it.unit=_uFix(ci.unit||'');it.qd=it.desc;it.oq=parseFloat(ci.qty)||0;
+    if(it.per==='m'){var l=_itemLenOf(ci);if(l>0)it.len=l;}
+    return true;
+  });
+  r.quoteVer=q.ver||1;r.mt=Date.now();
+  return d;
+}
+function rfqQuoteSync(rid){
+  var q=_rfqQ();if(!q)return;var r=_rfqs(q).find(function(x){return x.id===rid;});if(!r)return;
+  var d=_rfqQuoteDiff(q,r);if(!d.any){r.quoteVer=q.ver||1;r.mt=Date.now();_touch(q);try{persist();}catch(e){_err('rfqQuoteSync',e);}renderRfq();return;}
+  var quoted=r.status==='awarded'||(r.vendors||[]).some(function(v){return v.status==='quoted'||v.status==='won';});
+  if(!quoted){
+    showConfirm('同步報價 v'+d.ver+' 工項','本單尚未有廠商回價，直接改成報價 v'+d.ver+' 的工項：<br>'+d.diffs.map(function(x){return '・'+esc(_rfqDiffTxt(x));}).join('<br>'),function(){
+      _rfqApplyQuote(q,r);_touch(q);try{persist();_immediateUpload();}catch(e){_err('rfqQuoteSync',e);}renderRfq();toast(r.no+' 已同步報價 v'+(q.ver||1)+' 工項');});
+    return;
+  }
+  r.chg={id:'chg'+Date.now().toString(36),date:localToday(),from:d.base,to:d.ver,diffs:d.diffs,by:'',on:'',amt:_rfqChgAmt(q,r,d.diffs)};r.mt=Date.now();
+  _touch(q);try{persist();}catch(e){_err('rfqQuoteSync',e);}renderRfq();toast('已產生分包變更（追加減）草稿：請填包商確認方式與日期後按「確認變更」');
+}
+function rfqChgSet(rid,f,v){var q=_rfqQ();if(!q)return;var r=_rfqs(q).find(function(x){return x.id===rid;});if(!r||!r.chg)return;r.chg[f]=String(v||'');r.mt=Date.now();_touch(q);try{persist();}catch(e){_err('rfqChgSet',e);}}
+function rfqChgDrop(rid){var q=_rfqQ();if(!q)return;var r=_rfqs(q).find(function(x){return x.id===rid;});if(!r||!r.chg)return;showConfirm('刪除變更草稿','確定刪除這份分包變更（追加減）草稿？詢價單維持原狀，提醒會繼續顯示。',function(){delete r.chg;r.mt=Date.now();_touch(q);try{persist();}catch(e){_err('rfqChgDrop',e);}renderRfq();},true);}
+function rfqChgConfirm(rid){
+  var q=_rfqQ();if(!q)return;var r=_rfqs(q).find(function(x){return x.id===rid;});if(!r||!r.chg)return;
+  var g=r.chg;if(!g.by||!g.on){toast('請先填包商確認方式（LINE／書面）與確認日期');return;}
+  showConfirm('確認分包變更','依報價 v'+g.to+' 更新本單工項（說明／數量）'+(r.status==='awarded'?'與分包合約數量':'')+'；<b>包商單價不變</b>。<br>確認方式：'+esc(g.by)+'　'+esc(g.on),function(){
+    var c=(r.status==='awarded'&&r.award&&r.award.costId)?(q.costs||[]).find(function(x){return x&&x.id===r.award.costId;}):null;
+    var d=_rfqQuoteDiff(q,r);
+    if(c){var st=_subStat(c);
+      d.diffs.forEach(function(x){
+        (c.rows||[]).forEach(function(row){
+          if(row.lump&&Array.isArray(row.lumpItems)){row.lumpItems.forEach(function(li){if(Number(li.idx)!==x.idx)return;if(x.t==='qty')li.q0=Math.max(0,(parseFloat(li.q0)||0)+(x.to-x.from));if(x.t==='del')li.del=1;});return;}
+          if(Number(row.linkedItemIdx)!==x.idx)return;
+          if(x.t==='qty')row.qty=Math.max(0,Math.round(((parseFloat(row.qty)||0)+(x.to-x.from))*100)/100);   // 分包列數量與報價同單位（依 M 者單價已換算成每支）
+          if(x.t==='del')row.qty=Math.round((st.byRow[row.id]||0)*100)/100;   // 報價已刪：保留已計價數量，其餘減帳
+        });
+      });
+      (c.rows||[]).forEach(function(row){var ni=d.map[parseInt(row.linkedItemIdx)];if(ni!=null)row.linkedItemIdx=ni;if(Array.isArray(row.lumpItems))row.lumpItems.forEach(function(li){var n2=d.map[parseInt(li.idx)];if(n2!=null)li.idx=n2;});if(Array.isArray(row.lumpIdxs))row.lumpIdxs=row.lumpIdxs.map(function(i){var n3=d.map[parseInt(i)];return n3!=null?n3:i;});});
+      if(!Array.isArray(c.chgLog))c.chgLog=[];c.chgLog.push({from:g.from,to:g.to,by:g.by,on:g.on,diffs:g.diffs,amt:g.amt||null,ts:Date.now()});
+      try{recalcCostAmt(c);syncCostToPayable(q,c);}catch(e){_err('rfqChgConfirm',e);}
+    }
+    _rfqApplyQuote(q,r);
+    if(!Array.isArray(r.chgLog))r.chgLog=[];r.chgLog.push({from:g.from,to:g.to,by:g.by,on:g.on,diffs:g.diffs,amt:g.amt||null,ts:Date.now()});
+    delete r.chg;r.mt=Date.now();_touch(q);try{persist();_immediateUpload();}catch(e){_err('rfqChgConfirm',e);}
+    renderRfq();toast(r.no+' 已依報價 v'+(q.ver||1)+' 變更（包商單價不變）');
+  });
+}
+// 分包卡／廠商請款上的進版提醒
+function _subVerWarn(q,c){
+  try{if(!q||!c||!c.rfqId)return '';var r=_rfqs(q).find(function(x){return x.id===c.rfqId;});if(!r)return '';
+    var d=_rfqQuoteDiff(q,r);if(!d.any)return '';
+    return '<div style="margin:4px 0;background:#fff8e1;border:1px solid #f0c040;border-radius:var(--r8);padding:5px 9px;font-size:11.5px;color:#6d4c00">報價已進版至 v'+d.ver+'，本分包工項仍是舊版（'+esc(r.no||'')+' 依 v'+d.base+'）：'+esc(d.diffs.slice(0,3).map(_rfqDiffTxt).join('；'))+(d.diffs.length>3?' 等':'')
+      +'　<a href="javascript:void(0)" onclick="_rfqQid=\''+q.id+'\';_rfqTab=\'rfq\';go(\'rfq\')" style="color:#1565C0;font-weight:700">到發包同步</a></div>';
+  }catch(e){_err('_subVerWarn',e);return '';}
+}
+function _rfqVerTodo(items){
+  var ic='<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>';
+  (Q||[]).forEach(function(q){
+    if(!q||q.parentId||q.closed||!q.awarded)return;
+    var n=_rfqs(q).filter(function(r){return _rfqQuoteDiff(q,r).any;}).length;
+    if(n)items.push({type:'rfq_ver',urgent:false,jump:"_rfqQid='"+q.id+"';_rfqTab='rfq';go('rfq')",icon:ic,color:'#b26a00',
+      text:(q.name||'')+' 報價已進版至 v'+(q.ver||1)+'，有 '+n+' 張詢價／分包尚未同步',sub:'到發包同步'});
+  });
+}
+// 一式分包列：完成百分比（日報涵蓋工項回報量 ÷ 各工項報價數量合計）
+function _subLumpDaily(q,row,from,to){
+  var tq=0,dq=0;(row.lumpItems||[]).forEach(function(li){if(li.del)return;var it=(q.items||[])[li.idx];if(!it)return;tq+=parseFloat(li.q0)||0;dq+=_dailyQtyBetween(q,it.desc,from,to);});
+  return tq>0?Math.min(1,dq/tq):0;
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
