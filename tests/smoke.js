@@ -7429,14 +7429,16 @@ async function newPage(browser, width, height) {
         const oT = window.toast; window.toast = function () {};
         CUSTOMERS.length = 0; CUSTOMERS.push({ id: 'c1', name: '亞東營造', payDue: 25, payMonthDelay: 1, recvDay: 20 }, { id: 'c2', name: '乙營造', payDue: 25, payMonthDelay: 2, recvDay: 10, payTermCash: 50, payTermTicket: 60, recvRuleOn: true });
         Q = [{ id: 'qF', name: '亞東觀音F20', client: '亞東營造', awarded: true, items: [], ownerPay: null, _mt: 1 }, { id: 'qG', name: '乙案', client: '乙營造', awarded: true, items: [], _mt: 1 }];
-        const inv = { id: 'iF3', quoteId: 'qF', project: '亞東觀音F20', client: '亞東營造', periodNo: 3, date: '2026-08-04', expectedRecvDate: '2026-09-20', payMonthDelay: 1, recvDay: 20, totals: { total: 100000 }, received: 0, items: [] };
-        INV.length = 0; INV.push(inv);
-        /* 沒設放款規則：照現行（存的 9/20） */
-        let e = _invExpectedDate(inv); out.old = e.date === '2026-09-20' && !e.src && _invDueISO(inv) === '2026-09-20';
+        const old = { id: 'iF2', quoteId: 'qF', project: '亞東觀音F20', client: '亞東營造', periodNo: 2, date: '2026-07-04', expectedRecvDate: '2026-08-20', payMonthDelay: 1, recvDay: 20, totals: { total: 100000 }, received: 0, items: [] };
+        const inv = { id: 'iF3', quoteId: 'qF', project: '亞東觀音F20', client: '亞東營造', periodNo: 3, date: '2026-08-04', expectedRecvDate: '', recvRule: 1, payMonthDelay: 1, recvDay: 20, totals: { total: 100000 }, received: 0, items: [] };
+        INV.length = 0; INV.push(old, inv);
+        /* 沒設放款規則：照現行（存的日期／推定次月 20 日） */
+        let e = _invExpectedDate(old); out.old = e.date === '2026-08-20' && !e.src && _invDueISO(old) === '2026-08-20' && _invExpectedDate(inv).date === '2026-09-20';
         out.hintNo = /尚未設定放款規則/.test(_pjOwnerPayHtml(Q[0])) && /尚未設定放款規則/.test(_recvRuleChip(CUSTOMERS[0])) && _recvRuleChip(CUSTOMERS[1]) === '';
         /* 專案設次兩月 20 日放款、25 日截止 → 10/20 */
         Q[0].ownerPay = { cut: 25, delay: 2, day: 20 };
-        e = _invExpectedDate(inv); out.rule = e.src === 'rule' && e.date === '2026-10-20' && e.rule.src === '專案' && _invDueISO(inv) === '2026-10-20' && inv.expectedRecvDate === '2026-09-20';
+        e = _invExpectedDate(inv); out.rule = e.src === 'rule' && e.date === '2026-10-20' && e.rule.src === '專案' && _invDueISO(inv) === '2026-10-20' && inv.expectedRecvDate === ''
+          && _invExpectedDate(old).date === '2026-08-20' && !_invExpectedDate(old).src;   // 審查修正：舊單存的日期不被規則蓋掉
         out.hintYes = /放款規則（專案）：每月 25 日截止，次 2 月 20 日放款/.test(_pjOwnerPayHtml(Q[0]));
         /* 過截止日算下個月；日號超過月底＝月底；票款另算兌現日 */
         out.cut = _recvByRule('2026-08-27', { cut: 25, delay: 2, day: 20, cashPct: 100, ticketDays: 0 }).date === '2026-11-20';
@@ -7454,7 +7456,8 @@ async function newPage(browser, width, height) {
         document.getElementById('rov-reason').value = '業主來電改 11/5'; document.getElementById('fy-modal-o').click();
         e = _invExpectedDate(inv); out.manual = e.src === 'manual' && e.date === '2026-11-05' && inv.recvOvLog.length === 1 && inv.recvOvLog[0].reason === '業主來電改 11/5' && !document.getElementById('fy-modal');
         invRecvOverride(); document.getElementById('rov-date').value = ''; document.getElementById('rov-reason').value = '改回規則'; document.getElementById('fy-modal-o').click();
-        const iv2 = INV.find(x => x.id === 'iF3'); out.clear = !iv2.recvOv && iv2.recvOvLog.length === 2 && _invExpectedDate(iv2).src === 'rule';   // saveInv 會換掉記錄物件，重新取
+        const iv2 = INV.find(x => x.id === 'iF3');
+        out.noWrite = iv2.expectedRecvDate === '';   /* 規則日期不寫回 */ out.clear = !iv2.recvOv && iv2.recvOvLog.length === 2 && _invExpectedDate(iv2).src === 'rule';   // saveInv 會換掉記錄物件，重新取
         /* 編輯器：有規則時預計收款日唯讀顯示規則結果 */
         loadInvoice('iF3'); calcExpectedRecvDate(); const el = document.getElementById('inv-expected-recv-date');
         out.editor = el.value === '2026-10-20' && el.readOnly === true && /依放款規則（專案）/.test(document.getElementById('inv-recv-hint').textContent);
@@ -7578,6 +7581,71 @@ async function newPage(browser, width, height) {
     check('批次 B 審查：逾期租金在場量上限＝實際打設（打設量＜合約量）、拔完歸零、分批可折讓支·天', r.rent && r.rentOpen && r.disc, JSON.stringify(r));
     check('批次 B 審查：包商裝設％空白＝業主參照、請款計算照發票規則 B、唯讀可開佣金／業務但不能存', r.inst && r.ruleB && r.prev && r.roOpen && r.roSave, JSON.stringify(r));
     check('批次 B 審查測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── 批次 C 審查修正：一式單位不同不換算、不可混根固、一般樣板分段請款、已回價不改基準、草稿版次、放款規則不蓋舊單、條件卡預設與影響筆數 ──
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = function () {};
+        const ok = () => document.getElementById('gen-confirm-ok').click();
+        P.vendorPayDay = 25; P.vendorPayDelay = 1; P.vendorCutDay = 25; P.subPayOnBill = true; P.tax = 5; VENDORS.length = 0; PAYABLES.length = 0; Q_HISTORY = {};
+        /* 🔴 一式：涵蓋工項單位不同 → 無法換算、合約寫另行議價 */
+        const rr = { items: [{ idx: 0, qty: 100, unit: '支' }, { idx: 1, qty: 50, unit: 'M3' }] }, vv = { lump: { idxs: [0, 1], total: 380000 } };
+        out.unit = _rfqLumpRef(rr, vv, true) === null && _rfqVendorPrice(rr, vv, 0) === null && _rfqVendorTotal(rr, vv, true).total === 380000;
+        const qL = { id: 'qL', name: '單位案', items: [{ desc: 'A', unit: '支', qty: 1 }], costs: [] };
+        const cL = { id: 'cL', type: 'sub', vendor: '甲', rows: [{ id: 'cL_L', lump: true, desc: '一式（涵蓋 A、B）', unit: '式', qty: 1, unitPrice: 380000, ref: null, lumpItems: [{ idx: 0, unit: '支' }, { idx: 1, unit: 'M3' }] }] };
+        const ct = _subContractHtml(qL, cL, _sctCfg()); out.ctUnit = /增減數量另行議價/.test(ct) && !/換算單價新臺幣/.test(ct);
+        /* 🔴 一般樣板分段：打設、拔除工項得標 → 裝設 70%／拆除 30% */
+        Q = [{ id: 'qS', code: '115', name: '分段案', client: '業主', awarded: true, ver: 1, exs: [], rmk: {}, _mt: 1, costs: [], dailyLogs: [],
+          items: [{ desc: 'H型鋼樁 打設、拔除', unit: '支', qty: '100', price: '10000', cat: 'both' }, { desc: '中間樁根固', unit: '支', qty: '10', price: '8000' }] }];
+        const q = Q[0]; eid = 'qS'; _rfqQid = 'qS'; _rfqTab = 'rfq'; go('rfq');
+        rfqNew(); document.querySelectorAll('.rfq-it').forEach(cb => cb.checked = true); document.querySelectorAll('.rfq-tpl')[1].value = 'grout'; ok();
+        const r1 = q.rfqs[0];
+        /* 一式不准同時涵蓋一般與根固 */
+        rfqFill(r1.id, -1); document.getElementById('rf-name').value = '混合'; document.getElementById('rf-mode').value = 'lump'; _rfModeUI(); document.getElementById('rf-lump').value = '500000'; _rfRecalc();
+        out.mixUi = /一式不能同時涵蓋一般與根固工項/.test(document.getElementById('rf-tot').innerHTML); ok();
+        out.mix = !r1.vendors.length || !r1.vendors[0].lump;
+        r1.vendors.length = 0;
+        rfqFill(r1.id, -1); document.getElementById('rf-name').value = '甲'; document.querySelectorAll('.rf-p')[0].value = '10000'; document.querySelectorAll('.rf-p')[1].value = '8000'; ok();
+        /* 🟡 已回價：編輯存檔不改 quoteVer／qd */
+        q.ver = 2; q.items[0].desc = 'H型鋼樁 打設、拔除（GL-20m）'; rfqEdit(r1.id); ok();
+        out.keepBase = r1.quoteVer === 1 && r1.items[0].qd === 'H型鋼樁 打設、拔除' && _rfqQuoteDiff(q, r1).any;
+        /* 🟡 草稿版次不是現行版次 → 擋 */
+        rfqQuoteSync(r1.id); rfqChgSet(r1.id, 'by', 'LINE'); rfqChgSet(r1.id, 'on', '2026-10-20'); q.ver = 3; rfqChgConfirm(r1.id);
+        out.stale = !!r1.chg && r1.quoteVer === 1; delete r1.chg; q.ver = 1; q.items[0].desc = 'H型鋼樁 打設、拔除';
+        rfqAward(r1.id); document.querySelector('input[name="rfq-win"]').checked = true; document.getElementById('rfq-reason').value = '最低'; ok();
+        const c = q.costs.find(x => x.rfqId === r1.id), row = c.rows[0], rowG = c.rows[1];
+        out.award = row.stage === 1 && row.inst === _instOf({}, q) && rowG.tpl === 'grout' && !rowG.stage;
+        const ins = row.inst;
+        openSubPeriod(c.id); const sr = document.querySelector('.sp-row[data-stage="1"]');
+        sr.querySelector('.sp-qi').value = '40'; sr.querySelector('.sp-qi').dataset.touched = '1'; document.querySelector('.sp-row:not([data-stage]) .sp-qty').value = ''; _spRecalc(); ok();
+        const p1 = c.periods[0]; out.inst = !!p1 && p1.amt === Math.round(40 * 10000 * ins / 100);
+        openSubPeriod(c.id); const sr2 = document.querySelector('.sp-row[data-stage="1"]');
+        sr2.querySelector('.sp-qi').value = ''; sr2.querySelector('.sp-qi').dataset.touched = '1'; sr2.querySelector('.sp-qr').value = '150'; sr2.querySelector('.sp-qr').dataset.touched = '1'; _spRecalc();
+        out.capUi = /拆除累計 150 超過發包量 100/.test(sr2.innerHTML); ok();
+        const p2 = c.periods[1]; out.remove = !!p2 && p2.rows[0].qr === 100 && p2.amt === Math.round(100 * 10000 * (100 - ins) / 100);
+        /* 🔴 110：舊單存的預計收款日不被規則蓋、規則日期不寫回；新建單標 recvRule */
+        q.ownerPay = { cut: 25, delay: 2, day: 20 }; const nInv = buildInvFromQuote(q); out.recvRule = nInv.recvRule === 1;
+        out.oldKeep = _invExpectedDate({ quoteId: 'qS', date: '2026-08-04', expectedRecvDate: '2026-09-20' }).date === '2026-09-20' && _invExpectedDate({ quoteId: 'qS', date: '2026-08-04', expectedRecvDate: '2026-09-20', recvRule: 1 }).date === '2026-10-20';
+        out.defs = _recvRuleOf({ quoteId: 'qS' }).cut === 25 && _recvRuleOf({ quoteId: 'qX' }) === null && _ownerTerms({ ownerPay: { cashPct: 100 }, client: '' }).day === 20;
+        /* 🟡 111：缺欄補預設、影響筆數 */
+        const F = _cardParse({ schema: 'fj-contract-card/1', billing: { payMonthOffset: { value: 2, source: 'contract', evidence: { clause: '六', quote: '次兩月' } } } });
+        out.cardDef = F['billing.cutoffDay'].value === 25 && F['billing.cutoffDay'].source === 'default' && F['billing.payDay'].value === 20 && F['billing.chequeDays'].value === 30 && F['billing.instPct'].value === 70 && F['billing.payMonthOffset'].value === 2;
+        INV.length = 0; q.ownerPay = null;
+        INV.push({ id: 'k1', quoteId: 'qS', project: '分段案', date: '2026-08-04', expectedRecvDate: '', recvRule: 1, totals: { total: 1000 }, received: 0, items: [] }, { id: 'k2', quoteId: 'qS', project: '分段案', date: '2026-08-04', expectedRecvDate: '2026-09-20', totals: { total: 1000 }, received: 0, items: [] });
+        out.impact = _cardRecvImpact(q, F) === 1;
+        INV.length = 0; window.toast = oT; Q = []; eid = null; _rfqQid = ''; VENDORS.length = 0; PAYABLES.length = 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    check('批次 C 審查：一式涵蓋工項單位不同不換算（合約寫另行議價）、不可混一般與根固、已回價編輯不改基準、草稿版次過期擋下', r.unit && r.ctUnit && r.mixUi && r.mix && r.keepBase && r.stale, JSON.stringify(r));
+    check('批次 C 審查：一般樣板分段請款（裝設 inst%、拆除其餘、各階段以發包量為上限），根固照全額＋保留', r.award && r.inst && r.capUi && r.remove, JSON.stringify(r));
+    check('批次 C 審查：放款規則不蓋舊單、新建單標記、共用預設；條件卡缺欄補預設、列出受影響請款單', r.recvRule && r.oldKeep && r.defs && r.cardDef && r.impact, JSON.stringify(r));
+    check('批次 C 審查測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
