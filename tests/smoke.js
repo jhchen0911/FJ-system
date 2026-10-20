@@ -7645,6 +7645,38 @@ async function newPage(browser, width, height) {
     check('批次 C 審查：一式涵蓋工項單位不同不換算（合約寫另行議價）、不可混一般與根固、已回價編輯不改基準、草稿版次過期擋下', r.unit && r.ctUnit && r.mixUi && r.mix && r.keepBase && r.stale, JSON.stringify(r));
     check('批次 C 審查：一般樣板分段請款（裝設 inst%、拆除其餘、各階段以發包量為上限），根固照全額＋保留', r.award && r.inst && r.capUi && r.remove, JSON.stringify(r));
     check('批次 C 審查：放款規則不蓋舊單、新建單標記、共用預設；條件卡缺欄補預設、列出受影響請款單', r.recvRule && r.oldKeep && r.defs && r.cardDef && r.impact, JSON.stringify(r));
+    const r2 = await page.evaluate(() => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = function () {};
+        P.tax = 5; PAYABLES.length = 0;
+        /* 審查第 1 輪：一式列在數量四方對照按涵蓋工項分攤 */
+        const q = { id: 'qR2', name: '對照案', awarded: true, items: [{ desc: '中間樁', unit: '支', qty: 2 }, { desc: '共構樁', unit: '支', qty: 4 }], dailyLogs: [], costs: [] };
+        const c = { id: 'cR2', type: 'sub', vendor: '協漾', invoice: true, retRate: 0, rows: [{ id: 'cR2_L', lump: true, linkedItemIdx: 0, desc: '一式', unit: '式', qty: 1, unitPrice: 380000, lumpItems: [{ idx: 0, q0: 2, unit: '支' }, { idx: 1, q0: 4, unit: '支' }] }],
+          periods: [{ no: 1, date: '2026-10-25', rows: [{ rid: 'cR2_L', qty: 0.5 }] }] };
+        q.costs.push(c); Q = [q]; eid = 'qR2';
+        const R = _qtyRecon(q), a = R.find(x => x.idx === 0), b = R.find(x => x.idx === 1);
+        out.recon = !!a && !!b && a.sub === 2 && b.sub === 4 && a.vb === 1 && b.vb === 2;
+        /* 介紹費跟隨一式：按各涵蓋工項 完成比例 × 數量 */
+        const f = { id: 'cR2i', type: 'sub', vendor: '介紹人', followOf: 'cR2', isIntro: true, invoice: false, retRate: 0, rows: [{ id: 'f0', linkedItemIdx: 0, qty: 2, unitPrice: 2000 }, { id: 'f1', linkedItemIdx: 1, qty: 4, unitPrice: 2000 }] };
+        q.costs.push(f); _subFollowApply(q, c);
+        const fp = (f.periods || [])[0]; out.follow = !!fp && fp.rows.length === 2 && fp.rows[0].qty === 1 && fp.rows[1].qty === 2 && fp.amt === 6000;
+        /* 廠商請款核對單：一式列以 % 顯示、分段列金額與合計同口徑 */
+        let cap = null; const oP = window._printNativeHTML; window._printNativeHTML = function (h) { cap = h; };
+        printVendorStatement('cR2', 1); out.stmtLump = !!cap && /50%/.test(cap) && /190,000/.test(cap);
+        const cS = { id: 'cS2', type: 'sub', vendor: '乙', invoice: true, retRate: 0, rows: [{ id: 'cS2_0', linkedItemIdx: 0, qty: 100, unitPrice: 10000, tpl: 'gen', stage: 1, inst: 70 }],
+          periods: [{ no: 1, date: '2026-10-25', rows: [{ rid: 'cS2_0', qty: 0, qi: 0, qr: 100 }] }] };
+        q.costs.push(cS); cap = null; printVendorStatement('cS2', 1); window._printNativeHTML = oP;
+        out.stmtStage = !!cap && /拆除 100（30%）/.test(cap) && (cap.match(/300,000/g) || []).length >= 2;
+        /* 一式累計以 100% 為限（預覽與存檔同口徑） */
+        c.periods[0].rows[0].qty = 0.7; openSubPeriod('cR2'); const sq = document.querySelector('.sp-row[data-lump="1"] .sp-qty'); sq.value = '50'; sq.dataset.touched = '1'; _spRecalc();
+        out.clampUi = /累計完成超過 100%/.test(document.querySelector('.sp-row[data-lump="1"]').innerHTML); document.getElementById('gen-confirm-ok').click();
+        const p2 = c.periods.find(x => x.no === 2); out.clamp = !!p2 && Math.abs(p2.rows[0].qty - 0.3) < 1e-9 && p2.amt === 114000;
+        window.toast = oT; Q = []; eid = null; PAYABLES.length = 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    check('批次 C 審查第 1 輪：一式列數量對照分攤、介紹費跟隨一式、廠商核對單一式／分段金額同口徑、一式累計不超過 100%', r2.recon && r2.follow && r2.stmtLump && r2.stmtStage && r2.clampUi && r2.clamp, JSON.stringify(r2));
     check('批次 C 審查測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
