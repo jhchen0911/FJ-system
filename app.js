@@ -3810,7 +3810,7 @@ function rInvTots(srcInv){
   // v6.0.95 發票做法：每期發票開「扣除保留款後」金額（清潔費直接扣除者一併扣），保留款退還時另開
   const einvBox=document.getElementById('inv-einv-amt');
   if(einvBox){var _cmode=document.getElementById('inv-clean-mode')?.value||'net';var _eg=beforeRetention-retention-(_cmode==='net'?cleanGross:0);
-    einvBox.style.display=curTotal?'flex':'none';einvBox.querySelector('span').textContent=_einvTxt(_eg,'本期發票應開金額（扣保留款後）');}
+    einvBox.style.display=curTotal?'flex':'none';einvBox.querySelector('span').textContent=_einvTxt(_eg,retention?'本期發票應開金額（扣保留款後）':'本期發票應開金額');}
   const cleanBox=document.getElementById('inv-clean-row');
   if(cleanBox){cleanBox.style.display=cleanGross?'flex':'none';cleanBox.querySelector('span:last-child').textContent='- '+fmt(cleanGross);var cl=document.getElementById('inv-clean-label');if(cl)cl.textContent='清潔費 ('+_rfmt(_cleanPm)+'‰，含稅)';}
   }
@@ -4753,39 +4753,30 @@ function buildInvPreview(srcInv){
       </tr>
     </thead>
     <tbody>${rows}</tbody>
+    <tbody class="inv-sumrow"><tr style="background:#f0f4f8;font-weight:700;border-top:1.5px solid #1a6b3f">
+      <td colspan="5" style="text-align:right;padding:4px 8px;color:#333;letter-spacing:4px">合計</td>
+      <td></td>
+      <td style="text-align:right;padding:4px;color:#555;font-variant-numeric:tabular-nums">${_totalPrev?fmt(_totalPrev):''}</td>
+      <td></td><td></td>
+      <td style="text-align:right;padding:4px;color:#1a6b3f;font-variant-numeric:tabular-nums">${fmt(t.curTotal)}</td>
+      <td></td><td></td>
+      <td style="text-align:right;padding:4px;color:#2a4a8a;font-variant-numeric:tabular-nums">${_totalCum?fmt(_totalCum):''}</td>
+    </tr></tbody>
   </table>
 
   <!-- 合計區 + 頁尾：固定在底部 -->
   <div style="margin-top:auto">
-    <!-- 合計 -->
-    <table style="width:100%;border-collapse:collapse;font-size:11px;border-top:2px solid #1a6b3f;margin-top:4px">
-      <tr style="background:#f0f4f8">
-        <td colspan="6" style="text-align:right;padding:4px 10px;color:#555;font-weight:700">前期估驗合計</td>
-        <td style="text-align:right;padding:4px 10px;font-weight:700;color:#555;font-variant-numeric:tabular-nums">${_totalPrev?fmt(_totalPrev):''}</td>
-        <td colspan="3"></td>
-        <td style="text-align:right;padding:4px 10px;font-weight:700;color:#2a4a8a;font-variant-numeric:tabular-nums">${_totalCum?fmt(_totalCum):''}</td>
-        <td style="width:2%"></td>
-      </tr>
-      <tr style="background:#f8f8f8">
-        <td colspan="10" style="text-align:right;padding:5px 10px;color:#555;font-weight:700">本期估驗小計</td>
-        <td style="text-align:right;padding:5px 10px;font-weight:700;color:#1a6b3f;font-variant-numeric:tabular-nums;width:15%">${fmt(t.curTotal)}</td>
-        <td style="width:2%"></td>
-      </tr>
-      <tr style="background:#f8f8f8">
-        <td colspan="10" style="text-align:right;padding:5px 10px;color:#555;font-weight:700">${_taxR()}% 營業稅</td>
-        <td style="text-align:right;padding:5px 10px;font-weight:700;color:#555;font-variant-numeric:tabular-nums">${fmt(t.tax)}</td>
-        <td></td>
-      </tr>
-      ${t.retention?'<tr style="background:#fff4f4"><td colspan="10" style="text-align:right;padding:5px 10px;color:#c0392b;font-weight:700">保留款 ('+_retPctShow+'%)</td><td style="text-align:right;padding:5px 10px;font-weight:700;color:#c0392b;font-variant-numeric:tabular-nums">- '+fmt(t.retention)+'</td><td></td></tr>':''}
-      ${_retCm?'<tr style="background:#fff4f4"><td colspan="11" style="text-align:right;padding:2px 10px 5px;color:#8a3a30;font-size:10.5px">'+esc(_retCumTxt(_retCm))+'</td><td></td></tr>':''}
-      ${t.cleanGross?'<tr style="background:#fff4f4"><td colspan="10" style="text-align:right;padding:5px 10px;color:#c0392b;font-weight:700">清潔費 ('+_rfmt(t.cleanPermil)+'‰，含稅)</td><td style="text-align:right;padding:5px 10px;font-weight:700;color:#c0392b;font-variant-numeric:tabular-nums">- '+fmt(t.cleanGross)+'</td><td></td></tr>':''}
-      <tr style="background:#0e3d22;color:#fff">
-        <td colspan="10" style="text-align:right;padding:8px 10px;font-weight:900;font-size:14px;letter-spacing:2px">本&nbsp;期&nbsp;請&nbsp;款&nbsp;總&nbsp;計</td>
-        <td style="text-align:right;padding:8px 10px;font-weight:900;font-size:15px;font-variant-numeric:tabular-nums">${fmt(t.total)}</td>
-        <td></td>
-      </tr>
-      ${t.curTotal?'<tr><td colspan="11" style="text-align:right;padding:4px 10px;font-size:10.5px;color:#333">'+esc(_einvTxt(_einvG,'本期發票應開金額（扣保留款後）'))+'</td><td></td></tr>':''}
+    <!-- 本期請款計算（v6.0.108：明細合計已移到上方合計列；右下角獨立一塊，順序＝小計 → 保留款 → 營業稅 → 清潔費 → 總計） -->
+    <table style="width:48%;min-width:300px;margin:6px 0 0 auto;border-collapse:collapse;font-size:11px;border:1.5px solid #1a6b3f">
+      <tr><td colspan="2" style="background:#e8f2ec;color:#1a6b3f;font-weight:900;padding:4px 10px;letter-spacing:2px">本期請款計算</td></tr>
+      <tr><td style="padding:4px 10px;color:#555;font-weight:700">本期估驗小計</td><td style="text-align:right;padding:4px 10px;font-weight:700;color:#1a6b3f;font-variant-numeric:tabular-nums">${fmt(t.curTotal)}</td></tr>
+      ${t.retention?'<tr style="background:#fff4f4"><td style="padding:4px 10px;color:#c0392b;font-weight:700">保留款 '+_retPctShow+'%</td><td style="text-align:right;padding:4px 10px;font-weight:700;color:#c0392b;font-variant-numeric:tabular-nums">- '+fmt(t.retention)+'</td></tr>':''}
+      ${_retCm?'<tr style="background:#fff4f4"><td colspan="2" style="text-align:right;padding:1px 10px 4px;color:#8a3a30;font-size:10px">'+esc(_retCumTxt(_retCm))+'</td></tr>':''}
+      <tr><td style="padding:4px 10px;color:#555;font-weight:700">${_taxR()}% 營業稅</td><td style="text-align:right;padding:4px 10px;font-weight:700;color:#555;font-variant-numeric:tabular-nums">${fmt(t.tax)}</td></tr>
+      ${t.cleanGross?'<tr style="background:#fff4f4"><td style="padding:4px 10px;color:#c0392b;font-weight:700">清潔費 ('+_rfmt(t.cleanPermil)+'‰，含稅)</td><td style="text-align:right;padding:4px 10px;font-weight:700;color:#c0392b;font-variant-numeric:tabular-nums">- '+fmt(t.cleanGross)+'</td></tr>':''}
+      <tr style="background:#0e3d22;color:#fff"><td style="padding:7px 10px;font-weight:900;font-size:13px;letter-spacing:2px">本期請款總計</td><td style="text-align:right;padding:7px 10px;font-weight:900;font-size:14px;font-variant-numeric:tabular-nums">${fmt(t.total)}</td></tr>
     </table>
+    ${t.curTotal?'<div style="text-align:right;padding:4px 2px 0;font-size:10.5px;color:#333">'+esc(_einvTxt(_einvG,t.retention?'本期發票應開金額（扣保留款後）':'本期發票應開金額'))+'</div>':''}
     ${_calcLines.length?('<table class="inv-calc-tbl" style="width:100%;border-collapse:collapse;font-size:10px;margin-top:6px"><thead><tr><th colspan="2" style="text-align:left;padding:4px 6px;color:#1a6b3f;border-bottom:1px solid #cfe3d6;font-size:10.5px">本期估驗計算式</th></tr></thead><tbody>'+_calcLines.map(function(l){return '<tr><td style="width:3%;padding:2px 6px;color:#555;vertical-align:top;text-align:center">'+l.li+'</td><td style="padding:2px 6px;line-height:1.5">'+esc(l.desc)+'：'+esc(l.txt)+(l.note?('　<span style="color:#555">（'+esc(l.note)+'）</span>'):'')+'</td></tr>';}).join('')+'</tbody></table>'):''}
 
     <!-- 頁尾資訊（固定底部） -->

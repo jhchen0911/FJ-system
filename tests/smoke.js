@@ -3897,7 +3897,7 @@ async function newPage(browser, width, height) {
           host.innerHTML='<style>#inv-doc{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}</style>'+html;document.body.appendChild(host);
           const H=host.scrollHeight;const plan=_pdfPlanPages({width:2092,height:Math.round(H*2)},host,1046,true);
           out.onePage=plan.pages.length===1;out.H=H;out.pages=plan.pages.length;
-          const cb=_pdfContentBottom(host);out.cbLtH=cb>0&&cb<=H;
+          const cb=_pdfContentBottom(host);out.cbLtH=cb>0&&cb<=H+1;   // scrollHeight 取整、底緣可能有小數像素
           host.remove();
           // 尾端內距不算文件高度：內容 600px＋外框下內距 200px → 一頁（舊邏輯算 800px 會拆成兩頁）
           const h2=document.createElement('div');h2.style.cssText='position:absolute;left:-9999px;top:0;width:1046px;background:#fff';
@@ -7218,6 +7218,35 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.107 租期結束日口徑：舊案拔除第一天、新案拔除完成日分批計算（每批計到完成日、未拔完計到截止日）、計算式印出每批、專案可切換', r.a && r.b && r.c && r.calc && r.ui && r.scanTxt && r.lotion && r.open && r.calcB, JSON.stringify(r));
     check('v6.0.107 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── 請款單版面：明細合計列對齊、右下「本期請款計算」、無保留款不寫「扣保留款後」 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const mk = (id, ret) => ({ id, project: '版面案', periodNo: 2, retention: ret, retentionPct: 5, cleanMode: 'net',
+          items: [{ type: 'item', desc: '打設', unit: 'M', contractQty: 20, contractPrice: 1000, prevQty: 5, prevAmt: 5000, curQty: 10, curAmt: 10000, payRate: 100 }] });
+        const PV = v => { invItems = JSON.parse(JSON.stringify(v.items)); invEid = v.id; buildInvPreview(v); return document.getElementById('inv-prev-html'); };
+        let el = PV(mk('LY1', true)); const h1 = el.innerHTML;
+        const sr = el.querySelector('.inv-sumrow tr'); const cells = sr ? Array.from(sr.children) : [];
+        const span = cells.reduce((a, c) => a + (c.colSpan || 1), 0);
+        const hdCols = (() => { const tr = el.querySelectorAll('thead tr'); let n = 0; Array.from(tr[0].children).forEach(c => n += c.colSpan || 1); return n; })();
+        out.row = !!sr && span === hdCols && /合計/.test(cells[0].textContent) && cells[2].textContent.trim() === '5,000' && cells[5].textContent.trim() === '10,000' && cells[8].textContent.trim() === '15,000';
+        const i1 = h1.indexOf('本期請款計算'), iSub = h1.indexOf('本期估驗小計', i1), iRet = h1.indexOf('保留款 5%', i1), iTax = h1.indexOf('% 營業稅', i1), iTot = h1.indexOf('本期請款總計', i1);
+        out.order = i1 > 0 && i1 < iSub && iSub < iRet && iRet < iTax && iTax < iTot;
+        out.einvRet = /本期發票應開金額（扣保留款後）/.test(h1) && !/前期估驗合計/.test(h1);
+        const h2 = PV(mk('LY2', false)).innerHTML;
+        out.noRet = !/保留款 5%/.test(h2) && /本期發票應開金額：/.test(h2) && !/扣保留款後/.test(h2);
+        /* 編輯器：營業稅列移到保留款之後 */
+        const tb = document.getElementById('inv-totbox').innerHTML; out.ed = tb.indexOf('inv-retention-row') < tb.indexOf('inv-tax-lbl') && tb.indexOf('inv-tax-lbl') < tb.indexOf('inv-total-amt');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('v6.0.107 請款單版面：明細合計列對齊前期／本期／累積金額、右下本期請款計算（小計→保留款→營業稅→總計）、無保留款不顯示「扣保留款後」', r.row && r.order && r.einvRet && r.noRet && r.ed, JSON.stringify(r));
+    check('v6.0.107 請款單版面測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
