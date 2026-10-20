@@ -42,3 +42,9 @@ Firebase 主控台 → Authentication → 設定（Settings）→ 使用者動�
 | 生效 | 今天貼規則即可 | 需部署一次 functions |
 | 名冊變動 | 每次要重新產生、發布 | 自動（最多 1 小時或重新整理後生效） |
 | 維運 | 無程式 | 一支 Function（Node 20） |
+
+
+## 帳號驗證（2026-10-20 審查決定）
+
+- **不要求 `email_verified`**：帳號由管理員在 Firebase 主控台建立，可能沒有完成信箱驗證；規則若加 `request.auth.token.email_verified == true` 會把這些人鎖在外面。
+- 對應的風險（有人自行註冊別人的信箱）已由 Lotion 在 Firebase 主控台 Authentication → 設定 **關閉「允許使用者自行註冊」與「允許使用者刪除帳號」** 處理；之後若重新開放自行註冊，要回頭評估加上 `email_verified`。
