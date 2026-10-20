@@ -7105,7 +7105,8 @@ async function newPage(browser, width, height) {
   // ── v6.0.105 任務 7：Storage 規則產生器（人員／唯讀清單＋custom claim）──
   {
     const fn = require('fs').readFileSync(require('path').join(__dirname, '..', 'functions', 'index.js'), 'utf8');
-    const fnOk = /fydata\/readers/.test(fn) && /fydata\/adminEmails/.test(fn) && /fydata\/access/.test(fn) && /setCustomUserClaims/.test(fn) && /'reader'/.test(fn) && /delete claims\.fy/.test(fn);
+    const fb = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'firebase.json'), 'utf8'));
+    const fnOk = !fb.database && !fb.storage && !!fb.functions && /cors: \['https:\/\/jhchen0911\.github\.io'\]/.test(fn) && /fydata\/readers/.test(fn) && /fydata\/adminEmails/.test(fn) && /fydata\/access/.test(fn) && /setCustomUserClaims/.test(fn) && /'reader'/.test(fn) && /delete claims\.fy/.test(fn);
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
       const out = {};
@@ -7119,13 +7120,14 @@ async function newPage(browser, width, height) {
         p.__staff.push({ id: 'sx1', email: 'Work@X.com', active: true, roles: [] }, { id: 'sx2', email: 'gone@x.com', active: false, roles: [] }, { id: 'sx3', email: 'hsuanchen911@gmail.com', active: true, roles: [] });
         _acctSave(p);
         _readersCache = { 'hsuanchen911@gmail,com': true };
+        _readersCache = null; out.blockNull = _storageRulesLists() === null; _readersCache = { 'hsuanchen911@gmail,com': true };
         const L = _storageRulesLists();
         out.lists = L.staff.indexOf('work@x.com') >= 0 && L.staff.indexOf('gone@x.com') < 0 && L.staff.indexOf('hsuanchen911@gmail.com') < 0 && L.staff.indexOf('jhchen0911@gmail.com') >= 0 && L.readers[0] === 'hsuanchen911@gmail.com';
         p.__staff.length = 0; o.forEach(x => p.__staff.push(x)); _acctSave(p); _readersCache = null;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
       return out;
     });
-    check('v6.0.105 Storage 規則產生器：只放行人員名冊（claim 或清單）、唯讀只讀、陌生帳號全擋、backups 只給擁有者；functions 依三份名冊設定 claim', r.txt && r.lists && fnOk, JSON.stringify(r));
+    check('v6.0.105 Storage 規則產生器：只放行人員名冊（claim 或清單）、唯讀只讀、陌生帳號全擋、backups 只給擁有者；functions 依三份名冊設定 claim', r.txt && r.lists && r.blockNull && fnOk, JSON.stringify(r));
     check('v6.0.105 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

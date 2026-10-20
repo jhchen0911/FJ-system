@@ -36989,6 +36989,7 @@ function _otCsv(){
 // ── Storage 權限（v6.0.105 任務 7）：短期＝規則內寫明人員／唯讀信箱清單（由此產生，名冊變動後重新產生發布）；
 // 長期＝functions/index.js 依名冊設定 custom claim `fy`（staff／admin／reader），規則先看 claim、再看清單。
 var _ST_FOLDERS=['projfiles','payfiles','einv'];
+var _ST_READERS_FIXED=['hsuanchen911@gmail.com'];   // AI 助理唯讀帳號：一定列在 isReader（名冊讀取異常也不會被放成人員）
 function _storageRulesText(staff,readers){
   var q=function(a){return a.map(function(e){return "'"+String(e).toLowerCase().replace(/[^a-z0-9._%+\-@]/g,'')+"'";}).join(', ');};
   var fl=q(_ST_FOLDERS);
@@ -37030,15 +37031,18 @@ function _storageRulesText(staff,readers){
 function _storageRulesLists(){
   var staff=listStaff().filter(function(st){return st&&st.active!==false&&st.email;}).map(function(st){return String(st.email).toLowerCase();})
     .concat(BOOTSTRAP_DEV,[_RULES_OWNER]).filter(function(e,i,a){return e&&a.indexOf(e)===i;});
-  var rc=(_readersCache&&typeof _readersCache==='object')?_readersCache:{};
-  var readers=Object.keys(rc).filter(function(k){return rc[k]===true;}).map(function(k){return k.replace(/,/g,'.');});
+  var rc=(_readersCache&&typeof _readersCache==='object')?_readersCache:null;
+  if(!rc)return null;   // v6.0.105 讀不到唯讀名冊就不產生（否則唯讀帳號會被當成人員或漏擋）
+  var readers=Object.keys(rc).filter(function(k){return rc[k]===true;}).map(function(k){return k.replace(/,/g,'.');})
+    .concat(_ST_READERS_FIXED).filter(function(e,i,a){return a.indexOf(e)===i;});
   staff=staff.filter(function(e){return readers.indexOf(e)<0;});   // 唯讀帳號不會同時是人員
   return {staff:staff,readers:readers};
 }
 function openStorageRulesGen(){
   if(!_isRulesOwner()&&!(_fbUser&&isAdmin(_fbUser.email))){toast('只有管理員可產生');return;}
   var go=function(){
-    var L=_storageRulesLists(),txt=_storageRulesText(L.staff,L.readers);
+    var L=_storageRulesLists();if(!L){toast('讀不到唯讀名冊（請確認已登入、已發布新版資料庫規則），暫不產生');return;}
+    var txt=_storageRulesText(L.staff,L.readers);
     window._stRulesTxt=txt;
     showConfirm('Storage 規則（人員 '+L.staff.length+' 位、唯讀 '+L.readers.length+' 位）',
       '<div style="font-size:12px;color:var(--b4);margin-bottom:6px">只有下列人員能讀寫工程／應付／發票／合約附件；唯讀帳號只能讀；不在名冊的帳號一律擋下。複製全文 → Firebase 主控台 Storage → 規則 → 貼上 → 發布。人員有增減時請重新產生。</div>'
