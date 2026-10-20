@@ -23,13 +23,17 @@
 2. 取得 repo：`git clone https://github.com/jhchen0911/FJ-system.git && cd FJ-system`。
 3. `cd functions && npm install && cd ..`
 4. `firebase use jhchen-aed9a`
-5. **只部署 functions**：`firebase deploy --only functions`（`firebase.json` 也列了規則檔，不要省略 `--only`，免得把主控台上已發布的規則換成 repo 版本）。
+5. **只部署 functions**：`firebase deploy --only functions`（`firebase.json` 只列 functions，規則一律在主控台貼上發布，不會被部署覆蓋）。
 6. 部署完成後執行一次全量重算：用擁有者帳號登入系統，瀏覽器開發者工具 Console 執行
    `firebase.auth().currentUser.getIdToken().then(t=>fetch('https://asia-southeast1-jhchen-aed9a.cloudfunctions.net/fyClaimsSyncNow',{headers:{Authorization:'Bearer '+t}}).then(r=>r.text()).then(console.log))`
    → 顯示 `{"changed":N}`。
 7. 各使用者重新整理系統一次（系統登入時會重新取得權限）。
 
 費用：觸發次數＝名冊變動次數，量極小，Blaze 免費額度內。
+
+## 建議：關閉自行註冊
+
+Firebase 主控台 → Authentication → 設定（Settings）→ 使用者動作（User actions）→ 取消勾選「啟用建立帳戶（Enable create）」，帳號一律由擁有者在 Authentication → Users 新增（Google 登入不受此設定影響時，仍以人員名冊與規則把關）。這樣陌生人無法自己用 Email／密碼註冊帳號。
 
 ## 優缺點
 

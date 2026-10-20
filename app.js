@@ -4237,7 +4237,7 @@ function addNextPeriod(id){
   //（原本新期繼承上期的匯費／扣款／保留款，應收短計、保留款提醒逐期翻倍）
   next.partialConfirmed=false;
   next.recvFee=0;next.recvDeduct=0;next.recvHold=0;delete next.allow;
-  delete next.receipts;next.holdRetAmt=0;next.holdRetDate='';   // v6.0.102 收款明細與當場扣款退還屬該期，不帶到下一期（原本 _cashOf 會多算）
+  delete next.receipts;delete next.holdRetLog;next.holdRetAmt=0;next.holdRetDate='';   // v6.0.102 收款明細與當場扣款退還屬該期，不帶到下一期（原本 _cashOf 會多算）
   _touch(next);
   // v5.336 健檢G：逾期租金列是「該期時段」的一次性計費，下一期直接剔除
   //（原本照抄整列並把逾期金額滾進 prevQty/prevAmt，前期累計混入非合約項目、
@@ -4251,7 +4251,7 @@ function addNextPeriod(id){
     const prevQ=Math.round(((parseFloat(it.prevQty)||0)+_wQty(it.curQty,thisRate))*100)/100;  // v5.385：依請款比例加權
     const prevA=(parseFloat(it.prevAmt)||0)+(parseFloat(it.curAmt)||0);
     // 各類型累積：只加入本類型的 curQty
-    const isInstall=(thisRate!==30);
+    const isInstall=(thisRate!==_removeRate());   // v6.0.103 拆除請款比例改讀參數（原本寫死 30）
     const thisCurQty=parseFloat(it.curQty)||0;
     const newInstallCum=(parseFloat(it.installCum)||0)+(isInstall?thisCurQty:0);
     const newRemoveCum=(parseFloat(it.removeCum)||0)+(!isInstall?thisCurQty:0);
@@ -6366,7 +6366,8 @@ function renderClientReport(el,year,month){
         <td style="padding:6px 8px;text-align:right;color:${_arSum(data.invs)>0?'#c8890a':'var(--b3)'}">${fmt(_arSum(data.invs))}</td>
         <td style="padding:6px 8px;text-align:right;font-weight:700;color:${actNet>=0?'var(--g3)':'var(--red)'}">${fmt(actNet)}</td>
       </tr>`;
-    }).join('')+'</tbody></table></div>';
+    }).join('')+'</tbody></table>'
+    +'<div style="font-size:11px;color:var(--b3);margin-top:6px">報價、請款、已收為所選期間的數字；「應收餘額」＝這些請款單目前還欠的金額（不分期間），不能用請款減已收直接相減。</div></div>';
 }
 
 // ══════════ v5.387：報表中心明細視窗（業主往來／得標率／廠商績效可點入）══════════
@@ -6925,8 +6926,7 @@ function receiptHoldReturn(){
   var pend=_invHold(inv);
   if(pend<=0){toast('此單沒有待退還的保留款');return;}
   showConfirm('保留款退還','確認業主已退還保留款 NT$ '+fmt(pend)+'？入帳日以今天記錄。',function(){
-    inv.holdRetAmt=(parseFloat(inv.holdRetAmt)||0)+pend;
-    inv.holdRetDate=localToday();
+    _holdRetPush(inv,pend,localToday(),'receipt');   // v6.0.102 分次退還各留一筆日期
     _touch(inv);
     saveInv();
     try{updateFinanceKPIs();}catch(e){_err('receiptHoldReturn',e);}
@@ -10536,7 +10536,7 @@ function _pushCloud(opts){
     var perRec=_perRecordDelta(delta,clean,newHashes,baseHashes,opts);
     // v6.0.106 材料位置清單（不含成本）：只有讀得到 private 台帳的管理員裝置產生並上傳到 shared/matLoc，給唯讀帳號讀
     var mlWork=false,mlHash='';
-    try{if(_fbUser&&isAdmin(_fbUser.email)&&_privReadOk===true){var _ml=_cleanEnc({v:_matLocList()}).v||[];mlHash=_collHash(_ml);if(opts.full||localStorage.getItem('fy_matloc_hash')!==mlHash){delta.matLoc=_ml;mlWork=true;}}}catch(e){_err('_pushCloud.matLoc',e);}
+    try{if(_fbUser&&isAdmin(_fbUser.email)&&_privReadOk===true&&Array.isArray(MAT_LEDGER)&&MAT_LEDGER.length>0){var _ml=_cleanEnc({v:_matLocList()}).v||[];mlHash=_collHash(_ml);if(opts.full||localStorage.getItem('fy_matloc_hash')!==mlHash){delta.matLoc=_ml;mlWork=true;}}}catch(e){_err('_pushCloud.matLoc',e);}
     var okWrap=function(){_storeSyncHashes(newHashes);_storeRecHashes(perRec.recHashes);if(mlWork){try{localStorage.setItem('fy_matloc_hash',mlHash);}catch(e){/* 可忽略 */}}ok();};
     // v5.314：完全沒有變動時不要空推 uploadedAt，否則會害其他裝置誤判「雲端有更新」而跳覆蓋提示
     // v5.319：無變更時不謊報「已上傳雲端」，也不推進 fy_last_fb_sync
@@ -34698,7 +34698,7 @@ buildSubMgmtHtml=function(q){var h=_buildSubMgmtHtml0(q);if(q&&typeof h==='strin
 
 // ── ④ 資料健檢加項 ──
 // v6.0.49 健檢＝本體＋兩段加項（原兩層包裝）
-function _healthRows(){var R=_healthRowsBase();try{R=_healthAdd637(R)||R;}catch(e){_err('_healthRows.637',e);}try{R=_healthAdd639(R)||R;}catch(e){_err('_healthRows.639',e);}try{R=_healthAdd689(R)||R;}catch(e){_err('_healthRows.689',e);}return R;}
+function _healthRows(){var R=_healthRowsBase();try{R=_healthAdd637(R)||R;}catch(e){_err('_healthRows.637',e);}try{R=_healthAdd639(R)||R;}catch(e){_err('_healthRows.639',e);}try{R=_healthAdd689(R)||R;}catch(e){_err('_healthRows.689',e);}try{R=_healthAdd6102(R)||R;}catch(e){_err('_healthRows.6102',e);}return R;}
 function _healthAdd637(R){   // v6.0.37 加項：重複發包卡、重複應付、多餘應付
   var add=function(sev,area,msg,fix){R.push({sev:sev,area:area,msg:msg,fix:fix||''});};
   try{
@@ -36553,6 +36553,18 @@ function exportPayDiag(){
     a.href=url;a.download='付款診斷_'+fmtDateStr()+'.json';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(url);a.remove();},1000);toast('已匯出付款診斷檔');
   }catch(e){_err('exportPayDiag',e);toast('匯出失敗：'+e.message);}
 }
+function _healthAdd6102(R){   // v6.0.102 健檢：舊版開下一期抄到上期的收款明細／當場扣款退還——只列出，不自動改
+  if(!R)R=[];
+  var seen={};
+  (INV||[]).forEach(function(i){
+    if(!i||i.kind==='retReturn')return;
+    var pk=i.quoteId||i.sourceQid||i.project||'';
+    _invReceipts(i).forEach(function(r){if(!r.id)return;var k=pk+'|'+r.id;if(seen[k]&&seen[k]!==i.id){R.push({sev:'warn',area:'收款',msg:(i.project||'')+' 第 '+(i.periodNo||'?')+' 期的收款明細（'+(r.date||'')+' NT$ '+fmt(r.amt||0)+'）與同案另一期相同，可能是舊版開下一期時抄過來的',fix:'打開該期收款視窗確認；若不是本期收到的請刪除該筆明細'});}else seen[k]=i.id;});
+    var hr=parseFloat(i.holdRetAmt)||0,rh=parseFloat(i.recvHold)||0;
+    if(hr>rh+0.5)R.push({sev:'warn',area:'收款',msg:(i.project||'')+' 第 '+(i.periodNo||'?')+' 期「當場扣款已退還」NT$ '+fmt(hr)+' 大於該期當場扣款 NT$ '+fmt(rh)+'（多出的部分實收報表不計）',fix:'可能是舊版開下一期時抄過來的；確認後到收款視窗修正'});
+  });
+  return R;
+}
 function _healthAdd689(R){   // 健檢：帳本記載已付但待付、近 14 天已付被改回／刪除、有裝置仍在舊版
   if(!R)R=[];
   try{
@@ -36632,14 +36644,14 @@ function readerDel(k){
 // 保留款%＝業主扣款設定 q.deduct.ret（_ownerRetPct，只看專案；客戶資料不帶入），退還條件＝q.deduct.retCond。全部沒有＝null，照公司預設（P.vendor*／P.subRetDef）運作。
 // 收款時點以「計價月月初起算的天數」比較（月＝30 天）：現金部分＝放款月×30＋放款日，期票部分再加票期天數。
 // 專案有填「營造廠付款條件」（任一欄）才算背對背案；只有保留款設定或客戶規則不算（v6.0.100）
-function _ownerPaySet(q){var o=q&&q.ownerPay;return !!(o&&typeof o==='object'&&Object.keys(o).some(function(k){return o[k]!=null&&o[k]!=='';}));}
+function _ownerPaySet(q){var o=q&&q.ownerPay;return !!(o&&typeof o==='object'&&Object.keys(o).some(function(k){return k!=='instLog'&&k!=='instReason'&&o[k]!=null&&o[k]!=='';}));}   // 調整紀錄／原因不算填了付款條件
 function _ownerCust(q){var n=String((q&&q.client)||'').trim();return n?((CUSTOMERS||[]).find(function(c){return c&&c.name===n;})||null):null;}
 function _ownerTerms(q){
   if(!q)return null;
   var o=q.ownerPay||{},c=_ownerCust(q)||{},d=q.deduct||{};
   var pick=function(a,b){var x=(a==null||a==='')?NaN:parseFloat(a);if(!isNaN(x))return x;x=(b==null||b==='')?NaN:parseFloat(b);return isNaN(x)?null:x;};
   var t={cut:pick(o.cut,c.payDue),delay:pick(o.delay,c.payMonthDelay),day:pick(o.day,c.recvDay),cashPct:pick(o.cashPct,c.payTermCash),ticketDays:pick(o.ticketDays,c.payTermTicket),ret:(d.ret!=null&&d.ret!=='')?_ownerRetPct(q):null,retCond:String(d.retCond||'').trim(),instPct:pick(o.instPct,_ownerCtInst(q))};
-  if(t.day==null&&t.cashPct==null&&t.ticketDays==null&&t.ret==null&&!t.retCond&&t.instPct==null)return null;
+  if(t.day==null&&t.cashPct==null&&t.ticketDays==null&&t.ret==null&&!t.retCond&&!(o.instPct!=null&&o.instPct!==''))return null;   // v6.0.103 只有業主合約的裝設％、沒填付款條件 → 不給背對背預設
   var ir=_ownerInstRef(q);t.instSrc=(o.instPct!=null&&o.instPct!=='')?'手動調整':ir.src;if(t.instPct==null)t.instPct=ir.pct;t.instPct=Math.max(0,Math.min(100,t.instPct));
   if(t.cut==null)t.cut=25;if(t.delay==null)t.delay=1;if(t.day==null)t.day=t.cut;
   if(t.cashPct==null)t.cashPct=(t.ticketDays>0)?0:100;
@@ -36663,7 +36675,8 @@ var _B2B_RETWHEN='依業主退還本公司保留款之時點，於收到後 7 �
 // 裝設請款％（v6.0.96）：分段計價工項（構台、支撐等）裝設（打設）完成先請 N%、拆除（拔除）完成再請其餘；公司預設 90（報價條件 90／10）
 var _INST_DEF=90;
 // v6.0.103 裝設請款％參照：業主合約（CONTRACTS 關聯此案、合約欄「裝設請款 %」）→ 公司請款設定（100 − 拆除請款比例 P.removeRate）
-function _ownerCt(q){if(!q)return null;return (CONTRACTS||[]).find(function(c){return c&&c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return c&&c.name&&c.name===q.name;})||null;}
+function _ownerCt(q){if(!q)return null;var a=(CONTRACTS||[]).find(function(c){return c&&c.linkedQid===q.id;});if(a)return a;
+  var byName=(CONTRACTS||[]).filter(function(c){return c&&!c.linkedQid&&c.name&&c.name===q.name;});return byName.length===1?byName[0]:null;}   // 沒有關聯時，只有恰好一份未關聯的同名合約才採用
 function _ownerCtInst(q){var c=_ownerCt(q),v=c&&c.instPct;return (v==null||v==='')?null:Math.max(0,Math.min(100,parseFloat(v)||0));}
 function _ownerInstRef(q){var v=_ownerCtInst(q);if(v!=null)return {pct:v,src:'業主合約「'+(_ownerCt(q).name||'')+'」'};var rr=_removeRate();return {pct:Math.max(0,100-rr),src:'公司請款設定（拆除請款 '+rr+'%）'};}
 function _instOf(c){var v=c&&c.instPct;return (v==null||v==='')?_INST_DEF:Math.max(0,Math.min(100,parseFloat(v)||0));}
@@ -36746,7 +36759,11 @@ function pjOwnerInstSet(qid,v){
     _touch(q);try{persist();}catch(e){_err('pjOwnerInstSet',e);}
     toast('已更新裝設請款％');try{renderProj();}catch(e){_err('pjOwnerInstSet',e);}
   });
-  setTimeout(function(){try{var c=document.getElementById('fy-modal-c');if(c)c.addEventListener('click',function(){try{renderProj();}catch(e){_err('pjOwnerInstSet',e);}});}catch(e){_err('pjOwnerInstSet',e);}},0);   // 取消＝輸入框還原
+  setTimeout(function(){try{   // 取消／✕／點背景＝輸入框還原
+    var d=document.getElementById('fy-modal');if(!d)return;var rr=function(){setTimeout(function(){if(!document.getElementById('fy-modal')){try{renderProj();}catch(e){_err('pjOwnerInstSet',e);}}},0);};
+    ['fy-modal-c','fy-modal-x'].forEach(function(id){var b=document.getElementById(id);if(b)b.addEventListener('click',rr);});
+    d.addEventListener('click',function(e){if(e.target===d)rr();});
+  }catch(e){_err('pjOwnerInstSet',e);}},0);
 }
 function pjOwnerInstLog(qid){
   var q=Q.find(function(x){return x.id===qid;});if(!q)return;var L=((q.ownerPay||{}).instLog)||[];
@@ -36800,10 +36817,23 @@ function _retMarkReturned(inv,on,date,byId){
 function _retSepCash(inv){return (inv&&inv.retentionSep&&inv.retentionReturned)?{amt:parseFloat(inv.retentionReceivedAmt)||0,date:String(inv.retentionReturnedDate||'')}:{amt:0,date:''};}
 // 某月（YYYY-MM）收到的保留款退還現金
 // 實收（含另記的保留款退還）：總額 _invRcv、某期間（'YYYY' 或 'YYYY-MM'）_invRcvIn——全站「已收／實收」報表共用（應收 _invAR 仍只看 received）
-function _holdRetCash(inv){var a=parseFloat(inv&&inv.holdRetAmt)||0;return {amt:a,date:a?String(inv.holdRetDate||''):''};}   // 業主當場扣款的退還（receiptHoldReturn／退還請款單）
+// 業主當場扣款的退還（receiptHoldReturn／退還請款單）：每次退還一筆 {amt,date}（inv.holdRetLog）；舊資料只有 holdRetAmt／holdRetDate＝一筆
+// 金額上限＝該期當場扣款 recvHold——舊版 addNextPeriod 會把上期的 holdRetAmt 抄到下一期，超過的部分不算實收（健檢另列出）
+function _holdRetEntries(inv){
+  if(!inv)return [];
+  var cap=parseFloat(inv.recvHold)||0,L=Array.isArray(inv.holdRetLog)&&inv.holdRetLog.length?inv.holdRetLog:((parseFloat(inv.holdRetAmt)||0)>0?[{amt:parseFloat(inv.holdRetAmt)||0,date:String(inv.holdRetDate||'')}]:[]);
+  var out=[],left=cap;L.forEach(function(e){var a=Math.min(Math.max(0,parseFloat(e&&e.amt)||0),left);if(a>0){out.push({amt:a,date:String((e&&e.date)||'')});left-=a;}});
+  return out;
+}
+function _holdRetCash(inv){var E=_holdRetEntries(inv),a=E.reduce(function(x,e){return x+e.amt;},0);return {amt:a,date:E.length?E[E.length-1].date:''};}
+function _holdRetPush(inv,amt,date,by){   // 新增一筆退還（保留先前的日期）
+  if(!Array.isArray(inv.holdRetLog)||!inv.holdRetLog.length)inv.holdRetLog=(parseFloat(inv.holdRetAmt)||0)>0?[{amt:parseFloat(inv.holdRetAmt)||0,date:String(inv.holdRetDate||'')}]:[];
+  inv.holdRetLog.push({amt:amt,date:date,by:by||''});
+  inv.holdRetAmt=inv.holdRetLog.reduce(function(a,e){return a+(parseFloat(e.amt)||0);},0);inv.holdRetDate=date;
+}
 function _invRcv(inv){return (parseFloat(inv&&inv.received)||0)+_retSepCash(inv).amt+_holdRetCash(inv).amt;}
-function _invRcvIn(inv,pre){if(!inv)return 0;var a=0,n=pre.length;if(String(inv.receivedDate||'').slice(0,n)===pre)a+=parseFloat(inv.received)||0;var c=_retSepCash(inv);if(c.amt&&c.date.slice(0,n)===pre)a+=c.amt;var h=_holdRetCash(inv);if(h.amt&&h.date.slice(0,n)===pre)a+=h.amt;return a;}
-function _retCashOn(ym){return (INV||[]).reduce(function(a,i){var c=_retSepCash(i),h=_holdRetCash(i),n=ym.length;return a+((c.amt&&c.date.slice(0,n)===ym)?c.amt:0)+((h.amt&&h.date.slice(0,n)===ym)?h.amt:0);},0);}   // 某月收到的保留款退還（預扣＋當場扣款）
+function _invRcvIn(inv,pre){if(!inv)return 0;var a=0,n=pre.length;if(String(inv.receivedDate||'').slice(0,n)===pre)a+=parseFloat(inv.received)||0;var c=_retSepCash(inv);if(c.amt&&c.date.slice(0,n)===pre)a+=c.amt;_holdRetEntries(inv).forEach(function(h){if(h.date.slice(0,n)===pre)a+=h.amt;});return a;}
+function _retCashOn(ym){return (INV||[]).reduce(function(a,i){var c=_retSepCash(i),n=ym.length;a+=(c.amt&&c.date.slice(0,n)===ym)?c.amt:0;_holdRetEntries(i).forEach(function(h){if(h.date.slice(0,n)===ym)a+=h.amt;});return a;},0);}   // 某月收到的保留款退還（預扣＋當場扣款）
 // 應收餘額：逐張 _invAR 加總（已扣保留款、扣抵銷項、已結清＝0），保留款退還後不會變負數
 function _arSum(list){return (list||[]).reduce(function(a,i){return a+_invAR(i);},0);}
 function _retPendInvs(q){return INV.filter(function(x){return x&&x.kind!=='retReturn'&&_retSameProj(x,{quoteId:q.id,project:q.name})&&(_invRetention(x)>0||_invHold(x)>0);})
@@ -36888,7 +36918,7 @@ function retReturnReceive(id){
     var d=(document.getElementById('rr-date')||{}).value||localToday(),got=0;
     cur.rows.forEach(function(r){var x=INV.find(function(v){return v.id===r.id;});if(x&&!x.retentionReturned)got+=_retMarkReturned(x,true,d,inv.id);});
     cur.holds.forEach(function(r){var x=INV.find(function(v){return v.id===r.id;});if(!x)return;var h=_invHold(x);if(h<=0)return;
-      x.holdRetAmt=(parseFloat(x.holdRetAmt)||0)+h;x.holdRetDate=d;r.amt=h;_touch(x);got+=h;});   // 與收款視窗「登錄已退還」相同
+      _holdRetPush(x,h,d,inv.id);r.amt=h;_touch(x);got+=h;});   // 與收款視窗「登錄已退還」相同
     R.rows=cur.rows;R.holds=cur.holds;R.amt=cur.amt;R.done=true;R.doneDate=d;R.got=got;inv.retRet=R;inv.receivedDate=d;inv.receivedConfirmed=true;_touch(inv);
     try{saveInv();}catch(e){_err('retReturnReceive',e);}
     try{renderInvList();}catch(e){_err('retReturnReceive',e);}try{renderRetention();}catch(e){_err('retReturnReceive',e);}try{updateInvStats();}catch(e){_err('retReturnReceive',e);}
@@ -36899,7 +36929,10 @@ function retReturnUndo(id){
   var inv=INV.find(function(x){return x.id===id;});if(!inv||inv.kind!=='retReturn'||!(inv.retRet&&inv.retRet.done))return;
   showConfirm('取消退還登錄','確定取消此筆保留款退還？各期的退還入帳會同步沖回。',function(){
     (inv.retRet.rows||[]).forEach(function(r){var x=INV.find(function(v){return v.id===r.id;});if(x&&x.retentionReturned&&x.retentionReturnedBy===inv.id)_retMarkReturned(x,false);});
-    (inv.retRet.holds||[]).forEach(function(r){var x=INV.find(function(v){return v.id===r.id;});if(!x)return;x.holdRetAmt=Math.max(0,(parseFloat(x.holdRetAmt)||0)-(parseFloat(r.amt)||0));if(!x.holdRetAmt)x.holdRetDate='';_touch(x);});
+    (inv.retRet.holds||[]).forEach(function(r){var x=INV.find(function(v){return v.id===r.id;});if(!x)return;
+      if(Array.isArray(x.holdRetLog)&&x.holdRetLog.some(function(e){return e&&e.by===inv.id;})){x.holdRetLog=x.holdRetLog.filter(function(e){return !(e&&e.by===inv.id);});x.holdRetAmt=x.holdRetLog.reduce(function(a,e){return a+(parseFloat(e.amt)||0);},0);x.holdRetDate=x.holdRetLog.length?x.holdRetLog[x.holdRetLog.length-1].date:'';}
+      else{x.holdRetAmt=Math.max(0,(parseFloat(x.holdRetAmt)||0)-(parseFloat(r.amt)||0));if(!x.holdRetAmt)x.holdRetDate='';}
+      _touch(x);});
     inv.retRet.done=false;inv.retRet.doneDate='';inv.receivedConfirmed=false;inv.receivedDate='';_touch(inv);
     try{saveInv();}catch(e){_err('retReturnUndo',e);}try{renderInvList();}catch(e){_err('retReturnUndo',e);}try{renderRetention();}catch(e){_err('retReturnUndo',e);}
     toast('已取消退還登錄');
@@ -36930,13 +36963,11 @@ function _otRows(year,month){
   return keys.map(function(k){
     var g=by[k],st=_bidStat(g.qs);
     var rev=g.invs.reduce(function(a,i){return a+((i.totals&&parseFloat(i.totals.curTotal))||0);},0);   // 營收＝請款未稅（權責口徑）
-    var rcv=g.invs.reduce(function(a,i){return a+_invRcv(i);},0);
-    // 付款條件：該類型業主（有報價或請款者）客戶資料的平均現金％、平均票期、平均放款天數（次月 N 日＝月數×30＋N）
+    var rcv=(INV||[]).reduce(function(a,i){return a+((i&&_ownerTypeOf(i.client)===k)?_invRcvIn(i,pre):0);},0);   // 實收＝期間內實際收到（依收款日／退還日），不限期間內開的單
+    // 付款條件：該類型各案的營造廠付款條件（_ownerTerms：專案 ownerPay，空白沿用客戶資料）平均現金％、票期、放款天數（放款月×30＋放款日，約略）
     var names={};g.qs.forEach(function(q){if(q.client)names[String(q.client).trim()]=1;});g.invs.forEach(function(i){if(i.client)names[String(i.client).trim()]=1;});
-    var cash=[],tk=[],lag=[];Object.keys(names).forEach(function(n){var c=_custOf(n);if(!c)return;
-      if(c.payTermCash!=null&&c.payTermCash!=='')cash.push(parseFloat(c.payTermCash)||0);
-      if(c.payTermTicket!=null&&c.payTermTicket!=='')tk.push(parseFloat(c.payTermTicket)||0);
-      if(c.recvDay!=null&&c.recvDay!=='')lag.push((c.payMonthDelay!=null&&c.payMonthDelay!==''?parseFloat(c.payMonthDelay)||0:1)*30+(parseFloat(c.recvDay)||0));});
+    var cash=[],tk=[],lag=[];g.qs.forEach(function(q){var o=null;try{o=_ownerTerms(q);}catch(e){_err('_otRows',e);}if(!o)return;
+      cash.push(o.cashPct);if(o.cashPct<100)tk.push(o.ticketDays);lag.push(o.delay*30+o.day);});
     var avg=function(a){return a.length?Math.round(a.reduce(function(x,y){return x+y;},0)/a.length):null;};
     // 保留款：得標案的專案扣款設定（_ownerRetPct，與請款同口徑）
     var won=g.qs.filter(function(q){return q.awarded;}),rets=won.map(function(q){return _ownerRetPct(q);});
@@ -36960,7 +36991,7 @@ function renderOwnerTypeReport(el,year,month){
         r.retOf?('平均 '+r.retAvg+'%（'+r.retN+'／'+r.retOf+' 案有扣'+(r.over10?('，'+r.over10+' 案 >10%'):'')+'）'):'—']
         .map(function(v){return '<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">'+v+'</td>';}).join('')+'</tr>';}).join('')
     +'</tbody></table>'
-    +'<div style="font-size:11px;color:var(--b3);margin-top:8px;line-height:1.7">得標率口徑同「得標率」報表（得標 ÷ 全部報價）；營收＝期間內請款單本期估驗小計（未稅），實收含另記的保留款退還；付款條件取客戶資料的付款規則平均（放款天數＝計價月起算約略天數）；保留款取得標案的專案「業主扣款設定」。</div></div>';
+    +'<div style="font-size:11px;color:var(--b3);margin-top:8px;line-height:1.7">得標率口徑同「得標率」報表（得標 ÷ 全部報價）；營收＝期間內開立的請款單本期估驗小計（未稅）；實收＝期間內實際收到的款項（依收款日，含保留款退還，不限期間內開的單）；付款條件取各案的營造廠付款條件（專案設定，空白沿用客戶資料）平均，放款天數為計價月起算約略天數；保留款取得標案的專案「業主扣款設定」。</div></div>';
   try{_mstack(document.getElementById('rpt-otype-root'));}catch(e){_err('renderOwnerTypeReport',e);}
 }
 function _otCsv(){
@@ -36971,6 +37002,7 @@ function _otCsv(){
 // ── Storage 權限（v6.0.105 任務 7）：短期＝規則內寫明人員／唯讀信箱清單（由此產生，名冊變動後重新產生發布）；
 // 長期＝functions/index.js 依名冊設定 custom claim `fy`（staff／admin／reader），規則先看 claim、再看清單。
 var _ST_FOLDERS=['projfiles','payfiles','einv'];
+var _ST_READERS_FIXED=['hsuanchen911@gmail.com'];   // AI 助理唯讀帳號：一定列在 isReader（名冊讀取異常也不會被放成人員）
 function _storageRulesText(staff,readers){
   var q=function(a){return a.map(function(e){return "'"+String(e).toLowerCase().replace(/[^a-z0-9._%+\-@]/g,'')+"'";}).join(', ');};
   var fl=q(_ST_FOLDERS);
@@ -37012,15 +37044,18 @@ function _storageRulesText(staff,readers){
 function _storageRulesLists(){
   var staff=listStaff().filter(function(st){return st&&st.active!==false&&st.email;}).map(function(st){return String(st.email).toLowerCase();})
     .concat(BOOTSTRAP_DEV,[_RULES_OWNER]).filter(function(e,i,a){return e&&a.indexOf(e)===i;});
-  var rc=(_readersCache&&typeof _readersCache==='object')?_readersCache:{};
-  var readers=Object.keys(rc).filter(function(k){return rc[k]===true;}).map(function(k){return k.replace(/,/g,'.');});
+  var rc=(_readersCache&&typeof _readersCache==='object')?_readersCache:null;
+  if(!rc)return null;   // v6.0.105 讀不到唯讀名冊就不產生（否則唯讀帳號會被當成人員或漏擋）
+  var readers=Object.keys(rc).filter(function(k){return rc[k]===true;}).map(function(k){return k.replace(/,/g,'.');})
+    .concat(_ST_READERS_FIXED).filter(function(e,i,a){return a.indexOf(e)===i;});
   staff=staff.filter(function(e){return readers.indexOf(e)<0;});   // 唯讀帳號不會同時是人員
   return {staff:staff,readers:readers};
 }
 function openStorageRulesGen(){
   if(!_isRulesOwner()&&!(_fbUser&&isAdmin(_fbUser.email))){toast('只有管理員可產生');return;}
   var go=function(){
-    var L=_storageRulesLists(),txt=_storageRulesText(L.staff,L.readers);
+    var L=_storageRulesLists();if(!L){toast('讀不到唯讀名冊（請確認已登入、已發布新版資料庫規則），暫不產生');return;}
+    var txt=_storageRulesText(L.staff,L.readers);
     window._stRulesTxt=txt;
     showConfirm('Storage 規則（人員 '+L.staff.length+' 位、唯讀 '+L.readers.length+' 位）',
       '<div style="font-size:12px;color:var(--b4);margin-bottom:6px">只有下列人員能讀寫工程／應付／發票／合約附件；唯讀帳號只能讀；不在名冊的帳號一律擋下。複製全文 → Firebase 主控台 Storage → 規則 → 貼上 → 發布。人員有增減時請重新產生。</div>'
