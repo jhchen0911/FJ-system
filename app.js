@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.101';
+var APP_VERSION='v6.0.102';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -3446,6 +3446,7 @@ function rInvItems(){
       ta.style.cssText='width:100%;font-size:13px;font-weight:600;border:1px solid var(--b2);border-radius:6px;padding:6px 8px;font-family:inherit;resize:none;line-height:1.4;margin-bottom:6px';
       ta.addEventListener('input',function(){invItems[i].desc=this.value;});
       card.appendChild(ta);
+      if(it._qRetired){const tg=document.createElement('div');tg.style.cssText='font-size:11px;color:#b26a00;margin:-2px 0 6px';tg.textContent='報價 v'+it._qRetired+' 已刪除此工項，保留歷史數量';card.appendChild(tg);}
       // 合約資訊列
       const info=document.createElement('div');
       info.style.cssText='font-size:11px;color:var(--b4);margin-bottom:7px;display:flex;gap:10px;flex-wrap:wrap';
@@ -3594,6 +3595,7 @@ function rInvItems(){
       tdIdx.textContent='⠿ '+li;
       tr.appendChild(tdIdx);
       tr.appendChild(mkTxtTd('desc',it.desc,'工程項目','120px'));
+      if(it._qRetired){const _dtd=tr.lastChild;const tg=document.createElement('div');tg.style.cssText='font-size:10.5px;color:#b26a00;margin-top:2px';tg.textContent='報價 v'+it._qRetired+' 已刪，保留歷史數量';_dtd.appendChild(tg);}   // v6.0.102
       tr.appendChild(mkTxtTd('unit',_uFix(it.unit),isRental?'片/天':'支'));
       tr.appendChild(mkNumTd('#f5faf7','contractPrice',it.contractPrice,'合約單價'));
       tr.appendChild(mkNumTd('#f5faf7','contractQty',it.contractQty,'合約數量'));
@@ -3625,7 +3627,7 @@ function rInvItems(){
         const cum=Math.round(((parseFloat(invItems[i].prevQty)||0)+_curW(invItems[i]))*100)/100;
         const inp2=tr.querySelector('input[data-f="curQty"]');
         if(!inp2)return;
-        if(cq>0&&cum>cq+1e-9){
+        if(!invItems[i]._qRetired&&cq>0&&cum>cq+1e-9){
           inp2.style.borderColor='var(--red)';inp2.style.background='#fdecea';inp2.style.color='var(--red)';inp2.style.fontWeight='700';
           inp2.title='累計 '+cum+' 已超過合約數量 '+cq+'（超請 '+(Math.round((cum-cq)*100)/100)+'，仍可出單）';
           pqTd.style.color='var(--red)';pqTd.style.fontWeight='700';pqTd.title='含本期累計 '+cum+'／合約 '+cq;
@@ -3878,7 +3880,7 @@ function saveInvoice(){
     if(it.type==='sec')continue;
     if((parseFloat(it.curQty)||0)<0||(parseFloat(it.contractPrice)||0)<0){toast('數量／單價不可為負數');return;}
     const cq=parseFloat(it.contractQty)||0;
-    if(cq>0&&((parseFloat(it.prevQty)||0)+_curW(it))>cq+1e-9)_overN++;
+    if(!it._qRetired&&cq>0&&((parseFloat(it.prevQty)||0)+_curW(it))>cq+1e-9)_overN++;   // v6.0.102 報價已刪的保留列不算超請
   }
   const t=rInvTots();
   // P1：儲存時回填 quoteId（依工程名稱對應主報價單）
@@ -5117,13 +5119,17 @@ function _invQuoteDiff(inv,q){
   const cm={},qm={};
   cur.forEach(x=>{cm[_invKey(x.desc)]=x;});qi.forEach(x=>{qm[_invKey(x.desc)]=x;});
   const added=qi.filter(x=>!cm[_invKey(x.desc)]).map(x=>_invKey(x.desc));
-  const removed=cur.filter(x=>_invKey(x.desc)&&!qm[_invKey(x.desc)]).map(x=>_invKey(x.desc));
+  // v6.0.102 hotfix：同步時刻意保留的舊工項（報價已刪、但有數量）不算「仍是舊版」——
+  // 有 _qRetired 標記，或本單已同步到目前版次（quoteVer＝q.ver）且有數量者，一律視為已保留的歷史列
+  const synced=!!(inv&&(inv.quoteVer||null)===(q.ver||1));
+  const removed=cur.filter(x=>_invKey(x.desc)&&!qm[_invKey(x.desc)]&&!(x._qRetired||(synced&&_invHasQty(x)))).map(x=>_invKey(x.desc));
   const changed=qi.filter(x=>{const c=cm[_invKey(x.desc)];
     return c&&((parseFloat(c.contractPrice)||0)!==x.contractPrice||(parseFloat(c.contractQty)||0)!==x.contractQty||_uFix(c.unit||'')!==_uFix(x.unit||''));}).map(x=>_invKey(x.desc));
   return {added,removed,changed,any:!!(added.length||removed.length||changed.length),ver:q.ver||1,invVer:inv?(inv.quoteVer||null):null};
 }
 // 以報價現行工項重建請款明細：同名工項保留已填的前期／本期數量與請款類型，
 // 單價／合約量／單位／類別／逾期單價以報價為準；報價已無但已有數量的舊工項、逾期租金列、手動列保留在最後
+function _invHasQty(x){return (parseFloat(x&&x.curQty)||0)>0||(parseFloat(x&&x.prevQty)||0)>0||(parseFloat(x&&x.prevAmt)||0)>0||(parseFloat(x&&x.curAmt)||0)>0;}
 function _invSyncItems(items,q){
   const fresh=_invItemsFromQuote(q),old=(items||[]).slice(),used={};
   const out=fresh.map(f=>{
@@ -5137,8 +5143,9 @@ function _invSyncItems(items,q){
   });
   old.forEach((x,i)=>{
     if(used[i]||!x||x.type==='sec')return;
-    const hasQty=(parseFloat(x.curQty)||0)>0||(parseFloat(x.prevQty)||0)>0||(parseFloat(x.prevAmt)||0)>0||(parseFloat(x.curAmt)||0)>0;
-    if(x.type!=='item'||hasQty)out.push(x);
+    const hasQty=_invHasQty(x);
+    if(x.type!=='item'){out.push(x);return;}
+    if(hasQty)out.push(Object.assign({},x,{_qRetired:x._qRetired||(q.ver||1)}));   // v6.0.102：標記為「報價已刪、保留歷史數量」
   });
   return out;
 }
