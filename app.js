@@ -279,7 +279,7 @@ const fmt=n=>Math.round(n).toLocaleString('zh-TW');
 var ITEM_CATS=[['','自動判斷'],['install','打設／裝設'],['remove','拔除／拆除'],
   ['both','打設＋拔除'],['other','其他（不列入數量統計）']];
 var ITEM_PHASES=[['','自動判斷'],['install','打設／裝設期'],['remove','拔除／拆除期']];
-function _removeRate(){var v=P&&P.removeRate;return (v==null||v==='')?30:(parseFloat(v)||30);}
+function _removeRate(){var v=P&&P.removeRate;if(v==null||v==='')return 30;var x=parseFloat(v);return isNaN(x)?30:Math.max(0,Math.min(100,x));}   // 審查：0 是合法值（原本被當成 30）
 // 回傳 {install:bool, remove:bool}
 function _itemCat(it){
   var c=it&&it.cat;
@@ -473,7 +473,7 @@ function _rentBatchQtyDays(pg,qty,startISO,endISO){
   var span=Math.max(0,_dDiff(startISO,endISO)+1);
   B.closed.forEach(function(b){if(left<=0)return;var q2=Math.min(b.qty,left);left-=q2;n++;
     var d=Math.max(0,Math.min(_dDiff(startISO,b.date),span));tot+=q2*d;rows.push({no:n,date:b.date,qty:q2,days:d});});
-  if(left>0&&pg&&pg.removeDone&&!B.stage)left=0;   // 已全部拔完：沒有剩餘在場量
+  if(left>0&&pg&&pg.removeDone&&!B.stage){n++;var d3=Math.max(0,Math.min(_dDiff(startISO,pg.removeDone),span));tot+=left*d3;rows.push({no:n,date:pg.removeDone,qty:left,days:d3});left=0;}   // 已全部拔完但最後一批沒勾：視為在拔除完成日完成（審查修正：不可歸零漏收）
   if(left>0){
     if(B.stage){n++;var d2=Math.max(0,Math.min(_dDiff(startISO,B.stage),span));tot+=left*d2;rows.push({no:n,date:B.stage,qty:left,days:d2});}
     else {rows.push({no:n+1,date:'',qty:left,days:span,open:true});tot+=left*span;}
@@ -5744,7 +5744,8 @@ function calcInvDays(){
       let _bq=null;try{const _q=_invQuote();if(_q&&_rentEndMode(_q)==='removeDone'){const _ix=(_q.items||[]).findIndex(it=>it&&!it.sec&&_invKey(it.desc)===_invKey(selDesc));if(_ix>=0)_bq=_rentBatchQtyDays(_itemProgress(_q,_ix),srcQty,_isoD(billStart),_isoD(claimDate));}}catch(e){_err('calcInvDays.batch',e);}
       const overAmt=_bq?Math.round(srcPrice*_bq.qtyDays):Math.round(srcPrice*srcQty*billDays);
       // 租用型正規寫法：單價＝逾期租金單價、數量＝合約數量、天數＝本期新增逾期天數
-      const _ow={type:'rental',desc:_bq?(baseDesc+'  逾期租金：'+fmtMD(billStart)+'～'+fmtMD(claimDate)+'（分批，見計算式）'):overLabel,   // 審查修正：分批模式標題unit:_bq?(srcUnit+'·天'):srcUnit,
+      // 審查修正：分批模式標題
+      const _ow={type:'rental',desc:_bq?(baseDesc+'  逾期租金：'+fmtMD(billStart)+'～'+fmtMD(claimDate)+'（分批，見計算式）'):overLabel,unit:_bq?(srcUnit+'·天'):srcUnit,
         contractPrice:srcPrice,contractQty:_bq?_bq.qtyDays:srcQty,
         prevQty:0,prevAmt:0,
         curQty:_bq?_bq.qtyDays:srcQty,curDays:_bq?0:billDays,curAmt:overAmt,_ovBatches:_bq?_bq.rows:undefined,
@@ -6652,7 +6653,7 @@ function _invCalcText(it,curAmt){
   parts.push(_qfmt(w)+' '+u+(d?(' × '+_qfmt(d)+' 天'):'')+' × '+fmt(p)+' ＝ '+fmt(amt));
   if(it._ovKey!=null&&it.type==='rental'&&Array.isArray(it._ovBatches)&&it._ovBatches.length){   // v6.0.107 分批明細
     var bu=String(it.unit||'').replace(/·天$/,''),md=function(d){return d?String(d).slice(5).replace('-','/'):'';};
-    parts=[it._ovBatches.map(function(b){return '第'+b.no+'批 '+(b.open?'尚未拔除（計到本期截止）':(md(b.date)+' 拔除完成'))+' '+_qfmt(b.qty)+' '+bu+' × '+b.days+' 天 ＝ '+_qfmt(b.qty*b.days)+' '+bu+'·天'+(p?('（NT$ '+fmt(Math.round(b.qty*b.days*p))+'）'):'');}).join('；')
+    parts=[it._ovBatches.filter(function(b){return b.days>0||b.open;}).map(function(b){   /* 審查：完成日早於本期起算的批次（0 天）不印 */ return '第'+b.no+'批 '+(b.open?'尚未拔除（計到本期截止）':(md(b.date)+' 拔除完成'))+' '+_qfmt(b.qty)+' '+bu+' × '+b.days+' 天 ＝ '+_qfmt(b.qty*b.days)+' '+bu+'·天'+(p?('（NT$ '+fmt(Math.round(b.qty*b.days*p))+'）'):'');}).join('；')
       +'；合計 '+_qfmt(q)+' '+bu+'·天'+((parseFloat(it.discQd)||0)>0?(' − 折讓 '+_qfmt(it.discQd)+' '+bu+'·天 ＝ '+_qfmt(_invRentQ(it))+' '+bu+'·天'):'')+' × '+fmt(p)+' ＝ '+fmt(amt)];
   }
   if(it._ovKey!=null&&it.type==='rental')parts.push('租期結束日口徑：'+(_RENT_END_LBL[it._ovBasis]||_RENT_END_LBL.removeFirst));   // v6.0.107
@@ -10587,7 +10588,7 @@ function _pushCloud(opts){
     var perRec=_perRecordDelta(delta,clean,newHashes,baseHashes,opts);
     // v6.0.106 材料位置清單（不含成本）：只有讀得到 private 台帳的管理員裝置產生並上傳到 shared/matLoc，給唯讀帳號讀
     var mlWork=false,mlHash='';
-    try{if(_fbUser&&isAdmin(_fbUser.email)&&_privReadOk===true&&Array.isArray(MAT_LEDGER)&&MAT_LEDGER.length>0){var _ml=_cleanEnc({v:_matLocList()}).v||[];mlHash=_collHash(_ml);if(opts.full||localStorage.getItem('fy_matloc_hash')!==mlHash){delta.matLoc=_ml;mlWork=true;}}}catch(e){_err('_pushCloud.matLoc',e);}
+    try{if(_fbUser&&isAdmin(_fbUser.email)&&_privReadOk===true&&Array.isArray(MAT_LEDGER)&&(MAT_LEDGER.length>0||localStorage.getItem('fy_matloc_hash'))){   /* 審查：台帳清空後也要上傳空清單（曾上傳過才會），避免雲端留舊位置 */var _ml=_cleanEnc({v:_matLocList()}).v||[];mlHash=_collHash(_ml);if(opts.full||localStorage.getItem('fy_matloc_hash')!==mlHash){delta.matLoc=_ml;mlWork=true;}}}catch(e){_err('_pushCloud.matLoc',e);}
     var okWrap=function(){_storeSyncHashes(newHashes);_storeRecHashes(perRec.recHashes);if(mlWork){try{localStorage.setItem('fy_matloc_hash',mlHash);}catch(e){/* 可忽略 */}}ok();};
     // v5.314：完全沒有變動時不要空推 uploadedAt，否則會害其他裝置誤判「雲端有更新」而跳覆蓋提示
     // v5.319：無變更時不謊報「已上傳雲端」，也不推進 fy_last_fb_sync
@@ -22806,7 +22807,7 @@ function editDailyLog(qid,lid){
     +'<button type="button" class="btn btn-xs" onclick="document.getElementById(\'dle-crews\').insertAdjacentHTML(\'beforeend\',_dleCrewRow({type:\'sub\',vendor:\'\',n:\'\'},\''+IN.replace(/'/g,'')+'\'))" style="padding:4px 12px;margin-bottom:6px">＋ 出工列</button>'
     +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:8px 0"><input type="checkbox" id="dle-eq"'+(L.ownEquip?' checked':'')+' style="width:18px;height:18px"> 本日使用自有機具</label>'
     +'<div style="font-size:12px;font-weight:700;color:var(--b4);margin:6px 0 4px">今日進度（工項／數量／備註）</div>'
-    +rows.map(function(r,i){return '<div style="display:flex;gap:5px;margin-bottom:5px"><select class="dle-it" style="flex:1 1 0;min-width:0;'+IN+'">'+opts(parseInt(r.itemIdx))+'</select>'+_dlePhaseSel(q,r,IN)+'<input class="dle-q" type="number" inputmode="decimal" value="'+(r.qty||'')+'" placeholder="數量" style="flex:1 1 0;min-width:0;text-align:right;'+IN+'"><input class="dle-n" value="'+esc(r.note||'')+'" placeholder="備註" style="flex:1 1 0;min-width:0;'+IN+'"></div>';}).join('')
+    +rows.map(function(r,i){return '<div style="display:flex;gap:5px;margin-bottom:5px"><select class="dle-it" style="flex:1 1 0;min-width:0;'+IN+'">'+opts(parseInt(r.itemIdx))+'</select>'+_dlePhaseSel(q,r,IN)+'<input class="dle-q" type="number" inputmode="decimal" value="'+(r.qty||'')+'" placeholder="數量" style="flex:1 1 0;min-width:0;text-align:right;'+IN+'"><input class="dle-n" value="'+esc(r.note||'')+'" placeholder="備註" style="flex:1 1 0;min-width:0;'+IN+'"><label title="拔除（拆除）本批完成" style="flex:0 0 auto;display:flex;align-items:center;gap:3px;font-size:11px;color:var(--b4);white-space:nowrap"><input type="checkbox" class="dle-bd"'+(r.batchDone?' checked':'')+' style="width:15px;height:15px">本批完成</label></div>';}).join('')
     +'<div style="font-size:11px;color:var(--b3)">留空的進度列會自動略過；修改會重算專案進度、逾期租金與數量對照。</div>';
   showConfirm('修改日報：'+esc(q.name||''),html,function(){
     L.date=gv('dle-date')||L.date;
@@ -22814,8 +22815,8 @@ function editDailyLog(qid,lid){
     L.stageOf=L.status==='stage'?(gv('dle-stage-of')||'install'):'';L.stageDate=L.status==='stage'?(gv('dle-stage-date')||L.date):'';
     _crewsApply(L,[].slice.call(document.querySelectorAll('#dle-crews .dle-crew')).map(function(el){return {type:el.querySelector('.dle-ct').value,vendor:el.querySelector('.dle-cv').value,n:el.querySelector('.dle-cn').value};}));
     L.ownEquip=!!document.getElementById('dle-eq')?.checked;
-    const its=[].slice.call(document.querySelectorAll('.dle-it')),qs=[].slice.call(document.querySelectorAll('.dle-q')),ns=[].slice.call(document.querySelectorAll('.dle-n')),phs=[].slice.call(document.querySelectorAll('.dle-ph'));
-    const pr=[];its.forEach(function(sel,i){const idx=parseInt(sel.value),qty=parseFloat(qs[i].value)||0,note=(ns[i].value||'').trim();if((idx>=0&&qty>0)||note)pr.push({itemIdx:idx,desc:idx>=0?((q.items[idx]||{}).desc||'').split('\n')[0]:'',qty:qty,note:note,ph:(phs[i]&&phs[i].value)||''});});
+    const its=[].slice.call(document.querySelectorAll('.dle-it')),qs=[].slice.call(document.querySelectorAll('.dle-q')),ns=[].slice.call(document.querySelectorAll('.dle-n')),phs=[].slice.call(document.querySelectorAll('.dle-ph')),bds=[].slice.call(document.querySelectorAll('.dle-bd'));
+    const pr=[];its.forEach(function(sel,i){const idx=parseInt(sel.value),qty=parseFloat(qs[i].value)||0,note=(ns[i].value||'').trim();if((idx>=0&&qty>0)||note){pr.push({itemIdx:idx,desc:idx>=0?((q.items[idx]||{}).desc||'').split('\n')[0]:'',qty:qty,note:note,ph:(phs[i]&&phs[i].value)||''});if(bds[i]&&bds[i].checked)pr[pr.length-1].batchDone=true;}});   // 審查修正：修改日報保留「本批完成」
     L.progressRows=pr;
     L.progress=pr.map(function(r){return (r.desc?(r.desc+(r.qty?(' '+r.qty+((q.items[r.itemIdx]||{}).unit||'')):'')):'')+(r.note?((r.desc?'；':'')+r.note):'');}).filter(Boolean).join('\n');
     L.editedAt=Date.now();
