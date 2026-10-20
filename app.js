@@ -4241,7 +4241,7 @@ function addNextPeriod(id){
     const prevQ=Math.round(((parseFloat(it.prevQty)||0)+_wQty(it.curQty,thisRate))*100)/100;  // v5.385：依請款比例加權
     const prevA=(parseFloat(it.prevAmt)||0)+(parseFloat(it.curAmt)||0);
     // 各類型累積：只加入本類型的 curQty
-    const isInstall=(thisRate!==30);
+    const isInstall=(thisRate!==_removeRate());   // v6.0.103 拆除請款比例改讀參數（原本寫死 30）
     const thisCurQty=parseFloat(it.curQty)||0;
     const newInstallCum=(parseFloat(it.installCum)||0)+(isInstall?thisCurQty:0);
     const newRemoveCum=(parseFloat(it.removeCum)||0)+(!isInstall?thisCurQty:0);
@@ -36625,14 +36625,14 @@ function readerDel(k){
 // 保留款%＝業主扣款設定 q.deduct.ret（_ownerRetPct，只看專案；客戶資料不帶入），退還條件＝q.deduct.retCond。全部沒有＝null，照公司預設（P.vendor*／P.subRetDef）運作。
 // 收款時點以「計價月月初起算的天數」比較（月＝30 天）：現金部分＝放款月×30＋放款日，期票部分再加票期天數。
 // 專案有填「營造廠付款條件」（任一欄）才算背對背案；只有保留款設定或客戶規則不算（v6.0.100）
-function _ownerPaySet(q){var o=q&&q.ownerPay;return !!(o&&typeof o==='object'&&Object.keys(o).some(function(k){return o[k]!=null&&o[k]!=='';}));}
+function _ownerPaySet(q){var o=q&&q.ownerPay;return !!(o&&typeof o==='object'&&Object.keys(o).some(function(k){return k!=='instLog'&&k!=='instReason'&&o[k]!=null&&o[k]!=='';}));}   // 調整紀錄／原因不算填了付款條件
 function _ownerCust(q){var n=String((q&&q.client)||'').trim();return n?((CUSTOMERS||[]).find(function(c){return c&&c.name===n;})||null):null;}
 function _ownerTerms(q){
   if(!q)return null;
   var o=q.ownerPay||{},c=_ownerCust(q)||{},d=q.deduct||{};
   var pick=function(a,b){var x=(a==null||a==='')?NaN:parseFloat(a);if(!isNaN(x))return x;x=(b==null||b==='')?NaN:parseFloat(b);return isNaN(x)?null:x;};
   var t={cut:pick(o.cut,c.payDue),delay:pick(o.delay,c.payMonthDelay),day:pick(o.day,c.recvDay),cashPct:pick(o.cashPct,c.payTermCash),ticketDays:pick(o.ticketDays,c.payTermTicket),ret:(d.ret!=null&&d.ret!=='')?_ownerRetPct(q):null,retCond:String(d.retCond||'').trim(),instPct:pick(o.instPct,_ownerCtInst(q))};
-  if(t.day==null&&t.cashPct==null&&t.ticketDays==null&&t.ret==null&&!t.retCond&&t.instPct==null)return null;
+  if(t.day==null&&t.cashPct==null&&t.ticketDays==null&&t.ret==null&&!t.retCond&&!(o.instPct!=null&&o.instPct!==''))return null;   // v6.0.103 只有業主合約的裝設％、沒填付款條件 → 不給背對背預設
   var ir=_ownerInstRef(q);t.instSrc=(o.instPct!=null&&o.instPct!=='')?'手動調整':ir.src;if(t.instPct==null)t.instPct=ir.pct;t.instPct=Math.max(0,Math.min(100,t.instPct));
   if(t.cut==null)t.cut=25;if(t.delay==null)t.delay=1;if(t.day==null)t.day=t.cut;
   if(t.cashPct==null)t.cashPct=(t.ticketDays>0)?0:100;
@@ -36656,7 +36656,8 @@ var _B2B_RETWHEN='依業主退還本公司保留款之時點，於收到後 7 �
 // 裝設請款％（v6.0.96）：分段計價工項（構台、支撐等）裝設（打設）完成先請 N%、拆除（拔除）完成再請其餘；公司預設 90（報價條件 90／10）
 var _INST_DEF=90;
 // v6.0.103 裝設請款％參照：業主合約（CONTRACTS 關聯此案、合約欄「裝設請款 %」）→ 公司請款設定（100 − 拆除請款比例 P.removeRate）
-function _ownerCt(q){if(!q)return null;return (CONTRACTS||[]).find(function(c){return c&&c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return c&&c.name&&c.name===q.name;})||null;}
+function _ownerCt(q){if(!q)return null;var a=(CONTRACTS||[]).find(function(c){return c&&c.linkedQid===q.id;});if(a)return a;
+  var byName=(CONTRACTS||[]).filter(function(c){return c&&!c.linkedQid&&c.name&&c.name===q.name;});return byName.length===1?byName[0]:null;}   // 沒有關聯時，只有恰好一份未關聯的同名合約才採用
 function _ownerCtInst(q){var c=_ownerCt(q),v=c&&c.instPct;return (v==null||v==='')?null:Math.max(0,Math.min(100,parseFloat(v)||0));}
 function _ownerInstRef(q){var v=_ownerCtInst(q);if(v!=null)return {pct:v,src:'業主合約「'+(_ownerCt(q).name||'')+'」'};var rr=_removeRate();return {pct:Math.max(0,100-rr),src:'公司請款設定（拆除請款 '+rr+'%）'};}
 function _instOf(c){var v=c&&c.instPct;return (v==null||v==='')?_INST_DEF:Math.max(0,Math.min(100,parseFloat(v)||0));}
@@ -36739,7 +36740,11 @@ function pjOwnerInstSet(qid,v){
     _touch(q);try{persist();}catch(e){_err('pjOwnerInstSet',e);}
     toast('已更新裝設請款％');try{renderProj();}catch(e){_err('pjOwnerInstSet',e);}
   });
-  setTimeout(function(){try{var c=document.getElementById('fy-modal-c');if(c)c.addEventListener('click',function(){try{renderProj();}catch(e){_err('pjOwnerInstSet',e);}});}catch(e){_err('pjOwnerInstSet',e);}},0);   // 取消＝輸入框還原
+  setTimeout(function(){try{   // 取消／✕／點背景＝輸入框還原
+    var d=document.getElementById('fy-modal');if(!d)return;var rr=function(){setTimeout(function(){if(!document.getElementById('fy-modal')){try{renderProj();}catch(e){_err('pjOwnerInstSet',e);}}},0);};
+    ['fy-modal-c','fy-modal-x'].forEach(function(id){var b=document.getElementById(id);if(b)b.addEventListener('click',rr);});
+    d.addEventListener('click',function(e){if(e.target===d)rr();});
+  }catch(e){_err('pjOwnerInstSet',e);}},0);
 }
 function pjOwnerInstLog(qid){
   var q=Q.find(function(x){return x.id===qid;});if(!q)return;var L=((q.ownerPay||{}).instLog)||[];

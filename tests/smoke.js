@@ -7059,11 +7059,16 @@ async function newPage(browser, width, height) {
         /* 合約表單欄位：存檔保留其他欄位 */
         CONTRACTS.find(x => x.id === 'ctI4').settled = 1; editContract('ctI4'); document.getElementById('c-inst-pct').value = '75'; saveContract();
         const ct = CONTRACTS.find(x => x.id === 'ctI4'); out.ctForm = ct.instPct === 75 && ct.settled === 1;
+        /* 審查修正：只有調整紀錄不算付款條件、只有合約裝設％不給背對背預設、同名多筆不自動選合約 */
+        out.paySet = !_ownerPaySet({ ownerPay: { instLog: [{ a: 1 }], instReason: 'x' } });
+        out.noB2b = _ownerTerms({ id: 'qX', name: '裝設案', ownerPay: {} }) === null;
+        CONTRACTS.push({ id: 'n1', name: '同名案', instPct: 60 }, { id: 'n2', name: '同名案', instPct: 70 });
+        out.ctName = _ownerCt({ id: 'qY', name: '同名案' }) === null && _ownerCt({ id: 'qI4', name: '別名' }) !== null && _ownerCt({ id: 'qZ', name: '裝設案' }) === null;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
       Q.length = 0; oQ.forEach(x => Q.push(x)); CONTRACTS.length = 0; oC.forEach(x => CONTRACTS.push(x));
       return out;
     });
-    check('v6.0.103 裝設請款％：自動參照業主合約（無則公司請款設定）、手動調整與清除都必填原因並留紀錄、合約表單可填且存檔不丟其他欄位', r.fallback && r.fromCt && r.needReason && r.manual && r.clear && r.ctForm, JSON.stringify(r));
+    check('v6.0.103 裝設請款％：自動參照業主合約（無則公司請款設定）、手動調整與清除都必填原因並留紀錄、合約表單可填且存檔不丟其他欄位', r.fallback && r.fromCt && r.needReason && r.manual && r.clear && r.ctForm && r.paySet && r.noB2b && r.ctName, JSON.stringify(r));
     check('v6.0.103 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
