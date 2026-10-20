@@ -1469,6 +1469,7 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
               style="width:56px;text-align:center;padding:5px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px;font-family:inherit;background:var(--w)">
             <span style="font-size:13px;color:var(--b5)">日付款</span>
           </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--b5);margin:-2px 0 8px"><input type="checkbox" id="cust-recv-rule" style="width:15px;height:15px"> 以此為放款規則：預計收款日依此計算（請款日過計價日算下個月；專案有填營造廠付款條件時以專案為準）</label>
           <!-- 第二行：付款條件 + 保留款 -->
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <span style="font-size:13px;color:var(--b5)">現金</span>
@@ -2537,6 +2538,7 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
               <input type="date" id="inv-expected-recv-date" oninput="this._userEdited=true"
                 style="padding:7px 10px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px;font-family:inherit;width:100%;background:var(--w)">
               <div id="inv-recv-hint" style="font-size:11px;color:var(--g3);margin-top:4px"></div>
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px"><button type="button" class="btn btn-xs" onclick="invRecvOverride()">手動修改（需填原因）</button><span id="inv-recv-ov-log" style="font-size:11px;color:var(--b4)"></span></div>
               <div style="font-size:11px;color:var(--b3);margin-top:3px">截止日前3天自動提醒送件</div>
             </div>
           </div>
@@ -2792,7 +2794,7 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.109" defer></script><script src="beta.js?v=6.0.109" defer></script>
+<script src="app.js?v=6.0.110" defer></script><script src="beta.js?v=6.0.110" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">

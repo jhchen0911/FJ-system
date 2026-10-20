@@ -7398,6 +7398,54 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.110 預計收款日依放款規則（專案 ownerPay／客戶 recvRuleOn）、手動改需原因、沒設規則照舊 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = function () {};
+        CUSTOMERS.length = 0; CUSTOMERS.push({ id: 'c1', name: '亞東營造', payDue: 25, payMonthDelay: 1, recvDay: 20 }, { id: 'c2', name: '乙營造', payDue: 25, payMonthDelay: 2, recvDay: 10, payTermCash: 50, payTermTicket: 60, recvRuleOn: true });
+        Q = [{ id: 'qF', name: '亞東觀音F20', client: '亞東營造', awarded: true, items: [], ownerPay: null, _mt: 1 }, { id: 'qG', name: '乙案', client: '乙營造', awarded: true, items: [], _mt: 1 }];
+        const inv = { id: 'iF3', quoteId: 'qF', project: '亞東觀音F20', client: '亞東營造', periodNo: 3, date: '2026-08-04', expectedRecvDate: '2026-09-20', payMonthDelay: 1, recvDay: 20, totals: { total: 100000 }, received: 0, items: [] };
+        INV.length = 0; INV.push(inv);
+        /* 沒設放款規則：照現行（存的 9/20） */
+        let e = _invExpectedDate(inv); out.old = e.date === '2026-09-20' && !e.src && _invDueISO(inv) === '2026-09-20';
+        out.hintNo = /尚未設定放款規則/.test(_pjOwnerPayHtml(Q[0])) && /尚未設定放款規則/.test(_recvRuleChip(CUSTOMERS[0])) && _recvRuleChip(CUSTOMERS[1]) === '';
+        /* 專案設次兩月 20 日放款、25 日截止 → 10/20 */
+        Q[0].ownerPay = { cut: 25, delay: 2, day: 20 };
+        e = _invExpectedDate(inv); out.rule = e.src === 'rule' && e.date === '2026-10-20' && e.rule.src === '專案' && _invDueISO(inv) === '2026-10-20' && inv.expectedRecvDate === '2026-09-20';
+        out.hintYes = /放款規則（專案）：每月 25 日截止，次 2 月 20 日放款/.test(_pjOwnerPayHtml(Q[0]));
+        /* 過截止日算下個月；日號超過月底＝月底；票款另算兌現日 */
+        out.cut = _recvByRule('2026-08-27', { cut: 25, delay: 2, day: 20, cashPct: 100, ticketDays: 0 }).date === '2026-11-20';
+        out.clamp = _recvByRule('2026-01-10', { cut: 25, delay: 1, day: 31, cashPct: 100, ticketDays: 0 }).date === '2026-02-28';
+        const tk = _recvByRule('2026-08-04', { cut: 25, delay: 1, day: 20, cashPct: 50, ticketDays: 60 }); out.ticket = tk.date === '2026-09-20' && tk.ticketDate === '2026-11-19';
+        /* 客戶規則（勾選才算）＋現金比例／票期進金流 */
+        const ig = { id: 'iG', quoteId: 'qG', project: '乙案', client: '乙營造', date: '2026-08-04', cashPct: 100, ticketDays: 0, totals: { total: 1000 } };
+        const eg = _invExpectedDate(ig), pg = _invRecvPlan(ig); out.cust = eg.src === 'rule' && eg.rule.src === '客戶' && eg.date === '2026-10-10' && pg.cp === 0.5 && pg.td === 60 && eg.ticketDate === '2026-12-09';
+        CUSTOMERS[1].recvRuleOn = false; out.custOff = !_invExpectedDate(ig).src; CUSTOMERS[1].recvRuleOn = true;
+        /* 逾期判斷改用新日期：10/1 時 9/20 版已逾期、規則版未到期 */
+        out.overdue = _invDueISO(inv) > '2026-10-01';
+        /* 手動改：必填原因、留紀錄，優先於規則；清空回自動 */
+        invEid = 'iF3'; invRecvOverride(); document.getElementById('rov-date').value = '2026-11-05'; document.getElementById('fy-modal-o').click();
+        out.needReason = !!document.getElementById('fy-modal') && !inv.recvOv;
+        document.getElementById('rov-reason').value = '業主來電改 11/5'; document.getElementById('fy-modal-o').click();
+        e = _invExpectedDate(inv); out.manual = e.src === 'manual' && e.date === '2026-11-05' && inv.recvOvLog.length === 1 && inv.recvOvLog[0].reason === '業主來電改 11/5' && !document.getElementById('fy-modal');
+        invRecvOverride(); document.getElementById('rov-date').value = ''; document.getElementById('rov-reason').value = '改回規則'; document.getElementById('fy-modal-o').click();
+        const iv2 = INV.find(x => x.id === 'iF3'); out.clear = !iv2.recvOv && iv2.recvOvLog.length === 2 && _invExpectedDate(iv2).src === 'rule';   // saveInv 會換掉記錄物件，重新取
+        /* 編輯器：有規則時預計收款日唯讀顯示規則結果 */
+        loadInvoice('iF3'); calcExpectedRecvDate(); const el = document.getElementById('inv-expected-recv-date');
+        out.editor = el.value === '2026-10-20' && el.readOnly === true && /依放款規則（專案）/.test(document.getElementById('inv-recv-hint').textContent);
+        window.toast = oT; INV.length = 0; Q = []; CUSTOMERS.length = 0; invEid = null;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    check('v6.0.110 預計收款日：專案放款規則（截止日、放款月數、放款日、月底）、客戶規則需勾選、票款兌現日進金流、逾期改用新日期', r.rule && r.hintYes && r.cut && r.clamp && r.ticket && r.cust && r.custOff && r.overdue, JSON.stringify(r));
+    check('v6.0.110 沒設放款規則照現行邏輯、客戶與專案頁提示、手動改需原因留紀錄、編輯器唯讀顯示規則結果', r.old && r.hintNo && r.needReason && r.manual && r.clear && r.editor, JSON.stringify(r));
+    check('v6.0.110 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

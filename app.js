@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.109';
+var APP_VERSION='v6.0.110';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -4024,7 +4024,7 @@ function renderCustomers(){
         <div class="qt">${esc(name)}</div>
         <div class="qsb">${contact?esc(contact):''}${tel?' ／ '+esc(tel):''}${
           (c.payDue||c.payTermCash!=null)?' ／ <svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg>'+(c.payDue?'每月'+c.payDue+'日'+(c.payMonthDelay!=null&&c.recvDay?'，第'+c.payMonthDelay+'月'+c.recvDay+'日付':''):'')+(c.payTermCash!=null?'，現金'+c.payTermCash+'%':'')+(c.payTermTicket?'+票'+c.payTermTicket+'天':''):''
-        }</div>
+        }${_recvRuleChip(c)}</div>
       </div>
       <div style="display:flex;gap:4px;margin-left:8px;flex-shrink:0">
         <button type="button" class="btn btn-xs" style="background:var(--gl);color:var(--g3)" onclick="applyCustomerToQuote('${c.id}')" title="帶入報價單"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg></button>
@@ -4068,6 +4068,7 @@ function editCustomer(id){
   var custRetEl=document.getElementById('cust-retention');
   if(custRetEl)custRetEl.value=c.retentionPct!=null?c.retentionPct:'';
   var custOt=document.getElementById('cust-otype');if(custOt)custOt.value=c.ownerType||'';
+  var custRr=document.getElementById('cust-recv-rule');if(custRr)custRr.checked=!!c.recvRuleOn;   // v6.0.110
   document.getElementById('customer-modal').style.display='flex';
 }
 
@@ -4093,6 +4094,7 @@ function saveCustomer(){
     payTermTicket:document.getElementById('cust-pay-ticket')?.value!==''?parseInt(document.getElementById('cust-pay-ticket')?.value)||0:null,
     retentionPct:document.getElementById('cust-retention')?.value!==''?parseFloat(document.getElementById('cust-retention')?.value)||0:null
     ,ownerType:document.getElementById('cust-otype')?.value||''   // v6.0.104 業主類型
+    ,recvRuleOn:!!document.getElementById('cust-recv-rule')?.checked   // v6.0.110 以付款規則為放款規則（預計收款日依此計算）
     ,_mt:Date.now()
   };
   if(id){
@@ -6018,8 +6020,9 @@ function renderBizGates(){
   // 4) 平均回收天數（請款日→預計收款日）
   var recvSum=0,recvN=0;
   INV.forEach(function(v){
-    if(v.date&&v.expectedRecvDate){
-      var d=(new Date(v.expectedRecvDate)-new Date(v.date))/86400000;
+    var _ed=(v.date&&(v.expectedRecvDate||v.recvOv))?_invDueISO(v):(v.date?((function(){var e=_invExpectedDate(v);return e&&(e.src==='rule')?e.date:'';})()):'');   // v6.0.110 有放款規則的也算
+    if(v.date&&_ed){
+      var d=(new Date(_ed)-new Date(v.date))/86400000;
       if(d>0&&d<400){recvSum+=d;recvN++;}
     }
   });
@@ -26160,7 +26163,7 @@ function renderCashForecast(){
     var rcv=parseFloat(i.received||0);if(!rcv||!i.receivedDate)return;
     // v5.337 健檢H：改用 _cashPctOf——cashPct=0/空值＝100% 現金（v5.319 在 _cashOf 修過的坑，
     // 預測這裡自算一套又重蹈：0 被當 0% 現金，整筆收款被錯誤後移票期天數）
-    var td=i.ticketDays||0,cp=_cashPctOf(i);
+    var _pl0=_invRecvPlan(i),td=_pl0.td,cp=_pl0.cp;   // v6.0.110 有放款規則時用規則的票期
     if(td<=0)return;
     var tk=rcv*(1-cp);if(!tk)return;
     var d=Math.round((new Date(i.receivedDate).getTime()+td*864e5-t0)/864e5);
@@ -26170,14 +26173,13 @@ function renderCashForecast(){
   INV.forEach(function(i){
     var unpaid=_invAR(i);
     if(unpaid<=0)return;
-    var ds=i.expectedRecvDate||((i.payDue&&/^\d{4}-\d{2}-\d{2}/.test(i.payDue))?i.payDue:'');
-    if(!ds){try{var e2=_invExpectedDate(i);if(e2)ds=e2.date;}catch(e){_err('dayOf',e);}}
+    var _pl=_invRecvPlan(i),ds=_pl.date;   // v6.0.110 依放款規則（有設才用；票款另算兌現日）
     if(!ds)return;
     var d=dayOf(ds);if(d==null)return;
     if(d<0)d=3; // 逾期款：保守假設催收後3天內入帳
     d+=_cfDelay; // v5.381 缺口模擬：未收款統一延後 N 天
     if(d>90)return;
-    var cp2=_cashPctOf(i),td2=i.ticketDays||0;   // v5.337：同上，統一走 _cashPctOf
+    var cp2=_pl.cp,td2=_pl.td;   // v5.337：同上，統一走 _cashPctOf（v6.0.110 有放款規則時用規則的現金比例／票期）
     var cashAmt=unpaid*cp2,tkAmt=unpaid-cashAmt;
     var lbl=(i.project||'')+' 第'+(i.periodNo||'?')+'期';
     if(cashAmt>0)events.push({day:d,amt:cashAmt,label:lbl+' 收款'+(cp2<1?'（現金'+Math.round(cp2*100)+'%）':'')});
@@ -26360,8 +26362,7 @@ function renderCashflow(){
     // 原本只認 expectedRecvDate 或完整日期格式的 payDue，實務上 payDue 多為估驗日號
     // 或「月結60天」之類文字 → 四個桶全部顯示 NT$ 0，與同一頁上方的預測自相矛盾。
     const _dueOf=i=>{
-      var ds=i.expectedRecvDate||((i.payDue&&/^\d{4}-\d{2}-\d{2}/.test(i.payDue))?i.payDue:'');
-      if(!ds){try{const e=_invExpectedDate(i);ds=(e&&e.date)||'';}catch(err){_err('renderCashflow',err);}}
+      var ds=_invDueISO(i);   // v6.0.110
       if(!ds)return null;
       const t=new Date(ds);return isNaN(t)?null:t;
     };
@@ -26407,7 +26408,7 @@ function renderCashflow(){
     // 預計收款（未收款，expectedRecvDate 在本月）
     var mExpected=INV.reduce(function(s,inv){
       if(inv.receivedConfirmed)return s;
-      var d=inv.expectedRecvDate||'';
+      var d=_invDueISO(inv)||'';   // v6.0.110 依放款規則
       if(d.startsWith(mStr)){
         var unpaid=_invAR(inv);   // v5.326：改走統一函式，抵銷項（匯費／扣款／保留款）不再誤報逾期
         return s+(unpaid>0?unpaid:0);
@@ -28882,6 +28883,9 @@ function _erdMigrate(){
 }
 setTimeout(function(){try{_erdMigrate();try{renderInvList();}catch(e){_err('_erdMigrate',e);}try{rDash();}catch(e){_err('_erdMigrate',e);}}catch(e){_err('_erdMigrate',e);}},2500);
 function _invExpectedDate(inv){
+  if(inv&&inv.recvOv&&inv.recvOv.date)return {date:inv.recvOv.date,est:false,src:'manual',reason:inv.recvOv.reason||''};   // v6.0.110 手動改（必填原因、留紀錄）
+  var _R=null;try{_R=_recvRuleOf(inv);}catch(e){_err('_invExpectedDate',e);}
+  if(_R&&inv.date){var _k=_recvByRule(inv.date,_R);if(_k)return {date:_k.date,est:true,src:'rule',rule:_R,ticketDate:_k.ticketDate};}   // v6.0.110 依放款規則（專案／客戶）；沒設規則＝以下現行邏輯
   if(inv.expectedRecvDate)return {date:inv.expectedRecvDate,est:false};
   // 估驗基準月：估驗日期優先，其次 month 欄（支援 YYYY-MM 與 115年07月）
   var y=0,m=0;
@@ -28902,6 +28906,18 @@ function _invExpectedDate(inv){
 function calcExpectedRecvDate(){
   const el=document.getElementById('inv-expected-recv-date');
   if(!el)return;
+  try{   // v6.0.110 手動改或有放款規則：顯示規則結果（唯讀），改日期走「手動修改」（需原因）
+    const _iv=INV.find(function(x){return x.id===invEid;})||{};
+    const _ps={id:_iv.id,date:gv('inv-date')||_iv.date,quoteId:_iv.quoteId,sourceQid:_iv.sourceQid,project:gv('inv-project')||_iv.project,client:gv('inv-client')||_iv.client,recvOv:_iv.recvOv};
+    const _e=_invExpectedDate(_ps),hint0=document.getElementById('inv-recv-hint'),lg=document.getElementById('inv-recv-ov-log');
+    if(lg)lg.textContent=(Array.isArray(_iv.recvOvLog)&&_iv.recvOvLog.length)?('手動修改紀錄 '+_iv.recvOvLog.length+' 筆，最近：'+_iv.recvOvLog[_iv.recvOvLog.length-1].reason):'';
+    if(_e&&(_e.src==='manual'||_e.src==='rule')){
+      el.value=_e.date;el.readOnly=true;el._userEdited=false;
+      if(hint0)hint0.textContent=_e.src==='manual'?('手動：'+_e.date+'（原因：'+(_e.reason||'')+'）'):('依放款規則（'+_e.rule.src+'）：'+_recvRuleTxt(_e.rule)+' → '+_e.date+(_e.ticketDate?('；票款兌現 '+_e.ticketDate):''));
+      return;
+    }
+    el.readOnly=false;
+  }catch(e){_err('calcExpectedRecvDate.rule',e);}
   if(el._userEdited&&el.value)return; // 已手動覆寫，不自動覆蓋
   const invDate=document.getElementById('inv-date')?.value;
   const _mdRaw=document.getElementById('inv-pay-month-delay')?.value;
@@ -29145,7 +29161,7 @@ function renderCustomersContact(){
       <div class="qdot" style="background:var(--g)"></div>
       <div class="qm">
         <div class="qt">${esc(c.name||'未命名')}</div>
-        <div class="qsb">${c.taxid?'統編：'+esc(c.taxid):''}${c.tel?' ／ '+esc(c.tel):''}${c.contact?' ／ '+esc(c.contact):''}</div>
+        <div class="qsb">${c.taxid?'統編：'+esc(c.taxid):''}${c.tel?' ／ '+esc(c.tel):''}${c.contact?' ／ '+esc(c.contact):''}${_recvRuleChip(c)}</div>
       </div>
       <div style="display:flex;gap:4px;margin-left:8px">
         ${c.tel?`<a href="tel:${c.tel}" class="btn btn-xs" style="text-decoration:none"><svg class="ic ib" aria-hidden="true"><use href="#i-phone"/></svg></a>`:''}
@@ -36898,7 +36914,11 @@ function _pjOwnerPayHtml(q){
     +f('cut','每月','payDue','日計價',31)+f('delay','放款','payMonthDelay','個月後',12)+f('day','','recvDay','日放款',31)
     +f('cashPct','現金','payTermCash','%',100)+f('ticketDays','期票','payTermTicket','天',365)
     +_pjInstHtml(q,IN)
-    +'<span style="color:var(--b4);font-size:11px">保留款％與退還條件見上方「業主扣款設定」</span></div>';
+    +'<span style="color:var(--b4);font-size:11px">保留款％與退還條件見上方「業主扣款設定」</span>'
+    +(function(){var R=null;try{R=_recvRuleOf({quoteId:q.id,project:q.name,client:q.client});}catch(e){_err('_pjOwnerPayHtml',e);}   // v6.0.110 放款規則（預計收款日）
+      return R?('<div style="flex-basis:100%;font-size:11px;color:var(--g3)">放款規則（'+R.src+'）：'+esc(_recvRuleTxt(R))+'；預計收款日依此計算</div>')
+        :'<div style="flex-basis:100%;font-size:11px;color:#c62828;font-weight:700">尚未設定放款規則：預計收款日照請款單付款條件（未填＝次月）計算；填「放款 N 個月後」或「日放款」即生效</div>';})()
+    +'</div>';
 }
 function _pjInstHtml(q,IN){
   var o=q.ownerPay||{},ref=_ownerInstRef(q),man=(o.instPct!=null&&o.instPct!=='');
@@ -37251,7 +37271,7 @@ var _RO_PAGES_OFF=['staff','roles'];
 var _RO_ROLE={id:'__reader',name:'唯讀',reader:true,enabled:true,sys:false,cloudCost:false,pages:{}};
 var _RO_DENY=new RegExp('^(?:save|del|delete|remove|add|new|edit|create|submit|import|upload|restore|reset|clear|clean|confirm|apply|award|revoke|bump|settle|release|recalc|fix|merge'
   +'|toggle(?:RetentionReturn|PaidDateField|PayVat|AutoSync|CumFix)|pay(?:MarkPaid|Unmark|VendorAll)|ps(?:Paid|Generate|Upd|Del)|pc(?:Paid|Generate|Upd|Del)|hr(?:Edit|Del|WriteFixedCost)'
-  +'|staff(?:Edit|Del|Import|Template)|role(?:Edit|Del|Toggle|Perm)|dept|reader(?:Add|Del|Rename)|rfq(?:New|Labor|Edit|Del|Award|RemoveVendor|Fill|QuoteSync|Chg)'
+  +'|staff(?:Edit|Del|Import|Template)|role(?:Edit|Del|Toggle|Perm)|dept|reader(?:Add|Del|Rename)|rfq(?:New|Labor|Edit|Del|Award|RemoveVendor|Fill|QuoteSync|Chg)|invRecvOverride'
   +'|mat(?:Led|Rent|Equip|Trans|Alloc|RowEdit|Out|Back|EstSave|EstApplyCost|EstPickProj)|m6(?:Decide|Rent|Batch|TpUpd|EquipUpd)'
   +'|open(?:SubPeriod|SubAdvance|RentPeriod|Prepay|NegotiateModal|ReceiptModal|InvClauseModal|CommPick|SalesPick|SalesBook|RmkModal|StorageRulesGen|Dunning)'
   +'|pj(?:DeductSet|OwnerPaySet|OwnerInstSet|RentEndSet|SetFollow|PayAdv|PlanSet|CloseAll|IntroEdit)|sub(?:AdvRealloc|FollowSync)'
@@ -37514,6 +37534,65 @@ function _rfqVerTodo(items){
 function _subLumpDaily(q,row,from,to){
   var tq=0,dq=0;(row.lumpItems||[]).forEach(function(li){if(li.del)return;var it=(q.items||[])[li.idx];if(!it)return;tq+=parseFloat(li.q0)||0;dq+=_dailyQtyBetween(q,it.desc,from,to);});
   return tq>0?Math.min(1,dq/tq):0;
+}
+// ── v6.0.110 預計收款日依各案放款規則 ──
+// 放款規則＝專案「營造廠付款條件」q.ownerPay（填了放款月數或放款日才算；空白欄沿用客戶），沒有才用客戶（勾「以此為放款規則」c.recvRuleOn）。
+// 預計收款日＝請款日所屬計價月（過截止日算下個月）＋放款月數，在放款日放款（日號大於當月天數＝月底）；票款另算兌現日＝放款日＋票期（金流預測用）。
+// 優先序：請款單手動改（inv.recvOv，必填原因、inv.recvOvLog 留紀錄）＞放款規則＞現行邏輯（請款單存的預計收款日／付款條件推定，未填＝次月）。不改寫既有欄位。
+function _recvCustOf(inv,q){var n=String((inv&&inv.client)||(q&&q.client)||'').trim();return n?((CUSTOMERS||[]).find(function(c){return c&&c.name===n;})||null):null;}
+function _recvRuleOf(inv){
+  var q=_retQOf(inv),o=(q&&q.ownerPay)||{},c=_recvCustOf(inv,q)||{};
+  var num=function(v){var x=(v==null||v==='')?NaN:parseFloat(v);return isNaN(x)?null:x;},pk=function(a,b){var x=num(a);return x!=null?x:num(b);};
+  var R=null;
+  if(num(o.delay)!=null||num(o.day)!=null)R={src:'專案',cut:pk(o.cut,c.payDue),delay:pk(o.delay,c.payMonthDelay),day:pk(o.day,c.recvDay),cashPct:pk(o.cashPct,c.payTermCash),ticketDays:pk(o.ticketDays,c.payTermTicket)};
+  else if(c.recvRuleOn)R={src:'客戶',cut:num(c.payDue),delay:num(c.payMonthDelay),day:num(c.recvDay),cashPct:num(c.payTermCash),ticketDays:num(c.payTermTicket)};
+  if(!R)return null;
+  R.delay=R.delay==null?1:Math.max(0,Math.round(R.delay));R.ticketDays=R.ticketDays==null?0:Math.max(0,Math.round(R.ticketDays));
+  if(R.cashPct==null)R.cashPct=R.ticketDays>0?0:100;R.cashPct=Math.max(0,Math.min(100,R.cashPct));
+  R.cut=R.cut?Math.max(1,Math.min(31,Math.round(R.cut))):null;R.day=R.day?Math.max(1,Math.min(31,Math.round(R.day))):null;
+  return R;
+}
+function _recvRuleTxt(R){return (R.cut?('每月 '+R.cut+' 日截止'):'不設截止日')+'，'+(R.delay===0?'當月':R.delay===1?'次月':('次 '+R.delay+' 月'))+' '+(R.day?(R.day+' 日'):'月底')+'放款'+(R.cashPct<100?('（現金 '+R.cashPct+'%、票 '+R.ticketDays+' 天）'):'');}
+function _recvIso(t){return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');}
+function _recvByRule(dateISO,R){
+  var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateISO||''));if(!m||!R)return null;
+  var y=+m[1],mo=+m[2]-1,dd=+m[3],bm=mo+((R.cut&&dd>R.cut)?1:0),tm=bm+R.delay;
+  var last=new Date(y,tm+1,0).getDate(),pay=new Date(y,tm,R.day?Math.min(R.day,last):last);
+  var tk=(R.ticketDays>0&&R.cashPct<100)?new Date(y,tm,pay.getDate()+R.ticketDays):null;
+  return {date:_recvIso(pay),ticketDate:tk?_recvIso(tk):''};
+}
+// 逾期／催款／金流共用的到期日：手動或放款規則優先；其餘維持原口徑（存的預計收款日 → 完整日期的 payDue → 推定）
+function _invDueISO(i){
+  var e=null;try{e=_invExpectedDate(i);}catch(x){_err('_invDueISO',x);}
+  if(e&&(e.src==='manual'||e.src==='rule'))return e.date;
+  var ds=i.expectedRecvDate||((i.payDue&&/^\d{4}-\d{2}-\d{2}/.test(i.payDue))?i.payDue:'');
+  return ds||((e&&e.date)||'');
+}
+function _invRecvPlan(i){
+  var e=null;try{e=_invExpectedDate(i);}catch(x){_err('_invRecvPlan',x);}
+  if(e&&e.src==='rule')return {date:e.date,cp:e.rule.cashPct/100,td:e.rule.ticketDays,ticketDate:e.ticketDate};
+  return {date:_invDueISO(i),cp:_cashPctOf(i),td:parseInt(i.ticketDays)||0,ticketDate:''};
+}
+function _recvRuleChip(c){return (c&&!c.recvRuleOn)?' <span style="font-size:10.5px;color:#c62828;border:1px solid #f3c1c1;border-radius:99px;padding:0 6px;white-space:nowrap">尚未設定放款規則</span>':'';}
+// 請款單手動改預計收款日：必填原因，留紀錄；清空＝回到自動（規則或現行邏輯）
+function invRecvOverride(){
+  var inv=INV.find(function(x){return x.id===invEid;});if(!inv){toast('請先儲存請款單，再手動修改預計收款日');return;}
+  var auto=_invExpectedDate(Object.assign({},inv,{recvOv:null})),cur=(inv.recvOv&&inv.recvOv.date)||'';
+  var L=Array.isArray(inv.recvOvLog)?inv.recvOvLog:[];
+  _modal('手動修改預計收款日','<div style="font-size:12px;color:var(--b4);margin-bottom:6px">自動：'+esc((auto&&auto.date)||'—')+(auto&&auto.src==='rule'?('（放款規則：'+esc(_recvRuleTxt(auto.rule))+'）'):'')+'。清空日期＝取消手動、改回自動。</div>'
+    +'<div class="f"><label>預計收款日</label><input id="rov-date" type="date" value="'+esc(cur||((auto&&auto.date)||''))+'"></div>'
+    +'<div class="f"><label>原因 <span style="color:var(--red)">*</span></label><input id="rov-reason" placeholder="例：業主來電改 11/5 放款"></div>'
+    +(L.length?('<div style="font-size:11px;color:var(--b4);max-height:120px;overflow:auto">'+L.slice().reverse().map(function(r){return esc(new Date(r.at).toLocaleString('zh-TW'))+'　'+esc(String(r.from||'自動'))+' → '+esc(String(r.to||'自動'))+'　'+esc(r.reason||'')+(r.by?('（'+esc(r.by)+'）'):'');}).join('<br>')+'</div>'):''),function(){
+    var d=String((document.getElementById('rov-date')||{}).value||'').trim(),rs=String((document.getElementById('rov-reason')||{}).value||'').trim();
+    if(!rs){toast('請填寫原因');return false;}
+    if(d===cur){toast('日期沒有變更');return false;}
+    var by=(typeof _meEmail==='function'?_meEmail():'')||'';
+    L.push({at:Date.now(),by:by,from:cur||'',to:d||'',reason:rs});inv.recvOvLog=L.slice(-50);
+    if(d)inv.recvOv={date:d,reason:rs,by:by,at:Date.now()};else delete inv.recvOv;
+    _touch(inv);try{saveInv();}catch(e){_err('invRecvOverride',e);}
+    try{calcExpectedRecvDate();}catch(e){_err('invRecvOverride',e);}try{renderInvList();}catch(e){_err('invRecvOverride',e);}
+    toast(d?('預計收款日已改為 '+d):'已改回自動計算');
+  });
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
