@@ -64,7 +64,7 @@ exports.fyClaimsOnCreate = functionsV1.region(REGION).auth.user().onCreate(async
 });
 
 // 手動全量重算（部署後跑一次）：只有擁有者可呼叫——帶 Authorization: Bearer <ID token>
-exports.fyClaimsSyncNow = onRequest({ region: REGION }, async (req, res) => {
+exports.fyClaimsSyncNow = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'] }, async (req, res) => {
   try {
     const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
     if (!m) { res.status(401).send('需要登入'); return; }
