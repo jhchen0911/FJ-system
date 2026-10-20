@@ -7446,6 +7446,70 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.111 匯入合約條件卡（fj-contract-card/1）：對照表逐欄打勾、寫入放款規則／裝設％／保留款／租期／個別工項例外、證據、手動改需原因 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = function () {};
+        const ok = () => document.getElementById('gen-confirm-ok').click();
+        CUSTOMERS.length = 0; CUSTOMERS.push({ id: 'cy', name: '元昱營造' });
+        Q = [{ id: 'qJ', code: '115100101', name: '金華段', client: '元昱營造', awarded: true, ver: 1, _mt: 1, exs: [], rmk: {}, costs: [], dailyLogs: [],
+          items: [{ desc: '中間樁 H350 打設、切除', unit: '支', qty: '10', price: '50000' }, { desc: '中間樁根固處理 D=80cm', unit: '支', qty: '10', price: '8000' }] }];
+        const q = Q[0];
+        const E = (c, t) => ({ clause: c, quote: t });
+        const card = { schema: 'fj-contract-card/1', project: '金華段', owner: '元昱',
+          ownerType: { value: '營造廠', source: 'contract', evidence: E('甲方', '元昱營造') }, contractNo: { value: 'YY-115-08', source: 'contract', evidence: E('首頁', '合約編號 YY-115-08') },
+          billing: { cutoffDay: { value: 25, source: 'contract', evidence: E('第六條一', '每月 25 日前送估驗') }, payMonthOffset: { value: 1, source: 'contract', evidence: E('第六條一', '次月 20 日放款') },
+            payDay: { value: 20, source: 'contract', evidence: E('第六條一', '次月 20 日放款') }, cashPct: { value: 0, source: 'contract', evidence: E('第六條二～四', '100%-30 天期票') },
+            chequeDays: { value: 30, source: 'contract', evidence: E('第六條二～四', '100%-30 天期票') }, instPct: { value: 80, source: 'contract', evidence: E('第六條二', '完成請款 80%') },
+            removePct: { value: 20, source: 'contract', evidence: E('第六條二', '拆除拔除完成付 20%') },
+            itemOverrides: { value: [{ itemMatch: '根固', instPct: 100, removePct: 0, retentionPct: 10, retentionRelease: '開挖確認無問題' }], source: 'contract', evidence: E('附表', '根固保留 10%') } },
+          retention: { pct: { value: 10, source: 'contract', evidence: E('第六條', '保留款 10%') }, release: { value: '拆除拔除完成、驗收後 30 日內一次無息退還', source: 'contract', evidence: E('第六條', '驗收後 30 日內一次無息退還') } },
+          deductions: [{ value: { name: '營造保險分擔', amount: 5000, when: '第一次請款' }, source: 'contract', evidence: E('第十二條', '保險分擔 5,000 元') }],
+          rent: { endMode: { value: 'removeDone', source: 'default', evidence: E('', '合約未載明'), note: '照新報價條件第 14 條' } } };
+        const F = _cardParse(card); out.parse = F['billing.cutoffDay'].value === 25 && F['deductions'].value[0].amount === 5000 && F['billing.itemOverrides'].value.length === 1 && F['rent.endMode'].source === 'default';
+        let bad = ''; try { _cardParse({ schema: 'fj-contract-card/9' }); } catch (e) { bad = e.message; } out.schema = /不支援/.test(bad);
+        /* 對照表：黃底 default、沒打勾不寫入 */
+        _cardPreview(q, card, '合約條件卡.json'); const m = document.getElementById('gen-confirm-modal').innerHTML;
+        out.table = /每月估驗截止日/.test(m) && /第六條一/.test(m) && /#fff8e1|rgb\(255, 248, 225\)/.test(m) && document.querySelectorAll('.cc-pick').length >= 12 && !/與本專案/.test(m);
+        ok(); out.noPick = !q.ownerPay && !q.ownerCard;
+        /* 全勾 → 寫入 */
+        _cardPreview(q, card, '合約條件卡.json'); document.querySelectorAll('.cc-pick').forEach(c => c.checked = true); ok();
+        const o = q.ownerPay || {};
+        out.apply = o.cut === 25 && o.delay === 1 && o.day === 20 && o.cashPct === 0 && o.ticketDays === 30 && o.instPct === 80 && o.instLog.length === 1 && /合約條件卡匯入/.test(o.instLog[0].reason)
+          && q.deduct.ret === 10 && /30 日內/.test(q.deduct.retCond) && q.rentEnd === 'removeDone' && o.itemOv[0].itemMatch === '根固' && CUSTOMERS[0].ownerType === '營造廠'
+          && q.ownerCard.fields['contractNo'].value === 'YY-115-08' && q.ownerCard.fields['deductions'].applied === true;
+        /* 接 v6.0.110：放款規則 → 預計收款日（全票 30 天） */
+        const e = _invExpectedDate({ quoteId: 'qJ', project: '金華段', client: '元昱營造', date: '2026-08-04' }); out.recv = e.src === 'rule' && e.date === '2026-09-20' && e.ticketDate === '2026-10-20';
+        /* 接 v6.0.109：根固工項詢價自動帶根固樣板與合約保留／退還條件 */
+        eid = 'qJ'; _rfqQid = 'qJ'; _rfqTab = 'rfq'; go('rfq'); rfqNew();
+        const tps = [...document.querySelectorAll('.rfq-tpl')].map(x => x.value); out.tplUi = tps[0] === 'gen' && tps[1] === 'grout' && /合約個別約定（根固）/.test(document.getElementById('gen-confirm-modal').innerHTML);
+        document.querySelectorAll('.rfq-it').forEach(cb => cb.checked = true); ok();
+        const rq = q.rfqs[0]; out.rfq = rq.items[1].tpl === 'grout' && rq.items[1].ov && rq.items[1].ov.ret === 10 && !rq.items[0].ov && /第 2 項付款樣板：根固：施作完成計價 100%，其中 10% 為保留款/.test(_rfqCondLines(rq).join('|'));
+        /* 專案頁證據、手動改需原因 */
+        const ph = _pjOwnerPayHtml(q); out.ev = /合約條件卡（合約）：第六條一「每月 25 日前送估驗」/.test(ph) && /對照表／證據/.test(ph);
+        pjOwnerPaySet('qJ', 'delay', '2'); out.guard = !!document.getElementById('fy-modal') && q.ownerPay.delay === 1;
+        document.getElementById('fy-modal-o').click(); out.needReason = !!document.getElementById('fy-modal');
+        document.getElementById('cc-reason').value = '業主來函改次兩月'; document.getElementById('fy-modal-o').click();
+        const fd = q.ownerCard.fields['billing.payMonthOffset']; out.edit = q.ownerPay.delay === 2 && fd.source === 'manual' && fd.note === '業主來函改次兩月' && q.ownerCard.log.some(l => l.act === 'edit' && l.k === 'billing.payMonthOffset');
+        pjCardView('qJ'); out.view = /業主來函改次兩月/.test(document.getElementById('gen-confirm-modal').innerHTML); ok();
+        /* 不是卡片來源的欄位照舊直接改 */
+        pjDeductSet('qJ', 'clean', 3); out.plain = q.deduct.clean === 3 && !document.getElementById('fy-modal');
+        /* 選錯檔：工程／業主不同要提醒 */
+        _cardPreview(q, Object.assign({}, card, { project: '別案', owner: '別家' }), 'x.json'); out.mism = /與本專案/.test(document.getElementById('gen-confirm-modal').innerHTML); document.getElementById('gen-confirm-modal').style.display = 'none';
+        window.toast = oT; Q = []; CUSTOMERS.length = 0; eid = null; _rfqQid = '';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    check('v6.0.111 合約條件卡：解析格式、對照表（來源／證據、預設黃底）、逐欄打勾才寫入、選錯檔提醒', r.parse && r.schema && r.table && r.noPick && r.mism, JSON.stringify(r));
+    check('v6.0.111 合約條件卡寫入：放款規則→預計收款日、裝設％留紀錄、保留款、租期結束、業主類型、個別工項例外→詢價付款樣板', r.apply && r.recv && r.tplUi && r.rfq, JSON.stringify(r));
+    check('v6.0.111 合約條件卡：專案頁滑過看證據、改卡片欄位必填原因留紀錄、其他欄位照舊', r.ev && r.guard && r.needReason && r.edit && r.view && r.plain, JSON.stringify(r));
+    check('v6.0.111 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
