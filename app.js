@@ -36948,13 +36948,11 @@ function _otRows(year,month){
   return keys.map(function(k){
     var g=by[k],st=_bidStat(g.qs);
     var rev=g.invs.reduce(function(a,i){return a+((i.totals&&parseFloat(i.totals.curTotal))||0);},0);   // 營收＝請款未稅（權責口徑）
-    var rcv=g.invs.reduce(function(a,i){return a+_invRcv(i);},0);
-    // 付款條件：該類型業主（有報價或請款者）客戶資料的平均現金％、平均票期、平均放款天數（次月 N 日＝月數×30＋N）
+    var rcv=(INV||[]).reduce(function(a,i){return a+((i&&_ownerTypeOf(i.client)===k)?_invRcvIn(i,pre):0);},0);   // 實收＝期間內實際收到（依收款日／退還日），不限期間內開的單
+    // 付款條件：該類型各案的營造廠付款條件（_ownerTerms：專案 ownerPay，空白沿用客戶資料）平均現金％、票期、放款天數（放款月×30＋放款日，約略）
     var names={};g.qs.forEach(function(q){if(q.client)names[String(q.client).trim()]=1;});g.invs.forEach(function(i){if(i.client)names[String(i.client).trim()]=1;});
-    var cash=[],tk=[],lag=[];Object.keys(names).forEach(function(n){var c=_custOf(n);if(!c)return;
-      if(c.payTermCash!=null&&c.payTermCash!=='')cash.push(parseFloat(c.payTermCash)||0);
-      if(c.payTermTicket!=null&&c.payTermTicket!=='')tk.push(parseFloat(c.payTermTicket)||0);
-      if(c.recvDay!=null&&c.recvDay!=='')lag.push((c.payMonthDelay!=null&&c.payMonthDelay!==''?parseFloat(c.payMonthDelay)||0:1)*30+(parseFloat(c.recvDay)||0));});
+    var cash=[],tk=[],lag=[];g.qs.forEach(function(q){var o=null;try{o=_ownerTerms(q);}catch(e){_err('_otRows',e);}if(!o)return;
+      cash.push(o.cashPct);if(o.cashPct<100)tk.push(o.ticketDays);lag.push(o.delay*30+o.day);});
     var avg=function(a){return a.length?Math.round(a.reduce(function(x,y){return x+y;},0)/a.length):null;};
     // 保留款：得標案的專案扣款設定（_ownerRetPct，與請款同口徑）
     var won=g.qs.filter(function(q){return q.awarded;}),rets=won.map(function(q){return _ownerRetPct(q);});
@@ -36978,7 +36976,7 @@ function renderOwnerTypeReport(el,year,month){
         r.retOf?('平均 '+r.retAvg+'%（'+r.retN+'／'+r.retOf+' 案有扣'+(r.over10?('，'+r.over10+' 案 >10%'):'')+'）'):'—']
         .map(function(v){return '<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">'+v+'</td>';}).join('')+'</tr>';}).join('')
     +'</tbody></table>'
-    +'<div style="font-size:11px;color:var(--b3);margin-top:8px;line-height:1.7">得標率口徑同「得標率」報表（得標 ÷ 全部報價）；營收＝期間內請款單本期估驗小計（未稅），實收含另記的保留款退還；付款條件取客戶資料的付款規則平均（放款天數＝計價月起算約略天數）；保留款取得標案的專案「業主扣款設定」。</div></div>';
+    +'<div style="font-size:11px;color:var(--b3);margin-top:8px;line-height:1.7">得標率口徑同「得標率」報表（得標 ÷ 全部報價）；營收＝期間內開立的請款單本期估驗小計（未稅）；實收＝期間內實際收到的款項（依收款日，含保留款退還，不限期間內開的單）；付款條件取各案的營造廠付款條件（專案設定，空白沿用客戶資料）平均，放款天數為計價月起算約略天數；保留款取得標案的專案「業主扣款設定」。</div></div>';
   try{_mstack(document.getElementById('rpt-otype-root'));}catch(e){_err('renderOwnerTypeReport',e);}
 }
 function _otCsv(){

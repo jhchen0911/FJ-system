@@ -7085,7 +7085,7 @@ async function newPage(browser, width, height) {
           { id: 'oq3', name: 'C', client: '乙建設', date: '2026-05-01', awarded: true, t: { total: 300000 } }, { id: 'oq4', name: 'D', client: '丙不明', date: '2026-05-02', awarded: false, t: { total: 1 } });
         INV.push({ id: 'oi1', client: '甲營造', project: 'A', date: '2026-06-25', totals: { curTotal: 200000, total: 189000 }, received: '189000', receivedDate: '2026-07-20', items: [] });
         const rows = _otRows(2026, 0), g = k => rows.find(x => x.k === k);
-        out.rows = g('營造廠').n === 2 && g('營造廠').won === 1 && g('營造廠').rate === 50 && g('營造廠').rev === 200000 && g('營造廠').tk === 30 && g('營造廠').lag === 50 && g('營造廠').retAvg === 10
+        out.rows = g('營造廠').n === 2 && g('營造廠').won === 1 && g('營造廠').rate === 50 && g('營造廠').rev === 200000 && g('營造廠').rcv === 189000 && g('營造廠').tk === 30 && g('營造廠').lag === 50 && g('營造廠').retAvg === 10
           && g('建設公司').won === 1 && g('建設公司').retAvg === 0 && g('未分類').n === 1 && !!g('大包');
         const rc = document.getElementById('report-content') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'report-content' })); renderOwnerTypeReport(rc, 2026, 0); const h = rc.innerHTML; out.h = h.slice(0, 120); out.render = /依業主類型/.test(h) && /營造廠/.test(h) && /尚未設定業主類型/.test(h);
         let csv = null; const od = window.downloadCSV; window.downloadCSV = (n, hd, rw) => { csv = { n, hd, rw }; }; _otCsv(); window.downloadCSV = od; out.csv = !!csv && csv.hd[0] === '業主類型' && csv.rw.length >= 4;
