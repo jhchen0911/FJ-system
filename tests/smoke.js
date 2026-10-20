@@ -7198,7 +7198,13 @@ async function newPage(browser, width, height) {
           dailyLogs: [{ date: '2026-01-10', progressRows: [{ itemIdx: 0, qty: 10, ph: 'install' }] }, { date: '2026-03-01', progressRows: [{ itemIdx: 0, qty: 4, ph: 'remove' }] }, { date: '2026-03-10', progressRows: [{ itemIdx: 0, qty: 6, ph: 'remove' }] }] });
         const a = _rentStatus(mk(undefined), 0, '2026-04-01'), b = _rentStatus(mk('removeDone'), 0, '2026-04-01');
         out.a = a && a.endMode === 'removeFirst' && a.endDate === '2026-03-01';
-        out.b = b && b.endMode === 'removeDone' && b.endDate === '2026-03-10' && b.overDays - a.overDays === 9 && b.amount - a.amount === 50 * 10 * 9;
+        out.b = b && b.endMode === 'removeDone' && b.endDate === '2026-03-10' && b.overDays - a.overDays === 9 && b.qtyDays === 4 * 19 + 6 * 28 && b.amount === 50 * (4 * 19 + 6 * 28);
+        /* Lotion 例：100 支，逾期 11/1 起，11/10 第一批拔完 60、11/25 第二批拔完 40 → 1,500 支·天；勾選才算一批 */
+        const pg = { cum: 100, remLogs: [{ date: '2026-11-08', qty: 30 }, { date: '2026-11-10', qty: 30, done: true }, { date: '2026-11-25', qty: 40, done: true }] };
+        const bq = _rentBatchQtyDays(pg, 100, '2026-11-01', '2026-11-30'); out.lotion = bq.qtyDays === 1500 && bq.rows.length === 2 && bq.rows[0].qty === 60 && bq.rows[0].days === 9;
+        /* 未拔完：計到本期截止日（含）；第一批 60 拔完 */
+        const bq2 = _rentBatchQtyDays({ cum: 100, remLogs: [{ date: '2026-11-10', qty: 60, done: true }] }, 100, '2026-11-01', '2026-11-30'); out.open = bq2.qtyDays === 60 * 9 + 40 * 30 && bq2.rows[1].open === true;
+        out.calcB = /第1批 11\/10 拔除完成 60 支 × 9 天 ＝ 540 支·天/.test(_invCalcText({ type: 'rental', _ovKey: 'x', _ovBasis: 'removeDone', unit: '支·天', curQty: 1500, contractPrice: 50, curDays: 0, payRate: 100, _ovBatches: bq.rows }));
         /* 拔除未完成＝仍在場：算到結束日 */
         const c = mk('removeDone'); c.dailyLogs.pop(); const cs = _rentStatus(c, 0, '2026-04-01'); out.c = cs.endDate === '2026-04-01';
         /* 計算式說明印出口徑；專案頁可選；新報價預設完成日 */
@@ -7210,7 +7216,7 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
       return out;
     });
-    check('v6.0.107 租期結束日口徑：舊案拔除第一天、新案拔除完成日（未完成算到結束日）、逾期租金依此計算、計算式說明印出口徑、專案可切換', r.a && r.b && r.c && r.calc && r.ui && r.scanTxt, JSON.stringify(r));
+    check('v6.0.107 租期結束日口徑：舊案拔除第一天、新案拔除完成日分批計算（每批計到完成日、未拔完計到截止日）、計算式印出每批、專案可切換', r.a && r.b && r.c && r.calc && r.ui && r.scanTxt && r.lotion && r.open && r.calcB, JSON.stringify(r));
     check('v6.0.107 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

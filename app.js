@@ -394,7 +394,7 @@ function _itemProgress(q,idx){
     (L.progressRows||[]).forEach(function(r){
       if(!r||Number(r.itemIdx)!==Number(idx))return;   // v5.336：匯入／同步的舊資料可能是字串型
       var n=parseFloat(r.qty)||0;if(n<=0)return;
-      (_prPhase(q,r)==='remove'?rem:ins).push({date:L.date||'',qty:n,from:L.backfillFrom||''});   // v6.0.33 補登先前：起日
+      (_prPhase(q,r)==='remove'?rem:ins).push({date:L.date||'',qty:n,from:L.backfillFrom||'',done:!!r.batchDone});   // v6.0.107 batchDone＝本次拔除完成   // v6.0.33 補登先前：起日
     });
   });
   var byD=function(a,b){return String(a.date)<String(b.date)?-1:1;};
@@ -419,7 +419,7 @@ function _itemProgress(q,idx){
   return {n:ins.length+rem.length,nInstall:ins.length,nRemove:rem.length,
     first:ins.length?(ins[0].from&&ins[0].from<ins[0].date?ins[0].from:ins[0].date):'',last:ins.length?ins[ins.length-1].date:'',
     installLast:installLast,stageInstall:stIns,stageRemove:stRem,
-    removeFirst:removeFirst,removeLast:rem.length?rem[rem.length-1].date:(stRem||''),removeDone:remDone||stRem||'',
+    removeFirst:removeFirst,removeLast:rem.length?rem[rem.length-1].date:(stRem||''),removeDone:remDone||stRem||'',remLogs:rem,stageRemove2:stRem,
     cum:cum,removeCum:rcum,target:target,doneDate:doneDate};
 }
 // 單一工項的租期／逾期狀態（純函式，不碰 DOM）
@@ -446,10 +446,36 @@ function _rentStatus(q,idx,endDate){
   var over=Math.max(0,_dDiff(expiry,end));
   var price=parseFloat((String(it.ot||'').match(/[\d.]+/)||[0])[0])||0;
   var qty=Math.abs(parseFloat(it.qty)||0);
+  if(mode==='removeDone'&&over>0){   // v6.0.107 分批：逾期起算日起，每批計到該批拔除完成日，未拔完的計到結束日
+    var bq=_rentBatchQtyDays(pg,qty,_dAdd(expiry,1),end);
+    return {idx:idx,desc:String(it.desc||'').split('\n')[0],unit:it.unit||'',days:days,installDate:base,removeFirst:pg.removeFirst||'',estimated:!pg.doneDate,cum:pg.cum,target:pg.target,
+      start:start,expiry:expiry,endDate:end,overDays:over,endMode:mode,removeDone:pg.removeDone||'',batches:bq.rows,qtyDays:bq.qtyDays,
+      otPrice:price,otUnit:it.otu||'',qty:qty,amount:Math.round(price*bq.qtyDays)};
+  }
   return {idx:idx,desc:String(it.desc||'').split('\n')[0],unit:it.unit||'',
     days:days,installDate:base,removeFirst:pg.removeFirst||'',estimated:!pg.doneDate,cum:pg.cum,target:pg.target,
     start:start,expiry:expiry,endDate:end,overDays:over,endMode:mode,removeDone:pg.removeDone||'',
     otPrice:price,otUnit:it.otu||'',qty:qty,amount:Math.round(price*qty*over)};
+}
+// v6.0.107 拔除完成日模式的分批逾期：期間 [startISO, endISO]（含頭含尾）內的「支·天」
+//   批次＝日報拔除列勾「本次拔除完成」的那天為該批完成日、上次勾選到這次之間的拔除數量為該批數量；
+//   沒有任何勾選＝每天的拔除各算一批；拔除階段完工日報＝其餘全部在那天完成。
+//   每批計到完成日前一天（完成當天已拔走）；尚未完成的數量計到 endISO（含）。
+function _rentBatchList(pg){
+  var rem=(pg&&pg.remLogs)||[],anyDone=rem.some(function(r){return r.done;}),out=[],acc=0;
+  rem.forEach(function(r){acc+=r.qty;if(!anyDone||r.done){out.push({date:r.date,qty:acc});acc=0;}});
+  return {closed:out,open:acc,stage:(pg&&pg.stageRemove2)||''};
+}
+function _rentBatchQtyDays(pg,qty,startISO,endISO){
+  var B=_rentBatchList(pg),rows=[],left=qty>0?qty:((pg&&pg.cum)||0),tot=0,n=0;
+  var span=Math.max(0,_dDiff(startISO,endISO)+1);
+  B.closed.forEach(function(b){if(left<=0)return;var q2=Math.min(b.qty,left);left-=q2;n++;
+    var d=Math.max(0,Math.min(_dDiff(startISO,b.date),span));tot+=q2*d;rows.push({no:n,date:b.date,qty:q2,days:d});});
+  if(left>0){
+    if(B.stage){n++;var d2=Math.max(0,Math.min(_dDiff(startISO,B.stage),span));tot+=left*d2;rows.push({no:n,date:B.stage,qty:left,days:d2});}
+    else {rows.push({no:n+1,date:'',qty:left,days:span,open:true});tot+=left*span;}
+  }
+  return {qtyDays:tot,rows:rows};
 }
 // v6.0.107 租期結束日口徑（報價條件第 14 條）：q.rentEnd＝'removeFirst' 拔除（拆除）第一天（舊案預設）／'removeDone' 拔除（拆除）完成日（新報價預設）
 var _RENT_END_LBL={removeFirst:'拔除（拆除）第一天',removeDone:'拔除（拆除）完成日'};
@@ -5708,12 +5734,14 @@ function calcInvDays(){
       const srcPrice=_qot?_qot.price:(srcItem?(srcItem.otPrice||0):0);
       const srcQty=srcItem?(srcItem.contractQty||1):1;
       const srcUnit=_uFix(srcItem?(srcItem.unit||'式'):'式');
-      const overAmt=Math.round(srcPrice*srcQty*billDays);
+      // v6.0.107 拔除完成日模式：分批計算「支·天」（每批計到該批拔除完成日，未拔完的計到本期截止日）
+      let _bq=null;try{const _q=_invQuote();if(_q&&_rentEndMode(_q)==='removeDone'){const _ix=(_q.items||[]).findIndex(it=>it&&!it.sec&&_invKey(it.desc)===_invKey(selDesc));if(_ix>=0)_bq=_rentBatchQtyDays(_itemProgress(_q,_ix),srcQty,_isoD(billStart),_isoD(claimDate));}}catch(e){_err('calcInvDays.batch',e);}
+      const overAmt=_bq?Math.round(srcPrice*_bq.qtyDays):Math.round(srcPrice*srcQty*billDays);
       // 租用型正規寫法：單價＝逾期租金單價、數量＝合約數量、天數＝本期新增逾期天數
-      const _ow={type:'rental',desc:overLabel,unit:srcUnit,
-        contractPrice:srcPrice,contractQty:srcQty,
+      const _ow={type:'rental',desc:overLabel,unit:_bq?(srcUnit+'·天'):srcUnit,
+        contractPrice:srcPrice,contractQty:_bq?_bq.qtyDays:srcQty,
         prevQty:0,prevAmt:0,
-        curQty:srcQty,curDays:billDays,curAmt:overAmt,
+        curQty:_bq?_bq.qtyDays:srcQty,curDays:_bq?0:billDays,curAmt:overAmt,_ovBatches:_bq?_bq.rows:undefined,
         payRate:100,note:'逾期租金',otPrice:0,otUnit:'',
         _ovKey:selDesc,_ovStart:_isoD(billStart),_ovEnd:_isoD(claimDate),_ovBasis:_rentEndMode(_invQuote())};   // v6.0.107 租期結束日口徑
       if(existIdx>=0){
@@ -6616,6 +6644,11 @@ function _invCalcText(it,curAmt){
   if(dd>0)parts.push('逾期 '+_qfmt(it.curDays)+' 天 − 折讓 '+_qfmt(dd)+' 天 ＝ '+_qfmt(d)+' 天');   // v6.0.73
   if(rate!==100&&rate!==0)parts.push(_qfmt(q)+' '+u+' × '+rate+'% ＝ '+_qfmt(w)+' '+u);
   parts.push(_qfmt(w)+' '+u+(d?(' × '+_qfmt(d)+' 天'):'')+' × '+fmt(p)+' ＝ '+fmt(amt));
+  if(it._ovKey!=null&&it.type==='rental'&&Array.isArray(it._ovBatches)&&it._ovBatches.length){   // v6.0.107 分批明細
+    var bu=String(it.unit||'').replace(/·天$/,''),md=function(d){return d?String(d).slice(5).replace('-','/'):'';};
+    parts=[it._ovBatches.map(function(b){return '第'+b.no+'批 '+(b.open?'尚未拔除（計到本期截止）':(md(b.date)+' 拔除完成'))+' '+_qfmt(b.qty)+' '+bu+' × '+b.days+' 天 ＝ '+_qfmt(b.qty*b.days)+' '+bu+'·天'+(p?('（NT$ '+fmt(Math.round(b.qty*b.days*p))+'）'):'');}).join('；')
+      +'；合計 '+_qfmt(q)+' '+bu+'·天 × '+fmt(p)+' ＝ '+fmt(amt)];
+  }
   if(it._ovKey!=null&&it.type==='rental')parts.push('租期結束日口徑：'+(_RENT_END_LBL[it._ovBasis]||_RENT_END_LBL.removeFirst));   // v6.0.107
   return parts.join('；');
 }
@@ -22297,6 +22330,7 @@ function drRenderProgRows(reset){
     +opts
     +'</select>'
     +_drPhaseSel(q,r,ri)
+    +((q&&_rentEndMode(q)==='removeDone'&&_drRowPhase(q,r)==='remove')?('<label title="這一批拔完了（逾期租金分批計到這天）" style="flex:0 0 auto;display:flex;align-items:center;gap:2px;font-size:11.5px;white-space:nowrap"><input type="checkbox"'+(r.batchDone?' checked':'')+' onchange="_drProgRows['+ri+'].batchDone=this.checked">本批完成</label>'):'')
     +'<input type="number" inputmode="decimal" value="'+(r.qty||'')+'" placeholder="數量" oninput="_drProgRows['+ri+'].qty=this.value;_drUpdHint('+ri+')" style="flex:1 1 0;min-width:0;font-size:14px;font-weight:700;text-align:right;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">'
     +'<input value="'+esc(r.note||'')+'" placeholder="內容/備註" oninput="_drProgRows['+ri+'].note=this.value" style="flex:1 1 0;min-width:0;font-size:13px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">'
     +(_drProgRows.length>1?'<button type="button" class="btn btn-xs btn-r" onclick="_drProgRows.splice('+ri+',1);drRenderProgRows()" style="flex-shrink:0">✕</button>':'')
@@ -22451,7 +22485,7 @@ function _drExistingBanner(){
 }
 function drLoadExisting(){
   var L=_drExistingLog();if(!L){toast('此日沒有日報');return;}
-  _drProgRows=(L.progressRows||[]).map(function(r){return {itemIdx:Number(r.itemIdx),qty:r.qty||'',note:r.note||'',ph:r.ph||''};});
+  _drProgRows=(L.progressRows||[]).map(function(r){return {itemIdx:Number(r.itemIdx),qty:r.qty||'',note:r.note||'',ph:r.ph||'',batchDone:!!r.batchDone};});
   if(!_drProgRows.length)_drProgRows=[{itemIdx:-1,qty:'',note:''}];
   drRenderProgRows();
   _drCrews=_crewsOf(L).map(function(c){return {type:c.type||'labor',vendor:c.vendor||'',n:c.n||''};});
@@ -22498,7 +22532,7 @@ function _drCollect(){
   const stageOf=status==='stage'?(gv('dr-stage-of')||'install'):'',stageDate=status==='stage'?(gv('dr-stage-date')||gv('dr-date')||localToday()):'';   // v5.442
   if(!workers&&!subWorkers&&!rows.length&&!_drPhotos.length&&!equip.length&&status==='work')return null;
   const over=[];_drProgRows.forEach(function(_r,ri){const h=_drRowHint(ri);if(h.over)over.push(h.desc+' 累計 '+fmt(h.after)+' ＞ 合約 '+fmt(h.target));});
-  const progRows=rows.map(r=>({itemIdx:r.itemIdx,desc:r.itemIdx>=0?((q.items[r.itemIdx]||{}).desc||'').split('\n')[0]:'',qty:parseFloat(r.qty)||0,note:(r.note||'').trim(),ph:_drRowPhase(q,r)}));
+  const progRows=rows.map(r=>{const o={itemIdx:r.itemIdx,desc:r.itemIdx>=0?((q.items[r.itemIdx]||{}).desc||'').split('\n')[0]:'',qty:parseFloat(r.qty)||0,note:(r.note||'').trim(),ph:_drRowPhase(q,r)};if(r.batchDone&&o.ph==='remove')o.batchDone=true;return o;});   // v6.0.107 本批拔除完成
   const progressText=progRows.map(r=>(r.desc?(r.desc+(r.qty?(' '+r.qty+((q.items[r.itemIdx]||{}).unit||'')):'')):'')+(r.note?((r.desc?'；':'')+r.note):'')).filter(Boolean).join('\n');
   return {qid:qid,name:q.name||'',workers:workers,subWorkers:subWorkers,subVendor:subVendor,crews:cw.crews,over:over,equip:equip,
     status:status,stopReason:stopReason,resumeDate:resumeDate,stageOf:stageOf,stageDate:stageDate,
