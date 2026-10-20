@@ -7102,16 +7102,36 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.102 hotfix：同步報價後保留的舊工項不再一直判成「仍是舊版」──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const q = { id: 'qHF', ver: 1, name: '同步案', items: [{ desc: '中間樁打設', unit: '支', qty: 10, price: 1000 }] };
+        const inv = { id: 'iHF', quoteId: 'qHF', periodNo: 5, quoteVer: null, items: [{ type: 'item', desc: '中間樁打設', unit: '支', contractQty: 10, contractPrice: 1000, prevQty: 4, curQty: 2 }, { type: 'item', desc: '技術工', unit: '工', contractQty: 5, contractPrice: 3000, prevQty: 8, curQty: 1 }] };
+        out.before = _invQuoteDiff(inv, q).removed.length === 1;
+        _invApplyQuoteSync(inv, q);
+        const tech = inv.items.find(x => x.desc === '技術工');
+        out.after = !_invQuoteDiff(inv, q).any && !!tech && tech._qRetired === 1 && inv.quoteVer === 1;
+        /* 既有資料：已同步到 v1、保留列沒有標記 → 也不再提醒 */
+        const old = { id: 'iHF2', quoteId: 'qHF', quoteVer: 1, items: [{ type: 'item', desc: '中間樁打設', unit: '支', contractQty: 10, contractPrice: 1000 }, { type: 'item', desc: '技術工', prevQty: 8 }] };
+        out.legacy = !_invQuoteDiff(old, q).any;
+        /* 尚未同步的單：報價真的刪了工項仍要提醒 */
+        out.still = _invQuoteDiff({ quoteVer: null, items: [{ type: 'item', desc: '技術工', prevQty: 8 }] }, q).removed.length === 1;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('v6.0.102 同步報價後：保留的舊工項標「報價已刪、保留歷史數量」、不再判成仍是舊版（含已同步的既有資料）、未同步者照常提醒', r.before && r.after && r.legacy && r.still, JSON.stringify(r));
+    check('v6.0.102 hotfix 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.105 任務 7：Storage 規則產生器（人員／唯讀清單＋custom claim）──
   {
     const fn = require('fs').readFileSync(require('path').join(__dirname, '..', 'functions', 'index.js'), 'utf8');
     const fb = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'firebase.json'), 'utf8'));
     const fnOk = !fb.database && !fb.storage && !!fb.functions && /cors: \['https:\/\/jhchen0911\.github\.io'\]/.test(fn) && /fydata\/readers/.test(fn) && /fydata\/adminEmails/.test(fn) && /fydata\/access/.test(fn) && /setCustomUserClaims/.test(fn) && /'reader'/.test(fn) && /delete claims\.fy/.test(fn);
-    await page.close();
-  }
-
-  // ── v6.0.102 hotfix：同步報價後保留的舊工項不再一直判成「仍是舊版」──
-  {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
       const out = {};
@@ -7192,25 +7212,6 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.107 租期結束日口徑：舊案拔除第一天、新案拔除完成日（未完成算到結束日）、逾期租金依此計算、計算式說明印出口徑、專案可切換', r.a && r.b && r.c && r.calc && r.ui && r.scanTxt, JSON.stringify(r));
     check('v6.0.107 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
-    await page.close();
-  }
-
-        const q = { id: 'qHF', ver: 1, name: '同步案', items: [{ desc: '中間樁打設', unit: '支', qty: 10, price: 1000 }] };
-        const inv = { id: 'iHF', quoteId: 'qHF', periodNo: 5, quoteVer: null, items: [{ type: 'item', desc: '中間樁打設', unit: '支', contractQty: 10, contractPrice: 1000, prevQty: 4, curQty: 2 }, { type: 'item', desc: '技術工', unit: '工', contractQty: 5, contractPrice: 3000, prevQty: 8, curQty: 1 }] };
-        out.before = _invQuoteDiff(inv, q).removed.length === 1;
-        _invApplyQuoteSync(inv, q);
-        const tech = inv.items.find(x => x.desc === '技術工');
-        out.after = !_invQuoteDiff(inv, q).any && !!tech && tech._qRetired === 1 && inv.quoteVer === 1;
-        /* 既有資料：已同步到 v1、保留列沒有標記 → 也不再提醒 */
-        const old = { id: 'iHF2', quoteId: 'qHF', quoteVer: 1, items: [{ type: 'item', desc: '中間樁打設', unit: '支', contractQty: 10, contractPrice: 1000 }, { type: 'item', desc: '技術工', prevQty: 8 }] };
-        out.legacy = !_invQuoteDiff(old, q).any;
-        /* 尚未同步的單：報價真的刪了工項仍要提醒 */
-        out.still = _invQuoteDiff({ quoteVer: null, items: [{ type: 'item', desc: '技術工', prevQty: 8 }] }, q).removed.length === 1;
-      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
-      return out;
-    });
-    check('v6.0.102 同步報價後：保留的舊工項標「報價已刪、保留歷史數量」、不再判成仍是舊版（含已同步的既有資料）、未同步者照常提醒', r.before && r.after && r.legacy && r.still, JSON.stringify(r));
-    check('v6.0.102 hotfix 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
