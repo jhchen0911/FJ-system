@@ -6744,9 +6744,9 @@ async function newPage(browser, width, height) {
   {
     const rules = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const RD = "root.child('fydata/readers')";
-    const wr = [rules.shared['.write'], rules.relay['.write'], rules.relay['.read'], rules.private['.write'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.backups['.write'], rules.logs['$uid']['.write']];
+    const wr = [rules.shared['.write'], rules.relay['.write'], rules.relay['.read'], rules.private['.write'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.logs['$uid']['.write']];   // backups 改只給擁有者（另驗）
     check('v6.0.90 規則：readers 可讀 shared（v6.0.108 起也可讀 private）、所有寫入與 relay／backups 皆排除 readers 名冊、名冊僅管理員可寫',
-      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && rules.private['.read'].includes('|| ' + RD) /* v6.0.108 Lotion：唯讀帳號可讀 private */ && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
+      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.backups['.read'].includes('adminEmails') && !rules.backups['.write'].includes('adminEmails') && rules.relay['.read'].includes('|| ' + RD) && rules.private['.read'].includes('|| ' + RD) /* v6.0.108 Lotion：唯讀帳號可讀 private */ && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
       '');
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -7278,14 +7278,14 @@ async function newPage(browser, width, height) {
     const fs = require('fs'), pth = require('path');
     const rules = JSON.parse(fs.readFileSync(pth.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const RK = "root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()";
-    const rr = {};
+    const rr = {}, OWN = "auth != null && auth.token.email != null && auth.token.email === 'jhchen0911@gmail.com'";
     rr.privRead = rules.private['.read'].indexOf('|| ' + RK) > 0;
     const writes = [];
     (function walk(o, path) { Object.keys(o).forEach(k => { if (k === '.write') writes.push([path, o[k]]); else if (o[k] && typeof o[k] === 'object') walk(o[k], path + '/' + k); }); })(rules, 'fydata');
-    rr.writes = writes.length >= 9 && writes.every(([p, w]) => w.indexOf('!' + RK) >= 0 || (p === 'fydata/logs/$uid' && w.indexOf("!root.child('fydata/readers')") >= 0));
-    rr.badW = writes.filter(([p, w]) => !(w.indexOf('!' + RK) >= 0 || p === 'fydata/logs/$uid')).map(x => x[0]);
+    rr.writes = writes.length >= 9 && writes.every(([p, w]) => w.indexOf('!' + RK) >= 0 || (p === 'fydata/logs/$uid' && w.indexOf("!root.child('fydata/readers')") >= 0) || (p === 'fydata/backups' && w === OWN));
+    rr.badW = writes.filter(([p, w]) => !(w.indexOf('!' + RK) >= 0 || p === 'fydata/logs/$uid' || (p === 'fydata/backups' && w === OWN))).map(x => x[0]);
     const rv = rules.readers.$email['.validate']; rr.nameRule = /newData\.val\(\) === true/.test(rv) && /hasChildren\(\['name'\]\)/.test(rv) && rules.readers.$email.$other['.validate'] === false;
-    rr.backups = rules.backups['.read'].indexOf('!' + RK) > 0 && rules.backups['.write'].indexOf('!' + RK) > 0;
+    rr.backups = rules.backups['.read'] === OWN && rules.backups['.write'] === OWN && rules.relay['.read'].indexOf('|| ' + RK) > 0;   // 審查修正：備份只給擁有者；日報照片（relay）唯讀帳號可讀
     const fn = fs.readFileSync(pth.join(__dirname, '..', 'functions', 'index.js'), 'utf8'); rr.fn = /readers: set\(rdr, on\)/.test(fn);
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
@@ -7417,6 +7417,55 @@ async function newPage(browser, width, height) {
     check('v6.0.109 得標：一式一列、根固保留 10%＋退還條件、材料與數量變更條文進合約；廠商請款依完成百分比', r.award && r.ct && r.spUi && r.sp, JSON.stringify(r));
     check('v6.0.109 報價進版連動：差異（深度／數量）、提醒、總覽待辦、已簽約產生變更草稿（需確認方式與日期、不改價）、未回價直接同步、舊單推定版次', r.diff && r.warn && r.todo && r.subWarn && r.draft && r.needBy && r.chg && r.sync1 && r.infer, JSON.stringify(r));
     check('v6.0.109 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── 批次 B 審查修正：當場扣款退還上限、逾期租金在場量上限、裝設％參照、發票規則 B、唯讀可開佣金／業務 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = function () {};
+        /* 🔴 102：第 1 期退還 10,000 被抄到第 2 期（recvHold=0）→ 不算實收、不算已退、不影響可請退；健檢列出 */
+        const i1 = { id: 'h1', project: '退款案', periodNo: 1, date: '2026-04-25', recvHold: 10000, holdRetAmt: 10000, holdRetDate: '2026-05-10', holdRetLog: [{ amt: 10000, date: '2026-05-10' }], received: 0, totals: { total: 0, curTotal: 0 }, items: [] };
+        const i2 = Object.assign({}, i1, { id: 'h2', periodNo: 2, date: '2026-05-25', recvHold: 0, holdRetLog: undefined });
+        INV.length = 0; INV.push(i1, i2);
+        const c2 = _cashOf(i2), c2n = _cashOf(Object.assign({}, i2, { holdRetAmt: 0, holdRetDate: '' }));
+        out.cash = c2 === c2n && _invHold(i2) === 0 && _invHold(i1) === 0 && _holdRetCash(i2).amt === 0;
+        const rr = _retentionRows().find(x => x.proj === '退款案'); out.ret = !rr || rr.returned === 10000;
+        const R = []; _healthAdd6102(R); out.health = R.some(x => /第 2 期「當場扣款已退還」NT\$ 10,000（2026-05-10）與第 1 期完全相同、退還日早於本期估驗日/.test(x.msg));
+        INV.length = 0;
+        /* 🔴 107：合約 100、打設 80、分兩批拔完 → 不收沒打設的 20 支 */
+        const pg = { cum: 80, removeDone: '2026-11-25', remLogs: [{ date: '2026-11-10', qty: 50, done: true }, { date: '2026-11-25', qty: 30, done: true }] };
+        const bq = _rentBatchQtyDays(pg, 100, '2026-11-01', '2026-11-30');
+        out.rent = bq.qtyDays === 50 * 9 + 30 * 24 && bq.rows.length === 2 && !bq.rows.some(x => x.open);
+        const bq2 = _rentBatchQtyDays({ cum: 80, remLogs: [{ date: '2026-11-10', qty: 50, done: true }] }, 100, '2026-11-01', '2026-11-30');
+        out.rentOpen = bq2.qtyDays === 50 * 9 + 30 * 30 && bq2.rows[1].qty === 30;
+        /* 分批折讓（支·天）＋列標題 */
+        const bit = { type: 'rental', curQty: 1170, contractPrice: 50, payRate: 100, _ovKey: 'x', _ovBatches: bq.rows, unit: '支·天', discQd: 170 };
+        out.disc = _invRentQ(bit) === 1000 && /折讓 170 支·天 ＝ 1,000 支·天/.test(_invCalcText(bit));
+        /* 🟡 103：包商空白＝業主參照 */
+        const qx = { id: 'qX', name: 'X', items: [] }; Q = [qx]; CONTRACTS = CONTRACTS || [];
+        out.inst = _instOf({}, qx) === _ownerInstRef(qx).pct && _instOf({ instPct: 90 }, qx) === 90 && _instOf({}) === _instDef();
+        /* 🟡 發票規則 B：小計 10,000、保留 5% → 保留 500（未稅）、扣保留後 9,500、稅 475、總計 9,975 */
+        const b = _invRuleB(10000, 500, 525); out.ruleB = b.retU === 500 && b.net === 9500 && b.tax === 475;
+        const pv = { id: 'PB', project: '版面B', periodNo: 2, retention: true, retentionPct: 5, cleanMode: 'net', items: [{ type: 'item', desc: '打設', unit: 'M', contractQty: 20, contractPrice: 1000, curQty: 10, curAmt: 10000, payRate: 100 }] };
+        invItems = JSON.parse(JSON.stringify(pv.items)); invEid = 'PB'; buildInvPreview(pv);
+        const h = document.getElementById('inv-prev-html').innerHTML.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+        out.prev = /本期估驗小計（未稅） 10,000 保留款 5%（以未稅計） - 500 .*扣保留後未稅 9,500 5% 營業稅（以扣保留後未稅計） 475 .*本期請款總計 9,975/.test(h) && /本期發票應開金額（扣保留款後）：未稅 NT\$ 9,500、稅額 NT\$ 475/.test(h);
+        /* 🟡 108：唯讀帳號可開佣金／業務視窗看，但不能存 */
+        _fbUser = { email: 'ai@x.com', uid: 'u' }; _isReaderUser = true;
+        out.roOpen = !_roIsWriteSrc('openCommPick(\'q1\')') && !_roIsWriteSrc('openSalesPick(\'q1\')') && _roIsWriteSrc('_commPickSave(q)');
+        const qc = { id: 'qC', name: 'C', comms: [] }; Q = [qc]; _commPickSave(qc); out.roSave = !qc.comms.length;
+        _isReaderUser = false; _fbUser = null; window.toast = oT; Q = []; invItems = []; invEid = null;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('批次 B 審查：當場扣款退還以該期扣款為上限（可動用資金／保留款總覽／可請退）、健檢列出抄到下一期的退還', r.cash && r.ret && r.health, JSON.stringify(r));
+    check('批次 B 審查：逾期租金在場量上限＝實際打設（打設量＜合約量）、拔完歸零、分批可折讓支·天', r.rent && r.rentOpen && r.disc, JSON.stringify(r));
+    check('批次 B 審查：包商裝設％空白＝業主參照、請款計算照發票規則 B、唯讀可開佣金／業務但不能存', r.inst && r.ruleB && r.prev && r.roOpen && r.roSave, JSON.stringify(r));
+    check('批次 B 審查測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
