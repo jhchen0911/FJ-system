@@ -7026,6 +7026,28 @@ async function newPage(browser, width, height) {
       return out;
     });
     check('v6.0.102 同步報價後：保留的舊工項標「報價已刪、保留歷史數量」、不再判成仍是舊版（含已同步的既有資料）、未同步者照常提醒', r.before && r.after && r.legacy && r.still, JSON.stringify(r));
+    /* 審查修正：刪除→同步→加回→同步，_qRetired 要清掉；超請警示不受 _qRetired 影響 */
+    const r2 = await page.evaluate(() => {
+      const out = {};
+      try {
+        const q = { id: 'qHG', ver: 1, name: '加回案', items: [{ desc: '中間樁打設', unit: '支', qty: 10, price: 1000 }] };
+        Q = [q];
+        const inv = { id: 'iHG', quoteId: 'qHG', project: '加回案', periodNo: 5, quoteVer: null, items: [{ type: 'item', desc: '中間樁打設', unit: '支', contractQty: 10, contractPrice: 1000, prevQty: 4, curQty: 2 }, { type: 'item', desc: '技術工', unit: '工', contractQty: 5, contractPrice: 3000, prevQty: 8, curQty: 1 }] };
+        _invApplyQuoteSync(inv, q); out.del = inv.items.find(x => x.desc === '技術工')._qRetired === 1;
+        q.ver = 2; q.items.push({ desc: '技術工', unit: '工', qty: 5, price: 3000 });
+        _invApplyQuoteSync(inv, q); const t = inv.items.find(x => x.desc === '技術工');
+        out.back = !!t && t._qRetired === undefined && t.contractQty === 5 && t.prevQty === 8 && !_invQuoteDiff(inv, q).any;
+        INV.length = 0; INV.push(inv); loadInvoice('iHG');
+        const red = () => [...document.querySelectorAll('#inv-body input[data-f="curQty"]')].filter(x => x.title && /已超過合約數量/.test(x.title)).length;
+        const tick = () => new Promise(res => setTimeout(res, 30));   // 超請檢查在 setTimeout(0) 執行
+        return tick().then(() => { out.warnBack = red() === 1;
+          /* 仍被刪除的保留列（有 _qRetired）也照常顯示超請 */
+          invItems[1]._qRetired = 2; rInvItems(); return tick(); }).then(() => { out.warnRetired = red() === 1;
+          INV.length = 0; Q = []; invEid = null; invItems = []; return out; });
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('v6.0.102 審查修正：工項刪除後又加回時清除已刪標記、超請警示不受已刪標記影響', r2.del && r2.back && r2.warnBack && r2.warnRetired, JSON.stringify(r2));
     check('v6.0.102 hotfix 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
