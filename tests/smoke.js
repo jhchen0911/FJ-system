@@ -6012,7 +6012,7 @@ async function newPage(browser, width, height) {
         go('contacts'); editVendor('vS');
         const m = document.getElementById('vendor-modal'), box = m.firstElementChild, btn = [...m.querySelectorAll('button')].find(b => /儲存/.test(b.textContent));
         out.shown = getComputedStyle(m).display === 'flex';
-        const sb = box.children[1]; out.scrollable = /auto|scroll/.test(getComputedStyle(sb).overflowY) && sb.scrollHeight > sb.clientHeight && box.getBoundingClientRect().bottom <= window.innerHeight + 1;   /* v6.0.103 起內容區捲動、按鈕列固定底部 */
+        const sb = box.children[1]; out.scrollable = /auto|scroll/.test(getComputedStyle(sb).overflowY) && sb.scrollHeight > sb.clientHeight && box.getBoundingClientRect().bottom <= window.innerHeight + 1;   /* v6.0.104 起內容區捲動、按鈕列固定底部 */
         btn.scrollIntoView(); const rc = btn.getBoundingClientRect(); out.btnVisible = rc.top >= 0 && rc.bottom <= window.innerHeight;
         out.label = /聯絡人/.test(m.innerHTML) && !/<label>客戶<\/label>/.test(m.innerHTML);
         document.getElementById('v-bankacct').value = '123-456'; btn.click();
@@ -7053,7 +7053,7 @@ async function newPage(browser, width, height) {
   }
 
 
-  // ── v6.0.103 長表單視窗：矮螢幕（筆電可視高度小）與手機都能按到確認鈕（本體以 vh 為上限、內容區捲動、按鈕固定底部） ──
+  // ── v6.0.104 長表單視窗：矮螢幕（筆電可視高度小）與手機都能按到確認鈕（本體以 vh 為上限、內容區捲動、按鈕固定底部） ──
   for (const [w, h] of [[1280, 460], [390, 560], [320, 560]]) {
     const { page, errors } = await newPage(browser, w, h);
     const r = await page.evaluate(() => {
@@ -7079,8 +7079,8 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.103 長表單視窗（' + w + '×' + h + '）：收款視窗確認鈕看得到可按、各視窗本體不超出螢幕、按鈕列固定底部、無橫向捲動', r.rcpt && !r.bad.length && r.noHs && !r.err, JSON.stringify(r));
-    check('v6.0.103 長表單視窗（' + w + '×' + h + '）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    check('v6.0.104 長表單視窗（' + w + '×' + h + '）：收款視窗確認鈕看得到可按、各視窗本體不超出螢幕、按鈕列固定底部、無橫向捲動', r.rcpt && !r.bad.length && r.noHs && !r.err, JSON.stringify(r));
+    check('v6.0.104 長表單視窗（' + w + '×' + h + '）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

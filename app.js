@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.103';
+var APP_VERSION='v6.0.104';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -36868,7 +36868,7 @@ function _retReturnCard(inv){
       :'<button type="button" class="btn btn-xs btn-g" onclick="event.stopPropagation();retReturnReceive(\''+id+'\')">登錄收款</button>')
     +'<button type="button" class="btn btn-xs btn-r" onclick="event.stopPropagation();delInvoice(\''+id+'\',event)">刪除</button></div></div></div>';
 }
-// v6.0.103 長表單視窗：置中的固定視窗加 .fy-mdl（本體以 vh 為上限、內容區捲動），內容區最後一列按鈕加 .fy-mdl-foot（固定在底部）
+// v6.0.104 長表單視窗：置中的固定視窗加 .fy-mdl（本體以 vh 為上限、內容區捲動），內容區最後一列按鈕加 .fy-mdl-foot（固定在底部）
 var _MDL_IDS=['customer-modal','merge-cost-modal','rmk-modal','negotiate-modal','inv-clause-modal','award-modal','import-confirm-modal','contract-modal','vendor-modal','payable-modal','invoice-rec-modal','receipt-modal','retention-modal'];
 function _mdlFoot(body){
   if(!body)return null;
