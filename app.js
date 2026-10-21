@@ -21162,6 +21162,7 @@ function updOwnRow(cid,rid,field,val){
   const q=Q.find(x=>x.id===eid);if(!q)return;
   const cc=(q.costs||[]).find(x=>x.id===cid);if(!cc)return;
   const r=(cc.rows||[]).find(x=>x.id===rid);if(!r)return;
+  if(r&&r.offset){toast('沖銷列不能修改；要撤銷請刪除對應的實際採購卡');return;}   // Lotion 10/21 第 9 題：估算卡沖銷列保護
   r[field]=(field==='qty'||field==='unitPrice'||field==='ret')?(parseFloat(val)||0):val;
   if(field==='ret'){try{var gb=document.getElementById('gas-onsite-'+cid);if(gb)gb.outerHTML=_gasOnSiteHtml(q,cc);}catch(e){_err('updOwnRow.gas',e);}}   // v6.0.69
   _ownAutoCat(cc);recalcCostAmt(cc);_touch(q);if(field!=='ret'){try{syncCostToPayable(q,cc);}catch(e){_err('updOwnRow.pay',e);}}try{persist();}catch(e){_err('updOwnRow',e);}   // v6.0.70 明細變動即同步應付
@@ -21174,6 +21175,7 @@ function updOwnRow(cid,rid,field,val){
 function delOwnRow(cid,rid){
   const q=Q.find(x=>x.id===eid);if(!q)return;
   const cc=(q.costs||[]).find(x=>x.id===cid);if(!cc)return;
+  if((cc.rows||[]).some(x=>x.id===rid&&x.offset)){toast('沖銷列不能刪除；要撤銷請刪除對應的實際採購卡');return;}   // Lotion 10/21 第 9 題
   cc.rows=(cc.rows||[]).filter(x=>x.id!==rid);
   _ownAutoCat(cc);recalcCostAmt(cc);_touch(q);try{syncCostToPayable(q,cc);}catch(e){_err('delOwnRow.pay',e);}try{persist();}catch(e){_err('delOwnRow',e);}   // v6.0.70
   rCostItems();
@@ -21607,7 +21609,7 @@ function _spRecalc(){
     var total=parseFloat(el.getAttribute('data-total'))||0,prev=parseFloat(el.getAttribute('data-prev'))||0;
     var w=el.querySelector('.sp-warn');
     if(lumpR&&!lumpKeep&&(parseFloat(inp.value)||0)>0&&prev+(parseFloat(inp.value)||0)/100>1+1e-6){lumpOver++;w.style.display='';w.style.color='var(--red)';w.textContent='累計完成超過 100%：超過合約一式總價，請走追加減（不能存檔）';}   // Lotion 10/21：直接擋下
-    else if(total>0&&prev+qn>total+1e-6){over++;var ex=Math.max(0,prev+qn-total)-Math.max(0,prev-total);overAmt+=ex*price;w.style.display='';w.textContent='累計 '+fmt(Math.round((prev+qn)*100)/100)+' 超過發包量 '+fmt(total)+'（實作實算：本期超出 '+fmt(Math.round(ex*100)/100)+'，向業主追加請款）';}
+    else if(!lumpKeep&&total>0&&prev+qn>total+1e-6){over++;var ex=Math.max(0,prev+qn-total)-Math.max(0,prev-total);overAmt+=ex*price;w.style.display='';w.textContent='累計 '+fmt(Math.round((prev+qn)*100)/100)+' 超過發包量 '+fmt(total)+'（實作實算：本期超出 '+fmt(Math.round(ex*100)/100)+'，向業主追加請款）';}
     else{w.style.display='none';}
   });
   var aw=document.getElementById('sp-absorb-wrap');if(aw)aw.style.display=over?'':'none';
@@ -23096,6 +23098,8 @@ function fixCostPayable(cid){
 function delCostItem(cid){
   var q=Q.find(function(x){return x.id===eid;});
   if(!q||!q.costs)return;
+  var _dc=q.costs.find(function(x){return x.id===cid;});
+  if(_dc&&_dc.estOf){var _es=q.costs.find(function(x){return x.id===_dc.estOf;});if(_es&&_es.offsetBy===cid){_es.rows=(_es.rows||[]).filter(function(r){return !r.offset;});delete _es.offsetBy;_es.mt=Date.now();try{recalcCostAmt(_es);}catch(e){_err('delCostItem.est',e);}}}   // 刪實際採購卡＝還原估算卡（Lotion 10/21 第 9 題）
   q.costs=q.costs.filter(function(x){return x.id!==cid;});
   removePayableByCostId(cid);
   rCostItems();
@@ -23124,6 +23128,7 @@ function delCostRow(cid,rid){
   if(!q||!q.costs)return;
   var cc=q.costs.find(function(x){return x.id===cid;});
   if(!cc||!cc.rows)return;
+  if(cc.rows.some(function(r){return r.id===rid&&r.offset;})){toast('沖銷列不能刪除；要撤銷請刪除對應的實際採購卡');return;}   // Lotion 10/21 第 9 題
   if(cc.rows.length<=1){toast('至少保留一行');return;}
   cc.rows=cc.rows.filter(function(r){return r.id!==rid;});
   recalcCostAmt(cc);
@@ -33956,7 +33961,7 @@ function _piSave(){
   if(per==='m'&&(c.rows||[]).some(function(r,i){return !(lens[i]>0);})){toast('依 M 計請填每個工項的單支長度（或改 $/支）');pjIntroEdit(x.qid,x.cid,x.fid,pre);return;}
   if((per==='pct'||per==='lump')&&pay==='follow')pay='first';
   var f=x.fid?(q.costs||[]).find(function(y){return y.id===x.fid;}):null,isNew=!f;
-  if(f&&(f.introPay||'follow')!==pay&&(_subPeriods(f).some(function(p){return !p.isRet;})||PAYABLES.some(function(p){return p&&p.id==='pay'+f.id+'_intro';}))){toast('介紹費已有期別／應付，付款時機已鎖住；要改請另開調整單');pjIntroEdit(x.qid,x.cid,x.fid,pre);return;}   // Lotion 10/21 第 8 題：有期別就全部鎖住
+  if(f&&(f.introPay||'follow')!==pay&&(_subPeriods(f).some(function(p){return !p.isRet;})||PAYABLES.some(function(p){return p&&p.id==='pay'+f.id+'_intro';}))){toast((per==='pct'||per==='lump')&&gv('pi-pay')==='follow'?'介紹費已有期別／應付，不能改成「合約金額%／一筆」計價（會變成一次付清）；要改請另開調整單':'介紹費已有期別／應付，付款時機已鎖住；要改請另開調整單');pjIntroEdit(x.qid,x.cid,x.fid,pre);return;}   // Lotion 10/21 第 8 題：有期別就全部鎖住
   if(!f){f={id:c.id+'i'+Math.random().toString(36).slice(2,4),type:'sub',isAttached:false,attachedTo:'',mergedInto:'',cat:c.cat||'打設',date:localToday(),rows:[],amt:0,signDate:localToday(),entryDate:c.entryDate||'',retRate:0,rfqId:c.rfqId||'',followOf:c.id,isIntro:true};q.costs.push(f);}
   var old=f.rows||[];
   if(per==='pct'||per==='lump'){
@@ -34034,13 +34039,14 @@ function costEstToActual(cid){
   if(_roDeny())return;
   var q=Q.find(function(x){return x.id===eid;});if(!q)return;var c=(q.costs||[]).find(function(x){return x.id===cid;});if(!c||!c.estMat||c.offsetBy)return;
   try{recalcCostAmt(c);}catch(e){_err('costEstToActual',e);}
-  var amt=Math.round(parseFloat(c.amt)||0);
+  var amt=parseFloat(c.amt)||0;   // 沖銷用精確值，估算卡歸零
   showConfirm('登錄實際採購','另開一張「實際採購」成本卡（先帶入估算明細，請改成實際金額），估算卡加一列沖銷 −NT$ '+fmt(amt)+'，估算卡保留不刪。',function(){
+    if(c.offsetBy)return;   // 重複按下
     var nid=cid+'a'+Math.random().toString(36).slice(2,6),now=Date.now();
     var n={id:nid,type:'own',isAttached:false,attachedTo:'',mergedInto:'',vendor:'',linkedItemIdx:c.linkedItemIdx,cat:c.cat||'工項材料',date:localToday(),rfqId:c.rfqId||'',estOf:cid,
       rows:(c.rows||[]).filter(function(r){return !r.offset;}).map(function(r,k){return {id:nid+'_'+k,preset:'',desc:String(r.desc||'').replace(/（豐有提供，[^）]*）/,'（實際採購）'),qty:r.qty,unit:r.unit,unitPrice:r.unitPrice};}),amt:0,mt:now};
     q.costs.push(n);
-    if(!Array.isArray(c.rows))c.rows=[];c.rows.push({id:cid+'_off',offset:1,preset:'',desc:'沖銷：已改登實際採購（'+localToday()+'）',qty:1,unit:'式',unitPrice:-amt});
+    if(!Array.isArray(c.rows))c.rows=[];c.rows.push({id:cid+'_off',offset:1,preset:'',desc:'沖銷：已改登實際採購（'+localToday()+'）',qty:1,unit:'式',unitPrice:-amt});   // 沖銷列（offset）不可改、不可刪
     c.offsetBy=nid;c.mt=now;
     try{recalcCostAmt(c);recalcCostAmt(n);}catch(e){_err('costEstToActual.calc',e);}
     _touch(q);try{persist();_immediateUpload();}catch(e){_err('costEstToActual',e);}
