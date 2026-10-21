@@ -603,6 +603,13 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 }
 /* v6.0.57 信封列印視窗：手機改單欄、預覽在上 */
 @media(max-width:767px){.env-grid{grid-template-columns:1fr!important}.env-grid>div:nth-child(2){order:-1}}
+/* v6.0.103 長表單視窗（收款、合約、應付、廠商、發票、保留款…）：本體高度以 vh 為上限、內容區自己捲、最後一列按鈕固定在視窗底部
+   （Lotion 筆電約 1080 高、瀏覽器可視高度更小時捲不到「確認」）。類別由 _mdlInit 加上；gen-confirm-modal 原本就有自己的版面 */
+.fy-mdl>div:first-child{max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);display:flex;flex-direction:column;margin-top:0!important;margin-bottom:0!important}
+.fy-mdl>div:first-child>div:first-child{flex:0 0 auto}
+.fy-mdl>div:first-child>div:nth-child(2){flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:0!important}
+.fy-mdl-foot{position:sticky;bottom:0;z-index:3;background:var(--w);padding-top:10px;padding-bottom:14px;box-shadow:0 -8px 8px -8px rgba(0,0,0,.25)}
+.fy-mdl>div:first-child>div:nth-child(2)>:last-child:not(.fy-mdl-foot){margin-bottom:14px}
 </style>
 
   <!-- Firebase SDK -->
@@ -2764,7 +2771,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.102" defer></script>
+<script src="app.js?v=6.0.103" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">

@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.102';
+var APP_VERSION='v6.0.103';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -36868,17 +36868,35 @@ function _retReturnCard(inv){
       :'<button type="button" class="btn btn-xs btn-g" onclick="event.stopPropagation();retReturnReceive(\''+id+'\')">登錄收款</button>')
     +'<button type="button" class="btn btn-xs btn-r" onclick="event.stopPropagation();delInvoice(\''+id+'\',event)">刪除</button></div></div></div>';
 }
+// v6.0.103 長表單視窗：置中的固定視窗加 .fy-mdl（本體以 vh 為上限、內容區捲動），內容區最後一列按鈕加 .fy-mdl-foot（固定在底部）
+var _MDL_IDS=['customer-modal','merge-cost-modal','rmk-modal','negotiate-modal','inv-clause-modal','award-modal','import-confirm-modal','contract-modal','vendor-modal','payable-modal','invoice-rec-modal','receipt-modal','retention-modal'];
+function _mdlFoot(body){
+  if(!body)return null;
+  var k=[].slice.call(body.children).filter(function(x){return x.tagName!=='SCRIPT'&&x.tagName!=='INPUT';});
+  var last=k[k.length-1];
+  if(last&&last.querySelector('button')&&!last.querySelector('input:not([type=hidden]),select,textarea')){last.classList.add('fy-mdl-foot');return last;}
+  return null;
+}
+function _mdlInit(){
+  _MDL_IDS.forEach(function(id){
+    var o=document.getElementById(id);if(!o||o.classList.contains('fy-mdl'))return;
+    var pn=o.firstElementChild;if(!pn||!pn.children[1])return;
+    o.classList.add('fy-mdl');pn.style.maxHeight='';pn.style.overflow='hidden';
+    _mdlFoot(pn.children[1]);
+  });
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',_mdlInit);else _mdlInit();
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
-  d.id='fy-modal';
+  d.id='fy-modal';d.className='fy-mdl';
   d.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
   d.innerHTML='<div style="max-width:460px;width:100%;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
     +'<div style="background:var(--g3);padding:12px 16px;display:flex;justify-content:space-between;align-items:center">'
     +'<span style="color:#fff;font-size:14px;font-weight:700">'+esc(title)+'</span>'
     +'<button type="button" id="fy-modal-x" style="border:none;background:transparent;color:rgba(255,255,255,.8);font-size:19px;cursor:pointer">✕</button></div>'
     +'<div style="padding:15px 17px">'+bodyHtml
-    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:15px">'
+    +'<div class="fy-mdl-foot" style="display:flex;gap:8px;justify-content:flex-end;margin-top:15px">'
     +'<button type="button" id="fy-modal-c" class="btn btn-sm">取消</button>'
     +'<button type="button" id="fy-modal-o" class="btn btn-sm btn-g" style="padding:7px 20px">確定</button></div></div></div>';
   document.body.appendChild(d);
