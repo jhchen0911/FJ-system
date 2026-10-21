@@ -52,7 +52,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
 .snav.active{background:var(--gl);color:var(--g3);font-weight:700}
 .snav.active .sic{opacity:1}
 .snav .cnt{margin-left:auto;background:var(--g);color:#fff;border-radius:99px;padding:1px 6px;font-size:10px;font-weight:700;min-width:18px;text-align:center}
-.content{flex:1;overflow-y:auto;overflow-x:clip}
+.content{flex:1;min-width:0;overflow-y:auto;overflow-x:clip}
 .page{display:none}.page.active{display:block}
 
 /* ═══ 頁面標題列 ═══ */
@@ -101,6 +101,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
 
 /* ═══ 表單 ═══ */
 .fg{display:grid;gap:10px;margin-bottom:10px}.fg:last-child{margin-bottom:0}
+.fg>*,.f>input,.f>select,.f>textarea{min-width:0}
 .fg2{grid-template-columns:1fr 1fr}.fg3{grid-template-columns:1fr 1fr 1fr}.fg4{grid-template-columns:1fr 1fr 1fr 1fr}
 /* 參數設定：單價欄位固定緊湊寬度（220~300px），各區塊一致、不再超寬或大片留白 */
 #page-params .fg.fg2{grid-template-columns:repeat(auto-fit,minmax(220px,300px));gap:10px 14px}
@@ -607,6 +608,18 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 .fy-ro-x{display:none!important}
 body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
 .fy-ro-d{cursor:not-allowed}
+/* v6.0.104 長表單視窗（收款、合約、應付、廠商、發票、保留款…）：本體高度以 vh 為上限、內容區自己捲、最後一列按鈕固定在視窗底部
+   （Lotion 筆電約 1080 高、瀏覽器可視高度更小時捲不到「確認」）。類別由 _mdlInit 加上；gen-confirm-modal 原本就有自己的版面 */
+/* 外層 fixed inset:0 高度確定，100%＝扣掉外層內距的可視高度（不依賴 dvh，舊版 iOS 也正確） */
+.fy-mdl>div:first-child{max-height:100%;display:flex;flex-direction:column;margin-top:0!important;margin-bottom:0!important}
+.fy-mdl>div:first-child>div:first-child{flex:0 0 auto}
+.fy-mdl>div:first-child>div:nth-child(2){flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:0!important}
+/* 內容區不得左右滑：格線欄位可縮（原本超寬欄位被外框截斷看不到） */
+.fy-mdl .fg>*{min-width:0}
+.fy-mdl .fg input,.fy-mdl .fg select,.fy-mdl .fg textarea{max-width:100%;min-width:0;box-sizing:border-box}
+.fy-mdl .fg .btn{max-width:100%;white-space:normal;height:auto}
+.fy-mdl-foot{position:sticky;bottom:0;z-index:3;background:var(--w);padding-top:10px;padding-bottom:14px;margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px;box-shadow:0 -8px 8px -8px rgba(0,0,0,.25)}
+.fy-mdl>div:first-child>div:nth-child(2)>:last-child:not(.fy-mdl-foot){margin-bottom:14px}
 </style>
 
   <!-- Firebase SDK -->
@@ -896,7 +909,7 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
           <div class="f" id="upa-overtime-wrap">
             <label>逾期租金（選填）</label>
             <div style="display:flex;gap:6px">
-              <input type="number" id="upa-ot-amt" placeholder="自動計算" oninput="this._userEdited=true" style="flex:1;font-size:14px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">
+              <input type="number" id="upa-ot-amt" placeholder="自動計算" oninput="this._userEdited=true" style="flex:1;min-width:0;font-size:14px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">
               <select id="upa-ot-unit" style="font-size:12px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit">
                 <option>$/M/天</option>
                 <option>$/支/天</option>
