@@ -7998,8 +7998,13 @@ async function newPage(browser, width, height) {
         draftQuoteSubmit(); await new Promise(res => setTimeout(res, 50));
         const k1 = Object.keys(store).find(k => store[k].type === 'quote');
         out.quote = !!k1 && store[k1].status === 'pending' && store[k1].by === 'hsuanchen911@gmail.com' && store[k1].payload.fields.name === 'AI 草稿新案' && Q.length === 1;
-        /* 2. 得標狀態草稿：點狀態 chip → 草稿，報價狀態不變 */
-        cycleBidStatus('qD'); document.getElementById('db-st').value = 'lost'; document.getElementById('db-note').value = '業主 LINE 通知'; document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 50));
+        /* 審查 🔴5：停在編輯頁不操作，草稿列不得一直重寫 */
+        draftQuoteNew(); let mut = 0; const mo = new MutationObserver(m => { mut += m.length; }); mo.observe(document.getElementById('draft-bar'), { childList: true, subtree: true });
+        await new Promise(res => setTimeout(res, 400)); mo.disconnect(); out.noLoop = mut === 0; draftQuoteCancel();
+        /* 2. 得標狀態草稿：在報價列表真的點狀態 chip → 草稿，報價狀態不變（審查 🔴1） */
+        go('quotes'); renderList(); await new Promise(res => setTimeout(res, 120));
+        const chip = document.querySelector('[onclick*="draftBidOpen(\'qD\')"]'); out.chip = !!chip && chip.offsetParent !== null && !chip.classList.contains('fy-ro-x');
+        if (chip) chip.click(); else cycleBidStatus('qD'); document.getElementById('db-st').value = 'lost'; document.getElementById('db-note').value = '業主 LINE 通知'; document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 50));
         const k2 = Object.keys(store).find(k => store[k].type === 'bid');
         out.bid = !!k2 && store[k2].payload.to === 'lost' && !Q[0].bidStatus;
         /* 唯讀帳號不能確認 */
@@ -8010,14 +8015,32 @@ async function newPage(browser, width, height) {
         const todo = []; _v6TodoItems(todo); out.todo = todo.some(t => t.type === 'ai_draft' && /AI 草稿 2 筆待確認/.test(t.text));
         draftApply(store[k2].id); document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 50));
         out.bidApplied = Q[0].bidStatus === 'lost' && Q[0].lostNote === '業主 LINE 通知' && DRAFTS[store[k2].id].status === 'applied';
+        /* 審查 🔴2：套用後沒存就離開，之後存別張報價 → 草稿不能被誤標為已套用 */
+        draftApply(store[k1].id); document.getElementById('gen-confirm-ok').click();
+        go('quotes'); loadQ('qD'); saveQ(); await new Promise(res => setTimeout(res, 30));
+        out.noMis = DRAFTS[store[k1].id].status === 'pending' && !window._draftApplying;
         /* 4. 管理員套用報價草稿 → 開編輯頁、按儲存才寫入 */
         draftApply(store[k1].id); document.getElementById('gen-confirm-ok').click();
         out.qOpen = document.getElementById('fn').value === 'AI 草稿新案' && Q.length === 1;
-        saveQ(); out.qSaved = Q.length === 2 && Q.some(q => q.name === 'AI 草稿新案') && DRAFTS[store[k1].id].status === 'applied';
+        saveQ(); await new Promise(res => setTimeout(res, 30)); out.qSaved = Q.length === 2 && Q.some(q => q.name === 'AI 草稿新案') && DRAFTS[store[k1].id].status === 'applied';
+        /* 審查 🔴3／4／6：惡意 id、非字串欄位、非圖片檔 → 不執行、不壞清單、不套用 */
+        window.__xss = 0;
+        DRAFTS["x');window.__xss=1;//"] = { id: "x');window.__xss=1;//", type: 'bid', by: 'x', at: 2, status: 'pending', summary: 'x', payload: {} };
+        DRAFTS.dNum1 = { id: 'dNum1', type: 'bid', by: 7, byName: 8, at: 3, status: 'pending', summary: 123, payload: { qid: 'qD', to: 'void' } };
+        DRAFTS.dImg1 = { id: 'dImg1', type: 'irPhoto', by: 'x', at: 4, status: 'pending', summary: 'p', payload: { file: 'x" onerror="window.__xss=2" a.png' } };
+        let lh = ''; try { lh = _draftListHtml(); out.strOk = true; } catch (e) { out.strOk = false; }
+        out.noBadId = !/__xss/.test(lh) && /dNum1/.test(lh) && !/onerror/.test(lh);
+        draftApply("x');window.__xss=1;//"); draftApply('dImg1');
+        out.noXss = window.__xss === 0 && !document.getElementById('gen-confirm-ok') && DRAFTS.dImg1.status === 'pending';
+        delete DRAFTS["x');window.__xss=1;//"]; delete DRAFTS.dNum1; delete DRAFTS.dImg1;
+        /* 審查 🟡9：已得標案件不能用草稿改狀態 */
+        Q.find(q => q.id === 'qD').awarded = true; DRAFTS.dAwd1 = { id: 'dAwd1', type: 'bid', by: 'x', at: 5, status: 'pending', summary: 'x', payload: { qid: 'qD', from: '', to: 'void' } };
+        draftApply('dAwd1'); out.awdGuard = !document.getElementById('gen-confirm-ok') && Q.find(q => q.id === 'qD').bidStatus === 'lost';
+        Q.find(q => q.id === 'qD').awarded = false; delete DRAFTS.dAwd1;
         /* 5. 退回 */
-        const dRej = { id: 'dX', type: 'bid', by: 'x', at: 1, status: 'pending', summary: 'x', payload: { qid: 'qD', to: 'void' } }; DRAFTS.dX = dRej;
-        const oP = window.prompt; window.prompt = () => '不對'; draftReject('dX'); window.prompt = oP; await new Promise(res => setTimeout(res, 30));
-        out.rej = DRAFTS.dX.status === 'rejected' && DRAFTS.dX.reason === '不對' && Q.find(q => q.id === 'qD').bidStatus === 'lost';
+        const dRej = { id: 'dXXX', type: 'bid', by: 'x', at: 1, status: 'pending', summary: 'x', payload: { qid: 'qD', to: 'void' } }; DRAFTS.dXXX = dRej;
+        const oP = window.prompt; window.prompt = () => '不對'; draftReject('dXXX'); window.prompt = oP; await new Promise(res => setTimeout(res, 30));
+        out.rej = DRAFTS.dXXX.status === 'rejected' && DRAFTS.dXXX.reason === '不對' && Q.find(q => q.id === 'qD').bidStatus === 'lost';
         /* 6. 規則檔：唯讀帳號只能新增 pending、不能改 */
         out.rules = typeof _draftPush === 'function';
         _fbDb = oDb; _fbUser = null; DRAFTS = {}; Q = []; window.toast = oT;
@@ -8027,8 +8050,10 @@ async function newPage(browser, width, height) {
     const rules = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8'));
     const dr = rules.rules.fydata.drafts || {};
     const rw = (dr.$id || {})['.write'] || '';
-    check('v6.0.109 AI 草稿：唯讀帳號可編輯報價並送草稿、得標狀態草稿，正式資料不變；唯讀不能確認', r.btn && r.editable && r.saveHidden && r.quote && r.bid && r.roApply && !r.err, JSON.stringify(r));
+    check('v6.0.109 AI 草稿：唯讀帳號可編輯報價並送草稿、得標狀態草稿，正式資料不變；唯讀不能確認', r.btn && r.editable && r.saveHidden && r.quote && r.chip && r.noLoop && r.bid && r.roApply && !r.err, JSON.stringify(r));
     check('v6.0.109 AI 草稿：管理員待辦、確認得標狀態／報價（按儲存才寫入）、退回', r.todo && r.bidApplied && r.qOpen && r.qSaved && r.rej, JSON.stringify(r));
+    check('v6.0.109 AI 草稿審查：取消套用不誤標、惡意 id／非字串／非圖片不執行不套用、已得標不改', r.noMis && r.strOk && r.noBadId && r.noXss && r.awdGuard, JSON.stringify(r));
+    check('v6.0.109 AI 草稿規則：欄位白名單（$other false）、id 格式、照片限 data:image 與大小、唯讀不得帶處理欄位', (dr.$id || {}).$other && dr.$id.$other['.validate'] === 'false' && /\$id\.matches/.test(dr.$id['.validate']) && /beginsWith\('data:image\/'\)/.test(dr.$id.payload.file['.validate']) && /!newData\.hasChild\('doneAt'\)/.test(rw) && (dr['.indexOn'] || []).indexOf('status') >= 0, JSON.stringify(dr).slice(0, 200));
     check('v6.0.109 AI 草稿規則：唯讀帳號只能新增 by＝自己的 pending 草稿（!data.exists()），管理員可改', /!data\.exists\(\)/.test(rw) && /newData\.child\('status'\)\.val\(\) === 'pending'/.test(rw) && /newData\.child\('by'\)\.val\(\) === auth\.token\.email\.toLowerCase\(\)/.test(rw), rw.slice(0, 200));
     check('v6.0.109 AI 草稿測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
