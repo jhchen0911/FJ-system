@@ -6013,7 +6013,7 @@ async function newPage(browser, width, height) {
         go('contacts'); editVendor('vS');
         const m = document.getElementById('vendor-modal'), box = m.firstElementChild, btn = [...m.querySelectorAll('button')].find(b => /儲存/.test(b.textContent));
         out.shown = getComputedStyle(m).display === 'flex';
-        out.scrollable = /auto|scroll/.test(getComputedStyle(box).overflowY) && box.scrollHeight > box.clientHeight && box.getBoundingClientRect().bottom <= window.innerHeight + 1;
+        const sb = box.children[1]; out.scrollable = /auto|scroll/.test(getComputedStyle(sb).overflowY) && sb.scrollHeight > sb.clientHeight && box.getBoundingClientRect().bottom <= window.innerHeight + 1;   /* v6.0.104 起內容區捲動、按鈕列固定底部 */
         btn.scrollIntoView(); const rc = btn.getBoundingClientRect(); out.btnVisible = rc.top >= 0 && rc.bottom <= window.innerHeight;
         out.label = /聯絡人/.test(m.innerHTML) && !/<label>客戶<\/label>/.test(m.innerHTML);
         document.getElementById('v-bankacct').value = '123-456'; btn.click();
@@ -6872,7 +6872,7 @@ async function newPage(browser, width, height) {
           && !/0 天期票/.test(_sctPayTxt(Object.assign({}, cost, { payTerm: { cashPct: 50, ticketPct: 50, ticketDays: 0 } }), _sctCfg(), q));
         q.ownerPay = { delay: 3, day: 1, cashPct: 50, ticketDays: 0 }; out.noZero = _rfqCond(null).ticketDays > 0 || _rfqCond(null).cashPct === 100;
         /* v6.0.96 裝設請款％：營造廠 80 → 包商預設 80；包商 90 提醒先墊 10%；空白＝公司預設 90；合約與詢價單寫出分段 */
-        q.ownerPay = { instPct: 80 }; const ci = _rfqCond(null);
+        q.ownerPay = { instPct: 80 }; q.instV = 2; const ci = _rfqCond(null);   /* 新專案：包商空白跟業主（舊專案凍結 90，見 Lotion 10/21 測試） */
         out.inst = ci.instPct === 80 && _b2bIssues(q, Object.assign({}, ci, { instPct: 90 })).some(x => /包商裝設完成先拿 90%，比營造廠的 80% 多 10%（豐有先墊）/.test(x)) && !_b2bIssues(q, ci).some(x => /裝設/.test(x))
           && !_b2bIssues(q, Object.assign({}, ci, { instPct: null })).some(x => /裝設/.test(x)) && _instOf({}) === 100 - _removeRate() && /裝設（打設）完成請款 80%，拆除（拔除）完成請款 20%/.test(_rfqCondLines({ cond: ci }).join(''));
         out.retB = _ownerTerms({ id: 'zr', client: '元昱測試營造', ownerPay: { day: 20 } }).ret === null && _ownerTerms(q).ret === 10;
@@ -7566,7 +7566,7 @@ async function newPage(browser, width, height) {
         const bit = { type: 'rental', curQty: 1170, contractPrice: 50, payRate: 100, _ovKey: 'x', _ovBatches: bq.rows, unit: '支·天', discQd: 170 };
         out.disc = _invRentQ(bit) === 1000 && /折讓 170 支·天 ＝ 1,000 支·天/.test(_invCalcText(bit));
         /* 🟡 103：包商空白＝業主參照 */
-        const qx = { id: 'qX', name: 'X', items: [] }; Q = [qx]; CONTRACTS = CONTRACTS || [];
+        const qx = { id: 'qX', name: 'X', items: [], instV: 2 }; Q = [qx]; CONTRACTS = CONTRACTS || [];
         out.inst = _instOf({}, qx) === _ownerInstRef(qx).pct && _instOf({ instPct: 90 }, qx) === 90 && _instOf({}) === _instDef();
         /* 🟡 發票規則 B：小計 10,000、保留 5% → 保留 500（未稅）、扣保留後 9,500、稅 475、總計 9,975 */
         const b = _invRuleB(10000, 500, 525); out.ruleB = b.retU === 500 && b.net === 9500 && b.tax === 475;
@@ -7610,7 +7610,7 @@ async function newPage(browser, width, height) {
         invRentDisc(0); document.getElementById('rd-amt').value = String(97 * 50 * 15); document.getElementById('rd-note').value = '業主協商 −15 天'; document.getElementById('gen-confirm-ok').click();
         out.disc = invItems[0].discDays === 15 && invItems[0].discLog.length === 1 && invItems[0].discLog[0].reason === '業主協商 −15 天';
         /* 包商空白＝業主手動調過的％ */
-        out.inst = _instOf({}, { ownerPay: { instPct: 60 } }) === 60;
+        out.inst = _instOf({}, { instV: 2, ownerPay: { instPct: 60 } }) === 60 && _instOf({}, { ownerPay: { instPct: 60 } }) === 90;   /* 舊專案凍結原值 90 */
         /* 唯讀：明細入口放行，視窗確認＝關閉不存 */
         out.roAllow = !_roIsWriteSrc("editCustomer('c1')") && !_roIsWriteSrc("openSubPeriod('c1')") && _roIsWriteSrc('saveCustomer()');
         _fbUser = { email: 'ai@x.com', uid: 'u' }; _isReaderUser = true; let hit = 0;
@@ -7872,6 +7872,36 @@ async function newPage(browser, width, height) {
     check('Lotion 10/21（C）：根固／一般保留款分開退、舊單票期改用規則、分段裝設％需原因留紀錄不回溯、提示文字', r.grp && r.rel && r.ticket && r.instNoReason && r.inst && r.instRo && r.cardMiss && r.mixed, JSON.stringify(r));
     check('審查修正（C 第 4 輪）：一式已計價不可直接改總價、參考單價不入實績平均、規則沒寫付款比例保留單據票期、條件卡舊雲端資料一次性搬移、複製報價為新專案', r.lumpBilled && r.histRef && r.ticketKeep && r.ocMig && r.copyDef && r.lumpBlockUi && r.lumpBlock && r.okReset && r.frozen && r.emptyOk && r.ocDrop && r.copyNoCard && r.keepOk && r.keepSaved && r.keepBlock && r.cardLogin, JSON.stringify(r));
     check('Lotion 10/21（C）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── v6.0.104 長表單視窗：矮螢幕（筆電可視高度小）與手機都能按到確認鈕（本體以 vh 為上限、內容區捲動、按鈕固定底部） ──
+  for (const [w, h] of [[1280, 460], [390, 560], [320, 560]]) {
+    const { page, errors } = await newPage(browser, w, h);
+    const r = await page.evaluate(() => {
+      const out = { bad: [] };
+      try {
+        Q = [{ id: 'qM', name: '長表單案', client: '業主', awarded: true, items: [] }];
+        INV.length = 0; INV.push({ id: 'iM', quoteId: 'qM', project: '長表單案', client: '業主', periodNo: 1, date: '2026-10-01', totals: { curTotal: 100000, total: 100000 }, items: [] });
+        openReceiptModal('iM');
+        const ro = document.getElementById('receipt-modal'), ok = [...ro.querySelectorAll('button')].find(x => /確認收款/.test(x.textContent));
+        const rc = ok.getBoundingClientRect(), el = document.elementFromPoint(rc.left + rc.width / 2, rc.top + rc.height / 2);
+        out.rcpt = rc.bottom <= innerHeight && (el === ok || ok.contains(el)) && ro.firstElementChild.children[1].scrollHeight > ro.firstElementChild.children[1].clientHeight;
+        ro.style.display = 'none';
+        _MDL_IDS.concat(['fy-modal']).forEach(id => {
+          if (id === 'fy-modal') _modal('測試', '<div style="height:1200px">長內容</div>', function () {});
+          const o = document.getElementById(id); o.style.display = 'flex';
+          const pn = o.firstElementChild, pr = pn.getBoundingClientRect(), f = o.querySelector('.fy-mdl-foot');
+          let hit = true; if (f) { const bt = [...f.querySelectorAll('button')].pop(), b = bt.getBoundingClientRect(), e2 = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); hit = !!e2 && (e2 === bt || bt.contains(e2)); }
+          if (!(o.classList.contains('fy-mdl') && pr.bottom <= innerHeight + 1 && pr.top >= -1 && hit && pn.scrollWidth <= pn.clientWidth + 1 && pn.children[1].scrollWidth <= pn.children[1].clientWidth + 1 && (id === 'retention-modal' || !!f))) out.bad.push(id);
+          if (id === 'fy-modal') o.remove(); else o.style.display = 'none';
+        });
+        out.noHs = document.documentElement.scrollWidth <= innerWidth;
+        INV.length = 0; Q = [];
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.104 長表單視窗（' + w + '×' + h + '）：收款視窗確認鈕看得到可按、各視窗本體不超出螢幕、按鈕列固定底部、無橫向捲動', r.rcpt && !r.bad.length && r.noHs && !r.err, JSON.stringify(r));
+    check('v6.0.104 長表單視窗（' + w + '×' + h + '）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
