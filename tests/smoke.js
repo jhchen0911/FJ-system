@@ -7978,6 +7978,8 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.108 安全：雲端參數裡的 AI 金鑰會被移除（管理員裝置刪雲端欄位）、上傳參數不含金鑰、唯讀帳號拿不到且本機清除', r.scrub && r.noUp && r.ro && !r.err, JSON.stringify(r));
     check('v6.0.108 金鑰安全測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
 
   // ── v6.0.109 批次 E：AI 草稿（唯讀帳號送報價／得標狀態／發票照片草稿，管理員確認才生效） ──
   {
