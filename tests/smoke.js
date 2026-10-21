@@ -4374,7 +4374,7 @@ async function newPage(browser, width, height) {
         // 5 施工成本頁預設唯讀卡，按「編輯明細」才展開
         window._costEditAll=false;window._costEditId=null;openProjectCosts('qA');window._costView='list';rCostItems();
         const cl=document.getElementById('cost-list').innerHTML;
-        out.ro=document.querySelectorAll('#cost-list .cost-ro').length===3&&!document.getElementById('cost-rows-cH')&&/costEdit\('cH'\)/.test(cl)&&/openPrepay\('cH'\)/.test(cl)&&/openSubPeriod\('cH'\)/.test(cl)&&/來自 /.test(cl)&&/介紹費・合約金額 %・第一期請款後/.test(cl);
+        out.ro=document.querySelectorAll('#cost-list .cost-ro').length===3&&!document.getElementById('cost-rows-cH')&&/costEdit\('cH'\)/.test(cl)&&/openPrepay\('cH'\)/.test(cl)&&/openSubPeriod\('cH'\)/.test(cl)&&/來自 /.test(cl)&&/介紹費・合約金額 %・一次付清（第一期請款後）/.test(cl);
         costEdit('cH');out.edit=!!document.getElementById('cost-rows-cH')&&/正在編輯明細/.test(document.getElementById('cost-list').innerHTML)&&document.querySelectorAll('#cost-list .cost-ro').length===2;
         window._costEditId=null;rCostItems();out.back=document.querySelectorAll('#cost-list .cost-ro').length===3;
         costAddPick();out.pickExtra=/go\('quickcost'\)/.test(document.getElementById('gen-confirm-modal').innerHTML)&&!/addCostItem\('extra'\)/.test(document.getElementById('gen-confirm-modal').innerHTML);document.getElementById('gen-confirm-modal').style.display='none';
@@ -7679,7 +7679,7 @@ async function newPage(browser, width, height) {
         /* 🔴 110：舊單存的預計收款日不被規則蓋、規則日期不寫回；新建單標 recvRule */
         q.ownerPay = { cut: 25, delay: 2, day: 20 }; const nInv = buildInvFromQuote(q); out.recvRule = nInv.recvRule === 1;
         out.oldKeep = _invExpectedDate({ quoteId: 'qS', date: '2026-08-04', expectedRecvDate: '2026-09-20' }).date === '2026-09-20' && _invExpectedDate({ quoteId: 'qS', date: '2026-08-04', expectedRecvDate: '2026-09-20', recvRule: 1 }).date === '2026-10-20';
-        out.defs = _recvRuleOf({ quoteId: 'qS' }).cut === 25 && _recvRuleOf({ quoteId: 'qX' }) === null && _ownerTerms({ ownerPay: { cashPct: 100 }, client: '' }).day === 20;
+        out.defs = _recvRuleOf({ quoteId: 'qS' }).cut === 25 && _recvRuleOf({ quoteId: 'qX' }) === null && _ownerTerms({ payDefV: 2, ownerPay: { cashPct: 100 }, client: '' }).day === 20 && _ownerTerms({ ownerPay: { cashPct: 100 }, client: '' }).day === 25;   /* Lotion 10/21：舊專案放款日預設＝截止日 */
         /* 🟡 111：缺欄補預設、影響筆數 */
         const F = _cardParse({ schema: 'fj-contract-card/1', billing: { payMonthOffset: { value: 2, source: 'contract', evidence: { clause: '六', quote: '次兩月' } } } });
         out.cardDef = F['billing.cutoffDay'].value === 25 && F['billing.cutoffDay'].source === 'default' && F['billing.payDay'].value === 20 && F['billing.chequeDays'].value === 30 && F['billing.instPct'].value === 70 && F['billing.payMonthOffset'].value === 2;
@@ -7752,6 +7752,64 @@ async function newPage(browser, width, height) {
     });
     check('批次 C 審查第 2 輪：業主請款帶入廠商一式量、單位不同不推算完成％、合約例外只比工項名稱、重定位丟掉已刪單價、條件卡空值補預設、重複匯入保留來源', r3.sug && r3.mixed && r3.ovLine && r3.remap && r3.nullDef && r3.merge, JSON.stringify(r3));
     check('批次 C 審查測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── Lotion 10/21 決定（批次 C）：介紹費背對背、條件卡 private、新專案放款日 20、拆分發包數量分配、一式依比例調價、根固／一般保留款分開退、舊單票期用規則、分段裝設％調整需原因、提示文字 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = function () {};
+        out.intro = !!_INTRO_PAY.b2b && _introFollows({ introPay: 'b2b' }) && _introFollows({}) && !_introFollows({ introPay: 'first' });
+        out.priv = !('ownerCard' in _stripQuoteSens({ id: 'x', items: [], ownerCard: { fields: {} } }));
+        out.payDef = _payDayDef({ payDefV: 2 }, 25) === 20 && _payDayDef({}, 25) === 25;
+        /* 拆分：報價 100 → 110，兩張詢價 60／40 → +6／+4；先同步的單不影響後同步 */
+        const qS = { id: 'qS', ver: 2, items: [{ desc: '中間樁', unit: '支', qty: 110 }], rfqs: [] };
+        const rA = { id: 'rA', no: 'A', quoteVer: 1, items: [{ idx: 0, qty: 60 }] }, rB = { id: 'rB', no: 'B', quoteVer: 1, items: [{ idx: 0, qty: 40 }] };
+        qS.rfqs.push(rA, rB); const x = { t: 'qty', idx: 0, from: 100, to: 110 };
+        const sA = _rfqDiffShare(qS, rA, x, { 0: 0 }); rA.quoteVer = 2; rA.items[0].qty = 66;
+        const sB = _rfqDiffShare(qS, rB, x, { 0: 0 });
+        rB.qShare = { 0: '5' }; const sB2 = _rfqDiffShare(qS, rB, x, { 0: 0 }); delete rB.qShare;
+        out.share = sA === 6 && sB === 4 && sB2 === 5 && _rfqDiffShare({ ver: 2, rfqs: [rA] }, rA, x, { 0: 0 }) === 10;
+        /* 一式依比例：300,000、100 支 → 110 支 = 330,000（只提示） */
+        const qL = { id: 'qL', ver: 2, items: [{ desc: '中間樁', unit: '支', qty: 110 }], costs: [{ id: 'cL', type: 'sub', rows: [{ id: 'cL1', lump: true, unitPrice: 300000, lumpItems: [{ idx: 0, q0: 100, u0: '支' }] }] }] };
+        const rL = { id: 'rL', status: 'awarded', award: { costId: 'cL' }, quoteVer: 1, items: [{ idx: 0, qty: 100 }] }; qL.rfqs = [rL];
+        const la = _rfqLumpAdjOf(qL, rL, { diffs: [x] }); out.lumpAdj = la.length === 1 && la[0].nw === 330000 && qL.costs[0].rows[0].unitPrice === 300000;
+        /* 根固／一般保留款分開 */
+        const qR = { id: 'qR', name: '保留案', items: [], costs: [] };
+        const cR = { id: 'cR', type: 'sub', vendor: '乙', retRate: 10, rows: [{ id: 'g1', unitPrice: 100, qty: 100 }, { id: 'g2', tpl: 'grout', unitPrice: 200, qty: 50 }], periods: [{ no: 1, date: '2026-10-01', rows: [{ rid: 'g1', qty: 100 }, { rid: 'g2', qty: 50 }] }] };
+        qR.costs.push(cR); Q = [qR]; eid = 'qR'; PAYABLES.length = 0;
+        const G = _subRetGroups(cR); out.grp = G.gen.held === 1000 && G.grout.held === 1000;
+        releaseSubRet('cR'); document.querySelector('input[name="sr-grp"][value="grout"]').checked = true; document.getElementById('gen-confirm-ok').click();
+        const rp = cR.periods.find(p => p.isRet); const G2 = _subRetGroups(cR);
+        out.rel = !!rp && rp.retGrp === 'grout' && rp.amt === 1000 && G2.grout.held === 0 && G2.gen.held === 1000;
+        /* 舊單（已存預計收款日）：日期不動、現金／票期改用規則 */
+        Q = [{ id: 'qP', name: '票期案', client: '', ownerPay: { delay: 1, day: 20, cashPct: 40, ticketDays: 60 } }];
+        const pl = _invRecvPlan({ id: 'iP', quoteId: 'qP', date: '2026-10-25', expectedRecvDate: '2026-12-05' });
+        out.ticket = pl.date === '2026-12-05' && Math.abs(pl.cp - 0.4) < 1e-9 && pl.td === 60 && pl.ticketDate === '2027-02-03';
+        /* 分段裝設％：需原因、留紀錄、已計價期別凍結原％ */
+        const qI = { id: 'qI', name: '分段案', items: [{ desc: '鋼軌樁打設及拔除', unit: '支', qty: 10 }], costs: [] };
+        const cI = { id: 'cI', type: 'sub', vendor: '丙', rows: [{ id: 's1', stage: 1, tpl: 'gen', inst: 70, linkedItemIdx: 0, unitPrice: 1000, qty: 10 }], periods: [{ no: 1, rows: [{ rid: 's1', qi: 10, qr: 0, qty: 10 }] }] };
+        qI.costs.push(cI); Q = [qI]; eid = 'qI';
+        const a0 = _subPeriodCalc(cI, cI.periods[0]).amt;
+        subStageInstEdit('cI', 's1'); document.getElementById('sie-pct').value = '60'; document.getElementById('fy-modal-o').click();
+        out.instNoReason = cI.rows[0].inst === 70 && !!document.getElementById('fy-modal');
+        document.getElementById('sie-rs').value = '與廠商議定'; document.getElementById('fy-modal-o').click();
+        out.inst = cI.rows[0].inst === 60 && cI.rows[0].instLog.length === 1 && cI.periods[0].rows[0].ins === 70 && _subPeriodCalc(cI, cI.periods[0]).amt === a0 && a0 === 7000;
+        out.instRo = _roIsWriteSrc("subStageInstEdit('cI','s1')");
+        /* 提示：條件卡例外對不到工項、一式單位不同 */
+        Q = [{ id: 'qW', items: [{ desc: '鋼軌樁打設\n（含根固）' }] }]; _cardCtx = { qid: 'qW' };
+        out.cardMiss = /未對到任何工項：根固/.test(_cardWarn('billing.itemOverrides', [{ itemMatch: '根固' }], {}) || '') && !_cardWarn('billing.itemOverrides', [{ itemMatch: '鋼軌樁' }], {});
+        out.mixed = _subLumpMixed({ lumpItems: [{ q0: 1, u0: '支' }, { q0: 2, u0: 'M3' }] }) && !_subLumpMixed({ lumpItems: [{ q0: 1, u0: '支' }] });
+        _cardCtx = null; window.toast = oT; Q = []; eid = null; PAYABLES.length = 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    check('Lotion 10/21（C）：介紹費背對背、條件卡進 private、新專案放款日 20、拆分發包數量依原量比例分配可改、一式依比例調價只提示', r.intro && r.priv && r.payDef && r.share && r.lumpAdj, JSON.stringify(r));
+    check('Lotion 10/21（C）：根固／一般保留款分開退、舊單票期改用規則、分段裝設％需原因留紀錄不回溯、提示文字', r.grp && r.rel && r.ticket && r.instNoReason && r.inst && r.instRo && r.cardMiss && r.mixed, JSON.stringify(r));
+    check('Lotion 10/21（C）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

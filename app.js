@@ -37470,7 +37470,7 @@ var _RO_PAGES_OFF=['staff','roles'];
 var _RO_ROLE={id:'__reader',name:'唯讀',reader:true,enabled:true,sys:false,cloudCost:false,pages:{}};
 var _RO_DENY=new RegExp('^(?:save|del|delete|remove|add|new|edit|create|submit|import|upload|restore|reset|clear|clean|confirm|apply|award|revoke|bump|settle|release|recalc|fix|merge'
   +'|toggle(?:RetentionReturn|PaidDateField|PayVat|AutoSync|CumFix)|pay(?:MarkPaid|Unmark|VendorAll)|ps(?:Paid|Generate|Upd|Del)|pc(?:Paid|Generate|Upd|Del)|hr(?:Edit|Del|WriteFixedCost)'
-  +'|staff(?:Edit|Del|Import|Template)|role(?:Edit|Del|Toggle|Perm)|dept|reader(?:Add|Del|Rename)|rfq(?:New|Labor|Edit|Del|Award|RemoveVendor|Fill|QuoteSync|Chg)|subStageInst|subRetRelease|invRecvOverride|pjCardImport'
+  +'|staff(?:Edit|Del|Import|Template)|role(?:Edit|Del|Toggle|Perm)|dept|reader(?:Add|Del|Rename)|rfq(?:New|Labor|Edit|Del|Award|RemoveVendor|Fill|QuoteSync|Chg)|subStageInst|invRecvOverride|pjCardImport'
   +'|mat(?:Led|Rent|Equip|Trans|Alloc|RowEdit|Out|Back|EstSave|EstApplyCost|EstPickProj)|m6(?:Decide|Rent|Batch|TpUpd|EquipUpd)'
   +'|open(?:SubPeriod|SubAdvance|RentPeriod|Prepay|NegotiateModal|ReceiptModal|InvClauseModal|SalesBook|RmkModal|StorageRulesGen|Dunning)'
   +'|pj(?:DeductSet|OwnerPaySet|OwnerInstSet|RentEndSet|SetFollow|PayAdv|PlanSet|CloseAll|IntroEdit)|sub(?:AdvRealloc|FollowSync)'
