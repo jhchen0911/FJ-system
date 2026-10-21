@@ -465,21 +465,21 @@ function _rentStatus(q,idx,endDate){
 //   每批計到完成日前一天（完成當天已拔走）；尚未完成的數量計到 endISO（含）。
 function _rentBatchList(pg){
   var rem=(pg&&pg.remLogs)||[],anyDone=rem.some(function(r){return r.done;}),out=[],acc=0;
-  rem.forEach(function(r){acc+=r.qty;if(!anyDone||r.done){out.push({date:r.date,qty:acc});acc=0;}});
-  return {closed:out,open:acc,stage:(pg&&pg.stageRemove2)||''};
+  rem.forEach(function(r){acc+=r.qty;if(anyDone&&r.done){out.push({date:r.date,qty:acc});acc=0;}});   // Lotion 10/21：批次以「本批完成」（退場）切；都沒勾＝整批計到全部拔完
+  return {closed:out,open:acc,stage:(pg&&pg.stageRemove2)||'',noTick:!anyDone};
 }
 function _rentBatchQtyDays(pg,qty,startISO,endISO){
   var cap=(pg&&(parseFloat(pg.cum)||0)>0)?parseFloat(pg.cum):qty;   // 審查修正：在場量上限＝實際打設累計（沒打設的不收逾期租金）
   var B=_rentBatchList(pg),rows=[],left=Math.min(qty>0?qty:cap,cap>0?cap:Infinity),tot=0,n=0;
   var span=Math.max(0,_dDiff(startISO,endISO)+1);
   B.closed.forEach(function(b){if(left<=0)return;var q2=Math.min(b.qty,left);left-=q2;n++;
-    var d=Math.max(0,Math.min(_dDiff(startISO,b.date),span));tot+=q2*d;rows.push({no:n,date:b.date,qty:q2,days:d});});
-  if(left>0&&pg&&pg.removeDone&&!B.stage){n++;var d3=Math.max(0,Math.min(_dDiff(startISO,pg.removeDone),span));tot+=left*d3;rows.push({no:n,date:pg.removeDone,qty:left,days:d3});left=0;}   // 已全部拔完但最後一批沒勾：視為在拔除完成日完成（審查修正：不可歸零漏收）
+    var d=Math.max(0,Math.min(_dDiff(startISO,b.date)+1,span));tot+=q2*d;rows.push({no:n,date:b.date,qty:q2,days:d});});   // Lotion 10/21：完成當天計租（算頭算尾）
+  if(left>0&&pg&&pg.removeDone&&!B.stage){n++;var d3=Math.max(0,Math.min(_dDiff(startISO,pg.removeDone)+1,span));tot+=left*d3;rows.push({no:n,date:pg.removeDone,qty:left,days:d3});left=0;}   // 已全部拔完但最後一批沒勾：視為在拔除完成日完成（審查修正：不可歸零漏收）
   if(left>0){
-    if(B.stage){n++;var d2=Math.max(0,Math.min(_dDiff(startISO,B.stage),span));tot+=left*d2;rows.push({no:n,date:B.stage,qty:left,days:d2});}
+    if(B.stage){n++;var d2=Math.max(0,Math.min(_dDiff(startISO,B.stage)+1,span));tot+=left*d2;rows.push({no:n,date:B.stage,qty:left,days:d2});}
     else {rows.push({no:n+1,date:'',qty:left,days:span,open:true});tot+=left*span;}
   }
-  return {qtyDays:tot,rows:rows};
+  return {qtyDays:tot,rows:rows,noTick:!!B.noTick&&(B.open>0||rows.length>0)};
 }
 // v6.0.107 租期結束日口徑（報價條件第 14 條）：q.rentEnd＝'removeFirst' 拔除（拆除）第一天（舊案預設）／'removeDone' 拔除（拆除）完成日（新報價預設）
 var _RENT_END_LBL={removeFirst:'拔除（拆除）第一天',removeDone:'拔除（拆除）完成日'};
@@ -5749,7 +5749,7 @@ function calcInvDays(){
       const _ow={type:'rental',desc:_bq?(baseDesc+'  逾期租金：'+fmtMD(billStart)+'～'+fmtMD(claimDate)+'（分批，見計算式）'):overLabel,unit:_bq?(srcUnit+'·天'):srcUnit,
         contractPrice:srcPrice,contractQty:_bq?_bq.qtyDays:srcQty,
         prevQty:0,prevAmt:0,
-        curQty:_bq?_bq.qtyDays:srcQty,curDays:_bq?0:billDays,curAmt:overAmt,_ovBatches:_bq?_bq.rows:undefined,
+        curQty:_bq?_bq.qtyDays:srcQty,curDays:_bq?0:billDays,curAmt:overAmt,_ovBatches:_bq?_bq.rows:undefined,_ovNoTick:_bq?!!_bq.noTick:undefined,
         payRate:100,note:'逾期租金',otPrice:0,otUnit:'',
         _ovKey:selDesc,_ovStart:_isoD(billStart),_ovEnd:_isoD(claimDate),_ovBasis:_rentEndMode(_invQuote())};   // v6.0.107 租期結束日口徑
       if(existIdx>=0){
@@ -6655,7 +6655,7 @@ function _invCalcText(it,curAmt){
   if(it._ovKey!=null&&it.type==='rental'&&Array.isArray(it._ovBatches)&&it._ovBatches.length){   // v6.0.107 分批明細
     var bu=String(it.unit||'').replace(/·天$/,''),md=function(d){return d?String(d).slice(5).replace('-','/'):'';};
     parts=[it._ovBatches.filter(function(b){return b.days>0||b.open;}).map(function(b){   /* 審查：完成日早於本期起算的批次（0 天）不印 */ return '第'+b.no+'批 '+(b.open?'尚未拔除（計到本期截止）':(md(b.date)+' 拔除完成'))+' '+_qfmt(b.qty)+' '+bu+' × '+b.days+' 天 ＝ '+_qfmt(b.qty*b.days)+' '+bu+'·天'+(p?('（NT$ '+fmt(Math.round(b.qty*b.days*p))+'）'):'');}).join('；')
-      +(it._ovBatches.some(function(b){return !(b.days>0||b.open);})?'（其餘批次完成日早於本期起算，已於前期計價）':'')+'；合計 '+_qfmt(q)+' '+bu+'·天'+((parseFloat(it.discQd)||0)>0?(' − 折讓 '+_qfmt(it.discQd)+' '+bu+'·天 ＝ '+_qfmt(_invRentQ(it))+' '+bu+'·天'):'')+' × '+fmt(p)+' ＝ '+fmt(amt)];
+      +(it._ovBatches.some(function(b){return !(b.days>0||b.open);})?'（其餘批次完成日早於本期起算，已於前期計價）':'')+(it._ovNoTick?'（日報未勾「本批完成」，整批計到拔除完成）':'')+'；合計 '+_qfmt(q)+' '+bu+'·天'+((parseFloat(it.discQd)||0)>0?(' − 折讓 '+_qfmt(it.discQd)+' '+bu+'·天 ＝ '+_qfmt(_invRentQ(it))+' '+bu+'·天'):'')+' × '+fmt(p)+' ＝ '+fmt(amt)];
   }
   if(it._ovKey!=null&&it.type==='rental')parts.push('租期結束日口徑：'+(_RENT_END_LBL[it._ovBasis]||_RENT_END_LBL.removeFirst));   // v6.0.107
   return parts.join('；');
@@ -26533,13 +26533,14 @@ function renderRetention(){
   if(!rows.length){el.innerHTML='<div class="empty"><p>目前沒有任何保留款記錄</p><p style="font-size:12px;color:var(--b4)">請款單勾選「保留款」或收款時填「業主保留款」後會出現在這裡</p></div>';return;}
   var totPend=rows.reduce(function(a,r){return a+r.pending+r.hold;},0);
   var totDue=rows.filter(function(r){return r.due;}).reduce(function(a,r){return a+r.pending+r.hold;},0);
+  var U=function(x){return Math.round((parseFloat(x)||0)/_taxM());};   // Lotion 10/21：保留款總覽改未稅顯示，與請款單一致
   var html='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'
-    +'<div style="flex:1;min-width:150px;background:var(--w);border:1px solid var(--b2);border-radius:var(--r10);padding:12px 14px"><div style="font-size:11px;color:var(--b4)">押在業主端（未退）</div><div style="font-size:20px;font-weight:900;color:#b26a00">NT$ '+fmt(totPend)+'</div></div>'
-    +'<div style="flex:1;min-width:150px;background:var(--w);border:1px solid '+(totDue?'#f5b5ae':'var(--b2)')+';border-radius:var(--r10);padding:12px 14px"><div style="font-size:11px;color:var(--b4)">已完工、該請退</div><div style="font-size:20px;font-weight:900;color:'+(totDue?'var(--red)':'var(--b3)')+'">NT$ '+fmt(totDue)+'</div></div>'
+    +'<div style="flex:1;min-width:150px;background:var(--w);border:1px solid var(--b2);border-radius:var(--r10);padding:12px 14px"><div style="font-size:11px;color:var(--b4)">押在業主端（未退，未稅）</div><div style="font-size:20px;font-weight:900;color:#b26a00">NT$ '+fmt(U(totPend))+'</div></div>'
+    +'<div style="flex:1;min-width:150px;background:var(--w);border:1px solid '+(totDue?'#f5b5ae':'var(--b2)')+';border-radius:var(--r10);padding:12px 14px"><div style="font-size:11px;color:var(--b4)">已完工、該請退（未稅）</div><div style="font-size:20px;font-weight:900;color:'+(totDue?'var(--red)':'var(--b3)')+'">NT$ '+fmt(U(totDue))+'</div></div>'
     +'</div>'
     +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:560px">'
     +'<thead><tr style="background:var(--gl);color:var(--b5);font-size:11px"><th style="padding:6px 8px;text-align:left">工程</th>'
-    +'<th style="padding:6px 8px;text-align:right">累計保留</th><th style="padding:6px 8px;text-align:right">已退還</th>'
+    +'<th style="padding:6px 8px;text-align:right">累計保留（未稅）</th><th style="padding:6px 8px;text-align:right">已退還</th>'
     +'<th style="padding:6px 8px;text-align:right">未退（押在業主）</th><th style="padding:6px 8px;text-align:center">狀態</th>'
     +'<th style="padding:6px 8px"></th></tr></thead><tbody>'
     +rows.map(function(r){
@@ -26548,9 +26549,9 @@ function renderRetention(){
         +'<td style="padding:6px 8px"><b>'+esc(r.proj)+'</b>'+(r.client?('<br><span style="font-size:10.5px;color:var(--b3)">'+esc(r.client)+'</span>'):'')
           +(r.cond?('<br><span style="font-size:10.5px;color:var(--b4)">退還條件：'+esc(r.cond)+'</span>'):'')
           +(r.retDue?('<br><span style="font-size:10.5px;'+(r.overdue?'color:var(--red);font-weight:700':'color:var(--b4)')+'">預計退還 '+esc(r.retDue)+(r.overdue?'（已過期未退）':'')+'</span>'):'')+'</td>'
-        +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(r.accr)+'</td>'
-        +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;color:var(--g3)">'+fmt(r.returned)+'</td>'
-        +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:'+(pend?(r.due?'var(--red)':'#b26a00'):'var(--b3)')+'">'+fmt(pend)+'</td>'
+        +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(U(r.accr))+'</td>'
+        +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;color:var(--g3)">'+fmt(U(r.returned))+'</td>'
+        +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:'+(pend?(r.due?'var(--red)':'#b26a00'):'var(--b3)')+'">'+fmt(U(pend))+'</td>'
         +'<td style="padding:6px 8px;text-align:center;font-size:11px;color:'+(r.status==='completed'?'var(--g3)':'var(--b4)')+'">'
           +(r.overdue?'<b style="color:var(--red)">逾期未退</b>':r.status==='completed'?('已完工'+(r.due?'<br><b style="color:var(--red)">該請退</b>':'')):(r.status==='active'?'進行中':'—'))+'</td>'
         +'<td style="padding:6px 8px;text-align:right;white-space:nowrap">'+(r.q?_retReturnBtn(r.q):'')+' <button type="button" class="btn btn-xs" onclick="loadInvoice(\''+escq(r.invIds[r.invIds.length-1])+'\');go(\'invoice-edit\')">開請款單</button></td></tr>';
@@ -36215,6 +36216,7 @@ function _invRentBatch(it){return !!(it&&it.type==='rental'&&Array.isArray(it._o
 function _invRentQ(it){var q=parseFloat(it&&it.curQty)||0;if(_invRentBatch(it)){var x=parseFloat(it.discQd)||0;return x>0?Math.max(0,q-x):q;}return q;}
 function _invBillDays(it){var d=parseFloat(it&&it.curDays)||0,x=parseFloat(it&&it.discDays)||0;return x>0?Math.max(0,d-x):d;}
 function _invDaysCell(it){   // 列印用天數欄：有折讓印「51−15」換行「＝36」
+  if(_invRentBatch(it)&&(parseFloat(it.discQd)||0)>0)return '折讓<br>−'+_qfmt(it.discQd)+'<br><span style="font-size:9px">支·天</span>';   // Lotion 10/21：分批模式在天數欄標出折讓（原始支·天在數量欄）
   var d=parseFloat(it&&it.curDays)||0,x=parseFloat(it&&it.discDays)||0;
   if(!d)return '';
   if(!(x>0))return _qfmt(d);
@@ -36236,9 +36238,14 @@ function invRentDisc(i){
     var tq=parseFloat(it.curQty)||0,pp=parseFloat(it.contractPrice)||0,bu=String(it.unit||'').replace(/·天$/,'');
     showConfirm('逾期租金折讓（議價）','<div style="font-size:12.5px;line-height:1.8;margin-bottom:6px">'+esc(String(it.desc||'').split('\n')[0])+'<br>本期逾期合計 <b>'+_qfmt(tq)+'</b> '+esc(bu)+'·天　單價 '+fmt(pp)+'（分批，見計算式）</div>'
       +'<div class="f"><label>談定折讓（'+esc(bu)+'·天）<span style="font-size:10px;color:var(--b3)">印在請款單</span></label><input id="rd-qd" type="number" inputmode="decimal" min="0" max="'+tq+'" value="'+((parseFloat(it.discQd)||0)>0?it.discQd:'')+'" placeholder="例：天數 × 該批支數" style="'+IN+'"></div>'
-      +'<div class="f" style="margin-top:6px"><label>議價說明 <span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-note" value="'+esc(it.discNote||'')+'" style="'+IN+'"></div>',function(){
-      var x=parseFloat(gv('rd-qd'));if(isFinite(x)&&x>tq){toast('折讓不能超過逾期合計，已改為 '+_qfmt(tq));x=tq;}
-      it.discQd=isFinite(x)&&x>0?x:0;it.discNote=(gv('rd-note')||'').trim();
+      +'<div class="f" style="margin-top:6px"><label>或折讓金額（NT$，未稅）<span style="font-size:10px;color:var(--b3)">填了金額就以金額換算</span></label><input id="rd-amt" type="number" inputmode="decimal" min="0" placeholder="例：15000" style="'+IN+'"></div>'
+      +'<div class="f" style="margin-top:6px"><label>折讓原因 <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-note" value="'+esc(it.discNote||'')+'" style="'+IN+'"></div>'+_rdLogHtml(it),function(){
+      var x=parseFloat(gv('rd-qd')),am=parseFloat(gv('rd-amt'));if(isFinite(am)&&am>0&&pp>0)x=Math.round(am/pp*100)/100;   // Lotion 10/21：可輸入天數或金額
+      if(isFinite(x)&&x>tq){toast('折讓不能超過逾期合計，已改為 '+_qfmt(tq));x=tq;}
+      var nx=isFinite(x)&&x>0?x:0,rs=(gv('rd-note')||'').trim();
+      if(nx!==(parseFloat(it.discQd)||0)&&!rs){toast('請填寫折讓原因');setTimeout(function(){invRentDisc(i);},50);return;}   // 必填原因
+      if(nx!==(parseFloat(it.discQd)||0))_rdLog(it,(parseFloat(it.discQd)||0)+' '+bu+'·天',nx+' '+bu+'·天',rs);
+      it.discQd=nx;it.discNote=rs;
       try{updateInvRowAmt(i);}catch(e){_err('invRentDisc',e);}try{rInvItems();rInvTots();}catch(e){_err('invRentDisc.re',e);}try{autoSaveInv();}catch(e){_err('invRentDisc.save',e);}
       toast(it.discQd>0?('已折讓 '+_qfmt(it.discQd)+' '+bu+'·天，計費 '+_qfmt(_invRentQ(it))+' '+bu+'·天'):'已取消折讓');
     },false,null,false);
@@ -36248,12 +36255,17 @@ function invRentDisc(i){
   var html='<div style="font-size:12.5px;line-height:1.8;margin-bottom:6px">'+esc(String(it.desc||'').split('\n')[0])+'<br>本期逾期 <b>'+_qfmt(d)+'</b> 天　單價 '+fmt(p)+' × '+_qfmt(q)+' '+esc(_uFix(it.unit||''))+'</div>'
     +'<div class="fg fg2" style="gap:8px"><div class="f"><label>業主要求折讓（天）<span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-ask" type="number" inputmode="decimal" min="0" value="'+(it.discAsk!=null&&it.discAsk!==0?it.discAsk:'')+'" placeholder="例：30" style="'+IN+'"></div>'
     +'<div class="f"><label>談定折讓（天）<span style="font-size:10px;color:var(--b3)">印在請款單</span></label><input id="rd-days" type="number" inputmode="decimal" min="0" max="'+d+'" value="'+(it.discDays!=null&&it.discDays!==0?it.discDays:'')+'" placeholder="例：15" oninput="_rdPreview()" style="'+IN+'"></div></div>'
-    +'<div class="f" style="margin-top:6px"><label>議價說明 <span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-note" value="'+esc(it.discNote||'')+'" placeholder="例：10/15 與業主工務協商，原要求 30 天，談成 15 天" style="'+IN+'"></div>'
-    +'<div id="rd-prev" style="margin-top:8px;font-size:12px;color:var(--g3)"></div>';
+    +'<div class="f" style="margin-top:6px"><label>或折讓金額（NT$，未稅）<span style="font-size:10px;color:var(--b3)">填了金額就以金額換算天數</span></label><input id="rd-amt" type="number" inputmode="decimal" min="0" placeholder="例：15000" style="'+IN+'"></div>'
+    +'<div class="f" style="margin-top:6px"><label>折讓原因 <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-note" value="'+esc(it.discNote||'')+'" placeholder="例：10/15 與業主工務協商，原要求 30 天，談成 15 天" style="'+IN+'"></div>'
+    +'<div id="rd-prev" style="margin-top:8px;font-size:12px;color:var(--g3)"></div>'+_rdLogHtml(it);
   showConfirm('逾期租金折讓（議價）',html,function(){
-    var ask=parseFloat(gv('rd-ask')),dd=parseFloat(gv('rd-days'));
+    var ask=parseFloat(gv('rd-ask')),dd=parseFloat(gv('rd-days')),am=parseFloat(gv('rd-amt')),rt=(it.payRate!=null&&it.payRate!=='')?parseFloat(it.payRate):100;
+    if(isFinite(am)&&am>0&&p>0&&q>0)dd=Math.round(am/(p*q*(rt/100))*100)/100;   // Lotion 10/21：可輸入天數或金額
     if(isFinite(dd)&&dd>d){toast('折讓天數不能超過逾期天數，已改為 '+_qfmt(d)+' 天');dd=d;}   // 視窗按確定即關，超過就夾在逾期天數
-    it.discAsk=isFinite(ask)&&ask>0?ask:0;it.discDays=isFinite(dd)&&dd>0?dd:0;it.discNote=(gv('rd-note')||'').trim();
+    var nd=isFinite(dd)&&dd>0?dd:0,rs=(gv('rd-note')||'').trim();
+    if(nd!==(parseFloat(it.discDays)||0)&&!rs){toast('請填寫折讓原因');setTimeout(function(){invRentDisc(i);},50);return;}   // 必填原因
+    if(nd!==(parseFloat(it.discDays)||0))_rdLog(it,(parseFloat(it.discDays)||0)+' 天',nd+' 天',rs);
+    it.discAsk=isFinite(ask)&&ask>0?ask:0;it.discDays=nd;it.discNote=rs;
     try{_rentDiscNoteSync(it);}catch(e){_err('invRentDisc.note',e);}   // v6.0.75 備註列同步「折讓 N 天，計 M 天」
     try{updateInvRowAmt(i);}catch(e){_err('invRentDisc',e);}
     try{rInvItems();rInvTots();}catch(e){_err('invRentDisc.re',e);}
@@ -36271,6 +36283,9 @@ function _rentDiscNoteSync(it){
   hit.value=String(hit.value).replace(/（\d+(?:\.\d+)?天[^）]*）/,_rentDaysNote(parseFloat(it.curDays)||0,it.discDays));
 }
 var _rdCur=null;   // 折讓視窗目前的逾期列
+// Lotion 10/21：折讓必填原因、留紀錄（it.discLog）
+function _rdLog(it,from,to,reason){if(!Array.isArray(it.discLog))it.discLog=[];it.discLog.push({at:Date.now(),by:(typeof _meEmail==='function'?_meEmail():''),from:from,to:to,reason:reason});it.discLog=it.discLog.slice(-30);}
+function _rdLogHtml(it){var L=(it&&it.discLog)||[];return L.length?('<div style="font-size:11px;color:var(--b4);margin-top:6px;max-height:90px;overflow:auto">折讓紀錄：<br>'+L.slice().reverse().map(function(r){return esc(new Date(r.at).toLocaleDateString('zh-TW'))+'　'+esc(String(r.from))+' → '+esc(String(r.to))+'　'+esc(r.reason||'');}).join('<br>')+'</div>'):'';}
 function _rdPreview(){
   var el=document.getElementById('rd-prev'),row=_rdCur;if(!el||!row)return;
   var dd=parseFloat(gv('rd-days'))||0;
@@ -36772,7 +36787,7 @@ function _ownerCt(q){if(!q)return null;var a=(CONTRACTS||[]).find(function(c){re
   var byName=(CONTRACTS||[]).filter(function(c){return c&&!c.linkedQid&&c.name&&c.name===q.name;});return byName.length===1?byName[0]:null;}   // 沒有關聯時，只有恰好一份未關聯的同名合約才採用
 function _ownerCtInst(q){var c=_ownerCt(q),v=c&&c.instPct;return (v==null||v==='')?null:Math.max(0,Math.min(100,parseFloat(v)||0));}
 function _ownerInstRef(q){var v=_ownerCtInst(q);if(v!=null)return {pct:v,src:'業主合約「'+(_ownerCt(q).name||'')+'」'};return {pct:_instDef(),src:'公司請款設定（拆除請款 '+_removeRate()+'%）'};}
-function _instOf(c,q){var v=c&&c.instPct;if(v==null||v===''){if(q){try{return _ownerInstRef(q).pct;}catch(e){_err('_instOf',e);}}return _instDef();}return Math.max(0,Math.min(100,parseFloat(v)||0));}   // 包商空白＝與業主同一個參照（審查修正：有專案時用 _ownerInstRef）
+function _instOf(c,q){var v=c&&c.instPct;if(v==null||v===''){if(q){try{var _om=q.ownerPay&&q.ownerPay.instPct;if(_om!=null&&_om!=='')return Math.max(0,Math.min(100,parseFloat(_om)||0));return _ownerInstRef(q).pct;}catch(e){_err('_instOf',e);}}return _instDef();}   /* Lotion 10/21：業主手動調過的％優先 */return Math.max(0,Math.min(100,parseFloat(v)||0));}   // 包商空白＝與業主同一個參照（審查修正：有專案時用 _ownerInstRef）
 function _b2bRetWhen(o){return _B2B_RETWHEN;}
 // 新詢價單的預設條件：現金部分不早於營造廠放款、期票到期不早於營造廠最後一筆款到帳（票期進位到 30 天）、保留款不低於營造廠
 function _b2bDefCond(q){
@@ -37196,7 +37211,7 @@ function _roCalls(src){
   while((m=re.exec(src))){out.push(m[2]);re.lastIndex=m.index+m[0].length;}
   return out;
 }
-var _RO_ALLOW=/^(?:clearTimeout|clearInterval)$/;
+var _RO_ALLOW=/^(?:clearTimeout|clearInterval|editCustomer|editCustomerContact|editVendor|editContract|editPayable|editInvoiceRecord|editDailyLog|openReceiptModal|openSubPeriod|openRentPeriod|openDunning|rfqEdit|rfqFill|matLedEdit|hrEdit|wkEdit)$/;   // Lotion 10/21：檢視明細的入口放行（視窗內只能看）
 function _roIsWriteSrc(src){return _roCalls(src).some(function(n){return _RO_DENY.test(n)&&!_RO_ALLOW.test(n);});}
 function _roIsWrite(el,evs){
   if(!el||el.nodeType!==1)return false;
@@ -37208,7 +37223,7 @@ function _roDeny(){
   if(Date.now()-_roLastToast>2500){_roLastToast=Date.now();try{toast('唯讀帳號：不能新增、修改或刪除資料');}catch(e){/* 可忽略 */}}
   return true;
 }
-var _RO_FORM_ROOTS='#page-editor,#page-invoice-edit,#page-params';
+var _RO_FORM_ROOTS='#page-editor,#page-invoice-edit,#page-params,#gen-confirm-modal,#customer-modal,#vendor-modal,#contract-modal,#payable-modal,#receipt-modal,#invoice-rec-modal,#retention-modal';   // 明細視窗內欄位停用
 function _roScan(root){
   if(!_isReaderUser)return;
   root=root||document.body;if(!root||!root.querySelectorAll)return;
@@ -37495,7 +37510,9 @@ function showConfirm(title, msg, onOk, danger, onCancel, wide){
     const newOk=okBtn.cloneNode(true);
     newOk.textContent='確認';newOk.style.display='';if(cancelBtn)cancelBtn.style.display='';   // v5.381：有些呼叫端會改按鈕文字（如催款的「複製」），每次開啟先還原
     okBtn.parentNode.replaceChild(newOk,okBtn);
-    newOk.onclick=function(){modal.style.display='none';onOk();};
+    var _roForm=!!(_isReaderUser&&msgEl&&msgEl.querySelector('input:not([type=hidden]),select,textarea'));   // Lotion 10/21：唯讀帳號開明細視窗只能看，確認＝關閉、不存
+    if(_roForm){newOk.textContent='關閉';if(cancelBtn)cancelBtn.style.display='none';}
+    newOk.onclick=function(){modal.style.display='none';if(_roForm)return;onOk();};
   }
   if(cancelBtn){
     const newCancel=cancelBtn.cloneNode(true);
