@@ -37074,7 +37074,7 @@ function _retReturnCard(inv){
     +'<div class="qleft"><div class="qdot" style="background:'+(R.done?'var(--g)':'var(--ym)')+'"></div></div>'
     +'<div class="qmain"><div class="qtitle">'+esc(inv.project||'')+' — 保留款退還請款單</div>'
     +'<div class="qsub">'+esc(inv.client||'')+' / '+esc(inv.date||'')+' / 第 '+(R.rows||[]).concat(R.holds||[]).map(function(r){return esc(String(r.periodNo));}).filter(function(v,i,a){return a.indexOf(v)===i;}).join('、')+' 期'+(R.cond?(' / 退還條件：'+esc(R.cond)):'')+'</div></div>'
-    +'<div class="qr"><div class="qa" style="font-size:17px;font-weight:900">NT$ '+fmt(R.amt||0)+'</div><div style="font-size:10.5px;color:var(--b4)">'+_retRetSplitTxt(R)+'</div>'
+    +'<div class="qr"><div class="qa" style="font-size:17px;font-weight:900">NT$ '+fmt(R.amt||0)+'</div><div style="font-size:10.5px;color:var(--b4);max-width:240px;margin-left:auto;text-align:right;white-space:normal;line-height:1.5">'+esc(_retRetSplitTxt(R)).replace(/；/g,'<br>')+'</div>'
     +(R.done?'<span class="bdg ok" style="font-size:11px">✓ 已退還 '+esc(R.doneDate||'')+'</span>':'<span class="bdg warn" style="font-size:11px">待退還</span>')
     +'<div style="display:flex;gap:4px;margin-top:4px;justify-content:flex-end">'
     +(R.done?'<button type="button" class="btn btn-xs" onclick="event.stopPropagation();retReturnUndo(\''+id+'\')">取消退還</button>'
