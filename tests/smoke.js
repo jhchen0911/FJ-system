@@ -7504,11 +7504,12 @@ async function newPage(browser, width, height) {
         const t = _retRetSplitTxt({ rows: [{ amt: 525 }], holds: [{ amt: 1050 }] });
         out.card = /另開發票部分 未稅 500｜稅 25/.test(t) && /當場扣款 1,050（當期發票已開，不另拆）/.test(t) && !/未稅 1,500/.test(t);
         out.cardRowsOnly = _retRetSplitTxt({ rows: [{ amt: 1050 }] }) === '含稅；另開發票部分 未稅 1,000｜稅 50';
+        out.chipName = _chipNameRole('陳軒（唯讀）', '唯讀') === '陳軒（唯讀）' && _chipNameRole('陳軒(唯讀)', '唯讀') === '陳軒(唯讀)' && _chipNameRole('陳軒', '唯讀') === '陳軒（唯讀）' && _chipNameRole('王', '系統管理員') === '王（系統管理員）';
         out.kpi = /_retTaxSplit\(totalRetention\)/.test(String(updateInvStats)) && /_retTaxSplit\(totalRet\)/.test(String(openRetentionModal));
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.106 保留款拆稅：退還單列表只拆另開發票的預扣保留款（當場扣款不拆）、財務頁保留款總額加未稅／稅', r.card && r.cardRowsOnly && r.kpi && !r.err, JSON.stringify(r));
+    check('v6.0.106 保留款拆稅：退還單列表只拆另開發票的預扣保留款（當場扣款不拆）、財務頁保留款總額加未稅／稅；右上角名稱不重複加（唯讀）', r.card && r.cardRowsOnly && r.kpi && r.chipName && !r.err, JSON.stringify(r));
     check('v6.0.106 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
