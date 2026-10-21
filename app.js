@@ -4251,7 +4251,7 @@ function addAddendum(id){
   copy.code=genQuoteCode();
   copy.parentId=id;
   copy.awarded=false;copy.payDue='';copy.costs=[];
-  copy.name=(copy.name||'未命名')+' (追加)';copy.payDefV=2;   // 新專案
+  copy.name=(copy.name||'未命名')+' (追加)';copy.payDefV=2;delete copy.ownerCard;delete copy._ocPriv;   // 新專案
   copy.items=[];
   copy.date=localToday();
   Q.unshift(copy);
@@ -5853,7 +5853,7 @@ function _copyQDo(id){
   // Set date to today
   copy.date=localToday();
   // Append (複製) to name
-  copy.name=(copy.name||'未命名')+' (複製)';copy.payDefV=2;   // 新專案
+  copy.name=(copy.name||'未命名')+' (複製)';copy.payDefV=2;delete copy.ownerCard;delete copy._ocPriv;   // 新專案
   Q.unshift(copy);
   persist();
   toast('已複製為新報價草稿！');
@@ -10121,8 +10121,10 @@ function _applyQuoteSens(q,s,fill){
   if(Array.isArray(s.rfqs)&&s.rfqs.length&&(!fill||!Array.isArray(q.rfqs)||!q.rfqs.length))q.rfqs=s.rfqs;   // v6
   if(s.mat&&typeof s.mat==='object'&&(!fill||q.mat==null))q.mat=s.mat;   // v6 材料
   if(s.comm&&typeof s.comm==='object'&&(!fill||q.comm==null))q.comm=s.comm;   // v6.0.74 業務抽成
-  if(s.ownerCard&&typeof s.ownerCard==='object'&&(!fill||q.ownerCard==null))q.ownerCard=s.ownerCard;   // Lotion 10/21
+  if(s.ownerCard&&typeof s.ownerCard==='object'&&(!fill||q.ownerCard==null)&&_ocCanKeep())q.ownerCard=s.ownerCard;   // Lotion 10/21
 }
+// 條件卡只留在讀得到 private 的裝置（管理員、唯讀帳號、未登入的本機模式）；其他裝置同步後清掉本機殘留
+function _ocCanKeep(){try{return !_fbUser||_isReaderUser||isAdmin(String(_fbUser.email||'').toLowerCase());}catch(e){_err('_ocCanKeep',e);return true;}}
 function _applyQuoteSensAll(map){
   if(!map)return;
   // v5.335 健檢F：逐案比 _mt——本機較新（剛改完成本還沒推上去）就只補空缺，
@@ -10134,7 +10136,7 @@ function _applyQuoteSensAll(map){
     _applyQuoteSens(q,map[q.id],localNewer);
   });
   // Lotion 10/21 一次性：條件卡移到 private——管理員裝置讀到 private 後，把帶有 ownerCard 的報價各 _touch 一次，下次上傳 shared 即抹除舊卡
-  Q.forEach(function(q){if(q&&q.ownerCard&&!q._ocPriv){q._ocPriv=1;_touch(q);}});
+  if(_fbUser&&!_isReaderUser)Q.forEach(function(q){if(q&&q.ownerCard&&!q._ocPriv){q._ocPriv=1;_touch(q);}});   // 唯讀帳號不上傳，不必搬
   try{persist();}catch(e){_err('_applyQuoteSensAll',e);}
 }
 // 合併前先拍下本機敏感欄位；shared 的報價已去敏感，合併後必須補回，
@@ -10145,6 +10147,7 @@ function _snapshotQuoteSens(){
 function _regraftQuoteSens(snap){
   if(!snap)return;
   Q.forEach(function(q){if(q&&q.id&&snap[q.id])_applyQuoteSens(q,snap[q.id],true);});
+  if(!_ocCanKeep())Q.forEach(function(q){if(q&&q.ownerCard)delete q.ownerCard;});   // 審查修正（C 第 5 輪）：非管理員裝置不留舊條件卡
 }
 
 // v5.335 健檢F：部門／角色／人員的記錄級合併——id 對位、_mt 新者勝、尊重墓碑；
@@ -21529,7 +21532,7 @@ function _spStageRowHtml(q,c,r,st,editing,IN,name,unit){
   var ep=editing?((editing.rows||[]).find(function(pr){return pr.rid===r.id;})||{}):{};
   var prevI=(st.byRow[r.id]||0)-(parseFloat(ep.qi!=null?ep.qi:ep.qty)||0),prevR=((st.byRowR||{})[r.id]||0)-(parseFloat(ep.qr)||0),ins=_subPrInst(r,ep),tq=parseFloat(r.qty)||0,rr=_subRetRate(c,r);
   var inp=function(cls,v){return '<input class="'+cls+'" type="number" inputmode="decimal" step="any" min="0" value="'+(v!=null&&v!==''?v:'')+'" oninput="_spRecalc()" style="flex:1;min-width:60px;text-align:right;'+IN+'">';};
-  return '<div class="sp-row" data-stage="1" data-rid="'+r.id+'" data-total="'+tq+'" data-prev="'+prevI+'" data-prevr="'+prevR+'" data-inst="'+ins+'"'+(ep.ins!=null?' data-frozen="1"':'')+' data-price="'+(parseFloat(r.unitPrice)||0)+'" data-ret="'+rr+'" data-desc="'+esc(name)+'" style="border:1px solid var(--b1);border-radius:var(--r8);padding:7px 9px;margin-bottom:6px;background:var(--w)">'
+  return '<div class="sp-row" data-stage="1" data-rid="'+r.id+'" data-total="'+tq+'" data-prev="'+prevI+'" data-prevr="'+prevR+'" data-inst="'+ins+'"'+((ep.ins!=null||ep.qi!=null||ep.qr!=null)?' data-frozen="1"':'')+' data-price=""'+(parseFloat(r.unitPrice)||0)+'" data-ret="'+rr+'" data-desc="'+esc(name)+'" style="border:1px solid var(--b1);border-radius:var(--r8);padding:7px 9px;margin-bottom:6px;background:var(--w)">'
     +'<div style="font-size:12.5px;font-weight:700">'+esc(name)+'</div>'
     +'<div style="font-size:11px;color:var(--b4);margin:2px 0 5px">發包 '+fmt(tq)+' '+esc(unit)+'｜單價 '+fmt(parseFloat(r.unitPrice)||0)+'｜<span class="sp-instx">裝設完成請 '+ins+'%、拆除完成請 '+(100-ins)+'%</span> <button type="button" class="btn btn-xs" onclick="subStageInstEdit(\''+c.id+'\',\''+r.id+'\')" style="padding:0 6px;font-size:10.5px">調整</button>｜已計價 裝設 '+_rfmt(Math.round(prevI*100)/100)+'、拆除 '+_rfmt(Math.round(prevR*100)/100)+(rr?('｜保留 '+rr+'%'+(r.retCond?('（'+esc(r.retCond)+'後退還）'):'')):'')+'　<span class="sp-daily" style="color:var(--g3)"></span></div>'
     +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;color:var(--b4);white-space:nowrap">裝設量</span>'+inp('sp-qi',ep.qi!=null?ep.qi:(ep.qty!=null&&ep.qr==null?ep.qty:''))
@@ -21591,7 +21594,7 @@ function _spRecalc(){
     else if(df){if(qn>0&&Math.abs(qn-dl)>1e-6){df.style.display='';df.style.color=qn>dl?'#b26a00':'var(--b4)';df.textContent=qn>dl?('⚠ 多於日報回報 '+fmt(Math.round((qn-dl)*100)/100)+'，請核實廠商請款單'):('少於日報回報 '+fmt(Math.round((dl-qn)*100)/100));}else df.style.display='none';}
     var total=parseFloat(el.getAttribute('data-total'))||0,prev=parseFloat(el.getAttribute('data-prev'))||0;
     var w=el.querySelector('.sp-warn');
-    if(lumpR&&prev+(parseFloat(inp.value)||0)/100>1+1e-6){lumpOver++;w.style.display='';w.style.color='var(--red)';w.textContent='累計完成超過 100%：超過合約一式總價，請走追加減（不能存檔）';}   // Lotion 10/21：直接擋下
+    if(lumpR&&(parseFloat(inp.value)||0)>0&&prev+(parseFloat(inp.value)||0)/100>1+1e-6){lumpOver++;w.style.display='';w.style.color='var(--red)';w.textContent='累計完成超過 100%：超過合約一式總價，請走追加減（不能存檔）';}   // Lotion 10/21：直接擋下
     else if(total>0&&prev+qn>total+1e-6){over++;var ex=Math.max(0,prev+qn-total)-Math.max(0,prev-total);overAmt+=ex*price;w.style.display='';w.textContent='累計 '+fmt(Math.round((prev+qn)*100)/100)+' 超過發包量 '+fmt(total)+'（實作實算：本期超出 '+fmt(Math.round(ex*100)/100)+'，向業主追加請款）';}
     else{w.style.display='none';}
   });
@@ -21607,7 +21610,7 @@ function _spRecalc(){
   var pay=net-adv,tax=inv?Math.round(pay*_taxR()/100):0;
   var due=_vendorDueDate(gv('sp-date')||localToday());
   var t=document.getElementById('sp-tot');
-  var _okB=document.getElementById('gen-confirm-ok');if(_okB){_okB.disabled=lumpOver>0;_okB.style.opacity=lumpOver>0?'.45':'';_okB.title=lumpOver>0?'一式累計超過 100%，請走追加減':'';}   // Lotion 10/21：一式超過 100% 不能存
+  var _okB=document.getElementById('gen-confirm-ok');if(_okB&&!_isReaderUser){_okB.disabled=lumpOver>0;_okB.style.opacity=lumpOver>0?'.45':'';_okB.title=lumpOver>0?'一式累計超過 100%，請走追加減':'';}   // Lotion 10/21：一式超過 100% 不能存
   if(t)t.innerHTML='本期金額（未稅）<b style="float:right">NT$ '+fmt(amt)+'</b><br>'
     +(ret?('扣保留款<b style="float:right;color:#b26a00">− NT$ '+fmt(ret)+'</b><br>'):'')
     +(adv?('抵扣預付款<b style="float:right;color:#1565C0">− NT$ '+fmt(adv)+'</b><br>'):'')
@@ -21631,7 +21634,7 @@ function _spSave(){
       rows.push(ps);return;
     }
     var _lp=el.getAttribute('data-lump')==='1',qn=(parseFloat(el.querySelector('.sp-qty').value)||0)/(_lp?100:1);   // v6.0.109 一式：完成 % → 數量（1＝100%）
-    if(_lp&&qn+(parseFloat(el.getAttribute('data-prev'))||0)>1+1e-6)lumpOver=1;   // Lotion 10/21：一式累計超過 100% 直接擋下
+    if(_lp&&qn>0&&qn+(parseFloat(el.getAttribute('data-prev'))||0)>1+1e-6)lumpOver=1;   // Lotion 10/21：一式累計超過 100% 直接擋下
     if(_lp){qn=Math.round(Math.min(qn,Math.max(0,1-(parseFloat(el.getAttribute('data-prev'))||0)))*1e6)/1e6;}   // 審查修正：一式累計以 100% 為限、保留 6 位
     if(!(qn>0))return;
     var pr={rid:el.getAttribute('data-rid'),qty:_lp?qn:Math.round(qn*10000)/10000};
@@ -37850,7 +37853,8 @@ function _invDueISO(i){
 }
 function _invRecvPlan(i){
   var e=null;try{e=_invExpectedDate(i);}catch(x){_err('_invRecvPlan',x);}
-  if(e&&e.src==='rule')return {date:e.date,cp:e.rule.cashPct/100,td:e.rule.ticketDays,ticketDate:e.ticketDate};
+  if(e&&e.src==='rule'){if(e.rule.cpSet)return {date:e.date,cp:e.rule.cashPct/100,td:e.rule.ticketDays,ticketDate:e.ticketDate};
+    var td0=parseInt(i.ticketDays)||0,cp0=_cashPctOf(i);return {date:e.date,cp:cp0,td:td0,ticketDate:(td0>0&&cp0<1&&/^\d{4}-\d{2}-\d{2}/.test(e.date||''))?_dAdd(e.date.slice(0,10),td0):''};}   // 規則沒寫付款比例：用單據自帶的
   var R=null;try{R=_recvRuleOf(i);}catch(x){_err('_invRecvPlan.rule',x);}
   var d0=_invDueISO(i);
   if(R&&R.cpSet){var tk='';if(R.ticketDays>0&&R.cashPct<100&&/^\d{4}-\d{2}-\d{2}/.test(d0||''))tk=_dAdd(d0.slice(0,10),R.ticketDays);return {date:d0,cp:R.cashPct/100,td:R.ticketDays,ticketDate:tk};}   // Lotion 10/21：舊單（日期沿用原本）的現金／票期比例也改用放款規則
