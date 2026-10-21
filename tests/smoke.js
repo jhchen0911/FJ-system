@@ -7282,8 +7282,8 @@ async function newPage(browser, width, height) {
     rr.privRead = rules.private['.read'].indexOf('|| ' + RK) > 0;
     const writes = [];
     (function walk(o, path) { Object.keys(o).forEach(k => { if (k === '.write') writes.push([path, o[k]]); else if (o[k] && typeof o[k] === 'object') walk(o[k], path + '/' + k); }); })(rules, 'fydata');
-    rr.writes = writes.length >= 9 && writes.every(([p, w]) => w.indexOf('!' + RK) >= 0 || (p === 'fydata/logs/$uid' && w.indexOf("!root.child('fydata/readers')") >= 0) || (p === 'fydata/backups' && w === OWN));
-    rr.badW = writes.filter(([p, w]) => !(w.indexOf('!' + RK) >= 0 || p === 'fydata/logs/$uid' || (p === 'fydata/backups' && w === OWN))).map(x => x[0]);
+    rr.writes = writes.length >= 9 && writes.every(([p, w]) => w === 'false' || w.indexOf('!' + RK) >= 0 || (p === 'fydata/logs/$uid' && w.indexOf("!root.child('fydata/readers')") >= 0) || (p === 'fydata/backups' && w === OWN));
+    rr.badW = writes.filter(([p, w]) => !(w === 'false' || w.indexOf('!' + RK) >= 0 || p === 'fydata/logs/$uid' || (p === 'fydata/backups' && w === OWN))).map(x => x[0]);
     const rv = rules.readers.$email['.validate']; rr.nameRule = /newData\.val\(\) === true/.test(rv) && /hasChildren\(\['name'\]\)/.test(rv) && rules.readers.$email.$other['.validate'] === false;
     rr.backups = rules.backups['.read'] === OWN && rules.backups['.write'] === OWN && rules.relay['.read'].indexOf('|| ' + RK) > 0;   // 審查修正：備份只給擁有者；日報照片（relay）唯讀帳號可讀
     const fn = fs.readFileSync(pth.join(__dirname, '..', 'functions', 'index.js'), 'utf8'); rr.fn = /readers: set\(rdr, on\)/.test(fn);
