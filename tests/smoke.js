@@ -8031,11 +8031,12 @@ async function newPage(browser, width, height) {
         let lh = ''; try { lh = _draftListHtml(); out.strOk = true; } catch (e) { out.strOk = false; }
         out.noBadId = !/__xss/.test(lh) && /dNum1/.test(lh) && !/onerror/.test(lh);
         draftApply("x');window.__xss=1;//"); draftApply('dImg1');
-        out.noXss = window.__xss === 0 && !document.getElementById('gen-confirm-ok') && DRAFTS.dImg1.status === 'pending';
+        const cOpen = () => { const m = document.getElementById('gen-confirm-modal'); return !!m && getComputedStyle(m).display !== 'none'; };
+        out.noXss = window.__xss === 0 && !cOpen() && DRAFTS.dImg1.status === 'pending';
         delete DRAFTS["x');window.__xss=1;//"]; delete DRAFTS.dNum1; delete DRAFTS.dImg1;
         /* 審查 🟡9：已得標案件不能用草稿改狀態 */
         Q.find(q => q.id === 'qD').awarded = true; DRAFTS.dAwd1 = { id: 'dAwd1', type: 'bid', by: 'x', at: 5, status: 'pending', summary: 'x', payload: { qid: 'qD', from: '', to: 'void' } };
-        draftApply('dAwd1'); out.awdGuard = !document.getElementById('gen-confirm-ok') && Q.find(q => q.id === 'qD').bidStatus === 'lost';
+        draftApply('dAwd1'); out.awdGuard = !cOpen() && Q.find(q => q.id === 'qD').bidStatus === 'lost';
         Q.find(q => q.id === 'qD').awarded = false; delete DRAFTS.dAwd1;
         /* 5. 退回 */
         const dRej = { id: 'dXXX', type: 'bid', by: 'x', at: 1, status: 'pending', summary: 'x', payload: { qid: 'qD', to: 'void' } }; DRAFTS.dXXX = dRej;
