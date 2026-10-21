@@ -8062,6 +8062,67 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.110 批次 F：LINE 機器人（FJ 端：草稿確認、現場追加、LINE 設定卡、規則；Cloud Functions 單元測試） ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = () => {};
+        const store = {}, cfg = { owners: {}, groups: {}, pending: { users: { Uabc123: { text: '你好', at: 1 } }, groups: { Gsite9999: { at: 1 } } } };
+        const get = p => p.replace(/^fydata\/lineCfg\/?/, '').split('/').filter(Boolean).reduce((o, k) => (o == null ? undefined : o[k]), cfg);
+        const setC = (p, v) => { const ks = p.replace(/^fydata\/lineCfg\//, '').split('/'); let o = cfg; ks.slice(0, -1).forEach(k => { o[k] = o[k] || {}; o = o[k]; }); if (v == null) delete o[ks[ks.length - 1]]; else o[ks[ks.length - 1]] = v; };
+        const ref = p => ({ set: v => { if (/^fydata\/lineCfg/.test(p)) setC(p, v); else store[p] = JSON.parse(JSON.stringify(v)); return Promise.resolve(); }, remove: () => { setC(p, null); return Promise.resolve(); }, update: v => { store[p] = Object.assign(store[p] || {}, v); return Promise.resolve(); }, on: () => {}, once: () => Promise.resolve({ val: () => JSON.parse(JSON.stringify(get(p) || null)) }) });
+        const oDb = window._fbDb; _fbDb = { ref }; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a1' }; _isReaderUser = false;
+        Q = [{ id: 'qL', name: '內湖興中路', awarded: true, items: [], dailyLogs: [], t: { total: 0 } }];
+        /* 1. 現場追加草稿 → 確認 → q.addons（不進請款單） */
+        DRAFTS = { dl5551: { id: 'dl5551', type: 'addon', by: 'line-bot', byName: 'LINE 機器人', at: 1, status: 'pending', summary: '現場追加：內湖興中路　鋼板樁 12 支', payload: { qid: 'qL', groupId: 'Gsite9999', date: '2026-10-22', text: '#追加 鋼板樁 12 支', qty: 12, unit: '支', photos: ['line/group/Gsite9999/2026-10-22/p1.jpg', 'javascript:alert(1)'] } },
+          dd99992026: { id: 'dd99992026', type: 'dailyLog', by: 'line-bot', at: 2, status: 'pending', summary: '施工日報', payload: { qid: 'qL', groupId: 'Gsite9999', date: '2026-10-22', answers: ['1. 打設 H 型鋼 8 支'], dayTexts: ['早安'], photos: ['line/group/Gsite9999/2026-10-22/p2.jpg'], replied: true } } };
+        const lh = _draftListHtml(); out.list = /現場追加（LINE）/.test(lh) && /data-lpath="line\/group/.test(lh) && /打設 H 型鋼/.test(lh);
+        draftApply('dl5551'); document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 30));
+        const q = Q[0]; out.addon = (q.addons || []).length === 1 && q.addons[0].qty === 12 && q.addons[0].status === 'confirmed' && q.addons[0].photos.length === 1 && DRAFTS.dl5551.status === 'applied' && !!q._mt;
+        /* 2. 施工日報草稿 → 確認 → q.dailyLogs */
+        draftApply('dd99992026'); document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 30));
+        out.daily = q.dailyLogs.length === 1 && /【LINE】1\. 打設 H 型鋼/.test(q.dailyLogs[0].progress) && q.dailyLogs[0].linePhotos.length === 1 && q.dailyLogs[0].date === '2026-10-22';
+        /* 審查 🔴3：同一天已有日報 → 合併成備註列；之後再用日報表單提交，LINE 文字不能被洗掉 */
+        q.dailyLogs = [{ id: 'dOld', date: '2026-10-23', progress: '舊文字', status: 'work', workers: 3 }];
+        DRAFTS.dd99992027 = { id: 'dd99992027', type: 'dailyLog', by: 'line-bot', at: 3, status: 'pending', summary: 'x', payload: { qid: 'qL', date: '2026-10-23', answers: ['LINE 回覆'], photos: [] } };
+        draftApply('dd99992027'); document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 30));
+        _drMergeLog(q, q.dailyLogs[0], { progressRows: [{ itemIdx: -1, qty: '', note: '表單補充' }] });
+        out.merge = q.dailyLogs.length === 1 && /舊文字/.test(q.dailyLogs[0].progress) && /【LINE】LINE 回覆/.test(q.dailyLogs[0].progress) && /表單補充/.test(q.dailyLogs[0].progress);
+        /* 3. 專案頁現場追加區塊 */
+        openProj('qL'); await new Promise(res => setTimeout(res, 80)); out.pj = /現場追加（LINE）/.test(document.getElementById('page-proj').innerText);
+        /* 4. LINE 設定卡：擁有者、群組綁定、固定句子 */
+        go('staff'); await new Promise(res => setTimeout(res, 120)); renderLineBox(); await new Promise(res => setTimeout(res, 50));
+        const box = document.getElementById('line-box'); out.box = box.style.display !== 'none' && /待確認的一對一帳號/.test(box.innerText) && /待綁定的群組/.test(box.innerText);
+        const oP = window.prompt; window.prompt = () => 'Lotion'; lineOwnerAdd('Uabc123'); window.prompt = oP; await new Promise(res => setTimeout(res, 50));
+        out.owner = cfg.owners.Uabc123 && cfg.owners.Uabc123.name === 'Lotion' && !cfg.pending.users.Uabc123;
+        await new Promise(res => setTimeout(res, 50)); document.getElementById('lg-q-Gsite9999').value = 'qL'; lineGroupSave('Gsite9999'); await new Promise(res => setTimeout(res, 60));
+        out.group = cfg.groups.Gsite9999 && cfg.groups.Gsite9999.qid === 'qL' && cfg.groups.Gsite9999.daily === true && !cfg.pending.groups.Gsite9999;
+        await new Promise(res => setTimeout(res, 50)); document.querySelector('#line-box details').open = true; document.getElementById('lt-daily3').value = 'Lotion 定稿三句'; lineTextsSave(); await new Promise(res => setTimeout(res, 50));
+        out.texts = cfg.texts && cfg.texts.daily3 === 'Lotion 定稿三句';
+        linePushTest(); await new Promise(res => setTimeout(res, 30)); const pk = Object.keys(store).find(k => /^fydata\/linePush\//.test(k)); out.push = !!pk && store[pk].status === 'pending';
+        /* 5. 唯讀帳號看不到 LINE 卡 */
+        _isReaderUser = true; renderLineBox(); out.roHide = box.style.display === 'none'; _isReaderUser = false;
+        out.storage = /match \/line\/\{rest=\*\*\}/.test(_storageRulesText([], [])) && /allow write: if false/.test(_storageRulesText([], []));
+        _fbDb = oDb; _fbUser = null; DRAFTS = {}; Q = []; _lineCfgCache = null; window.toast = oT;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    const rules = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    check('v6.0.110 LINE：現場追加／施工日報草稿（同日合併成備註列、表單再提交不洗掉）顯示 LINE 照片、確認後寫入 q.addons／q.dailyLogs（過濾非 line/ 路徑）、專案頁區塊', r.list && r.addon && r.daily && r.merge && r.pj && !r.err, JSON.stringify(r));
+    check('v6.0.110 LINE 設定卡：設為擁有者、綁定工地群組、固定句子、測試推播；唯讀帳號看不到', r.box && r.owner && r.group && r.texts && r.push && r.roHide, JSON.stringify(r));
+    check('v6.0.110 LINE 規則：草稿類型含 addon／dailyLog、lineCfg 管理員寫、lineInbox／lineLog／lineDaily 網頁不可寫、linePush 只能新增 pending、Storage line/ 只讀',
+      /addon\|dailyLog/.test(rules.drafts.$id['.validate']) && rules.lineCfg && rules.lineInbox['.write'] === 'false' && rules.lineLog['.write'] === 'false' && rules.lineDaily['.write'] === 'false' && /!data\.exists\(\)/.test(rules.linePush.$id['.write']) && /'pending'/.test(rules.linePush.$id['.validate']) && r.storage
+      && /match \/line\/\{rest=\*\*\}[\s\S]*?allow write: if false/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'storage.rules'), 'utf8')), '');
+    check('v6.0.110 LINE 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+    /* Cloud Functions 單元測試（不需 Firebase／網路） */
+    let fo = '', fok = false;
+    try { fo = require('child_process').execFileSync(process.execPath, ['--test', require('path').join(__dirname, '..', 'functions', 'test', 'line.test.js')], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); fok = /# fail 0/.test(fo); } catch (e) { fo = String(e.stdout || e.message); }
+    check('v6.0.110 LINE Cloud Functions 單元測試（簽章、轉傳歸檔、現場追加、事故前兆與否定詞、日報問／整理／提醒、推播佇列與失敗、重送去重、待綁定上限）全過', fok, fo.slice(-300));
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

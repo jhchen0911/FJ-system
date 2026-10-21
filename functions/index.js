@@ -75,3 +75,42 @@ exports.fyClaimsSyncNow = onRequest({ region: REGION, cors: ['https://jhchen0911
     res.json({ changed: await syncAll() });
   } catch (e) { res.status(500).send(String(e && e.message || e)); }
 });
+
+// ══════════ LINE 機器人（批次 F；規格見 my-agent 400_Project/line-bot/README.md）══════════
+// 密鑰用 defineSecret：回國後由 Lotion 在自己電腦執行 `firebase functions:secrets:set LINE_CHANNEL_SECRET` 與
+// `firebase functions:secrets:set LINE_CHANNEL_ACCESS_TOKEN` 貼上（不進程式碼、不進 Git、不經對話）。
+// 寫進 FJ 的一律是草稿（fydata/drafts，type addon／dailyLog），要人在 FJ 按確認。
+const { defineSecret } = require('firebase-functions/params');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { onValueCreated } = require('firebase-functions/v2/database');
+const lineCore = require('./line/core.js');
+const lineAdapters = require('./line/adapters.js');
+const LINE_SECRET = defineSecret('LINE_CHANNEL_SECRET');
+const LINE_TOKEN = defineSecret('LINE_CHANNEL_ACCESS_TOKEN');
+const TZ = 'Asia/Taipei';
+
+// Webhook：LINE 後台「Webhook URL」貼這支的網址（部署後終端機會印出 lineWebhook 的網址）
+exports.lineWebhook = onRequest({ region: REGION, secrets: [LINE_SECRET, LINE_TOKEN], memory: '512MiB', timeoutSeconds: 120 }, async (req, res) => {
+  if (req.method !== 'POST') { res.status(200).send('ok'); return; }   // LINE 後台「驗證」用 GET／空 POST 都回 200
+  const raw = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body || {});
+  if (!lineCore.verifySignature(LINE_SECRET.value(), raw, req.get('x-line-signature'))) { res.status(401).send('bad signature'); return; }
+  const events = (req.body && req.body.events) || [];
+  try { await lineCore.handleEvents(events, lineAdapters.mkDeps(LINE_TOKEN.value())); } catch (e) { console.error('lineWebhook', e); }
+  res.status(200).send('ok');   // 一律回 200，LINE 才不會重送
+});
+// 17:30 工地群組問三句（固定文字）
+exports.lineDailyAsk = onSchedule({ schedule: '30 17 * * *', timeZone: TZ, region: REGION, secrets: [LINE_TOKEN] }, async () => {
+  await lineCore.dailyAsk(lineAdapters.mkDeps(LINE_TOKEN.value()), Date.now());
+});
+// 20:00 整理成 FJ 日報草稿
+exports.lineDailyCompile = onSchedule({ schedule: '0 20 * * *', timeZone: TZ, region: REGION, secrets: [LINE_TOKEN] }, async () => {
+  await lineCore.dailyCompile(lineAdapters.mkDeps(LINE_TOKEN.value()), Date.now());
+});
+// 08:00 前一天沒回 → 群組提醒；連兩天沒回 → 通知 Lotion
+exports.lineMorningCheck = onSchedule({ schedule: '0 8 * * *', timeZone: TZ, region: REGION, secrets: [LINE_TOKEN] }, async () => {
+  await lineCore.morningCheck(lineAdapters.mkDeps(LINE_TOKEN.value()), Date.now());
+});
+// 推播佇列：FJ／陳軒寫 fydata/linePush/<id>（status:'pending'）→ 推給 Lotion
+exports.linePushQueue = onValueCreated({ ref: '/fydata/linePush/{id}', region: REGION, secrets: [LINE_TOKEN] }, async (event) => {
+  await lineCore.processPush(event.params.id, event.data.val(), lineAdapters.mkDeps(LINE_TOKEN.value()));
+});

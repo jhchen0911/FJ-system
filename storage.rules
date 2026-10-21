@@ -32,5 +32,10 @@ service firebase.storage {
       allow read: if signedIn();
       allow write: if signedIn() && !isReader();
     }
+    // LINE 機器人檔案：Cloud Functions 以管理權限寫入，網頁只能讀（v6.0.110）
+    match /line/{rest=**} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
   }
 }

@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.109';
+var APP_VERSION='v6.0.110';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -29544,6 +29544,7 @@ function _staffRoleNames(st){
 }
 function renderStaffPage(){
   try{renderReadersBox();}catch(e){_err('renderStaffPage',e);}
+  try{renderLineBox();}catch(e){_err('renderStaffPage.line',e);}   // v6.0.110
   var box=document.getElementById('staff-table');if(!box)return;
   var all=listStaff().slice();
   // 角色篩選下拉
@@ -31933,10 +31934,12 @@ function renderProj(){
     +_pjSection('cost','施工成本統計',_pjCostHtml(q,st),'',!st.all.some(function(x){return (x.costs||[]).length;}))
     +_pjSection('sched','進度（預定 vs 實際）',_pjSchedHtml(q,st),'',!st.logs.length&&!_pjHasPlan(q))
     +_pjSection('log','工作日報',_pjLogHtml(q,st),'',!st.logs.length)
+    +((q.addons||[]).length?_pjSection('addon','現場追加（LINE）',_pjAddonHtml(q),'',false):'')
     +_pjSection('docs','合約與文件',_pjDocsHtml(q,st),'',!st.ct&&!(q.confirmFiles||[]).length)
     +_pjSection('close','完工與結案',_pjCloseHtml(q,st),'',!q.closed&&!st.done&&!st.invs.length);
   root.innerHTML=h;
   try{if(typeof _mstack==='function')_mstack(document.getElementById('proj-root'));}catch(e){_err('renderProj.mstack',e);}
+  try{_lineImgFill(root);}catch(e){_err('renderProj.line',e);}   // v6.0.110 LINE 照片縮圖
 }
 function _pjBtn(onclick,label,style){return '<button type="button" class="btn btn-xs" onclick="'+onclick.replace(/"/g,'&quot;')+'"'+(style?(' style="'+style+'"'):'')+'>'+label+'</button>';}
 function _pjListHtml(list){
@@ -37510,6 +37513,11 @@ function _storageRulesText(staff,readers){
     '      allow read: if isStaff() || isReader();',
     '      allow write: if isStaff();',
     '    }',
+    '    // LINE 機器人檔案（Cloud Functions 寫入；網頁只能讀）',
+    '    match /line/{rest=**} {',
+    '      allow read: if isStaff() || isReader();',
+    '      allow write: if false;',
+    '    }',
     '  }',
     '}',''].join('\n');
 }
@@ -37577,7 +37585,7 @@ var _RO_DENY=new RegExp('^(?:save|del|delete|remove|add|new|edit|create|submit|i
   +'|upd(?:CostField|OwnRow|SubField|NgtItemsSum|NgtWay|CostAttachTarget)|qc(?:Upd|Del|Add)|dr(?:AddToList|RemoveFromList|AddProgRow|AddPhoto|AddCrew|MonthSubmit|LoadExisting)'
   +'|wk(?:Save|Edit|Upload|Del|AddCert|CertField|SetExp|AiFromId|ExpPlus)|inv(?:SyncQuoteNow|ScanRent|RentalPick|RentApply|FillVendor|FillDaily)'
   +'|pullInvFromCustomer|receiptHoldReturn|retReturn|ledgerRegInvNo|exp(?:Scan|Manual|Del)|fc(?:AddRow|DelRow|ApplySuggest)|cfSetDelay|shareCfgInput'
-  +'|costAddPick|costEstToActual|changeCostType|onVendorChange|onLaborItemChange|calcPayableAmt|intake|siteRestoreVer|siteBump|plBump|rentPlanEnd|quoteOwnerDocRemove|quoteImportOwner'
+  +'|costAddPick|line(?:OwnerAdd|OwnerDel|PendDel|GroupSave|GroupDel|TextsSave|PushTest)|costEstToActual|changeCostType|onVendorChange|onLaborItemChange|calcPayableAmt|intake|siteRestoreVer|siteBump|plBump|rentPlanEnd|quoteOwnerDocRemove|quoteImportOwner'
   +'|projDelConfirmFile|irPickFile|irClearFile|handleContractFileSelect|loadSealImage|contactAddRole|newContactItem|fbUploadWithConflictCheck|gdriveSync'
   +'|rescue(?:Restore|LoadFile|Load)|rmk(?:AddExtra|DelExtra)|ctDupDelete|doSave|copyQ|cycleBidStatus|autoSaveInv|projUpload|writeCostHist|fcQuick|drBackfillStop'
   +'|_(?:commSync|salesCommSync|einvScan|pay(?:Upload|DelFile|PaidToggle)|sp(?:Recalc|FillDaily|SelChange|OnDate)|saOnInput|rcpt|receiptCalc|salesBookAddRow|comm(?:AddRow|RowMode)|advPayFix|costOddFix|trDelUI'
@@ -38149,7 +38157,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // 安全規則（database.rules.json 的 fydata/drafts，回國後發布）：唯讀名冊與管理員可讀；唯讀帳號只能新增 by＝自己的 pending 草稿、不能改舊的；狀態只有管理員能改；欄位型別與大小有上限。
 // 記錄：{id,type:'quote'|'bid'|'irPhoto',by,byName,at,status:'pending'|'applied'|'rejected',summary,payload,(doneAt,doneBy,resultId,reason)}
 var DRAFTS={};
-var _DRAFT_T={quote:'報價單',bid:'得標狀態',irPhoto:'發票照片'};
+var _DRAFT_T={quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）'};   // v6.0.110 LINE 機器人草稿
 var _draftOn=false,_draftErrAt=0;
 var _DRAFT_ID=/^[A-Za-z0-9_-]{4,40}$/;
 var _DRAFT_IMG=/^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+\/=]+$/;
@@ -38167,7 +38175,7 @@ function _draftWatch(){
     Object.keys(v).forEach(function(k){var d=v[k];if(d&&typeof d==='object'&&_DRAFT_ID.test(k)&&d.id===k)o[k]=d;});
     DRAFTS=o;
     try{if(typeof updateDashTodo==='function')updateDashTodo();}catch(e){_err('_draftWatch.todo',e);}
-    try{var b=document.getElementById('draft-list-box');if(b)b.innerHTML=_draftListHtml();}catch(e){_err('_draftWatch.list',e);}
+    try{var b=document.getElementById('draft-list-box');if(b){b.innerHTML=_draftListHtml();_lineImgFill(b);}}catch(e){_err('_draftWatch.list',e);}
   },function(err){_draftOn=false;_draftErrAt=Date.now();_err('_draftWatch',err);});   // 規則尚未發布時會被拒，等回國後部署
 }
 function _draftPending(){return Object.keys(DRAFTS||{}).map(function(k){return DRAFTS[k];}).filter(function(d){return d&&d.status==='pending';}).sort(function(a,b){return (a.at||0)-(b.at||0);});}
@@ -38240,7 +38248,7 @@ function draftBidOpen(qid){
   if(q.awarded){toast('已得標案件不能用草稿改狀態');return;}
   var cur=q.awarded?'awarded':(q.bidStatus||'');
   var opts=[['awarded','得標'],['','待回覆'],['nego','議價中'],['lost','未得標'],['void','流標']];
-  showConfirm('得標狀態草稿：'+esc((q.name||'').slice(0,20)),
+  showConfirm('得標狀態草稿：'+String(q.name||'').slice(0,20),
     '<div style="font-size:12px;color:var(--b4);margin-bottom:6px">送出後要 Lotion 確認才會改。目前：'+esc(({awarded:'得標','':'待回覆',nego:'議價中',lost:'未得標',void:'流標'})[cur]||'待回覆')+'</div>'
     +'<div class="f"><label>建議改成</label><select id="db-st" data-ro-ok="1">'+opts.map(function(o){return '<option value="'+o[0]+'"'+(o[0]===cur?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></div>'
     +'<div class="f" style="margin-top:6px"><label>未得標原因（選未得標時）</label><select id="db-reason" data-ro-ok="1">'+['價格過高','規格不符','工期不符','業主關係','未回應','其他'].map(function(r){return '<option'+(q.lostReason===r?' selected':'')+'>'+r+'</option>';}).join('')+'</select></div>'
@@ -38279,12 +38287,14 @@ function _draftListHtml(){
     return '<div style="border:1px solid var(--b1);border-radius:var(--r8);padding:8px 10px;margin-bottom:6px"><div style="font-size:11px;color:var(--b4)">'+esc(S(_DRAFT_T[d.type]||d.type))+'　'+esc(who.slice(0,60))+(d.byName&&d.by?('（'+esc(S(d.by).slice(0,60))+'）'):'')+'　'+esc(new Date(+d.at||0).toLocaleString('zh-TW'))+'</div>'
       +'<div style="font-size:13px;font-weight:700;margin:2px 0 6px">'+esc(S(d.summary).slice(0,300))+'</div>'
       +(d.type==='irPhoto'&&d.payload&&_draftImgOk(d.payload.file)?'<img src="'+esc(d.payload.file)+'" style="max-width:100%;max-height:160px;border-radius:6px;display:block;margin-bottom:6px">':'')
+      +((d.type==='addon'||d.type==='dailyLog')?_lineDraftBody(d):'')
       +'<div style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="btn btn-xs btn-g" onclick="draftApply(\''+escq(d.id)+'\')">確認套用</button><button type="button" class="btn btn-xs btn-r" onclick="draftReject(\''+escq(d.id)+'\')">退回</button></div></div>';
   }).join('');
 }
 function openDrafts(){
   if(_isReaderUser){toast('草稿要由 Lotion 確認');return;}
   _modal('AI 草稿待確認','<div id="draft-list-box" style="max-height:60vh;overflow:auto">'+_draftListHtml()+'</div>',function(){return true;});
+  _lineImgFill(document.getElementById('draft-list-box'));
 }
 function draftReject(id){
   if(_roDeny())return;var d=DRAFTS[id];if(!d)return;
@@ -38326,6 +38336,7 @@ function draftApply(id){
     },false);
     return;
   }
+  if(d.type==='addon'||d.type==='dailyLog'){_lineDraftApply(d,close);return;}   // v6.0.110 LINE 機器人
   if(d.type==='irPhoto'){
     if(!_draftImgOk(pl.file)){toast('草稿的照片格式不正確，請退回');return;}
     close();newInvoiceRecord();
@@ -38344,6 +38355,115 @@ function _draftOpenQuote(q,isEdit){
   items=JSON.parse(JSON.stringify(q.items||[]));exs=JSON.parse(JSON.stringify(q.exs||[]));if(q.rmk)rmkCustom=JSON.parse(JSON.stringify(q.rmk));
   try{rItems();calcT();if(typeof rTots==='function')rTots();}catch(e){_err('_draftOpenQuote',e);}
   st('esub','AI 草稿：請檢查後按「儲存」');
+}
+// ══════════ v6.0.110 LINE 機器人（批次 F）：FJ 端 ══════════
+// Cloud Functions（functions/line/）收 LINE 訊息：擁有者一對一的檔案 → Storage line/inbox；工地群組 → fydata/lineLog，
+// 現場追加與施工日報寫成草稿（fydata/drafts type addon／dailyLog）。這裡負責：草稿顯示與確認、LINE 設定卡（擁有者、群組綁定工程、固定句子）。
+// 設定 fydata/lineCfg：{owners:{<userId>:{name}}, groups:{<groupId>:{qid,name,daily}}, pending:{users:{},groups:{}}, texts:{inboxAck,daily3,remind,alarm,noReply2}}
+var _LINE_TEXTS={inboxAck:'收到，{n} 個檔案，歸到哪一案？',daily3:'今天辛苦了，麻煩回三件事：\n1. 今天做了哪些？（工項、數量）\n2. 幾個人、什麼機具？\n3. 有沒有問題、等待或追加？',remind:'昨天的施工日報還沒回，麻煩補一下三件事，謝謝。',alarm:'{site}工地群組出現「{word}」，請判斷是否停工。',noReply2:'{site}工地群組連兩天沒有回施工日報。'};
+var _LINE_TL={inboxAck:'收到檔案的回覆（{n}＝檔案數）',daily3:'17:30 在工地群組問的三句',remind:'隔天 08:00 沒回的提醒',alarm:'事故前兆通知 Lotion（{site} 工地、{word} 關鍵字）',noReply2:'連兩天沒回通知 Lotion'};
+function _lineDraftBody(d){
+  var S=_draftS,pl=(d.payload&&typeof d.payload==='object')?d.payload:{},q=Q.find(function(x){return x.id===pl.qid;});
+  var ph=_lineArr(pl.photos).slice(0,6).map(function(path){return '<img data-lpath="'+esc(path)+'" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:6px;background:var(--b1)">';}).join('');
+  var txt=d.type==='addon'?S(pl.text):(_lineArr(pl.answers).join('\n')||'（尚未回三句）');
+  return '<div style="font-size:11.5px;color:var(--b4)">工程：'+esc(q?S(q.name):'（找不到工程）')+'　'+esc(S(pl.date))+(pl.qty!=null?('　數量 '+esc(S(pl.qty))+esc(S(pl.unit))):'')+'</div>'
+    +'<div style="font-size:12.5px;white-space:pre-wrap;margin:4px 0">'+esc(txt)+'</div>'+(ph?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">'+ph+'</div>':'');
+}
+function _lineArr(a){return Array.isArray(a)?a.map(function(x){return _draftS(x);}):[];}
+function _lineImgFill(box){
+  if(!box||!_fbStorage)return;
+  box.querySelectorAll('img[data-lpath]').forEach(function(im){var p=im.getAttribute('data-lpath');im.removeAttribute('data-lpath');
+    if(!/^line\//.test(p))return;
+    try{_fbStorage.ref(p).getDownloadURL().then(function(u){if(/^https:\/\//.test(u))im.src=u;}).catch(function(){/* 可忽略：規則未發布或檔案不存在 */});}catch(e){_err('_lineImgFill',e);}});
+}
+function _lineDraftApply(d,close){
+  var S=_draftS,pl=(d.payload&&typeof d.payload==='object')?d.payload:{},q=Q.find(function(x){return x.id===pl.qid;});
+  if(!q){toast('找不到這個工程（群組綁定的工程可能已刪除）');return;}
+  var photos=_lineArr(pl.photos).filter(function(x){return /^line\//.test(x);});
+  if(d.type==='addon'){
+    showConfirm('確認現場追加：'+S(q.name).slice(0,20),'<div style="font-size:12.5px;line-height:1.7">'+esc(S(pl.text))+'</div>'
+      +'<div class="f" style="margin-top:6px"><label>數量（可改）</label><input id="la-qty" type="number" inputmode="decimal" value="'+(isFinite(+pl.qty)&&pl.qty!=null?+pl.qty:'')+'"></div>'
+      +'<div class="f"><label>單位</label><input id="la-unit" value="'+esc(S(pl.unit))+'"></div>'
+      +'<div style="font-size:11px;color:var(--b4);margin-top:6px">確認後記到工程專案「現場追加（LINE）」，標為已確認；請款時再帶入（不會自動進請款單）。</div>',function(){
+        if(!Array.isArray(q.addons))q.addons=[];
+        var qn=parseFloat(gv('la-qty'));
+        q.addons.push({id:d.id,date:S(pl.date).slice(0,10),text:S(pl.text).slice(0,2000),qty:isFinite(qn)?qn:null,unit:(gv('la-unit')||'').trim(),photos:photos.slice(0,20),src:'line',status:'confirmed',confirmedAt:Date.now(),confirmedBy:_meEmail()});
+        _touch(q);persist();_draftMark(d.id,'applied',{resultId:q.id});close();toast('已記到現場追加');
+      },false,null,true);
+    return;
+  }
+  var txt=_lineArr(pl.answers).join('\n');
+  showConfirm('確認施工日報：'+S(q.name).slice(0,20)+'　'+S(pl.date),
+    '<div class="f"><label>日報內容（可改）</label><textarea id="ld-txt" rows="6" style="width:100%;box-sizing:border-box">'+esc(txt)+'</textarea></div>'
+    +(_lineArr(pl.dayTexts).length?('<details style="font-size:11.5px;color:var(--b4);margin-top:6px"><summary>當天群組其他文字（'+_lineArr(pl.dayTexts).length+' 則）</summary><div style="white-space:pre-wrap">'+esc(_lineArr(pl.dayTexts).join('\n'))+'</div></details>'):'')
+    +'<div style="font-size:11px;color:var(--b4);margin-top:6px">照片 '+photos.length+' 張會掛在這筆日報（LINE 照片）。同一天已有日報時合併進去。</div>',function(){
+      var t=(gv('ld-txt')||'').trim();if(!Array.isArray(q.dailyLogs))q.dailyLogs=[];
+      var ex=q.dailyLogs.find(function(L){return L&&L.date===S(pl.date)&&!L.stopFrom;});
+      // LINE 文字存成日報的「備註列」（itemIdx:-1）：之後再用日報表單提交時 _drMergeLog 會由列重算 progress，備註列不會被洗掉
+      var row={itemIdx:-1,qty:'',note:'【LINE】'+t};
+      if(ex){
+        if(!(ex.progressRows||[]).length&&ex.progress)ex.progressRows=[{itemIdx:-1,qty:'',note:String(ex.progress)}];   // 舊日報只有文字：先轉成備註列保留
+        _drMergeLog(q,ex,{progressRows:[row]});ex.linePhotos=(ex.linePhotos||[]).concat(photos).slice(0,30);
+      }
+      else q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:/^\d{4}-\d{2}-\d{2}$/.test(S(pl.date))?S(pl.date):localToday(),workers:0,subWorkers:0,crews:[],progress:row.note,progressRows:[row],photos:[],linePhotos:photos.slice(0,30),equip:[],status:'work',by:'LINE 機器人（'+_meEmail()+' 確認）',src:'line',ts:Date.now()});
+      if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120);
+      _touch(q);persist();_draftMark(d.id,'applied',{resultId:q.id});close();toast('已寫入施工日報');
+    },false,null,true);
+}
+function _pjAddonHtml(q){
+  var L=(q&&q.addons)||[];if(!L.length)return '<div style="font-size:12px;color:var(--b3)">尚無現場追加紀錄（LINE 工地群組的「追加」會先成為草稿，確認後列在這裡）</div>';
+  return L.slice().reverse().map(function(a){return '<div style="border-bottom:1px solid var(--b1);padding:6px 0;font-size:12.5px"><b>'+esc(a.date||'')+'</b>　'+esc(a.text||'')+(a.qty!=null?('　<span style="color:var(--g3)">'+esc(String(a.qty))+esc(a.unit||'')+'</span>'):'')+'<span style="font-size:10.5px;color:var(--b4);margin-left:6px">'+(a.status==='confirmed'?'已確認':'待確認')+'</span>'
+    +((a.photos||[]).length?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'+a.photos.slice(0,8).map(function(p){return '<img data-lpath="'+esc(String(p))+'" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:6px;background:var(--b1)">';}).join('')+'</div>':'')+'</div>';}).join('');
+}
+// ── LINE 設定卡（人員管理頁，管理員才見） ──
+var _lineCfgCache=null;
+function renderLineBox(){
+  var box=document.getElementById('line-box');if(!box)return;
+  var me=(_fbUser&&_fbUser.email)||'';
+  if(!me||_isReaderUser||!isAdmin(String(me).toLowerCase())){box.style.display='none';return;}
+  box.style.display='';
+  if(_lineCfgCache===null&&_fbDb){_lineCfgCache={};_fbDb.ref('fydata/lineCfg').once('value').then(function(sn){_lineCfgCache=sn.val()||{};renderLineBox();}).catch(function(e){_err('renderLineBox',e);_lineCfgCache={__err:1};renderLineBox();});}
+  if(_lineCfgCache&&_lineCfgCache.__err){box.innerHTML='<div class="card"><div class="cb"><div style="font-weight:700;font-size:13.5px;margin-bottom:4px">LINE 機器人（陳軒｜AI 助理）</div><div style="font-size:12px;color:var(--red)">讀不到 LINE 設定：雲端規則尚未發布（見 docs/回國後部署清單_20261031.md 第 1 步）。</div><div style="margin-top:8px"><button type="button" class="btn btn-xs" onclick="_lineCfgCache=null;renderLineBox()">重新整理</button></div></div></div>';return;}
+  var C=_lineCfgCache||{},own=C.owners||{},gr=C.groups||{},pu=(C.pending&&C.pending.users)||{},pg=(C.pending&&C.pending.groups)||{},tx=Object.assign({},_LINE_TEXTS,C.texts||{});
+  var projs=(Q||[]).filter(function(q){return q&&q.awarded&&!q.closed&&!q.parentId;});
+  var sel=function(id,cur){return '<select id="'+id+'" style="font-size:12px;max-width:100%"><option value="">（選工程）</option>'+projs.map(function(q){return '<option value="'+esc(q.id)+'"'+(q.id===cur?' selected':'')+'>'+esc(q.name||'')+'</option>';}).join('')+'</select>';};
+  var B=function(js,l,c){return '<button type="button" class="btn btn-xs'+(c?' '+c:'')+'" onclick="'+js+'">'+l+'</button>';};
+  var row=function(h){return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 0;border-bottom:1px solid var(--b1);font-size:12px">'+h+'</div>';};
+  var k=function(x){return esc(String(x)).replace(/'/g,'');};
+  box.innerHTML='<div class="card"><div class="cb"><div style="font-weight:700;font-size:13.5px;margin-bottom:4px">LINE 機器人（陳軒｜AI 助理）</div>'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-bottom:8px">Cloud Functions 部署、LINE 密鑰設定好之後才會運作。寫進 FJ 的一律是草稿，要在總覽「AI 草稿」確認。</div>'
+    +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">擁有者（收檔案、收通知）</div>'
+    +(Object.keys(own).map(function(u){return row(esc((own[u]&&own[u].name)||'')+'<span style="color:var(--b3)">'+esc(u.slice(0,10))+'…</span><span style="margin-left:auto">'+B("lineOwnerDel('"+k(u)+"')",'移除','btn-r')+'</span>');}).join('')||'<div style="font-size:12px;color:var(--b3)">尚未設定（先用自己的 LINE 傳任一則訊息給機器人，下方「待確認」會出現）</div>')
+    +(Object.keys(pu).length?('<div style="font-size:12px;margin-top:6px">待確認的一對一帳號：</div>'+Object.keys(pu).map(function(u){return row('<span>'+esc((pu[u]&&pu[u].text)||'')+'</span><span style="color:var(--b3)">'+esc(new Date((pu[u]&&pu[u].at)||0).toLocaleString('zh-TW'))+'</span><span style="margin-left:auto;display:flex;gap:4px">'+B("lineOwnerAdd('"+k(u)+"')",'設為擁有者','btn-g')+B("linePendDel('users','"+k(u)+"')",'忽略')+'</span>');}).join('')):'')
+    +'<div style="font-weight:700;font-size:12.5px;margin-top:10px">工地群組</div>'
+    +(Object.keys(gr).map(function(g){var v=gr[g]||{};return row('<b>'+esc(v.name||'')+'</b>'+sel('lg-q-'+k(g),v.qid)+'<label style="font-size:11.5px"><input type="checkbox" id="lg-d-'+k(g)+'"'+(v.daily!==false?' checked':'')+'> 每天問日報</label><span style="margin-left:auto;display:flex;gap:4px">'+B("lineGroupSave('"+k(g)+"')",'儲存','btn-g')+B("lineGroupDel('"+k(g)+"')",'解除','btn-r')+'</span>');}).join('')||'<div style="font-size:12px;color:var(--b3)">尚未綁定（把機器人拉進工地群組，群組有人講話後會出現在下方）</div>')
+    +(Object.keys(pg).length?('<div style="font-size:12px;margin-top:6px">待綁定的群組：</div>'+Object.keys(pg).map(function(g){return row('<span style="color:var(--b3)">'+esc(g.slice(0,10))+'…　'+esc(new Date((pg[g]&&(pg[g].lastAt||pg[g].at))||0).toLocaleString('zh-TW'))+'</span>'+sel('lg-q-'+k(g),'')+'<label style="font-size:11.5px"><input type="checkbox" id="lg-d-'+k(g)+'" checked> 每天問日報</label><span style="margin-left:auto;display:flex;gap:4px">'+B("lineGroupSave('"+k(g)+"')",'綁定','btn-g')+B("linePendDel('groups','"+k(g)+"')",'忽略')+'</span>');}).join('')):'')
+    +'<details style="margin-top:10px"><summary style="font-weight:700;font-size:12.5px;cursor:pointer">機器人固定句子（Lotion 定稿；群組裡只會發這些）</summary>'
+    +Object.keys(_LINE_TEXTS).map(function(t){return '<div class="f" style="margin-top:6px"><label>'+esc(_LINE_TL[t]||t)+'</label><textarea id="lt-'+t+'" rows="'+(t==='daily3'?4:2)+'" style="width:100%;box-sizing:border-box;font-size:12px">'+esc(tx[t])+'</textarea></div>';}).join('')
+    +'<div style="text-align:right;margin-top:6px">'+B('lineTextsSave()','儲存固定句子','btn-g')+'</div></details>'
+    +'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+B('linePushTest()','傳一則測試通知給擁有者')+B('_lineCfgCache=null;renderLineBox()','重新整理')+'</div>'
+    +'</div></div>';
+}
+function _lineCfgSet(path,val,okMsg){
+  if(_roDeny())return Promise.resolve(false);
+  if(!_fbDb){toast('要登入才能設定');return Promise.resolve(false);}
+  var ref=_fbDb.ref('fydata/lineCfg/'+path);
+  return (val==null?ref.remove():ref.set(val)).then(function(){_lineCfgCache=null;renderLineBox();if(okMsg)toast(okMsg);return true;}).catch(function(e){_err('_lineCfgSet',e);toast('設定失敗'+(/permission/i.test(String(e&&(e.code||e.message)))?'：雲端規則尚未發布':''));return false;});
+}
+function lineOwnerAdd(u){var n=window.prompt('這個 LINE 帳號是誰？（例：Lotion）','Lotion');if(n==null)return;_lineCfgSet('owners/'+u,{name:String(n).trim().slice(0,30)||'擁有者',at:Date.now()},'已設為擁有者').then(function(ok){if(ok)_lineCfgSet('pending/users/'+u,null);});}
+function lineOwnerDel(u){showConfirm('移除擁有者','移除後這個 LINE 帳號傳的檔案不再收件、也不會收到通知。',function(){_lineCfgSet('owners/'+u,null,'已移除');},true);}
+function linePendDel(kind,id){_lineCfgSet('pending/'+(kind==='groups'?'groups':'users')+'/'+id,null);}
+function lineGroupSave(g){
+  var qid=gv('lg-q-'+g),q=Q.find(function(x){return x.id===qid;});if(!q){toast('請先選工程');return;}
+  var d=!!(document.getElementById('lg-d-'+g)||{}).checked;
+  _lineCfgSet('groups/'+g,{qid:qid,name:String(q.name||'').slice(0,40),daily:d,at:Date.now()},'已綁定「'+(q.name||'')+'」').then(function(ok){if(ok)_lineCfgSet('pending/groups/'+g,null);});
+}
+function lineGroupDel(g){showConfirm('解除工地群組','解除後這個群組的訊息不再記錄、也不會問日報（已記的資料保留）。',function(){_lineCfgSet('groups/'+g,null,'已解除');},true);}
+function lineTextsSave(){var t={};Object.keys(_LINE_TEXTS).forEach(function(k){var v=(gv('lt-'+k)||'').trim();if(v)t[k]=v.slice(0,1000);});_lineCfgSet('texts',t,'已儲存固定句子');}
+function linePushTest(){
+  if(_roDeny()||!_fbDb)return;
+  var id='p'+Date.now().toString(36);
+  _fbDb.ref('fydata/linePush/'+id).set({id:id,text:'FJ 測試通知：LINE 機器人推播正常。',by:_meEmail(),at:Date.now(),status:'pending'}).then(function(){toast('已送出測試通知（約幾秒後到 LINE）');}).catch(function(e){_err('linePushTest',e);toast('送出失敗：Cloud Functions 或規則尚未部署');});
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
