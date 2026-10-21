@@ -36874,7 +36874,12 @@ function _mdlFoot(body){
   if(!body)return null;
   var k=[].slice.call(body.children).filter(function(x){return x.tagName!=='SCRIPT'&&x.tagName!=='INPUT';});
   var last=k[k.length-1];
-  if(last&&last.querySelector('button')&&!last.querySelector('input:not([type=hidden]),select,textarea')){last.classList.add('fy-mdl-foot');return last;}
+  if(last&&last.querySelector('button')&&!last.querySelector('input:not([type=hidden]),select,textarea')){
+    last.classList.add('fy-mdl-foot');
+    var pl=body.style.paddingLeft||'',pr=body.style.paddingRight||'';   // 依內容區實際左右內距延伸到滿版（16～18px 不一，避免露縫）
+    if(pl){last.style.marginLeft='-'+pl;last.style.paddingLeft=pl;}if(pr){last.style.marginRight='-'+pr;last.style.paddingRight=pr;}
+    return last;
+  }
   return null;
 }
 function _mdlInit(){
@@ -36896,7 +36901,7 @@ function _modal(title,bodyHtml,onOk){
     +'<span style="color:#fff;font-size:14px;font-weight:700">'+esc(title)+'</span>'
     +'<button type="button" id="fy-modal-x" style="border:none;background:transparent;color:rgba(255,255,255,.8);font-size:19px;cursor:pointer">✕</button></div>'
     +'<div style="padding:15px 17px">'+bodyHtml
-    +'<div class="fy-mdl-foot" style="display:flex;gap:8px;justify-content:flex-end;margin-top:15px">'
+    +'<div class="fy-mdl-foot" style="display:flex;gap:8px;justify-content:flex-end;margin-top:15px;margin-left:-17px;margin-right:-17px;padding-left:17px;padding-right:17px">'
     +'<button type="button" id="fy-modal-c" class="btn btn-sm">取消</button>'
     +'<button type="button" id="fy-modal-o" class="btn btn-sm btn-g" style="padding:7px 20px">確定</button></div></div></div>';
   document.body.appendChild(d);
