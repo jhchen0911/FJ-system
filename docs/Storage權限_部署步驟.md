@@ -13,23 +13,77 @@
 
 > 注意：沒在人員名冊的人（例如剛加入、還沒建檔）會被擋下上傳附件——先到人員管理新增再重新產生規則。
 
-## 長期：Cloud Function 自動依名冊設定權限（custom claims，方案 B）
+## 長期：自動依名冊設定附件權限（Cloud Function，Lotion 10/21 決定採用）
 
-`functions/index.js`：監看 `fydata/access`、`fydata/adminEmails`、`fydata/readers`，任一變動就把所有帳號的 claim `fy` 設為 `admin`／`staff`／`reader`（不在名冊＝移除）；新帳號建立時也會設定。產生的規則先看 claim，再看清單，所以部署後名冊變動會自動生效，不必每次重新貼規則。
+**這是什麼**：在 Firebase 上放一支小程式（Cloud Function）。之後在系統「人員管理」新增、停用人員，或增減唯讀帳號時，它會自動更新每個帳號能不能看／上傳附件，不用再手動貼規則。
+程式已寫好放在 repo 的 `functions/index.js`，下面只是「把它放上 Firebase」的步驟，**整個過程只要做一次**，約 20～30 分鐘。
 
-部署（需在電腦上做一次；專案為 Blaze 方案才可用 Functions）：
+**時機**：批次 B 上線時一起做。做好之前，先用上面「短期」的清單規則頂著（兩者可以並存，不衝突）。
 
-1. 安裝 Node.js 20 與 Firebase CLI：`npm install -g firebase-tools`，`firebase login`（用擁有者帳號）。
-2. 取得 repo：`git clone https://github.com/jhchen0911/FJ-system.git && cd FJ-system`。
-3. `cd functions && npm install && cd ..`
-4. `firebase use jhchen-aed9a`
-5. **只部署 functions**：`firebase deploy --only functions`（`firebase.json` 只列 functions，規則一律在主控台貼上發布，不會被部署覆蓋）。
-6. 部署完成後執行一次全量重算：用擁有者帳號登入系統，瀏覽器開發者工具 Console 執行
-   `firebase.auth().currentUser.getIdToken().then(t=>fetch('https://asia-southeast1-jhchen-aed9a.cloudfunctions.net/fyClaimsSyncNow',{headers:{Authorization:'Bearer '+t}}).then(r=>r.text()).then(console.log))`
-   → 顯示 `{"changed":N}`。
-7. 各使用者重新整理系統一次（系統登入時會重新取得權限）。
+### 事前確認（1 分鐘）
 
-費用：觸發次數＝名冊變動次數，量極小，Blaze 免費額度內。
+- Firebase 專案 **jhchen-aed9a** 是 **Blaze（隨用隨付）方案**：Firebase 主控台左下角「方案」顯示 Blaze 即可。不是的話要先升級（需綁信用卡；這支程式用量極小，在免費額度內，實際不會產生費用）。
+- 用 **擁有者帳號 jhchen0911@gmail.com** 操作。
+
+### 步驟一：在電腦安裝工具（第一次才需要，約 10 分鐘）
+
+1. 到 https://nodejs.org 下載 **LTS 版**（20 或以上）安裝，一路「下一步」即可。
+2. 打開「終端機」（Mac：應用程式 → 工具程式 → 終端機；Windows：開始 → 輸入 `cmd` → 命令提示字元）。
+3. 貼上下面這行、按 Enter（安裝 Firebase 工具，跑完會回到可輸入狀態）：
+   ```
+   npm install -g firebase-tools
+   ```
+   Mac 若出現 permission denied，改貼 `sudo npm install -g firebase-tools`，再輸入電腦開機密碼（輸入時畫面不會顯示字，正常）。
+4. 貼上下面這行、按 Enter：
+   ```
+   firebase login
+   ```
+   會自動開瀏覽器 → 選 **jhchen0911@gmail.com** → 允許。看到「Success! Logged in」就完成。
+
+### 步驟二：下載程式並放上 Firebase（約 10 分鐘）
+
+在同一個終端機視窗，**一行一行**貼上、每行按 Enter，等它跑完再貼下一行：
+
+```
+git clone https://github.com/jhchen0911/FJ-system.git
+cd FJ-system
+cd functions
+npm install
+cd ..
+firebase use jhchen-aed9a
+firebase deploy --only functions
+```
+
+- 沒有 `git` 的話（出現「找不到指令／command not found」）：到 https://github.com/jhchen0911/FJ-system 按綠色「Code」→「Download ZIP」，解壓縮後在終端機用 `cd 解壓縮後的資料夾路徑`（可把資料夾直接拖進終端機視窗帶出路徑），再從 `cd functions` 那行接著做。
+- `git clone` 若要求登入 GitHub：輸入 GitHub 帳號，密碼欄要貼 GitHub 的「Personal access token」；不熟的話直接用上一點的 Download ZIP（先在瀏覽器登入 GitHub）。
+- 最後一行會跑 2～5 分鐘。成功時最後會出現 **「Deploy complete!」**。
+- 第一次部署可能會問「是否啟用某些 API（enable … API?）」，輸入 `y` 按 Enter。
+- 這個指令**只會放上這支小程式**，不會動到資料庫規則、Storage 規則或任何資料。
+
+### 步驟三：在系統裡按一次「重新同步附件權限」（1 分鐘）
+
+1. 用擁有者帳號登入系統 → **人員管理** → 下方「唯讀帳號（AI 助理）」卡。
+2. 按 **「重新同步附件權限」**（只有擁有者帳號看得到這顆按鈕）。
+3. 畫面下方出現「附件權限已同步，更新 N 個帳號」就完成。
+   - 若出現「同步失敗：連不到 Cloud Function」→ 步驟二沒有成功，回去看最後一行的訊息。
+4. 請其他同事**重新整理系統一次**（之後就自動，不用再做）。
+
+### 步驟四：貼一次新版 Storage 規則（1 分鐘）
+
+人員管理 → **產生 Storage 規則** → **複製全文** → Firebase 主控台 → Storage → 規則 → 全部取代貼上 → **發布**。
+（新版規則會先看自動設定的權限，再看清單；之後人員增減不必再貼。）
+
+### 之後
+
+- 人員或唯讀帳號增減：照常在系統人員管理操作即可，**自動生效**（對方重新整理後；最遲 1 小時）。
+- 費用：只在名冊變動時執行，次數極少，在 Blaze 免費額度內。
+- 要撤銷：Firebase 主控台 → Functions → 刪除名稱以 `fyClaims` 開頭的函式，並重新貼一次短期清單規則。
+
+<details><summary>技術說明（給工程師）</summary>
+
+`functions/index.js` 監看 `fydata/access`、`fydata/adminEmails`、`fydata/readers`，任一變動就全量重算所有帳號的 custom claim `fy`（`admin`／`staff`／`reader`，不在名冊＝移除）；`fyClaimsOnCreate` 在新帳號建立時設定；`fyClaimsSyncNow`（HTTPS，只接受擁有者 ID token，CORS 限 GitHub Pages 網域）供人員管理頁「重新同步附件權限」（`storageClaimsSync`）呼叫。`firebase.json` 只列 functions，`firebase deploy --only functions` 不會覆蓋任何規則。前端登入時 `getIdToken(true)` 主動更新 token。
+
+</details>
 
 ## 建議：關閉自行註冊
 
