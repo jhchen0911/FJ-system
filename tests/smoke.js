@@ -7739,7 +7739,8 @@ async function newPage(browser, width, height) {
         /* 一式累計以 100% 為限（預覽與存檔同口徑） */
         c.periods[0].rows[0].qty = 0.7; openSubPeriod('cR2'); const sq = document.querySelector('.sp-row[data-lump="1"] .sp-qty'); sq.value = '50'; sq.dataset.touched = '1'; _spRecalc();
         out.clampUi = /累計完成超過 100%/.test(document.querySelector('.sp-row[data-lump="1"]').innerHTML); document.getElementById('gen-confirm-ok').click();
-        const p2 = c.periods.find(x => x.no === 2); out.clamp = !!p2 && Math.abs(p2.rows[0].qty - 0.3) < 1e-9 && p2.amt === 114000;
+        /* Lotion 10/21：超過 100% 改為直接擋下（不再夾在 100% 存檔） */
+        out.clamp = !c.periods.find(x => x.no === 2) && document.getElementById('gen-confirm-ok').disabled === true; document.getElementById('gen-confirm-modal').style.display = 'none';
         window.toast = oT; Q = []; eid = null; PAYABLES.length = 0;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
       return out;
@@ -7823,12 +7824,32 @@ async function newPage(browser, width, height) {
         Q = [{ id: 'qW', items: [{ desc: '鋼軌樁打設\n（含根固）' }] }]; _cardCtx = { qid: 'qW' };
         out.cardMiss = /未對到任何工項：根固/.test(_cardWarn('billing.itemOverrides', [{ itemMatch: '根固' }], {}) || '') && !_cardWarn('billing.itemOverrides', [{ itemMatch: '鋼軌樁' }], {});
         out.mixed = _subLumpMixed({ lumpItems: [{ q0: 1, u0: '支' }, { q0: 2, u0: 'M3' }] }) && !_subLumpMixed({ lumpItems: [{ q0: 1, u0: '支' }] });
+        /* 審查修正（C 第 4 輪） */
+        qL.costs[0].periods = [{ no: 1, rows: [{ rid: 'cL1', qty: 0.5 }] }];
+        const la2 = _rfqLumpAdjOf(qL, rL, { diffs: [x] }); out.lumpBilled = la2[0].billed === 0.5 && /不能直接改總價/.test(_rfqChgHtml(qL, Object.assign({}, rL, { chg: { from: 1, to: 2, diffs: [x], lumpAdj: '1' } })));
+        COST_HIST.length = 0; COST_HIST.push({ key: _normName('測試工項'), unit: '支', actUnit: 100 }, { key: _normName('測試工項'), unit: '支', actUnit: 900, ref: true });
+        out.histRef = (_histCostFor('測試工項', '支') || {}).avg === 100; COST_HIST.length = 0;
+        Q = [{ id: 'qP2', name: '票期案2', client: '', ownerPay: { delay: 1, day: 20 } }];
+        const pl2 = _invRecvPlan({ id: 'iP2', quoteId: 'qP2', date: '2026-10-25', expectedRecvDate: '2026-12-05', cashPct: 30, ticketDays: 90 });
+        out.ticketKeep = pl2.td === 90 && Math.abs(pl2.cp - 0.3) < 1e-9;
+        const qO = { id: 'qO', name: '舊案', client: '', items: [], ownerCard: { fields: {} } }; Q = [qO]; _applyQuoteSensAll({ qO: { _mt: 0 } });
+        out.ocMig = qO._ocPriv === 1 && qO._mt > 0;
+        _copyQDo('qO'); out.copyDef = Q[0].id !== 'qO' && Q[0].payDefV === 2;
+        /* Lotion 10/21 第 9 項：一式累計超過 100% 直接擋下 */
+        const qX = { id: 'qX', name: '一式案', items: [{ desc: '中間樁', unit: '支', qty: 10 }], costs: [{ id: 'cX', type: 'sub', vendor: '丁', rows: [{ id: 'x1', lump: true, qty: 1, unitPrice: 100000, lumpItems: [{ idx: 0, q0: 10, u0: '支' }] }], periods: [{ no: 1, rows: [{ rid: 'x1', qty: 0.8 }] }] }] };
+        Q = [qX]; eid = 'qX'; openSubPeriod('cX');
+        const lq = document.querySelector('.sp-row[data-lump="1"] .sp-qty'); lq.value = '30'; lq.dataset.touched = '1'; _spRecalc();
+        out.lumpBlockUi = document.getElementById('gen-confirm-ok').disabled === true && /不能存檔/.test(document.getElementById('gen-confirm-modal').innerHTML);
+        _spSave(); out.lumpBlock = qX.costs[0].periods.length === 1;
+        document.getElementById('gen-confirm-modal').style.display = 'none';
+        showConfirm('x', 'y', function () {}, false); out.okReset = document.getElementById('gen-confirm-ok').disabled === false; document.getElementById('gen-confirm-modal').style.display = 'none';
         _cardCtx = null; window.toast = oT; Q = []; eid = null; PAYABLES.length = 0;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
       return out;
     });
     check('Lotion 10/21（C）：介紹費背對背、條件卡進 private、新專案放款日 20、拆分發包數量依原量比例分配可改、一式依比例調價只提示', r.intro && r.priv && r.payDef && r.share && r.lumpAdj, JSON.stringify(r));
     check('Lotion 10/21（C）：根固／一般保留款分開退、舊單票期改用規則、分段裝設％需原因留紀錄不回溯、提示文字', r.grp && r.rel && r.ticket && r.instNoReason && r.inst && r.instRo && r.cardMiss && r.mixed, JSON.stringify(r));
+    check('審查修正（C 第 4 輪）：一式已計價不可直接改總價、參考單價不入實績平均、規則沒寫付款比例保留單據票期、條件卡舊雲端資料一次性搬移、複製報價為新專案', r.lumpBilled && r.histRef && r.ticketKeep && r.ocMig && r.copyDef && r.lumpBlockUi && r.lumpBlock && r.okReset, JSON.stringify(r));
     check('Lotion 10/21（C）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
