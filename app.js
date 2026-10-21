@@ -2109,6 +2109,7 @@ function saveQ(){
     rmkText:buildRmkText(),
     items:JSON.parse(JSON.stringify(items)),exs:JSON.parse(JSON.stringify(exs)),t};
   if(!existingQ&&!q.rentEnd)q.rentEnd='removeDone';   // v6.0.107 新報價：報價條件第 14 條租期結束日＝拆除（拔除）完成日；舊案沒有此欄＝拔除第一天
+  if(!existingQ&&!q.instV)q.instV=2;   // Lotion 10/21：新專案包商裝設％空白＝跟業主；舊專案（無此欄）維持原本 90%
   const idx=Q.findIndex(x=>x.id===q.id);
   if(idx>=0)Q[idx]=q;else Q.unshift(q);
   persist();
@@ -4246,7 +4247,7 @@ function addAddendum(id){
   copy.code=genQuoteCode();
   copy.parentId=id;
   copy.awarded=false;copy.payDue='';copy.costs=[];
-  copy.name=(copy.name||'未命名')+' (追加)';
+  copy.name=(copy.name||'未命名')+' (追加)';copy.instV=2;   // 新專案
   copy.items=[];
   copy.date=localToday();
   Q.unshift(copy);
@@ -5842,7 +5843,7 @@ function _copyQDo(id){
   // Set date to today
   copy.date=localToday();
   // Append (複製) to name
-  copy.name=(copy.name||'未命名')+' (複製)';
+  copy.name=(copy.name||'未命名')+' (複製)';copy.instV=2;   // 新專案
   Q.unshift(copy);
   persist();
   toast('已複製為新報價草稿！');
@@ -36790,7 +36791,8 @@ function _ownerCt(q){if(!q)return null;var a=(CONTRACTS||[]).find(function(c){re
   var byName=(CONTRACTS||[]).filter(function(c){return c&&!c.linkedQid&&c.name&&c.name===q.name;});return byName.length===1?byName[0]:null;}   // 沒有關聯時，只有恰好一份未關聯的同名合約才採用
 function _ownerCtInst(q){var c=_ownerCt(q),v=c&&c.instPct;return (v==null||v==='')?null:Math.max(0,Math.min(100,parseFloat(v)||0));}
 function _ownerInstRef(q){var v=_ownerCtInst(q);if(v!=null)return {pct:v,src:'業主合約「'+(_ownerCt(q).name||'')+'」'};return {pct:_instDef(),src:'公司請款設定（拆除請款 '+_removeRate()+'%）'};}
-function _instOf(c,q){var v=c&&c.instPct;if(v==null||v===''){if(q){try{var _om=q.ownerPay&&q.ownerPay.instPct;if(_om!=null&&_om!=='')return Math.max(0,Math.min(100,parseFloat(_om)||0));return _ownerInstRef(q).pct;}catch(e){_err('_instOf',e);}}return _instDef();}   /* Lotion 10/21：業主手動調過的％優先 */return Math.max(0,Math.min(100,parseFloat(v)||0));}   // 包商空白＝與業主同一個參照（審查修正：有專案時用 _ownerInstRef）
+var _INST_LEGACY=90;   // v6.0.107 以前包商裝設請款％空白的預設（舊專案凍結在此值，Lotion 10/21 第 13 項）
+function _instOf(c,q){var v=c&&c.instPct;if(v==null||v===''){if(q&&q.instV!==2)return _INST_LEGACY;if(q){try{var _om=q.ownerPay&&q.ownerPay.instPct;if(_om!=null&&_om!=='')return Math.max(0,Math.min(100,parseFloat(_om)||0));return _ownerInstRef(q).pct;}catch(e){_err('_instOf',e);}}return _instDef();}   /* Lotion 10/21：業主手動調過的％優先 */return Math.max(0,Math.min(100,parseFloat(v)||0));}   // 包商空白＝與業主同一個參照（審查修正：有專案時用 _ownerInstRef）
 function _b2bRetWhen(o){return _B2B_RETWHEN;}
 // 新詢價單的預設條件：現金部分不早於營造廠放款、期票到期不早於營造廠最後一筆款到帳（票期進位到 30 天）、保留款不低於營造廠
 function _b2bDefCond(q){

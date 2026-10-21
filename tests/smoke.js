@@ -6871,7 +6871,7 @@ async function newPage(browser, width, height) {
           && !/0 天期票/.test(_sctPayTxt(Object.assign({}, cost, { payTerm: { cashPct: 50, ticketPct: 50, ticketDays: 0 } }), _sctCfg(), q));
         q.ownerPay = { delay: 3, day: 1, cashPct: 50, ticketDays: 0 }; out.noZero = _rfqCond(null).ticketDays > 0 || _rfqCond(null).cashPct === 100;
         /* v6.0.96 裝設請款％：營造廠 80 → 包商預設 80；包商 90 提醒先墊 10%；空白＝公司預設 90；合約與詢價單寫出分段 */
-        q.ownerPay = { instPct: 80 }; const ci = _rfqCond(null);
+        q.ownerPay = { instPct: 80 }; q.instV = 2; const ci = _rfqCond(null);   /* 新專案：包商空白跟業主（舊專案凍結 90，見 Lotion 10/21 測試） */
         out.inst = ci.instPct === 80 && _b2bIssues(q, Object.assign({}, ci, { instPct: 90 })).some(x => /包商裝設完成先拿 90%，比營造廠的 80% 多 10%（豐有先墊）/.test(x)) && !_b2bIssues(q, ci).some(x => /裝設/.test(x))
           && !_b2bIssues(q, Object.assign({}, ci, { instPct: null })).some(x => /裝設/.test(x)) && _instOf({}) === 100 - _removeRate() && /裝設（打設）完成請款 80%，拆除（拔除）完成請款 20%/.test(_rfqCondLines({ cond: ci }).join(''));
         out.retB = _ownerTerms({ id: 'zr', client: '元昱測試營造', ownerPay: { day: 20 } }).ret === null && _ownerTerms(q).ret === 10;
@@ -7367,7 +7367,7 @@ async function newPage(browser, width, height) {
         const bit = { type: 'rental', curQty: 1170, contractPrice: 50, payRate: 100, _ovKey: 'x', _ovBatches: bq.rows, unit: '支·天', discQd: 170 };
         out.disc = _invRentQ(bit) === 1000 && /折讓 170 支·天 ＝ 1,000 支·天/.test(_invCalcText(bit));
         /* 🟡 103：包商空白＝業主參照 */
-        const qx = { id: 'qX', name: 'X', items: [] }; Q = [qx]; CONTRACTS = CONTRACTS || [];
+        const qx = { id: 'qX', name: 'X', items: [], instV: 2 }; Q = [qx]; CONTRACTS = CONTRACTS || [];
         out.inst = _instOf({}, qx) === _ownerInstRef(qx).pct && _instOf({ instPct: 90 }, qx) === 90 && _instOf({}) === _instDef();
         /* 🟡 發票規則 B：小計 10,000、保留 5% → 保留 500（未稅）、扣保留後 9,500、稅 475、總計 9,975 */
         const b = _invRuleB(10000, 500, 525); out.ruleB = b.retU === 500 && b.net === 9500 && b.tax === 475;
@@ -7411,7 +7411,7 @@ async function newPage(browser, width, height) {
         invRentDisc(0); document.getElementById('rd-amt').value = String(97 * 50 * 15); document.getElementById('rd-note').value = '業主協商 −15 天'; document.getElementById('gen-confirm-ok').click();
         out.disc = invItems[0].discDays === 15 && invItems[0].discLog.length === 1 && invItems[0].discLog[0].reason === '業主協商 −15 天';
         /* 包商空白＝業主手動調過的％ */
-        out.inst = _instOf({}, { ownerPay: { instPct: 60 } }) === 60;
+        out.inst = _instOf({}, { instV: 2, ownerPay: { instPct: 60 } }) === 60 && _instOf({}, { ownerPay: { instPct: 60 } }) === 90;   /* 舊專案凍結原值 90 */
         /* 唯讀：明細入口放行，視窗確認＝關閉不存 */
         out.roAllow = !_roIsWriteSrc("editCustomer('c1')") && !_roIsWriteSrc("openSubPeriod('c1')") && _roIsWriteSrc('saveCustomer()');
         _fbUser = { email: 'ai@x.com', uid: 'u' }; _isReaderUser = true; let hit = 0;
