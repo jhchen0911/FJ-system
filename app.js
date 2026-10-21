@@ -2109,6 +2109,7 @@ function saveQ(){
     rmkText:buildRmkText(),
     items:JSON.parse(JSON.stringify(items)),exs:JSON.parse(JSON.stringify(exs)),t};
   if(!existingQ&&!q.rentEnd)q.rentEnd='removeDone';   // v6.0.107 新報價：報價條件第 14 條租期結束日＝拆除（拔除）完成日；舊案沒有此欄＝拔除第一天
+  if(!existingQ&&!q.instV)q.instV=2;   // Lotion 10/21：新專案包商裝設％空白＝跟業主；舊專案（無此欄）維持原本 90%
   const idx=Q.findIndex(x=>x.id===q.id);
   if(idx>=0)Q[idx]=q;else Q.unshift(q);
   persist();
@@ -4248,7 +4249,7 @@ function addAddendum(id){
   copy.code=genQuoteCode();
   copy.parentId=id;
   copy.awarded=false;copy.payDue='';copy.costs=[];
-  copy.name=(copy.name||'未命名')+' (追加)';
+  copy.name=(copy.name||'未命名')+' (追加)';copy.instV=2;   // 新專案
   copy.items=[];
   copy.date=localToday();
   Q.unshift(copy);
@@ -5844,7 +5845,7 @@ function _copyQDo(id){
   // Set date to today
   copy.date=localToday();
   // Append (複製) to name
-  copy.name=(copy.name||'未命名')+' (複製)';
+  copy.name=(copy.name||'未命名')+' (複製)';copy.instV=2;   // 新專案
   Q.unshift(copy);
   persist();
   toast('已複製為新報價草稿！');
@@ -36912,7 +36913,8 @@ function _ownerCt(q){if(!q)return null;var a=(CONTRACTS||[]).find(function(c){re
   var byName=(CONTRACTS||[]).filter(function(c){return c&&!c.linkedQid&&c.name&&c.name===q.name;});return byName.length===1?byName[0]:null;}   // 沒有關聯時，只有恰好一份未關聯的同名合約才採用
 function _ownerCtInst(q){var c=_ownerCt(q),v=c&&c.instPct;return (v==null||v==='')?null:Math.max(0,Math.min(100,parseFloat(v)||0));}
 function _ownerInstRef(q){var v=_ownerCtInst(q);if(v!=null)return {pct:v,src:'業主合約「'+(_ownerCt(q).name||'')+'」'};return {pct:_instDef(),src:'公司請款設定（拆除請款 '+_removeRate()+'%）'};}
-function _instOf(c,q){var v=c&&c.instPct;if(v==null||v===''){if(q){try{var _om=q.ownerPay&&q.ownerPay.instPct;if(_om!=null&&_om!=='')return Math.max(0,Math.min(100,parseFloat(_om)||0));return _ownerInstRef(q).pct;}catch(e){_err('_instOf',e);}}return _instDef();}   /* Lotion 10/21：業主手動調過的％優先 */return Math.max(0,Math.min(100,parseFloat(v)||0));}   // 包商空白＝與業主同一個參照（審查修正：有專案時用 _ownerInstRef）
+var _INST_LEGACY=90;   // v6.0.107 以前包商裝設請款％空白的預設（舊專案凍結在此值，Lotion 10/21 第 13 項）
+function _instOf(c,q){var v=c&&c.instPct;if(v==null||v===''){if(q&&q.instV!==2)return _INST_LEGACY;if(q){try{var _om=q.ownerPay&&q.ownerPay.instPct;if(_om!=null&&_om!=='')return Math.max(0,Math.min(100,parseFloat(_om)||0));return _ownerInstRef(q).pct;}catch(e){_err('_instOf',e);}}return _instDef();}   /* Lotion 10/21：業主手動調過的％優先 */return Math.max(0,Math.min(100,parseFloat(v)||0));}   // 包商空白＝與業主同一個參照（審查修正：有專案時用 _ownerInstRef）
 function _b2bRetWhen(o){return _B2B_RETWHEN;}
 // 新詢價單的預設條件：現金部分不早於營造廠放款、期票到期不早於營造廠最後一筆款到帳（票期進位到 30 天）、保留款不低於營造廠
 function _b2bDefCond(q){
@@ -37658,17 +37660,40 @@ function invRecvOverride(){
     toast(d?('預計收款日已改為 '+d):'已改回自動計算');
   });
 }
+// v6.0.104 長表單視窗：置中的固定視窗加 .fy-mdl（本體以 vh 為上限、內容區捲動），內容區最後一列按鈕加 .fy-mdl-foot（固定在底部）
+var _MDL_IDS=['customer-modal','merge-cost-modal','rmk-modal','negotiate-modal','inv-clause-modal','award-modal','import-confirm-modal','contract-modal','vendor-modal','payable-modal','invoice-rec-modal','receipt-modal','retention-modal'];
+function _mdlFoot(body){
+  if(!body)return null;
+  var k=[].slice.call(body.children).filter(function(x){return x.tagName!=='SCRIPT'&&x.tagName!=='INPUT';});
+  var last=k[k.length-1];
+  if(last&&last.querySelector('button')&&!last.querySelector('input:not([type=hidden]),select,textarea')){
+    last.classList.add('fy-mdl-foot');
+    var pl=body.style.paddingLeft||'',pr=body.style.paddingRight||'';   // 依內容區實際左右內距延伸到滿版（16～18px 不一，避免露縫）
+    if(pl){last.style.marginLeft='-'+pl;last.style.paddingLeft=pl;}if(pr){last.style.marginRight='-'+pr;last.style.paddingRight=pr;}
+    return last;
+  }
+  return null;
+}
+function _mdlInit(){
+  _MDL_IDS.forEach(function(id){
+    var o=document.getElementById(id);if(!o||o.classList.contains('fy-mdl'))return;
+    var pn=o.firstElementChild;if(!pn||!pn.children[1])return;
+    o.classList.add('fy-mdl');pn.style.maxHeight='';pn.style.overflow='hidden';
+    _mdlFoot(pn.children[1]);
+  });
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',_mdlInit);else _mdlInit();
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
-  d.id='fy-modal';
+  d.id='fy-modal';d.className='fy-mdl';
   d.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
   d.innerHTML='<div style="max-width:460px;width:100%;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
     +'<div style="background:var(--g3);padding:12px 16px;display:flex;justify-content:space-between;align-items:center">'
     +'<span style="color:#fff;font-size:14px;font-weight:700">'+esc(title)+'</span>'
     +'<button type="button" id="fy-modal-x" style="border:none;background:transparent;color:rgba(255,255,255,.8);font-size:19px;cursor:pointer">✕</button></div>'
     +'<div style="padding:15px 17px">'+bodyHtml
-    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:15px">'
+    +'<div class="fy-mdl-foot" style="display:flex;gap:8px;justify-content:flex-end;margin-top:15px;margin-left:-17px;margin-right:-17px;padding-left:17px;padding-right:17px">'
     +'<button type="button" id="fy-modal-c" class="btn btn-sm">取消</button>'
     +'<button type="button" id="fy-modal-o" class="btn btn-sm btn-g" style="padding:7px 20px">確定</button></div></div></div>';
   document.body.appendChild(d);
