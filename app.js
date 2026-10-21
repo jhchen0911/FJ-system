@@ -479,7 +479,7 @@ function _rentBatchQtyDays(pg,qty,startISO,endISO){
     if(B.stage){n++;var d2=Math.max(0,Math.min(_dDiff(startISO,B.stage)+1,span));tot+=left*d2;rows.push({no:n,date:B.stage,qty:left,days:d2});}
     else {rows.push({no:n+1,date:'',qty:left,days:span,open:true});tot+=left*span;}
   }
-  return {qtyDays:tot,rows:rows,noTick:!!B.noTick&&(B.open>0||rows.length>0)};
+  return {qtyDays:tot,rows:rows,noTick:!!B.noTick&&!!((pg&&pg.remLogs)||[]).length};   // 審查修正：還沒有拔除紀錄時不印「未勾本批完成」
 }
 // v6.0.107 租期結束日口徑（報價條件第 14 條）：q.rentEnd＝'removeFirst' 拔除（拆除）第一天（舊案預設）／'removeDone' 拔除（拆除）完成日（新報價預設）
 var _RENT_END_LBL={removeFirst:'拔除（拆除）第一天',removeDone:'拔除（拆除）完成日'};
@@ -29622,7 +29622,7 @@ var HR=[],PAYSLIPS=[];
 try{var _hr0=localStorage.getItem('fy_hr');if(_hr0)HR=JSON.parse(_hr0)||[];}catch(e){_err('HR.load',e);}
 try{var _ps0=localStorage.getItem('fy_payslips');if(_ps0)PAYSLIPS=JSON.parse(_ps0)||[];}catch(e){_err('PAYSLIPS.load',e);}
 if(!Array.isArray(HR))HR=[];if(!Array.isArray(PAYSLIPS))PAYSLIPS=[];
-function saveHR(){_lsSet('fy_hr',JSON.stringify(HR),'人員薪資');try{_autoUpload();}catch(e){_err('saveHR',e);}}
+function saveHR(){if(_roDeny())return;_lsSet('fy_hr',JSON.stringify(HR),'人員薪資');try{_autoUpload();}catch(e){_err('saveHR',e);}}
 function savePayslips(){_lsSet('fy_payslips',JSON.stringify(PAYSLIPS),'薪資條');try{_autoUpload();}catch(e){_err('savePayslips',e);}}
 function _hrNum(v,d){var n=parseFloat(v);return isFinite(n)?n:(d||0);}
 // 費率（可在人員薪資頁「費率設定」調整；預設為 2026 年一般口徑，請依當年公告核對）
@@ -36216,7 +36216,7 @@ function _invRentBatch(it){return !!(it&&it.type==='rental'&&Array.isArray(it._o
 function _invRentQ(it){var q=parseFloat(it&&it.curQty)||0;if(_invRentBatch(it)){var x=parseFloat(it.discQd)||0;return x>0?Math.max(0,q-x):q;}return q;}
 function _invBillDays(it){var d=parseFloat(it&&it.curDays)||0,x=parseFloat(it&&it.discDays)||0;return x>0?Math.max(0,d-x):d;}
 function _invDaysCell(it){   // 列印用天數欄：有折讓印「51−15」換行「＝36」
-  if(_invRentBatch(it)&&(parseFloat(it.discQd)||0)>0)return '折讓<br>−'+_qfmt(it.discQd)+'<br><span style="font-size:9px">支·天</span>';   // Lotion 10/21：分批模式在天數欄標出折讓（原始支·天在數量欄）
+  if(_invRentBatch(it)&&(parseFloat(it.discQd)||0)>0)return '折讓<br>−'+_qfmt(it.discQd)+'<br><span style="font-size:9px">'+esc((String(it.unit||'').replace(/·天$/,'')||'支')+'·天')+'</span>';   // Lotion 10/21：分批模式在天數欄標出折讓（原始支·天在數量欄）
   var d=parseFloat(it&&it.curDays)||0,x=parseFloat(it&&it.discDays)||0;
   if(!d)return '';
   if(!(x>0))return _qfmt(d);
@@ -36225,52 +36225,53 @@ function _invDaysCell(it){   // 列印用天數欄：有折讓印「51−15」�
 function _invDiscBtn(i,it){
   var bt=_invRentBatch(it),x=bt?(parseFloat(it&&it.discQd)||0):(parseFloat(it&&it.discDays)||0);
   var b=document.createElement('button');b.type='button';b.className='btn btn-xs';
-  b.textContent=x>0?('折讓 '+_qfmt(x)+(bt?' 支·天':' 天')):'折讓';b.title='逾期租金議價：業主要求折讓幾天、談定折讓幾天；計費天數＝逾期天數 − 折讓天數';
+  b.textContent=x>0?('折讓 '+_qfmt(x)+(bt?(' '+(String(it.unit||'').replace(/·天$/,'')||'支')+'·天'):' 天')):'折讓';b.title='逾期租金議價：業主要求折讓幾天、談定折讓幾天；計費天數＝逾期天數 − 折讓天數';
   b.style.cssText='margin-top:3px;width:100%;padding:2px 4px;font-size:10.5px;'+(x>0?'border-color:#ffcc80;color:#b45309;background:#FFF8E1':'color:var(--b4)');
   b.addEventListener('click',function(){invRentDisc(i);});
   return b;
 }
-function invRentDisc(i){
+function invRentDisc(i,pre){   // pre：原因沒填重開時保留剛輸入的值
+  pre=pre||null;var _pv=function(k,v){return pre&&pre[k]!=null?pre[k]:v;};
   var it=invItems[i];if(!it||it.type!=='rental'){toast('只有逾期租金列可以折讓');return;}
   _rdCur=it;
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   if(_invRentBatch(it)){   // 審查修正：分批模式以「支·天」折讓
     var tq=parseFloat(it.curQty)||0,pp=parseFloat(it.contractPrice)||0,bu=String(it.unit||'').replace(/·天$/,'');
     showConfirm('逾期租金折讓（議價）','<div style="font-size:12.5px;line-height:1.8;margin-bottom:6px">'+esc(String(it.desc||'').split('\n')[0])+'<br>本期逾期合計 <b>'+_qfmt(tq)+'</b> '+esc(bu)+'·天　單價 '+fmt(pp)+'（分批，見計算式）</div>'
-      +'<div class="f"><label>談定折讓（'+esc(bu)+'·天）<span style="font-size:10px;color:var(--b3)">印在請款單</span></label><input id="rd-qd" type="number" inputmode="decimal" min="0" max="'+tq+'" value="'+((parseFloat(it.discQd)||0)>0?it.discQd:'')+'" placeholder="例：天數 × 該批支數" style="'+IN+'"></div>'
-      +'<div class="f" style="margin-top:6px"><label>或折讓金額（NT$，未稅）<span style="font-size:10px;color:var(--b3)">填了金額就以金額換算</span></label><input id="rd-amt" type="number" inputmode="decimal" min="0" placeholder="例：15000" style="'+IN+'"></div>'
-      +'<div class="f" style="margin-top:6px"><label>折讓原因 <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-note" value="'+esc(it.discNote||'')+'" style="'+IN+'"></div>'+_rdLogHtml(it),function(){
+      +'<div class="f"><label>談定折讓（'+esc(bu)+'·天）<span style="font-size:10px;color:var(--b3)">印在請款單</span></label><input id="rd-qd" type="number" inputmode="decimal" min="0" max="'+tq+'" value="'+esc(String(_pv('qd',(parseFloat(it.discQd)||0)>0?it.discQd:'')))+'" placeholder="例：天數 × 該批支數" style="'+IN+'"></div>'
+      +'<div class="f" style="margin-top:6px"><label>或折讓金額（NT$，未稅）<span style="font-size:10px;color:var(--b3)">填了金額就以金額換算</span></label><input id="rd-amt" type="number" inputmode="decimal" min="0" value="'+esc(String(_pv('amt','')))+'" placeholder="例：15000" style="'+IN+'"></div>'
+      +'<div class="f" style="margin-top:6px"><label>折讓原因 <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-note" value="'+esc(_pv('note',it.discNote||''))+'" style=""'+IN+'"></div>'+_rdLogHtml(it),function(){
       var x=parseFloat(gv('rd-qd')),am=parseFloat(gv('rd-amt'));if(isFinite(am)&&am>0&&pp>0)x=Math.round(am/pp*100)/100;   // Lotion 10/21：可輸入天數或金額
       if(isFinite(x)&&x>tq){toast('折讓不能超過逾期合計，已改為 '+_qfmt(tq));x=tq;}
       var nx=isFinite(x)&&x>0?x:0,rs=(gv('rd-note')||'').trim();
-      if(nx!==(parseFloat(it.discQd)||0)&&!rs){toast('請填寫折讓原因');setTimeout(function(){invRentDisc(i);},50);return;}   // 必填原因
+      if(nx!==(parseFloat(it.discQd)||0)&&!rs){var _p1={qd:gv('rd-qd'),amt:gv('rd-amt'),note:''};toast('請填寫折讓原因');setTimeout(function(){invRentDisc(i,_p1);},50);return;}   // 必填原因
       if(nx!==(parseFloat(it.discQd)||0))_rdLog(it,(parseFloat(it.discQd)||0)+' '+bu+'·天',nx+' '+bu+'·天',rs);
       it.discQd=nx;it.discNote=rs;
       try{updateInvRowAmt(i);}catch(e){_err('invRentDisc',e);}try{rInvItems();rInvTots();}catch(e){_err('invRentDisc.re',e);}try{autoSaveInv();}catch(e){_err('invRentDisc.save',e);}
-      toast(it.discQd>0?('已折讓 '+_qfmt(it.discQd)+' '+bu+'·天，計費 '+_qfmt(_invRentQ(it))+' '+bu+'·天'):'已取消折讓');
+      toast(it.discQd>0?('已折讓 '+_qfmt(it.discQd)+' '+bu+'·天（NT$ '+fmt(Math.round(it.discQd*pp))+'），計費 '+_qfmt(_invRentQ(it))+' '+bu+'·天'):'已取消折讓');   // 以金額換算時天數取到小數 2 位，實際折讓金額可能差幾元，toast 顯示實際值
     },false,null,false);
     return;
   }
   var d=parseFloat(it.curDays)||0,p=parseFloat(it.contractPrice)||0,q=parseFloat(it.curQty)||0;
   var html='<div style="font-size:12.5px;line-height:1.8;margin-bottom:6px">'+esc(String(it.desc||'').split('\n')[0])+'<br>本期逾期 <b>'+_qfmt(d)+'</b> 天　單價 '+fmt(p)+' × '+_qfmt(q)+' '+esc(_uFix(it.unit||''))+'</div>'
-    +'<div class="fg fg2" style="gap:8px"><div class="f"><label>業主要求折讓（天）<span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-ask" type="number" inputmode="decimal" min="0" value="'+(it.discAsk!=null&&it.discAsk!==0?it.discAsk:'')+'" placeholder="例：30" style="'+IN+'"></div>'
-    +'<div class="f"><label>談定折讓（天）<span style="font-size:10px;color:var(--b3)">印在請款單</span></label><input id="rd-days" type="number" inputmode="decimal" min="0" max="'+d+'" value="'+(it.discDays!=null&&it.discDays!==0?it.discDays:'')+'" placeholder="例：15" oninput="_rdPreview()" style="'+IN+'"></div></div>'
-    +'<div class="f" style="margin-top:6px"><label>或折讓金額（NT$，未稅）<span style="font-size:10px;color:var(--b3)">填了金額就以金額換算天數</span></label><input id="rd-amt" type="number" inputmode="decimal" min="0" placeholder="例：15000" style="'+IN+'"></div>'
-    +'<div class="f" style="margin-top:6px"><label>折讓原因 <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-note" value="'+esc(it.discNote||'')+'" placeholder="例：10/15 與業主工務協商，原要求 30 天，談成 15 天" style="'+IN+'"></div>'
+    +'<div class="fg fg2" style="gap:8px"><div class="f"><label>業主要求折讓（天）<span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-ask" type="number" inputmode="decimal" min="0" value="'+esc(String(_pv('ask',it.discAsk!=null&&it.discAsk!==0?it.discAsk:'')))+'" placeholder="例：30" style="'+IN+'"></div>'
+    +'<div class="f"><label>談定折讓（天）<span style="font-size:10px;color:var(--b3)">印在請款單</span></label><input id="rd-days" type="number" inputmode="decimal" min="0" max="'+d+'" value="'+esc(String(_pv('days',it.discDays!=null&&it.discDays!==0?it.discDays:'')))+'" placeholder="例：15" oninput="_rdPreview()" style="'+IN+'"></div></div>'
+    +'<div class="f" style="margin-top:6px"><label>或折讓金額（NT$，未稅）<span style="font-size:10px;color:var(--b3)">填了金額就以金額換算天數</span></label><input id="rd-amt" type="number" inputmode="decimal" min="0" value="'+esc(String(_pv('amt','')))+'" placeholder="例：15000" style="'+IN+'"></div>'
+    +'<div class="f" style="margin-top:6px"><label>折讓原因 <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-note" value="'+esc(_pv('note',it.discNote||''))+'" placeholder="例：10/15 與業主工務協商，原要求 30 天，談成 15 天" style="'+IN+'"></div>'
     +'<div id="rd-prev" style="margin-top:8px;font-size:12px;color:var(--g3)"></div>'+_rdLogHtml(it);
   showConfirm('逾期租金折讓（議價）',html,function(){
     var ask=parseFloat(gv('rd-ask')),dd=parseFloat(gv('rd-days')),am=parseFloat(gv('rd-amt')),rt=(it.payRate!=null&&it.payRate!=='')?parseFloat(it.payRate):100;
     if(isFinite(am)&&am>0&&p>0&&q>0)dd=Math.round(am/(p*q*(rt/100))*100)/100;   // Lotion 10/21：可輸入天數或金額
     if(isFinite(dd)&&dd>d){toast('折讓天數不能超過逾期天數，已改為 '+_qfmt(d)+' 天');dd=d;}   // 視窗按確定即關，超過就夾在逾期天數
     var nd=isFinite(dd)&&dd>0?dd:0,rs=(gv('rd-note')||'').trim();
-    if(nd!==(parseFloat(it.discDays)||0)&&!rs){toast('請填寫折讓原因');setTimeout(function(){invRentDisc(i);},50);return;}   // 必填原因
+    if(nd!==(parseFloat(it.discDays)||0)&&!rs){var _p2={ask:gv('rd-ask'),days:gv('rd-days'),amt:gv('rd-amt'),note:''};toast('請填寫折讓原因');setTimeout(function(){invRentDisc(i,_p2);},50);return;}   // 必填原因
     if(nd!==(parseFloat(it.discDays)||0))_rdLog(it,(parseFloat(it.discDays)||0)+' 天',nd+' 天',rs);
     it.discAsk=isFinite(ask)&&ask>0?ask:0;it.discDays=nd;it.discNote=rs;
     try{_rentDiscNoteSync(it);}catch(e){_err('invRentDisc.note',e);}   // v6.0.75 備註列同步「折讓 N 天，計 M 天」
     try{updateInvRowAmt(i);}catch(e){_err('invRentDisc',e);}
     try{rInvItems();rInvTots();}catch(e){_err('invRentDisc.re',e);}
     try{autoSaveInv();}catch(e){_err('invRentDisc.save',e);}
-    toast(it.discDays>0?('已折讓 '+_qfmt(it.discDays)+' 天，計費 '+_qfmt(_invBillDays(it))+' 天'):'已取消折讓');
+    toast(it.discDays>0?('已折讓 '+_qfmt(it.discDays)+' 天（NT$ '+fmt(Math.round(p*q*it.discDays*rt/100))+'），計費 '+_qfmt(_invBillDays(it))+' 天'):'已取消折讓');
   },false,null,false);
   setTimeout(_rdPreview,30);
 }
@@ -37229,7 +37230,7 @@ function _roScan(root){
   root=root||document.body;if(!root||!root.querySelectorAll)return;
   root.querySelectorAll('[onclick]').forEach(function(el){if(el._roChk)return;el._roChk=1;if(_roIsWrite(el))el.classList.add('fy-ro-x');});
   root.querySelectorAll('input,select,textarea').forEach(function(el){
-    if(el._roChk||el.disabled||el.type==='hidden')return;el._roChk=1;
+    if(el._roChk||el.disabled||el.type==='hidden'||el.hasAttribute('data-ro-ok'))return;el._roChk=1;   // data-ro-ok：純讀取用（如催款文字複製）
     if(_roIsWrite(el,['onchange','oninput','onblur'])||el.type==='file'||(el.closest&&el.closest(_RO_FORM_ROOTS))){el.disabled=true;el.classList.add('fy-ro-d');}
   });
 }
@@ -37281,7 +37282,9 @@ function _modal(title,bodyHtml,onOk){
   d.addEventListener('click',function(e){if(e.target===d)close();});
   d.querySelector('#fy-modal-x').onclick=close;
   d.querySelector('#fy-modal-c').onclick=close;
-  d.querySelector('#fy-modal-o').onclick=function(){ if(onOk()!==false)close(); };
+  var _roF=!!(_isReaderUser&&d.querySelector('input:not([type=hidden]),select,textarea'));   // 審查修正：唯讀帳號開 _modal 明細視窗只能看
+  if(_roF){d.querySelectorAll('input,select,textarea').forEach(function(el){el.disabled=true;});d.querySelector('#fy-modal-o').textContent='關閉';d.querySelector('#fy-modal-c').style.display='none';}
+  d.querySelector('#fy-modal-o').onclick=function(){ if(_roF){close();return;} if(onOk()!==false)close(); };
 }
 function _dlText(name,text){
   try{
@@ -37510,7 +37513,7 @@ function showConfirm(title, msg, onOk, danger, onCancel, wide){
     const newOk=okBtn.cloneNode(true);
     newOk.textContent='確認';newOk.style.display='';if(cancelBtn)cancelBtn.style.display='';   // v5.381：有些呼叫端會改按鈕文字（如催款的「複製」），每次開啟先還原
     okBtn.parentNode.replaceChild(newOk,okBtn);
-    var _roForm=!!(_isReaderUser&&msgEl&&msgEl.querySelector('input:not([type=hidden]),select,textarea'));   // Lotion 10/21：唯讀帳號開明細視窗只能看，確認＝關閉、不存
+    var _roForm=!!(_isReaderUser&&msgEl&&msgEl.querySelector('input:not([type=hidden]):not([data-ro-ok]),select:not([data-ro-ok]),textarea:not([data-ro-ok])'));   // Lotion 10/21：唯讀帳號開明細視窗只能看，確認＝關閉、不存
     if(_roForm){newOk.textContent='關閉';if(cancelBtn)cancelBtn.style.display='none';}
     newOk.onclick=function(){modal.style.display='none';if(_roForm)return;onOk();};
   }
@@ -37634,7 +37637,7 @@ function openDunning(invId){
   var inv=INV.find(function(x){return x.id===invId;});if(!inv)return;
   var txt=_dunningText(inv);
   showConfirm('催款通知（複製後貼 LINE／訊息）',
-    '<textarea id="dun-txt" rows="12" style="width:100%;font-size:12.5px;line-height:1.7;padding:10px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;box-sizing:border-box">'+esc(txt)+'</textarea>'
+    '<textarea id="dun-txt" data-ro-ok="1" rows="12" style="width:100%;font-size:12.5px;line-height:1.7;padding:10px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;box-sizing:border-box">'+esc(txt)+'</textarea>'
     +'<div style="font-size:11px;color:var(--b3);margin-top:6px">內容可直接修改；按「複製」放進剪貼簿。</div>',
     function(){
       var el=document.getElementById('dun-txt');
