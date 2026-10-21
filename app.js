@@ -3361,7 +3361,7 @@ function _recalcInvAmounts(inv){
     let baseAmt=0;
     if(_q>0&&_p>0){
       const days=_invBillDays(it);   // v6.0.73 逾期租金折讓後的計費天數
-      if(it.type==='rental')baseAmt=_p*_q*(days||1);
+      if(it.type==='rental')baseAmt=_p*_q*_rentDayFactor(it,days);   // 審查修正：與 updateInvRowAmt 同口徑（全額折讓可到 0）
       else if(days)baseAmt=_p*_q*days;
       else baseAmt=_p*_q;
     }
@@ -3386,7 +3386,7 @@ function updateInvRowAmt(i, tr){
     const isRentalItem=(it.type==='rental');
     const days=_invBillDays(it);   // v6.0.73
     if(isRentalItem)
-      baseAmt=_p*_q*((days>0||(parseFloat(it.discDays)||0)>0)?days:1); // rental 至少1天；Lotion 10/21 第 4 題：全額折讓可折到 0
+      baseAmt=_p*_q*_rentDayFactor(it,days); // rental 至少1天；Lotion 10/21 第 4 題：全額折讓可折到 0
     else if(days)
       baseAmt=_p*_q*days;
     else
@@ -5717,6 +5717,11 @@ function calcInvDays(){
     billDays=Math.floor((claimDate-billStart)/864e5)+1;
   }
 
+  // Lotion 10/21 第 3 題：已存檔請款單裡舊算法算出的逾期列不重算（先擋，備註也不動）
+  if(selDesc&&billDays>0){
+    const _rs0=(typeof invEid!=='undefined'&&invEid)?INV.find(x=>x.id===invEid):null,_ex0=invItems.find(r=>r&&r.type==='rental'&&r._ovKey===selDesc);
+    if(_rs0&&_ex0&&!(_ex0._ovAlg>=2)&&((parseFloat(_ex0.curAmt)||0)>0||(parseFloat(_ex0.discDays)||0)>0||(parseFloat(_ex0.discQd)||0)>0)){toast('本期已請過逾期租金（舊算法），不重算；要重算請先刪除該列。新算法只用在之後的期別');return;}
+  }
   // 底部備註：只動「該工項的逾期租金」那一行，其他備註不重建
   if(billDays>0){
     const _exDisc=(function(){var x=invItems.find(function(r){return r&&r.type==='rental'&&r._ovKey===selDesc;});return x?(parseFloat(x.discDays)||0):0;})();   // v6.0.75 既有折讓一併寫進備註
@@ -36532,6 +36537,8 @@ function _salesCsv(){
 // 跨期不重複計費的「已請至」日期（_ovEnd）不變——折讓只少收錢，不改天數區間。
 function _invRentBatch(it){return !!(it&&it.type==='rental'&&Array.isArray(it._ovBatches)&&it._ovBatches.length);}
 // 審查修正：分批（支·天）模式折讓以「支·天」計（it.discQd），計費量＝支·天 − 折讓
+// 租賃列計費天數：沒填天數至少 1 天；有折讓（天數折到 0）就照實 0 天（Lotion 10/21 第 4 題）
+function _rentDayFactor(it,days){return (days>0||(parseFloat(it&&it.discDays)||0)>0)?days:1;}
 function _invRentQ(it){var q=parseFloat(it&&it.curQty)||0;if(_invRentBatch(it)){var x=parseFloat(it.discQd)||0;return x>0?Math.max(0,q-x):q;}return q;}
 function _invBillDays(it){var d=parseFloat(it&&it.curDays)||0,x=parseFloat(it&&it.discDays)||0;return x>0?Math.max(0,d-x):d;}
 function _invDaysCell(it){   // 列印用天數欄：有折讓印「51−15」換行「＝36」
