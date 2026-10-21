@@ -7501,7 +7501,21 @@ async function newPage(browser, width, height) {
         _fbUser = { email: 'ai@x.com', uid: 'u' }; _isReaderUser = true; let hit = 0;
         showConfirm('看', '<input id="roX" value="1">', function () { hit++; }, false); out.roBtn = document.getElementById('gen-confirm-ok').textContent === '關閉';
         document.getElementById('gen-confirm-ok').click(); out.roNoSave = hit === 0;
+        /* 審查修正（B 第 4 輪）：_modal 明細視窗（如人員薪資）唯讀只看、saveHR 擋寫；催款文字可複製 */
+        let hit2 = 0; _modal('看', '<input id="roM" value="1">', function () { hit2++; });
+        const mo = document.getElementById('fy-modal-o'); out.roModal = mo.textContent === '關閉' && document.getElementById('roM').disabled === true;
+        mo.click(); out.roModal = out.roModal && hit2 === 0 && !document.getElementById('fy-modal');
+        const hr0 = localStorage.getItem('fy_hr'); saveHR(); out.roHR = localStorage.getItem('fy_hr') === hr0;
+        showConfirm('催款', '<textarea id="dunX" data-ro-ok="1">x</textarea>', function () {}, false); _roScan(document.body);
+        out.roDun = document.getElementById('gen-confirm-ok').textContent !== '關閉' && !document.getElementById('dunX').disabled;
+        document.getElementById('gen-confirm-modal').style.display = 'none';
         _isReaderUser = false; _fbUser = null;
+        /* 還沒有拔除紀錄：不印「未勾本批完成」 */
+        out.noTick0 = _rentBatchQtyDays({ cum: 10, remLogs: [] }, 10, '2026-10-01', '2026-10-31').noTick === false;
+        /* 原因沒填重開保留輸入 */
+        invItems = [{ type: 'rental', desc: 'Y 逾期租金', unit: '支', curQty: 10, curDays: 20, contractPrice: 50, payRate: 100, _ovKey: 'Y' }];
+        invRentDisc(0, { days: '7', amt: '', ask: '9', note: '' }); out.keep = document.getElementById('rd-days').value === '7' && document.getElementById('rd-ask').value === '9';
+        document.getElementById('gen-confirm-modal').style.display = 'none';
         /* 保留款總覽未稅 */
         Q = [{ id: 'qT', name: '保留案', awarded: true, items: [] }]; INV.length = 0;
         INV.push({ id: 'iT', quoteId: 'qT', project: '保留案', periodNo: 1, retention: true, retentionPct: 5, totals: { curTotal: 10000, total: 9975, retention: 525 }, items: [] });
@@ -7513,6 +7527,7 @@ async function newPage(browser, width, height) {
     });
     check('Lotion 10/21（B）：完成當天計租、批次以本批完成切、沒勾整批計到拔完並提示、折讓需原因可填金額留紀錄', r.bs && r.noTick && r.needReason && r.disc, JSON.stringify(r));
     check('Lotion 10/21（B）：包商參照業主手動％、唯讀可開明細只看（確認＝關閉）、保留款總覽未稅', r.inst && r.roAllow && r.roBtn && r.roNoSave && r.retU, JSON.stringify(r));
+    check('審查修正（B 第 4 輪）：_modal 唯讀只看、saveHR 擋寫、催款可複製、無拔除紀錄不提示、折讓原因重開保留輸入', r.roModal && r.roHR && r.roDun && r.noTick0 && r.keep, JSON.stringify(r));
     check('Lotion 10/21（B）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
