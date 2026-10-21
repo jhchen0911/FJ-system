@@ -997,11 +997,23 @@ function doSaveP(){
 // API Key 僅存本機裝置（每台各填一次；換裝置需重填）
 function _aiKey(){
   try{
-    var k=localStorage.getItem('fy_aikey')||'';
-    if(!k&&P.aiKey){k=P.aiKey;localStorage.setItem('fy_aikey',k);delete P.aiKey;try{_autoUpload();}catch(e){_err('_aiKey',e);}}  // 舊版遷移：搬到本機並從雲端移除
-    return k;
+    if(P&&P.aiKey)_aiKeyScrub(false);
+    if(_isReaderUser||_roState==='reader'){localStorage.removeItem('fy_aikey');return '';}   // v6.0.108 唯讀帳號（AI 助理）不得持有金鑰
+    return localStorage.getItem('fy_aikey')||'';
   }catch(e){return '';}
 }
+// v6.0.108 安全：舊版曾把金鑰存在參數 P.aiKey（隨 fydata/shared 同步，全體員工與唯讀帳號都讀得到）。
+// 一律從 P 移除；只有管理員裝置在本機沒有金鑰時才接手存到本機；從雲端收到時由可寫的裝置直接刪掉雲端那一欄。
+function _aiKeyScrub(fromCloud){
+  if(!P||!P.aiKey)return;
+  var k=String(P.aiKey);delete P.aiKey;
+  try{
+    var em=String((_fbUser&&_fbUser.email)||'').toLowerCase();
+    if(!_isReaderUser&&_roState!=='reader'&&em&&isAdmin(em)&&!localStorage.getItem('fy_aikey'))localStorage.setItem('fy_aikey',k);
+    if(fromCloud&&_fbDb&&_fbUser&&!_isReaderUser&&_roState==='rw')_fbDb.ref('fydata/shared/params/aiKey').remove().catch(function(e){_err('_aiKeyScrub.remove',e);});
+  }catch(e){_err('_aiKeyScrub',e);}
+}
+function _paramsOut(){var o=Object.assign({},P);delete o.aiKey;return o;}   // 上傳／備份的參數一律不含金鑰
 // ── 公司固定成本明細 → 推算管理費率（存 P.fixedCosts，隨參數雲端同步）──
 function _fcSuggestRate(){
   var mTotal=(P.fixedCosts||[]).reduce(function(a,r){return a+(parseFloat(r.amt)||0);},0);
@@ -5434,7 +5446,7 @@ function importData(file){
         Q=data.quotes||[];
         INV=_invUnpackAll(data.invoices);   // v5.374 備份檔內的請款單為壓縮格式，還原後才進記憶體
         UH=data.upaHistory||[];
-        if(data.params)Object.assign(P,data.params);
+        if(data.params){Object.assign(P,data.params);_aiKeyScrub(false);}
         // 全量還原（舊備份檔沒有的區塊保留現值，不清空）
         if(data.contracts)CONTRACTS=arr(data.contracts);
         if(data.vendors)VENDORS=arr(data.vendors);
@@ -8106,7 +8118,7 @@ function _autoSyncOnLogin(){
 function _readerOn(v){return v===true||!!(v&&typeof v==='object'&&!Array.isArray(v));}
 function _readerCheck(cb){
   _isReaderUser=false;_readerName='';_roState='pending';
-  var done=function(ro){_isReaderUser=!!ro;_roState=ro?'reader':'rw';if(cb){var c=cb;cb=null;c(!!ro);}};
+  var done=function(ro){_isReaderUser=!!ro;_roState=ro?'reader':'rw';if(ro){try{localStorage.removeItem('fy_aikey');if(P)delete P.aiKey;}catch(e){_err('_readerCheck.aikey',e);}}if(cb){var c=cb;cb=null;c(!!ro);}};
   try{
     if(!_fbUser||!_fbDb||!_fbUser.email){_roState='';if(cb)cb(false);return;}
     if(String(_fbUser.email).toLowerCase()===_RULES_OWNER){done(false);return;}
@@ -9823,7 +9835,7 @@ function _syncPayload(){
   var admins=getAdminEmails();   // v5.314：管理員清單納入同步，避免新裝置讀不到而權限失準
   return {ts:ts, data:{
     version:'fy-v5', uploadedAt:ts, uploadedBy:(_fbUser&&_fbUser.email)||'',
-    quotes:Q, invoices:_invPackAll(INV), upaHistory:UH, params:P,   // v5.374 請款單壓縮儲存
+    quotes:Q, invoices:_invPackAll(INV), upaHistory:UH, params:_paramsOut(),   // v6.0.108 不含金鑰；v5.374 請款單壓縮儲存
     contracts:CONTRACTS, vendors:VENDORS, payables:PAYABLES,
     invoiceRecs:INVOICE_RECS, expenses:EXPENSES, tombs:TOMBS, activityLog:ACTIVITY_LOG.slice(0,100),
     customers:CUSTOMERS, upaCostDB:UPA_COST_DB, pagePerms:pagePerms, costHist:COST_HIST,
@@ -9966,7 +9978,7 @@ function _applyCloud(data){
     }
     INV=_safeMerge(INV,_invUnpackAll(data.invoices).filter(function(inv){return inv&&(inv.project||inv.client||inv.id);}),'invoices');   // v5.374 先解壓再合併
     if(data.upaHistory)UH=data.upaHistory;   // v5.314：原本 ||[] 會在雲端缺此欄時把本機分析歷史清空
-    if(data.params)Object.assign(P,data.params);
+    if(data.params){Object.assign(P,data.params);_aiKeyScrub(true);}   // v6.0.108 金鑰不得留在參數
     if(data.contracts)CONTRACTS=_safeMerge(CONTRACTS,data.contracts,'contracts');
     if(data.vendors)VENDORS=_safeMerge(VENDORS,data.vendors,'vendors');
     if(data.invoiceRecs){
@@ -21081,7 +21093,7 @@ function _dailyBackup(){
     var needMonth=localStorage.getItem('fy_snap_month')!==month;
     if(!needDaily&&!needMonth)return;
     // v5.314：改用與匯出備份相同的完整 payload（原本缺客戶／廠商／單價庫／材料台帳／分潤，災難還原時救不回）
-    var _snap;try{_snap=_syncPayload().data;}catch(e2){_snap={quotes:Q,invoices:INV,contracts:CONTRACTS,payables:PAYABLES,invoiceRecs:INVOICE_RECS,expenses:EXPENSES,params:P};}
+    var _snap;try{_snap=_syncPayload().data;}catch(e2){_snap={quotes:Q,invoices:INV,contracts:CONTRACTS,payables:PAYABLES,invoiceRecs:INVOICE_RECS,expenses:EXPENSES,params:_paramsOut()};}
     _snap.date=today;
     var payload=JSON.stringify(_snap);
     var _put=function(name,markKey,markVal,label){

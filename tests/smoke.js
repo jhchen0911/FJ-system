@@ -7959,6 +7959,28 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.108 安全：AI 金鑰不得隨參數上雲、唯讀帳號不得持有 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const removed = []; const oDb = window._fbDb, oU = window._fbUser, oS = window._roState;
+        _fbDb = { ref: p => ({ remove: () => { removed.push(p); return Promise.resolve(); } }) }; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a1' }; _roState = 'rw'; _isReaderUser = false;
+        localStorage.removeItem('fy_aikey');
+        _applyCloud({ quotes: Q.slice(), params: { aiKey: 'sk-test-cloud' } });
+        out.scrub = !P.aiKey && localStorage.getItem('fy_aikey') === 'sk-test-cloud' && removed.indexOf('fydata/shared/params/aiKey') >= 0;
+        P.aiKey = 'sk-test-2'; out.noUp = !('aiKey' in _syncPayload().data.params);
+        _isReaderUser = true; _roState = 'reader'; out.ro = _aiKey() === '' && localStorage.getItem('fy_aikey') === null && !P.aiKey;
+        _isReaderUser = false; _roState = oS; _fbDb = oDb; _fbUser = oU; localStorage.removeItem('fy_aikey');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.108 安全：雲端參數裡的 AI 金鑰會被移除（管理員裝置刪雲端欄位）、上傳參數不含金鑰、唯讀帳號拿不到且本機清除', r.scrub && r.noUp && r.ro && !r.err, JSON.stringify(r));
+    check('v6.0.108 金鑰安全測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
