@@ -37281,17 +37281,40 @@ function _roInit(){
     },true);});
   }
 }
+// v6.0.104 長表單視窗：置中的固定視窗加 .fy-mdl（本體以 vh 為上限、內容區捲動），內容區最後一列按鈕加 .fy-mdl-foot（固定在底部）
+var _MDL_IDS=['customer-modal','merge-cost-modal','rmk-modal','negotiate-modal','inv-clause-modal','award-modal','import-confirm-modal','contract-modal','vendor-modal','payable-modal','invoice-rec-modal','receipt-modal','retention-modal'];
+function _mdlFoot(body){
+  if(!body)return null;
+  var k=[].slice.call(body.children).filter(function(x){return x.tagName!=='SCRIPT'&&x.tagName!=='INPUT';});
+  var last=k[k.length-1];
+  if(last&&last.querySelector('button')&&!last.querySelector('input:not([type=hidden]),select,textarea')){
+    last.classList.add('fy-mdl-foot');
+    var pl=body.style.paddingLeft||'',pr=body.style.paddingRight||'';   // 依內容區實際左右內距延伸到滿版（16～18px 不一，避免露縫）
+    if(pl){last.style.marginLeft='-'+pl;last.style.paddingLeft=pl;}if(pr){last.style.marginRight='-'+pr;last.style.paddingRight=pr;}
+    return last;
+  }
+  return null;
+}
+function _mdlInit(){
+  _MDL_IDS.forEach(function(id){
+    var o=document.getElementById(id);if(!o||o.classList.contains('fy-mdl'))return;
+    var pn=o.firstElementChild;if(!pn||!pn.children[1])return;
+    o.classList.add('fy-mdl');pn.style.maxHeight='';pn.style.overflow='hidden';
+    _mdlFoot(pn.children[1]);
+  });
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',_mdlInit);else _mdlInit();
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
-  d.id='fy-modal';
+  d.id='fy-modal';d.className='fy-mdl';
   d.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px';
   d.innerHTML='<div style="max-width:460px;width:100%;background:var(--w);border-radius:var(--r14);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
     +'<div style="background:var(--g3);padding:12px 16px;display:flex;justify-content:space-between;align-items:center">'
     +'<span style="color:#fff;font-size:14px;font-weight:700">'+esc(title)+'</span>'
     +'<button type="button" id="fy-modal-x" style="border:none;background:transparent;color:rgba(255,255,255,.8);font-size:19px;cursor:pointer">✕</button></div>'
     +'<div style="padding:15px 17px">'+bodyHtml
-    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:15px">'
+    +'<div class="fy-mdl-foot" style="display:flex;gap:8px;justify-content:flex-end;margin-top:15px;margin-left:-17px;margin-right:-17px;padding-left:17px;padding-right:17px">'
     +'<button type="button" id="fy-modal-c" class="btn btn-sm">取消</button>'
     +'<button type="button" id="fy-modal-o" class="btn btn-sm btn-g" style="padding:7px 20px">確定</button></div></div></div>';
   document.body.appendChild(d);

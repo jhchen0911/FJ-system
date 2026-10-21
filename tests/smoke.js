@@ -6012,7 +6012,7 @@ async function newPage(browser, width, height) {
         go('contacts'); editVendor('vS');
         const m = document.getElementById('vendor-modal'), box = m.firstElementChild, btn = [...m.querySelectorAll('button')].find(b => /儲存/.test(b.textContent));
         out.shown = getComputedStyle(m).display === 'flex';
-        out.scrollable = /auto|scroll/.test(getComputedStyle(box).overflowY) && box.scrollHeight > box.clientHeight && box.getBoundingClientRect().bottom <= window.innerHeight + 1;
+        const sb = box.children[1]; out.scrollable = /auto|scroll/.test(getComputedStyle(sb).overflowY) && sb.scrollHeight > sb.clientHeight && box.getBoundingClientRect().bottom <= window.innerHeight + 1;   /* v6.0.104 起內容區捲動、按鈕列固定底部 */
         btn.scrollIntoView(); const rc = btn.getBoundingClientRect(); out.btnVisible = rc.top >= 0 && rc.bottom <= window.innerHeight;
         out.label = /聯絡人/.test(m.innerHTML) && !/<label>客戶<\/label>/.test(m.innerHTML);
         document.getElementById('v-bankacct').value = '123-456'; btn.click();
@@ -7453,6 +7453,37 @@ async function newPage(browser, width, height) {
     check('Lotion 10/21（B）：包商參照業主手動％、唯讀可開明細只看（確認＝關閉）、保留款總覽未稅', r.inst && r.roAllow && r.roBtn && r.roNoSave && r.retU, JSON.stringify(r));
     check('審查修正（B 第 4 輪）：_modal 唯讀只看、saveHR 擋寫、催款可複製、無拔除紀錄不提示、折讓原因重開保留輸入', r.roModal && r.roHR && r.roDun && r.noTick0 && r.keep && r.bRate && r.claimOwnerOnly, JSON.stringify(r));
     check('Lotion 10/21（B）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.104 長表單視窗：矮螢幕（筆電可視高度小）與手機都能按到確認鈕（本體以 vh 為上限、內容區捲動、按鈕固定底部） ──
+  for (const [w, h] of [[1280, 460], [390, 560], [320, 560]]) {
+    const { page, errors } = await newPage(browser, w, h);
+    const r = await page.evaluate(() => {
+      const out = { bad: [] };
+      try {
+        Q = [{ id: 'qM', name: '長表單案', client: '業主', awarded: true, items: [] }];
+        INV.length = 0; INV.push({ id: 'iM', quoteId: 'qM', project: '長表單案', client: '業主', periodNo: 1, date: '2026-10-01', totals: { curTotal: 100000, total: 100000 }, items: [] });
+        openReceiptModal('iM');
+        const ro = document.getElementById('receipt-modal'), ok = [...ro.querySelectorAll('button')].find(x => /確認收款/.test(x.textContent));
+        const rc = ok.getBoundingClientRect(), el = document.elementFromPoint(rc.left + rc.width / 2, rc.top + rc.height / 2);
+        out.rcpt = rc.bottom <= innerHeight && (el === ok || ok.contains(el)) && ro.firstElementChild.children[1].scrollHeight > ro.firstElementChild.children[1].clientHeight;
+        ro.style.display = 'none';
+        _MDL_IDS.concat(['fy-modal']).forEach(id => {
+          if (id === 'fy-modal') _modal('測試', '<div style="height:1200px">長內容</div>', function () {});
+          const o = document.getElementById(id); o.style.display = 'flex';
+          const pn = o.firstElementChild, pr = pn.getBoundingClientRect(), f = o.querySelector('.fy-mdl-foot');
+          let hit = true; if (f) { const bt = [...f.querySelectorAll('button')].pop(), b = bt.getBoundingClientRect(), e2 = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); hit = !!e2 && (e2 === bt || bt.contains(e2)); }
+          if (!(o.classList.contains('fy-mdl') && pr.bottom <= innerHeight + 1 && pr.top >= -1 && hit && pn.scrollWidth <= pn.clientWidth + 1 && pn.children[1].scrollWidth <= pn.children[1].clientWidth + 1 && (id === 'retention-modal' || !!f))) out.bad.push(id);
+          if (id === 'fy-modal') o.remove(); else o.style.display = 'none';
+        });
+        out.noHs = document.documentElement.scrollWidth <= innerWidth;
+        INV.length = 0; Q = [];
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.104 長表單視窗（' + w + '×' + h + '）：收款視窗確認鈕看得到可按、各視窗本體不超出螢幕、按鈕列固定底部、無橫向捲動', r.rcpt && !r.bad.length && r.noHs && !r.err, JSON.stringify(r));
+    check('v6.0.104 長表單視窗（' + w + '×' + h + '）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
