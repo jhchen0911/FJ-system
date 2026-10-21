@@ -21492,12 +21492,18 @@ function openSubPeriod(cid,editNo){
   showConfirm((editing?'修改第'+editNo+'期廠商請款：':'登錄廠商請款：')+esc(c.vendor)+'（'+esc(q.name||'')+'）',html,function(){_spSave();},false,null,true);
   if(!editing)_spFillDaily();else _spRecalc();
 }
+// Lotion 10/21：修改既有期別時，一式列完成％與單價都沒改＝只改備註／發票號／日期等不影響金額的欄位，舊資料累計已超過 100% 也照存（保留原數量）
+function _spLumpKeep(el){
+  var o=el&&el.getAttribute('data-orig');if(o==null)return false;
+  var inp=el.querySelector('.sp-qty'),ue=el.querySelector('.sp-up');
+  return Math.abs((parseFloat(inp&&inp.value)||0)/100-(parseFloat(o)||0))<1e-6&&String((ue&&ue.value)||'')===String(el.getAttribute('data-origup')||'');
+}
 function _spLumpRowHtml(q,c,r,st,editing,IN){
   var prev=(st.byRow[r.id]||0)-(editing?((editing.rows||[]).filter(function(pr){return pr.rid===r.id;}).reduce(function(a,pr){return a+(parseFloat(pr.qty)||0);},0)):0);
   var curPr=editing?((editing.rows||[]).find(function(pr){return pr.rid===r.id;})||{}):{};
   var cur=(curPr.qty!=null&&curPr.qty!=='')?Math.round(parseFloat(curPr.qty)*1e6)/1e4:'',curUp=(curPr.up!=null&&curPr.up!=='')?curPr.up:'';
   var rr=_subRetRate(c,r);
-  return '<div class="sp-row" data-lump="1" data-rid="'+r.id+'" data-total="1" data-prev="'+prev+'" data-price="'+(parseFloat(r.unitPrice)||0)+'" data-ret="'+rr+'" data-desc="" style="border:1px solid #90CAF9;border-radius:var(--r8);padding:7px 9px;margin-bottom:6px;background:#f5faff">'
+  return '<div class="sp-row" data-lump="1" data-rid="'+r.id+'" data-total="1" data-prev="'+prev+'"'+((curPr.qty!=null&&curPr.qty!=='')?(' data-orig="'+(parseFloat(curPr.qty)||0)+'" data-origup="'+esc(String(curUp))+'"'):'')+' data-price="'+(parseFloat(r.unitPrice)||0)+'" data-ret="'+rr+'" data-desc="" style="border:1px solid #90CAF9;border-radius:var(--r8);padding:7px 9px;margin-bottom:6px;background:#f5faff">'
     +'<div style="font-size:12.5px;font-weight:700">'+esc(r.desc||'一式')+'</div>'
     +'<div style="font-size:11px;color:var(--b4);margin:2px 0 5px">一式總價 '+fmt(parseFloat(r.unitPrice)||0)+'｜已計價 '+_rfmt(Math.round(prev*1000)/10)+'%'+(rr?('｜保留 '+rr+'%'+(r.retCond?('（'+esc(r.retCond)+'後退還）'):'')):'')+(r.ref!=null?('｜換算 '+fmt(r.ref)+'／'+esc(((r.lumpItems||[])[0]||{}).unit||'')):'')+'　<span class="sp-daily" style="color:var(--g3)"></span></div>'
     +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;color:var(--b4);white-space:nowrap">本期完成</span>'
@@ -21586,7 +21592,9 @@ function _spRecalc(){
     if(upEl)upEl.style.borderColor=(upEl.value!==''&&Math.abs(price-cprice)>1e-6)?'#b26a00':'';
     var lumpR=el.getAttribute('data-lump')==='1';
     var qn=(parseFloat(inp.value)||0)/(lumpR?100:1),rr=parseFloat(el.getAttribute('data-ret'))||0;   // v6.0.109 一式以完成 % 輸入
-    if(lumpR)qn=Math.round(Math.min(qn,Math.max(0,1-(parseFloat(el.getAttribute('data-prev'))||0)))*1e6)/1e6;   // 審查修正：預覽與存檔同口徑（夾在 100%）
+    var lumpKeep=lumpR&&_spLumpKeep(el);
+    if(lumpR&&lumpKeep)qn=parseFloat(el.getAttribute('data-orig'))||0;
+    else if(lumpR)qn=Math.round(Math.min(qn,Math.max(0,1-(parseFloat(el.getAttribute('data-prev'))||0)))*1e6)/1e6;   // 審查修正：預覽與存檔同口徑（夾在 100%）
     var a=qn*price;amt+=a;ret+=a*rr/100;
     el.querySelector('.sp-amt').textContent=fmt(Math.round(a));
     var dl=parseFloat(el.getAttribute('data-daily'))||0,df=el.querySelector('.sp-diff');
@@ -21594,7 +21602,7 @@ function _spRecalc(){
     else if(df){if(qn>0&&Math.abs(qn-dl)>1e-6){df.style.display='';df.style.color=qn>dl?'#b26a00':'var(--b4)';df.textContent=qn>dl?('⚠ 多於日報回報 '+fmt(Math.round((qn-dl)*100)/100)+'，請核實廠商請款單'):('少於日報回報 '+fmt(Math.round((dl-qn)*100)/100));}else df.style.display='none';}
     var total=parseFloat(el.getAttribute('data-total'))||0,prev=parseFloat(el.getAttribute('data-prev'))||0;
     var w=el.querySelector('.sp-warn');
-    if(lumpR&&(parseFloat(inp.value)||0)>0&&prev+(parseFloat(inp.value)||0)/100>1+1e-6){lumpOver++;w.style.display='';w.style.color='var(--red)';w.textContent='累計完成超過 100%：超過合約一式總價，請走追加減（不能存檔）';}   // Lotion 10/21：直接擋下
+    if(lumpR&&!lumpKeep&&(parseFloat(inp.value)||0)>0&&prev+(parseFloat(inp.value)||0)/100>1+1e-6){lumpOver++;w.style.display='';w.style.color='var(--red)';w.textContent='累計完成超過 100%：超過合約一式總價，請走追加減（不能存檔）';}   // Lotion 10/21：直接擋下
     else if(total>0&&prev+qn>total+1e-6){over++;var ex=Math.max(0,prev+qn-total)-Math.max(0,prev-total);overAmt+=ex*price;w.style.display='';w.textContent='累計 '+fmt(Math.round((prev+qn)*100)/100)+' 超過發包量 '+fmt(total)+'（實作實算：本期超出 '+fmt(Math.round(ex*100)/100)+'，向業主追加請款）';}
     else{w.style.display='none';}
   });
@@ -21634,8 +21642,9 @@ function _spSave(){
       rows.push(ps);return;
     }
     var _lp=el.getAttribute('data-lump')==='1',qn=(parseFloat(el.querySelector('.sp-qty').value)||0)/(_lp?100:1);   // v6.0.109 一式：完成 % → 數量（1＝100%）
-    if(_lp&&qn>0&&qn+(parseFloat(el.getAttribute('data-prev'))||0)>1+1e-6)lumpOver=1;   // Lotion 10/21：一式累計超過 100% 直接擋下
-    if(_lp){qn=Math.round(Math.min(qn,Math.max(0,1-(parseFloat(el.getAttribute('data-prev'))||0)))*1e6)/1e6;}   // 審查修正：一式累計以 100% 為限、保留 6 位
+    var _lk=_lp&&_spLumpKeep(el);if(_lk)qn=parseFloat(el.getAttribute('data-orig'))||0;   // 金額欄位沒改：保留原數量
+    if(_lp&&!_lk&&qn>0&&qn+(parseFloat(el.getAttribute('data-prev'))||0)>1+1e-6)lumpOver=1;   // Lotion 10/21：一式累計超過 100% 直接擋下
+    if(_lp&&!_lk){qn=Math.round(Math.min(qn,Math.max(0,1-(parseFloat(el.getAttribute('data-prev'))||0)))*1e6)/1e6;}   // 審查修正：一式累計以 100% 為限、保留 6 位
     if(!(qn>0))return;
     var pr={rid:el.getAttribute('data-rid'),qty:_lp?qn:Math.round(qn*10000)/10000};
     var upEl=el.querySelector('.sp-up'),cp=parseFloat(el.getAttribute('data-price'))||0;
@@ -37945,7 +37954,7 @@ function _cardWarn(k,v,all){
 // 專案頁「匯入合約條件卡」
 function pjCardImport(qid){
   var q=Q.find(function(x){return x.id===qid;});if(!q)return;
-  if(_fbUser&&!isAdmin(String(_fbUser.email||'').toLowerCase())){toast('合約條件卡存在管理員資料區，只有管理員可以匯入');return;}   // 審查修正（C 第 4 輪）
+  if(!_fbUser||!isAdmin(String(_fbUser.email||'').toLowerCase())){toast(_fbUser?'合約條件卡存在管理員資料區，只有管理員可以匯入':'請先登入管理員帳號再匯入合約條件卡');return;}   // Lotion 10/21：本機模式（未登入）不能匯入   // 審查修正（C 第 4 輪）
   var inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';inp.style.display='none';
   inp.onchange=function(){var f=inp.files&&inp.files[0];inp.remove();if(!f)return;var rd=new FileReader();
     rd.onload=function(){try{_cardPreview(q,JSON.parse(String(rd.result||'')),f.name);}catch(e){toast('合約條件卡讀取失敗：'+((e&&e.message)||''));}};rd.readAsText(f);};
