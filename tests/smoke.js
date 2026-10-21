@@ -7528,7 +7528,7 @@ async function newPage(browser, width, height) {
         invItems = [{ type: 'rental', desc: 'F 逾期租金', unit: '支', curQty: 10, curDays: 20, contractPrice: 50, payRate: 100, _ovKey: 'F', discDays: 20 }];
         try { updateInvRowAmt(0); } catch (e) { /* 可忽略：測試用，無畫面列 */ }
         out.disc0 = invItems[0].curAmt === 0;
-        invItems[0].discDays = 0; try { updateInvRowAmt(0); } catch (e) { /* 可忽略 */ } out.disc0 = out.disc0 && invItems[0].curAmt === 10000;
+        invItems[0].discDays = 0; try { updateInvRowAmt(0); } catch (e) { /* 可忽略 */ } out.disc0 = out.disc0 && invItems[0].curAmt === 10000; out.disc0 = out.disc0 && _rentDayFactor({ discDays: 5 }, 0) === 0 && _rentDayFactor({}, 0) === 1 && /_rentDayFactor\(it,days\)/.test(String(_recalcInvAmounts));
         /* 第 3 題：新算法列標記 _ovAlg */
         out.alg = /_ovAlg:2/.test(calcInvDays.toString()) && /本期已請過逾期租金（舊算法），不重算/.test(calcInvDays.toString());
         /* 保留款總覽：含稅＋拆分 */
