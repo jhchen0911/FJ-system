@@ -7873,7 +7873,7 @@ async function newPage(browser, width, height) {
         out.introLock = /付款時機已鎖住/.test(String(_piSave)) && /pay'\+f\.id\+'_intro'/.test(String(_piSave));
         out.estAct = !!act && est.offsetBy === act.id && Math.round(est.amt) === 0 && act.amt === 50000 && est.rows.length === 2 && /實際採購/.test(act.rows[0].desc);
         /* 第 6 項：未登入不能匯入條件卡 */
-        { let m6 = ''; const t6 = window.toast; window.toast = m => { m6 = m; }; _fbUser = null; pjCardImport('qX'); out.cardLogin = /請先登入管理員帳號/.test(m6); window.toast = t6; }
+        { let m6 = ''; const t6 = window.toast; window.toast = m => { m6 = m; }; _fbUser = null; pjCardImport('qE'); out.cardLogin = /請先登入管理員帳號/.test(m6); window.toast = t6; }
         _fbUser = { email: 'staff@x.com' }; const qN = { id: 'qN', ownerCard: { fields: {} } }; Q = [qN]; _regraftQuoteSens({ qN: { ownerCard: { fields: {} } } });
         out.ocDrop = !qN.ownerCard; _fbUser = null;
         Q = [{ id: 'qY', name: 'Y', items: [], ownerCard: { fields: {} }, _ocPriv: 1 }]; _copyQDo('qY'); out.copyNoCard = !Q[0].ownerCard && !Q[0]._ocPriv;
