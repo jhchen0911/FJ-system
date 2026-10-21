@@ -52,7 +52,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
 .snav.active{background:var(--gl);color:var(--g3);font-weight:700}
 .snav.active .sic{opacity:1}
 .snav .cnt{margin-left:auto;background:var(--g);color:#fff;border-radius:99px;padding:1px 6px;font-size:10px;font-weight:700;min-width:18px;text-align:center}
-.content{flex:1;overflow-y:auto;overflow-x:clip}
+.content{flex:1;min-width:0;overflow-y:auto;overflow-x:clip}
 .page{display:none}.page.active{display:block}
 
 /* ═══ 頁面標題列 ═══ */
@@ -101,6 +101,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
 
 /* ═══ 表單 ═══ */
 .fg{display:grid;gap:10px;margin-bottom:10px}.fg:last-child{margin-bottom:0}
+.fg>*,.f>input,.f>select,.f>textarea{min-width:0}
 .fg2{grid-template-columns:1fr 1fr}.fg3{grid-template-columns:1fr 1fr 1fr}.fg4{grid-template-columns:1fr 1fr 1fr 1fr}
 /* 參數設定：單價欄位固定緊湊寬度（220~300px），各區塊一致、不再超寬或大片留白 */
 #page-params .fg.fg2{grid-template-columns:repeat(auto-fit,minmax(220px,300px));gap:10px 14px}
@@ -869,7 +870,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
           <div class="f" id="upa-overtime-wrap">
             <label>逾期租金（選填）</label>
             <div style="display:flex;gap:6px">
-              <input type="number" id="upa-ot-amt" placeholder="自動計算" oninput="this._userEdited=true" style="flex:1;font-size:14px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">
+              <input type="number" id="upa-ot-amt" placeholder="自動計算" oninput="this._userEdited=true" style="flex:1;min-width:0;font-size:14px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8)">
               <select id="upa-ot-unit" style="font-size:12px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit">
                 <option>$/M/天</option>
                 <option>$/支/天</option>
@@ -2764,7 +2765,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.102" defer></script>
+<script src="app.js?v=6.0.103" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">

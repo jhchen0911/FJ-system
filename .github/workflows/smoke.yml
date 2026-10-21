@@ -10,6 +10,7 @@ on:
       - 'app.js'
       - 'sw.js'
       - 'tests/**'
+      - 'package.json'
       - '.github/workflows/smoke.yml'
   push:
     branches: [main]
@@ -18,6 +19,8 @@ on:
       - 'app.js'
       - 'sw.js'
       - 'tests/**'
+      - 'package.json'
+      - '.github/workflows/smoke.yml'
   workflow_dispatch:
 
 jobs:
