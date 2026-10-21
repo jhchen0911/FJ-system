@@ -7516,6 +7516,11 @@ async function newPage(browser, width, height) {
         invItems = [{ type: 'rental', desc: 'Y 逾期租金', unit: '支', curQty: 10, curDays: 20, contractPrice: 50, payRate: 100, _ovKey: 'Y' }];
         invRentDisc(0, { days: '7', amt: '', ask: '9', note: '' }); out.keep = document.getElementById('rd-days').value === '7' && document.getElementById('rd-ask').value === '9';
         document.getElementById('gen-confirm-modal').style.display = 'none';
+        /* 審查修正（B 第 5 輪）：分批折讓金額＝實際扣款（含請款％） */
+        invItems = [{ type: 'rental', desc: 'Z 逾期租金', unit: '支·天', curQty: 1000, curDays: 0, contractPrice: 20, payRate: 50, _ovKey: 'Z', _ovBatches: [{ no: 1, qty: 10, days: 100 }] }];
+        try { updateInvRowAmt(0); } catch (e) { /* 可忽略：測試用，無畫面列 */ }
+        invRentDisc(0); document.getElementById('rd-amt').value = '1000'; document.getElementById('rd-note').value = '協商'; document.getElementById('gen-confirm-ok').click();
+        out.bRate = invItems[0].discQd === 100 && Math.round(20 * (1000 - 100) * 0.5) === 9000 && /style="width:100%/.test((function () { invRentDisc(0); const h = document.getElementById('rd-note').getAttribute('style') || ''; document.getElementById('gen-confirm-modal').style.display = 'none'; return 'style="' + h; })());
         /* 保留款總覽未稅 */
         Q = [{ id: 'qT', name: '保留案', awarded: true, items: [] }]; INV.length = 0;
         INV.push({ id: 'iT', quoteId: 'qT', project: '保留案', periodNo: 1, retention: true, retentionPct: 5, totals: { curTotal: 10000, total: 9975, retention: 525 }, items: [] });
@@ -7527,7 +7532,7 @@ async function newPage(browser, width, height) {
     });
     check('Lotion 10/21（B）：完成當天計租、批次以本批完成切、沒勾整批計到拔完並提示、折讓需原因可填金額留紀錄', r.bs && r.noTick && r.needReason && r.disc, JSON.stringify(r));
     check('Lotion 10/21（B）：包商參照業主手動％、唯讀可開明細只看（確認＝關閉）、保留款總覽未稅', r.inst && r.roAllow && r.roBtn && r.roNoSave && r.retU, JSON.stringify(r));
-    check('審查修正（B 第 4 輪）：_modal 唯讀只看、saveHR 擋寫、催款可複製、無拔除紀錄不提示、折讓原因重開保留輸入', r.roModal && r.roHR && r.roDun && r.noTick0 && r.keep, JSON.stringify(r));
+    check('審查修正（B 第 4 輪）：_modal 唯讀只看、saveHR 擋寫、催款可複製、無拔除紀錄不提示、折讓原因重開保留輸入', r.roModal && r.roHR && r.roDun && r.noTick0 && r.keep && r.bRate, JSON.stringify(r));
     check('Lotion 10/21（B）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

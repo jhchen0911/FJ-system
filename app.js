@@ -479,7 +479,7 @@ function _rentBatchQtyDays(pg,qty,startISO,endISO){
     if(B.stage){n++;var d2=Math.max(0,Math.min(_dDiff(startISO,B.stage)+1,span));tot+=left*d2;rows.push({no:n,date:B.stage,qty:left,days:d2});}
     else {rows.push({no:n+1,date:'',qty:left,days:span,open:true});tot+=left*span;}
   }
-  return {qtyDays:tot,rows:rows,noTick:!!B.noTick&&!!((pg&&pg.remLogs)||[]).length};   // 審查修正：還沒有拔除紀錄時不印「未勾本批完成」
+  return {qtyDays:tot,rows:rows,noTick:!!B.noTick&&(!!((pg&&pg.remLogs)||[]).length||!!(pg&&pg.removeDone)||!!B.stage)};   // 審查修正：完全沒有拔除／完工資訊時不印「未勾本批完成」
 }
 // v6.0.107 租期結束日口徑（報價條件第 14 條）：q.rentEnd＝'removeFirst' 拔除（拆除）第一天（舊案預設）／'removeDone' 拔除（拆除）完成日（新報價預設）
 var _RENT_END_LBL={removeFirst:'拔除（拆除）第一天',removeDone:'拔除（拆除）完成日'};
@@ -29682,6 +29682,7 @@ function _hrMask(s){s=String(s||'');return s.length>4?(s.slice(0,2)+'＊＊＊�
 var _HR_FIELDS=['name','title','hire','birth','sex','idNo','addr','phone','bank','emg','emgPhone','payType','base','telAllow','otherAllow','laborGrade','laborCo','laborSelf','healthGrade','healthCo','healthSelf','dep','pensionCo','pensionSelf','pettyQuota','memo'];
 var _HR_NUM=['base','telAllow','otherAllow','laborGrade','laborCo','laborSelf','healthGrade','healthCo','healthSelf','dep','pensionCo','pensionSelf','pettyQuota'];
 function hrDel(id){
+  if(_roDeny())return;
   var h=_hrById(id);if(!h)return;
   showConfirm('刪除人員資料','確定刪除「'+esc(h.name||'')+'」的基本資料與薪資設定？已產生的薪資條會保留。',function(){
     _tomb('hr',id);HR=HR.filter(function(x){return x.id!==id;});saveHR();renderPayroll();toast('已刪除');
@@ -36346,15 +36347,15 @@ function invRentDisc(i,pre){   // pre：原因沒填重開時保留剛輸入的�
     showConfirm('逾期租金折讓（議價）','<div style="font-size:12.5px;line-height:1.8;margin-bottom:6px">'+esc(String(it.desc||'').split('\n')[0])+'<br>本期逾期合計 <b>'+_qfmt(tq)+'</b> '+esc(bu)+'·天　單價 '+fmt(pp)+'（分批，見計算式）</div>'
       +'<div class="f"><label>談定折讓（'+esc(bu)+'·天）<span style="font-size:10px;color:var(--b3)">印在請款單</span></label><input id="rd-qd" type="number" inputmode="decimal" min="0" max="'+tq+'" value="'+esc(String(_pv('qd',(parseFloat(it.discQd)||0)>0?it.discQd:'')))+'" placeholder="例：天數 × 該批支數" style="'+IN+'"></div>'
       +'<div class="f" style="margin-top:6px"><label>或折讓金額（NT$，未稅）<span style="font-size:10px;color:var(--b3)">填了金額就以金額換算</span></label><input id="rd-amt" type="number" inputmode="decimal" min="0" value="'+esc(String(_pv('amt','')))+'" placeholder="例：15000" style="'+IN+'"></div>'
-      +'<div class="f" style="margin-top:6px"><label>折讓原因 <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-note" value="'+esc(_pv('note',it.discNote||''))+'" style=""'+IN+'"></div>'+_rdLogHtml(it),function(){
-      var x=parseFloat(gv('rd-qd')),am=parseFloat(gv('rd-amt'));if(isFinite(am)&&am>0&&pp>0)x=Math.round(am/pp*100)/100;   // Lotion 10/21：可輸入天數或金額
+      +'<div class="f" style="margin-top:6px"><label>折讓原因 <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--b3)">內部紀錄，不印</span></label><input id="rd-note" value="'+esc(_pv('note',it.discNote||''))+'" style="'+IN+'"></div>'+_rdLogHtml(it),function(){
+      var rt1=(it.payRate!=null&&it.payRate!=='')?parseFloat(it.payRate):100,x=parseFloat(gv('rd-qd')),am=parseFloat(gv('rd-amt'));if(isFinite(am)&&am>0&&pp>0&&rt1>0)x=Math.round(am/(pp*rt1/100)*100)/100;   // 審查修正：金額＝實際扣款（含請款％）   // Lotion 10/21：可輸入天數或金額
       if(isFinite(x)&&x>tq){toast('折讓不能超過逾期合計，已改為 '+_qfmt(tq));x=tq;}
       var nx=isFinite(x)&&x>0?x:0,rs=(gv('rd-note')||'').trim();
       if(nx!==(parseFloat(it.discQd)||0)&&!rs){var _p1={qd:gv('rd-qd'),amt:gv('rd-amt'),note:''};toast('請填寫折讓原因');setTimeout(function(){invRentDisc(i,_p1);},50);return;}   // 必填原因
       if(nx!==(parseFloat(it.discQd)||0))_rdLog(it,(parseFloat(it.discQd)||0)+' '+bu+'·天',nx+' '+bu+'·天',rs);
-      it.discQd=nx;it.discNote=rs;
+      var _b1=parseFloat(it.curAmt)||0;it.discQd=nx;it.discNote=rs;
       try{updateInvRowAmt(i);}catch(e){_err('invRentDisc',e);}try{rInvItems();rInvTots();}catch(e){_err('invRentDisc.re',e);}try{autoSaveInv();}catch(e){_err('invRentDisc.save',e);}
-      toast(it.discQd>0?('已折讓 '+_qfmt(it.discQd)+' '+bu+'·天（NT$ '+fmt(Math.round(it.discQd*pp))+'），計費 '+_qfmt(_invRentQ(it))+' '+bu+'·天'):'已取消折讓');   // 以金額換算時天數取到小數 2 位，實際折讓金額可能差幾元，toast 顯示實際值
+      toast(it.discQd>0?('已折讓 '+_qfmt(it.discQd)+' '+bu+'·天（本列金額 '+fmt(_b1)+' → '+fmt(parseFloat(it.curAmt)||0)+'），計費 '+_qfmt(_invRentQ(it))+' '+bu+'·天'):'已取消折讓');   // 以金額換算時取到小數 2 位，toast 顯示實際前後金額
     },false,null,false);
     return;
   }
@@ -36372,12 +36373,12 @@ function invRentDisc(i,pre){   // pre：原因沒填重開時保留剛輸入的�
     var nd=isFinite(dd)&&dd>0?dd:0,rs=(gv('rd-note')||'').trim();
     if(nd!==(parseFloat(it.discDays)||0)&&!rs){var _p2={ask:gv('rd-ask'),days:gv('rd-days'),amt:gv('rd-amt'),note:''};toast('請填寫折讓原因');setTimeout(function(){invRentDisc(i,_p2);},50);return;}   // 必填原因
     if(nd!==(parseFloat(it.discDays)||0))_rdLog(it,(parseFloat(it.discDays)||0)+' 天',nd+' 天',rs);
-    it.discAsk=isFinite(ask)&&ask>0?ask:0;it.discDays=nd;it.discNote=rs;
+    var _b2=parseFloat(it.curAmt)||0;it.discAsk=isFinite(ask)&&ask>0?ask:0;it.discDays=nd;it.discNote=rs;
     try{_rentDiscNoteSync(it);}catch(e){_err('invRentDisc.note',e);}   // v6.0.75 備註列同步「折讓 N 天，計 M 天」
     try{updateInvRowAmt(i);}catch(e){_err('invRentDisc',e);}
     try{rInvItems();rInvTots();}catch(e){_err('invRentDisc.re',e);}
     try{autoSaveInv();}catch(e){_err('invRentDisc.save',e);}
-    toast(it.discDays>0?('已折讓 '+_qfmt(it.discDays)+' 天（NT$ '+fmt(Math.round(p*q*it.discDays*rt/100))+'），計費 '+_qfmt(_invBillDays(it))+' 天'):'已取消折讓');
+    toast(it.discDays>0?('已折讓 '+_qfmt(it.discDays)+' 天（本列金額 '+fmt(_b2)+' → '+fmt(parseFloat(it.curAmt)||0)+'），計費 '+_qfmt(_invBillDays(it))+' 天'+(_invBillDays(it)<=0?'（逾期租金列最少計 1 天）':'')):'已取消折讓');
   },false,null,false);
   setTimeout(_rdPreview,30);
 }
