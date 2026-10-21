@@ -7940,6 +7940,25 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+
+  // ── v6.0.108 批次 D：手機版看得到系統版次（標題列小字＋「更多」頁） ──
+  for (const w of [320, 390]) {
+    const { page, errors } = await newPage(browser, w, 740);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const v = document.getElementById('brand-ver'), rc = v.getBoundingClientRect();
+        out.top = getComputedStyle(v.parentNode).display !== 'none' && v.textContent === APP_VERSION && rc.width > 0 && rc.right <= innerWidth;
+        renderMobMore(); out.more = (document.getElementById('mob-more-body').textContent || '').indexOf('豐有工程管理系統 ' + APP_VERSION) >= 0;
+        out.noHs = document.documentElement.scrollWidth <= innerWidth;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
+      return out;
+    });
+    check('v6.0.108 手機版（' + w + ' 寬）看得到系統版次：標題列小字、更多頁、不橫向捲動', r.top && r.more && r.noHs && !r.err, JSON.stringify(r));
+    check('v6.0.108 手機版版次（' + w + ' 寬）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

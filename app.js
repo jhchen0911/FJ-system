@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.107';
+var APP_VERSION='v6.0.108';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -29512,6 +29512,7 @@ function renderMobMore(){
   // 智慧收件不列在此（v5.311 使用者指示：總覽的相機鈕已是入口，更多選單不重複）
   h+=title('工具')+grid(
       '<button type="button" id="mn-sync" class="mob-more-btn mob-more-btn-accent" onclick="fbUploadWithConflictCheck();toggleMobMore()"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-cloud"/></svg></span><span>同步</span></button>');
+  h+='<div class="mob-more-ver" style="text-align:center;font-size:11px;color:var(--b4);padding:10px 0 2px">豐有工程管理系統 '+esc(APP_VERSION)+'</div>';   // 批次 D：手機版在「更多」最下方顯示版次
   box.innerHTML=h;
 }
 
