@@ -38163,6 +38163,12 @@ function _meRoleLabel(){
   if(!rs.length)return '尚未指派角色';
   return rs.map(function(r){return r.name;}).join('、');
 }
+// 右上角「名稱（角色）」：名稱裡已經寫了同樣的（角色）就不再加（例：唯讀名冊顯示名稱設成「陳軒（唯讀）」）；全形／半形括號都認
+function _chipNameRole(nm,role){
+  var n=String(nm||'').trim(),r=String(role||'').trim();if(!r)return n;
+  var tail=new RegExp('[（(]\\s*'+r.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*[）)]$');
+  return tail.test(n)?n:(n+'（'+r+'）');
+}
 function renderUserChip(){
   var el=document.getElementById('user-chip');if(!el)return;
   if(!_fbUser){
@@ -38178,7 +38184,7 @@ function renderUserChip(){
   var initial=esc(String(nm||'?').trim().charAt(0)||'?');
   el.innerHTML='<button type="button" id="user-chip-btn" style="display:flex;align-items:center;gap:8px;background:transparent;border:none;cursor:pointer;padding:4px 6px;color:#fff;font-family:inherit">'
     +'<span style="width:28px;height:28px;border-radius:50%;background:var(--y);color:#3a2b00;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+initial+'</span>'
-    +'<span style="font-size:12.5px;font-weight:700;white-space:nowrap" class="desk-only">'+esc(nm)+'（'+esc(_meRoleLabel())+'）</span>'
+    +'<span style="font-size:12.5px;font-weight:700;white-space:nowrap" class="desk-only">'+esc(_chipNameRole(nm,_meRoleLabel()))+'</span>'
     +'</button>'
     +'<div id="user-menu" style="display:none;position:absolute;right:0;top:38px;background:var(--w);border:1px solid var(--b2);border-radius:var(--r10);box-shadow:0 12px 32px rgba(0,0,0,.18);min-width:190px;z-index:200;overflow:hidden">'
     +'<div style="padding:9px 13px;border-bottom:1px solid var(--b1)">'
