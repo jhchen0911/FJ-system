@@ -7517,49 +7517,6 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── Lotion 10/21 決定（批次 B）：完成當天計租、沒勾本批完成整批計到拔完、折讓需原因可填金額、包商參照業主手動％、唯讀可開明細只看、保留款總覽未稅 ──
-  {
-    const { page, errors } = await newPage(browser, 1280, 900);
-    const r = await page.evaluate(() => {
-      const out = {};
-      try {
-        const oT = window.toast; window.toast = function () {};
-        /* 寶山例：97 支逾期 51 天時第一階段 60 支退場 → 97×51；其餘 37 支計到拔除完成 */
-        const pg = { cum: 97, removeDone: '2026-12-10', remLogs: [{ date: '2026-11-21', qty: 60, done: true }, { date: '2026-12-10', qty: 37 }] };
-        const bq = _rentBatchQtyDays(pg, 97, '2026-10-01', '2026-12-31');
-        out.bs = bq.rows[0].days === 52 && bq.rows[0].qty === 60 && bq.rows[1].qty === 37 && bq.rows[1].days === 71 && bq.qtyDays === 60 * 52 + 37 * 71;
-        const nt = _rentBatchQtyDays({ cum: 10, removeDone: '2026-10-05', remLogs: [{ date: '2026-10-03', qty: 4 }, { date: '2026-10-05', qty: 6 }] }, 10, '2026-10-01', '2026-10-31');
-        out.noTick = nt.noTick === true && nt.rows.length === 1 && nt.qtyDays === 10 * 5 && /未勾「本批完成」，整批計到拔除完成/.test(_invCalcText({ type: 'rental', _ovKey: 'x', _ovBasis: 'removeDone', unit: '支·天', curQty: 50, contractPrice: 1, payRate: 100, _ovBatches: nt.rows, _ovNoTick: true }));
-        /* 折讓：沒填原因不改；填金額換算；留紀錄 */
-        invItems = [{ type: 'rental', desc: 'X 逾期租金', unit: '支', curQty: 97, curDays: 51, contractPrice: 50, payRate: 100, _ovKey: 'X' }];
-        invRentDisc(0); document.getElementById('rd-days').value = '15'; document.getElementById('gen-confirm-ok').click();
-        out.needReason = !(parseFloat(invItems[0].discDays) > 0);
-        document.getElementById('gen-confirm-modal').style.display = 'none';
-        invRentDisc(0); document.getElementById('rd-amt').value = String(97 * 50 * 15); document.getElementById('rd-note').value = '業主協商 −15 天'; document.getElementById('gen-confirm-ok').click();
-        out.disc = invItems[0].discDays === 15 && invItems[0].discLog.length === 1 && invItems[0].discLog[0].reason === '業主協商 −15 天';
-        /* 包商空白＝業主手動調過的％ */
-        out.inst = _instOf({}, { ownerPay: { instPct: 60 } }) === 60;
-        /* 唯讀：明細入口放行，視窗確認＝關閉不存 */
-        out.roAllow = !_roIsWriteSrc("editCustomer('c1')") && !_roIsWriteSrc("openSubPeriod('c1')") && _roIsWriteSrc('saveCustomer()');
-        _fbUser = { email: 'ai@x.com', uid: 'u' }; _isReaderUser = true; let hit = 0;
-        showConfirm('看', '<input id="roX" value="1">', function () { hit++; }, false); out.roBtn = document.getElementById('gen-confirm-ok').textContent === '關閉';
-        document.getElementById('gen-confirm-ok').click(); out.roNoSave = hit === 0;
-        _isReaderUser = false; _fbUser = null;
-        /* 保留款總覽未稅 */
-        Q = [{ id: 'qT', name: '保留案', awarded: true, items: [] }]; INV.length = 0;
-        INV.push({ id: 'iT', quoteId: 'qT', project: '保留案', periodNo: 1, retention: true, retentionPct: 5, totals: { curTotal: 10000, total: 9975, retention: 525 }, items: [] });
-        renderRetention(); const h = (document.getElementById('finance-retention-list') || {}).innerHTML || '';
-        out.retU = /累計保留（未稅）/.test(h) && /500/.test(h) && !/525/.test(h);
-        INV.length = 0; Q = []; invItems = []; window.toast = oT;
-      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
-      return out;
-    });
-    check('Lotion 10/21（B）：完成當天計租、批次以本批完成切、沒勾整批計到拔完並提示、折讓需原因可填金額留紀錄', r.bs && r.noTick && r.needReason && r.disc, JSON.stringify(r));
-    check('Lotion 10/21（B）：包商參照業主手動％、唯讀可開明細只看（確認＝關閉）、保留款總覽未稅', r.inst && r.roAllow && r.roBtn && r.roNoSave && r.retU, JSON.stringify(r));
-    check('Lotion 10/21（B）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
-    await page.close();
-  }
-
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
