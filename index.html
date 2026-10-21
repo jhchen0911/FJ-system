@@ -605,10 +605,15 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 @media(max-width:767px){.env-grid{grid-template-columns:1fr!important}.env-grid>div:nth-child(2){order:-1}}
 /* v6.0.103 長表單視窗（收款、合約、應付、廠商、發票、保留款…）：本體高度以 vh 為上限、內容區自己捲、最後一列按鈕固定在視窗底部
    （Lotion 筆電約 1080 高、瀏覽器可視高度更小時捲不到「確認」）。類別由 _mdlInit 加上；gen-confirm-modal 原本就有自己的版面 */
-.fy-mdl>div:first-child{max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);display:flex;flex-direction:column;margin-top:0!important;margin-bottom:0!important}
+/* 外層 fixed inset:0 高度確定，100%＝扣掉外層內距的可視高度（不依賴 dvh，舊版 iOS 也正確） */
+.fy-mdl>div:first-child{max-height:100%;display:flex;flex-direction:column;margin-top:0!important;margin-bottom:0!important}
 .fy-mdl>div:first-child>div:first-child{flex:0 0 auto}
-.fy-mdl>div:first-child>div:nth-child(2){flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:0!important}
-.fy-mdl-foot{position:sticky;bottom:0;z-index:3;background:var(--w);padding-top:10px;padding-bottom:14px;box-shadow:0 -8px 8px -8px rgba(0,0,0,.25)}
+.fy-mdl>div:first-child>div:nth-child(2){flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:0!important}
+/* 內容區不得左右滑：格線欄位可縮（原本超寬欄位被外框截斷看不到） */
+.fy-mdl .fg>*{min-width:0}
+.fy-mdl .fg input,.fy-mdl .fg select,.fy-mdl .fg textarea{max-width:100%;min-width:0;box-sizing:border-box}
+.fy-mdl .fg .btn{max-width:100%;white-space:normal;height:auto}
+.fy-mdl-foot{position:sticky;bottom:0;z-index:3;background:var(--w);padding-top:10px;padding-bottom:14px;margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px;box-shadow:0 -8px 8px -8px rgba(0,0,0,.25)}
 .fy-mdl>div:first-child>div:nth-child(2)>:last-child:not(.fy-mdl-foot){margin-bottom:14px}
 </style>
 

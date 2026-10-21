@@ -7054,7 +7054,7 @@ async function newPage(browser, width, height) {
 
 
   // ── v6.0.103 長表單視窗：矮螢幕（筆電可視高度小）與手機都能按到確認鈕（本體以 vh 為上限、內容區捲動、按鈕固定底部） ──
-  for (const [w, h] of [[1280, 460], [390, 560]]) {
+  for (const [w, h] of [[1280, 460], [390, 560], [320, 560]]) {
     const { page, errors } = await newPage(browser, w, h);
     const r = await page.evaluate(() => {
       const out = { bad: [] };
@@ -7071,7 +7071,7 @@ async function newPage(browser, width, height) {
           const o = document.getElementById(id); o.style.display = 'flex';
           const pn = o.firstElementChild, pr = pn.getBoundingClientRect(), f = o.querySelector('.fy-mdl-foot');
           let hit = true; if (f) { const bt = [...f.querySelectorAll('button')].pop(), b = bt.getBoundingClientRect(), e2 = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); hit = !!e2 && (e2 === bt || bt.contains(e2)); }
-          if (!(o.classList.contains('fy-mdl') && pr.bottom <= innerHeight + 1 && pr.top >= -1 && hit && pn.scrollWidth <= pn.clientWidth + 1 && (id === 'retention-modal' || !!f))) out.bad.push(id);
+          if (!(o.classList.contains('fy-mdl') && pr.bottom <= innerHeight + 1 && pr.top >= -1 && hit && pn.scrollWidth <= pn.clientWidth + 1 && pn.children[1].scrollWidth <= pn.children[1].clientWidth + 1 && (id === 'retention-modal' || !!f))) out.bad.push(id);
           if (id === 'fy-modal') o.remove(); else o.style.display = 'none';
         });
         out.noHs = document.documentElement.scrollWidth <= innerWidth;
