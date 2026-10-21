@@ -606,6 +606,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 @media(max-width:767px){.env-grid{grid-template-columns:1fr!important}.env-grid>div:nth-child(2){order:-1}}
 /* v6.0.108 唯讀帳號：寫入按鈕隱藏、輸入停用、備份還原卡隱藏 */
 .fy-ro-x{display:none!important}
+.fy-ro-only{display:none!important}body.fy-ro .fy-ro-only{display:inline-flex!important}   /* v6.0.109 唯讀帳號專用的草稿按鈕 */
 body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
 .fy-ro-d{cursor:not-allowed}
 /* v6.0.104 長表單視窗（收款、合約、應付、廠商、發票、保留款…）：本體高度以 vh 為上限、內容區自己捲、最後一列按鈕固定在視窗底部
@@ -1408,6 +1409,7 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
       <button type="button" id="awarded-filter-btn" class="btn btn-sm" onclick="toggleAwardedFilter()" style="border:1px solid #1a3a6b;color:#1a3a6b;background:transparent" title="只顯示得標案件"><svg class="ic ib" aria-hidden="true"><use href="#i-trophy"/></svg> 得標</button>
       <button type="button" class="btn btn-sm" onclick="exportQuotesExcel()" title="匯出報價單 Excel"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> Excel</button>
       <button type="button" class="btn btn-sm btn-g" onclick="newQ()">+ 新增</button>
+      <button type="button" class="btn btn-sm btn-g fy-ro-only" onclick="draftQuoteNew()">＋ 報價草稿</button>
     </div>
   </div>
   <div id="quote-stats-grid" style="display:flex;gap:10px;flex-wrap:wrap;padding:12px 18px 8px"></div>
@@ -1679,6 +1681,7 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
     <div id="finance-invoice" style="display:none">
       <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
         <button type="button" class="btn btn-sm btn-g" onclick="newInvoiceRecord()">＋ 新增發票</button>
+        <button type="button" class="btn btn-sm btn-g fy-ro-only" onclick="draftIrPhoto()">＋ 發票照片草稿</button>
       </div>
       <div class="card" style="margin-bottom:0"><div id="invoice-record-list"></div></div>
     </div>
@@ -2808,7 +2811,7 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.108" defer></script><script src="beta.js?v=6.0.108" defer></script>
+<script src="app.js?v=6.0.109" defer></script><script src="beta.js?v=6.0.109" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">

@@ -7978,6 +7978,59 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.108 安全：雲端參數裡的 AI 金鑰會被移除（管理員裝置刪雲端欄位）、上傳參數不含金鑰、唯讀帳號拿不到且本機清除', r.scrub && r.noUp && r.ro && !r.err, JSON.stringify(r));
     check('v6.0.108 金鑰安全測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+
+  // ── v6.0.109 批次 E：AI 草稿（唯讀帳號送報價／得標狀態／發票照片草稿，管理員確認才生效） ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      try {
+        const oT = window.toast; let msg = ''; window.toast = m => { msg = m; };
+        const store = {};
+        const mockDb = { ref: p => ({ set: v => { store[p] = JSON.parse(JSON.stringify(v)); return Promise.resolve(); }, update: v => { store[p] = Object.assign(store[p] || {}, v); return Promise.resolve(); }, on: () => {}, once: () => Promise.resolve({ val: () => null }) }) };
+        const oDb = window._fbDb; _fbDb = mockDb; _fbUser = { email: 'hsuanchen911@gmail.com', uid: 'r1' }; _isReaderUser = true; _roInit();
+        Q = [{ id: 'qD', name: '草稿測試案', client: '業主甲', items: [{ desc: '鋼軌樁', unit: '支', qty: 10, price: 100 }], t: { total: 1050 } }];
+        /* 1. 報價草稿：唯讀帳號可編輯、只能送草稿，正式 Q 不變 */
+        go('quotes'); out.btn = getComputedStyle(document.querySelector('[onclick="draftQuoteNew()"]')).display !== 'none';
+        draftQuoteNew(); const fn = document.getElementById('fn'); out.editable = !fn.disabled;
+        fn.value = 'AI 草稿新案'; document.getElementById('fcl').value = '業主乙';
+        const saveBtn = [...document.querySelectorAll('#page-editor [onclick="saveQ()"]')]; out.saveHidden = saveBtn.every(b => b.classList.contains('fy-ro-x') || b.offsetParent === null);
+        draftQuoteSubmit(); await new Promise(res => setTimeout(res, 50));
+        const k1 = Object.keys(store).find(k => store[k].type === 'quote');
+        out.quote = !!k1 && store[k1].status === 'pending' && store[k1].by === 'hsuanchen911@gmail.com' && store[k1].payload.fields.name === 'AI 草稿新案' && Q.length === 1;
+        /* 2. 得標狀態草稿：點狀態 chip → 草稿，報價狀態不變 */
+        cycleBidStatus('qD'); document.getElementById('db-st').value = 'lost'; document.getElementById('db-note').value = '業主 LINE 通知'; document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 50));
+        const k2 = Object.keys(store).find(k => store[k].type === 'bid');
+        out.bid = !!k2 && store[k2].payload.to === 'lost' && !Q[0].bidStatus;
+        /* 唯讀帳號不能確認 */
+        DRAFTS = {}; Object.keys(store).forEach(k => { DRAFTS[store[k].id] = store[k]; });
+        draftApply(store[k2].id); out.roApply = !Q[0].bidStatus;
+        /* 3. 管理員確認得標狀態草稿 → 正式資料才改 */
+        _isReaderUser = false; _roInit(); _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a1' };
+        const todo = []; _v6TodoItems(todo); out.todo = todo.some(t => t.type === 'ai_draft' && /AI 草稿 2 筆待確認/.test(t.text));
+        draftApply(store[k2].id); document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 50));
+        out.bidApplied = Q[0].bidStatus === 'lost' && Q[0].lostNote === '業主 LINE 通知' && DRAFTS[store[k2].id].status === 'applied';
+        /* 4. 管理員套用報價草稿 → 開編輯頁、按儲存才寫入 */
+        draftApply(store[k1].id); document.getElementById('gen-confirm-ok').click();
+        out.qOpen = document.getElementById('fn').value === 'AI 草稿新案' && Q.length === 1;
+        saveQ(); out.qSaved = Q.length === 2 && Q.some(q => q.name === 'AI 草稿新案') && DRAFTS[store[k1].id].status === 'applied';
+        /* 5. 退回 */
+        const dRej = { id: 'dX', type: 'bid', by: 'x', at: 1, status: 'pending', summary: 'x', payload: { qid: 'qD', to: 'void' } }; DRAFTS.dX = dRej;
+        const oP = window.prompt; window.prompt = () => '不對'; draftReject('dX'); window.prompt = oP; await new Promise(res => setTimeout(res, 30));
+        out.rej = DRAFTS.dX.status === 'rejected' && DRAFTS.dX.reason === '不對' && Q.find(q => q.id === 'qD').bidStatus === 'lost';
+        /* 6. 規則檔：唯讀帳號只能新增 pending、不能改 */
+        out.rules = typeof _draftPush === 'function';
+        _fbDb = oDb; _fbUser = null; DRAFTS = {}; Q = []; window.toast = oT;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    const rules = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8'));
+    const dr = rules.rules.fydata.drafts || {};
+    const rw = (dr.$id || {})['.write'] || '';
+    check('v6.0.109 AI 草稿：唯讀帳號可編輯報價並送草稿、得標狀態草稿，正式資料不變；唯讀不能確認', r.btn && r.editable && r.saveHidden && r.quote && r.bid && r.roApply && !r.err, JSON.stringify(r));
+    check('v6.0.109 AI 草稿：管理員待辦、確認得標狀態／報價（按儲存才寫入）、退回', r.todo && r.bidApplied && r.qOpen && r.qSaved && r.rej, JSON.stringify(r));
+    check('v6.0.109 AI 草稿規則：唯讀帳號只能新增 by＝自己的 pending 草稿（!data.exists()），管理員可改', /!data\.exists\(\)/.test(rw) && /newData\.child\('status'\)\.val\(\) === 'pending'/.test(rw) && /newData\.child\('by'\)\.val\(\) === auth\.token\.email\.toLowerCase\(\)/.test(rw), rw.slice(0, 200));
+    check('v6.0.109 AI 草稿測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

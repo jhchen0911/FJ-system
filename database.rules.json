@@ -77,6 +77,13 @@
         "$uid": {
           ".write": "auth != null && auth.uid === $uid && (auth.token.email == null || !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())"
         }
+      },
+      "drafts": {
+        ".read": "auth != null && auth.token.email != null && ((auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())) || root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())",
+        "$id": {
+          ".write": "auth != null && auth.token.email != null && ((auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())) || (root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !data.exists() && newData.child('by').val() === auth.token.email.toLowerCase() && newData.child('status').val() === 'pending'))",
+          ".validate": "newData.hasChildren(['id','type','by','at','status']) && newData.child('id').val() === $id && newData.child('type').isString() && newData.child('type').val().matches(/^(quote|bid|irPhoto)$/) && newData.child('status').val().matches(/^(pending|applied|rejected)$/)"
+        }
       }
     }
   }
