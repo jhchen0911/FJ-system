@@ -36807,6 +36807,7 @@ function renderReadersBox(){
     +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">'
     +'<div style="font-weight:700;font-size:13.5px;flex:1">唯讀帳號（AI 助理）</div>'
     +'<button type="button" class="btn btn-xs" onclick="openStorageRulesGen()" title="依目前人員名冊與唯讀名冊產生 Storage 規則全文">產生 Storage 規則</button> '
+    +(_fbUser&&String(_fbUser.email||'').toLowerCase()===_RULES_OWNER?'<button type="button" class="btn btn-xs" onclick="storageClaimsSync()" title="Cloud Function 部署好之後按一次：依人員／唯讀名冊重新設定每個帳號的附件權限">重新同步附件權限</button> ':'')
     +'<button type="button" class="btn btn-xs btn-g" onclick="readerAdd()">＋ 新增唯讀帳號</button></div>'
     +'<div style="font-size:11.5px;color:var(--b4);margin-bottom:8px">名冊內帳號可查看全部資料（含成本／毛利／應付／分潤／單價庫等 fydata/private 敏感資料）與全部頁面（人員管理、角色權限、備份還原除外）；所有新增／修改／刪除／儲存／上傳一律停用，安全規則也拒絕其寫入任何節點。Storage 檔案寫入另需在 storage.rules 的唯讀清單加入同一信箱。請勿把同一信箱加進人員名冊。</div>'
     +body+'</div></div>';
@@ -37266,6 +37267,19 @@ function _storageRulesLists(){
     .concat(_ST_READERS_FIXED).filter(function(e,i,a){return a.indexOf(e)===i;});
   staff=staff.filter(function(e){return readers.indexOf(e)<0;});   // 唯讀帳號不會同時是人員
   return {staff:staff,readers:readers};
+}
+// Storage 長期方案（custom claims）：部署 functions 後由擁有者按一次「重新同步附件權限」＝呼叫 fyClaimsSyncNow 全量重算（取代在 Console 貼程式碼）
+function storageClaimsSync(){
+  if(!_fbUser||String(_fbUser.email||'').toLowerCase()!==_RULES_OWNER){toast('只有擁有者帳號可以執行');return;}
+  toast('同步中…');
+  _fbUser.getIdToken().then(function(t){return fetch('https://asia-southeast1-jhchen-aed9a.cloudfunctions.net/fyClaimsSyncNow',{headers:{Authorization:'Bearer '+t}});})
+    .then(function(r){return r.text().then(function(x){return {ok:r.ok,status:r.status,x:x};});})
+    .then(function(o){
+      if(!o.ok){toast('同步失敗（'+o.status+'）：'+String(o.x||'').slice(0,80)+'。請確認 Cloud Function 已部署');return;}
+      var n=0;try{n=JSON.parse(o.x).changed||0;}catch(e){/* 可忽略：回應不是 JSON 時只顯示完成 */}
+      try{_fbUser.getIdToken(true).catch(function(){/* 可忽略 */});}catch(e){_err('storageClaimsSync.token',e);}
+      toast('附件權限已同步，更新 '+n+' 個帳號。其他人重新整理系統後生效');
+    }).catch(function(e){_err('storageClaimsSync',e);toast('同步失敗：連不到 Cloud Function（尚未部署或網路問題）');});
 }
 function openStorageRulesGen(){
   if(!_isRulesOwner()&&!(_fbUser&&isAdmin(_fbUser.email))){toast('只有管理員可產生');return;}
