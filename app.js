@@ -29512,7 +29512,7 @@ function renderMobMore(){
   // 智慧收件不列在此（v5.311 使用者指示：總覽的相機鈕已是入口，更多選單不重複）
   h+=title('工具')+grid(
       '<button type="button" id="mn-sync" class="mob-more-btn mob-more-btn-accent" onclick="fbUploadWithConflictCheck();toggleMobMore()"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-cloud"/></svg></span><span>同步</span></button>');
-  h+='<div class="mob-more-ver" style="text-align:center;font-size:11px;color:var(--b4);padding:10px 0 2px">豐有工程管理系統 '+esc(APP_VERSION)+'</div>';   // 批次 D：手機版在「更多」最下方顯示版次
+  h+='<div class="mob-more-ver" style="text-align:center;font-size:10.5px;color:var(--b4);margin-top:4px;padding:0">豐有工程管理系統 '+esc(APP_VERSION)+'</div>';   // 批次 D：手機版在「更多」最下方顯示版次
   box.innerHTML=h;
 }
 
