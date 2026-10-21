@@ -7920,6 +7920,25 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+
+  // ── v6.0.106 保留款拆稅：退還單列表只拆另開發票的預扣保留款、財務頁保留款總額加拆分 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const t = _retRetSplitTxt({ rows: [{ amt: 525 }], holds: [{ amt: 1050 }] });
+        out.card = /另開發票部分 未稅 500｜稅 25/.test(t) && /當場扣款 1,050（當期發票已開，不另拆）/.test(t) && !/未稅 1,500/.test(t);
+        out.cardRowsOnly = _retRetSplitTxt({ rows: [{ amt: 1050 }] }) === '含稅；另開發票部分 未稅 1,000｜稅 50';
+        out.kpi = /_retTaxSplit\(totalRetention\)/.test(String(updateInvStats)) && /_retTaxSplit\(totalRet\)/.test(String(openRetentionModal));
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.106 保留款拆稅：退還單列表只拆另開發票的預扣保留款（當場扣款不拆）、財務頁保留款總額加未稅／稅', r.card && r.cardRowsOnly && r.kpi && !r.err, JSON.stringify(r));
+    check('v6.0.106 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
