@@ -7859,6 +7859,12 @@ async function newPage(browser, width, height) {
         out.keepSaved = !!pK && pK.rows[0].qty === 1.2 && pK.note === '補發票號';
         openSubPeriod('cX', 1); const lq2 = document.querySelector('.sp-row[data-lump="1"] .sp-qty'); lq2.value = '130'; lq2.dataset.touched = '1'; _spRecalc();
         out.keepBlock = document.getElementById('gen-confirm-ok').disabled === true; document.getElementById('gen-confirm-modal').style.display = 'none';
+        /* Lotion 10/21 第 9 題：實際採購另開卡、估算卡沖銷不刪 */
+        const qE = { id: 'qE', name: '材料案', items: [], costs: [{ id: 'cEm', type: 'own', vendor: '', cat: '工項材料', estMat: 1, linkedItemIdx: -1, rows: [{ id: 'cEm_0', desc: '水泥（豐有提供，發包 R1 估算；實際採購時請改這張卡）', qty: 1, unit: '式', unitPrice: 50000 }], amt: 50000 }] };
+        Q = [qE]; eid = 'qE'; costEstToActual('cEm'); document.getElementById('gen-confirm-ok').click();
+        const est = qE.costs[0], act = qE.costs.find(x => x.estOf === 'cEm');
+        out.introLock = /付款時機已鎖住/.test(String(_piSave)) && /pay'\+f\.id\+'_intro'/.test(String(_piSave));
+        out.estAct = !!act && est.offsetBy === act.id && Math.round(est.amt) === 0 && act.amt === 50000 && est.rows.length === 2 && /實際採購/.test(act.rows[0].desc);
         /* 第 6 項：未登入不能匯入條件卡 */
         { let m6 = ''; const t6 = window.toast; window.toast = m => { m6 = m; }; _fbUser = null; pjCardImport('qX'); out.cardLogin = /請先登入管理員帳號/.test(m6); window.toast = t6; }
         _fbUser = { email: 'staff@x.com' }; const qN = { id: 'qN', ownerCard: { fields: {} } }; Q = [qN]; _regraftQuoteSens({ qN: { ownerCard: { fields: {} } } });
@@ -7870,7 +7876,7 @@ async function newPage(browser, width, height) {
     });
     check('Lotion 10/21（C）：介紹費背對背、條件卡進 private、新專案放款日 20、拆分發包數量依原量比例分配可改、一式依比例調價只提示', r.intro && r.priv && r.payDef && r.share && r.lumpAdj, JSON.stringify(r));
     check('Lotion 10/21（C）：根固／一般保留款分開退、舊單票期改用規則、分段裝設％需原因留紀錄不回溯、提示文字', r.grp && r.rel && r.ticket && r.instNoReason && r.inst && r.instRo && r.cardMiss && r.mixed, JSON.stringify(r));
-    check('審查修正（C 第 4 輪）：一式已計價不可直接改總價、參考單價不入實績平均、規則沒寫付款比例保留單據票期、條件卡舊雲端資料一次性搬移、複製報價為新專案', r.lumpBilled && r.histRef && r.ticketKeep && r.ocMig && r.copyDef && r.lumpBlockUi && r.lumpBlock && r.okReset && r.frozen && r.emptyOk && r.ocDrop && r.copyNoCard && r.keepOk && r.keepSaved && r.keepBlock && r.cardLogin, JSON.stringify(r));
+    check('審查修正（C 第 4 輪）：一式已計價不可直接改總價、參考單價不入實績平均、規則沒寫付款比例保留單據票期、條件卡舊雲端資料一次性搬移、複製報價為新專案', r.lumpBilled && r.histRef && r.ticketKeep && r.ocMig && r.copyDef && r.lumpBlockUi && r.lumpBlock && r.okReset && r.frozen && r.emptyOk && r.ocDrop && r.copyNoCard && r.keepOk && r.keepSaved && r.keepBlock && r.cardLogin && r.estAct && r.introLock, JSON.stringify(r));
     check('Lotion 10/21（C）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

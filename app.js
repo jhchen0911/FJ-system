@@ -33157,7 +33157,7 @@ function rfqAward(rid){
     if(!Array.isArray(q.costs))q.costs=[];q.costs.push(cost);
     try{   // Lotion 10/21：豐有提供的材料算進成本（另建自有成本卡，估算金額）；一式換算單價存單價庫當參考
       var _fx=_rfqExtras(v).filter(function(x){return x.by!=='owner'&&(parseFloat(x.amt)||0)>0;});
-      if(_fx.length){var mid=cid+'m';q.costs.push({id:mid,type:'own',isAttached:false,attachedTo:'',mergedInto:'',vendor:'',linkedItemIdx:(r.items[0]||{}).idx!=null?r.items[0].idx:-1,cat:'工項材料',date:sd,rfqId:r.id,matByOf:cid,
+      if(_fx.length){var mid=cid+'m';q.costs.push({id:mid,type:'own',isAttached:false,attachedTo:'',mergedInto:'',vendor:'',linkedItemIdx:(r.items[0]||{}).idx!=null?r.items[0].idx:-1,cat:'工項材料',date:sd,rfqId:r.id,matByOf:cid,estMat:1,
         rows:_fx.map(function(x,k){return {id:mid+'_'+k,preset:'',desc:String(x.name||'材料')+'（豐有提供，發包 '+(r.no||'')+' 估算；實際採購時請改這張卡）',qty:1,unit:'式',unitPrice:Math.round(parseFloat(x.amt)||0)};}),amt:0});
         try{recalcCostAmt(q.costs[q.costs.length-1]);}catch(e2){_err('rfqAward.matBy',e2);}}
       if(L){var _ref=_rfqLumpRef(r,v,true);if(_ref!=null){(r.items||[]).filter(function(it){return _rfqLumpOn(v,it.idx);}).forEach(function(it){var qi2=(q.items||[])[it.idx];if(!qi2)return;
@@ -33951,7 +33951,7 @@ function _piSave(){
   if(per==='m'&&(c.rows||[]).some(function(r,i){return !(lens[i]>0);})){toast('依 M 計請填每個工項的單支長度（或改 $/支）');pjIntroEdit(x.qid,x.cid,x.fid,pre);return;}
   if((per==='pct'||per==='lump')&&pay==='follow')pay='first';
   var f=x.fid?(q.costs||[]).find(function(y){return y.id===x.fid;}):null,isNew=!f;
-  if(f&&_introFollows(f)&&(pay==='follow'||pay==='b2b')&&(f.introPay||'follow')!==pay&&_subPeriods(f).some(function(p){return !p.isRet;})&&(c.rows||[]).some(_subStaged)){toast('已有跟隨計價的期別，不能在「隨廠商每期計價」與「背對背」之間切換（會改到已產生的應付）');pjIntroEdit(x.qid,x.cid,x.fid,pre);return;}   // 審查修正（C 第 4 輪）
+  if(f&&(f.introPay||'follow')!==pay&&(_subPeriods(f).some(function(p){return !p.isRet;})||PAYABLES.some(function(p){return p&&p.id==='pay'+f.id+'_intro';}))){toast('介紹費已有期別／應付，付款時機已鎖住；要改請另開調整單');pjIntroEdit(x.qid,x.cid,x.fid,pre);return;}   // Lotion 10/21 第 8 題：有期別就全部鎖住
   if(!f){f={id:c.id+'i'+Math.random().toString(36).slice(2,4),type:'sub',isAttached:false,attachedTo:'',mergedInto:'',cat:c.cat||'打設',date:localToday(),rows:[],amt:0,signDate:localToday(),entryDate:c.entryDate||'',retRate:0,rfqId:c.rfqId||'',followOf:c.id,isIntro:true};q.costs.push(f);}
   var old=f.rows||[];
   if(per==='pct'||per==='lump'){
@@ -34020,8 +34020,27 @@ function _costRoCard(q,c){
     var rows=(c.rows||[]).slice(0,4).map(function(r){if(c.type==='own')return esc((r.desc||r.preset||'')+' '+_rfmt(r.qty)+' '+(r.unit||'')+'×'+_rfmt(r.unitPrice));return esc((r.desc||'')+(r.days?(' '+_rfmt(r.days)+'天×'+_rfmt(r.dayRate)):''));}).filter(Boolean).join('、');
     body='<div style="font-size:11.5px;color:var(--b4)">'+(it?('工項 '+esc(it)+'　'):'')+rows+((c.rows||[]).length>4?'…':'')+'</div>'+(c.type==='own'?_gasOnSiteHtml(q,c):'');   // v6.0.69
   }
+  if(c.type==='own'&&c.estMat){body+='<div style="font-size:11px;color:#8a6d00">'+(c.offsetBy?'估算已沖銷，改看實際採購卡':'估算成本（豐有提供材料，尚未登錄實際採購）')+'</div>';if(!c.offsetBy)acts+=B2("costEstToActual('"+c.id+"')",'登錄實際採購','#8a6d00');}   // Lotion 10/21 第 9 題
   acts+=B2("costEdit('"+c.id+"')",'編輯明細')+B2("delCostItem('"+c.id+"')",'刪除','var(--red)');
   return '<div class="cost-ro" data-cid="'+c.id+'" style="padding:8px 0;border-bottom:1px solid var(--b1)"><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;border:1.5px solid '+C[c.type]+';background:'+B[c.type]+';color:'+C[c.type]+'">'+L[c.type]+'</span><b style="font-size:13px">'+esc(c.vendor&&c.vendor!=='公司支出（自付）'?c.vendor:(it||'公司自備'))+'</b><span style="font-size:11px;color:var(--b4)">'+esc(_costCatNorm(c.cat||'')||'')+'　'+esc(c.date||'')+'　來自 '+(src.js?('<a href="javascript:void(0)" onclick="'+src.js.replace(/"/g,'&quot;')+'" style="color:var(--g3)">'+esc(src.t)+' ›</a>'):esc(src.t))+'</span><span style="margin-left:auto;font-size:11px;color:var(--b4)">'+(c.type==='sub'?'發包 ':'小計 ')+'<b id="cost-amt-'+c.id+'" style="color:var(--g3);font-variant-numeric:tabular-nums">'+fmt(amt)+'</b></span></div>'+body+'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px">'+acts+'</div></div>';
+}
+// Lotion 10/21 第 9 題：實際採購進來時另開一張實際成本卡，估算卡加一列沖銷歸零（不刪，留紀錄）
+function costEstToActual(cid){
+  if(_roDeny())return;
+  var q=Q.find(function(x){return x.id===eid;});if(!q)return;var c=(q.costs||[]).find(function(x){return x.id===cid;});if(!c||!c.estMat||c.offsetBy)return;
+  try{recalcCostAmt(c);}catch(e){_err('costEstToActual',e);}
+  var amt=Math.round(parseFloat(c.amt)||0);
+  showConfirm('登錄實際採購','另開一張「實際採購」成本卡（先帶入估算明細，請改成實際金額），估算卡加一列沖銷 −NT$ '+fmt(amt)+'，估算卡保留不刪。',function(){
+    var nid=cid+'a'+Math.random().toString(36).slice(2,6),now=Date.now();
+    var n={id:nid,type:'own',isAttached:false,attachedTo:'',mergedInto:'',vendor:'',linkedItemIdx:c.linkedItemIdx,cat:c.cat||'工項材料',date:localToday(),rfqId:c.rfqId||'',estOf:cid,
+      rows:(c.rows||[]).filter(function(r){return !r.offset;}).map(function(r,k){return {id:nid+'_'+k,preset:'',desc:String(r.desc||'').replace(/（豐有提供，[^）]*）/,'（實際採購）'),qty:r.qty,unit:r.unit,unitPrice:r.unitPrice};}),amt:0,mt:now};
+    q.costs.push(n);
+    if(!Array.isArray(c.rows))c.rows=[];c.rows.push({id:cid+'_off',offset:1,preset:'',desc:'沖銷：已改登實際採購（'+localToday()+'）',qty:1,unit:'式',unitPrice:-amt});
+    c.offsetBy=nid;c.mt=now;
+    try{recalcCostAmt(c);recalcCostAmt(n);}catch(e){_err('costEstToActual.calc',e);}
+    _touch(q);try{persist();_immediateUpload();}catch(e){_err('costEstToActual',e);}
+    costEdit(nid);toast('已另開實際採購卡，估算卡已沖銷');
+  },false);
 }
 function costEdit(cid){window._costEditId=cid;rCostItems();setTimeout(function(){var el=document.getElementById('cost-rows-'+cid);if(el)el.scrollIntoView({block:'center'});},60);}
 
@@ -37514,7 +37533,7 @@ var _RO_DENY=new RegExp('^(?:save|del|delete|remove|add|new|edit|create|submit|i
   +'|upd(?:CostField|OwnRow|SubField|NgtItemsSum|NgtWay|CostAttachTarget)|qc(?:Upd|Del|Add)|dr(?:AddToList|RemoveFromList|AddProgRow|AddPhoto|AddCrew|MonthSubmit|LoadExisting)'
   +'|wk(?:Save|Edit|Upload|Del|AddCert|CertField|SetExp|AiFromId|ExpPlus)|inv(?:SyncQuoteNow|ScanRent|RentalPick|RentApply|FillVendor|FillDaily)'
   +'|pullInvFromCustomer|receiptHoldReturn|retReturn|ledgerRegInvNo|exp(?:Scan|Manual|Del)|fc(?:AddRow|DelRow|ApplySuggest)|cfSetDelay|shareCfgInput'
-  +'|costAddPick|changeCostType|onVendorChange|onLaborItemChange|calcPayableAmt|intake|siteRestoreVer|siteBump|plBump|rentPlanEnd|quoteOwnerDocRemove|quoteImportOwner'
+  +'|costAddPick|costEstToActual|changeCostType|onVendorChange|onLaborItemChange|calcPayableAmt|intake|siteRestoreVer|siteBump|plBump|rentPlanEnd|quoteOwnerDocRemove|quoteImportOwner'
   +'|projDelConfirmFile|irPickFile|irClearFile|handleContractFileSelect|loadSealImage|contactAddRole|newContactItem|fbUploadWithConflictCheck|gdriveSync'
   +'|rescue(?:Restore|LoadFile|Load)|rmk(?:AddExtra|DelExtra)|ctDupDelete|doSave|copyQ|cycleBidStatus|autoSaveInv|projUpload|writeCostHist|fcQuick|drBackfillStop'
   +'|_(?:commSync|salesCommSync|einvScan|pay(?:Upload|DelFile|PaidToggle)|sp(?:Recalc|FillDaily|SelChange|OnDate)|saOnInput|rcpt|receiptCalc|salesBookAddRow|comm(?:AddRow|RowMode)|advPayFix|costOddFix|trDelUI'
