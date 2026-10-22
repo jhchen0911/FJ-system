@@ -8240,8 +8240,21 @@ async function newPage(browser, width, height) {
         out.adjRow = !!adjR && adjR.contractPrice === 2400 && adjR.curAmt === 2400 && /單價更正/.test(adjR.adjReason);
         invItems.push({ type: 'item', desc: '調整：多請扣回', unit: '式', contractPrice: -500, contractQty: 0, curQty: 1, payRate: 100, adjOf: 'manual', adjReason: 'x' });
         saveInvoice(); out.adjNeg = INV.find(x => x.id === 'IL2').items.some(it => it.contractPrice === -500 && it.curAmt === -500);
-        /* 已結案專案比照鎖住 */
-        Q[0].closed = true; out.closedLock = /已結案/.test(_invLockWhy(INV.find(x => x.id === 'IL2')));
+        /* 審查 🔴3：開單時負數調整列金額不歸零 */
+        loadInvoice('IL2'); out.negLoad = INV.find(x => x.id === 'IL2').items.some(it => it.contractPrice === -500 && it.curAmt === -500);
+        /* 審查 🟡4：已加過調整列的差額不再重複提示 */
+        out.adjDone = !_invAdjCandidates(INV.find(x => x.id === 'IL2'), Q.find(x => x.id === 'qL')).length;
+        /* 審查 🔴1：自動存檔不能繞過鎖 */
+        loadInvoice('IL1'); invItems[0].curQty = 50; autoSaveInv();
+        out.autoLock = INV.find(x => x.id === 'IL1').items[0].curQty === 12;
+        msg = ''; invRentDisc(0); out.discLock = /已鎖住/.test(msg);
+        /* 審查 🟡1：保留款也鎖 */
+        loadInvoice('IL1'); const rcb = document.getElementById('inv-retention'); if (rcb) { rcb.checked = !rcb.checked; } const rp = document.getElementById('inv-retention-pct'); if (rp) rp.value = '10';
+        msg = ''; saveInvoice(); out.headLock = /已鎖住/.test(msg) || !rcb;
+        /* 已結案專案：結案當下已有的期別鎖住；結案後新開的期別不鎖、可以加調整列（審查 🔴2） */
+        Q[0].closed = true; Q[0].closedAt = Date.now(); out.closedLock = /已結案/.test(_invLockWhy(INV.find(x => x.id === 'IL2')));
+        const nv = { id: String(Date.now() + 5000), sourceQid: 'qL', quoteId: 'qL', project: '鎖住案', client: 'K', periodNo: 3, items: [] };
+        out.closedNew = !_invLockWhy(nv);
         INV.length = 0; _fbUser = null;
         PAYABLES.length = 0; Q = []; CONTRACTS.splice(0); window.toast = oT; window.confirm = oC;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
@@ -8254,7 +8267,7 @@ async function newPage(browser, width, height) {
     check('v6.0.111 健檢1 #2：同名工項重存報價後各自保留單價／數量', r.dup && !r.err, JSON.stringify(r));
     check('v6.0.111 健檢1 #5：打設＋拔除合一工項拔除未完成不准結算', r.settleBlock && r.settleBlock2 && r.settleOk && !r.err, JSON.stringify(r));
     check('v6.0.111 健檢1 #13／#14：已付應付不被改寫或刪除（差額另立、手動修改擋下）', r.paidKeep && r.deltaGone && r.editBlock && r.paid2 && r.paidNoRewrite && r.cleanKeep && r.noTombReuse && r.subBase && r.subDelta && !r.err, JSON.stringify(r));
-    check('v6.0.111 健檢1 #1（Lotion 10/22）：已收款／已開發票／已結案期別鎖住、改報價只動未鎖的期別、調整列連回原期、管理員填原因解鎖並留紀錄', r.lockWhy && r.lockQ && r.adjDiff && r.lockSave && r.unlockEdit && r.adjRow && r.adjNeg && r.closedLock && !r.err, JSON.stringify(r));
+    check('v6.0.111 健檢1 #1（Lotion 10/22）：已收款／已開發票／已結案期別鎖住、改報價只動未鎖的期別、調整列連回原期、管理員填原因解鎖並留紀錄', r.lockWhy && r.lockQ && r.adjDiff && r.lockSave && r.unlockEdit && r.adjRow && r.adjNeg && r.negLoad && r.adjDone && r.autoLock && r.discLock && r.headLock && r.closedLock && r.closedNew && !r.err, JSON.stringify(r));
     check('v6.0.111 批次 G 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

@@ -2169,8 +2169,8 @@ function saveQ(){
       const _match=q.items.map(qi=>qi.sec?null:_pick(qi.desc));
       // 健檢1 #1（Lotion 10/22）：已收款／已開發票／已結案的期別一律不動；算出差額提示在下一期加「調整」列
       if(_invLockWhy(linkedInv)&&!_invUnlocked(linkedInv)){
-        const df=_invRepriceDiff(linkedInv,q,_match);
-        _lockedSkip.push({no:linkedInv.periodNo,why:_invLockWhy(linkedInv),diff:df});
+        const df=_invRepriceDiff(linkedInv,q,_match)-_invAdjDone(linkedInv.id,'');
+        _lockedSkip.push({no:linkedInv.periodNo,why:_invLockWhy(linkedInv),diff:df,latest:linkedInv===latestInv});
         return;
       }
       const _lockBefore=_invLockWhy(linkedInv)?_invRowsSum(linkedInv.items):null;
@@ -2212,13 +2212,14 @@ function saveQ(){
         linkedInv.loc=q.loc||linkedInv.loc;
       }
       _recalcInvAmounts(linkedInv);
-      if(_lockBefore!=null){linkedInv.lockLog=(linkedInv.lockLog||[]).concat([{at:Date.now(),by:_meEmail(),kind:'edit',src:'報價連動',reason:linkedInv.unlock.reason,before:_lockBefore,after:_invRowsSum(linkedInv.items)}]).slice(-50);delete linkedInv.unlock;}
+      if(_lockBefore!=null&&_lockBefore!==_invRowsSum(linkedInv.items)){linkedInv.lockLog=(linkedInv.lockLog||[]).concat([{at:Date.now(),by:_meEmail(),kind:'edit',src:'報價連動',reason:linkedInv.unlock.reason,before:_lockBefore,after:_invRowsSum(linkedInv.items)}]);delete linkedInv.unlock;}
       _touch(linkedInv); // 跨裝置同步：連動後的新值必須獲勝
     });
     saveInv();
-    toast('報價已儲存，已連動更新 '+linkedInvs.length+' 期請款單的合約單價與金額！');
+    {const _upd=linkedInvs.length-_lockedSkip.length;toast(_upd>0?('報價已儲存，已連動更新 '+_upd+' 期請款單的合約單價與金額！'):'報價已儲存！');}
     if(_settleKept>0)setTimeout(function(){toast('有 '+_settleKept+' 項已做過工項結算，合約數量維持結算後的實作量（未被報價數量覆寫）');},450);
-    if(_lockedSkip.length){const _dsum=_lockedSkip.reduce((a,x)=>a+x.diff,0);setTimeout(function(){toast('第 '+_lockedSkip.map(x=>x.no).join('、')+' 期已鎖住（已收款／已開發票／已結案），金額沒有改'+(_dsum?('；依新單價差額合計（未稅）NT$ '+fmt(_dsum)+'，請在下一期按「＋ 調整列」補上'):''));},900);}
+    {const _dz=_lockedSkip.filter(x=>x.diff),_dsum=_dz.reduce((a,x)=>a+x.diff,0),_lat=_lockedSkip.some(x=>x.latest);
+      if(_dz.length||_lat)setTimeout(function(){toast((_dz.length?('第 '+_dz.map(x=>x.no).join('、')+' 期已鎖住（已收款／已開發票／已結案），金額沒有改；依新單價差額合計（未稅）NT$ '+fmt(_dsum)+'，請在下一期按「＋ 調整列」補上'):'')+(_lat?((_dz.length?'。':'')+'最新一期已鎖住，報價新增的工項請在下一期按「同步報價」帶入'):''));},900);}
   } else {
     toast('報價已儲存！');
   }
@@ -2940,7 +2941,7 @@ function loadInvoice(id){
   // 清洗存量資料：數量或單價為 0 的工項，本期金額歸零（修正歷史殘留金額）
   try{(inv.items||[]).forEach(function(it){
     if(it&&it.type!=='sec'){
-      if((parseFloat(it.curQty)||0)<=0||(parseFloat(it.contractPrice)||0)<=0){
+      if((parseFloat(it.curQty)||0)<=0||((parseFloat(it.contractPrice)||0)<=0&&!((parseFloat(it.contractPrice)||0)<0&&_invNegOk(it)))){   // 健檢1 #1／#3：議價尾差、調整列的負單價不歸零
         if((parseFloat(it.curAmt)||0)!==0)it.curAmt=0;
       }
     }
@@ -3054,8 +3055,11 @@ function delInvoice(id,ev){
   if(ev&&ev.preventDefault)ev.preventDefault();
   // v5.372：改自製確認框（原生 confirm 被擋掉時，原本會直接刪除）
   const _v=INV.find(x=>x.id===id);
+  // 健檢1 #1：鎖住的期別（已收款／已開發票／已結案）只有管理員能刪，並多一句提醒
+  const _lw=_v?_invLockWhy(_v):'';
+  if(_lw&&!(_fbUser&&!_isReaderUser&&isAdmin(String(_fbUser.email||'').toLowerCase()))){toast('這期已鎖住（'+_lw+'），只有管理員能刪除');return;}
   showConfirm('刪除請款單',
-    '確定刪除「'+esc((_v&&_v.project)||'未命名')+'」第 '+((_v&&_v.periodNo)||'?')+' 期？<br><br>此動作無法復原，後續期數的前期累計需自行檢查。',
+    '確定刪除「'+esc((_v&&_v.project)||'未命名')+'」第 '+((_v&&_v.periodNo)||'?')+' 期？'+(_lw?('<br><br><b style="color:var(--red)">這期'+esc(_lw)+'，刪除後收款與發票的對帳會對不上。</b>'):'')+'<br><br>此動作無法復原，後續期數的前期累計需自行檢查。',
     ()=>{
       _tomb('invoices',id); // 確認刪除後才立墓碑（原本取消刪除也會立墓碑，導致同步後請款單被誤刪）
       INV=INV.filter(x=>x.id!==id);saveInv();renderInvList();
@@ -3393,6 +3397,7 @@ function _invDailySuggest(i){
   return _dailyQtyBetween(q,it.desc,from,to,_isRemovePeriod(it)?'remove':'install');
 }
 function invFillDaily(i){
+  if(_invEdLocked())return;   // 健檢1 #1
   var sg=_invDailySuggest(i);if(!(sg>0))return;
   invItems[i].curQty=sg;
   var amtEl=document.getElementById('iamt-'+i),tr=amtEl?amtEl.closest('tr'):null;
@@ -3981,10 +3986,6 @@ function saveInvoice(){
   const _existInv=invEid?INV.find(x=>x.id===invEid):null;
   // 健檢1 #1（Lotion 10/22）：已收款／已開發票／已結案的期別鎖住，金額相關欄位改了就擋；管理員填原因解鎖後才能改，並記稽核紀錄
   let _lockAudit=null;
-  if(_existInv&&_invLockWhy(_existInv)&&_invMoneySig(_existInv.items)!==_invMoneySig(invItems)){
-    if(!_invUnlocked(_existInv)){toast('這期已鎖住（'+_invLockWhy(_existInv)+'），金額不能直接改。差額請在下一期加「調整」列；真的要改這期，請管理員按「解鎖」並填原因');try{_invRenderLockBanner(_existInv);}catch(e){_err('saveInvoice.lock',e);}return;}
-    _lockAudit={at:Date.now(),by:_meEmail(),kind:'edit',src:'請款單編輯',reason:_existInv.unlock.reason,before:_invRowsSum(_existInv.items),after:_invRowsSum(invItems)};   // 未稅本期金額
-  }
   const inv={
     ...(_existInv||{}),
     id:invEid||Date.now().toString(),_mt:Date.now(),_by:_meEmail(),
@@ -4009,7 +4010,11 @@ function saveInvoice(){
     totals:t
   };
   try{const _er=document.getElementById('inv-expected-recv-date');if(_er&&_er.dataset.rule==='1')inv.expectedRecvDate=(_existInv&&_existInv.expectedRecvDate)||'';if(!_existInv)inv.recvRule=1;if(_er&&_er.dataset.rule!=='1'&&_er._userEdited&&_er.value)inv.recvRule=0;   /* 審查修正：使用者手填的日期之後不被規則蓋 */}catch(e){_err('saveInvoice.recv',e);}   // 審查修正：放款規則日期不寫回；新建單標 recvRule
-  if(_lockAudit){inv.lockLog=(inv.lockLog||[]).concat([_lockAudit]).slice(-50);delete inv.unlock;}   // 健檢1 #1：解鎖只用一次
+  if(_existInv&&_invLockWhy(_existInv)&&(_invMoneySig(_existInv.items)!==_invMoneySig(inv.items)||_invHeadSig(_existInv)!==_invHeadSig(inv))){
+    if(!_invUnlocked(_existInv)){toast('這期已鎖住（'+_invLockWhy(_existInv)+'），金額與保留款／清潔費不能直接改。差額請在下一期加「調整」列；真的要改這期，請管理員按「解鎖」並填原因');try{_invRenderLockBanner(_existInv);}catch(e){_err('saveInvoice.lock',e);}return;}
+    _lockAudit={at:Date.now(),by:_meEmail(),kind:'edit',src:'請款單編輯',reason:_existInv.unlock.reason,before:_invRowsSum(_existInv.items),after:_invRowsSum(inv.items)};   // 未稅本期金額
+  }
+  if(_lockAudit){inv.lockLog=(inv.lockLog||[]).concat([_lockAudit]);delete inv.unlock;}   // 健檢1 #1：解鎖只用一次；稽核紀錄不截斷
   const idx=INV.findIndex(x=>x.id===inv.id);
   if(idx>=0)INV[idx]=inv;else INV.unshift(inv);
   // 立即存 localStorage（主儲存）
@@ -4043,7 +4048,12 @@ function autoSaveInv(){
     const invIdx=INV.findIndex(x=>x.id===inv_id);
     if(invIdx>=0){
       if(notes)INV[invIdx].note=notes;
-      if(Array.isArray(invItems)&&invItems.length)INV[invIdx].items=JSON.parse(JSON.stringify(invItems));
+      // 健檢1 #1：鎖住的期別自動存檔只存備註／收款，不寫工項；解鎖中且金額有變 → 記稽核、用掉解鎖
+      const _li=INV[invIdx],_sigChg=_invMoneySig(_li.items)!==_invMoneySig(invItems);
+      if(Array.isArray(invItems)&&invItems.length&&!(_sigChg&&_invLocked(_li))){
+        if(_sigChg&&_invLockWhy(_li)&&_invUnlocked(_li)){const _b=_invRowsSum(_li.items);_li.lockLog=(_li.lockLog||[]).concat([{at:Date.now(),by:_meEmail(),kind:'edit',src:'自動存檔',reason:_li.unlock.reason,before:_b,after:_invRowsSum(invItems)}]);delete _li.unlock;}
+        INV[invIdx].items=JSON.parse(JSON.stringify(invItems));
+      }
       if(recv!==null)INV[invIdx].received=String(recv);
       _touch(INV[invIdx]); // 更新修改時間，確保跨裝置同步時新值獲勝
       saveInv();
@@ -5197,7 +5207,7 @@ function _invUntouched(inv){
 // 報價現行工項 vs 請款工項的差異
 function _invQuoteDiff(inv,q){
   const qi=_invItemsFromQuote(q).filter(x=>x.type!=='sec');
-  const cur=((inv&&inv.items)||[]).filter(x=>x&&x.type==='item');
+  const cur=((inv&&inv.items)||[]).filter(x=>x&&x.type==='item'&&!x.adjOf);   // 健檢1 #1：調整列不是報價工項
   const cm={},qm={};
   cur.forEach(x=>{cm[_invKey(x.desc)]=x;});qi.forEach(x=>{qm[_invKey(x.desc)]=x;});
   const added=qi.filter(x=>!cm[_invKey(x.desc)]).map(x=>_invKey(x.desc));
@@ -31163,6 +31173,7 @@ function _invVendorSuggest(i){
   return Math.round(sum*100)/100;
 }
 function invFillVendor(i){
+  if(_invEdLocked())return;   // 健檢1 #1
   var sg=_invVendorSuggest(i);if(!(sg>0))return;
   invItems[i].curQty=sg;
   var amtEl=document.getElementById('iamt-'+i),tr=amtEl?amtEl.closest('tr'):null;
@@ -36641,6 +36652,7 @@ function _invDiscBtn(i,it){
   return b;
 }
 function invRentDisc(i,pre){   // pre：原因沒填重開時保留剛輸入的值
+  if(_invEdLocked())return;   // 健檢1 #1
   pre=pre||null;var _pv=function(k,v){return pre&&pre[k]!=null?pre[k]:v;};
   var it=invItems[i];if(!it||it.type!=='rental'){toast('只有逾期租金列可以折讓');return;}
   _rdCur=it;
@@ -38532,16 +38544,20 @@ function _invLockWhy(inv){
   var r=[];
   if(inv.receivedConfirmed||_invRcv(inv)>0)r.push('已收款');
   try{if(_invEinvOf(inv.id))r.push('已開發票');}catch(e){_err('_invLockWhy',e);}
-  try{var q=(Q||[]).find(function(x){return x&&(x.id===inv.quoteId||x.id===inv.sourceQid);});if(q&&q.closed)r.push('已結案');}catch(e){_err('_invLockWhy.q',e);}
+  // 已結案只鎖「結案當下已有的期別」；結案後新增的期別不鎖，才能在那一期加調整列（審查：否則結案後無路可走）
+  try{var q=(Q||[]).find(function(x){return x&&(x.id===inv.quoteId||x.id===inv.sourceQid);});
+    if(q&&q.closed){var ct=+inv._ct||(/^\d{12,14}$/.test(String(inv.id||''))?+inv.id:0);if(!q.closedAt||!ct||ct<=q.closedAt)r.push('已結案');}}catch(e){_err('_invLockWhy.q',e);}
   return r.join('、');
 }
 function _invRowsSum(items){return (items||[]).reduce(function(a,it){return a+(it&&it.type!=='sec'?_invRowAmt(it):0);},0);}   // 本期金額合計（未稅），稽核紀錄用
-function _invUnlocked(inv){var u=inv&&inv.unlock;return !!(u&&u.at&&u.reason&&Date.now()-u.at<2*3600000);}
+function _invUnlocked(inv){var u=inv&&inv.unlock,now=Date.now();return !!(u&&u.at&&u.reason&&u.at<=now+60000&&now-u.at<2*3600000&&String(u.by||'').toLowerCase()===String(_meEmail()||'').toLowerCase());}   // 只對解鎖的那位管理員有效
+function _invEdLocked(){var inv=invEid?INV.find(function(x){return x.id===invEid;}):null;if(inv&&_invLocked(inv)){toast('這期已鎖住（'+_invLockWhy(inv)+'），金額不能改；差額請在下一期加「調整」列');return true;}return false;}
 function _invLocked(inv){return !!_invLockWhy(inv)&&!_invUnlocked(inv);}
 function _invMoneySig(items){
   return JSON.stringify((items||[]).filter(function(it){return it&&it.type!=='sec';}).map(function(it){
     return [it.type||'',String(it.desc||''),+it.curQty||0,+it.contractPrice||0,+it.contractQty||0,it.payRate!=null?+it.payRate:100,+it.curDays||0,+it.discDays||0,+it.discQd||0];}));
 }
+function _invHeadSig(inv){return JSON.stringify([!!(inv&&inv.retention),+(inv&&inv.retentionPct)||0,+(inv&&inv.cleanPermil)||0,(inv&&inv.cleanMode)||'',(inv&&inv.claimType)||'']);}   // 保留款、清潔費等表頭金額欄位
 // 依報價現行單價重算這一期本期金額（未稅）的差額；_match 為與報價工項的一對一配對（saveQ 傳入），沒有就依序配對
 function _invRepriceDiff(inv,q,_match){
   if(!inv||!q)return 0;
@@ -38574,6 +38590,13 @@ function _invRenderLockBanner(inv){
     +'</div></div></div>';
 }
 // 同一報價、期別在本期之前、已鎖住且依現行單價有差額的期別
+// 指向某期（adjOf）的調整列合計：其他各期已存的＋目前編輯中的（不重複算正在編輯的這期存檔值）
+function _invAdjDone(srcId,curId){
+  var sum=0,add=function(items){(items||[]).forEach(function(it){if(it&&it.adjOf===srcId)sum+=_invRowAmt(it);});};
+  (INV||[]).forEach(function(v){if(v&&v.id!==curId)add(v.items);});
+  if(curId===invEid)add(invItems);else{var c=(INV||[]).find(function(v){return v&&v.id===curId;});if(c)add(c.items);}
+  return Math.round(sum);
+}
 function _invAdjCandidates(inv,q){
   if(!inv||!q)return [];
   var no=parseInt(inv.periodNo)||0,out=[];
@@ -38581,8 +38604,7 @@ function _invAdjCandidates(inv,q){
     if(!v||v.id===inv.id||(v.quoteId!==q.id&&v.sourceQid!==q.id))return;
     if(no&&(parseInt(v.periodNo)||0)>=no)return;
     if(!_invLockWhy(v))return;
-    var already=(invItems||[]).some(function(it){return it&&it.adjOf===v.id;});
-    var d=_invRepriceDiff(v,q);if(d&&!already)out.push({inv:v,diff:d});
+    var d=_invRepriceDiff(v,q)-_invAdjDone(v.id,inv.id);if(d)out.push({inv:v,diff:d});   // 扣掉後續各期已加的調整列
   });
   return out;
 }
@@ -38614,7 +38636,7 @@ function invUnlock(){
     +'<div class="f" style="margin-top:6px"><label>原因（必填）</label><input id="unlock-reason" placeholder="例：業主要求更正第2期數量，已重開發票"></div>',function(){
       var r=(gv('unlock-reason')||'').trim();if(!r){toast('請填原因');return false;}
       inv.unlock={at:Date.now(),by:_meEmail(),reason:r.slice(0,200)};
-      inv.lockLog=(inv.lockLog||[]).concat([{at:Date.now(),by:_meEmail(),kind:'unlock',reason:r.slice(0,200)}]).slice(-50);
+      inv.lockLog=(inv.lockLog||[]).concat([{at:Date.now(),by:_meEmail(),kind:'unlock',reason:r.slice(0,200)}]);
       _touch(inv);saveInv();_invRenderLockBanner(inv);toast('已解鎖（2 小時內存檔一次有效）');
     },false,null,true);
 }
