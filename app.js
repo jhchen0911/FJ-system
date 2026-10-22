@@ -8140,7 +8140,7 @@ function _autoSyncOnLogin(){
   _readerCheck(function(ro){
     try{_draftWatch();}catch(e){_err('_autoSyncOnLogin.draft',e);}   // v6.0.109 AI 草稿
     try{_bankWatch();}catch(e){_err('_autoSyncOnLogin.bank',e);}   // v6.0.112 匯款帳號
-    setTimeout(function(){try{_wkSensPull();_tombReqPull();}catch(e){_err('_autoSyncOnLogin.h',e);}},4000);   // 審查 🔴4：不必等雲端有更新才收投遞／刪除申請
+    setTimeout(function(){try{_wkSensPull();_tombReqPull();}catch(e){_err('_autoSyncOnLogin.h',e);}},4000);   // _wkSensPull 內判斷誰讀得到（管理員／進場權限／唯讀帳號）   // 審查 🔴4：不必等雲端有更新才收投遞／刪除申請
     if(ro){
       _readerApply();
       _pullCloudIfNewer({interactive:false});
@@ -10598,16 +10598,19 @@ function _encEmailKey(e){return String(e||'').toLowerCase().replace(/\./g,',');}
 function _syncAccessLists(cb){
   try{
     if(!_fbUser||!_fbDb||_isReaderUser||!isAdmin(_fbUser.email)){if(cb)cb(false);return;}
-    var access={},admins={};
+    var access={},admins={},wk={};
     listStaff().forEach(function(st){
       if(!st||st.active===false)return;
       var e=_encEmailKey(st.email);if(!e)return;
       access[e]=true;
       if(isAdmin(st.email))admins[e]=true;
+      if(_wkAccessOf(st.email))wk[e]=true;   // v6.0.112：人員進場資料權限名單（規則用來放行證件讀寫）
     });
     BOOTSTRAP_DEV.forEach(function(e){var k=_encEmailKey(e);access[k]=true;admins[k]=true;});
     _fbDb.ref('fydata/access').set(access).then(function(){
       return _fbDb.ref('fydata/adminEmails').set(admins);
+    }).then(function(){
+      return _fbDb.ref('fydata/wkAccess').set(wk).catch(function(e){_err('_syncAccessLists.wk',e);});   // 規則未發布時寫不進去，不影響名冊
     }).then(function(){if(cb)cb(true);}).catch(function(err){
       console.warn('[權限] 名冊上雲失敗（發布新版安全規則後恢復）：',err&&err.message);
       if(cb)cb(false);
@@ -30623,7 +30626,7 @@ function wkDel(id){
   var w=_wkById(id);if(!w)return;
   showConfirm('刪除人員','確定刪除「'+esc(w.name||'')+'」的進場資料與全部證件影本？',function(){
     _tomb('workers',id);WORKERS=WORKERS.filter(function(x){return x.id!==id;});delete WK_SENS[id];_wkSensSave();
-    try{if(_fbDb&&_wkSensAdmin()){var u={};u['workerSens/'+id]=null;u['workerSensIn/'+id]=null;_fbDb.ref('fydata').update(u).catch(function(e){_err('wkDel.sens',e);});}}catch(e){_err('wkDel.sens',e);}   // v6.0.112：證件影像一併刪
+    try{if(_fbDb&&_wkSensCanWrite()){var u={};u['workerSens/'+id]=null;if(_wkSensAdmin())u['workerSensIn/'+id]=null;_fbDb.ref('fydata').update(u).catch(function(e){_err('wkDel.sens',e);});}}catch(e){_err('wkDel.sens',e);}   // v6.0.112：證件影像一併刪
     saveWorkers();renderWorkers();toast('已刪除');
   },true);
 }
@@ -38803,12 +38806,16 @@ function _wkGraft(){
     Object.keys(s.docs||{}).forEach(function(k){var d=w.docs[k]||{};if(!d.du)w.docs[k]=Object.assign({},d,{du:s.docs[k].du,name:s.docs[k].name||d.name||'',ts:s.docs[k].ts||d.ts||0});});
   });
 }
+// Lotion 10/22：證件限管理員與有「人員進場資料」權限的人（角色勾了 workers 頁）；唯讀帳號維持看全部（只讀）
+function _wkAccessOf(email){try{return _rolesOf(email).some(function(r){return r.sys||r.cloudCost||(r.pages&&r.pages.workers===true);});}catch(e){return false;}}
 function _wkSensAdmin(){return !!(_fbUser&&!_isReaderUser&&isAdmin(String(_fbUser.email||'').toLowerCase()));}
+function _wkSensCanWrite(){return !!(_fbUser&&!_isReaderUser&&_wkAccessOf(String(_fbUser.email||'').toLowerCase()));}   // 直接寫 workerSens
+function _wkSensCanRead(){return _wkSensCanWrite()||!!_isReaderUser;}
 function _wkSensHash(o){return _collHash(o);}
 // 上傳敏感部分：管理員寫 workerSens，員工寫投遞區；內容沒變不送
 function _wkSensPush(){
   if(!_fbDb||!_fbUser||_isReaderUser)return;
-  var adm=_wkSensAdmin(),hs={};try{hs=JSON.parse(localStorage.getItem('fy_wksens_h')||'{}')||{};}catch(e){hs={};}
+  var adm=_wkSensCanWrite(),hs={};try{hs=JSON.parse(localStorage.getItem('fy_wksens_h')||'{}')||{};}catch(e){hs={};}
   (WORKERS||[]).forEach(function(w){
     if(!w||!w.id||!/^[A-Za-z0-9_-]{1,60}$/.test(String(w.id)))return;
     var sp=_wkSplit(w).sens;if(!sp)return;
@@ -38825,8 +38832,9 @@ function _wkSensPush(){
 }
 // 管理員：下載 workerSens、收投遞區
 function _wkSensPull(){
-  if(!_fbDb||!_wkSensAdmin())return;
-  Promise.all([_fbDb.ref('fydata/workerSens').once('value'),_fbDb.ref('fydata/workerSensIn').once('value')]).then(function(r){
+  if(!_fbDb||!_wkSensCanRead())return;
+  var adm=_wkSensAdmin();   // 只有管理員收投遞區
+  Promise.all([_fbDb.ref('fydata/workerSens').once('value'),adm?_fbDb.ref('fydata/workerSensIn').once('value'):Promise.resolve({val:function(){return null;}})]).then(function(r){
     var cur=r[0].val()||{},inb=r[1].val()||{},up={},n=0;
     Object.keys(cur).forEach(function(id){WK_SENS[id]=cur[id];});
     Object.keys(inb).forEach(function(id){
@@ -38842,9 +38850,9 @@ function _wkSensPull(){
     _wkGraft();try{_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');}catch(e){_err('_wkSensPull.save',e);}
     try{localStorage.setItem('fy_r112','1');}catch(e){_err('_wkSensPull.r112',e);}   // 讀得到 workerSens＝新規則已發布
     if(n)_fbDb.ref('fydata').update(up).then(function(){console.log('[人員] 已收 '+n+' 筆員工輸入的證件資料');}).catch(function(e){_err('_wkSensPull.in',e);});
-    setTimeout(function(){try{_pushCloud({silent:true});}catch(e){_err('_wkSensPull.up',e);}},1500);   // 審查 🔴4：讓共用區換成公開版（清掉舊證件欄位），不必等有人存檔
+    if(adm)setTimeout(function(){try{_pushCloud({silent:true});}catch(e){_err('_wkSensPull.up',e);}},1500);   // 審查 🔴4：讓共用區換成公開版（清掉舊證件欄位），不必等有人存檔
     // 遷移：本機完整資料還沒進 workerSens 的，由管理員裝置補送（第一次升級時，舊的共用區資料會從這裡搬過去）
-    try{_wkSensPush();}catch(e){_err('_wkSensPull.push',e);}
+    if(_wkSensCanWrite()){try{_wkSensPush();}catch(e){_err('_wkSensPull.push',e);}}
   }).catch(function(e){_err('_wkSensPull',e);});   // 規則尚未發布：讀不到，維持本機
 }
 // ══════════ v6.0.112 健檢2 #3：墓碑（刪除記錄）只有管理員能寫，員工的刪除改送「刪除申請」 ══════════
