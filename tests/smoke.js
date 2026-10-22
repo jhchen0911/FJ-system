@@ -8314,6 +8314,12 @@ async function newPage(browser, width, height) {
         editVendor('v1'); out.lock = document.getElementById('v-bankacct').disabled === true;
         document.getElementById('v-bankacct').value = '777'; document.getElementById('v-bankacct').disabled = false; saveVendor();
         out.staffNoChange = VENDORS.find(v => v.id === 'v1').bankAcct === '666' && _vendorBank('甲工程行').bankAcct === '222';
+        /* 審查 🔴4：遷移要等套用過雲端資料才跑 */
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o1' }; VENDORS = [{ id: 'v1', name: '甲工程行', bankAcct: '111' }];
+        const ups = []; const oDb = window._fbDb; _fbDb = { ref: p => ({ update: v => { ups.push([p, v]); return Promise.resolve(); } }) };
+        BANK = {}; window._cloudApplied1 = false; _bankMigrate(); out.migWait = ups.length === 0;
+        window._cloudApplied1 = true; _bankMigrate(); out.migGo = ups.length === 1 && !!ups[0][1]['vendors/' + _bankKey('甲工程行')] && !!ups[0][1].migrated;
+        _fbDb = oDb;
         BANK = null; VENDORS = []; _fbUser = oU; window.toast = oT;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
       return out;
@@ -8325,13 +8331,14 @@ async function newPage(browser, width, height) {
       noRootWrite: !('.write' in sh),
       pp: sh.pagePerms && sh.pagePerms['.write'].includes(ADMK) && !sh.pagePerms['.write'].includes("fydata/access"),
       whole: ['quotes', 'invoices', 'workers'].every(k => sh[k] && sh[k]['.write'].includes(ADMK) && !sh[k]['.write'].includes('fydata/access') && sh[k][Object.keys(sh[k]).find(x => x[0] === '$')]['.write'].includes('fydata/access')),
-      other: /newData\.exists\(\) \|\|/.test(sh.$other['.write']),
+      other: /newData\.exists\(\) \|\| \(auth\.token\.email === /.test(sh.$other['.write']) && !/!data\.exists\(\)/.test(sh.$other['.write']),
+      noTail: ['version', 'uploadedAt'].every(k => !/!data\.exists\(\)/.test(sh[k]['.write'])) && !/!data\.exists\(\)/.test(sh.quotes.$qid['.write']),   // 審查 🔴1／2：管理員能刪集合、員工能刪單筆
       bank: rules.bank && rules.bank['.write'].includes(ADMK) && !rules.bank['.write'].includes('fydata/access') && rules.bank.$other['.validate'] === 'false',
     };
     const SR = fs.readFileSync(pth.join(__dirname, '..', 'storage.rules'), 'utf8');
     check('v6.0.112 健檢2 #2／#3：一般員工上傳不送名冊／角色與空集合、逐筆集合不整包改寫；管理員照常', r.staffNotAdmin && r.strip && r.perRec && r.adminKeep && !r.err, JSON.stringify(r));
-    check('v6.0.112 健檢2 #2／#3 規則：共用區逐集合授權（名冊／角色、整包改寫只限管理員；員工不能刪整個集合）', rr.noRootWrite && rr.pp && rr.whole && rr.other, JSON.stringify(rr));
-    check('v6.0.112 健檢2 #4：匯款帳號遷移後以 fydata/bank 為準（員工改不了、近期變更紅標）、未遷移沿用舊欄位；規則只限管理員寫', r.legacy && r.bankSrc && r.ignoreShared && r.lock && r.staffNoChange && rr.bank && !r.err, JSON.stringify(r));
+    check('v6.0.112 健檢2 #2／#3 規則：共用區逐集合授權（名冊／角色、整包改寫只限管理員；員工不能刪整個集合）', rr.noRootWrite && rr.pp && rr.whole && rr.other && rr.noTail, JSON.stringify(rr));
+    check('v6.0.112 健檢2 #4：匯款帳號遷移後以 fydata/bank 為準（員工改不了、近期變更紅標）、未遷移沿用舊欄位；規則只限管理員寫', r.legacy && r.bankSrc && r.ignoreShared && r.lock && r.staffNoChange && r.migWait && r.migGo && rr.bank && !r.err, JSON.stringify(r));
     check('v6.0.112 健檢2 #6：storage.rules 改用權限標記 fy（與產生器同一版）', /request\.auth\.token\.get\('fy', ''\) in \['staff', 'admin'\]/.test(SR) && /token\.get\('fy', ''\) == 'reader'/.test(SR) && !/signedIn\(\) && folder in/.test(SR), '');
     check('v6.0.112 批次 H 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();

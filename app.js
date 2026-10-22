@@ -1108,6 +1108,7 @@ function syncParamsUI(){
   syncSiteLabels();
   const pb=document.getElementById('pbank');if(pb)pb.value=_coBank().bank;
   const pba=document.getElementById('pbankacct');if(pba)pba.value=_coBank().account;
+  try{var _bl=!!(BANK&&BANK.migrated&&!_shWholeOk());[pb,pba].forEach(function(el){if(el){el.disabled=_bl;el.title=_bl?'公司收款帳號只有管理員能修改':'';}});}catch(e){_err('syncParamsUI.bank',e);}
   // 印章預覽
   const sealPrev=document.getElementById('seal-preview');
   const clearBtn=document.getElementById('seal-clear-btn');
@@ -10139,6 +10140,8 @@ function _applyCloud(data){
   }finally{
     setTimeout(function(){window._applyingCloud=false;},500);
   }
+  window._cloudApplied1=true;   // v6.0.112：至少成功套用過一次雲端資料（匯款帳號遷移要等這個，免得拿本機舊資料當正本）
+  try{_bankMigrate();}catch(e){_err('_applyCloud.bank',e);}
   return true;
 }
 // ══════════ 敏感資料節點拆分（v5.324）══════════
@@ -25352,7 +25355,10 @@ function saveVendor(){
   if(BANK&&BANK.migrated){
     const _old=idx>=0?VENDORS[idx]:null;
     if(!_shWholeOk()){['bank','bankAcct','bankHolder'].forEach(function(f){v[f]=_old?(_old[f]||''):'';});}
-    else{try{_bankVendorSave(_old&&_old.name,v);}catch(e){_err('saveVendor.bank',e);}}
+    else{
+      if(!v.bankAcct&&_old&&_old.bankAcct&&!_vendorBank(_old.name))['bank','bankAcct','bankHolder'].forEach(function(f){v[f]=_old[f]||'';});   // 審查：新位置沒有這家的帳號、欄位又是空的 → 不把舊欄位洗成空白
+      else{try{_bankVendorSave(_old&&_old.name,v);}catch(e){_err('saveVendor.bank',e);}}
+    }
   }
   if(idx>=0)VENDORS[idx]=v;else VENDORS.unshift(v);
   saveVendors();
@@ -38708,6 +38714,7 @@ function _bankLog(up,kind,name,before,after){
 }
 function _bankMigrate(){
   if(!BANK||BANK.migrated||!_shWholeOk()||!_fbDb)return;
+  if(!window._cloudApplied1)return;   // 審查：要等本機套用過雲端最新資料（參數、廠商名冊）才複製，否則新瀏覽器會把預設帳號當正本
   var up={},n=0;
   up.company={bank:P.bank||_CO_BANK_DEF.bank,account:P.bankAccount||_CO_BANK_DEF.account,at:0,by:'migrate'};
   (VENDORS||[]).forEach(function(v){if(v&&v.name&&v.bankAcct){up['vendors/'+_bankKey(v.name)]={name:v.name,bank:v.bank||'',acct:v.bankAcct,holder:v.bankHolder||'',at:0,by:'migrate'};n++;}});
