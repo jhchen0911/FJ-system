@@ -8123,6 +8123,92 @@ async function newPage(browser, width, height) {
     check('v6.0.110 LINE Cloud Functions 單元測試（簽章、轉傳歸檔、現場追加、事故前兆與否定詞、日報問／整理／提醒、推播佇列與失敗、重送去重、待綁定上限）全過', fok, fo.slice(-300));
   }
 
+
+  // ── v6.0.111 批次 G：健檢1 金額 hotfix ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      try {
+        const oT = window.toast; let msg = ''; window.toast = m => { msg = String(m); };
+        const oC = window.confirm; window.confirm = () => true;
+        PAYABLES.length = 0; INV.length = 0; CONTRACTS.splice(0);
+        /* #3 議價尾差負數：可存、會從請款扣掉 */
+        const adj = { type: 'item', desc: NGT_ADJ_DESC, unit: '式', contractPrice: -400, contractQty: 1, curQty: 1, payRate: 100 };
+        out.adjAmt = _invRowAmt(adj) === -400;
+        const invA = { id: 'IA', items: [{ type: 'item', desc: '鋼板樁', contractPrice: 1000, contractQty: 1000, curQty: 1000, payRate: 100 }, adj] };
+        _recalcInvAmounts(invA); out.adjTot = invA.items[1].curAmt === -400;
+        /* #4 列印明細＝總計：一般工項有天數要乘天數 */
+        const itD = { type: 'item', desc: '覆工板', unit: 'M', contractPrice: 10, contractQty: 100, curQty: 100, curDays: 30, payRate: 100 };
+        const invD = { id: 'ID4', project: 'D4', client: 'K', periodNo: 1, date: '2026-10-01', items: [itD] };
+        INV.push(invD); invItems = JSON.parse(JSON.stringify(invD.items)); invEid = 'ID4'; buildInvPreview(invD);
+        const ph = document.getElementById('inv-prev-html').innerHTML;
+        out.prev30k = _invRowAmt(itD) === 30000 && /30,000/.test(ph) && !/>1,000</.test(ph);
+        INV.length = 0;
+        /* #6 得標金額＝主約＋已得標追加案；#7 建立追加只帶表頭 */
+        Q = [{ id: 'qM', name: '主案', client: 'K', awarded: true, items: [{ desc: 'A', unit: 'M', qty: 100, price: 1000 }], t: { total: 105000 }, dailyLogs: [{ id: 'd1', date: '2026-10-01' }], rfqs: [{ id: 'r1' }], comms: [{ id: 'c1' }], exs: [{ d: 'x' }], salesId: 's1', deduct: { ret: 5 } },
+             { id: 'qA', name: '主案 (追加)', parentId: 'qM', awarded: true, items: [], t: { total: 21000 } },
+             { id: 'qB', name: '主案 (追加2)', parentId: 'qM', awarded: false, items: [], t: { total: 9999 } }];
+        CONTRACTS.push({ id: 'ctM', linkedQid: 'qM', name: '主案', amount: 105000 });
+        out.won = _wonAmt(Q[0]) === 126000 && _pjStat(Q[0]).base === 126000;
+        CONTRACTS.splice(0); out.wonNoCt = _wonAmt(Q.find(q => q.id === 'qM')) === 126000;
+        addAddendum('qM'); const ad = Q[0];
+        out.addendum = ad.parentId === 'qM' && !ad.dailyLogs && !ad.rfqs && !ad.comms && !ad.salesId && (ad.exs || []).length === 0 && ad.t.total === 0 && ad.client === 'K' && ad.deduct && ad.deduct.ret === 5
+          && _wonAmt(Q.find(q => q.id === 'qM')) === 126000;
+        /* #2 同名工項（分區）重存報價：請款單各列單價不互相覆蓋 */
+        Q = [{ id: 'qDup', code: 'D', name: '分區案', client: 'K', date: '2026-10-01', awarded: true, exs: [], rmk: {}, _mt: 1, costs: [],
+          items: [{ desc: 'H型鋼打設', unit: 'M', qty: 100, price: 1000 }, { desc: 'H型鋼打設', unit: 'M', qty: 50, price: 1200 }] }];
+        INV.push({ id: 'IDup', sourceQid: 'qDup', quoteId: 'qDup', project: '分區案', client: 'K', periodNo: 1, date: '2026-10-01',
+          items: [{ type: 'item', desc: 'H型鋼打設', contractPrice: 1000, contractQty: 100, curQty: 0 }, { type: 'item', desc: 'H型鋼打設', contractPrice: 1200, contractQty: 50, curQty: 0 }] });
+        loadQ('qDup'); items[1].price = 1300; saveQ();
+        const iv = INV.find(x => x.id === 'IDup');
+        out.dup = iv.items.length === 2 && iv.items[0].contractPrice === 1000 && iv.items[0].contractQty === 100 && iv.items[1].contractPrice === 1300 && iv.items[1].contractQty === 50;
+        INV.length = 0;
+        /* #5 打設＋拔除合一：拔除沒完成不准工項結算 */
+        Q = [{ id: 'qS', name: '結算案', client: 'K', awarded: true, items: [{ desc: 'H型鋼 打設、拔除', unit: 'M', qty: 100, price: 1000 }], t: {} }];
+        INV.push({ id: 'IS', quoteId: 'qS', project: '結算案', client: 'K', periodNo: 1, date: '2026-10-01',
+          items: [{ type: 'item', desc: 'H型鋼 打設、拔除', cat: 'both', unit: 'M', contractPrice: 1000, contractQty: 100, prevQty: 0, curQty: 100, payRate: 70, installCum: 0, removeCum: 0 }] });
+        loadInvoice('IS'); msg = ''; settleInvItem(0);
+        out.settleBlock = invItems[0].contractQty === 100 && /拔除尚未完成/.test(msg);
+        INV.length = 0;
+        /* #13 已付期別：自動重算不改寫已付金額，差額另立；手動修改先擋 */
+        PAYABLES.push({ id: 'payC1_p1', costId: 'C1', costPeriod: 1, to: '甲', amount: 19950, status: 'paid', paidDate: '2026-10-05', project: 'X' });
+        _payPaidDelta({ id: 'payC1_p1', costId: 'C1', to: '甲', amount: 29925, status: 'pending', note: '第1期計價', project: 'X' }, PAYABLES[0]);
+        const main1 = PAYABLES.find(x => x.id === 'payC1_p1'), d1 = PAYABLES.find(x => x.deltaOf === 'payC1_p1');
+        out.paidKeep = main1.amount === 19950 && main1.status === 'paid' && !!d1 && d1.amount === 9975 && d1.status === 'pending';
+        _payPaidDelta({ id: 'payC1_p1', costId: 'C1', to: '甲', amount: 19950, note: '' }, main1);
+        out.deltaGone = !PAYABLES.some(x => x.deltaOf === 'payC1_p1');
+        PAYABLES.length = 0;
+        Q = [{ id: 'qP', name: '分包案', client: 'K', awarded: true, items: [{ desc: 'A', unit: '支', qty: 40, price: 900 }], t: {},
+          costs: [{ id: 'cP', type: 'sub', vendor: '乙', amt: 20000, rows: [{ id: 'r1', linkedItemIdx: 0, qty: 40, unitPrice: 500 }], periods: [{ no: 1, date: '2026-10-01', rows: [{ rid: 'r1', qty: 20 }] }] }] }];
+        PAYABLES.push({ id: 'paycP_p1', costId: 'cP', costPeriod: 1, to: '乙', amount: 10500, status: 'paid', project: '分包案' });
+        eid = 'qP'; msg = ''; try { openSubPeriod('cP', 1); } catch (e) { /* 可忽略 */ }
+        out.editBlock = /已付款，不能直接修改/.test(msg);
+        /* #14 同步應付：已付的手動記錄不刪、不改金額 */
+        PAYABLES.length = 0;
+        const qq = { id: 'qX', name: '手動案', items: [] }, cX = { id: 'cX', type: 'labor', vendor: '丁', amt: 1500 };
+        PAYABLES.push({ id: 'm1', to: '丁', project: '手動案', amount: 1500, status: 'paid' }, { id: 'm2', to: '丁', project: '手動案', amount: 1500, status: 'paid' });
+        syncCostToPayable(qq, cX);
+        out.paid2 = PAYABLES.filter(x => x.status === 'paid').length === 2;
+        cX.amt = 1575; syncCostToPayable(qq, cX);
+        const paidAmts = PAYABLES.filter(x => x.status === 'paid').map(x => x.amount).join(',');
+        const pend = PAYABLES.filter(x => x.status !== 'paid');
+        out.paidNoRewrite = paidAmts === '1500,1500' && pend.length === 1 && pend[0].amount === 75;
+        PAYABLES.length = 0; Q = []; CONTRACTS.splice(0); window.toast = oT; window.confirm = oC;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    check('v6.0.111 健檢1 #15：分段工項列的單價屬性沒有多餘引號（預覽與預付款扣回才會正確）', !/data-price=""'\+/.test(src), '');
+    check('v6.0.111 健檢1 #3／#4：議價尾差負數列算進請款、列印明細與總計同一算法（天數）', r.adjAmt && r.adjTot && r.prev30k && !r.err, JSON.stringify(r));
+    check('v6.0.111 健檢1 #6／#7：得標金額含已得標追加案（不含未得標）、建立追加只帶表頭', r.won && r.wonNoCt && r.addendum && !r.err, JSON.stringify(r));
+    check('v6.0.111 健檢1 #2：同名工項重存報價後各自保留單價／數量', r.dup && !r.err, JSON.stringify(r));
+    check('v6.0.111 健檢1 #5：打設＋拔除合一工項拔除未完成不准結算', r.settleBlock && !r.err, JSON.stringify(r));
+    check('v6.0.111 健檢1 #13／#14：已付應付不被改寫或刪除（差額另立、手動修改擋下）', r.paidKeep && r.deltaGone && r.editBlock && r.paid2 && r.paidNoRewrite && !r.err, JSON.stringify(r));
+    check('v6.0.111 批次 G 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

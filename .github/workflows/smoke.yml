@@ -13,15 +13,16 @@ on:
       - 'package.json'
       - '.github/workflows/smoke.yml'
   push:
-    branches: [main]
-    paths:
-      - 'index.html'
-      - 'app.js'
-      - 'sw.js'
-      - 'tests/**'
-      - 'package.json'
-      - '.github/workflows/smoke.yml'
+    branches: [main]   # 推 main 一律跑（健檢3 🔴1：部署要等測試通過，所以每次推送都要有結果）
   workflow_dispatch:
+
+# 健檢3 🔴1：網站改成「冒煙測試通過才部署」。
+# 啟用方式（一次）：GitHub → Settings → Pages → Source 改「GitHub Actions」，
+# 再到 Settings → Secrets and variables → Actions → Variables 新增 PAGES_FROM_ACTIONS＝true。
+# 還沒啟用前 deploy 工作會跳過，網站照舊由分支直接部署（行為不變）。
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   smoke:
@@ -41,3 +42,33 @@ jobs:
 
       - name: 執行冒煙測試
         run: npm test
+
+  deploy:
+    needs: smoke
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PAGES_FROM_ACTIONS == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.dep.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 整理要上線的檔案（與分支部署相同內容，排除 .git／.github）
+        run: |
+          mkdir -p _site
+          rsync -a --exclude '.git' --exclude '.github' --exclude '_site' --exclude 'node_modules' ./ _site/
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: dep
+        uses: actions/deploy-pages@v4

@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.110';
+var APP_VERSION='v6.0.111';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -500,15 +500,24 @@ function _rentScan(q,endDate){
 // 真正得標的金額寫在合約上；有合約就以合約為準（追加減已折進合約金額，不能再加追加案，
 // 否則同一筆錢算兩次），沒有合約才退回報價總額＋追加案報價。
 // 與專案卡的 base 同一口徑。傳入的必須是主案（parentId 為空）。
-function _wonAmt(q){
+// 得標金額（含稅）：主案合約金額（沒有合約用報價總計）＋已得標的追加案。
+// 健檢1 #6：追加案得標時另建獨立合約（confirmAward），主約金額不含追加；原本有主約就只回主約，追加案從合約金額消失，
+// 請款與成本卻照算 → 請款進度超過 100%、毛利被低估。未得標的追加案不算。
+function _ctAmtOf(q){
   if(!q)return 0;
   var ct=(CONTRACTS||[]).find(function(c){return c.linkedQid===q.id;})
        ||(CONTRACTS||[]).find(function(c){return c.name&&c.name===q.name;});
-  var ctAmt=ct?(parseFloat(ct.amount)||0):0;
-  if(ctAmt>0)return ctAmt;
-  var base=(q.t&&parseFloat(q.t.total))||0;
-  Q.forEach(function(x){if(x.parentId===q.id)base+=(x.t&&parseFloat(x.t.total))||0;});
-  return base;
+  return ct?(parseFloat(ct.amount)||0):0;
+}
+function _addsWonAmt(q){
+  var s=0;
+  (Q||[]).forEach(function(x){if(x&&x.parentId===q.id&&x.awarded){var a=_ctAmtOf(x);s+=a>0?a:((x.t&&parseFloat(x.t.total))||0);}});
+  return s;
+}
+function _wonAmt(q){
+  if(!q)return 0;
+  var ctAmt=_ctAmtOf(q);
+  return (ctAmt>0?ctAmt:((q.t&&parseFloat(q.t.total))||0))+_addsWonAmt(q);
 }
 
 // 待付應付（status 為空的舊資料視為待付，與清單口徑一致）
@@ -2154,9 +2163,12 @@ function saveQ(){
     const latestInv=linkedInvs.slice().sort((a,b)=>(parseInt(b.periodNo)||0)-(parseInt(a.periodNo)||0))[0];
     linkedInvs.forEach(linkedInv=>{
       // 更新合約單價/數量/說明（本期估驗數量保留）
-      q.items.forEach(qi=>{
+      // 健檢1 #2：同名工項（分區報價）依出現順序一對一配對，不能都對到第一列（否則 A 區、B 區單價互相覆蓋）
+      const _used=new Set(),_pick=function(desc){const k=linkedInv.items.findIndex((x,i)=>!_used.has(i)&&x.type!=='sec'&&x.desc===desc);if(k<0)return null;_used.add(k);return linkedInv.items[k];};
+      const _match=q.items.map(qi=>qi.sec?null:_pick(qi.desc));
+      q.items.forEach((qi,qix)=>{
         if(qi.sec)return;
-        const li=linkedInv.items.find(x=>x.type!=='sec'&&x.desc===qi.desc);
+        const li=_match[qix];
         if(li){
           li.contractPrice=parseFloat(qi.price)||0;
           // v5.315：已做過「工項結算」的項目不覆寫合約數量，否則追加減成果會被靜默還原
@@ -2170,9 +2182,9 @@ function saveQ(){
         }
       });
       if(linkedInv===latestInv){
-        q.items.forEach(qi=>{
+        q.items.forEach((qi,qix)=>{
           if(qi.sec)return;
-          const exists=linkedInv.items.find(x=>x.type!=='sec'&&x.desc===qi.desc);
+          const exists=_match[qix];   // 健檢1 #2：同名第二列沒有對應請款列時才補，不因第一列存在就略過
           if(!exists){
             linkedInv.items.push({
               type:'item',desc:qi.desc||'',unit:qi.unit||'',
@@ -3145,6 +3157,20 @@ function settleInvItem(i){
   });
   const cum=Math.round(Math.max(_cumAll,(parseFloat(it.prevQty)||0)+_curW(it))*100)/100;
   if(cum<=0){toast('此工項尚無實作數量，無法結算');return;}
+  // 健檢1 #5：打設＋拔除合一的工項，累計量依請款％加權（打設 70%＋拔除 30%），拔除沒完成前一定小於實作量，
+  // 這時結算會把合約砍成 70%、之後拔除期又變超請 → 拔除完成（拔除累計＝打設累計）才准結算
+  try{
+    const _c=_itemCat(it);
+    if(_c.install&&_c.remove){
+      const _rmNow=_isRemovePeriod(it),_cq=parseFloat(it.curQty)||0;
+      const _inst=(parseFloat(it.installCum)||0)+(_rmNow?0:_cq),_rem=(parseFloat(it.removeCum)||0)+(_rmNow?_cq:0);
+      const _partial=(it.payRate!=null&&+it.payRate<100)||(it.prevPayRate!=null&&+it.prevPayRate<100);
+      if(_inst>0?(_rem+1e-9<_inst):_partial){
+        toast(_inst>0?('拔除尚未完成（已打設 '+fmt(_inst)+'、已拔除 '+fmt(_rem)+'），拔除完成後再做工項結算'):'這個工項分打設／拔除請款，查不到拔除進度，拔除完成後再做工項結算');
+        return;
+      }
+    }
+  }catch(e){_err('settleInvItem.remove',e);}
   const orig=parseFloat(it.contractQty)||0;
   if(orig===cum){toast('合約數量已與實作數量一致，無需結算');return;}
   if(_maxPeriod>0&&_curPeriod>0&&_curPeriod<_maxPeriod){
@@ -3366,21 +3392,23 @@ function invFillDaily(i){
 }
 // 只更新請款明細行的金額顯示（不重渲染整個表格）
 // 離頁重算請款單金額（不依賴 DOM）：邏輯與 updateInvRowAmt + rInvTots 一致
+// 健檢1 #4：請款單逐列「本期金額」唯一算法——編輯畫面、離頁重算、列印預覽共用，明細與總計才會一致
+// 基礎金額＝單價×數量（租賃乘計費天數因子、一般工項有填天數乘天數）；本期金額＝基礎×請款%
+function _invRowBase(it){
+  if(!it||it.type==='sec')return 0;
+  const _q=it.type==='rental'?_invRentQ(it):(parseFloat(it.curQty)||0),_p=parseFloat(it.contractPrice)||0;   // 審查修正：分批折讓
+  if(!(_q>0&&(_p>0||(_p<0&&it.desc===NGT_ADJ_DESC))))return 0;   // 健檢1 #3：議價尾差可為負（折讓）
+  const days=_invBillDays(it);   // v6.0.73 逾期租金折讓後的計費天數
+  if(it.type==='rental')return _p*_q*_rentDayFactor(it,days);   // 全額折讓可到 0
+  return days?_p*_q*days:_p*_q;
+}
+function _invRowAmt(it){return Math.round(_invRowBase(it)*((it&&it.payRate!=null?it.payRate:100)/100));}
 function _recalcInvAmounts(inv){
   if(!inv||!Array.isArray(inv.items))return;
   let curTotal=0;
   inv.items.forEach(it=>{
     if(it.type==='sec')return;
-    const rate=(it.payRate!=null?it.payRate:100)/100;
-    const _q=it.type==='rental'?_invRentQ(it):(parseFloat(it.curQty)||0),_p=parseFloat(it.contractPrice)||0;   // 審查修正：分批折讓
-    let baseAmt=0;
-    if(_q>0&&_p>0){
-      const days=_invBillDays(it);   // v6.0.73 逾期租金折讓後的計費天數
-      if(it.type==='rental')baseAmt=_p*_q*_rentDayFactor(it,days);   // 審查修正：與 updateInvRowAmt 同口徑（全額折讓可到 0）
-      else if(days)baseAmt=_p*_q*days;
-      else baseAmt=_p*_q;
-    }
-    it.curAmt=Math.round(baseAmt*rate);
+    it.curAmt=_invRowAmt(it);
   });
   inv.items.forEach(it=>{if(it.type!=='sec')curTotal+=parseFloat(it.curAmt)||0;});
   const tax=curTotal*_taxR()/100;
@@ -3394,21 +3422,8 @@ function updateInvRowAmt(i, tr){
   const it=invItems[i];
   if(!it||it.type==='sec')return;
   const rate=(it.payRate!=null?it.payRate:100)/100;
-  let baseAmt=0;
-  // 基礎金額 = price × qty（rental 必須再乘天數）
-  const _q=it.type==='rental'?_invRentQ(it):(parseFloat(it.curQty)||0), _p=parseFloat(it.contractPrice)||0;   // 審查修正：分批折讓
-  if(_q>0&&_p>0){
-    const isRentalItem=(it.type==='rental');
-    const days=_invBillDays(it);   // v6.0.73
-    if(isRentalItem)
-      baseAmt=_p*_q*_rentDayFactor(it,days); // rental 至少1天；Lotion 10/21 第 4 題：全額折讓可折到 0
-    else if(days)
-      baseAmt=_p*_q*days;
-    else
-      baseAmt=_p*_q;
-  }
-  // 數量或單價為 0/空 → 本期金額必為 0（不再沿用舊 curAmt，修正刪數量金額殘留 bug）
-  // 本期金額 = 基礎金額 × 請款%
+  // 數量或單價為 0/空 → 本期金額必為 0（不再沿用舊 curAmt，修正刪數量金額殘留 bug）；算法見 _invRowBase
+  const baseAmt=_invRowBase(it);
   const curAmt=Math.round(baseAmt*rate);
   it.curAmt=curAmt;
   it._baseAmt=baseAmt;  // 保存原始金額供參考
@@ -3603,17 +3618,7 @@ function rInvItems(){
       li++;
       const isRental=(it.type==='rental');
       // Auto-calc curAmt：基礎金額 × 請款%
-      const _rate=(it.payRate!=null?it.payRate:100)/100;
-      let curAmt=0;
-      const _rq=parseFloat(it.curQty)||0, _rp=parseFloat(it.contractPrice)||0;
-      if(_rq>0&&_rp>0){
-        const _bd=_invBillDays(it);   // v6.0.73 折讓後天數
-        const baseAmt=_bd
-          ?_rp*_rq*_bd
-          :_rp*_rq;
-        curAmt=Math.round(baseAmt*_rate);
-      }
-      // 數量或單價為 0 → 金額必為 0（修正刪數量後金額殘留 bug）
+      const curAmt=_invRowAmt(it);   // 健檢1 #4：與總計、列印同一算法（數量或單價為 0 → 金額必為 0）
       it.curAmt=curAmt;  // 同步回資料
 
       function mkNumTd(bg,field,val,title){
@@ -3942,7 +3947,7 @@ function saveInvoice(){
   let _overN=0;
   for(const it of (invItems||[])){
     if(it.type==='sec')continue;
-    if((parseFloat(it.curQty)||0)<0||(parseFloat(it.contractPrice)||0)<0){toast('數量／單價不可為負數');return;}
+    if((parseFloat(it.curQty)||0)<0||((parseFloat(it.contractPrice)||0)<0&&it.desc!==NGT_ADJ_DESC)){toast('數量／單價不可為負數');return;}   // 健檢1 #3：議價尾差列放行負單價
     const cq=parseFloat(it.contractQty)||0;
     if(cq>0&&((parseFloat(it.prevQty)||0)+_curW(it))>cq+1e-9)_overN++;   // 審查修正：_qRetired 不關超請警示
   }
@@ -4260,16 +4265,20 @@ function refreshContractClientList(){
 
 
 // ── 追加合約功能 ──
+// 健檢1 #7：追加案只帶表頭與合約條件（白名單）。原本整包複製主案，連總計 t、日報、詢價單、佣金、其他費用、業務都帶走，
+// 存檔前得標金額就會多算一份主案、專案頁的日報／詢價也各多一份
+var _ADDENDUM_KEEP=['client','loc','contact','phone','rmk','rmkText','deduct','ownerPay'];
 function addAddendum(id){
   const src=Q.find(x=>x.id===id);if(!src)return;
-  const copy=JSON.parse(JSON.stringify(src));
+  const copy={};
+  _ADDENDUM_KEEP.forEach(function(k){if(src[k]!==undefined)copy[k]=JSON.parse(JSON.stringify(src[k]));});
   copy.id=Date.now().toString();
   copy.code=genQuoteCode();
   copy.parentId=id;
-  copy.awarded=false;copy.payDue='';copy.costs=[];
-  copy.name=(copy.name||'未命名')+' (追加)';copy.payDefV=2;copy.instV=2;delete copy.ownerCard;delete copy._ocPriv;   // 新專案
-  copy.items=[];
-  copy.date=localToday();
+  copy.awarded=false;copy.payDue='';copy.costs=[];copy.exs=[];
+  copy.name=(src.name||'未命名')+' (追加)';copy.payDefV=2;copy.instV=2;   // 新專案
+  copy.items=[];copy.t={sub:0,tax:0,total:0,ext:0,cost:0,gross:0,net:0,grossR:0,netR:0,costKnown:0,costFilled:false};
+  copy.date=localToday();copy._mt=Date.now();
   Q.unshift(copy);
   persist();
   loadQ(copy.id);
@@ -4624,31 +4633,13 @@ function buildInvPreview(srcInv){
     const cumQty=parseFloat(it.cumQty)||0;
     // 累積數量顯示：未另存 cumQty 時自動以「前期＋本期」計算（僅供顯示，不影響金額計算）
     const cumQtyShow=cumQty||(Math.round((prevQtyShow+_curW(it))*100)/100);   // v5.385：本期依請款比例加權
-    const _previewPr=(it.payRate!=null?it.payRate:100)/100;
-    let curAmt=0;
-    if(isRental&&it.curQty&&it.contractPrice){
-      const _days=_invBillDays(it)||1;   // v6.0.73
-      curAmt=Math.round(it.contractPrice*_invRentQ(it)*_days*_previewPr);
-    } else if(!isRental&&it.curQty&&it.contractPrice){
-      curAmt=Math.round(it.contractPrice*it.curQty*_previewPr);
-    } else {
-      curAmt=it.curAmt||0; // fallback：用已存值
-    }
-    // 防呆：數量或單價為 0 → 本期金額必為 0（不讓舊 curAmt 殘留在 PDF）
-    if((parseFloat(it.curQty)||0)<=0 || (parseFloat(it.contractPrice)||0)<=0) curAmt=0;
+    // 健檢1 #4：與畫面、總計同一算法（原本沒乘一般工項天數、全額折讓又被 ||1 當成 1 天，明細和總計對不上）
+    let curAmt=_invRowAmt(it);
     // ─── 金額計算（全部含請款%，這才是「估驗金額」= 請款金額）───
     const _pr = (it.payRate!=null ? it.payRate : 100) / 100;
     const _prevPr = (it.prevPayRate!=null ? it.prevPayRate : _pr*100) / 100;
     const _cpEff2 = parseFloat(it.contractPrice) || 0;
 
-    // 本期請款金額 = 本期數量 × 單價 × 請款%
-    // curAmt 已在 updateInvRowAmt 算好，直接用
-    // 若 curAmt=0 但有 curQty 和 contractPrice，補算
-    if(!curAmt && it.curQty && _cpEff2){
-      curAmt = isRental
-        ? Math.round(_cpEff2 * _invRentQ(it) * (_invBillDays(it)||1) * _pr)
-        : Math.round(_cpEff2 * it.curQty * _pr);
-    }
 
     // 前期請款金額 = 前期累積數量 × 單價 × 前期請款%
     let prevAmt, cumAmt;
@@ -5879,6 +5870,9 @@ function _copyQDo(id){
   copy.date=localToday();
   // Append (複製) to name
   copy.name=(copy.name||'未命名')+' (複製)';copy.payDefV=2;copy.instV=2;delete copy.ownerCard;delete copy._ocPriv;   // 新專案
+  // 健檢1 #7：複製報價＝新的一張報價，不帶原案的專案狀態（追加案關聯、結案、版次、日報、詢價、材料、佣金、得標結果…）
+  ['parentId','closed','closedAt','ver','dailyLogs','rfqs','mat','comms','comm','referral','confirmFiles','addons','siteHist','bidStatus','lostReason','lostPrice','lostNote','rentEnd','ownerDoc','matEst','plan'].forEach(function(k){delete copy[k];});
+  copy._mt=Date.now();
   Q.unshift(copy);
   persist();
   toast('已複製為新報價草稿！');
@@ -21467,6 +21461,7 @@ function openSubPeriod(cid,editNo){
   if(!rows.length){toast('請先建立發包工項（數量×單價）');return;}
   var st=_subStat(c);
   var editing=editNo!=null?_subPeriods(c).find(function(p){return p.no===editNo&&!p.isRet;}):null;
+  if(editing){var _pp=(PAYABLES||[]).find(function(p){return p.id===_subPayId(cid,editing);});if(_pp&&_pp.status==='paid'){toast('第'+editNo+'期應付已付款，不能直接修改（金額會和已匯出的對不上）；請先到應付管理改回未付，或另登一期');return;}}   // 健檢1 #13：比照刪除
   var lastDate='';_subPeriods(c).forEach(function(p){if(!p.isRet&&(!editing||p.no!==editNo)&&p.to>lastDate)lastDate=p.to||p.date||'';});
   var from=editing?(editing.from||''):(lastDate||c.entryDate||c.date||'');
   var cut=_vendorCutDate(localToday());   // v5.443 預設計價日／期間迄＝最近一次截止日（每月 P.vendorCutDay 日）
@@ -21566,7 +21561,7 @@ function _spStageRowHtml(q,c,r,st,editing,IN,name,unit){
   var ep=editing?((editing.rows||[]).find(function(pr){return pr.rid===r.id;})||{}):{};
   var prevI=(st.byRow[r.id]||0)-(parseFloat(ep.qi!=null?ep.qi:ep.qty)||0),prevR=((st.byRowR||{})[r.id]||0)-(parseFloat(ep.qr)||0),ins=_subPrInst(r,ep),tq=parseFloat(r.qty)||0,rr=_subRetRate(c,r);
   var inp=function(cls,v){return '<input class="'+cls+'" type="number" inputmode="decimal" step="any" min="0" value="'+(v!=null&&v!==''?v:'')+'" oninput="_spRecalc()" style="flex:1;min-width:60px;text-align:right;'+IN+'">';};
-  return '<div class="sp-row" data-stage="1" data-rid="'+r.id+'" data-total="'+tq+'" data-prev="'+prevI+'" data-prevr="'+prevR+'" data-inst="'+ins+'"'+((ep.ins!=null||ep.qi!=null||ep.qr!=null)?' data-frozen="1"':'')+' data-price=""'+(parseFloat(r.unitPrice)||0)+'" data-ret="'+rr+'" data-desc="'+esc(name)+'" style="border:1px solid var(--b1);border-radius:var(--r8);padding:7px 9px;margin-bottom:6px;background:var(--w)">'
+  return '<div class="sp-row" data-stage="1" data-rid="'+r.id+'" data-total="'+tq+'" data-prev="'+prevI+'" data-prevr="'+prevR+'" data-inst="'+ins+'"'+((ep.ins!=null||ep.qi!=null||ep.qr!=null)?' data-frozen="1"':'')+' data-price="'+(parseFloat(r.unitPrice)||0)+'" data-ret="'+rr+'" data-desc="'+esc(name)+'" style="border:1px solid var(--b1);border-radius:var(--r8);padding:7px 9px;margin-bottom:6px;background:var(--w)">'
     +'<div style="font-size:12.5px;font-weight:700">'+esc(name)+'</div>'
     +'<div style="font-size:11px;color:var(--b4);margin:2px 0 5px">發包 '+fmt(tq)+' '+esc(unit)+'｜單價 '+fmt(parseFloat(r.unitPrice)||0)+'｜<span class="sp-instx">裝設完成請 '+ins+'%、拆除完成請 '+(100-ins)+'%</span> <button type="button" class="btn btn-xs" onclick="subStageInstEdit(\''+c.id+'\',\''+r.id+'\')" style="padding:0 6px;font-size:10.5px">調整</button>｜已計價 裝設 '+_rfmt(Math.round(prevI*100)/100)+'、拆除 '+_rfmt(Math.round(prevR*100)/100)+(rr?('｜保留 '+rr+'%'+(r.retCond?('（'+esc(r.retCond)+'後退還）'):'')):'')+'　<span class="sp-daily" style="color:var(--g3)"></span></div>'
     +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="font-size:11px;color:var(--b4);white-space:nowrap">裝設量</span>'+inp('sp-qi',ep.qi!=null?ep.qi:(ep.qty!=null&&ep.qr==null?ep.qty:''))
@@ -21847,6 +21842,7 @@ function syncCostToPayable(q, cost){
 
   // 優先：用 costId 精確比對
   PAYABLES.forEach(function(p,i){
+    if(p.deltaOf)return;   // 健檢1 #13／#14：已付後的差額筆不是本體
     if(p.costId===cost.id){
       if(existIdx<0){existIdx=i;existStatus=p.status||'pending';existId=p.id;existP=p;}
     }
@@ -21854,6 +21850,7 @@ function syncCostToPayable(q, cost){
   // 次要：用 costSourceId 比對（手動建立且已連結工項的記錄）
   if(existIdx<0){
     PAYABLES.forEach(function(p,i){
+      if(p.deltaOf)return;
       if(p.costSourceId===cost.id){
         if(existIdx<0){existIdx=i;existStatus=p.status||'pending';existId=p.id;existP=p;}
       }
@@ -21874,7 +21871,10 @@ function syncCostToPayable(q, cost){
 
   // 移除所有與此成本相關的記錄（含被領養的孤立記錄 existIdx），再建立唯一一筆
   var _removedIds=[];
+  // 健檢1 #14：已付的記錄一律不刪（同廠商同金額的兩筆已付，原本同步一次就刪掉一筆）；差額筆由 _payPaidDelta 管
+  var _existPaid=!!(existP&&existP.status==='paid');
   PAYABLES=PAYABLES.filter(function(p,i){
+    if(p.status==='paid'||p.deltaOf)return true;
     var drop=false;
     if(i===existIdx)drop=true;                // 被比對/領養的那筆 → 移除（下面重建）
     else if(p.costId===cost.id)drop=true;      // 任何 costId 重複 → 移除
@@ -21888,12 +21888,19 @@ function syncCostToPayable(q, cost){
   // 墓碑：被移除且「不會用同 id 重建」的記錄要立墓碑，否則雲端同步會復活成重複帳款
   var _willRebuild=(cost.amt>0&&payVendor!=='公司支出（自付）');
   _removedIds.forEach(function(pid){if(!(_willRebuild&&pid===existId))_tomb('payables',pid);});
+  if(_existPaid&&!existP.costId&&existP.costSourceId!==cost.id){existP.costSourceId=cost.id;_touch(existP);}   // 領養的已付手動記錄：補連結，下次才對得到（不改金額）
   if(cost.amt<=0){
-    // 金額為零：不建立應付（已移除相關記錄）
+    // 金額為零：不建立應付（已移除相關記錄；已付的保留）
     savePayables();return;
   }
   if(payVendor==='公司支出（自付）'){
     // 公司自付：計入施工成本、但不產生應付帳款（不會欠自己錢）
+    savePayables();return;
+  }
+  // 健檢1 #14：對到的是已付記錄 → 不改它的金額，成本變動的差額另立一筆待付（見 _payPaidDelta）
+  if(_existPaid){
+    _payPaidDelta({id:existP.id,costId:cost.id,quoteId:q.id,to:payVendor||existP.to||'未命名',amount:cost.amt,date:existP.date||_vendorDueDate(cost.date),
+      category:existP.category||'subcontract',project:q.name||'',note:existP.note||'',itemName:existP.itemName||'',updatedAt:Date.now()},existP);
     savePayables();return;
   }
   // 取得主工項描述（承包=第一行工項；點工/額外=頂層linkedItemIdx）
@@ -31879,7 +31886,7 @@ function _pjStat(q){
   var st={adds:adds,all:all};
   st.ct=(CONTRACTS||[]).find(function(c){return c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return c.name&&c.name===q.name;})||null;
   st.quoteTotal=all.reduce(function(a,x){var t=(x.t&&parseFloat(x.t.total))||0;if(!t){var sub=0;(x.items||[]).forEach(function(it){if(it&&!it.sec&&!_isSpare(it))sub+=Math.abs(parseFloat(it.qty)||0)*(parseFloat(it.price)||0);});t=Math.round(sub*_taxM());}return a+t;},0);
-  st.base=(st.ct&&parseFloat(st.ct.amount)>0)?parseFloat(st.ct.amount):st.quoteTotal;
+  st.base=(st.ct&&parseFloat(st.ct.amount)>0)?parseFloat(st.ct.amount)+_addsWonAmt(q):st.quoteTotal;   // 健檢1 #6：主約＋已得標追加案
   // 議價：items.origPrice 保留議價前單價
   var origSub=0,curSub=0,neg=false;
   all.forEach(function(x){(x.items||[]).forEach(function(it){if(!it||it.sec||_isSpare(it))return;var qn=Math.abs(parseFloat(it.qty)||0),p=parseFloat(it.price)||0,op=(it.origPrice!=null&&it.origPrice!=='')?parseFloat(it.origPrice):p;if(it.origPrice!=null&&it.origPrice!==''&&Math.abs(op-p)>1e-9)neg=true;origSub+=qn*op;curSub+=qn*p;});});
@@ -32848,6 +32855,7 @@ function openRentPeriod(cid,editNo){
   var c=(q.costs||[]).find(function(x){return x.id===cid;});if(!c||!c.rental)return;
   if(!c.vendor){toast('請先選擇租賃廠商');return;}
   var editing=editNo!=null?_subPeriods(c).find(function(p){return p.no===editNo&&!p.isRet;}):null;
+  if(editing){var _pp=(PAYABLES||[]).find(function(p){return p.id===_subPayId(cid,editing);});if(_pp&&_pp.status==='paid'){toast('第'+editNo+'期應付已付款，不能直接修改（金額會和已匯出的對不上）；請先到應付管理改回未付，或另登一期');return;}}   // 健檢1 #13：比照刪除
   var lastTo='';_subPeriods(c).forEach(function(p){if(!p.isRet&&(!editing||p.no!==editNo)&&(p.to||p.date||'')>lastTo)lastTo=p.to||p.date||'';});
   var firstFrom='';(c.rows||[]).forEach(function(r){if(r.from&&(!firstFrom||r.from<firstFrom))firstFrom=r.from;});
   var from=editing?(editing.from||''):(lastTo||firstFrom||c.date||'');
@@ -33232,6 +33240,21 @@ function rfqAward(rid){
 function _subEarly(per){return (per&&Array.isArray(per.early))?per.early:[];}
 function _subEarlySum(per){return _subEarly(per).reduce(function(a,e){return a+Math.round(parseFloat(e.amt)||0);},0);}
 function _subEarlyId(cid,per,e){return 'pay'+cid+'_p'+per.no+'_e'+e.id;}
+// 健檢1 #13：已付應付的金額不再被自動重建改寫。本體與差額（deltaOf＝本體 id）合計已付 vs 新算出的應付 → 差額掛一筆待付
+//（正＝還要付；負＝多付了，待下期扣回或向廠商收回）；差額為 0 就拿掉未付的差額筆。
+function _payPaidDelta(p,old){
+  var fam=PAYABLES.filter(function(x){return x&&(x.id===old.id||x.deltaOf===old.id);});
+  var paid=fam.reduce(function(a,x){return a+(x.status==='paid'?(parseFloat(x.amount)||0):0);},0);
+  var diff=Math.round((parseFloat(p.amount)||0)-paid);
+  var un=fam.find(function(x){return x.id!==old.id&&x.status!=='paid';});
+  if(diff===0){if(un){PAYABLES=PAYABLES.filter(function(x){return x!==un;});_tomb('payables',un.id);}return;}
+  var n=1;while(PAYABLES.some(function(x){return x.id===old.id+'_d'+n;}))n++;
+  var d=Object.assign({},p,{id:un?un.id:(old.id+'_d'+n),deltaOf:old.id,amount:diff,status:'pending',
+    note:(diff>0?'已付後追加差額：':'已付後減少（多付 '+fmt(-diff)+'，待扣回）：')+(p.note||''),date:(un&&un.date)||p.date});
+  ['paidDate','paidAt','unpaidAt'].forEach(function(f){delete d[f];});
+  if(un&&_recSame(un,d))_keepStamp(d,un);else _touch(d);
+  var ix=PAYABLES.indexOf(un);if(ix>=0)PAYABLES[ix]=d;else PAYABLES.unshift(d);
+}
 function _syncSubPeriodPayables(q,c){
   // v6.0.49 原三層包裝併入：① 自我修復缺應付（v6.0.44）② 抵扣不超過預付款總額（v6.0.39）③ 舊提前放款轉預付款（v6.0.38）
   try{if(!_healBusy&&c&&c.type==='sub')_advPayHeal(q,c);}catch(e){_err('_syncSubPeriodPayables.heal',e);}
@@ -33242,7 +33265,7 @@ function _syncSubPeriodPayables(q,c){
   var keep={};periods.forEach(function(per){keep[_subPayId(c.id,per)]=per;_subEarly(per).forEach(function(e){keep[_subEarlyId(c.id,per,e)]=e;});});
   _subAdvs(c).forEach(function(a){keep[_subAdvPayId(c.id,a)]=a;});keep['pay'+c.id+'_intro']=1;
   var removed=[];
-  PAYABLES=PAYABLES.filter(function(p){if(p.costId!==c.id)return true;if(keep[p.id])return true;if(p.status==='paid')return true;removed.push(p.id);return false;});   // v6.0.89 已付的不動（錢已匯出去，留著對帳）
+  PAYABLES=PAYABLES.filter(function(p){if(p.costId!==c.id)return true;if(keep[p.id])return true;if(p.deltaOf&&keep[p.deltaOf])return true;if(p.status==='paid')return true;removed.push(p.id);return false;});   // 健檢1 #13：差額筆跟著本體   // v6.0.89 已付的不動（錢已匯出去，留著對帳）
   removed.forEach(function(pid){_tomb('payables',pid);});
   if(!vendor||vendor==='公司支出（自付）'){
     PAYABLES=PAYABLES.filter(function(p){if(p.costId===c.id&&p.status!=='paid'){_tomb('payables',p.id);return false;}return true;});
@@ -33251,6 +33274,8 @@ function _syncSubPeriodPayables(q,c){
   var itemName='';
   if(c.rows&&c.rows.length&&c.rows[0].linkedItemIdx>=0&&q.items&&q.items[c.rows[0].linkedItemIdx])itemName=(q.items[c.rows[0].linkedItemIdx].desc||'').split('\n')[0];
   var put=function(p,old,idx){
+    // 健檢1 #13：已付的應付不覆寫金額（錢已匯出去）；自動重算出的金額不同 → 差額另立一筆待付（id 加 _d<n>），付清的差額也照樣保留
+    if(old&&old.status==='paid'){_payPaidDelta(p,old);return;}
     if(old){['paidDate','paidAt','unpaidAt','payDue','files','invNo','costSourceId','retentionPct'].forEach(function(f){if(old[f]!=null)p[f]=old[f];});if(old.vat!=null&&old.vatManual)p.vat=old.vat;}
     if(old&&_recSame(old,p)){_keepStamp(p,old);}else _touch(p);
     if(idx>=0)PAYABLES[idx]=p;else PAYABLES.unshift(p);
