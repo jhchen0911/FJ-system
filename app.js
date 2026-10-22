@@ -38761,7 +38761,7 @@ function _bankVendorSave(oldName,v){
   _fbDb.ref('fydata/bank').update(up).then(function(){if(!same)toast(v.name+' 的匯款帳號已變更（已留紀錄，30 天內付款會提醒先電話確認）');}).catch(function(e){_err('_bankVendorSave',e);toast('匯款帳號變更失敗：'+(e&&e.message||''));});
 }
 // ══════════ v6.0.112 健檢2 #7：AI 呼叫改走雲端代理 aiProxy（前端不再持有金鑰） ══════════
-// 原本各裝置把金鑰存在本機、瀏覽器直接呼叫 Anthropic（anthropic-dangerous-direct-browser-access）——任何持有金鑰的裝置都拿得出來。
+// 原本各裝置把金鑰存在本機、瀏覽器直接呼叫 Anthropic（開了「允許瀏覽器直接存取」）——任何持有金鑰的裝置都拿得出來。
 // 改為：帶登入憑證（ID token）呼叫 Cloud Function aiProxy，由伺服器加上金鑰（defineSecret ANTHROPIC_API_KEY）轉送；只有員工與管理員可用、每人每天上限。
 // 回傳值與 fetch 相同（有 json()），呼叫端不用改。
 var _AI_PROXY='https://asia-southeast1-jhchen-aed9a.cloudfunctions.net/aiProxy';

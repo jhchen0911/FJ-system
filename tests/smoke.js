@@ -7298,10 +7298,10 @@ async function newPage(browser, width, height) {
         out.me = _meName() === '陳軒（AI）' && _meRoleLabel() === '唯讀';
         /* 讀 private：_pullPrivate 不再對唯讀帳號提前返回（模擬資料庫） */
         let asked = '';
-        _fbDb = { ref: p => ({ once: () => { asked = p; return Promise.resolve({ val: () => null }); }, update: () => { out.wrote = true; return Promise.resolve(); }, set: () => { out.wrote = true; return Promise.resolve(); } }) };
+        _fbDb = { ref: p => ({ once: () => { asked += p + '|'; return Promise.resolve({ val: () => null }); }, update: () => { out.wrote = true; return Promise.resolve(); }, set: () => { out.wrote = true; return Promise.resolve(); } }) };
         return new Promise(res => {
           _pullPrivate(ok => {
-            out.priv = ok === true && asked === 'fydata/private';
+            out.priv = ok === true && asked.indexOf('fydata/private|') === 0;   // v6.0.112：唯讀帳號之後還會讀 workerSens（看全部）
             /* 資料層：上傳一律擋 */
             let pushed = null; _pushCloud({ silent: true, onDone: v => { pushed = v; } }); out.push = pushed === false;
             _pushPrivate(v => { out.pushPriv = v === false; });
