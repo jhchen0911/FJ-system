@@ -114,3 +114,55 @@ exports.lineMorningCheck = onSchedule({ schedule: '0 8 * * *', timeZone: TZ, reg
 exports.linePushQueue = onValueCreated({ ref: '/fydata/linePush/{id}', region: REGION, secrets: [LINE_TOKEN] }, async (event) => {
   await lineCore.processPush(event.params.id, event.data.val(), lineAdapters.mkDeps(LINE_TOKEN.value()));
 });
+
+// ══════════ v6.0.112 健檢2 #7：AI 代理（前端不再持有 Anthropic 金鑰） ══════════
+// 金鑰用 defineSecret：回國後由 Lotion 在自己電腦執行 `firebase functions:secrets:set ANTHROPIC_API_KEY`，程式與 Git 都不含金鑰。
+// 前端：fetch(aiProxy, {Authorization: Bearer <ID token>, body: Anthropic messages 格式})；只有員工與管理員可用、每人每天上限。
+const opsCore = require('./ops/core.js');
+const ANTHROPIC_KEY = defineSecret('ANTHROPIC_API_KEY');
+exports.aiProxy = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], secrets: [ANTHROPIC_KEY], memory: '512MiB', timeoutSeconds: 120 }, async (req, res) => {
+  try {
+    if (req.method !== 'POST') { res.status(405).send('只接受 POST'); return; }
+    const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
+    if (!m) { res.status(401).json({ error: { message: '需要登入' } }); return; }
+    const t = await admin.auth().verifyIdToken(m[1]);
+    const role = t.fy || roleOf(t.email, await lists());
+    if (!opsCore.aiRoleOk(role)) { res.status(403).json({ error: { message: '這個帳號不能使用 AI 功能' } }); return; }
+    if ((req.rawBody ? req.rawBody.length : 0) > opsCore.AI_MAX_BODY) { res.status(413).json({ error: { message: '檔案太大' } }); return; }
+    const c = opsCore.cleanAiBody(req.body);
+    if (c.err) { res.status(400).json({ error: { message: c.err } }); return; }
+    // 每人每天上限（RTDB fydata/aiUsage/<uid>/<日期>，網頁不可寫）
+    const ref = admin.database().ref('fydata/aiUsage/' + t.uid + '/' + opsCore.tpeDate());
+    const tx = await ref.transaction((n) => ((n || 0) >= opsCore.AI_DAILY_LIMIT ? undefined : (n || 0) + 1));
+    if (!tx.committed) { res.status(429).json({ error: { message: '今天的 AI 使用次數已達上限（' + opsCore.AI_DAILY_LIMIT + ' 次）' } }); return; }
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': ANTHROPIC_KEY.value(), 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify(c.body),
+    });
+    const j = await r.json().catch(() => ({ error: { message: 'AI 服務回應格式錯誤' } }));
+    res.status(r.status).json(j);
+  } catch (e) {
+    console.error('aiProxy', e);
+    res.status(500).json({ error: { message: 'AI 代理錯誤' } });
+  }
+});
+
+// ══════════ v6.0.112 健檢2 #13：伺服器端每日備份（不再只靠擁有者開 App） ══════════
+// 每天 03:15（台北）把 RTDB fydata 整包（扣掉 backups）存到 Storage fydata/backups/server/daily/<日期>.json，
+// 每月 1 日另存 monthly/<年月>.json；保留 30 份日備份、12 份月備份。Storage 規則：fydata/backups/** 只有擁有者能讀。
+exports.dailyServerBackup = onSchedule({ schedule: '15 3 * * *', timeZone: TZ, region: REGION, memory: '1GiB', timeoutSeconds: 540 }, async () => {
+  const now = Date.now();
+  const snap = await admin.database().ref('fydata').once('value');
+  const payload = opsCore.backupPayload(snap.val(), now);
+  const buf = Buffer.from(JSON.stringify(payload));
+  const bucket = admin.storage().bucket();
+  for (const p of opsCore.backupPaths(now)) {
+    await bucket.file(p).save(buf, { contentType: 'application/json', resumable: false });
+  }
+  for (const [prefix, keep] of [['fydata/backups/server/daily/', opsCore.KEEP_DAILY], ['fydata/backups/server/monthly/', opsCore.KEEP_MONTHLY]]) {
+    const [files] = await bucket.getFiles({ prefix });
+    for (const n of opsCore.pruneList(files.map((f) => f.name), keep)) await bucket.file(n).delete().catch((e) => console.error('prune', n, e));
+  }
+  console.log('[備份] 完成', JSON.stringify(payload.counts), buf.length, 'bytes');
+});

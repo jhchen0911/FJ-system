@@ -1893,7 +1893,7 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
           <div class="f"><label>帳號</label><input id="pbankacct" value="031035008864"></div>
         </div>
         <div class="fg fg3" style="margin-bottom:8px">
-          <div class="f" style="grid-column:1/-1"><label>智慧辨識 API Key（僅存這台裝置、不上雲；每台裝置各填一次）</label><input id="paikey" type="password" placeholder="sk-ant-…" autocomplete="off"></div>
+          <div class="f" style="grid-column:1/-1"><label>智慧辨識（AI）</label><div style="font-size:12px;color:var(--b4);line-height:1.6">v6.0.112 起改由雲端代理呼叫，金鑰只存在伺服器（Cloud Functions 密鑰 ANTHROPIC_API_KEY），各裝置不用也不能再填金鑰。<input id="paikey" type="hidden" value=""></div></div>
         </div>
         <div class="fg fg2" style="margin-top:8px">
           <div class="f">

@@ -911,7 +911,7 @@ function newQ(){
 function doSaveP(){
   if(_roDeny())return;   // v6.0.108 唯讀帳號
   P.company=gv('pc');P.taxid=gv('pt');P.boss=gv('pb');P.contact=gv('pco');
-  try{localStorage.setItem('fy_aikey',(gv('paikey')||'').trim());}catch(e){_err('doSaveP',e);}
+  try{localStorage.removeItem('fy_aikey');}catch(e){_err('doSaveP',e);}   // v6.0.112：AI 改走雲端代理，本機不再存金鑰
   delete P.aiKey; // Key 僅存本機，絕不上雲
   P.tel=gv('ptel');P.email=gv('pem');P.addr=gv('pad');
   P.tax=parseFloat(gv('ptax'))||5;
@@ -1022,7 +1022,7 @@ function _aiKeyScrub(fromCloud){
   var k=String(P.aiKey);delete P.aiKey;
   try{
     var em=String((_fbUser&&_fbUser.email)||'').toLowerCase();
-    if(!_isReaderUser&&_roState!=='reader'&&em&&isAdmin(em)&&!localStorage.getItem('fy_aikey'))localStorage.setItem('fy_aikey',k);
+    void k;void em;   // v6.0.112：AI 改走雲端代理，任何裝置都不再保存金鑰
     if(fromCloud&&_fbDb&&_fbUser&&!_isReaderUser&&_roState==='rw')_fbDb.ref('fydata/shared/params/aiKey').remove().catch(function(e){_err('_aiKeyScrub.remove',e);});
   }catch(e){_err('_aiKeyScrub',e);}
 }
@@ -1079,7 +1079,7 @@ function fcApplySuggest(){
 function syncParamsUI(){
   try{rFixedCosts();}catch(e){_err('syncParamsUI',e);}
   try{var _rr=P.matRentRate||{};[['h300','H300',3],['h350','H350',4],['h400','H400',5]].forEach(function(x){var e=document.getElementById('pmat-'+x[0]);if(e)e.value=(_rr[x[1]]!=null?_rr[x[1]]:x[2]);});var _pf=document.getElementById('pmat-factor');if(_pf)_pf.value=(P.matRentFactor!=null?P.matRentFactor:0.8);var _pl=document.getElementById('pmat-loss');if(_pl)_pl.value=(P.matLossAccrue===false?'0':'1');var _pt=document.getElementById('pmat-trans');if(_pt)_pt.value=(P.matTransRate!=null?P.matTransRate:450);}catch(e){_err('syncParamsUI.mat',e);}   // v6
-  try{var _pk=document.getElementById('paikey');if(_pk)_pk.value=_aiKey();}catch(e){_err('syncParamsUI',e);}
+  try{var _pk=document.getElementById('paikey');if(_pk)_pk.value='';}catch(e){_err('syncParamsUI',e);}   // v6.0.112：不再顯示／保存金鑰
   try{var _pe=document.getElementById('pequip');if(_pe)_pe.value=(P.equipList||[]).join('\n');var _pg=document.getElementById('pdrgap');if(_pg)_pg.value=(P.drGapDays==null?3:P.drGapDays);var _pd=document.getElementById('pvpayday');if(_pd)_pd.value=(P.vendorPayDay||25);var _pm=document.getElementById('pvpaydelay');if(_pm)_pm.value=(P.vendorPayDelay==null?1:P.vendorPayDelay);var _pc=document.getElementById('pvcutday');if(_pc)_pc.value=(P.vendorCutDay||25);var _pb=document.getElementById('pvsubbill');if(_pb)_pb.value=(P.subPayOnBill===false?'0':'1');}catch(e){_err('syncParamsUI',e);}
   const m={pc:'company',pt:'taxid',pb:'boss',pco:'contact',ptel:'tel',pem:'email',pad:'addr',
     ptax:'tax',prmrate:'removeRate',pohd:'overheadPct',plabor:'laborDayRate',popen:'openingCash',popendate:'openingDate',popres:'opReserveMonths',popresamt:'opReserveAmt',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
@@ -9844,6 +9844,7 @@ function _sharedPayload(){
   var out={};
   Object.keys(d).forEach(function(k){if(_PRIV_COLLS.indexOf(k)<0)out[k]=d[k];});
   out.quotes=(d.quotes||[]).map(_stripQuoteSens);
+  out.workers=(d.workers||[]).map(function(w){return _wkSplit(w).pub;});   // v6.0.112 健檢2 #5：身分證字號、地址、緊急聯絡人、證件影像不上共用區
   // v5.336 健檢G：發票的內嵌影像（base64）不上 RTDB——幾張就撞節點寫入上限。
   // 雲端只留 fileUrl（Storage 連結）；內嵌影像留在本機，合併後由 regraft 補回。
   out.invoiceRecs=(d.invoiceRecs||[]).map(function(r){
@@ -9941,6 +9942,7 @@ var _shEmptyWarned={};
 function _shStripForStaff(delta){
   if(_shWholeOk())return;
   delete delta.pagePerms;   // 名冊／角色：只有管理員的裝置會上傳（規則端同樣只放行管理員）
+  if('tombs' in delta){delete delta.tombs;try{_tombReqPush();}catch(e){_err('_shStripForStaff.tomb',e);}}   // 墓碑只有管理員能寫：員工的刪除改送「刪除申請」
   Object.keys(delta).forEach(function(k){
     if(k==='version'||k==='uploadedAt'||k==='uploadedBy'||k.indexOf('/')>=0)return;
     var v=delta[k],empty=v==null||(Array.isArray(v)&&!v.length)||(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length);
@@ -10049,7 +10051,7 @@ function _applyCloud(data){
     }
     if(data.activityLog)ACTIVITY_LOG=data.activityLog;
     if(data.customers)CUSTOMERS=_safeMerge(CUSTOMERS,data.customers,'customers');
-    if(data.workers){WORKERS=_safeMerge(WORKERS,data.workers,'workers');try{_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');}catch(e){_err('_applyCloud.workers',e);}}   // v5.438
+    if(data.workers){WORKERS=_safeMerge(WORKERS,data.workers,'workers');try{_wkGraft();}catch(e){_err('_applyCloud.wkGraft',e);}try{_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');}catch(e){_err('_applyCloud.workers',e);}}   // v5.438
     if(data.matStock){
       try{
         var _msc=data.matStock||{};
@@ -10457,6 +10459,8 @@ function _pullPrivate(cb){
     }
     try{_pullRelayCosts();}catch(e){_err('_pullPrivate',e);}
     try{_pullRelayExpenses();}catch(e){_err('_pullPrivate',e);}
+    try{_wkSensPull();}catch(e){_err('_pullPrivate.wk',e);}   // v6.0.112 健檢2 #5
+    try{_tombReqPull();}catch(e){_err('_pullPrivate.tomb',e);}   // v6.0.112 健檢2 #3
     if(cb)cb(true);
   }).catch(function(err){
     _privReadOk=false;
@@ -12753,7 +12757,7 @@ function _plPickSoil(){var el=document.getElementById('pl-soil-input');if(el)el.
 async function _plSoilAI(input){
   var files=Array.prototype.slice.call(input.files||[]);input.value='';
   if(!files.length)return;
-  if(!_aiKey()){toast('尚未設定智慧辨識 API Key（參數設定 → 智慧辨識，僅存本機）');return;}
+  if(!_aiOn()){toast(_aiOffMsg());return;}
   var pdf=files.find(function(f){return f.type==='application/pdf';});
   var imgs=files.filter(function(f){return /^image\//.test(f.type);}).slice(0,8);
   if(pdf&&pdf.size>20*1024*1024){
@@ -12777,9 +12781,9 @@ async function _plSoilAI(input){
     }
     if(!blocks.length){toast('未取得可辨識的檔案');return;}
     var block=null; // 相容舊變數名（未使用）
-    var r=await fetch('https://api.anthropic.com/v1/messages',{
+    var r=await _aiFetch({
       method:'POST',
-      headers:{'content-type':'application/json','x-api-key':_aiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      headers:{'content-type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-5',max_tokens:900,messages:[{role:'user',content:blocks.concat([
         {type:'text',text:'這是工程鑽探報告（可能為多頁或多張照片）。請整理成 JSON（繁體中文，不要多餘文字）：'
           +'{"soil":"地層概況一段話：各深度區間之土壤分類與 SPT-N 值（例：GL-0~6m 粉土質砂 SPT-N=8~15，GL-6~20m 粉土質黏土 N=4~9），最後附地下水位深度",'
@@ -12805,12 +12809,12 @@ async function _plEmerAutofill(){
   var map={'勞動檢查機構':g.labor,'轄區警察分局':g.police,'轄區消防分隊':g.fire};
   _plState.emer.forEach(function(r){if(map[r[0]]&&!r[1]){r[1]=map[r[0]];n++;}});
   // 有 AI Key：依工地地址自動搜尋最近的醫院／分局／分隊／勞檢機構／瓦斯公司（名稱、電話、地址）
-  if(_aiKey()&&loc){
+  if(_aiOn()&&loc){
     toast('AI 依工地地址搜尋鄰近單位中（約 10~20 秒）…');
     try{
-      var r=await fetch('https://api.anthropic.com/v1/messages',{
+      var r=await _aiFetch({
         method:'POST',
-        headers:{'content-type':'application/json','x-api-key':_aiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        headers:{'content-type':'application/json'},
         body:JSON.stringify({model:'claude-sonnet-5',max_tokens:800,messages:[{role:'user',content:
           '台灣工地地址：'+loc+'。請依你對台灣行政區與機構的知識，提供距離此地址最近的下列單位（回傳 JSON，不要多餘文字；'
           +'每單位含 name/tel/addr 三欄，不確定之欄位給空字串，寧缺勿錯）：'
@@ -25979,7 +25983,7 @@ function _payUpload(pid,kind){
       var ctx=_payFileCtx;if(!f||!ctx)return;
       var pid2=ctx.pid,kind2=ctx.kind;
       // 照片 → 智慧辨識（發票類；有 Key 才啟動）
-      if(kind2==='inv'&&_aiKey()&&/^image\//.test(f.type)){
+      if(kind2==='inv'&&_aiOn()&&/^image\//.test(f.type)){
         _fileToDataUrl(f,1400).then(function(du){
           aiScanDoc(du,'廠商請款單或統一發票').then(function(r){
             if(!r)return;
@@ -26101,14 +26105,14 @@ function _fileToDataUrl(file,maxW){
   });
 }
 async function aiScanDoc(dataUrl,hint){
-  if(!_aiKey()){toast('尚未設定智慧辨識 API Key（參數設定 → 智慧辨識，僅存本機）');return null;}
+  if(!_aiOn()){toast(_aiOffMsg());return null;}
   if(!/^data:image\//.test(dataUrl)){toast('智慧辨識僅支援照片（PDF 請改拍照）');return null;}
   toast('辨識中…');
   try{
     var b64=dataUrl.split(',')[1];var mt=dataUrl.match(/^data:([^;]+)/)[1];
-    var r=await fetch('https://api.anthropic.com/v1/messages',{
+    var r=await _aiFetch({
       method:'POST',
-      headers:{'content-type':'application/json','x-api-key':_aiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      headers:{'content-type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-5',max_tokens:600,messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:mt,data:b64}},
         {type:'text',text:'這是台灣營建業的'+(hint||'單據')+'照片。擷取欄位。回覆第一個字元必須是 { 、最後一個字元必須是 } ，禁止任何說明文字或圍欄。JSON 格式：{"docType":"invoice|transfer|receipt|other","number":"發票字軌號碼如AB12345678（無則空字串）","date":"YYYY-MM-DD（民國年請轉西元）","seller":"開立方/賣方名稱","buyerTaxId":"買受人統編（無則空）","amount":含稅總金額數字,"tax":營業稅額數字（未載明則以總額/21推算取整）,"note":"品名摘要或匯款帳號末五碼等關鍵資訊（20字內）"}'}]}]})
@@ -27193,7 +27197,7 @@ function expScan(){
 var _INTAKE_TYPES={work_confirm:'工作確認單（帶入估驗）',vendor_quote:'廠商報價單（建立成本）',vendor_invoice:'廠商發票（應付登錄）',own_material:'自有成本（材料採購發票）',transfer:'匯款紀錄（應付核實）',owner_invoice:'開給業主的發票',expense:'日常費用發票',other:'其他（手動處理）'};
 function _nrm(x){return String(x||'').replace(/[\s()（）\-－_／/]/g,'').toLowerCase();}
 function smartIntake(){
-  if(!_aiKey()){toast('請先於參數設定填入智慧辨識 API Key（僅存本機）');return;}
+  if(!_aiOn()){toast(_aiOffMsg());return;}
   var inp=document.getElementById('intake-input');
   if(!inp){
     inp=document.createElement('input');
@@ -27214,9 +27218,9 @@ async function aiClassifyDoc(du){
   var ctx='進行中專案：'+JSON.stringify(projs)+'；常用廠商：'+JSON.stringify(vendors);
   try{
     var b64=du.split(',')[1];var mt=du.match(/^data:([^;]+)/)[1];
-    var r=await fetch('https://api.anthropic.com/v1/messages',{
+    var r=await _aiFetch({
       method:'POST',
-      headers:{'content-type':'application/json','x-api-key':_aiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      headers:{'content-type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-5',max_tokens:1200,messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:mt,data:b64}},
         {type:'text',text:'你是台灣營建公司「豐有工程」的文件分類員。'+ctx+'\n判斷這張照片的文件類型並擷取資料。類型定義：work_confirm=工地工作確認單/估驗單(業主或監造簽認數量)；vendor_quote=廠商給我們的報價單；vendor_invoice=工程承攬廠商的計價請款單或發票（有工程款/計價性質）；own_material=公司自購工程材料耗材的發票（鋼索、母索、止水鈑、五金、油壓配件、租金運費等，賣方為材料行/租賃商）；transfer=匯款/轉帳證明；owner_invoice=我們開給業主的統一發票(賣方為豐有)；expense=日常消費發票收據；other=無法判斷。\n回覆第一個字元必須是 { ，最後一個字元必須是 } ，禁止任何說明文字。JSON：{"docType":"上述其一","projectId":"從進行中專案清單比對出的id（無把握則空）","vendor":"對方名稱","items":[{"desc":"工項名","unit":"單位","qty":數量,"price":單價(無則0)}]（confirm/quote/own_material需要——材料發票務必逐品項列出品名/單位/數量/單價,最多12筆）,"number":"發票號碼","date":"YYYY-MM-DD","amount":總金額數字,"tax":稅額數字,"note":"關鍵摘要20字內","confidence":"high|low"}'}]}]})
@@ -30432,7 +30436,7 @@ function renderHrReport(el,year){
 var WORKERS=[];
 try{var _wk0=localStorage.getItem('fy_workers');if(_wk0)WORKERS=JSON.parse(_wk0)||[];}catch(e){_err('WORKERS.load',e);}
 if(!Array.isArray(WORKERS))WORKERS=[];
-function saveWorkers(){_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');try{_autoUpload();}catch(e){_err('saveWorkers',e);}}
+function saveWorkers(){_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');try{_wkSensPush();}catch(e){_err('saveWorkers.sens',e);}try{_autoUpload();}catch(e){_err('saveWorkers',e);}}
 var _WK_DOCS=[
   {k:'photo',n:'大頭照'},{k:'idF',n:'身分證正面'},{k:'idB',n:'身分證反面'},
   {k:'nhiF',n:'健保卡正面'},{k:'nhiB',n:'健保卡反面'},
@@ -30486,7 +30490,7 @@ function _wkRenderList(root){
         return '<tr>'
           +'<td style="'+TD+';font-weight:700">'+(ph?'<img src="'+ph+'" style="width:28px;height:28px;object-fit:cover;border-radius:50%;vertical-align:middle;margin-right:6px">':'')+esc(w.name||'')+(w.status==='left'?'<span class="bdg warn" style="margin-left:4px">離職</span>':'')+'</td>'
           +'<td style="'+TD+'">'+esc(w.sex||'')+'</td>'
-          +'<td style="'+TD+'">'+esc(_hrMask(w.idNo||''))+'</td>'
+          +'<td style="'+TD+'">'+esc(w.idNo?_hrMask(w.idNo):(w.idMask||''))+'</td>'   // v6.0.112：非管理員裝置只有遮罩
           +'<td style="'+TD+'">'+esc(w.phone||'')+'</td>'
           +'<td style="'+TD+'">'+esc(w.company||'')+(w.title?'<span style="color:var(--b3);font-size:11px"> '+esc(w.title)+'</span>':'')+'</td>'
           +'<td style="'+TD+'">'+_wkDocCount(w)+'／'+_WK_DOCS.length+(w.certs&&w.certs.length?('＋證照 '+w.certs.length):'')+'</td>'
@@ -30618,14 +30622,14 @@ function wkDel(id){
 // ── AI：拍身分證／健保卡自動帶入 ──
 async function wkAiFromId(){
   if(!_wkDraft)return;
-  if(!_aiKey()){toast('請先到參數設定填入 AI 金鑰');return;}
+  if(!_aiOn()){toast(_aiOffMsg());return;}
   _wkPickFile('image/*',async function(f){
     var du;try{du=await _fileToDataUrl(f,1200);}catch(e){toast('讀取失敗');return;}
     toast('辨識中…');
     try{
       var b64=du.split(',')[1],mt=du.match(/^data:([^;]+)/)[1];
-      var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-        headers:{'content-type':'application/json','x-api-key':_aiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      var r=await _aiFetch({method:'POST',
+        headers:{'content-type':'application/json'},
         body:JSON.stringify({model:'claude-sonnet-5',max_tokens:500,messages:[{role:'user',content:[
           {type:'image',source:{type:'base64',media_type:mt,data:b64}},
           {type:'text',text:'這是台灣的身分證或健保卡照片。擷取欄位並只回傳 JSON：{"doc":"id_front|id_back|nhi|other","name":"","idNo":"","birth":"YYYY-MM-DD","sex":"男|女|","regAddr":"","blood":""}。民國年請換算西元；身分證反面才有住址；讀不到的欄位留空字串。回覆第一個字元必須是 {。'}]}]})});
@@ -30843,7 +30847,7 @@ function _wkTplGet(key){return ((P.wkTpl||{})[key])||null;}
 function _wkTplSave(key,map,label){if(!P.wkTpl)P.wkTpl={};P.wkTpl[key]={map:map,label:label||'',ts:Date.now()};try{persistP();}catch(e){_err('_wkTplSave',e);}try{_onSave();}catch(e){_err('_wkTplSave',e);}}
 // ── AI 對應 ──
 async function _wkAiMap(kind,entries){
-  if(!_aiKey())throw new Error('請先到參數設定填入 AI 金鑰');
+  if(!_aiOn())throw new Error(_aiOffMsg());
   var fields=_WK_FILL_FIELDS.map(function(f){return f[0]+'='+f[1];}).join('；');
   var list=entries.slice(0,400).map(function(e){return kind==='xlsx'?('['+e.sheet+'!'+e.cell+'] '+e.text.slice(0,40)):('['+e.i+':'+e.kind+'] '+e.text.slice(0,60));}).join('\n');
   var prompt='這是台灣營建業主給協力廠商的「人員進場申請／名冊」空白表格，我列出'+(kind==='xlsx'?'有文字的儲存格（[工作表!位址] 文字）':'表格儲存格（[序號:tc]）與段落（[序號:p]）的文字')+'。\n'
@@ -30855,19 +30859,19 @@ async function _wkAiMap(kind,entries){
       ?'{"mode":"single|roster","targets":[{"sheet":"工作表1","cell":"C3","field":"name","label":"姓名"}],"roster":{"sheet":"工作表1","firstRow":5,"cols":{"name":"B","idNo":"C"}}}'
       :'{"mode":"single|roster","targets":[{"i":12,"field":"name","label":"姓名"}],"roster":{"start":30,"cols":6,"fields":["","name","idNo","birth","phone",""]}}')
     +'\n不確定或表格上沒有的欄位不要硬填。\n\n'+list;
-  var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-    headers:{'content-type':'application/json','x-api-key':_aiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+  var r=await _aiFetch({method:'POST',
+    headers:{'content-type':'application/json'},
     body:JSON.stringify({model:'claude-sonnet-5',max_tokens:1500,messages:[{role:'user',content:[{type:'text',text:prompt}]}]})});
   var d=await r.json();
   if(d.error)throw new Error(d.error.message||'AI 錯誤');
   return _aiJson((d.content||[]).map(function(b){return b.text||'';}).join(''));
 }
 async function _wkAiReadImage(du){
-  if(!_aiKey())throw new Error('請先到參數設定填入 AI 金鑰');
+  if(!_aiOn())throw new Error(_aiOffMsg());
   var b64=du.split(',')[1],mt=du.match(/^data:([^;]+)/)[1];
   var fields=_WK_FILL_FIELDS.map(function(f){return f[0]+'='+f[1];}).join('；');
-  var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
-    headers:{'content-type':'application/json','x-api-key':_aiKey(),'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+  var r=await _aiFetch({method:'POST',
+    headers:{'content-type':'application/json'},
     body:JSON.stringify({model:'claude-sonnet-5',max_tokens:900,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mt,data:b64}},
       {type:'text',text:'這是台灣營建業主的人員進場申請表。依表格出現順序列出要填寫的欄位，對應到欄位代碼（'+fields+'），表上沒有對應者 field 留空。只回傳 JSON：{"fields":[{"label":"姓名","field":"name"}]}'}]}]})});
   var d=await r.json();if(d.error)throw new Error(d.error.message||'AI 錯誤');
@@ -32853,6 +32857,7 @@ function _v6PermMigrate(){
 // 總覽待辦：待登錄廠商請款／本月尚未開單／自有材料在工地
 function _v6TodoItems(items){
   var ic=function(h){return '<svg class="ic ib" aria-hidden="true"><use href="#'+h+'"/></svg>';};
+  try{var _th=_tombHoldCount();if(_th&&_shWholeOk())items.push({type:'tomb_hold',urgent:true,jump:'openTombHold()',icon:ic('i-warn'),color:'var(--red)',text:'刪除申請待確認 '+_th+' 筆',sub:'員工一次刪除很多筆，先擋下等管理員確認'});}catch(e){_err('_v6TodoItems.tomb',e);}   // v6.0.112
   try{if(!_isReaderUser){var _dp=_draftPending();if(_dp.length)items.push({type:'ai_draft',urgent:false,jump:'openDrafts()',icon:ic('i-doc'),color:'#1565C0',text:'AI 草稿 '+_dp.length+' 筆待確認',sub:_dp.slice(0,2).map(function(d){return _DRAFT_T[d.type]||'';}).join('、')});}}catch(e){_err('_v6TodoItems.draft',e);}   // v6.0.109
   try{_rfqVerTodo(items);}catch(e){_err('_v6TodoItems.rfqVer',e);}   // v6.0.109 報價進版、詢價／分包未同步
   try{
@@ -38741,6 +38746,153 @@ function _bankVendorSave(oldName,v){
   up['vendors/'+nk]=nv.acct?Object.assign(nv,{at:same?(cur.at||0):Date.now(),by:same?(cur.by||''):_meEmail()}):null;
   if(!same)_bankLog(up,'vendor',v.name,{bank:cur.bank||'',acct:cur.acct||'',holder:cur.holder||''},{bank:nv.bank,acct:nv.acct,holder:nv.holder});
   _fbDb.ref('fydata/bank').update(up).then(function(){if(!same)toast(v.name+' 的匯款帳號已變更（已留紀錄，30 天內付款會提醒先電話確認）');}).catch(function(e){_err('_bankVendorSave',e);toast('匯款帳號變更失敗：'+(e&&e.message||''));});
+}
+// ══════════ v6.0.112 健檢2 #7：AI 呼叫改走雲端代理 aiProxy（前端不再持有金鑰） ══════════
+// 原本各裝置把金鑰存在本機、瀏覽器直接呼叫 Anthropic（anthropic-dangerous-direct-browser-access）——任何持有金鑰的裝置都拿得出來。
+// 改為：帶登入憑證（ID token）呼叫 Cloud Function aiProxy，由伺服器加上金鑰（defineSecret ANTHROPIC_API_KEY）轉送；只有員工與管理員可用、每人每天上限。
+// 回傳值與 fetch 相同（有 json()），呼叫端不用改。
+var _AI_PROXY='https://asia-southeast1-jhchen-aed9a.cloudfunctions.net/aiProxy';
+function _aiOn(){return !!(_fbUser&&!_isReaderUser&&_roState!=='reader');}
+function _aiOffMsg(){return _isReaderUser?'唯讀帳號不能使用 AI 辨識':'AI 辨識要先登入帳號';}
+async function _aiFetch(opts){
+  if(!_aiOn())throw new Error(_aiOffMsg());
+  try{localStorage.removeItem('fy_aikey');}catch(e){/* 可忽略 */}   // 舊版留在本機的金鑰一併清掉
+  var tok=await _fbUser.getIdToken();
+  var r;
+  try{r=await fetch(_AI_PROXY,{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+tok},body:(opts&&opts.body)||'{}'});}
+  catch(e){_err('_aiFetch',e);r={status:0};}   // 代理未部署時沒有 CORS 標頭，fetch 直接失敗
+  if(r.status===404||r.status===0)return {ok:false,status:r.status,json:function(){return Promise.resolve({error:{message:'AI 代理尚未部署（回國後部署清單）'}});}};
+  return r;
+}
+// ══════════ v6.0.112 健檢2 #5：人員進場資料的身分證件移出共用區 ══════════
+// 原本身分證字號、生日、血型、地址、緊急聯絡人與身分證／健保卡／體檢／藥檢影像都在 fydata/shared/workers，全體員工與唯讀帳號都讀得到。
+// 改為：共用區只放公開版（姓名、職稱、所屬公司、證照、各文件到期日、身分證字號遮罩 idMask）；
+// 敏感部分存 fydata/workerSens/<id>（只有管理員能讀寫，唯讀帳號也讀不到）；員工裝置輸入的敏感資料寫到投遞區
+// fydata/workerSensIn/<id>（員工只能寫、不能讀），管理員裝置同步時收進 workerSens 後刪除。本機的完整資料不刪。
+var _WK_SENS_F=['idNo','birth','blood','regAddr','mailAddr','emg','emgRel','emgPhone'];
+var _WK_SENS_DOCS=['idF','idB','nhiF','nhiB','health','drug'];
+var WK_SENS={};try{WK_SENS=JSON.parse(localStorage.getItem('fy_wksens')||'{}')||{};}catch(e){WK_SENS={};}
+function _wkIdMask(v){v=String(v||'');return v.length>=6?(v.slice(0,3)+'****'+v.slice(-3)):(v?'****':'');}
+function _wkSplit(w){
+  w=w&&typeof w==='object'?w:{};
+  var pub=JSON.parse(JSON.stringify(w)),sens={id:w.id,_mt:w._mt||0,f:{},docs:{}},has=false;
+  _WK_SENS_F.forEach(function(k){if(pub[k]!=null&&pub[k]!==''){sens.f[k]=pub[k];has=true;}delete pub[k];});
+  if(w.idNo)pub.idMask=_wkIdMask(w.idNo);
+  var docs=pub.docs&&typeof pub.docs==='object'?pub.docs:{};
+  _WK_SENS_DOCS.forEach(function(k){var d=docs[k];if(!d)return;if(d.du){sens.docs[k]={du:d.du,name:d.name||'',ts:d.ts||0};has=true;}docs[k]={du:'',name:'',ts:d.ts||0,exp:d.exp||'',_sens:d.du?1:0};});
+  pub.docs=docs;
+  return {pub:pub,sens:has?sens:null};
+}
+// 把敏感部分接回本機記錄（本機已有值的不覆蓋）
+function _wkGraft(){
+  (WORKERS||[]).forEach(function(w){
+    var s=w&&WK_SENS[w.id];if(!s)return;
+    Object.keys(s.f||{}).forEach(function(k){if(w[k]==null||w[k]==='')w[k]=s.f[k];});
+    if(!w.docs||typeof w.docs!=='object')w.docs={};
+    Object.keys(s.docs||{}).forEach(function(k){var d=w.docs[k]||{};if(!d.du)w.docs[k]=Object.assign({},d,{du:s.docs[k].du,name:s.docs[k].name||d.name||'',ts:s.docs[k].ts||d.ts||0});});
+  });
+}
+function _wkSensAdmin(){return !!(_fbUser&&!_isReaderUser&&isAdmin(String(_fbUser.email||'').toLowerCase()));}
+function _wkSensHash(o){return _collHash(o);}
+// 上傳敏感部分：管理員寫 workerSens，員工寫投遞區；內容沒變不送
+function _wkSensPush(){
+  if(!_fbDb||!_fbUser||_isReaderUser)return;
+  var adm=_wkSensAdmin(),hs={};try{hs=JSON.parse(localStorage.getItem('fy_wksens_h')||'{}')||{};}catch(e){hs={};}
+  var up={},n=0;
+  (WORKERS||[]).forEach(function(w){
+    if(!w||!w.id||!/^[A-Za-z0-9_-]{1,60}$/.test(String(w.id)))return;
+    var sp=_wkSplit(w).sens;if(!sp)return;
+    var h=_wkSensHash(sp);if(hs[w.id]===h)return;
+    if(adm){up['workerSens/'+w.id]=sp;WK_SENS[w.id]=sp;}else up['workerSensIn/'+w.id]=Object.assign({},sp,{by:_meEmail(),at:Date.now()});
+    hs[w.id]=h;n++;
+  });
+  if(!n)return;
+  _fbDb.ref('fydata').update(up).then(function(){
+    try{localStorage.setItem('fy_wksens_h',JSON.stringify(hs));if(adm)localStorage.setItem('fy_wksens',JSON.stringify(WK_SENS));}catch(e){_err('_wkSensPush.ls',e);}
+  }).catch(function(e){_err('_wkSensPush',e);});   // 規則尚未發布：下次存檔再送（雜湊沒存）
+}
+// 管理員：下載 workerSens、收投遞區
+function _wkSensPull(){
+  if(!_fbDb||!_wkSensAdmin())return;
+  Promise.all([_fbDb.ref('fydata/workerSens').once('value'),_fbDb.ref('fydata/workerSensIn').once('value')]).then(function(r){
+    var cur=r[0].val()||{},inb=r[1].val()||{},up={},n=0;
+    Object.keys(cur).forEach(function(id){WK_SENS[id]=cur[id];});
+    Object.keys(inb).forEach(function(id){
+      var x=inb[id];if(!x||!/^[A-Za-z0-9_-]{1,60}$/.test(id))return;
+      var have=WK_SENS[id];
+      if(!have||(+x._mt||0)>=(+have._mt||0)){var c={id:id,_mt:+x._mt||Date.now(),f:x.f||{},docs:x.docs||{}};WK_SENS[id]=c;up['workerSens/'+id]=c;}
+      up['workerSensIn/'+id]=null;n++;
+    });
+    try{localStorage.setItem('fy_wksens',JSON.stringify(WK_SENS));}catch(e){_err('_wkSensPull.ls',e);}
+    _wkGraft();try{_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');}catch(e){_err('_wkSensPull.save',e);}
+    if(n)_fbDb.ref('fydata').update(up).then(function(){console.log('[人員] 已收 '+n+' 筆員工輸入的證件資料');}).catch(function(e){_err('_wkSensPull.in',e);});
+    // 遷移：本機完整資料還沒進 workerSens 的，由管理員裝置補送（第一次升級時，舊的共用區資料會從這裡搬過去）
+    try{_wkSensPush();}catch(e){_err('_wkSensPull.push',e);}
+  }).catch(function(e){_err('_wkSensPull',e);});   // 規則尚未發布：讀不到，維持本機
+}
+// ══════════ v6.0.112 健檢2 #3：墓碑（刪除記錄）只有管理員能寫，員工的刪除改送「刪除申請」 ══════════
+// 原本任何員工都能往 tombs 塞一批編號，各裝置合併時就把那些資料刪掉。改為：
+//  員工裝置刪除 → 本機照刪、本機墓碑照記；上傳時把新墓碑送到 fydata/tombReq/<員工>/<集合>/<編號>（只能寫自己的、不能讀）。
+//  管理員裝置同步時收申請：同一位員工這一批 ≤ 30 筆自動套用（寫進墓碑、刪本機）；超過就先擋下，總覽待辦「刪除申請待確認」由管理員決定。
+//  員工直接把雲端記錄清掉、但沒有墓碑 → 管理員裝置合併時會把本機那筆補回去（不會真的刪光）。
+var _TOMB_AUTO_MAX=30;
+var TOMB_HOLD={};try{TOMB_HOLD=JSON.parse(localStorage.getItem('fy_tombhold')||'{}')||{};}catch(e){TOMB_HOLD={};}
+var _TOMB_COLLS={quotes:function(){return Q;},invoices:function(){return INV;},contracts:function(){return CONTRACTS;},customers:function(){return CUSTOMERS;},vendors:function(){return VENDORS;},
+  invoiceRecs:function(){return INVOICE_RECS;},workers:function(){return WORKERS;},payables:function(){return PAYABLES;},expenses:function(){return EXPENSES;}};
+function _tombReqPush(){
+  if(!_fbDb||!_fbUser||_isReaderUser||_shWholeOk())return;
+  var me=_encEmailKey(_fbUser.email);if(!me)return;
+  var sent={};try{sent=JSON.parse(localStorage.getItem('fy_tombreq_sent')||'{}')||{};}catch(e){sent={};}
+  var up={},n=0;
+  Object.keys(TOMBS||{}).forEach(function(c){if(!_TOMB_COLLS[c])return;Object.keys(TOMBS[c]||{}).forEach(function(id){
+    var k=c+'/'+id;if(sent[k]||!/^[A-Za-z0-9_-]{1,80}$/.test(id))return;up[c+'/'+id]=TOMBS[c][id];sent[k]=1;n++;});});
+  if(!n)return;
+  _fbDb.ref('fydata/tombReq/'+me).update(up).then(function(){try{localStorage.setItem('fy_tombreq_sent',JSON.stringify(sent));}catch(e){_err('_tombReqPush.ls',e);}}).catch(function(e){_err('_tombReqPush',e);});
+}
+function _tombApplyOne(c,id,ts){
+  TOMBS[c]=TOMBS[c]||{};TOMBS[c][id]=ts||Date.now();
+  var a=_TOMB_COLLS[c]&&_TOMB_COLLS[c]();if(!Array.isArray(a))return;
+  for(var i=a.length-1;i>=0;i--){if(a[i]&&a[i].id===id){if(c==='payables'&&a[i].status==='paid')continue;a.splice(i,1);}}   // 已付的應付不刪
+}
+function _tombSaveAll(){
+  try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e){_err('_tombSaveAll',e);}
+  try{persist();saveInv();saveContracts();saveVendors();saveInvoiceRecs();savePayables();saveExpenses();_lsSet('fy_customers',JSON.stringify(CUSTOMERS),'客戶');_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');}catch(e){_err('_tombSaveAll.save',e);}
+  try{_autoUpload();}catch(e){_err('_tombSaveAll.up',e);}
+}
+function _tombReqPull(){
+  if(!_fbDb||!_shWholeOk())return;
+  _fbDb.ref('fydata/tombReq').once('value').then(function(snap){
+    var all=snap.val()||{},clr={},applied=0,held=0;
+    Object.keys(all).forEach(function(who){
+      var list=[];Object.keys(all[who]||{}).forEach(function(c){if(!_TOMB_COLLS[c])return;Object.keys(all[who][c]||{}).forEach(function(id){list.push({c:c,id:id,ts:+all[who][c][id]||Date.now()});});});
+      list.forEach(function(x){clr[who+'/'+x.c+'/'+x.id]=null;});
+      if(list.length<=_TOMB_AUTO_MAX&&!TOMB_HOLD[who]){list.forEach(function(x){_tombApplyOne(x.c,x.id,x.ts);});applied+=list.length;}
+      else{TOMB_HOLD[who]=(TOMB_HOLD[who]||[]).concat(list);held+=list.length;}
+    });
+    if(!Object.keys(clr).length)return;
+    try{localStorage.setItem('fy_tombhold',JSON.stringify(TOMB_HOLD));}catch(e){_err('_tombReqPull.hold',e);}
+    if(applied)_tombSaveAll();
+    _fbDb.ref('fydata/tombReq').update(clr).catch(function(e){_err('_tombReqPull.clr',e);});
+    if(held)toast('有員工一次申請刪除很多筆資料（共 '+held+' 筆），已先擋下，請到總覽「刪除申請待確認」處理');
+    try{updateDashTodo();}catch(e){_err('_tombReqPull.todo',e);}
+  }).catch(function(e){_err('_tombReqPull',e);});   // 規則尚未發布
+}
+function _tombHoldCount(){return Object.keys(TOMB_HOLD||{}).reduce(function(a,k){return a+((TOMB_HOLD[k]||[]).length);},0);}
+function openTombHold(){
+  var keys=Object.keys(TOMB_HOLD||{});if(!keys.length){toast('沒有待確認的刪除申請');return;}
+  var h=keys.map(function(who){var L=TOMB_HOLD[who]||[];var byC={};L.forEach(function(x){byC[x.c]=(byC[x.c]||0)+1;});
+    return '<div style="border:1px solid var(--b1);border-radius:var(--r8);padding:8px 10px;margin-bottom:6px"><b>'+esc(String(who).replace(/,/g,'.'))+'</b>　共 '+L.length+' 筆（'+Object.keys(byC).map(function(c){return esc(c)+' '+byC[c];}).join('、')+'）'
+      +'<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px"><button type="button" class="btn btn-xs btn-r" onclick="tombHoldDo(\''+escq(who)+'\',1)">照申請刪除</button><button type="button" class="btn btn-xs" onclick="tombHoldDo(\''+escq(who)+'\',0)">不刪（資料留著）</button></div></div>';}).join('');
+  _modal('刪除申請待確認','<div style="font-size:12px;color:var(--b4);margin-bottom:6px">員工一次刪除超過 '+_TOMB_AUTO_MAX+' 筆時會先擋下。確認是正常整理才刪；不是的話選「不刪」，資料會留著並同步回去。</div><div id="tomb-hold-box">'+h+'</div>',function(){return true;});
+}
+function tombHoldDo(who,ok){
+  if(_roDeny()||!_shWholeOk())return;
+  var L=TOMB_HOLD[who]||[];
+  if(ok){L.forEach(function(x){_tombApplyOne(x.c,x.id,x.ts);});_tombSaveAll();}
+  delete TOMB_HOLD[who];try{localStorage.setItem('fy_tombhold',JSON.stringify(TOMB_HOLD));}catch(e){_err('tombHoldDo',e);}
+  var m=document.getElementById('fy-modal');if(m)m.remove();if(Object.keys(TOMB_HOLD).length)openTombHold();
+  try{updateDashTodo();}catch(e){_err('tombHoldDo.todo',e);}
+  toast(ok?('已刪除 '+L.length+' 筆'):'已保留，不刪');
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
