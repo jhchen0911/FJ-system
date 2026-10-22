@@ -111,7 +111,7 @@
 
 ## 測試
 
-`tests/smoke.js`（742 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（747 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。`package.json` 釘死 playwright 版本（v6.0.103 起 1.64.1＝Chrome 156），CI 與本機才用同一瀏覽器；升級 playwright 要當成一次改版、跑過冒煙再推。雲端容器裝不到新瀏覽器時，可從 storage.googleapis.com 的 chrome-for-testing-public 下載同版 chrome-headless-shell，用 `CHROMIUM_PATH` 指定。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
