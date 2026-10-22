@@ -4267,7 +4267,7 @@ function refreshContractClientList(){
 // ── 追加合約功能 ──
 // 健檢1 #7：追加案只帶表頭與合約條件（白名單）。原本整包複製主案，連總計 t、日報、詢價單、佣金、其他費用、業務都帶走，
 // 存檔前得標金額就會多算一份主案、專案頁的日報／詢價也各多一份
-var _ADDENDUM_KEEP=['client','loc','contact','phone','rmk','rmkText','deduct','ownerPay'];
+var _ADDENDUM_KEEP=['client','loc','contact','phone','rmk','rmkText','deduct','ownerPay','rentEnd'];
 function addAddendum(id){
   const src=Q.find(x=>x.id===id);if(!src)return;
   const copy={};
@@ -21847,6 +21847,8 @@ function syncCostToPayable(q, cost){
       if(existIdx<0){existIdx=i;existStatus=p.status||'pending';existId=p.id;existP=p;}
     }
   });
+  // 健檢1 #14：同 costId 有多筆時優先對已付的那筆（否則刪掉未付、全額重建，加上保留的已付＝重複）
+  if(existP&&existP.status!=='paid'){PAYABLES.forEach(function(p,i){if(!p.deltaOf&&p.costId===cost.id&&p.status==='paid'&&existP.status!=='paid'){existIdx=i;existStatus='paid';existId=p.id;existP=p;}});}
   // 次要：用 costSourceId 比對（手動建立且已連結工項的記錄）
   if(existIdx<0){
     PAYABLES.forEach(function(p,i){
@@ -33248,10 +33250,12 @@ function _payPaidDelta(p,old){
   var diff=Math.round((parseFloat(p.amount)||0)-paid);
   var un=fam.find(function(x){return x.id!==old.id&&x.status!=='paid';});
   if(diff===0){if(un){PAYABLES=PAYABLES.filter(function(x){return x!==un;});_tomb('payables',un.id);}return;}
-  var n=1;while(PAYABLES.some(function(x){return x.id===old.id+'_d'+n;}))n++;
+  // 新 id 要避開現有記錄與墓碑（墓碑裡的 id 重新出現會在雲端合併時被丟掉）
+  var _tb=(typeof TOMBS!=='undefined'&&TOMBS&&TOMBS.payables)||{};
+  var n=1;while(PAYABLES.some(function(x){return x.id===old.id+'_d'+n;})||_tb[old.id+'_d'+n]!=null)n++;
   var d=Object.assign({},p,{id:un?un.id:(old.id+'_d'+n),deltaOf:old.id,amount:diff,status:'pending',
-    note:(diff>0?'已付後追加差額：':'已付後減少（多付 '+fmt(-diff)+'，待扣回）：')+(p.note||''),date:(un&&un.date)||p.date});
-  ['paidDate','paidAt','unpaidAt'].forEach(function(f){delete d[f];});
+    note:(diff>0?'已付後追加差額：':'已付後減少（多付 '+fmt(-diff)+'，待扣回）：')+(p.note||''),date:(un&&un.date)||_vendorDueDate(localToday())});   // 差額從今天起算放款日，不沿用本體的舊日期
+  ['paidDate','paidAt','unpaidAt','costPeriod','costEarly','costAdv'].forEach(function(f){delete d[f];});   // 差額筆不是期別本體（不參與期別卡計算與清重複）
   if(un&&_recSame(un,d))_keepStamp(d,un);else _touch(d);
   var ix=PAYABLES.indexOf(un);if(ix>=0)PAYABLES[ix]=d;else PAYABLES.unshift(d);
 }
@@ -35067,6 +35071,7 @@ function _subPayAuditRows(q,c){
   _subPeriods(c).forEach(function(per){exp[_subPayId(c.id,per)]=(per.isRet?'保留款退還':('第'+per.no+'期計價'));_subEarly(per).forEach(function(e){exp[_subEarlyId(c.id,per,e)]='第'+per.no+'期提前放款';});});
   _subAdvs(c).forEach(function(a){exp[_subAdvPayId(c.id,a)]='預付款';});
   exp['pay'+c.id+'_intro']='介紹費（一次）';
+  (PAYABLES||[]).forEach(function(p){if(p&&p.deltaOf&&exp[p.deltaOf]&&p.costId===c.id)exp[p.id]=exp[p.deltaOf]+'（已付後差額）';});   // 健檢1 #13
   var allCostIds={};(q.costs||[]).forEach(function(x){if(x&&x.id)allCostIds[x.id]=x;});
   var rows=[];
   (PAYABLES||[]).forEach(function(p){
@@ -35314,6 +35319,7 @@ function _subExpectedPayIds(c){
   _subAdvs(c).forEach(function(a){exp[_subAdvPayId(c.id,a)]='預付款';});
   exp['pay'+c.id+'_intro']='介紹費';
   if(!_subPeriods(c).length)exp['pay'+c.id]='發包整筆';
+  (PAYABLES||[]).forEach(function(p){if(p&&p.deltaOf&&exp[p.deltaOf]&&p.costId===c.id)exp[p.id]=exp[p.deltaOf]+'（已付後差額）';});   // 健檢1 #13
   return exp;
 }
 function _paySource(p){
@@ -35346,7 +35352,7 @@ function _payVatCtl(p){
 //   以及「同 costId 的多筆整筆應付」（沒有期別／預付／介紹標記的舊式整筆），期別／預付款／介紹費一律保留。
 function cleanDuplicatePayables(){
   var seenId={},whole={},out=[],n=0;
-  var isWhole=function(p){return !p.costPeriod&&!p.costAdv&&!p.costEarly&&!/_(p|r|a|e)\w*$|_intro$/.test(String(p.id||''));};
+  var isWhole=function(p){return !p.deltaOf&&!p.costPeriod&&!p.costAdv&&!p.costEarly&&!/_(p|r|a|e)\w*$|_intro$/.test(String(p.id||''));};   // 健檢1 #13：已付後差額筆不是整筆
   var sorted=PAYABLES.slice().sort(function(a,b){return ((b.status==='paid')-(a.status==='paid'))||((b.updatedAt||b._mt||0)-(a.updatedAt||a._mt||0));});   // v6.0.89 同編號重複時已付優先
   var keep=[];
   sorted.forEach(function(p){
@@ -35376,7 +35382,7 @@ togglePayVat=function(pid,on){var p=(PAYABLES||[]).find(function(x){return x&&x.
 // ── 1. 預付款併入期別卡 ──
 function _payCostOf(p){var c=null,qq=null;(Q||[]).some(function(q){var x=(q&&q.costs||[]).find(function(y){return y&&y.id===p.costId;});if(x){c=x;qq=q;return true;}return false;});return c?{q:qq,c:c}:null;}
 function _payPeriodCtx(p){
-  if(!p||!p.costId||p.costPeriod==null||p.costEarly)return null;
+  if(!p||!p.costId||p.costPeriod==null||p.costEarly||p.deltaOf)return null;
   var f=_payCostOf(p);if(!f||f.c.type!=='sub')return null;
   var per=_subPeriods(f.c).find(function(x){return String(x.no)===String(p.costPeriod)&&!x.isRet;});if(!per)return null;
   return {q:f.q,c:f.c,per:per,k:_subPeriodCalc(f.c,per)};

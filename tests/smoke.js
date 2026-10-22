@@ -8170,6 +8170,10 @@ async function newPage(browser, width, height) {
           items: [{ type: 'item', desc: 'H型鋼 打設、拔除', cat: 'both', unit: 'M', contractPrice: 1000, contractQty: 100, prevQty: 0, curQty: 100, payRate: 70, installCum: 0, removeCum: 0 }] });
         loadInvoice('IS'); msg = ''; settleInvItem(0);
         out.settleBlock = invItems[0].contractQty === 100 && /拔除尚未完成/.test(msg);
+        /* 拔除完成後可結算（打設 100、拔除 90 → 實作 97） */
+        invItems[0].installCum = 100; invItems[0].removeCum = 0; invItems[0].prevQty = 70; invItems[0].curQty = 90; invItems[0].payRate = 30; invItems[0].phase = 'remove';
+        msg = ''; settleInvItem(0); out.settleBlock2 = /拔除尚未完成/.test(msg);
+        invItems[0].curQty = 100; msg = ''; settleInvItem(0); out.settleOk = !/拔除尚未完成/.test(msg);
         INV.length = 0;
         /* #13 已付期別：自動重算不改寫已付金額，差額另立；手動修改先擋 */
         PAYABLES.push({ id: 'payC1_p1', costId: 'C1', costPeriod: 1, to: '甲', amount: 19950, status: 'paid', paidDate: '2026-10-05', project: 'X' });
@@ -8194,6 +8198,23 @@ async function newPage(browser, width, height) {
         const paidAmts = PAYABLES.filter(x => x.status === 'paid').map(x => x.amount).join(',');
         const pend = PAYABLES.filter(x => x.status !== 'paid');
         out.paidNoRewrite = paidAmts === '1500,1500' && pend.length === 1 && pend[0].amount === 75;
+        /* 審查 🔴：整筆應付已付 → 成本改動產生差額筆 → 開應付分頁（清重複）後差額筆還在 */
+        PAYABLES.length = 0; const cW = { id: 'cW', type: 'labor', vendor: '戊', amt: 1500 }; qq.costs = [cW]; Q.push(qq);
+        syncCostToPayable(qq, cW); PAYABLES.find(x => x.costId === 'cW').status = 'paid';
+        cW.amt = 2000; syncCostToPayable(qq, cW); cleanDuplicatePayables();
+        const dW = PAYABLES.find(x => x.deltaOf);
+        out.cleanKeep = !!dW && dW.amount === 500 && PAYABLES.find(x => x.id === 'paycW').amount === 1500 && PAYABLES.find(x => x.id === 'paycW').status === 'paid' && _paySource(dW).auto;
+        /* 差額歸 0 後再出現：不能重用墓碑裡的 id */
+        cW.amt = 1500; syncCostToPayable(qq, cW); cW.amt = 1800; syncCostToPayable(qq, cW);
+        const dW2 = PAYABLES.find(x => x.deltaOf); out.noTombReuse = !!dW2 && dW2.amount === 300 && !(TOMBS.payables && TOMBS.payables[dW2.id] != null);
+        /* 發包期別：已付後改量 → 差額筆有來源、對帳不標無對應、不當成期別卡 */
+        PAYABLES.length = 0;
+        const qS2 = Q.find(x => x.id === 'qP'), cS2 = qS2.costs[0];
+        _syncSubPeriodPayables(qS2, cS2); const pp = PAYABLES.find(x => x.id === 'paycP_p1');
+        out.subBase = !!pp; if (pp) { pp.status = 'paid'; const amt0 = pp.amount;
+          cS2.periods[0].rows[0].qty = 30; _syncSubPeriodPayables(qS2, cS2);
+          const ds = PAYABLES.find(x => x.deltaOf === 'paycP_p1');
+          out.subDelta = !!ds && pp.amount === amt0 && ds.amount > 0 && _paySource(ds).auto && !_subPayAuditRows(qS2, cS2).some(r => r.p === ds && r.orphan) && _payPeriodCtx(ds) === null && ds.costPeriod == null; }
         PAYABLES.length = 0; Q = []; CONTRACTS.splice(0); window.toast = oT; window.confirm = oC;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
       return out;
@@ -8203,8 +8224,8 @@ async function newPage(browser, width, height) {
     check('v6.0.111 健檢1 #3／#4：議價尾差負數列算進請款、列印明細與總計同一算法（天數）', r.adjAmt && r.adjTot && r.prev30k && !r.err, JSON.stringify(r));
     check('v6.0.111 健檢1 #6／#7：得標金額含已得標追加案（不含未得標）、建立追加只帶表頭', r.won && r.wonNoCt && r.addendum && !r.err, JSON.stringify(r));
     check('v6.0.111 健檢1 #2：同名工項重存報價後各自保留單價／數量', r.dup && !r.err, JSON.stringify(r));
-    check('v6.0.111 健檢1 #5：打設＋拔除合一工項拔除未完成不准結算', r.settleBlock && !r.err, JSON.stringify(r));
-    check('v6.0.111 健檢1 #13／#14：已付應付不被改寫或刪除（差額另立、手動修改擋下）', r.paidKeep && r.deltaGone && r.editBlock && r.paid2 && r.paidNoRewrite && !r.err, JSON.stringify(r));
+    check('v6.0.111 健檢1 #5：打設＋拔除合一工項拔除未完成不准結算', r.settleBlock && r.settleBlock2 && r.settleOk && !r.err, JSON.stringify(r));
+    check('v6.0.111 健檢1 #13／#14：已付應付不被改寫或刪除（差額另立、手動修改擋下）', r.paidKeep && r.deltaGone && r.editBlock && r.paid2 && r.paidNoRewrite && r.cleanKeep && r.noTombReuse && r.subBase && r.subDelta && !r.err, JSON.stringify(r));
     check('v6.0.111 批次 G 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
