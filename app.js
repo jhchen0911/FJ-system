@@ -8140,6 +8140,7 @@ function _autoSyncOnLogin(){
   _readerCheck(function(ro){
     try{_draftWatch();}catch(e){_err('_autoSyncOnLogin.draft',e);}   // v6.0.109 AI 草稿
     try{_bankWatch();}catch(e){_err('_autoSyncOnLogin.bank',e);}   // v6.0.112 匯款帳號
+    setTimeout(function(){try{_wkSensPull();_tombReqPull();}catch(e){_err('_autoSyncOnLogin.h',e);}},4000);   // 審查 🔴4：不必等雲端有更新才收投遞／刪除申請
     if(ro){
       _readerApply();
       _pullCloudIfNewer({interactive:false});
@@ -8229,6 +8230,7 @@ function _tomb(coll,id){
   if(coll==='payables'){try{if(typeof PAID_LOG!=='undefined'&&PAID_LOG[id]){delete PAID_LOG[id];localStorage.setItem('fy_paidlog',JSON.stringify(PAID_LOG));}}catch(e){_err('_tomb.paidLog',e);}}   // v6.0.85
   TOMBS[coll]=TOMBS[coll]||{};TOMBS[coll][id]=Date.now();
   try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e){_err('_tomb',e);}
+  if(!_shWholeOk())try{var _tp=JSON.parse(localStorage.getItem('fy_tombreq_pending')||'{}')||{};_tp[coll+'/'+id]=TOMBS[coll][id];localStorage.setItem('fy_tombreq_pending',JSON.stringify(_tp));}catch(e){_err('_tomb.req',e);}   // v6.0.112：只有本機自己刪的才送刪除申請
 }
 // v5.375：墓碑原本只增不減，會一路長大並跟著每次同步上傳。
 // 超過 180 天的墓碑一律清掉——那時所有裝置早就同步過了，
@@ -9844,7 +9846,7 @@ function _sharedPayload(){
   var out={};
   Object.keys(d).forEach(function(k){if(_PRIV_COLLS.indexOf(k)<0)out[k]=d[k];});
   out.quotes=(d.quotes||[]).map(_stripQuoteSens);
-  out.workers=(d.workers||[]).map(function(w){return _wkSplit(w).pub;});   // v6.0.112 健檢2 #5：身分證字號、地址、緊急聯絡人、證件影像不上共用區
+  if(_r112())out.workers=(d.workers||[]).map(function(w){return _wkSplit(w).pub;});   // v6.0.112 健檢2 #5：身分證字號、地址、緊急聯絡人、證件影像不上共用區（新規則發布、新位置可寫之後才剝離——審查 🔴5）
   // v5.336 健檢G：發票的內嵌影像（base64）不上 RTDB——幾張就撞節點寫入上限。
   // 雲端只留 fileUrl（Storage 連結）；內嵌影像留在本機，合併後由 regraft 補回。
   out.invoiceRecs=(d.invoiceRecs||[]).map(function(r){
@@ -9939,9 +9941,12 @@ function _byId(arr){
 // 一般員工不能刪掉整個集合、也不能整包改寫逐筆同步的集合。上傳前先把員工不能送的部分拿掉，免得整次 update 被規則拒絕。
 function _shWholeOk(){try{return !!(_fbUser&&!_isReaderUser&&isAdmin(_fbUser.email));}catch(e){return false;}}
 var _shEmptyWarned={};
+// 新規則是否已發布：讀得到 fydata/bank（v6.0.112 新增的節點）就代表發布了（記在本機，之後都算）
+function _r112(){try{if(BANK!==null)localStorage.setItem('fy_r112','1');return localStorage.getItem('fy_r112')==='1';}catch(e){return BANK!==null;}}
 function _shStripForStaff(delta){
   if(_shWholeOk())return;
   delete delta.pagePerms;   // 名冊／角色：只有管理員的裝置會上傳（規則端同樣只放行管理員）
+  if(!_r112())return;   // 審查 🔴5：新規則還沒發布前，墓碑與空集合照舊上傳（舊規則允許；提早拿掉反而刪除傳不出去）
   if('tombs' in delta){delete delta.tombs;try{_tombReqPush();}catch(e){_err('_shStripForStaff.tomb',e);}}   // 墓碑只有管理員能寫：員工的刪除改送「刪除申請」
   Object.keys(delta).forEach(function(k){
     if(k==='version'||k==='uploadedAt'||k==='uploadedBy'||k.indexOf('/')>=0)return;
@@ -10796,6 +10801,7 @@ function _pullCloudIfNewer(opts){
       }
     } else {
       window._pullInFlight=false;
+      if(cloudTime>0&&localSync>=cloudTime){window._cloudApplied1=true;try{_bankMigrate();}catch(e){_err('_pullCloudIfNewer.bank',e);}}   // 審查 🔴4：本機已是最新，也可以做匯款帳號遷移
       if(dirty)_pushCloud({silent:true});
       else _pullPrivateIfNewer();   // v5.324：只有成本／分潤變動時 shared 不會動，要單獨看私有節點
     }
@@ -30455,7 +30461,7 @@ function _wkExpiries(w){
   w.certs.forEach(function(c){if(c&&c.exp)out.push({label:c.name||'證照',exp:c.exp,dd:_dDiff(today,c.exp)});});
   return out.sort(function(a,b){return a.dd-b.dd;});
 }
-function _wkDocCount(w){w=_wkNorm(w);var n=0;_WK_DOCS.forEach(function(d){if(w.docs[d.k]&&w.docs[d.k].du)n++;});return n;}
+function _wkDocCount(w){w=_wkNorm(w);var n=0;_WK_DOCS.forEach(function(d){if(w.docs[d.k]&&(w.docs[d.k].du||w.docs[d.k]._sens))n++;});return n;}   // v6.0.112：公開版（_sens）也算有交件
 function _wkExpBadge(w){
   var ex=_wkExpiries(w);if(!ex.length)return '';
   var e=ex[0];var c=e.dd<0?'#c62828':(e.dd<=60?'#b26a00':'var(--g3)');
@@ -30616,7 +30622,9 @@ function wkCancel(){_wkEditId=null;_wkDraft=null;renderWorkers();}
 function wkDel(id){
   var w=_wkById(id);if(!w)return;
   showConfirm('刪除人員','確定刪除「'+esc(w.name||'')+'」的進場資料與全部證件影本？',function(){
-    _tomb('workers',id);WORKERS=WORKERS.filter(function(x){return x.id!==id;});saveWorkers();renderWorkers();toast('已刪除');
+    _tomb('workers',id);WORKERS=WORKERS.filter(function(x){return x.id!==id;});delete WK_SENS[id];_wkSensSave();
+    try{if(_fbDb&&_wkSensAdmin()){var u={};u['workerSens/'+id]=null;u['workerSensIn/'+id]=null;_fbDb.ref('fydata').update(u).catch(function(e){_err('wkDel.sens',e);});}}catch(e){_err('wkDel.sens',e);}   // v6.0.112：證件影像一併刪
+    saveWorkers();renderWorkers();toast('已刪除');
   },true);
 }
 // ── AI：拍身分證／健保卡自動帶入 ──
@@ -38721,8 +38729,9 @@ function _bankMigrate(){
   if(!BANK||BANK.migrated||!_shWholeOk()||!_fbDb)return;
   if(!window._cloudApplied1)return;   // 審查：要等本機套用過雲端最新資料（參數、廠商名冊）才複製，否則新瀏覽器會把預設帳號當正本
   var up={},n=0;
-  up.company={bank:P.bank||_CO_BANK_DEF.bank,account:P.bankAccount||_CO_BANK_DEF.account,at:0,by:'migrate'};
-  (VENDORS||[]).forEach(function(v){if(v&&v.name&&v.bankAcct){up['vendors/'+_bankKey(v.name)]={name:v.name,bank:v.bank||'',acct:v.bankAcct,holder:v.bankHolder||'',at:0,by:'migrate'};n++;}});
+  var S=function(v,n){return String(v==null?'':v).slice(0,n);};   // 審查：舊資料可能是數字或太長，規則會整批拒絕
+  up.company={bank:S(P.bank||_CO_BANK_DEF.bank,100),account:S(P.bankAccount||_CO_BANK_DEF.account,40),at:0,by:'migrate'};
+  (VENDORS||[]).forEach(function(v){if(v&&v.name&&v.bankAcct){up['vendors/'+_bankKey(v.name)]={name:S(v.name,100),bank:S(v.bank,100),acct:S(v.bankAcct,40),holder:S(v.bankHolder,100),at:0,by:'migrate'};n++;}});
   _bankLog(up,'migrate','',null,{vendors:n});
   up.migrated=Date.now();
   _fbDb.ref('fydata/bank').update(up).then(function(){console.log('[帳號] 已把 '+n+' 家廠商帳號與公司帳號搬到 fydata/bank');}).catch(function(e){_err('_bankMigrate',e);});
@@ -38761,7 +38770,7 @@ async function _aiFetch(opts){
   var r;
   try{r=await fetch(_AI_PROXY,{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+tok},body:(opts&&opts.body)||'{}'});}
   catch(e){_err('_aiFetch',e);r={status:0};}   // 代理未部署時沒有 CORS 標頭，fetch 直接失敗
-  if(r.status===404||r.status===0)return {ok:false,status:r.status,json:function(){return Promise.resolve({error:{message:'AI 代理尚未部署（回國後部署清單）'}});}};
+  if(r.status===404||r.status===0){var off=(typeof navigator!=='undefined'&&navigator.onLine===false);return {ok:false,status:r.status,json:function(){return Promise.resolve({error:{message:off?'目前沒有網路，AI 辨識要連網才能用':(r.status===404?'AI 代理尚未部署（回國後部署清單）':'AI 代理連不上（檔案可能太大，或代理尚未部署）')}});}};}
   return r;
 }
 // ══════════ v6.0.112 健檢2 #5：人員進場資料的身分證件移出共用區 ══════════
@@ -38772,6 +38781,7 @@ async function _aiFetch(opts){
 var _WK_SENS_F=['idNo','birth','blood','regAddr','mailAddr','emg','emgRel','emgPhone'];
 var _WK_SENS_DOCS=['idF','idB','nhiF','nhiB','health','drug'];
 var WK_SENS={};try{WK_SENS=JSON.parse(localStorage.getItem('fy_wksens')||'{}')||{};}catch(e){WK_SENS={};}
+function _wkSensSave(){try{var o={};Object.keys(WK_SENS).forEach(function(k){var x=WK_SENS[k];if(x)o[k]={id:x.id,_mt:x._mt,f:x.f||{},docs:{}};});localStorage.setItem('fy_wksens',JSON.stringify(o));}catch(e){_err('_wkSensSave',e);}}   // 本機只存文字欄位，影像不落地
 function _wkIdMask(v){v=String(v||'');return v.length>=6?(v.slice(0,3)+'****'+v.slice(-3)):(v?'****':'');}
 function _wkSplit(w){
   w=w&&typeof w==='object'?w:{};
@@ -38798,18 +38808,19 @@ function _wkSensHash(o){return _collHash(o);}
 function _wkSensPush(){
   if(!_fbDb||!_fbUser||_isReaderUser)return;
   var adm=_wkSensAdmin(),hs={};try{hs=JSON.parse(localStorage.getItem('fy_wksens_h')||'{}')||{};}catch(e){hs={};}
-  var up={},n=0;
   (WORKERS||[]).forEach(function(w){
     if(!w||!w.id||!/^[A-Za-z0-9_-]{1,60}$/.test(String(w.id)))return;
     var sp=_wkSplit(w).sens;if(!sp)return;
+    if(adm&&WK_SENS[w.id]){var m=WK_SENS[w.id];sp.f=Object.assign({},m.f||{},sp.f);sp.docs=Object.assign({},m.docs||{},sp.docs);}   // 管理員：本機沒有的欄位保留雲端的
     var h=_wkSensHash(sp);if(hs[w.id]===h)return;
-    if(adm){up['workerSens/'+w.id]=sp;WK_SENS[w.id]=sp;}else up['workerSensIn/'+w.id]=Object.assign({},sp,{by:_meEmail(),at:Date.now()});
-    hs[w.id]=h;n++;
+    var up={},id=w.id;
+    if(adm)up['workerSens/'+id]=sp;else up['workerSensIn/'+id]=Object.assign({},sp,{by:String(_fbUser.email||'').toLowerCase(),at:Date.now()});
+    // 逐人送（含影像，一次全部送可能超過單次寫入上限）；成功才記雜湊
+    _fbDb.ref('fydata').update(up).then(function(){
+      if(adm)WK_SENS[id]=sp;
+      try{var h2=JSON.parse(localStorage.getItem('fy_wksens_h')||'{}')||{};h2[id]=h;localStorage.setItem('fy_wksens_h',JSON.stringify(h2));_wkSensSave();localStorage.setItem('fy_r112','1');}catch(e){_err('_wkSensPush.ls',e);}
+    }).catch(function(e){_err('_wkSensPush',e);});   // 規則尚未發布：下次存檔再送（雜湊沒存）
   });
-  if(!n)return;
-  _fbDb.ref('fydata').update(up).then(function(){
-    try{localStorage.setItem('fy_wksens_h',JSON.stringify(hs));if(adm)localStorage.setItem('fy_wksens',JSON.stringify(WK_SENS));}catch(e){_err('_wkSensPush.ls',e);}
-  }).catch(function(e){_err('_wkSensPush',e);});   // 規則尚未發布：下次存檔再送（雜湊沒存）
 }
 // 管理員：下載 workerSens、收投遞區
 function _wkSensPull(){
@@ -38819,13 +38830,18 @@ function _wkSensPull(){
     Object.keys(cur).forEach(function(id){WK_SENS[id]=cur[id];});
     Object.keys(inb).forEach(function(id){
       var x=inb[id];if(!x||!/^[A-Za-z0-9_-]{1,60}$/.test(id))return;
-      var have=WK_SENS[id];
-      if(!have||(+x._mt||0)>=(+have._mt||0)){var c={id:id,_mt:+x._mt||Date.now(),f:x.f||{},docs:x.docs||{}};WK_SENS[id]=c;up['workerSens/'+id]=c;}
+      // 審查 🔴2：欄位級合併——投遞只覆蓋它帶來的欄位／文件，其他保留（員工裝置只有公開版，常常只補一兩項）
+      var have=WK_SENS[id]||{id:id,f:{},docs:{}},c={id:id,_mt:Math.min(+x.at||Date.now(),Date.now()),f:Object.assign({},have.f||{}),docs:Object.assign({},have.docs||{})};
+      Object.keys(x.f||{}).forEach(function(k){if(_WK_SENS_F.indexOf(k)>=0&&x.f[k]!=null&&x.f[k]!=='')c.f[k]=String(x.f[k]).slice(0,300);});
+      Object.keys(x.docs||{}).forEach(function(k){var dd=x.docs[k];if(_WK_SENS_DOCS.indexOf(k)>=0&&dd&&typeof dd.du==='string'&&/^data:/.test(dd.du))c.docs[k]={du:dd.du,name:String(dd.name||'').slice(0,100),ts:+dd.ts||0};});
+      WK_SENS[id]=c;up['workerSens/'+id]=c;
       up['workerSensIn/'+id]=null;n++;
     });
-    try{localStorage.setItem('fy_wksens',JSON.stringify(WK_SENS));}catch(e){_err('_wkSensPull.ls',e);}
+    _wkSensSave();
     _wkGraft();try{_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');}catch(e){_err('_wkSensPull.save',e);}
+    try{localStorage.setItem('fy_r112','1');}catch(e){_err('_wkSensPull.r112',e);}   // 讀得到 workerSens＝新規則已發布
     if(n)_fbDb.ref('fydata').update(up).then(function(){console.log('[人員] 已收 '+n+' 筆員工輸入的證件資料');}).catch(function(e){_err('_wkSensPull.in',e);});
+    setTimeout(function(){try{_pushCloud({silent:true});}catch(e){_err('_wkSensPull.up',e);}},1500);   // 審查 🔴4：讓共用區換成公開版（清掉舊證件欄位），不必等有人存檔
     // 遷移：本機完整資料還沒進 workerSens 的，由管理員裝置補送（第一次升級時，舊的共用區資料會從這裡搬過去）
     try{_wkSensPush();}catch(e){_err('_wkSensPull.push',e);}
   }).catch(function(e){_err('_wkSensPull',e);});   // 規則尚未發布：讀不到，維持本機
@@ -38837,19 +38853,23 @@ function _wkSensPull(){
 //  員工直接把雲端記錄清掉、但沒有墓碑 → 管理員裝置合併時會把本機那筆補回去（不會真的刪光）。
 var _TOMB_AUTO_MAX=30;
 var TOMB_HOLD={};try{TOMB_HOLD=JSON.parse(localStorage.getItem('fy_tombhold')||'{}')||{};}catch(e){TOMB_HOLD={};}
+var _TOMB_REQ_COLLS={quotes:1,invoices:1,contracts:1,customers:1,vendors:1,invoiceRecs:1,workers:1};   // 審查 🟡2：員工只能申請刪員工看得到的集合（應付／費用不收）
 var _TOMB_COLLS={quotes:function(){return Q;},invoices:function(){return INV;},contracts:function(){return CONTRACTS;},customers:function(){return CUSTOMERS;},vendors:function(){return VENDORS;},
   invoiceRecs:function(){return INVOICE_RECS;},workers:function(){return WORKERS;},payables:function(){return PAYABLES;},expenses:function(){return EXPENSES;}};
 function _tombReqPush(){
   if(!_fbDb||!_fbUser||_isReaderUser||_shWholeOk())return;
   var me=_encEmailKey(_fbUser.email);if(!me)return;
-  var sent={};try{sent=JSON.parse(localStorage.getItem('fy_tombreq_sent')||'{}')||{};}catch(e){sent={};}
-  var up={},n=0;
-  Object.keys(TOMBS||{}).forEach(function(c){if(!_TOMB_COLLS[c])return;Object.keys(TOMBS[c]||{}).forEach(function(id){
-    var k=c+'/'+id;if(sent[k]||!/^[A-Za-z0-9_-]{1,80}$/.test(id))return;up[c+'/'+id]=TOMBS[c][id];sent[k]=1;n++;});});
-  if(!n)return;
-  _fbDb.ref('fydata/tombReq/'+me).update(up).then(function(){try{localStorage.setItem('fy_tombreq_sent',JSON.stringify(sent));}catch(e){_err('_tombReqPush.ls',e);}}).catch(function(e){_err('_tombReqPush',e);});
+  // 審查 🔴1：只送本機自己刪的（_tomb 記在 fy_tombreq_pending），不送從雲端合併來的舊墓碑
+  var pend={};try{pend=JSON.parse(localStorage.getItem('fy_tombreq_pending')||'{}')||{};}catch(e){pend={};}
+  var up={},keys=[];
+  Object.keys(pend).forEach(function(k){var c=k.split('/')[0],id=k.slice(c.length+1);if(!_TOMB_REQ_COLLS[c]||!/^[A-Za-z0-9_-]{1,80}$/.test(id))return;up[c+'/'+id]=+pend[k]||Date.now();keys.push(k);});
+  if(!keys.length){try{localStorage.removeItem('fy_tombreq_pending');}catch(e){_err('_tombReqPush.clr',e);}return;}
+  _fbDb.ref('fydata/tombReq/'+me).update(up).then(function(){try{var p2=JSON.parse(localStorage.getItem('fy_tombreq_pending')||'{}')||{};keys.forEach(function(k){delete p2[k];});localStorage.setItem('fy_tombreq_pending',JSON.stringify(p2));}catch(e){_err('_tombReqPush.ls',e);}}).catch(function(e){_err('_tombReqPush',e);});
 }
 function _tombApplyOne(c,id,ts){
+  if(!_TOMB_REQ_COLLS[c])return;
+  try{if(_tombExempt(c,id))return;}catch(e){_err('_tombApplyOne.exempt',e);}   // 現行仍需要的自動應付不刪
+  if(TOMBS[c]&&TOMBS[c][id]!=null)return;   // 已有墓碑：不用舊時間戳覆寫
   TOMBS[c]=TOMBS[c]||{};TOMBS[c][id]=ts||Date.now();
   var a=_TOMB_COLLS[c]&&_TOMB_COLLS[c]();if(!Array.isArray(a))return;
   for(var i=a.length-1;i>=0;i--){if(a[i]&&a[i].id===id){if(c==='payables'&&a[i].status==='paid')continue;a.splice(i,1);}}   // 已付的應付不刪
@@ -38866,7 +38886,9 @@ function _tombReqPull(){
     Object.keys(all).forEach(function(who){
       var list=[];Object.keys(all[who]||{}).forEach(function(c){if(!_TOMB_COLLS[c])return;Object.keys(all[who][c]||{}).forEach(function(id){list.push({c:c,id:id,ts:+all[who][c][id]||Date.now()});});});
       list.forEach(function(x){clr[who+'/'+x.c+'/'+x.id]=null;});
-      if(list.length<=_TOMB_AUTO_MAX&&!TOMB_HOLD[who]){list.forEach(function(x){_tombApplyOne(x.c,x.id,x.ts);});applied+=list.length;}
+      list=list.filter(function(x){return !(TOMBS[x.c]&&TOMBS[x.c][x.id]!=null);});   // 已經刪過的不算
+      if(!list.length)return;
+      if(list.length<=_TOMB_AUTO_MAX&&!TOMB_HOLD[who]){list.forEach(function(x){_tombApplyOne(x.c,x.id,x.ts);});applied+=list.length;try{logActivity('刪除申請','自動套用 '+String(who).replace(/,/g,'.')+' 的刪除 '+list.length+' 筆');}catch(e){_err('_tombReqPull.log',e);}}
       else{TOMB_HOLD[who]=(TOMB_HOLD[who]||[]).concat(list);held+=list.length;}
     });
     if(!Object.keys(clr).length)return;
@@ -38888,7 +38910,8 @@ function openTombHold(){
 function tombHoldDo(who,ok){
   if(_roDeny()||!_shWholeOk())return;
   var L=TOMB_HOLD[who]||[];
-  if(ok){L.forEach(function(x){_tombApplyOne(x.c,x.id,x.ts);});_tombSaveAll();}
+  if(ok){L.forEach(function(x){_tombApplyOne(x.c,x.id,x.ts);});_tombSaveAll();try{logActivity('刪除申請','確認刪除 '+String(who).replace(/,/g,'.')+' 的申請 '+L.length+' 筆');}catch(e){_err('tombHoldDo.log',e);}}
+  else{try{var rh=_loadRecHashes()||{};L.forEach(function(x){if(rh[x.c])delete rh[x.c][x.id];});_storeRecHashes(rh);localStorage.removeItem('fy_sync_hashes');}catch(e){_err('tombHoldDo.keep',e);}try{_autoUpload();}catch(e){_err('tombHoldDo.up',e);}}   // 審查 🟡1：不刪 → 本機那幾筆重新上傳，補回雲端
   delete TOMB_HOLD[who];try{localStorage.setItem('fy_tombhold',JSON.stringify(TOMB_HOLD));}catch(e){_err('tombHoldDo',e);}
   var m=document.getElementById('fy-modal');if(m)m.remove();if(Object.keys(TOMB_HOLD).length)openTombHold();
   try{updateDashTodo();}catch(e){_err('tombHoldDo.todo',e);}

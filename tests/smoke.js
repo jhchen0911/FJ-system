@@ -8293,6 +8293,7 @@ async function newPage(browser, width, height) {
         const oU = window._fbUser;
         /* #2／#3 一般員工上傳：拿掉名冊／角色、不送空集合；逐筆集合不整包改寫 */
         _fbUser = { email: 'staff1@example.com', uid: 's1' }; _isReaderUser = false;
+        try { localStorage.setItem('fy_r112', '1'); } catch (e) { /* 可忽略 */ }   // 新規則已發布後的行為
         out.staffNotAdmin = !_shWholeOk();
         const d1 = { version: 'v', uploadedAt: 1, pagePerms: { x: 1 }, customers: [], vendors: [{ id: 'v1' }], 'quotes/q1': { id: 'q1' } };
         _shStripForStaff(d1);
@@ -8327,6 +8328,7 @@ async function newPage(browser, width, height) {
         window.__aiR = await (await _aiFetch({ body: '{}' })).json();
         window.fetch = oF;
         /* 健檢2 #5：人員證件不上共用區；員工寫投遞區、管理員寫 workerSens；合併後接回 */
+        try { localStorage.setItem('fy_r112', '1'); } catch (e) { /* 可忽略 */ }   // 新規則已發布
         WORKERS = [{ id: 'w1', name: '王小明', idNo: 'A123456789', birth: '1980-01-01', emgPhone: '0912', title: '技工', _mt: 5, docs: { idF: { du: 'data:image/png;base64,AAA', name: 'a', ts: 1 }, oshF: { du: 'data:image/png;base64,BBB', exp: '2027-01-01' } }, certs: [] }];
         const sp = _wkSplit(WORKERS[0]);
         out.wkPub = !sp.pub.idNo && !sp.pub.birth && !sp.pub.emgPhone && sp.pub.idMask === 'A12****789' && sp.pub.docs.idF.du === '' && sp.pub.docs.oshF.du !== '' && sp.sens.f.idNo === 'A123456789' && sp.sens.docs.idF.du;
@@ -8336,13 +8338,18 @@ async function newPage(browser, width, height) {
         _wkSensPush(); out.wkStaff = ups2.length === 1 && !!ups2[0][1]['workerSensIn/w1'] && !ups2[0][1]['workerSens/w1'];
         try { localStorage.removeItem('fy_wksens_h'); } catch (e) { /* 可忽略 */ }
         _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o1', getIdToken: () => Promise.resolve('tok') }; ups2.length = 0;
-        _wkSensPush(); out.wkAdmin = ups2.length === 1 && !!ups2[0][1]['workerSens/w1'];
+        _wkSensPush(); out.wkAdmin = ups2.length === 1 && !!ups2[0][1]['workerSens/w1']; await new Promise(res => setTimeout(res, 20));
         WORKERS = [sp.pub]; _wkGraft(); out.wkGraft = WORKERS[0].idNo === 'A123456789' && WORKERS[0].docs.idF.du === 'data:image/png;base64,AAA';
         /* 健檢2 #3：員工的刪除改送申請；管理員一批 ≤30 自動套用、超過先擋下 */
         _fbUser = { email: 'staff1@example.com', uid: 's1' }; ups2.length = 0;
         try { localStorage.removeItem('fy_tombreq_sent'); } catch (e) { /* 可忽略 */ }
-        TOMBS = { quotes: { qz1: 111 } }; const d4 = { version: 'v', uploadedAt: 1, tombs: TOMBS }; _shStripForStaff(d4);
-        out.tombStaff = !('tombs' in d4) && ups2.some(u => u[0] === 'fydata/tombReq/staff1@example,com' && u[1]['quotes/qz1'] === 111);
+        /* 審查 🔴1：從雲端合併來的舊墓碑不回送；只送本機自己刪的 */
+        try { localStorage.removeItem('fy_tombreq_pending'); } catch (e) { /* 可忽略 */ }
+        TOMBS = {}; const old = {}; for (let i = 0; i < 120; i++) old['p' + i] = 1; _mergeTombs({ payables: old, quotes: { qold: 2 } });
+        _fbDb = { ref: p => ({ update: v => { ups2.push([p, v]); return Promise.resolve(); }, once: () => Promise.resolve({ val: () => null }) }) };
+        _tomb('quotes', 'qz1'); const d4 = { version: 'v', uploadedAt: 1, tombs: TOMBS }; _shStripForStaff(d4);
+        const tr = ups2.find(u => u[0] === 'fydata/tombReq/staff1@example,com');
+        out.tombStaff = !('tombs' in d4) && !!tr && Object.keys(tr[1]).length === 1 && !!tr[1]['quotes/qz1'];
         _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o1' };
         Q = [{ id: 'qz1', name: 'X' }, { id: 'qz2', name: 'Y' }]; TOMBS = {}; TOMB_HOLD = {};
         const many = {}; for (let i = 0; i < 31; i++) many['m' + i] = 1;
@@ -8351,6 +8358,12 @@ async function newPage(browser, width, height) {
         _tombReqPull(); await new Promise(res => setTimeout(res, 30));
         out.tombAdmin = !Q.some(q => q.id === 'qz1') && Q.some(q => q.id === 'qz2') && TOMBS.quotes && TOMBS.quotes.qz1 === 5 && _tombHoldCount() === 31 && !TOMBS.quotes.m0;
         tombHoldDo('b@x,com', 0); out.tombKeep = _tombHoldCount() === 0 && !TOMBS.quotes.m0;
+        /* 審查 🔴2：員工只補一張文件，不洗掉管理員那邊已有的身分證欄位與影像 */
+        WK_SENS = { w9: { id: 'w9', _mt: 1, f: { idNo: 'B123456789', birth: '1990-02-02' }, docs: { idF: { du: 'data:image/png;base64,ID', name: 'id', ts: 1 } } } };
+        const inbox = { w9: { id: 'w9', _mt: 9e15, by: 'staff1@example.com', at: Date.now(), f: {}, docs: { health: { du: 'data:image/png;base64,HE', name: 'h', ts: 2 } } } };
+        _fbDb = { ref: p => ({ once: () => Promise.resolve({ val: () => (p === 'fydata/workerSensIn' ? inbox : p === 'fydata/workerSens' ? { w9: WK_SENS.w9 } : null) }), update: v => Promise.resolve() }) };
+        WORKERS = []; _wkSensPull(); await new Promise(res => setTimeout(res, 30));
+        out.wkMerge = WK_SENS.w9.f.idNo === 'B123456789' && WK_SENS.w9.docs.idF && WK_SENS.w9.docs.health && WK_SENS.w9._mt < 9e15;
         _fbDb = oDb2; WORKERS = []; Q = []; TOMBS = {};
         await new Promise(res => setTimeout(res, 20));
         out.ai = sentTo === _AI_PROXY && sentH.Authorization === 'Bearer tok' && !sentH['x-api-key'] && window.__aiR && /尚未部署/.test(window.__aiR.error.message);
@@ -8378,6 +8391,8 @@ async function newPage(browser, width, height) {
     const APPSRC = fs.readFileSync(pth.join(__dirname, '..', 'app.js'), 'utf8');
     check('v6.0.112 健檢2 #7：AI 呼叫一律走雲端代理（帶登入憑證、不帶金鑰），前端沒有直接呼叫 Anthropic；唯讀帳號不能用', r.ai && r.aiRo && !/api\.anthropic\.com/.test(APPSRC) && !/anthropic-dangerous-direct-browser-access/.test(APPSRC), JSON.stringify(r));
     check('v6.0.112 健檢2 #5：人員證件與身分證欄位不上共用區（遮罩）、員工寫投遞區、管理員寫 workerSens、合併後接回；規則只限管理員讀', r.wkPub && r.wkShared && r.wkStaff && r.wkAdmin && r.wkGraft && rules.workerSens && rules.workerSens['.read'].includes(ADMK) && !rules.workerSens['.read'].includes('fydata/access') && rules.workerSensIn['.read'].includes(ADMK) && !rules.workerSensIn['.read'].includes('fydata/access'), JSON.stringify(r));
+    const BETA = fs.readFileSync(pth.join(__dirname, '..', 'beta.js'), 'utf8');
+    check('v6.0.112 審查：員工補交部分證件不洗掉既有資料；beta 沙盒不會執行新的雲端寫入', r.wkMerge && ['_tombReqPull', '_wkSensPush', '_wkSensPull', '_bankMigrate'].every(f => BETA.includes("'" + f + "'")), JSON.stringify(r));
     check('v6.0.112 健檢2 #3：墓碑只限管理員寫、員工刪除改送申請（只能寫自己的）、管理員一批 ≤30 自動套用、超過先擋下等確認', r.tombStaff && r.tombAdmin && r.tombKeep && rules.shared.tombs && rules.shared.tombs['.write'].includes(ADMK) && !rules.shared.tombs['.write'].includes('fydata/access') && /\$who === auth\.token\.email/.test(rules.tombReq.$who['.write']), JSON.stringify(r));
     check('v6.0.112 批次 H 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();

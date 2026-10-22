@@ -235,7 +235,7 @@
         ".read": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()))",
         "$id": {
           ".write": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || ((root.child('fydata/access').child(auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists()) && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()))",
-          ".validate": "$id.matches(/^[A-Za-z0-9_-]{1,60}$/) && (!newData.exists() || newData.hasChildren(['id','by','at']))"
+          ".validate": "$id.matches(/^[A-Za-z0-9_-]{1,60}$/) && (!newData.exists() || (newData.hasChildren(['id','by','at']) && newData.child('by').val() === auth.token.email.toLowerCase() && newData.child('at').isNumber() && newData.child('at').val() <= now + 60000))"
         }
       },
       "aiUsage": {

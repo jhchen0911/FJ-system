@@ -15,15 +15,16 @@ test('AI 代理：只有員工與管理員可用', () => {
   assert.ok(ops.aiRoleOk('admin') && ops.aiRoleOk('staff'));
   assert.ok(!ops.aiRoleOk('reader') && !ops.aiRoleOk(null) && !ops.aiRoleOk(undefined));
 });
-test('每日備份：檔名用台北日期、每月 1 日另存月備份', () => {
-  assert.deepEqual(ops.backupPaths(Date.parse('2026-10-31T17:00:00Z')), ['fydata/backups/server/daily/2026-11-01.json', 'fydata/backups/server/monthly/2026-11.json']);
-  assert.deepEqual(ops.backupPaths(Date.parse('2026-10-22T03:00:00Z')), ['fydata/backups/server/daily/2026-10-22.json']);
+test('每日備份：資料夾用台北日期、每月 1 日另存月備份；不備份 backups 本身', () => {
+  assert.deepEqual(ops.backupDirs(Date.parse('2026-10-31T17:00:00Z')), ['fydata/backups/server/daily/2026-11-01/', 'fydata/backups/server/monthly/2026-11/']);
+  assert.deepEqual(ops.backupDirs(Date.parse('2026-10-22T03:00:00Z')), ['fydata/backups/server/daily/2026-10-22/']);
+  assert.ok(ops.BACKUP_NODES.indexOf('backups') < 0 && ops.BACKUP_NODES.indexOf('shared') >= 0 && ops.BACKUP_NODES.indexOf('workerSens') >= 0);
 });
-test('每日備份：保留最新 30 份、只刪日期檔名', () => {
-  const names = []; for (let i = 1; i <= 35; i++) names.push('fydata/backups/server/daily/2026-' + (i <= 31 ? '10-' + String(i).padStart(2, '0') : '11-0' + (i - 31)) + '.json');
+test('每日備份：保留最新 30 天的資料夾、只刪日期資料夾', () => {
+  const names = []; for (let i = 1; i <= 35; i++) { const d = '2026-' + (i <= 31 ? '10-' + String(i).padStart(2, '0') : '11-0' + (i - 31)); names.push('fydata/backups/server/daily/' + d + '/shared.json', 'fydata/backups/server/daily/' + d + '/private.json'); }
   names.push('fydata/backups/server/daily/readme.txt');
   const del = ops.pruneList(names, 30);
-  assert.equal(del.length, 5); assert.equal(del[0], 'fydata/backups/server/daily/2026-10-01.json');
+  assert.equal(del.length, 5); assert.equal(del[0], 'fydata/backups/server/daily/2026-10-01/');
   assert.ok(!del.some((n) => /readme/.test(n)));
 });
 test('每日備份內容：不含 backups 本身、附筆數', () => {

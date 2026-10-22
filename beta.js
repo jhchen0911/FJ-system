@@ -1,6 +1,6 @@
 /* ── 測試版沙盒：不上傳雲端（beta.js，defer 接在 app.js 之後）── */
 (function(){
-  ['_autoUpload','_immediateUpload','_pushPrivate','_pushRelayCosts','_pushRelayExpenses','fbUpload','fbUploadWithConflictCheck','_pushCloud'].forEach(function(nm){
+  ['_autoUpload','_immediateUpload','_pushPrivate','_pushRelayCosts','_pushRelayExpenses','fbUpload','fbUploadWithConflictCheck','_pushCloud','_tombReqPush','_tombReqPull','_wkSensPush','_wkSensPull','_bankMigrate','_bankCompanySave','_bankVendorSave','_syncAccessLists'].forEach(function(nm){
     if(typeof window[nm]==='function'){window[nm]=function(){var cb=null;for(var i=0;i<arguments.length;i++){if(typeof arguments[i]==='function'){cb=arguments[i];break;}}if(cb){try{cb(false);}catch(e){}}return false;};}
   });
   try{document.title='β 測試版｜'+document.title;}catch(e){}

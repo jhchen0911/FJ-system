@@ -141,6 +141,7 @@ exports.aiProxy = onRequest({ region: REGION, cors: ['https://jhchen0911.github.
       body: JSON.stringify(c.body),
     });
     const j = await r.json().catch(() => ({ error: { message: 'AI 服務回應格式錯誤' } }));
+    if (!r.ok) await ref.transaction((n) => Math.max(0, (n || 1) - 1)).catch(() => null);   // 呼叫失敗不算一次
     res.status(r.status).json(j);
   } catch (e) {
     console.error('aiProxy', e);
@@ -153,16 +154,23 @@ exports.aiProxy = onRequest({ region: REGION, cors: ['https://jhchen0911.github.
 // 每月 1 日另存 monthly/<年月>.json；保留 30 份日備份、12 份月備份。Storage 規則：fydata/backups/** 只有擁有者能讀。
 exports.dailyServerBackup = onSchedule({ schedule: '15 3 * * *', timeZone: TZ, region: REGION, memory: '1GiB', timeoutSeconds: 540 }, async () => {
   const now = Date.now();
-  const snap = await admin.database().ref('fydata').once('value');
-  const payload = opsCore.backupPayload(snap.val(), now);
-  const buf = Buffer.from(JSON.stringify(payload));
   const bucket = admin.storage().bucket();
-  for (const p of opsCore.backupPaths(now)) {
-    await bucket.file(p).save(buf, { contentType: 'application/json', resumable: false });
+  const db = admin.database();
+  const counts = {};
+  const dirs = opsCore.backupDirs(now);
+  // 逐個節點讀、逐個寫（不一次載入整包 fydata，避免記憶體不足）
+  for (const node of opsCore.BACKUP_NODES) {
+    const v = (await db.ref('fydata/' + node).once('value')).val();
+    if (v == null) continue;
+    if (node === 'shared' || node === 'private') Object.assign(counts, opsCore.backupPayload({ [node]: v }, now).counts);
+    const buf = Buffer.from(JSON.stringify({ kind: 'fy-server-backup', version: 2, at: now, node, data: v }));
+    for (const d of dirs) await bucket.file(d + node + '.json').save(buf, { contentType: 'application/json', resumable: false });
   }
+  for (const d of dirs) await bucket.file(d + '_index.json').save(Buffer.from(JSON.stringify({ at: now, counts, nodes: opsCore.BACKUP_NODES })), { contentType: 'application/json', resumable: false });
   for (const [prefix, keep] of [['fydata/backups/server/daily/', opsCore.KEEP_DAILY], ['fydata/backups/server/monthly/', opsCore.KEEP_MONTHLY]]) {
     const [files] = await bucket.getFiles({ prefix });
-    for (const n of opsCore.pruneList(files.map((f) => f.name), keep)) await bucket.file(n).delete().catch((e) => console.error('prune', n, e));
+    const del = opsCore.pruneList(files.map((f) => f.name), keep);
+    for (const f of files) if (del.some((p) => f.name.indexOf(p) === 0)) await f.delete().catch((e) => console.error('prune', f.name, e));
   }
-  console.log('[備份] 完成', JSON.stringify(payload.counts), buf.length, 'bytes');
+  console.log('[備份] 完成', JSON.stringify(counts));
 });
