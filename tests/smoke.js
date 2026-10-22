@@ -2618,7 +2618,7 @@ async function newPage(browser, width, height) {
       const dx = td.decode(dfiles['word/document.xml']);
       out.dw = /<w:tc><w:p><w:pPr\/><w:r><w:t xml:space="preserve">林阿明<\/w:t><\/w:r><\/w:p><\/w:tc>/.test(dx) && /電話：0912345678/.test(dx) && /<w:t>備註<\/w:t>/.test(dx);
       // ⑤ AI 對應：stub fetch 回傳 JSON；單人表對應→寫入；範本記憶 P.wkTpl
-      const origFetch = window.fetch; localStorage.setItem('fy_aikey', 'test');
+      const origFetch = window.fetch; const oU2 = window._fbUser; _fbUser = { email: 'staff@x.com', uid: 'u', getIdToken: async () => 't' };   // v6.0.112：AI 走雲端代理，要登入（不再用本機金鑰）
       window.fetch = async () => ({ json: async () => ({ content: [{ text: '{"mode":"single","targets":[{"sheet":"進場申請","cell":"B2","field":"name","label":"姓名"},{"sheet":"進場申請","cell":"D3","field":"birthRoc","label":"出生日期"}]}' }] }) });
       const map = await _wkAiMap('xlsx', parsed.cells);
       out.ai = map.mode === 'single' && map.targets.length === 2 && map.targets[1].field === 'birthRoc';
@@ -2640,7 +2640,7 @@ async function newPage(browser, width, height) {
       // ⑦ 入口：按鈕存在、開啟視窗列出人員
       go('workers'); out.btn = /wkFillOwnerForm/.test(document.getElementById('page-workers').innerHTML);
       wkFillOwnerForm(); out.modal = document.querySelectorAll('.wkof-w').length === 2 && !!document.getElementById('wkof-file'); document.getElementById('gen-confirm-ok') && document.querySelector('#gen-confirm-modal .btn-cancel, #gen-confirm-cancel')?.click();
-      window.fetch = origFetch; localStorage.removeItem('fy_aikey'); delete P.wkTpl; WORKERS.length = 0; _wkOF = null;
+      window.fetch = origFetch; _fbUser = oU2; delete P.wkTpl; WORKERS.length = 0; _wkOF = null;
       return out;
     });
     check('業主表格：zip 讀寫往返、xlsx 儲存格列出與寫入（改格／插格／新列、欄序）', r.zip && r.parse && r.xw && r.xorder && r.rezip);
