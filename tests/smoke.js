@@ -8138,6 +8138,16 @@ async function newPage(browser, width, height) {
         out.adjAmt = _invRowAmt(adj) === -400;
         const invA = { id: 'IA', items: [{ type: 'item', desc: '鋼板樁', contractPrice: 1000, contractQty: 1000, curQty: 1000, payRate: 100 }, adj] };
         _recalcInvAmounts(invA); out.adjTot = invA.items[1].curAmt === -400;
+        /* #3（Lotion 10/22）議價尾差：整數、單價不攤；未稅總價剛好＝目標；含稅四捨五入後＝目標；到請款單標示折讓 */
+        P.tax = 5; items = [{ desc: '鋼板樁', unit: 'M', qty: '1000', price: '1000', note: '', sec: false }, { desc: '動員', unit: '式', qty: '1', price: '33333', note: '', sec: false }]; exs = [];
+        document.querySelector('input[name="ngt-way"][value="whole"]').checked = true;
+        document.querySelector('input[name="ngt-mode"][value="excl"]').checked = true; document.getElementById('ngt-target').value = '1000000'; applyNegotiate();
+        const aE = items.find(it => it.desc === NGT_ADJ_DESC); out.ngtExcl = calcT().sub === 1000000 && (!aE || Number.isInteger(+aE.price)) && items.every(it => it.desc === NGT_ADJ_DESC || Number.isInteger(+it.price));
+        document.querySelector('input[name="ngt-mode"][value="incl"]').checked = true; document.getElementById('ngt-target').value = '1050000'; applyNegotiate();
+        const aI = items.find(it => it.desc === NGT_ADJ_DESC); out.ngtIncl = Math.round(calcT().total) === 1050000 && (!aI || Number.isInteger(+aI.price));
+        const qN = { id: 'qN', items: JSON.parse(JSON.stringify(items)) }; const ivN = _invItemsFromQuote(qN).find(it => it.desc === NGT_ADJ_DESC);
+        out.ngtInv = !ivN || ivN.contractPrice >= 0 || /折讓/.test(ivN.note);
+        items = []; exs = [];
         /* #4 列印明細＝總計：一般工項有天數要乘天數 */
         const itD = { type: 'item', desc: '覆工板', unit: 'M', contractPrice: 10, contractQty: 100, curQty: 100, curDays: 30, payRate: 100 };
         const invD = { id: 'ID4', project: 'D4', client: 'K', periodNo: 1, date: '2026-10-01', items: [itD] };
@@ -8262,7 +8272,7 @@ async function newPage(browser, width, height) {
     });
     const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
     check('v6.0.111 健檢1 #15：分段工項列的單價屬性沒有多餘引號（預覽與預付款扣回才會正確）', !/data-price=""'\+/.test(src), '');
-    check('v6.0.111 健檢1 #3／#4：議價尾差負數列算進請款、列印明細與總計同一算法（天數）', r.adjAmt && r.adjTot && r.prev30k && !r.err, JSON.stringify(r));
+    check('v6.0.111 健檢1 #3／#4：議價尾差負數列算進請款（Lotion 10/22：整數、未稅剛好、含稅四捨五入後剛好、請款單標折讓）、列印明細與總計同一算法（天數）', r.adjAmt && r.adjTot && r.ngtExcl && r.ngtIncl && r.ngtInv && r.prev30k && !r.err, JSON.stringify(r));
     check('v6.0.111 健檢1 #6／#7：得標金額含已得標追加案（不含未得標）、建立追加只帶表頭', r.won && r.wonNoCt && r.addendum && !r.err, JSON.stringify(r));
     check('v6.0.111 健檢1 #2：同名工項重存報價後各自保留單價／數量', r.dup && !r.err, JSON.stringify(r));
     check('v6.0.111 健檢1 #5：打設＋拔除合一工項拔除未完成不准結算', r.settleBlock && r.settleBlock2 && r.settleOk && !r.err, JSON.stringify(r));

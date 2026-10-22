@@ -1429,7 +1429,14 @@ function applyNegotiate(){
   });
   // 尾差：單價取整後與目標的差額，補一行「議價調整」讓總價精準等於議價金額
   const sub2=items.reduce((a,it)=>(it.sec||_isSpare(it))?a:a+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0),0);
-  const adj=Math.round((subTarget-sub2)*100)/100;
+  // Lotion 10/22（健檢1 #3）：尾差列不帶小數、單價不攤；未稅議價總價剛好等於目標，
+  // 含稅議價在相鄰整數裡挑「含稅總價四捨五入後＝目標」的那個（稅額不另取整，所以少數金額會差 1 元）
+  let adj=Math.round(subTarget-sub2);
+  if(mode!=='excl'){
+    let best=adj,bd=Infinity;
+    for(let d=-3;d<=3;d++){const a2=adj+d,diff=Math.abs(Math.round((sub2+a2)*(1+r))-target);if(diff<bd){bd=diff;best=a2;}}
+    adj=best;
+  }
   if(Math.abs(adj)>=1){
     const lbl=mode==='excl'?'未稅':'含稅';
     const origBase=mode==='excl'?t.sub:t.total;
@@ -5186,7 +5193,7 @@ function _invItemsFromQuote(q){
       cat:it.cat||'',                       // v5.377：工項類別跟著帶進請款單
       prevQty:0,prevAmt:0,
       curQty:0,curDays:0,curAmt:0,
-      note:it.note||'',cumQty:0,cumAmt:0,
+      note:(it.desc===NGT_ADJ_DESC&&(parseFloat(it.price)||0)<0)?'議價折讓（照扣）':(it.note||''),cumQty:0,cumAmt:0,   // Lotion 10/22：負數尾差到請款單轉成折讓
       payRate:100,
       installCum:0,removeCum:0,
       prevPayRate:100,
