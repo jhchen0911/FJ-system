@@ -38700,6 +38700,7 @@ function invUnlock(){
       inv.lockLog=(inv.lockLog||[]).concat([{at:Date.now(),by:_meEmail(),kind:'unlock',reason:r.slice(0,200)}]);
       _touch(inv);saveInv();_invRenderLockBanner(inv);toast('已解鎖（2 小時內存檔一次有效）');
     },false,null,true);
+}
 // ══════════ v6.0.112 健檢2 #4：匯款帳號（公司收款帳號、廠商匯款帳號）只有管理員能改 ══════════
 // 原本存在共用區（參數 P.bank／廠商資料 bankAcct），任何員工都能改 → 可被用來詐騙（業主照請款單付款、會計照「複製帳號」匯款）。
 // 改存 fydata/bank（規則：員工與唯讀帳號可讀、只有管理員能寫）：{company:{bank,account,at,by}, vendors:{<鍵>:{name,bank,acct,holder,at,by}}, log:{<id>:{at,by,kind,name,before,after}}, migrated}
