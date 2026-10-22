@@ -3425,6 +3425,7 @@ function updateInvRowAmt(i, tr){
   // 數量或單價為 0/空 → 本期金額必為 0（不再沿用舊 curAmt，修正刪數量金額殘留 bug）；算法見 _invRowBase
   const baseAmt=_invRowBase(it);
   const curAmt=Math.round(baseAmt*rate);
+  const _q=it.type==='rental'?_invRentQ(it):(parseFloat(it.curQty)||0);   // 下方「計價量／日報／廠商量」提示用
   it.curAmt=curAmt;
   it._baseAmt=baseAmt;  // 保存原始金額供參考
   // v5.387：本期估驗數量＝輸入量 × 請款%（打設 70%、拔除 30%），列印與累計皆以此為準。

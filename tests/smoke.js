@@ -2684,10 +2684,10 @@ async function newPage(browser, width, height) {
         syncCostToPayable(q, c);
         const p2 = PAYABLES.find(p => p.costId === c.id);
         out.costIdem = !!p2 && p2.status === 'paid' && p2._mt === mt1 && PAYABLES.filter(p => p.costId === c.id).length === 1;
-        // 金額真的變了才戳
+        // 金額真的變了：健檢1 #14（v6.0.111）已付那筆不改金額，差額另立一筆待付（才戳那筆的 _mt）
         c.amt = 2000; syncCostToPayable(q, c);
-        const p3 = PAYABLES.find(p => p.costId === c.id);
-        out.costChanged = !!p3 && p3.amount === 2000 && p3.status === 'paid' && p3._mt !== mt1;
+        const p3 = PAYABLES.find(p => p.costId === c.id && !p.deltaOf), d3 = PAYABLES.find(p => p.deltaOf === (p3 && p3.id));
+        out.costChanged = !!p3 && p3.amount !== 2000 && p3.status === 'paid' && p3._mt === mt1 && !!d3 && d3.status === 'pending' && d3.amount === 2000 - p3.amount;
         // 薪資→應付 upsert 兩次同內容
         const f = { to: '員工A', amount: 30000, date: '2026-10-05', category: 'salary', project: '', note: '2026-09 薪資', itemName: '薪資', hrRef: 'ps_x', status: 'pending', paidDate: '' };
         const h1 = _hrUpsertPay('pay_ps_x', f); const hm = h1._mt = Date.now() + 5000;
@@ -2704,7 +2704,7 @@ async function newPage(browser, width, height) {
       res(out);
     }));
     check('v5.441 成本→應付連動：內容沒變不重戳 _mt、已付狀態保留、只有一筆', r.created && r.costIdem, r.err || JSON.stringify(r));
-    check('v5.441 成本→應付連動：金額變了才更新 _mt', r.costChanged, r.err || '');
+    check('v5.441 成本→應付連動：金額變了才更新 _mt（v6.0.111：已付那筆不改，差額另立）', r.costChanged, r.err || JSON.stringify(r));
     check('v5.441 薪資→應付 upsert：同內容不重戳、變更才戳', r.hrIdem && r.hrChanged, r.err || '');
     check('v5.441 兩邊都有更新改逐筆合併上傳（不再問覆蓋）；內容簽章排除時間戳', r.noOverwritePrompt && r.sig, r.err || '');
     await page.close();
@@ -5985,7 +5985,7 @@ async function newPage(browser, width, height) {
         delOwnRow(c.id, c.rows[1].id); out.delSync = PAYABLES.find(p => p.costId === c.id).amount === 800;
         /* 已付的不會被重算改狀態 */
         PAYABLES.find(p => p.costId === c.id).status = 'paid'; addOwnRow(c.id, '止水鈑', '片'); updOwnRow(c.id, c.rows[1].id, 'unitPrice', 100);
-        out.keepPaid = PAYABLES.find(p => p.costId === c.id).status === 'paid';
+        out.keepPaid = PAYABLES.find(p => p.costId === c.id && !p.deltaOf).status === 'paid';   // v6.0.111：成本變動的差額另立一筆，本體仍是已付
         /* 名冊已有同名不重複；公司支出（自付）不建 */
         updCostField(c.id, 'vendor', '丙丁企業有限公司'); updCostField(c.id, 'vendor', '公司支出（自付）'); out.noDup = VENDORS.length === 1;
         updCostField(c.id, 'vendor', '丙丁企業有限公司');
@@ -7643,7 +7643,7 @@ async function newPage(browser, width, height) {
         invItems = [{ type: 'rental', desc: 'F 逾期租金', unit: '支', curQty: 10, curDays: 20, contractPrice: 50, payRate: 100, _ovKey: 'F', discDays: 20 }];
         try { updateInvRowAmt(0); } catch (e) { /* 可忽略：測試用，無畫面列 */ }
         out.disc0 = invItems[0].curAmt === 0;
-        invItems[0].discDays = 0; try { updateInvRowAmt(0); } catch (e) { /* 可忽略 */ } out.disc0 = out.disc0 && invItems[0].curAmt === 10000; out.disc0 = out.disc0 && _rentDayFactor({ discDays: 5 }, 0) === 0 && _rentDayFactor({}, 0) === 1 && /_rentDayFactor\(it,days\)/.test(String(_recalcInvAmounts));
+        invItems[0].discDays = 0; try { updateInvRowAmt(0); } catch (e) { /* 可忽略 */ } out.disc0 = out.disc0 && invItems[0].curAmt === 10000; out.disc0 = out.disc0 && _rentDayFactor({ discDays: 5 }, 0) === 0 && _rentDayFactor({}, 0) === 1 && /_rentDayFactor\(it,days\)/.test(String(_invRowBase)) && /_invRowAmt\(it\)/.test(String(_recalcInvAmounts));   // v6.0.111 健檢1 #4：逐列算法統一在 _invRowBase
         /* 第 3 題：新算法列標記 _ovAlg */
         out.alg = /_ovAlg:2/.test(calcInvDays.toString()) && /本期已請過逾期租金（舊算法），不重算/.test(calcInvDays.toString());
         /* 保留款總覽：含稅＋拆分 */
