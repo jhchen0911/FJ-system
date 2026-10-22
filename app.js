@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.111';
+var APP_VERSION='v6.0.112';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -988,6 +988,7 @@ function doSaveP(){
   P.dpRegE=parseFloat(gv('dp-reg-e'))||1.8;
   P.bank=gv('pbank')||'國泰世華建成分行(013)';
   P.bankAccount=gv('pbankacct')||'031035008864';
+  try{_bankCompanySave(P.bank,P.bankAccount);}catch(e){_err('doSaveP.bank',e);}   // 健檢2 #4
   // 儲存備註條款模板
   const prmSave=document.getElementById('prm');
   if(prmSave)P.rmkBase=prmSave.value;
@@ -1105,8 +1106,8 @@ function syncParamsUI(){
     'dp-reg-tc':'dpRegTc','dp-reg-c':'dpRegC','dp-reg-s':'dpRegS','dp-reg-e':'dpRegE'};
   Object.entries(m).forEach(([id,k])=>{const e=document.getElementById(id);if(e&&P[k]!==undefined)e.value=P[k];});
   syncSiteLabels();
-  const pb=document.getElementById('pbank');if(pb)pb.value=P.bank||'國泰世華建成分行(013)';
-  const pba=document.getElementById('pbankacct');if(pba)pba.value=P.bankAccount||'031035008864';
+  const pb=document.getElementById('pbank');if(pb)pb.value=_coBank().bank;
+  const pba=document.getElementById('pbankacct');if(pba)pba.value=_coBank().account;
   // 印章預覽
   const sealPrev=document.getElementById('seal-preview');
   const clearBtn=document.getElementById('seal-clear-btn');
@@ -4853,7 +4854,7 @@ function buildInvPreview(srcInv){
       </tr>
       <tr>
         <td style="color:#555;font-weight:700;padding:4px 0;vertical-align:top">匯款資料</td>
-        <td style="padding:4px 10px;line-height:1.7">${esc(P.company)}<br>${esc(P.bank||'國泰世華建成分行(013)')}<br>帳號：${esc(P.bankAccount||'031035008864')}${(()=>{const cp=parseInt(giv('inv-cash-pct'))||0;const td=parseInt(giv('inv-ticket-days'))||0;return(cp||td)?`<br><span style="color:#888;font-size:9px">付款條件：現金${cp||100}%${td?' + '+td+'天期票':''}</span>`:'';})()}</td>
+        <td style="padding:4px 10px;line-height:1.7">${esc(P.company)}<br>${esc(_coBank().bank)}<br>帳號：${esc(_coBank().account)}${(()=>{const cp=parseInt(giv('inv-cash-pct'))||0;const td=parseInt(giv('inv-ticket-days'))||0;return(cp||td)?`<br><span style="color:#888;font-size:9px">付款條件：現金${cp||100}%${td?' + '+td+'天期票':''}</span>`:'';})()}</td>
         <td style="color:#555;font-weight:700;padding:4px 0;text-align:right;vertical-align:top;white-space:nowrap">寄送方式</td>
         <td style="padding:4px 10px">${sendOpts}</td>
       </tr>
@@ -8137,6 +8138,7 @@ function _autoSyncOnLogin(){
   try{if(_fbUser&&_fbUser.getIdToken)_fbUser.getIdToken(true).catch(function(){/* 可忽略：離線時沿用舊 token */});}catch(e){_err('_autoSyncOnLogin.token',e);}   // v6.0.105 取得最新 custom claims（Storage 規則用）
   _readerCheck(function(ro){
     try{_draftWatch();}catch(e){_err('_autoSyncOnLogin.draft',e);}   // v6.0.109 AI 草稿
+    try{_bankWatch();}catch(e){_err('_autoSyncOnLogin.bank',e);}   // v6.0.112 匯款帳號
     if(ro){
       _readerApply();
       _pullCloudIfNewer({interactive:false});
@@ -9931,6 +9933,19 @@ function _byId(arr){
   return m;
 }
 // 回傳 {hasWork, recHashes}；同時把逐筆路徑塞進 delta，並把該集合從整包 delta 移除
+// 健檢2 #2／#3（v6.0.112）：共用區改逐集合授權——人員名冊與角色（pagePerms）只有管理員能寫；
+// 一般員工不能刪掉整個集合、也不能整包改寫逐筆同步的集合。上傳前先把員工不能送的部分拿掉，免得整次 update 被規則拒絕。
+function _shWholeOk(){try{return !!(_fbUser&&!_isReaderUser&&isAdmin(_fbUser.email));}catch(e){return false;}}
+var _shEmptyWarned={};
+function _shStripForStaff(delta){
+  if(_shWholeOk())return;
+  delete delta.pagePerms;   // 名冊／角色：只有管理員的裝置會上傳（規則端同樣只放行管理員）
+  Object.keys(delta).forEach(function(k){
+    if(k==='version'||k==='uploadedAt'||k==='uploadedBy'||k.indexOf('/')>=0)return;
+    var v=delta[k],empty=v==null||(Array.isArray(v)&&!v.length)||(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length);
+    if(empty){delete delta[k];if(!_shEmptyWarned[k]){_shEmptyWarned[k]=1;try{toast('「'+k+'」最後一筆的刪除要由管理員裝置同步（一般帳號不能清空整個集合）');}catch(e){_err('_shStripForStaff',e);}}}
+  });
+}
 function _perRecordDelta(delta,clean,newHashes,baseHashes,opts){
   var recHashes=_loadRecHashes()||{};
   var out={hasWork:false,recHashes:recHashes};
@@ -9938,12 +9953,16 @@ function _perRecordDelta(delta,clean,newHashes,baseHashes,opts){
     var arr=clean[k];
     if(!Array.isArray(arr))return;
     // 尚未遷移、或明確要求全量 → 整包以 id 為鍵改寫一次
+    // 健檢2 #3：規則只准管理員整包改寫集合；一般員工裝置改成「每一筆都送一次」（同樣是全量、但逐筆寫入）
     if(!_recMigrated(k)||opts.full){
-      delta[k]=_byId(arr);
-      out.hasWork=true;
-      recHashes[k]={};arr.forEach(function(r){if(r&&r.id)recHashes[k][r.id]=_collHash(r);});
-      _markRecMigrated(k);
-      return;
+      if(_shWholeOk()){
+        delta[k]=_byId(arr);
+        out.hasWork=true;
+        recHashes[k]={};arr.forEach(function(r){if(r&&r.id)recHashes[k][r.id]=_collHash(r);});
+        _markRecMigrated(k);
+        return;
+      }
+      recHashes[k]={};_markRecMigrated(k);
     }
     delete delta[k];                       // 這個集合改走逐筆路徑
     var base=recHashes[k]||{},now={};
@@ -10448,7 +10467,7 @@ function _purgeLegacySensitive(){
     // v5.335：原本一裝置只清一次；若還有裝置跑 v5.323 以前的版本，敏感資料會被
     // 寫回 shared 且沒人再清。改為每天清一次，直到全部裝置升級為止。
     if(localStorage.getItem('fy_priv_purged_d')===localToday())return;
-    if(!_fbDb||!_fbUser||_isReaderUser)return;
+    if(!_fbDb||!_fbUser||_isReaderUser||!_shWholeOk())return;   // 健檢2 #3：刪整個集合只有管理員可以
     var nul={};_PRIV_COLLS.forEach(function(k){nul[k]=null;});
     _fbDb.ref('fydata/shared').update(nul).then(function(){
       try{localStorage.setItem('fy_priv_purged_d',localToday());}catch(e){_err('_purgeLegacySensitive',e);}
@@ -10667,6 +10686,7 @@ function _pushCloud(opts){
     // 兩三個人用很容易踩線。改成 fydata/shared/quotes/{id} 逐筆 update 之後，
     // 同一次存檔只送那一張（幾十 KB），順帶把衝突面縮到單筆。
     var perRec=_perRecordDelta(delta,clean,newHashes,baseHashes,opts);
+    _shStripForStaff(delta);   // 健檢2 #2／#3
     // v6.0.106 材料位置清單（不含成本）：只有讀得到 private 台帳的管理員裝置產生並上傳到 shared/matLoc，給唯讀帳號讀
     var mlWork=false,mlHash='';
     try{if(_fbUser&&isAdmin(_fbUser.email)&&_privReadOk===true&&Array.isArray(MAT_LEDGER)&&(MAT_LEDGER.length>0||localStorage.getItem('fy_matloc_hash'))){   /* 審查：台帳清空後也要上傳空清單（曾上傳過才會），避免雲端留舊位置 */var _ml=_cleanEnc({v:_matLocList()}).v||[];mlHash=_collHash(_ml);if(opts.full||localStorage.getItem('fy_matloc_hash')!==mlHash){delta.matLoc=_ml;mlWork=true;}}}catch(e){_err('_pushCloud.matLoc',e);}
@@ -25306,7 +25326,9 @@ function editVendor(id){
   document.getElementById('v-addr').value=v.addr||'';
   document.getElementById('v-items').value=v.items||'';
   document.getElementById('v-note').value=v.note||'';
-  ['v-bank','v-bankacct','v-bankholder'].forEach(function(id,i){var el=document.getElementById(id);if(el)el.value=v[['bank','bankAcct','bankHolder'][i]]||'';});   // v6.0.68 匯款帳戶
+  var _vb=_vendorBank(v.name)||(BANK&&BANK.migrated?{}:v),_bLock=!!(BANK&&BANK.migrated&&!_shWholeOk());   // 健檢2 #4：遷移後只有管理員能改帳號
+  ['v-bank','v-bankacct','v-bankholder'].forEach(function(id,i){var el=document.getElementById(id);if(el){el.value=_vb[['bank','bankAcct','bankHolder'][i]]||'';el.disabled=_bLock;el.title=_bLock?'匯款帳號只有管理員能修改':'';}});   // v6.0.68 匯款帳戶
+  try{var _bh=document.getElementById('v-bank-hint');if(_bh)_bh.innerHTML=(_vb&&_vb._at?('帳號最後變更：'+esc(new Date(_vb._at).toLocaleString('zh-TW'))+(_vb._by?'（'+esc(_vb._by)+'）':'')):'')+(_bLock?'　匯款帳號只有管理員能修改':'');}catch(e){_err('editVendor.bank',e);}
   const vPayCashEl=document.getElementById('v-pay-cash');
   const vPayTicketEl=document.getElementById('v-pay-ticket');
   if(vPayCashEl)vPayCashEl.value=v.payTermCash!=null?v.payTermCash:'';
@@ -25321,11 +25343,17 @@ function saveVendor(){
   const v={id,name:gv('v-name'),type:gv('v-type'),contact:gv('v-contact'),
     phone:gv('v-phone'),taxid:gv('v-taxid'),email:gv('v-email'),
     addr:gv('v-addr'),items:gv('v-items'),note:gv('v-note'),
-    bank:(gv('v-bank')||'').trim(),bankAcct:(gv('v-bankacct')||'').trim(),bankHolder:(gv('v-bankholder')||'').trim(),   // v6.0.68
+    bank:(gv('v-bank')||'').trim(),bankAcct:(gv('v-bankacct')||'').trim(),bankHolder:(gv('v-bankholder')||'').trim(),   // v6.0.68（遷移後以 fydata/bank 為準，見 _bankVendorSave）
     payTermCash:_vPayCash!==''?parseInt(_vPayCash)||0:null,
     payTermTicket:_vPayTicket!==''?parseInt(_vPayTicket)||0:null,
     updatedAt:Date.now(),_mt:Date.now()};
   const idx=VENDORS.findIndex(x=>x.id===id);
+  // 健檢2 #4：遷移後一般帳號不能改匯款帳號（欄位已鎖），廠商記錄保留原值；管理員改的寫進 fydata/bank 並留紀錄
+  if(BANK&&BANK.migrated){
+    const _old=idx>=0?VENDORS[idx]:null;
+    if(!_shWholeOk()){['bank','bankAcct','bankHolder'].forEach(function(f){v[f]=_old?(_old[f]||''):'';});}
+    else{try{_bankVendorSave(_old&&_old.name,v);}catch(e){_err('saveVendor.bank',e);}}
+  }
   if(idx>=0)VENDORS[idx]=v;else VENDORS.unshift(v);
   saveVendors();
   logActivity('廠商',(idx>=0?'修改':'新增')+'廠商：'+v.name);
@@ -36774,14 +36802,21 @@ function _ownAutoCat(c){
   c.cat=best||'一次性材料購置';return c.cat;
 }
 // 廠商匯款帳戶：VENDORS[].bank（銀行／分行）、bankAcct（帳號）、bankHolder（戶名）
+// 健檢2 #4（v6.0.112）：管理員確認過的帳號存 fydata/bank（只有管理員能寫）。遷移後一律以那邊為準，廠商資料裡的舊欄位只給舊版用。
 function _vendorBank(name){
   if(!name)return null;
+  if(BANK&&BANK.migrated){
+    var b=BANK.vendors&&BANK.vendors[_bankKey(name)];
+    return (b&&b.acct)?{name:name,bank:b.bank||'',bankAcct:b.acct,bankHolder:b.holder||'',_at:b.at||0,_by:b.by||''}:null;
+  }
   var v=(VENDORS||[]).find(function(x){return x&&(x.name||'')===name;});
   return (v&&v.bankAcct)?v:null;
 }
+function _bankRecent(v){return !!(v&&v._at&&Date.now()-v._at<30*86400000);}   // 近 30 天變更過 → 紅標
 function _bankLine(name){   // 顯示用：🏦 銀行 帳號 戶名 ＋ 複製鈕
   var v=_vendorBank(name);if(!v)return '';
-  return '<span style="font-size:11px;color:var(--b4);white-space:nowrap">'+(v.bank?esc(v.bank)+' ':'')+'<b style="font-variant-numeric:tabular-nums;letter-spacing:.3px;color:var(--b5)">'+esc(v.bankAcct)+'</b>'+(v.bankHolder?' '+esc(v.bankHolder):'')+'</span>'+_bankBtn(name);
+  return '<span style="font-size:11px;color:var(--b4);white-space:nowrap">'+(v.bank?esc(v.bank)+' ':'')+'<b style="font-variant-numeric:tabular-nums;letter-spacing:.3px;color:var(--b5)">'+esc(v.bankAcct)+'</b>'+(v.bankHolder?' '+esc(v.bankHolder):'')+'</span>'
+    +(_bankRecent(v)?'<span style="font-size:10.5px;color:#fff;background:var(--red);border-radius:4px;padding:0 5px;margin-left:5px;white-space:nowrap" title="帳號 '+esc(new Date(v._at).toLocaleDateString('zh-TW'))+' 變更過">近期變更・付款前先電話確認</span>':'')+_bankBtn(name);
 }
 function _bankBtn(name){
   var v=_vendorBank(name);if(!v)return '';
@@ -36790,7 +36825,7 @@ function _bankBtn(name){
 function _bankCopy(name){
   var v=_vendorBank(name);if(!v){toast('此廠商尚未登錄匯款帳號');return;}
   var txt=String(v.bankAcct).replace(/[^\d]/g,'')||String(v.bankAcct);   // 網銀只收數字：去掉空格與「-」
-  var done=function(){toast('已複製 '+esc(v.name||'')+' 帳號 '+txt+(v.bank?'（'+esc(v.bank)+'）':''));};
+  var done=function(){toast('已複製 '+esc(v.name||'')+' 帳號 '+txt+(v.bank?'（'+esc(v.bank)+'）':'')+(_bankRecent(v)?'——這個帳號最近變更過，付款前請先電話向廠商確認':''));};
   var fallback=function(){try{var ta=document.createElement('textarea');ta.value=txt;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);done();}catch(e){_err('_bankCopy',e);toast('無法複製，帳號：'+txt);}};
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done,fallback);}else fallback();
 }
@@ -38646,6 +38681,59 @@ function invUnlock(){
       inv.lockLog=(inv.lockLog||[]).concat([{at:Date.now(),by:_meEmail(),kind:'unlock',reason:r.slice(0,200)}]);
       _touch(inv);saveInv();_invRenderLockBanner(inv);toast('已解鎖（2 小時內存檔一次有效）');
     },false,null,true);
+// ══════════ v6.0.112 健檢2 #4：匯款帳號（公司收款帳號、廠商匯款帳號）只有管理員能改 ══════════
+// 原本存在共用區（參數 P.bank／廠商資料 bankAcct），任何員工都能改 → 可被用來詐騙（業主照請款單付款、會計照「複製帳號」匯款）。
+// 改存 fydata/bank（規則：員工與唯讀帳號可讀、只有管理員能寫）：{company:{bank,account,at,by}, vendors:{<鍵>:{name,bank,acct,holder,at,by}}, log:{<id>:{at,by,kind,name,before,after}}, migrated}
+// 遷移：管理員裝置第一次讀到 fydata/bank 沒有 migrated 時，把現有參數與廠商資料的帳號「複製」過去（不刪舊欄位，退回舊版照常可用）。
+// 規則未發布前讀不到 fydata/bank → BANK＝null → 沿用舊欄位（行為與以前相同）。
+var BANK=null,_bankOn=false;
+var _CO_BANK_DEF={bank:'國泰世華建成分行(013)',account:'031035008864'};
+function _bankKey(name){return encodeURIComponent(String(name||'').trim()).replace(/\./g,'%2E').slice(0,300)||'_';}
+function _coBank(){
+  var c=BANK&&BANK.migrated&&BANK.company;
+  if(c&&c.account)return {bank:c.bank||'',account:c.account,at:c.at||0,by:c.by||''};
+  return {bank:P.bank||_CO_BANK_DEF.bank,account:P.bankAccount||_CO_BANK_DEF.account};
+}
+function _bankWatch(){
+  if(_bankOn||!_fbDb||!_fbUser)return;
+  _bankOn=true;
+  _fbDb.ref('fydata/bank').on('value',function(snap){
+    BANK=snap.val()||{};
+    try{_bankMigrate();}catch(e){_err('_bankWatch.mig',e);}
+  },function(err){_bankOn=false;BANK=null;_err('_bankWatch',err);});   // 規則尚未發布：沿用舊欄位
+}
+function _bankLog(up,kind,name,before,after){
+  var id='l'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  up['log/'+id]={at:Date.now(),by:_meEmail(),kind:kind,name:String(name||'').slice(0,100),before:before||null,after:after||null};
+}
+function _bankMigrate(){
+  if(!BANK||BANK.migrated||!_shWholeOk()||!_fbDb)return;
+  var up={},n=0;
+  up.company={bank:P.bank||_CO_BANK_DEF.bank,account:P.bankAccount||_CO_BANK_DEF.account,at:0,by:'migrate'};
+  (VENDORS||[]).forEach(function(v){if(v&&v.name&&v.bankAcct){up['vendors/'+_bankKey(v.name)]={name:v.name,bank:v.bank||'',acct:v.bankAcct,holder:v.bankHolder||'',at:0,by:'migrate'};n++;}});
+  _bankLog(up,'migrate','',null,{vendors:n});
+  up.migrated=Date.now();
+  _fbDb.ref('fydata/bank').update(up).then(function(){console.log('[帳號] 已把 '+n+' 家廠商帳號與公司帳號搬到 fydata/bank');}).catch(function(e){_err('_bankMigrate',e);});
+}
+function _bankCompanySave(bank,account){
+  if(!(BANK&&BANK.migrated)||!_shWholeOk()||!_fbDb)return;
+  var cur=BANK.company||{};
+  if((cur.bank||'')===(bank||'')&&(cur.account||'')===(account||''))return;
+  var up={};up.company={bank:bank||'',account:account||'',at:Date.now(),by:_meEmail()};
+  _bankLog(up,'company','公司收款帳號',{bank:cur.bank||'',account:cur.account||''},{bank:bank||'',account:account||''});
+  _fbDb.ref('fydata/bank').update(up).then(function(){toast('公司收款帳號已變更（已留紀錄）');}).catch(function(e){_err('_bankCompanySave',e);toast('公司收款帳號變更失敗：'+(e&&e.message||''));});
+}
+function _bankVendorSave(oldName,v){
+  if(!(BANK&&BANK.migrated)||!_shWholeOk()||!_fbDb||!v||!v.name)return;
+  var ok=_bankKey(oldName||v.name),nk=_bankKey(v.name),cur=(BANK.vendors&&BANK.vendors[ok])||{};
+  var nv={name:v.name,bank:v.bank||'',acct:v.bankAcct||'',holder:v.bankHolder||''};
+  var same=(cur.bank||'')===nv.bank&&(cur.acct||'')===nv.acct&&(cur.holder||'')===nv.holder;
+  if(same&&ok===nk)return;
+  var up={};
+  if(ok!==nk)up['vendors/'+ok]=null;   // 廠商改名：帳號跟著搬
+  up['vendors/'+nk]=nv.acct?Object.assign(nv,{at:same?(cur.at||0):Date.now(),by:same?(cur.by||''):_meEmail()}):null;
+  if(!same)_bankLog(up,'vendor',v.name,{bank:cur.bank||'',acct:cur.acct||'',holder:cur.holder||''},{bank:nv.bank,acct:nv.acct,holder:nv.holder});
+  _fbDb.ref('fydata/bank').update(up).then(function(){if(!same)toast(v.name+' 的匯款帳號已變更（已留紀錄，30 天內付款會提醒先電話確認）');}).catch(function(e){_err('_bankVendorSave',e);toast('匯款帳號變更失敗：'+(e&&e.message||''));});
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

@@ -6744,7 +6744,7 @@ async function newPage(browser, width, height) {
   {
     const rules = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const RD = "root.child('fydata/readers')";
-    const wr = [rules.shared['.write'], rules.relay['.write'], rules.relay['.read'], rules.private['.write'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.logs['$uid']['.write']];   // backups 改只給擁有者（另驗）
+    const wr = [rules.shared.pagePerms['.write'], rules.shared.$other['.write'], rules.shared.quotes.$qid['.write'], rules.shared.version['.write'], rules.relay['.write'], rules.relay['.read'], rules.private['.write'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.logs['$uid']['.write']];   // backups 改只給擁有者（另驗）
     check('v6.0.90 規則：readers 可讀 shared（v6.0.108 起也可讀 private）、所有寫入與 relay／backups 皆排除 readers 名冊、名冊僅管理員可寫',
       rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.backups['.read'].includes('adminEmails') && !rules.backups['.write'].includes('adminEmails') && rules.relay['.read'].includes('|| ' + RD) && rules.private['.read'].includes('|| ' + RD) /* v6.0.108 Lotion：唯讀帳號可讀 private */ && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
       '');
@@ -6822,7 +6822,7 @@ async function newPage(browser, width, height) {
       const usedF = used.filter(u => u !== 'fydata'); r.srUsed = usedF.join(',');
       r.sr = !/match \/\{allPaths/.test(SR) && /match \/fydata\/backups\/\{file=\*\*\} \{\s*allow read, write: if isOwner\(\);/.test(SR)
         && usedF.length >= 5 && usedF.every(u => u === 'fydata/backups' || (u.startsWith('fydata/') ? new RegExp("'" + u.split('/')[1] + "'").test(SR) : new RegExp('match /' + u + '/').test(SR)))
-        && /hsuanchen911@gmail\.com/.test(SR) && (SR.match(/!isReader\(\)/g) || []).length === 2;
+        && /hsuanchen911@gmail\.com/.test(SR) && (SR.match(/!isReader\(\)/g) || []).length >= 1 && (SR.match(/allow write: if isStaff\(\)/g) || []).length === 2;   // v6.0.112 改用 isStaff（claim fy）
       r.static = dels.length === 2 && dels.every(l => /function _stDel|kill\.forEach/.test(l)) && puts.length >= 4 && puts.every(i => L.slice(Math.max(0, i - 40), i).some(x => /_stOk\(\)/.test(x)));
     }
     check('v6.0.93 唯讀 Storage fail-closed：唯讀／未確認／離線不上傳不刪檔、舊規則被拒＝一般帳號、只豁免擁有者、刪檔只經 _stDel', r.stReader && r.pendCb && r.stPending && r.oldRules && r.stRw && r.ownerSkip && r.static && r.inputCheck && r.ownerOnlyBackup, JSON.stringify(r));
@@ -8279,6 +8279,61 @@ async function newPage(browser, width, height) {
     check('v6.0.111 健檢1 #13／#14：已付應付不被改寫或刪除（差額另立、手動修改擋下）', r.paidKeep && r.deltaGone && r.editBlock && r.paid2 && r.paidNoRewrite && r.cleanKeep && r.noTombReuse && r.subBase && r.subDelta && !r.err, JSON.stringify(r));
     check('v6.0.111 健檢1 #1（Lotion 10/22）：已收款／已開發票／已結案期別鎖住、改報價只動未鎖的期別、調整列連回原期、管理員填原因解鎖並留紀錄', r.lockWhy && r.lockQ && r.adjDiff && r.lockSave && r.unlockEdit && r.adjRow && r.adjNeg && r.negLoad && r.adjDone && r.autoLock && r.discLock && r.headLock && r.closedLock && r.closedNew && !r.err, JSON.stringify(r));
     check('v6.0.111 批次 G 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+
+  // ── v6.0.112 批次 H：健檢2 安全（名冊／角色只有管理員能寫、共用區不能整包清空、匯款帳號只有管理員能改、Storage 用權限標記） ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = () => {};
+        const oU = window._fbUser;
+        /* #2／#3 一般員工上傳：拿掉名冊／角色、不送空集合；逐筆集合不整包改寫 */
+        _fbUser = { email: 'staff1@example.com', uid: 's1' }; _isReaderUser = false;
+        out.staffNotAdmin = !_shWholeOk();
+        const d1 = { version: 'v', uploadedAt: 1, pagePerms: { x: 1 }, customers: [], vendors: [{ id: 'v1' }], 'quotes/q1': { id: 'q1' } };
+        _shStripForStaff(d1);
+        out.strip = !('pagePerms' in d1) && !('customers' in d1) && Array.isArray(d1.vendors) && !!d1['quotes/q1'];
+        try { localStorage.removeItem('fy_rec_mig_quotes'); } catch (e) { /* 可忽略 */ }
+        const clean = { quotes: [{ id: 'qa', name: 'A' }, { id: 'qb', name: 'B' }], invoices: [], workers: [] };
+        const d2 = {}; _perRecordDelta(d2, clean, {}, {}, { full: true });
+        out.perRec = !('quotes' in d2) && !!d2['quotes/qa'] && !!d2['quotes/qb'];
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o1' };
+        const d3 = { version: 'v', uploadedAt: 1, pagePerms: { x: 1 } }; _shStripForStaff(d3); out.adminKeep = !!d3.pagePerms;
+        /* #4 匯款帳號：遷移後以 fydata/bank 為準、近期變更紅標、員工改不了 */
+        VENDORS = [{ id: 'v1', name: '甲工程行', bank: '舊銀行', bankAcct: '111', bankHolder: '甲' }];
+        BANK = null; out.legacy = _vendorBank('甲工程行').bankAcct === '111' && _coBank().account === (P.bankAccount || '031035008864');
+        BANK = { migrated: 1, company: { bank: '新銀行', account: '999' }, vendors: {} };
+        BANK.vendors[_bankKey('甲工程行')] = { name: '甲工程行', bank: '新銀行', acct: '222', holder: '甲', at: Date.now() };
+        out.bankSrc = _vendorBank('甲工程行').bankAcct === '222' && _coBank().account === '999' && /近期變更/.test(_bankLine('甲工程行'));
+        VENDORS[0].bankAcct = '666'; out.ignoreShared = _vendorBank('甲工程行').bankAcct === '222';
+        _fbUser = { email: 'staff1@example.com', uid: 's1' };
+        editVendor('v1'); out.lock = document.getElementById('v-bankacct').disabled === true;
+        document.getElementById('v-bankacct').value = '777'; document.getElementById('v-bankacct').disabled = false; saveVendor();
+        out.staffNoChange = VENDORS.find(v => v.id === 'v1').bankAcct === '666' && _vendorBank('甲工程行').bankAcct === '222';
+        BANK = null; VENDORS = []; _fbUser = oU; window.toast = oT;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    const fs = require('fs'), pth = require('path');
+    const rules = JSON.parse(fs.readFileSync(pth.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    const sh = rules.shared, ADMK = "fydata/adminEmails";
+    const rr = {
+      noRootWrite: !('.write' in sh),
+      pp: sh.pagePerms && sh.pagePerms['.write'].includes(ADMK) && !sh.pagePerms['.write'].includes("fydata/access"),
+      whole: ['quotes', 'invoices', 'workers'].every(k => sh[k] && sh[k]['.write'].includes(ADMK) && !sh[k]['.write'].includes('fydata/access') && sh[k][Object.keys(sh[k]).find(x => x[0] === '$')]['.write'].includes('fydata/access')),
+      other: /newData\.exists\(\) \|\|/.test(sh.$other['.write']),
+      bank: rules.bank && rules.bank['.write'].includes(ADMK) && !rules.bank['.write'].includes('fydata/access') && rules.bank.$other['.validate'] === 'false',
+    };
+    const SR = fs.readFileSync(pth.join(__dirname, '..', 'storage.rules'), 'utf8');
+    check('v6.0.112 健檢2 #2／#3：一般員工上傳不送名冊／角色與空集合、逐筆集合不整包改寫；管理員照常', r.staffNotAdmin && r.strip && r.perRec && r.adminKeep && !r.err, JSON.stringify(r));
+    check('v6.0.112 健檢2 #2／#3 規則：共用區逐集合授權（名冊／角色、整包改寫只限管理員；員工不能刪整個集合）', rr.noRootWrite && rr.pp && rr.whole && rr.other, JSON.stringify(rr));
+    check('v6.0.112 健檢2 #4：匯款帳號遷移後以 fydata/bank 為準（員工改不了、近期變更紅標）、未遷移沿用舊欄位；規則只限管理員寫', r.legacy && r.bankSrc && r.ignoreShared && r.lock && r.staffNoChange && rr.bank && !r.err, JSON.stringify(r));
+    check('v6.0.112 健檢2 #6：storage.rules 改用權限標記 fy（與產生器同一版）', /request\.auth\.token\.get\('fy', ''\) in \['staff', 'admin'\]/.test(SR) && /token\.get\('fy', ''\) == 'reader'/.test(SR) && !/signedIn\(\) && folder in/.test(SR), '');
+    check('v6.0.112 批次 H 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
