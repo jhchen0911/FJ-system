@@ -8282,6 +8282,85 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.112 批次 G2：刪報價／取消得標／自動結算防護（健檢1 #30 #20 #19）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      try {
+        const oT = window.toast; let msg = ''; window.toast = m => { msg = String(m); };
+        const ok = () => document.getElementById('gen-confirm-ok').click();
+        const title = () => (document.getElementById('gen-confirm-title') || {}).textContent || '';
+        const shut = () => { const m = document.getElementById('gen-confirm-modal'); if (m) m.style.display = 'none'; };
+        PAYABLES.length = 0; INV.length = 0; CONTRACTS.splice(0);
+        /* #30 有已付應付 → 擋；有已收款請款單 → 擋；都沒有 → 可刪 */
+        Q = [{ id: 'qD1', name: '刪1', items: [], costs: [{ id: 'cD1', type: 'sub' }] }, { id: 'qD2', name: '刪2', items: [] }, { id: 'qD3', name: '刪3', items: [] }];
+        PAYABLES.push({ id: 'paycD1_p1', status: 'paid', amount: 1000, to: '甲', paidDate: '2026-10-01' });
+        INV.push({ id: 'iD2', quoteId: 'qD2', periodNo: 1, received: 500, items: [] });
+        PAYABLES.push({ id: 'payX', quoteId: 'qD3', status: 'pending', amount: 10 });
+        delQ('qD1'); out.blkPay = /不能刪除/.test(title()) && Q.some(q => q.id === 'qD1'); shut();
+        _delQDo('qD1'); out.blkPayDo = Q.some(q => q.id === 'qD1') && PAYABLES.some(p => p.id === 'paycD1_p1');
+        delQ('qD2'); out.blkInv = /不能刪除/.test(title()); shut(); _delQDo('qD2'); out.blkInvDo = Q.some(q => q.id === 'qD2') && INV.some(v => v.id === 'iD2');
+        delQ('qD3'); out.delOk = /刪除報價單/.test(title()); ok(); out.delOk = out.delOk && !Q.some(q => q.id === 'qD3') && !PAYABLES.some(p => p.id === 'payX');
+        /* #20 取消得標：只刪 linkedQid 合約、同名別案不動；未付抽成／佣金作廢；已付擋下 */
+        PAYABLES.length = 0; INV.length = 0;
+        Q = [{ id: 'qR', name: '同名案', awarded: true, items: [] }];
+        CONTRACTS.push({ id: 'cR1', name: '同名案', linkedQid: 'qR', amount: 100 }, { id: 'cR2', name: '同名案', linkedQid: 'qOther', amount: 200 }, { id: 'cR3', name: '同名案', amount: 300 });
+        PAYABLES.push({ id: 'pay_sales_qR', quoteId: 'qR', status: 'pending', amount: 2000, to: '業務' }, { id: 'comm_qR_c1', quoteId: 'qR', status: 'pending', amount: 3000, to: '主任' });
+        revokeAward('qR'); ok(); out.needReason = Q[0].awarded === true && /原因/.test(msg); shut();
+        revokeAward('qR'); document.getElementById('revoke-reason').value = '業主改發別家'; ok();
+        const ps = PAYABLES.find(p => p.id === 'pay_sales_qR'), pc = PAYABLES.find(p => p.id === 'comm_qR_c1');
+        out.revoked = Q[0].awarded === false && Q[0].revokeLog && Q[0].revokeLog[0].reason === '業主改發別家';
+        out.ctOnlyLinked = !CONTRACTS.some(c => c.id === 'cR1') && CONTRACTS.some(c => c.id === 'cR2') && CONTRACTS.some(c => c.id === 'cR3');
+        out.voided = ps && pc && ps.voidAt && pc.voidAt && ps.amount === 0 && ps.voidAmt === 2000 && pc.voidAmt === 3000 && /取消得標/.test(ps.voidReason);
+        /* 同步不會刪掉作廢紀錄、作廢的不列入待付 */
+        _salesCommSync(Q[0]); _commSync(Q[0]);
+        out.syncKeep = PAYABLES.some(p => p.id === 'pay_sales_qR' && p.voidAt) && PAYABLES.some(p => p.id === 'comm_qR_c1' && p.voidAt);
+        out.payBlock = (() => { payMarkPaid('pay_sales_qR'); return /作廢/.test(msg) && ps.status !== 'paid'; })();
+        /* 已付 → 擋下取消得標 */
+        Q = [{ id: 'qR2', name: 'R2', awarded: true, items: [] }]; CONTRACTS.splice(0); CONTRACTS.push({ id: 'cR4', name: 'R2', linkedQid: 'qR2' });
+        PAYABLES.push({ id: 'pay_sales_qR2', quoteId: 'qR2', status: 'paid', amount: 2000, to: '業務', paidDate: '2026-10-02' });
+        revokeAward('qR2'); out.paidBlock = /不能取消得標/.test(title()); ok(); out.paidBlock = out.paidBlock && Q[0].awarded === true && CONTRACTS.length === 1;
+        /* #19 已竣工結算：補日報不改結算數字，改成提示 */
+        const oA = window._itemActual; let act = 120;
+        window._itemActual = () => ({ qty: act, date: '2026-10-10' });
+        P.tax = 5;
+        Q = [{ id: 'qS', name: '結算案', awarded: true, items: [{ desc: '鋼板樁', unit: 'M', qty: 100, price: 1000 }] }];
+        CONTRACTS.splice(0); CONTRACTS.push({ id: 'cS', name: '結算案', linkedQid: 'qS', amount: 105000, status: 'active' });
+        _autoSettle(Q[0]); out.adjNormal = CONTRACTS[0].amount === 126000 && CONTRACTS[0].autoAdjSum === 21000 && !_autoSettleHint(Q[0]);
+        CONTRACTS[0].status = 'completed'; CONTRACTS[0].amount = 84000; CONTRACTS[0].note += '　竣工結算：原合約 NT$126,000 → 結算 NT$84,000';
+        act = 125; _autoSettle(Q[0]);
+        const hS = _autoSettleHint(Q[0]);
+        out.settledKeep = CONTRACTS[0].amount === 84000 && Q[0].items[0].settledQty === 120 && hS && hS.kind === 'settled' && hS.diff === 5250;
+        out.settledTodo = _pjTodoItems(Q[0], { invs: [], base: 0, billed: 0, retHeld: 0 }).some(x => /合約已結算/.test(x.text) && /調整列或重新結算/.test(x.sub));
+        autoSettleReview('qS'); ok(); out.settledAck = !_autoSettleHint(Q[0]) && CONTRACTS[0].amount === 84000;
+        /* 先自動結算、後建合約 → 提示更新；按更新才改 */
+        Q = [{ id: 'qT', name: '後建案', awarded: true, items: [{ desc: '鋼板樁', unit: 'M', qty: 100, price: 1000 }] }];
+        CONTRACTS.splice(0); act = 120; _autoSettle(Q[0]);
+        CONTRACTS.push({ id: 'cT', name: '後建案', linkedQid: 'qT', amount: 105000, status: 'active' });
+        _autoSettle(Q[0]); const hT = _autoSettleHint(Q[0]);
+        out.staleHint = CONTRACTS[0].amount === 105000 && hT && hT.kind === 'stale' && hT.diff === 21000;
+        autoSettleReview('qT'); ok(); out.staleApply = CONTRACTS[0].amount === 126000 && !_autoSettleHint(Q[0]);
+        /* 合約金額本來就對（如 F25P1 實作實算）：勾「不用更新」→ 金額不動、提示消失 */
+        CONTRACTS[0].amount = 2100000; CONTRACTS[0].autoAdjSum = 0;
+        autoSettleReview('qT'); document.getElementById('as-keep').checked = true; ok();
+        out.staleKeep = CONTRACTS[0].amount === 2100000 && !_autoSettleHint(Q[0]);
+        /* 舊資料：備註已有「階段完工結算」→ 視為已反映，不提示 */
+        Q = [{ id: 'qU', name: '舊案', awarded: true, items: [{ desc: '鋼板樁', unit: 'M', qty: 100, price: 1000, settledQty: 120, settledFrom: '2026-10-10', settledAdj: 21000 }] }];
+        CONTRACTS.splice(0); CONTRACTS.push({ id: 'cU', name: '舊案', linkedQid: 'qU', amount: 126000, status: 'active', note: '階段完工結算(鋼板樁)：100→120' });
+        _autoSettle(Q[0]); out.legacy = CONTRACTS[0].autoAdjSum === 21000 && !_autoSettleHint(Q[0]) && CONTRACTS[0].amount === 126000;
+        window._itemActual = oA; window.toast = oT; shut();
+        Q = []; CONTRACTS.splice(0); PAYABLES.length = 0; INV.length = 0;
+      } catch (e) { out.err = String(e && e.stack || e); }
+      return out;
+    });
+    check('v6.0.112 健檢1 #30：有已付應付或已收款／已開發票請款單的報價不准刪（沒有才可刪）', r.blkPay && r.blkPayDo && r.blkInv && r.blkInvDo && r.delOk && !r.err, JSON.stringify(r));
+    check('v6.0.112 健檢1 #20：取消得標只刪連結的合約（同名別案不動）、要填原因、未付抽成／佣金作廢留紀錄、已付擋下', r.needReason && r.revoked && r.ctOnlyLinked && r.voided && r.syncKeep && r.payBlock && r.paidBlock && !r.err, JSON.stringify(r));
+    check('v6.0.112 健檢1 #19：已竣工結算不被日報改動（改提示）、先結算後建合約提示更新、舊資料不誤報', r.adjNormal && r.settledKeep && r.settledTodo && r.settledAck && r.staleHint && r.staleApply && r.staleKeep && r.legacy && !r.err, JSON.stringify(r));
+    check('v6.0.112 批次 G2 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
