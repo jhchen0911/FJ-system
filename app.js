@@ -521,7 +521,7 @@ function _wonAmt(q){
 }
 
 // 待付應付（status 為空的舊資料視為待付，與清單口徑一致）
-function _apList(){return PAYABLES.filter(function(p){return p.status!=='paid';});}
+function _apList(){return PAYABLES.filter(function(p){return p.status!=='paid'&&!p.voidAt;});}   // 作廢（取消得標）的不算待付
 function _apTotal(){return _apList().reduce(function(a,p){return a+_payEff(p);},0);}
 
 // ── 請款單↔報價單／合約 關聯：quoteId 優先，sourceQid 相容，名稱為最後手段 ──
@@ -5127,6 +5127,7 @@ function confirmAward(){
       // 應付帳款 upsert（固定 id 防重複；保留既有付款狀態）
       let cp=PAYABLES.find(p=>p.id===commPayId);
       if(!cp){cp={id:commPayId,status:'pending'};PAYABLES.unshift(cp);}
+      _payVoidOff(cp);   // 重新得標：取消得標時作廢的恢復
       cp.kind='commission';cp.to=refName;cp.project=q.name||'';cp.quoteId=id;
       cp.amount=amt;
       cp.note='專案獎金（'+who+'）'+(mode==='amt'?'一筆 NT$'+fmt(amt):rate+'%')+'・依實收款進度分期支付';
@@ -5135,7 +5136,7 @@ function confirmAward(){
     }else{
       // 清除姓名＝取消獎金：移除未付款的獎金應付（已付款者保留帳）
       const cp=PAYABLES.find(p=>p.id===commPayId);
-      if(cp&&cp.status!=='paid'){_tomb('payables',commPayId);PAYABLES=PAYABLES.filter(p=>p.id!==commPayId);savePayables();}
+      if(cp&&cp.status!=='paid'&&!cp.voidAt){_tomb('payables',commPayId);PAYABLES=PAYABLES.filter(p=>p.id!==commPayId);savePayables();}
       delete q.referral;
     }
   }catch(e){_err('top',e);}
@@ -5476,7 +5477,7 @@ function _revokePays(q){
   if(!q||!q.id)return [];var sid='pay_sales_'+q.id,pre='comm_'+q.id;
   return (PAYABLES||[]).filter(function(p){if(!p||!p.id)return false;var i=String(p.id);return i===sid||i===pre||i.indexOf(pre+'_')===0;});
 }
-function _payVoidOff(p){if(!p||!p.voidAt)return false;delete p.voidAt;delete p.voidBy;delete p.voidReason;delete p.voidAmt;return true;}   // 重新得標：作廢的抽成／佣金恢復，金額由同步重算
+function _payVoidOff(p){if(!p||!p.voidAt)return false;p.voidLog=(Array.isArray(p.voidLog)?p.voidLog:[]).concat([{at:p.voidAt,by:p.voidBy||'',reason:p.voidReason||'',amt:p.voidAmt||0,offAt:Date.now()}]).slice(-10);delete p.voidAt;delete p.voidBy;delete p.voidReason;delete p.voidAmt;return true;}   // 重新得標：作廢的抽成／佣金恢復，金額由同步重算
 
 // ── Payment reminders ──
 function checkPayReminders(){
@@ -25239,6 +25240,7 @@ function _settleContractDo(id,orig,billed,_retSum){
   if(c.originalAmount==null)c.originalAmount=orig; // 保留原始合約金額
   c.amount=billed;
   c.status='completed';
+  try{var _sq=Q.find(function(x){return x.id===c.linkedQid;})||Q.find(function(x){return !c.linkedQid&&x.name&&x.name===c.name&&!x.parentId;});if(_sq)c.settleSnap={qid:_sq.id,at:Date.now(),qty:_asSnap(_sq)};}catch(e){_err('_settleContractDo.snap',e);}   // 健檢1 #19：記下結算當下的實作量，之後日報有變才提示
   const settleNote='竣工結算：原合約 NT$'+fmt(orig)+' → 結算 NT$'+fmt(billed);
   c.note=c.note?(c.note+'　'+settleNote):settleNote;
   _touch(c);c.updatedAt=Date.now(); // 更新修改時間，確保跨裝置同步時新值獲勝
@@ -26194,7 +26196,7 @@ function renderPayables(){
     return true;
   });
   const _agingBar=(function(){
-    const pend=filtered.filter(p=>p.status!=='paid');
+    const pend=filtered.filter(p=>p.status!=='paid'&&!p.voidAt);
     const sum=arr=>fmt(arr.reduce((a,p)=>a+_payEff(p),0));
     const gOverdue=pend.filter(p=>p.date&&p.date<_today),
           gW7=pend.filter(p=>p.date&&p.date>=_today&&p.date<=_in7),
@@ -34148,14 +34150,19 @@ function _piSave(){
 // 健檢1 #19：合約已竣工結算後不再自動改合約金額；先結算、後建合約的差額提示更新（不默默不動）
 function _asCt(q){return (CONTRACTS||[]).find(function(c){return c&&c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return c&&!c.linkedQid&&c.name&&c.name===q.name;})||null;}
 function _ctSettled(ct){return !!ct&&(ct.status==='completed'||/竣工結算/.test(ct.note||''));}
+function _asSnap(q){var m={};((q&&q.items)||[]).forEach(function(it,i){if(!it||it.sec||_isSpare(it))return;var a;try{a=_itemActual(q,i);}catch(e){a=null;}m[i]=(a&&a.qty>0)?a.qty:0;});return m;}   // 竣工結算當下各工項的日報實作量
+function _asBase(q,ct){return ct.autoAdjSum!=null?(+ct.autoAdjSum||0):(/階段完工結算\(/.test(ct.note||'')?_asAdjSum(q):0);}   // 合約已計入的自動結算差額（舊資料：備註有標記＝全部已計入）
 function _asAdjSum(q){return ((q&&q.items)||[]).reduce(function(a,it){return a+(it&&!it.sec?Math.round(+it.settledAdj||0):0);},0);}
 function _autoSettle(q){
   if(!q||!Array.isArray(q.items))return false;
   var ct=_asCt(q);
-  if(_ctSettled(ct))return false;   // 已竣工結算：結算數字不動，差異由 _autoSettleHint 提示
+  if(_ctSettled(ct)){   // 已竣工結算：結算數字不動，差異由 _autoSettleHint 提示；舊資料第一次看到時記下目前實作量當基準
+    if(!ct.settleSnap||ct.settleSnap.qid!==q.id){ct.settleSnap={qid:q.id,at:Date.now(),qty:_asSnap(q)};_touch(ct);try{saveContracts();}catch(e){_err('_autoSettle.snap',e);}}
+    return false;
+  }
   var tm=_taxM(),ch=false,ctCh=false,invCh={};
   // 舊資料：v6.0.112 以前自動結算調過的合約（備註有「階段完工結算」）視為已反映目前全部差額
-  if(ct&&ct.autoAdjSum==null&&/階段完工結算\(/.test(ct.note||'')){ct.autoAdjSum=_asAdjSum(q);_touch(ct);ctCh=true;}
+  if(ct&&ct.autoAdjSum==null&&/階段完工結算\(/.test(ct.note||'')){ct.autoAdjSum=_asBase(q,ct);_touch(ct);ctCh=true;}
   q.items.forEach(function(it,i){
     if(!it||it.sec||_isSpare(it))return;
     var a;try{a=_itemActual(q,i);}catch(e){a=null;}
@@ -34182,16 +34189,16 @@ function _autoSettleHint(q){
   if(!q||q.closed||!Array.isArray(q.items))return null;
   var ct=_asCt(q);if(!ct)return null;var tm=_taxM(),h=null;
   if(_ctSettled(ct)){
-    var d=0,n=[];
+    var d=0,n=[],sn=ct.settleSnap&&ct.settleSnap.qid===q.id&&ct.settleSnap.qty;if(!sn)return null;   // 還沒有結算基準（_autoSettle 會補）
     q.items.forEach(function(it,i){
-      if(!it||it.sec||_isSpare(it)||it.settledQty==null)return;
-      var a;try{a=_itemActual(q,i);}catch(e){a=null;}
-      if(!a||!(a.qty>0)||a.qty===+it.settledQty)return;
-      d+=Math.round((a.qty-(+it.settledQty))*(parseFloat(it.price)||0)*tm);n.push(String(it.desc||'').split('\n')[0].trim().slice(0,14)+' '+_rfmt(+it.settledQty)+'→'+_rfmt(a.qty));
+      if(!it||it.sec||_isSpare(it)||sn[i]==null)return;
+      var a;try{a=_itemActual(q,i);}catch(e){a=null;}var nq=(a&&a.qty>0)?a.qty:0,b0=+sn[i]||0;
+      if(nq===b0)return;
+      d+=Math.round((nq-b0)*(parseFloat(it.price)||0)*tm);n.push(String(it.desc||'').split('\n')[0].trim().slice(0,14)+' '+_rfmt(b0)+'→'+_rfmt(nq));
     });
     if(n.length)h={kind:'settled',diff:d,items:n,sig:'s:'+d+':'+n.join('|')};
   }else{
-    var gap=Math.round(_asAdjSum(q)-(+ct.autoAdjSum||0));
+    var gap=Math.round(_asAdjSum(q)-_asBase(q,ct));
     if(gap)h={kind:'stale',diff:gap,items:[],sig:'g:'+gap};
   }
   if(!h||ct.autoAdjAck===h.sig)return null;
@@ -34209,10 +34216,14 @@ function autoSettleReview(qid){
   }
   showConfirm('合約金額需要更新','<div style="font-size:12.5px;line-height:1.75">工項已依日報做過階段完工結算，差額（含稅）NT$ <b>'+fmt(h.diff)+'</b> 還沒有反映到合約金額（常見原因：先結算、後建合約）。<br><br>'
     +'合約目前 NT$ '+fmt(parseFloat(ct.amount)||0)+' → 更新後 NT$ <b>'+fmt(Math.max(0,Math.round((parseFloat(ct.amount)||0)+h.diff)))+'</b><br><br>'
-    +'<label style="display:flex;gap:6px;align-items:flex-start"><input type="checkbox" id="as-keep" style="margin-top:4px">合約金額是對的，不用更新（例如業主合約本來就照實作數量訂）</label></div>',function(){
-      if(document.getElementById('as-keep')&&document.getElementById('as-keep').checked){ack();toast('已記下：合約金額維持不變');return;}
+    +'<div style="font-weight:700">請選一個：</div>'
+    +'<label style="display:flex;gap:6px;align-items:flex-start"><input type="radio" name="as-ch" id="as-upd" style="margin-top:4px">更新合約金額</label>'
+    +'<label style="display:flex;gap:6px;align-items:flex-start"><input type="radio" name="as-ch" id="as-keep" style="margin-top:4px">合約金額是對的，不用更新（例如業主合約本來就照實作數量訂）</label></div>',function(){
+      var up=document.getElementById('as-upd'),kp=document.getElementById('as-keep');
+      if(kp&&kp.checked){ack();toast('已記下：合約金額維持不變');return;}
+      if(!(up&&up.checked)){toast('請選「更新」或「不用更新」');return false;}
       if(ct.originalAmount==null)ct.originalAmount=parseFloat(ct.amount)||0;
-      ct.amount=Math.max(0,Math.round((parseFloat(ct.amount)||0)+h.diff));ct.autoAdjSum=Math.round((+ct.autoAdjSum||0)+h.diff);
+      ct.amount=Math.max(0,Math.round((parseFloat(ct.amount)||0)+h.diff));ct.autoAdjSum=Math.round(_asBase(q,ct)+h.diff);
       var tag='階段完工結算補入合約：'+(h.diff>0?'+':'')+fmt(h.diff);ct.note=ct.note?(ct.note+'　'+tag):tag;
       _touch(ct);ct.updatedAt=Date.now();saveContracts();toast('合約金額已更新為 NT$ '+fmt(ct.amount));try{renderProj();}catch(e){_err('autoSettleReview',e);}
     },false,null,true);
@@ -35119,7 +35130,7 @@ function _costSummaryStrip(q,costs){
   });
   var b=_costOwnBreak(q,false);
   var unpaid=0,unpaidN=0;
-  (PAYABLES||[]).forEach(function(p){if(p&&p.quoteId===q.id&&p.status!=='paid'){unpaid+=_payEff(p);unpaidN++;}});
+  (PAYABLES||[]).forEach(function(p){if(p&&p.quoteId===q.id&&p.status!=='paid'&&!p.voidAt){unpaid+=_payEff(p);unpaidN++;}});
   var total=S.sub+S.labor+b.amort+b.buy+b.rent+b.trans+b.loss+S.extra+S.quick;
   var quote=(q&&q.t&&parseFloat(q.t.sub))||0,pct=quote>0?Math.round(total/quote*1000)/10:null;
   var tile=function(l,v,clr,sub,strong){return '<div class="cs-tile" style="border:1px solid '+(strong?'var(--gm)':'var(--b1)')+';border-radius:var(--r8);padding:6px 9px;background:'+(strong?'var(--gl)':'var(--w)')+';min-width:0"><div style="font-size:10.5px;color:var(--b4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+l+'</div><div style="font-size:'+(strong?'15px':'13.5px')+';font-weight:800;color:'+clr+';font-variant-numeric:tabular-nums">'+fmt(Math.round(v))+'</div>'+(sub?('<div style="font-size:10px;color:var(--b4);line-height:1.5;margin-top:1px">'+sub+'</div>'):'')+'</div>';};
@@ -39014,7 +39025,7 @@ function showConfirm(title, msg, onOk, danger, onCancel, wide){
     okBtn.parentNode.replaceChild(newOk,okBtn);
     var _roForm=!!(_isReaderUser&&msgEl&&msgEl.querySelector('input:not([type=hidden]):not([data-ro-ok]),select:not([data-ro-ok]),textarea:not([data-ro-ok])'));   // Lotion 10/21：唯讀帳號開明細視窗只能看，確認＝關閉、不存
     if(_roForm){newOk.textContent='關閉';if(cancelBtn)cancelBtn.style.display='none';}
-    newOk.onclick=function(){modal.style.display='none';if(_roForm)return;onOk();};
+    newOk.onclick=function(){modal.style.display='none';if(_roForm)return;if(onOk()===false&&modal.style.display==='none')modal.style.display='flex';};   // G2 審查：回傳 false（如原因沒填）＝視窗留著、已填內容不丟
   }
   if(cancelBtn){
     const newCancel=cancelBtn.cloneNode(true);
