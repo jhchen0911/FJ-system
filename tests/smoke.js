@@ -8437,6 +8437,8 @@ async function newPage(browser, width, height) {
     {
       const fs = require('fs'), rd = f => fs.existsSync(path.join(__dirname, '..', f)) ? fs.readFileSync(path.join(__dirname, '..', f), 'utf8') : '';
       const ix = rd('index.html'), th = rd('test.html'), ver = (ix.match(/app\.js\?v=([^"]+)"/) || [])[1];
+      const pbReal = (ix.match(/<input id="pb" value="([^"]*)"/) || [])[1] || '', pbTest = (th.match(/<input id="pb" value="([^"]*)"/) || [])[1] || '';
+      check('v6.0.113 改版第 0 步：測試站 test.html 不含正式站的負責人姓名（負責人欄預設值換成假名）', !!pbTest && pbTest === '測試負責人' && (!pbReal || th.indexOf(pbReal) < 0), '');
       const sw = rd('sw.js');
       check('v6.0.113 改版第 0 步（審查）：離線時只有正式站本身（/、/index.html）退回快取的 index.html，beta.html／test.html 不退回（避免沒隔離的頁面連到測試專案）', /function isIndexPath\(url\)/.test(sw) && (sw.match(/isIndexPath\(url\)/g) || []).length >= 3, '');
       check('v6.0.113 改版第 0 步：測試站 test.html（連測試專案、可寫入）本機資料走 test: 前綴、不從正式版複製、不載 beta.js，app.js 版本與 index.html 一致',

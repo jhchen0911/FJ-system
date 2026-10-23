@@ -80,6 +80,9 @@ if os.path.basename(out).lower().startswith('test'):
 '''
     i=src.index('</head>');src=src[:i]+test_head+src[i:]
     src=src.replace('<title>','<title>測試站 ',1)
+    # 測試站不帶正式站的公司資料預設值（負責人姓名等），一律換假名（Lotion-HQ 10/23 真實案名掃描）
+    src,nn=re.subn(r'(<input id="pb" value=")[^"]*(")',r'\1測試負責人\2',src)
+    if nn!=1: raise SystemExit('test.html：找不到負責人欄位 id="pb"，請檢查 index.html')
     io.open(out,'w',encoding='utf-8').write(src)
     print('test.html written',len(src))
     raise SystemExit(0)
