@@ -8048,7 +8048,7 @@ function initFirebase(){
   _fbAuth.onAuthStateChanged(user=>{
     _fbUser = user;
     _updateFbUI(!!user);
-    if(user) _autoSyncOnLogin();
+    if(user) _minVerWatch(_autoSyncOnLogin);
     else { _isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
   });
 }
@@ -9877,6 +9877,37 @@ function _regraftPlanImgs(cloud,loc){
   return cloud;
 }
 // 報價版本歷史：{qid:[{savedAt,...}]}——以 savedAt 為身分做聯集，不會互相蓋掉
+// 改版第 0 步（待查 3a）：報價版本歷史 qHistory 會上 shared，快照是整張報價的深拷貝（含成本、估算成本、毛利）。
+//   上傳 shared 前逐筆快照走 _stripQuoteSens；抽走的欄位以 qHistSens[qid][savedAt]=_extractQuoteSens(快照) 存 private；
+//   讀得到 private 的裝置合併後用 _qhFill 補回（只補空缺，本機原有的完整快照不動）
+var _QH_SENS=null;
+function _qhStrip(h){
+  var out={};
+  Object.keys(h||{}).forEach(function(qid){
+    var arr=Array.isArray(h[qid])?h[qid]:Object.values(h[qid]||{});
+    out[qid]=arr.map(function(v){if(!v||!v.snapshot)return v;var c=Object.assign({},v);c.snapshot=_stripQuoteSens(v.snapshot);return c;});
+  });
+  return out;
+}
+function _qhSensMap(){
+  var out={};
+  Object.keys(Q_HISTORY||{}).forEach(function(qid){
+    (Array.isArray(Q_HISTORY[qid])?Q_HISTORY[qid]:[]).forEach(function(v){
+      if(!v||!v.snapshot||v.savedAt==null)return;
+      var x=_extractQuoteSens(v.snapshot),has=(x.costs&&x.costs.length)||Object.keys(x.est||{}).length||Object.keys(x.t||{}).length||Object.keys(x).some(function(k){return ['costs','est','t','_mt'].indexOf(k)<0;});
+      if(!has)return;delete x._mt;(out[qid]=out[qid]||{})[String(v.savedAt)]=x;
+    });
+  });
+  return out;
+}
+function _qhFill(map){
+  if(!map)return false;var n=0;
+  Object.keys(map).forEach(function(qid){
+    var arr=Q_HISTORY&&Q_HISTORY[qid];if(!Array.isArray(arr))return;
+    arr.forEach(function(v){var s=v&&v.snapshot&&map[qid][String(v.savedAt)];if(!s)return;_applyQuoteSens(v.snapshot,s,true);n++;});
+  });
+  return n>0;
+}
 function _mergeQHistory(loc,cloud){
   var out=Object.assign({},loc||{});
   Object.keys(cloud||{}).forEach(function(qid){
@@ -9924,6 +9955,7 @@ function _sharedPayload(){
   var out={};
   Object.keys(d).forEach(function(k){if(_PRIV_COLLS.indexOf(k)<0)out[k]=d[k];});
   out.quotes=(d.quotes||[]).map(_stripQuoteSens);
+  out.qHistory=_qhStrip(d.qHistory);   // 改版第 0 步（待查 3a）：報價版本歷史的快照也去敏感，完整欄位改存 private qHistSens
   // v5.336 健檢G：發票的內嵌影像（base64）不上 RTDB——幾張就撞節點寫入上限。
   // 雲端只留 fileUrl（Storage 連結）；內嵌影像留在本機，合併後由 regraft 補回。
   out.invoiceRecs=(d.invoiceRecs||[]).map(function(r){
@@ -9944,7 +9976,7 @@ function _privatePayload(){
   Q.forEach(function(q){if(q&&q.id)qs[q.id]=_extractQuoteSens(q);});
   return {ts:ts,data:{
     version:'fy-v5p', uploadedAt:ts, uploadedBy:(_fbUser&&_fbUser.email)||'',
-    quoteSens:qs, payables:PAYABLES, expenses:EXPENSES, costHist:COST_HIST,
+    quoteSens:qs, qHistSens:_qhSensMap(), payables:PAYABLES, expenses:EXPENSES, costHist:COST_HIST,
     upaCostDB:UPA_COST_DB, shareProfit:SHARE_PROFIT, matLedger:MAT_LEDGER, dealHist:DEAL_HIST,
     hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]), petty:(typeof PETTY!=='undefined'?PETTY:[]),   // v5.433／v5.434
     paidLog:(typeof PAID_LOG!=='undefined'?PAID_LOG:{}),   // v6.0.85
@@ -10149,6 +10181,7 @@ function _applyCloud(data){
     }catch(e){console.error('[同步] 計畫書草稿合併失敗',e);}}
     if(data.qHistory){try{
       Q_HISTORY=_mergeQHistory(Q_HISTORY,data.qHistory);
+      try{_qhFill(_QH_SENS);}catch(e3){_err('qHistory.fill',e3);}
       localStorage.setItem('fy_q_history',JSON.stringify(Q_HISTORY));
     }catch(e){console.error('[同步] 報價版本歷史合併失敗',e);}}
     if(data.toolStates){try{
@@ -10398,6 +10431,7 @@ function _applySensColls(data,tombs){
     }catch(e){_err('top',e);}
   }
   if(data.quoteSens){try{_applyQuoteSensAll(data.quoteSens);}catch(e){console.error('[同步] 報價敏感欄位套用失敗',e);}}
+  if(data.qHistSens){try{_QH_SENS=data.qHistSens;if(_qhFill(_QH_SENS))localStorage.setItem('fy_q_history',JSON.stringify(Q_HISTORY));}catch(e){_err('_applyPrivate.qh',e);}}   // 改版第 0 步：版本歷史補回成本欄位
   try{savePayables();}catch(e){_err('top',e);}
   try{_lsSet('fy_expenses',JSON.stringify(EXPENSES),'費用');}catch(e){_err('top',e);}
 }
@@ -10464,6 +10498,7 @@ var _privFailAt=0;         // v5.335：被拒後冷卻 60 秒再試（原本一�
 function _privRef(){return (_fbDb&&_fbUser)?_fbDb.ref('fydata/private'):null;}
 function _privHashKey(){return 'fy_priv_hash';}
 function _pushPrivate(cb){
+  if(_verGuard('敏感資料上傳')){if(cb)cb(false);return;}
   var ref=_privRef();
   if(!ref||_isReaderUser){if(cb)cb(false);return;}
   if(_privReadOk===false&&Date.now()-_privFailAt<60000){if(cb)cb(false);return;}
@@ -10471,14 +10506,14 @@ function _pushPrivate(cb){
   try{
     var pp=_privatePayload();
     clean=_cleanEnc(pp.data);
-    h=_collHash({q:clean.quoteSens,p:clean.payables,e:clean.expenses,c:clean.costHist,
+    h=_collHash({q:clean.quoteSens,qh:clean.qHistSens,p:clean.payables,e:clean.expenses,c:clean.costHist,
       u:clean.upaCostDB,s:clean.shareProfit,m:clean.matLedger,d:clean.dealHist,l:clean.paidLog});
   }catch(e){if(cb)cb(false);return;}
   if(localStorage.getItem(_privHashKey())===h){if(cb)cb(true);return;}   // 無變更不空推
   var doPush=function(){
     var clean2,h2;
     try{var pp2=_privatePayload();clean2=_cleanEnc(pp2.data);
-      h2=_collHash({q:clean2.quoteSens,p:clean2.payables,e:clean2.expenses,c:clean2.costHist,
+      h2=_collHash({q:clean2.quoteSens,qh:clean2.qHistSens,p:clean2.payables,e:clean2.expenses,c:clean2.costHist,
         u:clean2.upaCostDB,s:clean2.shareProfit,m:clean2.matLedger,d:clean2.dealHist,l:clean2.paidLog});
     }catch(e){if(cb)cb(false);return;}
     ref.update(clean2).then(function(){
@@ -10546,7 +10581,7 @@ function _purgeLegacySensitive(){
 // 非管理員上傳自己新增的成本 → 管理員裝置同步時收進 private → 刪除接力記錄。
 function _pushRelayCosts(){
   try{
-    if(!_fbUser||!_fbDb||_isReaderUser)return;
+    if(!_fbUser||!_fbDb||_isReaderUser||_verGuard('現場支出接力'))return;
     if(isAdmin(_fbUser.email))return;            // 管理員直接走 private，不用接力
     var sent={};try{sent=JSON.parse(localStorage.getItem('fy_relay_sent')||'{}');}catch(e){_err('_pushRelayCosts',e);}
     var ups={},n=0;
@@ -10572,7 +10607,7 @@ function _pushRelayCosts(){
 // v5.437 公司費用（不掛專案）接力：非管理員在「日報．支出」登錄的 EXPENSES 走 fydata/relay/expenses
 function _pushRelayExpenses(){
   try{
-    if(!_fbUser||!_fbDb||_isReaderUser)return;
+    if(!_fbUser||!_fbDb||_isReaderUser||_verGuard('公司費用接力'))return;
     if(isAdmin(_fbUser.email))return;
     var sent={};try{sent=JSON.parse(localStorage.getItem('fy_relay_exp_sent')||'{}');}catch(e){_err('_pushRelayExpenses',e);}
     var ups={},n=0;
@@ -10667,8 +10702,29 @@ function _syncAccessLists(cb){
   }catch(e){if(cb)cb(false);}
 }
 
+// 改版第 0 步（健檢 3 #20）：擋舊版裝置寫入。雲端 fydata/minVer（例如 "v6.0.120"，管理員設）高於本機版號 → 這台不上傳，頂端紅條請重新整理。
+//   minVer 沒設＝不擋（出國期間不開啟；回國後由管理員在主控台或參數頁設定，見 docs/回國後部署清單）
+var _MIN_VER='';
+function _verNum(v){var m=String(v||'').match(/(\d+)\.(\d+)\.(\d+)/);return m?(+m[1])*1e8+(+m[2])*1e4+(+m[3]):0;}
+function _verBlocked(){return !!_MIN_VER&&_verNum(APP_VERSION)>0&&_verNum(APP_VERSION)<_verNum(_MIN_VER);}
+function _verGuard(what){if(!_verBlocked())return false;_verBanner();console.warn('[版本] 本機 '+APP_VERSION+' 低於最低版本 '+_MIN_VER+'，'+(what||'上傳')+'已暫停');return true;}
+function _verBanner(){
+  try{var id='fy-minver-bar',el=document.getElementById(id);
+    if(!_verBlocked()){if(el)el.remove();return;}
+    if(!el){el=document.createElement('div');el.id=id;el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100000;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';document.body.appendChild(el);}
+    el.innerHTML='這台裝置是舊版 '+esc(APP_VERSION)+'（最低 '+esc(_MIN_VER)+'），已暫停上傳以免蓋掉新資料。<button type="button" onclick="location.reload()" style="margin-left:8px;border:1px solid #fff;background:transparent;color:#fff;border-radius:99px;padding:2px 10px;font-family:inherit;cursor:pointer">重新整理</button>';
+  }catch(e){_err('_verBanner',e);}
+}
+function _minVerWatch(cb){   // cb：第一次讀到（或讀不到、3 秒逾時）後才做登入同步，避免舊版裝置趁空檔先推一次
+  var done=false,go=function(){if(done)return;done=true;if(cb)try{cb();}catch(e){_err('_minVerWatch.cb',e);}};
+  try{if(!_fbDb){go();return;}
+    if(_minVerWatch._on){go();return;}_minVerWatch._on=1;setTimeout(go,3000);
+    _fbDb.ref('fydata/minVer').on('value',function(sn){var v=sn.val();_MIN_VER=(typeof v==='string'&&_verNum(v))?v:'';_verBanner();go();},function(err){console.warn('[版本] 讀不到最低版本（規則未發布屬正常）',err&&err.message);go();});
+  }catch(e){_err('_minVerWatch',e);go();}
+}
 function _pushCloud(opts){
   opts=opts||{};
+  if(_verGuard('上傳')){if(opts.onDone)opts.onDone(false);return;}
   // v6.0.90：唯讀帳號一律不上傳（shared／private／接力全部略過；規則端同樣拒絕 readers 寫入）
   if(_isReaderUser){
     try{localStorage.removeItem('fy_pending_sync');}catch(e){/* 可忽略 */}

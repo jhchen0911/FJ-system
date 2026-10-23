@@ -8403,6 +8403,20 @@ async function newPage(browser, width, height) {
         out.fnBlock = window._pushCloud() === false && window._autoUpload() === false;
         window.firebase = oF; window.FY_BETA = oB; Object.keys(fns).forEach(n => { window[n] = fns[n]; });
         const c = document.getElementById('fy-beta-chip'); if (c) c.remove(); document.title = document.title.replace(/^β 測試版｜/, '');
+        /* 待查 3a：報價版本歷史上 shared 前去敏感，完整欄位存 private 並能補回 */
+        Q = [{ id: 'qH1', name: '範例H', items: [{ desc: 'A', unit: 'M', qty: 1, price: 100, estCost: '60' }], t: { total: 105, cost: 60, gross: 40, net: 30 }, costs: [{ id: 'c1', amt: 60 }], _mt: 1 }];
+        const oH = Q_HISTORY; Q_HISTORY = { qH1: [{ savedAt: 111, by: 'x', snapshot: JSON.parse(JSON.stringify(Q[0])) }] };
+        const shp = _sharedPayload().data.qHistory.qH1[0].snapshot, pvp = _privatePayload().data.qHistSens;
+        out.qhStrip = !shp.costs && shp.items[0].estCost == null && shp.t.cost == null && shp.t.total === 105 && Q_HISTORY.qH1[0].snapshot.costs.length === 1;
+        out.qhPriv = !!(pvp.qH1 && pvp.qH1['111'] && pvp.qH1['111'].costs.length === 1 && pvp.qH1['111'].est);
+        Q_HISTORY = { qH1: [{ savedAt: 111, by: 'x', snapshot: shp }] }; _qhFill(pvp);
+        out.qhFill = Q_HISTORY.qH1[0].snapshot.costs.length === 1 && String(Q_HISTORY.qH1[0].snapshot.items[0].estCost) === '60' && Q_HISTORY.qH1[0].snapshot.t.cost === 60;
+        Q_HISTORY = oH; Q = [];
+        /* 健檢 3 #20：最低版本（沒設不擋；設了比本機新就不上傳） */
+        let done = 'x'; _MIN_VER = ''; out.verOff = !_verBlocked();
+        _MIN_VER = 'v6.0.999'; _pushCloud({ silent: true, onDone: v => { done = v; } }); let pd = 'x'; _pushPrivate(v => { pd = v; });
+        out.verOn = _verBlocked() && done === false && pd === false && !!document.getElementById('fy-minver-bar');
+        _MIN_VER = 'v6.0.1'; out.verOld = !_verBlocked(); _MIN_VER = ''; _verBanner(); out.verBar = !document.getElementById('fy-minver-bar');
       } catch (e) { out.err = String(e && e.stack || e); }
       return out;
     }, require('fs').readFileSync(require('path').join(__dirname, '..', 'beta.js'), 'utf8'));
@@ -8413,6 +8427,13 @@ async function newPage(browser, width, height) {
       const ix = rd('index.html'), th = rd('test.html'), ver = (ix.match(/app\.js\?v=([^"]+)"/) || [])[1];
       check('v6.0.113 改版第 0 步：測試站 test.html（連測試專案、可寫入）本機資料走 test: 前綴、不從正式版複製、不載 beta.js，app.js 版本與 index.html 一致',
         !!th && /var P='test:'/.test(th) && /FY_TESTSITE=true/.test(th) && !/FY_BETA/.test(th) && !/beta\.js/.test(th) && !/__seeded/.test(th) && !!ver && th.indexOf('app.js?v=' + ver + '"') > 0, ver || '');
+    }
+    {
+      const R = JSON.parse(require('fs').readFileSync(path.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+      const rl = R.relay || {};
+      check('v6.0.113 改版第 0 步（待查 3）：報價版本歷史上傳共用區前去敏感、完整欄位存私密區並補回；成本／公司費用接力只有管理員與唯讀帳號讀得到（relay 根層沒有讀權）',
+        r.qhStrip && r.qhPriv && r.qhFill && !rl['.read'] && rl.costs && rl.costs['.read'] === R.private['.read'] && rl.expenses && rl.expenses['.read'] === R.private['.read'] && rl.photos && /fydata\/access/.test(rl.photos['.read']) && !/fydata\/access/.test(rl.costs['.read']) && !r.err, JSON.stringify({ qhStrip: r.qhStrip, qhPriv: r.qhPriv, qhFill: r.qhFill }));
+      check('v6.0.113 改版第 0 步（健檢 3 #20）：雲端最低版本沒設就不擋；設了且本機比較舊 → 不上傳並顯示紅條；規則只准管理員改', r.verOff && r.verOn && r.verOld && r.verBar && R.minVer && /adminEmails/.test(R.minVer['.write']) && !r.err, JSON.stringify({ verOff: r.verOff, verOn: r.verOn, verOld: r.verOld, verBar: r.verBar }));
     }
     check('v6.0.113 改版第 0 步測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();

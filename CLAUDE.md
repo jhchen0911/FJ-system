@@ -12,6 +12,7 @@
   報價單裡的 `costs`／`items[].estCost`／`t.cost|gross|net` 由 `_stripQuoteSens` 抽走後另存 private。
 - `sw.js`：Service Worker。v6.0.33 起 **index.html／導覽請求改快取優先**（開頁不等網路）、背景以 no-cache 重新驗證，ETag／Last-Modified／長度不同就 `postMessage({type:'fy-update'})` → 頁面顯示「系統有新版本」提醒重新整理（**部署後使用者要重新整理兩次才看到新版：第一次開舊版並下載新版，提示後再整理**）；v6.0.34 起 `app.js` 同為應用殼（快取鍵去查詢字串 `shellKey`／`appJsKey`），**index.html 變更時先把 app.js 也換新再通知**，不會新 index 配舊 app.js；CACHE `fy-app-v3`。其他同源資源仍網路優先、PDF 套件快取優先。除此之外**不需改動**
 - 部署：push 到 `main` → GitHub Pages 自動上線（約 1 分鐘）→ https://jhchen0911.github.io/FJ-system/
+- **正式／測試兩個 Firebase 專案**（v6.0.113 改版第 0 步）：`app.js` 的 `FB_CONFIGS`＋`_fyEnvOf`——只有 `https://jhchen0911.github.io/FJ-system/`（或 `/index.html`）且不是 beta 才連正式 `jhchen-aed9a`；beta.html、test.html、本機 file://、localhost、分支預覽、任何其他網址一律連測試 `fj-system-test`（判斷與設定不符 `FY_ENV_OK` 就不連）。Cloud Functions 網址用 `_fnUrl(name)` 跟著專案走，**不要再寫死專案 id**。測試頁右下角紫色「測試環境」標示。`test.html`（`python3 tools/build-beta.py index.html test.html` 產生）連測試專案、可寫入、本機鍵 `test:` 前綴且不複製正式資料；beta.html 在 Firebase SDK 層擋所有寫入。設定步驟見 `docs/測試專案_設定步驟.md`
 
 ## 修改規則（重要）
 
@@ -53,6 +54,8 @@
 - push 前一定要先 `git fetch origin main` 並確認本機是最新的，避免推不上去
 - 回覆一律列出：版本號、改動明細、以及「已上線，約 1 分鐘後重新整理即可（標題列應顯示 vX.XXX）」
 - 例外：改動很大或使用者明說要先看過時，才改走分支＋PR
+- **改版期間（2026-10-23 起，需求書 `400_Project/workflow/2026-10-21_FJ改版需求書.md` 第 0～7 步）**：每一步走獨立分支＋PR，CI（冒煙＋合成樣本）全過、另一個模型審查、Lotion 在對話裡說「上線」才合併 `main`；小型 hotfix 批次仍可照上面直接推，但同樣要等 Lotion 說「上線」
+- **分支版號＝上線版號**：分支一開工就取「下一個要上線的版號」；別的批次先上線時，合併前把自己的版號改成再下一號（`APP_VERSION`、`index.html`、`beta.html`／`test.html` 重產、程式註解與測試名稱裡的版號一起改），CLAUDE.md 的測試數、頁數同一個 PR 更新
 
 ## 施工計畫書圖面：先出圖檢核，再上線（重要）
 
