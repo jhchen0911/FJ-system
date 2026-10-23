@@ -6744,9 +6744,9 @@ async function newPage(browser, width, height) {
   {
     const rules = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const RD = "root.child('fydata/readers')";
-    const wr = [rules.shared['.write'], rules.relay['.write'], rules.relay['.read'], rules.private['.write'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.logs['$uid']['.write']];   // backups 改只給擁有者（另驗）
+    const wr = [rules.shared['.write'], rules.relay['.write'], rules.relay.photos['.read'], rules.private['.write'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.logs['$uid']['.write']];   // backups 改只給擁有者（另驗）
     check('v6.0.90 規則：readers 可讀 shared（v6.0.108 起也可讀 private）、所有寫入與 relay／backups 皆排除 readers 名冊、名冊僅管理員可寫',
-      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.backups['.read'].includes('adminEmails') && !rules.backups['.write'].includes('adminEmails') && rules.relay['.read'].includes('|| ' + RD) && rules.private['.read'].includes('|| ' + RD) /* v6.0.108 Lotion：唯讀帳號可讀 private */ && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
+      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.backups['.read'].includes('adminEmails') && !rules.backups['.write'].includes('adminEmails') && rules.relay.photos['.read'].includes('|| ' + RD) && rules.private['.read'].includes('|| ' + RD) /* v6.0.108 Lotion：唯讀帳號可讀 private */ && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
       '');
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -7285,7 +7285,7 @@ async function newPage(browser, width, height) {
     rr.writes = writes.length >= 9 && writes.every(([p, w]) => w === 'false' || w.indexOf('!' + RK) >= 0 || (p === 'fydata/logs/$uid' && w.indexOf("!root.child('fydata/readers')") >= 0) || (p === 'fydata/backups' && w === OWN));
     rr.badW = writes.filter(([p, w]) => !(w === 'false' || w.indexOf('!' + RK) >= 0 || p === 'fydata/logs/$uid' || (p === 'fydata/backups' && w === OWN))).map(x => x[0]);
     const rv = rules.readers.$email['.validate']; rr.nameRule = /newData\.val\(\) === true/.test(rv) && /hasChildren\(\['name'\]\)/.test(rv) && rules.readers.$email.$other['.validate'] === false;
-    rr.backups = rules.backups['.read'] === OWN && rules.backups['.write'] === OWN && rules.relay['.read'].indexOf('|| ' + RK) > 0;   // 審查修正：備份只給擁有者；日報照片（relay）唯讀帳號可讀
+    rr.backups = rules.backups['.read'] === OWN && rules.backups['.write'] === OWN && rules.relay.photos['.read'].indexOf('|| ' + RK) > 0;   // 審查修正：備份只給擁有者；日報照片（relay）唯讀帳號可讀
     const fn = fs.readFileSync(pth.join(__dirname, '..', 'functions', 'index.js'), 'utf8'); rr.fn = /readers: set\(rdr, on\)/.test(fn);
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
@@ -8384,6 +8384,10 @@ async function newPage(browser, width, height) {
         out.cfg = FB_CONFIGS.prod.projectId === 'jhchen-aed9a' && FB_CONFIGS.test.projectId === 'fj-system-test' && FB_CONFIGS.test.databaseURL.indexOf('fj-system-test') > 0 && FB_CONFIGS.prod.databaseURL.indexOf('jhchen-aed9a') > 0;
         out.here = FY_ENV === 'test' && FB_CONFIG.projectId === 'fj-system-test' && FY_ENV_OK === true && /fj-system-test\.cloudfunctions\.net\/x$/.test(_fnUrl('x'));
         out.guard = /FY_ENV_OK/.test(String(initFirebase));
+        const K = _fyEnvOkOf, H = 'jhchen0911.github.io';
+        out.okMatrix = K('prod', 'jhchen-aed9a', H, false, false) && !K('prod', 'jhchen-aed9a', H, true, false) && !K('prod', 'jhchen-aed9a', H, false, true) && !K('prod', 'fj-system-test', H, false, false)
+          && K('test', 'fj-system-test', H, true, false) && K('test', 'fj-system-test', H, false, true) && !K('test', 'fj-system-test', H, false, false) && K('test', 'fj-system-test', 'localhost', false, false) && !K('test', 'jhchen-aed9a', 'localhost', false, false);
+        out.phDb = _PH_DB === 'fy_photos';
         out.three = /window\.FY_BETA/.test(String(_dailyBackup)) && /window\.FY_BETA/.test(String(logActivity)) && /window\.FY_BETA/.test(String(_syncAccessLists));
         out.chip = !!document.getElementById('fy-env-chip');
         /* beta.js：SDK 層擋寫（用假 SDK，不靠網路） */
@@ -8406,17 +8410,24 @@ async function newPage(browser, width, height) {
         /* 待查 3a：報價版本歷史上 shared 前去敏感，完整欄位存 private 並能補回 */
         Q = [{ id: 'qH1', name: '範例H', items: [{ desc: 'A', unit: 'M', qty: 1, price: 100, estCost: '60' }], t: { total: 105, cost: 60, gross: 40, net: 30 }, costs: [{ id: 'c1', amt: 60 }], _mt: 1 }];
         const oH = Q_HISTORY; Q_HISTORY = { qH1: [{ savedAt: 111, by: 'x', snapshot: JSON.parse(JSON.stringify(Q[0])) }] };
-        const shp = _sharedPayload().data.qHistory.qH1[0].snapshot, pvp = _privatePayload().data.qHistSens;
+        const oS0 = _QH_SENS; _QH_SENS = {};
+        const shp = _sharedPayload().data.qHistory.qH1[0].snapshot, pvp = _privatePayload().data.qHistSens; _QH_SENS = oS0;
         out.qhStrip = !shp.costs && shp.items[0].estCost == null && shp.t.cost == null && shp.t.total === 105 && Q_HISTORY.qH1[0].snapshot.costs.length === 1;
         out.qhPriv = !!(pvp.qH1 && pvp.qH1['111'] && pvp.qH1['111'].costs.length === 1 && pvp.qH1['111'].est);
         Q_HISTORY = { qH1: [{ savedAt: 111, by: 'x', snapshot: shp }] }; _qhFill(pvp);
         out.qhFill = Q_HISTORY.qH1[0].snapshot.costs.length === 1 && String(Q_HISTORY.qH1[0].snapshot.items[0].estCost) === '60' && Q_HISTORY.qH1[0].snapshot.t.cost === 60;
+        /* 審查：還沒拉過 private 不送 qHistSens；拉過後保留雲端有、本機沒有的版本 */
+        const oS = _QH_SENS; _QH_SENS = null; out.qhNoPull = _privatePayload().data.qHistSens === undefined;
+        _QH_SENS = { qH1: { '999': { costs: [{ id: 'x' }], est: {}, t: {} } } }; const keep = _privatePayload().data.qHistSens;
+        out.qhKeep = !!(keep.qH1 && keep.qH1['999'] && keep.qH1['111']); _QH_SENS = oS;
         Q_HISTORY = oH; Q = [];
         /* 健檢 3 #20：最低版本（沒設不擋；設了比本機新就不上傳） */
         let done = 'x'; _MIN_VER = ''; out.verOff = !_verBlocked();
         _MIN_VER = 'v6.0.999'; _pushCloud({ silent: true, onDone: v => { done = v; } }); let pd = 'x'; _pushPrivate(v => { pd = v; });
         out.verOn = _verBlocked() && done === false && pd === false && !!document.getElementById('fy-minver-bar');
-        _MIN_VER = 'v6.0.1'; out.verOld = !_verBlocked(); _MIN_VER = ''; _verBanner(); out.verBar = !document.getElementById('fy-minver-bar');
+        _MIN_VER = 'v6.0.1'; out.verOld = !_verBlocked();
+        const oU = _fbUser, oR = _MIN_READY; _fbUser = { email: 'x@example.com', uid: 'u' }; _MIN_READY = false; let d2 = 'x'; _pushCloud({ silent: true, onDone: v => { d2 = v; } });
+        out.verWait = d2 === false; _fbUser = oU; _MIN_READY = oR; _MIN_VER = ''; _verBanner(); out.verBar = !document.getElementById('fy-minver-bar');
       } catch (e) { out.err = String(e && e.stack || e); }
       return out;
     }, require('fs').readFileSync(require('path').join(__dirname, '..', 'beta.js'), 'utf8'));
@@ -8425,6 +8436,8 @@ async function newPage(browser, width, height) {
     {
       const fs = require('fs'), rd = f => fs.existsSync(path.join(__dirname, '..', f)) ? fs.readFileSync(path.join(__dirname, '..', f), 'utf8') : '';
       const ix = rd('index.html'), th = rd('test.html'), ver = (ix.match(/app\.js\?v=([^"]+)"/) || [])[1];
+      const sw = rd('sw.js');
+      check('v6.0.113 改版第 0 步（審查）：離線時只有正式站本身（/、/index.html）退回快取的 index.html，beta.html／test.html 不退回（避免沒隔離的頁面連到測試專案）', /function isIndexPath\(url\)/.test(sw) && (sw.match(/isIndexPath\(url\)/g) || []).length >= 3, '');
       check('v6.0.113 改版第 0 步：測試站 test.html（連測試專案、可寫入）本機資料走 test: 前綴、不從正式版複製、不載 beta.js，app.js 版本與 index.html 一致',
         !!th && /var P='test:'/.test(th) && /FY_TESTSITE=true/.test(th) && !/FY_BETA/.test(th) && !/beta\.js/.test(th) && !/__seeded/.test(th) && !!ver && th.indexOf('app.js?v=' + ver + '"') > 0, ver || '');
     }
@@ -8432,8 +8445,8 @@ async function newPage(browser, width, height) {
       const R = JSON.parse(require('fs').readFileSync(path.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
       const rl = R.relay || {};
       check('v6.0.113 改版第 0 步（待查 3）：報價版本歷史上傳共用區前去敏感、完整欄位存私密區並補回；成本／公司費用接力只有管理員與唯讀帳號讀得到（relay 根層沒有讀權）',
-        r.qhStrip && r.qhPriv && r.qhFill && !rl['.read'] && rl.costs && rl.costs['.read'] === R.private['.read'] && rl.expenses && rl.expenses['.read'] === R.private['.read'] && rl.photos && /fydata\/access/.test(rl.photos['.read']) && !/fydata\/access/.test(rl.costs['.read']) && !r.err, JSON.stringify({ qhStrip: r.qhStrip, qhPriv: r.qhPriv, qhFill: r.qhFill }));
-      check('v6.0.113 改版第 0 步（健檢 3 #20）：雲端最低版本沒設就不擋；設了且本機比較舊 → 不上傳並顯示紅條；規則只准管理員改', r.verOff && r.verOn && r.verOld && r.verBar && R.minVer && /adminEmails/.test(R.minVer['.write']) && !r.err, JSON.stringify({ verOff: r.verOff, verOn: r.verOn, verOld: r.verOld, verBar: r.verBar }));
+        r.qhStrip && r.qhPriv && r.qhFill && r.qhNoPull && r.qhKeep && !rl['.read'] && rl.costs && rl.costs['.read'] === R.private['.read'] && rl.expenses && rl.expenses['.read'] === R.private['.read'] && rl.photos && /fydata\/access/.test(rl.photos['.read']) && !/fydata\/access/.test(rl.costs['.read']) && !r.err, JSON.stringify({ qhStrip: r.qhStrip, qhPriv: r.qhPriv, qhFill: r.qhFill }));
+      check('v6.0.113 改版第 0 步（健檢 3 #20）：雲端最低版本沒設就不擋；設了且本機比較舊 → 不上傳並顯示紅條；規則只准管理員改', r.verOff && r.verOn && r.verOld && r.verWait && r.verBar && R.minVer && /adminEmails/.test(R.minVer['.write']) && !r.err, JSON.stringify({ verOff: r.verOff, verOn: r.verOn, verOld: r.verOld, verBar: r.verBar }));
     }
     check('v6.0.113 改版第 0 步測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();

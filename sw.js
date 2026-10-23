@@ -27,6 +27,9 @@ function notifyUpdate() {
   self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     .then(cs => cs.forEach(c => c.postMessage({ type: 'fy-update' }))).catch(() => {});
 }
+// 改版第 0 步：只有正式站本身（/ 或 /index.html）離線時可以退回快取的 index.html；beta.html／test.html 等別的頁面不行，
+// 否則第一次開 test.html 剛好斷線，會拿到正式站的 index.html（沒有本機資料隔離）卻連到測試專案
+function isIndexPath(url) { return /\/(index\.html)?$/.test(url.pathname); }
 function isAppShell(req, url) {
   return req.mode === 'navigate' || /\/index\.html$/.test(url.pathname) || /\/$/.test(url.pathname) || /\/app\.js$/.test(url.pathname);
 }
@@ -80,7 +83,7 @@ self.addEventListener('fetch', e => {
         return fetch(e.request).then(res => {
           if (res && res.ok) { const clone = res.clone(); caches.open(CACHE).then(c => c.put(key, clone)).catch(() => {}); }
           return res;
-        }).catch(() => caches.match(key).then(m => m || (isJs ? Response.error() : caches.match('./index.html'))));
+        }).catch(() => caches.match(key).then(m => m || ((isJs || !isIndexPath(url)) ? Response.error() : caches.match('./index.html'))));
       })
     );
     return;
@@ -97,7 +100,7 @@ self.addEventListener('fetch', e => {
       })
       .catch(() =>
         caches.match(e.request).then(m =>
-          m || (e.request.mode === 'navigate' ? caches.match('./index.html') : Response.error())
+          m || ((e.request.mode === 'navigate' && isIndexPath(url)) ? caches.match('./index.html') : Response.error())
         )
       )
   );

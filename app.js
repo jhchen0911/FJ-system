@@ -167,10 +167,16 @@ function _fyEnvOf(protocol,host,path,isBeta){
 const FY_ENV = (function(){try{return _fyEnvOf(location.protocol,location.hostname,location.pathname,!!window.FY_BETA);}catch(e){return 'test';}})();
 const FB_CONFIG = FB_CONFIGS[FY_ENV];
 // 雙向防呆：判斷結果與實際設定對不上就不連雲端（_fbInit 檢查 FY_ENV_OK）
-const FY_ENV_OK = (FY_ENV==='prod'&&FB_CONFIG.projectId==='jhchen-aed9a'&&!window.FY_BETA)||(FY_ENV==='test'&&FB_CONFIG.projectId==='fj-system-test');
+//   審查修正：正式網域上的測試頁一定要是 beta.html 或 test.html（各自有本機資料隔離）；萬一拿到的是沒隔離的頁面（例如離線時被退回 index.html），一律不連雲端
+function _fyEnvOkOf(env,pid,host,isBeta,isTestSite){
+  if(env==='prod')return pid==='jhchen-aed9a'&&!isBeta&&!isTestSite;
+  if(env==='test')return pid==='fj-system-test'&&(String(host||'').toLowerCase()!==FY_PROD_HOST||!!isBeta||!!isTestSite);
+  return false;
+}
+const FY_ENV_OK = (function(){try{return _fyEnvOkOf(FY_ENV,FB_CONFIG.projectId,location.hostname,!!window.FY_BETA,!!window.FY_TESTSITE);}catch(e){return false;}})();
 function _fnUrl(name){return 'https://asia-southeast1-'+FB_CONFIG.projectId+'.cloudfunctions.net/'+name;}   // Cloud Functions 跟著所連的專案
 // 測試站標示（beta 有自己的橙色標示）：右下角小字，列印不出現
-try{if(FY_ENV==='test'&&!window.FY_BETA)document.addEventListener('DOMContentLoaded',function(){try{var d=document.createElement('div');d.id='fy-env-chip';d.textContent='測試環境・'+FB_CONFIG.projectId;d.title='這個網址連的是測試用 Firebase（fj-system-test），資料和正式站分開';d.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);z-index:99997;background:#5b21b6;color:#fff;font-size:10.5px;font-weight:700;border-radius:999px;padding:4px 9px;opacity:.85;pointer-events:none;font-family:inherit';document.body.appendChild(d);var st=document.createElement('style');st.textContent='@media print{#fy-env-chip{display:none!important}}';document.head.appendChild(st);}catch(e){_err('fy-env-chip',e);}});}catch(e){_err('fy-env-chip',e);}
+try{if((FY_ENV==='test'&&!window.FY_BETA)||!FY_ENV_OK)document.addEventListener('DOMContentLoaded',function(){try{var d=document.createElement('div');d.id='fy-env-chip';d.textContent=FY_ENV_OK?('測試環境・'+FB_CONFIG.projectId):'網址與頁面不符，未連雲端（請重新整理）';d.title='這個網址連的是測試用 Firebase（fj-system-test），資料和正式站分開';d.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);z-index:99997;background:#5b21b6;color:#fff;font-size:10.5px;font-weight:700;border-radius:999px;padding:4px 9px;opacity:.85;pointer-events:none;font-family:inherit';if(!FY_ENV_OK){d.style.background='#c62828';d.style.opacity='1';}document.body.appendChild(d);var st=document.createElement('style');st.textContent='@media print{#fy-env-chip{display:none!important}}';document.head.appendChild(st);}catch(e){_err('fy-env-chip',e);}});}catch(e){_err('fy-env-chip',e);}
 // 全局錯誤捕捉（診斷 Script error）
 window.addEventListener('error', function(e){
   // 過濾跨域腳本錯誤（Firebase SDK 在受限環境下的正常行為）
@@ -8049,7 +8055,7 @@ function initFirebase(){
     _fbUser = user;
     _updateFbUI(!!user);
     if(user) _minVerWatch(_autoSyncOnLogin);
-    else { _isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
+    else { _minVerOff();_isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
   });
 }
 function initGoogleSignIn(){
@@ -9890,7 +9896,10 @@ function _qhStrip(h){
   return out;
 }
 function _qhSensMap(){
+  if(_QH_SENS===null)return undefined;   // 審查：這台還沒讀過 private 的 qHistSens → 先不上傳，免得用本機不完整的歷史蓋掉雲端
   var out={};
+  // 雲端已有、本機歷史沒有的版本（別台裝置存的）原樣帶回，報價還在才留
+  Object.keys(_QH_SENS||{}).forEach(function(qid){if(!(Q||[]).some(function(q){return q&&q.id===qid;}))return;var m=_QH_SENS[qid]||{};Object.keys(m).forEach(function(sa){(out[qid]=out[qid]||{})[sa]=m[sa];});});
   Object.keys(Q_HISTORY||{}).forEach(function(qid){
     (Array.isArray(Q_HISTORY[qid])?Q_HISTORY[qid]:[]).forEach(function(v){
       if(!v||!v.snapshot||v.savedAt==null)return;
@@ -9976,10 +9985,11 @@ function _privatePayload(){
   Q.forEach(function(q){if(q&&q.id)qs[q.id]=_extractQuoteSens(q);});
   return {ts:ts,data:{
     version:'fy-v5p', uploadedAt:ts, uploadedBy:(_fbUser&&_fbUser.email)||'',
-    quoteSens:qs, qHistSens:_qhSensMap(), payables:PAYABLES, expenses:EXPENSES, costHist:COST_HIST,
+    quoteSens:qs, payables:PAYABLES, expenses:EXPENSES, costHist:COST_HIST,
     upaCostDB:UPA_COST_DB, shareProfit:SHARE_PROFIT, matLedger:MAT_LEDGER, dealHist:DEAL_HIST,
     hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]), petty:(typeof PETTY!=='undefined'?PETTY:[]),   // v5.433／v5.434
     paidLog:(typeof PAID_LOG!=='undefined'?PAID_LOG:{}),   // v6.0.85
+    qHistSens:_qhSensMap(),   // 改版第 0 步：版本歷史的敏感欄位（還沒拉過 private 時是 undefined → 不送這個鍵，不會蓋掉雲端）
     payAudit:(typeof PAY_AUDIT!=='undefined'?PAY_AUDIT.slice(0,1000):[]), uploadedVer:APP_VERSION, uploadedDev:(typeof _devId==='function'?_devId():'')   // v6.0.89 付款狀態稽核＋上傳者版本／裝置
   }};
 }
@@ -10431,7 +10441,7 @@ function _applySensColls(data,tombs){
     }catch(e){_err('top',e);}
   }
   if(data.quoteSens){try{_applyQuoteSensAll(data.quoteSens);}catch(e){console.error('[同步] 報價敏感欄位套用失敗',e);}}
-  if(data.qHistSens){try{_QH_SENS=data.qHistSens;if(_qhFill(_QH_SENS))localStorage.setItem('fy_q_history',JSON.stringify(Q_HISTORY));}catch(e){_err('_applyPrivate.qh',e);}}   // 改版第 0 步：版本歷史補回成本欄位
+  if(data.qHistSens||data.quoteSens||data.payables){try{_QH_SENS=(data.qHistSens&&typeof data.qHistSens==='object')?data.qHistSens:{};if(_qhFill(_QH_SENS))localStorage.setItem('fy_q_history',JSON.stringify(Q_HISTORY));}catch(e){_err('_applyPrivate.qh',e);}}   // 改版第 0 步：版本歷史補回成本欄位
   try{savePayables();}catch(e){_err('top',e);}
   try{_lsSet('fy_expenses',JSON.stringify(EXPENSES),'費用');}catch(e){_err('top',e);}
 }
@@ -10704,10 +10714,10 @@ function _syncAccessLists(cb){
 
 // 改版第 0 步（健檢 3 #20）：擋舊版裝置寫入。雲端 fydata/minVer（例如 "v6.0.120"，管理員設）高於本機版號 → 這台不上傳，頂端紅條請重新整理。
 //   minVer 沒設＝不擋（出國期間不開啟；回國後由管理員在主控台或參數頁設定，見 docs/回國後部署清單）
-var _MIN_VER='';
+var _MIN_VER='',_MIN_READY=false;   // _MIN_READY：登入後讀過一次（或讀不到／逾時）才放行上傳（審查：避免舊版裝置趁空檔推）
 function _verNum(v){var m=String(v||'').match(/(\d+)\.(\d+)\.(\d+)/);return m?(+m[1])*1e8+(+m[2])*1e4+(+m[3]):0;}
 function _verBlocked(){return !!_MIN_VER&&_verNum(APP_VERSION)>0&&_verNum(APP_VERSION)<_verNum(_MIN_VER);}
-function _verGuard(what){if(!_verBlocked())return false;_verBanner();console.warn('[版本] 本機 '+APP_VERSION+' 低於最低版本 '+_MIN_VER+'，'+(what||'上傳')+'已暫停');return true;}
+function _verGuard(what){if(_fbUser&&!_MIN_READY){console.warn('[版本] 尚未讀到最低版本，'+(what||'上傳')+'稍後再試');return true;}if(!_verBlocked())return false;_verBanner();console.warn('[版本] 本機 '+APP_VERSION+' 低於最低版本 '+_MIN_VER+'，'+(what||'上傳')+'已暫停');return true;}
 function _verBanner(){
   try{var id='fy-minver-bar',el=document.getElementById(id);
     if(!_verBlocked()){if(el)el.remove();return;}
@@ -10716,12 +10726,14 @@ function _verBanner(){
   }catch(e){_err('_verBanner',e);}
 }
 function _minVerWatch(cb){   // cb：第一次讀到（或讀不到、3 秒逾時）後才做登入同步，避免舊版裝置趁空檔先推一次
-  var done=false,go=function(){if(done)return;done=true;if(cb)try{cb();}catch(e){_err('_minVerWatch.cb',e);}};
+  var done=false,go=function(){_MIN_READY=true;if(done)return;done=true;if(cb)try{cb();}catch(e){_err('_minVerWatch.cb',e);}};
   try{if(!_fbDb){go();return;}
-    if(_minVerWatch._on){go();return;}_minVerWatch._on=1;setTimeout(go,3000);
-    _fbDb.ref('fydata/minVer').on('value',function(sn){var v=sn.val();_MIN_VER=(typeof v==='string'&&_verNum(v))?v:'';_verBanner();go();},function(err){console.warn('[版本] 讀不到最低版本（規則未發布屬正常）',err&&err.message);go();});
+    if(_minVerWatch._ref){go();return;}
+    var ref=_fbDb.ref('fydata/minVer');_minVerWatch._ref=ref;setTimeout(go,3000);
+    ref.on('value',function(sn){var v=sn.val();_MIN_VER=(typeof v==='string'&&_verNum(v))?v:'';_verBanner();go();},function(err){console.warn('[版本] 讀不到最低版本（規則未發布屬正常）',err&&err.message);_minVerWatch._ref=null;go();});
   }catch(e){_err('_minVerWatch',e);go();}
 }
+function _minVerOff(){try{if(_minVerWatch._ref)_minVerWatch._ref.off();}catch(e){_err('_minVerOff',e);}_minVerWatch._ref=null;_MIN_READY=false;_MIN_VER='';_verBanner();}   // 登出：下次登入重新讀
 function _pushCloud(opts){
   opts=opts||{};
   if(_verGuard('上傳')){if(opts.onDone)opts.onDone(false);return;}
@@ -35070,7 +35082,7 @@ function _syncChip(){
 try{setInterval(_syncChip,4000);window.addEventListener('online',_syncChip);window.addEventListener('offline',_syncChip);document.addEventListener('DOMContentLoaded',function(){setTimeout(_syncChip,800);});}catch(e){_err('_syncChip',e);}
 
 // ── ⑤ 日報照片分離 ──
-var _PH_DB='fy_photos',_phCache={};
+var _PH_DB=(window.FY_TESTSITE?'test:':window.FY_BETA?'beta:':'')+'fy_photos',_phCache={};   // 改版第 0 步：測試站、beta 的照片庫與正式站分開
 var _PH_PLACEHOLDER='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="#eceff1"/><text x="40" y="44" font-size="11" text-anchor="middle" fill="#90a4ae">載入中</text></svg>');
 function _phOpen(){
   return new Promise(function(res){

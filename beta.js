@@ -11,7 +11,12 @@
     if(R){['set','update','remove','setWithPriority','setPriority','transaction'].forEach(function(m){if(R[m])R[m]=no;});
       var p0=R.push;if(p0)R.push=function(v){if(arguments.length&&v!==undefined)return no.apply(this,arguments);return p0.apply(this,arguments);};}
     var SR=window.firebase&&firebase.storage&&firebase.storage.Reference&&firebase.storage.Reference.prototype;
-    if(SR){['put','putString','delete','updateMetadata'].forEach(function(m){if(SR[m])SR[m]=no;});}
+    // 上傳呼叫端會用 task.on('state_changed',進度,錯誤) 與 task.snapshot.ref → 回一個假的上傳工作，非同步回報錯誤（審查修正）
+    var task=function(){var e=new Error('β 測試版不上傳檔案');window.__fyBetaBlocked=(window.__fyBetaBlocked||0)+1;var p=Promise.reject(e);p.catch(function(){});
+      var t={on:function(ev,a,b){var cb=typeof b==='function'?b:(a&&typeof a.error==='function'?a.error.bind(a):null);setTimeout(function(){if(cb)try{cb(e);}catch(x){}},0);return function(){};},
+        then:function(f,r){return p.then(f,r);},catch:function(r){return p.catch(r);},cancel:function(){return false;},pause:function(){return false;},resume:function(){return false;},
+        snapshot:{bytesTransferred:0,totalBytes:0,state:'error',ref:{getDownloadURL:function(){return Promise.reject(e);}}}};return t;};
+    if(SR){['put','putString'].forEach(function(m){if(SR[m])SR[m]=task;});['delete','updateMetadata'].forEach(function(m){if(SR[m])SR[m]=no;});}
   }catch(e){}
   try{document.title='β 測試版｜'+document.title;}catch(e){}
   var seeded='';try{seeded=localStorage.getItem('__seeded')||'';}catch(e){}
