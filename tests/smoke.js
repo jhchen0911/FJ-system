@@ -28,7 +28,8 @@ async function newPage(browser, width, height) {
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => {
     // 離線環境載不到 Firebase / CDN 屬正常，不算錯誤
-    if (m.type() === 'error' && !/ERR_(TUNNEL|INTERNET|NAME|CONNECTION|BLOCKED)|Failed to load resource/.test(m.text())) {
+    // v6.0.113：測試以 file:// 開頁 → 連測試專案 fj-system-test；它的 Storage 要 Blaze 方案才開（回國清單第 8 步），沒開前 CORS 失敗屬正常
+    if (m.type() === 'error' && !/ERR_(TUNNEL|INTERNET|NAME|CONNECTION|BLOCKED)|Failed to load resource/.test(m.text()) && !/fj-system-test\.firebasestorage\.app[^]*CORS policy|CORS policy[^]*fj-system-test\.firebasestorage\.app/.test(m.text())) {
       errors.push('console: ' + m.text());
     }
   });
