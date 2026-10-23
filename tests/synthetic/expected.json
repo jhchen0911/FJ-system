@@ -1,0 +1,108 @@
+{
+ "A01": {
+  "p1Price": 1000,
+  "p1Total": 10500,
+  "p1Locked": true,
+  "p2Price": 1200,
+  "p2Total": 12600,
+  "diffExcl": 2000,
+  "adjRow": 2000
+ },
+ "A02": {
+  "rows": [
+   "1000×100",
+   "1300×50"
+  ],
+  "contractExcl": 165000
+ },
+ "A03": {
+  "exclSub": 999600,
+  "exclUnitPrice": 1000,
+  "exclAdj": -400,
+  "invAdjPrice": -400,
+  "invAdjNote": "議價折讓（照扣）",
+  "invSubExcl": 999600,
+  "inclTotal": 1050000,
+  "inclAdj": -258
+ },
+ "A04": {
+  "rowDays": 30000,
+  "rowDisc": 0,
+  "prevHas30000": true,
+  "prevHas1000": false,
+  "prevRentRowHas500": false
+ },
+ "A05": {
+  "blocked": true,
+  "qtyAfterBlock": 100,
+  "allowedAfterRemove": true
+ },
+ "A06": {
+  "wonNoContract": 126000,
+  "wonWithContract": 126000,
+  "pjBase": 126000
+ },
+ "A07": {
+  "adTotal": 0,
+  "adItems": 0,
+  "adCarried": [],
+  "adExs": 0,
+  "adRet": 5,
+  "won": 105000
+ },
+ "A13": {
+  "paidAmt": 19950,
+  "paidStatus": "paid",
+  "deltaAmt": 9975,
+  "deltaStatus": "pending"
+ },
+ "A14": {
+  "paidCount": 2,
+  "paidAmts": [
+   1500,
+   1500
+  ],
+  "pending": [
+   75
+  ]
+ },
+ "A15": {
+  "dataPrice": "500",
+  "dataTotal": "40"
+ },
+ "A19": {
+  "afterAuto": 126000,
+  "afterFinal": 84000,
+  "hintKind": "settled",
+  "hintDiff": 5250
+ },
+ "A20": {
+  "awarded": false,
+  "voidAmts": [
+   2000,
+   3000
+  ],
+  "amounts": [
+   0,
+   0
+  ],
+  "apTotal": 0,
+  "apCount": 0,
+  "contractsLeft": [
+   "cA20b",
+   "cA20c"
+  ]
+ },
+ "A30": {
+  "left": [
+   "qA30a",
+   "qA30b"
+  ],
+  "payLeft": [
+   "paycA30_p1"
+  ],
+  "invLeft": [
+   "iA30"
+  ]
+ }
+}
