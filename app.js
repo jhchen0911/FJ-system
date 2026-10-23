@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.112';
+var APP_VERSION='v6.0.113';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -133,15 +133,44 @@ setTimeout(function(){
 
 // 若未登入，隱藏所有非公開功能
 
-const FB_CONFIG = {
-  apiKey: "AIzaSyA5BjG97tVVE2Ud4rZvGXW5rDTPWPNVFcM",
-  authDomain: "jhchen-aed9a.firebaseapp.com",
-  databaseURL: "https://jhchen-aed9a-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "jhchen-aed9a",
-  storageBucket: "jhchen-aed9a.firebasestorage.app",
-  messagingSenderId: "33934811977",
-  appId: "1:33934811977:web:dd25128bb50ced948bb098"
+// 改版第 0 步：正式站與測試站分開兩個 Firebase 專案（健檢 3 🔴2）
+//   正式（jhchen-aed9a）：只有 https://jhchen0911.github.io/FJ-system/（或 /index.html）、而且不是 beta.html
+//   測試（fj-system-test）：其他全部——beta.html、本機 file://、localhost、分支預覽、任何別的網址
+//   兩組設定都是前端公開設定（不是密碼）；判斷寫成純函式 _fyEnvOf，冒煙測試逐條驗
+const FB_CONFIGS = {
+  prod: {
+    apiKey: "AIzaSyA5BjG97tVVE2Ud4rZvGXW5rDTPWPNVFcM",
+    authDomain: "jhchen-aed9a.firebaseapp.com",
+    databaseURL: "https://jhchen-aed9a-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "jhchen-aed9a",
+    storageBucket: "jhchen-aed9a.firebasestorage.app",
+    messagingSenderId: "33934811977",
+    appId: "1:33934811977:web:dd25128bb50ced948bb098"
+  },
+  test: {
+    apiKey: "AIzaSyDURddsz8wMOdX_jqAziWkwHh_LMpSMxOQ",
+    authDomain: "fj-system-test.firebaseapp.com",
+    databaseURL: "https://fj-system-test-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "fj-system-test",
+    storageBucket: "fj-system-test.firebasestorage.app",
+    messagingSenderId: "1086580630026",
+    appId: "1:1086580630026:web:949f700da0007fb6c0f5f3"
+  }
 };
+const FY_PROD_HOST = 'jhchen0911.github.io';
+function _fyEnvOf(protocol,host,path,isBeta){
+  if(isBeta)return 'test';
+  if(String(protocol||'')!=='https:')return 'test';
+  if(String(host||'').toLowerCase()!==FY_PROD_HOST)return 'test';
+  return /^\/fj-system\/(index\.html)?$/i.test(String(path||''))?'prod':'test';
+}
+const FY_ENV = (function(){try{return _fyEnvOf(location.protocol,location.hostname,location.pathname,!!window.FY_BETA);}catch(e){return 'test';}})();
+const FB_CONFIG = FB_CONFIGS[FY_ENV];
+// 雙向防呆：判斷結果與實際設定對不上就不連雲端（_fbInit 檢查 FY_ENV_OK）
+const FY_ENV_OK = (FY_ENV==='prod'&&FB_CONFIG.projectId==='jhchen-aed9a'&&!window.FY_BETA)||(FY_ENV==='test'&&FB_CONFIG.projectId==='fj-system-test');
+function _fnUrl(name){return 'https://asia-southeast1-'+FB_CONFIG.projectId+'.cloudfunctions.net/'+name;}   // Cloud Functions 跟著所連的專案
+// 測試站標示（beta 有自己的橙色標示）：右下角小字，列印不出現
+try{if(FY_ENV==='test'&&!window.FY_BETA)document.addEventListener('DOMContentLoaded',function(){try{var d=document.createElement('div');d.id='fy-env-chip';d.textContent='測試環境・'+FB_CONFIG.projectId;d.title='這個網址連的是測試用 Firebase（fj-system-test），資料和正式站分開';d.style.cssText='position:fixed;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);z-index:99997;background:#5b21b6;color:#fff;font-size:10.5px;font-weight:700;border-radius:999px;padding:4px 9px;opacity:.85;pointer-events:none;font-family:inherit';document.body.appendChild(d);var st=document.createElement('style');st.textContent='@media print{#fy-env-chip{display:none!important}}';document.head.appendChild(st);}catch(e){_err('fy-env-chip',e);}});}catch(e){_err('fy-env-chip',e);}
 // 全局錯誤捕捉（診斷 Script error）
 window.addEventListener('error', function(e){
   // 過濾跨域腳本錯誤（Firebase SDK 在受限環境下的正常行為）
@@ -8008,6 +8037,7 @@ var _isOwnerUser=false;
 // _fbApp/_fbAuth/_fbDb/_fbUser 已在頂部宣告
 function initFirebase(){
   if(_fbApp) return;
+  if(!FY_ENV_OK){console.error('[FY] Firebase 環境判斷與設定不一致，停止連線',FY_ENV,FB_CONFIG&&FB_CONFIG.projectId);return;}
   try{ _fbApp = firebase.initializeApp(FB_CONFIG); }
   catch(e){ console.error('[FY] initializeApp failed:',e.message); return; }
   try{ _fbAuth = firebase.auth(); }
@@ -10619,7 +10649,7 @@ function _pullRelayCosts(){
 function _encEmailKey(e){return String(e||'').toLowerCase().replace(/\./g,',');}
 function _syncAccessLists(cb){
   try{
-    if(!_fbUser||!_fbDb||_isReaderUser||!isAdmin(_fbUser.email)){if(cb)cb(false);return;}
+    if(window.FY_BETA||!_fbUser||!_fbDb||_isReaderUser||!isAdmin(_fbUser.email)){if(cb)cb(false);return;}   // 改版第 0 步：beta 不寫人員名冊
     var access={},admins={};
     listStaff().forEach(function(st){
       if(!st||st.active===false)return;
@@ -21176,6 +21206,7 @@ function _snapPrune(){
 }
 function _dailyBackup(){
   try{
+    if(window.FY_BETA)return;   // 改版第 0 步（健檢 3 🔴3）：beta 不上傳每日備份
     if(!_stOk()||!_isRulesOwner())return;   // v6.0.93 fail-closed；v6.0.97 Storage 規則 backups 只給擁有者 → 其他管理員不跑（避免靜默失敗）
     var today=localToday();   // v5.318 本地日期
     var month=today.slice(0,7);
@@ -25079,7 +25110,7 @@ function logActivity(action, detail){
   if(ACTIVITY_LOG.length>500)ACTIVITY_LOG=ACTIVITY_LOG.slice(0,500);
   saveActivityLog();
   // 即時寫入 Firebase（讓所有用戶都看到）；唯讀帳號不寫
-  if(_fbUser&&_fbDb&&!_isReaderUser){
+  if(_fbUser&&_fbDb&&!_isReaderUser&&!window.FY_BETA){   // 改版第 0 步：beta 的操作只記本機
     try{
       var uid=(_fbUser.uid||_fbUser.email||'unknown').replace(/[.#$\[\]@]/g,'_');
       _fbDb.ref('fydata/activity/'+uid+'/'+entry.id).set({
@@ -37730,7 +37761,7 @@ function _storageRulesLists(){
 function storageClaimsSync(){
   if(!_fbUser||String(_fbUser.email||'').toLowerCase()!==_RULES_OWNER){toast('只有擁有者帳號可以執行');return;}
   toast('同步中…');
-  _fbUser.getIdToken().then(function(t){return fetch('https://asia-southeast1-jhchen-aed9a.cloudfunctions.net/fyClaimsSyncNow',{headers:{Authorization:'Bearer '+t}});})
+  _fbUser.getIdToken().then(function(t){return fetch(_fnUrl('fyClaimsSyncNow'),{headers:{Authorization:'Bearer '+t}});})
     .then(function(r){return r.text().then(function(x){return {ok:r.ok,status:r.status,x:x};});})
     .then(function(o){
       if(!o.ok){toast('同步失敗（'+o.status+'）：'+String(o.x||'').slice(0,80)+'。請確認 Cloud Function 已部署');return;}

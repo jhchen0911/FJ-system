@@ -8369,6 +8369,55 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.113 改版第 0 步：正式／測試 Firebase 分流、beta 不寫雲端 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async (bjs) => {
+      const out = {};
+      try {
+        const E = (pr, h, p, b) => _fyEnvOf(pr, h, p, b);
+        out.prodOnly = E('https:', 'jhchen0911.github.io', '/FJ-system/', false) === 'prod' && E('https:', 'jhchen0911.github.io', '/FJ-system/index.html', false) === 'prod' && E('https:', 'JHCHEN0911.github.io', '/fj-system/', false) === 'prod';
+        out.testAll = [['https:', 'jhchen0911.github.io', '/FJ-system/beta.html', false], ['https:', 'jhchen0911.github.io', '/FJ-system/', true], ['http:', 'jhchen0911.github.io', '/FJ-system/', false],
+          ['file:', '', '/home/u/FJ-system/index.html', false], ['http:', 'localhost', '/index.html', false], ['https:', 'raw.githack.com', '/jhchen0911/FJ-system/claude/x/index.html', false],
+          ['https:', 'jhchen0911.github.io', '/FJ-system/x/index.html', false], ['https:', 'jhchen0911.github.io.evil.com', '/FJ-system/', false], ['https:', 'jhchen0911.github.io', '/FJ-systemx/', false], ['https:', 'jhchen0911.github.io', '', false], ['https:', 'jhchen0911.github.io', '/FJ-system/test.html', false]]
+          .every(a => E.apply(null, a) === 'test');
+        out.cfg = FB_CONFIGS.prod.projectId === 'jhchen-aed9a' && FB_CONFIGS.test.projectId === 'fj-system-test' && FB_CONFIGS.test.databaseURL.indexOf('fj-system-test') > 0 && FB_CONFIGS.prod.databaseURL.indexOf('jhchen-aed9a') > 0;
+        out.here = FY_ENV === 'test' && FB_CONFIG.projectId === 'fj-system-test' && FY_ENV_OK === true && /fj-system-test\.cloudfunctions\.net\/x$/.test(_fnUrl('x'));
+        out.guard = /FY_ENV_OK/.test(String(initFirebase));
+        out.three = /window\.FY_BETA/.test(String(_dailyBackup)) && /window\.FY_BETA/.test(String(logActivity)) && /window\.FY_BETA/.test(String(_syncAccessLists));
+        out.chip = !!document.getElementById('fy-env-chip');
+        /* beta.js：SDK 層擋寫（用假 SDK，不靠網路） */
+        const calls = [];
+        const mk = () => { function R() {} ['set', 'update', 'remove', 'setWithPriority', 'setPriority', 'transaction'].forEach(m => { R.prototype[m] = function () { calls.push(m); return Promise.resolve(); }; }); R.prototype.push = function (v) { calls.push('push' + (arguments.length ? 'V' : '')); return { key: 'k1' }; }; return R; };
+        const mkS = () => { function S() {} ['put', 'putString', 'delete', 'updateMetadata'].forEach(m => { S.prototype[m] = function () { calls.push(m); return Promise.resolve(); }; }); return S; };
+        const oF = window.firebase, oB = window.FY_BETA, fns = {};
+        ['_autoUpload', '_immediateUpload', '_pushPrivate', '_pushRelayCosts', '_pushRelayExpenses', 'fbUpload', 'fbUploadWithConflictCheck', '_pushCloud'].forEach(n => { fns[n] = window[n]; });
+        window.firebase = { database: { Reference: mk() }, storage: { Reference: mkS() } };
+        (0, eval)(bjs);
+        const ref = new firebase.database.Reference(), sref = new firebase.storage.Reference();
+        let rej = 0; for (const m of ['set', 'update', 'remove', 'transaction']) { try { await ref[m]({ a: 1 }); } catch (e) { rej++; } }
+        try { await ref.push({ a: 1 }); } catch (e) { rej++; }
+        for (const m of ['put', 'putString', 'delete']) { try { await sref[m]('x'); } catch (e) { rej++; } }
+        const k = ref.push().key;
+        out.sdkBlock = rej === 8 && calls.join(',') === 'push' && k === 'k1';
+        out.fnBlock = window._pushCloud() === false && window._autoUpload() === false;
+        window.firebase = oF; window.FY_BETA = oB; Object.keys(fns).forEach(n => { window[n] = fns[n]; });
+        const c = document.getElementById('fy-beta-chip'); if (c) c.remove(); document.title = document.title.replace(/^β 測試版｜/, '');
+      } catch (e) { out.err = String(e && e.stack || e); }
+      return out;
+    }, require('fs').readFileSync(require('path').join(__dirname, '..', 'beta.js'), 'utf8'));
+    check('v6.0.113 改版第 0 步：只有正式網址（jhchen0911.github.io/FJ-system/）連正式 Firebase，beta／本機／分支預覽／其他網址一律連測試專案 fj-system-test，判斷與設定不符就不連', r.prodOnly && r.testAll && r.cfg && r.here && r.guard && r.chip && !r.err, JSON.stringify(r));
+    check('v6.0.113 改版第 0 步：beta 擋住每日備份、活動紀錄、人員名冊三條寫入，Firebase SDK 層資料庫與 Storage 寫入一律拒絕（push 取 key 仍可用）', r.three && r.sdkBlock && r.fnBlock && !r.err, JSON.stringify(r));
+    {
+      const fs = require('fs'), rd = f => fs.existsSync(path.join(__dirname, '..', f)) ? fs.readFileSync(path.join(__dirname, '..', f), 'utf8') : '';
+      const ix = rd('index.html'), th = rd('test.html'), ver = (ix.match(/app\.js\?v=([^"]+)"/) || [])[1];
+      check('v6.0.113 改版第 0 步：測試站 test.html（連測試專案、可寫入）本機資料走 test: 前綴、不從正式版複製、不載 beta.js，app.js 版本與 index.html 一致',
+        !!th && /var P='test:'/.test(th) && /FY_TESTSITE=true/.test(th) && !/FY_BETA/.test(th) && !/beta\.js/.test(th) && !/__seeded/.test(th) && !!ver && th.indexOf('app.js?v=' + ver + '"') > 0, ver || '');
+    }
+    check('v6.0.113 改版第 0 步測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

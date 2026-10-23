@@ -9,11 +9,15 @@ on:
       - 'index.html'
       - 'app.js'
       - 'sw.js'
+      - 'beta.html'
+      - 'beta.js'
+      - 'test.html'
+      - 'tools/build-beta.py'
       - 'tests/**'
       - 'package.json'
       - '.github/workflows/smoke.yml'
   push:
-    branches: [main]   # 推 main 一律跑（健檢3 🔴1：部署要等測試通過，所以每次推送都要有結果）
+    branches: [main, 'claude/**']   # 推 main 一律跑（健檢3 🔴1：部署要等測試通過）；改版第 0 步：推工作分支也跑
   workflow_dispatch:
 
 # 健檢3 🔴1：網站改成「冒煙測試通過才部署」。
@@ -42,6 +46,9 @@ jobs:
 
       - name: 執行冒煙測試
         run: npm test
+
+      - name: 執行合成樣本（健檢 1 每種算錢情境，假資料）
+        run: npm run synth
 
   deploy:
     needs: smoke
