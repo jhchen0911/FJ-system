@@ -8426,8 +8426,8 @@ async function newPage(browser, width, height) {
         _MIN_VER = 'v6.0.999'; _pushCloud({ silent: true, onDone: v => { done = v; } }); let pd = 'x'; _pushPrivate(v => { pd = v; });
         out.verOn = _verBlocked() && done === false && pd === false && !!document.getElementById('fy-minver-bar');
         _MIN_VER = 'v6.0.1'; out.verOld = !_verBlocked();
-        const oU = _fbUser, oR = _MIN_READY; _fbUser = { email: 'x@example.com', uid: 'u' }; _MIN_READY = false; let d2 = 'x'; _pushCloud({ silent: true, onDone: v => { d2 = v; } });
-        out.verWait = d2 === false; _fbUser = oU; _MIN_READY = oR; _MIN_VER = ''; _verBanner(); out.verBar = !document.getElementById('fy-minver-bar');
+        const oU = _fbUser; _fbUser = { email: 'x@example.com', uid: 'u' }; _MIN_PENDING = true; let d2 = 'x'; _pushCloud({ silent: true, onDone: v => { d2 = v; } });
+        out.verWait = d2 === false; _fbUser = oU; _MIN_PENDING = false; _MIN_VER = ''; _verBanner(); out.verBar = !document.getElementById('fy-minver-bar');
       } catch (e) { out.err = String(e && e.stack || e); }
       return out;
     }, require('fs').readFileSync(require('path').join(__dirname, '..', 'beta.js'), 'utf8'));

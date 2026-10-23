@@ -10714,10 +10714,9 @@ function _syncAccessLists(cb){
 
 // 改版第 0 步（健檢 3 #20）：擋舊版裝置寫入。雲端 fydata/minVer（例如 "v6.0.120"，管理員設）高於本機版號 → 這台不上傳，頂端紅條請重新整理。
 //   minVer 沒設＝不擋（出國期間不開啟；回國後由管理員在主控台或參數頁設定，見 docs/回國後部署清單）
-var _MIN_VER='',_MIN_READY=false;   // _MIN_READY：登入後讀過一次（或讀不到／逾時）才放行上傳（審查：避免舊版裝置趁空檔推）
-function _verNum(v){var m=String(v||'').match(/(\d+)\.(\d+)\.(\d+)/);return m?(+m[1])*1e8+(+m[2])*1e4+(+m[3]):0;}
+var _MIN_VER='',_MIN_PENDING=false;   // _MIN_PENDING：登入後正在讀最低版本（最多 3 秒），這段時間不上傳（審查：避免舊版裝置趁空檔推）；版號比較用下方共用的 _verNum
 function _verBlocked(){return !!_MIN_VER&&_verNum(APP_VERSION)>0&&_verNum(APP_VERSION)<_verNum(_MIN_VER);}
-function _verGuard(what){if(_fbUser&&!_MIN_READY){console.warn('[版本] 尚未讀到最低版本，'+(what||'上傳')+'稍後再試');return true;}if(!_verBlocked())return false;_verBanner();console.warn('[版本] 本機 '+APP_VERSION+' 低於最低版本 '+_MIN_VER+'，'+(what||'上傳')+'已暫停');return true;}
+function _verGuard(what){if(_fbUser&&_MIN_PENDING){console.warn('[版本] 尚未讀到最低版本，'+(what||'上傳')+'稍後再試');return true;}if(!_verBlocked())return false;_verBanner();console.warn('[版本] 本機 '+APP_VERSION+' 低於最低版本 '+_MIN_VER+'，'+(what||'上傳')+'已暫停');return true;}
 function _verBanner(){
   try{var id='fy-minver-bar',el=document.getElementById(id);
     if(!_verBlocked()){if(el)el.remove();return;}
@@ -10726,14 +10725,14 @@ function _verBanner(){
   }catch(e){_err('_verBanner',e);}
 }
 function _minVerWatch(cb){   // cb：第一次讀到（或讀不到、3 秒逾時）後才做登入同步，避免舊版裝置趁空檔先推一次
-  var done=false,go=function(){_MIN_READY=true;if(done)return;done=true;if(cb)try{cb();}catch(e){_err('_minVerWatch.cb',e);}};
+  var done=false,go=function(){_MIN_PENDING=false;if(done)return;done=true;if(cb)try{cb();}catch(e){_err('_minVerWatch.cb',e);}};
   try{if(!_fbDb){go();return;}
     if(_minVerWatch._ref){go();return;}
-    var ref=_fbDb.ref('fydata/minVer');_minVerWatch._ref=ref;setTimeout(go,3000);
+    var ref=_fbDb.ref('fydata/minVer');_minVerWatch._ref=ref;_MIN_PENDING=true;setTimeout(go,3000);
     ref.on('value',function(sn){var v=sn.val();_MIN_VER=(typeof v==='string'&&_verNum(v))?v:'';_verBanner();go();},function(err){console.warn('[版本] 讀不到最低版本（規則未發布屬正常）',err&&err.message);_minVerWatch._ref=null;go();});
   }catch(e){_err('_minVerWatch',e);go();}
 }
-function _minVerOff(){try{if(_minVerWatch._ref)_minVerWatch._ref.off();}catch(e){_err('_minVerOff',e);}_minVerWatch._ref=null;_MIN_READY=false;_MIN_VER='';_verBanner();}   // 登出：下次登入重新讀
+function _minVerOff(){try{if(_minVerWatch._ref)_minVerWatch._ref.off();}catch(e){_err('_minVerOff',e);}_minVerWatch._ref=null;_MIN_PENDING=false;_MIN_VER='';_verBanner();}   // 登出：下次登入重新讀
 function _pushCloud(opts){
   opts=opts||{};
   if(_verGuard('上傳')){if(opts.onDone)opts.onDone(false);return;}
