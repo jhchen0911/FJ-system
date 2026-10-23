@@ -49,7 +49,7 @@ function tableMd() {
     const m = MAP[String(n)] || {};
     const ids = m.samples || [];
     const st = ids.length ? Array.from(new Set(ids.map(id => (byId[id] && byId[id].status) || '?'))).join('／') : '—';
-    h += '| ' + n + ' | ' + (m.title || '') + ' | ' + (ids.length ? ids.join('、') : ('不涉及金額：' + (m.none || ''))) + ' | ' + st + ' |\n';
+    h += '| ' + n + ' | ' + (m.title || '') + ' | ' + (ids.length ? ids.join('、') : ('不涉及金額：' + (m.none || ''))) + (m.gap ? '（未涵蓋：' + m.gap + '）' : '') + ' | ' + st + ' |\n';
   }
   h += '\n## 樣本清單\n\n| 樣本 | 條號 | 情境 | 狀態 | 手算核對 |\n|:--|:--|:--|:--|:--|\n';
   SAMPLES_ALL.forEach(s => { h += '| ' + s.id + ' | ' + s.items.join('、') + ' | ' + s.title + ' | ' + s.status + ' | ' + (s.hand || '') + ' |\n'; });

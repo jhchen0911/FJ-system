@@ -104,5 +104,151 @@
   "invLeft": [
    "iA30"
   ]
+ },
+ "B08": {
+  "invTotal": 94500,
+  "revNetBefore": 100000,
+  "revNetAfter": 90000,
+  "shareRevBefore": 105000,
+  "shareRevAfter": 94500
+ },
+ "B09": {
+  "cost2026": 800000,
+  "cost2027": 0,
+  "share2026": 800000,
+  "share2027": 0
+ },
+ "B10": {
+  "salesAccr": 2000,
+  "commAccr": 3000,
+  "pretaxWith": 100000,
+  "pretaxWithout": 100000,
+  "shareNetWith": 80000,
+  "shareNetWithout": 80000
+ },
+ "B11": {
+  "invTotal": 103950,
+  "revNet": 99000,
+  "exp": 1000,
+  "cleanExpense": 1000,
+  "revMinusExp": 98000
+ },
+ "B12": {
+  "invTotal": 66150,
+  "retention": 7350,
+  "forecastInflow90": 112350
+ },
+ "B21": {
+  "salesPay": 2000,
+  "salesDate": "2026-09-25",
+  "commPay": 3000,
+  "commDate": "2026-09-25",
+  "salesAccrued": 0
+ },
+ "B22": {
+  "revTax": 94500,
+  "revNet": 100000,
+  "grossSummary": 40000,
+  "projBase": 105000,
+  "projProfit": 42000,
+  "bidWonAmt": 105000
+ },
+ "B23": {
+  "shRptExp": 21000,
+  "shareExp": 26000
+ },
+ "B24": {
+  "calcTNetR": 23.8,
+  "estNetR": 23.8
+ },
+ "B25": {
+  "invTotal": 103950,
+  "irAmount": 103950,
+  "irTax": 4950
+ },
+ "B26": {
+  "invTotal": 103950,
+  "contractAfter": 103950,
+  "status": "completed"
+ },
+ "C16": {
+  "options": [
+   "100",
+   "70",
+   "30",
+   "0"
+  ],
+  "shown": "100",
+  "rowAmt": 20000
+ },
+ "C17": {
+  "overDays": 45,
+  "qty": 100,
+  "amount": 90000,
+  "expiry": "2026-08-31"
+ },
+ "C18": {
+  "areaA": 15,
+  "areaB": 15
+ },
+ "C27": {
+  "p1Amt": 14000,
+  "p2Amt": 15000
+ },
+ "C28": {
+  "introAmt": 1000,
+  "introDue": "2026-11-25",
+  "ownerReceived": 0
+ },
+ "C29": {
+  "written": 3,
+  "avg": 18000,
+  "n": 3,
+  "unit": "M"
+ },
+ "C31": {
+  "costAmt": 1050,
+  "costType": "extra"
+ },
+ "C32": {
+  "sub": 999,
+  "printedRows": [
+   500,
+   500
+  ],
+  "printedSum": 1000
+ },
+ "C33": {
+  "quoteTotal": 31499.685,
+  "invTotal": 31498.95,
+  "invTotalIsInt": false
+ },
+ "C34": {
+  "genHeld0": 24,
+  "groutHeld0": 24,
+  "totalRet": 49,
+  "released": 48,
+  "stillHeld": 1
+ },
+ "C35": {
+  "dueBefore": "2026-10-25",
+  "periodDueAfter": "2026-11-25",
+  "payDateAfter": "2026-10-25"
+ },
+ "C36": {
+  "tplInstPct": 70,
+  "rowInstPct": 60,
+  "billed": 600
+ },
+ "C37": {
+  "rate": 25,
+  "n": 4,
+  "wonAmt": 105000,
+  "dateAfterBump": "2026-10-15"
+ },
+ "C39": {
+  "savedQty": 30,
+  "savedRate": 70,
+  "savedTotal": 22050
  }
 }

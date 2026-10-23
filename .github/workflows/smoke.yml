@@ -31,7 +31,7 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -49,6 +49,9 @@ jobs:
 
       - name: 執行合成樣本（健檢 1 每種算錢情境，假資料）
         run: npm run synth
+
+      - name: 合成樣本反向驗證（故意改壞一處金額算法，樣本必須變紅）
+        run: node tests/synthetic.js --selftest
 
   deploy:
     needs: smoke
