@@ -5561,7 +5561,7 @@ function importData(file){
         // 全量還原（舊備份檔沒有的區塊保留現值，不清空）
         if(data.contracts)CONTRACTS=arr(data.contracts);
         if(data.vendors)VENDORS=arr(data.vendors);
-        if(data.payables)PAYABLES=arr(data.payables);
+        if(data.payables){PAYABLES=arr(data.payables);window._payGuardOff=true;}   // 批次 G3：還原備份＝整包換掉，已付消失防線這次不救
         if(data.invoiceRecs)INVOICE_RECS=arr(data.invoiceRecs);
         if(data.expenses)EXPENSES=arr(data.expenses);
         if(data.customers)CUSTOMERS=arr(data.customers);
@@ -8302,7 +8302,8 @@ function _tomb(coll,id,moved){   // moved：改編號（舊 id 換新 id，付�
   if(coll==='payables'&&!moved){
     // 批次 G3：已付的應付不立墓碑、付款帳本也不刪（要刪得先改回未付）；呼叫端若照樣從陣列拿掉，savePayables 的 _paidVanishGuard 會救回
     try{var _pr=(PAYABLES||[]).find(function(x){return x&&x.id===id;});var _pl=(typeof PAID_LOG!=='undefined')&&PAID_LOG[id];
-      if((_pr&&_pr.status==='paid')||(_pl&&(+_pl.paidAt||0)>(+_pl.unpaidAt||0))){console.warn('[應付] 擋下刪除已付應付 '+id);return false;}}catch(e){_err('_tomb.paidGuard',e);}
+      var _ps=false;if(!_pr){try{_payAuditLoadSnap();_ps=(_payStatSnap||{})[id]==='paid';}catch(e2){_err('_tomb.snap',e2);}}   // 呼叫端先從陣列拿掉的 → 看上次存檔的狀態
+      if((_pr&&_pr.status==='paid')||_ps||(_pl&&(+_pl.paidAt||0)>(+_pl.unpaidAt||0))){console.warn('[應付] 擋下刪除已付應付 '+id);return false;}}catch(e){_err('_tomb.paidGuard',e);}
     try{if(typeof PAID_LOG!=='undefined'&&PAID_LOG[id]){delete PAID_LOG[id];localStorage.setItem('fy_paidlog',JSON.stringify(PAID_LOG));}}catch(e){_err('_tomb.paidLog',e);}}   // v6.0.85
   TOMBS[coll]=TOMBS[coll]||{};TOMBS[coll][id]=Date.now();
   try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e){_err('_tomb',e);}
@@ -23565,8 +23566,10 @@ function saveVendors(){_lsSet('fy_vendors',JSON.stringify(VENDORS),'廠商'); tr
 //   再把「已付→被刪→重建成待付」的記錄依付款稽核恢復成已付（金額相同才自動恢復，不同就提醒人工確認）
 function _payLedgerMove(oldId,newId){try{if(typeof PAID_LOG!=='undefined'&&PAID_LOG[oldId]){if(!PAID_LOG[newId])PAID_LOG[newId]=PAID_LOG[oldId];delete PAID_LOG[oldId];localStorage.setItem('fy_paidlog',JSON.stringify(PAID_LOG));}}catch(e){_err('_payLedgerMove',e);}}
 function _paidVanishGuard(){
-  var prev;try{prev=JSON.parse(localStorage.getItem('fy_payables')||'[]');}catch(e){return 0;}if(!Array.isArray(prev))return 0;
+  if(window._payGuardOff){window._payGuardOff=false;return 0;}
   var have={},n=0;(PAYABLES||[]).forEach(function(p){if(p&&p.id)have[p.id]=1;});
+  try{_payAuditLoadSnap();var miss=Object.keys(_payStatSnap||{}).some(function(id){return _payStatSnap[id]==='paid'&&!have[id];});if(!miss)return 0;}catch(e){_err('_paidVanishGuard.snap',e);}   // 先用狀態快照判斷，有已付不見才讀整份上次存檔
+  var prev;try{prev=JSON.parse(localStorage.getItem('fy_payables')||'[]');}catch(e){return 0;}if(!Array.isArray(prev))return 0;
   prev.forEach(function(p){
     if(!p||!p.id||have[p.id]||p.status!=='paid')return;
     var l=(typeof PAID_LOG!=='undefined')&&PAID_LOG[p.id];if(!l||!((+l.paidAt||0)>(+l.unpaidAt||0)))return;   // 帳本要記載已付才救（改回未付、或改編號搬走帳本的，是真的要刪）
@@ -23581,10 +23584,11 @@ function _paidRebuildHeal(){
   var last={};PAY_AUDIT.forEach(function(a){if(a&&a.id&&(!last[a.id]||(a.at||0)>(last[a.id].at||0)))last[a.id]=a;});
   var n=0,ask=[];
   (PAYABLES||[]).forEach(function(p){
-    if(!p||!p.id||p.status==='paid')return;var a=last[p.id];if(!a||a.from!=='paid'||a.to!=='（已刪除）')return;
+    if(!p||!p.id||p.status==='paid'||!p.costId||String(p.id).indexOf('pay'+p.costId)!==0)return;   // 只救成本卡衍生的應付（分包期別、預付款、提前放款、整筆）；薪資、稅費、抽成等每期新單不動
+    var a=last[p.id];if(!a||a.from!=='paid'||a.to!=='（已刪除）'||Date.now()-(a.at||0)>30*86400000)return;   // 30 天內被刪的才救
     if((+p.unpaidAt||0)>(a.at||0))return;
     if(Math.round(_payEff(p))!==Math.round(+a.amt||0)){if(!p.healAsk){p.healAsk=a.at;_touch(p);ask.push(p);}return;}
-    p.status='paid';p.paidDate=p.paidDate||a.pd||'';p.paidAt=a.lp||a.at;p.healFrom=a.at;delete p.healAsk;_touch(p);
+    p.status='paid';p.paidDate=p.paidDate||a.pd||'';p.paidAt=a.lp||a.at;p.healFrom=a.at;delete p.healAsk;_touch(p);   // 稽核會記成「待付→已付」，來源程式路徑含 _paidRebuildHeal
     try{if(typeof PAID_LOG!=='undefined'){PAID_LOG[p.id]=Object.assign({},PAID_LOG[p.id]||{},{paidAt:p.paidAt,paidDate:p.paidDate});localStorage.setItem('fy_paidlog',JSON.stringify(PAID_LOG));}}catch(e){_err('_paidRebuildHeal',e);}
     n++;
   });
@@ -33490,7 +33494,7 @@ function _payPaidDelta(p,old){
   var n=1;while(PAYABLES.some(function(x){return x.id===old.id+'_d'+n;})||_tb[old.id+'_d'+n]!=null)n++;
   var d=Object.assign({},p,{id:un?un.id:(old.id+'_d'+n),deltaOf:old.id,amount:diff,status:'pending',
     note:(diff>0?'已付後追加差額：':'已付後減少（多付 '+fmt(-diff)+'，待扣回）：')+(p.note||''),date:(un&&un.date)||_vendorDueDate(localToday())});   // 差額從今天起算放款日，不沿用本體的舊日期
-  ['paidDate','paidAt','unpaidAt','costPeriod','costEarly','costAdv'].forEach(function(f){delete d[f];});   // 差額筆不是期別本體（不參與期別卡計算與清重複）
+  ['paidDate','paidAt','unpaidAt','costPeriod','costEarly','costAdv','incl','rekeyFrom','healAsk','healFrom'].forEach(function(f){delete d[f];});   // 批次 G3：incl 是整期含稅，差額筆不能帶   // 差額筆不是期別本體（不參與期別卡計算與清重複）
   if(un&&_recSame(un,d))_keepStamp(d,un);else _touch(d);
   var ix=PAYABLES.indexOf(un);if(ix>=0)PAYABLES[ix]=d;else PAYABLES.unshift(d);
 }
@@ -36172,13 +36176,17 @@ function _advPayFix(qid,cid){
   try{renderPayables();}catch(e){_err('_advPayFix',e);}toast(n?('已補建／改掛 '+n+' 筆應付；已付款的請按「標記已付」'):'已重新同步此發包的應付');
 }
 // 應付卡預付款列：缺應付 → 一鍵補建
+function _advDedOf(c,per,tm,k){   // 批次 G3：本期預付款抵扣（含稅時用 _subAdvInclAlloc，與期別應付 p.incl 同一口徑）
+  if(tm!==1&&_subInvoice(c)){var m=_subAdvInclAlloc(c);if(m[per.no]!=null)return m[per.no];}
+  return Math.round(k.adv*tm);
+}
 function _payAdvInfo(p){
   var ctx=null;try{ctx=_payPeriodCtx(p);}catch(e){_err('_payAdvInfo',e);}
   if(!ctx||!(ctx.k.adv>0))return '';
   var k=ctx.k,tm=p.vat===false?1:_taxM(),us=_payAdvUsed(ctx.c,ctx.per),q=ctx.q,c=ctx.c;
   var line=function(u){var a=u.a,pp=u.pay,paid=pp&&pp.status==='paid';
     return '<div>預付款 '+esc(a.date||'')+'　NT$ '+fmt(Math.round(u.amt*tm))+(paid?' <span style="color:var(--g3)">✓ 已付 '+esc(pp.paidDate||a.date||'')+'</span>':(pp?' <span style="color:var(--red)">待付</span> '+_payLedgerWarn(pp)+' <a href="javascript:void(0)" onclick="payMarkPaid(\''+pp.id+'\',\''+esc(a.date||'')+'\',renderPayables)" style="color:#1565C0">標記已付</a> <a href="javascript:void(0)" onclick="openPayAudit(\''+pp.id+'\')" style="color:var(--b4)">歷程</a>':' <span style="color:#b26a00">缺應付</span> <a href="javascript:void(0)" onclick="_advPayFix(\''+q.id+'\',\''+c.id+'\')" style="color:#1565C0">補建</a>'))+'</div>';};
-  return '<div style="margin-top:4px;padding:6px 8px;background:var(--b0);border-radius:var(--r8);font-size:11px;line-height:1.6;color:var(--b5)">本期計價（'+(p.vat===false?'未稅':'含稅')+'）NT$ '+fmt(Math.round(k.net*tm))+' － 預付款抵扣 NT$ '+fmt(Math.round(k.adv*tm))+' ＝ <b>本期應付 NT$ '+fmt(Math.round(k.pay*tm))+'</b>'+us.map(line).join('')+'</div>';
+  return '<div style="margin-top:4px;padding:6px 8px;background:var(--b0);border-radius:var(--r8);font-size:11px;line-height:1.6;color:var(--b5)">本期計價（'+(p.vat===false?'未稅':'含稅')+'）NT$ '+fmt(Math.round(k.net*tm))+' － 預付款抵扣 NT$ '+fmt(_advDedOf(c,ctx.per,tm,k))+' ＝ <b>本期應付 NT$ '+fmt(Math.round(k.net*tm)-_advDedOf(c,ctx.per,tm,k))+'</b>'+us.map(line).join('')+'</div>';
 }
 
 
@@ -37308,6 +37316,7 @@ function _payAuditMerge(remote){   // 跨裝置聯集（以 k 去重）
 }
 function _payAuditOf(id){return PAY_AUDIT.filter(function(a){return a&&a.id===id;});}
 function _payLedgerWarn(p){   // 帳本記載已付、記錄卻待付 → 紅色警示（確認前不要再匯）
+  if(p&&p.id&&p.status!=='paid'&&p.healAsk)return '<span class="bdg pay-ledger-warn" style="background:#fdecea;color:#c62828;border:1px solid #f5b5ae;font-size:10px;cursor:pointer" onclick="event.stopPropagation();openPayAudit(\''+p.id+'\')" title="這筆曾經已付、被刪除後重建成待付，但金額和付款時不同；確認是否已付過再匯款">⚠ 曾已付、金額不同</span>';   // 批次 G3
   if(!p||!p.id||p.status==='paid'||typeof PAID_LOG==='undefined')return '';
   var l=PAID_LOG[p.id];if(!l||!((l.paidAt||0)>(l.unpaidAt||0)))return '';
   return '<span class="bdg pay-ledger-warn" style="background:#fdecea;color:#c62828;border:1px solid #f5b5ae;font-size:10px;cursor:pointer" onclick="event.stopPropagation();openPayAudit(\''+p.id+'\')" title="付款帳本記載這筆已標記已付，但目前記錄是待付；點開看歷程，確認前不要再匯款">⚠ 帳本記載已付'+(l.paidDate?(' '+esc(l.paidDate)):'')+'</span>';

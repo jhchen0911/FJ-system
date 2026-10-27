@@ -22,8 +22,17 @@ function check(name, ok, detail) {
   if (!ok) failed++;
 }
 
+function _fakeClock() {
+  const RealDate = Date, t0 = RealDate.now(), base = RealDate.UTC(2026, 9, 15, 2, 0, 0);
+  const now = () => base + (RealDate.now() - t0);
+  class FakeDate extends RealDate { constructor(...a) { if (a.length) super(...a); else super(now()); } static now() { return now(); } }
+  window.Date = FakeDate;
+}
 async function newPage(browser, width, height) {
   const page = await browser.newPage({ viewport: { width, height } });
+  // v6.0.114：時鐘固定從 2026-10-15 10:00（台北）起跑、照實際經過時間前進——有些測試依「計價截止日（25 日）」「本月」判斷，
+  //   跑測試的日期過了 25 日就會變紅（10/27 實際發生：v6.0.112 與 v6.0.113 同樣 8 項）；與合成樣本同一套做法
+  await page.addInitScript(_fakeClock);
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => {
@@ -5450,6 +5459,7 @@ async function newPage(browser, width, height) {
   // ───────────── v6.0.54 手機（iOS）列印信封：改由主畫面列印＋信封尺寸 PDF ─────────────
   {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
+    await ctx.addInitScript(_fakeClock);
     const page = await ctx.newPage(); const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(INDEX); await page.waitForTimeout(1500);
@@ -5568,6 +5578,7 @@ async function newPage(browser, width, height) {
   // ───────────── v6.0.57 手機（iPhone）信封列印校正：印十字→量→解倍率與位移→列印反向套用 ─────────────
   {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
+    await ctx.addInitScript(_fakeClock);
     const page = await ctx.newPage(); const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(INDEX); await page.waitForTimeout(1500);
@@ -5611,6 +5622,7 @@ async function newPage(browser, width, height) {
   // ───────────── v6.0.60 信封版面依規格分開（15K 依實際信封）、校正換規格自動換算、iOS 列印區清除時機 ─────────────
   {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
+    await ctx.addInitScript(_fakeClock);
     const page = await ctx.newPage(); const errors = [];
     page.on('pageerror', e => errors.push(e.message));
     await page.goto(INDEX); await page.waitForTimeout(1500);
@@ -8495,23 +8507,29 @@ async function newPage(browser, width, height) {
     PAYABLES = PAYABLES.filter(p => p.id !== 'paycG3_p2'); savePayables();
     out.vanishBack = PAYABLES.some(p => p.id === 'paycG3_p2' && p.status === 'paid');
     /* C：曾經已付、被（舊版）刪掉後重建成待付 → 依付款稽核恢復；金額不同只提醒 */
-    const mk = (id, amt) => ({ id, costId: 'cX', to: '丙', amount: amt, vat: false, status: 'pending', project: '範例工程G3' });
-    PAYABLES.push(mk('payHeal1', 5000), mk('payHeal2', 6000));
-    PAY_AUDIT.unshift({ k: 'h1', id: 'payHeal1', from: 'paid', to: '（已刪除）', at: Date.now() - 5000, amt: 5000, pd: '2026-10-25', lp: Date.now() - 9000 },
-                      { k: 'h2', id: 'payHeal2', from: 'paid', to: '（已刪除）', at: Date.now() - 5000, amt: 5500, pd: '2026-10-25', lp: Date.now() - 9000 });
+    const mk = (id, amt) => ({ id, costId: 'cX', costPeriod: 1, to: '丙', amount: amt, vat: false, status: 'pending', project: '範例工程G3' });
+    PAYABLES.push(mk('paycX_p1', 5000), mk('paycX_p2', 6000));
+    PAY_AUDIT.unshift({ k: 'h1', id: 'paycX_p1', from: 'paid', to: '（已刪除）', at: Date.now() - 5000, amt: 5000, pd: '2026-10-25', lp: Date.now() - 9000 },
+                      { k: 'h2', id: 'paycX_p2', from: 'paid', to: '（已刪除）', at: Date.now() - 5000, amt: 5500, pd: '2026-10-25', lp: Date.now() - 9000 });
     savePayables();
-    const h1 = PAYABLES.find(p => p.id === 'payHeal1'), h2 = PAYABLES.find(p => p.id === 'payHeal2');
-    out.heal = h1.status === 'paid' && h1.paidDate === '2026-10-25' && !!PAID_LOG['payHeal1'];
+    const h1 = PAYABLES.find(p => p.id === 'paycX_p1'), h2 = PAYABLES.find(p => p.id === 'paycX_p2');
+    out.heal = h1.status === 'paid' && h1.paidDate === '2026-10-25' && !!PAID_LOG['paycX_p1'];
     out.healAsk = h2.status !== 'paid' && !!h2.healAsk;
+    /* 審查：已付期別改量 → 差額筆不能帶整期含稅 incl */
+    card.periods[0].rows[0].qty = 410; _syncSubPeriodPayables(Q[0], card);
+    const dl = PAYABLES.find(p => p.deltaOf === 'paycG3_p1'); out.deltaEff = dl ? _payEff(dl) : null; out.deltaNoIncl = !!dl && dl.incl == null;
+    out.p1Kept = _payEff(PAYABLES.find(p => p.id === 'paycG3_p1'));
+    /* 還原備份（整包換掉）不被救回 */
+    window._payGuardOff = true; const keep = PAYABLES.slice(); PAYABLES = PAYABLES.filter(p => p.id !== 'paycG3_p2'); savePayables(); out.importNoGuard = !PAYABLES.some(p => p.id === 'paycG3_p2'); PAYABLES = keep; savePayables();
     /* 已付不能從應付管理直接刪 */
-    msg = []; delPayable('payHeal1'); out.delBlock = PAYABLES.some(p => p.id === 'payHeal1') && msg.some(m => /改回未付/.test(m));
+    msg = []; delPayable('paycX_p1'); out.delBlock = PAYABLES.some(p => p.id === 'paycX_p1') && msg.some(m => /改回未付/.test(m));
     window.toast = oT;
   } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
   return out;
 });
 
     check('v6.0.114 批次 G3：分期成本卡（預付款＋兩期）都已付後，在別張報價與這張報價各按儲存，已付筆數與付款帳本不變（原本 3 筆剩 1 筆）', r.paidBefore === 3 && r.paidAfter === 3 && r.plBefore === 3 && r.plAfter === 3 && !r.err, JSON.stringify(r));
-    check('v6.0.114 批次 G3：已付應付不立墓碑、付款帳本不刪；自動流程硬刪會被存檔前救回；應付管理不能直接刪已付；被刪後重建成待付的依付款稽核恢復已付（金額不同只提醒）', r.tombBlock === 'blocked' && r.plKept && r.vanishBack && r.heal && r.healAsk && r.delBlock && !r.err, JSON.stringify(r));
+    check('v6.0.114 批次 G3：已付應付不立墓碑、付款帳本不刪；自動流程硬刪會被存檔前救回；應付管理不能直接刪已付；被刪後重建成待付的依付款稽核恢復已付（金額不同只提醒）', r.tombBlock === 'blocked' && r.plKept && r.vanishBack && r.heal && r.healAsk && r.delBlock && r.deltaNoIncl && r.deltaEff === Math.round(10000 * 1.05) && r.p1Kept === 210000 && r.importNoGuard && !r.err, JSON.stringify(r));
     check('v6.0.114 批次 G3（D）：預付款抵扣用含稅口徑——預付款 359,988 未稅＝377,987 含稅，兩期抵扣含稅合計剛好 377,987，總付款＝兩期含稅 735,000，期別備註標含稅', r.advIncl === 377987 && r.totalPaid === r.netIncl && r.p1 === 210000 && r.p2 === 147013 && r.note1 === '抵扣預付款 210,000（含稅）' && !r.err, JSON.stringify(r));
     check('v6.0.114 批次 G3 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
