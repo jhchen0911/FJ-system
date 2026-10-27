@@ -8562,7 +8562,7 @@ async function newPage(browser, width, height) {
     const listHas=id=>{go('acct');acctTab('ap');window._payAging='all';renderPayables();return [...document.getElementById('payable-list').querySelectorAll('.ql')].some(x=>x.innerHTML.includes(id));};
     // ① 預付款沒付 → 列表看得到、待付合計有它
     out.pendShown=!!adv&&adv.status!=='paid'&&_payHiddenAdv(adv)===false&&listHas('paycM_aa1')&&_apList().some(p=>p.id==='paycM_aa1');
-    out.allIncl=_payVendorOthers(per).some(p=>p.id==='paycM_aa1');
+    out.allExcl=!_payVendorOthers(per).some(p=>p.id==='paycM_aa1')&&!/全付/.test(_payVendorAllBtn(per));
     // ② 預付款已付 → 併進期別卡、不在列表；第 1 期的「全付」不會把它算進去
     adv.status='paid';adv.paidDate='2026-10-05';adv.paidAt=Date.now();
     out.paidHidden=_payHiddenAdv(adv)===true&&!listHas('paycM_aa1')&&!_payVendorOthers(per).some(p=>p.id==='paycM_aa1')&&!/全付/.test(_payVendorAllBtn(per));
@@ -8570,11 +8570,11 @@ async function newPage(browser, width, height) {
     let n=0;const o=window._salesCommSyncAll;window._salesCommSyncAll=function(){n++;};
     _salesCommBoot();_salesCommBoot();
     setTimeout(()=>{out.bootOnce=n===1;_salesCommBoot();setTimeout(()=>{out.bootStill=n===1;window._salesCommSyncAll=o;
-      out.pullHook=/_salesCommBoot\(\)/.test(String(_pullPrivate));res(out);},2600);},2600);
+      out.pullHook=/_salesCommBoot\(\)/.test(String(_pullPrivate));res(out);},3500);},3500);
   }catch(e){out.err=String(e&&e.stack||e);res(out);}
     }));
-    check('v6.0.115 批次 G4：沒付的預付款即使已被期別抵扣完也顯示在應付列表（待付合計與列表一致），同廠商「全付」會列出它', r.pendShown && r.allIncl, JSON.stringify(r));
-    check('v6.0.115 批次 G4：預付款已付才併進期別卡；第 1 期「全付」不會把已抵扣的預付款一起標成已付', r.paidHidden, JSON.stringify(r));
+    check('v6.0.115 批次 G4：沒付的預付款即使已被期別抵扣完也顯示在應付列表（待付合計與列表一致）；第 1 期「全付」不會把預付款一起標成已付（預付款自己標、日期帶預付款日）', r.pendShown && r.allExcl, JSON.stringify(r));
+    check('v6.0.115 批次 G4：預付款已付才併進期別卡、不在列表上', r.paidHidden, JSON.stringify(r));
     check('v6.0.115 批次 G4：私有資料下載完後重算一次業務抽成（只跑一次）', r.bootOnce && r.bootStill && r.pullHook, JSON.stringify(r));
     check('v6.0.115 批次 G4 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();

@@ -34893,7 +34893,7 @@ function _saQuickChips(c){
   return B(Math.round(rest/2),'餘額一半')+B(rest,'餘額全部')+'<span style="color:var(--b3)">（發包未稅 '+fmt(Math.round(parseFloat(c.amt)||0))+'，已預付 '+fmt(adv)+'）</span>';
 }
 // ── 2 應付：同廠商同工程的待付一併付款 ──
-function _payVendorOthers(p){return (PAYABLES||[]).filter(function(x){return x&&x.id!==p.id&&x.status!=='paid'&&!x.voidAt&&!x.planned&&!_payHiddenAdv(x)&&(x.to||'')===(p.to||'')&&(x.project||'')===(p.project||'');});}   // 批次 G4：「全付」不含併在期別卡裡的已抵扣預付款
+function _payVendorOthers(p){return (PAYABLES||[]).filter(function(x){return x&&x.id!==p.id&&x.status!=='paid'&&!x.voidAt&&!x.planned&&!x.costAdv&&(x.to||'')===(p.to||'')&&(x.project||'')===(p.project||'');});}   // 批次 G4：「全付」不含預付款——預付款付款日和期別不同，要在預付款那一列自己標（之前會跟第 1 期一起標成當天）
 function _payVendorAllBtn(p){var n=_payVendorOthers(p).length;return n?'<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" title="同廠商、同工程的待付一起標記付款" onclick="payVendorAll(\''+p.id+'\')">全付 '+(n+1)+' 筆</button>':'';}
 function payVendorAll(pid){
   var p=(PAYABLES||[]).find(function(x){return x.id===pid;});if(!p)return;
