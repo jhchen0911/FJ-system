@@ -8297,9 +8297,9 @@ try{const x=localStorage.getItem('fy_payables');if(x)PAYABLES=JSON.parse(x);}cat
 var PAID_LOG={};try{var _plx=localStorage.getItem('fy_paidlog');if(_plx)PAID_LOG=JSON.parse(_plx)||{};}catch(e){_err('paidLog.load',e);PAID_LOG={};}   // v6.0.85 付款帳本（應付 id → paidAt／paidDate／unpaidAt），只增不減、跨裝置取聯集
 try{const x=localStorage.getItem('fy_inv_recs');if(x)INVOICE_RECS=JSON.parse(x);}catch(e){_err('_adminUidHint',e);}
 var TOMBS={};try{TOMBS=JSON.parse(localStorage.getItem('fy_tombs')||'{}');}catch(e){_err('_adminUidHint',e);}
-function _tomb(coll,id){
+function _tomb(coll,id,moved){   // moved：改編號（舊 id 換新 id，付款帳本已搬過去）→ 舊 id 照樣立墓碑
   if(!id)return false;
-  if(coll==='payables'){
+  if(coll==='payables'&&!moved){
     // 批次 G3：已付的應付不立墓碑、付款帳本也不刪（要刪得先改回未付）；呼叫端若照樣從陣列拿掉，savePayables 的 _paidVanishGuard 會救回
     try{var _pr=(PAYABLES||[]).find(function(x){return x&&x.id===id;});var _pl=(typeof PAID_LOG!=='undefined')&&PAID_LOG[id];
       if((_pr&&_pr.status==='paid')||(_pl&&(+_pl.paidAt||0)>(+_pl.unpaidAt||0))){console.warn('[應付] 擋下刪除已付應付 '+id);return false;}}catch(e){_err('_tomb.paidGuard',e);}
@@ -23563,12 +23563,13 @@ function closeMergeCost(){
 function saveVendors(){_lsSet('fy_vendors',JSON.stringify(VENDORS),'廠商'); try{_autoUpload();}catch(e){_err('saveVendors',e);}}
 // 批次 G3：已付應付消失防線——和上一次存檔比，已付（帳本也記已付）的記錄不見了就放回去並提醒；
 //   再把「已付→被刪→重建成待付」的記錄依付款稽核恢復成已付（金額相同才自動恢復，不同就提醒人工確認）
+function _payLedgerMove(oldId,newId){try{if(typeof PAID_LOG!=='undefined'&&PAID_LOG[oldId]){if(!PAID_LOG[newId])PAID_LOG[newId]=PAID_LOG[oldId];delete PAID_LOG[oldId];localStorage.setItem('fy_paidlog',JSON.stringify(PAID_LOG));}}catch(e){_err('_payLedgerMove',e);}}
 function _paidVanishGuard(){
   var prev;try{prev=JSON.parse(localStorage.getItem('fy_payables')||'[]');}catch(e){return 0;}if(!Array.isArray(prev))return 0;
   var have={},n=0;(PAYABLES||[]).forEach(function(p){if(p&&p.id)have[p.id]=1;});
   prev.forEach(function(p){
     if(!p||!p.id||have[p.id]||p.status!=='paid')return;
-    var l=(typeof PAID_LOG!=='undefined')&&PAID_LOG[p.id];if(l&&(+l.unpaidAt||0)>(+l.paidAt||0))return;   // 帳本記載已改回未付 → 真的要刪
+    var l=(typeof PAID_LOG!=='undefined')&&PAID_LOG[p.id];if(!l||!((+l.paidAt||0)>(+l.unpaidAt||0)))return;   // 帳本要記載已付才救（改回未付、或改編號搬走帳本的，是真的要刪）
     try{if(TOMBS&&TOMBS.payables&&TOMBS.payables[p.id]!=null){delete TOMBS.payables[p.id];localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}}catch(e){_err('_paidVanishGuard',e);}
     _touch(p);PAYABLES.push(p);have[p.id]=1;n++;
   });
@@ -35456,7 +35457,7 @@ function _earlyToAdv(q,c){
       per.adv=Math.round(parseFloat(per.adv)||0)+amt;
       var oldId='pay'+c.id+'_p'+per.no+'_e'+e.id,newId=_subAdvPayId(c.id,a);
       var oi=-1;PAYABLES.forEach(function(p,i){if(p&&p.id===oldId&&oi<0)oi=i;});
-      if(oi>=0){var op=PAYABLES[oi];var ex2=PAYABLES.find(function(p){return p&&p.id===newId;});if(!ex2){var np=Object.assign({},op,{id:newId,costAdv:a.id,note:'預付款'+(a.note?('：'+a.note):'')+'（第'+per.no+'期）'});delete np.costEarly;_touch(np);PAYABLES.splice(oi,1,np);}else{if(op.status==='paid'&&ex2.status!=='paid'){ex2.status='paid';ex2.paidDate=op.paidDate;ex2.paidAt=op.paidAt||_payStamp(ex2);_touch(ex2);}PAYABLES.splice(oi,1);}_tomb('payables',oldId);}   // v6.0.89 舊提前放款已付 → 新編號也要是已付
+      if(oi>=0){var op=PAYABLES[oi];var ex2=PAYABLES.find(function(p){return p&&p.id===newId;});if(!ex2){var np=Object.assign({},op,{id:newId,rekeyFrom:oldId,costAdv:a.id,note:'預付款'+(a.note?('：'+a.note):'')+'（第'+per.no+'期）'});delete np.costEarly;_touch(np);PAYABLES.splice(oi,1,np);}else{ex2.rekeyFrom=oldId;if(op.status==='paid'&&ex2.status!=='paid'){ex2.status='paid';ex2.paidDate=op.paidDate;ex2.paidAt=op.paidAt||_payStamp(ex2);_touch(ex2);}PAYABLES.splice(oi,1);}_payLedgerMove(oldId,newId);_tomb('payables',oldId,true);}   // v6.0.89 舊提前放款已付 → 新編號也要是已付；批次 G3：改編號時付款帳本跟著搬
       n++;
     });
     delete per.early;per.mt=Date.now();
@@ -36129,7 +36130,7 @@ function _liveExpectedPayIds(){
 // 墓碑豁免：成本卡現在仍需要的應付 id，就算曾被刪除（舊版去重 bug）也不得在合併時被丟掉；順手把本機墓碑拿掉
 function _tombExempt(coll,id){
   if(coll!=='payables')return false;
-  var _pl=(typeof PAID_LOG!=='undefined')&&PAID_LOG[id],paid=!!(_pl&&(+_pl.paidAt||0)>(+_pl.unpaidAt||0));   // 批次 G3：付款帳本記載已付的，別台（舊版）立的墓碑不算
+  var _pl=(typeof PAID_LOG!=='undefined')&&PAID_LOG[id],paid=!!(_pl&&(+_pl.paidAt||0)>(+_pl.unpaidAt||0))&&!(PAYABLES||[]).some(function(x){return x&&x.rekeyFrom===id;});   // 批次 G3：付款帳本記載已付的，別台（舊版）立的墓碑不算；改過編號的舊 id 除外
   var live=_liveExpectedPayIds();if(!live[id]&&!paid)return false;
   try{if(TOMBS&&TOMBS.payables&&TOMBS.payables[id]!=null){delete TOMBS.payables[id];localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}}catch(e){_err('_tombExempt',e);}
   return true;
@@ -36139,7 +36140,9 @@ function _advPayHeal(q,c){
   if(!q||!c||c.type!=='sub'||_healBusy)return 0;
   var n=0,exp=_subExpectedPayIds(c),vendor=c.vendor||'';
   var has=function(id){return PAYABLES.some(function(p){return p&&p.id===id;});};
-  var rekey=function(p,pid,patch){var old=p.id;Object.assign(p,patch,{id:pid});_touch(p);try{_tomb('payables',old);}catch(e){_err('_advPayHeal',e);}n++;};
+  var rekey=function(p,pid,patch){var old=p.id;Object.assign(p,patch,{id:pid,rekeyFrom:old});_touch(p);
+    _payLedgerMove(old,pid);   // 批次 G3：付款帳本跟著搬到新編號
+    try{_tomb('payables',old,true);}catch(e){_err('_advPayHeal',e);}n++;};
   _subAdvs(c).forEach(function(a){
     var pid=_subAdvPayId(c.id,a);if(has(pid))return;
     var amt=Math.round(parseFloat(a.amt)||0);
