@@ -8531,12 +8531,14 @@ async function newPage(browser, width, height) {
     CONTRACTS.push({ id: 'cS3', linkedQid: 'qS3', name: '範例工程S3', amount: 3357900, date: '2026-08-10' });
     _salesCommSync(Q.find(q => q.id === 'qS3')); const sp = PAYABLES.find(p => p.id === 'pay_sales_qS3');
     out.salesAmt = sp && sp.amount; out.salesPlanned = !!(sp && sp.planned && !sp.date && !_apList().includes(sp));
+    INV.push({ id: 'iS3', quoteId: 'qS3', project: '範例工程S3', periodNo: 1, date: '2026-11-05', items: [] }); _salesCommSync(Q.find(q => q.id === 'qS3'));
+    const sp2 = PAYABLES.find(p => p.id === 'pay_sales_qS3'); out.salesDue = sp2 && !sp2.planned && sp2.date === '2026-12-25' && _apList().includes(sp2);
     window.toast = oT;
   } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
   return out;
 });
 
-    check('v6.0.114 批次 G3（Lotion 10/27）：業務抽成＝合約未稅 × 抽成率（合約含稅 3,357,900 → 5% 為 159,900）；第一期請款單送出前只是「預計」，不算待付', r.salesAmt === 159900 && r.salesPlanned && !r.err, JSON.stringify({ salesAmt: r.salesAmt, salesPlanned: r.salesPlanned }));
+    check('v6.0.114 批次 G3（Lotion 10/27）：業務抽成＝合約未稅 × 抽成率（合約含稅 3,357,900 → 5% 為 159,900）；第一期請款單送出前只是「預計」，不算待付；送出（11/05）後才到期（次月 25 日）', r.salesAmt === 159900 && r.salesPlanned && r.salesDue && !r.err, JSON.stringify({ salesAmt: r.salesAmt, salesPlanned: r.salesPlanned, salesDue: r.salesDue }));
     check('v6.0.114 批次 G3：分期成本卡（預付款＋兩期）都已付後，在別張報價與這張報價各按儲存，已付筆數與付款帳本不變（原本 3 筆剩 1 筆）', r.paidBefore === 3 && r.paidAfter === 3 && r.plBefore === 3 && r.plAfter === 3 && !r.err, JSON.stringify(r));
     check('v6.0.114 批次 G3：已付應付不立墓碑、付款帳本不刪；自動流程硬刪會被存檔前救回；應付管理不能直接刪已付；被刪後重建成待付的依付款稽核恢復已付（金額不同只提醒）', r.tombBlock === 'blocked' && r.plKept && r.vanishBack && r.heal && r.healAsk && r.delBlock && r.deltaNoIncl && r.deltaEff === Math.round(10000 * 1.05) && r.p1Kept === 210000 && r.importNoGuard && !r.err, JSON.stringify(r));
     check('v6.0.114 批次 G3（D）：預付款抵扣用含稅口徑——預付款 359,988 未稅＝377,987 含稅，兩期抵扣含稅合計剛好 377,987，總付款＝兩期含稅 735,000，期別備註標含稅', r.advIncl === 377987 && r.totalPaid === r.netIncl && r.p1 === 210000 && r.p2 === 147013 && r.note1 === '抵扣預付款 210,000（含稅）' && !r.err, JSON.stringify(r));

@@ -36693,7 +36693,7 @@ function _salesDueFrom(q){
   if(!q)return '';
   if(_salesPayOn(q)==='contract'){var ct=(CONTRACTS||[]).find(function(c){return c&&c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return c&&!c.linkedQid&&c.name&&c.name===q.name;});return ct?String(ct.signDate||ct.date||'').slice(0,10):'';}
   var qn=String(q.name||'').trim();
-  var ds=(INV||[]).filter(function(i){return i&&i.kind!=='retReturn'&&i.date&&(i.quoteId===q.id||i.sourceQid===q.id||(!i.quoteId&&!i.sourceQid&&qn&&String(i.project||'').trim()===qn));})   // 審查：舊請款單只用工程名稱歸戶的也算.map(function(i){return String(i.date).slice(0,10);}).sort();
+  var ds=(INV||[]).filter(function(i){return i&&i.kind!=='retReturn'&&i.date&&(i.quoteId===q.id||i.sourceQid===q.id||(!i.quoteId&&!i.sourceQid&&qn&&String(i.project||'').trim()===qn));}).map(function(i){return String(i.date).slice(0,10);}).sort();   // 審查：舊請款單只用工程名稱歸戶的也算
   return ds[0]||'';
 }
 // v6.0.76 抽成三種方式：rev＝營收%（未稅合約×%）、profit＝毛利%（(未稅合約−成本)×%；成本＝實際施工成本，尚無成本以報價預估成本代）、amt＝每案固定額。
