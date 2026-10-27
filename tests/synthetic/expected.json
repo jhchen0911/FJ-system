@@ -103,6 +103,18 @@
    "cA20c"
   ]
  },
+ "A21": {
+  "amt": 159900,
+  "planned": true,
+  "date": "",
+  "inAp": false,
+  "fixNote": true,
+  "afterInvPlanned": false,
+  "afterInvDate": "2026-12-25",
+  "afterInvInAp": true,
+  "contractDate": "2026-09-25",
+  "paidKeep": 159900
+ },
  "A30": {
   "left": [
    "qA30a",
@@ -150,7 +162,7 @@
  },
  "B21": {
   "salesPay": 2000,
-  "salesDate": "2026-09-25",
+  "salesDate": "",
   "commPay": 3000,
   "commDate": "2026-09-25",
   "salesAccrued": 0

@@ -79,8 +79,8 @@ module.exports = [
   },
   {
     id: 'B21', items: [21], status: '現況',
-    title: '得標當天抽成 2,000、佣金 3,000 應付就是全額，付款日照得標日推算（尚未收款）',
-    hand: '應為依實收款進度產生（尚未收款＝0）；現況得標即全額 2,000／3,000，付款日落在得標日次月',
+    title: '得標當天：業務抽成 2,000 只標「預計」（v6.0.114，Lotion 10/27：一次付清、第一期請款單送出才到期）；業主佣金 3,000 仍是得標即全額、付款日照得標日推算',
+    hand: '業務抽成已照 Lotion 10/27 規則（沒有請款單 → 無到期日）；業主佣金的到期規則尚未決定（現況得標即全額，付款日落在得標日次月）',
     run: async () => {
       P.sales = [{ id: 'sB21', name: '業務甲', kind: 'staff', commMode: 'amt', commVal: 2000, active: true }];
       Q = [{ id: 'qB21', name: '範例工程B21', client: '甲營造', date: '2026-08-01', awarded: true, salesId: 'sB21', items: [{ desc: '鋼板樁', unit: 'M', qty: 100, price: 1000 }], t: { sub: 100000, tax: 5000, total: 105000 },

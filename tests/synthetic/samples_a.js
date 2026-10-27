@@ -187,6 +187,26 @@ module.exports = [
     }
   },
   {
+    id: 'A21', items: [21], status: '正確',
+    title: '業務抽成（Lotion 10/27）：5% × 合約未稅；合約含稅 3,357,900 → 未稅 3,198,000 → 抽成 159,900；第一期請款單送出前只是「預計」，送出後才到期；舊版算成 167,900 的那筆改正並在備註留原值',
+    hand: '3,357,900 ÷ 1.05＝3,198,000；×5%＝159,900（舊版拿 3,358,000 當未稅 → 167,900，多 8,000）',
+    run: async () => {
+      P.sales = [{ id: 'sA21', name: '業務甲', kind: 'staff', commMode: 'rev', commVal: 5, active: true }];
+      Q = [{ id: 'qA21', name: '範例工程A21', client: '甲營造', date: '2026-08-01', awarded: true, salesId: 'sA21', items: [{ desc: '鋼板樁', unit: 'M', qty: 1, price: 3358000 }], t: { sub: 3358000, tax: 167900, total: 3525900 } }];
+      CONTRACTS.push({ id: 'cA21', linkedQid: 'qA21', name: '範例工程A21', amount: 3357900, date: '2026-08-10', status: 'active' });
+      PAYABLES.push({ id: 'pay_sales_qA21', kind: 'sales', to: '業務甲', quoteId: 'qA21', amount: 167900, vat: false, status: 'pending', date: '2026-09-25', note: '業務抽成' });
+      _salesCommSync(Q[0]);
+      const p0 = PAYABLES.find(p => p.id === 'pay_sales_qA21');
+      const r = { amt: p0.amount, planned: !!p0.planned, date: p0.date, inAp: _apList().some(p => p.id === 'pay_sales_qA21'), fixNote: /原 167,900 → 159,900/.test(p0.note) };
+      INV.push({ id: 'iA21', quoteId: 'qA21', project: '範例工程A21', periodNo: 1, date: '2026-11-05', items: [] });
+      _salesCommSync(Q[0]); const p1 = PAYABLES.find(p => p.id === 'pay_sales_qA21');
+      r.afterInvPlanned = !!p1.planned; r.afterInvDate = p1.date; r.afterInvInAp = _apList().some(p => p.id === 'pay_sales_qA21');
+      Q[0].salesPayOn = 'contract'; _salesCommSync(Q[0]); r.contractDate = PAYABLES.find(p => p.id === 'pay_sales_qA21').date;
+      PAYABLES.find(p => p.id === 'pay_sales_qA21').status = 'paid'; CONTRACTS[0].amount = 4200000; _salesCommSync(Q[0]); r.paidKeep = PAYABLES.find(p => p.id === 'pay_sales_qA21').amount;
+      return r;
+    }
+  },
+  {
     id: 'A30', items: [30], status: '正確',
     title: '刪報價：有已付應付或已收款請款單就擋下；都沒有才刪',
     hand: '—（只看擋不擋）',
