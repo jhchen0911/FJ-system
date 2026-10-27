@@ -2414,9 +2414,9 @@ async function newPage(browser, width, height) {
       go('reports'); showReport('hr');
       const rp = document.getElementById('report-content').innerHTML;
       out.rpt = /2026-09/.test(rp) && /人事成本/.test(rp) && /王小明/.test(rp) && !!document.getElementById('rpt-hr-btn');
-      // 刪薪資條 → 應付撤掉並立墓碑
+      // 刪薪資條 → 未付的應付撤掉；v6.0.114 批次 G3：已發放（已付）的薪資應付保留、不立墓碑（已付應付不刪）
       psDel(ps.id); document.getElementById('gen-confirm-ok').click();
-      out.del = !PAYABLES.some(p => p.id === 'pay_' + ps.id) && !!(TOMBS.payables || {})['pay_' + ps.id] && !PAYABLES.some(p => p.id === 'pay_ins_2026-09');
+      out.del = PAYABLES.some(p => p.id === 'pay_' + ps.id && p.status === 'paid') && !(TOMBS.payables || {})['pay_' + ps.id] && !PAYABLES.some(p => p.id === 'pay_ins_2026-09');
       // 待辦：上月薪資條未產生（測試環境未登入 → canAccess 對 adminOnly 頁回 false，直接驗函式邏輯）
       out.todoFn = typeof _psYmText === 'function' && /薪資條尚未產生|todo\.hr/.test(updateDashTodo.toString());
       HR.length = 0; PAYSLIPS.length = 0; PETTY.length = 0; PAYABLES.length = 0; P.fixedCosts = []; Q = _Q0;
@@ -2424,7 +2424,7 @@ async function newPage(browser, width, height) {
     });
     check('薪資／零用金 → 應付：實發次月發放日、勞健保一筆次月底、零用金補足＋代墊，狀態雙向', r.pay && r.ins && r.petty && r.paid1 && r.paid2 && r.label);
     check('人事成本推估：寫入公司固定成本、金流預測不重複扣並推估未產生月份', r.est && r.fixed && r.cf);
-    check('報表中心人事成本分頁；刪薪資條撤應付並立墓碑；待辦提醒', r.rpt && r.del && r.todoFn);
+    check('報表中心人事成本分頁；刪薪資條撤未付應付（已發放的保留）；待辦提醒', r.rpt && r.del && r.todoFn);
     check('v5.435 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -2856,7 +2856,7 @@ async function newPage(browser, width, height) {
         advEl.value='50000';_spRecalc();
         document.getElementById('gen-confirm-ok').click();
         const per=cM.periods[0],pp=PAYABLES.find(p=>p.id==='paycM_p1');
-        out.per=!!per&&per.amt===68750&&per.adv===50000&&per.due==='2026-10-25'&&!!pp&&pp.amount===18750&&/抵扣預付款 50,000/.test(pp.note);
+        out.per=!!per&&per.amt===68750&&per.adv===50000&&per.due==='2026-10-25'&&!!pp&&pp.amount===18750&&/抵扣預付款 52,500（含稅）/.test(pp.note);   // v6.0.114：抵扣改含稅口徑（50,000／120,000 × 已付含稅預付 126,000）
         const stM=_subStat(cM);out.stat=stM.advPaid===120000&&stM.advUsed===50000&&stM.advLeft===70000&&stM.payN===3;
         delSubAdvance('cM',_subAdvs(cM)[0].id);out.delBlock=_subAdvs(cM).length===2;
         delSubAdvance('cM',_subAdvs(cM)[1].id);document.getElementById('gen-confirm-ok').click();out.delOk=_subAdvs(cM).length===1&&!PAYABLES.some(p=>p.costAdv&&p.amount===20000);
@@ -3976,7 +3976,7 @@ async function newPage(browser, width, height) {
           out.seHint=/已登錄未付/.test(document.getElementById('gen-confirm-msg').innerHTML)&&_saCtx.est>=k1.pay&&document.getElementById('sa-warn').style.display==='none';
           document.getElementById('gen-confirm-ok').click();
           const pe=PAYABLES.find(p=>p.costAdv&&p.costId===c.id);
-          out.early=!!pe&&pe.amount===100000&&pe.vat===true&&pe.date===localToday()&&/預付款/.test(pe.note)&&pMain().amount===k1.pay-100000&&/抵扣預付款 100,000/.test(pMain().note)&&pMain().date==='2026-11-25'&&c.periods[0].adv===100000;
+          out.early=!!pe&&pe.amount===100000&&pe.vat===true&&pe.date===localToday()&&/預付款/.test(pe.note)&&pMain().amount===k1.pay-100000&&/抵扣預付款 105,000（含稅）/.test(pMain().note)&&pMain().date==='2026-11-25'&&c.periods[0].adv===100000;
           const st=_subStat(c);out.stat=st.unpaid===Math.round((k1.pay)*1.05);
           // 超過可扣回金額（已登錄未付＋本期預估）→ 需勾特殊情況，否則擋下
           openSubAdvance(c.id);document.getElementById('sa-amt').value=String(_saCtx.est+1);_saOnInput();out.over=document.getElementById('sa-warn').style.display!=='none';document.getElementById('gen-confirm-ok').click();
@@ -4134,8 +4134,8 @@ async function newPage(browser, width, height) {
         payMarkPaid('paycH_aa1','2026-10-05');document.getElementById('pmp-date').value='2026-10-05';document.getElementById('gen-confirm-ok').click();
         const per=cH.periods[0];
         const pMain=PAYABLES.find(p=>p.id==='paycH_p1');
-        out.a2e=cH.advances.length===1&&per.adv===548625&&!!pMain&&pMain.amount===548625&&_payEff(pMain)===576056&&pAdv2.status==='paid'&&pAdv2.paidDate==='2026-10-05'&&!(per.early||[]).length;
-        const sH=_subStat(cH);out.a2eStat=sH.paid===576056&&sH.unpaid===576056&&sH.advLeft===0;
+        out.a2e=cH.advances.length===1&&per.adv===548625&&!!pMain&&pMain.amount===548625&&_payEff(pMain)===576057&&pAdv2.status==='paid'&&pAdv2.paidDate==='2026-10-05'&&!(per.early||[]).length;
+        const sH=_subStat(cH);out.a2eStat=sH.paid===576056&&sH.unpaid===576057&&sH.advLeft===0;   // v6.0.114：預付 576,056＋期別 576,057＝本期含稅 1,152,113
         // 修改預付款
         cH.advances=[{id:'a2',date:'2026-10-05',amt:50000,ts:2}];syncCostToPayable(q,cH);
         editSubAdvance('cH','a2');document.getElementById('sa-amt').value='40000';document.getElementById('gen-confirm-ok').click();
@@ -4979,7 +4979,7 @@ async function newPage(browser, width, height) {
     // 同步 → 夾回 → 第 1 期應付出現（另一半 10/25）
     syncCostToPayable(Q[0],Q[0].costs[0]);
     const c=Q[0].costs[0],per=c.periods[0],pMain=PAYABLES.find(p=>p.id==='paycH_p1');
-    out.clamp=per.adv===548625&&!!pMain&&pMain.amount===548625&&_payEff(pMain)===576056&&pMain.status==='pending';
+    out.clamp=per.adv===548625&&!!pMain&&pMain.amount===548625&&_payEff(pMain)===576057&&pMain.status==='pending';   // v6.0.114 含稅口徑：本期含稅 1,152,113－已付預付 576,056
     // 重算抵扣：亂改後回到正確分配
     per.adv=100;subAdvRealloc('cH');
     out.realloc=per.adv===548625&&PAYABLES.find(p=>p.id==='paycH_p1').amount===548625;
@@ -6164,7 +6164,7 @@ async function newPage(browser, width, height) {
         Q.push({ id: 'qB', name: '業務案B', client: '乙', date: '2026-09-20', salesId: sid, bidStatus: 'lost', items: [], t: { sub: 50000, total: 52500 } });
         Q.push({ id: 'qC', name: '業務案C', client: '丙', date: '2026-10-01', salesId: sid2, awarded: true, comm: { mode: 'amt', amt: 5000 }, items: [], t: { sub: 200000, total: 210000 } });
         Q.push({ id: 'qD', name: '無業務案', client: '丁', date: '2026-10-02', items: [], t: { sub: 1000, total: 1050 } });
-        Q.push({ id: 'qC2', name: '業務案C 追加', client: '丙', parentId: 'qC', date: '2026-10-05', items: [], t: { sub: 10000, total: 10500 } });
+        Q.push({ id: 'qC2', name: '業務案C 追加', client: '丙', parentId: 'qC', awarded: true, date: '2026-10-05', items: [], t: { sub: 10000, total: 10500 } });   // v6.0.114：基數只算已得標追加
         INV.push({ id: 'iC', quoteId: 'qC', project: '業務案C', client: '丙', date: '2026-10-10', items: [], totals: { total: 110250 }, received: 110250, receivedDate: '2026-10-12' });
         _salesCommSyncAll(); const pc = PAYABLES.find(p => p.id === 'pay_sales_qC'); out.payC = !!pc && pc.amount === 5000 && pc.to === '李大華';
         out.rcv = Math.round(_salesRcvRate(Q.find(x => x.id === 'qC')) * 100) === 50 && _salesBase(Q.find(x => x.id === 'qC')) === 210000;
@@ -6569,8 +6569,10 @@ async function newPage(browser, width, height) {
         _applySensColls({ payables: [{ id: 'payL1', to: '甲乙', amount: 200000, status: 'paid', paidAt: paidAt, paidDate: '2026-09-09', date: '2026-09-09', _mt: Date.now() + 9000 }] }, {});
         out.staleRePaid = PAYABLES.find(p => p.id === 'payL1').status === 'pending';
         payMarkPaid('payL1'); document.getElementById('gen-confirm-ok').click(); out.rePaid = PAYABLES[0].status === 'paid' && PAID_LOG.payL1.paidAt > PAID_LOG.payL1.unpaidAt;
-        /* ⑥ 刪除應付（墓碑）→ 帳本清掉；同 id 重建不會被誤判已付 */
-        _tomb('payables', 'payL1'); out.tombClear = !PAID_LOG.payL1; PAYABLES[0] = { id: 'payL1', to: '甲乙', amount: 1, status: 'pending' }; savePayables(); out.rebuildPending = PAYABLES[0].status === 'pending';
+        /* ⑥ v6.0.114 批次 G3：已付的不能刪（墓碑擋下、帳本保留）；改回未付後才刪得掉 → 帳本清掉；同 id 重建不會被誤判已付 */
+        out.tombBlock = _tomb('payables', 'payL1') === false && !!PAID_LOG.payL1;
+        payUnmark('payL1'); document.getElementById('gen-confirm-ok').click();
+        _tomb('payables', 'payL1'); out.tombClear = out.tombBlock && !PAID_LOG.payL1; PAYABLES[0] = { id: 'payL1', to: '甲乙', amount: 1, status: 'pending' }; savePayables(); out.rebuildPending = PAYABLES[0].status === 'pending';
         /* ⑦ 私有上傳內容含帳本 */
         out.payload = !!_privatePayload().data.paidLog;
         Object.keys(PAID_LOG).forEach(k => delete PAID_LOG[k]); PAYABLES.length = 0;
@@ -6619,7 +6621,7 @@ async function newPage(browser, width, height) {
       try {
         P.sales = []; Q.length = 0; INV.length = 0; PAYABLES.length = 0; CONTRACTS.splice(0);
         Q.push({ id: 'qK', name: '佣金案K', client: '甲營造', date: '2026-10-01', awarded: true, items: [{ desc: 'H型鋼樁 打設', unit: '支', qty: 100, price: 1000, sec: false }], exs: [], rmk: {}, t: { sub: 100000, total: 105000 } });
-        Q.push({ id: 'qK2', name: '佣金案K 追加', client: '甲營造', parentId: 'qK', date: '2026-10-05', items: [], t: { sub: 20000, total: 21000 } });
+        Q.push({ id: 'qK2', name: '佣金案K 追加', client: '甲營造', parentId: 'qK', awarded: true, date: '2026-10-05', items: [], t: { sub: 20000, total: 21000 } });   // v6.0.114：抽成／佣金基數＝合約未稅（主約＋已得標追加）
         Q.push({ id: 'qR', name: '舊獎金案R', client: '乙營造', date: '2026-09-01', awarded: true, items: [], t: { sub: 300000, total: 315000 }, referral: { name: '老張', who: '中間人', mode: 'pct', rate: 2, cap: null, amount: 6000 } });
         PAYABLES.push({ id: 'comm_qR', kind: 'commission', to: '老張', project: '舊獎金案R', quoteId: 'qR', amount: 6000, status: 'paid', paidDate: '2026-09-20', paidAt: 1 });
         go('quotes'); renderList();
@@ -8540,6 +8542,38 @@ async function newPage(browser, width, height) {
     check('v6.0.114 批次 G3（D）：預付款抵扣用含稅口徑——預付款 359,988 未稅＝377,987 含稅，兩期抵扣含稅合計剛好 377,987，總付款＝兩期含稅 735,000，期別備註標含稅', r.advIncl === 377987 && r.totalPaid === r.netIncl && r.p1 === 210000 && r.p2 === 147013 && r.note1 === '抵扣預付款 210,000（含稅）' && !r.err, JSON.stringify(r));
     check('v6.0.114 批次 G3 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
+  }
+
+  // ── v6.0.114 beta 不寫雲端（實際攔截 Firebase 連線）：beta 存報價＋各上傳路徑 → 寫入框數 0；test.html 對照組要有寫入 ──
+  {
+    const SDK_DIR = process.env.FJ_FB_SDK_DIR || '';   // 雲端容器連不到 gstatic 時，指到 npm 套件 firebase@10.12.0 的資料夾
+    const probe = async (file) => {
+      const ctx = await browser.newContext(); await ctx.addInitScript(_fakeClock);
+      const page = await ctx.newPage(); const frames = [];
+      if (SDK_DIR) await page.route(/gstatic\.com\/firebasejs\/.*\/(firebase-[a-z]+-compat\.js)/, r => { const f = r.request().url().match(/(firebase-[a-z]+-compat\.js)/)[1]; r.fulfill({ body: require('fs').readFileSync(path.join(SDK_DIR, f)), contentType: 'application/javascript' }); });
+      await page.route(/googleapis\.com|firebasestorage/, r => r.abort());
+      await page.routeWebSocket(/firebasedatabase\.app|firebaseio\.com/, ws => {
+        ws.send(JSON.stringify({ t: 'c', d: { t: 'h', d: { ts: Date.now(), v: '5', h: 'fj-system-test-default-rtdb.asia-southeast1.firebasedatabase.app', s: 's1' } } }));
+        ws.onMessage(m => { const t = String(m); frames.push(t); try { const j = JSON.parse(t); if (j.t === 'd' && j.d && j.d.r) ws.send(JSON.stringify({ t: 'd', d: { r: j.d.r, b: { s: 'ok', d: '' } } })); } catch (e) { /* 可忽略 */ } });
+      });
+      await page.goto('file://' + path.join(__dirname, '..', file)); await page.waitForTimeout(3000);
+      const info = await page.evaluate(async () => {
+        const o = { sdk: typeof firebase !== 'undefined' && !!_fbDb, env: FY_ENV };
+        if (!o.sdk) return o;
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'u1', getIdToken: () => Promise.resolve('x') }; _roState = 'rw';
+        Q.unshift({ id: 'qProbe', name: '測試123', client: '甲', date: '2026-10-15', items: [{ desc: 'A', unit: 'M', qty: 1, price: 100 }], t: { sub: 100, total: 105 }, _mt: Date.now() });
+        const run = f => { try { const r = f(); if (r && r.catch) r.catch(() => { /* 可忽略 */ }); } catch (e) { /* 可忽略 */ } };
+        run(() => persist()); run(() => _autoUpload()); run(() => _immediateUpload()); run(() => _pushCloud({ silent: true })); run(() => _pushPrivate(() => { /* 可忽略 */ }));
+        run(() => logActivity('測試', 'x')); run(() => _syncAccessLists()); run(() => _pushRelayCosts()); run(() => _fbDb.ref('fydata/shared/quotes/qProbe').update({ name: 'x' }));
+        await new Promise(r => setTimeout(r, 5000));
+        return o;
+      });
+      await ctx.close();
+      return { info, writes: frames.filter(f => /"a":"(p|m)"/.test(f)).length };
+    };
+    const rb = await probe('beta.html'), rt = await probe('test.html');
+    if (!rb.info.sdk || !rt.info.sdk) check('v6.0.114 beta 不寫雲端（實際攔截 Firebase 連線）', true, '略過：Firebase 套件沒載入（容器連不到 gstatic 時設 FJ_FB_SDK_DIR）');
+    else check('v6.0.114 beta 存報價＋所有上傳路徑：實際送往 Firebase 的寫入是 0 筆（test.html 對照組有寫入，證明攔截有效）', rb.writes === 0 && rt.writes > 0 && rb.info.env === 'test', JSON.stringify({ beta: rb.writes, test: rt.writes }));
   }
 
   await browser.close();

@@ -2896,7 +2896,8 @@ function _invStoreRead(){
 }
 
 try{var _invLoaded=_invStoreRead();if(_invLoaded){INV=_invLoaded;const _before=INV.length;INV=INV.filter(function(inv){return inv&&(inv.project||inv.client||inv.id);});if(INV.length!==_before){try{_invStoreWrite();}catch(e){_err('_invStoreRead',e);}}}}catch(e){_err('_invStoreRead',e);}
-function _salesCommSoon(){if(window._applyingCloud)return;clearTimeout(_salesCommSoon._t);_salesCommSoon._t=setTimeout(function(){try{_salesCommSyncAll();}catch(e){_err('_salesCommSoon',e);}},800);}   // 批次 G3（Lotion 10/27）：開第一期請款單／簽合約後抽成才到期
+function _salesCommOk(){try{return !window._applyingCloud&&(!_fbUser||(_isAdminUser&&!_isReaderUser&&typeof _privReadOk!=='undefined'&&_privReadOk===true));}catch(e){return false;}}   // 審查：只在讀得到 private 的管理員裝置（或未登入的本機模式）重算，免得用不完整的應付蓋掉雲端
+function _salesCommSoon(){if(!_salesCommOk())return;clearTimeout(_salesCommSoon._t);_salesCommSoon._t=setTimeout(function(){if(!_salesCommOk())return;try{_salesCommSyncAll();}catch(e){_err('_salesCommSoon',e);}},800);}   // 批次 G3（Lotion 10/27）：開第一期請款單／簽合約後抽成才到期
 function saveInv(){try{_salesCommSoon();}catch(e){_err('saveInv.sales',e);}
   // 儲存前自動清理空白資料（確保 badge 與列表一致）
   INV=INV.filter(function(inv){return inv&&(inv.project||inv.client||inv.id);});
@@ -7553,7 +7554,7 @@ function updateDashAR(){
     const ic=document.getElementById('dash-inv-count');if(ic)ic.textContent=INV.length+' 件';
     const apSum=document.getElementById('dash-ap-summary');
     if(apSum){
-      const pending=PAYABLES.filter(p=>p.status==='pending');
+      const pending=PAYABLES.filter(p=>p.status==='pending'&&!p.voidAt&&!p.planned);
       const totalAP=pending.reduce((a,p)=>a+_payEff(p),0);
       apSum.innerHTML=pending.length?
         '<div style="font-size:20px;font-weight:800">NT$ '+fmt(totalAP)+'</div>'+
@@ -25536,7 +25537,7 @@ function renderVendors(){
   el.innerHTML=list.map(v=>{
     // 計算此廠商的應付帳款
     var vPayables=PAYABLES.filter(function(p){return (p.to||'')===(v.name||'');});
-    var vUnpaid=vPayables.filter(function(p){return p.status!=='paid';}).reduce(function(s,p){return s+_payEff(p);},0);
+    var vUnpaid=vPayables.filter(function(p){return p.status!=='paid'&&!p.voidAt&&!p.planned;}).reduce(function(s,p){return s+_payEff(p);},0);
     var vTotal=vPayables.reduce(function(s,p){return s+_payEff(p);},0);
     return`<div class="ql" style="cursor:default">
       <div class="qdot" style="background:${typeClr[v.type]||'var(--b2)'}"></div>
@@ -26316,6 +26317,7 @@ function renderPayables(){
     if(!window._payAging||_payAging==='all')return true;
     if(_payAging==='paid')return p.status==='paid';
     if(p.status==='paid')return false;
+    if(p.planned)return false;   // 批次 G3：預計（還沒到期點）的只在「全部」列出
     if(_payAging==='unpaid')return true;   // v5.318 待付（與應付 KPI 同口徑）
     if(_payAging==='overdue')return p.date&&p.date<_today;
     if(_payAging==='w7')return p.date&&p.date>=_today&&p.date<=_in7;
@@ -26346,7 +26348,8 @@ function renderPayables(){
     if(a.status==='paid'&&b.status!=='paid')return 1;
     if(a.status!=='paid'&&b.status==='paid')return -1;
     if(a.status==='paid'&&b.status==='paid')return new Date(b.paidDate||b.date)-new Date(a.paidDate||a.date);
-    return new Date(a.date)-new Date(b.date); // 未付：日期近的排前
+    if(!!a.planned!==!!b.planned)return a.planned?1:-1;   // 預計的排在待付後面
+    return new Date(a.date||'2999-12-31')-new Date(b.date||'2999-12-31'); // 未付：日期近的排前
   });
   // 廠商分組模式判斷
   var _payMode=document.getElementById('payable-group-mode')?document.getElementById('payable-group-mode').value:'project';
@@ -26364,7 +26367,7 @@ function renderPayables(){
     vorder.forEach(function(vname){
       var ps=vgroups[vname];
       var vTotal=ps.reduce(function(s,p){return s+_payEff(p);},0);
-      var vUnpaid=ps.filter(function(p){return p.status!=='paid';}).reduce(function(s,p){return s+_payEff(p);},0);
+      var vUnpaid=ps.filter(function(p){return p.status!=='paid'&&!p.voidAt&&!p.planned;}).reduce(function(s,p){return s+_payEff(p);},0);
       var vPaid=vTotal-vUnpaid;
       var gkey=_payMode+':'+vname;
       var gExpanded=window._payGroupState[gkey]!==false;   // 預設展開，可收合
@@ -35512,7 +35515,7 @@ function payMarkPaid(pid,defDate,after){
   if(p.voidAt){toast('這筆已作廢（'+(p.voidReason||'')+'），不用付款');return;}
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   showConfirm('標記已付：'+esc(p.to||''),'<div style="font-size:12.5px;line-height:1.8">'+esc((p.note||'').slice(0,60))+'<br>應付 NT$ <b>'+fmt(_payEff(p))+'</b>（'+(p.vat===false?'不含稅':'含稅')+'）'+(_vendorBank(p.to)?'<br>'+_bankLine(p.to):'')+'</div><div class="f" style="margin-top:6px"><label>實付日</label><input id="pmp-date" type="date" value="'+esc(p.paidDate||defDate||p.date||localToday())+'" style="'+IN+'"></div>',function(){
-    p.status='paid';p.paidDate=gv('pmp-date')||defDate||localToday();p.paidAt=_payStamp(p);_touch(p);
+    p.status='paid';delete p.planned;p.paidDate=gv('pmp-date')||defDate||localToday();p.paidAt=_payStamp(p);_touch(p);
     try{savePayables();_onSave();}catch(er){_err('payMarkPaid',er);}
     try{rCostItems();}catch(er){_err('payMarkPaid',er);}try{if(typeof after==='function')after();}catch(er){_err('payMarkPaid',er);}toast('已標記已付');
   },false,null,false);
@@ -36688,8 +36691,9 @@ var _SALES_PAYON={firstInv:'第一期請款單送出',contract:'合約簽訂'};
 function _salesPayOn(q){return (q&&q.salesPayOn==='contract')?'contract':'firstInv';}
 function _salesDueFrom(q){
   if(!q)return '';
-  if(_salesPayOn(q)==='contract'){var ct=(CONTRACTS||[]).find(function(c){return c&&c.linkedQid===q.id;});return ct?String(ct.signDate||ct.date||'').slice(0,10):'';}
-  var ds=(INV||[]).filter(function(i){return i&&i.kind!=='retReturn'&&(i.quoteId===q.id||i.sourceQid===q.id)&&i.date;}).map(function(i){return String(i.date).slice(0,10);}).sort();
+  if(_salesPayOn(q)==='contract'){var ct=(CONTRACTS||[]).find(function(c){return c&&c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return c&&!c.linkedQid&&c.name&&c.name===q.name;});return ct?String(ct.signDate||ct.date||'').slice(0,10):'';}
+  var qn=String(q.name||'').trim();
+  var ds=(INV||[]).filter(function(i){return i&&i.kind!=='retReturn'&&i.date&&(i.quoteId===q.id||i.sourceQid===q.id||(!i.quoteId&&!i.sourceQid&&qn&&String(i.project||'').trim()===qn));})   // 審查：舊請款單只用工程名稱歸戶的也算.map(function(i){return String(i.date).slice(0,10);}).sort();
   return ds[0]||'';
 }
 // v6.0.76 抽成三種方式：rev＝營收%（未稅合約×%）、profit＝毛利%（(未稅合約−成本)×%；成本＝實際施工成本，尚無成本以報價預估成本代）、amt＝每案固定額。
@@ -37141,7 +37145,8 @@ function _commSync(q){   // 得標＋佣金>0 → 每位收款人一筆應付（
     var cfg=_salesCommNorm(c),id=_commPayId(q,c),amt=q.awarded?_commDueFor(q,cfg):0;
     var p=(PAYABLES||[]).find(function(x){return x&&x.id===id;});
     if(amt>0){
-      keep[id]=1;var isNew=!p;if(!p){p={id:id,status:'pending',createdAt:Date.now()};PAYABLES.unshift(p);}
+      keep[id]=1;if(p&&_payPaidHard(p))return;   // 批次 G3：已付的佣金不改寫
+      var isNew=!p;if(!p){p={id:id,status:'pending',createdAt:Date.now()};PAYABLES.unshift(p);}
       var before=_recSig(p);_payVoidOff(p);
       p.kind='commission';p.to=c.name;p.project=q.name||'';p.quoteId=q.id;p.amount=amt;p.vat=false;p.category='other';
       p.note='業主端佣金（'+(c.role||'')+'）・'+_commTxtFor(q,cfg)+(cfg.mode==='unit'?'・依業主請款數量實作實算':'・依實收款進度支付')+(c.note?('・'+c.note):'');
@@ -37334,6 +37339,7 @@ function _payAuditMerge(remote){   // 跨裝置聯集（以 k 去重）
 }
 function _payAuditOf(id){return PAY_AUDIT.filter(function(a){return a&&a.id===id;});}
 function _payLedgerWarn(p){   // 帳本記載已付、記錄卻待付 → 紅色警示（確認前不要再匯）
+  if(p&&p.id&&p.status!=='paid'&&p.planned)return '<span class="bdg" style="background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;font-size:10px" title="還沒到期點，不算待付、不進逾期與金流">預計</span>';   // 批次 G3（Lotion 10/27）
   if(p&&p.id&&p.status!=='paid'&&p.healAsk)return '<span class="bdg pay-ledger-warn" style="background:#fdecea;color:#c62828;border:1px solid #f5b5ae;font-size:10px;cursor:pointer" onclick="event.stopPropagation();openPayAudit(\''+p.id+'\')" title="這筆曾經已付、被刪除後重建成待付，但金額和付款時不同；確認是否已付過再匯款">⚠ 曾已付、金額不同</span>';   // 批次 G3
   if(!p||!p.id||p.status==='paid'||typeof PAID_LOG==='undefined')return '';
   var l=PAID_LOG[p.id];if(!l||!((l.paidAt||0)>(l.unpaidAt||0)))return '';
