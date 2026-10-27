@@ -132,6 +132,24 @@ module.exports = [
     }
   },
   {
+    id: 'A14b', items: [14], status: '正確',
+    title: '分期成本卡（預付款 359,988 未稅＋兩期）全部已付後，在別張報價與這張報價各按儲存：已付 3 筆、付款帳本 3 筆不變；預付款抵扣改含稅口徑',
+    hand: '預付 359,988×1.05＝377,987；第 1 期 400,000×1.05＝420,000，抵扣 200,000/359,988×377,987＝210,000 → 應付 210,000；第 2 期 315,000－167,987＝147,013；合計 735,000＝兩期含稅',
+    run: async () => {
+      const card = { id: 'cA14b', type: 'sub', vendor: '乙工程行', amt: 1000000, invoice: true, rows: [{ id: 'r1', linkedItemIdx: 0, qty: 1000, unitPrice: 1000 }],
+        advances: [{ id: 'a1', amt: 359988, date: '2026-09-01' }],
+        periods: [{ no: 1, date: '2026-09-30', rows: [{ rid: 'r1', qty: 400 }], adv: 200000 }, { no: 2, date: '2026-10-31', rows: [{ rid: 'r1', qty: 300 }], adv: 159988 }] };
+      Q = [{ id: 'qA14b', name: '範例工程A14b', client: '甲營造', awarded: true, items: [{ desc: '鋼板樁', unit: 'M', qty: 1000, price: 1200 }], t: {}, costs: [card], exs: [], rmk: {}, _mt: 1 },
+        { id: 'qA14c', name: '範例工程A14c', client: '甲營造', items: [{ desc: 'A', unit: 'M', qty: 1, price: 1 }], t: {}, costs: [], exs: [], rmk: {}, _mt: 1 }];
+      _syncSubPeriodPayables(Q[0], card);
+      PAYABLES.filter(p => p.costId === 'cA14b').forEach(p => { payMarkPaid(p.id, '2026-10-05'); __synOk(); });
+      loadQ('qA14c'); saveQ(); loadQ('qA14b'); saveQ();
+      const mine = PAYABLES.filter(p => p.costId === 'cA14b');
+      return { paid: mine.filter(p => p.status === 'paid').length, ledger: Object.keys(PAID_LOG).filter(k => PAID_LOG[k].paidAt > (PAID_LOG[k].unpaidAt || 0)).length,
+        payEff: mine.map(p => p.id + ':' + _payEff(p)).sort(), total: mine.reduce((a, p) => a + _payEff(p), 0) };
+    }
+  },
+  {
     id: 'A15', items: [15], status: '正確',
     title: '分段工項（裝設 40 支×500）登錄廠商請款：預覽單價帶得到 500',
     hand: '單價 500（原本多一個引號，預覽全是 0、預付款永遠不扣回）',

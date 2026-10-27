@@ -66,6 +66,16 @@
    75
   ]
  },
+ "A14b": {
+  "paid": 3,
+  "ledger": 3,
+  "payEff": [
+   "paycA14b_aa1:377987",
+   "paycA14b_p1:210000",
+   "paycA14b_p2:147013"
+  ],
+  "total": 735000
+ },
  "A15": {
   "dataPrice": "500",
   "dataTotal": "40"

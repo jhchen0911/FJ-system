@@ -8455,6 +8455,68 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.114 批次 G3：已付應付不被 saveQ 去重刪掉、不被墓碑刪、被刪重建的恢復已付；預付款抵扣含稅口徑 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+  const out = {};
+  try {
+    const oT = window.toast; let msg = []; window.toast = m => { msg.push(String(m)); };
+    PAYABLES.length = 0; INV.length = 0; CONTRACTS.splice(0); try { Object.keys(PAID_LOG).forEach(k => delete PAID_LOG[k]); } catch (e) { /* 可忽略 */ }
+    P.tax = 5;
+    const card = { id: 'cG3', type: 'sub', vendor: '乙工程行', amt: 1000000, invoice: true,
+      rows: [{ id: 'r1', linkedItemIdx: 0, qty: 1000, unitPrice: 1000 }],
+      advances: [{ id: 'a1', amt: 359988, date: '2026-09-01' }],
+      periods: [{ no: 1, date: '2026-09-30', rows: [{ rid: 'r1', qty: 400 }], adv: 200000 }, { no: 2, date: '2026-10-31', rows: [{ rid: 'r1', qty: 300 }], adv: 159988 }] };
+    Q = [{ id: 'qG3', name: '範例工程G3', client: '甲營造', awarded: true, items: [{ desc: '鋼板樁', unit: 'M', qty: 1000, price: 1200 }], t: {}, costs: [card], exs: [], rmk: {}, _mt: 1 },
+         { id: 'qG3b', name: '範例工程G3乙', client: '甲營造', items: [{ desc: 'A', unit: 'M', qty: 1, price: 1 }], t: {}, costs: [], exs: [], rmk: {}, _mt: 1 }];
+    _syncSubPeriodPayables(Q[0], card);
+    const ids = PAYABLES.filter(p => p.costId === 'cG3').map(p => p.id).sort();
+    out.ids = ids.join(',');
+    PAYABLES.filter(p => p.costId === 'cG3').forEach(p => { payMarkPaid(p.id, '2026-10-05'); document.getElementById('gen-confirm-ok').click(); });
+    const paidBefore = PAYABLES.filter(p => p.status === 'paid').length, plBefore = Object.keys(PAID_LOG).filter(k => PAID_LOG[k].paidAt).length;
+    out.paidBefore = paidBefore;
+    /* 在別的報價與這張報價各按一次存檔 */
+    loadQ('qG3b'); saveQ(); loadQ('qG3'); saveQ();
+    out.paidAfter = PAYABLES.filter(p => p.status === 'paid').length;
+    out.plAfter = Object.keys(PAID_LOG).filter(k => PAID_LOG[k].paidAt && PAID_LOG[k].paidAt > (PAID_LOG[k].unpaidAt || 0)).length;
+    out.plBefore = plBefore;
+    /* D：預付款含稅 377,987＝兩期抵扣含稅合計 */
+    const pa = PAYABLES.find(p => p.costAdv === 'a1'), p1 = PAYABLES.find(p => p.id === 'paycG3_p1'), p2 = PAYABLES.find(p => p.id === 'paycG3_p2');
+    out.advIncl = pa ? _payEff(pa) : null;
+    out.totalPaid = PAYABLES.filter(p => p.costId === 'cG3').reduce((a, p) => a + _payEff(p), 0);
+    out.netIncl = Math.round(400000 * 1.05) + Math.round(300000 * 1.05);
+    out.p1 = p1 ? _payEff(p1) : null; out.p2 = p2 ? _payEff(p2) : null;
+    out.note1 = p1 ? (p1.note.match(/抵扣預付款 [\d,]+(（含稅）)?/) || [''])[0] : '';
+    /* B：_tomb 擋已付；delPayable 擋已付 */
+    out.tombBlock = (typeof _tomb('payables', 'paycG3_p1') === 'boolean') ? (TOMBS.payables && TOMBS.payables['paycG3_p1'] != null ? 'tombed' : 'blocked') : (TOMBS.payables && TOMBS.payables['paycG3_p1'] != null ? 'tombed' : 'blocked');
+    out.plKept = !!PAID_LOG['paycG3_p1'];
+    /* 自動流程硬刪 → savePayables 救回 */
+    PAYABLES = PAYABLES.filter(p => p.id !== 'paycG3_p2'); savePayables();
+    out.vanishBack = PAYABLES.some(p => p.id === 'paycG3_p2' && p.status === 'paid');
+    /* C：曾經已付、被（舊版）刪掉後重建成待付 → 依付款稽核恢復；金額不同只提醒 */
+    const mk = (id, amt) => ({ id, costId: 'cX', to: '丙', amount: amt, vat: false, status: 'pending', project: '範例工程G3' });
+    PAYABLES.push(mk('payHeal1', 5000), mk('payHeal2', 6000));
+    PAY_AUDIT.unshift({ k: 'h1', id: 'payHeal1', from: 'paid', to: '（已刪除）', at: Date.now() - 5000, amt: 5000, pd: '2026-10-25', lp: Date.now() - 9000 },
+                      { k: 'h2', id: 'payHeal2', from: 'paid', to: '（已刪除）', at: Date.now() - 5000, amt: 5500, pd: '2026-10-25', lp: Date.now() - 9000 });
+    savePayables();
+    const h1 = PAYABLES.find(p => p.id === 'payHeal1'), h2 = PAYABLES.find(p => p.id === 'payHeal2');
+    out.heal = h1.status === 'paid' && h1.paidDate === '2026-10-25' && !!PAID_LOG['payHeal1'];
+    out.healAsk = h2.status !== 'paid' && !!h2.healAsk;
+    /* 已付不能從應付管理直接刪 */
+    msg = []; delPayable('payHeal1'); out.delBlock = PAYABLES.some(p => p.id === 'payHeal1') && msg.some(m => /改回未付/.test(m));
+    window.toast = oT;
+  } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+  return out;
+});
+
+    check('v6.0.114 批次 G3：分期成本卡（預付款＋兩期）都已付後，在別張報價與這張報價各按儲存，已付筆數與付款帳本不變（原本 3 筆剩 1 筆）', r.paidBefore === 3 && r.paidAfter === 3 && r.plBefore === 3 && r.plAfter === 3 && !r.err, JSON.stringify(r));
+    check('v6.0.114 批次 G3：已付應付不立墓碑、付款帳本不刪；自動流程硬刪會被存檔前救回；應付管理不能直接刪已付；被刪後重建成待付的依付款稽核恢復已付（金額不同只提醒）', r.tombBlock === 'blocked' && r.plKept && r.vanishBack && r.heal && r.healAsk && r.delBlock && !r.err, JSON.stringify(r));
+    check('v6.0.114 批次 G3（D）：預付款抵扣用含稅口徑——預付款 359,988 未稅＝377,987 含稅，兩期抵扣含稅合計剛好 377,987，總付款＝兩期含稅 735,000，期別備註標含稅', r.advIncl === 377987 && r.totalPaid === r.netIncl && r.p1 === 210000 && r.p2 === 147013 && r.note1 === '抵扣預付款 210,000（含稅）' && !r.err, JSON.stringify(r));
+    check('v6.0.114 批次 G3 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
