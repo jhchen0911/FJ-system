@@ -8546,6 +8546,40 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.115 批次 G4：沒付的預付款不再藏起來（待付合計算了、列表卻看不到）；「全付」不含已抵扣預付款；開機後重算一次抽成 ──
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+  const out={};
+  try{
+    const d=n=>{const x=new Date();x.setDate(x.getDate()+n);return x.toISOString().slice(0,10);};
+    Q=[{id:'qM',code:'M',name:'材料案',client:'業主',date:d(-60),awarded:true,exs:[],rmk:{},_mt:1,site:{P:100,A:1000,layers:1,L:[{w:'H350',s:'H350'}]},
+      items:[{desc:'H型鋼樁 H300, L=15M@80cm（含30天租期）',unit:'支',qty:'40',price:'1000',sec:false,_uid:'m1'},{desc:'水平支撐系統 H350（含90天租期）',unit:'式',qty:'1',price:'500000',sec:false,_uid:'m2'}],t:{sub:100000,tax:5000,total:105000},dailyLogs:[],
+      costs:[{id:'cM',type:'sub',vendor:'甲',cat:'打設',date:d(-50),invoice:true,retRate:0,linkedItemIdx:0,rows:[{id:'r1',linkedItemIdx:0,qty:40,unitPrice:1000}],amt:40000,advances:[{id:'a1',date:d(-10),amt:10000}],periods:[{no:1,date:d(-5),rows:[{rid:'r1',qty:40}],adv:10000}]}]}];
+    eid='qM';PAYABLES.length=0;Q[0].costs.forEach(c=>syncCostToPayable(Q[0],c));
+    const adv=PAYABLES.find(p=>p.id==='paycM_aa1'),per=PAYABLES.find(p=>p.id==='paycM_p1');
+    out.ids=PAYABLES.map(p=>p.id+':'+p.status);
+    const listHas=id=>{go('acct');acctTab('ap');window._payAging='all';renderPayables();return [...document.getElementById('payable-list').querySelectorAll('.ql')].some(x=>x.innerHTML.includes(id));};
+    // ① 預付款沒付 → 列表看得到、待付合計有它
+    out.pendShown=!!adv&&adv.status!=='paid'&&_payHiddenAdv(adv)===false&&listHas('paycM_aa1')&&_apList().some(p=>p.id==='paycM_aa1');
+    out.allIncl=_payVendorOthers(per).some(p=>p.id==='paycM_aa1');
+    // ② 預付款已付 → 併進期別卡、不在列表；第 1 期的「全付」不會把它算進去
+    adv.status='paid';adv.paidDate='2026-10-05';adv.paidAt=Date.now();
+    out.paidHidden=_payHiddenAdv(adv)===true&&!listHas('paycM_aa1')&&!_payVendorOthers(per).some(p=>p.id==='paycM_aa1')&&!/全付/.test(_payVendorAllBtn(per));
+    // ③ 開機重算抽成：本機模式呼叫一次就跑一次，第二次不重跑；私有資料下載完會呼叫
+    let n=0;const o=window._salesCommSyncAll;window._salesCommSyncAll=function(){n++;};
+    _salesCommBoot();_salesCommBoot();
+    setTimeout(()=>{out.bootOnce=n===1;_salesCommBoot();setTimeout(()=>{out.bootStill=n===1;window._salesCommSyncAll=o;
+      out.pullHook=/_salesCommBoot\(\)/.test(String(_pullPrivate));res(out);},2600);},2600);
+  }catch(e){out.err=String(e&&e.stack||e);res(out);}
+    }));
+    check('v6.0.115 批次 G4：沒付的預付款即使已被期別抵扣完也顯示在應付列表（待付合計與列表一致），同廠商「全付」會列出它', r.pendShown && r.allIncl, JSON.stringify(r));
+    check('v6.0.115 批次 G4：預付款已付才併進期別卡；第 1 期「全付」不會把已抵扣的預付款一起標成已付', r.paidHidden, JSON.stringify(r));
+    check('v6.0.115 批次 G4：私有資料下載完後重算一次業務抽成（只跑一次）', r.bootOnce && r.bootStill && r.pullHook, JSON.stringify(r));
+    check('v6.0.115 批次 G4 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.114 beta 不寫雲端（實際攔截 Firebase 連線）：beta 存報價＋各上傳路徑 → 寫入框數 0；test.html 對照組要有寫入 ──
   {
     const SDK_DIR = process.env.FJ_FB_SDK_DIR || '';   // 雲端容器連不到 gstatic 時，指到 npm 套件 firebase@10.12.0 的資料夾

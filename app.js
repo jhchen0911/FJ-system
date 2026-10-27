@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.114';
+var APP_VERSION='v6.0.115';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -2897,6 +2897,7 @@ function _invStoreRead(){
 
 try{var _invLoaded=_invStoreRead();if(_invLoaded){INV=_invLoaded;const _before=INV.length;INV=INV.filter(function(inv){return inv&&(inv.project||inv.client||inv.id);});if(INV.length!==_before){try{_invStoreWrite();}catch(e){_err('_invStoreRead',e);}}}}catch(e){_err('_invStoreRead',e);}
 function _salesCommOk(){try{return !window._applyingCloud&&(!_fbUser||(_isAdminUser&&!_isReaderUser&&typeof _privReadOk!=='undefined'&&_privReadOk===true));}catch(e){return false;}}   // 審查：只在讀得到 private 的管理員裝置（或未登入的本機模式）重算，免得用不完整的應付蓋掉雲端
+function _salesCommBoot(){if(_salesCommBoot._done)return;setTimeout(function(){if(_salesCommBoot._done||!_salesCommOk())return;_salesCommBoot._done=1;_salesCommSoon();},1500);}   // 批次 G4：開機（私有資料下載完）後重算一次抽成，改版後的算法不必等人去開報表
 function _salesCommSoon(){if(!_salesCommOk())return;clearTimeout(_salesCommSoon._t);_salesCommSoon._t=setTimeout(function(){if(!_salesCommOk())return;try{_salesCommSyncAll();}catch(e){_err('_salesCommSoon',e);}},800);}   // 批次 G3（Lotion 10/27）：開第一期請款單／簽合約後抽成才到期
 function saveInv(){try{_salesCommSoon();}catch(e){_err('saveInv.sales',e);}
   // 儲存前自動清理空白資料（確保 badge 與列表一致）
@@ -10558,6 +10559,7 @@ function _pullPrivate(cb){
     }
     try{_pullRelayCosts();}catch(e){_err('_pullPrivate',e);}
     try{_pullRelayExpenses();}catch(e){_err('_pullPrivate',e);}
+    try{_salesCommBoot();}catch(e){_err('_pullPrivate.sales',e);}
     if(cb)cb(true);
   }).catch(function(err){
     _privReadOk=false;
@@ -34891,7 +34893,7 @@ function _saQuickChips(c){
   return B(Math.round(rest/2),'餘額一半')+B(rest,'餘額全部')+'<span style="color:var(--b3)">（發包未稅 '+fmt(Math.round(parseFloat(c.amt)||0))+'，已預付 '+fmt(adv)+'）</span>';
 }
 // ── 2 應付：同廠商同工程的待付一併付款 ──
-function _payVendorOthers(p){return (PAYABLES||[]).filter(function(x){return x&&x.id!==p.id&&x.status!=='paid'&&!x.voidAt&&!x.planned&&(x.to||'')===(p.to||'')&&(x.project||'')===(p.project||'');});}
+function _payVendorOthers(p){return (PAYABLES||[]).filter(function(x){return x&&x.id!==p.id&&x.status!=='paid'&&!x.voidAt&&!x.planned&&!_payHiddenAdv(x)&&(x.to||'')===(p.to||'')&&(x.project||'')===(p.project||'');});}   // 批次 G4：「全付」不含併在期別卡裡的已抵扣預付款
 function _payVendorAllBtn(p){var n=_payVendorOthers(p).length;return n?'<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" title="同廠商、同工程的待付一起標記付款" onclick="payVendorAll(\''+p.id+'\')">全付 '+(n+1)+' 筆</button>':'';}
 function payVendorAll(pid){
   var p=(PAYABLES||[]).find(function(x){return x.id===pid;});if(!p)return;
@@ -35702,6 +35704,7 @@ function _payAdvUsed(c,per){var out=[];_subAdvs(c).forEach(function(a){_subAdvUs
 function _payHiddenAdv(p){
   try{
     if(!p||!p.costAdv||!p.costId)return false;
+    if(p.status!=='paid')return false;   // 批次 G4：沒付的預付款一律顯示（否則待付合計算了、列表卻看不到）
     var f=_payCostOf(p);if(!f)return false;var c=f.c;
     var a=_subAdvs(c).find(function(x){return x.id===p.costAdv;});if(!a)return false;
     var us=_subAdvUsedBy(c,a),used=us.reduce(function(s,u){return s+u.amt;},0);
