@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.115';
+var APP_VERSION='v6.0.116';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -21353,7 +21353,7 @@ function addOwnRow(cid,preset,unit){
   const q=Q.find(x=>x.id===eid);if(!q)return;
   const cc=(q.costs||[]).find(x=>x.id===cid);if(!cc)return;
   if(!cc.rows)cc.rows=[];
-  cc.rows.push({id:cid+'_'+Date.now(),preset:preset||'',desc:'',qty:1,unit:unit||'',unitPrice:0});
+  cc.rows.push({id:_uid(cid+'_'),preset:preset||'',desc:'',qty:1,unit:unit||'',unitPrice:0});
   _ownAutoCat(cc);recalcCostAmt(cc);_touch(q);try{syncCostToPayable(q,cc);}catch(e){_err('addOwnRow.pay',e);}try{persist();}catch(e){_err('addOwnRow',e);}   // v6.0.70 明細變動即同步應付
   rCostItems();
   setTimeout(function(){
@@ -23333,7 +23333,7 @@ function addCostRow(cid){
   if(!q||!q.costs)return;
   var cc=q.costs.find(function(x){return x.id===cid;});
   if(!cc)return;
-  var rid=cid+'_'+Date.now().toString(36);
+  var rid=_uid(cid+'_');   // v6.0.116：同一毫秒連加兩列不再撞編號（之前改數量會改到另一列）
   if(cc.type==='sub'){
     cc.rows.push({id:rid,linkedItemIdx:-1,desc:'',qty:0,unitPrice:0});   // v5.403：數量待選工項後自動帶合約量
   } else {
@@ -23388,7 +23388,7 @@ function addCostQuickRow(cid,name){
   const q=Q.find(x=>x.id===eid);if(!q||!q.costs)return;
   const cc=q.costs.find(x=>x.id===cid);if(!cc)return;
   if(!cc.rows)cc.rows=[];
-  const rid=cid+'_'+Date.now();
+  const rid=_uid(cid+'_');
   cc.rows.push({id:rid,subType:'misc',desc:name,reason:'',days:1,dayRate:0,transport:0});
   recalcCostAmt(cc);
   _touch(q);

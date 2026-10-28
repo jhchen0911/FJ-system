@@ -5933,7 +5933,10 @@ async function newPage(browser, width, height) {
         PAYABLES.length = 0; CONTRACTS.splice(0); INV.length = 0;
         openProjectCosts('q69');
         addCostItem('own'); const c = Q[0].costs[0]; window._costEditId = c.id; updCostField(c.id, 'vendor', '丙丁企業有限公司');
+        /* v6.0.116：同一毫秒連加三列（CI 機器快時會發生）→ 列編號不能相同，否則改數量會改到另一列 */
+        const _dn = Date.now; Date.now = () => 1700000000000;
         addOwnRow(c.id, '氧氣', '支'); addOwnRow(c.id, '乙炔', '支'); addOwnRow(c.id, '止水鈑', '片');
+        Date.now = _dn; out.uniqId = new Set(c.rows.map(x => x.id)).size === 3;
         updOwnRow(c.id, c.rows[0].id, 'qty', 2); updOwnRow(c.id, c.rows[1].id, 'qty', 2); updOwnRow(c.id, c.rows[2].id, 'qty', 5);
         rCostItems();
         const card = () => document.getElementById('cost-list').innerHTML;
@@ -5969,7 +5972,7 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.69 氣瓶追蹤：氧氣／乙炔列「退回空瓶」、卡片依廠商彙總在場瓶數（跨請款單、即時更新、唯讀卡同顯、全退變綠）、材料頁同步卡不算', r.retInput && r.onsite && r.sum && r.live && r.ro && r.allBack && r.skipMat && r.cat, JSON.stringify(r));
+    check('v6.0.69 氣瓶追蹤：氧氣／乙炔列「退回空瓶」、卡片依廠商彙總在場瓶數（跨請款單、即時更新、唯讀卡同顯、全退變綠）、材料頁同步卡不算；v6.0.116 同一毫秒加的列編號不重複', r.uniqId && r.retInput && r.onsite && r.sum && r.live && r.ro && r.allBack && r.skipMat && r.cat, JSON.stringify(r));
     check('v6.0.69 完工後仍有氣瓶在場 → 工程專案待辦（緊急）與結案視窗提醒；未完工不提醒', r.todoNo && r.todo && r.close && r.notClosed, JSON.stringify(r));
     check('v6.0.69 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
