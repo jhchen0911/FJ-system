@@ -8641,12 +8641,15 @@ async function newPage(browser, width, height) {
           _pushCloud({ silent: true });
           setTimeout(() => { out.failDirty = _isDirty() === true && localStorage.getItem('fy_priv_pending') === '1';
             window._fakeFail = false; _privReadOk = true; _privFailAt = 0; _pushCloud({ silent: true });
-            setTimeout(() => { out.recovered = _isDirty() === false; _fbDb = null; _fbUser = null; _isAdminUser = false; res(out); }, 1500);
+            setTimeout(() => { out.recovered = _isDirty() === false;
+              // 管理員上傳失敗留下旗標 → 換一般員工登入：員工的私有上傳一定被拒，不能因此一直「未同步」
+              localStorage.setItem('fy_priv_pending', '1'); _isAdminUser = false; window._fakeFail = true; _privReadOk = true; _privFailAt = 0; _markDirty(); _pushCloud({ silent: true });
+              setTimeout(() => { out.staffClean = _isDirty() === false; window._fakeFail = false; _fbDb = null; _fbUser = null; _isAdminUser = false; res(out); }, 1500); }, 1500);
           }, 1500);
         }, 1500);
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
     }));
-    check('v6.0.116「未同步」：只改應付等私有資料、上傳成功後會消失；私有資料上傳被拒時顯示「未同步」，下次成功再消失', r.dirty0 && r.clean && r.failDirty && r.recovered, JSON.stringify(r));
+    check('v6.0.116「未同步」：只改應付等私有資料、上傳成功後會消失；私有資料上傳被拒時顯示「未同步」，下次成功再消失；換一般員工登入不會殘留', r.dirty0 && r.clean && r.failDirty && r.recovered && r.staffClean, JSON.stringify(r));
     check('v6.0.116「未同步」測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

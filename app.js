@@ -8045,7 +8045,7 @@ function initFirebase(){
     _fbUser = user;
     _updateFbUI(!!user);
     if(user) _minVerWatch(_autoSyncOnLogin);
-    else { _minVerOff();_isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
+    else { _minVerOff();_isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{localStorage.removeItem('fy_priv_pending');}catch(e){/* 可忽略 */}   /* v6.0.116：登出清掉私有上傳失敗旗標，換人登入不會一直「未同步」 */try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
   });
 }
 function initGoogleSignIn(){
@@ -10825,7 +10825,7 @@ function _pushCloud(opts){
     // v5.335 健檢F：私有推送必須在「shared 無變更提前 return」之前執行。
     // 原本排在 return 之後，只改費用／應付／分潤／材料（全在 private）時
     // shared 沒變 → 提前 return → 私有集合完全不上雲，還誤報「雲端已是最新」。
-    try{_pushPrivate(function(ok){try{if(ok)localStorage.removeItem('fy_priv_pending');else if(_isAdminUser&&!_isReaderUser)localStorage.setItem('fy_priv_pending','1');}catch(e){/* 可忽略 */}});}catch(e){_err('top',e);}   // v6.0.116：私有資料上傳結果另外記，「未同步」才看得到私有資料沒上去
+    try{_pushPrivate(function(ok){try{if(!ok&&_isAdminUser&&!_isReaderUser)localStorage.setItem('fy_priv_pending','1');else localStorage.removeItem('fy_priv_pending');}catch(e){/* 可忽略 */}});}catch(e){_err('top',e);}   // v6.0.116：私有資料上傳結果另外記，「未同步」才看得到私有資料沒上去
     try{_pushRelayCosts();}catch(e){_err('top',e);}
     try{_pushRelayExpenses();}catch(e){_err('top',e);}
     if(!opts.full&&baseHashes&&changed.length===0&&!perRec.hasWork&&!mlWork){
