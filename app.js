@@ -10933,7 +10933,7 @@ function _pullPrivateIfNewer(){
         _pullPrivate(function(ok){
           if(ok){try{localStorage.setItem('fy_last_priv_sync',String(ct));}catch(e){_err('_pullPrivateIfNewer',e);}}
         });
-      }else if(ct===0){_privReadOk=true;}
+      }else{_privReadOk=true;try{_salesCommBoot();}catch(e){_err('_pullPrivateIfNewer.sales',e);}}   // v6.0.116：讀得到私有節點時間戳＝有讀取權限、本機已是最新；開機重算抽成原本只掛在「真的下載」那條，資料已最新的裝置永遠不跑
       try{_pullRelayCosts();}catch(e){_err('_pullPrivateIfNewer',e);}
       try{_pullRelayExpenses();}catch(e){_err('_pullPrivateIfNewer',e);}
     }).catch(function(){_privReadOk=false;});
@@ -26401,7 +26401,7 @@ function renderPayables(){
         +_payVatCtl(p)   // v6.0.42 自動產生的不給改稅別
           +'<span class="bdg '+(p.status==='paid'?'ok':'warn')+'">'+(p.status==='paid'?'✓ 已付款':'待付款')+'</span>'+_payLedgerWarn(p)+'</div>'
           +'<div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">'
-          +(p.status!=='paid'?'<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid(\''+p.id+'\',null,_payAfterMark)">✓ 付款</button>'+_payVendorAllBtn(p):'<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark(\''+p.id+'\')">改回未付</button>')   // v6
+          +(p.status!=='paid'?'<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid(\''+p.id+'\',null,_payAfterMark)">✓ 付款</button>'+_payVendorAllBtn(p):'<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark(\''+p.id+'\')">改回未付</button><button type="button" class="btn btn-xs" title="只改這一筆的實付日期" onclick="payEditPaidDate(\''+p.id+'\')">改付款日</button>')   // v6
           +_payAuditBtn(p)   // v6.0.89.0.72 付款先問實付日；已付可改回
         +(p.quoteId?'<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts(\''+p.quoteId+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>':'')
           +_payEditBtns(p)   // v6.0.42 自動產生的唯讀
@@ -26442,7 +26442,7 @@ function renderPayables(){
         <span class="bdg ${p.status==='paid'?'ok':'warn'}">${p.status==='paid'?'✓ 已付款':'待付款'}</span>${_payLedgerWarn(p)}
       </div>
       <div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">
-        ${p.status!=='paid'?`<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid('${p.id}',null,_payAfterMark)">✓ 付款</button>`:`<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark('${p.id}')">改回未付</button>`}${_payAuditBtn(p)}
+        ${p.status!=='paid'?`<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid('${p.id}',null,_payAfterMark)">✓ 付款</button>`:`<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark('${p.id}')">改回未付</button><button type="button" class="btn btn-xs" title="只改這一筆的實付日期" onclick="payEditPaidDate('${p.id}')">改付款日</button>`}${_payAuditBtn(p)}
               ${p.quoteId?`<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts('${p.quoteId}')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>`:''}
         ${_payEditBtns(p)}
         ${_payFilesInline(p)}
@@ -27215,9 +27215,9 @@ function _shareCapHtml(cap,drawn,remain,pct,byWho,capEarn,capCash,limitedBy,apPe
 function exportFinanceCSV(){
   // 匯出應付帳款
   const catMap={material:'材料費',labor:'人工費',equipment:'機具費',subcontract:'協力廠商',salary:'薪資／勞健保',petty:'零用金',other:'其他'};
-  const headers=['付款對象','金額','日期','類別','工程','狀態','備註'];
+  const headers=['付款對象','金額','日期','類別','工程','狀態','備註','應付（含稅）','實付日'];   // v6.0.116：「金額」是未稅、「日期」是到期日（原欄位不動），後面補含稅應付與實付日
   const rows=PAYABLES.map(p=>[p.to||'',p.amount||0,p.date||'',catMap[p.category]||'',
-    p.project||'',p.status==='paid'?'已付款':'待付款',p.note||'']);
+    p.project||'',p.status==='paid'?'已付款':'待付款',p.note||'',_payEff(p),p.status==='paid'?(p.paidDate||''):'']);
   downloadCSV('應付帳款_'+fmtDateStr(),headers,rows);
   toast('財務記錄已匯出');
 }
@@ -35522,6 +35522,21 @@ function payMarkPaid(pid,defDate,after){
     try{rCostItems();}catch(er){_err('payMarkPaid',er);}try{if(typeof after==='function')after();}catch(er){_err('payMarkPaid',er);}toast('已標記已付');
   },false,null,false);
 }
+// v6.0.116：已付的應付直接改實付日（不必先改回未付再重標；Lotion 10/28 想改預付款日期，結果改到第 1 期）
+function payEditPaidDate(pid,after){
+  var p=PAYABLES.find(function(x){return x.id===pid;});if(!p||p.status!=='paid')return;
+  var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
+  showConfirm('改實付日：'+esc(p.to||''),'<div style="font-size:12.5px;line-height:1.8">'+esc((p.note||'').slice(0,60))+'<br>應付 NT$ <b>'+fmt(_payEff(p))+'</b>　目前實付日 <b>'+esc(p.paidDate||'（未填）')+'</b></div><div class="f" style="margin-top:6px"><label>實付日</label><input id="ped-date" type="date" value="'+esc(p.paidDate||'')+'" style="'+IN+'"></div>',function(){
+    var d=gv('ped-date');if(!d){toast('請填實付日');return false;}
+    if(d===p.paidDate)return;
+    if(!Array.isArray(p.paidDateLog))p.paidDateLog=[];p.paidDateLog.push({from:p.paidDate||'',to:d,at:Date.now(),v:APP_VERSION});
+    p.paidDate=d;_touch(p);
+    try{if(typeof PAID_LOG!=='undefined'&&PAID_LOG[p.id]){PAID_LOG[p.id].paidDate=d;localStorage.setItem('fy_paidlog',JSON.stringify(PAID_LOG));}}catch(e){_err('payEditPaidDate',e);}
+    try{savePayables();_onSave();}catch(e){_err('payEditPaidDate',e);}
+    try{rCostItems();}catch(e){_err('payEditPaidDate',e);}try{if(typeof after==='function')after();else if(document.getElementById('page-acct')&&document.getElementById('page-acct').classList.contains('active'))renderPayables();}catch(e){_err('payEditPaidDate',e);}
+    toast('實付日已改為 '+d);
+  },false,null,false);
+}
 // 分包管理表：預付款列（統一後：顯示扣在哪幾期、可標記已付／改回未付／修改／刪除）
 function _subAdvRowsHtml(c){
   var B=function(js,lbl,clr,bd){return '<button type="button" onclick="'+js+'" style="font-size:11px;padding:2px 8px;border:1px solid '+(bd||'var(--b2)')+';background:var(--w);color:'+(clr||'var(--b5)')+';border-radius:99px;cursor:pointer;font-family:inherit;margin-left:3px">'+lbl+'</button>';};
@@ -35532,7 +35547,7 @@ function _subAdvRowsHtml(c){
     var stTxt=!p?('<span style="color:var(--red)">缺應付</span>'+B("subPayResync('"+c.id+"')",'補建應付','var(--red)','#f0c4c4')):(p.status==='paid'?'<span style="color:#1B5E20">✓ 已付 '+esc(p.paidDate||'')+'</span>':('<span style="color:#b45309">未付</span>'+(p.date&&p.date<localToday()?' <span style="color:var(--red);font-weight:700">逾期</span>':'')));
     var usedSum=used.reduce(function(s,u){return s+u.amt;},0);
     var usedTxt=used.length?('<div style="font-weight:400;color:#1565C0;font-size:10.5px">扣在：'+used.map(function(u){return '第'+u.per.no+'期 '+fmt(u.amt);}).join('、')+(usedSum<amt?('；餘 '+fmt(amt-usedSum)+' 下期扣'):'')+'</div>'):'<div style="font-weight:400;color:var(--b4);font-size:10.5px">尚未扣回（下期登錄請款時自動扣）</div>';
-    var acts=(p?(p.status==='paid'?B("payUnmark('"+p.id+"')",'改回未付','#b45309','#ffcc80'):B("payMarkPaid('"+p.id+"','"+esc(a.date||'')+"')",'標記已付','#1B5E20','#a5d6a7'))+B("openPayAudit('"+p.id+"')",'歷程','var(--b4)'):'')
+    var acts=(p?(p.status==='paid'?B("payUnmark('"+p.id+"')",'改回未付','#b45309','#ffcc80')+B("payEditPaidDate('"+p.id+"')",'改付款日'):B("payMarkPaid('"+p.id+"','"+esc(a.date||'')+"')",'標記已付','#1B5E20','#a5d6a7'))+B("openPayAudit('"+p.id+"')",'歷程','var(--b4)'):'')
       +((p&&p.status==='paid')?'':B("editSubAdvance('"+c.id+"','"+a.id+"')",'修改'))+((p&&p.status==='paid')?'':B("delSubAdvance('"+c.id+"','"+a.id+"')",'刪除','var(--red)','#f0c4c4'));
     return '<tr style="border-bottom:1px solid var(--b1);background:#eef5fd">'
       +'<td style="padding:4px 6px;white-space:nowrap;color:#1565C0;font-weight:700">'+(c.isIntro?'預付款（介紹費）':'預付款')+(a.fromPeriod?'<div style="font-weight:400;font-size:10px;color:var(--b4)">原第'+a.fromPeriod+'期提前放款</div>':'')+'</td>'
@@ -36192,7 +36207,7 @@ function _payAdvInfo(p){
   if(!ctx||!(ctx.k.adv>0))return '';
   var k=ctx.k,tm=p.vat===false?1:_taxM(),us=_payAdvUsed(ctx.c,ctx.per),q=ctx.q,c=ctx.c;
   var line=function(u){var a=u.a,pp=u.pay,paid=pp&&pp.status==='paid';
-    return '<div>預付款 '+esc(a.date||'')+'　NT$ '+fmt(Math.round(u.amt*tm))+(paid?' <span style="color:var(--g3)">✓ 已付 '+esc(pp.paidDate||a.date||'')+'</span>':(pp?' <span style="color:var(--red)">待付</span> '+_payLedgerWarn(pp)+' <a href="javascript:void(0)" onclick="payMarkPaid(\''+pp.id+'\',\''+esc(a.date||'')+'\',renderPayables)" style="color:#1565C0">標記已付</a> <a href="javascript:void(0)" onclick="openPayAudit(\''+pp.id+'\')" style="color:var(--b4)">歷程</a>':' <span style="color:#b26a00">缺應付</span> <a href="javascript:void(0)" onclick="_advPayFix(\''+q.id+'\',\''+c.id+'\')" style="color:#1565C0">補建</a>'))+'</div>';};
+    return '<div>預付款 '+esc(a.date||'')+'　NT$ '+fmt(Math.round(u.amt*tm))+(paid?' <span style="color:var(--g3)">✓ 已付 '+esc(pp.paidDate||a.date||'')+'</span> <a href="javascript:void(0)" onclick="payEditPaidDate(\''+pp.id+'\',renderPayables)" style="color:#1565C0">改預付款付款日</a>':(pp?' <span style="color:var(--red)">待付</span> '+_payLedgerWarn(pp)+' <a href="javascript:void(0)" onclick="payMarkPaid(\''+pp.id+'\',\''+esc(a.date||'')+'\',renderPayables)" style="color:#1565C0">標記已付</a> <a href="javascript:void(0)" onclick="openPayAudit(\''+pp.id+'\')" style="color:var(--b4)">歷程</a>':' <span style="color:#b26a00">缺應付</span> <a href="javascript:void(0)" onclick="_advPayFix(\''+q.id+'\',\''+c.id+'\')" style="color:#1565C0">補建</a>'))+'</div>';};
   return '<div style="margin-top:4px;padding:6px 8px;background:var(--b0);border-radius:var(--r8);font-size:11px;line-height:1.6;color:var(--b5)">本期計價（'+(p.vat===false?'未稅':'含稅')+'）NT$ '+fmt(Math.round(k.net*tm))+' － 預付款抵扣 NT$ '+fmt(_advDedOf(c,ctx.per,tm,k))+' ＝ <b>本期應付 NT$ '+fmt(Math.round(k.net*tm)-_advDedOf(c,ctx.per,tm,k))+'</b>'+us.map(line).join('')+'</div>';
 }
 

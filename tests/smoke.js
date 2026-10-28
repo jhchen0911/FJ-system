@@ -8583,6 +8583,34 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.116：已付應付直接改實付日（不必改回未付再重標）；資料已最新的裝置也會重算抽成；應付 CSV 補含稅應付與實付日 ──
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        PAYABLES.length = 0;
+        PAYABLES.push({ id: 'pE1', to: '甲廠', project: '乙案', amount: 1000, vat: true, date: '2026-10-05', status: 'paid', paidDate: '2026-10-25', paidAt: Date.now(), note: '第1期' },
+                      { id: 'pE2', to: '甲廠', project: '乙案', amount: 500, vat: false, date: '2026-11-25', status: 'pending', note: '第2期' });
+        PAID_LOG.pE1 = { paidAt: PAYABLES[0].paidAt, paidDate: '2026-10-25' };
+        go('acct'); acctTab('ap'); window._payAging = 'all'; renderPayables();
+        const pl = document.getElementById('payable-list').innerHTML;
+        out.btn = /payEditPaidDate\('pE1'\)/.test(pl) && !/payEditPaidDate\('pE2'\)/.test(pl);
+        payEditPaidDate('pE1'); document.getElementById('ped-date').value = '2026-10-05'; document.getElementById('gen-confirm-ok').click();
+        const p1 = PAYABLES[0];
+        out.edit = p1.status === 'paid' && p1.paidDate === '2026-10-05' && PAID_LOG.pE1.paidDate === '2026-10-05' && p1.paidDateLog && p1.paidDateLog[0].from === '2026-10-25';
+        payEditPaidDate('pE2'); out.noPending = document.getElementById('gen-confirm-modal').style.display === 'none' || !document.getElementById('ped-date');
+        out.csv = /實付日/.test(String(exportFinanceCSV)) && /_payEff\(p\)/.test(String(exportFinanceCSV));
+        out.boot = /_salesCommBoot\(\)/.test(String(_pullPrivateIfNewer));
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.116 已付應付「改付款日」：只改這一筆的實付日（狀態仍已付、付款帳本跟著改、留下修改紀錄）；待付的沒有這個按鈕', r.btn && r.edit && r.noPending, JSON.stringify(r));
+    check('v6.0.116 資料已最新的裝置也會重算業務抽成；應付 CSV 補「應付（含稅）」與「實付日」', r.csv && r.boot, JSON.stringify(r));
+    check('v6.0.116 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.114 beta 不寫雲端（實際攔截 Firebase 連線）：beta 存報價＋各上傳路徑 → 寫入框數 0；test.html 對照組要有寫入 ──
   {
     const SDK_DIR = process.env.FJ_FB_SDK_DIR || '';   // 雲端容器連不到 gstatic 時，指到 npm 套件 firebase@10.12.0 的資料夾
