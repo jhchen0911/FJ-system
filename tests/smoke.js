@@ -5071,7 +5071,7 @@ async function newPage(browser, width, height) {
     out.pay={advAmt:adv&&adv.amount,perAmt:per&&per.amount,ids:PAYABLES.map(p=>p.id)};
     go('acct');acctTab('ap');window._payAging='all';renderPayables();
     const pl=document.getElementById('payable-list');
-    const row=id=>[...pl.querySelectorAll('.ql')].find(x=>x.innerHTML.includes(id));
+    const row=id=>pl.querySelector('.ql[data-pid="'+id+'"]');   // v6.0.116：期別卡內預付款列有「改預付款付款日」連結（含預付款編號），改用列自己的 data-pid 判斷
     out.advHidden=!row('paycM_aa1');
     const pr=row('paycM_p1');
     out.perCard=!!pr&&/預付款抵扣/.test(pr.innerHTML)&&/本期應付 NT\$ 31,500/.test(pr.innerHTML)&&/✓ 已付/.test(pr.innerHTML);
@@ -8562,7 +8562,7 @@ async function newPage(browser, width, height) {
     eid='qM';PAYABLES.length=0;Q[0].costs.forEach(c=>syncCostToPayable(Q[0],c));
     const adv=PAYABLES.find(p=>p.id==='paycM_aa1'),per=PAYABLES.find(p=>p.id==='paycM_p1');
     out.ids=PAYABLES.map(p=>p.id+':'+p.status);
-    const listHas=id=>{go('acct');acctTab('ap');window._payAging='all';renderPayables();return [...document.getElementById('payable-list').querySelectorAll('.ql')].some(x=>x.innerHTML.includes(id));};
+    const listHas=id=>{go('acct');acctTab('ap');window._payAging='all';renderPayables();return !!document.getElementById('payable-list').querySelector('.ql[data-pid="'+id+'"]');};
     // ① 預付款沒付 → 列表看得到、待付合計有它
     out.pendShown=!!adv&&adv.status!=='paid'&&_payHiddenAdv(adv)===false&&listHas('paycM_aa1')&&_apList().some(p=>p.id==='paycM_aa1');
     out.allExcl=!_payVendorOthers(per).some(p=>p.id==='paycM_aa1')&&!/全付/.test(_payVendorAllBtn(per));
@@ -8593,21 +8593,61 @@ async function newPage(browser, width, height) {
         PAYABLES.push({ id: 'pE1', to: '甲廠', project: '乙案', amount: 1000, vat: true, date: '2026-10-05', status: 'paid', paidDate: '2026-10-25', paidAt: Date.now(), note: '第1期' },
                       { id: 'pE2', to: '甲廠', project: '乙案', amount: 500, vat: false, date: '2026-11-25', status: 'pending', note: '第2期' });
         PAID_LOG.pE1 = { paidAt: PAYABLES[0].paidAt, paidDate: '2026-10-25' };
-        go('acct'); acctTab('ap'); window._payAging = 'all'; renderPayables();
+        go('acct'); acctTab('ap'); window._payAging = 'paid'; renderPayables();
         const pl = document.getElementById('payable-list').innerHTML;
         out.btn = /payEditPaidDate\('pE1'\)/.test(pl) && !/payEditPaidDate\('pE2'\)/.test(pl);
         payEditPaidDate('pE1'); document.getElementById('ped-date').value = '2026-10-05'; document.getElementById('gen-confirm-ok').click();
         const p1 = PAYABLES[0];
         out.edit = p1.status === 'paid' && p1.paidDate === '2026-10-05' && PAID_LOG.pE1.paidDate === '2026-10-05' && p1.paidDateLog && p1.paidDateLog[0].from === '2026-10-25';
         payEditPaidDate('pE2'); out.noPending = document.getElementById('gen-confirm-modal').style.display === 'none' || !document.getElementById('ped-date');
+        PAYABLES.push({ id: 'pay_ps_x1', to: '員工甲', amount: 30000, vat: false, status: 'paid', paidDate: '2026-10-10', paidAt: Date.now(), category: 'salary' });
+        renderPayables(); out.psHide = !/payEditPaidDate\('pay_ps_x1'\)/.test(document.getElementById('payable-list').innerHTML) && _payDateEditable(PAYABLES[0]) && !_payDateEditable(PAYABLES[2]);
+        out.ro = _RO_DENY.test('payEditPaidDate');
         out.csv = /實付日/.test(String(exportFinanceCSV)) && /_payEff\(p\)/.test(String(exportFinanceCSV));
         out.boot = /_salesCommBoot\(\)/.test(String(_pullPrivateIfNewer));
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.116 已付應付「改付款日」：只改這一筆的實付日（狀態仍已付、付款帳本跟著改、留下修改紀錄）；待付的沒有這個按鈕', r.btn && r.edit && r.noPending, JSON.stringify(r));
+    check('v6.0.116 已付應付「改付款日」：只改這一筆的實付日（狀態仍已付、付款帳本跟著改、留下修改紀錄）；待付、薪資／零用金沒有這個按鈕；唯讀帳號擋下', r.btn && r.edit && r.noPending && r.psHide && r.ro, JSON.stringify(r));
     check('v6.0.116 資料已最新的裝置也會重算業務抽成；應付 CSV 補「應付（含稅）」與「實付日」', r.csv && r.boot, JSON.stringify(r));
     check('v6.0.116 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.116：只改私有資料（應付）時「未同步」要能消失；私有資料上傳失敗時要顯示「未同步」 ──
+  {
+    const { page, errors } = await newPage(browser, 1200, 900);
+    const r = await page.evaluate(() => new Promise(res => {
+      const out = {};
+      try {
+        const R = path => { const o = { path,
+          once: () => Promise.resolve({ val: () => 0, exists: () => false, forEach: () => false }),
+          update: () => (window._fakeFail && path.indexOf('fydata/private') === 0) ? Promise.reject(new Error('PERMISSION_DENIED')) : Promise.resolve(),
+          set: () => Promise.resolve(), remove: () => Promise.resolve(), transaction: () => Promise.resolve(),
+          on: () => {}, off: () => {}, child: c => R(path + '/' + c), push: () => R(path + '/x') };
+          o.orderByChild = o.equalTo = o.limitToLast = o.startAt = () => o; return o; };
+        _fbDb = { ref: R }; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'u1', getIdToken: () => Promise.resolve('x') };
+        _isAdminUser = true; _isReaderUser = false; _roState = 'rw'; _MIN_PENDING = false; _privReadOk = true;
+        const bc = _buildCleanPayload().clean; _storeSyncHashes(_calcSyncHashes(bc)); _storeRecHashes(_recHashesOfClean(bc));
+        localStorage.setItem('fy_last_fb_sync', '1000'); localStorage.removeItem('fy_pending_sync'); localStorage.removeItem('fy_priv_pending');
+        // 只改應付（私有）→ 共用區無變更、私有上傳成功 → 不再顯示未同步
+        PAYABLES.push({ id: 'pSync1', to: '甲', amount: 100, status: 'pending', _mt: Date.now() }); _markDirty();
+        out.dirty0 = _isDirty() === true;
+        _pushCloud({ silent: true });
+        setTimeout(() => {
+          out.clean = _isDirty() === false;
+          // 私有上傳被拒 → 顯示未同步
+          window._fakeFail = true; PAYABLES.push({ id: 'pSync2', to: '乙', amount: 200, status: 'pending', _mt: Date.now() }); _markDirty();
+          _pushCloud({ silent: true });
+          setTimeout(() => { out.failDirty = _isDirty() === true && localStorage.getItem('fy_priv_pending') === '1';
+            window._fakeFail = false; _privReadOk = true; _privFailAt = 0; _pushCloud({ silent: true });
+            setTimeout(() => { out.recovered = _isDirty() === false; _fbDb = null; _fbUser = null; _isAdminUser = false; res(out); }, 1500);
+          }, 1500);
+        }, 1500);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); res(out); }
+    }));
+    check('v6.0.116「未同步」：只改應付等私有資料、上傳成功後會消失；私有資料上傳被拒時顯示「未同步」，下次成功再消失', r.dirty0 && r.clean && r.failDirty && r.recovered, JSON.stringify(r));
+    check('v6.0.116「未同步」測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

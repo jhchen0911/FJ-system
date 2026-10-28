@@ -10106,6 +10106,7 @@ function _syncDropGuard(clean){
 function _isDirty(){
   if(_isReaderUser)return false;   // v6.0.90：唯讀帳號永遠以雲端為準
   if(localStorage.getItem('fy_pending_sync')==='1')return true;
+  if(localStorage.getItem('fy_priv_pending')==='1')return true;   // v6.0.116：管理員裝置的私有資料（應付、成本…）上傳失敗
   var ls=parseInt(localStorage.getItem('fy_last_local_save')||'0');
   var lt=parseInt(localStorage.getItem('fy_last_fb_sync')||'0');
   return ls>lt;
@@ -10824,12 +10825,13 @@ function _pushCloud(opts){
     // v5.335 健檢F：私有推送必須在「shared 無變更提前 return」之前執行。
     // 原本排在 return 之後，只改費用／應付／分潤／材料（全在 private）時
     // shared 沒變 → 提前 return → 私有集合完全不上雲，還誤報「雲端已是最新」。
-    try{_pushPrivate();}catch(e){_err('top',e);}
+    try{_pushPrivate(function(ok){try{if(ok)localStorage.removeItem('fy_priv_pending');else if(_isAdminUser&&!_isReaderUser)localStorage.setItem('fy_priv_pending','1');}catch(e){/* 可忽略 */}});}catch(e){_err('top',e);}   // v6.0.116：私有資料上傳結果另外記，「未同步」才看得到私有資料沒上去
     try{_pushRelayCosts();}catch(e){_err('top',e);}
     try{_pushRelayExpenses();}catch(e){_err('top',e);}
     if(!opts.full&&baseHashes&&changed.length===0&&!perRec.hasWork&&!mlWork){
       _storeSyncHashes(newHashes);
       localStorage.removeItem('fy_pending_sync');
+      try{localStorage.setItem('fy_last_local_save',localStorage.getItem('fy_last_fb_sync')||'0');}catch(e){/* 可忽略 */}   // v6.0.116：共用區沒有要傳的 → 本機存檔時間不再「超前」，否則只改應付等私有資料時「未同步」永遠消不掉（私有資料是否上傳成功看 fy_priv_pending）
       if(!opts.silent){_setFbLoading(false);toast('無新變更，雲端已是最新');}
       if(opts.onDone)opts.onDone(true);
       return;
@@ -26385,7 +26387,7 @@ function renderPayables(){
         +'<div style="font-size:10px;color:var(--b4)">合計</div></div></div></div>'
         +'<div id="'+gid+'_body" style="display:'+(gExpanded?'':'none')+'">'
         +(function(){var rowHtml=function(p){return(
-          '<div class="ql" style="cursor:default;margin-left:8px;margin-bottom:2px">'
+          '<div class="ql" data-pid="'+esc(p.id||'')+'" style="cursor:default;margin-left:8px;margin-bottom:2px">'
           +'<div class="qdot" style="background:'+(p.status==='paid'?'var(--g)':'var(--red)')+'"></div>'
           +'<div class="qm" style="flex:1;min-width:0">'
           +'<div class="qt">'+esc(p.to||'未知')+' <span style="font-size:11px;color:var(--b3)">'+_payCatTxt(p,catMap)+'</span>'+_bankBtn(p.to)+'</div>'
@@ -26401,7 +26403,7 @@ function renderPayables(){
         +_payVatCtl(p)   // v6.0.42 自動產生的不給改稅別
           +'<span class="bdg '+(p.status==='paid'?'ok':'warn')+'">'+(p.status==='paid'?'✓ 已付款':'待付款')+'</span>'+_payLedgerWarn(p)+'</div>'
           +'<div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">'
-          +(p.status!=='paid'?'<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid(\''+p.id+'\',null,_payAfterMark)">✓ 付款</button>'+_payVendorAllBtn(p):'<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark(\''+p.id+'\')">改回未付</button><button type="button" class="btn btn-xs" title="只改這一筆的實付日期" onclick="payEditPaidDate(\''+p.id+'\')">改付款日</button>')   // v6
+          +(p.status!=='paid'?'<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid(\''+p.id+'\',null,_payAfterMark)">✓ 付款</button>'+_payVendorAllBtn(p):'<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark(\''+p.id+'\')">改回未付</button>'+(_payDateEditable(p)?'<button type="button" class="btn btn-xs" title="只改這一筆的實付日期" onclick="payEditPaidDate(\''+p.id+'\')">改付款日</button>':''))   // v6
           +_payAuditBtn(p)   // v6.0.89.0.72 付款先問實付日；已付可改回
         +(p.quoteId?'<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts(\''+p.quoteId+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>':'')
           +_payEditBtns(p)   // v6.0.42 自動產生的唯讀
@@ -26422,7 +26424,7 @@ function renderPayables(){
   } else {
     if(!sorted.length){el.innerHTML=_agingBar+'<div class="empty" style="padding:20px"><p style="font-size:12.5px;color:var(--b3)">此分類目前沒有項目</p></div>';return;}
     el.innerHTML=_agingBar+_payAutoHint()+sorted.filter(p=>!_payHiddenAdv(p)).map(p=>`
-    <div class="ql" style="cursor:default">
+    <div class="ql" data-pid="${esc(p.id||'')}" style="cursor:default">
       <div class="qdot" style="background:${p.status==='paid'?'var(--g)':'var(--red)'}"></div>
       <div class="qm" style="flex:1;min-width:0">
         <div class="qt">${esc(p.to||'未知')} <span style="font-size:11px;color:var(--b3)">${_payCatTxt(p,catMap)}</span>${_bankBtn(p.to)}</div>
@@ -26442,7 +26444,7 @@ function renderPayables(){
         <span class="bdg ${p.status==='paid'?'ok':'warn'}">${p.status==='paid'?'✓ 已付款':'待付款'}</span>${_payLedgerWarn(p)}
       </div>
       <div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">
-        ${p.status!=='paid'?`<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid('${p.id}',null,_payAfterMark)">✓ 付款</button>`:`<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark('${p.id}')">改回未付</button><button type="button" class="btn btn-xs" title="只改這一筆的實付日期" onclick="payEditPaidDate('${p.id}')">改付款日</button>`}${_payAuditBtn(p)}
+        ${p.status!=='paid'?`<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid('${p.id}',null,_payAfterMark)">✓ 付款</button>`:`<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark('${p.id}')">改回未付</button>${_payDateEditable(p)?`<button type="button" class="btn btn-xs" title="只改這一筆的實付日期" onclick="payEditPaidDate('${p.id}')">改付款日</button>`:''}`}${_payAuditBtn(p)}
               ${p.quoteId?`<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts('${p.quoteId}')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>`:''}
         ${_payEditBtns(p)}
         ${_payFilesInline(p)}
@@ -35523,8 +35525,10 @@ function payMarkPaid(pid,defDate,after){
   },false,null,false);
 }
 // v6.0.116：已付的應付直接改實付日（不必先改回未付再重標；Lotion 10/28 想改預付款日期，結果改到第 1 期）
+function _payDateEditable(p){return !!p&&!/^(pay_ps_|pay_pc_)/.test(String(p.id||''));}   // 薪資條、零用金的付款日以來源為準（應付頁改了不會回寫）
 function payEditPaidDate(pid,after){
   var p=PAYABLES.find(function(x){return x.id===pid;});if(!p||p.status!=='paid')return;
+  if(!_payDateEditable(p)){toast('薪資／零用金的付款日請到薪資或零用金頁修改');return;}
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   showConfirm('改實付日：'+esc(p.to||''),'<div style="font-size:12.5px;line-height:1.8">'+esc((p.note||'').slice(0,60))+'<br>應付 NT$ <b>'+fmt(_payEff(p))+'</b>　目前實付日 <b>'+esc(p.paidDate||'（未填）')+'</b></div><div class="f" style="margin-top:6px"><label>實付日</label><input id="ped-date" type="date" value="'+esc(p.paidDate||'')+'" style="'+IN+'"></div>',function(){
     var d=gv('ped-date');if(!d){toast('請填實付日');return false;}
@@ -37966,7 +37970,7 @@ function _matLocList(){
 var _RO_PAGES_OFF=['staff','roles'];
 var _RO_ROLE={id:'__reader',name:'唯讀',reader:true,enabled:true,sys:false,cloudCost:false,pages:{}};
 var _RO_DENY=new RegExp('^(?:save|del|delete|remove|add|new|edit|create|submit|import|upload|restore|reset|clear|clean|confirm|apply|award|revoke|bump|settle|release|recalc|fix|merge'
-  +'|toggle(?:RetentionReturn|PaidDateField|PayVat|AutoSync|CumFix)|pay(?:MarkPaid|Unmark|VendorAll)|ps(?:Paid|Generate|Upd|Del)|pc(?:Paid|Generate|Upd|Del)|hr(?:Edit|Del|WriteFixedCost)'
+  +'|toggle(?:RetentionReturn|PaidDateField|PayVat|AutoSync|CumFix)|pay(?:MarkPaid|Unmark|VendorAll|EditPaidDate)|ps(?:Paid|Generate|Upd|Del)|pc(?:Paid|Generate|Upd|Del)|hr(?:Edit|Del|WriteFixedCost)'
   +'|staff(?:Edit|Del|Import|Template)|role(?:Edit|Del|Toggle|Perm)|dept|reader(?:Add|Del|Rename)|rfq(?:New|Labor|Edit|Del|Award|RemoveVendor|Fill|QuoteSync|Chg)|subStageInst|invRecvOverride|pjCardImport'
   +'|mat(?:Led|Rent|Equip|Trans|Alloc|RowEdit|Out|Back|EstSave|EstApplyCost|EstPickProj)|m6(?:Decide|Rent|Batch|TpUpd|EquipUpd)'
   +'|open(?:SubPeriod|SubAdvance|RentPeriod|Prepay|NegotiateModal|ReceiptModal|InvClauseModal|SalesBook|RmkModal|StorageRulesGen|Dunning)'
