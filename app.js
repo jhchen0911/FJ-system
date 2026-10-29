@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.116';
+var APP_VERSION='v6.0.117';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -460,7 +460,7 @@ function _itemProgress(q,idx){
     cum:cum,removeCum:rcum,target:target,doneDate:doneDate};
 }
 // 單一工項的租期／逾期狀態（純函式，不碰 DOM）
-//   起算日＝日報「打設／裝設」最後一天的次日（v5.428；報價備註第 14 條：材料使用期限自各單一工項完成後之次日起算）
+//   起算日＝日報「打設／裝設」最後一天的次日（v5.428；報價備註「材料使用期限」條（v6.0.117 起條號依實際條目重編）：材料使用期限自各單一工項完成後之次日起算）
 //   到期日＝起算日＋租期−1
 //   逾期天數＝結束日 − 到期日（結束日：日報「拔除／拆除」第一天；尚未拔除者取請款日／結案日／今天＝材料仍在場）
 //   逾期租金＝逾期天數 × 合約數量 × 工項的逾期租金單價（it.ot）
@@ -2691,7 +2691,7 @@ function rmkRenderExtra(){
     return;
   }
   const base=(document.getElementById('prm')?.value||P.rmkBase||'');
-  const n0=_rmkBaseCount(base);
+  const n0=_rmkBuild(base,Object.assign(_rmkFormVals(),{extra:[]}),true).nBase;   // v6.0.117 接在實際最後一條之後
   box.innerHTML=arr.map((v,i)=>
     '<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px">'
     +'<span style="font-size:11.5px;font-weight:700;color:var(--g3);padding-top:7px;min-width:24px">'+(n0+i+1)+'.</span>'
@@ -2702,28 +2702,51 @@ function rmkRenderExtra(){
 }
 function rmkAddExtra(){_rmkExtraList().push('');rmkRenderExtra();}
 function rmkDelExtra(i){_rmkExtraList().splice(i,1);rmkRenderExtra();}
-// 通用版條款的最後一個編號（用來接續編號）
-// v6.0.84 備註填寫視窗的「第 N 條」標題依參數條款現況計算：找含該佔位符的那一行的編號；自訂條款接在最後一條之後
-function _rmkClauseNo(base,token){var n=0;String(base||'').split('\n').forEach(function(l){if(n||l.indexOf(token)<0)return;var m=l.match(/^\s*(\d+)\s*\./);if(m)n=parseInt(m[1],10);});return n;}
+// v6.0.117 備註條款共用產生器：報價單輸出（edit=false：沒填的條款整條不出）與編輯畫面（edit=true：載重／動員費留空格）同一套；
+//   輸出前依實際有內容的條目從 1 重新編號（Lotion 10/29：沒填的條目會跳號 1…7, 9…）。no[佔位符]＝該條輸出後的條號
+function _rmkBuild(base,c,edit){
+  c=c||{};var rows=[];
+  String(base||'').split('\n').forEach(function(line){
+    var toks=line.match(/【[A-Z_]+】/g)||[],t=line;
+    if(line.includes('【LOAD】'))t=c.load?line.replace('【LOAD】',c.load):(edit?line.replace('【LOAD】','_____'):null);
+    else if(line.includes('【WALK】')||line.includes('【TECH】')){
+      var it=[];if(c.walk)it.push('a.安全走道M/$'+c.walk+'元');if(c.tech)it.push('b.技術工/天/$'+c.tech+'元');
+      t=it.length?('11. 備用單價：'+it.join('、')):null;
+    }else if(line.includes('【BUY_H】')){
+      var ib=[];if(c.bh)ib.push('型鋼KG/$'+c.bh+'元');if(c.br)ib.push('鋼軌樁KG/$'+c.br+'元');if(c.bs)ib.push('鋼板樁KG/$'+c.bs+'元');if(c.bb)ib.push('支撐KG/$'+c.bb+'元');
+      if(c.c2)ib.push('2M覆工板/片/$'+c.c2+'元');if(c.c3)ib.push('3M覆工板/片/$'+c.c3+'元');if(c.ir)ib.push('鋪路鐵板/片/$'+c.ir+'元');
+      t=ib.length?('12. 如因甲方因素或要求買斷：'+ib.join('、')+'（未稅）計。'):null;
+    }else if(line.includes('【MOB】')){
+      t=c.mob?_rmkMinQty(line.replace('【MOB】',c.mob),c):(edit?_rmkMinQty(line.replace('$【MOB】元','$______元'),c):null);
+    }
+    if(t!==null)rows.push({t:t,toks:toks});
+  });
+  var nBase=0;
+  (Array.isArray(c.extra)?c.extra:[]).map(function(x){return String(x||'').trim();}).filter(Boolean).forEach(function(x){rows.push({t:'0. '+x,toks:[],extra:1});});
+  var n=0,no={};
+  var out=rows.map(function(r){
+    var m=r.t.match(/^(\s*)\d+(\s*\.)(?!\d)/);if(!m)return r.t;
+    n++;if(!r.extra)nBase=n;r.toks.forEach(function(k){if(no[k]==null)no[k]=n;});
+    return m[1]+n+m[2]+r.t.slice(m[0].length);
+  });
+  return {text:out.join('\n'),no:no,nBase:nBase};
+}
+// 編輯視窗目前填的值（還沒按套用也算）
+function _rmkFormVals(){
+  var c=JSON.parse(JSON.stringify(rmkCustom||{}));
+  ['load','walk','tech','bh','br','bs','bb','c2','c3','ir','mob'].forEach(function(k){var e=document.getElementById('rmk-'+k);if(e)c[k]=e.value;});
+  var mq=document.getElementById('rmk-minqty');if(mq)c.minQty=mq.value;c.extra=_rmkExtraList();
+  return c;
+}
+// v6.0.84 備註填寫視窗的「第 N 條」標題；v6.0.117 起依目前填的內容即時算（沒填的條目不出現、後面的往前遞補）
 function _rmkModalTitles(){
   var base=document.getElementById('prm')?.value||P.rmkBase||'';
-  var set=function(id,tok,label){var el=document.getElementById(id);if(!el)return;var n=_rmkClauseNo(base,tok);el.textContent=(n?('第'+n+'條：'):'')+label+(n?'':'（參數條款中找不到 '+tok+'，此欄不會套用）');};
+  var b=_rmkBuild(base,_rmkFormVals(),true);
+  var set=function(id,tok,label){var el=document.getElementById(id);if(!el)return;var n=b.no[tok];
+    el.textContent=n?('第'+n+'條：'+label):(base.indexOf(tok)<0?(label+'（參數條款中找不到 '+tok+'，此欄不會套用）'):(label+'（未填，報價單不會出現這一條）'));};
   set('rmk-t-load','【LOAD】','施工構台設計載重');set('rmk-t-spare','【WALK】','備用單價');set('rmk-t-buy','【BUY_H】','買斷單價（未稅）');set('rmk-t-mob','【MOB】','動員費');
-  var hint=document.getElementById('rmk-extra-hint');if(hint)hint.textContent='自訂條款（依序接在第 '+_rmkBaseCount(base)+' 條之後；條號隨參數「預設備註條款」自動變）';
-}
-function _rmkBaseCount(base){
-  let n=0;
-  String(base||'').split('\n').forEach(l=>{const mm=l.match(/^\s*(\d+)\s*\./);if(mm)n=Math.max(n,parseInt(mm[1],10));});
-  return n||17;
-}
-// 把自訂條款接在備註文字之後
-function _rmkAppendExtra(txt,c){
-  const arr=(c&&Array.isArray(c.extra))?c.extra:[];
-  const list=arr.map(x=>String(x||'').trim()).filter(Boolean);
-  if(!list.length)return txt;
-  const base=document.getElementById('prm')?.value||P.rmkBase||'';
-  let n=_rmkBaseCount(base);
-  return txt+'\n'+list.map(x=>(++n)+'. '+x).join('\n');
+  var hint=document.getElementById('rmk-extra-hint');if(hint)hint.textContent='自訂條款（依序接在第 '+b.nBase+' 條之後；條號依實際有內容的條目自動編號）';
+  var m=document.getElementById('rmk-modal');if(m&&!m._rmkLive){m._rmkLive=1;m.addEventListener('input',function(ev){try{if(ev.target&&/^rmk-/.test(ev.target.id||''))_rmkModalTitles();}catch(e){_err('_rmkModalTitles.live',e);}});}
 }
 function openRmkModal(){
   const map={load:'rmk-load',walk:'rmk-walk',tech:'rmk-tech',bh:'rmk-bh',
@@ -2744,77 +2767,17 @@ function applyRmkCustom(){
   toast('備註已客製化，預覽時套用');
 }
 
-// 從報價單物件建立備註條款文字（用 q.rmk 的數字 + prm 條款）
+// 從報價單物件建立備註條款文字（用 q.rmk 的數字 + prm 條款）；v6.0.117 依實際條目重新編號（只影響輸出，不改存檔）
 function buildRmkTextFromQ(q){
   const base=document.getElementById('prm')?.value||P.rmkBase||'';
-  const c=q.rmk||{};
-  const lines=base.split('\n');
-  const out=lines.map(line=>{
-    if(line.includes('【LOAD】'))
-      return c.load?line.replace('【LOAD】',c.load):null;
-    if(line.includes('【WALK】')||line.includes('【TECH】')){
-      const items=[];
-      if(c.walk)items.push('a.安全走道M/$'+c.walk+'元');
-      if(c.tech)items.push('b.技術工/天/$'+c.tech+'元');
-      if(items.length===0)return null;
-      return '11. 備用單價：'+items.join('、');
-    }
-    if(line.includes('【BUY_H】')){
-      const items=[];
-      if(c.bh)items.push('型鋼KG/$'+c.bh+'元');
-      if(c.br)items.push('鋼軌樁KG/$'+c.br+'元');
-      if(c.bs)items.push('鋼板樁KG/$'+c.bs+'元');
-      if(c.bb)items.push('支撐KG/$'+c.bb+'元');
-      if(c.c2)items.push('2M覆工板/片/$'+c.c2+'元');
-      if(c.c3)items.push('3M覆工板/片/$'+c.c3+'元');
-      if(c.ir)items.push('鋪路鐵板/片/$'+c.ir+'元');
-      if(items.length===0)return null;
-      return '12. 如因甲方因素或要求買斷：'+items.join('、')+'（未稅）計。';
-    }
-    if(line.includes('【MOB】')){
-      if(!c.mob)return null;
-      return _rmkMinQty(line.replace('【MOB】',c.mob),c);
-    }
-    return line;
-  }).filter(l=>l!==null).join('\n');
-  return _rmkAppendExtra(out,c);
+  return _rmkBuild(base,(q&&q.rmk)||{},false).text;
 }
 
 // v6.0.83 第16條「施作數量不足時」→ 有填最低數量就寫成「施作數量不足 20 支時」（條款母本不必改，舊參數也適用）
 function _rmkMinQty(line,c){var m=String((c&&c.minQty)||'').trim();if(!m)return line;return line.replace(/施作數量不足(?!\s*\d)/,'施作數量不足 '+m+' ');}
 function buildRmkText(){
   const base=document.getElementById('prm')?.value||'';
-  const c=rmkCustom;
-  const lines=base.split('\n');
-  const out2=lines.map(line=>{
-    if(line.includes('【LOAD】'))
-      return line.replace('【LOAD】',c.load||'_____');
-    if(line.includes('【WALK】')||line.includes('【TECH】')){
-      const items=[];
-      if(c.walk)items.push('a.安全走道M/$'+c.walk+'元');
-      if(c.tech)items.push('b.技術工/天/$'+c.tech+'元');
-      if(items.length===0)return null;
-      return '11. 備用單價：'+items.join('、');
-    }
-    if(line.includes('【BUY_H】')){
-      const items=[];
-      if(c.bh)items.push('型鋼KG/$'+c.bh+'元');
-      if(c.br)items.push('鋼軌樁KG/$'+c.br+'元');
-      if(c.bs)items.push('鋼板樁KG/$'+c.bs+'元');
-      if(c.bb)items.push('支撐KG/$'+c.bb+'元');
-      if(c.c2)items.push('2M覆工板/片/$'+c.c2+'元');
-      if(c.c3)items.push('3M覆工板/片/$'+c.c3+'元');
-      if(c.ir)items.push('鋪路鐵板/片/$'+c.ir+'元');
-      if(items.length===0)return null;
-      return '12. 如因甲方因素或要求買斷：'+items.join('、')+'（未稅）計。';
-    }
-    if(line.includes('【MOB】')){
-      if(!c.mob)return _rmkMinQty(line.replace('$【MOB】元','$______元'),c);
-      return _rmkMinQty(line.replace('【MOB】',c.mob),c);
-    }
-    return line;
-  }).filter(l=>l!==null).join('\n');
-  return _rmkAppendExtra(out2,c);
+  return _rmkBuild(base,rmkCustom,true).text;
 }
 
 // ════════════════ INVOICE / 請款 ════════════════
@@ -3143,16 +3106,16 @@ function addInvRental(){
 
 // ── 備註條款請款：勾選條款項目並輸入數量，帶入估驗明細 ──
 var CLAUSE_DEFS=[
-  {k:'walk',clause:'第11條',name:'安全走道',unit:'M'},
-  {k:'tech',clause:'第11條',name:'技術工',unit:'天'},
-  {k:'bh',clause:'第12條',name:'型鋼（買斷）',unit:'KG'},
-  {k:'br',clause:'第12條',name:'鋼軌樁（買斷）',unit:'KG'},
-  {k:'bs',clause:'第12條',name:'鋼板樁（買斷）',unit:'KG'},
-  {k:'bb',clause:'第12條',name:'支撐料（買斷）',unit:'KG'},
-  {k:'c2',clause:'第12條',name:'2M覆工板（買斷）',unit:'片'},
-  {k:'c3',clause:'第12條',name:'3M覆工板（買斷）',unit:'片'},
-  {k:'ir',clause:'第12條',name:'鋪路鐵板（買斷）',unit:'片'},
-  {k:'mob',clause:'第16條',name:'動員費',unit:'次'}
+  {k:'walk',tok:'【WALK】',name:'安全走道',unit:'M'},
+  {k:'tech',tok:'【WALK】',name:'技術工',unit:'天'},
+  {k:'bh',tok:'【BUY_H】',name:'型鋼（買斷）',unit:'KG'},
+  {k:'br',tok:'【BUY_H】',name:'鋼軌樁（買斷）',unit:'KG'},
+  {k:'bs',tok:'【BUY_H】',name:'鋼板樁（買斷）',unit:'KG'},
+  {k:'bb',tok:'【BUY_H】',name:'支撐料（買斷）',unit:'KG'},
+  {k:'c2',tok:'【BUY_H】',name:'2M覆工板（買斷）',unit:'片'},
+  {k:'c3',tok:'【BUY_H】',name:'3M覆工板（買斷）',unit:'片'},
+  {k:'ir',tok:'【BUY_H】',name:'鋪路鐵板（買斷）',unit:'片'},
+  {k:'mob',tok:'【MOB】',name:'動員費',unit:'次'}
 ];
 function openInvClauseModal(){
   // 找關聯報價單的條款金額（sourceQid 優先，退回工程名稱比對）
@@ -3164,12 +3127,13 @@ function openInvClauseModal(){
   }
   const rmk=(q&&q.rmk)||{};
   const tb=document.getElementById('icl-rows');if(!tb)return;
+  let _no={};try{_no=_rmkBuild(document.getElementById('prm')?.value||P.rmkBase||'',rmk,false).no;}catch(e){_err('openInvClauseModal.no',e);}   // v6.0.117 條號依該報價實際輸出的編號
   const inp='padding:5px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-size:12px;font-family:inherit;width:100%;box-sizing:border-box';
   tb.innerHTML=CLAUSE_DEFS.map(d=>{
     const p=parseFloat(rmk[d.k])||'';
     return `<tr>
       <td style="text-align:center;padding:3px 2px"><input type="checkbox" id="icl-ck-${d.k}"></td>
-      <td style="padding:3px 4px"><span style="color:var(--b3);font-size:10px">${d.clause}</span> ${d.name}<span style="color:var(--b3);font-size:10px">（$/${d.unit}）</span></td>
+      <td style="padding:3px 4px"><span style="color:var(--b3);font-size:10px">${_no[d.tok]?('第'+_no[d.tok]+'條'):''}</span> ${d.name}<span style="color:var(--b3);font-size:10px">（$/${d.unit}）</span></td>
       <td style="padding:3px 4px"><input type="number" id="icl-p-${d.k}" value="${p}" placeholder="單價" style="${inp}"></td>
       <td style="padding:3px 4px"><input type="number" id="icl-q-${d.k}" placeholder="數量" style="${inp}" oninput="var c=document.getElementById('icl-ck-${d.k}');if(c)c.checked=!!this.value"></td>
     </tr>`;

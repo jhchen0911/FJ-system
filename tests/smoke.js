@@ -1619,13 +1619,13 @@ async function newPage(browser, width, height) {
       const out = {};
       // 2) 報價備註：自訂條款依序接在通用版最後一條之後
       const base = document.getElementById('prm')?.value || P.rmkBase || '';
-      const n0 = _rmkBaseCount(base);
-      rmkCustom.extra = ['甲條款', '  ', '乙條款'];
-      const t1 = _rmkAppendExtra('原文', rmkCustom);
-      out.rmk = t1 === '原文\n' + (n0 + 1) + '. 甲條款\n' + (n0 + 2) + '. 乙條款';
+      /* v6.0.117：自訂條款接在「實際輸出的最後一條」之後（沒填的條目不佔號） */
+      const b0 = _rmkBuild(base, { extra: [] }, false);
+      const t1 = _rmkBuild(base, { extra: ['甲條款', '  ', '乙條款'] }, false).text;
+      out.rmk = t1 === b0.text + '\n' + (b0.nBase + 1) + '. 甲條款\n' + (b0.nBase + 2) + '. 乙條款';
       rmkCustom.extra = [];
-      out.rmkNone = _rmkAppendExtra('原文', rmkCustom) === '原文';
-      out.rmkCnt = _rmkBaseCount('1. a\n2. b\n17. c') === 17 && _rmkBaseCount('') === 17;
+      out.rmkNone = _rmkBuild('1. a\n2. b', { extra: [] }, false).text === '1. a\n2. b';
+      out.rmkCnt = _rmkBuild('1. a\n2. b\n17. c', {}, false).text === '1. a\n2. b\n3. c';
       out.rmkApi = ['rmkAddExtra', 'rmkDelExtra', 'rmkRenderExtra'].every(k => typeof window[k] === 'function');
 
       _plClear();
@@ -6525,13 +6525,14 @@ async function newPage(browser, width, height) {
       try {
         const prm = document.getElementById('prm'); const bak = prm.value;
         newQ(); openRmkModal();
-        out.t16 = document.getElementById('rmk-t-mob').textContent === '第16條：動員費' && /第 17 條之後/.test(document.getElementById('rmk-extra-hint').textContent) && document.getElementById('rmk-t-load').textContent === '第8條：施工構台設計載重';
+        /* v6.0.117：新報價備用單價（第11條）、買斷（第12條）沒填 → 不出現，動員費由第16條遞補成第14條、自訂接第15條後 */
+        out.t16 = document.getElementById('rmk-t-mob').textContent === '第14條：動員費' && /第 15 條之後/.test(document.getElementById('rmk-extra-hint').textContent) && document.getElementById('rmk-t-load').textContent === '第8條：施工構台設計載重' && /未填/.test(document.getElementById('rmk-t-spare').textContent);
         document.getElementById('rmk-modal').style.display = 'none';
         /* 參數最前面插一條 → 動員費變第 17 條、自訂接第 19 條後；多條件門檻 */
         prm.value = '1. 新增第一條。\n' + bak.split('\n').map(l => l.replace(/^(\d+)\./, (m, n) => (parseInt(n, 10) + 1) + '.')).join('\n');
-        openRmkModal(); out.shift = document.getElementById('rmk-t-mob').textContent === '第17條：動員費' && /第 18 條之後/.test(document.getElementById('rmk-extra-hint').textContent);
+        openRmkModal(); out.shift = document.getElementById('rmk-t-mob').textContent === '第15條：動員費' && /第 16 條之後/.test(document.getElementById('rmk-extra-hint').textContent);
         document.getElementById('rmk-mob').value = '40000'; document.getElementById('rmk-minqty').value = 'H型鋼樁 20 支或水平支撐 200 M'; applyRmkCustom(); rmkCustom.extra = ['自訂甲條款'];
-        const txt = buildRmkText(); out.multi = /施作數量不足 H型鋼樁 20 支或水平支撐 200 M 時/.test(txt) && /^19\. 自訂甲條款$/m.test(txt);
+        const txt = buildRmkText(); out.multi = /施作數量不足 H型鋼樁 20 支或水平支撐 200 M 時/.test(txt) && /^17\. 自訂甲條款$/m.test(txt);
         /* 參數拿掉動員費條 → 標題提示找不到 */
         prm.value = bak.split('\n').filter(l => !/【MOB】/.test(l)).join('\n'); openRmkModal(); out.missing = /找不到 【MOB】/.test(document.getElementById('rmk-t-mob').textContent);
         document.getElementById('rmk-modal').style.display = 'none'; prm.value = bak; rmkCustom.extra = [];
@@ -8651,6 +8652,43 @@ async function newPage(browser, width, height) {
     }));
     check('v6.0.116「未同步」：只改應付等私有資料、上傳成功後會消失；私有資料上傳被拒時顯示「未同步」，下次成功再消失；換一般員工登入不會殘留', r.dirty0 && r.clean && r.failDirty && r.recovered && r.staffClean, JSON.stringify(r));
     check('v6.0.116「未同步」測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.117 批次 G6：報價單備註依實際有內容的條目從 1 重新編號（沒填的條目不再跳號）；條號引用跟著算；存檔不改 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const nums = t => t.split('\n').map(l => (l.match(/^(\d+)\.(?!\d)/) || [])[1]).filter(Boolean).map(Number);
+        const seq = a => a.length > 0 && a.every((n, i) => n === i + 1);
+        /* 載重沒填（第8條）、備用單價有填、買斷沒填（第12條）、動員費有填 + 自訂條款 → 1…N 連號 */
+        const q = { id: 'qR', name: '備註案', rmk: { walk: '500', mob: '30000', extra: ['自訂甲'] } };
+        const t = buildRmkTextFromQ(q), n = nums(t);
+        out.seq = seq(n) && !/構台之設計載重/.test(t) && !/買斷/.test(t) && /備用單價/.test(t) && /動員費/.test(t);
+        out.walkNo = (t.split('\n').find(l => /備用單價/.test(l)) || '').startsWith('10. ');   // 原第11條，前面少了第8條 → 第10條
+        out.extraLast = new RegExp('^' + n[n.length - 1] + '\\. 自訂甲$', 'm').test(t);
+        /* 存檔資料不被改：q.rmk 原樣、沒有寫入條號 */
+        out.noWrite = JSON.stringify(q.rmk) === JSON.stringify({ walk: '500', mob: '30000', extra: ['自訂甲'] });
+        /* 小數開頭的續行（如 2.5M）不被當成條號 */
+        out.dec = _rmkBuild('1. a\n2.5M 說明\n3. b', {}, false).text === '1. a\n2.5M 說明\n2. b';
+        /* 報價單列印（_buildQuoteDocHTML 走 buildRmkTextFromQ）同樣連號 */
+        Q.unshift(Object.assign({ client: '甲', date: '2026-10-15', items: [{ desc: 'A', unit: 'M', qty: 1, price: 100 }], t: { sub: 100, tax: 5, total: 105 } }, q));
+        const html = String(_buildQuoteDocHTML(Q[0]) || '');
+        const docNums = [...html.matchAll(/flex-shrink:0">(\d+)\.<\/span>/g)].map(m => Number(m[1]));
+        out.doc = seq(docNums) && docNums.length === n.length && /10\.<\/span><span>備用單價/.test(html); Q.shift();
+        /* 請款「備註條款計價」視窗的條號跟著該報價實際輸出算 */
+        const no = _rmkBuild(document.getElementById('prm')?.value || P.rmkBase || '', q.rmk, false).no;
+        const mobNo = Number(((t.split('\n').find(l => /動員費/.test(l)) || '').match(/^(\d+)\./) || [])[1]);
+        out.inv = no['【WALK】'] === 10 && mobNo === 14 && no['【MOB】'] === 14 && !no['【BUY_H】'];
+        out.defs = CLAUSE_DEFS.every(d => !!d.tok && !d.clause);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.117 批次 G6：報價單備註依實際有內容的條目從 1 連號（沒填的不佔號、自訂條款接在最後）；存檔資料不改；小數開頭的續行不誤判', r.seq && r.walkNo && r.extraLast && r.noWrite && r.dec && r.doc, JSON.stringify(r));
+    check('v6.0.117 批次 G6：請款「備註條款計價」的條號依該報價實際輸出的編號（不再寫死第11／12／16條）', r.inv && r.defs, JSON.stringify(r));
+    check('v6.0.117 批次 G6 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
