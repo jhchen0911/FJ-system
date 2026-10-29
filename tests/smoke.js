@@ -6526,19 +6526,19 @@ async function newPage(browser, width, height) {
         const prm = document.getElementById('prm'); const bak = prm.value;
         newQ(); openRmkModal();
         /* v6.0.117：新報價備用單價（第11條）、買斷（第12條）沒填 → 不出現，動員費由第16條遞補成第14條、自訂接第15條後 */
-        /* v6.0.117：條號照印出來的報價單算——新報價載重（第8條）、備用單價（第11條）、買斷（第12條）、動員費（第16條）都沒填 → 都標「未填」、自訂接第13條後；
-           填動員費（不必按套用）→ 即時變「第13條：動員費」、自訂接第14條後 */
+        /* v6.0.117：條號照印出來的報價單算——新報價載重（第8條）、備用單價（第11條）、買斷（第12條）、動員費（第16條）都沒填 → 都標「未填」、自訂接第14條後（預設 18 條，v6.0.117 第17條拆成結構補強／吊車拔樁兩條）；
+           填動員費（不必按套用）→ 即時變「第13條：動員費」、自訂接第15條後 */
         const T = id => document.getElementById(id).textContent, H = () => T('rmk-extra-hint');
-        const blank = /未填/.test(T('rmk-t-mob')) && /未填/.test(T('rmk-t-load')) && /未填/.test(T('rmk-t-spare')) && /第 13 條之後/.test(H());
+        const blank = /未填/.test(T('rmk-t-mob')) && /未填/.test(T('rmk-t-load')) && /未填/.test(T('rmk-t-spare')) && /第 14 條之後/.test(H());
         const mobEl = document.getElementById('rmk-mob'); mobEl.value = '35000'; mobEl.dispatchEvent(new Event('input', { bubbles: true }));
-        out.t16 = blank && T('rmk-t-mob') === '第13條：動員費' && /第 14 條之後/.test(H());
+        out.t16 = blank && T('rmk-t-mob') === '第13條：動員費' && /第 15 條之後/.test(H());
         mobEl.value = ''; mobEl.dispatchEvent(new Event('input', { bubbles: true }));
         document.getElementById('rmk-modal').style.display = 'none';
         /* 參數最前面插一條 → 動員費變第 17 條、自訂接第 19 條後；多條件門檻 */
         prm.value = '1. 新增第一條。\n' + bak.split('\n').map(l => l.replace(/^(\d+)\./, (m, n) => (parseInt(n, 10) + 1) + '.')).join('\n');
-        rmkCustom.mob = '40000'; openRmkModal(); out.shift = document.getElementById('rmk-t-mob').textContent === '第14條：動員費' && /第 15 條之後/.test(document.getElementById('rmk-extra-hint').textContent);
+        rmkCustom.mob = '40000'; openRmkModal(); out.shift = document.getElementById('rmk-t-mob').textContent === '第14條：動員費' && /第 16 條之後/.test(document.getElementById('rmk-extra-hint').textContent);
         document.getElementById('rmk-mob').value = '40000'; document.getElementById('rmk-minqty').value = 'H型鋼樁 20 支或水平支撐 200 M'; applyRmkCustom(); rmkCustom.extra = ['自訂甲條款'];
-        const txt = buildRmkText(); out.multi = /施作數量不足 H型鋼樁 20 支或水平支撐 200 M 時/.test(txt) && /^17\. 自訂甲條款$/m.test(txt);
+        const txt = buildRmkText(); out.multi = /施作數量不足 H型鋼樁 20 支或水平支撐 200 M 時/.test(txt) && /^18\. 自訂甲條款$/m.test(txt);
         /* 參數拿掉動員費條 → 標題提示找不到 */
         prm.value = bak.split('\n').filter(l => !/【MOB】/.test(l)).join('\n'); openRmkModal(); out.missing = /找不到 【MOB】/.test(document.getElementById('rmk-t-mob').textContent);
         document.getElementById('rmk-modal').style.display = 'none'; prm.value = bak; rmkCustom.extra = [];
@@ -8689,11 +8689,15 @@ async function newPage(browser, width, height) {
         const mobNo = Number(((t.split('\n').find(l => /動員費/.test(l)) || '').match(/^(\d+)\./) || [])[1]);
         out.inv = no['【WALK】'] === 10 && mobNo === 14 && no['【MOB】'] === 14 && !no['【BUY_H】'];
         out.defs = CLAUSE_DEFS.every(d => !!d.tok && !d.clause);
+        /* 預設條款 18 條（Lotion 實際報價單）：第17條結構補強、第18條吊車拔樁；參數頁預設與「還原預設」同一份 */
+        const prmDef = document.getElementById('prm').defaultValue || '';
+        const dl = prmDef.split('\n').filter(l => /^\d+\. /.test(l));
+        out.def18 = dl.length === 18 && /^17\. 於結構體作業時/.test(dl[16]) && /^18\. 如因甲方要求或施工動線限制需使用吊車進行拔樁作業，其施工單價另議。$/.test(dl[17]) && String(resetRmkBase).indexOf('於結構體作業時') > 0;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
     check('v6.0.117 批次 G6：報價單備註依實際有內容的條目從 1 連號（沒填的不佔號、自訂條款接在最後）；存檔資料不改；小數開頭的續行不誤判', r.seq && r.walkNo && r.extraLast && r.noWrite && r.dec && r.doc, JSON.stringify(r));
-    check('v6.0.117 批次 G6：請款「備註條款計價」的條號依該報價實際輸出的編號（不再寫死第11／12／16條）', r.inv && r.defs, JSON.stringify(r));
+    check('v6.0.117 批次 G6：請款「備註條款計價」的條號依該報價實際輸出的編號（不再寫死第11／12／16條）；預設條款 18 條（結構補強、吊車拔樁分開）', r.inv && r.defs && r.def18, JSON.stringify(r));
     check('v6.0.117 批次 G6 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
