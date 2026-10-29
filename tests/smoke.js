@@ -6526,11 +6526,17 @@ async function newPage(browser, width, height) {
         const prm = document.getElementById('prm'); const bak = prm.value;
         newQ(); openRmkModal();
         /* v6.0.117：新報價備用單價（第11條）、買斷（第12條）沒填 → 不出現，動員費由第16條遞補成第14條、自訂接第15條後 */
-        out.t16 = document.getElementById('rmk-t-mob').textContent === '第14條：動員費' && /第 15 條之後/.test(document.getElementById('rmk-extra-hint').textContent) && document.getElementById('rmk-t-load').textContent === '第8條：施工構台設計載重' && /未填/.test(document.getElementById('rmk-t-spare').textContent);
+        /* v6.0.117：條號照印出來的報價單算——新報價載重（第8條）、備用單價（第11條）、買斷（第12條）、動員費（第16條）都沒填 → 都標「未填」、自訂接第13條後；
+           填動員費（不必按套用）→ 即時變「第13條：動員費」、自訂接第14條後 */
+        const T = id => document.getElementById(id).textContent, H = () => T('rmk-extra-hint');
+        const blank = /未填/.test(T('rmk-t-mob')) && /未填/.test(T('rmk-t-load')) && /未填/.test(T('rmk-t-spare')) && /第 13 條之後/.test(H());
+        const mobEl = document.getElementById('rmk-mob'); mobEl.value = '35000'; mobEl.dispatchEvent(new Event('input', { bubbles: true }));
+        out.t16 = blank && T('rmk-t-mob') === '第13條：動員費' && /第 14 條之後/.test(H());
+        mobEl.value = ''; mobEl.dispatchEvent(new Event('input', { bubbles: true }));
         document.getElementById('rmk-modal').style.display = 'none';
         /* 參數最前面插一條 → 動員費變第 17 條、自訂接第 19 條後；多條件門檻 */
         prm.value = '1. 新增第一條。\n' + bak.split('\n').map(l => l.replace(/^(\d+)\./, (m, n) => (parseInt(n, 10) + 1) + '.')).join('\n');
-        openRmkModal(); out.shift = document.getElementById('rmk-t-mob').textContent === '第15條：動員費' && /第 16 條之後/.test(document.getElementById('rmk-extra-hint').textContent);
+        rmkCustom.mob = '40000'; openRmkModal(); out.shift = document.getElementById('rmk-t-mob').textContent === '第14條：動員費' && /第 15 條之後/.test(document.getElementById('rmk-extra-hint').textContent);
         document.getElementById('rmk-mob').value = '40000'; document.getElementById('rmk-minqty').value = 'H型鋼樁 20 支或水平支撐 200 M'; applyRmkCustom(); rmkCustom.extra = ['自訂甲條款'];
         const txt = buildRmkText(); out.multi = /施作數量不足 H型鋼樁 20 支或水平支撐 200 M 時/.test(txt) && /^17\. 自訂甲條款$/m.test(txt);
         /* 參數拿掉動員費條 → 標題提示找不到 */
@@ -8666,7 +8672,7 @@ async function newPage(browser, width, height) {
         /* 載重沒填（第8條）、備用單價有填、買斷沒填（第12條）、動員費有填 + 自訂條款 → 1…N 連號 */
         const q = { id: 'qR', name: '備註案', rmk: { walk: '500', mob: '30000', extra: ['自訂甲'] } };
         const t = buildRmkTextFromQ(q), n = nums(t);
-        out.seq = seq(n) && !/構台之設計載重/.test(t) && !/買斷/.test(t) && /備用單價/.test(t) && /動員費/.test(t);
+        out.seq = seq(n) && !/構台之設計載重/.test(t) && !/如因甲方因素或要求買斷/.test(t) && /備用單價/.test(t) && /動員費/.test(t);
         out.walkNo = (t.split('\n').find(l => /備用單價/.test(l)) || '').startsWith('10. ');   // 原第11條，前面少了第8條 → 第10條
         out.extraLast = new RegExp('^' + n[n.length - 1] + '\\. 自訂甲$', 'm').test(t);
         /* 存檔資料不被改：q.rmk 原樣、沒有寫入條號 */

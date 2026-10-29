@@ -2691,10 +2691,10 @@ function rmkRenderExtra(){
     return;
   }
   const base=(document.getElementById('prm')?.value||P.rmkBase||'');
-  const n0=_rmkBuild(base,Object.assign(_rmkFormVals(),{extra:[]}),true).nBase;   // v6.0.117 接在實際最後一條之後
+  const n0=_rmkBuild(base,Object.assign(_rmkFormVals(),{extra:[]}),false).nBase;   // v6.0.117 接在實際最後一條之後
   box.innerHTML=arr.map((v,i)=>
     '<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px">'
-    +'<span style="font-size:11.5px;font-weight:700;color:var(--g3);padding-top:7px;min-width:24px">'+(n0+i+1)+'.</span>'
+    +'<span class="rmk-xno" style="font-size:11.5px;font-weight:700;color:var(--g3);padding-top:7px;min-width:24px">'+(n0+i+1)+'.</span>'
     +'<textarea rows="2" oninput="_rmkExtraList()['+i+']=this.value" placeholder="輸入條款內容"'
     +' style="flex:1;min-width:0;font-size:12px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;resize:vertical">'
     +esc(v||'')+'</textarea>'
@@ -2741,12 +2741,13 @@ function _rmkFormVals(){
 // v6.0.84 備註填寫視窗的「第 N 條」標題；v6.0.117 起依目前填的內容即時算（沒填的條目不出現、後面的往前遞補）
 function _rmkModalTitles(){
   var base=document.getElementById('prm')?.value||P.rmkBase||'';
-  var b=_rmkBuild(base,_rmkFormVals(),true);
+  var b=_rmkBuild(base,_rmkFormVals(),false);   // 審查：條號照「印出來的報價單」算（沒填的載重／動員費不佔號）
   var set=function(id,tok,label){var el=document.getElementById(id);if(!el)return;var n=b.no[tok];
     el.textContent=n?('第'+n+'條：'+label):(base.indexOf(tok)<0?(label+'（參數條款中找不到 '+tok+'，此欄不會套用）'):(label+'（未填，報價單不會出現這一條）'));};
   set('rmk-t-load','【LOAD】','施工構台設計載重');set('rmk-t-spare','【WALK】','備用單價');set('rmk-t-buy','【BUY_H】','買斷單價（未稅）');set('rmk-t-mob','【MOB】','動員費');
-  var hint=document.getElementById('rmk-extra-hint');if(hint)hint.textContent='自訂條款（依序接在第 '+b.nBase+' 條之後；條號依實際有內容的條目自動編號）';
-  var m=document.getElementById('rmk-modal');if(m&&!m._rmkLive){m._rmkLive=1;m.addEventListener('input',function(ev){try{if(ev.target&&/^rmk-/.test(ev.target.id||''))_rmkModalTitles();}catch(e){_err('_rmkModalTitles.live',e);}});}
+  var hint=document.getElementById('rmk-extra-hint');if(hint)hint.textContent='自訂條款（依序接在'+(b.nBase?('第 '+b.nBase+' 條'):'最後一條')+'之後；條號依實際有內容的條目自動編號）';
+  document.querySelectorAll('#rmk-extra .rmk-xno').forEach(function(el,i){el.textContent=(b.nBase+i+1)+'.';});
+  var m=document.getElementById('rmk-modal');if(m&&!m._rmkLive){m._rmkLive=1;m.addEventListener('input',function(ev){try{if(ev.target&&(/^rmk-/.test(ev.target.id||'')||ev.target.closest('#rmk-extra')))_rmkModalTitles();}catch(e){_err('_rmkModalTitles.live',e);}});}
 }
 function openRmkModal(){
   const map={load:'rmk-load',walk:'rmk-walk',tech:'rmk-tech',bh:'rmk-bh',
@@ -3107,7 +3108,7 @@ function addInvRental(){
 // ── 備註條款請款：勾選條款項目並輸入數量，帶入估驗明細 ──
 var CLAUSE_DEFS=[
   {k:'walk',tok:'【WALK】',name:'安全走道',unit:'M'},
-  {k:'tech',tok:'【WALK】',name:'技術工',unit:'天'},
+  {k:'tech',tok:'【TECH】',name:'技術工',unit:'天'},
   {k:'bh',tok:'【BUY_H】',name:'型鋼（買斷）',unit:'KG'},
   {k:'br',tok:'【BUY_H】',name:'鋼軌樁（買斷）',unit:'KG'},
   {k:'bs',tok:'【BUY_H】',name:'鋼板樁（買斷）',unit:'KG'},
