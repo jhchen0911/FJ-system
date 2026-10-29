@@ -8692,12 +8692,12 @@ async function newPage(browser, width, height) {
         /* 預設條款 18 條（Lotion 實際報價單）：第17條結構補強、第18條吊車拔樁；參數頁預設與「還原預設」同一份 */
         const prmDef = document.getElementById('prm').defaultValue || '';
         const dl = prmDef.split('\n').filter(l => /^\d+\. /.test(l));
-        out.def18 = dl.length === 18 && /^17\. 於結構體作業時/.test(dl[16]) && /^18\. 如因甲方要求或施工動線限制需使用吊車進行拔樁作業，其施工單價另議。$/.test(dl[17]) && String(resetRmkBase).indexOf('於結構體作業時') > 0;
+        out.def18 = dl.length === 18 && /^17\. 於結構體作業時/.test(dl[16]) && /^18\. 如因甲方要求或施工動線限制需使用吊車進行拔樁作業，其施工單價另議。$/.test(dl[17]) && String(resetRmkBase).indexOf('於結構體作業時') > 0 && /^3\. 付款方式：每月月底估驗一次、次月20日付款。.*按裝（打設）完成付70%，拆除（拔除）完成付30%，工程款以100%現金支付。$/.test(dl[2]);
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
     check('v6.0.117 批次 G6：報價單備註依實際有內容的條目從 1 連號（沒填的不佔號、自訂條款接在最後）；存檔資料不改；小數開頭的續行不誤判', r.seq && r.walkNo && r.extraLast && r.noWrite && r.dec && r.doc, JSON.stringify(r));
-    check('v6.0.117 批次 G6：請款「備註條款計價」的條號依該報價實際輸出的編號（不再寫死第11／12／16條）；預設條款 18 條（結構補強、吊車拔樁分開）', r.inv && r.defs && r.def18, JSON.stringify(r));
+    check('v6.0.117 批次 G6：請款「備註條款計價」的條號依該報價實際輸出的編號（不再寫死第11／12／16條）；預設條款 18 條（結構補強、吊車拔樁分開；第3條次月20日、70／30、100%現金）', r.inv && r.defs && r.def18, JSON.stringify(r));
     check('v6.0.117 批次 G6 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
