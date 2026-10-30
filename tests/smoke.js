@@ -6524,7 +6524,13 @@ async function newPage(browser, width, height) {
       const out = {};
       try {
         const prm = document.getElementById('prm'); const bak = prm.value;
-        newQ(); openRmkModal();
+        /* v6.0.117：新報價帶預設備註值（技術工一律 3,500 等）；先上一張報價填了載重，新報價不能沿用 */
+        rmkCustom.load = '40'; newQ();
+        out.defVals = rmkCustom.tech === '3500' && rmkCustom.walk === '3000' && rmkCustom.mob === '60000' && rmkCustom.bh === '32' && rmkCustom.bb === '34' && rmkCustom.ir === '50000' && rmkCustom.load === '' && rmkCustom.br === '';
+        const dt = buildRmkTextFromQ({ rmk: JSON.parse(JSON.stringify(rmkCustom)) });
+        out.defText = /^10\. 備用單價：a\.安全走道M\/\$3000元、b\.技術工\/天\/\$3500元$/m.test(dt) && /^11\. 如因甲方因素或要求買斷：型鋼KG\/\$32元、支撐KG\/\$34元、2M覆工板\/片\/\$20000元、3M覆工板\/片\/\$30000元、鋪路鐵板\/片\/\$50000元（未稅）計。$/m.test(dt) && /次\/\$60000元/.test(dt);
+        ['walk', 'tech', 'bh', 'bb', 'c2', 'c3', 'ir', 'mob'].forEach(k => { rmkCustom[k] = ''; });   // 以下沿用「都沒填」的情境
+        openRmkModal();
         /* v6.0.117：新報價備用單價（第11條）、買斷（第12條）沒填 → 不出現，動員費由第16條遞補成第14條、自訂接第15條後 */
         /* v6.0.117：條號照印出來的報價單算——新報價載重（第8條）、備用單價（第11條）、買斷（第12條）、動員費（第16條）都沒填 → 都標「未填」、自訂接第14條後（預設 18 條，v6.0.117 第17條拆成結構補強／吊車拔樁兩條）；
            填動員費（不必按套用）→ 即時變「第13條：動員費」、自訂接第15條後 */
@@ -6545,7 +6551,7 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.84 備註填寫視窗：各區「第 N 條」與自訂條款起號依參數條款即時計算（插入即位移、刪除則提示）、門檻可寫多條件', r.t16 && r.shift && r.multi && r.missing, JSON.stringify(r));
+    check('v6.0.84 備註填寫視窗：各區「第 N 條」與自訂條款起號依參數條款即時計算（插入即位移、刪除則提示）、門檻可寫多條件；v6.0.117 新報價帶預設備註值（技術工 3,500、買斷、動員費 60,000）', r.t16 && r.shift && r.multi && r.missing && r.defVals && r.defText, JSON.stringify(r));
     check('v6.0.84 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

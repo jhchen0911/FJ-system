@@ -251,7 +251,9 @@ var P={
   dpBuH:33,dpBuR:28,dpBuS:32,dpBuB:36
 };
 let items=[],exs=[],costs=[],eid=null;
-let rmkCustom={load:'',walk:'',tech:'',bh:'',br:'',bs:'',bb:'',c2:'',c3:'',ir:'',mob:'',minQty:'',extra:[]};   // v6.0.83 minQty：第16條「施作數量不足 N 時」
+let rmkCustom={load:'',walk:'',tech:'',bh:'',br:'',bs:'',bb:'',c2:'',c3:'',ir:'',mob:'',minQty:'',extra:[]};
+// v6.0.117 新報價備註預設值（Lotion 10/30 久年 115102902 現行寫法；技術工一律 3,500）。只套在「新增報價」，已存報價不動；每案仍可在備註視窗改
+var _RMK_NEW_DEF={walk:'3000',tech:'3500',bh:'32',bb:'34',c2:'20000',c3:'30000',ir:'50000',mob:'60000'};   // v6.0.83 minQty：第16條「施作數量不足 N 時」
 
 try{const s=localStorage.getItem('fy6_q');if(s)Q=JSON.parse(s);}catch(e){_err('top',e);}
 // v5.318：應付狀態正規化。status 為空的舊資料在 ==='pending' 與 !=='paid' 兩種寫法下
@@ -931,6 +933,7 @@ function genQuoteCode(){
 function newQ(){
   _draftReset();   // v6.0.109 草稿模式與待套用旗標不跨單
   eid=null;items=[{desc:'',unit:'',qty:'',price:'',note:'',ot:'',otu:'$/M/天',sec:false}];exs=[];costs=[];
+  Object.keys(rmkCustom).forEach(function(k){rmkCustom[k]=(k==='extra')?[]:(_RMK_NEW_DEF[k]||'');});   // v6.0.117 新報價帶預設備註值（原本沿用上一張報價的備註數字）
   ['fcl','fn','fl','fco','fp'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   const fc=document.getElementById('fc');if(fc)fc.value=genQuoteCode();
   const fd=document.getElementById('fd');if(fd)fd.value=localToday();
