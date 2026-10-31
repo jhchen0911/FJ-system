@@ -80,13 +80,20 @@ function parseCoReport(text) {
   const out = []; let cur = null, key = '';
   const re = /【\s*(工地|今天|明天|問題)\s*】/g; let m; const segs = [];
   while ((m = re.exec(t))) { segs.push({ tag: m[1], start: m.index, end: re.lastIndex }); }
+  let pre = null;   // 【工地】前面就先寫的欄位（順序寫反）→ 併到第一段
   segs.forEach((g, i) => {
     const val = t.slice(g.end, i + 1 < segs.length ? segs[i + 1].start : t.length).trim();
     key = CO_TAGS[g.tag];
-    if (key === 'site') { cur = { site: val.split('\n')[0].trim().slice(0, 60), today: '', tomorrow: '', issue: '' }; out.push(cur); const rest = val.split('\n').slice(1).join('\n').trim(); if (rest) cur.today = rest.slice(0, 1000); }
-    else if (cur) cur[key] = (cur[key] ? cur[key] + '\n' : '') + val.slice(0, 1000);
+    if (key === 'site') {
+      cur = { site: val.split('\n')[0].trim().slice(0, 60), today: '', tomorrow: '', issue: '' }; out.push(cur);
+      const rest = val.split('\n').slice(1).join('\n').trim(); if (rest) cur.today = rest.slice(0, 1000);
+      if (pre) { Object.keys(pre).forEach(k => { cur[k] = (pre[k] + (cur[k] ? '\n' + cur[k] : '')).slice(0, 1000); }); pre = null; }
+    } else if (cur) cur[key] = (cur[key] ? cur[key] + '\n' : '') + val.slice(0, 1000);
+    else if (val) { pre = pre || {}; pre[key] = (pre[key] ? pre[key] + '\n' : '') + val.slice(0, 1000); }
   });
-  return out.filter(b => b.site);
+  // 空白格式（把機器人的範本原樣貼回）、地名還是「地名」的段落不算
+  const EMPTY = /^(無|没有|沒有|none|-|－|—)?$/i;
+  return out.filter(b => b.site && !/^(地名|地點|工地名稱?)$/.test(b.site) && !(EMPTY.test(b.today.trim()) && EMPTY.test(b.tomorrow.trim()) && EMPTY.test(b.issue.trim())));
 }
 const _nrmSite = (x) => String(x || '').replace(/[\s()（）［］\[\]「」『』\-－_／/、，,.。]/g, '').toLowerCase();
 // 地名對專案：專案名稱（格式「（業主）地名工程名稱」）含地名、或地名含專案短名；只有唯一一案對得上才算，否則待分類
@@ -96,7 +103,7 @@ function matchSite(sites, site) {
   const exact = Object.keys(sites || {}).filter(qid => (Array.isArray((sites[qid] || {}).keys) ? sites[qid].keys : []).some(k => _nrmSite(k) === a));
   if (exact.length === 1) return exact[0];
   const hits = Object.keys(sites || {}).filter(qid => {
-    const s = sites[qid] || {}; const names = [s.name].concat(Array.isArray(s.keys) ? s.keys : []).map(_nrmSite).filter(n => n.length >= 2);
+    const s = sites[qid] || {}; const names = [String(s.name || '').replace(/^\s*[（(][^）)]*[）)]/, '')].concat(Array.isArray(s.keys) ? s.keys : []).map(_nrmSite).filter(n => n.length >= 2);   // 開頭（業主）不比對，免得寫業主名就對到
     return names.some(n => n.indexOf(a) >= 0 || a.indexOf(n) >= 0);
   });
   return hits.length === 1 ? hits[0] : '';
@@ -248,39 +255,40 @@ async function handleCoGroup(ev, msg, src, now, date, cfg, T, deps) {
     if (c.buf && c.buf.length > MAX_FILE_BYTES) { await deps.dbSet(base, Object.assign(rec, { status: 'tooBig', size: c.buf.length })); return { kind: 'tooBig' }; }
     const path = 'line/group/' + gid + '/' + date + '/' + msg.id + '.' + extOf(msg);
     await deps.putFile(path, c.buf, c.contentType || 'application/octet-stream');
-    rec.path = path; await deps.dbSet(base, rec);
+    rec.path = path;
     if (msg.type === 'image') {
-      // 這個人 10 分鐘內的回報只有一段 → 掛上去
+      // 這個人 10 分鐘內只回報了一個工地 → 掛上去；回報了兩個以上工地就不掛（分不出是哪個）
       const day = (await deps.dbGet(coPath)) || {};
       const mine = Object.keys(day).map(k => Object.assign({ key: k }, day[k])).filter(r => r && r.user === user && r.at >= now - PHOTO_WINDOW_MS && r.at <= now + PHOTO_WINDOW_MS);
-      const msgs = {}; mine.forEach(r => { (msgs[r.msgId] = msgs[r.msgId] || []).push(r); });
-      const lastMsg = Object.keys(msgs).sort((x, y) => (msgs[y][0].at || 0) - (msgs[x][0].at || 0))[0];
-      if (lastMsg && msgs[lastMsg].length === 1) await deps.dbSet(coPath + '/' + msgs[lastMsg][0].key + '/photos/' + msg.id, path);
+      if (mine.length === 1) { await deps.dbSet(coPath + '/' + mine[0].key + '/photos/' + msg.id, path); rec.claimed = mine[0].key; }
     }
+    await deps.dbSet(base, rec);   // 最後才寫：前面任何一步失敗，LINE 重送時還能重做
     return { kind: 'coMedia', path };
   }
   if (msg.type !== 'text') return { kind: 'skip', type: msg.type };
   const text = String(msg.text || '').slice(0, 4000);
-  rec.text = text; await deps.dbSet(base, rec);
+  rec.text = text;
   const blocks = parseCoReport(text);
   const res = { kind: 'coText', blocks: blocks.length };
   if (!blocks.length) {
     // 沒用格式：照樣看警報字（工地名寫群組名）
     const w0 = alarmWord(text);
     if (w0) { await pushOwners(cfg, deps, fill(T.alarm, { site: siteName(cfg.groups[gid]), word: w0 })); res.alarm = w0; }
+    await deps.dbSet(base, rec);
     return res;
   }
   // 這則之前 10 分鐘同一人傳的照片：只有一段時一起掛
   let prevPhotos = [];
   if (blocks.length === 1) {
     const logs = (await deps.dbGet('fydata/lineLog/' + gid + '/' + date)) || {};
-    prevPhotos = Object.keys(logs).map(k => logs[k]).filter(r => r && r.path && r.type === 'image' && r.user === user && r.at >= now - PHOTO_WINDOW_MS && r.at <= now);
+    prevPhotos = Object.keys(logs).map(k => logs[k]).filter(r => r && r.path && r.type === 'image' && !r.claimed && r.user === user && r.at >= now - PHOTO_WINDOW_MS && r.at <= now);
   }
   res.qids = [];
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i], qid = matchSite(cfg.sites, b.site);
     const photos = {}; prevPhotos.forEach(r => { photos[r.id] = r.path; });
     await deps.dbSet(coPath + '/' + msg.id + '_' + i, { at: now, user, msgId: msg.id, site: b.site, qid, today: b.today, tomorrow: b.tomorrow, issue: b.issue, photos });
+    for (const r of prevPhotos) await deps.dbSet('fydata/lineLog/' + gid + '/' + date + '/' + r.id + '/claimed', msg.id + '_' + i);   // 一張照片只掛一個工地
     res.qids.push(qid);
     const all = [b.today, b.tomorrow, b.issue].join('\n');
     const w = alarmWord(all);
@@ -292,6 +300,7 @@ async function handleCoGroup(ev, msg, src, now, date, cfg, T, deps) {
         payload: { qid, site: b.site, unmatched: !qid, groupId: gid, date, text: coBlockText(b), user, qty: q ? q.qty : null, unit: q ? q.unit : '', photos: Object.keys(photos).map(k => photos[k]), msgId: msg.id } });
     }
   }
+  await deps.dbSet(base, rec);   // 最後才寫（同上：失敗可重送）
   return res;
 }
 
@@ -348,19 +357,21 @@ async function dailyCompile(deps, now) {
 }
 
 // 公司大群組 20:00：同一工地當天所有回報合成一份日報草稿；對不到工地的每段各一份「待分類」草稿（在 FJ 選工程再確認）
-async function coCompile(deps, cfg, gid, date, now) {
+// late=true（隔天 08:00 補跑）：只收 20:00 之後才回報、還沒進草稿的段落，草稿 id 加 L，不跟前一晚的撞
+async function coCompile(deps, cfg, gid, date, now, late) {
   const day = (await deps.dbGet('fydata/lineCo/' + gid + '/' + date)) || {};
-  const rows = Object.keys(day).map(k => Object.assign({ key: k }, day[k])).filter(r => r && r.site).sort((a, b) => (a.at || 0) - (b.at || 0));
+  const rows = Object.keys(day).map(k => Object.assign({ key: k }, day[k])).filter(r => r && r.site && !r.compiled).sort((a, b) => (a.at || 0) - (b.at || 0));
   const by = {};
   rows.forEach(r => { const k = r.qid || ('?' + r.key); (by[k] = by[k] || []).push(r); });
   let n = 0;
   for (const k of Object.keys(by)) {
     const L = by[k], qid = L[0].qid || '';
     const photos = []; L.forEach(r => Object.keys(r.photos || {}).forEach(p => photos.push(r.photos[p])));
-    const id = qid ? ('dc' + gid.slice(-6) + qid.replace(/[^\w]/g, '').slice(-10) + date.replace(/-/g, '')) : ('du' + gid.slice(-6) + String(L[0].key).replace(/[^\w]/g, '').slice(-16));
+    const id = qid ? ('dc' + gid.slice(-6) + qid.replace(/[^\w]/g, '').slice(-10) + date.replace(/-/g, '') + (late ? 'L' : '')) : ('du' + gid.slice(-6) + String(L[0].key).replace(/[^\w]/g, '').slice(-16));
     await deps.createDraft({ id, type: 'dailyLog', by: 'line-bot', byName: 'LINE 機器人', at: now || Date.now(), status: 'pending',
       summary: ('施工日報' + (qid ? '' : '（待分類）') + '：' + L[0].site + '　' + date).slice(0, 200),
       payload: { qid, site: L[0].site, unmatched: !qid, groupId: gid, date, answers: L.map(r => coBlockText(r)), dayTexts: [], photos: photos.slice(0, 20), replied: true } });
+    for (const r of L) await deps.dbSet('fydata/lineCo/' + gid + '/' + date + '/' + r.key + '/compiled', id);
     n++;
   }
   return n;
@@ -372,7 +383,9 @@ async function morningCheck(deps, now) {
   const today = tpeDate(now), d1 = addDays(today, -1), d2 = addDays(today, -2);
   let reminded = 0, escalated = 0;
   for (const gid of Object.keys(cfg.groups || {})) {
-    const g = cfg.groups[gid]; if (!g || !g.qid || g.daily === false) continue;
+    const g = cfg.groups[gid];
+    if (g && g.mode === 'company') { await coCompile(deps, cfg, gid, d1, now, true); continue; }   // 昨天 20:00 之後才回報的補成草稿（已建過的不重複）
+    if (!g || !g.qid || g.daily === false) continue;
     const y1 = (await deps.dbGet('fydata/lineDaily/' + gid + '/' + d1)) || null;
     if (!y1 || !y1.askedAt || y1.replied || y1.reminded) continue;
     // 早上補回也算（問三句之後到現在有文字）

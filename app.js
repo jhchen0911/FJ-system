@@ -22785,7 +22785,7 @@ function _drGapState(q,today,gap){
   if(!q||!q.awarded||q.closed||q.parentId)return null;
   var logs=q.dailyLogs||[];
   if(!logs.length&&!(q.costs||[]).length)return null;
-  var lastL=null;logs.forEach(function(L){var d=String((L&&L.date)||'');if(!lastL||d>String(lastL.date||''))lastL=L;});
+  var lastL=null;logs.forEach(function(L){if(L&&L.photoOnly)return;var d=String((L&&L.date)||'');if(!lastL||d>String(lastL.date||''))lastL=L;});   // v6.0.119 只有照片的不算日報
   if(!lastL)return null;
   var last=String(lastL.date||''),days=_dDiff(last,today);
   if(!(days>=gap))return null;
@@ -22912,6 +22912,7 @@ function _drMergeLog(q,L,e){
   if(e.weather)L.weather=e.weather;if(e.backfillFrom)L.backfillFrom=e.backfillFrom;   // v6.0.33
   if(e.status&&e.status!=='work'){L.status=e.status;L.stopReason=e.stopReason||'';L.resumeDate=e.resumeDate||'';L.stageOf=e.stageOf||'';L.stageDate=e.stageDate||'';}
   L.editedAt=Date.now();L.by=((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||L.by||'');
+  if(L.photoOnly)delete L.photoOnly;   // v6.0.119 只有照片的日報補上正式內容 → 變成一般日報
   return {rep:rep,add:add};
 }
 function _drCollect(){
@@ -23050,7 +23051,7 @@ function _drLogRow(q,L){
 }
 function _drvSummary(rows){
   var work=0,stop=0,pause=0;
-  rows.forEach(function(r){if(r.status==='work')work++;else if(r.status==='stop')stop+=r.stopDays;else pause+=r.stopDays;});
+  rows.forEach(function(r){if(r.L&&r.L.photoOnly)return;if(r.status==='work')work++;else if(r.status==='stop')stop+=r.stopDays;else pause+=r.stopDays;});
   return {n:rows.length,work:work,stop:stop,pause:pause};
 }
 function viewDailyReports(qid){
@@ -27388,9 +27389,11 @@ function _ikSubVendors(){
 }
 function _ikSubHit(name){
   var a=_nrm(name);if(!a||a.length<2)return '';
-  return _ikSubVendors().find(function(v){var b=_nrm(v);return b&&b.length>=2&&(a.indexOf(b)>=0||b.indexOf(a)>=0);})||'';
+  // 完全相同，或賣方全名包含分包廠商名（至少 3 個字，「乙工程行有限公司」⊃「乙工程行」）；兩個字的簡稱不比，免得誤判
+  return _ikSubVendors().find(function(v){var b=_nrm(v);return b&&(a===b||(b.length>=3&&a.indexOf(b)>=0));})||'';
 }
 function smartIntake(){
+  if(_roDeny())return;   // 唯讀帳號不寫日報
   if(!_aiOn()){toast(_aiOffMsg());return;}
   var inp=document.getElementById('intake-input');
   if(!inp){
@@ -27480,7 +27483,8 @@ function _intakeConfirm(r,du){
     }
     if(ty==='site_photo'){
       html2+='<div style="font-size:12px;color:var(--b4);margin:4px 0">放進「'+esc(((Q.find(function(x){return x.id===qid2;})||{}).name)||'（請選工地）')+'」該日期的施工日報照片（每天最多 12 張）。</div>';
-      if(left)html2+='<label style="display:flex;gap:6px;align-items:center;font-size:12.5px;margin-top:4px"><input type="checkbox" id="ik-rest" style="width:16px;height:16px"> 其餘 '+left+' 張也是這個工地的施工照片（不再逐張辨識）</label>';
+      var restOn=!!(document.getElementById('ik-rest')||{}).checked;
+      if(left)html2+='<label style="display:flex;gap:6px;align-items:center;font-size:12.5px;margin-top:4px"><input type="checkbox" id="ik-rest"'+(restOn?' checked':'')+' style="width:16px;height:16px"> 其餘 '+left+' 張也是這個工地的施工照片（不再逐張辨識）</label>';
     }
     if(ty==='delivery_slip'){
       var s=r.slip||{};var IN='width:100%;box-sizing:border-box';
@@ -27538,7 +27542,7 @@ function _ikSitePhotos(qid,dus,date,quiet){
   if(!q.dailyLogs)q.dailyLogs=[];
   var L=q.dailyLogs.find(function(x){return x&&x.date===date&&!x.stopFrom;});
   var by=((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'');
-  if(!L){L={id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:date,workers:0,subWorkers:0,subVendor:'',crews:[],progress:'',progressRows:[],photos:[],ownEquip:false,equip:[],status:'work',by:by,ts:Date.now(),src:'intake'};q.dailyLogs.unshift(L);q.dailyLogs.sort(function(a,b){return String(b.date||'')<String(a.date||'')?-1:1;});}
+  if(!L){L={id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:date,workers:0,subWorkers:0,subVendor:'',crews:[],progress:'',progressRows:[],photos:[],ownEquip:false,equip:[],status:'work',by:by,ts:Date.now(),src:'intake',photoOnly:true};q.dailyLogs.unshift(L);}   // photoOnly：只有照片／簽收單，不算施工日、不擋「幾天沒日報」提醒
   L.photos=L.photos||[];
   var room=12-L.photos.length,n=0;
   dus.forEach(function(du){if(room>0){L.photos.push(_photoPut(du));room--;n++;}});
@@ -27546,7 +27550,7 @@ function _ikSitePhotos(qid,dus,date,quiet){
   _touch(q);_ikSetLastProj(qid);
   try{persist();_immediateUpload();}catch(e){_err('_ikSitePhotos',e);}
   if(!quiet||n<dus.length)toast(n?('已放進「'+(q.name||'')+'」'+date+' 日報照片（'+L.photos.length+' 張）'):('「'+(q.name||'')+'」'+date+' 日報照片已滿 12 張，這張沒有放進去'));
-  return n>0;
+  return true;   // 滿了也不重開視窗（已提示）
 }
 // 材料簽收單 → 該工地該日日報 slips（照片＋讀出的欄位）；成本、調撥由管理員在材料頁處理
 function _ikSlipSave(qid,r,du){
@@ -27555,7 +27559,7 @@ function _ikSlipSave(qid,r,du){
   if(!q.dailyLogs)q.dailyLogs=[];
   var L=q.dailyLogs.find(function(x){return x&&x.date===date&&!x.stopFrom;});
   var by=((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'');
-  if(!L){L={id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:date,workers:0,subWorkers:0,subVendor:'',crews:[],progress:'',progressRows:[],photos:[],ownEquip:false,equip:[],status:'work',by:by,ts:Date.now(),src:'intake'};q.dailyLogs.unshift(L);q.dailyLogs.sort(function(a,b){return String(b.date||'')<String(a.date||'')?-1:1;});}
+  if(!L){L={id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:date,workers:0,subWorkers:0,subVendor:'',crews:[],progress:'',progressRows:[],photos:[],ownEquip:false,equip:[],status:'work',by:by,ts:Date.now(),src:'intake',photoOnly:true};q.dailyLogs.unshift(L);}   // photoOnly：只有照片／簽收單，不算施工日、不擋「幾天沒日報」提醒
   var s=r.slip||{};
   L.slips=L.slips||[];
   L.slips.push({id:'sl'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),date:date,dir:s.dir||'other',from:s.from||'',to:s.to||'',truck:s.truck||'',vendor:r.vendor||'',

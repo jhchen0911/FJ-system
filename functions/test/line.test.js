@@ -181,6 +181,7 @@ test('公司群：地名唯一對到才歸案；對到兩案或沒對到＝待�
   assert.equal(core.matchSite(CO.sites, '板橋 文化路'), 'qB');    // 空白去掉後被專案名包含
   assert.equal(core.matchSite(CO.sites, '內湖'), '');              // 兩案都有內湖 → 不猜
   assert.equal(core.matchSite(CO.sites, '台中'), '');
+  assert.equal(core.matchSite(CO.sites, '乙建設'), '');            // 開頭（業主）不比對
   assert.equal(core.matchSite(Object.assign({}, CO.sites, { qC: { name: CO.sites.qC.name, keys: ['內湖'] } }), '內湖'), 'qC');   // 手動對過的地名優先
 });
 
@@ -209,4 +210,40 @@ test('公司群：17:30 發固定格式；隔天 08:00 不提醒公司群', asyn
   assert.match(d.pushes[0].text, /【工地】/);
   const r = await core.morningCheck(d, T0 + 24 * 3600000);
   assert.equal(r.reminded, 0);
+});
+
+test('公司群（審查）：空白範本與「地名」不算；欄位寫在【工地】前面併到第一段', () => {
+  assert.deepEqual(core.parseCoReport('【工地】地名\n【今天】\n【明天】\n【問題】'), []);
+  assert.deepEqual(core.parseCoReport('【工地】興中路\n【今天】\n【明天】\n【問題】無'), []);
+  const b = core.parseCoReport('【今天】打樁\n【工地】內湖');
+  assert.equal(b.length, 1); assert.equal(b[0].today, '打樁');
+});
+
+test('公司群（審查）：同一張照片只掛一個工地；連報兩工地的照片不掛；20:00 後的回報隔天 08:00 補成草稿', async () => {
+  const d = mkDeps(CO);
+  const g = { type: 'group', groupId: 'Gco', userId: 'Uw1' };
+  await core.handleEvents([{ type: 'message', timestamp: T0 - 120000, source: g, message: { id: 'i1', type: 'image' } }], d);
+  await core.handleEvents([{ type: 'message', timestamp: T0 - 60000, source: g, message: { id: 'a1', type: 'text', text: '【工地】興中路\n【今天】打樁' } }], d);
+  await core.handleEvents([{ type: 'message', timestamp: T0, source: g, message: { id: 'a2', type: 'text', text: '【工地】文化路\n【今天】進料' } }], d);
+  const co = d.db.fydata.lineCo.Gco['2026-10-22'];
+  assert.equal(Object.keys(co.a1_0.photos).length, 1);
+  assert.equal(Object.keys(co.a2_0.photos).length, 0);
+  await core.handleEvents([{ type: 'message', timestamp: T0 + 1000, source: g, message: { id: 'i2', type: 'image' } }], d);
+  assert.ok(!co.a2_0.photos.i2 && !co.a1_0.photos.i2, '10 分鐘內報了兩個工地 → 照片不掛');
+  assert.equal(await core.dailyCompile(d, T0 + 10 * 3600000), 2);
+  await core.handleEvents([{ type: 'message', timestamp: T0 + 11 * 3600000, source: g, message: { id: 'a3', type: 'text', text: '【工地】興中路\n【今天】補報：拔樁' } }], d);
+  await core.morningCheck(d, T0 + 24 * 3600000);
+  const late = Object.values(d.drafts).filter(x => x.type === 'dailyLog' && /L$/.test(x.id));
+  assert.equal(late.length, 1); assert.match(late[0].payload.answers.join(''), /補報/);
+  assert.equal(Object.values(d.drafts).filter(x => x.type === 'dailyLog').length, 3);
+});
+
+test('公司群（審查）：處理中途失敗，LINE 重送時能重做（紀錄最後才寫）', async () => {
+  const d = mkDeps(CO); let boom = true;
+  const cd = d.createDraft; d.createDraft = async r => { if (boom) throw new Error('x'); return cd(r); };
+  const ev = { type: 'message', timestamp: T0, source: { type: 'group', groupId: 'Gco', userId: 'U' }, message: { id: 'r1', type: 'text', text: '【工地】興中路\n【今天】追加 3 支' } };
+  await core.handleEvents([ev], d);
+  boom = false;
+  await core.handleEvents([ev], d);
+  assert.ok(d.drafts.dlr1_0, '重送後追加草稿建立');
 });

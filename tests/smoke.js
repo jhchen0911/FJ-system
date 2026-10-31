@@ -8902,7 +8902,7 @@ async function newPage(browser, width, height) {
         out.staffTypes = [...document.querySelectorAll('#ik-type option')].map(o => o.value).join(',') === 'site_photo,delivery_slip,other';
         ok(); await wait(60);
         const L = Q[0].dailyLogs.find(x => x.date === '2026-10-31');
-        out.photo = !!L && L.photos.length === 1 && /^ph:/.test(L.photos[0]);
+        out.photo = !!L && L.photos.length === 1 && /^ph:/.test(L.photos[0]) && L.photoOnly === true && _drvSummary([_drLogRow(Q[0], L)]).work === 0;   // 只有照片：不算施工日
         out.model = sentModel === _AI_MODEL && /^claude-/.test(_AI_MODEL);
         /* 材料簽收單 → 日報 slips；材料頁出現簽收單清單與趟數 */
         reply = { docType: 'delivery_slip', projectId: 'qI1', date: '2026-10-31', vendor: '丙料場', slip: { dir: 'rentIn', from: '丙料場', to: '內湖興中路', truck: 'KLA-1234', items: [{ name: 'H型鋼', spec: 'H300', len: 9, qty: 12, unit: '支' }] } };
