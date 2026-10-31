@@ -8708,6 +8708,28 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.118 批次 H 併入審查：員工的刪報價申請也要過「有已付應付／已收款不准刪」；管理員裝置不留刪除申請殘留 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        TOMBS.quotes = {}; PAYABLES.length = 0; INV.length = 0;
+        Q = [{ id: 'qB1', name: '有已付', items: [], costs: [{ id: 'cB1', type: 'sub' }] }, { id: 'qB2', name: '可刪', items: [] }];
+        PAYABLES.push({ id: 'paycB1_p1', status: 'paid', amount: 1000, to: '甲', paidDate: '2026-10-01' });
+        _tombApplyOne('quotes', 'qB1', 1); _tombApplyOne('quotes', 'qB2', 1);
+        out.blk = Q.some(q => q.id === 'qB1') && !(TOMBS.quotes && TOMBS.quotes.qB1) && !Q.some(q => q.id === 'qB2') && !!TOMBS.quotes.qB2;
+        localStorage.setItem('fy_tombreq_pending', JSON.stringify({ 'quotes/x1': 1 }));
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'u1' }; _isReaderUser = false; _tombReqPush();
+        out.clr = localStorage.getItem('fy_tombreq_pending') === null; _fbUser = null;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.118 批次 H 審查：員工送來的刪報價申請，報價有已付應付就不套用（與直接刪報價同一道檢查）；管理員裝置清掉殘留的刪除申請', r.blk && r.clr, JSON.stringify(r));
+    check('v6.0.118 批次 H 審查測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.114 beta 不寫雲端（實際攔截 Firebase 連線）：beta 存報價＋各上傳路徑 → 寫入框數 0；test.html 對照組要有寫入 ──
   {
     const SDK_DIR = process.env.FJ_FB_SDK_DIR || '';   // 雲端容器連不到 gstatic 時，指到 npm 套件 firebase@10.12.0 的資料夾

@@ -39153,7 +39153,8 @@ var _TOMB_REQ_COLLS={quotes:1,invoices:1,contracts:1,customers:1,vendors:1,invoi
 var _TOMB_COLLS={quotes:function(){return Q;},invoices:function(){return INV;},contracts:function(){return CONTRACTS;},customers:function(){return CUSTOMERS;},vendors:function(){return VENDORS;},
   invoiceRecs:function(){return INVOICE_RECS;},workers:function(){return WORKERS;},payables:function(){return PAYABLES;},expenses:function(){return EXPENSES;}};
 function _tombReqPush(){
-  if(!_fbDb||!_fbUser||_isReaderUser||_shWholeOk())return;
+  if(_fbUser&&!_isReaderUser&&_shWholeOk()){try{localStorage.removeItem('fy_tombreq_pending');}catch(e){/* 可忽略 */}return;}   // v6.0.118 審查：管理員裝置（登入前刪的也記成申請）直接立墓碑，不必送申請 → 清掉殘留
+  if(!_fbDb||!_fbUser||_isReaderUser)return;
   var me=_encEmailKey(_fbUser.email);if(!me)return;
   // 審查 🔴1：只送本機自己刪的（_tomb 記在 fy_tombreq_pending），不送從雲端合併來的舊墓碑
   var pend={};try{pend=JSON.parse(localStorage.getItem('fy_tombreq_pending')||'{}')||{};}catch(e){pend={};}
@@ -39165,6 +39166,7 @@ function _tombReqPush(){
 function _tombApplyOne(c,id,ts){
   if(!_TOMB_REQ_COLLS[c])return;
   try{if(_tombExempt(c,id))return;}catch(e){_err('_tombApplyOne.exempt',e);}   // 現行仍需要的自動應付不刪
+  try{if(c==='quotes'&&_delQBlockers(id))return;}catch(e){_err('_tombApplyOne.qblk',e);}   // v6.0.118 審查：員工送來的刪報價申請也要過健檢1 #30（有已付應付／已收款或已開發票的請款單不准刪）
   if(TOMBS[c]&&TOMBS[c][id]!=null)return;   // 已有墓碑：不用舊時間戳覆寫
   TOMBS[c]=TOMBS[c]||{};TOMBS[c][id]=ts||Date.now();
   var a=_TOMB_COLLS[c]&&_TOMB_COLLS[c]();if(!Array.isArray(a))return;
