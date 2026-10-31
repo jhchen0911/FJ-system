@@ -8877,6 +8877,82 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.119 批次 I：智慧收件（黃色相機）施工照片／材料簽收單／分包發票提醒、AI 模型集中、LINE 公司大群組 ──
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const wait = ms => new Promise(res => setTimeout(res, ms));
+      const ok = () => document.getElementById('gen-confirm-ok').click();
+      const oU = _fbUser, oA = _isAdminUser, oF = window._aiFetch, oDb = _fbDb, oT = window.toast;
+      try {
+        window.toast = () => {};
+        /* 手機總覽黃色相機 → 智慧收件 */
+        let called = 0; const oSI = window.smartIntake; window.smartIntake = () => { called++; };
+        _currentPage = 'dash'; mobFabAction(); window.smartIntake = oSI;
+        out.fab = called === 1;
+        const du = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+        Q = [{ id: 'qI1', name: '（甲營造）內湖興中路擋土工程', awarded: true, items: [], dailyLogs: [], costs: [{ id: 'c1', type: 'sub', vendor: '乙工程行' }] }];
+        _fbUser = { email: 'staff@x.com', uid: 'u1', getIdToken: async () => 't' }; _isAdminUser = false;
+        let reply = {}, sentModel = '';
+        window._aiFetch = async o => { sentModel = JSON.parse(o.body).model; return { json: async () => ({ content: [{ text: JSON.stringify(reply) }] }) }; };
+        /* 一般員工：施工照片 → 該工地當天日報（只看得到三種類型） */
+        reply = { docType: 'site_photo', projectId: 'qI1', date: '2026-10-31', confidence: 'high' };
+        await aiClassifyDoc(du); await wait(120);
+        out.staffTypes = [...document.querySelectorAll('#ik-type option')].map(o => o.value).join(',') === 'site_photo,delivery_slip,other';
+        ok(); await wait(60);
+        const L = Q[0].dailyLogs.find(x => x.date === '2026-10-31');
+        out.photo = !!L && L.photos.length === 1 && /^ph:/.test(L.photos[0]);
+        out.model = sentModel === _AI_MODEL && /^claude-/.test(_AI_MODEL);
+        /* 材料簽收單 → 日報 slips；材料頁出現簽收單清單與趟數 */
+        reply = { docType: 'delivery_slip', projectId: 'qI1', date: '2026-10-31', vendor: '丙料場', slip: { dir: 'rentIn', from: '丙料場', to: '內湖興中路', truck: 'KLA-1234', items: [{ name: 'H型鋼', spec: 'H300', len: 9, qty: 12, unit: '支' }] } };
+        await aiClassifyDoc(du); await wait(120);
+        out.slipForm = /H型鋼 H300 9M 12支/.test(document.getElementById('ik-s-items').value) && document.getElementById('ik-s-dir').value === 'rentIn';
+        ok(); await wait(60);
+        const S = (L.slips || [])[0];
+        out.slip = !!S && S.dir === 'rentIn' && S.items[0].qty === 12 && S.items[0].len === 9 && S.truck === 'KLA-1234' && /^ph:/.test(S.photo);
+        const mh = _m6SlipsHtml(Q[0]);
+        out.slipList = /材料簽收單/.test(mh) && /1 張待登錄/.test(mh) && /2026-10：1 趟/.test(mh) && /帶入租料進場/.test(mh);
+        out.slipRow = /材料簽收：租賃商 → 工地/.test(_drLogRow(Q[0], L).progress);
+        const pr = _ikSlipItemsParse('鋼板樁 IV型 12M 30支\n角鐵 5');
+        out.parse = pr[0].name === '鋼板樁' && pr[0].len === 12 && pr[0].qty === 30 && pr[0].unit === '支' && pr[1].qty === 5;
+        /* 員工不能登錄費用類（要讀寫私密資料） */
+        out.staffDeny = _intakeRoute('expense', '', {}, du) === false;
+        /* 管理員：分包廠商的發票辨識成費用 → 紅色提醒 */
+        _isAdminUser = true;
+        out.subHit = _ikSubHit('乙工程行有限公司') === '乙工程行' && _ikSubHit('全聯') === '';
+        reply = { docType: 'expense', vendor: '乙工程行有限公司', amount: 105000, date: '2026-10-31', confidence: 'high' };
+        await aiClassifyDoc(du); await wait(120);
+        out.subWarn = /分包廠商「乙工程行」的工程款發票/.test(document.getElementById('ik-extra').innerHTML) && document.querySelectorAll('#ik-type option').length > 3;
+        document.getElementById('gen-confirm-cancel').click(); await wait(30);
+        /* LINE 公司大群組：設定寫 mode company；待分類草稿選工程後記下地名、寫進日報 */
+        const sets = []; _fbDb = { ref: p => ({ set: v => { sets.push([p, v]); return Promise.resolve(); }, remove: () => { sets.push([p, null]); return Promise.resolve(); }, once: () => Promise.resolve({ val: () => null }) }) };
+        document.body.insertAdjacentHTML('beforeend', '<select id="lg-q-Gco"><option value="__co" selected>x</option></select><input type="checkbox" id="lg-d-Gco" checked>');
+        lineGroupSave('Gco'); await wait(30);
+        out.coSave = sets.some(s => s[0] === 'fydata/lineCfg/groups/Gco' && s[1].mode === 'company' && s[1].daily === true && !s[1].qid);
+        out.body = /待分類（回報寫「興中」）/.test(_lineDraftBody({ type: 'dailyLog', payload: { qid: '', unmatched: true, site: '興中', date: '2026-10-30', answers: ['【今天】打樁'] } }));
+        let marked = ''; const oM = window._draftMark; window._draftMark = (id, st) => { marked = id + ':' + st; };
+        _lineDraftApply({ id: 'duX', type: 'dailyLog', payload: { qid: '', unmatched: true, site: '興中', date: '2026-10-30', answers: ['【今天】打樁 3 支'], photos: [] } }, () => {});
+        await wait(30); document.getElementById('lu-q').value = 'qI1'; ok(); await wait(150); ok(); await wait(60);
+        window._draftMark = oM;
+        const L2 = Q[0].dailyLogs.find(x => x.date === '2026-10-30');
+        out.coApply = marked === 'duX:applied' && !!L2 && /打樁 3 支/.test(L2.progress);
+        out.siteKey = sets.some(s => s[0] === 'fydata/lineCfg/sites/qI1' && s[1].keys && s[1].keys.indexOf('興中') >= 0);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      _fbUser = oU; _isAdminUser = oA; window._aiFetch = oF; _fbDb = oDb; window.toast = oT; Q = [];
+      return out;
+    });
+    const fs = require('fs'), pth = require('path');
+    const APP = fs.readFileSync(pth.join(__dirname, '..', 'app.js'), 'utf8');
+    check('v6.0.119 手機總覽黃色相機＝智慧收件；AI 模型集中一處（沒有寫死的舊模型）', r.fab && r.model && !/model:'claude-sonnet-5'/.test(APP) && (APP.match(/model:_AI_MODEL/g) || []).length >= 7, JSON.stringify(r));
+    check('v6.0.119 智慧收件：一般員工只見施工照片／簽收單；施工照片放進該工地當天日報；費用類被擋', r.staffTypes && r.photo && r.staffDeny, JSON.stringify(r));
+    check('v6.0.119 材料簽收單：讀出方向／品名／單長／支數／車號存進日報；材料頁列出待登錄與運費趟數；日報檢視帶出', r.slipForm && r.slip && r.slipList && r.slipRow && r.parse, JSON.stringify(r));
+    check('v6.0.119 分包廠商的發票辨識成費用時紅字提醒（請到分包卡登錄）', r.subHit && r.subWarn, JSON.stringify(r));
+    check('v6.0.119 LINE 公司大群組：設定成 company、待分類草稿選工程後寫日報並記下地名', r.coSave && r.body && r.coApply && r.siteKey, JSON.stringify(r));
+    check('v6.0.119 批次 I 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

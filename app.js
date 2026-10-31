@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.118';
+var APP_VERSION='v6.0.119';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -5997,7 +5997,7 @@ function mobScrollTo(id){
 // FAB 動作（依當前頁面決定）
 var _currentPage='dash';
 function mobFabAction(){
-  if(_currentPage==='dash'){go('quickcost');return;}   // v6.0.28 智慧收件移除
+  if(_currentPage==='dash'){smartIntake();return;}   // v6.0.119 黃色相機＝智慧收件（AI 判斷照片類型，人按確認才寫入）
   if(_currentPage==='quotes')newQ();
   else if(_currentPage==='invoice')go('invoice-edit');
   else if(_currentPage==='contracts')newQ();
@@ -6206,6 +6206,7 @@ function updateDashTodo(){
   var el=document.getElementById('dash-todo-list');
   var badge=document.getElementById('dash-todo-badge');
   if(!el)return;
+  _lineSitesSync();   // v6.0.119 公司大群組地名比對清單（管理員、最多一小時一次）
   var now=new Date();
   var today=localToday();
   var yy=now.getFullYear(),mm=now.getMonth();
@@ -12910,7 +12911,7 @@ async function _plSoilAI(input){
     var r=await _aiFetch({
       method:'POST',
       headers:{'content-type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-5',max_tokens:900,messages:[{role:'user',content:blocks.concat([
+      body:JSON.stringify({model:_AI_MODEL,max_tokens:900,messages:[{role:'user',content:blocks.concat([
         {type:'text',text:'這是工程鑽探報告（可能為多頁或多張照片）。請整理成 JSON（繁體中文，不要多餘文字）：'
           +'{"soil":"地層概況一段話：各深度區間之土壤分類與 SPT-N 值（例：GL-0~6m 粉土質砂 SPT-N=8~15，GL-6~20m 粉土質黏土 N=4~9），最後附地下水位深度",'
           +'"nearby":"若報告含基地周邊環境或鄰近構造物描述則整理一句，否則空字串"}'}])}]})
@@ -12941,7 +12942,7 @@ async function _plEmerAutofill(){
       var r=await _aiFetch({
         method:'POST',
         headers:{'content-type':'application/json'},
-        body:JSON.stringify({model:'claude-sonnet-5',max_tokens:800,messages:[{role:'user',content:
+        body:JSON.stringify({model:_AI_MODEL,max_tokens:800,messages:[{role:'user',content:
           '台灣工地地址：'+loc+'。請依你對台灣行政區與機構的知識，提供距離此地址最近的下列單位（回傳 JSON，不要多餘文字；'
           +'每單位含 name/tel/addr 三欄，不確定之欄位給空字串，寧缺勿錯）：'
           +'{"hospital":{急診責任醫院},"police":{轄區警察分局},"fire":{轄區消防分隊},"labor":{該縣市勞動檢查機構},"gas":{當地天然氣公司}}'}]})
@@ -22907,7 +22908,7 @@ function _drMergeLog(q,L,e){
   L.progress=rows.map(function(r){return (r.desc?(r.desc+(r.qty?(' '+r.qty+((q.items[r.itemIdx]||{}).unit||'')):'')):'')+(r.note?((r.desc?'；':'')+r.note):'');}).filter(Boolean).join('\n');
   if((e.crews||[]).some(function(c){return (parseFloat(c&&c.n)||0)>0;})){L.crews=e.crews;L.workers=e.workers||0;L.subWorkers=e.subWorkers||0;L.subVendor=e.subVendor||'';}
   if((e.equip||[]).length){L.equip=e.equip;L.ownEquip=true;}else if(e.ownEquip)L.ownEquip=true;
-  L.photos=L.photos||[];(e.photos||[]).forEach(function(p){if(L.photos.indexOf(p)<0)L.photos.push(p);});L.photos=L.photos.slice(0,6);
+  L.photos=L.photos||[];(e.photos||[]).forEach(function(p){if(L.photos.indexOf(p)<0)L.photos.push(p);});L.photos=L.photos.slice(0,12);   // v6.0.119 智慧收件可加到 12 張
   if(e.weather)L.weather=e.weather;if(e.backfillFrom)L.backfillFrom=e.backfillFrom;   // v6.0.33
   if(e.status&&e.status!=='work'){L.status=e.status;L.stopReason=e.stopReason||'';L.resumeDate=e.resumeDate||'';L.stageOf=e.stageOf||'';L.stageDate=e.stageDate||'';}
   L.editedAt=Date.now();L.by=((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||L.by||'');
@@ -23041,6 +23042,7 @@ function _drLogRow(q,L){
   var stopDays=0;
   if(st!=='work'){stopDays=Math.max(1,_dDiff(L.stopFrom||L.date,L.date)+1);}
   if(L.backfillFrom)prog=(prog?prog+'\n':'')+'（補登：自 '+L.backfillFrom+' 起累計）';
+  if((L.slips||[]).length)prog=(prog?prog+'\n':'')+L.slips.map(function(sl){return '材料簽收：'+((_IK_DIRS[sl.dir]||'其他').split('（')[0])+(sl.items&&sl.items.length?('　'+_ikSlipItemsTxt(sl.items).replace(/\n/g,'、')):'');}).join('\n');   // v6.0.119
   return {date:L.date||'',weather:L.weather||'',status:st,statusText:st==='work'?'施工中':(st==='pause'?'暫停（階段性退場）':'停工'),
     range:(L.stopFrom&&L.stopFrom!==L.date)?(L.stopFrom+'～'+L.date):'',stopDays:stopDays,
     reason:L.stopReason||'',resume:L.resumeDate||'',
@@ -26277,7 +26279,7 @@ async function aiScanDoc(dataUrl,hint){
     var r=await _aiFetch({
       method:'POST',
       headers:{'content-type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-5',max_tokens:600,messages:[{role:'user',content:[
+      body:JSON.stringify({model:_AI_MODEL,max_tokens:600,messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:mt,data:b64}},
         {type:'text',text:'這是台灣營建業的'+(hint||'單據')+'照片。擷取欄位。回覆第一個字元必須是 { 、最後一個字元必須是 } ，禁止任何說明文字或圍欄。JSON 格式：{"docType":"invoice|transfer|receipt|other","number":"發票字軌號碼如AB12345678（無則空字串）","date":"YYYY-MM-DD（民國年請轉西元）","seller":"開立方/賣方名稱","buyerTaxId":"買受人統編（無則空）","amount":含稅總金額數字,"tax":營業稅額數字（未載明則以總額/21推算取整）,"note":"品名摘要或匯款帳號末五碼等關鍵資訊（20字內）"}'}]}]})
     });
@@ -27354,7 +27356,12 @@ function expScan(){
       _fileToDataUrl(f,1400).then(function(du){
         aiScanDoc(du,'日常消費的統一發票或收據（買受人為公司統編）').then(function(r){
           if(!r){_expForm();return;}
-          _expForm({seller:r.seller,number:r.number,date:r.date,amount:r.amount,tax:r.tax,note:r.note});
+          var fv={seller:r.seller,number:r.number,date:r.date,amount:r.amount,tax:r.tax,note:r.note};
+          var sub=_ikSubHit(r.seller);   // v6.0.119：分包廠商的發票不該登錄成費用（成本、應付會各算兩次）
+          if(!sub){_expForm(fv);return;}
+          showConfirm('這張是分包廠商的發票',
+            '<div style="font-size:13px;line-height:1.7">賣方「'+esc(r.seller||'')+'」是分包廠商「'+esc(sub)+'」。<br>分包工程款請到該案「施工成本 › 分包卡」登錄期別請款；這裡登錄成費用，成本和應付會各算兩次。<br><br>按「確定」把發票歸到這家廠商的應付款（附上照片、填發票號碼）；按「取消」仍登錄成費用。</div>',
+            function(){_intakeRoute('vendor_invoice','',{vendor:r.seller||sub,number:r.number,date:r.date,amount:r.amount,tax:r.tax,note:r.note},du);},false,function(){_expForm(fv);},true);
         });
       });
     };
@@ -27363,59 +27370,107 @@ function expScan(){
   inp.click();
 }
 // ═══════════════════ 智慧收件匣：拍照 → 自動分類 → 確認 → 歸檔 ═══════════════════
-var _INTAKE_TYPES={work_confirm:'工作確認單（帶入估驗）',vendor_quote:'廠商報價單（建立成本）',vendor_invoice:'廠商發票（應付登錄）',own_material:'自有成本（材料採購發票）',transfer:'匯款紀錄（應付核實）',owner_invoice:'開給業主的發票',expense:'日常費用發票',other:'其他（手動處理）'};
+var _INTAKE_TYPES={site_photo:'施工照片（放進當天日報）',delivery_slip:'材料簽收單（進出場紀錄）',work_confirm:'工作確認單（帶入估驗）',vendor_quote:'廠商報價單（建立成本）',vendor_invoice:'廠商發票（應付登錄）',own_material:'自有成本（材料採購發票）',transfer:'匯款紀錄（應付核實）',owner_invoice:'開給業主的發票',expense:'日常費用發票',other:'其他（手動處理）'};
 function _nrm(x){return String(x||'').replace(/[\s()（）\-－_／/]/g,'').toLowerCase();}
+// v6.0.119 批次 I：智慧收件匣重新上線（手機總覽黃色相機）——一次可選多張，逐張 AI 分類 → 人按確認才寫入。
+//   新增「施工照片」（放進該工地當天日報）、「材料簽收單」（記在日報 slips，管理員在材料頁對應調撥／歸還／租料）；
+//   分包廠商的發票會提醒「請到分包卡登錄」（避免費用＋分包成本重複）；一般員工只看得到施工照片／簽收單兩類（其他要讀寫私密資料）。
+var _ikQueue=[],_ikBatch=null;
+function _ikAdmin(){return !!(_isAdminUser&&!_isReaderUser);}
+function _ikTypesFor(){var t=_ikAdmin()?Object.keys(_INTAKE_TYPES):['site_photo','delivery_slip','other'];return t;}
+function _ikProjs(){return Q.filter(function(q){return q&&q.awarded&&!q.closed;});}
+function _ikLastProj(){try{return localStorage.getItem('fy_ik_lastproj')||'';}catch(e){return '';}}
+function _ikSetLastProj(qid){try{if(qid)localStorage.setItem('fy_ik_lastproj',qid);}catch(e){/* 可忽略 */}}
+// 分包廠商名單：各案成本卡 type:'sub' 的廠商（私密資料，管理員裝置才有）
+function _ikSubVendors(){
+  var s={};Q.forEach(function(q){(q.costs||[]).forEach(function(c){if(c&&c.type==='sub'&&c.vendor)s[c.vendor]=1;});});
+  return Object.keys(s);
+}
+function _ikSubHit(name){
+  var a=_nrm(name);if(!a||a.length<2)return '';
+  return _ikSubVendors().find(function(v){var b=_nrm(v);return b&&b.length>=2&&(a.indexOf(b)>=0||b.indexOf(a)>=0);})||'';
+}
 function smartIntake(){
   if(!_aiOn()){toast(_aiOffMsg());return;}
   var inp=document.getElementById('intake-input');
   if(!inp){
     inp=document.createElement('input');
-    inp.type='file';inp.id='intake-input';inp.accept='image/*';inp.style.display='none';
+    inp.type='file';inp.id='intake-input';inp.accept='image/*';inp.multiple=true;inp.style.display='none';
     inp.onchange=function(){
-      var f=this.files&&this.files[0];this.value='';if(!f)return;
-      _fileToDataUrl(f,1400).then(function(du){aiClassifyDoc(du);});
+      var fs=[].slice.call(this.files||[]).filter(function(f){return /^image\//.test(f.type||'image/');}).slice(0,12);this.value='';
+      if(!fs.length)return;
+      _ikQueue=fs;_ikBatch={n:fs.length,i:0,photoQid:''};
+      _ikNext();
     };
     document.body.appendChild(inp);
   }
   inp.click();
 }
+// 處理佇列下一張：「其餘也是施工照片」勾選後，剩下的不再送 AI，直接放同一工地日報
+function _ikNext(){
+  if(!_ikQueue.length){_ikBatch=null;return;}
+  var f=_ikQueue.shift();if(_ikBatch)_ikBatch.i++;
+  _fileToDataUrl(f,1400).then(function(du){
+    if(_ikBatch&&_ikBatch.photoQid){_ikSitePhotos(_ikBatch.photoQid,[du],_ikBatch.photoDate||localToday(),true);_ikNext();return;}
+    aiClassifyDoc(du);
+  }).catch(function(e){_err('_ikNext',e);_ikNext();});
+}
 async function aiClassifyDoc(du){
-  if(!/^data:image\//.test(du)){toast('僅支援照片');return;}
-  toast('辨識與分類中…');
-  var projs=Q.filter(function(q){return q.awarded&&!q.closed;}).slice(0,15).map(function(q){return {id:q.id,name:q.name};});
-  var vendors=(typeof VENDORS!=='undefined'?VENDORS:[]).slice(0,20).map(function(v){return v.name||v;});
-  var ctx='進行中專案：'+JSON.stringify(projs)+'；常用廠商：'+JSON.stringify(vendors);
+  if(!/^data:image\//.test(du)){toast('僅支援照片');_ikNext();return;}
+  toast('辨識與分類中…'+(_ikBatch&&_ikBatch.n>1?('（'+_ikBatch.i+'／'+_ikBatch.n+'）'):''));
+  var projs=_ikProjs().slice(0,30).map(function(q){return {id:q.id,name:q.name};});
+  var vendors=(typeof VENDORS!=='undefined'?VENDORS:[]).slice(0,30).map(function(v){return v.name||v;});
+  var subs=_ikSubVendors().slice(0,30);
+  var ctx='進行中專案：'+JSON.stringify(projs)+'；常用廠商：'+JSON.stringify(vendors)+(subs.length?('；分包廠商：'+JSON.stringify(subs)):'');
   try{
     var b64=du.split(',')[1];var mt=du.match(/^data:([^;]+)/)[1];
     var r=await _aiFetch({
       method:'POST',
       headers:{'content-type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-5',max_tokens:1200,messages:[{role:'user',content:[
+      body:JSON.stringify({model:_AI_MODEL,max_tokens:1500,messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:mt,data:b64}},
-        {type:'text',text:'你是台灣營建公司「豐有工程」的文件分類員。'+ctx+'\n判斷這張照片的文件類型並擷取資料。類型定義：work_confirm=工地工作確認單/估驗單(業主或監造簽認數量)；vendor_quote=廠商給我們的報價單；vendor_invoice=工程承攬廠商的計價請款單或發票（有工程款/計價性質）；own_material=公司自購工程材料耗材的發票（鋼索、母索、止水鈑、五金、油壓配件、租金運費等，賣方為材料行/租賃商）；transfer=匯款/轉帳證明；owner_invoice=我們開給業主的統一發票(賣方為豐有)；expense=日常消費發票收據；other=無法判斷。\n回覆第一個字元必須是 { ，最後一個字元必須是 } ，禁止任何說明文字。JSON：{"docType":"上述其一","projectId":"從進行中專案清單比對出的id（無把握則空）","vendor":"對方名稱","items":[{"desc":"工項名","unit":"單位","qty":數量,"price":單價(無則0)}]（confirm/quote/own_material需要——材料發票務必逐品項列出品名/單位/數量/單價,最多12筆）,"number":"發票號碼","date":"YYYY-MM-DD","amount":總金額數字,"tax":稅額數字,"note":"關鍵摘要20字內","confidence":"high|low"}'}]}]})
+        {type:'text',text:'你是台灣擋土支撐工程公司「豐有工程」的文件分類員。'+ctx+'\n判斷這張照片的類型並擷取資料。類型定義：site_photo=工地現場施工照片（機具、鋼樁、開挖、支撐、人員作業等，不是文件）；delivery_slip=材料簽收單／出貨單／送貨單／過磅單（寫著出發地、目的地、品名、規格、支數、車號）；work_confirm=工地工作確認單/估驗單(業主或監造簽認數量)；vendor_quote=廠商給我們的報價單；vendor_invoice=工程承攬廠商（分包）的計價請款單或發票（有工程款/計價性質）；own_material=公司自購工程材料耗材的發票（鋼索、母索、止水鈑、五金、油壓配件、租金運費等，賣方為材料行/租賃商）；transfer=匯款/轉帳證明；owner_invoice=我們開給業主的統一發票(賣方為豐有)；expense=日常消費發票收據；other=無法判斷。\n回覆第一個字元必須是 { ，最後一個字元必須是 } ，禁止任何說明文字。JSON：{"docType":"上述其一","projectId":"從進行中專案清單比對出的id（照片或單據上的工地名、地址對得上才填，無把握則空）","vendor":"對方名稱","isSub":是否為分包廠商開的工程款發票或請款單(true/false),"items":[{"desc":"工項名","unit":"單位","qty":數量,"price":單價(無則0)}]（confirm/quote/own_material需要——材料發票務必逐品項列出品名/單位/數量/單價,最多12筆）,"slip":{"from":"出發地","to":"目的地","dir":"out=公司倉庫到工地|back=工地回公司倉庫|rentIn=租賃商料場到工地|rentOut=工地退回租賃商|other","truck":"車號","items":[{"name":"品名","spec":"規格","len":單長公尺數字或0,"qty":數量,"unit":"單位"}]}（只有 delivery_slip 要填）,"number":"發票號碼","date":"YYYY-MM-DD（民國年請轉西元）","amount":總金額數字,"tax":稅額數字,"note":"關鍵摘要20字內","confidence":"high|low"}'}]}]})
     });
     var d=await r.json();
-    if(d.error){toast(''+(d.error.message||'').slice(0,60));return;}
-    var res=_aiJson((d.content||[]).map(function(b){return b.text||'';}).join(''));
+    if(d.error){toast(''+(d.error.message||'').slice(0,60));_ikNext();return;}
+    var res=_aiJson((d.content||[]).map(function(b){return b.text||'';}).join(''))||{};
+    if(_ikTypesFor().indexOf(res.docType)<0)res.docType=_ikAdmin()?'other':(res.docType==='site_photo'||res.docType==='delivery_slip'?res.docType:'other');
     _intakeConfirm(res,du);
-  }catch(e){toast('辨識失敗：'+(e.message||'').slice(0,50));}
+  }catch(e){toast('辨識失敗：'+(e.message||'').slice(0,50));_ikNext();}
+}
+var _IK_DIRS={out:'公司倉庫 → 工地（調撥）',back:'工地 → 公司倉庫（歸還）',rentIn:'租賃商 → 工地（租料進場）',rentOut:'工地 → 租賃商（租料退場）',other:'其他'};
+function _ikSlipItemsTxt(items){return (items||[]).map(function(it){return [it.name||'',it.spec||'',(parseFloat(it.len)>0?(it.len+'M'):''),(it.qty!=null&&it.qty!==''?(it.qty+(it.unit||'')):'')].filter(Boolean).join(' ');}).join('\n');}
+function _ikSlipItemsParse(txt){
+  return String(txt||'').split(/\n/).map(function(l){return l.trim();}).filter(Boolean).map(function(l){
+    var m=l.match(/(\d+(?:\.\d+)?)\s*(支|根|片|組|件|式|條|只|個|塊|噸|t|T)?\s*$/),qty=m?parseFloat(m[1]):'',unit=m?(m[2]||''):'';
+    var rest=m?l.slice(0,m.index).trim():l;var lm=rest.match(/(\d+(?:\.\d+)?)\s*[Mm米]\b/);var len=lm?parseFloat(lm[1]):0;
+    var parts=rest.split(/\s+/);return {name:parts[0]||'',spec:parts.slice(1).join(' '),len:len,qty:qty,unit:unit};
+  });
 }
 function _intakeConfirm(r,du){
-  var typeOpts=Object.keys(_INTAKE_TYPES).map(function(k){return '<option value="'+k+'" '+(r.docType===k?'selected':'')+'>'+_INTAKE_TYPES[k]+'</option>';}).join('');
-  var projOpts='<option value="">（不歸屬特定專案）</option>'+Q.filter(function(q){return q.awarded&&!q.closed;}).map(function(q){return '<option value="'+q.id+'" '+(r.projectId===q.id?'selected':'')+'>'+esc(q.name)+'</option>';}).join('');
-  var itemsPrev=(r.items&&r.items.length)?('<div style="font-size:11px;color:var(--b4);margin-top:6px;max-height:120px;overflow:auto;border:1px solid var(--b1);border-radius:8px;padding:6px 8px">'
+  r=r||{};
+  var types=_ikTypesFor();
+  var typeOpts=types.map(function(k){return '<option value="'+k+'" '+(r.docType===k?'selected':'')+'>'+_INTAKE_TYPES[k]+'</option>';}).join('');
+  var pid=r.projectId&&_ikProjs().some(function(q){return q.id===r.projectId;})?r.projectId:'';
+  if(!pid&&(r.docType==='site_photo'||r.docType==='delivery_slip'))pid=_ikLastProj();
+  var projOpts='<option value="">（不歸屬特定專案）</option>'+_ikProjs().map(function(q){return '<option value="'+q.id+'" '+(pid===q.id?'selected':'')+'>'+esc(q.name)+'</option>';}).join('');
+  var itemsPrev=(r.items&&r.items.length)?('<div id="ik-items-prev" style="font-size:11px;color:var(--b4);margin-top:6px;max-height:120px;overflow:auto;border:1px solid var(--b1);border-radius:8px;padding:6px 8px">'
     +r.items.map(function(it){return esc(it.desc||'')+'　'+(it.qty||'')+' '+esc(it.unit||'')+(it.price?('　@'+fmt(it.price)):'');}).join('<br>')+'</div>'):'';
+  var subHit=_ikAdmin()?_ikSubHit(r.vendor):'';
+  var left=_ikQueue.length;
   window._ikRenderExtra=function(){
     var box=document.getElementById('ik-extra');if(!box)return;
     var ty=gv('ik-type'),qid2=gv('ik-proj');
     var html2='';
-    // 成本科目：會建立成本的類型顯示（預設依類型帶入）
+    var money=['vendor_quote','vendor_invoice','own_material','transfer','owner_invoice','expense','work_confirm'].indexOf(ty)>=0;
+    var mb=document.getElementById('ik-money');if(mb)mb.style.display=money?'':'none';
+    var ip=document.getElementById('ik-items-prev');if(ip)ip.style.display=(ty==='site_photo'||ty==='delivery_slip')?'none':'';
+    if((r.isSub||subHit)&&(ty==='expense'||ty==='own_material'||ty==='vendor_quote'))
+      html2+='<div style="background:#fdecea;border:1px solid #f0b8b0;color:#a8261c;border-radius:8px;padding:8px 10px;font-size:12.5px;margin:6px 0;line-height:1.6"><b>這張像是分包廠商'+(subHit?('「'+esc(subHit)+'」'):'')+'的工程款發票。</b><br>分包工程款請到該案「施工成本 › 分包卡」登錄期別請款；登錄成費用或自有成本會讓成本、應付各算兩次。建議把類型改成「廠商發票（應付登錄）」。</div>';
     if(ty==='vendor_quote'||ty==='own_material'||ty==='expense'){
       var defCat=ty==='vendor_quote'?'打設':ty==='own_material'?'一次性材料購置':'其他';
       var cur=document.getElementById('ik-cat')?gv('ik-cat'):defCat;
-      html2+='<div class="f"><label>成本科目</label><select id="ik-cat">'
-        +_costCatOpts(cur)
-        +'</select></div>';
+      html2+='<div class="f"><label>成本科目</label><select id="ik-cat">'+_costCatOpts(cur)+'</select></div>';
     }
     if(ty==='own_material'){
       var q2=Q.find(function(x){return x.id===qid2;});
@@ -27423,26 +27478,41 @@ function _intakeConfirm(r,du){
         +((q2&&q2.items)||[]).map(function(it,i){return it.sec?'':'<option value="'+i+'">'+esc(it.desc||'工項'+(i+1))+'</option>';}).join('');
       html2+='<div class="f"><label>對應報價工項（自有成本歸戶）</label><select id="ik-item">'+opts+'</select></div>';
     }
+    if(ty==='site_photo'){
+      html2+='<div style="font-size:12px;color:var(--b4);margin:4px 0">放進「'+esc(((Q.find(function(x){return x.id===qid2;})||{}).name)||'（請選工地）')+'」該日期的施工日報照片（每天最多 12 張）。</div>';
+      if(left)html2+='<label style="display:flex;gap:6px;align-items:center;font-size:12.5px;margin-top:4px"><input type="checkbox" id="ik-rest" style="width:16px;height:16px"> 其餘 '+left+' 張也是這個工地的施工照片（不再逐張辨識）</label>';
+    }
+    if(ty==='delivery_slip'){
+      var s=r.slip||{};var IN='width:100%;box-sizing:border-box';
+      var dirOpts=Object.keys(_IK_DIRS).map(function(k){return '<option value="'+k+'"'+((s.dir||'other')===k?' selected':'')+'>'+_IK_DIRS[k]+'</option>';}).join('');
+      var cs={};['ik-s-dir','ik-s-from','ik-s-to','ik-s-truck','ik-s-items'].forEach(function(id){var e=document.getElementById(id);if(e)cs[id]=e.value;});
+      html2+='<div class="f"><label>進出方向</label><select id="ik-s-dir" style="'+IN+'">'+dirOpts+'</select></div>'
+        +'<div class="fg fg2"><div class="f"><label>出發地</label><input id="ik-s-from" value="'+esc(s.from||'')+'"></div><div class="f"><label>目的地</label><input id="ik-s-to" value="'+esc(s.to||'')+'"></div></div>'
+        +'<div class="f"><label>車號</label><input id="ik-s-truck" value="'+esc(s.truck||'')+'"></div>'
+        +'<div class="f"><label>品名／規格／單長／數量（一行一項）</label><textarea id="ik-s-items" rows="4" style="'+IN+';font-size:13px">'+esc(_ikSlipItemsTxt(s.items))+'</textarea></div>'
+        +'<div style="font-size:11px;color:var(--b3)">存進該工地這天的日報；管理員在「材料．運輸」頁對應調撥／歸還／租料，並可核對運費趟數。</div>';
+      setTimeout(function(){Object.keys(cs).forEach(function(id){var e=document.getElementById(id);if(e)e.value=cs[id];});},0);
+    }
     box.innerHTML=html2;
   };
-  showConfirm('智慧收件確認',
+  showConfirm('智慧收件確認'+(_ikBatch&&_ikBatch.n>1?('（'+_ikBatch.i+'／'+_ikBatch.n+'）'):''),
     '<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">'
     +'<img src="'+du+'" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--b2);flex-shrink:0;cursor:zoom-in" onclick="_viewFile(\'文件照片\',this.src)">'
     +'<div style="font-size:12px;color:var(--b4);line-height:1.6">AI 判讀（'+(r.confidence==='high'?'<span style="color:var(--g3);font-weight:700">信心高</span>':'<span style="color:#e65100;font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 信心低，請逐欄確認</span>')+'）<br>'+esc(r.note||'')+'</div>'
     +'</div>'
-    +'<div class="f"><label>文件類型</label><select id="ik-type" onchange="_ikRenderExtra()">'+typeOpts+'</select></div>'
-    +'<div class="f"><label>歸屬專案</label><select id="ik-proj" onchange="_ikRenderExtra()">'+projOpts+'</select></div>'
+    +'<div class="f"><label>照片類型</label><select id="ik-type" onchange="_ikRenderExtra()">'+typeOpts+'</select></div>'
+    +'<div class="f"><label>歸屬專案（工地）</label><select id="ik-proj" onchange="_ikRenderExtra()">'+projOpts+'</select></div>'
+    +'<div class="f"><label>日期</label><input id="ik-date" type="date" value="'+esc(r.date||localToday())+'"></div>'
+    +'<div id="ik-money">'
     +'<div class="fg fg2">'
     +'<div class="f"><label>對方名稱</label><input id="ik-vendor" value="'+esc(r.vendor||'')+'" placeholder="廠商／賣方"></div>'
     +'<div class="f"><label>金額（含稅）</label><input id="ik-amount" type="number" value="'+(_aiNum(r.amount)||'')+'" style="text-align:right;font-weight:700"></div>'
     +'</div>'
-    +'<div class="fg fg2">'
-    +'<div class="f"><label>日期</label><input id="ik-date" type="date" value="'+esc(r.date||'')+'"></div>'
     +'<div class="f"><label>發票號碼</label><input id="ik-number" value="'+esc(r.number||'')+'" placeholder="（無則留空）"></div>'
     +'</div>'
     +'<div id="ik-extra"></div>'
     +itemsPrev
-    +'<div style="font-size:11px;color:var(--b3);margin-top:8px">欄位皆可修正；確認後才會寫入系統並連動施工成本／應付／帳務。</div>',
+    +'<div style="font-size:11px;color:var(--b3);margin-top:8px">AI 只負責猜，欄位都可以改；按「確定」才會寫入系統。</div>',
     function(){
       var r2=Object.assign({},r);
       var _v=gv('ik-vendor');if(_v!==undefined)r2.vendor=_v;
@@ -27450,9 +27520,51 @@ function _intakeConfirm(r,du){
       var _d=gv('ik-date');if(_d)r2.date=_d;
       var _n=gv('ik-number');if(_n!==undefined)r2.number=_n;
       try{r2._cat=gv('ik-cat')||'';}catch(e){r2._cat='';}
-      _intakeRoute(gv('ik-type'),gv('ik-proj'),r2,du);
-    },false,null,true);
-  setTimeout(function(){try{_ikRenderExtra();}catch(e){_err('top',e);}},80);
+      var ty=gv('ik-type'),qid=gv('ik-proj');
+      if(ty==='delivery_slip')r2.slip={dir:gv('ik-s-dir')||'other',from:gv('ik-s-from')||'',to:gv('ik-s-to')||'',truck:gv('ik-s-truck')||'',items:_ikSlipItemsParse(gv('ik-s-items'))};
+      if((ty==='site_photo'||ty==='delivery_slip')&&!qid){toast('請選擇工地');return false;}
+      if(ty==='site_photo'&&_ikBatch&&(document.getElementById('ik-rest')||{}).checked){_ikBatch.photoQid=qid;_ikBatch.photoDate=r2.date||localToday();}
+      var ok=_intakeRoute(ty,qid,r2,du);
+      if(ok===false)return false;
+      // 帳務類會另外開畫面（應付、費用表單、施工成本），佇列停在這裡，免得下一張的確認視窗蓋掉
+      if(ty!=='site_photo'&&ty!=='delivery_slip'&&ty!=='other'&&_ikQueue.length){var n=_ikQueue.length;_ikQueue=[];_ikBatch=null;setTimeout(function(){toast('其餘 '+n+' 張請再按一次相機');},1500);return;}
+      setTimeout(_ikNext,250);
+    },false,function(){setTimeout(_ikNext,250);},true);
+  setTimeout(function(){try{_ikRenderExtra();}catch(e){_err('_intakeConfirm',e);}},80);
+}
+// 施工照片 → 該工地該日日報（沒有就新建一筆只有照片的日報）
+function _ikSitePhotos(qid,dus,date,quiet){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return false;
+  if(!q.dailyLogs)q.dailyLogs=[];
+  var L=q.dailyLogs.find(function(x){return x&&x.date===date&&!x.stopFrom;});
+  var by=((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'');
+  if(!L){L={id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:date,workers:0,subWorkers:0,subVendor:'',crews:[],progress:'',progressRows:[],photos:[],ownEquip:false,equip:[],status:'work',by:by,ts:Date.now(),src:'intake'};q.dailyLogs.unshift(L);q.dailyLogs.sort(function(a,b){return String(b.date||'')<String(a.date||'')?-1:1;});}
+  L.photos=L.photos||[];
+  var room=12-L.photos.length,n=0;
+  dus.forEach(function(du){if(room>0){L.photos.push(_photoPut(du));room--;n++;}});
+  L.editedAt=Date.now();
+  _touch(q);_ikSetLastProj(qid);
+  try{persist();_immediateUpload();}catch(e){_err('_ikSitePhotos',e);}
+  if(!quiet||n<dus.length)toast(n?('已放進「'+(q.name||'')+'」'+date+' 日報照片（'+L.photos.length+' 張）'):('「'+(q.name||'')+'」'+date+' 日報照片已滿 12 張，這張沒有放進去'));
+  return n>0;
+}
+// 材料簽收單 → 該工地該日日報 slips（照片＋讀出的欄位）；成本、調撥由管理員在材料頁處理
+function _ikSlipSave(qid,r,du){
+  var q=Q.find(function(x){return x.id===qid;});if(!q)return false;
+  var date=r.date||localToday();
+  if(!q.dailyLogs)q.dailyLogs=[];
+  var L=q.dailyLogs.find(function(x){return x&&x.date===date&&!x.stopFrom;});
+  var by=((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'');
+  if(!L){L={id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:date,workers:0,subWorkers:0,subVendor:'',crews:[],progress:'',progressRows:[],photos:[],ownEquip:false,equip:[],status:'work',by:by,ts:Date.now(),src:'intake'};q.dailyLogs.unshift(L);q.dailyLogs.sort(function(a,b){return String(b.date||'')<String(a.date||'')?-1:1;});}
+  var s=r.slip||{};
+  L.slips=L.slips||[];
+  L.slips.push({id:'sl'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),date:date,dir:s.dir||'other',from:s.from||'',to:s.to||'',truck:s.truck||'',vendor:r.vendor||'',
+    items:(s.items||[]).slice(0,20),photo:_photoPut(du),by:by,at:Date.now()});
+  L.editedAt=Date.now();
+  _touch(q);_ikSetLastProj(qid);
+  try{persist();_immediateUpload();}catch(e){_err('_ikSlipSave',e);}
+  toast('簽收單已存進「'+(q.name||'')+'」'+date+' 日報');
+  return true;
 }
 var INTAKE_LOG=[];try{INTAKE_LOG=JSON.parse(localStorage.getItem('fy_intake_log')||'[]');}catch(e){_err('top',e);}
 function _ikLog(entry){
@@ -27503,6 +27615,10 @@ function intakeUndo(id){
 }
 function _intakeRoute(type,qid,r,du){
   var today=localToday?localToday():new Date().toISOString().slice(0,10);
+  if(type==='site_photo')return _ikSitePhotos(qid,[du],r.date||today);   // v6.0.119
+  if(type==='delivery_slip')return _ikSlipSave(qid,r,du);
+  if(type!=='other'&&!_ikAdmin()){toast('這類單據要由管理員登錄');return false;}
+  if(qid)_ikSetLastProj(qid);
   if(type==='work_confirm'){
     if(!qid){toast('請選擇歸屬專案');return;}
     _projAttachFile(qid,'confirm','智慧收件_確認單_'+today+'.jpg',du);
@@ -30801,7 +30917,7 @@ async function wkAiFromId(){
       var b64=du.split(',')[1],mt=du.match(/^data:([^;]+)/)[1];
       var r=await _aiFetch({method:'POST',
         headers:{'content-type':'application/json'},
-        body:JSON.stringify({model:'claude-sonnet-5',max_tokens:500,messages:[{role:'user',content:[
+        body:JSON.stringify({model:_AI_MODEL,max_tokens:500,messages:[{role:'user',content:[
           {type:'image',source:{type:'base64',media_type:mt,data:b64}},
           {type:'text',text:'這是台灣的身分證或健保卡照片。擷取欄位並只回傳 JSON：{"doc":"id_front|id_back|nhi|other","name":"","idNo":"","birth":"YYYY-MM-DD","sex":"男|女|","regAddr":"","blood":""}。民國年請換算西元；身分證反面才有住址；讀不到的欄位留空字串。回覆第一個字元必須是 {。'}]}]})});
       var d=await r.json();
@@ -31032,7 +31148,7 @@ async function _wkAiMap(kind,entries){
     +'\n不確定或表格上沒有的欄位不要硬填。\n\n'+list;
   var r=await _aiFetch({method:'POST',
     headers:{'content-type':'application/json'},
-    body:JSON.stringify({model:'claude-sonnet-5',max_tokens:1500,messages:[{role:'user',content:[{type:'text',text:prompt}]}]})});
+    body:JSON.stringify({model:_AI_MODEL,max_tokens:1500,messages:[{role:'user',content:[{type:'text',text:prompt}]}]})});
   var d=await r.json();
   if(d.error)throw new Error(d.error.message||'AI 錯誤');
   return _aiJson((d.content||[]).map(function(b){return b.text||'';}).join(''));
@@ -31043,7 +31159,7 @@ async function _wkAiReadImage(du){
   var fields=_WK_FILL_FIELDS.map(function(f){return f[0]+'='+f[1];}).join('；');
   var r=await _aiFetch({method:'POST',
     headers:{'content-type':'application/json'},
-    body:JSON.stringify({model:'claude-sonnet-5',max_tokens:900,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mt,data:b64}},
+    body:JSON.stringify({model:_AI_MODEL,max_tokens:900,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mt,data:b64}},
       {type:'text',text:'這是台灣營建業主的人員進場申請表。依表格出現順序列出要填寫的欄位，對應到欄位代碼（'+fields+'），表上沒有對應者 field 留空。只回傳 JSON：{"fields":[{"label":"姓名","field":"name"}]}'}]}]})});
   var d=await r.json();if(d.error)throw new Error(d.error.message||'AI 錯誤');
   return _aiJson((d.content||[]).map(function(b){return b.text||'';}).join(''));
@@ -34577,7 +34693,7 @@ function m6LedDel(qid,lid){var lr=MAT_LEDGER.find(function(x){return x.id===lid;
   showConfirm('刪除台帳','確定刪除「'+esc(_matLabel(lr))+' ×'+fmt(lr.qty)+'」？（進貨登錯用；工地用掉的請走「歸還／損耗」）',function(){_tomb('matLedger',lr.id);MAT_LEDGER=MAT_LEDGER.filter(function(x){return x!==lr;});saveMatLedger();try{_m6Re();}catch(e){_err('m6LedDel',e);}toast('已刪除');});}
 // ── 5 發包／材料頁標題帶工程名（從工程專案進來的子頁）──
 // v6.0.49 原兩層包裝併成一個：副標「工程專案 › 案名」＋頁尾跨案購租分析
-function renderMat6(){var r=_renderMat6Base.apply(this,arguments);try{var q=_m6Q();var s=document.querySelector('#page-mat6 .ph-s');if(s)s.textContent=q?('工程專案 › '+(q.name||'')+'　需求比對 → 調撥／接切／租賃；公司倉庫台帳在本頁'):'請先選擇工程';var root=document.getElementById('mat6-root');if(root&&q&&typeof _m6CrossHtml==='function')root.insertAdjacentHTML('beforeend',_m6CrossHtml());}catch(e){_err('renderMat6.after',e);}return r;}
+function renderMat6(){var r=_renderMat6Base.apply(this,arguments);try{var q=_m6Q();var s=document.querySelector('#page-mat6 .ph-s');if(s)s.textContent=q?('工程專案 › '+(q.name||'')+'　需求比對 → 調撥／接切／租賃；公司倉庫台帳在本頁'):'請先選擇工程';var root=document.getElementById('mat6-root');if(root&&q&&typeof _m6CrossHtml==='function')root.insertAdjacentHTML('beforeend',_m6CrossHtml());if(root&&q)root.insertAdjacentHTML('beforeend',_m6SlipsHtml(q));}catch(e){_err('renderMat6.after',e);}return r;}
 
 // ══════════ v6.0.31 第四批：業主扣款設定＋收款折讓證明單、保留款廠商端、薪資 4 欄、報表合併 ══════════
 // ── 1 業主扣款設定（工程層級，每期自動套）：q.deduct={ret:保留款%, clean:清潔費‰, cleanMode:'exp'|'allow'} ──
@@ -38778,13 +38894,13 @@ function _draftOpenQuote(q,isEdit){
 // Cloud Functions（functions/line/）收 LINE 訊息：擁有者一對一的檔案 → Storage line/inbox；工地群組 → fydata/lineLog，
 // 現場追加與施工日報寫成草稿（fydata/drafts type addon／dailyLog）。這裡負責：草稿顯示與確認、LINE 設定卡（擁有者、群組綁定工程、固定句子）。
 // 設定 fydata/lineCfg：{owners:{<userId>:{name}}, groups:{<groupId>:{qid,name,daily}}, pending:{users:{},groups:{}}, texts:{inboxAck,daily3,remind,alarm,noReply2}}
-var _LINE_TEXTS={inboxAck:'收到，{n} 個檔案，歸到哪一案？',daily3:'今天辛苦了，麻煩回三件事：\n1. 今天做了哪些？（工項、數量）\n2. 幾個人、什麼機具？\n3. 有沒有問題、等待或追加？',remind:'昨天的施工日報還沒回，麻煩補一下三件事，謝謝。',alarm:'{site}工地群組出現「{word}」，請判斷是否停工。',noReply2:'{site}工地群組連兩天沒有回施工日報。'};
-var _LINE_TL={inboxAck:'收到檔案的回覆（{n}＝檔案數）',daily3:'17:30 在工地群組問的三句',remind:'隔天 08:00 沒回的提醒',alarm:'事故前兆通知 Lotion（{site} 工地、{word} 關鍵字）',noReply2:'連兩天沒回通知 Lotion'};
+var _LINE_TEXTS={inboxAck:'收到，{n} 個檔案，歸到哪一案？',daily3:'今天辛苦了，麻煩回三件事：\n1. 今天做了哪些？（工項、數量）\n2. 幾個人、什麼機具？\n3. 有沒有問題、等待或追加？',remind:'昨天的施工日報還沒回，麻煩補一下三件事，謝謝。',alarm:'{site}工地群組出現「{word}」，請判斷是否停工。',noReply2:'{site}工地群組連兩天沒有回施工日報。',dailyCo:'今天辛苦了，請照下面格式回報（一個工地一段，可以貼好幾段）：\n【工地】地名\n【今天】\n【明天】\n【問題】'};
+var _LINE_TL={inboxAck:'收到檔案的回覆（{n}＝檔案數）',daily3:'17:30 在工地群組問的三句',remind:'隔天 08:00 沒回的提醒',alarm:'事故前兆通知 Lotion（{site} 工地、{word} 關鍵字）',noReply2:'連兩天沒回通知 Lotion',dailyCo:'17:30 在公司大群組發的回報格式'};
 function _lineDraftBody(d){
   var S=_draftS,pl=(d.payload&&typeof d.payload==='object')?d.payload:{},q=Q.find(function(x){return x.id===pl.qid;});
   var ph=_lineArr(pl.photos).slice(0,6).map(function(path){return '<img data-lpath="'+esc(path)+'" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:6px;background:var(--b1)">';}).join('');
   var txt=d.type==='addon'?S(pl.text):(_lineArr(pl.answers).join('\n')||'（尚未回三句）');
-  return '<div style="font-size:11.5px;color:var(--b4)">工程：'+esc(q?S(q.name):'（找不到工程）')+'　'+esc(S(pl.date))+(pl.qty!=null?('　數量 '+esc(S(pl.qty))+esc(S(pl.unit))):'')+'</div>'
+  return '<div style="font-size:11.5px;color:var(--b4)">工程：'+esc(q?S(q.name):(pl.unmatched?('待分類（回報寫「'+S(pl.site)+'」）'):'（找不到工程）'))+'　'+esc(S(pl.date))+(pl.qty!=null?('　數量 '+esc(S(pl.qty))+esc(S(pl.unit))):'')+'</div>'
     +'<div style="font-size:12.5px;white-space:pre-wrap;margin:4px 0">'+esc(txt)+'</div>'+(ph?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">'+ph+'</div>':'');
 }
 function _lineArr(a){return Array.isArray(a)?a.map(function(x){return _draftS(x);}):[];}
@@ -38796,6 +38912,16 @@ function _lineImgFill(box){
 }
 function _lineDraftApply(d,close){
   var S=_draftS,pl=(d.payload&&typeof d.payload==='object')?d.payload:{},q=Q.find(function(x){return x.id===pl.qid;});
+  if(!q&&pl.unmatched){   // v6.0.119 公司大群組對不到工地：先選工程，再走原本的確認
+    var po=(Q||[]).filter(function(x){return x&&x.awarded&&!x.closed;}).map(function(x){return '<option value="'+esc(x.id)+'">'+esc(x.name||'')+'</option>';}).join('');
+    showConfirm('這筆回報是哪個工地？','<div style="font-size:12.5px;margin-bottom:6px">回報寫的地名：<b>'+esc(S(pl.site))+'</b></div><div class="f"><label>工程</label><select id="lu-q"><option value="">（選工程）</option>'+po+'</select></div><div style="font-size:11px;color:var(--b4)">之後同樣的地名會自動對到這個工程。</div>',function(){
+      var qid=gv('lu-q');if(!qid){toast('請選工程');return false;}
+      _lineSiteKeyAdd(qid,S(pl.site));
+      var d2=JSON.parse(JSON.stringify(d));d2.payload.qid=qid;d2.payload.unmatched=false;
+      setTimeout(function(){_lineDraftApply(d2,close);},80);
+    },false,null,true);
+    return;
+  }
   if(!q){toast('找不到這個工程（群組綁定的工程可能已刪除）');return;}
   var photos=_lineArr(pl.photos).filter(function(x){return /^line\//.test(x);});
   if(d.type==='addon'){
@@ -38844,7 +38970,7 @@ function renderLineBox(){
   if(_lineCfgCache&&_lineCfgCache.__err){box.innerHTML='<div class="card"><div class="cb"><div style="font-weight:700;font-size:13.5px;margin-bottom:4px">LINE 機器人（陳軒｜AI 助理）</div><div style="font-size:12px;color:var(--red)">讀不到 LINE 設定：雲端規則尚未發布（見 docs/回國後部署清單_20261031.md 第 1 步）。</div><div style="margin-top:8px"><button type="button" class="btn btn-xs" onclick="_lineCfgCache=null;renderLineBox()">重新整理</button></div></div></div>';return;}
   var C=_lineCfgCache||{},own=C.owners||{},gr=C.groups||{},pu=(C.pending&&C.pending.users)||{},pg=(C.pending&&C.pending.groups)||{},tx=Object.assign({},_LINE_TEXTS,C.texts||{});
   var projs=(Q||[]).filter(function(q){return q&&q.awarded&&!q.closed&&!q.parentId;});
-  var sel=function(id,cur){return '<select id="'+id+'" style="font-size:12px;max-width:100%"><option value="">（選工程）</option>'+projs.map(function(q){return '<option value="'+esc(q.id)+'"'+(q.id===cur?' selected':'')+'>'+esc(q.name||'')+'</option>';}).join('')+'</select>';};
+  var sel=function(id,cur){return '<select id="'+id+'" style="font-size:12px;max-width:100%"><option value="">（選工程）</option><option value="__co"'+(cur==='__co'?' selected':'')+'>公司大群組（固定格式回報，多個工地）</option>'+projs.map(function(q){return '<option value="'+esc(q.id)+'"'+(q.id===cur?' selected':'')+'>'+esc(q.name||'')+'</option>';}).join('')+'</select>';};
   var B=function(js,l,c){return '<button type="button" class="btn btn-xs'+(c?' '+c:'')+'" onclick="'+js+'">'+l+'</button>';};
   var row=function(h){return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 0;border-bottom:1px solid var(--b1);font-size:12px">'+h+'</div>';};
   var k=function(x){return esc(String(x)).replace(/'/g,'');};
@@ -38854,10 +38980,10 @@ function renderLineBox(){
     +(Object.keys(own).map(function(u){return row(esc((own[u]&&own[u].name)||'')+'<span style="color:var(--b3)">'+esc(u.slice(0,10))+'…</span><span style="margin-left:auto">'+B("lineOwnerDel('"+k(u)+"')",'移除','btn-r')+'</span>');}).join('')||'<div style="font-size:12px;color:var(--b3)">尚未設定（先用自己的 LINE 傳任一則訊息給機器人，下方「待確認」會出現）</div>')
     +(Object.keys(pu).length?('<div style="font-size:12px;margin-top:6px">待確認的一對一帳號：</div>'+Object.keys(pu).map(function(u){return row('<span>'+esc((pu[u]&&pu[u].text)||'')+'</span><span style="color:var(--b3)">'+esc(new Date((pu[u]&&pu[u].at)||0).toLocaleString('zh-TW'))+'</span><span style="margin-left:auto;display:flex;gap:4px">'+B("lineOwnerAdd('"+k(u)+"')",'設為擁有者','btn-g')+B("linePendDel('users','"+k(u)+"')",'忽略')+'</span>');}).join('')):'')
     +'<div style="font-weight:700;font-size:12.5px;margin-top:10px">工地群組</div>'
-    +(Object.keys(gr).map(function(g){var v=gr[g]||{};return row('<b>'+esc(v.name||'')+'</b>'+sel('lg-q-'+k(g),v.qid)+'<label style="font-size:11.5px"><input type="checkbox" id="lg-d-'+k(g)+'"'+(v.daily!==false?' checked':'')+'> 每天問日報</label><span style="margin-left:auto;display:flex;gap:4px">'+B("lineGroupSave('"+k(g)+"')",'儲存','btn-g')+B("lineGroupDel('"+k(g)+"')",'解除','btn-r')+'</span>');}).join('')||'<div style="font-size:12px;color:var(--b3)">尚未綁定（把機器人拉進工地群組，群組有人講話後會出現在下方）</div>')
+    +(Object.keys(gr).map(function(g){var v=gr[g]||{};return row('<b>'+esc(v.name||'')+'</b>'+sel('lg-q-'+k(g),v.mode==='company'?'__co':v.qid)+'<label style="font-size:11.5px"><input type="checkbox" id="lg-d-'+k(g)+'"'+(v.daily!==false?' checked':'')+'> 每天問日報</label><span style="margin-left:auto;display:flex;gap:4px">'+B("lineGroupSave('"+k(g)+"')",'儲存','btn-g')+B("lineGroupDel('"+k(g)+"')",'解除','btn-r')+'</span>');}).join('')||'<div style="font-size:12px;color:var(--b3)">尚未綁定（把機器人拉進工地群組，群組有人講話後會出現在下方）</div>')
     +(Object.keys(pg).length?('<div style="font-size:12px;margin-top:6px">待綁定的群組：</div>'+Object.keys(pg).map(function(g){return row('<span style="color:var(--b3)">'+esc(g.slice(0,10))+'…　'+esc(new Date((pg[g]&&(pg[g].lastAt||pg[g].at))||0).toLocaleString('zh-TW'))+'</span>'+sel('lg-q-'+k(g),'')+'<label style="font-size:11.5px"><input type="checkbox" id="lg-d-'+k(g)+'" checked> 每天問日報</label><span style="margin-left:auto;display:flex;gap:4px">'+B("lineGroupSave('"+k(g)+"')",'綁定','btn-g')+B("linePendDel('groups','"+k(g)+"')",'忽略')+'</span>');}).join('')):'')
     +'<details style="margin-top:10px"><summary style="font-weight:700;font-size:12.5px;cursor:pointer">機器人固定句子（Lotion 定稿；群組裡只會發這些）</summary>'
-    +Object.keys(_LINE_TEXTS).map(function(t){return '<div class="f" style="margin-top:6px"><label>'+esc(_LINE_TL[t]||t)+'</label><textarea id="lt-'+t+'" rows="'+(t==='daily3'?4:2)+'" style="width:100%;box-sizing:border-box;font-size:12px">'+esc(tx[t])+'</textarea></div>';}).join('')
+    +Object.keys(_LINE_TEXTS).map(function(t){return '<div class="f" style="margin-top:6px"><label>'+esc(_LINE_TL[t]||t)+'</label><textarea id="lt-'+t+'" rows="'+(t==='daily3'||t==='dailyCo'?5:2)+'" style="width:100%;box-sizing:border-box;font-size:12px">'+esc(tx[t])+'</textarea></div>';}).join('')
     +'<div style="text-align:right;margin-top:6px">'+B('lineTextsSave()','儲存固定句子','btn-g')+'</div></details>'
     +'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+B('linePushTest()','傳一則測試通知給擁有者')+B('_lineCfgCache=null;renderLineBox()','重新整理')+'</div>'
     +'</div></div>';
@@ -38872,9 +38998,36 @@ function lineOwnerAdd(u){var n=window.prompt('這個 LINE 帳號是誰？（例�
 function lineOwnerDel(u){showConfirm('移除擁有者','移除後這個 LINE 帳號傳的檔案不再收件、也不會收到通知。',function(){_lineCfgSet('owners/'+u,null,'已移除');},true);}
 function linePendDel(kind,id){_lineCfgSet('pending/'+(kind==='groups'?'groups':'users')+'/'+id,null);}
 function lineGroupSave(g){
-  var qid=gv('lg-q-'+g),q=Q.find(function(x){return x.id===qid;});if(!q){toast('請先選工程');return;}
+  var qid=gv('lg-q-'+g),q=Q.find(function(x){return x.id===qid;});
   var d=!!(document.getElementById('lg-d-'+g)||{}).checked;
+  if(qid==='__co'){   // v6.0.119 公司大群組：不綁單一工程，依回報的【工地】地名對專案
+    _lineCfgSet('groups/'+g,{mode:'company',name:'公司大群組',daily:d,at:Date.now()},'已設為公司大群組').then(function(ok){if(ok){_lineCfgSet('pending/groups/'+g,null);_lineSitesSync(true);}});
+    return;
+  }
+  if(!q){toast('請先選工程');return;}
   _lineCfgSet('groups/'+g,{qid:qid,name:String(q.name||'').slice(0,40),daily:d,at:Date.now()},'已綁定「'+(q.name||'')+'」').then(function(ok){if(ok)_lineCfgSet('pending/groups/'+g,null);});
+}
+// v6.0.119 公司大群組：把進行中工程的名稱（只有名稱，沒有金額）寫到 lineCfg/sites，機器人拿來比對【工地】地名；
+//   keys＝手動對過的地名（待分類草稿選了工程後記下來，下次同樣寫法自動對到）。管理員裝置開總覽時最多一小時同步一次。
+var _lineSitesAt=0;
+function _lineSitesSync(force){
+  try{
+    if(!_fbDb||!_fbUser||_isReaderUser||!_isAdminUser||window.FY_BETA)return;
+    if(!force&&Date.now()-_lineSitesAt<3600000)return;
+    _lineSitesAt=Date.now();
+    _fbDb.ref('fydata/lineCfg').once('value').then(function(sn){
+      var C=sn.val()||{},gr=C.groups||{};
+      if(!Object.keys(gr).some(function(g){return gr[g]&&gr[g].mode==='company';}))return;
+      var cur=C.sites||{},next={};
+      (Q||[]).filter(function(q){return q&&q.awarded&&!q.closed;}).forEach(function(q){next[q.id]={name:String(q.name||'').slice(0,60)};var ks=cur[q.id]&&cur[q.id].keys;if(Array.isArray(ks)&&ks.length)next[q.id].keys=ks.slice(0,20);});
+      if(JSON.stringify(next)!==JSON.stringify(cur))return _fbDb.ref('fydata/lineCfg/sites').set(next);
+    }).catch(function(e){_err('_lineSitesSync',e);});
+  }catch(e){_err('_lineSitesSync',e);}
+}
+function _lineSiteKeyAdd(qid,site){
+  site=String(site||'').trim().slice(0,40);if(!site||!_fbDb||_isReaderUser)return;
+  var ref=_fbDb.ref('fydata/lineCfg/sites/'+qid);
+  ref.once('value').then(function(sn){var v=sn.val()||{name:String(((Q.find(function(x){return x.id===qid;})||{}).name)||'').slice(0,60)};var ks=Array.isArray(v.keys)?v.keys:[];if(ks.indexOf(site)<0)ks.push(site);v.keys=ks.slice(-20);return ref.set(v);}).catch(function(e){_err('_lineSiteKeyAdd',e);});
 }
 function lineGroupDel(g){showConfirm('解除工地群組','解除後這個群組的訊息不再記錄、也不會問日報（已記的資料保留）。',function(){_lineCfgSet('groups/'+g,null,'已解除');},true);}
 function lineTextsSave(){var t={};Object.keys(_LINE_TEXTS).forEach(function(k){var v=(gv('lt-'+k)||'').trim();if(v)t[k]=v.slice(0,1000);});_lineCfgSet('texts',t,'已儲存固定句子');}
@@ -39052,6 +39205,7 @@ function _bankVendorSave(oldName,v){
 // 改為：帶登入憑證（ID token）呼叫 Cloud Function aiProxy，由伺服器加上金鑰（defineSecret ANTHROPIC_API_KEY）轉送；只有員工與管理員可用、每人每天上限。
 // 回傳值與 fetch 相同（有 json()），呼叫端不用改。
 var _AI_PROXY=_fnUrl('aiProxy');   // 跟著所連的 Firebase 專案（改版第 0 步：測試站連測試專案的 aiProxy）
+var _AI_MODEL='claude-sonnet-5-5';   // v6.0.119：AI 辨識模型集中一處（原各處寫死 claude-sonnet-5）
 function _aiOn(){return !!(_fbUser&&!_isReaderUser&&_roState!=='reader');}
 function _aiOffMsg(){return _isReaderUser?'唯讀帳號不能使用 AI 辨識':'AI 辨識要先登入帳號';}
 async function _aiFetch(opts){
@@ -39214,6 +39368,79 @@ function tombHoldDo(who,ok){
   var m=document.getElementById('fy-modal');if(m)m.remove();if(Object.keys(TOMB_HOLD).length)openTombHold();
   try{updateDashTodo();}catch(e){_err('tombHoldDo.todo',e);}
   toast(ok?('已刪除 '+L.length+' 筆'):'已保留，不刪');
+}
+// ══════════ v6.0.119 材料簽收單（智慧收件 delivery_slip → q.dailyLogs[].slips）══════════
+// 工務拍簽收單只存「照片＋讀出的欄位」在日報（共用資料）；管理員在材料．運輸頁逐張對應：
+//   公司倉庫→工地＝調撥（matOut）、工地→倉庫＝歸還（matBack）、租料進場＝登記進場批次（m6Batch）、租料退場＝填批次退場日；
+//   按下去只是把日期／M 數帶進原本的畫面，存檔仍走原流程。「已登錄」勾選記在簽收單上，運費趟數＝簽收單張數（同日同車號算一趟）。
+function _m6Slips(q){
+  var out=[];((q&&q.dailyLogs)||[]).forEach(function(L){(L&&L.slips||[]).forEach(function(s){if(s&&s.id)out.push(s);});});
+  return out.sort(function(a,b){return String(b.date||'')<String(a.date||'')?-1:String(b.date||'')>String(a.date||'')?1:(b.at||0)-(a.at||0);});
+}
+function _m6SlipFind(q,sid){var hit=null;((q&&q.dailyLogs)||[]).some(function(L){var s=(L&&L.slips||[]).find(function(x){return x&&x.id===sid;});if(s){hit=s;return true;}return false;});return hit;}
+function _m6SlipM(s){return Math.round((s.items||[]).reduce(function(a,it){return a+(parseFloat(it.len)||0)*(parseFloat(it.qty)||0);},0)*100)/100;}
+function _m6SlipN(s){return (s.items||[]).reduce(function(a,it){return a+(parseFloat(it.qty)||0);},0);}
+function _m6SlipTrips(list){var k={};list.forEach(function(s){k[(s.date||'')+'|'+String(s.truck||s.id).replace(/\s/g,'')]=1;});return Object.keys(k).length;}
+function _m6SlipsHtml(q){
+  var L=_m6Slips(q);if(!L.length)return '';
+  var todo=L.filter(function(s){return !s.done;}).length;
+  var mon={};L.forEach(function(s){var k=String(s.date||'').slice(0,7);(mon[k]=mon[k]||[]).push(s);});
+  var monTxt=Object.keys(mon).sort().reverse().slice(0,3).map(function(k){return k+'：'+_m6SlipTrips(mon[k])+' 趟';}).join('　');
+  var rows=L.slice(0,40).map(function(s){
+    var items=(s.items||[]).map(function(it){return esc([it.name,it.spec,(parseFloat(it.len)>0?(it.len+'M'):''),(it.qty!==''&&it.qty!=null?(it.qty+(it.unit||'')):'')].filter(Boolean).join(' '));}).join('、');
+    var act=s.dir==='other'?'':'<button type="button" class="btn btn-xs" onclick="m6SlipAct(\''+q.id+'\',\''+s.id+'\')">'+({out:'帶入調撥',back:'帶入歸還',rentIn:'帶入租料進場',rentOut:'帶入租料退場'}[s.dir]||'')+'</button>';
+    return '<div class="m6-slip" data-sid="'+esc(s.id)+'" style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px dotted var(--b1);font-size:12.5px'+(s.done?';opacity:.55':'')+'">'
+      +'<div style="flex:1;min-width:0"><b>'+esc(s.date||'')+'</b>　'+esc((_IK_DIRS[s.dir]||'其他').split('（')[0])+(s.truck?('　車號 '+esc(s.truck)):'')
+      +'<div style="font-size:11.5px;color:var(--b4)">'+esc(s.from||'?')+' → '+esc(s.to||'?')+(s.vendor?('　'+esc(s.vendor)):'')+'</div>'
+      +(items?'<div style="font-size:11.5px">'+items+'</div>':'')+'</div>'
+      +'<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">'
+      +'<button type="button" class="btn btn-xs" onclick="m6SlipPhoto(\''+q.id+'\',\''+s.id+'\')">照片</button>'+act
+      +'<label style="font-size:11px;display:flex;gap:4px;align-items:center"><input type="checkbox" '+(s.done?'checked':'')+' onchange="m6SlipDone(\''+q.id+'\',\''+s.id+'\',this.checked)" style="width:15px;height:15px"> 已登錄</label></div></div>';
+  }).join('');
+  return '<div class="card" id="m6-slips" style="margin-top:12px"><div style="font-weight:700;font-size:14px">材料簽收單'+(todo?('<span style="color:#b26a00;font-size:12px;font-weight:600">　'+todo+' 張待登錄</span>'):'')+'</div>'
+    +'<div style="font-size:11.5px;color:var(--b4);margin:2px 0 6px">工地用黃色相機拍的簽收單。按「帶入」把日期、M 數帶進原本的調撥／歸還／租料畫面，存檔後勾「已登錄」。運費趟數（同日同車號算一趟）：'+monTxt+'</div>'
+    +rows+'</div>';
+}
+function m6SlipPhoto(qid,sid){
+  var q=Q.find(function(x){return x.id===qid;});var s=_m6SlipFind(q,sid);if(!s||!s.photo)return;
+  _photoGet(s.photo).then(function(du){if(du)_viewFile('材料簽收單 '+(s.date||''),du);else toast('照片尚未同步到這台裝置');}).catch(function(e){_err('m6SlipPhoto',e);});
+}
+function m6SlipDone(qid,sid,on){
+  var q=Q.find(function(x){return x.id===qid;});var s=_m6SlipFind(q,sid);if(!s)return;
+  s.done=!!on;s.doneAt=Date.now();_touch(q);
+  try{persist();_immediateUpload();}catch(e){_err('m6SlipDone',e);}
+  _m6Re();
+}
+// 依方向挑對應的需求列／台帳／租賃單，再開原本的畫面並帶入日期、M 數
+function m6SlipAct(qid,sid){
+  var q=Q.find(function(x){return x.id===qid;});var s=_m6SlipFind(q,sid);if(!q||!s)return;
+  var m=_matQ(q),opts='',lab='';
+  if(s.dir==='out'){lab='對應的材料需求列';opts=(m.rows||[]).map(function(r){return '<option value="'+r.id+'">'+esc(_matLabel(r))+'</option>';}).join('');}
+  else if(s.dir==='back'){lab='工地上的哪一批料';opts=MAT_LEDGER.filter(function(lr){return lr&&lr.projQid===q.id;}).map(function(lr){return '<option value="'+lr.id+'">'+esc(_matLabel(lr))+'　'+fmt(lr.qty)+' 支・'+esc(lr.outDate||'')+'</option>';}).join('');}
+  else if(s.dir==='rentIn'||s.dir==='rentOut'){lab='對應的租賃單';opts=_m6Arr(m,'rents').map(function(rt){return '<option value="'+rt.id+'">'+esc(rt.vendor||'')+'　'+esc(_matLabel(rt))+'</option>';}).join('');}
+  if(!opts){toast(s.dir==='back'?'這個工地在台帳上沒有自有料':(s.dir==='out'?'請先建立材料需求列':'請先建立租賃單'));return;}
+  showConfirm('簽收單 '+(s.date||'')+'：'+(_IK_DIRS[s.dir]||''),
+    '<div style="font-size:12px;color:var(--b4);margin-bottom:6px">'+esc(_ikSlipItemsTxt(s.items)).replace(/\n/g,'、')+(_m6SlipM(s)?('　共 '+_rfmt(_m6SlipM(s))+' M'):'')+'</div>'
+    +'<div class="f"><label>'+lab+'</label><select id="m6sl-pick">'+opts+'</select></div>',
+    function(){
+      var id=gv('m6sl-pick');if(!id)return false;
+      window._m6SlipPre={d:s.date||'',m:_m6SlipM(s),n:_m6SlipN(s)};
+      setTimeout(function(){
+        if(s.dir==='out')matOut(q.id,id);
+        else if(s.dir==='back')matBack(q.id,id);
+        else if(s.dir==='rentIn')m6Batch(q.id,id);
+        else{var rt=_m6Arr(m,'rents').find(function(x){return x.id===id;});var b=rt&&(rt.batches||[]).filter(function(x){return !x.o;}).slice(-1)[0];if(!b){window._m6SlipPre=null;toast('這張租賃單沒有尚未退場的進場批次');return;}window._m6SlipPre={o:s.date||''};m6Batch(q.id,id,b.id);}
+        _m6SlipFill();
+      },60);
+    },false,null,false);
+}
+// 把簽收單的日期／M 數填進剛開的原畫面（只填空格或預設值，不改流程）
+function _m6SlipFill(){
+  var p=window._m6SlipPre;window._m6SlipPre=null;if(!p)return;
+  setTimeout(function(){
+    var set=function(id,v){var e=document.getElementById(id);if(e&&v!==''&&v!=null&&v!==0){e.value=v;try{e.dispatchEvent(new Event('input'));}catch(x){/* 可忽略 */}}};
+    set('mo-date',p.d);set('mb-date',p.d);set('bt-d',p.d);set('bt-m',p.m);set('bt-n',p.n);set('bt-o',p.o);
+  },120);
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

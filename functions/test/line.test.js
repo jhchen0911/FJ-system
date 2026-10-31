@@ -164,3 +164,49 @@ test('推播佇列：擁有者推不到 → status failed（FJ 看得出來）�
   await core.handleEvents([{ type: 'message', timestamp: T0, source: { type: 'user', userId: 'Unew' }, message: { id: 'z1', type: 'text', text: 'hi' } }], d2);
   assert.ok(!(d2.db.fydata && d2.db.fydata.lineCfg));
 });
+
+// ── v6.0.119 批次 I：公司大群組固定格式回報 ──
+const CO = { owners: { Uowner: { name: 'Lotion' } }, groups: { Gco: { mode: 'company', name: '豐有工務群' } },
+  sites: { qA: { name: '（甲營造）內湖興中路擋土工程' }, qB: { name: '（乙建設）板橋文化路基樁工程' }, qC: { name: '（丙營造）內湖成功路工程' } } };
+
+test('公司群：解析多段【工地】格式', () => {
+  const b = core.parseCoReport('【工地】興中路\n【今天】打樁 12 支\n【明天】續打\n【問題】無\n\n【工地】文化路\n【今天】進料\n【明天】\n【問題】等圖');
+  assert.equal(b.length, 2);
+  assert.equal(b[0].site, '興中路'); assert.equal(b[0].today, '打樁 12 支'); assert.equal(b[1].issue, '等圖');
+  assert.deepEqual(core.parseCoReport('今天打樁'), []);
+});
+
+test('公司群：地名唯一對到才歸案；對到兩案或沒對到＝待分類', () => {
+  assert.equal(core.matchSite(CO.sites, '興中路'), 'qA');
+  assert.equal(core.matchSite(CO.sites, '板橋 文化路'), 'qB');    // 空白去掉後被專案名包含
+  assert.equal(core.matchSite(CO.sites, '內湖'), '');              // 兩案都有內湖 → 不猜
+  assert.equal(core.matchSite(CO.sites, '台中'), '');
+  assert.equal(core.matchSite(Object.assign({}, CO.sites, { qC: { name: CO.sites.qC.name, keys: ['內湖'] } }), '內湖'), 'qC');   // 手動對過的地名優先
+});
+
+test('公司群：回報存 lineCo、20:00 每工地一份日報草稿、對不到的待分類、追加與警報照常', async () => {
+  const d = mkDeps(CO);
+  const g = { type: 'group', groupId: 'Gco', userId: 'Uw1' };
+  await core.handleEvents([{ type: 'message', timestamp: T0 - 60000, source: g, message: { id: 'img1', type: 'image' } }], d);
+  await core.handleEvents([{ type: 'message', timestamp: T0, source: g, message: { id: 'c1', type: 'text', text: '【工地】興中路\n【今天】打樁 12 支\n【明天】續打\n【問題】擋土壁有裂縫' } }], d);
+  await core.handleEvents([{ type: 'message', timestamp: T0 + 1000, source: { type: 'group', groupId: 'Gco', userId: 'Uw2' }, message: { id: 'c2', type: 'text', text: '【工地】內湖\n【今天】追加鋼板樁 5 支\n【明天】\n【問題】' } }], d);
+  const co = d.db.fydata.lineCo.Gco['2026-10-22'];
+  assert.equal(co.c1_0.qid, 'qA');
+  assert.ok(Object.values(co.c1_0.photos).some(p => /img1/.test(p)), '前 10 分鐘同一人的照片掛上');
+  assert.equal(co.c2_0.qid, '');
+  assert.ok(d.pushes.some(p => /興中路/.test(p.text) && /裂/.test(p.text)), '警報用地名通知擁有者');
+  const addon = d.drafts.dlc2_0; assert.ok(addon && addon.payload.unmatched && addon.payload.qty === 5);
+  const n = await core.dailyCompile(d, T0 + 10 * 3600000);
+  assert.equal(n, 2);
+  const ds = Object.values(d.drafts).filter(x => x.type === 'dailyLog');
+  assert.ok(ds.some(x => x.payload.qid === 'qA' && /打樁 12 支/.test(x.payload.answers.join('\n')) && x.payload.photos.length === 1));
+  assert.ok(ds.some(x => x.payload.qid === '' && x.payload.unmatched && /待分類/.test(x.summary)));
+});
+
+test('公司群：17:30 發固定格式；隔天 08:00 不提醒公司群', async () => {
+  const d = mkDeps(CO);
+  assert.equal(await core.dailyAsk(d, T0 + 7.5 * 3600000), 1);
+  assert.match(d.pushes[0].text, /【工地】/);
+  const r = await core.morningCheck(d, T0 + 24 * 3600000);
+  assert.equal(r.reminded, 0);
+});
