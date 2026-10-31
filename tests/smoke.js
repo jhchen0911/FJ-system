@@ -2628,7 +2628,7 @@ async function newPage(browser, width, height) {
       const dx = td.decode(dfiles['word/document.xml']);
       out.dw = /<w:tc><w:p><w:pPr\/><w:r><w:t xml:space="preserve">林阿明<\/w:t><\/w:r><\/w:p><\/w:tc>/.test(dx) && /電話：0912345678/.test(dx) && /<w:t>備註<\/w:t>/.test(dx);
       // ⑤ AI 對應：stub fetch 回傳 JSON；單人表對應→寫入；範本記憶 P.wkTpl
-      const origFetch = window.fetch; localStorage.setItem('fy_aikey', 'test');
+      const origFetch = window.fetch; const oU2 = window._fbUser; _fbUser = { email: 'staff@x.com', uid: 'u', getIdToken: async () => 't' };   // v6.0.118：AI 走雲端代理，要登入（不再用本機金鑰）
       window.fetch = async () => ({ json: async () => ({ content: [{ text: '{"mode":"single","targets":[{"sheet":"進場申請","cell":"B2","field":"name","label":"姓名"},{"sheet":"進場申請","cell":"D3","field":"birthRoc","label":"出生日期"}]}' }] }) });
       const map = await _wkAiMap('xlsx', parsed.cells);
       out.ai = map.mode === 'single' && map.targets.length === 2 && map.targets[1].field === 'birthRoc';
@@ -2650,7 +2650,7 @@ async function newPage(browser, width, height) {
       // ⑦ 入口：按鈕存在、開啟視窗列出人員
       go('workers'); out.btn = /wkFillOwnerForm/.test(document.getElementById('page-workers').innerHTML);
       wkFillOwnerForm(); out.modal = document.querySelectorAll('.wkof-w').length === 2 && !!document.getElementById('wkof-file'); document.getElementById('gen-confirm-ok') && document.querySelector('#gen-confirm-modal .btn-cancel, #gen-confirm-cancel')?.click();
-      window.fetch = origFetch; localStorage.removeItem('fy_aikey'); delete P.wkTpl; WORKERS.length = 0; _wkOF = null;
+      window.fetch = origFetch; _fbUser = oU2; delete P.wkTpl; WORKERS.length = 0; _wkOF = null;
       return out;
     });
     check('業主表格：zip 讀寫往返、xlsx 儲存格列出與寫入（改格／插格／新列、欄序）', r.zip && r.parse && r.xw && r.xorder && r.rezip);
@@ -6775,7 +6775,7 @@ async function newPage(browser, width, height) {
   {
     const rules = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const RD = "root.child('fydata/readers')";
-    const wr = [rules.shared['.write'], rules.relay['.write'], rules.relay.photos['.read'], rules.private['.write'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.logs['$uid']['.write']];   // backups 改只給擁有者（另驗）
+    const wr = [rules.shared.pagePerms['.write'], rules.shared.$other['.write'], rules.shared.quotes.$qid['.write'], rules.shared.version['.write'], rules.relay['.write'], rules.relay.photos['.read'], rules.private['.write'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.logs['$uid']['.write']];   // backups 改只給擁有者（另驗）
     check('v6.0.90 規則：readers 可讀 shared（v6.0.108 起也可讀 private）、所有寫入與 relay／backups 皆排除 readers 名冊、名冊僅管理員可寫',
       rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.backups['.read'].includes('adminEmails') && !rules.backups['.write'].includes('adminEmails') && rules.relay.photos['.read'].includes('|| ' + RD) && rules.private['.read'].includes('|| ' + RD) /* v6.0.108 Lotion：唯讀帳號可讀 private */ && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
       '');
@@ -6853,7 +6853,7 @@ async function newPage(browser, width, height) {
       const usedF = used.filter(u => u !== 'fydata'); r.srUsed = usedF.join(',');
       r.sr = !/match \/\{allPaths/.test(SR) && /match \/fydata\/backups\/\{file=\*\*\} \{\s*allow read, write: if isOwner\(\);/.test(SR)
         && usedF.length >= 5 && usedF.every(u => u === 'fydata/backups' || (u.startsWith('fydata/') ? new RegExp("'" + u.split('/')[1] + "'").test(SR) : new RegExp('match /' + u + '/').test(SR)))
-        && /hsuanchen911@gmail\.com/.test(SR) && (SR.match(/!isReader\(\)/g) || []).length === 2;
+        && /hsuanchen911@gmail\.com/.test(SR) && (SR.match(/!isReader\(\)/g) || []).length >= 1 && (SR.match(/allow write: if isStaff\(\)/g) || []).length === 2;   // v6.0.118 改用 isStaff（claim fy）
       r.static = dels.length === 2 && dels.every(l => /function _stDel|kill\.forEach/.test(l)) && puts.length >= 4 && puts.every(i => L.slice(Math.max(0, i - 40), i).some(x => /_stOk\(\)/.test(x)));
     }
     check('v6.0.93 唯讀 Storage fail-closed：唯讀／未確認／離線不上傳不刪檔、舊規則被拒＝一般帳號、只豁免擁有者、刪檔只經 _stDel', r.stReader && r.pendCb && r.stPending && r.oldRules && r.stRw && r.ownerSkip && r.static && r.inputCheck && r.ownerOnlyBackup, JSON.stringify(r));
@@ -7329,10 +7329,10 @@ async function newPage(browser, width, height) {
         out.me = _meName() === '陳軒（AI）' && _meRoleLabel() === '唯讀';
         /* 讀 private：_pullPrivate 不再對唯讀帳號提前返回（模擬資料庫） */
         let asked = '';
-        _fbDb = { ref: p => ({ once: () => { asked = p; return Promise.resolve({ val: () => null }); }, update: () => { out.wrote = true; return Promise.resolve(); }, set: () => { out.wrote = true; return Promise.resolve(); } }) };
+        _fbDb = { ref: p => ({ once: () => { asked += p + '|'; return Promise.resolve({ val: () => null }); }, update: () => { out.wrote = true; return Promise.resolve(); }, set: () => { out.wrote = true; return Promise.resolve(); } }) };
         return new Promise(res => {
           _pullPrivate(ok => {
-            out.priv = ok === true && asked === 'fydata/private';
+            out.priv = ok === true && asked.indexOf('fydata/private|') === 0;   // v6.0.118：唯讀帳號之後還會讀 workerSens（看全部）
             /* 資料層：上傳一律擋 */
             let pushed = null; _pushCloud({ silent: true, onDone: v => { pushed = v; } }); out.push = pushed === false;
             _pushPrivate(v => { out.pushPriv = v === false; });
@@ -8000,7 +8000,7 @@ async function newPage(browser, width, height) {
         _fbDb = { ref: p => ({ remove: () => { removed.push(p); return Promise.resolve(); } }) }; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a1' }; _roState = 'rw'; _isReaderUser = false;
         localStorage.removeItem('fy_aikey');
         _applyCloud({ quotes: Q.slice(), params: { aiKey: 'sk-test-cloud' } });
-        out.scrub = !P.aiKey && localStorage.getItem('fy_aikey') === 'sk-test-cloud' && removed.indexOf('fydata/shared/params/aiKey') >= 0;
+        out.scrub = !P.aiKey && !localStorage.getItem('fy_aikey') && removed.indexOf('fydata/shared/params/aiKey') >= 0;   // v6.0.118：AI 改走雲端代理，任何裝置都不再保存金鑰
         P.aiKey = 'sk-test-2'; out.noUp = !('aiKey' in _syncPayload().data.params);
         _isReaderUser = true; _roState = 'reader'; out.ro = _aiKey() === '' && localStorage.getItem('fy_aikey') === null && !P.aiKey;
         _isReaderUser = false; _roState = oS; _fbDb = oDb; _fbUser = oU; localStorage.removeItem('fy_aikey');
@@ -8150,7 +8150,7 @@ async function newPage(browser, width, height) {
     await page.close();
     /* Cloud Functions 單元測試（不需 Firebase／網路） */
     let fo = '', fok = false;
-    try { fo = require('child_process').execFileSync(process.execPath, ['--test', require('path').join(__dirname, '..', 'functions', 'test', 'line.test.js')], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); fok = /# fail 0/.test(fo); } catch (e) { fo = String(e.stdout || e.message); }
+    try { fo = require('child_process').execFileSync(process.execPath, ['--test', require('path').join(__dirname, '..', 'functions', 'test', 'line.test.js'), require('path').join(__dirname, '..', 'functions', 'test', 'ops.test.js')], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); fok = /# fail 0/.test(fo); } catch (e) { fo = String(e.stdout || e.message); }
     check('v6.0.110 LINE Cloud Functions 單元測試（簽章、轉傳歸檔、現場追加、事故前兆與否定詞、日報問／整理／提醒、推播佇列與失敗、重送去重、待綁定上限）全過', fok, fo.slice(-300));
   }
 
@@ -8738,6 +8738,121 @@ async function newPage(browser, width, height) {
     const rb = await probe('beta.html'), rt = await probe('test.html');
     if (!rb.info.sdk || !rt.info.sdk) check('v6.0.114 beta 不寫雲端（實際攔截 Firebase 連線）', true, '略過：Firebase 套件沒載入（容器連不到 gstatic 時設 FJ_FB_SDK_DIR）');
     else check('v6.0.114 beta 存報價＋所有上傳路徑：實際送往 Firebase 的寫入是 0 筆（test.html 對照組有寫入，證明攔截有效）', rb.writes === 0 && rt.writes > 0 && rb.info.env === 'test', JSON.stringify({ beta: rb.writes, test: rt.writes }));
+  }
+
+  // ── v6.0.118 批次 H：健檢2 安全（名冊／角色只有管理員能寫、共用區不能整包清空、匯款帳號只有管理員能改、Storage 用權限標記） ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = () => {};
+        const oU = window._fbUser;
+        /* #2／#3 一般員工上傳：拿掉名冊／角色、不送空集合；逐筆集合不整包改寫 */
+        _fbUser = { email: 'staff1@example.com', uid: 's1' }; _isReaderUser = false;
+        try { localStorage.setItem('fy_r112', '1'); } catch (e) { /* 可忽略 */ }   // 新規則已發布後的行為
+        out.staffNotAdmin = !_shWholeOk();
+        const d1 = { version: 'v', uploadedAt: 1, pagePerms: { x: 1 }, customers: [], vendors: [{ id: 'v1' }], 'quotes/q1': { id: 'q1' } };
+        _shStripForStaff(d1);
+        out.strip = !('pagePerms' in d1) && !('customers' in d1) && Array.isArray(d1.vendors) && !!d1['quotes/q1'];
+        try { localStorage.removeItem('fy_rec_mig_quotes'); } catch (e) { /* 可忽略 */ }
+        const clean = { quotes: [{ id: 'qa', name: 'A' }, { id: 'qb', name: 'B' }], invoices: [], workers: [] };
+        const d2 = {}; _perRecordDelta(d2, clean, {}, {}, { full: true });
+        out.perRec = !('quotes' in d2) && !!d2['quotes/qa'] && !!d2['quotes/qb'];
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o1' };
+        const d3 = { version: 'v', uploadedAt: 1, pagePerms: { x: 1 } }; _shStripForStaff(d3); out.adminKeep = !!d3.pagePerms;
+        /* #4 匯款帳號：遷移後以 fydata/bank 為準、近期變更紅標、員工改不了 */
+        VENDORS = [{ id: 'v1', name: '甲工程行', bank: '舊銀行', bankAcct: '111', bankHolder: '甲' }];
+        BANK = null; out.legacy = _vendorBank('甲工程行').bankAcct === '111' && _coBank().account === (P.bankAccount || '031035008864');
+        BANK = { migrated: 1, company: { bank: '新銀行', account: '999' }, vendors: {} };
+        BANK.vendors[_bankKey('甲工程行')] = { name: '甲工程行', bank: '新銀行', acct: '222', holder: '甲', at: Date.now() };
+        out.bankSrc = _vendorBank('甲工程行').bankAcct === '222' && _coBank().account === '999' && /近期變更/.test(_bankLine('甲工程行'));
+        VENDORS[0].bankAcct = '666'; out.ignoreShared = _vendorBank('甲工程行').bankAcct === '222';
+        _fbUser = { email: 'staff1@example.com', uid: 's1' };
+        editVendor('v1'); out.lock = document.getElementById('v-bankacct').disabled === true;
+        document.getElementById('v-bankacct').value = '777'; document.getElementById('v-bankacct').disabled = false; saveVendor();
+        out.staffNoChange = VENDORS.find(v => v.id === 'v1').bankAcct === '666' && _vendorBank('甲工程行').bankAcct === '222';
+        /* 審查 🔴4：遷移要等套用過雲端資料才跑 */
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o1' }; VENDORS = [{ id: 'v1', name: '甲工程行', bankAcct: '111' }];
+        const ups = []; const oDb = window._fbDb; _fbDb = { ref: p => ({ update: v => { ups.push([p, v]); return Promise.resolve(); } }) };
+        BANK = {}; window._cloudApplied1 = false; _bankMigrate(); out.migWait = ups.length === 0;
+        window._cloudApplied1 = true; _bankMigrate(); out.migGo = ups.length === 1 && !!ups[0][1]['vendors/' + _bankKey('甲工程行')] && !!ups[0][1].migrated;
+        _fbDb = oDb;
+        /* 健檢2 #7：AI 走雲端代理，前端沒有金鑰；代理未部署時給友善錯誤 */
+        const oF = window.fetch; let sentTo = '', sentH = {};
+        window.fetch = (u, o) => { sentTo = u; sentH = (o && o.headers) || {}; return Promise.resolve({ status: 404, json: () => Promise.resolve({}) }); };
+        _fbUser = { email: 'staff1@example.com', uid: 's1', getIdToken: () => Promise.resolve('tok') }; _isReaderUser = false; _roState = 'rw';
+        window.__aiR = await (await _aiFetch({ body: '{}' })).json();
+        window.fetch = oF;
+        /* 健檢2 #5：人員證件不上共用區；員工寫投遞區、管理員寫 workerSens；合併後接回 */
+        try { localStorage.setItem('fy_r112', '1'); } catch (e) { /* 可忽略 */ }   // 新規則已發布
+        WORKERS = [{ id: 'w1', name: '王小明', idNo: 'A123456789', birth: '1980-01-01', emgPhone: '0912', title: '技工', _mt: 5, docs: { idF: { du: 'data:image/png;base64,AAA', name: 'a', ts: 1 }, oshF: { du: 'data:image/png;base64,BBB', exp: '2027-01-01' } }, certs: [] }];
+        const sp = _wkSplit(WORKERS[0]);
+        out.wkPub = !sp.pub.idNo && !sp.pub.birth && !sp.pub.emgPhone && sp.pub.idMask === 'A12****789' && sp.pub.docs.idF.du === '' && sp.pub.docs.oshF.du !== '' && sp.sens.f.idNo === 'A123456789' && sp.sens.docs.idF.du;
+        const shp = _sharedPayload().data.workers[0]; out.wkShared = !shp.idNo && !(shp.docs.idF && shp.docs.idF.du);
+        const ups2 = []; const oDb2 = window._fbDb; _fbDb = { ref: p => ({ update: v => { ups2.push([p, v]); return Promise.resolve(); }, once: () => Promise.resolve({ val: () => null }) }) };
+        try { localStorage.removeItem('fy_wksens_h'); } catch (e) { /* 可忽略 */ }
+        _wkSensPush(); out.wkStaff = ups2.length === 1 && !!ups2[0][1]['workerSensIn/w1'] && !ups2[0][1]['workerSens/w1'];
+        try { localStorage.removeItem('fy_wksens_h'); } catch (e) { /* 可忽略 */ }
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o1', getIdToken: () => Promise.resolve('tok') }; ups2.length = 0;
+        _wkSensPush(); out.wkAdmin = ups2.length === 1 && !!ups2[0][1]['workerSens/w1']; await new Promise(res => setTimeout(res, 20));
+        WORKERS = [sp.pub]; _wkGraft(); out.wkGraft = WORKERS[0].idNo === 'A123456789' && WORKERS[0].docs.idF.du === 'data:image/png;base64,AAA';
+        /* 健檢2 #3：員工的刪除改送申請；管理員一批 ≤30 自動套用、超過先擋下 */
+        _fbUser = { email: 'staff1@example.com', uid: 's1' }; ups2.length = 0;
+        try { localStorage.removeItem('fy_tombreq_sent'); } catch (e) { /* 可忽略 */ }
+        /* 審查 🔴1：從雲端合併來的舊墓碑不回送；只送本機自己刪的 */
+        try { localStorage.removeItem('fy_tombreq_pending'); } catch (e) { /* 可忽略 */ }
+        TOMBS = {}; const old = {}; for (let i = 0; i < 120; i++) old['p' + i] = 1; _mergeTombs({ payables: old, quotes: { qold: 2 } });
+        _fbDb = { ref: p => ({ update: v => { ups2.push([p, v]); return Promise.resolve(); }, once: () => Promise.resolve({ val: () => null }) }) };
+        _tomb('quotes', 'qz1'); const d4 = { version: 'v', uploadedAt: 1, tombs: TOMBS }; _shStripForStaff(d4);
+        const tr = ups2.find(u => u[0] === 'fydata/tombReq/staff1@example,com');
+        out.tombStaff = !('tombs' in d4) && !!tr && Object.keys(tr[1]).length === 1 && !!tr[1]['quotes/qz1'];
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o1' };
+        Q = [{ id: 'qz1', name: 'X' }, { id: 'qz2', name: 'Y' }]; TOMBS = {}; TOMB_HOLD = {};
+        const many = {}; for (let i = 0; i < 31; i++) many['m' + i] = 1;
+        const reqs = { 'a@x,com': { quotes: { qz1: 5 } }, 'b@x,com': { quotes: many } };
+        _fbDb = { ref: p => ({ once: () => Promise.resolve({ val: () => (p === 'fydata/tombReq' ? reqs : null) }), update: v => Promise.resolve() }) };
+        _tombReqPull(); await new Promise(res => setTimeout(res, 30));
+        out.tombAdmin = !Q.some(q => q.id === 'qz1') && Q.some(q => q.id === 'qz2') && TOMBS.quotes && TOMBS.quotes.qz1 === 5 && _tombHoldCount() === 31 && !TOMBS.quotes.m0;
+        tombHoldDo('b@x,com', 0); out.tombKeep = _tombHoldCount() === 0 && !TOMBS.quotes.m0;
+        /* 審查 🔴2：員工只補一張文件，不洗掉管理員那邊已有的身分證欄位與影像 */
+        WK_SENS = { w9: { id: 'w9', _mt: 1, f: { idNo: 'B123456789', birth: '1990-02-02' }, docs: { idF: { du: 'data:image/png;base64,ID', name: 'id', ts: 1 } } } };
+        const inbox = { w9: { id: 'w9', _mt: 9e15, by: 'staff1@example.com', at: Date.now(), f: {}, docs: { health: { du: 'data:image/png;base64,HE', name: 'h', ts: 2 } } } };
+        _fbDb = { ref: p => ({ once: () => Promise.resolve({ val: () => (p === 'fydata/workerSensIn' ? inbox : p === 'fydata/workerSens' ? { w9: WK_SENS.w9 } : null) }), update: v => Promise.resolve() }) };
+        WORKERS = []; _wkSensPull(); await new Promise(res => setTimeout(res, 30));
+        out.wkMerge = WK_SENS.w9.f.idNo === 'B123456789' && WK_SENS.w9.docs.idF && WK_SENS.w9.docs.health && WK_SENS.w9._mt < 9e15;
+        _fbDb = oDb2; WORKERS = []; Q = []; TOMBS = {};
+        await new Promise(res => setTimeout(res, 20));
+        out.ai = sentTo === _AI_PROXY && _AI_PROXY === _fnUrl('aiProxy') && /fj-system-test/.test(_AI_PROXY) && sentH.Authorization === 'Bearer tok' && !sentH['x-api-key'] && window.__aiR && /尚未部署/.test(window.__aiR.error.message);
+        _isReaderUser = true; out.aiRo = !_aiOn(); _isReaderUser = false;
+        BANK = null; VENDORS = []; _fbUser = oU; window.toast = oT;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    const fs = require('fs'), pth = require('path');
+    const rules = JSON.parse(fs.readFileSync(pth.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    const sh = rules.shared, ADMK = "fydata/adminEmails";
+    const rr = {
+      noRootWrite: !('.write' in sh),
+      pp: sh.pagePerms && sh.pagePerms['.write'].includes(ADMK) && !sh.pagePerms['.write'].includes("fydata/access"),
+      whole: ['quotes', 'invoices', 'workers'].every(k => sh[k] && sh[k]['.write'].includes(ADMK) && !sh[k]['.write'].includes('fydata/access') && sh[k][Object.keys(sh[k]).find(x => x[0] === '$')]['.write'].includes('fydata/access')),
+      other: /newData\.exists\(\) \|\| \(auth\.token\.email === /.test(sh.$other['.write']) && !/!data\.exists\(\)/.test(sh.$other['.write']),
+      noTail: ['version', 'uploadedAt'].every(k => !/!data\.exists\(\)/.test(sh[k]['.write'])) && !/!data\.exists\(\)/.test(sh.quotes.$qid['.write']),   // 審查 🔴1／2：管理員能刪集合、員工能刪單筆
+      bank: rules.bank && rules.bank['.write'].includes(ADMK) && !rules.bank['.write'].includes('fydata/access') && rules.bank.$other['.validate'] === 'false',
+    };
+    const SR = fs.readFileSync(pth.join(__dirname, '..', 'storage.rules'), 'utf8');
+    check('v6.0.118 健檢2 #2／#3：一般員工上傳不送名冊／角色與空集合、逐筆集合不整包改寫；管理員照常', r.staffNotAdmin && r.strip && r.perRec && r.adminKeep && !r.err, JSON.stringify(r));
+    check('v6.0.118 健檢2 #2／#3 規則：共用區逐集合授權（名冊／角色、整包改寫只限管理員；員工不能刪整個集合）', rr.noRootWrite && rr.pp && rr.whole && rr.other && rr.noTail, JSON.stringify(rr));
+    check('v6.0.118 健檢2 #4：匯款帳號遷移後以 fydata/bank 為準（員工改不了、近期變更紅標）、未遷移沿用舊欄位；規則只限管理員寫', r.legacy && r.bankSrc && r.ignoreShared && r.lock && r.staffNoChange && r.migWait && r.migGo && rr.bank && !r.err, JSON.stringify(r));
+    check('v6.0.118 健檢2 #6：storage.rules 改用權限標記 fy（與產生器同一版）', /request\.auth\.token\.get\('fy', ''\) in \['staff', 'admin'\]/.test(SR) && /token\.get\('fy', ''\) == 'reader'/.test(SR) && !/signedIn\(\) && folder in/.test(SR), '');
+    const APPSRC = fs.readFileSync(pth.join(__dirname, '..', 'app.js'), 'utf8');
+    check('v6.0.118 健檢2 #7：AI 呼叫一律走雲端代理（帶登入憑證、不帶金鑰），前端沒有直接呼叫 Anthropic；唯讀帳號不能用', r.ai && r.aiRo && !/api\.anthropic\.com/.test(APPSRC) && !/anthropic-dangerous-direct-browser-access/.test(APPSRC), JSON.stringify(r));
+    check('v6.0.118 健檢2 #5：人員證件與身分證欄位不上共用區（遮罩）、員工寫投遞區、管理員寫 workerSens、合併後接回；規則限管理員與進場權限讀寫、唯讀帳號可讀（Lotion 10/22）', r.wkPub && r.wkShared && r.wkStaff && r.wkAdmin && r.wkGraft && rules.workerSens && rules.workerSens['.read'].includes(ADMK) && rules.workerSens['.read'].includes('fydata/wkAccess') && rules.workerSens['.read'].includes("root.child('fydata/readers')") && !rules.workerSens['.read'].includes('fydata/access') && rules.wkAccess && rules.wkAccess['.write'].includes(ADMK) && !rules.wkAccess['.write'].includes('fydata/access') && rules.workerSensIn['.read'].includes(ADMK) && !rules.workerSensIn['.read'].includes('fydata/access'), JSON.stringify(r));
+    const BETA = fs.readFileSync(pth.join(__dirname, '..', 'beta.js'), 'utf8');
+    check('v6.0.118 審查：員工補交部分證件不洗掉既有資料；beta 沙盒不會執行新的雲端寫入', r.wkMerge && ['_tombReqPull', '_wkSensPush', '_wkSensPull', '_bankMigrate'].every(f => BETA.includes("'" + f + "'")), JSON.stringify(r));
+    check('v6.0.118 健檢2 #3：墓碑只限管理員寫、員工刪除改送申請（只能寫自己的）、管理員一批 ≤30 自動套用、超過先擋下等確認', r.tombStaff && r.tombAdmin && r.tombKeep && rules.shared.tombs && rules.shared.tombs['.write'].includes(ADMK) && !rules.shared.tombs['.write'].includes('fydata/access') && /\$who === auth\.token\.email/.test(rules.tombReq.$who['.write']), JSON.stringify(r));
+    check('v6.0.118 批次 H 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
   }
 
   await browser.close();

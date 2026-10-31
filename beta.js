@@ -1,6 +1,6 @@
 /* ── 測試版沙盒：不上傳雲端（beta.js，defer 接在 app.js 之後）── */
 (function(){
-  ['_autoUpload','_immediateUpload','_pushPrivate','_pushRelayCosts','_pushRelayExpenses','fbUpload','fbUploadWithConflictCheck','_pushCloud'].forEach(function(nm){
+  ['_autoUpload','_immediateUpload','_pushPrivate','_pushRelayCosts','_pushRelayExpenses','fbUpload','fbUploadWithConflictCheck','_pushCloud','_tombReqPush','_tombReqPull','_wkSensPush','_wkSensPull','_bankMigrate','_bankCompanySave','_bankVendorSave','_syncAccessLists'].forEach(function(nm){
     if(typeof window[nm]==='function'){window[nm]=function(){var cb=null;for(var i=0;i<arguments.length;i++){if(typeof arguments[i]==='function'){cb=arguments[i];break;}}if(cb){try{cb(false);}catch(e){}}return false;};}
   });
   // 改版第 0 步（健檢 3 🔴3）：Firebase SDK 層一律不寫——資料庫 set／update／push(值)／remove／transaction、Storage 上傳／刪除，
