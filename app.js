@@ -35826,7 +35826,6 @@ function cleanDuplicatePayables(){
   if(n){var set=new Set(keep);PAYABLES=PAYABLES.filter(function(p){return set.has(p);});savePayables();}
   return n;
 }
-var _delPayableCore=delPayable,_editPayableCore=editPayable,_togglePayVatCore=togglePayVat;
 function delPayable(id){var p=(PAYABLES||[]).find(function(x){return x&&x.id===id;});var s=_paySource(p);if(s.auto){toast('這筆由「'+s.label+'」自動產生，請到來源修改或刪除');return;}return _delPayableCore.apply(this,arguments);};
 function editPayable(id){var p=(PAYABLES||[]).find(function(x){return x&&x.id===id;});var s=_paySource(p);if(s.auto){toast('這筆由「'+s.label+'」自動產生，請到來源修改');return;}return _editPayableCore.apply(this,arguments);};
 function togglePayVat(pid,on){var p=(PAYABLES||[]).find(function(x){return x&&x.id===pid;});var s=_paySource(p);if(s.auto){toast('稅別跟著來源的「開發票」設定，請到來源改');try{renderPayables();}catch(e){_err('togglePayVat',e);}return;}return _togglePayVatCore.apply(this,arguments);};

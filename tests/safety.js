@@ -1,6 +1,6 @@
 // 健檢 3 第三節：改版前的四道安全網（只加測試、不改程式）
 //   ① 同步合併：兩台裝置交錯修改、付款／改回未付的先後、墓碑、180 天沒開的舊裝置、舊版裝置上傳
-//   ② 衍生應付重跑：分包期別／預付款／成本卡的自動應付重算 N 次結果完全相同；已付的那筆怎麼重算都不會被刪、不會變回待付
+//   ② 衍生應付重跑：分包期別／預付款／成本卡的自動應付重算 N 次結果完全相同；已付的那筆怎麼重算都不會被刪、不會變回待付；手動應付切稅別、刪除正常
 //   ③ 備份來回：在 A 頁做資料、取全量備份內容（exportData 用的同一份 _syncPayload）→ 全新 B 頁用 importData 匯入 → 再取一次，兩份逐欄相同（不含時間戳）；
 //      報價、請款、應付、合約、客戶、廠商、費用、薪資、薪資單、零用金、材料台帳、單價歷史、分潤都放資料，沒放到就算失敗
 //   ④ 包裝白名單：程式裡「用 x=function 覆寫同名函式」的地方只能是白名單上這幾個（第 2a 步拆包裝時同步刪白名單）
@@ -23,6 +23,12 @@ function wrapScan(src) {
   const fns = new Set([...src.matchAll(/^(?:async\s+)?function\s*\*?\s*([\w$]+)\s*\(/gm)].map(m => m[1]));
   const hits = {};
   for (const m of src.matchAll(/(?:^|[;{}\s,])(?:window\.)?([\w$]+)\s*=\s*(?:async\s+)?(?:function\b|\([^)]*\)\s*=>|[\w$]+\s*=>)/gm)) if (fns.has(m[1])) hits[m[1]] = (hits[m[1]] || 0) + 1;
+  // 最外層（第 0 欄）把同名函式重新指定成任何東西也算：例如漏刪的別名「var _fCore=f」會讓 _fCore 指回包裝、無限遞迴（2a 審查抓到）
+  const seen = new Set();
+  for (const m of src.matchAll(/^(?:var\s+|let\s+|const\s+|window\.)?([\w$]+)\s*=(?![=>])|^var\s+[^;\n]*?,\s*([\w$]+)\s*=(?![=>])/gm)) {
+    const n = m[1] || m[2]; if (!fns.has(n) || seen.has(m.index)) continue; seen.add(m.index);
+    if (!/^(?:window\.)?[\w$]+\s*=\s*(?:async\s+)?(?:function\b|\(|[\w$]+\s*=>)/.test(m[0] + src.slice(m.index + m[0].length, m.index + m[0].length + 20))) hits[n] = (hits[n] || 0) + 1;
+  }
   return hits;
 }
 function testWrap(root) {
@@ -96,6 +102,15 @@ const DERIVED = async () => {
   savePayables();
   const after = PAYABLES.find(p => p.id === p2.id);
   r.paidKept = !!after && after.status === 'paid' && _payEff(after) === amt;
+  // 手動應付（非自動產生）：切稅別、刪除要真的作用、不能出錯（2a 審查：漏刪別名時這三個會無限遞迴）
+  try {
+    PAYABLES.push({ id: 'mS1', to: '丁工班', amount: 100, status: 'pending', _mt: 1 });
+    togglePayVat('mS1', false);
+    const vatOff = PAYABLES.find(p => p.id === 'mS1').vat === false;
+    const sc = window.showConfirm; window.showConfirm = (t, h, ok) => ok();
+    try { delPayable('mS1'); } finally { window.showConfirm = sc; }
+    r.manual = vatOff && !PAYABLES.some(p => p.id === 'mS1');
+  } catch (e) { r.manual = false; r.err = String(e && e.message || e).slice(0, 80); }
   return r;
 };
 
@@ -169,7 +184,7 @@ async function runAll(browser, root, only) {
   if (!only || only === 'derived') {
     const { ctx, page } = await newPage(browser, root);
     let r; try { r = await page.evaluate(body(DERIVED)); } catch (e) { r = { err: String(e.message).slice(0, 120) }; }
-    res.derived = { ok: r.idempotent === true && r.paidKept === true, info: (r.err || '') + '應付 ' + r.n + ' 筆；重跑 5 次相同 ' + (r.idempotent ? '✓' : '✗') + '；已付刪期別後仍在 ' + (r.paidKept ? '✓' : '✗') };
+    res.derived = { ok: r.idempotent === true && r.paidKept === true && r.manual === true, info: (r.err ? r.err + '；' : '') + '應付 ' + r.n + ' 筆；重跑 5 次相同 ' + (r.idempotent ? '✓' : '✗') + '；已付刪期別後仍在 ' + (r.paidKept ? '✓' : '✗') + '；手動應付切稅別／刪除 ' + (r.manual ? '✓' : '✗') };
     await ctx.close();
   }
   if (!only || only === 'backup') {
