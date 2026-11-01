@@ -2332,7 +2332,8 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
 15. 如因甲方工地緊急狀況、工程聯絡單或口頭指示，要求乙方先行配合施作追加工項者，經甲方工地簽認報價單後，該報價單即視為本合約之一部分。甲方不得以未另行簽訂書面合約為由，拒絕或延遲辦理當期工程款之給付。
 16. 本報價各階段均以一次施工作業為原則；如因實際需求須進行第二次施作，或施作數量不足時，甲方應另行補貼動員費用（次/$【MOB】元）。
 17. 於結構體作業時，其相關補強作業由甲方負責。結構板面施工動線（含鐵板鋪設）如甲方委由乙方，相關費用另行議定。
-18. 如因甲方要求或施工動線限制需使用吊車進行拔樁作業，其施工單價另議。</textarea>
+18. 如因甲方要求或施工動線限制需使用吊車進行拔樁作業，其施工單價另議。
+19. 本報價有效期限為報價日起【VALID】天，逾期依鋼材行情另議。</textarea>
         <div style="display:flex;justify-content:flex-end;margin-top:8px">
           <button type="button" class="btn btn-xs" onclick="resetRmkBase()" style="background:#fff3e0;color:#e65100;border-color:#ffcc80">↩ 還原預設備註條款</button>
         </div>
@@ -2790,7 +2791,7 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="app.js?v=6.0.123" defer></script>
+<script src="app.js?v=6.0.124" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
@@ -2864,6 +2865,7 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
       <div id="rmk-t-mob" style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:5px">第16條：動員費</div>
       <div class="fg fg4" style="margin-bottom:12px">
         <div class="f"><label>動員費 ($/次)</label><input type="number" id="rmk-mob" placeholder="選填"></div>
+        <div class="f"><label id="rmk-t-valid">報價有效期限（天）</label><input type="number" id="rmk-valid" placeholder="例：14（空白＝不印這一條）"></div>
         <div class="f" style="grid-column:span 2"><label>施作數量不足（門檻，可寫多個條件）</label><input id="rmk-minqty" placeholder="例：20 支；多條件：H型鋼樁 20 支或水平支撐 200 M"></div>
         <div class="f"></div>
       </div>
