@@ -14,6 +14,7 @@ on:
       - 'test.html'
       - 'tools/build-beta.py'
       - 'tests/**'
+      - 'tools/golden/**'
       - 'package.json'
       - '.github/workflows/smoke.yml'
   push:
@@ -31,7 +32,7 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -52,6 +53,14 @@ jobs:
 
       - name: 合成樣本反向驗證（故意改壞一處金額算法，樣本必須變紅）
         run: node tests/synthetic.js --selftest
+
+      - name: 健檢 3 安全網（同步合併、衍生應付重跑、備份來回、包裝白名單）＋反向驗證
+        run: |
+          npm run safety
+          node tests/safety.js --selftest
+
+      - name: 真實黃金樣本工具自我檢查（假資料跑一遍擷取、去識別化、比對）
+        run: npm run golden
 
   deploy:
     needs: smoke

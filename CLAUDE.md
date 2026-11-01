@@ -125,6 +125,8 @@
 
 **合成樣本 (a)**（v6.0.113）：`npm run synth`（`tests/synthetic.js`）跑健檢 1 每一種算錢情境的假資料樣本（`tests/synthetic/`），結果要和 `expected.json` 逐值相同；`map.json` 必須涵蓋健檢 1 第 1～39 條、對照表 `docs/合成樣本對照表.md` 由 `--table` 產生。**會改數字的修正（2b、3b）在同一個 PR 用 `--update` 更新答案，commit 寫明哪幾筆、為什麼**；`--selftest` 故意改壞金額算法，樣本必須變紅。樣本只放假資料（repo 是公開的），不得出現真實案名、客戶、廠商、金額。CI 先跑冒煙、再跑合成樣本與反向驗證。
 
+**真實黃金樣本 (b) 與安全網**（v6.0.125 改版第 1 步）：`tools/golden/`（`run.js` 擷取、`compare.js` 比對、`namecheck.js` 真名檢查、`deid.js` 去識別化）由 Lotion-HQ 在本機對凍結快照執行，真實數字與名字不進 repo，步驟見 `docs/黃金樣本_電腦端操作.md`；改版分支上線前要附「compare＝通過（或與預期差異清單相符）、namecheck＝沒有出現」。`npm run golden` 用假資料自我檢查整條流程。`npm run safety`（`tests/safety.js`）四道安全網：同步合併、衍生應付重跑、備份來回、包裝覆寫白名單（tests/safety.js 的 WRAP_WHITELIST，第 2a 步拆包裝時同步刪）；`--selftest` 每項故意改壞必須變紅。CI 順序：冒煙 → 合成樣本＋反向驗證 → 安全網＋反向驗證 → 黃金樣本工具自我檢查。
+
 **新增功能時請一併補進 tests/smoke.js。** 其餘仍以人工驗證：用瀏覽器開 `index.html`
 確認被改動的頁面渲染正常。雲端環境無法登入 Firebase 屬正常（本機資料模式仍可驗證 UI 與邏輯）。
 
