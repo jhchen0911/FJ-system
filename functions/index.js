@@ -154,6 +154,8 @@ exports.aiProxy = onRequest({ region: REGION, cors: ['https://jhchen0911.github.
 // 紀錄 fydata/aiNotifyLog（只有管理員可讀、網頁不能寫）保留 180 天；每天計數 fydata/aiNotifyCount/<日期>。
 const notifyCore = require('./ops/notify.js');
 exports.aiNotify = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], secrets: [LINE_TOKEN] }, async (req, res) => {
+  let logRef = null, logged = false, logText = '', logBy = '';
+  // 不檢查 email_verified：FJ 用帳號密碼登入、兩個帳號早已存在，別人無法用同一個 email 再註冊（審查 #4 的取捨，見版本紀錄）
   try {
     if (req.method !== 'POST') { res.status(405).json({ error: { message: '只接受 POST' } }); return; }
     const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
@@ -161,16 +163,24 @@ exports.aiNotify = onRequest({ region: REGION, cors: ['https://jhchen0911.github
     const t = await admin.auth().verifyIdToken(m[1]);
     const email = String(t.email || '').toLowerCase();
     if (!notifyCore.notifyAllowed(email)) { res.status(403).json({ error: { message: '這個帳號不能發通知' } }); return; }
-    const db = admin.database(), now = Date.now();
-    const logRef = db.ref('fydata/aiNotifyLog').push();
+    const db = admin.database(), now = Date.now(), day = opsCore.tpeDate(now);
+    logRef = db.ref('fydata/aiNotifyLog').push(); logBy = email;
     const b = notifyCore.buildNotify(req.body);
-    if (b.err) { await logRef.set({ by: email, at: now, text: String((req.body && (req.body.text || req.body.title)) || '').slice(0, 120), status: 'rejected', reason: b.err }); res.status(400).json({ error: { message: b.err } }); return; }
-    const tx = await db.ref('fydata/aiNotifyCount/' + opsCore.tpeDate(now)).transaction((n) => ((n || 0) >= notifyCore.NOTIFY_DAILY ? undefined : (n || 0) + 1));
+    if (b.err) {
+      // 被擋的也記，但每天最多記 30 筆（審查：避免帳號被誘導狂送時灌爆紀錄）
+      const rj = await db.ref('fydata/aiNotifyCount/' + day + '_rej').transaction((n) => ((n || 0) >= notifyCore.NOTIFY_DAILY ? undefined : (n || 0) + 1));
+      if (rj.committed) await logRef.set({ by: email, at: now, text: String((req.body && typeof req.body.text === 'string' && req.body.text) || (req.body && typeof req.body.title === 'string' && req.body.title) || '').slice(0, 120), status: 'rejected', reason: b.err });
+      res.status(400).json({ error: { message: b.err } }); return;
+    }
+    const cntRef = db.ref('fydata/aiNotifyCount/' + day);
+    const tx = await cntRef.transaction((n) => ((n || 0) >= notifyCore.NOTIFY_DAILY ? undefined : (n || 0) + 1));
     if (!tx.committed) { await logRef.set({ by: email, at: now, text: b.text, status: 'dropped', reason: '超過每天 ' + notifyCore.NOTIFY_DAILY + ' 則' }); res.status(429).json({ error: { message: '今天的通知已達上限（' + notifyCore.NOTIFY_DAILY + ' 則）' } }); return; }
+    logText = b.text;
     const deps = lineAdapters.mkDeps(LINE_TOKEN.value());
     const cfg = (await deps.getCfg()) || {};
     const sent = Object.keys(cfg.owners || {}).length ? await lineCore.pushOwners(cfg, deps, b.text) : 0;   // 收件人只看伺服器端的擁有者名單
-    await logRef.set({ by: email, at: now, text: b.text, status: sent ? 'sent' : 'failed', to: sent });
+    await logRef.set({ by: email, at: now, text: b.text, status: sent ? 'sent' : 'failed', to: sent }); logged = true;
+    if (!sent) await cntRef.transaction((n) => Math.max(0, (n || 1) - 1)).catch(() => null);   // 沒送出不佔當天名額
     // 超過 180 天的紀錄清掉（每次最多 50 筆）
     try {
       const old = (await db.ref('fydata/aiNotifyLog').orderByChild('at').endAt(now - notifyCore.NOTIFY_KEEP_MS).limitToFirst(50).once('value')).val() || {};
@@ -180,6 +190,7 @@ exports.aiNotify = onRequest({ region: REGION, cors: ['https://jhchen0911.github
     res.status(200).json({ ok: true, text: b.text });
   } catch (e) {
     console.error('aiNotify', e);
+    if (logRef && !logged && logText) { try { await logRef.set({ by: logBy, at: Date.now(), text: logText, status: 'error', reason: String(e && e.message || e).slice(0, 200) }); } catch (e2) { console.error('aiNotify.log', e2); } }
     res.status(500).json({ error: { message: '通知服務錯誤' } });
   }
 });

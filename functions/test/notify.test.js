@@ -21,3 +21,13 @@ test('AI 通知：固定格式、100 字上限、不能有網址、換行壓成�
   ['看 https://x.y', '到 www.abc.tw', '網址 bit.ly/abc', 'line.me/R/ti'].forEach(t => assert.equal(n.buildNotify({ text: t }).err, '不能放網址', t));
   assert.ok(!n.buildNotify({ text: 'H300 L=10M*5 支，v6.0.123 已上線' }).err);
 });
+
+test('AI 通知（審查）：全形、零寬、其他網域、IP、各種 scheme、短網址、email 都擋；版號與規格不誤擋；只收字串；看不見的字元拿掉', () => {
+  ['example。com', 'example．com', 'ｈｔｔｐｓ：／／a', 'ｗｗｗ．ａｂｃ．ｔｗ', 'example.xyz', 'x.top', '1.2.3.4', 'lin.ee/abc', 'line://ti/p/x', 'mailto:a', 'tel:0912', 'a\u200b.com', 'http\u200b://a.b', 'a .com', 'a.b/c', '找 a@b']
+    .forEach(t => assert.equal(n.buildNotify({ text: t }).err, '不能放網址', JSON.stringify(t)));
+  ['H300 L=10M*5 支，v6.0.123 已上線', '11/01 F25P2 打設 5 支', '✅【報價草稿送出】做完了｜要你做：到 AI 草稿按確認']
+    .forEach(t => assert.equal(n.buildNotify({ text: t }).text, t));
+  assert.equal(n.buildNotify({ title: ['a'] }).err, '格式不正確');
+  assert.equal(n.buildNotify({ text: { a: 1 } }).err, '格式不正確');
+  assert.equal(n.buildNotify({ text: 'a\u202eb\u200bc\u2066d' }).text, 'abcd');
+});
