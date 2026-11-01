@@ -464,4 +464,4 @@ async function processPush(id, rec, deps) {
   return n > 0;
 }
 
-module.exports = { verifySignature, handleEvents, dailyAsk, dailyCompile, morningCheck, processPush, isAddon, alarmWord, parseQty, parseCoReport, parseMD, matchSite, tpeDate, addDays, fill, DEFAULT_TEXTS, ALARM_WORDS };
+module.exports = { verifySignature, handleEvents, dailyAsk, dailyCompile, morningCheck, processPush, pushOwners, isAddon, alarmWord, parseQty, parseCoReport, parseMD, matchSite, tpeDate, addDays, fill, DEFAULT_TEXTS, ALARM_WORDS };

@@ -149,6 +149,41 @@ exports.aiProxy = onRequest({ region: REGION, cors: ['https://jhchen0911.github.
   }
 });
 
+// ══════════ v6.0.123 AI 通知：AI 帳號／Lotion 用 LINE「陳軒｜AI 助理」傳一行短訊息給 Lotion ══════════
+// 前端（FJ 總覽「通知 Lotion」或 fyNotify()）帶登入憑證呼叫；所有檢查都在這裡做：發送者名單、短文字、每天 30 則、收件人固定 LINE 擁有者。
+// 紀錄 fydata/aiNotifyLog（只有管理員可讀、網頁不能寫）保留 180 天；每天計數 fydata/aiNotifyCount/<日期>。
+const notifyCore = require('./ops/notify.js');
+exports.aiNotify = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], secrets: [LINE_TOKEN] }, async (req, res) => {
+  try {
+    if (req.method !== 'POST') { res.status(405).json({ error: { message: '只接受 POST' } }); return; }
+    const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
+    if (!m) { res.status(401).json({ error: { message: '需要登入' } }); return; }
+    const t = await admin.auth().verifyIdToken(m[1]);
+    const email = String(t.email || '').toLowerCase();
+    if (!notifyCore.notifyAllowed(email)) { res.status(403).json({ error: { message: '這個帳號不能發通知' } }); return; }
+    const db = admin.database(), now = Date.now();
+    const logRef = db.ref('fydata/aiNotifyLog').push();
+    const b = notifyCore.buildNotify(req.body);
+    if (b.err) { await logRef.set({ by: email, at: now, text: String((req.body && (req.body.text || req.body.title)) || '').slice(0, 120), status: 'rejected', reason: b.err }); res.status(400).json({ error: { message: b.err } }); return; }
+    const tx = await db.ref('fydata/aiNotifyCount/' + opsCore.tpeDate(now)).transaction((n) => ((n || 0) >= notifyCore.NOTIFY_DAILY ? undefined : (n || 0) + 1));
+    if (!tx.committed) { await logRef.set({ by: email, at: now, text: b.text, status: 'dropped', reason: '超過每天 ' + notifyCore.NOTIFY_DAILY + ' 則' }); res.status(429).json({ error: { message: '今天的通知已達上限（' + notifyCore.NOTIFY_DAILY + ' 則）' } }); return; }
+    const deps = lineAdapters.mkDeps(LINE_TOKEN.value());
+    const cfg = (await deps.getCfg()) || {};
+    const sent = Object.keys(cfg.owners || {}).length ? await lineCore.pushOwners(cfg, deps, b.text) : 0;   // 收件人只看伺服器端的擁有者名單
+    await logRef.set({ by: email, at: now, text: b.text, status: sent ? 'sent' : 'failed', to: sent });
+    // 超過 180 天的紀錄清掉（每次最多 50 筆）
+    try {
+      const old = (await db.ref('fydata/aiNotifyLog').orderByChild('at').endAt(now - notifyCore.NOTIFY_KEEP_MS).limitToFirst(50).once('value')).val() || {};
+      const up = {}; Object.keys(old).forEach(k => { up[k] = null; }); if (Object.keys(up).length) await db.ref('fydata/aiNotifyLog').update(up);
+    } catch (e) { console.error('aiNotify.prune', e); }
+    if (!sent) { res.status(502).json({ error: { message: 'LINE 沒送出（擁有者還沒設定或 LINE 推播失敗）' } }); return; }
+    res.status(200).json({ ok: true, text: b.text });
+  } catch (e) {
+    console.error('aiNotify', e);
+    res.status(500).json({ error: { message: '通知服務錯誤' } });
+  }
+});
+
 // ══════════ v6.0.118 健檢2 #13：伺服器端每日備份（不再只靠擁有者開 App） ══════════
 // 每天 03:15（台北）把 RTDB fydata 整包（扣掉 backups）存到 Storage fydata/backups/server/daily/<日期>.json，
 // 每月 1 日另存 monthly/<年月>.json；保留 30 份日備份、12 份月備份。Storage 規則：fydata/backups/** 只有擁有者能讀。

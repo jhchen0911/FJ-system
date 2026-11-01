@@ -9003,6 +9003,52 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.123 AI 通知：只有 AI 帳號與 Lotion 看得到按鈕、走雲端 aiNotify 帶登入憑證；規則收掉唯讀帳號寫 linePush ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const oU = _fbUser, oF = window.fetch, oT = window.toast, oR = _isReaderUser;
+      try {
+        let toasts = []; window.toast = m => toasts.push(m);
+        _fbUser = { email: 'staff@x.com', uid: 's', getIdToken: async () => 't' }; renderDashGreet();
+        out.staffHidden = !document.getElementById('ai-notify-btn');
+        _fbUser = { email: 'HsuanChen911@gmail.com', uid: 'a', getIdToken: async () => 'tokA' }; _isReaderUser = true; renderDashGreet();
+        out.aiShown = !!document.getElementById('ai-notify-btn');
+        let sent = null; window.fetch = async (u, o) => { sent = { u, o }; return { ok: true, status: 200, json: async () => ({ ok: true }) }; };
+        const m = await fyNotify('報價草稿送出', '到 AI 草稿按確認');
+        const body = JSON.parse(sent.o.body);
+        out.call = m === '已送出' && sent.u === _fnUrl('aiNotify') && sent.o.headers.Authorization === 'Bearer tokA' && body.title === '報價草稿送出' && !('to' in body);
+        /* 唯讀帳號也能開視窗、填字（data-ro-ok），預覽與 100 字檢查 */
+        lotionNotifyOpen(); await new Promise(res => setTimeout(res, 80));
+        const ti = document.getElementById('nf-title'); ti.value = '備份完成'; ti.dispatchEvent(new Event('input'));
+        out.prev = /✅【備份完成】做完了/.test(document.getElementById('nf-prev').textContent) && !ti.disabled;
+        ti.value = '字'.repeat(60); document.getElementById('nf-todo').value = '字'.repeat(60);
+        document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 30));
+        out.tooLong = toasts.some(t => /超過 100 字/.test(t)) && document.getElementById('gen-confirm-modal').style.display !== 'none';
+        document.getElementById('gen-confirm-cancel').click();
+        /* 伺服器拒絕時把原因帶回來 */
+        window.fetch = async () => ({ ok: false, status: 429, json: async () => ({ error: { message: '今天的通知已達上限（30 則）' } }) });
+        out.err = /已達上限/.test(await fyNotify('x'));
+        _fbUser = { email: 'staff@x.com', uid: 's', getIdToken: async () => 't' };
+        out.staffDeny = /不能發通知/.test(await fyNotify('x'));
+      } catch (e) { out.err2 = String(e && e.stack || e).slice(0, 500); }
+      _fbUser = oU; window.fetch = oF; window.toast = oT; _isReaderUser = oR; try { renderDashGreet(); } catch (e) { /* 可忽略 */ }
+      return out;
+    });
+    const fs = require('fs'), pth = require('path');
+    const RF = JSON.parse(fs.readFileSync(pth.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    const N = require(pth.join(__dirname, '..', 'functions', 'ops', 'notify.js'));
+    const IDX = fs.readFileSync(pth.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    check('v6.0.123 AI 通知：按鈕只有 AI 帳號／Lotion 看得到；帶登入憑證呼叫雲端、不能指定收件人；超過 100 字擋下；伺服器拒絕原因帶回', r.staffHidden && r.aiShown && r.call && r.prev && r.tooLong && r.err && r.staffDeny, JSON.stringify(r));
+    check('v6.0.123 AI 通知安全：唯讀帳號不能再寫 linePush（健檢2 #27）；通知紀錄與計數網頁不能寫；伺服器只放行名單、100 字、擋網址、每天 30 則、收件人取擁有者',
+      !/fydata\/readers/.test(RF.linePush.$id['.write']) && RF.aiNotifyLog['.write'] === 'false' && RF.aiNotifyCount['.write'] === 'false' && /at/.test(String(RF.aiNotifyLog['.indexOn']))
+      && N.notifyAllowed('hsuanchen911@gmail.com') && !N.notifyAllowed('staff@x.com') && N.NOTIFY_DAILY === 30 && N.NOTIFY_MAX === 100 && N.buildNotify({ text: 'https://x.tw' }).err && !!N.buildNotify({ title: 'a' }).text
+      && /exports\.aiNotify/.test(IDX) && /pushOwners\(cfg, deps, b\.text\)/.test(IDX) && /aiNotifyCount/.test(IDX) && /NOTIFY_KEEP_MS/.test(IDX), '');
+    check('v6.0.123 AI 通知測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

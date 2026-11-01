@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.122';
+var APP_VERSION='v6.0.123';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -39472,6 +39472,39 @@ function _m6SlipFill(){
     set('mo-date',p.d);set('mb-date',p.d);set('bt-d',p.d);set('bt-m',p.m);set('bt-n',p.n);set('bt-o',p.o);
   },120);
 }
+// ══════════ v6.0.123 AI 通知：AI 帳號（陳軒唯讀）或 Lotion 用 LINE「陳軒｜AI 助理」傳一行短訊息給 Lotion ══════════
+// 走雲端 aiNotify（functions/ops/notify.js）：發送者名單、≤100 字、不能有網址、每天 30 則、收件人固定 LINE 擁有者，都由伺服器檢查。
+// 電腦端（Lotion-HQ）：總覽「📣 通知 Lotion」按鈕，或在 FJ 分頁執行 fyNotify('標題','要你做')，回傳「已送出」或沒送出的原因。
+var _AI_NOTIFY_SENDERS=['jhchen0911@gmail.com','hsuanchen911@gmail.com'];
+function _aiNotifyOk(){var e=String((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'').toLowerCase();return !!e&&_AI_NOTIFY_SENDERS.indexOf(e)>=0&&!window.FY_BETA;}
+function _aiNotifyText(title,todo){title=String(title||'').replace(/\s+/g,' ').trim();todo=String(todo||'').replace(/\s+/g,' ').trim();return title?('✅【'+title+'】做完了'+(todo?'｜要你做：'+todo:'')):'';}
+async function fyNotify(title,todo,text){
+  if(!_aiNotifyOk())return '沒送出：這個帳號不能發通知';
+  var body={title:title||'',todo:todo||''};if(text)body={text:String(text)};
+  try{
+    var tok=await _fbUser.getIdToken();
+    var r=await fetch(_fnUrl('aiNotify'),{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify(body)});
+    var j={};try{j=await r.json();}catch(e){/* 可忽略：未部署時沒有 JSON */}
+    if(r.ok)return '已送出';
+    return '沒送出：'+((j&&j.error&&j.error.message)||(r.status===404?'通知服務尚未部署':('錯誤 '+r.status)));
+  }catch(e){_err('fyNotify',e);return '沒送出：'+(navigator.onLine===false?'目前沒有網路':'通知服務尚未部署或連不上');}
+}
+function lotionNotifyOpen(){
+  if(!_aiNotifyOk()){toast('這個帳號不能發通知');return;}
+  window._aiNfPrev=function(){var t=_aiNotifyText(gv('nf-title'),gv('nf-todo')),n=Array.from(t).length,el=document.getElementById('nf-prev');if(el)el.innerHTML=t?(esc(t)+'<span style="color:'+(n>100?'var(--red)':'var(--b3)')+'">　'+n+'/100 字</span>'):'<span style="color:var(--b3)">（填標題後顯示）</span>';};
+  showConfirm('通知 Lotion（LINE）',
+    '<div style="font-size:12px;color:var(--b4);margin-bottom:6px">會用 LINE「陳軒｜AI 助理」傳給 Lotion 本人。一則最多 100 字、不能放網址，每天最多 30 則。</div>'
+    +'<div class="f"><label>做完了什麼（標題）</label><input id="nf-title" data-ro-ok="1" maxlength="60" oninput="_aiNfPrev()" placeholder="例：棋勝綠盛世報價草稿送出"></div>'
+    +'<div class="f"><label>要你做什麼（選填）</label><input id="nf-todo" data-ro-ok="1" maxlength="80" oninput="_aiNfPrev()" placeholder="例：到 AI 草稿按確認"></div>'
+    +'<div id="nf-prev" style="font-size:12.5px;margin-top:6px;padding:6px 8px;background:var(--gl);border-radius:6px"></div>',
+    function(){
+      var t=_aiNotifyText(gv('nf-title'),gv('nf-todo'));
+      if(!t){toast('請填標題');return false;}
+      if(Array.from(t).length>100){toast('超過 100 字，請縮短');return false;}
+      fyNotify(gv('nf-title'),gv('nf-todo')).then(function(m){toast(m);});
+    },false,null,false);
+  setTimeout(function(){try{_aiNfPrev();}catch(e){_err('lotionNotifyOpen',e);}},50);
+}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
@@ -39619,7 +39652,7 @@ function renderDashGreet(){
   var el=document.getElementById('dash-greet');if(!el)return;
   if(!_fbUser){el.textContent='';el.style.display='none';return;}
   el.style.display='';
-  el.textContent='嗨，'+_meName();
+  el.innerHTML=esc('嗨，'+_meName())+(_aiNotifyOk()?'<button type="button" class="btn btn-xs" id="ai-notify-btn" onclick="lotionNotifyOpen()" style="float:right;font-size:12px;font-weight:600">📣 通知 Lotion</button>':'');   // v6.0.123 只有 AI 帳號與 Lotion 看得到
 }
 
 function applyRoleUI(){
