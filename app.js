@@ -38945,17 +38945,20 @@ function _lineDraftApply(d,close){
   var back=!!pl.backfill;
   showConfirm('確認施工日報：'+S(q.name).slice(0,20),
     (back?'<div style="font-size:12px;color:#b26a00;margin-bottom:6px">補傳：'+esc(S(pl.recvDate).slice(5))+' 才收到，回報內文寫的是 '+esc(d0)+'。日期不對可以改。</div>':'')
-    +'<div class="f"><label>日報日期'+(back?'（補傳）':'')+'</label><input id="ld-date" type="date" value="'+esc(d0)+'" oninput="_ldDupHint(\''+escq(q.id)+'\')"></div>'
+    +(Array.isArray(pl.dateBad)&&pl.dateBad.length?'<div style="font-size:12px;color:#b26a00;margin-bottom:6px">回報裡寫的日期「'+esc(S(pl.dateBad[0]).slice(0,20))+'」超過 7 天或不正確，先照收到日；需要的話請改日期。</div>':'')
+    +'<div class="f"><label>日報日期'+(back?'（補傳）':'')+'</label><input id="ld-date" type="date" max="'+localToday()+'" value="'+esc(d0)+'" oninput="_ldDupHint(\''+escq(q.id)+'\')"></div>'
     +'<div id="ld-dup" style="font-size:12px;color:var(--red);margin:4px 0"></div>'
     +'<div class="f"><label>日報內容（可改）</label><textarea id="ld-txt" rows="6" style="width:100%;box-sizing:border-box">'+esc(txt)+'</textarea></div>'
     +(_lineArr(pl.dayTexts).length?('<details style="font-size:11.5px;color:var(--b4);margin-top:6px"><summary>當天群組其他文字（'+_lineArr(pl.dayTexts).length+' 則）</summary><div style="white-space:pre-wrap">'+esc(_lineArr(pl.dayTexts).join('\n'))+'</div></details>'):'')
     +'<div style="font-size:11px;color:var(--b4);margin-top:6px">照片 '+photos.length+' 張會掛在這筆日報（LINE 照片）。這天已經有日報時，會先問你要合併還是取消。</div>',function(){
       var t=(gv('ld-txt')||'').trim(),dt=gv('ld-date')||'';
       if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){toast('請選日報日期');return false;}
+      if(dt>localToday()){toast('日報日期不能是未來');return false;}
       if(!Array.isArray(q.dailyLogs))q.dailyLogs=[];
       var ex=_ldExisting(q,dt);
       var write=function(){
-        var L0=q.dailyLogs.find(function(L){return L&&L.date===dt&&!L.stopFrom;});
+        // 審查：寫進使用者確認的那筆（ex）；沒有確認過的日報才併進只有照片的那筆，都沒有就新建
+        var L0=ex||q.dailyLogs.find(function(L){return L&&L.date===dt&&!L.stopFrom&&L.photoOnly;});
         // LINE 文字存成日報的「備註列」（itemIdx:-1）：之後再用日報表單提交時 _drMergeLog 會由列重算 progress，備註列不會被洗掉
         var row={itemIdx:-1,qty:'',note:'【LINE】'+(back?('（'+S(pl.recvDate).slice(5)+' 補傳）'):'')+t};
         if(L0){

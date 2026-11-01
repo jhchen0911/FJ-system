@@ -73,18 +73,29 @@ function siteName(g) { return (g && (g.name || g.qName)) || '（未命名）'; }
 // ── 公司大群組（v6.0.119 批次 I）：一個群組多個工地，工務用固定格式回報，依【工地】地名對到 FJ 專案 ──
 function coGroupOf(cfg, groupId) { const g = groupId && cfg && cfg.groups && cfg.groups[groupId]; return g && g.mode === 'company' ? g : null; }
 const CO_TAGS = { '工地': 'site', '今天': 'today', '明天': 'tomorrow', '問題': 'issue', '日期': 'date' };
-// 補傳日期（v6.0.121）：「10/31」「10/31 補」「10月31日」→ 只認收到當天往前 7 天內（含當天）；認不出或超出範圍回 ''
-function parseMD(text, refYmd) {
-  const m = String(text || '').match(/(\d{1,2})\s*[\/月]\s*(\d{1,2})/); if (!m || !refYmd) return '';
-  const mo = +m[1], d = +m[2]; if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
-  let y = +refYmd.slice(0, 4);
+// 補傳日期（v6.0.121）：一行只寫日期才算，例「10/31」「10/31 補」「10月31日 補傳」「日期：10/31」「2026/10/31」「115/10/31」
+//   （審查：避免「H300 1/2」「3/4 吋」這類規格被當成日期）；只認收到當天往前 7 天內（含當天），跨年回推
+const DATE_LINE = /^(?:日期\s*[:：]?\s*)?(?:(\d{2,4})\s*[\/年.-]\s*)?(\d{1,2})\s*[\/月.-]\s*(\d{1,2})\s*日?\s*(?:[（(]?\s*(?:補傳|補報|補)\s*[）)]?)?$/;
+// 回傳 {ymd, raw}：ymd＝採用的日期（'' 表示不採用）；raw＝有寫日期但超出範圍或不合法時的原文（給草稿提示）
+function parseDateLine(text, refYmd) {
+  const lines = String(text || '').split('\n').map(l => l.trim()).filter(Boolean);
+  for (const l of lines) {
+    const m = l.match(DATE_LINE); if (!m) continue;
+    const ymd = _mdToYmd(+m[2], +m[3], refYmd);
+    return ymd ? { ymd, raw: '' } : { ymd: '', raw: l.slice(0, 20) };
+  }
+  return { ymd: '', raw: '' };
+}
+function _mdToYmd(mo, d, refYmd) {
+  if (!refYmd || mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+  const y = +refYmd.slice(0, 4);
   const mk = yy => yy + '-' + String(mo).padStart(2, '0') + '-' + String(d).padStart(2, '0');
   let ymd = mk(y); if (ymd > refYmd) ymd = mk(y - 1);   // 1/2 補 12/31 → 去年
   const dt = new Date(ymd + 'T00:00:00Z'); if (dt.getUTCMonth() + 1 !== mo) return '';   // 2/30 之類
   const diff = Math.round((Date.parse(refYmd + 'T00:00:00Z') - dt.getTime()) / 86400000);
   return diff >= 0 && diff <= 7 ? ymd : '';
 }
-// 「【工地】內湖\n【今天】打樁 12 支\n【明天】…\n【問題】無」→ [{site, today, tomorrow, issue}]；一則訊息可有多段【工地】
+function parseMD(text, refYmd) { return parseDateLine(text, refYmd).ymd; }
 function parseCoReport(text, refYmd) {
   const t = String(text || '').replace(/\r/g, '');
   if (!/【\s*工地\s*】/.test(t)) return [];
@@ -93,13 +104,22 @@ function parseCoReport(text, refYmd) {
   while ((m = re.exec(t))) { segs.push({ tag: m[1], start: m.index, end: re.lastIndex }); }
   let pre = null;   // 【工地】前面就先寫的欄位（順序寫反）→ 併到第一段
   // 日期：訊息開頭（第一個【】之前）寫的日期套用全部段落；【日期】套用它所在的段落與之後的段落
-  let curDate = parseMD(segs.length ? t.slice(0, segs[0].start) : '', refYmd);
+  const p0 = parseDateLine(segs.length ? t.slice(0, segs[0].start) : '', refYmd);
+  let curDate = p0.ymd, curRaw = p0.raw;
   segs.forEach((g, i) => {
     const val = t.slice(g.end, i + 1 < segs.length ? segs[i + 1].start : t.length).trim();
     key = CO_TAGS[g.tag];
-    if (key === 'date') { const d = parseMD(val, refYmd); if (d) { curDate = d; if (cur && !cur.dateTag) { cur.date = d; cur.dateTag = true; } } return; }
+    if (key === 'date') {
+      const p = parseDateLine(val, refYmd);
+      if (p.ymd || p.raw) {
+        curDate = p.ymd; curRaw = p.raw;
+        // 【日期】寫在這段還沒有內容時才改這段（審查：放在下一段【工地】前當標題，不回頭改上一段）
+        if (cur && !cur.today && !cur.tomorrow && !cur.issue) { cur.date = p.ymd; cur.dateRaw = p.raw; }
+      }
+      return;
+    }
     if (key === 'site') {
-      cur = { site: val.split('\n')[0].trim().slice(0, 60), today: '', tomorrow: '', issue: '', date: curDate }; out.push(cur);
+      cur = { site: val.split('\n')[0].trim().slice(0, 60), today: '', tomorrow: '', issue: '', date: curDate, dateRaw: curRaw }; out.push(cur);
       const rest = val.split('\n').slice(1).join('\n').trim(); if (rest) cur.today = rest.slice(0, 1000);
       if (pre) { Object.keys(pre).forEach(k => { cur[k] = (pre[k] + (cur[k] ? '\n' + cur[k] : '')).slice(0, 1000); }); pre = null; }
     } else if (cur) cur[key] = (cur[key] ? cur[key] + '\n' : '') + val.slice(0, 1000);
@@ -107,7 +127,6 @@ function parseCoReport(text, refYmd) {
   });
   // 空白格式（把機器人的範本原樣貼回）、地名還是「地名」的段落不算
   const EMPTY = /^(無|没有|沒有|none|-|－|—)?$/i;
-  out.forEach(b => { delete b.dateTag; });
   return out.filter(b => b.site && !/^(地名|地點|工地名稱?)$/.test(b.site) && !(EMPTY.test(b.today.trim()) && EMPTY.test(b.tomorrow.trim()) && EMPTY.test(b.issue.trim())));
 }
 const _nrmSite = (x) => String(x || '').replace(/[\s()（）［］\[\]「」『』\-－_／/、，,.。]/g, '').toLowerCase();
@@ -305,7 +324,7 @@ async function handleCoGroup(ev, msg, src, now, date, cfg, T, deps) {
     const b = blocks[i], qid = matchSite(cfg.sites, b.site);
     const photos = {}; prevPhotos.forEach(r => { photos[r.id] = r.path; });
     const day = b.date || date;   // 補傳：內文寫的日期；沒寫＝收到日期
-    await deps.dbSet(coPath + '/' + msg.id + '_' + i, { at: now, user, msgId: msg.id, site: b.site, qid, today: b.today, tomorrow: b.tomorrow, issue: b.issue, photos, day });
+    await deps.dbSet(coPath + '/' + msg.id + '_' + i, { at: now, user, msgId: msg.id, site: b.site, qid, today: b.today, tomorrow: b.tomorrow, issue: b.issue, photos, day, dateRaw: b.dateRaw || '' });
     for (const r of prevPhotos) await deps.dbSet('fydata/lineLog/' + gid + '/' + date + '/' + r.id + '/claimed', msg.id + '_' + i);   // 一張照片只掛一個工地
     res.qids.push(qid);
     const all = [b.today, b.tomorrow, b.issue].join('\n');
@@ -384,12 +403,13 @@ async function coCompile(deps, cfg, gid, date, now, late) {
   let n = 0;
   for (const k of Object.keys(by)) {
     const L = by[k], qid = L[0].qid || '', day = L[0].day || date, back = day !== date;
+    const bad = L.map(r => r.dateRaw).filter(Boolean);   // 有寫日期但超過 7 天／不合法 → 照收到日，草稿註明
     const photos = []; L.forEach(r => Object.keys(r.photos || {}).forEach(p => photos.push(r.photos[p])));
     // 補傳的另加收到日（MMDD），不跟那一天自己的草稿撞號
     const id = qid ? ('dc' + gid.slice(-6) + qid.replace(/[^\w]/g, '').slice(-10) + day.replace(/-/g, '') + (back ? 'b' + date.slice(5).replace('-', '') : '') + (late ? 'L' : '')) : ('du' + gid.slice(-6) + String(L[0].key).replace(/[^\w]/g, '').slice(-16));
     await deps.createDraft({ id, type: 'dailyLog', by: 'line-bot', byName: 'LINE 機器人', at: now || Date.now(), status: 'pending',
-      summary: ('施工日報' + (qid ? '' : '（待分類）') + '：' + L[0].site + '　' + day + (back ? '（補傳，' + date.slice(5) + ' 收到）' : '')).slice(0, 200),
-      payload: { qid, site: L[0].site, unmatched: !qid, groupId: gid, date: day, backfill: back, recvDate: date, answers: L.map(r => coBlockText(r)), dayTexts: [], photos: photos.slice(0, 20), replied: true } });
+      summary: ('施工日報' + (qid ? '' : '（待分類）') + '：' + L[0].site + '　' + day + (back ? '（補傳，' + date.slice(5) + ' 收到）' : '') + (bad.length ? '（內文日期「' + bad[0] + '」超過 7 天或不正確，先照收到日）' : '')).slice(0, 200),
+      payload: { qid, site: L[0].site, unmatched: !qid, groupId: gid, date: day, backfill: back, recvDate: date, dateBad: bad.slice(0, 3), answers: L.map(r => coBlockText(r)), dayTexts: [], photos: photos.slice(0, 20), replied: true } });
     for (const r of L) await deps.dbSet('fydata/lineCo/' + gid + '/' + date + '/' + r.key + '/compiled', id);
     n++;
   }

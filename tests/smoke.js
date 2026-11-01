@@ -8986,11 +8986,15 @@ async function newPage(browser, width, height) {
         /* 只有照片的日報不算「已有日報」 */
         Q[0].dailyLogs.push({ id: 'L9', date: '2026-10-29', photos: ['ph:x'], progress: '', progressRows: [], photoOnly: true, status: 'work' });
         out.photoOnly = !_ldExisting(Q[0], '2026-10-29') && !!_ldExisting(Q[0], '2026-10-31');
+        /* 審查：同一天前面有只有照片的、後面有正式日報 → 合併寫進正式那筆 */
+        Q[0].dailyLogs.unshift({ id: 'LP', date: '2026-10-31', photos: ['ph:y'], progress: '', progressRows: [], photoOnly: true, status: 'work' });
+        _lineDraftApply({ id: 'dcD', type: 'dailyLog', payload: { qid: 'qB', date: '2026-10-31', answers: ['【今天】收尾'], photos: [] } }, () => {}); await wait(80); ok(); await wait(250); ok(); await wait(60);
+        out.target = /收尾/.test(Q[0].dailyLogs.find(L => L.id === 'L1').progress) && !/收尾/.test(Q[0].dailyLogs.find(L => L.id === 'LP').progress || '');
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
       window._draftMark = oM; window.toast = oT; Q = [];
       return out;
     });
-    check('v6.0.121 LINE 補傳日期：草稿標「補傳」、確認時日期可改；同一天已有日報先問合併或取消（取消不寫入）', r.body && r.dateField && r.asked && r.cancel && r.merge && r.newDay && r.photoOnly, JSON.stringify(r));
+    check('v6.0.121 LINE 補傳日期：草稿標「補傳」、確認時日期可改；同一天已有日報先問合併或取消（取消不寫入）', r.body && r.dateField && r.asked && r.cancel && r.merge && r.newDay && r.photoOnly && r.target, JSON.stringify(r));
     check('v6.0.121 補傳日期測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

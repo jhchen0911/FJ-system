@@ -294,3 +294,20 @@ test('補傳日期：歸到內文日期、草稿標補傳、不跟當天自己�
   assert.ok(today && !today.payload.backfill && /打樁 4 支/.test(today.payload.answers.join('')) && !/拔樁/.test(today.payload.answers.join('')));
   assert.equal(new Set(ds.map(x => x.id)).size, 3);
 });
+
+test('補傳日期（審查）：規格數字不當日期；西元／民國年寫法；超出範圍的日期草稿註明', async () => {
+  const R = '2026-11-01';
+  assert.equal(core.parseMD('H300 10/31', R), '');                 // 不是整行日期
+  assert.equal(core.parseMD('2026/10/31 補', R), '2026-10-31');
+  assert.equal(core.parseMD('115/10/31', R), '2026-10-31');
+  assert.equal(core.parseMD('日期：10/30', R), '2026-10-30');
+  let b = core.parseCoReport('H300 1/2 吋\n【工地】興中路\n【今天】打樁', R);
+  assert.equal(b[0].date, '');
+  b = core.parseCoReport('【工地】興中路\n【今天】打樁\n【日期】10/30\n【工地】文化路\n【今天】進料', R);
+  assert.deepEqual(b.map(x => x.date), ['', '2026-10-30']);       // 【日期】在第一段有內容後才寫 → 只管後面
+  const d = mkDeps(CO);
+  await core.handleEvents([{ type: 'message', timestamp: Date.parse('2026-11-01T02:00:00Z'), source: { type: 'group', groupId: 'Gco', userId: 'U' }, message: { id: 'z1', type: 'text', text: '10/15 補\n【工地】興中路\n【今天】打樁' } }], d);
+  await core.dailyCompile(d, Date.parse('2026-11-01T12:00:00Z'));
+  const x = Object.values(d.drafts).find(r => r.type === 'dailyLog');
+  assert.ok(x && x.payload.date === '2026-11-01' && !x.payload.backfill && x.payload.dateBad[0] === '10/15 補' && /超過 7 天/.test(x.summary));
+});
