@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.120';
+var APP_VERSION='v6.0.121';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -38904,7 +38904,7 @@ function _lineDraftBody(d){
   var S=_draftS,pl=(d.payload&&typeof d.payload==='object')?d.payload:{},q=Q.find(function(x){return x.id===pl.qid;});
   var ph=_lineArr(pl.photos).slice(0,6).map(function(path){return '<img data-lpath="'+esc(path)+'" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:6px;background:var(--b1)">';}).join('');
   var txt=d.type==='addon'?S(pl.text):(_lineArr(pl.answers).join('\n')||'（尚未回三句）');
-  return '<div style="font-size:11.5px;color:var(--b4)">工程：'+esc(q?S(q.name):(pl.unmatched?('待分類（回報寫「'+S(pl.site)+'」）'):'（找不到工程）'))+'　'+esc(S(pl.date))+(pl.qty!=null?('　數量 '+esc(S(pl.qty))+esc(S(pl.unit))):'')+'</div>'
+  return (pl.backfill?'<div style="font-size:11.5px;color:#b26a00;font-weight:700">日期：'+esc(S(pl.date))+'（補傳，'+esc(S(pl.recvDate).slice(5))+' 收到）</div>':'')+'<div style="font-size:11.5px;color:var(--b4)">工程：'+esc(q?S(q.name):(pl.unmatched?('待分類（回報寫「'+S(pl.site)+'」）'):'（找不到工程）'))+'　'+esc(S(pl.date))+(pl.qty!=null?('　數量 '+esc(S(pl.qty))+esc(S(pl.unit))):'')+'</div>'
     +'<div style="font-size:12.5px;white-space:pre-wrap;margin:4px 0">'+esc(txt)+'</div>'+(ph?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">'+ph+'</div>':'');
 }
 function _lineArr(a){return Array.isArray(a)?a.map(function(x){return _draftS(x);}):[];}
@@ -38941,22 +38941,45 @@ function _lineDraftApply(d,close){
     return;
   }
   var txt=_lineArr(pl.answers).join('\n');
-  showConfirm('確認施工日報：'+S(q.name).slice(0,20)+'　'+S(pl.date),
-    '<div class="f"><label>日報內容（可改）</label><textarea id="ld-txt" rows="6" style="width:100%;box-sizing:border-box">'+esc(txt)+'</textarea></div>'
+  var d0=/^\d{4}-\d{2}-\d{2}$/.test(S(pl.date))?S(pl.date):localToday();
+  var back=!!pl.backfill;
+  showConfirm('確認施工日報：'+S(q.name).slice(0,20),
+    (back?'<div style="font-size:12px;color:#b26a00;margin-bottom:6px">補傳：'+esc(S(pl.recvDate).slice(5))+' 才收到，回報內文寫的是 '+esc(d0)+'。日期不對可以改。</div>':'')
+    +'<div class="f"><label>日報日期'+(back?'（補傳）':'')+'</label><input id="ld-date" type="date" value="'+esc(d0)+'" oninput="_ldDupHint(\''+escq(q.id)+'\')"></div>'
+    +'<div id="ld-dup" style="font-size:12px;color:var(--red);margin:4px 0"></div>'
+    +'<div class="f"><label>日報內容（可改）</label><textarea id="ld-txt" rows="6" style="width:100%;box-sizing:border-box">'+esc(txt)+'</textarea></div>'
     +(_lineArr(pl.dayTexts).length?('<details style="font-size:11.5px;color:var(--b4);margin-top:6px"><summary>當天群組其他文字（'+_lineArr(pl.dayTexts).length+' 則）</summary><div style="white-space:pre-wrap">'+esc(_lineArr(pl.dayTexts).join('\n'))+'</div></details>'):'')
-    +'<div style="font-size:11px;color:var(--b4);margin-top:6px">照片 '+photos.length+' 張會掛在這筆日報（LINE 照片）。同一天已有日報時合併進去。</div>',function(){
-      var t=(gv('ld-txt')||'').trim();if(!Array.isArray(q.dailyLogs))q.dailyLogs=[];
-      var ex=q.dailyLogs.find(function(L){return L&&L.date===S(pl.date)&&!L.stopFrom;});
-      // LINE 文字存成日報的「備註列」（itemIdx:-1）：之後再用日報表單提交時 _drMergeLog 會由列重算 progress，備註列不會被洗掉
-      var row={itemIdx:-1,qty:'',note:'【LINE】'+t};
-      if(ex){
-        if(!(ex.progressRows||[]).length&&ex.progress)ex.progressRows=[{itemIdx:-1,qty:'',note:String(ex.progress)}];   // 舊日報只有文字：先轉成備註列保留
-        _drMergeLog(q,ex,{progressRows:[row]});ex.linePhotos=(ex.linePhotos||[]).concat(photos).slice(0,30);
-      }
-      else q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:/^\d{4}-\d{2}-\d{2}$/.test(S(pl.date))?S(pl.date):localToday(),workers:0,subWorkers:0,crews:[],progress:row.note,progressRows:[row],photos:[],linePhotos:photos.slice(0,30),equip:[],status:'work',by:'LINE 機器人（'+_meEmail()+' 確認）',src:'line',ts:Date.now()});
-      if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120);
-      _touch(q);persist();_draftMark(d.id,'applied',{resultId:q.id});close();toast('已寫入施工日報');
+    +'<div style="font-size:11px;color:var(--b4);margin-top:6px">照片 '+photos.length+' 張會掛在這筆日報（LINE 照片）。這天已經有日報時，會先問你要合併還是取消。</div>',function(){
+      var t=(gv('ld-txt')||'').trim(),dt=gv('ld-date')||'';
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){toast('請選日報日期');return false;}
+      if(!Array.isArray(q.dailyLogs))q.dailyLogs=[];
+      var ex=_ldExisting(q,dt);
+      var write=function(){
+        var L0=q.dailyLogs.find(function(L){return L&&L.date===dt&&!L.stopFrom;});
+        // LINE 文字存成日報的「備註列」（itemIdx:-1）：之後再用日報表單提交時 _drMergeLog 會由列重算 progress，備註列不會被洗掉
+        var row={itemIdx:-1,qty:'',note:'【LINE】'+(back?('（'+S(pl.recvDate).slice(5)+' 補傳）'):'')+t};
+        if(L0){
+          if(!(L0.progressRows||[]).length&&L0.progress)L0.progressRows=[{itemIdx:-1,qty:'',note:String(L0.progress)}];   // 舊日報只有文字：先轉成備註列保留
+          _drMergeLog(q,L0,{progressRows:[row]});L0.linePhotos=(L0.linePhotos||[]).concat(photos).slice(0,30);
+        }
+        else q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:dt,workers:0,subWorkers:0,crews:[],progress:row.note,progressRows:[row],photos:[],linePhotos:photos.slice(0,30),equip:[],status:'work',by:'LINE 機器人（'+_meEmail()+' 確認）',src:'line',ts:Date.now()});
+        if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120);
+        _touch(q);persist();_draftMark(d.id,'applied',{resultId:q.id});close();toast('已寫入 '+dt+' 施工日報');
+      };
+      if(!ex){write();return;}
+      // v6.0.121 同工地同一天已有確認過的日報：不自動合併，問清楚（取消＝草稿保留待確認）
+      setTimeout(function(){showConfirm('重複，請確認：'+dt+' 已有日報',
+        '<div style="font-size:12.5px;line-height:1.7">「'+esc(S(q.name).slice(0,20))+'」'+esc(dt)+' 已經有一筆日報：<div style="background:var(--b0,#f6f6f6);border-radius:6px;padding:6px 8px;margin:6px 0;white-space:pre-wrap;max-height:140px;overflow:auto">'+esc(String(ex.progress||'（只有人數／機具）').slice(0,400))+'</div>按「確認」把這則 LINE 回報<b>合併</b>進去；按「取消」先不寫入，草稿留著待確認。</div>',
+        function(){write();},false,function(){toast('已取消，草稿仍在待確認');},true);},120);
     },false,null,true);
+  setTimeout(function(){_ldDupHint(q.id);},60);
+}
+// 這天已有「確認過的」日報（不算只有照片的、停工區間的）
+function _ldExisting(q,dt){return ((q&&q.dailyLogs)||[]).find(function(L){return L&&L.date===dt&&!L.stopFrom&&!L.photoOnly;})||null;}
+function _ldDupHint(qid){
+  var q=Q.find(function(x){return x.id===qid;}),box=document.getElementById('ld-dup');if(!box)return;
+  var ex=_ldExisting(q,gv('ld-date')||'');
+  box.textContent=ex?'重複，請確認：這天已經有日報，按確認後會再問一次要合併還是取消。':'';
 }
 function _pjAddonHtml(q){
   var L=(q&&q.addons)||[];if(!L.length)return '<div style="font-size:12px;color:var(--b3)">尚無現場追加紀錄（LINE 工地群組的「追加」會先成為草稿，確認後列在這裡）</div>';

@@ -8953,6 +8953,48 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.121 LINE 補傳日期：草稿標補傳、日期可改、同一天已有日報先問合併或取消 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const wait = ms => new Promise(res => setTimeout(res, ms));
+      const ok = () => document.getElementById('gen-confirm-ok').click();
+      const cancel = () => document.getElementById('gen-confirm-cancel').click();
+      const oM = window._draftMark, oT = window.toast;
+      try {
+        window.toast = () => {};
+        let marks = []; window._draftMark = (id, st) => { marks.push(id + ':' + st); return Promise.resolve(true); };
+        Q = [{ id: 'qB', name: '補傳案', awarded: true, items: [], dailyLogs: [{ id: 'L1', date: '2026-10-31', progress: '打樁 3 支', progressRows: [{ itemIdx: -1, qty: '', note: '打樁 3 支' }], photos: [], status: 'work' }] }];
+        const d = { id: 'dcB', type: 'dailyLog', payload: { qid: 'qB', date: '2026-10-31', backfill: true, recvDate: '2026-11-01', answers: ['【今天】拔樁 2 支'], photos: [] } };
+        out.body = /日期：2026-10-31（補傳，11-01 收到）/.test(_lineDraftBody(d));
+        /* 同一天已有日報 → 先問；取消＝不寫、草稿不標 */
+        _lineDraftApply(d, () => {}); await wait(80);
+        out.dateField = document.getElementById('ld-date').value === '2026-10-31' && /重複，請確認/.test(document.getElementById('ld-dup').textContent);
+        ok(); await wait(250);
+        out.asked = /重複，請確認/.test(document.getElementById('gen-confirm-title').textContent);
+        cancel(); await wait(60);
+        out.cancel = Q[0].dailyLogs.length === 1 && !/拔樁/.test(Q[0].dailyLogs[0].progress) && marks.length === 0;
+        /* 再來一次選合併 */
+        _lineDraftApply(d, () => {}); await wait(80); ok(); await wait(250); ok(); await wait(60);
+        out.merge = Q[0].dailyLogs.length === 1 && /打樁 3 支/.test(Q[0].dailyLogs[0].progress) && /11-01 補傳/.test(Q[0].dailyLogs[0].progress) && /拔樁 2 支/.test(Q[0].dailyLogs[0].progress) && marks[0] === 'dcB:applied';
+        /* 改日期到沒有日報的那天 → 直接新建，不再問 */
+        marks = [];
+        _lineDraftApply({ id: 'dcC', type: 'dailyLog', payload: { qid: 'qB', date: '2026-10-31', backfill: true, recvDate: '2026-11-01', answers: ['【今天】進料'], photos: [] } }, () => {}); await wait(80);
+        document.getElementById('ld-date').value = '2026-10-30'; ok(); await wait(250);
+        out.newDay = Q[0].dailyLogs.some(L => L.date === '2026-10-30' && /進料/.test(L.progress)) && marks[0] === 'dcC:applied';
+        /* 只有照片的日報不算「已有日報」 */
+        Q[0].dailyLogs.push({ id: 'L9', date: '2026-10-29', photos: ['ph:x'], progress: '', progressRows: [], photoOnly: true, status: 'work' });
+        out.photoOnly = !_ldExisting(Q[0], '2026-10-29') && !!_ldExisting(Q[0], '2026-10-31');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      window._draftMark = oM; window.toast = oT; Q = [];
+      return out;
+    });
+    check('v6.0.121 LINE 補傳日期：草稿標「補傳」、確認時日期可改；同一天已有日報先問合併或取消（取消不寫入）', r.body && r.dateField && r.asked && r.cancel && r.merge && r.newDay && r.photoOnly, JSON.stringify(r));
+    check('v6.0.121 補傳日期測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

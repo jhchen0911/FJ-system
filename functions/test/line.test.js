@@ -254,3 +254,43 @@ test('公司群（v6.0.120）：回報地名開頭寫（業主）也對得到；
   assert.equal(core.matchSite(S, '（八九）中科台積電F25P1'), 'p1');
   assert.equal(core.matchSite(S, '(八九) 中科台積電'), '');   // 兩案都符合 → 待分類
 });
+
+// ── v6.0.121 補傳日期 ──
+test('補傳日期：認得 10/31、10/31 補、10月31日；只認 7 天內；跨年', () => {
+  assert.equal(core.parseMD('10/31 補', '2026-11-01'), '2026-10-31');
+  assert.equal(core.parseMD('10月31日', '2026-11-01'), '2026-10-31');
+  assert.equal(core.parseMD('11/1', '2026-11-01'), '2026-11-01');
+  assert.equal(core.parseMD('10/20', '2026-11-01'), '');      // 超過 7 天
+  assert.equal(core.parseMD('11/5', '2026-11-01'), '');       // 未來 → 當成去年 → 超過 7 天
+  assert.equal(core.parseMD('12/31', '2027-01-02'), '2026-12-31');
+  assert.equal(core.parseMD('2/30', '2026-03-02'), '');
+  assert.equal(core.parseMD('打樁', '2026-11-01'), '');
+});
+
+test('補傳日期：開頭日期套全部段落；【日期】套所在段落；沒寫照收到日', () => {
+  const R = '2026-11-01';
+  let b = core.parseCoReport('10/31 補\n【工地】興中路\n【今天】打樁\n【工地】文化路\n【今天】進料', R);
+  assert.deepEqual(b.map(x => x.date), ['2026-10-31', '2026-10-31']);
+  b = core.parseCoReport('【工地】興中路\n【日期】10/30\n【今天】打樁\n【工地】文化路\n【今天】進料', R);
+  assert.deepEqual(b.map(x => x.date), ['2026-10-30', '2026-10-30']);
+  b = core.parseCoReport('【工地】興中路\n【今天】H300 L=10M*5 支', R);
+  assert.equal(b[0].date, '');
+});
+
+test('補傳日期：歸到內文日期、草稿標補傳、不跟當天自己的草稿撞號；當天回報照舊', async () => {
+  const d = mkDeps(CO);
+  const g = { type: 'group', groupId: 'Gco', userId: 'Uw1' };
+  const D1 = Date.parse('2026-10-31T04:00:00Z'), D2 = Date.parse('2026-11-01T01:00:00Z');
+  await core.handleEvents([{ type: 'message', timestamp: D1, source: g, message: { id: 'x1', type: 'text', text: '【工地】興中路\n【今天】打樁 3 支' } }], d);
+  await core.dailyCompile(d, D1 + 8 * 3600000);
+  await core.handleEvents([{ type: 'message', timestamp: D2, source: g, message: { id: 'x2', type: 'text', text: '10/31 補\n【工地】興中路\n【今天】拔樁 2 支' } }], d);
+  await core.handleEvents([{ type: 'message', timestamp: D2 + 1000, source: g, message: { id: 'x3', type: 'text', text: '【工地】興中路\n【今天】打樁 4 支' } }], d);
+  await core.dailyCompile(d, D2 + 11 * 3600000);
+  const ds = Object.values(d.drafts).filter(x => x.type === 'dailyLog');
+  assert.equal(ds.length, 3);
+  const back = ds.find(x => x.payload.backfill);
+  assert.ok(back && back.payload.date === '2026-10-31' && back.payload.recvDate === '2026-11-01' && /補傳/.test(back.summary) && /拔樁/.test(back.payload.answers.join('')));
+  const today = ds.find(x => x.payload.date === '2026-11-01');
+  assert.ok(today && !today.payload.backfill && /打樁 4 支/.test(today.payload.answers.join('')) && !/拔樁/.test(today.payload.answers.join('')));
+  assert.equal(new Set(ds.map(x => x.id)).size, 3);
+});
