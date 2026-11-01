@@ -8699,7 +8699,7 @@ async function newPage(browser, width, height) {
         /* 預設條款 18 條（Lotion 實際報價單）：第17條結構補強、第18條吊車拔樁；參數頁預設與「還原預設」同一份 */
         const prmDef = document.getElementById('prm').defaultValue || '';
         const dl = prmDef.split('\n').filter(l => /^\d+\. /.test(l));
-        out.def18 = dl.length === 19 && /^19\. 本報價有效期限為報價日起【VALID】天/.test(dl[18]) && /^17\. 於結構體作業時/.test(dl[16]) && /^18\. 如因甲方要求或施工動線限制需使用吊車進行拔樁作業，其施工單價另議。$/.test(dl[17]) && String(resetRmkBase).indexOf('於結構體作業時') > 0 && /^3\. 付款方式：每月月底估驗一次、次月20日付款。.*按裝（打設）完成付70%，拆除（拔除）完成付30%，工程款以100%現金支付。$/.test(dl[2]);
+        out.def18 = dl.length === 19 && dl[18] === '19. 本報價有效期限為報價日起 14 天。' && String(resetRmkBase).indexOf('本報價有效期限為報價日起 14 天') > 0 && /^17\. 於結構體作業時/.test(dl[16]) && /^18\. 如因甲方要求或施工動線限制需使用吊車進行拔樁作業，其施工單價另議。$/.test(dl[17]) && String(resetRmkBase).indexOf('於結構體作業時') > 0 && /^3\. 付款方式：每月月底估驗一次、次月20日付款。.*按裝（打設）完成付70%，拆除（拔除）完成付30%，工程款以100%現金支付。$/.test(dl[2]);
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
@@ -9049,51 +9049,24 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── v6.0.124 預設備註條款第 19 條「有效期限」：新報價帶 14 天、連號正確；舊報價不印；參數補一次、已有不重複、補過後刪掉不再加 ──
+  // ── v6.0.124 預設條款第 19 條有效期限（與 Lotion 參數頁寫法相同）；開舊報價不帶上一張報價的備註值 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
       const out = {};
-      const oP = JSON.parse(JSON.stringify(P)), oU = _fbUser, oA = _isAdminUser, oUp = window._immediateUpload;
       try {
-        window._immediateUpload = () => {};
-        const nums = t => t.split('\n').map(l => (l.match(/^(\d+)\.(?!\d)/) || [])[1]).filter(Boolean).map(Number);
         const base = document.getElementById('prm').defaultValue;
-        /* 新報價：帶 valid 14 → 最後一條「本報價有效期限為報價日起 14 天」，條號 1…N 連號 */
-        newQ();
-        const t = _rmkBuild(base, rmkCustom, false).text, n = nums(t), lastLine = t.split('\n').filter(l => /^\d+\./.test(l)).pop();
-        out.newQ = rmkCustom.valid === '14' && /^\d+\. 本報價有效期限為報價日起 14 天，逾期依鋼材行情另議。$/.test(lastLine) && n.every((x, i) => x === i + 1) && n[n.length - 1] === Number(lastLine.match(/^(\d+)/)[1]);
-        /* 自訂條款接在第19條之後 */
-        const t2 = _rmkBuild(base, Object.assign({}, rmkCustom, { extra: ['自訂甲'] }), false).text.split('\n');
-        out.extraAfter = /有效期限/.test(t2[t2.length - 2]) && /^\d+\. 自訂甲$/.test(t2[t2.length - 1]) && nums(t2.join('\n')).every((x, i) => x === i + 1);
-        /* 舊報價（沒有 valid）：不印這一條，輸出跟以前一樣 */
-        const old = { walk: '500', mob: '30000' };
-        out.oldQ = !/有效期限/.test(_rmkBuild(base, old, false).text) && !/有效期限/.test(buildRmkTextFromQ({ rmk: old }));
-        /* 參數補一次：舊 18 條 → 補「19.」；已有「有效期限」不重複；補過後 Lotion 刪掉不再加 */
-        const b18 = base.split('\n').filter(l => !/有效期限/.test(l)).join('\n');
-        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o' }; _isAdminUser = true;
-        P.rmkBase = b18; delete P.rmkV19;
-        out.mig = _rmkV19Migrate() === true && /\n19\. 本報價有效期限為報價日起【VALID】天，逾期依鋼材行情另議。$/.test(P.rmkBase) && P.rmkV19 === 1 && (P.rmkBase.match(/有效期限/g) || []).length === 1;
-        P.rmkBase = b18 + '\n19. 本報價有效期限為報價日起【VALID】天，逾期依鋼材行情另議。'; delete P.rmkV19;
-        _rmkV19Migrate(); out.noDup = (P.rmkBase.match(/有效期限/g) || []).length === 1;
-        P.rmkBase = b18; _rmkV19Migrate(); out.once = !/有效期限/.test(P.rmkBase);   // 已補過（rmkV19）→ 刪掉後不再加
-        /* 一般員工、唯讀帳號不改參數 */
-        delete P.rmkV19; _isAdminUser = false; _fbUser = { email: 'staff@x.com', uid: 's' };
-        out.staff = _rmkV19Migrate() === false && !/有效期限/.test(P.rmkBase);
-        /* 審查：先開新報價（14 天）再開舊報價 → 舊報價不帶有效期限；雲端參數沒有補過標記 → 本機標記作廢重補 */
-        Q.unshift({ id: 'qOldV', name: '舊報價', client: '甲', date: '2026-01-01', items: [], rmk: { walk: '500' } });
-        newQ(); loadQ('qOldV'); out.noLeak = !rmkCustom.valid && rmkCustom.walk === '500';
-        Q = Q.filter(x => x.id !== 'qOldV');
-        /* 備註填寫視窗有「報價有效期限」欄，條號跟著算 */
-        openRmkModal(); out.modal = !!document.getElementById('rmk-valid') && /第\d+條：報價有效期限/.test(document.getElementById('rmk-t-valid').textContent);
-        document.getElementById('rmk-modal').style.display = 'none';
+        newQ(); rmkCustom.bh = '99';
+        const t = _rmkBuild(base, rmkCustom, false).text, n = t.split('\n').map(l => (l.match(/^(\d+)\.(?!\d)/) || [])[1]).filter(Boolean).map(Number);
+        out.seq = n.every((x, i) => x === i + 1) && new RegExp('^' + n[n.length - 1] + '\\. 本報價有效期限為報價日起 14 天。$', 'm').test(t);
+        Q.unshift({ id: 'qOldR', name: '舊報價', client: '甲', date: '2026-01-01', items: [], rmk: { walk: '500' } });
+        loadQ('qOldR'); out.noLeak = rmkCustom.bh === '' && rmkCustom.walk === '500' && !rmkCustom.mob;
+        Q = Q.filter(x => x.id !== 'qOldR');
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
-      Object.keys(P).forEach(k => delete P[k]); Object.assign(P, oP); _fbUser = oU; _isAdminUser = oA; window._immediateUpload = oUp;
       return out;
     });
-    check('v6.0.124 第19條有效期限：新報價帶 14 天且條號連號（自訂條款接在後面）；舊報價不印', r.newQ && r.extraAfter && r.oldQ && r.modal && r.noLeak, JSON.stringify(r));
-    check('v6.0.124 參數預設條款補第19條：只補一次、已有不重複、補過後刪掉不再加、只有管理員裝置會補', r.mig && r.noDup && r.once && r.staff, JSON.stringify(r));
-    check('v6.0.124 有效期限測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    check('v6.0.124 預設條款第19條「本報價有效期限為報價日起 14 天。」連號在最後；開舊報價不帶上一張報價的備註值', r.seq && r.noLeak, JSON.stringify(r));
+    check('v6.0.124 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

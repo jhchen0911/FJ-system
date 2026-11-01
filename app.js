@@ -253,7 +253,7 @@ var P={
 let items=[],exs=[],costs=[],eid=null;
 let rmkCustom={load:'',walk:'',tech:'',bh:'',br:'',bs:'',bb:'',c2:'',c3:'',ir:'',mob:'',minQty:'',extra:[]};
 // v6.0.117 新報價備註預設值（Lotion 10/30 久年 115102902 現行寫法；技術工一律 3,500）。只套在「新增報價」，已存報價不動；每案仍可在備註視窗改
-var _RMK_NEW_DEF={walk:'3000',tech:'3500',bh:'32',bb:'34',c2:'20000',c3:'30000',ir:'50000',mob:'60000',valid:'14'};   // v6.0.124 valid：第19條有效期限（天）   // v6.0.83 minQty：第16條「施作數量不足 N 時」
+var _RMK_NEW_DEF={walk:'3000',tech:'3500',bh:'32',bb:'34',c2:'20000',c3:'30000',ir:'50000',mob:'60000'};   // v6.0.83 minQty：第16條「施作數量不足 N 時」
 
 try{const s=localStorage.getItem('fy6_q');if(s)Q=JSON.parse(s);}catch(e){_err('top',e);}
 // v5.318：應付狀態正規化。status 為空的舊資料在 ==='pending' 與 !=='paid' 兩種寫法下
@@ -1115,7 +1115,6 @@ function fcApplySuggest(){
 }
 
 function syncParamsUI(){
-  try{if(typeof _fbUser==='undefined'||!_fbUser)_rmkV19Migrate();}catch(e){_err('syncParamsUI.rmk19',e);}   // v6.0.124 沒登入的本機模式也補第19條（登入後以雲端參數為準，會重新判斷）
   try{rFixedCosts();}catch(e){_err('syncParamsUI',e);}
   try{var _rr=P.matRentRate||{};[['h300','H300',3],['h350','H350',4],['h400','H400',5]].forEach(function(x){var e=document.getElementById('pmat-'+x[0]);if(e)e.value=(_rr[x[1]]!=null?_rr[x[1]]:x[2]);});var _pf=document.getElementById('pmat-factor');if(_pf)_pf.value=(P.matRentFactor!=null?P.matRentFactor:0.8);var _pl=document.getElementById('pmat-loss');if(_pl)_pl.value=(P.matLossAccrue===false?'0':'1');var _pt=document.getElementById('pmat-trans');if(_pt)_pt.value=(P.matTransRate!=null?P.matTransRate:450);}catch(e){_err('syncParamsUI.mat',e);}   // v6
   try{var _pk=document.getElementById('paikey');if(_pk)_pk.value='';}catch(e){_err('syncParamsUI',e);}   // v6.0.118：不再顯示／保存金鑰
@@ -1161,7 +1160,7 @@ function syncParamsUI(){
 
 function resetRmkBase(){
   if(!confirm('確定要還原備註條款為系統預設值？\n（目前自訂內容將被覆蓋）'))return;
-  var DEFAULT_RMK="1. 營業稅5%外加。\n2. 本工程報價以單價為準，數量僅供參考，實際工程款依實際施作數量核實計算。\n3. 付款方式：每月月底估驗一次、次月20日付款。①一次性工項施工完成請款100%。②中間樁/共構樁買斷項目，於打設完成或引孔根固後請款100%。③其他工項每階段按裝（打設）完成付70%，拆除（拔除）完成付30%，工程款以100%現金支付。\n4. 基準線放樣、場地整理、地下障礙物清除、施工動線規劃（如因動線調整致施工費用增加，由甲方負責），及動線鐵板（包含施工動線、出入口、連續壁導溝、地中壁導溝開口等），另棄土坑型鋼亦由甲方自行負責。\n5. 有關施工所需之水源、電力、背填材料（含鋼筋、水泥、砂、混凝土等）、交通疏導及抽排水等項目，均由甲方負責。惟如前述項目已於報價內容中明確載明由乙方負責，則不在此限。\n6. 本工程無保固及保留款，亦不含回填砂、各類型鋼材試（檢）驗費用、保險費、清潔費及技師簽證費等相關費用。凡本工程報價或工作項目未列之事項，概由甲方自行負責；如甲方另行委由乙方施作，相關費用另行議定。\n7. 本工程依甲方提供之圖說或經審核完成之施工圖說及相關規範施作；如未提供圖說，則依甲方現場人員指示施作。倘因圖說內容不完整、規格不明，或甲方現場指示不當，致使材料毀損或產生其他相關損失，其材料費用及衍生之一切費用，概由甲方負擔。\n8. 本工程施工構台之設計載重以【LOAD】T 為上限。倘甲方需使用超過前述載重之機具，或因實際需求須增加分段拆除次數，應事先通知乙方，並經雙方協議後辦理，其所增加之相關費用及施工單價另行議定。\n9. 筏基如設有回填區，中間樁及共構樁因埋入所產生之損耗，應依實際切除長度核實計價，並以現場量測或雙方確認之數據為準。\n10. 圍令與擋土牆間之填縫材料由甲方提供；乙方僅負責澆置、打除及吊起集中，其運棄及相關處理，由甲方負責。\n11. 備用單價：a.安全走道M/$【WALK】元、b.技術工/天/$【TECH】元\n12. 如因甲方因素或要求買斷：型鋼KG/$【BUY_H】元、鋼軌樁KG/$【BUY_R】元、鋼板樁KG/$【BUY_S】元、支撐KG/$【BUY_B】元、2M覆工板/片/$【COV2】元、3M覆工板/片/$【COV3】元、鋪路鐵板/片/$【IRON】元（未稅）計。\n13. 本工程不包含底層鋼製樓梯及鋪路鐵板鋪設等相關施作項目；如需施作，應另行協商，其費用另議。\n14. 材料使用期限自各單一工項打設（裝設）完成之次日起算，至該工項拔除（拆除）完成日止。本工程各工項之租期均由甲方提供；如實際使用期間未超過備註所載租期，不另行辦理加減帳；超過者依備註所載逾期租金計價。拆除（拔除）期間因甲方因素致延誤者，延誤天數併入計算。\n15. 如因甲方工地緊急狀況、工程聯絡單或口頭指示，要求乙方先行配合施作追加工項者，經甲方工地簽認報價單後，該報價單即視為本合約之一部分。甲方不得以未另行簽訂書面合約為由，拒絕或延遲辦理當期工程款之給付。\n16. 本報價各階段均以一次施工作業為原則；如因實際需求須進行第二次施作，或施作數量不足時，甲方應另行補貼動員費用（次/$【MOB】元）。\n17. 於結構體作業時，其相關補強作業由甲方負責。結構板面施工動線（含鐵板鋪設）如甲方委由乙方，相關費用另行議定。\n18. 如因甲方要求或施工動線限制需使用吊車進行拔樁作業，其施工單價另議。\n19. 本報價有效期限為報價日起【VALID】天，逾期依鋼材行情另議。";
+  var DEFAULT_RMK="1. 營業稅5%外加。\n2. 本工程報價以單價為準，數量僅供參考，實際工程款依實際施作數量核實計算。\n3. 付款方式：每月月底估驗一次、次月20日付款。①一次性工項施工完成請款100%。②中間樁/共構樁買斷項目，於打設完成或引孔根固後請款100%。③其他工項每階段按裝（打設）完成付70%，拆除（拔除）完成付30%，工程款以100%現金支付。\n4. 基準線放樣、場地整理、地下障礙物清除、施工動線規劃（如因動線調整致施工費用增加，由甲方負責），及動線鐵板（包含施工動線、出入口、連續壁導溝、地中壁導溝開口等），另棄土坑型鋼亦由甲方自行負責。\n5. 有關施工所需之水源、電力、背填材料（含鋼筋、水泥、砂、混凝土等）、交通疏導及抽排水等項目，均由甲方負責。惟如前述項目已於報價內容中明確載明由乙方負責，則不在此限。\n6. 本工程無保固及保留款，亦不含回填砂、各類型鋼材試（檢）驗費用、保險費、清潔費及技師簽證費等相關費用。凡本工程報價或工作項目未列之事項，概由甲方自行負責；如甲方另行委由乙方施作，相關費用另行議定。\n7. 本工程依甲方提供之圖說或經審核完成之施工圖說及相關規範施作；如未提供圖說，則依甲方現場人員指示施作。倘因圖說內容不完整、規格不明，或甲方現場指示不當，致使材料毀損或產生其他相關損失，其材料費用及衍生之一切費用，概由甲方負擔。\n8. 本工程施工構台之設計載重以【LOAD】T 為上限。倘甲方需使用超過前述載重之機具，或因實際需求須增加分段拆除次數，應事先通知乙方，並經雙方協議後辦理，其所增加之相關費用及施工單價另行議定。\n9. 筏基如設有回填區，中間樁及共構樁因埋入所產生之損耗，應依實際切除長度核實計價，並以現場量測或雙方確認之數據為準。\n10. 圍令與擋土牆間之填縫材料由甲方提供；乙方僅負責澆置、打除及吊起集中，其運棄及相關處理，由甲方負責。\n11. 備用單價：a.安全走道M/$【WALK】元、b.技術工/天/$【TECH】元\n12. 如因甲方因素或要求買斷：型鋼KG/$【BUY_H】元、鋼軌樁KG/$【BUY_R】元、鋼板樁KG/$【BUY_S】元、支撐KG/$【BUY_B】元、2M覆工板/片/$【COV2】元、3M覆工板/片/$【COV3】元、鋪路鐵板/片/$【IRON】元（未稅）計。\n13. 本工程不包含底層鋼製樓梯及鋪路鐵板鋪設等相關施作項目；如需施作，應另行協商，其費用另議。\n14. 材料使用期限自各單一工項打設（裝設）完成之次日起算，至該工項拔除（拆除）完成日止。本工程各工項之租期均由甲方提供；如實際使用期間未超過備註所載租期，不另行辦理加減帳；超過者依備註所載逾期租金計價。拆除（拔除）期間因甲方因素致延誤者，延誤天數併入計算。\n15. 如因甲方工地緊急狀況、工程聯絡單或口頭指示，要求乙方先行配合施作追加工項者，經甲方工地簽認報價單後，該報價單即視為本合約之一部分。甲方不得以未另行簽訂書面合約為由，拒絕或延遲辦理當期工程款之給付。\n16. 本報價各階段均以一次施工作業為原則；如因實際需求須進行第二次施作，或施作數量不足時，甲方應另行補貼動員費用（次/$【MOB】元）。\n17. 於結構體作業時，其相關補強作業由甲方負責。結構板面施工動線（含鐵板鋪設）如甲方委由乙方，相關費用另行議定。\n18. 如因甲方要求或施工動線限制需使用吊車進行拔樁作業，其施工單價另議。\n19. 本報價有效期限為報價日起 14 天。";
   P.rmkBase=DEFAULT_RMK;
   var prmEl=document.getElementById('prm');
   if(prmEl)prmEl.value=DEFAULT_RMK;
@@ -2350,7 +2349,7 @@ function loadQ(id){
   }catch(e){_err('loadQ.costFix',e);}
   const map={fc:'code',fcl:'client',fn:'name',fl:'loc',fco:'contact',fp:'phone',fd:'date'};
   Object.entries(map).forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.value=q[k]||'';});
-  Object.keys(rmkCustom).forEach(function(k){rmkCustom[k]=(k==='extra')?[]:'';});   // v6.0.124 審查：先清空，免得上一張（新報價的有效期限 14 天等）帶進這張舊報價
+  Object.keys(rmkCustom).forEach(function(k){rmkCustom[k]=(k==='extra')?[]:'';});   // v6.0.124 先清空，免得上一張報價的備註值（買斷單價、動員費等）帶進這張
   if(q.rmk){Object.assign(rmkCustom,q.rmk);if(!Array.isArray(rmkCustom.extra))rmkCustom.extra=[];}
   else{Object.keys(rmkCustom).forEach(k=>{rmkCustom[k]=(k==='extra')?[]:'';});}
   window._qSnap=JSON.stringify(items);
@@ -2723,8 +2722,6 @@ function _rmkBuild(base,c,edit){
       var ib=[];if(c.bh)ib.push('型鋼KG/$'+c.bh+'元');if(c.br)ib.push('鋼軌樁KG/$'+c.br+'元');if(c.bs)ib.push('鋼板樁KG/$'+c.bs+'元');if(c.bb)ib.push('支撐KG/$'+c.bb+'元');
       if(c.c2)ib.push('2M覆工板/片/$'+c.c2+'元');if(c.c3)ib.push('3M覆工板/片/$'+c.c3+'元');if(c.ir)ib.push('鋪路鐵板/片/$'+c.ir+'元');
       t=ib.length?('12. 如因甲方因素或要求買斷：'+ib.join('、')+'（未稅）計。'):null;
-    }else if(line.includes('【VALID】')){   // v6.0.124 有效期限：只有填了天數的報價才印（舊報價沒有 valid → 不出現，印出來跟以前一樣）
-      t=c.valid?line.replace('【VALID】',' '+String(c.valid).trim()+' '):null;
     }else if(line.includes('【MOB】')){
       t=c.mob?_rmkMinQty(line.replace('【MOB】',c.mob),c):(edit?_rmkMinQty(line.replace('$【MOB】元','$______元'),c):null);
     }
@@ -2743,7 +2740,7 @@ function _rmkBuild(base,c,edit){
 // 編輯視窗目前填的值（還沒按套用也算）
 function _rmkFormVals(){
   var c=JSON.parse(JSON.stringify(rmkCustom||{}));
-  ['load','walk','tech','bh','br','bs','bb','c2','c3','ir','mob','valid'].forEach(function(k){var e=document.getElementById('rmk-'+k);if(e)c[k]=e.value;});
+  ['load','walk','tech','bh','br','bs','bb','c2','c3','ir','mob'].forEach(function(k){var e=document.getElementById('rmk-'+k);if(e)c[k]=e.value;});
   var mq=document.getElementById('rmk-minqty');if(mq)c.minQty=mq.value;c.extra=_rmkExtraList();
   return c;
 }
@@ -2753,14 +2750,14 @@ function _rmkModalTitles(){
   var b=_rmkBuild(base,_rmkFormVals(),false);   // 審查：條號照「印出來的報價單」算（沒填的載重／動員費不佔號）
   var set=function(id,tok,label){var el=document.getElementById(id);if(!el)return;var n=b.no[tok];
     el.textContent=n?('第'+n+'條：'+label):(base.indexOf(tok)<0?(label+'（參數條款中找不到 '+tok+'，此欄不會套用）'):(label+'（未填，報價單不會出現這一條）'));};
-  set('rmk-t-load','【LOAD】','施工構台設計載重');set('rmk-t-spare','【WALK】','備用單價');set('rmk-t-buy','【BUY_H】','買斷單價（未稅）');set('rmk-t-mob','【MOB】','動員費');set('rmk-t-valid','【VALID】','報價有效期限');
+  set('rmk-t-load','【LOAD】','施工構台設計載重');set('rmk-t-spare','【WALK】','備用單價');set('rmk-t-buy','【BUY_H】','買斷單價（未稅）');set('rmk-t-mob','【MOB】','動員費');
   var hint=document.getElementById('rmk-extra-hint');if(hint)hint.textContent='自訂條款（依序接在'+(b.nBase?('第 '+b.nBase+' 條'):'最後一條')+'之後；條號依實際有內容的條目自動編號）';
   document.querySelectorAll('#rmk-extra .rmk-xno').forEach(function(el,i){el.textContent=(b.nBase+i+1)+'.';});
   var m=document.getElementById('rmk-modal');if(m&&!m._rmkLive){m._rmkLive=1;m.addEventListener('input',function(ev){try{if(ev.target&&(/^rmk-/.test(ev.target.id||'')||ev.target.closest('#rmk-extra')))_rmkModalTitles();}catch(e){_err('_rmkModalTitles.live',e);}});}
 }
 function openRmkModal(){
   const map={load:'rmk-load',walk:'rmk-walk',tech:'rmk-tech',bh:'rmk-bh',
-    br:'rmk-br',bs:'rmk-bs',bb:'rmk-bb',c2:'rmk-c2',c3:'rmk-c3',ir:'rmk-ir',mob:'rmk-mob',valid:'rmk-valid',minQty:'rmk-minqty'};
+    br:'rmk-br',bs:'rmk-bs',bb:'rmk-bb',c2:'rmk-c2',c3:'rmk-c3',ir:'rmk-ir',mob:'rmk-mob',minQty:'rmk-minqty'};
   Object.entries(map).forEach(([k,id])=>{const e=document.getElementById(id);if(e)e.value=rmkCustom[k]||'';});
   try{_rmkModalTitles();}catch(e){_err('openRmkModal.titles',e);}   // v6.0.84 條號依參數「預設備註條款」即時算
   rmkRenderExtra();
@@ -2768,7 +2765,7 @@ function openRmkModal(){
 }
 
 function applyRmkCustom(){
-  ['load','walk','tech','bh','br','bs','bb','c2','c3','ir','mob','valid'].forEach(k=>{
+  ['load','walk','tech','bh','br','bs','bb','c2','c3','ir','mob'].forEach(k=>{
     const e=document.getElementById('rmk-'+k);rmkCustom[k]=e?e.value:'';
   });
   rmkCustom.minQty=(document.getElementById('rmk-minqty')||{}).value||'';   // v6.0.83
@@ -10140,7 +10137,7 @@ function _applyCloud(data){
     }
     INV=_safeMerge(INV,_invUnpackAll(data.invoices).filter(function(inv){return inv&&(inv.project||inv.client||inv.id);}),'invoices');   // v5.374 先解壓再合併
     if(data.upaHistory)UH=data.upaHistory;   // v5.314：原本 ||[] 會在雲端缺此欄時把本機分析歷史清空
-    if(data.params){Object.assign(P,data.params);_aiKeyScrub(true);if(!('rmkV19' in data.params))delete P.rmkV19;setTimeout(_rmkV19Migrate,1500);}   // 審查：雲端參數還沒有補過的標記 → 本機標記作廢重補（舊版裝置把 18 條傳回雲端時也會補回）   // v6.0.108 金鑰不得留在參數；v6.0.124 雲端參數到了才補第19條
+    if(data.params){Object.assign(P,data.params);_aiKeyScrub(true);}   // v6.0.108 金鑰不得留在參數
     if(data.contracts)CONTRACTS=_safeMerge(CONTRACTS,data.contracts,'contracts');
     if(data.vendors)VENDORS=_safeMerge(VENDORS,data.vendors,'vendors');
     if(data.invoiceRecs){
@@ -38894,7 +38891,7 @@ function _draftOpenQuote(q,isEdit){
   if(isEdit){loadQ(q.id);}else{newQ();}
   var sv=function(i,v){var e=document.getElementById(i);if(e)e.value=v==null?'':v;};
   sv('fc',q.code||genQuoteCode());sv('fcl',q.client);sv('fn',q.name);sv('fl',q.loc);sv('fco',q.contact);sv('fp',q.phone);sv('fd',q.date||localToday());
-  items=JSON.parse(JSON.stringify(q.items||[]));exs=JSON.parse(JSON.stringify(q.exs||[]));if(q.rmk)rmkCustom=Object.assign({},rmkCustom,JSON.parse(JSON.stringify(q.rmk)));   // v6.0.124 疊在 newQ／loadQ 的值上（舊草稿沒有有效期限時，新報價照樣帶 14 天）
+  items=JSON.parse(JSON.stringify(q.items||[]));exs=JSON.parse(JSON.stringify(q.exs||[]));if(q.rmk)rmkCustom=Object.assign({},rmkCustom,JSON.parse(JSON.stringify(q.rmk)));   // v6.0.124 疊在 newQ／loadQ 的值上
   try{rItems();calcT();if(typeof rTots==='function')rTots();}catch(e){_err('_draftOpenQuote',e);}
   st('esub','AI 草稿：請檢查後按「儲存」');
 }
@@ -39508,27 +39505,6 @@ function lotionNotifyOpen(){
       fyNotify(gv('nf-title'),gv('nf-todo')).then(function(m){toast(m);});
     },false,null,false);
   setTimeout(function(){try{_aiNfPrev();}catch(e){_err('lotionNotifyOpen',e);}},50);
-}
-// ══════════ v6.0.124 預設備註條款補第 19 條「有效期限」（Lotion 11/1）══════════
-// 參數「預設備註條款」已存過的（舊的 18 條）：還沒有「有效期限」就補在最後一條後面；只補一次（P.rmkV19），之後 Lotion 自己改、刪都不再動。
-// 讀到雲端參數之後由管理員裝置做（雲端參數沒有 rmkV19 就把本機標記作廢重補）；沒登入的本機模式在 syncParamsUI 做。舊報價沒有 valid 天數 → 這一條不印，輸出跟以前一樣。
-var _RMK_L19='本報價有效期限為報價日起【VALID】天，逾期依鋼材行情另議。';
-function _rmkV19Add(base){
-  base=String(base||'');if(/有效期限/.test(base))return base;
-  var last=0;base.split('\n').forEach(function(l){var m=l.match(/^\s*(\d+)\s*\.(?!\d)/);if(m)last=Math.max(last,+m[1]);});
-  return base.replace(/\s+$/,'')+'\n'+(last+1)+'. '+_RMK_L19;
-}
-function _rmkV19Migrate(){
-  try{
-    if(P.rmkV19)return false;
-    if(typeof _fbUser!=='undefined'&&_fbUser&&(!_isAdminUser||_isReaderUser))return false;
-    if(window.FY_BETA)return false;
-    var old=P.rmkBase||'';
-    if(old){var nb=_rmkV19Add(old);if(nb!==old){P.rmkBase=nb;var el=document.getElementById('prm');if(el)el.value=nb;}}
-    P.rmkV19=1;P._mt=Date.now();persistP();
-    try{if(typeof _fbUser!=='undefined'&&_fbUser)_immediateUpload();}catch(e){_err('_rmkV19Migrate.up',e);}
-    return true;
-  }catch(e){_err('_rmkV19Migrate',e);return false;}
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
