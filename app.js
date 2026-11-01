@@ -34961,7 +34961,7 @@ async function quoteExportOwnerDoc(){
   }catch(e){_err('quoteExportOwnerDoc',e);toast('回填失敗：'+(e.message||'').slice(0,80));}
 }
 // ── 2 單位清單＋單支長明確欄位＋換算檢查 ──
-var _UNIT_LIST=['支','M','m²','座','組','式','天','車','噸','kg','處','片','條','才'];
+var _UNIT_LIST=['支','M','m²','座','組','具','式','天','車','噸','kg','處','片','條','才'];   // v6.0.121 加「具」（油壓千斤頂、軸力計、土壓計；單價分析本來就用具）
 function _itemLenOf(it){var l=parseFloat(it&&it.len)||0;if(l>0)return l;var m=/L\s*[=＝]\s*([\d.]+)\s*M/i.exec(String((it&&it.desc)||''));return m?(parseFloat(m[1])||0):0;}
 function _rfqLen(desc){var m=/L\s*[=＝]\s*([\d.]+)\s*M/i.exec(String(desc||''));if(m)return parseFloat(m[1])||0;
   try{var q=(typeof _rfqQ==='function'&&_rfqQ())||Q.find(function(x){return x.id===eid;});var d=String(desc||'').trim();if(q&&d){var it=(q.items||[]).find(function(x){return x&&String(x.desc||'').trim()===d;});if(it&&(parseFloat(it.len)||0)>0)return parseFloat(it.len);}}catch(e){_err('_rfqLen',e);}return 0;}
@@ -34969,7 +34969,7 @@ function _itemUnitCheck(it){
   if(!it||it.sec||_isSpare(it))return '';
   var u=_uFix(String(it.unit||'').trim()),d=String(it.desc||''),len=parseFloat(it.len)||0,dl=(/L\s*[=＝]\s*([\d.]+)\s*M/i.exec(d)||[])[1];
   if(!u)return '';
-  if(_UNIT_LIST.indexOf(u)<0&&!/^(m2|M2|㎡|公尺|米|支\/天|支・天)$/.test(u))return '單位「'+u+'」不在清單，請選 支／M／m²／座／組／式…';
+  if(_UNIT_LIST.indexOf(u)<0&&!/^(m2|M2|㎡|公尺|米|支\/天|支・天)$/.test(u))return '單位「'+u+'」不在清單，請選 支／M／m²／座／組／具／式…';
   if(dl&&len>0&&Math.abs(parseFloat(dl)-len)>1e-6)return '單支長 '+_rfmt(len)+'M 與說明 L='+dl+'M 不一致';
   if(u==='支'&&!len&&!dl&&/型鋼|鋼樁|H\d{3}|支撐|中間樁|鋼板樁|鋼軌/.test(d))return '以支計價請填單支長（發包依 M、材料需求、介紹費都要用）';
   if(u==='M'&&/\d+\s*支\b/.test(d)&&!len)return '以 M 計價但說明寫支數，請確認數量是總 M 數';
