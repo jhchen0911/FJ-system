@@ -79,6 +79,22 @@ async function makeSnapshot(file) {
   const results = [];
   const check = (name, pass, info) => { results.push(pass); console.log((pass ? '  ✓ ' : '  ✗ ') + name + (info ? '　' + info : '')); };
   console.log('\n真實黃金樣本工具．自我檢查（假資料）\n' + '─'.repeat(64));
+  // deid 個資偵測：單獨出現的一定要抓到並遮掉；夾在 id、網址裡的不能誤報、id 不能被改
+  {
+    const { deid, piiCount } = require(path.join(TOOLS, 'deid.js'));
+    const loose = { version: 'fy-v5', quotes: [{ id: 'q1', name: '試驗工程', note: '聯絡 0912-345-678，身分證 B123456789，信箱 abc.d@example.org' }] };
+    const r1 = deid(loose), t1 = JSON.stringify(r1.out);
+    check('deid：單獨的手機、身分證、Email 會遮掉', !/0912-345-678|B123456789|abc\.d@example\.org/.test(t1) && r1.pii === 0);
+    const raw = { version: 'fy-v5', quotes: [{ id: 'L20260912345678x', name: '試驗工程', costs: [{ id: 'c1709123456789', rows: [{ id: 'rA123456789z' }] }],
+      photos2: 'https://firebasestorage.googleapis.com/v0/b/x/o/line%2FA123456789.jpg?alt=media&token=ab0912345678cd',
+      memo: 'see file 0912345678abc and xyzA123456789' }] };
+    const r2 = deid(raw), t2 = JSON.stringify(r2.out);
+    check('deid：夾在 id 與英數字中間的不誤報、id 原樣保留', r2.pii === 0 && t2.includes('L20260912345678x') && t2.includes('c1709123456789') && t2.includes('rA123456789z') && t2.includes('0912345678abc'));
+    check('deid：網址與檔名清空（檔名可能帶身分證號）', !t2.includes('firebasestorage') && !t2.includes('line%2FA123456789'));
+    // 反向：偵測本身——單獨出現的三種都要算到；夾在 id、網址、英數字中間的一個都不算
+    check('deid：偵測抓得到單獨的手機、身分證、Email', piiCount('"聯絡 0912-345-678 或 0912345678，B123456789，a.b@corp.com.tw"') === 4);
+    check('deid：偵測不把 id／網址片段當個資', piiCount('"L20260912345678x","c1709123456789","rA123456789z","token=ab0912345678cd","xyzA123456789","0912345678abc"') === 0);
+  }
   const snap = path.join(tmp, 'snapshot.json');
   const mk = await makeSnapshot(snap);
   check('假快照', mk.quotes > 0 && mk.invoices > 0, '樣本 ' + mk.ok + '/' + mk.total + '、報價 ' + mk.quotes + '、請款單 ' + mk.invoices);
