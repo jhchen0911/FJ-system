@@ -8118,7 +8118,8 @@ async function newPage(browser, width, height) {
         /* 審查 🔴3：同一天已有日報 → 合併成備註列；之後再用日報表單提交，LINE 文字不能被洗掉 */
         q.dailyLogs = [{ id: 'dOld', date: '2026-10-23', progress: '舊文字', status: 'work', workers: 3 }];
         DRAFTS.dd99992027 = { id: 'dd99992027', type: 'dailyLog', by: 'line-bot', at: 3, status: 'pending', summary: 'x', payload: { qid: 'qL', date: '2026-10-23', answers: ['LINE 回覆'], photos: [] } };
-        draftApply('dd99992027'); document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 30));
+        draftApply('dd99992027'); document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 250));
+        document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 30));   // v6.0.121：同一天已有日報會再問一次「重複，請確認」→ 確認＝合併
         _drMergeLog(q, q.dailyLogs[0], { progressRows: [{ itemIdx: -1, qty: '', note: '表單補充' }] });
         out.merge = q.dailyLogs.length === 1 && /舊文字/.test(q.dailyLogs[0].progress) && /【LINE】LINE 回覆/.test(q.dailyLogs[0].progress) && /表單補充/.test(q.dailyLogs[0].progress);
         /* 3. 專案頁現場追加區塊 */
