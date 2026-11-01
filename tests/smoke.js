@@ -9042,7 +9042,7 @@ async function newPage(browser, width, height) {
     const IDX = fs.readFileSync(pth.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
     check('v6.0.123 AI 通知：按鈕只有 AI 帳號／Lotion 看得到；帶登入憑證呼叫雲端、不能指定收件人；超過 100 字擋下；伺服器拒絕原因帶回', r.staffHidden && r.aiShown && r.call && r.prev && r.tooLong && r.err && r.staffDeny, JSON.stringify(r));
     check('v6.0.123 AI 通知安全：唯讀帳號不能再寫 linePush（健檢2 #27）；通知紀錄與計數網頁不能寫；伺服器只放行名單、100 字、擋網址、每天 30 則、收件人取擁有者',
-      !/fydata\/readers/.test(RF.linePush.$id['.write']) && RF.aiNotifyLog['.write'] === 'false' && RF.aiNotifyCount['.write'] === 'false' && /at/.test(String(RF.aiNotifyLog['.indexOn']))
+      !/\|\|\s*root\.child\('fydata\/readers'\)/.test(RF.linePush.$id['.write']) && /!root\.child\('fydata\/readers'\)/.test(RF.linePush.$id['.write']) && RF.aiNotifyLog['.write'] === 'false' && RF.aiNotifyCount['.write'] === 'false' && /at/.test(String(RF.aiNotifyLog['.indexOn']))
       && N.notifyAllowed('hsuanchen911@gmail.com') && !N.notifyAllowed('staff@x.com') && N.NOTIFY_DAILY === 30 && N.NOTIFY_MAX === 100 && N.buildNotify({ text: 'https://x.tw' }).err && !!N.buildNotify({ title: 'a' }).text
       && /exports\.aiNotify/.test(IDX) && /pushOwners\(cfg, deps, b\.text\)/.test(IDX) && /aiNotifyCount/.test(IDX) && /NOTIFY_KEEP_MS/.test(IDX), '');
     check('v6.0.123 AI 通知測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
