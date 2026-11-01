@@ -4789,7 +4789,7 @@ async function newPage(browser, width, height) {
         setTimeout(function(){
           window._toolPrint=oP;window.showConfirm=oC;
           out.exportRan=printed.length>0||true;
-          out.exportPre=typeof _drExportPDF0==='function';
+          out.exportPre=typeof _drExportPDFCore==='function';
           box.remove();_drPhotos=[];Q=[];PAYABLES.length=0;INV.length=0;CONTRACTS.length=0;eid=null;localStorage.removeItem('fy_photo_pending');
           res(out);
         },300);
@@ -7266,7 +7266,7 @@ async function newPage(browser, width, height) {
           && /租期結束日口徑：拔除（拆除）第一天/.test(_invCalcText({ type: 'rental', _ovKey: 'x', curQty: 10, contractPrice: 50, curDays: 9, payRate: 100, unit: '支' }))
           && !/租期結束日口徑/.test(_invCalcText({ type: 'item', curQty: 1, contractPrice: 5, unit: '式' }));
         out.ui1 = /租期結束日/.test(_pjDeductHtml({ id: 'z', deduct: {} }));
-        out.scanTxt = invScanRent.toString().indexOf("_rentEndMode(q)==='removeDone'") >= 0; out.ui2 = (typeof _saveQ632 === 'function' ? _saveQ632 : saveQ).toString().indexOf("q.rentEnd='removeDone'") >= 0; out.ui = out.ui1 && out.ui2;
+        out.scanTxt = invScanRent.toString().indexOf("_rentEndMode(q)==='removeDone'") >= 0; out.ui2 = (typeof _saveQCore === 'function' ? _saveQCore : saveQ).toString().indexOf("q.rentEnd='removeDone'") >= 0; out.ui = out.ui1 && out.ui2;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
       return out;
     });

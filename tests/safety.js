@@ -16,23 +16,20 @@ const ROOT = path.join(__dirname, '..');
 const SELFTEST = process.argv.includes('--selftest');
 const RESET = fs.readFileSync(path.join(__dirname, 'synthetic', 'reset.js'), 'utf8');
 
-// ④ 目前（v6.0.124）的包裝覆寫：函式名 → 次數。第 2a 步拆掉一個就從這裡刪一個；不能新增。
-const WRAP_WHITELIST = {
-  txt: 1, addSec: 1, renderProjects: 1, _pjInvHtml: 1, buildInvFromQuote: 1, renderRetention: 1, saveQ: 1, loadQ: 1, drExportPDF: 1,
-  buildSubMgmtHtml: 1, _pjAdvRowsHtml: 1, delPayable: 1, editPayable: 1, togglePayVat: 1, _paySource: 1, _payIsCompany: 1,
-  _shRptYear: 1, _rptBasisStrip: 1, _qiPreview: 1, showConfirm: 1, _cleanExpenseSync: 1, _advUnifyAll: 1, go: 2, matEstSave: 1, matEstCalc: 1
-};
+// ④ 包裝白名單：第 2a 步（v6.0.127）已全部拆完，白名單清空——之後一處都不能新增（規則 9：改原函式本體）。
+//    掃描範圍：同名頂層函式（含 async）被「X=function／X=async function／X=箭頭函式」重新指定，連函式內同名的區域變數也算（容易看錯）
+const WRAP_WHITELIST = {};
 function wrapScan(src) {
-  const fns = new Set([...src.matchAll(/^function\s+([\w$]+)\s*\(/gm)].map(m => m[1]));
+  const fns = new Set([...src.matchAll(/^(?:async\s+)?function\s*\*?\s*([\w$]+)\s*\(/gm)].map(m => m[1]));
   const hits = {};
-  for (const m of src.matchAll(/(?:^|[;{}\s])(?:window\.)?([\w$]+)\s*=\s*(?:async\s+)?function\b/gm)) if (fns.has(m[1])) hits[m[1]] = (hits[m[1]] || 0) + 1;
+  for (const m of src.matchAll(/(?:^|[;{}\s,])(?:window\.)?([\w$]+)\s*=\s*(?:async\s+)?(?:function\b|\([^)]*\)\s*=>|[\w$]+\s*=>)/gm)) if (fns.has(m[1])) hits[m[1]] = (hits[m[1]] || 0) + 1;
   return hits;
 }
 function testWrap(root) {
   const hits = wrapScan(fs.readFileSync(path.join(root, 'app.js'), 'utf8'));
   const added = Object.keys(hits).filter(k => hits[k] > (WRAP_WHITELIST[k] || 0));
   const gone = Object.keys(WRAP_WHITELIST).filter(k => (hits[k] || 0) < WRAP_WHITELIST[k]);
-  return { ok: !added.length && !gone.length, info: (added.length ? '新增包裝：' + added.join('、') + '（規則 9：改原函式本體）' : '') + (gone.length ? (added.length ? '；' : '') + '已拆掉、請從白名單刪：' + gone.join('、') : '') || '共 ' + Object.values(hits).reduce((a, b) => a + b, 0) + ' 處，與白名單相同' };
+  return { ok: !added.length && !gone.length, info: (added.length ? '新增包裝：' + added.join('、') + '（規則 9：改原函式本體）' : '') + (gone.length ? (added.length ? '；' : '') + '已拆掉、請從白名單刪：' + gone.join('、') : '') || (Object.keys(WRAP_WHITELIST).length ? '共 ' + Object.values(hits).reduce((a, b) => a + b, 0) + ' 處，與白名單相同' : '0 處（第 2a 步已全部拆完）') };
 }
 
 // ① 同步合併（在頁面裡跑）

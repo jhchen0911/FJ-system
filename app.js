@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.126';
+var APP_VERSION='v6.0.127';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -803,7 +803,7 @@ function _updMobEditbar(p){
   eb.classList.add('on');document.body.classList.add('has-editbar');
   try{mode==='q'?rTots():rInvTots();}catch(e){_err('_updMobEditbar',e);}
 }
-function go(p){
+function _goCore(p){
   if(p!=='editor'){try{_draftReset();}catch(e){_err('go.draft',e);}}   // v6.0.109
   // v6 帳務：金流管理／帳務管理／薪資零用金 併成一頁，舊頁名一律轉到對應分頁
   if(p==='finance'||p==='ledger'||p==='payroll'){try{if(_acctMount()){_acctTab=({finance:'ar',ledger:'inv',payroll:'pay'})[p];p='acct';}}catch(e){_err('go.acct',e);}}
@@ -2143,7 +2143,7 @@ function upEx(){
 }
 
 // ════════════════════ SAVE/LOAD ════════════════════
-function saveQ(){
+function _saveQCore(){
   if(_roDeny())return;   // v6.0.108 唯讀帳號
   // 儲存驗證（最低限度）：必填與數值合理性
   if(!(gv('fn')||'').trim()){toast('請填寫「工程名稱」再儲存');const el=document.getElementById('fn');if(el)el.focus();return;}
@@ -2334,7 +2334,7 @@ function saveQ(){
   _markDirty();
   _pushCloud({silent:true});
 }
-function loadQ(id){
+function _loadQCore(id){
   const q=Q.find(x=>x.id===id);if(!q)return;
   _draftReset();   // v6.0.109
   eid=q.id;items=JSON.parse(JSON.stringify(q.items||[]));exs=JSON.parse(JSON.stringify(q.exs||[]));
@@ -5399,7 +5399,7 @@ function _invAfterLoad(inv){
   if(m)toast('已依日報自動列入 '+m+' 項逾期租金，請確認後儲存');
 }
 
-function buildInvFromQuote(q){
+function _buildInvFromQuoteCore(q){
   const invItems=_invItemsFromQuote(q);
   // 從客戶資料自動帶入統編、電話、傳真
   const cust=CUSTOMERS.find(x=>x.name===q.client);
@@ -8430,7 +8430,7 @@ function _sdRender(){
   if(sub)sub.textContent=(q.name||'未命名')+(q.client?'　/　'+q.client:'')+'　·　細節 v'+(sd.ver||1)+(sd.date?('　'+sd.date):'')+'　·　報價 v'+(q.ver||1);
   var IN='width:100%;box-sizing:border-box;font-size:14px;padding:8px 9px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)';
   var num=function(path,label,unit,ph){return '<div class="f"><label style="font-size:11px">'+label+(unit?' <span style="color:var(--b3)">('+unit+')</span>':'')+'</label><input type="number" inputmode="decimal" step="any" value="'+esc(_sdGet(sd,path))+'" placeholder="'+(ph||'')+'" onchange="_sdSet(\''+path+'\',this.value)" style="'+IN+';text-align:right"></div>';};
-  var txt=function(path,label,ph,list){return '<div class="f"><label style="font-size:11px">'+label+'</label><input value="'+esc(_sdGet(sd,path))+'" placeholder="'+(ph||'')+'"'+(list?' list="'+list+'"':'')+' onchange="_sdSet(\''+path+'\',this.value)" style="'+IN+'"></div>';};
+  var txtF=function(path,label,ph,list){return '<div class="f"><label style="font-size:11px">'+label+'</label><input value="'+esc(_sdGet(sd,path))+'" placeholder="'+(ph||'')+'"'+(list?' list="'+list+'"':'')+' onchange="_sdSet(\''+path+'\',this.value)" style="'+IN+'"></div>';};
   var sel=function(path,label,opts,allowEmpty){var cur=_sdGet(sd,path);return '<div class="f"><label style="font-size:11px">'+label+'</label><select onchange="_sdSet(\''+path+'\',this.value)" style="'+IN+'">'+(allowEmpty!==false?'<option value="">－</option>':'')+opts.map(function(o){return '<option value="'+esc(o)+'"'+(cur===o?' selected':'')+'>'+esc(o)+'</option>';}).join('')+(cur&&opts.indexOf(cur)<0?'<option value="'+esc(cur)+'" selected>'+esc(cur)+'</option>':'')+'</select></div>';};
   var secH=function(t,hint){return '<div class="me-sub" style="margin-top:16px">'+t+(hint?' <span style="font-weight:400;font-size:10.5px;color:var(--b3)">'+hint+'</span>':'')+'</div>';};
   var selC=function(path,label,opts,hint){var cur=_sdGet(sd,path);return '<div class="f"><label style="font-size:11px">'+label+(hint?' <span style="color:var(--b3)">'+hint+'</span>':'')+'</label><select onchange="if(this.value===\'__c\'){var v=prompt(\'請輸入規格\','+"'"+'+JSON.stringify(cur).replace(/"/g,\'&quot;\')+'+"'"+');if(v!=null)_sdSet(\''+path+'\',v.trim());else _sdRender();}else _sdSet(\''+path+'\',this.value)" style="'+IN+'"><option value="">－</option>'+opts.map(function(o){return '<option value="'+esc(o)+'"'+(cur===o?' selected':'')+'>'+esc(o)+'</option>';}).join('')+(cur&&opts.indexOf(cur)<0?'<option value="'+esc(cur)+'" selected>'+esc(cur)+'（自訂）</option>':'')+'<option value="__c">✎ 自訂…</option></select></div>';};
@@ -8438,7 +8438,7 @@ function _sdRender(){
     +'<div class="f"><label style="font-size:11px">總長</label><div style="padding:8px 0;font-weight:800;color:var(--g3)">'+(c[k+'Len']?_shR1(c[k+'Len'])+' M':'—')+'</div></div></div>';};
   var h='<div class="card"><div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 圖面數量</div></div><div class="cb">'
     +'<datalist id="sd-spec-list">'+SH_SPECS.concat(['H350×350','H400×400','H300×300','SP-II','SP-III','SP-IV','37kg 鋼軌','50kg 鋼軌']).map(function(x){return '<option value="'+esc(x)+'">';}).join('')+'</datalist>'
-    +'<div class="me-grid wide">'+txt('drawing','圖說版本／來源','例：結構圖 S-03 rev.B 2026/08')+'<div class="f"><label style="font-size:11px">紀錄日期</label><input type="date" value="'+esc(sd.date||'')+'" onchange="_sdSet(\'date\',this.value)" style="'+IN+'"></div></div>'
+    +'<div class="me-grid wide">'+txtF('drawing','圖說版本／來源','例：結構圖 S-03 rev.B 2026/08')+'<div class="f"><label style="font-size:11px">紀錄日期</label><input type="date" value="'+esc(sd.date||'')+'" onchange="_sdSet(\'date\',this.value)" style="'+IN+'"></div></div>'
     +secH('基地')+'<div class="me-grid">'+num('P','基地周長','M')+num('A','開挖面積','m²')+num('H','開挖深度','M')+num('slabT','大底厚度','M','例：0.8')+num('corners','正角隅數','個','4')+num('irr','不規則邊','個','0')+'</div>'
     +secH('擋土壁','支數＝周長 ÷ 間距 無條件進位，可手動改')+'<div class="me-grid">'+sel('wall.form','形式',_sdWallForms())+(sd.wall.form?selC('wall.spec','規格',_sdSpecOpts(sd.wall.form),''):'<div class="f"><label style="font-size:11px">規格</label><div style="padding:8px 0;font-size:12px;color:var(--b3)">先選形式</div></div>')+sel('wall.method','工法',_sdMethodOpts(sd.wall.form))+num('wall.len','長度','M')+num('wall.sp','間距','M','例：0.6')
     +'<div class="f"><label style="font-size:11px">支數 <span style="color:var(--b3)">(支)</span>'+(sd.wall.nAuto!==false?' <span style="color:var(--g3)">自動</span>':' <button type="button" onclick="_sdSet(\'wall.nAuto\',true)" style="border:none;background:none;color:var(--g3);cursor:pointer;font-size:11px;padding:0;text-decoration:underline">改回自動 '+c.wallNAuto+'</button>')+'</label><input type="number" inputmode="numeric" value="'+(sd.wall.nAuto!==false?(c.wallN||''):esc(sd.wall.n))+'" placeholder="'+(c.wallNAuto||'')+'" onchange="_sdSet(\'wall.n\',this.value)" style="'+IN+';text-align:right;font-weight:800"></div>'
@@ -9376,16 +9376,16 @@ function matEstExportPDF(){
   // v5.399：明細維持表格（數量／單位須對齊核對），但改「依分類分塊」：每一分類一條色帶標題，
   // 該分類的項目再左右兩欄並排、由上而下再換右欄——不再把整份長清單硬切三段
   var secs=[];
-  var addSec=function(title,rows){
+  var addSecF=function(title,rows){
     if(!rows||!rows.length)return;
     var list=[];rows.forEach(function(r){if(r.sec)list.push({sec:r.sec});else list.push({k:r.k,v:r.v,u:r.u||''});});
     secs.push({h:title,rows:list});
   };
-  addSec('① 擋土壁體（樁）',res.pile);
-  addSec('② 中柱（進場／退場／買斷）',(res.postRows||[]).concat(res.procRows||[]));
-  addSec('③ 圍令／支撐／配件／上下設備',res.main);
-  addSec('④ 施工構台／欄杆／安全設施',res.back);
-  addSec('⑤ 先行加工',res.pre);
+  addSecF('① 擋土壁體（樁）',res.pile);
+  addSecF('② 中柱（進場／退場／買斷）',(res.postRows||[]).concat(res.procRows||[]));
+  addSecF('③ 圍令／支撐／配件／上下設備',res.main);
+  addSecF('④ 施工構台／欄杆／安全設施',res.back);
+  addSecF('⑤ 先行加工',res.pre);
   var cell=function(c){
     if(!c)return '<td class="e"></td><td class="e"></td><td class="e"></td>';
     if(c.sec)return '<td colspan="3" class="sec">'+esc(c.sec)+'</td>';
@@ -9636,7 +9636,7 @@ function matEstRopePDF(){
     +'<div class="cond">公式：每層母索＝該層圍令長度（周圍）＋縱橫支撐路總長 − 構台下方母索（僅第一層扣除）；每層路數＝縱橫路數＋周圍 1 路；需求長度＝Σ(每層母索＋路數×每路端部預留)；折捲＝需求長度÷每捲長度（無條件進位）。</div>';
   _toolPrint('安全母索用量表',(q&&q.name)||'',body,{fname:_toolFileName('matest','安全母索用量表',(q&&q.name)||'')});
 }
-function matEstCalc(){
+function _matEstCalcCore(){
   if(!MAT_EST)MAT_EST=_shDefaults();
   var res=computeShoringFY(MAT_EST);
   window._matEstRes=res;
@@ -9707,7 +9707,7 @@ function matEstCalc(){
   el.innerHTML=h;
   el.scrollIntoView({behavior:'smooth',block:'start'});
 }
-function matEstSave(){
+function _matEstSaveCore(){
   var qid=window._matEstQid;
   if(!qid){toast('請先在上方選擇要綁定的工程專案');return;}
   var q=Q.find(function(x){return x.id===qid;});
@@ -10727,12 +10727,12 @@ function _verBanner(){
   }catch(e){_err('_verBanner',e);}
 }
 function _minVerWatch(cb){   // cb：第一次讀到（或讀不到、3 秒逾時）後才做登入同步，避免舊版裝置趁空檔先推一次
-  var done=false,go=function(){_MIN_PENDING=false;if(done)return;done=true;if(cb)try{cb();}catch(e){_err('_minVerWatch.cb',e);}};
-  try{if(!_fbDb){go();return;}
-    if(_minVerWatch._ref){go();return;}
-    var ref=_fbDb.ref('fydata/minVer');_minVerWatch._ref=ref;_MIN_PENDING=true;setTimeout(go,3000);
-    ref.on('value',function(sn){var v=sn.val();if(typeof v==='string')v=v.replace(/["'\s]/g,'');_MIN_VER=(typeof v==='string'&&_verNum(v))?v:'';_verBanner();go();},function(err){console.warn('[版本] 讀不到最低版本（規則未發布屬正常）',err&&err.message);_minVerWatch._ref=null;go();});   // 主控台手動輸入常多一組引號 → 先去掉
-  }catch(e){_err('_minVerWatch',e);go();}
+  var done=false,goOnce=function(){_MIN_PENDING=false;if(done)return;done=true;if(cb)try{cb();}catch(e){_err('_minVerWatch.cb',e);}};
+  try{if(!_fbDb){goOnce();return;}
+    if(_minVerWatch._ref){goOnce();return;}
+    var ref=_fbDb.ref('fydata/minVer');_minVerWatch._ref=ref;_MIN_PENDING=true;setTimeout(goOnce,3000);
+    ref.on('value',function(sn){var v=sn.val();if(typeof v==='string')v=v.replace(/["'\s]/g,'');_MIN_VER=(typeof v==='string'&&_verNum(v))?v:'';_verBanner();goOnce();},function(err){console.warn('[版本] 讀不到最低版本（規則未發布屬正常）',err&&err.message);_minVerWatch._ref=null;goOnce();});   // 主控台手動輸入常多一組引號 → 先去掉
+  }catch(e){_err('_minVerWatch',e);goOnce();}
 }
 function _minVerOff(){try{if(_minVerWatch._ref)_minVerWatch._ref.off();}catch(e){_err('_minVerOff',e);}_minVerWatch._ref=null;_MIN_PENDING=false;_MIN_VER='';_verBanner();}   // 登出：下次登入重新讀
 function _pushCloud(opts){
@@ -21945,7 +21945,7 @@ function releaseSubRet(cid){
   },false);
 }
 // ── 分包管理總表 ──
-function buildSubMgmtHtml(q){
+function _buildSubMgmtHtmlCore(q){
   if(!q)return '<div style="padding:20px;text-align:center;color:var(--b3);font-size:12px">請先開啟專案</div>';
   var subs=(q.costs||[]).filter(function(c){return c.type==='sub'&&!c.mergedInto;});
   var K={total:0,billed:0,paid:0,unpaid:0,ret:0};
@@ -23102,7 +23102,7 @@ function _drvCond(f){
   if(f.kw)c.push('關鍵字：'+f.kw);
   return c.join('；');
 }
-function drExportPDF(){
+function _drExportPDFCore(){
   const q=Q.find(x=>x.id===_drvQid);if(!q)return;
   const f=_drvFilter(),logs=_drFilterLogs(q,f);
   if(!logs.length){toast('沒有可匯出的日報');return;}
@@ -25616,7 +25616,7 @@ function newPayable(){
   document.getElementById('payable-modal').style.display='flex';
 }
 
-function editPayable(id){
+function _editPayableCore(id){
   const p=PAYABLES.find(x=>x.id===id);if(!p)return;
   document.getElementById('payable-edit-id').value=id;
   document.getElementById('payable-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 編輯付款記錄';
@@ -25757,7 +25757,7 @@ function calcPayableAmt(){
 }
 
 
-function delPayable(id){
+function _delPayableCore(id){
   var _p0=PAYABLES.find(x=>x.id===id);if(_p0&&_payPaidHard(_p0)){toast('這筆已付款，不能刪除；確定要刪請先改回未付');return;}   // 批次 G3（Lotion 10/22：已付應付不改寫不刪）
   showConfirm('刪除付款記錄','確定刪除此付款記錄？',()=>{
     _tomb('payables',id); // 確認後才立墓碑，按取消不會誤刪
@@ -25924,7 +25924,7 @@ function toggleProjClosed(qid,close){
     toast('已恢復進行中：'+(q.name||''));
   }
 }
-function renderProjects(){
+function _renderProjectsCore(){
   if(window._showClosed===undefined)window._showClosed=localStorage.getItem('fy_show_closed')==='1';
   const box=document.getElementById('projects-list');if(!box)return;
   // 以主報價單為專案（追加合約併入父案）
@@ -26307,7 +26307,7 @@ function _payFilesRow(p){
 }
 function _payEff(p){var a=parseFloat(p.amount)||0;if(p.vat!==false&&p.incl!=null&&isFinite(+p.incl))return Math.round(+p.incl);return p.vat===false?Math.round(a):Math.round(a*_taxM());}   // 批次 G3：有抵扣預付款的期別存含稅應付 p.incl   // v5.318 不再寫死 1.05
 function _payVatAmt(p){return _payEff(p)-Math.round(parseFloat(p.amount)||0);}
-function togglePayVat(pid,on){
+function _togglePayVatCore(pid,on){
   var p=PAYABLES.find(x=>x.id===pid);if(!p)return;
   p.vat=!!on;_touch(p);
   try{savePayables();}catch(e){_err('togglePayVat',e);}
@@ -26971,7 +26971,7 @@ function _retRetSplitTxt(R){
   return '含稅'+(rowAmt>0?('；另開發票部分 '+_retTaxSplit(rowAmt)):'')+(holdAmt>0?('；當場扣款 '+fmt(Math.round(holdAmt))+'（當期發票已開，不另拆）'):'');
 }
 function _retTaxSplit(x){var t=Math.round(parseFloat(x)||0),u=Math.round(t/_taxM());return '未稅 '+fmt(u)+'｜稅 '+fmt(t-u);}
-function renderRetention(){
+function _renderRetentionCore(){
   var el=document.getElementById('finance-retention-list');if(!el)return;
   var rows=_retentionRows();
   if(!rows.length){el.innerHTML='<div class="empty"><p>目前沒有任何保留款記錄</p><p style="font-size:12px;color:var(--b4)">請款單勾選「保留款」或收款時填「業主保留款」後會出現在這裡</p></div>';return;}
@@ -32400,7 +32400,7 @@ function pjInvPaidToggle(qid){
   window._pjInvPaidOpen=window._pjInvPaidOpen||{};window._pjInvPaidOpen[qid]=!window._pjInvPaidOpen[qid];
   try{var q=Q.find(function(x){return x.id===qid;});var b=document.getElementById('pj-body-inv');if(q&&b)b.innerHTML=_pjInvHtml(q,_pjStat(q));}catch(e){_err('pjInvPaidToggle',e);}
 }
-function _pjInvHtml(q,st){
+function _pjInvHtmlCore(q,st){
   var openPaid=!!(window._pjInvPaidOpen&&window._pjInvPaidOpen[q.id]);
   var settled=st.invs.filter(_pjInvSettled);
   var shown=openPaid?st.invs:st.invs.filter(function(v){return !_pjInvSettled(v);});
@@ -32924,7 +32924,7 @@ function _acctTabsHtml(){
 // 分頁切換；noRender＝只同步外觀（switchFinanceTab 已經渲染過）
 // switchFinanceTab 仍被各處呼叫（go('finance') 後切分頁）→ 同步帳務分頁外觀
 // ══════════ v6 股東報表（報表中心分頁 shareholder）：年度損益、各案損益、財務狀況、分潤、業務 ══════════
-function _shRptYear(year){
+function _shRptYearCore(year){
   var Y=String(year),tm=_taxM();
   var revTax=0,ret=0;INV.forEach(function(v){if((v.date||'').slice(0,4)!==Y)return;revTax+=((v.totals&&parseFloat(v.totals.total))||0);ret+=_invRetention(v);});
   var recv=INV.reduce(function(a,i){return a+_invRcvIn(i,Y);},0);
@@ -33202,7 +33202,7 @@ function _rptCashYear(year){
   var paid=PAYABLES.filter(function(p){return p.status==='paid'&&String(p.paidDate||p.date||'').slice(0,4)===Y;}).reduce(function(a,p){return a+_payEff(p);},0);
   return {recv:Math.round(recv),paid:Math.round(paid),net:Math.round(recv-paid)};
 }
-function _rptBasisStrip(year){
+function _rptBasisStripCore(year){
   var d=null,c=null;try{d=_shRptYear(year);}catch(e){_err('_rptBasisStrip',e);}try{c=_rptCashYear(year);}catch(e){_err('_rptBasisStrip',e);}
   if(!d)return '';
   var pct=function(v){return (Math.round(v*10)/10)+'%';};
@@ -34181,8 +34181,7 @@ function _m6TransPlan(q){
 }
 // 預付款金額改小後，各期抵扣不可超過預付總額（由最後一期往前扣回）
 // 舊版卡片頁已移除：上傳合約檔／確認單後改重繪工程專案
-var _pj626RP=renderProjects;
-renderProjects=function(){try{_pj626RP.apply(this,arguments);}catch(e){_err('renderProjects',e);}try{var pg=document.querySelector('.page.active');if(pg&&pg.id==='page-proj')renderProj();}catch(e){_err('renderProjects.proj',e);}};
+function renderProjects(){try{_renderProjectsCore.apply(this,arguments);}catch(e){_err('renderProjects',e);}try{var pg=document.querySelector('.page.active');if(pg&&pg.id==='page-proj')renderProj();}catch(e){_err('renderProjects.proj',e);}};
 
 // ══════════ v6.0.27 階段完工＝實作數量；施工成本頁精簡（分區、材料租賃卡唯讀、常用改下拉）══════════
 // ── 階段完工日報（打設／裝設完成；拔除／拆除完成）→ 該工項的現場實作數量＝日報累計；合約數量不動 ──
@@ -34711,10 +34710,8 @@ function pjDeductSet(qid,k,v){
     if(k==='ret')_retWarn(v);
   });
 }
-var _pjInvHtml0=_pjInvHtml;
-_pjInvHtml=function(q,st){var h='';try{h=_pjDeductHtml(q)+_pjOwnerPayHtml(q);}catch(e){_err('_pjDeductHtml',e);}return h+_pjInvHtml0.apply(this,arguments);};
-var _buildInvFromQuote0=buildInvFromQuote;
-buildInvFromQuote=function(q){var inv=_buildInvFromQuote0.apply(this,arguments);try{inv.recvRule=1;var d=_pjDeduct(q);if(d.ret!=null){inv.retention=d.ret>0;inv.retentionPct=d.ret;}if(d.clean>0){inv.cleanPermil=d.clean;inv.cleanMode=d.cleanMode;}}catch(e){_err('buildInvFromQuote.deduct',e);}return inv;};
+function _pjInvHtml(q,st){var h='';try{h=_pjDeductHtml(q)+_pjOwnerPayHtml(q);}catch(e){_err('_pjDeductHtml',e);}return h+_pjInvHtmlCore.apply(this,arguments);};
+function buildInvFromQuote(q){var inv=_buildInvFromQuoteCore.apply(this,arguments);try{inv.recvRule=1;var d=_pjDeduct(q);if(d.ret!=null){inv.retention=d.ret>0;inv.retentionPct=d.ret;}if(d.clean>0){inv.cleanPermil=d.clean;inv.cleanMode=d.cleanMode;}}catch(e){_err('buildInvFromQuote.deduct',e);}return inv;};
 // ── 2 收款折讓：原發票號碼、折讓金額（未稅＋稅額）、折讓單日期、原因 → inv.allow；折讓證明單 PDF ──
 function _invAllowAmt(inv){return (inv&&inv.allow)?(parseFloat(inv.allow.amt)||0):0;}
 function _invOffset(inv){
@@ -34752,7 +34749,7 @@ function printAllowance(invId){
   _toolPrint('營業人銷貨退回進貨退出或折讓證明單',inv.project||'',body,{fname:'折讓證明單_'+(inv.project||'')+'_第'+(inv.periodNo||'')+'期'});
 }
 // 清潔費「業主開發票給我方」：收款結清時自動成為公司費用（進項），同一張單只建一筆
-function _cleanExpenseSync(inv){
+function _cleanExpenseSyncCore(inv){
   if(!inv)return;var id='E_clean_'+inv.id,t=inv.totals||{},clean=Math.round(t.clean||0),gross=Math.round(t.cleanGross||0);
   var i=-1;(EXPENSES||[]).forEach(function(e,k){if(e&&e.id===id&&i<0)i=k;});
   var want=inv.cleanMode!=='allow'&&clean>0&&!!(inv.receivedConfirmed||inv.partialConfirmed);
@@ -34765,9 +34762,8 @@ function _cleanExpenseSync(inv){
   try{saveExpenses();}catch(err){_err('_cleanExpenseSync',err);}
 }
 // ── 3 保留款廠商端：帳務 › 保留款 加「我方押廠商的保留款」──
-var _renderRetention0=renderRetention;
-renderRetention=function(){
-  _renderRetention0.apply(this,arguments);
+function renderRetention(){
+  _renderRetentionCore.apply(this,arguments);
   var el=document.getElementById('finance-retention-list');if(!el)return;
   var rows=[];
   (Q||[]).forEach(function(q){(q.costs||[]).forEach(function(c){if(!c||c.type!=='sub'||c.isIntro)return;var s;try{s=_subStat(c);}catch(e){return;}if(!(s.ret>0||s.released>0))return;rows.push({q:q,c:c,s:s});});});
@@ -34894,12 +34890,12 @@ function _qiFromFiles(files,ext,meta){
   var draft={name:meta.name,size:meta.size,kind:ext,b64:meta.b64,sheet:map.sheet||'',cols:map.cols,colL:map.colL||{},maxRow:map.maxRow||0,totals:map.totals.map(function(t){return {key:t.key,kind:t.kind,amtRef:t.amtRef};}),terms:map.terms,head:map.head,rows:map.items.map(function(it){return {key:it.key,sec:!!it.sec,priceRef:it.priceRef||null,amtRef:it.amtRef||null,noteRef:it.noteRef||null};}),ts:Date.now()};
   _qiPreview(map,draft);return map;
 }
-function _qiPreview(map,draft){
+function _qiPreviewCore(map,draft,note){   // note：PDF 匯入時加在預覽最上面的說明（2a 由包裝併入）
   var list=map.items.map(function(it){return '<tr style="border-bottom:1px solid var(--b1)'+(it.sec?';background:var(--b0);font-weight:700':'')+'"><td style="padding:3px 6px">'+esc(it.desc)+'</td><td style="padding:3px 6px;text-align:center">'+esc(it.unit||'')+'</td><td style="padding:3px 6px;text-align:right">'+(it.qty===''?'':_rfmt(it.qty))+'</td><td style="padding:3px 6px;text-align:right;color:var(--b4)">'+(it.price===''?'':_rfmt(it.price))+'</td></tr>';}).join('');
   var html='<div style="font-size:12px;color:var(--b4);margin-bottom:6px">'+esc(draft.name)+'　讀到 <b>'+map.nItems+'</b> 個工項'+(map.terms.length?('、業主條款 '+map.terms.length+' 條'):'')+(map.totals.length?('、合計列 '+map.totals.length+' 列'):'')+'。工項接在目前報價的後面；條款唯讀保留，回填匯出時原檔格式不動。</div>'
     +'<div style="max-height:46vh;overflow:auto;border:1px solid var(--b1);border-radius:var(--r8)"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--gl)"><th style="padding:4px 6px;text-align:left">工項</th><th style="padding:4px 6px">單位</th><th style="padding:4px 6px;text-align:right">數量</th><th style="padding:4px 6px;text-align:right">原單價</th></tr></thead><tbody>'+list+'</tbody></table></div>'
     +(map.terms.length?('<details style="margin-top:8px;font-size:12px"><summary style="cursor:pointer;color:var(--g3);font-weight:700">業主條款（'+map.terms.length+'）</summary><div style="max-height:22vh;overflow:auto;color:var(--b5);line-height:1.6">'+map.terms.map(function(t){return '<div>'+esc(t)+'</div>';}).join('')+'</div></details>'):'');
-  showConfirm('匯入業主詢價單',html,function(){_qiApply(map,draft);},false,null,true);
+  showConfirm('匯入業主詢價單',(note||'')+html,function(){_qiApply(map,draft);},false,null,true);
 }
 function _qiApply(map,draft){
   if(typeof items==='undefined'||!Array.isArray(items))return;
@@ -34921,10 +34917,8 @@ function _qiPanelRender(doc){
     +'</div>';
 }
 function quoteOwnerDocRemove(){var q=Q.find(function(x){return x.id===eid;});_qOwnerDraft=null;if(q&&q.ownerDoc){delete q.ownerDoc;_touch(q);try{persist();}catch(e){_err('quoteOwnerDocRemove',e);}}(items||[]).forEach(function(it){if(it)delete it.oKey;});_qiPanelRender(null);toast('已移除與業主檔的連結（工項保留）');}
-var _saveQ632=saveQ;
-saveQ=function(){var r=_saveQ632.apply(this,arguments);try{if(_qOwnerDraft&&eid){var q=Q.find(function(x){return x.id===eid;});if(q){q.ownerDoc=_qOwnerDraft;_qOwnerDraft=null;_touch(q);persist();}}}catch(e){_err('saveQ.ownerDoc',e);}return r;};
-var _loadQ632=loadQ;
-loadQ=function(id){var r=_loadQ632.apply(this,arguments);try{var q=Q.find(function(x){return x.id===id;});_qOwnerDraft=null;_qiPanelRender(q&&q.ownerDoc?q.ownerDoc:null);}catch(e){_err('loadQ',e);}return r;};
+function saveQ(){var r=_saveQCore.apply(this,arguments);try{if(_qOwnerDraft&&eid){var q=Q.find(function(x){return x.id===eid;});if(q){q.ownerDoc=_qOwnerDraft;_qOwnerDraft=null;_touch(q);persist();}}}catch(e){_err('saveQ.ownerDoc',e);}return r;};
+function loadQ(id){var r=_loadQCore.apply(this,arguments);try{var q=Q.find(function(x){return x.id===id;});_qOwnerDraft=null;_qiPanelRender(q&&q.ownerDoc?q.ownerDoc:null);}catch(e){_err('loadQ',e);}return r;};
 function _qiWrites(doc,its){
   var w=[],sub=0;
   its.forEach(function(it){if(!it||it.sec||it.oKey==null)return;var row=(doc.rows||[]).find(function(r){return r.key===it.oKey&&!r.sec;});if(!row)return;var q=parseFloat(it.qty)||0,p=parseFloat(it.price)||0,a=Math.round(q*p);sub+=a;
@@ -34935,7 +34929,7 @@ function _qiWrites(doc,its){
   (doc.totals||[]).forEach(function(t){var v=t.kind==='tax'?tax:(t.kind==='total'?tot:sub);if(t.amtRef!=null)w.push({ref:t.amtRef,value:v});else if(doc.kind==='xlsx'&&doc.cols.amt!=null&&doc.colL[doc.cols.amt]!=null)w.push({ref:doc.colL[doc.cols.amt]+t.key,value:v});});
   return {writes:w,sub:sub,tax:tax,tot:tot};
 }
-async function quoteExportOwnerDoc(){
+async function _quoteExportOwnerDocCore(){
   var q=Q.find(function(x){return x.id===eid;}),doc=_qOwnerDraft||(q&&q.ownerDoc);
   if(!doc){toast('這張報價沒有連結的業主詢價單');return;}
   var its=(typeof items!=='undefined'&&Array.isArray(items)&&items.length)?items:((q&&q.items)||[]);
@@ -35015,7 +35009,7 @@ function _m6CrossHtml(){
 
 // ══════════ v6.0.33 回饋修正：預付款可見與付款、同廠商一併付款、帳務分頁等寬、天氣與補登、月表單只留支出、PDF 逐頁高解析 ══════════
 // ── 1 工程專案：各筆預付款（日期／金額／已付或付款鈕）直接列在分包列下 ──
-function _pjAdvRowsHtml(c){
+function _pjAdvRowsHtmlCore(c){
   var as=_subAdvs(c);if(!as.length)return '';
   return '<div style="font-size:10.5px;margin-top:2px">'+as.map(function(a){var pid=_subAdvPayId(c.id,a),p=(PAYABLES||[]).find(function(x){return x.id===pid;}),paid=p&&p.status==='paid';
     return '<div style="display:flex;gap:4px;align-items:center;justify-content:flex-end;white-space:nowrap"><span style="color:var(--b4)">'+esc(a.date||'')+' 預付 '+fmt(Math.round(parseFloat(a.amt)||0))+(p&&p.vat!==false?'<span style="color:var(--b3)">（含稅 '+fmt(_payEff(p))+'）</span>':'')+'</span>'
@@ -35364,14 +35358,13 @@ try{setInterval(function(){try{_phFlush();}catch(e){_err('_photoMigrate',e);}},2
   document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{if(_phCanCloud()){_photoMigrate();_phFlush();}}catch(e){_err('photoMigrate',e);}},8000);});
 }catch(e){_err('_photoMigrate',e);}
 // 匯出 PDF 前先把參照照片取回（原函式同步組 HTML）
-var _drExportPDF0=drExportPDF;
-drExportPDF=function(){
+function drExportPDF(){
   var args=arguments,self=this;
   var q=Q.find(function(x){return x.id===_drvQid;});var refs=[];
   if(q)(q.dailyLogs||[]).forEach(function(L){(L&&L.photos||[]).forEach(function(p){if(_phIsRef(p))refs.push(p);});});
-  if(!refs.length)return _drExportPDF0.apply(self,args);
+  if(!refs.length)return _drExportPDFCore.apply(self,args);
   toast('取回照片中…');
-  return _photoPreload(refs).then(function(){return _drExportPDF0.apply(self,args);});
+  return _photoPreload(refs).then(function(){return _drExportPDFCore.apply(self,args);});
 };
 
 // ── ⑥ 工項索引重定位：加上詢價單工項 ──
@@ -35441,7 +35434,7 @@ function _costSummaryStrip(q,costs){
 }
 
 // ── ② 應付分組／類別 ──
-function _payIsCompany(p){return !!p&&(p.category==='salary'||p.category==='petty'||/^(pay_ps_|pay_ins_|pay_pc_)/.test(String(p.id||'')));}
+function _payIsCompanyCore(p){return !!p&&(p.category==='salary'||p.category==='petty'||/^(pay_ps_|pay_ins_|pay_pc_)/.test(String(p.id||'')));}
 function _payGroupName(p){return p.project||(_payIsCompany(p)?'公司支出（薪資／勞健保／零用金）':'（未指定工程）');}
 var _payCostTypeCache=null;
 function _payCatTxt(p,catMap){
@@ -35572,8 +35565,7 @@ function _subDupCardsHtml(q){
     +d.map(function(pr){return esc(pr[0].vendor||'')+'（'+esc(pr[0].date||'')+' 與 '+esc(pr[1].date||'')+'）';}).join('、')
     +'<div style="font-size:11px;color:var(--b4)">兩張卡都會各自產生應付，容易重複付款。確認後把多餘那張在「施工成本明細」刪除（已計價的先刪期別），或用「合併」併成一張。</div></div>';
 }
-var _buildSubMgmtHtml0=buildSubMgmtHtml;
-buildSubMgmtHtml=function(q){var h=_buildSubMgmtHtml0(q);if(q&&typeof h==='string')h=_subDupCardsHtml(q)+h;return h;};
+function buildSubMgmtHtml(q){var h=_buildSubMgmtHtmlCore(q);if(q&&typeof h==='string')h=_subDupCardsHtml(q)+h;return h;};
 
 // ── ④ 資料健檢加項 ──
 // v6.0.49 健檢＝本體＋兩段加項（原兩層包裝）
@@ -35616,7 +35608,7 @@ function _earlyToAdv(q,c){
   if(n){_touch(q);}
   return n;
 }
-function _advUnifyAll(){
+function _advUnifyAllCore(){
   var n=0;
   (Q||[]).forEach(function(q){(q&&q.costs||[]).forEach(function(c){try{var k=_earlyToAdv(q,c);if(k){n+=k;try{syncCostToPayable(q,c);}catch(e){_err('_advUnifyAll.sync',e);}}}catch(e){_err('_advUnifyAll',e);}});});
   if(n){try{persist();savePayables();_markDirty();}catch(e){_err('_advUnifyAll.save',e);}console.info('[FY] 提前放款併入預付款：'+n+' 筆');}
@@ -35777,8 +35769,7 @@ function _payFilesInline(p){
 
 // ══════════════ v6.0.40：工程專案分包列「重算抵扣」（v640.js 區塊；原本同區的一次性資料修正 _fixF25P1／_fixF25P1b 已於 v6.0.86 移除）═════════════
 // 工程專案分包列：預付款列尾加「重算抵扣」
-var _pjAdvRowsHtml640=_pjAdvRowsHtml;
-_pjAdvRowsHtml=function(c){var h=_pjAdvRowsHtml640(c);if(!h||!c||c.followOf)return h;return h.replace(/<\/div>$/,'<div style="text-align:right;margin-top:2px">'+_reallocBtn(c).replace('font-size:11px;padding:3px 10px','font-size:10.5px;padding:1px 8px')+'</div></div>');};
+function _pjAdvRowsHtml(c){var h=_pjAdvRowsHtmlCore(c);if(!h||!c||c.followOf)return h;return h.replace(/<\/div>$/,'<div style="text-align:right;margin-top:2px">'+_reallocBtn(c).replace('font-size:11px;padding:3px 10px','font-size:10.5px;padding:1px 8px')+'</div></div>');};
 
 
 // ══════════════ v6.0.42：自動產生的應付一律唯讀（v642.js 區塊）══════════════
@@ -35793,7 +35784,7 @@ function _subExpectedPayIds(c){
   (PAYABLES||[]).forEach(function(p){if(p&&p.deltaOf&&exp[p.deltaOf]&&p.costId===c.id)exp[p.id]=exp[p.deltaOf]+'（已付後差額）';});   // 健檢1 #13
   return exp;
 }
-function _paySource(p){
+function _paySourceCore(p){
   if(!p)return {auto:false};
   var id=String(p.id||'');
   var acct=function(t){return "go('acct');setTimeout(function(){acctTab('"+t+"');},200)";};
@@ -35835,10 +35826,10 @@ function cleanDuplicatePayables(){
   if(n){var set=new Set(keep);PAYABLES=PAYABLES.filter(function(p){return set.has(p);});savePayables();}
   return n;
 }
-var _delPayable642=delPayable,_editPayable642=editPayable,_togglePayVat642=togglePayVat;
-delPayable=function(id){var p=(PAYABLES||[]).find(function(x){return x&&x.id===id;});var s=_paySource(p);if(s.auto){toast('這筆由「'+s.label+'」自動產生，請到來源修改或刪除');return;}return _delPayable642.apply(this,arguments);};
-editPayable=function(id){var p=(PAYABLES||[]).find(function(x){return x&&x.id===id;});var s=_paySource(p);if(s.auto){toast('這筆由「'+s.label+'」自動產生，請到來源修改');return;}return _editPayable642.apply(this,arguments);};
-togglePayVat=function(pid,on){var p=(PAYABLES||[]).find(function(x){return x&&x.id===pid;});var s=_paySource(p);if(s.auto){toast('稅別跟著來源的「開發票」設定，請到來源改');try{renderPayables();}catch(e){_err('togglePayVat',e);}return;}return _togglePayVat642.apply(this,arguments);};
+var _delPayableCore=delPayable,_editPayableCore=editPayable,_togglePayVatCore=togglePayVat;
+function delPayable(id){var p=(PAYABLES||[]).find(function(x){return x&&x.id===id;});var s=_paySource(p);if(s.auto){toast('這筆由「'+s.label+'」自動產生，請到來源修改或刪除');return;}return _delPayableCore.apply(this,arguments);};
+function editPayable(id){var p=(PAYABLES||[]).find(function(x){return x&&x.id===id;});var s=_paySource(p);if(s.auto){toast('這筆由「'+s.label+'」自動產生，請到來源修改');return;}return _editPayableCore.apply(this,arguments);};
+function togglePayVat(pid,on){var p=(PAYABLES||[]).find(function(x){return x&&x.id===pid;});var s=_paySource(p);if(s.auto){toast('稅別跟著來源的「開發票」設定，請到來源改');try{renderPayables();}catch(e){_err('togglePayVat',e);}return;}return _togglePayVatCore.apply(this,arguments);};
 
 
 // ══════════════ v6.0.43：預付款併入期別應付卡、材料流程優化、稅費科目（v643.js 區塊）══════════════
@@ -36188,15 +36179,11 @@ function expDel(id){
     saveExpenses();renderLedger();
   },true);
 }
-var _paySource0_643=_paySource;
-_paySource=function(p){if(p&&/^pay_tax_/.test(String(p.id||'')))return {auto:true,label:'費用．發票（稅費）',go:"go('acct');setTimeout(function(){acctTab('inv');},200)"};return _paySource0_643.apply(this,arguments);};
-var _payIsCompany0_643=_payIsCompany;
-_payIsCompany=function(p){return _payIsCompany0_643(p)||!!(p&&/^pay_tax_/.test(String(p.id||'')));};
+function _paySource(p){if(p&&/^pay_tax_/.test(String(p.id||'')))return {auto:true,label:'費用．發票（稅費）',go:"go('acct');setTimeout(function(){acctTab('inv');},200)"};return _paySourceCore.apply(this,arguments);};
+function _payIsCompany(p){return _payIsCompanyCore(p)||!!(p&&/^pay_tax_/.test(String(p.id||'')));};
 // 報表：營業稅代收代付不計費用；營所稅列稅後
-var _shRptYear0_643=_shRptYear;
-_shRptYear=function(year){var d=_shRptYear0_643.apply(this,arguments);try{var vat=Math.round(d.expByCat['營業稅']||0),inc=Math.round(d.expByCat['營所稅']||0);d.vat=vat;d.inctax=inc;if(vat||inc){d.exp-=vat+inc;d.pretax+=vat+inc;d.netR=d.revNet>0?d.pretax/d.revNet*100:0;}d.afterTax=d.pretax-inc;}catch(e){_err('_shRptYear.tax',e);}return d;};
-var _rptBasisStrip0_643=_rptBasisStrip;
-_rptBasisStrip=function(year){var h=_rptBasisStrip0_643.apply(this,arguments);try{var d=_shRptYear(year);if(d&&(d.vat||d.inctax))h+='<div style="padding:4px 14px 0;font-size:11px;color:var(--b4)">'+(d.vat?('營業稅（代收代付，不計費用）NT$ '+fmt(d.vat)+'　'):'')+(d.inctax?('營所稅 NT$ '+fmt(d.inctax)+' → 稅後淨利 <b>NT$ '+fmt(d.afterTax)+'</b>'):'')+'</div>';}catch(e){_err('_rptBasisStrip',e);}return h;};
+function _shRptYear(year){var d=_shRptYearCore.apply(this,arguments);try{var vat=Math.round(d.expByCat['營業稅']||0),inc=Math.round(d.expByCat['營所稅']||0);d.vat=vat;d.inctax=inc;if(vat||inc){d.exp-=vat+inc;d.pretax+=vat+inc;d.netR=d.revNet>0?d.pretax/d.revNet*100:0;}d.afterTax=d.pretax-inc;}catch(e){_err('_shRptYear.tax',e);}return d;};
+function _rptBasisStrip(year){var h=_rptBasisStripCore.apply(this,arguments);try{var d=_shRptYear(year);if(d&&(d.vat||d.inctax))h+='<div style="padding:4px 14px 0;font-size:11px;color:var(--b4)">'+(d.vat?('營業稅（代收代付，不計費用）NT$ '+fmt(d.vat)+'　'):'')+(d.inctax?('營所稅 NT$ '+fmt(d.inctax)+' → 稅後淨利 <b>NT$ '+fmt(d.afterTax)+'</b>'):'')+'</div>';}catch(e){_err('_rptBasisStrip',e);}return h;};
 
 
 // ══════════════ v6.0.44：匯入 PDF 詢價單、清潔費直接扣款、預付款應付自我修復（v644.js 區塊）══════════════
@@ -36249,18 +36236,15 @@ async function _qiStart(f){
     _qiFromFiles(files,ext,{name:f.name,size:f.size,b64:_u8b64(new Uint8Array(buf))});
   }catch(e){_err('_qiStart',e);toast('讀取失敗：'+(e.message||'').slice(0,80));}
 }
-var _qiPreview0_644=_qiPreview;
-_qiPreview=function(map,draft){
+function _qiPreview(map,draft){
   if(draft&&draft.kind==='pdf'){
     var note='<div style="font-size:12px;color:#b26a00;margin-bottom:6px">PDF 只讀進工項與條款；填完單價請用本公司報價單 PDF 回覆業主（PDF 無法回填）。欄位若對不準，請改用 Excel／Word 原檔。</div>';
-    var sc=window.showConfirm;window.showConfirm=function(t,h){var a=[].slice.call(arguments);a[1]=note+String(h||'');window.showConfirm=sc;return sc.apply(this,a);};
-    try{_qiPreview0_644(map,draft);}finally{window.showConfirm=sc;}
+    _qiPreviewCore(map,draft,note);   // 2a：原本暫時換掉 showConfirm 來加說明，改成直接傳給 Core
     return;
   }
-  return _qiPreview0_644.apply(this,arguments);
+  return _qiPreviewCore.apply(this,arguments);
 };
-var _quoteExportOwnerDoc0_644=quoteExportOwnerDoc;
-quoteExportOwnerDoc=function(){var q=Q.find(function(x){return x.id===eid;}),doc=_qOwnerDraft||(q&&q.ownerDoc);if(doc&&doc.kind==='pdf'){toast('PDF 詢價單無法回填，請用「預覽 → 匯出 PDF」出本公司報價單');return;}return _quoteExportOwnerDoc0_644.apply(this,arguments);};
+function quoteExportOwnerDoc(){var q=Q.find(function(x){return x.id===eid;}),doc=_qOwnerDraft||(q&&q.ownerDoc);if(doc&&doc.kind==='pdf'){toast('PDF 詢價單無法回填，請用「預覽 → 匯出 PDF」出本公司報價單');return;}return _quoteExportOwnerDocCore.apply(this,arguments);};
 
 // ── 2 清潔費：直接自請款扣除 ──
 function _pjDeduct(q){var d=(q&&q.deduct)||{};var cm=d.cleanMode==='allow'?'allow':(d.cleanMode==='exp'?'exp':'net');return {ret:d.ret!=null&&d.ret!==''?parseFloat(d.ret)||0:null,clean:parseFloat(d.clean)||0,cleanMode:cm};}
@@ -36279,8 +36263,7 @@ function _pjDeductHtml(q){
     +'<span style="color:var(--b4);font-size:11px">保留款與清潔費都直接列在請款單扣款列，總計＝扣除後金額</span>'
     +'</div>';
 }
-var _cleanExpenseSync0_644=_cleanExpenseSync;
-_cleanExpenseSync=function(inv){if(inv&&inv.cleanMode!=='exp'){var id='E_clean_'+inv.id,i=-1;(EXPENSES||[]).forEach(function(e,k){if(e&&e.id===id&&i<0)i=k;});if(i>=0){EXPENSES.splice(i,1);try{_tomb('expenses',id);}catch(e){_err('_cleanExpenseSync',e);}try{saveExpenses();}catch(e){_err('_cleanExpenseSync',e);}}return;}return _cleanExpenseSync0_644.apply(this,arguments);};
+function _cleanExpenseSync(inv){if(inv&&inv.cleanMode!=='exp'){var id='E_clean_'+inv.id,i=-1;(EXPENSES||[]).forEach(function(e,k){if(e&&e.id===id&&i<0)i=k;});if(i>=0){EXPENSES.splice(i,1);try{_tomb('expenses',id);}catch(e){_err('_cleanExpenseSync',e);}try{saveExpenses();}catch(e){_err('_cleanExpenseSync',e);}}return;}return _cleanExpenseSyncCore.apply(this,arguments);};
 // 請款單編輯器的清潔費處理下拉補上「直接扣除」
 try{(function(){var s=document.getElementById('inv-clean-mode');if(s&&![].some.call(s.options,function(o){return o.value==='net';})){s.insertAdjacentHTML('afterbegin','<option value="net">直接扣除（發票開扣後金額）</option>');}})();}catch(e){_err('_cleanExpenseSync',e);}
 
@@ -36333,8 +36316,7 @@ function _advPayHealAll(){
   if(n){try{savePayables();persist();_markDirty();}catch(e){_err('_advPayHealAll',e);}console.info('[FY] 應付自我修復：'+n+' 筆');}
   return n;
 }
-var _advUnifyAll0_644=_advUnifyAll;
-_advUnifyAll=function(){var n=_advUnifyAll0_644.apply(this,arguments);try{n+=_advPayHealAll();}catch(e){_err('_advUnifyAll.heal',e);}return n;};
+function _advUnifyAll(){var n=_advUnifyAllCore.apply(this,arguments);try{n+=_advPayHealAll();}catch(e){_err('_advUnifyAll.heal',e);}return n;};
 function _advPayFix(qid,cid){
   var q=Q.find(function(x){return x.id===qid;});if(!q)return;var c=(q.costs||[]).find(function(x){return x.id===cid;});if(!c)return;
   var n=0;try{n=_advPayHeal(q,c);_healBusy=true;syncCostToPayable(q,c);_healBusy=false;savePayables();persist();_immediateUpload();}catch(e){_healBusy=false;_err('_advPayFix',e);}
@@ -36357,8 +36339,7 @@ function _payAdvInfo(p){
 
 // ══════════════ v6.0.45：預覽頁「返回」回到上一頁（不走瀏覽器歷史）（v645.js 區塊）══════════════
 // 本系統是單頁應用、換頁不寫瀏覽器歷史，預覽頁按 history.back() 會離開整個網站。改記上一個頁面 id。
-var _go0_645=go;
-go=function(p){try{var cur=document.querySelector('.page.active');if(cur&&cur.id){var id=cur.id.replace(/^page-/,'');if(id!==p)window._goPrev=id;}}catch(e){_err('go',e);}return _go0_645.apply(this,arguments);};
+function go(p){try{var cur=document.querySelector('.page.active');if(cur&&cur.id){var id=cur.id.replace(/^page-/,'');if(id!==p)window._goPrev=id;}}catch(e){_err('go',e);}return _goCore.apply(this,arguments);};
 function _prevBack(def){
   var p=window._goPrev;
   if(p&&p!=='preview'&&p!=='invoice-prev'&&document.getElementById('page-'+p))return go(p);
@@ -36527,8 +36508,7 @@ function _matEstNoSiteHint(){
   return '<div style="border:1px solid #ffcc80;background:#fff8e1;border-radius:var(--r8);padding:9px 12px;margin:10px 0;font-size:12.5px;line-height:1.7">此工程還沒有案場細節。可以直接在下方輸入圖面數量，按「存入專案」時系統會用這些數量建立案場細節，之後改數量請到案場細節。'
     +' <button type="button" class="btn btn-xs" onclick="openSiteDet(\''+id+'\')" style="margin-left:4px">改到案場細節填</button></div>';
 }
-var _matEstSave0_648=matEstSave;
-matEstSave=function(){var r=_matEstSave0_648.apply(this,arguments);try{var q=Q.find(function(x){return x.id===window._matEstQid;});if(q&&_sdEnsure(q)){toast('已存入專案，並用這些數量建立案場細節');renderMatEst();}}catch(e){_err('matEstSave.site',e);}return r;};
+function matEstSave(){var r=_matEstSaveCore.apply(this,arguments);try{var q=Q.find(function(x){return x.id===window._matEstQid;});if(q&&_sdEnsure(q)){toast('已存入專案，並用這些數量建立案場細節');renderMatEst();}}catch(e){_err('matEstSave.site',e);}return r;};
 function _matEstLoadFor(q){MAT_EST=(q&&q.matEst&&q.matEst.inputs)?_matEstNorm(JSON.parse(JSON.stringify(q.matEst.inputs))):_shDefaults();window._matEstRes=null;}
 function matEstPickProj(qid){
   window._matEstQid=qid||'';
@@ -36569,8 +36549,7 @@ function _sdMatEstLayerHtml(q,m,sec,fS,fN){
     +((rv&&!(_shNum(rv.rl)>0))||(rh&&!(_shNum(rh.rl)>0))?'<span style="color:var(--red)">　有路數但沒填每路長，請到案場細節補上</span>':'')+'</div>';
   return h;
 }
-var _matEstCalc0_648=matEstCalc;
-matEstCalc=function(){try{var q=_matEstSiteQ();if(q){MAT_EST=_matEstNorm(MAT_EST);_sdToMatEst(_sdNorm(q.site),MAT_EST);}}catch(e){_err('matEstCalc.site',e);}return _matEstCalc0_648.apply(this,arguments);};
+function matEstCalc(){try{var q=_matEstSiteQ();if(q){MAT_EST=_matEstNorm(MAT_EST);_sdToMatEst(_sdNorm(q.site),MAT_EST);}}catch(e){_err('matEstCalc.site',e);}return _matEstCalcCore.apply(this,arguments);};
 
 // ══════════ v6.0.85 付款帳本 PAID_LOG：已付狀態的最後防線 ══════════
 // 問題：自動應付（分包期別／預付款／薪資／抽成）每台裝置都會依「本機舊狀態」重建；舊裝置在同步完成前重建、或本機記錄一時不在，
@@ -38085,7 +38064,7 @@ function storageClaimsSync(){
 }
 function openStorageRulesGen(){
   if(!_isRulesOwner()&&!(_fbUser&&isAdmin(_fbUser.email))){toast('只有管理員可產生');return;}
-  var go=function(){
+  var doGen=function(){
     var L=_storageRulesLists();if(!L){toast('讀不到唯讀名冊（請確認已登入、已發布新版資料庫規則），暫不產生');return;}
     var txt=_storageRulesText(L.staff,L.readers);
     window._stRulesTxt=txt;
@@ -38094,8 +38073,8 @@ function openStorageRulesGen(){
       +'<textarea readonly style="width:100%;height:260px;font-family:monospace;font-size:11px;box-sizing:border-box">'+esc(txt)+'</textarea>'
       +'<div style="margin-top:6px"><button type="button" class="btn btn-xs btn-g" onclick="_dlTextCopy(window._stRulesTxt)">複製全文</button></div>',function(){},false,null,true);
   };
-  if(_readersCache===null&&_fbUser&&_fbDb){_fbDb.ref('fydata/readers').once('value').then(function(s){_readersCache=s.val()||{};go();}).catch(function(e){_err('openStorageRulesGen',e);go();});}
-  else go();
+  if(_readersCache===null&&_fbUser&&_fbDb){_fbDb.ref('fydata/readers').once('value').then(function(s){_readersCache=s.val()||{};doGen();}).catch(function(e){_err('openStorageRulesGen',e);doGen();});}
+  else doGen();
 }
 function _dlTextCopy(t){var done=function(){toast('已複製');};var fb=function(){try{var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();done();}catch(e){_err('_dlTextCopy',e);toast('複製失敗，請手動選取');}};
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(done,fb);else fb();}
