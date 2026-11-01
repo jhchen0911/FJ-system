@@ -38953,7 +38953,6 @@ function _lineDraftApply(d,close){
     +'<div style="font-size:11px;color:var(--b4);margin-top:6px">照片 '+photos.length+' 張會掛在這筆日報（LINE 照片）。這天已經有日報時，會先問你要合併還是取消。</div>',function(){
       var t=(gv('ld-txt')||'').trim(),dt=gv('ld-date')||'';
       if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){toast('請選日報日期');return false;}
-      if(dt>localToday()){toast('日報日期不能是未來');return false;}
       if(!Array.isArray(q.dailyLogs))q.dailyLogs=[];
       var ex=_ldExisting(q,dt);
       var write=function(){
