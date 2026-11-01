@@ -23,8 +23,10 @@ const DEFAULT_TEXTS = {
   remind: '昨天的施工日報還沒回，麻煩補一下三件事，謝謝。',
   alarm: '{site}工地群組出現「{word}」，請判斷是否停工。',
   noReply2: '{site}工地群組連兩天沒有回施工日報。',
-  dailyCo: '今天辛苦了，請照下面格式回報（一個工地一段，可以貼好幾段）：\n【工地】地名\n【今天】\n【明天】\n【問題】',
+  dailyCo: '今天辛苦了，請複製下面格式回報（一個工地一段，可以貼好幾段；補昨天的只改日期）：\n【日期】{date}\n【工地】\n【今天】\n【明天】\n【問題】',
 };
+// v6.0.119～121 的舊預設（沒有【日期】）：存過固定句子沒改這句的，當成新預設（v6.0.122）
+const OLD_DAILYCO = '今天辛苦了，請照下面格式回報（一個工地一段，可以貼好幾段）：\n【工地】地名\n【今天】\n【明天】\n【問題】';
 
 function verifySignature(secret, rawBody, signature) {
   if (!secret || !signature || rawBody == null) return false;
@@ -45,7 +47,7 @@ function addDays(ymd, n) {
 function fill(tpl, vars) {
   return String(tpl || '').replace(/\{(\w+)\}/g, (m, k) => (vars && vars[k] != null ? String(vars[k]) : ''));
 }
-function textsOf(cfg) { return Object.assign({}, DEFAULT_TEXTS, (cfg && cfg.texts) || {}); }
+function textsOf(cfg) { const T = Object.assign({}, DEFAULT_TEXTS, (cfg && cfg.texts) || {}); if (T.dailyCo === OLD_DAILYCO) T.dailyCo = DEFAULT_TEXTS.dailyCo; return T; }
 
 // 找到「沒被否定」的關鍵字：前 3 個字內有否定詞就跳過，同一句後面若再出現且沒被否定仍算
 function _hitNotNegated(t, word) {
@@ -357,7 +359,9 @@ async function dailyAsk(deps, now) {
   for (const gid of Object.keys(cfg.groups || {})) {
     const g = cfg.groups[gid]; if (!g || (!g.qid && g.mode !== 'company') || g.daily === false) continue;
     if (await deps.dbGet('fydata/lineDaily/' + gid + '/' + date + '/askedAt')) continue;   // 排程重跑：今天問過就不再問
-    if (!(await safePush(deps, gid, g.mode === 'company' ? T.dailyCo : T.daily3))) continue;   // 這個群組推不到（例如機器人被移出），其他群組照問
+    // 公司群範本帶入當天日期（{date}＝MM/DD），工務複製後改內容就好
+    const txt = g.mode === 'company' ? fill(T.dailyCo, { date: date.slice(5).replace('-', '/') }) : T.daily3;
+    if (!(await safePush(deps, gid, txt))) continue;   // 這個群組推不到（例如機器人被移出），其他群組照問
     await deps.dbSet('fydata/lineDaily/' + gid + '/' + date + '/askedAt', now || Date.now());
     n++;
   }

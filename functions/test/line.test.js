@@ -340,3 +340,34 @@ test('日期括號寫法（Lotion 11/1）：［］、[]、【】，後面接空�
   const c = ds.find(x => /進料/.test(x.payload.answers.join('')));
   assert.ok(c && c.payload.date === '2026-11-01' && !c.payload.backfill, '沒寫日期照送出時間');
 });
+
+// ── v6.0.122 範本第一行【日期】自動帶當天 ──
+test('v6.0.122 範本：17:30 發的格式第一行【日期】帶當天日期；舊預設自動換新', async () => {
+  const d = mkDeps(CO);
+  await core.dailyAsk(d, Date.parse('2026-11-01T09:30:00Z'));
+  assert.match(d.pushes[0].text, /\n【日期】11\/01\n【工地】\n【今天】\n【明天】\n【問題】$/);
+  const d2 = mkDeps(Object.assign({}, CO, { texts: { dailyCo: '今天辛苦了，請照下面格式回報（一個工地一段，可以貼好幾段）：\n【工地】地名\n【今天】\n【明天】\n【問題】' } }));
+  await core.dailyAsk(d2, Date.parse('2026-11-01T09:30:00Z'));
+  assert.match(d2.pushes[0].text, /【日期】11\/01/);
+});
+
+test('v6.0.122 解析：範本原樣、改成前一天、【日期】空白、工地全形／半形括號都對得到', async () => {
+  const R = '2026-11-01';
+  const S = { p1: { name: '（八九）中科台積電F25P1擋土支撐工程' }, p2: { name: '（八九）中科台積電F25P2擋土支撐工程' } };
+  const tpl = d => '今天辛苦了，請複製下面格式回報（一個工地一段，可以貼好幾段；補昨天的只改日期）：\n【日期】' + d + '\n【工地】（八九）中科台積電F25P2\n【今天】打設H300, L=10M*5支\n【明天】續打\n【問題】無';
+  let b = core.parseCoReport(tpl('11/01'), R);
+  assert.equal(b.length, 1); assert.equal(b[0].date, '2026-11-01'); assert.equal(core.matchSite(S, b[0].site), 'p2');   // 範本原樣（全形括號）
+  b = core.parseCoReport(tpl('10/31'), R);
+  assert.equal(b[0].date, '2026-10-31');                                                                               // 改成前一天
+  b = core.parseCoReport(tpl(''), R);
+  assert.equal(b[0].date, '');                                                                                         // 【日期】空白 → 照送出時間
+  b = core.parseCoReport('【日期】\n【工地】(八九) 中科台積電 F25P1\n【今天】進料', R);
+  assert.equal(b[0].date, ''); assert.equal(core.matchSite(S, b[0].site), 'p1');                                      // 半形括號
+  assert.deepEqual(core.parseCoReport('【日期】11/01\n【工地】\n【今天】\n【明天】\n【問題】', R), []);                // 範本沒填 → 不建草稿
+  // 實際流程：範本原樣送出 → 當天草稿、對到 F25P2
+  const d = mkDeps({ owners: {}, groups: { Gco: { mode: 'company', name: '豐有工程' } }, sites: S });
+  await core.handleEvents([{ type: 'message', timestamp: Date.parse('2026-11-01T04:26:00Z'), source: { type: 'group', groupId: 'Gco', userId: 'U' }, message: { id: 't1', type: 'text', text: tpl('11/01') } }], d);
+  await core.dailyCompile(d, Date.parse('2026-11-01T12:00:00Z'));
+  const x = Object.values(d.drafts).find(r => r.type === 'dailyLog');
+  assert.ok(x && x.payload.qid === 'p2' && x.payload.date === '2026-11-01' && !x.payload.backfill && !x.payload.unmatched);
+});
