@@ -247,3 +247,10 @@ test('公司群（審查）：處理中途失敗，LINE 重送時能重做（紀
   await core.handleEvents([ev], d);
   assert.ok(d.drafts.dlr1_0, '重送後追加草稿建立');
 });
+
+test('公司群（v6.0.120）：回報地名開頭寫（業主）也對得到；同業主兩案用案號分開', () => {
+  const S = { p1: { name: '（八九）中科台積電F25P1擋土支撐工程' }, p2: { name: '（八九）中科台積電F25P2擋土支撐工程' } };
+  assert.equal(core.matchSite(S, '(八九) 中科台積電 F25P2'), 'p2');
+  assert.equal(core.matchSite(S, '（八九）中科台積電F25P1'), 'p1');
+  assert.equal(core.matchSite(S, '(八九) 中科台積電'), '');   // 兩案都符合 → 待分類
+});

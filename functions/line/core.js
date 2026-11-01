@@ -102,9 +102,11 @@ function matchSite(sites, site) {
   // 先看手動對過的地名（keys 完全相同），再看名稱包含
   const exact = Object.keys(sites || {}).filter(qid => (Array.isArray((sites[qid] || {}).keys) ? sites[qid].keys : []).some(k => _nrmSite(k) === a));
   if (exact.length === 1) return exact[0];
+  // 回報開頭也常寫（業主），例「(八九) 中科台積電 F25P2」→ 比對名稱時一樣拿掉（v6.0.120）
+  const b = _nrmSite(String(site || '').replace(/^\s*[（(][^）)]*[）)]/, '')), key = b.length >= 2 ? b : a;
   const hits = Object.keys(sites || {}).filter(qid => {
     const s = sites[qid] || {}; const names = [String(s.name || '').replace(/^\s*[（(][^）)]*[）)]/, '')].concat(Array.isArray(s.keys) ? s.keys : []).map(_nrmSite).filter(n => n.length >= 2);   // 開頭（業主）不比對，免得寫業主名就對到
-    return names.some(n => n.indexOf(a) >= 0 || a.indexOf(n) >= 0);
+    return names.some(n => n.indexOf(key) >= 0 || key.indexOf(n) >= 0);
   });
   return hits.length === 1 ? hits[0] : '';
 }
