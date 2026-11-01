@@ -311,3 +311,32 @@ test('補傳日期（審查）：規格數字不當日期；西元／民國年�
   const x = Object.values(d.drafts).find(r => r.type === 'dailyLog');
   assert.ok(x && x.payload.date === '2026-11-01' && !x.payload.backfill && x.payload.dateBad[0] === '10/15 補' && /超過 7 天/.test(x.summary));
 });
+
+test('日期括號寫法（Lotion 11/1）：［］、[]、【】，後面接空白或內文都認；沒寫照送出時間；20:00 後才傳的當天日報歸當天', async () => {
+  const R = '2026-11-01';
+  assert.equal(core.parseMD('［10/31］', R), '2026-10-31');
+  assert.equal(core.parseMD('[10/31] 補', R), '2026-10-31');
+  assert.equal(core.parseMD('【10/31】打樁', R), '2026-10-31');
+  assert.equal(core.parseMD('[10/20]', R), '');                       // 超過 7 天
+  let b = core.parseCoReport('【10/31】\n【工地】興中路\n【今天】打樁', R);
+  assert.equal(b[0].date, '2026-10-31');
+  b = core.parseCoReport('[10/31]【工地】興中路\n【今天】打樁', R);
+  assert.equal(b[0].date, '2026-10-31');
+  b = core.parseCoReport('［11/1］ 【工地】興中路\n【今天】打樁', R);
+  assert.equal(b[0].date, '2026-11-01');
+  const d = mkDeps(CO);
+  const g = { type: 'group', groupId: 'Gco', userId: 'U' };
+  // 10/31 20:30（台北）才傳、寫了 10/31 → 當天 20:00 已整理過，隔天 08:00 補成草稿，日期 10/31、不算補傳
+  const late = Date.parse('2026-10-31T12:30:00Z');
+  await core.dailyCompile(d, Date.parse('2026-10-31T12:00:00Z'));
+  await core.handleEvents([{ type: 'message', timestamp: late, source: g, message: { id: 'n1', type: 'text', text: '[10/31]\n【工地】興中路\n【今天】晚上收尾' } }], d);
+  // 沒寫日期 → 照送出時間
+  await core.handleEvents([{ type: 'message', timestamp: Date.parse('2026-11-01T03:00:00Z'), source: g, message: { id: 'n2', type: 'text', text: '【工地】文化路\n【今天】進料' } }], d);
+  await core.morningCheck(d, Date.parse('2026-11-01T00:00:00Z'));
+  await core.dailyCompile(d, Date.parse('2026-11-01T12:00:00Z'));
+  const ds = Object.values(d.drafts).filter(x => x.type === 'dailyLog');
+  const a = ds.find(x => /晚上收尾/.test(x.payload.answers.join('')));
+  assert.ok(a && a.payload.date === '2026-10-31' && !a.payload.backfill, '20:00 後當天傳的歸當天');
+  const c = ds.find(x => /進料/.test(x.payload.answers.join('')));
+  assert.ok(c && c.payload.date === '2026-11-01' && !c.payload.backfill, '沒寫日期照送出時間');
+});

@@ -76,11 +76,13 @@ const CO_TAGS = { '工地': 'site', '今天': 'today', '明天': 'tomorrow', '�
 // 補傳日期（v6.0.121）：一行只寫日期才算，例「10/31」「10/31 補」「10月31日 補傳」「日期：10/31」「2026/10/31」「115/10/31」
 //   （審查：避免「H300 1/2」「3/4 吋」這類規格被當成日期）；只認收到當天往前 7 天內（含當天），跨年回推
 const DATE_LINE = /^(?:日期\s*[:：]?\s*)?(?:(\d{2,4})\s*[\/年.-]\s*)?(\d{1,2})\s*[\/月.-]\s*(\d{1,2})\s*日?\s*(?:[（(]?\s*(?:補傳|補報|補)\s*[）)]?)?$/;
+// 括號包起來的日期（Lotion 11/1）：「［10/31］」「[10/31]」「【10/31】」，後面接空白或直接接內文都算
+const DATE_BRACKET = /^[［\[【]\s*(?:(\d{2,4})\s*[\/年.-]\s*)?(\d{1,2})\s*[\/月.-]\s*(\d{1,2})\s*日?\s*(?:補傳|補報|補)?\s*[］\]】]/;
 // 回傳 {ymd, raw}：ymd＝採用的日期（'' 表示不採用）；raw＝有寫日期但超出範圍或不合法時的原文（給草稿提示）
 function parseDateLine(text, refYmd) {
   const lines = String(text || '').split('\n').map(l => l.trim()).filter(Boolean);
   for (const l of lines) {
-    const m = l.match(DATE_LINE); if (!m) continue;
+    const m = l.match(DATE_LINE) || l.match(DATE_BRACKET); if (!m) continue;
     const ymd = _mdToYmd(+m[2], +m[3], refYmd);
     return ymd ? { ymd, raw: '' } : { ymd: '', raw: l.slice(0, 20) };
   }
