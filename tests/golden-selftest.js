@@ -61,7 +61,13 @@ async function makeSnapshot(file) {
     INV.forEach(i => { if (q && i.quoteId === q.id) i.client = F.client; });
     const d = JSON.parse(JSON.stringify(_syncPayload().data));
     d.exportDate = new Date().toISOString();
-    d.hr = [{ id: 'hr1', name: F.person, salary: 50000 }];
+    d.hr = [{ id: 'hr1', name: F.person, h: { base: 50000 } }];
+    // 薪資單：去識別化會拿掉，股東報表 hr／稅前會變 → compare --deid 不比這幾欄
+    d.payslips = [{ id: 'ps_hr1_2026-09', hrId: 'hr1', ym: '2026-09', name: F.person, gross: 50000, coCost: 6000, status: 'paid' }];
+    d.petty = [{ id: 'pc1', date: '2026-09-10', amount: 800, note: F.person }];
+    // 系統哨兵值與品名不能被當成名字換掉（公司支出（自付）、成本列品名「租金」）
+    const q2 = d.quotes.find(x => x.awarded && x.costs) || d.quotes[0];
+    q2.costs = (q2.costs || []).concat([{ id: 'cSelf', type: 'own', vendor: '公司支出（自付）', name: '租金', amt: 3000, date: '2026-09-15' }]);
     return d;
   }, FAKE);
   await browser.close();
@@ -94,9 +100,13 @@ async function makeSnapshot(file) {
   const leak = [FAKE.client, FAKE.vendor, FAKE.person, '0912-345-678', FAKE.email, '12345678', '000123456789', '某市某路', '"salary"'].map((s, i) => dtxt.includes(s) ? i : -1).filter(i => i >= 0);
   check('假名字、電話、Email、統編、帳號、地址、薪資都不見', !!dtxt && !leak.length, leak.length ? '還在：第 ' + leak.map(i => i + 1).join('、') + ' 項' : '');
   check('業主代號保留「營造」字尾', /業主C\d{3}營造/.test(dtxt));
+  check('哨兵值「公司支出（自付）」與品名「租金」沒被換掉', dtxt.includes('公司支出（自付）') && dtxt.includes('"租金"'));
+  check('薪資、零用金清空', (() => { try { const j = JSON.parse(dtxt); return !j.payslips.length && !j.petty.length && !j.hr.length && !('admins' in j) && !('pagePerms' in j); } catch (e) { return false; } })());
   const deidOut = path.join(tmp, 'deid-out.json');
   const r3 = node([path.join(TOOLS, 'run.js'), '--snapshot', dfile, '--out', deidOut, '--root', ROOT]);
-  const r4 = r3.code === 0 ? node([path.join(TOOLS, 'compare.js'), base, deidOut]) : { code: 1, out: r3.out };
+  const r4 = r3.code === 0 ? node([path.join(TOOLS, 'compare.js'), base, deidOut, '--deid']) : { code: 1, out: r3.out };
+  const r4b = r3.code === 0 ? node([path.join(TOOLS, 'compare.js'), base, deidOut]) : { code: 0, out: '' };
+  check('拿掉薪資後，不加 --deid 會報股東報表差異（確認薪資真的有進年度數字）', r4b.code === 1 && /股東報表年度數字/.test(r4b.out), r4b.out.trim());
   check('去識別化後金額完全相同', r4.code === 0 && r4.out.trim() === '通過', r4.out.trim());
 
   // 反向驗證：請款列金額故意 +1 元，比對一定要報差異

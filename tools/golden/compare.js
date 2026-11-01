@@ -1,6 +1,7 @@
 // 真實黃金樣本 (b) 比對：基準結果 vs 這次結果。只印「通過」或「差異 N 筆＋欄位類別」，不印金額、不印 id 以外的東西。
 //
-//   node tools/golden/compare.js <基準.json> <這次.json> [--detail]
+//   node tools/golden/compare.js <基準.json> <這次.json> [--detail] [--deid]
+//   --deid 比對去識別化複本時用：股東報表年度裡跟薪資、零用金有關的欄位不比（複本拿掉了這兩項）
 //   node tools/golden/compare.js --selftest      反向驗證：故意改一個數字，一定要抓到「差異 1 筆」
 //
 //   --detail 只在 Lotion-HQ 本機看：多列出有差異的 id 與欄位名（仍不印金額），方便告訴 AI 是哪一類算法變了
@@ -15,10 +16,13 @@ const CAT = {
   pay: { eff: '應付每期金額', paid: '應付付款狀態', '*': '應付其他' },
   year: { '*': '股東報表年度數字' }
 };
+// 去識別化複本拿掉了薪資與零用金，股東報表年度裡受它們影響的欄位不比（compare.js --deid）
+const DEID_SKIP = { year: ['hr', 'pretax', 'cap', 'drawn'] };
 const catOf = (sec, f) => (CAT[sec] && (CAT[sec][f] || CAT[sec]['*'])) || sec;
 
-function compare(a, b) {
+function compare(a, b, skip) {
   const diffs = [];
+  skip = skip || {};
   Object.keys(CAT).forEach(sec => {
     const A = a[sec] || {}, B = b[sec] || {};
     new Set(Object.keys(A).concat(Object.keys(B))).forEach(id => {
@@ -26,6 +30,7 @@ function compare(a, b) {
       if (!(id in A)) { diffs.push({ sec, id, f: '(多出一筆)', cat: catOf(sec, '*') + '：多出一筆' }); return; }
       const x = A[id] || {}, y = B[id] || {};
       new Set(Object.keys(x).concat(Object.keys(y))).forEach(f => {
+        if ((skip[sec] || []).includes(f)) return;
         if (JSON.stringify(x[f]) !== JSON.stringify(y[f])) diffs.push({ sec, id, f, cat: catOf(sec, f) });
       });
     });
@@ -53,9 +58,16 @@ if (require.main === module) {
   }
   const files = args.filter(a => !a.startsWith('--'));
   if (files.length !== 2) { console.error('用法：node tools/golden/compare.js <基準.json> <這次.json> [--detail]'); process.exit(2); }
-  const [a, b] = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8')));
-  const diffs = compare(a, b);
+  let a, b;
+  try { [a, b] = files.map(f => JSON.parse(fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, ''))); } catch (e) { console.error('結果檔讀不到或不是有效的 JSON（不要用記事本另存，重新跑 run.js）'); process.exit(2); }
+  // 不能空過：任一邊有算到出錯的欄位、或筆數不同（快照沒載完整）都算不通過
+  const errN = JSON.stringify(a).split('"__err"').length - 1 + JSON.stringify(b).split('"__err"').length - 1;
+  if (errN) { console.log('不通過：結果裡有 ' + errN + ' 筆算到出錯'); process.exit(1); }
+  const ma = a.meta || {}, mb = b.meta || {};
+  if (['quotes', 'invoices', 'payables'].some(k => ma[k] !== mb[k])) { console.log('不通過：兩份結果不是同一份快照（報價／請款單／應付筆數不同）'); process.exit(1); }
+  if (!Object.keys(a.stat || {}).length) { console.log('不通過：基準沒有任何得標案，比對沒有意義'); process.exit(1); }
+  const diffs = compare(a, b, args.includes('--deid') ? DEID_SKIP : null);
   console.log(report(diffs, args.includes('--detail')));
   process.exit(diffs.length ? 1 : 0);
 }
-module.exports = { compare, report };
+module.exports = { compare, report, DEID_SKIP };

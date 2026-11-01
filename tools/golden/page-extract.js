@@ -8,6 +8,7 @@
   const out = { meta: { app: APP_VERSION, quotes: Q.length, invoices: INV.length, payables: PAYABLES.length }, quote: {}, stat: {}, inv: {}, sub: {}, pay: {}, year: {} };
   const names = new Set();
   const nm = s => { s = String(s || '').trim(); if (s.length >= 2) names.add(s); };
+  // 順序固定（報價 → 專案 → 應付 → 年度）：_pjStat 內的 _subStat 會重算成本卡金額，兩版都照同一順序算才可比
   // 選案：全部得標案（含已結案、含追加案）；再加 5 張代表性報價（未得標、工項最多的）
   const won = Q.filter(q => q && q.awarded);
   const rep = Q.filter(q => q && !q.awarded && Array.isArray(q.items)).sort((a, b) => (b.items.length - a.items.length) || String(a.id).localeCompare(String(b.id))).slice(0, 5);
@@ -19,7 +20,7 @@
       const t = calcT() || {};
       out.quote[q.id] = pick(t, ['sub', 'tax', 'total', 'ext', 'cost', 'gross', 'net']);
     } catch (e) { out.quote[q.id] = { __err: String(e && e.message || e).slice(0, 80) }; }
-    nm(q.name); nm(q.client); nm(q.contact); nm(q.loc);
+    nm(q.name); nm(q.client); nm(q.contact); nm(q.siteContact); nm(q.loc);
   }
   // 專案統計（主案）＋每期請款＋分包
   for (const q of won.filter(x => !x.parentId)) {
@@ -50,7 +51,10 @@
       out.year[y] = Object.assign(pick(s, ['revTax', 'ret', 'revNet', 'recv', 'cost', 'gross', 'exp', 'hr', 'pretax']), { cap: R(s.sh && s.sh.cap), drawn: R(s.sh && s.sh.drawn) });
     } catch (e) { out.year[y] = { __err: String(e && e.message || e).slice(0, 80) }; }
   }
-  (CUSTOMERS || []).forEach(c => nm(c && c.name));
+  (CUSTOMERS || []).forEach(c => { nm(c && c.name); nm(c && c.contact); });
+  (typeof WORKERS !== 'undefined' ? WORKERS : []).forEach(w => nm(w && w.name));
+  ((P && P.sales) || []).forEach(s => nm(s && s.name));
+  INV.forEach(i => { nm(i.siteContact); nm(i.companyContact); });
   (VENDORS || []).forEach(v => nm(v && (v.name || v)));
   (CONTRACTS || []).forEach(c => nm(c && c.name));
   return { data: out, names: Array.from(names).sort() };

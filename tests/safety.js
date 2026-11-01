@@ -1,7 +1,8 @@
 // 健檢 3 第三節：改版前的四道安全網（只加測試、不改程式）
 //   ① 同步合併：兩台裝置交錯修改、付款／改回未付的先後、墓碑、180 天沒開的舊裝置、舊版裝置上傳
 //   ② 衍生應付重跑：分包期別／預付款／成本卡的自動應付重算 N 次結果完全相同；已付的那筆怎麼重算都不會被刪、不會變回待付
-//   ③ 備份來回：在 A 頁匯出 → 全新 B 頁匯入 → 再匯出，兩份逐欄相同（不含時間戳）
+//   ③ 備份來回：在 A 頁做資料、取全量備份內容（exportData 用的同一份 _syncPayload）→ 全新 B 頁用 importData 匯入 → 再取一次，兩份逐欄相同（不含時間戳）；
+//      報價、請款、應付、合約、客戶、廠商、費用、薪資、薪資單、零用金、材料台帳、單價歷史、分潤都放資料，沒放到就算失敗
 //   ④ 包裝白名單：程式裡「用 x=function 覆寫同名函式」的地方只能是白名單上這幾個（第 2a 步拆包裝時同步刪白名單）
 //
 //   npm run safety              跑四項
@@ -113,6 +114,13 @@ const BUILD = async () => {
   CUSTOMERS.push({ id: 'cuB1', name: '甲營造', ownerType: '營造廠' }); VENDORS.push({ id: 'veB1', name: '乙工程行' });
   EXPENSES.push({ id: 'exB1', date: '2026-10-02', amount: 1234, cat: '雜支' });
   CONTRACTS.push({ id: 'ctB1', linkedQid: 'qB1', name: '範例工程B1', amount: 1260000 });
+  // 匯入時另外處理的集合也放資料，才不會空過
+  HR = [{ id: 'hrB1', name: '範例人員', h: { base: 40000 }, _mt: 1 }];
+  PAYSLIPS = [{ id: 'ps_hrB1_2026-09', hrId: 'hrB1', ym: '2026-09', name: '範例人員', gross: 40000, coCost: 5000, status: 'paid', _mt: 1 }];
+  PETTY = [{ id: 'pcB1', date: '2026-09-10', amount: 800, _mt: 1 }];
+  MAT_LEDGER = [{ id: 'mlB1', date: '2026-09-01', item: '鋼板樁', qty: 10, _mt: 1 }];
+  SHARE_PROFIT = { cfg: { 2026: { netProfit: 0, retentionAdd: 0, wcAdd: 0, machineSelfPay: 0 } }, draws: [{ id: 'dB1', date: '2026-09-30', amount: 1000 }] };
+  COST_HIST = [{ id: 'chB1', desc: '鋼板樁', unit: 'M', cost: 900 }];
   return JSON.stringify(_syncPayload().data);
 };
 const EXPORT = async () => { return JSON.stringify(_syncPayload().data); };
@@ -183,7 +191,8 @@ async function runAll(browser, root, only) {
     await B.ctx.close();
     const d = j1 && j2 ? firstDiff(norm(j1), norm(j2), '') : '(沒有產生備份' + (j1 ? '' : '：' + e1) + ')';
     const n = j1 ? JSON.parse(j1) : {};
-    res.backup = { ok: !d && !!j1 && n.quotes.length === 1 && n.payables.length >= 2, info: d ? '第一個不同的地方：' + d : '報價、請款、應付、合約、客戶、廠商、費用逐欄相同' };
+    const filled = ['quotes', 'invoices', 'payables', 'contracts', 'customers', 'vendors', 'expenses', 'hr', 'payslips', 'petty', 'matLedger', 'costHist'].filter(k => !(Array.isArray(n[k]) && n[k].length));
+    res.backup = { ok: !d && !!j1 && !filled.length && n.shareProfit && n.shareProfit.draws.length === 1, info: d ? '第一個不同的地方：' + d : filled.length ? '這些集合沒放到資料、等於沒測：' + filled.join('、') : '報價、請款、應付、合約、客戶、廠商、費用、薪資、薪資單、零用金、材料台帳、單價歷史、分潤逐欄相同' };
   }
   if (!only || only === 'wrap') res.wrap = testWrap(root);
   return res;
