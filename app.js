@@ -1115,6 +1115,7 @@ function fcApplySuggest(){
 }
 
 function syncParamsUI(){
+  try{if(typeof _fbUser==='undefined'||!_fbUser)_rmkV19Migrate();}catch(e){_err('syncParamsUI.rmk19',e);}   // v6.0.124 沒登入的本機模式也補第19條（登入後以雲端參數為準，會重新判斷）
   try{rFixedCosts();}catch(e){_err('syncParamsUI',e);}
   try{var _rr=P.matRentRate||{};[['h300','H300',3],['h350','H350',4],['h400','H400',5]].forEach(function(x){var e=document.getElementById('pmat-'+x[0]);if(e)e.value=(_rr[x[1]]!=null?_rr[x[1]]:x[2]);});var _pf=document.getElementById('pmat-factor');if(_pf)_pf.value=(P.matRentFactor!=null?P.matRentFactor:0.8);var _pl=document.getElementById('pmat-loss');if(_pl)_pl.value=(P.matLossAccrue===false?'0':'1');var _pt=document.getElementById('pmat-trans');if(_pt)_pt.value=(P.matTransRate!=null?P.matTransRate:450);}catch(e){_err('syncParamsUI.mat',e);}   // v6
   try{var _pk=document.getElementById('paikey');if(_pk)_pk.value='';}catch(e){_err('syncParamsUI',e);}   // v6.0.118：不再顯示／保存金鑰
@@ -2349,6 +2350,7 @@ function loadQ(id){
   }catch(e){_err('loadQ.costFix',e);}
   const map={fc:'code',fcl:'client',fn:'name',fl:'loc',fco:'contact',fp:'phone',fd:'date'};
   Object.entries(map).forEach(([id,k])=>{const e=document.getElementById(id);if(e)e.value=q[k]||'';});
+  Object.keys(rmkCustom).forEach(function(k){rmkCustom[k]=(k==='extra')?[]:'';});   // v6.0.124 審查：先清空，免得上一張（新報價的有效期限 14 天等）帶進這張舊報價
   if(q.rmk){Object.assign(rmkCustom,q.rmk);if(!Array.isArray(rmkCustom.extra))rmkCustom.extra=[];}
   else{Object.keys(rmkCustom).forEach(k=>{rmkCustom[k]=(k==='extra')?[]:'';});}
   window._qSnap=JSON.stringify(items);
@@ -10138,7 +10140,7 @@ function _applyCloud(data){
     }
     INV=_safeMerge(INV,_invUnpackAll(data.invoices).filter(function(inv){return inv&&(inv.project||inv.client||inv.id);}),'invoices');   // v5.374 先解壓再合併
     if(data.upaHistory)UH=data.upaHistory;   // v5.314：原本 ||[] 會在雲端缺此欄時把本機分析歷史清空
-    if(data.params){Object.assign(P,data.params);_aiKeyScrub(true);setTimeout(_rmkV19Migrate,1500);}   // v6.0.108 金鑰不得留在參數；v6.0.124 雲端參數到了才補第19條
+    if(data.params){Object.assign(P,data.params);_aiKeyScrub(true);if(!('rmkV19' in data.params))delete P.rmkV19;setTimeout(_rmkV19Migrate,1500);}   // 審查：雲端參數還沒有補過的標記 → 本機標記作廢重補（舊版裝置把 18 條傳回雲端時也會補回）   // v6.0.108 金鑰不得留在參數；v6.0.124 雲端參數到了才補第19條
     if(data.contracts)CONTRACTS=_safeMerge(CONTRACTS,data.contracts,'contracts');
     if(data.vendors)VENDORS=_safeMerge(VENDORS,data.vendors,'vendors');
     if(data.invoiceRecs){
@@ -38892,7 +38894,7 @@ function _draftOpenQuote(q,isEdit){
   if(isEdit){loadQ(q.id);}else{newQ();}
   var sv=function(i,v){var e=document.getElementById(i);if(e)e.value=v==null?'':v;};
   sv('fc',q.code||genQuoteCode());sv('fcl',q.client);sv('fn',q.name);sv('fl',q.loc);sv('fco',q.contact);sv('fp',q.phone);sv('fd',q.date||localToday());
-  items=JSON.parse(JSON.stringify(q.items||[]));exs=JSON.parse(JSON.stringify(q.exs||[]));if(q.rmk)rmkCustom=JSON.parse(JSON.stringify(q.rmk));
+  items=JSON.parse(JSON.stringify(q.items||[]));exs=JSON.parse(JSON.stringify(q.exs||[]));if(q.rmk)rmkCustom=Object.assign({},rmkCustom,JSON.parse(JSON.stringify(q.rmk)));   // v6.0.124 疊在 newQ／loadQ 的值上（舊草稿沒有有效期限時，新報價照樣帶 14 天）
   try{rItems();calcT();if(typeof rTots==='function')rTots();}catch(e){_err('_draftOpenQuote',e);}
   st('esub','AI 草稿：請檢查後按「儲存」');
 }
@@ -39509,7 +39511,7 @@ function lotionNotifyOpen(){
 }
 // ══════════ v6.0.124 預設備註條款補第 19 條「有效期限」（Lotion 11/1）══════════
 // 參數「預設備註條款」已存過的（舊的 18 條）：還沒有「有效期限」就補在最後一條後面；只補一次（P.rmkV19），之後 Lotion 自己改、刪都不再動。
-// 只在讀到雲端參數之後（或沒登入的本機模式）由管理員裝置做，免得舊的本機參數蓋掉雲端。舊報價沒有 valid 天數 → 這一條不印，輸出跟以前一樣。
+// 讀到雲端參數之後由管理員裝置做（雲端參數沒有 rmkV19 就把本機標記作廢重補）；沒登入的本機模式在 syncParamsUI 做。舊報價沒有 valid 天數 → 這一條不印，輸出跟以前一樣。
 var _RMK_L19='本報價有效期限為報價日起【VALID】天，逾期依鋼材行情另議。';
 function _rmkV19Add(base){
   base=String(base||'');if(/有效期限/.test(base))return base;

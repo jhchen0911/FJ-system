@@ -9080,6 +9080,10 @@ async function newPage(browser, width, height) {
         /* 一般員工、唯讀帳號不改參數 */
         delete P.rmkV19; _isAdminUser = false; _fbUser = { email: 'staff@x.com', uid: 's' };
         out.staff = _rmkV19Migrate() === false && !/有效期限/.test(P.rmkBase);
+        /* 審查：先開新報價（14 天）再開舊報價 → 舊報價不帶有效期限；雲端參數沒有補過標記 → 本機標記作廢重補 */
+        Q.unshift({ id: 'qOldV', name: '舊報價', client: '甲', date: '2026-01-01', items: [], rmk: { walk: '500' } });
+        newQ(); loadQ('qOldV'); out.noLeak = !rmkCustom.valid && rmkCustom.walk === '500';
+        Q = Q.filter(x => x.id !== 'qOldV');
         /* 備註填寫視窗有「報價有效期限」欄，條號跟著算 */
         openRmkModal(); out.modal = !!document.getElementById('rmk-valid') && /第\d+條：報價有效期限/.test(document.getElementById('rmk-t-valid').textContent);
         document.getElementById('rmk-modal').style.display = 'none';
@@ -9087,7 +9091,7 @@ async function newPage(browser, width, height) {
       Object.keys(P).forEach(k => delete P[k]); Object.assign(P, oP); _fbUser = oU; _isAdminUser = oA; window._immediateUpload = oUp;
       return out;
     });
-    check('v6.0.124 第19條有效期限：新報價帶 14 天且條號連號（自訂條款接在後面）；舊報價不印', r.newQ && r.extraAfter && r.oldQ && r.modal, JSON.stringify(r));
+    check('v6.0.124 第19條有效期限：新報價帶 14 天且條號連號（自訂條款接在後面）；舊報價不印', r.newQ && r.extraAfter && r.oldQ && r.modal && r.noLeak, JSON.stringify(r));
     check('v6.0.124 參數預設條款補第19條：只補一次、已有不重複、補過後刪掉不再加、只有管理員裝置會補', r.mig && r.noDup && r.once && r.staff, JSON.stringify(r));
     check('v6.0.124 有效期限測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
