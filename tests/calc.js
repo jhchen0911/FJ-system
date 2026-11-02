@@ -82,7 +82,7 @@ check('廠商請款單價可核實覆寫、應付 id 規則', PY.rowPrice({ unit
   const d0 = R.year({ invoices: invs, quotes, expenses: [], payslips: [] }, '2026', fn);
   check('沒有薪資單：有營運活動的年度用人事估算；沒活動的年度不估', d0.hr === 60000 && d0.hrEst && R.year({ invoices: [], quotes: [], expenses: [], payslips: [] }, '2024', fn).hr === 0);
   const sa = R.shareAuto({ invoices: invs, quotes, expenses }, '2026', { taxM: 1.05, months: 10, salaryMonth: 150000 }, fn);
-  check('分潤估算：營收含保留款、扣成本費用與估計薪資；循環資金增額', sa.rev === 315000 && sa.cost === 180000 && sa.exp === 40000 && sa.salary === 3000000 && sa.netProfit === 0 && sa.wcAdd === Math.max(0, Math.round(((180000 + 40000 + 3000000) / 10 - 99999 / 12) * 23 / 30)), JSON.stringify(sa));
+  check('分潤估算：營收含保留款、扣成本費用與估計薪資；循環資金增額（手算 (322,000−8,333.25)×23/30＝240,478）', sa.rev === 315000 && sa.cost === 180000 && sa.exp === 40000 && sa.salary === 3000000 && sa.netProfit === 0 && sa.wcAdd === 240478, JSON.stringify(sa));
 }
 
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
