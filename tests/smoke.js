@@ -7735,8 +7735,8 @@ async function newPage(browser, width, height) {
         const p1 = c.periods[0]; out.inst = !!p1 && p1.amt === Math.round(40 * 10000 * ins / 100);
         openSubPeriod(c.id); const sr2 = document.querySelector('.sp-row[data-stage="1"]');
         sr2.querySelector('.sp-qi').value = ''; sr2.querySelector('.sp-qi').dataset.touched = '1'; sr2.querySelector('.sp-qr').value = '150'; sr2.querySelector('.sp-qr').dataset.touched = '1'; _spRecalc();
-        out.capUi = /拆除累計 150 超過發包量 100/.test(sr2.innerHTML); ok();
-        const p2 = c.periods[1]; out.remove = !!p2 && p2.rows[0].qr === 100 && p2.amt === Math.round(100 * 10000 * (100 - ins) / 100);
+        out.capUi = /拆除累計 150 超過已裝設 40/.test(sr2.innerHTML); ok();   // v6.0.135 第 3b 步（健檢1 #27）：拆除上限＝已裝設
+        const p2 = c.periods[1]; out.remove = !!p2 && p2.rows[0].qr === 40 && p2.amt === Math.round(40 * 10000 * (100 - ins) / 100);
         /* 🔴 110：舊單存的預計收款日不被規則蓋、規則日期不寫回；新建單標 recvRule */
         q.ownerPay = { cut: 25, delay: 2, day: 20 }; const nInv = buildInvFromQuote(q); out.recvRule = nInv.recvRule === 1;
         out.oldKeep = _invExpectedDate({ quoteId: 'qS', date: '2026-08-04', expectedRecvDate: '2026-09-20' }).date === '2026-09-20' && _invExpectedDate({ quoteId: 'qS', date: '2026-08-04', expectedRecvDate: '2026-09-20', recvRule: 1 }).date === '2026-10-20';
@@ -7752,7 +7752,7 @@ async function newPage(browser, width, height) {
       return out;
     });
     check('批次 C 審查：一式涵蓋工項單位不同不換算（合約寫另行議價）、不可混一般與根固、已回價編輯不改基準、草稿版次過期擋下', r.unit && r.ctUnit && r.mixUi && r.mix && r.keepBase && r.stale, JSON.stringify(r));
-    check('批次 C 審查：一般樣板分段請款（裝設 inst%、拆除其餘、各階段以發包量為上限），根固照全額＋保留', r.award && r.inst && r.capUi && r.remove, JSON.stringify(r));
+    check('批次 C 審查：一般樣板分段請款（裝設 inst%、拆除其餘、拆除以已裝設為上限〔v6.0.135〕），根固照全額＋保留', r.award && r.inst && r.capUi && r.remove, JSON.stringify(r));
     check('批次 C 審查：放款規則不蓋舊單、新建單標記、共用預設；條件卡缺欄補預設、列出受影響請款單', r.recvRule && r.oldKeep && r.defs && r.cardDef && r.impact, JSON.stringify(r));
     const r2 = await page.evaluate(() => {
       const out = {};
@@ -9201,9 +9201,10 @@ async function newPage(browser, width, height) {
         const st = _pjStat(Q[0]);
         out.profitNet = st.profit === Math.round(st.base / _taxM()) - st.costNet && Math.round(st.billedGross) === 105000;
         // 會計用對照表：竣工結算後才列、完工年度＝結算日
-        CONTRACTS.push({ id: 'ct3b', linkedQid: 'q3b', name: '範例3b', amount: 1050000, status: 'completed', settleSnap: { at: new Date('2027-05-20T12:00:00').getTime() } });
+        CONTRACTS.push({ id: 'ct3b', linkedQid: 'q3b', name: '範例3b', amount: 1050000, status: 'completed', settleSnap: { at: new Date('2027-05-20T12:00:00').getTime(), src: 'settle' } });
         const acct = FJC.rpt.yearAcct(_acctProjects(), 2027);
         out.acct = acct.rows.length === 1 && acct.rows[0].doneDate === '2027-05-20' && acct.rows[0].revNet === 100000 && acct.rows[0].comm === 5000 && FJC.rpt.yearAcct(_acctProjects(), 2026).rows.length === 0;
+        delete CONTRACTS[0].settleSnap.src; out.acctLegacy = FJC.rpt.yearAcct(_acctProjects(), 2027).rows[0].doneDate === '2027-01-31'; CONTRACTS[0].settleSnap.src = 'settle';   // 自動結算補記的不算結算日 → 最後一期請款日
         const dv = document.createElement('div'); renderShareholderReport(dv, 2027); out.acctHtml = /會計用對照表（完工年度）/.test(dv.innerHTML) && /管理用（依期別）/.test(dv.innerHTML);
         // 金流：打設＋拔除合一工項，打設 100% 只算裝設％（預設 70%）
         Q[0].ownerPay = { instPct: 70 }; out.billProg = Math.round(_projBillProgress(Q[0]).pct) === 70;
@@ -9221,7 +9222,7 @@ async function newPage(browser, width, height) {
         // 得標率：流標不在分母；進版記第一次報價日
         out.bid = Math.round(_bidStat([{ awarded: true }, { bidStatus: 'lost' }, { bidStatus: 'void' }, {}]).rate) === 33;
         Q.push({ id: 'qv', name: '範例進版', date: '2025-12-20', awarded: false, ver: 1, items: [{ desc: 'A', unit: 'M', qty: 1, price: 100 }], t: { total: 105 } });
-        bumpQVersion('qv'); const qv = Q.find(x => x.id === 'qv'); out.date0 = qv.date0 === '2025-12-20' && _bidRows(2025, 0).some(x => x.id === 'qv');
+        bumpQVersion('qv'); document.getElementById('gen-confirm-ok').click(); const qv = Q.find(x => x.id === 'qv'); out.date0 = qv.date0 === '2025-12-20' && _bidRows(2025, 0).some(x => x.id === 'qv');
         // 健檢：舊結算少清潔費
         CONTRACTS[0].amount = Math.round(inv.totals.total + inv.totals.retention);
         out.health = _healthRows().some(x => /疑似少了清潔費/.test(x.msg));
@@ -9233,7 +9234,7 @@ async function newPage(browser, width, height) {
     });
     try { await page.evaluate(() => { try { document.getElementById('gen-confirm-cancel').click(); } catch (e) { /* 可忽略 */ } }); } catch (e) { /* 可忽略 */ }
     check('v6.0.135 3b 管理用損益：分包依計價期別、介紹費依實付日列費用、抽成佣金付款才認列、保留款退還不倒扣、清潔費只扣一次、費用有發票用未稅', r.subByPeriod && r.introExp && r.commPlanned && r.commPaid && r.revNoRet && r.revNetClean && r.expNet, JSON.stringify(r));
-    check('v6.0.135 3b 會計用對照表（完工年度＝竣工結算日）、各案毛利未稅、累計請款本期＋稅、報價淨利率未稅', r.acct && r.acctHtml && r.profitNet && r.netR, JSON.stringify(r));
+    check('v6.0.135 3b 會計用對照表（完工年度＝竣工結算日）、各案毛利未稅、累計請款本期＋稅、報價淨利率未稅', r.acct && r.acctLegacy && r.acctHtml && r.profitNet && r.netR, JSON.stringify(r));
     check('v6.0.135 3b 金流照請款％、結算不扣清潔費＋健檢、日報同名分區、請款％下拉跟參數、成交庫同名同單位、得標率扣流標＋第一次報價日', r.billProg && r.settleGross && r.health && r.dailyIdx && r.rateOpts && r.deal && r.bid && r.date0, JSON.stringify(r));
     check('v6.0.135 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
