@@ -3,6 +3,7 @@
 //   ② 衍生應付重跑：分包期別／預付款／成本卡的自動應付重算 N 次結果完全相同；已付的那筆怎麼重算都不會被刪、不會變回待付；手動應付切稅別、刪除正常
 //   ③ 備份來回：在 A 頁做資料、取全量備份內容（exportData 用的同一份 _syncPayload）→ 全新 B 頁用 importData 匯入 → 再取一次，兩份逐欄相同（不含時間戳）；
 //      報價、請款、應付、合約、客戶、廠商、費用、薪資、薪資單、零用金、材料台帳、單價歷史、分潤都放資料，沒放到就算失敗
+//   ⑤ 金額寫法：讀已收款只能經 _invRcvOwner／_invRcv，稅率不准寫死 1.05（第 2b 步）
 //   ④ 包裝白名單：程式裡「用 x=function 覆寫同名函式」的地方只能是白名單上這幾個（第 2a 步拆包裝時同步刪白名單）
 //
 //   npm run safety              跑四項
@@ -30,6 +31,17 @@ function wrapScan(src) {
     if (!/^(?:window\.)?[\w$]+\s*=\s*(?:async\s+)?(?:function\b|\(|[\w$]+\s*=>)/.test(m[0] + src.slice(m.index + m[0].length, m.index + m[0].length + 20))) hits[n] = (hits[n] || 0) + 1;
   }
   return hits;
+}
+// ⑤ 金額寫法（第 2b 步，v6.0.128）：讀「已收款」只能經 _invRcvOwner／_invRcv（另記保留款退還才不會漏）；稅率不准寫死 1.05
+function testMoneyStatic(root) {
+  const src = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  const bad = [];
+  src.split('\n').forEach((l, i) => {
+    const code = l.replace(/\/\/.*$/, '');
+    if (/\.received\b(?!\s*=[^=])/.test(code) && !/^function _invRcvOwner\(/.test(l) && !/\.received\s*\/\s*10000|d\.received\b/.test(code)) bad.push('第 ' + (i + 1) + ' 行直接讀 received');
+    if (/[*\/]\s*1\.05\b|1\.05\s*\*/.test(code) && /amt|amount|total|tot\b|tax|price|cost|稅|金額|fmt\(/i.test(code)) bad.push('第 ' + (i + 1) + ' 行寫死 1.05');   // 只看算錢的行（圖面座標的 1.05 不算）
+  });
+  return { ok: !bad.length, info: bad.length ? bad.slice(0, 5).join('、') : '已收款只走 _invRcvOwner／_invRcv、沒有寫死 1.05' };
 }
 function testWrap(root) {
   const hits = wrapScan(fs.readFileSync(path.join(root, 'app.js'), 'utf8'));
@@ -207,15 +219,17 @@ async function runAll(browser, root, only) {
     res.backup = { ok: !d && !!j1 && !filled.length && n.shareProfit && n.shareProfit.draws.length === 1, info: d ? '第一個不同的地方：' + d : filled.length ? '這些集合沒放到資料、等於沒測：' + filled.join('、') : '報價、請款、應付、合約、客戶、廠商、費用、薪資、薪資單、零用金、材料台帳、單價歷史、分潤逐欄相同' };
   }
   if (!only || only === 'wrap') res.wrap = testWrap(root);
+  if (!only || only === 'money') res.money = testMoneyStatic(root);
   return res;
 }
 
-const NAMES = { sync: '① 同步合併', derived: '② 衍生應付重跑', backup: '③ 備份來回', wrap: '④ 包裝白名單' };
+const NAMES = { sync: '① 同步合併', derived: '② 衍生應付重跑', backup: '③ 備份來回', wrap: '④ 包裝白名單', money: '⑤ 金額寫法' };
 // 反向驗證：每項各故意改壞一處
 const BREAK = {
   sync: [/if\(!o\|\|mt\(r\)>=mt\(o\)\)map\[r\.id\]=r;/, 'map[r.id]=r;'],                       // 合併不看修改時間，本機一律蓋雲端
   derived: [/function savePayables\(\)\{try\{_paidVanishGuard\(\);\}/, 'function savePayables(){PAYABLES=PAYABLES.filter(function(p){return !(p.status==="paid"&&p.costId==="cS1"&&/_p2$/.test(p.id));});try{_paidVanishGuard=function(){};}catch(e){}try{}'],   // 存檔時已付那筆被拿掉、救援也關掉（重跑相同那半不受影響，只有「已付仍在」會紅）
   backup: [/if\(data\.expenses\)EXPENSES=arr\(data\.expenses\);/, ''],                           // 還原漏掉費用
+  money: [/function _modal\(title,bodyHtml,onOk\)\{/, 'function _rcvX(i){return parseFloat(i.received)||0;}\nfunction _modal(title,bodyHtml,onOk){'],   // 新增一處直接讀 received
   wrap: [/function _modal\(title,bodyHtml,onOk\)\{/, 'var _payEffX0=_payEff;_payEff=function(p){return _payEffX0(p);};\nfunction _modal(title,bodyHtml,onOk){']   // 新增一處包裝覆寫
 };
 
@@ -243,6 +257,6 @@ const BREAK = {
   console.log('\n健檢 3 安全網（同步合併／衍生應付／備份來回／包裝白名單）\n' + '─'.repeat(64));
   let fail = 0;
   Object.keys(NAMES).forEach(k => { if (!res[k].ok) fail++; console.log((res[k].ok ? '  ✓ ' : '  ✗ ') + NAMES[k] + '　' + res[k].info); });
-  console.log('─'.repeat(64) + '\n  ' + (4 - fail) + ' / 4 通過' + (fail ? '　✗ ' + fail + ' 項失敗' : ''));
+  console.log('─'.repeat(64) + '\n  ' + (Object.keys(NAMES).length - fail) + ' / ' + Object.keys(NAMES).length + ' 通過' + (fail ? '　✗ ' + fail + ' 項失敗' : ''));
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('安全網測試執行失敗：', e); process.exit(1); });

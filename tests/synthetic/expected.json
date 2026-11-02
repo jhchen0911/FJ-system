@@ -185,8 +185,13 @@
  },
  "B25": {
   "invTotal": 103950,
-  "irAmount": 103950,
-  "irTax": 4950
+  "irAmount": 105000,
+  "irTax": 5000
+ },
+ "B25b": {
+  "owner": 95000,
+  "rcv": 100000,
+  "projRecv": 100000
  },
  "B26": {
   "invTotal": 103950,

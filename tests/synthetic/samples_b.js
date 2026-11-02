@@ -128,9 +128,9 @@ module.exports = [
     }
   },
   {
-    id: 'B25', items: [25], status: '現況',
+    id: 'B25', items: [25], status: '正確',
     title: '開立發票帶入金額：未稅 100,000、清潔費 10‰「折讓」模式',
-    hand: '應為本期發票應開金額 105,000（稅 5,000）；現況帶入 103,950（清潔費被扣掉）、稅額寫死 ÷1.05',
+    hand: '本期發票應開金額 105,000（稅 5,000）＝請款單畫面同一算法；2b 前帶入 103,950（清潔費被扣掉）、稅額寫死稅率（v6.0.128 修正）',
     run: async () => {
       const inv = { id: 'iB25', project: '範例工程B25', client: '甲營造', periodNo: 1, date: '2026-05-10', cleanPermil: 10, cleanMode: 'allow',
         items: [{ type: 'item', desc: '鋼板樁', unit: 'M', contractPrice: 1000, contractQty: 100, curQty: 100, payRate: 100 }] };
@@ -139,6 +139,20 @@ module.exports = [
       const a = parseFloat(document.getElementById('ir-amount').value) || 0, t = parseFloat(document.getElementById('ir-tax').value) || 0;
       const m = document.getElementById('invoice-rec-modal'); if (m) m.style.display = 'none';
       return { invTotal: Math.round(inv.totals.total), irAmount: Math.round(a), irTax: Math.round(t) };
+    }
+  },
+  {
+    id: 'B25b', items: [], status: '正確',
+    title: '工程專案「已收款」含業主當場扣款後退還（健檢 3 #5）：業主付 95,000、當場扣 5,000、之後退還 5,000',
+    hand: '已收款＝95,000＋5,000＝100,000；2b 前只算 95,000（漏掉當場扣款的退還），v6.0.128 改用 _invRcv',
+    run: async () => {
+      Q = [{ id: 'qB25b', name: '範例工程B25b', client: '甲營造', awarded: true, items: [{ desc: '鋼板樁', unit: 'M', qty: 100, price: 1000 }], t: {}, costs: [], exs: [], rmk: {}, _mt: 1 }];
+      const inv = { id: 'iB25b', quoteId: 'qB25b', sourceQid: 'qB25b', project: '範例工程B25b', client: '甲營造', periodNo: 1, date: '2026-09-10',
+        items: [{ type: 'item', desc: '鋼板樁', unit: 'M', contractPrice: 1000, contractQty: 100, curQty: 100, payRate: 100 }],
+        received: 95000, receivedDate: '2026-09-30', recvHold: 5000, holdRetLog: [{ amt: 5000, date: '2026-10-10' }] };
+      _recalcInvAmounts(inv); INV.push(inv);
+      const st = _pjStat(Q[0]);
+      return { owner: _invRcvOwner(inv), rcv: _invRcv(inv), projRecv: Math.round(st.recv) };
     }
   },
   {
