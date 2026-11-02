@@ -37,8 +37,16 @@ const fs0 = require('fs'), calcDir = path.join(__dirname, '..', 'calc');
 fs0.readdirSync(calcDir).filter(f => /\.js$/.test(f)).forEach(f => {
   const src = fs0.readFileSync(path.join(calcDir, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   // 在乾淨沙盒裡載入：模組本身不能碰任何外部名稱（只有 globalThis 掛 FJC）
-  let clean = true; try { require('vm').runInNewContext(src, { globalThis: {}, module: undefined }); } catch (e) { clean = false; }
-  check('calc/' + f + ' 不讀畫面與全域資料（乾淨沙盒可載入）', clean && !/\b(P|Q|INV|PAYABLES|CONTRACTS)\b\s*[.[]|document\.|localStorage/.test(src));
+  // 載入後把每個對外函式用幾組常見參數各呼叫一次：函式內部偷用全域名稱（P、_taxM、window…）會丟 ReferenceError
+  let clean = true;
+  try {
+    const g = {}; require('vm').runInNewContext(src, { globalThis: g, module: undefined });
+    const inv0 = { id: 'i', items: [], totals: { curTotal: 100, tax: 5, total: 105 }, retention: true, received: 50, recvHold: 5, holdRetLog: [{ amt: 5, date: '2026-01-01' }] };
+    const card0 = { id: 'c', rows: [{ id: 'r', unitPrice: 10, stage: 1 }], periods: [{ no: 1, rows: [{ rid: 'r', qty: 1, qi: 1 }], adv: 1 }], advances: [{ id: 'a', amt: 5 }] };
+    const argsets = [[], [inv0, 5, 10], [{ amount: 100, retentionPct: 5 }, 5], [card0, card0.periods[0], 100], [card0, 5, 100], [card0.rows[0], card0.periods[0].rows[0], 100], [[1, 2], { taxR: 5, retOn: true, retPct: 10 }], [105, 5], ['c', { no: 1, id: 'x' }, { id: 'e' }], [inv0, '2026']];
+    Object.values(g.FJC || {}).forEach(mod => Object.values(mod).forEach(fn => argsets.forEach(a => { try { fn.apply(null, a); } catch (e) { if (e instanceof ReferenceError || /is not defined/.test(e && e.message)) throw e; } })));
+  } catch (e) { clean = false; }
+  check('calc/' + f + ' 不讀畫面與全域資料（乾淨沙盒載入並逐一呼叫）', clean && !/\b(P|Q|INV|PAYABLES|CONTRACTS)\b\s*[.[]|document\.|localStorage/.test(src));
 });
 
 // ── 應付與分包計價（calc/payable.js）──
