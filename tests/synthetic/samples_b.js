@@ -2,9 +2,9 @@
 // run 在瀏覽器頁面裡執行（不能引用外面的變數）；回傳的數字就是要比對的值
 module.exports = [
   {
-    id: 'B08', items: [8], status: '現況',
+    id: 'B08', items: [8], status: '正確',
     title: '保留款退還後年度營收倒扣：未稅 100,000、保留 10%',
-    hand: '應為退還前後營收都是 100,000；現況退還後變 90,000（分潤上限同步變低）',
+    hand: '應為退還前後營收都是 100,000；現況退還後變 90,000（分潤上限同步變低）（v6.0.135 第 3b 步改成新口徑）',
     run: async () => {
       const inv = { id: 'iB08', project: '範例工程B08', client: '甲營造', periodNo: 1, date: '2026-05-10', retention: true, retentionPct: 10,
         items: [{ type: 'item', desc: '鋼板樁', unit: 'M', contractPrice: 1000, contractQty: 100, curQty: 100, payRate: 100 }] };
@@ -16,9 +16,9 @@ module.exports = [
     }
   },
   {
-    id: 'B09', items: [9], status: '現況',
+    id: 'B09', items: [9], status: '正確',
     title: '分包成本認列：2026-12 簽約發包 800,000，2027-01 才計價 400,000',
-    hand: '應為 2026 年 0、2027 年 400,000（依計價期別）；現況 2026 年 800,000、2027 年 0',
+    hand: '應為 2026 年 0、2027 年 400,000（依計價期別）；現況 2026 年 800,000、2027 年 0（v6.0.135 第 3b 步改成新口徑）',
     run: async () => {
       Q = [{ id: 'qB09', name: '範例工程B09', client: '甲營造', date: '2026-11-01', awarded: true, items: [{ desc: '鋼板樁', unit: 'M', qty: 1000, price: 1000 }],
         costs: [{ id: 'cB09', type: 'sub', vendor: '乙工程行', date: '2026-12-05', amt: 800000, rows: [{ id: 'r1', linkedItemIdx: 0, qty: 1000, unitPrice: 800 }],
@@ -27,9 +27,9 @@ module.exports = [
     }
   },
   {
-    id: 'B10', items: [10], status: '現況',
+    id: 'B10', items: [10], status: '正確',
     title: '年度損益與分潤沒扣業務抽成 2,000、業主端佣金 3,000（已全額收款）',
-    hand: '應為稅前淨利 100,000−5,000＝95,000（再扣已計提的抽成＋佣金）；現況有沒有抽成佣金都是 100,000，分潤 80,000',
+    hand: '應為稅前淨利 100,000−5,000＝95,000（再扣已計提的抽成＋佣金）；現況有沒有抽成佣金都是 100,000，分潤 80,000（v6.0.135 第 3b 步：已付的抽成＋佣金在付款日一次認列，稅前 95,000）',
     run: async () => {
       SHARE_SALARY_MONTH = 0;   // 不推估薪資，讓稅前淨利只看營收與成本
       P.sales = [{ id: 'sB10', name: '業務甲', kind: 'staff', commMode: 'amt', commVal: 2000, active: true }];
@@ -38,6 +38,8 @@ module.exports = [
       const inv = { id: 'iB10', quoteId: 'qB10', sourceQid: 'qB10', project: '範例工程B10', client: '甲營造', periodNo: 1, date: '2026-05-10',
         items: [{ type: 'item', desc: '鋼板樁', unit: 'M', contractPrice: 1000, contractQty: 100, curQty: 100, payRate: 100 }] };
       _recalcInvAmounts(inv); inv.received = Math.round(inv.totals.total); inv.receivedDate = '2026-06-10'; inv.receivedConfirmed = true; INV.push(inv);
+      _salesCommSync(Q[0]); _commSync(Q[0]);   // v6.0.135 第 3b 步：抽成、佣金在實際付款時一次認列——付款日 2026-06-15
+      PAYABLES.forEach(p => { if (/^pay_sales_|^comm_/.test(p.id)) { p.status = 'paid'; p.paidDate = '2026-06-15'; p.paidAt = Date.now(); } });
       const withComm = _shRptYear(2026), shWith = _shareAutoCalc('2026');
       const salesAccr = _salesCommAccr(Q[0]), commAccr = _commList(Q[0]).reduce((a, c) => a + _commAccrFor(Q[0], _salesCommNorm(c)), 0);
       Q[0].salesId = ''; Q[0].comms = [];
@@ -46,9 +48,9 @@ module.exports = [
     }
   },
   {
-    id: 'B11', items: [11], status: '現況',
+    id: 'B11', items: [11], status: '正確',
     title: '清潔費「業主開立」模式：請款未稅 100,000、清潔費 10‰，已收款',
-    hand: '應為營收 100,000－清潔費 1,000＝99,000；現況營收先扣一次（99,000）、費用再記一次 1,000 → 98,000',
+    hand: '應為營收 100,000－清潔費 1,000＝99,000；現況營收先扣一次（99,000）、費用再記一次 1,000 → 98,000（v6.0.135 第 3b 步改成新口徑）',
     run: async () => {
       const inv = { id: 'iB11', project: '範例工程B11', client: '甲營造', periodNo: 1, date: '2026-05-10', cleanPermil: 10, cleanMode: 'exp',
         items: [{ type: 'item', desc: '鋼板樁', unit: 'M', contractPrice: 1000, contractQty: 100, curQty: 100, payRate: 100 }] };
@@ -60,9 +62,9 @@ module.exports = [
     }
   },
   {
-    id: 'B12', items: [12], status: '現況',
+    id: 'B12', items: [12], status: '正確',
     title: '90 天金流預測：合約 105,000（打設＋拔除 100M×1000），第 1 期打設 70%、保留款 10%，日報進度 100%',
-    hand: '應為未來流入合計 105,000（含保留款回收）；現況 112,350（已請用扣保留款後金額、保留款又算一次，打設 70% 當完工）',
+    hand: '應為未來流入合計 105,000（含保留款回收）；現況 112,350（已請用扣保留款後金額、保留款又算一次，打設 70% 當完工）（v6.0.135 第 3b 步改成新口徑）',
     run: async () => {
       Q = [{ id: 'qB12', name: '範例工程B12', client: '甲營造', date: '2026-09-01', awarded: true, items: [{ desc: 'H型鋼 打設、拔除', unit: 'M', qty: 100, price: 1000 }], t: { sub: 100000, tax: 5000, total: 105000 },
         dailyLogs: [{ id: 'dB12', date: '2026-10-05', progressRows: [{ itemIdx: 0, qty: 100 }] }] }];
@@ -78,9 +80,9 @@ module.exports = [
     }
   },
   {
-    id: 'B21', items: [21], status: '現況',
+    id: 'B21', items: [21], status: '正確',
     title: '得標當天：業務抽成 2,000 只標「預計」（v6.0.114，Lotion 10/27：一次付清、第一期請款單送出才到期）；業主佣金 3,000 仍是得標即全額、付款日照得標日推算',
-    hand: '業務抽成已照 Lotion 10/27 規則（沒有請款單 → 無到期日）；業主佣金的到期規則尚未決定（現況得標即全額，付款日落在得標日次月）',
+    hand: '業務抽成已照 Lotion 10/27 規則（沒有請款單 → 無到期日）；業主佣金的到期規則尚未決定（現況得標即全額，付款日落在得標日次月）（v6.0.135 第 3b 步改成新口徑）',
     run: async () => {
       P.sales = [{ id: 'sB21', name: '業務甲', kind: 'staff', commMode: 'amt', commVal: 2000, active: true }];
       Q = [{ id: 'qB21', name: '範例工程B21', client: '甲營造', date: '2026-08-01', awarded: true, salesId: 'sB21', items: [{ desc: '鋼板樁', unit: 'M', qty: 100, price: 1000 }], t: { sub: 100000, tax: 5000, total: 105000 },
@@ -91,9 +93,9 @@ module.exports = [
     }
   },
   {
-    id: 'B22', items: [22], status: '現況',
+    id: 'B22', items: [22], status: '正確',
     title: '股東報表口徑：未稅 100,000、保留款 10%、成本 60,000；摘要毛利（未稅）與各案毛利（含稅）、請款金額（扣保留款後）',
-    hand: '應為同一口徑（未稅毛利 40,000）；現況摘要毛利 40,000（未稅）但各案毛利 105,000−60,000×1.05＝42,000（含稅），請款金額 94,500（已扣保留款）',
+    hand: '應為同一口徑（未稅毛利 40,000）；現況摘要毛利 40,000（未稅）但各案毛利 105,000−60,000×1.05＝42,000（含稅），請款金額 94,500（已扣保留款）（v6.0.135 第 3b 步改成新口徑）',
     run: async () => {
       Q = [{ id: 'qB22', name: '範例工程B22', client: '甲營造', date: '2026-04-01', awarded: true, items: [{ desc: '鋼板樁', unit: 'M', qty: 100, price: 1000 }], t: { sub: 100000, tax: 5000, total: 105000 },
         costs: [{ id: 'cB22', type: 'own', vendor: '', cat: '工項材料', date: '2026-05-01', amt: 60000, rows: [{ id: 'r1', desc: '材料', qty: 1, unit: '式', unitPrice: 60000 }] }] }];
@@ -106,18 +108,18 @@ module.exports = [
     }
   },
   {
-    id: 'B23', items: [23], status: '現況',
+    id: 'B23', items: [23], status: '正確',
     title: '公司費用：會計師費 21,000（含進項稅 1,000）、營業稅 5,000',
-    hand: '應為費用 20,000（未稅）；現況年度損益記 21,000；分潤把營業稅 5,000 也當費用（26,000），股東報表排除 → 兩邊不同',
+    hand: '應為費用 20,000（未稅）；現況年度損益記 21,000；分潤把營業稅 5,000 也當費用（26,000），股東報表排除 → 兩邊不同（v6.0.135 第 3b 步改成新口徑）',
     run: async () => {
       EXPENSES.push({ id: 'eB23a', date: '2026-03-10', seller: '甲會計師事務所', cat: '會計師費', amount: 21000, tax: 1000 }, { id: 'eB23b', date: '2026-03-15', seller: '國稅局', cat: '營業稅', amount: 5000, tax: 0 });
       return { shRptExp: _shRptYear(2026).exp, shareExp: _shareAutoCalc('2026').exp };
     }
   },
   {
-    id: 'B24', items: [24], status: '現況',
+    id: 'B24', items: [24], status: '正確',
     title: '報價淨利率：未稅 100,000、成本 80,000',
-    hand: '應為 20.0%（未稅收入）；現況 23.8%（含稅收入 105,000 − 未稅成本）',
+    hand: '應為 20.0%（未稅收入）；現況 23.8%（含稅收入 105,000 − 未稅成本）（v6.0.135 第 3b 步改成新口徑）',
     run: async () => {
       items = [{ desc: '鋼板樁', unit: 'M', qty: '100', price: '1000', estCost: '800', note: '', sec: false }]; exs = [];
       const t = calcT();
@@ -156,9 +158,9 @@ module.exports = [
     }
   },
   {
-    id: 'B26', items: [26], status: '現況',
+    id: 'B26', items: [26], status: '正確',
     title: '竣工結算：合約 105,000、請款未稅 100,000（全量）、清潔費 10‰',
-    hand: '應為結算 105,000（清潔費不是追減）；現況結算成 103,950',
+    hand: '應為結算 105,000（清潔費不是追減）；現況結算成 103,950（v6.0.135 第 3b 步改成新口徑）',
     run: async () => {
       Q = [{ id: 'qB26', name: '範例工程B26', client: '甲營造', date: '2026-04-01', awarded: true, items: [{ desc: '鋼板樁', unit: 'M', qty: 100, price: 1000 }], t: { sub: 100000, tax: 5000, total: 105000 } }];
       CONTRACTS.push({ id: 'cB26', name: '範例工程B26', linkedQid: 'qB26', amount: 105000, status: 'active' });

@@ -525,7 +525,7 @@ async function newPage(browser, width, height) {
         try { document.getElementById('gen-confirm-cancel').click(); } catch (e) {}
         return t;
       };
-      // 得標率口徑：得標 ÷ 全部（未得標、洽談、流標都在分母）
+      // 得標率口徑（第 3b 步）：得標 ÷（全部 − 流標）；未得標、洽談仍在分母
       out.rate = Math.round(_bidStat([{ awarded: true }, { bidStatus: 'lost' }, { bidStatus: 'void' }, {}]).rate);
       // 統計卡可點擊＋點擊出總結
       Q.push({ id: 'Q388', name: 'KPI冒煙案', client: 'K營造', awarded: true, status: 'won',
@@ -571,7 +571,7 @@ async function newPage(browser, width, height) {
       out.deleted = CONTRACTS.length === n0 - 1 && !CONTRACTS.some(c => c.id === 'CT88b');
       return out;
     });
-    check('得標率＝得標÷全部報價（1/4=25%）', r.rate === 25, '得到 ' + r.rate);
+    check('得標率＝得標÷（全部報價−流標）（1/3=33%）', r.rate === 33, '得到 ' + r.rate);
     check('報價／請款統計卡可點擊', r.qKpiClick && r.iKpiClick);
     check('總請款金額點擊出各工地總結', /總請款金額/.test(r.invBox) && /KPI冒煙案/.test(r.invBox), r.invBox.slice(0, 60));
     check('得標率點擊出得標明細', /得標率總結/.test(r.quoteBox), r.quoteBox.slice(0, 60));
@@ -1090,7 +1090,7 @@ async function newPage(browser, width, height) {
           { id: 'd2', date: ago(6), workers: 0, subWorkers: 6, subVendor: '乙承包', progressRows: [], photos: [], ownEquip: true, equip: [{ name: 'A機', hrs: 4 }, { name: 'B機', hrs: 8 }] }] }];
       INV.length = 0; CONTRACTS.splice(0);
       // 金流預測：日報進度 50% → 預估第 1 期（尚未開單）
-      out.phys = Math.round(_projPhysProgress(Q[0]).pct) === 50;
+      out.phys = Math.round(_projBillProgress(Q[0]).pct) === 50;   // 第 3b 步：只有打設的工項照回報量 100%
       go('finance'); renderCashForecast();
       out.cf = /預估第1期（日報進度 50%，尚未開單）/.test(document.getElementById('cashflow-forecast').innerHTML);
       // 廠商績效：日報承包出工 12 工、工期 2 天
@@ -9158,6 +9158,84 @@ async function newPage(browser, width, height) {
     check('v6.0.134 AI 通知：每天 6 則；LINE 本月 ≥180 只記在 FJ（回應寫已用幾則）；總覽列出本月沒推 LINE 的通知（文字跳脫、登出清掉）', r.held && r.sent && r.todo && r.logout && r.modal
       && N.NOTIFY_DAILY === 6 && N.monthHold(180) && !N.monthHold(179) && !N.monthHold(null) && /quotaUsed\(\)/.test(IDX) && /status: 'held'/.test(IDX) && /_held'/.test(IDX) && N.NOTIFY_HELD_DAILY === 30, JSON.stringify(r));
     check('v6.0.134 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.135 改版第 3b 步：管理用損益（依期別）、會計用對照表、各案毛利未稅、金流請款％、佣金付款時機、日報同名分區、下拉、成交庫、得標率 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      try {
+        SHARE_SALARY_MONTH = 0; PAYSLIPS = []; EXPENSES.length = 0; PAYABLES.length = 0; CONTRACTS.splice(0); INV.length = 0;
+        P.sales = [{ id: 's1', name: '業務甲', kind: 'staff', commMode: 'amt', commVal: 2000, active: true }];
+        // 跨年分包：2026-12 簽 800,000，2027-01 計價 400 支×1,000（未稅）；介紹費卡 10,000 2027-02 實付
+        Q = [{ id: 'q3b', name: '範例3b', client: '甲營造', date: '2026-11-01', awarded: true, salesId: 's1', comms: [{ id: 'c1', name: '主任乙', role: '工地主任', mode: 'amt', val: 3000, payOn: 'contract' }],
+          items: [{ desc: '鋼板樁打設＋拔除', unit: 'M', qty: 1000, price: 1000, cat: 'both' }], t: { sub: 1000000, tax: 50000, total: 1050000 },
+          costs: [{ id: 'cS', type: 'sub', vendor: '乙工程行', date: '2026-12-05', amt: 800000, rows: [{ id: 'r1', qty: 800, unitPrice: 1000 }], periods: [{ no: 1, date: '2027-01-20', rows: [{ rid: 'r1', qty: 400 }] }] },
+                  { id: 'cI', type: 'sub', vendor: '介紹人丙', isIntro: true, date: '2026-12-01', amt: 10000, rows: [{ id: 'ri', qty: 1, unitPrice: 10000 }] }],
+          dailyLogs: [{ id: 'd1', date: '2027-01-10', progressRows: [{ itemIdx: 0, qty: 1000, ph: 'install' }] }] }];
+        PAYABLES.push({ id: 'paycI_intro', costId: 'cI', quoteId: 'q3b', to: '介紹人丙', amount: 10000, vat: false, status: 'paid', paidDate: '2027-02-10', paidAt: Date.now(), date: '2027-02-10' });
+        const y26 = _shRptYear(2026), y27 = _shRptYear(2027);
+        out.subByPeriod = y26.cost === 0 && y27.cost === 400000;   // 簽約年 0、計價年 400,000
+        out.introExp = (y27.expByCat['介紹費'] || 0) === 10000 && y26.cost === 0;   // 介紹費依實付日列費用、不算施工成本
+        // 抽成／佣金：付款才認列
+        _salesCommSync(Q[0]); _commSync(Q[0]);
+        const cp = PAYABLES.find(p => /^comm_q3b_/.test(p.id)), sp = PAYABLES.find(p => p.id === 'pay_sales_q3b');
+        out.commPlanned = !!cp && cp.planned === true && cp.date === '' && /一次付清（合約簽訂）/.test(cp.note);   // 還沒簽約 → 不排日期
+        const before = _shRptYear(2027).exp;
+        [cp, sp].forEach(p => { if (p) { p.status = 'paid'; p.paidDate = '2027-03-01'; p.paidAt = Date.now(); } });
+        const y27b = _shRptYear(2027);
+        out.commPaid = y27b.exp - before === 5000 && (y27b.expByCat['業務抽成'] || 0) === 2000 && (y27b.expByCat['業主端佣金'] || 0) === 3000;
+        // 營收：保留款退還不倒扣；清潔費業主開立只算費用一次
+        const inv = { id: 'i3b', quoteId: 'q3b', project: '範例3b', client: '甲營造', periodNo: 1, date: '2027-01-31', retention: true, retentionPct: 10, cleanPermil: 10, cleanMode: 'exp',
+          items: [{ type: 'item', desc: '鋼板樁打設＋拔除', unit: 'M', contractPrice: 1000, contractQty: 1000, curQty: 100, payRate: 100 }] };
+        _recalcInvAmounts(inv); INV.push(inv);
+        const a1 = _shRptYear(2027).revNet; inv.retentionReturned = true; const a2 = _shRptYear(2027).revNet; inv.retentionReturned = false;
+        out.revNoRet = a1 === 100000 && a2 === 100000;
+        inv.cleanMode = 'net'; out.revNetClean = _shRptYear(2027).revNet === 99000; inv.cleanMode = 'exp';
+        // 公司費用：有進項稅＝未稅、沒稅額＝實付
+        EXPENSES.push({ id: 'e1', date: '2027-04-01', cat: '會計師費', amount: 21000, tax: 1000 }, { id: 'e2', date: '2027-04-02', cat: '其他', amount: 500, tax: 0 });
+        out.expNet = (_shRptYear(2027).expByCat['會計師費'] || 0) === 20000 && (_shRptYear(2027).expByCat['其他'] || 0) === 500;
+        // 各案毛利未稅、累計請款本期＋稅
+        const st = _pjStat(Q[0]);
+        out.profitNet = st.profit === Math.round(st.base / _taxM()) - st.costNet && Math.round(st.billedGross) === 105000;
+        // 會計用對照表：竣工結算後才列、完工年度＝結算日
+        CONTRACTS.push({ id: 'ct3b', linkedQid: 'q3b', name: '範例3b', amount: 1050000, status: 'completed', settleSnap: { at: new Date('2027-05-20T12:00:00').getTime() } });
+        const acct = FJC.rpt.yearAcct(_acctProjects(), 2027);
+        out.acct = acct.rows.length === 1 && acct.rows[0].doneDate === '2027-05-20' && acct.rows[0].revNet === 100000 && acct.rows[0].comm === 5000 && FJC.rpt.yearAcct(_acctProjects(), 2026).rows.length === 0;
+        const dv = document.createElement('div'); renderShareholderReport(dv, 2027); out.acctHtml = /會計用對照表（完工年度）/.test(dv.innerHTML) && /管理用（依期別）/.test(dv.innerHTML);
+        // 金流：打設＋拔除合一工項，打設 100% 只算裝設％（預設 70%）
+        Q[0].ownerPay = { instPct: 70 }; out.billProg = Math.round(_projBillProgress(Q[0]).pct) === 70;
+        // 竣工結算不扣清潔費
+        out.settleGross = Math.round(_invGrossOf(inv)) === 105000;
+        // 日報同名分區
+        const qd = { id: 'qd', items: [{ desc: 'H型鋼打設' }, { desc: 'H型鋼打設' }], dailyLogs: [{ date: '2026-10-05', progressRows: [{ itemIdx: 0, qty: 10 }, { itemIdx: 1, qty: 5 }] }] };
+        out.dailyIdx = _dailyQtyBetween(qd, 'H型鋼打設', '2026-10-01', '2026-10-31', undefined, 1) === 5 && _dailyQtyBetween(qd, 'H型鋼打設', '2026-10-01', '2026-10-31') === 15;
+        // 請款％下拉跟參數
+        const rr0 = P.removeRate; P.removeRate = 20; const ops = _invRateOpts({ payRate: 20 }).map(x => x[0]); const ops2 = _invRateOpts({ payRate: 55 }).map(x => x[0]); P.removeRate = rr0;
+        out.rateOpts = ops.indexOf('20') >= 0 && ops2.indexOf('55') >= 0;
+        // 成交單價庫：同名同單位、不收議價尾差
+        DEAL_HIST = [{ key: _normName('鋼板樁'), desc: '鋼板樁', unit: 'M', price: 1000 }, { key: _normName('鋼板樁'), desc: '鋼板樁', unit: '式', price: 50000 }, { key: _normName('鋼板樁打設'), desc: '鋼板樁打設', unit: 'M', price: 900 }];
+        const dp = _dealPriceFor('鋼板樁', 'M'); out.deal = !!dp && dp.avg === 1000 && dp.n === 1 && _dealSkipDesc('議價調整（尾差）');
+        // 得標率：流標不在分母；進版記第一次報價日
+        out.bid = Math.round(_bidStat([{ awarded: true }, { bidStatus: 'lost' }, { bidStatus: 'void' }, {}]).rate) === 33;
+        Q.push({ id: 'qv', name: '範例進版', date: '2025-12-20', awarded: false, ver: 1, items: [{ desc: 'A', unit: 'M', qty: 1, price: 100 }], t: { total: 105 } });
+        bumpQVersion('qv'); const qv = Q.find(x => x.id === 'qv'); out.date0 = qv.date0 === '2025-12-20' && _bidRows(2025, 0).some(x => x.id === 'qv');
+        // 健檢：舊結算少清潔費
+        CONTRACTS[0].amount = Math.round(inv.totals.total + inv.totals.retention);
+        out.health = _healthRows().some(x => /疑似少了清潔費/.test(x.msg));
+        // 報價淨利率未稅
+        items = [{ desc: 'X', qty: 100, price: 1000, estCost: 800 }]; exs = [];
+        out.netR = Math.round(calcT().netR * 1000) / 10 === 20;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    try { await page.evaluate(() => { try { document.getElementById('gen-confirm-cancel').click(); } catch (e) { /* 可忽略 */ } }); } catch (e) { /* 可忽略 */ }
+    check('v6.0.135 3b 管理用損益：分包依計價期別、介紹費依實付日列費用、抽成佣金付款才認列、保留款退還不倒扣、清潔費只扣一次、費用有發票用未稅', r.subByPeriod && r.introExp && r.commPlanned && r.commPaid && r.revNoRet && r.revNetClean && r.expNet, JSON.stringify(r));
+    check('v6.0.135 3b 會計用對照表（完工年度＝竣工結算日）、各案毛利未稅、累計請款本期＋稅、報價淨利率未稅', r.acct && r.acctHtml && r.profitNet && r.netR, JSON.stringify(r));
+    check('v6.0.135 3b 金流照請款％、結算不扣清潔費＋健檢、日報同名分區、請款％下拉跟參數、成交庫同名同單位、得標率扣流標＋第一次報價日', r.billProg && r.settleGross && r.health && r.dailyIdx && r.rateOpts && r.deal && r.bid && r.date0, JSON.stringify(r));
+    check('v6.0.135 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

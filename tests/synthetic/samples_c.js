@@ -2,9 +2,9 @@
 // run 在瀏覽器頁面裡執行（不能引用外面的變數）；回傳的數字就是要比對的值
 module.exports = [
   {
-    id: 'C16', items: [16], status: '現況',
+    id: 'C16', items: [16], status: '正確',
     title: '拆除％參數設 20：payRate=20 的列，請款％下拉沒有 20% 選項（顯示成 100%），金額卻按 20% 算',
-    hand: '正確：下拉應有 20% 且選中；金額 100M×1000×20%＝20,000',
+    hand: '正確：下拉應有 20% 且選中；金額 100M×1000×20%＝20,000（v6.0.135 第 3b 步改成新口徑）',
     run: async () => {
       P.removeRate = 20;
       INV.push({ id: 'iC16', project: '範例工程C16', client: '甲營造', periodNo: 2, date: '2026-10-01',
@@ -26,13 +26,13 @@ module.exports = [
     }
   },
   {
-    id: 'C18', items: [18], status: '現況',
+    id: 'C18', items: [18], status: '正確',
     title: '日報帶入數量：同名工項 A 區 10、B 區 5，兩列都帶 15',
-    hand: '正確：A 區 10、B 區 5',
+    hand: '正確：A 區 10、B 區 5（v6.0.135 第 3b 步改成新口徑）',
     run: async () => {
       const q = { id: 'qC18', name: '範例工程C18', items: [{ desc: 'H型鋼打設', unit: 'M', qty: 100, price: 1000 }, { desc: 'H型鋼打設', unit: 'M', qty: 50, price: 1200 }],
         dailyLogs: [{ id: 'd1', date: '2026-10-05', progressRows: [{ itemIdx: 0, qty: 10 }, { itemIdx: 1, qty: 5 }] }] };
-      return { areaA: _dailyQtyBetween(q, q.items[0].desc, '2026-10-01', '2026-10-31'), areaB: _dailyQtyBetween(q, q.items[1].desc, '2026-10-01', '2026-10-31') };
+      return { areaA: _dailyQtyBetween(q, q.items[0].desc, '2026-10-01', '2026-10-31', undefined, 0), areaB: _dailyQtyBetween(q, q.items[1].desc, '2026-10-01', '2026-10-31', undefined, 1) };   // v6.0.135：呼叫端帶工項位置
     }
   },
   {
@@ -61,9 +61,9 @@ module.exports = [
     }
   },
   {
-    id: 'C29', items: [29], status: '現況',
+    id: 'C29', items: [29], status: '正確',
     title: '成交單價庫：備用單價列也寫入、平均不分單位（M 1000、式 50,000 混算）、名稱模糊比對',
-    hand: '正確：只取同單位一般工項 → 鋼板樁打設 1,000／M（1 筆）；現況把式 50,000 也平均進去',
+    hand: '正確：只取同單位一般工項 → 鋼板樁打設 1,000／M（1 筆）；現況把式 50,000 也平均進去（v6.0.135 第 3b 步改成新口徑）',
     run: async () => {
       DEAL_HIST = [];
       writeDealHist({ id: 'qC29', date: '2026-10-01', client: '甲營造', items: [{ desc: '鋼板樁打設', unit: 'M', qty: 100, price: 1000 }, { desc: '鋼板樁打設', unit: '式', qty: 1, price: 50000, spare: true }, { desc: '鋼板樁打設工程', unit: '式', qty: 1, price: 3000 }] });
@@ -153,9 +153,9 @@ module.exports = [
     }
   },
   {
-    id: 'C37', items: [37], status: '現況',
+    id: 'C37', items: [37], status: '正確',
     title: '得標率：得標 1、未得標 1、作廢 1、待回覆 1 → 25%（分母含作廢）；2025 年的得標案進版後日期改成今天，搬到 2026 年',
-    hand: '正確：作廢不進分母 → 1/3＝33.3%；進版不應改變統計年度（仍算 2025）',
+    hand: '正確：作廢不進分母 → 1/3＝33.3%；進版不應改變統計年度（仍算 2025）（v6.0.135 第 3b 步改成新口徑）',
     run: async () => {
       const list = [{ id: 'a', awarded: true, t: { total: 105000 } }, { id: 'b', bidStatus: 'lost', t: { total: 50000 } }, { id: 'c', bidStatus: 'void', t: { total: 30000 } }, { id: 'd', t: { total: 20000 } }];
       const s = _bidStat(list);
