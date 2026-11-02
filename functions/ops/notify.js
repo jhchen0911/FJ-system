@@ -1,9 +1,13 @@
 // v6.0.123 AI 通知：AI 帳號（陳軒唯讀）或 Lotion 本人用 LINE「陳軒｜AI 助理」傳一行短訊息給 Lotion（純邏輯，單元測試 functions/test/notify.test.js）
 // 安全：收件人固定是 LINE 擁有者（lineCfg/owners，只有管理員能改），發送的人不能指定；只收短文字（≤100 字、不能有網址）；
-//       只有下面名單的帳號能發；每天最多 30 則，超過丟掉並記錄；紀錄保留 180 天。
+//       只有下面名單的帳號能發；每天最多 6 則（v6.0.134，原 30），超過丟掉並記錄；紀錄保留 180 天。
+//       v6.0.134：陳軒 LINE 是輕用量方案（每月 200 則、不能加購）→ 本月已用達 180 則就不推 LINE，只記在 FJ（總覽顯示），留額度給工地日報
 'use strict';
 const NOTIFY_SENDERS = ['jhchen0911@gmail.com', 'hsuanchen911@gmail.com'];   // Lotion 本人、AI 帳號（陳軒唯讀）
-const NOTIFY_DAILY = 30;
+const NOTIFY_DAILY = 6;
+const NOTIFY_REJ_LOG = 30;        // 被擋的訊息每天最多記幾筆
+const NOTIFY_MONTH_LIMIT = 200;   // LINE 每月免費則數（輕用量方案）
+const NOTIFY_MONTH_STOP = 180;    // 本月已用達這個數就不推 LINE、只記在 FJ
 const NOTIFY_MAX = 100;
 const NOTIFY_KEEP_MS = 180 * 86400000;
 // 審查：先 NFKC（全形字母、全形冒號斜線變半形）、拿掉零寬與方向控制字元、把「。．｡」當成點，再擋網址樣式
@@ -41,4 +45,7 @@ function buildNotify(body) {
   return { text };
 }
 
-module.exports = { NOTIFY_SENDERS, NOTIFY_DAILY, NOTIFY_MAX, NOTIFY_KEEP_MS, notifyAllowed, buildNotify };
+// 本月 LINE 已用則數 → 要不要推（查不到額度時照常推，避免 LINE API 暫時錯誤就整個停掉）
+function monthHold(used) { return typeof used === 'number' && isFinite(used) && used >= NOTIFY_MONTH_STOP; }
+
+module.exports = { NOTIFY_SENDERS, NOTIFY_DAILY, NOTIFY_REJ_LOG, NOTIFY_MONTH_LIMIT, NOTIFY_MONTH_STOP, NOTIFY_MAX, NOTIFY_KEEP_MS, notifyAllowed, buildNotify, monthHold };

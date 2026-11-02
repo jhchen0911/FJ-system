@@ -31,3 +31,15 @@ test('AI 通知（審查）：全形、零寬、其他網域、IP、各種 schem
   assert.equal(n.buildNotify({ text: { a: 1 } }).err, '格式不正確');
   assert.equal(n.buildNotify({ text: 'a\u202eb\u200bc\u2066d' }).text, 'abcd');
 });
+
+test('AI 通知上限（v6.0.134，Lotion 11/02）：每天 6 則；LINE 本月已用 ≥180／200 只記在 FJ、不推；查不到額度照常推', () => {
+  assert.equal(n.NOTIFY_DAILY, 6);
+  assert.equal(n.NOTIFY_MONTH_LIMIT, 200);
+  assert.equal(n.NOTIFY_MONTH_STOP, 180);
+  assert.equal(n.monthHold(179), false);
+  assert.equal(n.monthHold(180), true);
+  assert.equal(n.monthHold(200), true);
+  assert.equal(n.monthHold(null), false);
+  assert.equal(n.monthHold(undefined), false);
+  assert.equal(n.monthHold(NaN), false);
+});

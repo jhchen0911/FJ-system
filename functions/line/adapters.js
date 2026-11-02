@@ -26,6 +26,10 @@ function mkDeps(token) {
     dbGet: async path => (await db.ref(path).once('value')).val(),
     reply: (replyToken, text) => lineJson(LINE_API + '/message/reply', { replyToken, messages: [{ type: 'text', text: String(text).slice(0, 4900) }] }),
     push: (to, text) => lineJson(LINE_API + '/message/push', { to, messages: [{ type: 'text', text: String(text).slice(0, 4900) }] }),
+    // v6.0.134 本月已用的推播則數（LINE 官方帳號額度）；查不到回 null
+    quotaUsed: async () => {
+      try { const r = await fetch(LINE_API + '/message/quota/consumption', { headers: auth }); if (!r.ok) return null; const j = await r.json(); return typeof j.totalUsage === 'number' ? j.totalUsage : null; } catch (e) { return null; }
+    },
     createDraft: async rec => {
       const ref = db.ref('fydata/drafts/' + rec.id);
       // 同一則訊息／同一天只建一次（webhook 重送、排程重跑都不重複）
