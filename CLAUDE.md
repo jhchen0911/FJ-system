@@ -5,7 +5,7 @@
 ## 架構
 
 - **單一應用、兩個檔**（v6.0.34 起）：`index.html`（HTML／CSS／頭尾兩段小 script，~350KB）＋ `app.js`（主程式 ~2.6MB，`<script src="app.js?v=6.0.NN" defer>` 載入；外部化後瀏覽器可串流編譯＋程式碼快取，開頁快約三成）。無建置流程、無框架、無相依套件。**所有 JS 修改都在 `app.js`**（模組區塊插在 `function _modal(title,bodyHtml,onOk){` 之前，與以前相同）；HTML／CSS 改 `index.html`
-- **計算模組 `calc/`**（v6.0.130 改版第 3a 步起）：純計算（不讀畫面、不讀全域資料，值由參數傳入），一個領域一個檔，掛在 `window.FJC.<領域>`，`index.html` 在 `app.js` 之前 defer 載入；Node 可直接 `require`（`npm run calc` 跑 `tests/calc.js`，不開瀏覽器）。`app.js` 原函式只剩「讀資料 → 呼叫 calc → 回傳／寫畫面」。**calc 對外函式只能新增、不能改既有參數或意義**（換版空檔可能舊 app.js 配新 calc；要改算法就開新名字）。目前：`calc/invoice.js`（`FJC.inv`：稅率、請款合計、保留款、已收款、應收、發票應開）。Service Worker 把 `calc/*.js` 視同應用殼，與 index.html／app.js 一起換新；**新增 calc 檔要同時加進 index.html（app.js 之前）與 sw.js 的 `CALC_FILES`**（`tests/calc.js` 檢查）。測試或工具複製網站到暫存資料夾時，`calc/` 要一起複製
+- **計算模組 `calc/`**（v6.0.130 改版第 3a 步起）：純計算（不讀畫面、不讀全域資料，值由參數傳入），一個領域一個檔，掛在 `window.FJC.<領域>`，`index.html` 在 `app.js` 之前 defer 載入；Node 可直接 `require`（`npm run calc` 跑 `tests/calc.js`，不開瀏覽器）。`app.js` 原函式只剩「讀資料 → 呼叫 calc → 回傳／寫畫面」。**calc 對外函式只能新增、不能改既有參數或意義**（換版空檔可能舊 app.js 配新 calc；要改算法就開新名字）。目前：`calc/invoice.js`（`FJC.inv`：稅率、請款合計、保留款、已收款、應收、發票應開）、`calc/payable.js`（`FJC.pay`：應付含稅、廠商保留款、分包單期計價、分段裝設％、預付款含稅抵扣、自動應付 id）。Service Worker 把 `calc/*.js` 視同應用殼，與 index.html／app.js 一起換新；**新增 calc 檔要同時加進 index.html（app.js 之前）與 sw.js 的 `CALC_FILES`**（`tests/calc.js` 檢查）。測試或工具複製網站到暫存資料夾時，`calc/` 要一起複製
 - 資料存 localStorage ＋ Firebase RTDB 雲端同步（記錄級合併、`_mt` 修改時間新者勝）
 - **雲端分兩個節點**（v5.324）：`fydata/shared` 一般營運資料（登入即可讀）、`fydata/private`
   敏感資料（成本／毛利／分潤／應付／費用／材料台帳／單價庫，僅 `fydata/adminUids` 內的管理員可讀）。

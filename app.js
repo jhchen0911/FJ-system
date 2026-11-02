@@ -1,9 +1,9 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.130';
+var APP_VERSION='v6.0.131';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
-if(typeof FJC==='undefined'||!FJC.inv){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
+if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -359,10 +359,7 @@ function _invRetention(inv){
   return FJC.inv.retention(inv,_taxR(),_retPctOf(inv));
 }
 // 廠商保留款（改與業主端同為含稅基礎）
-function _payRetention(p){
-  if(!p||!(parseFloat(p.retentionPct)>0)||p.status==='paid')return 0;
-  return Math.round(_payEff(p)*parseFloat(p.retentionPct)/100);
-}
+function _payRetention(p){return FJC.pay.retention(p,_taxR());}
 
 // 單張請款單的應收（含稅、已扣保留款、扣除實收）
 // v5.326 抵銷項：匯費／業主扣款／業主當場加扣的保留款，業主不會再匯這筆錢過來，
@@ -21555,30 +21552,14 @@ function _vendorDueDate(d){
 // 欄位：signDate 簽約日／entryDate 進場日／invoice 開發票（預設 true → 應付 +5%）／retRate 保留款％（列可用 row.ret 覆寫）
 //       periods[]：逐期計價 {no,date,from,to,rows:[{rid,qty}],amt,ret,net,due,note}；isRet:true 的是「保留款退還」
 // 口徑：c.amt 仍是發包總額（成本分析用）；應付改由各期產生（pay<cid>_p<no>），有分期後整筆應付自動撤掉
-function _subInvoice(c){return !c||c.invoice!==false;}
-function _subRetRate(c,row){
-  var r=(row&&row.ret!=null&&row.ret!=='')?parseFloat(row.ret):parseFloat(c&&c.retRate);
-  return isNaN(r)?0:Math.max(0,Math.min(100,r));
-}
-function _subPeriods(c){return (c&&Array.isArray(c.periods))?c.periods:[];}
-function _subPeriodCalc(c,per){
-  var amt=0,ret=0;
-  if(per&&per.isRet){amt=Math.round(parseFloat(per.amt)||0);return {amt:amt,ret:0,net:amt,adv:0,pay:amt};}
-  ((per&&per.rows)||[]).forEach(function(pr){
-    var row=(c.rows||[]).find(function(r){return r.id===pr.rid;});if(!row)return;
-    var a=_subStaged(row)&&(pr.qi!=null||pr.qr!=null)
-      ?(((parseFloat(pr.qi)||0)*_subPrInst(row,pr)+(parseFloat(pr.qr)||0)*(100-_subPrInst(row,pr)))/100)*_subRowPrice(row,pr)   // 審查修正：分段＝裝設量×inst%＋拆除量×其餘%
-      :(parseFloat(pr.qty)||0)*_subRowPrice(row,pr);   // v5.444 廠商請款單價可核實覆寫
-    amt+=a;ret+=a*_subRetRate(c,row)/100;
-  });
-  amt=Math.round(amt);ret=Math.round(ret);
-  var net=amt-ret,adv=Math.max(0,Math.min(Math.round(parseFloat(per&&per.adv)||0),net));   // v5.443 抵扣預付款不超過本期
-  return {amt:amt,ret:ret,net:net,adv:adv,pay:net-adv};
-}
-function _subStaged(row){return !!(row&&row.stage&&!row.lump&&row.tpl!=='grout');}
-function _subPrInst(row,pr){var v=parseFloat(pr&&pr.ins);return isNaN(v)?_subInst(row):Math.max(0,Math.min(100,v));}   // Lotion 10/21：期別存當時的裝設％（pr.ins），之後調整不回溯
-function _subInst(row){var v=parseFloat(row&&row.inst);return isNaN(v)?_instDef():Math.max(0,Math.min(100,v));}
-function _subPayId(cid,per){return 'pay'+cid+(per.isRet?'_r':'_p')+per.no;}
+function _subInvoice(c){return FJC.pay.invoice(c);}
+function _subRetRate(c,row){return FJC.pay.retRate(c,row);}
+function _subPeriods(c){return FJC.pay.periods(c);}
+function _subPeriodCalc(c,per){return FJC.pay.periodCalc(c,per,_instDef());}   // 第 3a-2 步：算法在 calc/payable.js
+function _subStaged(row){return FJC.pay.staged(row);}
+function _subPrInst(row,pr){return FJC.pay.prInst(row,pr,_instDef());}   // Lotion 10/21：期別存當時的裝設％（pr.ins），之後調整不回溯
+function _subInst(row){return FJC.pay.inst(row,_instDef());}
+function _subPayId(cid,per){return FJC.pay.payId(cid,per);}
 function _subNextNo(c){return _subPeriods(c).reduce(function(m,p){return Math.max(m,parseInt(p.no)||0);},0)+1;}
 // 各期應付：金額＝本期未稅（已扣保留款），稅別依「開發票」，到期日依放款日參數；付款狀態與單據一律保留
 // 承包成本卡上的應付按鈕：整筆或分期彙總
@@ -26314,8 +26295,8 @@ function _payFilesRow(p){
     +'<button type="button" class="btn btn-xs" title="拍照或上傳匯款紀錄／轉帳截圖" onclick="_payUpload(\''+p.id+'\',\'pay\')" style="border-color:var(--b3);color:var(--b4)"><svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg> 匯款紀錄</button>'
     +chips+'</div>';
 }
-function _payEff(p){var a=parseFloat(p.amount)||0;if(p.vat!==false&&p.incl!=null&&isFinite(+p.incl))return Math.round(+p.incl);return p.vat===false?Math.round(a):Math.round(a*_taxM());}   // 批次 G3：有抵扣預付款的期別存含稅應付 p.incl   // v5.318 稅率改讀 _taxM
-function _payVatAmt(p){return _payEff(p)-Math.round(parseFloat(p.amount)||0);}
+function _payEff(p){return FJC.pay.eff(p,_taxR());}   // 第 3a-2 步：算法在 calc/payable.js（含稅；有抵扣預付款的期別用 p.incl）
+function _payVatAmt(p){return FJC.pay.vatAmt(p,_taxR());}
 function _togglePayVatCore(pid,on){
   var p=PAYABLES.find(x=>x.id===pid);if(!p)return;
   p.vat=!!on;_touch(p);
@@ -31287,21 +31268,11 @@ function _wkOFListView(fields,w){
 // ── 額外支出：日報．支出登錄的（src:'quick'，或舊資料有 payer 欄且廠商為公司自付）唯讀；施工成本頁自建的廠商型額外支出可編輯、掛應付
 function _isQuickExtra(c){return !!c&&c.type==='extra'&&(c.src==='quick'||(c.payer!==undefined&&(c.vendor||'')==='公司支出（自付）'));}
 // ── 預付款 ──
-function _subAdvs(c){return (c&&Array.isArray(c.advances))?c.advances:[];}
-function _subAdvPayId(cid,a){return 'pay'+cid+'_a'+a.id;}
+function _subAdvs(c){return FJC.pay.advs(c);}
+function _subAdvPayId(cid,a){return FJC.pay.advPayId(cid,a);}
 // 批次 G3（D）：預付款抵扣改用含稅口徑。預付款應付是「每筆預付未稅 × 稅率四捨五入」付出去的；各期抵扣以累計比例分攤這個含稅總額，
 //   扣滿時剛好等於已付的含稅預付款，不會再出現 359,988（未稅）和 377,987（含稅）混用、總付款比合約多 1 元。回傳 {期別:本期抵扣含稅}
-function _subAdvInclAlloc(c){
-  var out={},vat=_subInvoice(c),advs=_subAdvs(c);
-  var U=advs.reduce(function(a,x){return a+Math.round(parseFloat(x.amt)||0);},0);if(!(U>0))return out;
-  var I=advs.reduce(function(a,x){var v=Math.round(parseFloat(x.amt)||0);return a+(vat?Math.round(v*_taxM()):v);},0);
-  var cum=0,cumI=0;
-  _subPeriods(c).filter(function(p){return p&&!p.isRet;}).slice().sort(function(a,b){return (parseInt(a.no)||0)-(parseInt(b.no)||0);}).forEach(function(per){
-    var d=_subPeriodCalc(c,per).adv;if(!(d>0))return;cum+=d;
-    var ci=cum>=U?I:Math.round(cum/U*I);out[per.no]=ci-cumI;cumI=ci;
-  });
-  return out;
-}
+function _subAdvInclAlloc(c){return FJC.pay.advInclAlloc(c,_taxR(),_instDef());}
 function _subAdvStat(c){
   var paid=0,used=0;
   _subAdvs(c).forEach(function(a){paid+=Math.round(parseFloat(a.amt)||0);});
@@ -31474,7 +31445,7 @@ function _subFollowSummary(q,c){
 //  ‧ 自有成本＝前置購置／租賃的材料、機具（非施工本身）。選廠商即掛應付，開發票者 +5%；不選廠商＝公司自備不入應付。
 //  ‧ 點工／額外支出：廠商型掛應付；日報．支出登錄的零星支出唯讀（_isQuickExtra）。
 //  ‧ 逾期租金是業主端收入（依日報打設／拔除日推算），成本分析另列，不進成本。
-function _subRowPrice(row,pr){var u=pr&&pr.up;return (u!=null&&u!=='')?(parseFloat(u)||0):(parseFloat(row&&row.unitPrice)||0);}
+function _subRowPrice(row,pr){return FJC.pay.rowPrice(row,pr);}
 // 分包超量：逐期累計，超過發包量的金額；勾 absorb 的期歸「自行吸收」，其餘「應向業主追加」
 function _subOverStat(c){
   var out={overAmt:0,absorbed:0,toOwner:0,overQty:{},absorbQtyByItem:{},overQtyByItem:{}};
@@ -33637,7 +33608,7 @@ function rfqAward(rid){
 // ── 提前放款：已登錄的期別（本月 25 日請款、次月 25 日放款），廠商有困難先放一部分 → 拆出一筆應付（到期＝提前日），原期應付扣掉
 function _subEarly(per){return (per&&Array.isArray(per.early))?per.early:[];}
 function _subEarlySum(per){return _subEarly(per).reduce(function(a,e){return a+Math.round(parseFloat(e.amt)||0);},0);}
-function _subEarlyId(cid,per,e){return 'pay'+cid+'_p'+per.no+'_e'+e.id;}
+function _subEarlyId(cid,per,e){return FJC.pay.earlyId(cid,per,e);}
 // 健檢1 #13：已付應付的金額不再被自動重建改寫。本體與差額（deltaOf＝本體 id）合計已付 vs 新算出的應付 → 差額掛一筆待付
 //（正＝還要付；負＝多付了，待下期扣回或向廠商收回）；差額為 0 就拿掉未付的差額筆。
 function _payPaidDelta(p,old){

@@ -2,7 +2,8 @@
 //   npm run calc
 const path = require('path');
 const FJC = require(path.join(__dirname, '..', 'calc', 'invoice.js'));
-const I = FJC.inv;
+require(path.join(__dirname, '..', 'calc', 'payable.js'));
+const I = FJC.inv, PY = FJC.pay;
 const results = [];
 const check = (name, ok, info) => results.push({ name, ok: !!ok, info: info || '' });
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -32,8 +33,30 @@ check('發票應開：折讓模式 105,000、稅 5,000（B25）', I.einvGross(b2
 check('發票應開：直接扣除模式扣清潔費 103,950', I.einvGross({ cleanMode: 'net', totals: b25.totals }) === 103950 && I.einvGross({ totals: b25.totals }) === 103950);
 check('免稅案發票稅額 0', eq(I.einvSplit(100000, 0), { net: 100000, tax: 0, gross: 100000 }));
 // calc 不能碰全域資料：模組原始碼裡不准出現 P. / Q. / INV / document / window.（除了最後掛載）
-const src = require('fs').readFileSync(path.join(__dirname, '..', 'calc', 'invoice.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-check('calc/invoice.js 不讀畫面與全域資料', !/\b(P|Q|INV|PAYABLES|CONTRACTS)\b\s*[.[]|document\.|localStorage/.test(src));
+const fs0 = require('fs'), calcDir = path.join(__dirname, '..', 'calc');
+fs0.readdirSync(calcDir).filter(f => /\.js$/.test(f)).forEach(f => {
+  const src = fs0.readFileSync(path.join(calcDir, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  // 在乾淨沙盒裡載入：模組本身不能碰任何外部名稱（只有 globalThis 掛 FJC）
+  let clean = true; try { require('vm').runInNewContext(src, { globalThis: {}, module: undefined }); } catch (e) { clean = false; }
+  check('calc/' + f + ' 不讀畫面與全域資料（乾淨沙盒可載入）', clean && !/\b(P|Q|INV|PAYABLES|CONTRACTS)\b\s*[.[]|document\.|localStorage/.test(src));
+});
+
+// ── 應付與分包計價（calc/payable.js）──
+check('應付含稅：1,000 未稅×1.05＝1,050；未稅應付照原額；有含稅 incl 用 incl', PY.eff({ amount: 1000 }, 5) === 1050 && PY.eff({ amount: 1000, vat: false }, 5) === 1000 && PY.eff({ amount: 1000, incl: 1049 }, 5) === 1049 && PY.vatAmt({ amount: 1000 }, 5) === 50);
+check('廠商保留款：含稅 10,500×5%＝525；已付不計', PY.retention({ amount: 10000, retentionPct: 5 }, 5) === 525 && PY.retention({ amount: 10000, retentionPct: 5, status: 'paid' }, 5) === 0);
+const card = { id: 'c1', invoice: true, retRate: 5, rows: [{ id: 'r1', qty: 1000, unitPrice: 1000 }, { id: 'r2', qty: 40, unitPrice: 500, stage: 1, inst: 70 }],
+  advances: [{ id: 'a1', amt: 359988 }],
+  periods: [{ no: 1, rows: [{ rid: 'r1', qty: 400 }], adv: 200000 }, { no: 2, rows: [{ rid: 'r1', qty: 300 }, { rid: 'r2', qi: 40, qr: 0 }], adv: 159988 }, { no: 3, isRet: true, amt: 35700 }] };
+const p1 = PY.periodCalc(card, card.periods[0], 100);
+check('分包第 1 期：400×1,000＝400,000、保留 5%＝20,000、抵扣預付 200,000、應付 180,000', p1.amt === 400000 && p1.ret === 20000 && p1.net === 380000 && p1.adv === 200000 && p1.pay === 180000, JSON.stringify(p1));
+const p2 = PY.periodCalc(card, card.periods[1], 100);
+check('分段工項：裝設 40 支×70%×500＝14,000（列的裝設％優先於預設）', p2.amt === 300000 + 14000, JSON.stringify(p2));
+check('期別存當時的裝設％（pr.ins）優先，之後改列的％不回溯', PY.periodCalc(card, { no: 9, rows: [{ rid: 'r2', qi: 40, qr: 0, ins: 50 }] }, 100).amt === 10000);
+check('保留款退還期：只付退還金額', eq(PY.periodCalc(card, card.periods[2], 100), { amt: 35700, ret: 0, net: 35700, adv: 0, pay: 35700 }));
+check('抵扣預付不超過本期淨額', PY.periodCalc(card, { no: 8, rows: [{ rid: 'r1', qty: 1 }], adv: 999999 }, 100).adv === 950);
+const al = PY.advInclAlloc(card, 5, 100);
+check('預付款含稅抵扣（合成樣本 A14b）：預付 359,988×1.05＝377,987，第 1 期 210,000、第 2 期 167,987，合計＝已付含稅預付', al[1] === 210000 && al[2] === 167987 && al[1] + al[2] === 377987, JSON.stringify(al));
+check('廠商請款單價可核實覆寫、應付 id 規則', PY.rowPrice({ unitPrice: 1000 }, { up: 990 }) === 990 && PY.rowPrice({ unitPrice: 1000 }, { up: '' }) === 1000 && PY.payId('c1', { no: 2 }) === 'payc1_p2' && PY.payId('c1', { no: 3, isRet: true }) === 'payc1_r3' && PY.advPayId('c1', { id: 'a1' }) === 'payc1_aa1');
 
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
