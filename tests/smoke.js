@@ -9195,8 +9195,8 @@ async function newPage(browser, width, height) {
         out.revNoRet = a1 === 100000 && a2 === 100000;
         inv.cleanMode = 'net'; out.revNetClean = _shRptYear(2027).revNet === 99000; inv.cleanMode = 'exp';
         // 公司費用：有進項稅＝未稅、沒稅額＝實付
-        EXPENSES.push({ id: 'e1', date: '2027-04-01', cat: '會計師費', amount: 21000, tax: 1000 }, { id: 'e2', date: '2027-04-02', cat: '其他', amount: 500, tax: 0 });
-        out.expNet = (_shRptYear(2027).expByCat['會計師費'] || 0) === 20000 && (_shRptYear(2027).expByCat['其他'] || 0) === 500;
+        EXPENSES.push({ id: 'e1', date: '2027-04-01', cat: '會計師費', number: 'AB00000001', amount: 21000, tax: 1000 }, { id: 'e2', date: '2027-04-02', cat: '其他', amount: 525, tax: 25 });
+        out.expNet = (_shRptYear(2027).expByCat['會計師費'] || 0) === 20000 && (_shRptYear(2027).expByCat['其他'] || 0) === 525;   // 沒發票號碼＝實付（表單自動帶的稅額不扣）
         // 各案毛利未稅、累計請款本期＋稅
         const st = _pjStat(Q[0]);
         out.profitNet = st.profit === Math.round(st.base / _taxM()) - st.costNet && Math.round(st.billedGross) === 105000;

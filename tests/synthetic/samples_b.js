@@ -112,7 +112,7 @@ module.exports = [
     title: '公司費用：會計師費 21,000（含進項稅 1,000）、營業稅 5,000',
     hand: '應為費用 20,000（未稅）；現況年度損益記 21,000；分潤把營業稅 5,000 也當費用（26,000），股東報表排除 → 兩邊不同（v6.0.135 第 3b 步改成新口徑）',
     run: async () => {
-      EXPENSES.push({ id: 'eB23a', date: '2026-03-10', seller: '甲會計師事務所', cat: '會計師費', amount: 21000, tax: 1000 }, { id: 'eB23b', date: '2026-03-15', seller: '國稅局', cat: '營業稅', amount: 5000, tax: 0 });
+      EXPENSES.push({ id: 'eB23a', date: '2026-03-10', seller: '甲會計師事務所', number: 'AB00000001', cat: '會計師費', amount: 21000, tax: 1000 }, { id: 'eB23b', date: '2026-03-15', seller: '國稅局', cat: '營業稅', amount: 5000, tax: 0 });
       return { shRptExp: _shRptYear(2026).exp, shareExp: _shareAutoCalc('2026').exp };
     }
   },

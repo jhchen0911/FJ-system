@@ -65,16 +65,16 @@
   // ═══ 第 3b 步（v6.0.135）：管理用損益（依期別）——Lotion 11/02 定案口徑。舊 year／shareAuto 保留不動（換版空檔相容）═══
   //   營收：本期總額（未稅 curTotal），保留款退還不倒扣；清潔費只扣一次——「直接扣除」「我方開折讓單」在營收抵減，「業主另開發票」只算費用（健檢1 #8、#11）
   //   成本：data.costEntries [{date,amt,cat}]（app 依廠商計價期別／介紹費實付日／卡片日期展開，健檢1 #9）
-  //   費用：公司費用有發票（進項稅額>0）用未稅（含稅−進項稅）、沒發票用實付；清潔費（業主開立）本身就是未稅；data.extraExp [{date,amt,cat}]＝已付的業務抽成、業主端佣金（健檢1 #10、#23）
+  //   費用：公司費用有發票號碼用未稅（含稅−進項稅）、沒發票用實付；清潔費（業主開立）本身就是未稅；data.extraExp [{date,amt,cat}]＝已付的業務抽成、業主端佣金（健檢1 #10、#23）
   function invRev(v, tm, retention) {
     var t = (v && v.totals) || {};
     if (t.curTotal == null || t.curTotal === '') return (num(t.total) + retention(v)) / tm;   // 舊單沒有本期總額：退回舊算法
     return num(t.curTotal) - (v.cleanMode === 'exp' ? 0 : num(t.clean));
   }
-  function expAmt(e) {   // 有發票（填了進項稅額，跟 401 進項同一欄）＝含稅 − 進項稅；沒發票（稅額 0）＝實付；清潔費（業主開立）amount 本來就是未稅
+  function expAmt(e) {   // 有發票（填了發票號碼）＝含稅 − 進項稅；沒發票＝實付（表單會自動帶稅額，不能拿稅額判斷）；清潔費（業主開立）amount 本來就是未稅
     var a = num(e.amount != null ? e.amount : e.amt);
     if (e.src === 'clean') return a;
-    return a - Math.max(0, num(e.tax));
+    return String(e.number || '').trim() ? a - Math.max(0, num(e.tax)) : a;
   }
   function mgmtParts(data, per, fn) {   // per＝'YYYY' 或 'YYYY-MM'
     var n = per.length, tm = fn.taxM, rev = 0, revTax = 0, ret = 0, cost = 0, costByCat = {}, exp = 0, expByCat = {};

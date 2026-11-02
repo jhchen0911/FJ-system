@@ -337,7 +337,7 @@ function _isRemovePeriod(it){
   if(it&&it.phase==='install')return false;
   var rate=(it&&it.payRate!=null)?it.payRate:100,rr=_removeRate();
   if(rr===0)return false;   // 審查：拆除比例設 0 時，「0% 不請款」不可被當成拔除期
-  return parseFloat(rate)===rr;
+  return Math.abs(parseFloat(rate)-rr)<0.01;   // 第 3b 步：下拉值取到小數 2 位
 }
 // v5.318 口徑統一：同一個指標全站只有一套算法，避免各頁數字對不上
 // ══════════════════════════════════════════════════════════════
@@ -2467,7 +2467,7 @@ function qlHTML(q,clickable){
   // P1-2：實際毛利 =（報價額 − 實際發包成本）/ 報價額；有成本記錄才用實際
   var _actCost=0;try{_actCost=_projCostTotal(q);}catch(e){_err('qlHTML',e);}
   var _hasAct=_actCost>0&&(t.total||0)>0;
-  var _actNr=_hasAct?((t.total-_actCost)/t.total*100):0;
+  var _actNr=_hasAct&&t.sub?((t.sub-_actCost)/t.sub*100):0;   // 第 3b 步（健檢1 #24）：未稅對未稅
   if(_hasAct){nr=_actNr;ok=nr>=P.profit;}
   var awarded=q.awarded||false;
   var dotColor=awarded?'#1a3a6b':ok?'#1a6b3f':'#f5a623';
@@ -2862,7 +2862,7 @@ function _invStoreRead(){
 try{var _invLoaded=_invStoreRead();if(_invLoaded){INV=_invLoaded;const _before=INV.length;INV=INV.filter(function(inv){return inv&&(inv.project||inv.client||inv.id);});if(INV.length!==_before){try{_invStoreWrite();}catch(e){_err('_invStoreRead',e);}}}}catch(e){_err('_invStoreRead',e);}
 function _salesCommOk(){try{return !window._applyingCloud&&(!_fbUser||(_isAdminUser&&!_isReaderUser&&typeof _privReadOk!=='undefined'&&_privReadOk===true));}catch(e){return false;}}   // 審查：只在讀得到 private 的管理員裝置（或未登入的本機模式）重算，免得用不完整的應付蓋掉雲端
 function _salesCommBoot(){if(_salesCommBoot._done)return;setTimeout(function(){if(_salesCommBoot._done||!_salesCommOk())return;_salesCommBoot._done=1;_salesCommSoon();},1500);}   // 批次 G4：開機（私有資料下載完）後重算一次抽成，改版後的算法不必等人去開報表
-function _salesCommSoon(){if(!_salesCommOk())return;clearTimeout(_salesCommSoon._t);_salesCommSoon._t=setTimeout(function(){if(!_salesCommOk())return;try{_salesCommSyncAll();}catch(e){_err('_salesCommSoon',e);}},800);}   // 批次 G3（Lotion 10/27）：開第一期請款單／簽合約後抽成才到期
+function _salesCommSoon(){if(!_salesCommOk())return;clearTimeout(_salesCommSoon._t);_salesCommSoon._t=setTimeout(function(){if(!_salesCommOk())return;try{_salesCommSyncAll();}catch(e){_err('_salesCommSoon',e);}try{_commSyncAll();}catch(e){_err('_salesCommSoon.comm',e);}},800);}   // 批次 G3（Lotion 10/27）：開第一期請款單／簽合約後抽成才到期
 function saveInv(){try{_salesCommSoon();}catch(e){_err('saveInv.sales',e);}
   // 儲存前自動清理空白資料（確保 badge 與列表一致）
   INV=INV.filter(function(inv){return inv&&(inv.project||inv.client||inv.id);});
@@ -3399,7 +3399,8 @@ function _dailyQtyBetween(q,desc,from,to,ph,idx){   // 第 3b 步（健檢1 #18�
       if(!r)return;
       if(ph&&_prPhase(q,r)!==ph)return;   // v5.428：打設期只取打設回報、拔除期只取拔除回報
       var ri=(r.itemIdx!=null&&r.itemIdx!=='')?parseInt(r.itemIdx):-1;
-      if(ix>=0&&ri>=0){if(ri!==ix)return;}
+      var rdd=String(r.desc||'').split('\n')[0].trim(),idd=String(((q.items||[])[ri]||{}).desc||'').split('\n')[0].trim();
+      if(ix>=0&&ri>=0&&(!rdd||rdd===idd)){if(ri!==ix)return;}   // 審查：日報列記的名稱跟該位置工項不同（報價後來插入／刪除工項）→ 退回名稱比對
       else{var rd=String(r.desc||((q.items||[])[r.itemIdx]||{}).desc||'').split('\n')[0].trim();if(rd!==d)return;}
       sum+=parseFloat(r.qty)||0;
     });
@@ -21799,7 +21800,8 @@ function _spRecalc(){
       var ei=el.querySelector('.sp-qi'),er=el.querySelector('.sp-qr');[ei,er].forEach(function(x){if(x&&document.activeElement===x)x.dataset.touched='1';});
       var cp0=parseFloat(el.getAttribute('data-price'))||0,ue=el.querySelector('.sp-up'),pr0=(ue&&ue.value!=='')?(parseFloat(ue.value)||0):cp0;
       var qi=parseFloat(ei.value)||0,qr=parseFloat(er.value)||0,ins=parseFloat(el.getAttribute('data-inst'))||0,rr0=parseFloat(el.getAttribute('data-ret'))||0,tq0=parseFloat(el.getAttribute('data-total'))||0;
-      var a0=((qi*ins+qr*(100-ins))/100)*pr0;amt+=a0;ret+=a0*rr0/100;el.querySelector('.sp-amt').textContent=fmt(Math.round(a0));
+      var _pI0=parseFloat(el.getAttribute('data-prev'))||0,_pR0=parseFloat(el.getAttribute('data-prevr'))||0,qrC=Math.max(0,Math.min(qr,_pI0+qi-_pR0));   // 審查：預覽跟存檔一樣，拆除以已裝設為上限
+      var a0=((qi*ins+qrC*(100-ins))/100)*pr0;amt+=a0;ret+=a0*rr0/100;el.querySelector('.sp-amt').textContent=fmt(Math.round(a0));
       var w0=el.querySelector('.sp-warn'),pI=parseFloat(el.getAttribute('data-prev'))||0,pR=parseFloat(el.getAttribute('data-prevr'))||0,msg=[];
       // 第 3b 步（健檢1 #27）：拆除不能超過已裝設（含本期）；裝設超過發包量比照一般工項＝實作實算（向業主追加或勾自行吸收），不再默默截掉
       if(tq0>0&&pI+qi>tq0+1e-6){over++;var exI=Math.max(0,pI+qi-tq0)-Math.max(0,pI-tq0);overAmt+=exI*pr0*ins/100;msg.push('裝設累計 '+_rfmt(pI+qi)+' 超過發包量 '+_rfmt(tq0)+'（實作實算：本期超出 '+_rfmt(Math.round(exI*100)/100)+'，向業主追加請款或勾自行吸收）');}
@@ -25387,7 +25389,7 @@ function _settleContractDo(id,orig,billed,_retSum){
   if(c.originalAmount==null)c.originalAmount=orig; // 保留原始合約金額
   c.amount=billed;
   c.status='completed';
-  try{var _sq=Q.find(function(x){return x.id===c.linkedQid;})||Q.find(function(x){return !c.linkedQid&&x.name&&x.name===c.name&&!x.parentId;});if(_sq)c.settleSnap={qid:_sq.id,at:Date.now(),qty:_asSnap(_sq)};}catch(e){_err('_settleContractDo.snap',e);}   // 健檢1 #19：記下結算當下的實作量，之後日報有變才提示
+  try{var _sq=Q.find(function(x){return x.id===c.linkedQid;})||Q.find(function(x){return !c.linkedQid&&x.name&&x.name===c.name&&!x.parentId;});if(_sq)c.settleSnap={qid:_sq.id,at:Date.now(),qty:_asSnap(_sq),src:'settle'};   /* 第 3b 步：src＝竣工結算當下寫的（會計用完工日只認這個） */}catch(e){_err('_settleContractDo.snap',e);}   // 健檢1 #19：記下結算當下的實作量，之後日報有變才提示
   const settleNote='竣工結算：原合約 NT$'+fmt(orig)+' → 結算 NT$'+fmt(billed);
   c.note=c.note?(c.note+'　'+settleNote):settleNote;
   _touch(c);c.updatedAt=Date.now(); // 更新修改時間，確保跨裝置同步時新值獲勝
@@ -26580,7 +26582,7 @@ function _projBillProgress(q){
   return {has:has,pct:base>0?val/base*100:0,base:base};
 }
 function _instPctOfQ(q){try{var v=q&&q.ownerPay&&q.ownerPay.instPct;if(v!=null&&v!=='')return Math.max(0,Math.min(100,parseFloat(v)||0));return _ownerInstRef(q).pct;}catch(e){_err('_instPctOfQ',e);return _instDef();}}
-function _invGrossOf(x){var t=(x&&x.totals)||{};return (t.curTotal!=null&&t.curTotal!=='')?((parseFloat(t.curTotal)||0)+(parseFloat(t.tax)||0)):(parseFloat(t.total)||0);}   // 本期＋稅（不扣保留款、清潔費）
+function _invGrossOf(x){var t=(x&&x.totals)||{};if(t.curTotal!=null&&t.curTotal!==''&&(parseFloat(t.curTotal)||0)!==0)return (parseFloat(t.curTotal)||0)+(parseFloat(t.tax)||0);return (parseFloat(t.total)||0)+(parseFloat(t.retention)||0)+(parseFloat(t.cleanGross)||0);}   // 審查：舊單沒有本期總額＝total 加回保留款、清潔費   // 本期＋稅（不扣保留款、清潔費）
 function renderCashForecast(){
   var el=document.getElementById('cashflow-forecast');if(!el)return;
   var now=new Date();now.setHours(0,0,0,0);var t0=now.getTime();
@@ -27060,7 +27062,7 @@ function _mgmtCostEntries(){
     out.push({date:c.date||'',amt:parseFloat(c.amt)||0,cat:cat,qid:q.id});});});
   return out;
 }
-function _payPaidOn(p){return (p&&_payPaidHard(p)&&!p.voidAt)?String(p.paidDate||p.date||''):'';}
+function _payPaidOn(p){if(!(p&&_payPaidHard(p)&&!p.voidAt))return '';var d=String(p.paidDate||p.date||'');if(!d&&p.paidAt)d=_ymd(p.paidAt);if(!d){try{var L=PAID_LOG&&PAID_LOG[p.id];if(L&&L.paidAt)d=_ymd(L.paidAt);}catch(e){_err('_payPaidOn',e);}}return d;}
 function _mgmtExtraExp(){
   var out=[],intro={};
   (Q||[]).forEach(function(q){(q&&q.costs||[]).forEach(function(c){if(_isIntroCard(c))intro[c.id]=q.id;});});
@@ -27077,7 +27079,7 @@ function _acctProjects(){
   (_pjProjects(true)||[]).forEach(function(q){var st;try{st=_pjStat(q);}catch(e){_err('_acctProjects',e);return;}
     var ct=st.ct,done=!!(q.closed||st.done);if(!done)return;
     var invs=_invsOfQuoteAll(q).filter(function(i){return i&&i.kind!=='retReturn';}),last='';invs.forEach(function(i){if((i.date||'')>last)last=i.date||'';});
-    var dd='',by='';if(ct&&ct.settleSnap&&ct.settleSnap.at){dd=_ymd(ct.settleSnap.at);by='竣工結算';}else if(last){dd=last;by='最後一期請款';}else if(q.closed&&q.closedAt){dd=_ymd(q.closedAt);by='結案';}
+    var dd='',by='';if(ct&&ct.settleSnap&&ct.settleSnap.at&&ct.settleSnap.src==='settle'){dd=_ymd(ct.settleSnap.at);by='竣工結算';}   /* 審查：自動結算補記的 settleSnap 是補記當天，不是結算日 → 用最後一期請款日 */else if(last){dd=last;by='最後一期請款';}else if(q.closed&&q.closedAt){dd=_ymd(q.closedAt);by='結案';}
     if(!dd)return;
     var rev=invs.reduce(function(a,i){return a+FJC.rpt.invRev(i,_taxM(),_invRetention);},0);
     var ids={};st.all.forEach(function(x){ids[x.id]=1;});
@@ -32295,7 +32297,7 @@ function _pjStat(q){
   st.neg=neg;st.origTotal=Math.round(origSub*_taxM());st.curTotal=Math.round(curSub*_taxM());
   st.invs=_invsOfQuoteAll(q).slice().sort(function(a,b){return (parseInt(a.periodNo)||1)-(parseInt(b.periodNo)||1);});
   st.billed=st.invs.reduce(function(a,x){return a+((x.totals&&x.totals.total)||0);},0);
-  st.billedGross=st.invs.reduce(function(a,x){var t=x.totals||{};return a+((t.curTotal!=null&&t.curTotal!=='')?((parseFloat(t.curTotal)||0)+(parseFloat(t.tax)||0)):(parseFloat(t.total)||0));},0);   // 第 3b 步（健檢1 #22）：本期＋稅，不扣保留款、清潔費
+  st.billedGross=st.invs.reduce(function(a,x){return a+_invGrossOf(x);},0);   // 第 3b 步（健檢1 #22）：本期＋稅，不扣保留款、清潔費
   st.recv=st.invs.reduce(function(a,x){return a+_invRcv(x);},0);
   st.ar=st.invs.reduce(function(a,x){return a+_invAR(x);},0);
   st.retHeld=st.invs.reduce(function(a,x){return a+_invRetention(x);},0);
