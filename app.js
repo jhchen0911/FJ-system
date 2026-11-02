@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.129';
+var APP_VERSION='v6.0.130';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -340,8 +340,9 @@ function _isRemovePeriod(it){
 // v5.318 口徑統一：同一個指標全站只有一套算法，避免各頁數字對不上
 // ══════════════════════════════════════════════════════════════
 // 稅率／保留款%：0 是合法值（免稅案、不留保留款），不可被 || 預設值吃掉
-function _taxR(){var v=(P&&P.tax);return (v==null||v==='')?5:(parseFloat(v)||0);}
-function _taxM(){return 1+_taxR()/100;}
+// 第 3a 步（v6.0.130）：純計算搬到 calc/invoice.js（FJC.inv），這裡只負責「讀資料 → 呼叫 calc」
+function _taxR(){return FJC.inv.taxR(P&&P.tax);}
+function _taxM(){return FJC.inv.taxM(P&&P.tax);}
 // v6.0.92：請款單沒填保留款% → 跟隨專案「業主扣款設定」q.deduct.ret；專案也沒設定＝0（合約沒寫＝不扣）。明確填 0 就是 0
 // 記錄上空白＋已勾保留款＝v6.0.92 以前的舊單（舊版存檔一律寫數字，空白只出現在更早的資料），照原本 10% 計，金額不變
 function _retPctOf(inv){var v=inv&&inv.retentionPct;if(v!=null&&v!=='')return parseFloat(v)||0;if(inv&&inv.retention&&inv.kind!=='retReturn')return 10;return _ownerRetPct(_retQOf(inv));}
@@ -353,9 +354,7 @@ function _ownerRetPct(q){var r=q&&q.deduct&&q.deduct.ret;return (r!=null&&r!==''
 // 業主保留款（含稅基礎；已退還者不計）
 function _invRetention(inv){
   if(!inv||!inv.retention||inv.retentionReturned)return 0;
-  var base=(inv.totals&&parseFloat(inv.totals.curTotal))||0;
-  if(!base)return (inv.totals&&parseFloat(inv.totals.retention))||0;
-  return Math.round(base*_taxM()*_retPctOf(inv)/100);
+  return FJC.inv.retention(inv,_taxR(),_retPctOf(inv));
 }
 // 廠商保留款（改與業主端同為含稅基礎）
 function _payRetention(p){
@@ -367,15 +366,13 @@ function _payRetention(p){
 // v5.326 抵銷項：匯費／業主扣款／業主當場加扣的保留款，業主不會再匯這筆錢過來，
 // 所以不該繼續掛在應收與逾期提醒上（25 元匯費害整張單天天跳逾期）。
 function _invAR(inv){
-  if(!inv)return 0;
-  if(inv.receivedConfirmed)return 0;   // 已結清
-  var due=(inv.totals&&parseFloat(inv.totals.total))||0;
-  return Math.max(0,due-_invRcvOwner(inv)-_invOffset(inv));
+  if(!inv||inv.receivedConfirmed)return 0;   // 已結清
+  return FJC.inv.ar(inv,_invOffset(inv));
 }
 // 業主當場扣下的保留款：之後可以請退，另外累計提醒，不要跟著應收一起消失
 function _invHold(inv){
   // v5.337：扣掉已退還的部分——退還登錄後不再顯示「可請退」
-  return Math.max(0,(parseFloat(inv&&inv.recvHold)||0)-_holdRetCash(inv).amt);   // 審查修正：已退以 _holdRetCash（上限＝該期當場扣款）為準
+  return FJC.inv.hold(inv);   // 審查修正：已退以 _holdRetCash（上限＝該期當場扣款）為準
 }
 function _holdTotal(){return INV.reduce(function(a,i){return a+_invHold(i);},0);}
 // 全部尚有應收的請款單（全站唯一過濾條件）
@@ -3449,17 +3446,12 @@ function _invRowBase(it){
 function _invRowAmt(it){return Math.round(_invRowBase(it)*((it&&it.payRate!=null?it.payRate:100)/100));}
 function _recalcInvAmounts(inv){
   if(!inv||!Array.isArray(inv.items))return;
-  let curTotal=0;
   inv.items.forEach(it=>{
     if(it.type==='sec')return;
     it.curAmt=_invRowAmt(it);
   });
-  inv.items.forEach(it=>{if(it.type!=='sec')curTotal+=parseFloat(it.curAmt)||0;});
-  const tax=curTotal*_taxR()/100;
-  const beforeRetention=curTotal+tax;
-  const retention=inv.retention?beforeRetention*(_retPctOf(inv)/100):0;
-  const _cpm=parseFloat(inv.cleanPermil)||0,clean=Math.round(curTotal*_cpm/1000),cleanGross=Math.round(clean*_taxM());   // v6.0.31
-  inv.totals={curTotal,tax,total:beforeRetention-retention-cleanGross,retention,clean,cleanGross,cleanPermil:_cpm,baseTotal:curTotal,claimRatio:1};
+  const amts=inv.items.filter(it=>it.type!=='sec').map(it=>parseFloat(it.curAmt)||0);
+  inv.totals=FJC.inv.totals(amts,{taxR:_taxR(),retOn:!!inv.retention,retPct:inv.retention?_retPctOf(inv):0,cleanPermil:inv.cleanPermil});   // v6.0.31 清潔費；第 3a 步搬到 calc
 }
 
 function updateInvRowAmt(i, tr){
@@ -37822,27 +37814,22 @@ function _retMarkReturned(inv,on,date,byId){
   return amt;
 }
 // 另記的保留款退還現金（v6.0.95 起）：{amt,date}
-function _retSepCash(inv){return (inv&&inv.retentionSep&&inv.retentionReturned)?{amt:parseFloat(inv.retentionReceivedAmt)||0,date:String(inv.retentionReturnedDate||'')}:{amt:0,date:''};}
+function _retSepCash(inv){return FJC.inv.retSepCash(inv);}
 // 某月（YYYY-MM）收到的保留款退還現金
 // 實收（含另記的保留款退還）：總額 _invRcv、某期間（'YYYY' 或 'YYYY-MM'）_invRcvIn——全站「已收／實收」報表共用（應收 _invAR 仍只看 received）
 // 業主當場扣款的退還（receiptHoldReturn／退還請款單）：每次退還一筆 {amt,date}（inv.holdRetLog）；舊資料只有 holdRetAmt／holdRetDate＝一筆
 // 金額上限＝該期當場扣款 recvHold——舊版 addNextPeriod 會把上期的 holdRetAmt 抄到下一期，超過的部分不算實收（健檢另列出）
-function _holdRetEntries(inv){
-  if(!inv)return [];
-  var cap=parseFloat(inv.recvHold)||0,L=Array.isArray(inv.holdRetLog)&&inv.holdRetLog.length?inv.holdRetLog:((parseFloat(inv.holdRetAmt)||0)>0?[{amt:parseFloat(inv.holdRetAmt)||0,date:String(inv.holdRetDate||'')}]:[]);
-  var out=[],left=cap;L.forEach(function(e){var a=Math.min(Math.max(0,parseFloat(e&&e.amt)||0),left);if(a>0){out.push({amt:a,date:String((e&&e.date)||'')});left-=a;}});
-  return out;
-}
-function _holdRetCash(inv){var E=_holdRetEntries(inv),a=E.reduce(function(x,e){return x+e.amt;},0);return {amt:a,date:E.length?E[E.length-1].date:''};}
+function _holdRetEntries(inv){return FJC.inv.holdRetEntries(inv);}
+function _holdRetCash(inv){return FJC.inv.holdRetCash(inv);}
 function _holdRetPush(inv,amt,date,by){   // 新增一筆退還（保留先前的日期）
   if(!Array.isArray(inv.holdRetLog)||!inv.holdRetLog.length)inv.holdRetLog=(parseFloat(inv.holdRetAmt)||0)>0?[{amt:parseFloat(inv.holdRetAmt)||0,date:String(inv.holdRetDate||'')}]:[];
   inv.holdRetLog.push({amt:amt,date:date,by:by||''});
   inv.holdRetAmt=inv.holdRetLog.reduce(function(a,e){return a+(parseFloat(e.amt)||0);},0);inv.holdRetDate=date;
 }
 // 2b（健檢3 #5）：讀「已收款」一律走這兩個——_invRcvOwner＝業主本期付款（請款單 received 欄，不含另記的保留款退還）；_invRcv＝這張請款單實際收到的全部現金（＋另記的保留款退還＋業主當場扣款後退還）
-function _invRcvOwner(inv){return parseFloat(inv&&inv.received)||0;}
-function _invRcv(inv){return _invRcvOwner(inv)+_retSepCash(inv).amt+_holdRetCash(inv).amt;}
-function _invRcvIn(inv,pre){if(!inv)return 0;var a=0,n=pre.length;if(String(inv.receivedDate||'').slice(0,n)===pre)a+=_invRcvOwner(inv);var c=_retSepCash(inv);if(c.amt&&c.date.slice(0,n)===pre)a+=c.amt;_holdRetEntries(inv).forEach(function(h){if(h.date.slice(0,n)===pre)a+=h.amt;});return a;}
+function _invRcvOwner(inv){return FJC.inv.rcvOwner(inv);}
+function _invRcv(inv){return FJC.inv.rcv(inv);}
+function _invRcvIn(inv,pre){return FJC.inv.rcvIn(inv,pre);}
 function _retCashOn(ym){return (INV||[]).reduce(function(a,i){var c=_retSepCash(i),n=ym.length;a+=(c.amt&&c.date.slice(0,n)===ym)?c.amt:0;_holdRetEntries(i).forEach(function(h){if(h.date.slice(0,n)===ym)a+=h.amt;});return a;},0);}   // 某月收到的保留款退還（預扣＋當場扣款）
 // 應收餘額：逐張 _invAR 加總（已扣保留款、扣抵銷項、已結清＝0），保留款退還後不會變負數
 function _arSum(list){return (list||[]).reduce(function(a,i){return a+_invAR(i);},0);}
@@ -37860,8 +37847,8 @@ function _retPendRows(q){
 }
 // 發票應開金額：含稅 → 未稅＝含稅÷(1＋稅率) 四捨五入到元，稅額＝含稅－未稅（尾差都落在稅額）
 // 2b（健檢1 #25）：這張請款單的「本期發票應開金額」（含稅）＝本期＋稅－保留款－（清潔費「從請款扣」才扣）；與請款單畫面、列印同一算法
-function _invEinvGross(inv){var t=(inv&&inv.totals)||{};var mode=(inv&&inv.cleanMode)||'net';return Math.round((parseFloat(t.curTotal)||0)+(parseFloat(t.tax)||0)-(parseFloat(t.retention)||0)-(mode==='net'?(parseFloat(t.cleanGross)||0):0));}
-function _einvSplit(gross){var g=Math.round(parseFloat(gross)||0),n=Math.round(g/_taxM());return {net:n,tax:g-n,gross:g};}
+function _invEinvGross(inv){return FJC.inv.einvGross(inv);}
+function _einvSplit(gross){return FJC.inv.einvSplit(gross,_taxR());}
 function _einvTxt(gross,label){var e=_einvSplit(gross);return (label||'本期發票應開金額')+'：未稅 NT$ '+fmt(e.net)+'、稅額 NT$ '+fmt(e.tax)+'、合計 NT$ '+fmt(e.gross);}
 function _retOpenDoc(q){return INV.find(function(x){return x&&x.kind==='retReturn'&&!(x.retRet&&x.retRet.done)&&_retSameProj(x,{quoteId:q.id,project:q.name});})||null;}
 function _retReturnBtn(q){

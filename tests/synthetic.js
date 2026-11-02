@@ -128,7 +128,7 @@ function diff(exp, got) {
   if (SELFTEST) {
     // 反向驗證：把 app.js 複製到暫存資料夾，請款列金額 +1 元，樣本必須有不符
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fj-synth-'));
-    ['index.html', 'app.js', 'sw.js', 'manifest.json'].forEach(f => { if (fs.existsSync(path.join(ROOT, f))) fs.copyFileSync(path.join(ROOT, f), path.join(tmp, f)); });
+    ['index.html', 'app.js', 'sw.js', 'manifest.json'].forEach(f => { if (fs.existsSync(path.join(ROOT, f))) fs.copyFileSync(path.join(ROOT, f), path.join(tmp, f)); }); if (fs.existsSync(path.join(ROOT, 'calc'))) fs.cpSync(path.join(ROOT, 'calc'), path.join(tmp, 'calc'), { recursive: true });   // v6.0.130 計算模組
     const src = fs.readFileSync(path.join(tmp, 'app.js'), 'utf8');
     const re = /function _invRowAmt\(it\)\{/;
     if (!re.test(src)) { console.error('反向驗證：找不到 _invRowAmt，無法故意改壞'); process.exit(1); }

@@ -241,7 +241,7 @@ const BREAK = {
     let fail = 0;
     for (const k of Object.keys(BREAK)) {
       const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fj-safe-'));
-      ['index.html', 'app.js', 'sw.js', 'manifest.json'].forEach(f => { if (fs.existsSync(path.join(ROOT, f))) fs.copyFileSync(path.join(ROOT, f), path.join(tmp, f)); });
+      ['index.html', 'app.js', 'sw.js', 'manifest.json'].forEach(f => { if (fs.existsSync(path.join(ROOT, f))) fs.copyFileSync(path.join(ROOT, f), path.join(tmp, f)); }); if (fs.existsSync(path.join(ROOT, 'calc'))) fs.cpSync(path.join(ROOT, 'calc'), path.join(tmp, 'calc'), { recursive: true });   // v6.0.130 計算模組
       const src = fs.readFileSync(path.join(tmp, 'app.js'), 'utf8');
       if (!BREAK[k][0].test(src)) { fail++; console.log('  ✗ ' + NAMES[k] + '：找不到要改壞的地方'); continue; }
       fs.writeFileSync(path.join(tmp, 'app.js'), src.replace(BREAK[k][0], BREAK[k][1]));

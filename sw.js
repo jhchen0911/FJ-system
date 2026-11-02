@@ -1,8 +1,8 @@
-/* 豐有工程管理系統 Service Worker — v6.0.34
+/* 豐有工程管理系統 Service Worker — v6.0.34（v6.0.130 加 calc/*.js）
  * 策略：
- *  - 應用殼（index.html／導覽請求、app.js 主程式）：快取優先（開頁不等網路），同時背景以 no-cache 重新驗證；
+ *  - 應用殼（index.html／導覽請求、app.js 主程式、calc/*.js 計算模組）：快取優先（開頁不等網路），同時背景以 no-cache 重新驗證；
  *    抓到不同版本（ETag／Last-Modified／長度不同）就先把 index.html 與 app.js 都更新到快取，再通知頁面
- *    顯示「系統有新版本」，使用者按重新整理即更新（兩個檔一起換，不會新 index 配舊 app.js）。
+ *    顯示「系統有新版本」，使用者按重新整理即更新（一起換，不會新 index 配舊 app.js，也不會舊 app.js 配新 calc）。
  *  - 其他同源 GET：網路優先，失敗退回快取（工地無訊號也能開）。
  *  - PDF 套件 html2canvas／jsPDF（版本固定）：快取優先。Firebase／其他 CDN 不攔截。
  */
@@ -30,8 +30,14 @@ function notifyUpdate() {
 // 改版第 0 步：只有正式站本身（/ 或 /index.html）離線時可以退回快取的 index.html；beta.html／test.html 等別的頁面不行，
 // 否則第一次開 test.html 剛好斷線，會拿到正式站的 index.html（沒有本機資料隔離）卻連到測試專案
 function isIndexPath(url) { return /\/(index\.html)?$/.test(url.pathname); }
+function isCalc(url) { return /\/calc\/[\w-]+\.js$/.test(url.pathname); }
 function isAppShell(req, url) {
-  return req.mode === 'navigate' || /\/index\.html$/.test(url.pathname) || /\/$/.test(url.pathname) || /\/app\.js$/.test(url.pathname);
+  return req.mode === 'navigate' || /\/index\.html$/.test(url.pathname) || /\/$/.test(url.pathname) || /\/app\.js$/.test(url.pathname) || isCalc(url);
+}
+// index.html 換新時，快取裡的 calc 模組也一起重新驗證（v6.0.130）
+function revalidateCalc() {
+  return caches.open(CACHE).then(c => c.keys()).then(ks => Promise.all(ks.filter(r => isCalc(new URL(r.url)))
+    .map(r => caches.match(r).then(cc => revalidate(r.url, cc))))).catch(() => {});
 }
 // 快取鍵：去掉查詢字串（app.js?v=… 版本不同仍對到同一份），目錄請求視同 index.html
 function shellKey(url) {
@@ -68,7 +74,7 @@ self.addEventListener('fetch', e => {
   }
 
   if (isAppShell(e.request, url)) {
-    const isJs = /\/app\.js$/.test(url.pathname);
+    const isJs = /\/app\.js$/.test(url.pathname) || isCalc(url);
     const key = shellKey(url);
     e.respondWith(
       caches.match(key).then(cached => {
@@ -77,7 +83,7 @@ self.addEventListener('fetch', e => {
           // index.html 變了 → app.js 一起換新再通知；app.js 變了（通常同時）→ 直接通知
           if (isJs) { notifyUpdate(); return; }
           const jk = appJsKey(url);
-          return caches.match(jk).then(jc => revalidate(jk, jc)).then(() => notifyUpdate());
+          return caches.match(jk).then(jc => revalidate(jk, jc)).then(revalidateCalc).then(() => notifyUpdate());
         });
         if (cached) { e.waitUntil(net); return cached; }
         return fetch(e.request).then(res => {

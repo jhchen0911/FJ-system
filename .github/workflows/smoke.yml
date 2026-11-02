@@ -15,6 +15,7 @@ on:
       - 'tools/build-beta.py'
       - 'tests/**'
       - 'tools/golden/**'
+      - 'calc/**'
       - 'package.json'
       - '.github/workflows/smoke.yml'
   push:
@@ -44,6 +45,9 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npx playwright install --with-deps chromium
+
+      - name: 計算模組（Node 單獨跑，不開瀏覽器）
+        run: npm run calc
 
       - name: 執行冒煙測試
         run: npm test

@@ -127,7 +127,7 @@ async function makeSnapshot(file) {
 
   // 反向驗證：請款列金額故意 +1 元，比對一定要報差異
   const bad = path.join(tmp, 'bad'); fs.mkdirSync(bad);
-  ['index.html', 'app.js', 'sw.js', 'manifest.json'].forEach(f => { if (fs.existsSync(path.join(ROOT, f))) fs.copyFileSync(path.join(ROOT, f), path.join(bad, f)); });
+  ['index.html', 'app.js', 'sw.js', 'manifest.json'].forEach(f => { if (fs.existsSync(path.join(ROOT, f))) fs.copyFileSync(path.join(ROOT, f), path.join(bad, f)); }); if (fs.existsSync(path.join(ROOT, 'calc'))) fs.cpSync(path.join(ROOT, 'calc'), path.join(bad, 'calc'), { recursive: true });   // v6.0.130 計算模組
   const src = fs.readFileSync(path.join(bad, 'app.js'), 'utf8');
   fs.writeFileSync(path.join(bad, 'app.js'), src.replace(/function _invRowAmt\(it\)\{/, 'function _invRowAmt(it){return _invRowAmt0(it)+1;}\nfunction _invRowAmt0(it){'));
   const badOut = path.join(tmp, 'bad-out.json');
