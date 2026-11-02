@@ -3074,7 +3074,7 @@ async function newPage(browser, width, height) {
         const out={};
         P.company='豐有工程有限公司';P.addr='242新北市新莊區中央路722號7樓';P.tel='0989-023-760';delete P.coZip;P.env={size:'k12',k15mig:1};   /* v6.0.63 起預設小信封，本測試驗 12K 版面 */
         CUSTOMERS.push({id:'cu447',name:'戊己營造股份有限公司',contact:'王大明',addr:'30075新竹市東區光復路一段100號8樓',tel:'03-5555027'});
-        INV.push({id:'inv447',client:'戊己營造股份有限公司',project:'範例廠房AL2',loc:'新竹市東區範例路1號',caddr:'',contact:'王大明',periodNo:2,date:'2026-10-01',sendMethod:'郵寄公司',items:[]});
+        INV.push({id:'inv447',client:'戊己營造股份有限公司',project:'範例廠房AL2',loc:'新竹科學園區範例路1號',caddr:'',contact:'王大明',periodNo:2,date:'2026-10-01',sendMethod:'郵寄公司',items:[]});
         let printed='';const orig=window._printNativeHTML;window._printNativeHTML=function(h,f){printed=h;};
         openEnvelope('inv447');
         const m=document.getElementById('gen-confirm-modal');
@@ -3083,7 +3083,7 @@ async function newPage(browser, width, height) {
         _envPreview();
         out.prev=!!document.querySelector('#env-prev .env-sheet')&&/flex-direction:\s*row-reverse/.test(document.getElementById('env-prev').innerHTML)&&/戊己營造股份有限公司/.test(document.getElementById('env-prev').innerHTML.replace(/<[^>]+>/g,''));
         // 切工地地址
-        _envUseAddr('site');out.site=gv('env-addr')==='新竹市東區範例路1號'&&gv('env-zip')==='30075';_envUseAddr('co');
+        _envUseAddr('site');out.site=gv('env-addr')==='新竹科學園區範例路1號'&&gv('env-zip')==='30075';_envUseAddr('co');
         // 數字逐格：收件 30075 → 3,0,0,7,5；寄件 242 → 前三格
         const r=_envRead();const h=_envHtml(r.cfg,r.data,false);
         const digits=(h.match(/font-size:16pt;font-weight:700">(\d)<\/div>/g)||[]).map(s=>s.match(/>(\d)</)[1]).join('');
