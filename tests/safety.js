@@ -38,7 +38,8 @@ function testMoneyStatic(root) {
   const bad = [];
   src.split('\n').forEach((l, i) => {
     const code = l.replace(/\/\/.*$/, '');
-    if (/\.received\b(?!\s*=[^=])/.test(code) && !/^function _invRcvOwner\(/.test(l) && !/\.received\s*\/\s*10000|d\.received\b/.test(code)) bad.push('第 ' + (i + 1) + ' 行直接讀 received');
+    const c2 = code.replace(/\bd\.received\s*\/\s*10000/g, '');   // rProfit 的月資料 d.received（不是請款單）
+    if (/\.received\b(?!\s*=[^=])/.test(c2) && !/^function _invRcvOwner\(/.test(l)) bad.push('第 ' + (i + 1) + ' 行直接讀 received');
     if (/[*\/]\s*1\.05\b|1\.05\s*\*/.test(code) && /amt|amount|total|tot\b|tax|price|cost|稅|金額|fmt\(/i.test(code)) bad.push('第 ' + (i + 1) + ' 行寫死 1.05');   // 只看算錢的行（圖面座標的 1.05 不算）
   });
   return { ok: !bad.length, info: bad.length ? bad.slice(0, 5).join('、') : '已收款只走 _invRcvOwner／_invRcv、沒有寫死 1.05' };
