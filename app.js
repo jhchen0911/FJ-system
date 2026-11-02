@@ -23476,7 +23476,7 @@ function updCostField(cid,field,val,rid){
     var row=cc.rows&&cc.rows.find(function(r){return r.id===rid;});
     if(!row)return;
     var numFields=['qty','unitPrice','days','dayRate','transport','linkedItemIdx','upm','len'];
-    if(field==='pm'){row.pm=val==='m'?'m':'pc';}   // v6.0.129 計價方式：每支／每 M×樁長（存使用者的選擇，之後不再自動判斷）
+    if(field==='pm'){row.pm=val==='m'?'m':'pc';if(row.pm==='m')row.upm=null;}   // 切到每 M：每次由目前每支單價重新反推，不用上次留下的每 M 單價   // v6.0.129 計價方式：每支／每 M×樁長（存使用者的選擇，之後不再自動判斷）
     if(field==='ret'){var _rv=parseFloat(val);row.ret=(val===''||val==null||isNaN(_rv))?null:Math.max(0,Math.min(100,_rv));}   // v5.405 空白＝依合約
     else row[field]=numFields.includes(field)?(parseFloat(val)||0):val;
     // 選工項時帶入預設數量
@@ -23485,7 +23485,7 @@ function updCostField(cid,field,val,rid){
       if(it){var _em0=null;try{_em0=_effQtyMap(q);}catch(e){_err('updCostField',e);}
         row.qty=Math.abs(_em0?_effQty(_em0,it):(parseFloat(it.qty)||0))||0;}   // v5.403：一律帶合約（生效）數量，可再改
     }
-    if(field==='linkedItemIdx'&&row.linkedItemIdx>=0&&!(parseFloat(row.len)>0)){var _lf=_costLenFromDesc((q.items||[])[row.linkedItemIdx]);if(_lf)row.len=_lf;}   // v6.0.129 樁長從工項名稱 L=…M 帶
+    if(field==='linkedItemIdx'&&row.linkedItemIdx>=0){var _lf=_costLenFromDesc((q.items||[])[row.linkedItemIdx]);if(_lf)row.len=_lf;else if(row.pm==='m')row.len=0;}   // v6.0.129 換工項一律重帶樁長（帶不到就清空請手填，不沿用上一個工項的）
     if(['pm','upm','len','linkedItemIdx'].includes(field)&&_costRowIsPerM(q,row))_costRowPerMApply(row);
     recalcCostAmt(cc);
     // 更新金額顯示（不重繪）
@@ -25661,8 +25661,8 @@ function savePayable(){
   const _qty=parseFloat(gv('p-qty'))||0;
   const _up=parseFloat(gv('p-unit-price'))||0;
   const _csId=gv('p-cost-source')||'';
-  // v6.0.129：有單價就照「數量（空白＝1）×單價」重算一次，不靠打字當下的即時計算
-  let _amt=parseFloat(gv('p-amount'))||0;if(_up>0){const _q=String(gv('p-qty')||'').trim()===''?1:_qty;if(_q>0)_amt=Math.round(_q*_up);}
+  // v6.0.129：金額欄空白、有單價 → 照「數量（空白＝1）×單價」補算
+  let _amt=parseFloat(gv('p-amount'))||0;if(!_amt&&_up>0){const _q=String(gv('p-qty')||'').trim()===''?1:_qty;if(_q>0)_amt=Math.round(_q*_up);}   // 金額欄空白才補算；使用者自己填的金額（折扣、舊資料）不動
   const p={id,_mt:Date.now(),_by:_meEmail(),to:gv('p-to'),amount:_amt,date:gv('p-date'),
     paidDate:_paidDate,qty:_qty||0,unitPrice:_up||0,costSourceId:_csId||'',
     itemName:document.getElementById('p-item-name-hidden')?.value||'',
@@ -25674,8 +25674,6 @@ function savePayable(){
   // v6.0.129：表單沒有的欄位沿用舊記錄（原本一編輯就掉：未稅／含稅、附件、所屬案件）
   const _old=idx>=0?PAYABLES[idx]:null;
   if(_old){['vat','vatManual','files','quoteId'].forEach(function(k){if(_old[k]!=null&&p[k]==null)p[k]=_old[k];});}
-  // 選了「從施工成本帶入」→ 記下所屬案件（卡片才有「成本」按鈕、工程專案頁看得到這筆）
-  const _cs=_costSrcDecode(_csId);if(_cs&&_cs.qid&&!p.quoteId)p.quoteId=_cs.qid;
   if(idx>=0)PAYABLES[idx]=p;else PAYABLES.unshift(p);
   savePayables();logActivity('應付',(idx>=0?'修改':'新增')+'付款：'+p.to+' NT$'+fmt(p.amount));
   closePayableModal();renderPayables();updateFinanceKPIs();toast('付款記錄已儲存');
@@ -26441,7 +26439,7 @@ function renderPayables(){
           +'<div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">'
           +(p.status!=='paid'?'<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid(\''+p.id+'\',null,_payAfterMark)">✓ 付款</button>'+_payVendorAllBtn(p):'<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark(\''+p.id+'\')">改回未付</button>'+(_payDateEditable(p)?'<button type="button" class="btn btn-xs" title="只改這一筆的實付日期" onclick="payEditPaidDate(\''+p.id+'\')">改付款日</button>':''))   // v6
           +_payAuditBtn(p)   // v6.0.89.0.72 付款先問實付日；已付可改回
-        +(p.quoteId?'<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts(\''+p.quoteId+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>':'')
+        +(_payQidOf(p)?'<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts(\''+_payQidOf(p)+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>':'')
           +_payEditBtns(p)   // v6.0.42 自動產生的唯讀
           +_payFilesInline(p)+'</div>'   // v6.0.39 附件鈕併入同列
       +'</div>' 
@@ -26481,7 +26479,7 @@ function renderPayables(){
       </div>
       <div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">
         ${p.status!=='paid'?`<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid('${p.id}',null,_payAfterMark)">✓ 付款</button>`:`<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark('${p.id}')">改回未付</button>${_payDateEditable(p)?`<button type="button" class="btn btn-xs" title="只改這一筆的實付日期" onclick="payEditPaidDate('${p.id}')">改付款日</button>`:''}`}${_payAuditBtn(p)}
-              ${p.quoteId?`<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts('${p.quoteId}')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>`:''}
+              ${_payQidOf(p)?`<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts('${_payQidOf(p)}')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>`:''}
         ${_payEditBtns(p)}
         ${_payFilesInline(p)}
       </div>
@@ -39511,17 +39509,18 @@ function lotionNotifyOpen(){
 function _costLenFromDesc(it){var m=/L\s*[=＝]\s*([\d.]+)\s*[Mm米]/.exec(String((it&&it.desc)||''));var v=m?parseFloat(m[1]):0;return v>0?v:0;}
 function _costRowPerMDefault(q,row){   // 沒選過時：發包詢價那個工項是「依 M 計價」就預設每 M
   var hit=false;(q&&q.rfqs||[]).forEach(function(r){(r&&r.items||[]).forEach(function(it){if(it&&it.idx===row.linkedItemIdx&&it.per==='m')hit=true;});});return hit;}
-function _costRowIsPerM(q,row){if(!row)return false;if(row.pm)return row.pm==='m';return _costRowPerMDefault(q,row);}
+function _costRowPerMOk(q,row){var it=(row&&row.linkedItemIdx>=0&&q&&q.items)?q.items[row.linkedItemIdx]:null;return /支|根/.test(_uFix((it&&it.unit)||''));}   // 只有以支（根）計價的工項才有每 M 選項
+function _costRowIsPerM(q,row){if(!row||row.isIntro||!_costRowPerMOk(q,row))return false;if(row.pm)return row.pm==='m';return _costRowPerMDefault(q,row);}
 function _costRowPerMApply(row){
   var upm=parseFloat(row.upm)||0,len=parseFloat(row.len)||0;
   if(!upm&&len>0&&(parseFloat(row.unitPrice)||0)>0){upm=Math.round((parseFloat(row.unitPrice)||0)/len*100)/100;row.upm=upm;}   // 剛切到每 M：由現有每支單價反推，每支單價不變
   if(upm>0&&len>0)row.unitPrice=Math.round(upm*len);
-  var auto='$'+fmt(upm)+'/M';
+  var auto='$'+upm.toLocaleString('en-US',{maximumFractionDigits:2})+'/M';
   if(upm>0&&(!row.desc||/^\$[\d,.]+\/M/.test(row.desc)))row.desc=row.desc?row.desc.replace(/^\$[\d,.]+\/M/,auto):auto;   // 備註空白或原本就是自動帶的才改，使用者自己寫的不動
 }
 function _costRowPerMHtml(cc,q,row,IN){
   var it=(row.linkedItemIdx>=0&&q&&q.items)?q.items[row.linkedItemIdx]:null;
-  var u=_uFix((it&&it.unit)||'');if(!/支|根/.test(u))return '';   // 只有以支計價的工項才給選
+  if(!_costRowPerMOk(q,row))return '';
   var pm=_costRowIsPerM(q,row),len=parseFloat(row.len)>0?row.len:(_costLenFromDesc(it)||'');
   var sel='<select onchange="updCostField(\''+cc.id+'\',\'pm\',this.value,\''+row.id+'\')" style="flex:0 0 auto;'+IN+'"><option value="pc"'+(pm?'':' selected')+'>每支單價</option><option value="m"'+(pm?' selected':'')+'>每 M 單價 × 樁長</option></select>';
   if(!pm)return '<div style="display:flex;gap:5px;align-items:center;margin-bottom:5px">'+sel+'</div>';
@@ -39536,6 +39535,8 @@ var _costSavedT=null;
 function _costSavedHint(){try{clearTimeout(_costSavedT);_costSavedT=setTimeout(function(){toast('已儲存');},800);}catch(e){_err('_costSavedHint',e);}}
 // 應付「從施工成本帶入」選項值是編碼過的來源資訊（qid、cid…）；解出所屬案件
 function _costSrcDecode(v){if(!v)return null;try{return JSON.parse(decodeURIComponent(escape(atob(v))));}catch(e){return null;}}
+// 應付卡「成本」按鈕要開哪一案：自動應付看 quoteId；手動應付選過施工成本來源的，從來源資訊解出（不寫進 quoteId，免得算進專案應付造成重複、或刪報價時被連帶刪掉）
+function _payQidOf(p){if(!p)return '';if(p.quoteId)return p.quoteId;var d=_costSrcDecode(p.costSourceId);return (d&&d.qid&&(Q||[]).some(function(q){return q&&q.id===d.qid;}))?d.qid:'';}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');

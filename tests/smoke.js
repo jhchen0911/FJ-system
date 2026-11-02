@@ -9087,10 +9087,18 @@ async function newPage(browser, width, height) {
         updCostField('cV1', 'pm', 'm', 'rV1');
         updCostField('cV1', 'upm', '550', 'rV1');
         out.calc = row.unitPrice === 8250 && row.desc === '$550/M' && card.amt === 825000;
+        updCostField('cV1', 'upm', '550.5', 'rV1'); out.dec = row.desc === '$550.5/M' && row.unitPrice === 8258; updCostField('cV1', 'upm', '550', 'rV1');
         row.desc = '$550/M 含加工'; updCostField('cV1', 'upm', '560', 'rV1');   // 自動帶的開頭跟著改，使用者加的字留著
         out.memo = row.unitPrice === 8400 && row.desc === '$560/M 含加工';
-        updCostField('cV1', 'pm', 'pc', 'rV1'); updCostField('cV1', 'unitPrice', '8000', 'rV1');   // 改回每支：照填的
-        out.pc = row.unitPrice === 8000 && card.amt === 800000;
+        updCostField('cV1', 'pm', 'pc', 'rV1'); updCostField('cV1', 'unitPrice', '9000', 'rV1');   // 改回每支：照填的
+        out.pc = row.unitPrice === 9000 && card.amt === 900000;
+        updCostField('cV1', 'pm', 'm', 'rV1');                           // 再切回每 M：由 9,000 反推 600/M，不用舊的 560 蓋掉
+        out.back = row.unitPrice === 9000 && row.upm === 600;
+        Q[0].items.push({ desc: '鋼軌樁 50kg，L=12M', unit: '支', qty: 50, price: 7000 }, { desc: '安全母索', unit: 'M', qty: 10, price: 100 });
+        updCostField('cV1', 'linkedItemIdx', '1', 'rV1');               // 換工項：樁長改帶 12
+        out.relen = row.len === 12 && row.unitPrice === 7200;
+        out.noUnitM = !_costRowIsPerM(Q[0], { linkedItemIdx: 2, pm: 'm' }); // 單位是 M 的工項沒有每 M 選項、單價不鎖
+        updCostField('cV1', 'linkedItemIdx', '0', 'rV1');
         Q[0].rfqs = [{ id: 'rf1', items: [{ idx: 0, per: 'm', len: 15 }] }];
         out.defM = _costRowIsPerM(Q[0], { linkedItemIdx: 0 });          // 詢價依 M → 預設每 M
         await new Promise(res => setTimeout(res, 1000));
@@ -9108,16 +9116,16 @@ async function newPage(browser, width, height) {
         out.opt = !!opt; if (opt) document.getElementById('p-cost-source').value = opt.value;
         document.getElementById('p-unit-price').value = '3000'; document.getElementById('p-qty').value = '';
         const n0 = PAYABLES.length; savePayable();
-        const np = PAYABLES[0]; out.save = PAYABLES.length === n0 + 1 && np.amount === 3000 && np.quoteId === 'qV129';
-        np.vat = false; editPayable(np.id); savePayable();
-        const np2 = PAYABLES.find(x => x.id === np.id); out.keepVat = np2.vat === false && np2.quoteId === 'qV129';
+        const np = PAYABLES[0]; out.save = PAYABLES.length === n0 + 1 && np.amount === 3000 && !np.quoteId && _payQidOf(np) === 'qV129';   // 成本按鈕開得到該案，但不寫 quoteId（不算進專案應付）
+        np.vat = false; editPayable(np.id); document.getElementById('p-amount').value = '2700'; savePayable();   // 手改金額（折扣）要留著
+        const np2 = PAYABLES.find(x => x.id === np.id); out.keepVat = np2.vat === false && np2.amount === 2700;
         PAYABLES = PAYABLES.filter(x => x.id !== np.id); Q = Q.filter(x => x.id !== 'qV129'); window.toast = t0;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
       return out;
     });
-    check('v6.0.129 分包成本列「每 M 單價 × 樁長」：樁長從 L=15M 帶、550/M×15＝8,250／支、備註自動帶 $550/M（自己加的字留著）、可切回每支；詢價依 M 時預設每 M', r.defPc && r.len && r.calc && r.memo && r.pc && r.defM, JSON.stringify(r));
+    check('v6.0.129 分包成本列「每 M 單價 × 樁長」：樁長從 L=15M 帶、550/M×15＝8,250／支、備註自動帶 $550/M（小數照實、自己加的字留著）、切回每支再切回由現價反推、換工項重帶樁長、單位不是支的不鎖；詢價依 M 時預設每 M', r.defPc && r.len && r.calc && r.dec && r.memo && r.pc && r.back && r.relen && r.noUnitM && r.defM, JSON.stringify(r));
     check('v6.0.129 成本卡自動存檔停手後跳一次「已儲存」', r.hint && r.hintOnce, JSON.stringify(r));
-    check('v6.0.129 手動應付：數量空白當 1 算金額、新增時清發票號與工項名、選施工成本來源記下所屬案件、編輯不掉未稅設定', r.clear && r.qtyBlank && r.opt && r.save && r.keepVat, JSON.stringify(r));
+    check('v6.0.129 手動應付：數量空白當 1 算金額、新增時清發票號與工項名、選施工成本來源後「成本」按鈕開得到該案（不算進專案應付）、編輯不掉未稅與手改金額', r.clear && r.qtyBlank && r.opt && r.save && r.keepVat, JSON.stringify(r));
     check('v6.0.129 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
