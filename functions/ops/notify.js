@@ -6,6 +6,7 @@
 const NOTIFY_SENDERS = ['jhchen0911@gmail.com', 'hsuanchen911@gmail.com'];   // Lotion 本人、AI 帳號（陳軒唯讀）
 const NOTIFY_DAILY = 6;
 const NOTIFY_REJ_LOG = 30;        // 被擋的訊息每天最多記幾筆
+const NOTIFY_HELD_DAILY = 30;     // 只記在 FJ（沒推 LINE）的每天最多幾則（審查：不推 LINE 也不能無限寫紀錄）
 const NOTIFY_MONTH_LIMIT = 200;   // LINE 每月免費則數（輕用量方案）
 const NOTIFY_MONTH_STOP = 180;    // 本月已用達這個數就不推 LINE、只記在 FJ
 const NOTIFY_MAX = 100;
@@ -48,4 +49,4 @@ function buildNotify(body) {
 // 本月 LINE 已用則數 → 要不要推（查不到額度時照常推，避免 LINE API 暫時錯誤就整個停掉）
 function monthHold(used) { return typeof used === 'number' && isFinite(used) && used >= NOTIFY_MONTH_STOP; }
 
-module.exports = { NOTIFY_SENDERS, NOTIFY_DAILY, NOTIFY_REJ_LOG, NOTIFY_MONTH_LIMIT, NOTIFY_MONTH_STOP, NOTIFY_MAX, NOTIFY_KEEP_MS, notifyAllowed, buildNotify, monthHold };
+module.exports = { NOTIFY_SENDERS, NOTIFY_DAILY, NOTIFY_REJ_LOG, NOTIFY_HELD_DAILY, NOTIFY_MONTH_LIMIT, NOTIFY_MONTH_STOP, NOTIFY_MAX, NOTIFY_KEEP_MS, notifyAllowed, buildNotify, monthHold };

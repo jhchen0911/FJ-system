@@ -8006,7 +8006,7 @@ function initFirebase(){
     _fbUser = user;
     _updateFbUI(!!user);
     if(user) _minVerWatch(_autoSyncOnLogin);
-    else { _minVerOff();_isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{localStorage.removeItem('fy_priv_pending');}catch(e){/* 可忽略 */}   /* v6.0.116：登出清掉私有上傳失敗旗標，換人登入不會一直「未同步」 */try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
+    else { _aiHeldOff();_minVerOff();_isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{localStorage.removeItem('fy_priv_pending');}catch(e){/* 可忽略 */}   /* v6.0.116：登出清掉私有上傳失敗旗標，換人登入不會一直「未同步」 */try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
   });
 }
 function initGoogleSignIn(){
@@ -33091,7 +33091,7 @@ function _v6TodoItems(items){
   var ic=function(h){return '<svg class="ic ib" aria-hidden="true"><use href="#'+h+'"/></svg>';};
   try{var _th=_tombHoldCount();if(_th&&_shWholeOk())items.push({type:'tomb_hold',urgent:true,jump:'openTombHold()',icon:ic('i-warn'),color:'var(--red)',text:'刪除申請待確認 '+_th+' 筆',sub:'員工一次刪除很多筆，先擋下等管理員確認'});}catch(e){_err('_v6TodoItems.tomb',e);}   // v6.0.118
   try{if(!_isReaderUser){var _dp=_draftPending();if(_dp.length)items.push({type:'ai_draft',urgent:false,jump:'openDrafts()',icon:ic('i-doc'),color:'#1565C0',text:'AI 草稿 '+_dp.length+' 筆待確認',sub:_dp.slice(0,2).map(function(d){return _DRAFT_T[d.type]||'';}).join('、')});}}catch(e){_err('_v6TodoItems.draft',e);}   // v6.0.109
-  try{var _ah=_aiHeldList();if(_ah.length)items.push({type:'ai_held',urgent:true,jump:'openAiHeld()',icon:ic('i-bell'),color:'#E65100',text:'AI 通知 '+_ah.length+' 則沒推 LINE（本月額度快用完）',sub:_ah.slice(-2).map(function(x){return x.text;}).join('、').slice(0,60)});}catch(e){_err('_v6TodoItems.aiHeld',e);}   // v6.0.134
+  try{var _ah=_aiHeldList();if(_ah.length)items.push({type:'ai_held',urgent:true,jump:'openAiHeld()',icon:ic('i-bell'),color:'#E65100',text:'AI 通知 '+_ah.length+' 則沒推 LINE（本月額度快用完）',sub:esc(_ah.slice(-2).map(function(x){return x.text;}).join('、').slice(0,60))});}catch(e){_err('_v6TodoItems.aiHeld',e);}   // v6.0.134
   try{_rfqVerTodo(items);}catch(e){_err('_v6TodoItems.rfqVer',e);}   // v6.0.109 報價進版、詢價／分包未同步
   try{
     _retentionRows().filter(function(r){return r.overdue&&!r.due;}).forEach(function(r){   // 已完工的由「保留款可請退」待辦涵蓋，不重複
@@ -39376,7 +39376,7 @@ async function fyNotify(title,todo,text){
     var tok=await _fbUser.getIdToken();
     var r=await fetch(_fnUrl('aiNotify'),{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify(body)});
     var j={};try{j=await r.json();}catch(e){/* 可忽略：未部署時沒有 JSON */}
-    if(r.ok){var q=(j&&j.used!=null)?('（LINE 本月已用 '+j.used+'／'+(j.limit||200)+'）'):'';return j&&j.held?('已記在 FJ 總覽、沒推 LINE'+q+'：本月額度快用完，留給工地日報'):('已送出'+q);}   // v6.0.134
+    if(r.ok){var q=(j&&j.used!=null)?('（LINE 本月已用 '+j.used+'／'+(j.limit||200)+'）'):(j&&j.quota==='unknown'?'（查不到 LINE 本月額度，照常推送）':'');return j&&j.held?('已記在 FJ 總覽、沒推 LINE'+q+'：本月額度快用完，留給工地日報'):('已送出'+q);}   // v6.0.134
     return '沒送出：'+((j&&j.error&&j.error.message)||(r.status===404?'通知服務尚未部署':('錯誤 '+r.status)));
   }catch(e){_err('fyNotify',e);return '沒送出：'+(navigator.onLine===false?'目前沒有網路':'通知服務尚未部署或連不上');}
 }
@@ -39430,17 +39430,20 @@ function _costSrcDecode(v){if(!v)return null;try{return JSON.parse(decodeURIComp
 // 應付卡「成本」按鈕要開哪一案：自動應付看 quoteId；手動應付選過施工成本來源的，從來源資訊解出（不寫進 quoteId，免得算進專案應付造成重複、或刪報價時被連帶刪掉）
 function _payQidOf(p){if(!p)return '';if(p.quoteId)return p.quoteId;var d=_costSrcDecode(p.costSourceId);return (d&&d.qid&&(Q||[]).some(function(q){return q&&q.id===d.qid;}))?d.qid:'';}
 // ── v6.0.134 AI 通知額度：陳軒 LINE 每月 200 則（輕用量、不能加購）；本月已用 ≥180 時雲端只記 status:'held'，這裡在總覽列出（近 14 天、只有 Lotion／管理員讀得到） ──
-var AI_HELD={},_aiHeldOn=false;
+var AI_HELD={},_aiHeldOn=false,_aiHeldRef=null;
+function _aiHeldOff(){try{if(_aiHeldRef)_aiHeldRef.off();}catch(e){_err('_aiHeldOff',e);}_aiHeldRef=null;_aiHeldOn=false;AI_HELD={};}   // 審查：登出要清，換人登入不能看到上一位的通知
 function _aiHeldWatch(){
   if(_aiHeldOn||!_fbUser||!_fbDb||_isReaderUser)return;
   var em=String(_fbUser.email||'').toLowerCase();if(!isAdmin(em)&&em!==_RULES_OWNER)return;
   _aiHeldOn=true;
-  _fbDb.ref('fydata/aiNotifyLog').orderByChild('at').startAt(Date.now()-14*86400000).on('value',function(snap){
+  _aiHeldRef=_fbDb.ref('fydata/aiNotifyLog').orderByChild('at').startAt(Date.now()-14*86400000);
+  _aiHeldRef.on('value',function(snap){
     var v=snap.val()||{},o={};Object.keys(v).forEach(function(k){var x=v[k];if(x&&x.status==='held')o[k]=x;});AI_HELD=o;
     try{if(typeof updateDashTodo==='function')updateDashTodo();}catch(e){_err('_aiHeldWatch.todo',e);}
   },function(err){_aiHeldOn=false;_err('_aiHeldWatch',err);});   // 規則還沒發布或不是管理員：讀不到就不顯示
 }
-function _aiHeldList(){return Object.keys(AI_HELD||{}).map(function(k){return AI_HELD[k];}).sort(function(a,b){return (a.at||0)-(b.at||0);});}
+function _aiHeldList(){var d=new Date(),m0=new Date(d.getFullYear(),d.getMonth(),1).getTime();   // 審查：只列本月（下個月 LINE 額度重算，舊的不再是待辦）
+  return Object.keys(AI_HELD||{}).map(function(k){return AI_HELD[k];}).filter(function(x){return x&&(x.at||0)>=m0;}).sort(function(a,b){return (a.at||0)-(b.at||0);});}
 function openAiHeld(){
   var L=_aiHeldList();
   _modal('AI 通知（沒推 LINE）',

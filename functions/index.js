@@ -150,8 +150,8 @@ exports.aiProxy = onRequest({ region: REGION, cors: ['https://jhchen0911.github.
 });
 
 // ══════════ v6.0.123 AI 通知：AI 帳號／Lotion 用 LINE「陳軒｜AI 助理」傳一行短訊息給 Lotion ══════════
-// 前端（FJ 總覽「通知 Lotion」或 fyNotify()）帶登入憑證呼叫；所有檢查都在這裡做：發送者名單、短文字、每天 30 則、收件人固定 LINE 擁有者。
-// 紀錄 fydata/aiNotifyLog（只有管理員可讀、網頁不能寫）保留 180 天；每天計數 fydata/aiNotifyCount/<日期>（每天 6 則，v6.0.134）。
+// 前端（FJ 總覽「通知 Lotion」或 fyNotify()）帶登入憑證呼叫；所有檢查都在這裡做：發送者名單、短文字、每天 6 則（v6.0.134）、收件人固定 LINE 擁有者。
+// 紀錄 fydata/aiNotifyLog（只有管理員可讀、網頁不能寫）保留 180 天；每天計數 fydata/aiNotifyCount/<日期>（每天 6 則；_held 只記不推每天 30 則，v6.0.134）。
 // v6.0.134：發送前查 LINE 本月已用則數，≥180 就只記 status:'held'（FJ 總覽顯示），不推 LINE。
 const notifyCore = require('./ops/notify.js');
 exports.aiNotify = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], secrets: [LINE_TOKEN] }, async (req, res) => {
@@ -181,8 +181,10 @@ exports.aiNotify = onRequest({ region: REGION, cors: ['https://jhchen0911.github
     // v6.0.134：LINE 本月額度快用完（≥180／200）→ 不推 LINE，只記在 FJ（總覽顯示），也不佔當天名額
     const used = await deps.quotaUsed();
     if (notifyCore.monthHold(used)) {
-      await logRef.set({ by: email, at: now, text: b.text, status: 'held', reason: 'LINE 本月已用 ' + used + '／' + notifyCore.NOTIFY_MONTH_LIMIT + '，暫停推 LINE', used }); logged = true;
+      const ht = await db.ref('fydata/aiNotifyCount/' + day + '_held').transaction((n) => ((n || 0) >= notifyCore.NOTIFY_HELD_DAILY ? undefined : (n || 0) + 1));
       await cntRef.transaction((n) => Math.max(0, (n || 1) - 1)).catch(() => null);
+      if (!ht.committed) { res.status(429).json({ error: { message: 'LINE 本月額度快用完，今天只記在 FJ 的通知也已達 ' + notifyCore.NOTIFY_HELD_DAILY + ' 則' } }); return; }
+      await logRef.set({ by: email, at: now, text: b.text, status: 'held', reason: 'LINE 本月已用 ' + used + '／' + notifyCore.NOTIFY_MONTH_LIMIT + '，暫停推 LINE', used }); logged = true;
       res.status(200).json({ ok: true, held: true, used, limit: notifyCore.NOTIFY_MONTH_LIMIT, text: b.text }); return;
     }
     const cfg = (await deps.getCfg()) || {};
@@ -195,7 +197,7 @@ exports.aiNotify = onRequest({ region: REGION, cors: ['https://jhchen0911.github
       const up = {}; Object.keys(old).forEach(k => { up[k] = null; }); if (Object.keys(up).length) await db.ref('fydata/aiNotifyLog').update(up);
     } catch (e) { console.error('aiNotify.prune', e); }
     if (!sent) { res.status(502).json({ error: { message: 'LINE 沒送出（擁有者還沒設定或 LINE 推播失敗）' } }); return; }
-    res.status(200).json({ ok: true, text: b.text, used: used == null ? null : used + sent, limit: notifyCore.NOTIFY_MONTH_LIMIT });
+    res.status(200).json({ ok: true, text: b.text, used: used == null ? null : used + sent, limit: notifyCore.NOTIFY_MONTH_LIMIT, quota: used == null ? 'unknown' : 'ok' });
   } catch (e) {
     console.error('aiNotify', e);
     if (logRef && !logged && logText) { try { await logRef.set({ by: logBy, at: Date.now(), text: logText, status: 'error', reason: String(e && e.message || e).slice(0, 200) }); } catch (e2) { console.error('aiNotify.log', e2); } }

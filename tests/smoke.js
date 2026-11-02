@@ -9041,7 +9041,7 @@ async function newPage(browser, width, height) {
     const N = require(pth.join(__dirname, '..', 'functions', 'ops', 'notify.js'));
     const IDX = fs.readFileSync(pth.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
     check('v6.0.123 AI 通知：按鈕只有 AI 帳號／Lotion 看得到；帶登入憑證呼叫雲端、不能指定收件人；超過 100 字擋下；伺服器拒絕原因帶回', r.staffHidden && r.aiShown && r.call && r.prev && r.tooLong && r.err && r.staffDeny, JSON.stringify(r));
-    check('v6.0.123 AI 通知安全：唯讀帳號不能再寫 linePush（健檢2 #27）；通知紀錄與計數網頁不能寫；伺服器只放行名單、100 字、擋網址、每天 30 則、收件人取擁有者',
+    check('v6.0.123 AI 通知安全：唯讀帳號不能再寫 linePush（健檢2 #27）；通知紀錄與計數網頁不能寫；伺服器只放行名單、100 字、擋網址、每天 6 則、收件人取擁有者',
       !/\|\|\s*root\.child\('fydata\/readers'\)/.test(RF.linePush.$id['.write']) && /!root\.child\('fydata\/readers'\)/.test(RF.linePush.$id['.write']) && RF.aiNotifyLog['.write'] === 'false' && RF.aiNotifyCount['.write'] === 'false' && /at/.test(String(RF.aiNotifyLog['.indexOn']))
       && N.notifyAllowed('hsuanchen911@gmail.com') && !N.notifyAllowed('staff@x.com') && N.NOTIFY_DAILY === 6 && N.NOTIFY_MAX === 100 && N.buildNotify({ text: 'https://x.tw' }).err && !!N.buildNotify({ title: 'a' }).text
       && /exports\.aiNotify/.test(IDX) && /pushOwners\(cfg, deps, b\.text\)/.test(IDX) && /aiNotifyCount/.test(IDX) && /NOTIFY_KEEP_MS/.test(IDX), '');
@@ -9143,10 +9143,11 @@ async function newPage(browser, width, height) {
         window.fetch = async () => ({ ok: true, status: 200, json: async () => ({ ok: true, used: 12, limit: 200 }) });
         out.sent = (await fyNotify('測試', '')) === '已送出（LINE 本月已用 12／200）';
         window.fetch = f0; _fbUser = null;
-        AI_HELD = { a: { status: 'held', at: Date.now() - 3600000, text: '✅【範例】做完了' } };
+        AI_HELD = { a: { status: 'held', at: Date.now() - 3600000, text: '✅【範例】做完了<img src=x onerror=window.__x=1>' }, old: { status: 'held', at: Date.now() - 40 * 86400000, text: '上上個月' } };
         const items = []; _v6TodoItems(items);
         const it = items.find(x => x.type === 'ai_held');
-        out.todo = !!it && /AI 通知 1 則沒推 LINE/.test(it.text);
+        out.todo = !!it && /AI 通知 1 則沒推 LINE/.test(it.text) && /&lt;img/.test(it.sub) && !/<img/.test(it.sub);   // 只算本月、文字跳脫
+        _aiHeldOff(); out.logout = _aiHeldList().length === 0; AI_HELD = { a: { status: 'held', at: Date.now() - 3600000, text: '✅【範例】做完了' } };
         openAiHeld(); out.modal = /範例/.test((document.getElementById('fy-modal') || {}).innerHTML || '');
         const m = document.getElementById('fy-modal'); if (m) m.remove(); AI_HELD = {};
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
@@ -9154,8 +9155,8 @@ async function newPage(browser, width, height) {
     });
     const pth134 = require('path'), N = require(pth134.join(__dirname, '..', 'functions', 'ops', 'notify.js'));
     const IDX = require('fs').readFileSync(pth134.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
-    check('v6.0.134 AI 通知：每天 6 則；LINE 本月 ≥180 只記在 FJ（回應寫已用幾則）；總覽列出沒推 LINE 的通知', r.held && r.sent && r.todo && r.modal
-      && N.NOTIFY_DAILY === 6 && N.monthHold(180) && !N.monthHold(179) && !N.monthHold(null) && /quotaUsed\(\)/.test(IDX) && /status: 'held'/.test(IDX), JSON.stringify(r));
+    check('v6.0.134 AI 通知：每天 6 則；LINE 本月 ≥180 只記在 FJ（回應寫已用幾則）；總覽列出本月沒推 LINE 的通知（文字跳脫、登出清掉）', r.held && r.sent && r.todo && r.logout && r.modal
+      && N.NOTIFY_DAILY === 6 && N.monthHold(180) && !N.monthHold(179) && !N.monthHold(null) && /quotaUsed\(\)/.test(IDX) && /status: 'held'/.test(IDX) && /_held'/.test(IDX) && N.NOTIFY_HELD_DAILY === 30, JSON.stringify(r));
     check('v6.0.134 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
