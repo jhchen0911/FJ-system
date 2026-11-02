@@ -75,7 +75,10 @@
   // 含稅金額拆未稅／稅額
   function einvSplit(gross, tR) { var g = Math.round(num(gross)), n = Math.round(g / (1 + num(tR) / 100)); return { net: n, tax: g - n, gross: g }; }
 
-  var inv = { taxR: taxR, taxM: taxM, totals: totals, retention: retention, rcvOwner: rcvOwner, retSepCash: retSepCash, holdRetEntries: holdRetEntries,
+  // 收款的現金比例（其餘為票據）：空白、0、非數字＝全部現金
+  function cashPct(inv) { var v = inv && inv.cashPct, n = parseFloat(v); return (v == null || v === '' || !isFinite(n) || n <= 0) ? 1 : Math.min(1, n / 100); }
+
+  var inv = { cashPct: cashPct, taxR: taxR, taxM: taxM, totals: totals, retention: retention, rcvOwner: rcvOwner, retSepCash: retSepCash, holdRetEntries: holdRetEntries,
     holdRetCash: holdRetCash, rcv: rcv, rcvIn: rcvIn, hold: hold, ar: ar, einvGross: einvGross, einvSplit: einvSplit };
   var FJC = root.FJC || (root.FJC = {});
   FJC.inv = inv;

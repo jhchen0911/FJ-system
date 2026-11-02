@@ -4,7 +4,9 @@ const path = require('path');
 const FJC = require(path.join(__dirname, '..', 'calc', 'invoice.js'));
 require(path.join(__dirname, '..', 'calc', 'payable.js'));
 require(path.join(__dirname, '..', 'calc', 'report.js'));
-const I = FJC.inv, PY = FJC.pay, R = FJC.rpt;
+require(path.join(__dirname, '..', 'calc', 'comm.js'));
+require(path.join(__dirname, '..', 'calc', 'payroll.js'));
+const I = FJC.inv, PY = FJC.pay, R = FJC.rpt, C = FJC.comm, H = FJC.hr;
 const results = [];
 const check = (name, ok, info) => results.push({ name, ok: !!ok, info: info || '' });
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -45,7 +47,8 @@ fs0.readdirSync(calcDir).filter(f => /\.js$/.test(f)).forEach(f => {
     const inv0 = { id: 'i', items: [], totals: { curTotal: 100, tax: 5, total: 105 }, retention: true, received: 50, recvHold: 5, holdRetLog: [{ amt: 5, date: '2026-01-01' }] };
     const card0 = { id: 'c', rows: [{ id: 'r', unitPrice: 10, stage: 1 }], periods: [{ no: 1, rows: [{ rid: 'r', qty: 1, qi: 1 }], adv: 1 }], advances: [{ id: 'a', amt: 5 }] };
     const R0 = { invoices: [inv0], quotes: [{ costs: [{ amt: 1, date: '2026-01-01' }] }], expenses: [{ date: '2026-01-01', amount: 1 }], payslips: [] }, F0 = { taxM: 1.05, retention: () => 0, rcvIn: () => 0, hrEstimate: () => 0 };
-    const argsets = [[], [R0, '2026', F0], [R0, '2026', { taxM: 1.05, months: 1, salaryMonth: 1 }, F0], [{ expByCat: {}, revNet: 1, pretax: 1, exp: 1 }], [inv0, 5, 10], [{ amount: 100, retentionPct: 5 }, 5], [card0, card0.periods[0], 100], [card0, 5, 100], [card0.rows[0], card0.periods[0].rows[0], 100], [[1, 2], { taxR: 5, retOn: true, retPct: 10 }], [105, 5], ['c', { no: 1, id: 'x' }, { id: 'e' }], [inv0, '2026']];
+    const G0 = { base: () => 1, profit: () => 1, unit: () => ({ contract: 1, billed: 1 }), rate: () => 1 };
+    const argsets = [[], [{ mode: 'unit', val: 1 }, G0], [{ mode: 'rev', val: 1 }, G0], [{ base: 1, days: 1 }], [R0, '2026', F0], [R0, '2026', { taxM: 1.05, months: 1, salaryMonth: 1 }, F0], [{ expByCat: {}, revNet: 1, pretax: 1, exp: 1 }], [inv0, 5, 10], [{ amount: 100, retentionPct: 5 }, 5], [card0, card0.periods[0], 100], [card0, 5, 100], [card0.rows[0], card0.periods[0].rows[0], 100], [[1, 2], { taxR: 5, retOn: true, retPct: 10 }], [105, 5], ['c', { no: 1, id: 'x' }, { id: 'e' }], [inv0, '2026']];
     Object.values(g.FJC || {}).forEach(mod => Object.values(mod).forEach(fn => argsets.forEach(a => { try { fn.apply(null, a); } catch (e) { if (e instanceof ReferenceError || /is not defined/.test(e && e.message)) throw e; } })));
   } catch (e) { clean = false; console.error("[sandbox]", f, e && e.message); }
   check('calc/' + f + ' 不讀畫面與全域資料（乾淨沙盒載入並逐一呼叫）', clean && !/\b(P|Q|INV|PAYABLES|CONTRACTS)\b\s*[.[]|document\.|localStorage/.test(src));
@@ -83,6 +86,33 @@ check('廠商請款單價可核實覆寫、應付 id 規則', PY.rowPrice({ unit
   check('沒有薪資單：有營運活動的年度用人事估算；沒活動的年度不估', d0.hr === 60000 && d0.hrEst && R.year({ invoices: [], quotes: [], expenses: [], payslips: [] }, '2024', fn).hr === 0);
   const sa = R.shareAuto({ invoices: invs, quotes, expenses }, '2026', { taxM: 1.05, months: 10, salaryMonth: 150000 }, fn);
   check('分潤估算：營收含保留款、扣成本費用與估計薪資；循環資金增額（手算 (322,000−8,333.25)×23/30＝240,478）', sa.rev === 315000 && sa.cost === 180000 && sa.exp === 40000 && sa.salary === 3000000 && sa.netProfit === 0 && sa.wcAdd === 240478, JSON.stringify(sa));
+}
+
+// ── 抽成／佣金（calc/comm.js）：合成樣本 A21 合約含稅 3,357,900 → 未稅 3,198,000 → 5% 抽成 159,900 ──
+{
+  const get = (base, profit, unit, rate) => ({ base: () => base, profit: () => profit, unit: () => unit, rate: b => b ? rate.b : rate.c });
+  check('抽成基礎：合約含稅 3,357,900 ÷ 1.05＝3,198,000', C.salesBase(3357900, 1.05) === 3198000);
+  const g = get(3198000, 1000000, { contract: 300, billed: 120 }, { c: 0.5, b: 0.8 });
+  check('營收 5%＝159,900；毛利 10%＝100,000；固定額照填；每支 500 × 合約 300＝150,000', C.amount({ mode: 'rev', val: 5 }, g) === 159900 && C.amount({ mode: 'profit', val: 10 }, g) === 100000 && C.amount({ mode: 'amt', val: 30000 }, g) === 30000 && C.amount({ mode: 'unit', val: 500 }, g) === 150000);
+  check('已計提：總額×收款進度 50%＝79,950；每單位＝已請 120×500×(已收÷已請 80%)＝48,000', C.accr({ mode: 'rev', val: 5 }, g) === 79950 && C.accr({ mode: 'unit', val: 500 }, g) === 48000);
+  check('應付金額：每單位隨已請量（120×500＝60,000），其他＝總額', C.due({ mode: 'unit', val: 500 }, g) === 60000 && C.due({ mode: 'rev', val: 5 }, g) === 159900 && C.due(null, g) === 0);
+  let called = 0; const lazy = { base: () => { called++; return 100; }, profit: () => { called++; return 0; }, unit: () => { called++; return { contract: 0, billed: 0 }; }, rate: () => 0 };
+  C.amount({ mode: 'amt', val: 1 }, lazy);
+  check('基礎數字用到才算（固定額不算合約、毛利、數量）', called === 0);
+  check('毛利基礎：有實際成本用實際、沒有用預估、不為負；收款進度上限 1', C.profitBase(1000, 300, 999) === 700 && C.profitBase(1000, 0, 400) === 600 && C.profitBase(1000, 2000, 0) === 0 && C.rcvRate({ contractTotal: 100, rcv: 150, billed: 0 }) === 1 && C.rcvRate({ billed: 0, rcv: 1 }, true) === 0);
+}
+// ── 薪資單（calc/payroll.js）──
+{
+  const s = H.slip({ payType: 'day', base: '1500', days: '22', tel: 500, other: '', extra: 1000.4, laborSelf: 700, healthSelf: 500, pensionSelf: 0, otherDed: 'x', laborCo: 2000, healthCo: 1500, pensionCo: 1980 });
+  check('薪資單：日薪 1,500×22＝33,000＋津貼 500＋加班 1,000＝應發 34,500；扣 1,200；實發 33,300；公司負擔 5,480', s.baseAmt === 33000 && s.gross === 34500 && s.ded === 1200 && s.net === 33300 && s.coCost === 5480 && s.other === 0 && s.otherDed === 0);
+  check('月薪：照底薪', H.slip({ payType: 'month', base: 40000 }).gross === 40000);
+}
+// ── 期票現金比例、分包超量 ──
+check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超過 100＝1', I.cashPct({}) === 1 && I.cashPct({ cashPct: 0 }) === 1 && I.cashPct({ cashPct: 'x' }) === 1 && I.cashPct({ cashPct: 60 }) === 0.6 && I.cashPct({ cashPct: 150 }) === 1);
+{
+  const c = { rows: [{ id: 'r1', qty: 100, unitPrice: 1000, linkedItemIdx: 0 }], periods: [{ no: 1, rows: [{ rid: 'r1', qty: 80 }] }, { no: 2, rows: [{ rid: 'r1', qty: 30 }] }, { no: 3, absorb: true, rows: [{ rid: 'r1', qty: 5 }] }] };
+  const o = PY.overStat(c);
+  check('分包超量：合約 100、累計 115 → 超 15、第 2 期 10 向業主請、第 3 期 5 我方吸收', o.overAmt === 15000 && o.toOwner === 10000 && o.absorbed === 5000 && o.overQty.r1 === 15 && o.absorbQtyByItem[0] === 5 && o.overQtyByItem[0] === 15, JSON.stringify(o));
 }
 
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
