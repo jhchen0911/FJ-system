@@ -3,7 +3,8 @@
 const path = require('path');
 const FJC = require(path.join(__dirname, '..', 'calc', 'invoice.js'));
 require(path.join(__dirname, '..', 'calc', 'payable.js'));
-const I = FJC.inv, PY = FJC.pay;
+require(path.join(__dirname, '..', 'calc', 'report.js'));
+const I = FJC.inv, PY = FJC.pay, R = FJC.rpt;
 const results = [];
 const check = (name, ok, info) => results.push({ name, ok: !!ok, info: info || '' });
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -43,9 +44,10 @@ fs0.readdirSync(calcDir).filter(f => /\.js$/.test(f)).forEach(f => {
     const g = {}; require('vm').runInNewContext(src, { globalThis: g, module: undefined });
     const inv0 = { id: 'i', items: [], totals: { curTotal: 100, tax: 5, total: 105 }, retention: true, received: 50, recvHold: 5, holdRetLog: [{ amt: 5, date: '2026-01-01' }] };
     const card0 = { id: 'c', rows: [{ id: 'r', unitPrice: 10, stage: 1 }], periods: [{ no: 1, rows: [{ rid: 'r', qty: 1, qi: 1 }], adv: 1 }], advances: [{ id: 'a', amt: 5 }] };
-    const argsets = [[], [inv0, 5, 10], [{ amount: 100, retentionPct: 5 }, 5], [card0, card0.periods[0], 100], [card0, 5, 100], [card0.rows[0], card0.periods[0].rows[0], 100], [[1, 2], { taxR: 5, retOn: true, retPct: 10 }], [105, 5], ['c', { no: 1, id: 'x' }, { id: 'e' }], [inv0, '2026']];
+    const R0 = { invoices: [inv0], quotes: [{ costs: [{ amt: 1, date: '2026-01-01' }] }], expenses: [{ date: '2026-01-01', amount: 1 }], payslips: [] }, F0 = { taxM: 1.05, retention: () => 0, rcvIn: () => 0, hrEstimate: () => 0 };
+    const argsets = [[], [R0, '2026', F0], [R0, '2026', { taxM: 1.05, months: 1, salaryMonth: 1 }, F0], [{ expByCat: {}, revNet: 1, pretax: 1, exp: 1 }], [inv0, 5, 10], [{ amount: 100, retentionPct: 5 }, 5], [card0, card0.periods[0], 100], [card0, 5, 100], [card0.rows[0], card0.periods[0].rows[0], 100], [[1, 2], { taxR: 5, retOn: true, retPct: 10 }], [105, 5], ['c', { no: 1, id: 'x' }, { id: 'e' }], [inv0, '2026']];
     Object.values(g.FJC || {}).forEach(mod => Object.values(mod).forEach(fn => argsets.forEach(a => { try { fn.apply(null, a); } catch (e) { if (e instanceof ReferenceError || /is not defined/.test(e && e.message)) throw e; } })));
-  } catch (e) { clean = false; }
+  } catch (e) { clean = false; console.error("[sandbox]", f, e && e.message); }
   check('calc/' + f + ' 不讀畫面與全域資料（乾淨沙盒載入並逐一呼叫）', clean && !/\b(P|Q|INV|PAYABLES|CONTRACTS)\b\s*[.[]|document\.|localStorage/.test(src));
 });
 
@@ -65,6 +67,23 @@ check('抵扣預付不超過本期淨額', PY.periodCalc(card, { no: 8, rows: [{
 const al = PY.advInclAlloc(card, 5, 100);
 check('預付款含稅抵扣（合成樣本 A14b）：預付 359,988×1.05＝377,987，第 1 期 210,000、第 2 期 167,987，合計＝已付含稅預付', al[1] === 210000 && al[2] === 167987 && al[1] + al[2] === 377987, JSON.stringify(al));
 check('廠商請款單價可核實覆寫、應付 id 規則', PY.rowPrice({ unitPrice: 1000 }, { up: 990 }) === 990 && PY.rowPrice({ unitPrice: 1000 }, { up: '' }) === 1000 && PY.payId('c1', { no: 2 }) === 'payc1_p2' && PY.payId('c1', { no: 3, isRet: true }) === 'payc1_r3' && PY.advPayId('c1', { id: 'a1' }) === 'payc1_aa1');
+
+// ── 經營報表（calc/report.js）：年度損益、稅別調整、分潤估算 ──
+{
+  const invs = [I.totals([100000], { taxR: 5, retOn: true, retPct: 10 }), I.totals([200000], { taxR: 5 })].map((t, k) => ({ id: 'i' + k, date: k ? '2026-03-10' : '2026-02-10', retention: !k, totals: t, received: k ? 210000 : 94500, receivedDate: k ? '2026-04-10' : '2026-03-10' }));
+  const quotes = [{ id: 'q', costs: [{ type: 'sub', amt: 150000, date: '2026-02-20' }, { type: 'own', amt: 30000, date: '2026-03-01' }, { type: 'sub', amt: 99999, date: '2025-12-31' }] }];
+  const expenses = [{ date: '2026-05-01', amount: 20000, cat: '辦公' }, { date: '2026-05-01', amount: 15000, cat: '營業稅' }, { date: '2026-06-01', amount: 5000, cat: '營所稅' }, { date: '2026-05-02', amount: 9999, costRef: 'x' }];
+  const fn = { taxM: 1.05, retention: v => I.retention(v, 5, v.retention ? 10 : 0), rcvIn: I.rcvIn, hrEstimate: () => 60000 };
+  const d = R.year({ invoices: invs, quotes, expenses, payslips: [{ ym: '2026-04', gross: 40000, coCost: 6000 }] }, 2026, fn);
+  check('年度損益：營收含保留款未稅 300,000、成本 180,000、毛利 120,000、費用 40,000、人事 46,000、稅前 34,000', d.revTax === 304500 && d.ret === 10500 && d.revNet === 300000 && d.cost === 180000 && d.gross === 120000 && d.exp === 40000 && d.hr === 46000 && !d.hrEst && d.pretax === 34000, JSON.stringify(d).slice(0, 300));
+  check('年度實收依收款日、成本分類、月別', d.recv === 304500 && d.costByCat['承包（發包）'] === 150000 && d.costByCat['自有（材料機具）'] === 30000 && d.monthly[1].rev === 100000 && d.monthly[2].rev === 200000 && d.monthly[2].recv === 94500 && d.monthly[3].recv === 210000);
+  R.taxAdj(d);
+  check('營業稅代收代付不算費用、營所稅列稅後：費用 20,000、稅前 54,000、稅後 49,000', d.vat === 15000 && d.inctax === 5000 && d.exp === 20000 && d.pretax === 54000 && d.afterTax === 49000);
+  const d0 = R.year({ invoices: invs, quotes, expenses: [], payslips: [] }, '2026', fn);
+  check('沒有薪資單：有營運活動的年度用人事估算；沒活動的年度不估', d0.hr === 60000 && d0.hrEst && R.year({ invoices: [], quotes: [], expenses: [], payslips: [] }, '2024', fn).hr === 0);
+  const sa = R.shareAuto({ invoices: invs, quotes, expenses }, '2026', { taxM: 1.05, months: 10, salaryMonth: 150000 }, fn);
+  check('分潤估算：營收含保留款、扣成本費用與估計薪資；循環資金增額', sa.rev === 315000 && sa.cost === 180000 && sa.exp === 40000 && sa.salary === 3000000 && sa.netProfit === 0 && sa.wcAdd === Math.max(0, Math.round(((180000 + 40000 + 3000000) / 10 - 99999 / 12) * 23 / 30)), JSON.stringify(sa));
+}
 
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {

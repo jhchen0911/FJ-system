@@ -1,9 +1,9 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.131';
+var APP_VERSION='v6.0.132';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
-if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
+if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -27007,27 +27007,10 @@ function _shareMonths(y){
 }
 // 系統自動試算：稅後淨利＝(本年請款未稅－施工成本－費用發票－股東薪資)×(1−稅率20%)
 function _shareAutoCalc(y){
-  // v5.337 健檢H：totals.total 已扣掉保留款，capEarn 之後又減 retentionAdd（同一筆錢），
-  // 保留款被排除兩次、盈餘上限每年低估一整年保留款。營收改用「含保留款」的請款額，
-  // 讓後面的 − retentionAdd 恰好排除一次。
-  var rev=0;INV.forEach(function(v){
-    if((v.date||'').slice(0,4)!==y)return;
-    rev+=((v.totals&&parseFloat(v.totals.total))||0)+_invRetention(v);
-  });
-  var cost=0;Q.forEach(function(q){(q.costs||[]).forEach(function(c){if((c.date||'').slice(0,4)===y)cost+=parseFloat(c.amt)||0;});});
-  // v5.315：排除 costRef 標記者（智慧收件的材料發票已計入施工成本，再加一次就是雙重扣除）
-  var exp=0;(EXPENSES||[]).forEach(function(e){if(e&&e.costRef)return;if((e.date||'').slice(0,4)===y)exp+=parseFloat(e.amount!=null?e.amount:e.amt)||0;});
-  var months=_shareMonths(y);
-  var salary=SHARE_SALARY_MONTH*2*months;
-  var pretax=rev/_taxM()-cost-exp-salary;
-  // 循環資金增額估算：月均成本成長 ×（收款60天−付款約37天）/30
-  var prevCost=0;Q.forEach(function(q){(q.costs||[]).forEach(function(c){if((c.date||'').slice(0,4)===String(parseInt(y)-1))prevCost+=parseFloat(c.amt)||0;});});
-  var curMo=months>0?(cost+exp+salary)/months:0;
-  var prevMo=prevCost/12;
-  var wcAdd=Math.max(0,Math.round((curMo-prevMo)*23/30));
-  return {rev:Math.round(rev),cost:Math.round(cost),exp:Math.round(exp),salary:salary,months:months,
-    wcAdd:wcAdd,netProfit:Math.round(Math.max(0,pretax)*0.8)};
+  // 第 3a-3 步：算法在 calc/report.js（FJC.rpt.shareAuto）。v5.337：營收含保留款，後面的 − retentionAdd 恰好排除一次
+  return FJC.rpt.shareAuto({invoices:INV,quotes:Q,expenses:EXPENSES},y,{taxM:_taxM(),months:_shareMonths(y),salaryMonth:SHARE_SALARY_MONTH},{retention:_invRetention});
 }
+
 function _shareYear(){return window._shareY||String(new Date().getFullYear());}
 // v5.321：無設定時建立並存回 cfg（原本回傳暫時物件，對它的寫入會遺失）
 function _shareCfg(y){
@@ -32906,21 +32889,10 @@ function _acctTabsHtml(){
 // switchFinanceTab 仍被各處呼叫（go('finance') 後切分頁）→ 同步帳務分頁外觀
 // ══════════ v6 股東報表（報表中心分頁 shareholder）：年度損益、各案損益、財務狀況、分潤、業務 ══════════
 function _shRptYearCore(year){
-  var Y=String(year),tm=_taxM();
-  var revTax=0,ret=0;INV.forEach(function(v){if((v.date||'').slice(0,4)!==Y)return;revTax+=((v.totals&&parseFloat(v.totals.total))||0);ret+=_invRetention(v);});
-  var recv=INV.reduce(function(a,i){return a+_invRcvIn(i,Y);},0);
-  var cost=0,costByCat={};Q.forEach(function(q){(q.costs||[]).forEach(function(c){if((c.date||'').slice(0,4)!==Y)return;var a=parseFloat(c.amt)||0;cost+=a;var k=c.type==='sub'?'承包（發包）':c.type==='labor'?'點工':c.type==='own'?'自有（材料機具）':'額外支出';costByCat[k]=(costByCat[k]||0)+a;});});
-  var exp=0,expByCat={};(EXPENSES||[]).forEach(function(e){if(!e||e.costRef||(e.date||'').slice(0,4)!==Y)return;var a=parseFloat(e.amount!=null?e.amount:e.amt)||0;exp+=a;var k=e.cat||'其他';expByCat[k]=(expByCat[k]||0)+a;});
-  var slips=(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]).filter(function(s){return s&&String(s.ym||'').slice(0,4)===Y;});
-  var hr=slips.reduce(function(a,s){return a+(parseFloat(s.gross)||0)+(parseFloat(s.coCost)||0);},0),hrEst=false;
-  if(!slips.length){if(revTax>0||cost>0||exp>0){try{hr=_shareAutoCalc(Y).salary;hrEst=true;}catch(e){hr=0;}}else hr=0;}   // 無任何營運活動的年度不推估
-  var revNet=Math.round((revTax+ret)/tm);
-  var gross=revNet-cost,pretax=gross-exp-hr;
-  var monthly=[];for(var m=1;m<=12;m++){var ms=Y+'-'+String(m).padStart(2,'0');
-    var mr=INV.reduce(function(a,i){return a+(((i.date||'').slice(0,7)===ms)?((((i.totals&&parseFloat(i.totals.total))||0)+_invRetention(i))/tm):0);},0);
-    var mc=0;Q.forEach(function(q){(q.costs||[]).forEach(function(c){if((c.date||'').slice(0,7)===ms)mc+=parseFloat(c.amt)||0;});});
-    var mv=INV.reduce(function(a,i){return a+_invRcvIn(i,ms);},0);
-    monthly.push({m:m,rev:Math.round(mr),cost:Math.round(mc),recv:Math.round(mv)});}
+  // 第 3a-3 步：年度損益本體在 calc/report.js（FJC.rpt.year）；這裡只把資料與全站口徑函式交給它，再補分潤、得標、財務、各案
+  var Y=String(year);
+  var d=FJC.rpt.year({invoices:INV,quotes:Q,expenses:EXPENSES,payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[])},Y,
+    {taxM:_taxM(),retention:_invRetention,rcvIn:_invRcvIn,hrEstimate:function(y){return _shareAutoCalc(y).salary;}});
   // 分潤（與分潤頁同口徑：權責上限＝淨利×80% − 保留款增加 − 週轉增加 − 機具自付；本年提領）
   var sh={cap:0,drawn:0,byWho:{},remain:0,cfg:null};
   try{var cfg=_shareCfg(Y),a=_shareAutoCalc(Y);var net=a.netProfit;sh.cfg={netProfit:net,retentionAdd:cfg.retentionAdd||0,wcAdd:a.wcAdd||0,machineSelfPay:cfg.machineSelfPay||0};
@@ -32938,7 +32910,8 @@ function _shRptYearCore(year){
     if(!inY)return;
     projs.push({q:q,st:st,gm:st.base>0?(st.profit/st.base*100):0});});
   projs.sort(function(a,b){return b.st.base-a.st.base;});
-  return {Y:Y,revTax:Math.round(revTax),ret:Math.round(ret),revNet:revNet,recv:Math.round(recv),cost:Math.round(cost),costByCat:costByCat,gross:Math.round(gross),grossR:revNet>0?gross/revNet*100:0,exp:Math.round(exp),expByCat:expByCat,hr:Math.round(hr),hrEst:hrEst,pretax:Math.round(pretax),netR:revNet>0?pretax/revNet*100:0,monthly:monthly,share:sh,bid:bid,fin:fin,projs:projs};
+  d.share=sh;d.bid=bid;d.fin=fin;d.projs=projs;
+  return d;
 }
 function _shRptBody(d,forPrint){
   var pct=function(v){return (Math.round(v*10)/10)+'%';};
@@ -36162,7 +36135,7 @@ function expDel(id){
 function _paySource(p){if(p&&/^pay_tax_/.test(String(p.id||'')))return {auto:true,label:'費用．發票（稅費）',go:"go('acct');setTimeout(function(){acctTab('inv');},200)"};return _paySourceCore.apply(this,arguments);};
 function _payIsCompany(p){return _payIsCompanyCore(p)||!!(p&&/^pay_tax_/.test(String(p.id||'')));};
 // 報表：營業稅代收代付不計費用；營所稅列稅後
-function _shRptYear(year){var d=_shRptYearCore.apply(this,arguments);try{var vat=Math.round(d.expByCat['營業稅']||0),inc=Math.round(d.expByCat['營所稅']||0);d.vat=vat;d.inctax=inc;if(vat||inc){d.exp-=vat+inc;d.pretax+=vat+inc;d.netR=d.revNet>0?d.pretax/d.revNet*100:0;}d.afterTax=d.pretax-inc;}catch(e){_err('_shRptYear.tax',e);}return d;};
+function _shRptYear(year){var d=_shRptYearCore.apply(this,arguments);try{FJC.rpt.taxAdj(d);}catch(e){_err('_shRptYear.tax',e);}return d;}   // 營業稅代收代付不算費用、營所稅列稅後（calc/report.js）
 function _rptBasisStrip(year){var h=_rptBasisStripCore.apply(this,arguments);try{var d=_shRptYear(year);if(d&&(d.vat||d.inctax))h+='<div style="padding:4px 14px 0;font-size:11px;color:var(--b4)">'+(d.vat?('營業稅（代收代付，不計費用）NT$ '+fmt(d.vat)+'　'):'')+(d.inctax?('營所稅 NT$ '+fmt(d.inctax)+' → 稅後淨利 <b>NT$ '+fmt(d.afterTax)+'</b>'):'')+'</div>';}catch(e){_err('_rptBasisStrip',e);}return h;};
 
 
