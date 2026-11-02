@@ -10,7 +10,12 @@ const CACHE = 'fy-app-v3';
 const LIB_HOSTS = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'unpkg.com'];
 const LIB_RE = /html2canvas|jspdf/i;
 
-self.addEventListener('install', e => { self.skipWaiting(); });
+// v6.0.130：計算模組清單（新增 calc 檔時一起加）。安裝時先存進快取——否則升級那次 calc 不在快取裡，之後離線開啟會缺計算模組
+const CALC_FILES = ['./calc/invoice.js'];
+self.addEventListener('install', e => {
+  self.skipWaiting();
+  e.waitUntil(caches.open(CACHE).then(c => Promise.all(CALC_FILES.map(f => c.add(new Request(f, { cache: 'no-cache' })).catch(() => {})))).catch(() => {}));
+});
 
 self.addEventListener('activate', e => {
   e.waitUntil(
@@ -36,8 +41,12 @@ function isAppShell(req, url) {
 }
 // index.html 換新時，快取裡的 calc 模組也一起重新驗證（v6.0.130）
 function revalidateCalc() {
-  return caches.open(CACHE).then(c => c.keys()).then(ks => Promise.all(ks.filter(r => isCalc(new URL(r.url)))
-    .map(r => caches.match(r).then(cc => revalidate(r.url, cc))))).catch(() => {});
+  const base = self.registration ? self.registration.scope : self.location.href;
+  return caches.open(CACHE).then(c => c.keys()).then(ks => {
+    const urls = new Set(CALC_FILES.map(f => new URL(f, base).href));   // 清單上的一定重抓（快取裡還沒有也抓）
+    ks.forEach(r => { const u = new URL(r.url); if (isCalc(u)) urls.add(u.origin + u.pathname); });
+    return Promise.all([...urls].map(u => caches.match(u).then(cc => revalidate(u, cc))));
+  }).catch(() => {});
 }
 // 快取鍵：去掉查詢字串（app.js?v=… 版本不同仍對到同一份），目錄請求視同 index.html
 function shellKey(url) {
@@ -83,7 +92,7 @@ self.addEventListener('fetch', e => {
           // index.html 變了 → app.js 一起換新再通知；app.js 變了（通常同時）→ 直接通知
           if (isJs) { notifyUpdate(); return; }
           const jk = appJsKey(url);
-          return caches.match(jk).then(jc => revalidate(jk, jc)).then(revalidateCalc).then(() => notifyUpdate());
+          return revalidateCalc().then(() => caches.match(jk)).then(jc => revalidate(jk, jc)).then(() => notifyUpdate());   // 先換 calc 再換 app.js：不會出現新 app.js 配舊 calc
         });
         if (cached) { e.waitUntil(net); return cached; }
         return fetch(e.request).then(res => {

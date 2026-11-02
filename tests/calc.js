@@ -16,6 +16,7 @@ const t0 = I.totals([100000], { taxR: 5, retOn: false, retPct: 10 });
 check('沒勾保留款＝不扣', t0.retention === 0 && t0.total === 105000);
 // 保留款（含稅基礎）
 check('保留款：本期 100,000×1.05×10%＝10,500；已退還＝0', I.retention({ retention: true, totals: { curTotal: 100000 } }, 5, 10) === 10500 && I.retention({ retention: true, retentionReturned: true, totals: { curTotal: 100000 } }, 5, 10) === 0);
+check('保留款：本期 0 時沿用存檔的保留款金額', I.retention({ retention: true, totals: { curTotal: 0, retention: 3000 } }, 5, 10) === 3000);
 // 已收款三種（合成樣本 B25b）
 const iv = { received: 95000, receivedDate: '2026-09-30', recvHold: 5000, holdRetLog: [{ amt: 5000, date: '2026-10-10' }] };
 check('已收款：業主付款 95,000、全部現金 100,000（B25b）', I.rcvOwner(iv) === 95000 && I.rcv(iv) === 100000);
@@ -34,6 +35,15 @@ check('免稅案發票稅額 0', eq(I.einvSplit(100000, 0), { net: 100000, tax: 
 const src = require('fs').readFileSync(path.join(__dirname, '..', 'calc', 'invoice.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 check('calc/invoice.js 不讀畫面與全域資料', !/\b(P|Q|INV|PAYABLES|CONTRACTS)\b\s*[.[]|document\.|localStorage/.test(src));
 
+// 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
+{
+  const fs = require('fs'), R = path.join(__dirname, '..');
+  const files = fs.readdirSync(path.join(R, 'calc')).filter(f => /\.js$/.test(f));
+  const idx = fs.readFileSync(path.join(R, 'index.html'), 'utf8'), sw = fs.readFileSync(path.join(R, 'sw.js'), 'utf8');
+  const appAt = idx.indexOf('<script src="app.js');
+  const bad = files.filter(f => { const at = idx.indexOf('<script src="calc/' + f + '?v='); return at < 0 || at > appAt || sw.indexOf("'./calc/" + f + "'") < 0; });
+  check('calc 檔都在 index.html（app.js 之前）與 sw.js 安裝預載清單', files.length > 0 && !bad.length, bad.join('、'));
+}
 let fail = 0;
 console.log('\n計算模組（Node 單獨跑）\n' + '─'.repeat(64));
 results.forEach(r => { if (!r.ok) fail++; console.log((r.ok ? '  ✓ ' : '  ✗ ') + r.name + (r.ok ? '' : '　' + r.info)); });
