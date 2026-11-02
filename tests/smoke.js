@@ -9070,6 +9070,58 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.129 分包成本列「每 M 單價 × 樁長」、成本卡自動存檔提示、手動應付三個小問題 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      try {
+        const toasts = []; const t0 = window.toast; window.toast = m => { toasts.push(String(m)); };
+        const row = { id: 'rV1', linkedItemIdx: 0, qty: 100, unitPrice: 0 };
+        const card = { id: 'cV1', type: 'sub', vendor: '乙工程行', rows: [row] };
+        Q.unshift({ id: 'qV129', name: '範例工程V129', client: '甲營造', awarded: true, items: [{ desc: 'H型鋼樁 H300，L=15M@80cm', unit: '支', qty: 100, price: 9000 }], costs: [card], rfqs: [], exs: [], rmk: {}, t: {}, _mt: 1 });
+        eid = 'qV129';
+        out.defPc = !_costRowIsPerM(Q[0], row);                        // 詢價沒設依 M → 預設每支
+        updCostField('cV1', 'linkedItemIdx', '0', 'rV1');               // 選工項：樁長從 L=15M 帶
+        out.len = row.len === 15;
+        updCostField('cV1', 'pm', 'm', 'rV1');
+        updCostField('cV1', 'upm', '550', 'rV1');
+        out.calc = row.unitPrice === 8250 && row.desc === '$550/M' && card.amt === 825000;
+        row.desc = '$550/M 含加工'; updCostField('cV1', 'upm', '560', 'rV1');   // 自動帶的開頭跟著改，使用者加的字留著
+        out.memo = row.unitPrice === 8400 && row.desc === '$560/M 含加工';
+        updCostField('cV1', 'pm', 'pc', 'rV1'); updCostField('cV1', 'unitPrice', '8000', 'rV1');   // 改回每支：照填的
+        out.pc = row.unitPrice === 8000 && card.amt === 800000;
+        Q[0].rfqs = [{ id: 'rf1', items: [{ idx: 0, per: 'm', len: 15 }] }];
+        out.defM = _costRowIsPerM(Q[0], { linkedItemIdx: 0 });          // 詢價依 M → 預設每 M
+        await new Promise(res => setTimeout(res, 1000));
+        out.hint = toasts.filter(x => x === '已儲存').length >= 1;      // 停手後跳「已儲存」（連續輸入只跳一次）
+        out.hintOnce = toasts.filter(x => x === '已儲存').length === 1;
+        // 手動應付：數量空白＝1；新增時清發票號；選施工成本來源記下所屬案件；編輯不掉未稅設定
+        newPayable();
+        document.getElementById('p-invno').value = 'AB12345678'; document.getElementById('p-item-name-hidden').value = '舊工項';
+        newPayable();
+        out.clear = document.getElementById('p-invno').value === '' && document.getElementById('p-item-name-hidden').value === '';
+        document.getElementById('p-to').value = '丙五金行'; document.getElementById('p-unit-price').value = '3000'; document.getElementById('p-qty').value = '';
+        calcPayableAmt(); out.qtyBlank = document.getElementById('p-amount').value === '3000';
+        document.getElementById('p-amount').value = '';
+        const opt = [...document.querySelectorAll('#p-cost-source option')].find(o => o.value && (_costSrcDecode(o.value) || {}).qid === 'qV129');
+        out.opt = !!opt; if (opt) document.getElementById('p-cost-source').value = opt.value;
+        document.getElementById('p-unit-price').value = '3000'; document.getElementById('p-qty').value = '';
+        const n0 = PAYABLES.length; savePayable();
+        const np = PAYABLES[0]; out.save = PAYABLES.length === n0 + 1 && np.amount === 3000 && np.quoteId === 'qV129';
+        np.vat = false; editPayable(np.id); savePayable();
+        const np2 = PAYABLES.find(x => x.id === np.id); out.keepVat = np2.vat === false && np2.quoteId === 'qV129';
+        PAYABLES = PAYABLES.filter(x => x.id !== np.id); Q = Q.filter(x => x.id !== 'qV129'); window.toast = t0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('v6.0.129 分包成本列「每 M 單價 × 樁長」：樁長從 L=15M 帶、550/M×15＝8,250／支、備註自動帶 $550/M（自己加的字留著）、可切回每支；詢價依 M 時預設每 M', r.defPc && r.len && r.calc && r.memo && r.pc && r.defM, JSON.stringify(r));
+    check('v6.0.129 成本卡自動存檔停手後跳一次「已儲存」', r.hint && r.hintOnce, JSON.stringify(r));
+    check('v6.0.129 手動應付：數量空白當 1 算金額、新增時清發票號與工項名、選施工成本來源記下所屬案件、編輯不掉未稅設定', r.clear && r.qtyBlank && r.opt && r.save && r.keepVat, JSON.stringify(r));
+    check('v6.0.129 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.128';
+var APP_VERSION='v6.0.129';
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -21443,12 +21443,15 @@ function buildCostRowsHtml(cc,q){
         +'<input type="number" inputmode="decimal" value="'+(row.qty?row.qty:'')+'" placeholder="數量" title="選工項自動帶入合約數量，可修改" oninput="updCostField(\''+cc.id+'\',\'qty\',this.value,\''+row.id+'\')" style="flex:1;text-align:right;'+IN+'">'
         +(_lit&&_lit.unit?'<span style="font-size:11px;color:var(--b3);white-space:nowrap">'+esc(_uFix(_lit.unit))+'</span>':'')
         +'<span style="font-size:11px;color:var(--b3)">×</span>'
-        +'<input type="number" inputmode="decimal" value="'+(row.unitPrice||'')+'" placeholder="單價" oninput="updCostField(\''+cc.id+'\',\'unitPrice\',this.value,\''+row.id+'\')" style="flex:1;text-align:right;'+IN+'">'
+        +(_costRowIsPerM(q,row)
+          ?'<input type="number" inputmode="decimal" id="cost-row-up-'+row.id+'" value="'+(row.unitPrice||'')+'" placeholder="每支單價" readonly title="＝每 M 單價 × 樁長（自動算）" style="flex:1;text-align:right;background:var(--b0);'+IN+'">'
+          :'<input type="number" inputmode="decimal" id="cost-row-up-'+row.id+'" value="'+(row.unitPrice||'')+'" placeholder="單價" oninput="updCostField(\''+cc.id+'\',\'unitPrice\',this.value,\''+row.id+'\')" style="flex:1;text-align:right;'+IN+'">')
         +'<span style="font-size:11px;color:var(--b3)">＝</span>'
         +amtSpan+fmt(rowAmt)+'</span>'
         +'</div>'
+        +_costRowPerMHtml(cc,q,row,IN)
         +'<div style="display:flex;gap:5px;align-items:center">'
-        +'<input value="'+esc(row.desc||'')+'" class="crow-memo" placeholder="備註（例：$4,050／M，含 XX 加工）" oninput="updCostField(\''+cc.id+'\',\'desc\',this.value,\''+row.id+'\')" style="flex:1;min-width:0;'+IN+'">'
+        +'<input value="'+esc(row.desc||'')+'" id="cost-row-desc-'+row.id+'" class="crow-memo" placeholder="備註（例：$4,050／M，含 XX 加工）" oninput="updCostField(\''+cc.id+'\',\'desc\',this.value,\''+row.id+'\')" style="flex:1;min-width:0;'+IN+'">'
         +'<input type="number" inputmode="decimal" min="0" max="100" step="0.5" value="'+(row.ret!=null&&row.ret!==''?row.ret:'')+'" placeholder="保留%" title="此工項保留款％（空白＝依合約設定）" onchange="updCostField(\''+cc.id+'\',\'ret\',this.value,\''+row.id+'\')" style="flex:0 0 62px;text-align:right;'+IN+'">'
         +'</div>'
         +(function(){var done=(_subStat(cc).byRow[row.id]||0);return done>0?'<div style="font-size:10.5px;color:var(--b4);margin-top:3px">已計價 '+fmt(Math.round(done*100)/100)+(_lit&&_lit.unit?' '+esc(_uFix(_lit.unit)):'')+'／'+fmt(parseFloat(row.qty)||0)+(done>(parseFloat(row.qty)||0)+1e-6?' <b style="color:var(--red)">超過發包量</b>':'')+'</div>':'';})()
@@ -23472,7 +23475,8 @@ function updCostField(cid,field,val,rid){
     // 更新子行欄位
     var row=cc.rows&&cc.rows.find(function(r){return r.id===rid;});
     if(!row)return;
-    var numFields=['qty','unitPrice','days','dayRate','transport','linkedItemIdx'];
+    var numFields=['qty','unitPrice','days','dayRate','transport','linkedItemIdx','upm','len'];
+    if(field==='pm'){row.pm=val==='m'?'m':'pc';}   // v6.0.129 計價方式：每支／每 M×樁長（存使用者的選擇，之後不再自動判斷）
     if(field==='ret'){var _rv=parseFloat(val);row.ret=(val===''||val==null||isNaN(_rv))?null:Math.max(0,Math.min(100,_rv));}   // v5.405 空白＝依合約
     else row[field]=numFields.includes(field)?(parseFloat(val)||0):val;
     // 選工項時帶入預設數量
@@ -23481,11 +23485,13 @@ function updCostField(cid,field,val,rid){
       if(it){var _em0=null;try{_em0=_effQtyMap(q);}catch(e){_err('updCostField',e);}
         row.qty=Math.abs(_em0?_effQty(_em0,it):(parseFloat(it.qty)||0))||0;}   // v5.403：一律帶合約（生效）數量，可再改
     }
+    if(field==='linkedItemIdx'&&row.linkedItemIdx>=0&&!(parseFloat(row.len)>0)){var _lf=_costLenFromDesc((q.items||[])[row.linkedItemIdx]);if(_lf)row.len=_lf;}   // v6.0.129 樁長從工項名稱 L=…M 帶
+    if(['pm','upm','len','linkedItemIdx'].includes(field)&&_costRowIsPerM(q,row))_costRowPerMApply(row);
     recalcCostAmt(cc);
     // 更新金額顯示（不重繪）
     if(['vendor','desc','reason'].includes(field)){
       try{syncCostToPayable(q,cc);}catch(e){_err('updCostField',e);}
-      try{persist();}catch(e){_err('updCostField',e);} return;
+      try{persist();}catch(e){_err('updCostField',e);} _costSavedHint(); return;
     }
     var rowAmtEl=document.getElementById('cost-row-amt-'+rid);
     if(rowAmtEl){
@@ -23502,8 +23508,9 @@ function updCostField(cid,field,val,rid){
       totalEl.textContent='NT$ '+fmt(allAmt);
       var tw2=document.getElementById('cost-total-wrap');if(tw2)tw2.style.display='';
     }
+    if(['upm','len'].includes(field)){var _ue=document.getElementById('cost-row-up-'+rid);if(_ue)_ue.value=row.unitPrice||'';var _de=document.getElementById('cost-row-desc-'+rid);if(_de&&_de!==document.activeElement)_de.value=row.desc||'';}
     try{syncCostToPayable(q,cc);}catch(e){_err('top',e);}
-    if(field==='linkedItemIdx')rCostItems();
+    if(field==='linkedItemIdx'||field==='pm')rCostItems();
   } else {
     // 更新頂層欄位（vendor / linkedItemIdx for labor）
     var numTop=['linkedItemIdx'];
@@ -23511,12 +23518,13 @@ function updCostField(cid,field,val,rid){
     if(field==='vendor'){try{_vendorEnsure(val,cc.type);}catch(e){_err('updCostField.vendor',e);}}   // v6.0.70 手動輸入的廠商自動進名冊
     if(['vendor','desc','reason'].includes(field)){
       try{syncCostToPayable(q,cc);}catch(e){_err('top',e);}
-      try{persist();}catch(e){_err('top',e);} return;
+      try{persist();}catch(e){_err('top',e);} _costSavedHint(); return;
     }
     if(field==='linkedItemIdx')rCostItems();
     try{syncCostToPayable(q,cc);}catch(e){_err('top',e);} // 強連動：任何頂層欄位（科目/日期…）變更即同步應付
   }
   try{persist();}catch(e){_err('top',e);}
+  _costSavedHint();
 }
 
 
@@ -25608,7 +25616,7 @@ function togglePaidDateField(){
 function newPayable(){
   document.getElementById('payable-edit-id').value='';
   document.getElementById('payable-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-coins"/></svg> 新增付款記錄';
-  ['p-to','p-amount','p-qty','p-unit-price','p-retention-pct','p-project','p-note','p-paid-date','p-cost-source'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['p-to','p-amount','p-qty','p-unit-price','p-retention-pct','p-project','p-note','p-paid-date','p-cost-source','p-invno','p-item-name-hidden'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});   // v6.0.129 發票號、工項名不再帶到下一筆
   refreshCostSourceList();
   document.getElementById('p-date').value=localToday();
   document.getElementById('p-category').value='material';
@@ -25653,7 +25661,9 @@ function savePayable(){
   const _qty=parseFloat(gv('p-qty'))||0;
   const _up=parseFloat(gv('p-unit-price'))||0;
   const _csId=gv('p-cost-source')||'';
-  const p={id,_mt:Date.now(),_by:_meEmail(),to:gv('p-to'),amount:parseFloat(gv('p-amount'))||0,date:gv('p-date'),
+  // v6.0.129：有單價就照「數量（空白＝1）×單價」重算一次，不靠打字當下的即時計算
+  let _amt=parseFloat(gv('p-amount'))||0;if(_up>0){const _q=String(gv('p-qty')||'').trim()===''?1:_qty;if(_q>0)_amt=Math.round(_q*_up);}
+  const p={id,_mt:Date.now(),_by:_meEmail(),to:gv('p-to'),amount:_amt,date:gv('p-date'),
     paidDate:_paidDate,qty:_qty||0,unitPrice:_up||0,costSourceId:_csId||'',
     itemName:document.getElementById('p-item-name-hidden')?.value||'',
     retentionPct:parseFloat(document.getElementById('p-retention-pct')?.value)||0,
@@ -25661,6 +25671,11 @@ function savePayable(){
     retentionPct:gv('p-retention-pct')!==''?parseFloat(gv('p-retention-pct'))||0:null,
     updatedAt:Date.now()};
   const idx=PAYABLES.findIndex(x=>x.id===id);
+  // v6.0.129：表單沒有的欄位沿用舊記錄（原本一編輯就掉：未稅／含稅、附件、所屬案件）
+  const _old=idx>=0?PAYABLES[idx]:null;
+  if(_old){['vat','vatManual','files','quoteId'].forEach(function(k){if(_old[k]!=null&&p[k]==null)p[k]=_old[k];});}
+  // 選了「從施工成本帶入」→ 記下所屬案件（卡片才有「成本」按鈕、工程專案頁看得到這筆）
+  const _cs=_costSrcDecode(_csId);if(_cs&&_cs.qid&&!p.quoteId)p.quoteId=_cs.qid;
   if(idx>=0)PAYABLES[idx]=p;else PAYABLES.unshift(p);
   savePayables();logActivity('應付',(idx>=0?'修改':'新增')+'付款：'+p.to+' NT$'+fmt(p.amount));
   closePayableModal();renderPayables();updateFinanceKPIs();toast('付款記錄已儲存');
@@ -25743,6 +25758,7 @@ function calcPayableAmt(){
   var up=parseFloat(document.getElementById('p-unit-price')?.value)||0;
   var retPct=(parseFloat(document.getElementById('p-retention-pct')?.value)||0)/100;
   var amtEl=document.getElementById('p-amount');
+  if(!(qty>0)&&up>0&&String(document.getElementById('p-qty')?.value||'').trim()==='')qty=1;   // v6.0.129 數量欄空白（只看到提示字 1）＝1，否則金額不會算
   var baseAmt=qty>0&&up>0?Math.round(qty*up):parseFloat(amtEl?.value)||0;
   if(qty>0&&up>0&&amtEl)amtEl.value=baseAmt;
   // 顯示保留款金額提示
@@ -39490,6 +39506,36 @@ function lotionNotifyOpen(){
     },false,null,false);
   setTimeout(function(){try{_aiNfPrev();}catch(e){_err('lotionNotifyOpen',e);}},50);
 }
+// ── v6.0.129 小批次 ──
+// 分包成本列「每 M 單價 × 樁長」：以支計價的工項可改填每 M 單價，系統算每支單價（四捨五入到元），備註自動帶「$550/M」
+function _costLenFromDesc(it){var m=/L\s*[=＝]\s*([\d.]+)\s*[Mm米]/.exec(String((it&&it.desc)||''));var v=m?parseFloat(m[1]):0;return v>0?v:0;}
+function _costRowPerMDefault(q,row){   // 沒選過時：發包詢價那個工項是「依 M 計價」就預設每 M
+  var hit=false;(q&&q.rfqs||[]).forEach(function(r){(r&&r.items||[]).forEach(function(it){if(it&&it.idx===row.linkedItemIdx&&it.per==='m')hit=true;});});return hit;}
+function _costRowIsPerM(q,row){if(!row)return false;if(row.pm)return row.pm==='m';return _costRowPerMDefault(q,row);}
+function _costRowPerMApply(row){
+  var upm=parseFloat(row.upm)||0,len=parseFloat(row.len)||0;
+  if(!upm&&len>0&&(parseFloat(row.unitPrice)||0)>0){upm=Math.round((parseFloat(row.unitPrice)||0)/len*100)/100;row.upm=upm;}   // 剛切到每 M：由現有每支單價反推，每支單價不變
+  if(upm>0&&len>0)row.unitPrice=Math.round(upm*len);
+  var auto='$'+fmt(upm)+'/M';
+  if(upm>0&&(!row.desc||/^\$[\d,.]+\/M/.test(row.desc)))row.desc=row.desc?row.desc.replace(/^\$[\d,.]+\/M/,auto):auto;   // 備註空白或原本就是自動帶的才改，使用者自己寫的不動
+}
+function _costRowPerMHtml(cc,q,row,IN){
+  var it=(row.linkedItemIdx>=0&&q&&q.items)?q.items[row.linkedItemIdx]:null;
+  var u=_uFix((it&&it.unit)||'');if(!/支|根/.test(u))return '';   // 只有以支計價的工項才給選
+  var pm=_costRowIsPerM(q,row),len=parseFloat(row.len)>0?row.len:(_costLenFromDesc(it)||'');
+  var sel='<select onchange="updCostField(\''+cc.id+'\',\'pm\',this.value,\''+row.id+'\')" style="flex:0 0 auto;'+IN+'"><option value="pc"'+(pm?'':' selected')+'>每支單價</option><option value="m"'+(pm?' selected':'')+'>每 M 單價 × 樁長</option></select>';
+  if(!pm)return '<div style="display:flex;gap:5px;align-items:center;margin-bottom:5px">'+sel+'</div>';
+  return '<div style="display:flex;gap:5px;align-items:center;margin-bottom:5px;flex-wrap:wrap">'+sel
+    +'<input type="number" inputmode="decimal" step="any" value="'+(row.upm||'')+'" placeholder="每 M 單價" oninput="updCostField(\''+cc.id+'\',\'upm\',this.value,\''+row.id+'\')" style="flex:1;min-width:70px;text-align:right;'+IN+'">'
+    +'<span style="font-size:11px;color:var(--b3)">/M ×</span>'
+    +'<input type="number" inputmode="decimal" step="any" value="'+len+'" placeholder="樁長" title="從工項名稱 L=…M 帶入，帶不到請手填" oninput="updCostField(\''+cc.id+'\',\'len\',this.value,\''+row.id+'\')" style="flex:0 0 64px;text-align:right;'+IN+'">'
+    +'<span style="font-size:11px;color:var(--b3)">M／支</span></div>';
+}
+// 成本卡自動存檔提示（打字就存，停手 0.8 秒跳一次「已儲存」）
+var _costSavedT=null;
+function _costSavedHint(){try{clearTimeout(_costSavedT);_costSavedT=setTimeout(function(){toast('已儲存');},800);}catch(e){_err('_costSavedHint',e);}}
+// 應付「從施工成本帶入」選項值是編碼過的來源資訊（qid、cid…）；解出所屬案件
+function _costSrcDecode(v){if(!v)return null;try{return JSON.parse(decodeURIComponent(escape(atob(v))));}catch(e){return null;}}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
