@@ -59,13 +59,33 @@
     });
     return out;
   }
+  // 分包實作超量：各期累計數量超過合約數量的部分（逐期依序），吸收（per.absorb）＝我方自付，其餘＝向業主追加請款
+  function overStat(c) {
+    var out = { overAmt: 0, absorbed: 0, toOwner: 0, overQty: {}, absorbQtyByItem: {}, overQtyByItem: {} };
+    var cum = {};
+    periods(c).filter(function (p) { return !p.isRet; }).slice().sort(function (a, b) { return (a.no || 0) - (b.no || 0); }).forEach(function (per) {
+      (per.rows || []).forEach(function (pr) {
+        var row = ((c && c.rows) || []).find(function (r) { return r.id === pr.rid; }); if (!row) return;
+        var total = num(row.qty), before = cum[pr.rid] || 0, after = before + num(pr.qty); cum[pr.rid] = after;
+        if (total <= 0) return;
+        var ex = Math.max(0, after - total) - Math.max(0, before - total); if (ex <= 1e-9) return;
+        var amt = Math.round(ex * rowPrice(row, pr));
+        out.overAmt += amt; out.overQty[pr.rid] = (out.overQty[pr.rid] || 0) + ex;
+        var ii = parseInt(row.linkedItemIdx);
+        if (per.absorb) { out.absorbed += amt; if (!isNaN(ii) && ii >= 0) out.absorbQtyByItem[ii] = (out.absorbQtyByItem[ii] || 0) + ex; }
+        else { out.toOwner += amt; }
+        if (!isNaN(ii) && ii >= 0) out.overQtyByItem[ii] = (out.overQtyByItem[ii] || 0) + ex;
+      });
+    });
+    return out;
+  }
   // 自動應付的 id 規則
   function payId(cid, per) { return 'pay' + cid + (per.isRet ? '_r' : '_p') + per.no; }
   function advPayId(cid, a) { return 'pay' + cid + '_a' + a.id; }
   function earlyId(cid, per, e) { return 'pay' + cid + '_p' + per.no + '_e' + e.id; }
 
   var pay = { eff: eff, vatAmt: vatAmt, retention: retention, invoice: invoice, retRate: retRate, periods: periods, advs: advs, staged: staged, inst: inst,
-    prInst: prInst, rowPrice: rowPrice, periodCalc: periodCalc, advInclAlloc: advInclAlloc, payId: payId, advPayId: advPayId, earlyId: earlyId };
+    prInst: prInst, rowPrice: rowPrice, periodCalc: periodCalc, advInclAlloc: advInclAlloc, overStat: overStat, payId: payId, advPayId: advPayId, earlyId: earlyId };
   var FJC = root.FJC || (root.FJC = {});
   FJC.pay = pay;
   if (typeof module !== 'undefined' && module.exports) module.exports = FJC;

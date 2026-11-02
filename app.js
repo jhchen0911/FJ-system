@@ -1,9 +1,9 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.132';
+var APP_VERSION='v6.0.133';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
-if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
+if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -599,11 +599,8 @@ function _invsOfContract(c){
 // ── 實收（含票期）：票期未到的票款不算可動用 ──
 // 現金比例：欄位空白時存檔端會寫入 0（parseInt('')||0），因此 0 一律視為「未設定＝現金 100%」。
 // v5.319 修正：原本把 0 當成「現金 0%、票款 100%」，票期未到就整筆歸零，可動用資金會塌陷。
-function _cashPctOf(inv){
-  var v=inv&&inv.cashPct;
-  var n=parseFloat(v);
-  return (v==null||v===''||!isFinite(n)||n<=0)?1:Math.min(1,n/100);
-}
+function _cashPctOf(inv){return FJC.inv.cashPct(inv);}   // 收款現金比例（calc/invoice.js）
+
 // v5.325：期初現金若填「今天的銀行餘額」，再把歷史實收整包加上去就會重複計算
 // （使用者填 348 萬，系統卻算出 591 萬）。改為以「期初基準日」切線：
 // 基準日當天（含）以前的收付都當作已包含在期初餘額裡，只累加基準日之後的。
@@ -30180,7 +30177,7 @@ try{var _ps0=localStorage.getItem('fy_payslips');if(_ps0)PAYSLIPS=JSON.parse(_ps
 if(!Array.isArray(HR))HR=[];if(!Array.isArray(PAYSLIPS))PAYSLIPS=[];
 function saveHR(){if(_roDeny())return;_lsSet('fy_hr',JSON.stringify(HR),'人員薪資');try{_autoUpload();}catch(e){_err('saveHR',e);}}
 function savePayslips(){_lsSet('fy_payslips',JSON.stringify(PAYSLIPS),'薪資條');try{_autoUpload();}catch(e){_err('savePayslips',e);}}
-function _hrNum(v,d){var n=parseFloat(v);return isFinite(n)?n:(d||0);}
+function _hrNum(v,d){return FJC.hr.num(v,d);}
 // 費率（可在人員薪資頁「費率設定」調整；預設為 2026 年一般口徑，請依當年公告核對）
 var _HR_RATE_DEF={labor:12.5,inj:0.5,health:5.17,pension:6,laborEmp:20,laborCo:70,healthEmp:30,healthCo:60,coDep:1.57};
 var _HR_RATE_LABEL={labor:'勞保費率％（含就保）',inj:'職災費率％（依行業）',health:'健保費率％',pension:'勞退提繳％',laborEmp:'勞保 員工負擔％',laborCo:'勞保 雇主負擔％',healthEmp:'健保 員工負擔％',healthCo:'健保 雇主負擔％',coDep:'健保 雇主平均眷口係數'};
@@ -30220,16 +30217,8 @@ function hrDel(id){
 }
 // ── 薪資條 ──
 function _psYm(){var el=document.getElementById('pr-ym');var v=el&&el.value;return /^\d{4}-\d{2}$/.test(v||'')?v:localToday().slice(0,7);}
-function _psCalc(s){
-  s.days=_hrNum(s.days);
-  s.baseAmt=s.payType==='day'?Math.round(_hrNum(s.base)*s.days):Math.round(_hrNum(s.base));
-  ['tel','other','extra','laborSelf','healthSelf','pensionSelf','otherDed','laborCo','healthCo','pensionCo'].forEach(function(k){s[k]=Math.round(_hrNum(s[k]));});
-  s.gross=s.baseAmt+s.tel+s.other+s.extra;
-  s.ded=s.laborSelf+s.healthSelf+s.pensionSelf+s.otherDed;
-  s.net=s.gross-s.ded;
-  s.coCost=s.laborCo+s.healthCo+s.pensionCo;
-  return s;
-}
+function _psCalc(s){return FJC.hr.slip(s);}   // 薪資單計算（calc/payroll.js）
+
 function _psFromHR(p,ym){
   var h=p.h||{};
   return _psCalc({id:'ps_'+p.id+'_'+ym,hrId:p.id,ym:ym,name:p.name,title:h.title||'',payType:h.payType||'month',base:_hrNum(h.base),days:0,
@@ -31430,25 +31419,8 @@ function _subFollowSummary(q,c){
 //  ‧ 逾期租金是業主端收入（依日報打設／拔除日推算），成本分析另列，不進成本。
 function _subRowPrice(row,pr){return FJC.pay.rowPrice(row,pr);}
 // 分包超量：逐期累計，超過發包量的金額；勾 absorb 的期歸「自行吸收」，其餘「應向業主追加」
-function _subOverStat(c){
-  var out={overAmt:0,absorbed:0,toOwner:0,overQty:{},absorbQtyByItem:{},overQtyByItem:{}};
-  var cum={};
-  _subPeriods(c).filter(function(p){return !p.isRet;}).slice().sort(function(a,b){return (a.no||0)-(b.no||0);}).forEach(function(per){
-    (per.rows||[]).forEach(function(pr){
-      var row=(c.rows||[]).find(function(r){return r.id===pr.rid;});if(!row)return;
-      var total=parseFloat(row.qty)||0,before=cum[pr.rid]||0,after=before+(parseFloat(pr.qty)||0);cum[pr.rid]=after;
-      if(total<=0)return;
-      var ex=Math.max(0,after-total)-Math.max(0,before-total);if(ex<=1e-9)return;
-      var amt=Math.round(ex*_subRowPrice(row,pr));
-      out.overAmt+=amt;out.overQty[pr.rid]=(out.overQty[pr.rid]||0)+ex;
-      var ii=parseInt(row.linkedItemIdx);
-      if(per.absorb){out.absorbed+=amt;if(!isNaN(ii)&&ii>=0)out.absorbQtyByItem[ii]=(out.absorbQtyByItem[ii]||0)+ex;}
-      else{out.toOwner+=amt;}
-      if(!isNaN(ii)&&ii>=0)out.overQtyByItem[ii]=(out.overQtyByItem[ii]||0)+ex;
-    });
-  });
-  return out;
-}
+function _subOverStat(c){return FJC.pay.overStat(c);}   // 分包實作超量（calc/payable.js）
+
 // 業主請款單：本期區間內的廠商請款數量（同工項）
 function _invSugRange(){
   var q=_invCurQuote();if(!q)return null;
@@ -36775,9 +36747,10 @@ function _spSelChange(){   // 顯示名冊預設抽成
   el.innerHTML=(d?('名冊預設：<b>'+_SALES_MODES[d.mode]+' '+(d.mode==='unit'?('每'+d.unit+' '+fmt(d.val)+' 元'):(d.val+(d.mode==='amt'?' 元':'%')))+'</b>（沒勾「此案另訂」就用這個）'):'<span style="color:#b26a00">名冊未設定預設抽成，請在業務名冊填，或勾「此案另訂」</span>')
     +(x.kind==='intro'?'<div style="margin-top:4px;padding:5px 8px;border-radius:var(--r6);background:#FFF8E1;border:1px solid #f0da7a;color:#8a6d00;font-size:11.5px">外部介紹人：若他介紹的是<b>分包廠商</b>（跟著廠商計價每支給），請到 發包得標／工程專案分包列 填「介紹人」，不要掛在這裡；只有他帶來<b>業主案源</b>、照業主請款數量計酬時，才在這裡掛業務（名冊抽成選「每單位 × 實作量」）。</div>':'');   // v6.0.80
 }
-function _salesBase(q){   // 抽成基礎：合約未稅金額（Lotion 10/27：一律「合約未稅 × 抽成率」）＝合約含稅（主約＋已得標追加；沒有合約用報價總計）÷ 稅率
-  return Math.round((_wonAmt(q)||0)/_taxM());
+function _salesBase(q){   // 抽成基礎：合約未稅金額（Lotion 10/27：一律「合約未稅 × 抽成率」）＝合約含稅（主約＋已得標追加；沒有合約用報價總計）÷ 稅率（calc/comm.js）
+  return FJC.comm.salesBase(_wonAmt(q),_taxM());
 }
+
 // 業務抽成到期（Lotion 10/27）：一次付清；預設「第一期請款單送出」（以第一張請款單的日期），每案可改「合約簽訂」（以合約日期）。
 //   還沒到時間點 → 應付只標「預計」（不算待付、不進逾期與金流），到了才有到期日
 var _SALES_PAYON={firstInv:'第一期請款單送出',contract:'合約簽訂'};
@@ -36800,12 +36773,13 @@ function _salesCommCfg(q){   // → {mode,val,src:'case'|'default'}｜null；v6.
   var d=_salesCommNorm({mode:sp.commMode||(sp.defRate>0?'rev':''),val:sp.commVal!=null&&sp.commVal!==''?sp.commVal:sp.defRate,unit:sp.commUnit});
   if(d)d.src='default';return d;
 }
-function _salesProfitBase(q){   // 毛利基礎：未稅合約（含追加）− 成本（實際；無則預估）
-  var base=_salesBase(q),cost=0;
-  try{[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;})).forEach(function(x){cost+=_projCostTotal(x);});}catch(e){_err('_salesProfitBase',e);}
-  if(!(cost>0))cost=[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;})).reduce(function(a,x){return a+((x.t&&parseFloat(x.t.cost))||0);},0);
-  return Math.max(0,base-cost);
+function _salesProfitBase(q){   // 毛利基礎：未稅合約（含追加）− 成本（實際；無則預估）（calc/comm.js）
+  var base=_salesBase(q),cost=0,all=[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;}));
+  try{all.forEach(function(x){cost+=_projCostTotal(x);});}catch(e){_err('_salesProfitBase',e);}
+  var est=cost>0?0:all.reduce(function(a,x){return a+((x.t&&parseFloat(x.t.cost))||0);},0);
+  return FJC.comm.profitBase(base,cost,est);
 }
+
 // v6.0.77 每單位 × 實作量：合約量＝主案＋追加案中「單位相同」工項的生效數量（議價後）；已請量＝業主請款單同名工項累計本期數量（×請款%）
 function _salesUnitQty(q,unit){
   var u=_uFix(unit||'支'),all=[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;})),contract=0,billed=0,descs={};
@@ -36815,27 +36789,19 @@ function _salesUnitQty(q,unit){
     (i.items||[]).forEach(function(x){if(!x||x.type==='sec'||x.type==='rental')return;if(!descs[String(x.desc||'').trim()])return;billed+=_curW(x);});});
   return {unit:u,contract:Math.round(contract*100)/100,billed:Math.round(billed*100)/100};
 }
-function _salesCommAmt(q){   // 抽成總額（預估）
-  var c=_salesCommCfg(q);if(!c)return 0;
-  if(c.mode==='amt')return Math.round(c.val);
-  if(c.mode==='profit')return Math.round(_salesProfitBase(q)*c.val/100);
-  if(c.mode==='unit')return Math.round(_salesUnitQty(q,c.unit).contract*c.val);
-  return Math.round(_salesBase(q)*c.val/100);
-}
-function _salesCommAccr(q){   // 已計提：unit＝已請量 × 單價 × 收款比例；其他＝總額 × 收款進度
-  var c=_salesCommCfg(q);if(!c)return 0;
-  if(c.mode==='unit'){var k=_salesUnitQty(q,c.unit);return Math.round(k.billed*c.val*_salesRcvRate(q,true));}
-  return Math.round(_salesCommAmt(q)*_salesRcvRate(q));
-}
+function _salesCommAmt(q){return _commAmtFor(q,_salesCommCfg(q));}   // 抽成總額（預估）
+
+function _salesCommAccr(q){return _commAccrFor(q,_salesCommCfg(q));}   // 已計提：unit＝已請量 × 單價 × 收款比例；其他＝總額 × 收款進度
+
 function _salesCommTxt(q){var c=_salesCommCfg(q);if(!c)return '';var t=c.mode==='amt'?('固定 NT$ '+fmt(c.val)):c.mode==='profit'?(c.val+'% × 毛利 '+fmt(_salesProfitBase(q))):c.mode==='unit'?(function(){var k=_salesUnitQty(q,c.unit);return '每'+k.unit+' '+fmt(c.val)+' × 合約 '+(_qfmt(k.contract)||'0')+' '+k.unit+'（已請 '+(_qfmt(k.billed)||'0')+'）';})():(c.val+'% × 未稅 '+fmt(_salesBase(q)));return t+(c.src==='case'?'（此案另訂）':'');}
 function _salesCommShort(q){var c=_salesCommCfg(q);if(!c)return '';return c.mode==='amt'?('固定 '+fmt(c.val)):c.mode==='unit'?('每'+c.unit+' '+fmt(c.val)):((c.mode==='profit'?'毛利 ':'營收 ')+c.val+'%');}
-function _salesRcvRate(q,ofBilled){   // 收款進度＝已收 ÷ 合約含稅（主案＋追加）；ofBilled＝已收 ÷ 已請（v6.0.77 每單位模式用）
+function _salesRcvRate(q,ofBilled){   // 收款進度＝已收 ÷ 合約含稅（主案＋追加）；ofBilled＝已收 ÷ 已請（v6.0.77 每單位模式用）（calc/comm.js）
   var all=[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;}));
   var ctT=all.reduce(function(a,x){return a+((x.t&&x.t.total)||0);},0),rcv=0,bil=0;
   (INV||[]).forEach(function(i){if(!i)return;var same=(i.quoteId&&all.some(function(x){return x.id===i.quoteId;}))||String(i.project||'').trim()===String(q.name||'').trim();if(same){rcv+=_invRcv(i);bil+=(i.totals&&parseFloat(i.totals.total))||0;}});
-  if(ofBilled)return bil>0?Math.min(1,rcv/bil):0;
-  return ctT>0?Math.min(1,rcv/ctT):0;
+  return FJC.comm.rcvRate({contractTotal:ctT,rcv:rcv,billed:bil},ofBilled);
 }
+
 function _salesPayId(q){return 'pay_sales_'+q.id;}
 function _salesCommSync(q){   // 得標＋業務＋抽成>0 → 一筆應付（固定 id；保留付款狀態）；否則撤未付
   if(!q||!q.id||q.parentId)return;
@@ -37210,23 +37176,14 @@ function _commList(q){   // 讀取（含舊 referral 一次性轉換）
 function _commMigrateAll(){var n=0;(Q||[]).forEach(function(q){if(q&&q.referral){_commList(q);n++;}});if(n){try{persist();}catch(e){_err('_commMigrateAll',e);}}return n;}
 function _commPayId(q,c){return c.id==='ref'?('comm_'+q.id):('comm_'+q.id+'_'+c.id);}
 // 共用計算（與業務抽成同口徑）：cfg={mode,val,unit}
-function _commAmtFor(q,cfg){
-  if(!cfg)return 0;
-  if(cfg.mode==='amt')return Math.round(cfg.val);
-  if(cfg.mode==='profit')return Math.round(_salesProfitBase(q)*cfg.val/100);
-  if(cfg.mode==='unit')return Math.round(_salesUnitQty(q,cfg.unit).contract*cfg.val);
-  return Math.round(_salesBase(q)*cfg.val/100);
-}
-function _commAccrFor(q,cfg){   // 已計提：unit＝已請量×單價×收款比例；其他＝總額×收款進度
-  if(!cfg)return 0;
-  if(cfg.mode==='unit'){var k=_salesUnitQty(q,cfg.unit);return Math.round(k.billed*cfg.val*_salesRcvRate(q,true));}
-  return Math.round(_commAmtFor(q,cfg)*_salesRcvRate(q));
-}
-function _commDueFor(q,cfg){   // 應付金額：unit＝已請量×單價（隨請款增加），其他＝總額
-  if(!cfg)return 0;
-  if(cfg.mode==='unit')return Math.round(_salesUnitQty(q,cfg.unit).billed*cfg.val);
-  return _commAmtFor(q,cfg);
-}
+// 第 3a-4 步：抽成／佣金的金額算法在 calc/comm.js；這裡只提供各種基礎數字（用到才算）
+function _commGet(q,cfg){return {base:function(){return _salesBase(q);},profit:function(){return _salesProfitBase(q);},unit:function(){return _salesUnitQty(q,cfg&&cfg.unit);},rate:function(b){return _salesRcvRate(q,b);}};}
+function _commAmtFor(q,cfg){return FJC.comm.amount(cfg,_commGet(q,cfg));}
+
+function _commAccrFor(q,cfg){return FJC.comm.accr(cfg,_commGet(q,cfg));}   // 已計提：unit＝已請量×單價×收款比例；其他＝總額×收款進度
+
+function _commDueFor(q,cfg){return FJC.comm.due(cfg,_commGet(q,cfg));}   // 應付金額：unit＝已請量×單價（隨請款增加），其他＝總額
+
 function _commTxtFor(q,cfg){
   if(!cfg)return '';
   if(cfg.mode==='amt')return '固定 NT$ '+fmt(cfg.val);
