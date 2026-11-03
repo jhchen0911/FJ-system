@@ -626,6 +626,9 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
 .me-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
 .me-tab{padding:8px 16px;border-radius:20px;border:1px solid var(--b2);background:var(--w);font-weight:700;color:var(--b4);cursor:pointer;font-family:inherit;font-size:13px}
 .me-tab.on{background:var(--g);color:#fff;border-color:var(--g)}
+#page-matest .me-pv{position:relative;overflow:hidden;background:#e9ecea;border-radius:8px;padding:0;min-height:120px}
+#page-matest .me-chips{display:flex;flex-wrap:wrap;gap:4px 6px}#page-matest .me-chip{display:inline-flex;gap:4px;align-items:center;font-size:12.5px;padding:3px 8px;border:1px solid var(--b2);border-radius:14px;background:#fff;white-space:nowrap}#page-matest .me-chip input{width:15px;height:15px;min-height:0;margin:0;flex:none}
+@media(max-width:767px){#page-matest .me-pv{cursor:zoom-in}}
 .me-cols{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:12px;align-items:start}
 @media(max-width:1099px){.me-cols{grid-template-columns:minmax(0,1fr)}}
 #page-matest .me-col-l,#page-matest #mat-est-form,#page-matest .me-tool{min-width:0;max-width:100%}
@@ -1314,7 +1317,7 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
 </div>
 <div class="page" id="page-lifeline">
   <div class="ph"><div class="ph-l"><div class="ph-t">安全母索</div><div class="ph-s">水平安全母索用量：特多龍繩／鋼索兩種形式・分區塊縱橫向逐路計算・路數勾稽・扣除構台下・捲數與配件</div></div></div>
-  <div class="pad" style="max-width:1400px"><!-- lifeline-root 已移到材料估算分頁（v6.0.139） --></div>
+  <div class="pad" style="max-width:1400px"><!-- 安全母索 v6.0.141 起併入材料估算「擋土支撐全套」④-1 --></div>
 </div>
 <div class="page" id="page-progress">
   <div class="ph"><div class="ph-l"><div class="ph-t">施工進度</div><div class="ph-s">機組平行排程・甘特圖・落後偵測・S 曲線</div></div></div>
@@ -1335,7 +1338,6 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
         <div class="me-col-r"><div id="mat-est-out"></div></div>
       </div>
     </div>
-    <div class="me-pane me-tool" data-me="lifeline" style="display:none"><div id="lifeline-root"></div></div>
     <div class="me-pane me-tool" data-me="rebar" style="display:none"><div id="rebar-root"></div></div>
     <div class="me-pane me-tool" data-me="grout" style="display:none"><div id="grout-root"></div></div>
     <div class="me-pane me-tool" data-me="backfill" style="display:none"><div id="backfill-root"></div></div>
@@ -2840,14 +2842,14 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
   <div id="mob-more-body"></div>
 </div>
 
-<script src="calc/invoice.js?v=6.0.140" defer></script>
-<script src="calc/payable.js?v=6.0.140" defer></script>
-<script src="calc/report.js?v=6.0.140" defer></script>
-<script src="calc/comm.js?v=6.0.140" defer></script>
-<script src="calc/payroll.js?v=6.0.140" defer></script>
-<script src="calc/lifeline.js?v=6.0.140" defer></script>
-<script src="calc/settle.js?v=6.0.140" defer></script>
-<script src="app.js?v=6.0.140" defer></script><script src="beta.js?v=6.0.140" defer></script>
+<script src="calc/invoice.js?v=6.0.141" defer></script>
+<script src="calc/payable.js?v=6.0.141" defer></script>
+<script src="calc/report.js?v=6.0.141" defer></script>
+<script src="calc/comm.js?v=6.0.141" defer></script>
+<script src="calc/payroll.js?v=6.0.141" defer></script>
+<script src="calc/lifeline.js?v=6.0.141" defer></script>
+<script src="calc/settle.js?v=6.0.141" defer></script>
+<script src="app.js?v=6.0.141" defer></script><script src="beta.js?v=6.0.141" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">

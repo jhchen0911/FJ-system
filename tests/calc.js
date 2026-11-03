@@ -116,6 +116,42 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('分包超量：合約 100、累計 115 → 超 15、第 2 期 10 向業主請、第 3 期 5 我方吸收', o.overAmt === 15000 && o.toOwner === 10000 && o.absorbed === 5000 && o.overQty.r1 === 15 && o.absorbQtyByItem[0] === 5 && o.overQtyByItem[0] === 15, JSON.stringify(o));
 }
 
+// ── 安全母索：與豐有既有 Excel「安全母索（多區塊轉換檔）」逐格一致（v5.393 起的冒煙測試；v6.0.141 獨立母索頁併入全套後移到這裡，直接驗 FJC.ll.calc）──
+{
+  const FORMS = { wire: { label: '鋼索', specs: [['Ø9.53mm（3/8″）', 0.35], ['Ø12.7mm（1/2″）', 0.63], ['Ø16mm（5/8″）', 0.99]] },
+                  rope: { label: '特多龍繩', specs: [['Ø16mm', 0.17], ['Ø18mm', 0.21], ['Ø20mm', 0.26]] } };
+  const F = () => ({ wire: { spec: 'Ø12.7mm（1/2″）', spare: 1.5, reel: 200, acc: [8, 1, 2] }, rope: { spec: 'Ø16mm', spare: 2, reel: 200, acc: [4, 1, 2] } });
+  const Z = (name, deck, form, v, h) => ({ name, deck, form, v: { runs: v[0], rows: v[1].map(x => ({ n: x[0], len: x[1] })) }, h: { runs: h[0], rows: h[1].map(x => ({ n: x[0], len: x[1] })) } });
+  // ① 原 Excel「工作表1」：縱向 279.1＋橫向 289.4＋周長 207 ＝ 775.5 m
+  let c = LL.calc({ perim: 207, perimRuns: 1, layers: 1, deductLayers: 1, unit: 'cm', useSpare: false, waste: 0, form: 'wire', f: F(),
+    zones: [Z('第一區', false, '', [7, [[2, 5650], [2, 4830], [2, 2590], [1, 1770]]], [9, [[3, 4575], [1, 3925], [4, 2425], [1, 1590]]]), Z('構台下', true, '', [0, [[0, 0]]], [0, [[0, 0]]])] }, FORMS);
+  check('安全母索 Excel：單區塊 縱 279.1＋橫 289.4＋周長 207＝775.5 M', c.zones[0].v.len === 279.1 && c.zones[0].h.len === 289.4 && c.zoneLen === 568.5 && c.net === 775.5);
+  // ② 原 Excel「多區塊(轉換檔)」：縱橫 2973.75、構台下 849、3 層扣一層 ＝ 9275.25 m
+  const ZONES = () => [
+    Z('第一區', false, '', [9, [[2, 4693], [7, 5112]]], [8, [[8, 5943]]]), Z('第二區', false, '', [9, [[9, 5112]]], [8, [[6, 5512], [2, 4579]]]),
+    Z('第三區', false, '', [7, [[7, 3217]]], [5, [[5, 4573]]]), Z('第四區', false, '', [9, [[5, 3217], [3, 2746], [1, 2591]]], [5, [[1, 3397], [1, 5292], [3, 5512]]]),
+    Z('轉換檔', false, '', [1, [[1, 8600]]], [1, [[1, 10300]]]), Z('構台下', true, '', [11, [[6, 6400], [5, 1300]]], [19, [[16, 1300], [3, 6400]]])];
+  const base = { perim: 401, perimRuns: 1, layers: 3, deductLayers: 1, unit: 'cm', useSpare: false, waste: 0, form: 'wire' };
+  c = LL.calc(Object.assign({}, base, { f: F(), zones: ZONES() }), FORMS);
+  check('安全母索 Excel：多區塊＋扣構台下 縱橫 2973.75、構台下 849、3 層扣 1 層＝9275.25 M；宣告路數與明細相符', c.zoneLen === 2973.75 && c.deckLen === 849 && c.perLayer === 3374.75 && c.gross === 10124.25 && c.net === 9275.25 && c.bad.length === 0);
+  const zb = ZONES(); zb[0].v.runs = 99;
+  check('安全母索：宣告路數與明細不符會被抓出', LL.calc(Object.assign({}, base, { f: F(), zones: zb }), FORMS).bad.join('') === '第一區 縱向');
+  // ③ 端部預留與損耗：(9275.25＋63路×3層×1.5)×1.05（配件路數 159＝63×3−30）
+  c = LL.calc(Object.assign({}, base, { useSpare: true, waste: 5, f: F(), zones: ZONES() }), FORMS);
+  check('安全母索：總路數 159、端部預留（構台下不扣）與損耗計入需求長度、折捲', c.runs === 159 && Math.abs(c.need - (9275.25 + 283.5) * 1.05) < 1e-6 && c.reels === Math.ceil(c.need / 200));
+  // ④ 兩種形式混用：長度、路數、配件分開彙總；構台下每層最多扣到該層同形式長度
+  const zm = ZONES(); zm[2].form = 'rope'; zm[5].form = 'rope';
+  c = LL.calc(Object.assign({}, base, { useSpare: true, waste: 5, f: F(), zones: zm }), FORMS);
+  check('安全母索：特多龍繩／鋼索混用分開彙總（鋼索 8762.73、特多龍繩 907.68、路數 153／6、配件各自依形式）',
+    Math.abs(c.T.wire.net - 8762.73) < 1e-6 && Math.abs(c.T.rope.net - 907.68) < 1e-6 && Math.abs(c.net - 9670.41) < 1e-6 && c.mixed && c.used.length === 2
+    && c.T.wire.runs === 153 && c.T.rope.runs === 6 && c.runs === 159 && c.T.wire.unitW > c.T.rope.unitW && c.T.wire.acc[0] === 153 * 8 && c.T.rope.acc[0] === 6 * 4);
+  c = LL.calc(Object.assign({}, base, { form: 'rope', f: F(), zones: ZONES() }), FORMS);
+  check('安全母索：整案改特多龍繩——鋼索不出現、長度整包搬過去', !c.T.wire.used && Math.abs(c.T.rope.net - 9275.25) < 1e-6 && c.used.length === 1);
+  // ⑤ 構台下形式沒有對應區塊：不扣成負數並提出警告
+  c = LL.calc({ perim: 200, perimRuns: 1, layers: 3, deductLayers: 1, unit: 'cm', useSpare: false, waste: 0, form: 'wire', f: F(),
+    zones: [Z('第一區', false, '', [2, [[2, 5000]]], [2, [[2, 4000]]]), Z('構台下', true, 'rope', [1, [[1, 3000]]], [0, [['', '']]])] }, FORMS);
+  check('安全母索：構台下形式無對應區塊不扣成負數、提出警告', c.T.rope.net === 0 && c.T.rope.need === 0 && c.warn.length === 1 && c.T.wire.net === 1140);
+}
 // ── 第 3c 步：安全母索合一、清潔費一次扣、完工結算差異表 ──
 {
   const forms = { wire: { label: '鋼索', specs: [['A', 0.5]] }, rope: { label: '特多龍繩', specs: [['B', 0.2]] } };

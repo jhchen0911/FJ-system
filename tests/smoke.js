@@ -817,97 +817,49 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ───────────── 9. 安全母索（v5.393：口徑須與豐有既有 Excel 逐格一致）─────────────
+  // ───────────── 9. 安全母索（v6.0.141 起併入材料估算「擋土支撐全套」④-1；與既有 Excel 逐格一致的算法測試在 tests/calc.js）─────────────
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
       const out = {};
-      const Z = (name, deck, form, v, h) => ({
-        name, deck, form,
-        v: { runs: v[0], rows: v[1].map(x => ({ n: x[0], len: x[1] })) },
-        h: { runs: h[0], rows: h[1].map(x => ({ n: x[0], len: x[1] })) },
-      });
-      // ① 原 Excel「工作表1」：縱向 279.1＋橫向 289.4＋周長 207 ＝ 775.5 m
-      Object.assign(_llState, {
-        perim: 207, perimRuns: 1, layers: 1, deductLayers: 1, unit: 'cm',
-        useSpare: false, waste: 0, form: 'wire',
-        zones: [Z('第一區', false, '', [7, [[2, 5650], [2, 4830], [2, 2590], [1, 1770]]],
-                                       [9, [[3, 4575], [1, 3925], [4, 2425], [1, 1590]]]),
-                Z('構台下', true, '', [0, [[0, 0]]], [0, [[0, 0]]])],
-      });
-      let c = _llCalc();
-      out.sheet1 = c.zones[0].v.len === 279.1 && c.zones[0].h.len === 289.4
-        && c.zoneLen === 568.5 && c.net === 775.5;
-      // ② 原 Excel「多區塊(轉換檔)」：縱橫 2973.75、構台下 849、3 層扣一層 ＝ 9275.25 m
-      _llState.perim = 401; _llState.layers = 3; _llState.deductLayers = 1;
-      const ZONES = () => [
-        Z('第一區', false, '', [9, [[2, 4693], [7, 5112]]], [8, [[8, 5943]]]),
-        Z('第二區', false, '', [9, [[9, 5112]]], [8, [[6, 5512], [2, 4579]]]),
-        Z('第三區', false, '', [7, [[7, 3217]]], [5, [[5, 4573]]]),
-        Z('第四區', false, '', [9, [[5, 3217], [3, 2746], [1, 2591]]], [5, [[1, 3397], [1, 5292], [3, 5512]]]),
-        Z('轉換檔', false, '', [1, [[1, 8600]]], [1, [[1, 10300]]]),
-        Z('構台下', true, '', [11, [[6, 6400], [5, 1300]]], [19, [[16, 1300], [3, 6400]]])];
-      _llState.zones = ZONES();
-      c = _llCalc();
-      out.multi = c.zoneLen === 2973.75 && c.deckLen === 849
-        && c.perLayer === 3374.75 && c.gross === 10124.25 && c.net === 9275.25;
-      out.noBad = c.bad.length === 0;                       // 各方向宣告路數與明細相符
-      // ③ 路數勾稽：宣告與明細不符要抓出來
-      _llState.zones[0].v.runs = 99;
-      out.catches = _llCalc().bad.join('') === '第一區 縱向';
-      _llState.zones[0].v.runs = 9;
-      // ④ 端部預留與損耗：(9275.25＋189路×1.5)×1.05（配件路數仍 159）
-      _llState.useSpare = true; _llFP('wire').spare = 1.5; _llFP('wire').reel = 200; _llState.waste = 5;
-      c = _llCalc();
-      out.runs = c.runs === 159;                            // (63路×3層)−(30路×1層)
-      out.need = Math.abs(c.need - (9275.25 + 283.5) * 1.05) < 1e-6;   // v6.0.136（Lotion 11/03）：端部預留＝63 路×3 層×1.5，構台下的路不扣
-      out.reels = c.reels === Math.ceil(c.need / 200);
-      // ⑤ 兩種形式（特多龍繩／鋼索）：混用時長度、路數、配件分開彙總，總和不變
-      _llState.zones = ZONES(); _llState.zones[2].form = 'rope'; _llState.zones[5].form = 'rope';
-      c = _llCalc();
-      // v6.0.136（審查）：構台下每層最多扣到該層同形式長度——特多龍繩每層只有第三區 453.84，構台下 849 只能扣 453.84（原本 849 全扣、跨到別層）
-      out.mixSplit = Math.abs(c.T.wire.net - 8762.73) < 1e-6 && Math.abs(c.T.rope.net - 907.68) < 1e-6
-        && Math.abs(c.net - 9670.41) < 1e-6 && c.mixed && c.used.length === 2;
-      out.mixRuns = c.T.wire.runs === 153 && c.T.rope.runs === 6 && c.runs === 159;
-      out.mixSpec = c.T.wire.spec !== c.T.rope.spec && c.T.wire.unitW > c.T.rope.unitW
-        && c.T.wire.acc[0] === c.T.wire.runs * _llFP('wire').acc[0]
-        && c.T.rope.acc[0] === c.T.rope.runs * _llFP('rope').acc[0];
-      // 全部改特多龍繩：鋼索欄消失、長度整包搬過去
-      _llState.zones = ZONES(); _llState.form = 'rope';
-      c = _llCalc();
-      out.allRope = !c.T.wire.used && Math.abs(c.T.rope.net - 9275.25) < 1e-6 && c.used.length === 1;
-      _llState.form = 'wire'; _llState.zones = ZONES();
-      // ⑥ v5.393 舊存檔（只有鋼索一組參數）回載後要遷移進 f.wire，不能歸零
-      const mg = _llMigrate({ perim: 100, layers: 2, deductLayers: 1, unit: 'cm', useSpare: true,
-        spare: 1.5, waste: 5, reelLen: 250, clips: 6, turn: 2, shackle: 3,
-        zones: [Z('A', false, undefined, [1, [[1, 10000]]], [0, [[0, 0]]])] });
-      out.migrate = mg.form === 'wire' && mg.f.wire.reel === 250 && mg.f.wire.spare === 1.5
-        && mg.f.wire.acc.join(',') === '6,2,3' && !!mg.f.rope.spec
-        && mg.clips === undefined && mg.zones[0].form === '';
-      // ⑦ 匯出：Excel 必須是活公式、列印走統一引擎
-      _llState.zones[2].form = 'rope';
-      let sheets = null, printed = null;
-      const oX = window.xlsxDownload, oP = window._printViaIframe;
-      window.xlsxDownload = (f, s) => { sheets = s; };
-      window._printViaIframe = h => { printed = h; };
-      try { _llXlsx(); _llPrint(); } finally { window.xlsxDownload = oX; window._printViaIframe = oP; }
-      const flat = JSON.stringify(sheets || []);
-      out.xlsxLive = /"f":"C\d+\*D\d+\*\$B\$6"/.test(flat) && /CEILING\(/.test(flat)
-        && /IF\(F\d+=0/.test(flat) && /SUMIFS\(/.test(flat) && /特多龍繩/.test(flat) && /鋼索/.test(flat);
-      out.printOk = !!printed && printed.indexOf('安全母索用量表') > 0 && /母索總長/.test(printed);
-      // ⑧ 畫面
-      go('lifeline');
-      out.rendered = document.getElementById('lifeline-root').innerText.indexOf('母索總長') >= 0;
+      try {
+        try { localStorage.setItem('fy_lifeline', JSON.stringify({ form: 'rope', waste: 3, f: { rope: { spec: 'Ø18mm', spare: 2.5, reel: 150, acc: [6, 2, 3] } }, zones: [] })); } catch (e) { /* 可忽略 */ }
+        MAT_EST = _shDefaults(); MAT_EST.gtRopeDeduct = '1'; MAT_EST._gtRoutesV = [{ rc: 2, rl: 20 }]; MAT_EST._gtRoutesH = [{ rc: 2, rl: 15 }];
+        go('lifeline');
+        out.redirect = document.querySelector('.page.active').id === 'page-matest' && _meTab === 'shoring' && !ME_TABS.some(t => t[0] === 'lifeline') && !document.getElementById('lifeline-root');
+        matEstCalc();
+        let R = _matEstRes, T = R.T;
+        const l1 = R.staged.find(x => /第1層/.test(x.stage)).items, l2 = R.staged.find(x => /第2層/.test(x.stage)).items;
+        const q = (L, re) => (L.find(x => re.test(x.name)) || {}).quantity;
+        // 長度不變（同 v6.0.139）：需求 2,044.875、11 捲；新增：規格重量、配件（構台下沒拉的路不算：第 1 層 9−4＝5 路、其餘 9 路；鋼索夾每路 8）
+        out.len = Math.abs(T.ropeNeed - 2044.875) < 1e-6 && T.ropeReels === 11 && Math.round(T.ropeKg) === 1288;
+        out.acc = q(l1, /^鋼索夾/) === 40 && q(l2, /^鋼索夾/) === 72 && q(l1, /^緊索器/) === 5 && q(l1, /^套環/) === 10
+          && T.ropeT.wire.acc.join(',') === '328,41,82' && R.back.some(x => x.k === '鋼索夾' && x.v === '328') && R.back.some(x => /^規格 Ø12\.7mm/.test(x.k || ''));
+        // 每路配件數可改
+        MAT_EST.ropeAcc0 = '6'; matEstCalc(); out.accEdit = _matEstRes.T.ropeT.wire.acc[0] === 41 * 6;
+        MAT_EST.ropeAcc0 = '';
+        // 其他區塊改用特多龍繩：每層 2 路×30M，5 層＝300、端部預留 2×1.5×5＝15、×1.05＝330.75；鋼索長度不變
+        MAT_EST._ropeZones = [{ nm: '構台邊', fm: 'rope', vn: 2, vl: 30, hn: 0, hl: 0 }]; matEstCalc(); R = _matEstRes;
+        const m1 = R.staged.find(x => /第1層/.test(x.stage)).items;
+        out.mix = Math.abs(R.T.ropeOther.need - 330.75) < 1e-6 && R.T.ropeOther.reels === 2 && Math.abs(R.T.ropeNeed - 2044.875) < 1e-6
+          && q(m1, /特多龍繩，其他區塊/) === 1 && q(m1, /^繩用夾具/) === 8 && R.back.some(x => x.sec === '安全母索（特多龍繩，其他區塊）');
+        MAT_EST._ropeZones = [];
+        // 帶入舊「安全母索」頁的設定
+        renderMatEst(); out.importBtn = /matEstRopeImport\(\)/.test(document.getElementById('mat-est-form').innerHTML);
+        matEstRopeImport();
+        out.import = MAT_EST.ropeForm === 'rope' && MAT_EST.ropeSpec === 'Ø18mm' && MAT_EST.ropeSpare === 2.5 && MAT_EST.ropeReel === 150 && MAT_EST.ropeWaste === 3
+          && _matEstRes.T.ropeT.rope.acc[0] === _matEstRes.T.ropeT.rope.runs * 6;
+        // 切換形式：規格與配件回預設
+        matEstRopeForm(); out.formReset = MAT_EST.ropeSpec === '' && MAT_EST.ropeAcc0 === '';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      try { localStorage.removeItem('fy_lifeline'); } catch (e) { /* 可忽略 */ }
       return out;
     });
-    check('安全母索：單區塊口徑與 Excel 一致', r.sheet1);
-    check('安全母索：多區塊＋扣除構台下與 Excel 一致', r.multi && r.noBad);
-    check('安全母索：宣告路數與明細不符會被抓出', r.catches);
-    check('安全母索：總路數、端部預留與損耗計入需求長度', r.runs && r.need && r.reels);
-    check('安全母索：特多龍繩／鋼索混用時分開彙總', r.mixSplit && r.mixRuns && r.mixSpec);
-    check('安全母索：整案切換形式與舊存檔遷移', r.allRope && r.migrate);
-    check('安全母索：Excel 匯出為活公式、列印走統一引擎', r.xlsxLive && r.printOk);
-    check('安全母索：頁面渲染無 JS 錯誤', r.rendered && errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.141 安全母索併入全套：舊入口轉到全套、分頁與獨立頁移除', r.redirect, JSON.stringify(r));
+    check('v6.0.141 安全母索：長度不變（2,044.9 M、11 捲）＋規格重量、每層配件（構台下沒拉的路不算）、配件數可改', r.len && r.acc && r.accEdit, JSON.stringify(r));
+    check('v6.0.141 安全母索：其他區塊可改用特多龍繩（長度、捲數、配件另列，鋼索不變）', r.mix, JSON.stringify(r));
+    check('v6.0.141 安全母索：帶入舊安全母索頁設定、切換形式回預設', r.importBtn && r.import && r.formReset, JSON.stringify(r));
+    check('v6.0.141 安全母索測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
@@ -957,7 +909,7 @@ async function newPage(browser, width, height) {
         && ld[0].ropeRuns === 9 && r0.T.ropeSpare === 36 && Math.abs(r0.T.ropeNeed - 972.3) < 1e-6 && r0.T.ropeReels === 5   /* v6.0.136：加損耗 5%：(890＋36)×1.05 */ && r0.T.ropeForm === '特多龍繩';
       out.matRows = r0.back.some(x => x.sec === '安全母索（特多龍繩）') && r0.back.some(x => x.k === '安全母索需求長度' && x.v === '972.3')
         && !r0.back.some(x => x.k === '安全母索總長') && r0.staged.some(st => st.items.some(it => /安全母索（特多龍繩，折捲）/.test(it.name)));
-      out.matForm = /母索形式/.test(document.getElementById('mat-est-form').innerHTML) && /matEstExportMenu/.test(document.getElementById('me-bar-shoring').innerHTML)   /* v6.0.139：母索逐層表併入估價明細附錄；匯出在上方工具列 */
+      out.matForm = /母索形式/.test(document.getElementById('mat-est-form').innerHTML) && /matEstExportNow/.test(document.getElementById('me-bar-shoring').innerHTML)   /* v6.0.139：母索逐層表併入估價明細附錄；匯出在上方工具列 */
         && /構台下縱向路數/.test(document.getElementById('mat-est-form').innerHTML) && /_gtRoutesH/.test(document.getElementById('mat-est-form').innerHTML)
         && !/開啟安全母索/.test(document.getElementById('mat-est-form').innerHTML);
       // 材料估算表 PDF：橫式、叫料表格在最前、無彙總清冊；母索用量表可單獨列印
@@ -976,12 +928,6 @@ async function newPage(browser, width, height) {
         /* 可勾選要印的階段：只印擋土壁＋第1層，標題列出階段名 */
         && (printed[3].match(/class="z pdf-keep ord"/g) || []).length === 2 && /▸ 擋土壁/.test(printed[3]) && /▸ 第1層水平支撐/.test(printed[3]) && !/▸ 第2層水平支撐/.test(printed[3]) && /叫料單｜擋土壁、第1層水平支撐/.test(printed[3]);
       out.hidden = ALL_PAGES.find(p => p.id === 'lifeline').hidden === true;
-      // 構台下區塊形式沒有對應區塊：扣除不得扣成負數，並提出警告
-      _llState.perim = 200; _llState.layers = 3; _llState.form = 'wire';
-      _llState.zones = [{ name: '第一區', deck: false, form: '', v: { runs: 2, rows: [{ n: 2, len: 5000 }] }, h: { runs: 2, rows: [{ n: 2, len: 4000 }] } },
-                        { name: '構台下', deck: true, form: 'rope', v: { runs: 1, rows: [{ n: 1, len: 3000 }] }, h: { runs: 0, rows: [{ n: '', len: '' }] } }];
-      const c = _llCalc();
-      out.deckGuard = c.T.rope.net === 0 && c.T.rope.need === 0 && c.warn.length === 1 && c.T.wire.net === 1140;
       return out;
     });
     check('單價庫：實績比對受單位限制（式不套到逐M）', r.histUnit);
@@ -992,7 +938,6 @@ async function newPage(browser, width, height) {
     check('材料估算：母索形式欄位＋匯出在工具列、母索獨立頁隱藏', r.matForm && r.hidden);
     check('材料估算 PDF（v6.0.139）：叫料單／估價明細兩份、橫式、各自不重複、估價明細可附計算依據（母索逐層表）', r.matPdf);
     check('材料估算表 PDF：估價明細每列 3～4 組並排；叫料單每列 2 組、階段可複選、每個階段與附錄整區不拆頁', r.matDet);
-    check('安全母索：構台下形式無對應區塊不扣成負數', r.deckGuard);
     check('v5.395 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -9289,19 +9234,27 @@ async function newPage(browser, width, height) {
       try {
         go('rebar'); out.redirect = document.querySelector('.page.active').id === 'page-matest' && _meTab === 'rebar'
           && document.querySelector('#page-matest .me-pane[data-me="rebar"]').style.display === '' && !!document.querySelector('#rebar-root .tool-head');
-        out.tabs = document.querySelectorAll('#me-tabs .me-tab').length === 5 && /鋼筋籠/.test(document.querySelector('#me-tabs .me-tab.on').textContent);
+        out.tabs = document.querySelectorAll('#me-tabs .me-tab').length === 4 && /鋼筋籠/.test(document.querySelector('#me-tabs .me-tab.on').textContent);
         out.nav = ['rebar', 'grout', 'backfill', 'lifeline'].every(id => { const p = ALL_PAGES.find(x => x.id === id); return p && p.hidden && p.parent === 'matest'; });
         meTab('shoring');
         const f = document.getElementById('mat-est-form').innerHTML, o = document.getElementById('mat-est-out').innerHTML, b = document.getElementById('me-bar-shoring').innerHTML;
-        out.form = (f.match(/class="me-sec"/g) || []).length >= 8 && /class="me-adv"/.test(f) && /matEstCalc\(\)/.test(b) && /matEstExportMenu\(\)/.test(b) && /掛專案/.test(b);
-        out.out = /me-tiles/.test(o) && /<span>圍令<\/span><b>[\d,]+ M<\/b>/.test(o) && /<span>支撐<\/span><b>[\d,]+ M<\/b>/.test(o) && /第1層水平支撐[^]*圍令（H\d+）/.test(o) && /依進場階段（叫料）/.test(o) && /計算依據/.test(o) && !/材料需求清冊/.test(o) && !/分階段叫料建議/.test(o);
-        _meView = 'cat'; _matEstCalcCore(); out.cat = /① 擋土壁體（樁）/.test(document.getElementById('mat-est-out').innerHTML); _meView = 'stage';
+        out.form = (f.match(/class="me-sec"/g) || []).length >= 8 && /class="me-adv"/.test(f) && /matEstCalc\(\)/.test(b) && /matEstExportNow\(\)/.test(b) && /掛專案/.test(b);
+        const pv = document.getElementById('me-pv'), pvt = () => (pv && pv.shadowRoot ? pv.shadowRoot.innerHTML : '');
+        out.out = /me-tiles/.test(o) && /<span>圍令<\/span><b>[\d,]+ M<\/b>/.test(o) && /<span>支撐<\/span><b>[\d,]+ M<\/b>/.test(o) && /叫料單（依進場階段）/.test(o) && /計算依據/.test(o)
+          /* v6.0.141 右邊即時 A4 預覽＝匯出的同一份（shadow DOM）；分頁數與匯出引擎同規則 */
+          && /擋土支撐叫料單/.test(pvt()) && /第1層水平支撐[^]*圍令（H\d+）/.test(pvt()) && +pv.getAttribute('data-pages') >= 1 && !/材料需求清冊/.test(o + pvt()) && !/分階段叫料建議/.test(o + pvt());
+        mePvSet('stage', 0, false); out.pvStage = !/▸ 擋土壁/.test(pvt()) && /▸ 壓樑|▸ 中間樁/.test(pvt());
+        let last = null; const oE = window.matEstExportPDF; window.matEstExportPDF = (k, opt) => { last = { k, opt }; };
+        try { matEstExportNow(); } finally { window.matEstExportPDF = oE; }
+        out.pvExport = last && last.k === 'order' && last.opt.stages.indexOf(0) < 0 && last.opt.stages.length === _matEstRes.staged.length - 1;
+        mePvSet('all', 1);
+        mePvSet('view', 'cat'); mePvSet('basis', true); out.cat = /① 擋土壁體（樁）/.test(pvt()) && /附錄：計算依據/.test(pvt()); mePvSet('view', 'stage');
         meTab('grout'); out.grout = !!document.querySelector('#grout-root .tool-head') && /匯出 PDF/.test(document.querySelector('#grout-root .tool-head').innerHTML);
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
     check('v6.0.139 材料估算整合：舊頁名轉分頁、五個分頁、計算工具不在選單（權限跟材料估算）', r.redirect && r.tabs && r.nav, JSON.stringify(r));
-    check('v6.0.139 材料估算整合：工具列統一（掛專案／計算／匯出 PDF）、條件分段可收合＋進階、右邊摘要（型鋼用 M）＋材料清單兩種排法、不再重複列清冊', r.form && r.out && r.cat && r.grout, JSON.stringify(r));
+    check('v6.0.139 材料估算整合：工具列統一（掛專案／計算／匯出 PDF）、條件分段可收合＋進階、右邊摘要（型鋼用 M）＋材料清單兩種排法、不再重複列清冊', r.form && r.out && r.cat && r.grout && r.pvStage && r.pvExport, JSON.stringify(r));
     check('v6.0.139 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
@@ -9309,7 +9262,7 @@ async function newPage(browser, width, height) {
     // 審查：手機版（390px）各分頁展開全部段落，等手機表格改卡片（_mstack 非同步）後，沒有任何元素超出畫面右緣（grid 1fr 會被寬內容撐開，頁面 scrollWidth 抓不到）；掛專案入口一律回擋土支撐分頁
     const { page, errors } = await newPage(browser, 390, 800);
     const r = { over: {} };
-    for (const t of ['shoring', 'lifeline', 'rebar', 'grout', 'backfill']) {
+    for (const t of ['shoring', 'rebar', 'grout', 'backfill']) {
       await page.evaluate(t => { go('matest'); meTab(t); document.querySelectorAll('#page-matest details').forEach(d => { d.open = true; }); if (t === 'shoring') matEstCalc(); }, t);
       await page.waitForTimeout(600);
       r.over[t] = await page.evaluate(() => { const W = innerWidth; let n = 0; document.querySelectorAll('#page-matest *').forEach(e => { const R = e.getBoundingClientRect(); if (R.width > 0 && R.right > W + 1 && e.offsetParent) n++; }); return n; });
@@ -9318,7 +9271,7 @@ async function newPage(browser, width, height) {
       try { meTab('rebar'); const q0 = window._sdQ; window._sdQ = () => ({ id: 'zz' }); window.matEstFromSite = function () {};   // matEstFromSite 留空殼（setTimeout 稍後才呼叫）
         siteToMatEst(); const ok = _meTab === 'shoring'; window._sdQ = q0; return ok; } catch (e) { return String(e).slice(0, 200); }
     });
-    check('v6.0.139 材料估算手機版：五個分頁展開後沒有元素超出畫面；從案場細節帶入一律回擋土支撐分頁', Object.values(r.over).every(n => n === 0) && Object.keys(r.over).length === 5 && r.siteTab, JSON.stringify(r));
+    check('v6.0.139 材料估算手機版：五個分頁展開後沒有元素超出畫面；從案場細節帶入一律回擋土支撐分頁', Object.values(r.over).every(n => n === 0) && Object.keys(r.over).length === 4 && r.siteTab, JSON.stringify(r));
     check('v6.0.139 手機版測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
