@@ -9642,7 +9642,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── v6.0.149 議價可輸入折扣 %、即時預覽、稅前價；尾差併入工項單價，不再加「議價調整」列 ──
+  // ── v6.0.152 議價可輸入折扣 %、即時預覽、稅前價；尾差併入工項單價，不再加「議價調整」列 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -9682,14 +9682,21 @@ async function newPage(browser, width, height) {
         out.oldAdj = items.filter(it => it.desc === NGT_ADJ_DESC).length === 1 && +items.find(it => it.desc === NGT_ADJ_DESC).price === -400 && calcT().sub === 1000000;
         // 說明文字不再提「議價調整」項補足
         out.text = !/以「議價調整」項補足/.test(document.getElementById('negotiate-modal').innerHTML);
+        // 報價稅額四捨五入到元（含 .5 進位），含稅＝未稅＋整數稅額；存回的報價、重算 _recalcQuoteTotals 同一算法
+        items = [{ desc: '雜項', unit: '式', qty: '1', price: '30010', sec: false }]; exs = [];
+        const tq = calcT(); out.tax5 = tq.tax === 1501 && tq.total === 31511;
+        const qR = { id: 'qR152', items: [{ desc: '雜項', unit: '式', qty: '1', price: '30010', sec: false }], exs: [] }; _recalcQuoteTotals(qR);
+        out.taxRecalc = qR.t && qR.t.tax === 1501 && qR.t.total === 31511;
+        items = [{ desc: '雜項', unit: '式', qty: '1', price: '29990', sec: false }]; out.taxDown = calcT().tax === 1500;   // 1499.5 → 1500
         document.getElementById('negotiate-modal').style.display = 'none'; items = []; exs = [];
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
       window.toast = oT;
       return out;
     });
-    check('v6.0.149 議價折扣 %：5%（未稅／含稅口徑）精準等於目標、即時預覽改前→改後與降幅；稅前價（含稅＝原未稅、降 4.76%）', r.prev && r.pctExcl && r.pctIncl && r.preTaxFill && r.preTax, JSON.stringify(r));
-    check('v6.0.149 議價尾差：併入 1 式或數量能整除的工項單價（整數），不加「議價調整」列；無法剛好時顯示還差幾元可選列；舊報價的調整列保留', r.divisible && r.left && r.leftApply && r.oldAdj && r.text, JSON.stringify(r));
-    check('v6.0.149 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    check('v6.0.152 議價折扣 %：5%（未稅／含稅口徑）精準等於目標、即時預覽改前→改後與降幅；稅前價（含稅＝原未稅、降 4.76%）', r.prev && r.pctExcl && r.pctIncl && r.preTaxFill && r.preTax, JSON.stringify(r));
+    check('v6.0.152 議價尾差：併入 1 式或數量能整除的工項單價（整數），不加「議價調整」列；無法剛好時顯示還差幾元可選列；舊報價的調整列保留', r.divisible && r.left && r.leftApply && r.oldAdj && r.text, JSON.stringify(r));
+    check('v6.0.152 報價稅額四捨五入到元（30,010×5%＝1,500.5→1,501；29,990→1,500），含稅＝未稅＋整數稅額；重算報價同一算法', r.tax5 && r.taxRecalc && r.taxDown, JSON.stringify(r));
+    check('v6.0.152 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

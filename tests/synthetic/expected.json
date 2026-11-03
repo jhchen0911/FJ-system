@@ -16,14 +16,14 @@
   "contractExcl": 165000
  },
  "A03": {
-  "exclSub": 999600,
+  "exclSub": 1000000,
   "exclUnitPrice": 1000,
-  "exclAdj": -400,
-  "invAdjPrice": -400,
-  "invAdjNote": "議價折讓（照扣）",
-  "invSubExcl": 999600,
+  "exclAdj": 0,
+  "invAdjPrice": null,
+  "invAdjNote": "",
+  "invSubExcl": 1000000,
   "inclTotal": 1050000,
-  "inclAdj": -258
+  "inclAdj": 0
  },
  "A04": {
   "rowDays": 30000,
@@ -252,7 +252,7 @@
   "printedSum": 1000
  },
  "C33": {
-  "quoteTotal": 31499.685,
+  "quoteTotal": 31499.7,
   "invTotal": 31498.95,
   "invTotalIsInt": false
  },

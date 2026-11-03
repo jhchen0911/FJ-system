@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.149';
+var APP_VERSION='v6.0.152';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -1304,7 +1304,7 @@ var SPARE_NOTE='備用單價';
 function _isSpare(it){return !!(it&&it.spare);}
 function calcT(){
   const sub=items.reduce((a,it)=>(it.sec||_isSpare(it))?a:a+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0),0);
-  const tax=sub*_taxR()/100;const total=sub+tax;
+  const tax=Math.round(sub*_taxR()/100);const total=sub+tax;   // v6.0.152（Lotion 11/03）：報價稅額照開發票慣例四捨五入到元，含稅總計＝未稅＋整數稅額（請款單不動）
   const ext=exs.reduce((a,e)=>a+(parseFloat(e.amt)||0),0);
   // 成本：有填「成本單價」的工項逐項計算；未填的部分退回倍率(P.mult)推估
   let costKnown=0,subUnknown=0;
@@ -1349,9 +1349,9 @@ function rTots(){
   }
 }
 
-// ── 議價：輸入議價後金額或折扣 %，各工項單價等比例調整；尾差併入工項單價（v6.0.149 起不再加「議價調整」列） ──
-var NGT_ADJ_DESC='議價調整（尾差）';   // 舊報價可能還有這一列：照常顯示、存檔、轉請款（v6.0.149 起不再新增）
-// v6.0.149（Lotion 11/03）：輸入方式「議價後金額／折扣 %」、即時預覽改前→改後、「稅前價」快捷；
+// ── 議價：輸入議價後金額或折扣 %，各工項單價等比例調整；尾差併入工項單價（v6.0.152 起不再加「議價調整」列） ──
+var NGT_ADJ_DESC='議價調整（尾差）';   // 舊報價可能還有這一列：照常顯示、存檔、轉請款（v6.0.152 起不再新增）
+// v6.0.152（Lotion 11/03）：輸入方式「議價後金額／折扣 %」、即時預覽改前→改後、「稅前價」快捷；
 //   尾差不加列：先找數量 1 且金額最大的列調單價，沒有就找數量能整除尾差的列；單價維持整數；都不行就顯示「還差 N 元」讓人選列
 function _ngtIn(){var e=document.querySelector('input[name="ngt-in"]:checked');return e?e.value:'amt';}
 function _ngtInSw(){var p=_ngtIn()==='pct',a=document.getElementById('ngt-amt-wrap'),b=document.getElementById('ngt-pct-wrap');if(a)a.style.display=p?'none':'';if(b)b.style.display=p?'':'none';window._ngtPick=null;updNegotiatePreview();}
@@ -1376,11 +1376,11 @@ function _ngtPlan(target,mode,pickIdx){
   var rows=[];arr.forEach(function(it,i){if(it.sec||_isSpare(it))return;var p=parseFloat(it.price)||0,q=parseFloat(it.qty)||0;if(p<=0||q<=0)return;rows.push({i:i,q:q,p:p,amt:q*p});});
   var res={items:arr,S:S,fixed:null,diff:0,cands:rows.map(function(o){return {i:o.i,desc:String(arr[o.i].desc||'').split('\n')[0].slice(0,30),q:o.q,unit:arr[o.i].unit||''};})};
   if(Math.abs(diff)<0.005)return res;
-  var exact=function(o){var np=o.p+diff/o.q;return np>0&&Math.abs(np-Math.round(np))<1e-9;};
+  var exact=function(o){var np=o.p+diff/o.q;return np>0&&Math.abs(np-Math.round(np))<1e-9&&Math.abs(diff/o.q)<=o.p*0.2;};   // 審查：自動挑的列單價最多改 20%，超過就顯示還差、讓人自己選
   var pick=null;
   if(pickIdx!=null&&pickIdx>=0)pick=rows.find(function(o){return o.i===pickIdx;})||null;
   else if(pickIdx==null){var byAmt=function(a,b){return b.amt-a.amt;};pick=rows.filter(function(o){return o.q===1&&exact(o);}).sort(byAmt)[0]||rows.filter(exact).sort(byAmt)[0]||null;}
-  if(pick){var np=Math.round(pick.p+diff/pick.q);if(np>0){arr[pick.i].price=np;res.fixed={i:pick.i,desc:res.cands.find(function(c){return c.i===pick.i;}).desc,from:pick.p,to:np};}}
+  if(pick){var np=Math.round(pick.p+diff/pick.q);if(np>0){arr[pick.i].price=np;res.fixed={i:pick.i,desc:res.cands.find(function(c){return c.i===pick.i;}).desc,from:pick.p,to:np};}else res.pickBad=true;}   // 審查：選的列單價會變 0 以下 → 不改、提示
   res.diff=r2(S-_ngtCalcT(arr).sub);
   return res;
 }
@@ -1469,7 +1469,9 @@ function updNegotiatePreview(){
     +'<div style="text-align:right;margin-top:4px">'+(dn>=0?'降':'加')+' <b>'+Math.abs(pct)+'%</b>（'+(dn>=0?'少':'多')+' NT$ '+fmt(Math.abs(Math.round(dn)))+'，'+(mode==='excl'?'未稅':'含稅')+'）</div>';
   if(plan.fixed)h+='<div style="text-align:right;color:var(--b4)">尾差併入「'+esc(plan.fixed.desc)+'」單價 '+fmt(plan.fixed.from)+' → '+fmt(plan.fixed.to)+'</div>';
   if(Math.abs(plan.diff)>=0.005){
-    h+='<div style="text-align:right;color:#b26a00;margin-top:4px">還差 NT$ '+fmt(Math.abs(plan.diff))+'（'+(plan.diff>0?'低於':'高於')+'目標）：沒有剛好能吸收的工項，選一列調單價：'
+    var dInc=mode==='excl'?null:Math.round(target-Math.round(a.total));   // 審查：含稅口徑另列含稅差額（使用者輸入的是含稅）
+    h+=(plan.pickBad?'<div style="text-align:right;color:var(--red)">選的那列單價會變成 0 以下，沒有調整</div>':'')
+      +'<div style="text-align:right;color:#b26a00;margin-top:4px">還差 NT$ '+fmt(Math.abs(plan.diff))+'（未稅'+(dInc!=null?('；含稅差 NT$ '+fmt(Math.abs(dInc))):'')+'，'+(plan.diff>0?'低於':'高於')+'目標）：沒有剛好能吸收的工項，選一列調單價：'
       +'<select onchange="window._ngtPick=(this.value===\'\'?-1:+this.value);updNegotiatePreview()" style="font-size:12px;margin-left:4px;max-width:220px"><option value="">（不補）</option>'
       +plan.cands.map(function(c){return '<option value="'+c.i+'"'+(window._ngtPick===c.i?' selected':'')+'>'+esc(c.desc)+'（'+c.q+' '+esc(_uFix(c.unit))+'）</option>';}).join('')+'</select></div>';
   }
@@ -1493,7 +1495,7 @@ function applyNegotiate(){
       changed++;
     });
     if(!changed){toast('沒有工項單價被修改');return;}
-    rItems();rTots();   // v6.0.149：舊報價的「議價調整」列不再自動刪（不動舊資料）
+    rItems();rTots();   // v6.0.152：舊報價的「議價調整」列不再自動刪（不動舊資料）
     document.getElementById('negotiate-modal').style.display='none';
     const after=calcT();
     toast('已逐項調價 '+changed+' 項：未稅小計 NT$ '+fmt(before.sub)+' → NT$ '+fmt(after.sub)+'，記得儲存');
@@ -1503,7 +1505,7 @@ function applyNegotiate(){
   if(t.sub<=0){toast('工項小計為 0，無法議價');return;}
   const target=_ngtTargetOf(t,mode);
   if(target<=0){toast(_ngtIn()==='pct'?'請輸入折扣 %':'請輸入議價後金額');return;}
-  // v6.0.149：照預覽同一套算法（_ngtPlan）改單價；尾差併入工項單價，不加「議價調整」列
+  // v6.0.152：照預覽同一套算法（_ngtPlan）改單價；尾差併入工項單價，不加「議價調整」列
   const plan=_ngtPlan(target,mode,window._ngtPick);
   items=plan.items;
   rItems();rTots();
@@ -3318,7 +3320,7 @@ function _fixOddCostsAll(){
 function _recalcQuoteTotals(q){
   var its=q.items||[];
   var sub=its.reduce(function(a,it){return (it.sec||_isSpare(it))?a:a+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0);},0);
-  var tax=sub*_taxR()/100,total=sub+tax;
+  var tax=Math.round(sub*_taxR()/100),total=sub+tax;   // v6.0.152 與 calcT 同一算法
   var ext=(q.exs||[]).reduce(function(a,e){return a+(parseFloat(e.amt)||0);},0);
   var costKnown=0,subUnknown=0;
   its.forEach(function(it){
