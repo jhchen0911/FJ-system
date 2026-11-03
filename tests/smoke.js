@@ -5275,7 +5275,7 @@ async function newPage(browser, width, height) {
     out.listBtn=/quoteViewPdf\('qV'\)/.test(lh)&&/#i-eye/.test(lh);
     out.editorNoPreview=!/go\('preview'\)/.test(document.querySelector('#page-editor .ph-r').innerHTML);
     quoteViewPdf('qV');
-    out.opened=document.querySelector('.page.active').id==='page-preview'&&/眼睛測試案/.test(document.getElementById('page-preview').innerHTML)&&/exportQuotePDF/.test(document.getElementById('page-preview').innerHTML);
+    out.opened=document.querySelector('.page.active').id==='page-preview'&&/眼睛測試案/.test(document.getElementById('page-preview').innerHTML)&&/quoteSendPdf/.test(document.getElementById('page-preview').innerHTML);
     _prevBack('quotes');out.back=document.querySelector('.page.active').id==='page-quotes';
   }catch(e){out.err=String(e&&e.stack||e).slice(0,400);}
   Q=[];eid=null;res(out);
@@ -9772,8 +9772,9 @@ async function newPage(browser, width, height) {
         delete Q_HISTORY.qs1;
         const ok = () => document.getElementById('gen-confirm-ok'), cc = () => document.getElementById('gen-confirm-cancel'), open = () => document.getElementById('gen-confirm-modal').style.display === 'flex';
         let p = quoteSendPdf('qs1');
-        out.ask = open() && ok().textContent === '送出並封存' && cc().textContent === '只匯出、不封存' && /封存成 <strong>V1<\/strong>/.test(document.getElementById('gen-confirm-msg').innerHTML);
-        cc().click(); await p;
+        out.ask = open() && ok().textContent === '送出並封存' && cc().textContent === '取消' && !!document.getElementById('q-send-only') && /封存成 <strong>V1<\/strong>/.test(document.getElementById('gen-confirm-msg').innerHTML);
+        cc().click(); await p; out.cancelNothing = got.length === 0 && !open();   // 審查：取消／Esc 什麼都不做（不匯出）
+        p = quoteSendPdf('qs1'); document.getElementById('q-send-only').click(); await p;
         const q = Q.find(x => x.id === 'qs1');
         out.onlyExport = got.length === 1 && !(Q_HISTORY.qs1 || []).some(v => v.formal) && q.ver === 1;
         p = quoteSendPdf('qs1'); ok().click(); await p;
@@ -9785,6 +9786,9 @@ async function newPage(browser, width, height) {
         p = quoteSendPdf('qs1'); out.changed = open() && /封存成 <strong>V2<\/strong>/.test(document.getElementById('gen-confirm-msg').innerHTML); ok().click(); await p;
         out.v2 = Q_HISTORY.qs1.filter(v => v.formal).length === 2 && q.ver === 3 && /1,200|1200/.test(got[3]);
         showConfirm('x', 'y', () => {}); out.reset = ok().textContent === '確認' && cc().textContent === '取消'; cc().click();
+        // 審查：編輯頁存檔失敗（名稱空白）就不封存、不匯出
+        loadQ('qs1'); go('editor'); const g1 = got.length, f0 = Q_HISTORY.qs1.filter(v => v.formal).length; document.getElementById('fn').value = ''; items[0].price = 5000;
+        quoteSendPdf('qs1'); out.saveFail = !open() && got.length === g1 && Q_HISTORY.qs1.filter(v => v.formal).length === f0; document.getElementById('fn').value = '送出測試案'; items[0].price = Q.find(x => x.id === 'qs1').items[0].price; go('quotes'); if (open()) cc().click();
         window._isReaderUser = true; const g0 = got.length; quoteSendPdf('qs1'); out.reader = !open() && got.length === g0 + 1; window._isReaderUser = false;
         out.listBtn = /quoteSendPdf\(/.test(_renderProjectsCore.toString()) && !/exportQuotePDF\(/.test(_renderProjectsCore.toString()) && /quoteSendPdf\(eid\)/.test(document.getElementById('page-preview').innerHTML) && /quoteSendOwnerDoc\(\)/.test(_qiPanelRender.toString()) && !/onclick="quoteExportOwnerDoc/.test(_qiPanelRender.toString());
         showQVersions('qs1'); out.note = /送出 PDF \d{3}\/\d\d\/\d\d/.test(document.body.innerHTML);
@@ -9792,10 +9796,10 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
       return out;
     });
-    check('v6.0.158 送出自動進版：匯出 PDF 先問「送出並封存／只匯出、不封存」；只匯出不封存、不進版', r.ask && r.onlyExport, JSON.stringify(r));
+    check('v6.0.158 送出自動進版：匯出 PDF 先問「送出並封存／只匯出、不封存／取消」；只匯出不封存、不進版；取消不匯出', r.ask && r.onlyExport && r.cancelNothing, JSON.stringify(r));
     check('v6.0.158 送出並封存：封存 V1（正式版、備註「送出 PDF 民國日期」）、版號 +1；PDF 用封存版（報價日與封存版一致）', r.archive && r.v2, JSON.stringify(r));
     check('v6.0.158 內容跟上一個正式版相同：不重複封存、提示並用那一版匯出；改了內容才再問', r.same && r.changed, JSON.stringify(r));
-    check('v6.0.158 確認視窗按鈕文字用完還原；唯讀帳號直接匯出；列表與預覽按鈕走送出流程；歷史版本顯示備註', r.reset && r.reader && r.listBtn && r.note, JSON.stringify(r));
+    check('v6.0.158 確認視窗按鈕文字用完還原；唯讀帳號直接匯出；編輯頁存檔失敗不封存不匯出；列表與預覽按鈕走送出流程；歷史版本顯示備註', r.reset && r.reader && r.listBtn && r.note && r.saveFail, JSON.stringify(r));
     check('v6.0.158 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
