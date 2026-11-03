@@ -9760,6 +9760,78 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.157 路數明細（小批次；設計 docs/路數明細_設計筆記.md）：每路定尺組合、接頭避開中間樁、短節備品全案×1.1、構台下淨空 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      try {
+        MAT_EST = _shDefaults(); go('matest'); meTab('shoring'); matEstCalc();
+        let R = _matEstRes, d0 = R.layerData[0];
+        out.est = d0.heban === 83 && R.main.some(x => /^支撐 H350$/.test(x.k || '') && /（估算）/.test(x.u)) && /估算/.test(_meTilesHtml(R))
+          && (R.staged.find(x => /第1層/.test(x.stage)).notes || []).some(t => /估算（未填路數明細）/.test(t));
+        const base1 = { sM: d0.sM, heban: d0.heban, shortJ: d0.shortJ }, ropeBase = R.T.rope;
+        MAT_EST._routeRows = [{ ly: 1, id: 'V1', dir: '縱', wall: 24.6 }, { ly: 1, id: 'V2', dir: '縱', wall: 24.6, dbl: '雙' }, { ly: 1, id: 'H1', dir: '橫', wall: 17.35, mids: '8.3' }];
+        matEstCalc(); R = _matEstRes; const d = R.layerData[0], d2 = R.layerData[1];
+        const h1 = d.rt.find(x => x.id === 'H1');
+        out.h1 = h1.pieces.join('+') === '8.5+7' && h1.midChk === 'ok';   // 8+7.5 的接頭（8.35／7.85）都離 8.3 不到 0.5 → 改 8.5＋7（接頭 8.85）
+        out.rows = Math.abs(d.sM - 85.55) < 1e-6 && d.heban === Math.ceil(d.wM / 7) + (1 + 2 + 1) * 2 && d.shortJ === 4
+          && d2.sM === base1.sM && d2.heban === base1.heban && d2.shortJ === base1.shortJ;
+        const st1 = R.staged.find(x => /第1層/.test(x.stage)), it = n => (st1.items.find(x => x.name === n) || {}).quantity;
+        out.staged = it('短節 0.2M') === 3 && it('短節 0.4M') === 1 && it('短節備品 0.2M（全案×1.1）') === 1 && it('短節備品 0.4M（全案×1.1）') === 1 && it('支撐（H350）') === 86 && !st1.items.some(x => x.name === '短節');
+        out.notes = st1.notes.some(t => /千斤頂需伸長：H1 5 cm/.test(t)) && st1.notes.some(t => /接頭位置未檢查中間樁：V1、V2/.test(t))
+          && (R.staged.find(x => /第2層/.test(x.stage)).notes || []).some(t => /估算/.test(t)) && /※ 千斤頂需伸長/.test(_meDoc('order', {}, R).body);
+        const sj = R.main.find(x => x.k === '短節'), sk = R.main.find(x => /^短節規格/.test(x.k || ''));
+        out.main = sj && sj.v === String(R.layerData.slice(1).reduce((a, x) => a + x.shortJ, 0) + 6) && sk && /0\.2M×4、0\.4M×2/.test(sk.v) && R.main.some(x => /^支撐 H350$/.test(x.k || '') && /（部分層估算）/.test(x.u))
+          && /路數明細＋估算/.test(_meTilesHtml(R));
+        // 畫面：路數明細表、建議組合、結果文字
+        renderMatEst(); const f = document.getElementById('mat-est-form').innerHTML;
+        out.ui = /④-2 路數明細/.test(f) && /placeholder="12\.5\+10\.5"/.test(f) && /千斤頂伸長 5 cm/.test(f) && /接頭與懸臂檢查合格/.test(f) && /接頭位置未檢查中間樁/.test(f) && /路數明細與上面路數表/.test(f);
+        meRtU(0, 'combo', '13+10'); out.manual = /超過淨長|短節補不到/.test(document.getElementById('mat-est-form').innerHTML) === false && _matEstRes && true;
+        const x0 = FJC.route.row(MAT_EST._routeRows[0], _meRouteOpt(MAT_EST, MAT_EST._layers[0]));
+        out.manual = x0.manual && x0.pieces.join('+') === '13+10' && x0.jack === 0 && x0.shorts.join() === '0.2';
+        // CSV 匯入（取代前要確認）
+        MAT_EST._routeRows = [];
+        const file = new File(['層,路編號,方向,壁間長度,單雙,定尺組合,備註,中間樁位置 M（逗號分隔）\n1,V1,縱,24.6,雙,,,"6.2,12.9"\n2,H1,橫,30.80,,,,\n9,X,縱,10,,,,'], '量測_範例.csv', { type: 'text/csv' });
+        meRtCsv({ files: [file], value: '' }); await new Promise(res => setTimeout(res, 600));
+        out.csv = MAT_EST._routeRows.length === 3 && MAT_EST._routeSrc.file === '量測_範例.csv' && /來源：量測_範例\.csv/.test(document.getElementById('mat-est-form').innerHTML);
+        matEstCalc(); out.csvCalc = _matEstRes.rt.n === 2 && _matEstRes.layerData[1].rt.length === 1;   // 第 9 層超過層數不計
+        // 構台下淨空
+        MAT_EST = _shDefaults(); MAT_EST.gtRopeDeduct = '1'; MAT_EST._gtRoutesV = [{ rc: 2, rl: 10 }]; matEstCalc(); const ropeDed = _matEstRes.T.rope;
+        MAT_EST._layers[0].el = -2; MAT_EST._layers[1].el = -9; matEstCalc(); R = _matEstRes;
+        const n1 = R.staged.find(x => /第1層/.test(x.stage)).notes.join();
+        out.clrNo = R.T.rope === ropeDed && /第 1 層構台下淨空 0\.83 m，不拉母索（構台帽高程為預設值/.test(n1) && !/構台下/.test(R.staged.find(x => /第2層/.test(x.stage)).notes.join());
+        MAT_EST._layers[0].el = -3; matEstCalc(); R = _matEstRes;
+        out.clrYes = Math.abs(R.T.rope - (ropeDed + 20)) < 1e-6 && /第 1 層構台下淨空 1\.83 m，照拉母索/.test(R.staged.find(x => /第1層/.test(x.stage)).notes.join());
+        MAT_EST.capEl = -2.5; matEstCalc(); out.clrCap = /淨空 0\.33 m，不拉母索$/.test(_matEstRes.staged.find(x => /第1層/.test(x.stage)).notes.join()) && _matEstRes.T.rope === ropeDed;   // 填了構台帽高程（帽頂）就不標預設值
+        MAT_EST.gtPull1 = 'pull'; matEstCalc(); out.clrMan = Math.abs(_matEstRes.T.rope - (ropeDed + 20)) < 1e-6 && /照拉母索（手動指定）/.test(_matEstRes.staged.find(x => /第1層/.test(x.stage)).notes.join());
+        MAT_EST.gtPull1 = 'no'; MAT_EST._layers[0].el = ''; matEstCalc(); out.clrMan = out.clrMan && _matEstRes.T.rope === ropeDed && /不拉母索（手動指定）/.test(_matEstRes.staged.find(x => /第1層/.test(x.stage)).notes.join());
+        renderMatEst(); out.clrUi = /第 1 層構台下淨空/.test(document.getElementById('mat-est-form').innerHTML) && /第 1 層支撐中心高程/.test(document.getElementById('mat-est-form').innerHTML) && /手動：照拉/.test(document.getElementById('mat-est-form').innerHTML);
+        out.ropeNoEl = (MAT_EST = _shDefaults(), MAT_EST.gtRopeDeduct = '1', MAT_EST._gtRoutesV = [{ rc: 2, rl: 10 }], matEstCalc(), _matEstRes.T.rope === ropeDed && ropeDed === ropeBase - 20);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.157 路數明細：沒填照舊（合板 83 不變）並標「估算」（材料明細、摘要卡、叫料單）', r.est, JSON.stringify(r));
+    check('v6.0.157 路數明細：有填的層支撐 M＝Σ 淨長×倍率（雙支撐×2）、接頭／合板／短節依各路；沒填的層不變', r.rows && r.h1, JSON.stringify(r));
+    check('v6.0.157 路數明細：叫料單逐長度列短節、全案×1.1 備品、千斤頂伸長與未檢查中間樁的提醒；材料明細短節含備品', r.staged && r.notes && r.main, JSON.stringify(r));
+    check('v6.0.157 路數明細：畫面列建議組合與結果、可手改、CSV 匯入（顯示來源、超過層數不計）', r.ui && r.manual && r.csv && r.csvCalc, JSON.stringify(r));
+    check('v6.0.157 構台下淨空：只看第 1 層（第 2 層以下照拉）；填支撐中心高程才依淨空（構台帽沒填＝原地面−1.0 標預設值）；≥1.5 照拉、不到不拉；可手動改拉／不拉；沒填照舊扣第一層', r.clrNo && r.clrYes && r.clrCap && r.clrMan && r.clrUi && r.ropeNoEl, JSON.stringify(r));
+    check('v6.0.157 路數明細測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(async () => {
+      MAT_EST = _shDefaults(); MAT_EST._routeRows = [{ ly: 1, id: 'V1', wall: 24.6, mids: '6.2,12.9' }, { ly: 2, id: 'H1', wall: 30.8 }]; MAT_EST.gtRopeDeduct = '1';
+      go('matest'); meTab('shoring'); renderMatEst(); matEstCalc(); await new Promise(res => setTimeout(res, 500));
+      document.querySelectorAll('#mat-est-form details').forEach(x => x.open = true); await new Promise(res => setTimeout(res, 300));
+      return { sw: document.documentElement.scrollWidth, w: window.innerWidth };
+    });
+    check('v6.0.157 路數明細：手機版不左右滑動', r.sw <= r.w + 1, JSON.stringify(r));
+    check('v6.0.157 手機版路數明細無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

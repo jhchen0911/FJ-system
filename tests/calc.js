@@ -6,8 +6,8 @@ require(path.join(__dirname, '..', 'calc', 'payable.js'));
 require(path.join(__dirname, '..', 'calc', 'report.js'));
 require(path.join(__dirname, '..', 'calc', 'comm.js'));
 require(path.join(__dirname, '..', 'calc', 'payroll.js'));
-require(path.join(__dirname, '..', 'calc', 'lifeline.js')); require(path.join(__dirname, '..', 'calc', 'settle.js'));
-const I = FJC.inv, PY = FJC.pay, R = FJC.rpt, C = FJC.comm, H = FJC.hr, LL = FJC.ll, ST = FJC.settle;
+require(path.join(__dirname, '..', 'calc', 'lifeline.js')); require(path.join(__dirname, '..', 'calc', 'settle.js')); require(path.join(__dirname, '..', 'calc', 'route.js'));
+const I = FJC.inv, PY = FJC.pay, R = FJC.rpt, C = FJC.comm, H = FJC.hr, LL = FJC.ll, ST = FJC.settle, RT = FJC.route;
 const results = [];
 const check = (name, ok, info) => results.push({ name, ok: !!ok, info: info || '' });
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -170,6 +170,43 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
     { idx: 1, desc: '追加', unit: 'M', price: 500, stmtQty: 0, billedQty: 40, dailyQty: 40, addQty: 40 },
     { idx: 2, desc: '支撐', unit: 'T', price: 2000, stmtQty: 12, billedQty: 10, dailyQty: 12, addQty: 0 }], { clean: { pct: 0.3, took: 6000, finalNet: 1800000 }, retention: 52500 });
   check('完工結算差異表：少 50M×1,000＝−50,000（業主扣減）；追加 40M 沒進結算書；多 2T 漏請、請款沒跟上日報；清潔費應 5,400 已扣 6,000', d.rows[0].amt === -50000 && /業主扣減/.test(d.rows[0].reasons.join()) && /追加未納入/.test(d.rows[1].reasons.join()) && /漏請/.test(d.rows[2].reasons.join()) && /沒跟上日報/.test(d.rows[2].reasons.join()) && d.nDiff === 3 && d.sumAmt === -50000 - 20000 + 4000 && d.clean.should === 5400 && d.clean.diff === -600 && d.retention === 52500);
+}
+
+
+// ── 路數明細／定尺組合（calc/route.js，v6.0.157；設計筆記 docs/路數明細_設計筆記.md 試算 A～E）──
+{
+  const ex = [[1, 24.6, 'H350', 23.2, '12.5+10.5', [0.2], 0, 1], [2, 24.6, 'H350', 23.2, '8+7.5+7.5', [0.2], 0, 2], [1, 17.35, 'H350', 15.95, '8+7.5', [0.4], 5, 1],
+    [2, 30.8, 'H400', 29.3, '10+9.5+9.5', [0.3], 0, 2], [1, 9.3, 'H300', 8, '8', [], 0, 0]];
+  const got = ex.map(e => RT.row({ ly: e[0], wall: e[1] }, { wSpec: e[2] }));
+  check('定尺組合：設計筆記試算 A～E 逐例相同（淨長、組合、短節、千斤頂伸長、接頭）', got.every((r, i) => r.net === ex[i][3] && r.pieces.join('+') === ex[i][4] && eq(r.shorts, ex[i][5]) && r.jack === ex[i][6] && r.joints === ex[i][7]),
+    got.map(r => r.net + ':' + r.pieces.join('+') + ':' + r.shorts + ':' + r.jack).join(' | '));
+  check('定尺：1～13 M 每 0.5、沒有 11／11.5；第 1 層最長 13、第 2 層起 10', RT.STOCK.length === 23 && RT.STOCK.indexOf(11) < 0 && RT.STOCK.indexOf(11.5) < 0 && got[1].pieces.every(x => x <= 10) && got[0].maxLen === 13 && got[1].maxLen === 10);
+  check('沒填中間樁位置＝不檢查（叫料單標「接頭位置未檢查中間樁」）；單支沒有接頭', got[0].midChk === 'none' && got[4].midChk === 'single');
+  const m1 = RT.row({ ly: 1, wall: 24.6, mids: '6.2,12.9,18.6' }, { wSpec: 'H350' });   // 12.5 先放接頭在 12.85，離 12.9 不到 0.5 → 換成 10.5 先放（10.85；第 1 支靠 6.2 支承、凸出 4.65 ≤ 5.25）
+  check('接頭避開中間樁：A 例中間樁 6.2／12.9／18.6 → 改 10.5＋12.5、接頭 10.85、合格', m1.pieces.join('+') === '10.5+12.5' && eq(m1.jointPos, [10.85]) && m1.midChk === 'ok' && !m1.warn.length);
+  check('排法檢查：12.5 先放＝接頭離中間樁不到 0.5；只有 12.9 一支中間樁時第 1 支沒有支承（懸臂超過一半）', /接頭 12\.85 M 離中間樁 12\.9 M 不到 0\.5 M/.test(RT.check([12.5, 10.5], { x0: 0.35, mids: [6.2, 12.9, 18.6] }).join()) && /第 1 支（10\.5 M）凸出支承點 10\.5 M，超過一半/.test(RT.check([10.5, 12.5], { x0: 0.35, mids: [12.9] }).join()));
+  const m2 = RT.row({ ly: 2, wall: 24.6, mids: '8.4,16' }, { wSpec: 'H350' });
+  check('懸臂與接頭：B 例中間樁 8.4／16 → 排出的組合接頭離中間樁 ≥ 0.5、每支凸出最後支承點 ≤ 一半（重驗為合格）', m2.midChk === 'ok' && !RT.check(m2.pieces, { x0: 0.35, mids: [8.4, 16] }).length && m2.jointPos.every(j => Math.abs(j - 8.4) >= 0.5 && Math.abs(j - 16) >= 0.5) && m2.pieces.join('+') !== '8+7.5+7.5', m2.pieces.join('+') + ' ' + m2.jointPos);
+  const m4 = RT.row({ ly: 2, wall: 24.6, mids: '6,12,18', cross: '8,16' }, { wSpec: 'H350' });
+  check('交叉點：上層支撐接頭離交叉點中心 ≥ 0.5（交叉點也算支承點）', m4.midChk === 'ok' && m4.jointPos.every(j => [6, 12, 18, 8, 16].every(x => Math.abs(j - x) >= 0.5)) && !RT.check(m4.pieces, { x0: 0.35, mids: [6, 12, 18], cross: [8, 16] }).length, m4.pieces.join('+'));
+  const bad = []; for (let x = 0.5; x < 60; x += 0.5) bad.push(x);
+  const t0 = Date.now(), m3 = RT.row({ ly: 2, wall: 60, mids: bad.join(',') }, { wSpec: 'H350' });
+  check('中間樁密到怎麼排都會碰到：照長度排、標紅寫原因（排不出合格的組合：接頭…不到 0.5 M）、不會卡住（< 1 秒）', m3.midChk === 'conflict' && /排不出合格的組合：接頭 .*不到 0\.5 M/.test(m3.warn.join()) && m3.pieces.length === 6 && Date.now() - t0 < 1000);
+  const g2 = RT.row({ ly: 1, wall: 24.6, mids: '6.8,12.9,18.6' }, { wSpec: 'H350', minGap: 0.01 });
+  check('接頭離中間樁最小距離是參數（中間樁 6.8／12.9／18.6、改 0.01 M 時 12.85 可接受）', g2.pieces.join('+') === '12.5+10.5');
+  const mm = RT.row({ ly: 2, wall: 30.8, combo: '10+9.5x2', mids: '5,10.4,15,20,25' }, { wSpec: 'H400' }), mo = RT.row({ ly: 2, wall: 24.6, combo: '13+10' }, { wSpec: 'H350' });
+  check('手改組合：照手改、檢查中間樁（10.4 離接頭 10.4 太近）、超過該層最長要警示', mm.manual && mm.pieces.join('+') === '10+9.5+9.5' && mm.midChk === 'conflict' && /超過第 2 層單支最長/.test(mo.warn.join()));
+  const d = RT.row({ ly: 2, wall: 30.8, dbl: '雙' }, { wSpec: 'H400' });
+  check('雙支撐：兩支同組合、支撐 M／接頭／短節都 ×2', d.mult === 2 && d.supM === 58.6 && d.jointsN === 4 && d.shortsN === 2 && d.pieces.join('+') === '10+9.5+9.5');
+  const sp = RT.spares([{ shorts: [0.2], mult: 1 }, { shorts: [0.2], mult: 2 }, { shorts: [0.2, 0.1], mult: 1 }, { shorts: [0.2], mult: 1 }]);
+  check('短節備品：全案同長度合計×1.1 無條件進位（0.2×5→6、0.1×1→2）', eq(sp.rows, [{ len: 0.1, n: 1, order: 2 }, { len: 0.2, n: 5, order: 6 }]) && sp.order === 8);
+  check('零頭：≤15cm 千斤頂伸長；0.45 用 0.4＋伸長 5cm；1 只補不到才 2 只', eq(RT.fill(0.15), { shorts: [], jack: 15 }) && eq(RT.fill(0.45), { shorts: [0.4], jack: 5 }) && eq(RT.fill(0.95), { shorts: [0.6, 0.3], jack: 5 }) && RT.fill(2) === null);
+  const cv = RT.csv('層,路編號,方向,壁間長度,單雙,定尺組合,備註,中間樁位置 M,交叉點位置 M\n1,V1,縱,24.6,雙,,,"6.2,12.9","8,16"\n第2層,H1,橫,30.80,,10+9.5x2,備註\n3,X,縱,0,,,,');
+  check('CSV 匯入：略過標題、中間樁位置用雙引號、層可寫「第2層」、壁間 0 的列報錯', cv.rows.length === 2 && cv.rows[0].mids === '6.2,12.9' && cv.rows[0].cross === '8,16' && cv.rows[0].dbl === '雙' && cv.rows[1].ly === 2 && cv.rows[1].dir === '橫' && cv.errs.length === 1);
+  const c1 = RT.clearance({ supEl: -3, groundEl: 0, sSpec: 'H350' }), c2 = RT.clearance({ supEl: -1.5, capEl: -0.8, sSpec: 'H350' }), c3 = RT.clearance({ supEl: -3, capEl: -0.5, capRef: 'top', capH: 0.4, sSpec: 'H350' });
+  check('構台下淨空：帽梁沒填＝原地面−1.0（預設值）；淨空＝帽梁底−(支撐中心＋型鋼高÷2)；≥1.5 才拉；高程填梁頂時扣梁高', c1.isDef && c1.clear === 1.83 && c1.pull && !c2.isDef && c2.clear === 0.52 && !c2.pull && c3.clear === 1.93 && RT.clearance({ groundEl: 0 }) === null);
+  const rv = RT.review([{ idx: 0, qty: 109, meas: 100, amt: 50 }, { idx: 1, qty: 106, meas: 100, amt: 900 }, { idx: 2, qty: 120, meas: 100, amt: 50 }, { idx: 3, qty: 5, meas: '' }], 1000);
+  check('圖面覆核：一般工項 10%、占總價一成以上 5%；沒量測不比', rv.rows.length === 3 && !rv.rows[0].bad && rv.rows[1].bad && rv.rows[1].big && rv.rows[2].bad && rv.nBad === 2);
 }
 
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）

@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.156';
+var APP_VERSION='v6.0.157';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -8688,6 +8688,39 @@ function _shDefaults(){
     railScope:'0',postH:'1.2m',toe:'0',hookType:'std',
     _ud:[{ul:6.5,uh:2.2}],udMods:'6,3,2,1.5,1',_dc:[]};
 }
+// ── v6.0.157 路數明細（小批次；設計 docs/路數明細_設計筆記.md，純計算 calc/route.js 的 FJC.route）──
+// 參數：rtJack 千斤頂本體（0.7）、rtMax1／rtMax2 單支最長（第 1 層 13、第 2 層起 10）、rtGap 接頭離中間樁最小距離（0.5）
+function _meRouteOpt(inp,ly){var S=_shSel(ly.s||'H350'),o={wSpec:_shSel(ly.w||'H350').spec,sMult:S.mult};
+  [['jack','rtJack'],['max1','rtMax1'],['max2','rtMax2'],['minGap','rtGap']].forEach(function(k){var x=inp[k[1]];if(x!==''&&x!=null&&isFinite(parseFloat(x)))o[k[0]]=parseFloat(x);});return o;}
+function _meRouteRun(inp,layers,lys){
+  var by=[],all=[],last=-1;for(var i=0;i<layers;i++)by.push([]);
+  (Array.isArray(inp._routeRows)?inp._routeRows:[]).forEach(function(r){
+    if(!r||!(_shNum(r.wall)>0))return;var li=Math.round(_shNum(r.ly))-1;if(li<0||li>=layers)return;
+    var x=FJC.route.row(r,_meRouteOpt(inp,lys[li]||{}));by[li].push(x);all.push(x);if(li>last)last=li;});
+  return {by:by,all:all,n:all.length,lastLy:last,sp:FJC.route.spares(all)};
+}
+function _meRouteShorts(rows){var c={};rows.forEach(function(r){(r.shorts||[]).forEach(function(s){c[s]=(c[s]||0)+r.mult;});});return Object.keys(c).map(parseFloat).sort(function(a,b){return a-b;}).map(function(k){return {len:k,n:c[k]};});}
+// 構台下淨空（Lotion 11/03）：只有第 1 層會跟構台衝突，第 2 層以下一律照拉；第 1 層依淨空判斷，可手動改「拉／不拉」（gtPull1：''＝依淨空、'pull'、'no'）
+//   回傳 null＝沒填第 1 層支撐中心高程也沒手動指定 → 照舊扣第一層
+function _meGtClear(inp,layers,lys){
+  var l=(lys||[])[0]||{},man=inp.gtPull1==='pull'||inp.gtPull1==='no';
+  var c=FJC.route.clearance({supEl:l.el,capEl:inp.capEl,groundEl:inp.groundEl,capDrop:1.0,sSpec:_shSel(l.s||'H350').spec,clear:inp.gtClear});
+  if(!c&&!man)return null;
+  var pull=man?inp.gtPull1==='pull':c.pull;
+  return {L:[c],c:c,pull:pull,man:man,deduct:pull?0:1,isDef:!!(c&&c.isDef)};
+}
+function _meRouteNotes(d,i,gc,gtOn){
+  var n=[],rt=d.rt||[];
+  if(!rt.length)n.push('支撐長度與接頭為估算（未填路數明細）');
+  else{
+    var jk=rt.filter(function(r){return r.jack>0;});if(jk.length)n.push('千斤頂需伸長：'+jk.map(function(r){return (r.id||'?')+' '+r.jack+' cm';}).join('、'));
+    var nc=rt.filter(function(r){return r.midChk==='none';});if(nc.length)n.push('接頭位置未檢查中間樁：'+nc.map(function(r){return r.id||'?';}).join('、'));
+    var bd=rt.filter(function(r){return r.warn.length;});if(bd.length)n.push('請確認：'+bd.map(function(r){return (r.id||'?')+' '+r.warn.join('；');}).join('／'));
+  }
+  if(gtOn&&gc&&i===0){var c=gc.c;
+    n.push('第 1 層構台下'+(c?'淨空 '+c.clear.toFixed(2)+' m，':'')+(gc.pull?'照拉母索':'不拉母索')+(gc.man?'（手動指定）':'')+(c&&c.isDef&&!gc.man?'（構台帽高程為預設值：原地面−1.0 M，請確認）':''));}
+  return n;
+}
 function computeShoringFY(inp){
   var v=function(k){return _shNum(inp[k]);},b=function(k){return _shBool(inp[k]);};
   var P=v('P'),A=v('A'),H=v('H'),slabT=v('slabT'),corners=v('corners'),irr=v('irr');
@@ -8804,7 +8837,9 @@ function computeShoringFY(inp){
   var _rForm=(inp.ropeForm==='rope')?'rope':'wire',_rWaste=(inp.ropeWaste==null||inp.ropeWaste==='')?5:v('ropeWaste');
   var _rRows=function(rows,cnt,len,auto,side){return auto?[{n:cnt,len:side}]:(rows||[]).map(function(r){return {n:_shNum(r.rc),len:_shNum(r.rl)};});};
   var _rDeck=(GV.cnt+GH.cnt)>0?{v:{rows:_rRows(inp._gtRoutesV)},h:{rows:_rRows(inp._gtRoutesH)}}:{v:{rows:[{n:1,len:gtDeduct}]},h:{rows:[]}};
-  var _rSt={perim:P,perimRuns:1,layers:layers,deductLayers:b('gtRopeDeduct')?1:0,unit:'m',useSpare:true,waste:_rWaste,form:_rForm,
+  // v6.0.157（Lotion 11/03）：構台下淨空——只看第 1 層：淨空＝構台帽高程−(支撐中心＋型鋼高÷2)，≥ 門檻（預設 1.5 M）照拉、不到才扣，可手動改；沒填照舊扣第 1 層
+  var _gc=_meGtClear(inp,layers,lys),_rDl=b('gtRopeDeduct')?(_gc?_gc.deduct:1):0;
+  var _rSt={perim:P,perimRuns:1,layers:layers,deductLayers:_rDl,unit:'m',useSpare:true,waste:_rWaste,form:_rForm,
     f:{},zones:[{name:'支撐路',deck:false,form:'',v:{rows:_rRows(inp._routesV,routesV,lenV,autoV,W)},h:{rows:_rRows(inp._routesH,routesH,lenH,autoH,L)}}]};
   // v6.0.154（Lotion 11/03：安全母索併入全套、獨立頁刪除）：規格（算重量）、每路配件（鋼索夾／緊索器／套環…）、其他區塊（可改用另一種形式）
   var _rFm=_LL_FORM[_rForm],_rAcc=_meRopeAcc(inp,_rForm);
@@ -8818,24 +8853,27 @@ function computeShoringFY(inp){
   });
   if(b('gtRopeDeduct')&&gtDeduct>0)_rSt.zones.push(Object.assign({name:'構台下',deck:true,form:''},_rDeck));
   var _rRes=FJC.ll.calc(_rSt,_LL_FORM),_rT=_rRes.T[_rForm];
+  var _rt=_meRouteRun(inp,layers,lys),spEst={},spRow={};
   for(var i=0;i<layers;i++){
     var ly=lys[i]||{};
     var W_=_shSel(ly.w||'H350'),S_=_shSel(ly.s||'H350');
     var wl=W_.mult,sp=S_.mult;
     var wM=P*wl,sM=(A*0.4-P)*sp;   // 支撐長＝(面積×0.4−周長)×倍數；可為負，原引擎不 clamp
+    var _rl=_rt.by[i]||[];         // v6.0.157 路數明細：有填的層，支撐 M＝Σ 各路叫料淨長×倍率（雙支撐×2）
+    if(_rl.length){sM=_rl.reduce(function(a,r){return a+r.supM;},0);spRow[S_.spec]=1;}else spEst[S_.spec]=1;
     wlBy[W_.spec]=(wlBy[W_.spec]||0)+wM;
     spBy[S_.spec]=(spBy[S_.spec]||0)+sM;
     var tri,bigTri=0;
     if(wl===1)tri=_shCeil(P/3)+posts;else{bigTri=_shCeil(P/3);tri=posts*sp;}
     var jack=totalR*sp,jackClip=jack;
     var earth=heng?zones*2:2,earthClip=earth;
-    var shortJ=totalR*(sp===1?2:4);
+    var shortJ=_rl.length?_rl.reduce(function(a,r){return a+r.shortsN;},0):totalR*(sp===1?2:4);   // 路數明細：每路實際短節（短節不算接頭）
     var diag=Math.max(0,totalR*4-irr);
     var cornerN=corners;
     var triPlate=corners*2+irr*2;
     var stiffN=(ly.st&&stiff!=='0')?(stiff==='main'?totalR*2:(stiff==='both'?totalR*6:0)):0;
     // 接頭：圍令封閉一圈，接頭數≈支數＝圍令長÷7（照舊）；支撐依路數算（每路支數−1，雙支撐×倍數）
-    var wJ=wM/7,sJ=supJ1*sp;
+    var wJ=wM/7,sJ=_rl.length?_rl.reduce(function(a,r){return a+r.jointsN;},0):supJ1*sp;   // 路數明細：接頭＝每路支數−1（雙支撐×2）
     var heban=_shCeil(wJ)*1+sJ*2;   // 合板：圍令每接頭 1 片、支撐每接頭 2 片
     var smallU=posts*(sp===1?1:2);
     var bigU=posts*(sp===1?2:4),bigUangle=bigU;
@@ -8856,7 +8894,7 @@ function computeShoringFY(inp){
     var ropeSpare=Math.max(0,_rL.spare);                     // 端部錨錠預留（每路，構台下的路也算）
     var yellow=ropeL/2.5;
     T.fengtou+=fengtou;T.rope+=ropeL;T.yellow+=yellow;
-    layerData.push({L:i+1,w:ly.w||'H350',s:ly.s||'H350',dSpec:ly.d||'H350',wM:wM,sM:sM,tri:tri,bigTri:bigTri,jack:jack,jackClip:jackClip,earth:earth,earthClip:earthClip,shortJ:shortJ,diag:diag,corner:cornerN,triPlate:triPlate,stiffN:stiffN,smallU:smallU,bigU:bigU,bigUangle:bigUangle,subBlock:subBlock,heban:heban,screw:Math.round(screw),longS:Math.round(longS),shortS:Math.round(shortS),eScrew:Math.round(eScrew),fengtou:fengtou,rope:ropeL,ropeWal:ropeWal,ropeSup:ropeSup,ropeDed:ropeDed,ropeRuns:ropeRuns,ropeSpare:ropeSpare,yellow:yellow});
+    layerData.push({L:i+1,w:ly.w||'H350',s:ly.s||'H350',dSpec:ly.d||'H350',wM:wM,sM:sM,tri:tri,bigTri:bigTri,jack:jack,jackClip:jackClip,earth:earth,earthClip:earthClip,shortJ:shortJ,diag:diag,corner:cornerN,triPlate:triPlate,stiffN:stiffN,smallU:smallU,bigU:bigU,bigUangle:bigUangle,subBlock:subBlock,heban:heban,screw:Math.round(screw),longS:Math.round(longS),shortS:Math.round(shortS),eScrew:Math.round(eScrew),fengtou:fengtou,rope:ropeL,ropeWal:ropeWal,ropeSup:ropeSup,ropeDed:ropeDed,ropeRuns:ropeRuns,ropeSpare:ropeSpare,yellow:yellow,rt:_rl});
   }
   // ── 圍令/支撐彙總（定尺料扣除）──
   var DC={'圍令':{},'支撐':{}};
@@ -8869,7 +8907,7 @@ function computeShoringFY(inp){
   });
   SH_SPECS.forEach(function(s){
     if(spBy[s]){var dc2=DC['支撐'][s]||0;var net2=Math.max(0,spBy[s]-dc2);
-      main.push({k:'支撐 '+s,v:_shR1(net2),u:'M'+(dc2>0?'（原'+_shR1(spBy[s])+'−定尺扣'+_shR1(dc2)+'）':'')});}
+      main.push({k:'支撐 '+s,v:_shR1(net2),u:'M'+(dc2>0?'（原'+_shR1(spBy[s])+'−定尺扣'+_shR1(dc2)+'）':'')+(spEst[s]?(spRow[s]?'（部分層估算）':'（估算）'):'')});}
   });
   // 配件各層合計
   var tot=function(f){return layerData.reduce(function(a,d){return a+(d[f]||0);},0);};
@@ -8879,7 +8917,13 @@ function computeShoringFY(inp){
    ['角撐','corner','支'],['三角板','triPlate','片'],['加勁盒','stiffN','只'],['小U','smallU','支'],
    ['大U','bigU','支'],['大U角鐵','bigUangle','支'],['副支撐擋片','subBlock','片'],['合板','heban','片'],
    ['長螺絲','longS','顆'],['短螺絲','shortS','顆'],['膨脹螺絲','eScrew','只'],['封頭鈑','fengtou','片']
-  ].forEach(function(t){var n=tot(t[1]);if(n>0)main.push({k:t[0],v:_shR0(n),u:t[2]});});
+  ].forEach(function(t){var n=tot(t[1]);
+    if(t[1]==='shortJ'&&_rt.n){   // v6.0.157 路數明細的層：短節全案同長度×1.1 進位；沒填的層照舊
+      n=layerData.reduce(function(a,d){return a+(d.rt.length?0:d.shortJ);},0)+_rt.sp.order;
+      if(n>0)main.push({k:'短節',v:_shR0(n),u:'只（路數明細的層含備品 10%）'});
+      if(_rt.sp.rows.length)main.push({k:'短節規格（路數明細）',v:_rt.sp.rows.map(function(x){return x.len+'M×'+x.order;}).join('、'),u:'全案同長度×1.1 無條件進位'});
+      return;}
+    if(n>0)main.push({k:t[0],v:_shR0(n),u:t[2]});});
   // 背填（每層常量 × 層數）
   var hookLabel=(inp.hookType==='rebar')?'背填鉤（業主#4鋼筋1:1）':'背填鉤';
   main.push({sec:'背填材料（'+layers+'層合計）'});
@@ -9019,7 +9063,8 @@ function computeShoringFY(inp){
     sAdd(st,'三角架','支',d.tri);sAdd(st,'大三角架','支',d.bigTri);
     sAdd(st,'千斤頂','顆',d.jack);sAdd(st,'千斤頂保護夾','組',d.jackClip);
     sAdd(st,'土壓計','顆',d.earth);sAdd(st,'土壓計保護夾','組',d.earthClip);
-    sAdd(st,'短節','只',d.shortJ);sAdd(st,'斜撐（'+d.dSpec+'）','支',d.diag);sAdd(st,'角撐','支',d.corner);
+    if(d.rt.length)_meRouteShorts(d.rt).forEach(function(x){sAdd(st,'短節 '+x.len+'M','只',x.n);});else sAdd(st,'短節','只',d.shortJ);
+    sAdd(st,'斜撐（'+d.dSpec+'）','支',d.diag);sAdd(st,'角撐','支',d.corner);
     sAdd(st,'三角板','片',d.triPlate);sAdd(st,'加勁盒','只',d.stiffN);
     sAdd(st,'小U','支',d.smallU);sAdd(st,'大U','支',d.bigU);sAdd(st,'大U角鐵','支',d.bigUangle);
     sAdd(st,'副支撐擋片','片',d.subBlock);sAdd(st,'合板','片',d.heban);
@@ -9027,6 +9072,8 @@ function computeShoringFY(inp){
     sAdd(st,'安全母索（'+T.ropeForm+'，折捲）','捲',_shCeil((d.rope+d.ropeSpare)*(1+(T.ropeWaste||0)/100)/T.ropeReel));
     _meRopeStageAcc(st,T,i2,sAdd);   // v6.0.154：每層配件＋其他區塊的另一種母索
     sAdd(st,'黃色立柱','支',d.yellow);
+    if(_rt.n&&i2===_rt.lastLy)_rt.sp.rows.forEach(function(x){sAdd(st,'短節備品 '+x.len+'M（全案×1.1）','只',x.order-x.n);});
+    st.notes=_meRouteNotes(d,i2,_gc,b('gtRopeDeduct'));
     staged.push(st);
   });
   if(gantaiA>0||railLen>0){
@@ -9044,12 +9091,12 @@ function computeShoringFY(inp){
     if(st5.items.length)staged.push(st5);
   }
   return {pile:pile,postRows:postRows,procRows:procRows,main:main,back:back,pre:pre,
-    layerData:layerData,items:items,staged:staged,T:T,
+    layerData:layerData,items:items,staged:staged,T:T,rt:_rt,gtClear:_gc,
     info:{routesV:routesV,routesH:routesH,autoV:autoV,autoH:autoH,totalR:totalR,supLen:supLen,PW:PW,keep:keep,posts:posts,kingGt:kingGt,exp:exp,layers:layers,hookLabel:hookLabel,P:P}};
 }
 // ── 材料估算 UI ──
 var MAT_EST=null;
-var _SH_STR_KEYS={ropeForm:1,ropeSpec:1,ropeAcc0:1,ropeAcc1:1,ropeAcc2:1,method:1,pileSpec:1,capType:1,gtMode:1,midSpec:1,coSpec:1,gtSpec:1,stiff:1,heng:1,dogbone:1,fengProc:1,deck:1,gtRopeDeduct:1,railScope:1,postH:1,toe:1,hookType:1,udMods:1};
+var _SH_STR_KEYS={gtPull1:1,ropeForm:1,ropeSpec:1,ropeAcc0:1,ropeAcc1:1,ropeAcc2:1,method:1,pileSpec:1,capType:1,gtMode:1,midSpec:1,coSpec:1,gtSpec:1,stiff:1,heng:1,dogbone:1,fengProc:1,deck:1,gtRopeDeduct:1,railScope:1,postH:1,toe:1,hookType:1,udMods:1};
 function matSetView(vw){
   if(vw==='est')vw='stock';   // v5.352 材料估算已獨立成頁
   window._matView=vw;
@@ -9538,7 +9585,7 @@ function _meDoc(kind,opt,res){   // v6.0.154：叫料單／估價明細的內容
   }else{
     var _pick=_meStagePick(res,opt);
     (res.staged||[]).forEach(function(st,i){if(_pick.indexOf(i)<0)return;
-      addSecF('▸ '+st.stage,st.items.map(function(it){return {k:it.name,v:_shR0(it.quantity),u:it.unit};}));});
+      addSecF('▸ '+st.stage,st.items.map(function(it){return {k:it.name,v:_shR0(it.quantity),u:it.unit};}).concat((st.notes||[]).map(function(t){return {sec:'※ '+t};})));});   // v6.0.157 路數明細／構台下淨空的提醒
   }
   var cell=function(c){
     if(!c)return '<td class="e"></td><td class="e"></td><td class="e"></td>';
@@ -9622,6 +9669,7 @@ function _matEstNorm(src){
   arr('_layers',{w:'H350',s:'H350',st:false});
   arr('_ropeZones',{nm:'',fm:'rope',vn:0,vl:0,hn:0,hl:0});arr('_routesV',{rc:1,rl:0});arr('_routesH',{rc:1,rl:0});arr('_gtRoutesV',{rc:1,rl:0});arr('_gtRoutesH',{rc:1,rl:0});
   arr('_ud',{ul:0,uh:0});arr('_dc',{dcc:'圍令',dcs:'H300',dcv:0});
+  arr('_routeRows',{ly:1,id:'',dir:'縱',wall:'',dbl:'',combo:'',mids:'',cross:'',note:''});   // v6.0.157 路數明細
   var ly=Math.max(1,parseInt(m.layers)||5);while(m._layers.length<ly)m._layers.push({w:'H350',s:'H350',st:false});
   return m;
 }
@@ -9706,6 +9754,7 @@ function _renderMatEstInner(el){
   if(!_sq)h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">'
     +'<div>'+routeTbl('_routesV','縱向路數（沿長邊）')+'</div>'
     +'<div>'+routeTbl('_routesH','橫向路數（沿短邊）')+'</div></div>';
+  h+=_meRouteHtml(m,sec,fN,adv);   // v6.0.157 路數明細（定尺組合）
   // v5.397：安全母索併入材料估算（範圍＝各層圍令周圍＋縱橫支撐路；第一層扣構台下方）
   h+=sec('④-1 安全母索','範圍＝每層周圍一路＋縱橫支撐路；第一層扣構台下方；每層叫料自動列母索捲數與配件');
   var _rfm=_LL_FORM[m.ropeForm==='rope'?'rope':'wire'];
@@ -9714,7 +9763,8 @@ function _renderMatEstInner(el){
     +fS('gtRopeDeduct','扣構台下母索',[['0','否'],['1','是']],';renderMatEst()')+'</div>'
     +(_shBool(m.gtRopeDeduct)?('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:6px">'
       +'<div>'+routeTbl('_gtRoutesV','構台下縱向路數')+'</div><div>'+routeTbl('_gtRoutesH','構台下橫向路數')+'</div></div>'
-      +'<div style="font-size:10.5px;color:var(--b3);margin-top:2px">構台下方不設母索：第一層母索扣除 Σ(路數×每路長)'+(_shNum(m.gtDeduct)>0?'（舊資料總長 '+_shNum(m.gtDeduct)+' M 於未填路數時沿用）':'')+'</div>'):'')
+      +'<div style="font-size:10.5px;color:var(--b3);margin-top:2px">構台下方不設母索：第一層母索扣除 Σ(路數×每路長)'+(_shNum(m.gtDeduct)>0?'（舊資料總長 '+_shNum(m.gtDeduct)+' M 於未填路數時沿用）':'')+'；填了各層支撐中心高程就改依淨空判斷</div>'
+      +_meGtClearHtml(m,fN,fS)):'')
     +(function(){if(!_rfm.specs.some(function(x){return x[0]===m.ropeSpec;}))m.ropeSpec=_rfm.def.spec;return '';})()
     +adv('<div class="me-grid">'+fS('ropeSpec','規格（算重量）',_rfm.specs.map(function(x){return [x[0],x[0]+'（'+x[1]+' kg/M）'];}))
       +_rfm.accs.map(function(nm,ai){return fN('ropeAcc'+ai,esc(nm),'空白＝'+_rfm.def.acc[ai]);}).join('')+'</div>'
@@ -9855,7 +9905,7 @@ function _meAutoBind(){
 function _meTiles(res){
   var ld=res.layerData||[],T=res.T||{},wl=0,sp=0,jk=0;ld.forEach(function(d){wl+=d.wM||0;sp+=d.sM||0;jk+=d.jack||0;});
   var p0=(res.pile||[]).find(function(r){return r&&!r.sec;});
-  return [['擋土壁',p0?(_shR0(p0.v)+' '+(p0.u||'')):'—',p0?String(p0.k||''):''],['圍令',fmt(Math.round(wl))+' M',''],['支撐',fmt(Math.round(sp))+' M',''],   // v6.0.139 Lotion：圍令與支撐是不同料（孔位不同），分開列
+  return [['擋土壁',p0?(_shR0(p0.v)+' '+(p0.u||'')):'—',p0?String(p0.k||''):''],['圍令',fmt(Math.round(wl))+' M',''],['支撐',fmt(Math.round(sp))+' M',res.rt&&res.rt.n?('路數明細'+(res.rt.by.some(function(b){return !b.length;})?'＋估算':'')):'估算'],   // v6.0.139 Lotion：圍令與支撐是不同料（孔位不同），分開列
     
     ['中柱',(res.info&&res.info.posts||0)+' 支',''],['千斤頂',_shR0(jk)+' 顆',''],['安全母索',(T.ropeReels||0)+' 捲',_shR1(T.ropeNeed||0)+' M（'+(T.ropeForm||'')+'）']];
 }
@@ -36326,7 +36376,7 @@ function _sdToMatEst(sd,m){
   m.capType=!sd.wall.cap?'無':(/RC/i.test(sd.wall.capType||'')?'RC壓樑':'H型鋼壓樑(H300)');
   [['Mid','mid'],['Co','co'],['Gt','gt']].forEach(function(x){var p=sd[x[1]];m['king'+x[0]]=n(p.n);var s=_sdSpCore(p.spec);if(SH_SPECS.indexOf(s)>=0)m[x[1]+'Spec']=s;if(n(p.len)>0)m[x[1]+'Len']=n(p.len);});
   var ly=parseInt(sd.layers)||0;
-  if(ly>0){var old=m._layers||[];m.layers=ly;m._layers=sd.L.map(function(l,i){return {w:_sdSpLy(l.w),s:_sdSpLy(l.s),d:(l.d&&l.d!=='無')?_sdSpLy(l.d):_sdSpLy(l.s),st:!!(old[i]&&old[i].st)};});}
+  if(ly>0){var old=m._layers||[];m.layers=ly;m._layers=sd.L.map(function(l,i){return {w:_sdSpLy(l.w),s:_sdSpLy(l.s),d:(l.d&&l.d!=='無')?_sdSpLy(l.d):_sdSpLy(l.s),st:!!(old[i]&&old[i].st),el:(old[i]&&old[i].el!=null)?old[i].el:''};});}
   var L0=(sd.L||[]).find(function(l){return n(l.vc)>0||n(l.hc)>0;});
   m._routesV=(L0&&n(L0.vc)>0)?[{rc:n(L0.vc),rl:n(L0.vl)}]:[];
   m._routesH=(L0&&n(L0.hc)>0)?[{rc:n(L0.hc),rl:n(L0.hl)}]:[];
@@ -40016,6 +40066,86 @@ async function fyInboxMark(id,f){
   if(!_hqOk()&&!_lbxOk())return '沒改：這個帳號不能改收件匣';
   f=f||{};var r=await _lbxMarkCall(id,f.status==='new'?'new':'filed',{qid:f.qid||'',caseName:f.caseName||'',note:f.note||''});
   return r.ok?(r.status==='filed'?'已歸檔':'已改回未歸檔'):('沒改：'+r.msg);
+}
+// ── v6.0.157 路數明細 UI（材料估算 › ④ 支撐系統）：每列一路、CSV 匯入、系統建議定尺組合（可手改）──
+var _ME_RT_HEAD=['層','路編號','方向','壁間長度','單雙','定尺組合','備註','中間樁位置 M（逗號分隔）','交叉點位置 M（上層支撐才填）'];
+function _meRouteHtml(m,sec,fN,adv){
+  var rows=Array.isArray(m._routeRows)?m._routeRows:(m._routeRows=[]),L=Math.max(1,parseInt(m.layers)||1),lys=m._layers||[];
+  var h=sec('④-2 路數明細（定尺組合）','每列一路；有填的層，支撐 M、接頭、合板、螺絲、短節改依各路實際計算，沒填的層照舊「估算」');
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px">'
+    +'<label class="btn btn-xs" style="font-size:12px;cursor:pointer">匯入 CSV<input type="file" accept=".csv,text/csv,text/plain" style="display:none" onchange="meRtCsv(this)"></label>'
+    +'<button type="button" class="btn btn-xs" style="font-size:12px" onclick="meRtTpl()">下載 CSV 範本</button>'
+    +'<button type="button" class="btn btn-xs" style="font-size:12px" onclick="meRtAdd()">＋ 加一路</button>'
+    +(rows.length?'<button type="button" class="btn btn-xs" style="font-size:12px;color:var(--red)" onclick="meRtClear()">清空路數明細</button>':'')
+    +(m._routeSrc?'<span style="font-size:11px;color:var(--b3)">來源：'+esc(m._routeSrc.file||'')+(m._routeSrc.at?'（'+esc(m._routeSrc.at)+' 匯入）':'')+'</span>':'')+'</div>';
+  h+=adv('<div class="me-grid">'+fN('rtJack','千斤頂本體 (M)','空白＝0.7')+fN('rtMax1','第 1 層單支最長 (M)','空白＝13')+fN('rtMax2','第 2 層起單支最長 (M)','空白＝10')+fN('rtGap','接頭離中間樁最小距離 (M)','空白＝0.5')+'</div>'
+    +'<div style="font-size:10.5px;color:var(--b3)">淨長＝壁間 − 兩端圍令型鋼高 − 千斤頂本體；定尺 1～13 M 每 0.5（沒有 11、11.5）；零頭 ≤15 cm 由千斤頂伸長，其餘用短節（短節不算接頭）。中間樁、交叉點位置從該路起點壁面量起；接頭離中間樁與交叉點中心至少這個距離；每支凸出最後支承點不超過該支一半。</div>','千斤頂、單支最長、接頭離中間樁距離');
+  if(!rows.length)return h+'<div style="font-size:12px;color:var(--b3)">尚未填路數明細：支撐長度與接頭以「面積×0.4−周長」與「每路長÷7」估算。</div>';
+  var cnt=[];for(var i=0;i<L;i++)cnt.push(0);
+  var sel='font-size:13px;height:32px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit';
+  var inp=function(i,f,v,w,num){return '<input'+(num?' type="number" inputmode="decimal" step="any"':'')+' value="'+esc(v==null?'':String(v))+'" onchange="meRtU('+i+',\''+f+'\',this.value)" style="width:100%;min-width:'+w+'px;font-size:13px;height:32px'+(num?';text-align:right':'')+'">';};
+  h+='<div class="tbl-wrap"><table class="tbl" style="min-width:900px"><thead><tr><th>層</th><th>路編號</th><th>方向</th><th>壁間長度 M</th><th>單雙</th><th>中間樁位置 M</th><th>交叉點位置 M（上層才填）</th><th>定尺組合（空白＝建議）</th><th>結果</th><th>備註</th><th></th></tr></thead><tbody>';
+  rows.forEach(function(r,i){
+    var li=Math.round(_shNum(r.ly))-1,ok=li>=0&&li<L&&_shNum(r.wall)>0,x=null;
+    if(ok){cnt[li]++;try{x=FJC.route.row(r,_meRouteOpt(m,lys[li]||{}));}catch(e){_err('_meRouteHtml',e);}}
+    var res='';
+    if(!ok)res='<span style="color:var(--red)">層或壁間長度不對（不計）</span>';
+    else if(x){
+      res='淨長 '+x.net.toFixed(2)+(x.manual?'':'｜建議 '+esc(x.pieces.join('+')))+(x.mult>1?'｜雙支撐×2':'')
+        +'｜接頭 '+x.joints+(x.shorts.length?'｜短節 '+x.shorts.join('+'):'')+(x.jack>0?'｜千斤頂伸長 '+x.jack+' cm':'')
+        +(x.midChk==='ok'?'｜<span style="color:var(--g3)">接頭與懸臂檢查合格</span>':(x.midChk==='none'?'｜<span style="color:#b26a00">接頭位置未檢查中間樁</span>':''))
+        +(x.warn.length?'<br><span style="color:var(--red)">'+esc(x.warn.join('；'))+'</span>':'');
+    }
+    var lyo='';for(var k=1;k<=L;k++)lyo+='<option value="'+k+'"'+(Math.round(_shNum(r.ly))===k?' selected':'')+'>第'+k+'層</option>';
+    if(!(Math.round(_shNum(r.ly))>=1&&Math.round(_shNum(r.ly))<=L))lyo='<option value="" selected>？</option>'+lyo;
+    h+='<tr><td><select onchange="meRtU('+i+',\'ly\',this.value)" style="'+sel+'">'+lyo+'</select></td>'
+      +'<td>'+inp(i,'id',r.id,60)+'</td>'
+      +'<td><select onchange="meRtU('+i+',\'dir\',this.value)" style="'+sel+'"><option value="縱"'+(r.dir!=='橫'?' selected':'')+'>縱</option><option value="橫"'+(r.dir==='橫'?' selected':'')+'>橫</option></select></td>'
+      +'<td>'+inp(i,'wall',r.wall||'',80,1)+'</td>'
+      +'<td><select onchange="meRtU('+i+',\'dbl\',this.value)" style="'+sel+'"><option value=""'+(!r.dbl?' selected':'')+'>依該層</option><option value="單"'+(r.dbl==='單'?' selected':'')+'>單</option><option value="雙"'+(r.dbl==='雙'?' selected':'')+'>雙</option></select></td>'
+      +'<td>'+inp(i,'mids',r.mids,110)+'</td>'+'<td>'+inp(i,'cross',r.cross,100)+'</td>'
+      +'<td><input value="'+esc(r.combo||'')+'" placeholder="'+esc(x&&!x.manual?x.pieces.join('+'):'')+'" onchange="meRtU('+i+',\'combo\',this.value)" style="width:100%;min-width:120px;font-size:13px;height:32px"></td>'
+      +'<td style="font-size:11.5px;line-height:1.5;min-width:220px">'+res+'</td>'
+      +'<td>'+inp(i,'note',r.note,80)+'</td>'
+      +'<td style="text-align:center"><button type="button" class="btn btn-xs" onclick="meRtDel('+i+')" style="color:var(--red);padding:4px 8px">✕</button></td></tr>';
+  });
+  h+='</tbody></table></div>';
+  var tr=0;['_routesV','_routesH'].forEach(function(k){(m[k]||[]).forEach(function(r){tr+=_shNum(r.rc);});});
+  var diff=cnt.map(function(n,i){return n&&tr&&n!==tr?('第'+(i+1)+'層 '+n+' 路'):'';}).filter(Boolean);
+  if(diff.length)h+='<div style="font-size:11.5px;color:#b26a00;margin-top:4px">路數明細與上面路數表（'+tr+' 路）不同：'+esc(diff.join('、'))+'；千斤頂、封頭鈑等配件仍依路數表計算。</div>';
+  return h;
+}
+function meRtU(i,f,val){var r=(MAT_EST._routeRows||[])[i];if(!r)return;r[f]=(f==='wall'||f==='ly')?(val===''?'':(parseFloat(val)||0)):String(val==null?'':val).trim();renderMatEst();_meAutoKick(true);}
+function meRtAdd(){if(!Array.isArray(MAT_EST._routeRows))MAT_EST._routeRows=[];var a=MAT_EST._routeRows,last=a[a.length-1]||{};a.push({ly:last.ly||1,id:'',dir:last.dir||'縱',wall:'',dbl:'',combo:'',mids:'',cross:'',note:''});renderMatEst();}
+function meRtDel(i){(MAT_EST._routeRows||[]).splice(i,1);renderMatEst();_meAutoKick(true);}
+function meRtClear(){showConfirm('清空路數明細','清空後支撐長度與接頭回到估算。',function(){MAT_EST._routeRows=[];MAT_EST._routeSrc=null;renderMatEst();_meAutoKick(true);},true);}
+function meRtTpl(){downloadCSV('路數明細_範本',_ME_RT_HEAD,[[1,'V1','縱',24.6,'單','','範例','6.2,12.9,18.6',''],[1,'H1','橫',30.8,'雙','','','7.5,15,22.5','6.2,12.4']]);}
+function meRtCsv(el){
+  var f=el&&el.files&&el.files[0];if(!f)return;var rd=new FileReader();
+  rd.onload=function(){
+    try{
+      var r=FJC.route.csv(String(rd.result||''));el.value='';
+      if(!r.rows.length){toast('CSV 沒有可用的列'+(r.errs.length?'：'+r.errs[0]:''));return;}
+      var go=function(){MAT_EST._routeRows=r.rows;MAT_EST._routeSrc={file:f.name,at:localToday()};
+        var L=Math.max(1,parseInt(MAT_EST.layers)||1),over=r.rows.filter(function(x){return x.ly>L;}).length;
+        renderMatEst();_meAutoKick(true);toast('已匯入 '+r.rows.length+' 路'+(r.errs.length?'，'+r.errs.length+' 列略過（'+r.errs[0]+'）':'')+(over?'；'+over+' 路超過支撐層數不計':''));};
+      if((MAT_EST._routeRows||[]).length)showConfirm('匯入路數明細','匯入會取代目前 '+MAT_EST._routeRows.length+' 路的路數明細，確定？',go,true);else go();
+    }catch(e){_err('meRtCsv',e);toast('CSV 讀取失敗');}
+  };
+  rd.readAsText(f);
+}
+// 構台下淨空（④-1 安全母索，勾「扣構台下母索」時顯示）
+function _meGtClearHtml(m,fN,fS){
+  var l=(m._layers||[])[0]||{},gc=null;try{gc=_meGtClear(m,Math.max(1,parseInt(m.layers)||1),m._layers||[]);}catch(e){_err('_meGtClearHtml',e);}
+  var h='<div style="font-size:12px;font-weight:700;margin:10px 0 4px">第 1 層構台下淨空 <span style="font-weight:400;font-size:10.5px;color:var(--b3)">只有第 1 層會跟構台衝突（第 2 層以下一律照拉）；淨空＝構台帽高程 −（支撐中心＋型鋼高÷2），≥ 門檻照拉（鋼索夾每路 6），不到不拉</span></div>';
+  h+='<div class="me-grid">'+fN('groundEl','原地面高程 (M)','空白＝0')+fN('capEl','構台帽高程 (M)','填帽頂即可；空白＝原地面−1.0')
+    +'<div class="f"><label style="font-size:11px">第 1 層支撐中心高程 (M)</label><input type="number" inputmode="decimal" step="any" value="'+esc(l.el==null?'':String(l.el))+'" onchange="matEstLy(0,\'el\',this.value);renderMatEst()" style="font-size:14px;text-align:right;padding:7px 8px"></div>'
+    +fN('gtClear','淨空門檻 (M)','空白＝1.5')
+    +fS('gtPull1','第 1 層構台下',[['','依淨空判斷'],['pull','手動：照拉'],['no','手動：不拉']],';renderMatEst()')+'</div>';
+  if(gc)h+='<div style="font-size:12px;margin-top:4px">'+(gc.c?'淨空 '+gc.c.clear.toFixed(2)+' m（構台帽 '+gc.c.bottom.toFixed(2)+'），':'')+(gc.pull?'<span style="color:var(--g3)">照拉母索</span>':'<b style="color:#b26a00">不拉母索</b>')+(gc.man?'（手動指定）':'')+'</div>';
+  if(gc&&gc.isDef&&!gc.man)h+='<div style="font-size:11.5px;color:#b26a00;margin-top:2px">構台帽高程未填：用預設值（原地面−1.0 M＝'+(_shNum(m.groundEl)-1).toFixed(2)+'），請確認。</div>';
+  if(!gc)h+='<div style="font-size:11px;color:var(--b3);margin-top:4px">沒填第 1 層支撐中心高程：照舊第一層扣構台下母索。</div>';
+  return h;
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
