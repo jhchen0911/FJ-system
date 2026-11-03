@@ -851,6 +851,10 @@ async function newPage(browser, width, height) {
           && _matEstRes.T.ropeT.rope.acc[0] === _matEstRes.T.ropeT.rope.runs * 6;
         // 切換形式：規格與配件回預設
         matEstRopeForm(); out.formReset = MAT_EST.ropeSpec === '' && MAT_EST.ropeAcc0 === '';
+        // 審查：規格下拉顯示實際用的規格（空白＝形式預設）；全不選時提示顯示在預覽裡；刪除其他區塊後自動重算
+        out.specShown = MAT_EST.ropeSpec === 'Ø16mm';
+        MAT_EST.ropeForm = 'wire'; matEstRopeForm(); matEstCalc(); mePvSet('view', 'stage'); mePvSet('all', 0);
+        const sr = document.getElementById('me-pv').shadowRoot; out.noStage = !!sr && /請至少勾一個階段/.test(sr.textContent); mePvSet('all', 1);
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       try { localStorage.removeItem('fy_lifeline'); } catch (e) { /* 可忽略 */ }
       return out;
@@ -858,7 +862,7 @@ async function newPage(browser, width, height) {
     check('v6.0.142 安全母索併入全套：舊入口轉到全套、分頁與獨立頁移除', r.redirect, JSON.stringify(r));
     check('v6.0.142 安全母索：長度不變（2,044.9 M、11 捲）＋規格重量、每層配件（構台下沒拉的路不算）、配件數可改', r.len && r.acc && r.accEdit, JSON.stringify(r));
     check('v6.0.142 安全母索：其他區塊可改用特多龍繩（長度、捲數、配件另列，鋼索不變）', r.mix, JSON.stringify(r));
-    check('v6.0.142 安全母索：帶入舊安全母索頁設定、切換形式回預設', r.importBtn && r.import && r.formReset, JSON.stringify(r));
+    check('v6.0.142 安全母索：帶入舊安全母索頁設定、切換形式回預設', r.importBtn && r.import && r.formReset && r.specShown && r.noStage, JSON.stringify(r));
     check('v6.0.142 安全母索測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
