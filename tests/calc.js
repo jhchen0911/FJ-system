@@ -215,6 +215,7 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('構台下淨空：帽梁沒填＝原地面−1.0（預設值）；淨空＝帽梁底−(支撐中心＋型鋼高÷2)；≥1.5 才拉；高程填梁頂時扣梁高', c1.isDef && c1.clear === 1.83 && c1.pull && !c2.isDef && c2.clear === 0.52 && !c2.pull && c3.clear === 1.93 && RT.clearance({ groundEl: 0 }) === null);
   const c4 = RT.clearance({ triEl: -3, groundEl: 0, sSpec: 'H350' });
   check('構台下淨空用三角架高程（下支撐下緣，Lotion 11/03）：支撐頂＝三角架＋型鋼高 → −1−(−3＋0.35)＝1.65', c4.clear === 1.65 && c4.pull && c4.isDef);
+  check('斜撐／角撐固定長度：空間 ≥ 2.4 裝、2.1～2.4 待確認、< 2.1 不裝、沒資料不判斷；長度是參數', RT.brace(2.4).fit === 'yes' && RT.brace(2.39).fit === 'check' && RT.brace(2.1).fit === 'check' && RT.brace(2.09).fit === 'no' && RT.brace('').fit === 'none' && RT.brace(2.3, { max: 2.4 }).fit === 'yes');
   const rv = RT.review([{ idx: 0, qty: 109, meas: 100, amt: 50 }, { idx: 1, qty: 106, meas: 100, amt: 900 }, { idx: 2, qty: 120, meas: 100, amt: 50 }, { idx: 3, qty: 5, meas: '' }], 1000);
   check('圖面覆核：一般工項 10%、占總價一成以上 5%；沒量測不比', rv.rows.length === 3 && !rv.rows[0].bad && rv.rows[1].bad && rv.rows[1].big && rv.rows[2].bad && rv.nBad === 2);
 }

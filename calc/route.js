@@ -11,6 +11,7 @@
  *   spares(results)                   全案短節：同長度合計 ×1.1 無條件進位
  *   csv(text)                         CSV 匯入：層,路編號,方向,壁間長度,單雙,定尺組合,備註,中間樁位置 M,交叉點位置 M（逗號分隔，上層支撐才填）
  *   clearance(o)                      構台下淨空＝帽梁底 −（三角架高程＋型鋼高）；帽梁高程沒填用 原地面−1.0（預設值，請確認）
+ *   brace(space, o)                   斜撐／角撐裝不裝：空間 ≥ 最長 2.5−0.10 裝、2.1～2.4 待確認、更小不裝
  *   review(items, threshold)          報價數量 vs 圖面量測的差異（一般 10%、占總價一成以上 5%；只標示、不擋送出）
  *
  * 口徑（Lotion 11/03）：
@@ -27,7 +28,7 @@
   var STOCK = (function () { var a = []; for (var x = 100; x <= 1300; x += 50) if (x !== 1100 && x !== 1150) a.push(x); return a; })();   // 1～13 M 每 0.5，沒有 11、11.5
   var SHORTS = [10, 12, 15, 20, 30, 40, 50, 60];
   var SPEC_H = { H300: 0.30, H350: 0.35, H400: 0.40, H414: 0.414, H428: 0.428 };
-  var DEF = { jack: 0.7, max1: 13, max2: 10, minGap: 0.5, jackTol: 0.15, clear: 1.5, capDrop: 1.0 };
+  var DEF = { braceMin: 2.2, braceMax: 2.5, jack: 0.7, max1: 13, max2: 10, minGap: 0.5, jackTol: 0.15, clear: 1.5, capDrop: 1.0 };
 
   function specH(s) { s = String(s || '').replace(/^2/, ''); return SPEC_H[s] != null ? SPEC_H[s] : 0.35; }
   function net(wall, wSpec, jack) { return r2(num(wall) - 2 * specH(wSpec) - (jack == null || jack === '' ? DEF.jack : num(jack))); }
@@ -217,6 +218,19 @@
     return { clear: cl, pull: cl >= th - 1e-9, isDef: def, bottom: r2(bottom), th: th };
   }
 
+  // 斜撐／角撐（固定長度的料，角撐＝斜撐同長；Lotion 11/03）：可用空間 ≥ 最長 − 0.10 M 才裝（最多凸出 10 cm）；
+  //   介於「最短 − 0.10」與「最長 − 0.10」之間標待確認；更小不裝。o：{ min 最短（2.2）, max 最長（2.5，預設用它做空間檢查）, over 可凸出（0.10）}
+  //   可用空間要等量測檔（HQ JSON，11/05 定格式）才有，畫面先不接
+  function brace(space, o) {
+    o = o || {};
+    var mn = o.min == null || o.min === '' ? DEF.braceMin : num(o.min), mx = o.max == null || o.max === '' ? DEF.braceMax : num(o.max), ov = o.over == null || o.over === '' ? 0.1 : num(o.over);
+    if (space == null || space === '' || !isFinite(parseFloat(space))) return { fit: 'none' };
+    var S = c(num(space));
+    if (S >= c(mx - ov)) return { fit: 'yes' };
+    if (S >= c(mn - ov)) return { fit: 'check', note: '空間 ' + r2(S / 100) + ' M，介於 ' + r2(mn - ov) + '～' + r2(mx - ov) + ' M，待確認' };
+    return { fit: 'no', note: '空間 ' + r2(S / 100) + ' M 不到 ' + r2(mn - ov) + ' M，不裝' };
+  }
+
   // 圖面覆核：items [{ idx, desc, unit, qty 報價數量, meas 圖面量測, amt 該項金額 }]；total 總價（未稅）
   function review(items, total) {
     var T = num(total) || (items || []).reduce(function (a, b) { return a + num(b.amt); }, 0), out = [];
@@ -231,7 +245,7 @@
   // 排法檢查（給手改組合與對照表用）：pieces[M]、o：{ x0, mids[], cross[], wall 終點壁面, minGap } → 違反原因[]（空＝合格）
   function check(pieces, o) { o = o || {}; return layCheck((pieces || []).map(c), c(num(o.x0)), (o.mids || []).map(num).filter(function (x) { return x > 0; }).map(c), (o.cross || []).map(num).filter(function (x) { return x > 0; }).map(c), c(o.minGap == null ? DEF.minGap : num(o.minGap)), num(o.wall) > 0 ? c(num(o.wall)) : null); }
 
-  var api = { check: check, STOCK: STOCK.map(function (x) { return x / 100; }), SHORTS: SHORTS.map(function (x) { return x / 100; }), DEF: DEF, specH: specH, net: net, fill: fill, combo: combo, parse: parse, mids: mids, row: row, spares: spares, csv: csv, clearance: clearance, review: review };
+  var api = { brace: brace, check: check, STOCK: STOCK.map(function (x) { return x / 100; }), SHORTS: SHORTS.map(function (x) { return x / 100; }), DEF: DEF, specH: specH, net: net, fill: fill, combo: combo, parse: parse, mids: mids, row: row, spares: spares, csv: csv, clearance: clearance, review: review };
   root.FJC = root.FJC || {};
   root.FJC.route = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = root.FJC;
