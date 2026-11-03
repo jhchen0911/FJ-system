@@ -9379,6 +9379,89 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.140 勞報單（9A／50／92 代扣、二代健保、同意才開單、個資分開存）＋案件介紹費協議書 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const wait = ms => new Promise(res => setTimeout(res, ms));
+      const oR = _isReaderUser, oT = window.toast, oPrint = window._printViaIframe;
+      try {
+        window.toast = () => {};
+        const R = _lrsRates(115).R;
+        const c1 = _lrsCalc(20000, '9A', false, R), c2 = _lrsCalc(30000, '9A', false, R), c3 = _lrsCalc(30000, '9A', true, R);
+        const c4 = _lrsCalc(90500, '50', false, R), c5 = _lrsCalc(90501, '50', false, R), c6 = _lrsCalc(29499, '50', false, R), c7 = _lrsCalc(50000, '92', false, R);
+        out.calc = c1.tax === 0 && c1.nhi === 422 && c1.net === 19578 && c2.tax === 3000 && c2.nhi === 633 && c2.net === 26367 && c3.nhi === 0 && c3.net === 27000
+          && c4.tax === 0 && c4.nhi === 1910 && c5.tax === 4525 && c6.nhi === 0 && c7.tax === 0 && c7.nhi === 0 && c7.net === 50000;
+        const P0 = P.lrsRates; P.lrsRates = { '116': { '9A': { taxTh: 20000, taxOver: 1, tax: 10, nhiTh: 20000, nhi: 2.2 } } };
+        out.rates = _lrsRates(116).exact && _lrsRates(116).R['9A'].nhi === 2.2 && _lrsRates(117).y === 116 && !_lrsRates(117).exact && _lrsRates(115).y === 115;
+        P.lrsRates = P0;
+        // 應付卡：只有抽成／佣金／介紹費／點工有勞報單按鈕；唯讀帳號看不到
+        Q.push({ id: 'qL140', name: '範例介紹案', client: '範例營造', date: '2026-10-01', awarded: true, items: [], comms: [{ id: 'c1', name: '範例介紹人', mode: 'rev', val: 3, payOn: 'contract' }] });
+        const pc = { id: 'comm_qL140_c1', to: '範例介紹人', amount: 30000, vat: false, status: 'unpaid', date: '2026-11-10', quoteId: 'qL140', project: '範例介紹案' };
+        const pm = { id: 'payX140', to: '範例材料行', amount: 5000, vat: true, status: 'unpaid', date: '2026-11-10', category: 'material' };
+        PAYABLES.push(pc, pm);
+        out.btn = /openLrs\('comm_qL140_c1'\)/.test(_lrsPayBtn(pc)) && _lrsPayBtn(pm) === '' && /openLrs/.test(_lrsPayBtn({ id: 'pay_sales_q9', to: 'x' })) && /openLrs/.test(_lrsPayBtn({ id: 'payabc_intro', to: 'x' })) && /openLrs/.test(_lrsPayBtn({ id: 'payL', category: 'labor', to: 'x' }));
+        _isReaderUser = true; out.ro = _lrsPayBtn(pc) === ''; _isReaderUser = oR;
+        // 沒勾同意：記「無勞報單」，實付＝給付
+        openLrs('comm_qL140_c1'); await wait(80);
+        out.defNo = document.getElementById('lrs-agree').checked === false && gv('lrs-cat') === '9A' && gv('lrs-gross') === '30000';
+        document.getElementById('gen-confirm-ok').click(); await wait(250);
+        let sl = LRS.slips[_lrsSlipId('comm_qL140_c1')];
+        out.none = !!sl && sl.agree === false && sl.net === 30000 && sl.tax === 0 && /無勞報單/.test(_lrsPayBtn(pc));
+        try { document.getElementById('gen-confirm-cancel').click(); } catch (e) { /* 可忽略 */ }
+        // 勾同意＋填個資：代扣與實付、個資不進本機快取
+        openLrs('comm_qL140_c1'); await wait(80);
+        document.getElementById('lrs-agree').checked = true; document.getElementById('lrs-idno').value = 'a123456789'; document.getElementById('lrs-addr').value = '範例市範例路 9 號';
+        document.getElementById('lrs-acct').value = '0001-2345'; _lrsPrev();
+        out.prev = /實付 NT\$ 26,367/.test(document.getElementById('lrs-prev').innerHTML);
+        document.getElementById('gen-confirm-ok').click(); await wait(250);
+        sl = LRS.slips[_lrsSlipId('comm_qL140_c1')];
+        out.saved = sl.agree && sl.tax === 3000 && sl.nhi === 633 && sl.net === 26367 && sl.cat === '9A' && /勞報 9A・實付 26,367/.test(_lrsPayBtn(pc));
+        const ls = localStorage.getItem('fy_lrs') || '';
+        out.priv = ls.indexOf('A123456789') < 0 && ls.indexOf('範例路 9 號') < 0 && ls.indexOf('0001-2345') < 0 && (LRS_SENS[sl.payeeId] || {}).idNo === 'A123456789';
+        try { document.getElementById('gen-confirm-cancel').click(); } catch (e) { /* 可忽略 */ }
+        // 身分證格式不對擋下
+        openLrs('comm_qL140_c1'); await wait(80); document.getElementById('lrs-idno').value = '12345'; document.getElementById('gen-confirm-ok').click(); await wait(80);
+        out.badId = document.getElementById('gen-confirm-modal').style.display !== 'none'; document.getElementById('gen-confirm-cancel').click();
+        // A4 勞報單：給付單位、所得人個資、代扣、印章
+        const P1 = P.seal; P.seal = 'data:image/png;base64,iVBORw0KGgo=';
+        const h = _lrsSlipHtml(sl, LRS_SENS[sl.payeeId]);
+        out.slip = /勞務報酬單/.test(h) && /A123456789/.test(h) && /9A 執行業務所得/.test(h) && /新臺幣 3,000 元/.test(h) && /新臺幣 26,367 元/.test(h) && /class="stamp"/.test(h) && /@page\{size:A4 portrait;margin:10mm\}/.test(h);
+        let printed = null; window._printViaIframe = (html, fn) => { printed = { html, fn }; };
+        _lrsPrint(sl.id); await wait(50); out.print = !!printed && /勞務報酬單_範例介紹人/.test(printed.fn);
+        // 介紹費協議書：從佣金設定帶 3%、簽約後；六條；同意才產生
+        printed = null; openIntroAgr(sl.id); await wait(50);
+        out.agrForm = document.querySelector('input[name="ia-mode"][value="pct"]').checked && gv('ia-pct') === '3' && document.querySelector('input[name="ia-on"][value="contract"]').checked;
+        document.getElementById('gen-confirm-ok').click(); await wait(80);
+        out.agr = !!printed && /案件介紹費協議書/.test(printed.html) && /☑ 依甲方與業主簽訂之合約金額（未稅）<u>&nbsp;3&nbsp;<\/u>％/.test(printed.html) && /☑ 甲方與業主簽訂合約後/.test(printed.html)
+          && ['一、介紹費', '二、給付時點', '三、代扣與單據', '四、未簽約或合約解除', '五、保密', '六、其他'].every(t => printed.html.indexOf('<b>' + t.replace('、', '、')) >= 0 || printed.html.indexOf(t.split('、')[0] + '、' + t.split('、')[1]) >= 0)
+          && /A123456789/.test(printed.html) && /範例營造/.test(printed.html) && !/介紹工項/.test(printed.html);
+        LRS.slips[sl.id] = Object.assign({}, sl, { agree: false }); printed = null; openIntroAgr(sl.id); await wait(30); out.agrNo = printed === null; LRS.slips[sl.id] = sl;
+        P.seal = P1;
+        // 年度彙總：同意的依人合計、無勞報單另列
+        LRS.slips.s_x2 = { id: 's_x2', name: '範例乙', agree: false, gross: 8000, date: '2026-03-01', project: 'B' };
+        const Y = _lrsYearRows(2026);
+        out.year = Y.rows.length === 1 && Y.rows[0].gross === 30000 && Y.rows[0].tax === 3000 && Y.none.length === 1 && Y.none[0].gross === 8000;
+        openLrsYear(2026); out.yearUi = /無勞報單（對方未同意，1 筆/.test(document.getElementById('fy-modal').innerHTML); document.getElementById('fy-modal').remove();
+        delete LRS.slips.s_x2; delete LRS.slips[sl.id];
+        PAYABLES.splice(PAYABLES.indexOf(pc), 1); PAYABLES.splice(PAYABLES.indexOf(pm), 1); Q.splice(Q.findIndex(q => q.id === 'qL140'), 1);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      _isReaderUser = oR; window.toast = oT; window._printViaIframe = oPrint;
+      return out;
+    });
+    const fs140 = require('fs'), pth140 = require('path');
+    const RF140 = JSON.parse(fs140.readFileSync(pth140.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    const OPS140 = require(pth140.join(__dirname, '..', 'functions', 'ops', 'core.js'));
+    check('v6.0.140 勞報單計算：9A 超過 20,000 扣 10%、達 20,000 扣 2.11%；50 達 90,501 扣 5%、健保門檻 29,500；92 不扣；職業工會免扣健保；比率依民國年、沒有就沿用最近一年', r.calc && r.rates, JSON.stringify(r));
+    check('v6.0.140 勞報單流程：只有抽成／佣金／介紹費／點工有按鈕、唯讀帳號看不到；沒勾同意記「無勞報單」；勾了算代扣實付；身分證格式擋下；個資不進本機快取',
+      r.btn && r.ro && r.defNo && r.none && r.prev && r.saved && r.priv && r.badId, JSON.stringify(r));
+    check('v6.0.140 A4 勞報單（印章、個資、代扣）與案件介紹費協議書（佣金設定帶入、六條、同意才產生）；年度彙總分開列無勞報單；fydata/lrs 只有管理員、每日備份含 lrs',
+      r.slip && r.print && r.agrForm && r.agr && r.agrNo && r.year && r.yearUi && !!RF140.lrs && /!root\.child\('fydata\/readers'\)/.test(RF140.lrs['.read']) && /!root\.child\('fydata\/readers'\)/.test(RF140.lrs['.write']) && OPS140.BACKUP_NODES.indexOf('lrs') >= 0, JSON.stringify(r));
+    check('v6.0.140 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

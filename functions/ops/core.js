@@ -41,7 +41,7 @@ function pruneList(names, keep) {
 }
 // 要備份的 RTDB 節點（fydata 底下；backups 本身不備份）
 const BACKUP_NODES = ['shared', 'private', 'relay', 'access', 'adminEmails', 'adminUids', 'readers', 'logs', 'drafts', 'bank', 'workerSens', 'workerSensIn', 'tombReq',
-  'lineCfg', 'lineInbox', 'lineLog', 'lineDaily', 'linePush', 'lineErr', 'aiUsage'];
+  'lineCfg', 'lineInbox', 'lineLog', 'lineDaily', 'linePush', 'lineErr', 'aiUsage', 'lrs'];   // v6.0.140 勞報單
 function backupPayload(fydata, now) {
   const v = Object.assign({}, fydata || {});
   delete v.backups;   // 不備份備份

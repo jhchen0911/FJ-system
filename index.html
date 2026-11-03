@@ -1650,7 +1650,8 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
     <div id="finance-payable" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <select id="payable-group-mode" onchange="renderPayables()" style="font-size:12px;padding:6px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit"><option value="project" selected>依合約分組</option><option value="vendor">依廠商分組</option><option value="time">依時間排列</option></select>
-        <button type="button" class="btn btn-sm btn-g" onclick="newPayable()">＋ 新增付款記錄</button>
+        <span style="display:flex;gap:6px"><button type="button" class="btn btn-sm" onclick="openLrsYear()" title="勞務報酬單：每人全年給付、扣稅、扣健保（給會計師）">勞報單彙總</button>
+<button type="button" class="btn btn-sm btn-g" onclick="newPayable()">＋ 新增付款記錄</button></span>
       </div>
       <div class="card" style="margin-bottom:0"><div id="payable-list"></div></div>
     </div>
@@ -2798,14 +2799,14 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="calc/invoice.js?v=6.0.138" defer></script>
-<script src="calc/payable.js?v=6.0.138" defer></script>
-<script src="calc/report.js?v=6.0.138" defer></script>
-<script src="calc/comm.js?v=6.0.138" defer></script>
-<script src="calc/payroll.js?v=6.0.138" defer></script>
-<script src="calc/lifeline.js?v=6.0.138" defer></script>
-<script src="calc/settle.js?v=6.0.138" defer></script>
-<script src="app.js?v=6.0.138" defer></script>
+<script src="calc/invoice.js?v=6.0.140" defer></script>
+<script src="calc/payable.js?v=6.0.140" defer></script>
+<script src="calc/report.js?v=6.0.140" defer></script>
+<script src="calc/comm.js?v=6.0.140" defer></script>
+<script src="calc/payroll.js?v=6.0.140" defer></script>
+<script src="calc/lifeline.js?v=6.0.140" defer></script>
+<script src="calc/settle.js?v=6.0.140" defer></script>
+<script src="app.js?v=6.0.140" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
