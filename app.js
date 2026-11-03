@@ -4143,6 +4143,7 @@ function renderCustomers(){
 }
 
 function addCustomer(){
+  _contactFormReset('cust');   // v6.0.138
   document.getElementById('customer-edit-id').value='';
   document.getElementById('customer-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 新增客戶';
   ['cust-name','cust-taxid','cust-contact','cust-tel','cust-fax','cust-addr','cust-note','cust-paydue','cust-pay-month-delay','cust-recv-day','cust-pay-cash','cust-pay-ticket','cust-retention','cust-otype','cust-boss'].forEach(id=>{
@@ -4174,7 +4175,7 @@ function editCustomer(id){
   if(custRetEl)custRetEl.value=c.retentionPct!=null?c.retentionPct:'';
   var custOt=document.getElementById('cust-otype');if(custOt)custOt.value=c.ownerType||'';
   var custRr=document.getElementById('cust-recv-rule');if(custRr)custRr.checked=!!c.recvRuleOn;   // v6.0.110
-  _taxIdHint('cust','');   // v6.0.138
+  _contactFormReset('cust');   // v6.0.138
   document.getElementById('customer-modal').style.display='flex';
 }
 
@@ -25455,6 +25456,7 @@ function exportContractsCSV(){
 // 4. 廠商管理
 // ══════════════════════════════════════════════════════════════
 function newVendor(){
+  _contactFormReset('vend');   // v6.0.138
   document.getElementById('vendor-edit-id').value='';
   document.getElementById('vendor-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 新增廠商';
   ['v-name','v-contact','v-phone','v-taxid','v-boss','v-email','v-addr','v-items','v-note','v-pay-cash','v-pay-ticket'].forEach(id=>{
@@ -25473,7 +25475,7 @@ function editVendor(id){
   document.getElementById('v-contact').value=v.contact||'';
   document.getElementById('v-phone').value=v.phone||'';
   document.getElementById('v-taxid').value=v.taxid||'';
-  var _vbo=document.getElementById('v-boss');if(_vbo)_vbo.value=v.boss||'';_taxIdHint('vend','');   // v6.0.138
+  var _vbo=document.getElementById('v-boss');if(_vbo)_vbo.value=v.boss||'';_contactFormReset('vend');   // v6.0.138
   document.getElementById('v-email').value=v.email||'';
   document.getElementById('v-addr').value=v.addr||'';
   document.getElementById('v-items').value=v.items||'';
@@ -39614,6 +39616,8 @@ function _taxIdInput(form){
     _taxIdHint(form,'✓ 已帶入公司登記資料'+(diff.length?('　<span>查到不同的 '+esc(diff.join('；'))+'</span> <button type="button" class="btn btn-xs" data-ro-ok="1" onclick="_taxIdFill(\''+form+'\')">全部帶入</button>'):''));
   });
 }
+// 開客戶／廠商表單時：清掉上一張的查詢提示，並放掉還沒存檔的客戶·廠商草稿標記（審查：免得之後存別的資料時被當成套用了草稿）
+function _contactFormReset(form){_taxIdSeq[form]=(_taxIdSeq[form]||0)+1;if(window._taxIdHit)delete window._taxIdHit[form];_taxIdHint(form,'');var a=window._draftApplying;if(a&&(a.kind==='cust'||a.kind==='vendor'))window._draftApplying=null;}
 function _taxIdFill(form){var F=_TAXID_F[form],hit=window._taxIdHit&&window._taxIdHit[form];if(!F||!hit)return;['name','addr','boss'].forEach(function(k){var e=document.getElementById(F[k]);if(e&&hit[k])e.value=hit[k];});_taxIdHint(form,'✓ 已帶入公司登記資料');}
 
 // ── 客戶·廠商草稿：AI 唯讀帳號（信件分派「陳軒/建檔」）送草稿，Lotion 在 FJ 按確認、開表單檢查後按「儲存」才寫入 ──
@@ -39691,8 +39695,12 @@ function _rmk14Swap(base){
 }
 function _rmk14Migrate(){
   try{
-    if(!P||P.rmk14At||!window._cloudApplied1||_isReaderUser||!_shWholeOk())return;
+    if(!P||!window._cloudApplied1||_isReaderUser||!_shWholeOk())return;
     var nb=_rmk14Swap(P.rmkBase);
+    if(P.rmk14At){   // 已切換過：只有還原舊備份把舊第 14 條帶回來時再換一次（審查），舊全文與切換時間不動
+      if(nb!==null&&P.rmkBaseOld){P.rmkBase=nb;var el0=document.getElementById('prm');if(el0)el0.value=nb;persistP();try{_onSave();}catch(e){_err('_rmk14Migrate.re',e);}console.log('[備註] 參數又出現舊第 14 條（還原備份？），已再換成新文字');}
+      return;
+    }
     if(nb===null){if(!_rmk14Migrate._warned){_rmk14Migrate._warned=1;console.log('[備註] 參數裡找不到舊第 14 條（材料使用期限…），不自動更換');}return;}
     P.rmkBaseOld=String(P.rmkBase);P.rmkBase=nb;P.rmk14At=Date.now();
     var el=document.getElementById('prm');if(el)el.value=nb;   // 參數頁的文字框也換，免得之後按「儲存參數」又寫回舊文字

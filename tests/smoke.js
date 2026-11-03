@@ -9348,6 +9348,7 @@ async function newPage(browser, width, height) {
         const nV = VENDORS.length; saveVendor();
         out.applied = marked && marked.id === did && marked.st === 'applied' && VENDORS.length === nV && VENDORS.find(v => v.name === '範例廠商').boss === '範例戊';
         delete DRAFTS[did];
+        window._draftApplying = { id: 'dx', kind: 'cust', target: null }; addCustomer(); out.reset = window._draftApplying === null && document.getElementById('cust-taxid-hint').innerHTML === '';   // 套用後取消、改開新表單：不可被當成套用草稿
         // 備註第 14 條：管理員裝置遷移一次；切換前的舊報價仍印舊文字、新報價印新文字
         window._onSave = () => {}; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o' }; window._cloudApplied1 = true;
         const old14 = '14. 材料使用期限自各單一工項打設（裝設）完成之次日起算，至該工項拔除（拆除）完成日止。';
@@ -9356,6 +9357,7 @@ async function newPage(browser, width, height) {
         _rmk14Migrate();
         out.mig = !!P.rmk14At && /材料租期自各工項打設/.test(P.rmkBase) && P.rmkBaseOld.indexOf(old14) >= 0 && /材料租期/.test(document.getElementById('prm').value);
         const at1 = P.rmk14At; _rmk14Migrate(); out.once = P.rmk14At === at1;
+        const ob = P.rmkBaseOld; P.rmkBase = '13. 第十三條。\n' + old14; _rmk14Migrate(); out.reswap = /材料租期/.test(P.rmkBase) && P.rmk14At === at1 && P.rmkBaseOld === ob;   // 還原舊備份帶回舊第 14 條 → 再換一次
         out.oldQ = /材料使用期限/.test(buildRmkTextFromQ({ id: String(at1 - 86400000), rmk: {} })) && /材料使用期限/.test(buildRmkTextFromQ({ id: 'imported', rmk: {} }));
         out.newQ = /材料租期/.test(buildRmkTextFromQ({ id: String(at1 + 1000), rmk: {} }));
         const _eid0 = eid; eid = null; out.newEd = /材料租期/.test(buildRmkText()); eid = _eid0;
@@ -9371,8 +9373,8 @@ async function newPage(browser, width, height) {
     check('v6.0.138 統編查詢：檢查碼（含第 7 碼 7）、g0v 公司／商業兩種格式；空白欄帶入、已填的不蓋改「全部帶入」、同統編不重查；查不到與檢查碼不符只提醒不擋存檔；負責人欄存檔',
       r.chk && r.parse && r.fill && r.fillAll && r.saved && r.cache && r.miss && r.bad && r.vsaved, JSON.stringify(r));
     check('v6.0.138 客戶·廠商 AI 草稿：唯讀帳號送 contact 草稿（不收匯款帳號、名稱統編同→修改）；管理員套用開表單帶入、按儲存才寫入並標已套用；規則放行 contact',
-      r.dErr && r.push && r.form && r.applied && /contact\)\$/.test(RF138.drafts.$id['.validate']), JSON.stringify(r));
-    check('v6.0.138 備註第 14 條：管理員裝置遷移一次（舊全文另存）、切換前的舊報價印舊文字、新報價與新編輯印新文字；參數不是舊第 14 條不自動換；預設值已換', r.mig && r.once && r.oldQ && r.newQ && r.newEd && r.noHit && r.def, JSON.stringify(r));
+      r.dErr && r.push && r.form && r.applied && r.reset && /contact\)\$/.test(RF138.drafts.$id['.validate']), JSON.stringify(r));
+    check('v6.0.138 備註第 14 條：管理員裝置遷移一次（舊全文另存）、切換前的舊報價印舊文字、新報價與新編輯印新文字；參數不是舊第 14 條不自動換；預設值已換', r.mig && r.once && r.reswap && r.oldQ && r.newQ && r.newEd && r.noHit && r.def, JSON.stringify(r));
     check('v6.0.138 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
