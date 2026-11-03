@@ -25,6 +25,16 @@
     return { curTotal: curTotal, tax: tax, total: beforeRetention - retention - cleanGross, retention: retention, clean: clean, cleanGross: cleanGross, cleanPermil: cpm, baseTotal: curTotal, claimRatio: 1 };
   }
 
+  // 第 3c 步（v6.0.136）：同 totals，另可傳 o.cleanFixed（清潔費「第一期一次扣合約 %」算好的未稅金額，有值就用它、不看 ‰）
+  function totals2(rowAmts, o) {
+    o = o || {};
+    var t = totals(rowAmts, o), fx = Math.round(num(o.cleanFixed));
+    if (!(fx > 0)) return t;
+    var cg = Math.round(fx * (1 + num(o.taxR) / 100));
+    t.total = t.total + t.cleanGross - cg; t.clean = fx; t.cleanGross = cg; t.cleanFixed = fx;
+    return t;
+  }
+
   // 業主保留款（含稅基礎；已退還者不計）——retPct 由呼叫端依專案設定算好傳入
   function retention(inv, tR, retPct) {
     if (!inv || !inv.retention || inv.retentionReturned) return 0;
@@ -78,7 +88,7 @@
   // 收款的現金比例（其餘為票據）：空白、0、非數字＝全部現金
   function cashPct(inv) { var v = inv && inv.cashPct, n = parseFloat(v); return (v == null || v === '' || !isFinite(n) || n <= 0) ? 1 : Math.min(1, n / 100); }
 
-  var inv = { cashPct: cashPct, taxR: taxR, taxM: taxM, totals: totals, retention: retention, rcvOwner: rcvOwner, retSepCash: retSepCash, holdRetEntries: holdRetEntries,
+  var inv = { cashPct: cashPct, taxR: taxR, taxM: taxM, totals: totals, totals2: totals2, retention: retention, rcvOwner: rcvOwner, retSepCash: retSepCash, holdRetEntries: holdRetEntries,
     holdRetCash: holdRetCash, rcv: rcv, rcvIn: rcvIn, hold: hold, ar: ar, einvGross: einvGross, einvSplit: einvSplit };
   var FJC = root.FJC || (root.FJC = {});
   FJC.inv = inv;
