@@ -39474,6 +39474,17 @@ async function fyNotify(title,todo,text){
     return '沒送出：'+((j&&j.error&&j.error.message)||(r.status===404?'通知服務尚未部署':('錯誤 '+r.status)));
   }catch(e){_err('fyNotify',e);return '沒送出：'+(navigator.onLine===false?'目前沒有網路':'通知服務尚未部署或連不上');}
 }
+// v6.0.137 電腦端斷線警報：電腦端（Lotion-HQ）排程每 30～60 分鐘在 FJ 分頁執行 fyBeat() 報到（只記時間）；雲端 hqBeatCheck 台灣 08～22 點每小時檢查，超過 2 小時沒報到 LINE 通知 Lotion 一次
+async function fyBeat(){
+  if(!_aiNotifyOk())return '沒報到：這個帳號不能報到';
+  try{
+    var tok=await _fbUser.getIdToken();
+    var r=await fetch(_fnUrl('hqBeat'),{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+tok},body:'{}'});
+    var j={};try{j=await r.json();}catch(e){/* 可忽略：未部署時沒有 JSON */}
+    if(r.ok)return j&&j.recovered?'已報到（斷線警報已解除）':'已報到';
+    return '沒報到：'+((j&&j.error&&j.error.message)||(r.status===404?'報到服務尚未部署':('錯誤 '+r.status)));
+  }catch(e){_err('fyBeat',e);return '沒報到：'+(navigator.onLine===false?'目前沒有網路':'報到服務尚未部署或連不上');}
+}
 function lotionNotifyOpen(){
   if(!_aiNotifyOk()){toast('這個帳號不能發通知');return;}
   window._aiNfPrev=function(){var t=_aiNotifyText(gv('nf-title'),gv('nf-todo')),n=Array.from(t).length,el=document.getElementById('nf-prev');if(el)el.innerHTML=t?(esc(t)+'<span style="color:'+(n>100?'var(--red)':'var(--b3)')+'">　'+n+'/100 字</span>'):'<span style="color:var(--b3)">（填標題後顯示）</span>';};
