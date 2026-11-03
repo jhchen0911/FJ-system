@@ -1159,7 +1159,7 @@ function syncParamsUI(){
 
 function resetRmkBase(){
   if(!confirm('確定要還原備註條款為系統預設值？\n（目前自訂內容將被覆蓋）'))return;
-  var DEFAULT_RMK="1. 營業稅5%外加。\n2. 本工程報價以單價為準，數量僅供參考，實際工程款依實際施作數量核實計算。\n3. 付款方式：每月月底估驗一次、次月20日付款。①一次性工項施工完成請款100%。②中間樁/共構樁買斷項目，於打設完成或引孔根固後請款100%。③其他工項每階段按裝（打設）完成付70%，拆除（拔除）完成付30%，工程款以100%現金支付。\n4. 基準線放樣、場地整理、地下障礙物清除、施工動線規劃（如因動線調整致施工費用增加，由甲方負責），及動線鐵板（包含施工動線、出入口、連續壁導溝、地中壁導溝開口等），另棄土坑型鋼亦由甲方自行負責。\n5. 有關施工所需之水源、電力、背填材料（含鋼筋、水泥、砂、混凝土等）、交通疏導及抽排水等項目，均由甲方負責。惟如前述項目已於報價內容中明確載明由乙方負責，則不在此限。\n6. 本工程無保固及保留款，亦不含回填砂、各類型鋼材試（檢）驗費用、保險費、清潔費及技師簽證費等相關費用。凡本工程報價或工作項目未列之事項，概由甲方自行負責；如甲方另行委由乙方施作，相關費用另行議定。\n7. 本工程依甲方提供之圖說或經審核完成之施工圖說及相關規範施作；如未提供圖說，則依甲方現場人員指示施作。倘因圖說內容不完整、規格不明，或甲方現場指示不當，致使材料毀損或產生其他相關損失，其材料費用及衍生之一切費用，概由甲方負擔。\n8. 本工程施工構台之設計載重以【LOAD】T 為上限。倘甲方需使用超過前述載重之機具，或因實際需求須增加分段拆除次數，應事先通知乙方，並經雙方協議後辦理，其所增加之相關費用及施工單價另行議定。\n9. 筏基如設有回填區，中間樁及共構樁因埋入所產生之損耗，應依實際切除長度核實計價，並以現場量測或雙方確認之數據為準。\n10. 圍令與擋土牆間之填縫材料由甲方提供；乙方僅負責澆置、打除及吊起集中，其運棄及相關處理，由甲方負責。\n11. 備用單價：a.安全走道M/$【WALK】元、b.技術工/天/$【TECH】元\n12. 如因甲方因素或要求買斷：型鋼KG/$【BUY_H】元、鋼軌樁KG/$【BUY_R】元、鋼板樁KG/$【BUY_S】元、支撐KG/$【BUY_B】元、2M覆工板/片/$【COV2】元、3M覆工板/片/$【COV3】元、鋪路鐵板/片/$【IRON】元（未稅）計。\n13. 本工程不包含底層鋼製樓梯及鋪路鐵板鋪設等相關施作項目；如需施作，應另行協商，其費用另議。\n14. 材料使用期限自各單一工項打設（裝設）完成之次日起算，至該工項拔除（拆除）完成日止。本工程各工項之租期均由甲方提供；如實際使用期間未超過備註所載租期，不另行辦理加減帳；超過者依備註所載逾期租金計價。拆除（拔除）期間因甲方因素致延誤者，延誤天數併入計算。\n15. 如因甲方工地緊急狀況、工程聯絡單或口頭指示，要求乙方先行配合施作追加工項者，經甲方工地簽認報價單後，該報價單即視為本合約之一部分。甲方不得以未另行簽訂書面合約為由，拒絕或延遲辦理當期工程款之給付。\n16. 本報價各階段均以一次施工作業為原則；如因實際需求須進行第二次施作，或施作數量不足時，甲方應另行補貼動員費用（次/$【MOB】元）。\n17. 於結構體作業時，其相關補強作業由甲方負責。結構板面施工動線（含鐵板鋪設）如甲方委由乙方，相關費用另行議定。\n18. 如因甲方要求或施工動線限制需使用吊車進行拔樁作業，其施工單價另議。\n19. 本報價有效期限為報價日起 14 天。";
+  var DEFAULT_RMK="1. 營業稅5%外加。\n2. 本工程報價以單價為準，數量僅供參考，實際工程款依實際施作數量核實計算。\n3. 付款方式：每月月底估驗一次、次月20日付款。①一次性工項施工完成請款100%。②中間樁/共構樁買斷項目，於打設完成或引孔根固後請款100%。③其他工項每階段按裝（打設）完成付70%，拆除（拔除）完成付30%，工程款以100%現金支付。\n4. 基準線放樣、場地整理、地下障礙物清除、施工動線規劃（如因動線調整致施工費用增加，由甲方負責），及動線鐵板（包含施工動線、出入口、連續壁導溝、地中壁導溝開口等），另棄土坑型鋼亦由甲方自行負責。\n5. 有關施工所需之水源、電力、背填材料（含鋼筋、水泥、砂、混凝土等）、交通疏導及抽排水等項目，均由甲方負責。惟如前述項目已於報價內容中明確載明由乙方負責，則不在此限。\n6. 本工程無保固及保留款，亦不含回填砂、各類型鋼材試（檢）驗費用、保險費、清潔費及技師簽證費等相關費用。凡本工程報價或工作項目未列之事項，概由甲方自行負責；如甲方另行委由乙方施作，相關費用另行議定。\n7. 本工程依甲方提供之圖說或經審核完成之施工圖說及相關規範施作；如未提供圖說，則依甲方現場人員指示施作。倘因圖說內容不完整、規格不明，或甲方現場指示不當，致使材料毀損或產生其他相關損失，其材料費用及衍生之一切費用，概由甲方負擔。\n8. 本工程施工構台之設計載重以【LOAD】T 為上限。倘甲方需使用超過前述載重之機具，或因實際需求須增加分段拆除次數，應事先通知乙方，並經雙方協議後辦理，其所增加之相關費用及施工單價另行議定。\n9. 筏基如設有回填區，中間樁及共構樁因埋入所產生之損耗，應依實際切除長度核實計價，並以現場量測或雙方確認之數據為準。\n10. 圍令與擋土牆間之填縫材料由甲方提供；乙方僅負責澆置、打除及吊起集中，其運棄及相關處理，由甲方負責。\n11. 備用單價：a.安全走道M/$【WALK】元、b.技術工/天/$【TECH】元\n12. 如因甲方因素或要求買斷：型鋼KG/$【BUY_H】元、鋼軌樁KG/$【BUY_R】元、鋼板樁KG/$【BUY_S】元、支撐KG/$【BUY_B】元、2M覆工板/片/$【COV2】元、3M覆工板/片/$【COV3】元、鋪路鐵板/片/$【IRON】元（未稅）計。\n13. 本工程不包含底層鋼製樓梯及鋪路鐵板鋪設等相關施作項目；如需施作，應另行協商，其費用另議。\n14. 材料租期自各工項打設（裝設）完成次日起算，至進場拔除（拆除）之日止，分批者各批分別計算。租期依甲方提供之工期估列，未逾備註租期者不另加減帳，逾期依備註逾期租金計價。\n15. 如因甲方工地緊急狀況、工程聯絡單或口頭指示，要求乙方先行配合施作追加工項者，經甲方工地簽認報價單後，該報價單即視為本合約之一部分。甲方不得以未另行簽訂書面合約為由，拒絕或延遲辦理當期工程款之給付。\n16. 本報價各階段均以一次施工作業為原則；如因實際需求須進行第二次施作，或施作數量不足時，甲方應另行補貼動員費用（次/$【MOB】元）。\n17. 於結構體作業時，其相關補強作業由甲方負責。結構板面施工動線（含鐵板鋪設）如甲方委由乙方，相關費用另行議定。\n18. 如因甲方要求或施工動線限制需使用吊車進行拔樁作業，其施工單價另議。\n19. 本報價有效期限為報價日起 14 天。";
   P.rmkBase=DEFAULT_RMK;
   var prmEl=document.getElementById('prm');
   if(prmEl)prmEl.value=DEFAULT_RMK;
@@ -2775,14 +2775,14 @@ function applyRmkCustom(){
 
 // 從報價單物件建立備註條款文字（用 q.rmk 的數字 + prm 條款）；v6.0.117 依實際條目重新編號（只影響輸出，不改存檔）
 function buildRmkTextFromQ(q){
-  const base=document.getElementById('prm')?.value||P.rmkBase||'';
+  const base=_rmkBaseFor(q,document.getElementById('prm')?.value||P.rmkBase||'');   // v6.0.138 第 14 條切換前的舊報價用舊全文
   return _rmkBuild(base,(q&&q.rmk)||{},false).text;
 }
 
 // v6.0.83 第16條「施作數量不足時」→ 有填最低數量就寫成「施作數量不足 20 支時」（條款母本不必改，舊參數也適用）
 function _rmkMinQty(line,c){var m=String((c&&c.minQty)||'').trim();if(!m)return line;return line.replace(/施作數量不足(?!\s*\d)/,'施作數量不足 '+m+' ');}
 function buildRmkText(){
-  const base=document.getElementById('prm')?.value||'';
+  const base=_rmkBaseFor(eid?Q.find(function(x){return x.id===eid;}):null,document.getElementById('prm')?.value||'');   // v6.0.138
   return _rmkBuild(base,rmkCustom,true).text;
 }
 
@@ -4144,9 +4144,10 @@ function renderCustomers(){
 }
 
 function addCustomer(){
+  _contactFormReset('cust');   // v6.0.138
   document.getElementById('customer-edit-id').value='';
   document.getElementById('customer-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 新增客戶';
-  ['cust-name','cust-taxid','cust-contact','cust-tel','cust-fax','cust-addr','cust-note','cust-paydue','cust-pay-month-delay','cust-recv-day','cust-pay-cash','cust-pay-ticket','cust-retention','cust-otype'].forEach(id=>{
+  ['cust-name','cust-taxid','cust-contact','cust-tel','cust-fax','cust-addr','cust-note','cust-paydue','cust-pay-month-delay','cust-recv-day','cust-pay-cash','cust-pay-ticket','cust-retention','cust-otype','cust-boss'].forEach(id=>{
     const e=document.getElementById(id);if(e)e.value='';
   });
   document.getElementById('customer-modal').style.display='flex';
@@ -4156,7 +4157,7 @@ function editCustomer(id){
   const c=CUSTOMERS.find(x=>x.id===id);if(!c)return;
   document.getElementById('customer-edit-id').value=id;
   document.getElementById('customer-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯客戶';
-  const m={'cust-name':'name','cust-taxid':'taxid','cust-tel':'tel','cust-fax':'fax','cust-contact':'contact','cust-site-tel':'siteTel','cust-company-contact':'companyContact','cust-addr':'addr','cust-note':'note'};
+  const m={'cust-name':'name','cust-taxid':'taxid','cust-boss':'boss','cust-tel':'tel','cust-fax':'fax','cust-contact':'contact','cust-site-tel':'siteTel','cust-company-contact':'companyContact','cust-addr':'addr','cust-note':'note'};
   Object.entries(m).forEach(([eid,key])=>{
     const e=document.getElementById(eid);if(e)e.value=c[key]||'';
   });
@@ -4175,6 +4176,7 @@ function editCustomer(id){
   if(custRetEl)custRetEl.value=c.retentionPct!=null?c.retentionPct:'';
   var custOt=document.getElementById('cust-otype');if(custOt)custOt.value=c.ownerType||'';
   var custRr=document.getElementById('cust-recv-rule');if(custRr)custRr.checked=!!c.recvRuleOn;   // v6.0.110
+  _contactFormReset('cust');   // v6.0.138
   document.getElementById('customer-modal').style.display='flex';
 }
 
@@ -4186,6 +4188,7 @@ function saveCustomer(){
     id:id||Date.now().toString(),
     name,
     taxid:document.getElementById('cust-taxid')?.value||'',
+    boss:(document.getElementById('cust-boss')?.value||'').trim(),   // v6.0.138 負責人
     tel:document.getElementById('cust-tel')?.value||'',
     fax:document.getElementById('cust-fax')?.value||'',
     contact:document.getElementById('cust-contact')?.value||'',
@@ -4210,6 +4213,7 @@ function saveCustomer(){
     CUSTOMERS.unshift(obj);
   }
   saveCustomers();
+  try{_draftAppliedFor('cust',obj.id,!id);}catch(e){_err('saveCustomer.draft',e);}   // v6.0.138 客戶·廠商草稿
   document.getElementById('customer-modal').style.display='none';
   if(obj.retentionPct!=null)_retWarn(obj.retentionPct);   // v6.0.95 客戶資料保留款% 也提醒（僅供參考）
   renderCustomers();
@@ -10297,6 +10301,7 @@ function _applyCloud(data){
   }
   window._cloudApplied1=true;   // v6.0.118：至少成功套用過一次雲端資料（匯款帳號遷移要等這個，免得拿本機舊資料當正本）
   try{_bankMigrate();}catch(e){_err('_applyCloud.bank',e);}
+  try{_rmk14Migrate();}catch(e){_err('_applyCloud.rmk14',e);}   // v6.0.138 備註第 14 條
   return true;
 }
 // ══════════ 敏感資料節點拆分（v5.324）══════════
@@ -10978,7 +10983,7 @@ function _pullCloudIfNewer(opts){
       }
     } else {
       window._pullInFlight=false;
-      if(cloudTime>0&&localSync>=cloudTime){window._cloudApplied1=true;try{_bankMigrate();}catch(e){_err('_pullCloudIfNewer.bank',e);}}   // 審查 🔴4：本機已是最新，也可以做匯款帳號遷移
+      if(cloudTime>0&&localSync>=cloudTime){window._cloudApplied1=true;try{_bankMigrate();}catch(e){_err('_pullCloudIfNewer.bank',e);}try{_rmk14Migrate();}catch(e){_err('_pullCloudIfNewer.rmk14',e);}}   // 審查 🔴4：本機已是最新，也可以做匯款帳號遷移
       if(dirty)_pushCloud({silent:true});
       else _pullPrivateIfNewer();   // v5.324：只有成本／分潤變動時 shared 不會動，要單獨看私有節點
     }
@@ -25473,9 +25478,10 @@ function exportContractsCSV(){
 // 4. 廠商管理
 // ══════════════════════════════════════════════════════════════
 function newVendor(){
+  _contactFormReset('vend');   // v6.0.138
   document.getElementById('vendor-edit-id').value='';
   document.getElementById('vendor-modal-title').innerHTML='<svg class="ic ib" aria-hidden="true"><use href="#i-building"/></svg> 新增廠商';
-  ['v-name','v-contact','v-phone','v-taxid','v-email','v-addr','v-items','v-note','v-pay-cash','v-pay-ticket'].forEach(id=>{
+  ['v-name','v-contact','v-phone','v-taxid','v-boss','v-email','v-addr','v-items','v-note','v-pay-cash','v-pay-ticket'].forEach(id=>{
     const el=document.getElementById(id);if(el)el.value='';
   });
   document.getElementById('v-type').value='material';
@@ -25491,6 +25497,7 @@ function editVendor(id){
   document.getElementById('v-contact').value=v.contact||'';
   document.getElementById('v-phone').value=v.phone||'';
   document.getElementById('v-taxid').value=v.taxid||'';
+  var _vbo=document.getElementById('v-boss');if(_vbo)_vbo.value=v.boss||'';_contactFormReset('vend');   // v6.0.138
   document.getElementById('v-email').value=v.email||'';
   document.getElementById('v-addr').value=v.addr||'';
   document.getElementById('v-items').value=v.items||'';
@@ -25510,7 +25517,7 @@ function saveVendor(){
   const _vPayCash=document.getElementById('v-pay-cash')?.value;
   const _vPayTicket=document.getElementById('v-pay-ticket')?.value;
   const v={id,name:gv('v-name'),type:gv('v-type'),contact:gv('v-contact'),
-    phone:gv('v-phone'),taxid:gv('v-taxid'),email:gv('v-email'),
+    phone:gv('v-phone'),taxid:gv('v-taxid'),boss:(gv('v-boss')||'').trim(),email:gv('v-email'),
     addr:gv('v-addr'),items:gv('v-items'),note:gv('v-note'),
     bank:(gv('v-bank')||'').trim(),bankAcct:(gv('v-bankacct')||'').trim(),bankHolder:(gv('v-bankholder')||'').trim(),   // v6.0.68（遷移後以 fydata/bank 為準，見 _bankVendorSave）
     payTermCash:_vPayCash!==''?parseInt(_vPayCash)||0:null,
@@ -25528,6 +25535,7 @@ function saveVendor(){
   }
   if(idx>=0)VENDORS[idx]=v;else VENDORS.unshift(v);
   saveVendors();
+  try{_draftAppliedFor('vendor',v.id,idx<0);}catch(e){_err('saveVendor.draft',e);}   // v6.0.138 客戶·廠商草稿
   logActivity('廠商',(idx>=0?'修改':'新增')+'廠商：'+v.name);
   closeVendorModal();renderVendors();toast('廠商已儲存');
   _onSave();
@@ -36774,7 +36782,7 @@ function _subContractHtml(q,c,f){
     +'<h1>工程承攬合約書</h1>'
     +'<div class="party"><div>定作人：'+E(P.company||'')+'（以下簡稱甲方）</div><div>承攬人：'+E(c.vendor||'')+'（以下簡稱乙方）</div><div>茲因甲方承攬「'+E(q.name||'')+'」之擋土支撐相關工程，將其中部分工項委由乙方施作，雙方議定條款如下，共同遵守：</div></div>'
     +cl.join('')
-    +'<div class="sigs">'+sig('甲　方（定作人）',P.company,P.boss,P.addr,P.taxid,P.tel)+sig('乙　方（承攬人）',c.vendor,v.contact,v.addr,v.taxid,v.phone)+'</div>'
+    +'<div class="sigs">'+sig('甲　方（定作人）',P.company,P.boss,P.addr,P.taxid,P.tel)+sig('乙　方（承攬人）',c.vendor,v.boss||v.contact,v.addr,v.taxid,v.phone)+'</div>'
     +'<div class="date">'+_rocDate(f.date)+'</div>'
     +'</div></body></html>';
 }
@@ -38696,7 +38704,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // 安全規則（database.rules.json 的 fydata/drafts，回國後發布）：唯讀名冊與管理員可讀；唯讀帳號只能新增 by＝自己的 pending 草稿、不能改舊的；狀態只有管理員能改；欄位型別與大小有上限。
 // 記錄：{id,type:'quote'|'bid'|'irPhoto',by,byName,at,status:'pending'|'applied'|'rejected',summary,payload,(doneAt,doneBy,resultId,reason)}
 var DRAFTS={};
-var _DRAFT_T={quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）'};   // v6.0.110 LINE 機器人草稿
+var _DRAFT_T={quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）',contact:'客戶·廠商'};   // v6.0.138 客戶·廠商草稿   // v6.0.110 LINE 機器人草稿
 var _draftOn=false,_draftErrAt=0;
 var _DRAFT_ID=/^[A-Za-z0-9_-]{4,40}$/;
 var _DRAFT_IMG=/^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+\/=]+$/;
@@ -38876,6 +38884,7 @@ function draftApply(id){
     return;
   }
   if(d.type==='addon'||d.type==='dailyLog'){_lineDraftApply(d,close);return;}   // v6.0.110 LINE 機器人
+  if(d.type==='contact'){_draftContactApply(id,pl,close);return;}   // v6.0.138
   if(d.type==='irPhoto'){
     if(!_draftImgOk(pl.file)){toast('草稿的照片格式不正確，請退回');return;}
     close();newInvoiceRecord();
@@ -39490,6 +39499,17 @@ async function fyNotify(title,todo,text){
     return '沒送出：'+((j&&j.error&&j.error.message)||(r.status===404?'通知服務尚未部署':('錯誤 '+r.status)));
   }catch(e){_err('fyNotify',e);return '沒送出：'+(navigator.onLine===false?'目前沒有網路':'通知服務尚未部署或連不上');}
 }
+// v6.0.137 電腦端斷線警報：電腦端（Lotion-HQ）排程每 30～60 分鐘在 FJ 分頁執行 fyBeat() 報到（只記時間）；雲端 hqBeatCheck 台灣 08～22 點每小時檢查，超過 2 小時沒報到 LINE 通知 Lotion 一次
+async function fyBeat(){
+  if(!_aiNotifyOk())return '沒報到：這個帳號不能報到';
+  try{
+    var tok=await _fbUser.getIdToken();
+    var r=await fetch(_fnUrl('hqBeat'),{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+tok},body:'{}'});
+    var j={};try{j=await r.json();}catch(e){/* 可忽略：未部署時沒有 JSON */}
+    if(r.ok)return j&&j.recovered?'已報到（斷線警報已解除）':'已報到';
+    return '沒報到：'+((j&&j.error&&j.error.message)||(r.status===404?'報到服務尚未部署':('錯誤 '+r.status)));
+  }catch(e){_err('fyBeat',e);return '沒報到：'+(navigator.onLine===false?'目前沒有網路':'報到服務尚未部署或連不上');}
+}
 function lotionNotifyOpen(){
   if(!_aiNotifyOk()){toast('這個帳號不能發通知');return;}
   window._aiNfPrev=function(){var t=_aiNotifyText(gv('nf-title'),gv('nf-todo')),n=Array.from(t).length,el=document.getElementById('nf-prev');if(el)el.innerHTML=t?(esc(t)+'<span style="color:'+(n>100?'var(--red)':'var(--b3)')+'">　'+n+'/100 字</span>'):'<span style="color:var(--b3)">（填標題後顯示）</span>';};
@@ -39573,6 +39593,156 @@ function _meShow(){
   var fn={shoring:renderMatEst,lifeline:_llRender,rebar:_rbRender,grout:_gtRender,backfill:_bfRender}[_meTab];
   try{fn&&fn();}catch(e){_err('_meShow.'+_meTab,e);}
   if(_meTab==='shoring'){var o=document.getElementById('mat-est-out');if(o&&!o.innerHTML.trim()){try{matEstCalc();}catch(e){_err('_meShow.calc',e);}}}
+}
+// ══════════ v6.0.138 小批次：統編查詢＋客戶·廠商 AI 草稿；備註第 14 條新舊分流 ══════════
+// 統編查詢：輸入 8 碼統編 → 查公開的 g0v 公司資料（company.g0v.ronny.tw），帶公司名稱、地址、負責人。
+//   空白的欄位直接帶入；已經有填的不蓋，改顯示「查到…［全部帶入］」讓人自己決定。查不到、連不上照常手打，不擋存檔。
+//   檢查碼（財政部 2023 年起可被 5 整除；第 7 碼為 7 時另一種算法）不符只提醒。
+var _TAXID_API='https://company.g0v.ronny.tw/api/show/';
+var _TAXID_F={cust:{tax:'cust-taxid',name:'cust-name',addr:'cust-addr',boss:'cust-boss',hint:'cust-taxid-hint'},
+  vend:{tax:'v-taxid',name:'v-name',addr:'v-addr',boss:'v-boss',hint:'v-taxid-hint'},
+  dc:{tax:'dc-taxid',name:'dc-name',addr:'dc-addr',boss:'dc-boss',hint:'dc-taxid-hint'}};
+var _taxIdCache={},_taxIdSeq={};
+function _taxIdOk(s){
+  s=String(s||'');if(!/^\d{8}$/.test(s))return false;
+  var w=[1,2,1,2,1,2,4,1],sum=0;
+  for(var i=0;i<8;i++){var p=(+s[i])*w[i];sum+=Math.floor(p/10)+p%10;}
+  if(sum%5===0)return true;
+  return s[6]==='7'&&(sum-9)%5===0;   // 第 7 碼 7：7×4＝28→2+8＝10，可取 1 或 0（迴圈算的是 10，取 1 時總和少 9）
+}
+// g0v 回應：公司用「公司名稱／公司所在地／代表人姓名」，商業（行號）用「商業名稱／地址／負責人姓名」；也看「財政部」那一段
+function _taxIdParse(j){
+  var d=j&&j.data;if(!d||typeof d!=='object'||Array.isArray(d))return null;
+  var one=function(v){if(Array.isArray(v))v=v.filter(function(x){return typeof x==='string'&&x.trim();})[0];else if(v&&typeof v==='object'){var ks=Object.keys(v);v=ks.length?v[ks[0]]:'';}return typeof v==='string'?v.trim():'';};
+  var srcs=[d,(d['財政部']&&typeof d['財政部']==='object')?d['財政部']:{}];
+  var pick=function(keys){for(var a=0;a<srcs.length;a++)for(var b=0;b<keys.length;b++){var v=one(srcs[a][keys[b]]);if(v)return v.slice(0,200);}return '';};
+  var r={name:pick(['公司名稱','商業名稱','營業人名稱','名稱']),addr:pick(['公司所在地','地址','商業所在地','營業地址']),boss:pick(['代表人姓名','負責人姓名','負責人'])};
+  return r.name?r:null;
+}
+async function _taxIdLookup(tax){
+  if(!/^\d{8}$/.test(String(tax||'')))return null;
+  if(Object.prototype.hasOwnProperty.call(_taxIdCache,tax))return _taxIdCache[tax];
+  var ac=typeof AbortController!=='undefined'?new AbortController():null,tm=ac?setTimeout(function(){ac.abort();},8000):0;
+  try{
+    var r=await fetch(_TAXID_API+tax,ac?{signal:ac.signal}:{});
+    if(!r.ok)return null;
+    var hit=_taxIdParse(await r.json());
+    _taxIdCache[tax]=hit;return hit;
+  }catch(e){return null;/* 可忽略：連不上就手打 */}
+  finally{if(tm)clearTimeout(tm);}
+}
+function _taxIdHint(form,html){var F=_TAXID_F[form],h=F&&document.getElementById(F.hint);if(h)h.innerHTML=html||'';}
+function _taxIdInput(form){
+  var F=_TAXID_F[form];if(!F)return;var el=document.getElementById(F.tax);if(!el)return;
+  var tax=String(el.value||'').replace(/\D/g,'');
+  var seq=(_taxIdSeq[form]||0)+1;_taxIdSeq[form]=seq;
+  if(tax.length!==8){_taxIdHint(form,'');return;}
+  if(!_taxIdOk(tax)){_taxIdHint(form,'<span class="bad">統編檢查碼不符，請再確認（不擋存檔）</span>');return;}
+  _taxIdHint(form,'查詢公司資料中…');
+  _taxIdLookup(tax).then(function(hit){
+    if(_taxIdSeq[form]!==seq)return;   // 又打了別的字：舊結果丟掉
+    if(!hit){_taxIdHint(form,'查不到這個統編的公司資料，請手動填寫');return;}
+    window._taxIdHit=window._taxIdHit||{};window._taxIdHit[form]=hit;
+    var diff=[];
+    [['name','名稱'],['addr','地址'],['boss','負責人']].forEach(function(k){
+      var e=document.getElementById(F[k[0]]);if(!e||!hit[k[0]])return;
+      var cur=String(e.value||'').trim();
+      if(!cur){e.value=hit[k[0]];}else if(cur!==hit[k[0]])diff.push(k[1]+'：'+hit[k[0]]);
+    });
+    _taxIdHint(form,'✓ 已帶入公司登記資料'+(diff.length?('　<span>查到不同的 '+esc(diff.join('；'))+'</span> <button type="button" class="btn btn-xs" data-ro-ok="1" onclick="_taxIdFill(\''+form+'\')">全部帶入</button>'):''));
+  });
+}
+// 開客戶／廠商表單時：清掉上一張的查詢提示，並放掉還沒存檔的客戶·廠商草稿標記（審查：免得之後存別的資料時被當成套用了草稿）
+function _contactFormReset(form){_taxIdSeq[form]=(_taxIdSeq[form]||0)+1;if(window._taxIdHit)delete window._taxIdHit[form];_taxIdHint(form,'');var a=window._draftApplying;if(a&&(a.kind==='cust'||a.kind==='vendor'))window._draftApplying=null;}
+function _taxIdFill(form){var F=_TAXID_F[form],hit=window._taxIdHit&&window._taxIdHit[form];if(!F||!hit)return;['name','addr','boss'].forEach(function(k){var e=document.getElementById(F[k]);if(e&&hit[k])e.value=hit[k];});_taxIdHint(form,'✓ 已帶入公司登記資料');}
+
+// ── 客戶·廠商草稿：AI 唯讀帳號（信件分派「陳軒/建檔」）送草稿，Lotion 在 FJ 按確認、開表單檢查後按「儲存」才寫入 ──
+// payload：{kind:'customer'|'vendor', taxid,name,addr,boss,tel,email,contact,vtype,note,src}；不收匯款帳號（帳號只有管理員能改）
+var _DC_KEYS={taxid:8,name:100,addr:200,boss:50,tel:40,email:100,contact:100,vtype:20,note:300,src:100};
+function _draftContactClean(o){
+  o=(o&&typeof o==='object'&&!Array.isArray(o))?o:{};
+  var f={kind:o.kind==='vendor'?'vendor':(o.kind==='customer'?'customer':'')};
+  if(!f.kind)return {err:'請選客戶或廠商'};
+  Object.keys(_DC_KEYS).forEach(function(k){f[k]=String(o[k]==null?'':o[k]).replace(/[\u0000-\u001f\u007f]+/g,' ').trim().slice(0,_DC_KEYS[k]);});
+  f.taxid=f.taxid.replace(/\D/g,'');
+  if(!f.name)return {err:'請填名稱'};
+  if(f.taxid&&f.taxid.length!==8)return {err:'統編要 8 碼數字'};
+  if(f.kind!=='vendor'||['material','subcontract','equipment','other'].indexOf(f.vtype)<0)f.vtype='';   // 沒填或不認得：不改原本的類型
+  return {f:f};
+}
+function _draftContactMatch(f){var L=f.kind==='vendor'?VENDORS:CUSTOMERS;return (L||[]).find(function(x){return x&&f.taxid&&x.taxid===f.taxid;})||(L||[]).find(function(x){return x&&x.name===f.name;})||null;}
+// 電腦端可直接呼叫：await draftContact({kind:'vendor',taxid:'12345675',name:'…',tel:'…',src:'信件主旨'}) → true／false（原因會 toast）
+function draftContact(o){
+  if(!_isReaderUser){toast('草稿只給 AI 唯讀帳號用；管理員請直接新增');return Promise.resolve(false);}
+  var c=_draftContactClean(o);if(c.err){toast(c.err);return Promise.resolve(false);}
+  var f=c.f,ex=_draftContactMatch(f),K=f.kind==='vendor'?'廠商':'客戶';
+  return _draftPush('contact',f,(ex?'修改'+K+'：':'新'+K+'：')+f.name+(f.taxid?'（統編 '+f.taxid+'）':'')+(f.src?'　來源：'+f.src:''));
+}
+function draftContactNew(){
+  if(!_isReaderUser)return;
+  var I=function(id,l,ph,extra){return '<div class="f" style="margin-bottom:6px"><label>'+l+'</label><input id="'+id+'" data-ro-ok="1" placeholder="'+(ph||'')+'"'+(extra||'')+'></div>';};
+  showConfirm('客戶·廠商草稿',
+    '<div style="font-size:12px;color:var(--b4);margin-bottom:6px">送出後要 Lotion 確認才會寫進客戶·廠商。名稱或統編相同的會當成修改。</div>'
+    +'<div class="f" style="margin-bottom:6px"><label>類別</label><select id="dc-kind" data-ro-ok="1" onchange="document.getElementById(\'dc-vt-w\').style.display=this.value===\'vendor\'?\'\':\'none\'"><option value="customer">客戶（業主）</option><option value="vendor">廠商</option></select></div>'
+    +'<div class="f" id="dc-vt-w" style="margin-bottom:6px;display:none"><label>廠商類型</label><select id="dc-vtype" data-ro-ok="1"><option value="material">材料供應商</option><option value="subcontract">協力廠商</option><option value="equipment">機具設備</option><option value="other">其他</option></select></div>'
+    +I('dc-taxid','統一編號','8 碼，自動帶公司資料',' inputmode="numeric" oninput="_taxIdInput(\'dc\')"')+'<div id="dc-taxid-hint" class="taxid-hint"></div>'
+    +I('dc-name','名稱 *')+I('dc-addr','地址')+I('dc-boss','負責人')+I('dc-tel','電話')+I('dc-email','Email')+I('dc-contact','聯絡人')+I('dc-note','備註')+I('dc-src','來源（例：信件主旨）'),
+    function(){
+      var o={kind:gv('dc-kind'),vtype:gv('dc-vtype')};['taxid','name','addr','boss','tel','email','contact','note','src'].forEach(function(k){o[k]=gv('dc-'+k);});
+      var c=_draftContactClean(o);if(c.err){toast(c.err);return false;}
+      draftContact(o);
+    },false,null,true);
+}
+// 管理員套用：開新增／編輯表單、帶入草稿有填的欄位，按「儲存」才寫入（saveCustomer／saveVendor 內 _draftAppliedFor）
+function _draftContactApply(id,pl,close){
+  var c=_draftContactClean(pl);if(c.err){toast('草稿內容不正確（'+c.err+'），請退回');return;}
+  var f=c.f,ex=_draftContactMatch(f),isV=f.kind==='vendor';
+  close();
+  if(isV){if(ex)editVendor(ex.id);else newVendor();}else{if(ex)editCustomer(ex.id);else addCustomer();}
+  var M=isV?{taxid:'v-taxid',name:'v-name',addr:'v-addr',boss:'v-boss',tel:'v-phone',email:'v-email',contact:'v-contact',note:'v-note',vtype:'v-type'}
+    :{taxid:'cust-taxid',name:'cust-name',addr:'cust-addr',boss:'cust-boss',tel:'cust-tel',contact:'cust-company-contact',note:'cust-note'};
+  Object.keys(M).forEach(function(k){
+    if(!f[k])return;var e=document.getElementById(M[k]);if(!e)return;
+    if(k==='note'&&e.value&&e.value.indexOf(f[k])<0){e.value=e.value+'\n'+f[k];return;}   // 備註接在原本後面
+    if(k==='email'&&!isV)return;
+    e.value=f[k];
+  });
+  if(!isV&&f.email){var n=document.getElementById('cust-note');if(n&&n.value.indexOf(f.email)<0)n.value=(n.value?n.value+'\n':'')+'Email：'+f.email;}   // 客戶表單沒有 Email 欄
+  window._draftApplying={id:id,kind:isV?'vendor':'cust',target:ex?ex.id:null};
+  toast('確認資料後按「儲存」（取消就不會寫入）');
+}
+
+// ── 備註第 14 條（Lotion 11/03 定案）：只改之後新建的報價，舊報價維持原文 ──
+// 備註是列印時才用參數「預設備註條款」（P.rmkBase）組出來的，報價本身不存全文；直接改參數會連舊報價一起變。
+// 做法：管理員裝置套用過雲端資料後一次性遷移——舊全文存 P.rmkBaseOld、切換時間 P.rmk14At、P.rmkBase 第 14 條換新文字。
+// 報價 id 是建立時間（Date.now()，版次不換 id）：早於切換時間的舊報價列印仍用 P.rmkBaseOld。
+var _RMK14_NEW='14. 材料租期自各工項打設（裝設）完成次日起算，至進場拔除（拆除）之日止，分批者各批分別計算。租期依甲方提供之工期估列，未逾備註租期者不另加減帳，逾期依備註逾期租金計價。';
+var _RMK14_OLD=/^(\s*)14\s*\.\s*材料使用期限/;
+function _rmkQOld(q){
+  var at=+(P&&P.rmk14At)||0;if(!at||!P.rmkBaseOld||!q)return false;
+  var id=String(q.id||''),t=/^\d{12,14}$/.test(id)?+id:0;   // 不是時間戳的 id（匯入等）當舊報價
+  return t<at;
+}
+function _rmkBaseFor(q,cur){return _rmkQOld(q)?String(P.rmkBaseOld):cur;}
+function _rmk14Swap(base){
+  var L=String(base||'').split('\n'),hit=false;
+  L=L.map(function(l){var m=_RMK14_OLD.exec(l);if(!m||hit)return l;hit=true;return m[1]+_RMK14_NEW;});
+  return hit?L.join('\n'):null;
+}
+function _rmk14Migrate(){
+  try{
+    if(!P||!window._cloudApplied1||_isReaderUser||!_shWholeOk())return;
+    var nb=_rmk14Swap(P.rmkBase);
+    if(P.rmk14At){   // 已切換過：只有還原舊備份把舊第 14 條帶回來時再換一次（審查），舊全文與切換時間不動
+      if(nb!==null&&P.rmkBaseOld){P.rmkBase=nb;var el0=document.getElementById('prm');if(el0)el0.value=nb;persistP();try{_onSave();}catch(e){_err('_rmk14Migrate.re',e);}console.log('[備註] 參數又出現舊第 14 條（還原備份？），已再換成新文字');}
+      return;
+    }
+    if(nb===null){if(!_rmk14Migrate._warned){_rmk14Migrate._warned=1;console.log('[備註] 參數裡找不到舊第 14 條（材料使用期限…），不自動更換');}return;}
+    P.rmkBaseOld=String(P.rmkBase);P.rmkBase=nb;P.rmk14At=Date.now();
+    var el=document.getElementById('prm');if(el)el.value=nb;   // 參數頁的文字框也換，免得之後按「儲存參數」又寫回舊文字
+    persistP();try{_onSave();}catch(e){_err('_rmk14Migrate.save',e);}
+    console.log('[備註] 第 14 條已換新文字；舊報價列印維持原文');
+  }catch(e){_err('_rmk14Migrate',e);}
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

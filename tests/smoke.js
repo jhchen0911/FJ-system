@@ -9318,6 +9318,111 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.137 電腦端斷線警報：fyBeat() 帶登入憑證呼叫雲端 hqBeat；排程 08～22 點每小時、超過 2 小時沒報到 LINE 通知一次、額度保護同 aiNotify ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const oU = _fbUser, oF = window.fetch;
+      try {
+        _fbUser = { email: 'hsuanchen911@gmail.com', getIdToken: async () => 'tokB' };
+        let sent = null; window.fetch = async (u, o) => { sent = { u, o }; return { ok: true, status: 200, json: async () => ({ ok: true }) }; };
+        out.ok = (await fyBeat()) === '已報到' && sent.u === _fnUrl('hqBeat') && sent.o.headers.Authorization === 'Bearer tokB' && sent.o.method === 'POST';
+        window.fetch = async () => ({ ok: true, status: 200, json: async () => ({ ok: true, recovered: true }) });
+        out.rec = /斷線警報已解除/.test(await fyBeat());
+        window.fetch = async () => ({ ok: false, status: 404, json: async () => { throw new Error('x'); } });
+        out.nf = /尚未部署/.test(await fyBeat());
+        _fbUser = { email: 'staff@x.com', getIdToken: async () => 't' };
+        out.deny = /不能報到/.test(await fyBeat());
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      _fbUser = oU; window.fetch = oF;
+      return out;
+    });
+    const pth136 = require('path'), fs136 = require('fs');
+    const HB = require(pth136.join(__dirname, '..', 'functions', 'ops', 'heartbeat.js'));
+    const IDX0 = fs136.readFileSync(pth136.join(__dirname, '..', 'functions', 'index.js'), 'utf8'), IDX = IDX0.slice(IDX0.indexOf('exports.hqBeat ='));   // 只看 hqBeat 之後，不會被 aiNotify 的同名寫法矇過
+    const RF = JSON.parse(fs136.readFileSync(pth136.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    const t0 = Date.parse('2026-11-03T06:00:00Z');
+    check('v6.0.137 電腦端斷線警報：fyBeat 帶憑證報到、名單外不能報到；超過 2 小時才警報、同一次斷線只發一次、08～22 點；額度保護；網頁不能寫 hqBeat',
+      r.ok && r.rec && r.nf && r.deny && HB.HB_STALE_MS === 7200000 && HB.hbDecide({ at: t0 - 7200001 }, t0).alert && !HB.hbDecide({ at: t0 - 7200001, alertFor: t0 - 7200001 }, t0).alert
+      && !HB.hbDecide({ at: t0 - 9e6 }, Date.parse('2026-11-03T15:00:00Z')).alert && /exports\.hqBeat =/.test(IDX) && /exports\.hqBeatCheck/.test(IDX) && /'0 8-22 \* \* \*'/.test(IDX)
+      && /hqBeatCheck[\s\S]*monthHold\(used\)[\s\S]*status: 'held'/.test(IDX) && /hqBeat[\s\S]*notifyAllowed\(email\)/.test(IDX) && RF.hqBeat && RF.hqBeat['.write'] === 'false', JSON.stringify(r));
+    check('v6.0.137 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.138 統編查詢（g0v）、客戶·廠商 AI 草稿、備註第 14 條只改新報價 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const oF = window.fetch, oU = _fbUser, oR = _isReaderUser, oPush = window._draftPush, oMark = window._draftMark, oSave = window._onSave, oT = window.toast;
+      const wait = ms => new Promise(res => setTimeout(res, ms));
+      try {
+        out.chk = _taxIdOk('22099131') && !_taxIdOk('22099132') && _taxIdOk('10000073') && !_taxIdOk('1234567') && !_taxIdOk('abcdefgh');
+        out.parse = JSON.stringify(_taxIdParse({ data: { '公司名稱': '範例工程股份有限公司', '公司所在地': '範例市範例路 1 號', '代表人姓名': '範例甲' } })) === JSON.stringify({ name: '範例工程股份有限公司', addr: '範例市範例路 1 號', boss: '範例甲' })
+          && _taxIdParse({ data: { '商業名稱': '範例工程行', '地址': '範例路 2 號', '負責人姓名': '範例乙' } }).boss === '範例乙' && _taxIdParse({}) === null && _taxIdParse({ data: { '公司名稱': ['範例丙公司'] } }).name === '範例丙公司';
+        // 客戶表單：空白欄帶入、已填的不蓋改顯示「全部帶入」
+        let calls = 0;
+        window.fetch = async (u) => { calls++; out.url = u; return { ok: true, json: async () => ({ data: { '公司名稱': '範例工程股份有限公司', '公司所在地': '範例市範例路 1 號', '代表人姓名': '範例甲' } }) }; };
+        addCustomer(); document.getElementById('cust-addr').value = '自己填的地址';
+        const tx = document.getElementById('cust-taxid'); tx.value = '22099131'; _taxIdInput('cust'); await wait(50);
+        out.fill = gv('cust-name') === '範例工程股份有限公司' && gv('cust-boss') === '範例甲' && gv('cust-addr') === '自己填的地址' && /全部帶入/.test(document.getElementById('cust-taxid-hint').innerHTML) && out.url === 'https://company.g0v.ronny.tw/api/show/22099131';
+        _taxIdFill('cust'); out.fillAll = gv('cust-addr') === '範例市範例路 1 號';
+        saveCustomer(); const cs = CUSTOMERS.find(c => c.name === '範例工程股份有限公司'); out.saved = !!cs && cs.boss === '範例甲' && cs.taxid === '22099131';
+        _taxIdInput('cust'); await wait(30); out.cache = calls === 1;
+        // 查不到／連不上：提示手打、不擋存檔；檢查碼不符只提醒
+        window.fetch = async () => { throw new Error('offline'); };
+        newVendor(); document.getElementById('v-name').value = '範例廠商'; document.getElementById('v-taxid').value = '10000073'; _taxIdInput('vend'); await wait(50);
+        out.miss = /查不到/.test(document.getElementById('v-taxid-hint').textContent);
+        document.getElementById('v-taxid').value = '22099132'; _taxIdInput('vend'); out.bad = /檢查碼不符/.test(document.getElementById('v-taxid-hint').textContent);
+        document.getElementById('v-boss').value = '範例丁'; saveVendor(); const vs = VENDORS.find(v => v.name === '範例廠商'); out.vsaved = !!vs && vs.boss === '範例丁';
+        // 草稿：唯讀帳號送出 → type contact；管理員套用 → 開表單帶入，按儲存才寫入並標已套用
+        let pushed = null, marked = null; window.toast = () => {};
+        window._draftPush = (type, payload, summary) => { pushed = { type, payload, summary }; return Promise.resolve(true); };
+        window._draftMark = (id, st, ex) => { marked = { id, st, ex }; return Promise.resolve(true); };
+        _isReaderUser = true;
+        out.dErr = (await draftContact({ kind: 'vendor', name: '' })) === false && (await draftContact({ kind: 'x', name: 'a' })) === false && (await draftContact({ kind: 'vendor', name: 'a', taxid: '123' })) === false;
+        await draftContact({ kind: 'vendor', taxid: '10000073', name: '範例廠商', tel: '02-1234-5678', boss: '範例戊', src: '範例信件', bank: '不該收', vtype: '' });
+        out.push = pushed && pushed.type === 'contact' && pushed.payload.kind === 'vendor' && !('bank' in pushed.payload) && /^修改廠商：範例廠商/.test(pushed.summary) && pushed.payload.vtype === '';
+        _isReaderUser = false;
+        const did = 'dtest138a'; DRAFTS[did] = { id: did, type: 'contact', status: 'pending', summary: pushed.summary, payload: pushed.payload, by: 'x', at: 1 };
+        draftApply(did);
+        out.form = gv('v-boss') === '範例戊' && gv('v-phone') === '02-1234-5678' && document.getElementById('vendor-modal').style.display === 'flex' && !marked;
+        const nV = VENDORS.length; saveVendor();
+        out.applied = marked && marked.id === did && marked.st === 'applied' && VENDORS.length === nV && VENDORS.find(v => v.name === '範例廠商').boss === '範例戊';
+        delete DRAFTS[did];
+        window._draftApplying = { id: 'dx', kind: 'cust', target: null }; addCustomer(); out.reset = window._draftApplying === null && document.getElementById('cust-taxid-hint').innerHTML === '';   // 套用後取消、改開新表單：不可被當成套用草稿
+        // 備註第 14 條：管理員裝置遷移一次；切換前的舊報價仍印舊文字、新報價印新文字
+        window._onSave = () => {}; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o' }; window._cloudApplied1 = true;
+        const old14 = '14. 材料使用期限自各單一工項打設（裝設）完成之次日起算，至該工項拔除（拆除）完成日止。';
+        const P0 = { b: P.rmkBase, o: P.rmkBaseOld, a: P.rmk14At }; delete P.rmkBaseOld; delete P.rmk14At;
+        P.rmkBase = '13. 第十三條。\n' + old14 + '\n15. 第十五條。'; document.getElementById('prm').value = P.rmkBase;
+        _rmk14Migrate();
+        out.mig = !!P.rmk14At && /材料租期自各工項打設/.test(P.rmkBase) && P.rmkBaseOld.indexOf(old14) >= 0 && /材料租期/.test(document.getElementById('prm').value);
+        const at1 = P.rmk14At; _rmk14Migrate(); out.once = P.rmk14At === at1;
+        const ob = P.rmkBaseOld; P.rmkBase = '13. 第十三條。\n' + old14; _rmk14Migrate(); out.reswap = /材料租期/.test(P.rmkBase) && P.rmk14At === at1 && P.rmkBaseOld === ob;   // 還原舊備份帶回舊第 14 條 → 再換一次
+        out.oldQ = /材料使用期限/.test(buildRmkTextFromQ({ id: String(at1 - 86400000), rmk: {} })) && /材料使用期限/.test(buildRmkTextFromQ({ id: 'imported', rmk: {} }));
+        out.newQ = /材料租期/.test(buildRmkTextFromQ({ id: String(at1 + 1000), rmk: {} }));
+        const _eid0 = eid; eid = null; out.newEd = /材料租期/.test(buildRmkText()); eid = _eid0;
+        delete P.rmk14At; P.rmkBase = '14. 自己改過的第 14 條'; _rmk14Migrate(); out.noHit = !P.rmk14At || P.rmk14At === undefined;
+        out.def = /材料租期自各工項打設/.test(document.getElementById('prm').defaultValue || document.getElementById('prm').textContent || '');
+        P.rmkBase = P0.b; if (P0.o != null) P.rmkBaseOld = P0.o; else delete P.rmkBaseOld; if (P0.a != null) P.rmk14At = P0.a; else delete P.rmk14At;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      window.fetch = oF; _fbUser = oU; _isReaderUser = oR; window._draftPush = oPush; window._draftMark = oMark; window._onSave = oSave; window.toast = oT;
+      try { closeVendorModal(); document.getElementById('customer-modal').style.display = 'none'; } catch (e) { /* 可忽略 */ }
+      return out;
+    });
+    const RF138 = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    check('v6.0.138 統編查詢：檢查碼（含第 7 碼 7）、g0v 公司／商業兩種格式；空白欄帶入、已填的不蓋改「全部帶入」、同統編不重查；查不到與檢查碼不符只提醒不擋存檔；負責人欄存檔',
+      r.chk && r.parse && r.fill && r.fillAll && r.saved && r.cache && r.miss && r.bad && r.vsaved, JSON.stringify(r));
+    check('v6.0.138 客戶·廠商 AI 草稿：唯讀帳號送 contact 草稿（不收匯款帳號、名稱統編同→修改）；管理員套用開表單帶入、按儲存才寫入並標已套用；規則放行 contact',
+      r.dErr && r.push && r.form && r.applied && r.reset && /contact\)\$/.test(RF138.drafts.$id['.validate']), JSON.stringify(r));
+    check('v6.0.138 備註第 14 條：管理員裝置遷移一次（舊全文另存）、切換前的舊報價印舊文字、新報價與新編輯印新文字；參數不是舊第 14 條不自動換；預設值已換', r.mig && r.once && r.reswap && r.oldQ && r.newQ && r.newEd && r.noHit && r.def, JSON.stringify(r));
+    check('v6.0.138 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
