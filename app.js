@@ -40039,7 +40039,7 @@ async function fyInboxMark(id,f){
 // 內容跟上一個正式版次一樣（日期以外，比對給業主的文件主體）就不重複封存，直接用那一版匯出。唯讀帳號不能存檔，直接匯出。
 function _qSendSig(q){try{var c=JSON.parse(JSON.stringify(q));c.date='';return _buildQuoteDocHTML(c);}catch(e){_err('_qSendSig',e);return null;}}
 function _qLastFormal(qid){var vs=Q_HISTORY[qid]||[];for(var i=0;i<vs.length;i++)if(vs[i]&&vs[i].formal&&vs[i].snapshot)return vs[i];return null;}
-function _rocDate(iso){var d=String(iso||localToday()).split('-');return (parseInt(d[0],10)-1911)+'/'+d[1]+'/'+d[2];}
+function _qSendRoc(iso){var d=String(iso||localToday()).split('-');return (parseInt(d[0],10)-1911)+'/'+d[1]+'/'+d[2];}
 // what：'PDF'／'業主檔'；run(qObj)：用這份內容產生檔案（可回傳 Promise）
 function _qSendGate(qid,what,run){
   // 編輯頁開著＝先存檔；存不成（名稱空白、負數、雲端版本較新要先處理）就不封存也不匯出（審查：避免封存舊內容、PDF 與畫面不一致）
@@ -40066,7 +40066,7 @@ function _qSendGate(qid,what,run){
       '這份要送出給對方嗎？送出就把目前內容封存成 <strong>V'+n+'</strong>（永久保留），之後的修改算 <strong>V'+(n+1)+'</strong>。'
       +'<div style="margin:10px 0 2px"><button type="button" class="btn btn-sm" id="q-send-only" onclick="window._qSendOnly&&_qSendOnly()">只匯出、不封存</button></div>'
       +'<span style="font-size:11px;color:var(--b4)">只是自己看、還沒要送出，就按「只匯出、不封存」。要回到舊版本：歷史版本 › 還原。</span>',
-      function(){window._qSendOnly=null;var qq=Q.find(function(x){return x.id===qid;})||q;var snap=JSON.parse(JSON.stringify(qq));_qBumpDo(qid,'送出 '+what+' '+_rocDate(localToday()));toast('已封存 V'+n+'，之後的修改算 V'+(n+1));res(run(snap));},
+      function(){window._qSendOnly=null;var qq=Q.find(function(x){return x.id===qid;})||q;var snap=JSON.parse(JSON.stringify(qq));_qBumpDo(qid,'送出 '+what+' '+_qSendRoc(localToday()));toast('已封存 V'+n+'，之後的修改算 V'+(n+1));res(run(snap));},
       false,function(){window._qSendOnly=null;res(null);},false,{ok:'送出並封存',cancel:'取消'});
   });
 }
