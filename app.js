@@ -8911,7 +8911,7 @@ function computeShoringFY(inp){
   back.push({k:'安全母索折捲（每捲 '+_rReel+'M）',v:_shR0(_rReels),u:'捲'});
   T.ropeForm=_rf;T.ropeSpare=_rSpare;T.ropeNeed=_rNeed;T.ropeReels=_rReels;T.ropeReel=_rReel;T.ropeWaste=_rWaste;
   // v6.0.141：規格／重量、配件（構台下沒拉的路不算）；其他區塊改用另一種形式時另列一組
-  var _rAccRows=function(t,R){var nm=_LL_FORM[t].accs;R.acc.forEach(function(n,ai){if(n>0)back.push({k:String(nm[ai]).replace(/（.*$/,''),v:_shR0(n),u:String(nm[ai]).replace(/^.*（([^／]*)／.*$/,'$1')});});};
+  var _rAccRows=function(t,R,tag){var nm=_LL_FORM[t].accs;R.acc.forEach(function(n,ai){if(n>0)back.push({k:String(nm[ai]).replace(/（.*$/,'')+(tag||''),v:_shR0(n),u:String(nm[ai]).replace(/^.*（([^／]*)／.*$/,'$1')});});};
   if(_rT.spec)back.push({k:'規格 '+_rT.spec+'（重量約 '+_shR0(_rT.kg)+' kg）',v:_shR1(_rNeed),u:'M'});
   _rAccRows(_rForm,_rT);
   T.ropeKg=_rT.kg;T.ropeSpec=_rT.spec;T.ropeT=_rRes.T;T.ropeMain=_rForm;T.ropeDl=_rRes.deductLayers;
@@ -8924,7 +8924,8 @@ function computeShoringFY(inp){
     back.push({k:_rfo+'需求長度',v:_shR1(_rO.need),u:'M'});
     back.push({k:_rfo+'折捲（每捲 '+_rO.reel+'M）',v:_shR0(_rOReels),u:'捲'});
     if(_rO.spec)back.push({k:'規格 '+_rO.spec+'（重量約 '+_shR0(_rO.kg)+' kg）',v:_shR1(_rO.need),u:'M'});
-    _rAccRows(_rOther,_rO);
+    _rAccRows(_rOther,_rO,_rfo);   // 名稱帶形式（例：套環特多龍繩），採購清冊才不會跟主形式的套環併成一行
+    T.yellow+=_rO.yellow;
     T.ropeOther={form:_rOther,label:_rfo,need:_rO.need,reels:_rOReels,reel:_rO.reel,kg:_rO.kg};
   }
   back.push({k:'黃色立柱',v:_shR0(T.yellow),u:'支'});
@@ -9574,10 +9575,10 @@ function matEstRowU(arr,i,f,val){MAT_EST[arr][i][f]=(f==='dcc'||f==='dcs'||f==='
 function matEstRowAdd(arr){
   if(!Array.isArray(MAT_EST[arr]))MAT_EST[arr]=[];
   var tmpl={_ropeZones:{nm:'',fm:(MAT_EST.ropeForm==='rope'?'wire':'rope'),vn:0,vl:0,hn:0,hl:0},_routesV:{rc:1,rl:0},_routesH:{rc:1,rl:0},_gtRoutesV:{rc:1,rl:0},_gtRoutesH:{rc:1,rl:0},_ud:{ul:0,uh:0},_dc:{dcc:'圍令',dcs:'H400',dcv:0}}[arr];
-  MAT_EST[arr].push(JSON.parse(JSON.stringify(tmpl)));renderMatEst();
+  MAT_EST[arr].push(JSON.parse(JSON.stringify(tmpl)));renderMatEst();_meAutoKick();
 }
-function matEstRowDel(arr,i){MAT_EST[arr].splice(i,1);renderMatEst();}
-function matEstReset(){MAT_EST=_shDefaults();window._matEstRes=null;var o=document.getElementById('mat-est-out');if(o)o.innerHTML='';renderMatEst();}
+function matEstRowDel(arr,i){MAT_EST[arr].splice(i,1);renderMatEst();_meAutoKick();}
+function matEstReset(){_mePvStages=null;MAT_EST=_shDefaults();window._matEstRes=null;var o=document.getElementById('mat-est-out');if(o)o.innerHTML='';renderMatEst();}
 // v5.404：材料估算輸入正規化——存檔／雲端往返可能缺欄位、陣列被剝掉、元素不是物件、數字變字串，
 // 任何一種都曾讓整頁拋錯變空白。這裡把每個陣列與元素都補成合法形狀，渲染再包一層 try/catch。
 function _matEstNorm(src){
@@ -9683,6 +9684,7 @@ function _renderMatEstInner(el){
     +(_shBool(m.gtRopeDeduct)?('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:6px">'
       +'<div>'+routeTbl('_gtRoutesV','構台下縱向路數')+'</div><div>'+routeTbl('_gtRoutesH','構台下橫向路數')+'</div></div>'
       +'<div style="font-size:10.5px;color:var(--b3);margin-top:2px">構台下方不設母索：第一層母索扣除 Σ(路數×每路長)'+(_shNum(m.gtDeduct)>0?'（舊資料總長 '+_shNum(m.gtDeduct)+' M 於未填路數時沿用）':'')+'</div>'):'')
+    +(function(){if(!_rfm.specs.some(function(x){return x[0]===m.ropeSpec;}))m.ropeSpec=_rfm.def.spec;return '';})()
     +adv('<div class="me-grid">'+fS('ropeSpec','規格（算重量）',_rfm.specs.map(function(x){return [x[0],x[0]+'（'+x[1]+' kg/M）'];}))
       +_rfm.accs.map(function(nm,ai){return fN('ropeAcc'+ai,esc(nm),'空白＝'+_rfm.def.acc[ai]);}).join('')+'</div>'
       +'<div style="font-size:12px;font-weight:700;margin:10px 0 4px">其他區塊 <span style="font-weight:400;font-size:10.5px;color:var(--b3)">支撐路以外另外要拉的母索；可改用另一種形式（例：構台邊用特多龍繩），每層都加</span></div>'
@@ -9752,7 +9754,8 @@ var _meView='stage';   // 預覽哪一份：stage＝叫料單、cat＝估價明�
 var _mePvStages=null,_mePvBasis=false,_meAutoCalc=false,_meAutoT=0,_mePvRT=0;
 try{window.addEventListener('resize',function(){clearTimeout(_mePvRT);_mePvRT=setTimeout(function(){var pg=document.querySelector('.page.active');if(pg&&pg.id==='page-matest'&&_meTab==='shoring')_mePvRender();},200);});}catch(e){/* 可忽略 */}   // 叫料單要印的階段（null＝全部）、估價明細附計算依據
 function _mePvOpt(res){
-  var n=(res&&res.staged||[]).length,st=[];for(var i=0;i<n;i++)if(!_mePvStages||_mePvStages.indexOf(i)>=0)st.push(i);
+  var n=(res&&res.staged||[]).length,st=[];
+  if(_mePvStages&&_mePvStages._n!==n)_mePvStages=null;   // 階段數變了（層數改動、換專案）→ 回到全選for(var i=0;i<n;i++)if(!_mePvStages||_mePvStages.indexOf(i)>=0)st.push(i);
   return _meView==='cat'?{kind:'quote',opt:{basis:_mePvBasis}}:{kind:'order',opt:{stages:st}};
 }
 function _mePvCtlHtml(res){
@@ -9770,8 +9773,8 @@ function mePvSet(k,a,b){
   var n=(res.staged||[]).length;
   if(k==='view')_meView=a==='cat'?'cat':'stage';
   else if(k==='basis')_mePvBasis=!!a;
-  else if(k==='all')_mePvStages=a?null:[];
-  else if(k==='stage'){var cur=_mePvStages||(function(){var x=[];for(var i=0;i<n;i++)x.push(i);return x;})();cur=cur.filter(function(i){return i!==a;});if(b)cur.push(a);cur.sort(function(x,y){return x-y;});_mePvStages=cur.length===n?null:cur;}
+  else if(k==='all'){_mePvStages=a?null:[];if(_mePvStages)_mePvStages._n=n;}
+  else if(k==='stage'){var cur=_mePvStages||(function(){var x=[];for(var i=0;i<n;i++)x.push(i);return x;})();cur=cur.filter(function(i){return i!==a;});if(b)cur.push(a);cur.sort(function(x,y){return x-y;});_mePvStages=cur.length===n?null:cur;if(_mePvStages)_mePvStages._n=n;}
   var c=document.getElementById('me-pv-ctl');if(c)c.innerHTML=_mePvCtlHtml(res);
   _mePvRender();
 }
@@ -9780,11 +9783,11 @@ function mePvSet(k,a,b){
 function _mePvRender(){
   var host=document.getElementById('me-pv'),res=window._matEstRes;if(!host||!res)return;
   var o=_mePvOpt(res);
-  if(o.kind==='order'&&!o.opt.stages.length){if(host.shadowRoot)host.shadowRoot.innerHTML='';host.style.height='';host.innerHTML='<div style="padding:20px;color:var(--b3);font-size:13px;text-align:center">請至少勾一個階段</div>';return;}
-  host.innerHTML='';
+  var sr0=host.shadowRoot||host.attachShadow({mode:'open'});
+  if(o.kind==='order'&&!o.opt.stages.length){sr0.innerHTML='<div style="padding:20px;color:#8a918a;font:13px sans-serif;text-align:center">請至少勾一個階段</div>';host.style.height='';host.setAttribute('data-pages','0');return;}
   var d=_meDoc(o.kind,o.opt,res);
   var W=_pdfContentPx(true),MM=W/277,MG=Math.round(10*MM),SH=Math.round(210*MM),CH=SH-2*MG,GAP=24;
-  var sr=host.shadowRoot||host.attachShadow({mode:'open'});
+  var sr=sr0;
   sr.innerHTML='<style>'+d.css+'.pvz{position:relative;transform-origin:0 0;width:'+(W+2*MG)+'px}.pvs{position:absolute;left:0;width:'+(W+2*MG)+'px;height:'+SH+'px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}'
     +'.pvn{position:absolute;bottom:'+Math.round(MG/2)+'px;width:100%;text-align:center;font:10px sans-serif;color:#888}.medoc{position:relative;left:'+MG+'px;top:'+MG+'px;width:'+W+'px}.medoc>*:first-child{margin-top:0}</style>'
     +'<div class="pvz"><div class="medoc page-wrap">'+d.body+'</div></div>';
@@ -9794,7 +9797,7 @@ function _mePvRender(){
   if(doc.offsetHeight>CH+1){
     kids.forEach(function(c){
       var top=c.offsetTop,bot=top+c.offsetHeight;
-      if(bot>st(k)+CH+1&&top>st(k)+1){var mt=parseFloat(getComputedStyle(c).marginTop)||0;k++;c.style.marginTop=(mt+st(k)-top)+'px';top=c.offsetTop;bot=top+c.offsetHeight;}
+      if(bot>st(k)+CH+1&&top>st(k)+1){var mt=parseFloat(getComputedStyle(c).marginTop)||0;k++;c.style.marginTop=(mt+st(k)-top)+'px';top=c.offsetTop;if(top<st(k)){c.style.marginTop=(parseFloat(c.style.marginTop)+st(k)-top)+'px';top=c.offsetTop;}bot=top+c.offsetHeight;}
       while(bot>st(k)+CH+1)k++;   // 單一整塊比一頁還高：匯出時在列與列之間切開
     });
   }
@@ -9812,9 +9815,10 @@ function matEstExportNow(){
   matEstExportPDF(o.kind,o.opt);
 }
 // 左邊條件改動 → 自動重算（離開欄位或切換選項時）
+function _meAutoKick(force){if(!force&&!window._matEstRes)return;clearTimeout(_meAutoT);_meAutoT=setTimeout(function(){_meAutoCalc=true;try{matEstCalc();}catch(e){_err('_meAutoKick',e);}_meAutoCalc=false;},250);}
 function _meAutoBind(){
   var f=document.getElementById('mat-est-form');if(!f||f._meAuto)return;f._meAuto=1;
-  f.addEventListener('change',function(){clearTimeout(_meAutoT);_meAutoT=setTimeout(function(){_meAutoCalc=true;try{matEstCalc();}catch(e){_err('_meAutoBind',e);}_meAutoCalc=false;},250);});
+  f.addEventListener('change',function(){_meAutoKick(true);});
 }
 function _meTiles(res){
   var ld=res.layerData||[],T=res.T||{},wl=0,sp=0,jk=0;ld.forEach(function(d){wl+=d.wM||0;sp+=d.sM||0;jk+=d.jack||0;});
