@@ -431,7 +431,7 @@ async function newPage(browser, width, height) {
     });
     check('收款彈窗可選期數（列出全部 4 期）', r.periods === 4, '得到 ' + r.periods);
     check('收款彈窗可切換到指定期別', r.opened4 && r.switched2);
-    check('報價列表以「進版」取代「存至客戶清單」', r3.bump === 1 && r3.saveCli === 0,
+    check('報價列表沒有「進版」與「存至客戶清單」（v6.0.159 送出自動進版後，進版只留在歷史版本視窗）', r3.bump === 0 && r3.saveCli === 0,
           'bump=' + r3.bump + ' saveCli=' + r3.saveCli);
     check('歷史版本說明區分版次與自動存檔', r3.verBump && r3.verHint);
     check('報價／請款預覽各只有一顆「匯出PDF」', r.qBtns === '← 返回|匯出PDF' && r.iBtns === '← 返回|匯出PDF',
