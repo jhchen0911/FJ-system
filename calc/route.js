@@ -313,6 +313,8 @@
       var wDbl = (sW && sW.dbl) || /雙/.test(String(V(sp['圍令單雙']) || ''));
       var sDbl = (sS && sS.dbl) || /雙/.test(String(V(sp['支撐單雙']) || ''));
       if (!sW) warn.push('第 ' + n + ' 層圍令規格看不懂（' + (V(sp['圍令']) || V(sp['支撐']) || '空白') + '），用 H350');
+      else if (!V(sp['圍令']) && !/W/i.test(String(V(sp['支撐']) || ''))) warn.push('第 ' + n + ' 層量測檔沒寫圍令規格，照支撐規格 ' + sW.spec + '，請確認');
+      if (CF(ly['三角架高程']) === '低') warn.push('第 ' + n + ' 層三角架高程信心度低（構台下淨空用到），請確認');
       if (!sS) warn.push('第 ' + n + ' 層支撐規格看不懂（' + (V(sp['支撐']) || '空白') + '），用 H350');
       var w = sW ? sW.spec : 'H350', s = sS ? sS.spec : 'H350', h = specH(w);
       var tri = glOf(ly['三角架高程'] != null ? ly['三角架高程'] : ly['高程']);
@@ -329,6 +331,7 @@
         mid: V(ly['中間樁']), co: V(ly['共構樁']), corners: V(ly['轉角']), irr: V(ly['不規則處']) });
     });
     if (!L.length) warn.push('量測檔沒有「各層」');
+    if (V(d['層數']) != null && num(V(d['層數'])) !== L.length) warn.push('層數 ' + V(d['層數']) + ' 與各層 ' + L.length + ' 筆不一致');
     var wall = d['擋土壁'] || {}, cap = d['構台帽頂高程'] != null ? d['構台帽頂高程'] : d['帽梁高程'];
     var sheets = (Array.isArray(d['來源圖面']) ? d['來源圖面'] : []).map(function (x) { return x && x['圖號']; }).filter(Boolean);
     return {

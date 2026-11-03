@@ -6008,7 +6008,7 @@ function _copyQDo(id){
   // Append (複製) to name
   copy.name=(copy.name||'未命名')+' (複製)';copy.payDefV=2;copy.instV=2;delete copy.ownerCard;delete copy._ocPriv;   // 新專案
   // 健檢1 #7：複製報價＝新的一張報價，不帶原案的專案狀態（追加案關聯、結案、版次、日報、詢價、材料、佣金、得標結果…）
-  ['parentId','closed','closedAt','ver','date0','dailyLogs','rfqs','mat','comms','comm','referral','confirmFiles','addons','siteHist','bidStatus','lostReason','lostPrice','lostNote','rentEnd','ownerDoc','matEst','plan'].forEach(function(k){delete copy[k];});
+  ['parentId','closed','closedAt','ver','date0','dailyLogs','rfqs','mat','comms','comm','referral','confirmFiles','addons','siteHist','bidStatus','lostReason','lostPrice','lostNote','rentEnd','ownerDoc','matEst','measure','plan'].forEach(function(k){delete copy[k];});
   copy._mt=Date.now();
   Q.unshift(copy);
   persist();
@@ -40188,7 +40188,7 @@ function _meRouteHtml(m,sec,fN,adv){
 function meRtU(i,f,val){var r=(MAT_EST._routeRows||[])[i];if(!r)return;r[f]=(f==='wall'||f==='ly')?(val===''?'':(parseFloat(val)||0)):String(val==null?'':val).trim();renderMatEst();_meAutoKick(true);}
 function meRtAdd(){if(!Array.isArray(MAT_EST._routeRows))MAT_EST._routeRows=[];var a=MAT_EST._routeRows,last=a[a.length-1]||{};a.push({ly:last.ly||1,id:'',dir:last.dir||'縱',wall:'',dbl:'',combo:'',mids:'',cross:'',note:''});renderMatEst();}
 function meRtDel(i){(MAT_EST._routeRows||[]).splice(i,1);renderMatEst();_meAutoKick(true);}
-function meRtClear(){showConfirm('清空路數明細','清空後支撐長度與接頭回到估算。',function(){MAT_EST._routeRows=[];MAT_EST._routeSrc=null;renderMatEst();_meAutoKick(true);},true);}
+function meRtClear(){showConfirm('清空路數明細','清空後支撐長度與接頭回到估算。',function(){MAT_EST._routeRows=[];MAT_EST._routeSrc=null;MAT_EST._measBrace=null;renderMatEst();_meAutoKick(true);},true);}
 function meRtTpl(){downloadCSV('路數明細_範本',_ME_RT_HEAD,[[1,'V1','縱',24.6,'單','','範例','6.2,12.9,18.6',''],[1,'H1','橫',30.8,'雙','','','7.5,15,22.5','6.2,12.4']]);}
 function meRtCsv(el){
   var f=el&&el.files&&el.files[0];if(!f)return;var rd=new FileReader();
@@ -40198,7 +40198,7 @@ function meRtCsv(el){
       if(/\uFFFD/.test(txt)&&rd._buf&&typeof TextDecoder!=='undefined'){try{txt=new TextDecoder('big5').decode(new Uint8Array(rd._buf));}catch(e){_err('meRtCsv.big5',e);}}   // 審查：Excel 預設存 Big5
       var r=FJC.route.csv(txt);el.value='';
       if(!r.rows.length){toast('CSV 沒有可用的列'+(r.errs.length?'：'+r.errs[0]:''));return;}
-      var apply=function(){MAT_EST._routeRows=r.rows;MAT_EST._routeSrc={file:f.name,at:localToday()};
+      var apply=function(){MAT_EST._routeRows=r.rows;MAT_EST._routeSrc={file:f.name,at:localToday()};MAT_EST._measBrace=null;
         var L=Math.max(1,parseInt(MAT_EST.layers)||1),over=r.rows.filter(function(x){return x.ly>L;}).length;
         renderMatEst();_meAutoKick(true);toast('已匯入 '+r.rows.length+' 路'+(r.errs.length?'，'+r.errs.length+' 列略過（'+r.errs[0]+'）':'')+(over?'；'+over+' 路超過支撐層數不計':''));};
       if((MAT_EST._routeRows||[]).length)showConfirm('匯入路數明細','匯入會取代目前 '+MAT_EST._routeRows.length+' 路的路數明細，確定？',apply,true);else apply();
@@ -40373,6 +40373,7 @@ function _meMeasSrcHtml(src){
   if(!src||src.kind!=='measure')return '';
   var h='<div style="font-size:11.5px;line-height:1.7;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r8);padding:6px 10px;margin-bottom:6px">'
     +'量測檔：'+esc((src.sheets||[]).join('、')||'—')+'　量測 '+esc(String(src.date||'').replace('T',' ').slice(0,16))+'　引擎 '+esc(src.engine||'')+(src.sub?'　'+esc(src.sub):'');
+  h+='<br>斜撐／角撐支數依量測檔「可裝」（改用 CSV 或清空路數明細就恢復估算）';
   if(!src.hasLine)h+='<br><span style="color:#b26a00">量測檔沒有每路中間樁位置（v1）：接頭位置未檢查中間樁；交叉點已由縱橫路線算出、接頭照避。</span>';
   if((src.low||[]).length)h+='<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:4px 8px;margin-top:4px;color:#8d6e00">信心度低、要人確認：'+esc(src.low.slice(0,12).join('、'))+(src.low.length>12?'…等 '+src.low.length+' 項':'')+'</div>';
   if((src.warn||[]).length)h+='<div style="color:var(--red);margin-top:2px">'+esc(src.warn.join('；'))+'</div>';
@@ -40387,7 +40388,9 @@ function meMeasImport(el){
     var r=d?FJC.route.fromMeasure(d):{ok:false,err:'不是 JSON 檔'};
     if(!r.ok){toast('量測檔讀不進來：'+r.err);return;}
     var nR=r.rows.length,msg='量測檔 '+esc(f.name)+'：'+r.L.length+' 層、'+nR+' 路支撐。<br>會帶入：各層規格與三角架高程、路數明細（取代目前 '+((MAT_EST._routeRows||[]).length)+' 路）、斜撐／角撐可裝數'
-      +(window._matEstQid?'；已掛專案：基地尺寸、樁數以案場細節為準，另把量測數字存進報價供「圖面覆核」':'；基地周長、面積、深度、中間樁／共構樁支數')+'。'
+      +(function(){var sq=null;try{sq=_matEstSiteQ();}catch(e){_err('meMeasImport',e);}var sl=sq?parseInt(_sdNorm(sq.site).layers)||0:0;
+        return sq?('；已掛專案且有案場細節：基地尺寸、樁數、各層規格與層數以案場細節為準（只帶三角架高程、路數明細、斜撐角撐）'+(sl&&sl!==r.L.length?'<br><b style="color:#b26a00">案場細節 '+sl+' 層、量測檔 '+r.L.length+' 層，不一致：超過的層不計，請先改案場細節</b>':'')):'；基地周長、面積、深度、中間樁／共構樁支數、各層規格';})()
+      +(window._matEstQid?'；另把量測數字存進報價供「圖面覆核」':'')+'。'
       +((r.low||[]).length?'<br><span style="color:#8d6e00">有 '+r.low.length+' 項信心度低，帶入後會標黃。</span>':'');
     showConfirm('匯入量測檔',msg,function(){_meMeasApply(r,f.name);},false);
   };
@@ -40397,11 +40400,13 @@ function _meMeasApply(r,file){
   var m=MAT_EST=_matEstNorm(MAT_EST),n=function(x){var v=parseFloat(x);return isFinite(v)?v:null;};
   m.layers=Math.max(1,r.L.length||parseInt(r.layers)||1);
   var old=m._layers||[];
+  r.L.sort(function(a,b){return a.L-b.L;});
   m._layers=r.L.map(function(l,i){var o=old[i]||{};return {w:l.w,s:l.s,d:l.d,st:!!o.st,el:l.triEl==null?(o.el==null?'':o.el):l.triEl};});
   m._routeRows=r.rows.map(function(x){var y=Object.assign({},x);delete y.src;return y;});
-  m._measBrace=r.L.map(function(l){return l.brace;});
+  m._measBrace=[];r.L.forEach(function(l){if(l.L>=1)m._measBrace[l.L-1]=l.brace;});
   if(r.capEl!=null)m.capEl=r.capEl;
-  if(!window._matEstQid){
+  var _sq=null;try{_sq=_matEstSiteQ();}catch(e){_err('_meMeasApply',e);}
+  if(!_sq){   // 審查：沒有案場細節（含掛了專案但還沒填）才帶基地尺寸；有案場細節時以案場細節為準
     if(n(r.P)!=null)m.P=n(r.P);if(n(r.A)!=null)m.A=n(r.A);if(n(r.H)!=null)m.H=n(r.H);
     if(n(r.mid)!=null)m.kingMid=n(r.mid);if(n(r.co)!=null)m.kingCo=n(r.co);
     if(n(r.corners)!=null)m.corners=n(r.corners);if(n(r.irr)!=null)m.irr=n(r.irr);
@@ -40423,12 +40428,13 @@ function _qMeasMap(q){
   var M=q&&q.measure;if(!M)return [];
   var rows=[];
   (q.items||[]).forEach(function(it,i){
-    if(!it||it.sec)return;var d=String(it.desc||''),u=String(it.unit||'').replace(/\s/g,''),meas=null,lab='';
+    if(!it||it.sec)return;var d=String(it.desc||''),u=String(it.unit||'').replace(/\s/g,'').replace(/²/g,'2').replace(/^平方米$/,'㎡'),meas=null,lab='';
+    if(/構台|追加|另計/.test(d))return;   // 審查：構台支撐、追加工項不跟圖面總量比
     if(/中間樁/.test(d)&&/^支/.test(u)){meas=M.mid;lab='中間樁';}
     else if(/共構樁/.test(d)&&/^支/.test(u)){meas=M.co;lab='共構樁';}
     else if(/鋼[板鈑]樁/.test(d)&&/^(M|m|公尺)$/.test(u)){meas=M.sheetLen;lab='鋼板樁打設延長';}
     else if(/(鋼[板鈑]樁|H型鋼樁|鋼軌樁|排樁|擋土樁)/.test(d)&&/^(支|片)/.test(u)){meas=M.pileN;lab='擋土壁樁數';}
-    else if(/支撐/.test(d)&&/^(㎡|m2|M2|平方公尺)$/.test(u)){meas=M.A;lab='開挖面積';}
+    else if(/支撐/.test(d)&&/^(㎡|m2|M2|平方公尺)$/i.test(u)){meas=M.A;lab='開挖面積';}
     if(meas==null||!(meas>0))return;
     var qty=parseFloat(it.qty)||0,price=parseFloat(it.price)||0;
     rows.push({idx:i,desc:d.split('\n')[0],unit:u,qty:qty,meas:meas,amt:Math.round(qty*price),lab:lab});
@@ -40460,7 +40466,7 @@ function qMeasImport(el){
 function qMeasReview(){
   var q=Q.find(function(x){return x.id===eid;});if(!q||!q.measure)return;
   var rows=_qMeasMap(Object.assign({},q,{items:(typeof items!=='undefined'&&Array.isArray(items))?items:q.items}));
-  var tot=(q.t&&q.t.sub)||0,rv=FJC.route.review(rows,tot),M=q.measure;
+  var live=(typeof items!=='undefined'&&Array.isArray(items))?calcT():null,tot=(live&&live.sub)||(q.t&&q.t.sub)||0,rv=FJC.route.review(rows,tot),M=q.measure;   // 審查：與標示用同一個（畫面上的）小計
   var h='<div style="font-size:11.5px;color:var(--b4);margin-bottom:6px">量測檔 '+esc(M.file||'')+'（'+esc((M.sheets||[]).join('、'))+'，'+esc(String(M.date||'').slice(0,10))+'）。差異＝(報價數量−圖面)÷圖面；一般工項超過 10%、占總價一成以上的工項超過 5% 標紅。只提醒、不擋送出。</div>'
     +'<table class="tbl" style="width:100%"><thead><tr><th>工項</th><th>對應</th><th class="r">報價</th><th class="r">圖面</th><th class="r">差異</th></tr></thead><tbody>';
   rv.rows.forEach(function(x,i){var r=rows[i];h+='<tr style="'+(x.bad?'color:var(--red);font-weight:700':'')+'"><td>'+esc(r.desc)+'</td><td>'+esc(r.lab)+'</td><td class="r">'+fmt(x.qty)+' '+esc(r.unit)+'</td><td class="r">'+fmt(x.meas)+'</td><td class="r">'+(x.pct>0?'+':'')+x.pct+'%（門檻 '+x.th+'%）</td></tr>';});

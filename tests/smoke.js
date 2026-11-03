@@ -10037,6 +10037,10 @@ async function newPage(browser, width, height) {
         out.notes = st1.notes.some(t => /斜撐／角撐依量測檔：斜撐可裝 36、待確認 1/.test(t)) && st1.notes.some(t => /接頭位置未檢查（沒填中間樁）/.test(t));
         const f = document.getElementById('mat-est-form').innerHTML;
         out.ui = /量測檔：S-1 範例/.test(f) && /信心度低、要人確認/.test(f) && /量測檔沒有每路中間樁位置（v1）/.test(f) && /匯入量測檔（JSON）/.test(f);
+        // 審查：改用 CSV 匯入就不再用量測檔的斜撐支數；複製報價不帶量測檔
+        const keepRows = m._routeRows; meRtCsv({ files: [new File(['層,路編號,方向,壁間長度\n1,V1,縱,24.6'], 'x.csv')], value: '' }); await wait(400); if (document.getElementById('gen-confirm-modal').style.display === 'flex') document.getElementById('gen-confirm-ok').click(); await wait(200);
+        out.csvClears = MAT_EST._measBrace === null && /'measure'/.test(String(_copyQDo));
+        MAT_EST._routeRows = keepRows;
         // 掛專案：量測摘要存進報價、報價頁圖面覆核
         Q.push({ id: 'qm1', name: '量測測試案', client: '範例營造', date: '2026-11-03', items: [{ desc: '中間樁 H350', unit: '支', qty: 19, price: 1000 }, { desc: 'RC排樁', unit: '支', qty: 320, price: 100 }, { desc: '水平支撐', unit: '㎡', qty: 620, price: 50 }], exs: [], rmk: {} });
         window._matEstQid = 'qm1'; meMeasImport({ files: [new File([fx], '範例_量測檔.json', { type: 'application/json' })], value: '' }); await wait(500); document.getElementById('gen-confirm-ok').click(); await wait(300);
@@ -10056,7 +10060,7 @@ async function newPage(browser, width, height) {
     }, FX);
     check('v6.0.160 量測檔匯入：確認後帶入各層規格、三角架高程、30 路支撐、周長面積、中間樁；顯示來源、信心度低標黃、v1 沒有中間樁位置提示', r.ask && r.apply && r.ui, JSON.stringify(r));
     check('v6.0.160 量測檔：斜撐／角撐叫料依量測檔可裝數、叫料單列待確認與未檢查中間樁', r.brace && r.notes, JSON.stringify(r));
-    check('v6.0.160 報價頁圖面覆核：掛專案存量測摘要（不放金額）；差異超過門檻標紅、明細可看；沒量測檔可直接匯入；格式不對拒收', r.saved && r.chip && r.review && r.noMeas && r.bad, JSON.stringify(r));
+    check('v6.0.160 報價頁圖面覆核：掛專案存量測摘要（不放金額）；差異超過門檻標紅、明細可看；沒量測檔可直接匯入；格式不對拒收', r.saved && r.chip && r.review && r.noMeas && r.bad && r.csvClears, JSON.stringify(r));
     check('v6.0.160 量測檔測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
