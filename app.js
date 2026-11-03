@@ -9755,7 +9755,8 @@ var _mePvStages=null,_mePvBasis=false,_meAutoCalc=false,_meAutoT=0,_mePvRT=0;
 try{window.addEventListener('resize',function(){clearTimeout(_mePvRT);_mePvRT=setTimeout(function(){var pg=document.querySelector('.page.active');if(pg&&pg.id==='page-matest'&&_meTab==='shoring')_mePvRender();},200);});}catch(e){/* 可忽略 */}   // 叫料單要印的階段（null＝全部）、估價明細附計算依據
 function _mePvOpt(res){
   var n=(res&&res.staged||[]).length,st=[];
-  if(_mePvStages&&_mePvStages._n!==n)_mePvStages=null;   // 階段數變了（層數改動、換專案）→ 回到全選for(var i=0;i<n;i++)if(!_mePvStages||_mePvStages.indexOf(i)>=0)st.push(i);
+  if(_mePvStages&&_mePvStages._n!==n)_mePvStages=null;   // 階段數變了（層數改動、換專案）→ 回到全選
+  for(var i=0;i<n;i++)if(!_mePvStages||_mePvStages.indexOf(i)>=0)st.push(i);
   return _meView==='cat'?{kind:'quote',opt:{basis:_mePvBasis}}:{kind:'order',opt:{stages:st}};
 }
 function _mePvCtlHtml(res){

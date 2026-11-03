@@ -850,7 +850,7 @@ async function newPage(browser, width, height) {
         out.import = MAT_EST.ropeForm === 'rope' && MAT_EST.ropeSpec === 'Ø18mm' && MAT_EST.ropeSpare === 2.5 && MAT_EST.ropeReel === 150 && MAT_EST.ropeWaste === 3
           && _matEstRes.T.ropeT.rope.acc[0] === _matEstRes.T.ropeT.rope.runs * 6;
         // 切換形式：規格與配件回預設
-        matEstRopeForm(); out.formReset = MAT_EST.ropeSpec === '' && MAT_EST.ropeAcc0 === '';
+        matEstRopeForm(); out.formReset = MAT_EST.ropeAcc0 === '' && MAT_EST.ropeAcc1 === '' && MAT_EST.ropeAcc2 === '';   // 規格回預設見 specShown
         // 審查：規格下拉顯示實際用的規格（空白＝形式預設）；全不選時提示顯示在預覽裡；刪除其他區塊後自動重算
         out.specShown = MAT_EST.ropeSpec === 'Ø16mm';
         MAT_EST.ropeForm = 'wire'; matEstRopeForm(); matEstCalc(); mePvSet('view', 'stage'); mePvSet('all', 0);
