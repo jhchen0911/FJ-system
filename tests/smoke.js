@@ -817,7 +817,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ───────────── 9. 安全母索（v6.0.149 起併入材料估算「擋土支撐全套」④-1；與既有 Excel 逐格一致的算法測試在 tests/calc.js）─────────────
+  // ───────────── 9. 安全母索（v6.0.153 起併入材料估算「擋土支撐全套」④-1；與既有 Excel 逐格一致的算法測試在 tests/calc.js）─────────────
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
@@ -859,15 +859,15 @@ async function newPage(browser, width, height) {
       try { localStorage.removeItem('fy_lifeline'); } catch (e) { /* 可忽略 */ }
       return out;
     });
-    check('v6.0.149 安全母索併入全套：舊入口轉到全套、分頁與獨立頁移除', r.redirect, JSON.stringify(r));
-    check('v6.0.149 安全母索：長度不變（2,044.9 M、11 捲）＋規格重量、每層配件（構台下沒拉的路不算）、配件數可改', r.len && r.acc && r.accEdit, JSON.stringify(r));
-    check('v6.0.149 安全母索：其他區塊可改用特多龍繩（長度、捲數、配件另列，鋼索不變）', r.mix, JSON.stringify(r));
-    check('v6.0.149 安全母索：帶入舊安全母索頁設定、切換形式回預設', r.importBtn && r.import && r.formReset && r.specShown && r.noStage, JSON.stringify(r));
-    check('v6.0.149 安全母索測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.153 安全母索併入全套：舊入口轉到全套、分頁與獨立頁移除', r.redirect, JSON.stringify(r));
+    check('v6.0.153 安全母索：長度不變（2,044.9 M、11 捲）＋規格重量、每層配件（構台下沒拉的路不算）、配件數可改', r.len && r.acc && r.accEdit, JSON.stringify(r));
+    check('v6.0.153 安全母索：其他區塊可改用特多龍繩（長度、捲數、配件另列，鋼索不變）', r.mix, JSON.stringify(r));
+    check('v6.0.153 安全母索：帶入舊安全母索頁設定、切換形式回預設', r.importBtn && r.import && r.formReset && r.specShown && r.noStage, JSON.stringify(r));
+    check('v6.0.153 安全母索測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.150 螺絲修正（Lotion 11/03）：支撐接頭＝每路支數−1、千斤頂保護夾 16 顆短螺絲、構台長螺絲每㎡ 1 顆、貼板改名續接板 ──
+  // ── v6.0.154 螺絲修正（Lotion 11/03）：支撐接頭＝每路支數−1、千斤頂保護夾 16 顆短螺絲、構台長螺絲每㎡ 1 顆、貼板改名續接板 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
@@ -891,9 +891,9 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.150 螺絲：支撐接頭＝每路支數−1、合板跟著算、千斤頂保護夾每組 16 顆、H300 對鎖算短螺絲且總數不變', r.joint && r.h300, JSON.stringify(r));
-    check('v6.0.150 螺絲：施工構台改長螺絲每㎡ 1 顆（取代構台螺絲×2、併入長螺絲合計）；貼板改名續接板', r.deck && r.rename, JSON.stringify(r));
-    check('v6.0.150 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.154 螺絲：支撐接頭＝每路支數−1、合板跟著算、千斤頂保護夾每組 16 顆、H300 對鎖算短螺絲且總數不變', r.joint && r.h300, JSON.stringify(r));
+    check('v6.0.154 螺絲：施工構台改長螺絲每㎡ 1 顆（取代構台螺絲×2、併入長螺絲合計）；貼板改名續接板', r.deck && r.rename, JSON.stringify(r));
+    check('v6.0.154 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
@@ -9275,7 +9275,7 @@ async function newPage(browser, width, height) {
         out.form = (f.match(/class="me-sec"/g) || []).length >= 8 && /class="me-adv"/.test(f) && /matEstCalc\(\)/.test(b) && /matEstExportNow\(\)/.test(b) && /掛專案/.test(b);
         const pv = document.getElementById('me-pv'), pvt = () => (pv && pv.shadowRoot ? pv.shadowRoot.innerHTML : '');
         out.out = /me-tiles/.test(o) && /<span>圍令<\/span><b>[\d,]+ M<\/b>/.test(o) && /<span>支撐<\/span><b>[\d,]+ M<\/b>/.test(o) && /叫料單（依進場階段）/.test(o) && /計算依據/.test(o)
-          /* v6.0.149 右邊即時 A4 預覽＝匯出的同一份（shadow DOM）；分頁數與匯出引擎同規則 */
+          /* v6.0.153 右邊即時 A4 預覽＝匯出的同一份（shadow DOM）；分頁數與匯出引擎同規則 */
           && /擋土支撐叫料單/.test(pvt()) && /第1層水平支撐[^]*圍令（H\d+）/.test(pvt()) && +pv.getAttribute('data-pages') >= 1 && !/材料需求清冊/.test(o + pvt()) && !/分階段叫料建議/.test(o + pvt());
         mePvSet('stage', 0, false); out.pvStage = !/▸ 擋土壁/.test(pvt()) && /▸ 壓樑|▸ 中間樁/.test(pvt());
         let last = null; const oE = window.matEstExportPDF; window.matEstExportPDF = (k, opt) => { last = { k, opt }; };
@@ -9626,6 +9626,64 @@ async function newPage(browser, width, height) {
     check('v6.0.148 報價還原不覆蓋：確認視窗講清楚；還原前備份含未儲存修改、永久保留（自動存檔再存 12 次也不被擠掉）；還原後再改報價不會改到正式版次', r.msg && r.restored && r.pre && r.formalSafe && r.prune, JSON.stringify(r));
     check('v6.0.148 再還原回「還原前備份」內容一致；歷史版本另列還原前備份；清理版本歷史與跨裝置合併不刪正式版次與還原前備份', r.back && r.list && r.cleanup && r.merge && r.full, JSON.stringify(r));
     check('v6.0.148 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.152 議價可輸入折扣 %、即時預覽、稅前價；尾差併入工項單價，不再加「議價調整」列 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const oT = window.toast; let msg = ''; window.toast = m => { msg = String(m); };
+      try {
+        P.tax = 5; exs = [];
+        const base = () => [{ desc: '鋼板樁', unit: 'M', qty: '1000', price: '1000', note: '', sec: false }, { desc: '動員', unit: '式', qty: '1', price: '50000', note: '', sec: false }];
+        const setIn = v => { document.querySelector('input[name="ngt-in"][value="' + v + '"]').checked = true; _ngtInSw(); };
+        const setMode = v => { document.querySelector('input[name="ngt-mode"][value="' + v + '"]').checked = true; };
+        const noAdj = () => !items.some(it => it.desc === NGT_ADJ_DESC) && items.every(it => Number.isInteger(+it.price));
+        // 5% 未稅：1,050,000 → 997,500，尾差併入「動員」1 式
+        items = base(); openNegotiateModal(); setMode('excl'); setIn('pct'); document.getElementById('ngt-pct').value = '5'; updNegotiatePreview();
+        const pv = document.getElementById('ngt-preview').innerHTML;
+        out.prev = /997,500/.test(pv) && /降 <b>5%<\/b>/.test(pv) && /少 NT\$ 52,500/.test(pv) && /1,050,000/.test(pv);
+        applyNegotiate(); out.pctExcl = calcT().sub === 997500 && noAdj() && items[1].origPrice === 50000;
+        // 5% 含稅：1,102,500 → 1,047,375（含稅剛好）
+        items = base(); openNegotiateModal(); setMode('incl'); setIn('pct'); document.getElementById('ngt-pct').value = '5'; applyNegotiate();
+        out.pctIncl = Math.round(calcT().total) === 1047375 && noAdj();
+        // 稅前價：新含稅總計＝原未稅小計，實際降約 4.76%
+        items = base(); openNegotiateModal(); _ngtPreTax();
+        out.preTaxFill = document.getElementById('ngt-target').value === '1050000' && _ngtMode() === 'incl' && _ngtIn() === 'amt' && /降 <b>4\.76%<\/b>/.test(document.getElementById('ngt-preview').innerHTML);
+        applyNegotiate(); out.preTax = Math.round(calcT().total) === 1050000 && calcT().sub === 1000000 && noAdj();
+        // 沒有 1 式：找數量能整除尾差的列（7 M、3 M，目標未稅 9,997 → 差 -3 由 3 M 那列吸收）
+        items = [{ desc: 'A', unit: 'M', qty: '7', price: '1000', sec: false }, { desc: 'B', unit: 'M', qty: '3', price: '1000', sec: false }];
+        openNegotiateModal(); setMode('excl'); setIn('amt'); document.getElementById('ngt-target').value = '9997'; applyNegotiate();
+        out.divisible = calcT().sub === 9997 && +items[1].price === 999 && +items[0].price === 1000 && noAdj();
+        // 都不行：顯示「還差 N 元」讓人選列，不自動加列
+        items = [{ desc: 'A', unit: 'M', qty: '7', price: '1000', sec: false }, { desc: 'B', unit: 'M', qty: '3', price: '1000', sec: false }];
+        openNegotiateModal(); setMode('excl'); setIn('amt'); document.getElementById('ngt-target').value = '9999'; updNegotiatePreview();
+        const pv2 = document.getElementById('ngt-preview');
+        out.left = /還差 NT\$ 1/.test(pv2.innerHTML) && !!pv2.querySelector('select') && pv2.querySelectorAll('option').length === 3;
+        applyNegotiate(); out.leftApply = calcT().sub === 10000 && noAdj() && /與目標差 NT\$ 1/.test(msg);
+        // 舊報價已有「議價調整」列：保留不動（再議價也不刪）
+        items = base().concat([{ desc: NGT_ADJ_DESC, unit: '式', qty: 1, price: -400, note: '議價調整', sec: false }]);
+        openNegotiateModal(); setMode('excl'); setIn('amt'); document.getElementById('ngt-target').value = '1000000'; applyNegotiate();
+        out.oldAdj = items.filter(it => it.desc === NGT_ADJ_DESC).length === 1 && +items.find(it => it.desc === NGT_ADJ_DESC).price === -400 && calcT().sub === 1000000;
+        // 說明文字不再提「議價調整」項補足
+        out.text = !/以「議價調整」項補足/.test(document.getElementById('negotiate-modal').innerHTML);
+        // 報價稅額四捨五入到元（含 .5 進位），含稅＝未稅＋整數稅額；存回的報價、重算 _recalcQuoteTotals 同一算法
+        items = [{ desc: '雜項', unit: '式', qty: '1', price: '30010', sec: false }]; exs = [];
+        const tq = calcT(); out.tax5 = tq.tax === 1501 && tq.total === 31511;
+        const qR = { id: 'qR152', items: [{ desc: '雜項', unit: '式', qty: '1', price: '30010', sec: false }], exs: [] }; _recalcQuoteTotals(qR);
+        out.taxRecalc = qR.t && qR.t.tax === 1501 && qR.t.total === 31511;
+        items = [{ desc: '雜項', unit: '式', qty: '1', price: '29990', sec: false }]; out.taxDown = calcT().tax === 1500;   // 1499.5 → 1500
+        document.getElementById('negotiate-modal').style.display = 'none'; items = []; exs = [];
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      window.toast = oT;
+      return out;
+    });
+    check('v6.0.152 議價折扣 %：5%（未稅／含稅口徑）精準等於目標、即時預覽改前→改後與降幅；稅前價（含稅＝原未稅、降 4.76%）', r.prev && r.pctExcl && r.pctIncl && r.preTaxFill && r.preTax, JSON.stringify(r));
+    check('v6.0.152 議價尾差：併入 1 式或數量能整除的工項單價（整數），不加「議價調整」列；無法剛好時顯示還差幾元可選列；舊報價的調整列保留', r.divisible && r.left && r.leftApply && r.oldAdj && r.text, JSON.stringify(r));
+    check('v6.0.152 報價稅額四捨五入到元（30,010×5%＝1,500.5→1,501；29,990→1,500），含稅＝未稅＋整數稅額；重算報價同一算法', r.tax5 && r.taxRecalc && r.taxDown, JSON.stringify(r));
+    check('v6.0.152 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

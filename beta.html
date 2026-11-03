@@ -1317,7 +1317,7 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
 </div>
 <div class="page" id="page-lifeline">
   <div class="ph"><div class="ph-l"><div class="ph-t">安全母索</div><div class="ph-s">水平安全母索用量：特多龍繩／鋼索兩種形式・分區塊縱橫向逐路計算・路數勾稽・扣除構台下・捲數與配件</div></div></div>
-  <div class="pad" style="max-width:1400px"><!-- 安全母索 v6.0.149 起併入材料估算「擋土支撐全套」④-1 --></div>
+  <div class="pad" style="max-width:1400px"><!-- 安全母索 v6.0.153 起併入材料估算「擋土支撐全套」④-1 --></div>
 </div>
 <div class="page" id="page-progress">
   <div class="ph"><div class="ph-l"><div class="ph-t">施工進度</div><div class="ph-s">機組平行排程・甘特圖・落後偵測・S 曲線</div></div></div>
@@ -2843,14 +2843,14 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
   <div id="mob-more-body"></div>
 </div>
 
-<script src="calc/invoice.js?v=6.0.150" defer></script>
-<script src="calc/payable.js?v=6.0.150" defer></script>
-<script src="calc/report.js?v=6.0.150" defer></script>
-<script src="calc/comm.js?v=6.0.150" defer></script>
-<script src="calc/payroll.js?v=6.0.150" defer></script>
-<script src="calc/lifeline.js?v=6.0.150" defer></script>
-<script src="calc/settle.js?v=6.0.150" defer></script>
-<script src="app.js?v=6.0.150" defer></script><script src="beta.js?v=6.0.150" defer></script>
+<script src="calc/invoice.js?v=6.0.154" defer></script>
+<script src="calc/payable.js?v=6.0.154" defer></script>
+<script src="calc/report.js?v=6.0.154" defer></script>
+<script src="calc/comm.js?v=6.0.154" defer></script>
+<script src="calc/payroll.js?v=6.0.154" defer></script>
+<script src="calc/lifeline.js?v=6.0.154" defer></script>
+<script src="calc/settle.js?v=6.0.154" defer></script>
+<script src="app.js?v=6.0.154" defer></script><script src="beta.js?v=6.0.154" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
@@ -2951,7 +2951,7 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
     </div>
     <div style="padding:14px 16px">
       <div style="font-size:11.5px;color:var(--b4);margin-bottom:10px;background:var(--yl);padding:7px 10px;border-radius:var(--r6);border:1px solid var(--ym)">
-        選擇議價口徑（含稅或未稅）並輸入議價後金額，各工項單價會依比例自動調整（原單價保留在資料中），尾差自動以「議價調整」項補足，金額精準等於議價數字。
+        選擇議價口徑（含稅或未稅），輸入議價後金額或折扣 %，各工項單價會依比例自動調整（原單價保留在資料中）；尾差併入工項單價（先找數量 1 的工項），不會多出一列。
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:13px">
         <span style="color:var(--b4)">目前未稅小計</span>
@@ -2969,12 +2969,22 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
       <div id="ngt-whole-wrap">
         <div style="display:flex;gap:14px;margin-bottom:8px;font-size:13px;align-items:center">
           <span style="color:var(--b4);font-weight:700">議價口徑：</span>
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="ngt-mode" value="incl" checked onchange="updNegotiatePreview()"> 含稅</label>
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="ngt-mode" value="excl" onchange="updNegotiatePreview()"> 未稅</label>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="ngt-mode" value="incl" checked onchange="window._ngtPick=null;updNegotiatePreview()"> 含稅</label>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="ngt-mode" value="excl" onchange="window._ngtPick=null;updNegotiatePreview()"> 未稅</label>
         </div>
-        <div class="f" style="margin-bottom:6px">
+        <div style="display:flex;gap:14px;margin-bottom:8px;font-size:13px;align-items:center;flex-wrap:wrap">
+          <span style="color:var(--b4);font-weight:700">輸入：</span>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="ngt-in" value="amt" checked onchange="_ngtInSw()"> 議價後金額</label>
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer"><input type="radio" name="ngt-in" value="pct" onchange="_ngtInSw()"> 折扣 %</label>
+          <button type="button" class="btn btn-xs" onclick="_ngtPreTax()" title="新含稅總計＝目前未稅小計（稅率 5% 時實際降約 4.76%）" style="margin-left:auto">稅前價</button>
+        </div>
+        <div class="f" id="ngt-amt-wrap" style="margin-bottom:6px">
           <label>議價後金額</label>
-          <input type="number" id="ngt-target" placeholder="例：7000000" oninput="updNegotiatePreview()" style="font-size:16px;font-weight:700;text-align:right">
+          <input type="number" id="ngt-target" placeholder="例：7000000" oninput="window._ngtPick=null;updNegotiatePreview()" style="font-size:16px;font-weight:700;text-align:right">
+        </div>
+        <div class="f" id="ngt-pct-wrap" style="margin-bottom:6px;display:none">
+          <label>折扣 %（輸入 5 ＝ 降 5%）</label>
+          <input type="number" id="ngt-pct" step="any" inputmode="decimal" placeholder="例：5" oninput="window._ngtPick=null;updNegotiatePreview()" style="font-size:16px;font-weight:700;text-align:right">
         </div>
         <div id="ngt-preview" style="font-size:12px;color:var(--b4);min-height:18px;margin-bottom:12px;text-align:right"></div>
       </div>
