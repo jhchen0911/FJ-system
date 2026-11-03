@@ -817,7 +817,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ───────────── 9. 安全母索（v6.0.153 起併入材料估算「擋土支撐全套」④-1；與既有 Excel 逐格一致的算法測試在 tests/calc.js）─────────────
+  // ───────────── 9. 安全母索（v6.0.154 起併入材料估算「擋土支撐全套」④-1；與既有 Excel 逐格一致的算法測試在 tests/calc.js）─────────────
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
@@ -859,11 +859,11 @@ async function newPage(browser, width, height) {
       try { localStorage.removeItem('fy_lifeline'); } catch (e) { /* 可忽略 */ }
       return out;
     });
-    check('v6.0.153 安全母索併入全套：舊入口轉到全套、分頁與獨立頁移除', r.redirect, JSON.stringify(r));
-    check('v6.0.153 安全母索：長度不變（2,044.9 M、11 捲）＋規格重量、每層配件（構台下沒拉的路不算）、配件數可改', r.len && r.acc && r.accEdit, JSON.stringify(r));
-    check('v6.0.153 安全母索：其他區塊可改用特多龍繩（長度、捲數、配件另列，鋼索不變）', r.mix, JSON.stringify(r));
-    check('v6.0.153 安全母索：帶入舊安全母索頁設定、切換形式回預設', r.importBtn && r.import && r.formReset && r.specShown && r.noStage, JSON.stringify(r));
-    check('v6.0.153 安全母索測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.154 安全母索併入全套：舊入口轉到全套、分頁與獨立頁移除', r.redirect, JSON.stringify(r));
+    check('v6.0.154 安全母索：長度不變（2,044.9 M、11 捲）＋規格重量、每層配件（構台下沒拉的路不算）、配件數可改', r.len && r.acc && r.accEdit, JSON.stringify(r));
+    check('v6.0.154 安全母索：其他區塊可改用特多龍繩（長度、捲數、配件另列，鋼索不變）', r.mix, JSON.stringify(r));
+    check('v6.0.154 安全母索：帶入舊安全母索頁設定、切換形式回預設', r.importBtn && r.import && r.formReset && r.specShown && r.noStage, JSON.stringify(r));
+    check('v6.0.154 安全母索測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
@@ -9275,7 +9275,7 @@ async function newPage(browser, width, height) {
         out.form = (f.match(/class="me-sec"/g) || []).length >= 8 && /class="me-adv"/.test(f) && /matEstCalc\(\)/.test(b) && /matEstExportNow\(\)/.test(b) && /掛專案/.test(b);
         const pv = document.getElementById('me-pv'), pvt = () => (pv && pv.shadowRoot ? pv.shadowRoot.innerHTML : '');
         out.out = /me-tiles/.test(o) && /<span>圍令<\/span><b>[\d,]+ M<\/b>/.test(o) && /<span>支撐<\/span><b>[\d,]+ M<\/b>/.test(o) && /叫料單（依進場階段）/.test(o) && /計算依據/.test(o)
-          /* v6.0.153 右邊即時 A4 預覽＝匯出的同一份（shadow DOM）；分頁數與匯出引擎同規則 */
+          /* v6.0.154 右邊即時 A4 預覽＝匯出的同一份（shadow DOM）；分頁數與匯出引擎同規則 */
           && /擋土支撐叫料單/.test(pvt()) && /第1層水平支撐[^]*圍令（H\d+）/.test(pvt()) && +pv.getAttribute('data-pages') >= 1 && !/材料需求清冊/.test(o + pvt()) && !/分階段叫料建議/.test(o + pvt());
         mePvSet('stage', 0, false); out.pvStage = !/▸ 擋土壁/.test(pvt()) && /▸ 壓樑|▸ 中間樁/.test(pvt());
         let last = null; const oE = window.matEstExportPDF; window.matEstExportPDF = (k, opt) => { last = { k, opt }; };
@@ -9684,6 +9684,30 @@ async function newPage(browser, width, height) {
     check('v6.0.152 議價尾差：併入 1 式或數量能整除的工項單價（整數），不加「議價調整」列；無法剛好時顯示還差幾元可選列；舊報價的調整列保留', r.divisible && r.left && r.leftApply && r.oldAdj && r.text, JSON.stringify(r));
     check('v6.0.152 報價稅額四捨五入到元（30,010×5%＝1,500.5→1,501；29,990→1,500），含稅＝未稅＋整數稅額；重算報價同一算法', r.tax5 && r.taxRecalc && r.taxDown, JSON.stringify(r));
     check('v6.0.152 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.153 LINE 收件回覆合併：同一批（3 分鐘內）只回第一則、文字記成這批案名、失敗照樣回（雲端邏輯在 Node 直接跑） ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const fj = await page.evaluate(() => ({ ack: _LINE_TEXTS.inboxAck, note: _LINE_TEXTS.inboxNote, tl: _LINE_TL.inboxAck }));
+    const LC153 = require(require('path').join(__dirname, '..', 'functions', 'line', 'core.js'));
+    const db = {}, replies = [], pushes = [], files = {};
+    const get = p => p.split('/').reduce((o, k) => (o == null ? undefined : o[k]), db);
+    const set = (p, v) => { const ks = p.split('/'); let o = db; ks.slice(0, -1).forEach(k => { o[k] = o[k] || {}; o = o[k]; }); o[ks[ks.length - 1]] = v; };
+    const deps = { getCfg: async () => ({ owners: { Uo: { name: 'L' } } }), dbGet: async p => get(p), dbSet: async (p, v) => set(p, v), reply: async (t, text) => replies.push({ t, text }), push: async (to, text) => pushes.push(text),
+      fetchContent: async id => ({ buf: Buffer.from('x'), contentType: 'application/pdf' }), putFile: async (p, b) => { files[p] = b; }, log: () => {} };
+    const T0 = Date.parse('2026-11-03T02:00:00Z');
+    const f = (id, t) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uo' }, message: { id, type: 'file', fileName: id + '.pdf', fileSize: 10 } });
+    for (let i = 1; i <= 5; i++) await LC153.handleEvents([f('m' + i, T0 + i * 20e3)], deps);   // 連續轉傳 5 個檔
+    const five = replies.length === 1 && /之後的檔案會一起收/.test(replies[0].text) && Object.keys(files).length === 5;
+    await LC153.handleEvents([{ type: 'message', timestamp: T0 + 150e3, replyToken: 'rt', source: { type: 'user', userId: 'Uo' }, message: { id: 't1', type: 'text', text: '推薦人：範例業務' } }], deps);
+    const note = /這批 5 個檔案：推薦人：範例業務，已記下/.test((replies[1] || {}).text || '') && [1, 2, 3, 4, 5].every(i => db.fydata.lineInbox['m' + i].note === '推薦人：範例業務');
+    deps.putFile = async () => { throw new Error('x'); };
+    await LC153.handleEvents([f('m6', T0 + 170e3)], deps);
+    const fail = replies.length === 3 && replies[2].t === 'rm6' && /沒存成功，請重傳：m6\.pdf/.test(replies[2].text) && db.fydata.lineInbox.m6.status === 'error';
+    check('v6.0.153 LINE 收件回覆合併：連續 5 個檔只回 1 則；傳完打一行字記到這批每個檔並回「這批 N 個檔案：…已記下」；存檔失敗照樣回請重傳；FJ 預設文字已換新', five && note && fail && /之後的檔案會一起收/.test(fj.ack) && /\{text\}/.test(fj.note), JSON.stringify({ five, note, fail, fj, replies }));
+    check('v6.0.153 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

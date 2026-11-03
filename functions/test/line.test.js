@@ -42,7 +42,7 @@ test('① 擁有者一對一傳照片 → 存 line/inbox、記紀錄、回覆「
   const p = Object.keys(d.files)[0];
   assert.match(p, /^line\/inbox\/2026-10-22\/m1_m1\.jpg$/);
   assert.equal(d.db.fydata.lineInbox.m1.path, p);
-  assert.match(d.replies[0].text, /收到，1 個檔案/);
+  assert.match(d.replies[0].text, /收到，之後的檔案會一起收/);
 });
 
 test('① 陌生人一對一：不存檔、只記到待綁定名單', async () => {
@@ -372,13 +372,13 @@ test('v6.0.122 解析：範本原樣、改成前一天、【日期】空白、�
   assert.ok(x && x.payload.qid === 'p2' && x.payload.date === '2026-11-01' && !x.payload.backfill && !x.payload.unmatched);
 });
 
-test('v6.0.144 收件：一次 webhook 傳 3 個檔只回一句「收到，3 個檔案」，先回再存；重送不再回', async () => {
+test('v6.0.144／153 收件：一次 webhook 傳 3 個檔只回一句，先回再存；重送不再回', async () => {
   const d = mkDeps(CFG); const order = [];
   d.reply = async (t, text) => { order.push('reply'); d.replies.push({ t, text }); };
   const put0 = d.putFile; d.putFile = async (p, b) => { order.push('put'); return put0(p, b); };
   const ev = id => ({ type: 'message', timestamp: T0, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'file', fileName: id + '.pdf', fileSize: 10 } });
   await core.handleEvents([ev('f1'), ev('f2'), ev('f3')], d);
-  assert.equal(d.replies.length, 1); assert.match(d.replies[0].text, /收到，3 個檔案/); assert.equal(order[0], 'reply');
+  assert.equal(d.replies.length, 1); assert.match(d.replies[0].text, /收到，之後的檔案會一起收/); assert.equal(order[0], 'reply');
   assert.deepEqual(Object.keys(d.db.fydata.lineInbox).sort(), ['f1', 'f2', 'f3']);
   await core.handleEvents([ev('f1')], d);
   assert.equal(d.replies.length, 1);
@@ -410,4 +410,74 @@ test('v6.0.144 審查：下載前先認領，下載中的重送不重複下載�
   d.saveContent = async () => { t += core.INBOX_BUDGET_MS + 1; return { size: 10 }; };
   await core.handleEvents([e2('k1'), e2('k2')], d);
   assert.equal(d.db.fydata.lineInbox.k1.status, 'new'); assert.equal(d.db.fydata.lineInbox.k2.status, 'error'); assert.match(d.db.fydata.lineInbox.k2.err, /請重傳/);
+});
+
+test('v6.0.153 回覆合併：同一批（3 分鐘內）分開送來也只回第一則；隔超過 3 分鐘才算新的一批', async () => {
+  const d = mkDeps(CFG);
+  const ev = (id, t) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'file', fileName: id + '.pdf', fileSize: 10 } });
+  for (const [id, t] of [['b1', T0], ['b2', T0 + 60e3], ['b3', T0 + 170e3], ['b4', T0 + 400e3], ['b5', T0 + 450e3]]) await core.handleEvents([ev(id, t)], d);
+  assert.equal(d.replies.length, 2); assert.equal(d.replies[0].t, 'rb1'); assert.equal(d.replies[1].t, 'rb4');   // b4 距 b3 超過 3 分鐘＝新的一批
+  assert.equal(d.db.fydata.lineInbox.b2.batch, 'b1'); assert.equal(d.db.fydata.lineInbox.b5.batch, 'b4');
+  assert.equal(Object.keys(d.files).length, 5);
+});
+test('v6.0.153 回覆合併：傳完打一行字＝這批的案名，記到這批每個檔、回一句；先打字後傳檔也帶上', async () => {
+  const d = mkDeps(CFG);
+  const f = (id, t) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'image' } });
+  const tx = (id, t, text) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'text', text } });
+  await core.handleEvents([f('p1', T0), f('p2', T0 + 30e3)], d);
+  await core.handleEvents([tx('t1', T0 + 120e3, '推薦人：範例業務')], d);
+  assert.equal(d.db.fydata.lineInbox.p1.note, '推薦人：範例業務'); assert.equal(d.db.fydata.lineInbox.p2.note, '推薦人：範例業務');
+  assert.match(d.replies[d.replies.length - 1].text, /這批 2 個檔案：推薦人：範例業務，已記下/);
+  assert.equal(d.db.fydata.lineInbox.t1.status, 'filed');
+  // 過了 10 分鐘的文字不算這批：照舊記一筆文字、不回
+  const n0 = d.replies.length; await core.handleEvents([tx('t2', T0 + 20 * 60e3, '另一件事')], d);
+  assert.equal(d.replies.length, n0); assert.equal(d.db.fydata.lineInbox.t2.status, 'new');
+  // 先打字（t2），5 分鐘內傳檔 → 新的一批帶上這行字，回覆也說已記下
+  await core.handleEvents([f('p3', T0 + 25 * 60e3)], d);
+  assert.equal(d.db.fydata.lineInbox.p3.note, '另一件事'); assert.match(d.replies[d.replies.length - 1].text, /已記下：另一件事/);
+});
+test('v6.0.153 回覆合併：存檔失敗照樣回（不是第一則用自己的回覆權杖；第一則權杖已用掉才推播）', async () => {
+  const d = mkDeps(CFG);
+  d.saveContent = async (id) => { if (id === 'e2' || id === 'e1') throw new Error('壞了'); return { size: 1 }; };
+  const f = (id, t) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'file', fileName: id + '.pdf' } });
+  await core.handleEvents([f('e1', T0)], d);   // 第一則：回「收到」用掉權杖，失敗改推播
+  assert.equal(d.replies.length, 1); assert.equal(d.pushes.length, 1); assert.match(d.pushes[0].text, /沒存成功，請重傳：e1\.pdf/);
+  await core.handleEvents([f('e2', T0 + 30e3)], d);   // 同一批第二則：靜默，但失敗要回（用自己的權杖）
+  assert.equal(d.replies.length, 2); assert.equal(d.replies[1].t, 're2'); assert.match(d.replies[1].text, /沒存成功，請重傳：e2\.pdf/); assert.equal(d.pushes.length, 1);
+  await core.handleEvents([f('e3', T0 + 60e3)], d);   // 成功的不回
+  assert.equal(d.replies.length, 2);
+});
+test('v6.0.153 舊預設回覆「收到，{n} 個檔案，歸到哪一案？」存在設定裡沒改過 → 換成新預設', async () => {
+  const d = mkDeps(Object.assign({}, CFG, { texts: { inboxAck: '收到，{n} 個檔案，歸到哪一案？' } }));
+  await core.handleEvents([{ type: 'message', timestamp: T0, replyToken: 'r', source: { type: 'user', userId: 'Uowner' }, message: { id: 'o1', type: 'image' } }], d);
+  assert.match(d.replies[0].text, /之後的檔案會一起收/);
+});
+
+test('v6.0.153 審查：傳檔前連打兩行都留；回覆失敗不改推播；很舊的重送檔不蓋掉目前這批；文字重送不重回；有交易時兩個平行的第一則只回一次', async () => {
+  const d = mkDeps(CFG);
+  const f = (id, t) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'image' } });
+  const tx = (id, t, text) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'text', text } });
+  await core.handleEvents([tx('a1', T0, '範例營造')], d); await core.handleEvents([tx('a2', T0 + 60e3, '內湖案')], d);
+  await core.handleEvents([f('q1', T0 + 120e3)], d);
+  assert.equal(d.db.fydata.lineInbox.q1.note, '範例營造；內湖案');
+  // 回覆失敗：不推播
+  const p0 = d.pushes.length; d.reply = async () => { throw new Error('LINE 500'); };
+  await core.handleEvents([f('q2', T0 + 30 * 60e3)], d);
+  assert.equal(d.pushes.length, p0);
+  // 很舊的重送檔（比這批開始早超過 3 分鐘）：自成一批，不蓋掉目前這批
+  const cur = JSON.stringify(d.db.fydata.lineInboxBatch.Uowner);
+  await core.handleEvents([f('q0', T0 - 60 * 60e3)], d);
+  assert.equal(JSON.stringify(d.db.fydata.lineInboxBatch.Uowner), cur);
+  // 文字重送（有認領）：只回一次
+  const d2 = mkDeps(CFG); const claimed = {};
+  d2.claim = async (p, v) => { if (claimed[p]) return false; claimed[p] = 1; await d2.dbSet(p, v); return true; };
+  await core.handleEvents([f('w1', T0)], d2); const n1 = d2.replies.length;
+  claimed['fydata/lineInbox/w9'] = 1;   // 模擬同一則文字已在處理中
+  await core.handleEvents([tx('w9', T0 + 60e3, '某案')], d2);
+  assert.equal(d2.replies.length, n1);
+  // 交易：兩則檔案平行到，都讀到空的批次 → 交易讓第二個重跑，只有一個是第一則
+  const d3 = mkDeps(CFG); let lock = Promise.resolve();
+  d3.txn = async (path, fn) => { const run = lock.then(async () => { const cur = await d3.dbGet(path); const v = fn(cur || null); if (v !== undefined) await d3.dbSet(path, v); return v; }); lock = run.catch(() => {}); return run; };
+  await Promise.all([core.handleEvents([f('x1', T0)], d3), core.handleEvents([f('x2', T0 + 1000)], d3)]);
+  assert.equal(d3.replies.length, 1); assert.deepEqual(Object.keys(d3.db.fydata.lineInboxBatch.Uowner.ids).sort(), ['x1', 'x2']);
 });
