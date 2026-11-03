@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.141';
+var APP_VERSION='v6.0.142';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -807,7 +807,7 @@ function _goCore(p){
   if(p==='invoice'){try{if(_acctMount()){_acctTab=(typeof _invTab!=='undefined'&&_invTab==='vendor')?'vb':'own';p='acct';}}catch(e){_err('go.inv',e);}}   // v6.0.30 計價併入帳務
   if(p==='profit'){p='reports';_currentReport='overview';}
   if(p==='rebar'||p==='grout'||p==='backfill'){_meTab=p;p='matest';}   // v6.0.139 計算工具併入材料估算分頁
-  if(p==='lifeline'){_meTab='shoring';_meSecTog('1安全母索',true);p='matest';}   // v6.0.141 安全母索併入擋土支撐全套 ④-1
+  if(p==='lifeline'){_meTab='shoring';_meSecTog('1安全母索',true);p='matest';}   // v6.0.142 安全母索併入擋土支撐全套 ④-1
   if(p==='projects')p='proj';   // v6.0.26 舊版專案卡片頁移除，合約檔／確認單改在工程專案「合約與文件」   // v6.0.17 利潤分析併入經營報表
   try{if(p==='rfq'&&typeof _rfqTab!=='undefined'&&_rfqTab==='mat'){_rfqTab='rfq';if(_rfqQid)_m6Qid=_rfqQid;p='mat6';}}catch(e){_err('go',e);}   // v6.0.25 材料移出發包
   // 權限攔截（try/catch 保護避免 TDZ）
@@ -8780,7 +8780,7 @@ function computeShoringFY(inp){
   var _rDeck=(GV.cnt+GH.cnt)>0?{v:{rows:_rRows(inp._gtRoutesV)},h:{rows:_rRows(inp._gtRoutesH)}}:{v:{rows:[{n:1,len:gtDeduct}]},h:{rows:[]}};
   var _rSt={perim:P,perimRuns:1,layers:layers,deductLayers:b('gtRopeDeduct')?1:0,unit:'m',useSpare:true,waste:_rWaste,form:_rForm,
     f:{},zones:[{name:'支撐路',deck:false,form:'',v:{rows:_rRows(inp._routesV,routesV,lenV,autoV,W)},h:{rows:_rRows(inp._routesH,routesH,lenH,autoH,L)}}]};
-  // v6.0.141（Lotion 11/03：安全母索併入全套、獨立頁刪除）：規格（算重量）、每路配件（鋼索夾／緊索器／套環…）、其他區塊（可改用另一種形式）
+  // v6.0.142（Lotion 11/03：安全母索併入全套、獨立頁刪除）：規格（算重量）、每路配件（鋼索夾／緊索器／套環…）、其他區塊（可改用另一種形式）
   var _rFm=_LL_FORM[_rForm],_rAcc=_meRopeAcc(inp,_rForm);
   _rSt.f[_rForm]={spec:inp.ropeSpec&&_rFm.specs.some(function(x){return x[0]===inp.ropeSpec;})?inp.ropeSpec:_rFm.def.spec,spare:v('ropeSpare')||0,reel:v('ropeReel')||200,acc:_rAcc};
   var _rOther=_rForm==='rope'?'wire':'rope';
@@ -8910,7 +8910,7 @@ function computeShoringFY(inp){
   back.push({k:'安全母索需求長度',v:_shR1(_rNeed),u:'M'});
   back.push({k:'安全母索折捲（每捲 '+_rReel+'M）',v:_shR0(_rReels),u:'捲'});
   T.ropeForm=_rf;T.ropeSpare=_rSpare;T.ropeNeed=_rNeed;T.ropeReels=_rReels;T.ropeReel=_rReel;T.ropeWaste=_rWaste;
-  // v6.0.141：規格／重量、配件（構台下沒拉的路不算）；其他區塊改用另一種形式時另列一組
+  // v6.0.142：規格／重量、配件（構台下沒拉的路不算）；其他區塊改用另一種形式時另列一組
   var _rAccRows=function(t,R,tag){var nm=_LL_FORM[t].accs;R.acc.forEach(function(n,ai){if(n>0)back.push({k:String(nm[ai]).replace(/（.*$/,'')+(tag||''),v:_shR0(n),u:String(nm[ai]).replace(/^.*（([^／]*)／.*$/,'$1')});});};
   if(_rT.spec)back.push({k:'規格 '+_rT.spec+'（重量約 '+_shR0(_rT.kg)+' kg）',v:_shR1(_rNeed),u:'M'});
   _rAccRows(_rForm,_rT);
@@ -8994,7 +8994,7 @@ function computeShoringFY(inp){
     sAdd(st,'副支撐擋片','片',d.subBlock);sAdd(st,'合板','片',d.heban);
     sAdd(st,'長螺絲','顆',d.longS);sAdd(st,'短螺絲','顆',d.shortS);sAdd(st,'膨脹螺絲','只',d.eScrew);
     sAdd(st,'安全母索（'+T.ropeForm+'，折捲）','捲',_shCeil((d.rope+d.ropeSpare)*(1+(T.ropeWaste||0)/100)/T.ropeReel));
-    _meRopeStageAcc(st,T,i2,sAdd);   // v6.0.141：每層配件＋其他區塊的另一種母索
+    _meRopeStageAcc(st,T,i2,sAdd);   // v6.0.142：每層配件＋其他區塊的另一種母索
     sAdd(st,'黃色立柱','支',d.yellow);
     staged.push(st);
   });
@@ -9436,7 +9436,7 @@ function matEstU(k,val){
 }
 // v6.0.139（Lotion 11/03）：匯出改兩份，各給各的讀者、同一份裡同一數字只出現一次：
 //   kind 'order'＝叫料單（工務／料場；摘要＋依進場階段，可只印某一階段 opt.stage）；'quote'＝估價明細（內部；摘要＋依類別總量，opt.basis 附計算依據：路數摘要＋安全母索逐層表）
-// 安全母索形式定義（v5.394 起；v6.0.141 獨立的安全母索頁併入全套後搬到這裡）：規格（含單位重 kg/m）、端部作法對應的配件名稱與常用預設值
+// 安全母索形式定義（v5.394 起；v6.0.142 獨立的安全母索頁併入全套後搬到這裡）：規格（含單位重 kg/m）、端部作法對應的配件名稱與常用預設值
 var _LL_FORM={
   wire:{label:'鋼索',note:'端部以套環＋鋼索夾固定，另設緊索器（花籃螺絲）張緊',
         specs:[['Ø9.53mm（3/8″）',0.35],['Ø12.7mm（1/2″）',0.63],['Ø16mm（5/8″）',0.99]],
@@ -9446,9 +9446,9 @@ var _LL_FORM={
         specs:[['Ø16mm',0.17],['Ø18mm',0.21],['Ø20mm',0.26]],
         accs:['繩用夾具（只／路）','棘輪張力器（組／路）','套環（只／路）'],
         def:{spec:'Ø16mm',spare:2,reel:200,acc:[4,1,2]}}};
-// v6.0.141 切換母索形式：規格與配件數回到該形式的預設
+// v6.0.142 切換母索形式：規格與配件數回到該形式的預設
 function matEstRopeForm(){if(!MAT_EST)return;MAT_EST.ropeSpec='';MAT_EST.ropeAcc0=MAT_EST.ropeAcc1=MAT_EST.ropeAcc2='';renderMatEst();}
-// 舊「安全母索」獨立頁（v6.0.141 起併入全套）存在本機的設定：一鍵帶入全套 ④-1
+// 舊「安全母索」獨立頁（v6.0.142 起併入全套）存在本機的設定：一鍵帶入全套 ④-1
 function _meRopeOld(){try{var s=JSON.parse(localStorage.getItem('fy_lifeline')||'null');return (s&&typeof s==='object')?s:null;}catch(e){return null;}}
 function matEstRopeImport(){
   var s=_meRopeOld();if(!s){toast('這台裝置沒有舊的安全母索設定');return;}
@@ -9463,7 +9463,7 @@ function matEstRopeImport(){
   renderMatEst();try{matEstCalc();}catch(e){_err('matEstRopeImport',e);}
   toast('已帶入舊安全母索設定（形式、規格、端部預留、每捲長度、配件、損耗）；路數與長度仍依支撐路與「其他區塊」');
 }
-// v6.0.141 安全母索每路配件數：全套 ④-1 進階可改（空白＝依形式預設，例：鋼索每路 鋼索夾 8／緊索器 1／套環 2）
+// v6.0.142 安全母索每路配件數：全套 ④-1 進階可改（空白＝依形式預設，例：鋼索每路 鋼索夾 8／緊索器 1／套環 2）
 function _meRopeAcc(inp,t){var d=_LL_FORM[t].def.acc,a=inp?[inp.ropeAcc0,inp.ropeAcc1,inp.ropeAcc2]:[];return d.map(function(x,i){var y=a[i];return (y===''||y==null)?x:Math.max(0,Math.round(_shNum(y)));});}
 // 每層叫料：主形式配件（該層實際拉的路數×每路數；扣構台下的層不算構台下的路）＋其他區塊另一種形式的捲數與配件
 function _meRopeStageAcc(st,T,i,sAdd){
@@ -9485,7 +9485,7 @@ function _meStageTitle(res,pick){
   var n=(res.staged||[]).length;if(!pick.length||pick.length===n)return '';
   return '｜'+(pick.length<=3?pick.map(function(i){return esc(res.staged[i].stage);}).join('、'):(pick.length+' 個階段'));
 }
-function _meDoc(kind,opt,res){   // v6.0.141：叫料單／估價明細的內容（匯出 PDF 與右邊即時預覽共用同一份）；回傳 {fn,css,body}
+function _meDoc(kind,opt,res){   // v6.0.142：叫料單／估價明細的內容（匯出 PDF 與右邊即時預覽共用同一份）；回傳 {fn,css,body}
   // v5.397：A4 橫式、明細依分類分塊並排；v6.0.139 分成叫料單／估價明細兩份
   kind=kind==='quote'?'quote':'order';opt=opt||{};
   var q=Q.find(function(x){return x.id===window._matEstQid;});
@@ -9739,7 +9739,7 @@ function _renderMatEstInner(el){
   h+='</tbody></table><button type="button" class="btn btn-xs" onclick="matEstRowAdd(\'_dc\')" style="font-size:12px;margin-top:4px">＋ 加一筆</button>';
   if(_secOpen)h+='</div></details>';
   h+='<div style="font-size:11px;color:var(--b3);margin-top:8px">存入專案後，請至「專案材料」分配自有/租賃並填租金、運費，一鍵更新施工成本。</div>';
-  // v6.0.139 工具列（與其他計算工具同一位置）：掛專案｜計算｜存入專案｜匯出 PDF（v6.0.141：匯出右邊預覽的那份）｜重設
+  // v6.0.139 工具列（與其他計算工具同一位置）：掛專案｜計算｜存入專案｜匯出 PDF（v6.0.142：匯出右邊預覽的那份）｜重設
   var bar=document.getElementById('me-bar-shoring');
   if(bar)bar.innerHTML='<div class="card" style="margin-bottom:12px"><div class="cb tool-head" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
     +'<div style="flex:1;min-width:220px">'+tb+'</div>'
@@ -9840,7 +9840,7 @@ function _shPanelHtml(title,rows,chCls){
   });
   return h+'</tbody></table></div></div></div>';
 }
-// v6.0.136：材料估算的母索用 calc/lifeline.js（v6.0.141 獨立的安全母索頁併入全套 ④-1 後刪除）
+// v6.0.136：材料估算的母索用 calc/lifeline.js（v6.0.142 獨立的安全母索頁併入全套 ④-1 後刪除）
 // v5.397：安全母索用量表（單獨列印，供業主核算數量）
 // v6.0.139：安全母索逐層表改成估價明細的附錄（不再單獨一份）
 function _matEstRopeBody(res){
@@ -9873,7 +9873,7 @@ function _matEstCalcCore(){
   var el=document.getElementById('mat-est-out');if(!el)return;
   var info=res.info;
   // v6.0.139：右邊＝摘要（關鍵數字）＋材料清單（依進場階段／依類別切換，同一份資料不重複列）＋計算依據（收合）
-  // v6.0.141（Lotion 11/03）：右邊＝摘要＋即時 A4 預覽（就是匯出的那份；叫料單／估價明細切換、勾階段、附計算依據）
+  // v6.0.142（Lotion 11/03）：右邊＝摘要＋即時 A4 預覽（就是匯出的那份；叫料單／估價明細切換、勾階段、附計算依據）
   var h=_meTilesHtml(res)+'<div class="card"><div class="ch green"><div class="cht">文件預覽</div><button type="button" class="btn btn-sm" style="margin-left:auto" onclick="matEstExportNow()">匯出 PDF</button></div><div class="cb" id="me-pv-ctl">'+_mePvCtlHtml(res)+'</div>'
     +'<div class="cb" style="padding-top:0"><div id="me-pv" class="me-pv" onclick="if(isMob())matEstExportNow()"></div><div style="font-size:11px;color:var(--b3);margin-top:6px">預覽與匯出 PDF 同一份內容與分頁（左邊改了會自動重算）'+(isMob()?'；點預覽可放大看 PDF':'')+'</div></div></div>';
   var basis='<div class="cb" style="font-size:12.5px;line-height:1.9">壁線周長 '+_shR1(info.PW)+'M｜路數 縱'+info.routesV+(info.autoV?'（自動）':'')+'＋橫'+info.routesH+(info.autoH?'（自動）':'')+'＝'+info.totalR+' 路｜支撐總長 '+_shR1(info.supLen)+'M｜中柱合計 '+info.posts+' 支｜退場留存 '+_shR1(info.keep)+'M/支'
@@ -39558,7 +39558,8 @@ function _lrsSensGet(pid){
 function _lrsCalc(gross,cat,union,R){
   gross=Math.max(0,Math.round(parseFloat(gross)||0));
   var r=(R&&R[cat])||{},tax=0,nhi=0;
-  if((+r.tax||0)>0){var th=+r.taxTh||0;if(r.taxOver?gross>th:gross>=th)tax=Math.round(gross*(+r.tax)/100);}
+  // v6.0.141（會計師 11/03）：代扣所得稅元以下無條件捨去（國稅局算法）；二代健保補充保費角以下四捨五入（全民健康保險法施行細則第 52 條、健保署 Q&A）
+  if((+r.tax||0)>0){var th=+r.taxTh||0;if(r.taxOver?gross>th:gross>=th)tax=Math.floor(gross*(+r.tax)/100+1e-9);}
   if((+r.nhi||0)>0&&!union&&gross>=(+r.nhiTh||0))nhi=Math.round(gross*(+r.nhi)/100);
   return {gross:gross,tax:tax,nhi:nhi,net:gross-tax-nhi};
 }
@@ -39736,7 +39737,7 @@ function openLrsYear(y){
     +'</tbody></table>'
     +'<div style="font-weight:700;margin:12px 0 4px">無勞報單（對方未同意，'+D.none.length+' 筆，合計 NT$ '+fmt(T(D.none,'gross'))+'）</div>'
     +(D.none.length?D.none.map(function(s){return '<div style="font-size:12px;padding:3px 0;border-bottom:1px solid var(--b1)">'+esc(s.date||'')+'　'+esc(s.name||'')+'　'+esc(s.project||'')+'　NT$ '+fmt(s.gross||0)+'</div>';}).join(''):'<div style="font-size:12px;color:var(--b3)">沒有</div>')
-    +'<details style="margin-top:12px"><summary style="cursor:pointer;font-size:12.5px;font-weight:700">比率與門檻（民國 '+(y-1911)+' 年'+(rr.exact?'':'，目前沿用 '+rr.y+' 年')+'；上線前請會計師確認）</summary>'
+    +'<details style="margin-top:12px"><summary style="cursor:pointer;font-size:12.5px;font-weight:700">比率與門檻（民國 '+(y-1911)+' 年'+(rr.exact?'':'，目前沿用 '+rr.y+' 年')+'；會計師 11/03 確認 115 年比率與門檻、職業工會三種類別都免扣健保；所得稅元以下捨去、健保四捨五入）</summary>'
     +'<table class="mst" style="font-size:12px;margin-top:6px;border-collapse:collapse;width:100%"><thead><tr><th>類別</th><th>所得稅門檻</th><th>超過才扣</th><th>稅率%</th><th>健保門檻（達到）</th><th>健保%</th></tr></thead><tbody>'
     +Object.keys(_LRS_CATS).map(function(c){return '<tr><td data-th="類別">'+c+'</td><td data-th="所得稅門檻">'+RI(c,'taxTh',80)+'</td><td data-th="超過才扣"><input type="checkbox" id="lrr-'+c+'-taxOver"'+((R[c]||{}).taxOver?' checked':'')+'></td><td data-th="稅率%">'+RI(c,'tax',55)+'</td><td data-th="健保門檻">'+RI(c,'nhiTh',80)+'</td><td data-th="健保%">'+RI(c,'nhi',55)+'</td></tr>';}).join('')
     +'</tbody></table><button type="button" class="btn btn-xs btn-g" style="margin-top:6px" onclick="_lrsRatesSave('+(y-1911)+')">存成民國 '+(y-1911)+' 年的比率</button></details>';

@@ -817,7 +817,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ───────────── 9. 安全母索（v6.0.141 起併入材料估算「擋土支撐全套」④-1；與既有 Excel 逐格一致的算法測試在 tests/calc.js）─────────────
+  // ───────────── 9. 安全母索（v6.0.142 起併入材料估算「擋土支撐全套」④-1；與既有 Excel 逐格一致的算法測試在 tests/calc.js）─────────────
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
@@ -855,11 +855,11 @@ async function newPage(browser, width, height) {
       try { localStorage.removeItem('fy_lifeline'); } catch (e) { /* 可忽略 */ }
       return out;
     });
-    check('v6.0.141 安全母索併入全套：舊入口轉到全套、分頁與獨立頁移除', r.redirect, JSON.stringify(r));
-    check('v6.0.141 安全母索：長度不變（2,044.9 M、11 捲）＋規格重量、每層配件（構台下沒拉的路不算）、配件數可改', r.len && r.acc && r.accEdit, JSON.stringify(r));
-    check('v6.0.141 安全母索：其他區塊可改用特多龍繩（長度、捲數、配件另列，鋼索不變）', r.mix, JSON.stringify(r));
-    check('v6.0.141 安全母索：帶入舊安全母索頁設定、切換形式回預設', r.importBtn && r.import && r.formReset, JSON.stringify(r));
-    check('v6.0.141 安全母索測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.142 安全母索併入全套：舊入口轉到全套、分頁與獨立頁移除', r.redirect, JSON.stringify(r));
+    check('v6.0.142 安全母索：長度不變（2,044.9 M、11 捲）＋規格重量、每層配件（構台下沒拉的路不算）、配件數可改', r.len && r.acc && r.accEdit, JSON.stringify(r));
+    check('v6.0.142 安全母索：其他區塊可改用特多龍繩（長度、捲數、配件另列，鋼索不變）', r.mix, JSON.stringify(r));
+    check('v6.0.142 安全母索：帶入舊安全母索頁設定、切換形式回預設', r.importBtn && r.import && r.formReset, JSON.stringify(r));
+    check('v6.0.142 安全母索測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
@@ -9241,7 +9241,7 @@ async function newPage(browser, width, height) {
         out.form = (f.match(/class="me-sec"/g) || []).length >= 8 && /class="me-adv"/.test(f) && /matEstCalc\(\)/.test(b) && /matEstExportNow\(\)/.test(b) && /掛專案/.test(b);
         const pv = document.getElementById('me-pv'), pvt = () => (pv && pv.shadowRoot ? pv.shadowRoot.innerHTML : '');
         out.out = /me-tiles/.test(o) && /<span>圍令<\/span><b>[\d,]+ M<\/b>/.test(o) && /<span>支撐<\/span><b>[\d,]+ M<\/b>/.test(o) && /叫料單（依進場階段）/.test(o) && /計算依據/.test(o)
-          /* v6.0.141 右邊即時 A4 預覽＝匯出的同一份（shadow DOM）；分頁數與匯出引擎同規則 */
+          /* v6.0.142 右邊即時 A4 預覽＝匯出的同一份（shadow DOM）；分頁數與匯出引擎同規則 */
           && /擋土支撐叫料單/.test(pvt()) && /第1層水平支撐[^]*圍令（H\d+）/.test(pvt()) && +pv.getAttribute('data-pages') >= 1 && !/材料需求清冊/.test(o + pvt()) && !/分階段叫料建議/.test(o + pvt());
         mePvSet('stage', 0, false); out.pvStage = !/▸ 擋土壁/.test(pvt()) && /▸ 壓樑|▸ 中間樁/.test(pvt());
         let last = null; const oE = window.matEstExportPDF; window.matEstExportPDF = (k, opt) => { last = { k, opt }; };
@@ -9395,6 +9395,8 @@ async function newPage(browser, width, height) {
         const c4 = _lrsCalc(90500, '50', false, R), c5 = _lrsCalc(90501, '50', false, R), c6 = _lrsCalc(29499, '50', false, R), c7 = _lrsCalc(50000, '92', false, R);
         out.calc = c1.tax === 0 && c1.nhi === 422 && c1.net === 19578 && c2.tax === 3000 && c2.nhi === 633 && c2.net === 26367 && c3.nhi === 0 && c3.net === 27000
           && c4.tax === 0 && c4.nhi === 1910 && c5.tax === 4525 && c6.nhi === 0 && c7.tax === 0 && c7.nhi === 0 && c7.net === 50000;
+        const c8 = _lrsCalc(20005, '9A', false, R), c9 = _lrsCalc(90519, '50', false, R), c10 = _lrsCalc(20024, '9A', false, R);
+        out.round = c8.tax === 2000 && c8.nhi === 422 && c9.tax === 4525 && c10.nhi === 423 && c10.tax === 2002;   // v6.0.141 所得稅無條件捨去（2000.5→2000、4525.95→4525）；健保四捨五入（422.5064→423）
         const P0 = P.lrsRates; P.lrsRates = { '116': { '9A': { taxTh: 20000, taxOver: 1, tax: 10, nhiTh: 20000, nhi: 2.2 } } };
         out.rates = _lrsRates(116).exact && _lrsRates(116).R['9A'].nhi === 2.2 && _lrsRates(117).y === 116 && !_lrsRates(117).exact && _lrsRates(115).y === 115;
         P.lrsRates = P0;
@@ -9468,6 +9470,7 @@ async function newPage(browser, width, height) {
     const RF140 = JSON.parse(fs140.readFileSync(pth140.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const OPS140 = require(pth140.join(__dirname, '..', 'functions', 'ops', 'core.js'));
     check('v6.0.140 勞報單計算：9A 超過 20,000 扣 10%、達 20,000 扣 2.11%；50 達 90,501 扣 5%、健保門檻 29,500；92 不扣；職業工會免扣健保；比率依民國年、沒有就沿用最近一年', r.calc && r.rates, JSON.stringify(r));
+    check('v6.0.141 勞報單進位（會計師 11/03）：代扣所得稅元以下無條件捨去、二代健保補充保費角以下四捨五入（健保法施行細則第 52 條）', r.round, JSON.stringify(r));
     check('v6.0.140 勞報單流程：只有抽成／佣金／介紹費／點工有按鈕、唯讀帳號看不到；沒勾同意記「無勞報單」；勾了算代扣實付；身分證格式擋下；個資不進本機快取',
       r.btn && r.ro && r.defNo && r.none && r.prev && r.saved && r.priv && r.badId && r.resign && r.sameSel && r.newBlank && r.newPayee, JSON.stringify(r));
     check('v6.0.140 A4 勞報單（印章、個資、代扣）與案件介紹費協議書（佣金設定帶入、六條、同意才產生）；年度彙總分開列無勞報單；fydata/lrs 只有管理員、每日備份含 lrs',
