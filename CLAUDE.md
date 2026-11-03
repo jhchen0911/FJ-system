@@ -100,7 +100,7 @@
 | 業主類型統計 | `reports` › 其他報表 › 業主類型（`showReport('otype')`） | `_OWNER_TYPES` `_ownerTypeOf` `_otRows`（得標率同 `_bidStat`、營收＝請款未稅、實收 `_invRcv`、付款條件取客戶資料平均、保留款取得標案 `_ownerRetPct`）`renderOwnerTypeReport` `_otCsv` | `CUSTOMERS[].ownerType`（營造廠／大包／建設公司／其他） |
 | 業主端佣金 | 報價列表狀態 chip 旁「佣金」（`openCommPick`，管理員才見）；`reports` › 其他報表 › 業主端佣金（`renderCommReport`） | `_commList`（含舊 referral 一次性轉換 `_commFromReferral`）`_commAmtFor`／`_commAccrFor`／`_commDueFor`（與業務抽成同口徑、不互含）`_commSync`／`_commSyncAll`（應付）`_commChip` `_commPickSave` `_commTables` `_commPdf`／`_commCsv` `openCommKpi`（總覽／利潤 KPI 總結） | `q.comms[]`（private，隨 quoteSens）、`PAYABLES` id `comm_<qid>_<cid>` |
 | 施工計畫書 | `plan` | `_plBuild` `_plRender`；圖：`FY_SHEETS`（施工步驟示意圖組，`_fySheetId` 工項＋工法→圖組）、`_plStorySteps`（只剩水平支撐）、`_plDetailSteps`（水平支撐詳圖）、`_plFlowPages`（施工流程圖） | planState（shared） |
-| 工具 | `matest` `rebar` `grout` `backfill` `workers`；`lifeline`、`progress` 隱藏 | `renderMatEst` `matEstCalc`（綁定工程時幾何讀案場細節；母索段與安全母索頁 `_llCalc` 共用 `FJC.ll.calc`，v6.0.136）`renderWorkers` | toolStates、workers（逐筆） |
+| 工具 | `matest`（分頁：擋土支撐全套／安全母索／鋼筋籠／根固砂漿／背填材料，v6.0.139；`rebar`／`grout`／`backfill`／`lifeline` 由 `_goCore` 轉到對應分頁）`workers`；`progress` 隱藏 | `ME_TABS` `meTab` `_meShow` `renderMatEst` `matEstCalc`（綁定工程時幾何讀案場細節；母索段與安全母索 `_llCalc` 共用 `FJC.ll.calc`，v6.0.136）摘要卡 `_meTiles`、清單 `_meListHtml`（依進場階段／依類別）、匯出 `matEstExportMenu`／`matEstExportPDF`（叫料單／估價明細＋附計算依據）`renderWorkers` | toolStates、workers（逐筆） |
 | 單價分析／單價庫 | `upa`（sysOnly） | `upaCalc` `applyUPA` `writeCostHist`（結案回寫） | upaHistory（shared）、upaCostDB／costHist（private） |
 | 人員／角色／參數 | `staff` `roles` `params` | `renderStaffPage` `renderRolesPage` `rolePerm` `canAccess` `_v6PermMigrate` `doSaveP` `syncParamsUI` `prmTab` | pagePerms、params（shared） |
 | 同步／備份／錯誤 | 頂欄 `#sync-chip` | `_sharedPayload` `_privatePayload` `_mergeColl`（應付另以 `_payStatusReconcile` 依 paidAt／unpaidAt 先後決定付款狀態；付款帳本 `PAID_LOG`／`_paidLogSync`／`_paidLogMerge` 為已付最後防線，`savePayables` 先對帳）`_perRecordDelta` `_touch` `exportData`／`importData` `_err`／`renderErrLog` `_syncChip`；唯讀帳號 `_readerCheck`／`_isReaderUser`（所有上傳略過；v6.0.108 起下載 shared＋private、看得到全部頁面（人員／角色權限／備份還原除外），介面層 `_roInit`／`_roScan`／`_RO_DENY` 隱藏寫入按鈕、停用輸入、捕獲階段攔截，資料層 `_roDeny`）、名冊管理 `renderReadersBox`／`readerAdd`／`readerRename`（顯示名稱）／`readerDel`（人員管理頁） | 見「架構」；唯讀名冊 `fydata/readers`（值 true 或 `{name}`；可讀 shared＋private、不可寫） |
@@ -118,7 +118,7 @@
 
 ## 測試
 
-`tests/smoke.js`（816 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（821 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。`package.json` 釘死 playwright 版本（v6.0.103 起 1.64.1＝Chrome 156），CI 與本機才用同一瀏覽器；升級 playwright 要當成一次改版、跑過冒煙再推。雲端容器裝不到新瀏覽器時，可從 storage.googleapis.com 的 chrome-for-testing-public 下載同版 chrome-headless-shell，用 `CHROMIUM_PATH` 指定。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、

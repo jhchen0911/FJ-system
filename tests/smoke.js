@@ -957,18 +957,24 @@ async function newPage(browser, width, height) {
         && ld[0].ropeRuns === 9 && r0.T.ropeSpare === 36 && Math.abs(r0.T.ropeNeed - 972.3) < 1e-6 && r0.T.ropeReels === 5   /* v6.0.136：加損耗 5%：(890＋36)×1.05 */ && r0.T.ropeForm === '特多龍繩';
       out.matRows = r0.back.some(x => x.sec === '安全母索（特多龍繩）') && r0.back.some(x => x.k === '安全母索需求長度' && x.v === '972.3')
         && !r0.back.some(x => x.k === '安全母索總長') && r0.staged.some(st => st.items.some(it => /安全母索（特多龍繩，折捲）/.test(it.name)));
-      out.matForm = /母索形式/.test(document.getElementById('mat-est-form').innerHTML) && /matEstRopePDF/.test(document.getElementById('mat-est-form').innerHTML)
+      out.matForm = /母索形式/.test(document.getElementById('mat-est-form').innerHTML) && /matEstExportMenu/.test(document.getElementById('me-bar-shoring').innerHTML)   /* v6.0.139：母索逐層表併入估價明細附錄；匯出在上方工具列 */
         && /構台下縱向路數/.test(document.getElementById('mat-est-form').innerHTML) && /_gtRoutesH/.test(document.getElementById('mat-est-form').innerHTML)
         && !/開啟安全母索/.test(document.getElementById('mat-est-form').innerHTML);
       // 材料估算表 PDF：橫式、叫料表格在最前、無彙總清冊；母索用量表可單獨列印
       let printed = [], land = [];
       const oP2 = window._printViaIframe; window._printViaIframe = (h, f, l) => { printed.push(h); land.push(!!l); };
-      try { matEstExportPDF(); matEstRopePDF(); } finally { window._printViaIframe = oP2; }
-      out.matPdf = printed.length === 2 && land[0] === true && /分階段叫料建議/.test(printed[0]) && !/材料需求清冊/.test(printed[0])
-        && printed[0].indexOf('材料明細') < printed[0].indexOf('分階段叫料建議') && /A4 landscape/.test(printed[0])
-        && /安全母索用量表/.test(printed[1]) && /扣構台下 M/.test(printed[1]) && /972\.3/.test(printed[1]);
+      try { matEstExportPDF('order'); matEstExportPDF('quote', { basis: true }); matEstExportPDF('quote', {}); matEstExportPDF('order', { stages: [0, (_matEstRes.staged || []).findIndex(x => /第1層/.test(x.stage))] }); } finally { window._printViaIframe = oP2; }
+      // v6.0.139（Lotion 11/03）：兩份分開——叫料單（依進場階段）、估價明細（依類別總量，可附計算依據＝母索逐層表）；同一份裡材料不重複列
+      out.matPdf = printed.length === 4 && land[0] === true && /叫料單/.test(printed[0]) && /依進場階段叫料/.test(printed[0]) && !/材料明細（依類別總量）/.test(printed[0]) && /A4 landscape/.test(printed[0])
+        && /估價明細/.test(printed[1]) && /材料明細（依類別總量）/.test(printed[1]) && !/依進場階段叫料/.test(printed[1]) && /附錄：計算依據/.test(printed[1]) && /扣構台下 M/.test(printed[1]) && /972\.3/.test(printed[1])
+        && !/附錄：計算依據/.test(printed[2]) && !/分階段叫料建議/.test(printed.join('')) && !/材料需求清冊/.test(printed.join(''));
       // v5.400：明細每一分類自成一表、每列 3～4 組項目並排（分類標題 colspan 9 或 12），且分類不可少
-      out.matDet = (printed[0].match(/class="hd"/g) || []).length >= 4 && /colspan="(9|12)" class="hd"/.test(printed[0]) && !/colspan="6" class="hd"/.test(printed[0]);
+      out.matDet = (printed[1].match(/class="hd"/g) || []).length >= 4 && /colspan="(9|12)" class="hd"/.test(printed[1]) && !/colspan="6" class="hd"/.test(printed[1])
+        /* v6.0.139 Lotion：叫料單每列 2 組（colspan 6）、每個階段與附錄整區不拆頁（.pdf-keep 進 _pdfPlanPages 的整塊清單） */
+        && /colspan="6" class="hd"/.test(printed[0]) && (printed[0].match(/class="z pdf-keep ord"/g) || []).length === (_matEstRes.staged || []).length
+        && /class="apx pdf-keep"/.test(printed[1]) && /\.pdf-keep'\)/.test(_pdfPlanPages.toString())
+        /* 可勾選要印的階段：只印擋土壁＋第1層，標題列出階段名 */
+        && (printed[3].match(/class="z pdf-keep ord"/g) || []).length === 2 && /▸ 擋土壁/.test(printed[3]) && /▸ 第1層水平支撐/.test(printed[3]) && !/▸ 第2層水平支撐/.test(printed[3]) && /叫料單｜擋土壁、第1層水平支撐/.test(printed[3]);
       out.hidden = ALL_PAGES.find(p => p.id === 'lifeline').hidden === true;
       // 構台下區塊形式沒有對應區塊：扣除不得扣成負數，並提出警告
       _llState.perim = 200; _llState.layers = 3; _llState.form = 'wire';
@@ -983,9 +989,9 @@ async function newPage(browser, width, height) {
     check('單價分析：換工項逾期租金重置、千斤頂／構台自動帶入', r.upaReset);
     check('期別名稱：打設／裝設、拔除／拆除', r.labels);
     check('材料估算：母索＝圍令周圍＋支撐路、扣構台下、預留與折捲', r.matRope && r.matRows);
-    check('材料估算：母索形式欄位＋單獨 PDF、獨立頁隱藏', r.matForm && r.hidden);
-    check('材料估算表 PDF：橫式、明細表在前、叫料條列在後、無重複彙總', r.matPdf);
-    check('材料估算表 PDF：明細每列 3～4 組並排', r.matDet);
+    check('材料估算：母索形式欄位＋匯出在工具列、母索獨立頁隱藏', r.matForm && r.hidden);
+    check('材料估算 PDF（v6.0.139）：叫料單／估價明細兩份、橫式、各自不重複、估價明細可附計算依據（母索逐層表）', r.matPdf);
+    check('材料估算表 PDF：估價明細每列 3～4 組並排；叫料單每列 2 組、階段可複選、每個階段與附錄整區不拆頁', r.matDet);
     check('安全母索：構台下形式無對應區塊不扣成負數', r.deckGuard);
     check('v5.395 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
@@ -3637,10 +3643,11 @@ async function newPage(browser, width, height) {
           out.pdf=!!cap&&/股東報表 2026 年度/.test(cap.html);
           // 權限遷移 v2：profit → reports
           const p=_acct();const keep=JSON.stringify({r:p.__roles,s:p.__staff,v:p.__v6perm});
-          p.__roles.push({id:'r617',name:'會計測試',enabled:true,pages:{profit:true,finance:true},_mt:1});p.__v6perm=1;_acctSave(p);
+          p.__roles.push({id:'r617',name:'會計測試',enabled:true,pages:{profit:true,finance:true},_mt:1},{id:'r139',name:'工務測試',enabled:true,pages:{rebar:true},_mt:1});p.__v6perm=1;_acctSave(p);
           const oU=_fbUser,oT=window.toast;window.toast=function(){};_fbUser={email:BOOTSTRAP_DEV[0]};
           const n=_v6PermMigrate();const r=_acct().__roles.find(x=>x.id==='r617');
-          out.perm=n>=2&&r.pages.reports===true&&r.pages.acct===true&&_acct().__v6perm===3&&_v6PermMigrate()===false;   // v6.0.30 版本 3
+          out.permMat=(_acct().__roles.find(x=>x.id==='r139')||{pages:{}}).pages.matest===true;   // v6.0.139：有鋼筋籠權限的角色自動加開材料估算
+          out.perm=n>=2&&r.pages.reports===true&&r.pages.acct===true&&_acct().__v6perm===4&&_v6PermMigrate()===false;   // v6.0.30 版本 3；v6.0.139 版本 4（計算工具併入材料估算）
           const k=JSON.parse(keep);const p2=_acct();p2.__roles=k.r;p2.__staff=k.s;if(k.v)p2.__v6perm=k.v;else delete p2.__v6perm;_acctSave(p2);_fbUser=oU;window.toast=oT;
           Q=[];INV.length=0;PAYABLES.length=0;EXPENSES.length=0;PAYSLIPS.length=0;
           return out;
@@ -3648,7 +3655,7 @@ async function newPage(browser, width, height) {
     check('經營報表：reports 成為可見頁、利潤分析隱藏跟隨、go(profit) 轉到總覽、側欄與頁內切換列', r.pages && r.redir && r.statnav);
     check('經營報表總覽：利潤分析區塊搬入＋口徑列（權責稅前淨利／營收／成本／費用人事／現金淨流）、切換後仍在', r.overview && r.back);
     check('年度損益：新增「稅前淨利（權責）」欄與股東報表同數、現金欄標明口徑；總覽匯出＝股東版 PDF', r.yearly && r.pdf);
-    check('權限遷移 v2：profit → reports、旗標升到 2 後不重跑', r.perm);
+    check('權限遷移 v2：profit → reports、旗標升到 2 後不重跑；v6.0.139 鋼筋籠／根固砂漿／背填權限自動加開材料估算', r.perm && r.permMat);
     await page.setViewportSize({ width: 390, height: 844 });
     const mob = await page.evaluate(() => { Q=[{id:'qM7',code:'1',name:'手機報表案',client:'業主',date:'2026-03-01',awarded:true,exs:[],rmk:{},_mt:1,items:[],t:{total:1050000},costs:[]}]; go('reports'); showReport('overview'); const o={sw:document.documentElement.scrollWidth,iw:window.innerWidth}; showReport('yearly'); o.sw2=document.documentElement.scrollWidth; Q=[]; return o; });
     check('手機：經營報表總覽／年度損益無橫向捲動', mob.sw <= mob.iw + 1 && mob.sw2 <= mob.iw + 1, JSON.stringify(mob));
@@ -9271,6 +9278,48 @@ async function newPage(browser, width, height) {
     check('v6.0.136 3c 清潔費第一期一次扣合約 %：合約未稅 2,000,000×0.3%＝6,000（含稅 6,300）第一期扣、扣完下一期不帶、不夠扣順延；專案設定可選', r.once1 && r.tot1 && r.once2 && r.carry && r.ui && r.next, JSON.stringify(r));
     check('v6.0.136 3c 計算模組：安全母索 FJC.ll、完工結算 FJC.settle、清潔費 totals2 已載入；死碼 _llLinkFor 已刪', r.calcs, JSON.stringify(r));
     check('v6.0.136 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.139 材料估算整合：五個分頁同一頁、舊頁名轉分頁、工具列統一、條件可收合、摘要＋材料清單兩種排法 ──
+  {
+    const { page, errors } = await newPage(browser, 1400, 1000);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        go('rebar'); out.redirect = document.querySelector('.page.active').id === 'page-matest' && _meTab === 'rebar'
+          && document.querySelector('#page-matest .me-pane[data-me="rebar"]').style.display === '' && !!document.querySelector('#rebar-root .tool-head');
+        out.tabs = document.querySelectorAll('#me-tabs .me-tab').length === 5 && /鋼筋籠/.test(document.querySelector('#me-tabs .me-tab.on').textContent);
+        out.nav = ['rebar', 'grout', 'backfill', 'lifeline'].every(id => { const p = ALL_PAGES.find(x => x.id === id); return p && p.hidden && p.parent === 'matest'; });
+        meTab('shoring');
+        const f = document.getElementById('mat-est-form').innerHTML, o = document.getElementById('mat-est-out').innerHTML, b = document.getElementById('me-bar-shoring').innerHTML;
+        out.form = (f.match(/class="me-sec"/g) || []).length >= 8 && /class="me-adv"/.test(f) && /matEstCalc\(\)/.test(b) && /matEstExportMenu\(\)/.test(b) && /掛專案/.test(b);
+        out.out = /me-tiles/.test(o) && /<span>圍令<\/span><b>[\d,]+ M<\/b>/.test(o) && /<span>支撐<\/span><b>[\d,]+ M<\/b>/.test(o) && /第1層水平支撐[^]*圍令（H\d+）/.test(o) && /依進場階段（叫料）/.test(o) && /計算依據/.test(o) && !/材料需求清冊/.test(o) && !/分階段叫料建議/.test(o);
+        _meView = 'cat'; _matEstCalcCore(); out.cat = /① 擋土壁體（樁）/.test(document.getElementById('mat-est-out').innerHTML); _meView = 'stage';
+        meTab('grout'); out.grout = !!document.querySelector('#grout-root .tool-head') && /匯出 PDF/.test(document.querySelector('#grout-root .tool-head').innerHTML);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.139 材料估算整合：舊頁名轉分頁、五個分頁、計算工具不在選單（權限跟材料估算）', r.redirect && r.tabs && r.nav, JSON.stringify(r));
+    check('v6.0.139 材料估算整合：工具列統一（掛專案／計算／匯出 PDF）、條件分段可收合＋進階、右邊摘要（型鋼用 M）＋材料清單兩種排法、不再重複列清冊', r.form && r.out && r.cat && r.grout, JSON.stringify(r));
+    check('v6.0.139 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  {
+    // 審查：手機版（390px）各分頁展開全部段落，等手機表格改卡片（_mstack 非同步）後，沒有任何元素超出畫面右緣（grid 1fr 會被寬內容撐開，頁面 scrollWidth 抓不到）；掛專案入口一律回擋土支撐分頁
+    const { page, errors } = await newPage(browser, 390, 800);
+    const r = { over: {} };
+    for (const t of ['shoring', 'lifeline', 'rebar', 'grout', 'backfill']) {
+      await page.evaluate(t => { go('matest'); meTab(t); document.querySelectorAll('#page-matest details').forEach(d => { d.open = true; }); if (t === 'shoring') matEstCalc(); }, t);
+      await page.waitForTimeout(600);
+      r.over[t] = await page.evaluate(() => { const W = innerWidth; let n = 0; document.querySelectorAll('#page-matest *').forEach(e => { const R = e.getBoundingClientRect(); if (R.width > 0 && R.right > W + 1 && e.offsetParent) n++; }); return n; });
+    }
+    r.siteTab = await page.evaluate(() => {
+      try { meTab('rebar'); const q0 = window._sdQ; window._sdQ = () => ({ id: 'zz' }); window.matEstFromSite = function () {};   // matEstFromSite 留空殼（setTimeout 稍後才呼叫）
+        siteToMatEst(); const ok = _meTab === 'shoring'; window._sdQ = q0; return ok; } catch (e) { return String(e).slice(0, 200); }
+    });
+    check('v6.0.139 材料估算手機版：五個分頁展開後沒有元素超出畫面；從案場細節帶入一律回擋土支撐分頁', Object.values(r.over).every(n => n === 0) && Object.keys(r.over).length === 5 && r.siteTab, JSON.stringify(r));
+    check('v6.0.139 手機版測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

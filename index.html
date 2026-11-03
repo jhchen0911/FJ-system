@@ -153,7 +153,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
    由 _mstack() 自動掃描（有 thead 且欄數多的表加 .mst＋各格 data-th），此處只管排版。 */
 @media(max-width:767px){
   /* 工具頁未堆疊的小表也取消 min-width，改為壓縮欄寬而非左右滑動 */
-  #page-rebar table.tbl,#page-grout table.tbl,#page-backfill table.tbl,#page-lifeline table.tbl,
+  #page-rebar table.tbl,#page-grout table.tbl,#page-backfill table.tbl,#page-lifeline table.tbl,#page-matest .me-tool table.tbl,
   #page-progress table.tbl,#page-matest table.tbl,#page-plan table.tbl{min-width:0!important}
   /* 工具頁頂列（掛專案／開工日／存檔列印…）：改網格，欄位各占整列不重疊，按鈕兩顆一排 */
   .tool-head{display:grid!important;grid-template-columns:1fr 1fr;gap:10px 8px;align-items:end}
@@ -622,6 +622,19 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
 .fy-mdl .fg .btn{max-width:100%;white-space:normal;height:auto}
 .fy-mdl-foot{position:sticky;bottom:0;z-index:3;background:var(--w);padding-top:10px;padding-bottom:14px;margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px;box-shadow:0 -8px 8px -8px rgba(0,0,0,.25)}
 .fy-mdl>div:first-child>div:nth-child(2)>:last-child:not(.fy-mdl-foot){margin-bottom:14px}
+.me-list tr.me-grp td{background:var(--gl,#eef4f0);font-weight:800;color:var(--g3)}
+.me-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.me-tab{padding:8px 16px;border-radius:20px;border:1px solid var(--b2);background:var(--w);font-weight:700;color:var(--b4);cursor:pointer;font-family:inherit;font-size:13px}
+.me-tab.on{background:var(--g);color:#fff;border-color:var(--g)}
+.me-cols{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:12px;align-items:start}
+@media(max-width:1099px){.me-cols{grid-template-columns:minmax(0,1fr)}}
+#page-matest .me-col-l,#page-matest #mat-est-form,#page-matest .me-tool{min-width:0;max-width:100%}
+.me-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:10px}
+.me-tile{background:var(--w);border:1px solid var(--b1);border-radius:var(--r8);padding:8px 10px}.me-tile span{font-size:11px;color:var(--b4)}.me-tile b{display:block;font-size:17px;color:var(--g3)}.me-tile i{font-style:normal;font-size:10.5px;color:var(--b3)}
+.me-seg{display:flex;border:1px solid var(--b2);border-radius:8px;overflow:hidden;margin-bottom:8px}.me-seg button{flex:1;border:0;background:var(--w);padding:7px;font-weight:700;color:var(--b4);font-family:inherit;cursor:pointer}.me-seg button.on{background:var(--g);color:#fff}
+details.me-sec{border:1px solid var(--b1);border-radius:var(--r8);margin:10px 0;background:var(--w)}details.me-sec>summary{cursor:pointer;padding:8px 10px;font-weight:700;color:var(--g3);font-size:13px;background:var(--gl,#eef4f0);border-radius:var(--r8)}
+details.me-sec>.me-secb{padding:8px 10px}
+details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--g3)}details.me-adv>div{margin-top:6px}
 </style>
 
   <!-- Firebase SDK -->
@@ -1230,38 +1243,38 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
 #page-params details.prm-sec>summary::before{content:'▸ ';color:var(--b3)}
 #page-params details.prm-sec[open]>summary::before{content:'▾ '}
 /* v5.348 工具頁（鋼筋籠/根固/背填/進度）欄位統一系統風格 */
-#page-rebar input:not([type=checkbox]),#page-rebar select,#page-grout input:not([type=checkbox]),#page-grout select,
-#page-backfill input:not([type=checkbox]),#page-backfill select,#page-progress input:not([type=checkbox]),#page-progress select,
-#page-lifeline input:not([type=checkbox]),#page-lifeline select{
+#page-rebar input:not([type=checkbox]),#page-rebar select,#page-grout input:not([type=checkbox]),#page-grout select,#page-matest .me-tool input:not([type=checkbox]),#page-matest .me-tool select,
+#page-backfill input:not([type=checkbox]),#page-backfill select,#page-progress input:not([type=checkbox]),#page-progress select,#page-matest .me-tool input:not([type=checkbox]),#page-matest .me-tool select,
+#page-lifeline input:not([type=checkbox]),#page-lifeline select,#page-matest .me-tool input:not([type=checkbox]),#page-matest .me-tool select{
   height:36px;padding:7px 10px;border:1.5px solid var(--b2);border-radius:var(--r8);font-size:13.5px;
   font-family:inherit;background:var(--w);color:var(--b5);min-width:0;width:100%;box-sizing:border-box}
-#page-rebar input:focus,#page-rebar select:focus,#page-grout input:focus,#page-grout select:focus,
-#page-backfill input:focus,#page-backfill select:focus,#page-progress input:focus,#page-progress select:focus,
-#page-lifeline input:focus,#page-lifeline select:focus{
+#page-rebar input:focus,#page-rebar select:focus,#page-grout input:focus,#page-grout select:focus,#page-matest .me-tool input:focus,#page-matest .me-tool select:focus,
+#page-backfill input:focus,#page-backfill select:focus,#page-progress input:focus,#page-progress select:focus,#page-matest .me-tool input:focus,#page-matest .me-tool select:focus,
+#page-lifeline input:focus,#page-lifeline select:focus,#page-matest .me-tool input:focus,#page-matest .me-tool select:focus{
   border-color:var(--g3);outline:none;box-shadow:0 0 0 3px rgba(14,61,34,.08)}
-#page-backfill input[type=checkbox],#page-progress input[type=checkbox],#page-lifeline input[type=checkbox]{width:18px;height:18px;accent-color:var(--g3)}
-#page-rebar .tbl input,#page-progress .tbl input,#page-progress .tbl select,#page-backfill .tbl input,#page-backfill .tbl select,#page-lifeline .tbl input{height:32px;font-size:12.5px;padding:5px 8px}
-#page-progress .tbl th,#page-backfill .tbl th,#page-lifeline .tbl th{white-space:nowrap}
+#page-backfill input[type=checkbox],#page-progress input[type=checkbox],#page-lifeline input[type=checkbox],#page-matest .me-tool input[type=checkbox]{width:18px;height:18px;accent-color:var(--g3)}
+#page-rebar .tbl input,#page-progress .tbl input,#page-progress .tbl select,#page-backfill .tbl input,#page-backfill .tbl select,#page-lifeline .tbl input,#page-matest .me-tool .tbl input,#page-matest .me-tool .tbl select{height:32px;font-size:12.5px;padding:5px 8px}
+#page-progress .tbl th,#page-backfill .tbl th,#page-lifeline .tbl th,#page-matest .me-tool .tbl th{white-space:nowrap}
 #page-progress .tbl td{padding:5px 4px}
 @media(max-width:640px){
-  #page-rebar input:not([type=checkbox]),#page-rebar select,#page-grout input:not([type=checkbox]),#page-grout select,
-  #page-backfill input:not([type=checkbox]),#page-backfill select,#page-progress input:not([type=checkbox]),#page-progress select,
-  #page-lifeline input:not([type=checkbox]),#page-lifeline select{font-size:16px;height:42px}
+  #page-rebar input:not([type=checkbox]),#page-rebar select,#page-grout input:not([type=checkbox]),#page-grout select,#page-matest .me-tool input:not([type=checkbox]),#page-matest .me-tool select,
+  #page-backfill input:not([type=checkbox]),#page-backfill select,#page-progress input:not([type=checkbox]),#page-progress select,#page-matest .me-tool input:not([type=checkbox]),#page-matest .me-tool select,
+  #page-lifeline input:not([type=checkbox]),#page-lifeline select,#page-matest .me-tool input:not([type=checkbox]),#page-matest .me-tool select{font-size:16px;height:42px}
 }
 </style>
 <div class="page" id="page-rebar">
   <div class="ph">
     <div class="ph-l"><div class="ph-t">鋼筋籠檢料</div><div class="ph-s">全套管基樁鋼筋籠料單：規範搭接・分段主筋・內外箍・工作筋・板床</div></div>
   </div>
-  <div class="pad" style="max-width:1500px"><div id="rebar-root"></div></div>
+  <div class="pad" style="max-width:1500px"><!-- rebar-root 已移到材料估算分頁（v6.0.139） --></div>
 </div>
 <div class="page" id="page-grout">
   <div class="ph"><div class="ph-l"><div class="ph-t">根固砂漿</div><div class="ph-s">根固水泥砂漿用量：段長×截面積×配比（配比可依廠商修改）</div></div></div>
-  <div class="pad" style="max-width:1300px"><div id="grout-root"></div></div>
+  <div class="pad" style="max-width:1300px"><!-- grout-root 已移到材料估算分頁（v6.0.139） --></div>
 </div>
 <div class="page" id="page-backfill">
   <div class="ph"><div class="ph-l"><div class="ph-t">背填材料</div><div class="ph-s">支撐圍令背填：混凝土＋鋼筋用量（逐層計算）</div></div></div>
-  <div class="pad" style="max-width:1300px"><div id="backfill-root"></div></div>
+  <div class="pad" style="max-width:1300px"><!-- backfill-root 已移到材料估算分頁（v6.0.139） --></div>
 </div>
 <!-- ████ 人員進場資料（v5.438）████ -->
 <div class="page" id="page-workers">
@@ -1278,7 +1291,7 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
 </div>
 <div class="page" id="page-lifeline">
   <div class="ph"><div class="ph-l"><div class="ph-t">安全母索</div><div class="ph-s">水平安全母索用量：特多龍繩／鋼索兩種形式・分區塊縱橫向逐路計算・路數勾稽・扣除構台下・捲數與配件</div></div></div>
-  <div class="pad" style="max-width:1400px"><div id="lifeline-root"></div></div>
+  <div class="pad" style="max-width:1400px"><!-- lifeline-root 已移到材料估算分頁（v6.0.139） --></div>
 </div>
 <div class="page" id="page-progress">
   <div class="ph"><div class="ph-l"><div class="ph-t">施工進度</div><div class="ph-s">機組平行排程・甘特圖・落後偵測・S 曲線</div></div></div>
@@ -1289,15 +1302,20 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
   <div class="pad" style="max-width:1300px"><div id="plan-root"></div></div>
 </div>
 <div class="page" id="page-matest">
-  <div class="ph"><div class="ph-l"><div class="ph-t">材料估算</div><div class="ph-s">擋土支撐材料估算：選專案→輸入條件→計算所需材料</div></div></div>
-  <div class="pad" style="max-width:1300px">
-    <div id="mat-est-wrap">
-      <div class="card">
-        <div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-calc"/></svg> 擋土支撐材料估算</div></div>
-        <div class="cb"><div id="mat-est-form"></div></div>
+  <div class="ph"><div class="ph-l"><div class="ph-t">材料估算</div><div class="ph-s">選一項算一項：擋土支撐全套／安全母索／鋼筋籠／根固砂漿／背填材料（同一個版面：上方掛專案與按鈕、左邊條件、右邊結果）</div></div></div>
+  <div class="pad" style="max-width:1500px">
+    <div id="me-tabs" class="me-tabs"></div>
+    <div class="me-pane" data-me="shoring">
+      <div id="me-bar-shoring"></div>
+      <div id="mat-est-wrap" class="me-cols">
+        <div class="me-col-l"><div class="card"><div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-calc"/></svg> 條件</div></div><div class="cb"><div id="mat-est-form"></div></div></div></div>
+        <div class="me-col-r"><div id="mat-est-out"></div></div>
       </div>
-      <div id="mat-est-out"></div>
     </div>
+    <div class="me-pane me-tool" data-me="lifeline" style="display:none"><div id="lifeline-root"></div></div>
+    <div class="me-pane me-tool" data-me="rebar" style="display:none"><div id="rebar-root"></div></div>
+    <div class="me-pane me-tool" data-me="grout" style="display:none"><div id="grout-root"></div></div>
+    <div class="me-pane me-tool" data-me="backfill" style="display:none"><div id="backfill-root"></div></div>
   </div>
 </div>
 <div class="page" id="page-quickcost">
