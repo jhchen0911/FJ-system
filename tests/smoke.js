@@ -856,17 +856,18 @@ async function newPage(browser, width, height) {
       _llState.zones[0].v.runs = 99;
       out.catches = _llCalc().bad.join('') === '第一區 縱向';
       _llState.zones[0].v.runs = 9;
-      // ④ 端部預留與損耗：(9275.25＋159路×1.5)×1.05
+      // ④ 端部預留與損耗：(9275.25＋189路×1.5)×1.05（配件路數仍 159）
       _llState.useSpare = true; _llFP('wire').spare = 1.5; _llFP('wire').reel = 200; _llState.waste = 5;
       c = _llCalc();
       out.runs = c.runs === 159;                            // (63路×3層)−(30路×1層)
-      out.need = Math.abs(c.need - (9275.25 + 238.5) * 1.05) < 1e-6;
+      out.need = Math.abs(c.need - (9275.25 + 283.5) * 1.05) < 1e-6;   // v6.0.136（Lotion 11/03）：端部預留＝63 路×3 層×1.5，構台下的路不扣
       out.reels = c.reels === Math.ceil(c.need / 200);
       // ⑤ 兩種形式（特多龍繩／鋼索）：混用時長度、路數、配件分開彙總，總和不變
       _llState.zones = ZONES(); _llState.zones[2].form = 'rope'; _llState.zones[5].form = 'rope';
       c = _llCalc();
-      out.mixSplit = Math.abs(c.T.wire.net - 8762.73) < 1e-6 && Math.abs(c.T.rope.net - 512.52) < 1e-6
-        && Math.abs(c.net - 9275.25) < 1e-6 && c.mixed && c.used.length === 2;
+      // v6.0.136（審查）：構台下每層最多扣到該層同形式長度——特多龍繩每層只有第三區 453.84，構台下 849 只能扣 453.84（原本 849 全扣、跨到別層）
+      out.mixSplit = Math.abs(c.T.wire.net - 8762.73) < 1e-6 && Math.abs(c.T.rope.net - 907.68) < 1e-6
+        && Math.abs(c.net - 9670.41) < 1e-6 && c.mixed && c.used.length === 2;
       out.mixRuns = c.T.wire.runs === 153 && c.T.rope.runs === 6 && c.runs === 159;
       out.mixSpec = c.T.wire.spec !== c.T.rope.spec && c.T.wire.unitW > c.T.rope.unitW
         && c.T.wire.acc[0] === c.T.wire.runs * _llFP('wire').acc[0]
@@ -953,8 +954,8 @@ async function newPage(browser, width, height) {
       // 每層＝圍令(200×倍數1=200)＋支撐路 260；第一層扣 30 → 430；第二層 460；合計 890
       out.matRope = ld.length === 2 && ld[0].ropeWal === 200 && ld[0].ropeSup === 260 && ld[0].ropeDed === 30 && ld[0].rope === 430
         && ld[1].ropeDed === 0 && ld[1].rope === 460 && r0.T.rope === 890
-        && ld[0].ropeRuns === 9 && r0.T.ropeSpare === 36 && r0.T.ropeNeed === 926 && r0.T.ropeReels === 5 && r0.T.ropeForm === '特多龍繩';
-      out.matRows = r0.back.some(x => x.sec === '安全母索（特多龍繩）') && r0.back.some(x => x.k === '安全母索需求長度' && x.v === '926')
+        && ld[0].ropeRuns === 9 && r0.T.ropeSpare === 36 && Math.abs(r0.T.ropeNeed - 972.3) < 1e-6 && r0.T.ropeReels === 5   /* v6.0.136：加損耗 5%：(890＋36)×1.05 */ && r0.T.ropeForm === '特多龍繩';
+      out.matRows = r0.back.some(x => x.sec === '安全母索（特多龍繩）') && r0.back.some(x => x.k === '安全母索需求長度' && x.v === '972.3')
         && !r0.back.some(x => x.k === '安全母索總長') && r0.staged.some(st => st.items.some(it => /安全母索（特多龍繩，折捲）/.test(it.name)));
       out.matForm = /母索形式/.test(document.getElementById('mat-est-form').innerHTML) && /matEstRopePDF/.test(document.getElementById('mat-est-form').innerHTML)
         && /構台下縱向路數/.test(document.getElementById('mat-est-form').innerHTML) && /_gtRoutesH/.test(document.getElementById('mat-est-form').innerHTML)
@@ -965,7 +966,7 @@ async function newPage(browser, width, height) {
       try { matEstExportPDF(); matEstRopePDF(); } finally { window._printViaIframe = oP2; }
       out.matPdf = printed.length === 2 && land[0] === true && /分階段叫料建議/.test(printed[0]) && !/材料需求清冊/.test(printed[0])
         && printed[0].indexOf('材料明細') < printed[0].indexOf('分階段叫料建議') && /A4 landscape/.test(printed[0])
-        && /安全母索用量表/.test(printed[1]) && /扣構台下 M/.test(printed[1]) && /926/.test(printed[1]);
+        && /安全母索用量表/.test(printed[1]) && /扣構台下 M/.test(printed[1]) && /972\.3/.test(printed[1]);
       // v5.400：明細每一分類自成一表、每列 3～4 組項目並排（分類標題 colspan 9 或 12），且分類不可少
       out.matDet = (printed[0].match(/class="hd"/g) || []).length >= 4 && /colspan="(9|12)" class="hd"/.test(printed[0]) && !/colspan="6" class="hd"/.test(printed[0]);
       out.hidden = ALL_PAGES.find(p => p.id === 'lifeline').hidden === true;
@@ -7676,7 +7677,7 @@ async function newPage(browser, width, height) {
         out.disc0 = invItems[0].curAmt === 0;
         invItems[0].discDays = 0; try { updateInvRowAmt(0); } catch (e) { /* 可忽略 */ } out.disc0 = out.disc0 && invItems[0].curAmt === 10000; out.disc0 = out.disc0 && _rentDayFactor({ discDays: 5 }, 0) === 0 && _rentDayFactor({}, 0) === 1 && /_rentDayFactor\(it,days\)/.test(String(_invRowBase)) && /_invRowAmt\(it\)/.test(String(_recalcInvAmounts));   // v6.0.111 健檢1 #4：逐列算法統一在 _invRowBase
         /* 第 3 題：新算法列標記 _ovAlg */
-        out.alg = /_ovAlg:2/.test(calcInvDays.toString()) && /本期已請過逾期租金（舊算法），不重算/.test(calcInvDays.toString());
+        out.alg = /_ovAlg:3/.test(calcInvDays.toString())   /* v6.0.136：新算法標 3（舊合約 v6.0.136 前算的不重算） */ && /本期已請過逾期租金（舊算法），不重算/.test(calcInvDays.toString());
         /* 保留款總覽：含稅＋拆分 */
         Q = [{ id: 'qT', name: '保留案', awarded: true, items: [] }]; INV.length = 0;
         INV.push({ id: 'iT', quoteId: 'qT', project: '保留案', periodNo: 1, retention: true, retentionPct: 5, totals: { curTotal: 10000, total: 9975, retention: 525 }, items: [] });
@@ -9237,6 +9238,39 @@ async function newPage(browser, width, height) {
     check('v6.0.135 3b 會計用對照表（完工年度＝竣工結算日）、各案毛利未稅、累計請款本期＋稅、報價淨利率未稅', r.acct && r.acctLegacy && r.acctHtml && r.profitNet && r.netR, JSON.stringify(r));
     check('v6.0.135 3b 金流照請款％、結算不扣清潔費＋健檢、日報同名分區、請款％下拉跟參數、成交庫同名同單位、得標率扣流標＋第一次報價日', r.billProg && r.settleGross && r.health && r.dailyIdx && r.rateOpts && r.deal && r.bid && r.date0, JSON.stringify(r));
     check('v6.0.135 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.136 改版第 3c 步：清潔費第一期一次扣合約 %、逾期租金舊合約照實際打設量、母索合一 calc、完工結算差異表 calc ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      try {
+        INV.length = 0; CONTRACTS.splice(0);
+        Q = [{ id: 'q3c', name: '範例3c', client: '甲營造', date: '2026-10-01', awarded: true, items: [{ desc: '鋼板樁', unit: 'M', qty: 2000, price: 1000 }], t: { sub: 2000000, tax: 100000, total: 2100000 },
+          deduct: { cleanBase: 'once', cleanPct: 0.3, cleanMode: 'net' } }];
+        const i1 = buildInvFromQuote(Q[0]);
+        out.once1 = i1.cleanFixed === 6000 && i1.cleanPct === 0.3 && !i1.cleanPermil;
+        (i1.items || []).forEach(it => { if (it.type === 'item') { it.curQty = 100; it.payRate = 100; } });
+        _recalcInvAmounts(i1);
+        out.tot1 = i1.totals.clean === 6000 && i1.totals.cleanGross === 6300 && Math.round(i1.totals.total) === Math.round(100000 * 1.05) - 6300;
+        i1.id = 'I3c1'; INV.push(i1);   // 同一毫秒建的單 id 會相同
+        const i2 = buildInvFromQuote(Q[0]); out.once2 = !i2.cleanFixed && !i2.cleanPermil;
+        // 順延（Lotion 11/03）：第一期只請 4,000 未稅 → 本期扣 4,000、剩 2,000 下一期扣
+        (i1.items || []).forEach(it => { if (it.type === 'item') it.curQty = 4; }); _recalcInvAmounts(i1);
+        const i3 = buildInvFromQuote(Q[0]); out.carry = i1.totals.clean === 4000 && Math.round(i1.totals.total) === 0 && i3.cleanFixed === 2000;
+        // 專案頁設定欄位
+        const h = _pjDeductHtml(Q[0]); out.ui = /第一期一次扣（合約 %）/.test(h) && /約 NT\$ 6,000/.test(h);
+        // 下一期不帶一次扣
+        addNextPeriod(i1.id); const nx = INV.find(x => x.id !== i1.id && x.quoteId === i1.quoteId && x.periodNo === '2'); out.next = !!nx && nx.cleanFixed === 2000;   // 第一期只扣到 4,000 → 下一期（addNextPeriod）自動帶剩下的 2,000
+        out.calcs = !!(FJC.ll && FJC.ll.calc && FJC.settle && FJC.settle.diff && FJC.inv.totals2) && typeof _llLinkFor === 'undefined';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('v6.0.136 3c 清潔費第一期一次扣合約 %：合約未稅 2,000,000×0.3%＝6,000（含稅 6,300）第一期扣、扣完下一期不帶、不夠扣順延；專案設定可選', r.once1 && r.tot1 && r.once2 && r.carry && r.ui && r.next, JSON.stringify(r));
+    check('v6.0.136 3c 計算模組：安全母索 FJC.ll、完工結算 FJC.settle、清潔費 totals2 已載入；死碼 _llLinkFor 已刪', r.calcs, JSON.stringify(r));
+    check('v6.0.136 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 

@@ -3,7 +3,7 @@
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
 var APP_VERSION='v6.0.137';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
-if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
+if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -481,6 +481,7 @@ function _rentStatus(q,idx,endDate){
   var over=Math.max(0,_dDiff(expiry,end));
   var price=parseFloat((String(it.ot||'').match(/[\d.]+/)||[0])[0])||0;
   var qty=Math.abs(parseFloat(it.qty)||0);
+  if(mode!=='removeDone')qty=_rentOldQty(pg,qty);   // 第 3c 步（健檢1 #17）：舊合約照實際打設量（不超過合約量）
   if(mode==='removeDone'&&over>0){   // v6.0.107 分批：逾期起算日起，每批計到該批拔除完成日，未拔完的計到結束日
     var bq=_rentBatchQtyDays(pg,qty,_dAdd(expiry,1),end);
     return {idx:idx,desc:String(it.desc||'').split('\n')[0],unit:it.unit||'',days:days,installDate:base,removeFirst:pg.removeFirst||'',estimated:!pg.doneDate,cum:pg.cum,target:pg.target,
@@ -516,6 +517,9 @@ function _rentBatchQtyDays(pg,qty,startISO,endISO){
 }
 // v6.0.107 租期結束日口徑（報價條件第 14 條）：q.rentEnd＝'removeFirst' 拔除（拆除）第一天（舊案預設）／'removeDone' 拔除（拆除）完成日（新報價預設）
 var _RENT_END_LBL={removeFirst:'拔除（拆除）第一天',removeDone:'拔除（拆除）完成日'};
+// 第 3c 步（健檢1 #17）：舊合約（拔除第一天）逾期數量＝min(合約量, 實際打設累計)；有「階段完工」日報（打設已宣告完成）就照合約量（數量日報可能沒記全）
+function _rentOldQty(pg,qty){var c=pg&&(parseFloat(pg.cum)||0);if(!(c>0)||c>=qty||(pg&&pg.stageInstall))return qty;return Math.round(c*100)/100;}
+function _rentOldQtyByDesc(q,desc,qty){try{if(!q||_rentEndMode(q)==='removeDone')return qty;var i=(q.items||[]).findIndex(function(it){return it&&!it.sec&&_invKey(it.desc)===_invKey(desc);});return i>=0?_rentOldQty(_itemProgress(q,i),qty):qty;}catch(e){_err('_rentOldQtyByDesc',e);return qty;}}
 function _rentEndMode(q){return (q&&q.rentEnd==='removeDone')?'removeDone':'removeFirst';}
 function pjRentEndSet(qid,v){var q=Q.find(function(x){return x.id===qid;});if(!q)return;var nv=(v==='removeDone')?'removeDone':'removeFirst';
   _cardGuard(q,'rent.endMode',_RENT_END_LBL[nv],function(){q.rentEnd=nv;_touch(q);try{persist();}catch(e){_err('pjRentEndSet',e);}toast('租期結束日改為「'+_RENT_END_LBL[q.rentEnd]+'」，逾期租金依此計算');});}   // v6.0.111
@@ -3044,7 +3048,7 @@ function loadInvoice(id){
   const cte=document.getElementById('inv-claim-type');if(cte&&inv.claimType)cte.value=inv.claimType;
   const re2=document.getElementById('inv-retention');if(re2)re2.checked=!!inv.retention;
   const rp2=document.getElementById('inv-retention-pct');if(rp2){rp2.value=(inv.retentionPct!=null&&inv.retentionPct!=='')?inv.retentionPct:(inv.retention?_retPctOf(inv):'');   /* v6.0.100 舊單已勾空白＝10%，直接填入，存檔維持 10 */rp2.placeholder=String(_ownerRetPct(_retQOf(inv)));}   // v6.0.92 空白＝跟隨專案
-  const cp2=document.getElementById('inv-clean-permil');if(cp2)cp2.value=inv.cleanPermil||'';const cm2=document.getElementById('inv-clean-mode');if(cm2)cm2.value=inv.cleanMode==='allow'?'allow':(inv.cleanMode==='exp'?'exp':'net');   // v6.0.31／v6.0.44 預設直接扣除
+  const cp2=document.getElementById('inv-clean-permil');if(cp2)cp2.value=inv.cleanPermil||'';const cf2=document.getElementById('inv-clean-fixed'),cfw=document.getElementById('inv-clean-fixed-wrap');if(cf2){cf2.value=inv.cleanFixed||'';cf2.dataset.pct=inv.cleanPct||'';}if(cfw)cfw.style.display=(parseFloat(inv.cleanFixed)||0)>0?'':'none';   /* 第 3c 步：清潔費一次扣 */const cm2=document.getElementById('inv-clean-mode');if(cm2)cm2.value=inv.cleanMode==='allow'?'allow':(inv.cleanMode==='exp'?'exp':'net');   // v6.0.31／v6.0.44 預設直接扣除
   document.getElementById('inv-edit-title').textContent='編輯請款單 #'+inv.periodNo;
   const pdp2=document.getElementById('inv-period-display');
   if(pdp2)pdp2.textContent='第 '+(inv.periodNo||1)+' 期';
@@ -3467,7 +3471,8 @@ function _recalcInvAmounts(inv){
     it.curAmt=_invRowAmt(it);
   });
   const amts=inv.items.filter(it=>it.type!=='sec').map(it=>parseFloat(it.curAmt)||0);
-  inv.totals=FJC.inv.totals(amts,{taxR:_taxR(),retOn:!!inv.retention,retPct:inv.retention?_retPctOf(inv):0,cleanPermil:inv.cleanPermil});   // v6.0.31 清潔費；第 3a 步搬到 calc
+  if(!FJC.inv.totals2&&(parseFloat(inv.cleanFixed)||0)>0)_err('_recalcInvAmounts',new Error('計算模組 totals2 沒有載入，清潔費一次扣無法計算，請重新整理'));
+  inv.totals=(FJC.inv.totals2||FJC.inv.totals)(amts,{taxR:_taxR(),retOn:!!inv.retention,retPct:inv.retention?_retPctOf(inv):0,cleanPermil:inv.cleanPermil,cleanFixed:inv.cleanFixed});   // v6.0.31 清潔費；第 3a 步搬到 calc；第 3c 步一次扣（totals2）
 }
 
 function updateInvRowAmt(i, tr){
@@ -3872,7 +3877,8 @@ function rInvTots(srcInv){
   const retention=_retOn?beforeRetention*_retPct:0;
   // v6.0.31 清潔費：未稅工程款 × ‰，含稅自總計扣除（業主開發票當費用，或我方開折讓單）
   const _cleanPm=_rec?(parseFloat(_rec.cleanPermil)||0):(parseFloat(document.getElementById('inv-clean-permil')?.value)||0);
-  const clean=Math.round(curTotal*_cleanPm/1000),cleanGross=Math.round(clean*_taxM());
+  const _cleanFx=Math.round(_rec?(parseFloat(_rec.cleanFixed)||0):(parseFloat(document.getElementById('inv-clean-fixed')?.value)||0));   // 第 3c 步：第一期一次扣合約 %（未稅金額）
+  const clean=_cleanFx>0?Math.min(_cleanFx,Math.max(0,Math.round(curTotal))):Math.round(curTotal*_cleanPm/1000),cleanGross=Math.round(clean*_taxM());   // 一次扣：本期最多扣到本期未稅，其餘順延下一期
   const total=beforeRetention-retention-cleanGross;
   if(!_rec){
   // Display
@@ -3900,7 +3906,7 @@ function rInvTots(srcInv){
   if(einvBox){var _cmode=document.getElementById('inv-clean-mode')?.value||'net';var _eg=beforeRetention-retention-(_cmode==='net'?cleanGross:0);
     einvBox.style.display=curTotal?'flex':'none';einvBox.querySelector('span').textContent=_einvTxt(_eg,retention?'本期發票應開金額（扣保留款後）':'本期發票應開金額');}
   const cleanBox=document.getElementById('inv-clean-row');
-  if(cleanBox){cleanBox.style.display=cleanGross?'flex':'none';cleanBox.querySelector('span:last-child').textContent='- '+fmt(cleanGross);var cl=document.getElementById('inv-clean-label');if(cl)cl.textContent='清潔費 ('+_rfmt(_cleanPm)+'‰，含稅)';}
+  if(cleanBox){cleanBox.style.display=cleanGross?'flex':'none';cleanBox.querySelector('span:last-child').textContent='- '+fmt(cleanGross);var cl=document.getElementById('inv-clean-label');if(cl)cl.textContent=(_cleanFx>0&&_cleanFx>clean?'清潔費本期扣 '+fmt(clean)+'，剩 '+fmt(_cleanFx-clean)+'（未稅）順延下一期；':'')+'清潔費 ('+(_cleanFx>0?'一次扣合約'+(_invCleanPct(_rec)?' '+_rfmt(_invCleanPct(_rec))+'%':''):_rfmt(_cleanPm)+'‰')+'，含稅)';}
   }
   // ── 施工數量統計 ──
   // 打設面板：「合約數量 vs 打設累積」→ 待施 = 合約 - 打設累積
@@ -3989,7 +3995,7 @@ function rInvTots(srcInv){
   }
   // 待施 = 打設累積合計 - 拔除累積合計
   // 已打未拔面板已整合至拔除面板的「待拔」欄，無需額外顯示
-  return{curTotal,tax,total,retention,clean,cleanGross,cleanPermil:_cleanPm,baseTotal:curTotal,claimRatio:1};
+  return{curTotal,tax,total,retention,clean,cleanGross,cleanPermil:_cleanPm,cleanFixed:_cleanFx||undefined,baseTotal:curTotal,claimRatio:1};
 }
 
 
@@ -4035,7 +4041,7 @@ function saveInvoice(){
     cashPct:parseInt(gv('inv-cash-pct'))||0,ticketDays:parseInt(gv('inv-ticket-days'))||0,payMonthDelay:parseInt(gv('inv-pay-month-delay'))||0,recvDay:parseInt(gv('inv-recv-day'))||0,expectedRecvDate:gv('inv-expected-recv-date'),claimType:gv('inv-claim-type'),claimPct:gv('inv-claim-pct'),retention:document.getElementById('inv-retention')?.checked||false,
     retentionPct:(function(){var _v=document.getElementById('inv-retention-pct')?.value;
       return (_v==null||_v==='')?_invEdRetDef():(parseFloat(_v)||0);})(),   // v5.319：0% 是合法值；v6.0.92 空白＝專案設定（無＝0），存成數字
-    cleanPermil:parseFloat(document.getElementById('inv-clean-permil')?.value)||0,cleanMode:(document.getElementById('inv-clean-mode')?.value)||'net',   // v6.0.31 清潔費／v6.0.44 預設直接扣除
+    cleanPermil:parseFloat(document.getElementById('inv-clean-permil')?.value)||0,cleanFixed:Math.round(parseFloat(document.getElementById('inv-clean-fixed')?.value)||0)||undefined,cleanPct:(Math.round(parseFloat(document.getElementById('inv-clean-fixed')?.value)||0)>0?(parseFloat(document.getElementById('inv-clean-fixed')?.dataset.pct)||undefined):undefined),cleanMode:(document.getElementById('inv-clean-mode')?.value)||'net',   // v6.0.31 清潔費／v6.0.44 預設直接扣除
     docs:[
       document.getElementById('inv-doc-confirm')?.checked||false,
       document.getElementById('inv-doc-invoice')?.checked||false,
@@ -4369,6 +4375,8 @@ function addNextPeriod(id){
   next.receivedDate='';
   next.receivedNote='';
   next.retentionReturned=false;
+  delete next.cleanFixed;delete next.cleanPct;   // 第 3c 步：清潔費一次扣——上期沒扣完的順延到這期（下面依專案重算剩餘）
+  try{const _cq=Q.find(x=>x.id===(src.quoteId||src.sourceQid));if(_cq)_cleanOnceApply(_cq,next);}catch(e){_err('addNextPeriod.clean',e);}
   delete next.retentionSep;delete next.retentionReceivedAmt;delete next.retentionReturnedDate;delete next.retentionReturnedBy;   // v6.0.100 退還紀錄屬該期，不帶到下一期
   next.expectedRecvDate='';next.recvRule=1;   // v6.0.110 後新建：預計收款日依放款規則
   // v5.336 健檢G：抵銷欄位屬單期對帳結果，不得帶到下一期
@@ -4866,7 +4874,7 @@ function buildInvPreview(srcInv){
       ${_retCm?'<tr style="background:#fff4f4"><td colspan="2" style="text-align:right;padding:1px 10px 4px;color:#8a3a30;font-size:10px">'+esc(_retCumTxt(_retCmU(_retCm)))+'（未稅）</td></tr>':''}
       ${t.retention?'<tr><td style="padding:4px 10px;color:#555;font-weight:700">扣保留後未稅</td><td style="text-align:right;padding:4px 10px;font-weight:700;color:#333;font-variant-numeric:tabular-nums">'+fmt(_rb.net)+'</td></tr>':''}
       <tr><td style="padding:4px 10px;color:#555;font-weight:700">${_taxR()}% 營業稅${t.retention?'（以扣保留後未稅計）':''}</td><td style="text-align:right;padding:4px 10px;font-weight:700;color:#555;font-variant-numeric:tabular-nums">${fmt(t.retention?_rb.tax:t.tax)}</td></tr>
-      ${t.cleanGross?'<tr style="background:#fff4f4"><td style="padding:4px 10px;color:#c0392b;font-weight:700">清潔費 ('+_rfmt(t.cleanPermil)+'‰，含稅)</td><td style="text-align:right;padding:4px 10px;font-weight:700;color:#c0392b;font-variant-numeric:tabular-nums">- '+fmt(t.cleanGross)+'</td></tr>':''}
+      ${t.cleanGross?'<tr style="background:#fff4f4"><td style="padding:4px 10px;color:#c0392b;font-weight:700">清潔費 ('+(t.cleanFixed?'一次扣合約'+(_invCleanPct(_src)?' '+_rfmt(_invCleanPct(_src))+'%':''):_rfmt(t.cleanPermil)+'‰')+'，含稅)</td><td style="text-align:right;padding:4px 10px;font-weight:700;color:#c0392b;font-variant-numeric:tabular-nums">- '+fmt(t.cleanGross)+'</td></tr>':''}
       <tr style="background:#0e3d22;color:#fff"><td style="padding:7px 10px;font-weight:900;font-size:13px;letter-spacing:2px">本期請款總計</td><td style="text-align:right;padding:7px 10px;font-weight:900;font-size:14px;font-variant-numeric:tabular-nums">${fmt(t.total)}</td></tr>
     </table>
     ${t.curTotal?'<div style="text-align:right;padding:4px 2px 0;font-size:10.5px;color:#333">'+esc(_einvTxt(_einvG,t.retention?'本期發票應開金額（扣保留款後）':'本期發票應開金額'))+'</div>':''}
@@ -5826,7 +5834,7 @@ function calcInvDays(){
   // Lotion 10/21 第 3 題：已存檔請款單裡舊算法算出的逾期列不重算（先擋，備註也不動）
   if(selDesc&&billDays>0){
     const _rs0=(typeof invEid!=='undefined'&&invEid)?INV.find(x=>x.id===invEid):null,_ex0=invItems.find(r=>r&&r.type==='rental'&&r._ovKey===selDesc);
-    if(_rs0&&_ex0&&!(_ex0._ovAlg>=2)&&((parseFloat(_ex0.curAmt)||0)>0||(parseFloat(_ex0.discDays)||0)>0||(parseFloat(_ex0.discQd)||0)>0)){toast('本期已請過逾期租金（舊算法），不重算；要重算請先刪除該列。新算法只用在之後的期別');return;}
+    if(_rs0&&_ex0&&!(_ex0._ovAlg>=(_rentEndMode(_invQuote())==='removeDone'?2:3))&&((parseFloat(_ex0.curAmt)||0)>0||(parseFloat(_ex0.discDays)||0)>0||(parseFloat(_ex0.discQd)||0)>0)){toast('本期已請過逾期租金（舊算法），不重算；要重算請先刪除該列。新算法只用在之後的期別');return;}
   }
   // 底部備註：只動「該工項的逾期租金」那一行，其他備註不重建
   if(billDays>0){
@@ -5860,12 +5868,14 @@ function calcInvDays(){
       const srcItem=invItems[itemIdx];
       // Lotion 10/21 第 3 題：新的分批算法只用在還沒請過逾期租金的期別——已存檔的請款單裡、舊算法算出的逾期列（無 _ovAlg）不重算
       const _recSaved=(typeof invEid!=='undefined'&&invEid)?INV.find(x=>x.id===invEid):null;
-      if(existIdx>=0&&_recSaved&&!(invItems[existIdx]._ovAlg>=2)&&(parseFloat(invItems[existIdx].curAmt)||0)>0){toast('本期已請過逾期租金（舊算法），不重算；新算法只用在之後的期別');return;}
+      if(existIdx>=0&&_recSaved&&!(invItems[existIdx]._ovAlg>=(_rentEndMode(_invQuote())==='removeDone'?2:3))&&(parseFloat(invItems[existIdx].curAmt)||0)>0){   /* 第 3c 步：舊合約 v6.0.136 前算的（_ovAlg 2）也不重算 */toast('本期已請過逾期租金（舊算法），不重算；新算法只用在之後的期別');return;}
       // v5.384：單價以報價單的逾期租金欄為準；找得到報價工項就順手校正請款單裡的舊快照
       const _qot=_otFromQuote(selDesc);
       if(_qot&&srcItem){srcItem.otPrice=_qot.price;srcItem.otUnit=_qot.unit||srcItem.otUnit||'';}
       const srcPrice=_qot?_qot.price:(srcItem?(srcItem.otPrice||0):0);
-      const srcQty=srcItem?(srcItem.contractQty||1):1;
+      let srcQty=srcItem?(srcItem.contractQty||1):1;
+      // 第 3c 步（健檢1 #17）：舊合約（拔除第一天）逾期數量＝min(合約量, 實際打設累計)——只打了一部分就照實際在場的量收
+      srcQty=_rentOldQtyByDesc(_invQuote(),selDesc,srcQty);
       const srcUnit=_uFix(srcItem?(srcItem.unit||'式'):'式');
       // v6.0.107 拔除完成日模式：分批計算「支·天」（每批計到該批拔除完成日，未拔完的計到本期截止日）
       let _bq=null;try{const _q=_invQuote();if(_q&&_rentEndMode(_q)==='removeDone'){const _ix=(_q.items||[]).findIndex(it=>it&&!it.sec&&_invKey(it.desc)===_invKey(selDesc));if(_ix>=0)_bq=_rentBatchQtyDays(_itemProgress(_q,_ix),srcQty,_isoD(billStart),_isoD(claimDate));}}catch(e){_err('calcInvDays.batch',e);}
@@ -5877,7 +5887,7 @@ function calcInvDays(){
         prevQty:0,prevAmt:0,
         curQty:_bq?_bq.qtyDays:srcQty,curDays:_bq?0:billDays,curAmt:overAmt,_ovBatches:_bq?_bq.rows:undefined,_ovNoTick:_bq?!!_bq.noTick:undefined,
         payRate:100,note:'逾期租金',otPrice:0,otUnit:'',
-        _ovKey:selDesc,_ovStart:_isoD(billStart),_ovEnd:_isoD(claimDate),_ovBasis:_rentEndMode(_invQuote()),_ovAlg:2};   // _ovAlg：Lotion 10/21 新算法（完成當天計租、本批完成切批）   // v6.0.107 租期結束日口徑
+        _ovKey:selDesc,_ovStart:_isoD(billStart),_ovEnd:_isoD(claimDate),_ovBasis:_rentEndMode(_invQuote()),_ovAlg:3};   // _ovAlg：Lotion 10/21 新算法（完成當天計租、本批完成切批）   // v6.0.107 租期結束日口徑
       if(existIdx>=0){
         Object.keys(_ow).forEach(function(k){invItems[existIdx][k]=_ow[k];});
       } else {
@@ -5912,7 +5922,7 @@ function calcInvDays(){
       const _qot2=selDesc?_otFromQuote(selDesc):null;
       const _ot=_qot2?_qot2.price:(srcIt?(srcIt.otPrice||0):0);
       const _otU2=_uFix((_qot2?_qot2.unit:(srcIt?srcIt.otUnit:''))||'').replace('$','').trim();
-      const _qty=srcIt?(srcIt.contractQty||1):1;
+      const _qty=_rentOldQtyByDesc(_invQuote(),selDesc,srcIt?(srcIt.contractQty||1):1);   // 第 3c 步：預覽跟實際插入同一個數量
       const _unit=_uFix(srcIt?(srcIt.unit||'支'):'支');
       if(_ot>0){
         const _amt=Math.round(_ot*_qty*overDays);
@@ -8646,7 +8656,7 @@ function _shDefaults(){
     layers:5,_layers:lys,autoRouteSpace:6,stiff:'0',_routesV:[{rc:4,rl:25}],_routesH:[{rc:4,rl:40}],_gtRoutesV:[],_gtRoutesH:[],heng:'0',zones:2,
     spliceWall:0,spliceMid:0,spliceCo:0,spliceGt:0,procWall:0,procMid:0,procCo:0,procGt:0,shearSp:0.3,studLen:3,
     dogbone:'0',dbWall:false,dbMid:false,dbCo:false,dbGt:false,rgMid:true,rgCo:true,rgGt:true,fengProc:'0',fengCnt:'',
-    gantaiA:0,gantaiP:0,deck:'2',bigCap:0,gtRopeDeduct:'0',gtDeduct:0,ropeForm:'wire',ropeReel:200,ropeSpare:1.5,
+    gantaiA:0,gantaiP:0,deck:'2',bigCap:0,gtRopeDeduct:'0',gtDeduct:0,ropeForm:'wire',ropeReel:200,ropeSpare:1.5,ropeWaste:5,
     railScope:'0',postH:'1.2m',toe:'0',hookType:'std',
     _ud:[{ul:6.5,uh:2.2}],udMods:'6,3,2,1.5,1',_dc:[]};
 }
@@ -8757,6 +8767,16 @@ function computeShoringFY(inp){
   var stiff=inp.stiff||'0';
   var wlBy={},spBy={};SH_SPECS.forEach(function(s){wlBy[s]=0;spBy[s]=0;});
   var layerData=[],T={fengtou:0,rope:0,yellow:0};
+  // 第 3c 步（v6.0.136，Lotion 11/03）：安全母索改用與安全母索頁同一套算法（calc/lifeline.js）——周圍一路＝1 倍周長（不乘圍令倍數）、
+  //   構台下只扣第 1 層、端部預留照全部路數、需求長度加損耗（預設 5%）
+  var _rForm=(inp.ropeForm==='rope')?'rope':'wire',_rWaste=(inp.ropeWaste==null||inp.ropeWaste==='')?5:v('ropeWaste');
+  var _rRows=function(rows,cnt,len,auto,side){return auto?[{n:cnt,len:side}]:(rows||[]).map(function(r){return {n:_shNum(r.rc),len:_shNum(r.rl)};});};
+  var _rDeck=(GV.cnt+GH.cnt)>0?{v:{rows:_rRows(inp._gtRoutesV)},h:{rows:_rRows(inp._gtRoutesH)}}:{v:{rows:[{n:1,len:gtDeduct}]},h:{rows:[]}};
+  var _rSt={perim:P,perimRuns:1,layers:layers,deductLayers:b('gtRopeDeduct')?1:0,unit:'m',useSpare:true,waste:_rWaste,form:_rForm,
+    f:{},zones:[{name:'支撐路',deck:false,form:'',v:{rows:_rRows(inp._routesV,routesV,lenV,autoV,W)},h:{rows:_rRows(inp._routesH,routesH,lenH,autoH,L)}}]};
+  _rSt.f[_rForm]={spec:'',spare:v('ropeSpare')||0,reel:v('ropeReel')||200,acc:[0,0,0]};
+  if(b('gtRopeDeduct')&&gtDeduct>0)_rSt.zones.push(Object.assign({name:'構台下',deck:true,form:''},_rDeck));
+  var _rRes=FJC.ll.calc(_rSt,_LL_FORM),_rT=_rRes.T[_rForm];
   for(var i=0;i<layers;i++){
     var ly=lys[i]||{};
     var W_=_shSel(ly.w||'H350'),S_=_shSel(ly.s||'H350');
@@ -8783,10 +8803,11 @@ function computeShoringFY(inp){
     var longS=((W_.spec!=='H300')?(wM/7)*4:0)+((S_.spec!=='H300')?(sM/7)*4:0);
     var shortS=Math.max(0,screw-longS);
     var fengtou=totalR*2;
-    var ropeWal=wM,ropeSup=supLen,ropeDed=(i===0&&b('gtRopeDeduct'))?Math.min(gtDeduct,wM+supLen):0;
-    var ropeL=Math.max(0,ropeWal+ropeSup-ropeDed);
-    var ropeRuns=totalR+1;                                   // 每層路數＝縱橫支撐路＋周圍一路
-    var ropeSpare=Math.max(0,ropeRuns*(v('ropeSpare')||0));  // 端部錨錠預留（每路）
+    var _rL=_rT.layers[i]||{wal:0,sup:0,ded:0,len:0,runs:0,spare:0};
+    var ropeWal=_rL.wal,ropeSup=_rL.sup,ropeDed=_rL.ded;
+    var ropeL=Math.max(0,_rL.len);
+    var ropeRuns=_rL.runs;                                   // 每層路數＝縱橫支撐路＋周圍一路
+    var ropeSpare=Math.max(0,_rL.spare);                     // 端部錨錠預留（每路，構台下的路也算）
     var yellow=ropeL/2.5;
     T.fengtou+=fengtou;T.rope+=ropeL;T.yellow+=yellow;
     layerData.push({L:i+1,w:ly.w||'H350',s:ly.s||'H350',dSpec:ly.d||'H350',wM:wM,sM:sM,tri:tri,bigTri:bigTri,jack:jack,jackClip:jackClip,earth:earth,earthClip:earthClip,shortJ:shortJ,diag:diag,corner:cornerN,triPlate:triPlate,stiffN:stiffN,smallU:smallU,bigU:bigU,bigUangle:bigUangle,subBlock:subBlock,heban:heban,screw:Math.round(screw),longS:Math.round(longS),shortS:Math.round(shortS),eScrew:Math.round(eScrew),fengtou:fengtou,rope:ropeL,ropeWal:ropeWal,ropeSup:ropeSup,ropeDed:ropeDed,ropeRuns:ropeRuns,ropeSpare:ropeSpare,yellow:yellow});
@@ -8866,13 +8887,14 @@ function computeShoringFY(inp){
   // 形式分特多龍繩／鋼索，另計端部預留與折捲（配件、套環等後續再加）
   var _rf=(inp.ropeForm==='rope')?'特多龍繩':'鋼索',_rReel=v('ropeReel')||200;
   var _rSpare=layerData.reduce(function(a,d){return a+d.ropeSpare;},0);
-  var _rNeed=T.rope+_rSpare,_rReels=_rReel>0?_shCeil(_rNeed/_rReel):0;
+  var _rNeed=_rT.need,_rReels=_rReel>0?_shCeil(_rNeed/_rReel):0;   // 需求長度＝（淨長＋端部預留）×（1＋損耗%）
   back.push({sec:'安全母索（'+_rf+'）'});
   back.push({k:'安全母索總長（已扣構台下）',v:_shR1(T.rope),u:'M'});
   if(_rSpare>0)back.push({k:'端部錨錠預留（每路 '+(v('ropeSpare')||0)+'M）',v:_shR1(_rSpare),u:'M'});
+  if(_rWaste>0)back.push({k:'損耗 '+_rWaste+'%',v:_shR1(_rNeed-T.rope-_rSpare),u:'M'});
   back.push({k:'安全母索需求長度',v:_shR1(_rNeed),u:'M'});
   back.push({k:'安全母索折捲（每捲 '+_rReel+'M）',v:_shR0(_rReels),u:'捲'});
-  T.ropeForm=_rf;T.ropeSpare=_rSpare;T.ropeNeed=_rNeed;T.ropeReels=_rReels;T.ropeReel=_rReel;
+  T.ropeForm=_rf;T.ropeSpare=_rSpare;T.ropeNeed=_rNeed;T.ropeReels=_rReels;T.ropeReel=_rReel;T.ropeWaste=_rWaste;
   back.push({k:'黃色立柱',v:_shR0(T.yellow),u:'支'});
   // ── ⑤ 先行加工（封頭鈑＝加工支數×2；未填支數則以各層路數×2 合計）──
   var pre=[];
@@ -8937,7 +8959,7 @@ function computeShoringFY(inp){
     sAdd(st,'小U','支',d.smallU);sAdd(st,'大U','支',d.bigU);sAdd(st,'大U角鐵','支',d.bigUangle);
     sAdd(st,'副支撐擋片','片',d.subBlock);sAdd(st,'合板','片',d.heban);
     sAdd(st,'長螺絲','顆',d.longS);sAdd(st,'短螺絲','顆',d.shortS);sAdd(st,'膨脹螺絲','只',d.eScrew);
-    sAdd(st,'安全母索（'+T.ropeForm+'，折捲）','捲',_shCeil((d.rope+d.ropeSpare)/T.ropeReel));sAdd(st,'黃色立柱','支',d.yellow);
+    sAdd(st,'安全母索（'+T.ropeForm+'，折捲）','捲',_shCeil((d.rope+d.ropeSpare)*(1+(T.ropeWaste||0)/100)/T.ropeReel));sAdd(st,'黃色立柱','支',d.yellow);
     staged.push(st);
   });
   if(gantaiA>0||railLen>0){
@@ -9555,7 +9577,7 @@ function _renderMatEstInner(el){
   // v5.397：安全母索併入材料估算（範圍＝各層圍令周圍＋縱橫支撐路；第一層扣構台下方）
   h+='<div style="font-size:12px;font-weight:700;margin:12px 0 4px">安全母索 <span style="font-weight:400;font-size:10px;color:var(--b3)">範圍＝每層圍令（周圍）＋上方縱橫支撐路；第一層扣除構台下方；每路另計端部預留</span></div>';
   h+='<div class="me-grid">'+fS('ropeForm','母索形式',[['wire','鋼索'],['rope','特多龍繩']])
-    +fN('ropeReel','每捲長度 (M)')+fN('ropeSpare','每路端部預留 (M)')
+    +fN('ropeReel','每捲長度 (M)')+fN('ropeSpare','每路端部預留 (M)')+fN('ropeWaste','損耗 (%)','空白＝5，不加損耗請填 0')
     +fS('gtRopeDeduct','扣構台下母索',[['0','否'],['1','是']],';renderMatEst()')+'</div>'
     +(_shBool(m.gtRopeDeduct)?('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:6px">'
       +'<div>'+routeTbl('_gtRoutesV','構台下縱向路數')+'</div><div>'+routeTbl('_gtRoutesH','構台下橫向路數')+'</div></div>'
@@ -9620,7 +9642,7 @@ function _shPanelHtml(title,rows,chCls){
   });
   return h+'</tbody></table></div></div></div>';
 }
-// v5.395：綁定專案有安全母索工具的計算時，母索改引用工具結果（含分區塊、扣構台下、端部預留、損耗）
+// v6.0.136：材料估算的母索與安全母索頁共用 calc/lifeline.js（_llLinkFor 已刪）
 // v5.397：安全母索用量表（單獨列印，供業主核算數量）
 function matEstRopePDF(){
   if(!window._matEstRes)matEstCalc();
@@ -9635,11 +9657,12 @@ function matEstRopePDF(){
     body+='<tr><td>第'+d.L+'層</td><td>'+_xlEsc(d.w)+'</td><td class="r">'+_shR1(d.ropeWal)+'</td><td class="r">'+_shR1(d.ropeSup)+'</td><td class="r">'+(d.ropeDed?'−'+_shR1(d.ropeDed):'—')+'</td>'
       +'<td class="r">'+_shR1(d.rope)+'</td><td class="r">'+d.ropeRuns+'</td><td class="r">'+_shR1(d.ropeSpare)+'</td><td class="r">'+_shR1(d.rope+d.ropeSpare)+'</td></tr>';
   });
-  body+='<tr class="tt"><td colspan="5" class="r"><b>合計</b></td><td class="r"><b>'+_shR1(res.T.rope)+'</b></td><td class="r"><b>'+ld.reduce(function(a,d){return a+d.ropeRuns;},0)+'</b></td><td class="r"><b>'+_shR1(T.ropeSpare||0)+'</b></td><td class="r"><b>'+_shR1(T.ropeNeed||res.T.rope)+'</b></td></tr></table>'
+  body+='<tr class="tt"><td colspan="5" class="r"><b>合計</b></td><td class="r"><b>'+_shR1(res.T.rope)+'</b></td><td class="r"><b>'+ld.reduce(function(a,d){return a+d.ropeRuns;},0)+'</b></td><td class="r"><b>'+_shR1(T.ropeSpare||0)+'</b></td><td class="r"><b>'+_shR1(T.ropeNeed||res.T.rope)+((T.ropeWaste||0)>0?'（含損耗 '+T.ropeWaste+'%）':'')+'</b></td></tr></table>'
     +'<table><tr><th>項目</th><th>數值</th></tr>'
     +'<tr><td class="l">母索形式</td><td class="r">'+_xlEsc(T.ropeForm||'鋼索')+'</td></tr>'
     +'<tr><td class="l">安全母索總長（扣除後）</td><td class="r">'+_shR1(res.T.rope)+' M</td></tr>'
     +'<tr><td class="l">端部錨錠預留</td><td class="r">'+_shR1(T.ropeSpare||0)+' M</td></tr>'
+    +((T.ropeWaste||0)>0?'<tr><td class="l">損耗 '+T.ropeWaste+'%</td><td class="r">'+_shR1((T.ropeNeed||0)-(res.T.rope||0)-(T.ropeSpare||0))+' M</td></tr>':'')
     +'<tr class="tt"><td class="l">需求長度</td><td class="r">'+_shR1(T.ropeNeed||res.T.rope)+' M</td></tr>'
     +'<tr><td class="l">折捲（每捲 '+(T.ropeReel||200)+' M）</td><td class="r">'+(T.ropeReels||0)+' 捲</td></tr>'
     +'<tr><td class="l">黃色立柱</td><td class="r">'+_shR0(res.T.yellow)+' 支</td></tr></table>'
@@ -20351,72 +20374,11 @@ function _llDelZone(i){
 }
 // ── 計算（口徑與 Excel 逐格一致；依母索形式分開彙總）──
 function _llCalc(stArg){
-  var st=stArg||_llState,u=_LL_UNIT[st.unit]||0.01;
-  var dirOf=function(dir){
-    var rows=(dir&&dir.rows)||[];
-    var cnt=rows.reduce(function(a,r){return a+_llNum(r.n);},0);
-    var len=rows.reduce(function(a,r){return a+_llNum(r.n)*_llNum(r.len)*u;},0);
-    var dec=_llNum(dir&&dir.runs);
-    return {cnt:cnt,len:len,dec:dec,ok:dec>0?(Math.abs(dec-cnt)<1e-9):null};
-  };
-  var zones=(st.zones||[]).map(function(z){
-    var V=dirOf(z.v),H=dirOf(z.h);
-    return {name:z.name||'',deck:!!z.deck,own:z.form||'',
-      form:(z.form==='wire'||z.form==='rope')?z.form:st.form,
-      v:V,h:H,len:V.len+H.len,runs:V.cnt+H.cnt};
-  });
-  var perim=_llNum(st.perim),layers=_llInt(st.layers),dl=Math.min(layers,_llInt(st.deductLayers));
-  var T={},used=[];_llCalc._warn=[];
-  _LL_FORMS.forEach(function(t){
-    var zs=zones.filter(function(z){return z.form===t;});
-    var pick=function(deck,key){return zs.filter(function(z){return !!z.deck===deck;})
-      .reduce(function(a,z){return a+z[key];},0);};
-    var zoneLen=pick(false,'len'),deckLen=pick(true,'len');
-    var zoneRuns=pick(false,'runs'),deckRuns=pick(true,'runs');
-    var pm=(st.form===t)?perim:0,pr=(st.form===t)?_llInt(st.perimRuns):0;
-    var perLayer=pm+zoneLen,gross=perLayer*layers,deduct=Math.min(gross,deckLen*dl),net=gross-deduct;
-    if(deckLen>0&&gross<=0)_llCalc._warn.push(_llFm(t).label+'：構台下區塊標了這個形式，但沒有同形式的一般區塊或周長可供扣除，扣除未生效');
-    var runs=Math.max(0,Math.round((zoneRuns+pr)*layers-deckRuns*dl));
-    var fp=_llFP(t,st);
-    var spare=st.useSpare?runs*_llNum(fp.spare):0;
-    var need=(net+spare)*(1+_llNum(st.waste)/100);
-    var reel=_llNum(fp.reel),w=_llSpecW(t,fp.spec);
-    var u2={form:t,label:_llFm(t).label,spec:fp.spec,unitW:w,zoneCount:zs.length,
-      used:zs.length>0||st.form===t,perim:pm,perimRuns:pr,
-      zoneLen:zoneLen,deckLen:deckLen,zoneRuns:zoneRuns,deckRuns:deckRuns,
-      perLayer:perLayer,gross:gross,deduct:deduct,net:net,runs:runs,spare:spare,need:need,
-      reels:reel>0?Math.ceil(need/reel):0,reel:reel,kg:need*w,
-      acc:(fp.acc||[0,0,0]).map(function(n){return runs*_llInt(n);})};
-    T[t]=u2;if(u2.used)used.push(u2);
-  });
-  var bad=[];
-  zones.forEach(function(z){
-    if(z.v.ok===false)bad.push((z.name||'區塊')+' 縱向');
-    if(z.h.ok===false)bad.push((z.name||'區塊')+' 橫向');
-  });
-  var warn=_llCalc._warn.slice();
-  var sum=function(k){return used.reduce(function(a,x){return a+x[k];},0);};
-  return {zones:zones,T:T,used:used,mixed:used.length>1,layers:layers,deductLayers:dl,perim:perim,
-    perLayer:sum('perLayer'),gross:sum('gross'),deduct:sum('deduct'),net:sum('net'),
-    runs:sum('runs'),spare:sum('spare'),need:sum('need'),reels:sum('reels'),kg:sum('kg'),
-    zoneLen:sum('zoneLen'),deckLen:sum('deckLen'),bad:bad,warn:warn};
+  // 第 3c 步（v6.0.136）：算法在 calc/lifeline.js（FJC.ll.calc），材料估算的母索也用同一套；這裡只補齊各形式參數（_llFP 會寫入預設值）
+  var st=stArg||_llState;_LL_FORMS.forEach(function(t){_llFP(t,st);});
+  var r=FJC.ll.calc(st,_LL_FORM);_llCalc._warn=r.warn.slice();return r;
 }
 function _llM(x){return (Math.round(x*100)/100).toFixed(2);}
-// v5.395：供材料估算引用——同專案名稱的安全母索計算（目前工具輸入優先，其次最新存檔）
-function _llLinkFor(projName){
-  projName=String(projName||'').trim();if(!projName)return null;
-  try{
-    var st=null,src='';
-    if(String(_llState.proj||'').trim()===projName){st=_llState;src='目前輸入';}
-    else{var rec=_trList('lifeline').find(function(r){return String(r.proj||'').trim()===projName;});
-      if(rec){st=_llMigrate(JSON.parse(JSON.stringify(rec.inputs)));src='存檔 '+new Date(rec.ts).toLocaleDateString('zh-TW');}}
-    if(!st)return null;
-    var r=_llCalc(st);
-    if(!(r.net>0))return null;
-    return {src:src,net:r.net,need:r.need,reels:r.reels,runs:r.runs,layers:r.layers,deduct:r.deduct,
-      forms:r.used.map(function(T){return {label:T.label,spec:T.spec,need:T.need,reels:T.reels,reel:T.reel,net:T.net};})};
-  }catch(e){_err('_llLinkFor',e);return null;}
-}
 function _llR(x){return _llM(x).replace(/\.00$/,'');}
 // ── 畫面 ──
 function _llDirHtml(i,key,label,z,r){
@@ -20528,6 +20490,7 @@ function _llRender(){
     +row('構台下總長 × 扣除 '+res.deductLayers+' 層',function(T){return '−'+_llM(T.deduct)+' m';},'−'+_llM(res.deduct)+' m')
     +row('母索總長（扣除後）',function(T){return _llM(T.net)+' m';},_llM(res.net)+' m',true)
     +row('總路數',function(T){return fmt(T.runs)+' 路';},fmt(res.runs)+' 路')
+    +row('端部預留路數（構台下不扣）',function(T){return fmt(T.spareRuns||0)+' 路';},fmt(res.used.reduce(function(a,T){return a+(T.spareRuns||0);},0))+' 路')
     +row('端部錨錠預留',function(T){return '+'+_llM(T.spare)+' m';},'+'+_llM(res.spare)+' m')
     +row('損耗 '+_llNum(st.waste)+'%',function(){return '×'+(1+_llNum(st.waste)/100).toFixed(3);},null)
     +row('需求長度',function(T){return _llM(T.need)+' m';},_llM(res.need)+' m',true)
@@ -20594,6 +20557,7 @@ function _llPrint(){
   row('構台下總長 × 扣除 '+res.deductLayers+' 層',function(T){return '−'+_llM(T.deduct)+' m';},'−'+_llM(res.deduct)+' m');
   row('母索總長（扣除後）',function(T){return _llM(T.net)+' m';},_llM(res.net)+' m',1);
   row('總路數',function(T){return T.runs+' 路';},res.runs+' 路');
+  row('端部預留路數（構台下不扣）',function(T){return (T.spareRuns||0)+' 路';},res.used.reduce(function(a,T){return a+(T.spareRuns||0);},0)+' 路');
   row('端部錨錠預留',function(T){return '+'+_llM(T.spare)+' m';},'+'+_llM(res.spare)+' m');
   row('損耗 '+_llNum(st.waste)+'%',function(){return '×'+(1+_llNum(st.waste)/100).toFixed(3);},null);
   row('需求長度',function(T){return _llM(T.need)+' m';},_llM(res.need)+' m',1);
@@ -20609,7 +20573,7 @@ function _llPrint(){
   body+='</table>'
     +'<div class="cond">公式：各方向總長＝Σ(條數×單長)；每層長度＝基地周長＋各區塊縱橫總長；'
     +'母索總長＝每層長度×層數 − 構台下總長×扣除層數；'
-    +'需求長度＝(母索總長＋每路端部預留×總路數)×(1＋損耗%)。'
+    +'需求長度＝(母索總長＋每路端部預留×每層路數×層數)×(1＋損耗%)；構台下的路不拉、不算配件，但端部預留照全部路數算。'
     +'總路數＝(各區塊路數＋周長路數)×層數 − 構台下路數×扣除層數。宣告路數僅供與明細條數勾稽，不進入計算。'
     +'母索形式（特多龍繩／鋼索）各自的規格、單位重、端部預留與配件分開計算，長度不互相混計。</div>';
   _toolPrint('安全母索用量表',st.proj,body,{fname:_toolFileName('lifeline','安全母索用量表',st.proj)});
@@ -20673,12 +20637,12 @@ function _llXlsx(){
   ref.deck=b('構台下總長(m)',function(T){return sif('E',T.label,1);});
   ref.per =b('每層長度(m)＝基地周長(僅預設形式)＋區塊總長',function(T,c){return 'IF($B$8="'+T.label+'",$B$2,0)+'+c+ref.zone;});
   ref.gro =b('總長(m)＝每層長度×層數',function(T,c){return c+ref.per+'*$B$4';});
-  ref.ded =b('扣除構台下(m)＝構台下總長×扣除層數',function(T,c){return c+ref.deck+'*$B$5';});
+  ref.ded =b('扣除構台下(m)＝MIN(構台下總長, 每層長度)×扣除層數',function(T,c){return 'MIN('+c+ref.deck+','+c+ref.per+')*$B$5';});
   ref.net =b('母索總長(m)（扣除後）',function(T,c){return c+ref.gro+'-'+c+ref.ded;});
   ref.rl  =b('每層路數＝區塊路數＋周長路數(僅預設形式)',function(T,c){return sif('C',T.label,0)+'+IF($B$8="'+T.label+'",$B$3,0)';});
   ref.rd  =b('構台下路數',function(T){return sif('C',T.label,1);});
   ref.run =b('總路數',function(T,c){return c+ref.rl+'*$B$4-'+c+ref.rd+'*$B$5';});
-  ref.sp  =b('端部錨錠預留(m)＝總路數×每路預留',function(T,c){return c+ref.run+'*'+c+ref.spare;});
+  ref.sp  =b('端部錨錠預留(m)＝每層路數×層數×每路預留（構台下的路不扣，Lotion 11/03）',function(T,c){return c+ref.rl+'*$B$4*'+c+ref.spare;});
   ref.need=b('需求長度(m)＝(總長＋預留)×(1＋損耗%)',function(T,c){return '('+c+ref.net+'+'+c+ref.sp+')*(1+$B$7/100)';});
   b('捲數（無條件進位）',function(T,c){return 'CEILING('+c+ref.need+'/'+c+ref.reel+',1)';});
   b('概估重量(kg)',function(T,c){return c+ref.need+'*'+c+ref.w;});
@@ -20699,7 +20663,7 @@ function _llXlsx(){
       ['4. 每層長度 = 基地周長（僅計入 B8 指定的預設形式）＋ 該形式各區塊（縱向＋橫向）總長。'],
       ['5. 母索總長 = 每層長度 × 層數 − 構台下總長 × 扣除層數。'],
       ['6. 總路數 =（該形式區塊路數＋周長路數）× 層數 − 構台下路數 × 扣除層數。'],
-      ['7. 需求長度 =（母索總長 ＋ 總路數×每路端部預留）×（1＋損耗%）；重量 = 需求長度 × 單位重。'],
+      ['7. 需求長度 =（母索總長 ＋ 每層路數×層數×每路端部預留，構台下的路不扣）×（1＋損耗%）；重量 = 需求長度 × 單位重。'],
       ['8. 安全母索形式分「特多龍繩（聚酯纖維）」與「鋼索」，規格、單位重、端部作法與配件皆不同，兩者分欄計算不混計。'],
       ['9. 依營造安全衛生設施標準，安全母索材質得為鋼索、尼龍繩索或聚酯纖維等，最小斷裂強度應在 2,300 kgf 以上。']]}];
   xlsxDownload(_toolFileName('lifeline','安全母索用量表',st.proj),sheets);
@@ -26642,7 +26606,8 @@ function renderCashForecast(){
     if(total<=0)return;
     var estG=Math.round(pr.pct/100*total-billed);
     if(estG<=total*0.01)return;
-    var _dd=_pjDeduct(q),est=Math.round(estG*(1-((_dd.ret||0)/100))-estG*(_dd.clean||0)/1000);   // 預估實收＝預估請款 − 保留款（退還時另算）− 清潔費
+    var _dd=_pjDeduct(q),est=Math.round(estG*(1-((_dd.ret||0)/100))-estG*(_dd.clean||0)/1000);
+    if(_dd.cleanBase==='once'&&_dd.cleanPct>0&&!invs.length)est-=Math.round(_wonAmt(q)/_taxM()*_dd.cleanPct/100*_taxM());   // 第 3c 步：清潔費一次扣在第一期（含稅）   // 預估實收＝預估請款 − 保留款（退還時另算）− 清潔費
     if(est<=0)return;
     var last=invs.slice().sort(function(a,b){return (parseInt(b.periodNo)||0)-(parseInt(a.periodNo)||0);})[0]||null;
     var dom=last?(parseInt(last.payDue)||0):0;
@@ -34722,13 +34687,30 @@ function pjDeductSet(qid,k,v){
   var q=Q.find(function(x){return x.id===qid;});if(!q)return;
   _cardGuard(q,{ret:'retention.pct',retCond:'retention.release'}[k],String(v==null||v===''?'（空白）':v),function(){   // v6.0.111
     if(!q.deduct||typeof q.deduct!=='object')q.deduct={};
-    q.deduct[k]=v;_touch(q);try{persist();}catch(e){_err('pjDeductSet',e);}
+    q.deduct[k]=v;
+    if(k==='cleanBase'){   // 第 3c 步（審查）：一次扣時把 ‰ 移到備份欄並設 0——還沒更新的舊版裝置才不會每期再扣一次 ‰
+      if(v==='once'){if((parseFloat(q.deduct.clean)||0)>0){q.deduct.cleanPermilBak=q.deduct.clean;q.deduct.clean=0;}}
+      else if(q.deduct.cleanPermilBak!=null&&!(parseFloat(q.deduct.clean)>0)){q.deduct.clean=q.deduct.cleanPermilBak;delete q.deduct.cleanPermilBak;}
+    }
+    _touch(q);try{persist();}catch(e){_err('pjDeductSet',e);}
     toast('已更新扣款設定，下一期請款單起自動套用');
     if(k==='ret')_retWarn(v);
   });
 }
 function _pjInvHtml(q,st){var h='';try{h=_pjDeductHtml(q)+_pjOwnerPayHtml(q);}catch(e){_err('_pjDeductHtml',e);}return h+_pjInvHtmlCore.apply(this,arguments);};
-function buildInvFromQuote(q){var inv=_buildInvFromQuoteCore.apply(this,arguments);try{inv.recvRule=1;var d=_pjDeduct(q);if(d.ret!=null){inv.retention=d.ret>0;inv.retentionPct=d.ret;}if(d.clean>0){inv.cleanPermil=d.clean;inv.cleanMode=d.cleanMode;}}catch(e){_err('buildInvFromQuote.deduct',e);}return inv;};
+// 清潔費一次扣的 %：存檔的單看 inv.cleanPct，編輯中的看輸入框
+function _invCleanPct(src){var r=src||null;if(r&&r.cleanPct)return parseFloat(r.cleanPct)||0;var el=document.getElementById('inv-clean-fixed');return el?(parseFloat(el.dataset.pct)||0):0;}
+// 第 3c 步（Lotion 11/03）：清潔費一次扣的總額＝合約未稅（主約＋已得標追加）× %，第一張請款單開單時記在 q.deduct.cleanOnceAmt（合約後來變動不自動補扣）；
+//   每期本期最多扣到本期未稅，扣不完的順延下一期——剩餘＝總額 − 其他請款單已實扣（totals.clean）
+function _cleanOnceTotal(q){var d=(q&&q.deduct)||{};var v=parseFloat(d.cleanOnceAmt);if(v>0)return Math.round(v);return Math.round(_wonAmt(q)/_taxM()*(parseFloat(d.cleanPct)||0)/100);}
+function _cleanOnceRemain(q,exceptId){var T=_cleanOnceTotal(q),took=0;_invsOfQuoteAll(q).forEach(function(x){if(!x||x.kind==='retReturn'||x.id===exceptId||!((parseFloat(x.cleanFixed)||0)>0))return;took+=Math.round((x.totals&&parseFloat(x.totals.clean))||0);});return Math.max(0,T-took);}
+function _cleanOnceApply(q,inv){var d=_pjDeduct(q);if(!(d.cleanBase==='once'&&d.cleanPct>0)){delete inv.cleanFixed;delete inv.cleanPct;return;}
+  if(!(parseFloat((q.deduct||{}).cleanOnceAmt)>0)&&!_invsOfQuoteAll(q).some(function(x){return x&&x.kind!=='retReturn'&&x.id!==inv.id;})){q.deduct.cleanOnceAmt=_cleanOnceTotal(q);_touch(q);try{persist();}catch(e){_err('_cleanOnceApply',e);}}
+  var rem=_cleanOnceRemain(q,inv.id);if(rem>0){inv.cleanFixed=rem;inv.cleanPct=d.cleanPct;inv.cleanMode=d.cleanMode;inv.cleanPermil=0;}else{delete inv.cleanFixed;delete inv.cleanPct;}}
+function buildInvFromQuote(q){var inv=_buildInvFromQuoteCore.apply(this,arguments);try{inv.recvRule=1;var d=_pjDeduct(q);if(d.ret!=null){inv.retention=d.ret>0;inv.retentionPct=d.ret;}if(d.clean>0){inv.cleanPermil=d.clean;inv.cleanMode=d.cleanMode;}
+    // 第 3c 步（Lotion 11/03）：清潔費第一期一次扣＝合約未稅（主約＋已得標追加）× %；只在這案第一張請款單，之後各期 0；合約後來變動不自動補扣（完工結算差異表提醒）
+    if(d.cleanBase==='once'&&d.cleanPct>0){inv.cleanPermil=0;_cleanOnceApply(q,inv);}
+  }catch(e){_err('buildInvFromQuote.deduct',e);}return inv;};
 // ── 2 收款折讓：原發票號碼、折讓金額（未稅＋稅額）、折讓單日期、原因 → inv.allow；折讓證明單 PDF ──
 function _invAllowAmt(inv){return (inv&&inv.allow)?(parseFloat(inv.allow.amt)||0):0;}
 function _invOffset(inv){
@@ -34742,7 +34724,7 @@ function _receiptOffsets(){
 }
 function _allowRows(inv){
   var rows=[],t=inv.totals||{};
-  if(inv.cleanMode==='allow'&&(parseFloat(t.cleanGross)||0)>0)rows.push({name:'清潔費（'+_rfmt(t.cleanPermil||0)+'‰）',net:Math.round(t.clean||0),tax:Math.round(t.cleanGross)-Math.round(t.clean||0),gross:Math.round(t.cleanGross)});
+  if(inv.cleanMode==='allow'&&(parseFloat(t.cleanGross)||0)>0)rows.push({name:'清潔費（'+(t.cleanFixed?'一次扣合約 '+_rfmt(inv.cleanPct||0)+'%':_rfmt(t.cleanPermil||0)+'‰')+'）',net:Math.round(t.clean||0),tax:Math.round(t.cleanGross)-Math.round(t.clean||0),gross:Math.round(t.cleanGross)});
   if(inv.allow&&(parseFloat(inv.allow.amt)||0)>0)rows.push({name:inv.allow.reason||'收款折讓',net:Math.round(inv.allow.net||0),tax:Math.round(inv.allow.tax||0),gross:Math.round(inv.allow.amt||0)});
   return rows;
 }
@@ -36271,14 +36253,17 @@ function _qiPreview(map,draft){
 function quoteExportOwnerDoc(){var q=Q.find(function(x){return x.id===eid;}),doc=_qOwnerDraft||(q&&q.ownerDoc);if(doc&&doc.kind==='pdf'){toast('PDF 詢價單無法回填，請用「預覽 → 匯出 PDF」出本公司報價單');return;}return _quoteExportOwnerDocCore.apply(this,arguments);};
 
 // ── 2 清潔費：直接自請款扣除 ──
-function _pjDeduct(q){var d=(q&&q.deduct)||{};var cm=d.cleanMode==='allow'?'allow':(d.cleanMode==='exp'?'exp':'net');return {ret:d.ret!=null&&d.ret!==''?parseFloat(d.ret)||0:null,clean:parseFloat(d.clean)||0,cleanMode:cm};}
+function _pjDeduct(q){var d=(q&&q.deduct)||{};var cm=d.cleanMode==='allow'?'allow':(d.cleanMode==='exp'?'exp':'net');var once=d.cleanBase==='once';return {ret:d.ret!=null&&d.ret!==''?parseFloat(d.ret)||0:null,clean:once?0:(parseFloat(d.clean)||0),cleanMode:cm,cleanBase:once?'once':'period',cleanPct:parseFloat(d.cleanPct)||0};}   // 第 3c 步：cleanBase once＝第一期一次扣合約 %
 var _CLEAN_MODES=[['net','直接自請款扣除（發票開扣後金額）'],['exp','業主另開發票給我方（當費用）'],['allow','我方開折讓單']];
 function _pjDeductHtml(q){
   var d=_pjDeduct(q),IN='font-size:12px;padding:3px 6px;border:1px solid var(--b2);border-radius:var(--r6);font-family:inherit;background:var(--w);box-sizing:border-box';
   return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r8);padding:7px 10px;margin-bottom:8px">'
     +'<b style="color:var(--b5)">業主扣款設定</b><span style="color:var(--b4);font-size:11px">每期請款單自動套用（已開的單不改）</span>'
     +'<label style="display:flex;align-items:center;gap:4px">保留款 <input type="number" inputmode="decimal" step="any" min="0" max="50" value="'+(d.ret==null?'':d.ret)+'" placeholder="不扣" onchange="pjDeductSet(\''+q.id+'\',\'ret\',this.value)" style="'+IN+';width:58px;text-align:right"> %</label>'
-    +'<label style="display:flex;align-items:center;gap:4px">清潔費 <input type="number" inputmode="decimal" step="any" min="0" value="'+(d.clean||'')+'" placeholder="0" onchange="pjDeductSet(\''+q.id+'\',\'clean\',this.value)" style="'+IN+';width:58px;text-align:right"> ‰（未稅工程款）</label>'
+    +'<label style="display:flex;align-items:center;gap:4px">清潔費扣法 <select onchange="pjDeductSet(\''+q.id+'\',\'cleanBase\',this.value);setTimeout(function(){try{renderProj();}catch(e){_err(\'cleanBase\',e);}},50)" style="'+IN+'"><option value="period"'+(d.cleanBase!=='once'?' selected':'')+'>每期按比例（‰）</option><option value="once"'+(d.cleanBase==='once'?' selected':'')+'>第一期一次扣（合約 %）</option></select></label>'
+    +(d.cleanBase==='once'
+      ?'<label style="display:flex;align-items:center;gap:4px">合約未稅 × <input type="number" inputmode="decimal" step="any" min="0" value="'+(d.cleanPct||'')+'" placeholder="0" onchange="pjDeductSet(\''+q.id+'\',\'cleanPct\',this.value)" style="'+IN+';width:58px;text-align:right"> %（第一期扣，不夠扣順延下一期'+(function(){try{var n=Math.round(_wonAmt(q)/_taxM()*(d.cleanPct||0)/100);return n>0?'，約 NT$ '+fmt(n):'';}catch(e){_err('_pjDeductHtml.clean',e);return '';}})()+'）</label>'
+      :'<label style="display:flex;align-items:center;gap:4px">清潔費 <input type="number" inputmode="decimal" step="any" min="0" value="'+(d.clean||'')+'" placeholder="0" onchange="pjDeductSet(\''+q.id+'\',\'clean\',this.value)" style="'+IN+';width:58px;text-align:right"> ‰（未稅工程款）</label>')
     +'<label style="display:flex;align-items:center;gap:4px">清潔費處理 <select onchange="pjDeductSet(\''+q.id+'\',\'cleanMode\',this.value)" style="'+IN+'">'+_CLEAN_MODES.map(function(m){return '<option value="'+m[0]+'"'+(d.cleanMode===m[0]?' selected':'')+'>'+m[1]+'</option>';}).join('')+'</select></label>'
     +'<label style="display:flex;align-items:center;gap:4px;flex:1 1 260px">保留款退還條件 <input value="'+esc(String(((q.deduct||{}).retCond)||''))+'" placeholder="例：拆除拔除完成、驗收後 30 日內一次無息退還" onchange="pjDeductSet(\''+q.id+'\',\'retCond\',this.value.trim())" style="'+IN+';flex:1;min-width:0"></label>'
     +'<label style="display:flex;align-items:center;gap:4px">預計退還日 <input type="date" value="'+esc(String(((q.deduct||{}).retDue)||''))+'" onchange="pjDeductSet(\''+q.id+'\',\'retDue\',this.value)" style="'+IN+'"></label>'
@@ -39084,7 +39069,7 @@ function _invMoneySig(items){
   return JSON.stringify((items||[]).filter(function(it){return it&&it.type!=='sec';}).map(function(it){
     return [it.type||'',String(it.desc||''),+it.curQty||0,+it.contractPrice||0,+it.contractQty||0,it.payRate!=null?+it.payRate:100,+it.curDays||0,+it.discDays||0,+it.discQd||0];}));
 }
-function _invHeadSig(inv){return JSON.stringify([!!(inv&&inv.retention),+(inv&&inv.retentionPct)||0,+(inv&&inv.cleanPermil)||0,(inv&&inv.cleanMode)||'',(inv&&inv.claimType)||'']);}   // 保留款、清潔費等表頭金額欄位
+function _invHeadSig(inv){return JSON.stringify([!!(inv&&inv.retention),+(inv&&inv.retentionPct)||0,+(inv&&inv.cleanPermil)||0,+(inv&&inv.cleanFixed)||0,+(inv&&inv.cleanPct)||0,(inv&&inv.cleanMode)||'',(inv&&inv.claimType)||'']);}   // 保留款、清潔費等表頭金額欄位
 // 依報價現行單價重算這一期本期金額（未稅）的差額；_match 為與報價工項的一對一配對（saveQ 傳入），沒有就依序配對
 function _invRepriceDiff(inv,q,_match){
   if(!inv||!q)return 0;

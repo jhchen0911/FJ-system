@@ -210,9 +210,15 @@
  },
  "C17": {
   "overDays": 45,
-  "qty": 100,
-  "amount": 90000,
+  "qty": 80,
+  "amount": 72000,
   "expiry": "2026-08-31"
+ },
+ "C17b": {
+  "expiry": "2026-08-31",
+  "overDays": 20,
+  "qtyDays": 1300,
+  "amount": 26000
  },
  "C18": {
   "areaA": 10,

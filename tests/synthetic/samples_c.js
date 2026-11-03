@@ -15,14 +15,26 @@ module.exports = [
     }
   },
   {
-    id: 'C17', items: [17], status: '現況',
+    id: 'C17', items: [17], status: '正確',
     title: '逾期租金（拔除第一天模式）：合約 100 支只打設 80 支，逾期 45 天×20 元，照合約量 100 支收',
-    hand: '正確：min(合約 100, 打設 80)＝80 支 × 45 天 × 20＝72,000；現況 100 支＝90,000',
+    hand: '正確：min(合約 100, 打設 80)＝80 支 × 45 天 × 20＝72,000；v6.0.135 以前 100 支＝90,000（v6.0.136 第 3c 步改成新口徑）',
     run: async () => {
       window._itemProgress = () => ({ installLast: '2026-08-01', doneDate: '2026-08-01', last: '2026-08-01', cum: 80, target: 100 });
       const q = { id: 'qC17', name: '範例工程C17', items: [{ desc: '鋼軌樁', unit: '支', qty: 100, price: 500, note: '租期30天', ot: '20', otu: '$/支/天' }] };
       const r = _rentStatus(q, 0, '2026-10-15');
       return r ? { overDays: r.overDays, qty: r.qty, amount: r.amount, expiry: r.expiry } : { r: null };
+    }
+  },
+  {
+    id: 'C17b', items: [17], status: '正確',
+    title: '逾期租金（拔除完成日模式，新合約）：打設 80 支、租期 30 天（8/1 打完 → 8/31 到期）；9/10 拔完 30 支、9/20 拔完 50 支，每支每天 20 元',
+    hand: '9/1 起逾期：30 支 × 10 天（9/1～9/10，完成當天計租）＋ 50 支 × 20 天（9/1～9/20）＝1,300 支·天 × 20＝26,000',
+    run: async () => {
+      const q = { id: 'qC17b', name: '範例工程C17b', rentEnd: 'removeDone', items: [{ desc: '鋼軌樁打設及拔除', unit: '支', qty: 100, price: 500, note: '租期30天', ot: '20', otu: '$/支/天', cat: 'both' }],
+        dailyLogs: [{ id: 'd1', date: '2026-07-25', progressRows: [{ itemIdx: 0, qty: 50, ph: 'install' }] }, { id: 'd2', date: '2026-08-01', progressRows: [{ itemIdx: 0, qty: 30, ph: 'install' }] },
+          { id: 'd3', date: '2026-09-10', progressRows: [{ itemIdx: 0, qty: 30, ph: 'remove', batchDone: true }] }, { id: 'd4', date: '2026-09-20', progressRows: [{ itemIdx: 0, qty: 50, ph: 'remove', batchDone: true }] }] };
+      const r = _rentStatus(q, 0, '2026-10-15');
+      return r ? { expiry: r.expiry, overDays: r.overDays, qtyDays: r.qtyDays, amount: r.amount } : { r: null };
     }
   },
   {
