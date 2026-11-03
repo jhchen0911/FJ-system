@@ -1128,7 +1128,8 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
 
     <!-- 其他費用卡已移除（v5.244）：從未使用、與「施工成本→額外支出」重疊；q.exs 舊資料保留相容 -->
 
-    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <div style="display:flex;justify-content:flex-end;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <div id="q-meas-chip"></div>
       <div class="totbox" id="totbox-el">
         <div class="trow"><label>小計</label><span id="tsub">NT$ 0</span></div>
         <div class="trow"><label id="ttaxlbl">5% 營業稅</label><span id="ttax">NT$ 0</span></div>
@@ -2843,15 +2844,15 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
   <div id="mob-more-body"></div>
 </div>
 
-<script src="calc/invoice.js?v=6.0.159" defer></script>
-<script src="calc/payable.js?v=6.0.159" defer></script>
-<script src="calc/report.js?v=6.0.159" defer></script>
-<script src="calc/comm.js?v=6.0.159" defer></script>
-<script src="calc/payroll.js?v=6.0.159" defer></script>
-<script src="calc/lifeline.js?v=6.0.159" defer></script>
-<script src="calc/settle.js?v=6.0.159" defer></script>
-<script src="calc/route.js?v=6.0.159" defer></script>
-<script src="app.js?v=6.0.159" defer></script><script src="beta.js?v=6.0.159" defer></script>
+<script src="calc/invoice.js?v=6.0.160" defer></script>
+<script src="calc/payable.js?v=6.0.160" defer></script>
+<script src="calc/report.js?v=6.0.160" defer></script>
+<script src="calc/comm.js?v=6.0.160" defer></script>
+<script src="calc/payroll.js?v=6.0.160" defer></script>
+<script src="calc/lifeline.js?v=6.0.160" defer></script>
+<script src="calc/settle.js?v=6.0.160" defer></script>
+<script src="calc/route.js?v=6.0.160" defer></script>
+<script src="app.js?v=6.0.160" defer></script><script src="beta.js?v=6.0.160" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
