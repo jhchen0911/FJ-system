@@ -9642,6 +9642,57 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.149 議價可輸入折扣 %、即時預覽、稅前價；尾差併入工項單價，不再加「議價調整」列 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const oT = window.toast; let msg = ''; window.toast = m => { msg = String(m); };
+      try {
+        P.tax = 5; exs = [];
+        const base = () => [{ desc: '鋼板樁', unit: 'M', qty: '1000', price: '1000', note: '', sec: false }, { desc: '動員', unit: '式', qty: '1', price: '50000', note: '', sec: false }];
+        const setIn = v => { document.querySelector('input[name="ngt-in"][value="' + v + '"]').checked = true; _ngtInSw(); };
+        const setMode = v => { document.querySelector('input[name="ngt-mode"][value="' + v + '"]').checked = true; };
+        const noAdj = () => !items.some(it => it.desc === NGT_ADJ_DESC) && items.every(it => Number.isInteger(+it.price));
+        // 5% 未稅：1,050,000 → 997,500，尾差併入「動員」1 式
+        items = base(); openNegotiateModal(); setMode('excl'); setIn('pct'); document.getElementById('ngt-pct').value = '5'; updNegotiatePreview();
+        const pv = document.getElementById('ngt-preview').innerHTML;
+        out.prev = /997,500/.test(pv) && /降 <b>5%<\/b>/.test(pv) && /少 NT\$ 52,500/.test(pv) && /1,050,000/.test(pv);
+        applyNegotiate(); out.pctExcl = calcT().sub === 997500 && noAdj() && items[1].origPrice === 50000;
+        // 5% 含稅：1,102,500 → 1,047,375（含稅剛好）
+        items = base(); openNegotiateModal(); setMode('incl'); setIn('pct'); document.getElementById('ngt-pct').value = '5'; applyNegotiate();
+        out.pctIncl = Math.round(calcT().total) === 1047375 && noAdj();
+        // 稅前價：新含稅總計＝原未稅小計，實際降約 4.76%
+        items = base(); openNegotiateModal(); _ngtPreTax();
+        out.preTaxFill = document.getElementById('ngt-target').value === '1050000' && _ngtMode() === 'incl' && _ngtIn() === 'amt' && /降 <b>4\.76%<\/b>/.test(document.getElementById('ngt-preview').innerHTML);
+        applyNegotiate(); out.preTax = Math.round(calcT().total) === 1050000 && calcT().sub === 1000000 && noAdj();
+        // 沒有 1 式：找數量能整除尾差的列（7 M、3 M，目標未稅 9,997 → 差 -3 由 3 M 那列吸收）
+        items = [{ desc: 'A', unit: 'M', qty: '7', price: '1000', sec: false }, { desc: 'B', unit: 'M', qty: '3', price: '1000', sec: false }];
+        openNegotiateModal(); setMode('excl'); setIn('amt'); document.getElementById('ngt-target').value = '9997'; applyNegotiate();
+        out.divisible = calcT().sub === 9997 && +items[1].price === 999 && +items[0].price === 1000 && noAdj();
+        // 都不行：顯示「還差 N 元」讓人選列，不自動加列
+        items = [{ desc: 'A', unit: 'M', qty: '7', price: '1000', sec: false }, { desc: 'B', unit: 'M', qty: '3', price: '1000', sec: false }];
+        openNegotiateModal(); setMode('excl'); setIn('amt'); document.getElementById('ngt-target').value = '9999'; updNegotiatePreview();
+        const pv2 = document.getElementById('ngt-preview');
+        out.left = /還差 NT\$ 1/.test(pv2.innerHTML) && !!pv2.querySelector('select') && pv2.querySelectorAll('option').length === 3;
+        applyNegotiate(); out.leftApply = calcT().sub === 10000 && noAdj() && /與目標差 NT\$ 1/.test(msg);
+        // 舊報價已有「議價調整」列：保留不動（再議價也不刪）
+        items = base().concat([{ desc: NGT_ADJ_DESC, unit: '式', qty: 1, price: -400, note: '議價調整', sec: false }]);
+        openNegotiateModal(); setMode('excl'); setIn('amt'); document.getElementById('ngt-target').value = '1000000'; applyNegotiate();
+        out.oldAdj = items.filter(it => it.desc === NGT_ADJ_DESC).length === 1 && +items.find(it => it.desc === NGT_ADJ_DESC).price === -400 && calcT().sub === 1000000;
+        // 說明文字不再提「議價調整」項補足
+        out.text = !/以「議價調整」項補足/.test(document.getElementById('negotiate-modal').innerHTML);
+        document.getElementById('negotiate-modal').style.display = 'none'; items = []; exs = [];
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      window.toast = oT;
+      return out;
+    });
+    check('v6.0.149 議價折扣 %：5%（未稅／含稅口徑）精準等於目標、即時預覽改前→改後與降幅；稅前價（含稅＝原未稅、降 4.76%）', r.prev && r.pctExcl && r.pctIncl && r.preTaxFill && r.preTax, JSON.stringify(r));
+    check('v6.0.149 議價尾差：併入 1 式或數量能整除的工項單價（整數），不加「議價調整」列；無法剛好時顯示還差幾元可選列；舊報價的調整列保留', r.divisible && r.left && r.leftApply && r.oldAdj && r.text, JSON.stringify(r));
+    check('v6.0.149 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
