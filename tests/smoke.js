@@ -9424,7 +9424,19 @@ async function newPage(browser, width, height) {
         // 身分證格式不對擋下
         openLrs('comm_qL140_c1'); await wait(80); document.getElementById('lrs-idno').value = '12345'; document.getElementById('gen-confirm-ok').click(); await wait(80);
         out.badId = document.getElementById('gen-confirm-modal').style.display !== 'none'; document.getElementById('gen-confirm-cancel').click();
-        // A4 勞報單：給付單位、所得人個資、代扣、印章
+        // 審查：金額改了→已簽回清掉；同名不同人選「新的受領人」不會帶到別人的個資
+        LRS.slips[sl.id] = Object.assign({}, sl, { signedAt: 1 });
+        openLrs('comm_qL140_c1'); await wait(80); document.getElementById('lrs-gross').value = '25000'; document.getElementById('gen-confirm-ok').click(); await wait(250);
+        out.resign = !LRS.slips[sl.id].signedAt && LRS.slips[sl.id].gross === 25000; try { document.getElementById('gen-confirm-cancel').click(); } catch (e) { /* 可忽略 */ }
+        const pc2 = { id: 'pay_sales_qL140', to: '範例介紹人', amount: 10000, vat: false, status: 'unpaid', date: '2026-11-12', quoteId: 'qL140' }; PAYABLES.push(pc2);
+        openLrs('pay_sales_qL140'); await wait(80);
+        out.sameSel = gv('lrs-payee') === sl.payeeId && gv('lrs-idno') === 'A123456789';
+        document.getElementById('lrs-payee').value = 'new'; _lrsPayeeSwitch(); out.newBlank = gv('lrs-idno') === '';
+        document.getElementById('lrs-agree').checked = false; document.getElementById('lrs-idno').value = 'B123456789'; document.getElementById('gen-confirm-ok').click(); await wait(250);
+        const sl2 = LRS.slips[_lrsSlipId('pay_sales_qL140')];
+        out.newPayee = sl2.payeeId !== sl.payeeId && !(LRS_SENS[sl2.payeeId] || {}).idNo && LRS_SENS[sl.payeeId].idNo === 'A123456789';   // 沒勾同意不存個資
+        delete LRS.slips[sl2.id]; PAYABLES.splice(PAYABLES.indexOf(pc2), 1); sl = LRS.slips[sl.id];
+        LRS.slips[sl.id] = sl = Object.assign({}, sl, { gross: 30000, tax: 3000, nhi: 633, net: 26367 });
         const P1 = P.seal; P.seal = 'data:image/png;base64,iVBORw0KGgo=';
         const h = _lrsSlipHtml(sl, LRS_SENS[sl.payeeId]);
         out.slip = /勞務報酬單/.test(h) && /A123456789/.test(h) && /9A 執行業務所得/.test(h) && /新臺幣 3,000 元/.test(h) && /新臺幣 26,367 元/.test(h) && /class="stamp"/.test(h) && /@page\{size:A4 portrait;margin:10mm\}/.test(h);
@@ -9435,7 +9447,7 @@ async function newPage(browser, width, height) {
         out.agrForm = document.querySelector('input[name="ia-mode"][value="pct"]').checked && gv('ia-pct') === '3' && document.querySelector('input[name="ia-on"][value="contract"]').checked;
         document.getElementById('gen-confirm-ok').click(); await wait(80);
         out.agr = !!printed && /案件介紹費協議書/.test(printed.html) && /☑ 依甲方與業主簽訂之合約金額（未稅）<u>&nbsp;3&nbsp;<\/u>％/.test(printed.html) && /☑ 甲方與業主簽訂合約後/.test(printed.html)
-          && ['一、介紹費', '二、給付時點', '三、代扣與單據', '四、未簽約或合約解除', '五、保密', '六、其他'].every(t => printed.html.indexOf('<b>' + t.replace('、', '、')) >= 0 || printed.html.indexOf(t.split('、')[0] + '、' + t.split('、')[1]) >= 0)
+          && ['一、介紹費', '二、給付時點', '三、代扣與單據', '四、未簽約或合約解除', '五、保密', '六、其他'].every(x => printed.html.indexOf('<b>' + x + '</b>') >= 0)
           && /A123456789/.test(printed.html) && /範例營造/.test(printed.html) && !/介紹工項/.test(printed.html);
         LRS.slips[sl.id] = Object.assign({}, sl, { agree: false }); printed = null; openIntroAgr(sl.id); await wait(30); out.agrNo = printed === null; LRS.slips[sl.id] = sl;
         P.seal = P1;
@@ -9455,7 +9467,7 @@ async function newPage(browser, width, height) {
     const OPS140 = require(pth140.join(__dirname, '..', 'functions', 'ops', 'core.js'));
     check('v6.0.140 勞報單計算：9A 超過 20,000 扣 10%、達 20,000 扣 2.11%；50 達 90,501 扣 5%、健保門檻 29,500；92 不扣；職業工會免扣健保；比率依民國年、沒有就沿用最近一年', r.calc && r.rates, JSON.stringify(r));
     check('v6.0.140 勞報單流程：只有抽成／佣金／介紹費／點工有按鈕、唯讀帳號看不到；沒勾同意記「無勞報單」；勾了算代扣實付；身分證格式擋下；個資不進本機快取',
-      r.btn && r.ro && r.defNo && r.none && r.prev && r.saved && r.priv && r.badId, JSON.stringify(r));
+      r.btn && r.ro && r.defNo && r.none && r.prev && r.saved && r.priv && r.badId && r.resign && r.sameSel && r.newBlank && r.newPayee, JSON.stringify(r));
     check('v6.0.140 A4 勞報單（印章、個資、代扣）與案件介紹費協議書（佣金設定帶入、六條、同意才產生）；年度彙總分開列無勞報單；fydata/lrs 只有管理員、每日備份含 lrs',
       r.slip && r.print && r.agrForm && r.agr && r.agrNo && r.year && r.yearUi && !!RF140.lrs && /!root\.child\('fydata\/readers'\)/.test(RF140.lrs['.read']) && /!root\.child\('fydata\/readers'\)/.test(RF140.lrs['.write']) && OPS140.BACKUP_NODES.indexOf('lrs') >= 0, JSON.stringify(r));
     check('v6.0.140 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));

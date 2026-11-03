@@ -39738,7 +39738,7 @@ function _lrsWatch(){
     var ref=_fbDb.ref('fydata/lrs/'+k);_lrsRefs.push(ref);
     ref.on('value',function(s){var v=s.val()||{},o={};Object.keys(v).forEach(function(id){if(v[id]&&typeof v[id]==='object')o[id]=v[id];});LRS[k]=o;_lrsLocal();
       try{if(document.getElementById('payable-list')&&document.getElementById('finance-payable')&&document.getElementById('finance-payable').style.display!=='none')renderPayables();}catch(e){_err('_lrsWatch.render',e);}},
-      function(e){_lrsOn=false;_err('_lrsWatch',e);});   // 規則還沒發布：讀不到就用本機快取
+      function(e){_lrsRefs.forEach(function(r){try{r.off();}catch(e2){_err('_lrsWatch.off',e2);}});_lrsRefs=[];_lrsOn=false;_err('_lrsWatch',e);});   // 規則還沒發布：讀不到就用本機快取（審查：先拆掉監聽，下次重掛不會重複）
   });
 }
 function _lrsOff(){_lrsRefs.forEach(function(r){try{r.off();}catch(e){_err('_lrsOff',e);}});_lrsRefs=[];_lrsOn=false;LRS={slips:{},payees:{}};LRS_SENS={};try{localStorage.removeItem('fy_lrs');}catch(e){_err('_lrsOff.ls',e);}}   // 登出清掉，換人登入看不到
@@ -39746,7 +39746,7 @@ function _lrsSensGet(pid){
   if(!pid)return Promise.resolve({});
   if(LRS_SENS[pid])return Promise.resolve(LRS_SENS[pid]);
   if(!_lrsCloud())return Promise.resolve(LRS_SENS[pid]||{});
-  return _fbDb.ref('fydata/lrs/sens/'+pid).once('value').then(function(s){LRS_SENS[pid]=s.val()||{};return LRS_SENS[pid];}).catch(function(e){_err('_lrsSensGet',e);return {};});
+  return _fbDb.ref('fydata/lrs/sens/'+pid).once('value').then(function(s){LRS_SENS[pid]=s.val()||{};return LRS_SENS[pid];}).catch(function(e){_err('_lrsSensGet',e);return {_fail:1};});   // 審查：讀失敗要標記，存檔時不能拿空白蓋掉雲端個資
 }
 // 純計算：給付總額 → 代扣所得稅、二代健保補充保費、實付。R＝該年各類別 {taxTh,taxOver(1＝超過才扣；0＝達到就扣),tax%,nhiTh,nhi%}
 function _lrsCalc(gross,cat,union,R){
@@ -39775,6 +39775,10 @@ function _lrsPayBtn(p){
   return tag+'<button type="button" class="btn btn-xs" style="border-color:#90caf9;color:#1565C0" title="勞務報酬單：代扣所得稅、二代健保" onclick="openLrs(\''+escq(p.id)+'\')">勞報單</button>';
 }
 function _lrsPayeeFind(name){name=String(name||'').trim();return Object.keys(LRS.payees).map(function(k){return LRS.payees[k];}).find(function(x){return x&&x.name===name;})||null;}
+function _lrsPayeesNamed(name){name=String(name||'').trim();return Object.keys(LRS.payees).map(function(k){return LRS.payees[k];}).filter(function(x){return x&&x.name===name;});}
+// 審查：同名不同人——受領人用下拉選（同名的每一位＋「新的受領人」），換人時重讀該人的個資
+function _lrsPayeeSwitch(){var pid=gv('lrs-payee');var fill=function(z){z=z||{};var sv=function(i,v){var e=document.getElementById(i);if(e)e.value=v||'';};sv('lrs-idno',z.idNo);sv('lrs-addr',z.regAddr);sv('lrs-bank',z.bank);sv('lrs-acct',z.acct);sv('lrs-holder',z.holder);};
+  if(!pid||pid==='new'){fill({});return;}var pe=LRS.payees[pid];if(pe){var n=document.getElementById('lrs-name');if(n)n.value=pe.name||'';var u=document.getElementById('lrs-union');if(u)u.checked=!!pe.union;}_lrsSensGet(pid).then(fill);}
 function _lrsPrevHtml(){
   var c=_lrsCalc(gv('lrs-gross'),gv('lrs-cat'),!!(document.getElementById('lrs-union')||{}).checked,_lrsRates(_lrsRocY(gv('lrs-date'))).R);
   var rr=_lrsRates(_lrsRocY(gv('lrs-date')));
@@ -39784,7 +39788,7 @@ function _lrsPrev(){var el=document.getElementById('lrs-prev');if(el)el.innerHTM
 function openLrs(payId){
   if(!_lrsOk()){toast('勞報單只有管理員能開');return;}
   var p=(PAYABLES||[]).find(function(x){return x&&x.id===payId;});if(!p){toast('找不到這筆應付');return;}
-  var kind=_lrsKind(p),s=_lrsSlipOf(p)||{},pe=s.payeeId?LRS.payees[s.payeeId]:_lrsPayeeFind(p.to);
+  var kind=_lrsKind(p),s=_lrsSlipOf(p)||{},pe=s.payeeId?(LRS.payees[s.payeeId]||{id:s.payeeId,name:s.name}):_lrsPayeeFind(p.to);
   _lrsSensGet(pe&&pe.id).then(function(sens){
     var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
     var I=function(id,l,v,ex){return '<div class="f"><label>'+l+'</label><input id="'+id+'" value="'+esc(v==null?'':String(v))+'" style="'+IN+'"'+(ex||'')+'></div>';};
@@ -39793,6 +39797,10 @@ function openLrs(payId){
     var date=s.date||p.paidDate||p.date||localToday();
     var agree=s.id?!!s.agree:false,union=s.id?!!s.union:!!(pe&&pe.union);
     var has=!!s.id&&!!s.agree;
+    var same=_lrsPayeesNamed((pe&&pe.name)||p.to);if(pe&&pe.id&&!same.some(function(x){return x.id===pe.id;}))same.unshift(pe);
+    var psel='<div class="f"><label>受領人（同名不同人請選「新的受領人」）</label><select id="lrs-payee" onchange="_lrsPayeeSwitch()" style="'+IN+'">'+same.map(function(x,i){return '<option value="'+esc(x.id)+'"'+((pe&&pe.id===x.id)?' selected':'')+'>'+esc(x.name||'')+(same.length>1?('（第 '+(i+1)+' 位）'):'')+'</option>';}).join('')+'<option value="new"'+(pe?'':' selected')+'>新的受領人</option></select></div>';
+    var warn=(s.id&&Math.round(_payEff(p)||0)!==Math.round(+s.gross||0))?'<div style="font-size:12px;color:#b26a00;margin-bottom:6px">⚠️ 應付金額已改成 NT$ '+fmt(_payEff(p))+'，這張勞報單的給付總額是 NT$ '+fmt(s.gross)+'，請確認後重存（重存金額不同時，已簽回的照片要重簽）。</div>':'';
+    var sensNote=sens&&sens._fail?'<div style="font-size:12px;color:var(--red)">讀不到這位受領人的個資（網路或權限），這次存檔不會改個資。</div>':(!_lrsCloud()?'<div style="font-size:12px;color:#b26a00">本機資料模式：個資不會保存（登入後才存到雲端）。</div>':'');
     var acts=has?('<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">'
       +'<button type="button" class="btn btn-xs btn-g" onclick="_lrsPrint(\''+escq(s.id)+'\')">列印／PDF 勞報單</button>'
       +'<button type="button" class="btn btn-xs" onclick="_lrsUpload(\''+escq(s.id)+'\',\'s\')">'+(s.signedAt?'重傳':'上傳')+'簽回照片</button>'
@@ -39801,45 +39809,50 @@ function openLrs(payId){
         +'<button type="button" class="btn btn-xs" onclick="_lrsUpload(\''+escq(s.id)+'\',\'a\')">'+(s.agrSignedAt?'重傳':'上傳')+'協議書簽回</button>'
         +(s.agrSignedAt?'<button type="button" class="btn btn-xs" onclick="_lrsDocView(\''+escq(s.id)+'\',\'a\')">看協議書</button>':'')):'')
       +'</div>'):'';
-    showConfirm('勞務報酬單：'+esc(p.to||''),
+    showConfirm('勞務報酬單：'+(p.to||''),
       '<div style="font-size:12px;color:var(--b4);margin-bottom:6px">'+esc(p.project||'')+'　應付 NT$ '+fmt(_payEff(p))+'。應付金額不會改；勞報單記錄代扣與實付（匯款時照實付匯）。</div>'
       +'<label style="display:flex;gap:6px;align-items:center;font-size:13px;font-weight:700;margin:4px 0 8px"><input type="checkbox" id="lrs-agree" '+(agree?'checked':'')+' onchange="_lrsPrev()"> 對方同意簽勞報單（沒勾＝不開單，應付照付、標「無勞報單」）</label>'
-      +acts
-      +'<div id="lrs-body">'
+      +warn+acts
+      +'<div id="lrs-body">'+psel
       +'<div class="fg fg2" style="gap:8px">'+I('lrs-name','受領人姓名',s.name||(pe&&pe.name)||p.to||'')
         +'<div class="f"><label>所得類別</label><select id="lrs-cat" onchange="_lrsPrev()" style="'+IN+'">'+Object.keys(_LRS_CATS).map(function(k){return '<option value="'+k+'"'+(k===cat?' selected':'')+'>'+_LRS_CATS[k]+'</option>';}).join('')+'</select></div></div>'
       +'<div class="fg fg2" style="gap:8px;margin-top:6px">'+I('lrs-gross','給付總額（元）',gross,' type="number" inputmode="numeric" oninput="_lrsPrev()"')+I('lrs-date','給付日',date,' type="date" onchange="_lrsPrev()"')+'</div>'
       +'<label style="display:flex;gap:6px;align-items:center;font-size:12.5px;margin:6px 0"><input type="checkbox" id="lrs-union" '+(union?'checked':'')+' onchange="_lrsPrev()"> 有職業工會投保（免扣二代健保，請對方提供投保證明）</label>'
       +'<div id="lrs-prev" style="font-size:12.5px;padding:6px 8px;background:var(--gl);border-radius:6px;margin-bottom:8px"></div>'
-      +'<div style="font-size:11.5px;color:var(--b4);margin:4px 0">以下個資只存在管理員才讀得到的位置，一般畫面與唯讀帳號看不到：</div>'
+      +'<div style="font-size:11.5px;color:var(--b4);margin:4px 0">以下個資只存在管理員才讀得到的位置，一般畫面與唯讀帳號看不到（沒勾同意不會存個資）：</div>'+sensNote
       +'<div class="fg fg2" style="gap:8px">'+I('lrs-idno','身分證字號',sens.idNo||'',' autocomplete="off"')+I('lrs-addr','戶籍地址',sens.regAddr||'')+'</div>'
       +'<div class="fg fg3" style="gap:8px;margin-top:6px">'+I('lrs-bank','匯款銀行／分行',sens.bank||'')+I('lrs-acct','帳號',sens.acct||'',' inputmode="numeric" autocomplete="off"')+I('lrs-holder','戶名',sens.holder||'')+'</div>'
       +'</div>',
-      function(){_lrsSave(p,s,pe);},false,null,true);
+      function(){return _lrsSave(p,s,pe,sens);},false,null,true);
     setTimeout(function(){try{_lrsPrev();}catch(e){_err('openLrs.prev',e);}},30);
   });
 }
-function _lrsSave(p,s0,pe0){
+function _lrsSave(p,s0,pe0,sens0){
   var agree=!!(document.getElementById('lrs-agree')||{}).checked;
   var name=(gv('lrs-name')||'').trim()||p.to||'';
   var cat=_LRS_CATS[gv('lrs-cat')]?gv('lrs-cat'):'9A',union=!!(document.getElementById('lrs-union')||{}).checked,date=gv('lrs-date')||localToday();
   var idNo=(gv('lrs-idno')||'').trim().toUpperCase();
   if(agree&&idNo&&!/^[A-Z][A-Z0-9]\d{8}$/.test(idNo)){toast('身分證字號格式不對（1 個英文字母＋9 碼；居留證第 2 碼可為英文）');return false;}
   var now=Date.now(),by=_meEmail()||'';
-  var pe=pe0&&pe0.name===name?pe0:(_lrsPayeeFind(name)||{id:'p'+now.toString(36)+Math.random().toString(36).slice(2,5),name:name});
+  var sel=gv('lrs-payee')||'new';   // 審查：受領人以下拉選的為準（改名字不會換成別人；同名不同人選「新的受領人」）
+  var pe=(sel!=='new'&&LRS.payees[sel])?LRS.payees[sel]:(sel!=='new'&&pe0&&pe0.id===sel?pe0:{id:'p'+now.toString(36)+Math.random().toString(36).slice(2,5),name:name});
   pe=Object.assign({},pe,{name:name,cat:cat,union:union,_mt:now});
   var c=_lrsCalc(gv('lrs-gross'),cat,union,_lrsRates(_lrsRocY(date)).R);
   var id=_lrsSlipId(p.id);
+  var chg=!!(s0&&s0.id)&&(Math.round(+s0.gross||0)!==c.gross||s0.cat!==cat||!!s0.agree!==agree||!!s0.union!==union);   // 審查：內容改了，已簽回的那張不再相符
   var s=Object.assign({},s0||{},{id:id,payId:p.id,payeeId:pe.id,name:name,kind:_lrsKind(p),cat:cat,union:union,agree:agree,gross:c.gross,tax:agree?c.tax:0,nhi:agree?c.nhi:0,net:agree?c.net:c.gross,date:date,rocY:_lrsRocY(date),qid:p.quoteId||'',project:p.project||'',_mt:now,by:by});
+  if(chg&&s.signedAt){delete s.signedAt;toast('金額或類別改了：原本簽回的勞報單不再相符，請重新列印給對方簽');}
   LRS.slips[id]=s;LRS.payees[pe.id]=pe;_lrsLocal();
   var sens={idNo:idNo,regAddr:(gv('lrs-addr')||'').trim(),bank:(gv('lrs-bank')||'').trim(),acct:(gv('lrs-acct')||'').replace(/[^\d-]/g,''),holder:(gv('lrs-holder')||'').trim(),_mt:now};
   var sensHas=!!(sens.idNo||sens.regAddr||sens.bank||sens.acct||sens.holder),old=LRS_SENS[pe.id]||{};
   var sensChg=['idNo','regAddr','bank','acct','holder'].some(function(k){return (old[k]||'')!==(sens[k]||'');});
-  if(sensHas||sensChg)LRS_SENS[pe.id]=sens;
-  Promise.all([_lrsWrite('slips/'+id,s),_lrsWrite('payees/'+pe.id,pe),(sensHas||sensChg)?_lrsWrite('sens/'+pe.id,sens):Promise.resolve(true)]).then(function(r){
+  var sensFail=!!(sens0&&sens0._fail&&(!pe0||pe0.id===pe.id));
+  var sensDo=agree&&!sensFail&&(sensHas||sensChg);   // 審查：沒勾同意不存個資；讀不到原本的個資就不蓋
+  if(sensDo)LRS_SENS[pe.id]=sens;
+  Promise.all([_lrsWrite('slips/'+id,s),_lrsWrite('payees/'+pe.id,pe),sensDo?_lrsWrite('sens/'+pe.id,sens):Promise.resolve(true)]).then(function(r){
     if(r.every(Boolean))toast(agree?('已存勞報單：實付 NT$ '+fmt(s.net)):'已記「無勞報單」');
     try{renderPayables();}catch(e){_err('_lrsSave.render',e);}
-    if(agree)setTimeout(function(){openLrs(p.id);},150);   // 存好再開一次，顯示列印／上傳按鈕
+    if(agree&&r.every(Boolean))setTimeout(function(){openLrs(p.id);},150);   // 存好再開一次，顯示列印／上傳按鈕（審查：雲端沒存成功就不重開）
   });
 }
 function _lrsMoneyRow(k,v,b){return '<tr><th>'+k+'</th><td class="r"'+(b?' style="font-weight:900;font-size:14px"':'')+'>新臺幣 '+fmt(v)+' 元</td></tr>';}
@@ -39918,9 +39931,9 @@ function openLrsYear(y){
     +'<div style="font-weight:700;margin:12px 0 4px">無勞報單（對方未同意，'+D.none.length+' 筆，合計 NT$ '+fmt(T(D.none,'gross'))+'）</div>'
     +(D.none.length?D.none.map(function(s){return '<div style="font-size:12px;padding:3px 0;border-bottom:1px solid var(--b1)">'+esc(s.date||'')+'　'+esc(s.name||'')+'　'+esc(s.project||'')+'　NT$ '+fmt(s.gross||0)+'</div>';}).join(''):'<div style="font-size:12px;color:var(--b3)">沒有</div>')
     +'<details style="margin-top:12px"><summary style="cursor:pointer;font-size:12.5px;font-weight:700">比率與門檻（民國 '+(y-1911)+' 年'+(rr.exact?'':'，目前沿用 '+rr.y+' 年')+'；上線前請會計師確認）</summary>'
-    +'<table style="font-size:12px;margin-top:6px;border-collapse:collapse"><tr><th></th><th>所得稅門檻</th><th>超過才扣</th><th>稅率%</th><th>健保門檻（達到）</th><th>健保%</th></tr>'
-    +Object.keys(_LRS_CATS).map(function(c){return '<tr><td>'+c+'</td><td>'+RI(c,'taxTh',80)+'</td><td><input type="checkbox" id="lrr-'+c+'-taxOver"'+((R[c]||{}).taxOver?' checked':'')+'></td><td>'+RI(c,'tax',55)+'</td><td>'+RI(c,'nhiTh',80)+'</td><td>'+RI(c,'nhi',55)+'</td></tr>';}).join('')
-    +'</table><button type="button" class="btn btn-xs btn-g" style="margin-top:6px" onclick="_lrsRatesSave('+(y-1911)+')">存成民國 '+(y-1911)+' 年的比率</button></details>';
+    +'<table class="mst" style="font-size:12px;margin-top:6px;border-collapse:collapse;width:100%"><thead><tr><th>類別</th><th>所得稅門檻</th><th>超過才扣</th><th>稅率%</th><th>健保門檻（達到）</th><th>健保%</th></tr></thead><tbody>'
+    +Object.keys(_LRS_CATS).map(function(c){return '<tr><td data-th="類別">'+c+'</td><td data-th="所得稅門檻">'+RI(c,'taxTh',80)+'</td><td data-th="超過才扣"><input type="checkbox" id="lrr-'+c+'-taxOver"'+((R[c]||{}).taxOver?' checked':'')+'></td><td data-th="稅率%">'+RI(c,'tax',55)+'</td><td data-th="健保門檻">'+RI(c,'nhiTh',80)+'</td><td data-th="健保%">'+RI(c,'nhi',55)+'</td></tr>';}).join('')
+    +'</tbody></table><button type="button" class="btn btn-xs btn-g" style="margin-top:6px" onclick="_lrsRatesSave('+(y-1911)+')">存成民國 '+(y-1911)+' 年的比率</button></details>';
   _modal('勞報單年度彙總',html,null);
 }
 function _lrsRatesSave(rocY){
@@ -39980,7 +39993,7 @@ function openIntroAgr(id){
   if(s.kind!=='comm'&&s.kind!=='intro'){toast('只有業主端佣金與介紹費有協議書');return;}
   var d=_introAgrDef(s),f=Object.assign({},d.f,s.agr||{}),IN='font-size:13px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   var R=function(name,val,cur,l){return '<label style="margin-right:12px"><input type="radio" name="'+name+'" value="'+val+'"'+(cur===val?' checked':'')+'> '+l+'</label>';};
-  showConfirm('案件介紹費協議書：'+esc(s.name||''),
+  showConfirm('案件介紹費協議書：'+(s.name||''),
     '<div style="font-size:12px;color:var(--b4);margin-bottom:6px">'+esc(d.q.name||s.project||'')+(d.q.client?('　業主 '+esc(d.q.client)):'')+'。已從佣金設定帶入，可修改；沒填的會留空格手寫。</div>'
     +'<div style="margin:4px 0">'+R('ia-mode','pct',f.mode,'依合約金額（未稅）')+'<input id="ia-pct" type="number" step="any" value="'+esc(String(f.pct==null?'':f.pct))+'" style="width:70px;'+IN+'"> ％</div>'
     +'<div style="margin:4px 0 4px 18px;font-size:12.5px">追加減帳：'+R('ia-add','in',f.add,'計入')+R('ia-add','out',f.add,'不計入')+'</div>'
