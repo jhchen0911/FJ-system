@@ -9551,7 +9551,7 @@ async function newPage(browser, width, height) {
         const items = []; _v6TodoItems(items); const it = items.find(x => x.type === 'line_inbox');
         out.todo = !!it && /LINE 收件 3 件未歸檔/.test(it.text);
         openLineInbox(); const h = document.getElementById('lbx-list').innerHTML;
-        out.list = /範例營造 內湖案/.test(h) && /存檔失敗，請重傳/.test(h) && !/v\.mp4.*下載/.test(h) && /&lt;img/.test(h) && !/<img src=x/.test(h) && !/範例案/.test(h) && window.__lbx !== 1;
+        out.list = /範例營造 內湖案/.test(h) && /存檔失敗，請重傳/.test(h) && (h.match(/>下載<\/button>/g) || []).length === 1 && /&lt;img/.test(h) && !/<img src=x/.test(h) && !/範例案/.test(h) && window.__lbx !== 1;
         let sent = null; window.fetch = async (u, o) => { sent = { u, o }; return { ok: true, status: 200, json: async () => ({ ok: true, status: 'filed' }) }; };
         lbxMark('m1', 'filed', { qid: 'q1', caseName: '', note: '' }); await wait(50);
         const b = JSON.parse(sent.o.body);
