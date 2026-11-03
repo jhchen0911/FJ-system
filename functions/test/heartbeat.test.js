@@ -39,3 +39,11 @@ test('斷線警報：1 分鐘內重複報到不寫；文字含最後報到的台
   assert.equal(hb.hbText(T('2026-11-03T04:05:00Z')), '⚠️ 電腦端超過 2 小時沒報到，請看電腦（最後報到 11/3 12:05）');
   assert.ok(!require('../ops/notify.js').buildNotify({ text: hb.hbText(now) }).err);
 });
+
+test('斷線警報（審查）：夜間關機不算斷線——06:00 前的報到當成 06:00 起算；08:00 不叫、09:00 起 07:00 後都沒報到才叫', () => {
+  const night = T('2026-11-02T14:00:00Z');   // 前一晚台灣 22:00 最後報到
+  assert.equal(hb.hbDecide({ at: night }, T('2026-11-03T00:00:00Z')).alert, false);   // 台灣 08:00
+  assert.equal(hb.hbDecide({ at: night }, T('2026-11-03T01:00:00Z')).alert, true);    // 台灣 09:00
+  assert.equal(hb.hbDecide({ at: T('2026-11-02T23:30:00Z') }, T('2026-11-03T01:00:00Z')).alert, false);   // 07:30 有報到
+  assert.equal(hb.tpeDayStart(T('2026-11-03T05:00:00Z')), T('2026-11-02T22:00:00Z'));
+});

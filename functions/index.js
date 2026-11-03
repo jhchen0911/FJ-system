@@ -264,21 +264,16 @@ exports.hqBeatCheck = onSchedule({ schedule: '0 8-22 * * *', timeZone: TZ, regio
   if (!tx.committed) return;
   const text = hbCore.hbText(d.key);
   const logRef = db.ref('fydata/aiNotifyLog').push();
+  const undo = () => ref.child('alertFor').set(prev).catch((e) => console.error('hqBeatCheck.undo', e));   // 不用 transaction：本機快取是 null 時回 undefined 會直接放棄
+  const note = (rec) => Promise.all([logRef.set(rec), ref.update({ alertAt: now })]).catch((e) => console.error('hqBeatCheck.log', e));   // 審查：已推出去後紀錄寫失敗不能放掉 alertFor，否則下個小時重推
+  let used = null, sent = 0;
   try {
     const deps = lineAdapters.mkDeps(LINE_TOKEN.value());
-    const used = await deps.quotaUsed();
-    if (notifyCore.monthHold(used)) {
-      await logRef.set({ by: 'hqBeatCheck', at: now, text, status: 'held', reason: 'LINE 本月已用 ' + used + '／' + notifyCore.NOTIFY_MONTH_LIMIT + '，暫停推 LINE', used });
-      await ref.update({ alertAt: now });
-      return;
-    }
+    used = await deps.quotaUsed();
+    if (notifyCore.monthHold(used)) { await note({ by: 'hqBeatCheck', at: now, text, status: 'held', reason: 'LINE 本月已用 ' + used + '／' + notifyCore.NOTIFY_MONTH_LIMIT + '，暫停推 LINE', used }); return; }
     const cfg = (await deps.getCfg()) || {};
-    const sent = Object.keys(cfg.owners || {}).length ? await lineCore.pushOwners(cfg, deps, text) : 0;
-    await logRef.set({ by: 'hqBeatCheck', at: now, text, status: sent ? 'sent' : 'failed', to: sent, used: used == null ? null : used + sent });
-    if (sent) await ref.update({ alertAt: now });
-    else await ref.child('alertFor').set(prev);   // 沒送出：放掉，下個小時再試（不用 transaction：本機快取是 null 時回 undefined 會直接放棄）
-  } catch (e) {
-    console.error('hqBeatCheck', e);
-    await ref.child('alertFor').set(prev).catch((e2) => console.error('hqBeatCheck.undo', e2));
-  }
+    sent = Object.keys(cfg.owners || {}).length ? await lineCore.pushOwners(cfg, deps, text) : 0;
+  } catch (e) { console.error('hqBeatCheck', e); await undo(); return; }
+  if (!sent) { await undo(); await logRef.set({ by: 'hqBeatCheck', at: now, text, status: 'failed', to: 0 }).catch((e) => console.error('hqBeatCheck.log', e)); return; }   // 沒送出：放掉，下個小時再試
+  await note({ by: 'hqBeatCheck', at: now, text, status: 'sent', to: sent, used: used == null ? null : used + sent });
 });

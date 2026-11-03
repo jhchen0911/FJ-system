@@ -9262,7 +9262,7 @@ async function newPage(browser, width, height) {
     });
     const pth136 = require('path'), fs136 = require('fs');
     const HB = require(pth136.join(__dirname, '..', 'functions', 'ops', 'heartbeat.js'));
-    const IDX = fs136.readFileSync(pth136.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    const IDX0 = fs136.readFileSync(pth136.join(__dirname, '..', 'functions', 'index.js'), 'utf8'), IDX = IDX0.slice(IDX0.indexOf('exports.hqBeat ='));   // 只看 hqBeat 之後，不會被 aiNotify 的同名寫法矇過
     const RF = JSON.parse(fs136.readFileSync(pth136.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const t0 = Date.parse('2026-11-03T06:00:00Z');
     check('v6.0.137 電腦端斷線警報：fyBeat 帶憑證報到、名單外不能報到；超過 2 小時才警報、同一次斷線只發一次、08～22 點；額度保護；網頁不能寫 hqBeat',
