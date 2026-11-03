@@ -3,7 +3,7 @@
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
 var APP_VERSION='v6.0.157';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
-if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
+if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -8694,15 +8694,17 @@ function _meRouteOpt(inp,ly){var S=_shSel(ly.s||'H350'),o={wSpec:_shSel(ly.w||'H
   [['jack','rtJack'],['max1','rtMax1'],['max2','rtMax2'],['minGap','rtGap']].forEach(function(k){var x=inp[k[1]];if(x!==''&&x!=null&&isFinite(parseFloat(x)))o[k[0]]=parseFloat(x);});return o;}
 function _meRouteRun(inp,layers,lys){
   var by=[],all=[],last=-1;for(var i=0;i<layers;i++)by.push([]);
+  if(!window.FJC||!FJC.route)return {by:by,all:all,n:0,lastLy:-1,sp:{rows:[],n:0,order:0}};   // 審查：舊快取沒有 calc/route.js 時照舊估算、不讓整頁壞掉
   (Array.isArray(inp._routeRows)?inp._routeRows:[]).forEach(function(r){
     if(!r||!(_shNum(r.wall)>0))return;var li=Math.round(_shNum(r.ly))-1;if(li<0||li>=layers)return;
-    var x=FJC.route.row(r,_meRouteOpt(inp,lys[li]||{}));by[li].push(x);all.push(x);if(li>last)last=li;});
+    var x=FJC.route.row(r,_meRouteOpt(inp,lys[li]||{}));if(!(x.net>0))return;by[li].push(x);all.push(x);if(li>last)last=li;});   // 淨長 ≤ 0（壁間太短）不計，畫面標紅
   return {by:by,all:all,n:all.length,lastLy:last,sp:FJC.route.spares(all)};
 }
 function _meRouteShorts(rows){var c={};rows.forEach(function(r){(r.shorts||[]).forEach(function(s){c[s]=(c[s]||0)+r.mult;});});return Object.keys(c).map(parseFloat).sort(function(a,b){return a-b;}).map(function(k){return {len:k,n:c[k]};});}
 // 構台下淨空（Lotion 11/03）：只有第 1 層會跟構台衝突，第 2 層以下一律照拉；第 1 層依淨空判斷，可手動改「拉／不拉」（gtPull1：''＝依淨空、'pull'、'no'）
 //   回傳 null＝沒填第 1 層支撐中心高程也沒手動指定 → 照舊扣第一層
 function _meGtClear(inp,layers,lys){
+  if(!window.FJC||!FJC.route)return null;
   var l=(lys||[])[0]||{},man=inp.gtPull1==='pull'||inp.gtPull1==='no';
   var c=FJC.route.clearance({supEl:l.el,capEl:inp.capEl,groundEl:inp.groundEl,capDrop:1.0,sSpec:_shSel(l.s||'H350').spec,clear:inp.gtClear});
   if(!c&&!man)return null;
@@ -40087,9 +40089,9 @@ function _meRouteHtml(m,sec,fN,adv){
   h+='<div class="tbl-wrap"><table class="tbl" style="min-width:900px"><thead><tr><th>層</th><th>路編號</th><th>方向</th><th>壁間長度 M</th><th>單雙</th><th>中間樁位置 M</th><th>交叉點位置 M（上層才填）</th><th>定尺組合（空白＝建議）</th><th>結果</th><th>備註</th><th></th></tr></thead><tbody>';
   rows.forEach(function(r,i){
     var li=Math.round(_shNum(r.ly))-1,ok=li>=0&&li<L&&_shNum(r.wall)>0,x=null;
-    if(ok){cnt[li]++;try{x=FJC.route.row(r,_meRouteOpt(m,lys[li]||{}));}catch(e){_err('_meRouteHtml',e);}}
+    if(ok){try{x=FJC.route.row(r,_meRouteOpt(m,lys[li]||{}));}catch(e){_err('_meRouteHtml',e);}if(x&&!(x.net>0)){ok=false;x=null;}else cnt[li]++;}
     var res='';
-    if(!ok)res='<span style="color:var(--red)">層或壁間長度不對（不計）</span>';
+    if(!ok)res='<span style="color:var(--red)">層或壁間長度不對（不計）'+(_shNum(r.wall)>0&&li>=0&&li<L?'：淨長 ≤ 0':'')+'</span>';
     else if(x){
       res='淨長 '+x.net.toFixed(2)+(x.manual?'':'｜建議 '+esc(x.pieces.join('+')))+(x.mult>1?'｜雙支撐×2':'')
         +'｜接頭 '+x.joints+(x.shorts.length?'｜短節 '+x.shorts.join('+'):'')+(x.jack>0?'｜千斤頂伸長 '+x.jack+' cm':'')
@@ -40124,7 +40126,9 @@ function meRtCsv(el){
   var f=el&&el.files&&el.files[0];if(!f)return;var rd=new FileReader();
   rd.onload=function(){
     try{
-      var r=FJC.route.csv(String(rd.result||''));el.value='';
+      var txt=String(rd.result||'');
+      if(/\uFFFD/.test(txt)&&rd._buf&&typeof TextDecoder!=='undefined'){try{txt=new TextDecoder('big5').decode(new Uint8Array(rd._buf));}catch(e){_err('meRtCsv.big5',e);}}   // 審查：Excel 預設存 Big5
+      var r=FJC.route.csv(txt);el.value='';
       if(!r.rows.length){toast('CSV 沒有可用的列'+(r.errs.length?'：'+r.errs[0]:''));return;}
       var apply=function(){MAT_EST._routeRows=r.rows;MAT_EST._routeSrc={file:f.name,at:localToday()};
         var L=Math.max(1,parseInt(MAT_EST.layers)||1),over=r.rows.filter(function(x){return x.ly>L;}).length;
@@ -40132,7 +40136,7 @@ function meRtCsv(el){
       if((MAT_EST._routeRows||[]).length)showConfirm('匯入路數明細','匯入會取代目前 '+MAT_EST._routeRows.length+' 路的路數明細，確定？',apply,true);else apply();
     }catch(e){_err('meRtCsv',e);toast('CSV 讀取失敗');}
   };
-  rd.readAsText(f);
+  f.arrayBuffer().then(function(buf){rd._buf=buf;rd.readAsText(f);}).catch(function(e){_err('meRtCsv',e);rd.readAsText(f);});
 }
 // 構台下淨空（④-1 安全母索，勾「扣構台下母索」時顯示）
 function _meGtClearHtml(m,fN,fS){

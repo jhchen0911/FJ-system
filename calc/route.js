@@ -87,8 +87,8 @@
     var tol = o.jackTol == null ? DEF.jackTol : num(o.jackTol);
     if (!(NN > 0)) return { err: '淨長不足', pieces: [], total: 0, rem: 0, shorts: [], jack: 0, joints: 0, jointPos: [], midChk: 'single', bad: [] };
     var sd = STOCK.filter(function (x) { return x <= MAX; }).reverse();
-    var n0 = Math.max(1, Math.ceil(NN / MAX - 1e-9));
     var minFill = c(0.6 * 2 + tol);   // 零頭最多兩只短節＋千斤頂
+    var n0 = Math.max(1, Math.ceil((NN - minFill) / MAX - 1e-9));   // 審查：零頭可由短節／千斤頂補，13.10 用 1 支 13＋伸長 10 cm，不拆 2 支
     var X0 = c(x0), MC = mids.map(c), XC = cross.map(c), G = c(gap), chk = MC.length + XC.length > 0;
     var jOk = function (pos) { var x = X0 + pos, i; for (i = 0; i < MC.length; i++) if (Math.abs(x - MC[i]) < G) return false; for (i = 0; i < XC.length; i++) if (Math.abs(x - XC[i]) < G) return false; return true; };
     var SP = MC, pOk = function (k, n, pos, np) { return !SP.length || k + 1 === n || !cant(X0 + np, X0, SP); };
@@ -147,6 +147,7 @@
     var out = []; a.forEach(function (x) { var m = x.match(/^(\d+(?:\.\d+)?)(?:[x×*](\d+))?$/); if (!m) return; for (var i = 0; i < (m[2] ? parseInt(m[2], 10) : 1); i++) out.push(parseFloat(m[1])); });
     return out.filter(function (x) { return x > 0; });
   }
+  function parseBad(s) { return String(s == null ? '' : s).replace(/[＋，,、\s]+/g, '+').split('+').map(function (x) { return x.replace(/[MmＭ米]$/, ''); }).filter(function (x) { return x && !/^(\d+(?:\.\d+)?)(?:[x×*](\d+))?$/.test(x); }); }
   function mids(s) { return String(s == null ? '' : s).split(/[,，、;；\s]+/).map(num).filter(function (x) { return x > 0; }); }
 
   // 一路完整結果。r：{ ly, id, dir, wall, dbl('雙'|'單'|''), combo 手改字串, mids, note }；o：{ wSpec 該層圍令, sMult 該層支撐倍數, jack, max1, max2, minGap, jackTol }
@@ -159,13 +160,14 @@
     var dblS = String(r.dbl || '').trim();
     var mult = dblS === '雙' || dblS === '2' ? 2 : (dblS === '單' || dblS === '1' ? 1 : (num(o.sMult) || 1));
     var auto = combo(N, { maxLen: maxLen, mids: M, cross: X, x0: x0, minGap: gap, jackTol: tol }), res = auto, manual = false, warn = [];
-    var mp = parse(r.combo);
+    var mp = parse(r.combo), mpBad = parseBad(r.combo);
     if (mp.length) {
       manual = true;
       var sum = c(mp.reduce(function (a, b) { return a + b; }, 0)), NN = c(N), f = fill((NN - sum) / 100, tol), jp = jointsOf(mp, x0);
       if (sum > NN) warn.push('手改組合 ' + r2(sum / 100) + ' M 超過淨長 ' + N + ' M');
       else if (!f) warn.push('手改組合零頭 ' + r2((NN - sum) / 100) + ' M 短節補不到');
       if (mp.some(function (x) { return STOCK.indexOf(c(x)) < 0; })) warn.push('手改組合有非定尺長度');
+      if (mpBad.length) warn.push('手改組合看不懂：' + mpBad.join('、'));
       if (mp.some(function (x) { return c(x) > c(maxLen); })) warn.push('手改組合超過第 ' + ly + ' 層單支最長 ' + maxLen + ' M');
       var bad = layCheck(mp.map(c), c(x0), M.map(c), X.map(c), c(gap));
       var mc = !(M.length + X.length) ? (mp.length < 2 ? 'single' : 'none') : (bad.length ? 'conflict' : 'ok');
@@ -176,7 +178,7 @@
     return {
       ly: ly, id: String(r.id || ''), dir: String(r.dir || ''), wall: num(r.wall), net: N, mult: mult, maxLen: maxLen, manual: manual,
       pieces: res.pieces, total: res.total, rem: r2(res.rem), shorts: res.shorts, jack: res.jack, joints: res.joints, jointPos: res.jointPos, midChk: res.midChk,
-      mids: M, cross: X, bad: res.bad || [], auto: auto.pieces, supM: r2(N * mult), jointsN: res.joints * mult, shortsN: res.shorts.length * mult, note: String(r.note || ''), warn: warn
+      mids: M, cross: X, bad: res.bad || [], auto: auto.pieces, supM: r2(Math.max(0, N) * mult), jointsN: res.joints * mult, shortsN: res.shorts.length * mult, note: String(r.note || ''), warn: warn
     };
   }
 

@@ -196,6 +196,8 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('中間樁密到怎麼排都會碰到：照長度排、標紅寫原因（排不出合格的組合：接頭…不到 0.5 M）、不會卡住（< 1 秒）', m3.midChk === 'conflict' && /排不出合格的組合：接頭 .*不到 0\.5 M/.test(m3.warn.join()) && m3.pieces.length === 6 && Date.now() - t0 < 1000);
   const g2 = RT.row({ ly: 1, wall: 24.6, mids: '6.8,12.9,18.6' }, { wSpec: 'H350', minGap: 0.01 });
   check('接頭離中間樁最小距離是參數（中間樁 6.8／12.9／18.6、改 0.01 M 時 12.85 可接受）', g2.pieces.join('+') === '12.5+10.5');
+  check('審查：零頭可由千斤頂／短節補時不多拆一支（13.10→13＋伸長 10 cm；26.10→13＋13；10.40 第 2 層→10＋短節 0.4）', RT.combo(13.1, { maxLen: 13 }).pieces.join('+') === '13' && RT.combo(26.1, { maxLen: 13 }).pieces.join('+') === '13+13' && RT.combo(10.4, { maxLen: 10 }).pieces.join('+') === '10' && eq(RT.combo(10.4, { maxLen: 10 }).shorts, [0.4]));
+  check('審查：手改組合看不懂的字要警示；壁間太短（淨長 ≤ 0）支撐 M 不會變負', /手改組合看不懂：9x/.test(RT.row({ ly: 1, wall: 24.6, combo: '10+9x' }, { wSpec: 'H350' }).warn.join()) && RT.row({ ly: 1, wall: 1 }, { wSpec: 'H350' }).supM === 0);
   const mm = RT.row({ ly: 2, wall: 30.8, combo: '10+9.5x2', mids: '5,10.4,15,20,25' }, { wSpec: 'H400' }), mo = RT.row({ ly: 2, wall: 24.6, combo: '13+10' }, { wSpec: 'H350' });
   check('手改組合：照手改、檢查中間樁（10.4 離接頭 10.4 太近）、超過該層最長要警示', mm.manual && mm.pieces.join('+') === '10+9.5+9.5' && mm.midChk === 'conflict' && /超過第 2 層單支最長/.test(mo.warn.join()));
   const d = RT.row({ ly: 2, wall: 30.8, dbl: '雙' }, { wSpec: 'H400' });
