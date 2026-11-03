@@ -220,6 +220,23 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('圖面覆核：一般工項 10%、占總價一成以上 5%；沒量測不比', rv.rows.length === 3 && !rv.rows[0].bad && rv.rows[1].bad && rv.rows[1].big && rv.rows[2].bad && rv.nBad === 2);
 }
 
+// ── v6.0.160 圖面量測檔 v1 匯入（fixture 為去識別化的 HQ 黃金樣本，數字保留）──
+{
+  const fx = JSON.parse(require('fs').readFileSync(path.join(__dirname, 'fixtures', 'measure_v1_sample.json'), 'utf8'));
+  const m = RT.fromMeasure(fx);
+  check('量測檔：格式 v1、3 層、規格（H350／H400）、三角架高程 GL-1.50→−1.5、斜撐可裝 36／待確認 1／建議刪除 3、角撐可裝 0', m.ok && m.L.length === 3 && m.L[0].w === 'H350' && m.L[1].s === 'H400' && m.L[0].triEl === -1.5 && m.L[0].brace.fit === 36 && m.L[0].brace.check === 1 && m.L[0].brace.del === 3 && m.L[0].brace.cFit === 0, JSON.stringify(m.L[0]).slice(0, 300));
+  const v1 = m.rows.find(r => r.ly === 1 && r.id === 'V1');
+  check('量測檔：每路壁間＝量測長度＋2×圍令型鋼高（29.84＋0.70＝30.54）、方向、交叉點由縱橫中心線算出並換成從壁面量（＋0.35）', m.rows.length === 30 && v1.wall === 30.54 && v1.dir === '縱' && v1.cross.split(',').length >= 3 && v1.mids === '' && !m.hasLine, JSON.stringify(v1));
+  check('量測檔：信心度低列出來（結構高程 3 層）、沒有構台帽梁＝null、周長面積深度', m.low.length === 3 && /第1層 結構高程/.test(m.low[0]) && m.capEl === null && m.P === 107.1 && m.A === 616.36 && m.H === 12.3);
+  check('量測檔：格式不對拒收', !RT.fromMeasure({ 格式: '別的格式' }).ok && !RT.fromMeasure(null).ok);
+  check('規格字串：2-H350、2WH350*2SH350（W 圍令、S 支撐）、RH400、看不懂回 null', eq(RT.specOf('2-H350x350x12x19'), { spec: 'H350', dbl: true }) && eq(RT.specOf('WH400*SH350', 's'), { spec: 'H350', dbl: false }) && eq(RT.specOf('2WH400*2SH350', 'w'), { spec: 'H400', dbl: true }) && RT.specOf('RH400x400x13x21').spec === 'H400' && RT.specOf('') === null && RT.glOf('GL-1.95m') === -1.95 && RT.glOf({ 值: null }) === null);
+  // v1.1：每路沿線（中間樁位置、交叉點）有就用；位置從圍令內緣量，換成從壁面量
+  const fx2 = JSON.parse(JSON.stringify(fx)); fx2['版本細項'] = 'v1.1'; fx2['各層'][0]['每路沿線'] = { 值: [{ 編號: 1, 方向: '縱向（圖面上下）', 長度m: 29.84, 中間樁位置m: [6, 12, 18, 24], 共構樁位置m: [], 交叉點: [{ 與路: 7, 距起點m: 5 }] }], 信心度: '中' };
+  const m2 = RT.fromMeasure(fx2), w1 = m2.rows.find(r => r.ly === 1 && r.id === 'V1');
+  check('量測檔 v1.1：每路沿線的中間樁位置＋0.35 帶入、交叉點用檔案給的、接頭依窗口檢查', m2.hasLine && w1.mids === '6.35,12.35,18.35,24.35' && w1.cross === '5.35' && RT.row(w1, { wSpec: 'H350' }).midChk === 'ok', JSON.stringify(w1));
+  check('交叉點計算：十字交叉在中點、不相交不算', eq(RT.crossings([{ 編號: 1, 方向: '縱', 起點mm: [0, 0], 終點mm: [0, 10000] }, { 編號: 2, 方向: '橫', 起點mm: [-5000, 4000], 終點mm: [5000, 4000] }, { 編號: 3, 方向: '橫', 起點mm: [1000, 2000], 終點mm: [6000, 2000] }]), { 1: [4], 2: [5], 3: [] }));
+}
+
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');

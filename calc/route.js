@@ -12,6 +12,8 @@
  *   csv(text)                         CSV 匯入：層,路編號,方向,壁間長度,單雙,定尺組合,備註,中間樁位置 M,交叉點位置 M（逗號分隔，上層支撐才填）
  *   clearance(o)                      構台下淨空＝帽梁底 −（三角架高程＋型鋼高）；帽梁高程沒填用 原地面−1.0（預設值，請確認）
  *   brace(space, o)                   斜撐／角撐裝不裝：空間 ≥ 最長 2.5−0.10 裝、2.1～2.4 待確認、更小不裝
+ *   fromMeasure(json)                 圖面量測檔 v1 → 各層規格／三角架高程／每路（壁間、中間樁、交叉點）／斜撐角撐可裝數／信心度低清單（v6.0.160）
+ *   crossings(routes)                 同層縱橫路線中心線交點（距起點 m）
  *   review(items, threshold)          報價數量 vs 圖面量測的差異（一般 10%、占總價一成以上 5%；只標示、不擋送出）
  *
  * 口徑（Lotion 11/03）：
@@ -136,7 +138,7 @@
     return {
       pieces: pieces, total: best.sum / 100, rem: (NN - best.sum) / 100, shorts: best.f.shorts, jack: best.f.jack,
       joints: pieces.length - 1, jointPos: jp, bad: conflict ? layCheck(best.order, X0, MC, XC, G, END) : [],
-      midChk: !chk ? (pieces.length < 2 ? 'single' : 'none') : (conflict ? 'conflict' : 'ok')
+      midChk: pieces.length < 2 ? 'single' : (conflict ? 'conflict' : (!MC.length ? 'none' : 'ok'))   // 只有交叉點、沒有中間樁位置：交叉點照避、仍標未檢查中間樁
     };
   }
 
@@ -168,7 +170,7 @@
       if (mpBad.length) warn.push('手改組合看不懂：' + mpBad.join('、'));
       if (mp.some(function (x) { return c(x) > c(maxLen); })) warn.push('手改組合超過第 ' + ly + ' 層單支最長 ' + maxLen + ' M');
       var bad = layCheck(mp.map(c), c(x0), M.map(c), X.map(c), c(gap), c(num(r.wall)) || null);
-      var mc = !(M.length + X.length) ? (mp.length < 2 ? 'single' : 'none') : (bad.length ? 'conflict' : 'ok');
+      var mc = mp.length < 2 ? 'single' : (bad.length ? 'conflict' : (!M.length ? 'none' : 'ok'));
       res = { pieces: mp, total: sum / 100, rem: (NN - sum) / 100, shorts: f ? f.shorts : [], jack: f ? f.jack : 0, joints: mp.length - 1, jointPos: jp, midChk: mc, bad: bad };
     }
     if (res.err) warn.push(res.err);
@@ -245,7 +247,104 @@
   // 排法檢查（給手改組合與對照表用）：pieces[M]、o：{ x0, mids[], cross[], wall 終點壁面, minGap } → 違反原因[]（空＝合格）
   function check(pieces, o) { o = o || {}; return layCheck((pieces || []).map(c), c(num(o.x0)), (o.mids || []).map(num).filter(function (x) { return x > 0; }).map(c), (o.cross || []).map(num).filter(function (x) { return x > 0; }).map(c), c(o.minGap == null ? DEF.minGap : num(o.minGap)), num(o.wall) > 0 ? c(num(o.wall)) : null); }
 
-  var api = { brace: brace, check: check, STOCK: STOCK.map(function (x) { return x / 100; }), SHORTS: SHORTS.map(function (x) { return x / 100; }), DEF: DEF, specH: specH, net: net, fill: fill, combo: combo, parse: parse, mids: mids, row: row, spares: spares, csv: csv, clearance: clearance, review: review };
+
+  // ── v6.0.160 圖面量測檔 v1（HQ 引擎輸出，格式見 my-agent quote-builder/scripts/schema.md）──
+  // 值物件 {值, 單位, 圖號, 圖層或座標, 量法, 信心度, 備註}；圖上沒有＝值 null、信心度「無」
+  var V = function (o) { return o && typeof o === 'object' && !Array.isArray(o) && ('值' in o) ? o['值'] : o; };
+  var CF = function (o) { return o && typeof o === 'object' && o['信心度'] ? String(o['信心度']) : ''; };
+  // "GL-1.95m" → -1.95；"GL+0.5" → 0.5；數字照用；看不懂 → null
+  function glOf(x) {
+    var v = V(x); if (v == null || v === '') return null;
+    if (typeof v === 'number') return isFinite(v) ? v : null;
+    var m = String(v).replace(/\s/g, '').match(/^(?:GL)?([+\-−]?\d+(?:\.\d+)?)(m|M)?$/);
+    return m ? parseFloat(m[1].replace('−', '-')) : null;
+  }
+  // 型鋼規格字串 → { spec:'H350', dbl }；"2-H350x350x12x19"、"2WH350*2SH350"（W＝圍令、S＝支撐）、"RH400x400"
+  function specOf(str, which) {
+    var t = String(V(str) == null ? '' : V(str)).toUpperCase().replace(/\s/g, '');
+    if (!t) return null;
+    var toks = []; t.replace(/(2-?)?([WS]?)R?H(\d{3})/g, function (_, d2, ws, n) { toks.push({ dbl: !!d2, ws: ws, h: n }); return _; });
+    if (!toks.length) return null;
+    var k = toks.filter(function (x) { return which === 'w' ? x.ws === 'W' : (which === 's' ? x.ws === 'S' : false); })[0] || toks.filter(function (x) { return !x.ws; })[0] || toks[0];
+    return { spec: 'H' + k.h, dbl: k.dbl };
+  }
+  function lowList(d) {
+    var out = [];
+    (function walk(o, path) {
+      if (!o || typeof o !== 'object') return;
+      if (!Array.isArray(o) && ('值' in o) && ('信心度' in o)) {
+        if (o['信心度'] === '低' || o['值'] === '需人工判讀') out.push(path + '（' + (o['值'] === '需人工判讀' ? '需人工判讀' : '信心度低') + '）');
+        return;
+      }
+      if (Array.isArray(o)) { o.forEach(function (x, i) { walk(x, (path === '各層' ? '' : path) + (x && x['層'] ? '第' + x['層'] + '層' : '[' + i + ']')); }); return; }
+      Object.keys(o).forEach(function (k) { if (k !== '轉角明細' && k !== '斜撐檢核' && k !== '角撐檢核' && k !== '內轉角檢核' && k !== '標註文字') walk(o[k], path ? path + ' ' + k : k); });
+    })(d, '');
+    return out;
+  }
+  // 同一層不同方向的路線中心線交點（起點mm／終點mm），回傳 { 編號: [距起點 m…] }
+  function crossings(routes) {
+    var out = {}, R = (routes || []).filter(function (r) { return r && Array.isArray(r['起點mm']) && Array.isArray(r['終點mm']); });
+    R.forEach(function (a) { out[a['編號']] = []; });
+    for (var i = 0; i < R.length; i++) for (var j = 0; j < R.length; j++) {
+      if (i === j) continue;
+      var a = R[i], b = R[j];
+      if (String(a['方向']).slice(0, 1) === String(b['方向']).slice(0, 1)) continue;
+      var p = a['起點mm'], r = [a['終點mm'][0] - p[0], a['終點mm'][1] - p[1]], q = b['起點mm'], sv = [b['終點mm'][0] - q[0], b['終點mm'][1] - q[1]];
+      var den = r[0] * sv[1] - r[1] * sv[0]; if (Math.abs(den) < 1e-9) continue;
+      var t = ((q[0] - p[0]) * sv[1] - (q[1] - p[1]) * sv[0]) / den, u = ((q[0] - p[0]) * r[1] - (q[1] - p[1]) * r[0]) / den;
+      if (t < -1e-6 || t > 1 + 1e-6 || u < -1e-6 || u > 1 + 1e-6) continue;
+      var dist = Math.sqrt(r[0] * r[0] + r[1] * r[1]) * t / 1000;
+      out[a['編號']].push(r2(dist));
+    }
+    Object.keys(out).forEach(function (k) { out[k].sort(function (x, y) { return x - y; }); });
+    return out;
+  }
+  // 量測檔 → 材料估算用的資料。位置換算：量測檔的長度與沿線位置從「圍令內緣」量起，FJ 路數明細從擋土壁面量起，
+  //   所以壁間長度＝長度m＋2×圍令型鋼高、中間樁／交叉點位置＋圍令型鋼高
+  function fromMeasure(d) {
+    if (!d || typeof d !== 'object') return { ok: false, err: '不是量測檔' };
+    var fmt = String(d['格式'] || '');
+    if (fmt.indexOf('圖面量測檔 v1') !== 0) return { ok: false, err: '格式不是「圖面量測檔 v1」（' + (fmt || '沒有格式欄') + '）' };
+    var warn = [], rows = [], L = [];
+    var lineTop = V(d['每路沿線']);
+    (Array.isArray(d['各層']) ? d['各層'] : []).forEach(function (ly, li) {
+      var n = Math.round(num(ly['層'])) || (li + 1), sp = ly['規格'] || {};
+      var sS = specOf(sp['支撐'], 's'), sW = specOf(sp['圍令'], 'w') || specOf(sp['支撐'], 'w'), sD = specOf(sp['斜撐'], 's') || specOf(sp['斜撐']);
+      var wDbl = (sW && sW.dbl) || /雙/.test(String(V(sp['圍令單雙']) || ''));
+      var sDbl = (sS && sS.dbl) || /雙/.test(String(V(sp['支撐單雙']) || ''));
+      if (!sW) warn.push('第 ' + n + ' 層圍令規格看不懂（' + (V(sp['圍令']) || V(sp['支撐']) || '空白') + '），用 H350');
+      else if (!V(sp['圍令']) && !/W/i.test(String(V(sp['支撐']) || ''))) warn.push('第 ' + n + ' 層量測檔沒寫圍令規格，照支撐規格 ' + sW.spec + '，請確認');
+      if (CF(ly['三角架高程']) === '低') warn.push('第 ' + n + ' 層三角架高程信心度低（構台下淨空用到），請確認');
+      if (!sS) warn.push('第 ' + n + ' 層支撐規格看不懂（' + (V(sp['支撐']) || '空白') + '），用 H350');
+      var w = sW ? sW.spec : 'H350', s = sS ? sS.spec : 'H350', h = specH(w);
+      var tri = glOf(ly['三角架高程'] != null ? ly['三角架高程'] : ly['高程']);
+      var routes = V(ly['每路支撐長度']) || [], line = V(ly['每路沿線']) || (li === 0 ? lineTop : null), xs = crossings(routes);
+      var lineBy = {}; (Array.isArray(line) ? line : []).forEach(function (x) { if (x) lineBy[x['編號']] = x; });
+      routes.forEach(function (r) {
+        var id = r['編號'], dir = /^橫/.test(String(r['方向'] || '')) ? '橫' : '縱', ln = lineBy[id];
+        var mids = ln && Array.isArray(ln['中間樁位置m']) ? ln['中間樁位置m'].map(function (x) { return r2(num(x) + h); }) : [];
+        var cross = ln && Array.isArray(ln['交叉點']) ? ln['交叉點'].map(function (x) { return r2(num(x && x['距起點m']) + h); }) : (xs[id] || []).map(function (x) { return r2(x + h); });
+        rows.push({ ly: n, id: (dir === '縱' ? 'V' : 'H') + id, dir: dir, wall: r2(num(r['長度m']) + 2 * h), dbl: /雙/.test(String(r['單雙'] || '')) ? '雙' : '', combo: '', mids: mids.join(','), cross: cross.join(','), note: '量測 ' + r2(num(r['長度m'])) + ' M（圍令內緣到內緣）', src: 'measure' });
+      });
+      L.push({ L: n, w: (wDbl ? '2' : '') + w, s: (sDbl ? '2' : '') + s, d: sD ? sD.spec : s, triEl: tri, triConf: CF(ly['三角架高程']), hasLine: !!(line && line.length),
+        brace: { fit: V(ly['斜撐可裝']), check: V(ly['斜撐待確認']), del: V(ly['斜撐建議刪除']), cFit: V(ly['角撐可裝']), cCheck: V(ly['角撐待確認']), cDel: V(ly['角撐建議刪除']), noteCheck: (ly['斜撐待確認'] || {})['備註'] || '', noteDel: (ly['斜撐建議刪除'] || {})['備註'] || '' },
+        mid: V(ly['中間樁']), co: V(ly['共構樁']), corners: V(ly['轉角']), irr: V(ly['不規則處']) });
+    });
+    if (!L.length) warn.push('量測檔沒有「各層」');
+    if (V(d['層數']) != null && num(V(d['層數'])) !== L.length) warn.push('層數 ' + V(d['層數']) + ' 與各層 ' + L.length + ' 筆不一致');
+    var wall = d['擋土壁'] || {}, cap = d['構台帽頂高程'] != null ? d['構台帽頂高程'] : d['帽梁高程'];
+    var sheets = (Array.isArray(d['來源圖面']) ? d['來源圖面'] : []).map(function (x) { return x && x['圖號']; }).filter(Boolean);
+    return {
+      ok: true, fmt: fmt, sub: String(d['版本細項'] || ''), date: String(d['產生時間'] || ''), engine: String(d['引擎版本'] || ''), sheets: sheets,
+      P: V(d['周長']), A: V(d['面積']), H: V(d['開挖深度']), layers: V(d['層數']) || L.length, L: L, rows: rows,
+      mid: V(d['中間樁']), co: V(d['共構樁']), corners: V(d['轉角']), irr: V(d['不規則處']),
+      capEl: glOf(cap), capConf: CF(cap), gt: V(d['構台範圍']),
+      pile: { type: V(wall['型式']), n: V(wall['樁數']), len: V(wall['樁長']), sheetLen: V(wall['打設延長']) },
+      hasLine: L.some(function (x) { return x.hasLine; }), low: lowList(d), check: (Array.isArray(d['檢核']) ? d['檢核'] : []).map(function (x) { return typeof x === 'string' ? x : JSON.stringify(x); }), warn: warn
+    };
+  }
+
+  var api = { brace: brace, fromMeasure: fromMeasure, crossings: crossings, specOf: specOf, glOf: glOf, check: check, STOCK: STOCK.map(function (x) { return x / 100; }), SHORTS: SHORTS.map(function (x) { return x / 100; }), DEF: DEF, specH: specH, net: net, fill: fill, combo: combo, parse: parse, mids: mids, row: row, spares: spares, csv: csv, clearance: clearance, review: review };
   root.FJC = root.FJC || {};
   root.FJC.route = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = root.FJC;

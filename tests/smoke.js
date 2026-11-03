@@ -10111,6 +10111,55 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.160 圖面量測檔匯入（fixture 為去識別化的 HQ 黃金樣本）：材料估算帶入、斜撐角撐依量測檔、報價頁圖面覆核 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const FX = require('fs').readFileSync(require('path').join(__dirname, 'fixtures', 'measure_v1_sample.json'), 'utf8');
+    const r = await page.evaluate(async (fx) => {
+      const out = {};
+      const wait = ms => new Promise(res => setTimeout(res, ms));
+      try {
+        MAT_EST = _shDefaults(); window._matEstQid = ''; go('matest'); meTab('shoring'); renderMatEst(); matEstCalc();
+        const base = _matEstRes.layerData[0];
+        meMeasImport({ files: [new File([fx], '範例_量測檔.json', { type: 'application/json' })], value: '' }); await wait(500);
+        out.ask = document.getElementById('gen-confirm-modal').style.display === 'flex' && /3 層、30 路/.test(document.getElementById('gen-confirm-msg').innerHTML);
+        document.getElementById('gen-confirm-ok').click(); await wait(400);
+        const m = MAT_EST;
+        out.apply = m.layers === 3 && m._layers[0].w === 'H350' && m._layers[1].s === 'H400' && m._layers[0].el === -1.5 && m._routeRows.length === 30 && m.P === 107.1 && m.A === 616.36 && m.kingMid === 19 && m._routeSrc.kind === 'measure';
+        matEstCalc(); const R = _matEstRes, d = R.layerData[0];
+        out.brace = d.diag === 36 && d.corner === 0 && base.diag !== 36 && d.rt.length === 10;
+        const st1 = R.staged.find(x => /第1層/.test(x.stage));
+        out.notes = st1.notes.some(t => /斜撐／角撐依量測檔：斜撐可裝 36、待確認 1/.test(t)) && st1.notes.some(t => /接頭位置未檢查（沒填中間樁）/.test(t));
+        const f = document.getElementById('mat-est-form').innerHTML;
+        out.ui = /量測檔：S-1 範例/.test(f) && /信心度低、要人確認/.test(f) && /量測檔沒有每路中間樁位置（v1）/.test(f) && /匯入量測檔（JSON）/.test(f);
+        // 審查：改用 CSV 匯入就不再用量測檔的斜撐支數；複製報價不帶量測檔
+        const keepRows = m._routeRows; meRtCsv({ files: [new File(['層,路編號,方向,壁間長度\n1,V1,縱,24.6'], 'x.csv')], value: '' }); await wait(400); if (document.getElementById('gen-confirm-modal').style.display === 'flex') document.getElementById('gen-confirm-ok').click(); await wait(200);
+        out.csvClears = MAT_EST._measBrace === null && /'measure'/.test(String(_copyQDo));
+        MAT_EST._routeRows = keepRows;
+        // 掛專案：量測摘要存進報價、報價頁圖面覆核
+        Q.push({ id: 'qm1', name: '量測測試案', client: '範例營造', date: '2026-11-03', items: [{ desc: '中間樁 H350', unit: '支', qty: 19, price: 1000 }, { desc: 'RC排樁', unit: '支', qty: 320, price: 100 }, { desc: '水平支撐', unit: '㎡', qty: 620, price: 50 }], exs: [], rmk: {} });
+        window._matEstQid = 'qm1'; meMeasImport({ files: [new File([fx], '範例_量測檔.json', { type: 'application/json' })], value: '' }); await wait(500); document.getElementById('gen-confirm-ok').click(); await wait(300);
+        const q = Q.find(x => x.id === 'qm1');
+        out.saved = !!q.measure && q.measure.mid === 19 && q.measure.A === 616.36 && q.measure.pileN === 263 && !JSON.stringify(q.measure).includes('price');
+        window._matEstQid = '';
+        loadQ('qm1'); go('editor'); rTots(); await wait(200);
+        const chip = document.getElementById('q-meas-chip').innerHTML;
+        out.chip = /圖面覆核：1 項差異/.test(chip);   // 中間樁 19＝19、支撐 620 對 616.36（+0.6%）、排樁 320 對 263（+21.7%）
+        qMeasReview(); const mh = document.getElementById('gen-confirm-msg').innerHTML;
+        out.review = /RC排樁/.test(mh) && /\+21\.7%/.test(mh) && /中間樁/.test(mh) && /只提醒、不擋送出/.test(mh); document.getElementById('gen-confirm-ok').click();
+        delete Q.find(x => x.id === 'qm1').measure; rTots(); out.noMeas = /匯入量測檔（圖面覆核）/.test(document.getElementById('q-meas-chip').innerHTML);
+        out.bad = await (async () => { const tt = []; const oT = window.toast; window.toast = m => tt.push(String(m)); meMeasImport({ files: [new File(['{"格式":"別的"}'], 'x.json')], value: '' }); await wait(400); window.toast = oT; return tt.some(t => /量測檔讀不進來/.test(t)); })();
+        go('quotes');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    }, FX);
+    check('v6.0.160 量測檔匯入：確認後帶入各層規格、三角架高程、30 路支撐、周長面積、中間樁；顯示來源、信心度低標黃、v1 沒有中間樁位置提示', r.ask && r.apply && r.ui, JSON.stringify(r));
+    check('v6.0.160 量測檔：斜撐／角撐叫料依量測檔可裝數、叫料單列待確認與未檢查中間樁', r.brace && r.notes, JSON.stringify(r));
+    check('v6.0.160 報價頁圖面覆核：掛專案存量測摘要（不放金額）；差異超過門檻標紅、明細可看；沒量測檔可直接匯入；格式不對拒收', r.saved && r.chip && r.review && r.noMeas && r.bad && r.csvClears, JSON.stringify(r));
+    check('v6.0.160 量測檔測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
