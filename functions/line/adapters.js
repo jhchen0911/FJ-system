@@ -22,6 +22,27 @@ function mkDeps(token) {
       return { buf: Buffer.from(await r.arrayBuffer()), contentType: r.headers.get('content-type') || 'application/octet-stream' };
     },
     putFile: async (path, buf, contentType) => { await bucket.file(path).save(buf, { contentType, resumable: false }); },
+    // v6.0.144：串流存檔（大檔不進記憶體）；邊收邊計大小，超過上限就中止並刪掉半截檔 → {tooBig:true,size}；成功 → {size, contentType}
+    saveContent: async (msgId, path, max) => {
+      const r = await fetch(LINE_DATA + '/message/' + encodeURIComponent(msgId) + '/content', { headers: auth });
+      if (!r.ok || !r.body) throw new Error('LINE content ' + r.status);
+      const len = parseInt(r.headers.get('content-length') || '0', 10) || 0;
+      if (len > max) { try { await r.body.cancel(); } catch (e) { console.error('saveContent.cancel', e && e.message); } return { tooBig: true, size: len }; }
+      const contentType = r.headers.get('content-type') || 'application/octet-stream';
+      const { Readable, Transform } = require('stream');
+      const { pipeline } = require('stream/promises');
+      let size = 0, over = false;
+      const count = new Transform({ transform(ch, enc, cb) { size += ch.length; if (size > max) { over = true; cb(new Error('tooBig')); return; } cb(null, ch); } });
+      const file = bucket.file(path);
+      try {
+        await pipeline(Readable.fromWeb(r.body), count, file.createWriteStream({ contentType, resumable: size > 8 * 1048576 || len > 8 * 1048576 }));
+      } catch (e) {
+        await file.delete({ ignoreNotFound: true }).catch((e2) => console.error('saveContent.cleanup', e2 && e2.message));
+        if (over) return { tooBig: true, size };
+        throw e;
+      }
+      return { size, contentType };
+    },
     dbSet: async (path, val) => { await db.ref(path).set(val); },
     dbGet: async path => (await db.ref(path).once('value')).val(),
     reply: (replyToken, text) => lineJson(LINE_API + '/message/reply', { replyToken, messages: [{ type: 'text', text: String(text).slice(0, 4900) }] }),

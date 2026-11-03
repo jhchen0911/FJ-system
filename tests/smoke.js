@@ -9526,6 +9526,63 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.144 LINE 收件匣：管理員看未歸檔、下載、歸檔走雲端；唯讀帳號看不到；HQ（AI 帳號）用 fyInbox* 取檔 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const oU = _fbUser, oR = _isReaderUser, oF = window.fetch, oDb = _fbDb, oSt = _fbStorage, oT = window.toast;
+      const wait = ms => new Promise(res => setTimeout(res, ms));
+      try {
+        window.toast = () => {};
+        const now = Date.now();
+        const data = {
+          m1: { id: 'm1', at: now - 60000, type: 'file', fileName: '詢價單<img src=x onerror=window.__lbx=1>.pdf', size: 2.5 * 1048576, path: 'line/inbox/2026-11-03/m1_a.pdf', status: 'new' },
+          m2: { id: 'm2', at: now - 50000, type: 'text', text: '範例營造 內湖案', status: 'new' },
+          m3: { id: 'm3', at: now - 40000, type: 'video', fileName: 'v.mp4', size: 0, status: 'error' },
+          m4: { id: 'm4', at: now - 30000, type: 'image', fileName: 'p.jpg', path: 'line/inbox/2026-11-03/m4_p.jpg', status: 'filed', caseName: '範例案' } };
+        const mkDb = () => ({ ref: (p) => { const node = p === 'fydata/lineInbox' ? data : data[String(p).split('/').pop()];
+          const snap = { val: () => node || null };
+          const q = { orderByChild: () => q, startAt: () => q, once: async () => snap, on: (ev, cb) => cb(snap), off: () => {} }; return q; } });
+        _fbDb = mkDb(); _fbStorage = { ref: (p) => ({ getDownloadURL: async () => 'https://example.invalid/' + p }) };
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o', getIdToken: async () => 'tokO' }; _isReaderUser = false;
+        _lbxOff(); _lbxWatch();
+        out.open = _lbxOpen().map(x => x.id).join() === 'm3,m2,m1';
+        const items = []; _v6TodoItems(items); const it = items.find(x => x.type === 'line_inbox');
+        out.todo = !!it && /LINE 收件 3 件未歸檔/.test(it.text);
+        openLineInbox(); const h = document.getElementById('lbx-list').innerHTML;
+        out.list = /範例營造 內湖案/.test(h) && /存檔失敗，請重傳/.test(h) && !/v\.mp4.*下載/.test(h) && /&lt;img/.test(h) && !/<img src=x/.test(h) && !/範例案/.test(h) && window.__lbx !== 1;
+        let sent = null; window.fetch = async (u, o) => { sent = { u, o }; return { ok: true, status: 200, json: async () => ({ ok: true, status: 'filed' }) }; };
+        lbxMark('m1', 'filed', { qid: 'q1', caseName: '', note: '' }); await wait(50);
+        const b = JSON.parse(sent.o.body);
+        out.mark = sent.u === _fnUrl('lineInboxMark') && sent.o.headers.Authorization === 'Bearer tokO' && b.id === 'm1' && b.status === 'filed' && b.qid === 'q1' && LBX.m1.status === 'filed' && !/詢價單/.test(document.getElementById('lbx-list').innerHTML);
+        document.getElementById('fy-modal').remove();
+        // 唯讀帳號：畫面與待辦都沒有
+        _isReaderUser = true; const it2 = []; _v6TodoItems(it2); out.ro = !_lbxOk() && !it2.some(x => x.type === 'line_inbox');
+        // HQ（AI 帳號）：列出、取檔網址、標歸檔；一般員工不行；路徑不是 line/inbox 擋下
+        _fbUser = { email: 'hsuanchen911@gmail.com', uid: 'a', getIdToken: async () => 'tokA' };
+        data.m1.status = 'new';
+        const L = await fyInboxList(); out.hqList = Array.isArray(L) && L.map(x => x.id).join() === 'm1,m2,m3' && L[0].hasFile && !('path' in L[0]) && (await fyInboxList({ all: true })).length === 4;
+        const g = await fyInboxGet('m1'); out.hqGet = g.url === 'https://example.invalid/line/inbox/2026-11-03/m1_a.pdf' && /請 Lotion 重傳/.test((await fyInboxGet('m3')).err) && !!(await fyInboxGet('../x')).err;
+        data.m5 = { id: 'm5', at: now, type: 'file', path: 'fydata/backups/x.json', status: 'new' }; out.hqPath = !!(await fyInboxGet('m5')).err; delete data.m5;
+        out.hqMark = (await fyInboxMark('m2', { caseName: '範例案' })) === '已歸檔' && JSON.parse(sent.o.body).caseName === '範例案' && sent.o.headers.Authorization === 'Bearer tokA';
+        _fbUser = { email: 'staff@x.com', uid: 's', getIdToken: async () => 't' }; _isReaderUser = false;
+        out.staff = !!(await fyInboxList()).err && /不能改/.test(await fyInboxMark('m2', {}));
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      _lbxOff(); _fbUser = oU; _isReaderUser = oR; window.fetch = oF; _fbDb = oDb; _fbStorage = oSt; window.toast = oT;
+      return out;
+    });
+    const pth144 = require('path'), fs144 = require('fs');
+    const IB = require(pth144.join(__dirname, '..', 'functions', 'ops', 'inbox.js'));
+    const LC = require(pth144.join(__dirname, '..', 'functions', 'line', 'core.js'));
+    const IDX144 = fs144.readFileSync(pth144.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    check('v6.0.144 LINE 收件匣：管理員看未歸檔（含存檔失敗）、檔名跳脫、歸檔走雲端 lineInboxMark 帶憑證；總覽待辦；唯讀帳號看不到', r.open && r.todo && r.list && r.mark && r.ro, JSON.stringify(r));
+    check('v6.0.144 LINE 收件匣 HQ：AI 帳號 fyInboxList／fyInboxGet（只給 line/inbox 的下載網址）／fyInboxMark；一般員工不行；雲端：webhook 300 秒、上限 100MB、標歸檔只放行擁有者／管理員／AI 帳號',
+      r.hqList && r.hqGet && r.hqPath && r.hqMark && r.staff && /exports\.lineInboxMark/.test(IDX144) && /timeoutSeconds: 300 \}, async/.test(IDX144) && LC.MAX_FILE_BYTES === 100 * 1048576 && IB.markAllowed('hsuanchen911@gmail.com') && !IB.markAllowed('staff@x.com', 'staff'), JSON.stringify(r));
+    check('v6.0.144 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

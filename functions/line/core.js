@@ -15,7 +15,7 @@ const ALARM_WORDS = ['裂', '變形', '湧砂', '沉陷', '傾斜'];
 const PHOTO_WINDOW_MS = 10 * 60 * 1000;
 const NEG_RE = /(沒有|沒|没|無|无|未|不|並無|并无|非)/;   // 關鍵字前 3 個字內有否定詞 → 不算（「沒有裂縫」「無變形」「不用追加」）
 const PENDING_MAX = 50;                                   // 待綁定名單上限：陌生人灌不爆設定
-const MAX_FILE_BYTES = 50 * 1024 * 1024;                  // 超過 50MB 的影片／檔案不存，只記一筆
+const MAX_FILE_BYTES = 100 * 1024 * 1024;                 // 超過 100MB 的影片／檔案不存，只記一筆（v6.0.144：50→100MB，改串流存檔）
 
 const DEFAULT_TEXTS = {
   inboxAck: '收到，{n} 個檔案，歸到哪一案？',
@@ -162,10 +162,24 @@ const MEDIA = { image: 1, video: 1, audio: 1, file: 1 };
 // ── webhook：逐筆事件 ──
 // deps: getCfg() / fetchContent(msgId) → {buf, contentType} / putFile(path, buf, contentType) / dbSet(path, val) / dbPush(path, val) → key
 //       dbGet(path) / reply(token, text) / push(to, text) / createDraft(rec) / findAddonDrafts(groupId, sinceTs) / appendDraftPhotos(id, paths) / log(...)
+// v6.0.144：擁有者一對一傳來的檔案，一次 webhook 只回一句「收到 N 個檔案」（先回再存：大檔下載久，回覆權杖會過期）
+function inboxAckPlan(events, cfg) {
+  const ms = (events || []).filter(ev => ev && ev.type === 'message' && ev.message && MEDIA[ev.message.type] && ev.source && ev.source.type === 'user' && isOwner(cfg, ev.source.userId) && /^\w{1,40}$/.test(String(ev.message.id || '')));
+  const tok = (ms.find(ev => ev.replyToken) || {}).replyToken;
+  return { n: ms.length, token: tok || '' };
+}
 async function handleEvents(events, deps) {
   const cfg = (await deps.getCfg()) || {};
   const T = textsOf(cfg);
   const out = [];
+  const ack = inboxAckPlan(events, cfg);
+  if (ack.n && ack.token) {
+    // 重送的 webhook（同一則已經收過）不再回
+    let fresh = 0, big = 0;
+    for (const ev of events) if (ev && ev.message && MEDIA[ev.message.type] && ev.source && ev.source.type === 'user' && isOwner(cfg, ev.source.userId) && /^\w{1,40}$/.test(String(ev.message.id || '')) && !(await deps.dbGet('fydata/lineInbox/' + ev.message.id + '/id'))) { if (ev.message.fileSize > MAX_FILE_BYTES) big++; else fresh++; }
+    const txt = (fresh ? fill(T.inboxAck, { n: fresh }) : '') + (big ? (fresh ? '\n' : '') + '另有 ' + big + ' 個檔案超過 ' + Math.round(MAX_FILE_BYTES / 1048576) + 'MB 沒存，請改傳雲端連結。' : '');
+    if (txt) { try { await deps.reply(ack.token, txt); } catch (e) { (deps.log || console.error)('line.reply', e); } }
+  }
   for (const ev of events || []) {
     try { out.push(await handleEvent(ev, cfg, T, deps)); } catch (e) {
       (deps.log || console.error)('line.handleEvent', e);
@@ -214,16 +228,28 @@ async function handleEvent(ev, cfg, T, deps) {
         await deps.dbSet('fydata/lineInbox/' + msg.id, { id: msg.id, at: now, date, from: src.userId, type: msg.type, fileName: msg.fileName || '', size: msg.fileSize, status: 'tooBig' });
         return { kind: 'tooBig' };
       }
-      const c = await deps.fetchContent(msg.id);
-      if (c.buf && c.buf.length > MAX_FILE_BYTES) {
-        await deps.dbSet('fydata/lineInbox/' + msg.id, { id: msg.id, at: now, date, from: src.userId, type: msg.type, fileName: msg.fileName || '', size: c.buf.length, status: 'tooBig' });
-        return { kind: 'tooBig' };
-      }
       const name = msg.type === 'file' ? safeName(msg.fileName) : (msg.id + '.' + extOf(msg));
       const path = 'line/inbox/' + date + '/' + msg.id + '_' + name;
-      await deps.putFile(path, c.buf, c.contentType || 'application/octet-stream');
-      await deps.dbSet('fydata/lineInbox/' + msg.id, { id: msg.id, at: now, date, from: src.userId, type: msg.type, fileName: msg.fileName || name, size: (c.buf && c.buf.length) || 0, path, status: 'new' });
-      if (ev.replyToken) { try { await deps.reply(ev.replyToken, fill(T.inboxAck, { n: 1 })); } catch (e) { (deps.log || console.error)('line.reply', e); } }
+      const base = { id: msg.id, at: now, date, from: src.userId, type: msg.type, fileName: msg.fileName || name };
+      let size = 0;
+      try {
+        if (deps.saveContent) {   // v6.0.144：串流（邊收邊寫 Storage，不把整個檔案放進記憶體）
+          const r = await deps.saveContent(msg.id, path, MAX_FILE_BYTES);
+          if (r && r.tooBig) { await deps.dbSet('fydata/lineInbox/' + msg.id, Object.assign(base, { size: r.size || 0, status: 'tooBig' })); return { kind: 'tooBig' }; }
+          size = (r && r.size) || 0;
+        } else {
+          const c = await deps.fetchContent(msg.id);
+          if (c.buf && c.buf.length > MAX_FILE_BYTES) { await deps.dbSet('fydata/lineInbox/' + msg.id, Object.assign(base, { size: c.buf.length, status: 'tooBig' })); return { kind: 'tooBig' }; }
+          await deps.putFile(path, c.buf, c.contentType || 'application/octet-stream');
+          size = (c.buf && c.buf.length) || 0;
+        }
+      } catch (e) {
+        // 已經回「收到」了：存檔失敗要記一筆 error，FJ 收件匣看得到、請 Lotion 重傳
+        await deps.dbSet('fydata/lineInbox/' + msg.id, Object.assign(base, { size: msg.fileSize || 0, status: 'error', err: String(e && e.message || e).slice(0, 200) }));
+        (deps.log || console.error)('line.inboxSave', e);
+        return { kind: 'inboxErr' };
+      }
+      await deps.dbSet('fydata/lineInbox/' + msg.id, Object.assign(base, { size, path, status: 'new' }));
       return { kind: 'inboxFile', path };
     }
     if (msg.type === 'text') {
@@ -464,4 +490,4 @@ async function processPush(id, rec, deps) {
   return n > 0;
 }
 
-module.exports = { verifySignature, handleEvents, dailyAsk, dailyCompile, morningCheck, processPush, pushOwners, isAddon, alarmWord, parseQty, parseCoReport, parseMD, matchSite, tpeDate, addDays, fill, DEFAULT_TEXTS, ALARM_WORDS };
+module.exports = { MAX_FILE_BYTES, inboxAckPlan, verifySignature, handleEvents, dailyAsk, dailyCompile, morningCheck, processPush, pushOwners, isAddon, alarmWord, parseQty, parseCoReport, parseMD, matchSite, tpeDate, addDays, fill, DEFAULT_TEXTS, ALARM_WORDS };
