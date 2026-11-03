@@ -10225,6 +10225,7 @@ function _cleanEnc(obj){
   return _deepEncodeKeys(clean);
 }
 function _buildCleanPayload(){
+  try{_recIdHeal();}catch(e){_err('_buildCleanPayload.heal',e);}   // 4b 審查 B：每次上傳前都補（匯入、還原、舊程式建立的沒 id 記錄）
   var p=_sharedPayload();
   return {ts:p.ts,clean:_cleanEnc(p.data)};
 }
@@ -10337,6 +10338,12 @@ var _shEmptyWarned={};
 function _r112(){try{if(BANK!==null)localStorage.setItem('fy_r112','1');return localStorage.getItem('fy_r112')==='1';}catch(e){return BANK!==null;}}
 function _shStripForStaff(delta){
   if(_shWholeOk())return;
+  // 4b 審查 D：客戶／廠商／合約走 shared.$other 規則，員工把最後一筆刪掉（整個節點變空）會被拒、整次上傳失敗 → 先不送這幾筆刪除，等管理員裝置同步
+  try{[['customers',CUSTOMERS],['vendors',VENDORS],['contracts',CONTRACTS]].forEach(function(x){
+    if(Array.isArray(x[1])&&x[1].length)return;
+    var drop=Object.keys(delta).filter(function(k){return k.indexOf(x[0]+'/')===0&&delta[k]==null;});
+    if(drop.length){drop.forEach(function(k){delete delta[k];});if(!_shEmptyWarned[x[0]]){_shEmptyWarned[x[0]]=1;try{toast('「'+x[0]+'」最後一筆的刪除要由管理員裝置同步（一般帳號不能清空整個集合）');}catch(e){_err('_shStripForStaff.last',e);}}}
+  });}catch(e){_err('_shStripForStaff.last',e);}
   delete delta.pagePerms;   // 名冊／角色：只有管理員的裝置會上傳（規則端同樣只放行管理員）
   if(!_r112())return;   // 審查 🔴5：新規則還沒發布前，墓碑與空集合照舊上傳（舊規則允許；提早拿掉反而刪除傳不出去）
   if('tombs' in delta){delete delta.tombs;try{_tombReqPush();}catch(e){_err('_shStripForStaff.tomb',e);}}   // 墓碑只有管理員能寫：員工的刪除改送「刪除申請」
@@ -10770,7 +10777,11 @@ function _mergeColl(localArr,cloudArr,collName,cloudTombs){
     if(!o||mt(r)>=mt(o))map[r.id]=r;
     if(o&&collName==='payables')map[r.id]=_payStatusReconcile(map[r.id],map[r.id]===r?o:r);   // v6.0.67
   });
-  if(_CF_COLLS[collName]&&window._applyingCloud){try{cloudArr.forEach(function(r){if(r&&r.id&&!dead(r.id))_rbSet(collName,r);});_rbSave();}catch(e){_err('_mergeColl.rb',e);}}   // 4b 收到的雲端版＝新的共同祖先
+  if(_CF_COLLS[collName]&&window._applyingCloud){try{cloudArr.forEach(function(r){if(r&&r.id&&!dead(r.id))_rcbSet(collName,r);});_rcbSave();}catch(e){_err('_mergeColl.rb',e);}}   // 4b 收到的雲端版＝新的共同祖先
+  if(noId.length&&(collName==='customers'||collName==='vendors'||collName==='contracts')){   // 4b 審查 B：雲端舊版留下的沒 id 那份，本機已補 id 的同一筆 → 不重複保留
+    var nm={};Object.keys(map).forEach(function(k){var x=map[k];if(x&&x.name)nm[String(x.name)]=1;});
+    noId=noId.filter(function(x){var n2=typeof x==='string'?x:(x&&x.name);return !(n2&&nm[String(n2).trim()]);});
+  }
   return Object.values(map).concat(noId);
 }
 // v6.0.67：應付「已付」狀態不被舊裝置蓋回待付。
@@ -11105,7 +11116,7 @@ function _pushCloud(opts){
           _fbDb.ref('fydata/shared').once('value').then(function(s2){
             try{_applyCloud(s2.val());}catch(e){_err('_pushCloud',e);}
             opts._merged=true;setTimeout(function(){_pushCloud(opts);},700);
-          }).catch(function(){opts._merged=true;_pushCloud(opts);});
+          }).catch(function(){if(stale){console.warn('[同步] 超過 7 天沒同步、下載失敗：這次不上傳');if(opts.onDone)opts.onDone(false);return;}opts._merged=true;_pushCloud(opts);});   // 4b 審查 J
         }else{
           opts._merged=true;_pushCloud(opts);
         }
@@ -11171,7 +11182,7 @@ function _pushCloud(opts){
     // v6.0.106 材料位置清單（不含成本）：只有讀得到 private 台帳的管理員裝置產生並上傳到 shared/matLoc，給唯讀帳號讀
     var mlWork=false,mlHash='';
     try{if(_fbUser&&isAdmin(_fbUser.email)&&_privReadOk===true&&Array.isArray(MAT_LEDGER)&&(MAT_LEDGER.length>0||localStorage.getItem('fy_matloc_hash'))){   /* 審查：台帳清空後也要上傳空清單（曾上傳過才會），避免雲端留舊位置 */var _ml=_cleanEnc({v:_matLocList()}).v||[];mlHash=_collHash(_ml);if(opts.full||localStorage.getItem('fy_matloc_hash')!==mlHash){delta.matLoc=_ml;mlWork=true;}}}catch(e){_err('_pushCloud.matLoc',e);}
-    var okWrap=function(){_storeSyncHashes(newHashes);_storeRecHashes(perRec.recHashes);try{_rbAfterPush(delta);_cfPushed(delta);}catch(e){_err('_pushCloud.rb',e);}if(mlWork){try{localStorage.setItem('fy_matloc_hash',mlHash);}catch(e){/* 可忽略 */}}ok();};
+    var okWrap=function(){_storeSyncHashes(newHashes);_storeRecHashes(perRec.recHashes);try{_rcbAfterPush(delta);_cfPushed(delta);}catch(e){_err('_pushCloud.rb',e);}if(mlWork){try{localStorage.setItem('fy_matloc_hash',mlHash);}catch(e){/* 可忽略 */}}ok();};
     // v5.314：完全沒有變動時不要空推 uploadedAt，否則會害其他裝置誤判「雲端有更新」而跳覆蓋提示
     // v5.319：無變更時不謊報「已上傳雲端」，也不推進 fy_last_fb_sync
     //（推進了會讓本機 watermark 超前雲端，之後他人的真實上傳會被誤判為「不是更新」而永遠拉不下來）
@@ -40371,7 +40382,7 @@ function _healthAddPrj(R){
 try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{_prjSync();}catch(e){_err('prjBoot',e);}},1500);});}catch(e){_err('prjBoot',e);}   // 開頁對帳一次（第一次＝一次性建檔：全部得標案含已結案）
 // ══════════ 改版第 4 步 4b：同步改版（Lotion 11/03 第 6、7 題照建議）══════════
 // ① 客戶／廠商／合約改逐筆同步（_REC_COLLS），一次存檔只送動到的那幾筆。
-// ② 存檔衝突（三方合併）：每筆記錄記下「上次和雲端一致時」各欄位的指紋（_RB，本機 fy_rec_base，只存雜湊、不存內容）。
+// ② 存檔衝突（三方合併）：每筆記錄記下「上次和雲端一致時」各欄位的指紋（_RCB，本機 fy_rec_base，只存雜湊、不存內容）。
 //    兩台裝置都改了同一筆：改的是不同欄位 → 自動合併（兩邊的修改都留）；改到同一欄位、值不同 → 先照舊用較新的那版，
 //    同時把兩個值記進「同步衝突」清單（總覽待辦），讓人選要哪一個（openSyncConflicts）。沒有指紋的舊記錄照舊「較新者勝」。
 //    範圍：報價、客戶、廠商、合約（_CF_COLLS）。報價比對共用區那一份（成本欄位不參與，由原本的補回機制處理）。
@@ -40391,60 +40402,66 @@ function _srvOffWatch(){
 function _cfShared(coll,r){
   if(!r||typeof r!=='object')return r;
   if(coll==='quotes')return _stripQuoteSens(r);
-  if(coll==='vendors')return _vendorShOne(r);
+  if(coll==='vendors'){var o=Object.assign({},r);delete o.bank;delete o.bankAcct;delete o.bankHolder;return o;}   // 審查 G：帳號欄一律不比（是否已搬到 fydata/bank 會變）
   return r;
 }
 // Firebase 不存空陣列／空物件／null → 比對前一律視同「沒有」
-function _rbNorm(v){
+function _rcbNorm(v){
   if(v===undefined||v===null||v==='')return undefined;
   if(typeof v==='number'&&!isFinite(v))return 0;
-  if(Array.isArray(v)){var a=v.map(_rbNorm);while(a.length&&a[a.length-1]===undefined)a.pop();return a.length?a.map(function(x){return x===undefined?null:x;}):undefined;}
-  if(typeof v==='object'){var o={},n=0;Object.keys(v).sort().forEach(function(k){var x=_rbNorm(v[k]);if(x!==undefined){o[k]=x;n++;}});return n?o:undefined;}
+  if(Array.isArray(v)){var a=v.map(_rcbNorm);while(a.length&&a[a.length-1]===undefined)a.pop();return a.length?a.map(function(x){return x===undefined?null:x;}):undefined;}
+  if(typeof v==='object'){
+    var ks=Object.keys(v);
+    if(ks.length&&ks.every(function(k){return /^\d+$/.test(k);})){var arr2=[];ks.forEach(function(k){arr2[+k]=v[k];});return _rcbNorm(arr2);}   // 審查 G：Firebase 會把陣列存成 {0:…,1:…}
+    var o={},n=0;ks.sort().forEach(function(k){var x=_rcbNorm(v[k]);if(x!==undefined){o[k]=x;n++;}});return n?o:undefined;}
   return v;
 }
-function _rbHash(v){var x=_rbNorm(v);if(x===undefined)return '∅';var st=JSON.stringify(x),h=5381;for(var i=0;i<st.length;i++)h=((h<<5)+h+st.charCodeAt(i))|0;return (h>>>0).toString(36)+st.length.toString(36);}
-function _rbFields(coll,r){
+function _rcbHash(v){var x=_rcbNorm(v);if(x===undefined)return '∅';var st=JSON.stringify(x),h=5381;for(var i=0;i<st.length;i++)h=((h<<5)+h+st.charCodeAt(i))|0;return (h>>>0).toString(36)+st.length.toString(36);}
+function _rcbFields(coll,r){
   var s=_cfShared(coll,r)||{},h={};
-  Object.keys(s).forEach(function(k){if(!_CF_META[k]){var x=_rbHash(s[k]);if(x!=='∅')h[k]=x;}});
+  Object.keys(s).forEach(function(k){if(!_CF_META[k]){var x=_rcbHash(s[k]);if(x!=='∅')h[k]=x;}});
   return h;
 }
-var _RB=null;
-function _rbLoad(){if(_RB)return _RB;try{_RB=JSON.parse(localStorage.getItem('fy_rec_base')||'{}')||{};}catch(e){_RB={};}return _RB;}
-function _rbSave(){try{localStorage.setItem('fy_rec_base',JSON.stringify(_RB||{}));}catch(e){_err('_rbSave',e);}}
-var _RB_KEEP=180*86400000;   // 指紋只留最近 180 天有動過的記錄（本機空間有限；更舊的記錄被改到時照舊「較新者勝」）
-function _rbMt(r){return +(r&&(r._mt||r.ts||r.updatedAt))||0;}
-function _rbSet(coll,r){
-  if(!_CF_COLLS[coll]||!r||!r.id)return;var B=_rbLoad(),m=_rbMt(r),C=(B[coll]=B[coll]||{});
-  if(m&&Date.now()-m>_RB_KEEP){delete C[r.id];return;}
+var _RCB=null;
+function _rcbLoad(){if(_RCB)return _RCB;try{_RCB=JSON.parse(localStorage.getItem('fy_rec_base')||'{}')||{};}catch(e){_RCB={};}return _RCB;}
+var _rcbDirty=false;
+function _rcbSave(){if(!_rcbDirty)return;_rcbDirty=false;try{localStorage.setItem('fy_rec_base',JSON.stringify(_RCB||{}));}catch(e){_err('_rcbSave',e);}}
+var _RCB_KEEP=180*86400000;   // 指紋只留最近 180 天有動過的記錄（本機空間有限；更舊的記錄被改到時照舊「較新者勝」）
+function _rcbMt(r){return +(r&&(r._mt||r.ts||r.updatedAt))||0;}
+function _rcbSet(coll,r){
+  if(!_CF_COLLS[coll]||!r||!r.id)return;var B=_rcbLoad(),m=_rcbMt(r),C=(B[coll]=B[coll]||{});
+  if(m&&Date.now()-m>_RCB_KEEP){if(C[r.id]){delete C[r.id];_rcbDirty=true;}return;}   // 雲端版超過 180 天沒動：不留指紋，被改到時照舊較新者勝
   if(C[r.id]&&C[r.id].m===m&&m)return;   // 同一版（修改時間相同）不重算
-  C[r.id]={m:m,h:_rbFields(coll,r)};
+  C[r.id]={m:m,h:_rcbFields(coll,r)};_rcbDirty=true;
 }
 // 上傳成功：送上去的那幾筆＝雲端現況 → 更新指紋
-function _rbAfterPush(delta){
+function _rcbAfterPush(delta){
   try{
     var n=0;
     Object.keys(delta||{}).forEach(function(k){
       var sl=k.indexOf('/'),c=sl>0?k.slice(0,sl):k;if(!_CF_COLLS[c])return;
       var v=delta[k];
-      if(sl>0){var id=_fbDecKey(k.slice(sl+1));if(v==null){var B=_rbLoad();if(B[c])delete B[c][id];}else{_rbSet(c,_deepDecodeKeys(v));}n++;}
-      else if(v&&typeof v==='object'){var arr=Array.isArray(v)?v:Object.values(v);arr.forEach(function(r){if(r&&r.id){_rbSet(c,_deepDecodeKeys(r));n++;}});}
+      if(sl>0){var id=_fbDecKey(k.slice(sl+1));if(v==null){var B=_rcbLoad();if(B[c])delete B[c][id];}else{_rcbSet(c,_deepDecodeKeys(v));}n++;}
+      else if(v&&typeof v==='object'){var arr=Array.isArray(v)?v:Object.values(v);arr.forEach(function(r){if(r&&r.id){_rcbSet(c,_deepDecodeKeys(r));n++;}});}
     });
-    if(n)_rbSave();
-  }catch(e){_err('_rbAfterPush',e);}
+    if(n)_rcbSave();
+  }catch(e){_err('_rcbAfterPush',e);}
 }
 var SYNC_CONFLICTS=[];try{SYNC_CONFLICTS=JSON.parse(localStorage.getItem('fy_sync_conflicts')||'[]')||[];}catch(e){SYNC_CONFLICTS=[];}
 var _cfNeedPush={};try{_cfNeedPush=JSON.parse(localStorage.getItem('fy_cf_pending')||'{}')||{};}catch(e){_cfNeedPush={};}
 function _cfPendSave(){try{localStorage.setItem('fy_cf_pending',JSON.stringify(_cfNeedPush));}catch(e){_err('_cfPendSave',e);}}
-function _cfSave(){try{localStorage.setItem('fy_sync_conflicts',JSON.stringify(SYNC_CONFLICTS.slice(0,60)));}catch(e){_err('_cfSave',e);}}
+function _cfSave(){SYNC_CONFLICTS=SYNC_CONFLICTS.slice(0,30);try{localStorage.setItem('fy_sync_conflicts',JSON.stringify(SYNC_CONFLICTS));}catch(e){_err('_cfSave',e);}}
+var _CF_BIG=40000;   // 審查 E：單一欄位內容超過 4 萬字（例如整張報價的工項）只記「這台的值」，另一台的值不存在本機（現在用的就是較新的那版）
+function _cfKey(x){return x.coll+'|'+x.id+'|'+x.field;}
 // 三方合併：local＝本機、cloud＝雲端，以指紋為共同祖先。回傳合併後的記錄；沒有指紋（舊資料）回傳 null＝照舊較新者勝
 function _recMerge3(coll,local,cloud){
-  var B=_rbLoad(),bb=B[coll]&&B[coll][local.id],base=bb&&bb.h;
+  var B=_rcbLoad(),bb=B[coll]&&B[coll][local.id],base=bb&&bb.h;
   if(!base)return null;
-  var lm=_rbMt(local),cm=_rbMt(cloud);
+  var lm=_rcbMt(local),cm=_rcbMt(cloud);
   if(lm&&lm===cm)return null;          // 同一版：照舊
   if(bb.m&&bb.m===cm)return local;     // 雲端還是上次那版 → 只有本機改過（不用逐欄比，省時間）
   if(bb.m&&bb.m===lm)return cloud;     // 本機還是上次那版 → 只有雲端改過
-  var L=_rbFields(coll,local),C=_rbFields(coll,cloud),keys={};
+  var L=_rcbFields(coll,local),C=_rcbFields(coll,cloud),keys={};
   Object.keys(L).concat(Object.keys(C)).concat(Object.keys(base)).forEach(function(k){keys[k]=1;});
   var lc=[],cc=[];
   Object.keys(keys).forEach(function(k){var b=base[k]||'∅';if((L[k]||'∅')!==b)lc.push(k);if((C[k]||'∅')!==b)cc.push(k);});
@@ -40458,7 +40475,9 @@ function _recMerge3(coll,local,cloud){
     if(!inL){if(cloud[k]===undefined)delete out[k];else out[k]=cloud[k];return;}   // 只有雲端改 → 用雲端
     if((L[k]||'∅')===(C[k]||'∅'))return;                                           // 兩邊改成一樣
     if(newer==='cloud'){if(cloud[k]===undefined)delete out[k];else out[k]=cloud[k];}  // 同欄位都改：先用較新的，記成衝突讓人選
-    cf.push({coll:coll,id:local.id,field:k,name:_cfName(coll,local),mine:local[k]===undefined?null:local[k],theirs:cloud[k]===undefined?null:cloud[k],kept:newer,by:cloud._by||'',at:_srvNow()});
+    var mv=local[k]===undefined?null:local[k],tv=cloud[k]===undefined?null:cloud[k];
+    var big=(JSON.stringify(mv)||'').length+(JSON.stringify(tv)||'').length>_CF_BIG;
+    cf.push({coll:coll,id:local.id,field:k,name:_cfName(coll,local),mine:(big&&newer==='local')?null:mv,theirs:(big&&newer==='cloud')?null:tv,big:big?1:0,kept:newer,by:cloud._by||'',at:_srvNow()});
   });
   out._mt=Math.max(mt(local),mt(cloud),_srvNow());
   _cfNeedPush[coll+'/'+local.id]=1;_cfPendSave();
@@ -40505,17 +40524,27 @@ function openSyncConflicts(){
       +'<div style="color:var(--b4)">這台：'+esc(_cfVal(x.mine))+'</div>'
       +'<div style="color:var(--b4)">另一台'+(x.by?('（'+esc(String(x.by))+'）'):'')+'：'+esc(_cfVal(x.theirs))+'</div>'
       +'<div style="font-size:11px;color:var(--b3)">目前用的是'+(x.kept==='cloud'?'另一台':'這台')+'的版本</div>'
-      +'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button type="button" class="btn btn-xs" onclick="syncConflictPick('+i+',\'mine\')">用這台的</button><button type="button" class="btn btn-xs" onclick="syncConflictPick('+i+',\'theirs\')">用另一台的</button></div></div>';
+      +'<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button type="button" class="btn btn-xs" onclick="syncConflictPick(\''+esc(_cfKey(x)).replace(/'/g,'&#39;')+'\',\'mine\')">'+(x.kept==='local'?'維持這台的':'用這台的')+'</button><button type="button" class="btn btn-xs" onclick="syncConflictPick(\''+esc(_cfKey(x)).replace(/'/g,'&#39;')+'\',\'theirs\')">'+(x.kept==='cloud'?'維持另一台的':'用另一台的')+'</button></div></div>';
   };
   showConfirm('同步衝突（'+L.length+'）','<div style="font-size:12px;color:var(--b4);margin-bottom:8px">兩台裝置改到同一個欄位、值不一樣。選定之後會存檔並同步到所有裝置。</div>'+L.map(row).join(''),function(){},false,null,true);
 }
-function syncConflictPick(i,which){
+function syncConflictPick(key,which){
   if(_roDeny())return;
-  var x=SYNC_CONFLICTS[i];if(!x)return;
+  var i=SYNC_CONFLICTS.findIndex(function(y){return _cfKey(y)===key;});var x=SYNC_CONFLICTS[i];if(!x)return;   // 審查 F：用「集合｜id｜欄位」找，不用位置（視窗開著時可能又多一筆）
+  var keepSide=(which==='mine'&&x.kept==='local')||(which==='theirs'&&x.kept==='cloud');
   var arr=_cfColl(x.coll),r=arr&&arr.find(function(y){return y&&y.id===x.id;});
-  if(r){
+  if(r&&!keepSide){
     var v=which==='mine'?x.mine:x.theirs;
-    if(_rbHash(r[x.field])!==_rbHash(v)){if(v===null)delete r[x.field];else r[x.field]=JSON.parse(JSON.stringify(v));_touch(r);_cfPersist(x.coll);}
+    if(x.big&&v===null){toast('這個欄位內容太大，另一版沒有留在本機；目前用的是較新的那版');return;}
+    var curH=_rcbHash(r[x.field]),keptV=x.kept==='local'?x.mine:x.theirs;
+    if(!x.big&&curH!==_rcbHash(keptV)&&curH!==_rcbHash(v)){toast('這個欄位在衝突之後又被改過了，請直接到該筆資料確認');SYNC_CONFLICTS.splice(i,1);_cfSave();setTimeout(openSyncConflicts,80);return;}
+    if(curH!==_rcbHash(v)){
+      var snap=null;if(x.coll==='quotes'){try{snap=_snapshotQuoteSens();}catch(e){_err('syncConflictPick.snap',e);}}   // 審查 A：另一台的工項沒有成本單價（共用區版），換上後要把本機的成本欄位補回
+      if(v===null)delete r[x.field];else r[x.field]=JSON.parse(JSON.stringify(v));
+      if(snap&&snap[r.id]){try{_applyQuoteSens(r,snap[r.id],true);}catch(e){_err('syncConflictPick.graft',e);}}
+      _touch(r);_cfPersist(x.coll);
+      if(x.coll==='quotes'&&window._qEditBase&&window._qEditBase.id===r.id){try{toast('這張報價正在編輯中，已改用選定的版本：請重新開啟編輯頁再改');}catch(e){_err('syncConflictPick.ed',e);}}
+    }
   }
   SYNC_CONFLICTS.splice(i,1);_cfSave();
   try{logActivity('同步','同步衝突：'+(_CF_COLL_NAME[x.coll]||x.coll)+' '+(x.name||x.id)+' 欄位 '+x.field+' 用'+(which==='mine'?'這台':'另一台')+'的');}catch(e){_err('syncConflictPick.log',e);}
@@ -40532,16 +40561,18 @@ function _syncStale(){
 }
 function _pullOkMark(){try{localStorage.setItem('fy_last_pull_ok',String(Date.now()));}catch(e){_err('_pullOkMark',e);}}
 // 逐筆同步前：沒有 id 的客戶／廠商／合約補 id（逐筆上傳以 id 為鍵，沒 id 的會傳不上去）
-function _recIdHeal(){
+// 審查 B：補的 id 由內容決定（名稱＋統編／日期），兩台裝置補出來的一樣，不會變兩筆
+function _recHealId(pre,r){var sig=typeof r==='string'?r:[r.name||'',r.taxid||'',r.code||'',r.date||'',r.client||''].join('|');var h=5381;for(var i=0;i<sig.length;i++)h=((h<<5)+h+sig.charCodeAt(i))|0;return pre+'_h'+(h>>>0).toString(36);}
+function _recIdHeal(noSave){
   var n=0;
   [['customers',function(){return CUSTOMERS;},'cu'],['vendors',function(){return VENDORS;},'v'],['contracts',function(){return CONTRACTS;},'c']].forEach(function(x){
     var a=x[1]();if(!Array.isArray(a))return;
     for(var i=0;i<a.length;i++){var r=a[i];
-      if(typeof r==='string'&&r.trim()){a[i]=_touch({id:_uid(x[2]),name:r.trim()});n++;continue;}   // 很舊的廠商名冊只存名字 → 轉成記錄才能逐筆同步
-      if(r&&typeof r==='object'&&!r.id){r.id=_uid(x[2]);_touch(r);n++;}
+      if(typeof r==='string'&&r.trim()){a[i]={id:_recHealId(x[2],r.trim()),name:r.trim(),_mt:1};n++;continue;}   // 很舊的廠商名冊只存名字 → 轉成記錄才能逐筆同步（_mt 給 1：任何一台的正式記錄都比它新）
+      if(r&&typeof r==='object'&&!r.id){r.id=_recHealId(x[2],r);n++;}
     }
   });
-  if(n){try{saveCustomers();saveVendors();saveContracts();}catch(e){_err('_recIdHeal',e);}}
+  if(n&&!noSave){try{_lsSet('fy_customers',JSON.stringify(CUSTOMERS),'客戶');_lsSet('fy_vendors',JSON.stringify(VENDORS),'廠商');_lsSet('fy_contracts',JSON.stringify(CONTRACTS),'合約');}catch(e){_err('_recIdHeal',e);}}
   return n;
 }
 try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{_recIdHeal();}catch(e){_err('recIdHeal',e);}},1200);});}catch(e){_err('recIdHeal',e);}
