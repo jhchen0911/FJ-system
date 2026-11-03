@@ -9263,7 +9263,7 @@ async function newPage(browser, width, height) {
         // 專案頁設定欄位
         const h = _pjDeductHtml(Q[0]); out.ui = /第一期一次扣（合約 %）/.test(h) && /約 NT\$ 6,000/.test(h);
         // 下一期不帶一次扣
-        addNextPeriod(i1.id); const nx = INV.find(x => x.id !== i1.id && x.quoteId === i1.quoteId && x.periodNo === '2'); out.next = !!nx && !nx.cleanFixed;
+        addNextPeriod(i1.id); const nx = INV.find(x => x.id !== i1.id && x.quoteId === i1.quoteId && x.periodNo === '2'); out.next = !!nx && nx.cleanFixed === 2000;   // 第一期只扣到 4,000 → 下一期（addNextPeriod）自動帶剩下的 2,000
         out.calcs = !!(FJC.ll && FJC.ll.calc && FJC.settle && FJC.settle.diff && FJC.inv.totals2) && typeof _llLinkFor === 'undefined';
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
       return out;
