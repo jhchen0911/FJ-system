@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.156';
+var APP_VERSION='v6.0.158';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -25838,7 +25838,7 @@ function _renderProjectsCore(){
     // 1 報價（得標版本，可下載 PDF）
     steps.push({label:'報價',done:true,
       info:(q.code?esc(q.code)+'　':'')+'NT$ '+fmt(quoteTotal)+(adds.length?'（含 '+adds.length+' 筆追加）':''),
-      extra:'<button type="button" onclick="event.stopPropagation();exportQuotePDF(\''+q.id+'\')" title="開啟報價單預覽，預覽內可下載 PDF" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-search"/></svg> 查看報價PDF</button>',
+      extra:'<button type="button" onclick="event.stopPropagation();quoteSendPdf(\''+q.id+'\')" title="開啟報價單預覽，預覽內可下載 PDF" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-search"/></svg> 查看報價PDF</button>',
       jump:"loadQ('"+q.id+"')"});
     steps[steps.length-1].extra+=' <button type="button" onclick="event.stopPropagation();openSiteDet(\''+q.id+'\')" style="border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;padding:2px 10px;font-size:11px;cursor:pointer;font-family:inherit"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> 案場細節'+(q.site?('（v'+(q.site.ver||1)+'）'):'')+'</button>';
     // 2 合約（可上傳/下載合約檔）
@@ -27861,8 +27861,13 @@ function bumpQVersion(qid){
   const curVer=q.ver||1;
   showConfirm('報價進版',
     '將目前內容封存為正式版 <strong>v'+curVer+'</strong>，並開始編輯 <strong>v'+(curVer+1)+'</strong>？<br><span style="font-size:11px;color:var(--b4)">正式版次<strong>永久保留</strong>（不受自動存檔數量限制），供業主比選與追溯。</span>',
-    ()=>{
-      saveQVersion(qid,q,{formal:true});   // 封存為正式版次（永久保留，不受自動存檔修剪）
+    ()=>{_qBumpDo(qid);toast('已進版至 v'+q.ver+'（v'+curVer+' 已存入歷史）');});
+}
+// 進版本體（手動進版與 v6.0.158 送出自動封存共用）：目前內容封存成正式版 v{n}（永久保留），版號 +1、報價日改今天；note＝版次備註
+function _qBumpDo(qid,note){
+  const q=Q.find(x=>x.id===qid);if(!q)return null;
+  const curVer=q.ver||1;
+      saveQVersion(qid,q,{formal:true,note:note});   // 封存為正式版次（永久保留，不受自動存檔修剪）
       q.ver=curVer+1;
       if(!q.date0&&q.date)q.date0=q.date;   // 第 3b 步（健檢1 #37）：記下第一次報價日，得標率統計用它（進版不會把舊案搬到今年）
       q.date=localToday();                  // 進版＝重新報價：日期更新為當天
@@ -27875,8 +27880,7 @@ function bumpQVersion(qid){
       st('etitle','編輯報價 v'+q.ver);
       st('esub',(q.name||'')+(q.code?' ／ '+q.code:'')+'　·　版本 v'+q.ver);
       try{logActivity('報價','進版：'+(q.name||'')+' → v'+q.ver);}catch(e){_err('bumpQVersion',e);}
-      toast('已進版至 v'+q.ver+'（v'+curVer+' 已存入歷史）');
-    });
+  return q;
 }
 // ── 版本差異比較：歷史快照 vs 現行；或指定 newerIdx＝版次對版次（看某次進版改了什麼）──
 function compareQVersion(qid,idx,newerIdx){
@@ -27958,6 +27962,7 @@ function saveQVersion(qid,q,opts){
     pre:!!(opts&&opts.pre)||undefined,     // v6.0.148 還原前備份：永久保留、不算在自動存檔 10 份
     unsaved:!!(opts&&opts.unsaved)||undefined,   // 備份含編輯頁還沒按儲存的修改
     ver:(q.ver||1),
+    note:(opts&&opts.note)||undefined,      // v6.0.158 版次備註（例：送出 PDF 115/11/03）
     snapshot:JSON.parse(JSON.stringify(q))
   });
   // 修剪：正式版、還原前備份全保留；自動存檔僅留最近 10 份
@@ -27978,7 +27983,7 @@ function showQVersions(qid){
       <div style="flex:0 0 auto;font-family:'Noto Serif TC',serif;font-size:${v.formal?'17px':'12px'};font-weight:900;color:${v.formal?'var(--g3)':(v.pre?'#b26a00':'var(--b3)')};min-width:38px">${v.formal?('V'+(v.ver||1)):(v.pre?'備份':'存檔')}</div>
       <div style="flex:1;min-width:130px">
         <div style="font-size:12px;font-weight:700;color:var(--b5)">
-          ${v.formal?`<span style="display:inline-block;background:var(--gl);color:var(--g3);border:1px solid var(--gm);border-radius:99px;padding:1px 9px;font-size:11px;margin-right:6px">v${v.ver||'?'} 正式版</span>`:''}${v.pre?`<span style="display:inline-block;background:#fff3e0;color:#b26a00;border:1px solid #ffcc80;border-radius:99px;padding:1px 9px;font-size:11px;margin-right:6px">還原前備份${v.unsaved?'（含未儲存修改）':''}</span>`:''}
+          ${v.formal?`<span style="display:inline-block;background:var(--gl);color:var(--g3);border:1px solid var(--gm);border-radius:99px;padding:1px 9px;font-size:11px;margin-right:6px">v${v.ver||'?'} 正式版</span>`:''}${v.note?`<span style="font-size:11px;color:var(--b4);margin-right:6px">${esc(v.note)}</span>`:''}${v.pre?`<span style="display:inline-block;background:#fff3e0;color:#b26a00;border:1px solid #ffcc80;border-radius:99px;padding:1px 9px;font-size:11px;margin-right:6px">還原前備份${v.unsaved?'（含未儲存修改）':''}</span>`:''}
           ${v.snapshot.date?('報價日 '+fmtD(v.snapshot.date)):new Date(v.savedAt).toLocaleString('zh-TW')}
         </div>
         <div style="font-size:11px;color:var(--b4)">NT$ ${fmt(v.snapshot.t?.total||0)} ／ ${new Date(v.savedAt).toLocaleString('zh-TW')} ／ ${esc(v.by||'')}</div>
@@ -34795,7 +34800,7 @@ function _qiPanelRender(doc){
   if(!doc){if(box)box.remove();return;}
   if(!box){box=document.createElement('div');box.id='q-owner-box';box.className='card';box.style.marginTop='12px';var anchor=document.getElementById('itbody');var card=anchor?anchor.closest('.card'):null;if(card&&card.parentNode)card.parentNode.insertBefore(box,card.nextSibling);else pad.appendChild(box);}
   box.innerHTML='<div class="ch green"><div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 業主詢價單</div><div style="font-size:11px;color:var(--b4)">'+esc(doc.name)+'　'+doc.kind.toUpperCase()+'　'+(doc.terms||[]).length+' 條條款（唯讀）</div></div>'
-    +'<div class="cb"><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button type="button" class="btn btn-sm btn-g" onclick="quoteExportOwnerDoc()">回填匯出（寫回業主檔＋我方備註）</button><button type="button" class="btn btn-sm" onclick="quoteImportOwner()">重新匯入</button><button type="button" class="btn btn-sm" onclick="quoteOwnerDocRemove()" style="color:var(--red)">移除連結</button></div>'
+    +'<div class="cb"><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><button type="button" class="btn btn-sm btn-g" onclick="quoteSendOwnerDoc()">回填匯出（寫回業主檔＋我方備註）</button><button type="button" class="btn btn-sm" onclick="quoteImportOwner()">重新匯入</button><button type="button" class="btn btn-sm" onclick="quoteOwnerDocRemove()" style="color:var(--red)">移除連結</button></div>'
     +((doc.terms||[]).length?('<div style="font-size:12px;color:var(--b5);line-height:1.7;max-height:200px;overflow:auto;border:1px solid var(--b1);border-radius:var(--r8);padding:6px 10px;background:var(--b0)">'+doc.terms.map(function(t){return '<div>'+esc(t)+'</div>';}).join('')+'</div><div style="font-size:11px;color:var(--b4);margin-top:4px">業主條款原文保留在原檔，不會印在本公司報價單；回填匯出時在表格下方加上本公司備註。</div>'):'<div style="font-size:12px;color:var(--b3)">此詢價單沒有讀到條款文字。</div>')
     +'</div>';
 }
@@ -40017,6 +40022,39 @@ async function fyInboxMark(id,f){
   f=f||{};var r=await _lbxMarkCall(id,f.status==='new'?'new':'filed',{qid:f.qid||'',caseName:f.caseName||'',note:f.note||''});
   return r.ok?(r.status==='filed'?'已歸檔':'已改回未歸檔'):('沒改：'+r.msg);
 }
+// ── v6.0.158 小批次：報價送出自動進版（Lotion 11/03：常忘記送出後按「進版」）──
+// 匯出 PDF／回填業主檔時先問「送出給對方嗎？」：送出並封存＝目前內容封存成正式版 V{n}（與手動進版同一套 _qBumpDo，永久保留），之後修改算 V{n+1}；
+// 封存內容與 PDF 完全一致：PDF 用封存前的快照產生（報價日＝封存版的報價日，進版後才把工作版改成今天）。
+// 內容跟上一個正式版次一樣（日期以外，比對給業主的文件主體）就不重複封存，直接用那一版匯出。唯讀帳號不能存檔，直接匯出。
+function _qSendSig(q){try{var c=JSON.parse(JSON.stringify(q));c.date='';return _buildQuoteDocHTML(c);}catch(e){_err('_qSendSig',e);return null;}}
+function _qLastFormal(qid){var vs=Q_HISTORY[qid]||[];for(var i=0;i<vs.length;i++)if(vs[i]&&vs[i].formal&&vs[i].snapshot)return vs[i];return null;}
+function _rocDate(iso){var d=String(iso||localToday()).split('-');return (parseInt(d[0],10)-1911)+'/'+d[1]+'/'+d[2];}
+// what：'PDF'／'業主檔'；run(qObj)：用這份內容產生檔案（可回傳 Promise）
+function _qSendGate(qid,what,run){
+  try{if(typeof eid!=='undefined'&&eid===qid&&document.getElementById('page-editor')?.classList.contains('active'))saveQ();}catch(e){_err('_qSendGate',e);}
+  var q=Q.find(function(x){return x.id===qid;});
+  if(!q){toast('請先儲存報價單');return;}
+  if(_isReaderUser)return run(q);
+  var last=_qLastFormal(qid),sig=_qSendSig(q);
+  if(last&&sig!=null&&_qSendSig(last.snapshot)===sig){
+    toast('內容跟 V'+(last.ver||1)+' 相同，沒有另外封存');
+    return run(last.snapshot);
+  }
+  var n=q.ver||1;
+  return new Promise(function(res){
+    showConfirm('送出給對方？',
+      '這份要送出給對方嗎？送出就把目前內容封存成 <strong>V'+n+'</strong>（永久保留），之後的修改算 <strong>V'+(n+1)+'</strong>。'
+      +'<br><span style="font-size:11px;color:var(--b4)">只是自己看、還沒要送出，就按「只匯出、不封存」。要回到舊版本：歷史版本 › 還原。</span>',
+      function(){var snap=JSON.parse(JSON.stringify(q));_qBumpDo(qid,'送出 '+what+' '+_rocDate(localToday()));toast('已封存 V'+n+'，之後的修改算 V'+(n+1));res(run(snap));},
+      false,function(){res(run(q));},false,{ok:'送出並封存',cancel:'只匯出、不封存'});
+  });
+}
+function quoteSendPdf(qid){return _qSendGate(qid||eid,'PDF',function(q){return _exportQuotePDFOf(q);});}
+function quoteSendOwnerDoc(){
+  var q=Q.find(function(x){return x.id===eid;}),doc=_qOwnerDraft||(q&&q.ownerDoc);
+  if(!q||(doc&&doc.kind==='pdf'))return quoteExportOwnerDoc();   // 沒存檔／PDF 詢價單：照原本提示
+  return _qSendGate(eid,'業主檔',function(){return quoteExportOwnerDoc();});   // 回填用編輯頁目前內容（剛存檔＝封存內容）
+}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
@@ -40248,7 +40286,7 @@ document.addEventListener('keydown',function(e){
   }
   document.querySelectorAll('[id^="qmenu_"]').forEach(function(mm){mm.style.display='none';});
 });
-function showConfirm(title, msg, onOk, danger, onCancel, wide){
+function showConfirm(title, msg, onOk, danger, onCancel, wide, labels){   // labels（v6.0.158，可省略）：{ok,cancel} 按鈕文字
   if(danger===undefined)danger=true;
   var _box=document.getElementById('gen-confirm-box');
   if(_box)_box.style.maxWidth=wide?'640px':'340px';
@@ -40270,7 +40308,7 @@ function showConfirm(title, msg, onOk, danger, onCancel, wide){
   modal.style.display='flex';
   if(okBtn){
     const newOk=okBtn.cloneNode(true);
-    newOk.textContent='確認';newOk.style.display='';newOk.disabled=false;newOk.style.opacity='';newOk.title='';   /* 一式超過 100% 等情況會暫時停用，每次開啟先還原 */if(cancelBtn)cancelBtn.style.display='';   // v5.381：有些呼叫端會改按鈕文字（如催款的「複製」），每次開啟先還原
+    newOk.textContent=(labels&&labels.ok)||'確認';newOk.style.display='';newOk.disabled=false;newOk.style.opacity='';newOk.title='';   /* 一式超過 100% 等情況會暫時停用，每次開啟先還原 */if(cancelBtn)cancelBtn.style.display='';   // v5.381：有些呼叫端會改按鈕文字（如催款的「複製」），每次開啟先還原
     okBtn.parentNode.replaceChild(newOk,okBtn);
     var _roForm=!!(_isReaderUser&&msgEl&&msgEl.querySelector('input:not([type=hidden]):not([data-ro-ok]),select:not([data-ro-ok]),textarea:not([data-ro-ok])'));   // Lotion 10/21：唯讀帳號開明細視窗只能看，確認＝關閉、不存
     if(_roForm){newOk.textContent='關閉';if(cancelBtn)cancelBtn.style.display='none';}
@@ -40278,6 +40316,7 @@ function showConfirm(title, msg, onOk, danger, onCancel, wide){
   }
   if(cancelBtn){
     const newCancel=cancelBtn.cloneNode(true);
+    newCancel.textContent=(labels&&labels.cancel)||'取消';
     cancelBtn.parentNode.replaceChild(newCancel,cancelBtn);
     newCancel.onclick=function(){modal.style.display='none';if(onCancel)onCancel();};
   }
@@ -40691,6 +40730,10 @@ function _buildQuoteDocHTML(q){
 function exportQuotePDF(qid){
   const q=qid?Q.find(x=>x.id===qid):Q.find(x=>x.id===eid);
   if(!q){toast('請先選擇報價單');return;}
+  return _exportQuotePDFOf(q);
+}
+// v6.0.158：依指定內容產生報價單 PDF（送出封存時用封存快照，PDF 與封存版逐字一致）
+function _exportQuotePDFOf(q){
   const html=`<!DOCTYPE html><html lang="zh-TW"><head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=794, initial-scale=1, maximum-scale=1, user-scalable=no">

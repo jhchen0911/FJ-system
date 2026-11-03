@@ -9760,6 +9760,46 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.158 報價送出自動進版（Lotion 11/03：常忘記送出後按「進版」）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      try {
+        const oP = window._printViaIframe; let got = []; window._printViaIframe = function (h) { got.push(h); };
+        const tt = []; const oT = window.toast; window.toast = m => { tt.push(String(m)); };
+        Q.push({ id: 'qs1', name: '送出測試案', client: '範例營造', code: 'S1', date: '2026-09-30', ver: 1, items: [{ desc: 'H型鋼樁', unit: '支', qty: 10, price: 1000 }], exs: [], rmk: {} });
+        delete Q_HISTORY.qs1;
+        const ok = () => document.getElementById('gen-confirm-ok'), cc = () => document.getElementById('gen-confirm-cancel'), open = () => document.getElementById('gen-confirm-modal').style.display === 'flex';
+        let p = quoteSendPdf('qs1');
+        out.ask = open() && ok().textContent === '送出並封存' && cc().textContent === '只匯出、不封存' && /封存成 <strong>V1<\/strong>/.test(document.getElementById('gen-confirm-msg').innerHTML);
+        cc().click(); await p;
+        const q = Q.find(x => x.id === 'qs1');
+        out.onlyExport = got.length === 1 && !(Q_HISTORY.qs1 || []).some(v => v.formal) && q.ver === 1;
+        p = quoteSendPdf('qs1'); ok().click(); await p;
+        const f1 = (Q_HISTORY.qs1 || []).find(v => v.formal);
+        out.archive = !!f1 && f1.ver === 1 && /^送出 PDF \d{3}\/\d\d\/\d\d$/.test(f1.note) && f1.snapshot.date === '2026-09-30' && q.ver === 2 && q.date === localToday()
+          && got.length === 2 && /2026-09-30/.test(got[1]) && !/>\s*${localToday()}\s*</.test(got[1]);   // PDF＝封存版（報價日 9/30），工作版改今天
+        out.same = (() => { const n0 = Q_HISTORY.qs1.filter(v => v.formal).length; tt.length = 0; quoteSendPdf('qs1'); return !open() && Q_HISTORY.qs1.filter(v => v.formal).length === n0 && tt.some(t => /內容跟 V1 相同，沒有另外封存/.test(t)) && got.length === 3 && /2026-09-30/.test(got[2]); })();
+        q.items[0].price = 1200; _touch(q);
+        p = quoteSendPdf('qs1'); out.changed = open() && /封存成 <strong>V2<\/strong>/.test(document.getElementById('gen-confirm-msg').innerHTML); ok().click(); await p;
+        out.v2 = Q_HISTORY.qs1.filter(v => v.formal).length === 2 && q.ver === 3 && /1,200|1200/.test(got[3]);
+        showConfirm('x', 'y', () => {}); out.reset = ok().textContent === '確認' && cc().textContent === '取消'; cc().click();
+        window._isReaderUser = true; const g0 = got.length; quoteSendPdf('qs1'); out.reader = !open() && got.length === g0 + 1; window._isReaderUser = false;
+        out.listBtn = /quoteSendPdf\(/.test(_renderProjectsCore.toString()) && !/exportQuotePDF\(/.test(_renderProjectsCore.toString()) && /quoteSendPdf\(eid\)/.test(document.getElementById('page-preview').innerHTML) && /quoteSendOwnerDoc\(\)/.test(_qiPanelRender.toString()) && !/onclick="quoteExportOwnerDoc/.test(_qiPanelRender.toString());
+        showQVersions('qs1'); out.note = /送出 PDF \d{3}\/\d\d\/\d\d/.test(document.body.innerHTML);
+        window._printViaIframe = oP; window.toast = oT;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('v6.0.158 送出自動進版：匯出 PDF 先問「送出並封存／只匯出、不封存」；只匯出不封存、不進版', r.ask && r.onlyExport, JSON.stringify(r));
+    check('v6.0.158 送出並封存：封存 V1（正式版、備註「送出 PDF 民國日期」）、版號 +1；PDF 用封存版（報價日與封存版一致）', r.archive && r.v2, JSON.stringify(r));
+    check('v6.0.158 內容跟上一個正式版相同：不重複封存、提示並用那一版匯出；改了內容才再問', r.same && r.changed, JSON.stringify(r));
+    check('v6.0.158 確認視窗按鈕文字用完還原；唯讀帳號直接匯出；列表與預覽按鈕走送出流程；歷史版本顯示備註', r.reset && r.reader && r.listBtn && r.note, JSON.stringify(r));
+    check('v6.0.158 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
