@@ -9760,7 +9760,143 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── v6.0.157 路數明細（小批次；設計 docs/路數明細_設計筆記.md）：每路定尺組合、接頭避開中間樁、短節備品全案×1.1、構台下淨空 ──
+  // ── 改版第 4 步 4a 專案資料集（Lotion 11/03）：一個業主主約＝一個專案（p_＋主報價 id）、追加掛主約、案號只給內部、狀態跟報價結案、舊資料不動 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const oT = window.toast; window.toast = () => {};
+      try {
+        const H = x => JSON.stringify(x);
+        const mk = (id, o) => Object.assign({ id, name: '測試工程' + id, client: '測試業主', code: 'Q-' + id, date: '2026-01-05', items: [{ desc: '工項', unit: '式', qty: 1, price: 100000, sec: false }], exs: [], t: { sub: 100000, tax: 5000, total: 105000 }, _mt: 1 }, o);
+        Q = [mk('qa', { awarded: true, closed: true, closedAt: Date.now(), date: '2025-03-01' }), mk('qb', { awarded: true, date: '2026-02-01', rfqs: [{ id: 'r1' }] }),
+          mk('qb1', { parentId: 'qb', awarded: true, t: { sub: 20000, tax: 1000, total: 21000 } }), mk('qb2', { parentId: 'qb' }),
+          mk('qc', {}), mk('qd1', { parentId: 'qc', awarded: true })];
+        CONTRACTS = [{ id: 'ca', linkedQid: 'qa', name: '測試工程qa', date: '2025-03-01', amount: 105000 }, { id: 'cb', linkedQid: 'qb', name: '測試工程qb', date: '2026-02-01', amount: 105000 },
+          { id: 'cb1', linkedQid: 'qb1', name: '測試工程qb1', amount: 21000 }];
+        INV = [{ id: 'ia', quoteId: 'qa', project: '測試工程qa' }, { id: 'ib', quoteId: 'qb', project: '測試工程qb' }, { id: 'ib1', sourceQid: 'qb1', project: '測試工程qb1' }];
+        PROJECTS = []; delete TOMBS.projects;
+        const before = H([Q, CONTRACTS, INV, PAYABLES, INVOICE_RECS]);
+        const n1 = _prjSync(), n2 = _prjSync();
+        const pa = _prjOfQ('qa'), pb = _prjOfQ('qb'), pb1 = _prjOfQ('qb1');
+        out.mig = n1 === 2 && n2 === 0 && PROJECTS.length === 2 && pa && pa.id === 'p_qa' && pb.id === 'p_qb' && pb1 === pb && !_prjOfQ('qc') && !_prjOfQ('qd1')
+          && pa.no === '2025-001' && pb.no === '2026-001' && H(pb.addQids) === H(['qb1']) && _prjStatus(pa) === '結案' && _prjStatus(pb) === '施工中' && pa._mt > 0;
+        const L = _prjLinks(pb);
+        out.links = L.contracts.length === 2 && L.invoices.length === 2 && L.rfqs.length === 1 && L.missing.length === 0 && L.quotes.length === 2;
+        out.noMove = H([Q, CONTRACTS, INV, PAYABLES, INVOICE_RECS]) === before && !Object.keys(pb).some(k => /amt|amount|total|cost/i.test(k));
+        out.stored = JSON.parse(localStorage.getItem('fy_projects') || '[]').length === 2;
+        // 取消得標 → 作廢（不刪、案號保留）；重新得標 → 恢復、留紀錄
+        Q.find(q => q.id === 'qb').awarded = false; _prjSync();
+        const v1 = pb.voidAt > 0 && pb.voidWhy === '取消得標' && PROJECTS.length === 2 && _prjStatus(pb) === '作廢' && pb.no === '2026-001';
+        Q.find(q => q.id === 'qb').awarded = true; _prjSync();
+        out.voidCycle = v1 && !pb.voidAt && _prjArr(pb.voidLog).length === 1 && pb.no === '2026-001';
+        // 重號（兩台裝置同時得標）→ 較晚得標的改下一號、留紀錄
+        PROJECTS.push({ id: 'p_qx', qid: 'qx', no: '2026-001', awAt: Date.parse('2026-05-01'), createdAt: 1 }); Q.push(mk('qx', { awarded: true }));
+        _prjSync();
+        const px = _prjOfQ('qx');
+        out.dup = pb.no === '2026-001' && px.no === '2026-002' && _prjArr(px.noLog)[0].from === '2026-001';
+        // 同步：在集合清單、刪除墓碑、共用區上傳、筆數暴跌保護
+        const sp = _sharedPayload().data;
+        out.sync = _SYNC_COLLS.includes('projects') && _REC_COLLS.includes('projects') && _MERGE_COLLS.includes('projects') && _PRIV_COLLS.indexOf('projects') < 0
+          && Array.isArray(sp.projects) && sp.projects.length === 3 && _DROP_COLLS.some(x => x[0] === 'projects') && typeof _TOMB_COLLS.projects === 'function' && _TOMB_REQ_COLLS.projects === 1;
+        // 另一台刪了一筆專案（墓碑）→ 合併後消失、對帳也不自動復活；舊資料不受影響
+        const cloud = JSON.parse(H(PROJECTS)).filter(p => p.id !== 'p_qx'); const tombs = { projects: { p_qx: Date.now() } };
+        _mergeTombs(tombs); PROJECTS = _mergeColl(PROJECTS, cloud, 'projects', tombs); _prjSync();
+        out.tomb = !PROJECTS.some(p => p.id === 'p_qx') && PROJECTS.length === 2 && Q.some(q => q.id === 'qx' && q.awarded) && _healthRows().every(x => !/沒有專案/.test(x.msg));
+        // 雲端較新的一筆勝出（記錄級合併）
+        const newer = Object.assign({}, _prjOfQ('qa'), { _mt: Date.now() + 5000, sched: { start: '2026-03-01' } });
+        PROJECTS = _mergeColl(PROJECTS, [newer], 'projects', {}); out.merge = !!_prjOfQ('qa').sched && PROJECTS.length === 2;
+        // 健檢：追加得標但主約沒得標
+        out.health = _healthRows().some(x => x.area === '專案' && /追加報價已得標、但主報價沒有得標/.test(x.msg));
+        // 主報價被刪 → 專案作廢
+        Q = Q.filter(q => q.id !== 'qa'); _prjSync(); out.delQ = _prjOfQ('qa') && _prjOfQ('qa').voidWhy === '主報價已刪除';
+        // 審查修正：①刪掉最大號的專案，號碼不再發給新案（P.prjNoMax）②專案墓碑不過期 ③同步雲端的裝置在雲端套用前不對帳 ④員工裝置不編案號
+        const maxNo = PROJECTS.map(p => p.no).sort().pop(); const top = PROJECTS.find(p => p.no === maxNo);
+        _tomb('projects', top.id); PROJECTS = PROJECTS.filter(p => p !== top);
+        Q.push(mk('qn', { awarded: true, date: '2026-09-01' })); _prjSync();
+        out.noReuse = _prjOfQ('qn').no !== maxNo && +P.prjNoMax['2026'] >= 3;
+        TOMBS.projects[top.id] = Date.now() - 400 * 864e5; _tombPrune(); out.tombKeep = TOMBS.projects && TOMBS.projects[top.id] > 0;
+        localStorage.setItem('fy_last_fb_sync', String(Date.now())); const ca = window._cloudApplied1; window._cloudApplied1 = false;
+        Q.push(mk('qg', { awarded: true })); out.gate = _prjSync() === 0 && !_prjOfQ('qg');
+        window._cloudApplied1 = true; const oW = window._shWholeOk, oU = window._fbUser;
+        window._fbUser = { email: 'staff@example.com' }; window._shWholeOk = () => false;
+        _prjSync(); out.staffNoNum = !!_prjOfQ('qg') && !_prjOfQ('qg').no && /案號編號中/.test(_prjNoChip(Q.find(q => q.id === 'qg')));
+        window._shWholeOk = () => true; _prjSync(); out.adminNum = /^\d{4}-\d{3}$/.test(_prjOfQ('qg').no || '');
+        window._shWholeOk = oW; window._fbUser = oU; window._cloudApplied1 = ca; localStorage.removeItem('fy_last_fb_sync');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      window.toast = oT;
+      return out;
+    });
+    // 現行得標動作：主報價得標 → 專案 +1；追加得標 → 筆數不變、掛進主約、得標金額＝主約＋追加
+    const r2 = await page.evaluate(() => {
+      const out = {};
+      const oT = window.toast; window.toast = () => {};
+      try {
+        const mk = (id, o) => Object.assign({ id, name: '測試新案' + id, client: '測試業主', code: 'Q-' + id, date: '2026-10-01', items: [{ desc: '工項', unit: '式', qty: 1, price: 100000, sec: false }], exs: [], t: { sub: 100000, tax: 5000, total: 105000 }, _mt: 1 }, o);
+        Q.push(mk('qe', {}), mk('qe1', { parentId: 'qe', t: { sub: 20000, tax: 1000, total: 21000 } }));
+        const n0 = PROJECTS.filter(p => !p.voidAt).length;
+        awardQuote('qe'); confirmAward();
+        const pe = _prjOfQ('qe');
+        out.award = PROJECTS.filter(p => !p.voidAt).length === n0 + 1 && pe && pe.qid === 'qe' && /^\d{4}-\d{3}$/.test(pe.no) && Math.abs(pe.awAt - Date.now()) < 60000 && CONTRACTS.some(c => c.linkedQid === 'qe');
+        awardQuote('qe1'); confirmAward();
+        out.addon = PROJECTS.filter(p => !p.voidAt).length === n0 + 1 && JSON.stringify(_prjOfQ('qe').addQids) === '["qe1"]' && _prjOfQ('qe1') === pe && _wonAmt(Q.find(q => q.id === 'qe')) === 105000 + 21000;
+        // 案號只給內部：工程專案頁看得到；報價單／請款單列印（給業主）絕不出現
+        openProj('qe');
+        const ph4a = document.getElementById('proj-root').innerHTML; out.chip = ph4a.indexOf('案號 ' + pe.no) >= 0;
+        const qd = _buildQuoteDocHTML(Q.find(q => q.id === 'qe')) || '';
+        const inv = INV.find(i => i.sourceQid === 'qe' || i.quoteId === 'qe');
+        let ip = ''; try { ip = buildInvPreview(inv) || document.getElementById('inv-preview')?.innerHTML || ''; } catch (e) { ip = 'ERR' + e.message; }
+        out.noPrint = qd.length > 200 && qd.indexOf(pe.no) < 0 && qd.indexOf('案號') < 0 && String(ip).indexOf(pe.no) < 0;
+        out.noPrintLen = qd.length;
+        // 備份來回：匯出的全量備份含專案
+        out.exp = Array.isArray(_syncPayload().data.projects) && _syncPayload().data.projects.some(p => p.id === 'p_qe');
+        window.__bk = JSON.stringify(Object.assign(_syncPayload().data, { exportDate: new Date().toISOString() }));
+        window.__bkN = PROJECTS.length; window.__bkH = JSON.stringify(PROJECTS.map(p => [p.id, p.no, p.addQids || null]));
+        PROJECTS = []; localStorage.setItem('fy_projects', '[]');
+        out.storageGen = /match \/projects\/\{pid\}\/docs\/\{file=\*\*\}[^]*50 \* 1024 \* 1024/.test(_storageRulesText([], []));
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      window.toast = oT;
+      return out;
+    });
+    await page.evaluate(() => { importData(new File([window.__bk], 'bk.json', { type: 'application/json' })); });
+    await page.waitForSelector('#import-confirm-ok', { state: 'visible', timeout: 10000 });
+    await page.click('#import-confirm-ok');
+    await page.waitForTimeout(800);
+    const r3 = await page.evaluate(() => PROJECTS.length === window.__bkN && JSON.stringify(PROJECTS.map(p => [p.id, p.no, p.addQids || null])) === window.__bkH);
+    // 規則：projects 新節點從第一天就有格式檢查（不沿用 $other）、員工逐筆寫、管理員整包；Storage 送審文件 50 MB
+    const RP = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata.shared;
+    const SR = require('fs').readFileSync(require('path').join(__dirname, '..', 'storage.rules'), 'utf8');
+    const pr = RP.projects || {}, pc = pr.$pid || {};
+    const rulesOk = pr['.write'] === RP.quotes['.write'] && pc['.write'] === RP.quotes.$qid['.write'] && /\$pid === 'p_' \+ newData\.child\('qid'\)\.val\(\)/.test(pc['.validate'] || '')
+      && /hasChildren\(\['id','qid'\]\)/.test(pc['.validate'] || '') && pc.$other && pc.$other['.validate'] === false && /beginsWith\('projects\/' \+ \$pid \+ '\/docs\/'\)/.test(pc.docs.$d['.validate'])
+      && /match \/projects\/\{pid\}\/docs\/\{file=\*\*\}[^}]*isStaff\(\) \|\| isReader\(\)[^}]*request\.resource\.size < 50 \* 1024 \* 1024/.test(SR);
+    check('4a 專案資料集建檔：全部得標主報價（含已結案）各一筆 p_＋報價id、追加掛主約不另建、案號依得標日年份＋流水號、狀態跟報價結案、重跑不重建', r.mig && r.stored, JSON.stringify(r));
+    check('4a 專案連結從報價 id 反查（合約 linkedQid、請款單 quoteId／sourceQid、發包），舊資料（報價／合約／請款／應付／發票）一字不動、專案不含金額', r.links && r.noMove, JSON.stringify(r));
+    check('4a 取消得標＝專案作廢（不刪、案號保留）、重新得標恢復；主報價刪除＝作廢；兩台裝置重號 → 較晚的改下一號並留紀錄', r.voidCycle && r.dup && r.delQ, JSON.stringify(r));
+    check('4a 審查修正：刪掉的案號不再發出（每年最大號記在參數）、專案墓碑不過期、同步雲端的裝置在雲端套用前不對帳、只有管理員裝置編案號（員工裝置顯示「案號編號中」）', r.noReuse && r.tombKeep && r.gate && r.staffNoNum && r.adminNum, JSON.stringify(r));
+    check('4a 專案進同步清單（共用區、逐筆、記錄級合併、筆數暴跌保護、刪除墓碑）：另一台刪除後合併消失且不自動復活、較新版本勝出；健檢抓「追加得標但主約沒得標」', r.sync && r.tomb && r.merge && r.health, JSON.stringify(r));
+    check('4a 現行得標動作：主報價得標專案 +1（得標日＝今天）、追加得標筆數不變並掛主約、得標金額＝主約＋追加', r2.award && r2.addon, JSON.stringify(r2));
+    check('4a 案號只給內部：工程專案頁顯示案號；給業主的報價單、請款單列印不出現案號', r2.chip && r2.noPrint, JSON.stringify(r2));
+    check('4a 全量備份含專案、還原後筆數與內容一致', r2.exp && r3, JSON.stringify({ exp: r2.exp, r3 }));
+    check('4a 規則：projects 節點格式檢查（id＝p_＋qid、必填 id／qid、案號格式、未知欄位擋）、員工逐筆／管理員整包；Storage projects/<id>/docs 員工與唯讀可讀、員工上傳單檔 50 MB（規則檔與產生器一致）', rulesOk && r2.storageGen, JSON.stringify({ rulesOk, gen: r2.storageGen }));
+    check('4a 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── 錯誤日誌 _v6TodoItems.mat（Lotion 11/03）：有材料資料的未結案專案，開頁首繪總覽時台帳還沒載入，不再記錯誤；載入完待辦照常顯示 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    await page.evaluate(() => {
+      localStorage.setItem('fy6_q', JSON.stringify([{ id: '1700000000001', name: '材料測試案', awarded: true, mat: { rows: [] }, items: [], t: {} }]));
+      localStorage.setItem('fy_mat_ledger', JSON.stringify([{ id: 'mlT1', name: '型鋼', qty: 5, projQid: '1700000000001', outDate: '2026-09-01' }]));
+      localStorage.removeItem('fy_errlog');
+    });
+    await page.reload(); await page.waitForTimeout(3000);
+    const r = await page.evaluate(() => { const log = JSON.parse(localStorage.getItem('fy_errlog') || '[]'); const it = []; _v6TodoItems(it);
+      return { noErr: !log.some(x => /_v6TodoItems\.mat/.test(x.w)), item: it.some(x => x.type === 'mat_site'), dom: /自有材料在工地/.test(document.body.innerHTML) }; });
+    check('錯誤日誌 _v6TodoItems.mat：開頁首繪不再記錯誤，「自有材料在工地」待辦照常顯示', r.noErr && r.item && r.dom, JSON.stringify(r));
+    await page.evaluate(() => { localStorage.removeItem('fy6_q'); localStorage.removeItem('fy_mat_ledger'); });
+  // ── v6.0.158 路數明細（小批次；設計 docs/路數明細_設計筆記.md）：每路定尺組合、接頭避開中間樁、短節備品全案×1.1、構台下淨空 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -9811,12 +9947,12 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.157 路數明細：沒填照舊（合板 83 不變）並標「估算」（材料明細、摘要卡、叫料單）', r.est, JSON.stringify(r));
-    check('v6.0.157 路數明細：有填的層支撐 M＝Σ 淨長×倍率（雙支撐×2）、接頭／合板／短節依各路；沒填的層不變', r.rows && r.h1, JSON.stringify(r));
-    check('v6.0.157 路數明細：叫料單逐長度列短節、全案×1.1 備品、千斤頂伸長與未檢查中間樁的提醒；材料明細短節含備品', r.staged && r.notes && r.main, JSON.stringify(r));
-    check('v6.0.157 路數明細：畫面列建議組合與結果、可手改、CSV 匯入（顯示來源、超過層數不計）', r.ui && r.manual && r.csv && r.csvCalc, JSON.stringify(r));
-    check('v6.0.157 構台下淨空：只看第 1 層（第 2 層以下照拉）；填三角架高程才依淨空（構台帽沒填＝原地面−1.0 標預設值）；≥1.5 照拉、不到不拉；可手動改拉／不拉；沒填照舊扣第一層', r.clrNo && r.clrYes && r.clrCap && r.clrMan && r.clrUi && r.ropeNoEl, JSON.stringify(r));
-    check('v6.0.157 路數明細測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.158 路數明細：沒填照舊（合板 83 不變）並標「估算」（材料明細、摘要卡、叫料單）', r.est, JSON.stringify(r));
+    check('v6.0.158 路數明細：有填的層支撐 M＝Σ 淨長×倍率（雙支撐×2）、接頭／合板／短節依各路；沒填的層不變', r.rows && r.h1, JSON.stringify(r));
+    check('v6.0.158 路數明細：叫料單逐長度列短節、全案×1.1 備品、千斤頂伸長與未檢查中間樁的提醒；材料明細短節含備品', r.staged && r.notes && r.main, JSON.stringify(r));
+    check('v6.0.158 路數明細：畫面列建議組合與結果、可手改、CSV 匯入（顯示來源、超過層數不計）', r.ui && r.manual && r.csv && r.csvCalc, JSON.stringify(r));
+    check('v6.0.158 構台下淨空：只看第 1 層（第 2 層以下照拉）；填三角架高程才依淨空（構台帽沒填＝原地面−1.0 標預設值）；≥1.5 照拉、不到不拉；可手動改拉／不拉；沒填照舊扣第一層', r.clrNo && r.clrYes && r.clrCap && r.clrMan && r.clrUi && r.ropeNoEl, JSON.stringify(r));
+    check('v6.0.158 路數明細測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
   {
@@ -9827,8 +9963,8 @@ async function newPage(browser, width, height) {
       document.querySelectorAll('#mat-est-form details').forEach(x => x.open = true); await new Promise(res => setTimeout(res, 300));
       return { sw: document.documentElement.scrollWidth, w: window.innerWidth };
     });
-    check('v6.0.157 路數明細：手機版不左右滑動', r.sw <= r.w + 1, JSON.stringify(r));
-    check('v6.0.157 手機版路數明細無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.158 路數明細：手機版不左右滑動', r.sw <= r.w + 1, JSON.stringify(r));
+    check('v6.0.158 手機版路數明細無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 

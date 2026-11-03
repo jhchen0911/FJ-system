@@ -11,6 +11,7 @@ rules_version = '2';
 //   fydata/payfiles/<pid>/…          應付附件（廠商請款單、匯款單）
 //   fydata/einv/…                    發票影像
 //   contracts/<uid>/…                合約附件
+//   projects/<專案id>/docs/…         專案送審文件（4a，單檔 50 MB）
 //   line/…                           LINE 機器人檔案（Cloud Functions 寫入）
 // 其餘路徑一律拒絕。
 service firebase.storage {
@@ -41,6 +42,12 @@ service firebase.storage {
     match /contracts/{rest=**} {
       allow read: if isStaff() || isReader();
       allow write: if isStaff();
+    }
+    // 改版第 4 步 4a：專案送審文件（圖說、計算書、計畫書、材料送審、變更簽認、完工結算書）。看得到專案的員工與唯讀帳號可讀、員工可上傳，單檔 50 MB
+    match /projects/{pid}/docs/{file=**} {
+      allow read: if isStaff() || isReader();
+      allow create, update: if isStaff() && request.resource.size < 50 * 1024 * 1024;
+      allow delete: if isStaff();
     }
     match /line/{rest=**} {
       allow read: if isStaff() || isReader();
