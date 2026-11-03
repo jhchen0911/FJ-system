@@ -6,7 +6,8 @@ require(path.join(__dirname, '..', 'calc', 'payable.js'));
 require(path.join(__dirname, '..', 'calc', 'report.js'));
 require(path.join(__dirname, '..', 'calc', 'comm.js'));
 require(path.join(__dirname, '..', 'calc', 'payroll.js'));
-const I = FJC.inv, PY = FJC.pay, R = FJC.rpt, C = FJC.comm, H = FJC.hr;
+require(path.join(__dirname, '..', 'calc', 'lifeline.js')); require(path.join(__dirname, '..', 'calc', 'settle.js'));
+const I = FJC.inv, PY = FJC.pay, R = FJC.rpt, C = FJC.comm, H = FJC.hr, LL = FJC.ll, ST = FJC.settle;
 const results = [];
 const check = (name, ok, info) => results.push({ name, ok: !!ok, info: info || '' });
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -113,6 +114,22 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const c = { rows: [{ id: 'r1', qty: 100, unitPrice: 1000, linkedItemIdx: 0 }], periods: [{ no: 1, rows: [{ rid: 'r1', qty: 80 }] }, { no: 2, rows: [{ rid: 'r1', qty: 30 }] }, { no: 3, absorb: true, rows: [{ rid: 'r1', qty: 5 }] }] };
   const o = PY.overStat(c);
   check('分包超量：合約 100、累計 115 → 超 15、第 2 期 10 向業主請、第 3 期 5 我方吸收', o.overAmt === 15000 && o.toOwner === 10000 && o.absorbed === 5000 && o.overQty.r1 === 15 && o.absorbQtyByItem[0] === 5 && o.overQtyByItem[0] === 15, JSON.stringify(o));
+}
+
+// ── 第 3c 步：安全母索合一、清潔費一次扣、完工結算差異表 ──
+{
+  const forms = { wire: { label: '鋼索', specs: [['A', 0.5]] }, rope: { label: '特多龍繩', specs: [['B', 0.2]] } };
+  const st = { perim: 100, perimRuns: 1, layers: 3, deductLayers: 1, unit: 'm', useSpare: true, waste: 5, form: 'wire', f: { wire: { spec: 'A', spare: 1.5, reel: 200, acc: [2, 1, 0] } },
+    zones: [{ name: '一般', deck: false, form: '', v: { rows: [{ n: 4, len: 25 }] }, h: { rows: [{ n: 2, len: 50 }] } }, { name: '構台下', deck: true, form: '', v: { rows: [{ n: 2, len: 20 }] }, h: { rows: [] } }] };
+  const r = LL.calc(st, forms);
+  // 每層 100＋200＝300 × 3 層＝900，扣構台下 40×1 層＝860；路數 7×3−2＝19（配件）；端部預留 7×3×1.5＝31.5（構台下不扣）；需求 (860＋31.5)×1.05＝936.075
+  check('安全母索：每層 300×3 層−構台下 40＝860；配件路數 19；端部預留 31.5（構台下不扣）；需求 936.075；5 捲；黃色立柱 344', r.net === 860 && r.runs === 19 && r.spare === 31.5 && Math.abs(r.need - 936.075) < 1e-9 && r.reels === 5 && r.yellow === 344 && r.T.wire.acc[0] === 38 && r.T.wire.layers[0].len === 260 && r.T.wire.layers[1].len === 300);
+  const t = I.totals2([100000], { taxR: 5, cleanFixed: 6000 }), t0 = I.totals2([100000], { taxR: 5, cleanPermil: 10 });
+  check('清潔費一次扣：未稅 6,000（含稅 6,300）→ 總計 98,700；沒填一次扣＝照 ‰（同 totals）', t.clean === 6000 && t.cleanGross === 6300 && t.total === 98700 && t0.total === I.totals([100000], { taxR: 5, cleanPermil: 10 }).total);
+  const d = ST.diff([{ idx: 0, desc: 'H 型鋼樁', unit: 'M', price: 1000, stmtQty: 950, billedQty: 1000, dailyQty: 1000, addQty: 0 },
+    { idx: 1, desc: '追加', unit: 'M', price: 500, stmtQty: 0, billedQty: 40, dailyQty: 40, addQty: 40 },
+    { idx: 2, desc: '支撐', unit: 'T', price: 2000, stmtQty: 12, billedQty: 10, dailyQty: 12, addQty: 0 }], { clean: { pct: 0.3, took: 6000, finalNet: 1800000 }, retention: 52500 });
+  check('完工結算差異表：少 50M×1,000＝−50,000（業主扣減）；追加 40M 沒進結算書；多 2T 漏請、請款沒跟上日報；清潔費應 5,400 已扣 6,000', d.rows[0].amt === -50000 && /業主扣減/.test(d.rows[0].reasons.join()) && /追加未納入/.test(d.rows[1].reasons.join()) && /漏請/.test(d.rows[2].reasons.join()) && /沒跟上日報/.test(d.rows[2].reasons.join()) && d.nDiff === 3 && d.sumAmt === -50000 - 20000 + 4000 && d.clean.should === 5400 && d.clean.diff === -600 && d.retention === 52500);
 }
 
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
