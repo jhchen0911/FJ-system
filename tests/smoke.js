@@ -817,7 +817,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ───────────── 9. 安全母索（v6.0.145 起併入材料估算「擋土支撐全套」④-1；與既有 Excel 逐格一致的算法測試在 tests/calc.js）─────────────
+  // ───────────── 9. 安全母索（v6.0.149 起併入材料估算「擋土支撐全套」④-1；與既有 Excel 逐格一致的算法測試在 tests/calc.js）─────────────
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
@@ -859,15 +859,15 @@ async function newPage(browser, width, height) {
       try { localStorage.removeItem('fy_lifeline'); } catch (e) { /* 可忽略 */ }
       return out;
     });
-    check('v6.0.145 安全母索併入全套：舊入口轉到全套、分頁與獨立頁移除', r.redirect, JSON.stringify(r));
-    check('v6.0.145 安全母索：長度不變（2,044.9 M、11 捲）＋規格重量、每層配件（構台下沒拉的路不算）、配件數可改', r.len && r.acc && r.accEdit, JSON.stringify(r));
-    check('v6.0.145 安全母索：其他區塊可改用特多龍繩（長度、捲數、配件另列，鋼索不變）', r.mix, JSON.stringify(r));
-    check('v6.0.145 安全母索：帶入舊安全母索頁設定、切換形式回預設', r.importBtn && r.import && r.formReset && r.specShown && r.noStage, JSON.stringify(r));
-    check('v6.0.145 安全母索測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.149 安全母索併入全套：舊入口轉到全套、分頁與獨立頁移除', r.redirect, JSON.stringify(r));
+    check('v6.0.149 安全母索：長度不變（2,044.9 M、11 捲）＋規格重量、每層配件（構台下沒拉的路不算）、配件數可改', r.len && r.acc && r.accEdit, JSON.stringify(r));
+    check('v6.0.149 安全母索：其他區塊可改用特多龍繩（長度、捲數、配件另列，鋼索不變）', r.mix, JSON.stringify(r));
+    check('v6.0.149 安全母索：帶入舊安全母索頁設定、切換形式回預設', r.importBtn && r.import && r.formReset && r.specShown && r.noStage, JSON.stringify(r));
+    check('v6.0.149 安全母索測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.146 螺絲修正（Lotion 11/03）：支撐接頭＝每路支數−1、千斤頂保護夾 16 顆短螺絲、構台長螺絲每㎡ 1 顆、貼板改名續接板 ──
+  // ── v6.0.150 螺絲修正（Lotion 11/03）：支撐接頭＝每路支數−1、千斤頂保護夾 16 顆短螺絲、構台長螺絲每㎡ 1 顆、貼板改名續接板 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
@@ -891,13 +891,13 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.146 螺絲：支撐接頭＝每路支數−1、合板跟著算、千斤頂保護夾每組 16 顆、H300 對鎖算短螺絲且總數不變', r.joint && r.h300, JSON.stringify(r));
-    check('v6.0.146 螺絲：施工構台改長螺絲每㎡ 1 顆（取代構台螺絲×2、併入長螺絲合計）；貼板改名續接板', r.deck && r.rename, JSON.stringify(r));
-    check('v6.0.146 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.150 螺絲：支撐接頭＝每路支數−1、合板跟著算、千斤頂保護夾每組 16 顆、H300 對鎖算短螺絲且總數不變', r.joint && r.h300, JSON.stringify(r));
+    check('v6.0.150 螺絲：施工構台改長螺絲每㎡ 1 顆（取代構台螺絲×2、併入長螺絲合計）；貼板改名續接板', r.deck && r.rename, JSON.stringify(r));
+    check('v6.0.150 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.147 唯讀權限方案 B1（Lotion 11/03）：AI 唯讀帳號擋薪資名冊／薪資單／零用金／人員證件／匯款帳號，成本與帳務照讀 ──
+  // ── v6.0.151 唯讀權限方案 B1（Lotion 11/03）：AI 唯讀帳號擋薪資名冊／薪資單／零用金／人員證件／匯款帳號，成本與帳務照讀 ──
   {
     const RF = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const allowR = x => /(^|[^!])root\.child\('fydata\/readers'\)/.test(x || '');
@@ -939,9 +939,9 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.147 唯讀權限 B1 規則：private 逐項放行唯讀帳號（薪資名冊／薪資單／零用金除外）、匯款帳號與人員證件不放行、成本暫存／共用區／LINE 收件匣照放行', rulesOk);
-    check('v6.0.147 唯讀權限 B1 程式：唯讀帳號逐項下載不含薪資類、不讀人員證件、本機舊的薪資與證件清掉；管理員照舊整包讀', r.reader && r.wk && r.purge && r.admin && r.keys && r.allDenied && r.vendorStrip, JSON.stringify(r));
-    check('v6.0.147 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.151 唯讀權限 B1 規則：private 逐項放行唯讀帳號（薪資名冊／薪資單／零用金除外）、匯款帳號與人員證件不放行、成本暫存／共用區／LINE 收件匣照放行', rulesOk);
+    check('v6.0.151 唯讀權限 B1 程式：唯讀帳號逐項下載不含薪資類、不讀人員證件、本機舊的薪資與證件清掉；管理員照舊整包讀', r.reader && r.wk && r.purge && r.admin && r.keys && r.allDenied && r.vendorStrip, JSON.stringify(r));
+    check('v6.0.151 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
@@ -6812,7 +6812,7 @@ async function newPage(browser, width, height) {
     const RD = "root.child('fydata/readers')";
     const wr = [rules.shared.pagePerms['.write'], rules.shared.$other['.write'], rules.shared.quotes.$qid['.write'], rules.shared.version['.write'], rules.relay['.write'], rules.relay.photos['.read'], rules.private['.write'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.logs['$uid']['.write']];   // backups 改只給擁有者（另驗）
     check('v6.0.90 規則：readers 可讀 shared（v6.0.108 起也可讀 private）、所有寫入與 relay／backups 皆排除 readers 名冊、名冊僅管理員可寫',
-      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.backups['.read'].includes('adminEmails') && !rules.backups['.write'].includes('adminEmails') && rules.relay.photos['.read'].includes('|| ' + RD) && !rules.private['.read'].includes('|| ' + RD) && rules.private.$other['.read'].includes(RD) && !/'hr'|'payslips'|'petty'/.test(rules.private.$other['.read']) && /\$other === 'payables'/.test(rules.private.$other['.read']) /* v6.0.147 B1：唯讀帳號逐項讀 private、薪資類除外 */ && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
+      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.backups['.read'].includes('adminEmails') && !rules.backups['.write'].includes('adminEmails') && rules.relay.photos['.read'].includes('|| ' + RD) && !rules.private['.read'].includes('|| ' + RD) && rules.private.$other['.read'].includes(RD) && !/'hr'|'payslips'|'petty'/.test(rules.private.$other['.read']) && /\$other === 'payables'/.test(rules.private.$other['.read']) /* v6.0.151 B1：唯讀帳號逐項讀 private、薪資類除外 */ && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
       '');
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -7345,7 +7345,7 @@ async function newPage(browser, width, height) {
     const rules = JSON.parse(fs.readFileSync(pth.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const RK = "root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()";
     const rr = {}, OWN = "auth != null && auth.token.email != null && auth.token.email === 'jhchen0911@gmail.com'";
-    rr.privRead = rules.private['.read'].indexOf('|| ' + RK) < 0 && rules.private.$other['.read'].indexOf(RK) > 0 && !/'hr'|'payslips'|'petty'/.test(rules.private.$other['.read']) && rules.private.$other['.read'].includes("$other === 'quoteSens'");   // v6.0.147 B1（逐項允許清單）
+    rr.privRead = rules.private['.read'].indexOf('|| ' + RK) < 0 && rules.private.$other['.read'].indexOf(RK) > 0 && !/'hr'|'payslips'|'petty'/.test(rules.private.$other['.read']) && rules.private.$other['.read'].includes("$other === 'quoteSens'");   // v6.0.151 B1（逐項允許清單）
     const writes = [];
     (function walk(o, path) { Object.keys(o).forEach(k => { if (k === '.write') writes.push([path, o[k]]); else if (o[k] && typeof o[k] === 'object') walk(o[k], path + '/' + k); }); })(rules, 'fydata');
     rr.writes = writes.length >= 9 && writes.every(([p, w]) => w === 'false' || w.indexOf('!' + RK) >= 0 || (p === 'fydata/logs/$uid' && w.indexOf("!root.child('fydata/readers')") >= 0) || (p === 'fydata/backups' && w === OWN));
@@ -7365,10 +7365,10 @@ async function newPage(browser, width, height) {
         /* 讀 private：_pullPrivate 不再對唯讀帳號提前返回（模擬資料庫） */
         let asked = '';
         const mk = p => ({ once: () => { asked += p + '|'; return Promise.resolve({ val: () => null }); }, child: k => mk(p + '/' + k), update: () => { out.wrote = true; return Promise.resolve(); }, set: () => { out.wrote = true; return Promise.resolve(); } });
-        _fbDb = { ref: p => mk(p) };   // v6.0.147：唯讀帳號逐項讀 private（child）
+        _fbDb = { ref: p => mk(p) };   // v6.0.151：唯讀帳號逐項讀 private（child）
         return new Promise(res => {
           _pullPrivate(ok => {
-            out.priv = ok === true && asked.indexOf('fydata/private/quoteSens|') >= 0 && asked.indexOf('fydata/private|') < 0 && asked.indexOf('fydata/private/hr|') < 0 && asked.indexOf('fydata/workerSens') < 0;   // v6.0.147 B1：逐項讀、不含薪資類與人員證件
+            out.priv = ok === true && asked.indexOf('fydata/private/quoteSens|') >= 0 && asked.indexOf('fydata/private|') < 0 && asked.indexOf('fydata/private/hr|') < 0 && asked.indexOf('fydata/workerSens') < 0;   // v6.0.151 B1：逐項讀、不含薪資類與人員證件
             /* 資料層：上傳一律擋 */
             let pushed = null; _pushCloud({ silent: true, onDone: v => { pushed = v; } }); out.push = pushed === false;
             _pushPrivate(v => { out.pushPriv = v === false; });
@@ -7399,7 +7399,7 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.108 唯讀帳號：全部頁面（人員／角色除外）、看得到毛利與 private、顯示名稱與「唯讀」', r.on && r.pages && r.profit && r.me && r.priv, JSON.stringify(r));
     check('v6.0.108 唯讀帳號：上傳／儲存全擋、寫入按鈕隱藏、輸入停用、點擊攔截、備份還原卡隱藏、還原後恢復', r.push && r.pushPriv && r.save && r.saveQ && r.hide && r.dis && r.cap && r.backup && r.newQ && r.edDis && r.noWrite && r.restore, JSON.stringify(r));
-    check('v6.0.108 RTDB 規則：private 逐項放行唯讀帳號讀取（v6.0.147 起薪資名冊／薪資單／零用金除外）、所有寫入規則排除唯讀帳號、名冊可存顯示名稱、Functions 認得 {name}', rr.privRead && rr.writes && rr.nameRule && rr.backups && rr.fn, JSON.stringify(rr));
+    check('v6.0.108 RTDB 規則：private 逐項放行唯讀帳號讀取（v6.0.151 起薪資名冊／薪資單／零用金除外）、所有寫入規則排除唯讀帳號、名冊可存顯示名稱、Functions 認得 {name}', rr.privRead && rr.writes && rr.nameRule && rr.backups && rr.fn, JSON.stringify(rr));
     check('v6.0.108 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
@@ -8906,7 +8906,7 @@ async function newPage(browser, width, height) {
     check('v6.0.118 健檢2 #6：storage.rules 改用權限標記 fy（與產生器同一版）', /request\.auth\.token\.get\('fy', ''\) in \['staff', 'admin'\]/.test(SR) && /token\.get\('fy', ''\) == 'reader'/.test(SR) && !/signedIn\(\) && folder in/.test(SR), '');
     const APPSRC = fs.readFileSync(pth.join(__dirname, '..', 'app.js'), 'utf8');
     check('v6.0.118 健檢2 #7：AI 呼叫一律走雲端代理（帶登入憑證、不帶金鑰），前端沒有直接呼叫 Anthropic；唯讀帳號不能用', r.ai && r.aiRo && !/api\.anthropic\.com/.test(APPSRC) && !/anthropic-dangerous-direct-browser-access/.test(APPSRC), JSON.stringify(r));
-    check('v6.0.118 健檢2 #5：人員證件與身分證欄位不上共用區（遮罩）、員工寫投遞區、管理員寫 workerSens、合併後接回；規則限管理員與進場權限讀寫、唯讀帳號不可讀（v6.0.147 方案 B1）', r.wkPub && r.wkShared && r.wkStaff && r.wkAdmin && r.wkGraft && rules.workerSens && rules.workerSens['.read'].includes(ADMK) && rules.workerSens['.read'].includes('fydata/wkAccess') && !/(^|[^!])root\.child\('fydata\/readers'\)/.test(rules.workerSens['.read']) && !rules.workerSens['.read'].includes('fydata/access') && rules.wkAccess && rules.wkAccess['.write'].includes(ADMK) && !rules.wkAccess['.write'].includes('fydata/access') && rules.workerSensIn['.read'].includes(ADMK) && !rules.workerSensIn['.read'].includes('fydata/access'), JSON.stringify(r));
+    check('v6.0.118 健檢2 #5：人員證件與身分證欄位不上共用區（遮罩）、員工寫投遞區、管理員寫 workerSens、合併後接回；規則限管理員與進場權限讀寫、唯讀帳號不可讀（v6.0.151 方案 B1）', r.wkPub && r.wkShared && r.wkStaff && r.wkAdmin && r.wkGraft && rules.workerSens && rules.workerSens['.read'].includes(ADMK) && rules.workerSens['.read'].includes('fydata/wkAccess') && !/(^|[^!])root\.child\('fydata\/readers'\)/.test(rules.workerSens['.read']) && !rules.workerSens['.read'].includes('fydata/access') && rules.wkAccess && rules.wkAccess['.write'].includes(ADMK) && !rules.wkAccess['.write'].includes('fydata/access') && rules.workerSensIn['.read'].includes(ADMK) && !rules.workerSensIn['.read'].includes('fydata/access'), JSON.stringify(r));
     const BETA = fs.readFileSync(pth.join(__dirname, '..', 'beta.js'), 'utf8');
     check('v6.0.118 審查：員工補交部分證件不洗掉既有資料；beta 沙盒不會執行新的雲端寫入', r.wkMerge && ['_tombReqPull', '_wkSensPush', '_wkSensPull', '_bankMigrate'].every(f => BETA.includes("'" + f + "'")), JSON.stringify(r));
     check('v6.0.118 健檢2 #3：墓碑只限管理員寫、員工刪除改送申請（只能寫自己的）、管理員一批 ≤30 自動套用、超過先擋下等確認', r.tombStaff && r.tombAdmin && r.tombKeep && rules.shared.tombs && rules.shared.tombs['.write'].includes(ADMK) && !rules.shared.tombs['.write'].includes('fydata/access') && /\$who === auth\.token\.email/.test(rules.tombReq.$who['.write']), JSON.stringify(r));
@@ -9324,7 +9324,7 @@ async function newPage(browser, width, height) {
         out.form = (f.match(/class="me-sec"/g) || []).length >= 8 && /class="me-adv"/.test(f) && /matEstCalc\(\)/.test(b) && /matEstExportNow\(\)/.test(b) && /掛專案/.test(b);
         const pv = document.getElementById('me-pv'), pvt = () => (pv && pv.shadowRoot ? pv.shadowRoot.innerHTML : '');
         out.out = /me-tiles/.test(o) && /<span>圍令<\/span><b>[\d,]+ M<\/b>/.test(o) && /<span>支撐<\/span><b>[\d,]+ M<\/b>/.test(o) && /叫料單（依進場階段）/.test(o) && /計算依據/.test(o)
-          /* v6.0.145 右邊即時 A4 預覽＝匯出的同一份（shadow DOM）；分頁數與匯出引擎同規則 */
+          /* v6.0.149 右邊即時 A4 預覽＝匯出的同一份（shadow DOM）；分頁數與匯出引擎同規則 */
           && /擋土支撐叫料單/.test(pvt()) && /第1層水平支撐[^]*圍令（H\d+）/.test(pvt()) && +pv.getAttribute('data-pages') >= 1 && !/材料需求清冊/.test(o + pvt()) && !/分階段叫料建議/.test(o + pvt());
         mePvSet('stage', 0, false); out.pvStage = !/▸ 擋土壁/.test(pvt()) && /▸ 壓樑|▸ 中間樁/.test(pvt());
         let last = null; const oE = window.matEstExportPDF; window.matEstExportPDF = (k, opt) => { last = { k, opt }; };
@@ -9616,6 +9616,65 @@ async function newPage(browser, width, height) {
     check('v6.0.144 LINE 收件匣 HQ：AI 帳號 fyInboxList／fyInboxGet（只給 line/inbox 的下載網址）／fyInboxMark；一般員工不行；雲端：webhook 300 秒、上限 100MB、標歸檔只放行擁有者／管理員／AI 帳號',
       r.hqList && r.hqGet && r.hqPath && r.hqMark && r.staff && /exports\.lineInboxMark/.test(IDX144) && /timeoutSeconds: 300 \}, async/.test(IDX144) && LC.MAX_FILE_BYTES === 100 * 1048576 && IB.markAllowed('hsuanchen911@gmail.com') && !IB.markAllowed('staff@x.com', 'staff'), JSON.stringify(r));
     check('v6.0.144 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.148 報價還原不覆蓋：還原前先把目前內容（含未儲存修改）另存「還原前備份」、永久保留；正式版次不被改、不被清 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const wait = ms => new Promise(res => setTimeout(res, ms));
+      try {
+        const it = (d, p) => ({ desc: d, unit: '式', qty: '1', price: String(p) });
+        Q.unshift({ id: '1767000000001', name: '範例還原案', client: '範例營造', date: '2026-11-01', ver: 2, items: [it('V2工項', 2000)], exs: [], t: { sub: 2000, tax: 100, total: 2100 } });
+        Q_HISTORY['1767000000001'] = [{ savedAt: 1000, by: 't', formal: true, ver: 1, snapshot: { id: '1767000000001', name: '範例還原案', ver: 1, items: [it('V1工項', 1000)], exs: [], t: { total: 1050 } } }];
+        loadQ('1767000000001'); go('editor'); await wait(50);
+        items[0].price = '2500'; items[0].desc = 'V2改了還沒存';   // 未儲存的修改
+        const v1 = Q_HISTORY['1767000000001'].findIndex(v => v.formal && v.ver === 1);
+        restoreQVersion('1767000000001', v1); await wait(20);
+        out.msg = /會先另存成「還原前備份」，永久保留、不會不見/.test(document.getElementById('gen-confirm-modal').innerHTML) && /含編輯頁還沒按儲存的修改/.test(document.getElementById('gen-confirm-modal').innerHTML);
+        document.getElementById('gen-confirm-ok').click(); await wait(80);
+        const q = Q.find(x => x.id === '1767000000001'), H = Q_HISTORY['1767000000001'];
+        const pre = H.find(v => v.pre);
+        out.restored = q.items[0].desc === 'V1工項' && q.ver === 2;
+        out.pre = !!pre && pre.unsaved === true && pre.snapshot.items[0].desc === 'V2改了還沒存' && pre.snapshot.items[0].price === '2500';
+        // 深拷貝：還原後改報價，不會改到 V1 正式版
+        q.items[0].desc = '還原後又改'; out.formalSafe = H.find(v => v.formal).snapshot.items[0].desc === 'V1工項';
+        // 自動存檔 12 次：還原前備份與正式版都還在
+        for (let i = 0; i < 12; i++) saveQVersion('1767000000001', q);
+        const H2 = Q_HISTORY['1767000000001'];
+        out.prune = H2.filter(v => !v.formal && !v.pre).length === 10 && H2.some(v => v.pre) && H2.some(v => v.formal);
+        // 再還原回「還原前備份」：內容與當初未儲存的一致，而且又多一份備份
+        const pi = H2.findIndex(v => v.pre); restoreQVersion('1767000000001', pi); await wait(20); document.getElementById('gen-confirm-ok').click(); await wait(80);
+        const q2 = Q.find(x => x.id === '1767000000001');
+        out.back = q2.items[0].desc === 'V2改了還沒存' && q2.items[0].price === '2500' && Q_HISTORY['1767000000001'].filter(v => v.pre).length === 2;
+        // 歷史版本視窗：另列還原前備份，也有查看／vs現行／還原
+        showQVersions('1767000000001'); await wait(20);
+        const hv = document.getElementById('gen-confirm-modal').innerHTML;
+        out.list = /還原前備份<\/div>|還原前備份 <span/.test(hv) && /還原前備份（含未儲存修改）/.test(hv) && (hv.match(/restoreQVersion\(/g) || []).length === Q_HISTORY['1767000000001'].length;
+        document.getElementById('gen-confirm-cancel').click();
+        // 清理版本歷史、跨裝置合併：正式版與還原前備份都不刪
+        const nF = Q_HISTORY['1767000000001'].filter(v => v.formal || v.pre).length;
+        const oT = window.toast; window.toast = () => {}; cleanupQHistory(); window.toast = oT;
+        out.cleanup = Q_HISTORY['1767000000001'].filter(v => v.formal || v.pre).length === nF && Q_HISTORY['1767000000001'].filter(v => !v.formal && !v.pre).length === 3;
+        const many = []; for (let i = 0; i < 40; i++) many.push({ savedAt: 5000 + i, snapshot: {} });
+        const M = _mergeQHistory({ x: [{ savedAt: 1, formal: true, ver: 1, snapshot: {} }, { savedAt: 2, pre: true, snapshot: {} }] }, { x: many });
+        out.merge = M.x.length === 32 && M.x.some(v => v.formal) && M.x.some(v => v.pre);
+        // 審查：本機空間滿、備份存不進去 → 取消還原，內容不變
+        const ls0 = Storage.prototype.setItem; let tw = []; const oT2 = window.toast; window.toast = m => tw.push(m);
+        Storage.prototype.setItem = function (k, v) { if (k === 'fy_q_history') throw new Error('QuotaExceededError'); return ls0.apply(this, arguments); };
+        const before = JSON.stringify(Q.find(x => x.id === '1767000000001').items);
+        const fi = Q_HISTORY['1767000000001'].findIndex(v => v.formal); restoreQVersion('1767000000001', fi); await wait(20); document.getElementById('gen-confirm-ok').click(); await wait(80);
+        Storage.prototype.setItem = ls0; window.toast = oT2;
+        out.full = JSON.stringify(Q.find(x => x.id === '1767000000001').items) === before && tw.some(m => /已取消還原/.test(m));
+        delete Q_HISTORY['1767000000001']; Q.splice(Q.findIndex(x => x.id === '1767000000001'), 1); go('quotes');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    check('v6.0.148 報價還原不覆蓋：確認視窗講清楚；還原前備份含未儲存修改、永久保留（自動存檔再存 12 次也不被擠掉）；還原後再改報價不會改到正式版次', r.msg && r.restored && r.pre && r.formalSafe && r.prune, JSON.stringify(r));
+    check('v6.0.148 再還原回「還原前備份」內容一致；歷史版本另列還原前備份；清理版本歷史與跨裝置合併不刪正式版次與還原前備份', r.back && r.list && r.cleanup && r.merge && r.full, JSON.stringify(r));
+    check('v6.0.148 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
