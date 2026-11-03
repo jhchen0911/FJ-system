@@ -897,7 +897,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── v6.0.155 唯讀權限方案 B1（Lotion 11/03）：AI 唯讀帳號擋薪資名冊／薪資單／零用金／人員證件／匯款帳號，成本與帳務照讀 ──
+  // ── v6.0.156 唯讀權限方案 B1（Lotion 11/03）：AI 唯讀帳號擋薪資名冊／薪資單／零用金／人員證件／匯款帳號，成本與帳務照讀 ──
   {
     const RF = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const allowR = x => /(^|[^!])root\.child\('fydata\/readers'\)/.test(x || '');
@@ -939,9 +939,9 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.155 唯讀權限 B1 規則：private 逐項放行唯讀帳號（薪資名冊／薪資單／零用金除外）、匯款帳號與人員證件不放行、成本暫存／共用區／LINE 收件匣照放行', rulesOk);
-    check('v6.0.155 唯讀權限 B1 程式：唯讀帳號逐項下載不含薪資類、不讀人員證件、本機舊的薪資與證件清掉；管理員照舊整包讀', r.reader && r.wk && r.purge && r.admin && r.keys && r.allDenied && r.vendorStrip, JSON.stringify(r));
-    check('v6.0.155 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.156 唯讀權限 B1 規則：private 逐項放行唯讀帳號（薪資名冊／薪資單／零用金除外）、匯款帳號與人員證件不放行、成本暫存／共用區／LINE 收件匣照放行', rulesOk);
+    check('v6.0.156 唯讀權限 B1 程式：唯讀帳號逐項下載不含薪資類、不讀人員證件、本機舊的薪資與證件清掉；管理員照舊整包讀', r.reader && r.wk && r.purge && r.admin && r.keys && r.allDenied && r.vendorStrip, JSON.stringify(r));
+    check('v6.0.156 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
@@ -6812,7 +6812,7 @@ async function newPage(browser, width, height) {
     const RD = "root.child('fydata/readers')";
     const wr = [rules.shared.pagePerms['.write'], rules.shared.$other['.write'], rules.shared.quotes.$qid['.write'], rules.shared.version['.write'], rules.relay['.write'], rules.relay.photos['.read'], rules.private['.write'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.logs['$uid']['.write']];   // backups 改只給擁有者（另驗）
     check('v6.0.90 規則：readers 可讀 shared（v6.0.108 起也可讀 private）、所有寫入與 relay／backups 皆排除 readers 名冊、名冊僅管理員可寫',
-      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.backups['.read'].includes('adminEmails') && !rules.backups['.write'].includes('adminEmails') && rules.relay.photos['.read'].includes('|| ' + RD) && !rules.private['.read'].includes('|| ' + RD) && rules.private.$other['.read'].includes(RD) && !/'hr'|'payslips'|'petty'/.test(rules.private.$other['.read']) && /\$other === 'payables'/.test(rules.private.$other['.read']) /* v6.0.155 B1：唯讀帳號逐項讀 private、薪資類除外 */ && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
+      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.backups['.read'].includes('adminEmails') && !rules.backups['.write'].includes('adminEmails') && rules.relay.photos['.read'].includes('|| ' + RD) && !rules.private['.read'].includes('|| ' + RD) && rules.private.$other['.read'].includes(RD) && !/'hr'|'payslips'|'petty'/.test(rules.private.$other['.read']) && /\$other === 'payables'/.test(rules.private.$other['.read']) /* v6.0.156 B1：唯讀帳號逐項讀 private、薪資類除外 */ && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
       '');
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -7345,7 +7345,7 @@ async function newPage(browser, width, height) {
     const rules = JSON.parse(fs.readFileSync(pth.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const RK = "root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()";
     const rr = {}, OWN = "auth != null && auth.token.email != null && auth.token.email === 'jhchen0911@gmail.com'";
-    rr.privRead = rules.private['.read'].indexOf('|| ' + RK) < 0 && rules.private.$other['.read'].indexOf(RK) > 0 && !/'hr'|'payslips'|'petty'/.test(rules.private.$other['.read']) && rules.private.$other['.read'].includes("$other === 'quoteSens'");   // v6.0.155 B1（逐項允許清單）
+    rr.privRead = rules.private['.read'].indexOf('|| ' + RK) < 0 && rules.private.$other['.read'].indexOf(RK) > 0 && !/'hr'|'payslips'|'petty'/.test(rules.private.$other['.read']) && rules.private.$other['.read'].includes("$other === 'quoteSens'");   // v6.0.156 B1（逐項允許清單）
     const writes = [];
     (function walk(o, path) { Object.keys(o).forEach(k => { if (k === '.write') writes.push([path, o[k]]); else if (o[k] && typeof o[k] === 'object') walk(o[k], path + '/' + k); }); })(rules, 'fydata');
     rr.writes = writes.length >= 9 && writes.every(([p, w]) => w === 'false' || w.indexOf('!' + RK) >= 0 || (p === 'fydata/logs/$uid' && w.indexOf("!root.child('fydata/readers')") >= 0) || (p === 'fydata/backups' && w === OWN));
@@ -7365,10 +7365,10 @@ async function newPage(browser, width, height) {
         /* 讀 private：_pullPrivate 不再對唯讀帳號提前返回（模擬資料庫） */
         let asked = '';
         const mk = p => ({ once: () => { asked += p + '|'; return Promise.resolve({ val: () => null }); }, child: k => mk(p + '/' + k), update: () => { out.wrote = true; return Promise.resolve(); }, set: () => { out.wrote = true; return Promise.resolve(); } });
-        _fbDb = { ref: p => mk(p) };   // v6.0.155：唯讀帳號逐項讀 private（child）
+        _fbDb = { ref: p => mk(p) };   // v6.0.156：唯讀帳號逐項讀 private（child）
         return new Promise(res => {
           _pullPrivate(ok => {
-            out.priv = ok === true && asked.indexOf('fydata/private/quoteSens|') >= 0 && asked.indexOf('fydata/private|') < 0 && asked.indexOf('fydata/private/hr|') < 0 && asked.indexOf('fydata/workerSens') < 0;   // v6.0.155 B1：逐項讀、不含薪資類與人員證件
+            out.priv = ok === true && asked.indexOf('fydata/private/quoteSens|') >= 0 && asked.indexOf('fydata/private|') < 0 && asked.indexOf('fydata/private/hr|') < 0 && asked.indexOf('fydata/workerSens') < 0;   // v6.0.156 B1：逐項讀、不含薪資類與人員證件
             /* 資料層：上傳一律擋 */
             let pushed = null; _pushCloud({ silent: true, onDone: v => { pushed = v; } }); out.push = pushed === false;
             _pushPrivate(v => { out.pushPriv = v === false; });
@@ -7399,7 +7399,7 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.108 唯讀帳號：全部頁面（人員／角色除外）、看得到毛利與 private、顯示名稱與「唯讀」', r.on && r.pages && r.profit && r.me && r.priv, JSON.stringify(r));
     check('v6.0.108 唯讀帳號：上傳／儲存全擋、寫入按鈕隱藏、輸入停用、點擊攔截、備份還原卡隱藏、還原後恢復', r.push && r.pushPriv && r.save && r.saveQ && r.hide && r.dis && r.cap && r.backup && r.newQ && r.edDis && r.noWrite && r.restore, JSON.stringify(r));
-    check('v6.0.108 RTDB 規則：private 逐項放行唯讀帳號讀取（v6.0.155 起薪資名冊／薪資單／零用金除外）、所有寫入規則排除唯讀帳號、名冊可存顯示名稱、Functions 認得 {name}', rr.privRead && rr.writes && rr.nameRule && rr.backups && rr.fn, JSON.stringify(rr));
+    check('v6.0.108 RTDB 規則：private 逐項放行唯讀帳號讀取（v6.0.156 起薪資名冊／薪資單／零用金除外）、所有寫入規則排除唯讀帳號、名冊可存顯示名稱、Functions 認得 {name}', rr.privRead && rr.writes && rr.nameRule && rr.backups && rr.fn, JSON.stringify(rr));
     check('v6.0.108 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
@@ -8906,7 +8906,7 @@ async function newPage(browser, width, height) {
     check('v6.0.118 健檢2 #6：storage.rules 改用權限標記 fy（與產生器同一版）', /request\.auth\.token\.get\('fy', ''\) in \['staff', 'admin'\]/.test(SR) && /token\.get\('fy', ''\) == 'reader'/.test(SR) && !/signedIn\(\) && folder in/.test(SR), '');
     const APPSRC = fs.readFileSync(pth.join(__dirname, '..', 'app.js'), 'utf8');
     check('v6.0.118 健檢2 #7：AI 呼叫一律走雲端代理（帶登入憑證、不帶金鑰），前端沒有直接呼叫 Anthropic；唯讀帳號不能用', r.ai && r.aiRo && !/api\.anthropic\.com/.test(APPSRC) && !/anthropic-dangerous-direct-browser-access/.test(APPSRC), JSON.stringify(r));
-    check('v6.0.118 健檢2 #5：人員證件與身分證欄位不上共用區（遮罩）、員工寫投遞區、管理員寫 workerSens、合併後接回；規則限管理員與進場權限讀寫、唯讀帳號不可讀（v6.0.155 方案 B1）', r.wkPub && r.wkShared && r.wkStaff && r.wkAdmin && r.wkGraft && rules.workerSens && rules.workerSens['.read'].includes(ADMK) && rules.workerSens['.read'].includes('fydata/wkAccess') && !/(^|[^!])root\.child\('fydata\/readers'\)/.test(rules.workerSens['.read']) && !rules.workerSens['.read'].includes('fydata/access') && rules.wkAccess && rules.wkAccess['.write'].includes(ADMK) && !rules.wkAccess['.write'].includes('fydata/access') && rules.workerSensIn['.read'].includes(ADMK) && !rules.workerSensIn['.read'].includes('fydata/access'), JSON.stringify(r));
+    check('v6.0.118 健檢2 #5：人員證件與身分證欄位不上共用區（遮罩）、員工寫投遞區、管理員寫 workerSens、合併後接回；規則限管理員與進場權限讀寫、唯讀帳號不可讀（v6.0.156 方案 B1）', r.wkPub && r.wkShared && r.wkStaff && r.wkAdmin && r.wkGraft && rules.workerSens && rules.workerSens['.read'].includes(ADMK) && rules.workerSens['.read'].includes('fydata/wkAccess') && !/(^|[^!])root\.child\('fydata\/readers'\)/.test(rules.workerSens['.read']) && !rules.workerSens['.read'].includes('fydata/access') && rules.wkAccess && rules.wkAccess['.write'].includes(ADMK) && !rules.wkAccess['.write'].includes('fydata/access') && rules.workerSensIn['.read'].includes(ADMK) && !rules.workerSensIn['.read'].includes('fydata/access'), JSON.stringify(r));
     const BETA = fs.readFileSync(pth.join(__dirname, '..', 'beta.js'), 'utf8');
     check('v6.0.118 審查：員工補交部分證件不洗掉既有資料；beta 沙盒不會執行新的雲端寫入', r.wkMerge && ['_tombReqPull', '_wkSensPush', '_wkSensPull', '_bankMigrate'].every(f => BETA.includes("'" + f + "'")), JSON.stringify(r));
     check('v6.0.118 健檢2 #3：墓碑只限管理員寫、員工刪除改送申請（只能寫自己的）、管理員一批 ≤30 自動套用、超過先擋下等確認', r.tombStaff && r.tombAdmin && r.tombKeep && rules.shared.tombs && rules.shared.tombs['.write'].includes(ADMK) && !rules.shared.tombs['.write'].includes('fydata/access') && /\$who === auth\.token\.email/.test(rules.tombReq.$who['.write']), JSON.stringify(r));
