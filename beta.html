@@ -606,6 +606,7 @@ html,body{overscroll-behavior-y:contain;-webkit-text-size-adjust:100%}
 @media(max-width:767px){.env-grid{grid-template-columns:1fr!important}.env-grid>div:nth-child(2){order:-1}}
 /* v6.0.108 唯讀帳號：寫入按鈕隱藏、輸入停用、備份還原卡隱藏 */
 .fy-ro-x{display:none!important}
+.taxid-hint{font-size:11.5px;color:var(--b4);margin:-4px 0 8px;min-height:0}.taxid-hint:empty{display:none}.taxid-hint .bad{color:var(--red)}
 .fy-ro-only{display:none!important}body.fy-ro .fy-ro-only{display:inline-flex!important}   /* v6.0.109 唯讀帳號專用的草稿按鈕 */
 body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
 .fy-ro-d{cursor:not-allowed}
@@ -1453,9 +1454,13 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
       <input type="hidden" id="customer-edit-id">
       <div class="fg fg2" style="margin-bottom:8px">
         <div class="f"><label>業主名稱 *</label><input id="cust-name" placeholder="○○營造股份有限公司"></div>
-        <div class="f"><label>統一編號</label><input id="cust-taxid" placeholder="97630399"></div>
+        <div class="f"><label>統一編號</label><input id="cust-taxid" inputmode="numeric" placeholder="8 碼，自動帶公司資料" oninput="_taxIdInput('cust')"></div>
       </div>
-      <div class="f" style="margin-bottom:8px"><label>業主類型</label><select id="cust-otype" style="font-size:13px;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)"><option value="">（未設定）</option><option>營造廠</option><option>大包</option><option>建設公司</option><option>其他</option></select></div>
+      <div id="cust-taxid-hint" class="taxid-hint"></div>
+      <div class="fg fg2" style="margin-bottom:8px">
+        <div class="f"><label>業主類型</label><select id="cust-otype" style="font-size:13px;padding:7px 9px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w)"><option value="">（未設定）</option><option>營造廠</option><option>大包</option><option>建設公司</option><option>其他</option></select></div>
+        <div class="f"><label>負責人</label><input id="cust-boss" placeholder="公司登記負責人"></div>
+      </div>
       <div class="fg fg2" style="margin-bottom:8px">
         <div class="f"><label>公司電話</label><input id="cust-tel" placeholder="(03)1234567"></div>
         <div class="f"><label>公司傳真</label><input id="cust-fax" placeholder="(03)1234568"></div>
@@ -1520,6 +1525,7 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
     <div class="ph-r">
       <button type="button" class="btn btn-sm" onclick="exportContactsCSV()"><svg class="ic ib" aria-hidden="true"><use href="#i-chart"/></svg> Excel</button>
       <button type="button" class="btn btn-sm btn-g" id="contacts-add-btn" onclick="newContactItem()">＋ 新增</button>
+      <button type="button" class="btn btn-sm btn-g fy-ro-only" onclick="draftContactNew()">＋ 客戶·廠商草稿</button>
     </div>
   </div>
   <div id="customer-stats-grid" style="display:flex;gap:10px;flex-wrap:wrap;padding:12px 18px 10px"></div>
@@ -2351,7 +2357,7 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
 11. 備用單價：a.安全走道M/$【WALK】元、b.技術工/天/$【TECH】元
 12. 如因甲方因素或要求買斷：型鋼KG/$【BUY_H】元、鋼軌樁KG/$【BUY_R】元、鋼板樁KG/$【BUY_S】元、支撐KG/$【BUY_B】元、2M覆工板/片/$【COV2】元、3M覆工板/片/$【COV3】元、鋪路鐵板/片/$【IRON】元（未稅）計。
 13. 本工程不包含底層鋼製樓梯及鋪路鐵板鋪設等相關施作項目；如需施作，應另行協商，其費用另議。
-14. 材料使用期限自各單一工項打設（裝設）完成之次日起算，至該工項拔除（拆除）完成日止。本工程各工項之租期均由甲方提供；如實際使用期間未超過備註所載租期，不另行辦理加減帳；超過者依備註所載逾期租金計價。拆除（拔除）期間因甲方因素致延誤者，延誤天數併入計算。
+14. 材料租期自各工項打設（裝設）完成次日起算，至進場拔除（拆除）之日止，分批者各批分別計算。租期依甲方提供之工期估列，未逾備註租期者不另加減帳，逾期依備註逾期租金計價。
 15. 如因甲方工地緊急狀況、工程聯絡單或口頭指示，要求乙方先行配合施作追加工項者，經甲方工地簽認報價單後，該報價單即視為本合約之一部分。甲方不得以未另行簽訂書面合約為由，拒絕或延遲辦理當期工程款之給付。
 16. 本報價各階段均以一次施工作業為原則；如因實際需求須進行第二次施作，或施作數量不足時，甲方應另行補貼動員費用（次/$【MOB】元）。
 17. 於結構體作業時，其相關補強作業由甲方負責。結構板面施工動線（含鐵板鋪設）如甲方委由乙方，相關費用另行議定。
@@ -2815,14 +2821,14 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
   <div id="mob-more-body"></div>
 </div>
 
-<script src="calc/invoice.js?v=6.0.136" defer></script>
-<script src="calc/payable.js?v=6.0.136" defer></script>
-<script src="calc/report.js?v=6.0.136" defer></script>
-<script src="calc/comm.js?v=6.0.136" defer></script>
-<script src="calc/payroll.js?v=6.0.136" defer></script>
-<script src="calc/lifeline.js?v=6.0.136" defer></script>
-<script src="calc/settle.js?v=6.0.136" defer></script>
-<script src="app.js?v=6.0.136" defer></script><script src="beta.js?v=6.0.136" defer></script>
+<script src="calc/invoice.js?v=6.0.138" defer></script>
+<script src="calc/payable.js?v=6.0.138" defer></script>
+<script src="calc/report.js?v=6.0.138" defer></script>
+<script src="calc/comm.js?v=6.0.138" defer></script>
+<script src="calc/payroll.js?v=6.0.138" defer></script>
+<script src="calc/lifeline.js?v=6.0.138" defer></script>
+<script src="calc/settle.js?v=6.0.138" defer></script>
+<script src="app.js?v=6.0.138" defer></script><script src="beta.js?v=6.0.138" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
@@ -3170,9 +3176,11 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
         <div class="f"><label>電話</label><input id="v-phone" placeholder="電話"></div>
       </div>
       <div class="fg fg2" style="margin-bottom:10px">
-        <div class="f"><label>統一編號</label><input id="v-taxid" placeholder="統一編號"></div>
-        <div class="f"><label>Email</label><input type="email" id="v-email" placeholder="Email"></div>
+        <div class="f"><label>統一編號</label><input id="v-taxid" inputmode="numeric" placeholder="8 碼，自動帶公司資料" oninput="_taxIdInput('vend')"></div>
+        <div class="f"><label>負責人</label><input id="v-boss" placeholder="公司登記負責人"></div>
       </div>
+      <div id="v-taxid-hint" class="taxid-hint"></div>
+      <div class="f" style="margin-bottom:10px"><label>Email</label><input type="email" id="v-email" placeholder="Email"></div>
       <div class="f" style="margin-bottom:10px"><label>地址</label><input id="v-addr" placeholder="地址"></div>
       <div class="f" style="margin-bottom:10px"><label>供應品項</label><input id="v-items" placeholder="如：H型鋼、打樁機具…"></div>
       <div class="fg fg3" style="margin-bottom:10px">
