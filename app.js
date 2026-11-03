@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.142';
+var APP_VERSION='v6.0.145';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -807,7 +807,7 @@ function _goCore(p){
   if(p==='invoice'){try{if(_acctMount()){_acctTab=(typeof _invTab!=='undefined'&&_invTab==='vendor')?'vb':'own';p='acct';}}catch(e){_err('go.inv',e);}}   // v6.0.30 計價併入帳務
   if(p==='profit'){p='reports';_currentReport='overview';}
   if(p==='rebar'||p==='grout'||p==='backfill'){_meTab=p;p='matest';}   // v6.0.139 計算工具併入材料估算分頁
-  if(p==='lifeline'){_meTab='shoring';_meSecTog('1安全母索',true);p='matest';}   // v6.0.142 安全母索併入擋土支撐全套 ④-1
+  if(p==='lifeline'){_meTab='shoring';_meSecTog('1安全母索',true);p='matest';}   // v6.0.145 安全母索併入擋土支撐全套 ④-1
   if(p==='projects')p='proj';   // v6.0.26 舊版專案卡片頁移除，合約檔／確認單改在工程專案「合約與文件」   // v6.0.17 利潤分析併入經營報表
   try{if(p==='rfq'&&typeof _rfqTab!=='undefined'&&_rfqTab==='mat'){_rfqTab='rfq';if(_rfqQid)_m6Qid=_rfqQid;p='mat6';}}catch(e){_err('go',e);}   // v6.0.25 材料移出發包
   // 權限攔截（try/catch 保護避免 TDZ）
@@ -8041,7 +8041,7 @@ function initFirebase(){
     _fbUser = user;
     _updateFbUI(!!user);
     if(user) _minVerWatch(_autoSyncOnLogin);
-    else { _aiHeldOff();_lrsOff();_minVerOff();_isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{localStorage.removeItem('fy_priv_pending');}catch(e){/* 可忽略 */}   /* v6.0.116：登出清掉私有上傳失敗旗標，換人登入不會一直「未同步」 */try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
+    else { _aiHeldOff();_lrsOff();_lbxOff();_minVerOff();_isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{localStorage.removeItem('fy_priv_pending');}catch(e){/* 可忽略 */}   /* v6.0.116：登出清掉私有上傳失敗旗標，換人登入不會一直「未同步」 */try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
   });
 }
 function initGoogleSignIn(){
@@ -8213,7 +8213,8 @@ function _autoSyncOnLogin(){
   _readerCheck(function(ro){
     try{_draftWatch();}catch(e){_err('_autoSyncOnLogin.draft',e);}   // v6.0.109 AI 草稿
     try{_aiHeldWatch();}catch(e){_err('_autoSyncOnLogin.aiHeld',e);}
-    try{_lrsWatch();}catch(e){_err('_autoSyncOnLogin.lrs',e);}   // v6.0.140 勞報單（只有管理員）   // v6.0.134 LINE 額度暫停時只記在 FJ 的 AI 通知
+    try{_lrsWatch();}catch(e){_err('_autoSyncOnLogin.lrs',e);}
+    try{_lbxWatch();}catch(e){_err('_autoSyncOnLogin.lbx',e);}   // v6.0.144 LINE 收件匣（只有管理員）   // v6.0.140 勞報單（只有管理員）   // v6.0.134 LINE 額度暫停時只記在 FJ 的 AI 通知
     try{_bankWatch();}catch(e){_err('_autoSyncOnLogin.bank',e);}   // v6.0.118 匯款帳號
     setTimeout(function(){try{_wkSensPull();_tombReqPull();}catch(e){_err('_autoSyncOnLogin.h',e);}},4000);   // _wkSensPull 內判斷誰讀得到（管理員／進場權限／唯讀帳號）   // 審查 🔴4：不必等雲端有更新才收投遞／刪除申請
     if(ro){
@@ -8780,7 +8781,7 @@ function computeShoringFY(inp){
   var _rDeck=(GV.cnt+GH.cnt)>0?{v:{rows:_rRows(inp._gtRoutesV)},h:{rows:_rRows(inp._gtRoutesH)}}:{v:{rows:[{n:1,len:gtDeduct}]},h:{rows:[]}};
   var _rSt={perim:P,perimRuns:1,layers:layers,deductLayers:b('gtRopeDeduct')?1:0,unit:'m',useSpare:true,waste:_rWaste,form:_rForm,
     f:{},zones:[{name:'支撐路',deck:false,form:'',v:{rows:_rRows(inp._routesV,routesV,lenV,autoV,W)},h:{rows:_rRows(inp._routesH,routesH,lenH,autoH,L)}}]};
-  // v6.0.142（Lotion 11/03：安全母索併入全套、獨立頁刪除）：規格（算重量）、每路配件（鋼索夾／緊索器／套環…）、其他區塊（可改用另一種形式）
+  // v6.0.145（Lotion 11/03：安全母索併入全套、獨立頁刪除）：規格（算重量）、每路配件（鋼索夾／緊索器／套環…）、其他區塊（可改用另一種形式）
   var _rFm=_LL_FORM[_rForm],_rAcc=_meRopeAcc(inp,_rForm);
   _rSt.f[_rForm]={spec:inp.ropeSpec&&_rFm.specs.some(function(x){return x[0]===inp.ropeSpec;})?inp.ropeSpec:_rFm.def.spec,spare:v('ropeSpare')||0,reel:v('ropeReel')||200,acc:_rAcc};
   var _rOther=_rForm==='rope'?'wire':'rope';
@@ -8910,7 +8911,7 @@ function computeShoringFY(inp){
   back.push({k:'安全母索需求長度',v:_shR1(_rNeed),u:'M'});
   back.push({k:'安全母索折捲（每捲 '+_rReel+'M）',v:_shR0(_rReels),u:'捲'});
   T.ropeForm=_rf;T.ropeSpare=_rSpare;T.ropeNeed=_rNeed;T.ropeReels=_rReels;T.ropeReel=_rReel;T.ropeWaste=_rWaste;
-  // v6.0.142：規格／重量、配件（構台下沒拉的路不算）；其他區塊改用另一種形式時另列一組
+  // v6.0.145：規格／重量、配件（構台下沒拉的路不算）；其他區塊改用另一種形式時另列一組
   var _rAccRows=function(t,R,tag){var nm=_LL_FORM[t].accs;R.acc.forEach(function(n,ai){if(n>0)back.push({k:String(nm[ai]).replace(/（.*$/,'')+(tag||''),v:_shR0(n),u:String(nm[ai]).replace(/^.*（([^／]*)／.*$/,'$1')});});};
   if(_rT.spec)back.push({k:'規格 '+_rT.spec+'（重量約 '+_shR0(_rT.kg)+' kg）',v:_shR1(_rNeed),u:'M'});
   _rAccRows(_rForm,_rT);
@@ -8994,7 +8995,7 @@ function computeShoringFY(inp){
     sAdd(st,'副支撐擋片','片',d.subBlock);sAdd(st,'合板','片',d.heban);
     sAdd(st,'長螺絲','顆',d.longS);sAdd(st,'短螺絲','顆',d.shortS);sAdd(st,'膨脹螺絲','只',d.eScrew);
     sAdd(st,'安全母索（'+T.ropeForm+'，折捲）','捲',_shCeil((d.rope+d.ropeSpare)*(1+(T.ropeWaste||0)/100)/T.ropeReel));
-    _meRopeStageAcc(st,T,i2,sAdd);   // v6.0.142：每層配件＋其他區塊的另一種母索
+    _meRopeStageAcc(st,T,i2,sAdd);   // v6.0.145：每層配件＋其他區塊的另一種母索
     sAdd(st,'黃色立柱','支',d.yellow);
     staged.push(st);
   });
@@ -9436,19 +9437,19 @@ function matEstU(k,val){
 }
 // v6.0.139（Lotion 11/03）：匯出改兩份，各給各的讀者、同一份裡同一數字只出現一次：
 //   kind 'order'＝叫料單（工務／料場；摘要＋依進場階段，可只印某一階段 opt.stage）；'quote'＝估價明細（內部；摘要＋依類別總量，opt.basis 附計算依據：路數摘要＋安全母索逐層表）
-// 安全母索形式定義（v5.394 起；v6.0.142 獨立的安全母索頁併入全套後搬到這裡）：規格（含單位重 kg/m）、端部作法對應的配件名稱與常用預設值
+// 安全母索形式定義（v5.394 起；v6.0.145 獨立的安全母索頁併入全套後搬到這裡）：規格（含單位重 kg/m）、端部作法對應的配件名稱與常用預設值
 var _LL_FORM={
   wire:{label:'鋼索',note:'端部以套環＋鋼索夾固定，另設緊索器（花籃螺絲）張緊',
         specs:[['Ø9.53mm（3/8″）',0.35],['Ø12.7mm（1/2″）',0.63],['Ø16mm（5/8″）',0.99]],
         accs:['鋼索夾（只／路）','緊索器（組／路）','套環（只／路）'],
-        def:{spec:'Ø12.7mm（1/2″）',spare:1.5,reel:200,acc:[6,1,2]}},   // v6.0.142 Lotion：鋼索夾一端 3 只 → 每路 6（原 8）
+        def:{spec:'Ø12.7mm（1/2″）',spare:1.5,reel:200,acc:[6,1,2]}},   // v6.0.145 Lotion：鋼索夾一端 3 只 → 每路 6（原 8）
   rope:{label:'特多龍繩',note:'端部以套環＋繩用夾具（或編接）固定，另設棘輪張力器張緊；打結會多吃長度',
         specs:[['Ø16mm',0.17],['Ø18mm',0.21],['Ø20mm',0.26]],
         accs:['繩用夾具（只／路）','棘輪張力器（組／路）','套環（只／路）'],
         def:{spec:'Ø16mm',spare:2,reel:200,acc:[4,1,2]}}};
-// v6.0.142 切換母索形式：規格與配件數回到該形式的預設
+// v6.0.145 切換母索形式：規格與配件數回到該形式的預設
 function matEstRopeForm(){if(!MAT_EST)return;MAT_EST.ropeSpec='';MAT_EST.ropeAcc0=MAT_EST.ropeAcc1=MAT_EST.ropeAcc2='';renderMatEst();}
-// 舊「安全母索」獨立頁（v6.0.142 起併入全套）存在本機的設定：一鍵帶入全套 ④-1
+// 舊「安全母索」獨立頁（v6.0.145 起併入全套）存在本機的設定：一鍵帶入全套 ④-1
 function _meRopeOld(){try{var s=JSON.parse(localStorage.getItem('fy_lifeline')||'null');return (s&&typeof s==='object')?s:null;}catch(e){return null;}}
 function matEstRopeImport(){
   var s=_meRopeOld();if(!s){toast('這台裝置沒有舊的安全母索設定');return;}
@@ -9463,7 +9464,7 @@ function matEstRopeImport(){
   renderMatEst();try{matEstCalc();}catch(e){_err('matEstRopeImport',e);}
   toast('已帶入舊安全母索設定（形式、規格、端部預留、每捲長度、配件、損耗）；路數與長度仍依支撐路與「其他區塊」');
 }
-// v6.0.142 安全母索每路配件數：全套 ④-1 進階可改（空白＝依形式預設，例：鋼索每路 鋼索夾 6（一端 3 只）／緊索器 1／套環 2）
+// v6.0.145 安全母索每路配件數：全套 ④-1 進階可改（空白＝依形式預設，例：鋼索每路 鋼索夾 6（一端 3 只）／緊索器 1／套環 2）
 function _meRopeAcc(inp,t){var d=_LL_FORM[t].def.acc,a=inp?[inp.ropeAcc0,inp.ropeAcc1,inp.ropeAcc2]:[];return d.map(function(x,i){var y=a[i];return (y===''||y==null)?x:Math.max(0,Math.round(_shNum(y)));});}
 // 每層叫料：主形式配件（該層實際拉的路數×每路數；扣構台下的層不算構台下的路）＋其他區塊另一種形式的捲數與配件
 function _meRopeStageAcc(st,T,i,sAdd){
@@ -9485,7 +9486,7 @@ function _meStageTitle(res,pick){
   var n=(res.staged||[]).length;if(!pick.length||pick.length===n)return '';
   return '｜'+(pick.length<=3?pick.map(function(i){return esc(res.staged[i].stage);}).join('、'):(pick.length+' 個階段'));
 }
-function _meDoc(kind,opt,res){   // v6.0.142：叫料單／估價明細的內容（匯出 PDF 與右邊即時預覽共用同一份）；回傳 {fn,css,body}
+function _meDoc(kind,opt,res){   // v6.0.145：叫料單／估價明細的內容（匯出 PDF 與右邊即時預覽共用同一份）；回傳 {fn,css,body}
   // v5.397：A4 橫式、明細依分類分塊並排；v6.0.139 分成叫料單／估價明細兩份
   kind=kind==='quote'?'quote':'order';opt=opt||{};
   var q=Q.find(function(x){return x.id===window._matEstQid;});
@@ -9739,7 +9740,7 @@ function _renderMatEstInner(el){
   h+='</tbody></table><button type="button" class="btn btn-xs" onclick="matEstRowAdd(\'_dc\')" style="font-size:12px;margin-top:4px">＋ 加一筆</button>';
   if(_secOpen)h+='</div></details>';
   h+='<div style="font-size:11px;color:var(--b3);margin-top:8px">存入專案後，請至「專案材料」分配自有/租賃並填租金、運費，一鍵更新施工成本。</div>';
-  // v6.0.139 工具列（與其他計算工具同一位置）：掛專案｜計算｜存入專案｜匯出 PDF（v6.0.142：匯出右邊預覽的那份）｜重設
+  // v6.0.139 工具列（與其他計算工具同一位置）：掛專案｜計算｜存入專案｜匯出 PDF（v6.0.145：匯出右邊預覽的那份）｜重設
   var bar=document.getElementById('me-bar-shoring');
   if(bar)bar.innerHTML='<div class="card" style="margin-bottom:12px"><div class="cb tool-head" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
     +'<div style="flex:1;min-width:220px">'+tb+'</div>'
@@ -9841,7 +9842,7 @@ function _shPanelHtml(title,rows,chCls){
   });
   return h+'</tbody></table></div></div></div>';
 }
-// v6.0.136：材料估算的母索用 calc/lifeline.js（v6.0.142 獨立的安全母索頁併入全套 ④-1 後刪除）
+// v6.0.136：材料估算的母索用 calc/lifeline.js（v6.0.145 獨立的安全母索頁併入全套 ④-1 後刪除）
 // v5.397：安全母索用量表（單獨列印，供業主核算數量）
 // v6.0.139：安全母索逐層表改成估價明細的附錄（不再單獨一份）
 function _matEstRopeBody(res){
@@ -9874,7 +9875,7 @@ function _matEstCalcCore(){
   var el=document.getElementById('mat-est-out');if(!el)return;
   var info=res.info;
   // v6.0.139：右邊＝摘要（關鍵數字）＋材料清單（依進場階段／依類別切換，同一份資料不重複列）＋計算依據（收合）
-  // v6.0.142（Lotion 11/03）：右邊＝摘要＋即時 A4 預覽（就是匯出的那份；叫料單／估價明細切換、勾階段、附計算依據）
+  // v6.0.145（Lotion 11/03）：右邊＝摘要＋即時 A4 預覽（就是匯出的那份；叫料單／估價明細切換、勾階段、附計算依據）
   var h=_meTilesHtml(res)+'<div class="card"><div class="ch green"><div class="cht">文件預覽</div><button type="button" class="btn btn-sm" style="margin-left:auto" onclick="matEstExportNow()">匯出 PDF</button></div><div class="cb" id="me-pv-ctl">'+_mePvCtlHtml(res)+'</div>'
     +'<div class="cb" style="padding-top:0"><div id="me-pv" class="me-pv" onclick="if(isMob())matEstExportNow()"></div><div style="font-size:11px;color:var(--b3);margin-top:6px">預覽與匯出 PDF 同一份內容與分頁（左邊改了會自動重算）'+(isMob()?'；點預覽可放大看 PDF':'')+'</div></div></div>';
   var basis='<div class="cb" style="font-size:12.5px;line-height:1.9">壁線周長 '+_shR1(info.PW)+'M｜路數 縱'+info.routesV+(info.autoV?'（自動）':'')+'＋橫'+info.routesH+(info.autoH?'（自動）':'')+'＝'+info.totalR+' 路｜支撐總長 '+_shR1(info.supLen)+'M｜中柱合計 '+info.posts+' 支｜退場留存 '+_shR1(info.keep)+'M/支'
@@ -32950,6 +32951,7 @@ function _v6TodoItems(items){
   try{var _th=_tombHoldCount();if(_th&&_shWholeOk())items.push({type:'tomb_hold',urgent:true,jump:'openTombHold()',icon:ic('i-warn'),color:'var(--red)',text:'刪除申請待確認 '+_th+' 筆',sub:'員工一次刪除很多筆，先擋下等管理員確認'});}catch(e){_err('_v6TodoItems.tomb',e);}   // v6.0.118
   try{if(!_isReaderUser){var _dp=_draftPending();if(_dp.length)items.push({type:'ai_draft',urgent:false,jump:'openDrafts()',icon:ic('i-doc'),color:'#1565C0',text:'AI 草稿 '+_dp.length+' 筆待確認',sub:_dp.slice(0,2).map(function(d){return _DRAFT_T[d.type]||'';}).join('、')});}}catch(e){_err('_v6TodoItems.draft',e);}   // v6.0.109
   try{var _ah=_aiHeldList();if(_ah.length)items.push({type:'ai_held',urgent:true,jump:'openAiHeld()',icon:ic('i-bell'),color:'#E65100',text:'AI 通知 '+_ah.length+' 則沒推 LINE（本月額度快用完）',sub:esc(_ah.slice(-2).map(function(x){return x.text;}).join('、').slice(0,60))});}catch(e){_err('_v6TodoItems.aiHeld',e);}   // v6.0.134
+  try{if(_lbxOk()){var _lb=_lbxOpen();if(_lb.length)items.push({type:'line_inbox',urgent:false,jump:'openLineInbox()',icon:ic('i-doc'),color:'#2E7D32',text:'LINE 收件 '+_lb.length+' 件未歸檔',sub:esc(_lb.slice(0,3).map(function(x){return x.fileName||(x.type==='text'?String(x.text||'').slice(0,20):x.type);}).join('、').slice(0,60))});}}catch(e){_err('_v6TodoItems.lbx',e);}   // v6.0.144 LINE 收件匣
   try{_rfqVerTodo(items);}catch(e){_err('_v6TodoItems.rfqVer',e);}   // v6.0.109 報價進版、詢價／分包未同步
   try{
     _retentionRows().filter(function(r){return r.overdue&&!r.due;}).forEach(function(r){   // 已完工的由「保留款可請退」待辦涵蓋，不重複
@@ -39816,6 +39818,125 @@ function openIntroAgr(id){
         try{_printViaIframe(_introAgrHtml(s2,sens||{},d.q,ff),'案件介紹費協議書_'+(s.name||'')+'_'+(d.q.name||s.project||''),false);}catch(e){_err('openIntroAgr',e);toast('產生協議書失敗');}
       });
     },false,null,true);
+}
+// ══════════ v6.0.144 小批次：LINE 收件匣（業主詢價從 LINE 傳給「陳軒｜AI 助理」→ 雲端 lineWebhook 存檔 → 這裡看、下載、標已歸檔） ══════════
+// 資料：fydata/lineInbox/<訊息 id>（雲端程式寫；{id,at,date,from,type,fileName,size,path,text,status:'new'|'filed'|'error'|'tooBig',qid,caseName,note,filedAt,markedBy}）
+//   檔案在 Storage line/inbox/<日期>/<訊息 id>_<檔名>。網頁不能寫 lineInbox：標已歸檔一律走雲端 lineInboxMark（帶登入憑證，擁有者／管理員／AI 帳號）。
+// FJ 畫面只給管理員（唯讀帳號看不到）；電腦端 HQ（AI 帳號）用 fyInboxList／fyInboxGet／fyInboxMark。
+var LBX={},_lbxOn=false,_lbxRef=null;
+var _LBX_KEEP_MS=120*86400000;   // 畫面只抓近 120 天
+var _LBX_TYPE={file:'檔案',image:'照片',video:'影片',audio:'語音',text:'文字'};
+function _lbxOk(){return !!(_fbUser&&!_isReaderUser&&_shWholeOk());}
+function _lbxWatch(){
+  if(_lbxOn||!_fbDb||!_lbxOk())return;
+  _lbxOn=true;
+  _lbxRef=_fbDb.ref('fydata/lineInbox').orderByChild('at').startAt(Date.now()-_LBX_KEEP_MS);
+  _lbxRef.on('value',function(s){
+    var v=s.val()||{},o={};Object.keys(v).forEach(function(k){var x=v[k];if(x&&typeof x==='object'&&/^\w{1,40}$/.test(k))o[k]=x;});LBX=o;
+    try{var b=document.getElementById('lbx-btn');if(b){var n=_lbxOpen().length;b.style.display='';b.textContent='LINE 收件匣'+(n?'（'+n+'）':'');}}catch(e){_err('_lbxWatch.btn',e);}
+    try{if(typeof updateDashTodo==='function')updateDashTodo();}catch(e){_err('_lbxWatch.todo',e);}
+    try{var bx=document.getElementById('lbx-list');if(bx)bx.innerHTML=_lbxListHtml();}catch(e){_err('_lbxWatch.list',e);}
+  },function(e){if(_lbxRef){try{_lbxRef.off();}catch(e2){_err('_lbxWatch.off',e2);}}_lbxRef=null;_lbxOn=false;_err('_lbxWatch',e);});
+}
+function _lbxOff(){try{if(_lbxRef)_lbxRef.off();}catch(e){_err('_lbxOff',e);}_lbxRef=null;_lbxOn=false;LBX={};var b=document.getElementById('lbx-btn');if(b)b.style.display='none';}
+function _lbxAll(){return Object.keys(LBX||{}).map(function(k){return LBX[k];}).filter(Boolean).sort(function(a,b){return (b.at||0)-(a.at||0);});}
+function _lbxOpen(){return _lbxAll().filter(function(x){return x.status!=='filed';});}   // 未歸檔（含存檔失敗、太大沒存）
+function _lbxSize(n){n=+n||0;return n>=1048576?(Math.round(n/104857.6)/10)+' MB':(n>=1024?Math.round(n/1024)+' KB':(n?n+' B':''));}
+function _lbxTime(t){var d=new Date(+t||0);return (d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function _lbxRowHtml(x){
+  var S=function(v){return v==null?'':String(v);},id=S(x.id);
+  var st=x.status==='filed'?'<span class="bdg ok" style="font-size:10px">已歸檔'+(x.caseName||x.qid?('：'+esc(S(x.caseName)||_lbxQName(x.qid))):'')+'</span>'
+    :(x.status==='error'?'<span class="bdg" style="background:#fdecea;color:#c62828;font-size:10px">存檔失敗，請重傳</span>'
+    :(x.status==='tooBig'?'<span class="bdg" style="background:#fff3e0;color:#b26a00;font-size:10px">超過上限沒存</span>'
+    :(x.status==='saving'?((Date.now()-(+x.at||0)>10*60000)?'<span class="bdg" style="background:#fdecea;color:#c62828;font-size:10px">存檔中斷，請重傳</span>':'<span class="bdg" style="font-size:10px">存檔中…</span>'):'<span class="bdg warn" style="font-size:10px">未歸檔</span>')));   // 審查：saving 超過 10 分鐘＝函式中途被中斷
+  var body=x.type==='text'?('<div style="font-size:12.5px;white-space:pre-wrap;word-break:break-word">'+esc(S(x.text).slice(0,500))+'</div>')
+    :('<div style="font-size:13px;font-weight:700;word-break:break-all">'+esc(S(x.fileName)||id)+'</div>');
+  return '<div style="border-bottom:1px solid var(--b1);padding:7px 0;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">'
+    +'<div style="flex:1;min-width:180px"><div style="font-size:11px;color:var(--b3)">'+_lbxTime(x.at)+'　'+esc(_LBX_TYPE[x.type]||S(x.type))+(x.size?('　'+_lbxSize(x.size)):'')+'　'+st+'</div>'+body+(x.note?'<div style="font-size:11.5px;color:var(--b4)">'+esc(S(x.note))+'</div>':'')+'</div>'
+    +'<div style="display:flex;gap:4px;flex-wrap:wrap">'
+    +(x.path?'<button type="button" class="btn btn-xs" onclick="lbxDownload(\''+escq(id)+'\')">下載</button>':'')
+    +(x.status==='filed'?'<button type="button" class="btn btn-xs" onclick="lbxMark(\''+escq(id)+'\',\'new\')">改回未歸檔</button>':'<button type="button" class="btn btn-xs btn-g" onclick="lbxFileOpen(\''+escq(id)+'\')">歸檔</button>')
+    +'</div></div>';
+}
+function _lbxQName(qid){var q=qid&&(Q||[]).find(function(x){return x&&x.id===qid;});return q?((q.code?q.code+' ':'')+(q.name||'')):(qid||'');}
+function _lbxListHtml(){
+  var all=!!window._lbxShowAll,L=all?_lbxAll():_lbxOpen();
+  return (L.length?L.map(_lbxRowHtml).join(''):'<div style="padding:14px;text-align:center;color:var(--b3);font-size:12.5px">'+(all?'近 120 天沒有收件':'沒有未歸檔的收件')+'</div>');
+}
+function openLineInbox(){
+  if(!_lbxOk()){toast('LINE 收件匣只有管理員能看');return;}
+  _lbxWatch();
+  _modal('LINE 收件匣',
+    '<div style="font-size:12px;color:var(--b4);margin-bottom:6px">傳給 LINE「陳軒｜AI 助理」的檔案、照片、文字（只收名單內的人）。下載後歸到案件，按「歸檔」填報價或案名。</div>'
+    +'<label style="font-size:12px;display:inline-flex;gap:4px;align-items:center;margin-bottom:6px"><input type="checkbox" '+(window._lbxShowAll?'checked':'')+' onchange="window._lbxShowAll=this.checked;document.getElementById(\'lbx-list\').innerHTML=_lbxListHtml()"> 也顯示已歸檔</label>'
+    +'<div id="lbx-list" style="max-height:60vh;overflow:auto">'+_lbxListHtml()+'</div>',null);
+}
+function _lbxUrl(path){
+  if(!_fbStorage||!path)return Promise.reject(new Error('沒有檔案'));
+  if(!/^line\/inbox\//.test(String(path)))return Promise.reject(new Error('路徑不正確'));
+  return _fbStorage.ref(path).getDownloadURL();
+}
+function lbxDownload(id){
+  var x=LBX[id];if(!x||!x.path){toast('這筆沒有檔案');return;}
+  var w=window.open('about:blank','_blank');   // 先開視窗（iOS 擋非同步 window.open）
+  _lbxUrl(x.path).then(function(u){if(w)w.location.href=u;else location.href=u;}).catch(function(e){if(w)w.close();_err('lbxDownload',e);toast('下載失敗：'+(/unauthorized|permission/i.test(String(e&&(e.code||e.message)))?'Storage 規則不允許':'找不到檔案'));});
+}
+function lbxFileOpen(id){
+  var x=LBX[id];if(!x)return;
+  var opts=(Q||[]).filter(function(q){return q&&q.id;}).slice().sort(function(a,b){return String(b.date||'').localeCompare(String(a.date||''));}).slice(0,300);
+  showConfirm('歸檔：'+(x.fileName||_LBX_TYPE[x.type]||''),
+    '<div class="f"><label>報價／工程（可留空）</label><select id="lbx-qid" style="width:100%;font-size:13px;padding:7px 8px"><option value="">（不掛報價）</option>'+opts.map(function(q){return '<option value="'+esc(q.id)+'"'+(x.qid===q.id?' selected':'')+'>'+esc((q.code?q.code+' ':'')+(q.name||'')+(q.client?('／'+q.client):''))+'</option>';}).join('')+'</select></div>'
+    +'<div class="f" style="margin-top:6px"><label>案名（還沒建報價時填）</label><input id="lbx-case" value="'+esc(x.caseName||'')+'" maxlength="100" placeholder="例：範例營造 內湖案 詢價"></div>'
+    +'<div class="f" style="margin-top:6px"><label>備註</label><input id="lbx-note" value="'+esc(x.note||'')+'" maxlength="200"></div>',
+    function(){lbxMark(id,'filed',{qid:gv('lbx-qid')||'',caseName:(gv('lbx-case')||'').trim(),note:(gv('lbx-note')||'').trim()});},false);
+}
+// 標已歸檔／改回未歸檔：走雲端 lineInboxMark；成功才改畫面（監聽也會收到）
+async function _lbxMarkCall(id,status,f){
+  if(!_fbUser)return {ok:false,msg:'要登入'};
+  try{
+    var tok=await _fbUser.getIdToken();
+    var r=await fetch(_fnUrl('lineInboxMark'),{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify(Object.assign({id:id,status:status},f||{}))});
+    var j={};try{j=await r.json();}catch(e){/* 可忽略：未部署時沒有 JSON */}
+    if(r.ok)return {ok:true,status:j.status||status};
+    return {ok:false,msg:(j&&j.error&&j.error.message)||(r.status===404?'收件匣服務尚未部署或找不到這筆':('錯誤 '+r.status))};
+  }catch(e){_err('_lbxMarkCall',e);return {ok:false,msg:navigator.onLine===false?'目前沒有網路':'收件匣服務尚未部署或連不上'};}
+}
+function lbxMark(id,status,f){
+  if(!_lbxOk()){toast('只有管理員能改收件匣');return;}
+  _lbxMarkCall(id,status,f).then(function(r){
+    if(!r.ok){toast('沒改成：'+r.msg);return;}
+    var x=LBX[id];if(x){x.status=r.status;x.qid=(f&&f.qid)||null;x.caseName=(f&&f.caseName)||null;x.note=(f&&f.note)||null;}   // 審查：改回未歸檔時雲端也清掉這三欄
+    var bx=document.getElementById('lbx-list');if(bx)bx.innerHTML=_lbxListHtml();
+    try{updateDashTodo();}catch(e){_err('lbxMark.todo',e);}
+    toast(r.status==='filed'?'已歸檔':'已改回未歸檔');
+  });
+}
+// ── 電腦端 HQ（AI 帳號在 FJ 分頁執行）：await fyInboxList() → 未歸檔清單；fyInboxList({all:true}) 含已歸檔
+//   await fyInboxGet(id) → {id,fileName,type,size,url}（url 是 Storage 下載網址）；await fyInboxMark(id,{qid,caseName,note}) → '已歸檔' 或原因
+function _hqOk(){return typeof _aiNotifyOk==='function'&&_aiNotifyOk();}
+async function fyInboxList(opt){
+  if(!_hqOk()&&!_lbxOk())return {err:'這個帳號不能讀收件匣'};
+  try{
+    var s=await _fbDb.ref('fydata/lineInbox').orderByChild('at').startAt(Date.now()-_LBX_KEEP_MS).once('value');
+    var v=s.val()||{},all=!!(opt&&opt.all);
+    return Object.keys(v).map(function(k){var x=v[k]||{};return {id:x.id||k,at:x.at||0,date:x.date||'',type:x.type||'',fileName:x.fileName||'',size:x.size||0,text:x.type==='text'?String(x.text||''):'',status:x.status||'',qid:x.qid||'',caseName:x.caseName||'',hasFile:!!x.path};})
+      .filter(function(x){return all||x.status!=='filed';}).sort(function(a,b){return a.at-b.at;});
+  }catch(e){_err('fyInboxList',e);return {err:'讀不到收件匣（'+String(e&&(e.code||e.message)).slice(0,60)+'）'};}
+}
+async function fyInboxGet(id){
+  if(!_hqOk()&&!_lbxOk())return {err:'這個帳號不能讀收件匣'};
+  if(!/^\w{1,40}$/.test(String(id||'')))return {err:'收件編號不正確'};
+  try{
+    var x=(await _fbDb.ref('fydata/lineInbox/'+id).once('value')).val();
+    if(!x)return {err:'找不到這筆'};
+    if(!x.path)return {err:x.status==='tooBig'?'檔案太大沒存':(x.status==='error'?'存檔失敗，請 Lotion 重傳':'這筆沒有檔案'),id:id,type:x.type,text:x.text||''};
+    return {id:id,fileName:x.fileName||'',type:x.type||'',size:x.size||0,url:await _lbxUrl(x.path)};
+  }catch(e){_err('fyInboxGet',e);return {err:'取檔失敗（'+String(e&&(e.code||e.message)).slice(0,60)+'）'};}
+}
+async function fyInboxMark(id,f){
+  if(!_hqOk()&&!_lbxOk())return '沒改：這個帳號不能改收件匣';
+  f=f||{};var r=await _lbxMarkCall(id,f.status==='new'?'new':'filed',{qid:f.qid||'',caseName:f.caseName||'',note:f.note||''});
+  return r.ok?(r.status==='filed'?'已歸檔':'已改回未歸檔'):('沒改：'+r.msg);
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

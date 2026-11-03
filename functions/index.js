@@ -90,7 +90,7 @@ const LINE_TOKEN = defineSecret('LINE_CHANNEL_ACCESS_TOKEN');
 const TZ = 'Asia/Taipei';
 
 // Webhook：LINE 後台「Webhook URL」貼這支的網址（部署後終端機會印出 lineWebhook 的網址）
-exports.lineWebhook = onRequest({ region: REGION, secrets: [LINE_SECRET, LINE_TOKEN], memory: '512MiB', timeoutSeconds: 120 }, async (req, res) => {
+exports.lineWebhook = onRequest({ region: REGION, secrets: [LINE_SECRET, LINE_TOKEN], memory: '512MiB', timeoutSeconds: 300 }, async (req, res) => {
   if (req.method !== 'POST') { res.status(200).send('ok'); return; }   // LINE 後台「驗證」用 GET／空 POST 都回 200
   const raw = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body || {});
   if (!lineCore.verifySignature(LINE_SECRET.value(), raw, req.get('x-line-signature'))) { res.status(401).send('bad signature'); return; }
@@ -276,4 +276,31 @@ exports.hqBeatCheck = onSchedule({ schedule: '0 8-22 * * *', timeZone: TZ, regio
   } catch (e) { console.error('hqBeatCheck', e); await undo(); return; }
   if (!sent) { await undo(); await logRef.set({ by: 'hqBeatCheck', at: now, text, status: 'failed', to: 0 }).catch((e) => console.error('hqBeatCheck.log', e)); return; }   // 沒送出：放掉，下個小時再試
   await note({ by: 'hqBeatCheck', at: now, text, status: 'sent', to: sent, used: used == null ? null : used + sent });
+});
+
+// ══════════ v6.0.144 LINE 收件匣：標已歸檔（FJ 管理員畫面與電腦端 HQ 共用） ══════════
+// lineInbox 網頁不能寫（規則 .write false）；改狀態一律走這支：帶登入憑證，只有擁有者／管理員（名冊）或 AI 帳號名單（同 aiNotify）可用。
+// body：{id, status:'filed'|'new', qid?, caseName?, note?}；只改這幾個欄位，檔案路徑與來源不能改。
+const inboxCore = require('./ops/inbox.js');
+exports.lineInboxMark = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'] }, async (req, res) => {
+  try {
+    if (req.method !== 'POST') { res.status(405).json({ error: { message: '只接受 POST' } }); return; }
+    const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
+    if (!m) { res.status(401).json({ error: { message: '需要登入' } }); return; }
+    const t = await admin.auth().verifyIdToken(m[1]);
+    const email = String(t.email || '').toLowerCase();
+    const role = t.fy || roleOf(email, await lists());
+    if (!inboxCore.markAllowed(email, role)) { res.status(403).json({ error: { message: '這個帳號不能改收件匣' } }); return; }
+    const c = inboxCore.cleanMark(req.body);
+    if (c.err) { res.status(400).json({ error: { message: c.err } }); return; }
+    const ref = admin.database().ref('fydata/lineInbox/' + c.id);
+    const cur = (await ref.once('value')).val();
+    if (!cur || cur.id !== c.id) { res.status(404).json({ error: { message: '找不到這筆收件' } }); return; }
+    const up = inboxCore.markUpdate(cur, c, email, Date.now());
+    await ref.update(up);
+    res.status(200).json({ ok: true, id: c.id, status: up.status });
+  } catch (e) {
+    console.error('lineInboxMark', e);
+    res.status(500).json({ error: { message: '收件匣服務錯誤' } });
+  }
 });
