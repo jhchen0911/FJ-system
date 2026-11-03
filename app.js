@@ -3,7 +3,7 @@
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
 var APP_VERSION='v6.0.135';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
-if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
+if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
 // 全檔 553 個 try/catch 裡有 423 個是空的 catch(e){}——出事完全無聲，
 // 使用者只會覺得「這個數字怪怪的」，卻沒有任何線索可查，也無法遠端協助。
@@ -8646,7 +8646,7 @@ function _shDefaults(){
     layers:5,_layers:lys,autoRouteSpace:6,stiff:'0',_routesV:[{rc:4,rl:25}],_routesH:[{rc:4,rl:40}],_gtRoutesV:[],_gtRoutesH:[],heng:'0',zones:2,
     spliceWall:0,spliceMid:0,spliceCo:0,spliceGt:0,procWall:0,procMid:0,procCo:0,procGt:0,shearSp:0.3,studLen:3,
     dogbone:'0',dbWall:false,dbMid:false,dbCo:false,dbGt:false,rgMid:true,rgCo:true,rgGt:true,fengProc:'0',fengCnt:'',
-    gantaiA:0,gantaiP:0,deck:'2',bigCap:0,gtRopeDeduct:'0',gtDeduct:0,ropeForm:'wire',ropeReel:200,ropeSpare:1.5,
+    gantaiA:0,gantaiP:0,deck:'2',bigCap:0,gtRopeDeduct:'0',gtDeduct:0,ropeForm:'wire',ropeReel:200,ropeSpare:1.5,ropeWaste:5,
     railScope:'0',postH:'1.2m',toe:'0',hookType:'std',
     _ud:[{ul:6.5,uh:2.2}],udMods:'6,3,2,1.5,1',_dc:[]};
 }
@@ -8757,6 +8757,16 @@ function computeShoringFY(inp){
   var stiff=inp.stiff||'0';
   var wlBy={},spBy={};SH_SPECS.forEach(function(s){wlBy[s]=0;spBy[s]=0;});
   var layerData=[],T={fengtou:0,rope:0,yellow:0};
+  // 第 3c 步（v6.0.136，Lotion 11/03）：安全母索改用與安全母索頁同一套算法（calc/lifeline.js）——周圍一路＝1 倍周長（不乘圍令倍數）、
+  //   構台下只扣第 1 層、端部預留照全部路數、需求長度加損耗（預設 5%）
+  var _rForm=(inp.ropeForm==='rope')?'rope':'wire',_rWaste=(inp.ropeWaste==null||inp.ropeWaste==='')?5:v('ropeWaste');
+  var _rRows=function(rows,cnt,len,auto,side){return auto?[{n:cnt,len:side}]:(rows||[]).map(function(r){return {n:_shNum(r.rc),len:_shNum(r.rl)};});};
+  var _rDeck=(GV.cnt+GH.cnt)>0?{v:{rows:_rRows(inp._gtRoutesV)},h:{rows:_rRows(inp._gtRoutesH)}}:{v:{rows:[{n:1,len:gtDeduct}]},h:{rows:[]}};
+  var _rSt={perim:P,perimRuns:1,layers:layers,deductLayers:b('gtRopeDeduct')?1:0,unit:'m',useSpare:true,waste:_rWaste,form:_rForm,
+    f:{},zones:[{name:'支撐路',deck:false,form:'',v:{rows:_rRows(inp._routesV,routesV,lenV,autoV,W)},h:{rows:_rRows(inp._routesH,routesH,lenH,autoH,L)}}]};
+  _rSt.f[_rForm]={spec:'',spare:v('ropeSpare')||0,reel:v('ropeReel')||200,acc:[0,0,0]};
+  if(b('gtRopeDeduct')&&gtDeduct>0)_rSt.zones.push(Object.assign({name:'構台下',deck:true,form:''},_rDeck));
+  var _rRes=FJC.ll.calc(_rSt,_LL_FORM),_rT=_rRes.T[_rForm];
   for(var i=0;i<layers;i++){
     var ly=lys[i]||{};
     var W_=_shSel(ly.w||'H350'),S_=_shSel(ly.s||'H350');
@@ -8783,10 +8793,11 @@ function computeShoringFY(inp){
     var longS=((W_.spec!=='H300')?(wM/7)*4:0)+((S_.spec!=='H300')?(sM/7)*4:0);
     var shortS=Math.max(0,screw-longS);
     var fengtou=totalR*2;
-    var ropeWal=wM,ropeSup=supLen,ropeDed=(i===0&&b('gtRopeDeduct'))?Math.min(gtDeduct,wM+supLen):0;
-    var ropeL=Math.max(0,ropeWal+ropeSup-ropeDed);
-    var ropeRuns=totalR+1;                                   // 每層路數＝縱橫支撐路＋周圍一路
-    var ropeSpare=Math.max(0,ropeRuns*(v('ropeSpare')||0));  // 端部錨錠預留（每路）
+    var _rL=_rT.layers[i]||{wal:0,sup:0,ded:0,len:0,runs:0,spare:0};
+    var ropeWal=_rL.wal,ropeSup=_rL.sup,ropeDed=_rL.ded;
+    var ropeL=Math.max(0,_rL.len);
+    var ropeRuns=_rL.runs;                                   // 每層路數＝縱橫支撐路＋周圍一路
+    var ropeSpare=Math.max(0,_rL.spare);                     // 端部錨錠預留（每路，構台下的路也算）
     var yellow=ropeL/2.5;
     T.fengtou+=fengtou;T.rope+=ropeL;T.yellow+=yellow;
     layerData.push({L:i+1,w:ly.w||'H350',s:ly.s||'H350',dSpec:ly.d||'H350',wM:wM,sM:sM,tri:tri,bigTri:bigTri,jack:jack,jackClip:jackClip,earth:earth,earthClip:earthClip,shortJ:shortJ,diag:diag,corner:cornerN,triPlate:triPlate,stiffN:stiffN,smallU:smallU,bigU:bigU,bigUangle:bigUangle,subBlock:subBlock,heban:heban,screw:Math.round(screw),longS:Math.round(longS),shortS:Math.round(shortS),eScrew:Math.round(eScrew),fengtou:fengtou,rope:ropeL,ropeWal:ropeWal,ropeSup:ropeSup,ropeDed:ropeDed,ropeRuns:ropeRuns,ropeSpare:ropeSpare,yellow:yellow});
@@ -8866,13 +8877,14 @@ function computeShoringFY(inp){
   // 形式分特多龍繩／鋼索，另計端部預留與折捲（配件、套環等後續再加）
   var _rf=(inp.ropeForm==='rope')?'特多龍繩':'鋼索',_rReel=v('ropeReel')||200;
   var _rSpare=layerData.reduce(function(a,d){return a+d.ropeSpare;},0);
-  var _rNeed=T.rope+_rSpare,_rReels=_rReel>0?_shCeil(_rNeed/_rReel):0;
+  var _rNeed=_rT.need,_rReels=_rReel>0?_shCeil(_rNeed/_rReel):0;   // 需求長度＝（淨長＋端部預留）×（1＋損耗%）
   back.push({sec:'安全母索（'+_rf+'）'});
   back.push({k:'安全母索總長（已扣構台下）',v:_shR1(T.rope),u:'M'});
   if(_rSpare>0)back.push({k:'端部錨錠預留（每路 '+(v('ropeSpare')||0)+'M）',v:_shR1(_rSpare),u:'M'});
+  if(_rWaste>0)back.push({k:'損耗 '+_rWaste+'%',v:_shR1(_rNeed-T.rope-_rSpare),u:'M'});
   back.push({k:'安全母索需求長度',v:_shR1(_rNeed),u:'M'});
   back.push({k:'安全母索折捲（每捲 '+_rReel+'M）',v:_shR0(_rReels),u:'捲'});
-  T.ropeForm=_rf;T.ropeSpare=_rSpare;T.ropeNeed=_rNeed;T.ropeReels=_rReels;T.ropeReel=_rReel;
+  T.ropeForm=_rf;T.ropeSpare=_rSpare;T.ropeNeed=_rNeed;T.ropeReels=_rReels;T.ropeReel=_rReel;T.ropeWaste=_rWaste;
   back.push({k:'黃色立柱',v:_shR0(T.yellow),u:'支'});
   // ── ⑤ 先行加工（封頭鈑＝加工支數×2；未填支數則以各層路數×2 合計）──
   var pre=[];
@@ -8937,7 +8949,7 @@ function computeShoringFY(inp){
     sAdd(st,'小U','支',d.smallU);sAdd(st,'大U','支',d.bigU);sAdd(st,'大U角鐵','支',d.bigUangle);
     sAdd(st,'副支撐擋片','片',d.subBlock);sAdd(st,'合板','片',d.heban);
     sAdd(st,'長螺絲','顆',d.longS);sAdd(st,'短螺絲','顆',d.shortS);sAdd(st,'膨脹螺絲','只',d.eScrew);
-    sAdd(st,'安全母索（'+T.ropeForm+'，折捲）','捲',_shCeil((d.rope+d.ropeSpare)/T.ropeReel));sAdd(st,'黃色立柱','支',d.yellow);
+    sAdd(st,'安全母索（'+T.ropeForm+'，折捲）','捲',_shCeil((d.rope+d.ropeSpare)*(1+(T.ropeWaste||0)/100)/T.ropeReel));sAdd(st,'黃色立柱','支',d.yellow);
     staged.push(st);
   });
   if(gantaiA>0||railLen>0){
@@ -9555,7 +9567,7 @@ function _renderMatEstInner(el){
   // v5.397：安全母索併入材料估算（範圍＝各層圍令周圍＋縱橫支撐路；第一層扣構台下方）
   h+='<div style="font-size:12px;font-weight:700;margin:12px 0 4px">安全母索 <span style="font-weight:400;font-size:10px;color:var(--b3)">範圍＝每層圍令（周圍）＋上方縱橫支撐路；第一層扣除構台下方；每路另計端部預留</span></div>';
   h+='<div class="me-grid">'+fS('ropeForm','母索形式',[['wire','鋼索'],['rope','特多龍繩']])
-    +fN('ropeReel','每捲長度 (M)')+fN('ropeSpare','每路端部預留 (M)')
+    +fN('ropeReel','每捲長度 (M)')+fN('ropeSpare','每路端部預留 (M)')+fN('ropeWaste','損耗 (%)')
     +fS('gtRopeDeduct','扣構台下母索',[['0','否'],['1','是']],';renderMatEst()')+'</div>'
     +(_shBool(m.gtRopeDeduct)?('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:6px">'
       +'<div>'+routeTbl('_gtRoutesV','構台下縱向路數')+'</div><div>'+routeTbl('_gtRoutesH','構台下橫向路數')+'</div></div>'
@@ -20351,72 +20363,11 @@ function _llDelZone(i){
 }
 // ── 計算（口徑與 Excel 逐格一致；依母索形式分開彙總）──
 function _llCalc(stArg){
-  var st=stArg||_llState,u=_LL_UNIT[st.unit]||0.01;
-  var dirOf=function(dir){
-    var rows=(dir&&dir.rows)||[];
-    var cnt=rows.reduce(function(a,r){return a+_llNum(r.n);},0);
-    var len=rows.reduce(function(a,r){return a+_llNum(r.n)*_llNum(r.len)*u;},0);
-    var dec=_llNum(dir&&dir.runs);
-    return {cnt:cnt,len:len,dec:dec,ok:dec>0?(Math.abs(dec-cnt)<1e-9):null};
-  };
-  var zones=(st.zones||[]).map(function(z){
-    var V=dirOf(z.v),H=dirOf(z.h);
-    return {name:z.name||'',deck:!!z.deck,own:z.form||'',
-      form:(z.form==='wire'||z.form==='rope')?z.form:st.form,
-      v:V,h:H,len:V.len+H.len,runs:V.cnt+H.cnt};
-  });
-  var perim=_llNum(st.perim),layers=_llInt(st.layers),dl=Math.min(layers,_llInt(st.deductLayers));
-  var T={},used=[];_llCalc._warn=[];
-  _LL_FORMS.forEach(function(t){
-    var zs=zones.filter(function(z){return z.form===t;});
-    var pick=function(deck,key){return zs.filter(function(z){return !!z.deck===deck;})
-      .reduce(function(a,z){return a+z[key];},0);};
-    var zoneLen=pick(false,'len'),deckLen=pick(true,'len');
-    var zoneRuns=pick(false,'runs'),deckRuns=pick(true,'runs');
-    var pm=(st.form===t)?perim:0,pr=(st.form===t)?_llInt(st.perimRuns):0;
-    var perLayer=pm+zoneLen,gross=perLayer*layers,deduct=Math.min(gross,deckLen*dl),net=gross-deduct;
-    if(deckLen>0&&gross<=0)_llCalc._warn.push(_llFm(t).label+'：構台下區塊標了這個形式，但沒有同形式的一般區塊或周長可供扣除，扣除未生效');
-    var runs=Math.max(0,Math.round((zoneRuns+pr)*layers-deckRuns*dl));
-    var fp=_llFP(t,st);
-    var spare=st.useSpare?runs*_llNum(fp.spare):0;
-    var need=(net+spare)*(1+_llNum(st.waste)/100);
-    var reel=_llNum(fp.reel),w=_llSpecW(t,fp.spec);
-    var u2={form:t,label:_llFm(t).label,spec:fp.spec,unitW:w,zoneCount:zs.length,
-      used:zs.length>0||st.form===t,perim:pm,perimRuns:pr,
-      zoneLen:zoneLen,deckLen:deckLen,zoneRuns:zoneRuns,deckRuns:deckRuns,
-      perLayer:perLayer,gross:gross,deduct:deduct,net:net,runs:runs,spare:spare,need:need,
-      reels:reel>0?Math.ceil(need/reel):0,reel:reel,kg:need*w,
-      acc:(fp.acc||[0,0,0]).map(function(n){return runs*_llInt(n);})};
-    T[t]=u2;if(u2.used)used.push(u2);
-  });
-  var bad=[];
-  zones.forEach(function(z){
-    if(z.v.ok===false)bad.push((z.name||'區塊')+' 縱向');
-    if(z.h.ok===false)bad.push((z.name||'區塊')+' 橫向');
-  });
-  var warn=_llCalc._warn.slice();
-  var sum=function(k){return used.reduce(function(a,x){return a+x[k];},0);};
-  return {zones:zones,T:T,used:used,mixed:used.length>1,layers:layers,deductLayers:dl,perim:perim,
-    perLayer:sum('perLayer'),gross:sum('gross'),deduct:sum('deduct'),net:sum('net'),
-    runs:sum('runs'),spare:sum('spare'),need:sum('need'),reels:sum('reels'),kg:sum('kg'),
-    zoneLen:sum('zoneLen'),deckLen:sum('deckLen'),bad:bad,warn:warn};
+  // 第 3c 步（v6.0.136）：算法在 calc/lifeline.js（FJC.ll.calc），材料估算的母索也用同一套；這裡只補齊各形式參數（_llFP 會寫入預設值）
+  var st=stArg||_llState;_LL_FORMS.forEach(function(t){_llFP(t,st);});
+  var r=FJC.ll.calc(st,_LL_FORM);_llCalc._warn=r.warn.slice();return r;
 }
 function _llM(x){return (Math.round(x*100)/100).toFixed(2);}
-// v5.395：供材料估算引用——同專案名稱的安全母索計算（目前工具輸入優先，其次最新存檔）
-function _llLinkFor(projName){
-  projName=String(projName||'').trim();if(!projName)return null;
-  try{
-    var st=null,src='';
-    if(String(_llState.proj||'').trim()===projName){st=_llState;src='目前輸入';}
-    else{var rec=_trList('lifeline').find(function(r){return String(r.proj||'').trim()===projName;});
-      if(rec){st=_llMigrate(JSON.parse(JSON.stringify(rec.inputs)));src='存檔 '+new Date(rec.ts).toLocaleDateString('zh-TW');}}
-    if(!st)return null;
-    var r=_llCalc(st);
-    if(!(r.net>0))return null;
-    return {src:src,net:r.net,need:r.need,reels:r.reels,runs:r.runs,layers:r.layers,deduct:r.deduct,
-      forms:r.used.map(function(T){return {label:T.label,spec:T.spec,need:T.need,reels:T.reels,reel:T.reel,net:T.net};})};
-  }catch(e){_err('_llLinkFor',e);return null;}
-}
 function _llR(x){return _llM(x).replace(/\.00$/,'');}
 // ── 畫面 ──
 function _llDirHtml(i,key,label,z,r){
@@ -20609,7 +20560,7 @@ function _llPrint(){
   body+='</table>'
     +'<div class="cond">公式：各方向總長＝Σ(條數×單長)；每層長度＝基地周長＋各區塊縱橫總長；'
     +'母索總長＝每層長度×層數 − 構台下總長×扣除層數；'
-    +'需求長度＝(母索總長＋每路端部預留×總路數)×(1＋損耗%)。'
+    +'需求長度＝(母索總長＋每路端部預留×每層路數×層數)×(1＋損耗%)；構台下的路不拉、不算配件，但端部預留照全部路數算。'
     +'總路數＝(各區塊路數＋周長路數)×層數 − 構台下路數×扣除層數。宣告路數僅供與明細條數勾稽，不進入計算。'
     +'母索形式（特多龍繩／鋼索）各自的規格、單位重、端部預留與配件分開計算，長度不互相混計。</div>';
   _toolPrint('安全母索用量表',st.proj,body,{fname:_toolFileName('lifeline','安全母索用量表',st.proj)});
@@ -20678,7 +20629,7 @@ function _llXlsx(){
   ref.rl  =b('每層路數＝區塊路數＋周長路數(僅預設形式)',function(T,c){return sif('C',T.label,0)+'+IF($B$8="'+T.label+'",$B$3,0)';});
   ref.rd  =b('構台下路數',function(T){return sif('C',T.label,1);});
   ref.run =b('總路數',function(T,c){return c+ref.rl+'*$B$4-'+c+ref.rd+'*$B$5';});
-  ref.sp  =b('端部錨錠預留(m)＝總路數×每路預留',function(T,c){return c+ref.run+'*'+c+ref.spare;});
+  ref.sp  =b('端部錨錠預留(m)＝每層路數×層數×每路預留（構台下的路不扣，Lotion 11/03）',function(T,c){return c+ref.rl+'*$B$4*'+c+ref.spare;});
   ref.need=b('需求長度(m)＝(總長＋預留)×(1＋損耗%)',function(T,c){return '('+c+ref.net+'+'+c+ref.sp+')*(1+$B$7/100)';});
   b('捲數（無條件進位）',function(T,c){return 'CEILING('+c+ref.need+'/'+c+ref.reel+',1)';});
   b('概估重量(kg)',function(T,c){return c+ref.need+'*'+c+ref.w;});
@@ -20699,7 +20650,7 @@ function _llXlsx(){
       ['4. 每層長度 = 基地周長（僅計入 B8 指定的預設形式）＋ 該形式各區塊（縱向＋橫向）總長。'],
       ['5. 母索總長 = 每層長度 × 層數 − 構台下總長 × 扣除層數。'],
       ['6. 總路數 =（該形式區塊路數＋周長路數）× 層數 − 構台下路數 × 扣除層數。'],
-      ['7. 需求長度 =（母索總長 ＋ 總路數×每路端部預留）×（1＋損耗%）；重量 = 需求長度 × 單位重。'],
+      ['7. 需求長度 =（母索總長 ＋ 每層路數×層數×每路端部預留，構台下的路不扣）×（1＋損耗%）；重量 = 需求長度 × 單位重。'],
       ['8. 安全母索形式分「特多龍繩（聚酯纖維）」與「鋼索」，規格、單位重、端部作法與配件皆不同，兩者分欄計算不混計。'],
       ['9. 依營造安全衛生設施標準，安全母索材質得為鋼索、尼龍繩索或聚酯纖維等，最小斷裂強度應在 2,300 kgf 以上。']]}];
   xlsxDownload(_toolFileName('lifeline','安全母索用量表',st.proj),sheets);

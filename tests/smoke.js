@@ -856,11 +856,11 @@ async function newPage(browser, width, height) {
       _llState.zones[0].v.runs = 99;
       out.catches = _llCalc().bad.join('') === '第一區 縱向';
       _llState.zones[0].v.runs = 9;
-      // ④ 端部預留與損耗：(9275.25＋159路×1.5)×1.05
+      // ④ 端部預留與損耗：(9275.25＋189路×1.5)×1.05（配件路數仍 159）
       _llState.useSpare = true; _llFP('wire').spare = 1.5; _llFP('wire').reel = 200; _llState.waste = 5;
       c = _llCalc();
       out.runs = c.runs === 159;                            // (63路×3層)−(30路×1層)
-      out.need = Math.abs(c.need - (9275.25 + 238.5) * 1.05) < 1e-6;
+      out.need = Math.abs(c.need - (9275.25 + 283.5) * 1.05) < 1e-6;   // v6.0.136（Lotion 11/03）：端部預留＝63 路×3 層×1.5，構台下的路不扣
       out.reels = c.reels === Math.ceil(c.need / 200);
       // ⑤ 兩種形式（特多龍繩／鋼索）：混用時長度、路數、配件分開彙總，總和不變
       _llState.zones = ZONES(); _llState.zones[2].form = 'rope'; _llState.zones[5].form = 'rope';
