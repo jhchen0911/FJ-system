@@ -9896,6 +9896,9 @@ async function newPage(browser, width, height) {
       return { noErr: !log.some(x => /_v6TodoItems\.mat/.test(x.w)), item: it.some(x => x.type === 'mat_site'), dom: /自有材料在工地/.test(document.body.innerHTML) }; });
     check('錯誤日誌 _v6TodoItems.mat：開頁首繪不再記錯誤，「自有材料在工地」待辦照常顯示', r.noErr && r.item && r.dom, JSON.stringify(r));
     await page.evaluate(() => { localStorage.removeItem('fy6_q'); localStorage.removeItem('fy_mat_ledger'); });
+    await page.close();
+  }
+
   // ── v6.0.158 路數明細（小批次；設計 docs/路數明細_設計筆記.md）：每路定尺組合、接頭避開中間樁、短節備品全案×1.1、構台下淨空 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
