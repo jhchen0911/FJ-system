@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.146';
+var APP_VERSION='v6.0.150';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -807,7 +807,7 @@ function _goCore(p){
   if(p==='invoice'){try{if(_acctMount()){_acctTab=(typeof _invTab!=='undefined'&&_invTab==='vendor')?'vb':'own';p='acct';}}catch(e){_err('go.inv',e);}}   // v6.0.30 計價併入帳務
   if(p==='profit'){p='reports';_currentReport='overview';}
   if(p==='rebar'||p==='grout'||p==='backfill'){_meTab=p;p='matest';}   // v6.0.139 計算工具併入材料估算分頁
-  if(p==='lifeline'){_meTab='shoring';_meSecTog('1安全母索',true);p='matest';}   // v6.0.145 安全母索併入擋土支撐全套 ④-1
+  if(p==='lifeline'){_meTab='shoring';_meSecTog('1安全母索',true);p='matest';}   // v6.0.149 安全母索併入擋土支撐全套 ④-1
   if(p==='projects')p='proj';   // v6.0.26 舊版專案卡片頁移除，合約檔／確認單改在工程專案「合約與文件」   // v6.0.17 利潤分析併入經營報表
   try{if(p==='rfq'&&typeof _rfqTab!=='undefined'&&_rfqTab==='mat'){_rfqTab='rfq';if(_rfqQid)_m6Qid=_rfqQid;p='mat6';}}catch(e){_err('go',e);}   // v6.0.25 材料移出發包
   // 權限攔截（try/catch 保護避免 TDZ）
@@ -8684,7 +8684,7 @@ function computeShoringFY(inp){
   var routesH=RH.cnt,lenH=RH.len;
   if(routesH===0){routesH=_shCeil(W/aSp)+1;lenH=routesH*L;autoH=true;}
   var totalR=routesV+routesH,supLen=lenV+lenH;
-  // v6.0.146（Lotion 11/03）：支撐每一路是直線，接頭數＝每路支數−1＝ceil(每路長÷7)−1；逐路輸入取 Σ 路數×(每路支數−1)，自動路數每路長＝對邊長
+  // v6.0.150（Lotion 11/03）：支撐每一路是直線，接頭數＝每路支數−1＝ceil(每路長÷7)−1；逐路輸入取 Σ 路數×(每路支數−1)，自動路數每路長＝對邊長
   var _jn=function(len){return Math.max(0,_shCeil(len/7-1e-9)-1);};
   var supJ1=(RV.cnt>0?(inp._routesV||[]).reduce(function(a,r){return a+_shNum(r.rc)*_jn(_shNum(r.rl));},0):routesV*_jn(W))
            +(RH.cnt>0?(inp._routesH||[]).reduce(function(a,r){return a+_shNum(r.rc)*_jn(_shNum(r.rl));},0):routesH*_jn(L));
@@ -8762,7 +8762,7 @@ function computeShoringFY(inp){
   if(spliceMid>0)procRows.push({k:'接樁（中間樁）',v:_shR0(spliceMid),u:'接'});
   if(spliceCo>0)procRows.push({k:'接樁（共構樁）',v:_shR0(spliceCo),u:'接'});
   if(spliceGt>0)procRows.push({k:'接樁（構台樁）',v:_shR0(spliceGt),u:'接'});
-  if(spliceSum>0)procRows.push({k:'續接板',v:_shR0(spliceSum*3),u:'片'});   // v6.0.146 Lotion：「貼板」統一叫「續接板」（只改名稱）
+  if(spliceSum>0)procRows.push({k:'續接板',v:_shR0(spliceSum*3),u:'片'});   // v6.0.150 Lotion：「貼板」統一叫「續接板」（只改名稱）
   if(proc>0){
     procRows.push({k:'水刀管',v:_shR1(waterLen),u:'M'});
     procRows.push({k:'噴水頭',v:_shR1(proc*1.1),u:'個'});
@@ -8785,7 +8785,7 @@ function computeShoringFY(inp){
   var _rDeck=(GV.cnt+GH.cnt)>0?{v:{rows:_rRows(inp._gtRoutesV)},h:{rows:_rRows(inp._gtRoutesH)}}:{v:{rows:[{n:1,len:gtDeduct}]},h:{rows:[]}};
   var _rSt={perim:P,perimRuns:1,layers:layers,deductLayers:b('gtRopeDeduct')?1:0,unit:'m',useSpare:true,waste:_rWaste,form:_rForm,
     f:{},zones:[{name:'支撐路',deck:false,form:'',v:{rows:_rRows(inp._routesV,routesV,lenV,autoV,W)},h:{rows:_rRows(inp._routesH,routesH,lenH,autoH,L)}}]};
-  // v6.0.145（Lotion 11/03：安全母索併入全套、獨立頁刪除）：規格（算重量）、每路配件（鋼索夾／緊索器／套環…）、其他區塊（可改用另一種形式）
+  // v6.0.149（Lotion 11/03：安全母索併入全套、獨立頁刪除）：規格（算重量）、每路配件（鋼索夾／緊索器／套環…）、其他區塊（可改用另一種形式）
   var _rFm=_LL_FORM[_rForm],_rAcc=_meRopeAcc(inp,_rForm);
   _rSt.f[_rForm]={spec:inp.ropeSpec&&_rFm.specs.some(function(x){return x[0]===inp.ropeSpec;})?inp.ropeSpec:_rFm.def.spec,spare:v('ropeSpare')||0,reel:v('ropeReel')||200,acc:_rAcc};
   var _rOther=_rForm==='rope'?'wire':'rope';
@@ -8821,7 +8821,7 @@ function computeShoringFY(inp){
     var subBlock=posts*(sp===1?2:4);
     // 螺絲（Lotion 11/03 定義）：圍令每接頭 16＝對鎖 4＋合板 1 片 12；支撐每接頭 28＝對鎖 4＋合板 2 片 24；斜撐、角撐每支 10；三角架每支 2
     //   長螺絲＝H350／H400 的對鎖 4 顆；其餘（H300 對鎖、所有合板、斜撐、三角架）都是短螺絲＝總數−長螺絲
-    //   v6.0.146：千斤頂保護夾每組 16 顆短螺絲；三角架×2 含中間樁／共構樁上托支撐的三角架（tri 已含 posts）
+    //   v6.0.150：千斤頂保護夾每組 16 顆短螺絲；三角架×2 含中間樁／共構樁上托支撐的三角架（tri 已含 posts）
     var screw=tri*2+wJ*16+sJ*28+diag*10+cornerN*10+jackClip*16;
     var eScrew=0;
     if(exp){eScrew=(tri+bigTri)*2;screw-=tri*2;}
@@ -8894,7 +8894,7 @@ function computeShoringFY(inp){
     back.push({sec:'施工構台'});
     back.push({k:'覆工板',v:_shR0(deckN),u:'片（'+(deckDiv===3?'3M×1M':'2M×1M')+'）'});
     back.push({k:'覆工板擋片',v:_shR0(_shCeil(deckN/2)),u:'片'});
-    back.push({k:'長螺絲（施工構台，每㎡ 1 顆）',v:_shR0(gantaiA),u:'顆'});   // v6.0.146 Lotion：取代原「構台螺絲＝面積×2」
+    back.push({k:'長螺絲（施工構台，每㎡ 1 顆）',v:_shR0(gantaiA),u:'顆'});   // v6.0.150 Lotion：取代原「構台螺絲＝面積×2」
     if(capN>0)back.push({k:'構台帽',v:_shR0(capN),u:'頂'});
     if(bigCapV>0)back.push({k:'大構台帽',v:_shR0(bigCapV),u:'頂'});
     back.push({k:'主副樑',v:'—',u:'需依圖面另行配置'});
@@ -8920,7 +8920,7 @@ function computeShoringFY(inp){
   back.push({k:'安全母索需求長度',v:_shR1(_rNeed),u:'M'});
   back.push({k:'安全母索折捲（每捲 '+_rReel+'M）',v:_shR0(_rReels),u:'捲'});
   T.ropeForm=_rf;T.ropeSpare=_rSpare;T.ropeNeed=_rNeed;T.ropeReels=_rReels;T.ropeReel=_rReel;T.ropeWaste=_rWaste;
-  // v6.0.145：規格／重量、配件（構台下沒拉的路不算）；其他區塊改用另一種形式時另列一組
+  // v6.0.149：規格／重量、配件（構台下沒拉的路不算）；其他區塊改用另一種形式時另列一組
   var _rAccRows=function(t,R,tag){var nm=_LL_FORM[t].accs;R.acc.forEach(function(n,ai){if(n>0)back.push({k:String(nm[ai]).replace(/（.*$/,'')+(tag||''),v:_shR0(n),u:String(nm[ai]).replace(/^.*（([^／]*)／.*$/,'$1')});});};
   if(_rT.spec)back.push({k:'規格 '+_rT.spec+'（重量約 '+_shR0(_rT.kg)+' kg）',v:_shR1(_rNeed),u:'M'});
   _rAccRows(_rForm,_rT);
@@ -9004,7 +9004,7 @@ function computeShoringFY(inp){
     sAdd(st,'副支撐擋片','片',d.subBlock);sAdd(st,'合板','片',d.heban);
     sAdd(st,'長螺絲','顆',d.longS);sAdd(st,'短螺絲','顆',d.shortS);sAdd(st,'膨脹螺絲','只',d.eScrew);
     sAdd(st,'安全母索（'+T.ropeForm+'，折捲）','捲',_shCeil((d.rope+d.ropeSpare)*(1+(T.ropeWaste||0)/100)/T.ropeReel));
-    _meRopeStageAcc(st,T,i2,sAdd);   // v6.0.145：每層配件＋其他區塊的另一種母索
+    _meRopeStageAcc(st,T,i2,sAdd);   // v6.0.149：每層配件＋其他區塊的另一種母索
     sAdd(st,'黃色立柱','支',d.yellow);
     staged.push(st);
   });
@@ -9446,19 +9446,19 @@ function matEstU(k,val){
 }
 // v6.0.139（Lotion 11/03）：匯出改兩份，各給各的讀者、同一份裡同一數字只出現一次：
 //   kind 'order'＝叫料單（工務／料場；摘要＋依進場階段，可只印某一階段 opt.stage）；'quote'＝估價明細（內部；摘要＋依類別總量，opt.basis 附計算依據：路數摘要＋安全母索逐層表）
-// 安全母索形式定義（v5.394 起；v6.0.145 獨立的安全母索頁併入全套後搬到這裡）：規格（含單位重 kg/m）、端部作法對應的配件名稱與常用預設值
+// 安全母索形式定義（v5.394 起；v6.0.149 獨立的安全母索頁併入全套後搬到這裡）：規格（含單位重 kg/m）、端部作法對應的配件名稱與常用預設值
 var _LL_FORM={
   wire:{label:'鋼索',note:'端部以套環＋鋼索夾固定，另設緊索器（花籃螺絲）張緊',
         specs:[['Ø9.53mm（3/8″）',0.35],['Ø12.7mm（1/2″）',0.63],['Ø16mm（5/8″）',0.99]],
         accs:['鋼索夾（只／路）','緊索器（組／路）','套環（只／路）'],
-        def:{spec:'Ø12.7mm（1/2″）',spare:1.5,reel:200,acc:[6,1,2]}},   // v6.0.145 Lotion：鋼索夾一端 3 只 → 每路 6（原 8）
+        def:{spec:'Ø12.7mm（1/2″）',spare:1.5,reel:200,acc:[6,1,2]}},   // v6.0.149 Lotion：鋼索夾一端 3 只 → 每路 6（原 8）
   rope:{label:'特多龍繩',note:'端部以套環＋繩用夾具（或編接）固定，另設棘輪張力器張緊；打結會多吃長度',
         specs:[['Ø16mm',0.17],['Ø18mm',0.21],['Ø20mm',0.26]],
         accs:['繩用夾具（只／路）','棘輪張力器（組／路）','套環（只／路）'],
         def:{spec:'Ø16mm',spare:2,reel:200,acc:[4,1,2]}}};
-// v6.0.145 切換母索形式：規格與配件數回到該形式的預設
+// v6.0.149 切換母索形式：規格與配件數回到該形式的預設
 function matEstRopeForm(){if(!MAT_EST)return;MAT_EST.ropeSpec='';MAT_EST.ropeAcc0=MAT_EST.ropeAcc1=MAT_EST.ropeAcc2='';renderMatEst();}
-// 舊「安全母索」獨立頁（v6.0.145 起併入全套）存在本機的設定：一鍵帶入全套 ④-1
+// 舊「安全母索」獨立頁（v6.0.149 起併入全套）存在本機的設定：一鍵帶入全套 ④-1
 function _meRopeOld(){try{var s=JSON.parse(localStorage.getItem('fy_lifeline')||'null');return (s&&typeof s==='object')?s:null;}catch(e){return null;}}
 function matEstRopeImport(){
   var s=_meRopeOld();if(!s){toast('這台裝置沒有舊的安全母索設定');return;}
@@ -9473,7 +9473,7 @@ function matEstRopeImport(){
   renderMatEst();try{matEstCalc();}catch(e){_err('matEstRopeImport',e);}
   toast('已帶入舊安全母索設定（形式、規格、端部預留、每捲長度、配件、損耗）；路數與長度仍依支撐路與「其他區塊」');
 }
-// v6.0.145 安全母索每路配件數：全套 ④-1 進階可改（空白＝依形式預設，例：鋼索每路 鋼索夾 6（一端 3 只）／緊索器 1／套環 2）
+// v6.0.149 安全母索每路配件數：全套 ④-1 進階可改（空白＝依形式預設，例：鋼索每路 鋼索夾 6（一端 3 只）／緊索器 1／套環 2）
 function _meRopeAcc(inp,t){var d=_LL_FORM[t].def.acc,a=inp?[inp.ropeAcc0,inp.ropeAcc1,inp.ropeAcc2]:[];return d.map(function(x,i){var y=a[i];return (y===''||y==null)?x:Math.max(0,Math.round(_shNum(y)));});}
 // 每層叫料：主形式配件（該層實際拉的路數×每路數；扣構台下的層不算構台下的路）＋其他區塊另一種形式的捲數與配件
 function _meRopeStageAcc(st,T,i,sAdd){
@@ -9495,7 +9495,7 @@ function _meStageTitle(res,pick){
   var n=(res.staged||[]).length;if(!pick.length||pick.length===n)return '';
   return '｜'+(pick.length<=3?pick.map(function(i){return esc(res.staged[i].stage);}).join('、'):(pick.length+' 個階段'));
 }
-function _meDoc(kind,opt,res){   // v6.0.145：叫料單／估價明細的內容（匯出 PDF 與右邊即時預覽共用同一份）；回傳 {fn,css,body}
+function _meDoc(kind,opt,res){   // v6.0.149：叫料單／估價明細的內容（匯出 PDF 與右邊即時預覽共用同一份）；回傳 {fn,css,body}
   // v5.397：A4 橫式、明細依分類分塊並排；v6.0.139 分成叫料單／估價明細兩份
   kind=kind==='quote'?'quote':'order';opt=opt||{};
   var q=Q.find(function(x){return x.id===window._matEstQid;});
@@ -9749,7 +9749,7 @@ function _renderMatEstInner(el){
   h+='</tbody></table><button type="button" class="btn btn-xs" onclick="matEstRowAdd(\'_dc\')" style="font-size:12px;margin-top:4px">＋ 加一筆</button>';
   if(_secOpen)h+='</div></details>';
   h+='<div style="font-size:11px;color:var(--b3);margin-top:8px">存入專案後，請至「專案材料」分配自有/租賃並填租金、運費，一鍵更新施工成本。</div>';
-  // v6.0.139 工具列（與其他計算工具同一位置）：掛專案｜計算｜存入專案｜匯出 PDF（v6.0.145：匯出右邊預覽的那份）｜重設
+  // v6.0.139 工具列（與其他計算工具同一位置）：掛專案｜計算｜存入專案｜匯出 PDF（v6.0.149：匯出右邊預覽的那份）｜重設
   var bar=document.getElementById('me-bar-shoring');
   if(bar)bar.innerHTML='<div class="card" style="margin-bottom:12px"><div class="cb tool-head" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
     +'<div style="flex:1;min-width:220px">'+tb+'</div>'
@@ -9851,7 +9851,7 @@ function _shPanelHtml(title,rows,chCls){
   });
   return h+'</tbody></table></div></div></div>';
 }
-// v6.0.136：材料估算的母索用 calc/lifeline.js（v6.0.145 獨立的安全母索頁併入全套 ④-1 後刪除）
+// v6.0.136：材料估算的母索用 calc/lifeline.js（v6.0.149 獨立的安全母索頁併入全套 ④-1 後刪除）
 // v5.397：安全母索用量表（單獨列印，供業主核算數量）
 // v6.0.139：安全母索逐層表改成估價明細的附錄（不再單獨一份）
 function _matEstRopeBody(res){
@@ -9884,7 +9884,7 @@ function _matEstCalcCore(){
   var el=document.getElementById('mat-est-out');if(!el)return;
   var info=res.info;
   // v6.0.139：右邊＝摘要（關鍵數字）＋材料清單（依進場階段／依類別切換，同一份資料不重複列）＋計算依據（收合）
-  // v6.0.145（Lotion 11/03）：右邊＝摘要＋即時 A4 預覽（就是匯出的那份；叫料單／估價明細切換、勾階段、附計算依據）
+  // v6.0.149（Lotion 11/03）：右邊＝摘要＋即時 A4 預覽（就是匯出的那份；叫料單／估價明細切換、勾階段、附計算依據）
   var h=_meTilesHtml(res)+'<div class="card"><div class="ch green"><div class="cht">文件預覽</div><button type="button" class="btn btn-sm" style="margin-left:auto" onclick="matEstExportNow()">匯出 PDF</button></div><div class="cb" id="me-pv-ctl">'+_mePvCtlHtml(res)+'</div>'
     +'<div class="cb" style="padding-top:0"><div id="me-pv" class="me-pv" onclick="if(isMob())matEstExportNow()"></div><div style="font-size:11px;color:var(--b3);margin-top:6px">預覽與匯出 PDF 同一份內容與分頁（左邊改了會自動重算）'+(isMob()?'；點預覽可放大看 PDF':'')+'</div></div></div>';
   var basis='<div class="cb" style="font-size:12.5px;line-height:1.9">壁線周長 '+_shR1(info.PW)+'M｜路數 縱'+info.routesV+(info.autoV?'（自動）':'')+'＋橫'+info.routesH+(info.autoH?'（自動）':'')+'＝'+info.totalR+' 路｜支撐總長 '+_shR1(info.supLen)+'M｜中柱合計 '+info.posts+' 支｜退場留存 '+_shR1(info.keep)+'M/支'
@@ -10120,7 +10120,7 @@ function _mergeQHistory(loc,cloud){
     var seen={};lo.forEach(function(v){seen[String(v&&v.savedAt)]=1;});
     cl.forEach(function(v){if(v&&!seen[String(v.savedAt)]){lo.push(v);seen[String(v.savedAt)]=1;}});
     lo.sort(function(a,b){return (b.savedAt||0)-(a.savedAt||0);});
-    out[qid]=lo.slice(0,30);   // 與本機保留上限一致
+    out[qid]=_qhPrune(lo,30);   // v6.0.148：正式版次與還原前備份不因合併被擠掉；自動存檔最多 30 份
   });
   return out;
 }
@@ -27755,7 +27755,7 @@ function renderInvoiceRecords(){
 // ══════════════════════════════════════════════════════════════
 // Q_HISTORY 已在頂部宣告
 try{const x=localStorage.getItem('fy_q_history');if(x)Q_HISTORY=JSON.parse(x);}catch(e){_err('top',e);}
-const saveQHistory=()=>{try{localStorage.setItem('fy_q_history',JSON.stringify(Q_HISTORY));_autoUpload();}catch(e){_err('top',e);}};
+const saveQHistory=()=>{try{localStorage.setItem('fy_q_history',JSON.stringify(Q_HISTORY));}catch(e){_err('saveQHistory',e);return false;}try{_autoUpload();}catch(e){_err('saveQHistory.up',e);}return true;};   // v6.0.148 審查：回傳本機有沒有存成功（空間滿時還原要取消）
 // ── 儲存空間治理 ──
 function renderStorageUsage(){
   const el=document.getElementById('storage-usage-body');if(!el)return;
@@ -27783,7 +27783,7 @@ function cleanupQHistory(){
   let before=0,after=0;
   Object.keys(Q_HISTORY).forEach(qid=>{
     before+=(Q_HISTORY[qid]||[]).length;
-    if(Q_HISTORY[qid]&&Q_HISTORY[qid].length>3)Q_HISTORY[qid]=Q_HISTORY[qid].slice(0,3);
+    if(Q_HISTORY[qid])Q_HISTORY[qid]=_qhPrune(Q_HISTORY[qid],3);   // v6.0.148：只清自動存檔（原本 slice(0,3) 會連正式版次一起刪）
     after+=(Q_HISTORY[qid]||[]).length;
   });
   // 移除已不存在報價單的孤兒歷史
@@ -27889,19 +27889,23 @@ function compareQVersion(qid,idx,newerIdx){
     +'</div>';
   showConfirm('版本比較',head+'<div style="max-height:320px;overflow-y:auto">'+table+'</div>'+foot,()=>{},false,null,true);
 }
+// v6.0.148：版本歷史修剪共用——正式版次與還原前備份永遠保留，只修剪自動存檔（keep 份，由新到舊）
+function _qhKeep(e){return !!(e&&(e.formal||e.pre));}
+function _qhPrune(arr,keep){var n=0;return (arr||[]).filter(function(e){return _qhKeep(e)?true:(++n<=keep);});}
 function saveQVersion(qid,q,opts){
   if(!Q_HISTORY[qid])Q_HISTORY[qid]=[];
   Q_HISTORY[qid].unshift({
     savedAt:Date.now(),
     by:_fbUser?.email||'本機',
     formal:!!(opts&&opts.formal),          // 正式版次（進版產生）：永久保留
+    pre:!!(opts&&opts.pre)||undefined,     // v6.0.148 還原前備份：永久保留、不算在自動存檔 10 份
+    unsaved:!!(opts&&opts.unsaved)||undefined,   // 備份含編輯頁還沒按儲存的修改
     ver:(q.ver||1),
     snapshot:JSON.parse(JSON.stringify(q))
   });
-  // 修剪：正式版全保留；自動存檔僅留最近 10 份
-  var _auto=0;
-  Q_HISTORY[qid]=Q_HISTORY[qid].filter(function(e){return e.formal?true:(++_auto<=10);});
-  saveQHistory();
+  // 修剪：正式版、還原前備份全保留；自動存檔僅留最近 10 份
+  Q_HISTORY[qid]=_qhPrune(Q_HISTORY[qid],10);
+  return saveQHistory();
 }
 
 function showQVersions(qid){
@@ -27914,10 +27918,10 @@ function showQVersions(qid){
     const pf=prevFormalOf(i);
     return `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--b1);flex-wrap:wrap">
-      <div style="flex:0 0 auto;font-family:'Noto Serif TC',serif;font-size:${v.formal?'17px':'12px'};font-weight:900;color:${v.formal?'var(--g3)':'var(--b3)'};min-width:38px">${v.formal?('V'+(v.ver||1)):'存檔'}</div>
+      <div style="flex:0 0 auto;font-family:'Noto Serif TC',serif;font-size:${v.formal?'17px':'12px'};font-weight:900;color:${v.formal?'var(--g3)':(v.pre?'#b26a00':'var(--b3)')};min-width:38px">${v.formal?('V'+(v.ver||1)):(v.pre?'備份':'存檔')}</div>
       <div style="flex:1;min-width:130px">
         <div style="font-size:12px;font-weight:700;color:var(--b5)">
-          ${v.formal?`<span style="display:inline-block;background:var(--gl);color:var(--g3);border:1px solid var(--gm);border-radius:99px;padding:1px 9px;font-size:11px;margin-right:6px">v${v.ver||'?'} 正式版</span>`:''}
+          ${v.formal?`<span style="display:inline-block;background:var(--gl);color:var(--g3);border:1px solid var(--gm);border-radius:99px;padding:1px 9px;font-size:11px;margin-right:6px">v${v.ver||'?'} 正式版</span>`:''}${v.pre?`<span style="display:inline-block;background:#fff3e0;color:#b26a00;border:1px solid #ffcc80;border-radius:99px;padding:1px 9px;font-size:11px;margin-right:6px">還原前備份${v.unsaved?'（含未儲存修改）':''}</span>`:''}
           ${v.snapshot.date?('報價日 '+fmtD(v.snapshot.date)):new Date(v.savedAt).toLocaleString('zh-TW')}
         </div>
         <div style="font-size:11px;color:var(--b4)">NT$ ${fmt(v.snapshot.t?.total||0)} ／ ${new Date(v.savedAt).toLocaleString('zh-TW')} ／ ${esc(v.by||'')}</div>
@@ -27926,11 +27930,11 @@ function showQVersions(qid){
         <button type="button" onclick="viewQVersion('${qid}',${i})" class="btn btn-xs">查看</button>
         <button type="button" onclick="compareQVersion('${qid}',${i})" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" title="此版與現行內容比較">vs現行</button>
         ${(v.formal&&pf>=0)?`<button type="button" onclick="compareQVersion('${qid}',${pf},${i})" class="btn btn-xs" style="border-color:#7e57c2;color:#5e35b1" title="此版與前一個正式版比較（看這次進版改了什麼）">vs前版</button>`:''}
-        <button type="button" onclick="restoreQVersion('${qid}',${i})" class="btn btn-xs" style="border-color:#1a73e8;color:#1a73e8">還原</button>
+        <button type="button" onclick="restoreQVersion('${qid}',${i},${+v.savedAt||0})" class="btn btn-xs" style="border-color:#1a73e8;color:#1a73e8">還原</button>
       </div>
     </div>`;};
-  const formals=[],autos=[];
-  versions.forEach((v,i)=>{(v.formal?formals:autos).push(row(v,i));});
+  const formals=[],autos=[],pres=[];
+  versions.forEach((v,i)=>{(v.formal?formals:(v.pre?pres:autos)).push(row(v,i));});   // v6.0.148 還原前備份另列
   const sec=(t,hint)=>`<div style="padding:7px 12px;background:var(--b0);font-size:11px;font-weight:700;color:var(--b4)">${t}${hint?` <span style="font-weight:400">${hint}</span>`:''}</div>`;
   // v5.386：兩種版本的差別講清楚——正式版次是自己按「進版」產生的，永久保留；
   // 自動存檔是每次按儲存時系統自動留的一份，防誤關／誤改，只留最近 10 份。
@@ -27953,6 +27957,7 @@ function showQVersions(qid){
     +curRow
     +bumpBar
     +(formals.length?formals.join(''):'<div style="padding:10px 12px;font-size:11.5px;color:var(--b3)">尚無正式版次 — 在編輯頁按「進版」即可封存現行內容為正式版（V1、V2…依序累積）</div>')
+    +(pres.length?sec('還原前備份','· 每次「還原」前自動把當時的內容另存一份，永久保留')+pres.join(''):'')
     +sec('自動存檔','· 每按一次「儲存」自動留一份（防誤關／誤改），只保留最近 10 份，不是版次')
     +(autos.length?autos.join(''):'<div style="padding:10px 12px;font-size:11.5px;color:var(--b3)">尚無自動存檔</div>');
   showConfirm('歷史版本',`<div style="max-height:340px;overflow-y:auto;margin:-8px -12px">${body}</div>`,()=>{},false,null,true);
@@ -27970,7 +27975,7 @@ function viewQVersion(qid,idx){
      <td style="padding:4px 6px;border-bottom:1px solid var(--b1);text-align:right;white-space:nowrap">${fmt(parseFloat(it.qty)||0)} ${esc(_uFix(it.unit||''))}</td>
      <td style="padding:4px 6px;border-bottom:1px solid var(--b1);text-align:right">${fmt(parseFloat(it.price)||0)}</td>
      <td style="padding:4px 6px;border-bottom:1px solid var(--b1);text-align:right;font-weight:700">${_isSpare(it)?'<span style="color:var(--b3);font-weight:400">備用單價</span>':fmt((parseFloat(it.qty)||0)*(parseFloat(it.price)||0))}</td></tr>`).join('');
-  showConfirm((v.formal?'V'+(v.ver||1)+' ':'')+'版本內容（唯讀）',
+  showConfirm((v.formal?'V'+(v.ver||1)+' ':(v.pre?'還原前備份 ':''))+'版本內容（唯讀）',
     `<div style="font-size:12px;color:var(--b4);margin-bottom:8px">${esc(sn.name||'')}　·　報價日期 ${esc(sn.date||'—')}　·　封存於 ${new Date(v.savedAt).toLocaleString('zh-TW')}</div>
      <div style="max-height:340px;overflow:auto;border:1px solid var(--b1);border-radius:8px">
      <table style="width:100%;border-collapse:collapse;font-size:12px">
@@ -27979,15 +27984,22 @@ function viewQVersion(qid,idx){
      <div style="text-align:right;font-size:14px;font-weight:900;color:var(--g3);margin-top:8px">合計 NT$ ${fmt(sn.t?.total||0)}</div>`,
     ()=>{},false,null,true);
 }
-function restoreQVersion(qid,versionIdx){
+function restoreQVersion(qid,versionIdx,savedAt){
   const versions=Q_HISTORY[qid];
+  if(savedAt!=null&&versions){var _vi=versions.findIndex(function(v){return v&&v.savedAt===savedAt;});if(_vi>=0)versionIdx=_vi;}   // 審查：視窗開著時清單可能被同步重排，以存檔時間對到同一份
   if(!versions||!versions[versionIdx])return;
-  const snapshot=versions[versionIdx].snapshot;
-  showConfirm('還原版本','確定要還原到此版本？<br><span style="font-size:11px;color:var(--b4)">目前內容會先自動存檔（可再還原回來），版本號維持現行不倒退。</span>',()=>{
+  const src=versions[versionIdx],snapshot=JSON.parse(JSON.stringify(src.snapshot));   // v6.0.148：深拷貝——原本淺拷貝，還原後再改報價會連帶改到歷史版次的工項
+  const editing=typeof eid!=='undefined'&&eid===qid&&!!document.getElementById('page-editor')?.classList.contains('active');
+  const what=src.formal?('V'+(src.ver||1)+' 正式版'):(src.pre?'還原前備份':'自動存檔');
+  showConfirm('還原版本','確定要還原到「'+what+'（'+new Date(src.savedAt).toLocaleString('zh-TW')+'）」？<br><span style="font-size:12px;color:var(--b5)"><b>目前內容'+(editing?'（含編輯頁還沒按儲存的修改）':'')+'會先另存成「還原前備份」，永久保留、不會不見</b>，可以在歷史版本裡查看、比較或再還原回來。版本號維持現行不倒退；已封存的正式版次不會被改。</span>',()=>{
     const idx=Q.findIndex(x=>x.id===qid);
     if(idx>=0){
       const curVer=Q[idx].ver||1;
-      try{saveQVersion(qid,Q[idx]);}catch(e){_err('restoreQVersion',e);}          // 還原前備份現行，避免內容遺失
+      // v6.0.148：還原前備份＝目前畫面上的內容（編輯頁開著就把還沒儲存的修改一起收進來），標 pre、永久保留
+      let cur=Q[idx],unsaved=false;
+      if(editing){try{cur=Object.assign(JSON.parse(JSON.stringify(Q[idx])),_qEditorFields());unsaved=true;}catch(e){_err('restoreQVersion.cur',e);cur=Q[idx];}}
+      var _okB=false;try{_okB=saveQVersion(qid,cur,{pre:true,unsaved:unsaved});}catch(e){_err('restoreQVersion',e);}
+      if(!_okB){toast('還原前備份存不進這台裝置（儲存空間可能滿了），已取消還原：請先匯出備份或清理自動存檔');return;}   // 審查：空間滿時備份只在記憶體，重新整理就不見
       Q[idx]={...snapshot,id:qid,ver:Math.max(curVer,snapshot.ver||1)};  // 版號不倒退
       _touch(Q[idx]); // 快照裡的 _mt 是舊值，不蓋新戳記的話雲端同步會把還原吃掉
       persist();renderList();rDash();
@@ -27995,7 +28007,7 @@ function restoreQVersion(qid,versionIdx){
       try{
         if(typeof eid!=='undefined'&&eid===qid&&document.getElementById('page-editor')?.classList.contains('active'))loadQ(qid);
       }catch(e){_err('restoreQVersion',e);}
-      toast('已還原（原內容已自動存檔）');
+      toast('已還原（原內容已另存成「還原前備份」，在歷史版本裡）');
     }
   });
 }
