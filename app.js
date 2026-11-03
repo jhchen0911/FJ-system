@@ -8348,7 +8348,7 @@ function _tombPrune(){
   try{
     Object.keys(TOMBS||{}).forEach(function(c){
       Object.keys(TOMBS[c]||{}).forEach(function(id){
-        if(now-(TOMBS[c][id]||0)>TOMB_TTL){delete TOMBS[c][id];n++;}
+        if(c!=='projects'&&now-(TOMBS[c][id]||0)>TOMB_TTL){delete TOMBS[c][id];n++;}   // 4a 審查 2：專案墓碑不過期（過期後主報價仍得標會被自動重建）
       });
       if(!Object.keys(TOMBS[c]).length)delete TOMBS[c];
     });
@@ -11212,7 +11212,7 @@ function _pullCloudIfNewer(opts){
       }
     } else {
       window._pullInFlight=false;
-      if(cloudTime>0&&localSync>=cloudTime){window._cloudApplied1=true;try{_bankMigrate();}catch(e){_err('_pullCloudIfNewer.bank',e);}try{_rmk14Migrate();}catch(e){_err('_pullCloudIfNewer.rmk14',e);}}   // 審查 🔴4：本機已是最新，也可以做匯款帳號遷移
+      if(cloudTime>0&&localSync>=cloudTime){window._cloudApplied1=true;try{_bankMigrate();}catch(e){_err('_pullCloudIfNewer.bank',e);}try{_rmk14Migrate();}catch(e){_err('_pullCloudIfNewer.rmk14',e);}try{_prjSync();}catch(e){_err('_pullCloudIfNewer.prj',e);}}   // 審查 🔴4：本機已是最新，也可以做匯款帳號遷移
       if(dirty)_pushCloud({silent:true});
       else _pullPrivateIfNewer();   // v5.324：只有成本／分潤變動時 shared 不會動，要單獨看私有節點
     }
@@ -40062,7 +40062,8 @@ function _prjStatus(p){
 // 案號：只給內部畫面用（見上方說明）
 function _prjNo(qidOrP){var p=(qidOrP&&typeof qidOrP==='object')?qidOrP:_prjOfQ(qidOrP);return (p&&p.no)||'';}
 function _prjNoChip(q){
-  var p=q&&_prjOfQ(q.id);if(!p||!p.no)return '';
+  var p=q&&_prjOfQ(q.id);if(!p)return '';
+  if(!p.no)return '<span class="prj-no" title="內部案號由管理員裝置下一次同步時編上" style="font-size:11px;padding:1px 7px;border-radius:9px;background:var(--b1);color:var(--b4);white-space:nowrap">案號編號中</span>';
   return '<span class="prj-no" title="內部案號（只給公司內部看，不印在給業主的文件上）" style="font-size:11px;padding:1px 7px;border-radius:9px;background:var(--b1);color:var(--b5);white-space:nowrap">案號 '+esc(p.no)+(p.voidAt?'（作廢）':'')+'</span>';
 }
 // 連結：一律從報價 id 反查（合約 linkedQid、請款單 quoteId／sourceQid、發包 q.rfqs），不存在專案裡
@@ -40092,6 +40093,7 @@ function saveProjects(){_lsSet('fy_projects',JSON.stringify(PROJECTS),'專案');
 function _prjSync(opt){
   opt=opt||{};
   if(typeof Q==='undefined'||!Array.isArray(Q))return 0;
+  if(!_prjReady())return 0;   // 審查 1／3：同步雲端的裝置要等雲端資料套用過，才不會拿本機不完整的報價去建檔、編號、作廢
   var tomb=(TOMBS&&TOMBS.projects)||{},now=Date.now(),me=_meEmail()||'',ch={};
   PROJECTS=_prjArr(PROJECTS).filter(function(p){return p&&p.id;});
   var by={};PROJECTS.forEach(function(p){by[p.id]=p;});
@@ -40118,21 +40120,36 @@ function _prjSync(opt){
     var q=qById[p.qid],why=!q?'主報價已刪除':(q.parentId?'主報價變成追加報價':(!q.awarded?'取消得標':''));
     if(why){p.voidAt=now;p.voidWhy=why;ch[p.id]=p;}
   });
-  // 案號：沒有的依得標日排序補號；重號（兩台裝置同時得標）→ 較晚得標的改下一個空號，舊號留紀錄。全部裝置算法相同，結果一致。
-  var seq={},ord=function(a,b){return ((a.awAt||0)-(b.awAt||0))||String(a.qid).localeCompare(String(b.qid));};
-  var yr=function(p){return new Date(p.awAt||p.createdAt||now).getFullYear();};
-  PROJECTS.forEach(function(p){var m=String(p.no||'').match(/^(\d{4})-(\d{3,})$/);if(m)seq[m[1]]=Math.max(seq[m[1]]||0,+m[2]);});
-  var next=function(y){seq[y]=(seq[y]||0)+1;return y+'-'+String(seq[y]).padStart(3,'0');};
-  var seen={};
-  PROJECTS.slice().sort(ord).forEach(function(p){
-    if(p.no&&!seen[p.no]){seen[p.no]=p;return;}
-    var y=yr(p);
-    if(p.no)p.noLog=_prjArr(p.noLog).concat([{from:p.no,at:now,why:'案號重複'}]);
-    p.no=next(y);seen[p.no]=p;ch[p.id]=p;
-  });
+  // 案號：沒有的依得標日排序補號；重號（兩台裝置同時得標）→ 較晚得標的改下一個空號，舊號留紀錄。
+  // 審查 1：只有管理員裝置（或沒登入的本機模式）編號，員工裝置建的專案先沒有案號、等管理員裝置下一次同步補上 → 編號只出自一處、不會互相改號。
+  // 審查 2：每年用過的最大號記在參數 P.prjNoMax（共用區），刪掉的專案號碼不再發給別案。
+  if(_prjCanNumber()){
+    var seq={},ord=function(a,b){return ((a.awAt||0)-(b.awAt||0))||String(a.qid).localeCompare(String(b.qid));};
+    var yr=function(p){return new Date(p.awAt||p.createdAt||now).getFullYear();};
+    var hw=(P&&P.prjNoMax&&typeof P.prjNoMax==='object')?P.prjNoMax:{};
+    Object.keys(hw).forEach(function(y){seq[y]=+hw[y]||0;});
+    PROJECTS.forEach(function(p){var m=String(p.no||'').match(/^(\d{4})-(\d{3,})$/);if(m)seq[m[1]]=Math.max(seq[m[1]]||0,+m[2]);});
+    var next=function(y){seq[y]=(seq[y]||0)+1;return y+'-'+String(seq[y]).padStart(3,'0');};
+    var seen={};
+    PROJECTS.slice().sort(ord).forEach(function(p){
+      if(p.no&&!seen[p.no]){seen[p.no]=p;return;}
+      var y=yr(p);
+      if(p.no)p.noLog=_prjArr(p.noLog).concat([{from:p.no,at:now,why:'案號重複'}]);
+      p.no=next(y);seen[p.no]=p;ch[p.id]=p;
+    });
+    var hwCh=false;Object.keys(seq).forEach(function(y){if((+hw[y]||0)<seq[y]){hw[y]=seq[y];hwCh=true;}});
+    if(hwCh&&P){P.prjNoMax=hw;try{persistP();if(!opt.noSave)_autoUpload();}catch(e){_err('_prjSync.hw',e);}}
+  }
   var n=Object.keys(ch).length;
-  if(n){Object.keys(ch).forEach(function(k){_touch(ch[k]);});if(!opt.noSave)saveProjects();}
+  if(n){Object.keys(ch).forEach(function(k){_touch(ch[k]);});if(!opt.noSave)saveProjects();else{try{_markDirty();}catch(e){_err('_prjSync.dirty',e);}}}   // 審查 5
   return n;
+}
+// 同步雲端的裝置（曾經上傳／下載過）要等這次開頁的雲端資料套用過；沒用雲端的本機模式隨時可以
+function _prjReady(){
+  try{if(window._cloudApplied1)return true;return !localStorage.getItem('fy_last_fb_sync');}catch(e){_err('_prjReady',e);return false;}
+}
+function _prjCanNumber(){
+  try{if(typeof _fbUser==='undefined'||!_fbUser)return !_isReaderUser;return _shWholeOk();}catch(e){_err('_prjCanNumber',e);return false;}
 }
 // 手動刪除專案（管理員；主報價仍得標時刪了也不會自動再建，要重建得先刪墓碑）——只動專案這一筆，舊資料不受影響
 function prjDelete(id){

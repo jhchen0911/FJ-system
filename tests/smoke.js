@@ -9810,6 +9810,19 @@ async function newPage(browser, width, height) {
         out.health = _healthRows().some(x => x.area === '專案' && /追加報價已得標、但主報價沒有得標/.test(x.msg));
         // 主報價被刪 → 專案作廢
         Q = Q.filter(q => q.id !== 'qa'); _prjSync(); out.delQ = _prjOfQ('qa') && _prjOfQ('qa').voidWhy === '主報價已刪除';
+        // 審查修正：①刪掉最大號的專案，號碼不再發給新案（P.prjNoMax）②專案墓碑不過期 ③同步雲端的裝置在雲端套用前不對帳 ④員工裝置不編案號
+        const maxNo = PROJECTS.map(p => p.no).sort().pop(); const top = PROJECTS.find(p => p.no === maxNo);
+        _tomb('projects', top.id); PROJECTS = PROJECTS.filter(p => p !== top);
+        Q.push(mk('qn', { awarded: true, date: '2026-09-01' })); _prjSync();
+        out.noReuse = _prjOfQ('qn').no !== maxNo && +P.prjNoMax['2026'] >= 3;
+        TOMBS.projects[top.id] = Date.now() - 400 * 864e5; _tombPrune(); out.tombKeep = TOMBS.projects && TOMBS.projects[top.id] > 0;
+        localStorage.setItem('fy_last_fb_sync', String(Date.now())); const ca = window._cloudApplied1; window._cloudApplied1 = false;
+        Q.push(mk('qg', { awarded: true })); out.gate = _prjSync() === 0 && !_prjOfQ('qg');
+        window._cloudApplied1 = true; const oW = window._shWholeOk, oU = window._fbUser;
+        window._fbUser = { email: 'staff@example.com' }; window._shWholeOk = () => false;
+        _prjSync(); out.staffNoNum = !!_prjOfQ('qg') && !_prjOfQ('qg').no && /案號編號中/.test(_prjNoChip(Q.find(q => q.id === 'qg')));
+        window._shWholeOk = () => true; _prjSync(); out.adminNum = /^\d{4}-\d{3}$/.test(_prjOfQ('qg').no || '');
+        window._shWholeOk = oW; window._fbUser = oU; window._cloudApplied1 = ca; localStorage.removeItem('fy_last_fb_sync');
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
       window.toast = oT;
       return out;
@@ -9855,16 +9868,17 @@ async function newPage(browser, width, height) {
     const SR = require('fs').readFileSync(require('path').join(__dirname, '..', 'storage.rules'), 'utf8');
     const pr = RP.projects || {}, pc = pr.$pid || {};
     const rulesOk = pr['.write'] === RP.quotes['.write'] && pc['.write'] === RP.quotes.$qid['.write'] && /\$pid === 'p_' \+ newData\.child\('qid'\)\.val\(\)/.test(pc['.validate'] || '')
-      && /hasChildren\(\['id','qid','no'\]\)/.test(pc['.validate'] || '') && pc.$other && pc.$other['.validate'] === false && /beginsWith\('projects\/' \+ \$pid \+ '\/docs\/'\)/.test(pc.docs.$d['.validate'])
+      && /hasChildren\(\['id','qid'\]\)/.test(pc['.validate'] || '') && pc.$other && pc.$other['.validate'] === false && /beginsWith\('projects\/' \+ \$pid \+ '\/docs\/'\)/.test(pc.docs.$d['.validate'])
       && /match \/projects\/\{pid\}\/docs\/\{file=\*\*\}[^}]*isStaff\(\) \|\| isReader\(\)[^}]*request\.resource\.size < 50 \* 1024 \* 1024/.test(SR);
     check('4a 專案資料集建檔：全部得標主報價（含已結案）各一筆 p_＋報價id、追加掛主約不另建、案號依得標日年份＋流水號、狀態跟報價結案、重跑不重建', r.mig && r.stored, JSON.stringify(r));
     check('4a 專案連結從報價 id 反查（合約 linkedQid、請款單 quoteId／sourceQid、發包），舊資料（報價／合約／請款／應付／發票）一字不動、專案不含金額', r.links && r.noMove, JSON.stringify(r));
     check('4a 取消得標＝專案作廢（不刪、案號保留）、重新得標恢復；主報價刪除＝作廢；兩台裝置重號 → 較晚的改下一號並留紀錄', r.voidCycle && r.dup && r.delQ, JSON.stringify(r));
+    check('4a 審查修正：刪掉的案號不再發出（每年最大號記在參數）、專案墓碑不過期、同步雲端的裝置在雲端套用前不對帳、只有管理員裝置編案號（員工裝置顯示「案號編號中」）', r.noReuse && r.tombKeep && r.gate && r.staffNoNum && r.adminNum, JSON.stringify(r));
     check('4a 專案進同步清單（共用區、逐筆、記錄級合併、筆數暴跌保護、刪除墓碑）：另一台刪除後合併消失且不自動復活、較新版本勝出；健檢抓「追加得標但主約沒得標」', r.sync && r.tomb && r.merge && r.health, JSON.stringify(r));
     check('4a 現行得標動作：主報價得標專案 +1（得標日＝今天）、追加得標筆數不變並掛主約、得標金額＝主約＋追加', r2.award && r2.addon, JSON.stringify(r2));
     check('4a 案號只給內部：工程專案頁顯示案號；給業主的報價單、請款單列印不出現案號', r2.chip && r2.noPrint, JSON.stringify(r2));
     check('4a 全量備份含專案、還原後筆數與內容一致', r2.exp && r3, JSON.stringify({ exp: r2.exp, r3 }));
-    check('4a 規則：projects 節點格式檢查（id＝p_＋qid、必填 id／qid／no、未知欄位擋）、員工逐筆／管理員整包；Storage projects/<id>/docs 員工與唯讀可讀、員工上傳單檔 50 MB（規則檔與產生器一致）', rulesOk && r2.storageGen, JSON.stringify({ rulesOk, gen: r2.storageGen }));
+    check('4a 規則：projects 節點格式檢查（id＝p_＋qid、必填 id／qid、案號格式、未知欄位擋）、員工逐筆／管理員整包；Storage projects/<id>/docs 員工與唯讀可讀、員工上傳單檔 50 MB（規則檔與產生器一致）', rulesOk && r2.storageGen, JSON.stringify({ rulesOk, gen: r2.storageGen }));
     check('4a 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
