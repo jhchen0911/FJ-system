@@ -38964,8 +38964,8 @@ function _draftOpenQuote(q,isEdit){
 // Cloud Functions（functions/line/）收 LINE 訊息：擁有者一對一的檔案 → Storage line/inbox；工地群組 → fydata/lineLog，
 // 現場追加與施工日報寫成草稿（fydata/drafts type addon／dailyLog）。這裡負責：草稿顯示與確認、LINE 設定卡（擁有者、群組綁定工程、固定句子）。
 // 設定 fydata/lineCfg：{owners:{<userId>:{name}}, groups:{<groupId>:{qid,name,daily}}, pending:{users:{},groups:{}}, texts:{inboxAck,daily3,remind,alarm,noReply2}}
-var _LINE_TEXTS={inboxAck:'收到，之後的檔案會一起收。傳完打一行案名就好。',inboxNote:'這批 {n} 個檔案：{text}，已記下',daily3:'今天辛苦了，麻煩回三件事：\n1. 今天做了哪些？（工項、數量）\n2. 幾個人、什麼機具？\n3. 有沒有問題、等待或追加？',remind:'昨天的施工日報還沒回，麻煩補一下三件事，謝謝。',alarm:'{site}工地群組出現「{word}」，請判斷是否停工。',noReply2:'{site}工地群組連兩天沒有回施工日報。',dailyCo:'今天辛苦了，請複製下面格式回報（一個工地一段，可以貼好幾段；補昨天的只改日期）：\n【日期】{date}\n【工地】\n【今天】\n【明天】\n【問題】'};
-var _LINE_TL={inboxAck:'收到檔案的回覆（同一批 3 分鐘內只回第一則，v6.0.153）',inboxNote:'傳完檔案打一行字的回覆（{n}＝這批檔案數、{text}＝打的字）',daily3:'17:30 在工地群組問的三句',remind:'隔天 08:00 沒回的提醒',alarm:'事故前兆通知 Lotion（{site} 工地、{word} 關鍵字）',noReply2:'連兩天沒回通知 Lotion',dailyCo:'17:30 在公司大群組發的回報格式（{date}＝當天日期，例 11/01）'};
+var _LINE_TEXTS={inboxAck:'收到，之後的檔案會一起收。傳完打一行案名就好。',inboxNote:'這批 {n} 個檔案：{text}，已記下',inboxFail:'這個檔案沒存成功，請重傳：{name}',inboxBig:'這個檔案超過 {mb}MB 沒存，請改傳雲端連結：{name}',daily3:'今天辛苦了，麻煩回三件事：\n1. 今天做了哪些？（工項、數量）\n2. 幾個人、什麼機具？\n3. 有沒有問題、等待或追加？',remind:'昨天的施工日報還沒回，麻煩補一下三件事，謝謝。',alarm:'{site}工地群組出現「{word}」，請判斷是否停工。',noReply2:'{site}工地群組連兩天沒有回施工日報。',dailyCo:'今天辛苦了，請複製下面格式回報（一個工地一段，可以貼好幾段；補昨天的只改日期）：\n【日期】{date}\n【工地】\n【今天】\n【明天】\n【問題】'};
+var _LINE_TL={inboxAck:'收到檔案的回覆（同一批 3 分鐘內只回第一則，v6.0.153）',inboxNote:'傳完檔案打一行字的回覆（{n}＝這批檔案數、{text}＝打的字）',inboxFail:'檔案沒存成功的回覆（{name}＝檔名）',inboxBig:'檔案太大沒存的回覆（{mb}＝上限 MB、{name}＝檔名）',daily3:'17:30 在工地群組問的三句',remind:'隔天 08:00 沒回的提醒',alarm:'事故前兆通知 Lotion（{site} 工地、{word} 關鍵字）',noReply2:'連兩天沒回通知 Lotion',dailyCo:'17:30 在公司大群組發的回報格式（{date}＝當天日期，例 11/01）'};
 function _lineDraftBody(d){
   var S=_draftS,pl=(d.payload&&typeof d.payload==='object')?d.payload:{},q=Q.find(function(x){return x.id===pl.qid;});
   var ph=_lineArr(pl.photos).slice(0,6).map(function(path){return '<img data-lpath="'+esc(path)+'" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:6px;background:var(--b1)">';}).join('');

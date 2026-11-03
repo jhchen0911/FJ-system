@@ -452,3 +452,32 @@ test('v6.0.153 舊預設回覆「收到，{n} 個檔案，歸到哪一案？」�
   await core.handleEvents([{ type: 'message', timestamp: T0, replyToken: 'r', source: { type: 'user', userId: 'Uowner' }, message: { id: 'o1', type: 'image' } }], d);
   assert.match(d.replies[0].text, /之後的檔案會一起收/);
 });
+
+test('v6.0.153 審查：傳檔前連打兩行都留；回覆失敗不改推播；很舊的重送檔不蓋掉目前這批；文字重送不重回；有交易時兩個平行的第一則只回一次', async () => {
+  const d = mkDeps(CFG);
+  const f = (id, t) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'image' } });
+  const tx = (id, t, text) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'text', text } });
+  await core.handleEvents([tx('a1', T0, '範例營造')], d); await core.handleEvents([tx('a2', T0 + 60e3, '內湖案')], d);
+  await core.handleEvents([f('q1', T0 + 120e3)], d);
+  assert.equal(d.db.fydata.lineInbox.q1.note, '範例營造；內湖案');
+  // 回覆失敗：不推播
+  const p0 = d.pushes.length; d.reply = async () => { throw new Error('LINE 500'); };
+  await core.handleEvents([f('q2', T0 + 30 * 60e3)], d);
+  assert.equal(d.pushes.length, p0);
+  // 很舊的重送檔（比這批開始早超過 3 分鐘）：自成一批，不蓋掉目前這批
+  const cur = JSON.stringify(d.db.fydata.lineInboxBatch.Uowner);
+  await core.handleEvents([f('q0', T0 - 60 * 60e3)], d);
+  assert.equal(JSON.stringify(d.db.fydata.lineInboxBatch.Uowner), cur);
+  // 文字重送（有認領）：只回一次
+  const d2 = mkDeps(CFG); const claimed = {};
+  d2.claim = async (p, v) => { if (claimed[p]) return false; claimed[p] = 1; await d2.dbSet(p, v); return true; };
+  await core.handleEvents([f('w1', T0)], d2); const n1 = d2.replies.length;
+  claimed['fydata/lineInbox/w9'] = 1;   // 模擬同一則文字已在處理中
+  await core.handleEvents([tx('w9', T0 + 60e3, '某案')], d2);
+  assert.equal(d2.replies.length, n1);
+  // 交易：兩則檔案平行到，都讀到空的批次 → 交易讓第二個重跑，只有一個是第一則
+  const d3 = mkDeps(CFG); let lock = Promise.resolve();
+  d3.txn = async (path, fn) => { const run = lock.then(async () => { const cur = await d3.dbGet(path); const v = fn(cur || null); if (v !== undefined) await d3.dbSet(path, v); return v; }); lock = run.catch(() => {}); return run; };
+  await Promise.all([core.handleEvents([f('x1', T0)], d3), core.handleEvents([f('x2', T0 + 1000)], d3)]);
+  assert.equal(d3.replies.length, 1); assert.deepEqual(Object.keys(d3.db.fydata.lineInboxBatch.Uowner.ids).sort(), ['x1', 'x2']);
+});

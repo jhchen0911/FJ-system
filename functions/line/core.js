@@ -201,32 +201,48 @@ const BATCH_GAP_MS = 3 * 60 * 1000;      // 上一個檔案後 3 分鐘內＝同
 const NOTE_WIN_MS = 10 * 60 * 1000;      // 文字與檔案前後 10 分鐘內＝這批的案名／備註
 const BATCH_IDS_MAX = 200;
 const MEDIA_T = { image: '照片', video: '影片', audio: '語音', file: '檔案' };
+// 審查：LINE 轉傳多個檔會平行送 webhook → 批次狀態用交易更新（deps.txn），沒有交易的測試環境退回讀改寫
+async function _batchTx(deps, key, fn) {
+  if (deps.txn) return await deps.txn(key, fn);
+  const v = fn((await deps.dbGet(key)) || null); if (v !== undefined) await deps.dbSet(key, v); return v;
+}
 async function inboxBatchFile(deps, uid, msgId, now) {
   const key = 'fydata/lineInboxBatch/' + uid;
-  const cur = (await deps.dbGet(key)) || {};
-  let b, first = false;
-  if (cur.id && now - (cur.last || 0) <= BATCH_GAP_MS && now >= (cur.start || 0) - BATCH_GAP_MS) {
-    b = Object.assign({}, cur, { last: Math.max(cur.last || 0, now), n: (cur.n || 0) + 1 });
-  } else {
-    first = true;
-    b = { id: msgId, start: now, last: now, n: 1, ids: {} };
-    if (cur.pendNote && now - (cur.pendAt || 0) <= NOTE_WIN_MS && now >= (cur.pendAt || 0)) b.note = cur.pendNote;   // 先打字、後傳檔
-  }
-  const ids = Object.assign({}, b.ids || {}); if (Object.keys(ids).length < BATCH_IDS_MAX) ids[msgId] = 1; b.ids = ids;
-  await deps.dbSet(key, b);
-  return { id: b.id, first, note: b.note || '', n: b.n };
+  let first = false, alone = false;
+  const v = await _batchTx(deps, key, (cur0) => {
+    const cur = cur0 || {}; first = false; alone = false;
+    if (cur.id && now < (cur.start || 0) - BATCH_GAP_MS) { alone = true; return undefined; }   // 很久以前的重送檔：自成一批，不蓋掉目前這批
+    let b;
+    if (cur.id && now - (cur.last || 0) <= BATCH_GAP_MS) b = Object.assign({}, cur, { last: Math.max(cur.last || 0, now), n: (cur.n || 0) + 1 });
+    else {
+      first = true;
+      b = { id: msgId, start: now, last: now, n: 1, ids: {} };
+      if (cur.pendNote && now - (cur.pendAt || 0) <= NOTE_WIN_MS && now >= (cur.pendAt || 0)) b.note = cur.pendNote;   // 先打字、後傳檔（用過就清掉）
+    }
+    const ids = Object.assign({}, b.ids || {}); if (Object.keys(ids).length < BATCH_IDS_MAX) ids[msgId] = 1; b.ids = ids;
+    return b;
+  });
+  if (alone || !v) return { id: msgId, first: true, note: '', n: 1 };
+  return { id: v.id, first, note: v.note || '', n: v.n };
 }
 async function inboxBatchText(deps, uid, msgId, text, now) {
   const key = 'fydata/lineInboxBatch/' + uid;
-  const cur = (await deps.dbGet(key)) || {};
-  if (text && cur.id && now - (cur.last || 0) <= NOTE_WIN_MS && now >= (cur.start || 0)) {
-    const ids = Object.keys(cur.ids || {});
-    for (const id of ids) { try { await deps.dbSet('fydata/lineInbox/' + id + '/note', text); } catch (e) { (deps.log || console.error)('line.batchNote', e); } }
-    await deps.dbSet(key, Object.assign({}, cur, { note: text }));
-    return { batch: cur.id, n: cur.n || ids.length };
-  }
-  if (text) await deps.dbSet(key, Object.assign({}, cur, { pendNote: text, pendAt: now }));
-  return { batch: '' };
+  let hit = null;
+  await _batchTx(deps, key, (cur0) => {
+    const cur = cur0 || {}; hit = null;
+    if (!text) return undefined;
+    if (cur.id && now - (cur.last || 0) <= NOTE_WIN_MS && now >= (cur.start || 0)) {
+      hit = { batch: cur.id, ids: Object.keys(cur.ids || {}), n: cur.n || 0 };
+      return Object.assign({}, cur, { note: text, pendNote: null, pendAt: null });
+    }
+    const keep = cur.pendNote && now - (cur.pendAt || 0) <= NOTE_WIN_MS;   // 審查：傳檔前連打兩行 → 兩行都留
+    return Object.assign({}, cur, { pendNote: (keep ? cur.pendNote + '；' : '') + text, pendAt: now });
+  });
+  if (!hit) return { batch: '' };
+  // 審查：一次寫完這批每個檔的備註（不逐筆寫，避免大批次拖到逾時）
+  const up = {}; hit.ids.forEach((id) => { up['fydata/lineInbox/' + id + '/note'] = text; });
+  try { if (deps.dbUpdate) await deps.dbUpdate(up); else for (const k of Object.keys(up)) await deps.dbSet(k, text); } catch (e) { (deps.log || console.error)('line.batchNote', e); }
+  return { batch: hit.batch, n: hit.ids.length, total: hit.n };
 }
 
 async function handleEvent(ev, cfg, T, deps, t0) {
@@ -260,8 +276,8 @@ async function handleEvent(ev, cfg, T, deps, t0) {
       let replied = false;
       const say = async (txt) => {
         if (!txt) return;
-        if (!replied && ev.replyToken) { replied = true; try { await deps.reply(ev.replyToken, txt); return; } catch (e) { (deps.log || console.error)('line.reply', e); } }
-        await safePush(deps, src.userId, txt);   // 這則的回覆權杖已用掉（第一則回了「收到」）或失效：失敗通知改推播（少見，才會吃額度）
+        if (!replied && ev.replyToken) { replied = true; try { await deps.reply(ev.replyToken, txt); } catch (e) { (deps.log || console.error)('line.reply', e); } return; }   // 審查：回覆失敗不改推播（LINE 可能其實送到了，推播會重複又吃額度）
+        await safePush(deps, src.userId, txt);   // 只有第一則（權杖拿去回「收到」）存檔失敗時才推播：每批最多一則
       };
       const mb = Math.round(MAX_FILE_BYTES / 1048576), nm = msg.fileName || (MEDIA_T[msg.type] || '檔案');
       const big = msg.fileSize > MAX_FILE_BYTES;
@@ -299,10 +315,11 @@ async function handleEvent(ev, cfg, T, deps, t0) {
     if (msg.type === 'text') {
       // v6.0.153：文字＝這批的案名／備註。前 10 分鐘內有檔案 → 記到這批每個檔、回一句；沒有 → 先記著，10 分鐘內傳來的檔案會帶上
       const text = String(msg.text || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+      if (deps.claim && !(await deps.claim('fydata/lineInbox/' + msg.id, { id: msg.id, at: now, date, from: src.userId, type: 'text', status: 'saving' }))) return { kind: 'dup' };   // 審查：文字重送不重複回覆
       const r = await inboxBatchText(deps, src.userId, msg.id, text, now);
       await deps.dbSet('fydata/lineInbox/' + msg.id, Object.assign({ id: msg.id, at: now, date, from: src.userId, type: 'text', text: String(msg.text || '').slice(0, 1000) },
         r.batch ? { status: 'filed', batch: r.batch, note: '已記到這批 ' + r.n + ' 個檔案' } : { status: 'new' }));
-      if (r.batch && ev.replyToken) { try { await deps.reply(ev.replyToken, fill(T.inboxNote, { n: r.n, text })); } catch (e) { (deps.log || console.error)('line.reply', e); } }
+      if (r.batch && ev.replyToken) { try { await deps.reply(ev.replyToken, fill(T.inboxNote, { n: r.n, text }) + (r.total > r.n ? '（只記到前 ' + r.n + ' 個）' : '')); } catch (e) { (deps.log || console.error)('line.reply', e); } }
       return { kind: 'inboxText', batch: r.batch || '' };
     }
     return { kind: 'skip', type: msg.type };
