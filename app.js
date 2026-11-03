@@ -27994,7 +27994,7 @@ function renderInvoiceRecords(){
 // ══════════════════════════════════════════════════════════════
 // Q_HISTORY 已在頂部宣告
 try{const x=localStorage.getItem('fy_q_history');if(x)Q_HISTORY=JSON.parse(x);}catch(e){_err('top',e);}
-const saveQHistory=()=>{try{localStorage.setItem('fy_q_history',JSON.stringify(Q_HISTORY));_autoUpload();}catch(e){_err('top',e);}};
+const saveQHistory=()=>{try{localStorage.setItem('fy_q_history',JSON.stringify(Q_HISTORY));}catch(e){_err('saveQHistory',e);return false;}try{_autoUpload();}catch(e){_err('saveQHistory.up',e);}return true;};   // v6.0.148 審查：回傳本機有沒有存成功（空間滿時還原要取消）
 // ── 儲存空間治理 ──
 function renderStorageUsage(){
   const el=document.getElementById('storage-usage-body');if(!el)return;
@@ -28144,7 +28144,7 @@ function saveQVersion(qid,q,opts){
   });
   // 修剪：正式版、還原前備份全保留；自動存檔僅留最近 10 份
   Q_HISTORY[qid]=_qhPrune(Q_HISTORY[qid],10);
-  saveQHistory();
+  return saveQHistory();
 }
 
 function showQVersions(qid){
@@ -28169,7 +28169,7 @@ function showQVersions(qid){
         <button type="button" onclick="viewQVersion('${qid}',${i})" class="btn btn-xs">查看</button>
         <button type="button" onclick="compareQVersion('${qid}',${i})" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" title="此版與現行內容比較">vs現行</button>
         ${(v.formal&&pf>=0)?`<button type="button" onclick="compareQVersion('${qid}',${pf},${i})" class="btn btn-xs" style="border-color:#7e57c2;color:#5e35b1" title="此版與前一個正式版比較（看這次進版改了什麼）">vs前版</button>`:''}
-        <button type="button" onclick="restoreQVersion('${qid}',${i})" class="btn btn-xs" style="border-color:#1a73e8;color:#1a73e8">還原</button>
+        <button type="button" onclick="restoreQVersion('${qid}',${i},${+v.savedAt||0})" class="btn btn-xs" style="border-color:#1a73e8;color:#1a73e8">還原</button>
       </div>
     </div>`;};
   const formals=[],autos=[],pres=[];
@@ -28223,8 +28223,9 @@ function viewQVersion(qid,idx){
      <div style="text-align:right;font-size:14px;font-weight:900;color:var(--g3);margin-top:8px">合計 NT$ ${fmt(sn.t?.total||0)}</div>`,
     ()=>{},false,null,true);
 }
-function restoreQVersion(qid,versionIdx){
+function restoreQVersion(qid,versionIdx,savedAt){
   const versions=Q_HISTORY[qid];
+  if(savedAt!=null&&versions){var _vi=versions.findIndex(function(v){return v&&v.savedAt===savedAt;});if(_vi>=0)versionIdx=_vi;}   // 審查：視窗開著時清單可能被同步重排，以存檔時間對到同一份
   if(!versions||!versions[versionIdx])return;
   const src=versions[versionIdx],snapshot=JSON.parse(JSON.stringify(src.snapshot));   // v6.0.148：深拷貝——原本淺拷貝，還原後再改報價會連帶改到歷史版次的工項
   const editing=typeof eid!=='undefined'&&eid===qid&&!!document.getElementById('page-editor')?.classList.contains('active');
@@ -28236,7 +28237,8 @@ function restoreQVersion(qid,versionIdx){
       // v6.0.148：還原前備份＝目前畫面上的內容（編輯頁開著就把還沒儲存的修改一起收進來），標 pre、永久保留
       let cur=Q[idx],unsaved=false;
       if(editing){try{cur=Object.assign(JSON.parse(JSON.stringify(Q[idx])),_qEditorFields());unsaved=true;}catch(e){_err('restoreQVersion.cur',e);cur=Q[idx];}}
-      try{saveQVersion(qid,cur,{pre:true,unsaved:unsaved});}catch(e){_err('restoreQVersion',e);toast('還原前備份失敗，已取消還原');return;}
+      var _okB=false;try{_okB=saveQVersion(qid,cur,{pre:true,unsaved:unsaved});}catch(e){_err('restoreQVersion',e);}
+      if(!_okB){toast('還原前備份存不進這台裝置（儲存空間可能滿了），已取消還原：請先匯出備份或清理自動存檔');return;}   // 審查：空間滿時備份只在記憶體，重新整理就不見
       Q[idx]={...snapshot,id:qid,ver:Math.max(curVer,snapshot.ver||1)};  // 版號不倒退
       _touch(Q[idx]); // 快照裡的 _mt 是舊值，不蓋新戳記的話雲端同步會把還原吃掉
       persist();renderList();rDash();

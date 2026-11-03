@@ -9625,12 +9625,19 @@ async function newPage(browser, width, height) {
         const many = []; for (let i = 0; i < 40; i++) many.push({ savedAt: 5000 + i, snapshot: {} });
         const M = _mergeQHistory({ x: [{ savedAt: 1, formal: true, ver: 1, snapshot: {} }, { savedAt: 2, pre: true, snapshot: {} }] }, { x: many });
         out.merge = M.x.length === 32 && M.x.some(v => v.formal) && M.x.some(v => v.pre);
+        // 審查：本機空間滿、備份存不進去 → 取消還原，內容不變
+        const ls0 = Storage.prototype.setItem; let tw = []; const oT2 = window.toast; window.toast = m => tw.push(m);
+        Storage.prototype.setItem = function (k, v) { if (k === 'fy_q_history') throw new Error('QuotaExceededError'); return ls0.apply(this, arguments); };
+        const before = JSON.stringify(Q.find(x => x.id === '1767000000001').items);
+        const fi = Q_HISTORY['1767000000001'].findIndex(v => v.formal); restoreQVersion('1767000000001', fi); await wait(20); document.getElementById('gen-confirm-ok').click(); await wait(80);
+        Storage.prototype.setItem = ls0; window.toast = oT2;
+        out.full = JSON.stringify(Q.find(x => x.id === '1767000000001').items) === before && tw.some(m => /已取消還原/.test(m));
         delete Q_HISTORY['1767000000001']; Q.splice(Q.findIndex(x => x.id === '1767000000001'), 1); go('quotes');
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
       return out;
     });
     check('v6.0.148 報價還原不覆蓋：確認視窗講清楚；還原前備份含未儲存修改、永久保留（自動存檔再存 12 次也不被擠掉）；還原後再改報價不會改到正式版次', r.msg && r.restored && r.pre && r.formalSafe && r.prune, JSON.stringify(r));
-    check('v6.0.148 再還原回「還原前備份」內容一致；歷史版本另列還原前備份；清理版本歷史與跨裝置合併不刪正式版次與還原前備份', r.back && r.list && r.cleanup && r.merge, JSON.stringify(r));
+    check('v6.0.148 再還原回「還原前備份」內容一致；歷史版本另列還原前備份；清理版本歷史與跨裝置合併不刪正式版次與還原前備份', r.back && r.list && r.cleanup && r.merge && r.full, JSON.stringify(r));
     check('v6.0.148 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
