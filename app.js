@@ -9441,7 +9441,7 @@ var _LL_FORM={
   wire:{label:'鋼索',note:'端部以套環＋鋼索夾固定，另設緊索器（花籃螺絲）張緊',
         specs:[['Ø9.53mm（3/8″）',0.35],['Ø12.7mm（1/2″）',0.63],['Ø16mm（5/8″）',0.99]],
         accs:['鋼索夾（只／路）','緊索器（組／路）','套環（只／路）'],
-        def:{spec:'Ø12.7mm（1/2″）',spare:1.5,reel:200,acc:[8,1,2]}},
+        def:{spec:'Ø12.7mm（1/2″）',spare:1.5,reel:200,acc:[6,1,2]}},   // v6.0.142 Lotion：鋼索夾一端 3 只 → 每路 6（原 8）
   rope:{label:'特多龍繩',note:'端部以套環＋繩用夾具（或編接）固定，另設棘輪張力器張緊；打結會多吃長度',
         specs:[['Ø16mm',0.17],['Ø18mm',0.21],['Ø20mm',0.26]],
         accs:['繩用夾具（只／路）','棘輪張力器（組／路）','套環（只／路）'],
@@ -9463,7 +9463,7 @@ function matEstRopeImport(){
   renderMatEst();try{matEstCalc();}catch(e){_err('matEstRopeImport',e);}
   toast('已帶入舊安全母索設定（形式、規格、端部預留、每捲長度、配件、損耗）；路數與長度仍依支撐路與「其他區塊」');
 }
-// v6.0.142 安全母索每路配件數：全套 ④-1 進階可改（空白＝依形式預設，例：鋼索每路 鋼索夾 8／緊索器 1／套環 2）
+// v6.0.142 安全母索每路配件數：全套 ④-1 進階可改（空白＝依形式預設，例：鋼索每路 鋼索夾 6（一端 3 只）／緊索器 1／套環 2）
 function _meRopeAcc(inp,t){var d=_LL_FORM[t].def.acc,a=inp?[inp.ropeAcc0,inp.ropeAcc1,inp.ropeAcc2]:[];return d.map(function(x,i){var y=a[i];return (y===''||y==null)?x:Math.max(0,Math.round(_shNum(y)));});}
 // 每層叫料：主形式配件（該層實際拉的路數×每路數；扣構台下的層不算構台下的路）＋其他區塊另一種形式的捲數與配件
 function _meRopeStageAcc(st,T,i,sAdd){

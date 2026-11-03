@@ -831,12 +831,12 @@ async function newPage(browser, width, height) {
         let R = _matEstRes, T = R.T;
         const l1 = R.staged.find(x => /第1層/.test(x.stage)).items, l2 = R.staged.find(x => /第2層/.test(x.stage)).items;
         const q = (L, re) => (L.find(x => re.test(x.name)) || {}).quantity;
-        // 長度不變（同 v6.0.139）：需求 2,044.875、11 捲；新增：規格重量、配件（構台下沒拉的路不算：第 1 層 9−4＝5 路、其餘 9 路；鋼索夾每路 8）
+        // 長度不變（同 v6.0.139）：需求 2,044.875、11 捲；新增：規格重量、配件（構台下沒拉的路不算：第 1 層 9−4＝5 路、其餘 9 路；鋼索夾每路 6（Lotion：一端 3 只））
         out.len = Math.abs(T.ropeNeed - 2044.875) < 1e-6 && T.ropeReels === 11 && Math.round(T.ropeKg) === 1288;
-        out.acc = q(l1, /^鋼索夾/) === 40 && q(l2, /^鋼索夾/) === 72 && q(l1, /^緊索器/) === 5 && q(l1, /^套環/) === 10
-          && T.ropeT.wire.acc.join(',') === '328,41,82' && R.back.some(x => x.k === '鋼索夾' && x.v === '328') && R.back.some(x => /^規格 Ø12\.7mm/.test(x.k || ''));
+        out.acc = q(l1, /^鋼索夾/) === 30 && q(l2, /^鋼索夾/) === 54 && q(l1, /^緊索器/) === 5 && q(l1, /^套環/) === 10
+          && T.ropeT.wire.acc.join(',') === '246,41,82' && R.back.some(x => x.k === '鋼索夾' && x.v === '246') && R.back.some(x => /^規格 Ø12\.7mm/.test(x.k || ''));
         // 每路配件數可改
-        MAT_EST.ropeAcc0 = '6'; matEstCalc(); out.accEdit = _matEstRes.T.ropeT.wire.acc[0] === 41 * 6;
+        MAT_EST.ropeAcc0 = '8'; matEstCalc(); out.accEdit = _matEstRes.T.ropeT.wire.acc[0] === 41 * 8;
         MAT_EST.ropeAcc0 = '';
         // 其他區塊改用特多龍繩：每層 2 路×30M，5 層＝300、端部預留 2×1.5×5＝15、×1.05＝330.75；鋼索長度不變
         MAT_EST._ropeZones = [{ nm: '構台邊', fm: 'rope', vn: 2, vl: 30, hn: 0, hl: 0 }]; matEstCalc(); R = _matEstRes;
