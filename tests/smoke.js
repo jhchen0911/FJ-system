@@ -9883,6 +9883,22 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── 錯誤日誌 _v6TodoItems.mat（Lotion 11/03）：有材料資料的未結案專案，開頁首繪總覽時台帳還沒載入，不再記錯誤；載入完待辦照常顯示 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    await page.evaluate(() => {
+      localStorage.setItem('fy6_q', JSON.stringify([{ id: '1700000000001', name: '材料測試案', awarded: true, mat: { rows: [] }, items: [], t: {} }]));
+      localStorage.setItem('fy_mat_ledger', JSON.stringify([{ id: 'mlT1', name: '型鋼', qty: 5, projQid: '1700000000001', outDate: '2026-09-01' }]));
+      localStorage.removeItem('fy_errlog');
+    });
+    await page.reload(); await page.waitForTimeout(3000);
+    const r = await page.evaluate(() => { const log = JSON.parse(localStorage.getItem('fy_errlog') || '[]'); const it = []; _v6TodoItems(it);
+      return { noErr: !log.some(x => /_v6TodoItems\.mat/.test(x.w)), item: it.some(x => x.type === 'mat_site'), dom: /自有材料在工地/.test(document.body.innerHTML) }; });
+    check('錯誤日誌 _v6TodoItems.mat：開頁首繪不再記錯誤，「自有材料在工地」待辦照常顯示', r.noErr && r.item && r.dom, JSON.stringify(r));
+    await page.evaluate(() => { localStorage.removeItem('fy6_q'); localStorage.removeItem('fy_mat_ledger'); });
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

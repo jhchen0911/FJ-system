@@ -32596,8 +32596,9 @@ function _matFactor(){var f=parseFloat(P.matRentFactor);return (isNaN(f)||f<=0)?
 function _matMatch(a,b){return String(a.name||'')===String(b.name||'')&&String(a.spec||'')===String(b.spec||'')&&String(a.len===''||a.len==null?'':parseFloat(a.len))===String(b.len===''||b.len==null?'':parseFloat(b.len));}
 function _matLabel(r){return (r.name||'')+(r.spec?(' '+r.spec):'')+((r.len!=null&&r.len!=='')?(' L='+r.len+'M'):'');}
 // 台帳：在本專案工地的列／公司倉庫可調撥的列
-function _matLedAt(q){return MAT_LEDGER.filter(function(r){return r&&r.name&&(r.projQid===q.id||(!r.projQid&&q.name&&r.loc===q.name))&&(parseFloat(r.qty)||0)>0;});}
-function _matLedStock(row){return MAT_LEDGER.filter(function(r){return r&&r.name&&!r.projQid&&(!r.loc||r.loc==='公司倉庫')&&(parseFloat(r.qty)||0)>0&&_matMatch(r,row);});}
+// 開機首繪時（var MAT_LEDGER 尚未執行到）台帳是 undefined → 當空清單；載入完總覽會再畫一次（錯誤日誌 _v6TodoItems.mat，Lotion 11/03）
+function _matLedAt(q){return (MAT_LEDGER||[]).filter(function(r){return r&&r.name&&(r.projQid===q.id||(!r.projQid&&q.name&&r.loc===q.name))&&(parseFloat(r.qty)||0)>0;});}
+function _matLedStock(row){return (MAT_LEDGER||[]).filter(function(r){return r&&r.name&&!r.projQid&&(!r.loc||r.loc==='公司倉庫')&&(parseFloat(r.qty)||0)>0&&_matMatch(r,row);});}
 function _matLedUnitCost(r){var uw=parseFloat(r.uw)||0,len=parseFloat(r.len)||0,price=parseFloat(r.price)||0;if(price<=0)return 0;return uw>0?Math.round(uw*len*price):Math.round(price);}
 function _matAvgCost(row){var tot=0,n=0;MAT_LEDGER.forEach(function(r){if(!_matMatch(r,row))return;var uc=_matLedUnitCost(r);if(uc>0){tot+=uc*(parseFloat(r.qty)||0);n+=(parseFloat(r.qty)||0);}});return n>0?Math.round(tot/n):0;}
 function _matDays(from,to){if(!from)return 0;return Math.max(1,_dDiff(from,to||localToday()));}
