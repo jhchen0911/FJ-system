@@ -10197,7 +10197,7 @@ function _syncPayload(){
   return {ts:ts, data:{
     version:'fy-v5', uploadedAt:ts, uploadedBy:(_fbUser&&_fbUser.email)||'',
     quotes:Q, invoices:_invPackAll(INV), upaHistory:UH, params:_paramsOut(),   // v6.0.108 不含金鑰；v5.374 請款單壓縮儲存
-    contracts:CONTRACTS, vendors:VENDORS, payables:PAYABLES,
+    contracts:CONTRACTS, vendors:_vendorsShOut(), payables:PAYABLES,
     invoiceRecs:INVOICE_RECS, expenses:EXPENSES, tombs:TOMBS, activityLog:ACTIVITY_LOG.slice(0,100),
     customers:CUSTOMERS, upaCostDB:UPA_COST_DB, pagePerms:pagePerms, costHist:COST_HIST,
     workers:(typeof WORKERS!=='undefined'?WORKERS:[]),   // v5.438
@@ -10774,14 +10774,36 @@ function _pushPrivate(cb){
 var _PRIV_READER_KEYS=['version','uploadedAt','uploadedBy','uploadedVer','uploadedDev','quoteSens','qHistSens','payables','expenses','costHist','upaCostDB','shareProfit','matLedger','dealHist','paidLog','payAudit'];
 function _privReadAll(ref){
   if(!_isReaderUser)return ref.once('value').then(function(snap){return snap.val();});
-  return Promise.all(_PRIV_READER_KEYS.map(function(k){return ref.child(k).once('value').then(function(sn){return [k,sn.val()];},function(){return [k,null];});}))
-    .then(function(rs){var d={},any=false;rs.forEach(function(x){if(x[1]!=null){d[x[0]]=x[1];any=true;}});return any?d:null;});
+  return Promise.all(_PRIV_READER_KEYS.map(function(k){return ref.child(k).once('value').then(function(sn){return [k,sn.val(),0];},function(e){return [k,null,e||1];});}))
+    .then(function(rs){
+      var d={},any=false,bad=0;rs.forEach(function(x){if(x[2]){bad++;return;}if(x[1]!=null){d[x[0]]=x[1];any=true;}});
+      if(bad===rs.length)throw (rs[0][2]&&rs[0][2].message?rs[0][2]:new Error('permission_denied'));   // 審查：全部被拒＝沒讀權，照舊走失敗與 60 秒冷卻
+      return any?d:null;
+    });
 }
 // 唯讀帳號本機若留有 v6.0.147 前下載過的薪資／人員證件／匯款帳號，一次清掉（不上傳，只清這台）
+// v6.0.147（審查）：廠商匯款帳號已搬到 fydata/bank（v6.0.118）後，共用區的廠商資料不再帶帳號（唯讀帳號、員工都讀得到共用區）；
+//   只拿掉 fydata/bank 已有同一個帳號的那幾家，沒搬到的照舊保留（不會弄丟）；本機 VENDORS 不動
+function _vendorsShOut(){
+  var B=(typeof BANK!=='undefined'&&BANK&&BANK.migrated&&BANK.vendors)?BANK.vendors:null;
+  if(!B)return VENDORS;
+  return (VENDORS||[]).map(function(v){
+    if(!v||!v.bankAcct)return v;
+    var b=B[_bankKey(v.name)];
+    if(!b||String(b.acct||'')!==String(v.bankAcct))return v;
+    var o=Object.assign({},v);delete o.bank;delete o.bankAcct;delete o.bankHolder;return o;
+  });
+}
 function _readerSensPurge(){
   if(!_isReaderUser)return;
   try{HR=[];PAYSLIPS=[];PETTY=[];['fy_hr','fy_payslips','fy_petty','fy_wksens'].forEach(function(k){localStorage.removeItem(k);});}catch(e){_err('_readerSensPurge',e);}
-  try{WK_SENS={};(WORKERS||[]).forEach(function(w){if(w)_WK_SENS_F.forEach(function(k){if(w[k]!=null&&w[k]!=='')w[k]=(k==='idNo'?_wkIdMask(w[k]):'');});});}catch(e){_err('_readerSensPurge.wk',e);}
+  try{
+    WK_SENS={};var ch=false;
+    (WORKERS||[]).forEach(function(w){if(!w)return;
+      _WK_SENS_F.forEach(function(k){if(w[k]!=null&&w[k]!==''){if(k==='idNo')w[k]=_wkIdMask(w[k]);else delete w[k];ch=true;}});
+      if(w.docs&&typeof w.docs==='object')Object.keys(w.docs).forEach(function(k){var x=w.docs[k];if(x&&x.du){delete x.du;ch=true;}});});   // 審查：舊版接回的證件影像（base64）
+    if(ch)localStorage.setItem('fy_workers',JSON.stringify(WORKERS));
+  }catch(e){_err('_readerSensPurge.wk',e);}
   try{BANK=null;}catch(e){/* 可忽略 */}
 }
 function _pullPrivate(cb){

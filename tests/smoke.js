@@ -901,9 +901,10 @@ async function newPage(browser, width, height) {
   {
     const RF = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const allowR = x => /(^|[^!])root\.child\('fydata\/readers'\)/.test(x || '');
-    const rulesOk = !allowR(RF.private['.read']) && allowR(RF.private.$other['.read']) && ['hr', 'payslips', 'petty'].every(k => RF.private.$other['.read'].includes("$other !== '" + k + "'"))
+    const rulesOk = !allowR(RF.private['.read']) && allowR(RF.private.$other['.read']) && !/'hr'|'payslips'|'petty'/.test(RF.private.$other['.read'])
       && !allowR(RF.bank['.read']) && !allowR(RF.workerSens['.read']) && allowR(RF.relay.costs['.read']) && allowR(RF.shared['.read']) && allowR(RF.lineInbox && RF.lineInbox['.read']);
     const { page, errors } = await newPage(browser, 1280, 900);
+    await page.evaluate(o => { window.__rulesOther = o; }, RF.private.$other['.read']);
     const r = await page.evaluate(async () => {
       const out = {};
       try {
@@ -916,8 +917,22 @@ async function newPage(browser, width, height) {
         out.reader = asked.indexOf('*') < 0 && ['hr', 'payslips', 'petty'].every(k => asked.indexOf(k) < 0) && asked.indexOf('payables') >= 0 && asked.indexOf('quoteSens') >= 0 && d && d.payables && !d.hr;
         out.wk = _wkSensCanRead() === false;
         HR = [{ id: 'h1' }]; PAYSLIPS = [{ id: 's1' }]; PETTY = [{ id: 'c1' }]; localStorage.setItem('fy_hr', '[1]'); WK_SENS = { a: { f: { idNo: 'A123456789' } } };
+        WORKERS = [{ id: 'w1', name: 'A', idNo: 'A123456789', birth: '1990-01-01', docs: { idF: { du: 'data:x' } } }];
         _readerSensPurge();
-        out.purge = HR.length === 0 && PAYSLIPS.length === 0 && PETTY.length === 0 && localStorage.getItem('fy_hr') === null && Object.keys(WK_SENS).length === 0;
+        // 審查：允許清單要和程式逐項下載的鍵一致（新增 private 項目預設讀不到）
+        out.keys = _PRIV_READER_KEYS.every(k => window.__rulesOther.includes("$other === '" + k + "'"));
+        // 審查：全部被拒＝失敗（不可當成功）
+        const denyRef = { child: () => ({ once: () => Promise.reject(new Error('permission_denied')) }) };
+        _isReaderUser = true; out.allDenied = await _privReadAll(denyRef).then(() => false, () => true);
+        out.purge = HR.length === 0 && PAYSLIPS.length === 0 && PETTY.length === 0 && localStorage.getItem('fy_hr') === null && Object.keys(WK_SENS).length === 0
+          && WORKERS[0].idNo !== 'A123456789' && !WORKERS[0].birth && !WORKERS[0].docs.idF.du && !/A123456789|data:x/.test(localStorage.getItem('fy_workers') || '');
+        // 審查：廠商匯款帳號已在 fydata/bank 的，不再上傳到共用區；沒搬到的保留
+        const oV = VENDORS, oB = BANK;
+        VENDORS = [{ id: 'v1', name: '甲', bank: 'X', bankAcct: '111', bankHolder: '甲' }, { id: 'v2', name: '乙', bank: 'Y', bankAcct: '222', bankHolder: '乙' }];
+        BANK = { migrated: 1, vendors: {} }; BANK.vendors[_bankKey('甲')] = { acct: '111' };
+        const sv = _syncPayload().data.vendors;
+        out.vendorStrip = !sv[0].bankAcct && !sv[0].bank && sv[1].bankAcct === '222' && VENDORS[0].bankAcct === '111';
+        VENDORS = oV; BANK = oB;
         asked.length = 0; _isReaderUser = false;
         await _privReadAll(fakeRef); out.admin = asked.length === 1 && asked[0] === '*';   // 管理員照舊整包讀
         _isReaderUser = wasR;
@@ -925,7 +940,7 @@ async function newPage(browser, width, height) {
       return out;
     });
     check('v6.0.147 唯讀權限 B1 規則：private 逐項放行唯讀帳號（薪資名冊／薪資單／零用金除外）、匯款帳號與人員證件不放行、成本暫存／共用區／LINE 收件匣照放行', rulesOk);
-    check('v6.0.147 唯讀權限 B1 程式：唯讀帳號逐項下載不含薪資類、不讀人員證件、本機舊的薪資與證件清掉；管理員照舊整包讀', r.reader && r.wk && r.purge && r.admin, JSON.stringify(r));
+    check('v6.0.147 唯讀權限 B1 程式：唯讀帳號逐項下載不含薪資類、不讀人員證件、本機舊的薪資與證件清掉；管理員照舊整包讀', r.reader && r.wk && r.purge && r.admin && r.keys && r.allDenied && r.vendorStrip, JSON.stringify(r));
     check('v6.0.147 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -6797,7 +6812,7 @@ async function newPage(browser, width, height) {
     const RD = "root.child('fydata/readers')";
     const wr = [rules.shared.pagePerms['.write'], rules.shared.$other['.write'], rules.shared.quotes.$qid['.write'], rules.shared.version['.write'], rules.relay['.write'], rules.relay.photos['.read'], rules.private['.write'], rules.access['.write'], rules.adminEmails['.write'], rules.readers['.write'], rules.adminUids['$uid']['.write'], rules.logs['$uid']['.write']];   // backups 改只給擁有者（另驗）
     check('v6.0.90 規則：readers 可讀 shared（v6.0.108 起也可讀 private）、所有寫入與 relay／backups 皆排除 readers 名冊、名冊僅管理員可寫',
-      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.backups['.read'].includes('adminEmails') && !rules.backups['.write'].includes('adminEmails') && rules.relay.photos['.read'].includes('|| ' + RD) && !rules.private['.read'].includes('|| ' + RD) && rules.private.$other['.read'].includes(RD) && /\$other !== 'hr'/.test(rules.private.$other['.read']) /* v6.0.147 B1：唯讀帳號逐項讀 private、薪資類除外 */ && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
+      rules.shared['.read'].includes(RD) && wr.every(x => x.includes('!' + RD)) && !rules.backups['.read'].includes('adminEmails') && !rules.backups['.write'].includes('adminEmails') && rules.relay.photos['.read'].includes('|| ' + RD) && !rules.private['.read'].includes('|| ' + RD) && rules.private.$other['.read'].includes(RD) && !/'hr'|'payslips'|'petty'/.test(rules.private.$other['.read']) && /\$other === 'payables'/.test(rules.private.$other['.read']) /* v6.0.147 B1：唯讀帳號逐項讀 private、薪資類除外 */ && rules.readers['.read'].includes('!' + RD) && !rules.readers['.read'].includes('fydata/access') && rules.readers['$email']['.read'].includes('$email ===') && rules.readers['.validate'] === 'newData.hasChildren()' && !rules.readers['.write'].includes('fydata/access'),
       '');
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -7330,7 +7345,7 @@ async function newPage(browser, width, height) {
     const rules = JSON.parse(fs.readFileSync(pth.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const RK = "root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()";
     const rr = {}, OWN = "auth != null && auth.token.email != null && auth.token.email === 'jhchen0911@gmail.com'";
-    rr.privRead = rules.private['.read'].indexOf('|| ' + RK) < 0 && rules.private.$other['.read'].indexOf(RK) > 0 && ['hr', 'payslips', 'petty'].every(k => rules.private.$other['.read'].includes("$other !== '" + k + "'"));   // v6.0.147 B1
+    rr.privRead = rules.private['.read'].indexOf('|| ' + RK) < 0 && rules.private.$other['.read'].indexOf(RK) > 0 && !/'hr'|'payslips'|'petty'/.test(rules.private.$other['.read']) && rules.private.$other['.read'].includes("$other === 'quoteSens'");   // v6.0.147 B1（逐項允許清單）
     const writes = [];
     (function walk(o, path) { Object.keys(o).forEach(k => { if (k === '.write') writes.push([path, o[k]]); else if (o[k] && typeof o[k] === 'object') walk(o[k], path + '/' + k); }); })(rules, 'fydata');
     rr.writes = writes.length >= 9 && writes.every(([p, w]) => w === 'false' || w.indexOf('!' + RK) >= 0 || (p === 'fydata/logs/$uid' && w.indexOf("!root.child('fydata/readers')") >= 0) || (p === 'fydata/backups' && w === OWN));
@@ -7349,10 +7364,11 @@ async function newPage(browser, width, height) {
         out.me = _meName() === '陳軒（AI）' && _meRoleLabel() === '唯讀';
         /* 讀 private：_pullPrivate 不再對唯讀帳號提前返回（模擬資料庫） */
         let asked = '';
-        _fbDb = { ref: p => ({ once: () => { asked += p + '|'; return Promise.resolve({ val: () => null }); }, update: () => { out.wrote = true; return Promise.resolve(); }, set: () => { out.wrote = true; return Promise.resolve(); } }) };
+        const mk = p => ({ once: () => { asked += p + '|'; return Promise.resolve({ val: () => null }); }, child: k => mk(p + '/' + k), update: () => { out.wrote = true; return Promise.resolve(); }, set: () => { out.wrote = true; return Promise.resolve(); } });
+        _fbDb = { ref: p => mk(p) };   // v6.0.147：唯讀帳號逐項讀 private（child）
         return new Promise(res => {
           _pullPrivate(ok => {
-            out.priv = ok === true && asked.indexOf('fydata/private|') === 0;   // v6.0.118：唯讀帳號之後還會讀 workerSens（看全部）
+            out.priv = ok === true && asked.indexOf('fydata/private/quoteSens|') >= 0 && asked.indexOf('fydata/private|') < 0 && asked.indexOf('fydata/private/hr|') < 0 && asked.indexOf('fydata/workerSens') < 0;   // v6.0.147 B1：逐項讀、不含薪資類與人員證件
             /* 資料層：上傳一律擋 */
             let pushed = null; _pushCloud({ silent: true, onDone: v => { pushed = v; } }); out.push = pushed === false;
             _pushPrivate(v => { out.pushPriv = v === false; });
