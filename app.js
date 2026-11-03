@@ -8716,7 +8716,7 @@ function _meRouteNotes(d,i,gc,gtOn){
   if(!rt.length)n.push('支撐長度與接頭為估算（未填路數明細）');
   else{
     var jk=rt.filter(function(r){return r.jack>0;});if(jk.length)n.push('千斤頂需伸長：'+jk.map(function(r){return (r.id||'?')+' '+r.jack+' cm';}).join('、'));
-    var nc=rt.filter(function(r){return r.midChk==='none';});if(nc.length)n.push('接頭位置未檢查中間樁、懸臂未檢查：'+nc.map(function(r){return r.id||'?';}).join('、'));
+    var nc=rt.filter(function(r){return r.midChk==='none';});if(nc.length)n.push('接頭位置未檢查（沒填中間樁）：'+nc.map(function(r){return r.id||'?';}).join('、'));
     var bd=rt.filter(function(r){return r.warn.length;});if(bd.length)n.push('請確認：'+bd.map(function(r){return (r.id||'?')+' '+r.warn.join('；');}).join('／'));
   }
   if(gtOn&&gc&&i===0){var c=gc.c;
@@ -40081,7 +40081,7 @@ function _meRouteHtml(m,sec,fN,adv){
     +(rows.length?'<button type="button" class="btn btn-xs" style="font-size:12px;color:var(--red)" onclick="meRtClear()">清空路數明細</button>':'')
     +(m._routeSrc?'<span style="font-size:11px;color:var(--b3)">來源：'+esc(m._routeSrc.file||'')+(m._routeSrc.at?'（'+esc(m._routeSrc.at)+' 匯入）':'')+'</span>':'')+'</div>';
   h+=adv('<div class="me-grid">'+fN('rtJack','千斤頂本體 (M)','空白＝0.7')+fN('rtMax1','第 1 層單支最長 (M)','空白＝13')+fN('rtMax2','第 2 層起單支最長 (M)','空白＝10')+fN('rtGap','接頭離中間樁最小距離 (M)','空白＝0.5')+'</div>'
-    +'<div style="font-size:10.5px;color:var(--b3)">淨長＝壁間 − 兩端圍令型鋼高 − 千斤頂本體；定尺 1～13 M 每 0.5（沒有 11、11.5）；零頭 ≤15 cm 由千斤頂伸長，其餘用短節（短節不算接頭）。中間樁、交叉點位置從該路起點壁面量起；接頭離中間樁與交叉點中心至少這個距離；架設中末端凸出最後支承點不超過該處中間樁間距。</div>','千斤頂、單支最長、接頭離中間樁距離');
+    +'<div style="font-size:10.5px;color:var(--b3)">淨長＝壁間 − 兩端圍令型鋼高 − 千斤頂本體；定尺 1～13 M 每 0.5（沒有 11、11.5）；零頭 ≤15 cm 由千斤頂伸長，其餘用短節（短節不算接頭）。中間樁、交叉點位置從該路起點壁面量起；每個接頭要落在「前一支中間樁＋這個距離」到「與下一支中間樁的中點」之間，離交叉點中心也至少這個距離。</div>','千斤頂、單支最長、接頭離中間樁距離');
   if(!rows.length)return h+'<div style="font-size:12px;color:var(--b3)">尚未填路數明細：支撐長度與接頭以「面積×0.4−周長」與「每路長÷7」估算。</div>';
   var cnt=[];for(var i=0;i<L;i++)cnt.push(0);
   var sel='font-size:13px;height:32px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit';
@@ -40095,7 +40095,7 @@ function _meRouteHtml(m,sec,fN,adv){
     else if(x){
       res='淨長 '+x.net.toFixed(2)+(x.manual?'':'｜建議 '+esc(x.pieces.join('+')))+(x.mult>1?'｜雙支撐×2':'')
         +'｜接頭 '+x.joints+(x.shorts.length?'｜短節 '+x.shorts.join('+'):'')+(x.jack>0?'｜千斤頂伸長 '+x.jack+' cm':'')
-        +(x.midChk==='ok'?'｜<span style="color:var(--g3)">接頭與懸臂檢查合格</span>':(x.midChk==='none'?'｜<span style="color:#b26a00">接頭位置未檢查中間樁、懸臂未檢查</span>':''))
+        +(x.midChk==='ok'?'｜<span style="color:var(--g3)">接頭位置檢查合格</span>':(x.midChk==='none'?'｜<span style="color:#b26a00">接頭位置未檢查（沒填中間樁）</span>':''))
         +(x.warn.length?'<br><span style="color:var(--red)">'+esc(x.warn.join('；'))+'</span>':'');
     }
     var lyo='';for(var k=1;k<=L;k++)lyo+='<option value="'+k+'"'+(Math.round(_shNum(r.ly))===k?' selected':'')+'>第'+k+'層</option>';

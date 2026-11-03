@@ -9779,14 +9779,14 @@ async function newPage(browser, width, height) {
           && d2.sM === base1.sM && d2.heban === base1.heban && d2.shortJ === base1.shortJ;
         const st1 = R.staged.find(x => /第1層/.test(x.stage)), it = n => (st1.items.find(x => x.name === n) || {}).quantity;
         out.staged = it('短節 0.2M') === 3 && it('短節 0.4M') === 1 && it('短節備品 0.2M（全案×1.1）') === 1 && it('短節備品 0.4M（全案×1.1）') === 1 && it('支撐（H350）') === 86 && !st1.items.some(x => x.name === '短節');
-        out.notes = st1.notes.some(t => /千斤頂需伸長：H1 5 cm/.test(t)) && st1.notes.some(t => /接頭位置未檢查中間樁、懸臂未檢查：V1、V2/.test(t))
+        out.notes = st1.notes.some(t => /千斤頂需伸長：H1 5 cm/.test(t)) && st1.notes.some(t => /接頭位置未檢查（沒填中間樁）：V1、V2/.test(t))
           && (R.staged.find(x => /第2層/.test(x.stage)).notes || []).some(t => /估算/.test(t)) && /※ 千斤頂需伸長/.test(_meDoc('order', {}, R).body);
         const sj = R.main.find(x => x.k === '短節'), sk = R.main.find(x => /^短節規格/.test(x.k || ''));
         out.main = sj && sj.v === String(R.layerData.slice(1).reduce((a, x) => a + x.shortJ, 0) + 6) && sk && /0\.2M×4、0\.4M×2/.test(sk.v) && R.main.some(x => /^支撐 H350$/.test(x.k || '') && /（部分層估算）/.test(x.u))
           && /路數明細＋估算/.test(_meTilesHtml(R));
         // 畫面：路數明細表、建議組合、結果文字
         renderMatEst(); const f = document.getElementById('mat-est-form').innerHTML;
-        out.ui = /④-2 路數明細/.test(f) && /placeholder="12\.5\+10\.5"/.test(f) && /千斤頂伸長 5 cm/.test(f) && /接頭與懸臂檢查合格/.test(f) && /接頭位置未檢查中間樁/.test(f) && /路數明細與上面路數表/.test(f);
+        out.ui = /④-2 路數明細/.test(f) && /placeholder="12\.5\+10\.5"/.test(f) && /千斤頂伸長 5 cm/.test(f) && /接頭位置檢查合格/.test(f) && /接頭位置未檢查（沒填中間樁）/.test(f) && /路數明細與上面路數表/.test(f);
         meRtU(0, 'combo', '13+10'); out.manual = /超過淨長|短節補不到/.test(document.getElementById('mat-est-form').innerHTML) === false && _matEstRes && true;
         const x0 = FJC.route.row(MAT_EST._routeRows[0], _meRouteOpt(MAT_EST, MAT_EST._layers[0]));
         out.manual = x0.manual && x0.pieces.join('+') === '13+10' && x0.jack === 0 && x0.shorts.join() === '0.2';
