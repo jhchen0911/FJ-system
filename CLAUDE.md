@@ -93,7 +93,7 @@
 | 廠商請款 | `acct` › 廠商請款 | `renderVendorBilling` `_vbRows` `vbOpenPeriod` | 讀 `q.costs` |
 | 帳務 | `acct`（分頁 ar／ap／cash／inv／petty／pay／own／vb；`go('finance'|'ledger'|'payroll')` 轉來） | `acctTab` `_acctMount`（搬入舊頁元素）`renderPayables` `renderCashForecast` `renderRetention` `_expForm`（費用．發票） | `PAYABLES`、`EXPENSES`（private） |
 | 薪資．零用金 | `acct` › pay／petty（權限看 `payroll`） | `hrEdit` `psGenerate` `_hrSyncPayables` `pcGenerate` `_pcCalc` | `HR`／`PAYSLIPS`／`PETTY`（private） |
-| 勞報單．介紹費協議書（v6.0.140） | 應付卡「勞報單」（`_lrsPayBtn`）、帳務 › 應付「勞報單彙總」 | `openLrs` `_lrsCalc`（9A／50／92 代扣、二代健保，比率 `P.lrsRates[民國年]`）`_lrsSave` `_lrsSlipHtml`／`_lrsPrint`（A4＋印章）`_lrsUpload`／`_lrsDocView`（簽回照片）`openLrsYear`／`_lrsYearRows`／`_lrsCsv`（年度彙總）`openIntroAgr`／`_introAgrHtml`（案件介紹費協議書）`_lrsWatch`／`_lrsOff`；只讀應付 | `fydata/lrs`（slips／payees／sens（個資）／docs（簽回照片）；只有管理員，唯讀帳號讀不到） |
+| 勞報單．介紹費協議書（v6.0.140） | 應付卡「勞報單」（`_lrsPayBtn`）、帳務 › 應付「勞報單彙總」 | `openLrs` `_lrsCalc`（9A／50／92 代扣、二代健保，比率 `P.lrsRates[民國年]`；所得稅元以下捨去、健保四捨五入，v6.0.141）`_lrsSave` `_lrsSlipHtml`／`_lrsPrint`（A4＋印章）`_lrsUpload`／`_lrsDocView`（簽回照片）`openLrsYear`／`_lrsYearRows`／`_lrsCsv`（年度彙總）`openIntroAgr`／`_introAgrHtml`（案件介紹費協議書）`_lrsWatch`／`_lrsOff`；只讀應付 | `fydata/lrs`（slips／payees／sens（個資）／docs（簽回照片）；只有管理員，唯讀帳號讀不到） |
 | 經營報表 | `reports`（`go('profit')` 轉來） | `showReport` `renderOverviewReport` `_shRptYear`（**損益口徑單一來源**；損益本體在 `calc/report.js`，v6.0.132；v6.0.135 起管理用（依期別）：`_mgmtData`＝`_mgmtCostEntries`（分包依計價期別、介紹費不算施工成本）＋`_mgmtExtraExp`（已付抽成／佣金／介紹費依實付日），會計用（完工年度）對照表 `_acctProjects`；口徑見 `docs/3b_預期差異清單.md`）`_rptBasisStrip` `renderShareholderReport` `renderHealthReport`／`_healthRows`（資料健檢） | 讀各集合 |
 | 客戶．廠商 | `contacts` | `renderContactsAll` `renderCustomersContact` `renderVendors2`；統編查詢 `_taxIdInput`／`_taxIdLookup`／`_taxIdParse`／`_taxIdOk`（g0v 公司資料，帶名稱／地址／負責人（欄位 boss），v6.0.138）；電話自動格式 `_fmtPhoneTW`／`_phoneAutoFmt`（全站電話欄離開即排版）；廠商匯款帳戶 `_vendorBank`／`_bankCopy`（應付列與付款彈窗「複製帳號」） | customers、vendors（shared；廠商記錄含匯款銀行／帳號／戶名欄位） |
 | 業務績效 | `reports` › 其他報表 › 業務績效（`showReport('sales')`） | `renderSalesReport` `_salesRows`／`_salesStat`（篩選：年月＋`_rptSalesF` 業務／狀態）`_salesTables`（畫面與 PDF 共用）`_salesPdf`／`_salesCsv`；名冊 `openSalesBook`／`_salesBookSave`；報價列表狀態 chip 旁 `_salesChip`／`openSalesPick`（設業務＋抽成，抽成 `_salesCommVis` 管理員才見）；抽成四種方式 `_SALES_MODES`（營收%／毛利%／固定額／每單位×實作量 `_salesUnitQty`；名冊預設，個案另訂 `q.comm`）`_salesCommAccr``_salesCommCfg`／`_salesCommAmt`／`_salesBase`／`_salesProfitBase`／`_salesRcvRate`；應付 `_salesCommSync`／`_salesCommSyncAll`（開頁私有資料下載完重算一次 `_salesCommBoot`）；介紹費併入報表 `_introRows`／`_introStat`／`_introDlOpts`（名冊類型 staff／intro） | `P.sales[]`（params，shared）、`q.salesId`（shared）、`q.comm`（private，隨 quoteSens）、`PAYABLES` id `pay_sales_<qid>` |
@@ -118,7 +118,7 @@
 
 ## 測試
 
-`tests/smoke.js`（821 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（822 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。`package.json` 釘死 playwright 版本（v6.0.103 起 1.64.1＝Chrome 156），CI 與本機才用同一瀏覽器；升級 playwright 要當成一次改版、跑過冒煙再推。雲端容器裝不到新瀏覽器時，可從 storage.googleapis.com 的 chrome-for-testing-public 下載同版 chrome-headless-shell，用 `CHROMIUM_PATH` 指定。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、

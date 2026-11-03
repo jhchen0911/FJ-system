@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.140';
+var APP_VERSION='v6.0.141';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -39807,7 +39807,8 @@ function _lrsSensGet(pid){
 function _lrsCalc(gross,cat,union,R){
   gross=Math.max(0,Math.round(parseFloat(gross)||0));
   var r=(R&&R[cat])||{},tax=0,nhi=0;
-  if((+r.tax||0)>0){var th=+r.taxTh||0;if(r.taxOver?gross>th:gross>=th)tax=Math.round(gross*(+r.tax)/100);}
+  // v6.0.141（會計師 11/03）：代扣所得稅元以下無條件捨去（國稅局算法）；二代健保補充保費角以下四捨五入（全民健康保險法施行細則第 52 條、健保署 Q&A）
+  if((+r.tax||0)>0){var th=+r.taxTh||0;if(r.taxOver?gross>th:gross>=th)tax=Math.floor(gross*(+r.tax)/100+1e-9);}
   if((+r.nhi||0)>0&&!union&&gross>=(+r.nhiTh||0))nhi=Math.round(gross*(+r.nhi)/100);
   return {gross:gross,tax:tax,nhi:nhi,net:gross-tax-nhi};
 }
@@ -39985,7 +39986,7 @@ function openLrsYear(y){
     +'</tbody></table>'
     +'<div style="font-weight:700;margin:12px 0 4px">無勞報單（對方未同意，'+D.none.length+' 筆，合計 NT$ '+fmt(T(D.none,'gross'))+'）</div>'
     +(D.none.length?D.none.map(function(s){return '<div style="font-size:12px;padding:3px 0;border-bottom:1px solid var(--b1)">'+esc(s.date||'')+'　'+esc(s.name||'')+'　'+esc(s.project||'')+'　NT$ '+fmt(s.gross||0)+'</div>';}).join(''):'<div style="font-size:12px;color:var(--b3)">沒有</div>')
-    +'<details style="margin-top:12px"><summary style="cursor:pointer;font-size:12.5px;font-weight:700">比率與門檻（民國 '+(y-1911)+' 年'+(rr.exact?'':'，目前沿用 '+rr.y+' 年')+'；上線前請會計師確認）</summary>'
+    +'<details style="margin-top:12px"><summary style="cursor:pointer;font-size:12.5px;font-weight:700">比率與門檻（民國 '+(y-1911)+' 年'+(rr.exact?'':'，目前沿用 '+rr.y+' 年')+'；會計師 11/03 確認 115 年比率與門檻、職業工會三種類別都免扣健保；所得稅元以下捨去、健保四捨五入）</summary>'
     +'<table class="mst" style="font-size:12px;margin-top:6px;border-collapse:collapse;width:100%"><thead><tr><th>類別</th><th>所得稅門檻</th><th>超過才扣</th><th>稅率%</th><th>健保門檻（達到）</th><th>健保%</th></tr></thead><tbody>'
     +Object.keys(_LRS_CATS).map(function(c){return '<tr><td data-th="類別">'+c+'</td><td data-th="所得稅門檻">'+RI(c,'taxTh',80)+'</td><td data-th="超過才扣"><input type="checkbox" id="lrr-'+c+'-taxOver"'+((R[c]||{}).taxOver?' checked':'')+'></td><td data-th="稅率%">'+RI(c,'tax',55)+'</td><td data-th="健保門檻">'+RI(c,'nhiTh',80)+'</td><td data-th="健保%">'+RI(c,'nhi',55)+'</td></tr>';}).join('')
     +'</tbody></table><button type="button" class="btn btn-xs btn-g" style="margin-top:6px" onclick="_lrsRatesSave('+(y-1911)+')">存成民國 '+(y-1911)+' 年的比率</button></details>';

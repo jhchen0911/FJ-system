@@ -9442,6 +9442,8 @@ async function newPage(browser, width, height) {
         const c4 = _lrsCalc(90500, '50', false, R), c5 = _lrsCalc(90501, '50', false, R), c6 = _lrsCalc(29499, '50', false, R), c7 = _lrsCalc(50000, '92', false, R);
         out.calc = c1.tax === 0 && c1.nhi === 422 && c1.net === 19578 && c2.tax === 3000 && c2.nhi === 633 && c2.net === 26367 && c3.nhi === 0 && c3.net === 27000
           && c4.tax === 0 && c4.nhi === 1910 && c5.tax === 4525 && c6.nhi === 0 && c7.tax === 0 && c7.nhi === 0 && c7.net === 50000;
+        const c8 = _lrsCalc(20005, '9A', false, R), c9 = _lrsCalc(90519, '50', false, R), c10 = _lrsCalc(20024, '9A', false, R);
+        out.round = c8.tax === 2000 && c8.nhi === 422 && c9.tax === 4525 && c10.nhi === 423 && c10.tax === 2002;   // v6.0.141 所得稅無條件捨去（2000.5→2000、4525.95→4525）；健保四捨五入（422.5064→423）
         const P0 = P.lrsRates; P.lrsRates = { '116': { '9A': { taxTh: 20000, taxOver: 1, tax: 10, nhiTh: 20000, nhi: 2.2 } } };
         out.rates = _lrsRates(116).exact && _lrsRates(116).R['9A'].nhi === 2.2 && _lrsRates(117).y === 116 && !_lrsRates(117).exact && _lrsRates(115).y === 115;
         P.lrsRates = P0;
@@ -9515,6 +9517,7 @@ async function newPage(browser, width, height) {
     const RF140 = JSON.parse(fs140.readFileSync(pth140.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const OPS140 = require(pth140.join(__dirname, '..', 'functions', 'ops', 'core.js'));
     check('v6.0.140 勞報單計算：9A 超過 20,000 扣 10%、達 20,000 扣 2.11%；50 達 90,501 扣 5%、健保門檻 29,500；92 不扣；職業工會免扣健保；比率依民國年、沒有就沿用最近一年', r.calc && r.rates, JSON.stringify(r));
+    check('v6.0.141 勞報單進位（會計師 11/03）：代扣所得稅元以下無條件捨去、二代健保補充保費角以下四捨五入（健保法施行細則第 52 條）', r.round, JSON.stringify(r));
     check('v6.0.140 勞報單流程：只有抽成／佣金／介紹費／點工有按鈕、唯讀帳號看不到；沒勾同意記「無勞報單」；勾了算代扣實付；身分證格式擋下；個資不進本機快取',
       r.btn && r.ro && r.defNo && r.none && r.prev && r.saved && r.priv && r.badId && r.resign && r.sameSel && r.newBlank && r.newPayee, JSON.stringify(r));
     check('v6.0.140 A4 勞報單（印章、個資、代扣）與案件介紹費協議書（佣金設定帶入、六條、同意才產生）；年度彙總分開列無勞報單；fydata/lrs 只有管理員、每日備份含 lrs',
