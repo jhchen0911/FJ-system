@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.146';
+var APP_VERSION='v6.0.147';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -10770,12 +10770,26 @@ function _pushPrivate(cb){
     }).catch(function(){doPush();});
   }catch(e){doPush();}
 }
+// v6.0.147（Lotion 11/03 方案 B1）：唯讀帳號（AI）逐項讀 private，薪資名冊／薪資單／零用金不讀（規則也擋）；人員證件、匯款帳號不讀
+var _PRIV_READER_KEYS=['version','uploadedAt','uploadedBy','uploadedVer','uploadedDev','quoteSens','qHistSens','payables','expenses','costHist','upaCostDB','shareProfit','matLedger','dealHist','paidLog','payAudit'];
+function _privReadAll(ref){
+  if(!_isReaderUser)return ref.once('value').then(function(snap){return snap.val();});
+  return Promise.all(_PRIV_READER_KEYS.map(function(k){return ref.child(k).once('value').then(function(sn){return [k,sn.val()];},function(){return [k,null];});}))
+    .then(function(rs){var d={},any=false;rs.forEach(function(x){if(x[1]!=null){d[x[0]]=x[1];any=true;}});return any?d:null;});
+}
+// 唯讀帳號本機若留有 v6.0.147 前下載過的薪資／人員證件／匯款帳號，一次清掉（不上傳，只清這台）
+function _readerSensPurge(){
+  if(!_isReaderUser)return;
+  try{HR=[];PAYSLIPS=[];PETTY=[];['fy_hr','fy_payslips','fy_petty','fy_wksens'].forEach(function(k){localStorage.removeItem(k);});}catch(e){_err('_readerSensPurge',e);}
+  try{WK_SENS={};(WORKERS||[]).forEach(function(w){if(w)_WK_SENS_F.forEach(function(k){if(w[k]!=null&&w[k]!=='')w[k]=(k==='idNo'?_wkIdMask(w[k]):'');});});}catch(e){_err('_readerSensPurge.wk',e);}
+  try{BANK=null;}catch(e){/* 可忽略 */}
+}
 function _pullPrivate(cb){
   var ref=_privRef();
-  if(!ref){if(cb)cb(false);return;}   // v6.0.108：唯讀帳號也下載 private（只讀；_pushPrivate 仍擋）
-  ref.once('value').then(function(snap){
+  if(!ref){if(cb)cb(false);return;}   // v6.0.108：唯讀帳號也下載 private（只讀；_pushPrivate 仍擋）；v6.0.147 起逐項、不含薪資類
+  try{_readerSensPurge();}catch(e){_err('_pullPrivate.purge',e);}
+  _privReadAll(ref).then(function(d){
     _privReadOk=true;
-    var d=snap.val();
     if(d){
       try{d=_deepDecodeKeys(d);}catch(e){_err('_pullPrivate',e);}
       var wasApplying=window._applyingCloud;window._applyingCloud=true;
@@ -38982,7 +38996,7 @@ function _coBank(){
   return {bank:P.bank||_CO_BANK_DEF.bank,account:P.bankAccount||_CO_BANK_DEF.account};
 }
 function _bankWatch(){
-  if(_bankOn||!_fbDb||!_fbUser)return;
+  if(_bankOn||!_fbDb||!_fbUser||_isReaderUser)return;   // v6.0.147：唯讀帳號（AI）不讀匯款帳號（規則也擋）
   _bankOn=true;
   _fbDb.ref('fydata/bank').on('value',function(snap){
     BANK=snap.val()||{};
@@ -39075,7 +39089,7 @@ function _wkGraft(){
 function _wkAccessOf(email){try{return _rolesOf(email).some(function(r){return r.sys||r.cloudCost||(r.pages&&r.pages.workers===true);});}catch(e){return false;}}
 function _wkSensAdmin(){return !!(_fbUser&&!_isReaderUser&&isAdmin(String(_fbUser.email||'').toLowerCase()));}
 function _wkSensCanWrite(){return !!(_fbUser&&!_isReaderUser&&_wkAccessOf(String(_fbUser.email||'').toLowerCase()));}   // 直接寫 workerSens
-function _wkSensCanRead(){return _wkSensCanWrite()||!!_isReaderUser;}
+function _wkSensCanRead(){return _wkSensCanWrite();}   // v6.0.147：唯讀帳號（AI）不讀人員證件（規則也擋）
 function _wkSensHash(o){return _collHash(o);}
 // 上傳敏感部分：管理員寫 workerSens，員工寫投遞區；內容沒變不送
 function _wkSensPush(){

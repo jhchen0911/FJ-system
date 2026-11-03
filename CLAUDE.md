@@ -118,7 +118,7 @@
 
 ## 測試
 
-`tests/smoke.js`（824 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（827 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。`package.json` 釘死 playwright 版本（v6.0.103 起 1.64.1＝Chrome 156），CI 與本機才用同一瀏覽器；升級 playwright 要當成一次改版、跑過冒煙再推。雲端容器裝不到新瀏覽器時，可從 storage.googleapis.com 的 chrome-for-testing-public 下載同版 chrome-headless-shell，用 `CHROMIUM_PATH` 指定。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
@@ -136,7 +136,7 @@
 
 `database.rules.json` 是原始碼，**改完必須到 Firebase 主控台手動發布才會生效**。
 Storage 規則同理放在 `storage.rules`（v6.0.93 起；主控台 Storage → 規則 貼上發布）。Storage 規則讀不到 RTDB，唯讀帳號清單 `isReader()` 要與 `fydata/readers` 名冊手動同步。v6.0.105 起人員管理頁「產生 Storage 規則」（`openStorageRulesGen`／`_storageRulesText`）依人員與唯讀名冊產生只放行名冊的規則；長期由 `functions/index.js`（custom claim `fy`）自動同步，部署步驟見 `docs/Storage權限_部署步驟.md`（`firebase deploy --only functions`）。
-目前規則：`fydata/shared`（名冊內可讀寫；`fydata/readers` 唯讀名冊只可讀）／`fydata/private`（僅管理員），readers 名冊內帳號可讀 shared、private 與 relay（日報照片）（v6.0.108）、一律不得寫入任何節點；`fydata/backups` 只給擁有者，兩者都不得整包清空，
+目前規則：`fydata/shared`（名冊內可讀寫；`fydata/readers` 唯讀名冊只可讀）／`fydata/private`（僅管理員），readers 名冊內帳號可讀 shared、private（v6.0.147 起逐項，薪資名冊 hr／薪資單 payslips／零用金 petty 除外；人員證件 workerSens、匯款帳號 bank 不可讀）與 relay（日報照片）（v6.0.108）、一律不得寫入任何節點；`fydata/backups` 只給擁有者，兩者都不得整包清空，
 並要求 `version`／`uploadedAt` 的基本形態。
 
 ## 語言
