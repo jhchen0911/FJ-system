@@ -867,7 +867,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── v6.0.154 螺絲修正（Lotion 11/03）：支撐接頭＝每路支數−1、千斤頂保護夾 16 顆短螺絲、構台長螺絲每㎡ 1 顆、貼板改名續接板 ──
+  // ── v6.0.155 螺絲修正（Lotion 11/03）：支撐接頭＝每路支數−1、千斤頂保護夾 16 顆短螺絲、構台長螺絲每㎡ 1 顆、貼板改名續接板 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
@@ -891,9 +891,9 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.154 螺絲：支撐接頭＝每路支數−1、合板跟著算、千斤頂保護夾每組 16 顆、H300 對鎖算短螺絲且總數不變', r.joint && r.h300, JSON.stringify(r));
-    check('v6.0.154 螺絲：施工構台改長螺絲每㎡ 1 顆（取代構台螺絲×2、併入長螺絲合計）；貼板改名續接板', r.deck && r.rename, JSON.stringify(r));
-    check('v6.0.154 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.155 螺絲：支撐接頭＝每路支數−1、合板跟著算、千斤頂保護夾每組 16 顆、H300 對鎖算短螺絲且總數不變', r.joint && r.h300, JSON.stringify(r));
+    check('v6.0.155 螺絲：施工構台改長螺絲每㎡ 1 顆（取代構台螺絲×2、併入長螺絲合計）；貼板改名續接板', r.deck && r.rename, JSON.stringify(r));
+    check('v6.0.155 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
