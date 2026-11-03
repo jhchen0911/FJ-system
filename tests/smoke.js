@@ -963,13 +963,18 @@ async function newPage(browser, width, height) {
       // 材料估算表 PDF：橫式、叫料表格在最前、無彙總清冊；母索用量表可單獨列印
       let printed = [], land = [];
       const oP2 = window._printViaIframe; window._printViaIframe = (h, f, l) => { printed.push(h); land.push(!!l); };
-      try { matEstExportPDF('order'); matEstExportPDF('quote', { basis: true }); matEstExportPDF('quote', {}); } finally { window._printViaIframe = oP2; }
+      try { matEstExportPDF('order'); matEstExportPDF('quote', { basis: true }); matEstExportPDF('quote', {}); matEstExportPDF('order', { stages: [0, (_matEstRes.staged || []).findIndex(x => /第1層/.test(x.stage))] }); } finally { window._printViaIframe = oP2; }
       // v6.0.139（Lotion 11/03）：兩份分開——叫料單（依進場階段）、估價明細（依類別總量，可附計算依據＝母索逐層表）；同一份裡材料不重複列
-      out.matPdf = printed.length === 3 && land[0] === true && /叫料單/.test(printed[0]) && /依進場階段叫料/.test(printed[0]) && !/材料明細（依類別總量）/.test(printed[0]) && /A4 landscape/.test(printed[0])
+      out.matPdf = printed.length === 4 && land[0] === true && /叫料單/.test(printed[0]) && /依進場階段叫料/.test(printed[0]) && !/材料明細（依類別總量）/.test(printed[0]) && /A4 landscape/.test(printed[0])
         && /估價明細/.test(printed[1]) && /材料明細（依類別總量）/.test(printed[1]) && !/依進場階段叫料/.test(printed[1]) && /附錄：計算依據/.test(printed[1]) && /扣構台下 M/.test(printed[1]) && /972\.3/.test(printed[1])
         && !/附錄：計算依據/.test(printed[2]) && !/分階段叫料建議/.test(printed.join('')) && !/材料需求清冊/.test(printed.join(''));
       // v5.400：明細每一分類自成一表、每列 3～4 組項目並排（分類標題 colspan 9 或 12），且分類不可少
-      out.matDet = (printed[0].match(/class="hd"/g) || []).length >= 4 && /colspan="(9|12)" class="hd"/.test(printed[0]) && !/colspan="6" class="hd"/.test(printed[0]);
+      out.matDet = (printed[1].match(/class="hd"/g) || []).length >= 4 && /colspan="(9|12)" class="hd"/.test(printed[1]) && !/colspan="6" class="hd"/.test(printed[1])
+        /* v6.0.139 Lotion：叫料單每列 2 組（colspan 6）、每個階段與附錄整區不拆頁（.pdf-keep 進 _pdfPlanPages 的整塊清單） */
+        && /colspan="6" class="hd"/.test(printed[0]) && (printed[0].match(/class="z pdf-keep ord"/g) || []).length === (_matEstRes.staged || []).length
+        && /class="apx pdf-keep"/.test(printed[1]) && /\.pdf-keep'\)/.test(_pdfPlanPages.toString())
+        /* 可勾選要印的階段：只印擋土壁＋第1層，標題列出階段名 */
+        && (printed[3].match(/class="z pdf-keep ord"/g) || []).length === 2 && /▸ 擋土壁/.test(printed[3]) && /▸ 第1層水平支撐/.test(printed[3]) && !/▸ 第2層水平支撐/.test(printed[3]) && /叫料單｜擋土壁、第1層水平支撐/.test(printed[3]);
       out.hidden = ALL_PAGES.find(p => p.id === 'lifeline').hidden === true;
       // 構台下區塊形式沒有對應區塊：扣除不得扣成負數，並提出警告
       _llState.perim = 200; _llState.layers = 3; _llState.form = 'wire';
@@ -986,7 +991,7 @@ async function newPage(browser, width, height) {
     check('材料估算：母索＝圍令周圍＋支撐路、扣構台下、預留與折捲', r.matRope && r.matRows);
     check('材料估算：母索形式欄位＋匯出在工具列、母索獨立頁隱藏', r.matForm && r.hidden);
     check('材料估算 PDF（v6.0.139）：叫料單／估價明細兩份、橫式、各自不重複、估價明細可附計算依據（母索逐層表）', r.matPdf);
-    check('材料估算表 PDF：明細每列 3～4 組並排', r.matDet);
+    check('材料估算表 PDF：估價明細每列 3～4 組並排；叫料單每列 2 組、階段可複選、每個階段與附錄整區不拆頁', r.matDet);
     check('安全母索：構台下形式無對應區塊不扣成負數', r.deckGuard);
     check('v5.395 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();

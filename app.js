@@ -9406,14 +9406,29 @@ function matEstU(k,val){
 }
 // v6.0.139（Lotion 11/03）：匯出改兩份，各給各的讀者、同一份裡同一數字只出現一次：
 //   kind 'order'＝叫料單（工務／料場；摘要＋依進場階段，可只印某一階段 opt.stage）；'quote'＝估價明細（內部；摘要＋依類別總量，opt.basis 附計算依據：路數摘要＋安全母索逐層表）
+// v6.0.139 叫料單要印哪些階段：opt.stages（陣列，可複選）＞ 舊參數 opt.stage（單一）＞ 全部
+function _meStagePick(res,opt){
+  var n=(res.staged||[]).length,all=[];for(var i=0;i<n;i++)all.push(i);
+  if(opt&&Array.isArray(opt.stages))return opt.stages.map(Number).filter(function(i){return i>=0&&i<n;});
+  if(opt&&opt.stage!==''&&opt.stage!=null&&+opt.stage>=0&&+opt.stage<n)return [+opt.stage];
+  return all;
+}
+function _meXstAll(on){document.querySelectorAll('.me-xst').forEach(function(c){c.checked=!!on;});}
+function _meStageTitle(res,pick){
+  var n=(res.staged||[]).length;if(!pick.length||pick.length===n)return '';
+  return '｜'+(pick.length<=3?pick.map(function(i){return esc(res.staged[i].stage);}).join('、'):(pick.length+' 個階段'));
+}
 function matEstExportMenu(){
   if(!window._matEstRes)matEstCalc();
   var res=window._matEstRes;if(!res){toast('請先按「計算」');return;}
-  var stg=(res.staged||[]).map(function(st,i){return '<option value="'+i+'">'+esc(st.stage)+'</option>';}).join('');
+  var stg=(res.staged||[]).map(function(st,i){return '<label style="display:inline-flex;gap:4px;align-items:center;margin:0 10px 2px 0;white-space:nowrap"><input type="checkbox" class="me-xst" value="'+i+'" checked>'+esc(st.stage)+'</label>';}).join('');
   showConfirm('匯出 PDF','<div style="font-size:13px;line-height:1.9">'
-    +'<label style="display:flex;gap:6px;align-items:flex-start"><input type="radio" name="me-xk" value="order" checked style="margin-top:6px"><span><b>叫料單</b>（給工務／料場）：摘要＋依進場階段<br>階段 <select id="me-xstage" style="font-size:12.5px"><option value="">全部階段</option>'+stg+'</select></span></label>'
+    +'<label style="display:flex;gap:6px;align-items:flex-start"><input type="radio" name="me-xk" value="order" checked style="margin-top:6px"><span><b>叫料單</b>（給工務／料場）：摘要＋依進場階段<br><span style="font-size:12px;color:var(--b4)">要印的階段（可複選）　<a href="javascript:void(0)" onclick="_meXstAll(true)">全選</a>／<a href="javascript:void(0)" onclick="_meXstAll(false)">全不選</a></span><div style="font-size:12.5px;line-height:1.7">'+stg+'</div></span></label>'
     +'<label style="display:flex;gap:6px;align-items:flex-start;margin-top:6px"><input type="radio" name="me-xk" value="quote" style="margin-top:6px"><span><b>估價明細</b>（內部估價）：摘要＋依類別總量<br><label><input type="checkbox" id="me-xbasis"> 附計算依據（路數、安全母索逐層表）</label></span></label></div>',
-    function(){var k=(document.querySelector('input[name="me-xk"]:checked')||{}).value||'order';matEstExportPDF(k,{stage:gv('me-xstage'),basis:!!(document.getElementById('me-xbasis')||{}).checked});},false,null,true);
+    function(){var k=(document.querySelector('input[name="me-xk"]:checked')||{}).value||'order';
+      var sts=Array.prototype.filter.call(document.querySelectorAll('.me-xst'),function(c){return c.checked;}).map(function(c){return +c.value;});
+      if(k==='order'&&!sts.length){toast('請至少勾一個階段');return;}
+      matEstExportPDF(k,{stages:sts,basis:!!(document.getElementById('me-xbasis')||{}).checked});},false,null,true);
 }
 function matEstExportPDF(kind,opt){
   // v5.397：A4 橫式、明細依分類分塊並排；v6.0.139 分成叫料單／估價明細兩份
@@ -9437,7 +9452,8 @@ function matEstExportPDF(kind,opt){
     addSecF('④ 施工構台／欄杆／安全設施',res.back);
     addSecF('⑤ 先行加工',res.pre);
   }else{
-    (res.staged||[]).forEach(function(st,i){if(opt.stage!==''&&opt.stage!=null&&String(i)!==String(opt.stage))return;
+    var _pick=_meStagePick(res,opt);
+    (res.staged||[]).forEach(function(st,i){if(_pick.indexOf(i)<0)return;
       addSecF('▸ '+st.stage,st.items.map(function(it){return {k:it.name,v:_shR0(it.quantity),u:it.unit};}));});
   }
   var cell=function(c){
@@ -9449,10 +9465,10 @@ function matEstExportPDF(kind,opt){
   var det='';
   secs.forEach(function(sc){
     var maxLen=0;sc.rows.forEach(function(r){if(!r.sec)maxLen=Math.max(maxLen,String(r.k||'').length);});
-    var ncol=maxLen<=11?4:3;
+    var ncol=kind==='order'?2:(maxLen<=11?4:3);   // v6.0.139 Lotion：叫料單改每列 2 組（4 組太密）
     var gw=100/ncol,cg='';
     for(var c=0;c<ncol;c++)cg+='<col style="width:'+(gw*0.56).toFixed(2)+'%"><col style="width:'+(gw*0.24).toFixed(2)+'%"><col style="width:'+(gw*0.20).toFixed(2)+'%">';
-    det+='<table class="z"><colgroup>'+cg+'</colgroup><tbody>';
+    det+='<table class="z pdf-keep'+(kind==='order'?' ord':'')+'"><colgroup>'+cg+'</colgroup><tbody>';
     det+='<tr><td colspan="'+(ncol*3)+'" class="hd">'+esc(sc.h)+'</td></tr>';
     var cols=[],start=0,left=sc.rows.length;
     for(var c2=0;c2<ncol;c2++){
@@ -9464,11 +9480,11 @@ function matEstExportPDF(kind,opt){
     for(var r=0;r<nr;r++){det+='<tr>';cols.forEach(function(cl){det+=cell(cl[r]);});det+='</tr>';}
     det+='</tbody></table>';
   });
-  var body='<h1>擋土支撐'+(kind==='order'?'叫料單':'材料估算表（估價明細）')+(kind==='order'&&opt.stage!==''&&opt.stage!=null&&res.staged[opt.stage]?'｜'+esc(res.staged[opt.stage].stage):'')+'</h1>'
+  var body='<h1>擋土支撐'+(kind==='order'?'叫料單':'材料估算表（估價明細）')+(kind==='order'?_meStageTitle(res,_meStagePick(res,opt)):'')+'</h1>'
     +'<div class="meta">'+(q?('專案：'+esc(q.name)+'　'):'')+'日期：'+localToday()+'　｜　壁線周長 '+_shR1(info.PW)+'M｜路數 縱'+info.routesV+'＋橫'+info.routesH+'＝'+info.totalR+' 路｜支撐總長 '+_shR1(info.supLen)+'M｜中柱合計 '+info.posts+' 支｜退場留存 '+_shR1(info.keep)+'M/支</div>';
   body+='<h2>摘要</h2><div class="meta">'+_meTilesText(res)+'</div>';
   body+='<h2>'+(kind==='order'?'依進場階段叫料':'材料明細（依類別總量）')+'</h2>'+det;
-  if(kind==='quote'&&opt.basis)body+='<h2>附錄：計算依據</h2><div class="apx">'+_matEstRopeBody(res)+'</div>';
+  if(kind==='quote'&&opt.basis)body+='<div class="apx pdf-keep"><h2>附錄：計算依據</h2>'+_matEstRopeBody(res)+'</div>';
   var _mefn=_toolFileName('matest',kind==='order'?'叫料單':'材料估算表',(q&&q.name)||'');
   var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(_mefn)+'</title><style>'
     +'@page{size:A4 landscape;margin:10mm}body{font-family:"Microsoft JhengHei","PingFang TC",sans-serif;font-size:11px;color:#1a1a1a;margin:0}'
@@ -9480,6 +9496,7 @@ function matEstExportPDF(kind,opt){
     +'th{background:#2e5e42;color:#fff;font-weight:700}th.r{text-align:right}'
     +'td.r{text-align:right;font-weight:700}td.u{color:#666;font-size:9.5px;white-space:normal;line-height:1.2}td.e{border-color:transparent}'
     +'td.hd{background:#2e5e42;color:#fff;font-weight:700}td.sec{background:#eef4f0;font-weight:700;color:#2e5e42}td.stg{font-weight:700;color:#2e5e42;vertical-align:top}td.w{white-space:normal;line-height:1.6;padding:4px 6px}'
+    +'table.ord{margin:0 0 8px}table.ord td{font-size:12px;padding:5px 8px;line-height:1.4}table.ord td.u{font-size:11px}table.ord td.hd{font-size:12.5px;padding:5px 8px}'
     +'.apx td,.apx th{white-space:normal;text-overflow:clip}.apx tr.tt td{background:#f1f5f2}.apx .sub{font-size:10.5px;font-weight:400;color:#444}.apx .cond,.apx td.l{color:#333}'
     +'</style></head><body><div class="page-wrap">'+body+'</div></body></html>';
   _printViaIframe(html,_mefn,true);
@@ -9538,8 +9555,8 @@ function _renderMatEstInner(el){
   var _secOpen=false,_secN=0;
   var sec=function(t,hint){var id=String(t).replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g,'').slice(0,8)||('s'+(_secN++));var op=_meSecOpen(id,/^[①②③④]/.test(String(t)));
     var out=(_secOpen?'</div></details>':'');_secOpen=true;
-    return out+'<details class="me-sec"'+(op?' open':'')+' ontoggle="_meSecTog(\''+id+'\',this.open)"><summary>'+t+(hint?' <span style="font-weight:400;font-size:10.5px;color:var(--b3)">'+hint+'</span>':'')+'</summary><div class="me-secb">';};
-  var adv=function(inner,label){return '<details class="me-adv"'+(_meSecOpen('adv',false)?' open':'')+' ontoggle="_meSecTog(\'adv\',this.open)"><summary>進階'+(label?'（'+label+'）':'')+'</summary><div>'+inner+'</div></details>';};
+    return out+'<details class="me-sec"'+(op?' open':'')+' ontoggle="window._meSecTog&&_meSecTog(\''+id+'\',this.open)"><summary>'+t+(hint?' <span style="font-weight:400;font-size:10.5px;color:var(--b3)">'+hint+'</span>':'')+'</summary><div class="me-secb">';};
+  var adv=function(inner,label){return '<details class="me-adv"'+(_meSecOpen('adv',false)?' open':'')+' ontoggle="window._meSecTog&&_meSecTog(\'adv\',this.open)"><summary>進階'+(label?'（'+label+'）':'')+'</summary><div>'+inner+'</div></details>';};
   var g=function(inner,min){return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax('+(min||110)+'px,1fr));gap:8px">'+inner+'</div>';};
   var h='';
   var _sq=null;try{_sq=_matEstSiteQ();if(_sq)_sdToMatEst(_sdNorm(_sq.site),m);}catch(e){_err('matEst.site',e);_sq=null;}   // v6.0.48 綁定工程＝幾何讀案場細節
@@ -9764,7 +9781,7 @@ function _matEstCalcCore(){
     });
     basis+='</tbody></table></div></div>';
   }
-  h+='<details class="me-sec"'+(_meSecOpen('basis',false)?' open':'')+' ontoggle="_meSecTog(\'basis\',this.open)"><summary>計算依據（路數、各層明細）</summary>'+basis+'</details>';
+  h+='<details class="me-sec"'+(_meSecOpen('basis',false)?' open':'')+' ontoggle="window._meSecTog&&_meSecTog(\'basis\',this.open)"><summary>計算依據（路數、各層明細）</summary>'+basis+'</details>';
   el.innerHTML=h;
   if(isMob())el.scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -40578,7 +40595,7 @@ function _pdfPlanPages(cvs,root,renderW,ls){
       cands.push(yB(el));
     });
     // 不可拆開的整塊（用印區）；其頂緣為理想切點
-    root.querySelectorAll('.page-footer,.stamp-row,.stamp-box').forEach(function(el){
+    root.querySelectorAll('.page-footer,.stamp-row,.stamp-box,.pdf-keep').forEach(function(el){   // v6.0.139 .pdf-keep：整區不拆（材料估算叫料單各階段、附錄）
       atomic.push([yT(el),yB(el)]);cands.push(yT(el));
     });
     // 備註區可跨頁（可能很長），但整區頂緣是理想切點
