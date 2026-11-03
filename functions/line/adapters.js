@@ -21,10 +21,12 @@ function mkDeps(token) {
       if (!r.ok) throw new Error('LINE content ' + r.status);
       return { buf: Buffer.from(await r.arrayBuffer()), contentType: r.headers.get('content-type') || 'application/octet-stream' };
     },
+    // v6.0.144 審查：認領一筆紀錄（不存在才寫）→ true；已經有人在處理或處理過 → false
+    claim: async (path, val) => (await db.ref(path).transaction((cur) => (cur ? undefined : val))).committed,
     putFile: async (path, buf, contentType) => { await bucket.file(path).save(buf, { contentType, resumable: false }); },
     // v6.0.144：串流存檔（大檔不進記憶體）；邊收邊計大小，超過上限就中止並刪掉半截檔 → {tooBig:true,size}；成功 → {size, contentType}
     saveContent: async (msgId, path, max) => {
-      const r = await fetch(LINE_DATA + '/message/' + encodeURIComponent(msgId) + '/content', { headers: auth });
+      const r = await fetch(LINE_DATA + '/message/' + encodeURIComponent(msgId) + '/content', { headers: auth, signal: AbortSignal.timeout(200 * 1000) });   // 審查：傳輸卡住 200 秒就放棄（記 error），不會拖到函式被殺
       if (!r.ok || !r.body) throw new Error('LINE content ' + r.status);
       const len = parseInt(r.headers.get('content-length') || '0', 10) || 0;
       if (len > max) { try { await r.body.cancel(); } catch (e) { console.error('saveContent.cancel', e && e.message); } return { tooBig: true, size: len }; }
@@ -35,7 +37,7 @@ function mkDeps(token) {
       const count = new Transform({ transform(ch, enc, cb) { size += ch.length; if (size > max) { over = true; cb(new Error('tooBig')); return; } cb(null, ch); } });
       const file = bucket.file(path);
       try {
-        await pipeline(Readable.fromWeb(r.body), count, file.createWriteStream({ contentType, resumable: size > 8 * 1048576 || len > 8 * 1048576 }));
+        await pipeline(Readable.fromWeb(r.body), count, file.createWriteStream({ contentType, resumable: !len || len > 8 * 1048576 }));
       } catch (e) {
         await file.delete({ ignoreNotFound: true }).catch((e2) => console.error('saveContent.cleanup', e2 && e2.message));
         if (over) return { tooBig: true, size };

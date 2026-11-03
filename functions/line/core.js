@@ -15,6 +15,7 @@ const ALARM_WORDS = ['裂', '變形', '湧砂', '沉陷', '傾斜'];
 const PHOTO_WINDOW_MS = 10 * 60 * 1000;
 const NEG_RE = /(沒有|沒|没|無|无|未|不|並無|并无|非)/;   // 關鍵字前 3 個字內有否定詞 → 不算（「沒有裂縫」「無變形」「不用追加」）
 const PENDING_MAX = 50;                                   // 待綁定名單上限：陌生人灌不爆設定
+const INBOX_BUDGET_MS = 240 * 1000;                       // v6.0.144 審查：一次 webhook 最多花 240 秒存檔（函式上限 300 秒），超過的記 error 請重傳，不會無聲遺失
 const MAX_FILE_BYTES = 100 * 1024 * 1024;                 // 超過 100MB 的影片／檔案不存，只記一筆（v6.0.144：50→100MB，改串流存檔）
 
 const DEFAULT_TEXTS = {
@@ -180,8 +181,9 @@ async function handleEvents(events, deps) {
     const txt = (fresh ? fill(T.inboxAck, { n: fresh }) : '') + (big ? (fresh ? '\n' : '') + '另有 ' + big + ' 個檔案超過 ' + Math.round(MAX_FILE_BYTES / 1048576) + 'MB 沒存，請改傳雲端連結。' : '');
     if (txt) { try { await deps.reply(ack.token, txt); } catch (e) { (deps.log || console.error)('line.reply', e); } }
   }
+  const t0 = deps.now ? deps.now() : Date.now();
   for (const ev of events || []) {
-    try { out.push(await handleEvent(ev, cfg, T, deps)); } catch (e) {
+    try { out.push(await handleEvent(ev, cfg, T, deps, t0)); } catch (e) {
       (deps.log || console.error)('line.handleEvent', e);
       out.push({ ev: ev && ev.type, err: String(e && e.message || e) });
       // 失敗的事件留一筆紀錄（webhook 一律回 200，不記就永久遺失）
@@ -204,7 +206,7 @@ async function _addPending(cfg, deps, kind, id, val) {
   return true;
 }
 
-async function handleEvent(ev, cfg, T, deps) {
+async function handleEvent(ev, cfg, T, deps, t0) {
   const src = ev.source || {}, now = ev.timestamp || Date.now(), date = tpeDate(now);
   // 加入群組：記到待綁定清單，不主動發話（群組發話只用定稿句子）
   if (ev.type === 'join' && src.type === 'group') {
@@ -231,6 +233,13 @@ async function handleEvent(ev, cfg, T, deps) {
       const name = msg.type === 'file' ? safeName(msg.fileName) : (msg.id + '.' + extOf(msg));
       const path = 'line/inbox/' + date + '/' + msg.id + '_' + name;
       const base = { id: msg.id, at: now, date, from: src.userId, type: msg.type, fileName: msg.fileName || name };
+      // 審查：下載前先「認領」（status:'saving'），LINE 在下載途中重送也不會重複下載、重複回覆、蓋掉已歸檔的狀態
+      if (deps.claim && !(await deps.claim('fydata/lineInbox/' + msg.id, Object.assign({}, base, { status: 'saving' })))) return { kind: 'dup' };
+      const elapsed = (deps.now ? deps.now() : Date.now()) - (t0 || 0);
+      if (t0 != null && elapsed > INBOX_BUDGET_MS) {
+        await deps.dbSet('fydata/lineInbox/' + msg.id, Object.assign(base, { size: msg.fileSize || 0, status: 'error', err: '這一批檔案太多太大，時間不夠存，請重傳這個檔案' }));
+        return { kind: 'inboxErr', reason: 'budget' };
+      }
       let size = 0;
       try {
         if (deps.saveContent) {   // v6.0.144：串流（邊收邊寫 Storage，不把整個檔案放進記憶體）
@@ -490,4 +499,4 @@ async function processPush(id, rec, deps) {
   return n > 0;
 }
 
-module.exports = { MAX_FILE_BYTES, inboxAckPlan, verifySignature, handleEvents, dailyAsk, dailyCompile, morningCheck, processPush, pushOwners, isAddon, alarmWord, parseQty, parseCoReport, parseMD, matchSite, tpeDate, addDays, fill, DEFAULT_TEXTS, ALARM_WORDS };
+module.exports = { MAX_FILE_BYTES, INBOX_BUDGET_MS, inboxAckPlan, verifySignature, handleEvents, dailyAsk, dailyCompile, morningCheck, processPush, pushOwners, isAddon, alarmWord, parseQty, parseCoReport, parseMD, matchSite, tpeDate, addDays, fill, DEFAULT_TEXTS, ALARM_WORDS };

@@ -396,3 +396,18 @@ test('v6.0.144 收件：超過 100MB 的不存、回覆裡說明；串流存檔�
   await core.handleEvents([e('s3')], d);
   assert.equal(d.db.fydata.lineInbox.s3.status, 'error'); assert.match(d.db.fydata.lineInbox.s3.err, /網路斷了/);
 });
+
+test('v6.0.144 審查：下載前先認領，下載中的重送不重複下載也不重複回覆；超過時間預算的記 error 請重傳', async () => {
+  const d = mkDeps(CFG); const claimed = {};
+  d.claim = async (p, v) => { if (claimed[p] || d.dbGetSync) return false; claimed[p] = 1; await d.dbSet(p, v); return true; };
+  let saves = 0; d.saveContent = async () => { saves++; return { size: 10 }; };
+  const ev = { type: 'message', timestamp: T0, replyToken: 'r', source: { type: 'user', userId: 'Uowner' }, message: { id: 'c1', type: 'image' } };
+  await core.handleEvents([ev], d);
+  claimed['fydata/lineInbox/c1'] = 1;   // 第二次投遞：已認領
+  await core.handleEvents([ev], d);
+  assert.equal(saves, 1); assert.equal(d.replies.length, 1); assert.equal(d.db.fydata.lineInbox.c1.status, 'new');
+  let t = 0; d.now = () => t; const e2 = id => ({ type: 'message', timestamp: T0, replyToken: 'r', source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'file', fileName: id + '.pdf' } });
+  d.saveContent = async () => { t += core.INBOX_BUDGET_MS + 1; return { size: 10 }; };
+  await core.handleEvents([e2('k1'), e2('k2')], d);
+  assert.equal(d.db.fydata.lineInbox.k1.status, 'new'); assert.equal(d.db.fydata.lineInbox.k2.status, 'error'); assert.match(d.db.fydata.lineInbox.k2.err, /請重傳/);
+});

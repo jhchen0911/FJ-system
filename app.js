@@ -40095,7 +40095,8 @@ function _lbxRowHtml(x){
   var S=function(v){return v==null?'':String(v);},id=S(x.id);
   var st=x.status==='filed'?'<span class="bdg ok" style="font-size:10px">已歸檔'+(x.caseName||x.qid?('：'+esc(S(x.caseName)||_lbxQName(x.qid))):'')+'</span>'
     :(x.status==='error'?'<span class="bdg" style="background:#fdecea;color:#c62828;font-size:10px">存檔失敗，請重傳</span>'
-    :(x.status==='tooBig'?'<span class="bdg" style="background:#fff3e0;color:#b26a00;font-size:10px">超過上限沒存</span>':'<span class="bdg warn" style="font-size:10px">未歸檔</span>'));
+    :(x.status==='tooBig'?'<span class="bdg" style="background:#fff3e0;color:#b26a00;font-size:10px">超過上限沒存</span>'
+    :(x.status==='saving'?((Date.now()-(+x.at||0)>10*60000)?'<span class="bdg" style="background:#fdecea;color:#c62828;font-size:10px">存檔中斷，請重傳</span>':'<span class="bdg" style="font-size:10px">存檔中…</span>'):'<span class="bdg warn" style="font-size:10px">未歸檔</span>')));   // 審查：saving 超過 10 分鐘＝函式中途被中斷
   var body=x.type==='text'?('<div style="font-size:12.5px;white-space:pre-wrap;word-break:break-word">'+esc(S(x.text).slice(0,500))+'</div>')
     :('<div style="font-size:13px;font-weight:700;word-break:break-all">'+esc(S(x.fileName)||id)+'</div>');
   return '<div style="border-bottom:1px solid var(--b1);padding:7px 0;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">'
@@ -40152,7 +40153,7 @@ function lbxMark(id,status,f){
   if(!_lbxOk()){toast('只有管理員能改收件匣');return;}
   _lbxMarkCall(id,status,f).then(function(r){
     if(!r.ok){toast('沒改成：'+r.msg);return;}
-    var x=LBX[id];if(x){x.status=r.status;if(f){x.qid=f.qid||null;x.caseName=f.caseName||null;x.note=f.note||null;}}
+    var x=LBX[id];if(x){x.status=r.status;x.qid=(f&&f.qid)||null;x.caseName=(f&&f.caseName)||null;x.note=(f&&f.note)||null;}   // 審查：改回未歸檔時雲端也清掉這三欄
     var bx=document.getElementById('lbx-list');if(bx)bx.innerHTML=_lbxListHtml();
     try{updateDashTodo();}catch(e){_err('lbxMark.todo',e);}
     toast(r.status==='filed'?'已歸檔':'已改回未歸檔');
