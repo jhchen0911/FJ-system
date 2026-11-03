@@ -2416,7 +2416,7 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
         <div id="storage-usage-body" style="font-size:12px;color:var(--b5)">載入中…</div>
         <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
           <button type="button" class="btn btn-sm" onclick="renderStorageUsage()"><svg class="ic ib" aria-hidden="true"><use href="#i-refresh"/></svg> 重新整理</button>
-          <button type="button" class="btn btn-sm" onclick="cleanupQHistory()" style="border-color:var(--y);color:var(--yd)"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg> 清理版本歷史（每張保留 3 版）</button>
+          <button type="button" class="btn btn-sm" onclick="cleanupQHistory()" style="border-color:var(--y);color:var(--yd)"><svg class="ic ib" aria-hidden="true"><use href="#i-trash"/></svg> 清理版本歷史（自動存檔每張留 3 份；正式版次與還原前備份不刪）</button>
         </div>
         <div style="font-size:11px;color:var(--b4);margin-top:8px;line-height:1.6">版本歷史是每張報價單的還原快照，通常是空間最大宗。清理前建議先「<svg class="ic ib" aria-hidden="true"><use href="#i-upload"/></svg> 立即匯出」備份；雲端資料不受影響。</div>
       </div>
@@ -2829,14 +2829,14 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
   <div id="mob-more-body"></div>
 </div>
 
-<script src="calc/invoice.js?v=6.0.144" defer></script>
-<script src="calc/payable.js?v=6.0.144" defer></script>
-<script src="calc/report.js?v=6.0.144" defer></script>
-<script src="calc/comm.js?v=6.0.144" defer></script>
-<script src="calc/payroll.js?v=6.0.144" defer></script>
-<script src="calc/lifeline.js?v=6.0.144" defer></script>
-<script src="calc/settle.js?v=6.0.144" defer></script>
-<script src="app.js?v=6.0.144" defer></script>
+<script src="calc/invoice.js?v=6.0.148" defer></script>
+<script src="calc/payable.js?v=6.0.148" defer></script>
+<script src="calc/report.js?v=6.0.148" defer></script>
+<script src="calc/comm.js?v=6.0.148" defer></script>
+<script src="calc/payroll.js?v=6.0.148" defer></script>
+<script src="calc/lifeline.js?v=6.0.148" defer></script>
+<script src="calc/settle.js?v=6.0.148" defer></script>
+<script src="app.js?v=6.0.148" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">

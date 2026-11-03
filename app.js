@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.144';
+var APP_VERSION='v6.0.148';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -9976,7 +9976,7 @@ function _mergeQHistory(loc,cloud){
     var seen={};lo.forEach(function(v){seen[String(v&&v.savedAt)]=1;});
     cl.forEach(function(v){if(v&&!seen[String(v.savedAt)]){lo.push(v);seen[String(v.savedAt)]=1;}});
     lo.sort(function(a,b){return (b.savedAt||0)-(a.savedAt||0);});
-    out[qid]=lo.slice(0,30);   // 與本機保留上限一致
+    out[qid]=_qhPrune(lo,30);   // v6.0.148：正式版次與還原前備份不因合併被擠掉；自動存檔最多 30 份
   });
   return out;
 }
@@ -28022,7 +28022,7 @@ function cleanupQHistory(){
   let before=0,after=0;
   Object.keys(Q_HISTORY).forEach(qid=>{
     before+=(Q_HISTORY[qid]||[]).length;
-    if(Q_HISTORY[qid]&&Q_HISTORY[qid].length>3)Q_HISTORY[qid]=Q_HISTORY[qid].slice(0,3);
+    if(Q_HISTORY[qid])Q_HISTORY[qid]=_qhPrune(Q_HISTORY[qid],3);   // v6.0.148：只清自動存檔（原本 slice(0,3) 會連正式版次一起刪）
     after+=(Q_HISTORY[qid]||[]).length;
   });
   // 移除已不存在報價單的孤兒歷史
@@ -28128,18 +28128,22 @@ function compareQVersion(qid,idx,newerIdx){
     +'</div>';
   showConfirm('版本比較',head+'<div style="max-height:320px;overflow-y:auto">'+table+'</div>'+foot,()=>{},false,null,true);
 }
+// v6.0.148：版本歷史修剪共用——正式版次與還原前備份永遠保留，只修剪自動存檔（keep 份，由新到舊）
+function _qhKeep(e){return !!(e&&(e.formal||e.pre));}
+function _qhPrune(arr,keep){var n=0;return (arr||[]).filter(function(e){return _qhKeep(e)?true:(++n<=keep);});}
 function saveQVersion(qid,q,opts){
   if(!Q_HISTORY[qid])Q_HISTORY[qid]=[];
   Q_HISTORY[qid].unshift({
     savedAt:Date.now(),
     by:_fbUser?.email||'本機',
     formal:!!(opts&&opts.formal),          // 正式版次（進版產生）：永久保留
+    pre:!!(opts&&opts.pre)||undefined,     // v6.0.148 還原前備份：永久保留、不算在自動存檔 10 份
+    unsaved:!!(opts&&opts.unsaved)||undefined,   // 備份含編輯頁還沒按儲存的修改
     ver:(q.ver||1),
     snapshot:JSON.parse(JSON.stringify(q))
   });
-  // 修剪：正式版全保留；自動存檔僅留最近 10 份
-  var _auto=0;
-  Q_HISTORY[qid]=Q_HISTORY[qid].filter(function(e){return e.formal?true:(++_auto<=10);});
+  // 修剪：正式版、還原前備份全保留；自動存檔僅留最近 10 份
+  Q_HISTORY[qid]=_qhPrune(Q_HISTORY[qid],10);
   saveQHistory();
 }
 
@@ -28153,10 +28157,10 @@ function showQVersions(qid){
     const pf=prevFormalOf(i);
     return `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--b1);flex-wrap:wrap">
-      <div style="flex:0 0 auto;font-family:'Noto Serif TC',serif;font-size:${v.formal?'17px':'12px'};font-weight:900;color:${v.formal?'var(--g3)':'var(--b3)'};min-width:38px">${v.formal?('V'+(v.ver||1)):'存檔'}</div>
+      <div style="flex:0 0 auto;font-family:'Noto Serif TC',serif;font-size:${v.formal?'17px':'12px'};font-weight:900;color:${v.formal?'var(--g3)':(v.pre?'#b26a00':'var(--b3)')};min-width:38px">${v.formal?('V'+(v.ver||1)):(v.pre?'備份':'存檔')}</div>
       <div style="flex:1;min-width:130px">
         <div style="font-size:12px;font-weight:700;color:var(--b5)">
-          ${v.formal?`<span style="display:inline-block;background:var(--gl);color:var(--g3);border:1px solid var(--gm);border-radius:99px;padding:1px 9px;font-size:11px;margin-right:6px">v${v.ver||'?'} 正式版</span>`:''}
+          ${v.formal?`<span style="display:inline-block;background:var(--gl);color:var(--g3);border:1px solid var(--gm);border-radius:99px;padding:1px 9px;font-size:11px;margin-right:6px">v${v.ver||'?'} 正式版</span>`:''}${v.pre?`<span style="display:inline-block;background:#fff3e0;color:#b26a00;border:1px solid #ffcc80;border-radius:99px;padding:1px 9px;font-size:11px;margin-right:6px">還原前備份${v.unsaved?'（含未儲存修改）':''}</span>`:''}
           ${v.snapshot.date?('報價日 '+fmtD(v.snapshot.date)):new Date(v.savedAt).toLocaleString('zh-TW')}
         </div>
         <div style="font-size:11px;color:var(--b4)">NT$ ${fmt(v.snapshot.t?.total||0)} ／ ${new Date(v.savedAt).toLocaleString('zh-TW')} ／ ${esc(v.by||'')}</div>
@@ -28168,8 +28172,8 @@ function showQVersions(qid){
         <button type="button" onclick="restoreQVersion('${qid}',${i})" class="btn btn-xs" style="border-color:#1a73e8;color:#1a73e8">還原</button>
       </div>
     </div>`;};
-  const formals=[],autos=[];
-  versions.forEach((v,i)=>{(v.formal?formals:autos).push(row(v,i));});
+  const formals=[],autos=[],pres=[];
+  versions.forEach((v,i)=>{(v.formal?formals:(v.pre?pres:autos)).push(row(v,i));});   // v6.0.148 還原前備份另列
   const sec=(t,hint)=>`<div style="padding:7px 12px;background:var(--b0);font-size:11px;font-weight:700;color:var(--b4)">${t}${hint?` <span style="font-weight:400">${hint}</span>`:''}</div>`;
   // v5.386：兩種版本的差別講清楚——正式版次是自己按「進版」產生的，永久保留；
   // 自動存檔是每次按儲存時系統自動留的一份，防誤關／誤改，只留最近 10 份。
@@ -28192,6 +28196,7 @@ function showQVersions(qid){
     +curRow
     +bumpBar
     +(formals.length?formals.join(''):'<div style="padding:10px 12px;font-size:11.5px;color:var(--b3)">尚無正式版次 — 在編輯頁按「進版」即可封存現行內容為正式版（V1、V2…依序累積）</div>')
+    +(pres.length?sec('還原前備份','· 每次「還原」前自動把當時的內容另存一份，永久保留')+pres.join(''):'')
     +sec('自動存檔','· 每按一次「儲存」自動留一份（防誤關／誤改），只保留最近 10 份，不是版次')
     +(autos.length?autos.join(''):'<div style="padding:10px 12px;font-size:11.5px;color:var(--b3)">尚無自動存檔</div>');
   showConfirm('歷史版本',`<div style="max-height:340px;overflow-y:auto;margin:-8px -12px">${body}</div>`,()=>{},false,null,true);
@@ -28209,7 +28214,7 @@ function viewQVersion(qid,idx){
      <td style="padding:4px 6px;border-bottom:1px solid var(--b1);text-align:right;white-space:nowrap">${fmt(parseFloat(it.qty)||0)} ${esc(_uFix(it.unit||''))}</td>
      <td style="padding:4px 6px;border-bottom:1px solid var(--b1);text-align:right">${fmt(parseFloat(it.price)||0)}</td>
      <td style="padding:4px 6px;border-bottom:1px solid var(--b1);text-align:right;font-weight:700">${_isSpare(it)?'<span style="color:var(--b3);font-weight:400">備用單價</span>':fmt((parseFloat(it.qty)||0)*(parseFloat(it.price)||0))}</td></tr>`).join('');
-  showConfirm((v.formal?'V'+(v.ver||1)+' ':'')+'版本內容（唯讀）',
+  showConfirm((v.formal?'V'+(v.ver||1)+' ':(v.pre?'還原前備份 ':''))+'版本內容（唯讀）',
     `<div style="font-size:12px;color:var(--b4);margin-bottom:8px">${esc(sn.name||'')}　·　報價日期 ${esc(sn.date||'—')}　·　封存於 ${new Date(v.savedAt).toLocaleString('zh-TW')}</div>
      <div style="max-height:340px;overflow:auto;border:1px solid var(--b1);border-radius:8px">
      <table style="width:100%;border-collapse:collapse;font-size:12px">
@@ -28221,12 +28226,17 @@ function viewQVersion(qid,idx){
 function restoreQVersion(qid,versionIdx){
   const versions=Q_HISTORY[qid];
   if(!versions||!versions[versionIdx])return;
-  const snapshot=versions[versionIdx].snapshot;
-  showConfirm('還原版本','確定要還原到此版本？<br><span style="font-size:11px;color:var(--b4)">目前內容會先自動存檔（可再還原回來），版本號維持現行不倒退。</span>',()=>{
+  const src=versions[versionIdx],snapshot=JSON.parse(JSON.stringify(src.snapshot));   // v6.0.148：深拷貝——原本淺拷貝，還原後再改報價會連帶改到歷史版次的工項
+  const editing=typeof eid!=='undefined'&&eid===qid&&!!document.getElementById('page-editor')?.classList.contains('active');
+  const what=src.formal?('V'+(src.ver||1)+' 正式版'):(src.pre?'還原前備份':'自動存檔');
+  showConfirm('還原版本','確定要還原到「'+what+'（'+new Date(src.savedAt).toLocaleString('zh-TW')+'）」？<br><span style="font-size:12px;color:var(--b5)"><b>目前內容'+(editing?'（含編輯頁還沒按儲存的修改）':'')+'會先另存成「還原前備份」，永久保留、不會不見</b>，可以在歷史版本裡查看、比較或再還原回來。版本號維持現行不倒退；已封存的正式版次不會被改。</span>',()=>{
     const idx=Q.findIndex(x=>x.id===qid);
     if(idx>=0){
       const curVer=Q[idx].ver||1;
-      try{saveQVersion(qid,Q[idx]);}catch(e){_err('restoreQVersion',e);}          // 還原前備份現行，避免內容遺失
+      // v6.0.148：還原前備份＝目前畫面上的內容（編輯頁開著就把還沒儲存的修改一起收進來），標 pre、永久保留
+      let cur=Q[idx],unsaved=false;
+      if(editing){try{cur=Object.assign(JSON.parse(JSON.stringify(Q[idx])),_qEditorFields());unsaved=true;}catch(e){_err('restoreQVersion.cur',e);cur=Q[idx];}}
+      try{saveQVersion(qid,cur,{pre:true,unsaved:unsaved});}catch(e){_err('restoreQVersion',e);toast('還原前備份失敗，已取消還原');return;}
       Q[idx]={...snapshot,id:qid,ver:Math.max(curVer,snapshot.ver||1)};  // 版號不倒退
       _touch(Q[idx]); // 快照裡的 _mt 是舊值，不蓋新戳記的話雲端同步會把還原吃掉
       persist();renderList();rDash();
@@ -28234,7 +28244,7 @@ function restoreQVersion(qid,versionIdx){
       try{
         if(typeof eid!=='undefined'&&eid===qid&&document.getElementById('page-editor')?.classList.contains('active'))loadQ(qid);
       }catch(e){_err('restoreQVersion',e);}
-      toast('已還原（原內容已自動存檔）');
+      toast('已還原（原內容已另存成「還原前備份」，在歷史版本裡）');
     }
   });
 }

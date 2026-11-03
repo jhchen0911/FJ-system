@@ -9583,6 +9583,58 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.148 報價還原不覆蓋：還原前先把目前內容（含未儲存修改）另存「還原前備份」、永久保留；正式版次不被改、不被清 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const wait = ms => new Promise(res => setTimeout(res, ms));
+      try {
+        const it = (d, p) => ({ desc: d, unit: '式', qty: '1', price: String(p) });
+        Q.unshift({ id: '1767000000001', name: '範例還原案', client: '範例營造', date: '2026-11-01', ver: 2, items: [it('V2工項', 2000)], exs: [], t: { sub: 2000, tax: 100, total: 2100 } });
+        Q_HISTORY['1767000000001'] = [{ savedAt: 1000, by: 't', formal: true, ver: 1, snapshot: { id: '1767000000001', name: '範例還原案', ver: 1, items: [it('V1工項', 1000)], exs: [], t: { total: 1050 } } }];
+        loadQ('1767000000001'); go('editor'); await wait(50);
+        items[0].price = '2500'; items[0].desc = 'V2改了還沒存';   // 未儲存的修改
+        const v1 = Q_HISTORY['1767000000001'].findIndex(v => v.formal && v.ver === 1);
+        restoreQVersion('1767000000001', v1); await wait(20);
+        out.msg = /會先另存成「還原前備份」，永久保留、不會不見/.test(document.getElementById('gen-confirm-modal').innerHTML) && /含編輯頁還沒按儲存的修改/.test(document.getElementById('gen-confirm-modal').innerHTML);
+        document.getElementById('gen-confirm-ok').click(); await wait(80);
+        const q = Q.find(x => x.id === '1767000000001'), H = Q_HISTORY['1767000000001'];
+        const pre = H.find(v => v.pre);
+        out.restored = q.items[0].desc === 'V1工項' && q.ver === 2;
+        out.pre = !!pre && pre.unsaved === true && pre.snapshot.items[0].desc === 'V2改了還沒存' && pre.snapshot.items[0].price === '2500';
+        // 深拷貝：還原後改報價，不會改到 V1 正式版
+        q.items[0].desc = '還原後又改'; out.formalSafe = H.find(v => v.formal).snapshot.items[0].desc === 'V1工項';
+        // 自動存檔 12 次：還原前備份與正式版都還在
+        for (let i = 0; i < 12; i++) saveQVersion('1767000000001', q);
+        const H2 = Q_HISTORY['1767000000001'];
+        out.prune = H2.filter(v => !v.formal && !v.pre).length === 10 && H2.some(v => v.pre) && H2.some(v => v.formal);
+        // 再還原回「還原前備份」：內容與當初未儲存的一致，而且又多一份備份
+        const pi = H2.findIndex(v => v.pre); restoreQVersion('1767000000001', pi); await wait(20); document.getElementById('gen-confirm-ok').click(); await wait(80);
+        const q2 = Q.find(x => x.id === '1767000000001');
+        out.back = q2.items[0].desc === 'V2改了還沒存' && q2.items[0].price === '2500' && Q_HISTORY['1767000000001'].filter(v => v.pre).length === 2;
+        // 歷史版本視窗：另列還原前備份，也有查看／vs現行／還原
+        showQVersions('1767000000001'); await wait(20);
+        const hv = document.getElementById('gen-confirm-modal').innerHTML;
+        out.list = /還原前備份<\/div>|還原前備份 <span/.test(hv) && /還原前備份（含未儲存修改）/.test(hv) && (hv.match(/restoreQVersion\(/g) || []).length === Q_HISTORY['1767000000001'].length;
+        document.getElementById('gen-confirm-cancel').click();
+        // 清理版本歷史、跨裝置合併：正式版與還原前備份都不刪
+        const nF = Q_HISTORY['1767000000001'].filter(v => v.formal || v.pre).length;
+        const oT = window.toast; window.toast = () => {}; cleanupQHistory(); window.toast = oT;
+        out.cleanup = Q_HISTORY['1767000000001'].filter(v => v.formal || v.pre).length === nF && Q_HISTORY['1767000000001'].filter(v => !v.formal && !v.pre).length === 3;
+        const many = []; for (let i = 0; i < 40; i++) many.push({ savedAt: 5000 + i, snapshot: {} });
+        const M = _mergeQHistory({ x: [{ savedAt: 1, formal: true, ver: 1, snapshot: {} }, { savedAt: 2, pre: true, snapshot: {} }] }, { x: many });
+        out.merge = M.x.length === 32 && M.x.some(v => v.formal) && M.x.some(v => v.pre);
+        delete Q_HISTORY['1767000000001']; Q.splice(Q.findIndex(x => x.id === '1767000000001'), 1); go('quotes');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    check('v6.0.148 報價還原不覆蓋：確認視窗講清楚；還原前備份含未儲存修改、永久保留（自動存檔再存 12 次也不被擠掉）；還原後再改報價不會改到正式版次', r.msg && r.restored && r.pre && r.formalSafe && r.prune, JSON.stringify(r));
+    check('v6.0.148 再還原回「還原前備份」內容一致；歷史版本另列還原前備份；清理版本歷史與跨裝置合併不刪正式版次與還原前備份', r.back && r.list && r.cleanup && r.merge, JSON.stringify(r));
+    check('v6.0.148 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
