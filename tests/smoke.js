@@ -27,6 +27,7 @@ function _fakeClock() {
   const now = () => base + (RealDate.now() - t0);
   class FakeDate extends RealDate { constructor(...a) { if (a.length) super(...a); else super(now()); } static now() { return now(); } }
   window.Date = FakeDate;
+  window.__FY_FAKE_CLOCK = 1;   // 4b：時鐘是假的 → 程式不讀 Firebase 伺服器時間差（CI 連得到測試專案，真實時間差 19 天會讓修改時間全部偏移）
 }
 async function newPage(browser, width, height) {
   const page = await browser.newPage({ viewport: { width, height } });
@@ -10066,6 +10067,7 @@ async function newPage(browser, width, height) {
         out.afterPush = !_cfNeedPush['customers/cu4b'] && _RCB.customers && _RCB.customers.cu4b && _RCB.customers.cu4b.m === T + 600;
         // 伺服器時間
         const oOff = _SRV_OFF; _SRV_OFF = 3600000; const tt = _touch({})._mt; out.srv = Math.abs(tt - (Date.now() + 3600000)) < 2000; _SRV_OFF = oOff;
+        out.srvFakeSkip = window.__FY_FAKE_CLOCK === 1 && !_srvOffWatch._on;   // 測試頁假時鐘：不讀伺服器時間差（CI 曾因此 2 項失敗）
         // 7 天沒同步
         localStorage.setItem('fy_last_pull_ok', String(Date.now() - 8 * 86400000)); out.stale = _syncStale() === true;
         _pullOkMark(); out.fresh = _syncStale() === false;
@@ -10105,7 +10107,7 @@ async function newPage(browser, width, height) {
     check('4b 三方合併：兩台改不同欄位自動合併（兩邊都留）、合併結果一定上傳；沒有指紋的舊記錄照舊較新者勝', r.diffField && r.forcePush && r.afterPush && r.noBase, JSON.stringify(r));
     check('4b 同欄位衝突：先用較新的版本、記進「同步衝突」（總覽待辦），選「用這台的」後存回並同步', r.sameField && r.todo && r.pick, JSON.stringify(r));
     check('4b 報價三方合併：本機改工項、雲端改業主都留，本機成本欄位不被洗掉', r.quote, JSON.stringify(r));
-    check('4b 伺服器時間（_touch 用 .info/serverTimeOffset 校正）；超過 7 天沒同步的裝置上傳前先整份下載合併', r.srv && r.stale && r.fresh && staleHook, JSON.stringify({ srv: r.srv, stale: r.stale, fresh: r.fresh, staleHook }));
+    check('4b 伺服器時間（_touch 用 .info/serverTimeOffset 校正）；超過 7 天沒同步的裝置上傳前先整份下載合併', r.srv && r.srvFakeSkip && r.stale && r.fresh && staleHook, JSON.stringify({ srv: r.srv, srvFakeSkip: r.srvFakeSkip, stale: r.stale, fresh: r.fresh, staleHook }));
     check('4b 審查修正：報價工項衝突選另一台的、本機成本單價補回；補的 id 由內容決定（兩台一樣）、雲端舊的沒 id 那份不重複；員工刪最後一筆不整次失敗；陣列／物件形態一致', r.graft && r.detId && r.noIdDedupe && r.lastDel && r.normArr, JSON.stringify(r));
     check('4b 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();

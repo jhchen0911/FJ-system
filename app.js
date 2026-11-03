@@ -40401,7 +40401,7 @@ var _SRV_OFF=0;
 var _STALE_MS=7*86400000;
 function _srvNow(){return Date.now()+(+_SRV_OFF||0);}
 function _srvOffWatch(){
-  try{if(!_fbDb||_srvOffWatch._on)return;_srvOffWatch._on=1;
+  try{if(!_fbDb||_srvOffWatch._on||window.__FY_FAKE_CLOCK)return;_srvOffWatch._on=1;   // 測試頁把時鐘固定在某一天（__FY_FAKE_CLOCK），不能拿真實伺服器時間去校正
     _fbDb.ref('.info/serverTimeOffset').on('value',function(s){var v=+s.val();if(isFinite(v)&&Math.abs(v)<366*86400000)_SRV_OFF=v;});
   }catch(e){_err('_srvOffWatch',e);}
 }
