@@ -9240,6 +9240,39 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.137 電腦端斷線警報：fyBeat() 帶登入憑證呼叫雲端 hqBeat；排程 08～22 點每小時、超過 2 小時沒報到 LINE 通知一次、額度保護同 aiNotify ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const oU = _fbUser, oF = window.fetch;
+      try {
+        _fbUser = { email: 'hsuanchen911@gmail.com', getIdToken: async () => 'tokB' };
+        let sent = null; window.fetch = async (u, o) => { sent = { u, o }; return { ok: true, status: 200, json: async () => ({ ok: true }) }; };
+        out.ok = (await fyBeat()) === '已報到' && sent.u === _fnUrl('hqBeat') && sent.o.headers.Authorization === 'Bearer tokB' && sent.o.method === 'POST';
+        window.fetch = async () => ({ ok: true, status: 200, json: async () => ({ ok: true, recovered: true }) });
+        out.rec = /斷線警報已解除/.test(await fyBeat());
+        window.fetch = async () => ({ ok: false, status: 404, json: async () => { throw new Error('x'); } });
+        out.nf = /尚未部署/.test(await fyBeat());
+        _fbUser = { email: 'staff@x.com', getIdToken: async () => 't' };
+        out.deny = /不能報到/.test(await fyBeat());
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      _fbUser = oU; window.fetch = oF;
+      return out;
+    });
+    const pth136 = require('path'), fs136 = require('fs');
+    const HB = require(pth136.join(__dirname, '..', 'functions', 'ops', 'heartbeat.js'));
+    const IDX = fs136.readFileSync(pth136.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    const RF = JSON.parse(fs136.readFileSync(pth136.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    const t0 = Date.parse('2026-11-03T06:00:00Z');
+    check('v6.0.137 電腦端斷線警報：fyBeat 帶憑證報到、名單外不能報到；超過 2 小時才警報、同一次斷線只發一次、08～22 點；額度保護；網頁不能寫 hqBeat',
+      r.ok && r.rec && r.nf && r.deny && HB.HB_STALE_MS === 7200000 && HB.hbDecide({ at: t0 - 7200001 }, t0).alert && !HB.hbDecide({ at: t0 - 7200001, alertFor: t0 - 7200001 }, t0).alert
+      && !HB.hbDecide({ at: t0 - 9e6 }, Date.parse('2026-11-03T15:00:00Z')).alert && /exports\.hqBeat =/.test(IDX) && /exports\.hqBeatCheck/.test(IDX) && /'0 8-22 \* \* \*'/.test(IDX)
+      && /hqBeatCheck[\s\S]*monthHold\(used\)[\s\S]*status: 'held'/.test(IDX) && /hqBeat[\s\S]*notifyAllowed\(email\)/.test(IDX) && RF.hqBeat && RF.hqBeat['.write'] === 'false', JSON.stringify(r));
+    check('v6.0.137 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

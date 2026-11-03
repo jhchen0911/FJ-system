@@ -230,3 +230,55 @@ exports.dailyServerBackup = onSchedule({ schedule: '15 3 * * *', timeZone: TZ, r
   }
   console.log('[備份] 完成', JSON.stringify(counts));
 });
+
+// ══════════ v6.0.137 電腦端斷線警報：電腦端（Lotion-HQ）定時報到，超過 2 小時沒報到就 LINE 通知 Lotion 一次 ══════════
+// 報到：電腦端在 FJ 分頁執行 fyBeat()（帶登入憑證呼叫 hqBeat），只記時間；發送者名單與 aiNotify 相同（notifyAllowed）。
+// 檢查：台灣時間 08:00～22:00 每小時一次（hqBeatCheck）；同一次斷線只發一次（fydata/hqBeat/alertFor），恢復報到後重置。
+// LINE 月額度保護同 aiNotify：本月已用 ≥180 則只記 fydata/aiNotifyLog（status:'held'，FJ 總覽顯示），不推 LINE。不佔 aiNotify 每天 6 則名額。
+const hbCore = require('./ops/heartbeat.js');
+exports.hqBeat = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'] }, async (req, res) => {
+  try {
+    if (req.method !== 'POST') { res.status(405).json({ error: { message: '只接受 POST' } }); return; }
+    const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
+    if (!m) { res.status(401).json({ error: { message: '需要登入' } }); return; }
+    const t = await admin.auth().verifyIdToken(m[1]);
+    const email = String(t.email || '').toLowerCase();
+    if (!notifyCore.notifyAllowed(email)) { res.status(403).json({ error: { message: '這個帳號不能報到' } }); return; }
+    const ref = admin.database().ref('fydata/hqBeat'), now = Date.now();
+    const cur = (await ref.once('value')).val();
+    if (hbCore.hbShouldWrite(cur, now)) await ref.update({ at: now, by: email });
+    res.status(200).json({ ok: true, at: now, recovered: !!(cur && cur.alertFor && cur.alertFor === cur.at) });
+  } catch (e) {
+    console.error('hqBeat', e);
+    res.status(500).json({ error: { message: '報到服務錯誤' } });
+  }
+});
+exports.hqBeatCheck = onSchedule({ schedule: '0 8-22 * * *', timeZone: TZ, region: REGION, secrets: [LINE_TOKEN] }, async () => {
+  const db = admin.database(), now = Date.now(), ref = db.ref('fydata/hqBeat');
+  const st = (await ref.once('value')).val();
+  const d = hbCore.hbDecide(st, now);
+  if (!d.alert) return;
+  // 先佔住「這次斷線已發」：排程重跑或兩台同時跑只會有一次 committed
+  const prev = st.alertFor == null ? null : st.alertFor;
+  const tx = await ref.child('alertFor').transaction((c) => (c === d.key ? undefined : d.key));
+  if (!tx.committed) return;
+  const text = hbCore.hbText(d.key);
+  const logRef = db.ref('fydata/aiNotifyLog').push();
+  try {
+    const deps = lineAdapters.mkDeps(LINE_TOKEN.value());
+    const used = await deps.quotaUsed();
+    if (notifyCore.monthHold(used)) {
+      await logRef.set({ by: 'hqBeatCheck', at: now, text, status: 'held', reason: 'LINE 本月已用 ' + used + '／' + notifyCore.NOTIFY_MONTH_LIMIT + '，暫停推 LINE', used });
+      await ref.update({ alertAt: now });
+      return;
+    }
+    const cfg = (await deps.getCfg()) || {};
+    const sent = Object.keys(cfg.owners || {}).length ? await lineCore.pushOwners(cfg, deps, text) : 0;
+    await logRef.set({ by: 'hqBeatCheck', at: now, text, status: sent ? 'sent' : 'failed', to: sent, used: used == null ? null : used + sent });
+    if (sent) await ref.update({ alertAt: now });
+    else await ref.child('alertFor').set(prev);   // 沒送出：放掉，下個小時再試（不用 transaction：本機快取是 null 時回 undefined 會直接放棄）
+  } catch (e) {
+    console.error('hqBeatCheck', e);
+    await ref.child('alertFor').set(prev).catch((e2) => console.error('hqBeatCheck.undo', e2));
+  }
+});
