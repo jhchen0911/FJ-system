@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.138';
+var APP_VERSION='v6.0.139';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -806,7 +806,7 @@ function _goCore(p){
   if(p==='finance'||p==='ledger'||p==='payroll'){try{if(_acctMount()){_acctTab=({finance:'ar',ledger:'inv',payroll:'pay'})[p];p='acct';}}catch(e){_err('go.acct',e);}}
   if(p==='invoice'){try{if(_acctMount()){_acctTab=(typeof _invTab!=='undefined'&&_invTab==='vendor')?'vb':'own';p='acct';}}catch(e){_err('go.inv',e);}}   // v6.0.30 計價併入帳務
   if(p==='profit'){p='reports';_currentReport='overview';}
-  if(p==='rebar'||p==='grout'||p==='backfill'||p==='lifeline'){_meTab=p;p='matest';}   // v6.0.138 計算工具併入材料估算分頁
+  if(p==='rebar'||p==='grout'||p==='backfill'||p==='lifeline'){_meTab=p;p='matest';}   // v6.0.139 計算工具併入材料估算分頁
   if(p==='projects')p='proj';   // v6.0.26 舊版專案卡片頁移除，合約檔／確認單改在工程專案「合約與文件」   // v6.0.17 利潤分析併入經營報表
   try{if(p==='rfq'&&typeof _rfqTab!=='undefined'&&_rfqTab==='mat'){_rfqTab='rfq';if(_rfqQid)_m6Qid=_rfqQid;p='mat6';}}catch(e){_err('go',e);}   // v6.0.25 材料移出發包
   // 權限攔截（try/catch 保護避免 TDZ）
@@ -2629,10 +2629,10 @@ const ALL_PAGES = [
   {id:'contacts',  label:'客戶．廠商',icon:_pgIcon('users'),    grp:'data',  adminOnly:false},
   {id:'progress',  label:'施工進度',  icon:_pgIcon('calendar'), grp:'data',  adminOnly:false, hidden:true, parent:'proj'}, // v6 併入工程專案（預定排程由專案頁「施工進度工具」進）；v5.347
   {id:'plan',      label:'施工計畫書',icon:_pgIcon('contract'), grp:'data',  adminOnly:false}, // v5.353 分項工程施工計畫書自動生成
-  {id:'rebar',     label:'鋼筋籠檢料',icon:_pgIcon('scale'),    grp:'data',  adminOnly:false, hidden:true, parent:'matest'}, // v5.343；v6.0.138 併入材料估算分頁
+  {id:'rebar',     label:'鋼筋籠檢料',icon:_pgIcon('scale'),    grp:'data',  adminOnly:false, hidden:true, parent:'matest'}, // v5.343；v6.0.139 併入材料估算分頁
   {id:'matest',    label:'材料估算',  icon:_pgIcon('box'),      grp:'data',  adminOnly:false}, // v5.352 自材料管理獨立
-  {id:'grout',     label:'根固砂漿',  icon:_pgIcon('hardhat'),  grp:'data',  adminOnly:false, hidden:true, parent:'matest'}, // v5.346；v6.0.138 併入材料估算分頁
-  {id:'backfill',  label:'背填材料',  icon:_pgIcon('wrench'),   grp:'data',  adminOnly:false, hidden:true, parent:'matest'}, // v5.346；v6.0.138 併入材料估算分頁
+  {id:'grout',     label:'根固砂漿',  icon:_pgIcon('hardhat'),  grp:'data',  adminOnly:false, hidden:true, parent:'matest'}, // v5.346；v6.0.139 併入材料估算分頁
+  {id:'backfill',  label:'背填材料',  icon:_pgIcon('wrench'),   grp:'data',  adminOnly:false, hidden:true, parent:'matest'}, // v5.346；v6.0.139 併入材料估算分頁
   {id:'workers',   label:'人員進場資料',icon:_pgIcon('users'),  grp:'data',  adminOnly:false}, // v5.438 進場申請人員資料＋證件影本
   {id:'lifeline',  label:'安全母索',  icon:_pgIcon('link'),     grp:'data',  adminOnly:false, hidden:true, parent:'matest'}, // v5.393；v5.397 併入材料估算，導覽隱藏
   // v5.330 sysOnly：只有「系統管理員」角色能開，其他角色的權限表上是鎖住的
@@ -9399,7 +9399,7 @@ function matEstU(k,val){
   }
   if(k==='method'||k==='fengProc')renderMatEst(); // 工法連動加工矩陣列名／封頭鈑支數欄
 }
-// v6.0.138（Lotion 11/03）：匯出改兩份，各給各的讀者、同一份裡同一數字只出現一次：
+// v6.0.139（Lotion 11/03）：匯出改兩份，各給各的讀者、同一份裡同一數字只出現一次：
 //   kind 'order'＝叫料單（工務／料場；摘要＋依進場階段，可只印某一階段 opt.stage）；'quote'＝估價明細（內部；摘要＋依類別總量，opt.basis 附計算依據：路數摘要＋安全母索逐層表）
 function matEstExportMenu(){
   if(!window._matEstRes)matEstCalc();
@@ -9411,7 +9411,7 @@ function matEstExportMenu(){
     function(){var k=(document.querySelector('input[name="me-xk"]:checked')||{}).value||'order';matEstExportPDF(k,{stage:gv('me-xstage'),basis:!!(document.getElementById('me-xbasis')||{}).checked});},false,null,true);
 }
 function matEstExportPDF(kind,opt){
-  // v5.397：A4 橫式、明細依分類分塊並排；v6.0.138 分成叫料單／估價明細兩份
+  // v5.397：A4 橫式、明細依分類分塊並排；v6.0.139 分成叫料單／估價明細兩份
   kind=kind==='quote'?'quote':'order';opt=opt||{};
   if(!window._matEstRes)matEstCalc();
   var res=window._matEstRes;if(!res){toast('請先按「計算」');return;}
@@ -9528,7 +9528,7 @@ function _renderMatEstInner(el){
   var fS=function(k,label,opts,onEx){var h='<div class="f"><label style="font-size:11px">'+label+'</label><select onchange="matEstU(\''+k+'\',this.value)'+(onEx||'')+'" style="'+selCss+'">';
     opts.forEach(function(o){var vv=Array.isArray(o)?o[0]:o,ll=Array.isArray(o)?o[1]:o;h+='<option value="'+vv+'"'+(String(m[k])===String(vv)?' selected':'')+'>'+ll+'</option>';});
     return h+'</select></div>';};
-  // v6.0.138：每段一個可收合區塊（常用段預設展開、少用段預設收起；開合狀態記在本機），段內少用欄位再收進「進階」
+  // v6.0.139：每段一個可收合區塊（常用段預設展開、少用段預設收起；開合狀態記在本機），段內少用欄位再收進「進階」
   var _secOpen=false,_secN=0;
   var sec=function(t,hint){var id=String(t).replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g,'').slice(0,8)||('s'+(_secN++));var op=_meSecOpen(id,/^[①②③④]/.test(String(t)));
     var out=(_secOpen?'</div></details>':'');_secOpen=true;
@@ -9537,7 +9537,7 @@ function _renderMatEstInner(el){
   var g=function(inner,min){return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax('+(min||110)+'px,1fr));gap:8px">'+inner+'</div>';};
   var h='';
   var _sq=null;try{_sq=_matEstSiteQ();if(_sq)_sdToMatEst(_sdNorm(_sq.site),m);}catch(e){_err('matEst.site',e);_sq=null;}   // v6.0.48 綁定工程＝幾何讀案場細節
-  // 專案選擇（v6.0.138 移到上方工具列，與其他計算工具同一位置）
+  // 專案選擇（v6.0.139 移到上方工具列，與其他計算工具同一位置）
   var tb='<div class="f" style="margin-bottom:0"><label>掛專案（掛上後圖面數量讀案場細節；不掛＝純試算）</label><select onchange="matEstPickProj(this.value)" style="'+selCss+'"><option value="">— 不綁定（純試算）—</option>';
   Q.filter(function(q){return (q.awarded&&!q.parentId)||q.matEst||q.site;}).forEach(function(q){tb+='<option value="'+q.id+'"'+(window._matEstQid===q.id?' selected':'')+'>'+esc(q.name||'')+(q.matEst?' ✓已有估算':'')+(q.site?' ▪案場細節':'')+'</option>';});
   tb+='</select></div>';
@@ -9643,7 +9643,7 @@ function _renderMatEstInner(el){
   h+='</tbody></table><button type="button" class="btn btn-xs" onclick="matEstRowAdd(\'_dc\')" style="font-size:12px;margin-top:4px">＋ 加一筆</button>';
   if(_secOpen)h+='</div></details>';
   h+='<div style="font-size:11px;color:var(--b3);margin-top:8px">存入專案後，請至「專案材料」分配自有/租賃並填租金、運費，一鍵更新施工成本。</div>';
-  // v6.0.138 工具列（與其他計算工具同一位置）：掛專案｜計算｜存入專案｜匯出 PDF ▾｜重設
+  // v6.0.139 工具列（與其他計算工具同一位置）：掛專案｜計算｜存入專案｜匯出 PDF ▾｜重設
   var bar=document.getElementById('me-bar-shoring');
   if(bar)bar.innerHTML='<div class="card" style="margin-bottom:12px"><div class="cb tool-head" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
     +'<div style="flex:1;min-width:220px">'+tb+'</div>'
@@ -9683,7 +9683,7 @@ function _shPanelHtml(title,rows,chCls){
 }
 // v6.0.136：材料估算的母索與安全母索頁共用 calc/lifeline.js（_llLinkFor 已刪）
 // v5.397：安全母索用量表（單獨列印，供業主核算數量）
-// v6.0.138：安全母索逐層表改成估價明細的附錄（不再單獨一份）
+// v6.0.139：安全母索逐層表改成估價明細的附錄（不再單獨一份）
 function _matEstRopeBody(res){
   var T=res.T||{},ld=res.layerData||[];
   var st=MAT_EST||{};
@@ -9713,7 +9713,7 @@ function _matEstCalcCore(){
   window._matEstRes=res;
   var el=document.getElementById('mat-est-out');if(!el)return;
   var info=res.info;
-  // v6.0.138：右邊＝摘要（關鍵數字）＋材料清單（依進場階段／依類別切換，同一份資料不重複列）＋計算依據（收合）
+  // v6.0.139：右邊＝摘要（關鍵數字）＋材料清單（依進場階段／依類別切換，同一份資料不重複列）＋計算依據（收合）
   var h=_meTilesHtml(res)+'<div class="card"><div class="ch green"><div class="cht">材料清單</div></div><div class="cb"><div class="me-seg">'
     +'<button type="button" class="'+(_meView==='stage'?'on':'')+'" onclick="_meView=\'stage\';_matEstCalcCore()">依進場階段（叫料）</button>'
     +'<button type="button" class="'+(_meView==='cat'?'on':'')+'" onclick="_meView=\'cat\';_matEstCalcCore()">依類別（估價）</button></div>'
@@ -33146,7 +33146,7 @@ try{_helpMount();}catch(e){_err('help.mount',e);}
 function _v6PermMigrate(){
   try{
     if(!_fbUser||!_fbUser.email||!_isSysUser(_fbUser.email))return false;
-    var p=_acct();if(p.__v6perm&&p.__v6perm>=4)return false;   // 版本 3：計價併入帳務；版本 4（v6.0.138）：鋼筋籠／根固砂漿／背填併入材料估算
+    var p=_acct();if(p.__v6perm&&p.__v6perm>=4)return false;   // 版本 3：計價併入帳務；版本 4（v6.0.139）：鋼筋籠／根固砂漿／背填併入材料估算
     var changed=0;
     (p.__roles||[]).forEach(function(r){
       if(!r||r.sys||!r.pages)return;var pg=r.pages,c0=changed;
@@ -33155,7 +33155,7 @@ function _v6PermMigrate(){
       set('rfq',pg.materials||pg.costs||pg.projects);
       set('acct',pg.finance||pg.ledger||pg.invoice);   // v6.0.30 計價併入帳務
       set('reports',pg.profit||pg.reports);   // v6.0.17 經營報表
-      set('matest',pg.rebar||pg.grout||pg.backfill);   // v6.0.138 計算工具併入材料估算
+      set('matest',pg.rebar||pg.grout||pg.backfill);   // v6.0.139 計算工具併入材料估算
       if(changed>c0)_touch(r);
     });
     p.__v6perm=4;_acctSave(p);
@@ -39560,7 +39560,7 @@ function openAiHeld(){
     +(L.length?L.map(function(x){var d=new Date(x.at||0);return '<div style="padding:6px 0;border-bottom:1px solid var(--b1);font-size:13px"><span style="color:var(--b3);font-size:11px">'+(d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+'</span>　'+esc(x.text||'')+'</div>';}).join(''):'<div style="color:var(--b3)">沒有</div>'),
     null);
 }
-// ══════════ v6.0.138 材料估算整合：擋土支撐全套／安全母索／鋼筋籠／根固砂漿／背填材料 同一頁分頁（Lotion 11/03）══════════
+// ══════════ v6.0.139 材料估算整合：擋土支撐全套／安全母索／鋼筋籠／根固砂漿／背填材料 同一頁分頁（Lotion 11/03）══════════
 // 各工具原本的計算與存檔不變（rebar-root 等容器搬進材料估算頁）；導覽只留「材料估算」，舊頁名 go('rebar'…) 轉到對應分頁；權限跟材料估算走（_v6PermMigrate 版本 4 一次性補勾）
 var ME_TABS=[['shoring','擋土支撐全套'],['lifeline','安全母索'],['rebar','鋼筋籠'],['grout','根固砂漿'],['backfill','背填材料']];
 var _meTab=(function(){try{var v=localStorage.getItem('fy_meTab');return ME_TABS.some(function(t){return t[0]===v;})?v:'shoring';}catch(e){return 'shoring';}})();
