@@ -25,11 +25,12 @@
     return { curTotal: curTotal, tax: tax, total: beforeRetention - retention - cleanGross, retention: retention, clean: clean, cleanGross: cleanGross, cleanPermil: cpm, baseTotal: curTotal, claimRatio: 1 };
   }
 
-  // 第 3c 步（v6.0.136）：同 totals，另可傳 o.cleanFixed（清潔費「第一期一次扣合約 %」算好的未稅金額，有值就用它、不看 ‰）
+  // 第 3c 步（v6.0.136）：同 totals，另可傳 o.cleanFixed（清潔費「第一期一次扣合約 %」本期待扣的未稅金額，有值就用它、不看 ‰；最多扣到本期未稅，回傳 t.clean＝實扣）
   function totals2(rowAmts, o) {
     o = o || {};
     var t = totals(rowAmts, o), fx = Math.round(num(o.cleanFixed));
     if (!(fx > 0)) return t;
+    fx = Math.min(fx, Math.max(0, Math.round(num(t.curTotal))));   // Lotion 11/03：本期不夠扣只扣到本期未稅，扣不完的順延下一期（不出現負數）
     var cg = Math.round(fx * (1 + num(o.taxR) / 100));
     t.total = t.total + t.cleanGross - cg; t.clean = fx; t.cleanGross = cg; t.cleanFixed = fx;
     return t;

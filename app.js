@@ -3878,7 +3878,7 @@ function rInvTots(srcInv){
   // v6.0.31 清潔費：未稅工程款 × ‰，含稅自總計扣除（業主開發票當費用，或我方開折讓單）
   const _cleanPm=_rec?(parseFloat(_rec.cleanPermil)||0):(parseFloat(document.getElementById('inv-clean-permil')?.value)||0);
   const _cleanFx=Math.round(_rec?(parseFloat(_rec.cleanFixed)||0):(parseFloat(document.getElementById('inv-clean-fixed')?.value)||0));   // 第 3c 步：第一期一次扣合約 %（未稅金額）
-  const clean=_cleanFx>0?_cleanFx:Math.round(curTotal*_cleanPm/1000),cleanGross=Math.round(clean*_taxM());
+  const clean=_cleanFx>0?Math.min(_cleanFx,Math.max(0,Math.round(curTotal))):Math.round(curTotal*_cleanPm/1000),cleanGross=Math.round(clean*_taxM());   // 一次扣：本期最多扣到本期未稅，其餘順延下一期
   const total=beforeRetention-retention-cleanGross;
   if(!_rec){
   // Display
@@ -3906,7 +3906,7 @@ function rInvTots(srcInv){
   if(einvBox){var _cmode=document.getElementById('inv-clean-mode')?.value||'net';var _eg=beforeRetention-retention-(_cmode==='net'?cleanGross:0);
     einvBox.style.display=curTotal?'flex':'none';einvBox.querySelector('span').textContent=_einvTxt(_eg,retention?'本期發票應開金額（扣保留款後）':'本期發票應開金額');}
   const cleanBox=document.getElementById('inv-clean-row');
-  if(cleanBox){cleanBox.style.display=cleanGross?'flex':'none';cleanBox.querySelector('span:last-child').textContent='- '+fmt(cleanGross);var cl=document.getElementById('inv-clean-label');if(cl)cl.textContent=(_cleanFx>0&&_cleanFx>curTotal?'⚠ 一次扣清潔費大於本期未稅工程款，總計會變負數；':'')+'清潔費 ('+(_cleanFx>0?'一次扣合約'+(_invCleanPct(_rec)?' '+_rfmt(_invCleanPct(_rec))+'%':''):_rfmt(_cleanPm)+'‰')+'，含稅)';}
+  if(cleanBox){cleanBox.style.display=cleanGross?'flex':'none';cleanBox.querySelector('span:last-child').textContent='- '+fmt(cleanGross);var cl=document.getElementById('inv-clean-label');if(cl)cl.textContent=(_cleanFx>0&&_cleanFx>clean?'清潔費本期扣 '+fmt(clean)+'，剩 '+fmt(_cleanFx-clean)+'（未稅）順延下一期；':'')+'清潔費 ('+(_cleanFx>0?'一次扣合約'+(_invCleanPct(_rec)?' '+_rfmt(_invCleanPct(_rec))+'%':''):_rfmt(_cleanPm)+'‰')+'，含稅)';}
   }
   // ── 施工數量統計 ──
   // 打設面板：「合約數量 vs 打設累積」→ 待施 = 合約 - 打設累積
@@ -4375,7 +4375,8 @@ function addNextPeriod(id){
   next.receivedDate='';
   next.receivedNote='';
   next.retentionReturned=false;
-  delete next.cleanFixed;delete next.cleanPct;   // 第 3c 步：清潔費一次扣只在第一期
+  delete next.cleanFixed;delete next.cleanPct;   // 第 3c 步：清潔費一次扣——上期沒扣完的順延到這期（下面依專案重算剩餘）
+  try{const _cq=Q.find(x=>x.id===(src.quoteId||src.sourceQid));if(_cq)_cleanOnceApply(_cq,next);}catch(e){_err('addNextPeriod.clean',e);}
   delete next.retentionSep;delete next.retentionReceivedAmt;delete next.retentionReturnedDate;delete next.retentionReturnedBy;   // v6.0.100 退還紀錄屬該期，不帶到下一期
   next.expectedRecvDate='';next.recvRule=1;   // v6.0.110 後新建：預計收款日依放款規則
   // v5.336 健檢G：抵銷欄位屬單期對帳結果，不得帶到下一期
@@ -34699,10 +34700,16 @@ function pjDeductSet(qid,k,v){
 function _pjInvHtml(q,st){var h='';try{h=_pjDeductHtml(q)+_pjOwnerPayHtml(q);}catch(e){_err('_pjDeductHtml',e);}return h+_pjInvHtmlCore.apply(this,arguments);};
 // 清潔費一次扣的 %：存檔的單看 inv.cleanPct，編輯中的看輸入框
 function _invCleanPct(src){var r=src||null;if(r&&r.cleanPct)return parseFloat(r.cleanPct)||0;var el=document.getElementById('inv-clean-fixed');return el?(parseFloat(el.dataset.pct)||0):0;}
+// 第 3c 步（Lotion 11/03）：清潔費一次扣的總額＝合約未稅（主約＋已得標追加）× %，第一張請款單開單時記在 q.deduct.cleanOnceAmt（合約後來變動不自動補扣）；
+//   每期本期最多扣到本期未稅，扣不完的順延下一期——剩餘＝總額 − 其他請款單已實扣（totals.clean）
+function _cleanOnceTotal(q){var d=(q&&q.deduct)||{};var v=parseFloat(d.cleanOnceAmt);if(v>0)return Math.round(v);return Math.round(_wonAmt(q)/_taxM()*(parseFloat(d.cleanPct)||0)/100);}
+function _cleanOnceRemain(q,exceptId){var T=_cleanOnceTotal(q),took=0;_invsOfQuoteAll(q).forEach(function(x){if(!x||x.kind==='retReturn'||x.id===exceptId||!((parseFloat(x.cleanFixed)||0)>0))return;took+=Math.round((x.totals&&parseFloat(x.totals.clean))||0);});return Math.max(0,T-took);}
+function _cleanOnceApply(q,inv){var d=_pjDeduct(q);if(!(d.cleanBase==='once'&&d.cleanPct>0)){delete inv.cleanFixed;delete inv.cleanPct;return;}
+  if(!(parseFloat((q.deduct||{}).cleanOnceAmt)>0)&&!_invsOfQuoteAll(q).some(function(x){return x&&x.kind!=='retReturn'&&x.id!==inv.id;})){q.deduct.cleanOnceAmt=_cleanOnceTotal(q);_touch(q);try{persist();}catch(e){_err('_cleanOnceApply',e);}}
+  var rem=_cleanOnceRemain(q,inv.id);if(rem>0){inv.cleanFixed=rem;inv.cleanPct=d.cleanPct;inv.cleanMode=d.cleanMode;inv.cleanPermil=0;}else{delete inv.cleanFixed;delete inv.cleanPct;}}
 function buildInvFromQuote(q){var inv=_buildInvFromQuoteCore.apply(this,arguments);try{inv.recvRule=1;var d=_pjDeduct(q);if(d.ret!=null){inv.retention=d.ret>0;inv.retentionPct=d.ret;}if(d.clean>0){inv.cleanPermil=d.clean;inv.cleanMode=d.cleanMode;}
     // 第 3c 步（Lotion 11/03）：清潔費第一期一次扣＝合約未稅（主約＋已得標追加）× %；只在這案第一張請款單，之後各期 0；合約後來變動不自動補扣（完工結算差異表提醒）
-    if(d.cleanBase==='once'&&d.cleanPct>0){var has=_invsOfQuoteAll(q).some(function(x){return x&&x.kind!=='retReturn'&&x.id!==inv.id;});inv.cleanPermil=0;
-      if(!has){inv.cleanFixed=Math.round(_wonAmt(q)/_taxM()*d.cleanPct/100);inv.cleanPct=d.cleanPct;inv.cleanMode=d.cleanMode;}else{delete inv.cleanFixed;delete inv.cleanPct;}}
+    if(d.cleanBase==='once'&&d.cleanPct>0){inv.cleanPermil=0;_cleanOnceApply(q,inv);}
   }catch(e){_err('buildInvFromQuote.deduct',e);}return inv;};
 // ── 2 收款折讓：原發票號碼、折讓金額（未稅＋稅額）、折讓單日期、原因 → inv.allow；折讓證明單 PDF ──
 function _invAllowAmt(inv){return (inv&&inv.allow)?(parseFloat(inv.allow.amt)||0):0;}
@@ -36255,7 +36262,7 @@ function _pjDeductHtml(q){
     +'<label style="display:flex;align-items:center;gap:4px">保留款 <input type="number" inputmode="decimal" step="any" min="0" max="50" value="'+(d.ret==null?'':d.ret)+'" placeholder="不扣" onchange="pjDeductSet(\''+q.id+'\',\'ret\',this.value)" style="'+IN+';width:58px;text-align:right"> %</label>'
     +'<label style="display:flex;align-items:center;gap:4px">清潔費扣法 <select onchange="pjDeductSet(\''+q.id+'\',\'cleanBase\',this.value);setTimeout(function(){try{renderProj();}catch(e){_err(\'cleanBase\',e);}},50)" style="'+IN+'"><option value="period"'+(d.cleanBase!=='once'?' selected':'')+'>每期按比例（‰）</option><option value="once"'+(d.cleanBase==='once'?' selected':'')+'>第一期一次扣（合約 %）</option></select></label>'
     +(d.cleanBase==='once'
-      ?'<label style="display:flex;align-items:center;gap:4px">合約未稅 × <input type="number" inputmode="decimal" step="any" min="0" value="'+(d.cleanPct||'')+'" placeholder="0" onchange="pjDeductSet(\''+q.id+'\',\'cleanPct\',this.value)" style="'+IN+';width:58px;text-align:right"> %（只扣第一期'+(function(){try{var n=Math.round(_wonAmt(q)/_taxM()*(d.cleanPct||0)/100);return n>0?'，約 NT$ '+fmt(n):'';}catch(e){_err('_pjDeductHtml.clean',e);return '';}})()+'）</label>'
+      ?'<label style="display:flex;align-items:center;gap:4px">合約未稅 × <input type="number" inputmode="decimal" step="any" min="0" value="'+(d.cleanPct||'')+'" placeholder="0" onchange="pjDeductSet(\''+q.id+'\',\'cleanPct\',this.value)" style="'+IN+';width:58px;text-align:right"> %（第一期扣，不夠扣順延下一期'+(function(){try{var n=Math.round(_wonAmt(q)/_taxM()*(d.cleanPct||0)/100);return n>0?'，約 NT$ '+fmt(n):'';}catch(e){_err('_pjDeductHtml.clean',e);return '';}})()+'）</label>'
       :'<label style="display:flex;align-items:center;gap:4px">清潔費 <input type="number" inputmode="decimal" step="any" min="0" value="'+(d.clean||'')+'" placeholder="0" onchange="pjDeductSet(\''+q.id+'\',\'clean\',this.value)" style="'+IN+';width:58px;text-align:right"> ‰（未稅工程款）</label>')
     +'<label style="display:flex;align-items:center;gap:4px">清潔費處理 <select onchange="pjDeductSet(\''+q.id+'\',\'cleanMode\',this.value)" style="'+IN+'">'+_CLEAN_MODES.map(function(m){return '<option value="'+m[0]+'"'+(d.cleanMode===m[0]?' selected':'')+'>'+m[1]+'</option>';}).join('')+'</select></label>'
     +'<label style="display:flex;align-items:center;gap:4px;flex:1 1 260px">保留款退還條件 <input value="'+esc(String(((q.deduct||{}).retCond)||''))+'" placeholder="例：拆除拔除完成、驗收後 30 日內一次無息退還" onchange="pjDeductSet(\''+q.id+'\',\'retCond\',this.value.trim())" style="'+IN+';flex:1;min-width:0"></label>'

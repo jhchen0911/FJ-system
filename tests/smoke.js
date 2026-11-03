@@ -9257,6 +9257,9 @@ async function newPage(browser, width, height) {
         out.tot1 = i1.totals.clean === 6000 && i1.totals.cleanGross === 6300 && Math.round(i1.totals.total) === Math.round(100000 * 1.05) - 6300;
         i1.id = 'I3c1'; INV.push(i1);   // 同一毫秒建的單 id 會相同
         const i2 = buildInvFromQuote(Q[0]); out.once2 = !i2.cleanFixed && !i2.cleanPermil;
+        // 順延（Lotion 11/03）：第一期只請 4,000 未稅 → 本期扣 4,000、剩 2,000 下一期扣
+        (i1.items || []).forEach(it => { if (it.type === 'item') it.curQty = 4; }); _recalcInvAmounts(i1);
+        const i3 = buildInvFromQuote(Q[0]); out.carry = i1.totals.clean === 4000 && Math.round(i1.totals.total) === 0 && i3.cleanFixed === 2000;
         // 專案頁設定欄位
         const h = _pjDeductHtml(Q[0]); out.ui = /第一期一次扣（合約 %）/.test(h) && /約 NT\$ 6,000/.test(h);
         // 下一期不帶一次扣
@@ -9265,7 +9268,7 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
       return out;
     });
-    check('v6.0.136 3c 清潔費第一期一次扣合約 %：合約未稅 2,000,000×0.3%＝6,000（含稅 6,300）只扣第一期、下一期不帶；專案設定可選', r.once1 && r.tot1 && r.once2 && r.ui && r.next, JSON.stringify(r));
+    check('v6.0.136 3c 清潔費第一期一次扣合約 %：合約未稅 2,000,000×0.3%＝6,000（含稅 6,300）第一期扣、扣完下一期不帶、不夠扣順延；專案設定可選', r.once1 && r.tot1 && r.once2 && r.carry && r.ui && r.next, JSON.stringify(r));
     check('v6.0.136 3c 計算模組：安全母索 FJC.ll、完工結算 FJC.settle、清潔費 totals2 已載入；死碼 _llLinkFor 已刪', r.calcs, JSON.stringify(r));
     check('v6.0.136 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();

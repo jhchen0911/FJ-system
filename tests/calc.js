@@ -127,6 +127,8 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const big = LL.calc(Object.assign({}, st, { zones: [st.zones[0], { name: '構台下', deck: true, form: '', v: { rows: [{ n: 1, len: 500 }] }, h: { rows: [] } }] }), forms);
   check('安全母索：構台下填太大（500＞每層 300）只扣到該層長度——淨長 600、逐層 0／300／300，不會少算', big.net === 600 && big.T.wire.layers.map(x => x.len).join('/') === '0/300/300');
   const t = I.totals2([100000], { taxR: 5, cleanFixed: 6000 }), t0 = I.totals2([100000], { taxR: 5, cleanPermil: 10 });
+  const tc = I.totals2([4000], { taxR: 5, cleanFixed: 6000 });
+  check('清潔費一次扣：本期未稅 4,000 不夠扣 6,000 → 只扣 4,000、總計 0（其餘順延，不出現負數）', tc.clean === 4000 && tc.total === 0);
   check('清潔費一次扣：未稅 6,000（含稅 6,300）→ 總計 98,700；沒填一次扣＝照 ‰（同 totals）', t.clean === 6000 && t.cleanGross === 6300 && t.total === 98700 && t0.total === I.totals([100000], { taxR: 5, cleanPermil: 10 }).total);
   const d = ST.diff([{ idx: 0, desc: 'H 型鋼樁', unit: 'M', price: 1000, stmtQty: 950, billedQty: 1000, dailyQty: 1000, addQty: 0 },
     { idx: 1, desc: '追加', unit: 'M', price: 500, stmtQty: 0, billedQty: 40, dailyQty: 40, addQty: 40 },
