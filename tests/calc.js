@@ -213,6 +213,8 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('CSV 匯入：略過標題、中間樁位置用雙引號、層可寫「第2層」、壁間 0 的列報錯', cv.rows.length === 2 && cv.rows[0].mids === '6.2,12.9' && cv.rows[0].cross === '8,16' && cv.rows[0].dbl === '雙' && cv.rows[1].ly === 2 && cv.rows[1].dir === '橫' && cv.errs.length === 1);
   const c1 = RT.clearance({ supEl: -3, groundEl: 0, sSpec: 'H350' }), c2 = RT.clearance({ supEl: -1.5, capEl: -0.8, sSpec: 'H350' }), c3 = RT.clearance({ supEl: -3, capEl: -0.5, capRef: 'top', capH: 0.4, sSpec: 'H350' });
   check('構台下淨空：帽梁沒填＝原地面−1.0（預設值）；淨空＝帽梁底−(支撐中心＋型鋼高÷2)；≥1.5 才拉；高程填梁頂時扣梁高', c1.isDef && c1.clear === 1.83 && c1.pull && !c2.isDef && c2.clear === 0.52 && !c2.pull && c3.clear === 1.93 && RT.clearance({ groundEl: 0 }) === null);
+  const c4 = RT.clearance({ triEl: -3, groundEl: 0, sSpec: 'H350' });
+  check('構台下淨空用三角架高程（下支撐下緣，Lotion 11/03）：支撐頂＝三角架＋型鋼高 → −1−(−3＋0.35)＝1.65', c4.clear === 1.65 && c4.pull && c4.isDef);
   const rv = RT.review([{ idx: 0, qty: 109, meas: 100, amt: 50 }, { idx: 1, qty: 106, meas: 100, amt: 900 }, { idx: 2, qty: 120, meas: 100, amt: 50 }, { idx: 3, qty: 5, meas: '' }], 1000);
   check('圖面覆核：一般工項 10%、占總價一成以上 5%；沒量測不比', rv.rows.length === 3 && !rv.rows[0].bad && rv.rows[1].bad && rv.rows[1].big && rv.rows[2].bad && rv.nBad === 2);
 }

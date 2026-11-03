@@ -10,7 +10,7 @@
  *   row(r, o)                         一路完整結果（含手改組合、雙支撐、接頭檢查）
  *   spares(results)                   全案短節：同長度合計 ×1.1 無條件進位
  *   csv(text)                         CSV 匯入：層,路編號,方向,壁間長度,單雙,定尺組合,備註,中間樁位置 M,交叉點位置 M（逗號分隔，上層支撐才填）
- *   clearance(o)                      構台下淨空＝帽梁底 −（支撐中心＋型鋼高÷2）；帽梁高程沒填用 原地面−1.0（預設值，請確認）
+ *   clearance(o)                      構台下淨空＝帽梁底 −（三角架高程＋型鋼高）；帽梁高程沒填用 原地面−1.0（預設值，請確認）
  *   review(items, threshold)          報價數量 vs 圖面量測的差異（一般 10%、占總價一成以上 5%；只標示、不擋送出）
  *
  * 口徑（Lotion 11/03）：
@@ -203,14 +203,16 @@
     return { rows: rows, errs: errs };
   }
 
-  // 構台下淨空。o：{ capEl 構台帽高程（填帽頂即可，帽頂鋼板 1～2 cm 直接當帽梁底；空白＝原地面−capDrop）, capRef 'top' 時另扣 capH（預留）, groundEl 原地面高程, supEl 支撐中心高程, sSpec 支撐規格, clear 門檻 }
+  // 構台下淨空＝帽梁底 − 支撐頂（三角架高程＋型鋼高；或支撐中心＋型鋼高÷2）。o：{ triEl 三角架高程, capEl 構台帽高程（填帽頂即可，帽頂鋼板 1～2 cm 直接當帽梁底；空白＝原地面−capDrop）, capRef 'top' 時另扣 capH（預留）, groundEl 原地面高程, supEl 支撐中心高程, sSpec 支撐規格, clear 門檻 }
   function clearance(o) {
     o = o || {};
-    if (o.supEl == null || o.supEl === '' || !isFinite(parseFloat(o.supEl))) return null;
+    var tri = o.triEl != null && o.triEl !== '' && isFinite(parseFloat(o.triEl));   // 三角架高程（下支撐下緣＝三角托架面，Lotion 11/03）優先；支撐中心高程 supEl 保留相容
+    if (!tri && (o.supEl == null || o.supEl === '' || !isFinite(parseFloat(o.supEl)))) return null;
     var def = o.capEl == null || o.capEl === '' || !isFinite(parseFloat(o.capEl));
     var capEl = def ? num(o.groundEl) - (o.capDrop == null || o.capDrop === '' ? DEF.capDrop : num(o.capDrop)) : num(o.capEl);
     var bottom = o.capRef === 'top' ? capEl - num(o.capH) : capEl;
-    var cl = r2(bottom - (num(o.supEl) + specH(o.sSpec) / 2));
+    var top = tri ? num(o.triEl) + specH(o.sSpec) : num(o.supEl) + specH(o.sSpec) / 2;   // 支撐頂
+    var cl = r2(bottom - top);
     var th = o.clear == null || o.clear === '' ? DEF.clear : num(o.clear);
     return { clear: cl, pull: cl >= th - 1e-9, isDef: def, bottom: r2(bottom), th: th };
   }

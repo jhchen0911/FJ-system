@@ -9800,13 +9800,13 @@ async function newPage(browser, width, height) {
         MAT_EST = _shDefaults(); MAT_EST.gtRopeDeduct = '1'; MAT_EST._gtRoutesV = [{ rc: 2, rl: 10 }]; matEstCalc(); const ropeDed = _matEstRes.T.rope;
         MAT_EST._layers[0].el = -2; MAT_EST._layers[1].el = -9; matEstCalc(); R = _matEstRes;
         const n1 = R.staged.find(x => /第1層/.test(x.stage)).notes.join();
-        out.clrNo = R.T.rope === ropeDed && /第 1 層構台下淨空 0\.83 m，不拉母索（構台帽高程為預設值/.test(n1) && !/構台下/.test(R.staged.find(x => /第2層/.test(x.stage)).notes.join());
+        out.clrNo = R.T.rope === ropeDed && /第 1 層構台下淨空 0\.65 m，不拉母索（構台帽高程為預設值/.test(n1) && !/構台下/.test(R.staged.find(x => /第2層/.test(x.stage)).notes.join());
         MAT_EST._layers[0].el = -3; matEstCalc(); R = _matEstRes;
-        out.clrYes = Math.abs(R.T.rope - (ropeDed + 20)) < 1e-6 && /第 1 層構台下淨空 1\.83 m，照拉母索/.test(R.staged.find(x => /第1層/.test(x.stage)).notes.join());
-        MAT_EST.capEl = -2.5; matEstCalc(); out.clrCap = /淨空 0\.33 m，不拉母索$/.test(_matEstRes.staged.find(x => /第1層/.test(x.stage)).notes.join()) && _matEstRes.T.rope === ropeDed;   // 填了構台帽高程（帽頂）就不標預設值
+        out.clrYes = Math.abs(R.T.rope - (ropeDed + 20)) < 1e-6 && /第 1 層構台下淨空 1\.65 m，照拉母索/.test(R.staged.find(x => /第1層/.test(x.stage)).notes.join());
+        MAT_EST.capEl = -2.5; matEstCalc(); out.clrCap = /淨空 0\.15 m，不拉母索$/.test(_matEstRes.staged.find(x => /第1層/.test(x.stage)).notes.join()) && _matEstRes.T.rope === ropeDed;   // 填了構台帽高程（帽頂）就不標預設值
         MAT_EST.gtPull1 = 'pull'; matEstCalc(); out.clrMan = Math.abs(_matEstRes.T.rope - (ropeDed + 20)) < 1e-6 && /照拉母索（手動指定）/.test(_matEstRes.staged.find(x => /第1層/.test(x.stage)).notes.join());
         MAT_EST.gtPull1 = 'no'; MAT_EST._layers[0].el = ''; matEstCalc(); out.clrMan = out.clrMan && _matEstRes.T.rope === ropeDed && /不拉母索（手動指定）/.test(_matEstRes.staged.find(x => /第1層/.test(x.stage)).notes.join());
-        renderMatEst(); out.clrUi = /第 1 層構台下淨空/.test(document.getElementById('mat-est-form').innerHTML) && /第 1 層支撐中心高程/.test(document.getElementById('mat-est-form').innerHTML) && /手動：照拉/.test(document.getElementById('mat-est-form').innerHTML);
+        renderMatEst(); out.clrUi = /第 1 層構台下淨空/.test(document.getElementById('mat-est-form').innerHTML) && /第 1 層三角架高程/.test(document.getElementById('mat-est-form').innerHTML) && /手動：照拉/.test(document.getElementById('mat-est-form').innerHTML);
         out.ropeNoEl = (MAT_EST = _shDefaults(), MAT_EST.gtRopeDeduct = '1', MAT_EST._gtRoutesV = [{ rc: 2, rl: 10 }], matEstCalc(), _matEstRes.T.rope === ropeDed && ropeDed === ropeBase - 20);
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
@@ -9815,7 +9815,7 @@ async function newPage(browser, width, height) {
     check('v6.0.157 路數明細：有填的層支撐 M＝Σ 淨長×倍率（雙支撐×2）、接頭／合板／短節依各路；沒填的層不變', r.rows && r.h1, JSON.stringify(r));
     check('v6.0.157 路數明細：叫料單逐長度列短節、全案×1.1 備品、千斤頂伸長與未檢查中間樁的提醒；材料明細短節含備品', r.staged && r.notes && r.main, JSON.stringify(r));
     check('v6.0.157 路數明細：畫面列建議組合與結果、可手改、CSV 匯入（顯示來源、超過層數不計）', r.ui && r.manual && r.csv && r.csvCalc, JSON.stringify(r));
-    check('v6.0.157 構台下淨空：只看第 1 層（第 2 層以下照拉）；填支撐中心高程才依淨空（構台帽沒填＝原地面−1.0 標預設值）；≥1.5 照拉、不到不拉；可手動改拉／不拉；沒填照舊扣第一層', r.clrNo && r.clrYes && r.clrCap && r.clrMan && r.clrUi && r.ropeNoEl, JSON.stringify(r));
+    check('v6.0.157 構台下淨空：只看第 1 層（第 2 層以下照拉）；填三角架高程才依淨空（構台帽沒填＝原地面−1.0 標預設值）；≥1.5 照拉、不到不拉；可手動改拉／不拉；沒填照舊扣第一層', r.clrNo && r.clrYes && r.clrCap && r.clrMan && r.clrUi && r.ropeNoEl, JSON.stringify(r));
     check('v6.0.157 路數明細測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }

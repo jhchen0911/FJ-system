@@ -8702,11 +8702,11 @@ function _meRouteRun(inp,layers,lys){
 }
 function _meRouteShorts(rows){var c={};rows.forEach(function(r){(r.shorts||[]).forEach(function(s){c[s]=(c[s]||0)+r.mult;});});return Object.keys(c).map(parseFloat).sort(function(a,b){return a-b;}).map(function(k){return {len:k,n:c[k]};});}
 // 構台下淨空（Lotion 11/03）：只有第 1 層會跟構台衝突，第 2 層以下一律照拉；第 1 層依淨空判斷，可手動改「拉／不拉」（gtPull1：''＝依淨空、'pull'、'no'）
-//   回傳 null＝沒填第 1 層支撐中心高程也沒手動指定 → 照舊扣第一層
+//   回傳 null＝沒填第 1 層三角架高程也沒手動指定 → 照舊扣第一層
 function _meGtClear(inp,layers,lys){
   if(!window.FJC||!FJC.route)return null;
   var l=(lys||[])[0]||{},man=inp.gtPull1==='pull'||inp.gtPull1==='no';
-  var c=FJC.route.clearance({supEl:l.el,capEl:inp.capEl,groundEl:inp.groundEl,capDrop:1.0,sSpec:_shSel(l.s||'H350').spec,clear:inp.gtClear});
+  var c=FJC.route.clearance({triEl:l.el,capEl:inp.capEl,groundEl:inp.groundEl,capDrop:1.0,sSpec:_shSel(l.s||'H350').spec,clear:inp.gtClear});
   if(!c&&!man)return null;
   var pull=man?inp.gtPull1==='pull':c.pull;
   return {L:[c],c:c,pull:pull,man:man,deduct:pull?0:1,isDef:!!(c&&c.isDef)};
@@ -8839,7 +8839,7 @@ function computeShoringFY(inp){
   var _rForm=(inp.ropeForm==='rope')?'rope':'wire',_rWaste=(inp.ropeWaste==null||inp.ropeWaste==='')?5:v('ropeWaste');
   var _rRows=function(rows,cnt,len,auto,side){return auto?[{n:cnt,len:side}]:(rows||[]).map(function(r){return {n:_shNum(r.rc),len:_shNum(r.rl)};});};
   var _rDeck=(GV.cnt+GH.cnt)>0?{v:{rows:_rRows(inp._gtRoutesV)},h:{rows:_rRows(inp._gtRoutesH)}}:{v:{rows:[{n:1,len:gtDeduct}]},h:{rows:[]}};
-  // v6.0.157（Lotion 11/03）：構台下淨空——只看第 1 層：淨空＝構台帽高程−(支撐中心＋型鋼高÷2)，≥ 門檻（預設 1.5 M）照拉、不到才扣，可手動改；沒填照舊扣第 1 層
+  // v6.0.157（Lotion 11/03）：構台下淨空——只看第 1 層：淨空＝構台帽高程−(三角架高程＋型鋼高)，≥ 門檻（預設 1.5 M）照拉、不到才扣，可手動改；沒填照舊扣第 1 層
   var _gc=_meGtClear(inp,layers,lys),_rDl=b('gtRopeDeduct')?(_gc?_gc.deduct:1):0;
   var _rSt={perim:P,perimRuns:1,layers:layers,deductLayers:_rDl,unit:'m',useSpare:true,waste:_rWaste,form:_rForm,
     f:{},zones:[{name:'支撐路',deck:false,form:'',v:{rows:_rRows(inp._routesV,routesV,lenV,autoV,W)},h:{rows:_rRows(inp._routesH,routesH,lenH,autoH,L)}}]};
@@ -9765,7 +9765,7 @@ function _renderMatEstInner(el){
     +fS('gtRopeDeduct','扣構台下母索',[['0','否'],['1','是']],';renderMatEst()')+'</div>'
     +(_shBool(m.gtRopeDeduct)?('<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:6px">'
       +'<div>'+routeTbl('_gtRoutesV','構台下縱向路數')+'</div><div>'+routeTbl('_gtRoutesH','構台下橫向路數')+'</div></div>'
-      +'<div style="font-size:10.5px;color:var(--b3);margin-top:2px">構台下方不設母索：第一層母索扣除 Σ(路數×每路長)'+(_shNum(m.gtDeduct)>0?'（舊資料總長 '+_shNum(m.gtDeduct)+' M 於未填路數時沿用）':'')+'；填了各層支撐中心高程就改依淨空判斷</div>'
+      +'<div style="font-size:10.5px;color:var(--b3);margin-top:2px">構台下方不設母索：第一層母索扣除 Σ(路數×每路長)'+(_shNum(m.gtDeduct)>0?'（舊資料總長 '+_shNum(m.gtDeduct)+' M 於未填路數時沿用）':'')+'；填了第 1 層三角架高程就改依淨空判斷</div>'
       +_meGtClearHtml(m,fN,fS)):'')
     +(function(){if(!_rfm.specs.some(function(x){return x[0]===m.ropeSpec;}))m.ropeSpec=_rfm.def.spec;return '';})()
     +adv('<div class="me-grid">'+fS('ropeSpec','規格（算重量）',_rfm.specs.map(function(x){return [x[0],x[0]+'（'+x[1]+' kg/M）'];}))
@@ -40141,14 +40141,14 @@ function meRtCsv(el){
 // 構台下淨空（④-1 安全母索，勾「扣構台下母索」時顯示）
 function _meGtClearHtml(m,fN,fS){
   var l=(m._layers||[])[0]||{},gc=null;try{gc=_meGtClear(m,Math.max(1,parseInt(m.layers)||1),m._layers||[]);}catch(e){_err('_meGtClearHtml',e);}
-  var h='<div style="font-size:12px;font-weight:700;margin:10px 0 4px">第 1 層構台下淨空 <span style="font-weight:400;font-size:10.5px;color:var(--b3)">只有第 1 層會跟構台衝突（第 2 層以下一律照拉）；淨空＝構台帽高程 −（支撐中心＋型鋼高÷2），≥ 門檻照拉（鋼索夾每路 6），不到不拉</span></div>';
+  var h='<div style="font-size:12px;font-weight:700;margin:10px 0 4px">第 1 層構台下淨空 <span style="font-weight:400;font-size:10.5px;color:var(--b3)">只有第 1 層會跟構台衝突（第 2 層以下一律照拉）；淨空＝構台帽高程 −（三角架高程＋支撐型鋼高），≥ 門檻照拉（鋼索夾每路 6），不到不拉</span></div>';
   h+='<div class="me-grid">'+fN('groundEl','原地面高程 (M)','空白＝0')+fN('capEl','構台帽高程 (M)','填帽頂即可；空白＝原地面−1.0')
-    +'<div class="f"><label style="font-size:11px">第 1 層支撐中心高程 (M)</label><input type="number" inputmode="decimal" step="any" value="'+esc(l.el==null?'':String(l.el))+'" onchange="matEstLy(0,\'el\',this.value);renderMatEst()" style="font-size:14px;text-align:right;padding:7px 8px"></div>'
+    +'<div class="f"><label style="font-size:11px">第 1 層三角架高程 (M) <span style="font-size:9.5px;color:var(--b3)">下支撐下緣＝三角托架面</span></label><input type="number" inputmode="decimal" step="any" value="'+esc(l.el==null?'':String(l.el))+'" onchange="matEstLy(0,\'el\',this.value);renderMatEst()" style="font-size:14px;text-align:right;padding:7px 8px"></div>'
     +fN('gtClear','淨空門檻 (M)','空白＝1.5')
     +fS('gtPull1','第 1 層構台下',[['','依淨空判斷'],['pull','手動：照拉'],['no','手動：不拉']],';renderMatEst()')+'</div>';
   if(gc)h+='<div style="font-size:12px;margin-top:4px">'+(gc.c?'淨空 '+gc.c.clear.toFixed(2)+' m（構台帽 '+gc.c.bottom.toFixed(2)+'），':'')+(gc.pull?'<span style="color:var(--g3)">照拉母索</span>':'<b style="color:#b26a00">不拉母索</b>')+(gc.man?'（手動指定）':'')+'</div>';
   if(gc&&gc.isDef&&!gc.man)h+='<div style="font-size:11.5px;color:#b26a00;margin-top:2px">構台帽高程未填：用預設值（原地面−1.0 M＝'+(_shNum(m.groundEl)-1).toFixed(2)+'），請確認。</div>';
-  if(!gc)h+='<div style="font-size:11px;color:var(--b3);margin-top:4px">沒填第 1 層支撐中心高程：照舊第一層扣構台下母索。</div>';
+  if(!gc)h+='<div style="font-size:11px;color:var(--b3);margin-top:4px">沒填第 1 層三角架高程：照舊第一層扣構台下母索。</div>';
   return h;
 }
 function _modal(title,bodyHtml,onOk){
