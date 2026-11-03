@@ -22,6 +22,9 @@ function mkDeps(token) {
       return { buf: Buffer.from(await r.arrayBuffer()), contentType: r.headers.get('content-type') || 'application/octet-stream' };
     },
     // v6.0.144 審查：認領一筆紀錄（不存在才寫）→ true；已經有人在處理或處理過 → false
+    // v6.0.153：收件批次狀態的交易更新（fn 回傳 undefined＝不改）→ 回傳交易後的值
+    txn: async (path, fn) => { const r = await db.ref(path).transaction(fn); return r.committed ? r.snapshot.val() : undefined; },
+    dbUpdate: async (map) => { await db.ref().update(map); },
     claim: async (path, val) => (await db.ref(path).transaction((cur) => (cur ? undefined : val))).committed,
     putFile: async (path, buf, contentType) => { await bucket.file(path).save(buf, { contentType, resumable: false }); },
     // v6.0.144：串流存檔（大檔不進記憶體）；邊收邊計大小，超過上限就中止並刪掉半截檔 → {tooBig:true,size}；成功 → {size, contentType}
