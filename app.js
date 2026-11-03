@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.141';
+var APP_VERSION='v6.0.142';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -8683,6 +8683,10 @@ function computeShoringFY(inp){
   var routesH=RH.cnt,lenH=RH.len;
   if(routesH===0){routesH=_shCeil(W/aSp)+1;lenH=routesH*L;autoH=true;}
   var totalR=routesV+routesH,supLen=lenV+lenH;
+  // v6.0.142（Lotion 11/03）：支撐每一路是直線，接頭數＝每路支數−1＝ceil(每路長÷7)−1；逐路輸入取 Σ 路數×(每路支數−1)，自動路數每路長＝對邊長
+  var _jn=function(len){return Math.max(0,_shCeil(len/7-1e-9)-1);};
+  var supJ1=(RV.cnt>0?(inp._routesV||[]).reduce(function(a,r){return a+_shNum(r.rc)*_jn(_shNum(r.rl));},0):routesV*_jn(W))
+           +(RH.cnt>0?(inp._routesH||[]).reduce(function(a,r){return a+_shNum(r.rc)*_jn(_shNum(r.rl));},0):routesH*_jn(L));
   // v5.398：構台下母索改逐路輸入（縱向／橫向 路數×每路長），舊存檔仍有 gtDeduct 總長者沿用
   var GV=rd(inp._gtRoutesV),GH=rd(inp._gtRoutesH);
   var gtDeduct=b('gtRopeDeduct')?((GV.cnt+GH.cnt)>0?(GV.len+GH.len):v('gtDeduct')):0;
@@ -8808,14 +8812,18 @@ function computeShoringFY(inp){
     var cornerN=corners;
     var triPlate=corners*2+irr*2;
     var stiffN=(ly.st&&stiff!=='0')?(stiff==='main'?totalR*2:(stiff==='both'?totalR*6:0)):0;
-    var heban=_shCeil(wM/7)*1+_shCeil(sM/7)*2;
+    // 接頭：圍令封閉一圈，接頭數≈支數＝圍令長÷7（照舊）；支撐依路數算（每路支數−1，雙支撐×倍數）
+    var wJ=wM/7,sJ=supJ1*sp;
+    var heban=_shCeil(wJ)*1+sJ*2;   // 合板：圍令每接頭 1 片、支撐每接頭 2 片
     var smallU=posts*(sp===1?1:2);
     var bigU=posts*(sp===1?2:4),bigUangle=bigU;
     var subBlock=posts*(sp===1?2:4);
-    var screw=tri*2+(wM/7)*16+(sM/7)*28+diag*10+cornerN*10;
+    // 螺絲（Lotion 11/03 定義）：圍令每接頭 16＝對鎖 4＋合板 1 片 12；支撐每接頭 28＝對鎖 4＋合板 2 片 24；斜撐、角撐每支 10；三角架每支 2
+    //   長螺絲＝H350／H400 的對鎖 4 顆；其餘（H300 對鎖、所有合板、斜撐、三角架）都是短螺絲＝總數−長螺絲
+    var screw=tri*2+wJ*16+sJ*28+diag*10+cornerN*10;
     var eScrew=0;
     if(exp){eScrew=(tri+bigTri)*2;screw-=tri*2;}
-    var longS=((W_.spec!=='H300')?(wM/7)*4:0)+((S_.spec!=='H300')?(sM/7)*4:0);
+    var longS=((W_.spec!=='H300')?wJ*4:0)+((S_.spec!=='H300')?sJ*4:0);
     var shortS=Math.max(0,screw-longS);
     var fengtou=totalR*2;
     var _rL=_rT.layers[i]||{wal:0,sup:0,ded:0,len:0,runs:0,spare:0};
