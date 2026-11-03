@@ -8956,6 +8956,7 @@ function computeShoringFY(inp){
   if(st3.items.length)staged.push(st3);
   layerData.forEach(function(d,i2){
     var st={stage:'第'+(i2+1)+'層水平支撐',items:[]};
+    sAdd(st,'圍令（'+d.w+'）','M',d.wM);sAdd(st,'支撐（'+d.s+'）','M',d.sM);   // v6.0.139 Lotion：圍令（單面多孔）與支撐（兩面固定孔）是不同料，各層分開叫、用 M
     sAdd(st,'三角架','支',d.tri);sAdd(st,'大三角架','支',d.bigTri);
     sAdd(st,'千斤頂','顆',d.jack);sAdd(st,'千斤頂保護夾','組',d.jackClip);
     sAdd(st,'土壓計','顆',d.earth);sAdd(st,'土壓計保護夾','組',d.earthClip);
@@ -9662,7 +9663,8 @@ var _meView='stage';
 function _meTiles(res){
   var ld=res.layerData||[],T=res.T||{},wl=0,sp=0,jk=0;ld.forEach(function(d){wl+=d.wM||0;sp+=d.sM||0;jk+=d.jack||0;});
   var p0=(res.pile||[]).find(function(r){return r&&!r.sec;});
-  return [['擋土壁',p0?(_shR0(p0.v)+' '+(p0.u||'')):'—',p0?String(p0.k||''):''],['圍令＋支撐',fmt(Math.round(wl+sp))+' M','圍令 '+fmt(Math.round(wl))+'｜支撐 '+fmt(Math.round(sp))],
+  return [['擋土壁',p0?(_shR0(p0.v)+' '+(p0.u||'')):'—',p0?String(p0.k||''):''],['圍令',fmt(Math.round(wl))+' M',''],['支撐',fmt(Math.round(sp))+' M',''],   // v6.0.139 Lotion：圍令與支撐是不同料（孔位不同），分開列
+    
     ['中柱',(res.info&&res.info.posts||0)+' 支',''],['千斤頂',_shR0(jk)+' 顆',''],['安全母索',(T.ropeReels||0)+' 捲',_shR1(T.ropeNeed||0)+' M（'+(T.ropeForm||'')+'）']];
 }
 function _meTilesHtml(res){return '<div class="me-tiles">'+_meTiles(res).map(function(t){return '<div class="me-tile"><span>'+esc(t[0])+'</span><b>'+esc(t[1])+'</b>'+(t[2]?'<i>'+esc(t[2])+'</i>':'')+'</div>';}).join('')+'</div>';}

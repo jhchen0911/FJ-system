@@ -9289,7 +9289,7 @@ async function newPage(browser, width, height) {
         meTab('shoring');
         const f = document.getElementById('mat-est-form').innerHTML, o = document.getElementById('mat-est-out').innerHTML, b = document.getElementById('me-bar-shoring').innerHTML;
         out.form = (f.match(/class="me-sec"/g) || []).length >= 8 && /class="me-adv"/.test(f) && /matEstCalc\(\)/.test(b) && /matEstExportMenu\(\)/.test(b) && /掛專案/.test(b);
-        out.out = /me-tiles/.test(o) && /圍令＋支撐/.test(o) && / M</.test(o) && /依進場階段（叫料）/.test(o) && /計算依據/.test(o) && !/材料需求清冊/.test(o) && !/分階段叫料建議/.test(o);
+        out.out = /me-tiles/.test(o) && /<span>圍令<\/span><b>[\d,]+ M<\/b>/.test(o) && /<span>支撐<\/span><b>[\d,]+ M<\/b>/.test(o) && /第1層水平支撐[^]*圍令（H\d+）/.test(o) && /依進場階段（叫料）/.test(o) && /計算依據/.test(o) && !/材料需求清冊/.test(o) && !/分階段叫料建議/.test(o);
         _meView = 'cat'; _matEstCalcCore(); out.cat = /① 擋土壁體（樁）/.test(document.getElementById('mat-est-out').innerHTML); _meView = 'stage';
         meTab('grout'); out.grout = !!document.querySelector('#grout-root .tool-head') && /匯出 PDF/.test(document.querySelector('#grout-root .tool-head').innerHTML);
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
