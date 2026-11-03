@@ -9301,23 +9301,17 @@ async function newPage(browser, width, height) {
     await page.close();
   }
   {
-    // 審查：手機版（390px）各分頁展開全部段落，沒有任何元素超出畫面右緣（grid 1fr 會被寬內容撐開，頁面 scrollWidth 抓不到）；掛專案入口一律回擋土支撐分頁
+    // 審查：手機版（390px）各分頁展開全部段落，等手機表格改卡片（_mstack 非同步）後，沒有任何元素超出畫面右緣（grid 1fr 會被寬內容撐開，頁面 scrollWidth 抓不到）；掛專案入口一律回擋土支撐分頁
     const { page, errors } = await newPage(browser, 390, 800);
-    const r = await page.evaluate(() => {
-      const out = { over: {} };
-      try {
-        go('matest');
-        ['shoring', 'lifeline', 'rebar', 'grout', 'backfill'].forEach(t => {
-          meTab(t); document.querySelectorAll('#page-matest details').forEach(d => { d.open = true; });
-          if (t === 'shoring') matEstCalc();
-          const W = innerWidth; let n = 0;
-          document.querySelectorAll('#page-matest *').forEach(e => { const R = e.getBoundingClientRect(); if (R.width > 0 && R.right > W + 1 && e.offsetParent) n++; });
-          out.over[t] = n;
-        });
-        meTab('rebar'); const q0 = window._sdQ; window._sdQ = () => ({ id: 'zz' }); window.matEstFromSite = function () {};
-        siteToMatEst(); out.siteTab = _meTab === 'shoring'; window._sdQ = q0;   // matEstFromSite 留空殼（setTimeout 稍後才呼叫）
-      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
-      return out;
+    const r = { over: {} };
+    for (const t of ['shoring', 'lifeline', 'rebar', 'grout', 'backfill']) {
+      await page.evaluate(t => { go('matest'); meTab(t); document.querySelectorAll('#page-matest details').forEach(d => { d.open = true; }); if (t === 'shoring') matEstCalc(); }, t);
+      await page.waitForTimeout(600);
+      r.over[t] = await page.evaluate(() => { const W = innerWidth; let n = 0; document.querySelectorAll('#page-matest *').forEach(e => { const R = e.getBoundingClientRect(); if (R.width > 0 && R.right > W + 1 && e.offsetParent) n++; }); return n; });
+    }
+    r.siteTab = await page.evaluate(() => {
+      try { meTab('rebar'); const q0 = window._sdQ; window._sdQ = () => ({ id: 'zz' }); window.matEstFromSite = function () {};   // matEstFromSite 留空殼（setTimeout 稍後才呼叫）
+        siteToMatEst(); const ok = _meTab === 'shoring'; window._sdQ = q0; return ok; } catch (e) { return String(e).slice(0, 200); }
     });
     check('v6.0.139 材料估算手機版：五個分頁展開後沒有元素超出畫面；從案場細節帶入一律回擋土支撐分頁', Object.values(r.over).every(n => n === 0) && Object.keys(r.over).length === 5 && r.siteTab, JSON.stringify(r));
     check('v6.0.139 手機版測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
