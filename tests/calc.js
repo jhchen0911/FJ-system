@@ -124,6 +124,8 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const r = LL.calc(st, forms);
   // 每層 100＋200＝300 × 3 層＝900，扣構台下 40×1 層＝860；路數 7×3−2＝19（配件）；端部預留 7×3×1.5＝31.5（構台下不扣）；需求 (860＋31.5)×1.05＝936.075
   check('安全母索：每層 300×3 層−構台下 40＝860；配件路數 19；端部預留 31.5（構台下不扣）；需求 936.075；5 捲；黃色立柱 344', r.net === 860 && r.runs === 19 && r.spare === 31.5 && Math.abs(r.need - 936.075) < 1e-9 && r.reels === 5 && r.yellow === 344 && r.T.wire.acc[0] === 38 && r.T.wire.layers[0].len === 260 && r.T.wire.layers[1].len === 300);
+  const big = LL.calc(Object.assign({}, st, { zones: [st.zones[0], { name: '構台下', deck: true, form: '', v: { rows: [{ n: 1, len: 500 }] }, h: { rows: [] } }] }), forms);
+  check('安全母索：構台下填太大（500＞每層 300）只扣到該層長度——淨長 600、逐層 0／300／300，不會少算', big.net === 600 && big.T.wire.layers.map(x => x.len).join('/') === '0/300/300');
   const t = I.totals2([100000], { taxR: 5, cleanFixed: 6000 }), t0 = I.totals2([100000], { taxR: 5, cleanPermil: 10 });
   check('清潔費一次扣：未稅 6,000（含稅 6,300）→ 總計 98,700；沒填一次扣＝照 ‰（同 totals）', t.clean === 6000 && t.cleanGross === 6300 && t.total === 98700 && t0.total === I.totals([100000], { taxR: 5, cleanPermil: 10 }).total);
   const d = ST.diff([{ idx: 0, desc: 'H 型鋼樁', unit: 'M', price: 1000, stmtQty: 950, billedQty: 1000, dailyQty: 1000, addQty: 0 },

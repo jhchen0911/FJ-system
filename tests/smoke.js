@@ -865,8 +865,9 @@ async function newPage(browser, width, height) {
       // ⑤ 兩種形式（特多龍繩／鋼索）：混用時長度、路數、配件分開彙總，總和不變
       _llState.zones = ZONES(); _llState.zones[2].form = 'rope'; _llState.zones[5].form = 'rope';
       c = _llCalc();
-      out.mixSplit = Math.abs(c.T.wire.net - 8762.73) < 1e-6 && Math.abs(c.T.rope.net - 512.52) < 1e-6
-        && Math.abs(c.net - 9275.25) < 1e-6 && c.mixed && c.used.length === 2;
+      // v6.0.136（審查）：構台下每層最多扣到該層同形式長度——特多龍繩每層只有第三區 453.84，構台下 849 只能扣 453.84（原本 849 全扣、跨到別層）
+      out.mixSplit = Math.abs(c.T.wire.net - 8762.73) < 1e-6 && Math.abs(c.T.rope.net - 907.68) < 1e-6
+        && Math.abs(c.net - 9670.41) < 1e-6 && c.mixed && c.used.length === 2;
       out.mixRuns = c.T.wire.runs === 153 && c.T.rope.runs === 6 && c.runs === 159;
       out.mixSpec = c.T.wire.spec !== c.T.rope.spec && c.T.wire.unitW > c.T.rope.unitW
         && c.T.wire.acc[0] === c.T.wire.runs * _llFP('wire').acc[0]

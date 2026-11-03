@@ -9,7 +9,7 @@
  *           zones：[{ name, deck 是否構台下, form ''=跟預設, v|h：{ runs 宣告路數, rows：[{ n 路數, len 每路長 }] } }] }
  *     forms：{ wire|rope：{ label, specs：[[規格, kg/m]] } }
  *   口徑（Lotion 11/03）：周圍一路＝1 倍周長（不乘圍令倍數）；構台下扣長度、配件也不算構台下的路，但端部預留照全部路數算（不扣）；
- *         需求長度＝（淨長＋端部預留）×（1＋損耗%）；黃色立柱＝淨長 ÷ 2.5 M。逐層：第 1～扣除層數層各扣構台下長度（全部扣除以總長為上限）。
+ *         需求長度＝（淨長＋端部預留）×（1＋損耗%）；黃色立柱＝淨長 ÷ 2.5 M。逐層：第 1～扣除層數層各扣構台下長度（每層最多扣到該層長度）。
  */
 (function (root) {
   'use strict';
@@ -44,10 +44,10 @@
       var fp = ((st.f || {})[t]) || {};
       var spareLen = num(fp.spare), reel = num(fp.reel), w = specW(forms, t, fp.spec);
       var perLayer = pm + zoneLen, layerRuns = zoneRuns + pr, detail = [], spare = 0;
-      var deduct = Math.min(perLayer * layers, deckLen * dl), rem = deduct;   // 構台下扣除＝構台下長×扣除層數（以總長為上限，同既有 Excel）
+      var deduct = 0;   // 構台下扣除：第 1～扣除層數層各扣構台下長度，每層最多扣到該層長度（審查：輸入偏大時不會把別層扣掉、少算母索）
       for (var i = 0; i < layers; i++) {
-        var ded = i < dl ? Math.min(deckLen, rem) : 0, sp = st.useSpare ? layerRuns * spareLen : 0;
-        rem -= ded; spare += sp;
+        var ded = i < dl ? Math.max(0, Math.min(deckLen, perLayer)) : 0, sp = st.useSpare ? layerRuns * spareLen : 0;
+        deduct += ded; spare += sp;
         detail.push({ L: i + 1, wal: pm, sup: zoneLen, ded: ded, len: perLayer - ded, runs: layerRuns, spare: sp });
       }
       if (deckLen > 0 && perLayer <= 0) warn.push(((forms[t] || {}).label || t) + '：構台下區塊標了這個形式，但沒有同形式的一般區塊或周長可供扣除，扣除未生效');
