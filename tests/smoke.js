@@ -10162,6 +10162,27 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.162 量測檔修正（Lotion 11/04）：雙圍令每端扣兩支、交叉點只給上支撐（長向） ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const FX = require('fs').readFileSync(require('path').join(__dirname, 'fixtures', 'measure_v1_sample.json'), 'utf8');
+    const r = await page.evaluate(async (fx) => {
+      const out = {}, wait = ms => new Promise(res => setTimeout(res, ms));
+      try {
+        MAT_EST = _shDefaults(); window._matEstQid = ''; go('matest'); meTab('shoring');
+        MAT_EST._layers[1].w = '2H350'; MAT_EST._routeRows = [{ ly: 2, id: 'V1', dir: '縱', wall: 24.6 }]; matEstCalc();
+        out.dbl = _matEstRes.layerData[1].rt[0].net === 22.5;
+        meMeasImport({ files: [new File([fx], 'x.json')], value: '' }); await wait(500); document.getElementById('gen-confirm-ok').click(); await wait(300);
+        const rows = MAT_EST._routeRows.filter(x => x.ly === 1);
+        out.upper = rows.filter(x => x.dir === '縱').every(x => x.cross !== '' && /上支撐/.test(x.note)) && rows.filter(x => x.dir === '橫').every(x => x.cross === '' && /下支撐/.test(x.note)) && !MAT_EST._routeRows.some(x => 'up' in x);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    }, FX);
+    check('v6.0.162 雙圍令（2H350）每端扣兩支：壁間 24.6 → 淨長 22.50；量測檔交叉點只給上支撐（長向）、下支撐不限、備註標上下', r.dbl && r.upper, JSON.stringify(r));
+    check('v6.0.162 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

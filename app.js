@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.161';
+var APP_VERSION='v6.0.162';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -8694,7 +8694,7 @@ function _shDefaults(){
 }
 // ── v6.0.158 路數明細（小批次；設計 docs/路數明細_設計筆記.md，純計算 calc/route.js 的 FJC.route）──
 // 參數：rtJack 千斤頂本體（0.7）、rtMax1／rtMax2 單支最長（第 1 層 13、第 2 層起 10）、rtGap 接頭離中間樁最小距離（0.5）
-function _meRouteOpt(inp,ly){var S=_shSel(ly.s||'H350'),o={wSpec:_shSel(ly.w||'H350').spec,sMult:S.mult};
+function _meRouteOpt(inp,ly){var S=_shSel(ly.s||'H350'),o={wSpec:ly.w||'H350',sMult:S.mult,dblWal:true};   // v6.0.162：wSpec 保留 2H 前綴、雙圍令每端扣兩支（Lotion 11/04）
   [['jack','rtJack'],['max1','rtMax1'],['max2','rtMax2'],['minGap','rtGap']].forEach(function(k){var x=inp[k[1]];if(x!==''&&x!=null&&isFinite(parseFloat(x)))o[k[0]]=parseFloat(x);});return o;}
 function _meRouteRun(inp,layers,lys){
   var by=[],all=[],last=-1;for(var i=0;i<layers;i++)by.push([]);
@@ -40170,7 +40170,7 @@ function _meRouteHtml(m,sec,fN,adv){
     +(m._routeSrc?'<span style="font-size:11px;color:var(--b3)">來源：'+esc(m._routeSrc.file||'')+(m._routeSrc.at?'（'+esc(m._routeSrc.at)+' 匯入）':'')+'</span>':'')+'</div>'
     +_meMeasSrcHtml(m._routeSrc);
   h+=adv('<div class="me-grid">'+fN('rtJack','千斤頂本體 (M)','空白＝0.7')+fN('rtMax1','第 1 層單支最長 (M)','空白＝13')+fN('rtMax2','第 2 層起單支最長 (M)','空白＝10')+fN('rtGap','接頭離中間樁最小距離 (M)','空白＝0.5')+'</div>'
-    +'<div style="font-size:10.5px;color:var(--b3)">淨長＝壁間 − 兩端圍令型鋼高 − 千斤頂本體；定尺 1～13 M 每 0.5（沒有 11、11.5）；零頭 ≤15 cm 由千斤頂伸長，其餘用短節（短節不算接頭）。中間樁、交叉點位置從該路起點壁面量起；每個接頭要落在「前一支中間樁＋這個距離」到「與下一支中間樁的中點」之間，離交叉點中心也至少這個距離。</div>','千斤頂、單支最長、接頭離中間樁距離');
+    +'<div style="font-size:10.5px;color:var(--b3)">淨長＝壁間 − 兩端圍令型鋼高（雙圍令 2H 每端扣兩支）− 千斤頂本體；定尺 1～13 M 每 0.5（沒有 11、11.5）；零頭 ≤15 cm 由千斤頂伸長，其餘用短節（短節不算接頭）。中間樁、交叉點位置從該路起點壁面量起；每個接頭要落在「前一支中間樁＋這個距離」到「與下一支中間樁的中點」之間，離交叉點中心也至少這個距離。</div>','千斤頂、單支最長、接頭離中間樁距離');
   if(!rows.length)return h+'<div style="font-size:12px;color:var(--b3)">尚未填路數明細：支撐長度與接頭以「面積×0.4−周長」與「每路長÷7」估算。</div>';
   var cnt=[];for(var i=0;i<L;i++)cnt.push(0);
   var sel='font-size:13px;height:32px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit';
@@ -40588,6 +40588,8 @@ try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(
 // 中間樁／共構樁支數、斜撐／角撐可裝數（叫料以量測檔為準）、構台帽高程；掛專案時另存 q.measure（只放量測數字，給報價頁圖面覆核）
 function _meMeasSrcHtml(src){
   if(!src||src.kind!=='measure')return '';
+  var stale=!src.v&&((MAT_EST&&MAT_EST._layers)||[]).some(function(l){return /^2/.test(String(l&&l.w||''));});   // v6.0.160 匯入的雙圍令壁間只加一支型鋼高
+  if(stale)return '<div style="font-size:12px;background:#fdecea;border:1px solid #f5b5ae;border-radius:var(--r8);padding:6px 10px;margin-bottom:6px;color:var(--red)">這份路數明細是 v6.0.160 匯入的，雙圍令（2H）的壁間只算一支型鋼高、會少 0.7 M 左右：請重新匯入量測檔。</div>';
   var h='<div style="font-size:11.5px;line-height:1.7;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r8);padding:6px 10px;margin-bottom:6px">'
     +'量測檔：'+esc((src.sheets||[]).join('、')||'—')+'　量測 '+esc(String(src.date||'').replace('T',' ').slice(0,16))+'　引擎 '+esc(src.engine||'')+(src.sub?'　'+esc(src.sub):'');
   h+='<br>斜撐／角撐支數依量測檔「可裝」（改用 CSV 或清空路數明細就恢復估算）';
@@ -40602,7 +40604,7 @@ function meMeasImport(el){
   rd.onload=function(){
     var d=null;try{d=JSON.parse(String(rd.result||'').replace(/^﻿/,''));}catch(e){_err('meMeasImport.parse',e);}
     el.value='';
-    var r=d?FJC.route.fromMeasure(d):{ok:false,err:'不是 JSON 檔'};
+    var r=d?FJC.route.fromMeasure(d,{dblWal:true,upperOnly:true}):{ok:false,err:'不是 JSON 檔'};
     if(!r.ok){toast('量測檔讀不進來：'+r.err);return;}
     var nR=r.rows.length,msg='量測檔 '+esc(f.name)+'：'+r.L.length+' 層、'+nR+' 路支撐。<br>會帶入：各層規格與三角架高程、路數明細（取代目前 '+((MAT_EST._routeRows||[]).length)+' 路）、斜撐／角撐可裝數'
       +(function(){var sq=null;try{sq=_matEstSiteQ();}catch(e){_err('meMeasImport',e);}var sl=sq?parseInt(_sdNorm(sq.site).layers)||0:0;
@@ -40619,7 +40621,7 @@ function _meMeasApply(r,file){
   var old=m._layers||[];
   r.L.sort(function(a,b){return a.L-b.L;});
   m._layers=r.L.map(function(l,i){var o=old[i]||{};return {w:l.w,s:l.s,d:l.d,st:!!o.st,el:l.triEl==null?(o.el==null?'':o.el):l.triEl};});
-  m._routeRows=r.rows.map(function(x){var y=Object.assign({},x);delete y.src;return y;});
+  m._routeRows=r.rows.map(function(x){var y=Object.assign({},x);delete y.src;delete y.up;return y;});
   m._measBrace=[];r.L.forEach(function(l){if(l.L>=1)m._measBrace[l.L-1]=l.brace;});
   if(r.capEl!=null)m.capEl=r.capEl;
   var _sq=null;try{_sq=_matEstSiteQ();}catch(e){_err('_meMeasApply',e);}
@@ -40628,7 +40630,7 @@ function _meMeasApply(r,file){
     if(n(r.mid)!=null)m.kingMid=n(r.mid);if(n(r.co)!=null)m.kingCo=n(r.co);
     if(n(r.corners)!=null)m.corners=n(r.corners);if(n(r.irr)!=null)m.irr=n(r.irr);
   }
-  m._routeSrc={kind:'measure',file:file,at:localToday(),date:r.date,engine:r.engine,sub:r.sub,sheets:r.sheets,hasLine:r.hasLine,low:r.low,warn:r.warn,check:r.check};
+  m._routeSrc={kind:'measure',v:162,file:file,at:localToday(),date:r.date,engine:r.engine,sub:r.sub,sheets:r.sheets,hasLine:r.hasLine,low:r.low,warn:r.warn,check:r.check};
   var q=window._matEstQid?Q.find(function(x){return x.id===window._matEstQid;}):null;
   if(q){q.measure=_qMeasOf(r,file);_touch(q);try{persist();}catch(e){_err('_meMeasApply',e);}}
   renderMatEst();_meAutoKick(true);
@@ -40672,7 +40674,7 @@ function qMeasImport(el){
   var f=el&&el.files&&el.files[0];if(!f)return;var rd=new FileReader();
   rd.onload=function(){
     var d=null;try{d=JSON.parse(String(rd.result||'').replace(/^\uFEFF/,''));}catch(e){_err('qMeasImport.parse',e);}
-    el.value='';var r=d?FJC.route.fromMeasure(d):{ok:false,err:'不是 JSON 檔'};
+    el.value='';var r=d?FJC.route.fromMeasure(d,{dblWal:true,upperOnly:true}):{ok:false,err:'不是 JSON 檔'};
     if(!r.ok){toast('量測檔讀不進來：'+r.err);return;}
     var q=Q.find(function(x){return x.id===eid;});if(!q){toast('請先儲存報價單');return;}
     q.measure=_qMeasOf(r,f.name);_touch(q);try{persist();}catch(e){_err('qMeasImport',e);}
