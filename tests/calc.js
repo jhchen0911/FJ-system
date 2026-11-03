@@ -245,6 +245,12 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const mE = RT.fromMeasure(eqD, { upperOnly: true }), eqD2 = JSON.parse(JSON.stringify(eqD)); eqD2['各層'][0]['上支撐方向'] = { 值: '橫' };
   const mF = RT.fromMeasure(eqD2, { upperOnly: true });
   check('縱橫一樣長＝上下未定、兩向都避交叉點；檔案有「上支撐方向」以檔案為準；不傳 upperOnly 照舊兩向都給', mE.rows.every(r => r.up === null && r.cross !== '' && /上下未定/.test(r.note)) && mF.rows.find(r => r.dir === '橫').cross !== '' && mF.rows.find(r => r.dir === '縱').cross === '' && RT.fromMeasure(fx3).rows.find(r => r.ly === 1 && r.dir === '橫').cross !== '');
+  const m3o = RT.fromMeasure(fx3), r3o = m3o.rows.find(r => r.ly === 2 && r.id === 'V1');
+  const fx4 = JSON.parse(JSON.stringify(fx3)); fx4['各層'][1]['每路沿線'] = { 值: [{ 編號: 1, 中間樁位置m: [5, 11], 交叉點: [] }] };
+  const r4 = RT.fromMeasure(fx4, { dblWal: true }).rows.find(r => r.ly === 2 && r.id === 'V1');
+  const zD = JSON.parse(JSON.stringify(eqD)); zD['各層'][0]['每路支撐長度']['值'].push({ 編號: 3, 方向: '縱向', 長度m: 0 }); zD['各層'][0]['上支撐方向'] = { 值: '長向' };
+  const mZ = RT.fromMeasure(zD, { upperOnly: true });
+  check('審查：沒傳 dblWal 的 2H 照舊單支換算；沿線中間樁位置＋0.80 精確；長度 0 的路不影響上下判斷；看不懂的上支撐方向要警示', Math.abs(r3o.wall - (lenL2 + 0.8)) < 0.011 && r4.mids === '5.8,11.8' && mZ.rows.filter(r => r.wall > 0.7).every(r => r.up === null) && mZ.warn.some(w => /上支撐方向」看不懂/.test(w)));
   check('交叉點計算：十字交叉在中點、不相交不算', eq(RT.crossings([{ 編號: 1, 方向: '縱', 起點mm: [0, 0], 終點mm: [0, 10000] }, { 編號: 2, 方向: '橫', 起點mm: [-5000, 4000], 終點mm: [5000, 4000] }, { 編號: 3, 方向: '橫', 起點mm: [1000, 2000], 終點mm: [6000, 2000] }]), { 1: [4], 2: [5], 3: [] }));
 }
 

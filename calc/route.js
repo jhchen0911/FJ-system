@@ -154,7 +154,7 @@
   function parseBad(s) { return String(s == null ? '' : s).replace(/[＋，,、\s]+/g, '+').split('+').map(function (x) { return x.replace(/[MmＭ米]$/, ''); }).filter(function (x) { return x && !/^(\d+(?:\.\d+)?)(?:[x×*](\d+))?$/.test(x); }); }
   function mids(s) { return String(s == null ? '' : s).split(/[,，、;；\s]+/).map(num).filter(function (x) { return x > 0; }); }
 
-  // 一路完整結果。r：{ ly, id, dir, wall, dbl('雙'|'單'|''), combo 手改字串, mids, note }；o：{ wSpec 該層圍令, sMult 該層支撐倍數, jack, max1, max2, minGap, jackTol }
+  // 一路完整結果。r：{ ly, id, dir, wall, dbl('雙'|'單'|''), combo 手改字串, mids, cross, note }；o：{ wSpec 該層圍令（可含 2 前綴）, sMult 該層支撐倍數, jack, max1, max2, minGap, jackTol, dblWal（v6.0.162：雙圍令每端扣兩支） }
   function row(r, o) {
     o = o || {};
     var ly = Math.max(1, Math.round(num(r.ly)) || 1);
@@ -329,8 +329,10 @@
       // 上下支撐：短向是下支撐、長向是上支撐（Lotion 11/04）；平均長度差不到 0.05 M＝上下未定
       var upDir = '', fileUp = String(V(ly['上支撐方向']) || V(d['上支撐方向']) || '');
       if (/^縱/.test(fileUp)) upDir = '縱'; else if (/^橫/.test(fileUp)) upDir = '橫';
-      else {
-        var avg = function (k) { var a = routes.filter(function (r) { return (/^橫/.test(String(r['方向'] || '')) ? '橫' : '縱') === k; }); return a.length ? a.reduce(function (t, r) { return t + num(r['長度m']); }, 0) / a.length : 0; };
+      if (o.upperOnly && fileUp && !upDir) warn.push('第 ' + n + ' 層「上支撐方向」看不懂（' + fileUp + '），改用長向判斷');
+      if (o.upperOnly && upDir && fileUp && !routes.some(function (r) { return (/^橫/.test(String(r['方向'] || '')) ? '橫' : '縱') === upDir; })) { warn.push('第 ' + n + ' 層「上支撐方向」' + fileUp + ' 這層沒有這個方向的路，改用長向判斷'); upDir = ''; }
+      if (!upDir) {   // 檔案沒標（或看不懂、這層沒有那個方向）：長向＝上支撐
+        var avg = function (k) { var a = routes.filter(function (r) { return num(r['長度m']) > 0 && (/^橫/.test(String(r['方向'] || '')) ? '橫' : '縱') === k; }); return a.length ? a.reduce(function (t, r) { return t + num(r['長度m']); }, 0) / a.length : 0; };
         var aV = avg('縱'), aH = avg('橫');
         upDir = (aV && aH && Math.abs(aV - aH) >= 0.05) ? (aV > aH ? '縱' : '橫') : '';
       }

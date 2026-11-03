@@ -40149,7 +40149,7 @@ function _meRouteHtml(m,sec,fN,adv){
     +(m._routeSrc?'<span style="font-size:11px;color:var(--b3)">來源：'+esc(m._routeSrc.file||'')+(m._routeSrc.at?'（'+esc(m._routeSrc.at)+' 匯入）':'')+'</span>':'')+'</div>'
     +_meMeasSrcHtml(m._routeSrc);
   h+=adv('<div class="me-grid">'+fN('rtJack','千斤頂本體 (M)','空白＝0.7')+fN('rtMax1','第 1 層單支最長 (M)','空白＝13')+fN('rtMax2','第 2 層起單支最長 (M)','空白＝10')+fN('rtGap','接頭離中間樁最小距離 (M)','空白＝0.5')+'</div>'
-    +'<div style="font-size:10.5px;color:var(--b3)">淨長＝壁間 − 兩端圍令型鋼高 − 千斤頂本體；定尺 1～13 M 每 0.5（沒有 11、11.5）；零頭 ≤15 cm 由千斤頂伸長，其餘用短節（短節不算接頭）。中間樁、交叉點位置從該路起點壁面量起；每個接頭要落在「前一支中間樁＋這個距離」到「與下一支中間樁的中點」之間，離交叉點中心也至少這個距離。</div>','千斤頂、單支最長、接頭離中間樁距離');
+    +'<div style="font-size:10.5px;color:var(--b3)">淨長＝壁間 − 兩端圍令型鋼高（雙圍令 2H 每端扣兩支）− 千斤頂本體；定尺 1～13 M 每 0.5（沒有 11、11.5）；零頭 ≤15 cm 由千斤頂伸長，其餘用短節（短節不算接頭）。中間樁、交叉點位置從該路起點壁面量起；每個接頭要落在「前一支中間樁＋這個距離」到「與下一支中間樁的中點」之間，離交叉點中心也至少這個距離。</div>','千斤頂、單支最長、接頭離中間樁距離');
   if(!rows.length)return h+'<div style="font-size:12px;color:var(--b3)">尚未填路數明細：支撐長度與接頭以「面積×0.4−周長」與「每路長÷7」估算。</div>';
   var cnt=[];for(var i=0;i<L;i++)cnt.push(0);
   var sel='font-size:13px;height:32px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit';
@@ -40371,6 +40371,8 @@ try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(
 // 中間樁／共構樁支數、斜撐／角撐可裝數（叫料以量測檔為準）、構台帽高程；掛專案時另存 q.measure（只放量測數字，給報價頁圖面覆核）
 function _meMeasSrcHtml(src){
   if(!src||src.kind!=='measure')return '';
+  var stale=!src.v&&((MAT_EST&&MAT_EST._layers)||[]).some(function(l){return /^2/.test(String(l&&l.w||''));});   // v6.0.160 匯入的雙圍令壁間只加一支型鋼高
+  if(stale)return '<div style="font-size:12px;background:#fdecea;border:1px solid #f5b5ae;border-radius:var(--r8);padding:6px 10px;margin-bottom:6px;color:var(--red)">這份路數明細是 v6.0.160 匯入的，雙圍令（2H）的壁間只算一支型鋼高、會少 0.7 M 左右：請重新匯入量測檔。</div>';
   var h='<div style="font-size:11.5px;line-height:1.7;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r8);padding:6px 10px;margin-bottom:6px">'
     +'量測檔：'+esc((src.sheets||[]).join('、')||'—')+'　量測 '+esc(String(src.date||'').replace('T',' ').slice(0,16))+'　引擎 '+esc(src.engine||'')+(src.sub?'　'+esc(src.sub):'');
   h+='<br>斜撐／角撐支數依量測檔「可裝」（改用 CSV 或清空路數明細就恢復估算）';
@@ -40411,7 +40413,7 @@ function _meMeasApply(r,file){
     if(n(r.mid)!=null)m.kingMid=n(r.mid);if(n(r.co)!=null)m.kingCo=n(r.co);
     if(n(r.corners)!=null)m.corners=n(r.corners);if(n(r.irr)!=null)m.irr=n(r.irr);
   }
-  m._routeSrc={kind:'measure',file:file,at:localToday(),date:r.date,engine:r.engine,sub:r.sub,sheets:r.sheets,hasLine:r.hasLine,low:r.low,warn:r.warn,check:r.check};
+  m._routeSrc={kind:'measure',v:162,file:file,at:localToday(),date:r.date,engine:r.engine,sub:r.sub,sheets:r.sheets,hasLine:r.hasLine,low:r.low,warn:r.warn,check:r.check};
   var q=window._matEstQid?Q.find(function(x){return x.id===window._matEstQid;}):null;
   if(q){q.measure=_qMeasOf(r,file);_touch(q);try{persist();}catch(e){_err('_meMeasApply',e);}}
   renderMatEst();_meAutoKick(true);
