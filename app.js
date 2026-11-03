@@ -2452,7 +2452,7 @@ function _delQDo(id){
     INV=INV.filter(v=>!(_delIds.includes(v.sourceQid)||_delIds.includes(v.quoteId)));
     if(INV.length!==_ib)saveInv();
   }catch(e){_err('_delQDo',e);}
-  persist();renderList();rDash();updBadge();
+  persist();try{_prjSync();}catch(e){_err('_delQDo.prj',e);}   /* 4a 主報價刪了 → 專案作廢 */renderList();rDash();updBadge();
   toast('已刪除（關聯應付帳款與請款單已一併清除）');
 }
 
@@ -5184,6 +5184,7 @@ function confirmAward(){
   try{_salesCommSync(q);}catch(e){_err('confirmAward.sales',e);}   // v6.0.74
   try{_commSync(q);}catch(e){_err('confirmAward.comm',e);}   // v6.0.88 業主端佣金
   persist();
+  try{_prjSync({awardQid:q.id});if(q.parentId){var _pm=Q.find(function(x){return x&&x.id===q.parentId;});if(!_pm||!_pm.awarded)toast('提醒：這張追加的主報價還沒得標，專案暫時掛不上（主報價得標後自動掛上）');}}catch(e){_err('confirmAward.prj',e);}   // 4a 得標建專案／追加掛主約
   document.getElementById('award-modal').style.display='none';
   _fbWriteAll(
     ()=>{toast('已標記為得標並同步至雲端！');renderList();rDash();},
@@ -5499,6 +5500,7 @@ function revokeAward(id){
     q2.revokeLog=(Array.isArray(q2.revokeLog)?q2.revokeLog:[]).concat([{at:now,by:me,reason:r}]);
     _touch(q2); // 跨裝置同步：取消狀態必須獲勝，否則雲端舊資料會把「得標」蓋回來
     persist();
+    try{_prjSync();}catch(e){_err('revokeAward.prj',e);}   // 4a 專案標作廢（不刪、案號保留）
     var nv=0;pays2.forEach(function(p){if(p.voidAt)return;p.voidAt=now;p.voidBy=me;p.voidReason='取消得標：'+r;p.voidAmt=parseFloat(p.amount)||0;p.amount=0;p.note='【作廢】取消得標：'+r+(p.note?('・'+p.note):'');_touch(p);nv++;});
     if(nv){try{savePayables();}catch(e){_err('revokeAward.pay',e);}}
     // 連動刪除關聯合約（先立墓碑，否則同步合併時合約會復活）
@@ -5583,6 +5585,7 @@ function importData(file){
         if(data.expenses)EXPENSES=arr(data.expenses);
         if(data.customers)CUSTOMERS=arr(data.customers);
         if(data.workers){WORKERS=arr(data.workers);try{localStorage.setItem('fy_workers',JSON.stringify(WORKERS));}catch(e2){_err('importData.workers',e2);}}
+        if(data.projects){PROJECTS=arr(data.projects);try{localStorage.setItem('fy_projects',JSON.stringify(PROJECTS));}catch(e2){_err('importData.projects',e2);}}   // 4a（舊備份沒有 → 保留現值，下面 _prjSync 依報價補建）
         if(data.costHist){COST_HIST=arr(data.costHist);try{localStorage.setItem('fy_cost_hist',JSON.stringify(COST_HIST));}catch(e2){_err('importData',e2);}}
         if(data.dealHist){DEAL_HIST=arr(data.dealHist);try{localStorage.setItem('fy_deal_hist',JSON.stringify(DEAL_HIST));}catch(e2){_err('importData',e2);}}
         if(data.matStock&&typeof data.matStock==='object'){MAT_STOCK=data.matStock;try{localStorage.setItem('fy_mat_stock',JSON.stringify(MAT_STOCK));}catch(e2){_err('importData',e2);}}
@@ -5612,7 +5615,7 @@ function importData(file){
           Object.keys(_km).forEach(function(k){if(data.toolStates[k])localStorage.setItem(_km[k],JSON.stringify(data.toolStates[k]));});
           localStorage.setItem('fy_toolstates_mt',String(data.toolStates._mt||Date.now()));
         }catch(e2){_err('top',e2);}}
-        persist();saveInv();saveUH();persistP();
+        persist();saveInv();saveUH();persistP();try{_prjSync({noSave:true});localStorage.setItem('fy_projects',JSON.stringify(PROJECTS));}catch(e2){_err('importData.prj',e2);}   /* 4a 依還原後的報價對帳 */
         try{saveContracts();saveVendors();savePayables();saveInvoiceRecs();saveExpenses();saveCustomers();saveActivityLog();}catch(e2){_err('top',e2);}
         syncParamsUI();
         // 全面刷新所有頁面資料
@@ -6516,7 +6519,7 @@ function awardQuote(id){
   try{openAwardDetail(id);}catch(e){
     // fallback
     const q=Q.find(x=>x.id===id);if(!q)return;
-    q.awarded=true;_touch(q);persist();renderList();rDash();updBadge();
+    q.awarded=true;_touch(q);persist();try{_prjSync({awardQid:q.id});}catch(e2){_err('awardQuote.prj',e2);}renderList();rDash();updBadge();
     toast('已標記為得標');
   }
 }
@@ -8322,6 +8325,7 @@ try{const x=localStorage.getItem('fy_payables');if(x)PAYABLES=JSON.parse(x);}cat
 var PAID_LOG={};try{var _plx=localStorage.getItem('fy_paidlog');if(_plx)PAID_LOG=JSON.parse(_plx)||{};}catch(e){_err('paidLog.load',e);PAID_LOG={};}   // v6.0.85 付款帳本（應付 id → paidAt／paidDate／unpaidAt），只增不減、跨裝置取聯集
 try{const x=localStorage.getItem('fy_inv_recs');if(x)INVOICE_RECS=JSON.parse(x);}catch(e){_err('_adminUidHint',e);}
 var TOMBS={};try{TOMBS=JSON.parse(localStorage.getItem('fy_tombs')||'{}');}catch(e){_err('_adminUidHint',e);}
+var PROJECTS=[];try{var _prx=localStorage.getItem('fy_projects');if(_prx)PROJECTS=JSON.parse(_prx)||[];}catch(e){_err('projects.load',e);PROJECTS=[];}   // 改版第 4 步 4a 專案資料集
 function _tomb(coll,id,moved){   // moved：改編號（舊 id 換新 id，付款帳本已搬過去）→ 舊 id 照樣立墓碑
   if(!id)return false;
   if(coll==='payables'&&!moved){
@@ -10146,7 +10150,7 @@ function _mergeQHistory(loc,cloud){
   return out;
 }
 var _SYNC_COLLS=['quotes','invoices','upaHistory','params','contracts','vendors','invoiceRecs','activityLog','customers','pagePerms','workers',
-  'tombs','admins',
+  'tombs','admins','projects',
   'matStock','toolrecs','planState','qHistory','toolStates'];   // v5.373 新增（planAttLib 純圖檔，只進本機備份不上雲）
 // 敏感集合：只寫 fydata/private
 var _PRIV_COLLS=['payables','expenses','costHist','upaCostDB','shareProfit','matLedger','dealHist','hr','payslips','petty'];   // v5.433 人員薪資、v5.434 零用金
@@ -10222,6 +10226,7 @@ function _syncPayload(){
     invoiceRecs:INVOICE_RECS, expenses:EXPENSES, tombs:TOMBS, activityLog:ACTIVITY_LOG.slice(0,100),
     customers:CUSTOMERS, upaCostDB:UPA_COST_DB, pagePerms:pagePerms, costHist:COST_HIST,
     workers:(typeof WORKERS!=='undefined'?WORKERS:[]),   // v5.438
+    projects:(typeof PROJECTS!=='undefined'?PROJECTS:[]),   // 4a 專案資料集（只有連結，不含金額 → 共用區）
     shareProfit:SHARE_PROFIT, dealHist:DEAL_HIST, matLedger:MAT_LEDGER, admins:admins,
     hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]), petty:(typeof PETTY!=='undefined'?PETTY:[]),   // v5.433 人員薪資／v5.434 零用金（private；全量備份含）
     // v5.373：六大工具存檔、施工計畫書草稿、共用附件庫、材料庫存、報價版本歷史
@@ -10254,7 +10259,7 @@ function _deepDecodeKeys(o){
 // 雲端原本把 quotes 存成陣列（Firebase 會變成 {0:…,1:…} 的數字鍵）。
 // 第一次改用逐筆之前先做一次性遷移：整包改寫成 {報價id:報價}，
 // 之後每次只 update 動過的那幾筆；本機刪掉的則寫 null 真正移除。
-var _REC_COLLS=['quotes','invoices','workers'];   // v5.438 人員進場資料含影本，逐筆同步
+var _REC_COLLS=['quotes','invoices','workers','projects'];   // 4a 專案逐筆同步   // v5.438 人員進場資料含影本，逐筆同步
 function _recHashKey(){return 'fy_rec_hashes';}
 function _recHashesOfClean(clean){
   var h={};
@@ -10326,7 +10331,7 @@ function _perRecordDelta(delta,clean,newHashes,baseHashes,opts){
 // ══════════ v5.375：筆數暴跌保護 ══════════
 // 記下每次成功上傳時各集合的筆數；下次要送的筆數若不到一半（且少 3 筆以上）就先問過。
 var _DROP_COLLS=[['quotes','報價單'],['invoices','請款單'],['contracts','合約'],
-  ['customers','客戶'],['vendors','廠商'],['invoiceRecs','發票紀錄']];
+  ['customers','客戶'],['vendors','廠商'],['invoiceRecs','發票紀錄'],['projects','專案']];
 function _loadSyncCounts(){try{return JSON.parse(localStorage.getItem('fy_sync_counts')||'null');}catch(e){return null;}}
 function _storeSyncCounts(c){try{localStorage.setItem('fy_sync_counts',JSON.stringify(c));}catch(e){_err('_storeSyncCounts',e);}}
 function _countsOf(clean){
@@ -10394,6 +10399,7 @@ function _applyCloud(data){
     if(data.activityLog)ACTIVITY_LOG=data.activityLog;
     if(data.customers)CUSTOMERS=_safeMerge(CUSTOMERS,data.customers,'customers');
     if(data.workers){WORKERS=_safeMerge(WORKERS,data.workers,'workers');try{_wkGraft();}catch(e){_err('_applyCloud.wkGraft',e);}try{_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');}catch(e){_err('_applyCloud.workers',e);}}   // v5.438
+    if(data.projects){try{PROJECTS=_safeMerge(PROJECTS,data.projects,'projects');_lsSet('fy_projects',JSON.stringify(PROJECTS),'專案');}catch(e){_err('_applyCloud.projects',e);}}   // 4a
     if(data.matStock){
       try{
         var _msc=data.matStock||{};
@@ -10488,6 +10494,7 @@ function _applyCloud(data){
   window._cloudApplied1=true;   // v6.0.118：至少成功套用過一次雲端資料（匯款帳號遷移要等這個，免得拿本機舊資料當正本）
   try{_bankMigrate();}catch(e){_err('_applyCloud.bank',e);}
   try{_rmk14Migrate();}catch(e){_err('_applyCloud.rmk14',e);}   // v6.0.138 備註第 14 條
+  setTimeout(function(){try{_prjSync();}catch(e){_err('_applyCloud.prj',e);}},600);   // 4a：雲端報價合併完才對帳（等 _applyingCloud 解除，補建的才會上傳）
   return true;
 }
 // ══════════ 敏感資料節點拆分（v5.324）══════════
@@ -10688,7 +10695,7 @@ function _applySensColls(data,tombs){
   try{_lsSet('fy_expenses',JSON.stringify(EXPENSES),'費用');}catch(e){_err('top',e);}
 }
 // 記錄級合併：以 _mt（修改時間）新者勝；墓碑防止刪除復活
-var _MERGE_COLLS=['quotes','invoices','payables','contracts','invoiceRecs','expenses','customers','vendors','workers'];
+var _MERGE_COLLS=['quotes','invoices','payables','contracts','invoiceRecs','expenses','customers','vendors','workers','projects'];
 function _mergeColl(localArr,cloudArr,collName,cloudTombs){
   // Firebase 可能把陣列存成物件；一律轉陣列
   var _arr=function(x){if(Array.isArray(x))return x;if(x&&typeof x==='object')return Object.values(x);return [];};
@@ -32207,7 +32214,7 @@ function _pjListHtml(list){
     var st;try{st=_pjStat(q);}catch(e){st={base:0,billed:0,recv:0,costNet:0,physPct:0,hasRep:false,logs:[]};}
     var last=st.logs[0];
     return '<div class="card" style="margin:0;cursor:pointer" onclick="openProj(\''+q.id+'\')"><div class="cb">'
-      +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b style="font-size:13.5px">'+esc(q.name||'未命名')+'</b>'+_drProjChip(q)+(q.closed?'<span style="font-size:10.5px;color:var(--b3);border:1px solid var(--b2);border-radius:99px;padding:1px 8px">已結案</span>':'')+'</div>'
+      +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><b style="font-size:13.5px">'+esc(q.name||'未命名')+'</b>'+_drProjChip(q)+_prjNoChip(q)+(q.closed?'<span style="font-size:10.5px;color:var(--b3);border:1px solid var(--b2);border-radius:99px;padding:1px 8px">已結案</span>':'')+'</div>'
       +'<div style="font-size:11.5px;color:var(--b4)">'+esc(q.client||'')+(q.code?('　'+esc(q.code)):'')+(last?('　最近日報 '+esc(last.date)):'')+'</div>'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;font-size:11.5px;color:var(--b4);margin-top:6px">'
       +'<span>合約 <b style="color:var(--b5)">'+fmt(st.base)+'</b></span><span>已請 <b style="color:var(--g3)">'+fmt(st.billed)+'</b></span>'
@@ -32218,7 +32225,7 @@ function _pjListHtml(list){
 function _pjKpi(l,v,clr,onclick){return '<div '+(onclick?('onclick="'+onclick.replace(/"/g,'&quot;')+'" style="cursor:pointer;'):'style="')+'min-width:108px;flex:1 1 108px;background:var(--w);border:1px solid var(--b1);border-radius:var(--r8);padding:7px 10px"><div style="font-size:10px;color:var(--b4)">'+l+'</div><div style="font-size:14px;font-weight:900;color:'+(clr||'var(--b5)')+';font-variant-numeric:tabular-nums">'+v+'</div></div>';}
 function _pjHeadHtml(q,st){
   return '<div class="card" style="margin-top:10px"><div class="cb">'
-    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:16px">'+esc(q.name||'未命名')+'</b><span style="font-size:12px;color:var(--b4)">'+esc(q.client||'')+(q.code?('　'+esc(q.code)):'')+((q.ver||1)>1?('　報價 v'+q.ver):'')+'</span>'+_drProjChip(q)+(q.closed?'<span style="font-size:11px;color:var(--b3);border:1px solid var(--b2);border-radius:99px;padding:1px 8px">已結案</span>':'')+(st.adds.length?'<span style="font-size:11px;color:#1565C0">含 '+st.adds.length+' 筆追加</span>':'')+'</div>'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="font-size:16px">'+esc(q.name||'未命名')+'</b>+_prjNoChip(q)<span style="font-size:12px;color:var(--b4)">'+esc(q.client||'')+(q.code?('　'+esc(q.code)):'')+((q.ver||1)>1?('　報價 v'+q.ver):'')+'</span>'+_drProjChip(q)+(q.closed?'<span style="font-size:11px;color:var(--b3);border:1px solid var(--b2);border-radius:99px;padding:1px 8px">已結案</span>':'')+(st.adds.length?'<span style="font-size:11px;color:#1565C0">含 '+st.adds.length+' 筆追加</span>':'')+'</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'
     +_pjKpi('合約金額（含稅）','NT$ '+fmt(st.base),'var(--b5)',st.ct?"editContract('"+st.ct.id+"')":"loadQ('"+q.id+"')")
     +_pjKpi('累計請款','NT$ '+fmt(st.billed),'var(--g3)',"go('invoice')")
@@ -35452,7 +35459,7 @@ function buildSubMgmtHtml(q){var h=_buildSubMgmtHtmlCore(q);if(q&&typeof h==='st
 
 // ── ④ 資料健檢加項 ──
 // v6.0.49 健檢＝本體＋兩段加項（原兩層包裝）
-function _healthRows(){var R=_healthRowsBase();try{R=_healthAdd637(R)||R;}catch(e){_err('_healthRows.637',e);}try{R=_healthAdd639(R)||R;}catch(e){_err('_healthRows.639',e);}try{R=_healthAdd689(R)||R;}catch(e){_err('_healthRows.689',e);}try{R=_healthAdd6102(R)||R;}catch(e){_err('_healthRows.6102',e);}try{R=_healthAdd3b(R)||R;}catch(e){_err('_healthRows.3b',e);}return R;}
+function _healthRows(){var R=_healthRowsBase();try{R=_healthAdd637(R)||R;}catch(e){_err('_healthRows.637',e);}try{R=_healthAdd639(R)||R;}catch(e){_err('_healthRows.639',e);}try{R=_healthAdd689(R)||R;}catch(e){_err('_healthRows.689',e);}try{R=_healthAdd6102(R)||R;}catch(e){_err('_healthRows.6102',e);}try{R=_healthAdd3b(R)||R;}catch(e){_err('_healthRows.3b',e);}try{R=_healthAddPrj(R)||R;}catch(e){_err('_healthRows.prj',e);}return R;}
 // 第 3b 步（健檢1 #26）：v6.0.135 之前的竣工結算／結案把清潔費當合約追減——列出「結算金額＝舊算法、少了清潔費」的合約，不自動改（Lotion：不清歷史）
 function _healthAdd3b(R){
   (CONTRACTS||[]).forEach(function(c){if(!c||!(c.status==='completed'||c.status==='done'))return;var invs;try{invs=_invsOfContract(c);}catch(e){_err('_healthAdd3b',e);return;}
@@ -37913,6 +37920,12 @@ function _storageRulesText(staff,readers){
     '      allow read: if isStaff() || isReader();',
     '      allow write: if isStaff();',
     '    }',
+    '    // 改版第 4 步 4a：專案送審文件，單檔 50 MB',
+    '    match /projects/{pid}/docs/{file=**} {',
+    '      allow read: if isStaff() || isReader();',
+    '      allow create, update: if isStaff() && request.resource.size < 50 * 1024 * 1024;',
+    '      allow delete: if isStaff();',
+    '    }',
     '    // LINE 機器人檔案（Cloud Functions 寫入；網頁只能讀）',
     '    match /line/{rest=**} {',
     '      allow read: if isStaff() || isReader();',
@@ -39197,9 +39210,9 @@ function _wkSensPull(){
 //  員工直接把雲端記錄清掉、但沒有墓碑 → 管理員裝置合併時會把本機那筆補回去（不會真的刪光）。
 var _TOMB_AUTO_MAX=30;
 var TOMB_HOLD={};try{TOMB_HOLD=JSON.parse(localStorage.getItem('fy_tombhold')||'{}')||{};}catch(e){TOMB_HOLD={};}
-var _TOMB_REQ_COLLS={quotes:1,invoices:1,contracts:1,customers:1,vendors:1,invoiceRecs:1,workers:1};   // 審查 🟡2：員工只能申請刪員工看得到的集合（應付／費用不收）
+var _TOMB_REQ_COLLS={quotes:1,invoices:1,contracts:1,customers:1,vendors:1,invoiceRecs:1,workers:1,projects:1};   // 審查 🟡2：員工只能申請刪員工看得到的集合（應付／費用不收）
 var _TOMB_COLLS={quotes:function(){return Q;},invoices:function(){return INV;},contracts:function(){return CONTRACTS;},customers:function(){return CUSTOMERS;},vendors:function(){return VENDORS;},
-  invoiceRecs:function(){return INVOICE_RECS;},workers:function(){return WORKERS;},payables:function(){return PAYABLES;},expenses:function(){return EXPENSES;}};
+  invoiceRecs:function(){return INVOICE_RECS;},workers:function(){return WORKERS;},projects:function(){return PROJECTS;},payables:function(){return PAYABLES;},expenses:function(){return EXPENSES;}};
 function _tombReqPush(){
   if(_fbUser&&!_isReaderUser&&_shWholeOk()){try{localStorage.removeItem('fy_tombreq_pending');}catch(e){/* 可忽略 */}return;}   // v6.0.118 審查：管理員裝置（登入前刪的也記成申請）直接立墓碑，不必送申請 → 清掉殘留
   if(!_fbDb||!_fbUser||_isReaderUser)return;
@@ -39222,7 +39235,7 @@ function _tombApplyOne(c,id,ts){
 }
 function _tombSaveAll(){
   try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e){_err('_tombSaveAll',e);}
-  try{persist();saveInv();saveContracts();saveVendors();saveInvoiceRecs();savePayables();saveExpenses();_lsSet('fy_customers',JSON.stringify(CUSTOMERS),'客戶');_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');}catch(e){_err('_tombSaveAll.save',e);}
+  try{persist();saveInv();saveContracts();saveVendors();saveInvoiceRecs();savePayables();saveExpenses();_lsSet('fy_customers',JSON.stringify(CUSTOMERS),'客戶');_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');_lsSet('fy_projects',JSON.stringify(PROJECTS),'專案');}catch(e){_err('_tombSaveAll.save',e);}
   try{_autoUpload();}catch(e){_err('_tombSaveAll.up',e);}
 }
 function _tombReqPull(){
@@ -40017,6 +40030,136 @@ async function fyInboxMark(id,f){
   f=f||{};var r=await _lbxMarkCall(id,f.status==='new'?'new':'filed',{qid:f.qid||'',caseName:f.caseName||'',note:f.note||''});
   return r.ok?(r.status==='filed'?'已歸檔':'已改回未歸檔'):('沒改：'+r.msg);
 }
+// ══════════ 改版第 4 步 4a：專案資料集（做法 B）══════════
+// 一個「業主主合約」＝一個專案（Lotion 11/03）：id 一律 'p_'+主報價 id；已得標的追加報價（parentId）掛在主報價的專案底下，不另建。
+// 兩張主報價都得標＝兩個專案；暫不提供合併。專案只記連結、不放金額，放共用區 fydata/shared/projects（逐筆同步、規則有格式檢查）。
+// 舊資料一筆都不搬：合約（linkedQid）、業主請款單（quoteId／sourceQid）、發包（q.rfqs）一律從報價 id 反查（_prjLinks），不另存。
+// 狀態：7c 之前跟著主報價的結案狀態（_prjStatus），不另存。取消得標或主報價被刪 → 專案標「作廢」（voidAt），不刪、案號保留不重用；重新得標自動恢復。
+// 案號（p.no，例 2026-012）：依得標日排序的「年份＋流水號」，**只給內部看**（FJ 畫面、員工、AI 對話叫案子用），
+//   **絕不印在任何給業主／營造廠的文件上**（報價單、請款單、信封、合約書、送審文件一律照舊用報價編號 q.code）。
+// 預留位置（7c 才有畫面，現在只有欄位定義與規則）：送審文件 docs（附件放 Storage projects/<id>/docs/，單檔 50 MB）、
+//   整案排程 sched、變更簽認 changes、派工板 dispatch、包商評鑑 vendorEval、完工結算 settle。
+var _PRJ_ID_RE=/^p_[A-Za-z0-9_-]{1,60}$/;
+var _PRJ_SLOTS=['docs','sched','changes','dispatch','vendorEval','settle'];
+var _PRJ_DOC_MAX=50*1024*1024;   // 送審文件單檔上限（Storage 規則同步）
+function _prjId(qid){return 'p_'+String(qid==null?'':qid);}
+function _prjArr(x){return Array.isArray(x)?x:(x&&typeof x==='object'?Object.values(x):[]);}
+function _prjMainQid(qid){
+  var q=(Q||[]).find(function(x){return x&&x.id===qid;});
+  return q&&q.parentId?q.parentId:qid;
+}
+// 報價 id（主報價或追加）→ 所屬專案（作廢的也回傳，呼叫端自己看 voidAt）
+function _prjOfQ(qid){
+  if(qid==null)return null;var id=_prjId(_prjMainQid(qid));
+  return (PROJECTS||[]).find(function(p){return p&&p.id===id;})||null;
+}
+function _prjMainQ(p){return p?((Q||[]).find(function(x){return x&&x.id===p.qid;})||null):null;}
+function _prjQids(p){return p?[p.qid].concat(_prjArr(p.addQids)):[];}
+function _prjStatus(p){
+  if(!p)return '';if(p.voidAt)return '作廢';
+  var q=_prjMainQ(p);return (q&&q.closed)?'結案':'施工中';
+}
+// 案號：只給內部畫面用（見上方說明）
+function _prjNo(qidOrP){var p=(qidOrP&&typeof qidOrP==='object')?qidOrP:_prjOfQ(qidOrP);return (p&&p.no)||'';}
+function _prjNoChip(q){
+  var p=q&&_prjOfQ(q.id);if(!p||!p.no)return '';
+  return '<span class="prj-no" title="內部案號（只給公司內部看，不印在給業主的文件上）" style="font-size:11px;padding:1px 7px;border-radius:9px;background:var(--b1);color:var(--b5);white-space:nowrap">案號 '+esc(p.no)+(p.voidAt?'（作廢）':'')+'</span>';
+}
+// 連結：一律從報價 id 反查（合約 linkedQid、請款單 quoteId／sourceQid、發包 q.rfqs），不存在專案裡
+function _prjLinks(p){
+  var ids=_prjQids(p),has={};ids.forEach(function(i){has[i]=1;});
+  var quotes=ids.map(function(i){return (Q||[]).find(function(x){return x&&x.id===i;});});
+  var contracts=(CONTRACTS||[]).filter(function(c){return c&&c.linkedQid&&has[c.linkedQid];});
+  var invoices=(INV||[]).filter(function(v){return v&&((v.quoteId&&has[v.quoteId])||(v.sourceQid&&has[v.sourceQid]));});
+  var rfqs=[];quotes.forEach(function(q){if(q)_prjArr(q.rfqs).forEach(function(r){if(r&&r.id)rfqs.push({qid:q.id,id:r.id});});});
+  return {quotes:quotes,missing:ids.filter(function(i,k){return !quotes[k];}),contracts:contracts,invoices:invoices,rfqs:rfqs};
+}
+function _prjDay(s){
+  if(!s)return 0;var m=String(s).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m)return new Date(+m[1],+m[2]-1,+m[3]).getTime();
+  var n=+s;return (isFinite(n)&&n>1e12)?n:0;
+}
+// 得標日（舊案沒有記錄 → 主合約日期，再沒有用報價日期；只用來排案號順序）
+function _prjAwAt(q){
+  if(!q)return Date.now();
+  var ct=(CONTRACTS||[]).find(function(c){return c&&c.linkedQid===q.id;});
+  return _prjDay(ct&&ct.date)||_prjDay(q.date)||_prjDay(q.id)||Date.now();
+}
+function saveProjects(){_lsSet('fy_projects',JSON.stringify(PROJECTS),'專案');try{_autoUpload();}catch(e){_err('saveProjects',e);}}
+// 對帳：每一張「已得標的主報價」都要有一筆專案（含已結案）；追加掛主約；主報價不在或取消得標 → 作廢。
+// 冪等（id 固定、重跑不會多建），開頁、套用雲端、得標／取消得標／刪報價、還原備份後都會跑。回傳變動筆數。
+// opt.awardQid：剛按得標的那張（得標日記今天）
+function _prjSync(opt){
+  opt=opt||{};
+  if(typeof Q==='undefined'||!Array.isArray(Q))return 0;
+  var tomb=(TOMBS&&TOMBS.projects)||{},now=Date.now(),me=_meEmail()||'',ch={};
+  PROJECTS=_prjArr(PROJECTS).filter(function(p){return p&&p.id;});
+  var by={};PROJECTS.forEach(function(p){by[p.id]=p;});
+  var qById={};Q.forEach(function(q){if(q&&q.id)qById[q.id]=q;});
+  Q.forEach(function(q){
+    if(!q||!q.id||q.parentId||!q.awarded)return;
+    var id=_prjId(q.id);if(!_PRJ_ID_RE.test(id)||tomb[id]!=null)return;   // 手動刪過的專案不自動復活
+    var p=by[id];
+    if(!p){
+      var aw=(opt.awardQid===q.id)?now:_prjAwAt(q);
+      p={id:id,qid:String(q.id),awAt:aw,createdAt:now};if(me)p.by=me;
+      PROJECTS.push(p);by[id]=p;ch[id]=p;
+    }
+    if(p.voidAt){
+      p.voidLog=_prjArr(p.voidLog).concat([{at:p.voidAt,why:p.voidWhy||'',offAt:now}]);
+      delete p.voidAt;delete p.voidWhy;ch[id]=p;
+    }
+    var adds=Q.filter(function(x){return x&&x.parentId===q.id&&x.awarded;}).map(function(x){return String(x.id);}).sort();
+    var cur=_prjArr(p.addQids).map(String).sort();
+    if(cur.join('|')!==adds.join('|')){if(adds.length)p.addQids=adds;else delete p.addQids;ch[id]=p;}
+  });
+  PROJECTS.forEach(function(p){
+    if(p.voidAt)return;
+    var q=qById[p.qid],why=!q?'主報價已刪除':(q.parentId?'主報價變成追加報價':(!q.awarded?'取消得標':''));
+    if(why){p.voidAt=now;p.voidWhy=why;ch[p.id]=p;}
+  });
+  // 案號：沒有的依得標日排序補號；重號（兩台裝置同時得標）→ 較晚得標的改下一個空號，舊號留紀錄。全部裝置算法相同，結果一致。
+  var seq={},ord=function(a,b){return ((a.awAt||0)-(b.awAt||0))||String(a.qid).localeCompare(String(b.qid));};
+  var yr=function(p){return new Date(p.awAt||p.createdAt||now).getFullYear();};
+  PROJECTS.forEach(function(p){var m=String(p.no||'').match(/^(\d{4})-(\d{3,})$/);if(m)seq[m[1]]=Math.max(seq[m[1]]||0,+m[2]);});
+  var next=function(y){seq[y]=(seq[y]||0)+1;return y+'-'+String(seq[y]).padStart(3,'0');};
+  var seen={};
+  PROJECTS.slice().sort(ord).forEach(function(p){
+    if(p.no&&!seen[p.no]){seen[p.no]=p;return;}
+    var y=yr(p);
+    if(p.no)p.noLog=_prjArr(p.noLog).concat([{from:p.no,at:now,why:'案號重複'}]);
+    p.no=next(y);seen[p.no]=p;ch[p.id]=p;
+  });
+  var n=Object.keys(ch).length;
+  if(n){Object.keys(ch).forEach(function(k){_touch(ch[k]);});if(!opt.noSave)saveProjects();}
+  return n;
+}
+// 手動刪除專案（管理員；主報價仍得標時刪了也不會自動再建，要重建得先刪墓碑）——只動專案這一筆，舊資料不受影響
+function prjDelete(id){
+  if(_roDeny())return;
+  var p=(PROJECTS||[]).find(function(x){return x&&x.id===id;});if(!p)return;
+  try{if(!isAdmin(_meEmail())){toast('只有管理員可以刪除專案');return;}}catch(e){_err('prjDelete.admin',e);}
+  showConfirm('刪除專案','確定刪除專案「'+esc(p.no||p.id)+'」？<br><br>・只刪專案這一筆連結，報價、合約、請款單、應付都不會動<br>・刪除後這張報價即使仍是得標，也不會自動再建專案',function(){
+    _tomb('projects',id);
+    PROJECTS=PROJECTS.filter(function(x){return !(x&&x.id===id);});
+    try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e){_err('prjDelete.tomb',e);}
+    saveProjects();toast('已刪除專案 '+(p.no||id));
+  },true);
+}
+// 資料健檢：得標案數（含已得標追加）vs 專案數、連結打不開、追加的主約沒得標
+function _healthAddPrj(R){
+  var add=function(sev,area,msg,fix){R.push({sev:sev,area:area,msg:msg,fix:fix||''});};
+  var live=(PROJECTS||[]).filter(function(p){return p&&!p.voidAt;});
+  var mains=(Q||[]).filter(function(q){return q&&q.awarded&&!q.parentId;});
+  var tomb=(TOMBS&&TOMBS.projects)||{};
+  var miss=mains.filter(function(q){return !live.some(function(p){return p.qid===q.id;})&&tomb[_prjId(q.id)]==null;});
+  if(miss.length)add('warn','專案','得標主報價 '+mains.length+' 案、專案 '+live.length+' 筆：'+miss.length+' 案沒有專案（'+miss.slice(0,3).map(function(q){return q.name||q.id;}).join('、')+(miss.length>3?'…':'')+'）','重新整理一次會自動補建；仍不行請回報');
+  var orph=(Q||[]).filter(function(q){if(!q||!q.awarded||!q.parentId)return false;var m=(Q||[]).find(function(x){return x&&x.id===q.parentId;});return !m||!m.awarded;});
+  if(orph.length)add('warn','專案','追加報價已得標、但主報價沒有得標：'+orph.slice(0,3).map(function(q){return q.name||q.id;}).join('、')+'（追加掛不上專案）','報價 › 主報價標記得標，或確認追加是否掛錯主報價');
+  live.forEach(function(p){var L=_prjLinks(p);if(L.missing.length)add('warn','專案','案號 '+(p.no||p.id)+'：連到的報價不存在（'+L.missing.join('、')+'）','');});
+  return R;
+}
+try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{_prjSync();}catch(e){_err('prjBoot',e);}},1500);});}catch(e){_err('prjBoot',e);}   // 開頁對帳一次（第一次＝一次性建檔：全部得標案含已結案）
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
