@@ -184,11 +184,13 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('沒填中間樁位置＝不檢查（叫料單標「接頭位置未檢查中間樁」）；單支沒有接頭', got[0].midChk === 'none' && got[4].midChk === 'single');
   const m1 = RT.row({ ly: 1, wall: 24.6, mids: '6.2,12.9,18.6' }, { wSpec: 'H350' });   // 12.5 先放接頭在 12.85，離 12.9 不到 0.5 → 換成 10.5 先放（10.85；第 1 支靠 6.2 支承、凸出 4.65 ≤ 5.25）
   check('接頭避開中間樁：A 例中間樁 6.2／12.9／18.6 → 改 10.5＋12.5、接頭 10.85、合格', m1.pieces.join('+') === '10.5+12.5' && eq(m1.jointPos, [10.85]) && m1.midChk === 'ok' && !m1.warn.length);
-  check('排法檢查：12.5 先放＝接頭離中間樁不到 0.5；只有 12.9 一支中間樁時第 1 支沒有支承（懸臂超過一半）', /接頭 12\.85 M 離中間樁 12\.9 M 不到 0\.5 M/.test(RT.check([12.5, 10.5], { x0: 0.35, mids: [6.2, 12.9, 18.6] }).join()) && /第 1 支（10\.5 M）凸出支承點 10\.5 M，超過一半/.test(RT.check([10.5, 12.5], { x0: 0.35, mids: [12.9] }).join()));
+  check('排法檢查：12.5 先放＝接頭離中間樁不到 0.5；只有 3 M 一支中間樁時懸臂超過中間樁間距（Lotion 11/03 更正：懸臂 ≤ 中間樁間距）', /接頭 12\.85 M 離中間樁 12\.9 M 不到 0\.5 M/.test(RT.check([12.5, 10.5], { x0: 0.35, mids: [6.8, 12.9, 18.6] }).join()) && /第 1 支末端懸臂 7\.35 M，超過中間樁間距 2\.65 M/.test(RT.check([10, 10, 4], { x0: 0.35, mids: [3] }).join()) && !RT.check([10, 10, 4], { x0: 0.35, mids: [6, 12, 18] }).length);
   const m2 = RT.row({ ly: 2, wall: 24.6, mids: '8.4,16' }, { wSpec: 'H350' });
-  check('懸臂與接頭：B 例中間樁 8.4／16 → 排出的組合接頭離中間樁 ≥ 0.5、每支凸出最後支承點 ≤ 一半（重驗為合格）', m2.midChk === 'ok' && !RT.check(m2.pieces, { x0: 0.35, mids: [8.4, 16] }).length && m2.jointPos.every(j => Math.abs(j - 8.4) >= 0.5 && Math.abs(j - 16) >= 0.5) && m2.pieces.join('+') !== '8+7.5+7.5', m2.pieces.join('+') + ' ' + m2.jointPos);
+  check('B 例中間樁 8.4／16 → 7.5＋7.5＋8（接頭 7.85、15.35；懸臂都在間距內）', m2.pieces.join('+') === '7.5+7.5+8' && eq(m2.jointPos, [7.85, 15.35]) && m2.midChk === 'ok' && !RT.check(m2.pieces, { x0: 0.35, mids: [8.4, 16] }).length, m2.pieces.join('+'));
+  const m5 = RT.row({ ly: 2, wall: 24.6, mids: '3' }, { wSpec: 'H350' });
+  check('懸臂排不出來：只有 3 M 一支中間樁 → 照長度排、標紅寫「末端懸臂 … 超過中間樁間距」', m5.midChk === 'conflict' && /末端懸臂 .*超過中間樁間距/.test(m5.warn.join()));
   const m4 = RT.row({ ly: 2, wall: 24.6, mids: '6,12,18', cross: '8,16' }, { wSpec: 'H350' });
-  check('交叉點：上層支撐接頭離交叉點中心 ≥ 0.5（交叉點也算支承點）', m4.midChk === 'ok' && m4.jointPos.every(j => [6, 12, 18, 8, 16].every(x => Math.abs(j - x) >= 0.5)) && !RT.check(m4.pieces, { x0: 0.35, mids: [6, 12, 18], cross: [8, 16] }).length, m4.pieces.join('+'));
+  check('交叉點：上層支撐接頭離交叉點中心 ≥ 0.5（懸臂只看中間樁間距）', m4.midChk === 'ok' && m4.jointPos.every(j => [6, 12, 18, 8, 16].every(x => Math.abs(j - x) >= 0.5)) && !RT.check(m4.pieces, { x0: 0.35, mids: [6, 12, 18], cross: [8, 16] }).length, m4.pieces.join('+'));
   const bad = []; for (let x = 0.5; x < 60; x += 0.5) bad.push(x);
   const t0 = Date.now(), m3 = RT.row({ ly: 2, wall: 60, mids: bad.join(',') }, { wSpec: 'H350' });
   check('中間樁密到怎麼排都會碰到：照長度排、標紅寫原因（排不出合格的組合：接頭…不到 0.5 M）、不會卡住（< 1 秒）', m3.midChk === 'conflict' && /排不出合格的組合：接頭 .*不到 0\.5 M/.test(m3.warn.join()) && m3.pieces.length === 6 && Date.now() - t0 < 1000);

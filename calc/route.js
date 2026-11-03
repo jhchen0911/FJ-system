@@ -5,7 +5,7 @@
  *   net(wall, wSpec, jack)            叫料淨長＝壁間 − 2×圍令型鋼高 − 千斤頂本體
  *   combo(net, o)                     一路的定尺組合（o：maxLen 單支最長、mids 中間樁位置[]、x0 第一支起點、minGap 接頭離中間樁最小距離、jackTol 千斤頂可伸長）
  *   fill(rem, jackTol)                零頭補法：千斤頂伸長或短節
- *   check(pieces, o)                 排法檢查：接頭離中間樁／交叉點、懸臂不超過一半 → 違反原因[]
+ *   check(pieces, o)                 排法檢查：接頭離中間樁／交叉點、懸臂不超過中間樁間距 → 違反原因[]
  *   parse(str)                        手改的定尺組合字串「12.5+10.5」→ [12.5,10.5]
  *   row(r, o)                         一路完整結果（含手改組合、雙支撐、接頭檢查）
  *   spares(results)                   全案短節：同長度合計 ×1.1 無條件進位
@@ -14,7 +14,7 @@
  *   review(items, threshold)          報價數量 vs 圖面量測的差異（一般 10%、占總價一成以上 5%；只標示、不擋送出）
  *
  * 口徑（Lotion 11/03）：
- *   ① 接頭避開中間樁（接頭合板會讓支撐架不平中間樁托架）與交叉點（上層支撐架在下層上），離中心至少 0.5 M；懸臂不超過該支一半（蹺蹺板）：
+ *   ① 接頭避開中間樁（接頭合板會讓支撐架不平中間樁托架）與交叉點（上層支撐架在下層上），離中心至少 0.5 M；架設中的懸臂不超過該處中間樁間距（Lotion 11/03 更正）：
  *     先排接頭位置與支承，再考慮長度，條件相同才等長；排不出來照長度排、標紅寫原因；沒有中間樁位置＝不檢查並標示。
  *     位置從該路起點壁面量起；第一支從起點圍令內側（x0＝圍令型鋼高）開始，千斤頂與短節在終點端，接頭位置＝x0＋前幾支合計。
  *   ② 短節備品：全案同一長度合計 ×1.1 無條件進位。③ 短節不算接頭（不加合板、對鎖螺絲）。④ 雙支撐兩支同規格同組合。
@@ -51,31 +51,35 @@
 
   function jointsOf(pieces, x0) { var j = [], s = c(x0 || 0); for (var i = 0; i < pieces.length - 1; i++) { s += c(pieces[i]); j.push(s / 100); } return j; }
   // 排法檢查（Lotion 11/03）：① 接頭離中間樁中心、交叉點中心（上層支撐架在下層上的位置）至少 gap；
-  //   ② 懸臂：每一支凸出最後一個支承點的長度不超過該支長度一半（支承點＝範圍內的中間樁與交叉點（上層架在下層上）；第一支起點靠圍令、最後一支終點接短節／千斤頂靠圍令，也算）。
+  //   ② 懸臂（Lotion 11/03 更正）：支撐從起點一支一支往終點架，架到最後一支接上終點圍令才結束；每支架上去時，末端凸出「最後一個支承點」的長度
+  //     不能超過該處相鄰兩個支承點的間距（＝最後支承點與它前一個支承點的距離）。支承點＝起點圍令內側、中間樁；接頭與交叉點不算（交叉點只管接頭位置）。
   //   位置一律從該路起點壁面量起、單位公分整數。回傳違反清單（空＝合格）
   function layCheck(pieces, X0, MC, XC, G) {
-    var bad = [], a = X0, n = pieces.length, SP = MC.concat(XC);
+    var bad = [], a = X0, n = pieces.length, SP = MC;   // 懸臂只看中間樁（Lotion：中間樁間距）；交叉點只管接頭
     for (var i = 0; i < n; i++) {
       var b = a + pieces[i];
       if (i < n - 1) {
         MC.forEach(function (m) { if (Math.abs(b - m) < G) bad.push('接頭 ' + r2(b / 100) + ' M 離中間樁 ' + r2(m / 100) + ' M 不到 ' + r2(G / 100) + ' M'); });
         XC.forEach(function (m) { if (Math.abs(b - m) < G) bad.push('接頭 ' + r2(b / 100) + ' M 離交叉點 ' + r2(m / 100) + ' M 不到 ' + r2(G / 100) + ' M'); });
       }
-      if (SP.length) { var o = cant(a, b, i === 0, i === n - 1, SP); if (o > pieces[i] / 2 + 0.5) bad.push('第 ' + (i + 1) + ' 支（' + r2(pieces[i] / 100) + ' M）凸出支承點 ' + r2(o / 100) + ' M，超過一半'); }
+      if (SP.length && i < n - 1) { var o = cant(b, X0, SP); if (o) bad.push('第 ' + (i + 1) + ' 支末端懸臂 ' + r2(o.ovh / 100) + ' M，超過中間樁間距 ' + r2(o.lim / 100) + ' M'); }
       a = b;
     }
     return bad;
   }
-  function cant(a, b, first, last, MC) {
-    if (last) return 0;
-    var s = first ? a : null;
-    MC.forEach(function (m) { if (m >= a - 0.5 && m <= b + 0.5 && (s == null || m > s)) s = m; });
-    return s == null ? b - a : b - s;
+  // 末端在 b（不是最後一支）時的懸臂：違反回 { ovh, lim }，合格回 null
+  function cant(b, X0, SP) {
+    var sup = [X0].concat(SP.filter(function (m) { return m > X0; })).sort(function (x, y) { return x - y; }), k = -1;
+    for (var i = 0; i < sup.length; i++) if (sup[i] <= b + 0.5) k = i;
+    if (k < 0) return null;
+    var ovh = b - sup[k], lim = k > 0 ? sup[k] - sup[k - 1] : (k + 1 < sup.length ? sup[k + 1] - sup[k] : Infinity);
+    return ovh > lim + 0.5 ? { ovh: ovh, lim: lim } : null;
   }
+
 
   // 一路的定尺組合。o：{ maxLen, mids 中間樁位置[], cross 交叉點位置[], x0 第一支起點, minGap, jackTol }
   //   回傳 { pieces[M], total, rem, shorts[], jack(cm), joints, jointPos[], midChk:'ok'|'none'|'conflict'|'single', bad[] 違反原因, err }
-  //   先排「接頭避開中間樁／交叉點、沒有超過一半的懸臂」，再取總長最接近淨長，條件相同才等長；排不出來就照長度排、midChk＝conflict、bad 寫原因
+  //   先排「接頭避開中間樁／交叉點、懸臂不超過中間樁間距」，再取總長最接近淨長，條件相同才等長；排不出來就照長度排、midChk＝conflict、bad 寫原因
   function combo(N, o) {
     o = o || {};
     var NN = c(N), MAX = c(o.maxLen || DEF.max1), x0 = num(o.x0), gap = o.minGap == null ? DEF.minGap : num(o.minGap);
@@ -87,7 +91,7 @@
     var minFill = c(0.6 * 2 + tol);   // 零頭最多兩只短節＋千斤頂
     var X0 = c(x0), MC = mids.map(c), XC = cross.map(c), G = c(gap), chk = MC.length + XC.length > 0;
     var jOk = function (pos) { var x = X0 + pos, i; for (i = 0; i < MC.length; i++) if (Math.abs(x - MC[i]) < G) return false; for (i = 0; i < XC.length; i++) if (Math.abs(x - XC[i]) < G) return false; return true; };
-    var SP = MC.concat(XC), pOk = function (k, n, pos, np) { return !SP.length || cant(X0 + pos, X0 + np, k === 0, k + 1 === n, SP) <= (np - pos) / 2 + 0.5; };
+    var SP = MC, pOk = function (k, n, pos, np) { return !SP.length || k + 1 === n || !cant(X0 + np, X0, SP); };
     var stepOk = function (k, n, pos, np, use) { return !use || ((k + 1 === n || jOk(np)) && pOk(k, n, pos, np)); };
     // 依序排 n 支、只用 lens 長度、合計＝T：回傳由起點到終點的順序（每步取能完成的最長一支），不行回 null
     var seq = function (n, T, lens, use) {
