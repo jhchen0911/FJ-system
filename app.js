@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.142';
+var APP_VERSION='v6.0.143';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -8683,7 +8683,7 @@ function computeShoringFY(inp){
   var routesH=RH.cnt,lenH=RH.len;
   if(routesH===0){routesH=_shCeil(W/aSp)+1;lenH=routesH*L;autoH=true;}
   var totalR=routesV+routesH,supLen=lenV+lenH;
-  // v6.0.142（Lotion 11/03）：支撐每一路是直線，接頭數＝每路支數−1＝ceil(每路長÷7)−1；逐路輸入取 Σ 路數×(每路支數−1)，自動路數每路長＝對邊長
+  // v6.0.143（Lotion 11/03）：支撐每一路是直線，接頭數＝每路支數−1＝ceil(每路長÷7)−1；逐路輸入取 Σ 路數×(每路支數−1)，自動路數每路長＝對邊長
   var _jn=function(len){return Math.max(0,_shCeil(len/7-1e-9)-1);};
   var supJ1=(RV.cnt>0?(inp._routesV||[]).reduce(function(a,r){return a+_shNum(r.rc)*_jn(_shNum(r.rl));},0):routesV*_jn(W))
            +(RH.cnt>0?(inp._routesH||[]).reduce(function(a,r){return a+_shNum(r.rc)*_jn(_shNum(r.rl));},0):routesH*_jn(L));
@@ -8719,7 +8719,7 @@ function computeShoringFY(inp){
   var wallWaterLen=Math.max(0,pileLen-1)*procWall;
   if(spliceWall>0||procWall>0){
     pile.push({sec:'擋土壁加工耗材'});
-    if(spliceWall>0){pile.push({k:'接樁（擋土壁樁）',v:_shR0(spliceWall),u:'接'});pile.push({k:'貼板（擋土壁接樁）',v:_shR0(spliceWall*3),u:'片'});}
+    if(spliceWall>0){pile.push({k:'接樁（擋土壁樁）',v:_shR0(spliceWall),u:'接'});pile.push({k:'續接板（擋土壁接樁）',v:_shR0(spliceWall*3),u:'片'});}
     if(procWall>0){
       pile.push({k:'水刀管（擋土壁）',v:_shR1(wallWaterLen),u:'M'});
       pile.push({k:'噴水頭（擋土壁）',v:_shR1(procWall*1.1),u:'個'});
@@ -8761,7 +8761,7 @@ function computeShoringFY(inp){
   if(spliceMid>0)procRows.push({k:'接樁（中間樁）',v:_shR0(spliceMid),u:'接'});
   if(spliceCo>0)procRows.push({k:'接樁（共構樁）',v:_shR0(spliceCo),u:'接'});
   if(spliceGt>0)procRows.push({k:'接樁（構台樁）',v:_shR0(spliceGt),u:'接'});
-  if(spliceSum>0)procRows.push({k:'貼板',v:_shR0(spliceSum*3),u:'片'});
+  if(spliceSum>0)procRows.push({k:'續接板',v:_shR0(spliceSum*3),u:'片'});   // v6.0.143 Lotion：「貼板」統一叫「續接板」（只改名稱）
   if(proc>0){
     procRows.push({k:'水刀管',v:_shR1(waterLen),u:'M'});
     procRows.push({k:'噴水頭',v:_shR1(proc*1.1),u:'個'});
@@ -8820,7 +8820,8 @@ function computeShoringFY(inp){
     var subBlock=posts*(sp===1?2:4);
     // 螺絲（Lotion 11/03 定義）：圍令每接頭 16＝對鎖 4＋合板 1 片 12；支撐每接頭 28＝對鎖 4＋合板 2 片 24；斜撐、角撐每支 10；三角架每支 2
     //   長螺絲＝H350／H400 的對鎖 4 顆；其餘（H300 對鎖、所有合板、斜撐、三角架）都是短螺絲＝總數−長螺絲
-    var screw=tri*2+wJ*16+sJ*28+diag*10+cornerN*10;
+    //   v6.0.143：千斤頂保護夾每組 16 顆短螺絲；三角架×2 含中間樁／共構樁上托支撐的三角架（tri 已含 posts）
+    var screw=tri*2+wJ*16+sJ*28+diag*10+cornerN*10+jackClip*16;
     var eScrew=0;
     if(exp){eScrew=(tri+bigTri)*2;screw-=tri*2;}
     var longS=((W_.spec!=='H300')?wJ*4:0)+((S_.spec!=='H300')?sJ*4:0);
@@ -8892,7 +8893,7 @@ function computeShoringFY(inp){
     back.push({sec:'施工構台'});
     back.push({k:'覆工板',v:_shR0(deckN),u:'片（'+(deckDiv===3?'3M×1M':'2M×1M')+'）'});
     back.push({k:'覆工板擋片',v:_shR0(_shCeil(deckN/2)),u:'片'});
-    back.push({k:'構台螺絲',v:_shR0(gantaiA*2),u:'顆'});
+    back.push({k:'長螺絲（施工構台，每㎡ 1 顆）',v:_shR0(gantaiA),u:'顆'});   // v6.0.143 Lotion：取代原「構台螺絲＝面積×2」
     if(capN>0)back.push({k:'構台帽',v:_shR0(capN),u:'頂'});
     if(bigCapV>0)back.push({k:'大構台帽',v:_shR0(bigCapV),u:'頂'});
     back.push({k:'主副樑',v:'—',u:'需依圖面另行配置'});
@@ -8970,7 +8971,7 @@ function computeShoringFY(inp){
   var st1={stage:'擋土壁',items:[]};
   if(pileSummary)sAdd(st1,pileSummary.method+' '+pileSummary.spec+' L='+pileSummary.len+'M',(method==='鋼板樁'?'片':'支'),pileSummary.count);
   if(method==='鋼板樁')sAdd(st1,'角樁','片',corners);
-  sAdd(st1,'貼板（擋土壁）','片',spliceWall*3);
+  sAdd(st1,'續接板（擋土壁）','片',spliceWall*3);
   sAdd(st1,'噴水頭','個',procWall*1.1);
   sAdd(st1,'芽頭','個',procWall*1.1);
   if(procWall>0)sAdd(st1,'土豆','顆',wallWaterLen+4);
@@ -8982,7 +8983,7 @@ function computeShoringFY(inp){
   }
   var st3={stage:'中間樁／共構樁',items:[]};
   postSummary.forEach(function(p2){sAdd(st3,p2.type,'支',p2.count);});
-  sAdd(st3,'貼板','片',spliceSum*3);
+  sAdd(st3,'續接板','片',spliceSum*3);
   sAdd(st3,'噴水頭','個',proc*1.1);
   sAdd(st3,'芽頭','個',proc*1.1);
   if(proc>0)sAdd(st3,'土豆','顆',waterLen+4);
@@ -9010,7 +9011,7 @@ function computeShoringFY(inp){
     var st5={stage:'施工構台／欄杆／安全設施',items:[]};
     if(gantaiA>0){
       sAdd(st5,'覆工板','片',deckN);sAdd(st5,'覆工板擋片','片',_shCeil(deckN/2));
-      sAdd(st5,'構台螺絲','顆',gantaiA*2);sAdd(st5,'構台帽','頂',capN);sAdd(st5,'大構台帽','頂',bigCapV);
+      sAdd(st5,'長螺絲（施工構台）','顆',gantaiA);sAdd(st5,'構台帽','頂',capN);sAdd(st5,'大構台帽','頂',bigCapV);
     }
     if(railLen>0){
       sAdd(st5,'6m欄杆','支',_shCeil(railLen/6)*2);sAdd(st5,'立柱'+(inp.postH||'1.2m'),'支',_shCeil(railLen/2.5));

@@ -867,6 +867,36 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.143 螺絲修正（Lotion 11/03）：支撐接頭＝每路支數−1、千斤頂保護夾 16 顆短螺絲、構台長螺絲每㎡ 1 顆、貼板改名續接板 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        MAT_EST = _shDefaults(); go('matest'); meTab('shoring'); matEstCalc();
+        let R = _matEstRes, d = R.layerData[0];
+        // 預設：縱 4×25（每路 3 接頭）＋橫 4×40（每路 5 接頭）＝32；圍令 130÷7；合板 ceil(18.57)＋32×2＝83
+        const wJ = 130 / 7, sJ = 32, tot = d.tri * 2 + wJ * 16 + sJ * 28 + d.diag * 10 + d.corner * 10 + d.jackClip * 16;
+        out.joint = d.heban === 83 && Math.abs(d.longS - (wJ + sJ) * 4) < 1 && Math.abs(d.longS + d.shortS - tot) < 1 && d.jackClip === 8;
+        MAT_EST._layers = MAT_EST._layers.map(x => Object.assign({}, x, { w: 'H300', s: 'H300' })); matEstCalc(); d = _matEstRes.layerData[0];
+        out.h300 = d.longS === 0 && Math.abs(d.shortS - tot) < 1;   // H300 對鎖算短螺絲、總數不變（對鎖沒有重複算）
+        MAT_EST = _shDefaults(); MAT_EST.gantaiA = 200; matEstCalc(); R = _matEstRes;
+        const st5 = R.staged.find(x => /施工構台/.test(x.stage)) || { items: [] };
+        out.deck = !R.back.some(x => x.k === '構台螺絲') && R.back.some(x => /^長螺絲（施工構台/.test(x.k || '') && x.v === '200')
+          && st5.items.some(x => x.name === '長螺絲（施工構台）' && x.quantity === 200) && !st5.items.some(x => /構台螺絲/.test(x.name))
+          && (R.items.find(x => x.name === '長螺絲') || {}).quantity === Math.round(R.layerData.reduce((a, x) => a + x.longS, 0)) + 200;
+        MAT_EST = _shDefaults(); MAT_EST.spliceWall = 10; MAT_EST.spliceMid = 5; matEstCalc(); R = _matEstRes;
+        const all = JSON.stringify([R.pile, R.procRows, R.staged]);
+        out.rename = !/貼板/.test(all) && /續接板/.test(all);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.143 螺絲：支撐接頭＝每路支數−1、合板跟著算、千斤頂保護夾每組 16 顆、H300 對鎖算短螺絲且總數不變', r.joint && r.h300, JSON.stringify(r));
+    check('v6.0.143 螺絲：施工構台改長螺絲每㎡ 1 顆（取代構台螺絲×2、併入長螺絲合計）；貼板改名續接板', r.deck && r.rename, JSON.stringify(r));
+    check('v6.0.143 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // ───────── 10. v5.395：單價庫單位限制／異常成本警示／單價分析逾期租金重置／材料估算引用安全母索 ─────────
   {
     const { page, errors } = await newPage(browser, 1400, 1000);
