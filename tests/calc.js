@@ -234,6 +234,17 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const fx2 = JSON.parse(JSON.stringify(fx)); fx2['版本細項'] = 'v1.1'; fx2['各層'][0]['每路沿線'] = { 值: [{ 編號: 1, 方向: '縱向（圖面上下）', 長度m: 29.84, 中間樁位置m: [6, 12, 18, 24], 共構樁位置m: [], 交叉點: [{ 與路: 7, 距起點m: 5 }] }], 信心度: '中' };
   const m2 = RT.fromMeasure(fx2), w1 = m2.rows.find(r => r.ly === 1 && r.id === 'V1');
   check('量測檔 v1.1：每路沿線的中間樁位置＋0.35 帶入、交叉點用檔案給的、接頭依窗口檢查', m2.hasLine && w1.mids === '6.35,12.35,18.35,24.35' && w1.cross === '5.35' && RT.row(w1, { wSpec: 'H350' }).midChk === 'ok', JSON.stringify(w1));
+  // v6.0.162（Lotion 11/04）：雙圍令每端扣兩支；交叉點只給上支撐（長向）
+  check('雙圍令（前後並排兩支）：2H350 每端扣 0.70 → 壁間 24.6 淨長 22.50；舊呼叫（沒傳 dblWal）照舊 23.20；單圍令不受影響', RT.row({ ly: 2, wall: 24.6 }, { wSpec: '2H350', dblWal: true }).net === 22.5 && RT.row({ ly: 2, wall: 24.6 }, { wSpec: '2H350' }).net === 23.2 && RT.row({ ly: 2, wall: 24.6 }, { wSpec: 'H350', dblWal: true }).net === 23.2 && RT.walT('2H400', true) === 0.8);
+  const fx3 = JSON.parse(JSON.stringify(fx)); fx3['各層'][1]['規格']['圍令']['值'] = '2-H400x400x13x21';
+  const m3 = RT.fromMeasure(fx3, { dblWal: true, upperOnly: true }), lenL2 = fx3['各層'][1]['每路支撐長度']['值'][0]['長度m'];
+  const r3v = m3.rows.find(r => r.ly === 2 && r.id === 'V1'), r1h = m3.rows.find(r => r.ly === 1 && r.dir === '橫'), r1v = m3.rows.find(r => r.ly === 1 && r.id === 'V1');
+  check('量測檔＋雙圍令：壁間＝量測長度＋2×兩支型鋼高（＋1.60）、沿線位置＋0.80', Math.abs(r3v.wall - (lenL2 + 1.6)) < 0.011 && m3.L[1].w === '2H400' && Number(r3v.cross.split(',')[0]) > 0.8, JSON.stringify(r3v));
+  check('交叉點只給上支撐：長向（縱，約 30 M）留交叉點、短向（橫，約 18 M）清空，備註標上／下支撐', r1v.up === true && r1v.cross !== '' && /（上支撐）/.test(r1v.note) && r1h.up === false && r1h.cross === '' && /（下支撐）/.test(r1h.note));
+  const eqD = { 格式: '圖面量測檔 v1', 各層: [{ 層: 1, 規格: { 圍令: { 值: 'H350' }, 支撐: { 值: 'H350' } }, 每路支撐長度: { 值: [{ 編號: 1, 方向: '縱向', 長度m: 10, 起點mm: [0, 0], 終點mm: [0, 10000] }, { 編號: 2, 方向: '橫向', 長度m: 10, 起點mm: [-5000, 5000], 終點mm: [5000, 5000] }] } }] };
+  const mE = RT.fromMeasure(eqD, { upperOnly: true }), eqD2 = JSON.parse(JSON.stringify(eqD)); eqD2['各層'][0]['上支撐方向'] = { 值: '橫' };
+  const mF = RT.fromMeasure(eqD2, { upperOnly: true });
+  check('縱橫一樣長＝上下未定、兩向都避交叉點；檔案有「上支撐方向」以檔案為準；不傳 upperOnly 照舊兩向都給', mE.rows.every(r => r.up === null && r.cross !== '' && /上下未定/.test(r.note)) && mF.rows.find(r => r.dir === '橫').cross !== '' && mF.rows.find(r => r.dir === '縱').cross === '' && RT.fromMeasure(fx3).rows.find(r => r.ly === 1 && r.dir === '橫').cross !== '');
   check('交叉點計算：十字交叉在中點、不相交不算', eq(RT.crossings([{ 編號: 1, 方向: '縱', 起點mm: [0, 0], 終點mm: [0, 10000] }, { 編號: 2, 方向: '橫', 起點mm: [-5000, 4000], 終點mm: [5000, 4000] }, { 編號: 3, 方向: '橫', 起點mm: [1000, 2000], 終點mm: [6000, 2000] }]), { 1: [4], 2: [5], 3: [] }));
 }
 

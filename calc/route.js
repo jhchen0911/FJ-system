@@ -3,6 +3,7 @@
  * 規則同其他 calc：對外函式只能新增，不能改既有參數或意義。
  *
  *   net(wall, wSpec, jack)            叫料淨長＝壁間 − 2×圍令型鋼高 − 千斤頂本體
+ *   net2(wall, wSpec, jack, dblWal)   同上；dblWal＝雙圍令（2H…）每端扣兩支（v6.0.162）；row(r,o) 的 o.dblWal、fromMeasure(d,o) 的 o.dblWal／o.upperOnly 同
  *   combo(net, o)                     一路的定尺組合（o：maxLen 單支最長、mids 中間樁位置[]、x0 第一支起點、minGap 接頭離中間樁最小距離、jackTol 千斤頂可伸長）
  *   fill(rem, jackTol)                零頭補法：千斤頂伸長或短節
  *   check(pieces, o)                 排法檢查：接頭落在中間樁窗口（前一支＋0.5～與下一支的中點）、離交叉點 ≥ 0.5 → 違反原因[]
@@ -33,6 +34,9 @@
   var DEF = { braceMin: 2.2, braceMax: 2.5, jack: 0.7, max1: 13, max2: 10, minGap: 0.5, jackTol: 0.15, clear: 1.5, capDrop: 1.0 };
 
   function specH(s) { s = String(s || '').replace(/^2/, ''); return SPEC_H[s] != null ? SPEC_H[s] : 0.35; }
+  // v6.0.162（Lotion 11/04）：雙圍令（2H…）是前後並排兩支，每端扣兩支型鋼高；只有呼叫端傳 dblWal 才這樣算（calc 只加不改：舊呼叫照舊單支）
+  function walT(wSpec, dblWal) { return dblWal && /^2/.test(String(wSpec || '')) ? 2 * specH(wSpec) : specH(wSpec); }
+  function net2(wall, wSpec, jack, dblWal) { return r2(num(wall) - 2 * walT(wSpec, dblWal) - (jack == null || jack === '' ? DEF.jack : num(jack))); }
   function net(wall, wSpec, jack) { return r2(num(wall) - 2 * specH(wSpec) - (jack == null || jack === '' ? DEF.jack : num(jack))); }
 
   // 零頭補法：≤ jackTol 由千斤頂伸長；否則短節最少支數（先 1 只、補不到才 2 只）、總長不超過零頭、剩下 ≤ jackTol
@@ -155,7 +159,7 @@
     o = o || {};
     var ly = Math.max(1, Math.round(num(r.ly)) || 1);
     var maxLen = ly === 1 ? (num(o.max1) || DEF.max1) : (num(o.max2) || DEF.max2);
-    var N = net(r.wall, o.wSpec, o.jack), M = mids(r.mids), X = mids(r.cross), x0 = specH(o.wSpec), tol = o.jackTol == null ? DEF.jackTol : num(o.jackTol);
+    var N = net2(r.wall, o.wSpec, o.jack, o.dblWal), M = mids(r.mids), X = mids(r.cross), x0 = walT(o.wSpec, o.dblWal), tol = o.jackTol == null ? DEF.jackTol : num(o.jackTol);
     var gap = o.minGap == null || o.minGap === '' ? DEF.minGap : num(o.minGap);
     var dblS = String(r.dbl || '').trim();
     var mult = dblS === '雙' || dblS === '2' ? 2 : (dblS === '單' || dblS === '1' ? 1 : (num(o.sMult) || 1));
@@ -301,7 +305,9 @@
   }
   // 量測檔 → 材料估算用的資料。位置換算：量測檔的長度與沿線位置從「圍令內緣」量起，FJ 路數明細從擋土壁面量起，
   //   所以壁間長度＝長度m＋2×圍令型鋼高、中間樁／交叉點位置＋圍令型鋼高
-  function fromMeasure(d) {
+  // o（v6.0.162，可省略）：{ dblWal 雙圍令每端扣兩支, upperOnly 交叉點只給上支撐（長向；一樣長＝上下未定兩向都給；檔案有「上支撐方向」以檔案為準）}
+  function fromMeasure(d, o) {
+    o = o || {};
     if (!d || typeof d !== 'object') return { ok: false, err: '不是量測檔' };
     var fmt = String(d['格式'] || '');
     if (fmt.indexOf('圖面量測檔 v1') !== 0) return { ok: false, err: '格式不是「圖面量測檔 v1」（' + (fmt || '沒有格式欄') + '）' };
@@ -316,15 +322,26 @@
       else if (!V(sp['圍令']) && !/W/i.test(String(V(sp['支撐']) || ''))) warn.push('第 ' + n + ' 層量測檔沒寫圍令規格，照支撐規格 ' + sW.spec + '，請確認');
       if (CF(ly['三角架高程']) === '低') warn.push('第 ' + n + ' 層三角架高程信心度低（構台下淨空用到），請確認');
       if (!sS) warn.push('第 ' + n + ' 層支撐規格看不懂（' + (V(sp['支撐']) || '空白') + '），用 H350');
-      var w = sW ? sW.spec : 'H350', s = sS ? sS.spec : 'H350', h = specH(w);
+      var w = sW ? sW.spec : 'H350', s = sS ? sS.spec : 'H350', h = o.dblWal && wDbl ? 2 * specH(w) : specH(w);
       var tri = glOf(ly['三角架高程'] != null ? ly['三角架高程'] : ly['高程']);
       var routes = V(ly['每路支撐長度']) || [], line = V(ly['每路沿線']) || (li === 0 ? lineTop : null), xs = crossings(routes);
       var lineBy = {}; (Array.isArray(line) ? line : []).forEach(function (x) { if (x) lineBy[x['編號']] = x; });
+      // 上下支撐：短向是下支撐、長向是上支撐（Lotion 11/04）；平均長度差不到 0.05 M＝上下未定
+      var upDir = '', fileUp = String(V(ly['上支撐方向']) || V(d['上支撐方向']) || '');
+      if (/^縱/.test(fileUp)) upDir = '縱'; else if (/^橫/.test(fileUp)) upDir = '橫';
+      else {
+        var avg = function (k) { var a = routes.filter(function (r) { return (/^橫/.test(String(r['方向'] || '')) ? '橫' : '縱') === k; }); return a.length ? a.reduce(function (t, r) { return t + num(r['長度m']); }, 0) / a.length : 0; };
+        var aV = avg('縱'), aH = avg('橫');
+        upDir = (aV && aH && Math.abs(aV - aH) >= 0.05) ? (aV > aH ? '縱' : '橫') : '';
+      }
       routes.forEach(function (r) {
         var id = r['編號'], dir = /^橫/.test(String(r['方向'] || '')) ? '橫' : '縱', ln = lineBy[id];
         var mids = ln && Array.isArray(ln['中間樁位置m']) ? ln['中間樁位置m'].map(function (x) { return r2(num(x) + h); }) : [];
         var cross = ln && Array.isArray(ln['交叉點']) ? ln['交叉點'].map(function (x) { return r2(num(x && x['距起點m']) + h); }) : (xs[id] || []).map(function (x) { return r2(x + h); });
-        rows.push({ ly: n, id: (dir === '縱' ? 'V' : 'H') + id, dir: dir, wall: r2(num(r['長度m']) + 2 * h), dbl: /雙/.test(String(r['單雙'] || '')) ? '雙' : '', combo: '', mids: mids.join(','), cross: cross.join(','), note: '量測 ' + r2(num(r['長度m'])) + ' M（圍令內緣到內緣）', src: 'measure' });
+        var up = !o.upperOnly ? null : (upDir ? dir === upDir : null);   // null＝不分（舊呼叫）或上下未定
+        if (up === false) cross = [];   // 下支撐的接頭不受交叉點限制（中間樁那條照舊）
+        var tag = !o.upperOnly ? '' : (up === null ? '（上下未定，兩向都避交叉點）' : (up ? '（上支撐）' : '（下支撐）'));
+        rows.push({ ly: n, id: (dir === '縱' ? 'V' : 'H') + id, dir: dir, wall: r2(num(r['長度m']) + 2 * h), dbl: /雙/.test(String(r['單雙'] || '')) ? '雙' : '', combo: '', mids: mids.join(','), cross: cross.join(','), note: '量測 ' + r2(num(r['長度m'])) + ' M（圍令內緣到內緣）' + tag, src: 'measure', up: up });
       });
       L.push({ L: n, w: (wDbl ? '2' : '') + w, s: (sDbl ? '2' : '') + s, d: sD ? sD.spec : s, triEl: tri, triConf: CF(ly['三角架高程']), hasLine: !!(line && line.length),
         brace: { fit: V(ly['斜撐可裝']), check: V(ly['斜撐待確認']), del: V(ly['斜撐建議刪除']), cFit: V(ly['角撐可裝']), cCheck: V(ly['角撐待確認']), cDel: V(ly['角撐建議刪除']), noteCheck: (ly['斜撐待確認'] || {})['備註'] || '', noteDel: (ly['斜撐建議刪除'] || {})['備註'] || '' },
@@ -344,7 +361,7 @@
     };
   }
 
-  var api = { brace: brace, fromMeasure: fromMeasure, crossings: crossings, specOf: specOf, glOf: glOf, check: check, STOCK: STOCK.map(function (x) { return x / 100; }), SHORTS: SHORTS.map(function (x) { return x / 100; }), DEF: DEF, specH: specH, net: net, fill: fill, combo: combo, parse: parse, mids: mids, row: row, spares: spares, csv: csv, clearance: clearance, review: review };
+  var api = { walT: walT, net2: net2, brace: brace, fromMeasure: fromMeasure, crossings: crossings, specOf: specOf, glOf: glOf, check: check, STOCK: STOCK.map(function (x) { return x / 100; }), SHORTS: SHORTS.map(function (x) { return x / 100; }), DEF: DEF, specH: specH, net: net, fill: fill, combo: combo, parse: parse, mids: mids, row: row, spares: spares, csv: csv, clearance: clearance, review: review };
   root.FJC = root.FJC || {};
   root.FJC.route = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = root.FJC;
