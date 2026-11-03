@@ -40126,10 +40126,10 @@ function meRtCsv(el){
     try{
       var r=FJC.route.csv(String(rd.result||''));el.value='';
       if(!r.rows.length){toast('CSV 沒有可用的列'+(r.errs.length?'：'+r.errs[0]:''));return;}
-      var go=function(){MAT_EST._routeRows=r.rows;MAT_EST._routeSrc={file:f.name,at:localToday()};
+      var apply=function(){MAT_EST._routeRows=r.rows;MAT_EST._routeSrc={file:f.name,at:localToday()};
         var L=Math.max(1,parseInt(MAT_EST.layers)||1),over=r.rows.filter(function(x){return x.ly>L;}).length;
         renderMatEst();_meAutoKick(true);toast('已匯入 '+r.rows.length+' 路'+(r.errs.length?'，'+r.errs.length+' 列略過（'+r.errs[0]+'）':'')+(over?'；'+over+' 路超過支撐層數不計':''));};
-      if((MAT_EST._routeRows||[]).length)showConfirm('匯入路數明細','匯入會取代目前 '+MAT_EST._routeRows.length+' 路的路數明細，確定？',go,true);else go();
+      if((MAT_EST._routeRows||[]).length)showConfirm('匯入路數明細','匯入會取代目前 '+MAT_EST._routeRows.length+' 路的路數明細，確定？',apply,true);else apply();
     }catch(e){_err('meRtCsv',e);toast('CSV 讀取失敗');}
   };
   rd.readAsText(f);
