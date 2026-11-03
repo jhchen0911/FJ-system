@@ -9463,7 +9463,7 @@ function matEstExportPDF(kind,opt){
     +'<div class="meta">'+(q?('專案：'+esc(q.name)+'　'):'')+'日期：'+localToday()+'　｜　壁線周長 '+_shR1(info.PW)+'M｜路數 縱'+info.routesV+'＋橫'+info.routesH+'＝'+info.totalR+' 路｜支撐總長 '+_shR1(info.supLen)+'M｜中柱合計 '+info.posts+' 支｜退場留存 '+_shR1(info.keep)+'M/支</div>';
   body+='<h2>摘要</h2><div class="meta">'+_meTilesText(res)+'</div>';
   body+='<h2>'+(kind==='order'?'依進場階段叫料':'材料明細（依類別總量）')+'</h2>'+det;
-  if(kind==='quote'&&opt.basis)body+='<h2>附錄：計算依據</h2>'+_matEstRopeBody(res);
+  if(kind==='quote'&&opt.basis)body+='<h2>附錄：計算依據</h2><div class="apx">'+_matEstRopeBody(res)+'</div>';
   var _mefn=_toolFileName('matest',kind==='order'?'叫料單':'材料估算表',(q&&q.name)||'');
   var html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(_mefn)+'</title><style>'
     +'@page{size:A4 landscape;margin:10mm}body{font-family:"Microsoft JhengHei","PingFang TC",sans-serif;font-size:11px;color:#1a1a1a;margin:0}'
@@ -9475,6 +9475,7 @@ function matEstExportPDF(kind,opt){
     +'th{background:#2e5e42;color:#fff;font-weight:700}th.r{text-align:right}'
     +'td.r{text-align:right;font-weight:700}td.u{color:#666;font-size:9.5px;white-space:normal;line-height:1.2}td.e{border-color:transparent}'
     +'td.hd{background:#2e5e42;color:#fff;font-weight:700}td.sec{background:#eef4f0;font-weight:700;color:#2e5e42}td.stg{font-weight:700;color:#2e5e42;vertical-align:top}td.w{white-space:normal;line-height:1.6;padding:4px 6px}'
+    +'.apx td,.apx th{white-space:normal;text-overflow:clip}.apx tr.tt td{background:#f1f5f2}.apx .sub{font-size:10.5px;font-weight:400;color:#444}.apx .cond,.apx td.l{color:#333}'
     +'</style></head><body><div class="page-wrap">'+body+'</div></body></html>';
   _printViaIframe(html,_mefn,true);
 }
@@ -33155,7 +33156,7 @@ function _v6PermMigrate(){
       set('rfq',pg.materials||pg.costs||pg.projects);
       set('acct',pg.finance||pg.ledger||pg.invoice);   // v6.0.30 計價併入帳務
       set('reports',pg.profit||pg.reports);   // v6.0.17 經營報表
-      set('matest',pg.rebar||pg.grout||pg.backfill);   // v6.0.139 計算工具併入材料估算
+      if(pg.matest!==false)set('matest',pg.rebar||pg.grout||pg.backfill);   // 明確取消勾選的不蓋   // v6.0.139 計算工具併入材料估算
       if(changed>c0)_touch(r);
     });
     p.__v6perm=4;_acctSave(p);
@@ -36523,7 +36524,7 @@ function _sdClose(){
 }
 function siteToMatEst(){
   var q=_sdQ();if(!q){toast('請先選擇報價單');return;}
-  var id=q.id;_sdClose();go('matest');
+  var id=q.id;_sdClose();_meTab='shoring';try{localStorage.setItem('fy_meTab','shoring');}catch(e){/* 可忽略 */}go('matest');
   setTimeout(function(){matEstFromSite(id);},80);
 }
 // ── 材料估算：綁定工程＝讀案場細節 ──
