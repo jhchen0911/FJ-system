@@ -7677,7 +7677,7 @@ async function newPage(browser, width, height) {
         out.disc0 = invItems[0].curAmt === 0;
         invItems[0].discDays = 0; try { updateInvRowAmt(0); } catch (e) { /* 可忽略 */ } out.disc0 = out.disc0 && invItems[0].curAmt === 10000; out.disc0 = out.disc0 && _rentDayFactor({ discDays: 5 }, 0) === 0 && _rentDayFactor({}, 0) === 1 && /_rentDayFactor\(it,days\)/.test(String(_invRowBase)) && /_invRowAmt\(it\)/.test(String(_recalcInvAmounts));   // v6.0.111 健檢1 #4：逐列算法統一在 _invRowBase
         /* 第 3 題：新算法列標記 _ovAlg */
-        out.alg = /_ovAlg:2/.test(calcInvDays.toString()) && /本期已請過逾期租金（舊算法），不重算/.test(calcInvDays.toString());
+        out.alg = /_ovAlg:3/.test(calcInvDays.toString())   /* v6.0.136：新算法標 3（舊合約 v6.0.136 前算的不重算） */ && /本期已請過逾期租金（舊算法），不重算/.test(calcInvDays.toString());
         /* 保留款總覽：含稅＋拆分 */
         Q = [{ id: 'qT', name: '保留案', awarded: true, items: [] }]; INV.length = 0;
         INV.push({ id: 'iT', quoteId: 'qT', project: '保留案', periodNo: 1, retention: true, retentionPct: 5, totals: { curTotal: 10000, total: 9975, retention: 525 }, items: [] });
@@ -9255,7 +9255,7 @@ async function newPage(browser, width, height) {
         (i1.items || []).forEach(it => { if (it.type === 'item') { it.curQty = 100; it.payRate = 100; } });
         _recalcInvAmounts(i1);
         out.tot1 = i1.totals.clean === 6000 && i1.totals.cleanGross === 6300 && Math.round(i1.totals.total) === Math.round(100000 * 1.05) - 6300;
-        INV.push(i1);
+        i1.id = 'I3c1'; INV.push(i1);   // 同一毫秒建的單 id 會相同
         const i2 = buildInvFromQuote(Q[0]); out.once2 = !i2.cleanFixed && !i2.cleanPermil;
         // 專案頁設定欄位
         const h = _pjDeductHtml(Q[0]); out.ui = /第一期一次扣（合約 %）/.test(h) && /約 NT\$ 6,000/.test(h);
