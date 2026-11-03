@@ -9657,6 +9657,7 @@ function matEstRopePDF(){
     +'<tr><td class="l">母索形式</td><td class="r">'+_xlEsc(T.ropeForm||'鋼索')+'</td></tr>'
     +'<tr><td class="l">安全母索總長（扣除後）</td><td class="r">'+_shR1(res.T.rope)+' M</td></tr>'
     +'<tr><td class="l">端部錨錠預留</td><td class="r">'+_shR1(T.ropeSpare||0)+' M</td></tr>'
+    +((T.ropeWaste||0)>0?'<tr><td class="l">損耗 '+T.ropeWaste+'%</td><td class="r">'+_shR1((T.ropeNeed||0)-(res.T.rope||0)-(T.ropeSpare||0))+' M</td></tr>':'')
     +'<tr class="tt"><td class="l">需求長度</td><td class="r">'+_shR1(T.ropeNeed||res.T.rope)+' M</td></tr>'
     +'<tr><td class="l">折捲（每捲 '+(T.ropeReel||200)+' M）</td><td class="r">'+(T.ropeReels||0)+' 捲</td></tr>'
     +'<tr><td class="l">黃色立柱</td><td class="r">'+_shR0(res.T.yellow)+' 支</td></tr></table>'
