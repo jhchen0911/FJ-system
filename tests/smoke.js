@@ -957,16 +957,17 @@ async function newPage(browser, width, height) {
         && ld[0].ropeRuns === 9 && r0.T.ropeSpare === 36 && Math.abs(r0.T.ropeNeed - 972.3) < 1e-6 && r0.T.ropeReels === 5   /* v6.0.136：加損耗 5%：(890＋36)×1.05 */ && r0.T.ropeForm === '特多龍繩';
       out.matRows = r0.back.some(x => x.sec === '安全母索（特多龍繩）') && r0.back.some(x => x.k === '安全母索需求長度' && x.v === '972.3')
         && !r0.back.some(x => x.k === '安全母索總長') && r0.staged.some(st => st.items.some(it => /安全母索（特多龍繩，折捲）/.test(it.name)));
-      out.matForm = /母索形式/.test(document.getElementById('mat-est-form').innerHTML) && /matEstRopePDF/.test(document.getElementById('mat-est-form').innerHTML)
+      out.matForm = /母索形式/.test(document.getElementById('mat-est-form').innerHTML) && /matEstExportMenu/.test(document.getElementById('me-bar-shoring').innerHTML)   /* v6.0.139：母索逐層表併入估價明細附錄；匯出在上方工具列 */
         && /構台下縱向路數/.test(document.getElementById('mat-est-form').innerHTML) && /_gtRoutesH/.test(document.getElementById('mat-est-form').innerHTML)
         && !/開啟安全母索/.test(document.getElementById('mat-est-form').innerHTML);
       // 材料估算表 PDF：橫式、叫料表格在最前、無彙總清冊；母索用量表可單獨列印
       let printed = [], land = [];
       const oP2 = window._printViaIframe; window._printViaIframe = (h, f, l) => { printed.push(h); land.push(!!l); };
-      try { matEstExportPDF(); matEstRopePDF(); } finally { window._printViaIframe = oP2; }
-      out.matPdf = printed.length === 2 && land[0] === true && /分階段叫料建議/.test(printed[0]) && !/材料需求清冊/.test(printed[0])
-        && printed[0].indexOf('材料明細') < printed[0].indexOf('分階段叫料建議') && /A4 landscape/.test(printed[0])
-        && /安全母索用量表/.test(printed[1]) && /扣構台下 M/.test(printed[1]) && /972\.3/.test(printed[1]);
+      try { matEstExportPDF('order'); matEstExportPDF('quote', { basis: true }); matEstExportPDF('quote', {}); } finally { window._printViaIframe = oP2; }
+      // v6.0.139（Lotion 11/03）：兩份分開——叫料單（依進場階段）、估價明細（依類別總量，可附計算依據＝母索逐層表）；同一份裡材料不重複列
+      out.matPdf = printed.length === 3 && land[0] === true && /叫料單/.test(printed[0]) && /依進場階段叫料/.test(printed[0]) && !/材料明細（依類別總量）/.test(printed[0]) && /A4 landscape/.test(printed[0])
+        && /估價明細/.test(printed[1]) && /材料明細（依類別總量）/.test(printed[1]) && !/依進場階段叫料/.test(printed[1]) && /附錄：計算依據/.test(printed[1]) && /扣構台下 M/.test(printed[1]) && /972\.3/.test(printed[1])
+        && !/附錄：計算依據/.test(printed[2]) && !/分階段叫料建議/.test(printed.join('')) && !/材料需求清冊/.test(printed.join(''));
       // v5.400：明細每一分類自成一表、每列 3～4 組項目並排（分類標題 colspan 9 或 12），且分類不可少
       out.matDet = (printed[0].match(/class="hd"/g) || []).length >= 4 && /colspan="(9|12)" class="hd"/.test(printed[0]) && !/colspan="6" class="hd"/.test(printed[0]);
       out.hidden = ALL_PAGES.find(p => p.id === 'lifeline').hidden === true;
@@ -983,8 +984,8 @@ async function newPage(browser, width, height) {
     check('單價分析：換工項逾期租金重置、千斤頂／構台自動帶入', r.upaReset);
     check('期別名稱：打設／裝設、拔除／拆除', r.labels);
     check('材料估算：母索＝圍令周圍＋支撐路、扣構台下、預留與折捲', r.matRope && r.matRows);
-    check('材料估算：母索形式欄位＋單獨 PDF、獨立頁隱藏', r.matForm && r.hidden);
-    check('材料估算表 PDF：橫式、明細表在前、叫料條列在後、無重複彙總', r.matPdf);
+    check('材料估算：母索形式欄位＋匯出在工具列、母索獨立頁隱藏', r.matForm && r.hidden);
+    check('材料估算 PDF（v6.0.139）：叫料單／估價明細兩份、橫式、各自不重複、估價明細可附計算依據（母索逐層表）', r.matPdf);
     check('材料估算表 PDF：明細每列 3～4 組並排', r.matDet);
     check('安全母索：構台下形式無對應區塊不扣成負數', r.deckGuard);
     check('v5.395 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
