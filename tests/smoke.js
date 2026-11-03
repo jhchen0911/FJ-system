@@ -9700,6 +9700,30 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.153 LINE 收件回覆合併：同一批（3 分鐘內）只回第一則、文字記成這批案名、失敗照樣回（雲端邏輯在 Node 直接跑） ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const fj = await page.evaluate(() => ({ ack: _LINE_TEXTS.inboxAck, note: _LINE_TEXTS.inboxNote, tl: _LINE_TL.inboxAck }));
+    const LC153 = require(require('path').join(__dirname, '..', 'functions', 'line', 'core.js'));
+    const db = {}, replies = [], pushes = [], files = {};
+    const get = p => p.split('/').reduce((o, k) => (o == null ? undefined : o[k]), db);
+    const set = (p, v) => { const ks = p.split('/'); let o = db; ks.slice(0, -1).forEach(k => { o[k] = o[k] || {}; o = o[k]; }); o[ks[ks.length - 1]] = v; };
+    const deps = { getCfg: async () => ({ owners: { Uo: { name: 'L' } } }), dbGet: async p => get(p), dbSet: async (p, v) => set(p, v), reply: async (t, text) => replies.push({ t, text }), push: async (to, text) => pushes.push(text),
+      fetchContent: async id => ({ buf: Buffer.from('x'), contentType: 'application/pdf' }), putFile: async (p, b) => { files[p] = b; }, log: () => {} };
+    const T0 = Date.parse('2026-11-03T02:00:00Z');
+    const f = (id, t) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uo' }, message: { id, type: 'file', fileName: id + '.pdf', fileSize: 10 } });
+    for (let i = 1; i <= 5; i++) await LC153.handleEvents([f('m' + i, T0 + i * 20e3)], deps);   // 連續轉傳 5 個檔
+    const five = replies.length === 1 && /之後的檔案會一起收/.test(replies[0].text) && Object.keys(files).length === 5;
+    await LC153.handleEvents([{ type: 'message', timestamp: T0 + 150e3, replyToken: 'rt', source: { type: 'user', userId: 'Uo' }, message: { id: 't1', type: 'text', text: '推薦人：範例業務' } }], deps);
+    const note = /這批 5 個檔案：推薦人：範例業務，已記下/.test((replies[1] || {}).text || '') && [1, 2, 3, 4, 5].every(i => db.fydata.lineInbox['m' + i].note === '推薦人：範例業務');
+    deps.putFile = async () => { throw new Error('x'); };
+    await LC153.handleEvents([f('m6', T0 + 170e3)], deps);
+    const fail = replies.length === 3 && replies[2].t === 'rm6' && /沒存成功，請重傳：m6\.pdf/.test(replies[2].text) && db.fydata.lineInbox.m6.status === 'error';
+    check('v6.0.153 LINE 收件回覆合併：連續 5 個檔只回 1 則；傳完打一行字記到這批每個檔並回「這批 N 個檔案：…已記下」；存檔失敗照樣回請重傳；FJ 預設文字已換新', five && note && fail && /之後的檔案會一起收/.test(fj.ack) && /\{text\}/.test(fj.note), JSON.stringify({ five, note, fail, fj, replies }));
+    check('v6.0.153 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
