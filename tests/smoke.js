@@ -10016,6 +10016,101 @@ async function newPage(browser, width, height) {
   }
 
 
+  // ── 改版第 4 步 4b 同步改版（Lotion 11/03 第 6、7 題）：客戶／廠商／合約逐筆、三方合併（不同欄位自動合併、同欄位記衝突讓人選）、伺服器時間、7 天沒同步先下載 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const oT = window.toast; window.toast = () => {};
+      try {
+        const J = x => JSON.parse(JSON.stringify(x)); const T = Date.now() - 100000;
+        out.recColls = ['customers', 'vendors', 'contracts', 'quotes'].every(k => _REC_COLLS.includes(k));
+        SYNC_CONFLICTS = []; _cfNeedPush = {}; _RCB = {};
+        window._applyingCloud = true;
+        // 共同祖先：雲端那版 mt=100
+        const c0 = { id: 'cu4b', name: '甲營造', tel: '04-1111', addr: '', _mt: T + 100 };
+        _mergeColl([J(c0)], [J(c0)], 'customers', {});
+        // 不同欄位：本機改電話、雲端改地址 → 兩個都留、不算衝突、合併結果要上傳
+        const L1 = Object.assign(J(c0), { tel: '04-2222', _mt: T + 200 }), C1 = Object.assign(J(c0), { addr: '台中市', _mt: T + 300 });
+        const m1 = _mergeColl([L1], [C1], 'customers', {}).find(x => x.id === 'cu4b');
+        out.diffField = m1.tel === '04-2222' && m1.addr === '台中市' && SYNC_CONFLICTS.length === 0 && !!_cfNeedPush['customers/cu4b'] && m1._mt >= T + 300;
+        // 同欄位：兩邊都改名稱 → 先用較新的（雲端）、記一筆衝突讓人選
+        _cfNeedPush = {}; _mergeColl([J(C1)], [J(C1)], 'customers', {});
+        const L2 = Object.assign(J(C1), { name: '甲營造（本機）', _mt: T + 400 }), C2 = Object.assign(J(C1), { name: '甲營造（另一台）', _mt: T + 500 });
+        const m2 = _mergeColl([L2], [C2], 'customers', {}).find(x => x.id === 'cu4b');
+        out.sameField = m2.name === '甲營造（另一台）' && SYNC_CONFLICTS.length === 1 && SYNC_CONFLICTS[0].field === 'name' && SYNC_CONFLICTS[0].mine === '甲營造（本機）' && SYNC_CONFLICTS[0].theirs === '甲營造（另一台）';
+        window._applyingCloud = false;
+        const its = []; _v6TodoItems(its); out.todo = its.some(x => x.type === 'sync_conflict');
+        CUSTOMERS = [m2]; syncConflictPick('customers|cu4b|name', 'mine');
+        out.pick = CUSTOMERS[0].name === '甲營造（本機）' && SYNC_CONFLICTS.length === 0 && CUSTOMERS[0]._mt > T + 500;
+        // 報價：本機改工項、雲端改業主 → 兩個都留；本機的成本欄位不被雲端（去敏感版）洗掉
+        window._applyingCloud = true; _RCB = {};
+        const q0 = { id: 'q4b', name: '測試案', client: '甲', items: [{ desc: 'A', qty: 1, price: 100, estCost: 60 }], costs: [{ id: 'k1', amt: 5 }], _mt: T + 100 };
+        _mergeColl([J(q0)], [_stripQuoteSens(J(q0))], 'quotes', {});
+        const qL = Object.assign(J(q0), { items: [{ desc: 'A', qty: 2, price: 100, estCost: 60 }], _mt: T + 200 });
+        const qC = Object.assign(_stripQuoteSens(J(q0)), { client: '乙', _mt: T + 300 });
+        const qm = _mergeColl([qL], [qC], 'quotes', {}).find(x => x.id === 'q4b');
+        out.quote = qm.client === '乙' && qm.items[0].qty === 2 && qm.items[0].estCost === 60 && (qm.costs || []).length === 1 && SYNC_CONFLICTS.length === 0;
+        // 沒有指紋的舊記錄：照舊較新者勝、不記衝突
+        _RCB = {}; const n0 = _mergeColl([{ id: 'ct4b', name: '舊', _mt: T + 100 }], [{ id: 'ct4b', name: '新', _mt: T + 200 }], 'contracts', {}).find(x => x.id === 'ct4b');
+        out.noBase = n0.name === '新' && SYNC_CONFLICTS.length === 0;
+        window._applyingCloud = false;
+        // 合併結果一定上傳（即使雜湊跟上次一樣），上傳成功後清掉待傳、更新指紋
+        localStorage.setItem('fy_recmig_customers', '1');
+        const rec = { id: 'cu4b', name: '甲', _mt: T + 600 };
+        const rh = _loadRecHashes() || {}; rh.customers = { cu4b: _collHash(rec) }; _storeRecHashes(rh);
+        _cfNeedPush = { 'customers/cu4b': 1 };
+        const delta = {}; _perRecordDelta(delta, { customers: [rec] }, {}, {}, {});
+        out.forcePush = !!delta['customers/cu4b'];
+        _rcbAfterPush(delta); _cfPushed(delta);
+        out.afterPush = !_cfNeedPush['customers/cu4b'] && _RCB.customers && _RCB.customers.cu4b && _RCB.customers.cu4b.m === T + 600;
+        // 伺服器時間
+        const oOff = _SRV_OFF; _SRV_OFF = 3600000; const tt = _touch({})._mt; out.srv = Math.abs(tt - (Date.now() + 3600000)) < 2000; _SRV_OFF = oOff;
+        // 7 天沒同步
+        localStorage.setItem('fy_last_pull_ok', String(Date.now() - 8 * 86400000)); out.stale = _syncStale() === true;
+        _pullOkMark(); out.fresh = _syncStale() === false;
+        // 沒 id 的客戶／廠商補 id、只存名字的舊廠商轉成記錄
+        VENDORS = ['老廠商', { name: '新廠商' }]; CUSTOMERS = [{ name: '無編號客戶' }];
+        _recIdHeal();
+        out.heal = VENDORS.every(v => v && typeof v === 'object' && v.id) && VENDORS[0].name === '老廠商' && !!CUSTOMERS[0].id;
+        // 審查修正：A 報價工項衝突選「另一台的」，本機成本單價補回；F 用「集合｜id｜欄位」找；B 補的 id 由內容決定；D 員工刪最後一筆不送
+        window._applyingCloud = true; _RCB = {}; SYNC_CONFLICTS = [];
+        const qa = { id: 'q4bA', name: '衝突案', client: '甲', items: [{ desc: 'A', qty: 1, price: 100, estCost: 70 }], _mt: T + 100 };
+        _mergeColl([J(qa)], [_stripQuoteSens(J(qa))], 'quotes', {});
+        const qaL = Object.assign(J(qa), { items: [{ desc: 'A', qty: 3, price: 100, estCost: 70 }], _mt: T + 300 });   // 這台較新 → 先用這台的
+        const qaC = Object.assign(_stripQuoteSens(J(qa)), { items: [{ desc: 'A', qty: 5, price: 100 }], _mt: T + 200 });
+        const qam = _mergeColl([qaL], [qaC], 'quotes', {}).find(x => x.id === 'q4bA');
+        window._applyingCloud = false;
+        Q.push(qam);
+        const key = SYNC_CONFLICTS.length ? (SYNC_CONFLICTS[0].coll + '|' + SYNC_CONFLICTS[0].id + '|' + SYNC_CONFLICTS[0].field) : '';
+        syncConflictPick(key, 'theirs');
+        const qz = Q.find(x => x.id === 'q4bA');
+        out.graft = !!key && qz.items[0].qty === 5 && qz.items[0].estCost === 70 && SYNC_CONFLICTS.length === 0;
+        Q = Q.filter(x => x.id !== 'q4bA');
+        const v1 = ['同名廠商'], v2 = ['同名廠商']; VENDORS = v1; _recIdHeal(true); const id1 = VENDORS[0].id; VENDORS = v2; _recIdHeal(true);
+        out.detId = id1 === VENDORS[0].id && /^v_h/.test(id1);
+        out.noIdDedupe = _mergeColl([{ id: id1, name: '同名廠商', _mt: T }], ['同名廠商'], 'vendors', {}).length === 1;
+        const oW = window._shWholeOk; window._shWholeOk = () => false; const oC = CUSTOMERS; CUSTOMERS = [];
+        const dd = { 'customers/cuX': null, 'quotes/qY': { id: 'qY' } }; _shStripForStaff(dd);
+        out.lastDel = !('customers/cuX' in dd) && ('quotes/qY' in dd);
+        window._shWholeOk = oW; CUSTOMERS = oC;
+        out.normArr = _rcbHash({ 0: 'a', 1: 'b' }) === _rcbHash(['a', 'b']) && _rcbHash([]) === '∅';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      window._applyingCloud = false; window.toast = oT;
+      return out;
+    });
+    const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'app.js'), 'utf8');
+    const staleHook = /var stale=_syncStale\(\);[^]{0,300}if\(cts>mine\|\|stale\)/.test(src) && /\.info\/serverTimeOffset/.test(src);
+    check('4b 客戶／廠商／合約改逐筆同步；沒 id 的記錄補 id、只存名字的舊廠商轉成記錄', r.recColls && r.heal, JSON.stringify(r));
+    check('4b 三方合併：兩台改不同欄位自動合併（兩邊都留）、合併結果一定上傳；沒有指紋的舊記錄照舊較新者勝', r.diffField && r.forcePush && r.afterPush && r.noBase, JSON.stringify(r));
+    check('4b 同欄位衝突：先用較新的版本、記進「同步衝突」（總覽待辦），選「用這台的」後存回並同步', r.sameField && r.todo && r.pick, JSON.stringify(r));
+    check('4b 報價三方合併：本機改工項、雲端改業主都留，本機成本欄位不被洗掉', r.quote, JSON.stringify(r));
+    check('4b 伺服器時間（_touch 用 .info/serverTimeOffset 校正）；超過 7 天沒同步的裝置上傳前先整份下載合併', r.srv && r.stale && r.fresh && staleHook, JSON.stringify({ srv: r.srv, stale: r.stale, fresh: r.fresh, staleHook }));
+    check('4b 審查修正：報價工項衝突選另一台的、本機成本單價補回；補的 id 由內容決定（兩台一樣）、雲端舊的沒 id 那份不重複；員工刪最後一筆不整次失敗；陣列／物件形態一致', r.graft && r.detId && r.noIdDedupe && r.lastDel && r.normArr, JSON.stringify(r));
+    check('4b 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.160 圖面量測檔匯入（fixture 為去識別化的 HQ 黃金樣本）：材料估算帶入、斜撐角撐依量測檔、報價頁圖面覆核 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
