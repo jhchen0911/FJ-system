@@ -481,6 +481,7 @@ function _rentStatus(q,idx,endDate){
   var over=Math.max(0,_dDiff(expiry,end));
   var price=parseFloat((String(it.ot||'').match(/[\d.]+/)||[0])[0])||0;
   var qty=Math.abs(parseFloat(it.qty)||0);
+  if(mode!=='removeDone'&&pg.cum>0&&pg.cum<qty)qty=Math.round(pg.cum*100)/100;   // 第 3c 步（健檢1 #17）：舊合約照實際打設量（不超過合約量）
   if(mode==='removeDone'&&over>0){   // v6.0.107 分批：逾期起算日起，每批計到該批拔除完成日，未拔完的計到結束日
     var bq=_rentBatchQtyDays(pg,qty,_dAdd(expiry,1),end);
     return {idx:idx,desc:String(it.desc||'').split('\n')[0],unit:it.unit||'',days:days,installDate:base,removeFirst:pg.removeFirst||'',estimated:!pg.doneDate,cum:pg.cum,target:pg.target,
@@ -5865,7 +5866,9 @@ function calcInvDays(){
       const _qot=_otFromQuote(selDesc);
       if(_qot&&srcItem){srcItem.otPrice=_qot.price;srcItem.otUnit=_qot.unit||srcItem.otUnit||'';}
       const srcPrice=_qot?_qot.price:(srcItem?(srcItem.otPrice||0):0);
-      const srcQty=srcItem?(srcItem.contractQty||1):1;
+      let srcQty=srcItem?(srcItem.contractQty||1):1;
+      // 第 3c 步（健檢1 #17）：舊合約（拔除第一天）逾期數量＝min(合約量, 實際打設累計)——只打了一部分就照實際在場的量收
+      try{const _q0=_invQuote();if(_q0&&_rentEndMode(_q0)!=='removeDone'){const _i0=(_q0.items||[]).findIndex(it=>it&&!it.sec&&_invKey(it.desc)===_invKey(selDesc));if(_i0>=0){const _c0=_itemProgress(_q0,_i0).cum;if(_c0>0&&_c0<srcQty)srcQty=Math.round(_c0*100)/100;}}}catch(e){_err('calcInvDays.inst',e);}
       const srcUnit=_uFix(srcItem?(srcItem.unit||'式'):'式');
       // v6.0.107 拔除完成日模式：分批計算「支·天」（每批計到該批拔除完成日，未拔完的計到本期截止日）
       let _bq=null;try{const _q=_invQuote();if(_q&&_rentEndMode(_q)==='removeDone'){const _ix=(_q.items||[]).findIndex(it=>it&&!it.sec&&_invKey(it.desc)===_invKey(selDesc));if(_ix>=0)_bq=_rentBatchQtyDays(_itemProgress(_q,_ix),srcQty,_isoD(billStart),_isoD(claimDate));}}catch(e){_err('calcInvDays.batch',e);}
