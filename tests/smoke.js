@@ -10183,6 +10183,24 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.166 刪除 dp* 死參數（H350 租金 0.117 vs 4 調查：沒有輸入格、沒有程式讀）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        out.noDef = !Object.keys(P).some(k => /^dp[A-Z]/.test(k));
+        P.dpRentH350 = 0.117; P.dpFrH350 = 34; go('params'); doSaveP();
+        out.cleaned = !('dpRentH350' in P) && !('dpFrH350' in P) && P.tax != null;
+        out.upa = UPA_COST_DB.hsteel.H350.rent === 4 && UPA_COST_DB.strut.rent.H350 === 4;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
+      return out;
+    });
+    check('v6.0.166 dp* 死參數整組刪除：預設沒有、存參數時把舊存檔留著的 dp* 清掉；單價庫 H350 租金 4 元／M／天不受影響', r.noDef && r.cleaned && r.upa, JSON.stringify(r));
+    check('v6.0.166 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
