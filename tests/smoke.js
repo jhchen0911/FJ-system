@@ -10263,7 +10263,7 @@ async function newPage(browser, width, height) {
         const qB = { id: 'mb', name: 'x', awarded: true, ownerPay: { cut: 25 }, items: [{ desc: 'A', qty: 1, price: 1 }], dailyLogs: [{ date: '2026-04-10', progressRows: [{ itemIdx: 0, qty: 1 }] }] };
         out.late = !!FJC.todo.monthBill({ q: qB, invs: [{ date: '2026-03-26' }], today: '2026-04-21' }) && !FJC.todo.monthBill({ q: qB, invs: [{ date: '2026-04-20' }], today: '2026-04-21' });
         out.invK = JSON.stringify(_INV_K) === JSON.stringify(FJC.todo.INV_K) && FJC.todo.invUnpack(_invPack({ items: [{ desc: 'x', contractQty: 3 }] })).items[0].contractQty === 3;
-        out.data = { quotes: Q, invoices: INV.map(_invPack), payables: PAYABLES };
+        out.data = { quotes: Q, invoices: INV.map(_invPack), payables: PAYABLES, now: Date.now() };
         out.keys = _todoKeys(v);
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
       window.toast = oT; return out;
@@ -10272,7 +10272,7 @@ async function newPage(browser, width, height) {
     const TC5 = require(require('path').join(__dirname, '..', 'functions', 'ops', 'todos.js'));
     const sens = {}; ((data.data && data.data.quotes) || []).forEach(q => { const est = {}; q.items.forEach((it, i) => { if (it.estCost != null) est[it._uid ? String(it._uid) : '~h~' + i] = it.estCost; }); sens[q.id] = { costs: q.costs, est }; });
     const cloud5 = data.data ? TC5.buildRemind({ shared: { quotes: data.data.quotes.map(q => { const c = JSON.parse(JSON.stringify(q)); delete c.costs; c.items.forEach(it => delete it.estCost); return c; }), invoices: data.data.invoices, contracts: {}, customers: {}, params: {}, qHistory: {} },
-      priv: { payables: data.data.payables, matLedger: {}, quoteSens: sens }, now: Date.now() }) : null;
+      priv: { payables: data.data.payables, matLedger: {}, quoteSens: sens }, now: data.data.now }) : null;
     check('5c 每月請款：截止前 5 天、這期還沒開單、有新日報 → 本月要請款＋草稿數量（減項列不帶）；開過單就不提醒', data.bill && data.billed, JSON.stringify(data));
     check('5c 超支：工項實際成本 ≧ 報價成本 110% 提醒（117%）；雲端（成本在 private quoteSens、請款單壓縮過）算出同一組', data.over && !!cloud5 && JSON.stringify(cloud5.keys.bill) === JSON.stringify(data.keys.bill) && JSON.stringify(cloud5.keys.overrun) === JSON.stringify(data.keys.overrun), JSON.stringify({ loc: data.keys, cloud: cloud5 && cloud5.keys }));
     check('5c 付包商款核對：廠商累計請款超過日報量標差異、總覽列待核准、核對表按「有差異，仍核准」記下核准人與時間', data.vp && data.dash && data.modal && data.approved, JSON.stringify(data));
