@@ -1,0 +1,142 @@
+<title>進退料統整表銜接分析</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>:root{--bg:#f5f6f2;--surface:#fff;--fg:#1f2620;--muted:#5f6a62;--rule:#d7ddd5;--accent:#1c6937;--note:#f6ecd8;--noteb:#c99a3c;
+--font-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;--font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121714;--surface:#1a211d;--fg:#e3eae5;--muted:#9aa79f;--rule:#2c3731;--accent:#6cc28a;--note:#372b14;--noteb:#8a6a2a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121714;--surface:#1a211d;--fg:#e3eae5;--muted:#9aa79f;--rule:#2c3731;--accent:#6cc28a;--note:#372b14;--noteb:#8a6a2a;color-scheme:dark}
+*{box-sizing:border-box}body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.75}
+.wrap{max-width:860px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 40px}
+h1{font-size:1.55rem;margin:0 0 10px;text-wrap:balance}h2{font-size:1.15rem;margin:30px 0 10px;text-wrap:balance}h3{font-size:1rem;margin:20px 0 8px}
+p,li{overflow-wrap:anywhere}ul,ol{padding-left:1.3em}li.sub{margin-left:1.2em;list-style:circle}
+a{color:var(--accent)}code{font-family:var(--font-mono);font-size:.88em;background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:0 4px}
+pre{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:12px 14px;overflow-x:auto;font-family:var(--font-mono);font-size:.85rem;line-height:1.6}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--rule);border-radius:12px;margin:10px 0}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:.9rem}th,td{padding:9px 12px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top}
+th{font-size:.82rem;color:var(--muted)}tr:last-child td{border-bottom:none}
+.note{background:var(--note);border:1px solid var(--noteb);border-radius:12px;padding:12px 14px;font-size:.92rem;margin:10px 0}
+.theme{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));width:36px;height:36px;border-radius:50%;border:1px solid var(--rule);background:var(--surface);color:var(--fg);cursor:pointer}
+.report-credit{margin-top:48px;padding-top:20px;border-top:1px solid var(--rule);font-size:.8rem;line-height:1.9;color:var(--muted);text-align:center}
+.report-credit a{color:inherit}.report-credit .brandline{display:block;font-weight:700;color:var(--fg);margin-bottom:8px;text-decoration:none;font-size:.92rem}
+.report-credit .tagline-row{display:block;margin-bottom:8px}.report-credit .tagline{font-style:normal;color:var(--fg);font-weight:500}
+.report-credit .links{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 18px}@media(max-width:520px){.report-credit .sep{display:none}.report-credit .tagline{display:block}}</style>
+<button class="theme" id="theme" type="button" aria-label="切換深淺色">◐</button>
+<main class="wrap">
+<h1>進退料統整表：跟現有 FJ 程式怎麼接（銜接分析）</h1>
+<div class="note">2026-11-04 小批次線起草，給陳軒、主線、Lotion 對齊用。<b>只分析、沒寫程式。</b><br>需求來源：<code>my-agent/400_Project/workflow/2026-11-04_進退料統整表_需求.md</code>（第五節 5 項加碼建議 Lotion 已確認全部要做）。<br>對照程式版本：<code>claude/ui-review</code> 分支（v6.0.173）＋第 6 步設計 <code>origin/claude/small-step6-design:docs/第6步_廠商請款辨識_設計.md</code>。<br>文中範例全部是假資料。</div>
+<h2>第一部分：給 Lotion 的白話版</h2>
+<h3>一句結論</h3>
+<p><b>簽收單拍照、AI 讀單、存進日報、倉庫台帳、租料批次這五樣現在都有，只是各自分開、要管理員一張一張按「帶入」。這次要補的是中間那本「進退料簿」：每一趟車記一筆，工務按確認，後面的台帳、租金、租賃商對帳、業主逾期租金都由系統自己去改。</b> 最大的難題是「工務看得到、改得到，但看不到錢」。做法是把一筆拆成兩半存：<b>沒有錢的一半放大家都能讀的地方，有錢的一半放只有 Lotion 能讀的地方</b>，兩半用同一個編號對起來。</p>
+<h3>資料怎麼流</h3>
+<pre> 工務拍簽收單
+      │
+      ▼
+ AI 讀單（現有：智慧收件 delivery_slip）
+      │  讀不出的欄位標黃
+      ▼
+ ┌──────────────────────────────┐
+ │ 首頁卡片「簽收單待確認」          │   工務、Lotion 都看得到
+ │ [確認] [退回] [修改]             │   （卡片上沒有任何金額）
+ └──────────────┬───────────────┘
+                │ 確認
+                ▼
+ ┌──────────────────────────────┐        ┌───────────────────────┐
+ │ 進退料簿（每趟一筆，新）          │ ─同編號─▶│ 金額那一半（只給 Lotion）    │
+ │ 日期／方向／料／支數／車號／照片   │        │ 運費／租金單價／計租起訖     │
+ │ 工務可讀可寫                     │        │ 賠償／吊車費／同車分攤       │
+ └───┬──────────┬──────────┬────┘        └───────────────────────┘
+     │自有料     │租賃料      │轉場（A 案退、B 案進，一筆寫兩案）
+     ▼          ▼           ▼
+ 公司自有料台帳   租料批次      兩案各自的台帳／租料批次
+ （倉庫少、工地多；│
+  歸倉只加「可用」）├──▶ 租金成本（施工成本）
+                 ├──▶ 租賃商請款核對（第 6 步）：支數×天數×單價，差多少標出來
+                 ├──▶ 業主逾期租金（請款單）
+                 └──▶ 日期差太多、數字對不上 → 首頁提醒卡
+ 結案 ──▶ 單價庫（實際租期、每趟運費、損耗率、吊車費）──▶ 下次報價用</pre>
+<h3>現在有什麼、缺什麼（一張表看完）</h3>
+<div class="tbl"><table><thead><tr><th>需求</th><th>現在</th><th>缺</th></tr></thead><tbody><tr><td>拍簽收單、AI 讀單</td><td>✅ 有（v6.0.119 智慧收件「材料簽收單」）</td><td>AI 讀的欄位太少（沒有自有／租賃、租賃商單號、短少損壞、吊車、簽收人、歸倉狀況）；讀不出的不會標黃</td></tr><tr><td>首頁卡片確認／退回／修改</td><td>❌ 沒有；現在是管理員到「材料．運輸」頁按「帶入」</td><td>整個卡片要新做</td></tr><tr><td>每趟一筆的進退料簿</td><td>❌ 沒有；簽收單塞在日報裡，只是「附件」</td><td>新的資料表、每案一張＋全公司總表</td></tr><tr><td>工務看不到錢</td><td>⚠️ 半套：材料頁本來就只有管理員看得到</td><td>工務要能「寫」，所以要拆兩半存</td></tr><tr><td>自有料台帳自動更新</td><td>❌ 現在要 Lotion 手動按「調撥」「歸還」</td><td>確認後自動改；歸倉分可用／要修／報廢</td></tr><tr><td>租料進退場</td><td>⚠️ 有「租料批次」，但只記 M 數、日期，沒記哪一趟、哪張單</td><td>每批要對回簽收單；退場要對回同一批</td></tr><tr><td>工地直接轉場</td><td>❌ 沒有</td><td>一筆寫兩案、租期接續</td></tr><tr><td>計租日期兩個都記、差太多提醒</td><td>❌ 只有一個日期</td><td>加「租賃商計租起訖」與提醒</td></tr><tr><td>租賃商請款自動核對</td><td>❌（第 6 步設計有「租賃請款」這一類，但沒寫怎麼核）</td><td>用進退料簿算一次、標差額；16M 以上另一段單價</td></tr><tr><td>業主逾期租金</td><td>✅ 有，但算法看的是「日報裡的拔除進度」，不是材料進退場</td><td>要決定用哪個日期（見疑問 2）</td></tr><tr><td>加碼 1 結案回寫單價庫</td><td>⚠️ 有回寫，但只寫「工項單價」，不寫租期、運費、損耗、吊車</td><td>新增材料類實績</td></tr><tr><td>加碼 2 租或買提醒</td><td>❌（只有買租決策的思考文件）</td><td>累計租金 vs 購置價的計算與卡片</td></tr><tr><td>加碼 3 閒置止血</td><td>⚠️ 材料頁已有「倉庫同長閒置 → 先調撥」</td><td>租料用完沒退的提醒；報價時建議用自有料</td></tr><tr><td>加碼 4 防錯檢查</td><td>⚠️ 只有「同日同車號算一趟」</td><td>進退加總、重複登錄、運輸請款趟數對不上</td></tr><tr><td>加碼 5 車型建議</td><td>❌</td><td>依距離、數量建議；運費行情累積後比價</td></tr></tbody></table></div>
+<h3>工作量（白話）</h3>
+<p>大概分 <b>6 包</b>，前 2 包是地基，一定要先做：</p>
+<pre>A 地基：新資料表＋舊資料搬家（M）
+  └─ B 首頁卡片＋AI 多讀欄位（M）
+       ├─ C 自動改自有料台帳（M）
+       ├─ D 租金／租賃商對帳／業主逾期租金（L，D2 等第 6 步）
+       ├─ E 防錯檢查與提醒卡（S～M）
+       └─ F 結案回寫單價庫、租或買、閒置、車型建議（L，分兩次）</pre>
+<p>第 6 步（廠商請款辨識）只卡 <b>D2 租賃商請款核對</b>這一小塊：要等第 6 步的草稿做好，對帳結果才有地方顯示。其他都可以先做。</p>
+<h2>第二部分：技術細節</h2>
+<h3>1. 現況盤點（程式裡已經有的）</h3>
+<div class="tbl"><table><thead><tr><th>東西</th><th>函式／欄位</th><th>存哪裡</th><th>誰讀得到</th></tr></thead><tbody><tr><td>智慧收件簽收單</td><td><code>_INTAKE_TYPES.delivery_slip</code>、AI 提示詞（app.js 約 27259 行）、<code>_IK_DIRS</code>（out／back／rentIn／rentOut／other）、<code>_ikSlipSave</code></td><td><code>q.dailyLogs[].slips[]</code>：<code>{id,date,dir,from,to,truck,vendor,items:[{name,spec,len,qty,unit}],photo,by,at,done,doneAt}</code>，照片走 <code>_photoPut</code>（<code>fydata/relay/photos</code>）</td><td>報價記錄在 shared，<b>工務可讀可寫</b>（<code>shared/quotes/$qid</code> 逐筆規則放行 access 名單）</td></tr><tr><td>材料頁簽收單區</td><td><code>_m6Slips</code> <code>_m6SlipsHtml</code> <code>m6SlipAct</code> <code>_m6SlipFill</code> <code>m6SlipDone</code>、趟數 <code>_m6SlipTrips</code>（同日同車號算一趟）</td><td>只是把日期／M 數「帶進」原視窗，存檔仍走 <code>matOut</code>／<code>matBack</code>／<code>m6Batch</code></td><td>材料頁 <code>mat6</code> 只有管理員</td></tr><tr><td>自有料台帳</td><td><code>MAT_LEDGER</code>（<code>matLedger</code>）列：<code>{id,name,spec,len,qty,billM,uw,price,date,kind,loc,note,projQid,outDate,matRowId,planBack,splitFrom,_mt}</code>；<code>matLedAdd</code>／<code>matLedUpd</code>／<code>_matLedSplit</code>／<code>_matLedStock</code>／<code>_matLedAt</code></td><td><code>fydata/private</code>（<code>_PRIV_COLLS</code>），<b>整包同步、不是逐筆</b></td><td>管理員（＋唯讀名冊）</td></tr><tr><td>調撥／歸還</td><td><code>matOut</code>（倉庫→工地，拆台帳列、寫 <code>projQid/outDate</code>、<code>_matAmortSync</code>）、<code>matBack</code>（歸還＋損耗、寫 <code>q.mat.use[]</code> 內部攤提、<code>q.mat.loss[]</code> 損耗認列、切樁改長度）</td><td>台帳 private；<code>q.mat</code> 隨 <code>_stripQuoteSens</code> 抽到 private</td><td>管理員</td></tr><tr><td>材料位置清單</td><td><code>_matLocList()</code> → <code>fydata/shared/matLoc</code>（不含單價），<b>只有讀得到 private 的管理員裝置</b>在 <code>_pushCloud</code> 上傳</td><td>shared</td><td>所有人（含唯讀）</td></tr><tr><td>租料</td><td><code>q.mat.rents[]</code>：<code>{id,vendor,rowId,name,spec,len,rate(月租 $/M),cm(合約 M),pf,pt,ptAuto,mode,batches:[{id,d(進場),m(M 數),n(支數),o(退場)}]}</code>；<code>m6Batch</code>／<code>_m6BtSave</code>／<code>m6RentEdit</code>／<code>_m6RentArrived</code>／<code>_m6RentPlan</code>／<code>_m6ContractDays</code></td><td>private（<code>q.mat</code>）</td><td>管理員</td></tr><tr><td>租金成本</td><td><code>_m6Sync</code> → <code>_matSyncCost(q,'rent:'+廠商,…)</code>：每批一列 <code>rb_&lt;batchId&gt;</code>，<code>per:'mmonth'</code>、<code>from=b.d</code>、<code>to=b.o</code></td><td><code>q.costs</code>（private）</td><td>管理員</td></tr><tr><td>運費、設備（吊車）</td><td><code>q.mat.tps[]</code>（<code>{date,vendor,cat,desc,trips,price}</code>）→ <code>trans:&lt;廠商&gt;:&lt;科目&gt;</code> 成本卡；<code>q.mat.equip[]</code> → <code>erent:</code></td><td>private</td><td>管理員</td></tr><tr><td>租賃廠商請款期別</td><td><code>openRentPeriod(cid)</code>（租賃成本卡的一期，依成本列 from/to 算）</td><td><code>q.costs[].periods</code></td><td>管理員</td></tr><tr><td>業主逾期租金</td><td><code>_rentStatus</code> → <code>FJC.todo.rentStatus/rentScan/rentTodos/rentSoon</code>（calc/todo.js）；<code>_invBillDays</code>、<code>invRentDisc</code>（折讓）、<code>_rentEndMode</code>（拔除第一天／拔除完成日）</td><td>讀 <code>q.items[]</code>（<code>it.ot</code> 逾期單價、租期天數）＋日報施工進度（<code>itemProgress</code> 的安裝／拔除紀錄）</td><td>請款頁</td></tr><tr><td>首頁待辦</td><td><code>_v6TodoItems</code>（例：<code>ai_draft</code>、<code>tomb_hold</code>、<code>vb_pending</code>）、雲端 <code>fydata/todo</code>（dailyTodos 寫）</td><td>—</td><td>依角色</td></tr><tr><td>AI 草稿</td><td><code>_draftPush</code>／<code>openDrafts</code>／<code>draftApply</code>，<code>fydata/drafts</code>（<b>只有管理員與唯讀名冊能讀寫，工務不行</b>）</td><td>—</td><td>—</td></tr><tr><td>單價庫</td><td><code>writeCostHist</code>（結案依「工項」寫 <code>COST_HIST</code>：<code>{qid,key,name,unit,qty,priceUnit,actUnit}</code>）、<code>UPA_COST_DB</code>（參數表）、<code>P.matRentRate</code>／<code>P.matTransRate</code>（自有料內部租金、運費預設）</td><td>private</td><td>管理員</td></tr><tr><td>自有→租的順序</td><td><code>m6Decide</code> 一帶的比對（約 33539、33731 行：同長閒置先調撥 → 接切代用 → 租／買）</td><td>—</td><td>管理員</td></tr></tbody></table></div>
+<p><b>重要發現</b></p>
+<ol><li><b>業主逾期租金現在跟材料進退場無關</b>：<code>rentStatus</code> 用的是工項的租期天數＋日報的「拔除」進度，不看 <code>q.mat.rents</code>。所以「進退料簿 → 業主逾期租金」不是接一條線而已，要決定口徑（疑問 2）。</li><li><b>台帳只能在管理員裝置改</b>：<code>MAT_LEDGER</code> 在 private，工務的瀏覽器讀不到也寫不了。所以「工務按確認 → 台帳自動更新」一定是：工務寫 shared 的確認紀錄 → <b>管理員裝置（或雲端程式）看到後套用</b>。這跟現在 <code>matLoc</code> 由管理員裝置產生是同一個模式。</li><li><b>工務在智慧收件其實已經「確認」過一次</b>：AI 讀完會跳出可修改的欄位，按存檔才進日報。新卡片要決定是否取代這一步（疑問 1）。</li><li><b>AI 草稿區工務讀不到</b>（<code>fydata/drafts</code> 規則），所以簽收單卡片<b>不能</b>套用第 6 步的 <code>vendorBill</code> 草稿外殼，要另開工務可寫的節點。</li><li>租料單價只有一個 <code>rt.rate</code>（$/M/月），<b>沒有「16M 以上另一段單價」</b>，也沒有「每片每月」的計價單位。</li><li><code>_m6SlipM</code> 用 <code>len×qty</code> 算 M 數；鋼板樁類「每片」計價時 M 數不適用，要分單位。</li></ol>
+<h3>2. 逐項現況對照</h3>
+<h3>需求第二節（Lotion 已決定）</h3>
+<div class="tbl"><table><thead><tr><th>項目</th><th>已有</th><th>缺</th></tr></thead><tbody><tr><td>每案一張＋全公司總表（篩工地、材料、租賃商、運輸公司、日期）</td><td>材料頁的簽收單清單（每案、最多 40 筆、無篩選）</td><td>新的每案表與總表、篩選；第 7 步專案頁「材料」分頁一起換</td></tr><tr><td>工務可看、可拍、可按確認；金額看不到</td><td>拍照（智慧收件 <code>_ikTypesFor</code> 工務可用 delivery_slip）；簽收單本身無金額</td><td>確認卡片；兩半存（見第 3 節）；材料頁目前工務完全進不去</td></tr><tr><td>AI 讀欄位、讀不出標黃</td><td>AI 回傳 `confidence:high</td><td>low`（整張一個值）</td><td>逐欄 <code>conf</code>（比照第 6 步設計），低／無標黃、必點過才能確認</td></tr><tr><td>轉場一筆寫兩案</td><td>無</td><td>方向 <code>xfer</code>；同一筆帶 <code>fromQid</code>、<code>toQid</code>；租料批次搬家（舊案 <code>o</code>＝轉場日、新案新批 <code>d</code>＝轉場日、標 <code>chainFrom</code>，租商租期不中斷）；運費歸屬由 Lotion 選（存在金額那一半）</td></tr><tr><td>計租日期兩個都記、差超過設定天數提醒</td><td>只有 <code>b.d</code>／<code>b.o</code></td><td>金額那一半加 <code>billFrom</code>／<code>billTo</code>；參數 <code>P.mvDateTol</code>（預設天數，疑問 4）；超過出卡片</td></tr><tr><td>自有料確認後自動更新台帳</td><td><code>matOut</code>／<code>matBack</code> 內部邏輯可重用（<code>_matLedSplit</code>）</td><td>抽出「不開視窗」的版本；歸倉狀況 可用／要修／報廢</td></tr></tbody></table></div>
+<h3>需求第三節（每一筆的欄位）→ 放哪一半</h3>
+<div class="tbl"><table><thead><tr><th>類別</th><th>欄位</th><th>放 shared（工務可見）</th><th>放 private（只給 Lotion）</th><th>現有對應</th></tr></thead><tbody><tr><td>基本</td><td>日期、方向、自有／租賃、材料規格與長度、支數或 M 數、從哪裡、到哪裡</td><td>✓</td><td></td><td>slip 的 <code>date/dir/from/to/items</code>；自有／租賃現在由 <code>dir</code> 隱含（out/back vs rentIn/rentOut）</td></tr><tr><td>運輸</td><td>運輸公司、車型（平板／吊板）、車號、趟數</td><td>✓</td><td></td><td>只有 <code>truck</code>；<code>vendor</code> 混用（運輸公司或租賃商不分）</td></tr><tr><td>運輸</td><td>運費金額、每趟單價（依車型、地區）</td><td></td><td>✓</td><td><code>q.mat.tps[].price</code>（手動）</td></tr><tr><td>租賃</td><td>租賃商、租約批次、租賃商進退料單號</td><td>✓</td><td></td><td><code>rt.vendor</code>、<code>batches[].id</code>；單號無</td></tr><tr><td>租賃</td><td>租賃單價、計租起訖</td><td></td><td>✓</td><td><code>rt.rate</code>；起訖無</td></tr><tr><td>退場</td><td>短少、損壞支數</td><td>✓</td><td></td><td>自有料有 <code>matBack</code> 損耗；租料無</td></tr><tr><td>退場</td><td>賠償金額</td><td></td><td>✓</td><td>無（自有料的損耗認列在 <code>q.mat.loss</code>）</td></tr><tr><td>機具</td><td>卸貨吊車／怪手：有沒有、誰叫的</td><td>✓</td><td></td><td>無（<code>q.mat.equip</code> 是月租設備，不是單趟吊車）</td></tr><tr><td>機具</td><td>吊車／怪手費用</td><td></td><td>✓</td><td>無</td></tr><tr><td>證據</td><td>簽收單照片、簽收人</td><td>✓</td><td></td><td><code>photo</code>、<code>by</code>（拍照者，不是簽收人）</td></tr><tr><td>自有料歸倉</td><td>可用／要修／報廢</td><td>✓</td><td></td><td>無；台帳列需加 <code>cond</code></td></tr><tr><td>同車分攤</td><td>一車兩案依支數分攤運費</td><td></td><td>✓（分攤結果）</td><td>無；shared 只記「同車編號」<code>tripKey</code></td></tr></tbody></table></div>
+<h3>需求第四節（後端自動）</h3>
+<div class="tbl"><table><thead><tr><th>#</th><th>項目</th><th>已有</th><th>缺</th></tr></thead><tbody><tr><td>1</td><td>租賃商請款自動核對（支數×天數×單價，16M 以上另段）</td><td><code>openRentPeriod</code> 依成本列算；第 6 步設計 <code>kind:'rent'</code> 只寫「租賃卡的一期」</td><td>新純計算 <code>calc/matmove.js</code>：依進退料簿逐批 <code>支數×天數×單價</code>（分段單價表）→ 與請款單差額；在第 6 步 <code>vendorBill</code> 草稿卡上顯示「核對：差 NT$ X」</td></tr><tr><td>2</td><td>業主逾期租金自動算</td><td><code>FJC.todo.rentStatus</code>（看工項租期＋日報拔除進度）</td><td>口徑決定後，把進退料簿的退場日當成拔除證據（或差異提醒）</td></tr><tr><td>3</td><td>計租日期不一致提醒</td><td>無</td><td>每筆租料 `</td><td>簽收日 − 計租日</td><td>&gt; P.mvDateTol` → 首頁卡</td></tr><tr><td>4</td><td>自有料台帳自動更新，歸倉只加可用</td><td><code>matOut</code>／<code>matBack</code> 手動</td><td>自動套用器（見第 3 節）；要修→台帳列 <code>cond:'repair'</code>（不算可調撥庫存），報廢→扣台帳＋<code>q.mat.loss</code></td></tr></tbody></table></div>
+<h3>需求第五節（加碼 5 項，Lotion 已確認全部做）</h3>
+<div class="tbl"><table><thead><tr><th>#</th><th>項目</th><th>已有</th><th>缺</th></tr></thead><tbody><tr><td>1</td><td>結案回寫單價庫（實際租期、每趟運費依地區車型、損耗率、吊車費），報價列「假設 vs 實際」</td><td><code>writeCostHist</code> 只寫工項；<code>P.matRentRate</code>、<code>P.matTransRate</code> 是手填常數；結案 <code>pjCloseAll</code></td><td>新集合 <code>matHist</code>（private）：每案結案寫 `{qid,date,kind:'rentDays</td><td>freight</td><td>loss</td><td>crane',spec,region,truckType,value,unit}<code>；報價端（材料估算 </code>matEstCalc<code>／</code>_m6RentPlan`）讀最新實際值＋差異欄</td></tr><tr><td>2</td><td>租或買提醒（累計租金快超過買一批成本）</td><td>只有思考文件（現金底線、幾案划算）；台帳有購置價 <code>price/uw</code></td><td>計算：同規格「過去 12 個月累計租金」vs「購置價 × 參數比例」；超過門檻出卡片「建議評估買料」，連到買租決策（<b>不自動判斷現金底線，只提醒</b>，第 2 層錢的事 Lotion 拍板）</td></tr><tr><td>3</td><td>閒置止血：租料用完沒退 → 提醒問業主拔除、安排退料；倉庫閒置自有料、新案同規格 → 先建議自有</td><td>材料頁比對已有「同長閒置先調撥」</td><td>「用完」要定義（疑問 3）；報價端在材料估算加「倉庫有閒置 X 支同規格」提示（不加按鈕，只顯示）；調度順序 自有→租→買 沿用 <code>m6Decide</code></td></tr><tr><td>4</td><td>防錯：進退加總對不起來、同一張單重複登錄、運輸請款趟數與簽收單張數不符</td><td><code>_m6SlipTrips</code> 算趟數</td><td>①每案每規格 進−退−短少−損壞＝在場量，結案時≠0 出卡；②重複鍵＝照片 hash 或（日期＋車號＋單號＋品項）；③運輸公司請款（第 6 步）趟數 vs 進退料簿趟數</td></tr><tr><td>5</td><td>車型建議（遠距離叫平板，不叫吊板）＋運費行情比價</td><td>無；地區係數在 <code>UPA_COST_DB</code>（只乘搬運費）</td><td>規則表：距離（疑問 6，先用「縣市＋是否跨區」判斷）、支數 → 建議車型；<code>matHist</code> 累積 <code>freight</code> 後，顯示同地區同車型的近期均價與本次差異</td></tr></tbody></table></div>
+<h3>3. 關鍵設計：存在哪裡，工務才能寫又看不到錢</h3>
+<h3>建議：一筆拆兩半，同一個編號</h3>
+<pre>fydata/shared/matMoves/&lt;mvId&gt;      ← 工務可讀、可寫（逐筆），規則擋掉金額欄位
+fydata/private/matMoveFin          ← 只有管理員；以 mvId 為鍵的金額與套用標記</pre>
+<p><b>shared：<code>matMoves</code>（新集合，加入 <code>_SYNC_COLLS</code> 與 <code>_REC_COLLS</code> 逐筆同步）</b></p>
+<pre>{
+  &quot;id&quot;: &quot;mv_xxxx&quot;, &quot;_mt&quot;: 0,
+  &quot;st&quot;: &quot;draft | ok | rejected&quot;,
+  &quot;date&quot;: &quot;2026-11-05&quot;, &quot;dir&quot;: &quot;in | out | xfer&quot;,
+  &quot;own&quot;: true,
+  &quot;qid&quot;: &quot;&lt;本案&gt;&quot;, &quot;fromQid&quot;: &quot;&lt;轉場來源案&gt;&quot;, &quot;toQid&quot;: &quot;&lt;轉場目的案&gt;&quot;,
+  &quot;from&quot;: &quot;公司倉庫&quot;, &quot;to&quot;: &quot;範例工地&quot;,
+  &quot;items&quot;: [ { &quot;name&quot;: &quot;型鋼&quot;, &quot;spec&quot;: &quot;H350&quot;, &quot;len&quot;: 12, &quot;qty&quot;: 40, &quot;unit&quot;: &quot;支&quot;, &quot;m&quot;: 480,
+               &quot;short&quot;: 0, &quot;dmg&quot;: 0, &quot;cond&quot;: &quot;ok | repair | scrap&quot;, &quot;batch&quot;: &quot;&lt;租料批次 id&gt;&quot; } ],
+  &quot;carrier&quot;: &quot;範例運輸&quot;, &quot;truckType&quot;: &quot;flat | crane&quot;, &quot;truck&quot;: &quot;ABC-1234&quot;, &quot;trips&quot;: 1, &quot;tripKey&quot;: &quot;&lt;同車編號&gt;&quot;,
+  &quot;rentVendor&quot;: &quot;範例租賃&quot;, &quot;rentSlipNo&quot;: &quot;R-0001&quot;,
+  &quot;lift&quot;: { &quot;has&quot;: true, &quot;by&quot;: &quot;us | owner | vendor&quot; },
+  &quot;photo&quot;: &quot;&lt;relay 照片 id&gt;&quot;, &quot;signer&quot;: &quot;王先生&quot;,
+  &quot;conf&quot;: { &quot;items[0].qty&quot;: &quot;低&quot; },
+  &quot;src&quot;: { &quot;slipId&quot;: &quot;&lt;舊日報 slip id&gt;&quot;, &quot;by&quot;: &quot;工務 email&quot;, &quot;at&quot;: 0 },
+  &quot;okBy&quot;: &quot;&quot;, &quot;okAt&quot;: 0, &quot;rejReason&quot;: &quot;&quot;
+}</pre>
+<p><b>private：<code>matMoveFin</code>（新集合，加入 <code>_PRIV_COLLS</code>；量不大，先整包同步即可）</b></p>
+<pre>{ &quot;mv_xxxx&quot;: {
+    &quot;_mt&quot;: 0,
+    &quot;freight&quot;: 3500, &quot;freightUnit&quot;: 3500, &quot;freightQid&quot;: &quot;&lt;運費算哪案&gt;&quot;, &quot;share&quot;: { &quot;&lt;qidA&gt;&quot;: 0.6, &quot;&lt;qidB&gt;&quot;: 0.4 },
+    &quot;rentRate&quot;: 4, &quot;rentUnit&quot;: &quot;M·月 | 片·月 | M·天&quot;, &quot;billFrom&quot;: &quot;2026-11-05&quot;, &quot;billTo&quot;: &quot;&quot;,
+    &quot;comp&quot;: 0, &quot;liftFee&quot;: 0,
+    &quot;applied&quot;: { &quot;ledger&quot;: [&quot;&lt;台帳列 id&gt;&quot;], &quot;batch&quot;: &quot;&lt;租料批次 id&gt;&quot;, &quot;at&quot;: 0, &quot;sig&quot;: &quot;&lt;套用時內容簽章&gt;&quot; }
+} }</pre>
+<p><b>為什麼這樣拆</b></p>
+<ul><li>工務只碰 shared，規則可以白名單欄位：<code>matMoves/$id</code> 下只允許上面那些子鍵，<code>$other: .validate false</code>，<b>連不小心帶金額都寫不進去</b>。</li><li>已確認（<code>st:'ok'</code>）的紀錄，規則只讓管理員改（<code>data.child('st').val() !== 'ok' || isAdmin</code>），工務改錯要按「修改」走回 draft 前由 Lotion 處理，避免確認後被改掉卻沒重新套用台帳。</li><li>金額跟「套用到哪幾列台帳」放 private，工務的瀏覽器永遠不會下載到。</li><li>每筆同時記 <code>qid</code>（報價 id）；專案資料集 <code>PROJECTS</code>（<code>p_</code>＋主報價 id，<code>_prjOfQ</code>）可由 qid 反查，不另存專案 id，追加報價的料掛主約。</li><li>唯讀帳號（陳軒）可讀 private（v6.0.156 逐項放行），要不要讓它讀 <code>matMoveFin</code> 在規則逐項清單裡決定；預設比照 <code>matLedger</code>。</li><li>不放進報價記錄 <code>q</code> 裡：轉場要同時屬於兩案，獨立集合用 <code>qid/fromQid/toQid</code> 篩，比寫兩份好對帳；也不會讓報價記錄越來越肥。</li></ul>
+<p><b>跟現有資料的關係</b></p>
+<div class="tbl"><table><thead><tr><th>現有</th><th>之後的角色</th></tr></thead><tbody><tr><td><code>q.dailyLogs[].slips</code></td><td>保留不刪（舊資料照常顯示）；新拍的簽收單直接建 <code>matMoves</code>（<code>st:'draft'</code>），日報只留照片連結</td></tr><tr><td><code>MAT_LEDGER</code></td><td>仍是自有料唯一真相；由「套用器」依 <code>matMoves(st=ok, own=true)</code> 改，台帳列加 <code>mvId</code>（追溯）與 <code>cond</code>；<b>Lotion 手動改台帳照舊可以</b>（需求：只有 Lotion 能手動改）</td></tr><tr><td><code>q.mat.rents[].batches</code></td><td>仍是租金成本來源（<code>_m6Sync</code> 不動）；套用器依租料進場建批次、依退場填 <code>o</code>，批次加 <code>mvIn</code>／<code>mvOut</code> 指回進退料簿</td></tr><tr><td><code>q.mat.tps</code></td><td>運費改由 <code>matMoves</code>＋<code>matMoveFin</code> 依運輸公司／月份彙總自動產生列（<code>id:'mv_'+…</code>），手動列保留</td></tr><tr><td><code>matLoc</code></td><td>不變（仍由台帳派生）；之後可加「租料在場」一欄給唯讀帳號</td></tr></tbody></table></div>
+<p><b>套用器（台帳自動更新）跑在哪</b></p>
+<ul><li>建議：<b>管理員裝置</b>在私有資料下載完後跑一次 <code>_mvApplyAll()</code>（比照 <code>_salesCommBoot</code>），之後每次收到 shared 更新再跑。冪等：<code>matMoveFin[mvId].applied.sig</code> 與目前內容簽章相同就跳過；內容變了先「反套用」再重套。</li><li>管理員好幾天沒開 FJ 時台帳會慢；之後可把同一份 <code>calc/matmove.js</code> 搬到雲端程式（functions/ops，管理員權限）每天跑一次。<b>第一版先做裝置端</b>，因為台帳現在是整包同步，雲端寫整包容易跟裝置衝突。</li><li>套不上的（例：倉庫沒有同規格同長度庫存、退場找不到工地上的那批）不硬套，出首頁卡給 Lotion。</li></ul>
+<p><b>規則要改（<code>database.rules.json</code>，改完要到主控台發布）</b></p>
+<ol><li><code>fydata/shared/matMoves</code>：整個集合只有管理員能整包寫；<code>$id</code> 逐筆放行 access 名單（同 <code>shared/quotes/$qid</code>），唯讀名冊不可寫；子鍵白名單＋已確認只限管理員改。</li><li><code>fydata/private/matMoveFin</code>：沿用 private 既有規則（不用新加）。</li><li>不動 <code>fydata/drafts</code>（工務本來就不能寫）。</li></ol>
+<p><b>舊資料一次性遷移 <code>_mvMigrate()</code>（旗標 <code>P.__mvMig=1</code>，只在管理員裝置跑）</b></p>
+<ol><li>每張舊 <code>slips</code>（含 <code>done</code>）→ 建一筆 <code>matMoves</code>：<code>dir</code> 對照 out→<code>out</code> 自有、back→<code>in</code>… 注意方向是以「工地」為主：倉庫→工地＝進場、工地→倉庫＝退場；rentIn/rentOut 同理；<code>other</code> 建 <code>st:'draft'</code> 等人補。<code>src.slipId</code> 記回原單，避免重複遷移。</li><li><b>已勾「已登錄」的舊單 → <code>st:'ok'</code>，但 <code>applied</code> 直接標成「舊資料、已人工處理」，不再動台帳</b>（否則同一批料會被扣兩次）。沒勾的 → <code>st:'draft'</code>，出現在首頁卡片等確認。</li><li>現有租料批次 <code>batches</code> 若沒有對到任何簽收單：<b>不補建</b>進退料紀錄（避免憑空生資料），只在新表上顯示「舊批次（無簽收單）」。</li><li>舊 <code>slips</code> 欄位一律保留；v5／舊版裝置讀不到新集合也不會壞（新集合是新增的鍵）。</li><li>混用期：舊版裝置的「帶入」按鈕仍能用，但會變成雙軌；上線後第 7 步換畫面時把「帶入」拿掉（按鈕盤點表第 5 題已決定改首頁卡片）。</li></ol>
+<h3>4. 預估工作量（分批）</h3>
+<div class="tbl"><table><thead><tr><th>批</th><th>內容</th><th>大小</th><th>依賴</th></tr></thead><tbody><tr><td><b>A 資料＋遷移</b></td><td><code>matMoves</code>（shared 逐筆）、<code>matMoveFin</code>（private）、規則白名單、<code>_mvMigrate</code>、<code>calc/matmove.js</code>（在場量、趟數、M 數、單位換算的純計算，可 Node 測；<b>新 calc 檔要同時加進 index.html（app.js 之前）與 sw.js <code>CALC_FILES</code></b>，之後 dailyTodos 也能共用）、備份涵蓋新集合、冒煙＋合成樣本</td><td>M</td><td>無；<b>主線第 6 步做完接著做</b>（需求排程）</td></tr><tr><td><b>B 首頁卡片＋AI 欄位</b></td><td>AI 提示詞多讀：自有／租賃、運輸公司、車型、租賃商單號、短少／損壞、吊車、簽收人、歸倉狀況、逐欄 conf；智慧收件存成 <code>matMoves(draft)</code>；<code>_v6TodoItems</code> 加「簽收單待確認 N 張」→ 卡片 確認／退回／修改（手機逐列 <code>_mstack</code>、黃色欄必點）；工務與 Lotion 都看得到，金額欄只在 Lotion 的卡上出現（讀 private）</td><td>M</td><td>A</td></tr><tr><td><b>C 台帳自動更新</b></td><td>套用器 <code>_mvApplyAll</code>：抽出 <code>matOut</code>／<code>matBack</code> 的核心成「不開視窗」函式（改原函式本體，不寫包裝）；歸倉 可用／要修／報廢；轉場（台帳 <code>projQid</code> 由 A 改 B、攤提段切開）；套不上出卡</td><td>M</td><td>A、B</td></tr><tr><td><b>D1 租料批次＋租金＋業主逾期</b></td><td>租料進退場自動建／結批次、轉場租期接續；分段單價（16M 以上）資料結構 <code>rt.tiers</code>；計租日期差提醒；業主逾期租金依疑問 2 的口徑接</td><td>L</td><td>A、B；改 <code>_m6Sync</code> 會動到合成樣本答案（要 <code>--update</code> 並寫明）</td></tr><tr><td><b>D2 租賃商請款核對</b></td><td>第 6 步 <code>vendorBill</code>（kind <code>rent</code>）草稿卡上加「進退料簿核算：應付 X、請款 Y、差 Z」＋逐批明細；運輸公司趟數核對</td><td>M</td><td><b>第 6 步上線後</b>；D1</td></tr><tr><td><b>E 防錯檢查</b></td><td>進退加總、重複登錄、趟數不符、日期差 → 首頁卡片；後端 dailyTodos 也可跑（calc 共用）</td><td>S～M</td><td>A；趟數那條等 D2</td></tr><tr><td><b>F1 結案回寫單價庫</b></td><td><code>matHist</code>（private）：實際租期、每趟運費（地區、車型）、損耗率、吊車費；<code>pjCloseAll</code> 時寫；材料估算／報價顯示「假設 vs 實際」</td><td>M</td><td>A、C、D1 有一段時間的實際資料才有意義</td></tr><tr><td><b>F2 租或買、閒置、車型</b></td><td>租或買累計比較卡；租料用完沒退卡、報價時提示倉庫閒置；車型建議與運費行情比價</td><td>M～L</td><td>F1（行情）；閒置那條只需 A、D1</td></tr></tbody></table></div>
+<p>建議順序：<b>A → B → C → D1 → E →（第 6 步上線）D2 → F1 → F2</b>。A＋B＋C 做完，工務就能開始用，Lotion 不用再一張張按帶入。每批一個分支＋PR，照改版流程（CI、另一模型審查、Lotion 說「上線」才合併）。</p>
+<h3>5. 要問 Lotion 的疑問（附建議答案）</h3>
+<ol><li><b>工務拍照時，AI 讀完要不要先讓工務在手機上改一次，還是直接進首頁卡片？</b></li></ol>
+<p>建議：直接進首頁卡片，拍照那一步不再跳出修改畫面，只看到「已收到，待確認」。這樣只有一個地方確認，不會改兩次。</p>
+<ol><li><b>業主逾期租金，要看哪一天算「料已經退了」？</b> 現在系統看日報裡的「拔除」進度；新的進退料簿有每一趟的退場日。</li></ol>
+<p>建議：<b>業主請款仍照合約（日報拔除進度）算</b>，進退料簿的退場日只拿來比對，差超過設定天數出提醒。因為業主合約認的是拔除，不是料車離場；料留在工地但已拔除，不該向業主收。</p>
+<ol><li><b>「租料已經用完、還沒退場」要怎麼判斷？</b></li></ol>
+<p>建議：該工項日報已記「拔除完成」（或階段完工），但進退料簿這批料還在場超過 3 天 → 出卡片「問業主、安排退料」。天數可在參數改。</p>
+<ol><li><b>簽收單日期和租賃商計租日期，差幾天要提醒？</b></li></ol>
+<p>建議：差 <b>1 天以上</b>就提醒（租金按天算，多 1 天就是多付），卡片上直接寫「可能多算 N 天、約 NT$ X」，金額只給 Lotion 看。</p>
+<ol><li><b>工務按「確認」之後，台帳就立刻自動改嗎？還是 Lotion 要再看一次？</b></li></ol>
+<p>建議：自有料照需求<b>確認就自動改</b>，但只有三種情況改成卡片等 Lotion：倉庫找不到同規格庫存、退場支數比工地上多、歸倉狀況是「要修／報廢」。其他不打擾。</p>
+<ol><li><b>車型建議的「遠距離」怎麼算？</b></li></ol>
+<p>建議：先用簡單規則：<b>跨縣市（倉庫所在縣市以外）算遠，建議平板車</b>；同縣市且需要現場卸貨才建議吊板。等運費資料累積 3 個月後，再改成依實際運費行情比價。需要 Lotion 告訴我們倉庫在哪個縣市（可寫在參數）。</p>
+<footer class="report-credit"><a class="brandline" href="https://shifu.tw/course/trial/ai-agent-bootcamp">《超級 AI 個體》AI Agent 陪跑課</a>
+<span class="tagline-row"><em class="tagline">工作交給 AI，時間留給自己</em><span class="sep">｜</span><span>此提案報告由<a href="https://raymondhouch.com/">雷蒙（侯智薰）</a>設計</span></span>
+<span class="links"><a href="https://ai.lifehacker.tw">學習資源站 ai.lifehacker.tw</a><a href="https://works.lifehacker.tw">學員作品集 works.lifehacker.tw</a></span></footer>
+</main>
+<script>document.getElementById('theme').onclick=function(){var r=document.documentElement;var d=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=d?'light':'dark';try{localStorage.setItem('rp-theme',r.dataset.theme)}catch(e){}};try{var t=localStorage.getItem('rp-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
