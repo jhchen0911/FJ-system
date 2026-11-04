@@ -419,6 +419,87 @@ exports.monthlySnapshot = onSchedule({ schedule: '25 7 * * *', timeZone: TZ, reg
   }
 });
 exports.pnlSnapNow = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], memory: '1GiB', timeoutSeconds: 300 }, async (req, res) => {
+// ══════════ 改版第 5 步 5d：整體日報（#8）、實際進度回填（#9）、待辦同步 Google 工作表（#21） ══════════
+// #8 每天 21:30（台北）：讀已確認的日報（報價的 dailyLogs）→ 豐有內部群組（lineCfg/groups/<gid>.audience='internal'）直接推 LINE；
+//    有營造廠的群組（沒設定也算）只建「整體日報」草稿（type dailyOut）給 Lotion 自己轉發。每個群組每天只處理一次（fydata/dailyOut/<日期>/<gid>）。
+//    隔天 08:30 補跑前一天：21:30 之後才確認的工地補建草稿、當晚沒東西可推的內部群組補推。LINE 本月額度快用完（≥180）→ 內部群組也改成草稿。
+//    還沒確認的工地 → 後端待辦 fydata/todo/daily（工務）；推送失敗 → 緊急待辦（陳軒看了告訴 Lotion）。
+// #9 同一支排程接著跑：已確認日報 → fydata/progress/<專案 id>/<工項 key>（只有數量與日期），對不到工項 → fydata/todo/progress（工務）。
+// dailyReportNow：管理員手動跑（驗收；只補當天還沒處理過的群組，已推／已建草稿的不重送），可帶 {date:'YYYY-MM-DD'}。
+const dailyCore = require('./ops/daily.js');
+const progressCore = require('./ops/progress.js');
+const gtasksCore = require('./ops/gtasks.js');
+// 跟前端 _fbEncKey 一樣（Firebase key 不能有 . # $ / [ ]）
+const encKey = (k) => String(k).replace(/\./g, '~d~').replace(/#/g, '~h~').replace(/\$/g, '~s~').replace(/\//g, '~sl~').replace(/\[/g, '~lb~').replace(/\]/g, '~rb~');
+async function runProgress(now) {
+  const db = admin.database();
+  const val = (p) => db.ref(p).once('value').then((s) => s.val() || {});
+  const [quotes, projects] = await Promise.all([val('fydata/shared/quotes'), val('fydata/shared/projects')]);
+  const r = progressCore.build({ quotes, projects, now });
+  const out = {};
+  Object.keys(r.byPid).forEach((pid) => { out[encKey(pid)] = r.byPid[pid]; });
+  await db.ref('fydata/progress').set(Object.keys(out).length ? out : null);
+  await db.ref('fydata/todo/progress').set(progressCore.todoOf(r.mismatch, now));
+  console.log('[進度回填] 工項', r.n, '對不到', r.mismatch.length);
+  return r;
+}
+async function runDaily(date, now) {
+  const db = admin.database();
+  const val = (p) => db.ref(p).once('value').then((s) => s.val() || {});
+  const [quotes, cfg, pend, done] = await Promise.all([
+    val('fydata/shared/quotes'), val('fydata/lineCfg'),
+    db.ref('fydata/drafts').orderByChild('status').equalTo('pending').once('value').then((s) => s.val() || {}),
+    val('fydata/dailyOut/' + date),
+  ]);
+  const p = dailyCore.plan({ quotes, cfg, pending: Object.values(pend), date, now, done });
+  const deps = lineAdapters.mkDeps(LINE_TOKEN.value());
+  const fails = [];
+  let sends = p.sends;
+  if (sends.length) {
+    const used = await deps.quotaUsed();
+    if (notifyCore.monthHold(used)) {   // 額度快用完：內部群組也改草稿，Lotion 自己決定要不要轉
+      sends.forEach((s) => p.drafts.push({ id: 'do' + s.gid.replace(/[^\w]/g, '').slice(-10) + date.replace(/-/g, ''), type: 'dailyOut', by: 'line-bot', byName: 'LINE 機器人', at: now, status: 'pending',
+        summary: ('整體日報（LINE 本月額度快用完，改草稿）：' + s.label + '　' + date).slice(0, 200), payload: { groupId: s.gid, group: String(s.label).slice(0, 40), qid: '', date, text: s.text, internal: true } }));
+      sends = [];
+    }
+  }
+  for (const s of sends) {
+    // 審查：先認領（交易：沒有紀錄才寫 sending），兩支排程或手動同時跑也只有一支會推；推成功才改 sent，失敗刪掉認領（下次補推）
+    const ref = db.ref('fydata/dailyOut/' + date + '/' + s.gid);
+    const cl = await ref.transaction((cur) => (cur ? undefined : { at: now, kind: 'sending', label: String(s.label).slice(0, 40) }));
+    if (!cl.committed) continue;
+    try { await deps.push(s.gid, s.text); }
+    catch (e) { console.error('[整體日報] 推送失敗', s.gid, e && e.message); fails.push(String(s.label || '群組').slice(0, 20)); await ref.remove().catch((e2) => console.error('[整體日報] 認領清除失敗', e2 && e2.message)); continue; }
+    await ref.set({ at: now, kind: 'sent', label: String(s.label).slice(0, 40) }).catch((e) => console.error('[整體日報] 已推但紀錄失敗', s.gid, e && e.message));   // 已推出：紀錄失敗也不刪認領（寧可少推不重推）
+  }
+  for (const d of p.drafts) {
+    await deps.createDraft(d);   // 同一群組同一天只建一次
+    await db.ref('fydata/dailyOut/' + date + '/' + d.payload.groupId).set({ at: now, kind: 'draft', draft: d.id, label: String(d.payload.group || '').slice(0, 40) });
+  }
+  // 待辦依日期分 key（審查：補跑前一天不會蓋掉今天的）；同一天沒問題了就清掉，超過 2 天的一併清
+  const dk = date.replace(/-/g, ''), tnew = Object.assign({}, p.todo, dailyCore.failTodo(fails, date, now));
+  const tcur = (await db.ref('fydata/todo/daily').once('value')).val() || {}, tup = {};
+  tup['unconf_' + dk] = tnew['unconf_' + dk] || null;
+  tup['fail_' + dk] = fails.length ? tnew['fail_' + dk] : (sends.length ? null : (tcur['fail_' + dk] || null));   // 這次沒有要推的群組：保留之前的失敗紀錄（等補推成功才清）
+  Object.keys(tcur).forEach((k) => { const m = k.match(/_(\d{8})$/); if (m && m[1] < lineCore.addDays(date, -2).replace(/-/g, '')) tup[k] = null; });
+  await db.ref('fydata/todo/daily').update(tup);
+  // 30 天前的發送紀錄清掉
+  const days = Object.keys((await db.ref('fydata/dailyOut').once('value')).val() || {}).sort();
+  for (const d of days) if (d < lineCore.addDays(date, -30)) await db.ref('fydata/dailyOut/' + d).remove();
+  console.log('[整體日報]', date, '確認', p.confirmed.length, '推', sends.length - fails.length, '草稿', p.drafts.length, '失敗', fails.length);
+  return { date, confirmed: p.confirmed.length, unconf: p.unconf.length, sent: sends.length - fails.length, drafts: p.drafts.length, fails: fails.length };
+}
+exports.dailyReport = onSchedule({ schedule: '30 21 * * *', timeZone: TZ, region: REGION, secrets: [LINE_TOKEN], memory: '1GiB', timeoutSeconds: 300 }, async () => {
+  const now = Date.now();
+  try { await runDaily(lineCore.tpeDate(now), now); } catch (e) { console.error('dailyReport', e); }
+  try { await runProgress(now); } catch (e) { console.error('dailyReport.progress', e); }
+});
+exports.dailyReportCatchup = onSchedule({ schedule: '30 8 * * *', timeZone: TZ, region: REGION, secrets: [LINE_TOKEN], memory: '1GiB', timeoutSeconds: 300 }, async () => {
+  const now = Date.now();
+  try { await runDaily(lineCore.addDays(lineCore.tpeDate(now), -1), now); } catch (e) { console.error('dailyReportCatchup', e); }
+  try { await runProgress(now); } catch (e) { console.error('dailyReportCatchup.progress', e); }
+});
+exports.dailyReportNow = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], secrets: [LINE_TOKEN], memory: '1GiB', timeoutSeconds: 300 }, async (req, res) => {
   try {
     if (req.method !== 'POST') { res.status(405).json({ error: { message: '只接受 POST' } }); return; }
     const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
@@ -428,4 +509,91 @@ exports.pnlSnapNow = onRequest({ region: REGION, cors: ['https://jhchen0911.gith
     if (role !== 'admin') { res.status(403).json({ error: { message: '只有管理員可以手動執行' } }); return; }
     res.json(Object.assign({ ok: true }, await runPnl(Date.now())));
   } catch (e) { console.error('pnlSnapNow', e); res.status(500).json({ error: { message: '損益快照失敗' } }); }
+    const now = Date.now(), today = lineCore.tpeDate(now);
+    let date = String((req.body && req.body.date) || today);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today || date < lineCore.addDays(today, -7)) { res.status(400).json({ error: { message: '日期只能是 7 天內' } }); return; }
+    let r = {}, pr = null, err = '';
+    try { r = await runDaily(date, now); } catch (e) { console.error('dailyReportNow.daily', e); err = '整體日報失敗'; }
+    try { pr = await runProgress(now); } catch (e) { console.error('dailyReportNow.progress', e); err = err ? err + '、進度回填失敗' : '進度回填失敗'; }
+    if (err) { res.status(500).json({ error: { message: err } }); return; }
+    res.json(Object.assign({ ok: true, progress: pr.n, mismatch: pr.mismatch.length }, r));
+  } catch (e) { console.error('dailyReportNow', e); res.status(500).json({ error: { message: '整體日報失敗' } }); }
+});
+
+// #21 待辦同步 Google 工作表（Lotion 11/04 選 A：雲端直接建；Lotion 一次 OAuth 授權，步驟見 docs/待辦同步Google工作表_授權操作卡.md）
+// 金鑰：`firebase functions:secrets:set GTASKS_CLIENT_ID`、`GTASKS_CLIENT_SECRET`（Google Cloud 主控台建的 OAuth 用戶端；不進程式碼、不進 Git、不經對話）。
+// refresh token 存 fydata/gtasks/auth（規則讀寫全 false，只有雲端程式碰得到）；給 FJ 看的狀態寫 fydata/gtasksStatus（管理員可讀，不含金鑰）。
+// 觸發：fydata/todo 有變動就同步；另外每小時對一次帳（觸發漏掉、Google 暫時失敗都會補上）。
+const GT_ID = defineSecret('GTASKS_CLIENT_ID');
+const GT_SECRET = defineSecret('GTASKS_CLIENT_SECRET');
+const crypto = require('crypto');
+function gtRedirect() {
+  let pid = process.env.GCLOUD_PROJECT;
+  if (!pid) { try { pid = JSON.parse(process.env.FIREBASE_CONFIG || '{}').projectId; } catch (e) { console.error('gtRedirect', e && e.message); } }
+  return 'https://' + REGION + '-' + pid + '.cloudfunctions.net/gtasksAuthCallback';
+}
+async function gtStatus(db, patch) { await db.ref('fydata/gtasksStatus').update(Object.assign({ at: Date.now() }, patch)); }
+async function runGtasks() {
+  const db = admin.database(), now = Date.now(), day = lineCore.tpeDate(now);
+  const lock = await db.ref('fydata/gtasks/lock').transaction((cur) => (cur && now - cur < 120000 ? undefined : now));
+  if (!lock.committed) { await db.ref('fydata/gtasks/dirty').set(true); return { busy: true }; }   // 正在跑：跑完會再對一次
+  let last = null;
+  try {
+    for (let round = 0; round < 3; round++) {
+      await db.ref('fydata/gtasks/dirty').set(null);
+      const g = (await db.ref('fydata/gtasks').once('value')).val() || {};
+      if (!g.auth || !g.auth.refresh) { await gtStatus(db, { authed: false }); return { authed: false }; }
+      const todo = (await db.ref('fydata/todo').once('value')).val() || {};
+      const api = gtasksCore.client({ fetch, clientId: GT_ID.value(), clientSecret: GT_SECRET.value(), refresh: g.auth.refresh });
+      let r;
+      try {
+        r = await gtasksCore.run({ api, todo, map: g.map || {}, listId: g.listId || '', madeToday: (g.count && g.count[day]) || 0, now });
+      } catch (e) {
+        r = { listId: g.listId || '', map: g.map || {}, made: 0, done: 0, deferred: 0, errs: [String(e && e.message || e)], authLost: /授權失效/.test(String(e && e.message)) };
+      }
+      const up = { listId: r.listId || null, map: Object.keys(r.map).length ? r.map : null };
+      up['count/' + day] = ((g.count && g.count[day]) || 0) + r.made;
+      Object.keys(g.count || {}).forEach((d) => { if (d < lineCore.addDays(day, -7)) up['count/' + d] = null; });
+      await db.ref('fydata/gtasks').update(up);
+      const ft = gtasksCore.failTodo(r.errs, now);
+      const cur = (await db.ref('fydata/todo/gtasks').once('value')).val();
+      if (JSON.stringify(cur ? Object.keys(cur) : []) !== JSON.stringify(ft ? Object.keys(ft) : []) || (ft && cur && cur.fail && cur.fail.text !== ft.fail.text)) await db.ref('fydata/todo/gtasks').set(ft);
+      await gtStatus(db, { authed: !r.authLost, lastRun: now, made: r.made, done: r.done, deferred: r.deferred, errs: r.errs.length, lastErr: r.errs.length ? String(r.errs[0]).slice(0, 160) : null, today: up['count/' + day] });
+      last = r;
+      if (!(await db.ref('fydata/gtasks/dirty').once('value')).val()) break;
+    }
+  } finally { await db.ref('fydata/gtasks/lock').set(null); }
+  return last ? { made: last.made, done: last.done, errs: last.errs.length } : {};
+}
+exports.gtasksSync = onValueWritten({ ref: '/fydata/todo', region: REGION, secrets: [GT_ID, GT_SECRET] }, async () => { try { await runGtasks(); } catch (e) { console.error('gtasksSync', e); } });
+exports.gtasksSyncHourly = onSchedule({ schedule: '20 * * * *', timeZone: TZ, region: REGION, secrets: [GT_ID, GT_SECRET] }, async () => { try { await runGtasks(); } catch (e) { console.error('gtasksSyncHourly', e); } });
+// 授權第一步：FJ「授權 Google 工作表」（只有 Lotion 的帳號）→ 回傳 Google 同意畫面網址
+exports.gtasksAuthStart = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], secrets: [GT_ID] }, async (req, res) => {
+  try {
+    if (req.method !== 'POST') { res.status(405).json({ error: { message: '只接受 POST' } }); return; }
+    const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
+    if (!m) { res.status(401).json({ error: { message: '需要登入' } }); return; }
+    const t = await admin.auth().verifyIdToken(m[1]);
+    if (String(t.email || '').toLowerCase() !== OWNER) { res.status(403).json({ error: { message: '只有 Lotion 的帳號可以授權' } }); return; }
+    const s = crypto.randomBytes(24).toString('hex');
+    await admin.database().ref('fydata/gtasks/state').set({ s, at: Date.now() });
+    res.json({ ok: true, url: gtasksCore.authUrl(GT_ID.value(), gtRedirect(), s) });
+  } catch (e) { console.error('gtasksAuthStart', e); res.status(500).json({ error: { message: '授權服務錯誤' } }); }
+});
+// 授權第二步：Google 同意後導回這裡（網址要登記在 OAuth 用戶端的「已授權的重新導向 URI」）
+exports.gtasksAuthCallback = onRequest({ region: REGION, secrets: [GT_ID, GT_SECRET] }, async (req, res) => {
+  const page = (ok, msg) => res.status(ok ? 200 : 400).set('Content-Type', 'text/html; charset=utf-8').send('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Google 工作表授權</title><body style="font-family:sans-serif;padding:24px;line-height:1.7"><h3>' + (ok ? '✅ 授權完成' : '⚠️ 授權沒有完成') + '</h3><p>' + msg + '</p><p>可以關閉這個分頁，回到 FJ。</p></body>');
+  try {
+    const db = admin.database(), now = Date.now();
+    const code = String(req.query.code || ''), state = String(req.query.state || '');
+    if (req.query.error) { page(false, '你在 Google 畫面按了取消或沒有同意（' + String(req.query.error).replace(/[^\w-]/g, '').slice(0, 40) + '）。'); return; }
+    const saved = (await db.ref('fydata/gtasks/state').once('value')).val();
+    if (!code || !gtasksCore.stateOk(saved, state, now)) { page(false, '授權連結過期或不是從 FJ 按的，請回 FJ 重按一次「授權 Google 工作表」。'); return; }
+    await db.ref('fydata/gtasks/state').set(null);
+    const refresh = await gtasksCore.exchange(fetch, GT_ID.value(), GT_SECRET.value(), gtRedirect(), code);
+    await db.ref('fydata/gtasks/auth').set({ refresh, at: now });
+    await gtStatus(db, { authed: true, authAt: now, lastErr: null });
+    try { await runGtasks(); } catch (e) { console.error('gtasksAuthCallback.sync', e); }   // 回應前先同步一次（回應後的背景工作可能被凍結）
+    page(true, '之後 FJ 的後端待辦會自動出現在 Google 工作表的「' + gtasksCore.LIST_TITLE + '」清單（每天最多新建 ' + gtasksCore.DAILY_LIMIT + ' 筆），處理好會自動打勾。');
+  } catch (e) { console.error('gtasksAuthCallback', e); page(false, '換取授權失敗，請回 FJ 重按一次。'); }
 });
