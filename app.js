@@ -40765,12 +40765,14 @@ function _retDueHint(q){
 }
 // 這台用同一份算法算一次全部提醒（並行比對、總覽新提醒共用）；同一分鐘內重用
 var _todoBuildC=null;
+function _todoBuildFp(){var m=0,f=function(a){(a||[]).forEach(function(x){if(x&&(x._mt||0)>m)m=x._mt||0;});};f(Q);f(INV);f(PAYABLES);f(CONTRACTS);return [(Q||[]).length,(INV||[]).length,(PAYABLES||[]).length,m,localToday()].join('|');}
 function _todoBuild(force){
-  if(!force&&_todoBuildC&&Date.now()-_todoBuildC.at<60000)return _todoBuildC.v;
+  var fp='';try{fp=_todoBuildFp();}catch(e){_err('_todoBuild.fp',e);}
+  if(!force&&_todoBuildC&&_todoBuildC.v&&_todoBuildC.fp===fp&&Date.now()-_todoBuildC.at<60000)return _todoBuildC.v;   // 審查：資料一改就重算、失敗不快取
   var v=null;
   try{v=FJC.todo.build({quotes:Q,invoices:(INV||[]).map(function(i){return _invUnpack(i);}),contracts:CONTRACTS,customers:CUSTOMERS,payables:PAYABLES,matLedger:(typeof MAT_LEDGER!=='undefined'?MAT_LEDGER:[]),
     histOf:function(id){return Q_HISTORY[id]||[];}},{today:localToday(),now:Date.now(),tax:P&&P.tax,payDef:_OWNER_PAY_DEF,inv:FJC.inv});}catch(e){_err('_todoBuild',e);v=null;}
-  _todoBuildC={at:Date.now(),v:v};return v;
+  _todoBuildC={at:Date.now(),v:v,fp:fp};return v;
 }
 // 並行比對用的鑰匙（雲端 functions/ops/todos.js 用同一套）
 function _todoKeys(v){
