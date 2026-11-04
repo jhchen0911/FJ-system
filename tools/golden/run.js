@@ -1,11 +1,12 @@
 // 真實黃金樣本 (b)：用「某一版程式」把凍結快照算一遍，輸出關鍵數字（只用 id 當鍵，不含案名）。
 //
-//   node tools/golden/run.js --snapshot <快照.json> --out <結果.json> [--names <名單.json>] [--root <程式資料夾>]
+//   node tools/golden/run.js --snapshot <快照.json> --out <結果.json> [--names <名單.json>] [--root <程式資料夾>] [--sens <敏感資料備份.json>]
 //
 //   --snapshot  Lotion-HQ 從正式版匯出的全量備份（exportData 產生的 JSON），只放在 %USERPROFILE%\FJ-golden\，不進 repo
 //   --out       算出的數字（之後給 compare.js 比對）
 //   --names     另存真實名稱清單（案名、業主、廠商、合約名）給 namecheck.js 用，只存在本機
 //   --root      要用哪一份程式算（預設＝本 repo）；比對分支時指向分支的資料夾
+//   --sens      （改版第 5 步起）敏感資料備份檔；快照是新版匯出的就要一起給，否則薪資不見、股東報表年度數字會對不上
 //
 // 做法：開一個斷網的無頭瀏覽器 → 時鐘固定在快照匯出時間（「今天」不隨執行日期改變）→ 用系統自己的「匯入備份」載入快照
 //      → 在頁面裡用系統自己的算法算（tools/golden/page-extract.js）。不登入、不連雲端、不改任何正式資料。
@@ -14,14 +15,22 @@ const path = require('path');
 const { chromium } = require('playwright');
 
 function arg(name, def) { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : def; }
-const SNAP = arg('snapshot'), OUT = arg('out'), NAMES = arg('names');
+const SNAP = arg('snapshot'), OUT = arg('out'), NAMES = arg('names'), SENS = arg('sens');   // --sens：改版第 5 步起全量備份拆兩檔，薪資等敏感資料在另一個「敏感資料備份」檔
 const ROOT = path.resolve(arg('root', path.join(__dirname, '..', '..')));
-if (!SNAP || !OUT) { console.error('用法：node tools/golden/run.js --snapshot <快照.json> --out <結果.json> [--names <名單.json>] [--root <程式資料夾>]'); process.exit(2); }
+if (!SNAP || !OUT) { console.error('用法：node tools/golden/run.js --snapshot <快照.json> --out <結果.json> [--names <名單.json>] [--root <程式資料夾>] [--sens <敏感資料備份.json>]'); process.exit(2); }
 
 (async () => {
   let json, snap;
   try { json = fs.readFileSync(SNAP, 'utf8').replace(/^\uFEFF/, ''); snap = JSON.parse(json); } catch (e) { console.error('快照讀不到或不是有效的 JSON'); process.exit(2); }
   if (!snap.version || !snap.quotes) { console.error('快照格式不符（要用系統的「全量備份」檔）'); process.exit(2); }
+  if (SENS) {   // 敏感資料備份併回快照（新舊版程式都讀得懂合併後的檔）：薪資名冊、薪資單、零用金、人員證件
+    let sens;
+    try { sens = JSON.parse(fs.readFileSync(SENS, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { console.error('敏感資料備份讀不到'); process.exit(2); }
+    if (!sens || sens.kind !== 'fy-sens-backup') { console.error('--sens 要用系統匯出的「敏感資料備份」檔'); process.exit(2); }
+    snap.hr = sens.hr || []; snap.payslips = sens.payslips || []; snap.petty = sens.petty || [];
+    (snap.workers || []).forEach((w) => { const x = w && sens.workerSens && sens.workerSens[w.id]; if (x && x.f) Object.keys(x.f).forEach((k) => { if (w[k] == null || w[k] === '') w[k] = x.f[k]; }); });
+    json = JSON.stringify(snap);
+  }
   const t0 = Date.parse(snap.exportDate || '') || Date.UTC(2026, 9, 15, 2, 0, 0);
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, timezoneId: 'Asia/Taipei', locale: 'zh-TW', acceptDownloads: false });

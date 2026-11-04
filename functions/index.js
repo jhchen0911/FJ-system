@@ -304,3 +304,79 @@ exports.lineInboxMark = onRequest({ region: REGION, cors: ['https://jhchen0911.g
     res.status(500).json({ error: { message: '收件匣服務錯誤' } });
   }
 });
+
+// ══════════ 改版第 5 步 5a：雲端每日健檢（後端 28）＋後端待辦節點 ══════════
+// 每天 06:40（台北）跑一次：讀 shared／private（應付、付款帳本）與日報照片容量 → fydata/health/latest、fydata/health/days/<日期>（留 30 天），
+// 需要人處理的寫成後端待辦 fydata/todo/health/<key>（整個 health 子樹每次重寫：問題解決了待辦就消失）。網頁只能讀這兩個節點（規則）。
+// healthRunNow：管理員手動跑一次（驗收、出問題後立刻重查），帶登入憑證呼叫。
+const healthCore = require('./ops/health.js');
+async function photoStats(db) {
+  // 分批讀（每批 40 張；每張是整張 base64 照片，批次太大會吃光記憶體），只算筆數與大小
+  const PAGE = 40;
+  let count = 0, bytes = 0, last = null;
+  for (;;) {
+    let q = db.ref('fydata/relay/photos').orderByKey().limitToFirst(PAGE + 1);
+    if (last) q = db.ref('fydata/relay/photos').orderByKey().startAt(last).limitToFirst(PAGE + 1);
+    const v = (await q.once('value')).val() || {};
+    const keys = Object.keys(v).filter((k) => k !== last);
+    keys.forEach((k) => { const x = v[k]; count++; bytes += (x && typeof x === 'object' && typeof x.du === 'string') ? x.du.length + 60 : Buffer.byteLength(JSON.stringify(x || '')); });
+    if (keys.length < PAGE) break;
+    last = keys[keys.length - 1];
+  }
+  return { count, bytes };
+}
+async function runHealth() {
+  const db = admin.database(), now = Date.now();
+  // 只讀用得到的幾塊（不整包讀 shared）；照片統計失敗不影響其他項目
+  const val = (p) => db.ref(p).once('value').then((s) => s.val() || {});
+  const [quotes, projects, prjTombs, payables, paidLog] = await Promise.all([
+    val('fydata/shared/quotes'), val('fydata/shared/projects'), val('fydata/shared/tombs/projects'),
+    val('fydata/private/payables'), val('fydata/private/paidLog'),
+  ]);
+  let photos = { count: 0, bytes: 0 };
+  try { photos = await photoStats(db); } catch (e) { console.error('[健檢] 照片統計失敗', e); photos = { count: 0, bytes: 0, err: 1 }; }
+  const shared = { quotes, projects, tombs: { projects: prjTombs } };
+  const h = healthCore.buildHealth({ shared, priv: { payables, paidLog }, photos, now });
+  await db.ref('fydata/health/latest').set(h);
+  await db.ref('fydata/health/days/' + h.day).set(h);
+  const days = Object.keys((await db.ref('fydata/health/days').once('value')).val() || {});
+  for (const d of healthCore.pruneDays(days, 30)) await db.ref('fydata/health/days/' + d).remove();
+  await db.ref('fydata/todo/health').set(healthCore.todoFromHealth(h));
+  console.log('[健檢] 完成', JSON.stringify(h.counts), '問題', h.warn);
+  return h;
+}
+exports.dailyHealth = onSchedule({ schedule: '40 6 * * *', timeZone: TZ, region: REGION, memory: '1GiB', timeoutSeconds: 300 }, async () => { await runHealth(); });
+exports.healthRunNow = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], memory: '1GiB', timeoutSeconds: 300 }, async (req, res) => {
+  try {
+    if (req.method !== 'POST') { res.status(405).json({ error: { message: '只接受 POST' } }); return; }
+    const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
+    if (!m) { res.status(401).json({ error: { message: '需要登入' } }); return; }
+    const t = await admin.auth().verifyIdToken(m[1]);
+    const role = t.fy || roleOf(t.email, await lists());
+    if (role !== 'admin') { res.status(403).json({ error: { message: '只有管理員可以手動執行健檢' } }); return; }
+    const h = await runHealth();
+    res.json({ ok: true, at: h.at, warn: h.warn, counts: h.counts });
+  } catch (e) { console.error('healthRunNow', e); res.status(500).json({ error: { message: '健檢失敗' } }); }
+});
+
+// ══════════ 改版第 5 步 5a：回收筒到期清除（後端 30）══════════
+// 每天 03:45（台北）清掉超過保留天數（參數 trashDays，預設 30）的回收筒紀錄；每台裝置開頁也會清，這支確保沒人開也會清。
+const trashCore = require('./ops/trash.js');
+exports.trashPurge = onSchedule({ schedule: '45 3 * * *', timeZone: TZ, region: REGION }, async () => {
+  const db = admin.database(), now = Date.now();
+  const days = (await db.ref('fydata/shared/params/trashDays').once('value')).val();
+  let n = 0;
+  for (const p of ['fydata/shared/trash', 'fydata/private/trashPriv']) {
+    // 用 transaction：讀到寫之間有裝置剛刪了東西進回收筒，不會被蓋掉
+    let removed = 0;
+    await db.ref(p).transaction((v) => {
+      if (v == null) { removed = 0; return v; }
+      const r = trashCore.purge(v, days, now);
+      removed = r.removed;
+      if (!r.removed) return undefined;   // 沒東西要清：不寫
+      return r.keep.length ? r.keep : null;
+    });
+    n += removed;
+  }
+  console.log('[回收筒] 清除', n, '筆（保留', trashCore.trashDays(days), '天）');
+});

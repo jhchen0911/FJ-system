@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.163';
+var APP_VERSION='v6.0.164';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -2446,7 +2446,9 @@ function _delQDo(id){
   }catch(e){_err('_delQDo',e);}
   try{
     let _ctChanged=false;
-    (CONTRACTS||[]).forEach(c=>{if(_delIds.includes(c.linkedQid)){c.linkedQid=null;_touch(c);c.updatedAt=Date.now();_ctChanged=true;}});
+    const _ctL=[];
+    (CONTRACTS||[]).forEach(c=>{if(_delIds.includes(c.linkedQid)){_ctL.push({id:c.id,qid:c.linkedQid});c.linkedQid=null;_touch(c);c.updatedAt=Date.now();_ctChanged=true;}});
+    try{const _te=TRASH.find(x=>x&&x.id==='quotes|'+id);if(_te){_te.kids=_delIds.filter(x=>x!==id);_te.ctLink=_ctL;_te._mt=_srvNow();_trashSave();}}catch(e2){_err('_delQDo.trash',e2);}   // 5a 審查：回收筒還原時一起接回
     if(_ctChanged&&typeof saveContracts==='function')saveContracts();
   }catch(e){_err('_delQDo',e);}
   // v5.310：連動清除以 id 關聯的請款單（孤兒請款會持續灌入應收與營收統計）
@@ -5568,6 +5570,7 @@ function importData(file){
   reader.onload=e=>{
     try{
       const data=JSON.parse(e.target.result);
+      if(data&&data.kind==='fy-sens-backup'){_sensImport(data);return;}   // 改版第 5 步 5a：敏感資料備份另外還原
       if(!data.version||!data.quotes){
         toast('檔案格式不符，請選擇正確的匯出檔案');return;
       }
@@ -5587,7 +5590,7 @@ function importData(file){
         if(data.invoiceRecs)INVOICE_RECS=arr(data.invoiceRecs);
         if(data.expenses)EXPENSES=arr(data.expenses);
         if(data.customers)CUSTOMERS=arr(data.customers);
-        if(data.workers){WORKERS=arr(data.workers);try{localStorage.setItem('fy_workers',JSON.stringify(WORKERS));}catch(e2){_err('importData.workers',e2);}}
+        if(data.workers){WORKERS=arr(data.workers);try{_wkGraft();}catch(e2){_err('importData.wkGraft',e2);}try{localStorage.setItem('fy_workers',JSON.stringify(WORKERS));}catch(e2){_err('importData.workers',e2);}}   // 5a：一般備份的人員不含證件 → 接回本機留的證件
         if(data.projects){PROJECTS=arr(data.projects);try{localStorage.setItem('fy_projects',JSON.stringify(PROJECTS));}catch(e2){_err('importData.projects',e2);}}   // 4a（舊備份沒有 → 保留現值，下面 _prjSync 依報價補建）
         if(data.costHist){COST_HIST=arr(data.costHist);try{localStorage.setItem('fy_cost_hist',JSON.stringify(COST_HIST));}catch(e2){_err('importData',e2);}}
         if(data.dealHist){DEAL_HIST=arr(data.dealHist);try{localStorage.setItem('fy_deal_hist',JSON.stringify(DEAL_HIST));}catch(e2){_err('importData',e2);}}
@@ -7820,6 +7823,10 @@ function exportData(){
     // v5.373 起另含六大工具存檔、施工計畫書草稿與共用附件庫、材料庫存、報價版本歷史
     const data=_syncPayload().data;
     data.exportDate=new Date().toISOString();
+    // 改版第 5 步 5a（第 4 題 A）：薪資名冊、薪資單、零用金、人員證件另存「敏感資料備份」，一般備份不含
+    let _sens=null;try{_sens=_sensBackupOf(data);}catch(e){_err('exportData.sens',e);}
+    delete data.hr;delete data.payslips;delete data.petty;
+    try{data.workers=(data.workers||[]).map(function(w){return _wkSplit(w).pub;});data.sensSplit=1;}catch(e){_err('exportData.wk',e);}
     try{data.paidLog=PAID_LOG;data.payAudit=PAY_AUDIT;data.devId=_devId();data.appVersion=APP_VERSION;}catch(e){_err('exportData.audit',e);}   // v6.0.89
     const json=JSON.stringify(data,null,2);
     const blob=new Blob([json],{type:'application/json'});
@@ -7833,6 +7840,10 @@ function exportData(){
     a.download='豐有工程_全量備份_'+_ry+_mm+_dd+'.json';
     document.body.appendChild(a);a.click();
     setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1000);
+    if(_sens&&_sensBackupCan()&&((_sens.hr.length+_sens.payslips.length+_sens.petty.length)||Object.keys(_sens.workerSens).length)){
+      // 5a 審查：第二個檔要使用者按一下才下載（瀏覽器會擋自動連續下載，iPhone 會直接丟掉）
+      showConfirm('還有一個敏感資料備份','<div style="font-size:12.5px;line-height:1.75">一般備份已下載。<br>薪資名冊、薪資單、零用金、人員證件放在另一個檔，按「下載」另外存，請另外保管、不要傳給別人。</div>',function(){try{const b2=new Blob([JSON.stringify(_sens,null,2)],{type:'application/json'});const u2=URL.createObjectURL(b2);const a2=document.createElement('a');a2.href=u2;a2.download='豐有工程_敏感資料備份_'+_ry+_mm+_dd+'.json';document.body.appendChild(a2);a2.click();setTimeout(function(){URL.revokeObjectURL(u2);a2.remove();},1000);toast('已下載「敏感資料備份」');}catch(e){_err('exportData.sensFile',e);}},false,null,false,{ok:'下載',cancel:'先不要'});
+    }
     // 記錄備份時間
     localStorage.setItem('fy_last_backup',Date.now().toString());
     updateDashAR();
@@ -8069,7 +8080,7 @@ function initFirebase(){
     _fbUser = user;
     _updateFbUI(!!user);
     if(user) _minVerWatch(_autoSyncOnLogin);
-    else { _aiHeldOff();_lrsOff();_lbxOff();_minVerOff();_isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{localStorage.removeItem('fy_priv_pending');}catch(e){/* 可忽略 */}   /* v6.0.116：登出清掉私有上傳失敗旗標，換人登入不會一直「未同步」 */try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
+    else { _aiHeldOff();_lrsOff();_lbxOff();_bkOff();_minVerOff();_isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{localStorage.removeItem('fy_priv_pending');}catch(e){/* 可忽略 */}   /* v6.0.116：登出清掉私有上傳失敗旗標，換人登入不會一直「未同步」 */try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
   });
 }
 function initGoogleSignIn(){
@@ -8240,6 +8251,7 @@ function _autoSyncOnLogin(){
   try{if(_fbUser&&_fbUser.getIdToken)_fbUser.getIdToken(true).catch(function(){/* 可忽略：離線時沿用舊 token */});}catch(e){_err('_autoSyncOnLogin.token',e);}   // v6.0.105 取得最新 custom claims（Storage 規則用）
   _readerCheck(function(ro){
     try{_draftWatch();}catch(e){_err('_autoSyncOnLogin.draft',e);}   // v6.0.109 AI 草稿
+    try{_bkWatch();}catch(e){_err('_autoSyncOnLogin.bk',e);}   // 改版第 5 步 5a 後端待辦／雲端健檢（唯讀）
     try{_aiHeldWatch();}catch(e){_err('_autoSyncOnLogin.aiHeld',e);}
     try{_lrsWatch();}catch(e){_err('_autoSyncOnLogin.lrs',e);}
     try{_lbxWatch();}catch(e){_err('_autoSyncOnLogin.lbx',e);}   // v6.0.144 LINE 收件匣（只有管理員）   // v6.0.140 勞報單（只有管理員）   // v6.0.134 LINE 額度暫停時只記在 FJ 的 AI 通知
@@ -8338,7 +8350,10 @@ function _tomb(coll,id,moved){   // moved：改編號（舊 id 換新 id，付�
       var _ps=false;if(!_pr){try{_payAuditLoadSnap();_ps=(_payStatSnap||{})[id]==='paid';}catch(e2){_err('_tomb.snap',e2);}}   // 呼叫端先從陣列拿掉的 → 看上次存檔的狀態
       if((_pr&&_pr.status==='paid')||_ps||(_pl&&(+_pl.paidAt||0)>(+_pl.unpaidAt||0))){console.warn('[應付] 擋下刪除已付應付 '+id);return false;}}catch(e){_err('_tomb.paidGuard',e);}
     try{if(typeof PAID_LOG!=='undefined'&&PAID_LOG[id]){delete PAID_LOG[id];localStorage.setItem('fy_paidlog',JSON.stringify(PAID_LOG));}}catch(e){_err('_tomb.paidLog',e);}}   // v6.0.85
-  TOMBS[coll]=TOMBS[coll]||{};TOMBS[coll][id]=Date.now();
+  var _tt=Date.now();
+  if(!moved){try{_trashPut(coll,id);}catch(e){_err('_tomb.trash',e);}
+    try{_tt=_srvNow();var _g=_TOMB_COLLS[coll],_a=_g&&_g(),_r=Array.isArray(_a)&&_a.find(function(x){return x&&x.id===id;});if(_r&&+_r._restoredAt)_tt=Math.max(_tt,+_r._restoredAt+1);}catch(e){_tt=Date.now();_err('_tomb.ts',e);}}   // 5a 審查：墓碑用伺服器時間，而且一定晚於還原時間（還原後再刪才會真的刪）
+  TOMBS[coll]=TOMBS[coll]||{};TOMBS[coll][id]=_tt;
   try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e){_err('_tomb',e);}
   if(!_shWholeOk())try{var _tp=JSON.parse(localStorage.getItem('fy_tombreq_pending')||'{}')||{};_tp[coll+'/'+id]=TOMBS[coll][id];localStorage.setItem('fy_tombreq_pending',JSON.stringify(_tp));}catch(e){_err('_tomb.req',e);}   // v6.0.118：只有本機自己刪的才送刪除申請
   return true;
@@ -10210,10 +10225,10 @@ function _mergeQHistory(loc,cloud){
   return out;
 }
 var _SYNC_COLLS=['quotes','invoices','upaHistory','params','contracts','vendors','invoiceRecs','activityLog','customers','pagePerms','workers',
-  'tombs','admins','projects',
+  'tombs','admins','projects','trash',
   'matStock','toolrecs','planState','qHistory','toolStates'];   // v5.373 新增（planAttLib 純圖檔，只進本機備份不上雲）
 // 敏感集合：只寫 fydata/private
-var _PRIV_COLLS=['payables','expenses','costHist','upaCostDB','shareProfit','matLedger','dealHist','hr','payslips','petty'];   // v5.433 人員薪資、v5.434 零用金
+var _PRIV_COLLS=['payables','expenses','costHist','upaCostDB','shareProfit','matLedger','dealHist','hr','payslips','petty','trashPriv'];   // 5a 回收筒（敏感）   // v5.433 人員薪資、v5.434 零用金
 function _collHash(v){ // djb2 於 JSON 字串
   var st;try{st=JSON.stringify(v);}catch(e){st=String(v);}
   var h=5381;for(var i=0;i<st.length;i++){h=((h<<5)+h+st.charCodeAt(i))|0;}
@@ -10271,6 +10286,7 @@ function _privatePayload(){
     upaCostDB:UPA_COST_DB, shareProfit:SHARE_PROFIT, matLedger:MAT_LEDGER, dealHist:DEAL_HIST,
     hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]), petty:(typeof PETTY!=='undefined'?PETTY:[]),   // v5.433／v5.434
     paidLog:(typeof PAID_LOG!=='undefined'?PAID_LOG:{}),   // v6.0.85
+    trashPriv:(typeof TRASH_PRIV!=='undefined'?TRASH_PRIV:[]),   // 5a 回收筒（應付、費用、報價成本）
     qHistSens:_qhSensMap(),   // 改版第 0 步：版本歷史的敏感欄位（還沒拉過 private 時是 undefined → 不送這個鍵，不會蓋掉雲端）
     payAudit:(typeof PAY_AUDIT!=='undefined'?PAY_AUDIT.slice(0,1000):[]), uploadedVer:APP_VERSION, uploadedDev:(typeof _devId==='function'?_devId():'')   // v6.0.89 付款狀態稽核＋上傳者版本／裝置
   }};
@@ -10289,6 +10305,7 @@ function _syncPayload(){
     workers:(typeof WORKERS!=='undefined'?WORKERS:[]),   // v5.438
     projects:(typeof PROJECTS!=='undefined'?PROJECTS:[]),   // 4a 專案資料集（只有連結，不含金額 → 共用區）
     shareProfit:SHARE_PROFIT, dealHist:DEAL_HIST, matLedger:MAT_LEDGER, admins:admins,
+    trash:(typeof TRASH!=='undefined'?TRASH:[]), trashPriv:(typeof TRASH_PRIV!=='undefined'?TRASH_PRIV:[]),   // 改版第 5 步 5a 回收筒
     hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]), petty:(typeof PETTY!=='undefined'?PETTY:[]),   // v5.433 人員薪資／v5.434 零用金（private；全量備份含）
     // v5.373：六大工具存檔、施工計畫書草稿、共用附件庫、材料庫存、報價版本歷史
     matStock:MAT_STOCK, toolrecs:_trAllSafe(), planState:_planStateSaved(),
@@ -10466,6 +10483,7 @@ function _applyCloud(data){
     if(data.activityLog)ACTIVITY_LOG=data.activityLog;
     if(data.customers)CUSTOMERS=_safeMerge(CUSTOMERS,data.customers,'customers');
     if(data.workers){WORKERS=_safeMerge(WORKERS,data.workers,'workers');try{_wkGraft();}catch(e){_err('_applyCloud.wkGraft',e);}try{_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');}catch(e){_err('_applyCloud.workers',e);}}   // v5.438
+    if(data.trash){try{var _t0=JSON.stringify(TRASH);TRASH=_safeMerge(TRASH,data.trash,'trash');_trashPurge();if(JSON.stringify(TRASH)!==_t0)_trashSave();}catch(e){_err('_applyCloud.trash',e);}}   // 5a 回收筒
     if(data.projects){try{PROJECTS=_safeMerge(PROJECTS,data.projects,'projects');_lsSet('fy_projects',JSON.stringify(PROJECTS),'專案');}catch(e){_err('_applyCloud.projects',e);}}   // 4a
     if(data.matStock){
       try{
@@ -10687,6 +10705,7 @@ function _applySensColls(data,tombs){
   try{if(data.uploadedAt)localStorage.setItem('fy_priv_last_up',JSON.stringify({by:data.uploadedBy||'',ver:data.uploadedVer||'',dev:data.uploadedDev||'',at:parseInt(data.uploadedAt)||0}));}catch(e){_err('_applySensColls.uploader',e);}   // v6.0.89 雲端最後由誰／哪版上傳
   if(data.payables)PAYABLES=_safeMerge(PAYABLES,data.payables,'payables');
   if(data.expenses)EXPENSES=_safeMerge(EXPENSES,data.expenses,'expenses');
+  if(data.trashPriv){try{var _t0=JSON.stringify(TRASH_PRIV);TRASH_PRIV=_safeMerge(TRASH_PRIV,data.trashPriv,'trashPriv');_trashPurge();if(JSON.stringify(TRASH_PRIV)!==_t0)_trashSave();}catch(e){_err('_applySensColls.trash',e);}}   // 5a
   if(data.hr){HR=_safeMerge(HR,data.hr,'hr');try{_lsSet('fy_hr',JSON.stringify(HR),'人員薪資');}catch(e){_err('_applySensColls.hr',e);}}   // v5.433
   if(data.payslips){PAYSLIPS=_safeMerge(PAYSLIPS,data.payslips,'payslips');try{_lsSet('fy_payslips',JSON.stringify(PAYSLIPS),'薪資條');}catch(e){_err('_applySensColls.ps',e);}}
   if(data.petty){PETTY=_safeMerge(PETTY,data.petty,'petty');try{_lsSet('fy_petty',JSON.stringify(PETTY),'零用金');}catch(e){_err('_applySensColls.pc',e);}}   // v5.434
@@ -10769,10 +10788,10 @@ function _mergeColl(localArr,cloudArr,collName,cloudTombs){
   var _arr=function(x){if(Array.isArray(x))return x;if(x&&typeof x==='object')return Object.values(x);return [];};
   localArr=_arr(localArr);cloudArr=_arr(cloudArr);
   var lt=(TOMBS[collName]||{});var ct=(cloudTombs&&cloudTombs[collName])||{};
-  var dead=function(id){var d=lt[id]!=null||ct[id]!=null;if(d&&typeof _tombExempt==='function'&&_tombExempt(collName,id))return false;return d;};   // v6.0.44 成本卡仍需要的應付不受墓碑影響
+  var dead=function(id,r){var d=_tombDead(lt,ct,id,r);if(d&&typeof _tombExempt==='function'&&_tombExempt(collName,id))return false;return d;};   // v6.0.44 成本卡仍需要的應付不受墓碑影響
   var mt=function(r){return r._mt||r.ts||r.updatedAt||0;};
   var map={},noId=[];
-  cloudArr.forEach(function(r){if(!r)return;if(!r.id){noId.push(r);return;}if(!dead(r.id))map[r.id]=r;});
+  cloudArr.forEach(function(r){if(!r)return;if(!r.id){noId.push(r);return;}if(!dead(r.id,r))map[r.id]=r;});
   localArr.forEach(function(r){
     if(!r)return;
     if(!r.id){ // 無 id 舊資料：以內容近似去重後保留
@@ -10780,13 +10799,13 @@ function _mergeColl(localArr,cloudArr,collName,cloudTombs){
       if(!noId.some(function(x){return JSON.stringify(x).slice(0,120)===sig;}))noId.push(r);
       return;
     }
-    if(dead(r.id))return;
+    if(dead(r.id,r))return;
     var o=map[r.id];
     if(o&&o!==r&&_CF_COLLS[collName]&&window._applyingCloud){var m3=null;try{m3=_recMerge3(collName,r,o);}catch(e){_err('_mergeColl.m3',e);}if(m3){map[r.id]=m3;return;}}   // 4b 三方合併（兩邊都改過）
     if(!o||mt(r)>=mt(o))map[r.id]=r;
     if(o&&collName==='payables')map[r.id]=_payStatusReconcile(map[r.id],map[r.id]===r?o:r);   // v6.0.67
   });
-  if(_CF_COLLS[collName]&&window._applyingCloud){try{cloudArr.forEach(function(r){if(r&&r.id&&!dead(r.id))_rcbSet(collName,r);});_rcbSave();}catch(e){_err('_mergeColl.rb',e);}}   // 4b 收到的雲端版＝新的共同祖先
+  if(_CF_COLLS[collName]&&window._applyingCloud){try{cloudArr.forEach(function(r){if(r&&r.id&&!dead(r.id,r))_rcbSet(collName,r);});_rcbSave();}catch(e){_err('_mergeColl.rb',e);}}   // 4b 收到的雲端版＝新的共同祖先
   if(noId.length&&(collName==='customers'||collName==='vendors'||collName==='contracts')){   // 4b 審查 B：雲端舊版留下的沒 id 那份，本機已補 id 的同一筆 → 不重複保留
     var nm={};Object.keys(map).forEach(function(k){var x=map[k];if(x&&x.name)nm[String(x.name)]=1;});
     noId=noId.filter(function(x){var n2=typeof x==='string'?x:(x&&x.name);return !(n2&&nm[String(n2).trim()]);});
@@ -33151,6 +33170,7 @@ function _v6TodoItems(items){
         text:'自有材料在工地：'+(q.name||'')+' '+fmt(qty)+' 支，最久 '+days+' 天'+(days>=120?'（請確認是否該歸還）':''),sub:'攤提 NT$ '+fmt(amt)});
     });
   }catch(e){_err('_v6TodoItems.mat',e);}
+  try{_bkTodoList().forEach(function(t){items.push({type:'bk_'+(t.src||'')+'_'+(t.key||''),urgent:!!t.urgent,jump:t.go==='health'?"go('reports');setTimeout(function(){showReport('health')},80)":"go('dash')",icon:ic('i-cloud'),color:'#6a1b9a',text:String(t.text||''),sub:esc(String(t.sub||''))});});}catch(e){_err('_v6TodoItems.bk',e);}   // 改版第 5 步 後端待辦（雲端寫、網頁只顯示）
   try{if((SYNC_CONFLICTS||[]).length)items.push({type:'sync_conflict',urgent:true,jump:'openSyncConflicts()',icon:ic('i-warn'),color:'var(--red)',text:'同步衝突 '+SYNC_CONFLICTS.length+' 處：兩台裝置改了同一個欄位',sub:'點這裡選要用哪一個'});}catch(e){_err('_v6TodoItems.cf',e);}   // 4b
 }
 // ══════════ v6.0.17 經營報表：利潤分析併入報表中心（總覽分頁）、口徑統一（權責為主、現金為輔）、共用年度篩選 ══════════
@@ -35191,7 +35211,8 @@ function renderHealthReport(el){
   var rows;try{rows=_healthRows();}catch(e){_err('renderHealthReport',e);el.innerHTML='<div style="padding:20px;color:var(--red)">健檢失敗：'+esc(e.message)+'</div>';return;}
   var warn=rows.filter(function(r){return r.sev==='warn';}).length,info=rows.length-warn;
   var cnt={quotes:(Q||[]).length,inv:(INV||[]).length,ct:(CONTRACTS||[]).length,pay:(PAYABLES||[]).length,logs:(Q||[]).reduce(function(a,q){return a+((q&&q.dailyLogs)||[]).length;},0),costs:(Q||[]).reduce(function(a,q){return a+((q&&q.costs)||[]).length;},0)};
-  var h='<div class="card"><div class="cb">'
+  if(!renderHealthReport._bkAt||Date.now()-renderHealthReport._bkAt>60000){renderHealthReport._bkAt=Date.now();_bkHealthLoad(function(){var c=document.getElementById('bk-health-card');if(c)c.outerHTML=_bkHealthHtml();});}   // 審查：每次打開都讀最新一次雲端結果（一分鐘內不重讀）
+  var h=_bkHealthHtml()+'<div class="card"><div class="cb">'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><b style="font-size:14px">資料健檢</b>'
     +'<span style="font-size:12px;color:var(--b4)">報價 '+cnt.quotes+'・請款單 '+cnt.inv+'・合約 '+cnt.ct+'・成本 '+cnt.costs+'・日報 '+cnt.logs+'・應付 '+cnt.pay+'</span>'
     +'<span style="margin-left:auto;font-size:12.5px;font-weight:700;color:'+(warn?'#c62828':'var(--g3)')+'">'+(rows.length?('需處理 '+warn+'・提醒 '+info):'✓ 沒有發現問題')+'</span>'
@@ -39315,6 +39336,7 @@ function _tombApplyOne(c,id,ts){
   try{if(_tombExempt(c,id))return;}catch(e){_err('_tombApplyOne.exempt',e);}   // 現行仍需要的自動應付不刪
   try{if(c==='quotes'&&_delQBlockers(id))return;}catch(e){_err('_tombApplyOne.qblk',e);}   // v6.0.118 審查：員工送來的刪報價申請也要過健檢1 #30（有已付應付／已收款或已開發票的請款單不准刪）
   if(TOMBS[c]&&TOMBS[c][id]!=null)return;   // 已有墓碑：不用舊時間戳覆寫
+  try{_trashPut(c,id);}catch(e){_err('_tombApplyOne.trash',e);}   // 5a 審查：管理員核准員工的刪除時存管理員這份（含成本），還原才完整
   TOMBS[c]=TOMBS[c]||{};TOMBS[c][id]=ts||Date.now();
   var a=_TOMB_COLLS[c]&&_TOMB_COLLS[c]();if(!Array.isArray(a))return;
   for(var i=a.length-1;i>=0;i--){if(a[i]&&a[i].id===id){if(c==='payables'&&a[i].status==='paid')continue;a.splice(i,1);}}   // 已付的應付不刪
@@ -40695,6 +40717,211 @@ function qMeasReview(){
     +'<table class="tbl" style="width:100%"><thead><tr><th>工項</th><th>對應</th><th class="r">報價</th><th class="r">圖面</th><th class="r">差異</th></tr></thead><tbody>';
   rv.rows.forEach(function(x,i){var r=rows[i];h+='<tr style="'+(x.bad?'color:var(--red);font-weight:700':'')+'"><td>'+esc(r.desc)+'</td><td>'+esc(r.lab)+'</td><td class="r">'+fmt(x.qty)+' '+esc(r.unit)+'</td><td class="r">'+fmt(x.meas)+'</td><td class="r">'+(x.pct>0?'+':'')+x.pct+'%（門檻 '+x.th+'%）</td></tr>';});
   showConfirm('圖面覆核',h+'</tbody></table>',function(){},false,null,true);
+}
+// ══════════ 改版第 5 步 5a：後端待辦與雲端每日健檢（前端唯讀）══════════
+// 雲端排程 dailyHealth（每天 06:40）寫 fydata/health/latest（明細，只有管理員與唯讀帳號讀得到）與 fydata/todo/health（待辦，只放筆數）；
+// 網頁只讀：總覽待辦多出「☁ 系統健檢」項目；經營報表 › 資料健檢最上面多一張「雲端每日健檢」卡，跟這台裝置算的逐項並排比對（前兩週並行）。
+var BK_TODO={},BK_HEALTH=null;
+var _BK_HKEYS=[['prj_missing','已得標主報價沒有專案'],['prj_orphan_add','追加已得標、主報價沒有得標'],['paid_pending','付款帳本記已付、應付卻是待付'],['pay_dup','同廠商同工程同金額的應付有兩筆'],['photo_big','日報照片佔用超過 300MB']];
+var _bkRef=null;
+function _bkWatch(){
+  if(!_fbDb||!_fbUser||_bkWatch._on)return;_bkWatch._on=1;
+  try{_bkRef=_fbDb.ref('fydata/todo');_bkRef.on('value',function(s){BK_TODO=s.val()||{};try{if(document.getElementById('page-dash')&&document.getElementById('page-dash').classList.contains('active'))updateDashTodo();}catch(e){_err('_bkWatch.dash',e);}},function(e){_bkWatch._on=0;_bkRef=null;_err('_bkWatch.todo',e);});}catch(e){_bkWatch._on=0;_err('_bkWatch',e);}   // 審查：讀取被拒（規則還沒發布）下次登入再試
+  _bkHealthLoad();
+}
+// 審查：登出時清掉（同一台裝置換人登入，不能看到上一個人的健檢明細）
+function _bkOff(){try{if(_bkRef)_bkRef.off();}catch(e){_err('_bkOff',e);}_bkRef=null;_bkWatch._on=0;BK_TODO={};BK_HEALTH=null;}
+function _bkHealthLoad(cb){
+  if(!_fbDb||!_fbUser){if(cb)cb();return;}
+  _fbDb.ref('fydata/health/latest').once('value').then(function(s){BK_HEALTH=s.val()||null;if(cb)cb();}).catch(function(){/* 可忽略：一般員工讀不到健檢明細 */if(cb)cb();});
+}
+// 後端待辦攤平成清單（fydata/todo/<來源>/<key>）
+function _bkTodoList(){
+  var out=[];Object.keys(BK_TODO||{}).forEach(function(src){var g=BK_TODO[src]||{};Object.keys(g).forEach(function(k){var t=g[k];if(t&&t.text)out.push(t);});});
+  return out;
+}
+// 這台裝置用同樣規則算一次（並行比對用；規則同 functions/ops/health.js）
+function _bkHealthLocal(){
+  var r={};
+  try{
+    var live={};(PROJECTS||[]).forEach(function(p){if(p&&!p.voidAt)live[p.qid]=1;});
+    var tomb=(TOMBS&&TOMBS.projects)||{},byId={};(Q||[]).forEach(function(q){if(q&&q.id)byId[q.id]=q;});
+    r.prj_missing=(Q||[]).filter(function(q){return q&&q.awarded&&!q.parentId&&!live[q.id]&&tomb['p_'+q.id]==null;}).length;
+    r.prj_orphan_add=(Q||[]).filter(function(q){if(!q||!q.awarded||!q.parentId)return false;var m=byId[q.parentId];return !m||!m.awarded;}).length;
+    if(_bkHealthLocal._canPay()){
+      r.paid_pending=(PAYABLES||[]).filter(function(p){if(!p||!p.id||p.status==='paid')return false;var l=PAID_LOG&&PAID_LOG[p.id];return !!l&&(l.paidAt||0)>(l.unpaidAt||0);}).length;
+      var seen={},n=0;(PAYABLES||[]).forEach(function(p){if(!p)return;var k=[(p.to||''),(p.project||''),Math.round(parseFloat(p.amount)||0),p.costPeriod||''].join('|');if(seen[k]&&(parseFloat(p.amount)||0)>0)n++;seen[k]=1;});
+      r.pay_dup=n;
+    }
+  }catch(e){_err('_bkHealthLocal',e);}
+  return r;
+}
+_bkHealthLocal._canPay=function(){try{return _isAdminUser||_isReaderUser||!_fbUser;}catch(e){return false;}};
+function _bkHealthHtml(){
+  var h=BK_HEALTH;
+  var head='<div class="card" id="bk-health-card"><div class="cb"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px"><b style="font-size:14px">☁ 雲端每日健檢</b>';
+  var canRun=false;try{canRun=!!(_fbUser&&isAdmin(_fbUser.email)&&!_isReaderUser);}catch(e){canRun=false;}
+  if(!h&&_fbUser&&!canRun&&!(typeof _isReaderUser!=='undefined'&&_isReaderUser))return head+'<span style="font-size:12px;color:var(--b4)">明細只有管理員看得到</span></div></div></div>';   // 審查：一般員工讀不到，不要顯示成「還沒有結果」
+  if(!h)return head+'<span style="font-size:12px;color:var(--b4)">還沒有結果（雲端程式部署後每天 06:40 跑一次）</span>'+(canRun?'<button type="button" class="btn btn-sm" style="margin-left:auto" onclick="bkHealthRun()">立即跑一次</button>':'')+'</div></div></div>';
+  var loc=_bkHealthLocal(),by={};(h.items||[]).forEach(function(x){by[x.key]=x;});
+  var c=h.counts||{};
+  var rows=_BK_HKEYS.map(function(k){
+    var cn=by[k[0]]?by[k[0]].n:0,ln=loc[k[0]];
+    var same=ln==null?'':(ln===cn?'<span style="color:var(--g3)">✓ 一致</span>':'<span style="color:#c62828">✗ 本機 '+ln+'</span>');
+    var list=by[k[0]]?'<div style="font-size:11px;color:var(--b4)">'+(by[k[0]].list||[]).map(esc).join('、')+(by[k[0]].n>(by[k[0]].list||[]).length?'…':'')+'</div>':'';
+    return '<tr><td>'+esc(k[1])+list+'</td><td style="text-align:right;color:'+(cn?'#c62828':'var(--g3)')+'">'+cn+'</td><td>'+same+'</td></tr>';
+  }).join('');
+  return head+'<span style="font-size:12px;color:var(--b4)">'+esc(h.day||'')+' 跑完｜得標主報價 '+(c.wonMains||0)+'・專案 '+(c.projects||0)+'・應付 '+(c.payables||0)+'・日報照片 '+(c.photos||0)+' 張（約 '+(c.photoMB||0)+'MB）</span>'
+    +(canRun?'<button type="button" class="btn btn-sm" style="margin-left:auto" onclick="bkHealthRun()">立即重跑</button>':'')+'</div>'
+    +'<table class="tbl"><thead><tr><th>項目</th><th style="width:60px;text-align:right">雲端</th><th style="width:110px">跟這台比對</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<div style="font-size:11px;color:var(--b3);margin-top:6px">前兩週雲端與每台裝置並行計算、逐項比對；連續一致後才關掉前端那段（改版第 5 步）。「本機」是這台裝置現在的資料，剛改過還沒同步時會暫時不同。</div></div></div>';
+}
+function bkHealthRun(){
+  if(_roDeny())return;
+  if(!_fbUser){toast('請先登入');return;}
+  toast('雲端健檢執行中…');
+  _fbUser.getIdToken().then(function(tok){
+    return fetch(_fnUrl('healthRunNow'),{method:'POST',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},body:'{}'});
+  }).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j&&j.error&&j.error.message)||('HTTP '+r.status));return j;});})
+  .then(function(j){toast('雲端健檢完成：'+(j.warn?('需處理 '+j.warn+' 筆'):'沒有發現問題'));_bkHealthLoad(function(){try{renderCurrentReport();}catch(e){_err('bkHealthRun.render',e);}});})
+  .catch(function(e){toast('雲端健檢失敗：'+(e&&e.message||'')+'（雲端程式部署了嗎？）');});
+}
+// ══════════ 改版第 5 步 5a：回收筒（後端 30，健檢 2 #14；Lotion 11/04 第 3 題 A：全部集合）══════════
+// 刪除（立墓碑 _tomb）時先把那一筆存一份進回收筒，P.trashDays 天內（預設 30）可在「參數設定 › 系統 › 回收筒」還原；到期由每台裝置（_trashPurge）
+// 與雲端排程 trashPurge 一起清掉。共用區 trash：報價（去成本）、請款單、合約、客戶、廠商（去帳號）、發票紀錄（去影像）、人員（去證件）、專案；
+// 私有區 trashPriv（只有管理員）：應付、費用、報價的成本欄位。系統自動產生的應付／費用不進回收筒（它們會從來源重建）。
+// 還原：記錄放回原集合、蓋 _restoredAt（伺服器時間）→ _mergeColl 看到「還原時間晚於墓碑」就不再當成已刪（_tombDead）；墓碑本身不刪（其他裝置照樣認得）。
+var TRASH=[],TRASH_PRIV=[];
+try{TRASH=JSON.parse(localStorage.getItem('fy_trash')||'[]')||[];}catch(e){TRASH=[];}
+try{TRASH_PRIV=JSON.parse(localStorage.getItem('fy_trash_priv')||'[]')||[];}catch(e){TRASH_PRIV=[];}
+var _TRASH_PRIV_COLLS={payables:1,expenses:1};
+var _TRASH_NAME={quotes:'報價',invoices:'請款單',contracts:'合約',customers:'客戶',vendors:'廠商',invoiceRecs:'發票紀錄',workers:'人員',projects:'專案',payables:'應付',expenses:'費用'};
+var _TRASH_SAVE={quotes:function(){persist();},invoices:function(){saveInv();},contracts:function(){saveContracts();},customers:function(){saveCustomers();},vendors:function(){saveVendors();},
+  invoiceRecs:function(){saveInvoiceRecs();},workers:function(){saveWorkers();},projects:function(){saveProjects();},payables:function(){savePayables();},expenses:function(){saveExpenses();}};
+function _trashDays(){var d=parseInt(P&&P.trashDays,10);return d>0&&d<=365?d:30;}
+function _trashSave(){try{_lsSet('fy_trash',JSON.stringify(TRASH),'回收筒');_lsSet('fy_trash_priv',JSON.stringify(TRASH_PRIV),'回收筒');}catch(e){_err('_trashSave',e);}}
+// 立墓碑前呼叫：把要刪的那一筆存進回收筒（找不到記錄或系統自動產生的就不存）
+function _trashPut(coll,id){
+  try{
+    var g=_TOMB_COLLS[coll];if(!g||id==null)return false;
+    var a=g();if(!Array.isArray(a))return false;
+    var r=a.find(function(x){return x&&x.id===id;});if(!r)return false;
+    if(coll==='payables'){var _src=_paySource(r);if(_src&&_src.auto)return false;}               // 自動應付（分包期別、薪資、抽成…）由來源重建
+    if(coll==='expenses'&&/^E_clean_/.test(String(id)))return false;  // 請款單清潔費自動帶出的費用
+    var now=_srvNow(),key=coll+'|'+id,me=_meEmail()||'';
+    var nm=coll==='invoices'?((r.project||'')+(r.periodNo?(' 第'+r.periodNo+'期'):'')):coll==='payables'?((r.to||'')+' '+(r.project||'')):coll==='expenses'?((r.cat||'')+' '+(r.note||r.desc||'')):(r.name||r.no||r.code||'');
+    var base={id:key,coll:coll,rid:String(id),at:now,_mt:now,by:me,name:String(nm||'').slice(0,60)};
+    TRASH=TRASH.filter(function(x){return x&&x.id!==key;});TRASH_PRIV=TRASH_PRIV.filter(function(x){return x&&x.id!==key;});
+    var rec=JSON.parse(JSON.stringify(r));
+    if(_TRASH_PRIV_COLLS[coll]){TRASH_PRIV.unshift(Object.assign({},base,{rec:rec}));}
+    else{
+      var sh=rec;
+      if(coll==='quotes'){sh=_stripQuoteSens(rec);try{TRASH_PRIV.unshift(Object.assign({},base,{sens:_extractQuoteSens(rec)}));}catch(e){_err('_trashPut.sens',e);}}
+      else if(coll==='vendors'){sh=Object.assign({},rec);delete sh.bank;delete sh.bankAcct;delete sh.bankHolder;}
+      else if(coll==='invoiceRecs'){sh=Object.assign({},rec);if(sh.fileData){sh.fileData='';sh._fileLocal=1;}}
+      else if(coll==='workers'){var _ws=_wkSplit(rec);sh=_ws.pub;try{var _old=WK_SENS[id]||{},_sn=_ws.sens||{id:id,f:{},docs:{}};var _wsAll={id:id,_mt:now,f:Object.assign({},_old.f||{},_sn.f||{}),docs:Object.assign({},_old.docs||{},_sn.docs||{})};if(Object.keys(_wsAll.f).length||Object.keys(_wsAll.docs).length)TRASH_PRIV.unshift(Object.assign({},base,{wsens:_wsAll}));}catch(e){_err('_trashPut.wk',e);}}   // 審查：證件存私有回收筒
+      TRASH.unshift(Object.assign({},base,{rec:sh}));
+    }
+    _trashSave();return true;
+  }catch(e){_err('_trashPut',e);return false;}
+}
+// 墓碑判斷：還原過（_restoredAt 晚於墓碑時間）的記錄不算已刪
+function _tombDead(lt,ct,id,r){
+  var t=Math.max(+((lt||{})[id])||0,+((ct||{})[id])||0);
+  if(!t&&(lt||{})[id]==null&&(ct||{})[id]==null)return false;
+  if(r&&r._restoredAt&&+r._restoredAt>t)return false;
+  if(r&&r.coll&&r.rid&&r.id===r.coll+'|'+r.rid&&+r.at>t)return false;   // 5a 審查：回收筒紀錄（刪→還原→再刪）比回收筒墓碑新 → 是新的一筆
+  return true;
+}
+function _trashPurge(){
+  var lim=_srvNow()-_trashDays()*86400000,n0=TRASH.length+TRASH_PRIV.length;
+  TRASH=TRASH.filter(function(x){return x&&(+x.at||0)>=lim;});TRASH_PRIV=TRASH_PRIV.filter(function(x){return x&&(+x.at||0)>=lim;});
+  var n=n0-TRASH.length-TRASH_PRIV.length;if(n)_trashSave();return n;
+}
+function trashRestore(key){
+  if(_roDeny())return;
+  try{if(_fbUser&&!isAdmin(_fbUser.email)){toast('只有管理員可以還原');return;}}catch(e){_err('trashRestore.admin',e);}
+  var e=TRASH.find(function(x){return x&&x.id===key;})||TRASH_PRIV.find(function(x){return x&&x.id===key&&x.rec;});
+  if(!e||!e.rec){toast('找不到這筆（可能已過期清除）');return;}
+  var g=_TOMB_COLLS[e.coll],a=g&&g();if(!Array.isArray(a)){toast('這類資料不能還原');return;}
+  if(a.some(function(x){return x&&x.id===e.rid;})){toast('同一筆已經存在，不用還原');return;}
+  var rec=JSON.parse(JSON.stringify(e.rec));
+  if(e.coll==='quotes'){var s=TRASH_PRIV.find(function(x){return x&&x.id===key&&x.sens;});if(s){try{_applyQuoteSens(rec,s.sens,true);}catch(e2){_err('trashRestore.sens',e2);}}}
+  var n=_trashRestoreOne(e,rec,key),extra=0;
+  // 5a 審查：刪報價時一起刪掉的請款單、手動應付一起還原；合約連結接回
+  if(e.coll==='quotes'){
+    var ids={};ids[e.rid]=1;(e.kids||[]).forEach(function(k){ids[k]=1;});
+    TRASH.concat(TRASH_PRIV).filter(function(x){return x&&x.rec&&x.id!==key&&((x.coll==='quotes'&&ids[x.rid]&&x.rec.parentId===e.rid)||(x.coll==='invoices'&&(ids[x.rec.sourceQid]||ids[x.rec.quoteId]))||(x.coll==='payables'&&ids[x.rec.quoteId]))&&Math.abs((+x.at||0)-(+e.at||0))<120000;}).forEach(function(x){
+      var g2=_TOMB_COLLS[x.coll],a2=g2&&g2();if(!Array.isArray(a2)||a2.some(function(y){return y&&y.id===x.rid;}))return;
+      var r2=JSON.parse(JSON.stringify(x.rec));if(x.coll==='quotes'){var s2=TRASH_PRIV.find(function(y){return y&&y.id===x.id&&y.sens;});if(s2){try{_applyQuoteSens(r2,s2.sens,true);}catch(e7){_err('trashRestore.kidSens',e7);}}}
+      _trashRestoreOne(x,r2,x.id);extra++;try{(_TRASH_SAVE[x.coll]||function(){})();}catch(e8){_err('trashRestore.kidSave',e8);}
+    });
+    (e.ctLink||[]).forEach(function(l){var c=(CONTRACTS||[]).find(function(x){return x&&x.id===l.id;});if(c&&!c.linkedQid){c.linkedQid=l.qid;_touch(c);c.updatedAt=Date.now();extra++;}});
+    if((e.ctLink||[]).length)try{saveContracts();}catch(e9){_err('trashRestore.ct',e9);}
+  }
+  _trashSave();
+  try{(_TRASH_SAVE[e.coll]||function(){})();}catch(e3){_err('trashRestore.save',e3);}
+  try{logActivity('回收筒','還原'+(_TRASH_NAME[e.coll]||e.coll)+'：'+(e.name||e.rid)+(extra?('（連同 '+extra+' 筆相關資料）'):''));}catch(e4){_err('trashRestore.log',e4);}
+  toast('已還原'+(_TRASH_NAME[e.coll]||'')+'：'+(e.name||e.rid)+(extra?('，連同 '+extra+' 筆相關資料'):''));
+  try{if(document.getElementById('gen-confirm-modal').style.display!=='none')openTrash();}catch(e5){/* 可忽略 */}
+}
+// 放回一筆：還原時間一定晚於墓碑（各裝置時鐘不準也一樣）、人員證件接回、回收筒那一筆立墓碑
+function _trashRestoreOne(e,rec,key){
+  var g=_TOMB_COLLS[e.coll],a=g&&g();if(!Array.isArray(a))return 0;
+  var tt=+((TOMBS[e.coll]||{})[e.rid])||0;
+  rec._restoredAt=Math.max(_srvNow(),tt+1);_touch(rec);
+  if(e.coll==='workers'){var w=TRASH_PRIV.find(function(x){return x&&x.id===key&&x.wsens;});if(w){try{WK_SENS[e.rid]=Object.assign({},w.wsens,{id:e.rid,_mt:_srvNow()});_wkSensSave();}catch(e2){_err('trashRestore.wk',e2);}}}
+  a.unshift(rec);
+  if(e.coll==='workers')try{_wkGraft();}catch(e3){_err('trashRestore.graft',e3);}
+  var inPriv=TRASH_PRIV.some(function(x){return x&&x.id===key;}),inSh=TRASH.some(function(x){return x&&x.id===key;}),now=_srvNow();
+  TRASH=TRASH.filter(function(x){return x&&x.id!==key;});TRASH_PRIV=TRASH_PRIV.filter(function(x){return x&&x.id!==key;});
+  if(inSh){TOMBS.trash=TOMBS.trash||{};TOMBS.trash[key]=now;}if(inPriv){TOMBS.trashPriv=TOMBS.trashPriv||{};TOMBS.trashPriv[key]=now;}   // 回收筒那一筆也要刪掉，別台同步才不會再出現
+  try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e6){_err('trashRestore.tomb',e6);}
+  return 1;
+}
+function trashDaysSet(v){
+  if(_roDeny())return;
+  var d=parseInt(v,10);if(!(d>0&&d<=365)){toast('天數要在 1～365 之間');return;}
+  P.trashDays=d;try{persistP();_markDirty();_autoUpload();}catch(e){_err('trashDaysSet',e);}   // 只存這一個參數（doSaveP 會從表單重讀全部參數）
+  toast('回收筒保留 '+d+' 天');
+}
+function openTrash(){
+  _trashPurge();
+  var admin=false;try{admin=!_fbUser||isAdmin(_fbUser.email);}catch(e){admin=false;}
+  var all=TRASH.concat(TRASH_PRIV.filter(function(x){return x&&x.rec;})).sort(function(a,b){return (b.at||0)-(a.at||0);});
+  var days=_trashDays();
+  var rows=all.map(function(x){
+    var left=Math.max(0,Math.ceil(((+x.at||0)+days*86400000-_srvNow())/86400000));
+    return '<tr><td>'+esc(_TRASH_NAME[x.coll]||x.coll)+'</td><td>'+esc(x.name||x.rid)+'</td><td style="white-space:nowrap">'+esc(new Date(+x.at||0).toLocaleString('zh-TW',{hour12:false}))+'<div style="font-size:11px;color:var(--b3)">'+esc(String(x.by||''))+'・還剩 '+left+' 天</div></td>'
+      +'<td>'+(admin?'<button type="button" class="btn btn-xs" onclick="trashRestore(\''+esc(x.id).replace(/'/g,'&#39;')+'\')">還原</button>':'')+'</td></tr>';
+  }).join('');
+  var h='<div style="font-size:12px;color:var(--b4);margin-bottom:8px">刪掉的資料保留 '+days+' 天，期限內可以還原（還原只限管理員）。'
+    +(admin?'　保留天數 <input type="number" min="1" max="365" value="'+days+'" style="width:64px" onchange="trashDaysSet(this.value)"> 天':'')+'</div>'
+    +(all.length?'<table class="tbl"><thead><tr><th>類別</th><th>名稱</th><th>刪除時間</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>':'<div style="padding:12px;color:var(--b3)">回收筒是空的</div>');
+  showConfirm('回收筒',h,function(){},false,null,true);
+}
+try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{_trashPurge();}catch(e){_err('trashBoot',e);}},2000);});}catch(e){_err('trashBoot',e);}
+// ══════════ 改版第 5 步 5a：敏感資料備份分開（健檢 2 #13、#15；Lotion 11/04 第 4 題 A）══════════
+// 全量備份拆兩個檔：一般資料（不含薪資名冊、薪資單、零用金、人員證件）；「敏感資料備份」另一個檔，只有管理員（或沒登入的本機模式）會下載。
+// 匯入：一般備份照舊；敏感資料備份（kind fy-sens-backup）只還原那四塊，其他不動。
+function _sensBackupOf(d){
+  var ws={};(d.workers||[]).forEach(function(w){var s=_wkSplit(w).sens;if(s&&w&&w.id)ws[w.id]=s;});
+  Object.keys(WK_SENS||{}).forEach(function(k){if(!ws[k]&&WK_SENS[k])ws[k]=WK_SENS[k];});
+  return {kind:'fy-sens-backup',version:1,exportDate:new Date().toISOString(),appVersion:APP_VERSION,hr:d.hr||[],payslips:d.payslips||[],petty:d.petty||[],workerSens:ws};
+}
+function _sensBackupCan(){try{return !_fbUser||(isAdmin(_fbUser.email)&&!_isReaderUser);}catch(e){return false;}}
+function _sensImport(data){
+  if(!_sensBackupCan()){toast('只有管理員可以還原敏感資料備份');return;}
+  var n=(data.hr||[]).length+(data.payslips||[]).length+(data.petty||[]).length+Object.keys(data.workerSens||{}).length;
+  showConfirm('還原敏感資料備份','<div style="font-size:12.5px;line-height:1.75">會用這個檔取代本機的薪資名冊 '+(data.hr||[]).length+' 筆、薪資單 '+(data.payslips||[]).length+' 筆、零用金 '+(data.petty||[]).length+' 筆，並補回人員證件 '+Object.keys(data.workerSens||{}).length+' 人。<br>其他資料不會動。</div>',function(){
+    var arr=function(x){return Array.isArray(x)?x:(x&&typeof x==='object'?Object.values(x):[]);};
+    HR=arr(data.hr);PAYSLIPS=arr(data.payslips);PETTY=arr(data.petty);
+    try{localStorage.setItem('fy_hr',JSON.stringify(HR));localStorage.setItem('fy_payslips',JSON.stringify(PAYSLIPS));localStorage.setItem('fy_petty',JSON.stringify(PETTY));}catch(e){_err('_sensImport.ls',e);}
+    Object.keys(data.workerSens||{}).forEach(function(k){WK_SENS[k]=data.workerSens[k];});
+    try{_wkSensSave();_wkGraft();localStorage.setItem('fy_workers',JSON.stringify(WORKERS));}catch(e){_err('_sensImport.wk',e);}
+    try{_markDirty();_autoUpload();}catch(e){_err('_sensImport.up',e);}
+    toast('敏感資料已還原（'+n+' 筆）');
+  },true);
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
