@@ -435,6 +435,16 @@ exports.monthlySnapshot = onSchedule({ schedule: '25 7 * * *', timeZone: TZ, reg
   }
 });
 exports.pnlSnapNow = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], memory: '1GiB', timeoutSeconds: 300 }, async (req, res) => {
+  try {
+    if (req.method !== 'POST') { res.status(405).json({ error: { message: '只接受 POST' } }); return; }
+    const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
+    if (!m) { res.status(401).json({ error: { message: '需要登入' } }); return; }
+    const t = await admin.auth().verifyIdToken(m[1]);
+    const role = t.fy || roleOf(t.email, await lists());
+    if (role !== 'admin') { res.status(403).json({ error: { message: '只有管理員可以手動執行' } }); return; }
+    res.json(Object.assign({ ok: true }, await runPnl(Date.now())));
+  } catch (e) { console.error('pnlSnapNow', e); res.status(500).json({ error: { message: '損益快照失敗' } }); }
+});
 // ══════════ 改版第 5 步 5d：整體日報（#8）、實際進度回填（#9）、待辦同步 Google 工作表（#21） ══════════
 // #8 每天 21:30（台北）：讀已確認的日報（報價的 dailyLogs）→ 豐有內部群組（lineCfg/groups/<gid>.audience='internal'）直接推 LINE；
 //    有營造廠的群組（沒設定也算）只建「整體日報」草稿（type dailyOut）給 Lotion 自己轉發。每個群組每天只處理一次（fydata/dailyOut/<日期>/<gid>）。
@@ -523,8 +533,6 @@ exports.dailyReportNow = onRequest({ region: REGION, cors: ['https://jhchen0911.
     const t = await admin.auth().verifyIdToken(m[1]);
     const role = t.fy || roleOf(t.email, await lists());
     if (role !== 'admin') { res.status(403).json({ error: { message: '只有管理員可以手動執行' } }); return; }
-    res.json(Object.assign({ ok: true }, await runPnl(Date.now())));
-  } catch (e) { console.error('pnlSnapNow', e); res.status(500).json({ error: { message: '損益快照失敗' } }); }
     const now = Date.now(), today = lineCore.tpeDate(now);
     let date = String((req.body && req.body.date) || today);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today || date < lineCore.addDays(today, -7)) { res.status(400).json({ error: { message: '日期只能是 7 天內' } }); return; }
