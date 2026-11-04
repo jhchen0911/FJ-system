@@ -32,7 +32,7 @@ fyQuoteChange({
 | 新增列 | `{op:'add', item:{desc,unit,qty,price,note}, after:{idx,match}}` | `after` 省略＝加在最後；單價可負數＝減項（數量要 > 0） |
 | 改列 | `{op:'set', idx, match, fields:{desc,unit,qty,price,note}}` | 只改有寫的欄位 |
 | 刪列 | `{op:'del', idx, match}` | |
-| 改備註數字欄 | `{op:'rmk', key, value}` | key：load 載重、walk 走道、tech 技術工、bh／br／bs／bb 買斷、c2／c3 覆工板、ir 鋪路鐵板、mob 動員費、minQty 最低數量 |
+| 改備註欄位 | `{op:'rmk', key, value}` | key：load 載重、walk 走道、tech 技術工、bh／br／bs／bb 買斷、c2／c3 覆工板、ir 鋪路鐵板、mob 動員費、minQty 最低數量、spareTxt 備用單價那一條的文字（上限 300 字，v6.0.165 起） |
 | 自訂條款 | `{op:'rmkAdd', text}`、`{op:'rmkSet', n, match, text}`、`{op:'rmkDel', n, match}` | n＝第幾條自訂條款（從 0 起），match＝那一條開頭的字 |
 
 - `idx`＝報價工項的第幾列（從 0 起，分段標題也算一列）；`match`＝那一列說明的第一行，**兩個都對上才改**。只給 `match` 時要剛好一列相符。

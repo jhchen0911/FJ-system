@@ -40730,7 +40730,7 @@ function qMeasReview(){
 //   {op:'rmkAdd', text}／{op:'rmkSet', n, match, text}／{op:'rmkDel', n, match}   自訂條款（n＝第幾條自訂條款，從 0 起）
 // 唯讀帳號在主控台或自動化呼叫 fyQuoteChange({qid, ops, summary})。
 var _QCHG_F={desc:1,unit:1,qty:1,price:1,note:1};
-var _QCHG_RMK={load:1,walk:1,tech:1,bh:1,br:1,bs:1,bb:1,c2:1,c3:1,ir:1,mob:1,minQty:1};
+var _QCHG_RMK={load:1,walk:1,tech:1,bh:1,br:1,bs:1,bb:1,c2:1,c3:1,ir:1,mob:1,minQty:1,spareTxt:1};   // spareTxt：v6.0.165 備用單價那一條的單張文字（上限 300）
 var _QCHG_MAX=60;
 function _qchgHas(o,k){return Object.prototype.hasOwnProperty.call(o,k);}   // 審查：不讓 constructor／toString 這類繼承來的名字過白名單
 function _qchgNumOk(n,lim){return n!=null&&Math.abs(n)<=lim;}
@@ -40781,7 +40781,7 @@ function _qchgPlan(q,ops){
       Object.assign(o,nx);rows.push({act:lbl,ok:true,before:before,after:_qchgRowTxt(o),d:(parseFloat(o.qty)||0)*(parseFloat(o.price)||0)-a0});
     }else if(t==='rmk'){
       var k=String(op.key||'');if(!_qchgHas(_QCHG_RMK,k)){no('備註','不認得的欄位 '+k.slice(0,20));return;}
-      var v=String(op.value==null?'':op.value).slice(0,60);rows.push({act:'備註欄位 '+k,ok:true,before:String(rmk[k]||'（空白）'),after:v||'（清空）',d:0});rmk[k]=v;
+      var v=String(op.value==null?'':op.value).slice(0,k==='spareTxt'?300:60);rows.push({act:'備註欄位 '+k,ok:true,before:String(rmk[k]||'（空白）'),after:v||'（清空）',d:0});rmk[k]=v;
     }else if(t==='rmkAdd'){
       var tx=String(op.text||'').trim().slice(0,300);if(!tx){no('新增條款','沒有內容');return;}
       ex.push({t:tx,n:-1,del:0});rows.push({act:'新增自訂條款',ok:true,before:'',after:tx,d:0});
@@ -40807,7 +40807,7 @@ function _qchgClean(ops){
     op=op&&typeof op==='object'?op:{};var t=S(op.op,10),o={op:t};
     if(t==='add'){var it=op.item||{};o.item={desc:S(it.desc,500),unit:S(it.unit,20),qty:N(it.qty),price:N(it.price),note:S(it.note,200)};var a=ref(op.after);if(a)o.after=a;}
     else if(t==='set'||t==='del'){var r=ref(op)||{};if(r.idx!=null)o.idx=r.idx;if(r.match!=null)o.match=r.match;if(t==='set'){o.fields={};Object.keys(op.fields||{}).forEach(function(k){if(_qchgHas(_QCHG_F,k))o.fields[k]=(k==='qty'||k==='price')?N(op.fields[k]):S(op.fields[k],500);});}}
-    else if(t==='rmk'){o.key=S(op.key,20);o.value=S(op.value,60);}
+    else if(t==='rmk'){o.key=S(op.key,20);o.value=S(op.value,String(op.key)==='spareTxt'?300:60);}
     else if(t==='rmkAdd'){o.text=S(op.text,300);}
     else if(t==='rmkSet'||t==='rmkDel'){o.n=parseInt(op.n,10);if(op.match!=null)o.match=S(op.match,300);if(t==='rmkSet')o.text=S(op.text,300);}
     return o;
