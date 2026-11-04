@@ -1,0 +1,124 @@
+<title>報價補登歷史版次</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>:root{--bg:#f5f6f2;--surface:#fff;--fg:#1f2620;--muted:#5f6a62;--rule:#d7ddd5;--accent:#1c6937;--note:#f6ecd8;--noteb:#c99a3c;
+--font-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;--font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121714;--surface:#1a211d;--fg:#e3eae5;--muted:#9aa79f;--rule:#2c3731;--accent:#6cc28a;--note:#372b14;--noteb:#8a6a2a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121714;--surface:#1a211d;--fg:#e3eae5;--muted:#9aa79f;--rule:#2c3731;--accent:#6cc28a;--note:#372b14;--noteb:#8a6a2a;color-scheme:dark}
+*{box-sizing:border-box}body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.75}
+.wrap{max-width:860px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 40px}
+h1{font-size:1.55rem;margin:0 0 10px;text-wrap:balance}h2{font-size:1.15rem;margin:30px 0 10px;text-wrap:balance}h3{font-size:1rem;margin:20px 0 8px}
+p,li{overflow-wrap:anywhere}ul,ol{padding-left:1.3em}li.sub{margin-left:1.2em;list-style:circle}
+a{color:var(--accent)}code{font-family:var(--font-mono);font-size:.88em;background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:0 4px}
+pre{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:12px 14px;overflow-x:auto;font-family:var(--font-mono);font-size:.85rem;line-height:1.6}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--rule);border-radius:12px;margin:10px 0}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:.9rem}th,td{padding:9px 12px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top}
+th{font-size:.82rem;color:var(--muted)}tr:last-child td{border-bottom:none}
+.note{background:var(--note);border:1px solid var(--noteb);border-radius:12px;padding:12px 14px;font-size:.92rem;margin:10px 0}
+.theme{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));width:36px;height:36px;border-radius:50%;border:1px solid var(--rule);background:var(--surface);color:var(--fg);cursor:pointer}
+.report-credit{margin-top:48px;padding-top:20px;border-top:1px solid var(--rule);font-size:.8rem;line-height:1.9;color:var(--muted);text-align:center}
+.report-credit a{color:inherit}.report-credit .brandline{display:block;font-weight:700;color:var(--fg);margin-bottom:8px;text-decoration:none;font-size:.92rem}
+.report-credit .tagline-row{display:block;margin-bottom:8px}.report-credit .tagline{font-style:normal;color:var(--fg);font-weight:500}
+.report-credit .links{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 18px}@media(max-width:520px){.report-credit .sep{display:none}.report-credit .tagline{display:block}}</style>
+<button class="theme" id="theme" type="button" aria-label="切換深淺色">◐</button>
+<main class="wrap">
+<h1>報價補登歷史版次：設計（115102501 補 V2）</h1>
+<div class="note">狀態：設計稿，<b>還沒改程式、還沒上線</b>。依據程式版本 v6.0.173（分支 claude/ui-review）。<br>讀者：第 1～2、5 節給 Lotion；第 3～4 節的「技術」小節給實作的人。<br>風險層級：第 2 層（動到報價版次與跨裝置同步）→ 要先在測試專案演練、另一個模型審查、Lotion 說「上線」才上。</div>
+<h2>1. 一句結論</h2>
+<p><b>可以補，而且 V2 的原始內容很可能還在 FJ 裡</b>：那份「11/03 16:34 非正式快照」幾乎可以確定就是 10/27 寄出的 V2（舊版「還原」功能自動留的備份）。做法是一次性把它升成正式「版 2（10/27，已送業主）」，現在的「版 2（11/03）」改號成「版 3」，正在編輯的那份改成「版 4」，V4 之後照一般流程送出就會封存。</p>
+<pre>現在 FJ 顯示                       補登之後
+─────────────────────────          ─────────────────────────────────
+現行（編輯中） V3  1,857,713   →   現行（編輯中） V4  （套用 −30,000 改單後 1,826,213）
+版 2 正式  11/03  1,857,713    →   版 3 正式  11/03  1,857,713   ← 只改號碼，內容不動
+（存檔）   11/03 16:34 快照    →   版 2 正式  10/27  1,846,713   ← 新增一筆正式版（已送業主）
+                                   （存檔）   11/03 16:34 快照   ← 原樣保留，不刪
+版 1 正式  10/25  1,950,585    →   版 1 正式  10/25  1,950,585   ← 不動
+另一張 115110401「第二份報價，未採用」→ 只拿來對照；補登完成後怎麼處理見第 5 節</pre>
+<p>為什麼不能直接手動改：版次紀錄在跨裝置同步時是「各台裝置的紀錄聯集、同一筆以存檔時間認人」，<b>改既有那一筆的號碼不會傳到別台，別台還會把舊號碼傳回雲端蓋回來</b>（第 3.4 節）。所以要先上一小段程式，讓每台裝置都照同一條「更正規則」自己改。</p>
+<h2>2. 現在版次怎麼存（給實作的人，附行號）</h2>
+<h3>2.1 資料長相</h3>
+<div class="tbl"><table><thead><tr><th>東西</th><th>在哪裡</th><th>說明</th></tr></thead><tbody><tr><td>報價的「目前版號」</td><td><code>q.ver</code>（報價記錄，shared，逐筆同步、<code>_mt</code> 新者勝）</td><td>是<b>正在編輯的那一版</b>的號碼，不是最後封存的號碼。封存 V2 之後 <code>q.ver</code> 就變 3</td></tr><tr><td>版次紀錄</td><td><code>Q_HISTORY[qid]</code> 陣列（宣告 app.js:214；本機 <code>fy_q_history</code> 讀入 27752；<code>saveQHistory</code> 27753）</td><td>每筆 <code>{savedAt, by, formal, pre, unsaved, ver, note, snapshot}</code>（<code>saveQVersion</code> 27893–27907），<b>由新到舊</b>排</td></tr><tr><td>正式／非正式的旗標</td><td><code>formal:true</code>＝正式版次；<code>pre:true</code>＝還原前備份（v6.0.148）；兩者皆無＝「自動存檔」</td><td><code>_qhKeep</code>／<code>_qhPrune</code>（27891–27892）：formal 與 pre 永遠保留，只修剪自動存檔（<code>saveQVersion</code> 留 10、<code>cleanupQHistory</code> 27777 留 3、<code>_mergeQHistory</code> 留 30）</td></tr><tr><td>版次的號碼</td><td><code>entry.ver</code>＝封存當下的 <code>q.ver</code>；<code>entry.snapshot.ver</code> 也是同一個數字（快照是整張報價深拷貝）</td><td>號碼不是另外編的，是「封存時 q.ver 是多少就是多少」</td></tr><tr><td>報價日</td><td><code>q.date</code>（<code>snapshot.date</code>）；<code>q.date0</code>＝第一次報價日（得標率統計用）</td><td><code>_qBumpDo</code> 封存後把 <code>q.date</code> 改成今天（27812）</td></tr><tr><td>同步</td><td><code>qHistory</code> 在 <code>_SYNC_COLLS</code>（10017）→ <code>fydata/shared/qHistory</code>，<b>整包上傳</b>（不是逐筆），上傳前 <code>_qhStrip</code>（9973）抽掉成本欄位</td><td>成本欄位另存 <code>fydata/private</code> 的 <code>qHistSens[qid][savedAt]</code>（<code>_qhSensMap</code> 9981、讀回 <code>_qhFill</code> 9995、10568）</td></tr><tr><td>下載合併</td><td><code>_mergeQHistory</code>（10003，呼叫在 10311）</td><td><b>以 <code>savedAt</code> 當身分做聯集</b>：本機已有同一個 savedAt 就保留本機那筆，雲端那筆丟掉</td></tr><tr><td>匯入備份</td><td>5425</td><td>直接整包取代 <code>Q_HISTORY</code></td></tr></tbody></table></div>
+<h3>2.2 版號怎麼產生</h3>
+<pre>按「進版」或「送出並封存」
+  bumpQVersion (27792) ─┐
+  _qSendGate   (39937) ─┴→ _qBumpDo (27805)
+                             ├ saveQVersion(…{formal:true, note})  ← 封存 entry.ver = q.ver
+                             ├ q.ver = q.ver + 1
+                             ├ q.date0 補第一次報價日；q.date = 今天
+                             ├ _touch(q)、persist()
+                             └ _invSyncUntouched(q)               ← 沒動過的請款草稿跟上新版
+還原 restoreQVersion (27986)
+  ├ 先存「還原前備份」pre:true（v6.0.148 起；之前是一般自動存檔）
+  └ Q[idx] = 快照內容，ver = max(現行, 快照)  ← 版號不倒退</pre>
+<h3>2.3 別的地方記了版號（改號時都要一起處理）</h3>
+<div class="tbl"><table><thead><tr><th>誰記</th><th>欄位</th><th>寫入／使用的地方</th><th>改號不處理會怎樣</th></tr></thead><tbody><tr><td>詢價／分包單</td><td><code>q.rfqs[].quoteVer</code>（private，隨 quoteSens）</td><td>建單 31922、同步 38145／38150；<code>_rfqBaseVer</code> 38040 → <code>calc/todo.js</code> <code>rfqBaseVer</code> 257（沒記就用建立時間對照正式版次推定）</td><td>冒出假的「報價進版、詢價／分包未同步」提醒（總覽、雲端 5b 每日提醒）</td></tr><tr><td>分包變更草稿／紀錄</td><td><code>r.chg.from／to</code>（38158）、<code>r.chgLog[]</code>、<code>c.chgLog[]</code>（38182、38186）</td><td><code>rfqChgConfirm</code> 38166：<code>g.to</code> 不等於 <code>q.ver</code> 就擋「請刪除草稿重新產生」</td><td>待確認的變更草稿會被擋</td></tr><tr><td>版次快照查詢</td><td><code>_qSnapOf</code>（38039）、<code>rfqQuoteDiff</code>（calc/todo.js 264）用 <code>entry.ver===base</code> 找快照</td><td>—</td><td>比對錯版本的工項</td></tr><tr><td>業主請款單</td><td><code>inv.quoteVer</code>（建單 5264、同步 5132／5154／5164）</td><td><code>_invQuoteDiff</code> 5092、<code>_invSyncUntouched</code> 5137、5242</td><td>請款單出現「報價單已進版至 v4，本張仍是舊版」黃條</td></tr><tr><td>請款工項</td><td><code>it._qRetired</code>（5126，記哪一版刪掉了此工項）</td><td>顯示用 3411、3550</td><td>只是文字標示</td></tr><tr><td>AI 改單草稿</td><td><code>fydata/drafts/&lt;id&gt;.payload.baseVer</code>、<code>baseMt</code>（<code>fyQuoteChange</code> 40616）</td><td><code>_qchgOpen</code> 40634–40635：只顯示提醒，不擋；逐列用說明文字對</td><td>見 3.4 風險 5</td></tr><tr><td>雲端每日提醒</td><td><code>functions/ops/todos.js</code> 44 讀 <code>fydata/shared/qHistory</code></td><td>rfqVer 提醒</td><td>雲端那份還是舊號時會短暫誤報</td></tr><tr><td>合約、PDF</td><td>沒找到記報價版號的欄位；<code>_buildQuoteDocHTML</code>（41654）不印版號；PDF 檔名用報價日（41769）</td><td>—</td><td>不受影響</td></tr><tr><td>活動紀錄</td><td><code>logActivity('報價','進版：…→ vN')</code> 純文字</td><td>—</td><td>不改（歷史紀錄）</td></tr></tbody></table></div>
+<h3>2.4 這張報價的時間線（推定，要用資料驗證）</h3>
+<pre>10/25  V1 封存（正式 ver 1，1,950,585）→ q.ver=2
+10/27  在 q.ver=2 上改成 V2（1,846,713），寄給業主
+       ※ 當時還沒有「送出並封存」（v6.0.158 是 11/03 22:13 台灣時間才上線，commit 533e5c5），
+         要自己記得按「進版」，沒按 → V2 沒封存
+11/03 16:34  按「還原」回 V1 準備議價
+       ※ 當時是舊版還原（v6.0.148 在 16:55 才上線）：還原前把「目前內容」存成一般自動存檔
+         → 這筆就是畫面上的「版 2 非正式快照 11/03 16:34」，內容應該就是 V2
+11/03  由 V1 議價成 V3（1,857,713），經「送出並封存」或手動進版 → 封存成正式 ver 2 ← 號碼錯了
+       q.ver=3（現在編輯中的那份，內容＝V3）
+11/04  另建 115110401（編號 115/11/04 第 01 張＝今天才建的，genQuoteCode 785）→ 不是 10/27 的原始紀錄，是事後重建
+       AI 改單草稿（qchg，−30,000）依據 baseVer=3，待套用</pre>
+<h2>3. 一次性「補登歷史版次」設計</h2>
+<h3>3.1 白話流程（Lotion 看這段就好）</h3>
+<pre>① 先備份        ② 陳軒送一張卡片         ③ Lotion 在總覽「AI 草稿」打開卡片
+（匯出全部資料）  「補登 115102501 V2」 →   看前後對照、三個數字都對 → 按「套用」
+                                             數字不對 → 卡片自己擋住，不能套用
+④ 系統自動：存還原前備份 → 新增正式版 2 → 舊版 2 改成版 3 → 編輯中改成版 4
+            → 詢價單、請款單、變更草稿裡記的版號一起改 → 上傳
+⑤ 另一台裝置重新整理兩次 → 看到一樣的版次清單（驗收）
+⑥ 之後照平常：套用 −30,000 改單 → 匯出 PDF「送出並封存」→ 成為 V4</pre>
+<p>不加新按鈕：入口是既有的「AI 草稿」卡片（總覽待辦 → <code>openDrafts</code>），和 AI 改單草稿同一套。</p>
+<h3>3.2 補登前要先驗證（任何一項不對就停，不套用）</h3>
+<p>用 11/03 16:34 那筆快照（以下稱「來源」）做檢查，115110401 只當第二份對照：</p>
+<div class="tbl"><table><thead><tr><th>#</th><th>檢查</th><th>標準</th></tr></thead><tbody><tr><td>1</td><td>來源屬於這張報價</td><td><code>snapshot.id===q.id</code>、<code>snapshot.code==='115102501'</code>、<code>formal</code> 與 <code>pre</code> 都不是 true</td></tr><tr><td>2</td><td>報價日</td><td><code>snapshot.date==='2026-10-27'</code></td></tr><tr><td>3</td><td>列數</td><td>非分項標題（<code>!it.sec</code>）的工項列 = 18；另外把「備用單價」（<code>_isSpare</code>）列數也列出來給 Lotion 看</td></tr><tr><td>4</td><td>未稅</td><td><b>用工項重新算</b>（同 <code>calcT</code> 1101：Σ qty×price，跳過 sec 與備用單價）= 1,758,774</td></tr><tr><td>5</td><td>稅額</td><td><code>Math.round(1,758,774×5%)</code> = 87,939（注意：10/27 存的 <code>snapshot.t.tax</code> 可能是 87,938.7，因為稅額四捨五入到元是 v6.0.152（11/03）才改的，<b>以重算為準，不要只看存的 t</b>）</td></tr><tr><td>6</td><td>含稅</td><td>未稅＋稅額 = 1,846,713</td></tr><tr><td>7</td><td>時間順序</td><td>V1 正式版 <code>savedAt</code> &lt; 來源 <code>savedAt</code> &lt; 現在「版 2 正式」的 <code>savedAt</code>（否則插進去的版次順序會錯）</td></tr><tr><td>8</td><td>和 115110401 對照</td><td>逐列比說明、數量、單價、備註條款；不同的列逐條列在卡片上（115110401 是複製或重建的，名稱、日期、編號本來就會不同，這三項不比）</td></tr><tr><td>9</td><td>和寄出的檔案對照</td><td>卡片顯示用來源產生的報價單（同 <code>_buildQuoteDocHTML</code>），Lotion 拿 10/27 寄給業主的 PDF 目視比對</td></tr><tr><td>10</td><td>沒補過</td><td><code>q.verFix</code> 裡沒有同一個 fixId（冪等）</td></tr><tr><td>11</td><td>環境</td><td>管理員帳號、不是唯讀帳號、私有資料已下載（<code>_QH_SENS!==null</code>）、同步燈是綠的、這張報價沒有在別的分頁編輯中</td></tr></tbody></table></div>
+<p>1～7、10、11 是程式硬擋；8、9 是顯示給 Lotion 判斷。1～6 任何一項不對 → 卡片只能「關閉」，並寫出哪一項差多少。<b>這時候改用 115110401 當來源要另外再送一張卡，不自動換來源。</b></p>
+<h3>3.3 套用時做的事（技術）</h3>
+<p><b>做法核心：把更正寫成一條「規則」存在報價記錄上，每台裝置自己照規則改，而不是只改本機那幾筆紀錄。</b></p>
+<pre>q.verFix = [{
+  id: &#x27;vf_115102501_v2&#x27;,                 // 冪等鍵：已存在就不再做
+  at, by,                                // 套用時間、管理員 email
+  insert: { savedAt: SRC.savedAt + 1,    // 新正式版的身分（不能跟來源同一個 savedAt，見風險 3）
+            src: SRC.savedAt, ver: 2,
+            date: &#x27;2026-10-27&#x27;,
+            note: &#x27;送出 PDF 115/10/27（補登 115/11/0X）&#x27; },
+  shiftFrom: SRC.savedAt,                // savedAt 晚於這個、ver ≥ 2 的正式版次一律 +1
+  verTo: 4,                              // q.ver 至少要是這個（現行 3 → 4）
+  before: { qVer: 3, entries: [{savedAt, ver, snapVer}], rfqs: {rid: quoteVer}, chg: {...}, invs: {invId: quoteVer} },
+  undone: false
+}]</pre>
+<p>套用步驟（<code>_qvfApply</code>，全部在一次存檔內完成）：</p>
+<ol><li><b>備份</b>（任何一步失敗就整個取消）</li><li class="sub">下載一個 JSON：<code>{q, Q_HISTORY[qid], qHistSens[qid], 相關請款單, 草稿}</code>，檔名 <code>補登版次備份_115102501_&lt;時間&gt;.json</code>；同時寫本機 <code>fy_qvf_bak_&lt;qid&gt;</code>。</li><li class="sub"><code>saveQVersion(qid, q, {pre:true})</code> 存一份「還原前備份」（與 v6.0.148 同一套，永久保留）；<code>saveQHistory()</code> 回傳 false（空間滿）就取消。</li><li>寫 <code>q.verFix</code> 規則（含 <code>before</code> 原值，供復原）。</li><li>呼叫 <code>_qhApplyFix(qid)</code>：</li><li class="sub">新增正式版：<code>{savedAt: SRC.savedAt+1, by, formal:true, ver:2, note, backfill:{fixId, src}, snapshot: 深拷貝(SRC.snapshot) 且 snapshot.ver=2}</code>。<b>依 savedAt 插到正確位置</b>（不能用 <code>unshift</code>，否則 <code>_qLastFormal</code> 39934 會把它當成最新正式版，送出時的「內容相同不重複封存」就比錯版）。</li><li class="sub"><code>savedAt &gt; shiftFrom</code>、<code>formal</code>、<code>ver ≥ 2</code> 的每一筆：<code>ver</code> 與 <code>snapshot.ver</code> +1（目前只有那一筆 2→3）。</li><li class="sub"><code>q.ver = max(q.ver, verTo)</code>。</li><li>改其他地方的版號（規則：<b>舊號 ≥ 3 → +1；舊號 = 2 且建立時間晚於 SRC.savedAt → 3；其餘不變</b>）：</li><li class="sub"><code>q.rfqs[].quoteVer</code>（建立時間用 <code>r.ts</code>，沒有就 <code>r.date</code>）、<code>r.chg.from／to</code>、<code>r.chgLog[]</code>、<code>q.costs[].chgLog[]</code>，改完 <code>r.mt=Date.now()</code>。</li><li class="sub">這張報價的請款單 <code>inv.quoteVer</code>、<code>it._qRetired</code>，每張改完 <code>_touch(inv)</code>。</li><li class="sub">沒記 <code>quoteVer</code> 的舊詢價單不用改：<code>rfqBaseVer</code> 用建立時間推定，新版 2 的 savedAt 落在正確位置，推出來的號碼自然對。</li><li><code>_touch(q)</code>、<code>persist()</code>、<code>saveQHistory()</code>、<code>_immediateUpload()</code>。</li><li>草稿標已套用 <code>_draftMark(id,'applied')</code>、<code>logActivity('報價','補登版次：115102501 V2（10/27）；原 V2→V3、編輯中 V3→V4')</code>。</li><li>開「歷史版本」視窗給 Lotion 看結果。</li></ol>
+<p><b>冪等</b>：<code>_qhApplyFix</code> 每次都照規則算「應該長怎樣」再改（新版已存在就不再加；號碼已經是新的就不再 +1——用 <code>before.entries</code> 記的原號判斷，不是看現值再 +1）。跑 1 次和跑 10 次結果一樣。</p>
+<p><b><code>_qhApplyFix</code> 要在這些地方都跑一次</b>（這是要上程式的原因）：開頁讀本機後（27752 之後）、雲端合併後（10311 之後）、匯入備份後（5425）、私有資料補回後（10568）。有改到才 <code>saveQHistory()</code>。</p>
+<p><b>復原</b>（不加按鈕，主控台函式 <code>qVerFixUndo(qid, fixId)</code>，一樣先備份）：把規則標 <code>undone:true</code>、<code>_touch(q)</code>；<code>_qhApplyFix</code> 看到 undone 就把號碼照 <code>before</code> 還原、<b>把補登那筆隱藏</b>（不能真的刪：聯集合併會從別台裝置帶回來，所以用規則隱藏）、q.ver 還原（若之後又進版過，只扣回 1）。</p>
+<p><b>入口（不加新按鈕）</b>：</p>
+<ul><li>唯讀帳號（陳軒／HQ）在主控台跑 <code>fyQuoteVerBackfill({qid, src: 16:34 那筆的 savedAt, ver:2, date:'2026-10-27', expect:{rows:18, sub:1758774, tax:87939, total:1846713}})</code>，和 <code>fyQuoteChange</code>（40603）同一套：本機先試算、對不上就不送 → <code>_draftPush('qverfix', payload, summary)</code>。</li><li>草稿規則不用改：<code>fydata/drafts/$id/type</code> 只驗是字串、<code>payload</code> 只驗有子節點（database.rules.json），新增 <code>srcSavedAt</code>、<code>expect</code> 欄位可以寫入。</li><li>Lotion 在總覽 → AI 草稿 → 卡片 <code>_qvfOpen(id)</code>：前後對照表（版次清單改前／改後、三個數字、與 115110401 的差異、會改到的詢價單／請款單／變更草稿清單）→「套用」／「先不要」。</li><li><code>_DRAFT_T</code> 加 <code>qverfix:'補登版次'</code>；<code>openDrafts</code> 的分派（38602 附近）加一行。</li></ul>
+<h3>3.4 風險與對策</h3>
+<div class="tbl"><table><thead><tr><th>#</th><th>風險</th><th>對策</th></tr></thead><tbody><tr><td>1</td><td><b>版次紀錄聯集合併</b>：同一個 savedAt 本機優先（10003）。只改號碼的話，別台裝置保留舊號，而且 <code>qHistory</code> 是整包上傳，別台下一次存檔就把舊號傳回雲端蓋掉</td><td>規則存在 <code>q.verFix</code>（報價記錄逐筆同步、<code>_mt</code> 新者勝，會傳到每一台），每台合併後都重跑 <code>_qhApplyFix</code>。<b>程式要先上線、所有裝置重新整理兩次之後，才套用補登</b></td></tr><tr><td>2</td><td>別台裝置還開著舊報價（<code>q.ver=3</code>）又存檔，<code>q.ver</code> 被打回 3</td><td><code>_qhApplyFix</code> 同時把 <code>q.ver</code> 補到 ≥ <code>verTo</code>（並 <code>_touch</code>）；套用時請 Lotion 確認其他裝置沒開著這張報價；套用後在第二台裝置驗收</td></tr><tr><td>3</td><td>新版次用和來源同一個 savedAt，會被合併當成「同一筆」，別台永遠看不到 formal 旗標</td><td>新版次用 <code>SRC.savedAt+1</code>，套用前檢查這個值沒被用過</td></tr><tr><td>4</td><td>新版次的成本欄位（private）沒跟上</td><td>只在私有資料已下載的管理員裝置套用（<code>_QH_SENS!==null</code>）；<code>_qhSensMap</code> 會從本機完整快照產生 <code>qHistSens[qid][新 savedAt]</code></td></tr><tr><td>5</td><td>待套用的 AI 改單草稿（baseVer=3）</td><td><b>不改草稿</b>。補登後 <code>_qchgOpen</code> 會顯示「草稿依據 V3，目前是 V4（V3 已封存）：會改在 V4」——這句剛好就是事實；另外會出現「草稿建立後這張報價被改過」，改單是逐列用說明文字對，對得上就能套。順序：<b>先補登，再套 −30,000 改單，再送出</b></td></tr><tr><td>6</td><td>補登前就先把 V4 送出了（又多封存一版）</td><td>規則是「savedAt 晚於來源的正式版一律 +1」，多一版也照樣對；但建議先補登再送</td></tr><tr><td>7</td><td>雲端每日提醒（functions/ops/todos.js）讀的是雲端那份 qHistory，舊裝置蓋回去的期間會誤報</td><td>對策 1 生效後雲端會被改回；可選：把 <code>_qhApplyFix</code> 的純邏輯放 <code>calc/</code>（FJC），雲端讀 qHistory 後也套一次</td></tr><tr><td>8</td><td>那筆 16:34 自動存檔被修剪掉</td><td>目前程式沒有地方會再產生自動存檔，被擠掉的機率低，但「清理版本歷史」（<code>cleanupQHistory</code>）會只留 3 份。<b>今天就先匯出全部資料備份，補登前不要按清理</b></td></tr><tr><td>9</td><td>115110401 讓報價數／得標率多算一張</td><td>第 5 節決定</td></tr><tr><td>10</td><td>舊版程式的裝置（沒重新整理）</td><td>不認得 <code>verFix</code>：顯示舊號、可能把舊號傳回雲端。新版裝置下一次合併就改回來；驗收前請每台都重新整理到新版</td></tr></tbody></table></div>
+<h3>3.5 測試專案演練（正式上線前）</h3>
+<ol><li>正式版：管理員「備份還原 › 匯出」全部資料（含 private）。</li><li>開 <code>test.html</code>（連 <code>fj-system-test</code>、鍵 <code>test:</code> 前綴，不會碰正式資料）→ 匯入剛剛的備份。</li><li>在測試專案用唯讀測試帳號跑 <code>fyQuoteVerBackfill(...)</code> 送卡片 → 管理員測試帳號套用。</li><li>驗：歷史版本清單 V1／V2（10/27）／V3（11/03）／現行 V4；三個數字；詢價單與請款單沒有冒出「未同步」提醒；改單草稿可套用、套用後含稅 1,826,213；送出並封存 → 出現 V4、編輯中變 V5。</li><li>第二個瀏覽器（模擬別台裝置，先載入舊資料、不重新整理）存一次檔 → 確認第一台再同步後號碼仍是對的（風險 1、2）。</li><li>跑一次 <code>qVerFixUndo</code> → 回到原狀；再套用一次 → 結果一樣（冪等）。</li><li>冒煙測試補：插入順序、冪等、聯集合併後重套、undo 隱藏、號碼對照規則、驗證不過不能套用、唯讀帳號不能套用。</li></ol>
+<h2>4. 為什麼 V2 沒被封存，以及怎麼防</h2>
+<h3>4.1 找到的漏洞（依可能性排）</h3>
+<div class="tbl"><table><thead><tr><th>#</th><th>漏洞</th><th>程式位置</th><th>跟這次的關係</th></tr></thead><tbody><tr><td>G1</td><td>10/27 當時根本沒有「送出並封存」：v6.0.158（commit 533e5c5，2026-11-03 14:13 UTC＝台灣 22:13）才有，之前要自己記得按「進版」</td><td>—</td><td><b>主因</b></td></tr><tr><td>G2</td><td>舊版「還原」把目前內容存成<b>一般自動存檔</b>（非正式），所以 V2 只剩一筆非正式快照；現在的還原（v6.0.148 起）存成「還原前備份」，一樣<b>不是正式版</b>——如果目前內容已寄出但沒封存，還原時不會補封存</td><td><code>restoreQVersion</code> 27986</td><td>11/03 16:34 那筆的由來；現在仍會再發生</td></tr><tr><td>G3</td><td>「只匯出、不封存」完全不留紀錄，之後無從知道那份有寄出去</td><td><code>_qSendGate</code> 39958 <code>_qSendOnly</code></td><td>現在仍會發生</td></tr><tr><td>G4</td><td>唯讀帳號（陳軒／HQ）匯出直接放行、不封存也不留紀錄</td><td><code>_qSendGate</code> 39948 <code>if(_isReaderUser)return run(q)</code></td><td>AI 代出 PDF 給業主時會發生</td></tr><tr><td>G5</td><td>複製報價是一張全新的報價（<code>_copyQDo</code> 5813 刪掉 <code>ver</code>，新編號），送出複製品只會封存在複製品上，原報價的版次鏈看不到</td><td>5807–5830</td><td>115110401 就是這種「旁邊另建一張」的情況（而且是 11/04 建的）</td></tr><tr><td>G6</td><td>在 FJ 以外送出（預覽畫面截圖傳 LINE、另存 Word 改完寄）系統不可能知道</td><td>—</td><td>只能事後抓</td></tr><tr><td>G7</td><td>歷史版本視窗寫「每按一次儲存自動留一份（只留 10 份）」，但程式裡找不到存檔時呼叫 <code>saveQVersion</code> 的地方（只有進版 27808、還原 28000），所以實際上沒有這層安全網</td><td><code>showQVersions</code> 27963 文字</td><td>說明文字跟實際不符（待確認）</td></tr></tbody></table></div>
+<h3>4.2 修正提案（不加任何按鈕）</h3>
+<ol><li><b>每次匯出都留紀錄</b>：<code>_qSendGate</code> 所有出口（送出並封存／只匯出／內容相同／唯讀帳號）在 <code>q.sendLog</code> 記 <code>{at, by, what, sig(雜湊), mode, ver}</code>，最多 50 筆。「只匯出」另外把當下內容存成一筆 <code>sent:true</code> 的非正式紀錄（<code>_qhKeep</code> 把 <code>sent</code> 也算永久保留），內容不會再像 V2 一樣只能靠運氣找回來。</li><li><b>還原時自動補封存</b>：<code>restoreQVersion</code> 檢查「目前內容」的簽章（<code>_qSendSig</code> 39933）是否等於某次匯出、但不等於任何正式版 → 確認視窗的文字改成「這份內容 10/27 匯出過、還沒封存，還原前會先封存成 V{n}」，按確認就先 <code>_qBumpDo</code> 再還原。只改既有視窗的文字與行為。</li><li><b>唯讀帳號匯出 → 送卡片</b>：唯讀帳號不能寫入，所以匯出後自動 <code>_draftPush('qsend', …)</code>，Lotion 在 AI 草稿看到「陳軒匯出了 115102501（未稅 …）要封存嗎？」，套用＝封存。</li><li><b>健檢抓漏</b>（前端 <code>_healthRows</code> 35388 加一項＋雲端 <code>functions/ops/health.js</code>）：</li><li class="sub">「匯出過、沒封存、內容已改掉」：<code>sendLog</code> 有 mode=only／reader 的紀錄，簽章不等於任何正式版也不等於現行 → 列出，點進去開第 3 節同一張「補登版次」卡片（補登工具因此變成通用功能，不只這一次用）。</li><li class="sub">「已得標，合約金額對不上任何正式版次或現行報價的含稅總計」→ 抓 G6（在 FJ 以外送出的版本）。</li><li>修正 G7 的說明文字（或補回存檔時的自動存檔，二選一，另案）。</li></ol>
+<h2>5. 需要 Lotion 決定的</h2>
+<ol><li><b>V2 用哪一份當來源？</b></li></ol>
+<p>建議：用 <b>11/03 16:34 那筆快照</b>（它是原報價自己的紀錄，編號、業主、條款都是原本的），115110401 只拿來對照；再加上您手上 10/27 寄給業主的 PDF，三份一致才補登。三個數字對不上就停，不硬補。</p>
+<ol><li><b>115110401（第二份報價，未採用）補登完要怎麼處理？</b></li></ol>
+<p>建議：<b>補登驗收完刪掉</b>（走一般刪除，會進回收筒，可救回）。留著的話，報價張數、得標率會多算一張未得標。不想刪就至少改名「（已併入 115102501 V2）」並標未得標。</p>
+<ol><li><b>「只匯出、不封存」要不要留？</b></li></ol>
+<p>建議：<b>留</b>，但照 4.2 每次匯出都留紀錄＋健檢提醒，自己看的時候不會多出一堆版次。另一個選擇是拿掉、一律封存：最不會漏，但只是自己看一下也會多一版。</p>
+<h2>附：實作清單（一個 PR，版號照「分支版號＝上線版號」）</h2>
+<ul><li>新增：<code>_qhApplyFix</code>、<code>fyQuoteVerBackfill</code>、<code>_qvfPlan</code>（純函式：驗證＋前後對照）、<code>_qvfOpen</code>、<code>_qvfApply</code>、<code>qVerFixUndo</code>；草稿類型 <code>qverfix</code>。</li><li>修改：開頁／合併／匯入／私有補回後呼叫 <code>_qhApplyFix</code>；<code>_DRAFT_T</code>、<code>openDrafts</code> 分派。</li><li>第 4.2 節的防漏另開一個 PR（<code>sendLog</code>、<code>sent</code> 紀錄、還原補封存、<code>qsend</code> 卡片、兩項健檢）。</li><li>不用改資料庫規則、不用部署 Cloud Functions（除非採用風險 7 的雲端也套規則、或 4.2 的雲端健檢）。</li><li>順序：上程式 → 全部裝置重新整理兩次 → 測試專案演練 → 正式版送卡片、Lotion 套用 → 第二台裝置驗收 → 套 −30,000 改單 → 送出並封存成 V4。</li></ul>
+<footer class="report-credit"><a class="brandline" href="https://shifu.tw/course/trial/ai-agent-bootcamp">《超級 AI 個體》AI Agent 陪跑課</a>
+<span class="tagline-row"><em class="tagline">工作交給 AI，時間留給自己</em><span class="sep">｜</span><span>此提案報告由<a href="https://raymondhouch.com/">雷蒙（侯智薰）</a>設計</span></span>
+<span class="links"><a href="https://ai.lifehacker.tw">學習資源站 ai.lifehacker.tw</a><a href="https://works.lifehacker.tw">學員作品集 works.lifehacker.tw</a></span></footer>
+</main>
+<script>document.getElementById('theme').onclick=function(){var r=document.documentElement;var d=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=d?'light':'dark';try{localStorage.setItem('rp-theme',r.dataset.theme)}catch(e){}};try{var t=localStorage.getItem('rp-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
