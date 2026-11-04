@@ -10333,6 +10333,50 @@ async function newPage(browser, width, height) {
     check('A4 單據引擎：左邊改一個欄位，右邊預覽馬上跟著變；手機（390）、平板（900，上下排）不會左右滑動', res[1400].live && !res[390].hscroll && !res[900].hscroll && !res[1400].hscroll && ok(900), JSON.stringify(res));
     check('A4 單據引擎測試無 JS 錯誤', !res[1400].errors.length && !res[900].errors.length && !res[390].errors.length, JSON.stringify([res[1400].errors, res[900].errors, res[390].errors]));
   }
+  // ── 改版第 5 步 5b：雲端每日提醒（後端 10／12／13／17／20）：算法 calc/todo.js 前端與雲端同一份、逐類鑰匙一致；保留款到期＝結案日＋月數；總覽新提醒 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const data = await page.evaluate(() => {
+      const out = {}; const oT = window.toast; window.toast = () => {};
+      try {
+        const D = n => _dAdd(localToday(), n);
+        Q = [
+          { id: 't1', name: '提醒甲', awarded: true, ver: 1, items: [{ desc: 'H型鋼樁 打設', unit: 'M', qty: 10, price: 100, note: '30天租期', ot: '5' }], dailyLogs: [{ date: D(-60), progressRows: [{ itemIdx: 0, qty: 10 }] }] },
+          { id: 't2', name: '提醒乙', awarded: true, ver: 1, items: [{ desc: '支撐 安裝', unit: 'M', qty: 5, price: 100, note: '60天租期' }], dailyLogs: [{ date: D(-56), progressRows: [{ itemIdx: 0, qty: 5 }] }] },
+          { id: 't3', name: '提醒丙', awarded: true, closed: true, closedAt: Date.now() - 200 * 864e5, deduct: { retCond: '結案後 6 個月退還' }, items: [] },
+          { id: 't4', name: '提醒丁', awarded: true, ver: 2, items: [{ desc: '鋼板樁 打設 GL-12m', unit: 'M', qty: 20, price: 1 }], dailyLogs: [{ date: D(-30), status: 'stage', stageOf: 'remove' }],
+            rfqs: [{ id: 'r1', quoteVer: 1, items: [{ idx: 0, desc: '鋼板樁 打設 GL-10m', qd: '鋼板樁 打設 GL-10m', unit: 'M', oq: 20 }] }] }];
+        INV = [{ id: 'ti1', project: '提醒甲', quoteId: 't1', date: D(-40), expectedRecvDate: D(-5), totals: { total: 1050 } },
+          { id: 'ti3', project: '提醒丙', quoteId: 't3', retention: true, retentionPct: 10, totals: { curTotal: 1000, total: 945, retention: 105 }, received: 945 },
+          { id: 'ti4', project: '提醒丁', quoteId: 't4', totals: { total: 21 }, received: 21 }];
+        CONTRACTS = []; PAYABLES = []; MAT_LEDGER = []; Q_HISTORY = {};
+        Object.keys(localStorage).filter(k => k.indexOf('fy_rentscan_') === 0).forEach(k => localStorage.removeItem(k));
+        const v = _todoBuild(true); out.keys = _todoKeys(v);
+        // 保留款到期：結案日＋6 個月；專案頁顯示來源；手填優先
+        const rr = _retentionRows().find(r => r.proj === '提醒丙');
+        out.ret = !!rr && rr.retDueSrc === 'rule' && rr.overdue && /結案日 .+＋ 6 個月/.test(_retDueHint(Q[2]));
+        Q[2].deduct.retDue = '2099-01-01'; out.manual = _retDueOf(Q[2]).src === 'manual' && _retDueOf(Q[2]).date === '2099-01-01'; delete Q[2].deduct.retDue;
+        // 總覽：既有提醒照舊、5b 新增「可以確認結案」「租期 7 天內到期」
+        go('dash'); updateDashTodo(); const t = document.getElementById('dash-todo-list').textContent;
+        out.dash = /提醒甲」1 個工項租期已逾期/.test(t) && /提醒甲 第\?期 逾期 5 天未收款/.test(t) && /保留款逾期未退：提醒丙/.test(t) && /可以確認結案：提醒丁/.test(t) && /「提醒乙」1 個工項租期 \d 天內到期/.test(t) && /提醒丁 報價已進版至 v2/.test(t);
+        out.data = { quotes: Q.map(q => { const c = JSON.parse(JSON.stringify(q)); delete c.rfqs; return c; }), invoices: INV, sens: { t4: { rfqs: Q[3].rfqs } }, now: Date.now() };   // 測試頁的時鐘是假的（2026-10-15），雲端要用同一個「現在」
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      window.toast = oT; return out;
+    });
+    require(require('path').join(__dirname, '..', 'tools', 'copy-calc.js'));
+    const TC = require(require('path').join(__dirname, '..', 'functions', 'ops', 'todos.js'));
+    const cloud = data.data ? TC.buildRemind({ shared: { quotes: data.data.quotes, invoices: data.data.invoices, contracts: {}, customers: {}, params: {}, qHistory: {} }, priv: { payables: {}, matLedger: {}, quoteSens: data.data.sens }, now: data.data.now }) : null;
+    const want = { rent: ['t1'], rentSoon: ['t2#0'], recv: ['ti1'], ret: ['提醒丙'], close: ['t4'], rfqVer: ['t4'] };
+    check('5b 雲端每日提醒：雲端（functions/ops/todos.js）與網頁算出同一組提醒（租期逾期、7 天內到期、收款逾期、保留款逾期、可結案、報價進版）', !!cloud && JSON.stringify(cloud.keys) === JSON.stringify(data.keys) && JSON.stringify(data.keys) === JSON.stringify(want), JSON.stringify({ err: data.err, loc: data.keys, cloud: cloud && cloud.keys }));
+    check('5b 保留款到期（Lotion 11/04）：沒手填＝系統結案日＋退還條件月數、專案頁顯示怎麼算的；手填日期優先', data.ret && data.manual, JSON.stringify(data));
+    check('5b 總覽：既有提醒照舊，新增「可以確認結案」「租期 7 天內到期」', data.dash, JSON.stringify({ dash: data.dash, err: data.err }));
+    const r2 = await page.evaluate(() => { BK_REMIND = { day: '2026-11-04', keys: _todoKeys(_todoBuild(true)) }; const a = _bkRemindHtml(); BK_REMIND.keys.close = []; const b = _bkRemindHtml(); return { ok: (a.match(/✓ 一致/g) || []).length === 6, bad: /雲端少 1/.test(b) }; });
+    const rules = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata.health;
+    const fnSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    check('5b 資料健檢「雲端每日提醒」卡逐類比對（一致／雲端少幾筆）；雲端只寫 fydata/health/remind（網頁不能寫）、每天 07:00 排程、立即跑一次也一起跑', r2.ok && r2.bad && rules['.write'] === 'false' && /exports\.dailyTodos = onSchedule\(\{ schedule: '0 7 \* \* \*'/.test(fnSrc) && /fydata\/health\/remind/.test(fnSrc) && /await runRemind\(\)\)\.counts/.test(fnSrc), JSON.stringify(r2));
+    check('5b 提醒測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
 
   // ── 改版第 5 步 5a：雲端每日健檢（後端 28）與後端待辦：雲端與網頁同一套規則（並行比對）、待辦只放筆數、網頁不能寫 ──
   {
