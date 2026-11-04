@@ -23,6 +23,7 @@ th{font-size:.82rem;color:var(--muted)}tr:last-child td{border-bottom:none}
 <button class="theme" id="theme" type="button" aria-label="切換深淺色">◐</button>
 <main class="wrap">
 <h1>進退料統整表：跟現有 FJ 程式怎麼接（銜接分析）</h1>
+<div class="note"><b>Lotion 11/05 早上回覆：全部照建議。</b>第 6 題更正：<b>豐有目前沒有倉庫</b>（廠商單據上的料場不是公司的）。自有料現在是 H350 L=9m × 57 支，都在某工地。設計改成：倉庫地點放參數頁、可以空著；「遠距離」用起點到終點（工地、租賃商料場、未來倉庫）是否跨縣市判斷，不綁倉庫；自有料台帳要能表示「料在某工地、沒有倉庫」。</div>
 <div class="note">2026-11-04 小批次線起草，給陳軒、主線、Lotion 對齊用。<b>只分析、沒寫程式。</b><br>需求來源：<code>my-agent/400_Project/workflow/2026-11-04_進退料統整表_需求.md</code>（第五節 5 項加碼建議 Lotion 已確認全部要做）。<br>對照程式版本：<code>claude/ui-review</code> 分支（v6.0.173）＋第 6 步設計 <code>origin/claude/small-step6-design:docs/第6步_廠商請款辨識_設計.md</code>。<br>文中範例全部是假資料。</div>
 <h2>第一部分：給 Lotion 的白話版</h2>
 <h3>一句結論</h3>
