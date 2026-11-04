@@ -380,3 +380,46 @@ exports.trashPurge = onSchedule({ schedule: '45 3 * * *', timeZone: TZ, region: 
   }
   console.log('[回收筒] 清除', n, '筆（保留', trashCore.trashDays(days), '天）');
 });
+
+// ══════════ 改版第 5 步 5c #16 月損益／結案損益快照、#18 結案實際成本匯出（小批次線） ══════════
+// monthlySnapshot 每天 07:25（台北）：今年累計寫 fydata/private/pnlSnap/latest（FJ 資料健檢頁跟這台裝置的 _shRptYear 逐值並行比對）；
+//   上個月還沒凍結就凍結一份 fydata/private/pnlSnap/<YYYY-MM>（每月 1 日起，留 24 個月）；新結案的專案凍結一份 fydata/private/pnlClose/<報價 id>（之後不重算）。
+//   算法全部走 calc 模組（functions/ops/pnl.js 只做資料準備，跟前端 _mgmtData 一行對一行）。#18 結案實際成本：FJ 從 pnlClose 匯出 CSV，只匯出不改資料。
+// pnlSnapNow：管理員手動跑一次（驗收、並行比對不一致時重算）。
+const pnlCore = require('./ops/pnl.js');
+const pnlKey = (k) => String(k).replace(/\./g, '~d~').replace(/#/g, '~h~').replace(/\$/g, '~s~').replace(/\//g, '~sl~').replace(/\[/g, '~lb~').replace(/\]/g, '~rb~');   // 同前端 _fbEncKey
+async function runPnl(now) {
+  const db = admin.database();
+  const val = (p) => db.ref(p).once('value').then((s) => s.val() || {});
+  const [quotes, invoices, params, quoteSens, payables, paidLog, expenses, payslips, closed, snaps] = await Promise.all([
+    val('fydata/shared/quotes'), val('fydata/shared/invoices'), val('fydata/shared/params'),
+    val('fydata/private/quoteSens'), val('fydata/private/payables'), val('fydata/private/paidLog'), val('fydata/private/expenses'), val('fydata/private/payslips'),
+    val('fydata/private/pnlClose'), db.ref('fydata/private/pnlSnap').once('value').then((s) => Object.keys(s.val() || {})),
+  ]);
+  const inp = { quotes, invoices, params, quoteSens, payables, paidLog, expenses, payslips };
+  const today = pnlCore.tpeYmd(now), ym = today.slice(0, 7);
+  const prev = (() => { const y = +ym.slice(0, 4), m = +ym.slice(5, 7); return m === 1 ? (y - 1) + '-12' : y + '-' + String(m - 1).padStart(2, '0'); })();
+  const latest = pnlCore.monthSnap(inp, ym, now);
+  await db.ref('fydata/private/pnlSnap/latest').set(latest);
+  if (snaps.indexOf(prev) < 0) await db.ref('fydata/private/pnlSnap/' + prev).set(pnlCore.monthSnap(inp, prev, now));
+  for (const k of snaps.filter((k) => /^\d{4}-\d{2}$/.test(k)).sort().slice(0, -24)) await db.ref('fydata/private/pnlSnap/' + k).remove();
+  const cs = pnlCore.closeSnaps(inp, closed, now), up = {};
+  Object.keys(cs).forEach((qid) => { up[pnlKey(qid)] = cs[qid]; });
+  if (Object.keys(up).length) await db.ref('fydata/private/pnlClose').update(up);
+  console.log('[損益快照]', ym, '今年稅前', latest.ytd.pretax, '新結案', Object.keys(cs).length);
+  return { ym, pretax: latest.ytd.pretax, closed: Object.keys(cs).length };
+}
+exports.monthlySnapshot = onSchedule({ schedule: '25 7 * * *', timeZone: TZ, region: REGION, memory: '1GiB', timeoutSeconds: 300 }, async () => {
+  try { await runPnl(Date.now()); } catch (e) { console.error('monthlySnapshot', e); }
+});
+exports.pnlSnapNow = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], memory: '1GiB', timeoutSeconds: 300 }, async (req, res) => {
+  try {
+    if (req.method !== 'POST') { res.status(405).json({ error: { message: '只接受 POST' } }); return; }
+    const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
+    if (!m) { res.status(401).json({ error: { message: '需要登入' } }); return; }
+    const t = await admin.auth().verifyIdToken(m[1]);
+    const role = t.fy || roleOf(t.email, await lists());
+    if (role !== 'admin') { res.status(403).json({ error: { message: '只有管理員可以手動執行' } }); return; }
+    res.json(Object.assign({ ok: true }, await runPnl(Date.now())));
+  } catch (e) { console.error('pnlSnapNow', e); res.status(500).json({ error: { message: '損益快照失敗' } }); }
+});
