@@ -2780,7 +2780,8 @@ function _rmkModalTitles(){
   var set=function(id,tok,label){var el=document.getElementById(id);if(!el)return;var n=b.no[tok];
     el.textContent=n?('第'+n+'條：'+label):(base.indexOf(tok)<0?(label+'（參數條款中找不到 '+tok+'，此欄不會套用）'):(label+'（未填，報價單不會出現這一條）'));};
   set('rmk-t-load','【LOAD】','施工構台設計載重');set('rmk-t-spare','【WALK】','備用單價');
-  var sp=document.getElementById('rmk-spareTxt');if(sp)sp.placeholder='留空＝自動：'+(_rmkSpareAuto(_rmkFormVals())||'（沒填單價，這一條不出現）');   // v6.0.170set('rmk-t-buy','【BUY_H】','買斷單價（未稅）');set('rmk-t-mob','【MOB】','動員費');
+  var sp=document.getElementById('rmk-spareTxt');if(sp)sp.placeholder='留空＝自動：'+(_rmkSpareAuto(_rmkFormVals())||'（沒填單價，這一條不出現）');   /* v6.0.170 */
+  set('rmk-t-buy','【BUY_H】','買斷單價（未稅）');set('rmk-t-mob','【MOB】','動員費');
   var hint=document.getElementById('rmk-extra-hint');if(hint)hint.textContent='自訂條款（依序接在'+(b.nBase?('第 '+b.nBase+' 條'):'最後一條')+'之後；條號依實際有內容的條目自動編號）';
   document.querySelectorAll('#rmk-extra .rmk-xno').forEach(function(el,i){el.textContent=(b.nBase+i+1)+'.';});
   var m=document.getElementById('rmk-modal');if(m&&!m._rmkLive){m._rmkLive=1;m.addEventListener('input',function(ev){try{if(ev.target&&(/^rmk-/.test(ev.target.id||'')||ev.target.closest('#rmk-extra')))_rmkModalTitles();}catch(e){_err('_rmkModalTitles.live',e);}});}
