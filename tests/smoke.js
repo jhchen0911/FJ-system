@@ -9459,7 +9459,7 @@ async function newPage(browser, width, height) {
     check('v6.0.138 統編查詢：檢查碼（含第 7 碼 7）、g0v 公司／商業兩種格式；空白欄帶入、已填的不蓋改「全部帶入」、同統編不重查；查不到與檢查碼不符只提醒不擋存檔；負責人欄存檔',
       r.chk && r.parse && r.fill && r.fillAll && r.saved && r.cache && r.miss && r.bad && r.vsaved, JSON.stringify(r));
     check('v6.0.138 客戶·廠商 AI 草稿：唯讀帳號送 contact 草稿（不收匯款帳號、名稱統編同→修改）；管理員套用開表單帶入、按儲存才寫入並標已套用；規則放行 contact',
-      r.dErr && r.push && r.form && r.applied && r.reset && /contact\)\$/.test(RF138.drafts.$id['.validate']), JSON.stringify(r));
+      r.dErr && r.push && r.form && r.applied && r.reset && /\|contact(\|[A-Za-z]+)*\)\$/.test(RF138.drafts.$id['.validate']), JSON.stringify(r));
     check('v6.0.138 備註第 14 條：管理員裝置遷移一次（舊全文另存）、切換前的舊報價印舊文字、新報價與新編輯印新文字；參數不是舊第 14 條不自動換；預設值已換', r.mig && r.once && r.reswap && r.oldQ && r.newQ && r.newEd && r.noHit && r.def, JSON.stringify(r));
     check('v6.0.138 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
@@ -9734,6 +9734,124 @@ async function newPage(browser, width, height) {
     check('v6.0.152 議價尾差：併入 1 式或數量能整除的工項單價（整數），不加「議價調整」列；無法剛好時顯示還差幾元可選列；舊報價的調整列保留', r.divisible && r.left && r.leftApply && r.oldAdj && r.text, JSON.stringify(r));
     check('v6.0.152 報價稅額四捨五入到元（30,010×5%＝1,500.5→1,501；29,990→1,500），含稅＝未稅＋整數稅額；重算報價同一算法', r.tax5 && r.taxRecalc && r.taxDown, JSON.stringify(r));
     check('v6.0.152 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── 減項 hotfix（Lotion 11/04）：報價單價可負數（數量 > 0）、PDF 標【減項】、轉請款單照扣、不推估成本、不進租期與分包詢價 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {}; const msgs = []; const oT = window.toast; window.toast = m => msgs.push(String(m));
+      try {
+        newQ(); document.getElementById('fn').value = '減項測試案'; document.getElementById('fcl').value = '甲'; document.getElementById('fd').value = '2026-11-04';
+        items = [{ desc: 'H型鋼樁', unit: 'M', qty: 100, price: 1000, note: '', sec: false }, { desc: '角撐 H300＋大型撐 H350（第一層）', unit: '式', qty: 1, price: -30000, note: '', sec: false }];
+        const t = calcT(); out.calc = t.sub === 70000 && t.tax === 3500 && t.total === 73500;
+        out.cost = Math.abs(t.cost - (100000 * _taxM()) / (P.mult || 1.4)) < 1e-6;   // 減項沒填成本不推估
+        saveQ(); const q = Q.find(x => x.name === '減項測試案');
+        out.saved = !!q && +q.items[1].price === -30000;
+        // 數量 0 或負數擋下
+        items = [{ desc: 'X', unit: '式', qty: 0, price: -100, sec: false }]; const n0 = Q.length; msgs.length = 0; saveQ();
+        out.blockQty0 = msgs.some(m => /數量要大於 0/.test(m));
+        items = [{ desc: 'X', unit: '式', qty: -1, price: 100, sec: false }]; msgs.length = 0; saveQ();
+        out.blockNegQty = msgs.some(m => /數量不可為負數/.test(m));
+        // PDF
+        const html = String(_buildQuoteDocHTML(q) || '');
+        out.pdf = /【減項】/.test(html) && /-30,000/.test(html) && /70,000/.test(html);
+        // 請款單
+        const iv = _invItemsFromQuote(q); const ng = iv.find(x => x.contractPrice === -30000);
+        out.inv = !!ng && ng.neg === 1 && /減項（照扣）/.test(ng.note) && _invNegOk(ng) && !_invNegOk(iv.find(x => x.contractPrice === 1000 && x.type === 'item'));
+        // 租期、詢價
+        out.rent = _qNegLine(q.items[1]) && !_qNegLine(q.items[0]) && _rentStatus(Object.assign({}, q, { items: [Object.assign({}, q.items[1], { rent: 30 })] }), 0) === null;
+        // 審查：分包詢價視窗照常開（減項列不列）；存檔後重算的總計跟畫面同一算法
+        q.awarded = true; _rfqQid = q.id; let rfqErr = '';
+        try { rfqEdit(null); } catch (e) { rfqErr = String(e); }
+        const rh = (document.getElementById('gen-confirm-modal') || {}).innerHTML || '';
+        out.rfq = !rfqErr && /H型鋼樁/.test(rh) && !/角撐 H300/.test(rh);
+        try { document.getElementById('gen-confirm-modal').style.display = 'none'; } catch (e) { /* 可忽略 */ }
+        const q2 = JSON.parse(JSON.stringify(q)); _recalcQuoteTotals(q2); out.recalc = Math.abs(q2.t.cost - t.cost) < 1e-6 && q2.t.sub === 70000;
+        // 審查：先有請款單、之後報價才加減項並存檔 → 請款單那一列帶 neg、可以存
+        const iv2 = _invSyncItems([{ type: 'item', desc: '角撐 H300＋大型撐 H350（第一層）', contractPrice: 0, contractQty: 1, curQty: 0 }], q);
+        out.sync = iv2.some(x => x.contractPrice === -30000 && x.neg === 1);
+        q.awarded = false; _rfqQid = null;
+        Q = Q.filter(x => x !== q);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      window.toast = oT; items = []; return out;
+    });
+    check('減項 hotfix：報價單價可負數（數量 > 0）、小計／稅額照算、減項不推估成本；數量 0 或負數擋下；PDF 標【減項】；轉請款單帶 neg、備註「減項（照扣）」、存檔放行；不進租期', r.calc && r.cost && r.saved && r.blockQty0 && r.blockNegQty && r.pdf && r.inv && r.rent, JSON.stringify(r));
+    check('減項 hotfix（審查）：分包詢價視窗照常開、不列減項列；存檔重算總計與畫面同一算法；請款單跟上報價時減項列帶 neg', r.rfq && r.recalc && r.sync, JSON.stringify(r));
+    check('減項 hotfix 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── AI 改單草稿（qchg，Lotion 11/04）：唯讀帳號送「動作」草稿、Lotion 看前後對照按套用才改；對不上整份擋下 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const msgs = []; const oT = window.toast; window.toast = m => msgs.push(String(m));
+      try {
+        const q = { id: 'qC1', code: 'Q-C1', name: '改單測試案', client: '甲', date: '2026-11-04', ver: 3, _mt: Date.now() - 5000,
+          items: [{ desc: 'H型鋼樁', unit: 'M', qty: 100, price: 1000, sec: false }, { desc: '動員費', unit: '式', qty: 1, price: 50000, sec: false }, { desc: '舊項目', unit: '式', qty: 1, price: 2000, sec: false }],
+          rmk: { load: '', extra: ['付款條件：月結 60 天'] }, exs: [] };
+        Q.push(q);
+        const ops = [
+          { op: 'add', junk: 'x'.repeat(50), item: { desc: '角撐 H300＋大型撐 H350（第一層）', unit: '式', qty: 1, price: -30000 }, after: { idx: 1, match: '動員費' } },
+          { op: 'set', idx: 0, match: 'H型鋼樁', fields: { price: 950, note: '議價後' } },
+          { op: 'del', idx: 2, match: '舊項目' },
+          { op: 'rmk', key: 'load', value: '20T' },
+          { op: 'rmkSet', n: 0, match: '付款條件', text: '付款條件：月結 30 天' },
+          { op: 'rmkAdd', text: '本報價有效期限 30 天' }];
+        const p = _qchgPlan(q, ops);
+        out.plan = p.bad === 0 && p.items.length === 3 && p.items[2].price === -30000 && p.items[1].desc === '動員費' && p.items[0].price === 950 && p.items[0].note === '議價後'
+          && !p.items.some(it => it.desc === '舊項目') && p.rmk.load === '20T' && p.rmk.extra[0] === '付款條件：月結 30 天' && p.rmk.extra[1] === '本報價有效期限 30 天'
+          && q.items.length === 3 && q.items[0].price === 1000;   // 原報價沒被動到
+        // 對不上：說明不一樣、找不到、數量 0、同一列兩個動作
+        const bad = _qchgPlan(q, [{ op: 'set', idx: 0, match: '鋼板樁', fields: { price: 1 } }, { op: 'del', match: '不存在' }, { op: 'add', item: { desc: 'X', qty: 0, price: -1 } }, { op: 'set', idx: 1, match: '動員費', fields: { qty: 2 } }, { op: 'del', idx: 1, match: '動員費' }, { op: 'boom' }]);
+        out.bad = bad.bad === 5 && bad.rows.filter(x => !x.ok).length === 5;
+        // 審查：同一列後面加兩列照順序；自訂條款兩條一樣時照位置改、同一條兩個動作擋下；繼承來的欄位名不過白名單；說明不能改成空白
+        const q2 = { id: 'qC2', items: [{ desc: 'X', unit: '式', qty: 1, price: 10 }, { desc: 'Y', unit: '式', qty: 1, price: 20 }], rmk: { extra: ['同一句', '同一句'] } };
+        const p2 = _qchgPlan(q2, [{ op: 'add', item: { desc: 'A', qty: 1, price: 1 }, after: { idx: 0, match: 'X' } }, { op: 'add', item: { desc: 'B', qty: 1, price: 1 }, after: { idx: 0, match: 'X' } }, { op: 'rmkSet', n: 1, match: '同一句', text: '第二句' }]);
+        out.order = p2.bad === 0 && p2.items.map(x => x.desc).join('') === 'XABY' && p2.rmk.extra.join('|') === '同一句|第二句';
+        const p3 = _qchgPlan(q2, [{ op: 'rmkSet', n: 0, match: '同一句', text: 'Z' }, { op: 'rmkDel', n: 0, match: '同一句' }, { op: 'set', idx: 0, match: 'X', fields: { constructor: 'x' } }, { op: 'rmk', key: 'toString', value: 'x' }, { op: 'set', idx: 1, match: 'Y', fields: { desc: ' ' } }]);
+        out.guard = p3.bad === 4 && p3.rows.filter(x => !x.ok).length === 4;
+        // 唯讀帳號送出：先試算，對不上不送；送出的 payload 帶版次
+        const oUser = window._fbUser, oPush = window._draftPush; let pushed = null;
+        _fbUser = { email: 'ai@example.com' }; window._draftPush = (t, pl, sm) => { pushed = { t, pl, sm }; return Promise.resolve(true); };
+        const r1 = await fyQuoteChange({ qid: 'qC1', ops: [{ op: 'del', match: '不存在' }] });
+        const r2 = await fyQuoteChange({ code: 'Q-C1', ops, summary: '于城 V3 加減項' });
+        Q.push({ id: 'qC1dup', code: 'Q-DUP', name: 'd1', items: [] }, { id: 'qC1dup2', code: 'Q-DUP', name: 'd2', items: [] });
+        const r3 = await fyQuoteChange({ code: 'Q-DUP', ops: [{ op: 'rmkAdd', text: 'x' }] }); Q = Q.filter(x => !/^qC1dup/.test(x.id));
+        out.dupCode = !r3.ok && /2 張/.test(r3.why);
+        out.clean = true;
+        out.push = !r1.ok && /對不上/.test(r1.why) && r2.ok && pushed && pushed.t === 'qchg' && !('junk' in pushed.pl.ops[0]) && pushed.pl.qid === 'qC1' && pushed.pl.baseVer === 3 && /未稅 152,000 → 115,000/.test(pushed.sm);
+        window._draftPush = oPush; _fbUser = oUser;
+        // Lotion：草稿清單、前後對照、套用 → 開編輯頁存檔、草稿標已套用
+        const oMark = window._draftMark; let marked = null; window._draftMark = (id, st, ex) => { marked = { id, st, ex }; return Promise.resolve(true); };
+        DRAFTS = { dQC1aa: { id: 'dQC1aa', type: 'qchg', by: 'ai@example.com', byName: '陳軒', at: Date.now(), status: 'pending', summary: pushed.sm, payload: pushed.pl } };
+        out.list = /改單/.test(_draftListHtml()) && /6 項可套用/.test(_draftListHtml());
+        draftApply('dQC1aa');
+        const md = document.getElementById('gen-confirm-modal').innerHTML;
+        out.diff = /前後對照/.test(document.getElementById('gen-confirm-title').textContent) && /【減項】/.test(md) && /-30,000/.test(md) && /115,000/.test(md) && /120,750/.test(md) && document.getElementById('gen-confirm-ok').textContent === '套用';
+        document.getElementById('gen-confirm-ok').click();
+        const q1 = Q.find(x => x.id === 'qC1');
+        out.applied = q1.items.length === 3 && q1.items.some(it => +it.price === -30000) && +q1.items[0].price === 950 && q1.rmk.load === '20T' && q1.ver === 3 && marked && marked.id === 'dQC1aa' && marked.st === 'applied';
+        // 審查：這台套用過、雲端還沒回已套用 → 不能再開來套
+        DRAFTS.dQC1aa.status = 'pending'; msgs.length = 0; draftApply('dQC1aa');
+        out.once = msgs.some(m => /已經套用過/.test(m));
+        delete _qchgDone.dQC1aa;
+        // 報價被改過、列對不上 → 對照表標紅、按鈕變「關閉」、不能套用
+        draftApply('dQC1aa');
+        out.stale = /對不上/.test(document.getElementById('gen-confirm-modal').innerHTML) && document.getElementById('gen-confirm-ok').textContent === '關閉';
+        document.getElementById('gen-confirm-ok').click();
+        out.notAgain = Q.find(x => x.id === 'qC1').items.length === 3;
+        window._draftMark = oMark; DRAFTS = {}; Q = Q.filter(x => x.id !== 'qC1');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      window.toast = oT; return out;
+    });
+    check('AI 改單草稿：新增（含負數減項、接在指定列後）、改單價／備註、刪列、改備註條款數字與自訂條款；全部對位在原報價的複本上，原報價不動', r.plan, JSON.stringify(r));
+    check('AI 改單草稿（審查）：同一列後加兩列照順序；重複條款照位置改；同一條兩個動作、繼承欄位名、空白說明擋下；編號重複不猜；送出只留白名單欄位；這台套用過不能再套', r.order && r.guard && r.dupCode && r.once, JSON.stringify(r));
+    check('AI 改單草稿：說明不一樣／找不到／數量 0／同列兩個動作／不認得的動作都擋下；唯讀帳號送出前先試算、對不上不送，草稿帶版次與未稅前後', r.bad && r.push, JSON.stringify(r));
+    check('AI 改單草稿：Lotion 草稿清單、前後對照表（減項、未稅與含稅總計）、按「套用」開報價改好存檔、草稿標已套用；套用過再看就對不上、不能再套', r.list && r.diff && r.applied && r.stale && r.notAgain, JSON.stringify(r));
+    check('AI 改單草稿測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
 
@@ -10183,6 +10301,137 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── 共用 A4 單據引擎（Lotion 11/02）：鋼筋籠／根固砂漿／背填材料 左邊填、右邊即時 A4 預覽，預覽與匯出 PDF 同一份內容；擋土支撐全套也走同一個引擎 ──
+  {
+    const res = {};
+    for (const [w, h] of [[1400, 900], [900, 900], [390, 844]]) {
+      const { page, errors } = await newPage(browser, w, h);
+      res[w] = await page.evaluate(async () => {
+        const out = {}; const wait = ms => new Promise(r => setTimeout(r, ms));
+        try {
+          const cap = []; const oP = window._printViaIframe; window._printViaIframe = (html) => { cap.push(html); };
+          for (const [t, fn] of [['rebar', '_rbPrint'], ['grout', '_gtPrint'], ['backfill', '_bfPrint']]) {
+            go('matest'); meTab(t); await wait(200);
+            const pv = document.getElementById(t + '-pv'), el = pv && pv.shadowRoot ? pv.shadowRoot.querySelector('.a4doc') : null;
+            window[fn](); const html = cap.pop() || '', dd = new DOMParser().parseFromString(html, 'text/html'), pw = dd.querySelector('.page-wrap');
+            out[t] = { pages: +(pv && pv.getAttribute('data-pages')), same: !!el && !!pw && el.textContent === pw.textContent && el.querySelectorAll('table,tr,td').length === pw.querySelectorAll('table,tr,td').length && (dd.querySelector('style') || {}).textContent === _toolDocCss({}) && pv.shadowRoot.querySelector('style').textContent.indexOf(_toolDocCss({})) >= 0, logo: !!(el && el.querySelector('h1 ,img')) };
+          }
+          // 改左邊一個欄位，右邊馬上跟著變
+          meTab('grout'); await wait(150); const b0 = document.getElementById('grout-pv').shadowRoot.textContent;
+          _gtSet('dig', (parseFloat(_gtState.dig) || 0) + 1); await wait(150); out.live = document.getElementById('grout-pv').shadowRoot.textContent !== b0;
+          meTab('shoring'); await wait(400); out.shoring = +document.getElementById('me-pv').getAttribute('data-pages') >= 1 && !!document.getElementById('me-pv').shadowRoot.querySelector('.a4doc.medoc');
+          window._printViaIframe = oP;
+          out.hscroll = document.documentElement.scrollWidth > window.innerWidth + 1;
+        } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+        return out;
+      });
+      res[w].errors = errors.slice(0, 3);
+      await page.close();
+    }
+    const ok = w => ['rebar', 'grout', 'backfill'].every(t => res[w][t] && res[w][t].pages >= 1 && res[w][t].same && res[w][t].logo);
+    check('A4 單據引擎：鋼筋籠／根固砂漿／背填材料 右邊即時 A4 預覽，內容與「匯出 PDF」逐字相同；擋土支撐全套也走同一個引擎', ok(1400) && ok(390) && res[1400].shoring, JSON.stringify(res));
+    check('A4 單據引擎：左邊改一個欄位，右邊預覽馬上跟著變；手機（390）、平板（900，上下排）不會左右滑動', res[1400].live && !res[390].hscroll && !res[900].hscroll && !res[1400].hscroll && ok(900), JSON.stringify(res));
+    check('A4 單據引擎測試無 JS 錯誤', !res[1400].errors.length && !res[900].errors.length && !res[390].errors.length, JSON.stringify([res[1400].errors, res[900].errors, res[390].errors]));
+  }
+  // ── 改版第 5 步 5b：雲端每日提醒（後端 10／12／13／17／20）：算法 calc/todo.js 前端與雲端同一份、逐類鑰匙一致；保留款到期＝結案日＋月數；總覽新提醒 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const data = await page.evaluate(() => {
+      const out = {}; const oT = window.toast; window.toast = () => {};
+      try {
+        const D = n => _dAdd(localToday(), n);
+        Q = [
+          { id: 't1', name: '提醒甲', awarded: true, ver: 1, items: [{ desc: 'H型鋼樁 打設', unit: 'M', qty: 10, price: 100, note: '30天租期', ot: '5' }], dailyLogs: [{ date: D(-60), progressRows: [{ itemIdx: 0, qty: 10 }] }] },
+          { id: 't2', name: '提醒乙', awarded: true, ver: 1, items: [{ desc: '支撐 安裝', unit: 'M', qty: 5, price: 100, note: '60天租期' }], dailyLogs: [{ date: D(-56), progressRows: [{ itemIdx: 0, qty: 5 }] }] },
+          { id: 't3', name: '提醒丙', awarded: true, closed: true, closedAt: Date.now() - 200 * 864e5, deduct: { retCond: '結案後 6 個月退還' }, items: [] },
+          { id: 't4', name: '提醒丁', awarded: true, ver: 2, items: [{ desc: '鋼板樁 打設 GL-12m', unit: 'M', qty: 20, price: 1 }], dailyLogs: [{ date: D(-30), status: 'stage', stageOf: 'remove' }],
+            rfqs: [{ id: 'r1', quoteVer: 1, items: [{ idx: 0, desc: '鋼板樁 打設 GL-10m', qd: '鋼板樁 打設 GL-10m', unit: 'M', oq: 20 }] }] }];
+        INV = [{ id: 'ti1', project: '提醒甲', quoteId: 't1', date: D(-40), expectedRecvDate: D(-5), totals: { total: 1050 } },
+          { id: 'ti3', project: '提醒丙', quoteId: 't3', retention: true, retentionPct: 10, totals: { curTotal: 1000, total: 945, retention: 105 }, received: 945 },
+          { id: 'ti4', project: '提醒丁', quoteId: 't4', totals: { total: 21 }, received: 21 }];
+        CONTRACTS = []; PAYABLES = []; MAT_LEDGER = []; Q_HISTORY = {};
+        Object.keys(localStorage).filter(k => k.indexOf('fy_rentscan_') === 0).forEach(k => localStorage.removeItem(k));
+        const v = _todoBuild(true); out.keys = _todoKeys(v);
+        // 保留款到期：結案日＋6 個月；專案頁顯示來源；手填優先
+        const rr = _retentionRows().find(r => r.proj === '提醒丙');
+        out.ret = !!rr && rr.retDueSrc === 'rule' && rr.overdue && /結案日 .+＋ 6 個月/.test(_retDueHint(Q[2]));
+        Q[2].deduct.retDue = '2099-01-01'; out.manual = _retDueOf(Q[2]).src === 'manual' && _retDueOf(Q[2]).date === '2099-01-01'; delete Q[2].deduct.retDue;
+        // 總覽：既有提醒照舊、5b 新增「可以確認結案」「租期 7 天內到期」
+        go('dash'); updateDashTodo(); const t = document.getElementById('dash-todo-list').textContent;
+        out.dash = /提醒甲」1 個工項租期已逾期/.test(t) && /提醒甲 第\?期 逾期 5 天未收款/.test(t) && /保留款逾期未退：提醒丙/.test(t) && /可以確認結案：提醒丁/.test(t) && /「提醒乙」1 個工項租期 \d 天內到期/.test(t) && /提醒丁 報價已進版至 v2/.test(t);
+        out.data = { quotes: Q.map(q => { const c = JSON.parse(JSON.stringify(q)); delete c.rfqs; return c; }), invoices: INV, sens: { t4: { rfqs: Q[3].rfqs } }, now: Date.now() };   // 測試頁的時鐘是假的（2026-10-15），雲端要用同一個「現在」
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      window.toast = oT; return out;
+    });
+    require(require('path').join(__dirname, '..', 'tools', 'copy-calc.js'));
+    const TC = require(require('path').join(__dirname, '..', 'functions', 'ops', 'todos.js'));
+    const cloud = data.data ? TC.buildRemind({ shared: { quotes: data.data.quotes, invoices: data.data.invoices, contracts: {}, customers: {}, params: {}, qHistory: {} }, priv: { payables: {}, matLedger: {}, quoteSens: data.data.sens }, now: data.data.now }) : null;
+    const want = { rent: ['t1'], rentSoon: ['t2#0'], recv: ['ti1'], ret: ['提醒丙'], close: ['t4'], rfqVer: ['t4'], bill: [], overrun: [] };   // 5c 多兩類
+    check('5b 雲端每日提醒：雲端（functions/ops/todos.js）與網頁算出同一組提醒（租期逾期、7 天內到期、收款逾期、保留款逾期、可結案、報價進版）', !!cloud && JSON.stringify(cloud.keys) === JSON.stringify(data.keys) && JSON.stringify(data.keys) === JSON.stringify(want), JSON.stringify({ err: data.err, loc: data.keys, cloud: cloud && cloud.keys }));
+    check('5b 保留款到期（Lotion 11/04）：沒手填＝系統結案日＋退還條件月數、專案頁顯示怎麼算的；手填日期優先', data.ret && data.manual, JSON.stringify(data));
+    check('5b 總覽：既有提醒照舊，新增「可以確認結案」「租期 7 天內到期」', data.dash, JSON.stringify({ dash: data.dash, err: data.err }));
+    const r2 = await page.evaluate(() => { BK_REMIND = { day: '2026-11-04', keys: _todoKeys(_todoBuild(true)) }; const a = _bkRemindHtml(); BK_REMIND.keys.close = []; const b = _bkRemindHtml(); return { ok: (a.match(/✓ 一致/g) || []).length === _BK_RKEYS.length, bad: /雲端少 1/.test(b) }; });
+    const rules = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata.health;
+    const fnSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'functions', 'index.js'), 'utf8');
+    check('5b 資料健檢「雲端每日提醒」卡逐類比對（一致／雲端少幾筆）；雲端只寫 fydata/health/remind（網頁不能寫）、每天 07:00 排程、立即跑一次也一起跑', r2.ok && r2.bad && rules['.write'] === 'false' && /exports\.dailyTodos = onSchedule\(\{ schedule: '0 7 \* \* \*'/.test(fnSrc) && /fydata\/health\/remind/.test(fnSrc) && /await runRemind\(\)\)\.counts/.test(fnSrc), JSON.stringify(r2));
+    check('5b 提醒測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── 改版第 5 步 5c：每月請款（截止前 5 天）、超支（≧110%）、付包商款核對：算法 calc/todo.js 前端與雲端同一份 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const data = await page.evaluate(() => {
+      const out = {}; const oT = window.toast; window.toast = () => {};
+      try {
+        const D = n => _dAdd(localToday(), n), cut = parseInt(D(3).slice(8), 10);
+        Q = [{ id: 'm1', name: '月請甲', awarded: true, ownerPay: { cut: cut }, items: [{ desc: 'H型鋼樁 打設', unit: 'M', qty: 100, price: 1000, estCost: 600 }, { desc: '扣款', unit: '式', qty: 1, price: -5000 }],
+            dailyLogs: [{ date: D(-70), progressRows: [{ itemIdx: 0, qty: 10 }] }, { date: D(-2), progressRows: [{ itemIdx: 0, qty: 12 }, { itemIdx: 1, qty: 1 }] }],
+            costs: [{ id: 'c1', type: 'sub', vendor: '某分包', rows: [{ id: 'rw1', linkedItemIdx: 0, qty: 100, unitPrice: 700 }], periods: [{ no: 1, rows: [{ rid: 'rw1', qty: 30 }] }] }] }];
+        INV = [{ id: 'mi1', project: '月請甲', quoteId: 'm1', date: D(-60), totals: { total: 100 }, received: 100 }];
+        CONTRACTS = []; MAT_LEDGER = []; Q_HISTORY = {};
+        PAYABLES = [{ id: 'payc1_p1', costId: 'c1', costPeriod: 1, quoteId: 'm1', to: '某分包', project: '月請甲', amount: 21000, status: 'pending' }];
+        const v = _todoBuild(true);
+        out.bill = v.bill.length === 1 && v.bill[0].qid === 'm1' && v.bill[0].items.length === 1 && v.bill[0].items[0].qty === 12 && v.bill[0].left <= 5;   // 上次開單後的日報量、減項列不帶
+        out.over = v.overrun.length === 1 && v.overrun[0].rows[0].pct === 117;   // 實際 70,000 ÷ 報價成本 60,000
+        INV.push({ id: 'mi2', project: '月請甲', quoteId: 'm1', date: D(-1), totals: { total: 1 } }); out.billed = _todoBuild(true).bill.length === 0; INV.pop();   // 這期開過單就不提醒
+        // 付包商款核對：廠商累計請款 30 > 日報 22 → 差異；核准記人與時間
+        const k = _vpCheck(PAYABLES[0]); out.vp = !!k && k.bad >= 1 && k.rows[0].vb === 30 && k.rows[0].reported === 22;
+        go('dash'); updateDashTodo(); const t = document.getElementById('dash-todo-list').textContent;
+        out.dash = /本月要請款：月請甲/.test(t) && /超支提醒：月請甲 1 個工項/.test(t) && /付包商款待核准 1 筆（1 筆數量有差異）/.test(t);
+        openVendorPayCheck('payc1_p1'); const mh = document.getElementById('gen-confirm-modal').innerHTML;
+        out.modal = /廠商請款累計超過日報回報量/.test(mh) && document.getElementById('gen-confirm-ok').textContent === '有差異，仍核准';
+        document.getElementById('gen-confirm-ok').click();
+        out.approved = !!PAYABLES[0].approvedAt && PAYABLES[0].approvedDiff >= 1 && _vpPending().length === 0;
+        // 審查：分包期別應付重建後核准還在；預付早付、保留款退還不列
+        _syncSubPeriodPayables(Q[0], Q[0].costs[0]);
+        const pp = PAYABLES.find(x => x.id === 'payc1_p1'); out.keep = !!pp && !!pp.approvedAt && pp.amount === 21000;
+        PAYABLES.push({ id: 'payc1_r2', costId: 'c1', costPeriod: 2, quoteId: 'm1', amount: 100, status: 'pending' }, { id: 'payc1_e1', costId: 'c1', costPeriod: 1, costEarly: 'x', quoteId: 'm1', amount: 100, status: 'pending' });
+        out.narrow = _vpPending().length === 0; PAYABLES = PAYABLES.filter(x => !/_r2$|_e1$/.test(x.id));
+        // 審查：截止日 0 不算；截止日後幾天才開的上一期單不擋這期提醒
+        out.cut0 = FJC.todo.cutOf({ ownerPay: { cut: 0 } }, { payDue: 0 }, { cut: 25 }) === 25;
+        const qB = { id: 'mb', name: 'x', awarded: true, ownerPay: { cut: 25 }, items: [{ desc: 'A', qty: 1, price: 1 }], dailyLogs: [{ date: '2026-04-10', progressRows: [{ itemIdx: 0, qty: 1 }] }] };
+        out.late = !!FJC.todo.monthBill({ q: qB, invs: [{ date: '2026-03-26' }], today: '2026-04-21' }) && !FJC.todo.monthBill({ q: qB, invs: [{ date: '2026-04-20' }], today: '2026-04-21' });
+        out.invK = JSON.stringify(_INV_K) === JSON.stringify(FJC.todo.INV_K) && FJC.todo.invUnpack(_invPack({ items: [{ desc: 'x', contractQty: 3 }] })).items[0].contractQty === 3;
+        out.data = { quotes: Q, invoices: INV.map(_invPack), payables: PAYABLES, now: Date.now() };
+        out.keys = _todoKeys(v);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      window.toast = oT; return out;
+    });
+    require(require('path').join(__dirname, '..', 'tools', 'copy-calc.js'));
+    const TC5 = require(require('path').join(__dirname, '..', 'functions', 'ops', 'todos.js'));
+    const sens = {}; ((data.data && data.data.quotes) || []).forEach(q => { const est = {}; q.items.forEach((it, i) => { if (it.estCost != null) est[it._uid ? String(it._uid) : '~h~' + i] = it.estCost; }); sens[q.id] = { costs: q.costs, est }; });
+    const cloud5 = data.data ? TC5.buildRemind({ shared: { quotes: data.data.quotes.map(q => { const c = JSON.parse(JSON.stringify(q)); delete c.costs; c.items.forEach(it => delete it.estCost); return c; }), invoices: data.data.invoices, contracts: {}, customers: {}, params: {}, qHistory: {} },
+      priv: { payables: data.data.payables, matLedger: {}, quoteSens: sens }, now: data.data.now }) : null;
+    check('5c 每月請款：截止前 5 天、這期還沒開單、有新日報 → 本月要請款＋草稿數量（減項列不帶）；開過單就不提醒', data.bill && data.billed, JSON.stringify(data));
+    check('5c 超支：工項實際成本 ≧ 報價成本 110% 提醒（117%）；雲端（成本在 private quoteSens、請款單壓縮過）算出同一組', data.over && !!cloud5 && JSON.stringify(cloud5.keys.bill) === JSON.stringify(data.keys.bill) && JSON.stringify(cloud5.keys.overrun) === JSON.stringify(data.keys.overrun), JSON.stringify({ loc: data.keys, cloud: cloud5 && cloud5.keys }));
+    check('5c 付包商款核對：廠商累計請款超過日報量標差異、總覽列待核准、核對表按「有差異，仍核准」記下核准人與時間', data.vp && data.dash && data.modal && data.approved, JSON.stringify(data));
+    check('5c 審查：核准在應付重建後保留；預付早付、保留款退還不列待核准；截止日 0 不算；截止日後才開的上一期單不擋這期提醒', data.keep && data.narrow && data.cut0 && data.late, JSON.stringify(data));
+    check('5c 雲端還原請款單壓縮的欄位表跟網頁一樣', data.invK, '');
+    check('5c 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // ── 改版第 5 步 5a：雲端每日健檢（後端 28）與後端待辦：雲端與網頁同一套規則（並行比對）、待辦只放筆數、網頁不能寫 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -10323,6 +10572,185 @@ async function newPage(browser, width, height) {
     check('5a 回收筒：報價成本存私有回收筒、還原時補回；手動應付進私有回收筒、系統自動應付不進；保留天數參數到期清除；進同步清單', r.quoteSplit && r.quoteRestore && r.pay && r.purge && r.sync, JSON.stringify(r));
     check('5a 敏感資料備份分開：一般備份不含薪資名冊／薪資單／零用金與人員證件，另存「敏感資料備份」檔；匯入敏感檔只還原那幾塊', r.mainNoSens && r2.sensFile && r3, JSON.stringify({ main: r.mainNoSens, r2, r3 }));
     check('5a 回收筒／敏感備份測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.164 刪除 dp* 死參數（H350 租金 0.117 vs 4 調查：沒有輸入格、沒有程式讀）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        out.noDef = !Object.keys(P).some(k => /^dp[A-Z]/.test(k));
+        P.dpRentH350 = 0.117; P.dpFrH350 = 34; go('params'); doSaveP();
+        out.cleaned = !('dpRentH350' in P) && !('dpFrH350' in P) && P.tax != null;
+        out.upa = UPA_COST_DB.hsteel.H350.rent === 4 && UPA_COST_DB.strut.rent.H350 === 4;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
+      return out;
+    });
+    check('v6.0.164 dp* 死參數整組刪除：預設沒有、存參數時把舊存檔留著的 dp* 清掉；單價庫 H350 租金 4 元／M／天不受影響', r.noDef && r.cleaned && r.upa, JSON.stringify(r));
+    check('v6.0.164 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+
+  // ── v6.0.165 報價備註「備用單價」依實際項目編號（只有一項不編 a. b.）、單張報價可改條文（不動參數）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const base = '10. 營業稅外加。\n11. 備用單價：a.安全走道M/$【WALK】元、b.技術工/天/$【TECH】元\n12. 其他。';
+        const line = (c) => (_rmkBuild(base, c, false).text.split('\n').find((l) => /備用單價/.test(l)) || '');
+        out.one = line({ tech: '4000' }) === '2. 備用單價：技術工/天/$4000元';
+        out.walkOnly = line({ walk: '3000' }) === '2. 備用單價：安全走道M/$3000元';
+        out.two = line({ walk: '3000', tech: '3500' }) === '2. 備用單價：a.安全走道M/$3000元、b.技術工/天/$3500元';
+        out.none = line({}) === '' && /^2\. 其他。$/m.test(_rmkBuild(base, {}, false).text);
+        out.ov = line({ tech: '4000', spareTxt: '技術工每工 4,000 元（含工具）' }) === '2. 備用單價：技術工每工 4,000 元（含工具）';
+        // 視窗：填了自訂條文 → 存進這張報價的 rmkCustom，參數不變
+        const pb = P.rmkBase;
+        rmkCustom = { tech: '4000', extra: [] }; openRmkModal();
+        out.titles = /第\d+條：買斷單價|買斷單價（/.test(document.getElementById('rmk-t-buy').textContent) && /未填/.test(document.getElementById('rmk-t-mob').textContent) && /未填/.test(document.getElementById('rmk-t-buy').textContent) && /第\d+條：備用單價/.test(document.getElementById('rmk-t-spare').textContent);   // 審查：各區標題仍即時算
+        out.ph = /技術工\/天\/\$4000元/.test(document.getElementById('rmk-spareTxt').placeholder) && !/b\./.test(document.getElementById('rmk-spareTxt').placeholder);
+        document.getElementById('rmk-spareTxt').value = '  只有技術工 4,000  '; const oT = window.toast; window.toast = () => {}; try { applyRmkCustom(); } finally { window.toast = oT; }
+        out.saved = rmkCustom.spareTxt === '只有技術工 4,000' && P.rmkBase === pb;
+        rmkCustom = { tech: '4000', extra: [] }; openRmkModal(); out.reset = document.getElementById('rmk-spareTxt').value === '';
+        document.getElementById('rmk-modal').style.display = 'none';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
+      return out;
+    });
+    check('v6.0.165 備用單價條文：只有一項不編號、兩項 a. b.、都沒填不出現；單張報價可改條文（存在 rmkCustom，不動參數 P.rmkBase）', r.one && r.walkOnly && r.two && r.none && r.ov && r.ph && r.titles && r.saved && r.reset, JSON.stringify(r));
+    check('v6.0.165 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── 改版第 5 步 5d：整體日報（#8）、實際進度回填（#9）、待辦同步 Google 工作表（#21）——FJ 端顯示＋雲端純邏輯 ──
+  {
+    const D5 = require('../functions/ops/daily.js'), P5 = require('../functions/ops/progress.js'), G5 = require('../functions/ops/gtasks.js'), S5 = require('../functions/ops/sched.js');
+    const dt = '2026-11-04';
+    const qs = { a: { id: 'a', name: '假甲案', awarded: true, items: [{ desc: '打設', unit: 'M', qty: 10, price: 1 }, { desc: '減項', qty: 1, price: -9 }], dailyLogs: [{ date: dt, crews: [{ type: 'sub', vendor: '假包商', n: 3 }], progressRows: [{ itemIdx: 0, qty: 4 }, { itemIdx: 1, qty: 1 }] }] } };
+    const pl = D5.plan({ quotes: qs, cfg: { groups: { Gi: { mode: 'company', audience: 'internal' }, Gc: { qid: 'a' } } }, date: dt, now: 1 });
+    const nodeOk = pl.sends.length === 1 && pl.sends[0].gid === 'Gi' && /假包商/.test(pl.sends[0].text) && pl.drafts.length === 1 && pl.drafts[0].payload.groupId === 'Gc' && !/假包商/.test(pl.drafts[0].payload.text) && !/減項/.test(pl.sends[0].text);
+    const pr = P5.build({ quotes: qs, projects: { p_a: { id: 'p_a', qid: 'a' } }, now: 1 });
+    const prOk = Object.values(pr.byPid.p_a).length === 1 && Object.values(pr.byPid.p_a)[0].cum === 4;
+    const gp = G5.plan(G5.flatten({ daily: { unconf: { text: 'x' } }, gtasks: { fail: { text: 'y' } } }), { 'health~gone': { task: 't' } }, 0, 50);
+    const gtOk = gp.create.length === 1 && gp.complete.length === 0 && gp.gone.length === 1 && S5.ENABLED === false;   // 消失先記時間、10 分鐘後才打勾
+    check('5d 雲端純邏輯：內部群組直接推（含包商）、營造廠群組（沒設定）只建草稿（不寫包商）、減項不算；進度回填累計；待辦同步建／打勾；#25、26 不啟用', nodeOk && prOk && gtOk, JSON.stringify({ nodeOk, prOk, gtOk }));
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = () => {};
+        // ① 整體日報草稿：清單顯示文字、「複製文字」「已轉發」；按已轉發＝只標記
+        DRAFTS = { do1234567890ab: { id: 'do1234567890ab', type: 'dailyOut', by: 'line-bot', byName: 'LINE 機器人', at: Date.now(), status: 'pending', summary: '整體日報：假甲案', payload: { groupId: 'Gc', group: '假甲案', date: '2026-11-04', text: '豐有工程　施工日報\n<b>假</b>' } } };
+        const h = _draftListHtml();
+        out.list = /整體日報（請複製轉發）/.test(h) && /複製文字/.test(h) && /已轉發/.test(h) && /&lt;b>假/.test(h) && !/<b>假/.test(h);
+        const oM = window._draftMark; let marked = null; window._draftMark = (id, st) => { marked = [id, st]; return Promise.resolve(true); };
+        draftApply('do1234567890ab');
+        out.apply = !!marked && marked[1] === 'applied';
+        window._draftMark = oM;
+        // ② 後端待辦點了去對的地方
+        const oB = BK_TODO; BK_TODO = { daily: { unconf: { id: 'daily_unconf', src: 'daily', key: 'unconf', text: '整體日報：1 個工地沒確認', go: 'drafts' }, fail: { src: 'daily', key: 'fail', text: 'LINE 沒送出', go: 'staff', urgent: true } } };
+        const its = []; _v6TodoItems(its);
+        const bk = its.filter(x => /^bk_daily_/.test(x.type));
+        out.todo = bk.length === 2 && bk.some(x => x.jump === 'openDrafts()') && bk.some(x => x.urgent && /go\('staff'\)/.test(x.jump));
+        BK_TODO = oB;
+        // ③ LINE 群組卡：對象選單（沒設定＝當作有營造廠）；改成內部要先確認；存檔帶 audience
+        const oU = window._fbUser; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'u', getIdToken: async () => 't' };
+        Q.push({ id: 'a', name: '假甲案', awarded: true });
+        _lineCfgCache = { groups: { Gc: { qid: 'a', name: '假甲案', daily: true }, Gi: { mode: 'company', name: '公司大群組', audience: 'internal' } } };
+        _gtStatus = { authed: true, lastRun: Date.now(), made: 2, done: 1 };
+        let box = document.getElementById('line-box'); if (!box) { box = document.createElement('div'); box.id = 'line-box'; document.body.appendChild(box); }
+        renderLineBox();
+        const sc = document.getElementById('lg-a-Gc'), si = document.getElementById('lg-a-Gi');
+        out.sel = !!sc && sc.value === '' && /未設定（當作有營造廠）/.test(sc.options[0].text) && !!si && si.value === 'internal';
+        out.gt = /待辦同步 Google 工作表/.test(box.innerHTML) && /已授權/.test(box.innerHTML) && /重新授權/.test(box.innerHTML);
+        const oC = window.showConfirm, oS = window._lineCfgSet; let conf = 0, saved = null;
+        window.showConfirm = (t, b, ok) => { conf++; ok(); }; window._lineCfgSet = (pth, v) => { saved = [pth, v]; return Promise.resolve(false); };
+        sc.value = 'internal'; lineGroupSave('Gc');
+        out.save = conf === 1 && saved && saved[0] === 'groups/Gc' && saved[1].audience === 'internal' && saved[1].qid === 'a';
+        conf = 0; si.value = 'internal'; document.getElementById('lg-q-Gi').value = '__co'; lineGroupSave('Gi');
+        out.save2 = conf === 0 && saved[1].mode === 'company' && saved[1].audience === 'internal';   // 已經是內部：不再問
+        sc.value = ''; lineGroupSave('Gc');
+        out.save3 = !('audience' in saved[1]);
+        window.showConfirm = oC; window._lineCfgSet = oS; Q.pop();
+        _fbUser = { email: 'staff@x.com', uid: 'u2' }; renderLineBox();
+        out.hide = box.style.display === 'none';
+        _fbUser = oU; _lineCfgCache = null; _gtStatus = null; window.toast = oT;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
+      return out;
+    });
+    check('5d 整體日報草稿：顯示文字（跳脫）、複製文字／已轉發只標記；後端待辦點了開 AI 草稿／人員管理', r.list && r.apply && r.todo, JSON.stringify(r));
+    check('5d LINE 群組對象：沒設定＝當作有營造廠、改成豐有內部先確認、存檔帶 audience；Google 工作表授權狀態', r.sel && r.gt && r.save && r.save2 && r.save3 && r.hide, JSON.stringify(r));
+    const RF5 = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    const rOk = RF5.gtasks['.read'] === 'false' && RF5.gtasks['.write'] === 'false' && RF5.progress['.write'] === 'false' && RF5.dailyOut['.write'] === 'false' && RF5.gtasksStatus['.write'] === 'false'
+      && !/readers/.test(RF5.gtasksStatus['.read'].replace(/!root\.child\('fydata\/readers'\)/g, '')) && /dailyOut\)\$/.test(RF5.drafts.$id['.validate']);
+    check('5d 規則：Google 授權節點全部不可讀寫、進度／發送紀錄／同步狀態只有雲端寫；草稿類型加 dailyOut', rOk);
+    check('5d 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── 改版第 5 步 5c #16 月損益／結案損益快照、#18 結案實際成本匯出：雲端（functions/ops/pnl.js）與前端 _shRptYear 同一份假資料逐值相同 ──
+  {
+    const PN = require('../functions/ops/pnl.js');
+    const D = {
+      params: { tax: 5, removeRate: 0 },   // 拆除請款 0%＝裝設請款 100%（分段列全算裝設）
+      quotes: [
+        { id: 'pz.1', name: '假點號案', awarded: true, items: [] },   // id 有「.」：雲端 key 是編碼過的
+        { id: 'pm', name: '假主約丙', awarded: true, closed: true, deduct: { ret: 5 }, items: [] },
+        { id: 'pa', name: '假追加丙', awarded: true, parentId: 'pm', items: [] },
+        { id: 'po', name: '假進行中丁', awarded: true, items: [] },
+      ],
+      costs: {
+        pm: [{ id: 'k1', type: 'labor', date: '2026-03-05', amt: 30000, rows: [{ id: 'k1a', subType: 'worker', days: 3, dayRate: 10000, transport: 0 }] }, { id: 'k2', type: 'sub', date: '2026-03-01', amt: 3000, isIntro: true, rows: [{ id: 'k2a', qty: 1, unitPrice: 3000 }] },
+          { id: 'k5', type: 'sub', date: '2026-02-01', amt: 50000, rows: [{ id: 'r1', unitPrice: 1000, qty: 50 }, { id: 'r2', unitPrice: 500, qty: 20, stage: true }], periods: [{ no: 1, date: '2026-04-10', rows: [{ rid: 'r1', qty: 12 }, { rid: 'r2', qi: 4, qr: 2 }] }, { no: 2, date: '2026-05-10', rows: [{ rid: 'r1', qty: 8.5 }] }, { no: 9, isRet: true, date: '2026-06-01', amt: 777 }] }],
+        pa: [{ id: 'k3', type: 'own', date: '2026-03-20', amt: 5000, rows: [{ id: 'k3a', qty: 1, unitPrice: 5000 }] }, { id: 'k7', type: 'own', rental: true, date: '2026-06-01', amt: 6000, rows: [{ id: 'r7', unitPrice: 200, qty: 10 }], periods: [{ no: 1, date: '2026-06-30', rows: [{ rid: 'r7', qty: 30 }] }] }],
+        'pz.1': [{ id: 'k9', type: 'labor', date: '2026-09-09', amt: 900, rows: [{ id: 'k9a', subType: 'worker', days: 1, dayRate: 900, transport: 0 }] }],
+        po: [{ id: 'k4', type: 'labor', date: '2026-07-02', amt: 7000, rows: [{ id: 'k4a', subType: 'worker', days: 7, dayRate: 1000, transport: 0 }] }, { id: 'k6', type: 'labor', date: '2025-12-30', amt: 400, rows: [{ id: 'k6a', subType: 'worker', days: 1, dayRate: 400, transport: 0 }] }, { id: 'k8', type: 'sub', followOf: 'k5', date: '2026-07-01', amt: 1000, rows: [{ id: 'k8a', qty: 1, unitPrice: 1000 }] }],
+      },
+      invoices: [
+        { id: 'pi1', quoteId: 'pm', project: '假主約丙', date: '2026-03-25', periodNo: 1, retention: true, retentionPct: '', totals: { curTotal: 100000, total: 105000 }, receivedDate: '2026-04-30', receivedAmt: 99750 },
+        { id: 'pi2', quoteId: 'po', project: '假進行中丁', date: '2026-07-03', periodNo: 1, totals: { curTotal: 20000, total: 21000, clean: 300 } },
+        { id: 'pi3', project: '假主約丙', date: '2026-05-03', periodNo: 2, retention: true, retentionPct: '', totals: { curTotal: 40000, total: 42000 } },
+      ],
+      payables: [{ id: 'payk2_intro', costId: 'k2', amount: 3000, status: 'paid', paidDate: '2026-03-28' }, { id: 'pay_sales_pm', quoteId: 'pm', amount: 2000, status: 'pending' }, { id: 'comm_pm_x', quoteId: 'pm', amount: 1500, status: 'paid', voidAt: 5 }, { id: 'comm_pm_y', quoteId: 'pm', amount: 800, status: 'paid', paidDate: '2026-05-05' }, { id: 'payk8_p1', amount: 1000, status: 'paid', paidDate: '2026-07-20' }],   // 介紹費沒有 costId：靠 id 前綴對到
+      paidLog: { pay_sales_pm: { paidAt: Date.UTC(2026, 3, 30, 4) } },
+      expenses: [{ id: 'pe1', date: '2026-03-10', amount: 1050, tax: 50, number: 'AB12345678', cat: '文具' }, { id: 'pe2', date: '2026-08-10', amount: 800, cat: '雜支' }, { id: 'pe3', date: '2026-08-11', amount: 999, costRef: 'k4' }],
+      payslips: [{ ym: '2026-03', gross: 40000, coCost: 4000 }],
+    };
+    const now = Date.now();
+    // 雲端拿到的是 RTDB 形狀：以 id 為 key 的物件、key 編碼過（「.」→ ~d~）
+    const enc = (k) => String(k).replace(/\./g, '~d~');
+    const keyed = (a) => Object.fromEntries(a.map((x) => [enc(x.id), x]));
+    const cloudIn = { params: D.params, quotes: keyed(D.quotes), quoteSens: Object.fromEntries(Object.keys(D.costs).map((k) => [enc(k), { costs: D.costs[k] }])), invoices: keyed(D.invoices), payables: keyed(D.payables), paidLog: D.paidLog, expenses: D.expenses, payslips: D.payslips };
+    const cloud = PN.yearMgmt(cloudIn, '2026', now).d;
+    const cs = PN.closeSnaps(cloudIn, {}, now);
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(({ D, keys }) => {
+      const out = {};
+      try {
+        Object.assign(P, D.params);
+        Q = D.quotes.map((q) => Object.assign({}, q, { costs: D.costs[q.id] || [] }));
+        INV = D.invoices.map((x) => Object.assign({}, x)); PAYABLES = D.payables.map((x) => Object.assign({}, x)); PAID_LOG = Object.assign({}, D.paidLog);
+        EXPENSES = D.expenses.map((x) => Object.assign({}, x)); PAYSLIPS = D.payslips.map((x) => Object.assign({}, x));
+        const b0 = JSON.stringify(Q.map((q) => q.costs)); const d = _shRptYear('2026'); void b0;
+        out.v = {}; keys.forEach((k) => { out.v[k] = d[k]; }); out.costByCat = d.costByCat; out.expByCat = d.expByCat; out.monthly = d.monthly;
+        // 卡片：雲端快照＝同一份 → 全部 ✓；改一個數字 → ✗
+        PNL_SNAP = { ok: true, latest: { ym: '2026-11', at: Date.now(), ytd: Object.assign({}, out.v) }, close: {} };
+        let h = _pnlSnapHtml(); out.cardOk = /雲端損益快照/.test(h) && (h.match(/✓ 一致/g) || []).length === 7;
+        PNL_SNAP.latest.ytd.cost += 1; h = _pnlSnapHtml(); out.cardBad = (h.match(/✗ 不一致/g) || []).length === 1;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    }, { D, keys: PN.SNAP_KEYS });
+    const diffs = [];
+    PN.SNAP_KEYS.forEach((k) => { if (JSON.stringify(cloud[k]) !== JSON.stringify(r.v && r.v[k])) diffs.push(k + ' 雲端=' + cloud[k] + ' 前端=' + (r.v && r.v[k])); });
+    ['costByCat', 'expByCat', 'monthly'].forEach((k) => { if (JSON.stringify(cloud[k]) !== JSON.stringify(r[k])) diffs.push(k); });
+    check('5c 雲端損益（calc 同一套）與前端 _shRptYear 逐值相同：營收／保留款／實收／成本（分包依期別含分段列、租賃依期別、介紹費不算）／費用（發票未稅、已付抽成依帳本實付日、佣金、介紹費 id 前綴、作廢不算）／人事／稅／各月；雲端吃編碼過的 key', diffs.length === 0 && cloud.cost > 0 && (cloud.expByCat || {})['介紹費'] === 4000 && (cloud.expByCat || {})['業主端佣金'] === 800, diffs.join('；') || r.err || '');
+    check('5c 結案損益只算已結案主約（含追加、名稱對到的舊單）；資料健檢卡逐項並排比對', !!cs.pm && !cs.po && cs.pm.nInv === 2 && cs.pm.comm === 3000 + 2000 + 800 && cs.pm.cost === 30000 + 22500 + 5000 + 6000 && !cs['pz.1'] && r.cardOk && r.cardBad, JSON.stringify({ cs: cs.pm, card: [r.cardOk, r.cardBad], err: r.err, same: r.same }));
+    const csvN = PN.costExportCsv(cs);
+    const csvF = await page.evaluate((c) => _pnlCostCsv(c), cs);
+    check('5c #18 結案實際成本 CSV：前端匯出與雲端同一格式（逐字相同）、只匯出', csvN === csvF && /假主約丙,點工,30000/.test(csvN) && /假主約丙,承包（發包）,22500/.test(csvN), csvN.slice(0, 200));
+    check('5c 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 

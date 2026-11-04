@@ -630,6 +630,7 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
 #page-matest .me-chips{display:flex;flex-wrap:wrap;gap:4px 6px}#page-matest .me-chip{display:inline-flex;gap:4px;align-items:center;font-size:12.5px;padding:3px 8px;border:1px solid var(--b2);border-radius:14px;background:#fff;white-space:nowrap}#page-matest .me-chip input{width:15px;height:15px;min-height:0;margin:0;flex:none}
 @media(max-width:767px){#page-matest .me-pv{cursor:zoom-in}}
 .me-cols{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:12px;align-items:start}
+.me-cols.me-tcols{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}@media(min-width:1100px){.me-pvcol{position:sticky;top:64px;max-height:calc(100vh - 76px);overflow:auto}}@media(max-width:1099px){.me-cols.me-tcols{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:1099px){.me-cols{grid-template-columns:minmax(0,1fr)}}
 #page-matest .me-col-l,#page-matest #mat-est-form,#page-matest .me-tool{min-width:0;max-width:100%}
 .me-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:10px}
@@ -1327,9 +1328,9 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
         <div class="me-col-r"><div id="mat-est-out"></div></div>
       </div>
     </div>
-    <div class="me-pane me-tool" data-me="rebar" style="display:none"><div id="rebar-root"></div></div>
-    <div class="me-pane me-tool" data-me="grout" style="display:none"><div id="grout-root"></div></div>
-    <div class="me-pane me-tool" data-me="backfill" style="display:none"><div id="backfill-root"></div></div>
+    <div class="me-pane me-tool" data-me="rebar" style="display:none"><div class="me-cols me-tcols"><div class="me-col-l" id="rebar-root"></div><div class="me-col-r me-pvcol"><div class="card"><div class="ch green"><div class="cht">A4 預覽：鋼筋籠檢料表</div></div><div class="cb" style="padding-top:0"><div id="rebar-pv" class="me-pv" onclick="if(isMob())_rbPrint()"></div><div style="font-size:11px;color:var(--b3);margin-top:6px">預覽與「匯出 PDF」同一份內容與分頁（左邊改了馬上跟著變）</div></div></div></div></div></div>
+    <div class="me-pane me-tool" data-me="grout" style="display:none"><div class="me-cols me-tcols"><div class="me-col-l" id="grout-root"></div><div class="me-col-r me-pvcol"><div class="card"><div class="ch green"><div class="cht">A4 預覽：根固水泥砂漿用量表</div></div><div class="cb" style="padding-top:0"><div id="grout-pv" class="me-pv" onclick="if(isMob())_gtPrint()"></div><div style="font-size:11px;color:var(--b3);margin-top:6px">預覽與「匯出 PDF」同一份內容與分頁（左邊改了馬上跟著變）</div></div></div></div></div></div>
+    <div class="me-pane me-tool" data-me="backfill" style="display:none"><div class="me-cols me-tcols"><div class="me-col-l" id="backfill-root"></div><div class="me-col-r me-pvcol"><div class="card"><div class="ch green"><div class="cht">A4 預覽：背填材料用量表</div></div><div class="cb" style="padding-top:0"><div id="backfill-pv" class="me-pv" onclick="if(isMob())_bfPrint()"></div><div style="font-size:11px;color:var(--b3);margin-top:6px">預覽與「匯出 PDF」同一份內容與分頁（左邊改了馬上跟著變）</div></div></div></div></div></div>
   </div>
 </div>
 <div class="page" id="page-quickcost">
@@ -2833,15 +2834,16 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
   <div id="mob-more-body"></div>
 </div>
 
-<script src="calc/invoice.js?v=6.0.163" defer></script>
-<script src="calc/payable.js?v=6.0.163" defer></script>
-<script src="calc/report.js?v=6.0.163" defer></script>
-<script src="calc/comm.js?v=6.0.163" defer></script>
-<script src="calc/payroll.js?v=6.0.163" defer></script>
-<script src="calc/lifeline.js?v=6.0.163" defer></script>
-<script src="calc/settle.js?v=6.0.163" defer></script>
-<script src="calc/route.js?v=6.0.163" defer></script>
-<script src="app.js?v=6.0.163" defer></script>
+<script src="calc/invoice.js?v=6.0.172" defer></script>
+<script src="calc/payable.js?v=6.0.172" defer></script>
+<script src="calc/report.js?v=6.0.172" defer></script>
+<script src="calc/comm.js?v=6.0.172" defer></script>
+<script src="calc/payroll.js?v=6.0.172" defer></script>
+<script src="calc/lifeline.js?v=6.0.172" defer></script>
+<script src="calc/settle.js?v=6.0.172" defer></script>
+<script src="calc/route.js?v=6.0.172" defer></script>
+<script src="calc/todo.js?v=6.0.172" defer></script>
+<script src="app.js?v=6.0.172" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
@@ -2890,9 +2892,9 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
 
       <div id="rmk-t-spare" style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:5px">第11條：備用單價</div>
       <div class="fg fg4" style="margin-bottom:10px">
-        <div class="f"><label>a. 安全走道 ($/M)</label><input type="number" id="rmk-walk" placeholder="選填"></div>
-        <div class="f"><label>b. 技術工 ($/天)</label><input type="number" id="rmk-tech" placeholder="選填"></div>
-        <div class="f"></div><div class="f"></div>
+        <div class="f"><label>安全走道 ($/M)</label><input type="number" id="rmk-walk" placeholder="選填"></div>
+        <div class="f"><label>技術工 ($/天)</label><input type="number" id="rmk-tech" placeholder="選填"></div>
+        <div class="f" style="grid-column:span 2"><label>這張報價的條文（留空＝自動編號：只有一項不編 a. b.；只改這張，不動參數）</label><input id="rmk-spareTxt" maxlength="300" placeholder="留空＝自動"></div>
       </div>
 
       <div id="rmk-t-buy" style="font-size:11px;font-weight:700;color:var(--b4);margin-bottom:5px">第12條：買斷單價（未稅）</div>
