@@ -368,7 +368,7 @@
   // ── 每月請款（後端 11）：各案請款截止日前 5 天，有新日報數量、這期還沒開單 → 本月要請款的工地＋草稿數量 ──
   // cut＝截止日（每月幾號；專案 q.ownerPay.cut ＞ 客戶 payDue ＞ 預設 25）；這一期＝上個截止日隔天～這個截止日
   function cutOf(q, cust, def) {
-    var o = (q && q.ownerPay) || {}, c = cust || {}, x = parseFloat(o.cut); if (!isFinite(x)) x = parseFloat(c.payDue); if (!isFinite(x)) x = (def && def.cut) || 25;
+    var o = (q && q.ownerPay) || {}, c = cust || {}, x = parseFloat(o.cut); if (!(x >= 1)) x = parseFloat(c.payDue); if (!(x >= 1)) x = (def && def.cut) || 25;   // 審查：0／空白不算截止日
     return Math.max(1, Math.min(31, Math.round(x)));
   }
   function cycleOf(today, cut) {
@@ -384,7 +384,8 @@
     var cy = cycleOf(o.today, cutOf(q, o.cust, o.def)), left = dDiff(o.today, cy.end);
     if (left < 0 || left > 5) return null;
     var invs = (o.invs || []).filter(function (i) { return i && i.kind !== 'retReturn'; });
-    if (invs.some(function (i) { var d = String(i.date || ''); return d >= cy.start && d <= cy.end; })) return null;   // 這期已開單
+    var from = dAdd(cy.end, -20);   // 審查：截止日後幾天才開上一期的單（例：25 日截止、26 日開）不算這期；這期的單＝截止日前 20 天內開的
+    if (invs.some(function (i) { var d = String(i.date || ''); return d >= from && d <= cy.end; })) return null;   // 這期已開單
     var last = invs.map(function (i) { return String(i.date || ''); }).sort().pop() || '';
     var qty = {};
     ((q && q.dailyLogs) || []).forEach(function (L) {

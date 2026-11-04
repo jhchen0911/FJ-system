@@ -33512,7 +33512,8 @@ function _syncSubPeriodPayables(q,c){
   var put=function(p,old,idx){
     // 健檢1 #13：已付的應付不覆寫金額（錢已匯出去）；自動重算出的金額不同 → 差額另立一筆待付（id 加 _d<n>），付清的差額也照樣保留
     if(old&&old.status==='paid'){_payPaidDelta(p,old);return;}
-    if(old){['paidDate','paidAt','unpaidAt','payDue','files','invNo','costSourceId','retentionPct'].forEach(function(f){if(old[f]!=null)p[f]=old[f];});if(old.vat!=null&&old.vatManual)p.vat=old.vat;}
+    if(old){['paidDate','paidAt','unpaidAt','payDue','files','invNo','costSourceId','retentionPct'].forEach(function(f){if(old[f]!=null)p[f]=old[f];});if(old.vat!=null&&old.vatManual)p.vat=old.vat;
+      if(old.approvedAt&&Math.round(parseFloat(old.approvedAmt)||0)===Math.round(parseFloat(p.amount)||0)){p.approvedAt=old.approvedAt;p.approvedBy=old.approvedBy;p.approvedDiff=old.approvedDiff;p.approvedAmt=old.approvedAmt;}}   // 5c 審查：付包商款核准跟著重建保留；金額變了就要重新核准
     if(old&&_recSame(old,p)){_keepStamp(p,old);}else _touch(p);
     if(idx>=0)PAYABLES[idx]=p;else PAYABLES.unshift(p);
   };
@@ -40825,16 +40826,20 @@ function _vpCard(p){
   var q=(Q||[]).find(function(x){return x.id===p.quoteId;});if(!q)return null;
   var c=(q.costs||[]).find(function(x){return x&&x.id===p.costId;});return c?{q:q,c:c}:null;
 }
-function _vpCheck(p){
+function _vpCheck(p,rc){
   var qc=_vpCard(p);if(!qc)return null;
   var idxs={};(qc.c.rows||[]).forEach(function(r){if(r&&r.lump){(r.lumpItems||[]).forEach(function(li){var j=parseInt(li.idx);if(j>=0&&!li.del)idxs[j]=1;});return;}var i=parseInt(r&&r.linkedItemIdx);if(i>=0)idxs[i]=1;});
-  var rows=[];try{rows=_qtyRecon(qc.q).filter(function(r){return idxs[r.idx];});}catch(e){_err('_vpCheck',e);}
+  var rows=[];try{var all=rc?(rc[qc.q.id]||(rc[qc.q.id]=_qtyRecon(qc.q))):_qtyRecon(qc.q);rows=all.filter(function(r){return idxs[r.idx];});}catch(e){_err('_vpCheck',e);}   // rc：同一張報價只對帳一次
   var b2b=[];try{b2b=_b2bIssues(qc.q,qc.c)||[];}catch(e){_err('_vpCheck.b2b',e);}
   var bad=rows.reduce(function(a,r){return a+(r.warns||[]).length;},0);
   return {q:qc.q,c:qc.c,rows:rows,b2b:b2b,bad:bad,ok:!bad};
 }
 function _vpPending(){
-  return (PAYABLES||[]).filter(function(p){return p&&p.costId&&p.costPeriod!=null&&p.status!=='paid'&&!p.voidAt&&!p.approvedAt&&(parseFloat(p.amount)||0)>0;});
+  return (PAYABLES||[]).filter(function(p){
+    if(!p||!p.costId||p.costPeriod==null||p.status==='paid'||p.voidAt||p.approvedAt||p.costEarly||/_r\d+$/.test(String(p.id))||!((parseFloat(p.amount)||0)>0))return false;   // 審查：預付早付、保留款退還不核數量
+    try{if(_payPaidHard(p))return false;}catch(e){_err('_vpPending.paid',e);}
+    var qc=_vpCard(p);return !!(qc&&qc.c.type==='sub'&&!qc.c.rental&&!qc.c.followOf);   // 只有分包卡（租賃、跟隨計價不算）
+  });
 }
 function openVendorPayCheck(pid){
   var p=(PAYABLES||[]).find(function(x){return x.id===pid;});if(!p){toast('找不到這筆應付');return;}
@@ -40850,7 +40855,7 @@ function vpApprove(pid){
   if(_roDeny())return;
   var p=(PAYABLES||[]).find(function(x){return x.id===pid;});if(!p)return;
   var k=_vpCheck(p);
-  p.approvedAt=Date.now();p.approvedBy=_meEmail()||'';p.approvedDiff=k?k.bad:0;_touch(p);
+  p.approvedAt=Date.now();p.approvedBy=_meEmail()||'';p.approvedDiff=k?k.bad:0;p.approvedAmt=Math.round(parseFloat(p.amount)||0);_touch(p);
   savePayables();try{logActivity('付包商款','核准：'+(p.to||'')+' 第'+p.costPeriod+'期'+(k&&k.bad?('（'+k.bad+' 項差異）'):''));}catch(e){_err('vpApprove.log',e);}
   toast('已核准：'+(p.to||'')+' 第 '+p.costPeriod+' 期');try{updateDashTodo();}catch(e){_err('vpApprove.todo',e);}
 }
@@ -40858,12 +40863,12 @@ function _todo5cItems(items){
   var v=_todoBuild();
   var ic=function(h){return '<svg class="ic ib" aria-hidden="true"><use href="#'+h+'"/></svg>';};
   if(v){
-    (v.bill||[]).forEach(function(b){items.push({type:'bill_month',urgent:b.left<=1,jump:"openProj('"+b.qid+"')",icon:ic('i-receipt'),color:'#0D47A1',
+    (v.bill||[]).forEach(function(b){items.push({type:'bill_month',urgent:b.left<=1,jump:"openProj('"+escq(b.qid)+"')",icon:ic('i-receipt'),color:'#0D47A1',
       text:'本月要請款：'+esc(b.name)+'（'+(b.left===0?'今天':b.left+' 天後')+'截止 '+esc(b.cutDate.slice(5))+'）',sub:b.items.slice(0,3).map(function(x){return esc(x.desc.slice(0,14))+' '+fmt(x.qty)+esc(x.unit);}).join('、')+(b.items.length>3?' 等 '+b.items.length+' 項':'')});});
     (v.overrun||[]).forEach(function(o){var mx=o.rows.reduce(function(a,r){return Math.max(a,r.pct);},0);
-      items.push({type:'overrun',urgent:mx>=130,jump:"openProj('"+o.qid+"')",icon:ic('i-warn'),color:'var(--red)',text:'超支提醒：'+esc(o.name)+' '+o.n+' 個工項實際成本超過報價成本 10%（最高 '+mx+'%）',sub:o.rows.slice(0,2).map(function(r){return esc(r.desc.slice(0,14))+' '+r.pct+'%';}).join('、')});});
+      items.push({type:'overrun',urgent:mx>=130,jump:"openProj('"+escq(o.qid)+"')",icon:ic('i-warn'),color:'var(--red)',text:'超支提醒：'+esc(o.name)+' '+o.n+' 個工項實際成本超過報價成本 10%（最高 '+mx+'%）',sub:o.rows.slice(0,2).map(function(r){return esc(r.desc.slice(0,14))+' '+r.pct+'%';}).join('、')});});
   }
-  try{var vp=_vpPending();if(vp.length){var bad=0;vp.forEach(function(p){var k=_vpCheck(p);if(k&&k.bad)bad++;});
+  try{var vp=_vpPending();if(vp.length){var bad=0,rc={};vp.forEach(function(p){var k=_vpCheck(p,rc);if(k&&k.bad)bad++;});
     items.push({type:'vp_check',urgent:bad>0,jump:"openVendorPayCheck('"+escq(vp[0].id)+"')",icon:ic('i-coins'),color:bad?'var(--red)':'#E65100',
       text:'付包商款待核准 '+vp.length+' 筆'+(bad?('（'+bad+' 筆數量有差異）'):'（數量相符）'),sub:vp.slice(0,3).map(function(p){return esc(p.to||'')+' 第'+esc(String(p.costPeriod))+'期';}).join('、')});}}catch(e){_err('_todo5cItems.vp',e);}
 }

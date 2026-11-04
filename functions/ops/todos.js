@@ -20,7 +20,10 @@ function withSens(quotes, sens) {
     const c = Object.assign({}, q);
     if (Array.isArray(s.rfqs)) c.rfqs = s.rfqs;
     if (Array.isArray(s.costs)) c.costs = s.costs;
-    if (s.est && typeof s.est === 'object') c.items = (q.items || []).map((it, i) => { if (!it) return it; const k = it._uid ? String(it._uid) : ('#' + i); return s.est[k] != null ? Object.assign({}, it, { estCost: s.est[k] }) : it; });
+    if (s.est && typeof s.est === 'object') {
+      const est = {}; Object.keys(s.est).forEach((k) => { est[decKey(k)] = s.est[k]; });   // 審查：上雲時 # 編成 ~h~，要先還原
+      c.items = (q.items || []).map((it, i) => { if (!it) return it; const k = it._uid ? String(it._uid) : ('#' + i); return est[k] != null ? Object.assign({}, it, { estCost: est[k] }) : it; });
+    }
     return c;
   });
 }
