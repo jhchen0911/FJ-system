@@ -383,7 +383,8 @@ exports.trashPurge = onSchedule({ schedule: '45 3 * * *', timeZone: TZ, region: 
 
 // ══════════ 改版第 5 步 5c #16 月損益／結案損益快照、#18 結案實際成本匯出（小批次線） ══════════
 // monthlySnapshot 每天 07:25（台北）：今年累計寫 fydata/private/pnlSnap/latest（FJ 資料健檢頁跟這台裝置的 _shRptYear 逐值並行比對）；
-//   上個月還沒凍結就凍結一份 fydata/private/pnlSnap/<YYYY-MM>（每月 1 日起，留 24 個月）；新結案的專案凍結一份 fydata/private/pnlClose/<報價 id>（之後不重算）。
+//   上個月還沒凍結就凍結一份 fydata/private/pnlSnap/<YYYY-MM>（每月 1 日起，留 24 個月；ytd＝凍結當下的整年累計、cum＝截至該月底）；
+//   已結案的專案寫 fydata/private/pnlClose/<報價 id>（結案後 90 天內每天重算，補付的抽成、介紹費、最後一期才算得到；之後凍結）。
 //   算法全部走 calc 模組（functions/ops/pnl.js 只做資料準備，跟前端 _mgmtData 一行對一行）。#18 結案實際成本：FJ 從 pnlClose 匯出 CSV，只匯出不改資料。
 // pnlSnapNow：管理員手動跑一次（驗收、並行比對不一致時重算）。
 const pnlCore = require('./ops/pnl.js');
@@ -403,14 +404,19 @@ async function runPnl(now) {
   await db.ref('fydata/private/pnlSnap/latest').set(latest);
   if (snaps.indexOf(prev) < 0) await db.ref('fydata/private/pnlSnap/' + prev).set(pnlCore.monthSnap(inp, prev, now));
   for (const k of snaps.filter((k) => /^\d{4}-\d{2}$/.test(k)).sort().slice(0, -24)) await db.ref('fydata/private/pnlSnap/' + k).remove();
-  const cs = pnlCore.closeSnaps(inp, closed, now), up = {};
+  const cs = pnlCore.closeSnaps(inp, pnlCore.frozenIds(closed, now), now, closed), up = {};   // 結案 90 天內每天重算，之後凍結
   Object.keys(cs).forEach((qid) => { up[pnlKey(qid)] = cs[qid]; });
   if (Object.keys(up).length) await db.ref('fydata/private/pnlClose').update(up);
   console.log('[損益快照]', ym, '今年稅前', latest.ytd.pretax, '新結案', Object.keys(cs).length);
   return { ym, pretax: latest.ytd.pretax, closed: Object.keys(cs).length };
 }
 exports.monthlySnapshot = onSchedule({ schedule: '25 7 * * *', timeZone: TZ, region: REGION, memory: '1GiB', timeoutSeconds: 300 }, async () => {
-  try { await runPnl(Date.now()); } catch (e) { console.error('monthlySnapshot', e); }
+  const db = admin.database(), now = Date.now();
+  try { await runPnl(now); await db.ref('fydata/todo/pnl').set(null); }
+  catch (e) {
+    console.error('monthlySnapshot', e);   // 審查：失敗寫後端待辦（陳軒早報看得到），不只記 log
+    await db.ref('fydata/todo/pnl').set({ fail: { id: 'pnl_fail', src: 'pnl', key: 'fail', urgent: false, text: '雲端損益快照今天沒算成功', sub: '經營報表 › 資料健檢（可按「立即重算」）', go: 'health', at: now } }).catch((e2) => console.error('monthlySnapshot.todo', e2));
+  }
 });
 exports.pnlSnapNow = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], memory: '1GiB', timeoutSeconds: 300 }, async (req, res) => {
   try {

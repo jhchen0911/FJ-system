@@ -55,3 +55,17 @@ test('結案損益：主約＋追加加總、進行中的不算、已凍結的�
   assert.match(csv, /^﻿報價id,工程名稱,成本分類,金額（未稅）/);
   assert.match(csv, /m,假主約,點工,30000/);
 });
+
+test('審查修正：月凍結另給截至該月底的累計（cum）；結案 90 天內每天重算、之後凍結；巢狀 key 整棵還原；CSV 防公式注入', () => {
+  const s = N.monthSnap(inp, '2026-10', now);
+  assert.ok(s.cum && s.cum.rev === s.ytd.monthly.slice(0, 10).reduce((a, x) => a + x.rev, 0));
+  const c1 = N.closeSnaps(inp, {}, now);
+  assert.strictEqual(c1.m.firstAt, now);
+  const later = now + 10 * 86400000;
+  const c2 = N.closeSnaps(inp, N.frozenIds(c1, later), later, c1);
+  assert.strictEqual(c2.m.firstAt, now);                           // 重算時保留第一次的時間
+  assert.deepStrictEqual(N.frozenIds(c1, now + N.CLOSE_SETTLE_MS + 1), { m: 1 });   // 過 90 天凍結
+  assert.deepStrictEqual(N.deepDec({ 'a~d~b': { 'x~sl~y': [ { 'k~h~': 1 } ] } }), { 'a.b': { 'x/y': [ { 'k#': 1 } ] } });
+  const csv = N.costExportCsv({ m: { qid: 'm', name: '=HYPERLINK(1)', at: now, costByCat: { '點工': 1 } } });
+  assert.match(csv, /m,'=HYPERLINK\(1\),點工,1/);
+});

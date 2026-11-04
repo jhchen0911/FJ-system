@@ -12,6 +12,8 @@ const FJC = Object.assign({}, req('invoice.js'), req('payable.js'), req('report.
 
 function arr(x) { return Array.isArray(x) ? x.filter(Boolean) : (x && typeof x === 'object' ? Object.values(x).filter(Boolean) : []); }
 function decKey(k) { return String(k).replace(/~d~/g, '.').replace(/~h~/g, '#').replace(/~s~/g, '$').replace(/~sl~/g, '/').replace(/~lb~/g, '[').replace(/~rb~/g, ']'); }
+// 同前端 _deepDecodeKeys：整棵還原（審查：巢狀物件的 key 也可能被編碼）
+function deepDec(o) { if (Array.isArray(o)) return o.map(deepDec); if (o && typeof o === 'object') { const r = {}; Object.keys(o).forEach((k) => { r[decKey(k)] = deepDec(o[k]); }); return r; } return o; }
 function num(x) { const n = parseFloat(x); return isFinite(n) ? n : 0; }
 // 台北日期（前端 _ymd 用裝置本地時間；FJ 的裝置都在台灣）
 function tpeYmd(ts) { return new Date(ts + 8 * 3600 * 1000).toISOString().slice(0, 10); }
@@ -23,7 +25,8 @@ function mergeQuotes(sharedQuotes, quoteSens) {
   return arr(sharedQuotes).filter((q) => q && q.id).map((q) => Object.assign({}, q, sens[q.id] && sens[q.id].costs ? { costs: sens[q.id].costs } : {}));
 }
 
-function ctx(inp) {
+function ctx(inp0) {
+  const inp = deepDec(inp0 || {});
   const P = inp.params || {}, Q = mergeQuotes(inp.quotes, inp.quoteSens), INV = arr(inp.invoices), PAY = arr(inp.payables);
   const PAID = {}; Object.keys(inp.paidLog || {}).forEach((k) => { PAID[decKey(k)] = inp.paidLog[k]; });
   const taxR = FJC.inv.taxR(P.tax), taxM = FJC.inv.taxM(P.tax);
@@ -79,14 +82,21 @@ const SNAP_KEYS = ['revTax', 'ret', 'revNet', 'recv', 'cost', 'gross', 'exp', 'h
 function pick(d) { const o = {}; SNAP_KEYS.forEach((k) => { if (d[k] !== undefined) o[k] = d[k]; }); o.costByCat = d.costByCat || {}; o.expByCat = d.expByCat || {}; o.monthly = d.monthly || []; return o; }
 
 // 月損益快照：ym＝'YYYY-MM'（通常是上個月）→ {ym, at, ytd（該年的管理用損益）, month（該月 rev／cost／recv）}
+// 審查：ytd 是「算的當下」的整年累計（凍結上個月時已含本月初的資料）；要看截至該月底的累計用 cum（1 月到該月的各月加總）
 function monthSnap(inp, ym, now) {
   const Y = ym.slice(0, 4), m = parseInt(ym.slice(5, 7), 10);
   const { d } = yearMgmt(inp, Y, now);
-  return { ym, at: now, basis: 'mgmt', ytd: pick(d), month: (d.monthly || [])[m - 1] || { m, rev: 0, cost: 0, recv: 0 } };
+  const mm = (d.monthly || []).slice(0, m), cum = { rev: 0, cost: 0, recv: 0 };
+  mm.forEach((x) => { cum.rev += x.rev || 0; cum.cost += x.cost || 0; cum.recv += x.recv || 0; });
+  return { ym, at: now, basis: 'mgmt', ytdAsOf: now, ytd: pick(d), cum, month: (d.monthly || [])[m - 1] || { m, rev: 0, cost: 0, recv: 0 } };
 }
 
-// 結案損益：已結案的主約（含追加），同一套管理用口徑按專案加總；已凍結的（done）不重算
-function closeSnaps(inp, done, now) {
+// 結案損益：已結案的主約（含追加），同一套管理用口徑按專案加總。
+// 審查：結案後還可能補付抽成、介紹費、廠商最後一期 → 結案後 90 天內每天重算（firstAt 記第一次），過了 90 天才凍結；done＝已凍結（不重算）的報價 id
+const CLOSE_SETTLE_MS = 90 * 86400000;
+function frozenIds(prev, now) { const out = {}; Object.keys(prev || {}).forEach((k) => { const s = prev[k]; if (s && now - (s.firstAt || s.at || 0) > CLOSE_SETTLE_MS) out[s.qid || decKey(k)] = 1; }); return out; }
+function closeSnaps(inp, done, now, prev) {
+  const pv = {}; Object.keys(prev || {}).forEach((k) => { const s = prev[k]; if (s) pv[s.qid || decKey(k)] = s; });
   const c = ctx(inp), out = {};
   c.Q.filter((q) => q.awarded && !q.parentId && q.closed && !(done && done[q.id])).forEach((q) => {
     const ids = {}; ids[q.id] = 1; c.Q.forEach((x) => { if (x.parentId === q.id) ids[x.id] = 1; });
@@ -96,7 +106,7 @@ function closeSnaps(inp, done, now) {
     const cost = Math.round(ce.reduce((a, e) => a + num(e.amt), 0));
     const comm = Math.round(c.data.extraExp.filter((e) => ids[e.qid]).reduce((a, e) => a + num(e.amt), 0));   // 已付的業務抽成、業主端佣金、介紹費
     const costByCat = {}; ce.forEach((e) => { costByCat[e.cat] = Math.round((costByCat[e.cat] || 0) + num(e.amt)); });
-    out[q.id] = { qid: q.id, name: String(q.name || '').slice(0, 60), at: now, basis: 'mgmt', revNet: rev, cost, gross: rev - cost, comm, net: rev - cost - comm, nInv: invs.length, costByCat };
+    out[q.id] = { qid: q.id, name: String(q.name || '').slice(0, 60), at: now, firstAt: (pv[q.id] && (pv[q.id].firstAt || pv[q.id].at)) || now, basis: 'mgmt', revNet: rev, cost, gross: rev - cost, comm, net: rev - cost - comm, nInv: invs.length, costByCat };
   });
   return out;
 }
@@ -105,8 +115,9 @@ function closeSnaps(inp, done, now) {
 function costExportCsv(snaps) {
   const rows = [['報價id', '工程名稱', '成本分類', '金額（未稅）', '快照日期']];
   Object.keys(snaps || {}).sort().forEach((k) => { const s = snaps[k] || {}; Object.keys(s.costByCat || {}).sort().forEach((cat) => rows.push([s.qid || k, s.name || '', cat, Math.round(num(s.costByCat[cat])), s.at ? tpeYmd(s.at) : ''])); });
-  const cell = (v) => { const t = String(v == null ? '' : v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  // 審查：開頭是 = + - @ 的字加 ' 防 Excel 公式注入（金額是數字不受影響）
+  const cell = (v) => { let t = String(v == null ? '' : v); if (typeof v === 'string' && /^[=+\-@]/.test(t)) t = "'" + t; return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
   return '﻿' + rows.map((r) => r.map(cell).join(',')).join('\n');
 }
 
-module.exports = { ctx, yearMgmt, monthSnap, closeSnaps, costExportCsv, mergeQuotes, shareMonths, SNAP_KEYS, tpeYmd };
+module.exports = { CLOSE_SETTLE_MS, frozenIds, deepDec, ctx, yearMgmt, monthSnap, closeSnaps, costExportCsv, mergeQuotes, shareMonths, SNAP_KEYS, tpeYmd };

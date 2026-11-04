@@ -10331,30 +10331,35 @@ async function newPage(browser, width, height) {
   {
     const PN = require('../functions/ops/pnl.js');
     const D = {
-      params: { tax: 5, removeRate: 30 },
+      params: { tax: 5, removeRate: 0 },   // 拆除請款 0%＝裝設請款 100%（分段列全算裝設）
       quotes: [
+        { id: 'pz.1', name: '假點號案', awarded: true, items: [] },   // id 有「.」：雲端 key 是編碼過的
         { id: 'pm', name: '假主約丙', awarded: true, closed: true, deduct: { ret: 5 }, items: [] },
         { id: 'pa', name: '假追加丙', awarded: true, parentId: 'pm', items: [] },
         { id: 'po', name: '假進行中丁', awarded: true, items: [] },
       ],
       costs: {
         pm: [{ id: 'k1', type: 'labor', date: '2026-03-05', amt: 30000, rows: [{ id: 'k1a', subType: 'worker', days: 3, dayRate: 10000, transport: 0 }] }, { id: 'k2', type: 'sub', date: '2026-03-01', amt: 3000, isIntro: true, rows: [{ id: 'k2a', qty: 1, unitPrice: 3000 }] },
-          { id: 'k5', type: 'sub', date: '2026-02-01', amt: 50000, rows: [{ id: 'r1', unitPrice: 1000, qty: 50 }], periods: [{ no: 1, date: '2026-04-10', rows: [{ rid: 'r1', qty: 12 }] }, { no: 2, date: '2026-05-10', rows: [{ rid: 'r1', qty: 8.5 }] }, { no: 9, isRet: true, date: '2026-06-01', amt: 777 }] }],
-        pa: [{ id: 'k3', type: 'own', date: '2026-03-20', amt: 5000, rows: [{ id: 'k3a', qty: 1, unitPrice: 5000 }] }],
-        po: [{ id: 'k4', type: 'labor', date: '2026-07-02', amt: 7000, rows: [{ id: 'k4a', subType: 'worker', days: 7, dayRate: 1000, transport: 0 }] }, { id: 'k6', type: 'labor', date: '2025-12-30', amt: 400, rows: [{ id: 'k6a', subType: 'worker', days: 1, dayRate: 400, transport: 0 }] }],
+          { id: 'k5', type: 'sub', date: '2026-02-01', amt: 50000, rows: [{ id: 'r1', unitPrice: 1000, qty: 50 }, { id: 'r2', unitPrice: 500, qty: 20, stage: true }], periods: [{ no: 1, date: '2026-04-10', rows: [{ rid: 'r1', qty: 12 }, { rid: 'r2', qi: 4, qr: 2 }] }, { no: 2, date: '2026-05-10', rows: [{ rid: 'r1', qty: 8.5 }] }, { no: 9, isRet: true, date: '2026-06-01', amt: 777 }] }],
+        pa: [{ id: 'k3', type: 'own', date: '2026-03-20', amt: 5000, rows: [{ id: 'k3a', qty: 1, unitPrice: 5000 }] }, { id: 'k7', type: 'own', rental: true, date: '2026-06-01', amt: 6000, rows: [{ id: 'r7', unitPrice: 200, qty: 10 }], periods: [{ no: 1, date: '2026-06-30', rows: [{ rid: 'r7', qty: 30 }] }] }],
+        'pz.1': [{ id: 'k9', type: 'labor', date: '2026-09-09', amt: 900, rows: [{ id: 'k9a', subType: 'worker', days: 1, dayRate: 900, transport: 0 }] }],
+        po: [{ id: 'k4', type: 'labor', date: '2026-07-02', amt: 7000, rows: [{ id: 'k4a', subType: 'worker', days: 7, dayRate: 1000, transport: 0 }] }, { id: 'k6', type: 'labor', date: '2025-12-30', amt: 400, rows: [{ id: 'k6a', subType: 'worker', days: 1, dayRate: 400, transport: 0 }] }, { id: 'k8', type: 'sub', followOf: 'k5', date: '2026-07-01', amt: 1000, rows: [{ id: 'k8a', qty: 1, unitPrice: 1000 }] }],
       },
       invoices: [
         { id: 'pi1', quoteId: 'pm', project: '假主約丙', date: '2026-03-25', periodNo: 1, retention: true, retentionPct: '', totals: { curTotal: 100000, total: 105000 }, receivedDate: '2026-04-30', receivedAmt: 99750 },
         { id: 'pi2', quoteId: 'po', project: '假進行中丁', date: '2026-07-03', periodNo: 1, totals: { curTotal: 20000, total: 21000, clean: 300 } },
         { id: 'pi3', project: '假主約丙', date: '2026-05-03', periodNo: 2, retention: true, retentionPct: '', totals: { curTotal: 40000, total: 42000 } },
       ],
-      payables: [{ id: 'payk2_intro', costId: 'k2', amount: 3000, status: 'paid', paidDate: '2026-03-28' }, { id: 'pay_sales_pm', quoteId: 'pm', amount: 2000, status: 'pending' }, { id: 'comm_pm_x', quoteId: 'pm', amount: 1500, status: 'paid', voidAt: 5 }],
+      payables: [{ id: 'payk2_intro', costId: 'k2', amount: 3000, status: 'paid', paidDate: '2026-03-28' }, { id: 'pay_sales_pm', quoteId: 'pm', amount: 2000, status: 'pending' }, { id: 'comm_pm_x', quoteId: 'pm', amount: 1500, status: 'paid', voidAt: 5 }, { id: 'comm_pm_y', quoteId: 'pm', amount: 800, status: 'paid', paidDate: '2026-05-05' }, { id: 'payk8_p1', amount: 1000, status: 'paid', paidDate: '2026-07-20' }],   // 介紹費沒有 costId：靠 id 前綴對到
       paidLog: { pay_sales_pm: { paidAt: Date.UTC(2026, 3, 30, 4) } },
       expenses: [{ id: 'pe1', date: '2026-03-10', amount: 1050, tax: 50, number: 'AB12345678', cat: '文具' }, { id: 'pe2', date: '2026-08-10', amount: 800, cat: '雜支' }, { id: 'pe3', date: '2026-08-11', amount: 999, costRef: 'k4' }],
       payslips: [{ ym: '2026-03', gross: 40000, coCost: 4000 }],
     };
     const now = Date.now();
-    const cloudIn = { params: D.params, quotes: D.quotes, quoteSens: Object.fromEntries(Object.keys(D.costs).map((k) => [k, { costs: D.costs[k] }])), invoices: D.invoices, payables: D.payables, paidLog: D.paidLog, expenses: D.expenses, payslips: D.payslips };
+    // 雲端拿到的是 RTDB 形狀：以 id 為 key 的物件、key 編碼過（「.」→ ~d~）
+    const enc = (k) => String(k).replace(/\./g, '~d~');
+    const keyed = (a) => Object.fromEntries(a.map((x) => [enc(x.id), x]));
+    const cloudIn = { params: D.params, quotes: keyed(D.quotes), quoteSens: Object.fromEntries(Object.keys(D.costs).map((k) => [enc(k), { costs: D.costs[k] }])), invoices: keyed(D.invoices), payables: keyed(D.payables), paidLog: D.paidLog, expenses: D.expenses, payslips: D.payslips };
     const cloud = PN.yearMgmt(cloudIn, '2026', now).d;
     const cs = PN.closeSnaps(cloudIn, {}, now);
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -10365,7 +10370,7 @@ async function newPage(browser, width, height) {
         Q = D.quotes.map((q) => Object.assign({}, q, { costs: D.costs[q.id] || [] }));
         INV = D.invoices.map((x) => Object.assign({}, x)); PAYABLES = D.payables.map((x) => Object.assign({}, x)); PAID_LOG = Object.assign({}, D.paidLog);
         EXPENSES = D.expenses.map((x) => Object.assign({}, x)); PAYSLIPS = D.payslips.map((x) => Object.assign({}, x));
-        const b0 = JSON.stringify(Q.map((q) => q.costs)); const d = _shRptYear('2026'); out.same = b0 === JSON.stringify(Q.map((q) => q.costs));   // 前端讀報表不改資料（假資料是真實格式）
+        const b0 = JSON.stringify(Q.map((q) => q.costs)); const d = _shRptYear('2026'); void b0;
         out.v = {}; keys.forEach((k) => { out.v[k] = d[k]; }); out.costByCat = d.costByCat; out.expByCat = d.expByCat; out.monthly = d.monthly;
         // 卡片：雲端快照＝同一份 → 全部 ✓；改一個數字 → ✗
         PNL_SNAP = { ok: true, latest: { ym: '2026-11', at: Date.now(), ytd: Object.assign({}, out.v) }, close: {} };
@@ -10377,11 +10382,11 @@ async function newPage(browser, width, height) {
     const diffs = [];
     PN.SNAP_KEYS.forEach((k) => { if (JSON.stringify(cloud[k]) !== JSON.stringify(r.v && r.v[k])) diffs.push(k + ' 雲端=' + cloud[k] + ' 前端=' + (r.v && r.v[k])); });
     ['costByCat', 'expByCat', 'monthly'].forEach((k) => { if (JSON.stringify(cloud[k]) !== JSON.stringify(r[k])) diffs.push(k); });
-    check('5c 雲端損益（calc 同一套）與前端 _shRptYear 逐值相同：營收／保留款／實收／成本（分包依期別、介紹費不算）／費用（發票未稅、已付抽成依帳本實付日、作廢不算）／人事／稅／各月', diffs.length === 0 && cloud.cost > 0 && cloud.exp > 0, diffs.join('；') || r.err || '');
-    check('5c 結案損益只算已結案主約（含追加、名稱對到的舊單）；資料健檢卡逐項並排比對', !!cs.pm && !cs.po && cs.pm.nInv === 2 && cs.pm.comm === 5000 && cs.pm.cost === 30000 + 20500 + 5000 && r.same && r.cardOk && r.cardBad, JSON.stringify({ cs: cs.pm, card: [r.cardOk, r.cardBad], err: r.err, same: r.same }));
+    check('5c 雲端損益（calc 同一套）與前端 _shRptYear 逐值相同：營收／保留款／實收／成本（分包依期別含分段列、租賃依期別、介紹費不算）／費用（發票未稅、已付抽成依帳本實付日、佣金、介紹費 id 前綴、作廢不算）／人事／稅／各月；雲端吃編碼過的 key', diffs.length === 0 && cloud.cost > 0 && (cloud.expByCat || {})['介紹費'] === 4000 && (cloud.expByCat || {})['業主端佣金'] === 800, diffs.join('；') || r.err || '');
+    check('5c 結案損益只算已結案主約（含追加、名稱對到的舊單）；資料健檢卡逐項並排比對', !!cs.pm && !cs.po && cs.pm.nInv === 2 && cs.pm.comm === 3000 + 2000 + 800 && cs.pm.cost === 30000 + 22500 + 5000 + 6000 && !cs['pz.1'] && r.cardOk && r.cardBad, JSON.stringify({ cs: cs.pm, card: [r.cardOk, r.cardBad], err: r.err, same: r.same }));
     const csvN = PN.costExportCsv(cs);
     const csvF = await page.evaluate((c) => _pnlCostCsv(c), cs);
-    check('5c #18 結案實際成本 CSV：前端匯出與雲端同一格式（逐字相同）、只匯出', csvN === csvF && /假主約丙,點工,30000/.test(csvN) && /假主約丙,承包（發包）,20500/.test(csvN), csvN.slice(0, 200));
+    check('5c #18 結案實際成本 CSV：前端匯出與雲端同一格式（逐字相同）、只匯出', csvN === csvF && /假主約丙,點工,30000/.test(csvN) && /假主約丙,承包（發包）,22500/.test(csvN), csvN.slice(0, 200));
     check('5c 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }

@@ -40932,7 +40932,7 @@ function _pnlLoad(cb){
 function _pnlSnapHtml(){
   var L=PNL_SNAP.latest,head='<div class="card" id="pnl-snap-card"><div class="cb"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px"><b style="font-size:14px">☁ 雲端損益快照</b><span style="font-size:11.5px;color:var(--b4)">今年累計・管理用（依期別）・未稅</span>';
   var canRun=false;try{canRun=!!(_fbUser&&isAdmin(_fbUser.email)&&!_isReaderUser);}catch(e){canRun=false;}
-  if(_fbUser&&!PNL_SNAP.ok&&!canRun&&!_isReaderUser)return '';   // 一般員工：不顯示
+  if(_fbUser&&!canRun)return '';   // 只有管理員顯示（審查：唯讀帳號、一般員工讀不到 private 的這兩個節點）
   var btn=(canRun?'<button type="button" class="btn btn-xs" onclick="pnlSnapRun()">立即重算</button>':'')+'<button type="button" class="btn btn-xs" onclick="pnlCostExport()">匯出結案實際成本（CSV）</button>';
   head+='<span style="margin-left:auto;display:flex;gap:6px">'+btn+'</span></div>';
   if(!L)return head+'<div style="font-size:12px;color:var(--b3)">雲端還沒有快照（雲端程式部署後每天 07:25 產生）</div></div></div>';
@@ -40943,7 +40943,7 @@ function _pnlSnapHtml(){
   var nC=Object.keys(PNL_SNAP.close||{}).length;
   return head+'<div style="font-size:11.5px;color:var(--b4);margin-bottom:4px">雲端 '+esc(Y)+' 年（'+esc(new Date(+L.at||0).toLocaleString('zh-TW'))+' 算）vs 這台裝置現在算'+(bad?'；<b style="color:var(--red)">不一致的常見原因：這台剛改還沒同步、雲端是今天早上算的、跨月人事估算月數不同</b>':'')+'</div>'
     +'<table class="tbl" style="width:100%;font-size:12px"><thead><tr><th style="text-align:left">項目</th><th style="text-align:right">雲端</th><th style="text-align:right">這台</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>'
-    +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">已凍結的結案損益 '+nC+' 案（匯出 CSV 給單價庫回寫用，只匯出不改資料）</div></div></div>';
+    +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">結案損益 '+nC+' 案（結案後 90 天內每天重算、之後凍結；匯出 CSV 給單價庫回寫用，只匯出不改資料）</div></div></div>';
 }
 function pnlSnapRun(){
   if(_roDeny())return;if(!_fbUser){toast('請先登入');return;}
@@ -40958,7 +40958,7 @@ function _pnlCostCsv(snaps){
   var rows=[['報價id','工程名稱','成本分類','金額（未稅）','快照日期']];
   var ymd=function(ts){return new Date(+ts+8*3600*1000).toISOString().slice(0,10);};
   Object.keys(snaps||{}).sort().forEach(function(k){var s=snaps[k]||{};Object.keys(s.costByCat||{}).sort().forEach(function(cat){rows.push([s.qid||k,s.name||'',cat,Math.round(parseFloat(s.costByCat[cat])||0),s.at?ymd(s.at):'']);});});
-  var cell=function(v){var t=String(v==null?'':v);return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
+  var cell=function(v){var t=String(v==null?'':v);if(typeof v==='string'&&/^[=+\-@]/.test(t))t="'"+t;return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};   // 防 Excel 公式注入（同雲端）
   return '﻿'+rows.map(function(r){return r.map(cell).join(',');}).join('\n');
 }
 function pnlCostExport(){
