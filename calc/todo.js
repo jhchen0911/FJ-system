@@ -1,0 +1,372 @@
+// 改版第 5 步 5b：提醒的純計算（前端與雲端排程 dailyTodos 共用同一份，結果才會逐筆一樣）
+// 規則：不讀畫面、不讀全域資料；需要的資料（報價、請款單、今天日期、預設值）一律由參數傳入。
+// 對外函式只能新增、不能改既有參數或意義（換版空檔可能舊 app.js 配新 calc）。
+(function (root) {
+  'use strict';
+  var pad = function (n) { return String(n).padStart(2, '0'); };
+  function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  // 日期字串加減天／相差天數（本地時間；雲端程式要先設 TZ=Asia/Taipei）
+  function dAdd(ds, n) { var d = new Date(ds); if (isNaN(d)) return ''; d.setDate(d.getDate() + (n || 0)); return iso(d); }
+  function dDiff(a, b) { var x = new Date(a), y = new Date(b); if (isNaN(x) || isNaN(y)) return 0; x.setHours(0, 0, 0, 0); y.setHours(0, 0, 0, 0); return Math.round((y - x) / 864e5); }
+  function uFix(u) { if (u == null) return ''; return String(u).replace(/[Mm]\s*[2²㎡](?![0-9])/g, 'm²').replace(/㎡/g, 'm²'); }
+  function isSpare(it) { return !!(it && it.spare); }
+
+  // ── 租期（後端 10）──
+  function itemCat(it) {
+    var c = it && it.cat;
+    if (c === 'install') return { install: true, remove: false };
+    if (c === 'remove') return { install: false, remove: true };
+    if (c === 'both') return { install: true, remove: true };
+    if (c === 'other') return { install: false, remove: false };
+    var d = String((it && it.desc) || '');
+    return { install: d.indexOf('打設') >= 0 || d.indexOf('裝設') >= 0 || d.indexOf('安裝') >= 0, remove: d.indexOf('拔除') >= 0 || d.indexOf('拆除') >= 0 };
+  }
+  function rentDaysOf(it) {
+    if (!it) return 0;
+    var s = String(it.note || '') + ' ' + String(it.desc || '');
+    s = s.replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 65248); });
+    s = s.replace(/[不免][含計收算]?\s*\d*\s*[天日]?\s*租\s*期/g, ' ');
+    var m = s.match(/(\d+(?:\.\d+)?)\s*[天日]\s*[)）]?\s*租\s*期/) || s.match(/租\s*期\s*[:：（(]{0,2}\s*(\d+(?:\.\d+)?)\s*[天日]/) || s.match(/租\s*期\s*[:：]?\s*(\d+(?:\.\d+)?)(?!\d)/);
+    return m ? Math.round(parseFloat(m[1]) || 0) : 0;
+  }
+  function prPhase(q, r) {
+    var it = ((q && q.items) || [])[Number(r && r.itemIdx)] || {};
+    var c = itemCat(it);
+    if (c.install && c.remove && r && (r.ph === 'remove' || r.ph === 'install')) return r.ph;
+    return (c.remove && !c.install) ? 'remove' : 'install';
+  }
+  function itemProgress(q, idx) {
+    var ins = [], rem = [];
+    ((q && q.dailyLogs) || []).forEach(function (L) {
+      ((L && L.progressRows) || []).forEach(function (r) {
+        if (!r || Number(r.itemIdx) !== Number(idx)) return;
+        var n = parseFloat(r.qty) || 0; if (n <= 0) return;
+        (prPhase(q, r) === 'remove' ? rem : ins).push({ date: L.date || '', qty: n, from: L.backfillFrom || '', done: !!r.batchDone });
+      });
+    });
+    var byD = function (a, b) { return String(a.date) < String(b.date) ? -1 : 1; };
+    ins.sort(byD); rem.sort(byD);
+    var it = ((q && q.items) || [])[idx] || {};
+    var target = Math.abs(parseFloat(it.qty) || 0);
+    var cum = 0, doneDate = '';
+    ins.forEach(function (r) { cum += r.qty; if (!doneDate && target > 0 && cum >= target - 1e-6) doneDate = r.date; });
+    var rcum = 0, remDone = ''; rem.forEach(function (r) { rcum += r.qty; });
+    var remTarget = cum > 0 ? cum : target; if (remTarget > 0) { var rc2 = 0; rem.forEach(function (r) { rc2 += r.qty; if (!remDone && rc2 >= remTarget - 1e-6) remDone = r.date; }); }
+    var catS = itemCat(it), stIns = '', stRem = '';
+    ((q && q.dailyLogs) || []).forEach(function (L) {
+      if (!L || L.status !== 'stage') return; var d = L.stageDate || L.date || ''; if (!d) return;
+      if (L.stageOf === 'remove') { if (catS.remove && (!stRem || d < stRem)) stRem = d; }
+      else if (catS.install && d > stIns) stIns = d;
+    });
+    var installLast = ins.length ? ins[ins.length - 1].date : '';
+    if (stIns && stIns > installLast) installLast = stIns;
+    if (!doneDate && stIns) doneDate = stIns;
+    var removeFirst = rem.length ? rem[0].date : (stRem || '');
+    return { n: ins.length + rem.length, nInstall: ins.length, nRemove: rem.length,
+      first: ins.length ? (ins[0].from && ins[0].from < ins[0].date ? ins[0].from : ins[0].date) : '', last: ins.length ? ins[ins.length - 1].date : '',
+      installLast: installLast, stageInstall: stIns, stageRemove: stRem,
+      removeFirst: removeFirst, removeLast: rem.length ? rem[rem.length - 1].date : (stRem || ''), removeDone: remDone || stRem || '', remLogs: rem, stageRemove2: stRem,
+      cum: cum, removeCum: rcum, target: target, doneDate: doneDate };
+  }
+  function rentEndMode(q) { return (q && q.rentEnd === 'removeDone') ? 'removeDone' : 'removeFirst'; }
+  function rentOldQty(pg, qty) { var c = pg && (parseFloat(pg.cum) || 0); if (!(c > 0) || c >= qty || (pg && pg.stageInstall)) return qty; return Math.round(c * 100) / 100; }
+  function rentBatchList(pg) {
+    var rem = (pg && pg.remLogs) || [], anyDone = rem.some(function (r) { return r.done; }), out = [], acc = 0;
+    rem.forEach(function (r) { acc += r.qty; if (anyDone && r.done) { out.push({ date: r.date, qty: acc }); acc = 0; } });
+    return { closed: out, open: acc, stage: (pg && pg.stageRemove2) || '', noTick: !anyDone };
+  }
+  function rentBatchQtyDays(pg, qty, startISO, endISO) {
+    var cap = (pg && (parseFloat(pg.cum) || 0) > 0) ? parseFloat(pg.cum) : qty;
+    var B = rentBatchList(pg), rows = [], left = Math.min(qty > 0 ? qty : cap, cap > 0 ? cap : Infinity), tot = 0, n = 0;
+    var span = Math.max(0, dDiff(startISO, endISO) + 1);
+    B.closed.forEach(function (b) { if (left <= 0) return; var q2 = Math.min(b.qty, left); left -= q2; n++;
+      var d = Math.max(0, Math.min(dDiff(startISO, b.date) + 1, span)); tot += q2 * d; rows.push({ no: n, date: b.date, qty: q2, days: d }); });
+    if (left > 0 && pg && pg.removeDone && !B.stage) { n++; var d3 = Math.max(0, Math.min(dDiff(startISO, pg.removeDone) + 1, span)); tot += left * d3; rows.push({ no: n, date: pg.removeDone, qty: left, days: d3 }); left = 0; }
+    if (left > 0) {
+      if (B.stage) { n++; var d2 = Math.max(0, Math.min(dDiff(startISO, B.stage) + 1, span)); tot += left * d2; rows.push({ no: n, date: B.stage, qty: left, days: d2 }); }
+      else { rows.push({ no: n + 1, date: '', qty: left, days: span, open: true }); tot += left * span; }
+    }
+    return { qtyDays: tot, rows: rows, noTick: !!B.noTick && (!!((pg && pg.remLogs) || []).length || !!(pg && pg.removeDone) || !!B.stage) };
+  }
+  // today：今天（YYYY-MM-DD，由呼叫端給）
+  function rentStatus(q, idx, endDate, today) {
+    var it = ((q && q.items) || [])[idx]; if (!it || it.sec) return null;
+    if ((parseFloat(it.qty) || 0) <= 0 || (parseFloat(it.price) || 0) < 0) return null;   // 減帳列（負數量）、減項列（負數單價）沒有租期
+    var days = rentDaysOf(it); if (days <= 0) return null;
+    var pg = itemProgress(q, idx);
+    var base = pg.installLast || pg.doneDate || pg.last;
+    if (!base) return null;
+    var start = dAdd(base, 1);
+    var expiry = dAdd(start, days - 1);
+    var end = endDate || ((q && q.closed && q.closedAt) ? iso(new Date(q.closedAt)) : today);
+    var mode = rentEndMode(q);
+    if (mode === 'removeDone') { if (pg.removeDone && pg.removeDone < end) end = pg.removeDone; }
+    else if (pg.removeFirst && pg.removeFirst < end) end = pg.removeFirst;
+    var over = Math.max(0, dDiff(expiry, end));
+    var price = parseFloat((String(it.ot || '').match(/[\d.]+/) || [0])[0]) || 0;
+    var qty = Math.abs(parseFloat(it.qty) || 0);
+    if (mode !== 'removeDone') qty = rentOldQty(pg, qty);
+    var head = { idx: idx, desc: String(it.desc || '').split('\n')[0], unit: it.unit || '', days: days, installDate: base, removeFirst: pg.removeFirst || '', estimated: !pg.doneDate, cum: pg.cum, target: pg.target,
+      start: start, expiry: expiry, endDate: end, overDays: over, endMode: mode, removeDone: pg.removeDone || '' };
+    if (mode === 'removeDone' && over > 0) {
+      var bq = rentBatchQtyDays(pg, qty, dAdd(expiry, 1), end);
+      return Object.assign(head, { batches: bq.rows, qtyDays: bq.qtyDays, otPrice: price, otUnit: it.otu || '', qty: qty, amount: Math.round(price * bq.qtyDays) });
+    }
+    return Object.assign(head, { otPrice: price, otUnit: it.otu || '', qty: qty, amount: Math.round(price * qty * over) });
+  }
+  function rentScan(q, endDate, today) {
+    var out = [];
+    ((q && q.items) || []).forEach(function (it, i) { var s = rentStatus(q, i, endDate, today); if (s) out.push(s); });
+    out.sort(function (a, b) { return b.overDays - a.overDays; });
+    return out;
+  }
+  // 逾期租金待辦（總覽「租期已逾期」）：進行中的得標主報價，有工項逾期就一筆
+  function rentTodos(quotes, today) {
+    var out = [];
+    (quotes || []).filter(function (q) { return q && q.awarded && !q.parentId && !q.closed; }).forEach(function (q) {
+      var over = rentScan(q, today, today).filter(function (x) { return x && x.overDays > 0; });
+      if (over.length) out.push({ qid: q.id, name: q.name || '', n: over.length, amt: over.reduce(function (a, x) { return a + (x.amount || 0); }, 0), maxD: Math.max.apply(null, over.map(function (x) { return x.overDays; })) });
+    });
+    return out;
+  }
+  // 租期快到（到期前 7 天，後端 10「到期前 7 天 → 今天卡片」）：還沒拔除、到期日在 0～7 天內
+  function rentSoon(quotes, today) {
+    var out = [];
+    (quotes || []).filter(function (q) { return q && q.awarded && !q.parentId && !q.closed; }).forEach(function (q) {
+      rentScan(q, today, today).forEach(function (s) {
+        if (s.overDays > 0 || s.removeFirst) return;
+        var left = dDiff(today, s.expiry); if (left < 0 || left > 7) return;
+        out.push({ qid: q.id, name: q.name || '', idx: s.idx, desc: s.desc, expiry: s.expiry, left: left });
+      });
+    });
+    return out;
+  }
+
+  // ── 預計收款日（後端 12）──
+  // o＝專案 q.ownerPay、c＝客戶資料、def＝{delay,cut,day}、payDefV＝q.payDefV
+  function recvRule(o, c, def, payDefV) {
+    o = o || {}; c = c || {}; def = def || { delay: 1, cut: 25, day: 20 };
+    var num = function (v) { var x = (v == null || v === '') ? NaN : parseFloat(v); return isNaN(x) ? null : x; }, pk = function (a, b) { var x = num(a); return x != null ? x : num(b); };
+    var R = null;
+    if (num(o.delay) != null || num(o.day) != null) R = { src: '專案', cut: pk(o.cut, c.payDue), delay: pk(o.delay, c.payMonthDelay), day: pk(o.day, c.recvDay), cashPct: pk(o.cashPct, c.payTermCash), ticketDays: pk(o.ticketDays, c.payTermTicket) };
+    else if (c.recvRuleOn) R = { src: '客戶', cut: num(c.payDue), delay: num(c.payMonthDelay), day: num(c.recvDay), cashPct: num(c.payTermCash), ticketDays: num(c.payTermTicket) };
+    if (!R) return null;
+    R.cpSet = R.cashPct != null || R.ticketDays != null;
+    R.delay = R.delay == null ? def.delay : Math.max(0, Math.round(R.delay)); R.ticketDays = R.ticketDays == null ? 0 : Math.max(0, Math.round(R.ticketDays));
+    if (R.cashPct == null) R.cashPct = R.ticketDays > 0 ? 0 : 100; R.cashPct = Math.max(0, Math.min(100, R.cashPct));
+    R.cut = Math.max(1, Math.min(31, Math.round(R.cut || def.cut)));
+    var dayDef = payDefV === 2 ? def.day : (R.cut || def.cut);
+    R.day = Math.max(1, Math.min(31, Math.round(R.day || dayDef)));
+    return R;
+  }
+  function byRule(dateISO, R) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(dateISO || '')); if (!m || !R) return null;
+    var y = +m[1], mo = +m[2] - 1, dd = +m[3], bm = mo + ((R.cut && dd > R.cut) ? 1 : 0), tm = bm + R.delay;
+    var last = new Date(y, tm + 1, 0).getDate(), pay = new Date(y, tm, R.day ? Math.min(R.day, last) : last);
+    var tk = (R.ticketDays > 0 && R.cashPct < 100) ? new Date(y, tm, pay.getDate() + R.ticketDays) : null;
+    return { date: iso(pay), ticketDate: tk ? iso(tk) : '' };
+  }
+  // R＝recvRule 的結果（沒有規則傳 null）
+  function expectedDate(inv, R) {
+    if (inv && inv.recvOv && inv.recvOv.date) return { date: inv.recvOv.date, est: false, src: 'manual', reason: inv.recvOv.reason || '' };
+    if (R && inv.date && (!inv.expectedRecvDate || inv.recvRule === 1)) { var k = byRule(inv.date, R); if (k) return { date: k.date, est: true, src: 'rule', rule: R, ticketDate: k.ticketDate }; }
+    if (inv.expectedRecvDate) return { date: inv.expectedRecvDate, est: false };
+    var y = 0, m = 0;
+    if (inv.date && /^\d{4}-\d{2}/.test(inv.date)) { var p1 = inv.date.split('-'); y = parseInt(p1[0]); m = parseInt(p1[1]); }
+    else if (inv.month) {
+      var m1 = String(inv.month).match(/^(\d{4})[-/](\d{1,2})/), m2 = String(inv.month).match(/^(\d{2,3})年(\d{1,2})月/);
+      if (m1) { y = parseInt(m1[1]); m = parseInt(m1[2]); } else if (m2) { y = parseInt(m2[1]) + 1911; m = parseInt(m2[2]); }
+    }
+    if (!y || !m) return null;
+    var delay = (inv.payMonthDelay === '' || inv.payMonthDelay == null) ? 1 : (parseInt(inv.payMonthDelay) || 0);
+    if (delay < 1) delay = 1;
+    var dom = parseInt(inv.recvDay) || parseInt(inv.payDue) || 0;
+    var t = dom ? new Date(y, m - 1 + delay, dom) : new Date(y, m - 1 + delay + 1, 0);
+    return { date: iso(t), est: true };
+  }
+  // 收款提醒（總覽「預計明天／今天收款、逾期未收」）：inv 需帶 ar（未收金額）與 exp（expectedDate 的結果）；nowMs＝現在
+  function recvTodos(rows, nowMs) {
+    var out = [], now = new Date(nowMs);
+    var du = function (ds) { var p = ds.split('-'); return Math.ceil((new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2])).getTime() - now.getTime()) / 864e5); };
+    (rows || []).forEach(function (x) {
+      var inv = x.inv; if (!inv || inv.receivedConfirmed) return; if (!(x.ar > 0)) return;
+      if (x.exp) { var d = du(x.exp.date); if (d > 1) return; out.push({ id: inv.id, d: d, date: x.exp.date, ar: x.ar }); return; }
+      var recvDay = parseInt(inv.recvDay) || parseInt(inv.payDue) || 0; if (!recvDay) return;
+      var payDelay = parseInt(inv.payMonthDelay) || 0, baseDate = inv.date ? new Date(inv.date) : now;
+      var dueD = new Date(baseDate.getFullYear(), baseDate.getMonth() + payDelay, recvDay), overDays = Math.floor((now.getTime() - dueD.getTime()) / 864e5);
+      if (overDays > 0 && overDays < 1825) out.push({ id: inv.id, d: -overDays, date: '', ar: x.ar });
+    });
+    return out;
+  }
+
+  // ── 保留款到期（後端 13；Lotion 11/04：起算＝系統結案日，＋合約寫的月數；手填日期優先）──
+  var CN = { 一: 1, 二: 2, 兩: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10, 十一: 11, 十二: 12, 十八: 18, 二十四: 24 };
+  // 從退還條件文字抓月數：「完工驗收後 12 個月」「一年」「半年」「保固期滿（24 個月）」；抓不到回 null
+  function retMonths(cond) {
+    var s = String(cond || '').replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 65248); });
+    var m = s.match(/(\d+(?:\.\d+)?)\s*個?\s*月/); if (m) return Math.round(parseFloat(m[1]));
+    m = s.match(/(\d+(?:\.\d+)?)\s*年/); if (m) return Math.round(parseFloat(m[1]) * 12);
+    if (/半年/.test(s)) return 6;
+    m = s.match(/(十[一二]?|二十四|十八|[一二兩三四五六七八九])\s*個?\s*月/); if (m && CN[m[1]]) return CN[m[1]];
+    m = s.match(/([一二兩三])\s*年/); if (m && CN[m[1]]) return CN[m[1]] * 12;
+    return null;
+  }
+  function addMonths(isoDate, n) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(isoDate || '')); if (!m) return '';
+    var y = +m[1], mo = +m[2] - 1 + n, d = +m[3], last = new Date(y, mo + 1, 0).getDate();
+    return iso(new Date(y, mo, Math.min(d, last)));
+  }
+  // o＝{manual:手填預計退還日, closedAt:結案時間（毫秒或日期）, cond:退還條件文字, months:專案填的月數}
+  // 回傳 {date, src:'manual'|'rule'|'', months, base, why}
+  function retDue(o) {
+    o = o || {};
+    if (o.manual) return { date: String(o.manual), src: 'manual', months: null, base: '', why: '' };
+    var mo = (o.months != null && o.months !== '' && isFinite(parseFloat(o.months))) ? Math.round(parseFloat(o.months)) : retMonths(o.cond);
+    if (mo == null) return { date: '', src: '', months: null, base: '', why: o.cond ? 'nomonths' : 'nocond' };
+    if (!o.closedAt) return { date: '', src: '', months: mo, base: '', why: 'open' };
+    var base = typeof o.closedAt === 'number' ? iso(new Date(o.closedAt)) : String(o.closedAt).slice(0, 10);
+    return { date: addMonths(base, mo), src: 'rule', months: mo, base: base, why: '' };
+  }
+
+  // ── 結案判定（後端 17；Lotion 10/21：有保留款＝收回＋包商結清；沒保留款＝最後一期款收齊＋包商結清＋材料退完）──
+  // o＝{q, hasRet, retLeft（未退保留款）, invs:[{ar}], allDone（日報全部完工或合約已完工）, payLeft（未付應付筆數）, matLeft（在場材料筆數）}
+  function closeReady(o) {
+    o = o || {}; var q = o.q;
+    if (!q || q.closed || !q.awarded || q.parentId) return null;
+    var why = [];
+    if (o.payLeft > 0) why.push('pay');
+    if (o.hasRet) { if (o.retLeft > 0) why.push('ret'); }
+    else {
+      if (!(o.invs || []).length || (o.invs || []).some(function (x) { return x.ar > 0; })) why.push('recv');
+      if (!o.allDone) why.push('done');
+      if (o.matLeft > 0) why.push('mat');
+    }
+    return { qid: q.id, ok: !why.length, why: why };
+  }
+
+  // ── 報價改版連動（後端 20）：詢價單／分包依據的報價版次落後、而且工項真的有差 ──
+  function rfqKey(d) { return String(d || '').split('\n')[0].replace(/[（(][^）)]*[）)]/g, '').replace(/\s+/g, ''); }
+  function rfqGL(d) { return (String(d || '').match(/GL\s*[-－]?\s*[\d.]+\s*m?(?:\s*[～~至\-－]\s*[-－]?\s*[\d.]+\s*m?)?/gi) || []).map(function (x) { return x.replace(/\s+/g, ''); }).join('、'); }
+  // hist＝這張報價的版次紀錄陣列（Q_HISTORY[qid]）
+  function rfqBaseVer(q, r, hist) {
+    if (r && r.quoteVer) return { ver: parseInt(r.quoteVer) || 1, inferred: false };
+    var t = (r && (r.ts || Date.parse(String(r.date || '') + 'T23:59:59'))) || 0;
+    var hs = (hist || []).filter(function (e) { return e && e.formal && (e.savedAt || 0) > t; });
+    return { ver: hs.length ? Math.min.apply(null, hs.map(function (e) { return e.ver || 1; })) : ((q && q.ver) || 1), inferred: true };
+  }
+  function rfqQuoteDiff(q, r, hist) {
+    var rfqs = (q && Array.isArray(q.rfqs)) ? q.rfqs : [];
+    var cur = (q && q.ver) || 1, b = rfqBaseVer(q, r, hist), out = { ver: cur, base: b.ver, inferred: b.inferred, diffs: [], added: [], map: {}, any: false };
+    if (!q || !r || r.status === 'labor' || b.ver >= cur) return out;
+    var se = (hist || []).find(function (x) { return x && x.formal && (x.ver || 1) === b.ver && x.snapshot; }), snap = se ? se.snapshot : null;
+    var sItems = (snap && Array.isArray(snap.items)) ? snap.items : null, qi = q.items || [];
+    var findK = function (arr, k) { for (var j = 0; j < arr.length; j++) { var x = arr[j]; if (x && !x.sec && rfqKey(x.desc) === k) return j; } return -1; };
+    (r.items || []).forEach(function (it) {
+      var idx = parseInt(it.idx), bi = null;
+      if (it.qd != null) bi = { desc: it.qd, unit: it.unit, qty: it.oq };
+      else if (sItems) { var k0 = rfqKey(it.desc), bj = (sItems[idx] && rfqKey(sItems[idx].desc) === k0) ? idx : findK(sItems, k0); if (bj >= 0) bi = { desc: sItems[bj].desc, unit: sItems[bj].unit, qty: sItems[bj].qty }; }
+      if (!bi) bi = { desc: it.desc, unit: it.unit, qty: null, legacy: true };
+      var k = rfqKey(bi.desc), ni = (qi[idx] && !qi[idx].sec && rfqKey(qi[idx].desc) === k) ? idx : findK(qi, k), nm = String(bi.desc || '').split('\n')[0];
+      if (ni < 0) { out.diffs.push({ t: 'del', idx: idx, desc: nm }); return; }
+      out.map[idx] = ni; var ci = qi[ni];
+      var d0 = String(bi.desc || '').trim(), d1 = String(ci.desc || '').trim(); if (bi.legacy) { d0 = d0.split('\n')[0]; d1 = d1.split('\n')[0]; }
+      var g0 = rfqGL(d0), g1 = rfqGL(d1);
+      if (g0 !== g1) out.diffs.push({ t: 'depth', idx: idx, ni: ni, desc: nm, from: g0 || '—', to: g1 || '—' });
+      else if (d0.replace(/\s+/g, '') !== d1.replace(/\s+/g, '')) out.diffs.push({ t: 'desc', idx: idx, ni: ni, desc: nm, from: d0, to: d1 });
+      if (bi.qty != null && bi.qty !== '' && Math.abs((parseFloat(bi.qty) || 0) - (parseFloat(ci.qty) || 0)) > 1e-9) out.diffs.push({ t: 'qty', idx: idx, ni: ni, desc: nm, from: parseFloat(bi.qty) || 0, to: parseFloat(ci.qty) || 0, unit: uFix(ci.unit || '') });
+      if (bi.unit && uFix(bi.unit || '') !== uFix(ci.unit || '')) out.diffs.push({ t: 'unit', idx: idx, ni: ni, desc: nm, from: uFix(bi.unit || ''), to: uFix(ci.unit || '') });
+    });
+    if (sItems) { var allK = {}; rfqs.forEach(function (x) { (x.items || []).forEach(function (it) { allK[rfqKey(it.desc)] = 1; }); });
+      qi.forEach(function (x) { if (!x || x.sec || isSpare(x) || (parseFloat(x.price) || 0) < 0 || !String(x.desc || '').trim()) return; var k = rfqKey(x.desc); if (findK(sItems, k) < 0 && !allK[k]) out.added.push(String(x.desc || '').split('\n')[0]); }); }
+    out.any = out.diffs.length > 0;
+    return out;
+  }
+  // 每張進行中的得標主報價：有幾張詢價／分包還沒跟上新版次；histOf(qid)＝版次紀錄
+  function rfqVerTodos(quotes, histOf) {
+    var out = [];
+    (quotes || []).forEach(function (q) {
+      if (!q || q.parentId || q.closed || !q.awarded) return;
+      var rs = Array.isArray(q.rfqs) ? q.rfqs : [];
+      var n = rs.filter(function (r) { return rfqQuoteDiff(q, r, histOf ? histOf(q.id) : []).any; }).length;
+      if (n) out.push({ qid: q.id, name: q.name || '', ver: q.ver || 1, n: n });
+    });
+    return out;
+  }
+
+  // ── 期票兌現（後端 24，寫好先不啟用）：未兌現、7 天內到期或已到期 ──
+  function ticketTodos(invs, nowMs) {
+    var out = [], now = new Date(nowMs);
+    (invs || []).forEach(function (inv) {
+      (Array.isArray(inv && inv.receipts) ? inv.receipts : []).forEach(function (r) {
+        if (!r || r.kind !== 'ticket' || !((parseFloat(r.amt) || 0) > 0) || r.status !== 'hold' || !r.dueDate) return;
+        var dd = Math.ceil((new Date(r.dueDate).getTime() - now.getTime()) / 864e5); if (dd > 7) return;
+        out.push({ id: inv.id, ticketNo: r.ticketNo || '', dueDate: r.dueDate, dd: dd, amt: parseFloat(r.amt) || 0 });
+      });
+    });
+    return out;
+  }
+
+  // ── 全部提醒一次算（雲端 dailyTodos 與前端並行比對共用）──
+  // d＝{quotes, invoices, contracts, customers, payables, matLedger, histOf(qid)}；ctx＝{today, now, tax, payDef:{cut,delay,day}, inv:FJC.inv}
+  // 回傳 {rent:[], rentSoon:[], recv:[], ret:[], close:[], rfqVer:[], ticket:[]}（只放案名、期別、天數；金額只在 amt 欄，寫進雲端待辦前由呼叫端決定要不要帶）
+  function build(d, ctx) {
+    d = d || {}; ctx = ctx || {};
+    var I = ctx.inv, today = ctx.today, now = ctx.now, taxR = I.taxR(ctx.tax), taxM = I.taxM(ctx.tax);
+    var quotes = (d.quotes || []).filter(Boolean), invs = (d.invoices || []).filter(Boolean), cts = (d.contracts || []).filter(Boolean), custs = (d.customers || []).filter(Boolean);
+    var qById = {}; quotes.forEach(function (q) { if (q.id) qById[q.id] = q; });
+    var qOf = function (inv) { var id = inv.quoteId || inv.sourceQid; return (id && qById[id]) || (inv.project ? quotes.find(function (x) { return !x.parentId && x.name === inv.project; }) : null) || null; };
+    var custOf = function (inv, q) { var n = String((inv && inv.client) || (q && q.client) || '').trim(); return n ? (custs.find(function (c) { return c.name === n; }) || null) : null; };
+    var ownerRetPct = function (q) { var r = q && q.deduct && q.deduct.ret; return (r != null && r !== '') ? (parseFloat(r) || 0) : 0; };
+    var retPctOf = function (inv) { var v = inv && inv.retentionPct; if (v != null && v !== '') return parseFloat(v) || 0; if (inv && inv.retention && inv.kind !== 'retReturn') return 10; return ownerRetPct(qOf(inv)); };
+    var offset = function (inv) { return (parseFloat(inv.recvFee) || 0) + (parseFloat(inv.recvDeduct) || 0) + (parseFloat(inv.recvHold) || 0) + ((inv.allow) ? (parseFloat(inv.allow.amt) || 0) : 0); };
+    var arOf = function (inv) { return (!inv || inv.receivedConfirmed) ? 0 : I.ar(inv, offset(inv)); };
+    var expOf = function (inv) { var R = null; if (!(inv.recvOv && inv.recvOv.date)) { var q = qOf(inv); R = recvRule((q && q.ownerPay) || {}, custOf(inv, q) || {}, ctx.payDef, q && q.payDefV); } return expectedDate(inv, R); };
+    var out = { rent: rentTodos(quotes, today), rentSoon: rentSoon(quotes, today), recv: [], ret: [], close: [], rfqVer: rfqVerTodos(quotes, d.histOf), ticket: ticketTodos(invs, now) };
+    out.recv = recvTodos(invs.map(function (inv) { return { inv: inv, ar: arOf(inv), exp: (!inv.receivedConfirmed && arOf(inv) > 0) ? expOf(inv) : null }; }), now);
+    // 保留款（同前端 _retentionRows）
+    var byProj = {};
+    invs.forEach(function (inv) {
+      var held = (!inv.retention || inv.retentionReturned) ? 0 : I.retention(inv, taxR, retPctOf(inv));
+      var retAll = (!inv.retention) ? 0 : ((inv.totals && parseFloat(inv.totals.curTotal)) ? Math.round(inv.totals.curTotal * taxM * retPctOf(inv) / 100) : ((inv.totals && parseFloat(inv.totals.retention)) || 0));
+      var hold = I.hold(inv), holdRet = I.holdRetCash(inv).amt;
+      if (!retAll && !hold && !holdRet) return;
+      var k = inv.project || '（未命名）';
+      var o = byProj[k] = byProj[k] || { proj: k, accr: 0, returned: 0, pending: 0, hold: 0, q: null };
+      if (!o.q) o.q = qOf(inv);
+      o.accr += retAll; if (inv.retentionReturned) o.returned += retAll; else o.pending += held;
+      o.hold += hold; o.returned += holdRet;
+    });
+    var retByQ = {};
+    Object.keys(byProj).forEach(function (k) {
+      var r = byProj[k], ct = cts.find(function (c) { return c.name === r.proj; });
+      var done = !!(ct && (ct.status === 'completed' || ct.status === 'done')), left = r.pending + r.hold;
+      var dd = (r.q && r.q.deduct) || {}, rd = retDue({ manual: dd.retDue, closedAt: r.q && r.q.closed ? r.q.closedAt : null, cond: dd.retCond, months: dd.retMonths });
+      if (r.q) retByQ[r.q.id] = { accr: r.accr, left: left };
+      if (left > 0 && (done || (rd.date && rd.date < today))) out.ret.push({ proj: r.proj, qid: r.q ? r.q.id : '', due: done, overdue: !!(rd.date && rd.date < today), date: rd.date, src: rd.src, amt: left });
+    });
+    // 結案判定
+    var pays = (d.payables || []).filter(Boolean), mats = (d.matLedger || []).filter(Boolean);
+    quotes.forEach(function (q) {
+      if (!q.awarded || q.parentId || q.closed) return;
+      var ids = [q.id].concat(quotes.filter(function (x) { return x.parentId === q.id; }).map(function (x) { return x.id; }));
+      var my = invs.filter(function (inv) { return inv.kind !== 'retReturn' && (ids.indexOf(inv.quoteId) >= 0 || ids.indexOf(inv.sourceQid) >= 0 || (!inv.quoteId && !inv.sourceQid && inv.project === q.name)); });
+      var ct = cts.find(function (c) { return c.linkedQid === q.id || c.name === q.name; });
+      var stage = null; (q.dailyLogs || []).forEach(function (L) { if (!L || L.status !== 'stage') return; var dt = L.stageDate || L.date || ''; if (!stage || dt > (stage.stageDate || stage.date || '')) stage = L; });
+      var allDone = !!((ct && (ct.status === 'completed' || ct.status === 'done')) || (stage && stage.stageOf === 'remove'));
+      if (!allDone && !my.length) return;   // 還沒開工請款也沒完工：不判斷
+      var payLeft = pays.filter(function (p) { return (ids.indexOf(p.quoteId) >= 0 || (!p.quoteId && p.project === q.name)) && !p.voidAt && p.status !== 'paid' && (parseFloat(p.amount) || 0) > 0; }).length;
+      var matLeft = mats.filter(function (r) { return r.name && (r.projQid === q.id || (!r.projQid && q.name && r.loc === q.name)) && (parseFloat(r.qty) || 0) > 0 && r.kind !== '一次性'; }).length;
+      var rq = retByQ[q.id] || { accr: 0, left: 0 };
+      var c = closeReady({ q: q, hasRet: rq.accr > 0, retLeft: rq.left, invs: my.map(function (inv) { return { ar: arOf(inv) }; }), allDone: allDone, payLeft: payLeft, matLeft: matLeft });
+      if (c && c.ok) out.close.push({ qid: q.id, name: q.name || '' });
+    });
+    return out;
+  }
+  var todo = { dAdd: dAdd, dDiff: dDiff, itemCat: itemCat, rentDaysOf: rentDaysOf, prPhase: prPhase, itemProgress: itemProgress, rentEndMode: rentEndMode, rentOldQty: rentOldQty,
+    rentBatchList: rentBatchList, rentBatchQtyDays: rentBatchQtyDays, rentStatus: rentStatus, rentScan: rentScan, rentTodos: rentTodos, rentSoon: rentSoon,
+    recvRule: recvRule, byRule: byRule, expectedDate: expectedDate, recvTodos: recvTodos,
+    retMonths: retMonths, addMonths: addMonths, retDue: retDue, closeReady: closeReady,
+    rfqKey: rfqKey, rfqGL: rfqGL, rfqBaseVer: rfqBaseVer, rfqQuoteDiff: rfqQuoteDiff, rfqVerTodos: rfqVerTodos, ticketTodos: ticketTodos, build: build };
+  root.FJC = root.FJC || {}; root.FJC.todo = todo;
+  if (typeof module !== 'undefined' && module.exports) module.exports = root.FJC;
+})(typeof window !== 'undefined' ? window : globalThis);

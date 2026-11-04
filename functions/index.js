@@ -345,6 +345,21 @@ async function runHealth() {
   console.log('[健檢] 完成', JSON.stringify(h.counts), '問題', h.warn);
   return h;
 }
+// ══════════ 改版第 5 步 5b：雲端每日提醒（後端 10／12／13／17／20／24，算法 calc/todo.js 與前端同一份）══════════
+async function runRemind() {
+  const todosCore = require('./ops/todos.js');   // 用到才載入（calc/ 在部署前才複製進來）
+  const db = admin.database(), now = Date.now();
+  const val = (p) => db.ref(p).once('value').then((s) => s.val() || {});
+  const [quotes, invoices, contracts, customers, params, qHistory, payables, matLedger, quoteSens] = await Promise.all([
+    val('fydata/shared/quotes'), val('fydata/shared/invoices'), val('fydata/shared/contracts'), val('fydata/shared/customers'), val('fydata/shared/params'), val('fydata/shared/qHistory'),
+    val('fydata/private/payables'), val('fydata/private/matLedger'), val('fydata/private/quoteSens'),
+  ]);
+  const r = todosCore.buildRemind({ shared: { quotes, invoices, contracts, customers, params, qHistory }, priv: { payables, matLedger, quoteSens }, now });
+  await db.ref('fydata/health/remind').set(r);   // 並行比對期只寫這裡（不寫總覽待辦）
+  console.log('[提醒] 完成', JSON.stringify(r.counts));
+  return r;
+}
+exports.dailyTodos = onSchedule({ schedule: '0 7 * * *', timeZone: TZ, region: REGION, memory: '1GiB', timeoutSeconds: 300 }, async () => { await runRemind(); });
 exports.dailyHealth = onSchedule({ schedule: '40 6 * * *', timeZone: TZ, region: REGION, memory: '1GiB', timeoutSeconds: 300 }, async () => { await runHealth(); });
 exports.healthRunNow = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], memory: '1GiB', timeoutSeconds: 300 }, async (req, res) => {
   try {
@@ -355,7 +370,8 @@ exports.healthRunNow = onRequest({ region: REGION, cors: ['https://jhchen0911.gi
     const role = t.fy || roleOf(t.email, await lists());
     if (role !== 'admin') { res.status(403).json({ error: { message: '只有管理員可以手動執行健檢' } }); return; }
     const h = await runHealth();
-    res.json({ ok: true, at: h.at, warn: h.warn, counts: h.counts });
+    let rc = null; try { rc = (await runRemind()).counts; } catch (e2) { console.error('healthRunNow.remind', e2); }   // 5b：提醒一起跑
+    res.json({ ok: true, at: h.at, warn: h.warn, counts: h.counts, remind: rc });
   } catch (e) { console.error('healthRunNow', e); res.status(500).json({ error: { message: '健檢失敗' } }); }
 });
 

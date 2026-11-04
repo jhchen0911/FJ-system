@@ -1,0 +1,48 @@
+// 改版第 5 步 5b：雲端每日提醒（後端 10／12／13／17／20／24）
+// 算法一律用 calc/todo.js（前端畫面同一份；部署前 tools/copy-calc.js 複製到 functions/calc/），這裡只負責把 RTDB 的資料整理成陣列再呼叫。
+// 兩週並行期：結果寫 fydata/health/remind（管理員與唯讀帳號讀得到），前端資料健檢「雲端每日提醒」卡逐類比對；不寫總覽待辦。
+'use strict';
+process.env.TZ = 'Asia/Taipei';   // calc/todo.js 用本地時間算日期，跟台灣的瀏覽器一樣
+const FJC = require('../calc/invoice.js');
+require('../calc/todo.js');
+
+function arr(x) { return Array.isArray(x) ? x.filter(Boolean) : (x && typeof x === 'object' ? Object.values(x).filter(Boolean) : []); }
+function decKey(k) { return String(k).replace(/~d~/g, '.').replace(/~h~/g, '#').replace(/~s~/g, '$').replace(/~sl~/g, '/').replace(/~lb~/g, '[').replace(/~rb~/g, ']'); }
+function tpeDay(ms) { return new Date((ms || Date.now()) + 8 * 3600 * 1000).toISOString().slice(0, 10); }
+// 請款單上雲時工項會壓縮（_invPack）；提醒只用 totals／收款紀錄／保留款欄位，不必還原工項
+function unpack(inv) { return inv; }
+// 報價的發包（rfqs）只在 private quoteSens：接回報價複本
+function withSens(quotes, sens) {
+  const S = {}; Object.keys(sens || {}).forEach((k) => { S[decKey(k)] = sens[k]; });
+  return quotes.map((q) => { const s = S[q.id]; if (!s || !Array.isArray(s.rfqs)) return q; return Object.assign({}, q, { rfqs: s.rfqs }); });
+}
+// 跟前端 _todoKeys 同一套鑰匙
+function keysOf(v) {
+  v = v || {}; const K = {
+    rent: (v.rent || []).map((x) => x.qid), rentSoon: (v.rentSoon || []).map((x) => x.qid + '#' + x.idx), recv: (v.recv || []).map((x) => x.id),
+    ret: (v.ret || []).map((x) => x.proj), close: (v.close || []).map((x) => x.qid), rfqVer: (v.rfqVer || []).map((x) => x.qid),
+  };
+  Object.keys(K).forEach((k) => { K[k] = K[k].map(String).sort(); });
+  return K;
+}
+// inp＝{shared:{quotes,invoices,contracts,customers,params,qHistory}, priv:{payables,matLedger,quoteSens}, now}
+function buildRemind(inp) {
+  inp = inp || {}; const sh = inp.shared || {}, pv = inp.priv || {}, now = inp.now || Date.now();
+  const quotes = withSens(arr(sh.quotes), pv.quoteSens || {});
+  const hist = {}; Object.keys(sh.qHistory || {}).forEach((k) => { hist[decKey(k)] = arr(sh.qHistory[k]); });
+  const params = sh.params || {};
+  const def = { cut: 25, delay: 1, day: 20 };
+  const v = FJC.todo.build({ quotes, invoices: arr(sh.invoices).map(unpack), contracts: arr(sh.contracts), customers: arr(sh.customers), payables: arr(pv.payables), matLedger: arr(pv.matLedger),
+    histOf: (id) => hist[id] || [] }, { today: tpeDay(now), now, tax: params.tax, payDef: def, inv: FJC.inv });
+  const counts = {}; Object.keys(v).forEach((k) => { counts[k] = (v[k] || []).length; });
+  return { at: now, day: tpeDay(now), counts, keys: keysOf(v),
+    // 明細只放案名／期別／天數（金額留在只有管理員讀得到的節點也一樣不放，前端要金額自己算）
+    list: {
+      rent: v.rent.map((x) => ({ qid: x.qid, name: x.name, n: x.n, maxD: x.maxD })),
+      rentSoon: v.rentSoon.map((x) => ({ qid: x.qid, name: x.name, idx: x.idx, desc: x.desc, expiry: x.expiry, left: x.left })),
+      recv: v.recv.map((x) => ({ id: x.id, d: x.d, date: x.date })),
+      ret: v.ret.map((x) => ({ proj: x.proj, qid: x.qid, due: x.due, overdue: x.overdue, date: x.date, src: x.src })),
+      close: v.close, rfqVer: v.rfqVer, ticket: v.ticket.map((x) => ({ id: x.id, dueDate: x.dueDate, dd: x.dd })),
+    } };
+}
+module.exports = { buildRemind, keysOf, tpeDay };
