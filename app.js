@@ -230,27 +230,7 @@ var P={
   opReserveMonths:3,   // v5.325 營運週轉保留月數：分潤上限先扣掉 月固定成本×此月數
   opReserveAmt:0,      // v5.326 直接指定保留金額（>0 時優先於月數×固定成本）
   bank:'國泰世華建成分行(013)',bankAccount:'031035008864',
-  // unit price defaults
-  dpRent:0.111,dpLoss:0.05,dpProcess:900,dpPeriod:60,
-  dpRentH300:3,dpRentH350:4,dpRentH400:5,
-  // 鋼軌樁 per-length rent ($/支/天)
-  dpRentR3:3.5,dpRentR4:3.5,dpRentR5:3.5,dpRentR6:4.5,dpRentR7:5.0,
-  dpRentR8:5.5,dpRentR9:6.0,dpRentR10:6.5,dpRentR11:7.5,dpRentR12:8.5,
-  dpRentR125:9.5,dpRentR13:12.5,dpRentR14:13.5,dpRentR15:14.5,
-  // 鋼板樁 per-length rent ($/片/天)
-  // 鋼板樁租金 ($/片/月)：7/9/13/16/19/21m
-  dpRentSP7:240,dpRentSP9:280,dpRentSP13:360,dpRentSP16:440,dpRentSP19:540,dpRentSP21:600,
-  dpRentR1:5.0,dpRentR2:14.5,dpRentSP:8.0,// legacy keys
-  dpDmgH300:22,dpDmgH:30,dpDmgR:28,
-  dpDrillRate:450,dpWaterKnife:100,
-  dpFrH300:23,dpFrH350:34,dpFrH400:43,dpFrLong13:3,
-  dpFrR1:14,dpFrR2:15,dpFrSP7:90,dpFrSP9:110,
-  dpFrSP13:180,dpFrSP16:300,dpFrSP19:500,
-  dpFrCov2:110,dpFrCov3:170,dpFrIron:450,
-  dpRegTc:1.1,dpRegC:1.3,dpRegS:1.5,dpRegE:1.8,
-  dpIH300:850,dpRH300:300,dpIH350:1000,dpRH350:400,
-  dpIH400:950,dpRH400:300,dpIS:125,dpRS:30,
-  dpBuH:33,dpBuR:28,dpBuS:32,dpBuB:36
+  // v6.0.164：原「unit price defaults」dp* 整組（dpRent／dpLoss／dpProcess／dpPeriod／dpRent*／dpFr*／dpReg*／dpI*／dpR*／dpBu*／dpDmg*／dpDrillRate／dpWaterKnife）已刪：參數頁沒有輸入格、全檔沒有程式讀；單價分析與逾期租金的租金用單價庫 UPA_COST_DB（H350＝4 元／M／天）
 };
 let items=[],exs=[],costs=[],eid=null;
 let rmkCustom={load:'',walk:'',tech:'',bh:'',br:'',bs:'',bb:'',c2:'',c3:'',ir:'',mob:'',minQty:'',spareTxt:'',extra:[]};   // v6.0.165 spareTxt＝這張報價自訂的備用單價條文
@@ -968,60 +948,8 @@ function doSaveP(){
   P.mult=parseFloat(gv('pmul'))||1.4;
   P.profit=parseFloat(gv('ppro'))||18;
   P.s1=parseFloat(gv('ps1'))||1.12;P.s2=parseFloat(gv('ps2'))||1.0;P.s3=parseFloat(gv('ps3'))||0.9;
-  // unit price defaults
-  P.dpRent=parseFloat(gv('dp-rent'))||0.1;P.dpLoss=parseFloat(gv('dp-loss'))||0.05;
-  P.dpProcess=parseFloat(gv('dp-process'))||900;P.dpPeriod=parseFloat(gv('dp-period'))||60;
-  P.dpFrN=parseFloat(gv('dp-fr-n'))||27;P.dpFrTc=parseFloat(gv('dp-fr-tc'))||30;
-  P.dpFrC=parseFloat(gv('dp-fr-c'))||35;P.dpFrS=parseFloat(gv('dp-fr-s'))||40;
-  P.dpIH300=parseFloat(gv('dp-i-h300'))||850;P.dpRH300=parseFloat(gv('dp-r-h300'))||300;
-  P.dpIH350=parseFloat(gv('dp-i-h350'))||1000;P.dpRH350=parseFloat(gv('dp-r-h350'))||400;
-  P.dpIH400=parseFloat(gv('dp-i-h400'))||950;P.dpRH400=parseFloat(gv('dp-r-h400'))||300;
-  P.dpIS=parseFloat(gv('dp-i-s'))||125;P.dpRS=parseFloat(gv('dp-r-s'))||30;
-  P.dpBuH=parseFloat(gv('dp-bu-h'))||33;P.dpBuR=parseFloat(gv('dp-bu-r'))||28;
-  P.dpBuS=parseFloat(gv('dp-bu-s'))||32;P.dpBuB=parseFloat(gv('dp-bu-b'))||36;
-  // 鋼軌樁 per-length
-  P.dpRentR3=parseFloat(gv('dp-rent-r3'))||3.5;P.dpRentR4=parseFloat(gv('dp-rent-r4'))||3.5;
-  P.dpRentR5=parseFloat(gv('dp-rent-r5'))||3.5;P.dpRentR6=parseFloat(gv('dp-rent-r6'))||4.5;
-  P.dpRentR7=parseFloat(gv('dp-rent-r7'))||5.0;P.dpRentR8=parseFloat(gv('dp-rent-r8'))||5.5;
-  P.dpRentR9=parseFloat(gv('dp-rent-r9'))||6.0;P.dpRentR10=parseFloat(gv('dp-rent-r10'))||6.5;
-  P.dpRentR11=parseFloat(gv('dp-rent-r11'))||7.5;P.dpRentR12=parseFloat(gv('dp-rent-r12'))||8.5;
-  P.dpRentR125=parseFloat(gv('dp-rent-r125'))||9.5;P.dpRentR13=parseFloat(gv('dp-rent-r13'))||12.5;
-  P.dpRentR14=parseFloat(gv('dp-rent-r14'))||13.5;P.dpRentR15=parseFloat(gv('dp-rent-r15'))||14.5;
-  // 鋼板樁 per-length
-  P.dpRentSP7=parseFloat(gv('dp-rent-sp7'))||240;
-  P.dpRentSP9=parseFloat(gv('dp-rent-sp9'))||280;P.dpRentSP13=parseFloat(gv('dp-rent-sp13'))||360;
-  P.dpRentSP16=parseFloat(gv('dp-rent-sp16'))||440;P.dpRentSP19=parseFloat(gv('dp-rent-sp19'))||540;
-  P.dpRentSP21=parseFloat(gv('dp-rent-sp21'))||600;
-  // 鑽堡引孔費率
-  P.dpDrillRate=parseFloat(gv('dp-drill-rate'))||450;
-  P.dpRentH300=parseFloat(gv('dp-rent-h300'))||0.111;
-  P.dpRentH350=parseFloat(gv('dp-rent-h350'))||0.117;
-  P.dpRentH400=parseFloat(gv('dp-rent-h400'))||0.133;
-  P.dpRentSP=parseFloat(gv('dp-rent-sp'))||8;
-  P.dpRentR1=parseFloat(gv('dp-rent-r1'))||5;
-  P.dpRentR2=parseFloat(gv('dp-rent-r2'))||14.5;
-  P.dpDmgH300=parseFloat(gv('dp-dmg-h300'))||22;
-  P.dpDmgH=parseFloat(gv('dp-dmg-h'))||30;
-  P.dpDmgR=parseFloat(gv('dp-dmg-r'))||28;
-  P.dpWaterKnife=parseFloat(gv('dp-waterknife'))||100;
-  P.dpFrH300=parseFloat(gv('dp-fr-h300'))||23;
-  P.dpFrH350=parseFloat(gv('dp-fr-h350'))||34;
-  P.dpFrH400=parseFloat(gv('dp-fr-h400'))||43;
-  P.dpFrLong13=parseFloat(gv('dp-fr-long13'))||3;
-  P.dpFrR1=parseFloat(gv('dp-fr-r1'))||14;
-  P.dpFrR2=parseFloat(gv('dp-fr-r2'))||15;
-  P.dpFrSP7=parseFloat(gv('dp-fr-sp7'))||90;
-  P.dpFrSP9=parseFloat(gv('dp-fr-sp9'))||110;
-  P.dpFrSP13=parseFloat(gv('dp-fr-sp13'))||180;
-  P.dpFrSP16=parseFloat(gv('dp-fr-sp16'))||300;
-  P.dpFrSP19=parseFloat(gv('dp-fr-sp19'))||500;
-  P.dpFrCov2=parseFloat(gv('dp-fr-cov2'))||110;
-  P.dpFrCov3=parseFloat(gv('dp-fr-cov3'))||170;
-  P.dpFrIron=parseFloat(gv('dp-fr-iron'))||450;
-  P.dpRegTc=parseFloat(gv('dp-reg-tc'))||1.1;
-  P.dpRegC=parseFloat(gv('dp-reg-c'))||1.3;
-  P.dpRegS=parseFloat(gv('dp-reg-s'))||1.5;
-  P.dpRegE=parseFloat(gv('dp-reg-e'))||1.8;
+  // v6.0.164：dp* 單價參數整組已刪（沒有輸入格、沒有程式讀，見 P 預設處說明）；舊存檔留著的 dp* 鍵存檔時一併清掉
+  Object.keys(P).forEach(function(k){if(/^dp[A-Z]/.test(k))delete P[k];});
   P.bank=gv('pbank')||'國泰世華建成分行(013)';
   P.bankAccount=gv('pbankacct')||'031035008864';
   try{_bankCompanySave(P.bank,P.bankAccount);}catch(e){_err('doSaveP.bank',e);}   // 健檢2 #4
@@ -1120,27 +1048,7 @@ function syncParamsUI(){
   try{var _pe=document.getElementById('pequip');if(_pe)_pe.value=(P.equipList||[]).join('\n');var _pg=document.getElementById('pdrgap');if(_pg)_pg.value=(P.drGapDays==null?3:P.drGapDays);var _pd=document.getElementById('pvpayday');if(_pd)_pd.value=(P.vendorPayDay||25);var _pm=document.getElementById('pvpaydelay');if(_pm)_pm.value=(P.vendorPayDelay==null?1:P.vendorPayDelay);var _pc=document.getElementById('pvcutday');if(_pc)_pc.value=(P.vendorCutDay||25);var _pb=document.getElementById('pvsubbill');if(_pb)_pb.value=(P.subPayOnBill===false?'0':'1');}catch(e){_err('syncParamsUI',e);}
   const m={pc:'company',pt:'taxid',pb:'boss',pco:'contact',ptel:'tel',pem:'email',pad:'addr',
     ptax:'tax',prmrate:'removeRate',pohd:'overheadPct',plabor:'laborDayRate',popen:'openingCash',popendate:'openingDate',popres:'opReserveMonths',popresamt:'opReserveAmt',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
-    'dp-rent':'dpRent','dp-loss':'dpLoss','dp-process':'dpProcess','dp-period':'dpPeriod',
-    'dp-i-h300':'dpIH300','dp-r-h300':'dpRH300','dp-i-h350':'dpIH350','dp-r-h350':'dpRH350',
-    'dp-i-h400':'dpIH400','dp-r-h400':'dpRH400','dp-i-s':'dpIS','dp-r-s':'dpRS',
-    'dp-bu-h':'dpBuH','dp-bu-r':'dpBuR','dp-bu-s':'dpBuS','dp-bu-b':'dpBuB',
-    'dp-rent-h300':'dpRentH300','dp-rent-h350':'dpRentH350','dp-rent-h400':'dpRentH400',
-    'dp-rent-r3':'dpRentR3','dp-rent-r4':'dpRentR4','dp-rent-r5':'dpRentR5',
-    'dp-rent-r6':'dpRentR6','dp-rent-r7':'dpRentR7','dp-rent-r8':'dpRentR8',
-    'dp-rent-r9':'dpRentR9','dp-rent-r10':'dpRentR10','dp-rent-r11':'dpRentR11',
-    'dp-rent-r12':'dpRentR12','dp-rent-r125':'dpRentR125','dp-rent-r13':'dpRentR13',
-    'dp-rent-r14':'dpRentR14','dp-rent-r15':'dpRentR15',
-    'dp-rent-sp7':'dpRentSP7','dp-rent-sp9':'dpRentSP9','dp-rent-sp13':'dpRentSP13',
-    'dp-rent-sp16':'dpRentSP16','dp-rent-sp19':'dpRentSP19','dp-rent-sp21':'dpRentSP21',
-    'dp-drill-rate':'dpDrillRate',
-    'dp-rent-sp':'dpRentSP','dp-rent-r1':'dpRentR1','dp-rent-r2':'dpRentR2',
-    'dp-dmg-h300':'dpDmgH300','dp-dmg-h':'dpDmgH','dp-dmg-r':'dpDmgR','dp-waterknife':'dpWaterKnife',
-    'dp-fr-h300':'dpFrH300','dp-fr-h350':'dpFrH350','dp-fr-h400':'dpFrH400',
-    'dp-fr-long13':'dpFrLong13','dp-fr-r1':'dpFrR1','dp-fr-r2':'dpFrR2',
-    'dp-fr-sp7':'dpFrSP7','dp-fr-sp9':'dpFrSP9','dp-fr-sp13':'dpFrSP13',
-    'dp-fr-sp16':'dpFrSP16','dp-fr-sp19':'dpFrSP19',
-    'dp-fr-cov2':'dpFrCov2','dp-fr-cov3':'dpFrCov3','dp-fr-iron':'dpFrIron',
-    'dp-reg-tc':'dpRegTc','dp-reg-c':'dpRegC','dp-reg-s':'dpRegS','dp-reg-e':'dpRegE'};
+  };
   Object.entries(m).forEach(([id,k])=>{const e=document.getElementById(id);if(e&&P[k]!==undefined)e.value=P[k];});
   syncSiteLabels();
   const pb=document.getElementById('pbank');if(pb)pb.value=_coBank().bank;
