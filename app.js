@@ -35029,9 +35029,9 @@ function renderHealthReport(el){
   var rows;try{rows=_healthRows();}catch(e){_err('renderHealthReport',e);el.innerHTML='<div style="padding:20px;color:var(--red)">健檢失敗：'+esc(e.message)+'</div>';return;}
   var warn=rows.filter(function(r){return r.sev==='warn';}).length,info=rows.length-warn;
   var cnt={quotes:(Q||[]).length,inv:(INV||[]).length,ct:(CONTRACTS||[]).length,pay:(PAYABLES||[]).length,logs:(Q||[]).reduce(function(a,q){return a+((q&&q.dailyLogs)||[]).length;},0),costs:(Q||[]).reduce(function(a,q){return a+((q&&q.costs)||[]).length;},0)};
-  if(!renderHealthReport._bkAt||Date.now()-renderHealthReport._bkAt>60000){renderHealthReport._bkAt=Date.now();_bkHealthLoad(function(){var c=document.getElementById('bk-health-card');if(c)c.outerHTML=_bkHealthHtml();});}   // 審查：每次打開都讀最新一次雲端結果（一分鐘內不重讀）
+  if(!renderHealthReport._bkAt||Date.now()-renderHealthReport._bkAt>60000){renderHealthReport._bkAt=Date.now();_bkHealthLoad(function(){var c=document.getElementById('bk-health-card');if(c)c.outerHTML=_bkHealthHtml();});_pnlLoad(function(){var c=document.getElementById('pnl-snap-card');if(c)c.outerHTML=_pnlSnapHtml();});}   // 審查：每次打開都讀最新一次雲端結果（一分鐘內不重讀）；5c 損益快照同
   if(!renderHealthReport._bkRAt||Date.now()-renderHealthReport._bkRAt>60000){renderHealthReport._bkRAt=Date.now();_bkRemindLoad(function(){var c=document.getElementById('bk-remind-card');if(c)c.outerHTML=_bkRemindHtml();});}   // 5b
-  var h=_bkHealthHtml()+_bkRemindHtml()+'<div class="card"><div class="cb">'
+  var h=_bkHealthHtml()+_bkRemindHtml()+_pnlSnapHtml()+'<div class="card"><div class="cb">'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><b style="font-size:14px">資料健檢</b>'
     +'<span style="font-size:12px;color:var(--b4)">報價 '+cnt.quotes+'・請款單 '+cnt.inv+'・合約 '+cnt.ct+'・成本 '+cnt.costs+'・日報 '+cnt.logs+'・應付 '+cnt.pay+'</span>'
     +'<span style="margin-left:auto;font-size:12.5px;font-weight:700;color:'+(warn?'#c62828':'var(--g3)')+'">'+(rows.length?('需處理 '+warn+'・提醒 '+info):'✓ 沒有發現問題')+'</span>'
@@ -40676,7 +40676,7 @@ function _bkWatch(){
   _bkHealthLoad();
 }
 // 審查：登出時清掉（同一台裝置換人登入，不能看到上一個人的健檢明細）
-function _bkOff(){try{if(_bkRef)_bkRef.off();}catch(e){_err('_bkOff',e);}_bkRef=null;_bkWatch._on=0;BK_TODO={};BK_HEALTH=null;BK_REMIND=null;}
+function _bkOff(){try{if(_bkRef)_bkRef.off();}catch(e){_err('_bkOff',e);}PNL_SNAP={latest:null,close:null,ok:false};_bkRef=null;_bkWatch._on=0;BK_TODO={};BK_HEALTH=null;BK_REMIND=null;}
 function _bkHealthLoad(cb){
   if(!_fbDb||!_fbUser){if(cb)cb();return;}
   _fbDb.ref('fydata/health/latest').once('value').then(function(s){BK_HEALTH=s.val()||null;if(cb)cb();}).catch(function(){/* 可忽略：一般員工讀不到健檢明細 */if(cb)cb();});
@@ -40993,6 +40993,53 @@ function _todo5cItems(items){
   try{var vp=_vpPending();if(vp.length){var bad=0,rc={};vp.forEach(function(p){var k=_vpCheck(p,rc);if(k&&k.bad)bad++;});
     items.push({type:'vp_check',urgent:bad>0,jump:"openVendorPayCheck('"+escq(vp[0].id)+"')",icon:ic('i-coins'),color:bad?'var(--red)':'#E65100',
       text:'付包商款待核准 '+vp.length+' 筆'+(bad?('（'+bad+' 筆數量有差異）'):'（數量相符）'),sub:vp.slice(0,3).map(function(p){return esc(p.to||'')+' 第'+esc(String(p.costPeriod))+'期';}).join('、')});}}catch(e){_err('_todo5cItems.vp',e);}
+}
+// ══════════ 改版第 5 步 5c #16 月損益／結案損益快照、#18 結案實際成本匯出（雲端 monthlySnapshot；functions/ops/pnl.js）══════════
+// 雲端每天 07:25 用同一套 calc 算今年累計（管理用口徑）→ fydata/private/pnlSnap/latest；這裡跟這台裝置的 _shRptYear 逐值並排（同 5a 健檢的並行比對）。
+// 結案損益 fydata/private/pnlClose/<報價 id>（結案後凍結）；#18「匯出結案實際成本」只匯出 CSV，不改任何資料。只有管理員與唯讀帳號讀得到（private）。
+var PNL_SNAP={latest:null,close:null,ok:false};
+var _PNL_CMP=[['revNet','營收（未稅）'],['cost','施工成本'],['gross','毛利'],['exp','公司費用'],['hr','人事'],['pretax','稅前淨利'],['recv','實收']];
+function _pnlLoad(cb){
+  if(!_fbDb||!_fbUser){if(cb)cb();return;}
+  Promise.all([_fbDb.ref('fydata/private/pnlSnap/latest').once('value'),_fbDb.ref('fydata/private/pnlClose').once('value')])
+    .then(function(r){PNL_SNAP={latest:r[0].val()||null,close:r[1].val()||{},ok:true};if(cb)cb();})
+    .catch(function(){/* 可忽略：一般員工讀不到 private */PNL_SNAP.ok=false;if(cb)cb();});
+}
+function _pnlSnapHtml(){
+  var L=PNL_SNAP.latest,head='<div class="card" id="pnl-snap-card"><div class="cb"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px"><b style="font-size:14px">☁ 雲端損益快照</b><span style="font-size:11.5px;color:var(--b4)">今年累計・管理用（依期別）・未稅</span>';
+  var canRun=false;try{canRun=!!(_fbUser&&isAdmin(_fbUser.email)&&!_isReaderUser);}catch(e){canRun=false;}
+  if(_fbUser&&!canRun)return '';   // 只有管理員顯示（審查：唯讀帳號、一般員工讀不到 private 的這兩個節點）
+  var btn=(canRun?'<button type="button" class="btn btn-xs" onclick="pnlSnapRun()">立即重算</button>':'')+'<button type="button" class="btn btn-xs" onclick="pnlCostExport()">匯出結案實際成本（CSV）</button>';
+  head+='<span style="margin-left:auto;display:flex;gap:6px">'+btn+'</span></div>';
+  if(!L)return head+'<div style="font-size:12px;color:var(--b3)">雲端還沒有快照（雲端程式部署後每天 07:25 產生）</div></div></div>';
+  var Y=String(L.ym||'').slice(0,4),d=null;try{d=_shRptYear(Y);}catch(e){_err('_pnlSnapHtml',e);}
+  var y=L.ytd||{},bad=0;
+  var rows=_PNL_CMP.map(function(k){var cv=Math.round(+y[k[0]]||0),lv=d?Math.round(+d[k[0]]||0):null,ok=lv!=null&&cv===lv;if(!ok)bad++;
+    return '<tr><td style="padding:3px 6px">'+k[1]+'</td><td style="padding:3px 6px;text-align:right">'+fmt(cv)+'</td><td style="padding:3px 6px;text-align:right">'+(lv==null?'—':fmt(lv))+'</td><td style="padding:3px 6px;color:'+(ok?'var(--g3)':'var(--red)')+'">'+(ok?'✓ 一致':'✗ 不一致')+'</td></tr>';}).join('');
+  var nC=Object.keys(PNL_SNAP.close||{}).length;
+  return head+'<div style="font-size:11.5px;color:var(--b4);margin-bottom:4px">雲端 '+esc(Y)+' 年（'+esc(new Date(+L.at||0).toLocaleString('zh-TW'))+' 算）vs 這台裝置現在算'+(bad?'；<b style="color:var(--red)">不一致的常見原因：這台剛改還沒同步、雲端是今天早上算的、跨月人事估算月數不同</b>':'')+'</div>'
+    +'<table class="tbl" style="width:100%;font-size:12px"><thead><tr><th style="text-align:left">項目</th><th style="text-align:right">雲端</th><th style="text-align:right">這台</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">結案損益 '+nC+' 案（結案後 90 天內每天重算、之後凍結；匯出 CSV 給單價庫回寫用，只匯出不改資料）</div></div></div>';
+}
+function pnlSnapRun(){
+  if(_roDeny())return;if(!_fbUser){toast('請先登入');return;}
+  toast('雲端損益快照計算中…');
+  _fbUser.getIdToken().then(function(tok){return fetch(_fnUrl('pnlSnapNow'),{method:'POST',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},body:'{}'});})
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j&&j.error&&j.error.message)||('HTTP '+r.status));return j;});})
+    .then(function(j){toast('損益快照完成'+(j.closed?('，新凍結 '+j.closed+' 案結案損益'):''));_pnlLoad(function(){var c=document.getElementById('pnl-snap-card');if(c)c.outerHTML=_pnlSnapHtml();});})
+    .catch(function(e){toast('損益快照失敗：'+(e&&e.message||'')+'（雲端程式部署了嗎？）');});
+}
+// 跟 functions/ops/pnl.js 的 costExportCsv 同一個格式（冒煙測試逐字比對）
+function _pnlCostCsv(snaps){
+  var rows=[['報價id','工程名稱','成本分類','金額（未稅）','快照日期']];
+  var ymd=function(ts){return new Date(+ts+8*3600*1000).toISOString().slice(0,10);};
+  Object.keys(snaps||{}).sort().forEach(function(k){var s=snaps[k]||{};Object.keys(s.costByCat||{}).sort().forEach(function(cat){rows.push([s.qid||k,s.name||'',cat,Math.round(parseFloat(s.costByCat[cat])||0),s.at?ymd(s.at):'']);});});
+  var cell=function(v){var t=String(v==null?'':v);if(typeof v==='string'&&/^[=+\-@]/.test(t))t="'"+t;return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};   // 防 Excel 公式注入（同雲端）
+  return '﻿'+rows.map(function(r){return r.map(cell).join(',');}).join('\n');
+}
+function pnlCostExport(){
+  var c=PNL_SNAP.close||{};if(!Object.keys(c).length){toast('還沒有已凍結的結案損益');return;}
+  _dlText('結案實際成本_'+localToday()+'.csv',_pnlCostCsv(c));
 }
 // ══════════ 改版第 5 步 5d：整體日報草稿（#8）、待辦同步 Google 工作表（#21）的 FJ 端 ══════════
 // 整體日報：雲端 dailyReport（functions/ops/daily.js）每天 21:30 產生；有營造廠在的群組只建這種草稿，Lotion 複製文字自己轉發、回來按「已轉發」。
