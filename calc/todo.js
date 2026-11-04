@@ -184,6 +184,13 @@
     var t = dom ? new Date(y, m - 1 + delay, dom) : new Date(y, m - 1 + delay + 1, 0);
     return { date: iso(t), est: true };
   }
+  // v6.0.174：請款日期寬鬆解析（2026-10-05／2026/10/5／2026.10.05／115/10/05／115年10月5日），一律當地時間；
+  // 原本 new Date(字串) 在 iPhone Safari 遇到非 ISO 格式會變 Invalid Date → 手機少一筆逾期提醒、電腦有
+  function looseDate(s, fb) {
+    var m = /^(\d{2,4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})/.exec(String(s == null ? '' : s).trim());
+    if (m) { var y = +m[1]; if (y < 1911) y += 1911; return new Date(y, +m[2] - 1, +m[3]); }
+    var d = s ? new Date(s) : null; return d && !isNaN(d.getTime()) ? d : fb;
+  }
   // 收款提醒（總覽「預計明天／今天收款、逾期未收」）：inv 需帶 ar（未收金額）與 exp（expectedDate 的結果）；nowMs＝現在
   function recvTodos(rows, nowMs) {
     var out = [], now = new Date(nowMs);
@@ -192,7 +199,7 @@
       var inv = x.inv; if (!inv || inv.receivedConfirmed) return; if (!(x.ar > 0)) return;
       if (x.exp) { var d = du(x.exp.date); if (d > 1) return; out.push({ id: inv.id, d: d, date: x.exp.date, ar: x.ar }); return; }
       var recvDay = parseInt(inv.recvDay) || parseInt(inv.payDue) || 0; if (!recvDay) return;
-      var payDelay = parseInt(inv.payMonthDelay) || 0, baseDate = inv.date ? new Date(inv.date) : now;
+      var payDelay = parseInt(inv.payMonthDelay) || 0, baseDate = looseDate(inv.date, now);
       var dueD = new Date(baseDate.getFullYear(), baseDate.getMonth() + payDelay, recvDay), overDays = Math.floor((now.getTime() - dueD.getTime()) / 864e5);
       if (overDays > 0 && overDays < 1825) out.push({ id: inv.id, d: -overDays, date: '', ar: x.ar });
     });
@@ -465,7 +472,7 @@
   }
   var todo = { dAdd: dAdd, dDiff: dDiff, itemCat: itemCat, rentDaysOf: rentDaysOf, prPhase: prPhase, itemProgress: itemProgress, rentEndMode: rentEndMode, rentOldQty: rentOldQty,
     rentBatchList: rentBatchList, rentBatchQtyDays: rentBatchQtyDays, rentStatus: rentStatus, rentScan: rentScan, rentTodos: rentTodos, rentSoon: rentSoon,
-    recvRule: recvRule, byRule: byRule, expectedDate: expectedDate, recvTodos: recvTodos,
+    recvRule: recvRule, byRule: byRule, expectedDate: expectedDate, recvTodos: recvTodos, looseDate: looseDate,
     retMonths: retMonths, addMonths: addMonths, retDue: retDue, closeReady: closeReady,
     rfqKey: rfqKey, rfqGL: rfqGL, rfqBaseVer: rfqBaseVer, rfqQuoteDiff: rfqQuoteDiff, rfqVerTodos: rfqVerTodos, ticketTodos: ticketTodos, build: build,
     INV_K: INV_K, invUnpack: invUnpack, effQtyMap: effQtyMap, effQty: effQty, itemActual: itemActual, actQtyMap: actQtyMap, costByItem: costByItem, overrun: overrun, cutOf: cutOf, cycleOf: cycleOf, monthBill: monthBill };

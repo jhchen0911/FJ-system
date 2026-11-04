@@ -354,8 +354,16 @@ async function runRemind() {
     val('fydata/shared/quotes'), val('fydata/shared/invoices'), val('fydata/shared/contracts'), val('fydata/shared/customers'), val('fydata/shared/params'), val('fydata/shared/qHistory'),
     val('fydata/private/payables'), val('fydata/private/matLedger'), val('fydata/private/quoteSens'),
   ]);
-  const r = todosCore.buildRemind({ shared: { quotes, invoices, contracts, customers, params, qHistory }, priv: { payables, matLedger, quoteSens }, now });
-  await db.ref('fydata/health/remind').set(r);   // 並行比對期只寫這裡（不寫總覽待辦）
+  let r;
+  try {
+    r = todosCore.rtdbSafe(todosCore.buildRemind({ shared: { quotes, invoices, contracts, customers, params, qHistory }, priv: { payables, matLedger, quoteSens }, now }));   // v6.0.174：去掉 undefined／不合法鍵名，RTDB 才寫得進去
+    await db.ref('fydata/health/remind').set(r);   // 並行比對期只寫這裡（不寫總覽待辦）
+  } catch (e) {
+    // v6.0.174：失敗原因寫進 fydata/health/remindErr（資料健檢卡顯示），不只留在 log
+    await db.ref('fydata/health/remindErr').set({ at: now, msg: String((e && e.message) || e).slice(0, 300) }).catch((e2) => console.error('runRemind.err', e2));
+    throw e;
+  }
+  await db.ref('fydata/health/remindErr').set(null);
   console.log('[提醒] 完成', JSON.stringify(r.counts));
   return r;
 }
@@ -370,8 +378,8 @@ exports.healthRunNow = onRequest({ region: REGION, cors: ['https://jhchen0911.gi
     const role = t.fy || roleOf(t.email, await lists());
     if (role !== 'admin') { res.status(403).json({ error: { message: '只有管理員可以手動執行健檢' } }); return; }
     const h = await runHealth();
-    let rc = null; try { rc = (await runRemind()).counts; } catch (e2) { console.error('healthRunNow.remind', e2); }   // 5b：提醒一起跑
-    res.json({ ok: true, at: h.at, warn: h.warn, counts: h.counts, remind: rc });
+    let rc = null, rerr = ''; try { rc = (await runRemind()).counts; } catch (e2) { console.error('healthRunNow.remind', e2); rerr = String((e2 && e2.message) || e2).slice(0, 300); }   // 5b：提醒一起跑
+    res.json({ ok: true, at: h.at, warn: h.warn, counts: h.counts, remind: rc, remindErr: rerr });
   } catch (e) { console.error('healthRunNow', e); res.status(500).json({ error: { message: '健檢失敗' } }); }
 });
 

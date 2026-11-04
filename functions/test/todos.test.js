@@ -45,3 +45,14 @@ test('buildRemind：租期逾期、7 天內到期、收款逾期、保留款逾�
   assert.deepStrictEqual(r.keys.rfqVer, ['q4']);          // 詢價依據 v1、報價 v2 且深度不同
   assert.ok(!JSON.stringify(r.list).includes('1050'), '明細不放金額');
 });
+
+test('v6.0.174 rtdbSafe：去掉 undefined／NaN、鍵名不合法字元換成 _（RTDB 才寫得進去）', () => {
+  const r = T.rtdbSafe({ a: undefined, b: [1, undefined, NaN], 'x.y': { 'p$q': 2, 'r/s': [3] }, c: 's', d: null, e: { f: { g: Infinity } } });
+  assert.deepStrictEqual(r, { b: [1, null, null], x_y: { p_q: 2, r_s: [3] }, c: 's', e: { f: {} } });
+});
+
+test('v6.0.174 looseDate：非 ISO 請款日期（/、.、民國年）各裝置讀成同一天（iPhone 原本讀不懂）', () => {
+  const L = FJC.todo.looseDate, f = (s) => { const d = L(s, null); return d ? [d.getFullYear(), d.getMonth() + 1, d.getDate()].join('-') : null; };
+  assert.deepStrictEqual(['2026-10-05', '2026/10/5', '2026.10.05', '115/10/05', '115年10月5日'].map(f), Array(5).fill('2026-10-5'));
+  assert.strictEqual(f('亂打'), null);
+});

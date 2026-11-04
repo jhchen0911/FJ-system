@@ -9040,6 +9040,41 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.174 手機總覽「通知 Lotion」不擠統計卡；雲端健檢「立即重跑」後提醒卡也重讀、失敗原因顯示 ──
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(async () => {
+      const out = {}; const wait = ms => new Promise(res => setTimeout(res, ms));
+      const oU = _fbUser, oR = _isReaderUser, oDb = _fbDb, oF = window.fetch, oT = window.toast;
+      try {
+        go('dash'); await wait(150);
+        _fbUser = { email: 'HsuanChen911@gmail.com', uid: 'a', getIdToken: async () => 'tok' }; _isReaderUser = true; renderDashGreet(); await wait(50);
+        const g = document.getElementById('dash-greet'), kg = document.querySelector('#page-dash .kgrid');
+        out.btn = !!document.getElementById('ai-notify-btn');
+        out.noFloat = getComputedStyle(document.getElementById('ai-notify-btn')).float === 'none';
+        const gw = g.getBoundingClientRect().width, kw = kg ? kg.getBoundingClientRect().width : 0;
+        out.full = kg && Math.abs(kw - gw) < 2; out.w = [gw, kw];
+        _isReaderUser = false;
+        /* 立即重跑 → 提醒卡跟著重讀，雲端回報的失敗原因要出現 */
+        let reads = 0; const vals = { 'fydata/health/latest': null, 'fydata/health/remind': null, 'fydata/health/remindErr': { at: 1, msg: 'value argument contains undefined' } };
+        _fbDb = { ref: p => ({ once: async () => { if (p === 'fydata/health/remind') reads++; return { val: () => vals[p] }; } }) };
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o', getIdToken: async () => 'tok' };
+        let toasts = []; window.toast = m => toasts.push(m);
+        window.fetch = async () => ({ ok: true, status: 200, json: async () => ({ ok: true, warn: 0, remindErr: 'value argument contains undefined' }) });
+        bkHealthRun(); await wait(150);
+        out.reload = reads >= 1;
+        out.toast = toasts.some(t => /雲端提醒失敗/.test(t));
+        out.card = /上次雲端提醒沒跑成功/.test(_bkRemindHtml());
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      _fbUser = oU; _isReaderUser = oR; _fbDb = oDb; window.fetch = oF; window.toast = oT; _bkRemindLoad.err = null; BK_REMIND = null; BK_HEALTH = null; try { renderDashGreet(); } catch (e) { /* 可忽略 */ }
+      return out;
+    });
+    check('v6.0.174 手機總覽：「通知 Lotion」不用 float，統計卡跟問候列一樣寬（不擠到左邊 2/3）', r.btn && r.noFloat && r.full, JSON.stringify(r));
+    check('v6.0.174 雲端健檢立即重跑：提醒卡一起重讀，雲端提醒失敗原因顯示在提示與卡片上', r.reload && r.toast && r.card, JSON.stringify(r));
+    check('v6.0.174 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.123 AI 通知：只有 AI 帳號與 Lotion 看得到按鈕、走雲端 aiNotify 帶登入憑證；規則收掉唯讀帳號寫 linePush ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

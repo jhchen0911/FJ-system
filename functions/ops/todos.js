@@ -60,4 +60,15 @@ function buildRemind(inp) {
       ticket: v.ticket.map((x) => ({ id: x.id, dueDate: x.dueDate, dd: x.dd })),
     } };
 }
-module.exports = { buildRemind, keysOf, tpeDay };
+// v6.0.174：RTDB 不收 undefined／NaN，鍵名不能有 . # $ / [ ]（真實資料的工項說明、案名可能有）→ 寫入前整理一次
+function rtdbSafe(v) {
+  if (v === undefined || (typeof v === 'number' && !isFinite(v))) return null;
+  if (Array.isArray(v)) return v.map(rtdbSafe);
+  if (v && typeof v === 'object') {
+    const o = {};
+    Object.keys(v).forEach((k) => { const x = rtdbSafe(v[k]); if (x !== null) o[String(k).replace(/[.#$\/\[\]]/g, '_') || '_'] = x; });
+    return o;
+  }
+  return v;
+}
+module.exports = { buildRemind, keysOf, tpeDay, rtdbSafe };

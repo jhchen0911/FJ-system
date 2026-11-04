@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.173';
+var APP_VERSION='v6.0.174';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -6172,7 +6172,7 @@ function updateDashTodo(){
     }else{
       var recvDay=parseInt(inv.recvDay)||parseInt(inv.payDue)||0;if(!recvDay)return;
       var payDelay=parseInt(inv.payMonthDelay)||0;
-      var baseDate=inv.date?new Date(inv.date):now;
+      var baseDate=FJC.todo.looseDate(inv.date,now);   // v6.0.174 iPhone 讀不懂非 ISO 日期 → 手機少一筆逾期
       var dueD=new Date(baseDate.getFullYear(),baseDate.getMonth()+payDelay,recvDay);
       var overDays=Math.floor((now.getTime()-dueD.getTime())/864e5);
       if(overDays>0&&overDays<1825)items.push({type:'recv',urgent:true,jump:"openReceiptModal('"+inv.id+"')",
@@ -29160,7 +29160,7 @@ function checkNotifications(){
       const recvDay=parseInt(inv.recvDay)||parseInt(inv.payDue)||0;
       if(!recvDay)return;
       const payDelay=parseInt(inv.payMonthDelay)||0;
-      const baseDate=inv.date?new Date(inv.date):new Date(now);
+      const baseDate=FJC.todo.looseDate(inv.date,new Date(now));   // v6.0.174
       const dueDate=new Date(baseDate.getFullYear(),baseDate.getMonth()+payDelay,recvDay);
       const overDays=Math.floor((now-dueDate.getTime())/86400000);
       if(overDays>0&&overDays<1825){
@@ -40729,7 +40729,9 @@ function bkHealthRun(){
   _fbUser.getIdToken().then(function(tok){
     return fetch(_fnUrl('healthRunNow'),{method:'POST',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},body:'{}'});
   }).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j&&j.error&&j.error.message)||('HTTP '+r.status));return j;});})
-  .then(function(j){toast('雲端健檢完成：'+(j.warn?('需處理 '+j.warn+' 筆'):'沒有發現問題'));_bkHealthLoad(function(){try{renderCurrentReport();}catch(e){_err('bkHealthRun.render',e);}});})
+  .then(function(j){toast('雲端健檢完成：'+(j.warn?('需處理 '+j.warn+' 筆'):'沒有發現問題')+(j.remindErr?('；雲端提醒失敗：'+j.remindErr):''));
+    // v6.0.174：提醒卡也要重讀（原本只重讀健檢，按完提醒卡還是「還沒有結果」）
+    _bkHealthLoad(function(){_bkRemindLoad(function(){try{renderHealthReport._bkRAt=Date.now();renderCurrentReport();}catch(e){_err('bkHealthRun.render',e);}});});})
   .catch(function(e){toast('雲端健檢失敗：'+(e&&e.message||'')+'（雲端程式部署了嗎？）');});
 }
 // ══════════ 改版第 5 步 5a：回收筒（後端 30，健檢 2 #14；Lotion 11/04 第 3 題 A：全部集合）══════════
@@ -40914,19 +40916,22 @@ var _BK_RKEYS=[['rent','租期已逾期（逾期租金）'],['rentSoon','租期 
 var BK_REMIND=null;
 function _bkRemindLoad(cb){
   if(!_fbDb||!_fbUser)return;
-  try{_fbDb.ref('fydata/health/remind').once('value').then(function(s){BK_REMIND=s.val()||null;if(cb)cb();}).catch(function(e){_err('_bkRemindLoad',e);});}catch(e){_err('_bkRemindLoad',e);}
+  try{_fbDb.ref('fydata/health/remind').once('value').then(function(s){BK_REMIND=s.val()||null;
+    return _fbDb.ref('fydata/health/remindErr').once('value').then(function(s2){_bkRemindLoad.err=s2.val()||null;}).catch(function(){/* 可忽略：舊規則讀不到錯誤紀錄 */_bkRemindLoad.err=null;});   // v6.0.174
+  }).then(function(){if(cb)cb();}).catch(function(e){_err('_bkRemindLoad',e);});}catch(e){_err('_bkRemindLoad',e);}
 }
 function _bkRemindHtml(){
   var h=BK_REMIND;
   var head='<div class="card" id="bk-remind-card"><div class="cb"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px"><b style="font-size:14px">☁ 雲端每日提醒（並行比對）</b>';
-  if(!h)return head+'<span style="font-size:12px;color:var(--b4)">還沒有結果（雲端程式部署後每天 07:00 跑一次；「雲端每日健檢」的「立即跑一次」也會一起跑）</span></div></div></div>';
+  var er=_bkRemindLoad.err,erH=er&&er.msg?'<div style="font-size:12px;color:#c62828;margin:4px 0">上次雲端提醒沒跑成功（'+esc(er.at?new Date(er.at).toLocaleString('zh-TW',{hour12:false}):'')+'）：'+esc(er.msg)+'</div>':'';   // v6.0.174 失敗原因直接顯示
+  if(!h)return head+'<span style="font-size:12px;color:var(--b4)">還沒有結果（雲端程式部署後每天 07:00 跑一次；「雲端每日健檢」的「立即跑一次」也會一起跑）</span></div>'+erH+'</div></div>';
   var loc=_todoKeys(_todoBuild()),cl=(h.keys)||{};
   var rows=_BK_RKEYS.map(function(k){
     var c=(cl[k[0]]||[]).map(String).sort(),l=loc[k[0]]||[],same=c.join('|')===l.join('|');
     var miss=l.filter(function(x){return c.indexOf(x)<0;}).length,extra=c.filter(function(x){return l.indexOf(x)<0;}).length;
     return '<tr><td>'+esc(k[1])+'</td><td style="text-align:right">'+c.length+'</td><td>'+(same?'<span style="color:var(--g3)">✓ 一致</span>':'<span style="color:#c62828">✗ 本機 '+l.length+(miss?('（雲端少 '+miss+'）'):'')+(extra?('（雲端多 '+extra+'）'):'')+'</span>')+'</td></tr>';
   }).join('');
-  return head+'<span style="font-size:12px;color:var(--b4)">'+esc(h.day||'')+' 跑完</span></div>'
+  return head+'<span style="font-size:12px;color:var(--b4)">'+esc(h.day||'')+' 跑完</span></div>'+erH
     +'<table class="tbl"><thead><tr><th>提醒</th><th style="width:60px;text-align:right">雲端</th><th style="width:150px">跟這台比對</th></tr></thead><tbody>'+rows+'</tbody></table>'
     +'<div style="font-size:11px;color:var(--b3);margin-top:6px">兩週並行期間，總覽的提醒還是這台算；每天都一致才換成雲端。保留款到期：手填日期優先，沒填＝結案日＋合約月數。剛改過還沒同步、或雲端是早上 7 點的資料，會暫時不一致。</div></div></div>';
 }
@@ -41224,7 +41229,8 @@ function renderDashGreet(){
   var el=document.getElementById('dash-greet');if(!el)return;
   if(!_fbUser){el.textContent='';el.style.display='none';return;}
   el.style.display='';
-  el.innerHTML=esc('嗨，'+_meName())+(_aiNotifyOk()?'<button type="button" class="btn btn-xs" id="ai-notify-btn" onclick="lotionNotifyOpen()" style="float:right;font-size:12px;font-weight:600">📣 通知 Lotion</button>':'');   // v6.0.123 只有 AI 帳號與 Lotion 看得到
+  var nb=_aiNotifyOk();el.style.cssText=nb?'display:flex;align-items:center;gap:8px;flex-wrap:wrap':'';   // v6.0.174：不用 float（float 會讓下方統計卡格線縮到左邊 2/3，手機版跑版）
+  el.innerHTML='<span>'+esc('嗨，'+_meName())+'</span>'+(nb?'<button type="button" class="btn btn-xs" id="ai-notify-btn" onclick="lotionNotifyOpen()" style="margin-left:auto;font-size:12px;font-weight:600">📣 通知 Lotion</button>':'');   // v6.0.123 只有 AI 帳號與 Lotion 看得到
 }
 
 function applyRoleUI(){
