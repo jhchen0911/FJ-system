@@ -312,6 +312,92 @@
     return out;
   }
 
+  // ── 請款單工項還原（雲端讀到的是壓縮過的；表跟 app.js _INV_K 一樣，冒煙測試比對）──
+  var INV_K = { type: 't', desc: 'd', unit: 'u', contractPrice: 'cp', contractQty: 'cq', prevQty: 'pq', prevAmt: 'pa', curQty: 'q', curDays: 'cd', curAmt: 'a', note: 'n', cumQty: 'mq', cumAmt: 'ma', payRate: 'r',
+    installCum: 'ic', removeCum: 'rc', prevPayRate: 'pr', otPrice: 'op', otUnit: 'ou', cat: 'ct', phase: 'ph', discDays: 'dd', discAsk: 'da', discNote: 'dn' };
+  var INV_KR = (function () { var r = {}; Object.keys(INV_K).forEach(function (k) { r[INV_K[k]] = k; }); return r; })();
+  function invUnpack(inv) {
+    if (!inv || typeof inv !== 'object' || !inv._ip) return inv;
+    var c = Object.assign({}, inv);
+    c.items = Array.isArray(inv.items) ? inv.items.map(function (o) { if (!o || typeof o !== 'object') return o; var it = {}; Object.keys(o).forEach(function (k) { if (INV_KR[k]) it[INV_KR[k]] = o[k]; else it[k] = o[k]; }); return it; }) : [];
+    delete c._ip; return c;
+  }
+
+  // ── 超支檢查（後端 15；Lotion 10/19：實際成本 ≧ 報價成本 110%；10/21：每月只查、不回寫單價庫）──
+  function effQtyMap(q, invs) {
+    var map = {};
+    (invs || []).forEach(function (inv) {
+      if (!inv) return; if (!(inv.quoteId === q.id || (!inv.quoteId && inv.project === q.name))) return;
+      (inv.items || []).forEach(function (x) { if (!x || x.type === 'sec' || x.origContractQty == null) return; map[String(x.desc || '').trim()] = parseFloat(x.contractQty) || 0; });
+    });
+    return map;
+  }
+  function effQty(map, it) { var k = String((it && it.desc) || '').trim(); return (map && map[k] != null) ? map[k] : (parseFloat(it && it.qty) || 0); }
+  function itemActual(q, i) {
+    var it = ((q && q.items) || [])[i]; if (!it || it.sec || isSpare(it)) return null;
+    var cat = itemCat(it), stI = '', stR = '';
+    ((q && q.dailyLogs) || []).forEach(function (L) { if (!L || L.status !== 'stage') return; var d = L.stageDate || L.date || ''; if (!d) return; if (L.stageOf === 'remove') { if (!stR || d < stR) stR = d; } else if (d > stI) stI = d; });
+    if (!stI && !stR) return null;
+    var pg = itemProgress(q, i);
+    if ((cat.install || !cat.remove) && stI && pg.cum > 0) return { qty: Math.round(pg.cum * 100) / 100, date: stI, ph: 'install' };
+    if (cat.remove && !cat.install && stR && pg.removeCum > 0) return { qty: Math.round(pg.removeCum * 100) / 100, date: stR, ph: 'remove' };
+    return null;
+  }
+  function actQtyMap(q, invs) { var m = effQtyMap(q, invs); ((q && q.items) || []).forEach(function (it, i) { var a = itemActual(q, i); if (a) m[String(it.desc || '').trim()] = a.qty; }); return m; }
+  function costByItem(q) {
+    var map = {}, unassigned = 0, n = ((q && q.items) || []).length;
+    var ok = function (v) { var i = parseInt(v); return !isNaN(i) && i >= 0 && i < n; };
+    ((q && q.costs) || []).forEach(function (c) {
+      if (c.type === 'sub' && c.rows && c.rows.length) {
+        c.rows.forEach(function (r) { var amt = (parseFloat(r.qty) || 0) * (parseFloat(r.unitPrice) || 0); if (ok(r.linkedItemIdx)) map[r.linkedItemIdx] = (map[r.linkedItemIdx] || 0) + amt; else unassigned += amt; });
+      } else { var amt2 = parseFloat(c.amt) || 0; if (ok(c.linkedItemIdx)) map[c.linkedItemIdx] = (map[c.linkedItemIdx] || 0) + amt2; else unassigned += amt2; }
+    });
+    return { map: map, unassigned: unassigned };
+  }
+  // 每個工項：報價成本（生效數量 × 成本單價）有填、實際成本 ≧ ratio 倍 → 超支（同工程專案「工項成本分析」的算法）
+  function overrun(q, invs, ratio) {
+    ratio = ratio || 1.1; var att = costByItem(q), em = actQtyMap(q, invs), out = [];
+    ((q && q.items) || []).forEach(function (it, i) {
+      if (!it || it.sec || isSpare(it) || (parseFloat(it.price) || 0) < 0) return;   // 減項列（負數單價）不查超支
+      var est = effQty(em, it) * (parseFloat(it.estCost) || 0), act = att.map[i] || 0;
+      if (est > 0 && act >= est * ratio - 1e-6) out.push({ idx: i, desc: String(it.desc || '').split('\n')[0], est: Math.round(est), act: Math.round(act), pct: Math.round(act / est * 100) });
+    });
+    return out;
+  }
+
+  // ── 每月請款（後端 11）：各案請款截止日前 5 天，有新日報數量、這期還沒開單 → 本月要請款的工地＋草稿數量 ──
+  // cut＝截止日（每月幾號；專案 q.ownerPay.cut ＞ 客戶 payDue ＞ 預設 25）；這一期＝上個截止日隔天～這個截止日
+  function cutOf(q, cust, def) {
+    var o = (q && q.ownerPay) || {}, c = cust || {}, x = parseFloat(o.cut); if (!(x >= 1)) x = parseFloat(c.payDue); if (!(x >= 1)) x = (def && def.cut) || 25;   // 審查：0／空白不算截止日
+    return Math.max(1, Math.min(31, Math.round(x)));
+  }
+  function cycleOf(today, cut) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(today)); var y = +m[1], mo = +m[2] - 1, d = +m[3];
+    var endM = d > Math.min(cut, new Date(y, mo + 1, 0).getDate()) ? mo + 1 : mo;
+    var end = new Date(y, endM, Math.min(cut, new Date(y, endM + 1, 0).getDate()));
+    var prev = new Date(y, endM - 1, Math.min(cut, new Date(y, endM, 0).getDate()));
+    return { start: dAdd(iso(prev), 1), end: iso(end) };
+  }
+  // o＝{q, invs（這案的請款單）, cust, def, today}；回傳 null 或 {qid,name,cutDate,left,since,items:[{idx,desc,unit,qty}]}
+  function monthBill(o) {
+    var q = o.q; if (!q || !q.awarded || q.parentId || q.closed) return null;
+    var cy = cycleOf(o.today, cutOf(q, o.cust, o.def)), left = dDiff(o.today, cy.end);
+    if (left < 0 || left > 5) return null;
+    var invs = (o.invs || []).filter(function (i) { return i && i.kind !== 'retReturn'; });
+    var from = dAdd(cy.end, -20);   // 審查：截止日後幾天才開上一期的單（例：25 日截止、26 日開）不算這期；這期的單＝截止日前 20 天內開的
+    if (invs.some(function (i) { var d = String(i.date || ''); return d >= from && d <= cy.end; })) return null;   // 這期已開單
+    var last = invs.map(function (i) { return String(i.date || ''); }).sort().pop() || '';
+    var qty = {};
+    ((q && q.dailyLogs) || []).forEach(function (L) {
+      var d = String((L && L.date) || ''); if (!d || d <= last || d > cy.end) return;
+      ((L && L.progressRows) || []).forEach(function (r) { var n = parseFloat(r && r.qty) || 0; if (n > 0) { var i = Number(r.itemIdx); qty[i] = (qty[i] || 0) + n; } });
+    });
+    var items = Object.keys(qty).map(function (k) { var it = (q.items || [])[+k] || {}; return { idx: +k, desc: String(it.desc || '').split('\n')[0], unit: uFix(it.unit || ''), qty: Math.round(qty[k] * 100) / 100 }; })
+      .filter(function (x) { var it = (q.items || [])[x.idx]; return it && !it.sec && !((parseFloat(it.price) || 0) < 0); });
+    if (!items.length) return null;
+    return { qid: q.id, name: q.name || '', cutDate: cy.end, left: left, since: last, items: items };
+  }
+
   // ── 全部提醒一次算（雲端 dailyTodos 與前端並行比對共用）──
   // d＝{quotes, invoices, contracts, customers, payables, matLedger, histOf(qid)}；ctx＝{today, now, tax, payDef:{cut,delay,day}, inv:FJC.inv}
   // 回傳 {rent:[], rentSoon:[], recv:[], ret:[], close:[], rfqVer:[], ticket:[]}（只放案名、期別、天數；金額只在 amt 欄，寫進雲端待辦前由呼叫端決定要不要帶）
@@ -366,13 +452,23 @@
       var c = closeReady({ q: q, hasRet: rq.accr > 0, retLeft: rq.left, invs: my.map(function (inv) { return { ar: arOf(inv) }; }), allDone: allDone, payLeft: payLeft, matLeft: matLeft });
       if (c && c.ok) out.close.push({ qid: q.id, name: q.name || '' });
     });
+    // 每月請款、超支（5c）
+    var U = invs.map(invUnpack);
+    out.bill = []; out.overrun = [];
+    quotes.forEach(function (q) {
+      if (!q.awarded || q.parentId || q.closed) return;
+      var mine = U.filter(function (i) { return i.kind !== 'retReturn' && (i.quoteId === q.id || i.sourceQid === q.id || (!i.quoteId && !i.sourceQid && i.project === q.name)); });
+      var mb = monthBill({ q: q, invs: mine, cust: custOf({}, q), def: ctx.payDef, today: today }); if (mb) out.bill.push(mb);
+      if (Array.isArray(q.costs) && q.costs.length) { var ov = overrun(q, U, 1.1); if (ov.length) out.overrun.push({ qid: q.id, name: q.name || '', n: ov.length, rows: ov }); }
+    });
     return out;
   }
   var todo = { dAdd: dAdd, dDiff: dDiff, itemCat: itemCat, rentDaysOf: rentDaysOf, prPhase: prPhase, itemProgress: itemProgress, rentEndMode: rentEndMode, rentOldQty: rentOldQty,
     rentBatchList: rentBatchList, rentBatchQtyDays: rentBatchQtyDays, rentStatus: rentStatus, rentScan: rentScan, rentTodos: rentTodos, rentSoon: rentSoon,
     recvRule: recvRule, byRule: byRule, expectedDate: expectedDate, recvTodos: recvTodos,
     retMonths: retMonths, addMonths: addMonths, retDue: retDue, closeReady: closeReady,
-    rfqKey: rfqKey, rfqGL: rfqGL, rfqBaseVer: rfqBaseVer, rfqQuoteDiff: rfqQuoteDiff, rfqVerTodos: rfqVerTodos, ticketTodos: ticketTodos, build: build };
+    rfqKey: rfqKey, rfqGL: rfqGL, rfqBaseVer: rfqBaseVer, rfqQuoteDiff: rfqQuoteDiff, rfqVerTodos: rfqVerTodos, ticketTodos: ticketTodos, build: build,
+    INV_K: INV_K, invUnpack: invUnpack, effQtyMap: effQtyMap, effQty: effQty, itemActual: itemActual, actQtyMap: actQtyMap, costByItem: costByItem, overrun: overrun, cutOf: cutOf, cycleOf: cycleOf, monthBill: monthBill };
   root.FJC = root.FJC || {}; root.FJC.todo = todo;
   if (typeof module !== 'undefined' && module.exports) module.exports = root.FJC;
 })(typeof window !== 'undefined' ? window : globalThis);
