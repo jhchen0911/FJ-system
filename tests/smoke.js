@@ -10183,6 +10183,52 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── 改版第 5 步 5a：雲端每日健檢（後端 28）與後端待辦：雲端與網頁同一套規則（並行比對）、待辦只放筆數、網頁不能寫 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const data = await page.evaluate(() => {
+      const oT = window.toast; window.toast = () => {};
+      Q = [{ id: 'h1', name: '健檢甲', awarded: true }, { id: 'h2', name: '健檢乙', awarded: true, closed: true }, { id: 'h3', name: '健檢丙追加', awarded: true, parentId: 'h9' }];
+      PROJECTS = [{ id: 'p_h1', qid: 'h1', no: '2026-001' }]; TOMBS.projects = {};
+      PAYABLES = [{ id: 'hp1', to: '甲行', project: '健檢甲', amount: 100, costPeriod: '1', status: 'pending' }, { id: 'hp2', to: '甲行', project: '健檢甲', amount: 100, costPeriod: '1', status: 'pending' },
+        { id: 'hp3', to: '乙行', project: '健檢乙', amount: 50, status: 'pending' }];
+      PAID_LOG = { hp3: { paidAt: 20, unpaidAt: 10 } };
+      const loc = _bkHealthLocal();
+      window.toast = oT;
+      return { loc, shared: { quotes: Q, projects: PROJECTS, tombs: TOMBS }, priv: { payables: PAYABLES, paidLog: PAID_LOG } };
+    });
+    const HC = require(require('path').join(__dirname, '..', 'functions', 'ops', 'health.js'));
+    const cloud = HC.buildHealth({ shared: data.shared, priv: data.priv });
+    const cn = k => ((cloud.items.find(x => x.key === k) || {}).n || 0);
+    const same = ['prj_missing', 'prj_orphan_add', 'paid_pending', 'pay_dup'].every(k => cn(k) === data.loc[k]) && cn('prj_missing') === 1 && cn('paid_pending') === 1 && cn('pay_dup') === 1;
+    const todo = HC.todoFromHealth(cloud);
+    const r = await page.evaluate((args) => {
+      const out = {};
+      BK_TODO = { health: Object.assign({}, args.todo, { xss: { id: 'health_xss', src: 'health', key: 'xss', text: '<b>x</b>', sub: '<img src=x onerror=alert(1)>', go: 'health' } }) };
+      const its = []; _v6TodoItems(its);
+      const bk = its.filter(x => /^bk_health_/.test(x.type));
+      out.todo = bk.length === Object.keys(args.todo).length + 1 && bk.some(x => x.urgent && /付款帳本記已付/.test(x.text)) && bk.every(x => !/<img/.test(x.sub)) && /showReport\('health'\)/.test(bk[0].jump);
+      BK_HEALTH = args.cloud;
+      const h = _bkHealthHtml();
+      out.card = /雲端每日健檢/.test(h) && (h.match(/✓ 一致/g) || []).length >= 4 && !/✗ 本機/.test(h);
+      PROJECTS.push({ id: 'p_h2', qid: 'h2', no: '2026-002' });   // 本機補了專案、雲端還沒跑 → 顯示不一致
+      out.diff = /✗ 本機 0/.test(_bkHealthHtml());
+      BK_HEALTH = null; out.empty = /還沒有結果/.test(_bkHealthHtml());
+      return out;
+    }, { todo, cloud });
+    const RF = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    const FB = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'firebase.json'), 'utf8'));
+    const GI = require('fs').readFileSync(require('path').join(__dirname, '..', '.gitignore'), 'utf8');
+    const rulesOk = RF.todo && RF.todo['.write'] === false && RF.todo['.read'] === RF.shared['.read'] && RF.health && RF.health['.write'] === false
+      && !/fydata\/access/.test(RF.health['.read']) && /fydata\/readers/.test(RF.health['.read']) && /adminEmails/.test(RF.health['.read']);
+    const deployOk = /copy-calc/.test(JSON.stringify(FB.functions)) && /^functions\/calc\/$/m.test(GI) && require('fs').existsSync(require('path').join(__dirname, '..', 'tools', 'copy-calc.js'));
+    check('5a 雲端健檢與網頁健檢同一套規則：得標案數 vs 專案數（已結案也算、墓碑不算）、追加主約沒得標、帳本已付應付待付、重複應付逐項相同', same, JSON.stringify({ loc: data.loc, cloud: cloud.items.map(x => [x.key, x.n]) }));
+    check('5a 後端待辦顯示在總覽（☁、只放筆數、雲端來的字跳脫）；資料健檢頁「雲端每日健檢」卡逐項跟這台比對（一致／不一致／還沒結果）', r.todo && r.card && r.diff && r.empty, JSON.stringify(r));
+    check('5a 規則：fydata/todo 登入可讀、網頁不能寫；fydata/health 只有管理員與唯讀帳號可讀、網頁不能寫；部署前自動把 calc/ 複製進 functions（不進 git）', rulesOk && deployOk, JSON.stringify({ rulesOk, deployOk }));
+    check('5a 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

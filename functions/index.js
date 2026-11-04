@@ -304,3 +304,53 @@ exports.lineInboxMark = onRequest({ region: REGION, cors: ['https://jhchen0911.g
     res.status(500).json({ error: { message: '收件匣服務錯誤' } });
   }
 });
+
+// ══════════ 改版第 5 步 5a：雲端每日健檢（後端 28）＋後端待辦節點 ══════════
+// 每天 06:40（台北）跑一次：讀 shared／private（應付、付款帳本）與日報照片容量 → fydata/health/latest、fydata/health/days/<日期>（留 30 天），
+// 需要人處理的寫成後端待辦 fydata/todo/health/<key>（整個 health 子樹每次重寫：問題解決了待辦就消失）。網頁只能讀這兩個節點（規則）。
+// healthRunNow：管理員手動跑一次（驗收、出問題後立刻重查），帶登入憑證呼叫。
+const healthCore = require('./ops/health.js');
+async function photoStats(db) {
+  // 分批讀（每批 200 筆），只算筆數與大小，不把全部照片同時放進記憶體
+  let count = 0, bytes = 0, last = null;
+  for (;;) {
+    let q = db.ref('fydata/relay/photos').orderByKey().limitToFirst(201);
+    if (last) q = db.ref('fydata/relay/photos').orderByKey().startAt(last).limitToFirst(201);
+    const v = (await q.once('value')).val() || {};
+    const keys = Object.keys(v).filter((k) => k !== last);
+    keys.forEach((k) => { count++; bytes += Buffer.byteLength(JSON.stringify(v[k] || '')); });
+    if (keys.length < 200) break;
+    last = keys[keys.length - 1];
+  }
+  return { count, bytes };
+}
+async function runHealth() {
+  const db = admin.database(), now = Date.now();
+  const [shared, payables, paidLog, photos] = await Promise.all([
+    db.ref('fydata/shared').once('value').then((s) => s.val() || {}),
+    db.ref('fydata/private/payables').once('value').then((s) => s.val() || {}),
+    db.ref('fydata/private/paidLog').once('value').then((s) => s.val() || {}),
+    photoStats(db),
+  ]);
+  const h = healthCore.buildHealth({ shared, priv: { payables, paidLog }, photos, now });
+  await db.ref('fydata/health/latest').set(h);
+  await db.ref('fydata/health/days/' + h.day).set(h);
+  const days = Object.keys((await db.ref('fydata/health/days').once('value')).val() || {});
+  for (const d of healthCore.pruneDays(days, 30)) await db.ref('fydata/health/days/' + d).remove();
+  await db.ref('fydata/todo/health').set(healthCore.todoFromHealth(h));
+  console.log('[健檢] 完成', JSON.stringify(h.counts), '問題', h.warn);
+  return h;
+}
+exports.dailyHealth = onSchedule({ schedule: '40 6 * * *', timeZone: TZ, region: REGION, memory: '1GiB', timeoutSeconds: 300 }, async () => { await runHealth(); });
+exports.healthRunNow = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], memory: '1GiB', timeoutSeconds: 300 }, async (req, res) => {
+  try {
+    if (req.method !== 'POST') { res.status(405).json({ error: { message: '只接受 POST' } }); return; }
+    const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
+    if (!m) { res.status(401).json({ error: { message: '需要登入' } }); return; }
+    const t = await admin.auth().verifyIdToken(m[1]);
+    const role = t.fy || roleOf(t.email, await lists());
+    if (role !== 'admin') { res.status(403).json({ error: { message: '只有管理員可以手動執行健檢' } }); return; }
+    const h = await runHealth();
+    res.json({ ok: true, at: h.at, warn: h.warn, counts: h.counts });
+  } catch (e) { console.error('healthRunNow', e); res.status(500).json({ error: { message: '健檢失敗' } }); }
+});
