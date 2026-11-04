@@ -10326,6 +10326,36 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+
+  // ── v6.0.170 報價備註「備用單價」依實際項目編號（只有一項不編 a. b.）、單張報價可改條文（不動參數）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const base = '10. 營業稅外加。\n11. 備用單價：a.安全走道M/$【WALK】元、b.技術工/天/$【TECH】元\n12. 其他。';
+        const line = (c) => (_rmkBuild(base, c, false).text.split('\n').find((l) => /備用單價/.test(l)) || '');
+        out.one = line({ tech: '4000' }) === '2. 備用單價：技術工/天/$4000元';
+        out.walkOnly = line({ walk: '3000' }) === '2. 備用單價：安全走道M/$3000元';
+        out.two = line({ walk: '3000', tech: '3500' }) === '2. 備用單價：a.安全走道M/$3000元、b.技術工/天/$3500元';
+        out.none = line({}) === '' && /^2\. 其他。$/m.test(_rmkBuild(base, {}, false).text);
+        out.ov = line({ tech: '4000', spareTxt: '技術工每工 4,000 元（含工具）' }) === '2. 備用單價：技術工每工 4,000 元（含工具）';
+        // 視窗：填了自訂條文 → 存進這張報價的 rmkCustom，參數不變
+        const pb = P.rmkBase;
+        rmkCustom = { tech: '4000' }; openRmkModal();
+        out.ph = /技術工\/天\/\$4000元/.test(document.getElementById('rmk-spareTxt').placeholder) && !/b\./.test(document.getElementById('rmk-spareTxt').placeholder);
+        document.getElementById('rmk-spareTxt').value = '  只有技術工 4,000  '; const oT = window.toast; window.toast = () => {}; applyRmkCustom(); window.toast = oT;
+        out.saved = rmkCustom.spareTxt === '只有技術工 4,000' && P.rmkBase === pb;
+        rmkCustom = { tech: '4000' }; openRmkModal(); out.reset = document.getElementById('rmk-spareTxt').value === '';
+        document.getElementById('rmk-modal').style.display = 'none';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
+      return out;
+    });
+    check('v6.0.170 備用單價條文：只有一項不編號、兩項 a. b.、都沒填不出現；單張報價可改條文（存在 rmkCustom，不動參數 P.rmkBase）', r.one && r.walkOnly && r.two && r.none && r.ov && r.ph && r.saved && r.reset, JSON.stringify(r));
+    check('v6.0.170 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
