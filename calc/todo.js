@@ -200,16 +200,21 @@
   }
 
   // ── 保留款到期（後端 13；Lotion 11/04：起算＝系統結案日，＋合約寫的月數；手填日期優先）──
-  var CN = { 一: 1, 二: 2, 兩: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10, 十一: 11, 十二: 12, 十八: 18, 二十四: 24 };
-  // 從退還條件文字抓月數：「完工驗收後 12 個月」「一年」「半年」「保固期滿（24 個月）」；抓不到回 null
+  // 從退還條件文字抓月數：「完工驗收後 12 個月」「一年」「一年半」「半年」「十八個月」；抓不到或不合理（不在 1～120）回 null
+  // 審查：日期（12月31日、114年12月）、民國年（114 年）不算；有好幾段（6 個月退一半、12 個月退一半）取最長的，不提早報逾期
+  var CNM = [['三十六', 36], ['二十四', 24], ['二十', 20], ['十八', 18], ['十五', 15], ['十二', 12], ['十一', 11], ['十', 10], ['一', 1], ['二', 2], ['兩', 2], ['三', 3], ['四', 4], ['五', 5], ['六', 6], ['七', 7], ['八', 8], ['九', 9]];
   function retMonths(cond) {
     var s = String(cond || '').replace(/[０-９]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) - 65248); });
-    var m = s.match(/(\d+(?:\.\d+)?)\s*個?\s*月/); if (m) return Math.round(parseFloat(m[1]));
-    m = s.match(/(\d+(?:\.\d+)?)\s*年/); if (m) return Math.round(parseFloat(m[1]) * 12);
-    if (/半年/.test(s)) return 6;
-    m = s.match(/(十[一二]?|二十四|十八|[一二兩三四五六七八九])\s*個?\s*月/); if (m && CN[m[1]]) return CN[m[1]];
-    m = s.match(/([一二兩三])\s*年/); if (m && CN[m[1]]) return CN[m[1]] * 12;
-    return null;
+    s = s.replace(/\d+\s*年\s*\d+\s*月(\s*\d+\s*[日號])?/g, ' ').replace(/\d+\s*月\s*\d+\s*[日號]/g, ' ').replace(/(民國|中華民國)\s*\d+\s*年/g, ' ');
+    var c = [], m, re;
+    re = /(\d+(?:\.\d+)?)\s*個\s*月/g; while ((m = re.exec(s))) c.push(Math.round(parseFloat(m[1])));
+    re = /(?:^|[^\d年.])(\d+)\s*月(?!\s*\d)(?![日號份底初中])/g; while ((m = re.exec(s))) c.push(parseInt(m[1], 10));
+    re = /(\d+(?:\.\d+)?)\s*年(半)?(?!\s*\d*\s*月)(?![度])/g; while ((m = re.exec(s))) { var y = parseFloat(m[1]); if (y > 0 && y <= 10) c.push(Math.round(y * 12) + (m[2] ? 6 : 0)); }
+    if (/(^|[^一二兩三四五六七八九十])半年/.test(s)) c.push(6);
+    CNM.forEach(function (p) { if (new RegExp(p[0] + '\\s*個\\s*月').test(s)) { var rest = s.replace(new RegExp('[一二兩三四五六七八九十]+' + '(?=' + p[0] + '\\s*個\\s*月)'), ''); if (rest === s) c.push(p[1]); } });
+    re = /([一二兩三])\s*年(半)?/g; while ((m = re.exec(s))) { var cy = { 一: 1, 二: 2, 兩: 2, 三: 3 }[m[1]]; c.push(cy * 12 + (m[2] ? 6 : 0)); }
+    c = c.filter(function (n) { return n >= 1 && n <= 120; });
+    return c.length ? Math.max.apply(null, c) : null;
   }
   function addMonths(isoDate, n) {
     var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(isoDate || '')); if (!m) return '';
@@ -222,6 +227,7 @@
     o = o || {};
     if (o.manual) return { date: String(o.manual), src: 'manual', months: null, base: '', why: '' };
     var mo = (o.months != null && o.months !== '' && isFinite(parseFloat(o.months))) ? Math.round(parseFloat(o.months)) : retMonths(o.cond);
+    if (mo != null && !(mo >= 0 && mo <= 120)) mo = null;   // 審查：手填也限 0～120
     if (mo == null) return { date: '', src: '', months: null, base: '', why: o.cond ? 'nomonths' : 'nocond' };
     if (!o.closedAt) return { date: '', src: '', months: mo, base: '', why: 'open' };
     var base = typeof o.closedAt === 'number' ? iso(new Date(o.closedAt)) : String(o.closedAt).slice(0, 10);
@@ -341,7 +347,7 @@
       var r = byProj[k], ct = cts.find(function (c) { return c.name === r.proj; });
       var done = !!(ct && (ct.status === 'completed' || ct.status === 'done')), left = r.pending + r.hold;
       var dd = (r.q && r.q.deduct) || {}, rd = retDue({ manual: dd.retDue, closedAt: r.q && r.q.closed ? r.q.closedAt : null, cond: dd.retCond, months: dd.retMonths });
-      if (r.q) retByQ[r.q.id] = { accr: r.accr, left: left };
+      if (r.q) { var rid = r.q.parentId || r.q.id, rb = retByQ[rid] = retByQ[rid] || { accr: 0, left: 0 }; rb.accr += r.accr; rb.left += left; }   // 審查：追加案的保留款算回主約
       if (left > 0 && (done || (rd.date && rd.date < today))) out.ret.push({ proj: r.proj, qid: r.q ? r.q.id : '', due: done, overdue: !!(rd.date && rd.date < today), date: rd.date, src: rd.src, amt: left });
     });
     // 結案判定
@@ -354,7 +360,7 @@
       var stage = null; (q.dailyLogs || []).forEach(function (L) { if (!L || L.status !== 'stage') return; var dt = L.stageDate || L.date || ''; if (!stage || dt > (stage.stageDate || stage.date || '')) stage = L; });
       var allDone = !!((ct && (ct.status === 'completed' || ct.status === 'done')) || (stage && stage.stageOf === 'remove'));
       if (!allDone && !my.length) return;   // 還沒開工請款也沒完工：不判斷
-      var payLeft = pays.filter(function (p) { return (ids.indexOf(p.quoteId) >= 0 || (!p.quoteId && p.project === q.name)) && !p.voidAt && p.status !== 'paid' && (parseFloat(p.amount) || 0) > 0; }).length;
+      var payLeft = pays.filter(function (p) { return (ids.indexOf(p.quoteId) >= 0 || (!p.quoteId && p.project === q.name)) && !p.voidAt && !p.planned && p.status !== 'paid' && (parseFloat(p.amount) || 0) > 0; }).length;   // 審查：預估應付（planned）跟前端一樣不算
       var matLeft = mats.filter(function (r) { return r.name && (r.projQid === q.id || (!r.projQid && q.name && r.loc === q.name)) && (parseFloat(r.qty) || 0) > 0 && r.kind !== '一次性'; }).length;
       var rq = retByQ[q.id] || { accr: 0, left: 0 };
       var c = closeReady({ q: q, hasRet: rq.accr > 0, retLeft: rq.left, invs: my.map(function (inv) { return { ar: arOf(inv) }; }), allDone: allDone, payLeft: payLeft, matLeft: matLeft });

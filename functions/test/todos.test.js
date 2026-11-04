@@ -10,6 +10,9 @@ test('保留款到期：手填優先；沒填＝結案日＋條件月數；專�
   const td = FJC.todo;
   assert.strictEqual(td.retDue({ manual: '2027-01-01', closedAt: '2026-01-01', cond: '12 個月' }).date, '2027-01-01');
   assert.deepStrictEqual([td.retMonths('完工驗收後12個月無息退還'), td.retMonths('一年'), td.retMonths('半年'), td.retMonths('驗收後六個月'), td.retMonths('拆除完成後退還')], [12, 12, 6, 6, null]);
+  // 審查：日期、民國年、中文數字、兩段式條件
+  assert.deepStrictEqual(['114年12月31日前退還', '12月31日前', '民國 114 年驗收後退還', '十五個月', '二十個月', '一年半', '驗收後 6 個月退 50%，保固 12 個月退 50%', '驗收後 30 日內退還', '保固 1 年'].map(td.retMonths), [null, null, null, 15, 20, 18, 12, null, 12]);
+  assert.strictEqual(td.retDue({ closedAt: '2026-01-31', months: '999' }).date, '');   // 手填月數超過 120 不算
   const r = td.retDue({ closedAt: '2026-01-31', cond: '驗收後 1 個月' });
   assert.strictEqual(r.date, '2026-02-28'); assert.strictEqual(r.src, 'rule');
   assert.strictEqual(td.retDue({ closedAt: '2026-03-15', cond: '12 個月', months: '3' }).date, '2026-06-15');
