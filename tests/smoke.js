@@ -10219,7 +10219,7 @@ async function newPage(browser, width, height) {
     const RF = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const FB = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'firebase.json'), 'utf8'));
     const GI = require('fs').readFileSync(require('path').join(__dirname, '..', '.gitignore'), 'utf8');
-    const rulesOk = RF.todo && RF.todo['.write'] === false && RF.todo['.read'] === RF.shared['.read'] && RF.health && RF.health['.write'] === false
+    const rulesOk = RF.todo && RF.todo['.write'] === 'false' && RF.todo['.read'] === RF.shared['.read'] && RF.health && RF.health['.write'] === 'false'
       && !/fydata\/access/.test(RF.health['.read']) && /fydata\/readers/.test(RF.health['.read']) && /adminEmails/.test(RF.health['.read']);
     const deployOk = /copy-calc/.test(JSON.stringify(FB.functions)) && /^functions\/calc\/$/m.test(GI) && require('fs').existsSync(require('path').join(__dirname, '..', 'tools', 'copy-calc.js'));
     check('5a 雲端健檢與網頁健檢同一套規則：得標案數 vs 專案數（已結案也算、墓碑不算）、追加主約沒得標、帳本已付應付待付、重複應付逐項相同', same, JSON.stringify({ loc: data.loc, cloud: cloud.items.map(x => [x.key, x.n]) }));

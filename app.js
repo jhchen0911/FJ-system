@@ -8065,7 +8065,7 @@ function initFirebase(){
     _fbUser = user;
     _updateFbUI(!!user);
     if(user) _minVerWatch(_autoSyncOnLogin);
-    else { _aiHeldOff();_lrsOff();_lbxOff();_minVerOff();_isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{localStorage.removeItem('fy_priv_pending');}catch(e){/* 可忽略 */}   /* v6.0.116：登出清掉私有上傳失敗旗標，換人登入不會一直「未同步」 */try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
+    else { _aiHeldOff();_lrsOff();_lbxOff();_bkOff();_minVerOff();_isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{localStorage.removeItem('fy_priv_pending');}catch(e){/* 可忽略 */}   /* v6.0.116：登出清掉私有上傳失敗旗標，換人登入不會一直「未同步」 */try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
   });
 }
 function initGoogleSignIn(){
@@ -33147,7 +33147,7 @@ function _v6TodoItems(items){
         text:'自有材料在工地：'+(q.name||'')+' '+fmt(qty)+' 支，最久 '+days+' 天'+(days>=120?'（請確認是否該歸還）':''),sub:'攤提 NT$ '+fmt(amt)});
     });
   }catch(e){_err('_v6TodoItems.mat',e);}
-  try{_bkTodoList().forEach(function(t){items.push({type:'bk_'+(t.src||'')+'_'+(t.key||''),urgent:!!t.urgent,jump:t.go==='health'?"go('reports');setTimeout(function(){showReport('health')},80)":"go('dash')",icon:ic('i-cloud'),color:'#6a1b9a',text:'☁ '+String(t.text||''),sub:esc(String(t.sub||''))});});}catch(e){_err('_v6TodoItems.bk',e);}   // 改版第 5 步 後端待辦（雲端寫、網頁只顯示）
+  try{_bkTodoList().forEach(function(t){items.push({type:'bk_'+(t.src||'')+'_'+(t.key||''),urgent:!!t.urgent,jump:t.go==='health'?"go('reports');setTimeout(function(){showReport('health')},80)":"go('dash')",icon:ic('i-cloud'),color:'#6a1b9a',text:String(t.text||''),sub:esc(String(t.sub||''))});});}catch(e){_err('_v6TodoItems.bk',e);}   // 改版第 5 步 後端待辦（雲端寫、網頁只顯示）
   try{if((SYNC_CONFLICTS||[]).length)items.push({type:'sync_conflict',urgent:true,jump:'openSyncConflicts()',icon:ic('i-warn'),color:'var(--red)',text:'同步衝突 '+SYNC_CONFLICTS.length+' 處：兩台裝置改了同一個欄位',sub:'點這裡選要用哪一個'});}catch(e){_err('_v6TodoItems.cf',e);}   // 4b
 }
 // ══════════ v6.0.17 經營報表：利潤分析併入報表中心（總覽分頁）、口徑統一（權責為主、現金為輔）、共用年度篩選 ══════════
@@ -35188,6 +35188,7 @@ function renderHealthReport(el){
   var rows;try{rows=_healthRows();}catch(e){_err('renderHealthReport',e);el.innerHTML='<div style="padding:20px;color:var(--red)">健檢失敗：'+esc(e.message)+'</div>';return;}
   var warn=rows.filter(function(r){return r.sev==='warn';}).length,info=rows.length-warn;
   var cnt={quotes:(Q||[]).length,inv:(INV||[]).length,ct:(CONTRACTS||[]).length,pay:(PAYABLES||[]).length,logs:(Q||[]).reduce(function(a,q){return a+((q&&q.dailyLogs)||[]).length;},0),costs:(Q||[]).reduce(function(a,q){return a+((q&&q.costs)||[]).length;},0)};
+  if(!renderHealthReport._bkAt||Date.now()-renderHealthReport._bkAt>60000){renderHealthReport._bkAt=Date.now();_bkHealthLoad(function(){var c=document.getElementById('bk-health-card');if(c)c.outerHTML=_bkHealthHtml();});}   // 審查：每次打開都讀最新一次雲端結果（一分鐘內不重讀）
   var h=_bkHealthHtml()+'<div class="card"><div class="cb">'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><b style="font-size:14px">資料健檢</b>'
     +'<span style="font-size:12px;color:var(--b4)">報價 '+cnt.quotes+'・請款單 '+cnt.inv+'・合約 '+cnt.ct+'・成本 '+cnt.costs+'・日報 '+cnt.logs+'・應付 '+cnt.pay+'</span>'
@@ -40698,11 +40699,14 @@ function qMeasReview(){
 // 網頁只讀：總覽待辦多出「☁ 系統健檢」項目；經營報表 › 資料健檢最上面多一張「雲端每日健檢」卡，跟這台裝置算的逐項並排比對（前兩週並行）。
 var BK_TODO={},BK_HEALTH=null;
 var _BK_HKEYS=[['prj_missing','已得標主報價沒有專案'],['prj_orphan_add','追加已得標、主報價沒有得標'],['paid_pending','付款帳本記已付、應付卻是待付'],['pay_dup','同廠商同工程同金額的應付有兩筆'],['photo_big','日報照片佔用超過 300MB']];
+var _bkRef=null;
 function _bkWatch(){
   if(!_fbDb||!_fbUser||_bkWatch._on)return;_bkWatch._on=1;
-  try{_fbDb.ref('fydata/todo').on('value',function(s){BK_TODO=s.val()||{};try{if(document.getElementById('page-dash')&&document.getElementById('page-dash').classList.contains('active'))updateDashTodo();}catch(e){_err('_bkWatch.dash',e);}},function(e){_err('_bkWatch.todo',e);});}catch(e){_err('_bkWatch',e);}
+  try{_bkRef=_fbDb.ref('fydata/todo');_bkRef.on('value',function(s){BK_TODO=s.val()||{};try{if(document.getElementById('page-dash')&&document.getElementById('page-dash').classList.contains('active'))updateDashTodo();}catch(e){_err('_bkWatch.dash',e);}},function(e){_bkWatch._on=0;_bkRef=null;_err('_bkWatch.todo',e);});}catch(e){_bkWatch._on=0;_err('_bkWatch',e);}   // 審查：讀取被拒（規則還沒發布）下次登入再試
   _bkHealthLoad();
 }
+// 審查：登出時清掉（同一台裝置換人登入，不能看到上一個人的健檢明細）
+function _bkOff(){try{if(_bkRef)_bkRef.off();}catch(e){_err('_bkOff',e);}_bkRef=null;_bkWatch._on=0;BK_TODO={};BK_HEALTH=null;}
 function _bkHealthLoad(cb){
   if(!_fbDb||!_fbUser){if(cb)cb();return;}
   _fbDb.ref('fydata/health/latest').once('value').then(function(s){BK_HEALTH=s.val()||null;if(cb)cb();}).catch(function(){/* 可忽略：一般員工讀不到健檢明細 */if(cb)cb();});
@@ -40733,6 +40737,7 @@ function _bkHealthHtml(){
   var h=BK_HEALTH;
   var head='<div class="card" id="bk-health-card"><div class="cb"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px"><b style="font-size:14px">☁ 雲端每日健檢</b>';
   var canRun=false;try{canRun=!!(_fbUser&&isAdmin(_fbUser.email)&&!_isReaderUser);}catch(e){canRun=false;}
+  if(!h&&!canRun&&!(typeof _isReaderUser!=='undefined'&&_isReaderUser))return head+'<span style="font-size:12px;color:var(--b4)">明細只有管理員看得到</span></div></div></div>';   // 審查：一般員工讀不到，不要顯示成「還沒有結果」
   if(!h)return head+'<span style="font-size:12px;color:var(--b4)">還沒有結果（雲端程式部署後每天 06:40 跑一次）</span>'+(canRun?'<button type="button" class="btn btn-sm" style="margin-left:auto" onclick="bkHealthRun()">立即跑一次</button>':'')+'</div></div></div>';
   var loc=_bkHealthLocal(),by={};(h.items||[]).forEach(function(x){by[x.key]=x;});
   var c=h.counts||{};

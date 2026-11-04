@@ -311,27 +311,31 @@ exports.lineInboxMark = onRequest({ region: REGION, cors: ['https://jhchen0911.g
 // healthRunNow：管理員手動跑一次（驗收、出問題後立刻重查），帶登入憑證呼叫。
 const healthCore = require('./ops/health.js');
 async function photoStats(db) {
-  // 分批讀（每批 200 筆），只算筆數與大小，不把全部照片同時放進記憶體
+  // 分批讀（每批 40 張；每張是整張 base64 照片，批次太大會吃光記憶體），只算筆數與大小
+  const PAGE = 40;
   let count = 0, bytes = 0, last = null;
   for (;;) {
-    let q = db.ref('fydata/relay/photos').orderByKey().limitToFirst(201);
-    if (last) q = db.ref('fydata/relay/photos').orderByKey().startAt(last).limitToFirst(201);
+    let q = db.ref('fydata/relay/photos').orderByKey().limitToFirst(PAGE + 1);
+    if (last) q = db.ref('fydata/relay/photos').orderByKey().startAt(last).limitToFirst(PAGE + 1);
     const v = (await q.once('value')).val() || {};
     const keys = Object.keys(v).filter((k) => k !== last);
-    keys.forEach((k) => { count++; bytes += Buffer.byteLength(JSON.stringify(v[k] || '')); });
-    if (keys.length < 200) break;
+    keys.forEach((k) => { const x = v[k]; count++; bytes += (x && typeof x === 'object' && typeof x.du === 'string') ? x.du.length + 60 : Buffer.byteLength(JSON.stringify(x || '')); });
+    if (keys.length < PAGE) break;
     last = keys[keys.length - 1];
   }
   return { count, bytes };
 }
 async function runHealth() {
   const db = admin.database(), now = Date.now();
-  const [shared, payables, paidLog, photos] = await Promise.all([
-    db.ref('fydata/shared').once('value').then((s) => s.val() || {}),
-    db.ref('fydata/private/payables').once('value').then((s) => s.val() || {}),
-    db.ref('fydata/private/paidLog').once('value').then((s) => s.val() || {}),
-    photoStats(db),
+  // 只讀用得到的幾塊（不整包讀 shared）；照片統計失敗不影響其他項目
+  const val = (p) => db.ref(p).once('value').then((s) => s.val() || {});
+  const [quotes, projects, prjTombs, payables, paidLog] = await Promise.all([
+    val('fydata/shared/quotes'), val('fydata/shared/projects'), val('fydata/shared/tombs/projects'),
+    val('fydata/private/payables'), val('fydata/private/paidLog'),
   ]);
+  let photos = { count: 0, bytes: 0 };
+  try { photos = await photoStats(db); } catch (e) { console.error('[健檢] 照片統計失敗', e); photos = { count: 0, bytes: 0, err: 1 }; }
+  const shared = { quotes, projects, tombs: { projects: prjTombs } };
   const h = healthCore.buildHealth({ shared, priv: { payables, paidLog }, photos, now });
   await db.ref('fydata/health/latest').set(h);
   await db.ref('fydata/health/days/' + h.day).set(h);
