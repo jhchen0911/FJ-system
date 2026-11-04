@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.174';
+var APP_VERSION='v6.0.175';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -9471,7 +9471,7 @@ function _meDoc(kind,opt,res){   // v6.0.154：叫料單／估價明細的內容
 function _meDocHtml(d){return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(d.fn)+'</title><style>'+d.css+'</style></head><body><div class="page-wrap">'+d.body+'</div></body></html>';}
 function matEstExportPDF(kind,opt){
   if(!window._matEstRes)matEstCalc();
-  var res=window._matEstRes;if(!res){toast('請先按「計算」');return;}
+  var res=window._matEstRes;if(!res){toast('條件還不完整，算不出結果');return;}
   var d=_meDoc(kind,opt,res);
   _printViaIframe(_meDocHtml(d),d.fn,true);
 }
@@ -9656,16 +9656,16 @@ function _renderMatEstInner(el){
   h+='</tbody></table><button type="button" class="btn btn-xs" onclick="matEstRowAdd(\'_dc\')" style="font-size:12px;margin-top:4px">＋ 加一筆</button>';
   if(_secOpen)h+='</div></details>';
   h+='<div style="font-size:11px;color:var(--b3);margin-top:8px">存入專案後，請至「專案材料」分配自有/租賃並填租金、運費，一鍵更新施工成本。</div>';
-  // v6.0.139 工具列（與其他計算工具同一位置）：掛專案｜計算｜存入專案｜匯出 PDF（v6.0.154：匯出右邊預覽的那份）｜重設
+  // v6.0.139 工具列（與其他計算工具同一位置）：掛專案｜存入專案（v6.0.175 拿掉「計算」：改條件就自動重算）｜匯出 PDF（v6.0.154：匯出右邊預覽的那份）｜重設
   var bar=document.getElementById('me-bar-shoring');
   if(bar)bar.innerHTML='<div class="card" style="margin-bottom:12px"><div class="cb tool-head" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">'
     +'<div style="flex:1;min-width:220px">'+tb+'</div>'
-    +'<button type="button" class="btn btn-sm btn-g" onclick="matEstCalc()" style="font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-calc"/></svg> 計算</button>'
     +'<button type="button" class="btn btn-sm" onclick="matEstSave()"><svg class="ic ib" aria-hidden="true"><use href="#i-save"/></svg> 存入專案</button>'
     +'<button type="button" class="btn btn-sm" onclick="matEstExportNow()" title="匯出右邊預覽的這一份"><svg class="ic ib" aria-hidden="true"><use href="#i-printer"/></svg> 匯出 PDF</button>'
     +'<button type="button" class="btn btn-sm" onclick="matEstReset()" style="color:var(--b4)">重設</button></div></div>';
   el.innerHTML=h;
   _meAutoBind();
+  if(!window._matEstRes)_meAutoKick(true);   // v6.0.175：沒有「計算」鈕，開頁就算一次
 }
 var _meView='stage';   // 預覽哪一份：stage＝叫料單、cat＝估價明細
 var _mePvStages=null,_mePvBasis=false,_meAutoCalc=false,_meAutoT=0,_mePvRT=0;
@@ -9708,7 +9708,7 @@ function _mePvRender(){
 }
 function matEstExportNow(){
   if(!window._matEstRes)matEstCalc();
-  var res=window._matEstRes;if(!res){toast('請先按「計算」');return;}
+  var res=window._matEstRes;if(!res){toast('條件還不完整，算不出結果');return;}
   var o=_mePvOpt(res);
   if(o.kind==='order'&&!o.opt.stages.length){toast('請至少勾一個階段');return;}
   matEstExportPDF(o.kind,o.opt);
@@ -38768,7 +38768,7 @@ function renderLineBox(){
   var k=function(x){return esc(String(x)).replace(/'/g,'');};
   // 改版第 5 步 5d #8：群組對象（整體日報分流）——沒設定＝當作有營造廠（只給 Lotion 草稿），主線 11/04
   var aud=function(id,cur){return '<select id="'+id+'" style="font-size:12px" title="整體日報：豐有內部直接上傳；有營造廠在的群組先給 Lotion 草稿">'+[['','未設定（當作有營造廠）'],['contractor','有營造廠在（給 Lotion 草稿）'],['internal','豐有內部（直接上傳）']].map(function(o){return '<option value="'+o[0]+'"'+((cur||'')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>';};
-  box.innerHTML='<div class="card"><div class="cb"><div style="font-weight:700;font-size:13.5px;margin-bottom:4px">LINE 機器人（陳軒｜AI 助理）</div>'
+  box.innerHTML='<div class="card"><div class="cb"><div style="font-weight:700;font-size:13.5px;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>LINE 機器人（陳軒｜AI 助理）</span>'+(_aiNotifyOk()?'<button type="button" class="btn btn-xs" id="ai-notify-btn" onclick="lotionNotifyOpen()" style="margin-left:auto;font-size:12px">📣 手動通知 Lotion</button>':'')+'</div>'
     +'<div style="font-size:11.5px;color:var(--b4);margin-bottom:8px">Cloud Functions 部署、LINE 密鑰設定好之後才會運作。寫進 FJ 的一律是草稿，要在總覽「AI 草稿」確認。</div>'
     +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">擁有者（收檔案、收通知）</div>'
     +(Object.keys(own).map(function(u){return row(esc((own[u]&&own[u].name)||'')+'<span style="color:var(--b3)">'+esc(u.slice(0,10))+'…</span><span style="margin-left:auto">'+B("lineOwnerDel('"+k(u)+"')",'移除','btn-r')+'</span>');}).join('')||'<div style="font-size:12px;color:var(--b3)">尚未設定（先用自己的 LINE 傳任一則訊息給機器人，下方「待確認」會出現）</div>')
@@ -40479,23 +40479,11 @@ function _qMeasChip(t){
   var el=document.getElementById('q-meas-chip');if(!el)return;
   var q=(typeof eid!=='undefined'&&eid)?Q.find(function(x){return x.id===eid;}):null;
   if(!q){el.innerHTML='';return;}
-  if(!q.measure){el.innerHTML=_isReaderUser?'':'<label class="btn btn-xs" style="font-size:12px;cursor:pointer;color:var(--b4)" title="匯入 HQ 圖面量測檔，比對報價數量">匯入量測檔（圖面覆核）<input type="file" accept=".json,application/json" style="display:none" onchange="qMeasImport(this)"></label>';return;}
+  if(!q.measure){el.innerHTML='';return;}   // v6.0.175（盤點表第 3 題）：報價頁不放匯入鈕；量測檔在材料估算匯入時自動掛到綁定的報價（_meMeasApply）
   var rows=_qMeasMap(Object.assign({},q,{items:(typeof items!=='undefined'&&Array.isArray(items))?items:q.items}));
   if(!rows.length){el.innerHTML='<span class="chip" style="font-size:11.5px;color:var(--b3)">圖面覆核：沒有對得上的工項</span>';return;}
   var rv=FJC.route.review(rows,t&&t.sub);
   el.innerHTML='<button type="button" class="btn btn-xs" onclick="qMeasReview()" style="font-size:12px;'+(rv.nBad?'color:var(--red);border-color:var(--red)':'color:var(--g3);border-color:var(--gm)')+'">圖面覆核：'+(rv.nBad?rv.nBad+' 項差異':'通過')+'</button>';
-}
-function qMeasImport(el){
-  var f=el&&el.files&&el.files[0];if(!f)return;var rd=new FileReader();
-  rd.onload=function(){
-    var d=null;try{d=JSON.parse(String(rd.result||'').replace(/^\uFEFF/,''));}catch(e){_err('qMeasImport.parse',e);}
-    el.value='';var r=d?FJC.route.fromMeasure(d,{dblWal:true,upperOnly:true}):{ok:false,err:'不是 JSON 檔'};
-    if(!r.ok){toast('量測檔讀不進來：'+r.err);return;}
-    var q=Q.find(function(x){return x.id===eid;});if(!q){toast('請先儲存報價單');return;}
-    q.measure=_qMeasOf(r,f.name);_touch(q);try{persist();}catch(e){_err('qMeasImport',e);}
-    rTots();toast('已匯入量測檔，圖面覆核已更新');
-  };
-  rd.readAsText(f);
 }
 function qMeasReview(){
   var q=Q.find(function(x){return x.id===eid;});if(!q||!q.measure)return;
@@ -41229,8 +41217,7 @@ function renderDashGreet(){
   var el=document.getElementById('dash-greet');if(!el)return;
   if(!_fbUser){el.textContent='';el.style.display='none';return;}
   el.style.display='';
-  var nb=_aiNotifyOk();el.style.cssText=nb?'display:flex;align-items:center;gap:8px;flex-wrap:wrap':'';   // v6.0.174：不用 float（float 會讓下方統計卡格線縮到左邊 2/3，手機版跑版）
-  el.innerHTML='<span>'+esc('嗨，'+_meName())+'</span>'+(nb?'<button type="button" class="btn btn-xs" id="ai-notify-btn" onclick="lotionNotifyOpen()" style="margin-left:auto;font-size:12px;font-weight:600">📣 通知 Lotion</button>':'');   // v6.0.123 只有 AI 帳號與 Lotion 看得到
+  el.textContent='嗨，'+_meName();   // v6.0.175（按鈕盤點表第 1 題）：「📣 通知 Lotion」移到人員管理 › LINE 機器人卡，首頁不放
 }
 
 function applyRoleUI(){
