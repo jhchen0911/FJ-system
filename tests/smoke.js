@@ -9737,6 +9737,52 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── 減項 hotfix（Lotion 11/04）：報價單價可負數（數量 > 0）、PDF 標【減項】、轉請款單照扣、不推估成本、不進租期與分包詢價 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {}; const msgs = []; const oT = window.toast; window.toast = m => msgs.push(String(m));
+      try {
+        newQ(); document.getElementById('fn').value = '減項測試案'; document.getElementById('fcl').value = '甲'; document.getElementById('fd').value = '2026-11-04';
+        items = [{ desc: 'H型鋼樁', unit: 'M', qty: 100, price: 1000, note: '', sec: false }, { desc: '角撐 H300＋大型撐 H350（第一層）', unit: '式', qty: 1, price: -30000, note: '', sec: false }];
+        const t = calcT(); out.calc = t.sub === 70000 && t.tax === 3500 && t.total === 73500;
+        out.cost = Math.abs(t.cost - (100000 * _taxM()) / (P.mult || 1.4)) < 1e-6;   // 減項沒填成本不推估
+        saveQ(); const q = Q.find(x => x.name === '減項測試案');
+        out.saved = !!q && +q.items[1].price === -30000;
+        // 數量 0 或負數擋下
+        items = [{ desc: 'X', unit: '式', qty: 0, price: -100, sec: false }]; const n0 = Q.length; msgs.length = 0; saveQ();
+        out.blockQty0 = msgs.some(m => /數量要大於 0/.test(m));
+        items = [{ desc: 'X', unit: '式', qty: -1, price: 100, sec: false }]; msgs.length = 0; saveQ();
+        out.blockNegQty = msgs.some(m => /數量不可為負數/.test(m));
+        // PDF
+        const html = String(_buildQuoteDocHTML(q) || '');
+        out.pdf = /【減項】/.test(html) && /-30,000/.test(html) && /70,000/.test(html);
+        // 請款單
+        const iv = _invItemsFromQuote(q); const ng = iv.find(x => x.contractPrice === -30000);
+        out.inv = !!ng && ng.neg === 1 && /減項（照扣）/.test(ng.note) && _invNegOk(ng) && !_invNegOk(iv.find(x => x.contractPrice === 1000 && x.type === 'item'));
+        // 租期、詢價
+        out.rent = _qNegLine(q.items[1]) && !_qNegLine(q.items[0]) && _rentStatus(Object.assign({}, q, { items: [Object.assign({}, q.items[1], { rent: 30 })] }), 0) === null;
+        // 審查：分包詢價視窗照常開（減項列不列）；存檔後重算的總計跟畫面同一算法
+        q.awarded = true; _rfqQid = q.id; let rfqErr = '';
+        try { rfqEdit(null); } catch (e) { rfqErr = String(e); }
+        const rh = (document.getElementById('gen-confirm-modal') || {}).innerHTML || '';
+        out.rfq = !rfqErr && /H型鋼樁/.test(rh) && !/角撐 H300/.test(rh);
+        try { document.getElementById('gen-confirm-modal').style.display = 'none'; } catch (e) { /* 可忽略 */ }
+        const q2 = JSON.parse(JSON.stringify(q)); _recalcQuoteTotals(q2); out.recalc = Math.abs(q2.t.cost - t.cost) < 1e-6 && q2.t.sub === 70000;
+        // 審查：先有請款單、之後報價才加減項並存檔 → 請款單那一列帶 neg、可以存
+        const iv2 = _invSyncItems([{ type: 'item', desc: '角撐 H300＋大型撐 H350（第一層）', contractPrice: 0, contractQty: 1, curQty: 0 }], q);
+        out.sync = iv2.some(x => x.contractPrice === -30000 && x.neg === 1);
+        q.awarded = false; _rfqQid = null;
+        Q = Q.filter(x => x !== q);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      window.toast = oT; items = []; return out;
+    });
+    check('減項 hotfix：報價單價可負數（數量 > 0）、小計／稅額照算、減項不推估成本；數量 0 或負數擋下；PDF 標【減項】；轉請款單帶 neg、備註「減項（照扣）」、存檔放行；不進租期', r.calc && r.cost && r.saved && r.blockQty0 && r.blockNegQty && r.pdf && r.inv && r.rent, JSON.stringify(r));
+    check('減項 hotfix（審查）：分包詢價視窗照常開、不列減項列；存檔重算總計與畫面同一算法；請款單跟上報價時減項列帶 neg', r.rfq && r.recalc && r.sync, JSON.stringify(r));
+    check('減項 hotfix 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.153 LINE 收件回覆合併：同一批（3 分鐘內）只回第一則、文字記成這批案名、失敗照樣回（雲端邏輯在 Node 直接跑） ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

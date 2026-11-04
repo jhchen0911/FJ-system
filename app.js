@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.165';
+var APP_VERSION='v6.0.166';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -445,7 +445,7 @@ function _itemProgress(q,idx){
 // 回傳 null＝無租期約定或日報還沒登錄，無從起算。
 function _rentStatus(q,idx,endDate){
   var it=((q&&q.items)||[])[idx];if(!it||it.sec)return null;
-  if((parseFloat(it.qty)||0)<=0)return null;   // v5.336：減帳列（負數量）沒有租期計費
+  if((parseFloat(it.qty)||0)<=0||(parseFloat(it.price)||0)<0)return null;   // v5.336：減帳列（負數量）沒有租期計費；減項列（負數單價）也沒有
   var days=_rentDaysOf(it);if(days<=0)return null;
   var pg=_itemProgress(q,idx);
   var base=pg.installLast||pg.doneDate||pg.last;   // v5.428：起算＝打設／裝設最後一天（次日起算）
@@ -1220,7 +1220,7 @@ function calcT(){
     if(it.sec||_isSpare(it))return;
     const q=parseFloat(it.qty)||0,p=parseFloat(it.price)||0,c=parseFloat(it.estCost)||0;
     if(q>0&&c>0)costKnown+=q*c;
-    else subUnknown+=q*p;
+    else if(p>0)subUnknown+=q*p;   // 減項 hotfix：減項列沒填成本就不推估（不讓減價把成本也算低、毛利灌水）
   });
   const cost=costKnown+(subUnknown*_taxM())/(P.mult||1.4);
   const gross=sub-cost;const net=sub-cost-ext;   // 第 3b 步（健檢1 #24）：未稅收入 − 未稅成本（原本用含稅總價減未稅成本）
@@ -1259,6 +1259,8 @@ function rTots(){
 }
 
 // ── 議價：輸入議價後金額或折扣 %，各工項單價等比例調整；尾差併入工項單價（v6.0.152 起不再加「議價調整」列） ──
+// 減項列（Lotion 11/04 hotfix）：單價可以是負數（例：某工項 1 式 −30,000），數量要大於 0；報價單 PDF 標「減項」、轉請款單當折讓照扣、不算成本推估、不進租期、不進分包詢價
+function _qNegLine(it){return !!it&&!it.sec&&!_isSpare(it)&&(parseFloat(it.price)||0)<0;}
 var NGT_ADJ_DESC='議價調整（尾差）';   // 舊報價可能還有這一列：照常顯示、存檔、轉請款（v6.0.152 起不再新增）
 // v6.0.152（Lotion 11/03）：輸入方式「議價後金額／折扣 %」、即時預覽改前→改後、「稅前價」快捷；
 //   尾差不加列：先找數量 1 且金額最大的列調單價，沒有就找數量能整除尾差的列；單價維持整數；都不行就顯示「還差 N 元」讓人選列
@@ -1396,8 +1398,8 @@ function applyNegotiate(){
       const inp=document.getElementById('ngt-ip-'+i);
       if(!inp||inp.value==='')return;
       const np=parseFloat(inp.value);
-      if(isNaN(np)||np<0)return;
       const op=parseFloat(it.price)||0;
+      if(isNaN(np)||(np<0&&!(op<0)))return;   // 減項列（原本就是負數）可以改成另一個負數
       if(np===op)return;
       if(it.origPrice==null)it.origPrice=op; // 保留議價前原單價（可追溯）
       it.price=np;
@@ -2080,7 +2082,8 @@ function _saveQCore(){
     if(it.sec)continue;
     // v5.315：議價尾差列是系統產生的折讓，可為負值（原本會被擋下，導致議價後整張報價單存不了）
     if(it.desc===NGT_ADJ_DESC)continue;
-    if((parseFloat(it.qty)||0)<0||(parseFloat(it.price)||0)<0){toast('數量／單價不可為負數');return;}
+    if((parseFloat(it.qty)||0)<0){toast('數量不可為負數（要減項請把單價打成負數）');return;}
+    if((parseFloat(it.price)||0)<0&&!((parseFloat(it.qty)||0)>0)){toast('減項列（負數單價）的數量要大於 0');return;}   // 減項 hotfix
   }
   const t=calcT();
   // 施工成本從 Q 陣列讀取現有資料（addCostItem 直接更新 q.costs）
@@ -2154,7 +2157,7 @@ function _saveQCore(){
         if(qi.sec)return;
         const li=_match[qix];
         if(li){
-          li.contractPrice=parseFloat(qi.price)||0;
+          li.contractPrice=parseFloat(qi.price)||0;li.neg=_qNegLine(qi)?1:0;   // 減項 hotfix 審查：減項列照扣
           // v5.315：已做過「工項結算」的項目不覆寫合約數量，否則追加減成果會被靜默還原
           //（結算時 contractQty 已改為實作量並存下 origContractQty，合約金額也已連動追加減）
           if(li.origContractQty==null){li.contractQty=parseFloat(qi.qty)||0;}
@@ -2172,7 +2175,7 @@ function _saveQCore(){
           if(!exists){
             linkedInv.items.push({
               type:'item',desc:qi.desc||'',unit:qi.unit||'',
-              contractPrice:parseFloat(qi.price)||0,
+              contractPrice:parseFloat(qi.price)||0,neg:_qNegLine(qi)?1:0,
               contractQty:(qi.settledQty!=null?parseFloat(qi.settledQty):parseFloat(qi.qty))||0,
               cat:qi.cat||'',
               prevQty:0,prevAmt:0,curQty:0,curDays:0,curAmt:0,
@@ -3213,7 +3216,7 @@ function _quoteEstNetR(q){
       var qn=parseFloat(it.qty)||0,p=parseFloat(it.price)||0,c=parseFloat(it.estCost)||0;
       sub+=qn*p;
       var odd=p>0&&c>p*(typeof _COST_ODD_X!=='undefined'?_COST_ODD_X:3);
-      if(qn>0&&c>0&&!odd)costKnown+=qn*c;else subUnknown+=qn*p;
+      if(qn>0&&c>0&&!odd)costKnown+=qn*c;else if(p>0)subUnknown+=qn*p;   // 減項列不推估成本（同 calcT）
     });
     var total=sub*(1+_taxR()/100);
     var ext=(q.exs||[]).reduce(function(a,e){return a+(parseFloat(e.amt)||0);},0);
@@ -3246,7 +3249,7 @@ function _recalcQuoteTotals(q){
   its.forEach(function(it){
     if(it.sec||_isSpare(it))return;
     var qn=parseFloat(it.qty)||0,p=parseFloat(it.price)||0,c=parseFloat(it.estCost)||0;
-    if(qn>0&&c>0)costKnown+=qn*c;else subUnknown+=qn*p;
+    if(qn>0&&c>0)costKnown+=qn*c;else if(p>0)subUnknown+=qn*p;   // 減項列不推估成本（同 calcT）
   });
   var cost=costKnown+(subUnknown*_taxM())/(P.mult||1.4);
   var gross=sub-cost,net=sub-cost-ext;   // 第 3b 步（健檢1 #24）：未稅對未稅
@@ -5178,7 +5181,8 @@ function _invItemsFromQuote(q){
       cat:it.cat||'',                       // v5.377：工項類別跟著帶進請款單
       prevQty:0,prevAmt:0,
       curQty:0,curDays:0,curAmt:0,
-      note:(it.desc===NGT_ADJ_DESC&&(parseFloat(it.price)||0)<0)?'議價折讓（照扣）':(it.note||''),cumQty:0,cumAmt:0,   // Lotion 10/22：負數尾差到請款單轉成折讓
+      note:(it.desc===NGT_ADJ_DESC&&(parseFloat(it.price)||0)<0)?'議價折讓（照扣）':(_qNegLine(it)?(it.note?it.note+'；':'')+'減項（照扣）':(it.note||'')),cumQty:0,cumAmt:0,   // Lotion 10/22：負數尾差到請款單轉成折讓；減項列同樣照扣
+      neg:_qNegLine(it)?1:0,
       payRate:100,
       installCum:0,removeCum:0,
       prevPayRate:100,
@@ -5223,7 +5227,7 @@ function _invSyncItems(items,q){
     if(oi<0)return f;
     used[oi]=1;const o=old[oi];
     const m=Object.assign({},o,{desc:f.desc,unit:f.unit,contractPrice:f.contractPrice,contractQty:f.contractQty,cat:f.cat,
-      note:o.note||f.note,otPrice:f.otPrice,otUnit:f.otUnit});
+      note:o.note||f.note,otPrice:f.otPrice,otUnit:f.otUnit,neg:f.neg});
     delete m._qRetired;   // 審查修正：同名工項重新出現在報價 → 清掉「已刪」標記
     return m;
   });
@@ -6737,7 +6741,7 @@ function _curW(it){return it?_wQty(it.curQty,it.payRate):0;}
 function _invCalcText(it,curAmt){
   if(!it||it.type==='sec')return '';
   var q=parseFloat(it.curQty)||0,p=parseFloat(it.contractPrice)||0,d=_invBillDays(it),rate=(it.payRate!=null&&it.payRate!=='')?parseFloat(it.payRate):100,dd=parseFloat(it.discDays)||0;
-  if(!(q>0&&p>0))return '';
+  if(!(q>0&&p!==0))return '';   // 減項列（負數單價）也印算式
   var u=_uFix(it.unit||''),w=_wQty(q,rate),parts=[];
   var amt=(curAmt!=null)?curAmt:Math.round(p*_invRentQ(Object.assign({},it,{type:it.type}))*(d||1)*rate/100);
   if(dd>0)parts.push('逾期 '+_qfmt(it.curDays)+' 天 − 折讓 '+_qfmt(dd)+' 天 ＝ '+_qfmt(d)+' 天');   // v6.0.73
@@ -22072,7 +22076,7 @@ function _qtyRecon(q){
     });
   });
   (q.items||[]).forEach(function(it,i){
-    if(it.sec||_isSpare(it))return;
+    if(it.sec||_isSpare(it)||_qNegLine(it))return;   // 減項列不對帳數量
     var contract=Math.abs(_effQty(_em,it))||0;
     var pg=_itemProgress(q,i);
     var reported=Math.round(pg.cum*100)/100;
@@ -22626,7 +22630,7 @@ function _projStageDone(q){
     if(!anyRem)return true;
   }
   for(var i=0;i<items.length;i++){
-    var it=items[i];if(!it||it.sec||_isSpare(it))continue;
+    var it=items[i];if(!it||it.sec||_isSpare(it)||_qNegLine(it))continue;   // 減項列不是要做的工
     var c=_itemCat(it);if(!c.install)continue;
     var t=Math.abs(parseFloat(it.qty)||0);if(t<=0)continue;
     var pg=_itemProgress(q,i);
@@ -31952,7 +31956,8 @@ function rfqEdit(rid){
   var picked={};(r&&r.items||[]).forEach(function(it){picked[it.idx]=it;});
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   var d7=_dAdd(localToday(),7);
-  var itemsHtml=(q.items||[]).map(function(it,i){if(!it||it.sec||_isSpare(it))return '';var qty=picked[i]?picked[i].qty:Math.abs(em?_effQty(em,it):(parseFloat(it.qty)||0));
+  var itemsHtml=(q.items||[]).map(function(it,i){if(!it||it.sec||_isSpare(it)||_qNegLine(it))return '';   // 減項列不發包
+    var qty=picked[i]?picked[i].qty:Math.abs(em?_effQty(em,it):(parseFloat(it.qty)||0));
     var pk=picked[i]||null,cov=_rfqCoverOf(q,i,rid),ls=String(it.desc||'').split('\n'),iov=pk?(pk.ov||null):_ownerItemOv(q,it.desc),tpl=pk?(pk.tpl||'gen'):(iov&&_ovIsGrout(iov)?'grout':'gen');   // v6.0.109 完整說明、拆分範圍、付款樣板；v6.0.111 合約條件卡個別工項例外
     return '<label style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;border:1px solid var(--b1);border-radius:var(--r8);margin-bottom:4px;font-size:12.5px;cursor:pointer"><input type="checkbox" class="rfq-it" data-idx="'+i+'"'+(picked[i]?' checked':'')+' style="width:18px;height:18px;flex:0 0 18px;margin-top:2px">'
       +'<span style="flex:1;min-width:0"><span style="display:block;line-height:1.4;word-break:break-word">'+esc(ls[0])+'</span>'
@@ -34098,7 +34103,7 @@ function _pjItemsHtml(q,st){
   var rows=[];var rec={};try{_qtyRecon(q).forEach(function(r){rec[r.idx]=r;});}catch(e){_err('_pjItemsHtml',e);}
   var em=_effQtyMap(q),nAct=0;
   (q.items||[]).forEach(function(it,i){
-    if(!it||it.sec||_isSpare(it))return;
+    if(!it||it.sec||_isSpare(it)||_qNegLine(it))return;   // 減項列不列進度
     var qy=Math.abs(_effQty(em,it))||0,pg=_itemProgress(q,i),r=rec[i]||{},act=_itemActual(q,i);
     var base=act?act.qty:qy,pct=base>0?Math.min(100,pg.cum/base*100):0;if(act){pct=100;nAct++;}
     var vendor=_itemSubVendor(q,i);
@@ -34832,8 +34837,8 @@ function loadQ(id){var r=_loadQCore.apply(this,arguments);try{var q=Q.find(funct
 function _qiWrites(doc,its){
   var w=[],sub=0;
   its.forEach(function(it){if(!it||it.sec||it.oKey==null)return;var row=(doc.rows||[]).find(function(r){return r.key===it.oKey&&!r.sec;});if(!row)return;var q=parseFloat(it.qty)||0,p=parseFloat(it.price)||0,a=Math.round(q*p);sub+=a;
-    if(p>0){if(row.priceRef!=null)w.push({ref:row.priceRef,value:p});else if(doc.kind==='xlsx'&&doc.colL[doc.cols.price]!=null)w.push({ref:doc.colL[doc.cols.price]+row.key,value:p});}
-    if(a>0){if(row.amtRef!=null)w.push({ref:row.amtRef,value:a});else if(doc.kind==='xlsx'&&doc.cols.amt!=null&&doc.colL[doc.cols.amt]!=null)w.push({ref:doc.colL[doc.cols.amt]+row.key,value:a});}
+    if(p!==0){if(row.priceRef!=null)w.push({ref:row.priceRef,value:p});else if(doc.kind==='xlsx'&&doc.colL[doc.cols.price]!=null)w.push({ref:doc.colL[doc.cols.price]+row.key,value:p});}
+    if(a!==0){if(row.amtRef!=null)w.push({ref:row.amtRef,value:a});else if(doc.kind==='xlsx'&&doc.cols.amt!=null&&doc.colL[doc.cols.amt]!=null)w.push({ref:doc.colL[doc.cols.amt]+row.key,value:a});}
     var nt=String(it.note||'').trim();if(nt&&row.noteRef!=null)w.push({ref:row.noteRef,value:nt});});
   var tax=Math.round(sub*_taxR()/100),tot=sub+tax;
   (doc.totals||[]).forEach(function(t){var v=t.kind==='tax'?tax:(t.kind==='total'?tot:sub);if(t.amtRef!=null)w.push({ref:t.amtRef,value:v});else if(doc.kind==='xlsx'&&doc.cols.amt!=null&&doc.colL[doc.cols.amt]!=null)w.push({ref:doc.colL[doc.cols.amt]+t.key,value:v});});
@@ -36782,9 +36787,9 @@ function _salesProfitBase(q){   // 毛利基礎：未稅合約（含追加）−
 function _salesUnitQty(q,unit){
   var u=_uFix(unit||'支'),all=[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;})),contract=0,billed=0,descs={};
   all.forEach(function(x){var m=null;try{m=_effQtyMap(x);}catch(e){_err('_salesUnitQty',e);}
-    (x.items||[]).forEach(function(it){if(!it||it.sec||_uFix(it.unit||'')!==u)return;contract+=Math.abs(_effQty(m,it))||0;descs[String(it.desc||'').trim()]=1;});});
+    (x.items||[]).forEach(function(it){if(!it||it.sec||_qNegLine(it)||_uFix(it.unit||'')!==u)return;contract+=Math.abs(_effQty(m,it))||0;descs[String(it.desc||'').trim()]=1;});});
   (INV||[]).forEach(function(i){if(!i)return;var same=(i.quoteId&&all.some(function(x){return x.id===i.quoteId;}))||String(i.project||'').trim()===String(q.name||'').trim();if(!same)return;
-    (i.items||[]).forEach(function(x){if(!x||x.type==='sec'||x.type==='rental')return;if(!descs[String(x.desc||'').trim()])return;billed+=_curW(x);});});
+    (i.items||[]).forEach(function(x){if(!x||x.type==='sec'||x.type==='rental'||x.neg)return;if(!descs[String(x.desc||'').trim()])return;billed+=_curW(x);});});
   return {unit:u,contract:Math.round(contract*100)/100,billed:Math.round(billed*100)/100};
 }
 function _salesCommAmt(q){return _commAmtFor(q,_salesCommCfg(q));}   // 抽成總額（預估）
@@ -38157,7 +38162,7 @@ function _rfqQuoteDiff(q,r){
     if(bi.unit&&_uFix(bi.unit||'')!==_uFix(ci.unit||''))out.diffs.push({t:'unit',idx:idx,ni:ni,desc:nm,from:_uFix(bi.unit||''),to:_uFix(ci.unit||'')});
   });
   if(sItems){var allK={};_rfqs(q).forEach(function(x){(x.items||[]).forEach(function(it){allK[_rfqKey(it.desc)]=1;});});
-    qi.forEach(function(x){if(!x||x.sec||_isSpare(x)||!String(x.desc||'').trim())return;var k=_rfqKey(x.desc);if(findK(sItems,k)<0&&!allK[k])out.added.push(String(x.desc||'').split('\n')[0]);});}
+    qi.forEach(function(x){if(!x||x.sec||_isSpare(x)||_qNegLine(x)||!String(x.desc||'').trim())return;var k=_rfqKey(x.desc);if(findK(sItems,k)<0&&!allK[k])out.added.push(String(x.desc||'').split('\n')[0]);});}
   out.any=out.diffs.length>0;
   return out;
 }
@@ -38970,7 +38975,7 @@ function linePushTest(){
 //  ② 修正差額不改舊期：在下一期加「調整（＋／－）」列（invAddAdjust），寫原因、連回原期別（it.adjOf／it.adjReason）。
 //  ③ 真的要改舊期：管理員填原因解鎖（invUnlock，inv.unlock，2 小時內一次有效），存檔時記稽核 inv.lockLog（誰、何時、原因、改前改後金額）。
 //  ④ 已結案專案（q.closed）比照。
-function _invNegOk(it){return !!it&&(it.desc===NGT_ADJ_DESC||!!it.adjOf);}
+function _invNegOk(it){return !!it&&(it.desc===NGT_ADJ_DESC||!!it.adjOf||!!it.neg);}   // 減項 hotfix：報價減項列帶過來的
 function _invLockWhy(inv){
   if(!inv||inv.kind==='retReturn')return '';
   var r=[];
@@ -38997,7 +39002,7 @@ function _invRepriceDiff(inv,q,_match){
   var d=0;
   (q.items||[]).forEach(function(qi,i){
     var li=_match[i];if(!li||qi.sec)return;
-    var c=Object.assign({},li,{contractPrice:parseFloat(qi.price)||0});
+    var c=Object.assign({},li,{contractPrice:parseFloat(qi.price)||0,neg:_qNegLine(qi)?1:0});
     d+=_invRowAmt(c)-_invRowAmt(li);
   });
   return Math.round(d);
@@ -41432,7 +41437,7 @@ function _buildQuoteDocHTML(q){
       const _rawDesc=(it.desc||'').replace(/([^\n])（根固處理/g,'$1\n（根固處理').replace(/([^\n])（不含水泥/g,'$1\n（不含水泥');
       const _descLines=_rawDesc.split('\n').filter(l=>l.trim());
       // 同一儲存格內 <br> 換行，第2行起加縮排
-      const _descHtml=_descLines.map((l,i)=>i===0?esc(l):'<span style="display:block;padding-left:1em;color:#444">'+esc(l)+'</span>').join('');
+      const _descHtml=(_qNegLine(it)&&!/減/.test(_descLines[0]||'')?'<span style="font-weight:700">【減項】</span>':'')+_descLines.map((l,i)=>i===0?esc(l):'<span style="display:block;padding-left:1em;color:#444">'+esc(l)+'</span>').join('');   // 減項 hotfix
       const _sp=!!it.spare;
       rows+=`<tr${_sp?' style="background:#fffdf2"':''}>
         <td style="text-align:center">${li}</td>
@@ -42027,7 +42032,7 @@ function rProfit(){
         if((parseFloat(it.qty)||0)!==qy)_settled=true;
         estRevenue+=qy*pr;
         if(qy>0&&ec>0)estCostQ+=qy*ec;
-        else _subUnknown+=qy*pr;
+        else if(pr>0)_subUnknown+=qy*pr;   // 減項列不推估成本（同 calcT）
       });
     });
     if(_subUnknown>0)estCostQ+=(_subUnknown*_taxM())/(P.mult||1.4);
