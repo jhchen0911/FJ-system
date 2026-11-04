@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.170';
+var APP_VERSION='v6.0.165';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -253,7 +253,7 @@ var P={
   dpBuH:33,dpBuR:28,dpBuS:32,dpBuB:36
 };
 let items=[],exs=[],costs=[],eid=null;
-let rmkCustom={load:'',walk:'',tech:'',bh:'',br:'',bs:'',bb:'',c2:'',c3:'',ir:'',mob:'',minQty:'',spareTxt:'',extra:[]};   // v6.0.170 spareTxt＝這張報價自訂的備用單價條文
+let rmkCustom={load:'',walk:'',tech:'',bh:'',br:'',bs:'',bb:'',c2:'',c3:'',ir:'',mob:'',minQty:'',spareTxt:'',extra:[]};   // v6.0.165 spareTxt＝這張報價自訂的備用單價條文
 // v6.0.117 新報價備註預設值（Lotion 10/30 久年 115102902 現行寫法；技術工一律 3,500）。只套在「新增報價」，已存報價不動；每案仍可在備註視窗改
 var _RMK_NEW_DEF={walk:'3000',tech:'3500',bh:'32',bb:'34',c2:'20000',c3:'30000',ir:'50000',mob:'60000'};   // v6.0.83 minQty：第16條「施作數量不足 N 時」
 
@@ -2757,7 +2757,7 @@ function _rmkBuild(base,c,edit){
   });
   return {text:out.join('\n'),no:no,nBase:nBase};
 }
-// v6.0.170（Lotion 11/04，稻田 403 只有技術工卻印成「b. 技術工」）：備用單價條文依這張報價實際有填的項目編號——兩項以上 a. b.、只有一項不編號；
+// v6.0.165（Lotion 11/04，稻田 403 只有技術工卻印成「b. 技術工」）：備用單價條文依這張報價實際有填的項目編號——兩項以上 a. b.、只有一項不編號；
 //   單張報價可以自己改這一條（q.rmk.spareTxt，留空＝自動），不動參數設定（P.rmkBase），不影響其他報價
 function _rmkSpareAuto(c){
   c=c||{};var it=[];if(c.walk)it.push('安全走道M/$'+c.walk+'元');if(c.tech)it.push('技術工/天/$'+c.tech+'元');
@@ -2780,7 +2780,7 @@ function _rmkModalTitles(){
   var set=function(id,tok,label){var el=document.getElementById(id);if(!el)return;var n=b.no[tok];
     el.textContent=n?('第'+n+'條：'+label):(base.indexOf(tok)<0?(label+'（參數條款中找不到 '+tok+'，此欄不會套用）'):(label+'（未填，報價單不會出現這一條）'));};
   set('rmk-t-load','【LOAD】','施工構台設計載重');set('rmk-t-spare','【WALK】','備用單價');
-  var sp=document.getElementById('rmk-spareTxt');if(sp)sp.placeholder='留空＝自動：'+(_rmkSpareAuto(_rmkFormVals())||'（沒填單價，這一條不出現）');   /* v6.0.170 */
+  var sp=document.getElementById('rmk-spareTxt');if(sp)sp.placeholder='留空＝自動：'+(_rmkSpareAuto(_rmkFormVals())||'（沒填單價，這一條不出現）');   /* v6.0.165 */
   set('rmk-t-buy','【BUY_H】','買斷單價（未稅）');set('rmk-t-mob','【MOB】','動員費');
   var hint=document.getElementById('rmk-extra-hint');if(hint)hint.textContent='自訂條款（依序接在'+(b.nBase?('第 '+b.nBase+' 條'):'最後一條')+'之後；條號依實際有內容的條目自動編號）';
   document.querySelectorAll('#rmk-extra .rmk-xno').forEach(function(el,i){el.textContent=(b.nBase+i+1)+'.';});
@@ -2800,7 +2800,7 @@ function applyRmkCustom(){
     const e=document.getElementById('rmk-'+k);rmkCustom[k]=e?e.value:'';
   });
   rmkCustom.minQty=(document.getElementById('rmk-minqty')||{}).value||'';   // v6.0.83
-  rmkCustom.spareTxt=String((document.getElementById('rmk-spareTxt')||{}).value||'').trim().slice(0,300);   // v6.0.170 只改這張報價
+  rmkCustom.spareTxt=String((document.getElementById('rmk-spareTxt')||{}).value||'').trim().slice(0,300);   // v6.0.165 只改這張報價
   rmkCustom.extra=_rmkExtraList().map(x=>String(x||'').trim()).filter(Boolean);
   document.getElementById('rmk-modal').style.display='none';
   toast('備註已客製化，預覽時套用');

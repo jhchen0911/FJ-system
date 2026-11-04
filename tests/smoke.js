@@ -10327,7 +10327,7 @@ async function newPage(browser, width, height) {
   }
 
 
-  // ── v6.0.170 報價備註「備用單價」依實際項目編號（只有一項不編 a. b.）、單張報價可改條文（不動參數）──
+  // ── v6.0.165 報價備註「備用單價」依實際項目編號（只有一項不編 a. b.）、單張報價可改條文（不動參數）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
@@ -10352,8 +10352,8 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
       return out;
     });
-    check('v6.0.170 備用單價條文：只有一項不編號、兩項 a. b.、都沒填不出現；單張報價可改條文（存在 rmkCustom，不動參數 P.rmkBase）', r.one && r.walkOnly && r.two && r.none && r.ov && r.ph && r.titles && r.saved && r.reset, JSON.stringify(r));
-    check('v6.0.170 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.165 備用單價條文：只有一項不編號、兩項 a. b.、都沒填不出現；單張報價可改條文（存在 rmkCustom，不動參數 P.rmkBase）', r.one && r.walkOnly && r.two && r.none && r.ov && r.ph && r.titles && r.saved && r.reset, JSON.stringify(r));
+    check('v6.0.165 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
