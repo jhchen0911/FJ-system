@@ -2443,7 +2443,9 @@ function _delQDo(id){
   }catch(e){_err('_delQDo',e);}
   try{
     let _ctChanged=false;
-    (CONTRACTS||[]).forEach(c=>{if(_delIds.includes(c.linkedQid)){c.linkedQid=null;_touch(c);c.updatedAt=Date.now();_ctChanged=true;}});
+    const _ctL=[];
+    (CONTRACTS||[]).forEach(c=>{if(_delIds.includes(c.linkedQid)){_ctL.push({id:c.id,qid:c.linkedQid});c.linkedQid=null;_touch(c);c.updatedAt=Date.now();_ctChanged=true;}});
+    try{const _te=TRASH.find(x=>x&&x.id==='quotes|'+id);if(_te){_te.kids=_delIds.filter(x=>x!==id);_te.ctLink=_ctL;_te._mt=_srvNow();_trashSave();}}catch(e2){_err('_delQDo.trash',e2);}   // 5a 審查：回收筒還原時一起接回
     if(_ctChanged&&typeof saveContracts==='function')saveContracts();
   }catch(e){_err('_delQDo',e);}
   // v5.310：連動清除以 id 關聯的請款單（孤兒請款會持續灌入應收與營收統計）
@@ -7835,7 +7837,8 @@ function exportData(){
     document.body.appendChild(a);a.click();
     setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1000);
     if(_sens&&_sensBackupCan()&&((_sens.hr.length+_sens.payslips.length+_sens.petty.length)||Object.keys(_sens.workerSens).length)){
-      setTimeout(function(){try{const b2=new Blob([JSON.stringify(_sens,null,2)],{type:'application/json'});const u2=URL.createObjectURL(b2);const a2=document.createElement('a');a2.href=u2;a2.download='豐有工程_敏感資料備份_'+_ry+_mm+_dd+'.json';document.body.appendChild(a2);a2.click();setTimeout(function(){URL.revokeObjectURL(u2);a2.remove();},1000);toast('另存一份「敏感資料備份」（薪資、零用金、人員證件），請另外保管');}catch(e){_err('exportData.sensFile',e);}},1500);
+      // 5a 審查：第二個檔要使用者按一下才下載（瀏覽器會擋自動連續下載，iPhone 會直接丟掉）
+      showConfirm('還有一個敏感資料備份','<div style="font-size:12.5px;line-height:1.75">一般備份已下載。<br>薪資名冊、薪資單、零用金、人員證件放在另一個檔，按「下載」另外存，請另外保管、不要傳給別人。</div>',function(){try{const b2=new Blob([JSON.stringify(_sens,null,2)],{type:'application/json'});const u2=URL.createObjectURL(b2);const a2=document.createElement('a');a2.href=u2;a2.download='豐有工程_敏感資料備份_'+_ry+_mm+_dd+'.json';document.body.appendChild(a2);a2.click();setTimeout(function(){URL.revokeObjectURL(u2);a2.remove();},1000);toast('已下載「敏感資料備份」');}catch(e){_err('exportData.sensFile',e);}},false,null,false,{ok:'下載',cancel:'先不要'});
     }
     // 記錄備份時間
     localStorage.setItem('fy_last_backup',Date.now().toString());
@@ -8343,8 +8346,10 @@ function _tomb(coll,id,moved){   // moved：改編號（舊 id 換新 id，付�
       var _ps=false;if(!_pr){try{_payAuditLoadSnap();_ps=(_payStatSnap||{})[id]==='paid';}catch(e2){_err('_tomb.snap',e2);}}   // 呼叫端先從陣列拿掉的 → 看上次存檔的狀態
       if((_pr&&_pr.status==='paid')||_ps||(_pl&&(+_pl.paidAt||0)>(+_pl.unpaidAt||0))){console.warn('[應付] 擋下刪除已付應付 '+id);return false;}}catch(e){_err('_tomb.paidGuard',e);}
     try{if(typeof PAID_LOG!=='undefined'&&PAID_LOG[id]){delete PAID_LOG[id];localStorage.setItem('fy_paidlog',JSON.stringify(PAID_LOG));}}catch(e){_err('_tomb.paidLog',e);}}   // v6.0.85
-  if(!moved){try{_trashPut(coll,id);}catch(e){_err('_tomb.trash',e);}}   // 改版第 5 步 5a 回收筒：刪之前先存一份
-  TOMBS[coll]=TOMBS[coll]||{};TOMBS[coll][id]=Date.now();
+  var _tt=Date.now();
+  if(!moved){try{_trashPut(coll,id);}catch(e){_err('_tomb.trash',e);}
+    try{_tt=_srvNow();var _g=_TOMB_COLLS[coll],_a=_g&&_g(),_r=Array.isArray(_a)&&_a.find(function(x){return x&&x.id===id;});if(_r&&+_r._restoredAt)_tt=Math.max(_tt,+_r._restoredAt+1);}catch(e){_tt=Date.now();_err('_tomb.ts',e);}}   // 5a 審查：墓碑用伺服器時間，而且一定晚於還原時間（還原後再刪才會真的刪）
+  TOMBS[coll]=TOMBS[coll]||{};TOMBS[coll][id]=_tt;
   try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e){_err('_tomb',e);}
   if(!_shWholeOk())try{var _tp=JSON.parse(localStorage.getItem('fy_tombreq_pending')||'{}')||{};_tp[coll+'/'+id]=TOMBS[coll][id];localStorage.setItem('fy_tombreq_pending',JSON.stringify(_tp));}catch(e){_err('_tomb.req',e);}   // v6.0.118：只有本機自己刪的才送刪除申請
   return true;
@@ -10474,7 +10479,7 @@ function _applyCloud(data){
     if(data.activityLog)ACTIVITY_LOG=data.activityLog;
     if(data.customers)CUSTOMERS=_safeMerge(CUSTOMERS,data.customers,'customers');
     if(data.workers){WORKERS=_safeMerge(WORKERS,data.workers,'workers');try{_wkGraft();}catch(e){_err('_applyCloud.wkGraft',e);}try{_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');}catch(e){_err('_applyCloud.workers',e);}}   // v5.438
-    if(data.trash){try{TRASH=_safeMerge(TRASH,data.trash,'trash');_trashPurge();_trashSave();}catch(e){_err('_applyCloud.trash',e);}}   // 5a 回收筒
+    if(data.trash){try{var _t0=JSON.stringify(TRASH);TRASH=_safeMerge(TRASH,data.trash,'trash');_trashPurge();if(JSON.stringify(TRASH)!==_t0)_trashSave();}catch(e){_err('_applyCloud.trash',e);}}   // 5a 回收筒
     if(data.projects){try{PROJECTS=_safeMerge(PROJECTS,data.projects,'projects');_lsSet('fy_projects',JSON.stringify(PROJECTS),'專案');}catch(e){_err('_applyCloud.projects',e);}}   // 4a
     if(data.matStock){
       try{
@@ -10696,7 +10701,7 @@ function _applySensColls(data,tombs){
   try{if(data.uploadedAt)localStorage.setItem('fy_priv_last_up',JSON.stringify({by:data.uploadedBy||'',ver:data.uploadedVer||'',dev:data.uploadedDev||'',at:parseInt(data.uploadedAt)||0}));}catch(e){_err('_applySensColls.uploader',e);}   // v6.0.89 雲端最後由誰／哪版上傳
   if(data.payables)PAYABLES=_safeMerge(PAYABLES,data.payables,'payables');
   if(data.expenses)EXPENSES=_safeMerge(EXPENSES,data.expenses,'expenses');
-  if(data.trashPriv){try{TRASH_PRIV=_safeMerge(TRASH_PRIV,data.trashPriv,'trashPriv');_trashPurge();_trashSave();}catch(e){_err('_applySensColls.trash',e);}}   // 5a
+  if(data.trashPriv){try{var _t0=JSON.stringify(TRASH_PRIV);TRASH_PRIV=_safeMerge(TRASH_PRIV,data.trashPriv,'trashPriv');_trashPurge();if(JSON.stringify(TRASH_PRIV)!==_t0)_trashSave();}catch(e){_err('_applySensColls.trash',e);}}   // 5a
   if(data.hr){HR=_safeMerge(HR,data.hr,'hr');try{_lsSet('fy_hr',JSON.stringify(HR),'人員薪資');}catch(e){_err('_applySensColls.hr',e);}}   // v5.433
   if(data.payslips){PAYSLIPS=_safeMerge(PAYSLIPS,data.payslips,'payslips');try{_lsSet('fy_payslips',JSON.stringify(PAYSLIPS),'薪資條');}catch(e){_err('_applySensColls.ps',e);}}
   if(data.petty){PETTY=_safeMerge(PETTY,data.petty,'petty');try{_lsSet('fy_petty',JSON.stringify(PETTY),'零用金');}catch(e){_err('_applySensColls.pc',e);}}   // v5.434
@@ -39326,6 +39331,7 @@ function _tombApplyOne(c,id,ts){
   try{if(_tombExempt(c,id))return;}catch(e){_err('_tombApplyOne.exempt',e);}   // 現行仍需要的自動應付不刪
   try{if(c==='quotes'&&_delQBlockers(id))return;}catch(e){_err('_tombApplyOne.qblk',e);}   // v6.0.118 審查：員工送來的刪報價申請也要過健檢1 #30（有已付應付／已收款或已開發票的請款單不准刪）
   if(TOMBS[c]&&TOMBS[c][id]!=null)return;   // 已有墓碑：不用舊時間戳覆寫
+  try{_trashPut(c,id);}catch(e){_err('_tombApplyOne.trash',e);}   // 5a 審查：管理員核准員工的刪除時存管理員這份（含成本），還原才完整
   TOMBS[c]=TOMBS[c]||{};TOMBS[c][id]=ts||Date.now();
   var a=_TOMB_COLLS[c]&&_TOMB_COLLS[c]();if(!Array.isArray(a))return;
   for(var i=a.length-1;i>=0;i--){if(a[i]&&a[i].id===id){if(c==='payables'&&a[i].status==='paid')continue;a.splice(i,1);}}   // 已付的應付不刪
@@ -40808,7 +40814,7 @@ function _trashPut(coll,id){
       if(coll==='quotes'){sh=_stripQuoteSens(rec);try{TRASH_PRIV.unshift(Object.assign({},base,{sens:_extractQuoteSens(rec)}));}catch(e){_err('_trashPut.sens',e);}}
       else if(coll==='vendors'){sh=Object.assign({},rec);delete sh.bank;delete sh.bankAcct;delete sh.bankHolder;}
       else if(coll==='invoiceRecs'){sh=Object.assign({},rec);if(sh.fileData){sh.fileData='';sh._fileLocal=1;}}
-      else if(coll==='workers'){sh=_wkSplit(rec).pub;}
+      else if(coll==='workers'){var _ws=_wkSplit(rec);sh=_ws.pub;try{var _old=WK_SENS[id]||{},_sn=_ws.sens||{id:id,f:{},docs:{}};var _wsAll={id:id,_mt:now,f:Object.assign({},_old.f||{},_sn.f||{}),docs:Object.assign({},_old.docs||{},_sn.docs||{})};if(Object.keys(_wsAll.f).length||Object.keys(_wsAll.docs).length)TRASH_PRIV.unshift(Object.assign({},base,{wsens:_wsAll}));}catch(e){_err('_trashPut.wk',e);}}   // 審查：證件存私有回收筒
       TRASH.unshift(Object.assign({},base,{rec:sh}));
     }
     _trashSave();return true;
@@ -40819,6 +40825,7 @@ function _tombDead(lt,ct,id,r){
   var t=Math.max(+((lt||{})[id])||0,+((ct||{})[id])||0);
   if(!t&&(lt||{})[id]==null&&(ct||{})[id]==null)return false;
   if(r&&r._restoredAt&&+r._restoredAt>t)return false;
+  if(r&&r.coll&&r.rid&&r.id===r.coll+'|'+r.rid&&+r.at>t)return false;   // 5a 審查：回收筒紀錄（刪→還原→再刪）比回收筒墓碑新 → 是新的一筆
   return true;
 }
 function _trashPurge(){
@@ -40835,15 +40842,37 @@ function trashRestore(key){
   if(a.some(function(x){return x&&x.id===e.rid;})){toast('同一筆已經存在，不用還原');return;}
   var rec=JSON.parse(JSON.stringify(e.rec));
   if(e.coll==='quotes'){var s=TRASH_PRIV.find(function(x){return x&&x.id===key&&x.sens;});if(s){try{_applyQuoteSens(rec,s.sens,true);}catch(e2){_err('trashRestore.sens',e2);}}}
-  rec._restoredAt=_srvNow();_touch(rec);
-  a.unshift(rec);
-  TRASH=TRASH.filter(function(x){return x&&x.id!==key;});TRASH_PRIV=TRASH_PRIV.filter(function(x){return x&&x.id!==key;});
-  TOMBS.trash=TOMBS.trash||{};TOMBS.trash[key]=_srvNow();TOMBS.trashPriv=TOMBS.trashPriv||{};TOMBS.trashPriv[key]=_srvNow();try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e6){_err('trashRestore.tomb',e6);}   // 回收筒那一筆也要刪掉，別台同步才不會再出現
+  var n=_trashRestoreOne(e,rec,key),extra=0;
+  // 5a 審查：刪報價時一起刪掉的請款單、手動應付一起還原；合約連結接回
+  if(e.coll==='quotes'){
+    var ids={};ids[e.rid]=1;(e.kids||[]).forEach(function(k){ids[k]=1;});
+    TRASH.concat(TRASH_PRIV).filter(function(x){return x&&x.rec&&x.id!==key&&((x.coll==='quotes'&&ids[x.rid]&&x.rec.parentId===e.rid)||(x.coll==='invoices'&&(ids[x.rec.sourceQid]||ids[x.rec.quoteId]))||(x.coll==='payables'&&ids[x.rec.quoteId]))&&Math.abs((+x.at||0)-(+e.at||0))<120000;}).forEach(function(x){
+      var g2=_TOMB_COLLS[x.coll],a2=g2&&g2();if(!Array.isArray(a2)||a2.some(function(y){return y&&y.id===x.rid;}))return;
+      var r2=JSON.parse(JSON.stringify(x.rec));if(x.coll==='quotes'){var s2=TRASH_PRIV.find(function(y){return y&&y.id===x.id&&y.sens;});if(s2){try{_applyQuoteSens(r2,s2.sens,true);}catch(e7){_err('trashRestore.kidSens',e7);}}}
+      _trashRestoreOne(x,r2,x.id);extra++;try{(_TRASH_SAVE[x.coll]||function(){})();}catch(e8){_err('trashRestore.kidSave',e8);}
+    });
+    (e.ctLink||[]).forEach(function(l){var c=(CONTRACTS||[]).find(function(x){return x&&x.id===l.id;});if(c&&!c.linkedQid){c.linkedQid=l.qid;_touch(c);c.updatedAt=Date.now();extra++;}});
+    if((e.ctLink||[]).length)try{saveContracts();}catch(e9){_err('trashRestore.ct',e9);}
+  }
   _trashSave();
   try{(_TRASH_SAVE[e.coll]||function(){})();}catch(e3){_err('trashRestore.save',e3);}
-  try{logActivity('回收筒','還原'+(_TRASH_NAME[e.coll]||e.coll)+'：'+(e.name||e.rid));}catch(e4){_err('trashRestore.log',e4);}
-  toast('已還原'+(_TRASH_NAME[e.coll]||'')+'：'+(e.name||e.rid));
+  try{logActivity('回收筒','還原'+(_TRASH_NAME[e.coll]||e.coll)+'：'+(e.name||e.rid)+(extra?('（連同 '+extra+' 筆相關資料）'):''));}catch(e4){_err('trashRestore.log',e4);}
+  toast('已還原'+(_TRASH_NAME[e.coll]||'')+'：'+(e.name||e.rid)+(extra?('，連同 '+extra+' 筆相關資料'):''));
   try{if(document.getElementById('gen-confirm-modal').style.display!=='none')openTrash();}catch(e5){/* 可忽略 */}
+}
+// 放回一筆：還原時間一定晚於墓碑（各裝置時鐘不準也一樣）、人員證件接回、回收筒那一筆立墓碑
+function _trashRestoreOne(e,rec,key){
+  var g=_TOMB_COLLS[e.coll],a=g&&g();if(!Array.isArray(a))return 0;
+  var tt=+((TOMBS[e.coll]||{})[e.rid])||0;
+  rec._restoredAt=Math.max(_srvNow(),tt+1);_touch(rec);
+  if(e.coll==='workers'){var w=TRASH_PRIV.find(function(x){return x&&x.id===key&&x.wsens;});if(w){try{WK_SENS[e.rid]=Object.assign({},w.wsens,{id:e.rid,_mt:_srvNow()});_wkSensSave();}catch(e2){_err('trashRestore.wk',e2);}}}
+  a.unshift(rec);
+  if(e.coll==='workers')try{_wkGraft();}catch(e3){_err('trashRestore.graft',e3);}
+  var inPriv=TRASH_PRIV.some(function(x){return x&&x.id===key;}),inSh=TRASH.some(function(x){return x&&x.id===key;}),now=_srvNow();
+  TRASH=TRASH.filter(function(x){return x&&x.id!==key;});TRASH_PRIV=TRASH_PRIV.filter(function(x){return x&&x.id!==key;});
+  if(inSh){TOMBS.trash=TOMBS.trash||{};TOMBS.trash[key]=now;}if(inPriv){TOMBS.trashPriv=TOMBS.trashPriv||{};TOMBS.trashPriv[key]=now;}   // 回收筒那一筆也要刪掉，別台同步才不會再出現
+  try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e6){_err('trashRestore.tomb',e6);}
+  return 1;
 }
 function trashDaysSet(v){
   if(_roDeny())return;

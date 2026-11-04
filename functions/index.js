@@ -367,10 +367,16 @@ exports.trashPurge = onSchedule({ schedule: '45 3 * * *', timeZone: TZ, region: 
   const days = (await db.ref('fydata/shared/params/trashDays').once('value')).val();
   let n = 0;
   for (const p of ['fydata/shared/trash', 'fydata/private/trashPriv']) {
-    const v = (await db.ref(p).once('value')).val();
-    if (v == null) continue;
-    const r = trashCore.purge(v, days, now);
-    if (r.removed) { await db.ref(p).set(r.keep.length ? r.keep : null); n += r.removed; }
+    // 用 transaction：讀到寫之間有裝置剛刪了東西進回收筒，不會被蓋掉
+    let removed = 0;
+    await db.ref(p).transaction((v) => {
+      if (v == null) { removed = 0; return v; }
+      const r = trashCore.purge(v, days, now);
+      removed = r.removed;
+      if (!r.removed) return undefined;   // 沒東西要清：不寫
+      return r.keep.length ? r.keep : null;
+    });
+    n += removed;
   }
   console.log('[回收筒] 清除', n, '筆（保留', trashCore.trashDays(days), '天）');
 });

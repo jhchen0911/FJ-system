@@ -10260,6 +10260,27 @@ async function newPage(browser, width, height) {
         const auto = !!(_paySource(PAYABLES[1]) || {}).auto;
         _tomb('payables', 'mT1'); _tomb('payables', 'pay_ps_T1');
         out.pay = TRASH_PRIV.some(x => x.id === 'payables|mT1' && x.rec) && auto && !TRASH_PRIV.some(x => x.id === 'payables|pay_ps_T1');
+        // 審查 H1／H2：刪→還原→再刪：再刪的墓碑晚於還原時間、回收筒新的一筆不被舊墓碑吃掉；刪的裝置時鐘快 1 小時也能還原
+        _tomb('contracts', 'ctT'); CONTRACTS = CONTRACTS.filter(c => c.id !== 'ctT');
+        out.reDel = TRASH.some(x => x.id === 'contracts|ctT') && _mergeColl(TRASH, [], 'trash', TOMBS).some(x => x.id === 'contracts|ctT') && TOMBS.contracts.ctT > rc._restoredAt;
+        TOMBS.contracts.ctT = Date.now() + 3600000; trashRestore('contracts|ctT');
+        const rc2 = CONTRACTS.find(c => c.id === 'ctT');
+        out.skew = !!rc2 && _mergeColl(CONTRACTS, [], 'contracts', TOMBS).some(c => c.id === 'ctT');
+        // 審查 M2：人員證件存私有回收筒、還原補回
+        WORKERS = [{ id: 'wR', name: '某工人', idNo: 'B223456789' }];
+        _tomb('workers', 'wR'); WORKERS = []; delete WK_SENS.wR;
+        out.wkPriv = TRASH_PRIV.some(x => x.id === 'workers|wR' && x.wsens && x.wsens.f.idNo === 'B223456789') && !JSON.stringify(TRASH).includes('B223456789');
+        trashRestore('workers|wR'); out.wkBack = !!(WORKERS[0] && WORKERS[0].idNo === 'B223456789');
+        // 審查 M3：刪報價連同請款單一起還原、合約接回
+        Q.push({ id: 'qK', name: '連動報價', items: [], _mt: 1 }); INV.push({ id: 'iK', sourceQid: 'qK', project: '連動', items: [], _mt: 1 }); CONTRACTS.push({ id: 'cK', name: '連動合約', linkedQid: 'qK', _mt: 1 });
+        _delQDo('qK');
+        const gone = !Q.some(q => q.id === 'qK') && !INV.some(v => v.id === 'iK') && !CONTRACTS.find(c => c.id === 'cK').linkedQid;
+        trashRestore('quotes|qK');
+        out.cascade = gone && Q.some(q => q.id === 'qK') && INV.some(v => v.id === 'iK') && CONTRACTS.find(c => c.id === 'cK').linkedQid === 'qK';
+        Q = Q.filter(q => q.id !== 'qK'); INV = INV.filter(v => v.id !== 'iK'); CONTRACTS = CONTRACTS.filter(c => c.id !== 'cK');
+        // 審查 M1：管理員核准員工的刪除也進回收筒
+        CUSTOMERS.push({ id: 'cuK', name: '核准刪除客戶' }); _tombApplyOne('customers', 'cuK', Date.now());
+        out.staffApply = TRASH.some(x => x.id === 'customers|cuK'); CUSTOMERS = CUSTOMERS.filter(c => c.id !== 'cuK');
         // 到期清除：參數 1 天
         P.trashDays = 1; TRASH.push({ id: 'old|1', coll: 'contracts', rid: '1', at: Date.now() - 2 * 86400000, rec: {} });
         const n = _trashPurge(); out.purge = n >= 1 && !TRASH.some(x => x.id === 'old|1'); delete P.trashDays;
@@ -10279,7 +10300,9 @@ async function newPage(browser, width, height) {
       window.toast = oT;
       return out;
     });
-    await page.waitForTimeout(1800);
+    await page.waitForSelector('#gen-confirm-ok', { state: 'visible', timeout: 5000 }).catch(() => {});
+    await page.click('#gen-confirm-ok').catch(() => {});   // 第二個檔要按「下載」
+    await page.waitForTimeout(300);
     const r2 = await page.evaluate(() => {
       const out = {};
       try {
@@ -10296,6 +10319,7 @@ async function newPage(browser, width, height) {
     await page.waitForTimeout(400);
     const r3 = await page.evaluate(() => HR.length === 1 && HR[0].id === 'hrT');
     check('5a 回收筒：刪除先存一份、還原後放回原集合（墓碑還在也不再當已刪；沒還原過的照樣已刪）、回收筒那一筆同步刪掉', r.put && r.restore && r.mergeAlive, JSON.stringify(r));
+    check('5a 回收筒（審查）：刪→還原→再刪真的刪、回收筒新一筆不被吃掉；時鐘不準也能還原；人員證件存私有回收筒並補回；刪報價連同請款單還原、合約接回；核准員工刪除也進回收筒', r.reDel && r.skew && r.wkPriv && r.wkBack && r.cascade && r.staffApply, JSON.stringify(r));
     check('5a 回收筒：報價成本存私有回收筒、還原時補回；手動應付進私有回收筒、系統自動應付不進；保留天數參數到期清除；進同步清單', r.quoteSplit && r.quoteRestore && r.pay && r.purge && r.sync, JSON.stringify(r));
     check('5a 敏感資料備份分開：一般備份不含薪資名冊／薪資單／零用金與人員證件，另存「敏感資料備份」檔；匯入敏感檔只還原那幾塊', r.mainNoSens && r2.sensFile && r3, JSON.stringify({ main: r.mainNoSens, r2, r3 }));
     check('5a 回收筒／敏感備份測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
