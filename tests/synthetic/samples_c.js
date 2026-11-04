@@ -19,8 +19,8 @@ module.exports = [
     title: '逾期租金（拔除第一天模式）：合約 100 支只打設 80 支，逾期 45 天×20 元，照合約量 100 支收',
     hand: '正確：min(合約 100, 打設 80)＝80 支 × 45 天 × 20＝72,000；v6.0.135 以前 100 支＝90,000（v6.0.136 第 3c 步改成新口徑）',
     run: async () => {
-      window._itemProgress = () => ({ installLast: '2026-08-01', doneDate: '2026-08-01', last: '2026-08-01', cum: 80, target: 100 });
-      const q = { id: 'qC17', name: '範例工程C17', items: [{ desc: '鋼軌樁', unit: '支', qty: 100, price: 500, note: '租期30天', ot: '20', otu: '$/支/天' }] };
+      // 第 5 步 5b：租期算法搬到 calc/todo.js（不再呼叫 window._itemProgress），改用同樣的日報資料：8/1 打設 80 支
+      const q = { id: 'qC17', name: '範例工程C17', items: [{ desc: '鋼軌樁', unit: '支', qty: 100, price: 500, note: '租期30天', ot: '20', otu: '$/支/天' }], dailyLogs: [{ id: 'd1', date: '2026-08-01', progressRows: [{ itemIdx: 0, qty: 80 }] }] };
       const r = _rentStatus(q, 0, '2026-10-15');
       return r ? { overDays: r.overDays, qty: r.qty, amount: r.amount, expiry: r.expiry } : { r: null };
     }
