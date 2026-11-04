@@ -10209,13 +10209,13 @@ async function newPage(browser, width, height) {
         // 總覽：既有提醒照舊、5b 新增「可以確認結案」「租期 7 天內到期」
         go('dash'); updateDashTodo(); const t = document.getElementById('dash-todo-list').textContent;
         out.dash = /提醒甲」1 個工項租期已逾期/.test(t) && /提醒甲 第\?期 逾期 5 天未收款/.test(t) && /保留款逾期未退：提醒丙/.test(t) && /可以確認結案：提醒丁/.test(t) && /「提醒乙」1 個工項租期 \d 天內到期/.test(t) && /提醒丁 報價已進版至 v2/.test(t);
-        out.data = { quotes: Q.map(q => { const c = JSON.parse(JSON.stringify(q)); delete c.rfqs; return c; }), invoices: INV, sens: { t4: { rfqs: Q[3].rfqs } } };
+        out.data = { quotes: Q.map(q => { const c = JSON.parse(JSON.stringify(q)); delete c.rfqs; return c; }), invoices: INV, sens: { t4: { rfqs: Q[3].rfqs } }, now: Date.now() };   // 測試頁的時鐘是假的（2026-10-15），雲端要用同一個「現在」
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
       window.toast = oT; return out;
     });
     require(require('path').join(__dirname, '..', 'tools', 'copy-calc.js'));
     const TC = require(require('path').join(__dirname, '..', 'functions', 'ops', 'todos.js'));
-    const cloud = data.data ? TC.buildRemind({ shared: { quotes: data.data.quotes, invoices: data.data.invoices, contracts: {}, customers: {}, params: {}, qHistory: {} }, priv: { payables: {}, matLedger: {}, quoteSens: data.data.sens }, now: Date.now() }) : null;
+    const cloud = data.data ? TC.buildRemind({ shared: { quotes: data.data.quotes, invoices: data.data.invoices, contracts: {}, customers: {}, params: {}, qHistory: {} }, priv: { payables: {}, matLedger: {}, quoteSens: data.data.sens }, now: data.data.now }) : null;
     const want = { rent: ['t1'], rentSoon: ['t2#0'], recv: ['ti1'], ret: ['提醒丙'], close: ['t4'], rfqVer: ['t4'] };
     check('5b 雲端每日提醒：雲端（functions/ops/todos.js）與網頁算出同一組提醒（租期逾期、7 天內到期、收款逾期、保留款逾期、可結案、報價進版）', !!cloud && JSON.stringify(cloud.keys) === JSON.stringify(data.keys) && JSON.stringify(data.keys) === JSON.stringify(want), JSON.stringify({ err: data.err, loc: data.keys, cloud: cloud && cloud.keys }));
     check('5b 保留款到期（Lotion 11/04）：沒手填＝系統結案日＋退還條件月數、專案頁顯示怎麼算的；手填日期優先', data.ret && data.manual, JSON.stringify(data));
