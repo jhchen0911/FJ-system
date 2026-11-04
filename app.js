@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.163';
+var APP_VERSION='v6.0.167';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -33165,7 +33165,7 @@ function _v6TodoItems(items){
         text:'自有材料在工地：'+(q.name||'')+' '+fmt(qty)+' 支，最久 '+days+' 天'+(days>=120?'（請確認是否該歸還）':''),sub:'攤提 NT$ '+fmt(amt)});
     });
   }catch(e){_err('_v6TodoItems.mat',e);}
-  try{_bkTodoList().forEach(function(t){items.push({type:'bk_'+(t.src||'')+'_'+(t.key||''),urgent:!!t.urgent,jump:t.go==='health'?"go('reports');setTimeout(function(){showReport('health')},80)":"go('dash')",icon:ic('i-cloud'),color:'#6a1b9a',text:String(t.text||''),sub:esc(String(t.sub||''))});});}catch(e){_err('_v6TodoItems.bk',e);}   // 改版第 5 步 後端待辦（雲端寫、網頁只顯示）
+  try{_bkTodoList().forEach(function(t){items.push({type:'bk_'+(t.src||'')+'_'+(t.key||''),urgent:!!t.urgent,jump:t.go==='health'?"go('reports');setTimeout(function(){showReport('health')},80)":t.go==='drafts'?'openDrafts()':t.go==='staff'?"go('staff')":"go('dash')",icon:ic('i-cloud'),color:'#6a1b9a',text:String(t.text||''),sub:esc(String(t.sub||''))});});}catch(e){_err('_v6TodoItems.bk',e);}   // 改版第 5 步 後端待辦（雲端寫、網頁只顯示）
   try{if((SYNC_CONFLICTS||[]).length)items.push({type:'sync_conflict',urgent:true,jump:'openSyncConflicts()',icon:ic('i-warn'),color:'var(--red)',text:'同步衝突 '+SYNC_CONFLICTS.length+' 處：兩台裝置改了同一個欄位',sub:'點這裡選要用哪一個'});}catch(e){_err('_v6TodoItems.cf',e);}   // 4b
 }
 // ══════════ v6.0.17 經營報表：利潤分析併入報表中心（總覽分頁）、口徑統一（權責為主、現金為輔）、共用年度篩選 ══════════
@@ -38672,7 +38672,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // 安全規則（database.rules.json 的 fydata/drafts，回國後發布）：唯讀名冊與管理員可讀；唯讀帳號只能新增 by＝自己的 pending 草稿、不能改舊的；狀態只有管理員能改；欄位型別與大小有上限。
 // 記錄：{id,type:'quote'|'bid'|'irPhoto',by,byName,at,status:'pending'|'applied'|'rejected',summary,payload,(doneAt,doneBy,resultId,reason)}
 var DRAFTS={};
-var _DRAFT_T={quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）',contact:'客戶·廠商'};   // v6.0.138 客戶·廠商草稿   // v6.0.110 LINE 機器人草稿
+var _DRAFT_T={quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）',contact:'客戶·廠商',dailyOut:'整體日報（請複製轉發）'};   // v6.0.138 客戶·廠商草稿   // v6.0.110 LINE 機器人草稿
 var _draftOn=false,_draftErrAt=0;
 var _DRAFT_ID=/^[A-Za-z0-9_-]{4,40}$/;
 var _DRAFT_IMG=/^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+\/=]+$/;
@@ -38803,7 +38803,8 @@ function _draftListHtml(){
       +'<div style="font-size:13px;font-weight:700;margin:2px 0 6px">'+esc(S(d.summary).slice(0,300))+'</div>'
       +(d.type==='irPhoto'&&d.payload&&_draftImgOk(d.payload.file)?'<img src="'+esc(d.payload.file)+'" style="max-width:100%;max-height:160px;border-radius:6px;display:block;margin-bottom:6px">':'')
       +((d.type==='addon'||d.type==='dailyLog')?_lineDraftBody(d):'')
-      +'<div style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="btn btn-xs btn-g" onclick="draftApply(\''+escq(d.id)+'\')">確認套用</button><button type="button" class="btn btn-xs btn-r" onclick="draftReject(\''+escq(d.id)+'\')">退回</button></div></div>';
+      +(d.type==='dailyOut'?_dailyOutBody(d):'')
+      +'<div style="display:flex;gap:6px;justify-content:flex-end">'+(d.type==='dailyOut'?'<button type="button" class="btn btn-xs" onclick="dailyOutCopy(\''+escq(d.id)+'\')">複製文字</button>':'')+'<button type="button" class="btn btn-xs btn-g" onclick="draftApply(\''+escq(d.id)+'\')">'+(d.type==='dailyOut'?'已轉發':'確認套用')+'</button><button type="button" class="btn btn-xs btn-r" onclick="draftReject(\''+escq(d.id)+'\')">退回</button></div></div>';
   }).join('');
 }
 function openDrafts(){
@@ -38853,6 +38854,7 @@ function draftApply(id){
   }
   if(d.type==='addon'||d.type==='dailyLog'){_lineDraftApply(d,close);return;}   // v6.0.110 LINE 機器人
   if(d.type==='contact'){_draftContactApply(id,pl,close);return;}   // v6.0.138
+  if(d.type==='dailyOut'){_draftMark(id,'applied',{}).then(function(){var b=document.getElementById('draft-list-box');if(b)b.innerHTML=_draftListHtml();try{updateDashTodo();}catch(e){_err('draftApply.dailyOut',e);}toast('已標記轉發');});return;}   // 改版第 5 步 5d #8：Lotion 自己轉發，這裡只標記
   if(d.type==='irPhoto'){
     if(!_draftImgOk(pl.file)){toast('草稿的照片格式不正確，請退回');return;}
     close();newInvoiceRecord();
@@ -38973,6 +38975,7 @@ function renderLineBox(){
   var me=(_fbUser&&_fbUser.email)||'';
   if(!me||_isReaderUser||!isAdmin(String(me).toLowerCase())){box.style.display='none';return;}
   box.style.display='';
+  if(_gtStatus===null)_gtLoad();
   if(_lineCfgCache===null&&_fbDb){_lineCfgCache={};_fbDb.ref('fydata/lineCfg').once('value').then(function(sn){_lineCfgCache=sn.val()||{};renderLineBox();}).catch(function(e){_err('renderLineBox',e);_lineCfgCache={__err:1};renderLineBox();});}
   if(_lineCfgCache&&_lineCfgCache.__err){box.innerHTML='<div class="card"><div class="cb"><div style="font-weight:700;font-size:13.5px;margin-bottom:4px">LINE 機器人（陳軒｜AI 助理）</div><div style="font-size:12px;color:var(--red)">讀不到 LINE 設定：雲端規則尚未發布（見 docs/回國後部署清單_20261031.md 第 1 步）。</div><div style="margin-top:8px"><button type="button" class="btn btn-xs" onclick="_lineCfgCache=null;renderLineBox()">重新整理</button></div></div></div>';return;}
   var C=_lineCfgCache||{},own=C.owners||{},gr=C.groups||{},pu=(C.pending&&C.pending.users)||{},pg=(C.pending&&C.pending.groups)||{},tx=Object.assign({},_LINE_TEXTS,C.texts||{});
@@ -38983,18 +38986,21 @@ function renderLineBox(){
   var B=function(js,l,c){return '<button type="button" class="btn btn-xs'+(c?' '+c:'')+'" onclick="'+js+'">'+l+'</button>';};
   var row=function(h){return '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 0;border-bottom:1px solid var(--b1);font-size:12px">'+h+'</div>';};
   var k=function(x){return esc(String(x)).replace(/'/g,'');};
+  // 改版第 5 步 5d #8：群組對象（整體日報分流）——沒設定＝當作有營造廠（只給 Lotion 草稿），主線 11/04
+  var aud=function(id,cur){return '<select id="'+id+'" style="font-size:12px" title="整體日報：豐有內部直接上傳；有營造廠在的群組先給 Lotion 草稿">'+[['','未設定（當作有營造廠）'],['contractor','有營造廠在（給 Lotion 草稿）'],['internal','豐有內部（直接上傳）']].map(function(o){return '<option value="'+o[0]+'"'+((cur||'')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>';};
   box.innerHTML='<div class="card"><div class="cb"><div style="font-weight:700;font-size:13.5px;margin-bottom:4px">LINE 機器人（陳軒｜AI 助理）</div>'
     +'<div style="font-size:11.5px;color:var(--b4);margin-bottom:8px">Cloud Functions 部署、LINE 密鑰設定好之後才會運作。寫進 FJ 的一律是草稿，要在總覽「AI 草稿」確認。</div>'
     +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">擁有者（收檔案、收通知）</div>'
     +(Object.keys(own).map(function(u){return row(esc((own[u]&&own[u].name)||'')+'<span style="color:var(--b3)">'+esc(u.slice(0,10))+'…</span><span style="margin-left:auto">'+B("lineOwnerDel('"+k(u)+"')",'移除','btn-r')+'</span>');}).join('')||'<div style="font-size:12px;color:var(--b3)">尚未設定（先用自己的 LINE 傳任一則訊息給機器人，下方「待確認」會出現）</div>')
     +(Object.keys(pu).length?('<div style="font-size:12px;margin-top:6px">待確認的一對一帳號：</div>'+Object.keys(pu).map(function(u){return row('<span>'+esc((pu[u]&&pu[u].text)||'')+'</span><span style="color:var(--b3)">'+esc(new Date((pu[u]&&pu[u].at)||0).toLocaleString('zh-TW'))+'</span><span style="margin-left:auto;display:flex;gap:4px">'+B("lineOwnerAdd('"+k(u)+"')",'設為擁有者','btn-g')+B("linePendDel('users','"+k(u)+"')",'忽略')+'</span>');}).join('')):'')
     +'<div style="font-weight:700;font-size:12.5px;margin-top:10px">工地群組</div>'
-    +(Object.keys(gr).map(function(g){var v=gr[g]||{};return row('<b>'+esc(v.name||'')+'</b>'+sel('lg-q-'+k(g),v.mode==='company'?'__co':v.qid)+'<label style="font-size:11.5px"><input type="checkbox" id="lg-d-'+k(g)+'"'+(v.daily!==false?' checked':'')+'> 每天問日報</label><span style="margin-left:auto;display:flex;gap:4px">'+B("lineGroupSave('"+k(g)+"')",'儲存','btn-g')+B("lineGroupDel('"+k(g)+"')",'解除','btn-r')+'</span>');}).join('')||'<div style="font-size:12px;color:var(--b3)">尚未綁定（把機器人拉進工地群組，群組有人講話後會出現在下方）</div>')
-    +(Object.keys(pg).length?('<div style="font-size:12px;margin-top:6px">待綁定的群組：</div>'+Object.keys(pg).map(function(g){return row('<span style="color:var(--b3)">'+esc(g.slice(0,10))+'…　'+esc(new Date((pg[g]&&(pg[g].lastAt||pg[g].at))||0).toLocaleString('zh-TW'))+'</span>'+sel('lg-q-'+k(g),'')+'<label style="font-size:11.5px"><input type="checkbox" id="lg-d-'+k(g)+'" checked> 每天問日報</label><span style="margin-left:auto;display:flex;gap:4px">'+B("lineGroupSave('"+k(g)+"')",'綁定','btn-g')+B("linePendDel('groups','"+k(g)+"')",'忽略')+'</span>');}).join('')):'')
+    +(Object.keys(gr).map(function(g){var v=gr[g]||{};return row('<b>'+esc(v.name||'')+'</b>'+sel('lg-q-'+k(g),v.mode==='company'?'__co':v.qid)+'<label style="font-size:11.5px"><input type="checkbox" id="lg-d-'+k(g)+'"'+(v.daily!==false?' checked':'')+'> 每天問日報</label>'+aud('lg-a-'+k(g),v.audience)+'<span style="margin-left:auto;display:flex;gap:4px">'+B("lineGroupSave('"+k(g)+"')",'儲存','btn-g')+B("lineGroupDel('"+k(g)+"')",'解除','btn-r')+'</span>');}).join('')||'<div style="font-size:12px;color:var(--b3)">尚未綁定（把機器人拉進工地群組，群組有人講話後會出現在下方）</div>')
+    +(Object.keys(pg).length?('<div style="font-size:12px;margin-top:6px">待綁定的群組：</div>'+Object.keys(pg).map(function(g){return row('<span style="color:var(--b3)">'+esc(g.slice(0,10))+'…　'+esc(new Date((pg[g]&&(pg[g].lastAt||pg[g].at))||0).toLocaleString('zh-TW'))+'</span>'+sel('lg-q-'+k(g),'')+'<label style="font-size:11.5px"><input type="checkbox" id="lg-d-'+k(g)+'" checked> 每天問日報</label>'+aud('lg-a-'+k(g),'')+'<span style="margin-left:auto;display:flex;gap:4px">'+B("lineGroupSave('"+k(g)+"')",'綁定','btn-g')+B("linePendDel('groups','"+k(g)+"')",'忽略')+'</span>');}).join('')):'')
     +'<details style="margin-top:10px"><summary style="font-weight:700;font-size:12.5px;cursor:pointer">機器人固定句子（Lotion 定稿；群組裡只會發這些）</summary>'
     +Object.keys(_LINE_TEXTS).map(function(t){return '<div class="f" style="margin-top:6px"><label>'+esc(_LINE_TL[t]||t)+'</label><textarea id="lt-'+t+'" rows="'+(t==='daily3'||t==='dailyCo'?5:2)+'" style="width:100%;box-sizing:border-box;font-size:12px">'+esc(tx[t])+'</textarea></div>';}).join('')
     +'<div style="text-align:right;margin-top:6px">'+B('lineTextsSave()','儲存固定句子','btn-g')+'</div></details>'
-    +'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+B('linePushTest()','傳一則測試通知給擁有者')+B('_lineCfgCache=null;renderLineBox()','重新整理')+'</div>'
+    +'<div id="gt-box">'+_gtBoxHtml()+'</div>'
+    +'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+B('linePushTest()','傳一則測試通知給擁有者')+B('_lineCfgCache=null;_gtStatus=null;renderLineBox()','重新整理')+'</div>'
     +'</div></div>';
 }
 function _lineCfgSet(path,val,okMsg){
@@ -39006,15 +39012,20 @@ function _lineCfgSet(path,val,okMsg){
 function lineOwnerAdd(u){var n=window.prompt('這個 LINE 帳號是誰？（例：Lotion）','Lotion');if(n==null)return;_lineCfgSet('owners/'+u,{name:String(n).trim().slice(0,30)||'擁有者',at:Date.now()},'已設為擁有者').then(function(ok){if(ok)_lineCfgSet('pending/users/'+u,null);});}
 function lineOwnerDel(u){showConfirm('移除擁有者','移除後這個 LINE 帳號傳的檔案不再收件、也不會收到通知。',function(){_lineCfgSet('owners/'+u,null,'已移除');},true);}
 function linePendDel(kind,id){_lineCfgSet('pending/'+(kind==='groups'?'groups':'users')+'/'+id,null);}
-function lineGroupSave(g){
+function lineGroupSave(g,ok2){
   var qid=gv('lg-q-'+g),q=Q.find(function(x){return x.id===qid;});
   var d=!!(document.getElementById('lg-d-'+g)||{}).checked;
+  var a=gv('lg-a-'+g)||'';if(a!=='internal'&&a!=='contractor')a='';
+  // 改版第 5 步 5d：設成「豐有內部」＝整體日報會直接推進群組，先確認群組裡沒有營造廠／業主
+  var cur=(((_lineCfgCache||{}).groups||{})[g]||{}).audience||'';
+  if(a==='internal'&&cur!=='internal'&&!ok2){showConfirm('設成豐有內部群組？','設成「豐有內部」後，每天的整體日報（含包商名稱、人數、未確認工地）會<b>直接</b>推到這個群組。<br>請確定群組裡<b>沒有營造廠、業主</b>。',function(){lineGroupSave(g,true);},false);return;}
+  var ex=a?{audience:a}:{};
   if(qid==='__co'){   // v6.0.119 公司大群組：不綁單一工程，依回報的【工地】地名對專案
-    _lineCfgSet('groups/'+g,{mode:'company',name:'公司大群組',daily:d,at:Date.now()},'已設為公司大群組').then(function(ok){if(ok){_lineCfgSet('pending/groups/'+g,null);_lineSitesSync(true);}});
+    _lineCfgSet('groups/'+g,Object.assign({mode:'company',name:'公司大群組',daily:d,at:Date.now()},ex),'已設為公司大群組').then(function(ok){if(ok){_lineCfgSet('pending/groups/'+g,null);_lineSitesSync(true);}});
     return;
   }
   if(!q){toast('請先選工程');return;}
-  _lineCfgSet('groups/'+g,{qid:qid,name:String(q.name||'').slice(0,40),daily:d,at:Date.now()},'已綁定「'+(q.name||'')+'」').then(function(ok){if(ok)_lineCfgSet('pending/groups/'+g,null);});
+  _lineCfgSet('groups/'+g,Object.assign({qid:qid,name:String(q.name||'').slice(0,40),daily:d,at:Date.now()},ex),'已綁定「'+(q.name||'')+'」').then(function(ok){if(ok)_lineCfgSet('pending/groups/'+g,null);});
 }
 // v6.0.119 公司大群組：把進行中工程的名稱（只有名稱，沒有金額）寫到 lineCfg/sites，機器人拿來比對【工地】地名；
 //   keys＝手動對過的地名（待分類草稿選了工程後記下來，下次同樣寫法自動對到）。管理員裝置開總覽時最多一小時同步一次。
@@ -40917,6 +40928,42 @@ function _sensImport(data){
     try{_markDirty();_autoUpload();}catch(e){_err('_sensImport.up',e);}
     toast('敏感資料已還原（'+n+' 筆）');
   },true);
+}
+// ══════════ 改版第 5 步 5d：整體日報草稿（#8）、待辦同步 Google 工作表（#21）的 FJ 端 ══════════
+// 整體日報：雲端 dailyReport（functions/ops/daily.js）每天 21:30 產生；有營造廠在的群組只建這種草稿，Lotion 複製文字自己轉發、回來按「已轉發」。
+function _dailyOutBody(d){
+  var pl=(d.payload&&typeof d.payload==='object')?d.payload:{};
+  return '<div style="font-size:11.5px;color:var(--b4)">群組：'+esc(_draftS(pl.group).slice(0,40))+'　'+esc(_draftS(pl.date).slice(0,10))+(pl.internal?'（LINE 本月額度快用完，內部群組也改草稿）':'')+'</div>'
+    +'<div style="font-size:12.5px;white-space:pre-wrap;margin:4px 0;max-height:240px;overflow:auto;background:var(--b0,#f6f6f6);border-radius:6px;padding:6px 8px">'+esc(_draftS(pl.text).slice(0,5000))+'</div>';
+}
+function dailyOutCopy(id){
+  var d=DRAFTS[id];if(!d)return;var txt=_draftS(((d.payload||{}).text)).slice(0,5000);
+  var done=function(){toast('已複製，貼到 LINE 群組後回來按「已轉發」');};
+  var fallback=function(){try{var ta=document.createElement('textarea');ta.value=txt;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);done();}catch(e){_err('dailyOutCopy',e);toast('複製失敗，請長按文字自己複製');}};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done,fallback);}else fallback();
+}
+// 待辦同步 Google 工作表：狀態只讀 fydata/gtasksStatus（不含金鑰）；授權只有 Lotion 的帳號（雲端 gtasksAuthStart 再檢查一次）
+var _gtStatus=null;
+function _gtBoxHtml(){
+  var st=_gtStatus||{},me=String((_fbUser&&_fbUser.email)||'').toLowerCase(),own=me==='jhchen0911@gmail.com';
+  var t=st.authed?('✅ 已授權'+(st.lastRun?('　上次同步 '+new Date(st.lastRun).toLocaleString('zh-TW')+'：新建 '+(st.made||0)+'、打勾 '+(st.done||0)+(st.deferred?('、'+st.deferred+' 筆超過今天上限明天建'):'')):'')):(st.authAt?'⚠️ 授權失效，請重新授權':'尚未授權');
+  return '<div style="font-weight:700;font-size:12.5px;margin-top:10px">待辦同步 Google 工作表（「豐有」清單）</div>'
+    +'<div style="font-size:12px;margin:2px 0">'+esc(t)+(st.lastErr?('<div style="color:var(--red)">'+esc(String(st.lastErr).slice(0,160))+'</div>'):'')+'</div>'
+    +'<div style="font-size:11.5px;color:var(--b4)">總覽的雲端待辦（☁）會自動建成 Google 工作、處理好自動打勾；每天最多新建 50 筆。設定步驟見 docs/待辦同步Google工作表_授權操作卡.md。</div>'
+    +(own?'<div style="margin-top:4px"><button type="button" class="btn btn-xs" onclick="gtasksAuth()">'+(st.authed?'重新授權':'授權 Google 工作表')+'</button></div>':'<div style="font-size:11.5px;color:var(--b3)">只有 Lotion 的帳號可以授權</div>');
+}
+function _gtLoad(){
+  if(!_fbDb||!_fbUser||_gtLoad._busy)return;_gtLoad._busy=1;
+  _fbDb.ref('fydata/gtasksStatus').once('value').then(function(s){_gtLoad._busy=0;_gtStatus=s.val()||{};var b=document.getElementById('gt-box');if(b)b.innerHTML=_gtBoxHtml();}).catch(function(){/* 可忽略：規則未發布或非管理員 */_gtLoad._busy=0;});
+}
+function gtasksAuth(){
+  if(_roDeny())return;
+  if(!_fbUser){toast('要登入才能授權');return;}
+  var w=window.open('about:blank','_blank');   // 先開分頁（Safari 擋非點擊開窗），拿到網址再導過去
+  _fbUser.getIdToken().then(function(tk){return fetch(_fnUrl('gtasksAuthStart'),{method:'POST',headers:{'Authorization':'Bearer '+tk,'Content-Type':'application/json'},body:'{}'});})
+    .then(function(r){return r.json().then(function(j){if(!r.ok||!j.url)throw new Error((j.error&&j.error.message)||('HTTP '+r.status));return j.url;});})
+    .then(function(u){if(!/^https:\/\/accounts\.google\.com\//.test(u))throw new Error('網址不正確');if(w)w.location.href=u;else location.href=u;toast('在 Google 畫面選帳號並按「允許」');})
+    .catch(function(e){if(w)try{w.close();}catch(e2){/* 可忽略 */}_err('gtasksAuth',e);toast('授權失敗：'+String(e&&e.message||e).slice(0,80)+'（雲端程式可能還沒部署）');});
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
