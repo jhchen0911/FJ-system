@@ -40737,7 +40737,7 @@ function _bkHealthHtml(){
   var h=BK_HEALTH;
   var head='<div class="card" id="bk-health-card"><div class="cb"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px"><b style="font-size:14px">☁ 雲端每日健檢</b>';
   var canRun=false;try{canRun=!!(_fbUser&&isAdmin(_fbUser.email)&&!_isReaderUser);}catch(e){canRun=false;}
-  if(!h&&!canRun&&!(typeof _isReaderUser!=='undefined'&&_isReaderUser))return head+'<span style="font-size:12px;color:var(--b4)">明細只有管理員看得到</span></div></div></div>';   // 審查：一般員工讀不到，不要顯示成「還沒有結果」
+  if(!h&&_fbUser&&!canRun&&!(typeof _isReaderUser!=='undefined'&&_isReaderUser))return head+'<span style="font-size:12px;color:var(--b4)">明細只有管理員看得到</span></div></div></div>';   // 審查：一般員工讀不到，不要顯示成「還沒有結果」
   if(!h)return head+'<span style="font-size:12px;color:var(--b4)">還沒有結果（雲端程式部署後每天 06:40 跑一次）</span>'+(canRun?'<button type="button" class="btn btn-sm" style="margin-left:auto" onclick="bkHealthRun()">立即跑一次</button>':'')+'</div></div></div>';
   var loc=_bkHealthLocal(),by={};(h.items||[]).forEach(function(x){by[x.key]=x;});
   var c=h.counts||{};
