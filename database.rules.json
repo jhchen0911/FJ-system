@@ -227,6 +227,17 @@
           },
           "payload": {
             ".validate": "newData.hasChildren()",
+            "ops": {
+              "$i": {
+                ".validate": "$i.matches(/^([0-9]|[1-5][0-9])$/)"
+              }
+            },
+            "qid": {
+              ".validate": "newData.isString() && newData.val().length <= 80"
+            },
+            "code": {
+              ".validate": "newData.isString() && newData.val().length <= 60"
+            },
             "file": {
               ".validate": "newData.isString() && newData.val().length <= 1200000 && newData.val().beginsWith('data:image/')"
             }

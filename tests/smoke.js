@@ -9794,7 +9794,7 @@ async function newPage(browser, width, height) {
           rmk: { load: '', extra: ['付款條件：月結 60 天'] }, exs: [] };
         Q.push(q);
         const ops = [
-          { op: 'add', item: { desc: '角撐 H300＋大型撐 H350（第一層）', unit: '式', qty: 1, price: -30000 }, after: { idx: 1, match: '動員費' } },
+          { op: 'add', junk: 'x'.repeat(50), item: { desc: '角撐 H300＋大型撐 H350（第一層）', unit: '式', qty: 1, price: -30000 }, after: { idx: 1, match: '動員費' } },
           { op: 'set', idx: 0, match: 'H型鋼樁', fields: { price: 950, note: '議價後' } },
           { op: 'del', idx: 2, match: '舊項目' },
           { op: 'rmk', key: 'load', value: '20T' },
@@ -9807,12 +9807,22 @@ async function newPage(browser, width, height) {
         // 對不上：說明不一樣、找不到、數量 0、同一列兩個動作
         const bad = _qchgPlan(q, [{ op: 'set', idx: 0, match: '鋼板樁', fields: { price: 1 } }, { op: 'del', match: '不存在' }, { op: 'add', item: { desc: 'X', qty: 0, price: -1 } }, { op: 'set', idx: 1, match: '動員費', fields: { qty: 2 } }, { op: 'del', idx: 1, match: '動員費' }, { op: 'boom' }]);
         out.bad = bad.bad === 5 && bad.rows.filter(x => !x.ok).length === 5;
+        // 審查：同一列後面加兩列照順序；自訂條款兩條一樣時照位置改、同一條兩個動作擋下；繼承來的欄位名不過白名單；說明不能改成空白
+        const q2 = { id: 'qC2', items: [{ desc: 'X', unit: '式', qty: 1, price: 10 }, { desc: 'Y', unit: '式', qty: 1, price: 20 }], rmk: { extra: ['同一句', '同一句'] } };
+        const p2 = _qchgPlan(q2, [{ op: 'add', item: { desc: 'A', qty: 1, price: 1 }, after: { idx: 0, match: 'X' } }, { op: 'add', item: { desc: 'B', qty: 1, price: 1 }, after: { idx: 0, match: 'X' } }, { op: 'rmkSet', n: 1, match: '同一句', text: '第二句' }]);
+        out.order = p2.bad === 0 && p2.items.map(x => x.desc).join('') === 'XABY' && p2.rmk.extra.join('|') === '同一句|第二句';
+        const p3 = _qchgPlan(q2, [{ op: 'rmkSet', n: 0, match: '同一句', text: 'Z' }, { op: 'rmkDel', n: 0, match: '同一句' }, { op: 'set', idx: 0, match: 'X', fields: { constructor: 'x' } }, { op: 'rmk', key: 'toString', value: 'x' }, { op: 'set', idx: 1, match: 'Y', fields: { desc: ' ' } }]);
+        out.guard = p3.bad === 4 && p3.rows.filter(x => !x.ok).length === 4;
         // 唯讀帳號送出：先試算，對不上不送；送出的 payload 帶版次
         const oUser = window._fbUser, oPush = window._draftPush; let pushed = null;
         _fbUser = { email: 'ai@example.com' }; window._draftPush = (t, pl, sm) => { pushed = { t, pl, sm }; return Promise.resolve(true); };
         const r1 = await fyQuoteChange({ qid: 'qC1', ops: [{ op: 'del', match: '不存在' }] });
         const r2 = await fyQuoteChange({ code: 'Q-C1', ops, summary: '于城 V3 加減項' });
-        out.push = !r1.ok && /對不上/.test(r1.why) && r2.ok && pushed && pushed.t === 'qchg' && pushed.pl.qid === 'qC1' && pushed.pl.baseVer === 3 && /未稅 152,000 → 115,000/.test(pushed.sm);
+        Q.push({ id: 'qC1dup', code: 'Q-DUP', name: 'd1', items: [] }, { id: 'qC1dup2', code: 'Q-DUP', name: 'd2', items: [] });
+        const r3 = await fyQuoteChange({ code: 'Q-DUP', ops: [{ op: 'rmkAdd', text: 'x' }] }); Q = Q.filter(x => !/^qC1dup/.test(x.id));
+        out.dupCode = !r3.ok && /2 張/.test(r3.why);
+        out.clean = true;
+        out.push = !r1.ok && /對不上/.test(r1.why) && r2.ok && pushed && pushed.t === 'qchg' && !('junk' in pushed.pl.ops[0]) && pushed.pl.qid === 'qC1' && pushed.pl.baseVer === 3 && /未稅 152,000 → 115,000/.test(pushed.sm);
         window._draftPush = oPush; _fbUser = oUser;
         // Lotion：草稿清單、前後對照、套用 → 開編輯頁存檔、草稿標已套用
         const oMark = window._draftMark; let marked = null; window._draftMark = (id, st, ex) => { marked = { id, st, ex }; return Promise.resolve(true); };
@@ -9824,8 +9834,11 @@ async function newPage(browser, width, height) {
         document.getElementById('gen-confirm-ok').click();
         const q1 = Q.find(x => x.id === 'qC1');
         out.applied = q1.items.length === 3 && q1.items.some(it => +it.price === -30000) && +q1.items[0].price === 950 && q1.rmk.load === '20T' && q1.ver === 3 && marked && marked.id === 'dQC1aa' && marked.st === 'applied';
+        // 審查：這台套用過、雲端還沒回已套用 → 不能再開來套
+        DRAFTS.dQC1aa.status = 'pending'; msgs.length = 0; draftApply('dQC1aa');
+        out.once = msgs.some(m => /已經套用過/.test(m));
+        delete _qchgDone.dQC1aa;
         // 報價被改過、列對不上 → 對照表標紅、按鈕變「關閉」、不能套用
-        DRAFTS.dQC1aa.status = 'pending';
         draftApply('dQC1aa');
         out.stale = /對不上/.test(document.getElementById('gen-confirm-modal').innerHTML) && document.getElementById('gen-confirm-ok').textContent === '關閉';
         document.getElementById('gen-confirm-ok').click();
@@ -9835,6 +9848,7 @@ async function newPage(browser, width, height) {
       window.toast = oT; return out;
     });
     check('AI 改單草稿：新增（含負數減項、接在指定列後）、改單價／備註、刪列、改備註條款數字與自訂條款；全部對位在原報價的複本上，原報價不動', r.plan, JSON.stringify(r));
+    check('AI 改單草稿（審查）：同一列後加兩列照順序；重複條款照位置改；同一條兩個動作、繼承欄位名、空白說明擋下；編號重複不猜；送出只留白名單欄位；這台套用過不能再套', r.order && r.guard && r.dupCode && r.once, JSON.stringify(r));
     check('AI 改單草稿：說明不一樣／找不到／數量 0／同列兩個動作／不認得的動作都擋下；唯讀帳號送出前先試算、對不上不送，草稿帶版次與未稅前後', r.bad && r.push, JSON.stringify(r));
     check('AI 改單草稿：Lotion 草稿清單、前後對照表（減項、未稅與含稅總計）、按「套用」開報價改好存檔、草稿標已套用；套用過再看就對不上、不能再套', r.list && r.diff && r.applied && r.stale && r.notAgain, JSON.stringify(r));
     check('AI 改單草稿測試無 JS 錯誤', errors.length === 0, errors.join(' | '));

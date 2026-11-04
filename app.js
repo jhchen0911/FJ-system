@@ -40710,6 +40710,8 @@ function qMeasReview(){
 var _QCHG_F={desc:1,unit:1,qty:1,price:1,note:1};
 var _QCHG_RMK={load:1,walk:1,tech:1,bh:1,br:1,bs:1,bb:1,c2:1,c3:1,ir:1,mob:1,minQty:1};
 var _QCHG_MAX=60;
+function _qchgHas(o,k){return Object.prototype.hasOwnProperty.call(o,k);}   // 審查：不讓 constructor／toString 這類繼承來的名字過白名單
+function _qchgNumOk(n,lim){return n!=null&&Math.abs(n)<=lim;}
 function _qchgKey(it){return String((it&&it.desc)||'').split('\n')[0].trim();}
 function _qchgNum(v){if(v===''||v==null)return null;var n=parseFloat(v);return isFinite(n)?n:null;}
 // 找列：給 idx 就要 idx 那列的說明第一行等於 match（有給 match 時）；只給 match 就要唯一一列相符
@@ -40724,20 +40726,20 @@ function _qchgRowTxt(it){if(!it)return '';return _qchgKey(it)+'　'+(it.qty!=nul
 // 把動作套到複本：{items, rmk, rows:[{act,ok,why,before,after,d}], bad}
 function _qchgPlan(q,ops){
   var src=(q&&q.items)||[],its=JSON.parse(JSON.stringify(src)),rmk=JSON.parse(JSON.stringify((q&&q.rmk)||{}));if(!Array.isArray(rmk.extra))rmk.extra=[];
-  var ex0=rmk.extra.slice(),rows=[],bad=0;
+  var ex0=rmk.extra.slice(),ex=ex0.map(function(t,n){return {t:t,n:n,del:0};}),seenEx={},rows=[],bad=0;   // 審查：自訂條款用位置改，不用文字找（兩條一樣時不會改錯）
   var no=function(act,why){rows.push({act:act,ok:false,why:why});bad++;};
   if(!Array.isArray(ops)||!ops.length){no('—','沒有任何動作');return {items:its,rmk:rmk,rows:rows,bad:bad};}
   if(ops.length>_QCHG_MAX){no('—','動作太多（上限 '+_QCHG_MAX+'）');return {items:its,rmk:rmk,rows:rows,bad:bad};}
   var mkItem=function(s){s=s||{};var o={desc:String(s.desc||'').slice(0,500),unit:String(s.unit||'').slice(0,20),qty:_qchgNum(s.qty),price:_qchgNum(s.price),note:String(s.note||'').slice(0,200),sec:false};return o;};
   // 先把所有對位解析到「原本那一列的物件」，再改／刪／加，列號不會互相影響
-  var dels=[],adds=[],exDel=[],seen={};
+  var dels=[],adds=[],seen={};
   ops.forEach(function(op){
     op=op&&typeof op==='object'?op:{};var t=String(op.op||'');
     if(t==='add'){
       var ni=mkItem(op.item);
       if(!ni.desc.trim()){no('新增','沒有說明');return;}
-      if(!(ni.qty>0)){no('新增「'+ni.desc.slice(0,30)+'」','數量要大於 0');return;}
-      if(ni.price==null){no('新增「'+ni.desc.slice(0,30)+'」','單價不是數字');return;}
+      if(!(ni.qty>0)||!_qchgNumOk(ni.qty,1e7)){no('新增「'+ni.desc.slice(0,30)+'」','數量要大於 0（而且合理）');return;}
+      if(!_qchgNumOk(ni.price,1e9)){no('新增「'+ni.desc.slice(0,30)+'」','單價不是數字或太大');return;}
       var after=null;if(op.after){var ai=_qchgFind(src,op.after);if(ai<0){no('新增「'+ni.desc.slice(0,30)+'」','找不到要接在後面的那一列（'+String(op.after.match||op.after.idx)+'）');return;}after=its[ai];}
       adds.push({it:ni,after:after});rows.push({act:'新增',ok:true,before:'',after:_qchgRowTxt(ni)+(ni.price<0?'　【減項】':''),d:ni.qty*ni.price});
     }else if(t==='set'||t==='del'){
@@ -40746,46 +40748,63 @@ function _qchgPlan(q,ops){
       if(seen[i]){no(lbl,'同一列有兩個動作');return;}seen[i]=1;
       var o=its[i],before=_qchgRowTxt(o),a0=(parseFloat(o.qty)||0)*(parseFloat(o.price)||0);
       if(t==='del'){dels.push(o);rows.push({act:lbl,ok:true,before:before,after:'（刪除）',d:-a0});return;}
-      var f=op.fields&&typeof op.fields==='object'?op.fields:{},ks=Object.keys(f).filter(function(k){return _QCHG_F[k];});
+      var f=op.fields&&typeof op.fields==='object'?op.fields:{},ks=Object.keys(f).filter(function(k){return _qchgHas(_QCHG_F,k);});
       if(!ks.length){no(lbl,'沒有要改的欄位');return;}
       var nx=JSON.parse(JSON.stringify(o)),why='';
-      ks.forEach(function(k){if(k==='qty'||k==='price'){var n=_qchgNum(f[k]);if(n==null)why=why||(k==='qty'?'數量':'單價')+'不是數字';else nx[k]=n;}else nx[k]=String(f[k]==null?'':f[k]).slice(0,k==='desc'?500:k==='unit'?20:200);});
+      ks.forEach(function(k){if(k==='qty'||k==='price'){var n=_qchgNum(f[k]);if(!_qchgNumOk(n,k==='qty'?1e7:1e9))why=why||(k==='qty'?'數量':'單價')+'不是數字或太大';else nx[k]=n;}else nx[k]=String(f[k]==null?'':f[k]).slice(0,k==='desc'?500:k==='unit'?20:200);});
+      if(!why&&!String(nx.desc||'').trim())why='說明不能空白';
       if(!why&&!((parseFloat(nx.qty)||0)>0)&&(parseFloat(nx.price)||0)<0)why='減項列（負數單價）的數量要大於 0';
       if(!why&&(parseFloat(nx.qty)||0)<0)why='數量不可為負數';
       if(why){no(lbl,why);return;}
       Object.assign(o,nx);rows.push({act:lbl,ok:true,before:before,after:_qchgRowTxt(o),d:(parseFloat(o.qty)||0)*(parseFloat(o.price)||0)-a0});
     }else if(t==='rmk'){
-      var k=String(op.key||'');if(!_QCHG_RMK[k]){no('備註','不認得的欄位 '+k.slice(0,20));return;}
+      var k=String(op.key||'');if(!_qchgHas(_QCHG_RMK,k)){no('備註','不認得的欄位 '+k.slice(0,20));return;}
       var v=String(op.value==null?'':op.value).slice(0,60);rows.push({act:'備註欄位 '+k,ok:true,before:String(rmk[k]||'（空白）'),after:v||'（清空）',d:0});rmk[k]=v;
     }else if(t==='rmkAdd'){
       var tx=String(op.text||'').trim().slice(0,300);if(!tx){no('新增條款','沒有內容');return;}
-      rmk.extra.push(tx);rows.push({act:'新增自訂條款',ok:true,before:'',after:tx,d:0});
+      ex.push({t:tx,n:-1,del:0});rows.push({act:'新增自訂條款',ok:true,before:'',after:tx,d:0});
     }else if(t==='rmkSet'||t==='rmkDel'){
       var n=parseInt(op.n,10),cur=ex0[n],lb=(t==='rmkSet'?'修改':'刪除')+'自訂條款第 '+(n+1)+' 條';
       if(cur==null||(op.match!=null&&String(cur).trim().indexOf(String(op.match).trim())!==0)){no(lb,'對不上（條款內容不一樣或沒有這一條）');return;}
-      if(t==='rmkDel'){exDel.push(n);rows.push({act:lb,ok:true,before:cur,after:'（刪除）',d:0});return;}
+      if(seenEx[n]){no(lb,'同一條有兩個動作');return;}seenEx[n]=1;
+      if(t==='rmkDel'){ex[n].del=1;rows.push({act:lb,ok:true,before:cur,after:'（刪除）',d:0});return;}
       var tx2=String(op.text||'').trim().slice(0,300);if(!tx2){no(lb,'沒有內容（要刪請用刪除）');return;}
-      var pos=rmk.extra.indexOf(cur);if(pos>=0)rmk.extra[pos]=tx2;rows.push({act:lb,ok:true,before:cur,after:tx2,d:0});
+      ex[n].t=tx2;rows.push({act:lb,ok:true,before:cur,after:tx2,d:0});
     }else no('—','不認得的動作 '+t.slice(0,20));
   });
-  adds.forEach(function(a){var p=a.after?its.indexOf(a.after):-1;if(p<0)its.push(a.it);else its.splice(p+1,0,a.it);});
+  var lastIns=new Map();   // 審查：同一列後面加好幾列，照動作的順序排
+  adds.forEach(function(a){var ref=a.after?(lastIns.get(a.after)||a.after):null,p=ref?its.indexOf(ref):-1;if(p<0)its.push(a.it);else its.splice(p+1,0,a.it);if(a.after)lastIns.set(a.after,a.it);});
   its=its.filter(function(it){return dels.indexOf(it)<0;});
-  if(exDel.length){var drop=exDel.map(function(n){return ex0[n];});rmk.extra=rmk.extra.filter(function(x){var j=drop.indexOf(x);if(j>=0){drop.splice(j,1);return false;}return true;});}
+  rmk.extra=ex.filter(function(x){return !x.del;}).map(function(x){return x.t;});
   return {items:its,rmk:rmk,rows:rows,bad:bad};
+}
+// 送出前只留白名單欄位（審查：不把多餘或很長的欄位送上雲端）
+function _qchgClean(ops){
+  var S=function(v,n){return String(v==null?'':v).slice(0,n);},N=function(v){var x=_qchgNum(v);return x==null?null:x;},ref=function(r){if(!r||typeof r!=='object')return null;var o={};if(r.idx!=null&&r.idx!=='')o.idx=parseInt(r.idx,10);if(r.match!=null)o.match=S(r.match,500);return o;};
+  return (ops||[]).slice(0,_QCHG_MAX).map(function(op){
+    op=op&&typeof op==='object'?op:{};var t=S(op.op,10),o={op:t};
+    if(t==='add'){var it=op.item||{};o.item={desc:S(it.desc,500),unit:S(it.unit,20),qty:N(it.qty),price:N(it.price),note:S(it.note,200)};var a=ref(op.after);if(a)o.after=a;}
+    else if(t==='set'||t==='del'){var r=ref(op)||{};if(r.idx!=null)o.idx=r.idx;if(r.match!=null)o.match=r.match;if(t==='set'){o.fields={};Object.keys(op.fields||{}).forEach(function(k){if(_qchgHas(_QCHG_F,k))o.fields[k]=(k==='qty'||k==='price')?N(op.fields[k]):S(op.fields[k],500);});}}
+    else if(t==='rmk'){o.key=S(op.key,20);o.value=S(op.value,60);}
+    else if(t==='rmkAdd'){o.text=S(op.text,300);}
+    else if(t==='rmkSet'||t==='rmkDel'){o.n=parseInt(op.n,10);if(op.match!=null)o.match=S(op.match,300);if(t==='rmkSet')o.text=S(op.text,300);}
+    return o;
+  });
 }
 // 唯讀帳號（AI）送改單草稿：spec＝{qid, ops, summary}；回傳 Promise<{ok, id?, why?, plan?}>（先在本機試算過，對不上就不送）
 function fyQuoteChange(spec){
   spec=spec||{};
   try{
     if(!_fbUser)return Promise.resolve({ok:false,why:'要登入'});
-    var q=Q.find(function(x){return x.id===spec.qid||(spec.code&&x.code===spec.code);});
+    var q=spec.qid?Q.find(function(x){return x.id===spec.qid;}):null;
+    if(!q&&spec.code){var hit=Q.filter(function(x){return x&&x.code===spec.code;});if(hit.length>1)return Promise.resolve({ok:false,why:'報價編號 '+spec.code+' 有 '+hit.length+' 張，請改用 qid'});q=hit[0]||null;}   // 審查：編號重複不猜
     if(!q)return Promise.resolve({ok:false,why:'找不到這張報價（qid 或 code）'});
     var plan=_qchgPlan(q,spec.ops);
     if(plan.bad)return Promise.resolve({ok:false,why:plan.rows.filter(function(r){return !r.ok;}).map(function(r){return r.act+'：'+r.why;}).join('；'),plan:plan.rows});
     var sub0=_qchgSub(q.items),sub1=_qchgSub(plan.items);
     var sm=String(spec.summary||'').trim()||((q.code||'')+' '+(q.name||'')+' V'+(q.ver||1)+' 改單 '+plan.rows.length+' 項');
-    sm=sm.slice(0,160)+'（未稅 '+fmt(sub0)+' → '+fmt(sub1)+'）';
-    var pl={qid:q.id,code:String(q.code||''),baseVer:q.ver||1,baseMt:q._mt||0,ops:JSON.parse(JSON.stringify(spec.ops))};
+    sm=sm.slice(0,140)+'（未稅 '+fmt(sub0)+' → '+fmt(sub1)+'）';
+    var pl={qid:q.id,code:String(q.code||'').slice(0,60),baseVer:q.ver||1,baseMt:q._mt||0,ops:_qchgClean(spec.ops)};
     return _draftPush('qchg',pl,sm).then(function(ok){return ok?{ok:true,plan:plan.rows}:{ok:false,why:'草稿送出失敗'};});
   }catch(e){_err('fyQuoteChange',e);return Promise.resolve({ok:false,why:String(e&&e.message||e)});}
 }
@@ -40795,14 +40814,17 @@ function _qchgBody(d){
   var plan=_qchgPlan(q,pl.ops),ok=plan.rows.filter(function(r){return r.ok;}).length;
   return '<div style="font-size:11.5px;color:var(--b4)">'+esc(_draftS(q.code))+'　'+esc(_draftS(q.name))+'　目前 V'+(q.ver||1)+'　'+ok+' 項可套用'+(plan.bad?('，<b style="color:var(--red)">'+plan.bad+' 項對不上</b>'):'')+'</div>';
 }
+var _qchgDone={};   // 審查：這台已套用過的草稿（雲端還沒回「已套用」或標記失敗時）不能再套一次
 function _qchgOpen(id){
-  var d=DRAFTS[id];if(!d)return;var pl=(d.payload&&typeof d.payload==='object')?d.payload:{};
+  var d=DRAFTS[id];if(!d)return;
+  if(_qchgDone[id]){toast('這份改單這台已經套用過了（雲端狀態還沒更新）；不要再套一次');return;}var pl=(d.payload&&typeof d.payload==='object')?d.payload:{};
   var q=Q.find(function(x){return x.id===pl.qid;});if(!q){toast('找不到這張報價（可能已刪除），請退回');return;}
   var plan=_qchgPlan(q,pl.ops),S=_draftS;
   var sub0=_qchgSub(q.items),sub1=_qchgSub(plan.items),tx=function(s){return Math.round(s*_taxR()/100);};
   var warn=[];
   if((q.ver||1)!==(+pl.baseVer||1))warn.push('草稿依據 V'+(+pl.baseVer||1)+'，目前是 V'+(q.ver||1)+'（V'+(+pl.baseVer||1)+' 已封存）：會改在 V'+(q.ver||1)+'。');
   if((q._mt||0)>(+pl.baseMt||0))warn.push('草稿建立後這張報價被改過；每一列都重新對過說明文字，對不上的不會套用。');
+  if((q._mt||0)>(+pl.baseMt||0)&&!(pl.ops||[]).some(function(o){return o&&(o.op==='set'||o.op==='del'||o.op==='rmkSet'||o.op==='rmkDel');}))warn.push('這份只有新增：報價被改過時請確認不是已經套用過（重複套用會多出一樣的列）。');
   if(q.awarded)warn.push('這案已得標：改工項後，還沒動過的請款單草稿會跟著更新，已有的請款單不會改。');
   var tr=plan.rows.map(function(r){
     return '<tr'+(r.ok?'':' style="background:#fdecea"')+'><td style="white-space:nowrap">'+esc(S(r.act))+'</td><td>'+esc(S(r.before))+'</td><td>'+(r.ok?esc(S(r.after)):'<b style="color:var(--red)">'+esc(S(r.why))+'</b>')+'</td><td style="text-align:right;white-space:nowrap">'+(r.ok&&r.d?((r.d>0?'+':'')+fmt(r.d)):'')+'</td></tr>';
@@ -40830,7 +40852,7 @@ function _qchgApply(id){
   var mt0=q._mt||0;
   try{saveQ();}catch(e){_err('_qchgApply.save',e);}
   var q1=Q.find(function(x){return x.id===q.id;});
-  if(q1&&(q1._mt||0)>mt0){try{logActivity('AI 草稿','套用改單：'+(q.name||'')+' '+plan.rows.length+' 項');}catch(e){_err('_qchgApply.log',e);}toast('已套用改單草稿並儲存（V'+(q1.ver||1)+'）');return true;}
+  if(q1&&(q1._mt||0)>mt0){_qchgDone[id]=1;try{logActivity('AI 草稿','套用改單：'+(q.name||'')+' '+plan.rows.length+' 項');}catch(e){_err('_qchgApply.log',e);}toast('已套用改單草稿並儲存（V'+(q1.ver||1)+'）');return true;}
   toast('改單已放進編輯頁，但還沒存成功：請看提示處理後按「儲存」');return false;
 }
 function _modal(title,bodyHtml,onOk){
