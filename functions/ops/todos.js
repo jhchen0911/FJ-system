@@ -21,6 +21,7 @@ function keysOf(v) {
   v = v || {}; const K = {
     rent: (v.rent || []).map((x) => x.qid), rentSoon: (v.rentSoon || []).map((x) => x.qid + '#' + x.idx), recv: (v.recv || []).map((x) => x.id),
     ret: (v.ret || []).map((x) => x.proj), close: (v.close || []).map((x) => x.qid), rfqVer: (v.rfqVer || []).map((x) => x.qid),
+    bill: (v.bill || []).map((x) => x.qid), overrun: (v.overrun || []).map((x) => x.qid + '#' + x.n),   // 5c
   };
   Object.keys(K).forEach((k) => { K[k] = K[k].map(String).sort(); });
   return K;
@@ -42,7 +43,10 @@ function buildRemind(inp) {
       rentSoon: v.rentSoon.map((x) => ({ qid: x.qid, name: x.name, idx: x.idx, desc: x.desc, expiry: x.expiry, left: x.left })),
       recv: v.recv.map((x) => ({ id: x.id, d: x.d, date: x.date })),
       ret: v.ret.map((x) => ({ proj: x.proj, qid: x.qid, due: x.due, overdue: x.overdue, date: x.date, src: x.src })),
-      close: v.close, rfqVer: v.rfqVer, ticket: v.ticket.map((x) => ({ id: x.id, dueDate: x.dueDate, dd: x.dd })),
+      close: v.close, rfqVer: v.rfqVer,
+      bill: (v.bill || []).map((x) => ({ qid: x.qid, name: x.name, cutDate: x.cutDate, left: x.left, items: x.items })),
+      overrun: (v.overrun || []).map((x) => ({ qid: x.qid, name: x.name, n: x.n, rows: x.rows.map((r) => ({ idx: r.idx, desc: r.desc, pct: r.pct })) })),
+      ticket: v.ticket.map((x) => ({ id: x.id, dueDate: x.dueDate, dd: x.dd })),
     } };
 }
 module.exports = { buildRemind, keysOf, tpeDay };
