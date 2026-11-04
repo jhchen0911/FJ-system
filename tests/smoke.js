@@ -10676,14 +10676,11 @@ async function newPage(browser, width, height) {
       const out = {};
       try {
         const oT = window.toast; window.toast = () => {};
-        // ① 整體日報草稿：清單顯示文字、「複製文字」「已轉發」；按已轉發＝只標記
+        // ① 整體日報草稿 v6.0.176 起走拍板卡：AI 草稿清單不再列（卡片測試在 v6.0.176 區塊）
         DRAFTS = { do1234567890ab: { id: 'do1234567890ab', type: 'dailyOut', by: 'line-bot', byName: 'LINE 機器人', at: Date.now(), status: 'pending', summary: '整體日報：假甲案', payload: { groupId: 'Gc', group: '假甲案', date: '2026-11-04', text: '豐有工程　施工日報\n<b>假</b>' } } };
         const h = _draftListHtml();
-        out.list = /整體日報（請複製轉發）/.test(h) && /複製文字/.test(h) && /已轉發/.test(h) && /&lt;b>假/.test(h) && !/<b>假/.test(h);
-        const oM = window._draftMark; let marked = null; window._draftMark = (id, st) => { marked = [id, st]; return Promise.resolve(true); };
-        draftApply('do1234567890ab');
-        out.apply = !!marked && marked[1] === 'applied';
-        window._draftMark = oM;
+        out.list = !/整體日報/.test(h) && _draftPending().length === 0;
+        out.apply = true;
         // ② 後端待辦點了去對的地方
         const oB = BK_TODO; BK_TODO = { daily: { unconf: { id: 'daily_unconf', src: 'daily', key: 'unconf', text: '整體日報：1 個工地沒確認', go: 'drafts' }, fail: { src: 'daily', key: 'fail', text: 'LINE 沒送出', go: 'staff', urgent: true } } };
         const its = []; _v6TodoItems(its);
@@ -10715,7 +10712,7 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
       return out;
     });
-    check('5d 整體日報草稿：顯示文字（跳脫）、複製文字／已轉發只標記；後端待辦點了開 AI 草稿／人員管理', r.list && r.apply && r.todo, JSON.stringify(r));
+    check('5d 整體日報草稿不進 AI 草稿清單（v6.0.176 走拍板卡）；後端待辦點了開 AI 草稿／人員管理', r.list && r.apply && r.todo, JSON.stringify(r));
     check('5d LINE 群組對象：沒設定＝當作有營造廠、改成豐有內部先確認、存檔帶 audience；Google 工作表授權狀態', r.sel && r.gt && r.save && r.save2 && r.save3 && r.hide, JSON.stringify(r));
     const RF5 = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const rOk = RF5.gtasks['.read'] === 'false' && RF5.gtasks['.write'] === 'false' && RF5.progress['.write'] === 'false' && RF5.dailyOut['.write'] === 'false' && RF5.gtasksStatus['.write'] === 'false'
@@ -10786,6 +10783,52 @@ async function newPage(browser, width, height) {
     const csvF = await page.evaluate((c) => _pnlCostCsv(c), cs);
     check('5c #18 結案實際成本 CSV：前端匯出與雲端同一格式（逐字相同）、只匯出', csvN === csvF && /假主約丙,點工,30000/.test(csvN) && /假主約丙,承包（發包）,22500/.test(csvN), csvN.slice(0, 200));
     check('5c 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+
+  // ── v6.0.176 拍板卡（CLAUDE.md 第 11 條：只有確認／退回／修改）＋整體日報改用拍板卡＋結案實際成本 CSV 收進資料健檢的「匯出 Excel」──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    await page.evaluate(() => { try { Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t) => { window.__clip = t; } }, configurable: true }); } catch (e) { window.__clipErr = String(e); } });
+    const r = await page.evaluate(async () => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = () => {};
+        const mk = (id, txt) => ({ id, type: 'dailyOut', by: 'line-bot', byName: 'LINE 機器人', at: Date.now(), status: 'pending', summary: '整體日報（營造廠群組，請複製轉發）：假乙案', payload: { groupId: 'G' + id, group: '假乙案', date: '2026-11-04', text: txt } });
+        DRAFTS = { doaaaa1111: mk('doaaaa1111', '日報甲<b>x</b>'), dobbbb2222: mk('dobbbb2222', '日報乙'), docccc3333: mk('docccc3333', '日報丙') };
+        const marks = []; const oM = window._draftMark; window._draftMark = (id, st, ex) => { marks.push([id, st, ex && ex.reason]); DRAFTS[id].status = st; return Promise.resolve(true); };
+        const its = []; _v6TodoItems(its);
+        const row = its.find((x) => x.type === 'dec_dailyOut');
+        out.todo = !!row && /3 份待轉發/.test(row.text) && row.jump === "openDecList('dailyOut')" && !its.some((x) => x.type === 'ai_draft');
+        openDecList('dailyOut');
+        const box = document.getElementById('dec-box');
+        const btns = Array.from(box.querySelectorAll('.dec-card')[0].querySelectorAll('button')).map((b) => b.textContent);
+        out.three = JSON.stringify(btns) === JSON.stringify(['退回', '修改', '確認']) && box.querySelectorAll('.dec-card').length === 3 && /&lt;b&gt;x/.test(box.innerHTML) && !box.querySelector(".dec-card b");
+        decAct('dailyOut', 'doaaaa1111', 'ok'); await new Promise((r) => setTimeout(r, 60));
+        out.ok = window.__clip === '日報甲<b>x</b>' && marks[0][0] === 'doaaaa1111' && marks[0][1] === 'applied' && document.getElementById('dec-box').querySelectorAll('.dec-card').length === 2;
+        const oP = window.prompt; window.prompt = () => '這份不用'; decAct('dailyOut', 'dobbbb2222', 'reject'); window.prompt = oP; await new Promise((r) => setTimeout(r, 60));
+        out.rej = marks[1][1] === 'rejected' && marks[1][2] === '這份不用';
+        const oC = window.showConfirm; window.showConfirm = (t, b, ok) => { document.body.insertAdjacentHTML('beforeend', b); document.getElementById('do-edit').value = '改過的日報丙'; ok(); };
+        decAct('dailyOut', 'docccc3333', 'edit'); window.showConfirm = oC; await new Promise((r) => setTimeout(r, 60));
+        out.edit = window.__clip === '改過的日報丙' && marks[2][1] === 'applied';
+        out.done = /都處理完了/.test(document.getElementById('dec-box').innerHTML);
+        const its2 = []; _v6TodoItems(its2); out.gone = !its2.some((x) => x.type === 'dec_dailyOut');
+        window._draftMark = oM;
+        // 資料健檢卡沒有 CSV 鈕；資料健檢頁的「匯出 Excel」＝結案實際成本 CSV
+        PNL_SNAP = { ok: true, latest: { ym: '2026-11', at: Date.now(), ytd: {} }, close: { q1: { qid: 'q1', name: '假案', at: Date.now(), costByCat: { '點工': 100 } } } };
+        out.noBtn = !/匯出結案實際成本（CSV）<\/button>/.test(_pnlSnapHtml()) && /匯出 Excel/.test(_pnlSnapHtml());
+        let dl = null; const oD = window._dlText; window._dlText = (n, t) => { dl = [n, t]; }; _currentReport = 'health'; exportCurrentReportExcel(); window._dlText = oD;
+        out.csv = !!dl && /^結案實際成本_/.test(dl[0]) && /q1,假案,點工,100/.test(dl[1]);
+        document.querySelectorAll('#fy-modal').forEach((m) => m.remove());
+        window.toast = oT;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
+      return out;
+    });
+    check('v6.0.176 拍板卡：總覽待辦一列（不重複進 AI 草稿）→ 卡片只有退回／修改／確認三顆、內容跳脫', r.todo && r.three, JSON.stringify(r));
+    check('v6.0.176 整體日報：確認＝複製並標已轉發、退回＝寫原因不轉、修改＝改文字再複製；處理完待辦消失', r.ok && r.rej && r.edit && r.done && r.gone, JSON.stringify(r));
+    check('v6.0.176 結案實際成本 CSV 收進資料健檢頁的「匯出 Excel」（卡片不另放鈕）', r.noBtn && r.csv, JSON.stringify(r));
+    check('v6.0.176 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
