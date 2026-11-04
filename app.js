@@ -41056,7 +41056,7 @@ function dailyOutCopy(id,txt0){
   var d=DRAFTS[id];if(!d)return Promise.resolve(false);var txt=(txt0!=null?String(txt0):_draftS(((d.payload||{}).text))).slice(0,5000);
   return new Promise(function(res){
   var done=function(){toast('已複製，貼到 LINE 群組');res(true);};
-  var fallback=function(){try{var ta=document.createElement('textarea');ta.value=txt;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);done();}catch(e){_err('dailyOutCopy',e);toast('複製失敗，請長按文字自己複製');res(false);}};
+  var fallback=function(){try{var ta=document.createElement('textarea');ta.value=txt;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;left:-9999px;top:0';document.body.appendChild(ta);ta.select();var okc=document.execCommand('copy');document.body.removeChild(ta);if(!okc)throw new Error('execCommand copy 回傳 false');done();}catch(e){_err('dailyOutCopy',e);toast('複製失敗，這份先不標已轉發；請長按文字自己複製');res(false);}};
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(done,fallback);}else fallback();
   });
 }
@@ -41086,8 +41086,12 @@ function gtasksAuth(){
 // ══════════ v6.0.176 拍板卡（CLAUDE.md 第 11 條：要 Lotion 拍板的一律一張卡、只有「確認／退回／修改」三顆）══════════
 // 第 7 步新首頁之前：總覽待辦一列（_decTodoItems）→ 點進去 openDecList(kind) 逐張處理。新增一種卡＝_decReg 登記一次，主線與小批次共用。
 //   spec = { title, todo(n)→待辦文字, sub, list()→待處理清單, key(it)→id, head(it)→卡片標題, body(it)→卡片內容 HTML（自己跳脫）,
-//            ok(it)→Promise<boolean>, reject(it,reason)→Promise, edit(it)（開自己的修改視窗，存好後呼叫 _decRefresh(kind)）, canSee()→boolean }
-var _DEC={};
+//            fields(it)→[{label,value,money}]（可代替 body；money:true 的欄位非管理員不輸出），
+//            ok(it)→Promise<boolean>, reject(it,reason)→Promise<boolean>（回 false＝沒成功，不顯示成功、卡片留著）, edit(it)（開自己的修改視窗，存好後呼叫 _decRefresh(kind)）, canSee()→boolean }
+//   不綁 drafts：資料從哪來、按了做什麼都由呼叫端給（主線的進退料簽收單、補登版次卡共用）。
+var _DEC={},_DEC_BUSY={};
+function _decIsAdmin(){try{return !_fbUser||(!!_isAdminUser&&!_isReaderUser);}catch(e){return false;}}
+function _decFieldsHtml(fs){var adm=_decIsAdmin();return '<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12.5px">'+(fs||[]).filter(function(f){return f&&(!f.money||adm);}).map(function(f){return '<div style="color:var(--b4)">'+esc(String(f.label||''))+'</div><div>'+esc(String(f.value==null?'':f.value))+'</div>';}).join('')+'</div>';}
 var _DEC_DRAFT_TYPES={dailyOut:1};   // 走拍板卡的草稿類型：AI 草稿清單（_draftPending）不再列
 function _decReg(kind,spec){_DEC[kind]=spec;}
 function _decItems(kind){var k=_DEC[kind];if(!k)return [];try{if(k.canSee&&!k.canSee())return [];return (k.list()||[]).filter(Boolean);}catch(e){_err('_decItems.'+kind,e);return [];}}
@@ -41100,22 +41104,29 @@ function _decCardHtml(kind,it){
   var k=_DEC[kind],id=String(k.key(it));
   var B=function(act,l,c){return '<button type="button" class="btn btn-sm'+(c?' '+c:'')+'" onclick="decAct(\''+escq(kind)+'\',\''+escq(id)+'\',\''+act+'\')">'+l+'</button>';};
   return '<div class="dec-card" data-dec="'+esc(id)+'" style="border:1px solid var(--b1);border-radius:var(--r8);padding:10px 12px;margin-bottom:8px">'
-    +'<div style="font-size:13px;font-weight:700;margin-bottom:4px">'+esc(String(k.head(it)||'').slice(0,200))+'</div>'+(k.body(it)||'')
+    +'<div style="font-size:13px;font-weight:700;margin-bottom:4px">'+esc(String(k.head(it)||'').slice(0,200))+'</div>'+(k.fields?_decFieldsHtml(k.fields(it)):'')+(k.body?(k.body(it)||''):'')
     +'<div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;margin-top:6px">'+B('reject','退回','btn-r')+B('edit','修改')+B('ok','確認','btn-g')+'</div></div>';
 }
 function _decListHtml(kind){var L=_decItems(kind);return L.length?L.map(function(it){return _decCardHtml(kind,it);}).join(''):'<div style="padding:16px;text-align:center;color:var(--b3);font-size:12.5px">都處理完了</div>';}
 function openDecList(kind){
   var k=_DEC[kind];if(!k)return;if(_roDeny())return;
   _modal(k.title,'<div id="dec-box" data-kind="'+esc(kind)+'" style="max-height:65vh;overflow:auto">'+_decListHtml(kind)+'</div>',function(){return true;});
+  try{var ft=document.querySelector('#fy-modal .fy-mdl-foot');if(ft)ft.remove();}catch(e){_err('openDecList.foot',e);}   // 第 11 條：只有卡片上的三顆，視窗不再多「取消／確定」（右上 ✕ 關閉）
   try{if(k.after)k.after(document.getElementById('dec-box'));}catch(e){_err('openDecList.after',e);}
 }
 function _decRefresh(kind){var b=document.getElementById('dec-box');if(b&&b.getAttribute('data-kind')===kind){b.innerHTML=_decListHtml(kind);var k=_DEC[kind];try{if(k&&k.after)k.after(b);}catch(e){_err('_decRefresh.after',e);}}try{updateDashTodo();}catch(e){_err('_decRefresh',e);}}
+function _decLock(id,on){var b=document.getElementById('dec-box');if(!b)return;b.querySelectorAll('.dec-card').forEach(function(c){if(c.getAttribute('data-dec')===String(id))c.querySelectorAll('button').forEach(function(x){x.disabled=!!on;});});}
 function decAct(kind,id,act){
   if(_roDeny())return;var k=_DEC[kind];if(!k)return;
+  var bk=kind+'|'+id;if(_DEC_BUSY[bk])return;   // 審查：連按兩下只做一次
   var it=_decItems(kind).find(function(x){return String(k.key(x))===String(id);});if(!it){toast('這張已經處理過了');_decRefresh(kind);return;}
   if(act==='edit'){try{k.edit(it);}catch(e){_err('decAct.edit',e);}return;}
-  if(act==='reject'){var r=window.prompt('退回原因（選填）','');if(r==null)return;Promise.resolve(k.reject(it,String(r).slice(0,200))).then(function(){toast('已退回');_decRefresh(kind);}).catch(function(e){_err('decAct.reject',e);toast('退回失敗');});return;}
-  Promise.resolve(k.ok(it)).then(function(done){if(done!==false)_decRefresh(kind);}).catch(function(e){_err('decAct.ok',e);toast('確認失敗');});
+  var r=null;if(act==='reject'){r=window.prompt('退回原因（選填）','');if(r==null)return;}
+  _DEC_BUSY[bk]=1;_decLock(id,true);
+  var fin=function(){delete _DEC_BUSY[bk];_decLock(id,false);};
+  var p=act==='reject'?k.reject(it,String(r).slice(0,200)):k.ok(it);
+  Promise.resolve(p).then(function(done){fin();if(done===false){toast(act==='reject'?'退回沒成功，這張還留著':'沒有完成，這張還留著');return;}if(act==='reject')toast('已退回');_decRefresh(kind);})
+    .catch(function(e){fin();_err('decAct.'+act,e);toast(act==='reject'?'退回失敗':'確認失敗');});
 }
 // ── 整體日報（5d #8，雲端 dailyReport 建的 dailyOut 草稿）：確認＝複製文字並標已轉發、退回＝不轉發、修改＝改文字再複製 ──
 _decReg('dailyOut',{
@@ -41123,11 +41134,11 @@ _decReg('dailyOut',{
   canSee:function(){return !_isReaderUser;},
   list:function(){return Object.keys(DRAFTS||{}).map(function(k){return DRAFTS[k];}).filter(function(d){return d&&d.type==='dailyOut'&&d.status==='pending'&&_DRAFT_ID.test(_draftS(d.id));}).sort(function(a,b){return (a.at||0)-(b.at||0);});},
   key:function(d){return d.id;},head:function(d){return _draftS(d.summary);},body:function(d){return _dailyOutBody(d);},
-  ok:function(d,txt){return dailyOutCopy(d.id,txt).then(function(c){if(!c)return false;return _draftMark(d.id,'applied',{}).then(function(){return true;});});},
-  reject:function(d,why){return _draftMark(d.id,'rejected',{reason:why||'不轉發'});},
+  ok:function(d,txt){return dailyOutCopy(d.id,txt).then(function(c){if(!c)return false;return _draftMark(d.id,'applied',{}).then(function(m){return m!==false;});});},   // 審查：標記沒成功（離線／規則擋）＝沒完成
+  reject:function(d,why){return _draftMark(d.id,'rejected',{reason:why||'不轉發'}).then(function(m){return m!==false;});},
   edit:function(d){var t=_draftS((d.payload||{}).text).slice(0,5000);
     showConfirm('修改整體日報','<textarea id="do-edit" style="width:100%;min-height:260px;box-sizing:border-box;font-size:12.5px">'+esc(t)+'</textarea><div style="font-size:11.5px;color:var(--b4);margin-top:4px">改好按確定＝複製改過的文字並標已轉發</div>',function(){
-      var v=String(gv('do-edit')||'').slice(0,5000);_DEC.dailyOut.ok(d,v).then(function(done){if(done!==false)_decRefresh('dailyOut');});
+      var v=String(gv('do-edit')||'').slice(0,5000);_DEC.dailyOut.ok(d,v).then(function(done){if(done!==false)_decRefresh('dailyOut');else toast('沒有完成，這張還留著');}).catch(function(e){_err('dailyOut.edit',e);});
     },false,null,true);}
 });
 function _modal(title,bodyHtml,onOk){
@@ -42806,7 +42817,7 @@ function _prevFitApply(){
 function _prevZoomToggle(){_prevZoom=_prevZoom==='fit'?'100':'fit';_prevFitApply();}
 try{window.addEventListener('resize',function(){try{var pg=document.getElementById('page-preview');if(pg&&pg.classList.contains('active'))_prevFitApply();}catch(e){_err('_prevFitApply.resize',e);}});}catch(e){_err('_prevFitApply.bind',e);}
 function exportCurrentReportExcel(){
-  if(_currentReport==='health'){pnlCostExport();return;}   // v6.0.176 資料健檢頁的 Excel＝結案實際成本 CSV（按鈕盤點表：收進既有匯出，不另加鈕）
+  if(_currentReport==='health'){if(!_decIsAdmin()){toast('結案實際成本只有管理員能匯出');return;}pnlCostExport();return;}   // v6.0.176 資料健檢頁的 Excel＝結案實際成本 CSV（按鈕盤點表：收進既有匯出，不另加鈕）
   if(_currentReport==='shareholder'||_currentReport==='overview'){exportShareholderCSV();return;}   // v6
   if(_currentReport==='sales'){_salesCsv();return;}   // v6.0.74
   if(_currentReport==='comm'){_commCsv();return;}   // v6.0.88

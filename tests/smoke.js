@@ -10680,7 +10680,6 @@ async function newPage(browser, width, height) {
         DRAFTS = { do1234567890ab: { id: 'do1234567890ab', type: 'dailyOut', by: 'line-bot', byName: 'LINE 機器人', at: Date.now(), status: 'pending', summary: '整體日報：假甲案', payload: { groupId: 'Gc', group: '假甲案', date: '2026-11-04', text: '豐有工程　施工日報\n<b>假</b>' } } };
         const h = _draftListHtml();
         out.list = !/整體日報/.test(h) && _draftPending().length === 0;
-        out.apply = true;
         // ② 後端待辦點了去對的地方
         const oB = BK_TODO; BK_TODO = { daily: { unconf: { id: 'daily_unconf', src: 'daily', key: 'unconf', text: '整體日報：1 個工地沒確認', go: 'drafts' }, fail: { src: 'daily', key: 'fail', text: 'LINE 沒送出', go: 'staff', urgent: true } } };
         const its = []; _v6TodoItems(its);
@@ -10712,7 +10711,7 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
       return out;
     });
-    check('5d 整體日報草稿不進 AI 草稿清單（v6.0.176 走拍板卡）；後端待辦點了開 AI 草稿／人員管理', r.list && r.apply && r.todo, JSON.stringify(r));
+    check('5d 整體日報草稿不進 AI 草稿清單（v6.0.176 走拍板卡）；後端待辦點了開 AI 草稿／人員管理', r.list && r.todo, JSON.stringify(r));
     check('5d LINE 群組對象：沒設定＝當作有營造廠、改成豐有內部先確認、存檔帶 audience；Google 工作表授權狀態', r.sel && r.gt && r.save && r.save2 && r.save3 && r.hide, JSON.stringify(r));
     const RF5 = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const rOk = RF5.gtasks['.read'] === 'false' && RF5.gtasks['.write'] === 'false' && RF5.progress['.write'] === 'false' && RF5.dailyOut['.write'] === 'false' && RF5.gtasksStatus['.write'] === 'false'
@@ -10804,6 +10803,7 @@ async function newPage(browser, width, height) {
         openDecList('dailyOut');
         const box = document.getElementById('dec-box');
         const btns = Array.from(box.querySelectorAll('.dec-card')[0].querySelectorAll('button')).map((b) => b.textContent);
+        out.foot = !document.querySelector('#fy-modal .fy-mdl-foot');   // 視窗不多出「取消／確定」
         out.three = JSON.stringify(btns) === JSON.stringify(['退回', '修改', '確認']) && box.querySelectorAll('.dec-card').length === 3 && /&lt;b&gt;x/.test(box.innerHTML) && !box.querySelector(".dec-card b");
         decAct('dailyOut', 'doaaaa1111', 'ok'); await new Promise((r) => setTimeout(r, 60));
         out.ok = window.__clip === '日報甲<b>x</b>' && marks[0][0] === 'doaaaa1111' && marks[0][1] === 'applied' && document.getElementById('dec-box').querySelectorAll('.dec-card').length === 2;
@@ -10814,7 +10814,23 @@ async function newPage(browser, width, height) {
         out.edit = window.__clip === '改過的日報丙' && marks[2][1] === 'applied';
         out.done = /都處理完了/.test(document.getElementById('dec-box').innerHTML);
         const its2 = []; _v6TodoItems(its2); out.gone = !its2.some((x) => x.type === 'dec_dailyOut');
+        // 審查：標記沒成功（離線／規則擋）→ 卡片留著、不顯示成功；連按兩下只做一次；已處理的卡
+        DRAFTS.dodddd4444 = mk('dodddd4444', '日報丁'); openDecList('dailyOut');
+        let calls = 0; window._draftMark = () => { calls++; return Promise.resolve(false); };
+        decAct('dailyOut', 'dodddd4444', 'ok'); decAct('dailyOut', 'dodddd4444', 'ok'); await new Promise((r) => setTimeout(r, 60));
+        out.failKeep = calls === 1 && DRAFTS.dodddd4444.status === 'pending' && document.getElementById('dec-box').querySelectorAll('.dec-card').length === 1;
+        // 複製失敗（clipboard 拒絕、execCommand 回 false）→ 不標記
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('denied'); } }, configurable: true });
+        const oE = document.execCommand; document.execCommand = () => false; calls = 0;
+        decAct('dailyOut', 'dodddd4444', 'ok'); await new Promise((r) => setTimeout(r, 60)); document.execCommand = oE;
+        out.copyFail = calls === 0 && DRAFTS.dodddd4444.status === 'pending';
+        DRAFTS.dodddd4444.status = 'applied'; let tt = ''; window.toast = (m) => { tt = m; }; decAct('dailyOut', 'dodddd4444', 'ok'); out.stale = /已經處理過/.test(tt); window.toast = () => {};
         window._draftMark = oM;
+        // 欄位依角色：money:true 非管理員不輸出
+        _decReg('__t', { title: 't', todo: (n) => 't' + n, list: () => [{ id: 'x1' }], key: (x) => x.id, head: () => '簽收單', fields: () => [{ label: '材料', value: 'H300' }, { label: '金額', value: 'NT$ 9,999', money: true }], ok: () => Promise.resolve(true), reject: () => Promise.resolve(true), edit: () => {} });
+        const oU = window._fbUser, oA = window._isAdminUser; _fbUser = { email: 'w@x.com', uid: 'w' }; _isAdminUser = false;
+        const hw = _decCardHtml('__t', { id: 'x1' }); _isAdminUser = true; const ha = _decCardHtml('__t', { id: 'x1' }); _fbUser = oU; _isAdminUser = oA; delete _DEC.__t;
+        out.money = /H300/.test(hw) && !/9,999/.test(hw) && !/金額/.test(hw) && /9,999/.test(ha);
         // 資料健檢卡沒有 CSV 鈕；資料健檢頁的「匯出 Excel」＝結案實際成本 CSV
         PNL_SNAP = { ok: true, latest: { ym: '2026-11', at: Date.now(), ytd: {} }, close: { q1: { qid: 'q1', name: '假案', at: Date.now(), costByCat: { '點工': 100 } } } };
         out.noBtn = !/匯出結案實際成本（CSV）<\/button>/.test(_pnlSnapHtml()) && /匯出 Excel/.test(_pnlSnapHtml());
@@ -10825,7 +10841,8 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
       return out;
     });
-    check('v6.0.176 拍板卡：總覽待辦一列（不重複進 AI 草稿）→ 卡片只有退回／修改／確認三顆、內容跳脫', r.todo && r.three, JSON.stringify(r));
+    check('v6.0.176 拍板卡：總覽待辦一列（不重複進 AI 草稿）→ 卡片只有退回／修改／確認三顆（視窗不多取消／確定）、內容跳脫；money 欄位非管理員不輸出', r.todo && r.three && r.foot && r.money, JSON.stringify(r));
+    check('v6.0.176 拍板卡（審查）：標記沒成功卡片留著、連按只做一次、複製失敗不標已轉發、已處理的卡提示', r.failKeep && r.copyFail && r.stale, JSON.stringify(r));
     check('v6.0.176 整體日報：確認＝複製並標已轉發、退回＝寫原因不轉、修改＝改文字再複製；處理完待辦消失', r.ok && r.rej && r.edit && r.done && r.gone, JSON.stringify(r));
     check('v6.0.176 結案實際成本 CSV 收進資料健檢頁的「匯出 Excel」（卡片不另放鈕）', r.noBtn && r.csv, JSON.stringify(r));
     check('v6.0.176 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
