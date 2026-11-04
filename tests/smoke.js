@@ -9459,7 +9459,7 @@ async function newPage(browser, width, height) {
     check('v6.0.138 統編查詢：檢查碼（含第 7 碼 7）、g0v 公司／商業兩種格式；空白欄帶入、已填的不蓋改「全部帶入」、同統編不重查；查不到與檢查碼不符只提醒不擋存檔；負責人欄存檔',
       r.chk && r.parse && r.fill && r.fillAll && r.saved && r.cache && r.miss && r.bad && r.vsaved, JSON.stringify(r));
     check('v6.0.138 客戶·廠商 AI 草稿：唯讀帳號送 contact 草稿（不收匯款帳號、名稱統編同→修改）；管理員套用開表單帶入、按儲存才寫入並標已套用；規則放行 contact',
-      r.dErr && r.push && r.form && r.applied && r.reset && /contact\)\$/.test(RF138.drafts.$id['.validate']), JSON.stringify(r));
+      r.dErr && r.push && r.form && r.applied && r.reset && /\|contact(\|[A-Za-z]+)*\)\$/.test(RF138.drafts.$id['.validate']), JSON.stringify(r));
     check('v6.0.138 備註第 14 條：管理員裝置遷移一次（舊全文另存）、切換前的舊報價印舊文字、新報價與新編輯印新文字；參數不是舊第 14 條不自動換；預設值已換', r.mig && r.once && r.reswap && r.oldQ && r.newQ && r.newEd && r.noHit && r.def, JSON.stringify(r));
     check('v6.0.138 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
@@ -10621,6 +10621,72 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.165 備用單價條文：只有一項不編號、兩項 a. b.、都沒填不出現；單張報價可改條文（存在 rmkCustom，不動參數 P.rmkBase）', r.one && r.walkOnly && r.two && r.none && r.ov && r.ph && r.titles && r.saved && r.reset, JSON.stringify(r));
     check('v6.0.165 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── 改版第 5 步 5d：整體日報（#8）、實際進度回填（#9）、待辦同步 Google 工作表（#21）——FJ 端顯示＋雲端純邏輯 ──
+  {
+    const D5 = require('../functions/ops/daily.js'), P5 = require('../functions/ops/progress.js'), G5 = require('../functions/ops/gtasks.js'), S5 = require('../functions/ops/sched.js');
+    const dt = '2026-11-04';
+    const qs = { a: { id: 'a', name: '假甲案', awarded: true, items: [{ desc: '打設', unit: 'M', qty: 10, price: 1 }, { desc: '減項', qty: 1, price: -9 }], dailyLogs: [{ date: dt, crews: [{ type: 'sub', vendor: '假包商', n: 3 }], progressRows: [{ itemIdx: 0, qty: 4 }, { itemIdx: 1, qty: 1 }] }] } };
+    const pl = D5.plan({ quotes: qs, cfg: { groups: { Gi: { mode: 'company', audience: 'internal' }, Gc: { qid: 'a' } } }, date: dt, now: 1 });
+    const nodeOk = pl.sends.length === 1 && pl.sends[0].gid === 'Gi' && /假包商/.test(pl.sends[0].text) && pl.drafts.length === 1 && pl.drafts[0].payload.groupId === 'Gc' && !/假包商/.test(pl.drafts[0].payload.text) && !/減項/.test(pl.sends[0].text);
+    const pr = P5.build({ quotes: qs, projects: { p_a: { id: 'p_a', qid: 'a' } }, now: 1 });
+    const prOk = Object.values(pr.byPid.p_a).length === 1 && Object.values(pr.byPid.p_a)[0].cum === 4;
+    const gp = G5.plan(G5.flatten({ daily: { unconf: { text: 'x' } }, gtasks: { fail: { text: 'y' } } }), { 'health~gone': { task: 't' } }, 0, 50);
+    const gtOk = gp.create.length === 1 && gp.complete.length === 0 && gp.gone.length === 1 && S5.ENABLED === false;   // 消失先記時間、10 分鐘後才打勾
+    check('5d 雲端純邏輯：內部群組直接推（含包商）、營造廠群組（沒設定）只建草稿（不寫包商）、減項不算；進度回填累計；待辦同步建／打勾；#25、26 不啟用', nodeOk && prOk && gtOk, JSON.stringify({ nodeOk, prOk, gtOk }));
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = () => {};
+        // ① 整體日報草稿：清單顯示文字、「複製文字」「已轉發」；按已轉發＝只標記
+        DRAFTS = { do1234567890ab: { id: 'do1234567890ab', type: 'dailyOut', by: 'line-bot', byName: 'LINE 機器人', at: Date.now(), status: 'pending', summary: '整體日報：假甲案', payload: { groupId: 'Gc', group: '假甲案', date: '2026-11-04', text: '豐有工程　施工日報\n<b>假</b>' } } };
+        const h = _draftListHtml();
+        out.list = /整體日報（請複製轉發）/.test(h) && /複製文字/.test(h) && /已轉發/.test(h) && /&lt;b>假/.test(h) && !/<b>假/.test(h);
+        const oM = window._draftMark; let marked = null; window._draftMark = (id, st) => { marked = [id, st]; return Promise.resolve(true); };
+        draftApply('do1234567890ab');
+        out.apply = !!marked && marked[1] === 'applied';
+        window._draftMark = oM;
+        // ② 後端待辦點了去對的地方
+        const oB = BK_TODO; BK_TODO = { daily: { unconf: { id: 'daily_unconf', src: 'daily', key: 'unconf', text: '整體日報：1 個工地沒確認', go: 'drafts' }, fail: { src: 'daily', key: 'fail', text: 'LINE 沒送出', go: 'staff', urgent: true } } };
+        const its = []; _v6TodoItems(its);
+        const bk = its.filter(x => /^bk_daily_/.test(x.type));
+        out.todo = bk.length === 2 && bk.some(x => x.jump === 'openDrafts()') && bk.some(x => x.urgent && /go\('staff'\)/.test(x.jump));
+        BK_TODO = oB;
+        // ③ LINE 群組卡：對象選單（沒設定＝當作有營造廠）；改成內部要先確認；存檔帶 audience
+        const oU = window._fbUser; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'u', getIdToken: async () => 't' };
+        Q.push({ id: 'a', name: '假甲案', awarded: true });
+        _lineCfgCache = { groups: { Gc: { qid: 'a', name: '假甲案', daily: true }, Gi: { mode: 'company', name: '公司大群組', audience: 'internal' } } };
+        _gtStatus = { authed: true, lastRun: Date.now(), made: 2, done: 1 };
+        let box = document.getElementById('line-box'); if (!box) { box = document.createElement('div'); box.id = 'line-box'; document.body.appendChild(box); }
+        renderLineBox();
+        const sc = document.getElementById('lg-a-Gc'), si = document.getElementById('lg-a-Gi');
+        out.sel = !!sc && sc.value === '' && /未設定（當作有營造廠）/.test(sc.options[0].text) && !!si && si.value === 'internal';
+        out.gt = /待辦同步 Google 工作表/.test(box.innerHTML) && /已授權/.test(box.innerHTML) && /重新授權/.test(box.innerHTML);
+        const oC = window.showConfirm, oS = window._lineCfgSet; let conf = 0, saved = null;
+        window.showConfirm = (t, b, ok) => { conf++; ok(); }; window._lineCfgSet = (pth, v) => { saved = [pth, v]; return Promise.resolve(false); };
+        sc.value = 'internal'; lineGroupSave('Gc');
+        out.save = conf === 1 && saved && saved[0] === 'groups/Gc' && saved[1].audience === 'internal' && saved[1].qid === 'a';
+        conf = 0; si.value = 'internal'; document.getElementById('lg-q-Gi').value = '__co'; lineGroupSave('Gi');
+        out.save2 = conf === 0 && saved[1].mode === 'company' && saved[1].audience === 'internal';   // 已經是內部：不再問
+        sc.value = ''; lineGroupSave('Gc');
+        out.save3 = !('audience' in saved[1]);
+        window.showConfirm = oC; window._lineCfgSet = oS; Q.pop();
+        _fbUser = { email: 'staff@x.com', uid: 'u2' }; renderLineBox();
+        out.hide = box.style.display === 'none';
+        _fbUser = oU; _lineCfgCache = null; _gtStatus = null; window.toast = oT;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
+      return out;
+    });
+    check('5d 整體日報草稿：顯示文字（跳脫）、複製文字／已轉發只標記；後端待辦點了開 AI 草稿／人員管理', r.list && r.apply && r.todo, JSON.stringify(r));
+    check('5d LINE 群組對象：沒設定＝當作有營造廠、改成豐有內部先確認、存檔帶 audience；Google 工作表授權狀態', r.sel && r.gt && r.save && r.save2 && r.save3 && r.hide, JSON.stringify(r));
+    const RF5 = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    const rOk = RF5.gtasks['.read'] === 'false' && RF5.gtasks['.write'] === 'false' && RF5.progress['.write'] === 'false' && RF5.dailyOut['.write'] === 'false' && RF5.gtasksStatus['.write'] === 'false'
+      && !/readers/.test(RF5.gtasksStatus['.read'].replace(/!root\.child\('fydata\/readers'\)/g, '')) && /dailyOut\)\$/.test(RF5.drafts.$id['.validate']);
+    check('5d 規則：Google 授權節點全部不可讀寫、進度／發送紀錄／同步狀態只有雲端寫；草稿類型加 dailyOut', rOk);
+    check('5d 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 

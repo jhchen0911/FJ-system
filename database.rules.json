@@ -191,7 +191,7 @@
         ".read": "auth != null && auth.token.email != null && ((auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())) || root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())",
         "$id": {
           ".write": "auth != null && auth.token.email != null && ((auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())) || (root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !data.exists() && newData.child('by').val() === auth.token.email.toLowerCase() && newData.child('status').val() === 'pending' && !newData.hasChild('doneAt') && !newData.hasChild('doneBy') && !newData.hasChild('resultId') && !newData.hasChild('reason')))",
-          ".validate": "newData.hasChildren(['id','type','by','at','status','summary']) && $id.matches(/^[A-Za-z0-9_-]{4,40}$/) && newData.child('id').val() === $id && newData.child('type').isString() && newData.child('type').val().matches(/^(quote|qchg|bid|irPhoto|addon|dailyLog|contact)$/) && newData.child('status').isString() && newData.child('status').val().matches(/^(pending|applied|rejected)$/)",
+          ".validate": "newData.hasChildren(['id','type','by','at','status','summary']) && $id.matches(/^[A-Za-z0-9_-]{4,40}$/) && newData.child('id').val() === $id && newData.child('type').isString() && newData.child('type').val().matches(/^(quote|qchg|bid|irPhoto|addon|dailyLog|contact|dailyOut)$/) && newData.child('status').isString() && newData.child('status').val().matches(/^(pending|applied|rejected)$/)",
           "id": {
             ".validate": "newData.isString()"
           },
@@ -390,6 +390,22 @@
       },
       "todo": {
         ".read": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || root.child('fydata/access').child(auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())",
+        ".write": "false"
+      },
+      "progress": {
+        ".read": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || root.child('fydata/access').child(auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())",
+        ".write": "false"
+      },
+      "dailyOut": {
+        ".read": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()))",
+        ".write": "false"
+      },
+      "gtasks": {
+        ".read": "false",
+        ".write": "false"
+      },
+      "gtasksStatus": {
+        ".read": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()))",
         ".write": "false"
       },
       "health": {
