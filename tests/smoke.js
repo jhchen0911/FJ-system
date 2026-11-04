@@ -10229,6 +10229,79 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── 改版第 5 步 5a：回收筒（第 3 題 A，全部集合 30 天可還原）＋敏感資料備份分開（第 4 題 A） ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const oT = window.toast; window.toast = () => {};
+      try {
+        TRASH = []; TRASH_PRIV = []; delete TOMBS.contracts; delete TOMBS.quotes; delete TOMBS.payables;
+        // 合約：刪 → 進回收筒 → 還原（墓碑還在，但還原時間晚於墓碑 → 合併時不當已刪）
+        CONTRACTS = [{ id: 'ctT', name: '回收測試合約', amount: 100, _mt: Date.now() - 1000 }];
+        _tomb('contracts', 'ctT'); CONTRACTS = CONTRACTS.filter(c => c.id !== 'ctT');
+        out.put = TRASH.length === 1 && TRASH[0].coll === 'contracts' && TRASH[0].rec.name === '回收測試合約';
+        trashRestore('contracts|ctT');
+        const rc = CONTRACTS.find(c => c.id === 'ctT');
+        out.restore = !!rc && rc._restoredAt > 0 && TRASH.length === 0 && !!TOMBS.trash['contracts|ctT'];
+        const m = _mergeColl(CONTRACTS, [], 'contracts', { contracts: { ctT: Date.now() - 500 } });
+        const stale = _mergeColl([{ id: 'ctT', name: '舊', _mt: 1 }], [], 'contracts', { contracts: { ctT: Date.now() - 500 } });
+        out.mergeAlive = m.some(c => c.id === 'ctT') && !stale.some(c => c.id === 'ctT');   // 沒還原過的照樣算已刪
+        // 報價：共用區回收筒去成本、成本存私有回收筒；還原時補回
+        Q.push({ id: 'qT', name: '回收報價', items: [{ desc: 'A', qty: 1, price: 100, estCost: 70 }], costs: [{ id: 'k', amt: 9 }], t: { sub: 100, cost: 70 }, _mt: 1 });
+        _tomb('quotes', 'qT'); Q = Q.filter(q => q.id !== 'qT');
+        const tq = TRASH.find(x => x.id === 'quotes|qT'), tp = TRASH_PRIV.find(x => x.id === 'quotes|qT');
+        out.quoteSplit = !!tq && !tq.rec.costs && !(tq.rec.items[0].estCost) && !!tp && !!tp.sens;
+        trashRestore('quotes|qT'); const rq = Q.find(q => q.id === 'qT');
+        out.quoteRestore = !!rq && (rq.costs || []).length === 1 && rq.items[0].estCost === 70;
+        Q = Q.filter(q => q.id !== 'qT');
+        // 手動應付進私有回收筒；自動應付（分包期別）不進
+        PAYABLES = [{ id: 'mT1', to: '手動廠商', project: 'X', amount: 50, status: 'pending' }, { id: 'pay_ps_T1', to: '薪資', project: 'X', amount: 10, status: 'pending' }];
+        const auto = !!(_paySource(PAYABLES[1]) || {}).auto;
+        _tomb('payables', 'mT1'); _tomb('payables', 'pay_ps_T1');
+        out.pay = TRASH_PRIV.some(x => x.id === 'payables|mT1' && x.rec) && auto && !TRASH_PRIV.some(x => x.id === 'payables|pay_ps_T1');
+        // 到期清除：參數 1 天
+        P.trashDays = 1; TRASH.push({ id: 'old|1', coll: 'contracts', rid: '1', at: Date.now() - 2 * 86400000, rec: {} });
+        const n = _trashPurge(); out.purge = n >= 1 && !TRASH.some(x => x.id === 'old|1'); delete P.trashDays;
+        // 同步清單
+        out.sync = _SYNC_COLLS.includes('trash') && _PRIV_COLLS.includes('trashPriv') && Array.isArray(_syncPayload().data.trash) && Array.isArray(_privatePayload().data.trashPriv);
+        // 敏感資料備份：一般備份不含薪資名冊／薪資單／零用金、人員不含證件；另一個檔有
+        HR = [{ id: 'hrT', name: '某員工' }]; PAYSLIPS = [{ id: 'psT' }]; PETTY = [{ id: 'pcT' }];
+        WORKERS = [{ id: 'wT', name: '某工人', idNo: 'A123456789', regAddr: '某地址' }];
+        const files = []; const ob = window.Blob, oc = URL.createObjectURL, ok = HTMLAnchorElement.prototype.click;
+        window.Blob = function (parts) { this._t = parts.join(''); }; URL.createObjectURL = b => { files.push(b._t); return 'blob:x'; }; HTMLAnchorElement.prototype.click = function () {};
+        exportData();
+        window.__restoreExp = () => { window.Blob = ob; URL.createObjectURL = oc; HTMLAnchorElement.prototype.click = ok; };
+        window.__files = files;
+        const main = JSON.parse(files[0]);
+        out.mainNoSens = !main.hr && !main.payslips && !main.petty && main.workers[0] && !main.workers[0].idNo && !main.workers[0].regAddr && main.sensSplit === 1;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      window.toast = oT;
+      return out;
+    });
+    await page.waitForTimeout(1800);
+    const r2 = await page.evaluate(() => {
+      const out = {};
+      try {
+        window.__restoreExp();
+        const sens = JSON.parse(window.__files[1] || '{}');
+        out.sensFile = sens.kind === 'fy-sens-backup' && sens.hr.length === 1 && sens.payslips.length === 1 && sens.petty.length === 1 && sens.workerSens.wT && sens.workerSens.wT.f.idNo === 'A123456789';
+        HR = []; window.__sens = window.__files[1];
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
+      return out;
+    });
+    await page.evaluate(() => { importData(new File([window.__sens], 'sens.json', { type: 'application/json' })); });
+    await page.waitForSelector('#gen-confirm-ok', { state: 'visible', timeout: 5000 }).catch(() => {});
+    await page.click('#gen-confirm-ok').catch(() => {});
+    await page.waitForTimeout(400);
+    const r3 = await page.evaluate(() => HR.length === 1 && HR[0].id === 'hrT');
+    check('5a 回收筒：刪除先存一份、還原後放回原集合（墓碑還在也不再當已刪；沒還原過的照樣已刪）、回收筒那一筆同步刪掉', r.put && r.restore && r.mergeAlive, JSON.stringify(r));
+    check('5a 回收筒：報價成本存私有回收筒、還原時補回；手動應付進私有回收筒、系統自動應付不進；保留天數參數到期清除；進同步清單', r.quoteSplit && r.quoteRestore && r.pay && r.purge && r.sync, JSON.stringify(r));
+    check('5a 敏感資料備份分開：一般備份不含薪資名冊／薪資單／零用金與人員證件，另存「敏感資料備份」檔；匯入敏感檔只還原那幾塊', r.mainNoSens && r2.sensFile && r3, JSON.stringify({ main: r.mainNoSens, r2, r3 }));
+    check('5a 回收筒／敏感備份測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

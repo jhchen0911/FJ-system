@@ -358,3 +358,19 @@ exports.healthRunNow = onRequest({ region: REGION, cors: ['https://jhchen0911.gi
     res.json({ ok: true, at: h.at, warn: h.warn, counts: h.counts });
   } catch (e) { console.error('healthRunNow', e); res.status(500).json({ error: { message: '健檢失敗' } }); }
 });
+
+// ══════════ 改版第 5 步 5a：回收筒到期清除（後端 30）══════════
+// 每天 03:45（台北）清掉超過保留天數（參數 trashDays，預設 30）的回收筒紀錄；每台裝置開頁也會清，這支確保沒人開也會清。
+const trashCore = require('./ops/trash.js');
+exports.trashPurge = onSchedule({ schedule: '45 3 * * *', timeZone: TZ, region: REGION }, async () => {
+  const db = admin.database(), now = Date.now();
+  const days = (await db.ref('fydata/shared/params/trashDays').once('value')).val();
+  let n = 0;
+  for (const p of ['fydata/shared/trash', 'fydata/private/trashPriv']) {
+    const v = (await db.ref(p).once('value')).val();
+    if (v == null) continue;
+    const r = trashCore.purge(v, days, now);
+    if (r.removed) { await db.ref(p).set(r.keep.length ? r.keep : null); n += r.removed; }
+  }
+  console.log('[回收筒] 清除', n, '筆（保留', trashCore.trashDays(days), '天）');
+});

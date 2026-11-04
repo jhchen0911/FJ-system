@@ -5564,6 +5564,7 @@ function importData(file){
   reader.onload=e=>{
     try{
       const data=JSON.parse(e.target.result);
+      if(data&&data.kind==='fy-sens-backup'){_sensImport(data);return;}   // 改版第 5 步 5a：敏感資料備份另外還原
       if(!data.version||!data.quotes){
         toast('檔案格式不符，請選擇正確的匯出檔案');return;
       }
@@ -5583,7 +5584,7 @@ function importData(file){
         if(data.invoiceRecs)INVOICE_RECS=arr(data.invoiceRecs);
         if(data.expenses)EXPENSES=arr(data.expenses);
         if(data.customers)CUSTOMERS=arr(data.customers);
-        if(data.workers){WORKERS=arr(data.workers);try{localStorage.setItem('fy_workers',JSON.stringify(WORKERS));}catch(e2){_err('importData.workers',e2);}}
+        if(data.workers){WORKERS=arr(data.workers);try{_wkGraft();}catch(e2){_err('importData.wkGraft',e2);}try{localStorage.setItem('fy_workers',JSON.stringify(WORKERS));}catch(e2){_err('importData.workers',e2);}}   // 5a：一般備份的人員不含證件 → 接回本機留的證件
         if(data.projects){PROJECTS=arr(data.projects);try{localStorage.setItem('fy_projects',JSON.stringify(PROJECTS));}catch(e2){_err('importData.projects',e2);}}   // 4a（舊備份沒有 → 保留現值，下面 _prjSync 依報價補建）
         if(data.costHist){COST_HIST=arr(data.costHist);try{localStorage.setItem('fy_cost_hist',JSON.stringify(COST_HIST));}catch(e2){_err('importData',e2);}}
         if(data.dealHist){DEAL_HIST=arr(data.dealHist);try{localStorage.setItem('fy_deal_hist',JSON.stringify(DEAL_HIST));}catch(e2){_err('importData',e2);}}
@@ -7816,6 +7817,10 @@ function exportData(){
     // v5.373 起另含六大工具存檔、施工計畫書草稿與共用附件庫、材料庫存、報價版本歷史
     const data=_syncPayload().data;
     data.exportDate=new Date().toISOString();
+    // 改版第 5 步 5a（第 4 題 A）：薪資名冊、薪資單、零用金、人員證件另存「敏感資料備份」，一般備份不含
+    let _sens=null;try{_sens=_sensBackupOf(data);}catch(e){_err('exportData.sens',e);}
+    delete data.hr;delete data.payslips;delete data.petty;
+    try{data.workers=(data.workers||[]).map(function(w){return _wkSplit(w).pub;});data.sensSplit=1;}catch(e){_err('exportData.wk',e);}
     try{data.paidLog=PAID_LOG;data.payAudit=PAY_AUDIT;data.devId=_devId();data.appVersion=APP_VERSION;}catch(e){_err('exportData.audit',e);}   // v6.0.89
     const json=JSON.stringify(data,null,2);
     const blob=new Blob([json],{type:'application/json'});
@@ -7829,6 +7834,9 @@ function exportData(){
     a.download='豐有工程_全量備份_'+_ry+_mm+_dd+'.json';
     document.body.appendChild(a);a.click();
     setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},1000);
+    if(_sens&&_sensBackupCan()&&((_sens.hr.length+_sens.payslips.length+_sens.petty.length)||Object.keys(_sens.workerSens).length)){
+      setTimeout(function(){try{const b2=new Blob([JSON.stringify(_sens,null,2)],{type:'application/json'});const u2=URL.createObjectURL(b2);const a2=document.createElement('a');a2.href=u2;a2.download='豐有工程_敏感資料備份_'+_ry+_mm+_dd+'.json';document.body.appendChild(a2);a2.click();setTimeout(function(){URL.revokeObjectURL(u2);a2.remove();},1000);toast('另存一份「敏感資料備份」（薪資、零用金、人員證件），請另外保管');}catch(e){_err('exportData.sensFile',e);}},1500);
+    }
     // 記錄備份時間
     localStorage.setItem('fy_last_backup',Date.now().toString());
     updateDashAR();
@@ -8335,6 +8343,7 @@ function _tomb(coll,id,moved){   // moved：改編號（舊 id 換新 id，付�
       var _ps=false;if(!_pr){try{_payAuditLoadSnap();_ps=(_payStatSnap||{})[id]==='paid';}catch(e2){_err('_tomb.snap',e2);}}   // 呼叫端先從陣列拿掉的 → 看上次存檔的狀態
       if((_pr&&_pr.status==='paid')||_ps||(_pl&&(+_pl.paidAt||0)>(+_pl.unpaidAt||0))){console.warn('[應付] 擋下刪除已付應付 '+id);return false;}}catch(e){_err('_tomb.paidGuard',e);}
     try{if(typeof PAID_LOG!=='undefined'&&PAID_LOG[id]){delete PAID_LOG[id];localStorage.setItem('fy_paidlog',JSON.stringify(PAID_LOG));}}catch(e){_err('_tomb.paidLog',e);}}   // v6.0.85
+  if(!moved){try{_trashPut(coll,id);}catch(e){_err('_tomb.trash',e);}}   // 改版第 5 步 5a 回收筒：刪之前先存一份
   TOMBS[coll]=TOMBS[coll]||{};TOMBS[coll][id]=Date.now();
   try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e){_err('_tomb',e);}
   if(!_shWholeOk())try{var _tp=JSON.parse(localStorage.getItem('fy_tombreq_pending')||'{}')||{};_tp[coll+'/'+id]=TOMBS[coll][id];localStorage.setItem('fy_tombreq_pending',JSON.stringify(_tp));}catch(e){_err('_tomb.req',e);}   // v6.0.118：只有本機自己刪的才送刪除申請
@@ -10207,10 +10216,10 @@ function _mergeQHistory(loc,cloud){
   return out;
 }
 var _SYNC_COLLS=['quotes','invoices','upaHistory','params','contracts','vendors','invoiceRecs','activityLog','customers','pagePerms','workers',
-  'tombs','admins','projects',
+  'tombs','admins','projects','trash',
   'matStock','toolrecs','planState','qHistory','toolStates'];   // v5.373 新增（planAttLib 純圖檔，只進本機備份不上雲）
 // 敏感集合：只寫 fydata/private
-var _PRIV_COLLS=['payables','expenses','costHist','upaCostDB','shareProfit','matLedger','dealHist','hr','payslips','petty'];   // v5.433 人員薪資、v5.434 零用金
+var _PRIV_COLLS=['payables','expenses','costHist','upaCostDB','shareProfit','matLedger','dealHist','hr','payslips','petty','trashPriv'];   // 5a 回收筒（敏感）   // v5.433 人員薪資、v5.434 零用金
 function _collHash(v){ // djb2 於 JSON 字串
   var st;try{st=JSON.stringify(v);}catch(e){st=String(v);}
   var h=5381;for(var i=0;i<st.length;i++){h=((h<<5)+h+st.charCodeAt(i))|0;}
@@ -10268,6 +10277,7 @@ function _privatePayload(){
     upaCostDB:UPA_COST_DB, shareProfit:SHARE_PROFIT, matLedger:MAT_LEDGER, dealHist:DEAL_HIST,
     hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]), petty:(typeof PETTY!=='undefined'?PETTY:[]),   // v5.433／v5.434
     paidLog:(typeof PAID_LOG!=='undefined'?PAID_LOG:{}),   // v6.0.85
+    trashPriv:(typeof TRASH_PRIV!=='undefined'?TRASH_PRIV:[]),   // 5a 回收筒（應付、費用、報價成本）
     qHistSens:_qhSensMap(),   // 改版第 0 步：版本歷史的敏感欄位（還沒拉過 private 時是 undefined → 不送這個鍵，不會蓋掉雲端）
     payAudit:(typeof PAY_AUDIT!=='undefined'?PAY_AUDIT.slice(0,1000):[]), uploadedVer:APP_VERSION, uploadedDev:(typeof _devId==='function'?_devId():'')   // v6.0.89 付款狀態稽核＋上傳者版本／裝置
   }};
@@ -10286,6 +10296,7 @@ function _syncPayload(){
     workers:(typeof WORKERS!=='undefined'?WORKERS:[]),   // v5.438
     projects:(typeof PROJECTS!=='undefined'?PROJECTS:[]),   // 4a 專案資料集（只有連結，不含金額 → 共用區）
     shareProfit:SHARE_PROFIT, dealHist:DEAL_HIST, matLedger:MAT_LEDGER, admins:admins,
+    trash:(typeof TRASH!=='undefined'?TRASH:[]), trashPriv:(typeof TRASH_PRIV!=='undefined'?TRASH_PRIV:[]),   // 改版第 5 步 5a 回收筒
     hr:(typeof HR!=='undefined'?HR:[]), payslips:(typeof PAYSLIPS!=='undefined'?PAYSLIPS:[]), petty:(typeof PETTY!=='undefined'?PETTY:[]),   // v5.433 人員薪資／v5.434 零用金（private；全量備份含）
     // v5.373：六大工具存檔、施工計畫書草稿、共用附件庫、材料庫存、報價版本歷史
     matStock:MAT_STOCK, toolrecs:_trAllSafe(), planState:_planStateSaved(),
@@ -10463,6 +10474,7 @@ function _applyCloud(data){
     if(data.activityLog)ACTIVITY_LOG=data.activityLog;
     if(data.customers)CUSTOMERS=_safeMerge(CUSTOMERS,data.customers,'customers');
     if(data.workers){WORKERS=_safeMerge(WORKERS,data.workers,'workers');try{_wkGraft();}catch(e){_err('_applyCloud.wkGraft',e);}try{_lsSet('fy_workers',JSON.stringify(WORKERS),'人員進場資料');}catch(e){_err('_applyCloud.workers',e);}}   // v5.438
+    if(data.trash){try{TRASH=_safeMerge(TRASH,data.trash,'trash');_trashPurge();_trashSave();}catch(e){_err('_applyCloud.trash',e);}}   // 5a 回收筒
     if(data.projects){try{PROJECTS=_safeMerge(PROJECTS,data.projects,'projects');_lsSet('fy_projects',JSON.stringify(PROJECTS),'專案');}catch(e){_err('_applyCloud.projects',e);}}   // 4a
     if(data.matStock){
       try{
@@ -10684,6 +10696,7 @@ function _applySensColls(data,tombs){
   try{if(data.uploadedAt)localStorage.setItem('fy_priv_last_up',JSON.stringify({by:data.uploadedBy||'',ver:data.uploadedVer||'',dev:data.uploadedDev||'',at:parseInt(data.uploadedAt)||0}));}catch(e){_err('_applySensColls.uploader',e);}   // v6.0.89 雲端最後由誰／哪版上傳
   if(data.payables)PAYABLES=_safeMerge(PAYABLES,data.payables,'payables');
   if(data.expenses)EXPENSES=_safeMerge(EXPENSES,data.expenses,'expenses');
+  if(data.trashPriv){try{TRASH_PRIV=_safeMerge(TRASH_PRIV,data.trashPriv,'trashPriv');_trashPurge();_trashSave();}catch(e){_err('_applySensColls.trash',e);}}   // 5a
   if(data.hr){HR=_safeMerge(HR,data.hr,'hr');try{_lsSet('fy_hr',JSON.stringify(HR),'人員薪資');}catch(e){_err('_applySensColls.hr',e);}}   // v5.433
   if(data.payslips){PAYSLIPS=_safeMerge(PAYSLIPS,data.payslips,'payslips');try{_lsSet('fy_payslips',JSON.stringify(PAYSLIPS),'薪資條');}catch(e){_err('_applySensColls.ps',e);}}
   if(data.petty){PETTY=_safeMerge(PETTY,data.petty,'petty');try{_lsSet('fy_petty',JSON.stringify(PETTY),'零用金');}catch(e){_err('_applySensColls.pc',e);}}   // v5.434
@@ -10766,10 +10779,10 @@ function _mergeColl(localArr,cloudArr,collName,cloudTombs){
   var _arr=function(x){if(Array.isArray(x))return x;if(x&&typeof x==='object')return Object.values(x);return [];};
   localArr=_arr(localArr);cloudArr=_arr(cloudArr);
   var lt=(TOMBS[collName]||{});var ct=(cloudTombs&&cloudTombs[collName])||{};
-  var dead=function(id){var d=lt[id]!=null||ct[id]!=null;if(d&&typeof _tombExempt==='function'&&_tombExempt(collName,id))return false;return d;};   // v6.0.44 成本卡仍需要的應付不受墓碑影響
+  var dead=function(id,r){var d=_tombDead(lt,ct,id,r);if(d&&typeof _tombExempt==='function'&&_tombExempt(collName,id))return false;return d;};   // v6.0.44 成本卡仍需要的應付不受墓碑影響
   var mt=function(r){return r._mt||r.ts||r.updatedAt||0;};
   var map={},noId=[];
-  cloudArr.forEach(function(r){if(!r)return;if(!r.id){noId.push(r);return;}if(!dead(r.id))map[r.id]=r;});
+  cloudArr.forEach(function(r){if(!r)return;if(!r.id){noId.push(r);return;}if(!dead(r.id,r))map[r.id]=r;});
   localArr.forEach(function(r){
     if(!r)return;
     if(!r.id){ // 無 id 舊資料：以內容近似去重後保留
@@ -10777,13 +10790,13 @@ function _mergeColl(localArr,cloudArr,collName,cloudTombs){
       if(!noId.some(function(x){return JSON.stringify(x).slice(0,120)===sig;}))noId.push(r);
       return;
     }
-    if(dead(r.id))return;
+    if(dead(r.id,r))return;
     var o=map[r.id];
     if(o&&o!==r&&_CF_COLLS[collName]&&window._applyingCloud){var m3=null;try{m3=_recMerge3(collName,r,o);}catch(e){_err('_mergeColl.m3',e);}if(m3){map[r.id]=m3;return;}}   // 4b 三方合併（兩邊都改過）
     if(!o||mt(r)>=mt(o))map[r.id]=r;
     if(o&&collName==='payables')map[r.id]=_payStatusReconcile(map[r.id],map[r.id]===r?o:r);   // v6.0.67
   });
-  if(_CF_COLLS[collName]&&window._applyingCloud){try{cloudArr.forEach(function(r){if(r&&r.id&&!dead(r.id))_rcbSet(collName,r);});_rcbSave();}catch(e){_err('_mergeColl.rb',e);}}   // 4b 收到的雲端版＝新的共同祖先
+  if(_CF_COLLS[collName]&&window._applyingCloud){try{cloudArr.forEach(function(r){if(r&&r.id&&!dead(r.id,r))_rcbSet(collName,r);});_rcbSave();}catch(e){_err('_mergeColl.rb',e);}}   // 4b 收到的雲端版＝新的共同祖先
   if(noId.length&&(collName==='customers'||collName==='vendors'||collName==='contracts')){   // 4b 審查 B：雲端舊版留下的沒 id 那份，本機已補 id 的同一筆 → 不重複保留
     var nm={};Object.keys(map).forEach(function(k){var x=map[k];if(x&&x.name)nm[String(x.name)]=1;});
     noId=noId.filter(function(x){var n2=typeof x==='string'?x:(x&&x.name);return !(n2&&nm[String(n2).trim()]);});
@@ -40761,6 +40774,120 @@ function bkHealthRun(){
   }).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j&&j.error&&j.error.message)||('HTTP '+r.status));return j;});})
   .then(function(j){toast('雲端健檢完成：'+(j.warn?('需處理 '+j.warn+' 筆'):'沒有發現問題'));_bkHealthLoad(function(){try{renderCurrentReport();}catch(e){_err('bkHealthRun.render',e);}});})
   .catch(function(e){toast('雲端健檢失敗：'+(e&&e.message||'')+'（雲端程式部署了嗎？）');});
+}
+// ══════════ 改版第 5 步 5a：回收筒（後端 30，健檢 2 #14；Lotion 11/04 第 3 題 A：全部集合）══════════
+// 刪除（立墓碑 _tomb）時先把那一筆存一份進回收筒，P.trashDays 天內（預設 30）可在「參數設定 › 系統 › 回收筒」還原；到期由每台裝置（_trashPurge）
+// 與雲端排程 trashPurge 一起清掉。共用區 trash：報價（去成本）、請款單、合約、客戶、廠商（去帳號）、發票紀錄（去影像）、人員（去證件）、專案；
+// 私有區 trashPriv（只有管理員）：應付、費用、報價的成本欄位。系統自動產生的應付／費用不進回收筒（它們會從來源重建）。
+// 還原：記錄放回原集合、蓋 _restoredAt（伺服器時間）→ _mergeColl 看到「還原時間晚於墓碑」就不再當成已刪（_tombDead）；墓碑本身不刪（其他裝置照樣認得）。
+var TRASH=[],TRASH_PRIV=[];
+try{TRASH=JSON.parse(localStorage.getItem('fy_trash')||'[]')||[];}catch(e){TRASH=[];}
+try{TRASH_PRIV=JSON.parse(localStorage.getItem('fy_trash_priv')||'[]')||[];}catch(e){TRASH_PRIV=[];}
+var _TRASH_PRIV_COLLS={payables:1,expenses:1};
+var _TRASH_NAME={quotes:'報價',invoices:'請款單',contracts:'合約',customers:'客戶',vendors:'廠商',invoiceRecs:'發票紀錄',workers:'人員',projects:'專案',payables:'應付',expenses:'費用'};
+var _TRASH_SAVE={quotes:function(){persist();},invoices:function(){saveInv();},contracts:function(){saveContracts();},customers:function(){saveCustomers();},vendors:function(){saveVendors();},
+  invoiceRecs:function(){saveInvoiceRecs();},workers:function(){saveWorkers();},projects:function(){saveProjects();},payables:function(){savePayables();},expenses:function(){saveExpenses();}};
+function _trashDays(){var d=parseInt(P&&P.trashDays,10);return d>0&&d<=365?d:30;}
+function _trashSave(){try{_lsSet('fy_trash',JSON.stringify(TRASH),'回收筒');_lsSet('fy_trash_priv',JSON.stringify(TRASH_PRIV),'回收筒');}catch(e){_err('_trashSave',e);}}
+// 立墓碑前呼叫：把要刪的那一筆存進回收筒（找不到記錄或系統自動產生的就不存）
+function _trashPut(coll,id){
+  try{
+    var g=_TOMB_COLLS[coll];if(!g||id==null)return false;
+    var a=g();if(!Array.isArray(a))return false;
+    var r=a.find(function(x){return x&&x.id===id;});if(!r)return false;
+    if(coll==='payables'){var _src=_paySource(r);if(_src&&_src.auto)return false;}               // 自動應付（分包期別、薪資、抽成…）由來源重建
+    if(coll==='expenses'&&/^E_clean_/.test(String(id)))return false;  // 請款單清潔費自動帶出的費用
+    var now=_srvNow(),key=coll+'|'+id,me=_meEmail()||'';
+    var nm=coll==='invoices'?((r.project||'')+(r.periodNo?(' 第'+r.periodNo+'期'):'')):coll==='payables'?((r.to||'')+' '+(r.project||'')):coll==='expenses'?((r.cat||'')+' '+(r.note||r.desc||'')):(r.name||r.no||r.code||'');
+    var base={id:key,coll:coll,rid:String(id),at:now,_mt:now,by:me,name:String(nm||'').slice(0,60)};
+    TRASH=TRASH.filter(function(x){return x&&x.id!==key;});TRASH_PRIV=TRASH_PRIV.filter(function(x){return x&&x.id!==key;});
+    var rec=JSON.parse(JSON.stringify(r));
+    if(_TRASH_PRIV_COLLS[coll]){TRASH_PRIV.unshift(Object.assign({},base,{rec:rec}));}
+    else{
+      var sh=rec;
+      if(coll==='quotes'){sh=_stripQuoteSens(rec);try{TRASH_PRIV.unshift(Object.assign({},base,{sens:_extractQuoteSens(rec)}));}catch(e){_err('_trashPut.sens',e);}}
+      else if(coll==='vendors'){sh=Object.assign({},rec);delete sh.bank;delete sh.bankAcct;delete sh.bankHolder;}
+      else if(coll==='invoiceRecs'){sh=Object.assign({},rec);if(sh.fileData){sh.fileData='';sh._fileLocal=1;}}
+      else if(coll==='workers'){sh=_wkSplit(rec).pub;}
+      TRASH.unshift(Object.assign({},base,{rec:sh}));
+    }
+    _trashSave();return true;
+  }catch(e){_err('_trashPut',e);return false;}
+}
+// 墓碑判斷：還原過（_restoredAt 晚於墓碑時間）的記錄不算已刪
+function _tombDead(lt,ct,id,r){
+  var t=Math.max(+((lt||{})[id])||0,+((ct||{})[id])||0);
+  if(!t&&(lt||{})[id]==null&&(ct||{})[id]==null)return false;
+  if(r&&r._restoredAt&&+r._restoredAt>t)return false;
+  return true;
+}
+function _trashPurge(){
+  var lim=_srvNow()-_trashDays()*86400000,n0=TRASH.length+TRASH_PRIV.length;
+  TRASH=TRASH.filter(function(x){return x&&(+x.at||0)>=lim;});TRASH_PRIV=TRASH_PRIV.filter(function(x){return x&&(+x.at||0)>=lim;});
+  var n=n0-TRASH.length-TRASH_PRIV.length;if(n)_trashSave();return n;
+}
+function trashRestore(key){
+  if(_roDeny())return;
+  try{if(_fbUser&&!isAdmin(_fbUser.email)){toast('只有管理員可以還原');return;}}catch(e){_err('trashRestore.admin',e);}
+  var e=TRASH.find(function(x){return x&&x.id===key;})||TRASH_PRIV.find(function(x){return x&&x.id===key&&x.rec;});
+  if(!e||!e.rec){toast('找不到這筆（可能已過期清除）');return;}
+  var g=_TOMB_COLLS[e.coll],a=g&&g();if(!Array.isArray(a)){toast('這類資料不能還原');return;}
+  if(a.some(function(x){return x&&x.id===e.rid;})){toast('同一筆已經存在，不用還原');return;}
+  var rec=JSON.parse(JSON.stringify(e.rec));
+  if(e.coll==='quotes'){var s=TRASH_PRIV.find(function(x){return x&&x.id===key&&x.sens;});if(s){try{_applyQuoteSens(rec,s.sens,true);}catch(e2){_err('trashRestore.sens',e2);}}}
+  rec._restoredAt=_srvNow();_touch(rec);
+  a.unshift(rec);
+  TRASH=TRASH.filter(function(x){return x&&x.id!==key;});TRASH_PRIV=TRASH_PRIV.filter(function(x){return x&&x.id!==key;});
+  TOMBS.trash=TOMBS.trash||{};TOMBS.trash[key]=_srvNow();TOMBS.trashPriv=TOMBS.trashPriv||{};TOMBS.trashPriv[key]=_srvNow();try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e6){_err('trashRestore.tomb',e6);}   // 回收筒那一筆也要刪掉，別台同步才不會再出現
+  _trashSave();
+  try{(_TRASH_SAVE[e.coll]||function(){})();}catch(e3){_err('trashRestore.save',e3);}
+  try{logActivity('回收筒','還原'+(_TRASH_NAME[e.coll]||e.coll)+'：'+(e.name||e.rid));}catch(e4){_err('trashRestore.log',e4);}
+  toast('已還原'+(_TRASH_NAME[e.coll]||'')+'：'+(e.name||e.rid));
+  try{if(document.getElementById('gen-confirm-modal').style.display!=='none')openTrash();}catch(e5){/* 可忽略 */}
+}
+function trashDaysSet(v){
+  if(_roDeny())return;
+  var d=parseInt(v,10);if(!(d>0&&d<=365)){toast('天數要在 1～365 之間');return;}
+  P.trashDays=d;try{persistP();_markDirty();_autoUpload();}catch(e){_err('trashDaysSet',e);}   // 只存這一個參數（doSaveP 會從表單重讀全部參數）
+  toast('回收筒保留 '+d+' 天');
+}
+function openTrash(){
+  _trashPurge();
+  var admin=false;try{admin=!_fbUser||isAdmin(_fbUser.email);}catch(e){admin=false;}
+  var all=TRASH.concat(TRASH_PRIV.filter(function(x){return x&&x.rec;})).sort(function(a,b){return (b.at||0)-(a.at||0);});
+  var days=_trashDays();
+  var rows=all.map(function(x){
+    var left=Math.max(0,Math.ceil(((+x.at||0)+days*86400000-_srvNow())/86400000));
+    return '<tr><td>'+esc(_TRASH_NAME[x.coll]||x.coll)+'</td><td>'+esc(x.name||x.rid)+'</td><td style="white-space:nowrap">'+esc(new Date(+x.at||0).toLocaleString('zh-TW',{hour12:false}))+'<div style="font-size:11px;color:var(--b3)">'+esc(String(x.by||''))+'・還剩 '+left+' 天</div></td>'
+      +'<td>'+(admin?'<button type="button" class="btn btn-xs" onclick="trashRestore(\''+esc(x.id).replace(/'/g,'&#39;')+'\')">還原</button>':'')+'</td></tr>';
+  }).join('');
+  var h='<div style="font-size:12px;color:var(--b4);margin-bottom:8px">刪掉的資料保留 '+days+' 天，期限內可以還原（還原只限管理員）。'
+    +(admin?'　保留天數 <input type="number" min="1" max="365" value="'+days+'" style="width:64px" onchange="trashDaysSet(this.value)"> 天':'')+'</div>'
+    +(all.length?'<table class="tbl"><thead><tr><th>類別</th><th>名稱</th><th>刪除時間</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>':'<div style="padding:12px;color:var(--b3)">回收筒是空的</div>');
+  showConfirm('回收筒',h,function(){},false,null,true);
+}
+try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{_trashPurge();}catch(e){_err('trashBoot',e);}},2000);});}catch(e){_err('trashBoot',e);}
+// ══════════ 改版第 5 步 5a：敏感資料備份分開（健檢 2 #13、#15；Lotion 11/04 第 4 題 A）══════════
+// 全量備份拆兩個檔：一般資料（不含薪資名冊、薪資單、零用金、人員證件）；「敏感資料備份」另一個檔，只有管理員（或沒登入的本機模式）會下載。
+// 匯入：一般備份照舊；敏感資料備份（kind fy-sens-backup）只還原那四塊，其他不動。
+function _sensBackupOf(d){
+  var ws={};(d.workers||[]).forEach(function(w){var s=_wkSplit(w).sens;if(s&&w&&w.id)ws[w.id]=s;});
+  Object.keys(WK_SENS||{}).forEach(function(k){if(!ws[k]&&WK_SENS[k])ws[k]=WK_SENS[k];});
+  return {kind:'fy-sens-backup',version:1,exportDate:new Date().toISOString(),appVersion:APP_VERSION,hr:d.hr||[],payslips:d.payslips||[],petty:d.petty||[],workerSens:ws};
+}
+function _sensBackupCan(){try{return !_fbUser||(isAdmin(_fbUser.email)&&!_isReaderUser);}catch(e){return false;}}
+function _sensImport(data){
+  if(!_sensBackupCan()){toast('只有管理員可以還原敏感資料備份');return;}
+  var n=(data.hr||[]).length+(data.payslips||[]).length+(data.petty||[]).length+Object.keys(data.workerSens||{}).length;
+  showConfirm('還原敏感資料備份','<div style="font-size:12.5px;line-height:1.75">會用這個檔取代本機的薪資名冊 '+(data.hr||[]).length+' 筆、薪資單 '+(data.payslips||[]).length+' 筆、零用金 '+(data.petty||[]).length+' 筆，並補回人員證件 '+Object.keys(data.workerSens||{}).length+' 人。<br>其他資料不會動。</div>',function(){
+    var arr=function(x){return Array.isArray(x)?x:(x&&typeof x==='object'?Object.values(x):[]);};
+    HR=arr(data.hr);PAYSLIPS=arr(data.payslips);PETTY=arr(data.petty);
+    try{localStorage.setItem('fy_hr',JSON.stringify(HR));localStorage.setItem('fy_payslips',JSON.stringify(PAYSLIPS));localStorage.setItem('fy_petty',JSON.stringify(PETTY));}catch(e){_err('_sensImport.ls',e);}
+    Object.keys(data.workerSens||{}).forEach(function(k){WK_SENS[k]=data.workerSens[k];});
+    try{_wkSensSave();_wkGraft();localStorage.setItem('fy_workers',JSON.stringify(WORKERS));}catch(e){_err('_sensImport.wk',e);}
+    try{_markDirty();_autoUpload();}catch(e){_err('_sensImport.up',e);}
+    toast('敏感資料已還原（'+n+' 筆）');
+  },true);
 }
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
