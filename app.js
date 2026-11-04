@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.163';
+var APP_VERSION='v6.0.171';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -9893,26 +9893,7 @@ function _mePvRender(){
   var sr0=host.shadowRoot||host.attachShadow({mode:'open'});
   if(o.kind==='order'&&!o.opt.stages.length){sr0.innerHTML='<div style="padding:20px;color:#8a918a;font:13px sans-serif;text-align:center">請至少勾一個階段</div>';host.style.height='';host.setAttribute('data-pages','0');return;}
   var d=_meDoc(o.kind,o.opt,res);
-  var W=_pdfContentPx(true),MM=W/277,MG=Math.round(10*MM),SH=Math.round(210*MM),CH=SH-2*MG,GAP=24;
-  var sr=sr0;
-  sr.innerHTML='<style>'+d.css+'.pvz{position:relative;transform-origin:0 0;width:'+(W+2*MG)+'px}.pvs{position:absolute;left:0;width:'+(W+2*MG)+'px;height:'+SH+'px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}'
-    +'.pvn{position:absolute;bottom:'+Math.round(MG/2)+'px;width:100%;text-align:center;font:10px sans-serif;color:#888}.medoc{position:relative;left:'+MG+'px;top:'+MG+'px;width:'+W+'px}.medoc>*:first-child{margin-top:0}</style>'
-    +'<div class="pvz"><div class="medoc page-wrap">'+d.body+'</div></div>';
-  var z=sr.querySelector('.pvz'),doc=sr.querySelector('.medoc');
-  var k=0,kids=Array.prototype.slice.call(doc.children);
-  var st=function(i){return i*(SH+GAP);};
-  if(doc.offsetHeight>CH+1){
-    kids.forEach(function(c){
-      var top=c.offsetTop,bot=top+c.offsetHeight;
-      if(bot>st(k)+CH+1&&top>st(k)+1){var mt=parseFloat(getComputedStyle(c).marginTop)||0;k++;c.style.marginTop=(mt+st(k)-top)+'px';top=c.offsetTop;if(top<st(k)){c.style.marginTop=(parseFloat(c.style.marginTop)+st(k)-top)+'px';top=c.offsetTop;}bot=top+c.offsetHeight;}
-      while(bot>st(k)+CH+1)k++;   // 單一整塊比一頁還高：匯出時在列與列之間切開
-    });
-  }
-  var n=k+1,bg='';
-  for(var i=0;i<n;i++)bg+='<div class="pvs" style="top:'+st(i)+'px">'+(n>1?'<div class="pvn">'+(i+1)+' / '+n+'</div>':'')+'</div>';
-  z.insertAdjacentHTML('afterbegin',bg);
-  var total=n*SH+(n-1)*GAP,sc=Math.min(1,(host.clientWidth||W)/(W+2*MG));
-  z.style.transform='scale('+sc+')';host.style.height=Math.ceil(total*sc)+'px';host.setAttribute('data-pages',n);
+  _a4Pv(host,d.css,d.body,{landscape:true,cls:'medoc page-wrap'});   // 共用 A4 單據引擎（同一套分頁）
 }
 function matEstExportNow(){
   if(!window._matEstRes)matEstCalc();
@@ -11463,8 +11444,11 @@ function _toolFileName(kind,head,projName){
 }
 // v5.392：工具表單（鋼筋籠／根固砂漿／背填材料／施工進度）改走全站統一的 PDF 引擎，
 // 與報價單／請款單／實績表同一套規則：不縮放、四邊 10mm、填滿才換頁、續頁重印表頭、頁尾頁碼。
-function _toolPrint(title,proj,body,opts){
-  var css='*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
+// ══════════ 共用 A4 單據引擎（改版第 7 步提前，Lotion 11/02：左邊填、右邊即時 A4 預覽；列印＝PDF 一致）══════════
+// 一份版型（_toolDocCss 樣式＋_toolDocHtml 頁首：Logo、標題、專案、日期）同時給「匯出 PDF」（_toolPrint → _printViaIframe）與「右邊即時預覽」（_a4Pv）用，
+// 改一個欄位兩邊一起變；預覽照匯出引擎的口徑模擬分頁（內容寬＝A4 扣左右 10mm、整塊放不下才換頁、整份放得進一頁就一頁）。
+function _toolDocCss(opts){
+  return '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}'
    +'body{font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;color:#1f2937;padding:0;font-size:12.5px}'
    +'h1{font-size:19px;color:#0e3d22;margin:0}.b{color:#0e3d22;font-weight:700;font-size:11.5px;margin:2px 0 8px}'
    +'h2{color:#0e3d22;font-size:14px;margin:12px 0 4px;border-left:4px solid #0e3d22;padding-left:8px}h2 .sub{color:#555;font-size:11.5px;font-weight:600;margin-left:8px}'
@@ -11474,12 +11458,48 @@ function _toolPrint(title,proj,body,opts){
    +'td.l{text-align:left}td.r{text-align:right}tr.tt td{background:#eaf3ed;font-weight:700}'
    +'thead{display:table-header-group}'
    +'@page{size:A4 '+((opts&&opts.landscape)?'landscape':'portrait')+';margin:10mm}';
+}
+function _toolDocHtml(title,proj,body){
+  return '<div style="display:flex;align-items:center;gap:10px"><img src="'+FY_LOGO+'" style="height:36px"><h1>'+_xlEsc(title)+'</h1></div>'
+    +'<div class="b">'+(proj?(_xlEsc(proj)+'　'):'')+'日期：'+localToday()+'</div>'
+    +body;
+}
+function _toolPrint(title,proj,body,opts){
+  var css=_toolDocCss(opts);
   var html='<!DOCTYPE html><html lang="zh-TW"><head><meta charset="utf-8"><title>'+_xlEsc((opts&&opts.fname)||title)+'</title><style>'+css+'</style></head><body>'
     +'<div class="page-wrap">'
-    +'<div style="display:flex;align-items:center;gap:10px"><img src="'+FY_LOGO+'" style="height:36px"><h1>'+_xlEsc(title)+'</h1></div>'
-    +'<div class="b">'+(proj?(_xlEsc(proj)+'　'):'')+'日期：'+localToday()+'</div>'
-    +body+'</div></body></html>';
+    +_toolDocHtml(title,proj,body)+'</div></body></html>';
   _printViaIframe(html,(opts&&opts.fname)||title,!!(opts&&opts.landscape));
+}
+// 即時 A4 預覽（共用）：host＝預覽框，css／body＝跟匯出同一份，o＝{landscape, cls（文件根元素的 class）}；內容放進 shadow DOM（樣式不外漏）
+function _a4Pv(host,css,body,o){
+  if(!host)return 0;o=o||{};
+  var ls=!!o.landscape,sr=host.shadowRoot||host.attachShadow({mode:'open'});
+  var W=_pdfContentPx(ls),MM=W/(ls?277:190),MG=Math.round(10*MM),SH=Math.round((ls?210:297)*MM),CH=SH-2*MG,GAP=24;
+  sr.innerHTML='<style>.a4doc{font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;color:#1f2937;font-size:12.5px}'+css+'.pvz{position:relative;transform-origin:0 0;width:'+(W+2*MG)+'px}.pvs{position:absolute;left:0;width:'+(W+2*MG)+'px;height:'+SH+'px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25)}'
+    +'.pvn{position:absolute;bottom:'+Math.round(MG/2)+'px;width:100%;text-align:center;font:10px sans-serif;color:#888}.a4doc{position:relative;left:'+MG+'px;top:'+MG+'px;width:'+W+'px}.a4doc>*:first-child{margin-top:0}</style>'
+    +'<div class="pvz"><div class="a4doc '+(o.cls||'page-wrap')+'">'+body+'</div></div>';
+  var z=sr.querySelector('.pvz'),doc=sr.querySelector('.a4doc');
+  var k=0,kids=Array.prototype.slice.call(doc.children);
+  var st=function(i){return i*(SH+GAP);};
+  if(doc.offsetHeight>CH+1){
+    kids.forEach(function(c){
+      var top=c.offsetTop,bot=top+c.offsetHeight;
+      if(bot>st(k)+CH+1&&top>st(k)+1){var mt=parseFloat(getComputedStyle(c).marginTop)||0;k++;c.style.marginTop=(mt+st(k)-top)+'px';top=c.offsetTop;if(top<st(k)){c.style.marginTop=(parseFloat(c.style.marginTop)+st(k)-top)+'px';top=c.offsetTop;}bot=top+c.offsetHeight;}
+      while(bot>st(k)+CH+1)k++;   // 單一整塊比一頁還高：匯出時在列與列之間切開
+    });
+  }
+  var n=k+1,bg='';
+  for(var i=0;i<n;i++)bg+='<div class="pvs" style="top:'+st(i)+'px">'+(n>1?'<div class="pvn">'+(i+1)+' / '+n+'</div>':'')+'</div>';
+  z.insertAdjacentHTML('afterbegin',bg);
+  var total=n*SH+(n-1)*GAP,sc=Math.min(1,(host.clientWidth||W)/(W+2*MG));
+  z.style.transform='scale('+sc+')';host.style.height=Math.ceil(total*sc)+'px';host.setAttribute('data-pages',n);
+  return n;
+}
+// 工具單據的右邊預覽：跟「匯出 PDF」同一份標題、專案、內容
+function _toolPv(id,title,proj,body,opts){
+  var h=document.getElementById(id);if(!h)return 0;
+  try{return _a4Pv(h,_toolDocCss(opts),_toolDocHtml(title,proj,body),{landscape:!!(opts&&opts.landscape),cls:'page-wrap'});}catch(e){_err('_toolPv',e);return 0;}
 }
 // ══════════ Word (.docx) 產生器（v5.357：公文級黑白版面＋分節頁碼＋橫向節）══════════
 // 沿用 _zipStore/_crc32，無相依套件。字體採標楷體（公文慣例）＋Times New Roman；
@@ -20216,6 +20236,7 @@ function _rbRender(){
     }).join(''):'<tr><td colspan="9" style="color:var(--b3)">尚無鋼筋量</td></tr>')
     +'</tbody></table></div></div></div>';
   root.innerHTML=h;
+  try{_toolPv('rebar-pv','鋼筋籠檢料表',_rbState.proj,_rbDocBody());}catch(e){_err('_rbRender.pv',e);}   // 右邊即時 A4 預覽
 }
 function _rbHistToggle(){_rbHistOpen=!_rbHistOpen;_rbRender();}
 function _rbSaveRec(){
@@ -20230,7 +20251,7 @@ function _rbLoadRec(id){
   _rbActive=_rbState.types[0]?_rbState.types[0].key:'';
   _rbSave();_rbHistOpen=false;_rbRender();toast('已回載存檔');
 }
-function _rbPrint(){
+function _rbDocBody(){   // 共用 A4 單據引擎：匯出與右邊預覽同一份內容
   var res=_rbCompute(_rbState);
   var n1=function(x,d2){return x==null||!Number.isFinite(Number(x))?'—':Number(x).toLocaleString(undefined,{maximumFractionDigits:d2==null?1:d2});};
   var body='';
@@ -20262,8 +20283,9 @@ function _rbPrint(){
     +'<tr class="tt"><td colspan="'+(okIdx.length+(withBed?2:1)+2)+'" class="r"><b>全部合計'+(withBed?'（含板床）':'')+'</b></td><td class="r"><b>'+n1(res.summary.grand,0)+'</b></td><td class="r"><b>'+res.summary.grandT+'</b></td></tr></table>'
     +'<div class="cond">規範搭接：fc\' '+_rbState.spec.fc+'　fy '+_rbState.spec.fy+'　'+_xlEsc(_rbState.spec.lapClass)+'　ψt '+_rbState.spec.psiT+'　ψe '+_rbState.spec.psiE+'　λ '+_rbState.spec.lambda
     +'｜設計搭接長(m)：'+res.spec.rows.map(function(r){return r.no+'='+r.designM;}).join('、')+'</div>';
-  _toolPrint('鋼筋籠檢料表',_rbState.proj,body,{fname:_toolFileName('rebar','鋼筋籠檢料表',_rbState.proj)});
+  return body;
 }
+function _rbPrint(){_toolPrint('鋼筋籠檢料表',_rbState.proj,_rbDocBody(),{fname:_toolFileName('rebar','鋼筋籠檢料表',_rbState.proj)});}
 function _rbXlsx(){
   var res=_rbCompute(_rbState),sp=_rbState.spec;
   var sheets=[];
@@ -20441,6 +20463,7 @@ function _gtRender(){
     +'<div class="kpi hi" style="flex:1;min-width:200px"><div class="kl">水泥總量（含損耗）</div><div class="kv" style="font-size:19px">'+res.cemT.toFixed(2)+' t</div><div class="ks">約 '+fmt(Math.ceil(res.cemT*1000/50))+' 包（50kg／包）</div></div>'
     +'<div class="kpi hi" style="flex:1;min-width:200px"><div class="kl">砂總量（含損耗）</div><div class="kv" style="font-size:19px">'+res.sandM3.toFixed(1)+' m³</div></div></div>';
   root.innerHTML=h;
+  try{_toolPv('grout-pv','根固水泥砂漿用量表',_gtState.proj,_gtDocBody());}catch(e){_err('_gtRender.pv',e);}   // 右邊即時 A4 預覽
 }
 function _gtHistToggle(){_gtHistOpen=!_gtHistOpen;_gtRender();}
 function _gtSaveRec(){
@@ -20450,7 +20473,7 @@ function _gtSaveRec(){
   toast('已存檔（本機）');if(_gtHistOpen)_gtRender();
 }
 function _gtLoadRec(id){var r=_trGet(id);if(!r)return;_gtState=JSON.parse(JSON.stringify(r.inputs));_gtSave();_gtHistOpen=false;_gtRender();toast('已回載存檔');}
-function _gtPrint(){
+function _gtDocBody(){   // 共用 A4 單據引擎：匯出與右邊預覽同一份內容
   var res=_gtCalc(),st=_gtState;
   var body='<h2>配比 <span class="sub">'+_xlEsc(st.mix.label)+'：水泥 '+st.mix.cement+' kg/m³、砂 '+st.mix.sand+' m³/m³、損耗 '+(st.mix.waste||0)+'%｜基地開挖深度 '+st.dig+' m</span></h2>'
     +'<table><tr><th>樁型</th><th>根固深度(m)</th><th>口徑(m)</th><th>根固段長(m)</th><th>截面積(m²)</th><th>單支立方(m³)</th><th>支數</th><th>水泥/支(kg)</th><th>水泥總量(t)</th><th>砂/支(m³)</th><th>砂總量(m³)</th></tr>'
@@ -20458,8 +20481,9 @@ function _gtPrint(){
       return '<tr><td class="l">'+_xlEsc(p.name)+'</td><td class="r">'+p.depth+'</td><td class="r">'+p.dia+'</td><td class="r">'+r.secLen.toFixed(2)+'</td><td class="r">'+r.area.toFixed(4)+'</td><td class="r">'+r.vol.toFixed(3)+'</td><td class="r">'+p.count+'</td><td class="r">'+Math.round(r.cemPer).toLocaleString()+'</td><td class="r">'+r.cemTot.toFixed(2)+'</td><td class="r">'+r.sandPer.toFixed(3)+'</td><td class="r">'+r.sandTot.toFixed(1)+'</td></tr>';}).join('')
     +'<tr class="tt"><td colspan="8" class="r"><b>合計（含損耗）</b></td><td class="r"><b>'+res.cemT.toFixed(2)+' t</b></td><td></td><td class="r"><b>'+res.sandM3.toFixed(1)+' m³</b></td></tr></table>'
     +'<div class="cond">公式：根固段長＝根固深度−基地開挖深度；截面積＝π/4×口徑²；單支立方＝截面積×段長；水泥＝立方×配比水泥；砂＝立方×配比砂；總量另乘（1＋損耗%）。水泥約 '+Math.ceil(res.cemT*1000/50).toLocaleString()+' 包（50kg/包）。</div>';
-  _toolPrint('根固水泥砂漿用量表',st.proj,body,{fname:_toolFileName('grout','根固水泥砂漿用量表',st.proj)});
+  return body;
 }
+function _gtPrint(){_toolPrint('根固水泥砂漿用量表',_gtState.proj,_gtDocBody(),{fname:_toolFileName('grout','根固水泥砂漿用量表',_gtState.proj)});}
 function _gtXlsx(){
   var st=_gtState;
   var rows=[
@@ -20585,6 +20609,7 @@ function _bfRender(){
     +'<div class="kpi hi" style="flex:1;min-width:200px"><div class="kl">3000psi 混凝土</div><div class="kv" style="font-size:19px">'+res.concM3.toFixed(1)+' m³</div></div>'
     +'<div class="kpi hi" style="flex:1;min-width:200px"><div class="kl">'+esc(st.barNo)+' 鋼筋 L='+(st.barLen*100).toFixed(0)+'cm</div><div class="kv" style="font-size:19px">'+fmt(res.bars)+' 支</div><div class="ks">約 '+res.barKg.toFixed(0)+' kg</div></div></div>';
   root.innerHTML=h;
+  try{_toolPv('backfill-pv','背填材料用量表',_bfState.proj,_bfDocBody());}catch(e){_err('_bfRender.pv',e);}   // 右邊即時 A4 預覽
 }
 function _bfHistToggle(){_bfHistOpen=!_bfHistOpen;_bfRender();}
 function _bfSaveRec(){
@@ -20594,7 +20619,7 @@ function _bfSaveRec(){
   toast('已存檔（本機）');if(_bfHistOpen)_bfRender();
 }
 function _bfLoadRec(id){var r=_trGet(id);if(!r)return;_bfState=JSON.parse(JSON.stringify(r.inputs));_bfSave();_bfHistOpen=false;_bfRender();toast('已回載存檔');}
-function _bfPrint(){
+function _bfDocBody(){   // 共用 A4 單據引擎：匯出與右邊預覽同一份內容
   var res=_bfCalc(),st=_bfState;
   var body='<h2>共同條件 <span class="sub">基地周長 '+st.perim+' m｜車道長度 '+st.drive+' m｜背填厚度 '+st.thick+' m｜鋼筋 '+_xlEsc(st.barNo)+' L='+(st.barLen*100).toFixed(0)+'cm｜損耗 '+(st.waste||0)+'%</span></h2>'
     +'<table><tr><th>層</th><th>圍令規格</th><th>規格高(m)</th><th>含車道</th><th>該層周長(m)</th><th>間距(m)</th><th>混凝土(m³)</th><th>鋼筋(支)</th><th>鋼筋(kg)</th></tr>'
@@ -20602,8 +20627,9 @@ function _bfPrint(){
       return '<tr><td>'+_xlEsc(L.name)+'</td><td>'+_xlEsc(L.size)+'</td><td class="r">'+L.h+'</td><td>'+(L.incDrive?'✓':'—')+'</td><td class="r">'+r.perim.toFixed(0)+'</td><td class="r">'+L.gap+'</td><td class="r">'+r.conc.toFixed(2)+'</td><td class="r">'+r.bars.toLocaleString()+'</td><td class="r">'+r.barKg.toFixed(1)+'</td></tr>';}).join('')
     +'<tr class="tt"><td colspan="6" class="r"><b>合計（含損耗）</b></td><td class="r"><b>'+res.concM3.toFixed(2)+'</b></td><td class="r"><b>'+res.bars.toLocaleString()+'</b></td><td class="r"><b>'+res.barKg.toFixed(1)+'</b></td></tr></table>'
     +'<div class="cond">公式：背填混凝土＝該層周長×圍令規格高×背填厚度；背填鋼筋支數＝該層周長÷間距（無條件進位）；鋼筋重＝支數×單支長×單位重；合計另乘（1＋損耗%）。含車道層的周長＝基地周長＋車道長度。</div>';
-  _toolPrint('背填材料用量表',st.proj,body,{fname:_toolFileName('backfill','背填材料用量表',st.proj)});
+  return body;
 }
+function _bfPrint(){_toolPrint('背填材料用量表',_bfState.proj,_bfDocBody(),{fname:_toolFileName('backfill','背填材料用量表',_bfState.proj)});}
 function _bfXlsx(){
   var st=_bfState;
   var rows=[
