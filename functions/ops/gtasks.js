@@ -35,19 +35,21 @@ function flatten(todo, cfg) {
 }
 
 // 算要做什麼：create（新建）、reopen（重新出現：取消打勾）、retitle（文字變了）、complete（消失：打勾）、deferred（超過今天上限）
-function plan(items, map, madeToday, limit) {
-  map = map || {}; limit = limit == null ? DAILY_LIMIT : limit;
+const GONE_MS = 10 * 60 * 1000;   // 審查：卡片消失 10 分鐘以上才打勾（來源整段重寫時的瞬間消失不會打勾又取消）
+function plan(items, map, madeToday, limit, nowTs) {
+  map = map || {}; limit = limit == null ? DAILY_LIMIT : limit; nowTs = nowTs || Date.now();
   const room = Math.max(0, limit - (madeToday || 0));
   const now = {}; items.forEach((it) => { now[it.gid] = it; });
-  const create = [], reopen = [], retitle = [], complete = [], deferred = [];
+  const create = [], reopen = [], retitle = [], complete = [], deferred = [], gone = [], back = [];
   items.forEach((it) => {
     const m = map[it.gid];
     if (!m || !m.task) { if (create.length < room) create.push(it); else deferred.push(it); return; }
+    if (m.goneAt) back.push(it.gid);
     if (m.done) reopen.push({ gid: it.gid, task: m.task, title: it.title });
     else if (m.title !== it.title) retitle.push({ gid: it.gid, task: m.task, title: it.title });
   });
-  Object.keys(map).forEach((g) => { const m = map[g]; if (m && m.task && !m.done && !now[g]) complete.push({ gid: g, task: m.task }); });
-  return { create, reopen, retitle, complete, deferred };
+  Object.keys(map).forEach((g) => { const m = map[g]; if (!m || !m.task || m.done || now[g]) return; if (m.goneAt && nowTs - m.goneAt >= GONE_MS) complete.push({ gid: g, task: m.task }); else if (!m.goneAt) gone.push(g); });
+  return { create, reopen, retitle, complete, deferred, gone, back };
 }
 
 // 授權網址（Lotion 按 FJ「授權 Google 工作表」→ 雲端產生這個網址 → 瀏覽器開啟同意）
@@ -100,17 +102,20 @@ async function exchange(f, clientId, clientSecret, redirect, code) {
 // 回傳 { listId, map（新的對應表）, made, done, errs, deferred }
 async function run(io) {
   const items = flatten(io.todo, io.cfg);
-  const map = Object.assign({}, io.map || {});
-  const p = plan(items, map, io.madeToday, io.limit);
-  const listId = await io.api.ensureList(io.listId);
-  const errs = []; let made = 0, done = 0;
   const now = io.now || Date.now();
+  const listId = await io.api.ensureList(io.listId);
+  // 審查：「豐有」清單在 Google 被刪、重建成新清單 → 舊對應作廢，全部卡片在新清單重建
+  const map = (io.listId && listId !== io.listId) ? {} : Object.assign({}, io.map || {});
+  const p = plan(items, map, io.madeToday, io.limit, now);
+  p.gone.forEach((g) => { map[g] = Object.assign({}, map[g], { goneAt: now }); });
+  p.back.forEach((g) => { const m = Object.assign({}, map[g]); delete m.goneAt; map[g] = m; });
+  const errs = []; let made = 0, done = 0;
   for (const it of p.create) {
     try { const t = await io.api.create(listId, it); if (t && t.id) { map[it.gid] = { task: t.id, title: it.title, done: false, at: now }; made++; } }
     catch (e) { errs.push(it.gid + '：' + e.message); if (/授權/.test(e.message)) break; }
   }
   for (const x of p.reopen.concat(p.retitle)) {
-    try { const r = await io.api.patch(listId, x.task, { status: 'needsAction', title: x.title }); if (r && r.notFound) delete map[x.gid]; else map[x.gid] = Object.assign({}, map[x.gid], { title: x.title, done: false, at: now }); }
+    try { const r = await io.api.patch(listId, x.task, { status: 'needsAction', title: x.title }); if (r && r.notFound) delete map[x.gid]; else { const m = Object.assign({}, map[x.gid], { title: x.title, done: false, at: now }); delete m.goneAt; map[x.gid] = m; } }
     catch (e) { errs.push(x.gid + '：' + e.message); }
   }
   for (const x of p.complete) {
@@ -127,4 +132,4 @@ function failTodo(errs, now) {
   return { fail: { id: 'gtasks_fail', src: 'gtasks', key: 'fail', urgent: false, text: '待辦同步 Google 工作表失敗 ' + errs.length + ' 筆', sub: String(errs[0]).slice(0, 120), go: 'staff', at: now || Date.now() } };
 }
 
-module.exports = { flatten, plan, authUrl, stateOk, client, exchange, run, failTodo, gid, LIST_TITLE, DAILY_LIMIT, SCOPE, STATE_TTL_MS };
+module.exports = { GONE_MS, flatten, plan, authUrl, stateOk, client, exchange, run, failTodo, gid, LIST_TITLE, DAILY_LIMIT, SCOPE, STATE_TTL_MS };

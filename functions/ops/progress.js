@@ -1,7 +1,7 @@
 // 改版第 5 步 5d #9：實際進度回填（純邏輯；單元測試 functions/test/progress.test.js）
 // 已確認的施工日報（q.dailyLogs 的數量列）→ 每個專案每個工項的實際日期與累計數量，雲端寫 fydata/progress/<專案 id>/<工項 key>。
 // 7c 的整案排程讀這裡填「實際開始／實際完成」。只放數量與日期，不放金額（唯讀帳號也讀得到）。
-//   工項 key＝「報價工項列號＋說明第一行」的雜湊（主線 11/04）：列號會因插列變動，前端讀時用 name（說明第一行）對回去。
+//   工項 key＝「報價 id＋報價工項列號＋說明第一行」的雜湊（主線 11/04；審查加報價 id，主約與追加不撞）：列號會因插列變動，前端讀時用 qid＋name（說明第一行）對回去。
 //   打設／拔除分開累計（跟前端 _itemCat／_prPhase 同一套判斷）；減項列（單價負數，前端 _qNegLine）不回填。
 //   對不到工項的數量列（列號超出、指到分段標題／備用單價／減項）→ 後端待辦給工務。
 'use strict';
@@ -12,7 +12,8 @@ function arr(x) { return Array.isArray(x) ? x.filter(Boolean) : (x && typeof x =
 function num(x) { const n = parseFloat(x); return isFinite(n) ? n : 0; }
 function firstLine(s) { return String(s == null ? '' : s).split(/\r?\n/)[0].trim(); }
 
-function itemKey(idx, desc) { return 'k' + crypto.createHash('sha1').update(String(idx) + '|' + firstLine(desc)).digest('hex').slice(0, 12); }
+// 審查：主約與追加的同列同名工項會撞 key → 雜湊再加報價 id（7c 讀時用 qid＋name 對回去）
+function itemKey(idx, desc, qid) { return 'k' + crypto.createHash('sha1').update(String(qid || '') + '|' + String(idx) + '|' + firstLine(desc)).digest('hex').slice(0, 12); }
 
 // 跟前端 _itemCat 一樣：有指定類別用類別，沒指定用說明關鍵字推定
 function itemCat(it) {
@@ -50,7 +51,7 @@ function build(inp) {
         const it = items[idx];
         if (!it || it.sec || it.spare) { bad++; return; }
         if (D.negLine(it)) return;   // 減項列不回填
-        const k = itemKey(idx, it.desc);
+        const k = itemKey(idx, it.desc, q.id);
         const a = acc[k] || (acc[k] = { qid: q.id, idx, name: firstLine(it.desc).slice(0, 60), unit: String(it.unit || '').slice(0, 10), target: Math.abs(num(it.qty)), first: '', last: '', cum: 0, days: 0, rFirst: '', rLast: '', rCum: 0, _d: {} });
         const ph = phaseOf(it, r);
         if (ph === 'remove') { a.rCum += qty; if (!a.rFirst || L.date < a.rFirst) a.rFirst = L.date; if (L.date > a.rLast) a.rLast = L.date; }

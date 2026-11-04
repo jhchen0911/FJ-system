@@ -35,14 +35,14 @@ test('內部群組直接推、營造廠群組（含沒設定）只建草稿；�
   assert.match(co, /H 型鋼樁打設 24M/);
   assert.doesNotMatch(co, /第二行|議價減項|已結案/);   // 只寫說明第一行、減項不算數量、已結案不列
   assert.match(co, /備註：下午下雨停半天/);
-  assert.ok(p.todo.unconf && /1 個工地日報沒確認/.test(p.todo.unconf.text));
+  assert.ok(p.todo.unconf_20261104 && /1 個工地日報沒確認/.test(p.todo.unconf_20261104.text));
 });
 
 test('對外版（營造廠）不寫包商名稱、不寫未確認名單、不放金額', () => {
   const p = D.plan({ quotes, cfg, pending, date, now: 1 });
   const t = p.drafts[0].payload.text;
   assert.match(t, /人力：7 人/);
-  assert.doesNotMatch(t, /假工程行|承包|未確認|未回報|NT\$|500|3000/);
+  assert.doesNotMatch(t, /假工程行|承包|未確認|未回報|NT\$|500|3000|備註|下雨/);   // 審查：現場自由輸入的備註可能寫到包商或金額，對外版不帶
   assert.strictEqual(p.drafts[0].type, 'dailyOut');
   assert.match(p.drafts[0].id, /^[A-Za-z0-9_-]{4,40}$/);   // 草稿 id 要過規則格式
 });
@@ -67,6 +67,6 @@ test('太長截斷在 LINE 上限內；推送失敗寫緊急待辦', () => {
   const p = D.plan({ quotes: { big }, cfg: { groups: { G: { qid: 'g', audience: 'internal' } } }, date, now: 1 });
   assert.ok(p.sends[0].text.length <= D.LINE_MAX);
   const f = D.failTodo(['公司大群組'], date, 1);
-  assert.ok(f.fail.urgent && /1 個群組/.test(f.fail.text));
+  assert.ok(f.fail_20261104.urgent && /1 個群組/.test(f.fail_20261104.text));
   assert.deepStrictEqual(D.failTodo([], date, 1), {});
 });

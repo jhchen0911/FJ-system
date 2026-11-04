@@ -39012,13 +39012,15 @@ function _lineCfgSet(path,val,okMsg){
 function lineOwnerAdd(u){var n=window.prompt('這個 LINE 帳號是誰？（例：Lotion）','Lotion');if(n==null)return;_lineCfgSet('owners/'+u,{name:String(n).trim().slice(0,30)||'擁有者',at:Date.now()},'已設為擁有者').then(function(ok){if(ok)_lineCfgSet('pending/users/'+u,null);});}
 function lineOwnerDel(u){showConfirm('移除擁有者','移除後這個 LINE 帳號傳的檔案不再收件、也不會收到通知。',function(){_lineCfgSet('owners/'+u,null,'已移除');},true);}
 function linePendDel(kind,id){_lineCfgSet('pending/'+(kind==='groups'?'groups':'users')+'/'+id,null);}
-function lineGroupSave(g,ok2){
-  var qid=gv('lg-q-'+g),q=Q.find(function(x){return x.id===qid;});
-  var d=!!(document.getElementById('lg-d-'+g)||{}).checked;
-  var a=gv('lg-a-'+g)||'';if(a!=='internal'&&a!=='contractor')a='';
+function lineGroupSave(g,pre){
+  // 審查：確認視窗開著時卡片可能重畫（設定非同步載入），所以確認後用按下當時讀到的值（pre），不重讀畫面
+  var qid=pre?pre.qid:gv('lg-q-'+g),q=Q.find(function(x){return x.id===qid;});
+  var d=pre?pre.d:!!(document.getElementById('lg-d-'+g)||{}).checked;
+  var a=pre?pre.a:(gv('lg-a-'+g)||'');if(a!=='internal'&&a!=='contractor')a='';
+  var ok2=!!pre;
   // 改版第 5 步 5d：設成「豐有內部」＝整體日報會直接推進群組，先確認群組裡沒有營造廠／業主
   var cur=(((_lineCfgCache||{}).groups||{})[g]||{}).audience||'';
-  if(a==='internal'&&cur!=='internal'&&!ok2){showConfirm('設成豐有內部群組？','設成「豐有內部」後，每天的整體日報（含包商名稱、人數、未確認工地）會<b>直接</b>推到這個群組。<br>請確定群組裡<b>沒有營造廠、業主</b>。',function(){lineGroupSave(g,true);},false);return;}
+  if(a==='internal'&&cur!=='internal'&&!ok2){showConfirm('設成豐有內部群組？','設成「豐有內部」後，每天的整體日報（含包商名稱、人數、未確認工地）會<b>直接</b>推到這個群組。<br>請確定群組裡<b>沒有營造廠、業主</b>。',function(){lineGroupSave(g,{qid:qid,d:d,a:a});},false);return;}
   var ex=a?{audience:a}:{};
   if(qid==='__co'){   // v6.0.119 公司大群組：不綁單一工程，依回報的【工地】地名對專案
     _lineCfgSet('groups/'+g,Object.assign({mode:'company',name:'公司大群組',daily:d,at:Date.now()},ex),'已設為公司大群組').then(function(ok){if(ok){_lineCfgSet('pending/groups/'+g,null);_lineSitesSync(true);}});

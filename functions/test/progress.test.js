@@ -26,14 +26,14 @@ test('打設累計、首末日、達合約量那天；拔除分開；追加掛�
   const r = P.build({ quotes, projects, now: 7 });
   assert.deepStrictEqual(Object.keys(r.byPid), ['p_m']);
   const it = r.byPid.p_m;
-  const k0 = P.itemKey(0, 'H 型鋼樁打設');
+  const k0 = P.itemKey(0, 'H 型鋼樁打設', 'm');
   assert.deepStrictEqual([it[k0].first, it[k0].last, it[k0].cum, it[k0].doneDate, it[k0].days], ['2026-11-01', '2026-11-03', 30, '2026-11-03', 3]);
-  const k1 = P.itemKey(1, 'H 型鋼樁拔除');
+  const k1 = P.itemKey(1, 'H 型鋼樁拔除', 'm');
   assert.deepStrictEqual([it[k1].cum, it[k1].rCum, it[k1].rFirst], [0, 5, '2026-11-03']);
-  const k2 = P.itemKey(2, '鋼板樁');
+  const k2 = P.itemKey(2, '鋼板樁', 'm');
   assert.deepStrictEqual([it[k2].cum, it[k2].rCum], [4, 2]);
-  assert.ok(!it[P.itemKey(3, '減項')]);
-  const ka = P.itemKey(0, '構台裝設');
+  assert.ok(!it[P.itemKey(3, '減項', 'm')]);
+  const ka = P.itemKey(0, '構台裝設', 'add');
   assert.strictEqual(it[ka].qid, 'add');
   assert.ok(Object.values(it).every((x) => !('price' in x) && !('amount' in x)));   // 不放金額
 });
@@ -45,8 +45,17 @@ test('對不到工項（指到標題、列號超出）→ 工務待辦；作廢�
   assert.ok(/2 筆日報數量對不到工項/.test(t.m.text) && t.m.src === 'progress');
 });
 
-test('工項 key＝列號＋說明第一行的雜湊（說明第二行改了不變、列號變了會變）', () => {
-  assert.strictEqual(P.itemKey(0, 'A\n舊'), P.itemKey(0, 'A\n新'));
-  assert.notStrictEqual(P.itemKey(0, 'A'), P.itemKey(1, 'A'));
+test('工項 key＝報價 id＋列號＋說明第一行的雜湊（說明第二行改了不變、列號或報價不同會變）', () => {
+  assert.strictEqual(P.itemKey(0, 'A\n舊', 'q'), P.itemKey(0, 'A\n新', 'q'));
+  assert.notStrictEqual(P.itemKey(0, 'A', 'q'), P.itemKey(1, 'A', 'q'));
+  assert.notStrictEqual(P.itemKey(0, 'A', 'm'), P.itemKey(0, 'A', 'add'));
   assert.match(P.itemKey(0, 'A'), /^k[0-9a-f]{12}$/);
+});
+
+test('主約與追加同一列同名工項不互相覆蓋（審查）', () => {
+  const qs = { m: { id: 'm', awarded: true, items: [{ desc: '打設', qty: 10 }], dailyLogs: [{ date: '2026-11-01', progressRows: [{ itemIdx: 0, qty: 3 }] }] },
+    a: { id: 'a', awarded: true, parentId: 'm', items: [{ desc: '打設', qty: 5 }], dailyLogs: [{ date: '2026-11-02', progressRows: [{ itemIdx: 0, qty: 2 }] }] } };
+  const r = P.build({ quotes: qs, projects: { p_m: { id: 'p_m' } }, now: 1 });
+  const v = Object.values(r.byPid.p_m).map((x) => [x.qid, x.cum]).sort();
+  assert.deepStrictEqual(v, [['a', 2], ['m', 3]]);
 });

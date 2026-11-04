@@ -4,7 +4,7 @@
 //   豐有內部群組（lineCfg/groups/<gid>.audience === 'internal'）→ 雲端直接推 LINE
 //   有營造廠在的群組（audience 'contractor' 或沒設定）→ 建「整體日報」草稿（type dailyOut）給 Lotion，Lotion 自己複製轉發
 //   公司大群組（mode 'company'）收全部工地；單一工地群組只收自己那個工地
-// 對外版（給營造廠看的）不寫包商名稱、只寫人數（不讓業主覺得豐有是皮包客）；兩種版本都不放金額。
+// 對外版（給營造廠看的）不寫包商名稱、只寫人數、不帶現場自由輸入的備註（不讓業主覺得豐有是皮包客）；兩種版本都不放金額。
 'use strict';
 
 const LINE_MAX = 4800;
@@ -52,7 +52,7 @@ function siteSection(q, Ls, outward) {
     }
     const notes = rows.filter((r) => Number(r.itemIdx) < 0 && S(r.note).trim()).map((r) => S(r.note).replace(/^【LINE】/, '').trim());
     if (!rows.length && S(L.progress).trim()) notes.push(S(L.progress).trim());
-    if (notes.length) lines.push('備註：' + notes.join('；').slice(0, 300));
+    if (notes.length && !outward) lines.push('備註：' + notes.join('；').slice(0, 300));   // 審查：備註是現場自由輸入（可能寫到包商、金額），對外版不帶
   });
   return lines.join('\n');
 }
@@ -101,14 +101,16 @@ function plan(inp) {
       payload: { groupId: gid, group: label.slice(0, 40), qid, date, text } });
   });
   const todo = {};
-  if (unconf.length) todo['unconf'] = { id: 'daily_unconf', src: 'daily', key: 'unconf', urgent: false, text: '整體日報：' + date.slice(5) + ' 還有 ' + unconf.length + ' 個工地日報沒確認', sub: '總覽 › AI 草稿（工務確認後再補送）', go: 'drafts', at: inp.now || Date.now() };
+  const dk = date.replace(/-/g, '');
+  if (unconf.length) todo['unconf_' + dk] = { id: 'daily_unconf_' + dk, src: 'daily', key: 'unconf_' + dk, urgent: false, text: '整體日報：' + date.slice(5) + ' 還有 ' + unconf.length + ' 個工地日報沒確認', sub: '總覽 › AI 草稿（工務確認後再補送）', go: 'drafts', at: inp.now || Date.now() };
   return { date, confirmed: confirmed.map((q) => q.id), unconf, noRep, internalText: full(false), sends, drafts, todo };
 }
 
 // 推送失敗的待辦（陳軒看了告訴 Lotion）
 function failTodo(fails, date, now) {
   const out = {};
-  if (fails && fails.length) out['fail'] = { id: 'daily_fail', src: 'daily', key: 'fail', urgent: true, text: '整體日報：' + date.slice(5) + ' 有 ' + fails.length + ' 個群組 LINE 沒送出（' + fails.slice(0, 3).join('、') + '）', sub: '人員管理 › LINE 機器人', go: 'staff', at: now || Date.now() };
+  const dk = String(date).replace(/-/g, '');
+  if (fails && fails.length) out['fail_' + dk] = { id: 'daily_fail_' + dk, src: 'daily', key: 'fail_' + dk, urgent: true, text: '整體日報：' + date.slice(5) + ' 有 ' + fails.length + ' 個群組 LINE 沒送出（' + fails.slice(0, 3).join('、') + '）', sub: '人員管理 › LINE 機器人', go: 'staff', at: now || Date.now() };
   return out;
 }
 

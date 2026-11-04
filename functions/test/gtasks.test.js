@@ -18,12 +18,13 @@ test('攤平：排除 gtasks 來源與沒文字的、緊急的先；可只選部
 
 test('計畫：新的建、消失的打勾（不刪）、再出現取消打勾、文字變了改標題、超過每天上限延到隔天', () => {
   const L = G.flatten(todo);
-  const map = { 'health~pay_dup': { task: 't1', title: '舊文字' }, 'daily~unconf': { task: 't2', title: '整體日報：1 個工地沒確認', done: true }, 'health~gone': { task: 't3', title: 'x' } };
-  const p = G.plan(L, map, 49, 50);
+  const map = { 'health~pay_dup': { task: 't1', title: '舊文字' }, 'daily~unconf': { task: 't2', title: '整體日報：1 個工地沒確認', done: true }, 'health~gone': { task: 't3', title: 'x', goneAt: 1000 }, 'health~justgone': { task: 't4', title: 'y' } };
+  const p = G.plan(L, map, 49, 50, 1000 + G.GONE_MS);
   assert.deepStrictEqual(p.create.map((x) => x.gid), ['health~paid_pending']);
   assert.deepStrictEqual(p.reopen.map((x) => x.task), ['t2']);
   assert.deepStrictEqual(p.retitle.map((x) => x.task), ['t1']);
-  assert.deepStrictEqual(p.complete.map((x) => x.task), ['t3']);
+  assert.deepStrictEqual(p.complete.map((x) => x.task), ['t3']);       // 消失滿 10 分鐘才打勾
+  assert.deepStrictEqual(p.gone, ['health~justgone']);                  // 剛消失：先記時間（來源整段重寫的瞬間消失不打勾）
   const p2 = G.plan(L, {}, 50, 50);
   assert.strictEqual(p2.create.length, 0); assert.strictEqual(p2.deferred.length, 3);
 });
@@ -61,7 +62,7 @@ function fakeGoogle(opt) {
 test('執行：沒有「豐有」清單就建；建立／打勾後對應表正確；Google 端被刪的對應拿掉', async () => {
   const g = fakeGoogle({ t3gone: true });
   const api = G.client({ fetch: g.f, clientId: 'c', clientSecret: 's', refresh: 'r' });
-  const r = await G.run({ api, todo, map: { 'health~gone': { task: 't3', title: 'x' } }, madeToday: 0, now: 100 });
+  const r = await G.run({ api, todo, map: { 'health~gone': { task: 't3', title: 'x', goneAt: 1 } }, madeToday: 0, now: 100 + G.GONE_MS });
   assert.strictEqual(r.listId, 'Lnew');
   assert.strictEqual(r.made, 3);
   assert.ok(!r.map['health~gone']);
@@ -71,13 +72,15 @@ test('執行：沒有「豐有」清單就建；建立／打勾後對應表正�
   // 第二次：全部已建，沒有新動作；卡片消失 → 打勾
   const g2 = fakeGoogle({ hasList: true });
   const api2 = G.client({ fetch: g2.f, clientId: 'c', clientSecret: 's', refresh: 'r' });
-  const r2 = await G.run({ api: api2, todo: { health: { pay_dup: todo.health.pay_dup } }, map: r.map, listId: 'L1', madeToday: 3, now: 200 });
+  const r1b = await G.run({ api: api2, todo: { health: { pay_dup: todo.health.pay_dup } }, map: r.map, listId: 'L1', madeToday: 3, now: 200 });
+  assert.strictEqual(r1b.done, 0);                                       // 剛消失：先不打勾
+  const r2 = await G.run({ api: api2, todo: { health: { pay_dup: todo.health.pay_dup } }, map: r1b.map, listId: 'L1', madeToday: 3, now: 200 + G.GONE_MS });
   assert.strictEqual(r2.made, 0); assert.strictEqual(r2.done, 2);
   assert.ok(r2.map['daily~unconf'].done && !r2.map['health~pay_dup'].done);
   // 打勾超過 30 天的對應清掉
-  const r3 = await G.run({ api: api2, todo: {}, map: r2.map, listId: 'L1', madeToday: 0, now: 200 + 31 * 86400000 });
-  assert.deepStrictEqual(Object.keys(r3.map), ['health~pay_dup']);   // 剛打勾的留著、打勾 31 天的清掉
-  assert.ok(r3.map['health~pay_dup'].done);
+  const r3 = await G.run({ api: api2, todo: {}, map: r2.map, listId: 'L1', madeToday: 0, now: 200 + G.GONE_MS + 31 * 86400000 });
+  assert.deepStrictEqual(Object.keys(r3.map), ['health~pay_dup']);   // 打勾 31 天的清掉；剛消失的先記時間
+  assert.ok(r3.map['health~pay_dup'].goneAt && !r3.map['health~pay_dup'].done);
 });
 
 test('授權失效：記錯誤、停止建立，寫同步失敗待辦（不放金鑰）', async () => {
@@ -87,4 +90,14 @@ test('授權失效：記錯誤、停止建立，寫同步失敗待辦（不放�
   const t = G.failTodo(['x：Google 授權失效'], 1);
   assert.strictEqual(t.fail.src, 'gtasks');
   assert.strictEqual(G.failTodo([], 1), null);
+});
+
+test('Google 端「豐有」清單被刪 → 建新清單、舊對應作廢、全部卡片重建（審查）', async () => {
+  const g = fakeGoogle({ listGone: true });
+  const api = G.client({ fetch: g.f, clientId: 'c', clientSecret: 's', refresh: 'r' });
+  const old = { 'health~paid_pending': { task: 'old1', title: '已付卻待付 1 筆' }, 'health~pay_dup': { task: 'old2', title: '系統健檢：疑似重複應付 2 筆' }, 'daily~unconf': { task: 'old3', title: '整體日報：1 個工地沒確認' } };
+  const r = await G.run({ api, todo, map: old, listId: 'L1', madeToday: 0, now: 5 });
+  assert.strictEqual(r.listId, 'Lnew');
+  assert.strictEqual(r.made, 3);
+  assert.ok(Object.values(r.map).every((m) => /^T/.test(m.task)));
 });

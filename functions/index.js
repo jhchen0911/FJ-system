@@ -387,7 +387,7 @@ exports.trashPurge = onSchedule({ schedule: '45 3 * * *', timeZone: TZ, region: 
 //    隔天 08:30 補跑前一天：21:30 之後才確認的工地補建草稿、當晚沒東西可推的內部群組補推。LINE 本月額度快用完（≥180）→ 內部群組也改成草稿。
 //    還沒確認的工地 → 後端待辦 fydata/todo/daily（工務）；推送失敗 → 緊急待辦（陳軒看了告訴 Lotion）。
 // #9 同一支排程接著跑：已確認日報 → fydata/progress/<專案 id>/<工項 key>（只有數量與日期），對不到工項 → fydata/todo/progress（工務）。
-// dailyReportNow：管理員手動跑（驗收、補確認後重送），可帶 {date:'YYYY-MM-DD'}。
+// dailyReportNow：管理員手動跑（驗收；只補當天還沒處理過的群組，已推／已建草稿的不重送），可帶 {date:'YYYY-MM-DD'}。
 const dailyCore = require('./ops/daily.js');
 const progressCore = require('./ops/progress.js');
 const gtasksCore = require('./ops/gtasks.js');
@@ -426,14 +426,25 @@ async function runDaily(date, now) {
     }
   }
   for (const s of sends) {
-    try { await deps.push(s.gid, s.text); await db.ref('fydata/dailyOut/' + date + '/' + s.gid).set({ at: now, kind: 'sent', label: String(s.label).slice(0, 40) }); }
-    catch (e) { console.error('[整體日報] 推送失敗', s.gid, e && e.message); fails.push(String(s.label || '群組').slice(0, 20)); }
+    // 審查：先認領（交易：沒有紀錄才寫 sending），兩支排程或手動同時跑也只有一支會推；推成功才改 sent，失敗刪掉認領（下次補推）
+    const ref = db.ref('fydata/dailyOut/' + date + '/' + s.gid);
+    const cl = await ref.transaction((cur) => (cur ? undefined : { at: now, kind: 'sending', label: String(s.label).slice(0, 40) }));
+    if (!cl.committed) continue;
+    try { await deps.push(s.gid, s.text); }
+    catch (e) { console.error('[整體日報] 推送失敗', s.gid, e && e.message); fails.push(String(s.label || '群組').slice(0, 20)); await ref.remove().catch((e2) => console.error('[整體日報] 認領清除失敗', e2 && e2.message)); continue; }
+    await ref.set({ at: now, kind: 'sent', label: String(s.label).slice(0, 40) }).catch((e) => console.error('[整體日報] 已推但紀錄失敗', s.gid, e && e.message));   // 已推出：紀錄失敗也不刪認領（寧可少推不重推）
   }
   for (const d of p.drafts) {
     await deps.createDraft(d);   // 同一群組同一天只建一次
     await db.ref('fydata/dailyOut/' + date + '/' + d.payload.groupId).set({ at: now, kind: 'draft', draft: d.id, label: String(d.payload.group || '').slice(0, 40) });
   }
-  await db.ref('fydata/todo/daily').set(Object.assign({}, p.todo, dailyCore.failTodo(fails, date, now)));
+  // 待辦依日期分 key（審查：補跑前一天不會蓋掉今天的）；同一天沒問題了就清掉，超過 2 天的一併清
+  const dk = date.replace(/-/g, ''), tnew = Object.assign({}, p.todo, dailyCore.failTodo(fails, date, now));
+  const tcur = (await db.ref('fydata/todo/daily').once('value')).val() || {}, tup = {};
+  tup['unconf_' + dk] = tnew['unconf_' + dk] || null;
+  tup['fail_' + dk] = fails.length ? tnew['fail_' + dk] : (sends.length ? null : (tcur['fail_' + dk] || null));   // 這次沒有要推的群組：保留之前的失敗紀錄（等補推成功才清）
+  Object.keys(tcur).forEach((k) => { const m = k.match(/_(\d{8})$/); if (m && m[1] < lineCore.addDays(date, -2).replace(/-/g, '')) tup[k] = null; });
+  await db.ref('fydata/todo/daily').update(tup);
   // 30 天前的發送紀錄清掉
   const days = Object.keys((await db.ref('fydata/dailyOut').once('value')).val() || {}).sort();
   for (const d of days) if (d < lineCore.addDays(date, -30)) await db.ref('fydata/dailyOut/' + d).remove();
@@ -443,12 +454,12 @@ async function runDaily(date, now) {
 exports.dailyReport = onSchedule({ schedule: '30 21 * * *', timeZone: TZ, region: REGION, secrets: [LINE_TOKEN], memory: '1GiB', timeoutSeconds: 300 }, async () => {
   const now = Date.now();
   try { await runDaily(lineCore.tpeDate(now), now); } catch (e) { console.error('dailyReport', e); }
-  await runProgress(now);
+  try { await runProgress(now); } catch (e) { console.error('dailyReport.progress', e); }
 });
 exports.dailyReportCatchup = onSchedule({ schedule: '30 8 * * *', timeZone: TZ, region: REGION, secrets: [LINE_TOKEN], memory: '1GiB', timeoutSeconds: 300 }, async () => {
   const now = Date.now();
-  await runDaily(lineCore.addDays(lineCore.tpeDate(now), -1), now);
-  await runProgress(now);
+  try { await runDaily(lineCore.addDays(lineCore.tpeDate(now), -1), now); } catch (e) { console.error('dailyReportCatchup', e); }
+  try { await runProgress(now); } catch (e) { console.error('dailyReportCatchup.progress', e); }
 });
 exports.dailyReportNow = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], secrets: [LINE_TOKEN], memory: '1GiB', timeoutSeconds: 300 }, async (req, res) => {
   try {
@@ -461,8 +472,10 @@ exports.dailyReportNow = onRequest({ region: REGION, cors: ['https://jhchen0911.
     const now = Date.now(), today = lineCore.tpeDate(now);
     let date = String((req.body && req.body.date) || today);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today || date < lineCore.addDays(today, -7)) { res.status(400).json({ error: { message: '日期只能是 7 天內' } }); return; }
-    const r = await runDaily(date, now);
-    const pr = await runProgress(now);
+    let r = {}, pr = null, err = '';
+    try { r = await runDaily(date, now); } catch (e) { console.error('dailyReportNow.daily', e); err = '整體日報失敗'; }
+    try { pr = await runProgress(now); } catch (e) { console.error('dailyReportNow.progress', e); err = err ? err + '、進度回填失敗' : '進度回填失敗'; }
+    if (err) { res.status(500).json({ error: { message: err } }); return; }
     res.json(Object.assign({ ok: true, progress: pr.n, mismatch: pr.mismatch.length }, r));
   } catch (e) { console.error('dailyReportNow', e); res.status(500).json({ error: { message: '整體日報失敗' } }); }
 });

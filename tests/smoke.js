@@ -10337,7 +10337,7 @@ async function newPage(browser, width, height) {
     const pr = P5.build({ quotes: qs, projects: { p_a: { id: 'p_a', qid: 'a' } }, now: 1 });
     const prOk = Object.values(pr.byPid.p_a).length === 1 && Object.values(pr.byPid.p_a)[0].cum === 4;
     const gp = G5.plan(G5.flatten({ daily: { unconf: { text: 'x' } }, gtasks: { fail: { text: 'y' } } }), { 'health~gone': { task: 't' } }, 0, 50);
-    const gtOk = gp.create.length === 1 && gp.complete.length === 1 && S5.ENABLED === false;
+    const gtOk = gp.create.length === 1 && gp.complete.length === 0 && gp.gone.length === 1 && S5.ENABLED === false;   // 消失先記時間、10 分鐘後才打勾
     check('5d 雲端純邏輯：內部群組直接推（含包商）、營造廠群組（沒設定）只建草稿（不寫包商）、減項不算；進度回填累計；待辦同步建／打勾；#25、26 不啟用', nodeOk && prOk && gtOk, JSON.stringify({ nodeOk, prOk, gtOk }));
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
