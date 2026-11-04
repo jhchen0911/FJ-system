@@ -9459,7 +9459,7 @@ async function newPage(browser, width, height) {
     check('v6.0.138 統編查詢：檢查碼（含第 7 碼 7）、g0v 公司／商業兩種格式；空白欄帶入、已填的不蓋改「全部帶入」、同統編不重查；查不到與檢查碼不符只提醒不擋存檔；負責人欄存檔',
       r.chk && r.parse && r.fill && r.fillAll && r.saved && r.cache && r.miss && r.bad && r.vsaved, JSON.stringify(r));
     check('v6.0.138 客戶·廠商 AI 草稿：唯讀帳號送 contact 草稿（不收匯款帳號、名稱統編同→修改）；管理員套用開表單帶入、按儲存才寫入並標已套用；規則放行 contact',
-      r.dErr && r.push && r.form && r.applied && r.reset && /contact\)\$/.test(RF138.drafts.$id['.validate']), JSON.stringify(r));
+      r.dErr && r.push && r.form && r.applied && r.reset && /\|contact(\|[A-Za-z]+)*\)\$/.test(RF138.drafts.$id['.validate']), JSON.stringify(r));
     check('v6.0.138 備註第 14 條：管理員裝置遷移一次（舊全文另存）、切換前的舊報價印舊文字、新報價與新編輯印新文字；參數不是舊第 14 條不自動換；預設值已換', r.mig && r.once && r.reswap && r.oldQ && r.newQ && r.newEd && r.noHit && r.def, JSON.stringify(r));
     check('v6.0.138 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
