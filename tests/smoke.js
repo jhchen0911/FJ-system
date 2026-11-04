@@ -10228,6 +10228,50 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── 改版第 5 步 5c：每月請款（截止前 5 天）、超支（≧110%）、付包商款核對：算法 calc/todo.js 前端與雲端同一份 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const data = await page.evaluate(() => {
+      const out = {}; const oT = window.toast; window.toast = () => {};
+      try {
+        const D = n => _dAdd(localToday(), n), cut = parseInt(D(3).slice(8), 10);
+        Q = [{ id: 'm1', name: '月請甲', awarded: true, ownerPay: { cut: cut }, items: [{ desc: 'H型鋼樁 打設', unit: 'M', qty: 100, price: 1000, estCost: 600 }, { desc: '扣款', unit: '式', qty: 1, price: -5000 }],
+            dailyLogs: [{ date: D(-70), progressRows: [{ itemIdx: 0, qty: 10 }] }, { date: D(-2), progressRows: [{ itemIdx: 0, qty: 12 }, { itemIdx: 1, qty: 1 }] }],
+            costs: [{ id: 'c1', type: 'sub', vendor: '某分包', rows: [{ id: 'rw1', linkedItemIdx: 0, qty: 100, unitPrice: 700 }], periods: [{ no: 1, rows: [{ rid: 'rw1', qty: 30 }] }] }] }];
+        INV = [{ id: 'mi1', project: '月請甲', quoteId: 'm1', date: D(-60), totals: { total: 100 }, received: 100 }];
+        CONTRACTS = []; MAT_LEDGER = []; Q_HISTORY = {};
+        PAYABLES = [{ id: 'payc1_p1', costId: 'c1', costPeriod: 1, quoteId: 'm1', to: '某分包', project: '月請甲', amount: 21000, status: 'pending' }];
+        const v = _todoBuild(true);
+        out.bill = v.bill.length === 1 && v.bill[0].qid === 'm1' && v.bill[0].items.length === 1 && v.bill[0].items[0].qty === 12 && v.bill[0].left <= 5;   // 上次開單後的日報量、減項列不帶
+        out.over = v.overrun.length === 1 && v.overrun[0].rows[0].pct === 117;   // 實際 70,000 ÷ 報價成本 60,000
+        INV.push({ id: 'mi2', project: '月請甲', quoteId: 'm1', date: D(-1), totals: { total: 1 } }); out.billed = _todoBuild(true).bill.length === 0; INV.pop();   // 這期開過單就不提醒
+        // 付包商款核對：廠商累計請款 30 > 日報 22 → 差異；核准記人與時間
+        const k = _vpCheck(PAYABLES[0]); out.vp = !!k && k.bad >= 1 && k.rows[0].vb === 30 && k.rows[0].reported === 22;
+        go('dash'); updateDashTodo(); const t = document.getElementById('dash-todo-list').textContent;
+        out.dash = /本月要請款：月請甲/.test(t) && /超支提醒：月請甲 1 個工項/.test(t) && /付包商款待核准 1 筆（1 筆數量有差異）/.test(t);
+        openVendorPayCheck('payc1_p1'); const mh = document.getElementById('gen-confirm-modal').innerHTML;
+        out.modal = /廠商請款累計超過日報回報量/.test(mh) && document.getElementById('gen-confirm-ok').textContent === '有差異，仍核准';
+        document.getElementById('gen-confirm-ok').click();
+        out.approved = !!PAYABLES[0].approvedAt && PAYABLES[0].approvedDiff >= 1 && _vpPending().length === 0;
+        out.invK = JSON.stringify(_INV_K) === JSON.stringify(FJC.todo.INV_K) && FJC.todo.invUnpack(_invPack({ items: [{ desc: 'x', contractQty: 3 }] })).items[0].contractQty === 3;
+        out.data = { quotes: Q, invoices: INV.map(_invPack), payables: PAYABLES };
+        out.keys = _todoKeys(v);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      window.toast = oT; return out;
+    });
+    require(require('path').join(__dirname, '..', 'tools', 'copy-calc.js'));
+    const TC5 = require(require('path').join(__dirname, '..', 'functions', 'ops', 'todos.js'));
+    const sens = {}; ((data.data && data.data.quotes) || []).forEach(q => { const est = {}; q.items.forEach((it, i) => { if (it.estCost != null) est[it._uid ? String(it._uid) : '#' + i] = it.estCost; }); sens[q.id] = { costs: q.costs, est }; });
+    const cloud5 = data.data ? TC5.buildRemind({ shared: { quotes: data.data.quotes.map(q => { const c = JSON.parse(JSON.stringify(q)); delete c.costs; c.items.forEach(it => delete it.estCost); return c; }), invoices: data.data.invoices, contracts: {}, customers: {}, params: {}, qHistory: {} },
+      priv: { payables: data.data.payables, matLedger: {}, quoteSens: sens }, now: Date.now() }) : null;
+    check('5c 每月請款：截止前 5 天、這期還沒開單、有新日報 → 本月要請款＋草稿數量（減項列不帶）；開過單就不提醒', data.bill && data.billed, JSON.stringify(data));
+    check('5c 超支：工項實際成本 ≧ 報價成本 110% 提醒（117%）；雲端（成本在 private quoteSens、請款單壓縮過）算出同一組', data.over && !!cloud5 && JSON.stringify(cloud5.keys.bill) === JSON.stringify(data.keys.bill) && JSON.stringify(cloud5.keys.overrun) === JSON.stringify(data.keys.overrun), JSON.stringify({ loc: data.keys, cloud: cloud5 && cloud5.keys }));
+    check('5c 付包商款核對：廠商累計請款超過日報量標差異、總覽列待核准、核對表按「有差異，仍核准」記下核准人與時間', data.vp && data.dash && data.modal && data.approved, JSON.stringify(data));
+    check('5c 雲端還原請款單壓縮的欄位表跟網頁一樣', data.invK, '');
+    check('5c 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // ── 改版第 5 步 5a：雲端每日健檢（後端 28）與後端待辦：雲端與網頁同一套規則（並行比對）、待辦只放筆數、網頁不能寫 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

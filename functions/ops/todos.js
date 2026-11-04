@@ -11,10 +11,18 @@ function decKey(k) { return String(k).replace(/~d~/g, '.').replace(/~h~/g, '#').
 function tpeDay(ms) { return new Date((ms || Date.now()) + 8 * 3600 * 1000).toISOString().slice(0, 10); }
 // 請款單上雲時工項會壓縮（_invPack）；提醒只用 totals／收款紀錄／保留款欄位，不必還原工項
 function unpack(inv) { return inv; }
-// 報價的發包（rfqs）只在 private quoteSens：接回報價複本
+// 報價的發包（rfqs）、成本卡、成本單價只在 private quoteSens：接回報價複本
 function withSens(quotes, sens) {
   const S = {}; Object.keys(sens || {}).forEach((k) => { S[decKey(k)] = sens[k]; });
-  return quotes.map((q) => { const s = S[q.id]; if (!s || !Array.isArray(s.rfqs)) return q; return Object.assign({}, q, { rfqs: s.rfqs }); });
+  // 接回發包（rfqs）、成本卡（costs）、工項成本單價（est，鑰匙同前端 _sensKeyOf：有 _uid 用它、沒有用 #列號）
+  return quotes.map((q) => {
+    const s = S[q.id]; if (!s) return q;
+    const c = Object.assign({}, q);
+    if (Array.isArray(s.rfqs)) c.rfqs = s.rfqs;
+    if (Array.isArray(s.costs)) c.costs = s.costs;
+    if (s.est && typeof s.est === 'object') c.items = (q.items || []).map((it, i) => { if (!it) return it; const k = it._uid ? String(it._uid) : ('#' + i); return s.est[k] != null ? Object.assign({}, it, { estCost: s.est[k] }) : it; });
+    return c;
+  });
 }
 // 跟前端 _todoKeys 同一套鑰匙
 function keysOf(v) {
