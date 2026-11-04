@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.166';
+var APP_VERSION='v6.0.164';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -230,7 +230,7 @@ var P={
   opReserveMonths:3,   // v5.325 營運週轉保留月數：分潤上限先扣掉 月固定成本×此月數
   opReserveAmt:0,      // v5.326 直接指定保留金額（>0 時優先於月數×固定成本）
   bank:'國泰世華建成分行(013)',bankAccount:'031035008864',
-  // v6.0.166：原「unit price defaults」dp* 整組（dpRent／dpLoss／dpProcess／dpPeriod／dpRent*／dpFr*／dpReg*／dpI*／dpR*／dpBu*／dpDmg*／dpDrillRate／dpWaterKnife）已刪：參數頁沒有輸入格、全檔沒有程式讀；單價分析與逾期租金的租金用單價庫 UPA_COST_DB（H350＝4 元／M／天）
+  // v6.0.164：原「unit price defaults」dp* 整組（dpRent／dpLoss／dpProcess／dpPeriod／dpRent*／dpFr*／dpReg*／dpI*／dpR*／dpBu*／dpDmg*／dpDrillRate／dpWaterKnife）已刪：參數頁沒有輸入格、全檔沒有程式讀；單價分析與逾期租金的租金用單價庫 UPA_COST_DB（H350＝4 元／M／天）
 };
 let items=[],exs=[],costs=[],eid=null;
 let rmkCustom={load:'',walk:'',tech:'',bh:'',br:'',bs:'',bb:'',c2:'',c3:'',ir:'',mob:'',minQty:'',extra:[]};
@@ -948,7 +948,7 @@ function doSaveP(){
   P.mult=parseFloat(gv('pmul'))||1.4;
   P.profit=parseFloat(gv('ppro'))||18;
   P.s1=parseFloat(gv('ps1'))||1.12;P.s2=parseFloat(gv('ps2'))||1.0;P.s3=parseFloat(gv('ps3'))||0.9;
-  // v6.0.166：dp* 單價參數整組已刪（沒有輸入格、沒有程式讀，見 P 預設處說明）；舊存檔留著的 dp* 鍵存檔時一併清掉
+  // v6.0.164：dp* 單價參數整組已刪（沒有輸入格、沒有程式讀，見 P 預設處說明）；舊存檔留著的 dp* 鍵存檔時一併清掉
   Object.keys(P).forEach(function(k){if(/^dp[A-Z]/.test(k))delete P[k];});
   P.bank=gv('pbank')||'國泰世華建成分行(013)';
   P.bankAccount=gv('pbankacct')||'031035008864';

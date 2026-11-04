@@ -10326,7 +10326,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── v6.0.166 刪除 dp* 死參數（H350 租金 0.117 vs 4 調查：沒有輸入格、沒有程式讀）──
+  // ── v6.0.164 刪除 dp* 死參數（H350 租金 0.117 vs 4 調查：沒有輸入格、沒有程式讀）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
@@ -10339,8 +10339,8 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
       return out;
     });
-    check('v6.0.166 dp* 死參數整組刪除：預設沒有、存參數時把舊存檔留著的 dp* 清掉；單價庫 H350 租金 4 元／M／天不受影響', r.noDef && r.cleaned && r.upa, JSON.stringify(r));
-    check('v6.0.166 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.164 dp* 死參數整組刪除：預設沒有、存參數時把舊存檔留著的 dp* 清掉；單價庫 H350 租金 4 元／M／天不受影響', r.noDef && r.cleaned && r.upa, JSON.stringify(r));
+    check('v6.0.164 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
