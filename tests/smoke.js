@@ -10216,11 +10216,11 @@ async function newPage(browser, width, height) {
     require(require('path').join(__dirname, '..', 'tools', 'copy-calc.js'));
     const TC = require(require('path').join(__dirname, '..', 'functions', 'ops', 'todos.js'));
     const cloud = data.data ? TC.buildRemind({ shared: { quotes: data.data.quotes, invoices: data.data.invoices, contracts: {}, customers: {}, params: {}, qHistory: {} }, priv: { payables: {}, matLedger: {}, quoteSens: data.data.sens }, now: data.data.now }) : null;
-    const want = { rent: ['t1'], rentSoon: ['t2#0'], recv: ['ti1'], ret: ['提醒丙'], close: ['t4'], rfqVer: ['t4'] };
+    const want = { rent: ['t1'], rentSoon: ['t2#0'], recv: ['ti1'], ret: ['提醒丙'], close: ['t4'], rfqVer: ['t4'], bill: [], overrun: [] };   // 5c 多兩類
     check('5b 雲端每日提醒：雲端（functions/ops/todos.js）與網頁算出同一組提醒（租期逾期、7 天內到期、收款逾期、保留款逾期、可結案、報價進版）', !!cloud && JSON.stringify(cloud.keys) === JSON.stringify(data.keys) && JSON.stringify(data.keys) === JSON.stringify(want), JSON.stringify({ err: data.err, loc: data.keys, cloud: cloud && cloud.keys }));
     check('5b 保留款到期（Lotion 11/04）：沒手填＝系統結案日＋退還條件月數、專案頁顯示怎麼算的；手填日期優先', data.ret && data.manual, JSON.stringify(data));
     check('5b 總覽：既有提醒照舊，新增「可以確認結案」「租期 7 天內到期」', data.dash, JSON.stringify({ dash: data.dash, err: data.err }));
-    const r2 = await page.evaluate(() => { BK_REMIND = { day: '2026-11-04', keys: _todoKeys(_todoBuild(true)) }; const a = _bkRemindHtml(); BK_REMIND.keys.close = []; const b = _bkRemindHtml(); return { ok: (a.match(/✓ 一致/g) || []).length === 6, bad: /雲端少 1/.test(b) }; });
+    const r2 = await page.evaluate(() => { BK_REMIND = { day: '2026-11-04', keys: _todoKeys(_todoBuild(true)) }; const a = _bkRemindHtml(); BK_REMIND.keys.close = []; const b = _bkRemindHtml(); return { ok: (a.match(/✓ 一致/g) || []).length === _BK_RKEYS.length, bad: /雲端少 1/.test(b) }; });
     const rules = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata.health;
     const fnSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'functions', 'index.js'), 'utf8');
     check('5b 資料健檢「雲端每日提醒」卡逐類比對（一致／雲端少幾筆）；雲端只寫 fydata/health/remind（網頁不能寫）、每天 07:00 排程、立即跑一次也一起跑', r2.ok && r2.bad && rules['.write'] === 'false' && /exports\.dailyTodos = onSchedule\(\{ schedule: '0 7 \* \* \*'/.test(fnSrc) && /fydata\/health\/remind/.test(fnSrc) && /await runRemind\(\)\)\.counts/.test(fnSrc), JSON.stringify(r2));
