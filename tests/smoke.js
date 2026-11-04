@@ -9040,6 +9040,25 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.175 按鈕盤點表第 1～3 題：材料估算沒有「計算」鈕（開頁自動算）、報價頁沒有「匯入量測檔」鈕 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const wait = ms => new Promise(res => setTimeout(res, ms));
+      try {
+        window._matEstRes = null; MAT_EST = _shDefaults(); go('matest'); meTab('shoring'); await wait(600);
+        const b = document.getElementById('me-bar-shoring').innerHTML;
+        out.noCalcBtn = !/onclick="matEstCalc\(\)"/.test(b) && /matEstSave/.test(b);
+        out.auto = !!window._matEstRes;
+        out.noImport = typeof window.qMeasImport === 'undefined' && !/qMeasImport/.test(String(_qMeasChip));
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('v6.0.175 材料估算拿掉「計算」鈕、開頁自動算一次；報價頁拿掉「匯入量測檔」鈕（量測檔在材料估算匯入時自動掛到報價）', r.noCalcBtn && r.auto && r.noImport, JSON.stringify(r));
+    check('v6.0.175 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.174 手機總覽「通知 Lotion」不擠統計卡；雲端健檢「立即重跑」後提醒卡也重讀、失敗原因顯示 ──
   {
     const { page, errors } = await newPage(browser, 390, 844);
@@ -9050,8 +9069,8 @@ async function newPage(browser, width, height) {
         go('dash'); await wait(150);
         _fbUser = { email: 'HsuanChen911@gmail.com', uid: 'a', getIdToken: async () => 'tok' }; _isReaderUser = true; renderDashGreet(); await wait(50);
         const g = document.getElementById('dash-greet'), kg = document.querySelector('#page-dash .kgrid');
-        out.btn = !!document.getElementById('ai-notify-btn');
-        out.noFloat = getComputedStyle(document.getElementById('ai-notify-btn')).float === 'none';
+        out.btn = !document.getElementById('ai-notify-btn');   /* v6.0.175：按鈕移到人員管理 › LINE 機器人卡 */
+        out.noFloat = /ai-notify-btn/.test(String(renderLineBox));
         const gw = g.getBoundingClientRect().width, kw = kg ? kg.getBoundingClientRect().width : 0;
         out.full = kg && Math.abs(kw - gw) < 2; out.w = [gw, kw];
         _isReaderUser = false;
@@ -9069,7 +9088,7 @@ async function newPage(browser, width, height) {
       _fbUser = oU; _isReaderUser = oR; _fbDb = oDb; window.fetch = oF; window.toast = oT; _bkRemindLoad.err = null; BK_REMIND = null; BK_HEALTH = null; try { renderDashGreet(); } catch (e) { /* 可忽略 */ }
       return out;
     });
-    check('v6.0.174 手機總覽：「通知 Lotion」不用 float，統計卡跟問候列一樣寬（不擠到左邊 2/3）', r.btn && r.noFloat && r.full, JSON.stringify(r));
+    check('v6.0.174／175 手機總覽：問候列沒有按鈕（「通知 Lotion」移到 LINE 機器人卡），統計卡跟問候列一樣寬', r.btn && r.noFloat && r.full, JSON.stringify(r));
     check('v6.0.174 雲端健檢立即重跑：提醒卡一起重讀，雲端提醒失敗原因顯示在提示與卡片上', r.reload && r.toast && r.card, JSON.stringify(r));
     check('v6.0.174 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
@@ -9083,10 +9102,10 @@ async function newPage(browser, width, height) {
       const oU = _fbUser, oF = window.fetch, oT = window.toast, oR = _isReaderUser;
       try {
         let toasts = []; window.toast = m => toasts.push(m);
-        _fbUser = { email: 'staff@x.com', uid: 's', getIdToken: async () => 't' }; renderDashGreet();
-        out.staffHidden = !document.getElementById('ai-notify-btn');
-        _fbUser = { email: 'HsuanChen911@gmail.com', uid: 'a', getIdToken: async () => 'tokA' }; _isReaderUser = true; renderDashGreet();
-        out.aiShown = !!document.getElementById('ai-notify-btn');
+        _fbUser = { email: 'staff@x.com', uid: 's', getIdToken: async () => 't' };
+        out.staffHidden = !_aiNotifyOk();   /* v6.0.175：按鈕在 LINE 機器人卡（管理員），判斷式同一個 */
+        _fbUser = { email: 'HsuanChen911@gmail.com', uid: 'a', getIdToken: async () => 'tokA' }; _isReaderUser = true;
+        out.aiShown = _aiNotifyOk();
         let sent = null; window.fetch = async (u, o) => { sent = { u, o }; return { ok: true, status: 200, json: async () => ({ ok: true }) }; };
         const m = await fyNotify('報價草稿送出', '到 AI 草稿按確認');
         const body = JSON.parse(sent.o.body);
@@ -9357,7 +9376,7 @@ async function newPage(browser, width, height) {
         out.nav = ['rebar', 'grout', 'backfill', 'lifeline'].every(id => { const p = ALL_PAGES.find(x => x.id === id); return p && p.hidden && p.parent === 'matest'; });
         meTab('shoring');
         const f = document.getElementById('mat-est-form').innerHTML, o = document.getElementById('mat-est-out').innerHTML, b = document.getElementById('me-bar-shoring').innerHTML;
-        out.form = (f.match(/class="me-sec"/g) || []).length >= 8 && /class="me-adv"/.test(f) && /matEstCalc\(\)/.test(b) && /matEstExportNow\(\)/.test(b) && /掛專案/.test(b);
+        out.form = (f.match(/class="me-sec"/g) || []).length >= 8 && /class="me-adv"/.test(f) && !/matEstCalc\(\)/.test(b) && /matEstExportNow\(\)/.test(b) && /掛專案/.test(b);
         const pv = document.getElementById('me-pv'), pvt = () => (pv && pv.shadowRoot ? pv.shadowRoot.innerHTML : '');
         out.out = /me-tiles/.test(o) && /<span>圍令<\/span><b>[\d,]+ M<\/b>/.test(o) && /<span>支撐<\/span><b>[\d,]+ M<\/b>/.test(o) && /叫料單（依進場階段）/.test(o) && /計算依據/.test(o)
           /* v6.0.154 右邊即時 A4 預覽＝匯出的同一份（shadow DOM）；分頁數與匯出引擎同規則 */
@@ -9373,7 +9392,7 @@ async function newPage(browser, width, height) {
       return out;
     });
     check('v6.0.139 材料估算整合：舊頁名轉分頁、五個分頁、計算工具不在選單（權限跟材料估算）', r.redirect && r.tabs && r.nav, JSON.stringify(r));
-    check('v6.0.139 材料估算整合：工具列統一（掛專案／計算／匯出 PDF）、條件分段可收合＋進階、右邊摘要（型鋼用 M）＋材料清單兩種排法、不再重複列清冊', r.form && r.out && r.cat && r.grout && r.pvStage && r.pvExport, JSON.stringify(r));
+    check('v6.0.139 材料估算整合：工具列統一（掛專案／匯出 PDF；v6.0.175 起不放計算鈕）、條件分段可收合＋進階、右邊摘要（型鋼用 M）＋材料清單兩種排法、不再重複列清冊', r.form && r.out && r.cat && r.grout && r.pvStage && r.pvExport, JSON.stringify(r));
     check('v6.0.139 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
@@ -10302,7 +10321,7 @@ async function newPage(browser, width, height) {
         out.chip = /圖面覆核：1 項差異/.test(chip);   // 中間樁 19＝19、支撐 620 對 616.36（+0.6%）、排樁 320 對 263（+21.7%）
         qMeasReview(); const mh = document.getElementById('gen-confirm-msg').innerHTML;
         out.review = /RC排樁/.test(mh) && /\+21\.7%/.test(mh) && /中間樁/.test(mh) && /只提醒、不擋送出/.test(mh); document.getElementById('gen-confirm-ok').click();
-        delete Q.find(x => x.id === 'qm1').measure; rTots(); out.noMeas = /匯入量測檔（圖面覆核）/.test(document.getElementById('q-meas-chip').innerHTML);
+        delete Q.find(x => x.id === 'qm1').measure; rTots(); out.noMeas = document.getElementById('q-meas-chip').innerHTML === '';   /* v6.0.175：沒有量測檔就什麼都不顯示（不放匯入鈕） */
         out.bad = await (async () => { const tt = []; const oT = window.toast; window.toast = m => tt.push(String(m)); meMeasImport({ files: [new File(['{"格式":"別的"}'], 'x.json')], value: '' }); await wait(400); window.toast = oT; return tt.some(t => /量測檔讀不進來/.test(t)); })();
         go('quotes');
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
