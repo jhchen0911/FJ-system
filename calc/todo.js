@@ -187,8 +187,10 @@
   // v6.0.174：請款日期寬鬆解析（2026-10-05／2026/10/5／2026.10.05／115/10/05／115年10月5日），一律當地時間；
   // 原本 new Date(字串) 在 iPhone Safari 遇到非 ISO 格式會變 Invalid Date → 手機少一筆逾期提醒、電腦有
   function looseDate(s, fb) {
-    var m = /^(\d{2,4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})/.exec(String(s == null ? '' : s).trim());
-    if (m) { var y = +m[1]; if (y < 1911) y += 1911; return new Date(y, +m[2] - 1, +m[3]); }
+    var t = String(s == null ? '' : s).trim();
+    // 帶時間（ISO 時間戳）照原本解析；年份只認西元 4 位數（1990～2100）或民國 3 位數（90～199），其他（如 12/31/2026）交給 new Date
+    var m = /T\d/.test(t) ? null : /^(\d{3,4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})(?!\d)/.exec(t);
+    if (m) { var y = +m[1]; if (y >= 90 && y < 200) y += 1911; if (y >= 1990 && y <= 2100 && +m[2] >= 1 && +m[2] <= 12) return new Date(y, +m[2] - 1, +m[3]); }
     var d = s ? new Date(s) : null; return d && !isNaN(d.getTime()) ? d : fb;
   }
   // 收款提醒（總覽「預計明天／今天收款、逾期未收」）：inv 需帶 ar（未收金額）與 exp（expectedDate 的結果）；nowMs＝現在

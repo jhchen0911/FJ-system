@@ -363,7 +363,7 @@ async function runRemind() {
     await db.ref('fydata/health/remindErr').set({ at: now, msg: String((e && e.message) || e).slice(0, 300) }).catch((e2) => console.error('runRemind.err', e2));
     throw e;
   }
-  await db.ref('fydata/health/remindErr').set(null);
+  await db.ref('fydata/health/remindErr').set(null).catch((e) => console.error('runRemind.clearErr', e));   // 清不掉不算提醒失敗（資料已寫入）
   console.log('[提醒] 完成', JSON.stringify(r.counts));
   return r;
 }

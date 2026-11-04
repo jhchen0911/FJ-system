@@ -55,4 +55,6 @@ test('v6.0.174 looseDate：非 ISO 請款日期（/、.、民國年）各裝置�
   const L = FJC.todo.looseDate, f = (s) => { const d = L(s, null); return d ? [d.getFullYear(), d.getMonth() + 1, d.getDate()].join('-') : null; };
   assert.deepStrictEqual(['2026-10-05', '2026/10/5', '2026.10.05', '115/10/05', '115年10月5日'].map(f), Array(5).fill('2026-10-5'));
   assert.strictEqual(f('亂打'), null);
+  assert.strictEqual(f('12/31/2026'), '2026-12-31');   // 美式交給 new Date
+  const ts = L('2026-09-30T20:00:00Z', null); assert.strictEqual(ts.getTime(), Date.parse('2026-09-30T20:00:00Z'));   // 帶時間照原本
 });
