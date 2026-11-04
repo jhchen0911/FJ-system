@@ -10186,7 +10186,7 @@ async function newPage(browser, width, height) {
   // ── 共用 A4 單據引擎（Lotion 11/02）：鋼筋籠／根固砂漿／背填材料 左邊填、右邊即時 A4 預覽，預覽與匯出 PDF 同一份內容；擋土支撐全套也走同一個引擎 ──
   {
     const res = {};
-    for (const [w, h] of [[1400, 900], [390, 844]]) {
+    for (const [w, h] of [[1400, 900], [900, 900], [390, 844]]) {
       const { page, errors } = await newPage(browser, w, h);
       res[w] = await page.evaluate(async () => {
         const out = {}; const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -10196,7 +10196,7 @@ async function newPage(browser, width, height) {
             go('matest'); meTab(t); await wait(200);
             const pv = document.getElementById(t + '-pv'), el = pv && pv.shadowRoot ? pv.shadowRoot.querySelector('.a4doc') : null;
             window[fn](); const html = cap.pop() || '', dd = new DOMParser().parseFromString(html, 'text/html'), pw = dd.querySelector('.page-wrap');
-            out[t] = { pages: +(pv && pv.getAttribute('data-pages')), same: !!el && !!pw && el.textContent === pw.textContent && el.querySelectorAll('table,tr,td').length === pw.querySelectorAll('table,tr,td').length, logo: !!(el && el.querySelector('h1 ,img')) };
+            out[t] = { pages: +(pv && pv.getAttribute('data-pages')), same: !!el && !!pw && el.textContent === pw.textContent && el.querySelectorAll('table,tr,td').length === pw.querySelectorAll('table,tr,td').length && (dd.querySelector('style') || {}).textContent === _toolDocCss({}) && pv.shadowRoot.querySelector('style').textContent.indexOf(_toolDocCss({})) >= 0, logo: !!(el && el.querySelector('h1 ,img')) };
           }
           // 改左邊一個欄位，右邊馬上跟著變
           meTab('grout'); await wait(150); const b0 = document.getElementById('grout-pv').shadowRoot.textContent;
@@ -10212,8 +10212,8 @@ async function newPage(browser, width, height) {
     }
     const ok = w => ['rebar', 'grout', 'backfill'].every(t => res[w][t] && res[w][t].pages >= 1 && res[w][t].same && res[w][t].logo);
     check('A4 單據引擎：鋼筋籠／根固砂漿／背填材料 右邊即時 A4 預覽，內容與「匯出 PDF」逐字相同；擋土支撐全套也走同一個引擎', ok(1400) && ok(390) && res[1400].shoring, JSON.stringify(res));
-    check('A4 單據引擎：左邊改一個欄位，右邊預覽馬上跟著變；手機（390）不會左右滑動', res[1400].live && !res[390].hscroll && !res[1400].hscroll, JSON.stringify(res));
-    check('A4 單據引擎測試無 JS 錯誤', !res[1400].errors.length && !res[390].errors.length, JSON.stringify([res[1400].errors, res[390].errors]));
+    check('A4 單據引擎：左邊改一個欄位，右邊預覽馬上跟著變；手機（390）、平板（900，上下排）不會左右滑動', res[1400].live && !res[390].hscroll && !res[900].hscroll && !res[1400].hscroll && ok(900), JSON.stringify(res));
+    check('A4 單據引擎測試無 JS 錯誤', !res[1400].errors.length && !res[900].errors.length && !res[390].errors.length, JSON.stringify([res[1400].errors, res[900].errors, res[390].errors]));
   }
 
   // ── 改版第 5 步 5a：雲端每日健檢（後端 28）與後端待辦：雲端與網頁同一套規則（並行比對）、待辦只放筆數、網頁不能寫 ──
