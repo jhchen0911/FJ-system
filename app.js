@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.162';
+var APP_VERSION='v6.0.163';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -465,7 +465,7 @@ function _itemProgress(q,idx){
 // 回傳 null＝無租期約定或日報還沒登錄，無從起算。
 function _rentStatus(q,idx,endDate){
   var it=((q&&q.items)||[])[idx];if(!it||it.sec)return null;
-  if((parseFloat(it.qty)||0)<=0)return null;   // v5.336：減帳列（負數量）沒有租期計費
+  if((parseFloat(it.qty)||0)<=0||(parseFloat(it.price)||0)<0)return null;   // v5.336：減帳列（負數量）沒有租期計費；減項列（負數單價）也沒有
   var days=_rentDaysOf(it);if(days<=0)return null;
   var pg=_itemProgress(q,idx);
   var base=pg.installLast||pg.doneDate||pg.last;   // v5.428：起算＝打設／裝設最後一天（次日起算）
@@ -1312,7 +1312,7 @@ function calcT(){
     if(it.sec||_isSpare(it))return;
     const q=parseFloat(it.qty)||0,p=parseFloat(it.price)||0,c=parseFloat(it.estCost)||0;
     if(q>0&&c>0)costKnown+=q*c;
-    else subUnknown+=q*p;
+    else if(p>0)subUnknown+=q*p;   // 減項 hotfix：減項列沒填成本就不推估（不讓減價把成本也算低、毛利灌水）
   });
   const cost=costKnown+(subUnknown*_taxM())/(P.mult||1.4);
   const gross=sub-cost;const net=sub-cost-ext;   // 第 3b 步（健檢1 #24）：未稅收入 − 未稅成本（原本用含稅總價減未稅成本）
@@ -1351,6 +1351,8 @@ function rTots(){
 }
 
 // ── 議價：輸入議價後金額或折扣 %，各工項單價等比例調整；尾差併入工項單價（v6.0.152 起不再加「議價調整」列） ──
+// 減項列（Lotion 11/04 hotfix）：單價可以是負數（例：某工項 1 式 −30,000），數量要大於 0；報價單 PDF 標「減項」、轉請款單當折讓照扣、不算成本推估、不進租期、不進分包詢價
+function _qNegLine(it){return !!it&&!it.sec&&!_isSpare(it)&&(parseFloat(it.price)||0)<0;}
 var NGT_ADJ_DESC='議價調整（尾差）';   // 舊報價可能還有這一列：照常顯示、存檔、轉請款（v6.0.152 起不再新增）
 // v6.0.152（Lotion 11/03）：輸入方式「議價後金額／折扣 %」、即時預覽改前→改後、「稅前價」快捷；
 //   尾差不加列：先找數量 1 且金額最大的列調單價，沒有就找數量能整除尾差的列；單價維持整數；都不行就顯示「還差 N 元」讓人選列
@@ -2172,7 +2174,8 @@ function _saveQCore(){
     if(it.sec)continue;
     // v5.315：議價尾差列是系統產生的折讓，可為負值（原本會被擋下，導致議價後整張報價單存不了）
     if(it.desc===NGT_ADJ_DESC)continue;
-    if((parseFloat(it.qty)||0)<0||(parseFloat(it.price)||0)<0){toast('數量／單價不可為負數');return;}
+    if((parseFloat(it.qty)||0)<0){toast('數量不可為負數（要減項請把單價打成負數）');return;}
+    if((parseFloat(it.price)||0)<0&&!((parseFloat(it.qty)||0)>0)){toast('減項列（負數單價）的數量要大於 0');return;}   // 減項 hotfix
   }
   const t=calcT();
   // 施工成本從 Q 陣列讀取現有資料（addCostItem 直接更新 q.costs）
@@ -5257,7 +5260,8 @@ function _invItemsFromQuote(q){
       cat:it.cat||'',                       // v5.377：工項類別跟著帶進請款單
       prevQty:0,prevAmt:0,
       curQty:0,curDays:0,curAmt:0,
-      note:(it.desc===NGT_ADJ_DESC&&(parseFloat(it.price)||0)<0)?'議價折讓（照扣）':(it.note||''),cumQty:0,cumAmt:0,   // Lotion 10/22：負數尾差到請款單轉成折讓
+      note:(it.desc===NGT_ADJ_DESC&&(parseFloat(it.price)||0)<0)?'議價折讓（照扣）':(_qNegLine(it)?(it.note?it.note+'；':'')+'減項（照扣）':(it.note||'')),cumQty:0,cumAmt:0,   // Lotion 10/22：負數尾差到請款單轉成折讓；減項列同樣照扣
+      neg:_qNegLine(it)?1:0,
       payRate:100,
       installCum:0,removeCum:0,
       prevPayRate:100,
@@ -32014,7 +32018,7 @@ function rfqEdit(rid){
   var picked={};(r&&r.items||[]).forEach(function(it){picked[it.idx]=it;});
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   var d7=_dAdd(localToday(),7);
-  var itemsHtml=(q.items||[]).map(function(it,i){if(!it||it.sec||_isSpare(it))return '';var qty=picked[i]?picked[i].qty:Math.abs(em?_effQty(em,it):(parseFloat(it.qty)||0));
+  var itemsHtml=(q.items||[]).map(function(it,i){if(!it||it.sec||_isSpare(it)||_qNegLine(it))return '';   // 減項列不發包var qty=picked[i]?picked[i].qty:Math.abs(em?_effQty(em,it):(parseFloat(it.qty)||0));
     var pk=picked[i]||null,cov=_rfqCoverOf(q,i,rid),ls=String(it.desc||'').split('\n'),iov=pk?(pk.ov||null):_ownerItemOv(q,it.desc),tpl=pk?(pk.tpl||'gen'):(iov&&_ovIsGrout(iov)?'grout':'gen');   // v6.0.109 完整說明、拆分範圍、付款樣板；v6.0.111 合約條件卡個別工項例外
     return '<label style="display:flex;gap:8px;align-items:flex-start;padding:7px 9px;border:1px solid var(--b1);border-radius:var(--r8);margin-bottom:4px;font-size:12.5px;cursor:pointer"><input type="checkbox" class="rfq-it" data-idx="'+i+'"'+(picked[i]?' checked':'')+' style="width:18px;height:18px;flex:0 0 18px;margin-top:2px">'
       +'<span style="flex:1;min-width:0"><span style="display:block;line-height:1.4;word-break:break-word">'+esc(ls[0])+'</span>'
@@ -39030,7 +39034,7 @@ function linePushTest(){
 //  ② 修正差額不改舊期：在下一期加「調整（＋／－）」列（invAddAdjust），寫原因、連回原期別（it.adjOf／it.adjReason）。
 //  ③ 真的要改舊期：管理員填原因解鎖（invUnlock，inv.unlock，2 小時內一次有效），存檔時記稽核 inv.lockLog（誰、何時、原因、改前改後金額）。
 //  ④ 已結案專案（q.closed）比照。
-function _invNegOk(it){return !!it&&(it.desc===NGT_ADJ_DESC||!!it.adjOf);}
+function _invNegOk(it){return !!it&&(it.desc===NGT_ADJ_DESC||!!it.adjOf||!!it.neg);}   // 減項 hotfix：報價減項列帶過來的
 function _invLockWhy(inv){
   if(!inv||inv.kind==='retReturn')return '';
   var r=[];
@@ -41286,7 +41290,7 @@ function _buildQuoteDocHTML(q){
       const _rawDesc=(it.desc||'').replace(/([^\n])（根固處理/g,'$1\n（根固處理').replace(/([^\n])（不含水泥/g,'$1\n（不含水泥');
       const _descLines=_rawDesc.split('\n').filter(l=>l.trim());
       // 同一儲存格內 <br> 換行，第2行起加縮排
-      const _descHtml=_descLines.map((l,i)=>i===0?esc(l):'<span style="display:block;padding-left:1em;color:#444">'+esc(l)+'</span>').join('');
+      const _descHtml=(_qNegLine(it)&&!/減/.test(_descLines[0]||'')?'<span style="font-weight:700">【減項】</span>':'')+_descLines.map((l,i)=>i===0?esc(l):'<span style="display:block;padding-left:1em;color:#444">'+esc(l)+'</span>').join('');   // 減項 hotfix
       const _sp=!!it.spare;
       rows+=`<tr${_sp?' style="background:#fffdf2"':''}>
         <td style="text-align:center">${li}</td>
