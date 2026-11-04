@@ -50,7 +50,7 @@ jobs:
         run: npm run calc
 
       - name: 雲端程式單元測試（functions/test，純邏輯、不連網）
-        run: cd functions && node --test test/*.test.js
+        run: cd functions && node ../tools/copy-calc.js && node --test test/*.test.js
 
       - name: 執行冒煙測試
         run: npm test
