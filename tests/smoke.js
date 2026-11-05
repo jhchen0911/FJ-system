@@ -10984,6 +10984,13 @@ async function newPage(browser, width, height) {
         out.newRow = r4 === 'open' && !!nr && nr.unitPrice === 9000 && !!document.querySelector('#gen-confirm-msg .sp-row[data-rid="' + nr.id + '"]');
         document.getElementById('gen-confirm-cancel').click(); await W();
         out.newUndo = !Q[0].costs[0].rows.some((x) => x.fromDraft === 'dvb0000002') && DRAFTS.dvb0000002.status === 'pending';
+        // 審查：視窗被別的方式關掉（onCancel 沒跑）留下的暫加列，下次確認先清掉、不重複加；原檔網址白名單；ok 同步丟錯也解鎖
+        Q[0].costs[0].rows.push({ id: 'vbleft', desc: '吊車運費', qty: 0, unitPrice: 9000, linkedItemIdx: -1, fromDraft: 'dvb0000002' });
+        await _vbConfirm(DRAFTS.dvb0000002); out.purge = Q[0].costs[0].rows.filter((x) => x.fromDraft === 'dvb0000002').length === 1 && !Q[0].costs[0].rows.some((x) => x.id === 'vbleft');
+        document.getElementById('gen-confirm-cancel').click(); await W();
+        out.srcOk = _vbSrcOk('javascript:alert(1)') === '' && _vbSrcOk('data:text/html;base64,PGI+') === '' && _vbSrcOk('https://evil.com/x.pdf') === '' && _vbSrcOk(PNG) === PNG;
+        _decReg('__x', { title: 'x', todo: () => 'x', list: () => [{ id: 'z' }], key: (x) => x.id, head: () => 'z', detail: () => 'd', ok: () => { throw new Error('boom'); }, reject: () => Promise.resolve(true), edit: () => {} });
+        _DEC_READY['__x|z'] = 1; decAct('__x', 'z', 'ok'); await W(); out.unstuck = !_DEC_BUSY['__x|z']; delete _DEC.__x; delete _DEC_READY['__x|z'];
         // 退回：寫原因、給回覆廠商的草稿（不自動傳）
         const r5 = await _vbReject(DRAFTS.dvb0000002, '數量對不上'); await W(120);
         out.reject = r5 === true && DRAFTS.dvb0000002.status === 'rejected' && /數量對不上/.test(document.getElementById('gen-confirm-msg').innerHTML) && /不會自動傳/.test(document.getElementById('gen-confirm-title').textContent);
@@ -11008,7 +11015,7 @@ async function newPage(browser, width, height) {
     check('v6.0.179 拍板卡：沒有 detail 不准註冊；預設收起、確認灰（提示展開）；展開且照片載入完成才解鎖，壞照片不解鎖；退回不受限', r.noDetail && r.closed && r.blocked && r.unlock && r.badImg && r.rejOk && r.okRan, JSON.stringify(r));
     check('v6.0.179 廠商請款：總覽待辦一列、程式對位（對不到的要選）、明細有原檔／逐項／檢查結果、黃色沒處理不能確認', r.todo && r.match && r.why && r.detail && r.gate && r.pass, JSON.stringify(r));
     check('v6.0.179 廠商請款：重複請款要寫放行原因；確認＝期別視窗帶入、存檔才標已套用（resultId）、同一張不會入帳兩次', r.dupBlock && r.prefill && r.noMarkYet && r.saved && r.mark && r.again, JSON.stringify(r));
-    check('v6.0.179 廠商請款：新增分包列取消就拿掉、退回給回覆草稿不自動傳、唯讀帳號看不到、卡片三顆＋展開才解鎖、智慧收件分包請款背後建草稿', r.newRow && r.newUndo && r.reject && r.reader && r.card && r.cardOpen && r.intake, JSON.stringify(r));
+    check('v6.0.179 廠商請款：新增分包列取消就拿掉、退回給回覆草稿不自動傳、唯讀帳號看不到、卡片三顆＋展開才解鎖、智慧收件分包請款背後建草稿', r.newRow && r.newUndo && r.purge && r.srcOk && r.unstuck && r.reject && r.reader && r.card && r.cardOpen && r.intake, JSON.stringify(r));
     check('v6.0.179 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
