@@ -59,6 +59,19 @@
 - **改版期間（2026-10-23 起，需求書 `400_Project/workflow/2026-10-21_FJ改版需求書.md` 第 0～7 步）**：每一步走獨立分支＋PR，CI（冒煙＋合成樣本）全過、另一個模型審查、Lotion 在對話裡說「上線」才合併 `main`；小型 hotfix 批次仍可照上面直接推，但同樣要等 Lotion 說「上線」
 - **分支版號＝上線版號**：分支一開工就取「下一個要上線的版號」；別的批次先上線時，合併前把自己的版號改成再下一號（`APP_VERSION`、`index.html`、`beta.html`／`test.html` 重產、程式註解與測試名稱裡的版號一起改），CLAUDE.md 的測試數、頁數同一個 PR 更新
 
+## 給 Lotion 的電腦部署指令（Lotion 2026-11-05）
+
+要 Lotion 在電腦上跑的部署指令，**一律從頭給**，不能假設他已經在資料夾裡、在對的分支：
+```
+① 開新的 PowerShell
+② cd C:\Users\jhche\Agent\my-agent\400_Project\FJ-system
+③ git status -sb          （第一行要是 ## golive-1105...origin/main；不是就先停下來截圖）
+④ git pull
+⑤ firebase deploy --only "functions:名稱1,functions:名稱2" --project jhchen-aed9a
+⑥ 看到 Deploy complete! 就完成；有紅字就截圖給陳軒
+```
+資料庫規則（database.rules.json）、Storage 規則照舊到主控台貼上發布，步驟同樣從頭寫。
+
 ## 施工計畫書圖面：先出圖檢核，再上線（重要）
 
 只要改動到**施工步驟示意圖、施工流程圖、細部詳圖**（圖組 `FY_SHEETS`（`window.FY_SHEETS` 所在的圖庫 IIFE）／
