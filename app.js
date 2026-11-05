@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.176';
+var APP_VERSION='v6.0.177';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -3863,7 +3863,7 @@ function saveInvoice(){
   let _lockAudit=null;
   const inv={
     ...(_existInv||{}),
-    id:invEid||Date.now().toString(),_mt:Date.now(),_by:_meEmail(),
+    id:invEid||Date.now().toString(),_mt:_srvNow(),_by:_meEmail(),
     client:gv('inv-client'),taxid:gv('inv-taxid'),tel:gv('inv-tel'),fax:gv('inv-fax'),
     project:gv('inv-project'),loc:gv('inv-loc'),scope:gv('inv-scope'),
     caddr:gv('inv-caddr'),siteContact:gv('inv-site-contact'),siteTel:gv('inv-site-tel'),
@@ -4270,7 +4270,7 @@ function migrateInvQuoteIds(){
     (INV||[]).forEach(function(inv){
       if(inv.quoteId)return;
       const q=Q.find(x=>!x.parentId&&x.name&&x.name===inv.project);
-      if(q){inv.quoteId=q.id;changed=true;}
+      if(q){inv.quoteId=q.id;_touch(inv);changed=true;}   // v6.0.177 規則 4：改欄位要升 _mt
     });
     if(changed)saveInv();
   }catch(e){_err('migrateInvQuoteIds',e);}
@@ -10257,7 +10257,9 @@ function _applyCloud(data){
         if(_onEditor){try{toast('注意：你正在編輯的這張報價，剛才被其他裝置更新過——儲存前會再確認一次');}catch(e){_err('_applyCloud',e);}}
       }
     }
+    try{_invUnchangedMark();}catch(e){_err('_applyCloud.invBase',e);}   // v6.0.177：先記下「這台自上次同步後沒改過」的請款單
     INV=_safeMerge(INV,_invUnpackAll(data.invoices).filter(function(inv){return inv&&(inv.project||inv.client||inv.id);}),'invoices');   // v5.374 先解壓再合併
+    _invUnchangedMark._set=null;
     if(data.upaHistory)UH=data.upaHistory;   // v5.314：原本 ||[] 會在雲端缺此欄時把本機分析歷史清空
     if(data.params){Object.assign(P,data.params);_aiKeyScrub(true);}   // v6.0.108 金鑰不得留在參數
     if(data.contracts)CONTRACTS=_safeMerge(CONTRACTS,data.contracts,'contracts');
@@ -10589,6 +10591,7 @@ function _mergeColl(localArr,cloudArr,collName,cloudTombs){
     }
     if(dead(r.id,r))return;
     var o=map[r.id];
+    if(o&&o!==r&&collName==='invoices'&&window._applyingCloud&&_invUnchangedMark._set&&_invUnchangedMark._set[r.id]){_syncDivNote('invoices',r,o);map[r.id]=o;return;}   // v6.0.177：這台沒改過 → 一律用雲端版（不管修改時間誰新）
     if(o&&o!==r&&_CF_COLLS[collName]&&window._applyingCloud){var m3=null;try{m3=_recMerge3(collName,r,o);}catch(e){_err('_mergeColl.m3',e);}if(m3){map[r.id]=m3;return;}}   // 4b 三方合併（兩邊都改過）
     if(!o||mt(r)>=mt(o))map[r.id]=r;
     if(o&&collName==='payables')map[r.id]=_payStatusReconcile(map[r.id],map[r.id]===r?o:r);   // v6.0.67
@@ -35386,7 +35389,7 @@ function buildSubMgmtHtml(q){var h=_buildSubMgmtHtmlCore(q);if(q&&typeof h==='st
 
 // ── ④ 資料健檢加項 ──
 // v6.0.49 健檢＝本體＋兩段加項（原兩層包裝）
-function _healthRows(){var R=_healthRowsBase();try{R=_healthAdd637(R)||R;}catch(e){_err('_healthRows.637',e);}try{R=_healthAdd639(R)||R;}catch(e){_err('_healthRows.639',e);}try{R=_healthAdd689(R)||R;}catch(e){_err('_healthRows.689',e);}try{R=_healthAdd6102(R)||R;}catch(e){_err('_healthRows.6102',e);}try{R=_healthAdd3b(R)||R;}catch(e){_err('_healthRows.3b',e);}try{R=_healthAddPrj(R)||R;}catch(e){_err('_healthRows.prj',e);}return R;}
+function _healthRows(){var R=_healthRowsBase();try{R=_healthAdd637(R)||R;}catch(e){_err('_healthRows.637',e);}try{R=_healthAdd639(R)||R;}catch(e){_err('_healthRows.639',e);}try{R=_healthAdd689(R)||R;}catch(e){_err('_healthRows.689',e);}try{R=_healthAdd6102(R)||R;}catch(e){_err('_healthRows.6102',e);}try{R=_healthAdd3b(R)||R;}catch(e){_err('_healthRows.3b',e);}try{R=_healthAddPrj(R)||R;}catch(e){_err('_healthRows.prj',e);}try{R=_healthAddDiv(R)||R;}catch(e){_err('_healthRows.div',e);}return R;}
 // 第 3b 步（健檢1 #26）：v6.0.135 之前的竣工結算／結案把清潔費當合約追減——列出「結算金額＝舊算法、少了清潔費」的合約，不自動改（Lotion：不清歷史）
 function _healthAdd3b(R){
   (CONTRACTS||[]).forEach(function(c){if(!c||!(c.status==='completed'||c.status==='done'))return;var invs;try{invs=_invsOfContract(c);}catch(e){_err('_healthAdd3b',e);return;}
@@ -40308,6 +40311,37 @@ function _recMerge3(coll,local,cloud){
     if(!_recMerge3._toastAt||Date.now()-_recMerge3._toastAt>30000){_recMerge3._toastAt=Date.now();try{setTimeout(function(){toast('同步衝突：另一台裝置也改了同一個欄位（'+cf.length+' 處），先用較新的版本，請到總覽「同步衝突」確認');},50);}catch(e){_err('_recMerge3.toast',e);}}
   }
   return out;
+}
+// ══════════ v6.0.177 請款單「這台沒改過就用雲端版」（Lotion 11/05：iPhone 一張請款單停在舊版）══════════
+// 請款單是整筆「修改時間新者勝、同分本機勝」。某台裝置的舊版如果修改時間比雲端新（被動重算過、當時沒上傳成功），
+// 每次下載都會留本機舊版、還被當成新的同步基準。修正：套用雲端前，用上次同步的基準（fy_rec_hashes，和上傳比對同一份）
+// 判斷每張請款單「這台自上次同步後有沒有改過」；沒改過的，雲端版一律勝出。改過的照舊（修改時間新者勝）。
+// 被換掉、且內容真的不同的那幾張記進本機 fy_sync_div（資料健檢「這台和雲端不一樣」列出，最多 30 筆）。
+function _invUnchangedMark(){
+  _invUnchangedMark._set=null;
+  var rh=_loadRecHashes(),base=rh&&rh.invoices;if(!base||!Object.keys(base).length)return;   // 沒有基準（新裝置）→ 照舊
+  var cl=null;try{cl=_buildCleanPayload().clean;}catch(e){_err('_invUnchangedMark',e);return;}
+  var arr=(cl&&cl.invoices)||[],set={};
+  arr.forEach(function(r){if(r&&r.id&&base[r.id]&&base[r.id]===_collHash(r))set[r.id]=1;});
+  _invUnchangedMark._set=set;
+}
+var SYNC_DIV=[];try{SYNC_DIV=JSON.parse(localStorage.getItem('fy_sync_div')||'[]')||[];}catch(e){SYNC_DIV=[];}
+function _syncDivNote(coll,local,cloud){
+  try{
+    var sum=function(x){var t=x&&x.totals||{};return Math.round((+t.total||+t.grand||0)*10)/10;};
+    if(_collHash(_invPack(local))===_collHash(_invPack(cloud)))return;   // 內容一樣：不用記
+    SYNC_DIV=SYNC_DIV.filter(function(x){return !(x.coll===coll&&x.id===local.id);});
+    SYNC_DIV.unshift({coll:coll,id:local.id,name:(local.project||'')+(local.periodNo?(' 第'+local.periodNo+'期'):''),
+      localMt:+local._mt||0,cloudMt:+cloud._mt||0,localAmt:sum(local),cloudAmt:sum(cloud),at:Date.now()});
+    SYNC_DIV=SYNC_DIV.slice(0,30);localStorage.setItem('fy_sync_div',JSON.stringify(SYNC_DIV));
+  }catch(e){_err('_syncDivNote',e);}
+}
+// 資料健檢：這台裝置最近被雲端版換掉的請款單（本機那份是舊版、內容不同）——只是記錄，已經自動改用雲端版
+function _healthAddDiv(R){
+  var L=(SYNC_DIV||[]).filter(function(x){return x&&Date.now()-(x.at||0)<30*86400000;});
+  if(!L.length)return R;
+  R.push({sev:'info',area:'同步',msg:'這台裝置有 '+L.length+' 張請款單原本停在舊版，已自動改用雲端版：'+L.slice(0,3).map(function(x){return (x.name||x.id)+'（本機 '+fmt(x.localAmt)+' → 雲端 '+fmt(x.cloudAmt)+'）';}).join('、')+(L.length>3?'…':''),fix:'不用處理；如果雲端那份才是錯的，到該張請款單改回並儲存'});
+  return R;
 }
 function _cfName(coll,r){
   if(!r)return '';
