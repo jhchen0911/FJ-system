@@ -9057,6 +9057,11 @@ async function newPage(browser, width, height) {
         out.cloudWins = x && x.date === '2026-09-01' && x.totals.total === 670143.6;
         out.logged = SYNC_DIV.length === 1 && SYNC_DIV[0].localAmt === 658589 && SYNC_DIV[0].cloudAmt === 670143.6;
         out.health = _healthRows().some(rw => rw.area === '同步' && /停在舊版/.test(rw.msg));
+        /* 審查：內容相同、只是欄位順序不同（雲端照字母排）→ 不記成「停在舊版」 */
+        SYNC_DIV = [];
+        const same = { totals: { total: 1 }, project: '假案戊', id: 'ivT', items: [{ desc: 'x', qty: 1, price: 1 }] };
+        _syncDivNote('invoices', Object.assign({}, same, { _mt: 9 }), { id: 'ivT', items: [{ desc: 'x', price: 1, qty: 1 }], project: '假案戊', totals: { total: 1 }, _mt: 3 });
+        out.noNoise = SYNC_DIV.length === 0;
         /* 這台改過（和基準不同）→ 照舊修改時間新者勝，不被雲端蓋掉 */
         INV = [Object.assign({}, base, { _mt: 1000 })];
         _storeRecHashes(_recHashesOfClean(_buildCleanPayload().clean));
@@ -9073,7 +9078,7 @@ async function newPage(browser, width, height) {
       INV = oINV; Q = oQ; SYNC_DIV = []; window._applyingCloud = false;
       return out;
     });
-    check('v6.0.177 請款單：這台自上次同步後沒改過 → 雲端版勝出（不管修改時間），並記進資料健檢「停在舊版」', r.cloudWins && r.logged && r.health, JSON.stringify(r));
+    check('v6.0.177 請款單：這台自上次同步後沒改過 → 雲端版勝出（不管修改時間），並記進資料健檢「停在舊版」', r.cloudWins && r.logged && r.health && r.noNoise, JSON.stringify(r));
     check('v6.0.177 請款單：這台改過的照舊修改時間新者勝；沒有同步基準（新裝置）照舊', r.localEditKept && r.noBase, JSON.stringify(r));
     check('v6.0.177 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();

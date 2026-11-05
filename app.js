@@ -40329,7 +40329,8 @@ var SYNC_DIV=[];try{SYNC_DIV=JSON.parse(localStorage.getItem('fy_sync_div')||'[]
 function _syncDivNote(coll,local,cloud){
   try{
     var sum=function(x){var t=x&&x.totals||{};return Math.round((+t.total||+t.grand||0)*10)/10;};
-    if(_collHash(_invPack(local))===_collHash(_invPack(cloud)))return;   // 內容一樣：不用記
+    var _n=function(x){var y=Object.assign({},x);delete y._mt;delete y._by;return _rcbHash(_invPack(y));};   // 審查：比內容要先排好欄位順序（雲端來的欄位是照字母排）
+    if(_n(local)===_n(cloud))return;   // 內容一樣：不用記
     SYNC_DIV=SYNC_DIV.filter(function(x){return !(x.coll===coll&&x.id===local.id);});
     SYNC_DIV.unshift({coll:coll,id:local.id,name:(local.project||'')+(local.periodNo?(' 第'+local.periodNo+'期'):''),
       localMt:+local._mt||0,cloudMt:+cloud._mt||0,localAmt:sum(local),cloudAmt:sum(cloud),at:Date.now()});
