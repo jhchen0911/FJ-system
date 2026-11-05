@@ -527,3 +527,22 @@ test('v6.0.177 固定句子：存過沒改的舊預設「這批 {n} 個檔案」
   await core.handleEvents([{ type: 'message', timestamp: T0 + 30e3, replyToken: 'rt', source: { type: 'user', userId: 'Uowner' }, message: { id: 'ot', type: 'text', text: '範例案' } }], d);
   assert.match(d.replies[d.replies.length - 1].text, /^第 1 批 1 個檔案：範例案/);
 });
+
+test('v6.0.177 審查：比案名晚到的同批檔（平行投遞／重送）併回這批、帶案名，不另開一批；下一批案名連打兩行都留、補充接在下一批', async () => {
+  const d = mkDeps(CFG);
+  const f = (id, t) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'image' } });
+  const tx = (id, t, text) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'text', text } });
+  await core.handleEvents([f('a1', T0), f('a2', T0 + 5e3)], d);
+  await core.handleEvents([tx('n1', T0 + 40e3, '範例案 甲')], d);
+  await core.handleEvents([f('a3', T0 + 10e3)], d);   // 10 秒時傳出、案名之後才到
+  const I = d.db.fydata.lineInbox, B = d.db.fydata.lineInboxBatch.Uowner;
+  assert.equal(I.a3.batch, 'a1'); assert.equal(I.a3.note, '範例案 甲'); assert.equal(B.id, 'a1'); assert.equal(B.no, 1);
+  assert.ok(!d.replies.some((r) => /第 2 批/.test(r.text)));
+  // 下一批的案名連打兩行（含補充）：都接在下一批，不動上一批
+  await core.handleEvents([tx('n2', T0 + 60e3, '範例案 乙')], d);
+  await core.handleEvents([tx('n3', T0 + 70e3, '補充：業務假丙')], d);
+  assert.equal(I.a1.note, '範例案 甲'); assert.match(d.replies[d.replies.length - 1].text, /接下來傳的檔案記成：範例案 乙；業務假丙/);
+  await core.handleEvents([f('b1', T0 + 90e3)], d);
+  assert.equal(I.b1.batch, 'b1'); assert.equal(I.b1.note, '範例案 乙；業務假丙');
+  assert.ok(!d.db.fydata.lineInboxBatch.Uowner.pendNext);   // 用過就清掉
+});

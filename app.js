@@ -38759,8 +38759,8 @@ function renderLineBox(){
   if(_lineCfgCache&&_lineCfgCache.__err){box.innerHTML='<div class="card"><div class="cb"><div style="font-weight:700;font-size:13.5px;margin-bottom:4px">LINE 機器人（陳軒｜AI 助理）</div><div style="font-size:12px;color:var(--red)">讀不到 LINE 設定：雲端規則尚未發布（見 docs/回國後部署清單_20261031.md 第 1 步）。</div><div style="margin-top:8px"><button type="button" class="btn btn-xs" onclick="_lineCfgCache=null;renderLineBox()">重新整理</button></div></div></div>';return;}
   var C=_lineCfgCache||{},own=C.owners||{},gr=C.groups||{},pu=(C.pending&&C.pending.users)||{},pg=(C.pending&&C.pending.groups)||{},tx=Object.assign({},_LINE_TEXTS,C.texts||{});
   if(tx.dailyCo==='今天辛苦了，請照下面格式回報（一個工地一段，可以貼好幾段）：\n【工地】地名\n【今天】\n【明天】\n【問題】')tx.dailyCo=_LINE_TEXTS.dailyCo;   // v6.0.122 舊預設（沒有【日期】）→ 顯示新預設，雲端程式同樣換掉
-  if(tx.inboxAck==='收到，{n} 個檔案，歸到哪一案？')tx.inboxAck=_LINE_TEXTS.inboxAck;
-  if(tx.inboxNote==='這批 {n} 個檔案：{text}，已記下')tx.inboxNote=_LINE_TEXTS.inboxNote;   // v6.0.177 舊預設 → 新預設（寫第幾批；雲端程式同樣換掉）   // v6.0.153 舊預設 → 顯示新預設（雲端程式同樣換掉）
+  if(tx.inboxAck==='收到，{n} 個檔案，歸到哪一案？')tx.inboxAck=_LINE_TEXTS.inboxAck;   // v6.0.153 舊預設 → 顯示新預設（雲端程式同樣換掉）
+  if(tx.inboxNote==='這批 {n} 個檔案：{text}，已記下')tx.inboxNote=_LINE_TEXTS.inboxNote;   // v6.0.177 舊預設 → 新預設（寫第幾批；雲端程式同樣換掉）
   var projs=(Q||[]).filter(function(q){return q&&q.awarded&&!q.closed&&!q.parentId;});
   var sel=function(id,cur){return '<select id="'+id+'" style="font-size:12px;max-width:100%"><option value="">（選工程）</option><option value="__co"'+(cur==='__co'?' selected':'')+'>公司大群組（固定格式回報，多個工地）</option>'+projs.map(function(q){return '<option value="'+esc(q.id)+'"'+(q.id===cur?' selected':'')+'>'+esc(q.name||'')+'</option>';}).join('')+'</select>';};
   var B=function(js,l,c){return '<button type="button" class="btn btn-xs'+(c?' '+c:'')+'" onclick="'+js+'">'+l+'</button>';};

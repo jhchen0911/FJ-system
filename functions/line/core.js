@@ -222,7 +222,9 @@ async function inboxBatchFile(deps, uid, msgId, now) {
     const cur = cur0 || {}; first = false; alone = false;
     if (cur.id && now < (cur.start || 0) - BATCH_GAP_MS) { alone = true; return undefined; }   // 很久以前的重送檔：自成一批，不蓋掉目前這批
     let b;
-    if (cur.id && !cur.closed && now - (cur.last || 0) <= BATCH_GAP_MS) b = Object.assign({}, cur, { last: Math.max(cur.last || 0, now), n: (cur.n || 0) + 1 });
+    // 審查：關閉之前就傳出、但比案名晚到的檔（平行投遞／重送：時間早於案名、晚於這批開始前 3 分鐘）→ 併回這批、帶這批的案名，不另開一批蓋掉
+    const late = cur.id && cur.closed && cur.closedAt && now <= cur.closedAt && now >= (cur.start || 0) - BATCH_GAP_MS;
+    if (cur.id && (late || (!cur.closed && now - (cur.last || 0) <= BATCH_GAP_MS))) b = Object.assign({}, cur, { last: Math.max(cur.last || 0, now), n: (cur.n || 0) + 1 });
     else {
       first = true;
       const no = cur.id && _tpeDay(cur.start || 0) === _tpeDay(now) ? (cur.no || 1) + 1 : 1;
@@ -243,24 +245,30 @@ async function inboxBatchText(deps, uid, msgId, text, now) {
     const cur = cur0 || {}; hit = null;
     if (!text) return undefined;
     const inWin = cur.id && now - (cur.last || 0) <= NOTE_WIN_MS && now >= (cur.start || 0);
+    const pendNext = cur.pendNote && cur.pendNext && now - (cur.pendAt || 0) <= NOTE_WIN_MS;
+    if (pendNext) {   // 審查：已經說了下一批的案名、還沒傳檔 → 再打的字（含補充）都接在下一批的案名後面，不動上一批
+      const pn = (String(cur.pendNote) + '；' + (text.replace(MORE_RE, '').trim() || text)).slice(0, 400);
+      hit = { mode: 'next', note: pn };
+      return Object.assign({}, cur, { pendNote: pn, pendAt: now });
+    }
     if (inWin && !cur.note) {   // ① 這批還沒有案名：這行就是案名，這批關閉
-      hit = { mode: 'name', batch: cur.id, ids: Object.keys(cur.ids || {}), n: cur.n || 0, no: cur.no || 1, note: text };
-      return Object.assign({}, cur, { note: text, closed: true, pendNote: null, pendAt: null });
+      hit = { mode: 'name', batch: cur.id, ids: Object.keys(cur.ids || {}), n: cur.n || 0, no: cur.no || 1, note: text.slice(0, 400) };
+      return Object.assign({}, cur, { note: text.slice(0, 400), closed: true, closedAt: now, pendNote: null, pendAt: null, pendNext: null });
     }
     if (inWin && MORE_RE.test(text)) {   // ② 補充／備註：附加到這批
       const add = text.replace(MORE_RE, '').trim() || text, note = (String(cur.note) + '；' + add).slice(0, 400);
       hit = { mode: 'more', batch: cur.id, ids: Object.keys(cur.ids || {}), n: cur.n || 0, no: cur.no || 1, note, add };
-      return Object.assign({}, cur, { note, closed: true });
+      return Object.assign({}, cur, { note, closed: true, closedAt: Math.max(cur.closedAt || 0, now) });
     }
     if (inWin) {   // ② 這批已有案名、不是補充：當成下一批的案名，這批關閉（不蓋掉）
-      hit = { mode: 'next' };
-      return Object.assign({}, cur, { closed: true, pendNote: text, pendAt: now });
+      hit = { mode: 'next', note: text.slice(0, 400) };
+      return Object.assign({}, cur, { closed: true, closedAt: Math.max(cur.closedAt || 0, now), pendNote: text.slice(0, 400), pendAt: now, pendNext: true });
     }
     const keep = cur.pendNote && now - (cur.pendAt || 0) <= NOTE_WIN_MS;   // 審查：傳檔前連打兩行 → 兩行都留
-    return Object.assign({}, cur, { pendNote: (keep ? cur.pendNote + '；' : '') + text, pendAt: now });
+    return Object.assign({}, cur, { pendNote: ((keep ? cur.pendNote + '；' : '') + text).slice(0, 400), pendAt: now });
   });
   if (!hit) return { batch: '', mode: '' };
-  if (hit.mode === 'next') return { batch: '', mode: 'next' };
+  if (hit.mode === 'next') return { batch: '', mode: 'next', note: hit.note };
   // 審查：一次寫完這批每個檔的備註（不逐筆寫，避免大批次拖到逾時）
   const up = {}; hit.ids.forEach((id) => { up['fydata/lineInbox/' + id + '/note'] = hit.note; });
   try { if (deps.dbUpdate) await deps.dbUpdate(up); else for (const k of Object.keys(up)) await deps.dbSet(k, hit.note); } catch (e) { (deps.log || console.error)('line.batchNote', e); }
@@ -341,7 +349,7 @@ async function handleEvent(ev, cfg, T, deps, t0) {
       const r = await inboxBatchText(deps, src.userId, msg.id, text, now);
       await deps.dbSet('fydata/lineInbox/' + msg.id, Object.assign({ id: msg.id, at: now, date, from: src.userId, type: 'text', text: String(msg.text || '').slice(0, 1000) },
         r.batch ? { status: 'filed', batch: r.batch, note: (r.mode === 'more' ? '補充到第 ' : '已記到第 ') + r.no + ' 批 ' + r.n + ' 個檔案' } : (r.mode === 'next' ? { status: 'new', note: '下一批的案名' } : { status: 'new' })));
-      const rtxt = r.mode === 'more' ? fill(T.inboxMore, { no: r.no, text: r.add }) : r.mode === 'next' ? fill(T.inboxNext, { text }) : (r.batch ? fill(T.inboxNote, { no: r.no, n: r.n, text }) + (r.total > r.n ? '（只記到前 ' + r.n + ' 個）' : '') : '');
+      const rtxt = r.mode === 'more' ? fill(T.inboxMore, { no: r.no, text: r.add }) : r.mode === 'next' ? fill(T.inboxNext, { text: r.note || text }) : (r.batch ? fill(T.inboxNote, { no: r.no, n: r.n, text }) + (r.total > r.n ? '（只記到前 ' + r.n + ' 個）' : '') : '');
       if (rtxt && ev.replyToken) { try { await deps.reply(ev.replyToken, rtxt); } catch (e) { (deps.log || console.error)('line.reply', e); } }
       return { kind: 'inboxText', batch: r.batch || '' };
     }
