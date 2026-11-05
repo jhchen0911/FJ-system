@@ -9040,6 +9040,50 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.177 請款單：這台沒改過就用雲端版（iPhone 一張請款單停在舊版、修改時間反而比較新）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const oINV = INV, oQ = Q;
+      try {
+        const base = { id: 'ivS', project: '假案丁', periodNo: 4, client: '假業主', date: '', expectedRecvDate: '', items: [{ desc: '工項', qty: 1, price: 627233 }], totals: { total: 658589 } };
+        INV = [Object.assign({}, base, { _mt: 2000 })];
+        _storeRecHashes(_recHashesOfClean(_buildCleanPayload().clean));   // 上次同步的基準＝這台現在這份（舊版）
+        SYNC_DIV = [];
+        const cloud = Object.assign({}, base, { date: '2026-09-01', expectedRecvDate: '2026-10-20', items: [{ desc: '工項', qty: 1, price: 638232 }], totals: { total: 670143.6 }, _mt: 1000 });
+        _applyCloud({ quotes: Q.slice(), invoices: _invPackAll([cloud]) });
+        let x = INV.find(i => i.id === 'ivS');
+        out.cloudWins = x && x.date === '2026-09-01' && x.totals.total === 670143.6;
+        out.logged = SYNC_DIV.length === 1 && SYNC_DIV[0].localAmt === 658589 && SYNC_DIV[0].cloudAmt === 670143.6;
+        out.health = _healthRows().some(rw => rw.area === '同步' && /停在舊版/.test(rw.msg));
+        /* 審查：內容相同、只是欄位順序不同（雲端照字母排）→ 不記成「停在舊版」 */
+        SYNC_DIV = [];
+        const same = { totals: { total: 1 }, project: '假案戊', id: 'ivT', items: [{ desc: 'x', qty: 1, price: 1 }] };
+        _syncDivNote('invoices', Object.assign({}, same, { _mt: 9 }), { id: 'ivT', items: [{ desc: 'x', price: 1, qty: 1 }], project: '假案戊', totals: { total: 1 }, _mt: 3 });
+        out.noNoise = SYNC_DIV.length === 0;
+        /* 這台改過（和基準不同）→ 照舊修改時間新者勝，不被雲端蓋掉 */
+        INV = [Object.assign({}, base, { _mt: 1000 })];
+        _storeRecHashes(_recHashesOfClean(_buildCleanPayload().clean));
+        INV[0] = Object.assign({}, INV[0], { note: '這台剛改', _mt: 5000 });
+        _applyCloud({ quotes: Q.slice(), invoices: _invPackAll([Object.assign({}, cloud, { _mt: 3000 })]) });
+        x = INV.find(i => i.id === 'ivS');
+        out.localEditKept = x && x.note === '這台剛改' && x._mt === 5000;
+        /* 沒有基準（新裝置）→ 照舊 */
+        localStorage.removeItem('fy_rec_hashes');
+        INV = [Object.assign({}, base, { _mt: 9000 })];
+        _applyCloud({ quotes: Q.slice(), invoices: _invPackAll([cloud]) });
+        out.noBase = INV.find(i => i.id === 'ivS').totals.total === 658589;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      INV = oINV; Q = oQ; SYNC_DIV = []; window._applyingCloud = false;
+      return out;
+    });
+    check('v6.0.177 請款單：這台自上次同步後沒改過 → 雲端版勝出（不管修改時間），並記進資料健檢「停在舊版」', r.cloudWins && r.logged && r.health && r.noNoise, JSON.stringify(r));
+    check('v6.0.177 請款單：這台改過的照舊修改時間新者勝；沒有同步基準（新裝置）照舊', r.localEditKept && r.noBase, JSON.stringify(r));
+    check('v6.0.177 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.175 按鈕盤點表第 1～3 題：材料估算沒有「計算」鈕（開頁自動算）、報價頁沒有「匯入量測檔」鈕 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
