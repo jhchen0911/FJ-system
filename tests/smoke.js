@@ -11038,7 +11038,7 @@ async function newPage(browser, width, height) {
           { savedAt: T0 + 10 * H, by: 'a', formal: true, ver: 1, snapshot: snap(1500, '2026-10-01', 1) },
         ];
         Q = Q.filter((x) => x.id !== 'qvA' && x.id !== 'qvB');
-        const q = Object.assign(mkQ(1300, '2026-10-04', 3), { _mt: T0 + 31 * H, rfqs: [{ id: 'rA', no: 'R1', ts: T0 + 25 * H, quoteVer: 2 }, { id: 'rB', no: 'R2', ts: T0 + 5 * H, quoteVer: 1 }, { id: 'rC', no: 'R3', ts: T0 + 32 * H, quoteVer: 3, chg: { id: 'chg' + (T0 + 33 * H).toString(36), from: 2, to: 3 }, chgLog: [{ from: 1, to: 2, ts: T0 + 26 * H }] }] });
+        const q = Object.assign(mkQ(1300, '2026-10-04', 3), { _mt: T0 + 31 * H, rfqs: [{ id: 'rA', no: 'R1', ts: T0 + 25 * H, quoteVer: 2 }, { id: 'rB', no: 'R2', ts: T0 + 5 * H, quoteVer: 1 }, { id: 'rC', no: 'R3', ts: T0 + 32 * H, quoteVer: 3, chg: { id: 'chg' + (T0 + 33 * H).toString(36), from: 2, to: 3 }, chgLog: [{ from: 1, to: 2, ts: T0 + 26 * H }] }, { id: 'rD', no: 'R4', ts: T0 + 15 * H, quoteVer: 3, chgLog: [{ from: 2, to: 3, ts: T0 + 32 * H }] }], costs: [{ id: 'cD', rfqId: 'rD', chgLog: [{ from: 2, to: 3, ts: T0 + 32 * H }] }] });   // rD：來源之前依真正的 V2 建單、來源之後才變更（審查：from 看建單時間、to 看變更時間）
         Q.push(q); Q.push(Object.assign(mkQ(1200, '2026-10-02', 1), { id: 'qvB', code: 'QV-02', name: '假補登案（重建）' }));
         Q_HISTORY.qvA = JSON.parse(JSON.stringify(H0));
         INV = INV.filter((x) => x.quoteId !== 'qvA');
@@ -11069,7 +11069,7 @@ async function newPage(browser, width, height) {
         decToggle('qverfix', 'dqv0000001'); await W();
         const box = document.getElementById('dec-box'), bh = box.innerHTML;
         const btns = Array.from(box.querySelectorAll('.dec-card button')).map((b) => b.textContent);
-        out.card = JSON.stringify(btns) === JSON.stringify(['退回', '修改', '確認']) && /補登前/.test(bh) && /補登後/.test(bh) && /原 V2 改號/.test(bh) && /13,125/.test(bh) && /和對照報價的差異/.test(bh) && /請款單依據版次/.test(bh);
+        out.card = JSON.stringify(btns) === JSON.stringify(['退回', '修改', '確認']) && /補登前/.test(bh) && /補登後/.test(bh) && /原 V2 改號/.test(bh) && /13,125/.test(bh) && /和對照報價的差異/.test(bh) && /請款單依據版次/.test(bh) && /所有裝置都已更新到/.test(bh) && /依據版次（起）/.test(bh);
         // 細節讀不出來（找不到報價）→ 展開也不解鎖、按確認不會執行
         let okCalls = 0; const spQ = Object.assign({}, _DEC.qverfix, { list: () => [{ id: 'dx00000001', payload: { qid: 'nope' } }], ok: () => { okCalls++; return Promise.resolve(true); } });
         _decReg('__qd', spQ); openDecList('__qd'); decToggle('__qd', 'dx00000001'); await W();
@@ -11089,6 +11089,7 @@ async function newPage(browser, width, height) {
           && hh.some((e) => e.pre && /補登版次前備份/.test(e.note || '')) && !!dl && /^補登版次備份_/.test(dl[0]) && !!localStorage.getItem('fy_qvf_bak_qvA') && Array.isArray(q.verFix) && q.verFix.length === 1;
         const rA = q.rfqs[0], rB = q.rfqs[1], rC = q.rfqs[2], i1 = INV.find((x) => x.id === String(T0 + 34 * H)), i2 = INV.find((x) => x.id === String(T0 + 15 * H));
         out.refs = rA.quoteVer === 3 && rB.quoteVer === 1 && rC.quoteVer === 4 && rC.chg.from === 3 && rC.chg.to === 4 && rC.chgLog[0].to === 3 && rC.chgLog[0].from === 1 && i1.quoteVer === 4 && i1.items[0]._qRetired === 4 && i2.quoteVer === 2 && _qSnapOf(q, 2) === ins.snapshot;
+        const rD = q.rfqs[3], cD = q.costs[0]; out.refsFrom = rD.chgLog[0].from === 2 && rD.chgLog[0].to === 4 && rD.quoteVer === 4 && cD.chgLog[0].from === 2 && cD.chgLog[0].to === 4;
         // ⑤ 冪等：再跑 5 次結果一樣；卡片不能再套一次
         const before = JSON.stringify([Q_HISTORY.qvA, q.ver, q.rfqs, i1, i2]);
         for (let i = 0; i < 5; i++) _qhApplyFixAll();
@@ -11116,8 +11117,17 @@ async function newPage(browser, width, height) {
         const fid = q2.verFix[0].id; qVerFixUndo('qvA', fid);
         const hu = Q_HISTORY.qvA;
         out.undo = !hu.find((e) => e.savedAt === T0 + 20 * H + 1).formal && hu.find((e) => e.savedAt === T0 + 30 * H).ver === 2 && q2.ver === 3 && q2.rfqs[0].quoteVer === 2;
+        // 撤銷要耐久：舊裝置把報價記錄蓋掉（沒有 verFix）→ 不會從歷史復活
+        const vfKeep = q2.verFix; delete q2.verFix; _qhApplyFixAll();
+        out.undoDur = !q2.verFix && !Q_HISTORY.qvA.find((e) => e.savedAt === T0 + 20 * H + 1).formal && Q_HISTORY.qvA.find((e) => e.savedAt === T0 + 30 * H).ver === 2 && q2.ver === 3 && Q_HISTORY.qvA.find((e) => e.savedAt === T0 + 20 * H + 1).backfill.rule.undone === true;
+        q2.verFix = vfKeep;
         _qvfApply(q2, _qvfPlan(q2, { srcSavedAt: T0 + 20 * H, expect: exp }, { env: true }), null);
         out.redo = Q_HISTORY.qvA.filter((e) => e.formal).sort((a, b) => a.savedAt - b.savedAt).map((e) => e.ver).join(',') === '1,2,3' && q2.ver === 4 && q2.rfqs[0].quoteVer === 3;
+        // 補登之後又封存了新正式版 → 不准撤銷
+        Q_HISTORY.qvA.unshift({ savedAt: Date.now() + 9000, by: 'later', formal: true, ver: 4, snapshot: snap(1250, '2026-10-06', 4) }); q2.ver = 5; tt.length = 0;
+        const uu = qVerFixUndo('qvA', q2.verFix[0].id);
+        out.undoRefuse = uu === false && tt.some((t) => /已經封存了 V4，不能撤銷/.test(t)) && Q_HISTORY.qvA.find((e) => e.savedAt === T0 + 20 * H + 1).formal;
+        Q_HISTORY.qvA = Q_HISTORY.qvA.filter((e) => e.by !== 'later'); q2.ver = 4;
         // 唯讀帳號不能套用
         window._isReaderUser = true; out.ro = !_qvfPlan(q2, { srcSavedAt: T0 + 20 * H, expect: exp }, { env: true }).checks.find((c) => c.n === 11).ok; window._isReaderUser = false;
         window._draftMark = oM;
@@ -11130,7 +11140,7 @@ async function newPage(browser, width, height) {
         const sent = (Q_HISTORY.qvS || []).filter((e) => e.sent);
         out.only = qs.sendLog.length === 1 && qs.sendLog[0].mode === 'only' && !qs.sendLog[0].archived && !!qs.sendLog[0].h && sent.length === 1 && !sent[0].formal && _qhKeep(sent[0]) && !('sendLog' in sent[0].snapshot);
         p = quoteSendPdf('qvS'); document.getElementById('q-send-only').click(); await p;
-        out.onlyOnce = (Q_HISTORY.qvS || []).filter((e) => e.sent).length === 1 && qs.sendLog.length === 2;
+        out.onlyOnce = (Q_HISTORY.qvS || []).filter((e) => e.sent).length === 1 && qs.sendLog.length === 1;   // 同一份內容第二次只匯出：不再記、不動報價
         qs.items[0].price = 150; _touch(qs);
         let hr = _healthRows();
         out.health1 = hr.some((x) => /假送出案/.test(x.msg) && /匯出過的 PDF（V1）沒封存，內容已經改掉了/.test(x.msg));
@@ -11148,12 +11158,18 @@ async function newPage(browser, width, height) {
         // 唯讀帳號匯出 → 送 qsend 卡；確認（內容相同）＝封存
         const oU2 = window._fbUser, oP2 = window._draftPush; let qd = []; _fbUser = { email: 'ai@x.com', uid: 'ai' }; window._draftPush = (t, pl, s) => { qd.push([t, pl, s]); return Promise.resolve(true); };
         window._isReaderUser = true; await quoteSendPdf('qvS'); window._isReaderUser = false; _fbUser = oU2; window._draftPush = oP2;
-        out.reader = qd.length === 1 && qd[0][0] === 'qsend' && !!qd[0][1].h && !('costs' in qd[0][1].snap);
+        const pl0 = qd[0] && qd[0][1];
+        out.reader = qd.length === 1 && qd[0][0] === 'qsend' && !!pl0.h && !('snap' in pl0) && Array.isArray(pl0.items) && !('dailyLogs' in pl0) && !('costs' in pl0) && pl0.code === 'QS-1' && pl0.total > 0 && !pl0.items.some((it) => 'estCost' in it);
         DRAFTS = { dqs0000001: { id: 'dqs0000001', type: 'qsend', by: 'ai@x.com', byName: '假 AI', at: Date.now(), status: 'pending', summary: qd[0][2], payload: qd[0][1] } };
         window._draftMark = (id, st) => { DRAFTS[id].status = st; return Promise.resolve(true); };
         const v0 = qsx.ver; openDecList('qsend'); decToggle('qsend', 'dqs0000001'); await new Promise((res) => setTimeout(res, 60)); const qh = document.getElementById('dec-box').innerHTML;
         decAct('qsend', 'dqs0000001', 'ok'); await new Promise((res) => setTimeout(res, 60));
         out.qsend = /確認＝封存成正式版/.test(qh) && qsx.ver === v0 + 1 && DRAFTS.dqs0000001.status === 'applied' && qsx.sendLog.some((e) => e.mode === 'reader' && e.archived);
+        // 內容跟最後一個正式版相同 → 唯讀帳號再匯出不送卡；管理員匯出相同內容兩次只記一次、不再動報價
+        qd = []; _fbUser = { email: 'ai@x.com', uid: 'ai' }; window._draftPush = (t, pl, s) => { qd.push([t, pl, s]); return Promise.resolve(true); };
+        window._isReaderUser = true; await quoteSendPdf('qvS'); window._isReaderUser = false; _fbUser = oU2; window._draftPush = oP2;
+        await quoteSendPdf('qvS'); const nL = qsx.sendLog.length, mt1 = qsx._mt; await quoteSendPdf('qvS');
+        out.sameQuiet = qd.length === 0 && qsx.sendLog.length === nL && qsx._mt === mt1;
         window._draftMark = oM;
         // 複製報價不帶匯出紀錄與補登規則
         _copyQDo('qvA'); const cp = Q[0]; out.copy = cp.id !== 'qvA' && !('verFix' in cp) && !('sendLog' in cp); Q.shift();
@@ -11169,11 +11185,11 @@ async function newPage(browser, width, height) {
     const dv = RQ.rules.fydata.drafts.$id['.validate'];
     check('v6.0.180 補登版次：核對數字對不上、缺數字、拿正式版當來源都擋；唯讀帳號送卡前先試算，對不上不送', r.refuse && r.send, JSON.stringify(r));
     check('v6.0.180 補登版次拍板卡：總覽一列、只有退回／修改／確認、細節含補登前後對照與核對數字；預設收起、展開看過明細才解鎖；細節讀不出來不解鎖；確認時再驗一次、數字不對擋下', r.todo && r.locked && r.card && r.noDetail && r.cardRefuse, JSON.stringify(r));
-    check('v6.0.180 補登：新 V2（存檔時間＋1、正式、已送業主、稅額重算）、原 V2→V3、編輯中 V3→V4；詢價／變更／請款單版號一起改；先備份', r.apply && r.refs, JSON.stringify(r));
+    check('v6.0.180 補登：新 V2（存檔時間＋1、正式、已送業主、稅額重算）、原 V2→V3、編輯中 V3→V4；詢價／變更／請款單版號一起改（依據版次看建單時間、變更後版次看變更時間）；先備份', r.apply && r.refs && r.refsFrom, JSON.stringify(r));
     check('v6.0.180 補登冪等（重跑 5 次一樣、不能再套）；第二台舊號碼合併後收斂；報價被舊裝置蓋掉從歷史補回規則；舊裝置後封存的撞號往後排', r.idem && r.rt && r.dev2 && r.heal && r.clash, JSON.stringify(r));
-    check('v6.0.180 撤銷補登（主控台）號碼還原、再補一次結果一樣；唯讀帳號不能套用', r.undo && r.redo && r.ro, JSON.stringify(r));
+    check('v6.0.180 撤銷補登（主控台）號碼還原、舊裝置蓋掉報價也不復活、補登後已封存新版就不准撤銷、再補一次結果一樣；唯讀帳號不能套用', r.undo && r.undoDur && r.undoRefuse && r.redo && r.ro, JSON.stringify(r));
     check('v6.0.180 防漏：每次匯出記 sendLog；只匯出另存永久紀錄（同內容只存一次）；還原前內容匯出過沒封存→先封存成正式版', r.only && r.onlyOnce && r.restore, JSON.stringify(r));
-    check('v6.0.180 資料健檢：匯出過沒封存內容已改掉（封存後消失）、合約金額對不上任何正式版次；唯讀帳號匯出送 qsend 卡、確認＝封存；複製報價不帶紀錄', r.health1 && r.health1b && r.health2 && r.reader && r.qsend && r.copy, JSON.stringify(r));
+    check('v6.0.180 資料健檢：匯出過沒封存內容已改掉（封存後消失）、合約金額對不上任何正式版次；唯讀帳號匯出送 qsend 卡（只送工項條款與基本欄位、跟正式版相同不送）、確認＝封存；同內容重複匯出不再動報價；複製報價不帶紀錄', r.health1 && r.health1b && r.health2 && r.reader && r.qsend && r.sameQuiet && r.copy, JSON.stringify(r));
     check('v6.0.180 資料庫規則：草稿類型加 qverfix、qsend（其他類型保留）', /\|vendorBill\|qverfix\|qsend\)\$/.test(dv) && /quote\|qchg\|bid\|irPhoto\|addon\|dailyLog\|contact/.test(dv));
     check('v6.0.180 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
