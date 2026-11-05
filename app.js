@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.179';
+var APP_VERSION='v6.0.180';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -5423,7 +5423,7 @@ function importData(file){
         }catch(e2){_err('top',e2);}}
         if(data.planAttLib&&typeof data.planAttLib==='object'){try{localStorage.setItem('fy_plan_attlib',JSON.stringify(data.planAttLib));}catch(e2){_err('top',e2);}}
         if(data.qHistory&&typeof data.qHistory==='object'){try{Q_HISTORY=data.qHistory;localStorage.setItem('fy_q_history',JSON.stringify(Q_HISTORY));}catch(e2){_err('top',e2);}}
-        try{_qhApplyFixAll();}catch(e2){_err('importData.qvf',e2);}   // v6.0.179 匯入的舊備份照補登版次規則重套
+        try{_qhApplyFixAll();}catch(e2){_err('importData.qvf',e2);}   // v6.0.180 匯入的舊備份照補登版次規則重套
         if(data.toolStates&&typeof data.toolStates==='object'){try{
           var _km={progress:'fy_progress',rebar:'fy_rebar2',grout:'fy_grout',backfill:'fy_backfill',lifeline:'fy_lifeline'};
           Object.keys(_km).forEach(function(k){if(data.toolStates[k])localStorage.setItem(_km[k],JSON.stringify(data.toolStates[k]));});
@@ -5823,7 +5823,7 @@ function _copyQDo(id){
   // Append (複製) to name
   copy.name=(copy.name||'未命名')+' (複製)';copy.payDefV=2;copy.instV=2;delete copy.ownerCard;delete copy._ocPriv;   // 新專案
   // 健檢1 #7：複製報價＝新的一張報價，不帶原案的專案狀態（追加案關聯、結案、版次、日報、詢價、材料、佣金、得標結果…）
-  ['parentId','closed','closedAt','ver','date0','dailyLogs','rfqs','mat','comms','comm','referral','confirmFiles','addons','siteHist','bidStatus','lostReason','lostPrice','lostNote','rentEnd','ownerDoc','matEst','measure','plan','sendLog','verFix'].forEach(function(k){delete copy[k];});   // v6.0.179 匯出紀錄、補登版次規則屬於原報價
+  ['parentId','closed','closedAt','ver','date0','dailyLogs','rfqs','mat','comms','comm','referral','confirmFiles','addons','siteHist','bidStatus','lostReason','lostPrice','lostNote','rentEnd','ownerDoc','matEst','measure','plan','sendLog','verFix'].forEach(function(k){delete copy[k];});   // v6.0.180 匯出紀錄、補登版次規則屬於原報價
   copy._mt=Date.now();
   Q.unshift(copy);
   persist();
@@ -10370,7 +10370,7 @@ function _applyCloud(data){
   window._cloudApplied1=true;try{_pullOkMark();}catch(e){_err('_applyCloud.pullOk',e);}   // 4b 記下最後一次成功下載；v6.0.118：至少成功套用過一次雲端資料（匯款帳號遷移要等這個，免得拿本機舊資料當正本）
   try{_bankMigrate();}catch(e){_err('_applyCloud.bank',e);}
   try{_rmk14Migrate();}catch(e){_err('_applyCloud.rmk14',e);}   // v6.0.138 備註第 14 條
-  try{_qhApplyFixAll({cloud:true});}catch(e){_err('_applyCloud.qvf',e);}   // v6.0.179 補登版次規則：每台合併後重套（不把舊號碼傳回去）
+  try{_qhApplyFixAll({cloud:true});}catch(e){_err('_applyCloud.qvf',e);}   // v6.0.180 補登版次規則：每台合併後重套（不把舊號碼傳回去）
   setTimeout(function(){try{_prjSync();}catch(e){_err('_applyCloud.prj',e);}},600);
   try{_cfAfterApply();}catch(e){_err('_applyCloud.cf',e);}   // 4b 三方合併的結果要上傳   // 4a：雲端報價合併完才對帳（等 _applyingCloud 解除，補建的才會上傳）
   return true;
@@ -27913,7 +27913,7 @@ function compareQVersion(qid,idx,newerIdx){
   showConfirm('版本比較',head+'<div style="max-height:320px;overflow-y:auto">'+table+'</div>'+foot,()=>{},false,null,true);
 }
 // v6.0.148：版本歷史修剪共用——正式版次與還原前備份永遠保留，只修剪自動存檔（keep 份，由新到舊）
-function _qhKeep(e){return !!(e&&(e.formal||e.pre||e.sent||e.backfill));}   // v6.0.179：只匯出未封存的紀錄（sent）、補登版次（backfill）也永久保留
+function _qhKeep(e){return !!(e&&(e.formal||e.pre||e.sent||e.backfill));}   // v6.0.180：只匯出未封存的紀錄（sent）、補登版次（backfill）也永久保留
 function _qhPrune(arr,keep){var n=0;return (arr||[]).filter(function(e){return _qhKeep(e)?true:(++n<=keep);});}
 function saveQVersion(qid,q,opts){
   if(!Q_HISTORY[qid])Q_HISTORY[qid]=[];
@@ -27925,8 +27925,8 @@ function saveQVersion(qid,q,opts){
     unsaved:!!(opts&&opts.unsaved)||undefined,   // 備份含編輯頁還沒按儲存的修改
     ver:(q.ver||1),
     note:(opts&&opts.note)||undefined,      // v6.0.159 版次備註（例：送出 PDF 115/11/03）
-    sent:!!(opts&&opts.sent)||undefined,    // v6.0.179 只匯出、沒封存的那一份（永久保留，健檢與補登版次用）
-    h:(opts&&opts.h)||undefined,             // v6.0.179 內容雜湊（_qSigHash，比對匯出紀錄用）
+    sent:!!(opts&&opts.sent)||undefined,    // v6.0.180 只匯出、沒封存的那一份（永久保留，健檢與補登版次用）
+    h:(opts&&opts.h)||undefined,             // v6.0.180 內容雜湊（_qSigHash，比對匯出紀錄用）
     snapshot:_qhSnapOf(q)
   });
   // 修剪：正式版、還原前備份全保留；自動存檔僅留最近 10 份
@@ -28017,7 +28017,7 @@ function restoreQVersion(qid,versionIdx,savedAt){
   const src=versions[versionIdx],snapshot=JSON.parse(JSON.stringify(src.snapshot));   // v6.0.148：深拷貝——原本淺拷貝，還原後再改報價會連帶改到歷史版次的工項
   const editing=typeof eid!=='undefined'&&eid===qid&&!!document.getElementById('page-editor')?.classList.contains('active');
   const what=src.formal?('V'+(src.ver||1)+' 正式版'):(src.pre?'還原前備份':(src.sent?'匯出過的內容':'自動存檔'));
-  const q0=Q.find(x=>x.id===qid),sentHit=q0?_qSentUnarchived(q0):null;   // v6.0.179：目前內容匯出過、還沒封存 → 還原前先封存成正式版（V2 漏封存的教訓）
+  const q0=Q.find(x=>x.id===qid),sentHit=q0?_qSentUnarchived(q0):null;   // v6.0.180：目前內容匯出過、還沒封存 → 還原前先封存成正式版（V2 漏封存的教訓）
   showConfirm('還原版本','確定要還原到「'+what+'（'+new Date(src.savedAt).toLocaleString('zh-TW')+'）」？<br>'
     +(sentHit?'<div style="font-size:12.5px;color:#b26a00;margin:6px 0"><b>目前這份內容 '+esc(new Date(+sentHit.at||0).toLocaleDateString('zh-TW'))+' 匯出過（'+esc(String(sentHit.what||'PDF'))+'）、還沒封存：還原前會先封存成正式版 V'+(q0.ver||1)+'</b>，之後的版號往後排。</div>':'')
     +'<span style="font-size:12px;color:var(--b5)"><b>目前內容'+(editing?'（含編輯頁還沒按儲存的修改）':'')+'會先另存成「還原前備份」，永久保留、不會不見</b>，可以在歷史版本裡查看、比較或再還原回來。版本號維持現行不倒退；已封存的正式版次不會被改。</span>',()=>{
@@ -28030,7 +28030,7 @@ function restoreQVersion(qid,versionIdx,savedAt){
       if(editing){try{cur=Object.assign(JSON.parse(JSON.stringify(Q[idx])),_qEditorFields());unsaved=true;}catch(e){_err('restoreQVersion.cur',e);cur=Q[idx];}}
       var _okB=false;try{_okB=saveQVersion(qid,cur,{pre:true,unsaved:unsaved});}catch(e){_err('restoreQVersion',e);}
       if(!_okB){toast('還原前備份存不進這台裝置（儲存空間可能滿了），已取消還原：請先匯出備份或清理自動存檔');return;}   // 審查：空間滿時備份只在記憶體，重新整理就不見
-      const _keep={sendLog:Q[idx].sendLog,verFix:Q[idx].verFix};   // v6.0.179：匯出紀錄、補登版次規則屬於這張報價，不跟著快照倒回去
+      const _keep={sendLog:Q[idx].sendLog,verFix:Q[idx].verFix};   // v6.0.180：匯出紀錄、補登版次規則屬於這張報價，不跟著快照倒回去
       Q[idx]={...snapshot,id:qid,ver:Math.max(curVer,snapshot.ver||1)};  // 版號不倒退
       Object.keys(_keep).forEach(function(k){if(_keep[k]!=null)Q[idx][k]=_keep[k];else delete Q[idx][k];});
       _touch(Q[idx]); // 快照裡的 _mt 是舊值，不蓋新戳記的話雲端同步會把還原吃掉
@@ -39979,10 +39979,10 @@ function _qSendGate(qid,what,run){
   var q=Q.find(function(x){return x.id===qid;});
   if(!q){toast('請先儲存報價單');return;}
   var sig=_qSendSig(q),h=_qSigHash(sig);
-  if(_isReaderUser){try{_qSendReaderDraft(q,what,h);}catch(e){_err('_qSendGate.reader',e);}return run(q);}   // v6.0.179：唯讀帳號（AI）匯出 → 送一張卡問 Lotion 要不要封存
+  if(_isReaderUser){try{_qSendReaderDraft(q,what,h);}catch(e){_err('_qSendGate.reader',e);}return run(q);}   // v6.0.180：唯讀帳號（AI）匯出 → 送一張卡問 Lotion 要不要封存
   var last=_qLastFormal(qid);
   if(last&&sig!=null&&_qSendSig(last.snapshot)===sig){
-    try{_qSendLogAdd(q,{what:what,mode:'same',archived:true,ver:last.ver||1,h:h});_touch(q);persist();}catch(e){_err('_qSendGate.log',e);}   // v6.0.179 每次匯出都留紀錄
+    try{_qSendLogAdd(q,{what:what,mode:'same',archived:true,ver:last.ver||1,h:h});_touch(q);persist();}catch(e){_err('_qSendGate.log',e);}   // v6.0.180 每次匯出都留紀錄
     toast('內容跟 V'+(last.ver||1)+' 相同，沒有另外封存');
     return run(last.snapshot);
   }
@@ -39990,7 +39990,7 @@ function _qSendGate(qid,what,run){
   return new Promise(function(res){
     // 三個選擇：送出並封存（確認鈕）／只匯出、不封存（視窗內的鈕）／取消（取消鈕、Esc：什麼都不做）
     window._qSendOnly=function(){var md=document.getElementById('gen-confirm-modal');if(md)md.style.display='none';window._qSendOnly=null;var qq=Q.find(function(x){return x.id===qid;})||q;
-      try{_qSendOnlyKeep(qq,what,h);}catch(e){_err('_qSendGate.only',e);}   // v6.0.179：只匯出也留紀錄＋一份永久保留的內容（之後才找得回寄出的那份）
+      try{_qSendOnlyKeep(qq,what,h);}catch(e){_err('_qSendGate.only',e);}   // v6.0.180：只匯出也留紀錄＋一份永久保留的內容（之後才找得回寄出的那份）
       res(run(qq));};
     showConfirm('送出給對方？',
       '這份要送出給對方嗎？送出就把目前內容封存成 <strong>V'+n+'</strong>（永久保留），之後的修改算 <strong>V'+(n+1)+'</strong>。'
@@ -41239,7 +41239,7 @@ _decReg('dailyOut',{
       var v=String(gv('do-edit')||'').slice(0,5000);_DEC.dailyOut.ok(d,v).then(function(done){if(done!==false)_decRefresh('dailyOut');else toast('沒有完成，這張還留著');}).catch(function(e){_err('dailyOut.edit',e);});
     },false,null,true);}
 });
-// ══════════ v6.0.179 報價補登歷史版次（一次性）＋送出封存防漏 ══════════
+// ══════════ v6.0.180 報價補登歷史版次（一次性）＋送出封存防漏 ══════════
 // 設計：docs/報價補登歷史版次_設計.md。版次紀錄 Q_HISTORY 跨裝置是「以 savedAt 為身分的聯集」，只改本機那一筆的號碼會被別台的舊號碼傳回來蓋掉，
 //   所以更正寫成一條規則存在報價記錄上（q.verFix，逐筆同步、_mt 新者勝；補登那一筆的 backfill.rule 也帶一份，報價記錄被舊裝置蓋掉時從歷史補回），
 //   每台裝置在開頁／雲端合併／私有資料補回／匯入備份後都照規則重算一次（_qhApplyFix，冪等：照規則記的「原號碼」算應有的號碼，不是看現值再 +1）。

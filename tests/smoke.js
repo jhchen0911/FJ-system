@@ -11020,7 +11020,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── v6.0.179 報價補登歷史版次（一次性，規則 q.verFix 每台重套）＋送出封存防漏（假資料）──
+  // ── v6.0.180 報價補登歷史版次（一次性，規則 q.verFix 每台重套）＋送出封存防漏（假資料）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -11167,15 +11167,15 @@ async function newPage(browser, width, height) {
     });
     const RQ = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8'));
     const dv = RQ.rules.fydata.drafts.$id['.validate'];
-    check('v6.0.179 補登版次：核對數字對不上、缺數字、拿正式版當來源都擋；唯讀帳號送卡前先試算，對不上不送', r.refuse && r.send, JSON.stringify(r));
-    check('v6.0.179 補登版次拍板卡：總覽一列、只有退回／修改／確認、細節含補登前後對照與核對數字；預設收起、展開看過明細才解鎖；細節讀不出來不解鎖；確認時再驗一次、數字不對擋下', r.todo && r.locked && r.card && r.noDetail && r.cardRefuse, JSON.stringify(r));
-    check('v6.0.179 補登：新 V2（存檔時間＋1、正式、已送業主、稅額重算）、原 V2→V3、編輯中 V3→V4；詢價／變更／請款單版號一起改；先備份', r.apply && r.refs, JSON.stringify(r));
-    check('v6.0.179 補登冪等（重跑 5 次一樣、不能再套）；第二台舊號碼合併後收斂；報價被舊裝置蓋掉從歷史補回規則；舊裝置後封存的撞號往後排', r.idem && r.rt && r.dev2 && r.heal && r.clash, JSON.stringify(r));
-    check('v6.0.179 撤銷補登（主控台）號碼還原、再補一次結果一樣；唯讀帳號不能套用', r.undo && r.redo && r.ro, JSON.stringify(r));
-    check('v6.0.179 防漏：每次匯出記 sendLog；只匯出另存永久紀錄（同內容只存一次）；還原前內容匯出過沒封存→先封存成正式版', r.only && r.onlyOnce && r.restore, JSON.stringify(r));
-    check('v6.0.179 資料健檢：匯出過沒封存內容已改掉（封存後消失）、合約金額對不上任何正式版次；唯讀帳號匯出送 qsend 卡、確認＝封存；複製報價不帶紀錄', r.health1 && r.health1b && r.health2 && r.reader && r.qsend && r.copy, JSON.stringify(r));
-    check('v6.0.179 資料庫規則：草稿類型加 qverfix、qsend（其他類型保留）', /\|vendorBill\|qverfix\|qsend\)\$/.test(dv) && /quote\|qchg\|bid\|irPhoto\|addon\|dailyLog\|contact/.test(dv));
-    check('v6.0.179 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.180 補登版次：核對數字對不上、缺數字、拿正式版當來源都擋；唯讀帳號送卡前先試算，對不上不送', r.refuse && r.send, JSON.stringify(r));
+    check('v6.0.180 補登版次拍板卡：總覽一列、只有退回／修改／確認、細節含補登前後對照與核對數字；預設收起、展開看過明細才解鎖；細節讀不出來不解鎖；確認時再驗一次、數字不對擋下', r.todo && r.locked && r.card && r.noDetail && r.cardRefuse, JSON.stringify(r));
+    check('v6.0.180 補登：新 V2（存檔時間＋1、正式、已送業主、稅額重算）、原 V2→V3、編輯中 V3→V4；詢價／變更／請款單版號一起改；先備份', r.apply && r.refs, JSON.stringify(r));
+    check('v6.0.180 補登冪等（重跑 5 次一樣、不能再套）；第二台舊號碼合併後收斂；報價被舊裝置蓋掉從歷史補回規則；舊裝置後封存的撞號往後排', r.idem && r.rt && r.dev2 && r.heal && r.clash, JSON.stringify(r));
+    check('v6.0.180 撤銷補登（主控台）號碼還原、再補一次結果一樣；唯讀帳號不能套用', r.undo && r.redo && r.ro, JSON.stringify(r));
+    check('v6.0.180 防漏：每次匯出記 sendLog；只匯出另存永久紀錄（同內容只存一次）；還原前內容匯出過沒封存→先封存成正式版', r.only && r.onlyOnce && r.restore, JSON.stringify(r));
+    check('v6.0.180 資料健檢：匯出過沒封存內容已改掉（封存後消失）、合約金額對不上任何正式版次；唯讀帳號匯出送 qsend 卡、確認＝封存；複製報價不帶紀錄', r.health1 && r.health1b && r.health2 && r.reader && r.qsend && r.copy, JSON.stringify(r));
+    check('v6.0.180 資料庫規則：草稿類型加 qverfix、qsend（其他類型保留）', /\|vendorBill\|qverfix\|qsend\)\$/.test(dv) && /quote\|qchg\|bid\|irPhoto\|addon\|dailyLog\|contact/.test(dv));
+    check('v6.0.180 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
