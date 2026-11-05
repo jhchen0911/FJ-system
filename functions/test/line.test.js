@@ -427,7 +427,7 @@ test('v6.0.153 回覆合併：傳完打一行字＝這批的案名，記到這�
   await core.handleEvents([f('p1', T0), f('p2', T0 + 30e3)], d);
   await core.handleEvents([tx('t1', T0 + 120e3, '推薦人：範例業務')], d);
   assert.equal(d.db.fydata.lineInbox.p1.note, '推薦人：範例業務'); assert.equal(d.db.fydata.lineInbox.p2.note, '推薦人：範例業務');
-  assert.match(d.replies[d.replies.length - 1].text, /這批 2 個檔案：推薦人：範例業務，已記下/);
+  assert.match(d.replies[d.replies.length - 1].text, /第 1 批 2 個檔案：推薦人：範例業務，已記下/);
   assert.equal(d.db.fydata.lineInbox.t1.status, 'filed');
   // 過了 10 分鐘的文字不算這批：照舊記一筆文字、不回
   const n0 = d.replies.length; await core.handleEvents([tx('t2', T0 + 20 * 60e3, '另一件事')], d);
@@ -480,4 +480,50 @@ test('v6.0.153 審查：傳檔前連打兩行都留；回覆失敗不改推播�
   d3.txn = async (path, fn) => { const run = lock.then(async () => { const cur = await d3.dbGet(path); const v = fn(cur || null); if (v !== undefined) await d3.dbSet(path, v); return v; }); lock = run.catch(() => {}); return run; };
   await Promise.all([core.handleEvents([f('x1', T0)], d3), core.handleEvents([f('x2', T0 + 1000)], d3)]);
   assert.equal(d3.replies.length, 1); assert.deepEqual(Object.keys(d3.db.fydata.lineInboxBatch.Uowner.ids).sort(), ['x1', 'x2']);
+});
+
+// v6.0.177 Lotion 11/05：10:43 傳案 1 的 3 個檔＋案名、10:45 傳案 2 的 1 張圖＋案名（3 分鐘內）→ 不能併成一批、第二行字不能蓋掉第一批
+test('v6.0.177 分批：案名打完這批就關閉（3 分鐘內的檔案也開新批）；第二批的字不蓋掉第一批；回覆寫第幾批', async () => {
+  const d = mkDeps(CFG);
+  const f = (id, t, ty) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: Object.assign({ id, type: ty || 'file', fileSize: 10 }, ty === 'image' ? {} : { fileName: id + '.pdf' }) });
+  const tx = (id, t, text) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'text', text } });
+  const T = Date.UTC(2026, 10, 5, 2, 43);   // 台北 10:43
+  await core.handleEvents([f('a1', T), f('a2', T + 5e3), f('a3', T + 10e3)], d);
+  await core.handleEvents([tx('n1', T + 40e3, '業主詢價單（業務 假甲）')], d);
+  await core.handleEvents([f('b1', T + 120e3, 'image')], d);   // 10:45，距上一個檔不到 3 分鐘
+  await core.handleEvents([tx('n2', T + 150e3, '業主詢價單-假乙介紹')], d);
+  const I = d.db.fydata.lineInbox;
+  ['a1', 'a2', 'a3'].forEach((k) => { assert.equal(I[k].note, '業主詢價單（業務 假甲）'); assert.equal(I[k].batch, 'a1'); });
+  assert.equal(I.b1.batch, 'b1'); assert.equal(I.b1.note, '業主詢價單-假乙介紹');
+  const R = d.replies.map((r) => r.text);
+  assert.match(R.find((x) => /業務 假甲/.test(x)), /^第 1 批 3 個檔案：/);
+  assert.match(R.find((x) => /^第 2 批：收到/.test(x)) || '', /^第 2 批：收到/);   // 第二批第一個檔的回覆寫第 2 批
+  assert.match(R[R.length - 1], /^第 2 批 1 個檔案：業主詢價單-假乙介紹，已記下/);
+});
+test('v6.0.177 分批：已有案名後「補充」「備註」附加到這批；其他字＝下一批的案名（先打字後傳檔），不蓋掉這批', async () => {
+  const d = mkDeps(CFG);
+  const f = (id, t) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'image' } });
+  const tx = (id, t, text) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'text', text } });
+  await core.handleEvents([f('c1', T0), f('c2', T0 + 5e3)], d);
+  await core.handleEvents([tx('m1', T0 + 30e3, '範例案 A')], d);
+  await core.handleEvents([tx('m2', T0 + 60e3, '補充：含平面圖')], d);
+  assert.equal(d.db.fydata.lineInbox.c1.note, '範例案 A；含平面圖'); assert.equal(d.db.fydata.lineInbox.c2.note, '範例案 A；含平面圖');
+  assert.match(d.replies[d.replies.length - 1].text, /^第 1 批補充：含平面圖，已記下/);
+  await core.handleEvents([tx('m3', T0 + 90e3, '範例案 B')], d);   // 不是補充：下一批的案名
+  assert.equal(d.db.fydata.lineInbox.c1.note, '範例案 A；含平面圖');   // 沒被蓋掉
+  assert.match(d.replies[d.replies.length - 1].text, /接下來傳的檔案記成：範例案 B/);
+  assert.equal(d.db.fydata.lineInbox.m3.status, 'new');
+  await core.handleEvents([f('c3', T0 + 100e3)], d);   // 3 分鐘內，但上一批已關閉 → 新批、帶「範例案 B」
+  assert.equal(d.db.fydata.lineInbox.c3.batch, 'c3'); assert.equal(d.db.fydata.lineInbox.c3.note, '範例案 B');
+  await core.handleEvents([f('c4', T0 + 110e3)], d);   // 先打字後傳檔的批：還沒關閉，後續檔案照樣併進來
+  assert.equal(d.db.fydata.lineInbox.c4.batch, 'c3'); assert.equal(d.db.fydata.lineInbox.c4.note, '範例案 B');
+  await core.handleEvents([tx('m4', T0 + 130e3, '備註 急件')], d);
+  assert.equal(d.db.fydata.lineInbox.c3.note, '範例案 B；急件'); assert.equal(d.db.fydata.lineInbox.c1.note, '範例案 A；含平面圖');
+});
+test('v6.0.177 固定句子：存過沒改的舊預設「這批 {n} 個檔案」換成新預設（寫第幾批）', async () => {
+  const d = mkDeps(Object.assign({}, CFG, { texts: { inboxNote: '這批 {n} 個檔案：{text}，已記下' } }));
+  const f = (id, t) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'image' } });
+  await core.handleEvents([f('o1', T0)], d);
+  await core.handleEvents([{ type: 'message', timestamp: T0 + 30e3, replyToken: 'rt', source: { type: 'user', userId: 'Uowner' }, message: { id: 'ot', type: 'text', text: '範例案' } }], d);
+  assert.match(d.replies[d.replies.length - 1].text, /^第 1 批 1 個檔案：範例案/);
 });
