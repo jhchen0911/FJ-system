@@ -41282,7 +41282,7 @@ function _vbWhy(v,withDup){
   if(v.c&&!v.rows.some(function(x){return x.pick&&x.pick!=='skip';}))w.push('沒有任何一項要計價');
   return w;
 }
-function _vbBadge(conf){conf=_draftS(conf);return _VB_LOW[conf]?'<span style="background:#fff3bf;color:#8a6d00;border-radius:4px;padding:0 4px;font-size:11px">🟨 '+esc(conf||'無')+'</span>':'<span style="color:var(--b4);font-size:11px">'+esc(conf||'')+'</span>';}
+function _vbConfBadge(conf){conf=_draftS(conf);return _VB_LOW[conf]?'<span style="background:#fff3bf;color:#8a6d00;border-radius:4px;padding:0 4px;font-size:11px">🟨 '+esc(conf||'無')+'</span>':'<span style="color:var(--b4);font-size:11px">'+esc(conf||'')+'</span>';}
 function _vbSrcOk(u){u=_draftS(u);return (/^https:\/\/firebasestorage\.googleapis\.com\/v0\/b\/(jhchen-aed9a|fj-system-test)[a-z0-9.-]*\//.test(u)||/^data:(image\/(png|jpe?g|webp|gif)|application\/pdf);base64,[A-Za-z0-9+\/=]+$/.test(u))?u:'';}
 function _vbSrcUrl(u){u=_draftS(u);if(/^ph:[A-Za-z0-9_-]{4,40}$/.test(u))return _photoGet(u).then(_vbSrcOk);return Promise.resolve(_vbSrcOk(u));}   // 審查：照片庫取回的也要過白名單
 function _vbSrcHtml(pl){
@@ -41297,7 +41297,7 @@ function _vbSrcHtml(pl){
 }
 function _vbDetailHtml(d){
   var v=_vbView(d),pl=v.pl,F=function(k){return _vbF(pl[k]);};
-  var kv=function(l,val,conf){return '<div style="color:var(--b4)">'+esc(l)+'</div><div style="min-width:0;overflow-wrap:anywhere">'+esc(_draftS(val).slice(0,120))+(conf?' '+_vbBadge(conf):'')+'</div>';};
+  var kv=function(l,val,conf){return '<div style="color:var(--b4)">'+esc(l)+'</div><div style="min-width:0;overflow-wrap:anywhere">'+esc(_draftS(val).slice(0,120))+(conf?' '+_vbConfBadge(conf):'')+'</div>';};
   var tt=v.tot,head='<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12.5px">'
     +kv('廠商',F('vendor').text||v.vn,F('vendor').conf)
     +kv('專案',v.q?v.q.name:('（未選）'+(F('qid').text?'單據上寫：'+F('qid').text:'')),v.q?'':(F('qid').conf||'無'))
@@ -41314,7 +41314,7 @@ function _vbDetailHtml(d){
     return '<div style="border:1px solid var(--b1);border-radius:6px;padding:5px 8px;margin-top:4px;font-size:12px;overflow-wrap:anywhere'+(_VB_LOW[x.conf]&&x.auto?';background:#fffbe6':'')+'">'
       +'<div style="font-weight:700">'+(x.i+1)+'. '+esc(x.ln.text||'（無說明）')+'</div>'
       +'<div>'+fmt(x.ln.qty)+' '+esc(x.ln.unit)+' × '+fmt(x.ln.up)+' ＝ NT$ '+fmt(Math.round(amt))+'</div>'
-      +'<div>對到：'+esc(tgt)+(x.auto&&x.pick?' '+_vbBadge(x.conf):'')+'</div>'
+      +'<div>對到：'+esc(tgt)+(x.auto&&x.pick?' '+_vbConfBadge(x.conf):'')+'</div>'
       +(x.cr?('<div style="color:'+(x.up.diff?'#b26a00':'var(--b4)')+'">本期單價 '+fmt(x.up.up)+'（'+(x.up.src==='bill'?'用單據單價':'照分包卡')+'）'+(x.up.diff?'；單據與分包卡差 '+fmt(x.up.diff):'')+'</div>'):'')
       +(x.flags.length?'<div style="color:#b26a00">'+esc(x.flags.join('、'))+'</div>':'')+'</div>';
   }).join('');

@@ -10778,7 +10778,7 @@ async function newPage(browser, width, height) {
     check('5d LINE 群組對象：沒設定＝當作有營造廠、改成豐有內部先確認、存檔帶 audience；Google 工作表授權狀態', r.sel && r.gt && r.save && r.save2 && r.save3 && r.hide, JSON.stringify(r));
     const RF5 = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const rOk = RF5.gtasks['.read'] === 'false' && RF5.gtasks['.write'] === 'false' && RF5.progress['.write'] === 'false' && RF5.dailyOut['.write'] === 'false' && RF5.gtasksStatus['.write'] === 'false'
-      && !/readers/.test(RF5.gtasksStatus['.read'].replace(/!root\.child\('fydata\/readers'\)/g, '')) && /dailyOut\)\$/.test(RF5.drafts.$id['.validate']);
+      && !/readers/.test(RF5.gtasksStatus['.read'].replace(/!root\.child\('fydata\/readers'\)/g, '')) && /\|dailyOut(\|[A-Za-z]+)*\)\$/.test(RF5.drafts.$id['.validate']);
     check('5d 規則：Google 授權節點全部不可讀寫、進度／發送紀錄／同步狀態只有雲端寫；草稿類型加 dailyOut', rOk);
     check('5d 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
