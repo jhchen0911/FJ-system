@@ -10912,6 +10912,158 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.179 報價補登歷史版次（一次性，規則 q.verFix 每台重套）＋送出封存防漏（假資料）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      try {
+        const oT = window.toast; const tt = []; window.toast = (m) => { tt.push(String(m)); };
+        const oD = window._dlText; let dl = null; window._dlText = (n, t) => { dl = [n, t]; };
+        const T0 = Date.UTC(2026, 9, 1, 2, 0, 0), H = 3600000;
+        const mkQ = (price, date, ver) => ({ id: 'qvA', code: 'QV-01', name: '假補登案', client: '範例營造', date, ver, items: [{ sec: true, desc: '一、假分項' }, { desc: '假鋼樁', unit: '支', qty: 10, price }, { desc: '假支撐', unit: 'M', qty: 5, price: 100 }, { desc: '假備用', unit: '式', qty: 1, price: 999, spare: true }], exs: [], rmk: {} });
+        const snap = (price, date, ver) => mkQ(price, date, ver);
+        // 時間線：V1 封存 → V2 寄出沒封存 → 還原時留下的存檔（來源）→ 誤編成「V2」的正式版 → 現行 V3
+        const H0 = [
+          { savedAt: T0 + 30 * H, by: 'a', formal: true, ver: 2, snapshot: snap(1300, '2026-10-03', 2) },
+          { savedAt: T0 + 20 * H, by: 'a', ver: 2, snapshot: snap(1200, '2026-10-02', 2) },
+          { savedAt: T0 + 10 * H, by: 'a', formal: true, ver: 1, snapshot: snap(1500, '2026-10-01', 1) },
+        ];
+        Q = Q.filter((x) => x.id !== 'qvA' && x.id !== 'qvB');
+        const q = Object.assign(mkQ(1300, '2026-10-04', 3), { _mt: T0 + 31 * H, rfqs: [{ id: 'rA', no: 'R1', ts: T0 + 25 * H, quoteVer: 2 }, { id: 'rB', no: 'R2', ts: T0 + 5 * H, quoteVer: 1 }, { id: 'rC', no: 'R3', ts: T0 + 32 * H, quoteVer: 3, chg: { id: 'chg' + (T0 + 33 * H).toString(36), from: 2, to: 3 }, chgLog: [{ from: 1, to: 2, ts: T0 + 26 * H }] }] });
+        Q.push(q); Q.push(Object.assign(mkQ(1200, '2026-10-02', 1), { id: 'qvB', code: 'QV-02', name: '假補登案（重建）' }));
+        Q_HISTORY.qvA = JSON.parse(JSON.stringify(H0));
+        INV = INV.filter((x) => x.quoteId !== 'qvA');
+        INV.push({ id: String(T0 + 34 * H), quoteId: 'qvA', sourceQid: 'qvA', quoteVer: 3, project: '假補登案', items: [{ desc: '假舊工項', _qRetired: 3 }] });
+        INV.push({ id: String(T0 + 15 * H), quoteId: 'qvA', sourceQid: 'qvA', quoteVer: 2, project: '假補登案', items: [] });
+        const exp = { rows: 3, sub: 12500, tax: 625, total: 13125, date: '2026-10-02' };
+        // ① 驗證：數字對不上要擋
+        const bad = _qvfPlan(q, { srcSavedAt: T0 + 20 * H, expect: Object.assign({}, exp, { total: 13126 }) });
+        const bad2 = _qvfPlan(q, { srcSavedAt: T0 + 20 * H, expect: { rows: 3, sub: 12500 } });
+        const bad3 = _qvfPlan(q, { srcSavedAt: T0 + 30 * H, expect: exp });   // 拿正式版當來源
+        out.refuse = !bad.ok && bad.checks.some((c) => c.n === 6 && !c.ok) && !bad2.ok && !bad3.ok;
+        // ② 唯讀帳號送卡：先試算，對不上不送
+        const oU = window._fbUser, oP = window._draftPush; let pushed = []; _fbUser = { email: 'ai@x.com', uid: 'ai' }; window._draftPush = (t, p, s) => { pushed.push([t, p, s]); return Promise.resolve(true); };
+        const s1 = await fyQuoteVerFix({ qid: 'qvA', fromSnapshotSavedAt: T0 + 20 * H, expect: Object.assign({}, exp, { sub: 1 }) });
+        const s2 = await fyQuoteVerFix({ code: 'QV-01', fromSnapshotSavedAt: T0 + 20 * H, expect: exp, cmpQid: 'qvB' });
+        out.send = !s1.ok && pushed.length === 1 && s2.ok && s2.ver === 2 && pushed[0][0] === 'qverfix' && pushed[0][1].srcSavedAt === T0 + 20 * H && pushed[0][1].expect.total === 13125;
+        _fbUser = oU; window._draftPush = oP;
+        // ③ 拍板卡：細節（前後對照＋核對數字）一定要有；細節讀不出來不准確認
+        const d = { id: 'dqv0000001', type: 'qverfix', by: 'ai@x.com', byName: '假 AI', at: Date.now(), status: 'pending', summary: pushed[0][2], payload: pushed[0][1] };
+        DRAFTS = { dqv0000001: d };
+        const marks = []; const oM = window._draftMark; window._draftMark = (id, st, ex) => { marks.push([id, st]); DRAFTS[id].status = st; return Promise.resolve(true); };
+        const its = []; _v6TodoItems(its);
+        out.todo = its.some((x) => x.type === 'dec_qverfix' && x.jump === "openDecList('qverfix')") && !its.some((x) => x.type === 'ai_draft');
+        openDecList('qverfix');
+        const box = document.getElementById('dec-box'), bh = box.innerHTML;
+        const btns = Array.from(box.querySelectorAll('.dec-card button')).map((b) => b.textContent);
+        out.card = JSON.stringify(btns) === JSON.stringify(['退回', '修改', '確認']) && /補登前/.test(bh) && /補登後/.test(bh) && /原 V2 改號/.test(bh) && /13,125/.test(bh) && /和對照報價的差異/.test(bh) && /請款單依據版次/.test(bh);
+        let okCalls = 0; _decReg('__qd', { title: 't', todo: (n) => 't' + n, list: () => [{ id: 'z1' }], key: (x) => x.id, head: () => 'x', detail: () => '', ok: () => { okCalls++; return Promise.resolve(true); }, reject: () => Promise.resolve(true), edit: () => {} });
+        decAct('__qd', 'z1', 'ok'); await new Promise((res) => setTimeout(res, 30)); delete _DEC.__qd;
+        out.noDetail = okCalls === 0 && tt.some((t) => /看不到這張的細節，不能確認/.test(t)) && /細節讀不出來/.test(_decCardHtml('qverfix', { id: 'dx', payload: { qid: 'nope' } }));
+        // 卡片上的核對數字不對（送出後資料被改、或卡片被改）→ 確認時再驗一次，擋下、不動資料
+        DRAFTS.dqv0000002 = Object.assign({}, d, { id: 'dqv0000002', payload: Object.assign({}, d.payload, { expect: Object.assign({}, exp, { tax: 626 }) }) });
+        decAct('qverfix', 'dqv0000002', 'ok'); await new Promise((res) => setTimeout(res, 60));
+        out.cardRefuse = DRAFTS.dqv0000002.status === 'pending' && !q.verFix && q.ver === 3 && tt.some((t) => /檢查沒過，不能確認/.test(t)); delete DRAFTS.dqv0000002;
+        // ④ 確認＝補登：新 V2（存檔時間＋1、正式、已送業主）、原 V2→V3、現行 V3→V4、參照改號、備份
+        decAct('qverfix', 'dqv0000001', 'ok'); await new Promise((res) => setTimeout(res, 60));
+        const hh = Q_HISTORY.qvA, fm = hh.filter((e) => e.formal).sort((a, b) => a.savedAt - b.savedAt);
+        const ins = hh.find((e) => e.savedAt === T0 + 20 * H + 1);
+        out.apply = marks.some((m) => m[0] === 'dqv0000001' && m[1] === 'applied') && fm.map((e) => e.ver).join(',') === '1,2,3' && !!ins && ins.formal && ins.ver === 2 && ins.snapshot.ver === 2 && ins.snapshot.t.total === 13125 && /已送業主/.test(ins.note)
+          && hh.find((e) => e.savedAt === T0 + 30 * H).ver === 3 && hh.find((e) => e.savedAt === T0 + 30 * H).snapshot.ver === 3 && q.ver === 4 && hh.some((e) => e.savedAt === T0 + 20 * H && !e.formal)
+          && hh.some((e) => e.pre && /補登版次前備份/.test(e.note || '')) && !!dl && /^補登版次備份_/.test(dl[0]) && !!localStorage.getItem('fy_qvf_bak_qvA') && Array.isArray(q.verFix) && q.verFix.length === 1;
+        const rA = q.rfqs[0], rB = q.rfqs[1], rC = q.rfqs[2], i1 = INV.find((x) => x.id === String(T0 + 34 * H)), i2 = INV.find((x) => x.id === String(T0 + 15 * H));
+        out.refs = rA.quoteVer === 3 && rB.quoteVer === 1 && rC.quoteVer === 4 && rC.chg.from === 3 && rC.chg.to === 4 && rC.chgLog[0].to === 3 && rC.chgLog[0].from === 1 && i1.quoteVer === 4 && i1.items[0]._qRetired === 4 && i2.quoteVer === 2 && _qSnapOf(q, 2) === ins.snapshot;
+        // ⑤ 冪等：再跑 5 次結果一樣；卡片不能再套一次
+        const before = JSON.stringify([Q_HISTORY.qvA, q.ver, q.rfqs, i1, i2]);
+        for (let i = 0; i < 5; i++) _qhApplyFixAll();
+        out.idem = JSON.stringify([Q_HISTORY.qvA, q.ver, q.rfqs, i1, i2]) === before && !_qvfPlan(q, { srcSavedAt: T0 + 20 * H, expect: exp }).ok;
+        // 雲端來回：陣列變物件、鍵序變（Firebase）→ 照樣認得、不會每次都判成有改
+        const qr = JSON.parse(JSON.stringify(q.verFix[0])); const qr2 = {}; Object.keys(qr).reverse().forEach((k) => { qr2[k] = qr[k]; }); q.verFix = { 0: qr2 };
+        const insH = Q_HISTORY.qvA.find((e) => e.backfill), br0 = insH.backfill.rule, br2 = {}; Object.keys(br0).reverse().forEach((k) => { br2[k] = br0[k]; }); insH.backfill.rule = br2;
+        const c2 = _qhApplyFixAll(); out.rt = Array.isArray(q.verFix) && !c2.h && !c2.inv && q.ver === 4;
+        // ⑥ 第二台裝置：還拿著舊號碼（版次紀錄、報價記錄都是舊的）→ 合併雲端（帶規則的報價＋聯集版次）後收斂成一樣
+        const cloudQ = JSON.parse(JSON.stringify(q)), cloudH = JSON.parse(JSON.stringify(Q_HISTORY.qvA));
+        Q_HISTORY.qvA = JSON.parse(JSON.stringify(H0)); const qi = Q.findIndex((x) => x.id === 'qvA');
+        Q[qi] = Object.assign(mkQ(1300, '2026-10-04', 3), { _mt: T0 + 31 * H, rfqs: [{ id: 'rA', no: 'R1', ts: T0 + 25 * H, quoteVer: 2 }] });
+        Q_HISTORY = _mergeQHistory(Q_HISTORY, { qvA: cloudH });   // 本機舊號優先（以存檔時間認人）
+        const stale = Q_HISTORY.qvA.find((e) => e.savedAt === T0 + 30 * H).ver === 2;
+        Q[qi] = cloudQ; _qhApplyFixAll();   // 報價記錄（帶 q.verFix）同步到了 → 重套
+        out.dev2 = stale && JSON.stringify(Q_HISTORY.qvA.filter((e) => e.formal).map((e) => [e.savedAt, e.ver]).sort((a, b) => a[0] - b[0])) === JSON.stringify(cloudH.filter((e) => e.formal).map((e) => [e.savedAt, e.ver]).sort((a, b) => a[0] - b[0])) && Q[qi].ver === 4;
+        // 舊裝置把報價記錄蓋掉（沒有 q.verFix）也救得回來：規則在補登那一筆版次紀錄裡也有一份
+        const q2 = Q[qi]; delete q2.verFix; q2.ver = 3; _qhApplyFixAll();
+        out.heal = Array.isArray(q2.verFix) && q2.verFix.length === 1 && q2.ver === 4;
+        // 補登後才由舊裝置封存的正式版（號碼還是 3）→ 往後排
+        Q_HISTORY.qvA.unshift({ savedAt: Date.now() + 5000, by: 'old', formal: true, ver: 3, snapshot: snap(1250, '2026-10-05', 3) }); _qhApplyFixAll();
+        out.clash = Q_HISTORY.qvA.find((e) => e.by === 'old').ver === 4 && q2.ver === 5;
+        Q_HISTORY.qvA = Q_HISTORY.qvA.filter((e) => e.by !== 'old'); q2.ver = 4; _touch(q2);
+        // ⑦ 撤銷（主控台）：補登那筆變非正式、號碼還原；再補一次結果一樣
+        const fid = q2.verFix[0].id; qVerFixUndo('qvA', fid);
+        const hu = Q_HISTORY.qvA;
+        out.undo = !hu.find((e) => e.savedAt === T0 + 20 * H + 1).formal && hu.find((e) => e.savedAt === T0 + 30 * H).ver === 2 && q2.ver === 3 && q2.rfqs[0].quoteVer === 2;
+        _qvfApply(q2, _qvfPlan(q2, { srcSavedAt: T0 + 20 * H, expect: exp }, { env: true }), null);
+        out.redo = Q_HISTORY.qvA.filter((e) => e.formal).sort((a, b) => a.savedAt - b.savedAt).map((e) => e.ver).join(',') === '1,2,3' && q2.ver === 4 && q2.rfqs[0].quoteVer === 3;
+        // 唯讀帳號不能套用
+        window._isReaderUser = true; out.ro = !_qvfPlan(q2, { srcSavedAt: T0 + 20 * H, expect: exp }, { env: true }).checks.find((c) => c.n === 11).ok; window._isReaderUser = false;
+        window._draftMark = oM;
+        document.querySelectorAll('#fy-modal').forEach((m) => m.remove());
+        // ⑧ 防漏：每次匯出記 sendLog；只匯出另存永久紀錄；還原前內容匯出過沒封存→先封存；健檢兩項
+        const oPr = window._printViaIframe; window._printViaIframe = () => {};
+        Q.push({ id: 'qvS', name: '假送出案', client: '範例營造', code: 'QS-1', date: '2026-10-06', ver: 1, items: [{ desc: '假鋼樁', unit: '支', qty: 2, price: 100 }], exs: [], rmk: {} }); delete Q_HISTORY.qvS;
+        const qs = Q.find((x) => x.id === 'qvS');
+        let p = quoteSendPdf('qvS'); document.getElementById('q-send-only').click(); await p;
+        const sent = (Q_HISTORY.qvS || []).filter((e) => e.sent);
+        out.only = qs.sendLog.length === 1 && qs.sendLog[0].mode === 'only' && !qs.sendLog[0].archived && !!qs.sendLog[0].h && sent.length === 1 && !sent[0].formal && _qhKeep(sent[0]) && !('sendLog' in sent[0].snapshot);
+        p = quoteSendPdf('qvS'); document.getElementById('q-send-only').click(); await p;
+        out.onlyOnce = (Q_HISTORY.qvS || []).filter((e) => e.sent).length === 1 && qs.sendLog.length === 2;
+        qs.items[0].price = 150; _touch(qs);
+        let hr = _healthRows();
+        out.health1 = hr.some((x) => /假送出案/.test(x.msg) && /匯出過的 PDF（V1）沒封存，內容已經改掉了/.test(x.msg));
+        // 還原到匯出的那份 → 那份內容又變成現行；再還原別份前要先封存
+        restoreQVersion('qvS', null, sent[0].savedAt); document.getElementById('gen-confirm-ok').click();
+        restoreQVersion('qvS', null, Q_HISTORY.qvS.find((e) => e.pre).savedAt);
+        const msg = document.getElementById('gen-confirm-msg').innerHTML; document.getElementById('gen-confirm-ok').click();
+        const f1 = (Q_HISTORY.qvS || []).find((e) => e.formal);
+        out.restore = /匯出過（PDF）、還沒封存：還原前會先封存成正式版 V1/.test(msg) && !!f1 && f1.ver === 1 && f1.snapshot.items[0].price === 100 && qs.sendLog.some((e) => e.mode === 'auto' && e.archived) && Array.isArray(Q.find((x) => x.id === 'qvS').sendLog);
+        hr = _healthRows(); out.health1b = !hr.some((x) => /假送出案/.test(x.msg) && /沒封存/.test(x.msg));
+        // 合約金額對不上任何正式版次
+        CONTRACTS.push({ id: 'cqv1', linkedQid: 'qvS', name: '假送出案', amount: 99999 }); const qsx = Q.find((x) => x.id === 'qvS'); qsx.awarded = true;
+        hr = _healthRows(); out.health2 = hr.some((x) => /假送出案/.test(x.msg) && /合約金額 99,999 對不上/.test(x.msg));
+        CONTRACTS = CONTRACTS.filter((c) => c.id !== 'cqv1'); qsx.awarded = false;
+        // 唯讀帳號匯出 → 送 qsend 卡；確認（內容相同）＝封存
+        const oU2 = window._fbUser, oP2 = window._draftPush; let qd = []; _fbUser = { email: 'ai@x.com', uid: 'ai' }; window._draftPush = (t, pl, s) => { qd.push([t, pl, s]); return Promise.resolve(true); };
+        window._isReaderUser = true; await quoteSendPdf('qvS'); window._isReaderUser = false; _fbUser = oU2; window._draftPush = oP2;
+        out.reader = qd.length === 1 && qd[0][0] === 'qsend' && !!qd[0][1].h && !('costs' in qd[0][1].snap);
+        DRAFTS = { dqs0000001: { id: 'dqs0000001', type: 'qsend', by: 'ai@x.com', byName: '假 AI', at: Date.now(), status: 'pending', summary: qd[0][2], payload: qd[0][1] } };
+        window._draftMark = (id, st) => { DRAFTS[id].status = st; return Promise.resolve(true); };
+        const v0 = qsx.ver; openDecList('qsend'); const qh = document.getElementById('dec-box').innerHTML;
+        decAct('qsend', 'dqs0000001', 'ok'); await new Promise((res) => setTimeout(res, 60));
+        out.qsend = /確認＝封存成正式版/.test(qh) && qsx.ver === v0 + 1 && DRAFTS.dqs0000001.status === 'applied' && qsx.sendLog.some((e) => e.mode === 'reader' && e.archived);
+        window._draftMark = oM;
+        // 複製報價不帶匯出紀錄與補登規則
+        _copyQDo('qvA'); const cp = Q[0]; out.copy = cp.id !== 'qvA' && !('verFix' in cp) && !('sendLog' in cp); Q.shift();
+        // 資料庫規則：草稿類型加 qverfix／qsend
+        out.rules = true;
+        window._printViaIframe = oPr; window._dlText = oD; window.toast = oT;
+        Q = Q.filter((x) => !/^qv/.test(x.id)); delete Q_HISTORY.qvA; delete Q_HISTORY.qvS; INV = INV.filter((x) => x.quoteId !== 'qvA'); DRAFTS = {};
+        document.querySelectorAll('#fy-modal').forEach((m) => m.remove());
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      return out;
+    });
+    const RQ = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8'));
+    const dv = RQ.rules.fydata.drafts.$id['.validate'];
+    check('v6.0.179 補登版次：核對數字對不上、缺數字、拿正式版當來源都擋；唯讀帳號送卡前先試算，對不上不送', r.refuse && r.send, JSON.stringify(r));
+    check('v6.0.179 補登版次拍板卡：總覽一列、只有退回／修改／確認、細節含補登前後對照與核對數字；細節讀不出來不准確認；確認時再驗一次、數字不對擋下', r.todo && r.card && r.noDetail && r.cardRefuse, JSON.stringify(r));
+    check('v6.0.179 補登：新 V2（存檔時間＋1、正式、已送業主、稅額重算）、原 V2→V3、編輯中 V3→V4；詢價／變更／請款單版號一起改；先備份', r.apply && r.refs, JSON.stringify(r));
+    check('v6.0.179 補登冪等（重跑 5 次一樣、不能再套）；第二台舊號碼合併後收斂；報價被舊裝置蓋掉從歷史補回規則；舊裝置後封存的撞號往後排', r.idem && r.rt && r.dev2 && r.heal && r.clash, JSON.stringify(r));
+    check('v6.0.179 撤銷補登（主控台）號碼還原、再補一次結果一樣；唯讀帳號不能套用', r.undo && r.redo && r.ro, JSON.stringify(r));
+    check('v6.0.179 防漏：每次匯出記 sendLog；只匯出另存永久紀錄（同內容只存一次）；還原前內容匯出過沒封存→先封存成正式版', r.only && r.onlyOnce && r.restore, JSON.stringify(r));
+    check('v6.0.179 資料健檢：匯出過沒封存內容已改掉（封存後消失）、合約金額對不上任何正式版次；唯讀帳號匯出送 qsend 卡、確認＝封存；複製報價不帶紀錄', r.health1 && r.health1b && r.health2 && r.reader && r.qsend && r.copy, JSON.stringify(r));
+    check('v6.0.179 資料庫規則：草稿類型加 qverfix、qsend（其他類型保留）', /\|qverfix\|qsend\|dailyOut\)\$/.test(dv) && /quote\|qchg\|bid\|irPhoto\|addon\|dailyLog\|contact/.test(dv));
+    check('v6.0.179 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
