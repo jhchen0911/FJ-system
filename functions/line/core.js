@@ -20,7 +20,7 @@ const MAX_FILE_BYTES = 100 * 1024 * 1024;                 // 超過 100MB 的影
 
 const DEFAULT_TEXTS = {
   inboxAck: '收到，之後的檔案會一起收。傳完打一行案名就好。',   // v6.0.153：同一批只回這一則
-  inboxNote: '第 {no} 批 {n} 個檔案：{text}，已記下',   // v6.0.177 寫清楚第幾批（Lotion 11/05 兩案連傳被併成一批）
+  inboxNote: '第 {no} 批 {n} 個檔案：{text}，已記下',   // v6.0.178 寫清楚第幾批（Lotion 11/05 兩案連傳被併成一批）
   inboxMore: '第 {no} 批補充：{text}，已記下',
   inboxNext: '好，接下來傳的檔案記成：{text}',
   inboxFail: '這個檔案沒存成功，請重傳：{name}',
@@ -209,7 +209,7 @@ async function _batchTx(deps, key, fn) {
   if (deps.txn) return await deps.txn(key, fn);
   const v = fn((await deps.dbGet(key)) || null); if (v !== undefined) await deps.dbSet(key, v); return v;
 }
-// v6.0.177（Lotion 11/05：10:43 傳案 1 的 3 個檔＋案名、10:45 傳案 2 的 1 張圖＋案名 → 圖被併進同一批、第二行字蓋掉整批備註）：
+// v6.0.178（Lotion 11/05：10:43 傳案 1 的 3 個檔＋案名、10:45 傳案 2 的 1 張圖＋案名 → 圖被併進同一批、第二行字蓋掉整批備註）：
 //   ① 一批收到案名文字就「關閉」：之後的檔案一律開新批，不管有沒有超過 3 分鐘
 //   ② 已有案名的批（傳檔後打字、或先打字後傳檔）10 分鐘內再打字：「補充」「備註」開頭＝附加到這批；其他＝下一批的案名（不再蓋掉這批）
 //   ③ 回覆寫第幾批（台北時間每天從 1 起算）

@@ -482,8 +482,8 @@ test('v6.0.153 審查：傳檔前連打兩行都留；回覆失敗不改推播�
   assert.equal(d3.replies.length, 1); assert.deepEqual(Object.keys(d3.db.fydata.lineInboxBatch.Uowner.ids).sort(), ['x1', 'x2']);
 });
 
-// v6.0.177 Lotion 11/05：10:43 傳案 1 的 3 個檔＋案名、10:45 傳案 2 的 1 張圖＋案名（3 分鐘內）→ 不能併成一批、第二行字不能蓋掉第一批
-test('v6.0.177 分批：案名打完這批就關閉（3 分鐘內的檔案也開新批）；第二批的字不蓋掉第一批；回覆寫第幾批', async () => {
+// v6.0.178 Lotion 11/05：10:43 傳案 1 的 3 個檔＋案名、10:45 傳案 2 的 1 張圖＋案名（3 分鐘內）→ 不能併成一批、第二行字不能蓋掉第一批
+test('v6.0.178 分批：案名打完這批就關閉（3 分鐘內的檔案也開新批）；第二批的字不蓋掉第一批；回覆寫第幾批', async () => {
   const d = mkDeps(CFG);
   const f = (id, t, ty) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: Object.assign({ id, type: ty || 'file', fileSize: 10 }, ty === 'image' ? {} : { fileName: id + '.pdf' }) });
   const tx = (id, t, text) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'text', text } });
@@ -500,7 +500,7 @@ test('v6.0.177 分批：案名打完這批就關閉（3 分鐘內的檔案也開
   assert.match(R.find((x) => /^第 2 批：收到/.test(x)) || '', /^第 2 批：收到/);   // 第二批第一個檔的回覆寫第 2 批
   assert.match(R[R.length - 1], /^第 2 批 1 個檔案：業主詢價單-假乙介紹，已記下/);
 });
-test('v6.0.177 分批：已有案名後「補充」「備註」附加到這批；其他字＝下一批的案名（先打字後傳檔），不蓋掉這批', async () => {
+test('v6.0.178 分批：已有案名後「補充」「備註」附加到這批；其他字＝下一批的案名（先打字後傳檔），不蓋掉這批', async () => {
   const d = mkDeps(CFG);
   const f = (id, t) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'image' } });
   const tx = (id, t, text) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'text', text } });
@@ -520,7 +520,7 @@ test('v6.0.177 分批：已有案名後「補充」「備註」附加到這批�
   await core.handleEvents([tx('m4', T0 + 130e3, '備註 急件')], d);
   assert.equal(d.db.fydata.lineInbox.c3.note, '範例案 B；急件'); assert.equal(d.db.fydata.lineInbox.c1.note, '範例案 A；含平面圖');
 });
-test('v6.0.177 固定句子：存過沒改的舊預設「這批 {n} 個檔案」換成新預設（寫第幾批）', async () => {
+test('v6.0.178 固定句子：存過沒改的舊預設「這批 {n} 個檔案」換成新預設（寫第幾批）', async () => {
   const d = mkDeps(Object.assign({}, CFG, { texts: { inboxNote: '這批 {n} 個檔案：{text}，已記下' } }));
   const f = (id, t) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'image' } });
   await core.handleEvents([f('o1', T0)], d);
@@ -528,7 +528,7 @@ test('v6.0.177 固定句子：存過沒改的舊預設「這批 {n} 個檔案」
   assert.match(d.replies[d.replies.length - 1].text, /^第 1 批 1 個檔案：範例案/);
 });
 
-test('v6.0.177 審查：比案名晚到的同批檔（平行投遞／重送）併回這批、帶案名，不另開一批；下一批案名連打兩行都留、補充接在下一批', async () => {
+test('v6.0.178 審查：比案名晚到的同批檔（平行投遞／重送）併回這批、帶案名，不另開一批；下一批案名連打兩行都留、補充接在下一批', async () => {
   const d = mkDeps(CFG);
   const f = (id, t) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'image' } });
   const tx = (id, t, text) => ({ type: 'message', timestamp: t, replyToken: 'r' + id, source: { type: 'user', userId: 'Uowner' }, message: { id, type: 'text', text } });

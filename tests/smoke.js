@@ -9927,8 +9927,8 @@ async function newPage(browser, width, height) {
     const note = /第 1 批 5 個檔案：推薦人：範例業務，已記下/.test((replies[1] || {}).text || '') && [1, 2, 3, 4, 5].every(i => db.fydata.lineInbox['m' + i].note === '推薦人：範例業務');
     deps.putFile = async () => { throw new Error('x'); };
     await LC153.handleEvents([f('m6', T0 + 170e3)], deps);
-    const fail = replies.length === 3 && replies[2].t === 'rm6' && /^第 2 批：收到/.test(replies[2].text) && pushes.some(x => /沒存成功，請重傳：m6\.pdf/.test(x)) && db.fydata.lineInbox.m6.status === 'error';   // v6.0.177：案名打完這批就關閉 → m6 是第 2 批第一個檔（回「第 2 批：收到」用掉權杖，失敗改推播）
-    check('v6.0.153 LINE 收件回覆合併：連續 5 個檔只回 1 則；傳完打一行字記到這批每個檔並回「第 1 批 N 個檔案：…已記下」（v6.0.177 寫第幾批、打完案名就關閉）；存檔失敗照樣回請重傳；FJ 預設文字已換新', five && note && fail && /之後的檔案會一起收/.test(fj.ack) && /\{text\}/.test(fj.note), JSON.stringify({ five, note, fail, fj, replies }));
+    const fail = replies.length === 3 && replies[2].t === 'rm6' && /^第 2 批：收到/.test(replies[2].text) && pushes.some(x => /沒存成功，請重傳：m6\.pdf/.test(x)) && db.fydata.lineInbox.m6.status === 'error';   // v6.0.178：案名打完這批就關閉 → m6 是第 2 批第一個檔（回「第 2 批：收到」用掉權杖，失敗改推播）
+    check('v6.0.153 LINE 收件回覆合併：連續 5 個檔只回 1 則；傳完打一行字記到這批每個檔並回「第 1 批 N 個檔案：…已記下」（v6.0.178 寫第幾批、打完案名就關閉）；存檔失敗照樣回請重傳；FJ 預設文字已換新', five && note && fail && /之後的檔案會一起收/.test(fj.ack) && /\{text\}/.test(fj.note), JSON.stringify({ five, note, fail, fj, replies }));
     check('v6.0.153 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
