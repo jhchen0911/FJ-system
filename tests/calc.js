@@ -6,7 +6,7 @@ require(path.join(__dirname, '..', 'calc', 'payable.js'));
 require(path.join(__dirname, '..', 'calc', 'report.js'));
 require(path.join(__dirname, '..', 'calc', 'comm.js'));
 require(path.join(__dirname, '..', 'calc', 'payroll.js'));
-require(path.join(__dirname, '..', 'calc', 'lifeline.js')); require(path.join(__dirname, '..', 'calc', 'settle.js')); require(path.join(__dirname, '..', 'calc', 'route.js'));
+require(path.join(__dirname, '..', 'calc', 'lifeline.js')); require(path.join(__dirname, '..', 'calc', 'settle.js')); require(path.join(__dirname, '..', 'calc', 'route.js')); require(path.join(__dirname, '..', 'calc', 'vbill.js'));
 const I = FJC.inv, PY = FJC.pay, R = FJC.rpt, C = FJC.comm, H = FJC.hr, LL = FJC.ll, ST = FJC.settle, RT = FJC.route;
 const results = [];
 const check = (name, ok, info) => results.push({ name, ok: !!ok, info: info || '' });
@@ -254,6 +254,28 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('交叉點計算：十字交叉在中點、不相交不算', eq(RT.crossings([{ 編號: 1, 方向: '縱', 起點mm: [0, 0], 終點mm: [0, 10000] }, { 編號: 2, 方向: '橫', 起點mm: [-5000, 4000], 終點mm: [5000, 4000] }, { 編號: 3, 方向: '橫', 起點mm: [1000, 2000], 終點mm: [6000, 2000] }]), { 1: [4], 2: [5], 3: [] }));
 }
 
+// ── 第 6 步 廠商請款辨識（calc/vbill.js）——假資料 ──
+{
+  const V = FJC.vb;
+  const card = [{ id: 'r1', desc: 'H型鋼樁打設 H350 L=12M', unit: '支', unitPrice: 900 }, { id: 'r2', desc: 'H型鋼樁拔除 H350', unit: '支', unitPrice: 600 }, { id: 'r3', desc: '鋼索 Ø12 安裝', unit: 'M', unitPrice: 28 }];
+  const m1 = V.rowMatch({ text: 'Ｈ型鋼樁打設　H350 L=12M', unit: '支', up: 900 }, card);
+  const m2 = V.rowMatch({ text: '鋼索φ12', unit: 'M', up: 30 }, card);
+  const m3 = V.rowMatch({ text: '吊車租金', unit: '天', up: 8000 }, card);
+  check('請款辨識 對位：全形／空白不影響（高）、Ø／φ 統一、對不到＝無', m1.rowId === 'r1' && m1.conf === '高' && m2.rowId === 'r3' && m3.rowId === null && m3.conf === '無', JSON.stringify([m1, m2, m3]));
+  const booked = [{ vendor: '假工程行', invNo: 'AB12345678', ref: '第 3 期' }, { vendor: '假機具行', from: '2026-11-01', to: '2026-11-25', total: 52500, ref: '第 1 期' }];
+  check('請款辨識 重複請款（第 4 題）：廠商＋發票號（大小寫、全形一樣）；沒有發票號用廠商＋期間＋合計', !!V.dupHit({ vendor: '假工程行 ', invNo: 'ab12345678' }, booked) && !!V.dupHit({ vendor: '假機具行', from: '2026-11-01', to: '2026-11-25', total: '52500' }, booked) && !V.dupHit({ vendor: '假機具行', from: '2026-11-01', to: '2026-11-25', total: 52600 }, booked) && !V.dupHit({ vendor: '假工程行' }, booked));
+  const sc = V.sumCheck([{ qty: 40, up: 900 }, { amt: 9000 }], { sub: 45000, tax: 2250, taxMode: '外加' }, 5);
+  const sc2 = V.sumCheck([{ qty: 40, up: 900 }], { sub: 36500, tax: 2000, taxMode: '外加' }, 5);
+  check('請款辨識 合計檢核：逐項加總差 0、稅額 5%；差 500 與稅額不符會報', sc.diff === 0 && sc.taxOk && sc2.diff === -500 && !sc2.taxOk);
+  const s1 = V.slipAmt([{ n: 2, up: 3600 }, { n: 1.5, up: 3600 }], 3500), s2 = V.slipAmt([{ n: 2, up: 3600 }], 0);
+  check('請款辨識 簽單（第 7 題）：單價分包卡優先（3.5 工×3,500）、沒有卡價用簽單價並標黃', s1.amt === 12250 && !s1.yellow && s2.amt === 7200 && s2.yellow);
+  check('請款辨識 單價（第 2 題）：預設分包卡、勾選才用單據價', V.unitPrice({ up: 30 }, { unitPrice: 28 }, false).up === 28 && V.unitPrice({ up: 30 }, { unitPrice: 28 }, true).up === 30 && V.unitPrice({ up: 30 }, { unitPrice: 28 }, false).diff === 2 && V.unitPrice({ up: 30 }, {}, false).src === 'bill');
+  const pl = { vendor: { conf: '高' }, date: { conf: '低' }, rows: [{ rowConf: '高' }, { rowConf: '無' }], asks: [{ field: 'x', q: '要掛哪一項？' }] };
+  const g0 = V.gate(pl, {}, null), g1 = V.gate(pl, { qid: 'q', cid: 'c', seen: { date: 1 }, answers: { 'rows[1].rowId': 'none', x: 'new' } }, null);
+  const g2 = V.gate(pl, { qid: 'q', cid: 'c', seen: { date: 1 }, answers: { 'rows[1].rowId': 'none', x: 'new' } }, { ref: '第 3 期' }), g3 = V.gate(pl, { qid: 'q', cid: 'c', seen: { date: 1 }, answers: { 'rows[1].rowId': 'none', x: 'new' }, dupReason: '廠商重開發票' }, { ref: '第 3 期' });
+  const g4 = V.gate({ needHuman: true }, { qid: 'q', cid: 'c' }, null);
+  check('請款辨識 核准前的擋：沒選專案／分包卡、黃色欄位沒點、對不到的列沒選、題目沒答、重複沒寫原因、辨識失敗要人工（第 8 題）', g0.length === 5 && g1.length === 0 && g2.length === 1 && g3.length === 0 && g4.length === 1, JSON.stringify({ g0, g2, g4 }));
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');

@@ -10778,7 +10778,7 @@ async function newPage(browser, width, height) {
     check('5d LINE 群組對象：沒設定＝當作有營造廠、改成豐有內部先確認、存檔帶 audience；Google 工作表授權狀態', r.sel && r.gt && r.save && r.save2 && r.save3 && r.hide, JSON.stringify(r));
     const RF5 = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const rOk = RF5.gtasks['.read'] === 'false' && RF5.gtasks['.write'] === 'false' && RF5.progress['.write'] === 'false' && RF5.dailyOut['.write'] === 'false' && RF5.gtasksStatus['.write'] === 'false'
-      && !/readers/.test(RF5.gtasksStatus['.read'].replace(/!root\.child\('fydata\/readers'\)/g, '')) && /dailyOut\)\$/.test(RF5.drafts.$id['.validate']);
+      && !/readers/.test(RF5.gtasksStatus['.read'].replace(/!root\.child\('fydata\/readers'\)/g, '')) && /\|dailyOut(\|[A-Za-z]+)*\)\$/.test(RF5.drafts.$id['.validate']);
     check('5d 規則：Google 授權節點全部不可讀寫、進度／發送紀錄／同步狀態只有雲端寫；草稿類型加 dailyOut', rOk);
     check('5d 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
@@ -10864,6 +10864,9 @@ async function newPage(browser, width, height) {
         const row = its.find((x) => x.type === 'dec_dailyOut');
         out.todo = !!row && /3 份待轉發/.test(row.text) && row.jump === "openDecList('dailyOut')" && !its.some((x) => x.type === 'ai_draft');
         openDecList('dailyOut');
+        const xp = async (id) => { decToggle('dailyOut', id); await new Promise((r) => setTimeout(r, 30)); };   // v6.0.179：展開過明細才能確認
+        out.lockFirst = document.querySelector('.dec-card .dec-ok').disabled === true;
+        for (const id of ['doaaaa1111', 'dobbbb2222', 'docccc3333']) await xp(id);
         const box = document.getElementById('dec-box');
         const btns = Array.from(box.querySelectorAll('.dec-card')[0].querySelectorAll('button')).map((b) => b.textContent);
         out.foot = !document.querySelector('#fy-modal .fy-mdl-foot');   // 視窗不多出「取消／確定」
@@ -10878,7 +10881,7 @@ async function newPage(browser, width, height) {
         out.done = /都處理完了/.test(document.getElementById('dec-box').innerHTML);
         const its2 = []; _v6TodoItems(its2); out.gone = !its2.some((x) => x.type === 'dec_dailyOut');
         // 審查：標記沒成功（離線／規則擋）→ 卡片留著、不顯示成功；連按兩下只做一次；已處理的卡
-        DRAFTS.dodddd4444 = mk('dodddd4444', '日報丁'); openDecList('dailyOut');
+        DRAFTS.dodddd4444 = mk('dodddd4444', '日報丁'); openDecList('dailyOut'); await xp('dodddd4444');
         let calls = 0; window._draftMark = () => { calls++; return Promise.resolve(false); };
         decAct('dailyOut', 'dodddd4444', 'ok'); decAct('dailyOut', 'dodddd4444', 'ok'); await new Promise((r) => setTimeout(r, 60));
         out.failKeep = calls === 1 && DRAFTS.dodddd4444.status === 'pending' && document.getElementById('dec-box').querySelectorAll('.dec-card').length === 1;
@@ -10890,7 +10893,7 @@ async function newPage(browser, width, height) {
         DRAFTS.dodddd4444.status = 'applied'; let tt = ''; window.toast = (m) => { tt = m; }; decAct('dailyOut', 'dodddd4444', 'ok'); out.stale = /已經處理過/.test(tt); window.toast = () => {};
         window._draftMark = oM;
         // 欄位依角色：money:true 非管理員不輸出
-        _decReg('__t', { title: 't', todo: (n) => 't' + n, list: () => [{ id: 'x1' }], key: (x) => x.id, head: () => '簽收單', fields: () => [{ label: '材料', value: 'H300' }, { label: '金額', value: 'NT$ 9,999', money: true }], ok: () => Promise.resolve(true), reject: () => Promise.resolve(true), edit: () => {} });
+        _decReg('__t', { title: 't', todo: (n) => 't' + n, list: () => [{ id: 'x1' }], key: (x) => x.id, head: () => '簽收單', fields: () => [{ label: '材料', value: 'H300' }, { label: '金額', value: 'NT$ 9,999', money: true }], ok: () => Promise.resolve(true), reject: () => Promise.resolve(true), edit: () => {}, detail: () => '明細' });
         const oU = window._fbUser, oA = window._isAdminUser; _fbUser = { email: 'w@x.com', uid: 'w' }; _isAdminUser = false;
         const hw = _decCardHtml('__t', { id: 'x1' }); _isAdminUser = true; const ha = _decCardHtml('__t', { id: 'x1' }); _fbUser = oU; _isAdminUser = oA; delete _DEC.__t;
         out.money = /H300/.test(hw) && !/9,999/.test(hw) && !/金額/.test(hw) && /9,999/.test(ha);
@@ -10904,11 +10907,116 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
       return out;
     });
-    check('v6.0.176 拍板卡：總覽待辦一列（不重複進 AI 草稿）→ 卡片只有退回／修改／確認三顆（視窗不多取消／確定）、內容跳脫；money 欄位非管理員不輸出', r.todo && r.three && r.foot && r.money, JSON.stringify(r));
+    check('v6.0.176 拍板卡：總覽待辦一列（不重複進 AI 草稿）→ 卡片只有退回／修改／確認三顆（視窗不多取消／確定）、內容跳脫；money 欄位非管理員不輸出', r.todo && r.three && r.foot && r.money && r.lockFirst, JSON.stringify(r));
     check('v6.0.176 拍板卡（審查）：標記沒成功卡片留著、連按只做一次、複製失敗不標已轉發、已處理的卡提示', r.failKeep && r.copyFail && r.stale, JSON.stringify(r));
     check('v6.0.176 整體日報：確認＝複製並標已轉發、退回＝寫原因不轉、修改＝改文字再複製；處理完待辦消失', r.ok && r.rej && r.edit && r.done && r.gone, JSON.stringify(r));
     check('v6.0.176 結案實際成本 CSV 收進資料健檢頁的「匯出 Excel」（卡片不另放鈕）', r.noBtn && r.csv, JSON.stringify(r));
     check('v6.0.176 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.179 拍板卡看過明細才能確認（Lotion 11/05）＋第 6 步廠商請款辨識（vendorBill 草稿 → 拍板卡 → 期別視窗帶入）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const W = (ms) => new Promise((r) => setTimeout(r, ms || 40));
+      try {
+        let tt = ''; const oT = window.toast; window.toast = (m) => { tt = String(m); };
+        // A. 沒有 detail 不准註冊
+        out.noDetail = _decReg('__nd', { title: 't', todo: (n) => 't', list: () => [{ id: 'a' }], key: (x) => x.id, head: () => 'x', ok: () => Promise.resolve(true), reject: () => Promise.resolve(true), edit: () => {} }) === false && !_DEC.__nd;
+        // B／C. 預設收起、確認灰；展開後照片載入完成才解鎖；壞照片不解鎖
+        const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+        let okN = 0; const L = [{ id: 'g1', src: PNG }, { id: 'b1', src: 'data:image/png;base64,AAAA' }];
+        _decReg('__m', { title: '測試', todo: (n) => '測試 ' + n, list: () => L, key: (x) => x.id, head: (x) => '卡 ' + x.id, detail: (x) => '<img src="' + x.src + '">', ok: () => { okN++; return Promise.resolve(true); }, reject: () => Promise.resolve(true), edit: () => {} });
+        openDecList('__m');
+        const card = (id) => Array.from(document.querySelectorAll('#dec-box .dec-card')).find((c) => c.getAttribute('data-dec') === id);
+        out.closed = card('g1').querySelector('.dec-detail').style.display === 'none' && card('g1').querySelector('.dec-ok').disabled && /展開看過明細/.test(card('g1').querySelector('.dec-ok').title);
+        decAct('__m', 'g1', 'ok'); await W(); out.blocked = okN === 0 && /展開明細/.test(tt);
+        decToggle('__m', 'g1'); decToggle('__m', 'b1'); await W(300);
+        out.unlock = !card('g1').querySelector('.dec-ok').disabled && card('g1').querySelector('.dec-detail').style.display !== 'none';
+        out.badImg = card('b1').querySelector('.dec-ok').disabled && /沒有載入完成/.test(card('b1').innerHTML);
+        out.rejOk = !card('b1').querySelector('.btn-r').disabled;   // 退回、修改不受限
+        decAct('__m', 'g1', 'ok'); await W(); out.okRan = okN === 1;
+        delete _DEC.__m; document.querySelectorAll('#fy-modal').forEach((m) => m.remove());
+        // D. 廠商請款
+        P.vendorCutDay = 25; VENDORS.length = 0; VENDORS.push({ id: 'v1', name: '範例工程行', type: '承包' });
+        Q = [{ id: 'qV', code: '1151101', name: '範例案', client: '假業主', date: '2026-10-01', awarded: true, ver: 1, exs: [], rmk: {}, _mt: 1,
+          items: [{ desc: 'H型鋼樁打設 H350 L=12M', unit: '支', qty: '100', price: '1500', sec: false }, { desc: '鋼索 Ø12', unit: 'M', qty: '500', price: '50', sec: false }],
+          costs: [{ id: 'cV', type: 'sub', vendor: '範例工程行', cat: '打設', date: '2026-10-01', amt: 0, invoice: true, retRate: 0, rows: [{ id: 'r1', linkedItemIdx: 0, desc: '', qty: 100, unitPrice: 900 }, { id: 'r2', linkedItemIdx: 1, desc: '', qty: 500, unitPrice: 28 }], periods: [] }], dailyLogs: [] }];
+        PAYABLES.length = 0; INV.length = 0; CONTRACTS.splice(0);
+        const mkd = (id, extra) => Object.assign({ id, type: 'vendorBill', by: 'hq@x.com', byName: 'HQ', at: Date.now(), status: 'pending', summary: '範例工程行 11 月請款 2 項（範例案）',
+          payload: { src: { via: 'folder', file: '範例請款單.jpg', url: PNG }, kind: 'bill', vendor: { text: '範例工程行', match: '範例工程行', conf: '高' }, prj: { text: '範例案', match: 'qV', conf: '中' }, cid: { match: 'cV', conf: '中' },
+            date: { text: '115/11/25', iso: '2026-11-25', conf: '高' }, from: '2026-10-25', to: '2026-11-25', invNo: { text: 'AB12345678', conf: '高' },
+            rows: [{ text: 'H型鋼樁打設 H350 L=12M', qty: 40, unit: '支', up: 900, amt: 36000 }, { text: '吊車運費', qty: 1, unit: '式', up: 9000, amt: 9000 }],
+            tot: { sub: 45000, tax: 2250, total: 47250, taxMode: '外加', conf: '高' } } }, extra || {});
+        DRAFTS = { dvb0000001: mkd('dvb0000001') };
+        const marks = []; const oM = window._draftMark; window._draftMark = (id, st, ex) => { marks.push([id, st, ex]); DRAFTS[id].status = st; return Promise.resolve(true); };
+        try { localStorage.removeItem('fy_vb_st'); } catch (e) { /* 可忽略 */ }
+        const its = []; _v6TodoItems(its);
+        out.todo = its.some((x) => x.type === 'dec_vendorBill' && /廠商請款待確認 1 筆/.test(x.text)) && !its.some((x) => x.type === 'ai_draft');
+        const v = _vbView(DRAFTS.dvb0000001);
+        out.match = v.qid === 'qV' && v.cid === 'cV' && v.rows[0].pick === 'r1' && v.rows[1].pick === null;
+        const why = _vbWhy(v, false); out.why = why.some((w) => /第 2 項還沒選/.test(w));
+        const det = await _vbDetailHtml(DRAFTS.dvb0000001);
+        out.detail = /<img src="data:image\/png/.test(det) && /H型鋼樁打設/.test(det) && /對不到/.test(det) && /還不能確認/.test(det) && /47,250/.test(det);
+        tt = ''; const r0 = await _vbConfirm(DRAFTS.dvb0000001); out.gate = r0 === false && /還不能確認/.test(tt);
+        // 修改：第 2 項不計、第 1 項用單據單價 → 檢查都過
+        _vbStSet('dvb0000001', { map: { 1: 'skip' }, useBill: {} }); out.pass = _vbWhy(_vbView(DRAFTS.dvb0000001), false).length === 0;
+        // 重複請款：同廠商＋發票號已入帳 → 確認時要寫原因；沒寫不放
+        Q[0].costs[0].periods.push({ no: 1, date: '2026-10-25', from: '2026-10-01', to: '2026-10-25', rows: [{ rid: 'r1', qty: 10 }], amt: 9000, ret: 0, net: 9000, invNo: 'AB12345678' });
+        const oP = window.prompt; window.prompt = () => ''; const r1 = await _vbConfirm(DRAFTS.dvb0000001); out.dupBlock = r1 === false && /放行原因/.test(tt);
+        // 放行 → 開期別視窗帶入
+        window.prompt = () => '同號補開，不是重複'; const r2 = await _vbConfirm(DRAFTS.dvb0000001); window.prompt = oP;
+        const md = document.getElementById('gen-confirm-msg'), row1 = md.querySelector('.sp-row[data-rid="r1"] .sp-qty'), row2 = md.querySelector('.sp-row[data-rid="r2"] .sp-qty');
+        out.prefill = r2 === 'open' && document.getElementById('gen-confirm-modal').style.display === 'flex' && row1.value === '40' && row1.dataset.touched === '1' && row2.value === '' && document.getElementById('sp-invno').value === 'AB12345678' && document.getElementById('sp-date').value === '2026-11-25' && /由廠商請款草稿帶入/.test(md.innerHTML) && /放行：同號補開/.test(document.getElementById('sp-note').value);
+        out.noMarkYet = marks.length === 0;
+        document.getElementById('gen-confirm-ok').click(); await W();
+        const per = Q[0].costs[0].periods.find((p) => p.no === 2);
+        out.saved = !!per && per.srcDraft === 'dvb0000001' && per.rows.length === 1 && per.rows[0].rid === 'r1' && per.rows[0].qty === 40 && PAYABLES.some((p) => p.id === 'paycV_p2');
+        out.mark = marks.length === 1 && marks[0][1] === 'applied' && marks[0][2].resultId === 'qV|cV|2';
+        // 同一張草稿再確認 → 已入帳，不會再開一期
+        DRAFTS.dvb0000001.status = 'pending'; const r3 = await _vbConfirm(DRAFTS.dvb0000001);
+        out.again = r3 === true && Q[0].costs[0].periods.length === 2 && marks[1][1] === 'applied';
+        // 新增分包列：視窗取消 → 剛加的列拿掉
+        DRAFTS.dvb0000002 = mkd('dvb0000002', {}); DRAFTS.dvb0000002.payload.invNo = { text: 'AB99999999', conf: '高' }; DRAFTS.dvb0000002.payload.from = '2026-11-25'; DRAFTS.dvb0000002.payload.to = '2026-12-25';
+        _vbStSet('dvb0000002', { map: { 1: 'new' } });
+        const r4 = await _vbConfirm(DRAFTS.dvb0000002); const nr = Q[0].costs[0].rows.find((x) => x.fromDraft === 'dvb0000002');
+        out.newRow = r4 === 'open' && !!nr && nr.unitPrice === 9000 && !!document.querySelector('#gen-confirm-msg .sp-row[data-rid="' + nr.id + '"]');
+        document.getElementById('gen-confirm-cancel').click(); await W();
+        out.newUndo = !Q[0].costs[0].rows.some((x) => x.fromDraft === 'dvb0000002') && DRAFTS.dvb0000002.status === 'pending';
+        // 審查：視窗被別的方式關掉（onCancel 沒跑）留下的暫加列，下次確認先清掉、不重複加；原檔網址白名單；ok 同步丟錯也解鎖
+        Q[0].costs[0].rows.push({ id: 'vbleft', desc: '吊車運費', qty: 0, unitPrice: 9000, linkedItemIdx: -1, fromDraft: 'dvb0000002' });
+        await _vbConfirm(DRAFTS.dvb0000002); out.purge = Q[0].costs[0].rows.filter((x) => x.fromDraft === 'dvb0000002').length === 1 && !Q[0].costs[0].rows.some((x) => x.id === 'vbleft');
+        document.getElementById('gen-confirm-cancel').click(); await W();
+        out.srcOk = _vbSrcOk('javascript:alert(1)') === '' && _vbSrcOk('data:text/html;base64,PGI+') === '' && _vbSrcOk('https://evil.com/x.pdf') === '' && _vbSrcOk(PNG) === PNG;
+        _decReg('__x', { title: 'x', todo: () => 'x', list: () => [{ id: 'z' }], key: (x) => x.id, head: () => 'z', detail: () => 'd', ok: () => { throw new Error('boom'); }, reject: () => Promise.resolve(true), edit: () => {} });
+        _DEC_READY['__x|z'] = 1; decAct('__x', 'z', 'ok'); await W(); out.unstuck = !_DEC_BUSY['__x|z']; delete _DEC.__x; delete _DEC_READY['__x|z'];
+        // 退回：寫原因、給回覆廠商的草稿（不自動傳）
+        const r5 = await _vbReject(DRAFTS.dvb0000002, '數量對不上'); await W(120);
+        out.reject = r5 === true && DRAFTS.dvb0000002.status === 'rejected' && /數量對不上/.test(document.getElementById('gen-confirm-msg').innerHTML) && /不會自動傳/.test(document.getElementById('gen-confirm-title').textContent);
+        document.getElementById('gen-confirm-modal').style.display = 'none';
+        // 唯讀帳號看不到這種卡
+        const oR = window._isReaderUser; DRAFTS.dvb0000003 = mkd('dvb0000003'); _isReaderUser = true; out.reader = _decItems('vendorBill').length === 0; _isReaderUser = oR;
+        // 拍板卡畫面：展開明細才能確認
+        openDecList('vendorBill'); const c3 = card('dvb0000003');
+        out.card = !!c3 && c3.querySelector('.dec-ok').disabled && c3.querySelectorAll('button').length === 3;
+        decToggle('vendorBill', 'dvb0000003'); await W(300); out.cardOpen = !card('dvb0000003').querySelector('.dec-ok').disabled && /範例請款單/.test(card('dvb0000003').innerHTML);
+        document.querySelectorAll('#fy-modal').forEach((m) => m.remove());
+        // 智慧收件：分包廠商有逐項 → 背後建草稿；只有金額 → 照舊
+        const pushed = []; const oD = window._draftPush, oU = window._fbUser; window._draftPush = (t, pl, sm) => { pushed.push([t, pl, sm]); return Promise.resolve(true); }; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' };
+        const oA = window._ikAdmin; window._ikAdmin = () => true;
+        _intakeRoute('vendor_invoice', 'qV', { vendor: '範例工程行有限公司', number: 'CD11112222', date: '2026-11-20', amount: 10500, tax: 500, items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 10, price: 1000 }] }, PNG); await W();
+        out.intake = pushed.length === 1 && pushed[0][0] === 'vendorBill' && pushed[0][1].prj.match === 'qV' && pushed[0][1].cid.match === 'cV' && pushed[0][1].rows[0].qty === 10 && /^ph:/.test(pushed[0][1].src.url) && !('qid' in pushed[0][1]);
+        window._draftPush = oD; _fbUser = oU; window._ikAdmin = oA; window._draftMark = oM;
+        window.toast = oT; DRAFTS = {}; Q = []; PAYABLES.length = 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.179 拍板卡：沒有 detail 不准註冊；預設收起、確認灰（提示展開）；展開且照片載入完成才解鎖，壞照片不解鎖；退回不受限', r.noDetail && r.closed && r.blocked && r.unlock && r.badImg && r.rejOk && r.okRan, JSON.stringify(r));
+    check('v6.0.179 廠商請款：總覽待辦一列、程式對位（對不到的要選）、明細有原檔／逐項／檢查結果、黃色沒處理不能確認', r.todo && r.match && r.why && r.detail && r.gate && r.pass, JSON.stringify(r));
+    check('v6.0.179 廠商請款：重複請款要寫放行原因；確認＝期別視窗帶入、存檔才標已套用（resultId）、同一張不會入帳兩次', r.dupBlock && r.prefill && r.noMarkYet && r.saved && r.mark && r.again, JSON.stringify(r));
+    check('v6.0.179 廠商請款：新增分包列取消就拿掉、退回給回覆草稿不自動傳、唯讀帳號看不到、卡片三顆＋展開才解鎖、智慧收件分包請款背後建草稿', r.newRow && r.newUndo && r.purge && r.srcOk && r.unstuck && r.reject && r.reader && r.card && r.cardOpen && r.intake, JSON.stringify(r));
+    check('v6.0.179 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
@@ -10955,18 +11063,25 @@ async function newPage(browser, width, height) {
         const its = []; _v6TodoItems(its);
         out.todo = its.some((x) => x.type === 'dec_qverfix' && x.jump === "openDecList('qverfix')") && !its.some((x) => x.type === 'ai_draft');
         openDecList('qverfix');
+        const W = (ms) => new Promise((res) => setTimeout(res, ms || 60));
+        const okBtn = (id) => Array.from(document.querySelectorAll('#dec-box .dec-card')).find((c) => c.getAttribute('data-dec') === id).querySelector('.dec-ok');
+        out.locked = okBtn('dqv0000001').disabled === true && typeof _DEC.qverfix.detail === 'function' && typeof _DEC.qsend.detail === 'function';   // 拍板卡預設收起，展開看過明細才能確認
+        decToggle('qverfix', 'dqv0000001'); await W();
         const box = document.getElementById('dec-box'), bh = box.innerHTML;
         const btns = Array.from(box.querySelectorAll('.dec-card button')).map((b) => b.textContent);
         out.card = JSON.stringify(btns) === JSON.stringify(['退回', '修改', '確認']) && /補登前/.test(bh) && /補登後/.test(bh) && /原 V2 改號/.test(bh) && /13,125/.test(bh) && /和對照報價的差異/.test(bh) && /請款單依據版次/.test(bh);
-        let okCalls = 0; _decReg('__qd', { title: 't', todo: (n) => 't' + n, list: () => [{ id: 'z1' }], key: (x) => x.id, head: () => 'x', detail: () => '', ok: () => { okCalls++; return Promise.resolve(true); }, reject: () => Promise.resolve(true), edit: () => {} });
-        decAct('__qd', 'z1', 'ok'); await new Promise((res) => setTimeout(res, 30)); delete _DEC.__qd;
-        out.noDetail = okCalls === 0 && tt.some((t) => /看不到這張的細節，不能確認/.test(t)) && /細節讀不出來/.test(_decCardHtml('qverfix', { id: 'dx', payload: { qid: 'nope' } }));
+        // 細節讀不出來（找不到報價）→ 展開也不解鎖、按確認不會執行
+        let okCalls = 0; const spQ = Object.assign({}, _DEC.qverfix, { list: () => [{ id: 'dx00000001', payload: { qid: 'nope' } }], ok: () => { okCalls++; return Promise.resolve(true); } });
+        _decReg('__qd', spQ); openDecList('__qd'); decToggle('__qd', 'dx00000001'); await W();
+        decAct('__qd', 'dx00000001', 'ok'); await W(30);
+        out.noDetail = okCalls === 0 && okBtn('dx00000001').disabled === true && /沒有明細內容，不能確認/.test(document.getElementById('dec-box').innerHTML); delete _DEC.__qd;
+        openDecList('qverfix');
         // 卡片上的核對數字不對（送出後資料被改、或卡片被改）→ 確認時再驗一次，擋下、不動資料
         DRAFTS.dqv0000002 = Object.assign({}, d, { id: 'dqv0000002', payload: Object.assign({}, d.payload, { expect: Object.assign({}, exp, { tax: 626 }) }) });
-        decAct('qverfix', 'dqv0000002', 'ok'); await new Promise((res) => setTimeout(res, 60));
+        _decRefresh('qverfix'); decToggle('qverfix', 'dqv0000002'); await W(); decAct('qverfix', 'dqv0000002', 'ok'); await W();
         out.cardRefuse = DRAFTS.dqv0000002.status === 'pending' && !q.verFix && q.ver === 3 && tt.some((t) => /檢查沒過，不能確認/.test(t)); delete DRAFTS.dqv0000002;
         // ④ 確認＝補登：新 V2（存檔時間＋1、正式、已送業主）、原 V2→V3、現行 V3→V4、參照改號、備份
-        decAct('qverfix', 'dqv0000001', 'ok'); await new Promise((res) => setTimeout(res, 60));
+        _decRefresh('qverfix'); decToggle('qverfix', 'dqv0000001', true); await W(); decAct('qverfix', 'dqv0000001', 'ok'); await W();
         const hh = Q_HISTORY.qvA, fm = hh.filter((e) => e.formal).sort((a, b) => a.savedAt - b.savedAt);
         const ins = hh.find((e) => e.savedAt === T0 + 20 * H + 1);
         out.apply = marks.some((m) => m[0] === 'dqv0000001' && m[1] === 'applied') && fm.map((e) => e.ver).join(',') === '1,2,3' && !!ins && ins.formal && ins.ver === 2 && ins.snapshot.ver === 2 && ins.snapshot.t.total === 13125 && /已送業主/.test(ins.note)
@@ -11036,7 +11151,7 @@ async function newPage(browser, width, height) {
         out.reader = qd.length === 1 && qd[0][0] === 'qsend' && !!qd[0][1].h && !('costs' in qd[0][1].snap);
         DRAFTS = { dqs0000001: { id: 'dqs0000001', type: 'qsend', by: 'ai@x.com', byName: '假 AI', at: Date.now(), status: 'pending', summary: qd[0][2], payload: qd[0][1] } };
         window._draftMark = (id, st) => { DRAFTS[id].status = st; return Promise.resolve(true); };
-        const v0 = qsx.ver; openDecList('qsend'); const qh = document.getElementById('dec-box').innerHTML;
+        const v0 = qsx.ver; openDecList('qsend'); decToggle('qsend', 'dqs0000001'); await new Promise((res) => setTimeout(res, 60)); const qh = document.getElementById('dec-box').innerHTML;
         decAct('qsend', 'dqs0000001', 'ok'); await new Promise((res) => setTimeout(res, 60));
         out.qsend = /確認＝封存成正式版/.test(qh) && qsx.ver === v0 + 1 && DRAFTS.dqs0000001.status === 'applied' && qsx.sendLog.some((e) => e.mode === 'reader' && e.archived);
         window._draftMark = oM;
@@ -11053,13 +11168,13 @@ async function newPage(browser, width, height) {
     const RQ = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8'));
     const dv = RQ.rules.fydata.drafts.$id['.validate'];
     check('v6.0.179 補登版次：核對數字對不上、缺數字、拿正式版當來源都擋；唯讀帳號送卡前先試算，對不上不送', r.refuse && r.send, JSON.stringify(r));
-    check('v6.0.179 補登版次拍板卡：總覽一列、只有退回／修改／確認、細節含補登前後對照與核對數字；細節讀不出來不准確認；確認時再驗一次、數字不對擋下', r.todo && r.card && r.noDetail && r.cardRefuse, JSON.stringify(r));
+    check('v6.0.179 補登版次拍板卡：總覽一列、只有退回／修改／確認、細節含補登前後對照與核對數字；預設收起、展開看過明細才解鎖；細節讀不出來不解鎖；確認時再驗一次、數字不對擋下', r.todo && r.locked && r.card && r.noDetail && r.cardRefuse, JSON.stringify(r));
     check('v6.0.179 補登：新 V2（存檔時間＋1、正式、已送業主、稅額重算）、原 V2→V3、編輯中 V3→V4；詢價／變更／請款單版號一起改；先備份', r.apply && r.refs, JSON.stringify(r));
     check('v6.0.179 補登冪等（重跑 5 次一樣、不能再套）；第二台舊號碼合併後收斂；報價被舊裝置蓋掉從歷史補回規則；舊裝置後封存的撞號往後排', r.idem && r.rt && r.dev2 && r.heal && r.clash, JSON.stringify(r));
     check('v6.0.179 撤銷補登（主控台）號碼還原、再補一次結果一樣；唯讀帳號不能套用', r.undo && r.redo && r.ro, JSON.stringify(r));
     check('v6.0.179 防漏：每次匯出記 sendLog；只匯出另存永久紀錄（同內容只存一次）；還原前內容匯出過沒封存→先封存成正式版', r.only && r.onlyOnce && r.restore, JSON.stringify(r));
     check('v6.0.179 資料健檢：匯出過沒封存內容已改掉（封存後消失）、合約金額對不上任何正式版次；唯讀帳號匯出送 qsend 卡、確認＝封存；複製報價不帶紀錄', r.health1 && r.health1b && r.health2 && r.reader && r.qsend && r.copy, JSON.stringify(r));
-    check('v6.0.179 資料庫規則：草稿類型加 qverfix、qsend（其他類型保留）', /\|qverfix\|qsend\|dailyOut\)\$/.test(dv) && /quote\|qchg\|bid\|irPhoto\|addon\|dailyLog\|contact/.test(dv));
+    check('v6.0.179 資料庫規則：草稿類型加 qverfix、qsend（其他類型保留）', /\|vendorBill\|qverfix\|qsend\)\$/.test(dv) && /quote\|qchg\|bid\|irPhoto\|addon\|dailyLog\|contact/.test(dv));
     check('v6.0.179 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
