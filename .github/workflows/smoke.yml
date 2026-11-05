@@ -49,8 +49,11 @@ jobs:
       - name: 計算模組（Node 單獨跑，不開瀏覽器）
         run: npm run calc
 
+      - name: 語法檢查（雲端程式 functions、計算模組、app.js；部署前就要能解析）
+        run: for f in functions/*.js functions/*/*.js calc/*.js app.js sw.js beta.js; do node --check "$f" || exit 1; done
+
       - name: 雲端程式單元測試（functions/test，純邏輯、不連網）
-        run: cd functions && node --test test/*.test.js
+        run: cd functions && node ../tools/copy-calc.js && node --test test/*.test.js
 
       - name: 執行冒煙測試
         run: npm test

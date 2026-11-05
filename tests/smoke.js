@@ -9040,6 +9040,104 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.177 請款單：這台沒改過就用雲端版（iPhone 一張請款單停在舊版、修改時間反而比較新）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const oINV = INV, oQ = Q;
+      try {
+        const base = { id: 'ivS', project: '假案丁', periodNo: 4, client: '假業主', date: '', expectedRecvDate: '', items: [{ desc: '工項', qty: 1, price: 627233 }], totals: { total: 658589 } };
+        INV = [Object.assign({}, base, { _mt: 2000 })];
+        _storeRecHashes(_recHashesOfClean(_buildCleanPayload().clean));   // 上次同步的基準＝這台現在這份（舊版）
+        SYNC_DIV = [];
+        const cloud = Object.assign({}, base, { date: '2026-09-01', expectedRecvDate: '2026-10-20', items: [{ desc: '工項', qty: 1, price: 638232 }], totals: { total: 670143.6 }, _mt: 1000 });
+        _applyCloud({ quotes: Q.slice(), invoices: _invPackAll([cloud]) });
+        let x = INV.find(i => i.id === 'ivS');
+        out.cloudWins = x && x.date === '2026-09-01' && x.totals.total === 670143.6;
+        out.logged = SYNC_DIV.length === 1 && SYNC_DIV[0].localAmt === 658589 && SYNC_DIV[0].cloudAmt === 670143.6;
+        out.health = _healthRows().some(rw => rw.area === '同步' && /停在舊版/.test(rw.msg));
+        /* 審查：內容相同、只是欄位順序不同（雲端照字母排）→ 不記成「停在舊版」 */
+        SYNC_DIV = [];
+        const same = { totals: { total: 1 }, project: '假案戊', id: 'ivT', items: [{ desc: 'x', qty: 1, price: 1 }] };
+        _syncDivNote('invoices', Object.assign({}, same, { _mt: 9 }), { id: 'ivT', items: [{ desc: 'x', price: 1, qty: 1 }], project: '假案戊', totals: { total: 1 }, _mt: 3 });
+        out.noNoise = SYNC_DIV.length === 0;
+        /* 這台改過（和基準不同）→ 照舊修改時間新者勝，不被雲端蓋掉 */
+        INV = [Object.assign({}, base, { _mt: 1000 })];
+        _storeRecHashes(_recHashesOfClean(_buildCleanPayload().clean));
+        INV[0] = Object.assign({}, INV[0], { note: '這台剛改', _mt: 5000 });
+        _applyCloud({ quotes: Q.slice(), invoices: _invPackAll([Object.assign({}, cloud, { _mt: 3000 })]) });
+        x = INV.find(i => i.id === 'ivS');
+        out.localEditKept = x && x.note === '這台剛改' && x._mt === 5000;
+        /* 沒有基準（新裝置）→ 照舊 */
+        localStorage.removeItem('fy_rec_hashes');
+        INV = [Object.assign({}, base, { _mt: 9000 })];
+        _applyCloud({ quotes: Q.slice(), invoices: _invPackAll([cloud]) });
+        out.noBase = INV.find(i => i.id === 'ivS').totals.total === 658589;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      INV = oINV; Q = oQ; SYNC_DIV = []; window._applyingCloud = false;
+      return out;
+    });
+    check('v6.0.177 請款單：這台自上次同步後沒改過 → 雲端版勝出（不管修改時間），並記進資料健檢「停在舊版」', r.cloudWins && r.logged && r.health && r.noNoise, JSON.stringify(r));
+    check('v6.0.177 請款單：這台改過的照舊修改時間新者勝；沒有同步基準（新裝置）照舊', r.localEditKept && r.noBase, JSON.stringify(r));
+    check('v6.0.177 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.175 按鈕盤點表第 1～3 題：材料估算沒有「計算」鈕（開頁自動算）、報價頁沒有「匯入量測檔」鈕 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const wait = ms => new Promise(res => setTimeout(res, ms));
+      try {
+        window._matEstRes = null; MAT_EST = _shDefaults(); go('matest'); meTab('shoring'); await wait(600);
+        const b = document.getElementById('me-bar-shoring').innerHTML;
+        out.noCalcBtn = !/onclick="matEstCalc\(\)"/.test(b) && /matEstSave/.test(b);
+        out.auto = !!window._matEstRes;
+        out.noImport = typeof window.qMeasImport === 'undefined' && !/qMeasImport/.test(String(_qMeasChip));
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      return out;
+    });
+    check('v6.0.175 材料估算拿掉「計算」鈕、開頁自動算一次；報價頁拿掉「匯入量測檔」鈕（量測檔在材料估算匯入時自動掛到報價）', r.noCalcBtn && r.auto && r.noImport, JSON.stringify(r));
+    check('v6.0.175 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.174 手機總覽「通知 Lotion」不擠統計卡；雲端健檢「立即重跑」後提醒卡也重讀、失敗原因顯示 ──
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(async () => {
+      const out = {}; const wait = ms => new Promise(res => setTimeout(res, ms));
+      const oU = _fbUser, oR = _isReaderUser, oDb = _fbDb, oF = window.fetch, oT = window.toast;
+      try {
+        go('dash'); await wait(150);
+        _fbUser = { email: 'HsuanChen911@gmail.com', uid: 'a', getIdToken: async () => 'tok' }; _isReaderUser = true; renderDashGreet(); await wait(50);
+        const g = document.getElementById('dash-greet'), kg = document.querySelector('#page-dash .kgrid');
+        out.btn = !document.getElementById('ai-notify-btn');   /* v6.0.175：按鈕移到人員管理 › LINE 機器人卡 */
+        out.noFloat = /ai-notify-btn/.test(String(renderLineBox));
+        const gw = g.getBoundingClientRect().width, kw = kg ? kg.getBoundingClientRect().width : 0;
+        out.full = kg && Math.abs(kw - gw) < 2; out.w = [gw, kw];
+        _isReaderUser = false;
+        /* 立即重跑 → 提醒卡跟著重讀，雲端回報的失敗原因要出現 */
+        let reads = 0; const vals = { 'fydata/health/latest': null, 'fydata/health/remind': null, 'fydata/health/remindErr': { at: 1, msg: 'value argument contains undefined' } };
+        _fbDb = { ref: p => ({ once: async () => { if (p === 'fydata/health/remind') reads++; return { val: () => vals[p] }; } }) };
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o', getIdToken: async () => 'tok' };
+        let toasts = []; window.toast = m => toasts.push(m);
+        window.fetch = async () => ({ ok: true, status: 200, json: async () => ({ ok: true, warn: 0, remindErr: 'value argument contains undefined' }) });
+        bkHealthRun(); await wait(150);
+        out.reload = reads >= 1;
+        out.toast = toasts.some(t => /雲端提醒失敗/.test(t));
+        out.card = /上次雲端提醒沒跑成功/.test(_bkRemindHtml());
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      _fbUser = oU; _isReaderUser = oR; _fbDb = oDb; window.fetch = oF; window.toast = oT; _bkRemindLoad.err = null; BK_REMIND = null; BK_HEALTH = null; try { renderDashGreet(); } catch (e) { /* 可忽略 */ }
+      return out;
+    });
+    check('v6.0.174／175 手機總覽：問候列沒有按鈕（「通知 Lotion」移到 LINE 機器人卡），統計卡跟問候列一樣寬', r.btn && r.noFloat && r.full, JSON.stringify(r));
+    check('v6.0.174 雲端健檢立即重跑：提醒卡一起重讀，雲端提醒失敗原因顯示在提示與卡片上', r.reload && r.toast && r.card, JSON.stringify(r));
+    check('v6.0.174 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.123 AI 通知：只有 AI 帳號與 Lotion 看得到按鈕、走雲端 aiNotify 帶登入憑證；規則收掉唯讀帳號寫 linePush ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -9048,10 +9146,10 @@ async function newPage(browser, width, height) {
       const oU = _fbUser, oF = window.fetch, oT = window.toast, oR = _isReaderUser;
       try {
         let toasts = []; window.toast = m => toasts.push(m);
-        _fbUser = { email: 'staff@x.com', uid: 's', getIdToken: async () => 't' }; renderDashGreet();
-        out.staffHidden = !document.getElementById('ai-notify-btn');
-        _fbUser = { email: 'HsuanChen911@gmail.com', uid: 'a', getIdToken: async () => 'tokA' }; _isReaderUser = true; renderDashGreet();
-        out.aiShown = !!document.getElementById('ai-notify-btn');
+        _fbUser = { email: 'staff@x.com', uid: 's', getIdToken: async () => 't' };
+        out.staffHidden = !_aiNotifyOk();   /* v6.0.175：按鈕在 LINE 機器人卡（管理員），判斷式同一個 */
+        _fbUser = { email: 'HsuanChen911@gmail.com', uid: 'a', getIdToken: async () => 'tokA' }; _isReaderUser = true;
+        out.aiShown = _aiNotifyOk();
         let sent = null; window.fetch = async (u, o) => { sent = { u, o }; return { ok: true, status: 200, json: async () => ({ ok: true }) }; };
         const m = await fyNotify('報價草稿送出', '到 AI 草稿按確認');
         const body = JSON.parse(sent.o.body);
@@ -9322,7 +9420,7 @@ async function newPage(browser, width, height) {
         out.nav = ['rebar', 'grout', 'backfill', 'lifeline'].every(id => { const p = ALL_PAGES.find(x => x.id === id); return p && p.hidden && p.parent === 'matest'; });
         meTab('shoring');
         const f = document.getElementById('mat-est-form').innerHTML, o = document.getElementById('mat-est-out').innerHTML, b = document.getElementById('me-bar-shoring').innerHTML;
-        out.form = (f.match(/class="me-sec"/g) || []).length >= 8 && /class="me-adv"/.test(f) && /matEstCalc\(\)/.test(b) && /matEstExportNow\(\)/.test(b) && /掛專案/.test(b);
+        out.form = (f.match(/class="me-sec"/g) || []).length >= 8 && /class="me-adv"/.test(f) && !/matEstCalc\(\)/.test(b) && /matEstExportNow\(\)/.test(b) && /掛專案/.test(b);
         const pv = document.getElementById('me-pv'), pvt = () => (pv && pv.shadowRoot ? pv.shadowRoot.innerHTML : '');
         out.out = /me-tiles/.test(o) && /<span>圍令<\/span><b>[\d,]+ M<\/b>/.test(o) && /<span>支撐<\/span><b>[\d,]+ M<\/b>/.test(o) && /叫料單（依進場階段）/.test(o) && /計算依據/.test(o)
           /* v6.0.154 右邊即時 A4 預覽＝匯出的同一份（shadow DOM）；分頁數與匯出引擎同規則 */
@@ -9338,7 +9436,7 @@ async function newPage(browser, width, height) {
       return out;
     });
     check('v6.0.139 材料估算整合：舊頁名轉分頁、五個分頁、計算工具不在選單（權限跟材料估算）', r.redirect && r.tabs && r.nav, JSON.stringify(r));
-    check('v6.0.139 材料估算整合：工具列統一（掛專案／計算／匯出 PDF）、條件分段可收合＋進階、右邊摘要（型鋼用 M）＋材料清單兩種排法、不再重複列清冊', r.form && r.out && r.cat && r.grout && r.pvStage && r.pvExport, JSON.stringify(r));
+    check('v6.0.139 材料估算整合：工具列統一（掛專案／匯出 PDF；v6.0.175 起不放計算鈕）、條件分段可收合＋進階、右邊摘要（型鋼用 M）＋材料清單兩種排法、不再重複列清冊', r.form && r.out && r.cat && r.grout && r.pvStage && r.pvExport, JSON.stringify(r));
     check('v6.0.139 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
@@ -9870,11 +9968,11 @@ async function newPage(browser, width, height) {
     for (let i = 1; i <= 5; i++) await LC153.handleEvents([f('m' + i, T0 + i * 20e3)], deps);   // 連續轉傳 5 個檔
     const five = replies.length === 1 && /之後的檔案會一起收/.test(replies[0].text) && Object.keys(files).length === 5;
     await LC153.handleEvents([{ type: 'message', timestamp: T0 + 150e3, replyToken: 'rt', source: { type: 'user', userId: 'Uo' }, message: { id: 't1', type: 'text', text: '推薦人：範例業務' } }], deps);
-    const note = /這批 5 個檔案：推薦人：範例業務，已記下/.test((replies[1] || {}).text || '') && [1, 2, 3, 4, 5].every(i => db.fydata.lineInbox['m' + i].note === '推薦人：範例業務');
+    const note = /第 1 批 5 個檔案：推薦人：範例業務，已記下/.test((replies[1] || {}).text || '') && [1, 2, 3, 4, 5].every(i => db.fydata.lineInbox['m' + i].note === '推薦人：範例業務');
     deps.putFile = async () => { throw new Error('x'); };
     await LC153.handleEvents([f('m6', T0 + 170e3)], deps);
-    const fail = replies.length === 3 && replies[2].t === 'rm6' && /沒存成功，請重傳：m6\.pdf/.test(replies[2].text) && db.fydata.lineInbox.m6.status === 'error';
-    check('v6.0.153 LINE 收件回覆合併：連續 5 個檔只回 1 則；傳完打一行字記到這批每個檔並回「這批 N 個檔案：…已記下」；存檔失敗照樣回請重傳；FJ 預設文字已換新', five && note && fail && /之後的檔案會一起收/.test(fj.ack) && /\{text\}/.test(fj.note), JSON.stringify({ five, note, fail, fj, replies }));
+    const fail = replies.length === 3 && replies[2].t === 'rm6' && /^第 2 批：收到/.test(replies[2].text) && pushes.some(x => /沒存成功，請重傳：m6\.pdf/.test(x)) && db.fydata.lineInbox.m6.status === 'error';   // v6.0.178：案名打完這批就關閉 → m6 是第 2 批第一個檔（回「第 2 批：收到」用掉權杖，失敗改推播）
+    check('v6.0.153 LINE 收件回覆合併：連續 5 個檔只回 1 則；傳完打一行字記到這批每個檔並回「第 1 批 N 個檔案：…已記下」（v6.0.178 寫第幾批、打完案名就關閉）；存檔失敗照樣回請重傳；FJ 預設文字已換新', five && note && fail && /之後的檔案會一起收/.test(fj.ack) && /\{text\}/.test(fj.note), JSON.stringify({ five, note, fail, fj, replies }));
     check('v6.0.153 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
@@ -10267,7 +10365,7 @@ async function newPage(browser, width, height) {
         out.chip = /圖面覆核：1 項差異/.test(chip);   // 中間樁 19＝19、支撐 620 對 616.36（+0.6%）、排樁 320 對 263（+21.7%）
         qMeasReview(); const mh = document.getElementById('gen-confirm-msg').innerHTML;
         out.review = /RC排樁/.test(mh) && /\+21\.7%/.test(mh) && /中間樁/.test(mh) && /只提醒、不擋送出/.test(mh); document.getElementById('gen-confirm-ok').click();
-        delete Q.find(x => x.id === 'qm1').measure; rTots(); out.noMeas = /匯入量測檔（圖面覆核）/.test(document.getElementById('q-meas-chip').innerHTML);
+        delete Q.find(x => x.id === 'qm1').measure; rTots(); out.noMeas = document.getElementById('q-meas-chip').innerHTML === '';   /* v6.0.175：沒有量測檔就什麼都不顯示（不放匯入鈕） */
         out.bad = await (async () => { const tt = []; const oT = window.toast; window.toast = m => tt.push(String(m)); meMeasImport({ files: [new File(['{"格式":"別的"}'], 'x.json')], value: '' }); await wait(400); window.toast = oT; return tt.some(t => /量測檔讀不進來/.test(t)); })();
         go('quotes');
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
@@ -10641,14 +10739,10 @@ async function newPage(browser, width, height) {
       const out = {};
       try {
         const oT = window.toast; window.toast = () => {};
-        // ① 整體日報草稿：清單顯示文字、「複製文字」「已轉發」；按已轉發＝只標記
+        // ① 整體日報草稿 v6.0.176 起走拍板卡：AI 草稿清單不再列（卡片測試在 v6.0.176 區塊）
         DRAFTS = { do1234567890ab: { id: 'do1234567890ab', type: 'dailyOut', by: 'line-bot', byName: 'LINE 機器人', at: Date.now(), status: 'pending', summary: '整體日報：假甲案', payload: { groupId: 'Gc', group: '假甲案', date: '2026-11-04', text: '豐有工程　施工日報\n<b>假</b>' } } };
         const h = _draftListHtml();
-        out.list = /整體日報（請複製轉發）/.test(h) && /複製文字/.test(h) && /已轉發/.test(h) && /&lt;b>假/.test(h) && !/<b>假/.test(h);
-        const oM = window._draftMark; let marked = null; window._draftMark = (id, st) => { marked = [id, st]; return Promise.resolve(true); };
-        draftApply('do1234567890ab');
-        out.apply = !!marked && marked[1] === 'applied';
-        window._draftMark = oM;
+        out.list = !/整體日報/.test(h) && _draftPending().length === 0;
         // ② 後端待辦點了去對的地方
         const oB = BK_TODO; BK_TODO = { daily: { unconf: { id: 'daily_unconf', src: 'daily', key: 'unconf', text: '整體日報：1 個工地沒確認', go: 'drafts' }, fail: { src: 'daily', key: 'fail', text: 'LINE 沒送出', go: 'staff', urgent: true } } };
         const its = []; _v6TodoItems(its);
@@ -10680,7 +10774,7 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
       return out;
     });
-    check('5d 整體日報草稿：顯示文字（跳脫）、複製文字／已轉發只標記；後端待辦點了開 AI 草稿／人員管理', r.list && r.apply && r.todo, JSON.stringify(r));
+    check('5d 整體日報草稿不進 AI 草稿清單（v6.0.176 走拍板卡）；後端待辦點了開 AI 草稿／人員管理', r.list && r.todo, JSON.stringify(r));
     check('5d LINE 群組對象：沒設定＝當作有營造廠、改成豐有內部先確認、存檔帶 audience；Google 工作表授權狀態', r.sel && r.gt && r.save && r.save2 && r.save3 && r.hide, JSON.stringify(r));
     const RF5 = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const rOk = RF5.gtasks['.read'] === 'false' && RF5.gtasks['.write'] === 'false' && RF5.progress['.write'] === 'false' && RF5.dailyOut['.write'] === 'false' && RF5.gtasksStatus['.write'] === 'false'
@@ -10751,6 +10845,70 @@ async function newPage(browser, width, height) {
     const csvF = await page.evaluate((c) => _pnlCostCsv(c), cs);
     check('5c #18 結案實際成本 CSV：前端匯出與雲端同一格式（逐字相同）、只匯出', csvN === csvF && /假主約丙,點工,30000/.test(csvN) && /假主約丙,承包（發包）,22500/.test(csvN), csvN.slice(0, 200));
     check('5c 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+
+  // ── v6.0.176 拍板卡（CLAUDE.md 第 11 條：只有確認／退回／修改）＋整體日報改用拍板卡＋結案實際成本 CSV 收進資料健檢的「匯出 Excel」──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    await page.evaluate(() => { try { Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t) => { window.__clip = t; } }, configurable: true }); } catch (e) { window.__clipErr = String(e); } });
+    const r = await page.evaluate(async () => {
+      const out = {};
+      try {
+        const oT = window.toast; window.toast = () => {};
+        const mk = (id, txt) => ({ id, type: 'dailyOut', by: 'line-bot', byName: 'LINE 機器人', at: Date.now(), status: 'pending', summary: '整體日報（營造廠群組，請複製轉發）：假乙案', payload: { groupId: 'G' + id, group: '假乙案', date: '2026-11-04', text: txt } });
+        DRAFTS = { doaaaa1111: mk('doaaaa1111', '日報甲<b>x</b>'), dobbbb2222: mk('dobbbb2222', '日報乙'), docccc3333: mk('docccc3333', '日報丙') };
+        const marks = []; const oM = window._draftMark; window._draftMark = (id, st, ex) => { marks.push([id, st, ex && ex.reason]); DRAFTS[id].status = st; return Promise.resolve(true); };
+        const its = []; _v6TodoItems(its);
+        const row = its.find((x) => x.type === 'dec_dailyOut');
+        out.todo = !!row && /3 份待轉發/.test(row.text) && row.jump === "openDecList('dailyOut')" && !its.some((x) => x.type === 'ai_draft');
+        openDecList('dailyOut');
+        const box = document.getElementById('dec-box');
+        const btns = Array.from(box.querySelectorAll('.dec-card')[0].querySelectorAll('button')).map((b) => b.textContent);
+        out.foot = !document.querySelector('#fy-modal .fy-mdl-foot');   // 視窗不多出「取消／確定」
+        out.three = JSON.stringify(btns) === JSON.stringify(['退回', '修改', '確認']) && box.querySelectorAll('.dec-card').length === 3 && /&lt;b&gt;x/.test(box.innerHTML) && !box.querySelector(".dec-card b");
+        decAct('dailyOut', 'doaaaa1111', 'ok'); await new Promise((r) => setTimeout(r, 60));
+        out.ok = window.__clip === '日報甲<b>x</b>' && marks[0][0] === 'doaaaa1111' && marks[0][1] === 'applied' && document.getElementById('dec-box').querySelectorAll('.dec-card').length === 2;
+        const oP = window.prompt; window.prompt = () => '這份不用'; decAct('dailyOut', 'dobbbb2222', 'reject'); window.prompt = oP; await new Promise((r) => setTimeout(r, 60));
+        out.rej = marks[1][1] === 'rejected' && marks[1][2] === '這份不用';
+        const oC = window.showConfirm; window.showConfirm = (t, b, ok) => { document.body.insertAdjacentHTML('beforeend', b); document.getElementById('do-edit').value = '改過的日報丙'; ok(); };
+        decAct('dailyOut', 'docccc3333', 'edit'); window.showConfirm = oC; await new Promise((r) => setTimeout(r, 60));
+        out.edit = window.__clip === '改過的日報丙' && marks[2][1] === 'applied';
+        out.done = /都處理完了/.test(document.getElementById('dec-box').innerHTML);
+        const its2 = []; _v6TodoItems(its2); out.gone = !its2.some((x) => x.type === 'dec_dailyOut');
+        // 審查：標記沒成功（離線／規則擋）→ 卡片留著、不顯示成功；連按兩下只做一次；已處理的卡
+        DRAFTS.dodddd4444 = mk('dodddd4444', '日報丁'); openDecList('dailyOut');
+        let calls = 0; window._draftMark = () => { calls++; return Promise.resolve(false); };
+        decAct('dailyOut', 'dodddd4444', 'ok'); decAct('dailyOut', 'dodddd4444', 'ok'); await new Promise((r) => setTimeout(r, 60));
+        out.failKeep = calls === 1 && DRAFTS.dodddd4444.status === 'pending' && document.getElementById('dec-box').querySelectorAll('.dec-card').length === 1;
+        // 複製失敗（clipboard 拒絕、execCommand 回 false）→ 不標記
+        Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('denied'); } }, configurable: true });
+        const oE = document.execCommand; document.execCommand = () => false; calls = 0;
+        decAct('dailyOut', 'dodddd4444', 'ok'); await new Promise((r) => setTimeout(r, 60)); document.execCommand = oE;
+        out.copyFail = calls === 0 && DRAFTS.dodddd4444.status === 'pending';
+        DRAFTS.dodddd4444.status = 'applied'; let tt = ''; window.toast = (m) => { tt = m; }; decAct('dailyOut', 'dodddd4444', 'ok'); out.stale = /已經處理過/.test(tt); window.toast = () => {};
+        window._draftMark = oM;
+        // 欄位依角色：money:true 非管理員不輸出
+        _decReg('__t', { title: 't', todo: (n) => 't' + n, list: () => [{ id: 'x1' }], key: (x) => x.id, head: () => '簽收單', fields: () => [{ label: '材料', value: 'H300' }, { label: '金額', value: 'NT$ 9,999', money: true }], ok: () => Promise.resolve(true), reject: () => Promise.resolve(true), edit: () => {} });
+        const oU = window._fbUser, oA = window._isAdminUser; _fbUser = { email: 'w@x.com', uid: 'w' }; _isAdminUser = false;
+        const hw = _decCardHtml('__t', { id: 'x1' }); _isAdminUser = true; const ha = _decCardHtml('__t', { id: 'x1' }); _fbUser = oU; _isAdminUser = oA; delete _DEC.__t;
+        out.money = /H300/.test(hw) && !/9,999/.test(hw) && !/金額/.test(hw) && /9,999/.test(ha);
+        // 資料健檢卡沒有 CSV 鈕；資料健檢頁的「匯出 Excel」＝結案實際成本 CSV
+        PNL_SNAP = { ok: true, latest: { ym: '2026-11', at: Date.now(), ytd: {} }, close: { q1: { qid: 'q1', name: '假案', at: Date.now(), costByCat: { '點工': 100 } } } };
+        out.noBtn = !/匯出結案實際成本（CSV）<\/button>/.test(_pnlSnapHtml()) && /匯出 Excel/.test(_pnlSnapHtml());
+        let dl = null; const oD = window._dlText; window._dlText = (n, t) => { dl = [n, t]; }; _currentReport = 'health'; exportCurrentReportExcel(); window._dlText = oD;
+        out.csv = !!dl && /^結案實際成本_/.test(dl[0]) && /q1,假案,點工,100/.test(dl[1]);
+        document.querySelectorAll('#fy-modal').forEach((m) => m.remove());
+        window.toast = oT;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
+      return out;
+    });
+    check('v6.0.176 拍板卡：總覽待辦一列（不重複進 AI 草稿）→ 卡片只有退回／修改／確認三顆（視窗不多取消／確定）、內容跳脫；money 欄位非管理員不輸出', r.todo && r.three && r.foot && r.money, JSON.stringify(r));
+    check('v6.0.176 拍板卡（審查）：標記沒成功卡片留著、連按只做一次、複製失敗不標已轉發、已處理的卡提示', r.failKeep && r.copyFail && r.stale, JSON.stringify(r));
+    check('v6.0.176 整體日報：確認＝複製並標已轉發、退回＝寫原因不轉、修改＝改文字再複製；處理完待辦消失', r.ok && r.rej && r.edit && r.done && r.gone, JSON.stringify(r));
+    check('v6.0.176 結案實際成本 CSV 收進資料健檢頁的「匯出 Excel」（卡片不另放鈕）', r.noBtn && r.csv, JSON.stringify(r));
+    check('v6.0.176 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
