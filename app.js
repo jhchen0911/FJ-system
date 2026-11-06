@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.181';
+var APP_VERSION='v6.0.182';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -39284,17 +39284,21 @@ function _m6SlipFill(){
 var _AI_NOTIFY_SENDERS=['jhchen0911@gmail.com','hsuanchen911@gmail.com'];
 function _aiNotifyOk(){var e=String((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'').toLowerCase();return !!e&&_AI_NOTIFY_SENDERS.indexOf(e)>=0&&!window.FY_BETA;}
 function _aiNotifyText(title,todo){title=String(title||'').replace(/\s+/g,' ').trim();todo=String(todo||'').replace(/\s+/g,' ').trim();return title?('✅【'+title+'】做完了'+(todo?'｜要你做：'+todo:'')):'';}
-async function fyNotify(title,todo,text){
+async function fyNotify(title,todo,text,level){
   if(!_aiNotifyOk())return '沒送出：這個帳號不能發通知';
   var body={title:title||'',todo:todo||''};if(text)body={text:String(text)};
+  if(level)body.level=String(level);   // v6.0.182 'safety'＝安全類（只給風控／安全警報；不佔每天 6 則，同一句 30 分鐘 1 則、每天 30 則）
   try{
     var tok=await _fbUser.getIdToken();
     var r=await fetch(_fnUrl('aiNotify'),{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify(body)});
     var j={};try{j=await r.json();}catch(e){/* 可忽略：未部署時沒有 JSON */}
+    if(r.ok&&j&&j.level==='safety')return '已送出（安全通知，今天第 '+(j.today||'?')+'／'+(j.limit||30)+' 則）';
     if(r.ok){var q=(j&&j.used!=null)?('（LINE 本月已用 '+j.used+'／'+(j.limit||200)+'）'):(j&&j.quota==='unknown'?'（查不到 LINE 本月額度，照常推送）':'');return j&&j.held?('已記在 FJ 總覽、沒推 LINE'+q+'：本月額度快用完，留給工地日報'):('已送出'+q);}   // v6.0.134
     return '沒送出：'+((j&&j.error&&j.error.message)||(r.status===404?'通知服務尚未部署':('錯誤 '+r.status)));
   }catch(e){_err('fyNotify',e);return '沒送出：'+(navigator.onLine===false?'目前沒有網路':'通知服務尚未部署或連不上');}
 }
+// v6.0.182 安全通知：fyAlert('一句話') 或 fyAlert('標題','要你做')。只給風控／安全警報（例：倉位沒停損、帳務異常、系統故障），一般完成通知照舊用 fyNotify
+function fyAlert(a,b){return b==null?fyNotify('','',a,'safety'):fyNotify(a,b,'','safety');}
 // v6.0.137 電腦端斷線警報：電腦端（Lotion-HQ）排程每 30～60 分鐘在 FJ 分頁執行 fyBeat() 報到（只記時間）；雲端 hqBeatCheck 台灣 08～22 點每小時檢查，超過 2 小時沒報到 LINE 通知 Lotion 一次
 async function fyBeat(){
   if(!_aiNotifyOk())return '沒報到：這個帳號不能報到';

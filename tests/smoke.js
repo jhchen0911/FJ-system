@@ -9138,6 +9138,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  const fn182 = require('fs').readFileSync(require('path').join(__dirname, '..', 'functions', 'index.js'), 'utf8');
   // ── v6.0.123 AI 通知：只有 AI 帳號與 Lotion 看得到按鈕、走雲端 aiNotify 帶登入憑證；規則收掉唯讀帳號寫 linePush ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -9162,6 +9163,13 @@ async function newPage(browser, width, height) {
         document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 30));
         out.tooLong = toasts.some(t => /超過 100 字/.test(t)) && document.getElementById('gen-confirm-modal').style.display !== 'none';
         document.getElementById('gen-confirm-cancel').click();
+        /* v6.0.182 安全通知：fyAlert 一句話／標題＋要你做都帶 level:'safety'；一般 fyNotify 不帶 */
+        let bodies = []; window.fetch = async (u, o) => { bodies.push(JSON.parse(o.body)); return { ok: true, status: 200, json: async () => ({ ok: true, level: 'safety', today: 2, limit: 30 }) }; };
+        const sm = await fyAlert('2 個倉沒停損');
+        await fyAlert('風控警報', '馬上看倉位');
+        out.safety = sm === '已送出（安全通知，今天第 2／30 則）' && bodies[0].text === '2 個倉沒停損' && bodies[0].level === 'safety' && bodies[1].title === '風控警報' && bodies[1].todo === '馬上看倉位' && bodies[1].level === 'safety';
+        bodies = []; window.fetch = async (u, o) => { bodies.push(JSON.parse(o.body)); return { ok: true, status: 200, json: async () => ({ ok: true }) }; };
+        await fyNotify('一般', ''); out.normalNoLevel = !('level' in bodies[0]);
         /* 伺服器拒絕時把原因帶回來 */
         window.fetch = async () => ({ ok: false, status: 429, json: async () => ({ error: { message: '今天的通知已達上限（30 則）' } }) });
         out.err = /已達上限/.test(await fyNotify('x'));
@@ -9176,6 +9184,7 @@ async function newPage(browser, width, height) {
     const N = require(pth.join(__dirname, '..', 'functions', 'ops', 'notify.js'));
     const IDX = fs.readFileSync(pth.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
     check('v6.0.123 AI 通知：按鈕只有 AI 帳號／Lotion 看得到；帶登入憑證呼叫雲端、不能指定收件人；超過 100 字擋下；伺服器拒絕原因帶回', r.staffHidden && r.aiShown && r.call && r.prev && r.tooLong && r.err && r.staffDeny, JSON.stringify(r));
+    check('v6.0.182 安全通知：fyAlert 帶 level:safety（一句話或標題＋要你做）、回報今天第幾則；一般 fyNotify 不帶等級；雲端安全類有防洪（30 分鐘同一句、每天 30 則）且不佔每天 6 則', r.safety && r.normalNoLevel && /b\.level === 'safety'/.test(fn182) && /NOTIFY_SAFETY_DAILY/.test(fn182) && /aiNotifySafe/.test(fn182), JSON.stringify({ safety: r.safety, normalNoLevel: r.normalNoLevel }));
     check('v6.0.123 AI 通知安全：唯讀帳號不能再寫 linePush（健檢2 #27）；通知紀錄與計數網頁不能寫；伺服器只放行名單、100 字、擋網址、每天 6 則、收件人取擁有者',
       !/\|\|\s*root\.child\('fydata\/readers'\)/.test(RF.linePush.$id['.write']) && /!root\.child\('fydata\/readers'\)/.test(RF.linePush.$id['.write']) && RF.aiNotifyLog['.write'] === 'false' && RF.aiNotifyCount['.write'] === 'false' && /at/.test(String(RF.aiNotifyLog['.indexOn']))
       && N.notifyAllowed('hsuanchen911@gmail.com') && !N.notifyAllowed('staff@x.com') && N.NOTIFY_DAILY === 6 && N.NOTIFY_MAX === 100 && N.buildNotify({ text: 'https://x.tw' }).err && !!N.buildNotify({ title: 'a' }).text

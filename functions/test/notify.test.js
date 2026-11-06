@@ -43,3 +43,23 @@ test('AI 通知上限（v6.0.134，Lotion 11/02）：每天 6 則；LINE 本月�
   assert.equal(n.monthHold(undefined), false);
   assert.equal(n.monthHold(NaN), false);
 });
+
+test('v6.0.182 安全類（level:safety）：🚨 開頭、等級只收 safety／不填、同一句 30 分鐘 1 則、每天 30 則', () => {
+  assert.equal(n.NOTIFY_SAFETY_DAILY, 30);
+  assert.equal(n.NOTIFY_SAFETY_GAP_MS, 30 * 60000);
+  assert.deepEqual(n.buildNotify({ text: '2 個倉沒停損', level: 'safety' }), { text: '🚨2 個倉沒停損', level: 'safety' });
+  assert.deepEqual(n.buildNotify({ text: '🚨已經有記號', level: 'SAFETY' }), { text: '🚨已經有記號', level: 'safety' });
+  assert.deepEqual(n.buildNotify({ title: '風控警報', todo: '馬上看倉位', level: 'safety' }), { text: '🚨【風控警報】｜要你做：馬上看倉位', level: 'safety' });
+  assert.deepEqual(n.buildNotify({ text: '一般', level: 'normal' }), { text: '一般' });
+  assert.equal(n.buildNotify({ text: 'x', level: 'urgent' }).err, '等級只能是 safety 或不填');
+  assert.equal(n.buildNotify({ text: 'x', level: 1 }).err, '格式不正確');
+  assert.equal(n.buildNotify({ text: '看 a.com', level: 'safety' }).err, '不能放網址');
+  assert.ok(/超過 100 字/.test(n.buildNotify({ text: '字'.repeat(100), level: 'safety' }).err));   // 加了 🚨 一起算
+  assert.equal(n.safetyKey('🚨2 個倉沒停損'), n.safetyKey('🚨2  個倉沒停損​'));
+  assert.notEqual(n.safetyKey('🚨2 個倉沒停損'), n.safetyKey('🚨3 個倉沒停損'));
+  const t0 = 1_800_000_000_000;
+  assert.equal(n.safetyGapOk(null, t0), true);
+  assert.equal(n.safetyGapOk(t0 - 29 * 60000, t0), false);
+  assert.equal(n.safetyGapOk(t0 - 30 * 60000, t0), true);
+  assert.equal(n.safetyGapOk(t0 + 5000, t0), true);   // 時鐘倒退不卡死
+});

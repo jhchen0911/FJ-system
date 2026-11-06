@@ -10,6 +10,10 @@ const NOTIFY_HELD_DAILY = 30;     // 只記在 FJ（沒推 LINE）的每天最�
 const NOTIFY_MONTH_LIMIT = 200;   // LINE 每月免費則數（輕用量方案）
 const NOTIFY_MONTH_STOP = 180;    // 本月已用達這個數就不推 LINE、只記在 FJ
 const NOTIFY_MAX = 100;
+// v6.0.182 安全類（level:'safety'，Lotion 選 A）：只給風控／安全警報。不佔每天 6 則、LINE 本月 180 則也照推；
+// 自己的防洪：同一句 30 分鐘內只送 1 則、每天最多 30 則
+const NOTIFY_SAFETY_DAILY = 30;
+const NOTIFY_SAFETY_GAP_MS = 30 * 60000;
 const NOTIFY_KEEP_MS = 180 * 86400000;
 // 審查：先 NFKC（全形字母、全形冒號斜線變半形）、拿掉零寬與方向控制字元、把「。．｡」當成點，再擋網址樣式
 const INVIS_RE = /[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180b-\u180f\u200b-\u200f\u202a-\u202e\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0]/g;
@@ -33,20 +37,27 @@ const forCheck = s => s.normalize('NFKC').replace(INVIS_RE, '').replace(/[。．
 // body：{title, todo} → 「✅【標題】做完了｜要你做：…」；或 {text} 整句自己寫。只收字串。回傳 {text} 或 {err}
 function buildNotify(body) {
   const b = (body && typeof body === 'object' && !Array.isArray(body)) ? body : {};
-  for (const k of ['title', 'todo', 'text']) if (b[k] != null && typeof b[k] !== 'string') return { err: '格式不正確' };
+  for (const k of ['title', 'todo', 'text', 'level']) if (b[k] != null && typeof b[k] !== 'string') return { err: '格式不正確' };
+  const lv = String(b.level || '').trim().toLowerCase();
+  if (lv && lv !== 'safety' && lv !== 'normal') return { err: '等級只能是 safety 或不填' };
+  const safety = lv === 'safety';
   let text = clean(b.text || '');
   if (!text) {
     const title = clean(b.title || ''), todo = clean(b.todo || '');
     if (!title) return { err: '請填標題' };
-    text = '✅【' + title + '】做完了' + (todo ? '｜要你做：' + todo : '');
-  }
+    text = safety ? ('🚨【' + title + '】' + (todo ? '｜要你做：' + todo : '')) : ('✅【' + title + '】做完了' + (todo ? '｜要你做：' + todo : ''));
+  } else if (safety && text.indexOf('🚨') !== 0) text = '🚨' + text;
   if (len(text) > NOTIFY_MAX) return { err: '超過 ' + NOTIFY_MAX + ' 字（目前 ' + len(text) + ' 字）' };
   const chk = forCheck(text);
   if (LINK_RES.some(re => re.test(chk))) return { err: '不能放網址' };
-  return { text };
+  return safety ? { text, level: 'safety' } : { text };
 }
+
+// 安全類防洪：同一句（去掉看不見的字元、全半形一致）算同一則 → 雜湊當 key；上一則在 30 分鐘內就不送
+function safetyKey(text) { return require('crypto').createHash('sha1').update(forCheck(String(text || '')).replace(/\s+/g, ' ').trim()).digest('hex').slice(0, 20); }
+function safetyGapOk(lastAt, now) { return !(typeof lastAt === 'number' && isFinite(lastAt) && now - lastAt < NOTIFY_SAFETY_GAP_MS && now >= lastAt); }
 
 // 本月 LINE 已用則數 → 要不要推（查不到額度時照常推，避免 LINE API 暫時錯誤就整個停掉）
 function monthHold(used) { return typeof used === 'number' && isFinite(used) && used >= NOTIFY_MONTH_STOP; }
 
-module.exports = { NOTIFY_SENDERS, NOTIFY_DAILY, NOTIFY_REJ_LOG, NOTIFY_HELD_DAILY, NOTIFY_MONTH_LIMIT, NOTIFY_MONTH_STOP, NOTIFY_MAX, NOTIFY_KEEP_MS, notifyAllowed, buildNotify, monthHold };
+module.exports = { NOTIFY_SAFETY_DAILY, NOTIFY_SAFETY_GAP_MS, safetyKey, safetyGapOk, NOTIFY_SENDERS, NOTIFY_DAILY, NOTIFY_REJ_LOG, NOTIFY_HELD_DAILY, NOTIFY_MONTH_LIMIT, NOTIFY_MONTH_STOP, NOTIFY_MAX, NOTIFY_KEEP_MS, notifyAllowed, buildNotify, monthHold };
