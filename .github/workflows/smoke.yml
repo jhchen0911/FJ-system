@@ -74,7 +74,8 @@ jobs:
 
   deploy:
     needs: smoke
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PAGES_FROM_ACTIONS == 'true'
+    # 2026-11-07：GitHub Pages 發布卡住時，可在 Actions 對 main 手動 Run workflow 重新發布（同一次重跑會撞到兩份 github-pages 檔案）
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && vars.PAGES_FROM_ACTIONS == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
