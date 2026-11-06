@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.180';
+var APP_VERSION='v6.0.181';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -41335,7 +41335,7 @@ function _qvfRefSet(q,ref,a,b){
 }
 // 補登那一筆（每台裝置用同一條規則做出一模一樣的內容）
 function _qvfMkEntry(rule,src){
-  var sn=JSON.parse(JSON.stringify(src.snapshot||{}));sn.ver=rule.insert.ver;
+  var sn=JSON.parse(JSON.stringify(src.snapshot||{}));sn.ver=rule.insert.ver;if(rule.insert.date)sn.date=rule.insert.date;   // v6.0.181 指定了版次日期：這一版的報價日也記成那天（還原、看 PDF 一致）
   sn.t=Object.assign({},sn.t||{},{sub:rule.insert.sub,tax:rule.insert.tax,total:rule.insert.total});   // 稅額照現行口徑重算到元（以工項重算為準）
   return {savedAt:rule.insert.savedAt,by:rule.by||'',formal:true,ver:rule.insert.ver,note:rule.insert.note||'',backfill:{fixId:rule.id,src:rule.insert.src,rule:_qvfRuleCopy(rule)},snapshot:sn};
 }
@@ -41426,19 +41426,24 @@ function _qvfPlan(q,spec,opts){
   var sa=sa0+1,clash=hist.find(function(e){return e&&e.savedAt===sa&&!(e.backfill&&e.backfill.fixId===_qvfId(q.id,sa0));});
   ck(7,'時間順序',!!src&&!badPost.length&&!clash,'插在 V'+(N-1||'—')+' 之後'+(post.length?('、原 V'+post.map(function(e){return e.ver||1;}).sort(function(a,b){return a-b;})[0]+' 之前'):'')+(badPost.length?'；後面有號碼更小的正式版，順序不對':'')+(clash?'；存檔時間 +1 已被別筆用掉':''));
   if(spec.ver!=null&&spec.ver!=='')ck(7.5,'補登的版號',+spec.ver===N,'算出來是 V'+N+'／要求 V'+spec.ver);
+  // v6.0.181：另外指定補登版次的日期（快照是事後才存的、日期是存檔那天；實際送業主是更早那天）——快照日期照舊核對，版次日期不能早於前一個正式版、不能晚於快照
+  var vd=(spec.verDate==null||spec.verDate==='')?'':String(spec.verDate).slice(0,10);
+  if(vd){var prevE=pre.slice().sort(function(a,b){return (b.savedAt||0)-(a.savedAt||0);})[0],prevD=String((prevE&&prevE.snapshot&&prevE.snapshot.date)||'');
+    ck(2.5,'補登版次日期',/^\d{4}-\d{2}-\d{2}$/.test(vd)&&(!prevD||vd>=prevD)&&(!sn.date||vd<=String(sn.date)),'快照日期 '+(sn.date||'—')+'，補登成 '+vd+(prevD?('（前一個正式版 '+prevD+'）'):''));}
+  var insD=vd||String(sn.date||'');
   var fid=_qvfId(q.id,sa0);ck(10,'還沒補過',!_qvfActive(q,fid),_qvfActive(q,fid)?'這條補登已經套用過':'');
   if(opts&&opts.env){var en=_qvfEnv(q);ck(11,'環境（管理員、私有資料已下載、沒在編輯）',!en,en);}
   var ok=checks.every(function(c){return c.ok;});
   var today=_qSendRoc(localToday());
   var rule={id:fid,at:Date.now(),by:_meEmail()||'本機',qid:q.id,
-    insert:{savedAt:sa,src:sa0,ver:N,date:String(sn.date||''),note:'補登：'+(sn.date?_qSendRoc(sn.date):'')+' 已送業主（'+today+' 補登）',sub:sub,tax:tax,total:tot},
+    insert:{savedAt:sa,src:sa0,ver:N,date:insD,snapDate:String(sn.date||''),note:'補登：'+(insD?_qSendRoc(insD):'')+' 已送業主（'+today+' 補登'+(vd&&vd!==String(sn.date||'')?('；快照日期 '+_qSendRoc(sn.date)+'，補登成 '+_qSendRoc(vd)):'')+'）',sub:sub,tax:tax,total:tot},
     verTo:(q.ver||1)+1,before:{qVer:q.ver||1,entries:post.filter(function(e){return (e.ver||1)>=N;}).map(function(e){return {savedAt:e.savedAt,ver:e.ver||1};}),refs:[]}};
   rule.before.refs=_qvfRefs(q,rule);
   // 前後對照（由舊到新）
   var asc=hist.filter(function(e){return e&&(e.formal||e===src);}).slice().sort(function(a,b){return (a.savedAt||0)-(b.savedAt||0);});
   var listBefore=asc.map(function(e){return _qvfRowTxt(e);}).concat([_qvfRowTxt(null,q)]);
   var listAfter=[];asc.forEach(function(e){
-    if(e===src){listAfter.push(_qvfRowTxt(e));listAfter.push({ver:'V'+N,date:String(sn.date||''),total:tot,at:sa,ins:true,mv:'新增（已送業主）'});return;}
+    if(e===src){listAfter.push(_qvfRowTxt(e));listAfter.push({ver:'V'+N,date:insD,total:tot,at:sa,ins:true,mv:'新增（已送業主）'+(insD!==String(sn.date||'')?('；快照日期 '+(sn.date||'')+'，補登成 '+insD):'')});return;}
     var b=rule.before.entries.find(function(x){return x.savedAt===e.savedAt;}),o=_qvfRowTxt(e);if(b){o.ver='V'+(b.ver+1);o.mv='原 V'+b.ver+' 改號';}listAfter.push(o);});
   listAfter.push({ver:'現行 V'+rule.verTo,date:q.date||'',total:(q.t&&q.t.total)||0,at:0,mv:'原 V'+(q.ver||1)});
   // 和另一張報價對照（只顯示，不擋）
@@ -41472,15 +41477,15 @@ function fyQuoteVerFix(spec){
     var q=spec.qid?Q.find(function(x){return x.id===spec.qid;}):null;
     if(!q&&spec.code){var hit=Q.filter(function(x){return x&&x.code===spec.code;});if(hit.length>1)return Promise.resolve({ok:false,why:'報價編號 '+spec.code+' 有 '+hit.length+' 張，請改用 qid'});q=hit[0]||null;}
     if(!q)return Promise.resolve({ok:false,why:'找不到這張報價（qid 或 code）'});
-    var ps={srcSavedAt:+(spec.fromSnapshotSavedAt||spec.srcSavedAt)||0,expect:spec.expect||{},cmpQid:spec.cmpQid||'',ver:spec.ver};
+    var ps={srcSavedAt:+(spec.fromSnapshotSavedAt||spec.srcSavedAt)||0,expect:spec.expect||{},cmpQid:spec.cmpQid||'',ver:spec.ver,verDate:spec.verDate?String(spec.verDate).slice(0,10):''};
     var plan=_qvfPlan(q,ps);
     if(!plan.ok)return Promise.resolve({ok:false,why:plan.checks.filter(function(c){return !c.ok;}).map(function(c){return c.label+'：'+c.info;}).join('；'),checks:plan.checks});
-    var ex=ps.expect,pl={qid:q.id,code:String(q.code||'').slice(0,60),srcSavedAt:ps.srcSavedAt,ver:plan.N,baseVer:q.ver||1,cmpQid:String(ps.cmpQid||'').slice(0,40),expect:{rows:+ex.rows,sub:+ex.sub,tax:+ex.tax,total:+ex.total,date:String(ex.date).slice(0,10)}};
+    var ex=ps.expect,pl={qid:q.id,code:String(q.code||'').slice(0,60),srcSavedAt:ps.srcSavedAt,ver:plan.N,baseVer:q.ver||1,cmpQid:String(ps.cmpQid||'').slice(0,40),verDate:ps.verDate||'',expect:{rows:+ex.rows,sub:+ex.sub,tax:+ex.tax,total:+ex.total,date:String(ex.date).slice(0,10)}};
     var sm=(String(q.code||'')+' '+String(q.name||'')).slice(0,80)+' 補登 V'+plan.N+'（'+pl.expect.date+'，含稅 '+fmt(plan.total)+'）；原 V'+plan.N+' 起往後改號';
     return _draftPush('qverfix',pl,sm).then(function(ok){return ok?{ok:true,ver:plan.N,checks:plan.checks}:{ok:false,why:'草稿送出失敗'};});
   }catch(e){_err('fyQuoteVerFix',e);return Promise.resolve({ok:false,why:String(e&&e.message||e)});}
 }
-function _qvfSpecOf(d){var pl=(d&&d.payload&&typeof d.payload==='object')?d.payload:{};return {q:(Q||[]).find(function(x){return x&&x.id===pl.qid;})||null,spec:{srcSavedAt:+pl.srcSavedAt||0,expect:pl.expect||{},cmpQid:pl.cmpQid||'',ver:pl.ver}};}
+function _qvfSpecOf(d){var pl=(d&&d.payload&&typeof d.payload==='object')?d.payload:{};return {q:(Q||[]).find(function(x){return x&&x.id===pl.qid;})||null,spec:{srcSavedAt:+pl.srcSavedAt||0,expect:pl.expect||{},cmpQid:pl.cmpQid||'',ver:pl.ver,verDate:pl.verDate||''}};}
 // 套用（拍板卡「確認」）：再驗一次 → 備份 → 寫規則 → 照規則重算 → 存檔上傳
 function _qvfApply(q,plan,d){
   if(_roDeny())return false;

@@ -11020,6 +11020,44 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.181 補登可指定版次日期 verDate（快照是事後才存、日期是存檔那天）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      try {
+        const T0 = Date.UTC(2026, 9, 1, 2, 0, 0), H = 3600000;
+        const mk = (price, date, ver) => ({ id: 'qvD', code: 'QV-09', name: '假日期案', client: '範例營造', date, ver, items: [{ desc: '假鋼樁', unit: '支', qty: 10, price }, { desc: '假支撐', unit: 'M', qty: 5, price: 100 }] });
+        Q = Q.filter((x) => x.id !== 'qvD');
+        const q = Object.assign(mk(1300, '2026-10-09', 3), { _mt: T0 + 40 * H });
+        Q.push(q);
+        Q_HISTORY.qvD = [
+          { savedAt: T0 + 10 * H, by: 'a', formal: true, ver: 1, snapshot: mk(1500, '2026-10-01', 1) },
+          { savedAt: T0 + 20 * H, by: 'a', ver: 2, snapshot: mk(1200, '2026-10-08', 2) },          /* 來源快照：10/08 才存，實際 10/03 送出 */
+          { savedAt: T0 + 30 * H, by: 'a', formal: true, ver: 2, snapshot: mk(1300, '2026-10-08', 2) },
+        ];
+        const exp = { rows: 2, sub: 12500, tax: 625, total: 13125, date: '2026-10-08' };
+        const p0 = _qvfPlan(q, { srcSavedAt: T0 + 20 * H, expect: exp, verDate: '2026-10-03' });
+        out.ok = p0.ok && p0.rule.insert.date === '2026-10-03' && p0.rule.insert.snapDate === '2026-10-08' && p0.checks.some((c) => c.n === 2.5 && c.ok && /快照日期 2026-10-08，補登成 2026-10-03/.test(c.info));
+        const e0 = _qvfMkEntry(p0.rule, Q_HISTORY.qvD[1]);
+        out.entry = e0.snapshot.date === '2026-10-03' && /補登成/.test(e0.note) && Q_HISTORY.qvD[1].snapshot.date === '2026-10-08';
+        out.tooEarly = !_qvfPlan(q, { srcSavedAt: T0 + 20 * H, expect: exp, verDate: '2026-09-30' }).ok;   /* 早於前一個正式版 */
+        out.tooLate = !_qvfPlan(q, { srcSavedAt: T0 + 20 * H, expect: exp, verDate: '2026-10-09' }).ok;    /* 晚於快照 */
+        out.badFmt = !_qvfPlan(q, { srcSavedAt: T0 + 20 * H, expect: exp, verDate: '10/03' }).ok;
+        out.noVd = _qvfPlan(q, { srcSavedAt: T0 + 20 * H, expect: exp }).rule.insert.date === '2026-10-08';    /* 沒指定照舊 */
+        const oU = window._fbUser, oP = window._draftPush; let pushed = []; _fbUser = { email: 'ai@x.com', uid: 'ai' }; window._draftPush = (t2, p2, s2) => { pushed.push([t2, p2, s2]); return Promise.resolve(true); };
+        const sres = await fyQuoteVerFix({ qid: 'qvD', fromSnapshotSavedAt: T0 + 20 * H, expect: exp, verDate: '2026-10-03' });
+        out.send = sres.ok && pushed.length === 1 && pushed[0][1].verDate === '2026-10-03' && _qvfSpecOf({ payload: pushed[0][1] }).spec.verDate === '2026-10-03';
+        _fbUser = oU; window._draftPush = oP;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
+      Q = Q.filter((x) => x.id !== 'qvD'); delete Q_HISTORY.qvD;
+      return out;
+    });
+    check('v6.0.181 補登指定版次日期：快照日期照舊核對、版次與快照報價日記成指定日、卡片寫「快照日期…，補登成…」；早於前一正式版／晚於快照／格式錯都擋；沒指定照舊；送卡帶 verDate', r.ok && r.entry && r.tooEarly && r.tooLate && r.badFmt && r.noVd && r.send, JSON.stringify(r));
+    check('v6.0.181 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.180 報價補登歷史版次（一次性，規則 q.verFix 每台重套）＋送出封存防漏（假資料）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
