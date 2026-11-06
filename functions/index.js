@@ -177,24 +177,34 @@ exports.aiNotify = onRequest({ region: REGION, cors: ['https://jhchen0911.github
     // v6.0.182 安全類：不佔每天 6 則、LINE 本月 180 則也照推；自己的防洪＝同一句 30 分鐘 1 則、每天 30 則
     if (b.level === 'safety') {
       const sk = notifyCore.safetyKey(b.text), gapRef = db.ref('fydata/aiNotifySafe/' + sk);
-      let prevAt = null;
-      const g = await gapRef.transaction((v) => { prevAt = (v && typeof v.at === 'number') ? v.at : null; return notifyCore.safetyGapOk(prevAt, now) ? { at: now } : undefined; });
-      if (!g.committed) { await logRef.set({ by: email, at: now, text: b.text, level: 'safety', status: 'dropped', reason: '同一則 30 分鐘內已送過' }); logged = true; res.status(429).json({ error: { message: '同一則安全通知 30 分鐘內已送過' } }); return; }
       const sRef = db.ref('fydata/aiNotifyCount/' + day + '_safety');
-      const st = await sRef.transaction((n) => ((n || 0) >= notifyCore.NOTIFY_SAFETY_DAILY ? undefined : (n || 0) + 1));
-      const undoGap = () => gapRef.set(prevAt == null ? null : { at: prevAt }).catch(() => null);
-      if (!st.committed) { await undoGap(); await logRef.set({ by: email, at: now, text: b.text, level: 'safety', status: 'dropped', reason: '超過安全通知每天 ' + notifyCore.NOTIFY_SAFETY_DAILY + ' 則' }); logged = true; res.status(429).json({ error: { message: '今天的安全通知已達上限（' + notifyCore.NOTIFY_SAFETY_DAILY + ' 則）' } }); return; }
-      logText = b.text;
-      const deps = lineAdapters.mkDeps(LINE_TOKEN.value());
-      const cfg = (await deps.getCfg()) || {};
-      const sent = Object.keys(cfg.owners || {}).length ? await lineCore.pushOwners(cfg, deps, b.text) : 0;
-      await logRef.set({ by: email, at: now, text: b.text, level: 'safety', status: sent ? 'sent' : 'failed', to: sent }); logged = true;
-      if (!sent) { await sRef.transaction((n) => Math.max(0, (n || 1) - 1)).catch(() => null); await undoGap(); res.status(502).json({ error: { message: 'LINE 沒送出（擁有者還沒設定或 LINE 推播失敗）' } }); return; }
-      try {   // 防洪紀錄只要留一天
-        const old = (await db.ref('fydata/aiNotifySafe').orderByChild('at').endAt(now - 86400000).limitToFirst(50).once('value')).val() || {};
-        const up = {}; Object.keys(old).forEach(k => { up[k] = null; }); if (Object.keys(up).length) await db.ref('fydata/aiNotifySafe').update(up);
-      } catch (e) { console.error('aiNotify.safePrune', e); }
-      res.status(200).json({ ok: true, level: 'safety', text: b.text, today: st.snapshot.val(), limit: notifyCore.NOTIFY_SAFETY_DAILY }); return;
+      // 審查：被擋的紀錄每天最多 30 筆（同一句一直重送也不會灌爆紀錄）
+      const dropLog = async (reason) => { const d = await db.ref('fydata/aiNotifyCount/' + day + '_safedrop').transaction((n) => ((n || 0) >= notifyCore.NOTIFY_REJ_LOG ? undefined : (n || 0) + 1)); if (d.committed) await logRef.set({ by: email, at: now, text: b.text, level: 'safety', status: 'dropped', reason }); logged = true; };
+      let prevAt = null, gapTaken = false, cntTaken = false;
+      // 沒送出（含中途出錯）一律退回 30 分鐘紀錄與當天名額，馬上重送才不會被當成重複擋掉
+      const refund = async () => {
+        if (cntTaken) { cntTaken = false; await sRef.transaction((n) => Math.max(0, (n || 1) - 1)).catch(() => null); }
+        if (gapTaken) { gapTaken = false; await gapRef.transaction((v) => ((v && v.at === now) ? (prevAt == null ? null : { at: prevAt }) : undefined)).catch(() => null); }
+      };
+      try {
+        const g = await gapRef.transaction((v) => { prevAt = (v && typeof v.at === 'number') ? v.at : null; return notifyCore.safetyGapOk(prevAt, now) ? { at: now } : undefined; });
+        if (!g.committed) { await dropLog('同一則 30 分鐘內已送過'); res.status(429).json({ error: { message: '同一則安全通知 30 分鐘內已送過' } }); return; }
+        gapTaken = true;
+        const st = await sRef.transaction((n) => ((n || 0) >= notifyCore.NOTIFY_SAFETY_DAILY ? undefined : (n || 0) + 1));
+        if (!st.committed) { await refund(); await dropLog('超過安全通知每天 ' + notifyCore.NOTIFY_SAFETY_DAILY + ' 則'); res.status(429).json({ error: { message: '今天的安全通知已達上限（' + notifyCore.NOTIFY_SAFETY_DAILY + ' 則）' } }); return; }
+        cntTaken = true;
+        logText = b.text;
+        const deps = lineAdapters.mkDeps(LINE_TOKEN.value());
+        const cfg = (await deps.getCfg()) || {};
+        const sent = Object.keys(cfg.owners || {}).length ? await lineCore.pushOwners(cfg, deps, b.text) : 0;
+        await logRef.set({ by: email, at: now, text: b.text, level: 'safety', status: sent ? 'sent' : 'failed', to: sent }); logged = true;
+        if (!sent) { await refund(); res.status(502).json({ error: { message: 'LINE 沒送出（擁有者還沒設定或 LINE 推播失敗）' } }); return; }
+        try {   // 防洪紀錄只要留一天
+          const old = (await db.ref('fydata/aiNotifySafe').orderByChild('at').endAt(now - 86400000).limitToFirst(50).once('value')).val() || {};
+          const up = {}; Object.keys(old).forEach(k => { up[k] = null; }); if (Object.keys(up).length) await db.ref('fydata/aiNotifySafe').update(up);
+        } catch (e) { console.error('aiNotify.safePrune', e); }
+        res.status(200).json({ ok: true, level: 'safety', text: b.text, today: st.snapshot.val(), limit: notifyCore.NOTIFY_SAFETY_DAILY }); return;
+      } catch (e) { await refund(); throw e; }
     }
     const cntRef = db.ref('fydata/aiNotifyCount/' + day);
     const tx = await cntRef.transaction((n) => ((n || 0) >= notifyCore.NOTIFY_DAILY ? undefined : (n || 0) + 1));

@@ -55,7 +55,8 @@ function buildNotify(body) {
 
 // 安全類防洪：同一句（去掉看不見的字元、全半形一致）算同一則 → 雜湊當 key；上一則在 30 分鐘內就不送
 function safetyKey(text) { return require('crypto').createHash('sha1').update(forCheck(String(text || '')).replace(/\s+/g, ' ').trim()).digest('hex').slice(0, 20); }
-function safetyGapOk(lastAt, now) { return !(typeof lastAt === 'number' && isFinite(lastAt) && now - lastAt < NOTIFY_SAFETY_GAP_MS && now >= lastAt); }
+// 審查：兩則同時進來時伺服器時鐘先後不一定 → 前後 30 分鐘內都算重複（時鐘倒退超過 30 分鐘才放行，不會卡死）
+function safetyGapOk(lastAt, now) { return !(typeof lastAt === 'number' && isFinite(lastAt) && Math.abs(now - lastAt) < NOTIFY_SAFETY_GAP_MS); }
 
 // 本月 LINE 已用則數 → 要不要推（查不到額度時照常推，避免 LINE API 暫時錯誤就整個停掉）
 function monthHold(used) { return typeof used === 'number' && isFinite(used) && used >= NOTIFY_MONTH_STOP; }

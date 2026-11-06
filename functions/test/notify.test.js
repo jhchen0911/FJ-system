@@ -61,5 +61,6 @@ test('v6.0.182 安全類（level:safety）：🚨 開頭、等級只收 safety�
   assert.equal(n.safetyGapOk(null, t0), true);
   assert.equal(n.safetyGapOk(t0 - 29 * 60000, t0), false);
   assert.equal(n.safetyGapOk(t0 - 30 * 60000, t0), true);
-  assert.equal(n.safetyGapOk(t0 + 5000, t0), true);   // 時鐘倒退不卡死
+  assert.equal(n.safetyGapOk(t0 + 5000, t0), false);   // 同時進來、時間差幾秒：算重複
+  assert.equal(n.safetyGapOk(t0 + 31 * 60000, t0), true);   // 時鐘倒退超過 30 分鐘不卡死
 });
