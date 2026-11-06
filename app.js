@@ -41485,7 +41485,7 @@ function fyQuoteVerFix(spec){
     var plan=_qvfPlan(q,ps);
     if(!plan.ok)return Promise.resolve({ok:false,why:plan.checks.filter(function(c){return !c.ok;}).map(function(c){return c.label+'：'+c.info;}).join('；'),checks:plan.checks});
     var ex=ps.expect,pl={qid:q.id,code:String(q.code||'').slice(0,60),srcSavedAt:ps.srcSavedAt,ver:plan.N,baseVer:q.ver||1,cmpQid:String(ps.cmpQid||'').slice(0,40),verDate:ps.verDate||'',expect:{rows:+ex.rows,sub:+ex.sub,tax:+ex.tax,total:+ex.total,date:String(ex.date).slice(0,10)}};
-    var sm=(String(q.code||'')+' '+String(q.name||'')).slice(0,80)+' 補登 V'+plan.N+'（'+pl.expect.date+'，含稅 '+fmt(plan.total)+'）；原 V'+plan.N+' 起往後改號';
+    var sm=(String(q.code||'')+' '+String(q.name||'')).slice(0,80)+' 補登 V'+plan.N+'（'+(pl.verDate||pl.expect.date)+'，含稅 '+fmt(plan.total)+'）；原 V'+plan.N+' 起往後改號';
     return _draftPush('qverfix',pl,sm).then(function(ok){return ok?{ok:true,ver:plan.N,checks:plan.checks}:{ok:false,why:'草稿送出失敗'};});
   }catch(e){_err('fyQuoteVerFix',e);return Promise.resolve({ok:false,why:String(e&&e.message||e)});}
 }
