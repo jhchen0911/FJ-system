@@ -7221,7 +7221,7 @@ async function newPage(browser, width, height) {
   {
     const fn = require('fs').readFileSync(require('path').join(__dirname, '..', 'functions', 'index.js'), 'utf8');
     const fb = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'firebase.json'), 'utf8'));
-    const fnOk = !fb.database && !fb.storage && !!fb.functions && /cors: \['https:\/\/jhchen0911\.github\.io'\]/.test(fn) && /fydata\/readers/.test(fn) && /fydata\/adminEmails/.test(fn) && /fydata\/access/.test(fn) && /setCustomUserClaims/.test(fn) && /'reader'/.test(fn) && /delete claims\.fy/.test(fn);
+    const fnOk = (!fb.database || (fb.database.rules === 'database.rules.json' && Object.keys(fb.database).length === 1)) && !fb.storage && !!fb.functions && /cors: \['https:\/\/jhchen0911\.github\.io'\]/.test(fn) && /fydata\/readers/.test(fn) && /fydata\/adminEmails/.test(fn) && /fydata\/access/.test(fn) && /setCustomUserClaims/.test(fn) && /'reader'/.test(fn) && /delete claims\.fy/.test(fn);
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
       const out = {};
