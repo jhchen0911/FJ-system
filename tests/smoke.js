@@ -11070,7 +11070,7 @@ async function newPage(browser, width, height) {
         openDecList('zzT'); await W(50);
         decToggle('zzT', 'a1'); await W(50); decToggle('zzT', 'a1'); await W(20); decToggle('zzT', 'a1'); await W(50);
         out.recheck = n === 2 && /第 2 次/.test(document.querySelector('#dec-box .dec-detail').textContent);
-        delete _DEC.zzT; try { document.querySelector('#fy-modal .fy-mdl-x, #fy-modal [data-close]')?.click(); } catch (e) { /* 可忽略 */ }
+        delete _DEC.zzT; try { const m = document.getElementById('fy-modal'); if (m) m.remove(); } catch (e) { /* 可忽略 */ }
         localStorage.setItem('fy_priv_pending', '1'); localStorage.removeItem('fy_pending_sync');
         out.why = /私有資料/.test(_qvfDirtyWhy());
         _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o' };

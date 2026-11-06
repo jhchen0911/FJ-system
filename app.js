@@ -41187,7 +41187,7 @@ function decToggle(kind,id,force){
     det.innerHTML=h||'<div style="font-size:12px;color:var(--r,#c62828)">沒有明細內容，不能確認（請按修改或退回）</div>';det.setAttribute('data-done','1');
     if(!h)return false;return _decWaitMedia(det);
   }).then(function(ok){
-    if(ok){_DEC_READY[bk]=1;}else if(ok===false&&det.getAttribute('data-done')&&det.querySelector('img,iframe,embed,object,video')){det.removeAttribute('data-done');det.insertAdjacentHTML('afterbegin','<div style="font-size:12px;color:var(--r,#c62828);margin-bottom:4px">照片或 PDF 沒有載入完成，還不能確認；收起再展開重試</div>');}
+    if(ok&&det.style.display!=='none'&&det.getAttribute('data-done')){_DEC_READY[bk]=1;}else if(ok===false&&det.getAttribute('data-done')&&det.querySelector('img,iframe,embed,object,video')){det.removeAttribute('data-done');det.insertAdjacentHTML('afterbegin','<div style="font-size:12px;color:var(--r,#c62828);margin-bottom:4px">照片或 PDF 沒有載入完成，還不能確認；收起再展開重試</div>');}
     _decOkSync(kind,id);
   }).catch(function(e){_err('decToggle.'+kind,e);det.innerHTML='<div style="font-size:12px;color:var(--r,#c62828)">明細載入失敗，還不能確認</div>';});
 }
@@ -41429,7 +41429,7 @@ function _qvfEnv(q){
   if(_fbUser&&!_isAdminUser)return '只有管理員可以套用';
   if(_fbUser&&_QH_SENS===null)return '這台的私有資料還沒下載完，等同步燈變綠再按';
   try{if(typeof navigator!=='undefined'&&navigator.onLine===false)return '離線中，連上網路再按';}catch(e){/* 可忽略 */}
-  try{if(_fbUser&&_isDirty())return '這台還有資料沒上傳（'+(_qvfDirtyWhy()||'待上傳')+'）。按「確認」會先自動上傳再檢查一次；還是不行就照這行原因處理';}catch(e){_err('_qvfEnv.dirty',e);}
+  try{if(_fbUser&&_isDirty())return '這台還有資料沒上傳（'+(_qvfDirtyWhy()||'待上傳')+'）。按「確認」會先自動上傳再檢查；按過還是這樣＝自動上傳也沒成功，請截這行給陳軒';}catch(e){_err('_qvfEnv.dirty',e);}
   try{if(typeof eid!=='undefined'&&eid===q.id&&document.getElementById('page-editor')?.classList.contains('active'))return '這張報價正在編輯頁開著，請先離開編輯頁';}catch(e){_err('_qvfEnv',e);}
   return '';
 }
@@ -41578,6 +41578,10 @@ _decReg('qverfix',{
     if(_qvfActive(o.q,_qvfId(o.q.id,o.spec.srcSavedAt)))return _draftMark(d.id,'applied',{resultId:o.q.id}).then(function(m){return m!==false;});   // 這台已套用過、只差標記
     return _qvfSyncFirst().then(function(synced){
     if(synced)toast('已先上傳這台的資料，重新檢查…');
+    // 審查：同步過程可能換掉報價物件或別台已處理 → 重新取報價與草稿再做
+    var d2=(DRAFTS&&DRAFTS[d.id])||d;if(d2.status&&d2.status!=='pending'){toast('這張已在別台處理過');try{_decRefresh('qverfix');}catch(e){_err('qverfix.refresh',e);}return true;}
+    o=_qvfSpecOf(d2);if(!o.q){toast('找不到這張報價（可能已刪除），請退回');return false;}
+    if(_qvfActive(o.q,_qvfId(o.q.id,o.spec.srcSavedAt)))return _draftMark(d.id,'applied',{resultId:o.q.id}).then(function(m){return m!==false;});
     var plan=_qvfPlan(o.q,o.spec,{env:true});
     if(!plan.ok){toast('檢查沒過，不能確認：'+plan.checks.filter(function(c){return !c.ok;}).map(function(c){return c.label+(c.info?'（'+c.info+'）':'');}).join('、'));try{_decReload('qverfix',d.id);}catch(e){_err('qverfix.reload',e);}return false;}
     if(!_qvfApply(o.q,plan,d))return false;
