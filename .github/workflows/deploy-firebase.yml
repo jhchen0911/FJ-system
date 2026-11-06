@@ -117,6 +117,14 @@ jobs:
           umask 077
           printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+          # 確認是部署專用帳號（client_email 不是秘密）；不是就停，不拿別的帳號部署
+          SA_EMAIL=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).client_email||'')}catch(e){console.log('')}" "$RUNNER_TEMP/sa.json")
+          echo "部署帳號：$SA_EMAIL"
+          if [ "$SA_EMAIL" != "github-deploy@$PROJECT.iam.gserviceaccount.com" ]; then
+            rm -f "$RUNNER_TEMP/sa.json"
+            echo "::error::鑰匙不是部署專用帳號 github-deploy@$PROJECT.iam.gserviceaccount.com（讀到：${SA_EMAIL:-讀不到}），停止部署"
+            exit 1
+          fi
 
       - name: 發布資料庫規則
         if: steps.what.outputs.database == 'true'
