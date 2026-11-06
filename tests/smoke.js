@@ -11058,6 +11058,38 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.183 熱修：收起再展開＝重新檢查；環境「待上傳」寫出是哪一種；確認前先自動上傳再檢查 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const W = ms => new Promise(res => setTimeout(res, ms));
+      const keep = {}; ['fy_priv_pending', 'fy_pending_sync', 'fy_last_local_save', 'fy_last_fb_sync'].forEach(k => keep[k] = localStorage.getItem(k));
+      const oU = _fbUser, oP = window._pushPrivate, oC = window._pushCloud;
+      try {
+        let n = 0; _decReg('zzT', { title: '測試', todo: (x) => '測試 ' + x, list: () => [{ id: 'a1' }], key: (d) => d.id, head: () => '測試卡', detail: () => '<div>第 ' + (++n) + ' 次</div>', ok: () => Promise.resolve(false), reject: () => Promise.resolve(false), edit: () => {} });
+        openDecList('zzT'); await W(50);
+        decToggle('zzT', 'a1'); await W(50); decToggle('zzT', 'a1'); await W(20); decToggle('zzT', 'a1'); await W(50);
+        out.recheck = n === 2 && /第 2 次/.test(document.querySelector('#dec-box .dec-detail').textContent);
+        delete _DEC.zzT; try { document.querySelector('#fy-modal .fy-mdl-x, #fy-modal [data-close]')?.click(); } catch (e) { /* 可忽略 */ }
+        localStorage.setItem('fy_priv_pending', '1'); localStorage.removeItem('fy_pending_sync');
+        out.why = /私有資料/.test(_qvfDirtyWhy());
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o' };
+        let calls = [];
+        window._pushPrivate = (cb) => { calls.push('priv'); localStorage.removeItem('fy_priv_pending'); cb(true); };
+        window._pushCloud = (o) => { calls.push('cloud'); localStorage.setItem('fy_last_fb_sync', String(Date.now() + 5000)); o.onDone && o.onDone(true); };
+        const synced = await _qvfSyncFirst();
+        out.sync = synced === true && calls.join(',') === 'priv,cloud' && localStorage.getItem('fy_priv_pending') !== '1';
+        calls = []; out.noop = (await _qvfSyncFirst()) === false && calls.length === 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      _fbUser = oU; window._pushPrivate = oP; window._pushCloud = oC;
+      Object.keys(keep).forEach(k => { if (keep[k] == null) localStorage.removeItem(k); else localStorage.setItem(k, keep[k]); });
+      return out;
+    });
+    check('v6.0.183 拍板卡熱修：收起再展開會重新檢查；待上傳寫出是哪一種；補登確認前先自動上傳私有＋一般再檢查', r.recheck && r.why && r.sync && r.noop, JSON.stringify(r));
+    check('v6.0.183 熱修測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.181 補登可指定版次日期 verDate（快照是事後才存、日期是存檔那天）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

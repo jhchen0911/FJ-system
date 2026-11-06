@@ -41177,7 +41177,7 @@ function decToggle(kind,id,force){
   var k=_DEC[kind];if(!k)return;var c=_decCardEl(id);if(!c)return;
   var det=c.querySelector('.dec-detail'),tg=c.querySelector('.dec-tg'),bk=kind+'|'+id;
   var open=force!=null?!!force:det.style.display==='none';
-  if(!open){det.style.display='none';delete _DEC_OPEN[bk];if(tg)tg.textContent='展開明細';return;}
+  if(!open){det.style.display='none';delete _DEC_OPEN[bk];if(tg)tg.textContent='展開明細';det.removeAttribute('data-done');delete _DEC_READY[bk];_decOkSync(kind,id);return;}   // v6.0.183：收起再展開＝重新檢查（原本沿用舊結果）
   _DEC_OPEN[bk]=1;det.style.display='';if(tg)tg.textContent='收起明細';
   if(det.getAttribute('data-done'))return;
   delete _DEC_READY[bk];_decOkSync(kind,id);   // 審查：重新載入（修改後重繪）要再載完一次才解鎖
@@ -41191,6 +41191,8 @@ function decToggle(kind,id,force){
     _decOkSync(kind,id);
   }).catch(function(e){_err('decToggle.'+kind,e);det.innerHTML='<div style="font-size:12px;color:var(--r,#c62828)">明細載入失敗，還不能確認</div>';});
 }
+// v6.0.183：重新載入一張卡的明細（確認失敗後顯示最新原因）
+function _decReload(kind,id){var c=_decCardEl(id);if(!c)return;var det=c.querySelector('.dec-detail');if(!det||det.style.display==='none')return;det.removeAttribute('data-done');decToggle(kind,id,true);}
 function _decItems(kind){var k=_DEC[kind];if(!k)return [];try{if(k.canSee&&!k.canSee())return [];return (k.list()||[]).filter(Boolean);}catch(e){_err('_decItems.'+kind,e);return [];}}
 function _decTodoItems(items,ic){
   ic=ic||function(h){return '<svg class="ic ib" aria-hidden="true"><use href="#'+h+'"/></svg>';};
@@ -41397,12 +41399,37 @@ function _qhApplyFixAll(opts){
 try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{_qhApplyFixAll();}catch(e){_err('qvfBoot',e);}},1200);});}catch(e){_err('qvfBoot',e);}   // 開頁讀本機後重套一次
 
 // ── 補登前驗證（硬擋）與前後對照 ──
+// v6.0.183 熱修（Lotion 11/07：環境一直 ✗）：說清楚是哪一種待上傳
+function _qvfDirtyWhy(){
+  var w=[];
+  try{
+    if(typeof _MIN_PENDING!=='undefined'&&_MIN_PENDING)w.push('還沒讀到雲端最低版本');
+    else if(typeof _verBlocked==='function'&&_verBlocked())w.push('這台版本低於雲端最低版本，請重新整理兩次');
+    if(localStorage.getItem('fy_pending_sync')==='1')w.push('一般資料待上傳');
+    if(localStorage.getItem('fy_priv_pending')==='1')w.push('私有資料（成本、應付、版次明細）上次上傳失敗');
+    var ls=+localStorage.getItem('fy_last_local_save')||0,lt=+localStorage.getItem('fy_last_fb_sync')||0;
+    if(ls>lt&&localStorage.getItem('fy_pending_sync')!=='1')w.push('本機存檔時間比雲端新');
+  }catch(e){_err('_qvfDirtyWhy',e);}
+  return w.join('、');
+}
+// 確認前先把待上傳的送上去（私有＋一般），最多等 20 秒，再重新檢查（不用 Lotion 自己找同步燈）
+function _qvfSyncFirst(){
+  return new Promise(function(res){
+    var dirty=false;try{dirty=!!(_fbUser&&!_isReaderUser&&_isDirty());}catch(e){_err('_qvfSyncFirst',e);}
+    if(!dirty){res(false);return;}
+    var done=false,fin=function(){if(!done){done=true;res(true);}};
+    setTimeout(fin,20000);
+    try{if(typeof _privFailAt!=='undefined')_privFailAt=0;}catch(e){/* 可忽略 */}
+    var p1=new Promise(function(r){try{_pushPrivate(function(ok){try{if(ok)localStorage.removeItem('fy_priv_pending');}catch(e){/* 可忽略 */}r();});}catch(e){_err('_qvfSyncFirst.priv',e);r();}});
+    p1.then(function(){try{_pushCloud({silent:true,onDone:function(){fin();}});}catch(e){_err('_qvfSyncFirst.push',e);fin();}});
+  });
+}
 function _qvfEnv(q){
   if(_isReaderUser)return '唯讀帳號不能套用（要 Lotion 用管理員帳號確認）';
   if(_fbUser&&!_isAdminUser)return '只有管理員可以套用';
   if(_fbUser&&_QH_SENS===null)return '這台的私有資料還沒下載完，等同步燈變綠再按';
   try{if(typeof navigator!=='undefined'&&navigator.onLine===false)return '離線中，連上網路再按';}catch(e){/* 可忽略 */}
-  try{if(_fbUser&&_isDirty())return '這台還有資料沒上傳，等同步燈變綠再按';}catch(e){_err('_qvfEnv.dirty',e);}
+  try{if(_fbUser&&_isDirty())return '這台還有資料沒上傳（'+(_qvfDirtyWhy()||'待上傳')+'）。按「確認」會先自動上傳再檢查一次；還是不行就照這行原因處理';}catch(e){_err('_qvfEnv.dirty',e);}
   try{if(typeof eid!=='undefined'&&eid===q.id&&document.getElementById('page-editor')?.classList.contains('active'))return '這張報價正在編輯頁開著，請先離開編輯頁';}catch(e){_err('_qvfEnv',e);}
   return '';
 }
@@ -41549,12 +41576,15 @@ _decReg('qverfix',{
   ok:function(d){
     var o=_qvfSpecOf(d);if(!o.q){toast('找不到這張報價（可能已刪除），請退回');return Promise.resolve(false);}
     if(_qvfActive(o.q,_qvfId(o.q.id,o.spec.srcSavedAt)))return _draftMark(d.id,'applied',{resultId:o.q.id}).then(function(m){return m!==false;});   // 這台已套用過、只差標記
+    return _qvfSyncFirst().then(function(synced){
+    if(synced)toast('已先上傳這台的資料，重新檢查…');
     var plan=_qvfPlan(o.q,o.spec,{env:true});
-    if(!plan.ok){toast('檢查沒過，不能確認：'+plan.checks.filter(function(c){return !c.ok;}).map(function(c){return c.label;}).join('、'));return Promise.resolve(false);}
-    if(!_qvfApply(o.q,plan,d))return Promise.resolve(false);
+    if(!plan.ok){toast('檢查沒過，不能確認：'+plan.checks.filter(function(c){return !c.ok;}).map(function(c){return c.label+(c.info?'（'+c.info+'）':'');}).join('、'));try{_decReload('qverfix',d.id);}catch(e){_err('qverfix.reload',e);}return false;}
+    if(!_qvfApply(o.q,plan,d))return false;
     toast('已補登 V'+plan.N+'，後面的版次往後改號');
     setTimeout(function(){try{if(document.getElementById('dec-box'))return;showQVersions(o.q.id);}catch(e){_err('qverfix.show',e);}},300);
     return _draftMark(d.id,'applied',{resultId:o.q.id}).then(function(m){return m!==false;});
+    });
   },
   reject:function(d,why){return _draftMark(d.id,'rejected',{reason:why||'不補登'}).then(function(m){return m!==false;});},
   edit:function(d){var o=_qvfSpecOf(d);if(!o.q){toast('找不到這張報價');return;}_qvfPreview(o.q,(Q_HISTORY[o.q.id]||[]).find(function(e){return e&&e.savedAt===o.spec.srcSavedAt;}));}
