@@ -33,6 +33,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read   # 查上一次部署成功的版本
 
 env:
   PROJECT: jhchen-aed9a
@@ -40,6 +41,8 @@ env:
 
 jobs:
   deploy:
+    # 只在 main 跑（手動 Run workflow 選了別的分支也不部署）
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -52,20 +55,27 @@ jobs:
         env:
           EV: ${{ github.event_name }}
           TARGET: ${{ github.event.inputs.target }}
-          BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        # 跟「上一次推送觸發且部署成功」的版本比（不是只看這次推送）：
+        # 中間有部署失敗、或排隊被取消的推送，它們的改動也會算進來，不會漏部署
         run: |
           fn=false; db=false
           if [ "$EV" = "workflow_dispatch" ]; then
             case "$TARGET" in functions) fn=true;; database) db=true;; *) fn=true; db=true;; esac
-          elif [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            echo "找不到推送前的版本，保守起見兩者都部署"; fn=true; db=true
           else
-            changed=$(git -c core.quotePath=false diff --name-only "$BEFORE" "$AFTER")
-            echo "這次推送改到的檔案："; echo "$changed"
-            echo "$changed" | grep -Eq '^(functions/|calc/|tools/copy-calc\.js$)' && fn=true
-            echo "$changed" | grep -Eq '^database\.rules\.json$' && db=true
-            echo "$changed" | grep -Eq '^(firebase\.json|\.github/workflows/deploy-firebase\.yml)$' && { fn=true; db=true; }
+            BASE=$(gh api "repos/$REPO/actions/workflows/deploy-firebase.yml/runs?branch=main&event=push&status=success&per_page=1" --jq '.workflow_runs[0].head_sha // empty' 2>/dev/null || true)
+            if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null || ! git merge-base --is-ancestor "$BASE" "$AFTER"; then
+              echo "沒有可比對的上一次成功部署（第一次執行或歷史被改寫），兩者都部署"; fn=true; db=true
+            else
+              echo "上一次成功部署：$BASE"
+              changed=$(git -c core.quotePath=false diff --name-only "$BASE" "$AFTER")
+              echo "之後改到的檔案："; echo "$changed"
+              echo "$changed" | grep -Eq '^(functions/|calc/|tools/copy-calc\.js$)' && fn=true
+              echo "$changed" | grep -Eq '^database\.rules\.json$' && db=true
+              echo "$changed" | grep -Eq '^(firebase\.json|\.github/workflows/deploy-firebase\.yml)$' && { fn=true; db=true; }
+            fi
           fi
           echo "functions=$fn" >> "$GITHUB_OUTPUT"
           echo "database=$db" >> "$GITHUB_OUTPUT"
@@ -94,6 +104,10 @@ jobs:
           for f in functions/*.js functions/*/*.js calc/*.js; do node --check "$f" || exit 1; done
           npm run calc
           cd functions && npm install --no-audit --no-fund && node ../tools/copy-calc.js && node --test test/*.test.js
+
+      - name: 先下載部署工具（鑰匙檔寫出來之前）
+        if: steps.what.outputs.functions == 'true' || steps.what.outputs.database == 'true'
+        run: npx --yes "$FIREBASE_TOOLS" --version
 
       - name: 準備鑰匙檔（只存在這次執行的暫存區，結束即刪）
         if: steps.what.outputs.functions == 'true' || steps.what.outputs.database == 'true'
