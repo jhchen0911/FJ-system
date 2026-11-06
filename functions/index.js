@@ -1,3 +1,4 @@
+// 部署：推上 main 後由 .github/workflows/deploy-firebase.yml 自動部署（2026-11-06 起；設定見 docs/自動部署_設定步驟.md）；手動 firebase deploy 仍可用。
 // 豐有工程管理系統：Firebase Auth custom claims 同步（任務 7，Storage 權限長期方案 B）
 // 依 RTDB 名冊替每個帳號設定 claim `fy`：
 //   fydata/readers     → 'reader'（唯讀帳號，優先於其他名冊）

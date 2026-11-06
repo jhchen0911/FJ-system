@@ -1,0 +1,121 @@
+# Firebase 自動部署（2026-11-06 起）：推上 main 時，
+#   functions/、calc/、tools/copy-calc.js 有改 → 部署雲端程式（firebase deploy --only functions）
+#   database.rules.json 有改                  → 發布 RTDB 安全規則（firebase deploy --only database）
+#   firebase.json 或本檔有改                  → 兩者都部署（設定變了，整套重來一次）
+# 沒改到就整個跳過。也可在 GitHub → Actions → 「Firebase 自動部署」→ Run workflow 手動選目標。
+# 鑰匙：GitHub Secret FIREBASE_DEPLOY_SA（部署專用服務帳號的 JSON，只有部署需要的權限，
+#        步驟見 docs/自動部署_設定步驟.md）。沒設定就紅燈並說明，不會默默略過。
+# Storage 規則（storage.rules）仍由 Lotion 到主控台貼上，不在這裡。
+name: Firebase 自動部署
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'functions/**'
+      - 'calc/**'
+      - 'tools/copy-calc.js'
+      - 'database.rules.json'
+      - 'firebase.json'
+      - '.github/workflows/deploy-firebase.yml'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: '要部署什麼'
+        type: choice
+        options: [functions, database, both]
+        default: both
+
+# 同一時間只跑一個部署，後到的排隊（不取消正在跑的）
+concurrency:
+  group: firebase-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PROJECT: jhchen-aed9a
+  FIREBASE_TOOLS: firebase-tools@15.34.2
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 判斷要部署什麼
+        id: what
+        env:
+          EV: ${{ github.event_name }}
+          TARGET: ${{ github.event.inputs.target }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          fn=false; db=false
+          if [ "$EV" = "workflow_dispatch" ]; then
+            case "$TARGET" in functions) fn=true;; database) db=true;; *) fn=true; db=true;; esac
+          elif [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            echo "找不到推送前的版本，保守起見兩者都部署"; fn=true; db=true
+          else
+            changed=$(git -c core.quotePath=false diff --name-only "$BEFORE" "$AFTER")
+            echo "這次推送改到的檔案："; echo "$changed"
+            echo "$changed" | grep -Eq '^(functions/|calc/|tools/copy-calc\.js$)' && fn=true
+            echo "$changed" | grep -Eq '^database\.rules\.json$' && db=true
+            echo "$changed" | grep -Eq '^(firebase\.json|\.github/workflows/deploy-firebase\.yml)$' && { fn=true; db=true; }
+          fi
+          echo "functions=$fn" >> "$GITHUB_OUTPUT"
+          echo "database=$db" >> "$GITHUB_OUTPUT"
+          echo "### 部署目標：雲端程式 $fn／資料庫規則 $db" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 檢查部署鑰匙
+        if: steps.what.outputs.functions == 'true' || steps.what.outputs.database == 'true'
+        env:
+          SA: ${{ secrets.FIREBASE_DEPLOY_SA }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::error::還沒設定 GitHub Secret FIREBASE_DEPLOY_SA，無法自動部署。請照 docs/自動部署_設定步驟.md 設定，或照舊在電腦手動 firebase deploy。"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.what.outputs.functions == 'true' || steps.what.outputs.database == 'true'
+        with:
+          node-version: '22'
+
+      # 部署前先過一遍和冒煙測試同樣的雲端程式檢查，壞的不上線
+      - name: 部署前檢查（語法、規則 JSON、計算模組、雲端程式單元測試）
+        if: steps.what.outputs.functions == 'true' || steps.what.outputs.database == 'true'
+        run: |
+          node -e "JSON.parse(require('fs').readFileSync('database.rules.json','utf8'));JSON.parse(require('fs').readFileSync('firebase.json','utf8'))"
+          for f in functions/*.js functions/*/*.js calc/*.js; do node --check "$f" || exit 1; done
+          npm run calc
+          cd functions && npm install --no-audit --no-fund && node ../tools/copy-calc.js && node --test test/*.test.js
+
+      - name: 準備鑰匙檔（只存在這次執行的暫存區，結束即刪）
+        if: steps.what.outputs.functions == 'true' || steps.what.outputs.database == 'true'
+        env:
+          SA: ${{ secrets.FIREBASE_DEPLOY_SA }}
+        run: |
+          umask 077
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: 發布資料庫規則
+        if: steps.what.outputs.database == 'true'
+        run: npx --yes "$FIREBASE_TOOLS" deploy --only database --project "$PROJECT" --non-interactive
+
+      - name: 部署雲端程式
+        if: steps.what.outputs.functions == 'true'
+        run: npx --yes "$FIREBASE_TOOLS" deploy --only functions --project "$PROJECT" --non-interactive
+
+      - name: 刪除鑰匙檔
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"
+
+      - name: 結果摘要
+        if: always()
+        run: echo "### 結果：${{ job.status }}（雲端程式 ${{ steps.what.outputs.functions }}／資料庫規則 ${{ steps.what.outputs.database }}）" >> "$GITHUB_STEP_SUMMARY"

@@ -1,3 +1,4 @@
 {
-  "functions": [{ "source": "functions", "codebase": "default", "predeploy": ["node tools/copy-calc.js"] }]
+  "functions": [{ "source": "functions", "codebase": "default", "predeploy": ["node tools/copy-calc.js"], "disallowLegacyRuntimeConfig": true }],
+  "database": { "rules": "database.rules.json" }
 }

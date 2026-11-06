@@ -70,7 +70,11 @@
 ⑤ firebase deploy --only "functions:名稱1,functions:名稱2" --project jhchen-aed9a
 ⑥ 看到 Deploy complete! 就完成；有紅字就截圖給陳軒
 ```
-資料庫規則（database.rules.json）、Storage 規則照舊到主控台貼上發布，步驟同樣從頭寫。
+**自動部署（2026-11-06 起，`.github/workflows/deploy-firebase.yml`）**：推上 `main` 時 `functions/`、`calc/`、`tools/copy-calc.js` 有改就自動 `firebase deploy --only functions`，`database.rules.json` 有改就自動發布資料庫規則（`firebase.json`／workflow 有改＝兩者都部署）。所以：
+- 有改雲端程式或資料庫規則的批次，**上線＝推 main 後等「Firebase 自動部署」綠燈**，不用再請 Lotion 手動部署或貼規則；【上線結果】要附這個 workflow 的結果（mcp__github__actions_list 查 deploy-firebase.yml）。紅燈＝沒部署成功，查 log 修好再推，或請 Lotion 照上面的步驟手動部署
+- 鑰匙在 GitHub Secret `FIREBASE_DEPLOY_SA`（服務帳號 github-deploy，權限與換鑰匙見 `docs/自動部署_設定步驟.md`）；鑰匙內容永遠不進對話、不進 Git
+- 推上 main 前一樣要 Lotion 說「上線」（自動部署不改變這條）；要先在測試專案驗的，照舊在電腦手動部署到 `fj-system-test`
+- Storage 規則（storage.rules）仍到主控台貼上，步驟從頭寫；自動部署沒設好或被停用時，照上面 ①～⑥ 手動部署
 
 ## 施工計畫書圖面：先出圖檢核，再上線（重要）
 
@@ -156,7 +160,7 @@
 
 ## Firebase 安全規則
 
-`database.rules.json` 是原始碼，**改完必須到 Firebase 主控台手動發布才會生效**。
+`database.rules.json` 是原始碼，**2026-11-06 起推上 `main` 由「Firebase 自動部署」發布**（見上面「給 Lotion 的電腦部署指令」；自動部署停用時才到 Firebase 主控台手動發布）。
 Storage 規則同理放在 `storage.rules`（v6.0.93 起；主控台 Storage → 規則 貼上發布）。Storage 規則讀不到 RTDB，唯讀帳號清單 `isReader()` 要與 `fydata/readers` 名冊手動同步。v6.0.105 起人員管理頁「產生 Storage 規則」（`openStorageRulesGen`／`_storageRulesText`）依人員與唯讀名冊產生只放行名冊的規則；長期由 `functions/index.js`（custom claim `fy`）自動同步，部署步驟見 `docs/Storage權限_部署步驟.md`（`firebase deploy --only functions`）。
 目前規則：`fydata/shared`（名冊內可讀寫；`fydata/readers` 唯讀名冊只可讀）／`fydata/private`（僅管理員），readers 名冊內帳號可讀 shared、private（v6.0.156 起逐項，薪資名冊 hr／薪資單 payslips／零用金 petty 除外；人員證件 workerSens、匯款帳號 bank 不可讀）與 relay（日報照片）（v6.0.108）、一律不得寫入任何節點；`fydata/backups` 只給擁有者，兩者都不得整包清空，
 並要求 `version`／`uploadedAt` 的基本形態。
