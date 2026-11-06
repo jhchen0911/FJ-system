@@ -11029,6 +11029,35 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.183 拍板卡明細不左右捲（Lotion 11/07）：版次表自動換行、檢查表直排、✗ 原因紅字在項目正下方 ──
+  for (const W of [390, 1280]) {
+    const { page, errors } = await newPage(browser, W, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const long = '補登來源（2026/11/3 下午 3:45:12）原 V2 改號、這一行故意寫很長很長很長很長很長很長很長很長很長';
+        const row = (v) => ({ ver: v, date: '2026-10-27', total: 1846713, mv: long, ins: v === 'V2' });
+        const plan = { N: 2, rows: 18, spare: 0, sub: 1758774, tax: 87939, total: 1846713, cmp: null,
+          listBefore: ['V1', '（存檔）', 'V2', '現行 V3'].map(row), listAfter: ['V1', '（存檔）', 'V2', 'V3', '現行 V4'].map(row),
+          checks: [{ ok: true, label: '補登版次日期', info: '快照日期 2026-11-03，補登成 2026-10-27（前一個正式版 2026-10-25）' }, { ok: false, label: '環境（管理員、私有資料已下載、沒在編輯）', info: '這台還有資料沒上傳，等同步燈變綠再按' }],
+          rule: { before: { refs: [] } } };
+        const q = { id: 'qvN', code: 'QV-NS-0001', name: '假不捲動案' };
+        const box = document.createElement('div'); box.style.cssText = 'position:fixed;left:0;top:0;width:' + Math.min(window.innerWidth - 24, 640) + 'px;background:#fff;z-index:99999';
+        box.innerHTML = '<div class="dec-card" style="border:1px solid #ccc;padding:10px 12px"><div class="dec-detail">' + _qvfDetailHtml(q, plan) + '</div></div>';
+        document.body.appendChild(box);
+        const card = box.querySelector('.dec-card'), det = box.querySelector('.dec-detail');
+        out.noScroll = card.scrollWidth <= card.clientWidth + 1 && det.scrollWidth <= det.clientWidth + 1 && [...det.querySelectorAll('table')].every(t => t.getBoundingClientRect().right <= card.getBoundingClientRect().right + 1);
+        const bad = det.querySelector('.qvf-ck-bad'), why = bad && bad.querySelector('div');
+        out.stack = det.querySelectorAll('.qvf-ck').length === 2 && !det.querySelector('.qvf-cks table') && !!why && /沒上傳/.test(why.textContent) && getComputedStyle(why).color === 'rgb(198, 40, 40)' && why.getBoundingClientRect().top >= bad.querySelector('b').getBoundingClientRect().bottom - 1;
+        box.remove();
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.183 拍板卡明細不左右捲（寬 ' + W + '）：版次表換行不超出卡片、檢查表直排、✗ 原因紅字在項目正下方', r.noScroll && r.stack, JSON.stringify(r));
+    check('v6.0.183 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.181 補登可指定版次日期 verDate（快照是事後才存、日期是存檔那天）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

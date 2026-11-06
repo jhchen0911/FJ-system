@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.182';
+var APP_VERSION='v6.0.183';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -41462,10 +41462,11 @@ function _qvfPlan(q,spec,opts){
 var _QVF_REF_T={rfq:'詢價單依據版次',rfqChg:'分包變更草稿',rfqLog:'分包變更紀錄',costLog:'分包卡變更紀錄',inv:'請款單依據版次',invRet:'請款單「已刪工項」標示'};
 function _qvfDetailHtml(q,plan){
   var S=_draftS,tb=function(L){return '<table class="tbl" style="font-size:12px"><thead><tr><th>版次</th><th>報價日</th><th style="text-align:right">含稅</th><th>說明</th></tr></thead><tbody>'+L.map(function(r){return '<tr'+(r.ins?' style="background:#ede7f6"':'')+'><td style="white-space:nowrap">'+esc(S(r.ver))+'</td><td>'+esc(S(r.date))+'</td><td style="text-align:right">'+fmt(r.total||0)+'</td><td>'+esc(S(r.mv))+'</td></tr>';}).join('')+'</tbody></table>';};
-  var ckh='<table class="tbl" style="font-size:12px"><tbody>'+plan.checks.map(function(c){return '<tr'+(c.ok?'':' style="background:#fdecea"')+'><td>'+(c.ok?'✓':'✗')+'</td><td>'+esc(S(c.label))+'</td><td>'+esc(S(c.info))+'</td></tr>';}).join('')+'</tbody></table>';
+  // v6.0.183 檢查表直排（Lotion 11/07：不用左右捲）：✓／✗＋項目名，原因在正下方（✗ 紅字）
+  var ckh='<div class="qvf-cks" style="font-size:12.5px">'+plan.checks.map(function(c){return '<div class="qvf-ck'+(c.ok?'':' qvf-ck-bad')+'" style="padding:5px 8px;border-bottom:1px solid var(--b1)'+(c.ok?'':';background:#fdecea')+'"><b style="color:'+(c.ok?'#2e7d32':'#c62828')+'">'+(c.ok?'✓':'✗')+'</b> '+esc(S(c.label))+(c.info?'<div style="font-size:11.5px;margin-top:2px;color:'+(c.ok?'var(--b4)':'#c62828;font-weight:700')+'">'+esc(S(c.info))+'</div>':'')+'</div>';}).join('')+'</div>';
   var refs=plan.rule.before.refs;
   return '<div style="font-size:12.5px;line-height:1.6">'+esc(S(q.code))+'　'+esc(S(q.name))+'</div>'
-    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;margin:6px 0"><div><b style="font-size:12px">補登前</b>'+tb(plan.listBefore)+'</div><div><b style="font-size:12px">補登後</b>'+tb(plan.listAfter)+'</div></div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:8px;margin:6px 0"><div><b style="font-size:12px">補登前</b>'+tb(plan.listBefore)+'</div><div><b style="font-size:12px">補登後</b>'+tb(plan.listAfter)+'</div></div>'
     +'<div style="font-size:12.5px;margin:4px 0">補登 V'+plan.N+'：'+plan.rows+' 列（備用單價 '+plan.spare+' 列）　未稅 '+fmt(plan.sub)+'　稅 '+fmt(plan.tax)+'　<b>含稅 '+fmt(plan.total)+'</b></div>'
     +'<div style="font-size:12px;color:#b26a00;background:#fff8e1;border:1px solid #ffe08a;border-radius:6px;padding:5px 8px;margin:4px 0">確認前請先確定：<b>所有裝置都已更新到 '+esc(APP_VERSION)+'（重新整理兩次）並同步完、沒有待上傳</b>；別台不要開著這張報價。這台沒同步完會自動擋。</div>'
     +'<b style="font-size:12px">檢查</b>'+ckh
