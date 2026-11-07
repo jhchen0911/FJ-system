@@ -35552,7 +35552,7 @@ function payMarkPaid(pid,defDate,after){
     +'<div class="f" style="margin-top:6px"><label>這次付多少（含稅，預設＝付清餘額；少於餘額＝先付一部分）</label><input id="pmp-amt" type="number" inputmode="numeric" min="1" step="1" value="'+left+'" style="'+IN+'"></div>'
     +'<div class="f" style="margin-top:6px"><label>實付日</label><input id="pmp-date" type="date" value="'+esc(defDate||p.date||localToday())+'" style="'+IN+'"></div>'
     +(part?'<div style="font-size:11.5px;margin-top:6px"><a href="javascript:void(0)" onclick="payVoidLastPart(\''+escq(p.id)+'\')">付錯了：撤銷上一筆付款</a></div>':''),function(){
-    var amt=Math.round(parseFloat(gv('pmp-amt'))||0),d=gv('pmp-date')||defDate||localToday(),lf=_payLeft(p);
+    var lf=_payLeft(p),_ae=document.getElementById('pmp-amt'),amt=_ae?Math.round(parseFloat(_ae.value)||0):lf,d=gv('pmp-date')||defDate||localToday();   // 沒有金額欄（舊呼叫）＝付清餘額
     if(amt<=0){toast('請填這次付多少');return false;}
     if(amt>lf){toast('超過餘額 NT$ '+fmt(lf)+'；要多付請先確認應付金額');return false;}
     delete p.planned;
