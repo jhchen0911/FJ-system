@@ -10532,7 +10532,7 @@ function _applySensColls(data,tombs){
     }catch(e){_err('_applySensColls',e);}
   }
   if(data.matMoveFin&&typeof data.matMoveFin==='object'&&!Array.isArray(data.matMoveFin)){   // v6.0.195 進退料金額：以進退料 id 為鍵、_mt 新者勝
-    try{Object.keys(data.matMoveFin).forEach(function(k){var r=data.matMoveFin[k],l=MAT_MOVE_FIN[k];if(!r||typeof r!=='object')return;if(!l||((r._mt)||0)>=((l._mt)||0))MAT_MOVE_FIN[k]=r;});localStorage.setItem('fy_matmovefin',JSON.stringify(MAT_MOVE_FIN));}catch(e){_err('_applyCloud.matMoveFin',e);}
+    try{Object.keys(data.matMoveFin).forEach(function(k){var r=data.matMoveFin[k],l=MAT_MOVE_FIN[k];if(!r||typeof r!=='object')return;if(!l||((r._mt)||0)>=((l._mt)||0)){var nr=r;if(l&&(l.applied&&!r.applied||l.skip&&!r.skip)){nr=JSON.parse(JSON.stringify(r));if(l.applied&&!nr.applied){nr.applied=l.applied;delete nr.hold;}if(l.skip&&!nr.skip)nr.skip=l.skip;}MAT_MOVE_FIN[k]=nr;}else if(r.applied&&!l.applied){l.applied=r.applied;delete l.hold;}else if(r.skip&&!l.skip)l.skip=r.skip;/* v6.0.199 審查：套用／退回紀錄只增不減（舊裝置清 hold 不能把別台的套用紀錄蓋掉） */});localStorage.setItem('fy_matmovefin',JSON.stringify(MAT_MOVE_FIN));}catch(e){_err('_applyCloud.matMoveFin',e);}
   }
     if(data.matLedger){
     // 自有材料台帳合併：以 id 為鍵、_mt 新者勝，尊重刪除墓碑
@@ -42420,6 +42420,7 @@ function _mvLedMatch(rows,it){
   var c=rows.filter(function(r){return Math.abs((parseFloat(r.len)||0)-ln)<0.01&&(sk?_mvSpecKey(r)===sk:(!_mvSpecKey(r)&&_matNameOf(r.name||'')===nk));});
   if(!c.length)return {rows:[],why:'找不到同規格同長度的料'};
   var byN=c.filter(function(r){return _matNameOf(r.name||'')===nk;});if(byN.length)return {rows:byN};
+  if(/^(型鋼|支撐|斜撐|短節|鋼軌樁|鋼板樁)$/.test(nk))return {rows:[],why:'同規格同長度只有「'+c.map(function(r){return r.name||'';}).filter(function(v,i,a){return a.indexOf(v)===i;}).join('、')+'」，對不上「'+(it.name||'')+'」'};   // 審查：型鋼／支撐分得出來就不准混用（寧可出卡）
   var nm={};c.forEach(function(r){nm[_matNameOf(r.name||'')]=1;});
   if(Object.keys(nm).length===1)return {rows:c};
   return {rows:[],why:'同規格有好幾種品名（'+Object.keys(nm).join('、')+'），對不上「'+(it.name||'')+'」'};
@@ -42506,8 +42507,14 @@ function _mvLock(id,release){
   if(typeof _fbDb==='undefined'||!_fbDb||typeof _fbUser==='undefined'||!_fbUser)return Promise.resolve(true);
   var ref=_fbDb.ref('fydata/private/mvLock/'+id),dev=_devId();
   if(release)return ref.transaction(function(cur){if(cur&&cur.dev!==dev)return;return null;}).then(function(){return true;}).catch(function(e){_err('_mvLock.release',e);return false;});
-  var me={by:String(_fbUser.email||''),dev:dev,at:Date.now()};
-  return ref.transaction(function(cur){if(cur&&cur.dev&&cur.dev!==dev)return;return me;}).then(function(r){return !!(r&&r.committed);}).catch(function(e){_err('_mvLock',e);return false;});
+  var me={by:String(_fbUser.email||''),dev:dev,at:Date.now()},STALE=2*3600e3;   // 審查：別台搶到鎖超過 2 小時還沒套用完（關掉、沒傳上去）→ 可以接手；接手前先看雲端有沒有套用紀錄
+  var tx=ref.transaction(function(cur){if(cur&&cur.dev&&cur.dev!==dev&&!(Date.now()-(+cur.at||0)>STALE))return;return me;}).then(function(r){
+    if(!(r&&r.committed))return false;
+    return _fbDb.ref('fydata/private/matMoveFin/'+id).once('value').then(function(sn){var v=sn&&sn.val&&sn.val();
+      if(v&&(v.applied||v.skip)){var f=_mvFin(id,true);if(v.applied)f.applied=v.applied;if(v.skip)f.skip=v.skip;delete f.hold;try{localStorage.setItem('fy_matmovefin',JSON.stringify(MAT_MOVE_FIN));}catch(e){_err('_mvLock.fin',e);}return false;}
+      return true;});
+  }).catch(function(e){_err('_mvLock',e);return false;});
+  return Promise.race([tx,new Promise(function(res){setTimeout(function(){res(false);},8000);})]);   // 審查：沒網路時 transaction 不會回來 → 8 秒當作沒搶到，下一輪再試
 }
 function _mvApplyCand(m){if(!m||m.st!=='ok'||m.own!==true||m.legacy)return false;var f=_mvFin(m.id);return !(f&&(f.applied||f.skip||f.hold));}
 function _mvApplyOk(){try{return typeof _fbUser!=='undefined'&&!!_fbUser&&!_isReaderUser&&_shWholeOk()&&_privReadOk===true&&!!window._mvPulled&&!window.FY_BETA;}catch(e){return false;}}
@@ -42525,7 +42532,7 @@ function _mvApplyOne(m,forced){
   return _mvLock(m.id).then(function(got){
     if(!got)return 'skip';
     var f=_mvFin(m.id);if(f&&f.applied)return 'skip';
-    if(!forced&&!_mvApplyCand(m))return 'skip';
+    if(!forced&&!_mvApplyCand(m))return _mvLock(m.id,true).then(function(){return 'skip';});   // 審查：搶到鎖卻不套用要放掉
     var pl=_mvPlan(m,!!forced);
     if(pl.holds.length&&!forced||pl.holds.some(function(h){return h.k==='proj';})){var g=_mvFin(m.id,true);g.hold={at:Date.now(),list:pl.holds.slice(0,30)};g._mt=Date.now();saveMatMoveFin();return _mvLock(m.id,true).then(function(){return 'hold';});}
     _mvDo(m,pl.ops,!!forced);return 'ok';
@@ -42553,7 +42560,7 @@ _decReg('mvHold',{
     if(_mvPlan(m,true).holds.length){toast('找不到工地，請按「修改」選工地');return false;}
     return _mvApplyOne(m,true).then(function(r){if(r==='ok'){toast('已照簽收單改台帳');try{updateDashTodo();}catch(e){_err('mvHold.ok',e);}return true;}toast(r==='skip'?'另一台裝置正在處理這筆，稍後再看':'還是對不上，請按「修改」');return false;});},
   reject:function(m,why){var f=_mvFin(m.id,true);f.skip={at:Date.now(),by:(typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機',why:String(why||'退回').slice(0,200)};f._mt=Date.now();saveMatMoveFin();return true;},
-  edit:function(m){_mvEdit(m,function(){var f=_mvFin(m.id);if(f&&f.hold){delete f.hold;f._mt=Date.now();saveMatMoveFin();}var go=function(){try{_decRefresh('mvHold');}catch(e){_err('mvHold.edit',e);}};if(_mvApplyOk())_mvApplyAll().then(go);else setTimeout(go,50);});}
+  edit:function(m){_mvEdit(m,function(){var f=_mvFin(m.id);if(f&&f.hold){delete f.hold;f._mt=Date.now();saveMatMoveFin();}var _rf=function(){try{_decRefresh('mvHold');}catch(e){_err('mvHold.edit',e);}};if(_mvApplyOk())_mvApplyAll().then(_rf);else setTimeout(_rf,50);});}
 });
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

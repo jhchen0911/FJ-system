@@ -11103,12 +11103,19 @@ async function newPage(browser, width, height) {
         // 健檢：套用後內容被改
         const mA = _mvOf('mv_sX'); mA.items[0].qty = 3;
         out.health = _healthAddMv([]).some(x => /內容又被改 1 筆/.test(x.msg));
+        // 審查：型鋼／支撐同規格同長度不准混用（寧可出卡）；套用紀錄合併只增不減
+        MAT_LEDGER.push({ id: 'LS', name: '支撐', spec: 'H400', len: 7, qty: 4, loc: '公司倉庫', _mt: 1 });
+        const hn = mk({ date: '2026-11-17', dir: 'in', qid: 'qA199', items: [{ name: 'H型鋼', spec: 'H400', len: 7, qty: 1 }] });
+        await _mvApplyAll({ local: true });
+        out.nameStrict = f(hn.id).hold && f(hn.id).hold.list[0].k === 'nostock' && MAT_LEDGER.find(x => x.id === 'LS').qty === 4;
+        const ap = f(m1.id).applied; _applySensColls({ matMoveFin: { [m1.id]: { _mt: Date.now() + 9999, hold: { list: [] } } } }, TOMBS);
+        out.finMerge = !!MAT_MOVE_FIN[m1.id].applied && MAT_MOVE_FIN[m1.id].applied.h === ap.h && !MAT_MOVE_FIN[m1.id].hold;
         // 沒登入雲端的裝置不自動套用
         out.gate = _mvApplyOk() === false;
       } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; window.showConfirm = oC; window.prompt = oP; }
       return out;
     });
-    check('v6.0.199 進退料 M3：自有料進場／轉場／退場自動改台帳（先進先出、規格品名對位、使用段與損耗）、冪等不重扣、三種例外整筆不動出卡、確認／退回／修改、租賃料與舊單不動、舊單勾已登錄、健檢', r.in && r.amort && r.idem && r.xfer && r.back && r.holds && r.todo && r.detail && r.ok1 && r.ok3 && r.rej && r.edit && r.scrap && r.skip && r.oldSlip && r.bridge && r.health && r.gate, JSON.stringify(r));
+    check('v6.0.199 進退料 M3：自有料進場／轉場／退場自動改台帳（先進先出、規格品名對位、使用段與損耗）、冪等不重扣、三種例外整筆不動出卡、確認／退回／修改、租賃料與舊單不動、舊單勾已登錄、健檢', r.in && r.amort && r.idem && r.xfer && r.back && r.holds && r.todo && r.detail && r.ok1 && r.ok3 && r.rej && r.edit && r.scrap && r.skip && r.oldSlip && r.bridge && r.health && r.gate && r.nameStrict && r.finMerge, JSON.stringify(r));
     check('v6.0.199 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
