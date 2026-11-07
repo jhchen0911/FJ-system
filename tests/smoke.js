@@ -11499,6 +11499,61 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.191 LINE 收件：AI 建議歸檔收成一張拍板卡一次確認；超過 7 天的只列在卡片、不再逐件提醒 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const W = (ms) => new Promise((r) => setTimeout(r, ms || 40));
+      try {
+        const oT = window.toast; let tt = ''; window.toast = (m) => { tt = String(m); };
+        const oU = window._fbUser, oR = window._isReaderUser, oOk = window._lbxOk, oCall = window._lbxMarkCall;
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isReaderUser = false; window._lbxOk = () => true;
+        Q = [{ id: 'q1', code: '1151101', name: '範例案', items: [], _mt: 1 }];
+        const now = Date.now();
+        LBX = {
+          m1: { id: 'm1', at: now - 3600000, type: 'file', fileName: '範例詢價單.pdf', status: 'new', note: '第 1 批', sug: { qid: 'q1', why: '已交給報價線', by: 'ai@x.com', at: now } },
+          m2: { id: 'm2', at: now - 7200000, type: 'image', fileName: '現場照片<b>.jpg', status: 'new', sug: { caseName: '假乙案 詢價', why: '已建草稿 dabc' } },
+          m3: { id: 'm3', at: now - 3600000, type: 'file', fileName: '還沒處理.pdf', status: 'new' },
+          m4: { id: 'm4', at: now - 9 * 86400000, type: 'file', fileName: '很舊的.pdf', status: 'new' },
+          m5: { id: 'm5', at: now - 3600000, type: 'file', fileName: '已歸檔.pdf', status: 'filed', sug: { qid: 'q1' } },
+        };
+        const calls = []; window._lbxMarkCall = (id, st, f) => { calls.push([id, st, f && f.qid, f && f.caseName, f && f.note]); return Promise.resolve({ ok: true, status: st === 'unsug' ? 'new' : st }); };
+        const its = []; _v6TodoItems(its);
+        const row = its.find((x) => x.type === 'line_inbox'), card = its.find((x) => x.type === 'dec_lbxSug');
+        out.todo = !!row && /1 件未歸檔/.test(row.text) && !!card && /AI 建議歸檔 2 件/.test(card.text) && /超過 7 天未處理 1 件/.test(card.text);
+        openDecList('lbxSug');
+        const c = document.querySelector('#dec-box .dec-card');
+        out.one = document.querySelectorAll('#dec-box .dec-card').length === 1 && c.querySelector('.dec-ok').disabled;
+        decToggle('lbxSug', 'batch'); await W(80);
+        const h = c.querySelector('.dec-detail').innerHTML;
+        out.detail = /範例詢價單\.pdf/.test(h) && /1151101 範例案/.test(h) && /假乙案 詢價/.test(h) && /已交給報價線/.test(h) && /很舊的\.pdf/.test(h) && /超過 7 天/.test(h) && !/還沒處理\.pdf/.test(h) && !/已歸檔\.pdf/.test(h) && /&lt;b&gt;/.test(h) && !c.querySelector('.dec-detail b b');
+        // 修改：第 2 件先不歸、第 1 件改案名
+        const oC = window.showConfirm; window.showConfirm = (t, b, ok) => { document.body.insertAdjacentHTML('beforeend', '<div id="__lbs">' + b + '</div>'); document.getElementById('lbs-k1').checked = false; ok(); document.getElementById('__lbs').remove(); };
+        decAct('lbxSug', 'batch', 'edit'); window.showConfirm = oC; await W(80);
+        decToggle('lbxSug', 'batch', true); await W(80);
+        out.edit = /先不歸/.test(document.querySelector('#dec-box .dec-detail').innerHTML);
+        decAct('lbxSug', 'batch', 'ok'); await W(120);
+        out.ok = calls.length === 1 && calls[0][0] === 'm1' && calls[0][1] === 'filed' && calls[0][2] === 'q1' && calls[0][4] === '第 1 批' && LBX.m1.status === 'filed' && LBX.m2.status === 'new';
+        // 退回：剩下的建議清掉（狀態、備註不動）
+        calls.length = 0; const oP = window.prompt; window.prompt = () => '不對'; decAct('lbxSug', 'batch', 'ok'); await W(20);
+        decToggle('lbxSug', 'batch', true); await W(80); decAct('lbxSug', 'batch', 'reject'); window.prompt = oP; await W(120);
+        out.rej = calls.some((x) => x[0] === 'm2' && x[1] === 'unsug') && !LBX.m2.sug && LBX.m2.status === 'new';
+        // 只剩超過 7 天的：卡片還在（列出來），確認不做事
+        const its2 = []; _v6TodoItems(its2); const c2 = its2.find((x) => x.type === 'dec_lbxSug');
+        out.staleOnly = !!c2 && !/AI 建議/.test(c2.text) && /超過 7 天未處理 1 件/.test(c2.text) && its2.find((x) => x.type === 'line_inbox' && /2 件未歸檔/.test(x.text));
+        // 收件匣列表看得到 AI 建議
+        LBX.m3.sug = { caseName: '假丙案' }; out.rowBadge = /AI 建議歸到：假丙案/.test(_lbxRowHtml(LBX.m3));
+        document.querySelectorAll('#fy-modal').forEach((m) => m.remove());
+        window._lbxMarkCall = oCall; window._lbxOk = oOk; _fbUser = oU; _isReaderUser = oR; LBX = {}; Q = []; window.toast = oT;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.191 LINE 收件：AI 建議歸檔收成一張拍板卡（總覽一列），超過 7 天的只列在卡片、待辦那一列不再算；明細照檔名跳脫', r.todo && r.one && r.detail && r.staleOnly, JSON.stringify(r));
+    check('v6.0.191 LINE 收件拍板卡：修改可逐件先不歸、確認＝照建議逐件歸檔（帶原本備註）、退回＝清掉建議不動狀態；收件匣列表顯示建議', r.edit && r.ok && r.rej && r.rowBadge, JSON.stringify(r));
+    check('v6.0.191 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

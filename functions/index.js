@@ -690,7 +690,21 @@ exports.fyDraft = onRequest({ region: REGION, cors: ['https://jhchen0911.github.
       if (!w.ok) { res.status(w.why === '找不到這張草稿' ? 404 : 409).json({ error: { message: w.why || '撤回沒成功，請再試一次' } }); return; }
       res.status(200).json({ ok: true, id }); return;
     }
-    if (act !== 'submit') { res.status(400).json({ error: { message: 'action 要是 submit／mine／withdraw' } }); return; }
+    // v6.0.191 LINE 收件：AI 列出未歸檔的（不含下載網址）、寫「建議歸檔到某案」→ Lotion 在總覽拍板卡一次確認
+    if (act === 'inboxList') {
+      const v = (await db.ref('fydata/lineInbox').orderByChild('at').startAt(Date.now() - 120 * 86400000).once('value')).val() || {};
+      res.status(200).json({ ok: true, list: inboxCore.openList(v, Date.now(), 120 * 86400000) }); return;
+    }
+    if (act === 'inboxSuggest') {
+      const c = inboxCore.cleanSug(body);
+      if (c.err) { res.status(400).json({ error: { message: c.err } }); return; }
+      const ref = db.ref('fydata/lineInbox/' + c.id), cur = (await ref.once('value')).val();
+      const u = inboxCore.sugUpdate(cur && cur.id === c.id ? cur : null, c, email, Date.now());
+      if (u.err) { res.status(u.err === '找不到這筆收件' ? 404 : 409).json({ error: { message: u.err } }); return; }
+      await ref.update(u);
+      res.status(200).json({ ok: true, id: c.id }); return;
+    }
+    if (act !== 'submit') { res.status(400).json({ error: { message: 'action 要是 submit／mine／withdraw／inboxList／inboxSuggest' } }); return; }
     const sz = JSON.stringify(body).length; if (sz > 400000) { res.status(413).json({ error: { message: '草稿太大（上限約 400KB）' } }); return; }
     const [quotes, tax, rname] = await Promise.all([
       db.ref('fydata/shared/quotes').once('value').then((s) => pnlCore.deepDec(s.val() || {})),

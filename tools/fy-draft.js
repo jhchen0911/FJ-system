@@ -6,6 +6,8 @@
 //   node tools/fy-draft.js submit 草稿.json [--env test]
 //   node tools/fy-draft.js mine      [--env test]     列出自己還在待確認的草稿
 //   node tools/fy-draft.js withdraw <草稿id> [--env test]
+//   node tools/fy-draft.js inbox     [--env test]     LINE 收件匣未歸檔的清單（v6.0.191）
+//   node tools/fy-draft.js inbox-suggest <收件id> --qid <報價id> | --case <案名> [--why 處理說明] [--note 備註]
 //   node tools/fy-draft.js logout    [--env test]
 //
 // 預設連正式專案 jhchen-aed9a；--env test 連測試專案 fj-system-test（先在測試專案練習）。
@@ -86,10 +88,16 @@ async function call(body) {
   if (cmd === 'logout') { try { fs.unlinkSync(TOK); } catch (e) { /* 本來就沒有 */ } return out({ ok: true }); }
   if (cmd === 'mine') return call({ action: 'mine' });
   if (cmd === 'withdraw') { if (!args[1]) die('要給草稿 id'); return call({ action: 'withdraw', id: args[1] }); }
+  if (cmd === 'inbox') return call({ action: 'inboxList' });
+  if (cmd === 'inbox-suggest') {
+    if (!args[1]) die('要給收件 id');
+    const opt = (k) => { const i = args.indexOf('--' + k); return i >= 0 ? String(args[i + 1] || '') : ''; };
+    return call({ action: 'inboxSuggest', id: args[1], qid: opt('qid'), caseName: opt('case'), why: opt('why'), note: opt('note') });
+  }
   if (cmd === 'submit') {
     if (!args[1]) die('要給草稿 JSON 檔');
     let d; try { d = JSON.parse(fs.readFileSync(args[1], 'utf8')); } catch (e) { die('讀不到或不是 JSON：' + args[1]); }
     return call(Object.assign({}, d, { action: 'submit' }));
   }
-  console.log(fs.readFileSync(__filename, 'utf8').split('\n').slice(1, 14).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'));
+  console.log(fs.readFileSync(__filename, 'utf8').split('\n').slice(1, 16).map((l) => l.replace(/^\/\/ ?/, '')).join('\n'));
 })().catch((e) => die(String(e && e.message || e)));

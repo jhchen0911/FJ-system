@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.190';
+var APP_VERSION='v6.0.191';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -33025,7 +33025,7 @@ function _v6TodoItems(items){
   try{_decTodoItems(items,ic);}catch(e){_err('_v6TodoItems.dec',e);}   // v6.0.176 拍板卡
   try{if(!_isReaderUser){var _dp=_draftPending();if(_dp.length)items.push({type:'ai_draft',urgent:false,jump:'openDrafts()',icon:ic('i-doc'),color:'#1565C0',text:'AI 草稿 '+_dp.length+' 筆待確認',sub:_dp.slice(0,2).map(function(d){return _DRAFT_T[d.type]||'';}).join('、')});}}catch(e){_err('_v6TodoItems.draft',e);}   // v6.0.109
   try{var _ah=_aiHeldList();if(_ah.length)items.push({type:'ai_held',urgent:true,jump:'openAiHeld()',icon:ic('i-bell'),color:'#E65100',text:'AI 通知 '+_ah.length+' 則沒推 LINE（本月額度快用完）',sub:esc(_ah.slice(-2).map(function(x){return x.text;}).join('、').slice(0,60))});}catch(e){_err('_v6TodoItems.aiHeld',e);}   // v6.0.134
-  try{if(_lbxOk()){var _lb=_lbxOpen();if(_lb.length)items.push({type:'line_inbox',urgent:false,jump:'openLineInbox()',icon:ic('i-doc'),color:'#2E7D32',text:'LINE 收件 '+_lb.length+' 件未歸檔',sub:esc(_lb.slice(0,3).map(function(x){return x.fileName||(x.type==='text'?String(x.text||'').slice(0,20):x.type);}).join('、').slice(0,60))});}}catch(e){_err('_v6TodoItems.lbx',e);}   // v6.0.144 LINE 收件匣
+  try{if(_lbxOk()){var _lb=_lbxTodoOpen();/* v6.0.191：有 AI 建議的、超過 7 天的改由拍板卡列 */if(_lb.length)items.push({type:'line_inbox',urgent:false,jump:'openLineInbox()',icon:ic('i-doc'),color:'#2E7D32',text:'LINE 收件 '+_lb.length+' 件未歸檔',sub:esc(_lb.slice(0,3).map(function(x){return x.fileName||(x.type==='text'?String(x.text||'').slice(0,20):x.type);}).join('、').slice(0,60))});}}catch(e){_err('_v6TodoItems.lbx',e);}   // v6.0.144 LINE 收件匣
   try{_rfqVerTodo(items);}catch(e){_err('_v6TodoItems.rfqVer',e);}
   try{_todo5bItems(items);}catch(e){_err('_v6TodoItems.5b',e);}   // 改版第 5 步 5b
   try{if(_decIsAdmin()){var _hm=_holMissing();if(_hm.length)items.push({type:'hol_missing',urgent:false,jump:"_prmTab='cost';go('params')",icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg>',color:'#b26a00',text:'補 '+_hm.join('、')+' 年國定假日',sub:'參數 › 成本與廠商：包商放款日遇假日要順延，照人事行政總處公告貼上'});}}catch(e){_err('_v6TodoItems.hol',e);}   // v6.0.188 6-1p
@@ -40018,7 +40018,7 @@ function _lbxRowHtml(x){
   var body=x.type==='text'?('<div style="font-size:12.5px;white-space:pre-wrap;word-break:break-word">'+esc(S(x.text).slice(0,500))+'</div>')
     :('<div style="font-size:13px;font-weight:700;word-break:break-all">'+esc(S(x.fileName)||id)+'</div>');
   return '<div style="border-bottom:1px solid var(--b1);padding:7px 0;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">'
-    +'<div style="flex:1;min-width:180px"><div style="font-size:11px;color:var(--b3)">'+_lbxTime(x.at)+'　'+esc(_LBX_TYPE[x.type]||S(x.type))+(x.size?('　'+_lbxSize(x.size)):'')+'　'+st+'</div>'+body+(x.note?'<div style="font-size:11.5px;color:var(--b4)">'+esc(S(x.note))+'</div>':'')+'</div>'
+    +'<div style="flex:1;min-width:180px"><div style="font-size:11px;color:var(--b3)">'+_lbxTime(x.at)+'　'+esc(_LBX_TYPE[x.type]||S(x.type))+(x.size?('　'+_lbxSize(x.size)):'')+'　'+st+'</div>'+body+(x.note?'<div style="font-size:11.5px;color:var(--b4)">'+esc(S(x.note))+'</div>':'')+(x.status!=='filed'&&x.sug&&(x.sug.qid||x.sug.caseName)?'<div style="font-size:11.5px;color:#2e7d32">AI 建議歸到：'+esc(x.sug.qid?_lbxQName(x.sug.qid):S(x.sug.caseName))+'（總覽拍板卡一次確認）</div>':'')+'</div>'
     +'<div style="display:flex;gap:4px;flex-wrap:wrap">'
     +(x.path?'<button type="button" class="btn btn-xs" onclick="lbxDownload(\''+escq(id)+'\')">下載</button>':'')
     +(x.status==='filed'?'<button type="button" class="btn btn-xs" onclick="lbxMark(\''+escq(id)+'\',\'new\')">改回未歸檔</button>':'<button type="button" class="btn btn-xs btn-g" onclick="lbxFileOpen(\''+escq(id)+'\')">歸檔</button>')
@@ -41912,6 +41912,57 @@ function _vbFromIntake(qid,r,du){
   var summ=(sub+' 請款 '+rows.length+' 項 NT$ '+fmt(Math.round(amt))+(q?'（'+(q.name||'')+'）':'')).slice(0,200);
   return _draftPush('vendorBill',pl,summ).then(function(ok){if(ok){toast('已建廠商請款草稿：到總覽待辦「廠商請款待確認」確認後才入帳');try{updateDashTodo();}catch(e){_err('_vbFromIntake',e);}}return ok;});
 }
+// ══════════ v6.0.191 LINE 收件：AI 建議歸檔 → 總覽一張拍板卡一次確認（陳軒轉 Lotion 11/07：6 件未歸檔要一件一件按）══════════
+// AI 帳號（tools/fy-draft.js inbox-suggest）處理過的收件寫 x.sug={qid,caseName,note,why,by,at}；這裡把全部建議收成一張卡：
+//   確認＝逐件標已歸檔（雲端 lineInboxMark，跟手動歸檔同一條路）、退回＝清掉建議（狀態與備註不動）、修改＝逐件改案件或先不歸。
+//   超過 7 天沒處理（沒有建議）的只列在卡片明細裡，總覽那一列「LINE 收件 N 件未歸檔」不再算它們。
+var _LBX_STALE_MS=7*86400000,_LBX_SUG_OV={};   // _LBX_SUG_OV：修改時的本機調整 {id:{skip,qid,caseName}}
+function _lbxSugs(){return _lbxOpen().filter(function(x){return x&&x.status==='new'&&x.sug&&typeof x.sug==='object'&&(x.sug.qid||x.sug.caseName);});}
+function _lbxStale(){var t=Date.now()-_LBX_STALE_MS;return _lbxOpen().filter(function(x){return x&&!(x.sug&&(x.sug.qid||x.sug.caseName))&&(+x.at||0)<t;});}
+function _lbxTodoOpen(){var t=Date.now()-_LBX_STALE_MS;return _lbxOpen().filter(function(x){return x&&!(x.sug&&(x.sug.qid||x.sug.caseName))&&(+x.at||0)>=t;});}
+function _lbxSugOf(x){var s=x.sug||{},o=_LBX_SUG_OV[x.id]||{};return {skip:!!o.skip,qid:o.qid!=null?o.qid:(s.qid||''),caseName:o.caseName!=null?o.caseName:(s.caseName||''),note:x.note||s.note||'',why:s.why||''};}
+function _lbxSugName(x){var g=_lbxSugOf(x);return g.qid?_lbxQName(g.qid):(g.caseName||'');}
+function _lbxSugDetail(){
+  var S=function(v){return v==null?'':String(v);},L=_lbxSugs(),T=_lbxStale();
+  var row=function(x,sg){var g=_lbxSugOf(x),nm=S(x.fileName)||(x.type==='text'?S(x.text).slice(0,40):(_LBX_TYPE[x.type]||x.type));
+    return '<div style="border-bottom:1px solid var(--b1);padding:5px 0;font-size:12.5px;overflow-wrap:anywhere">'
+      +'<div style="font-size:11px;color:var(--b3)">'+_lbxTime(x.at)+'　'+esc(_LBX_TYPE[x.type]||S(x.type))+(x.size?('　'+_lbxSize(x.size)):'')+(x.note?'　'+esc(S(x.note).slice(0,80)):'')+'</div>'
+      +'<b>'+esc(nm)+'</b>'+(sg?('<div>'+(g.skip?'<span style="color:var(--b4)">這件先不歸（修改時拿掉的）</span>':'→ 歸到 <b>'+esc(_lbxSugName(x)||'（沒有案件）')+'</b>')+(g.why?'<span style="color:var(--b4)">　AI：'+esc(S(g.why).slice(0,120))+'</span>':'')+'</div>'):'')+'</div>';};
+  return '<div style="font-size:12.5px;font-weight:700">AI 建議歸檔 '+L.length+' 件</div>'+(L.length?L.map(function(x){return row(x,true);}).join(''):'<div style="font-size:12px;color:var(--b4)">（沒有）</div>')
+    +(T.length?'<div style="font-size:12.5px;font-weight:700;margin-top:8px">超過 7 天還沒處理 '+T.length+' 件（只列在這裡，不再逐件提醒；要歸檔請到 LINE 收件匣）</div>'+T.map(function(x){return row(x,false);}).join(''):'');
+}
+_decReg('lbxSug',{
+  title:'LINE 收件歸檔',todo:function(){var a=_lbxSugs().length,b=_lbxStale().length;return 'LINE 收件 '+(a?'AI 建議歸檔 '+a+' 件':'')+(a&&b?'、':'')+(b?'超過 7 天未處理 '+b+' 件':'');},sub:'一次確認：確認＝全部照建議歸檔；退回＝清掉建議；修改＝逐件改案件',
+  canSee:function(){return _lbxOk();},
+  list:function(){return (_lbxSugs().length||_lbxStale().length)?[{id:'batch'}]:[];},
+  key:function(it){return it.id;},
+  head:function(){var a=_lbxSugs().length;return a?('AI 建議把 '+a+' 件 LINE 收件歸到案件'):'LINE 收件有超過 7 天還沒處理的';},
+  detail:function(){return _lbxSugDetail();},
+  ok:function(){
+    var L=_lbxSugs().filter(function(x){return !_lbxSugOf(x).skip;});
+    if(!L.length){toast(_lbxSugs().length?'全部都先不歸了，沒有要確認的':'沒有 AI 建議要確認（超過 7 天的請到 LINE 收件匣歸檔）');return Promise.resolve(false);}
+    var bad=[];
+    return L.reduce(function(p,x){return p.then(function(){var g=_lbxSugOf(x);return _lbxMarkCall(x.id,'filed',{qid:g.qid||'',caseName:g.caseName||'',note:g.note||''}).then(function(r){if(r.ok){x.status='filed';x.qid=g.qid||null;x.caseName=g.caseName||null;x.sug=null;delete _LBX_SUG_OV[x.id];}else bad.push((x.fileName||x.id)+'：'+r.msg);});});},Promise.resolve())
+      .then(function(){if(bad.length){toast('有 '+bad.length+' 件沒歸成：'+bad.join('；').slice(0,120));return false;}toast('已歸檔 '+L.length+' 件');return true;});
+  },
+  reject:function(it,why){
+    var L=_lbxSugs(),bad=0;if(!L.length){toast('沒有 AI 建議可以退回');return Promise.resolve(false);}
+    return L.reduce(function(p,x){return p.then(function(){return _lbxMarkCall(x.id,'unsug',{}).then(function(r){if(r.ok){x.sug=null;delete _LBX_SUG_OV[x.id];}else bad++;});});},Promise.resolve()).then(function(){if(bad){toast(bad+' 件沒退成，請再試一次');return false;}return true;});
+  },
+  edit:function(){
+    var L=_lbxSugs();if(!L.length){toast('沒有 AI 建議可以改；超過 7 天的請到 LINE 收件匣歸檔');return;}
+    var opts=(Q||[]).filter(function(q){return q&&q.id;}).slice().sort(function(a,b){return String(b.date||'').localeCompare(String(a.date||''));}).slice(0,300);
+    var IN='width:100%;box-sizing:border-box;font-size:13px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r8)';
+    showConfirm('修改 AI 建議歸檔',L.map(function(x,i){var g=_lbxSugOf(x);
+      return '<div style="border:1px solid var(--b1);border-radius:6px;padding:6px 8px;margin-bottom:6px"><div style="font-size:12.5px;font-weight:700;overflow-wrap:anywhere">'+esc(String(x.fileName||(x.type==='text'?String(x.text||'').slice(0,40):x.type)||x.id))+'</div>'
+        +'<label style="font-size:12px;display:block;margin:3px 0"><input type="checkbox" id="lbs-k'+i+'"'+(g.skip?'':' checked')+'> 這件要歸檔</label>'
+        +'<select id="lbs-q'+i+'" style="'+IN+'"><option value="">（不掛報價）</option>'+opts.map(function(q){return '<option value="'+esc(q.id)+'"'+(g.qid===q.id?' selected':'')+'>'+esc((q.code?q.code+' ':'')+(q.name||''))+'</option>';}).join('')+'</select>'
+        +'<input id="lbs-c'+i+'" value="'+esc(g.caseName||'')+'" maxlength="100" placeholder="案名（還沒建報價時填）" style="'+IN+';margin-top:4px"></div>';}).join(''),function(){
+      L.forEach(function(x,i){var k=document.getElementById('lbs-k'+i);_LBX_SUG_OV[x.id]={skip:!(k&&k.checked),qid:gv('lbs-q'+i)||'',caseName:String(gv('lbs-c'+i)||'').trim().slice(0,100)};});
+      _decRefresh('lbxSug');toast('改好了，回到卡片按「確認」');
+    },false,null,true);
+  }
+});
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
