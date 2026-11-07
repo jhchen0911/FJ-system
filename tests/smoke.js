@@ -7349,8 +7349,9 @@ async function newPage(browser, width, height) {
     rr.privRead = rules.private['.read'].indexOf('|| ' + RK) < 0 && rules.private.$other['.read'].indexOf(RK) > 0 && !/'hr'|'payslips'|'petty'/.test(rules.private.$other['.read']) && rules.private.$other['.read'].includes("$other === 'quoteSens'");   // v6.0.156 B1（逐項允許清單）
     const writes = [];
     (function walk(o, path) { Object.keys(o).forEach(k => { if (k === '.write') writes.push([path, o[k]]); else if (o[k] && typeof o[k] === 'object') walk(o[k], path + '/' + k); }); })(rules, 'fydata');
-    rr.writes = writes.length >= 9 && writes.every(([p, w]) => w === 'false' || w.indexOf('!' + RK) >= 0 || (p === 'fydata/logs/$uid' && w.indexOf("!root.child('fydata/readers')") >= 0) || (p === 'fydata/backups' && w === OWN));
-    rr.badW = writes.filter(([p, w]) => !(w === 'false' || w.indexOf('!' + RK) >= 0 || p === 'fydata/logs/$uid' || (p === 'fydata/backups' && w === OWN))).map(x => x[0]);
+    const DRW = (p, w) => /^fydata\/drafts\/\$id\/(status|doneAt|doneBy|supersededBy)$/.test(p) && w.indexOf("data.parent().child('by').val() === auth.token.email.toLowerCase()") >= 0 && /'pending'/.test(w);   // v6.0.189：唯讀帳號只能撤回／取代自己的 pending 草稿
+    rr.writes = writes.length >= 9 && writes.every(([p, w]) => w === 'false' || w.indexOf('!' + RK) >= 0 || (p === 'fydata/logs/$uid' && w.indexOf("!root.child('fydata/readers')") >= 0) || (p === 'fydata/backups' && w === OWN) || DRW(p, w));
+    rr.badW = writes.filter(([p, w]) => !(w === 'false' || w.indexOf('!' + RK) >= 0 || p === 'fydata/logs/$uid' || (p === 'fydata/backups' && w === OWN) || DRW(p, w))).map(x => x[0]);
     const rv = rules.readers.$email['.validate']; rr.nameRule = /newData\.val\(\) === true/.test(rv) && /hasChildren\(\['name'\]\)/.test(rv) && rules.readers.$email.$other['.validate'] === false;
     rr.backups = rules.backups['.read'] === OWN && rules.backups['.write'] === OWN && rules.relay.photos['.read'].indexOf('|| ' + RK) > 0;   // 審查修正：備份只給擁有者；日報照片（relay）唯讀帳號可讀
     const fn = fs.readFileSync(pth.join(__dirname, '..', 'functions', 'index.js'), 'utf8'); rr.fn = /readers: set\(rdr, on\)/.test(fn);
@@ -11470,6 +11471,153 @@ async function newPage(browser, width, height) {
     check('v6.0.180 資料健檢：匯出過沒封存內容已改掉（封存後消失）、合約金額對不上任何正式版次；唯讀帳號匯出送 qsend 卡（只送工項條款與基本欄位、跟正式版相同不送）、確認＝封存；同內容重複匯出不再動報價；複製報價不帶紀錄', r.health1 && r.health1b && r.health2 && r.reader && r.qsend && r.sameQuiet && r.copy, JSON.stringify(r));
     check('v6.0.180 資料庫規則：草稿類型加 qverfix、qsend（其他類型保留）', /\|vendorBill\|qverfix\|qsend\)\$/.test(dv) && /quote\|qchg\|bid\|irPhoto\|addon\|dailyLog\|contact/.test(dv));
     check('v6.0.180 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.189 AI 草稿：唯讀帳號撤回自己的 pending、同一張報價新草稿取代舊的、清單顯示案名／時間／版次 ──
+  {
+    // 規則：用小型求值器實際跑 drafts 的 .write／.validate（data／newData／root 模擬）
+    const RD = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata.drafts.$id;
+    const snap = (v, par) => { const o = { val: () => (v === undefined ? null : v), exists: () => v !== undefined && v !== null, child: (k) => { let x = v; for (const p of String(k).split('/')) x = (x && typeof x === 'object') ? x[p] : undefined; return snap(x, o); }, hasChild: (k) => o.child(k).exists(), hasChildren: (ks) => ks.every((k) => o.child(k).exists()), isString: () => typeof v === 'string', isNumber: () => typeof v === 'number', parent: () => par }; return o; };
+    const ev = (expr, ctx) => { const e = expr.replace(/\.matches\(/g, '.__m('); String.prototype.__m = function (re) { return re.test(this); }; try { return !!new Function('auth', 'root', 'data', 'newData', 'now', '$id', 'return (' + e + ');')(ctx.auth, ctx.root, ctx.data, ctx.newData, Date.now(), ctx.id); } finally { delete String.prototype.__m; } };
+    const ROOT = snap({ fydata: { readers: { 'ai@x,com': true }, adminEmails: {}, drafts: { d0002: { by: 'ai@x.com' }, dzzz9: { by: 'b@x.com' } } } });
+    const base = { id: 'd0001', type: 'qchg', by: 'ai@x.com', at: 1, status: 'pending', summary: 's', payload: { qid: 'q1' } };
+    // 唯讀帳號改某個欄位：$id 層 .write 或該欄位 .write 任一過，再過 $id 與欄位 validate
+    const canUpd = (who, rec, up) => {
+      const auth = { token: { email: who } }, nr = Object.assign({}, rec, up), recS = snap(rec), nrS = snap(nr);
+      const idOk = ev(RD['.write'], { auth, root: ROOT, data: recS, newData: nrS, id: rec.id });
+      const fieldsOk = Object.keys(up).every((k) => RD[k] && RD[k]['.write'] && ev(RD[k]['.write'], { auth, root: ROOT, data: recS.child(k), newData: nrS.child(k), id: rec.id }));
+      const val = ev(RD['.validate'], { auth, root: ROOT, data: recS, newData: nrS, id: rec.id }) && Object.keys(up).every((k) => !(RD[k] || RD.$other)['.validate'] || ev((RD[k] || RD.$other)['.validate'], { auth, root: ROOT, data: recS.child(k), newData: nrS.child(k), id: rec.id }));
+      return (idOk || fieldsOk) && val;
+    };
+    const W = { status: 'withdrawn', doneAt: 5, doneBy: 'ai@x.com' };
+    const rr = {
+      own: canUpd('ai@x.com', base, W),
+      sup: canUpd('ai@x.com', base, { status: 'superseded', doneAt: 5, doneBy: 'ai@x.com', supersededBy: 'd0002' }),
+      other: !canUpd('ai@x.com', Object.assign({}, base, { by: 'b@x.com' }), W),
+      applied: !canUpd('ai@x.com', Object.assign({}, base, { status: 'applied' }), W),
+      toApplied: !canUpd('ai@x.com', base, { status: 'applied', doneAt: 5, doneBy: 'ai@x.com' }),
+      payload: !canUpd('ai@x.com', base, { status: 'withdrawn', summary: '改內容' }),
+      reason: !canUpd('ai@x.com', base, { status: 'withdrawn', resultId: 'x' }),
+      doneAtOnly: !canUpd('ai@x.com', base, { doneAt: 5 }),
+      stayPending: !canUpd('ai@x.com', base, { status: 'pending', doneAt: 5, doneBy: 'ai@x.com' }),
+      spoofBy: !canUpd('ai@x.com', base, { status: 'withdrawn', doneAt: 5, doneBy: 'jhchen0911@gmail.com' }),
+      futureAt: !canUpd('ai@x.com', base, { status: 'withdrawn', doneAt: Date.now() + 86400000, doneBy: 'ai@x.com' }),
+      supWd: !canUpd('ai@x.com', base, { status: 'withdrawn', doneAt: 5, doneBy: 'ai@x.com', supersededBy: 'd0002' }),
+      supOther: !canUpd('ai@x.com', base, { status: 'superseded', doneAt: 5, doneBy: 'ai@x.com', supersededBy: 'dzzz9' }),
+      admin: canUpd('jhchen0911@gmail.com', base, { status: 'superseded', doneAt: 5, doneBy: 'jhchen0911@gmail.com', supersededBy: 'd0002' }),
+    };
+    check('v6.0.189 規則：唯讀帳號只能把自己的 pending 改成撤回／已被取代；別人的、已套用的、改成已套用、順便改內容都擋；管理員照舊', Object.values(rr).every(Boolean), JSON.stringify(rr));
+
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const W8 = (ms) => new Promise((r) => setTimeout(r, ms || 30));
+      try {
+        const oT = window.toast; let tt = ''; window.toast = (m) => { tt = String(m); };
+        // 假雲端：fydata/drafts/<id> 的 set／update／once 與 orderByChild('status').equalTo(x).once
+        const DB = {}; const deny = { on: false };
+        const ref = (path) => { const id = path.split('/')[2];
+          const api = { set: (v) => { DB[id] = JSON.parse(JSON.stringify(v)); return Promise.resolve(); },
+            update: (u) => { if (deny.on) return Promise.reject({ code: 'PERMISSION_DENIED' }); Object.assign(DB[id], u); return Promise.resolve(); },
+            once: () => Promise.resolve({ val: () => (id ? (DB[id] ? JSON.parse(JSON.stringify(DB[id])) : null) : JSON.parse(JSON.stringify(DB))) }),
+            orderByChild: () => ({ equalTo: (st) => ({ once: () => { const o = {}; Object.keys(DB).forEach((k) => { if (DB[k].status === st) o[k] = JSON.parse(JSON.stringify(DB[k])); }); return Promise.resolve({ val: () => o }); } }) }) };
+          return api; };
+        const oDb = window._fbDb, oU = window._fbUser, oR = window._isReaderUser;
+        _fbDb = { ref }; _fbUser = { email: 'AI@x.com', uid: 'uAI' }; _isReaderUser = true;
+        Q = [{ id: 'q1', code: '1151101', name: '範例案', ver: 3, items: [], _mt: 1 }];
+        DB.dold0001 = { id: 'dold0001', type: 'qchg', by: 'ai@x.com', byName: 'AI', at: Date.now() - 5000, status: 'pending', summary: '舊改單', payload: { qid: 'q1', baseVer: 2 } };
+        DB.dbid0001 = { id: 'dbid0001', type: 'bid', by: 'ai@x.com', at: Date.now() - 4000, status: 'pending', summary: '得標狀態', payload: { qid: 'q1' } };
+        DB.dhum0001 = { id: 'dhum0001', type: 'qchg', by: 'other@x.com', at: Date.now() - 3000, status: 'pending', summary: '別人的', payload: { qid: 'q1' } };
+        DB.dq2x0001 = { id: 'dq2x0001', type: 'qchg', by: 'ai@x.com', at: Date.now() - 3000, status: 'pending', summary: '別張報價', payload: { qid: 'q2' } };
+        DB.dvf20001 = { id: 'dvf20001', type: 'qverfix', by: 'ai@x.com', at: Date.now() - 2000, status: 'pending', summary: '補登 V2', payload: { qid: 'q1', ver: 2 } };
+        await _draftPush('qverfix', { qid: 'q1', ver: 3 }, '補登 V3'); out.vfKeep = DB.dvf20001.status === 'pending';   // 審查：補登不同版次不互相取代
+        await _draftPush('qchg', { qid: 'q1', code: '1151101', baseVer: 3, ops: [] }, '新改單');
+        const nid = Object.keys(DB).find((k) => DB[k].summary === '新改單');
+        out.sup = DB.dold0001.status === 'superseded' && DB.dold0001.supersededBy === nid && DB.dbid0001.status === 'pending' && DB.dhum0001.status === 'pending' && DB.dq2x0001.status === 'pending' && /已被取代/.test(tt);
+        // 撤回：自己的 pending 可以；別人的、已處理的不行
+        Object.keys(DB).filter((k) => DB[k].type === 'qverfix').forEach((k) => { delete DB[k]; });
+        const m0 = await fyDraftMine(); out.mine = m0.ok && m0.list.length === 3 && m0.list.every((x) => x.id !== 'dhum0001') && m0.list.some((x) => x.case === '1151101 範例案' && /依 V3 改/.test(x.ver));
+        const w1 = await fyDraftWithdraw('dbid0001'); const w2 = await fyDraftWithdraw('dhum0001'); const w3 = await fyDraftWithdraw('dold0001');
+        out.wd = w1.ok && DB.dbid0001.status === 'withdrawn' && !w2.ok && /自己送/.test(w2.why) && DB.dhum0001.status === 'pending' && !w3.ok && /superseded/.test(w3.why);
+        deny.on = true; const w4 = await fyDraftWithdraw('dq2x0001'); deny.on = false; out.wdDeny = !w4.ok && /規則/.test(w4.why) && DB.dq2x0001.status === 'pending';
+        // 管理員清單：案名、建立時間、版次；舊版收在展開裡
+        _isReaderUser = false; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' };
+        DRAFTS = {}; Object.keys(DB).forEach((k) => { if (DB[k].status === 'pending') DRAFTS[k] = DB[k]; });
+        DRAFTS_OLD = { dold0001: DB.dold0001 };
+        const h = _draftListHtml(); const box = document.createElement('div'); box.innerHTML = h;
+        const cards = box.querySelectorAll('.dr-meta');
+        out.list = cards.length === 3 && /1151101 範例案/.test(h) && /建立 /.test(h) && /依 V3 改，報價目前 V3/.test(h) && !/舊改單<\/div><div style="display:flex/.test(h) && box.querySelectorAll('details.dr-old').length === 1 && /較早 1 筆已被這筆取代/.test(h) && /舊改單/.test(box.querySelector('details.dr-old').innerHTML);
+        // 舊版本留下的重複 pending：管理員端自動收成最新一筆
+        const marks = []; const oM = window._draftMark; _fbDb = { ref: (p) => ({ update: (u) => { marks.push([p.split('/')[2], u.status, u.supersededBy]); return Promise.reject(new Error('rules')); } }) };
+        DRAFTS = { da1: { id: 'da1', type: 'qchg', by: 'ai@x.com', at: 10, status: 'pending', payload: { qid: 'q9' } }, da2: { id: 'da2', type: 'qchg', by: 'ai@x.com', at: 20, status: 'pending', payload: { qid: 'q9' } }, da3: { id: 'da3', type: 'irPhoto', by: 'ai@x.com', at: 5, status: 'pending', payload: {} }, da4: { id: 'da4', type: 'irPhoto', by: 'ai@x.com', at: 6, status: 'pending', payload: {} } };
+        _draftDupHeal(); await W8(); _draftDupHeal(); await W8(); out.heal = marks.length === 1 && marks[0][0] === 'da1' && marks[0][1] === 'superseded' && marks[0][2] === 'da2';   // 失敗不重試
+        window._draftMark = oM; _fbDb = oDb; _fbUser = oU; _isReaderUser = oR; DRAFTS = {}; DRAFTS_OLD = {}; Q = []; window.toast = oT;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.189 同一張報價再送新草稿：同一人同一種的舊 pending 標已被取代（別人的、別種的、別張報價的不動）', r.sup && r.vfKeep, JSON.stringify(r));
+    check('v6.0.189 唯讀帳號 fyDraftMine／fyDraftWithdraw：只列、只撤回自己的待確認草稿；規則擋下照實回報', r.mine && r.wd && r.wdDeny, JSON.stringify(r));
+    check('v6.0.189 AI 草稿清單：案名、建立時間、版次說明；舊版收在「展開看」；舊重複 pending 自動收成最新一筆', r.list && r.heal, JSON.stringify(r));
+    check('v6.0.189 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.191 LINE 收件：AI 建議歸檔收成一張拍板卡一次確認；超過 7 天的只列在卡片、不再逐件提醒 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const W = (ms) => new Promise((r) => setTimeout(r, ms || 40));
+      try {
+        const oT = window.toast; let tt = ''; const TT = []; window.toast = (m) => { tt = String(m); TT.push(tt); };
+        const oU = window._fbUser, oR = window._isReaderUser, oOk = window._lbxOk, oCall = window._lbxMarkCall;
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isReaderUser = false; window._lbxOk = () => true;
+        Q = [{ id: 'q1', code: '1151101', name: '範例案', items: [], _mt: 1 }];
+        const now = Date.now();
+        LBX = {
+          m1: { id: 'm1', at: now - 3600000, type: 'file', fileName: '範例詢價單.pdf', status: 'new', note: '第 1 批', sug: { qid: 'q1', why: '已交給報價線', by: 'ai@x.com', at: now } },
+          m2: { id: 'm2', at: now - 7200000, type: 'image', fileName: '現場照片<b>.jpg', status: 'new', sug: { caseName: '假乙案 詢價', why: '已建草稿 dabc' } },
+          m3: { id: 'm3', at: now - 3600000, type: 'file', fileName: '還沒處理.pdf', status: 'new' },
+          m4: { id: 'm4', at: now - 9 * 86400000, type: 'file', fileName: '很舊的.pdf', status: 'new' },
+          m5: { id: 'm5', at: now - 3600000, type: 'file', fileName: '已歸檔.pdf', status: 'filed', sug: { qid: 'q1' } },
+        };
+        const calls = []; window._lbxMarkCall = (id, st, f) => { calls.push([id, st, f && f.qid, f && f.caseName, f && f.note]); return Promise.resolve({ ok: true, status: st === 'unsug' ? 'new' : st }); };
+        const its = []; _v6TodoItems(its);
+        const row = its.find((x) => x.type === 'line_inbox'), card = its.find((x) => x.type === 'dec_lbxSug');
+        out.todo = !!row && /1 件未歸檔/.test(row.text) && !!card && /AI 建議歸檔 2 件/.test(card.text) && /超過 7 天未處理 1 件/.test(card.text);
+        openDecList('lbxSug');
+        const c = document.querySelector('#dec-box .dec-card');
+        out.one = document.querySelectorAll('#dec-box .dec-card').length === 1 && c.querySelector('.dec-ok').disabled;
+        decToggle('lbxSug', 'batch'); await W(80);
+        const h = c.querySelector('.dec-detail').innerHTML;
+        out.detail = /範例詢價單\.pdf/.test(h) && /1151101 範例案/.test(h) && /假乙案 詢價/.test(h) && /已交給報價線/.test(h) && /很舊的\.pdf/.test(h) && /超過 7 天/.test(h) && !/還沒處理\.pdf/.test(h) && !/已歸檔\.pdf/.test(h) && /&lt;b&gt;/.test(h) && !c.querySelector('.dec-detail b b');
+        // 審查：展開後又來了新建議 → 確認不歸檔、要重新看
+        LBX.m6 = { id: 'm6', at: now - 60000, type: 'file', fileName: '新來的.pdf', status: 'new', sug: { qid: 'q1' } };
+        decAct('lbxSug', 'batch', 'ok'); await W(120); out.newSug = calls.length === 0 && TT.some((t) => /請收起再展開/.test(t)) && LBX.m6.status === 'new';
+        delete LBX.m6; _decRefresh('lbxSug'); decToggle('lbxSug', 'batch', true); await W(80);
+        // 修改：第 2 件先不歸、第 1 件改案名
+        const oC = window.showConfirm; window.showConfirm = (t, b, ok) => { document.body.insertAdjacentHTML('beforeend', '<div id="__lbs">' + b + '</div>'); document.getElementById('lbs-k1').checked = false; ok(); document.getElementById('__lbs').remove(); };
+        decAct('lbxSug', 'batch', 'edit'); window.showConfirm = oC; await W(80);
+        decToggle('lbxSug', 'batch', true); await W(80);
+        out.edit = /先不歸/.test(document.querySelector('#dec-box .dec-detail').innerHTML);
+        decAct('lbxSug', 'batch', 'ok'); await W(120);
+        out.ok = calls.length === 1 && calls[0][0] === 'm1' && calls[0][1] === 'filed' && calls[0][2] === 'q1' && calls[0][4] === '第 1 批' && LBX.m1.status === 'filed' && LBX.m2.status === 'new';
+        // 退回：剩下的建議清掉（狀態、備註不動）
+        calls.length = 0; const oP = window.prompt; window.prompt = () => '不對'; decAct('lbxSug', 'batch', 'ok'); await W(20);
+        decToggle('lbxSug', 'batch', true); await W(80); decAct('lbxSug', 'batch', 'reject'); window.prompt = oP; await W(120);
+        out.rej = calls.some((x) => x[0] === 'm2' && x[1] === 'unsug') && !LBX.m2.sug && LBX.m2.status === 'new';
+        // 只剩超過 7 天的：卡片還在（列出來），確認不做事
+        const its2 = []; _v6TodoItems(its2); const c2 = its2.find((x) => x.type === 'dec_lbxSug');
+        out.staleOnly = !!c2 && !/AI 建議/.test(c2.text) && /超過 7 天未處理 1 件/.test(c2.text) && its2.find((x) => x.type === 'line_inbox' && /2 件未歸檔/.test(x.text));
+        // 收件匣列表看得到 AI 建議
+        LBX.m3.sug = { caseName: '假丙案' }; out.rowBadge = /AI 建議歸到：假丙案/.test(_lbxRowHtml(LBX.m3));
+        document.querySelectorAll('#fy-modal').forEach((m) => m.remove());
+        window._lbxMarkCall = oCall; window._lbxOk = oOk; _fbUser = oU; _isReaderUser = oR; LBX = {}; Q = []; window.toast = oT;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.191 LINE 收件：AI 建議歸檔收成一張拍板卡（總覽一列），超過 7 天的只列在卡片、待辦那一列不再算；明細照檔名跳脫', r.todo && r.one && r.detail && r.staleOnly && r.newSug, JSON.stringify(r));
+    check('v6.0.191 LINE 收件拍板卡：修改可逐件先不歸、確認＝照建議逐件歸檔（帶原本備註）、退回＝清掉建議不動狀態；收件匣列表顯示建議', r.edit && r.ok && r.rej && r.rowBadge, JSON.stringify(r));
+    check('v6.0.191 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 

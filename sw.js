@@ -11,7 +11,7 @@ const LIB_HOSTS = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'unpkg.com'];
 const LIB_RE = /html2canvas|jspdf/i;
 
 // v6.0.130：計算模組清單（新增 calc 檔時一起加）。安裝時先存進快取——否則升級那次 calc 不在快取裡，之後離線開啟會缺計算模組
-const CALC_FILES = ['./calc/invoice.js', './calc/payable.js', './calc/report.js', './calc/comm.js', './calc/payroll.js', './calc/lifeline.js', './calc/settle.js', './calc/route.js', './calc/todo.js', './calc/vbill.js'];
+const CALC_FILES = ['./calc/invoice.js', './calc/payable.js', './calc/report.js', './calc/comm.js', './calc/payroll.js', './calc/lifeline.js', './calc/settle.js', './calc/route.js', './calc/todo.js', './calc/vbill.js', './calc/qdraft.js'];
 self.addEventListener('install', e => {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(CALC_FILES.map(f => c.add(new Request(f, { cache: 'no-cache' })).catch(() => {})))).catch(() => {}));

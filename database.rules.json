@@ -191,7 +191,7 @@
         ".read": "auth != null && auth.token.email != null && ((auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())) || root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())",
         "$id": {
           ".write": "auth != null && auth.token.email != null && ((auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())) || (root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !data.exists() && newData.child('by').val() === auth.token.email.toLowerCase() && newData.child('status').val() === 'pending' && !newData.hasChild('doneAt') && !newData.hasChild('doneBy') && !newData.hasChild('resultId') && !newData.hasChild('reason')))",
-          ".validate": "newData.hasChildren(['id','type','by','at','status','summary']) && $id.matches(/^[A-Za-z0-9_-]{4,40}$/) && newData.child('id').val() === $id && newData.child('type').isString() && newData.child('type').val().matches(/^(quote|qchg|bid|irPhoto|addon|dailyLog|contact|dailyOut|vendorBill|qverfix|qsend)$/) && newData.child('status').isString() && newData.child('status').val().matches(/^(pending|applied|rejected)$/)",
+          ".validate": "newData.hasChildren(['id','type','by','at','status','summary']) && $id.matches(/^[A-Za-z0-9_-]{4,40}$/) && newData.child('id').val() === $id && newData.child('type').isString() && newData.child('type').val().matches(/^(quote|qchg|bid|irPhoto|addon|dailyLog|contact|dailyOut|vendorBill|qverfix|qsend)$/) && newData.child('status').isString() && newData.child('status').val().matches(/^(pending|applied|rejected|withdrawn|superseded)$/)",
           "id": {
             ".validate": "newData.isString()"
           },
@@ -208,15 +208,18 @@
             ".validate": "newData.isNumber() && newData.val() <= now + 60000"
           },
           "status": {
+            ".write": "auth != null && auth.token.email != null && root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && data.parent().child('by').val() === auth.token.email.toLowerCase() && data.val() === 'pending' && (newData.val() === 'withdrawn' || newData.val() === 'superseded')",
             ".validate": "newData.isString()"
           },
           "summary": {
             ".validate": "newData.isString() && newData.val().length <= 300"
           },
           "doneAt": {
+            ".write": "auth != null && auth.token.email != null && root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && data.parent().child('by').val() === auth.token.email.toLowerCase() && data.parent().child('status').val() === 'pending' && (newData.parent().child('status').val() === 'withdrawn' || newData.parent().child('status').val() === 'superseded') && !data.exists() && newData.isNumber() && newData.val() <= now + 60000",
             ".validate": "newData.isNumber()"
           },
           "doneBy": {
+            ".write": "auth != null && auth.token.email != null && root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && data.parent().child('by').val() === auth.token.email.toLowerCase() && data.parent().child('status').val() === 'pending' && (newData.parent().child('status').val() === 'withdrawn' || newData.parent().child('status').val() === 'superseded') && !data.exists() && newData.val() === auth.token.email.toLowerCase()",
             ".validate": "newData.isString() && newData.val().length <= 100"
           },
           "resultId": {
@@ -242,13 +245,18 @@
               ".validate": "newData.isString() && newData.val().length <= 1200000 && newData.val().beginsWith('data:image/')"
             }
           },
+          "supersededBy": {
+            ".write": "auth != null && auth.token.email != null && root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && data.parent().child('by').val() === auth.token.email.toLowerCase() && data.parent().child('status').val() === 'pending' && newData.parent().child('status').val() === 'superseded' && !data.exists() && newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{4,40}$/) && root.child('fydata/drafts').child(newData.val()).child('by').val() === auth.token.email.toLowerCase()",
+            ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{4,40}$/)"
+          },
           "$other": {
             ".validate": "false"
           }
         },
         ".indexOn": [
           "status",
-          "at"
+          "at",
+          "by"
         ]
       },
       "lineCfg": {

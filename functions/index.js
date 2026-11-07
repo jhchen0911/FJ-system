@@ -662,3 +662,69 @@ exports.gtasksAuthCallback = onRequest({ region: REGION, secrets: [GT_ID, GT_SEC
     page(true, '之後 FJ 的後端待辦會自動出現在 Google 工作表的「' + gtasksCore.LIST_TITLE + '」清單（每天最多新建 ' + gtasksCore.DAILY_LIMIT + ' 筆），處理好會自動打勾。');
   } catch (e) { console.error('gtasksAuthCallback', e); page(false, '換取授權失敗，請回 FJ 重按一次。'); }
 });
+
+// ══════════ v6.0.190 AI 草稿上傳（不靠操作網頁）══════════
+// tools/fy-draft.js 用 AI 唯讀帳號登入後帶憑證呼叫；action：submit（送草稿）／mine（列出自己待確認的）／withdraw（撤回自己的）。
+// 只有唯讀名冊的帳號能用；送出前做跟網頁一樣的試算（functions/ops/drafts.js，對位與小計用 calc/qdraft.js），對不上就不收。
+// 雲端程式寫入不經安全規則，所以「只能動自己的 pending」在這裡再擋一次；寫的欄位跟網頁送出的草稿完全一樣（Lotion 端照原本畫面確認）。
+const draftsCore = require('./ops/drafts.js');
+exports.fyDraft = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'] }, async (req, res) => {
+  try {
+    if (req.method !== 'POST') { res.status(405).json({ error: { message: '只接受 POST' } }); return; }
+    const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
+    if (!m) { res.status(401).json({ error: { message: '需要登入' } }); return; }
+    const t = await admin.auth().verifyIdToken(m[1]);
+    const email = String(t.email || '').toLowerCase();
+    const L = await lists();
+    if (!L.readers.has(email)) { res.status(403).json({ error: { message: '只有 AI 唯讀帳號能用這個工具' } }); return; }
+    const db = admin.database(), body = (req.body && typeof req.body === 'object') ? req.body : {}, act = String(body.action || '');
+    // 審查：只讀這位送件人的草稿（不把別人的照片草稿整包下載）；狀態在程式裡篩
+    const pend = async () => { const v = (await db.ref('fydata/drafts').orderByChild('by').equalTo(email).once('value')).val() || {}, o = {}; Object.keys(v).forEach((k) => { if (v[k] && v[k].status === 'pending') o[k] = v[k]; }); return o; };
+    // 審查：交易第一次可能拿到本機快取的 null → 回傳 null（不是 undefined）讓伺服器用真值重跑，否則會誤判「找不到」或漏標取代
+    const txMine = async (id, upd) => { let why = ''; const tr = await db.ref('fydata/drafts/' + id).transaction((d) => { if (d === null) { why = '找不到這張草稿'; return null; } why = draftsCore.withdrawErr(d, email); if (why) return undefined; return Object.assign({}, d, upd); }); return { ok: tr.committed && !why && tr.snapshot.val() !== null, why: why || (tr.committed ? '' : '沒成功，請再試一次') }; };
+    if (act === 'mine') { res.status(200).json({ ok: true, list: draftsCore.mine(await pend(), email) }); return; }
+    if (act === 'withdraw') {
+      const id = String(body.id || '');
+      if (!/^[A-Za-z0-9_-]{4,40}$/.test(id)) { res.status(400).json({ error: { message: '草稿 id 不對' } }); return; }
+      const w = await txMine(id, { status: 'withdrawn', doneAt: Date.now(), doneBy: email });
+      if (!w.ok) { res.status(w.why === '找不到這張草稿' ? 404 : 409).json({ error: { message: w.why || '撤回沒成功，請再試一次' } }); return; }
+      res.status(200).json({ ok: true, id }); return;
+    }
+    // v6.0.191 LINE 收件：AI 列出未歸檔的（不含下載網址）、寫「建議歸檔到某案」→ Lotion 在總覽拍板卡一次確認
+    if (act === 'inboxList') {
+      const v = (await db.ref('fydata/lineInbox').orderByChild('at').startAt(Date.now() - 120 * 86400000).once('value')).val() || {};
+      res.status(200).json({ ok: true, list: inboxCore.openList(v, Date.now(), 120 * 86400000) }); return;
+    }
+    if (act === 'inboxSuggest') {
+      const c = inboxCore.cleanSug(body);
+      if (c.err) { res.status(400).json({ error: { message: c.err } }); return; }
+      const ref = db.ref('fydata/lineInbox/' + c.id), cur = (await ref.once('value')).val();
+      const u = inboxCore.sugUpdate(cur && cur.id === c.id ? cur : null, c, email, Date.now());
+      if (u.err) { res.status(u.err === '找不到這筆收件' ? 404 : 409).json({ error: { message: u.err } }); return; }
+      await ref.update(u);
+      res.status(200).json({ ok: true, id: c.id }); return;
+    }
+    if (act !== 'submit') { res.status(400).json({ error: { message: 'action 要是 submit／mine／withdraw／inboxList／inboxSuggest' } }); return; }
+    const sz = JSON.stringify(body).length; if (sz > 400000) { res.status(413).json({ error: { message: '草稿太大（上限約 400KB）' } }); return; }
+    const [quotes, tax, rname] = await Promise.all([
+      db.ref('fydata/shared/quotes').once('value').then((s) => pnlCore.deepDec(s.val() || {})),
+      db.ref('fydata/shared/params/tax').once('value').then((s) => s.val()),
+      db.ref('fydata/readers/' + email.replace(/\./g, ',')).once('value').then((s) => s.val()),
+    ]);
+    const mineN = Object.keys(await pend()).length;
+    if (mineN >= draftsCore.MAX_PENDING) { res.status(429).json({ error: { message: '你還有 ' + mineN + ' 張待確認的草稿（上限 ' + draftsCore.MAX_PENDING + '），先撤回用不到的' } }); return; }
+    const now = Date.now(), id = 'd' + now.toString(36) + require('crypto').randomBytes(4).toString('hex');
+    const name = (rname && typeof rname === 'object' && rname.name) ? String(rname.name) : 'AI';
+    const FJCinv = require('./calc/invoice.js');
+    const b = draftsCore.build({ email, name, body, quotes, taxR: FJCinv.inv.taxR(tax), now, id });
+    if (b.err) { res.status(400).json({ error: { message: b.err }, detail: b.detail || null }); return; }
+    const cr = await db.ref('fydata/drafts/' + id).transaction((d) => (d === null ? b.rec : undefined));   // 審查：id 撞到就不覆蓋
+    if (!cr.committed) { res.status(409).json({ error: { message: '草稿編號撞到，請再送一次' } }); return; }
+    const all = await pend(), old = draftsCore.superseded(b.rec, all);
+    const sup = await Promise.all(old.map((oid) => txMine(oid, { status: 'superseded', doneAt: now, doneBy: email, supersededBy: id }).then((r) => (r.ok ? oid : null))));
+    res.status(200).json({ ok: true, id, summary: b.rec.summary, superseded: sup.filter(Boolean) });
+  } catch (e) {
+    console.error('fyDraft', e);
+    res.status(500).json({ error: { message: 'AI 草稿服務錯誤' } });
+  }
+});
