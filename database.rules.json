@@ -255,7 +255,8 @@
         },
         ".indexOn": [
           "status",
-          "at"
+          "at",
+          "by"
         ]
       },
       "lineCfg": {
