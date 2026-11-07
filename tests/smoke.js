@@ -11029,6 +11029,30 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.184 熱修：本機私有資料時間戳已最新、但這次開頁還沒讀過私有資料 → 也要下載一次（補登卡「私有資料還沒下載完」一直 ✗）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const W = ms => new Promise(res => setTimeout(res, ms));
+      const oU = _fbUser, oD = _fbDb, oP = window._pullPrivate, oS = _QH_SENS, oR = _privReadOk, k = localStorage.getItem('fy_last_priv_sync');
+      try {
+        let n = 0; window._pullPrivate = (cb) => { n++; cb && cb(true); };
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'o' }; _privReadOk = null;
+        _fbDb = { ref: () => ({ once: () => Promise.resolve({ val: () => 1000 }) }) };
+        localStorage.setItem('fy_last_priv_sync', '1000');
+        _QH_SENS = null; _pullPrivateIfNewer(); await W(30); out.nullPulls = n === 1;
+        n = 0; _QH_SENS = {}; _pullPrivateIfNewer(); await W(30); out.readNoPull = n === 0;
+        n = 0; localStorage.setItem('fy_last_priv_sync', '900'); _pullPrivateIfNewer(); await W(30); out.newerPulls = n === 1;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      _fbUser = oU; _fbDb = oD; window._pullPrivate = oP; _QH_SENS = oS; _privReadOk = oR;
+      if (k == null) localStorage.removeItem('fy_last_priv_sync'); else localStorage.setItem('fy_last_priv_sync', k);
+      return out;
+    });
+    check('v6.0.184 私有資料：本機已最新但這次開頁還沒讀過（_QH_SENS 是 null）也下載一次；讀過且最新不重複下載；雲端較新照常下載', r.nullPulls && r.readNoPull && r.newerPulls, JSON.stringify(r));
+    check('v6.0.184 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.183 拍板卡明細不左右捲（Lotion 11/07）：版次表自動換行、檢查表直排、✗ 原因紅字在項目正下方 ──
   for (const W of [390, 1280]) {
     const { page, errors } = await newPage(browser, W, 900);
