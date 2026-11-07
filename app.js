@@ -2540,7 +2540,7 @@ function _rmkBuild(base,c,edit){
   var ov=(c.ov&&typeof c.ov==='object'&&!Array.isArray(c.ov))?c.ov:null;
   String(base||'').split('\n').forEach(function(line,li){
     // v6.0.196：這張報價改過的固定條款（q.rmk.ov[範本第幾行]＝{from,to}；範本那一行跟 from 一樣才換，範本改過就不套，避免換錯條）
-    if(ov&&ov[li]&&line.indexOf('【')<0&&FJC.qd.strip(line)===String(ov[li].from||'')&&String(ov[li].to||'').trim()){var pm=line.match(/^(\s*\d+\s*\.(?!\d)\s*)/);line=(pm?pm[1]:'')+String(ov[li].to).trim();}
+    var oo=ov&&ov['L'+li];if(oo&&line.indexOf('【')<0&&FJC.qd.strip(line)===String(oo.from||'')&&String(oo.to||'').trim()){var pm=line.match(/^(\s*\d+\s*\.(?!\d)\s*)/);line=(pm?pm[1]:'')+String(oo.to).trim();}
     var toks=line.match(/【[A-Z_]+】/g)||[],t=line;
     if(line.includes('【LOAD】'))t=c.load?line.replace('【LOAD】',c.load):(edit?line.replace('【LOAD】','_____'):null);
     else if(line.includes('【WALK】')||line.includes('【TECH】')){
@@ -42225,7 +42225,7 @@ function _qchgDetailHtml(d){
 }
 _decReg('qchg',{
   title:'AI 改單待確認',todo:function(n){return 'AI 改單 '+n+' 份待確認';},sub:'展開看逐項改前→改後（成本旁有改後毛利、條款標紅）→ 確認／退回／修改',
-  canSee:function(){return !_isReaderUser;},
+  canSee:function(){return _decIsAdmin();},   // 審查：改單可能改成本單價（私有資料），只有管理員確認
   list:function(){return Object.keys(DRAFTS||{}).map(function(k){return DRAFTS[k];}).filter(function(d){return d&&d.type==='qchg'&&d.status==='pending'&&_DRAFT_ID.test(_draftS(d.id));}).sort(function(a,b){return (a.at||0)-(b.at||0);});},
   key:function(d){return d.id;},head:function(d){return _draftS(d.summary);},body:function(d){return _qchgBody(d);},
   detail:function(d){return _qchgDetailHtml(d);},

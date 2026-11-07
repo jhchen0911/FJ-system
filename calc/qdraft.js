@@ -77,18 +77,18 @@ function _qchgPlan(q,ops,F,opts){F=F||_fmt0;opts=opts||{};
       if(t==='rmkDel'){ex[n].del=1;rows.push({act:lb,ok:true,before:cur,after:'（刪除）',d:0});return;}
       var tx2=String(op.text||'').trim().slice(0,300);if(!tx2){no(lb,'沒有內容（要刪請用刪除）');return;}
       ex[n].t=tx2;rows.push({act:lb,ok:true,before:cur,after:tx2,d:0,txt:1});
-    }else if(t==='rmkFix'){   // v6.0.196：改範本固定條款的字（只改這張報價，存在 rmk.ov[範本第幾行]＝{from 原文, to 新文}；text 空白＝回復範本）
+    }else if(t==='rmkFix'){   // v6.0.196：改範本固定條款的字（只改這張報價，存在 rmk.ov['L'+範本第幾行]＝{from 原文, to 新文}；key 用 L 開頭，免得 Firebase 把數字 key 存成陣列；text 空白＝回復範本）
       var base=String(opts.rmkBase||''),mt=String(op.match||'').trim(),L=base.split('\n'),hits=[];
       if(!base){no('改固定條款','沒有條款範本，不能改');return;}
       if(!mt){no('改固定條款','要給 match（原本條文，不含編號）');return;}
       if(!rmk.ov||typeof rmk.ov!=='object'||Array.isArray(rmk.ov))rmk.ov={};
-      L.forEach(function(line,li){if(line.indexOf('【')>=0)return;var st=_qchgStrip(line),ov=rmk.ov[li];if(!st)return;if(st===mt||(ov&&ov.from===st&&String(ov.to||'').trim()===mt))hits.push(li);});
+      L.forEach(function(line,li){if(line.indexOf('【')>=0)return;var st=_qchgStrip(line),ov=rmk.ov['L'+li];if(!st)return;if(st===mt||(ov&&ov.from===st&&String(ov.to||'').trim()===mt))hits.push(li);});
       var lb2='改固定條款「'+mt.slice(0,20)+'」';
       if(hits.length!==1){no(lb2,hits.length?'有 '+hits.length+' 條一樣，對不出是哪一條':'範本裡找不到這一條（要給原本的條文，不含編號；有填數字的條款不能用這個改）');return;}
-      var li=hits[0],orig=_qchgStrip(L[li]),now0=(rmk.ov[li]&&rmk.ov[li].from===orig)?String(rmk.ov[li].to):orig,tx3=String(op.text==null?'':op.text).trim().slice(0,300);
+      var li=hits[0],K='L'+li,orig=_qchgStrip(L[li]),now0=(rmk.ov[K]&&rmk.ov[K].from===orig)?String(rmk.ov[K].to):orig,tx3=String(op.text==null?'':op.text).trim().slice(0,300);
       if(seenEx['f'+li]){no(lb2,'同一條有兩個動作');return;}seenEx['f'+li]=1;
-      if(!tx3||tx3===orig){delete rmk.ov[li];rows.push({act:lb2+'（回復範本）',ok:true,before:now0,after:orig,d:0,txt:1});return;}
-      rmk.ov[li]={from:orig,to:tx3};rows.push({act:lb2,ok:true,before:now0,after:tx3,d:0,txt:1});
+      if(!tx3||tx3===orig){delete rmk.ov[K];rows.push({act:lb2+'（回復範本）',ok:true,before:now0,after:orig,d:0,txt:1});return;}
+      rmk.ov[K]={from:orig,to:tx3};rows.push({act:lb2,ok:true,before:now0,after:tx3,d:0,txt:1});
     }else no('—','不認得的動作 '+t.slice(0,20));
   });
   var lastIns=new Map();   // 審查：同一列後面加好幾列，照動作的順序排
@@ -103,7 +103,7 @@ function _qchgClean(ops){
   return (ops||[]).slice(0,_QCHG_MAX).map(function(op){
     op=op&&typeof op==='object'?op:{};var t=S(op.op,10),o={op:t};
     if(t==='add'){var it=op.item||{};o.item={desc:S(it.desc,500),unit:S(it.unit,20),qty:N(it.qty),price:N(it.price),note:S(it.note,200)};if(N(it.estCost)!=null)o.item.estCost=N(it.estCost);var a=ref(op.after);if(a)o.after=a;}
-    else if(t==='set'||t==='del'){var r=ref(op)||{};if(r.idx!=null)o.idx=r.idx;if(r.match!=null)o.match=r.match;if(t==='set'){o.fields={};Object.keys(op.fields||{}).forEach(function(k){if(_qchgHas(_QCHG_F,k))o.fields[k]=(k==='qty'||k==='price'||k==='estCost')?N(op.fields[k]):S(op.fields[k],500);});}}
+    else if(t==='set'||t==='del'){var r=ref(op)||{};if(r.idx!=null)o.idx=r.idx;if(r.match!=null)o.match=r.match;if(t==='set'){o.fields={};Object.keys(op.fields||{}).forEach(function(k){if(_qchgHas(_QCHG_F,k))o.fields[k]=(k==='qty'||k==='price')?N(op.fields[k]):k==='estCost'?((op.fields[k]===''||op.fields[k]==null)?null:(N(op.fields[k])==null?S(op.fields[k],40):N(op.fields[k]))):S(op.fields[k],500);});}}
     else if(t==='rmk'){o.key=S(op.key,20);o.value=S(op.value,String(op.key)==='spareTxt'?300:60);}
     else if(t==='rmkAdd'){o.text=S(op.text,300);}
     else if(t==='rmkSet'||t==='rmkDel'){o.n=parseInt(op.n,10);if(op.match!=null)o.match=S(op.match,300);if(t==='rmkSet')o.text=S(op.text,300);}
