@@ -56,6 +56,13 @@ fs0.readdirSync(calcDir).filter(f => /\.js$/.test(f)).forEach(f => {
 });
 
 // ── 應付與分包計價（calc/payable.js）──
+{ // v6.0.188 第 6 步 6-1p：放款日遇假日順延到下一個工作日
+  const ok1 = PY.nextWorkday('2026-11-25', [], []) === '2026-11-25' && PY.nextWorkday('2026-04-25', [], []) === '2026-04-27' && PY.nextWorkday('2026-10-25', [], []) === '2026-10-26';   // 平日不動、週六→週一、週日→週一
+  const ok2 = PY.nextWorkday('2027-02-05', ['2027-02-05', '2027-02-08'], []) === '2027-02-09';   // 週五假日→跳過週末→週一也放假→週二
+  const ok3 = PY.nextWorkday('2026-12-26', [], ['2026-12-26']) === '2026-12-26' && PY.isWorkday('2026-12-26', [], ['2026-12-26']) && !PY.isWorkday('2026-12-27', [], []);   // 補行上班的週六照常
+  const ok4 = PY.nextWorkday('2026-12-31', ['2026-12-31', '2027-01-01'], []) === '2027-01-04' && PY.nextWorkday('', [], []) === '' && PY.nextWorkday('bad', [], []) === 'bad';   // 跨年；空值不動
+  check('v6.0.188 放款日順延：平日不動、週末→週一、連續假日跳到第一個工作日、補班週六照常、跨年、空值不動', ok1 && ok2 && ok3 && ok4, JSON.stringify({ ok1, ok2, ok3, ok4 }));
+}
 { // v6.0.187 第 6 步 6-1a：同一筆應付分次付款
   const p = { amount: 1097250, vat: true, status: 'pending', pays: [{ id: 'a', amt: 576056, date: '2026-10-05', at: 1 }] };
   const ok1 = PY.eff(p, 5) === 1152113 && PY.paidSum(p, 5) === 576056 && PY.left(p, 5) === 576057 && PY.partial(p, 5) && PY.paidIn(p, '2026-10', 5) === 576056 && PY.paidIn(p, '2026-11', 5) === 0;

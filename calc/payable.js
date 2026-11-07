@@ -118,7 +118,22 @@
   }
   function partial(p, tR) { return !!p && p.status !== 'paid' && !p.voidAt && paidSum(p, tR) > 0; }
 
-  var pay = { paysOf: paysOf, paidSum: paidSum, left: left, paidIn: paidIn, partial: partial, eff: eff, vatAmt: vatAmt, retention: retention, invoice: invoice, retRate: retRate, periods: periods, advs: advs, staged: staged, inst: inst,
+  // v6.0.188 第 6 步 6-1p：放款日遇假日順延到下一個工作日（週末自動判斷；國定假日 hol、補行上班日 mk 由 app 從參數傳入，'YYYY-MM-DD' 陣列）
+  function ymd(t) { return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0'); }
+  function isWorkday(iso, hol, mk) {
+    iso = String(iso || '').slice(0, 10); if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return true;
+    if ((mk || []).indexOf(iso) >= 0) return true;
+    if ((hol || []).indexOf(iso) >= 0) return false;
+    var p = iso.split('-'), w = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
+    return w !== 0 && w !== 6;
+  }
+  function nextWorkday(iso, hol, mk) {
+    iso = String(iso || '').slice(0, 10); if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+    var p = iso.split('-'), t = new Date(+p[0], +p[1] - 1, +p[2]);
+    for (var i = 0; i < 40 && !isWorkday(ymd(t), hol, mk); i++) t.setDate(t.getDate() + 1);
+    return ymd(t);
+  }
+  var pay = { isWorkday: isWorkday, nextWorkday: nextWorkday, paysOf: paysOf, paidSum: paidSum, left: left, paidIn: paidIn, partial: partial, eff: eff, vatAmt: vatAmt, retention: retention, invoice: invoice, retRate: retRate, periods: periods, advs: advs, staged: staged, inst: inst,
     prInst: prInst, rowPrice: rowPrice, periodCalc: periodCalc, advInclAlloc: advInclAlloc, overStat: overStat, payId: payId, advPayId: advPayId, earlyId: earlyId };
   var FJC = root.FJC || (root.FJC = {});
   FJC.pay = pay;
