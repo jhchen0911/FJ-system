@@ -11050,7 +11050,9 @@ async function newPage(browser, width, height) {
         out.tomb = _tomb('payables', 'payS187_p1') === false && _payLocked(p);
         // 合併：另一台加了一筆付款、本機撤銷了第一筆 → 聯集，撤銷的不復活
         const other = JSON.parse(JSON.stringify(p)); other.pays.push({ id: 'zz', amt: 1000, date: '2026-10-20', at: Date.now() + 5 });
-        window.prompt = () => '付錯金額'; payVoidLastPart('payS187_p1'); await W(30);
+        payVoidLastPart('payS187_p1'); await W(30); document.getElementById('gen-confirm-ok').click(); await W(20);
+        out.needWhy = document.getElementById('gen-confirm-modal').style.display !== 'none' && FJC.pay.paysOf(p).length === 1;
+        document.getElementById('pvl-why').value = '付錯金額'; document.getElementById('gen-confirm-ok').click(); await W(30);
         const merged = _payStatusReconcile(p, other);
         out.union = FJC.pay.paysOf(merged).length === 1 && FJC.pay.paysOf(merged)[0].id === 'zz' && merged.pays.length === 2;
         // 付清：最後一次也記一筆，已付合計＝全額
@@ -11060,13 +11062,24 @@ async function newPage(browser, width, height) {
         payMarkPaid('payS187_p1', '2026-11-25'); await W(30); document.getElementById('gen-confirm-ok').click(); await W(30);
         out.full = p.status === 'paid' && p.paidDate === '2026-11-25' && _payPaidSum(p) === 1152113 && _payLeft(p) === 0 && _payPaidIn(p, '2026-11') === 1152113 && _payPaidIn(p, '2026-10') === 0;
         // 改回未付＝撤銷最後一筆（要原因），回到部分已付
-        payUnmark('payS187_p1'); await W(30);
+        payUnmark('payS187_p1'); await W(30); document.getElementById('pvl-why').value = '測試'; document.getElementById('gen-confirm-ok').click(); await W(30);
         out.unmark = p.status === 'pending' && _payPaidSum(p) === 576056 && _payLeft(p) === 576057;
+        // 兩台各付一次湊滿全額 → 自動標已付
+        p.pays.push({ id: 'z2', amt: 576057, date: '2026-12-01', at: Date.now() + 9 }); savePayables();
+        out.autoClose = p.status === 'paid' && p.paidDate === '2026-12-01';
+        // 一般成本卡重建（syncCostToPayable）不丟付款紀錄
+        const qx = { id: 'qS187b', name: '範例S187b', costs: [{ id: 'cS187b', type: 'labor', vendor: '丙工程行', amt: 10000, date: '2026-11-01' }] };
+        Q.push(qx); syncCostToPayable(qx, qx.costs[0]);
+        const lp = PAYABLES.find(x => x.costId === 'cS187b');
+        lp.pays = [{ id: 'lp1', amt: 3000, date: '2026-11-02', at: 1 }]; qx.costs[0].amt = 12000; syncCostToPayable(qx, qx.costs[0]);
+        const lp2 = PAYABLES.find(x => x.costId === 'cS187b');
+        out.rebuildKeep = !!lp2 && FJC.pay.paysOf(lp2).length === 1 && Math.round(+lp2.amount) === 12000;
+        Q = Q.filter(x => x.id !== 'qS187b');
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
-      window.prompt = oP; PAYABLES = keep; try { savePayables(); } catch (e) { /* 可忽略 */ }
+      window.prompt = oP; PAYABLES = keep; try { window._payGuardOff = true; localStorage.removeItem('fy_paystat'); _payStatSnap = null; savePayables(); } catch (e) { /* 可忽略 */ }
       return out;
     });
-    check('v6.0.187 分次付款：付款視窗填這次付多少（超過餘額擋下）、部分已付顯示已付／餘額、應付總額只算餘額、自動重算刪不掉、跨裝置付款紀錄聯集且撤銷不復活、付清記最後一筆、改回未付＝撤銷最後一筆', r.overBlocked && r.part && r.line && r.tomb && r.union && r.defLeft && r.full && r.unmark, JSON.stringify(r));
+    check('v6.0.187 分次付款：付款視窗填這次付多少（超過餘額擋下）、部分已付顯示已付／餘額、應付總額只算餘額、自動重算刪不掉、跨裝置付款紀錄聯集且撤銷不復活、付清記最後一筆、改回未付＝撤銷最後一筆', r.overBlocked && r.part && r.line && r.tomb && r.needWhy && r.union && r.defLeft && r.full && r.unmark && r.autoClose && r.rebuildKeep, JSON.stringify(r));
     check('v6.0.187 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

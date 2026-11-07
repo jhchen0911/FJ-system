@@ -2133,7 +2133,7 @@ function _saveQCore(){
       // 2) 清除「已被刪除成本」的殘留：屬於本報價、但 costId 已不在現有成本清單中
       PAYABLES=PAYABLES.filter(function(p){
         if(p.quoteId===_qid && p.costId && !_syncIds.has(p.costId) && !(p.costId&&p.costId.indexOf('merge_')===0)){
-          if(_payPaidHard(p))return true;   // 批次 G3：已付的不刪（成本卡刪了，付過的錢仍要留帳）
+          if(_payPaidAny(p))return true;   // 批次 G3：已付的不刪（成本卡刪了，付過的錢仍要留帳）
           if(p.id)_tomb('payables',p.id); // 立墓碑，否則同步後殘留復活
           return false;
         }
@@ -2206,11 +2206,13 @@ function _payPaidHard(p){
   try{var l=PAID_LOG&&PAID_LOG[p.id];if(l&&(+l.paidAt||0)>(+l.unpaidAt||0))return true;}catch(e){_err('_payPaidHard',e);}
   return false;
 }
+// v6.0.187 審查：付過一部分也要保護（刪報價、取消得標、刪成本卡、手動刪除、抽成佣金重算都擋）；損益口徑仍只看整筆已付（_payPaidOn）
+function _payPaidAny(p){return _payPaidHard(p)||FJC.pay.paysOf(p).length>0;}
 function _delQBlockers(id){
   var ids=Q.filter(function(q){return q.id===id||q.parentId===id;}).map(function(q){return q.id;});if(!ids.length)return '';
   var cids=[];Q.forEach(function(q){if(ids.indexOf(q.id)>=0)(q.costs||[]).forEach(function(c){if(c&&c.id)cids.push(String(c.id));});});
   var ofQ=function(p){if(ids.indexOf(p.quoteId)>=0)return true;var pid=String(p.id||'');return cids.some(function(c){return pid==='pay'+c||pid.indexOf('pay'+c+'_')===0;});};
-  var pays=(PAYABLES||[]).filter(function(p){return p&&ofQ(p)&&_payPaidHard(p);});
+  var pays=(PAYABLES||[]).filter(function(p){return p&&ofQ(p)&&_payPaidAny(p);});
   var invs=(INV||[]).filter(function(v){if(!v||!(ids.indexOf(v.sourceQid)>=0||ids.indexOf(v.quoteId)>=0))return false;
     var w='';try{w=_invLockWhy(v);}catch(e){_err('_delQBlockers',e);}
     return /已收款|已開發票/.test(w)||v.receivedConfirmed||_invRcv(v)>0||(parseFloat(v.retentionReceivedAmt)||0)>0;});
@@ -5284,7 +5286,7 @@ function revokeAward(id){
   if(_roDeny())return;
   const q=Q.find(x=>x.id===id);if(!q)return;
   // 健檢1 #20：抽成／佣金應付——已付就擋下；未付的標作廢（留紀錄、金額歸零），不默默刪
-  var pays=_revokePays(q),paid=pays.filter(_payPaidHard),open=pays.filter(function(p){return !_payPaidHard(p)&&!p.voidAt;});
+  var pays=_revokePays(q),paid=pays.filter(_payPaidAny),open=pays.filter(function(p){return !_payPaidAny(p)&&!p.voidAt;});
   if(paid.length){
     showConfirm('不能取消得標','<div style="font-size:12.5px;line-height:1.75">這案的業務抽成／業主佣金已經付款：<br>'
       +paid.map(function(p){return '・'+esc(p.to||'')+'　NT$ '+fmt(_payEff(p))+(p.paidDate?('（'+esc(p.paidDate)+' 付）'):'');}).join('<br>')
@@ -6511,7 +6513,7 @@ function openRptVendorDetail(name){
     return _rptInRange(d,y,m);
   });
   var payTot=pays.reduce(function(a,p2){return a+(parseFloat(p2.amount)||0);},0);
-  var unpaid=pays.filter(function(p2){return p2.status!=='paid';}).reduce(function(a,p2){return a+(parseFloat(p2.amount)||0);},0);
+  var unpaid=pays.filter(function(p2){return p2.status!=='paid';}).reduce(function(a,p2){var e2=_payEff(p2);return a+(e2>0?(parseFloat(p2.amount)||0)*_payLeft(p2)/e2:0);},0);   // v6.0.187：付過一部分的按比例算未稅餘額
   // v5.402 日報承包出工（此期間）
   var subDays=0,subFirst='',subLast='',subByProj={};
   (Q||[]).forEach(function(q){(q.dailyLogs||[]).forEach(function(d){
@@ -7290,7 +7292,7 @@ function openFinKpi(kind){
   // cash：可動用資金組成
   var cash=_availableCash(Date.now());
   var open0=parseFloat(P.openingCash)||0;
-  var paid=(PAYABLES||[]).filter(function(p){return p&&p.status==='paid';}).reduce(function(a,p){return a+(parseFloat(p.amount)||0);},0);
+  var paid=(PAYABLES||[]).reduce(function(a,p){if(!p)return a;var e2=_payEff(p);return a+(e2>0?(parseFloat(p.amount)||0)*_payPaidSum(p)/e2:0);},0);   // v6.0.187：含部分付款（未稅口徑照舊）
   var rcvAll=(INV||[]).reduce(function(a,i){return a+_invRcv(i);},0);
   var rows3=_rptRow('期初現金','參數設定可調整','NT$ '+fmt(open0),'')
     +_rptRow('歷史實收合計','含各期收款（現金＋票據）','＋NT$ '+fmt(rcvAll),'','var(--g3)')
@@ -21877,6 +21879,7 @@ function syncCostToPayable(q, cost){
   var _existPaid=!!(existP&&existP.status==='paid');
   PAYABLES=PAYABLES.filter(function(p,i){
     if(p.status==='paid'||p.deltaOf)return true;
+    if(i!==existIdx&&_payLocked(p))return true;   // v6.0.187 審查：付過一部分的（不是要重建的那筆）不刪
     var drop=false;
     if(i===existIdx)drop=true;                // 被比對/領養的那筆 → 移除（下面重建）
     else if(p.costId===cost.id)drop=true;      // 任何 costId 重複 → 移除
@@ -21940,6 +21943,7 @@ function syncCostToPayable(q, cost){
     if(existP.payDue)p.payDue=existP.payDue;
     if(existP.note&&!itemName)p.note=existP.note;
     if(existP.files)p.files=existP.files;           // 已上傳的請款單/發票/匯款紀錄不可遺失
+    if(Array.isArray(existP.pays)&&existP.pays.length)p.pays=existP.pays;   // v6.0.187 審查：分次付款紀錄跟著重建
     if(existP.invNo)p.invNo=existP.invNo;           // 廠商發票號碼
     if(existP.vat!=null)p.vat=existP.vat;           // 5%稅勾選狀態
     if(existP.costSourceId)p.costSourceId=existP.costSourceId;
@@ -23420,7 +23424,7 @@ function _paidRebuildHeal(){
   if(n||ask.length)setTimeout(function(){try{toast((n?('有 '+n+' 筆應付曾經已付、被刪後重建成待付，已依付款紀錄恢復為已付'):'')+(ask.length?((n?'；':'')+ask.length+' 筆金額和付款時不同，請到應付管理按「歷程」確認'):''));}catch(e){/* 可忽略 */}},900);
   return n;
 }
-function savePayables(){try{_paidVanishGuard();}catch(e){_err('savePayables.guard',e);}try{_paidLogSync();}catch(e){_err('savePayables.paidLog',e);}try{_paidRebuildHeal();}catch(e){_err('savePayables.heal',e);}try{_payAuditDiff();}catch(e){_err('savePayables.audit',e);}_lsSet('fy_payables',JSON.stringify(PAYABLES),'應付帳款'); try{_autoUpload();}catch(e){_err('savePayables',e);}}   // v6.0.85 存檔前先與付款帳本對帳
+function savePayables(){try{_paidVanishGuard();}catch(e){_err('savePayables.guard',e);}try{(PAYABLES||[]).forEach(_payAutoClose);}catch(e){_err('savePayables.autoClose',e);}try{_paidLogSync();}catch(e){_err('savePayables.paidLog',e);}try{_paidRebuildHeal();}catch(e){_err('savePayables.heal',e);}try{_payAuditDiff();}catch(e){_err('savePayables.audit',e);}_lsSet('fy_payables',JSON.stringify(PAYABLES),'應付帳款'); try{_autoUpload();}catch(e){_err('savePayables',e);}}   // v6.0.85 存檔前先與付款帳本對帳
 function saveInvoiceRecs(){_lsSet('fy_inv_recs',JSON.stringify(INVOICE_RECS),'發票紀錄'); try{_autoUpload();}catch(e){_err('saveInvoiceRecs',e);}}
 function saveExpenses(){_lsSet('fy_expenses',JSON.stringify(EXPENSES),'費用'); try{_autoUpload();}catch(e){_err('saveExpenses',e);}}
 function saveActivityLog(){_lsSet('fy_activity',JSON.stringify(ACTIVITY_LOG.slice(0,500)),'活動紀錄');}
@@ -25579,7 +25583,7 @@ function calcPayableAmt(){
 
 
 function _delPayableCore(id){
-  var _p0=PAYABLES.find(x=>x.id===id);if(_p0&&_payPaidHard(_p0)){toast('這筆已付款，不能刪除；確定要刪請先改回未付');return;}   // 批次 G3（Lotion 10/22：已付應付不改寫不刪）
+  var _p0=PAYABLES.find(x=>x.id===id);if(_p0&&_payPaidAny(_p0)){toast('這筆已付款，不能刪除；確定要刪請先改回未付');return;}   // 批次 G3（Lotion 10/22：已付應付不改寫不刪）
   showConfirm('刪除付款記錄','確定刪除此付款記錄？',()=>{
     _tomb('payables',id); // 確認後才立墓碑，按取消不會誤刪
     PAYABLES=PAYABLES.filter(x=>x.id!==id);savePayables();renderPayables();updateFinanceKPIs();toast('已刪除');
@@ -26501,8 +26505,9 @@ function renderCashForecast(){
     var d=noDate?30:dayOf(p.date);
     if(d==null)d=30;
     if(d<0)d=0;if(d>90)return;
-    var ret=_payRetention(p);          // 保留款押住不付，另排在第 90 天
-    var pay=_payEff(p)-ret;
+    var _lf=_payLeft(p);               // v6.0.187 審查：付過一部分的只算餘額
+    var ret=Math.min(_payRetention(p),_lf);          // 保留款押住不付，另排在第 90 天
+    var pay=_lf-ret;
     if(pay>0)events.push({day:d,amt:-pay,label:'付款：'+(p.to||'')+(p.project?'／'+p.project:'')+(noDate?'（未定付款日，暫估30天）':'')});
     if(ret>0)events.push({day:90,amt:-ret,label:'廠商保留款退還：'+(p.to||'')});
   });
@@ -34459,7 +34464,7 @@ function _pjTodoItems(q,st){
   try{_rfqs(q).forEach(function(r){if(r.status==='awarded'||r.status==='labor')return;var n=(r.vendors||[]).length;if(n)add('詢價單 '+(r.no||'')+' 已有 '+n+' 家回傳，待比價得標','',"_rfqQid='"+q.id+"';_rfqTab='rfq';go('rfq')",'比價得標');});}catch(e){_err('_pjTodoItems',e);}
   // 應付 7 天內到期／逾期
   try{var due=_dAdd(today,7),ap=(PAYABLES||[]).filter(function(p){return p&&p.status!=='paid'&&!p.voidAt&&!p.planned&&(p.quoteId===q.id||(!p.quoteId&&p.project===qn))&&p.date&&p.date<=due;});
-    if(ap.length){var sum=ap.reduce(function(a,p){return a+_payEff(p);},0),od=ap.filter(function(p){return p.date<today;}).length;add('應付 '+ap.length+' 筆 7 天內到期'+(od?('（'+od+' 筆已逾期）'):'')+'：'+ap.slice(0,3).map(function(p){return (p.to||'')+' '+fmt(_payEff(p));}).join('、'),'合計 NT$ '+fmt(sum),"go('finance');setTimeout(function(){switchFinanceTab('payable')},150)",'看應付',od>0);}}catch(e){_err('_pjTodoItems',e);}
+    if(ap.length){var sum=ap.reduce(function(a,p){return a+_payLeft(p);},0),od=ap.filter(function(p){return p.date<today;}).length;add('應付 '+ap.length+' 筆 7 天內到期'+(od?('（'+od+' 筆已逾期）'):'')+'：'+ap.slice(0,3).map(function(p){return (p.to||'')+' '+fmt(_payEff(p));}).join('、'),'合計 NT$ '+fmt(sum),"go('finance');setTimeout(function(){switchFinanceTab('payable')},150)",'看應付',od>0);}}catch(e){_err('_pjTodoItems',e);}
   // 材料：自有在工地太久、租料將到期
   try{var at=_matLedAt(q).filter(function(r){return r.kind!=='一次性';});if(at.length){var days=at.reduce(function(a,r){return Math.max(a,_matDays(r.outDate,today));},0);if(days>=120)add('自有材料在工地最久 '+days+' 天，確認是否歸還','',"_m6Qid='"+q.id+"';go('mat6')",'看材料',true);}
     (q.mat&&q.mat.rents||[]).forEach(function(rt){if(!rt.pt||!(rt.batches||[]).some(function(b){return b.d&&!b.o;}))return;var d=_dDiff(today,rt.pt);if(d<=14)add((rt.vendor||'')+' 租料 '+esc(_matLabel(rt))+(d<0?('預計退場 '+rt.pt+' 已過 '+(-d)+' 天'):('預計 '+rt.pt+' 退場（'+d+' 天後）')),'',"_m6Qid='"+q.id+"';go('mat6')",'看材料',d<0);});}catch(e){_err('_pjTodoItems',e);}
@@ -35526,7 +35531,16 @@ function openSubEarly(cid){openSubAdvance(cid);}
 function _subEarlyRowBtn(){return '';}
 // 應付：標記已付（填實付日）
 // v6.0.187 第 6 步 6-1a：部分已付的卡面一行「已付 X／餘額 Y」
-function _payPartLine(p){if(!_payPartial(p))return '';return '<div style="font-size:11px;color:#b26a00;white-space:nowrap">已付 '+fmt(_payPaidSum(p))+'／餘額 '+fmt(_payLeft(p))+'</div>';}
+// v6.0.187 審查：付款紀錄加起來已達全額（兩台各付一次、或應付金額改小）→ 自動標已付，實付日＝最後一次付款日；超付另記稽核
+function _payAutoClose(p){
+  if(!p||p.status==='paid'||p.voidAt)return false;var ps=FJC.pay.paysOf(p);if(!ps.length)return false;
+  var sum=ps.reduce(function(a,x){return a+Math.round(+x.amt||0);},0),e=_payEff(p);if(sum<e||e<=0)return false;
+  var last=ps.slice().sort(function(a,b){return String(a.date||'').localeCompare(String(b.date||''))||((+a.at||0)-(+b.at||0));}).pop();
+  p.status='paid';p.paidDate=last.date||localToday();p.paidAt=_payStamp(p);if(sum>e){p.overPaid=sum-e;}_touch(p);
+  if(sum>e){try{console.warn('[應付] 付款紀錄合計 '+sum+' 超過應付 '+e+'：'+p.id);}catch(er){/* 可忽略 */}}
+  return true;
+}
+function _payPartLine(p){if(p&&p.status==='paid'&&+p.overPaid>0)return '<div style="font-size:11px;color:var(--red);white-space:nowrap">付款紀錄多付 '+fmt(+p.overPaid)+'，請核對</div>';if(!_payPartial(p))return '';return '<div style="font-size:11px;color:#b26a00;white-space:nowrap">已付 '+fmt(_payPaidSum(p))+'／餘額 '+fmt(_payLeft(p))+'</div>';}
 function _payPaysHtml(p){var ps=FJC.pay.paysOf(p);if(!ps.length)return '';return '<div style="font-size:12px;color:var(--b4);margin-top:4px">已付紀錄：'+ps.map(function(x){return esc(x.date||'')+' NT$ '+fmt(Math.round(+x.amt||0));}).join('、')+'　合計 '+fmt(_payPaidSum(p))+'</div>';}
 function _payNewPay(p,amt,date,note){if(!Array.isArray(p.pays))p.pays=[];var x={id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),amt:Math.round(amt),date:date||localToday(),at:_payStamp(p),by:_meEmail()||'本機',v:APP_VERSION};if(note)x.note=String(note).slice(0,80);p.pays.push(x);return x;}
 function payMarkPaid(pid,defDate,after){
@@ -35557,15 +35571,16 @@ function payVoidLastPart(pid){
   var p=PAYABLES.find(function(x){return x.id===pid;});if(!p)return;
   var ps=FJC.pay.paysOf(p);if(!ps.length){toast('沒有可撤銷的付款');return;}
   var last=ps.slice().sort(function(a,b){return (+a.at||0)-(+b.at||0);}).pop();
-  var why=window.prompt('撤銷 '+(last.date||'')+' 付的 NT$ '+fmt(Math.round(+last.amt||0))+'：請寫原因','');if(why==null)return;
-  if(!String(why).trim()){toast('要寫原因才能撤銷');return;}
-  last.void=true;last.voidAt=_payStamp(p);last.voidBy=_meEmail()||'本機';last.voidWhy=String(why).trim().slice(0,80);
-  if(p.status==='paid'){var _ua=_payStamp(p);p.status='pending';delete p.paidDate;delete p.paidAt;p.unpaidAt=_ua;}
-  _touch(p);
-  try{savePayables();_onSave();}catch(er){_err('payVoidLastPart',er);}
-  try{var gm=document.getElementById('gen-confirm-modal');if(gm)gm.style.display='none';}catch(er){/* 可忽略 */}
-  try{rCostItems();}catch(er){_err('payVoidLastPart',er);}try{if(document.getElementById('page-acct')&&document.getElementById('page-acct').classList.contains('active'))renderPayables();}catch(er){_err('payVoidLastPart',er);}
-  toast('已撤銷這筆付款，餘額 NT$ '+fmt(_payLeft(p)));
+  var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
+  showConfirm('撤銷付款：'+esc(p.to||''),'<div style="font-size:12.5px;line-height:1.8">撤銷 '+esc(last.date||'')+' 付的 <b>NT$ '+fmt(Math.round(+last.amt||0))+'</b>（紀錄會留著、標成已撤銷）</div><div class="f" style="margin-top:6px"><label>原因（必填）</label><input id="pvl-why" maxlength="80" style="'+IN+'"></div>',function(){
+    var why=String(gv('pvl-why')||'').trim();if(!why){toast('要寫原因才能撤銷');return false;}
+    last.void=true;last.voidAt=_payStamp(p);last.voidBy=_meEmail()||'本機';last.voidWhy=why.slice(0,80);
+    if(p.status==='paid'){var _ua=_payStamp(p);p.status='pending';delete p.paidDate;delete p.paidAt;delete p.overPaid;p.unpaidAt=_ua;}
+    _touch(p);
+    try{savePayables();_onSave();}catch(er){_err('payVoidLastPart',er);}
+    try{rCostItems();}catch(er){_err('payVoidLastPart',er);}try{if(document.getElementById('page-acct')&&document.getElementById('page-acct').classList.contains('active'))renderPayables();}catch(er){_err('payVoidLastPart',er);}
+    toast('已撤銷這筆付款，餘額 NT$ '+fmt(_payLeft(p)));
+  },true);
 }
 // v6.0.116：已付的應付直接改實付日（不必先改回未付再重標；Lotion 10/28 想改預付款日期，結果改到第 1 期）
 function _payDateEditable(p){return !!p&&!/^(pay_ps_|pay_pc_)/.test(String(p.id||''));}   // 薪資條、零用金的付款日以來源為準（應付頁改了不會回寫）
@@ -36801,7 +36816,7 @@ function _salesCommSync(q){   // 得標＋業務＋抽成>0 → 一筆應付（�
   var cfg=_salesCommCfg(q),id=_salesPayId(q),amt=q.awarded?((cfg&&cfg.mode==='unit')?Math.round(_salesUnitQty(q,cfg.unit).billed*cfg.val):_salesCommAmt(q)):0,who=_salesName(q.salesId);   // v6.0.77 每單位模式：應付＝業主已請量 × 單價，隨請款增加
   var p=(PAYABLES||[]).find(function(x){return x&&x.id===id;});
   if(amt>0&&who){
-    if(p&&_payPaidHard(p))return;   // 批次 G3：已付的抽成不改寫
+    if(p&&_payPaidAny(p))return;   // 批次 G3：已付（含付過一部分）的抽成不改寫
     var isNew=!p;if(!p){p={id:id,status:'pending',createdAt:Date.now()};PAYABLES.unshift(p);}
     var before=_recSig(p);_payVoidOff(p);
     if(!isNew&&p._baseV!==2&&(cfg&&(cfg.mode==='rev'||cfg.mode==='profit'))&&Math.round(+p.amount||0)!==amt&&p.baseFixFrom==null)p.baseFixFrom=Math.round(+p.amount||0);   // 舊版以報價未稅（可能是含稅數字）算的金額，留下原值
@@ -36883,7 +36898,7 @@ function _salesRows(year,month,salesId,st){
 function _salesStat(list){
   var s=_bidStat(list);s.comm=0;s.accr=0;s.paid=0;s.unpaid=0;s.wonNet=0;
   list.forEach(function(q){if(!q.awarded)return;var a=_salesCommAmt(q);if(!(a>0))return;s.comm+=a;s.accr+=_salesCommAccr(q);
-    var p=(PAYABLES||[]).find(function(x){return x&&x.id===_salesPayId(q);});if(p&&p.status==='paid')s.paid+=a;else s.unpaid+=a;s.wonNet+=_salesBase(q);});
+    var p=(PAYABLES||[]).find(function(x){return x&&x.id===_salesPayId(q);});if(p&&p.status==='paid')s.paid+=a;else if(p&&_payPartial(p)){var _pp=Math.min(a,_payPaidSum(p));s.paid+=_pp;s.unpaid+=a-_pp;}else s.unpaid+=a;s.wonNet+=_salesBase(q);});
   return s;
 }
 function _salesStTxt(q){return q.awarded?'<span style="color:var(--g3);font-weight:700">✓ 得標</span>':(q.bidStatus==='lost'?'<span style="color:var(--red)">未得標</span>':q.bidStatus==='void'?'<span style="color:var(--b3)">流標</span>':'<span style="color:#e65100">洽談中</span>');}
@@ -37195,7 +37210,7 @@ function _commSync(q){   // 得標＋佣金>0 → 每位收款人一筆應付（
     var cfg=_salesCommNorm(c),id=_commPayId(q,c),amt=q.awarded?_commDueFor(q,cfg):0;
     var p=(PAYABLES||[]).find(function(x){return x&&x.id===id;});
     if(amt>0){
-      keep[id]=1;if(p&&_payPaidHard(p))return;   // 批次 G3：已付的佣金不改寫
+      keep[id]=1;if(p&&_payPaidAny(p))return;   // 批次 G3：已付（含付過一部分）的佣金不改寫
       var isNew=!p;if(!p){p={id:id,status:'pending',createdAt:Date.now()};PAYABLES.unshift(p);}
       var before=_recSig(p);_payVoidOff(p);
       p.kind='commission';p.to=c.name;p.project=q.name||'';p.quoteId=q.id;p.amount=amt;p.vat=false;p.category='other';
@@ -37287,7 +37302,7 @@ function _commRows(year,month,who){   // 得標主案、報價日在期間內、
 }
 function _commStat(rows){
   var s={n:0,total:0,accr:0,paid:0,unpaid:0},cases={};
-  rows.forEach(function(r){var a=_commAmt(r.q,r.c);cases[r.q.id]=1;s.total+=a;s.accr+=_commAccr(r.q,r.c);var p=_commPay(r.q,r.c);if(p&&p.status==='paid')s.paid+=(parseFloat(p.amount)||0);});
+  rows.forEach(function(r){var a=_commAmt(r.q,r.c);cases[r.q.id]=1;s.total+=a;s.accr+=_commAccr(r.q,r.c);var p=_commPay(r.q,r.c);if(p&&p.status==='paid')s.paid+=(parseFloat(p.amount)||0);else if(p&&_payPartial(p)){var _e=_payEff(p);s.paid+=_e>0?Math.round((parseFloat(p.amount)||0)*_payPaidSum(p)/_e):0;}});
   s.n=Object.keys(cases).length;s.unpaid=Math.max(0,s.total-s.paid);return s;
 }
 function _commPayTxt(r,withBtn){
@@ -43185,7 +43200,7 @@ function rProfit(){
   window._profitCases=cases;
   const totBonusFull=cases.reduce((a,r)=>a+(r.bonusFull||0),0);
   const totBonusAccr=cases.reduce((a,r)=>a+(r.bonusAccr||0),0);
-  const totBonusPaid=(PAYABLES||[]).filter(p=>p&&p.kind==='commission'&&p.status==='paid').reduce((a,p)=>a+(parseFloat(p.amount)||0),0);
+  const totBonusPaid=(PAYABLES||[]).filter(p=>p&&p.kind==='commission').reduce((a,p)=>{const _e=_payEff(p);return a+(_e>0?(parseFloat(p.amount)||0)*_payPaidSum(p)/_e:0);},0);   // v6.0.187 含部分付款
 
   el.innerHTML=`
     <!-- KPI 主要指標（v5.389：一排並列、全部可點入總結、加佣金卡） -->
