@@ -13,6 +13,11 @@ const S = (v, n) => String(v == null ? '' : v).slice(0, n);
 const N = (v) => { const x = D.num(v); return x == null ? null : x; };
 const fmt = (n) => Math.round(+n || 0).toLocaleString('en-US');
 
+// 同前端 _rmkBaseFor／_rmkQOld：第 14 條切換前建立的舊報價用舊範本
+function rmkBaseFor(q, rp) {
+  const at = +rp.rmk14At || 0, id = String((q && q.id) || ''), t = /^\d{12,14}$/.test(id) ? +id : 0;
+  return (at && rp.rmkBaseOld && q && t < at) ? String(rp.rmkBaseOld) : String(rp.rmkBase || '');
+}
 function arr(x) { return Array.isArray(x) ? x.filter(Boolean) : (x && typeof x === 'object' ? Object.values(x).filter(Boolean) : []); }
 // 找報價：qid 優先；只給報價編號時要唯一
 function findQuote(quotes, ref) {
@@ -40,7 +45,7 @@ function cleanItems(its) {
 
 // body＝{type, payload, summary?, expect}；回傳 {rec} 或 {err, detail?}
 function build(o) {
-  const { email, name, body, quotes, taxR, now, id } = o;
+  const { email, name, body, quotes, taxR, now, id } = o, rp = o.rmkParams || {};
   const b = (body && typeof body === 'object') ? body : {};
   const type = S(b.type, 20), pl = (b.payload && typeof b.payload === 'object') ? b.payload : {};
   if (!TYPES[type]) return { err: '這個工具只收 qchg（改單）、quote（報價單）、bid（得標狀態）；其他草稿請從網頁送' };
@@ -50,7 +55,7 @@ function build(o) {
     const f = findQuote(quotes, { qid: S(pl.qid, 80), code: S(pl.code, 60) }); if (f.err) return { err: f.err };
     const q = f.q; if (!q) return { err: '找不到這張報價（qid 或 code）' };
     const ops = D.clean(Array.isArray(pl.ops) ? pl.ops : []);
-    const plan = D.plan(q, ops, fmt);
+    const plan = D.plan(q, ops, fmt, { rmkBase: rmkBaseFor(q, rp) });   // v6.0.196 固定條款改字（範本跟前端 _rmkBaseFor 同一規則）
     if (plan.bad) return { err: '有動作對不上：' + plan.rows.filter((r) => !r.ok).map((r) => r.act + '：' + r.why).join('；'), detail: plan.rows };
     const t0 = D.totals(q.items, taxR), t1 = D.totals(plan.items, taxR);
     const ee = expectOk(b.expect, t1); if (ee) return { err: ee, detail: plan.rows };
@@ -106,4 +111,4 @@ function mine(all, email) {
   return Object.keys(all || {}).map((k) => all[k]).filter((d) => d && d.status === 'pending' && String(d.by || '').toLowerCase() === em)
     .sort((a, b) => (+a.at || 0) - (+b.at || 0)).map((d) => ({ id: d.id, type: d.type, at: d.at, summary: d.summary }));
 }
-module.exports = { TYPES, MAX_PENDING, build, superseded, withdrawErr, mine, expectOk, findQuote };
+module.exports = { rmkBaseFor, TYPES, MAX_PENDING, build, superseded, withdrawErr, mine, expectOk, findQuote };

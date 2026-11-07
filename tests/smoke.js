@@ -9935,7 +9935,7 @@ async function newPage(browser, width, height) {
         // Lotion：草稿清單、前後對照、套用 → 開編輯頁存檔、草稿標已套用
         const oMark = window._draftMark; let marked = null; window._draftMark = (id, st, ex) => { marked = { id, st, ex }; return Promise.resolve(true); };
         DRAFTS = { dQC1aa: { id: 'dQC1aa', type: 'qchg', by: 'ai@example.com', byName: '陳軒', at: Date.now(), status: 'pending', summary: pushed.sm, payload: pushed.pl } };
-        out.list = /改單/.test(_draftListHtml()) && /6 項可套用/.test(_draftListHtml());
+        { const it0 = []; _v6TodoItems(it0); out.list = !/6 項可套用/.test(_draftListHtml()) && it0.some((x) => x.type === 'dec_qchg' && /1 份待確認/.test(x.text)) && /6 項可套用/.test(_decCardHtml('qchg', DRAFTS.dQC1aa)); }   // v6.0.196 改走首頁拍板卡
         draftApply('dQC1aa');
         const md = document.getElementById('gen-confirm-modal').innerHTML;
         out.diff = /前後對照/.test(document.getElementById('gen-confirm-title').textContent) && /【減項】/.test(md) && /-30,000/.test(md) && /115,000/.test(md) && /120,750/.test(md) && document.getElementById('gen-confirm-ok').textContent === '套用';
@@ -9958,7 +9958,7 @@ async function newPage(browser, width, height) {
     check('AI 改單草稿：新增（含負數減項、接在指定列後）、改單價／備註、刪列、改備註條款數字與自訂條款；全部對位在原報價的複本上，原報價不動', r.plan, JSON.stringify(r));
     check('AI 改單草稿（審查）：同一列後加兩列照順序；重複條款照位置改；同一條兩個動作、繼承欄位名、空白說明擋下；編號重複不猜；送出只留白名單欄位；這台套用過不能再套', r.order && r.guard && r.dupCode && r.once, JSON.stringify(r));
     check('AI 改單草稿：說明不一樣／找不到／數量 0／同列兩個動作／不認得的動作都擋下；唯讀帳號送出前先試算、對不上不送，草稿帶版次與未稅前後', r.bad && r.push, JSON.stringify(r));
-    check('AI 改單草稿：Lotion 草稿清單、前後對照表（減項、未稅與含稅總計）、按「套用」開報價改好存檔、草稿標已套用；套用過再看就對不上、不能再套', r.list && r.diff && r.applied && r.stale && r.notAgain, JSON.stringify(r));
+    check('AI 改單草稿：Lotion 拍板卡（v6.0.196 起不在 AI 草稿清單）、前後對照表（減項、未稅與含稅總計）、按「套用」開報價改好存檔、草稿標已套用；套用過再看就對不上、不能再套', r.list && r.diff && r.applied && r.stale && r.notAgain, JSON.stringify(r));
     check('AI 改單草稿測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
@@ -11656,6 +11656,40 @@ async function newPage(browser, width, height) {
     check('v6.0.191 LINE 收件：AI 建議歸檔收成一張拍板卡（總覽一列），超過 7 天的只列在卡片、待辦那一列不再算；明細照檔名跳脫', r.todo && r.one && r.detail && r.staleOnly && r.newSug, JSON.stringify(r));
     check('v6.0.191 LINE 收件拍板卡：修改可逐件先不歸、確認＝照建議逐件歸檔（帶原本備註）、退回＝清掉建議不動狀態；收件匣列表顯示建議', r.edit && r.ok && r.rej && r.rowBadge, JSON.stringify(r));
     check('v6.0.191 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.196 AI 改單開放成本單價與條款文字（含範本固定條款），改走首頁拍板卡：逐項改前→改後、成本旁改後毛利、條款標紅 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const W = (ms) => new Promise((r) => setTimeout(r, ms || 40));
+      try {
+        const oT = window.toast; window.toast = () => {};
+        const oBase = P.rmkBase; P.rmkBase = '1. 本報價有效期限 30 天\n2. 本工程無保固及保留款';
+        Q = [{ id: 'qF1', code: '1151101', name: '範例案', ver: 2, _mt: 1, items: [{ desc: '假工項A', unit: '支', qty: 10, price: 1000, estCost: 600 }], rmk: {} }];
+        const ops = [{ op: 'set', idx: 0, match: '假工項A', fields: { estCost: 800 } }, { op: 'rmkFix', match: '本工程無保固及保留款', text: '本工程保固一年、無保留款' }];
+        DRAFTS = { dQF1aaa: { id: 'dQF1aaa', type: 'qchg', by: 'ai@x.com', byName: 'AI', at: Date.now(), status: 'pending', summary: '範例案 改成本與條款', payload: { qid: 'qF1', code: '1151101', baseVer: 2, baseMt: 1, ops } } };
+        const oU = window._fbUser, oA = window._isAdminUser; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        const h = await _qchgDetailHtml(DRAFTS.dQF1aaa);
+        out.detail = /成本單價 600 → <b>800<\/b>/.test(h) && /改後這列毛利 <b>20%<\/b>/.test(h) && /整張毛利 40% → <b>20%<\/b>/.test(h) && /本工程<del style="color:#c62828">無保固及<\/del><b style="color:#c62828;background:#fdecea">保固一年、無<\/b>保留款/.test(h);
+        // 非管理員看不到成本與毛利
+        _isAdminUser = false; _fbUser = { email: 'w@x.com', uid: 'w' }; const hw = await _qchgDetailHtml(DRAFTS.dQF1aaa); out.noCost = !/成本單價|毛利/.test(hw); _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        // 首頁拍板卡：AI 草稿清單不列、待辦一列；展開才能確認
+        const its = []; _v6TodoItems(its); out.card = its.some((x) => x.type === 'dec_qchg') && !/範例案 改成本/.test(_draftListHtml());
+        // 套用後：固定條款照新字印、成本寫進工項
+        const plan = _qchgPlan(Q[0], ops); const c = JSON.parse(JSON.stringify(Q[0])); c.items = plan.items; c.rmk = plan.rmk;
+        const txt = _rmkBuild(P.rmkBase, c.rmk, false).text;
+        out.rmk = /^2\. 本工程保固一年、無保留款$/m.test(txt) && /^1\. 本報價有效期限 30 天$/m.test(txt) && c.items[0].estCost === 800;
+        // 範本那一條被改過 → 覆寫不套（不換錯條）
+        out.safe = /^2\. 本工程無保固及保留款（新）$/m.test(_rmkBuild('1. 本報價有效期限 30 天\n2. 本工程無保固及保留款（新）', c.rmk, false).text);
+        _fbUser = oU; _isAdminUser = oA; P.rmkBase = oBase; DRAFTS = {}; Q = []; window.toast = oT;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.196 AI 改單拍板卡：成本單價改前→改後＋這列與整張改後毛利（只給管理員）、條款標紅差異；不在 AI 草稿清單', r.detail && r.noCost && r.card, JSON.stringify(r));
+    check('v6.0.196 範本固定條款改字：只改這張報價（rmk.ov），範本那一條改過就不套；成本寫進工項', r.rmk && r.safe, JSON.stringify(r));
+    check('v6.0.196 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 

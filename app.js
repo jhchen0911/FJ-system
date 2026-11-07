@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.194';
+var APP_VERSION='v6.0.196';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -2537,7 +2537,10 @@ function rmkDelExtra(i){_rmkExtraList().splice(i,1);rmkRenderExtra();}
 //   輸出前依實際有內容的條目從 1 重新編號（Lotion 10/29：沒填的條目會跳號 1…7, 9…）。no[佔位符]＝該條輸出後的條號
 function _rmkBuild(base,c,edit){
   c=c||{};var rows=[];
-  String(base||'').split('\n').forEach(function(line){
+  var ov=(c.ov&&typeof c.ov==='object'&&!Array.isArray(c.ov))?c.ov:null;
+  String(base||'').split('\n').forEach(function(line,li){
+    // v6.0.196：這張報價改過的固定條款（q.rmk.ov[範本第幾行]＝{from,to}；範本那一行跟 from 一樣才換，範本改過就不套，避免換錯條）
+    if(ov&&ov[li]&&line.indexOf('【')<0&&FJC.qd.strip(line)===String(ov[li].from||'')&&String(ov[li].to||'').trim()){var pm=line.match(/^(\s*\d+\s*\.(?!\d)\s*)/);line=(pm?pm[1]:'')+String(ov[li].to).trim();}
     var toks=line.match(/【[A-Z_]+】/g)||[],t=line;
     if(line.includes('【LOAD】'))t=c.load?line.replace('【LOAD】',c.load):(edit?line.replace('【LOAD】','_____'):null);
     else if(line.includes('【WALK】')||line.includes('【TECH】')){
@@ -40742,7 +40745,7 @@ function _qchgNum(v){return FJC.qd.num(v);}
 function _qchgFind(its,ref){return FJC.qd.find(its,ref);}
 function _qchgSub(its){return FJC.qd.sub(its);}
 function _qchgRowTxt(it){return FJC.qd.rowTxt(it,fmt);}
-function _qchgPlan(q,ops){return FJC.qd.plan(q,ops,fmt);}
+function _qchgPlan(q,ops){return FJC.qd.plan(q,ops,fmt,{rmkBase:_rmkBaseFor(q,P.rmkBase||'')});}   // v6.0.196 固定條款改字要用這張報價的範本
 function _qchgClean(ops){return FJC.qd.clean(ops);}
 // 唯讀帳號（AI）送改單草稿：spec＝{qid, ops, summary}；回傳 Promise<{ok, id?, why?, plan?}>（先在本機試算過，對不上就不送）
 function fyQuoteChange(spec){
@@ -40793,7 +40796,7 @@ function _qchgOpen(id){
     _qchgApply(id);
   },false,null,true,plan.bad?{ok:'關閉',cancel:'取消'}:{ok:'套用',cancel:'先不要'});
 }
-function _qchgApply(id){
+function _qchgApply(id,noSave){   // noSave（v6.0.196 拍板卡「修改」）：改好放進編輯頁、不存
   if(_roDeny())return false;
   var d=DRAFTS[id];if(!d||d.status!=='pending')return false;var pl=(d.payload&&typeof d.payload==='object')?d.payload:{};
   var q=Q.find(function(x){return x.id===pl.qid;});if(!q){toast('找不到這張報價');return false;}
@@ -40802,6 +40805,7 @@ function _qchgApply(id){
   var c=JSON.parse(JSON.stringify(q));c.items=plan.items;c.rmk=plan.rmk;
   _draftOpenQuote(c,true);
   window._draftApplying={id:id,kind:'quote',target:q.id};   // 要在開編輯頁之後設（loadQ 會清掉待套用旗標）；saveQ 存成功才標已套用
+  if(noSave){toast('改單已放進編輯頁（還沒存）：看過後按「儲存」才生效');return false;}
   var mt0=q._mt||0;
   try{saveQ();}catch(e){_err('_qchgApply.save',e);}
   var q1=Q.find(function(x){return x.id===q.id;});
@@ -41238,7 +41242,7 @@ function gtasksAuth(){
 var _DEC={},_DEC_BUSY={},_DEC_OPEN={},_DEC_READY={};   // v6.0.179：卡片預設收起；展開過且明細裡的照片／PDF 載入完成（_DEC_READY）才能按確認
 function _decIsAdmin(){try{return !_fbUser||(!!_isAdminUser&&!_isReaderUser);}catch(e){return false;}}
 function _decFieldsHtml(fs){var adm=_decIsAdmin();return '<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12.5px">'+(fs||[]).filter(function(f){return f&&(!f.money||adm);}).map(function(f){return '<div style="color:var(--b4)">'+esc(String(f.label||''))+'</div><div>'+esc(String(f.value==null?'':f.value))+'</div>';}).join('')+'</div>';}
-var _DEC_DRAFT_TYPES={dailyOut:1,vendorBill:1,qverfix:1,qsend:1};   // 走拍板卡的草稿類型：AI 草稿清單（_draftPending）不再列
+var _DEC_DRAFT_TYPES={qchg:1,dailyOut:1,vendorBill:1,qverfix:1,qsend:1};   // 走拍板卡的草稿類型：AI 草稿清單（_draftPending）不再列
 function _decReg(kind,spec){
   if(!spec||typeof spec.detail!=='function'){_err('_decReg',new Error(kind+'：沒有 detail，不准註冊（確認前一定要看得到完整內容）'));return false;}
   _DEC[kind]=spec;return true;
@@ -42184,6 +42188,50 @@ _decReg('qdup',{
     var opts=g.qs.map(function(q){return '<label style="display:block;margin:4px 0"><input type="radio" name="qdup-keep" value="'+esc(q.id)+'"'+(q.id===g.keep?' checked':'')+'> 保留原號：'+_qdupInfo(q)+'</label>';}).join('');
     showConfirm('報價編號 '+esc(g.code)+'：哪張保留原號？','<div style="font-size:12.5px">'+opts+'</div><div style="font-size:11.5px;color:var(--b4);margin-top:6px">其他張改成下一個空號。</div>',function(){
       var r=document.querySelector('input[name="qdup-keep"]:checked');var k=r?r.value:g.keep;if(_qdupApply(g.code,k,'報價編號重號（Lotion 改選保留）'))_decRefresh('qdup');},false,null,true);}
+});
+// ══════════ v6.0.196 AI 改單草稿改走首頁拍板卡（Lotion 11/07 經陳軒：開放成本單價、條款文字（含範本固定條款）；逐項改前→改後、成本旁顯示改後毛利、條款標紅差異）══════════
+// 確認＝跟原本「套用」一樣（_qchgApply：開報價、改好、儲存；存成功才標已套用）；退回＝寫原因；修改＝改好放進編輯頁、不存（自己看過再按儲存）
+function _qchgGross(its){   // 跟 calcT 同一套：有填成本單價逐項算，沒填的照倍率推估
+  var sub=0,known=0,unk=0;(its||[]).forEach(function(it){if(!it||it.sec||_isSpare(it))return;var q=parseFloat(it.qty)||0,p=parseFloat(it.price)||0,c=parseFloat(it.estCost)||0;sub+=q*p;if(q>0&&c>0)known+=q*c;else if(p>0)unk+=q*p;});
+  var cost=known+(unk*_taxM())/(P.mult||1.4);return {sub:sub,cost:cost,gross:sub-cost,pct:sub?Math.round((sub-cost)/sub*1000)/10:0,known:known>0};
+}
+function _txtDiffHtml(a,b){   // 只標中間不同的那一段：刪掉的劃線、加上的標紅
+  a=String(a==null?'':a);b=String(b==null?'':b);var i=0,j=0;while(i<a.length&&i<b.length&&a[i]===b[i])i++;
+  while(j<a.length-i&&j<b.length-i&&a[a.length-1-j]===b[b.length-1-j])j++;
+  var pre=a.slice(0,i),suf=a.slice(a.length-j),da=a.slice(i,a.length-j),db=b.slice(i,b.length-j);
+  return esc(pre)+(da?'<del style="color:#c62828">'+esc(da)+'</del>':'')+(db?'<b style="color:#c62828;background:#fdecea">'+esc(db)+'</b>':'')+esc(suf);
+}
+function _qchgDetailHtml(d){
+  var pl=(d.payload&&typeof d.payload==='object')?d.payload:{},q=Q.find(function(x){return x.id===pl.qid;}),S=_draftS;
+  if(!q)return '<div style="font-size:12px;color:var(--red)">找不到這張報價（可能已刪除），請退回</div>';
+  var plan=_qchgPlan(q,pl.ops),adm=_decIsAdmin(),sub0=_qchgSub(q.items),sub1=_qchgSub(plan.items),tx=function(s){return Math.round(s*_taxR()/100);};
+  var warn=[];
+  if((q.ver||1)!==(+pl.baseVer||1))warn.push('草稿依據 V'+(+pl.baseVer||1)+'，目前是 V'+(q.ver||1)+'：會改在 V'+(q.ver||1)+'。');
+  if((q._mt||0)>(+pl.baseMt||0))warn.push('草稿建立後這張報價被改過；每一列都重新對過說明文字，對不上的不會套用。');
+  if(q.awarded)warn.push('這案已得標：改工項後，還沒動過的請款單草稿會跟著更新，已有的請款單不會改。');
+  var pct=function(c,p){return (p>0&&c!=null)?(Math.round((p-c)/p*1000)/10)+'%':'—';};
+  var rows=plan.rows.map(function(r){
+    var main=!r.ok?'<b style="color:var(--red)">'+esc(S(r.why))+'</b>':(r.txt?('<div style="color:var(--b4)">改前：'+esc(S(r.before))+'</div><div>改後：'+_txtDiffHtml(r.before,r.after)+'</div>')
+      :('<div style="color:var(--b4)">改前：'+esc(S(r.before)||'（無）')+'</div><div>改後：'+esc(S(r.after))+'</div>'));
+    var cost=(r.ok&&r.cost&&adm)?'<div style="color:#1565C0">成本單價 '+(r.cost.b==null?'（未填）':fmt(r.cost.b))+' → <b>'+(r.cost.a==null?'（清空，改回倍率推估）':fmt(r.cost.a))+'</b>　改後這列毛利 <b>'+pct(r.cost.a,r.cost.price)+'</b></div>':'';
+    return '<div style="border:1px solid '+(r.ok?'var(--b1)':'#f5c2c0')+';border-radius:6px;padding:5px 8px;margin-top:4px;font-size:12px;overflow-wrap:anywhere'+(r.ok?'':';background:#fdecea')+'"><div style="font-weight:700">'+esc(S(r.act))+(r.ok&&r.d?'<span style="float:right;font-weight:400">'+(r.d>0?'+':'')+fmt(r.d)+'</span>':'')+'</div>'+main+cost+'</div>';
+  }).join('');
+  var g0=_qchgGross(q.items),g1=_qchgGross(plan.items);
+  return '<div style="font-size:12px;color:var(--b4)">'+esc(S(q.code))+'　'+esc(S(q.name))+'　目前 V'+(q.ver||1)+'　'+esc(S(d.byName||d.by))+' 提出　'+esc(new Date(+d.at||0).toLocaleString('zh-TW'))+'</div>'
+    +(warn.length?'<div style="font-size:12px;color:#b26a00;margin:6px 0">'+warn.map(esc).join('<br>')+'</div>':'')+rows
+    +'<div style="font-size:12.5px;margin-top:8px;line-height:1.8">未稅小計 NT$ '+fmt(sub0)+' → <b>NT$ '+fmt(sub1)+'</b>（'+(sub1-sub0>=0?'+':'')+fmt(sub1-sub0)+'）<br>含稅總計 NT$ '+fmt(sub0+tx(sub0))+' → <b>NT$ '+fmt(sub1+tx(sub1))+'</b>'
+    +(adm?'<br>整張毛利 '+g0.pct+'% → <b>'+g1.pct+'%</b>（NT$ '+fmt(Math.round(g0.gross))+' → NT$ '+fmt(Math.round(g1.gross))+'）':'')+'</div>'
+    +(plan.bad?'<div style="font-size:12px;color:var(--red);margin-top:6px">有 '+plan.bad+' 項對不上，整份不能確認。請退回，讓提出的人照目前的報價重做。</div>':'<div style="font-size:11.5px;color:var(--b4);margin-top:6px">確認＝開這張報價、改好並儲存（跟手動修改一樣，之後送出時才封存版次）。修改＝改好放進編輯頁、不存，自己看過再按儲存。</div>');
+}
+_decReg('qchg',{
+  title:'AI 改單待確認',todo:function(n){return 'AI 改單 '+n+' 份待確認';},sub:'展開看逐項改前→改後（成本旁有改後毛利、條款標紅）→ 確認／退回／修改',
+  canSee:function(){return !_isReaderUser;},
+  list:function(){return Object.keys(DRAFTS||{}).map(function(k){return DRAFTS[k];}).filter(function(d){return d&&d.type==='qchg'&&d.status==='pending'&&_DRAFT_ID.test(_draftS(d.id));}).sort(function(a,b){return (a.at||0)-(b.at||0);});},
+  key:function(d){return d.id;},head:function(d){return _draftS(d.summary);},body:function(d){return _qchgBody(d);},
+  detail:function(d){return _qchgDetailHtml(d);},
+  ok:function(d){if(_qchgDone[d.id]){toast('這份改單這台已經套用過了（雲端狀態還沒更新）；不要再套一次');return Promise.resolve(false);}return Promise.resolve(_qchgApply(d.id)?'open':false);},
+  reject:function(d,why){return _draftMark(d.id,'rejected',{reason:why||'退回'}).then(function(m){return m!==false;});},
+  edit:function(d){_qchgApply(d.id,true);}
 });
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

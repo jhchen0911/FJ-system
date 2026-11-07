@@ -708,7 +708,7 @@ exports.fyDraft = onRequest({ region: REGION, cors: ['https://jhchen0911.github.
     const sz = JSON.stringify(body).length; if (sz > 400000) { res.status(413).json({ error: { message: '草稿太大（上限約 400KB）' } }); return; }
     const [quotes, tax, rname] = await Promise.all([
       db.ref('fydata/shared/quotes').once('value').then((s) => pnlCore.deepDec(s.val() || {})),
-      db.ref('fydata/shared/params/tax').once('value').then((s) => s.val()),
+      Promise.all(['tax', 'rmkBase', 'rmkBaseOld', 'rmk14At'].map((k) => db.ref('fydata/shared/params/' + k).once('value').then((s) => s.val()))),
       db.ref('fydata/readers/' + email.replace(/\./g, ',')).once('value').then((s) => s.val()),
     ]);
     const mineN = Object.keys(await pend()).length;
@@ -716,7 +716,7 @@ exports.fyDraft = onRequest({ region: REGION, cors: ['https://jhchen0911.github.
     const now = Date.now(), id = 'd' + now.toString(36) + require('crypto').randomBytes(4).toString('hex');
     const name = (rname && typeof rname === 'object' && rname.name) ? String(rname.name) : 'AI';
     const FJCinv = require('./calc/invoice.js');
-    const b = draftsCore.build({ email, name, body, quotes, taxR: FJCinv.inv.taxR(tax), now, id });
+    const b = draftsCore.build({ email, name, body, quotes, taxR: FJCinv.inv.taxR(tax[0]), rmkParams: { rmkBase: tax[1], rmkBaseOld: tax[2], rmk14At: tax[3] }, now, id });
     if (b.err) { res.status(400).json({ error: { message: b.err }, detail: b.detail || null }); return; }
     const cr = await db.ref('fydata/drafts/' + id).transaction((d) => (d === null ? b.rec : undefined));   // 審查：id 撞到就不覆蓋
     if (!cr.committed) { res.status(409).json({ error: { message: '草稿編號撞到，請再送一次' } }); return; }
