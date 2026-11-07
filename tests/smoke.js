@@ -8945,14 +8945,15 @@ async function newPage(browser, width, height) {
         out.model = sentModel === _AI_MODEL && /^claude-/.test(_AI_MODEL);
         /* 材料簽收單 → 日報 slips；材料頁出現簽收單清單與趟數 */
         reply = { docType: 'delivery_slip', projectId: 'qI1', date: '2026-10-31', vendor: '丙料場', slip: { dir: 'rentIn', from: '丙料場', to: '內湖興中路', truck: 'KLA-1234', items: [{ name: 'H型鋼', spec: 'H300', len: 9, qty: 12, unit: '支' }] } };
-        await aiClassifyDoc(du); await wait(120);
-        out.slipForm = /H型鋼 H300 9M 12支/.test(document.getElementById('ik-s-items').value) && document.getElementById('ik-s-dir').value === 'rentIn';
-        ok(); await wait(60);
-        const S = (L.slips || [])[0];
-        out.slip = !!S && S.dir === 'rentIn' && S.items[0].qty === 12 && S.items[0].len === 9 && S.truck === 'KLA-1234' && /^ph:/.test(S.photo);
+        await aiClassifyDoc(du); await wait(400);
+        /* v6.0.198 M2：不跳修改畫面，直接存成進退料簿待確認（不再寫進日報）；確認後材料頁照舊列出、可帶入 */
+        const MV = (MAT_MOVES || []).find(m => m && m.qid === 'qI1' && m.date === '2026-10-31');
+        out.slipForm = !document.getElementById('ik-s-items') && !!MV && MV.st === 'draft';
+        out.slip = !!MV && MV.dir === 'in' && MV.own === false && MV.rentVendor === '丙料場' && MV.items[0].qty === 12 && MV.items[0].len === 9 && MV.truck === 'KLA-1234' && /^ph:/.test(MV.photo);
+        if (MV) { MV.st = 'ok'; MV.okAt = Date.now(); }
         const mh = _m6SlipsHtml(Q[0]);
         out.slipList = /材料簽收單/.test(mh) && /1 張待登錄/.test(mh) && /2026-10：1 趟/.test(mh) && /帶入租料進場/.test(mh);
-        out.slipRow = /材料簽收：租賃商 → 工地/.test(_drLogRow(Q[0], L).progress);
+        out.slipRow = !(L.slips || []).length;
         const pr = _ikSlipItemsParse('鋼板樁 IV型 12M 30支\n角鐵 5');
         out.parse = pr[0].name === '鋼板樁' && pr[0].len === 12 && pr[0].qty === 30 && pr[0].unit === '支' && pr[1].qty === 5;
         /* 員工不能登錄費用類（要讀寫私密資料） */
@@ -8985,7 +8986,7 @@ async function newPage(browser, width, height) {
     const APP = fs.readFileSync(pth.join(__dirname, '..', 'app.js'), 'utf8');
     check('v6.0.119 手機總覽黃色相機＝智慧收件；AI 模型集中一處（沒有寫死的舊模型）', r.fab && r.model && !/model:'claude-sonnet-5'/.test(APP) && (APP.match(/model:_AI_MODEL/g) || []).length >= 7, JSON.stringify(r));
     check('v6.0.119 智慧收件：一般員工只見施工照片／簽收單；施工照片放進該工地當天日報；費用類被擋', r.staffTypes && r.photo && r.staffDeny, JSON.stringify(r));
-    check('v6.0.119 材料簽收單：讀出方向／品名／單長／支數／車號存進日報；材料頁列出待登錄與運費趟數；日報檢視帶出', r.slipForm && r.slip && r.slipList && r.slipRow && r.parse, JSON.stringify(r));
+    check('v6.0.119 材料簽收單：讀出方向／品名／單長／支數／車號（v6.0.198 起直接存進退料簿待確認、不寫日報）；確認後材料頁列出待登錄與運費趟數', r.slipForm && r.slip && r.slipList && r.slipRow && r.parse, JSON.stringify(r));
     check('v6.0.119 分包廠商的發票辨識成費用時紅字提醒（請到分包卡登錄）', r.subHit && r.subWarn, JSON.stringify(r));
     check('v6.0.119 LINE 公司大群組：設定成 company、待分類草稿選工程後寫日報並記下地名', r.coSave && r.body && r.coApply && r.siteKey, JSON.stringify(r));
     check('v6.0.119 批次 I 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
@@ -11030,6 +11031,60 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.198 進退料統整表 M2：拍簽收單直接進首頁「簽收單待確認」卡片 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepM = MAT_MOVES, oC = window.showConfirm;
+      try {
+        MAT_MOVES = [];
+        Q = [{ id: 'qM198', name: '範例M198', client: '甲', awarded: true, items: [], _mt: 1, dailyLogs: [] }, { id: 'qN198', name: '範例N198', client: '甲', awarded: true, items: [], _mt: 1 }];
+        const ai = { docType: 'delivery_slip', projectId: 'qM198', date: '2026-11-05', vendor: '範例租賃', confidence: 'high',
+          slip: { dir: 'rentIn', own: false, from: '範例料場', to: '範例工地', carrier: '範例運輸', truckType: 'flat', truck: 'KAA-123', trips: 1, rentVendor: '範例租賃', rentSlipNo: 'R-9', signer: '王先生',
+            lift: { has: true, by: '我方' }, items: [{ name: '鋼板樁', spec: 'IV', len: '9', qty: '50', unit: '片' }], low: ['truck', 'items.0.qty'] } };
+        const m = _mvFromIntake(ai, '');
+        out.draft = !!m && m.st === 'draft' && m.dir === 'in' && m.own === false && m.qid === 'qM198' && m.items[0].qty === 50 && m.items[0].m === 450 && m.rentVendor === '範例租賃' && m.carrier === '範例運輸' && m.conf.truck === '低' && m.conf.items_0_qty === '低' && !Q[0].dailyLogs.length;
+        out.todo = (function () { const it = []; _v6TodoItems(it); return it.some(x => x.type === 'dec_mvSlip' && /1 張/.test(x.text)); })();
+        const det = await Promise.resolve(_DEC.mvSlip.detail(m));
+        out.detail = /黃色 2 項/.test(det) && /範例M198/.test(det) && /鋼板樁/.test(det) && !/運費|租金|NT\$|賠償/.test(det);
+        out.blocked = _DEC.mvSlip.ok(m) === false && m.st === 'draft';
+        // 修改：核對過＝黃色清掉；方向改退場、加短少
+        window.showConfirm = function (t, h, ok) { document.body.insertAdjacentHTML('beforeend', '<div id="tmpbox">' + h + '</div>'); document.getElementById('mv-items').value = '鋼板樁 IV 9M 48片 短少2'; document.getElementById('mv-dir').value = 'out'; ok(); document.getElementById('tmpbox').remove(); };
+        _DEC.mvSlip.edit(m);
+        out.edit = m.dir === 'out' && m.items[0].qty === 48 && m.items[0].short === 2 && !Object.keys(m.conf).length && _mvYellow(m).length === 0;
+        out.ok = _DEC.mvSlip.ok(m) === true && m.st === 'ok' && !!m.okAt && !_decItems('mvSlip').length;
+        // 審查：照片還沒同步到這台不准確認；AI 回中文欄位名照樣標黃並顯示原名
+        const mp = _mvFromIntake({ docType: 'delivery_slip', projectId: 'qM198', date: '2026-11-05', slip: { dir: 'out', own: true, items: [{ name: 'H型鋼', len: 12, qty: 3 }], low: ['車號'] } }, '');
+        mp.photo = 'ph:none'; mp.conf = {}; delete _MV_PH_OK[mp.id];
+        out.photoGate = _DEC.mvSlip.ok(mp) === false && mp.st === 'draft';
+        const mz = _mvFromIntake({ docType: 'delivery_slip', slip: { dir: 'out', own: true, items: [{ name: 'H型鋼', qty: 1 }], low: ['車號'] } }, '');
+        out.zhLow = _mvYellow(mz).some(t => /車號/.test(t));
+        // 審查：舊單勾已登錄 → 搬家那筆也標 legacy
+        Q[0].dailyLogs = [{ id: 'dl', date: '2026-11-01', slips: [{ id: 'sOld', date: '2026-11-01', dir: 'out', items: [{ name: 'H型鋼', len: 12, qty: 2 }], at: 1 }] }];
+        MAT_MOVES.push({ id: 'mv_sOld', st: 'ok', dir: 'in', own: true, qid: 'qM198', date: '2026-11-01', items: [], src: { slipId: 'sOld' }, _mt: 1 });
+        window._m6Re = window._m6Re || function () {}; m6SlipDone('qM198', 'sOld', true);
+        out.oldLegacy = _mvOf('mv_sOld').legacy === 1;
+        // 退回
+        const m2 = _mvFromIntake({ docType: 'delivery_slip', slip: { dir: 'other', items: [] } }, '');
+        out.noProj = m2.qid === '' && _mvYellow(m2).indexOf('工地') >= 0 && _mvYellow(m2).indexOf('方向') >= 0;
+        out.reject = _DEC.mvSlip.reject(m2, '拍錯') === true && m2.st === 'rejected' && m2.rejReason === '拍錯';
+        // 轉場要兩個工地
+        const m3 = { id: 'mv_t', st: 'draft', dir: 'xfer', own: true, date: '2026-11-06', fromQid: 'qM198', toQid: 'qN198', qid: 'qN198', items: [{ name: 'H型鋼', qty: 5 }], conf: {} };
+        out.xfer = _mvYellow(m3).length === 0 && _mvYellow(Object.assign({}, m3, { toQid: 'qM198' })).indexOf('轉場的兩個工地') >= 0;
+        // 智慧收件手動選「材料簽收單」也走同一條（不寫日報）
+        out.route = _ikSlipSave('qN198', { date: '2026-11-07', slip: { dir: 'out', items: [{ name: 'H型鋼', len: 12, qty: 10 }] } }, '') === true && MAT_MOVES.some(x => x.qid === 'qN198' && x.st === 'draft' && x.own === true) && !(Q[1].dailyLogs || []).length;
+        // 材料．運輸頁過渡：已確認的新簽收單列在簽收單清單，勾已登錄＝legacy
+        const sl = _m6Slips(Q[0]); const s0 = sl.find(x => x.id === m.id);
+        out.bridge = !!s0 && s0.dir === 'rentOut' && s0.done === false && s0.vendor === '範例租賃';
+        window._m6Re = window._m6Re || function () {}; m6SlipDone('qM198', m.id, true);
+        out.legacy = _mvOf(m.id).legacy === 1 && _m6Slips(Q[0]).find(x => x.id === m.id).done === true;
+      } finally { Q = keepQ; MAT_MOVES = keepM; window.showConfirm = oC; }
+      return out;
+    });
+    check('v6.0.198 進退料 M2：拍簽收單直接存待確認（不寫日報）、AI 沒把握的欄位標黃、首頁卡片、明細沒有金額、黃色沒核對不准確認、修改＝核對、確認／退回、轉場要兩個工地、手動選簽收單同一條、材料頁過渡帶入與已登錄', r.draft && r.todo && r.detail && r.blocked && r.edit && r.ok && r.photoGate && r.zhLow && r.oldLegacy && r.noProj && r.reject && r.xfer && r.route && r.bridge && r.legacy, JSON.stringify(r));
+    check('v6.0.198 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.195 進退料統整表 M1：進退料簿資料層＋舊簽收單搬家 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
