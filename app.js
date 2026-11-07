@@ -40002,6 +40002,7 @@ function _lbxWatch(){
     try{var b=document.getElementById('lbx-btn');if(b){var n=_lbxOpen().length;b.style.display='';b.textContent='LINE 收件匣'+(n?'（'+n+'）':'');}}catch(e){_err('_lbxWatch.btn',e);}
     try{if(typeof updateDashTodo==='function')updateDashTodo();}catch(e){_err('_lbxWatch.todo',e);}
     try{var bx=document.getElementById('lbx-list');if(bx)bx.innerHTML=_lbxListHtml();}catch(e){_err('_lbxWatch.list',e);}
+    try{var db=document.getElementById('dec-box');if(db&&db.getAttribute('data-kind')==='lbxSug'&&!_DEC_BUSY['lbxSug|batch'])_decRefresh('lbxSug');}catch(e){_err('_lbxWatch.dec',e);}   // v6.0.191 審查：建議有變就重畫卡片
   },function(e){if(_lbxRef){try{_lbxRef.off();}catch(e2){_err('_lbxWatch.off',e2);}}_lbxRef=null;_lbxOn=false;_err('_lbxWatch',e);});
 }
 function _lbxOff(){try{if(_lbxRef)_lbxRef.off();}catch(e){_err('_lbxOff',e);}_lbxRef=null;_lbxOn=false;LBX={};var b=document.getElementById('lbx-btn');if(b)b.style.display='none';}
@@ -41916,14 +41917,18 @@ function _vbFromIntake(qid,r,du){
 // AI 帳號（tools/fy-draft.js inbox-suggest）處理過的收件寫 x.sug={qid,caseName,note,why,by,at}；這裡把全部建議收成一張卡：
 //   確認＝逐件標已歸檔（雲端 lineInboxMark，跟手動歸檔同一條路）、退回＝清掉建議（狀態與備註不動）、修改＝逐件改案件或先不歸。
 //   超過 7 天沒處理（沒有建議）的只列在卡片明細裡，總覽那一列「LINE 收件 N 件未歸檔」不再算它們。
-var _LBX_STALE_MS=7*86400000,_LBX_SUG_OV={};   // _LBX_SUG_OV：修改時的本機調整 {id:{skip,qid,caseName}}
-function _lbxSugs(){return _lbxOpen().filter(function(x){return x&&x.status==='new'&&x.sug&&typeof x.sug==='object'&&(x.sug.qid||x.sug.caseName);});}
-function _lbxStale(){var t=Date.now()-_LBX_STALE_MS;return _lbxOpen().filter(function(x){return x&&!(x.sug&&(x.sug.qid||x.sug.caseName))&&(+x.at||0)<t;});}
-function _lbxTodoOpen(){var t=Date.now()-_LBX_STALE_MS;return _lbxOpen().filter(function(x){return x&&!(x.sug&&(x.sug.qid||x.sug.caseName))&&(+x.at||0)>=t;});}
+var _LBX_STALE_MS=7*86400000,_LBX_SUG_OV={},_LBX_SHOWN={};   // _LBX_SHOWN（審查）：展開明細時看到的每件建議指紋，確認／退回只處理看過、而且沒變的   // _LBX_SUG_OV：修改時的本機調整 {id:{skip,qid,caseName}}
+function _lbxSugs(){return _lbxOpen().filter(function(x){return _lbxHasSug(x);});}
+function _lbxHasSug(x){return !!(x&&x.status==='new'&&x.sug&&typeof x.sug==='object'&&(x.sug.qid||x.sug.caseName));}
+function _lbxStale(){var t=Date.now()-_LBX_STALE_MS;return _lbxOpen().filter(function(x){return x&&!_lbxHasSug(x)&&(+x.at||0)<t;});}
+function _lbxTodoOpen(){var t=Date.now()-_LBX_STALE_MS;return _lbxOpen().filter(function(x){return x&&!_lbxHasSug(x)&&(+x.at||0)>=t;});}
+function _lbxSugFp(x){var g=_lbxSugOf(x);return [x.id,g.skip?1:0,g.qid,g.caseName,g.note].join('|');}
+function _lbxSeen(){return _lbxSugs().filter(function(x){return _LBX_SHOWN[x.id]===_lbxSugFp(x);});}
 function _lbxSugOf(x){var s=x.sug||{},o=_LBX_SUG_OV[x.id]||{};return {skip:!!o.skip,qid:o.qid!=null?o.qid:(s.qid||''),caseName:o.caseName!=null?o.caseName:(s.caseName||''),note:x.note||s.note||'',why:s.why||''};}
 function _lbxSugName(x){var g=_lbxSugOf(x);return g.qid?_lbxQName(g.qid):(g.caseName||'');}
 function _lbxSugDetail(){
   var S=function(v){return v==null?'':String(v);},L=_lbxSugs(),T=_lbxStale();
+  _LBX_SHOWN={};L.forEach(function(x){_LBX_SHOWN[x.id]=_lbxSugFp(x);});
   var row=function(x,sg){var g=_lbxSugOf(x),nm=S(x.fileName)||(x.type==='text'?S(x.text).slice(0,40):(_LBX_TYPE[x.type]||x.type));
     return '<div style="border-bottom:1px solid var(--b1);padding:5px 0;font-size:12.5px;overflow-wrap:anywhere">'
       +'<div style="font-size:11px;color:var(--b3)">'+_lbxTime(x.at)+'　'+esc(_LBX_TYPE[x.type]||S(x.type))+(x.size?('　'+_lbxSize(x.size)):'')+(x.note?'　'+esc(S(x.note).slice(0,80)):'')+'</div>'
@@ -41939,14 +41944,17 @@ _decReg('lbxSug',{
   head:function(){var a=_lbxSugs().length;return a?('AI 建議把 '+a+' 件 LINE 收件歸到案件'):'LINE 收件有超過 7 天還沒處理的';},
   detail:function(){return _lbxSugDetail();},
   ok:function(){
-    var L=_lbxSugs().filter(function(x){return !_lbxSugOf(x).skip;});
-    if(!L.length){toast(_lbxSugs().length?'全部都先不歸了，沒有要確認的':'沒有 AI 建議要確認（超過 7 天的請到 LINE 收件匣歸檔）');return Promise.resolve(false);}
+    if(!_lbxSugs().length){try{openLineInbox();}catch(e){_err('lbxSug.ok',e);}return Promise.resolve('open');}   // 審查：只剩超過 7 天的＝打開收件匣自己處理
+    if(_lbxSeen().length!==_lbxSugs().length){toast('有新的或改過的建議，請收起再展開看一次');_LBX_SHOWN={};_decRefresh('lbxSug');return Promise.resolve(false);}
+    var L=_lbxSeen().filter(function(x){return !_lbxSugOf(x).skip;});
+    if(!L.length){toast('全部都先不歸了，沒有要確認的');return Promise.resolve(false);}
     var bad=[];
     return L.reduce(function(p,x){return p.then(function(){var g=_lbxSugOf(x);return _lbxMarkCall(x.id,'filed',{qid:g.qid||'',caseName:g.caseName||'',note:g.note||''}).then(function(r){if(r.ok){x.status='filed';x.qid=g.qid||null;x.caseName=g.caseName||null;x.sug=null;delete _LBX_SUG_OV[x.id];}else bad.push((x.fileName||x.id)+'：'+r.msg);});});},Promise.resolve())
       .then(function(){if(bad.length){toast('有 '+bad.length+' 件沒歸成：'+bad.join('；').slice(0,120));return false;}toast('已歸檔 '+L.length+' 件');return true;});
   },
   reject:function(it,why){
-    var L=_lbxSugs(),bad=0;if(!L.length){toast('沒有 AI 建議可以退回');return Promise.resolve(false);}
+    if(!_lbxSugs().length){toast('沒有 AI 建議可以退回；超過 7 天的請到 LINE 收件匣處理');return Promise.resolve(false);}
+    var L=_lbxSeen(),bad=0;if(L.length!==_lbxSugs().length){toast('有新的或改過的建議，請收起再展開看一次');_LBX_SHOWN={};_decRefresh('lbxSug');return Promise.resolve(false);}
     return L.reduce(function(p,x){return p.then(function(){return _lbxMarkCall(x.id,'unsug',{}).then(function(r){if(r.ok){x.sug=null;delete _LBX_SUG_OV[x.id];}else bad++;});});},Promise.resolve()).then(function(){if(bad){toast(bad+' 件沒退成，請再試一次');return false;}return true;});
   },
   edit:function(){
@@ -41958,6 +41966,8 @@ _decReg('lbxSug',{
         +'<label style="font-size:12px;display:block;margin:3px 0"><input type="checkbox" id="lbs-k'+i+'"'+(g.skip?'':' checked')+'> 這件要歸檔</label>'
         +'<select id="lbs-q'+i+'" style="'+IN+'"><option value="">（不掛報價）</option>'+opts.map(function(q){return '<option value="'+esc(q.id)+'"'+(g.qid===q.id?' selected':'')+'>'+esc((q.code?q.code+' ':'')+(q.name||''))+'</option>';}).join('')+'</select>'
         +'<input id="lbs-c'+i+'" value="'+esc(g.caseName||'')+'" maxlength="100" placeholder="案名（還沒建報價時填）" style="'+IN+';margin-top:4px"></div>';}).join(''),function(){
+      var miss=L.filter(function(x,i){var k=document.getElementById('lbs-k'+i);return k&&k.checked&&!gv('lbs-q'+i)&&!String(gv('lbs-c'+i)||'').trim();});
+      if(miss.length){toast('要歸檔的件要選報價或填案名（'+miss.length+' 件沒填）');return false;}   // 審查
       L.forEach(function(x,i){var k=document.getElementById('lbs-k'+i);_LBX_SUG_OV[x.id]={skip:!(k&&k.checked),qid:gv('lbs-q'+i)||'',caseName:String(gv('lbs-c'+i)||'').trim().slice(0,100)};});
       _decRefresh('lbxSug');toast('改好了，回到卡片按「確認」');
     },false,null,true);

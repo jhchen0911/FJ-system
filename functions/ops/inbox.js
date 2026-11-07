@@ -22,7 +22,7 @@ function cleanMark(b) {
 }
 // 只改狀態與歸檔資訊；路徑、檔名、來源不動
 function markUpdate(cur, c, email, now) {
-  if (c.status === 'unsug') return { sug: null, markedBy: String(email || '').toLowerCase(), markedAt: now };   // v6.0.191 退回 AI 建議：不動狀態、案名與備註
+  if (c.status === 'unsug') { const g = (cur && cur.sug) || {}; return { sug: null, sugRej: { qid: g.qid || null, caseName: g.caseName || null, at: now }, markedBy: String(email || '').toLowerCase(), markedAt: now }; }   // 審查：記下被退回的建議，AI 不能再送一模一樣的   // v6.0.191 退回 AI 建議：不動狀態、案名與備註
   const up = { sug: null, status: c.status, qid: c.qid || null, caseName: c.caseName || null, note: c.note || null, markedBy: String(email || '').toLowerCase(), markedAt: now };
   up.filedAt = c.status === 'filed' ? now : null;
   if (cur && (cur.status === 'error' || cur.status === 'tooBig') && c.status === 'new') up.status = cur.status;   // 存檔失敗／太大的不能改回「未歸檔」假裝有檔案
@@ -42,6 +42,9 @@ function cleanSug(b) {
 function sugUpdate(cur, c, email, now) {
   if (!cur) return { err: '找不到這筆收件' };
   if (cur.status === 'filed') return { err: '這筆已經歸檔了' };
+  if (cur.status !== 'new') return { err: '這筆存檔失敗或太大沒存，不能建議歸檔（請對方重傳）' };   // 審查
+  const rj = cur.sugRej;
+  if (rj && (rj.qid || null) === (c.qid || null) && (rj.caseName || null) === (c.caseName || null)) return { err: 'Lotion 退回過這個建議，請改建議別的案件或問 Lotion' };
   return { sug: { qid: c.qid || null, caseName: c.caseName || null, note: c.note || null, why: c.why || null, by: String(email || '').toLowerCase(), at: now } };
 }
 // 給 AI 看的未歸檔清單（不含下載網址）

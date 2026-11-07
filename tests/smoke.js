@@ -11505,7 +11505,7 @@ async function newPage(browser, width, height) {
     const r = await page.evaluate(async () => {
       const out = {}; const W = (ms) => new Promise((r) => setTimeout(r, ms || 40));
       try {
-        const oT = window.toast; let tt = ''; window.toast = (m) => { tt = String(m); };
+        const oT = window.toast; let tt = ''; const TT = []; window.toast = (m) => { tt = String(m); TT.push(tt); };
         const oU = window._fbUser, oR = window._isReaderUser, oOk = window._lbxOk, oCall = window._lbxMarkCall;
         _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isReaderUser = false; window._lbxOk = () => true;
         Q = [{ id: 'q1', code: '1151101', name: '範例案', items: [], _mt: 1 }];
@@ -11527,6 +11527,10 @@ async function newPage(browser, width, height) {
         decToggle('lbxSug', 'batch'); await W(80);
         const h = c.querySelector('.dec-detail').innerHTML;
         out.detail = /範例詢價單\.pdf/.test(h) && /1151101 範例案/.test(h) && /假乙案 詢價/.test(h) && /已交給報價線/.test(h) && /很舊的\.pdf/.test(h) && /超過 7 天/.test(h) && !/還沒處理\.pdf/.test(h) && !/已歸檔\.pdf/.test(h) && /&lt;b&gt;/.test(h) && !c.querySelector('.dec-detail b b');
+        // 審查：展開後又來了新建議 → 確認不歸檔、要重新看
+        LBX.m6 = { id: 'm6', at: now - 60000, type: 'file', fileName: '新來的.pdf', status: 'new', sug: { qid: 'q1' } };
+        decAct('lbxSug', 'batch', 'ok'); await W(120); out.newSug = calls.length === 0 && TT.some((t) => /請收起再展開/.test(t)) && LBX.m6.status === 'new';
+        delete LBX.m6; _decRefresh('lbxSug'); decToggle('lbxSug', 'batch', true); await W(80);
         // 修改：第 2 件先不歸、第 1 件改案名
         const oC = window.showConfirm; window.showConfirm = (t, b, ok) => { document.body.insertAdjacentHTML('beforeend', '<div id="__lbs">' + b + '</div>'); document.getElementById('lbs-k1').checked = false; ok(); document.getElementById('__lbs').remove(); };
         decAct('lbxSug', 'batch', 'edit'); window.showConfirm = oC; await W(80);
@@ -11548,7 +11552,7 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.191 LINE 收件：AI 建議歸檔收成一張拍板卡（總覽一列），超過 7 天的只列在卡片、待辦那一列不再算；明細照檔名跳脫', r.todo && r.one && r.detail && r.staleOnly, JSON.stringify(r));
+    check('v6.0.191 LINE 收件：AI 建議歸檔收成一張拍板卡（總覽一列），超過 7 天的只列在卡片、待辦那一列不再算；明細照檔名跳脫', r.todo && r.one && r.detail && r.staleOnly && r.newSug, JSON.stringify(r));
     check('v6.0.191 LINE 收件拍板卡：修改可逐件先不歸、確認＝照建議逐件歸檔（帶原本備註）、退回＝清掉建議不動狀態；收件匣列表顯示建議', r.edit && r.ok && r.rej && r.rowBadge, JSON.stringify(r));
     check('v6.0.191 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();

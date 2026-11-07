@@ -87,11 +87,11 @@ async function call(body) {
   if (cmd === 'login') return login();
   if (cmd === 'logout') { try { fs.unlinkSync(TOK); } catch (e) { /* 本來就沒有 */ } return out({ ok: true }); }
   if (cmd === 'mine') return call({ action: 'mine' });
-  if (cmd === 'withdraw') { if (!args[1]) die('要給草稿 id'); return call({ action: 'withdraw', id: args[1] }); }
+  if (cmd === 'withdraw') { if (!args[1] || /^--/.test(args[1])) die('要給草稿 id'); return call({ action: 'withdraw', id: args[1] }); }
   if (cmd === 'inbox') return call({ action: 'inboxList' });
   if (cmd === 'inbox-suggest') {
-    if (!args[1]) die('要給收件 id');
-    const opt = (k) => { const i = args.indexOf('--' + k); return i >= 0 ? String(args[i + 1] || '') : ''; };
+    if (!args[1] || /^--/.test(args[1])) die('要給收件 id');
+    const opt = (k) => { const i = args.indexOf('--' + k), v = i >= 0 ? String(args[i + 1] || '') : ''; return /^--/.test(v) ? '' : v; };   // 審查：下一個是旗標就當沒給
     return call({ action: 'inboxSuggest', id: args[1], qid: opt('qid'), caseName: opt('case'), why: opt('why'), note: opt('note') });
   }
   if (cmd === 'submit') {

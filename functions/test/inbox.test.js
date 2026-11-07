@@ -34,7 +34,10 @@ test('v6.0.191 AI 建議歸檔：要有報價或案名；已歸檔的不收；�
   assert.deepEqual(c, { id: 'm1', qid: 'q1', caseName: '', note: '', why: '已交給報價線 建草稿' });
   assert.ok(ib.sugUpdate({ status: 'filed' }, c, 'a', 1).err);
   assert.deepEqual(ib.sugUpdate({ status: 'new' }, c, 'AI@x.com', 9), { sug: { qid: 'q1', caseName: null, note: null, why: '已交給報價線 建草稿', by: 'ai@x.com', at: 9 } });
-  assert.deepEqual(ib.markUpdate({ status: 'new', note: '第 1 批' }, ib.cleanMark({ id: 'm1', status: 'unsug' }), 'a', 5), { sug: null, markedBy: 'a', markedAt: 5 });
+  assert.deepEqual(ib.markUpdate({ status: 'new', note: '第 1 批', sug: { qid: 'q1' } }, ib.cleanMark({ id: 'm1', status: 'unsug' }), 'a', 5), { sug: null, sugRej: { qid: 'q1', caseName: null, at: 5 }, markedBy: 'a', markedAt: 5 });
+  assert.match(ib.sugUpdate({ status: 'new', sugRej: { qid: 'q1', caseName: null } }, c, 'a', 1).err, /退回過/);
+  assert.ok(!ib.sugUpdate({ status: 'new', sugRej: { qid: 'q2' } }, c, 'a', 1).err);
+  assert.match(ib.sugUpdate({ status: 'error' }, c, 'a', 1).err, /重傳/);
   const L = ib.openList({ a: { id: 'a', at: 100, status: 'new', path: 'line/inbox/x', sug: { qid: 'q1' } }, b: { id: 'b', at: 100, status: 'filed' }, c: { id: 'c', at: 1, status: 'new' } }, 100, 50);
   assert.deepEqual(L.map((x) => x.id), ['a']); assert.ok(!('path' in L[0]) && L[0].sug.qid === 'q1');
 });
