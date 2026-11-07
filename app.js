@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.184';
+var APP_VERSION='v6.0.185';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -38482,11 +38482,11 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // ══════════ v6.0.109 AI 草稿（批次 E）══════════
 // 唯讀帳號（AI 助理）可送「草稿」：報價單、得標狀態、發票照片。草稿存 RTDB fydata/drafts/<id>（不碰正式資料），
 // 管理員在總覽待辦「AI 草稿待確認」逐筆確認才寫進正式資料；退回只改草稿狀態。正式資料寫入對唯讀帳號照樣擋。
-// 安全規則（database.rules.json 的 fydata/drafts）：唯讀名冊與管理員可讀；唯讀帳號只能新增 by＝自己的 pending 草稿，舊的只能把自己的 pending 改成 withdrawn／superseded（v6.0.184）；狀態只有管理員能改；欄位型別與大小有上限。
+// 安全規則（database.rules.json 的 fydata/drafts）：唯讀名冊與管理員可讀；唯讀帳號只能新增 by＝自己的 pending 草稿，舊的只能把自己的 pending 改成 withdrawn／superseded（v6.0.185）；狀態只有管理員能改；欄位型別與大小有上限。
 // 記錄：{id,type:'quote'|'bid'|'irPhoto',by,byName,at,status:'pending'|'applied'|'rejected',summary,payload,(doneAt,doneBy,resultId,reason)}
-var DRAFTS={},DRAFTS_OLD={};   // DRAFTS_OLD（v6.0.184）：已被取代的草稿（管理員展開看舊版用，最近 60 筆）
+var DRAFTS={},DRAFTS_OLD={};   // DRAFTS_OLD（v6.0.185）：已被取代的草稿（管理員展開看舊版用，最近 60 筆）
 var _DRAFT_T={qchg:'改單',quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）',contact:'客戶·廠商',dailyOut:'整體日報（請複製轉發）',vendorBill:'廠商請款',qverfix:'補登版次',qsend:'代匯出報價'};   // v6.0.138 客戶·廠商草稿   // v6.0.110 LINE 機器人草稿
-var _draftOn=false,_draftErrAt=0;
+var _draftOn=false,_draftErrAt=0,_draftRefs=[],_draftHealing={};
 var _DRAFT_ID=/^[A-Za-z0-9_-]{4,40}$/;
 var _DRAFT_IMG=/^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+\/=]+$/;
 function _draftS(v){return v==null?'':String(v);}
@@ -38498,7 +38498,9 @@ function _draftWatch(){
   var em=String(_fbUser.email||'').toLowerCase();
   if(!isAdmin(em)&&em!==_RULES_OWNER)return;
   _draftOn=true;
-  _fbDb.ref('fydata/drafts').orderByChild('status').equalTo('pending').on('value',function(snap){
+  _draftRefs.forEach(function(x){try{x.off();}catch(e){_err('_draftWatch.off',e);}});_draftRefs=[];   // 審查：出錯重訂時不重複掛監聽
+  var _rP=_fbDb.ref('fydata/drafts').orderByChild('status').equalTo('pending'),_rO=_fbDb.ref('fydata/drafts').orderByChild('status').equalTo('superseded').limitToLast(60);_draftRefs=[_rP,_rO];
+  _rP.on('value',function(snap){
     var v=snap.val()||{},o={};
     Object.keys(v).forEach(function(k){var d=v[k];if(d&&typeof d==='object'&&_DRAFT_ID.test(k)&&d.id===k)o[k]=d;});
     DRAFTS=o;
@@ -38506,17 +38508,18 @@ function _draftWatch(){
     try{if(typeof updateDashTodo==='function')updateDashTodo();}catch(e){_err('_draftWatch.todo',e);}
     try{var b=document.getElementById('draft-list-box');if(b){b.innerHTML=_draftListHtml();_lineImgFill(b);}}catch(e){_err('_draftWatch.list',e);}
   },function(err){_draftOn=false;_draftErrAt=Date.now();_err('_draftWatch',err);});   // 規則尚未發布時會被拒，等回國後部署
-  _fbDb.ref('fydata/drafts').orderByChild('status').equalTo('superseded').limitToLast(60).on('value',function(snap){   // v6.0.184 已被取代的（展開看舊版）
+  _rO.on('value',function(snap){   // v6.0.185 已被取代的（展開看舊版）
     var v=snap.val()||{},o={};Object.keys(v).forEach(function(k){var d=v[k];if(d&&typeof d==='object'&&_DRAFT_ID.test(k)&&d.id===k)o[k]=d;});DRAFTS_OLD=o;
     try{var b=document.getElementById('draft-list-box');if(b){b.innerHTML=_draftListHtml();_lineImgFill(b);}}catch(e){_err('_draftWatch.old',e);}
   },function(err){_err('_draftWatch.old',err);});
 }
-// ══ v6.0.184 AI 草稿：撤回、同一張報價新草稿取代舊的、清單顯示案名／時間／版次（Lotion 11/07 經陳軒）══
+// ══ v6.0.185 AI 草稿：撤回、同一張報價新草稿取代舊的、清單顯示案名／時間／版次（Lotion 11/07 經陳軒）══
 // 同一位送件人、同一種草稿、同一張報價（qid；新報價用報價編號）才算「同一件」。唯讀帳號只能把自己的 pending 改成 withdrawn／superseded（規則擋其他情況）。
 var _DRAFT_SUP_T={quote:1,qchg:1,bid:1,qverfix:1};
 function _draftKey(d){
   if(!d||!_DRAFT_SUP_T[d.type])return '';var pl=(d.payload&&typeof d.payload==='object')?d.payload:{},S=_draftS;
   var q=S(pl.qid||pl.base).slice(0,80);if(!q&&d.type==='quote'){var c=S(pl.fields&&pl.fields.code).trim();if(c)q='code:'+c.slice(0,60);}
+  if(q&&d.type==='qverfix')q+='|v'+(parseInt(pl.ver,10)||0);   // 審查：補登 V2、V3 是不同的事，不互相取代
   return q?(d.type+'|'+S(d.by).toLowerCase()+'|'+q):'';
 }
 function _draftQOf(d){var pl=(d&&d.payload&&typeof d.payload==='object')?d.payload:{},id=_draftS(pl.qid||pl.base);return id?((Q||[]).find(function(x){return x&&x.id===id;})||null):null;}
@@ -38542,7 +38545,8 @@ function _draftDupHeal(){
   if(_isReaderUser||!_fbDb)return;var G={};
   Object.keys(DRAFTS||{}).forEach(function(id){var d=DRAFTS[id],k=_draftKey(d);if(!k||d.status!=='pending')return;(G[k]=G[k]||[]).push(d);});
   Object.keys(G).forEach(function(k){var L=G[k];if(L.length<2)return;L.sort(function(a,b){return (+b.at||0)-(+a.at||0);});var top=L[0];
-    L.slice(1).forEach(function(d){if(d._healing)return;d._healing=1;_draftMark(d.id,'superseded',{supersededBy:top.id});});});
+    L.slice(1).forEach(function(d){if(_draftHealing[d.id])return;_draftHealing[d.id]=1;   // 審查：失敗不每次重試、不跳「正式資料已存」的提示
+      _fbDb.ref('fydata/drafts/'+d.id).update({status:'superseded',doneAt:Date.now(),doneBy:_meEmail(),supersededBy:top.id}).then(function(){if(DRAFTS[d.id])DRAFTS[d.id].status='superseded';}).catch(function(e){_err('_draftDupHeal',e);});});});
 }
 // 唯讀帳號（AI）：列出自己還在待確認的草稿、撤回自己的。回傳 Promise
 function fyDraftMine(){

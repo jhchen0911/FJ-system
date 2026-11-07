@@ -7349,8 +7349,9 @@ async function newPage(browser, width, height) {
     rr.privRead = rules.private['.read'].indexOf('|| ' + RK) < 0 && rules.private.$other['.read'].indexOf(RK) > 0 && !/'hr'|'payslips'|'petty'/.test(rules.private.$other['.read']) && rules.private.$other['.read'].includes("$other === 'quoteSens'");   // v6.0.156 B1（逐項允許清單）
     const writes = [];
     (function walk(o, path) { Object.keys(o).forEach(k => { if (k === '.write') writes.push([path, o[k]]); else if (o[k] && typeof o[k] === 'object') walk(o[k], path + '/' + k); }); })(rules, 'fydata');
-    rr.writes = writes.length >= 9 && writes.every(([p, w]) => w === 'false' || w.indexOf('!' + RK) >= 0 || (p === 'fydata/logs/$uid' && w.indexOf("!root.child('fydata/readers')") >= 0) || (p === 'fydata/backups' && w === OWN));
-    rr.badW = writes.filter(([p, w]) => !(w === 'false' || w.indexOf('!' + RK) >= 0 || p === 'fydata/logs/$uid' || (p === 'fydata/backups' && w === OWN))).map(x => x[0]);
+    const DRW = (p, w) => /^fydata\/drafts\/\$id\/(status|doneAt|doneBy|supersededBy)$/.test(p) && w.indexOf("data.parent().child('by').val() === auth.token.email.toLowerCase()") >= 0 && /'pending'/.test(w);   // v6.0.185：唯讀帳號只能撤回／取代自己的 pending 草稿
+    rr.writes = writes.length >= 9 && writes.every(([p, w]) => w === 'false' || w.indexOf('!' + RK) >= 0 || (p === 'fydata/logs/$uid' && w.indexOf("!root.child('fydata/readers')") >= 0) || (p === 'fydata/backups' && w === OWN) || DRW(p, w));
+    rr.badW = writes.filter(([p, w]) => !(w === 'false' || w.indexOf('!' + RK) >= 0 || p === 'fydata/logs/$uid' || (p === 'fydata/backups' && w === OWN) || DRW(p, w))).map(x => x[0]);
     const rv = rules.readers.$email['.validate']; rr.nameRule = /newData\.val\(\) === true/.test(rv) && /hasChildren\(\['name'\]\)/.test(rv) && rules.readers.$email.$other['.validate'] === false;
     rr.backups = rules.backups['.read'] === OWN && rules.backups['.write'] === OWN && rules.relay.photos['.read'].indexOf('|| ' + RK) > 0;   // 審查修正：備份只給擁有者；日報照片（relay）唯讀帳號可讀
     const fn = fs.readFileSync(pth.join(__dirname, '..', 'functions', 'index.js'), 'utf8'); rr.fn = /readers: set\(rdr, on\)/.test(fn);
@@ -11303,13 +11304,13 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── v6.0.184 AI 草稿：唯讀帳號撤回自己的 pending、同一張報價新草稿取代舊的、清單顯示案名／時間／版次 ──
+  // ── v6.0.185 AI 草稿：唯讀帳號撤回自己的 pending、同一張報價新草稿取代舊的、清單顯示案名／時間／版次 ──
   {
     // 規則：用小型求值器實際跑 drafts 的 .write／.validate（data／newData／root 模擬）
     const RD = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata.drafts.$id;
     const snap = (v, par) => { const o = { val: () => (v === undefined ? null : v), exists: () => v !== undefined && v !== null, child: (k) => { let x = v; for (const p of String(k).split('/')) x = (x && typeof x === 'object') ? x[p] : undefined; return snap(x, o); }, hasChild: (k) => o.child(k).exists(), hasChildren: (ks) => ks.every((k) => o.child(k).exists()), isString: () => typeof v === 'string', isNumber: () => typeof v === 'number', parent: () => par }; return o; };
     const ev = (expr, ctx) => { const e = expr.replace(/\.matches\(/g, '.__m('); String.prototype.__m = function (re) { return re.test(this); }; try { return !!new Function('auth', 'root', 'data', 'newData', 'now', '$id', 'return (' + e + ');')(ctx.auth, ctx.root, ctx.data, ctx.newData, Date.now(), ctx.id); } finally { delete String.prototype.__m; } };
-    const ROOT = snap({ fydata: { readers: { 'ai@x,com': true }, adminEmails: {} } });
+    const ROOT = snap({ fydata: { readers: { 'ai@x,com': true }, adminEmails: {}, drafts: { d0002: { by: 'ai@x.com' }, dzzz9: { by: 'b@x.com' } } } });
     const base = { id: 'd0001', type: 'qchg', by: 'ai@x.com', at: 1, status: 'pending', summary: 's', payload: { qid: 'q1' } };
     // 唯讀帳號改某個欄位：$id 層 .write 或該欄位 .write 任一過，再過 $id 與欄位 validate
     const canUpd = (who, rec, up) => {
@@ -11328,9 +11329,15 @@ async function newPage(browser, width, height) {
       toApplied: !canUpd('ai@x.com', base, { status: 'applied', doneAt: 5, doneBy: 'ai@x.com' }),
       payload: !canUpd('ai@x.com', base, { status: 'withdrawn', summary: '改內容' }),
       reason: !canUpd('ai@x.com', base, { status: 'withdrawn', resultId: 'x' }),
+      doneAtOnly: !canUpd('ai@x.com', base, { doneAt: 5 }),
+      stayPending: !canUpd('ai@x.com', base, { status: 'pending', doneAt: 5, doneBy: 'ai@x.com' }),
+      spoofBy: !canUpd('ai@x.com', base, { status: 'withdrawn', doneAt: 5, doneBy: 'jhchen0911@gmail.com' }),
+      futureAt: !canUpd('ai@x.com', base, { status: 'withdrawn', doneAt: Date.now() + 86400000, doneBy: 'ai@x.com' }),
+      supWd: !canUpd('ai@x.com', base, { status: 'withdrawn', doneAt: 5, doneBy: 'ai@x.com', supersededBy: 'd0002' }),
+      supOther: !canUpd('ai@x.com', base, { status: 'superseded', doneAt: 5, doneBy: 'ai@x.com', supersededBy: 'dzzz9' }),
       admin: canUpd('jhchen0911@gmail.com', base, { status: 'superseded', doneAt: 5, doneBy: 'jhchen0911@gmail.com', supersededBy: 'd0002' }),
     };
-    check('v6.0.184 規則：唯讀帳號只能把自己的 pending 改成撤回／已被取代；別人的、已套用的、改成已套用、順便改內容都擋；管理員照舊', Object.values(rr).every(Boolean), JSON.stringify(rr));
+    check('v6.0.185 規則：唯讀帳號只能把自己的 pending 改成撤回／已被取代；別人的、已套用的、改成已套用、順便改內容都擋；管理員照舊', Object.values(rr).every(Boolean), JSON.stringify(rr));
 
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -11352,10 +11359,13 @@ async function newPage(browser, width, height) {
         DB.dbid0001 = { id: 'dbid0001', type: 'bid', by: 'ai@x.com', at: Date.now() - 4000, status: 'pending', summary: '得標狀態', payload: { qid: 'q1' } };
         DB.dhum0001 = { id: 'dhum0001', type: 'qchg', by: 'other@x.com', at: Date.now() - 3000, status: 'pending', summary: '別人的', payload: { qid: 'q1' } };
         DB.dq2x0001 = { id: 'dq2x0001', type: 'qchg', by: 'ai@x.com', at: Date.now() - 3000, status: 'pending', summary: '別張報價', payload: { qid: 'q2' } };
+        DB.dvf20001 = { id: 'dvf20001', type: 'qverfix', by: 'ai@x.com', at: Date.now() - 2000, status: 'pending', summary: '補登 V2', payload: { qid: 'q1', ver: 2 } };
+        await _draftPush('qverfix', { qid: 'q1', ver: 3 }, '補登 V3'); out.vfKeep = DB.dvf20001.status === 'pending';   // 審查：補登不同版次不互相取代
         await _draftPush('qchg', { qid: 'q1', code: '1151101', baseVer: 3, ops: [] }, '新改單');
         const nid = Object.keys(DB).find((k) => DB[k].summary === '新改單');
         out.sup = DB.dold0001.status === 'superseded' && DB.dold0001.supersededBy === nid && DB.dbid0001.status === 'pending' && DB.dhum0001.status === 'pending' && DB.dq2x0001.status === 'pending' && /已被取代/.test(tt);
         // 撤回：自己的 pending 可以；別人的、已處理的不行
+        Object.keys(DB).filter((k) => DB[k].type === 'qverfix').forEach((k) => { delete DB[k]; });
         const m0 = await fyDraftMine(); out.mine = m0.ok && m0.list.length === 3 && m0.list.every((x) => x.id !== 'dhum0001') && m0.list.some((x) => x.case === '1151101 範例案' && /依 V3 改/.test(x.ver));
         const w1 = await fyDraftWithdraw('dbid0001'); const w2 = await fyDraftWithdraw('dhum0001'); const w3 = await fyDraftWithdraw('dold0001');
         out.wd = w1.ok && DB.dbid0001.status === 'withdrawn' && !w2.ok && /自己送/.test(w2.why) && DB.dhum0001.status === 'pending' && !w3.ok && /superseded/.test(w3.why);
@@ -11368,17 +11378,17 @@ async function newPage(browser, width, height) {
         const cards = box.querySelectorAll('.dr-meta');
         out.list = cards.length === 3 && /1151101 範例案/.test(h) && /建立 /.test(h) && /依 V3 改，報價目前 V3/.test(h) && !/舊改單<\/div><div style="display:flex/.test(h) && box.querySelectorAll('details.dr-old').length === 1 && /較早 1 筆已被這筆取代/.test(h) && /舊改單/.test(box.querySelector('details.dr-old').innerHTML);
         // 舊版本留下的重複 pending：管理員端自動收成最新一筆
-        const marks = []; const oM = window._draftMark; window._draftMark = (id, st, ex) => { marks.push([id, st, ex && ex.supersededBy]); DRAFTS[id].status = st; return Promise.resolve(true); };
+        const marks = []; const oM = window._draftMark; _fbDb = { ref: (p) => ({ update: (u) => { marks.push([p.split('/')[2], u.status, u.supersededBy]); return Promise.reject(new Error('rules')); } }) };
         DRAFTS = { da1: { id: 'da1', type: 'qchg', by: 'ai@x.com', at: 10, status: 'pending', payload: { qid: 'q9' } }, da2: { id: 'da2', type: 'qchg', by: 'ai@x.com', at: 20, status: 'pending', payload: { qid: 'q9' } }, da3: { id: 'da3', type: 'irPhoto', by: 'ai@x.com', at: 5, status: 'pending', payload: {} }, da4: { id: 'da4', type: 'irPhoto', by: 'ai@x.com', at: 6, status: 'pending', payload: {} } };
-        _draftDupHeal(); out.heal = marks.length === 1 && marks[0][0] === 'da1' && marks[0][1] === 'superseded' && marks[0][2] === 'da2';
+        _draftDupHeal(); await W8(); _draftDupHeal(); await W8(); out.heal = marks.length === 1 && marks[0][0] === 'da1' && marks[0][1] === 'superseded' && marks[0][2] === 'da2';   // 失敗不重試
         window._draftMark = oM; _fbDb = oDb; _fbUser = oU; _isReaderUser = oR; DRAFTS = {}; DRAFTS_OLD = {}; Q = []; window.toast = oT;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.184 同一張報價再送新草稿：同一人同一種的舊 pending 標已被取代（別人的、別種的、別張報價的不動）', r.sup, JSON.stringify(r));
-    check('v6.0.184 唯讀帳號 fyDraftMine／fyDraftWithdraw：只列、只撤回自己的待確認草稿；規則擋下照實回報', r.mine && r.wd && r.wdDeny, JSON.stringify(r));
-    check('v6.0.184 AI 草稿清單：案名、建立時間、版次說明；舊版收在「展開看」；舊重複 pending 自動收成最新一筆', r.list && r.heal, JSON.stringify(r));
-    check('v6.0.184 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.185 同一張報價再送新草稿：同一人同一種的舊 pending 標已被取代（別人的、別種的、別張報價的不動）', r.sup && r.vfKeep, JSON.stringify(r));
+    check('v6.0.185 唯讀帳號 fyDraftMine／fyDraftWithdraw：只列、只撤回自己的待確認草稿；規則擋下照實回報', r.mine && r.wd && r.wdDeny, JSON.stringify(r));
+    check('v6.0.185 AI 草稿清單：案名、建立時間、版次說明；舊版收在「展開看」；舊重複 pending 自動收成最新一筆', r.list && r.heal, JSON.stringify(r));
+    check('v6.0.185 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 

@@ -215,11 +215,11 @@
             ".validate": "newData.isString() && newData.val().length <= 300"
           },
           "doneAt": {
-            ".write": "auth != null && auth.token.email != null && root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && data.parent().child('by').val() === auth.token.email.toLowerCase() && data.parent().child('status').val() === 'pending' && (newData.parent().child('status').val() === 'withdrawn' || newData.parent().child('status').val() === 'superseded') && !data.exists()",
+            ".write": "auth != null && auth.token.email != null && root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && data.parent().child('by').val() === auth.token.email.toLowerCase() && data.parent().child('status').val() === 'pending' && (newData.parent().child('status').val() === 'withdrawn' || newData.parent().child('status').val() === 'superseded') && !data.exists() && newData.isNumber() && newData.val() <= now + 60000",
             ".validate": "newData.isNumber()"
           },
           "doneBy": {
-            ".write": "auth != null && auth.token.email != null && root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && data.parent().child('by').val() === auth.token.email.toLowerCase() && data.parent().child('status').val() === 'pending' && (newData.parent().child('status').val() === 'withdrawn' || newData.parent().child('status').val() === 'superseded') && !data.exists()",
+            ".write": "auth != null && auth.token.email != null && root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && data.parent().child('by').val() === auth.token.email.toLowerCase() && data.parent().child('status').val() === 'pending' && (newData.parent().child('status').val() === 'withdrawn' || newData.parent().child('status').val() === 'superseded') && !data.exists() && newData.val() === auth.token.email.toLowerCase()",
             ".validate": "newData.isString() && newData.val().length <= 100"
           },
           "resultId": {
@@ -246,7 +246,7 @@
             }
           },
           "supersededBy": {
-            ".write": "auth != null && auth.token.email != null && root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && data.parent().child('by').val() === auth.token.email.toLowerCase() && data.parent().child('status').val() === 'pending' && newData.parent().child('status').val() === 'superseded' && !data.exists()",
+            ".write": "auth != null && auth.token.email != null && root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && data.parent().child('by').val() === auth.token.email.toLowerCase() && data.parent().child('status').val() === 'pending' && newData.parent().child('status').val() === 'superseded' && !data.exists() && newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{4,40}$/) && root.child('fydata/drafts').child(newData.val()).child('by').val() === auth.token.email.toLowerCase()",
             ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{4,40}$/)"
           },
           "$other": {
