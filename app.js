@@ -11117,7 +11117,8 @@ function _pullPrivateIfNewer(){
     _fbDb.ref('fydata/private/uploadedAt').once('value').then(function(s){
       var ct=parseInt(s.val())||0;
       var mine=parseInt(localStorage.getItem('fy_last_priv_sync')||'0');
-      if(ct>0&&ct>mine){
+      // v6.0.184 熱修（Lotion 11/07：補登卡「私有資料還沒下載完」一直 ✗）：這次開頁還沒讀過私有資料（_QH_SENS 仍是 null）時，就算本機時間戳已是最新也下載一次
+      if((ct>0&&ct>mine)||(ct>0&&_QH_SENS===null)){
         _pullPrivate(function(ok){
           if(ok){try{localStorage.setItem('fy_last_priv_sync',String(ct));}catch(e){_err('_pullPrivateIfNewer',e);}}
         });
