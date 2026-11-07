@@ -1,4 +1,4 @@
-/* AI 改單草稿的純計算（v6.0.186 從 app.js 搬出來，前端 fyQuoteChange／_qchgOpen 與雲端 fyDraft 共用同一套對位與試算）
+/* AI 改單草稿的純計算（v6.0.190 從 app.js 搬出來，前端 fyQuoteChange／_qchgOpen 與雲端 fyDraft 共用同一套對位與試算）
  * 不讀畫面、不讀全域資料。掛在 window.FJC.qd；Node：require('./calc/qdraft.js').qd
  *   plan(q, ops, fmt)  把動作套到報價複本：{items, rmk, rows:[{act,ok,why,before,after,d}], bad}
  *   clean(ops)         只留白名單欄位
@@ -93,7 +93,7 @@ function _qchgClean(ops){
   });
 }
   function totals(its, taxR) { var sub = _qchgSub(its), tr = taxR == null ? 5 : (+taxR || 0), tax = Math.round(sub * tr / 100); return { sub: sub, tax: tax, total: sub + tax }; }
-  // 同一件草稿的鍵（v6.0.185 取代舊草稿用；前端 _draftKey 與雲端 fyDraft 共用）：同送件人＋同種＋同報價（新報價用報價編號；補登再分版次）
+  // 同一件草稿的鍵（v6.0.189 取代舊草稿用；前端 _draftKey 與雲端 fyDraft 共用）：同送件人＋同種＋同報價（新報價用報價編號；補登再分版次）
   var SUP_T = { quote: 1, qchg: 1, bid: 1, qverfix: 1 };
   function draftKey(d) {
     if (!d || !SUP_T[d.type]) return ''; var pl = (d.payload && typeof d.payload === 'object') ? d.payload : {}, S = function (v) { return v == null ? '' : String(v); };

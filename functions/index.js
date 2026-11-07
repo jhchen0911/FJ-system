@@ -663,7 +663,7 @@ exports.gtasksAuthCallback = onRequest({ region: REGION, secrets: [GT_ID, GT_SEC
   } catch (e) { console.error('gtasksAuthCallback', e); page(false, '換取授權失敗，請回 FJ 重按一次。'); }
 });
 
-// ══════════ v6.0.186 AI 草稿上傳（不靠操作網頁）══════════
+// ══════════ v6.0.190 AI 草稿上傳（不靠操作網頁）══════════
 // tools/fy-draft.js 用 AI 唯讀帳號登入後帶憑證呼叫；action：submit（送草稿）／mine（列出自己待確認的）／withdraw（撤回自己的）。
 // 只有唯讀名冊的帳號能用；送出前做跟網頁一樣的試算（functions/ops/drafts.js，對位與小計用 calc/qdraft.js），對不上就不收。
 // 雲端程式寫入不經安全規則，所以「只能動自己的 pending」在這裡再擋一次；寫的欄位跟網頁送出的草稿完全一樣（Lotion 端照原本畫面確認）。

@@ -1,4 +1,4 @@
-// v6.0.186 AI 草稿上傳（functions/ops/drafts.js）——全部假資料
+// v6.0.190 AI 草稿上傳（functions/ops/drafts.js）——全部假資料
 const test = require('node:test');
 const assert = require('node:assert');
 const D = require('../ops/drafts.js');

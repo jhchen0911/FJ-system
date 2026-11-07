@@ -138,7 +138,7 @@ module.exports = [
   },
   {
     id: 'C35', items: [35], status: '現況',
-    title: '廠商期別日期 9/30 改成 10/31：應付到期日停在 10/25，不跟著改成 11/25',
+    title: '廠商期別日期 9/30 改成 10/31：應付到期日停在 10/25（週日，v6.0.188 起順延 10/26），不跟著改成 11/25',
     hand: '正確：到期日依新期別日期 → 2026-11-25；現況 2026-10-25',
     run: async () => {
       const c = { id: 'cC35', type: 'sub', vendor: '乙工程行', retRate: 0, rows: [{ id: 'r1', qty: 100, unitPrice: 500 }], periods: [{ no: 1, date: '2026-09-30', due: _vendorDueDate('2026-09-30'), rows: [{ rid: 'r1', qty: 10 }] }] };
@@ -190,6 +190,19 @@ module.exports = [
       if (sel) { sel.value = '70'; sel.dispatchEvent(new Event('change')); }
       const v = INV.find(x => x.id === 'iC39');
       return { savedQty: v.items[0].curQty, savedRate: v.items[0].payRate, savedTotal: Math.round(v.totals.total) };
+    }
+  },
+  {
+    id: 'C40', items: [], status: '正確',
+    title: '第 6 步 6-1a：同一筆應付分次付款（第 1 期含稅 1,152,113：先付 576,056，再付清 576,057）',
+    hand: '應為一筆應付、兩筆付款紀錄；第一次付完餘額 576,057、狀態待付；付清後已付合計 1,152,113、餘額 0；10 月實付 576,056、11 月 576,057',
+    run: async () => {
+      PAYABLES.push({ id: 'payC40_p1', costId: 'C40', costPeriod: 1, quoteId: 'qC40', to: '乙工程行', amount: 1097250, vat: true, date: '2026-11-25', status: 'pending', category: 'subcontract', project: '範例工程C40', note: '第1期計價' });
+      payMarkPaid('payC40_p1', '2026-10-05'); document.getElementById('pmp-amt').value = '576056'; __synOk();
+      const p = PAYABLES.find(x => x.id === 'payC40_p1');
+      const after1 = { status: p.status, paid: _payPaidSum(p), left: _payLeft(p) };
+      payMarkPaid('payC40_p1', '2026-11-25'); __synOk();
+      return { eff: _payEff(p), after1, status2: p.status, pays: FJC.pay.paysOf(p).length, paid2: _payPaidSum(p), left2: _payLeft(p), oct: _payPaidIn(p, '2026-10'), nov: _payPaidIn(p, '2026-11') };
     }
   }
 ];

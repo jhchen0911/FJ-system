@@ -1206,8 +1206,8 @@ async function newPage(browser, width, height) {
       out.upaSP = c.addon === 6000 && /引孔/.test(c.breakdown);
       // ② 廠商放款日：本月計價、下月 25 日放款（可調）
       P.vendorPayDay = 25; P.vendorPayDelay = 1;
-      out.due = _vendorDueDate('2026-03-05') === '2026-04-25' && _vendorDueDate('2026-01-31') === '2026-02-25';
-      P.vendorPayDay = 31; out.dueClamp = _vendorDueDate('2026-01-15') === '2026-02-28';
+      out.due = _vendorDueDate('2026-03-05') === '2026-04-27' && _vendorDueDate('2026-01-31') === '2026-02-25';   // v6.0.188：4/25 週六順延 4/27
+      P.vendorPayDay = 31; out.dueClamp = _vendorDueDate('2026-01-15', true) === '2026-02-28' && _vendorDueDate('2026-01-15') === '2026-03-02';   // 31 日截到 2/28（週六）→ 順延 3/2
       P.vendorPayDay = 25; P.vendorPayDelay = 0; out.dueSame = _vendorDueDate('2026-03-05') === '2026-03-25';
       P.vendorPayDelay = 1;
       Q = [{ id: 'qH', code: '1163', name: '四零四案', client: 'K', date: '2026-01-01', awarded: true, exs: [], rmk: {}, _mt: 1,
@@ -1219,7 +1219,7 @@ async function newPage(browser, width, height) {
       P.subPayOnBill = false;   // v5.443 起預設未計價不掛整筆，此處驗到期日口徑
       syncCostToPayable(Q[0], Q[0].costs[0]);
       const pay = PAYABLES.find(p => p.costId === 'cH');
-      out.payDue = !!pay && pay.date === '2026-04-25';
+      out.payDue = !!pay && pay.date === '2026-04-27';
       P.subPayOnBill = true;
       // ③ 報價列表毛利：成本單價 > 報價 3 倍視為未填，不再出現 −N千% 的淨利率
       _recalcQuoteTotals(Q[0]);
@@ -1307,12 +1307,12 @@ async function newPage(browser, width, height) {
       _spFillDaily();
       const qtys = [...document.querySelectorAll('.sp-qty')].map(i => i.value);
       out.daily = qtys[0] === '60' && qtys[1] === '';
-      out.totTxt = /應付金額[\s\S]*NT\$ 29,925/.test(document.getElementById('sp-tot').innerHTML) && /2026-04-25/.test(document.getElementById('sp-tot').innerHTML);
+      out.totTxt = /應付金額[\s\S]*NT\$ 29,925/.test(document.getElementById('sp-tot').innerHTML) && /2026-04-27/.test(document.getElementById('sp-tot').innerHTML);
       document.getElementById('gen-confirm-ok').click();
       const per = c.periods && c.periods[0];
-      out.per = !!per && per.amt === 30000 && per.ret === 1500 && per.net === 28500 && per.due === '2026-04-25';
+      out.per = !!per && per.amt === 30000 && per.ret === 1500 && per.net === 28500 && per.due === '2026-04-27';
       const pp = PAYABLES.find(p => p.id === 'paycS_p1');
-      out.pay = !!pp && pp.amount === 28500 && pp.vat === true && pp.date === '2026-04-25' && _payEff(pp) === 29925 && !PAYABLES.some(p => p.id === 'paycS');
+      out.pay = !!pp && pp.amount === 28500 && pp.vat === true && pp.date === '2026-04-27' && _payEff(pp) === 29925 && !PAYABLES.some(p => p.id === 'paycS');
       // 第二期：拔除 30M（列保留 0%）
       openSubPeriod('cS');
       document.getElementById('sp-date').value = '2026-04-30';
@@ -2891,7 +2891,7 @@ async function newPage(browser, width, height) {
         advEl.value='50000';_spRecalc();
         document.getElementById('gen-confirm-ok').click();
         const per=cM.periods[0],pp=PAYABLES.find(p=>p.id==='paycM_p1');
-        out.per=!!per&&per.amt===68750&&per.adv===50000&&per.due==='2026-10-25'&&!!pp&&pp.amount===18750&&/抵扣預付款 52,500（含稅）/.test(pp.note);   // v6.0.114：抵扣改含稅口徑（50,000／120,000 × 已付含稅預付 126,000）
+        out.per=!!per&&per.amt===68750&&per.adv===50000&&per.due==='2026-10-26'&&!!pp&&pp.amount===18750&&/抵扣預付款 52,500（含稅）/.test(pp.note);   // v6.0.114：抵扣改含稅口徑（50,000／120,000 × 已付含稅預付 126,000）
         const stM=_subStat(cM);out.stat=stM.advPaid===120000&&stM.advUsed===50000&&stM.advLeft===70000&&stM.payN===3;
         delSubAdvance('cM',_subAdvs(cM)[0].id);out.delBlock=_subAdvs(cM).length===2;
         delSubAdvance('cM',_subAdvs(cM)[1].id);document.getElementById('gen-confirm-ok').click();out.delOk=_subAdvs(cM).length===1&&!PAYABLES.some(p=>p.costAdv&&p.amount===20000);
@@ -3185,7 +3185,7 @@ async function newPage(browser, width, height) {
         out.saved=!!r&&r.no==='RFQ-1150928-01'&&r.items.length===2&&r.items[1].qty===400&&r.vendors.length===0&&!document.querySelector('.rfq-v')&&r.cond.cashPct===40&&r.cond.ticketPct===60&&r.status==='open';
         // 條件條列：計價方式句含放款拆分與保留款；PDF 走預覽、含廠商名、無頁尾字
         const lines=_rfqCondLines(r);
-        out.cond=lines.length===8&&/一式/.test(lines[7])&&r.cond.extra.length===5&&/每月 25 日計價，次月 25 日放款（40% 匯款、60% 60 天票期）；保留款 5%/.test(lines[2])&&/^報價有效期 30 天/.test(lines[3])&&lines[6]==='引孔泥漿處理費請另列。'&&!/開立發票/.test(lines.join(''));
+        out.cond=lines.length===8&&/一式/.test(lines[7])&&r.cond.extra.length===5&&/每月 25 日計價，次月 25 日放款（遇假日順延至次一工作日）（40% 匯款、60% 60 天票期）；保留款 5%/.test(lines[2])&&/^報價有效期 30 天/.test(lines[3])&&lines[6]==='引孔泥漿處理費請另列。'&&!/開立發票/.test(lines.join(''));
         const html=_rfqDocHtml(q,r);
         out.doc=/分項工程詢價單/.test(html)&&/RFQ-1150928-01　/.test(html)&&!/甲乙/.test(html)&&/<ol>/.test(html)&&/class="vt"/.test(html)&&/統一編號/.test(html)&&!/本詢價單由/.test(html)&&!/豐有內部使用/.test(html)&&(html.match(/class="blank"/g)||[]).length===9&&/營業稅 5%/.test(html)&&/總計（含稅）/.test(html)&&/class="k sig"/.test(html);
         rfqPrint(r.id);out.prev=!!document.getElementById('_fy_print_overlay');['_fy_print_frame','_fy_print_overlay'].forEach(id=>{const el=document.getElementById(id);if(el)el.remove();});
@@ -3350,7 +3350,7 @@ async function newPage(browser, width, height) {
               out.kpi=/1 家/.test(h)&&/預估 NT\$ 123,750/.test(h)&&/本期已登錄/.test(h)&&/押保留款/.test(h)&&/5,500/.test(h);
               out.follow=/跟隨 甲乙工程行/.test(h)&&/介紹費／抽成/.test(h);
               out.all=/全部分包合約/.test(h)&&/220,000/.test(h)&&/55,000/.test(h)&&/25%/.test(h)&&/第1期 2026-08-25/.test(h);
-              out.cutLine=/本期計價截止 <b>2026-09-25<\/b>/.test(h)&&/放款日 <b>2026-10-25<\/b>/.test(h);
+              out.cutLine=/本期計價截止 <b>2026-09-25<\/b>/.test(h)&&/放款日 <b>2026-10-26<\/b>/.test(h);
               // 篩選
               vbFilter('st','follow');out.filter=/大明哥/.test(document.getElementById('vb-root').innerHTML)&&!/>甲乙工程行<\/b>/.test(document.getElementById('vb-root').innerHTML.split('全部分包合約')[1]);
               vbFilter('st','');vbFilter('kw','不存在');out.filterEmpty=/沒有符合的分包合約/.test(document.getElementById('vb-root').innerHTML);vbFilter('kw','');
@@ -3773,9 +3773,9 @@ async function newPage(browser, width, height) {
           document.getElementById('rp-invno').value='AB11223344';
           md.style.display='none';_rpSave();
           const per=cR.periods&&cR.periods[0];
-          out.saved=!!per&&per.no===1&&per.rows.length===2&&per.amt===28040&&per.invNo==='AB11223344'&&per.due==='2026-10-25'&&cR.rows.length===2&&cR.rows[1].preset==='損耗賠償'&&cR.amt===28040;
+          out.saved=!!per&&per.no===1&&per.rows.length===2&&per.amt===28040&&per.invNo==='AB11223344'&&per.due==='2026-10-26'&&cR.rows.length===2&&cR.rows[1].preset==='損耗賠償'&&cR.amt===28040;
           const pay=PAYABLES.find(p=>p.id==='pay'+cR.id+'_p1');
-          out.pay=!!pay&&Math.round(parseFloat(pay.amount))===28040&&pay.vat===true&&pay.category==='material'&&/租金請款/.test(pay.note)&&pay.date==='2026-10-25'&&PAYABLES.filter(p=>p.costId===cR.id).length===1;
+          out.pay=!!pay&&Math.round(parseFloat(pay.amount))===28040&&pay.vat===true&&pay.category==='material'&&/租金請款/.test(pay.note)&&pay.date==='2026-10-26'&&PAYABLES.filter(p=>p.costId===cR.id).length===1;
           out.estAfter=_rentEstimate(q,cR).from==='2026-09-25'&&_rentEstimate(q,cR).est===960*Math.max(0,_dDiff('2026-09-25',localToday()));
           out.status=_vbRows().find(x=>x.c&&x.c.id===cR.id).status==='billed';
           out.costTotal=_projCostTotal(q)===28040;
@@ -7349,7 +7349,7 @@ async function newPage(browser, width, height) {
     rr.privRead = rules.private['.read'].indexOf('|| ' + RK) < 0 && rules.private.$other['.read'].indexOf(RK) > 0 && !/'hr'|'payslips'|'petty'/.test(rules.private.$other['.read']) && rules.private.$other['.read'].includes("$other === 'quoteSens'");   // v6.0.156 B1（逐項允許清單）
     const writes = [];
     (function walk(o, path) { Object.keys(o).forEach(k => { if (k === '.write') writes.push([path, o[k]]); else if (o[k] && typeof o[k] === 'object') walk(o[k], path + '/' + k); }); })(rules, 'fydata');
-    const DRW = (p, w) => /^fydata\/drafts\/\$id\/(status|doneAt|doneBy|supersededBy)$/.test(p) && w.indexOf("data.parent().child('by').val() === auth.token.email.toLowerCase()") >= 0 && /'pending'/.test(w);   // v6.0.185：唯讀帳號只能撤回／取代自己的 pending 草稿
+    const DRW = (p, w) => /^fydata\/drafts\/\$id\/(status|doneAt|doneBy|supersededBy)$/.test(p) && w.indexOf("data.parent().child('by').val() === auth.token.email.toLowerCase()") >= 0 && /'pending'/.test(w);   // v6.0.189：唯讀帳號只能撤回／取代自己的 pending 草稿
     rr.writes = writes.length >= 9 && writes.every(([p, w]) => w === 'false' || w.indexOf('!' + RK) >= 0 || (p === 'fydata/logs/$uid' && w.indexOf("!root.child('fydata/readers')") >= 0) || (p === 'fydata/backups' && w === OWN) || DRW(p, w));
     rr.badW = writes.filter(([p, w]) => !(w === 'false' || w.indexOf('!' + RK) >= 0 || p === 'fydata/logs/$uid' || (p === 'fydata/backups' && w === OWN) || DRW(p, w))).map(x => x[0]);
     const rv = rules.readers.$email['.validate']; rr.nameRule = /newData\.val\(\) === true/.test(rv) && /hasChildren\(\['name'\]\)/.test(rv) && rules.readers.$email.$other['.validate'] === false;
@@ -11030,6 +11030,89 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keep = { h: P.holidays, m: P.makeupDays, d: P.vendorPayDay, y: P.vendorPayDelay };
+      try {
+        P.vendorPayDay = 25; P.vendorPayDelay = 1; P.holidays = ''; P.makeupDays = '';
+        out.plain = _vendorDueDate('2026-10-10') === '2026-11-25' && _vendorDueDate('2026-09-10') === '2026-10-26' && _vendorDueDate('2026-03-31') === '2026-04-27';   // 平日不動；10/25 週日→10/26；4/25 週六→4/27
+        P.holidays = '2026-11-25 測試假日\n2026/11/26 名稱'; out.hol = _vendorDueDate('2026-10-10') === '2026-11-27' && _payHolidays().hol.length === 2;
+        P.makeupDays = '2026-04-25'; out.makeup = _vendorDueDate('2026-03-31') === '2026-04-25';
+        P.holidays = ''; P.makeupDays = '';
+        const yy = new Date().getFullYear(); out.todo1 = (function () { const it = []; _v6TodoItems(it); return it.some(x => x.type === 'hol_missing'); })();
+        P.holidays = yy + '-01-01\n' + (yy + 1) + '-01-01'; out.todo2 = (function () { const it = []; _v6TodoItems(it); return !it.some(x => x.type === 'hol_missing'); })();
+        P.holidays = ''; out.miss = JSON.stringify(_holMissing(new Date(2026, 10, 7))) === JSON.stringify([2026, 2027]) && JSON.stringify(_holMissing(new Date(2026, 5, 1))) === JSON.stringify([2026]);
+        // 合約／詢價文字：新的才加「遇假日順延」，舊單重印一字不變
+        const q = { id: 'qS188', name: '範例S188', items: [], costs: [] };
+        out.rfqOld = !/順延/.test(_rfqCondLines({ cond: {} }).join ? _rfqCondLines({ cond: {} }).join('') : String(_rfqCondLines({ cond: {} })));
+        out.rfqNew = /遇假日順延至次一工作日/.test(String(_rfqCondLines({ cond: {}, payRoll: 1 })));
+        out.sctOld = !/順延/.test(_sctPayTxt({ id: 'c1', rows: [] }, {}, q)) && /遇假日順延至次一工作日/.test(_sctPayTxt({ id: 'c1', rows: [], payRoll: 1 }, {}, q));
+        P.holidays = ''; out.keep = _vendorDueKeep('2026-10-25', '2026-09-10') === '2026-10-25' && _vendorDueKeep('', '2026-09-10') === '2026-10-26' && _vendorDueKeep('2026-10-26', '2026-09-10') === '2026-10-26' && _vendorDueKeep('2026-10-25', '2026-10-10') === '2026-11-25';   // 抽成／佣金舊到期日不整批移動、起算日變了才重算
+        go('params'); prmTab('cost'); out.ui = !!document.getElementById('pholidays') && !!document.getElementById('pmakeup');
+        document.getElementById('pholidays').value = '2027-01-01 元旦'; doSaveP(); out.save = P.holidays === '2027-01-01 元旦';
+      } finally { P.holidays = keep.h; P.makeupDays = keep.m; P.vendorPayDay = keep.d; P.vendorPayDelay = keep.y; }
+      return out;
+    });
+    check('v6.0.188 放款日遇假日順延：週末→下一個工作日、國定假日清單、補班週六照常、缺明年假日總覽提醒、抽成佣金舊到期日不整批移動、新詢價單／新分包合約才寫順延條文、參數頁可存', r.plain && r.hol && r.makeup && r.todo1 && r.todo2 && r.miss && r.rfqOld && r.rfqNew && r.sctOld && r.keep && r.ui && r.save, JSON.stringify(r));
+    check('v6.0.188 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── v6.0.187 第 6 步 6-1a：同一筆應付分次付款（付款視窗填這次付多少；撤銷留紀錄；合併聯集；部分已付不被刪）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const W = ms => new Promise(res => setTimeout(res, ms));
+      const keep = JSON.parse(JSON.stringify(PAYABLES)), oP = window.prompt;
+      try {
+        PAYABLES = PAYABLES.filter(x => !/^payS187/.test(x.id));
+        PAYABLES.push({ id: 'payS187_p1', costId: 'S187', costPeriod: 1, quoteId: 'qS187', to: '乙工程行', amount: 1097250, vat: true, date: '2026-11-25', status: 'pending', project: '範例S187', note: '第1期計價' });
+        const ap0 = _apTotal();
+        payMarkPaid('payS187_p1', '2026-10-05'); await W(30);
+        document.getElementById('pmp-amt').value = '9999999'; document.getElementById('gen-confirm-ok').click(); await W(30);
+        out.overBlocked = document.getElementById('gen-confirm-modal').style.display !== 'none';
+        document.getElementById('pmp-amt').value = '576056'; document.getElementById('gen-confirm-ok').click(); await W(30);
+        const p = PAYABLES.find(x => x.id === 'payS187_p1');
+        out.part = p.status === 'pending' && FJC.pay.paysOf(p).length === 1 && _payLeft(p) === 576057 && _payPartial(p) && ap0 - _apTotal() === 576056;
+        out.line = /已付 576,056／餘額 576,057/.test(_payPartLine(p));
+        // 自動重算刪不掉部分已付
+        out.tomb = _tomb('payables', 'payS187_p1') === false && _payLocked(p);
+        // 合併：另一台加了一筆付款、本機撤銷了第一筆 → 聯集，撤銷的不復活
+        const other = JSON.parse(JSON.stringify(p)); other.pays.push({ id: 'zz', amt: 1000, date: '2026-10-20', at: Date.now() + 5 });
+        payVoidLastPart('payS187_p1'); await W(30); document.getElementById('gen-confirm-ok').click(); await W(20);
+        out.needWhy = document.getElementById('gen-confirm-modal').style.display !== 'none' && FJC.pay.paysOf(p).length === 1;
+        document.getElementById('pvl-why').value = '付錯金額'; document.getElementById('gen-confirm-ok').click(); await W(30);
+        const merged = _payStatusReconcile(p, other);
+        out.union = FJC.pay.paysOf(merged).length === 1 && FJC.pay.paysOf(merged)[0].id === 'zz' && merged.pays.length === 2;
+        // 付清：最後一次也記一筆，已付合計＝全額
+        payMarkPaid('payS187_p1', '2026-11-25'); await W(30);
+        out.defLeft = +document.getElementById('pmp-amt').value === 1152113;
+        document.getElementById('pmp-amt').value = '576056'; document.getElementById('gen-confirm-ok').click(); await W(30);
+        payMarkPaid('payS187_p1', '2026-11-25'); await W(30); document.getElementById('gen-confirm-ok').click(); await W(30);
+        out.full = p.status === 'paid' && p.paidDate === '2026-11-25' && _payPaidSum(p) === 1152113 && _payLeft(p) === 0 && _payPaidIn(p, '2026-11') === 1152113 && _payPaidIn(p, '2026-10') === 0;
+        // 改回未付＝撤銷最後一筆（要原因），回到部分已付
+        payUnmark('payS187_p1'); await W(30); document.getElementById('pvl-why').value = '測試'; document.getElementById('gen-confirm-ok').click(); await W(30);
+        out.unmark = p.status === 'pending' && _payPaidSum(p) === 576056 && _payLeft(p) === 576057;
+        // 兩台各付一次湊滿全額 → 自動標已付
+        p.pays.push({ id: 'z2', amt: 576057, date: '2026-12-01', at: Date.now() + 9 }); savePayables();
+        out.autoClose = p.status === 'paid' && p.paidDate === '2026-12-01';
+        // 一般成本卡重建（syncCostToPayable）不丟付款紀錄
+        const qx = { id: 'qS187b', name: '範例S187b', costs: [{ id: 'cS187b', type: 'labor', vendor: '丙工程行', amt: 10000, date: '2026-11-01' }] };
+        Q.push(qx); syncCostToPayable(qx, qx.costs[0]);
+        const lp = PAYABLES.find(x => x.costId === 'cS187b');
+        lp.pays = [{ id: 'lp1', amt: 3000, date: '2026-11-02', at: 1 }]; qx.costs[0].amt = 12000; syncCostToPayable(qx, qx.costs[0]);
+        const lp2 = PAYABLES.find(x => x.costId === 'cS187b');
+        out.rebuildKeep = !!lp2 && FJC.pay.paysOf(lp2).length === 1 && Math.round(+lp2.amount) === 12000;
+        Q = Q.filter(x => x.id !== 'qS187b');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      window.prompt = oP; PAYABLES = keep; try { window._payGuardOff = true; localStorage.removeItem('fy_paystat'); _payStatSnap = null; savePayables(); } catch (e) { /* 可忽略 */ }
+      return out;
+    });
+    check('v6.0.187 分次付款：付款視窗填這次付多少（超過餘額擋下）、部分已付顯示已付／餘額、應付總額只算餘額、自動重算刪不掉、跨裝置付款紀錄聯集且撤銷不復活、付清記最後一筆、改回未付＝撤銷最後一筆', r.overBlocked && r.part && r.line && r.tomb && r.needWhy && r.union && r.defLeft && r.full && r.unmark && r.autoClose && r.rebuildKeep, JSON.stringify(r));
+    check('v6.0.187 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.184 熱修：本機私有資料時間戳已最新、但這次開頁還沒讀過私有資料 → 也要下載一次（補登卡「私有資料還沒下載完」一直 ✗）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -11328,7 +11411,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── v6.0.185 AI 草稿：唯讀帳號撤回自己的 pending、同一張報價新草稿取代舊的、清單顯示案名／時間／版次 ──
+  // ── v6.0.189 AI 草稿：唯讀帳號撤回自己的 pending、同一張報價新草稿取代舊的、清單顯示案名／時間／版次 ──
   {
     // 規則：用小型求值器實際跑 drafts 的 .write／.validate（data／newData／root 模擬）
     const RD = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata.drafts.$id;
@@ -11361,7 +11444,7 @@ async function newPage(browser, width, height) {
       supOther: !canUpd('ai@x.com', base, { status: 'superseded', doneAt: 5, doneBy: 'ai@x.com', supersededBy: 'dzzz9' }),
       admin: canUpd('jhchen0911@gmail.com', base, { status: 'superseded', doneAt: 5, doneBy: 'jhchen0911@gmail.com', supersededBy: 'd0002' }),
     };
-    check('v6.0.185 規則：唯讀帳號只能把自己的 pending 改成撤回／已被取代；別人的、已套用的、改成已套用、順便改內容都擋；管理員照舊', Object.values(rr).every(Boolean), JSON.stringify(rr));
+    check('v6.0.189 規則：唯讀帳號只能把自己的 pending 改成撤回／已被取代；別人的、已套用的、改成已套用、順便改內容都擋；管理員照舊', Object.values(rr).every(Boolean), JSON.stringify(rr));
 
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -11409,10 +11492,10 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.185 同一張報價再送新草稿：同一人同一種的舊 pending 標已被取代（別人的、別種的、別張報價的不動）', r.sup && r.vfKeep, JSON.stringify(r));
-    check('v6.0.185 唯讀帳號 fyDraftMine／fyDraftWithdraw：只列、只撤回自己的待確認草稿；規則擋下照實回報', r.mine && r.wd && r.wdDeny, JSON.stringify(r));
-    check('v6.0.185 AI 草稿清單：案名、建立時間、版次說明；舊版收在「展開看」；舊重複 pending 自動收成最新一筆', r.list && r.heal, JSON.stringify(r));
-    check('v6.0.185 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.189 同一張報價再送新草稿：同一人同一種的舊 pending 標已被取代（別人的、別種的、別張報價的不動）', r.sup && r.vfKeep, JSON.stringify(r));
+    check('v6.0.189 唯讀帳號 fyDraftMine／fyDraftWithdraw：只列、只撤回自己的待確認草稿；規則擋下照實回報', r.mine && r.wd && r.wdDeny, JSON.stringify(r));
+    check('v6.0.189 AI 草稿清單：案名、建立時間、版次說明；舊版收在「展開看」；舊重複 pending 自動收成最新一筆', r.list && r.heal, JSON.stringify(r));
+    check('v6.0.189 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 

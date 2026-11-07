@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// v6.0.186 AI 草稿上傳（指令列）：不再靠操作 FJ 網頁。用 AI 唯讀帳號登入 → 呼叫雲端 fyDraft → 雲端做跟網頁一樣的試算檢查才收。
+// v6.0.190 AI 草稿上傳（指令列）：不再靠操作 FJ 網頁。用 AI 唯讀帳號登入 → 呼叫雲端 fyDraft → 雲端做跟網頁一樣的試算檢查才收。
 // 說明見 docs/AI草稿上傳_使用說明.md。只用 Node 18 以上內建的 fetch，不用裝套件。
 //
 //   node tools/fy-draft.js login     [--env test]     第一次用：輸入 AI 帳號密碼（不顯示、不存密碼，只存登入通行證）

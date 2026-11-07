@@ -1,4 +1,4 @@
-// v6.0.186 AI 草稿上傳（不靠操作網頁）：AI 唯讀帳號用指令列工具 tools/fy-draft.js 登入後呼叫雲端 fyDraft，
+// v6.0.190 AI 草稿上傳（不靠操作網頁）：AI 唯讀帳號用指令列工具 tools/fy-draft.js 登入後呼叫雲端 fyDraft，
 // 這裡做跟網頁一樣的試算與檢查（對位與小計用 calc/qdraft.js，和前端 fyQuoteChange 同一份），過了才寫 fydata/drafts。
 // 純邏輯、可在 Node 測（functions/test/drafts.test.js）；讀寫資料庫在 index.js。
 const FJC = require('../calc/qdraft.js');
