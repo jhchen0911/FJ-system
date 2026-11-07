@@ -4,7 +4,8 @@
 const FJC = require('../calc/qdraft.js');
 const D = FJC.qd;
 
-const TYPES = { qchg: 1, quote: 1, bid: 1 };   // 只開這三種；其他草稿照舊從網頁送
+const TYPES = { qchg: 1, quote: 1, bid: 1 };
+const MAX_PENDING = 50;   // 每個送件人同時待確認的上限   // 只開這三種；其他草稿照舊從網頁送
 const BID_TO = { awarded: '得標', '': '待回覆', nego: '議價中', lost: '未得標', void: '流標' };
 const LOST = ['價格過高', '規格不符', '工期不符', '業主關係', '未回應', '其他'];
 const ID_RE = /^[A-Za-z0-9_-]{4,40}$/;
@@ -66,7 +67,11 @@ function build(o) {
     const badIt = fields.items.findIndex((it) => !it.sec && (!D.numOk(it.qty, 1e7) || !D.numOk(it.price, 1e9) || it.qty < 0 || (it.price < 0 && !(it.qty > 0))));
     if (badIt >= 0) return { err: '第 ' + (badIt + 1) + ' 列數量或單價不對（數量不能是負的、減項的數量要大於 0）' };
     fields.exs = arr(f0.exs).slice(0, 50).map((e) => ({ desc: S(e.desc, 200), amt: N(e.amt) || 0 }));
-    if (f0.rmk && typeof f0.rmk === 'object' && !Array.isArray(f0.rmk)) fields.rmk = JSON.parse(JSON.stringify(f0.rmk));
+    if (f0.rmk && typeof f0.rmk === 'object' && !Array.isArray(f0.rmk)) {   // 審查：備註只收白名單欄位與自訂條款（不讓任意結構或不合法的 key 進資料庫）
+      const r = {}; Object.keys(f0.rmk).forEach((k) => { if (D.has(D.RMK, k) && f0.rmk[k] != null && typeof f0.rmk[k] !== 'object') r[k] = S(f0.rmk[k], k === 'spareTxt' ? 300 : 60); });
+      if (Array.isArray(f0.rmk.extra)) r.extra = f0.rmk.extra.slice(0, 50).filter((t) => typeof t === 'string').map((t) => S(t, 300)).filter((t) => t.trim());
+      fields.rmk = r;
+    }
     const t = D.totals(fields.items, taxR), ee = expectOk(b.expect, t); if (ee) return { err: ee };
     fields.t = t;
     payload = { base, baseMt: bq ? (bq._mt || 0) : 0, baseName: bq ? S(bq.name, 200) : '', fields };
@@ -101,4 +106,4 @@ function mine(all, email) {
   return Object.keys(all || {}).map((k) => all[k]).filter((d) => d && d.status === 'pending' && String(d.by || '').toLowerCase() === em)
     .sort((a, b) => (+a.at || 0) - (+b.at || 0)).map((d) => ({ id: d.id, type: d.type, at: d.at, summary: d.summary }));
 }
-module.exports = { TYPES, build, superseded, withdrawErr, mine, expectOk, findQuote };
+module.exports = { TYPES, MAX_PENDING, build, superseded, withdrawErr, mine, expectOk, findQuote };

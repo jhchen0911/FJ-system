@@ -36,6 +36,8 @@ test('報價單：工項清乾淨、小計含稅一致才收；得標狀態：�
   assert.ok(!('estCost' in r.rec.payload.fields.items[0]) && !('hack' in r.rec.payload.fields.items[0]));
   assert.deepStrictEqual(r.rec.payload.fields.t, { sub: 900, tax: 45, total: 945 });
   assert.match(D.build(Object.assign({}, base, { body: { type: 'quote', payload: { fields: { name: 'x', items: [{ desc: 'a', qty: -1, price: 1 }] } }, expect: { sub: -1, tax: 0, total: -1 } } })).err, /數量或單價/);
+  const rm = D.build(Object.assign({}, base, { body: { type: 'quote', payload: { fields: Object.assign({}, f, { rmk: { load: '20', 'bad.key': 1, hack: { x: 1 }, extra: ['條款一', { o: 1 }, ''] } }) }, expect: { sub: 900, tax: 45, total: 945 } } }));
+  assert.deepStrictEqual(rm.rec.payload.fields.rmk, { load: '20', extra: ['條款一'] });   // 審查：備註只收白名單欄位
   assert.match(D.build(Object.assign({}, base, { body: { type: 'bid', payload: { qid: 'q2', to: 'lost' } } })).err, /已得標/);
   assert.match(D.build(Object.assign({}, base, { body: { type: 'bid', payload: { qid: 'q1', to: 'hack' } } })).err, /to 只能/);
   const b = D.build(Object.assign({}, base, { body: { type: 'bid', payload: { qid: 'q1', to: 'lost', lostReason: '亂寫' } } }));

@@ -37,10 +37,19 @@ const FN = 'https://asia-southeast1-' + C.projectId + '.cloudfunctions.net/fyDra
 const DIR = path.join(os.homedir(), '.fj-draft'), TOK = path.join(DIR, ENV + '.json');
 
 function ask(q, hide) {
+  if (!hide || !process.stdin.isTTY) return new Promise((res) => { const rl = readline.createInterface({ input: process.stdin, output: process.stdout }); rl.question(q, (a) => { rl.close(); res(a); }); });
+  // 審查：密碼用原始模式一個字一個字讀，畫面完全不回顯（倒退鍵也不會把已打的字印出來）
   return new Promise((res) => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-    if (hide) { rl._writeToOutput = function (s) { if (s.indexOf(q) === 0) process.stdout.write(s); }; }
-    rl.question(q, (a) => { rl.close(); if (hide) process.stdout.write('\n'); res(a); });
+    process.stdout.write(q); const st = process.stdin; let buf = '';
+    st.setRawMode(true); st.resume(); st.setEncoding('utf8');
+    const on = (ch) => {
+      for (const c of ch) {
+        if (c === '\r' || c === '\n' || c === '\u0004') { st.setRawMode(false); st.pause(); st.removeListener('data', on); process.stdout.write('\n'); res(buf); return; }
+        if (c === '\u0003') { st.setRawMode(false); process.stdout.write('\n'); process.exit(130); }
+        if (c === '\u007f' || c === '\b') buf = buf.slice(0, -1); else buf += c;
+      }
+    };
+    st.on('data', on);
   });
 }
 async function post(url, body, headers) {

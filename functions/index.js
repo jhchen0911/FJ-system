@@ -678,15 +678,16 @@ exports.fyDraft = onRequest({ region: REGION, cors: ['https://jhchen0911.github.
     const L = await lists();
     if (!L.readers.has(email)) { res.status(403).json({ error: { message: '只有 AI 唯讀帳號能用這個工具' } }); return; }
     const db = admin.database(), body = (req.body && typeof req.body === 'object') ? req.body : {}, act = String(body.action || '');
-    const pend = async () => (await db.ref('fydata/drafts').orderByChild('status').equalTo('pending').once('value')).val() || {};
+    // 審查：只讀這位送件人的草稿（不把別人的照片草稿整包下載）；狀態在程式裡篩
+    const pend = async () => { const v = (await db.ref('fydata/drafts').orderByChild('by').equalTo(email).once('value')).val() || {}, o = {}; Object.keys(v).forEach((k) => { if (v[k] && v[k].status === 'pending') o[k] = v[k]; }); return o; };
+    // 審查：交易第一次可能拿到本機快取的 null → 回傳 null（不是 undefined）讓伺服器用真值重跑，否則會誤判「找不到」或漏標取代
+    const txMine = async (id, upd) => { let why = ''; const tr = await db.ref('fydata/drafts/' + id).transaction((d) => { if (d === null) { why = '找不到這張草稿'; return null; } why = draftsCore.withdrawErr(d, email); if (why) return undefined; return Object.assign({}, d, upd); }); return { ok: tr.committed && !why && tr.snapshot.val() !== null, why: why || (tr.committed ? '' : '沒成功，請再試一次') }; };
     if (act === 'mine') { res.status(200).json({ ok: true, list: draftsCore.mine(await pend(), email) }); return; }
     if (act === 'withdraw') {
       const id = String(body.id || '');
       if (!/^[A-Za-z0-9_-]{4,40}$/.test(id)) { res.status(400).json({ error: { message: '草稿 id 不對' } }); return; }
-      const ref = db.ref('fydata/drafts/' + id);
-      let why = '';
-      const tr = await ref.transaction((d) => { why = draftsCore.withdrawErr(d, email); if (why) return undefined; return Object.assign({}, d, { status: 'withdrawn', doneAt: Date.now(), doneBy: email }); });
-      if (!tr.committed) { res.status(why === '找不到這張草稿' ? 404 : 409).json({ error: { message: why || '撤回沒成功，請再試一次' } }); return; }
+      const w = await txMine(id, { status: 'withdrawn', doneAt: Date.now(), doneBy: email });
+      if (!w.ok) { res.status(w.why === '找不到這張草稿' ? 404 : 409).json({ error: { message: w.why || '撤回沒成功，請再試一次' } }); return; }
       res.status(200).json({ ok: true, id }); return;
     }
     if (act !== 'submit') { res.status(400).json({ error: { message: 'action 要是 submit／mine／withdraw' } }); return; }
@@ -696,15 +697,18 @@ exports.fyDraft = onRequest({ region: REGION, cors: ['https://jhchen0911.github.
       db.ref('fydata/shared/params/tax').once('value').then((s) => s.val()),
       db.ref('fydata/readers/' + email.replace(/\./g, ',')).once('value').then((s) => s.val()),
     ]);
-    const now = Date.now(), id = 'd' + now.toString(36) + Math.random().toString(36).slice(2, 6);
+    const mineN = Object.keys(await pend()).length;
+    if (mineN >= draftsCore.MAX_PENDING) { res.status(429).json({ error: { message: '你還有 ' + mineN + ' 張待確認的草稿（上限 ' + draftsCore.MAX_PENDING + '），先撤回用不到的' } }); return; }
+    const now = Date.now(), id = 'd' + now.toString(36) + require('crypto').randomBytes(4).toString('hex');
     const name = (rname && typeof rname === 'object' && rname.name) ? String(rname.name) : 'AI';
     const FJCinv = require('./calc/invoice.js');
     const b = draftsCore.build({ email, name, body, quotes, taxR: FJCinv.inv.taxR(tax), now, id });
     if (b.err) { res.status(400).json({ error: { message: b.err }, detail: b.detail || null }); return; }
-    await db.ref('fydata/drafts/' + id).set(b.rec);
+    const cr = await db.ref('fydata/drafts/' + id).transaction((d) => (d === null ? b.rec : undefined));   // 審查：id 撞到就不覆蓋
+    if (!cr.committed) { res.status(409).json({ error: { message: '草稿編號撞到，請再送一次' } }); return; }
     const all = await pend(), old = draftsCore.superseded(b.rec, all);
-    await Promise.all(old.map((oid) => db.ref('fydata/drafts/' + oid).transaction((d) => (d && d.status === 'pending' && String(d.by || '').toLowerCase() === email) ? Object.assign({}, d, { status: 'superseded', doneAt: now, doneBy: email, supersededBy: id }) : undefined)));
-    res.status(200).json({ ok: true, id, summary: b.rec.summary, superseded: old });
+    const sup = await Promise.all(old.map((oid) => txMine(oid, { status: 'superseded', doneAt: now, doneBy: email, supersededBy: id }).then((r) => (r.ok ? oid : null))));
+    res.status(200).json({ ok: true, id, summary: b.rec.summary, superseded: sup.filter(Boolean) });
   } catch (e) {
     console.error('fyDraft', e);
     res.status(500).json({ error: { message: 'AI 草稿服務錯誤' } });
