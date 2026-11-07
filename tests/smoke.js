@@ -11031,6 +11031,87 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.199 進退料統整表 M3：自有料確認後自動改台帳；三種例外出卡給 Lotion ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepM = MAT_MOVES, keepF = MAT_MOVE_FIN, keepL = MAT_LEDGER, oC = window.showConfirm, oP = window.prompt;
+      try {
+        MAT_MOVES = []; MAT_MOVE_FIN = {};
+        Q = [{ id: 'qA199', name: '範例A199', client: '甲', awarded: true, items: [], _mt: 1, dailyLogs: [] }, { id: 'qB199', name: '範例B199', client: '甲', awarded: true, items: [], _mt: 1 }];
+        MAT_LEDGER = [{ id: 'L1', name: '型鋼', spec: 'H300', len: 9, qty: 30, loc: '公司倉庫', date: '2026-01-01', price: 30, uw: 94, _mt: 1 },
+          { id: 'L2', name: '支撐', spec: 'H300', len: 9, qty: 10, loc: '公司倉庫', date: '2026-01-02', _mt: 1 },
+          { id: 'L3', name: '型鋼', spec: 'H350', len: 12, qty: 5, loc: '公司倉庫', date: '2026-01-03', _mt: 1 }];
+        const at = id => MAT_LEDGER.filter(x => x.projQid === id).reduce((s, x) => s + x.qty, 0);
+        const wh = (sp, nm) => MAT_LEDGER.filter(x => !x.projQid && x.spec === sp && (!nm || x.name === nm) && x.cond !== 'repair').reduce((s, x) => s + x.qty, 0);
+        const mk = (o) => { const m = Object.assign({ id: 'mv_' + Math.random().toString(36).slice(2, 8), st: 'ok', own: true, conf: {}, _mt: Date.now() }, o); MAT_MOVES.push(m); return m; };
+        // 進場：AI 寫「H型鋼 H300×300」→ 對到台帳「型鋼 H300 9M」（不是同規格的支撐）
+        const m1 = mk({ date: '2026-11-01', dir: 'in', qid: 'qA199', items: [{ name: 'H型鋼', spec: 'H300×300', len: 9, qty: 12 }] });
+        let res = await _mvApplyAll({ local: true });
+        out.in = res.n === 1 && at('qA199') === 12 && wh('H300', '型鋼') === 18 && wh('H300', '支撐') === 10 && !!MAT_MOVE_FIN[m1.id].applied && MAT_LEDGER.some(x => x.projQid === 'qA199' && x.outDate === '2026-11-01' && x.mvId === m1.id);
+        out.amort = (Q[0].costs || []).some(c => c._fromMat === 'amort') || _matAmortRows(Q[0]).length > 0;
+        // 冪等：再跑一次不重扣
+        res = await _mvApplyAll({ local: true });
+        out.idem = res.n === 0 && at('qA199') === 12 && wh('H300', '型鋼') === 18;
+        // 轉場 A → B 5 支：A 結算使用段、B 從轉場日起算
+        const m2 = mk({ date: '2026-11-05', dir: 'xfer', fromQid: 'qA199', toQid: 'qB199', qid: 'qB199', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 5 }] });
+        await _mvApplyAll({ local: true });
+        out.xfer = at('qA199') === 7 && at('qB199') === 5 && Q[0].mat.use.some(u => u.mvId === m2.id && u.qty === 5 && u.days === 4) && MAT_LEDGER.some(x => x.projQid === 'qB199' && x.outDate === '2026-11-05');
+        // 退場：A 退 6 支（短少 1）→ 倉庫 +6、損耗 1（購置單價）
+        const m3 = mk({ date: '2026-11-10', dir: 'out', qid: 'qA199', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 6, short: 1 }] });
+        await _mvApplyAll({ local: true });
+        out.back = at('qA199') === 0 && wh('H300', '型鋼') === 24 && Q[0].mat.loss.some(l => l.mvId === m3.id && l.qty === 1 && l.unitCost === 30 * 94 * 9) && MAT_LEDGER.some(x => !x.projQid && /歸還自 範例A199/.test(x.note || ''));
+        // 例外①：倉庫不夠 → 整筆不動、出卡；②退場比工地上多；③歸倉要修
+        const h1 = mk({ date: '2026-11-11', dir: 'in', qid: 'qB199', items: [{ name: '型鋼', spec: 'H350', len: 12, qty: 8 }] });
+        const h2 = mk({ date: '2026-11-12', dir: 'out', qid: 'qB199', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 9 }] });
+        const h3 = mk({ date: '2026-11-13', dir: 'out', qid: 'qB199', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 2, cond: 'repair' }] });
+        const beforeL = JSON.stringify(MAT_LEDGER.map(x => [x.id, x.qty, x.projQid || '']));
+        res = await _mvApplyAll({ local: true });
+        const f = id => MAT_MOVE_FIN[id] || {};
+        out.holds = res.hold === 3 && res.n === 0 && f(h1.id).hold.list[0].k === 'nostock' && f(h2.id).hold.list[0].k === 'over' && f(h3.id).hold.list[0].k === 'cond' && JSON.stringify(MAT_LEDGER.map(x => [x.id, x.qty, x.projQid || ''])) === beforeL;
+        out.todo = (function () { const it = []; _v6TodoItems(it); return it.some(x => x.type === 'dec_mvHold' && /3 筆/.test(x.text)); })();
+        const det = await Promise.resolve(_DEC.mvHold.detail(h1));
+        out.detail = /倉庫可用 5 支，簽收單 8 支/.test(det) && /無進貨紀錄/.test(det) && /範例B199/.test(det) && !/NT\$|租金|運費/.test(det);
+        // 確認①：倉庫 5 支先用、缺的 3 支新增一列標「無進貨紀錄」
+        out.ok1 = (await _DEC.mvHold.ok(h1)) === true && at('qB199') === 13 && MAT_LEDGER.some(x => x.noStock && x.qty === 3 && x.projQid === 'qB199') && wh('H350') === 0 && f(h1.id).applied.forced === 1;
+        // 確認③：要修 → 回倉庫但標要修、不算可用（調撥找不到）
+        out.ok3 = (await _DEC.mvHold.ok(h3)) === true && MAT_LEDGER.some(x => x.cond === 'repair' && x.qty === 2 && !x.projQid) && _matLedStock({ name: '型鋼', spec: 'H300', len: 9 }).every(x => x.cond !== 'repair');
+        // 退回②：不動台帳、不再列
+        out.rej = _DEC.mvHold.reject(h2, '我自己處理') === true && f(h2.id).skip.why === '我自己處理' && !_decItems('mvHold').length;
+        // 修改：改歸倉狀況後重新比對（例外解除就自動套用；本機模式按卡片確認）
+        const h4 = mk({ date: '2026-11-14', dir: 'out', qid: 'qB199', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 1, dmg: 1 }] });
+        await _mvApplyAll({ local: true });
+        window.showConfirm = function (t, h, ok) { document.body.insertAdjacentHTML('beforeend', '<div id="tmpbox">' + h + '</div>'); document.getElementById('mv-items').value = '型鋼 H300 9M 1支 報廢'; ok(); document.getElementById('tmpbox').remove(); };
+        _DEC.mvHold.edit(h4);
+        await new Promise(res2 => setTimeout(res2, 120));
+        out.edit = !f(h4.id).hold && h4.items[0].cond === 'scrap';
+        await _mvApplyAll({ local: true });   // 改成報廢：照規則還是要 Lotion 在卡片確認
+        out.scrap = f(h4.id).hold.list[0].k === 'cond' && /報廢/.test(f(h4.id).hold.list[0].msg) && (await _DEC.mvHold.ok(h4)) === true && !!f(h4.id).applied && Q[1].mat.loss.some(l => l.mvId === h4.id && /報廢/.test(l.note));
+        // 租賃料、舊單已登錄、草稿都不動台帳
+        const n0 = JSON.stringify(MAT_LEDGER.map(x => [x.id, x.qty]));
+        mk({ date: '2026-11-15', dir: 'in', qid: 'qA199', own: false, items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 1 }] });
+        mk({ date: '2026-11-15', dir: 'in', qid: 'qA199', legacy: 1, items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 1 }] });
+        mk({ date: '2026-11-15', dir: 'in', qid: 'qA199', st: 'draft', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 1 }] });
+        res = await _mvApplyAll({ local: true });
+        out.skip = res.n === 0 && JSON.stringify(MAT_LEDGER.map(x => [x.id, x.qty])) === n0;
+        // 舊日報簽收單搬來的：套用後原單也勾已登錄（材料頁不再出現「帶入」）；自有料新單在材料頁是已處理
+        Q[0].dailyLogs = [{ id: 'dl', date: '2026-11-16', slips: [{ id: 'sX', date: '2026-11-16', dir: 'out', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 2 }], at: 1 }] }];
+        mk({ id: 'mv_sX', date: '2026-11-16', dir: 'in', qid: 'qA199', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 2 }], src: { slipId: 'sX' } });
+        await _mvApplyAll({ local: true });
+        out.oldSlip = Q[0].dailyLogs[0].slips[0].done === true && at('qA199') === 2;
+        out.bridge = _mvSlipsOf(Q[0]).filter(s => s.dir === 'out' || s.dir === 'back').every(s => s.done) && _mvSlipsOf(Q[0]).some(s => s.dir === 'rentIn' && !s.done);   // 租賃料 M4 前照舊帶入
+        // 健檢：套用後內容被改
+        const mA = _mvOf('mv_sX'); mA.items[0].qty = 3;
+        out.health = _healthAddMv([]).some(x => /內容又被改 1 筆/.test(x.msg));
+        // 沒登入雲端的裝置不自動套用
+        out.gate = _mvApplyOk() === false;
+      } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; window.showConfirm = oC; window.prompt = oP; }
+      return out;
+    });
+    check('v6.0.199 進退料 M3：自有料進場／轉場／退場自動改台帳（先進先出、規格品名對位、使用段與損耗）、冪等不重扣、三種例外整筆不動出卡、確認／退回／修改、租賃料與舊單不動、舊單勾已登錄、健檢', r.in && r.amort && r.idem && r.xfer && r.back && r.holds && r.todo && r.detail && r.ok1 && r.ok3 && r.rej && r.edit && r.scrap && r.skip && r.oldSlip && r.bridge && r.health && r.gate, JSON.stringify(r));
+    check('v6.0.199 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.198 進退料統整表 M2：拍簽收單直接進首頁「簽收單待確認」卡片 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
