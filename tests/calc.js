@@ -12,6 +12,29 @@ const results = [];
 const check = (name, ok, info) => results.push({ name, ok: !!ok, info: info || '' });
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
+// ── 進退料簿（calc/matmove.js，v6.0.195 進退料統整表 M1）──
+{
+  const MV = require(path.join(__dirname, '..', 'calc', 'matmove.js')).mv;
+  const L = [
+    { id: 'a', st: 'ok', dir: 'in', qid: 'A', date: '2026-11-01', truck: 'ab-1', items: [{ name: 'H型鋼', spec: 'H350', len: 12, qty: 40 }] },
+    { id: 'b', st: 'ok', dir: 'out', qid: 'A', date: '2026-11-20', truck: 'AB-1', items: [{ name: 'H型鋼', spec: 'H350', len: 12, qty: 30, short: 2 }] },
+    { id: 'c', st: 'ok', dir: 'xfer', fromQid: 'A', toQid: 'B', date: '2026-11-20', truck: 'AB-1', items: [{ name: 'H型鋼', spec: 'H350', len: 12, qty: 8 }] },
+    { id: 'd', st: 'draft', dir: 'in', qid: 'A', date: '2026-11-21', items: [{ name: 'H型鋼', spec: 'H350', len: 12, qty: 99 }] }];
+  const sA = MV.onSite(L, 'A')['H型鋼|H350|12'], sB = MV.onSite(L, 'B')['H型鋼|H350|12'];
+  check('進退料：A 案進 40、退 30＋短少 2、轉場給 B 8 → 在場 0；B 案 8 支 96M；待確認不算', sA.qty === 0 && sB.qty === 8 && sB.m === 96, JSON.stringify({ sA, sB }));
+  check('進退料：同一天同車號（大小寫、空白不同）算一趟；沒車號每筆一趟', MV.trips(L) === 3 && MV.trips([{ id: 'x' }, { id: 'y' }]) === 2);
+  const dirs = ['out', 'back', 'rentIn', 'rentOut', 'other'].map(d => MV.fromSlipDir(d));
+  check('舊簽收單方向：倉庫→工地＝進場自有、工地→倉庫＝退場自有、租料進退、其他＝空白', JSON.stringify(dirs) === JSON.stringify([{ dir: 'in', own: true }, { dir: 'out', own: true }, { dir: 'in', own: false }, { dir: 'out', own: false }, { dir: '', own: null }]));
+  const wt = { H350: { kgm: 135 }, '千斤頂': { kgpc: 40 } };
+  const kgH = MV.itemKg({ spec: 'H350', len: 12, qty: 10 }, wt), kgJ = MV.itemKg({ name: '千斤頂', qty: 5 }, wt);
+  check('重量：型鋼 135kg/M × 120M＝16,200kg、副件 40kg × 5＝200kg、查不到＝null', kgH === 16200 && kgJ === 200 && MV.itemKg({ spec: 'H400', len: 9, qty: 1 }, wt) === null);
+  const sh = MV.shareByKg([{ key: 'A', kg: 16200 }, { key: 'B', kg: 200 }], 7001);
+  check('同車依重量分攤 7,001：加總不差 1 元；缺重量回 null', sh.A + sh.B === 7001 && sh.A === 6916 && sh.B === 85 && MV.shareByKg([{ key: 'A', kg: 1 }, { key: 'B', kg: null }], 100) === null, JSON.stringify(sh));
+  const ir = MV.idleRent({ pullDone: '2026-11-10', outDate: '2026-11-25', rate: 6, unit: 'M月', m: 120 });
+  check('閒置多付租金：拔除完成 11/10 到退場 11/25＝15 天 × 120M × 6 元／M月 ÷30＝360、每天 24', ir.days === 15 && ir.cost === 360 && ir.perDay === 24, JSON.stringify(ir));
+  check('租金單位：M天、片月', MV.rentFor(2, 'M天', 100, 0, 3) === 600 && MV.rentFor(300, '片月', 0, 10, 15) === 1500 && MV.days('2026-11-25', '2026-11-10') === 0);
+}
+
 // 稅率：空白＝5、0 合法
 check('稅率：空白＝5%、0 是免稅、字串照讀', I.taxR('') === 5 && I.taxR(null) === 5 && I.taxR(0) === 0 && I.taxR('8') === 8 && I.taxM(5) === 1.05 && I.taxM(0) === 1);
 // 請款合計：未稅 100,000、稅 5%、保留款 10%、清潔費 10‰

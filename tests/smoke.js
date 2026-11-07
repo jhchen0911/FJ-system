@@ -11030,6 +11030,53 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.195 進退料統整表 M1：進退料簿資料層＋舊簽收單搬家 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepM = MAT_MOVES, keepF = MAT_MOVE_FIN, keepT = JSON.parse(JSON.stringify(TOMBS.matMoves || {}));
+      try {
+        MAT_MOVES = []; MAT_MOVE_FIN = {}; if (TOMBS.matMoves) delete TOMBS.matMoves;
+        Q = [{ id: 'qM195', name: '範例M195', client: '甲', items: [], _mt: 1, dailyLogs: [{ id: 'd1', date: '2026-11-01', slips: [
+          { id: 's1', date: '2026-11-01', dir: 'out', from: '料場', to: '範例工地', truck: 'AB-1234', vendor: '範例運輸', items: [{ name: 'H型鋼', spec: 'H350', len: 12, qty: 40, unit: '支' }], photo: 'p1', by: 'w@x', at: 1, done: true, doneAt: 5 },
+          { id: 's2', date: '2026-11-02', dir: 'rentIn', from: '範例租賃料場', to: '範例工地', vendor: '範例租賃', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 50 }], at: 2 },
+          { id: 's3', date: '2026-11-03', dir: 'other', items: [{ name: '千斤頂', qty: 10 }], at: 3 }] }] }];
+        const n = _mvMigrate({ force: true });
+        const a = _mvOf('mv_s1'), b = _mvOf('mv_s2'), c = _mvOf('mv_s3');
+        out.mig = n === 3 && MAT_MOVES.length === 3 && a.st === 'ok' && a.legacy === 1 && a.dir === 'in' && a.own === true && a.carrier === '範例運輸' && a.items[0].m === 480 && a.src.slipId === 's1'
+          && b.st === 'draft' && b.dir === 'in' && b.own === false && b.rentVendor === '範例租賃' && !b.carrier && c.st === 'draft' && c.dir === '' && c.own === undefined;
+        out.noMoney = MAT_MOVES.every(m => !('freight' in m) && !('rentRate' in m) && !('comp' in m));
+        out.again = _mvMigrate({ force: true }) === 0 && MAT_MOVES.length === 3;
+        // 舊流程「帶入」後勾已登錄 → 待確認的跟著變已確認（legacy，之後不再套用台帳）
+        Q[0].dailyLogs[0].slips[1].done = true; out.doneLater = _mvMigrate({ force: true }) === 1 && _mvOf('mv_s2').st === 'ok' && _mvOf('mv_s2').legacy === 1;
+        // 刪過（墓碑）的不再搬回來
+        MAT_MOVES = MAT_MOVES.filter(m => m.id !== 'mv_s3'); TOMBS.matMoves = { mv_s3: Date.now() };
+        out.tomb = _mvMigrate({ force: true }) === 0 && !_mvOf('mv_s3');
+        // 在場量：自有 40 支進場（已確認）
+        out.onSite = FJC.mv.onSite(MAT_MOVES, 'qM195')['H型鋼|H350|12'].qty === 40;
+        // 同步分邊：進退料簿在共用區、金額在 private；全量備份兩個都有
+        MAT_MOVE_FIN.mv_s2 = { _mt: 1, rentRate: 6, rentUnit: 'M月' };
+        const sh = _sharedPayload().data, pv = _privatePayload().data, bk = _syncPayload().data;
+        out.split = Array.isArray(sh.matMoves) && sh.matMoves.length === 2 && !('matMoveFin' in sh) && pv.matMoveFin.mv_s2.rentRate === 6 && !('matMoves' in pv) && bk.matMoves.length === 2 && !!bk.matMoveFin.mv_s2;
+        // 審查 H1／H2：員工裝置進退料逐筆另外送——刪除不送、別人確認過的不送、整包不送；其他集合照舊
+        const sent = [], oDb = window._fbDb, oU = window._fbUser;
+        window._fbDb = { ref: (p) => ({ set: (v) => { sent.push(p); return Promise.resolve(); } }) }; window._fbUser = { email: 'W@X.com' };
+        const dl = { 'matMoves/a': null, 'matMoves/b': { st: 'ok', okBy: 'boss@x.com' }, 'matMoves/c': { st: 'draft' }, 'matMoves/d': { st: 'ok', okBy: 'w@x.com' }, matMoves: { z: 1 }, 'quotes/q1': { id: 'q1' } };
+        try { _mvStaffSplit(dl); } finally { window._fbDb = oDb; window._fbUser = oU; }
+        out.staff = JSON.stringify(Object.keys(dl)) === JSON.stringify(['quotes/q1']) && JSON.stringify(sent) === JSON.stringify(['fydata/shared/matMoves/c', 'fydata/shared/matMoves/d']);
+        // 審查：雲端已確認的，員工裝置較新的舊草稿不能蓋回去
+        const mg = _mergeColl([{ id: 'mv_z', st: 'draft', _mt: 999 }], [{ id: 'mv_z', st: 'ok', _mt: 5 }], 'matMoves', {});
+        out.mergeOk = mg.length === 1 && mg[0].st === 'ok';
+        // 審查：沒登入或還沒套用過雲端，不自動搬家
+        out.guard = _mvMigrate() === 0;
+        out.colls = _SYNC_COLLS.indexOf('matMoves') >= 0 && _REC_COLLS.indexOf('matMoves') >= 0 && _PRIV_COLLS.indexOf('matMoveFin') >= 0 && !!_TOMB_COLLS.matMoves;
+      } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; TOMBS.matMoves = keepT; }
+      return out;
+    });
+    check('v6.0.195 進退料簿 M1：舊簽收單搬家（已登錄＝已確認不再套用、沒勾＝待確認、方向對照、運輸公司／租賃商分開）、重跑不重複、後來勾已登錄跟著改、刪過不復活、在場量、共用區不含金額、金額在 private、備份都有、員工裝置逐筆送（刪除與別人確認過的不送）、雲端已確認不被舊草稿蓋、沒套用雲端前不搬家', r.mig && r.noMoney && r.again && r.doneLater && r.tomb && r.onSite && r.split && r.colls && r.staff && r.mergeOk && r.guard, JSON.stringify(r));
+    check('v6.0.195 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.194 報價編號重號：存檔時再查一次；已重號的拍板卡決定哪張改號 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

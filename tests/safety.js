@@ -146,6 +146,8 @@ const BUILD = async () => {
   MAT_LEDGER = [{ id: 'mlB1', date: '2026-09-01', item: '鋼板樁', qty: 10, _mt: 1 }];
   SHARE_PROFIT = { cfg: { 2026: { netProfit: 0, retentionAdd: 0, wcAdd: 0, machineSelfPay: 0 } }, draws: [{ id: 'dB1', date: '2026-09-30', amount: 1000 }] };
   COST_HIST = [{ id: 'chB1', desc: '鋼板樁', unit: 'M', cost: 900 }];
+  MAT_MOVES = [{ id: 'mv_B1', st: 'ok', _mt: 1, date: '2026-09-01', dir: 'in', own: false, qid: 'qB1', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 50, m: 450 }] }];   // v6.0.195 進退料簿
+  MAT_MOVE_FIN = { mv_B1: { _mt: 1, rentRate: 6, rentUnit: 'M月' } };
   if (typeof _prjSync === 'function') _prjSync();   // 4a：真實裝置開頁就會對帳建專案（得標主報價 qB1 → p_qB1），備份才帶得到
   return JSON.stringify(_syncPayload().data);
 };
@@ -217,7 +219,7 @@ async function runAll(browser, root, only) {
     await B.ctx.close();
     const d = j1 && j2 ? firstDiff(norm(j1), norm(j2), '') : '(沒有產生備份' + (j1 ? '' : '：' + e1) + ')';
     const n = j1 ? JSON.parse(j1) : {};
-    const filled = ['quotes', 'invoices', 'payables', 'contracts', 'customers', 'vendors', 'expenses', 'hr', 'payslips', 'petty', 'matLedger', 'costHist', 'projects'].filter(k => !(Array.isArray(n[k]) && n[k].length));
+    const filled = ['quotes', 'invoices', 'payables', 'contracts', 'customers', 'vendors', 'expenses', 'hr', 'payslips', 'petty', 'matLedger', 'costHist', 'projects', 'matMoves'].filter(k => !(Array.isArray(n[k]) && n[k].length)).concat(n.matMoveFin && n.matMoveFin.mv_B1 ? [] : ['matMoveFin']);
     res.backup = { ok: !d && !!j1 && !filled.length && n.shareProfit && n.shareProfit.draws.length === 1, info: d ? '第一個不同的地方：' + d : filled.length ? '這些集合沒放到資料、等於沒測：' + filled.join('、') : '報價、請款、應付、合約、客戶、廠商、費用、薪資、薪資單、零用金、材料台帳、單價歷史、分潤逐欄相同' };
   }
   if (!only || only === 'wrap') res.wrap = testWrap(root);
