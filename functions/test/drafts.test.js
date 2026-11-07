@@ -62,7 +62,7 @@ test('取代、撤回、列出：只動自己的同一件 pending', () => {
   assert.deepStrictEqual(D.mine(all, 'ai@x.com').map((x) => x.id), ['dold1', 'dold2', 'dnew0001', 'dold4']);
 });
 
-test('v6.0.196 改單可改成本單價與固定條款（範本照報價新舊選）', () => {
+test('v6.0.197 改單可改成本單價與固定條款（範本照報價新舊選）', () => {
   const OLD = String(Date.UTC(2026, 0, 1)); const qs = { k1: { id: OLD, code: 'Z1', name: '假丁案', ver: 1, items: [{ desc: '假工項A', qty: 2, price: 100, estCost: 60 }] } };
   const rp = { rmkBase: '6. 本工程無保固及保留款', rmkBaseOld: '6. 舊條款', rmk14At: Date.UTC(2026, 5, 1) };
   const body = { type: 'qchg', payload: { qid: OLD, ops: [{ op: 'set', idx: 0, match: '假工項A', fields: { estCost: 80 } }, { op: 'rmkFix', match: '舊條款', text: '新條款' }] }, expect: { sub: 200, tax: 10, total: 210 } };

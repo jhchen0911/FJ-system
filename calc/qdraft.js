@@ -8,7 +8,7 @@
 (function (root) {
   'use strict';
   function _fmt0(n) { n = Math.round((+n || 0) * 100) / 100; return n.toLocaleString('en-US'); }
-var _QCHG_F={desc:1,unit:1,qty:1,price:1,note:1,estCost:1};   // estCost：v6.0.196 成本單價（Lotion 11/07 開放；只有管理員確認後才生效）
+var _QCHG_F={desc:1,unit:1,qty:1,price:1,note:1,estCost:1};   // estCost：v6.0.197 成本單價（Lotion 11/07 開放；只有管理員確認後才生效）
 var _QCHG_RMK={load:1,walk:1,tech:1,bh:1,br:1,bs:1,bb:1,c2:1,c3:1,ir:1,mob:1,minQty:1,spareTxt:1};   // spareTxt：v6.0.165 備用單價那一條的單張文字（上限 300）
 var _QCHG_MAX=60;
 function _qchgHas(o,k){return Object.prototype.hasOwnProperty.call(o,k);}   // 審查：不讓 constructor／toString 這類繼承來的名字過白名單
@@ -25,7 +25,7 @@ function _qchgFind(its,ref){
 function _qchgSub(its){return (its||[]).reduce(function(a,it){return (!it||it.sec||!!(it&&it.spare))?a:a+(parseFloat(it.qty)||0)*(parseFloat(it.price)||0);},0);}
 function _qchgRowTxt(it,F){F=F||_fmt0;if(!it)return '';return _qchgKey(it)+'　'+(it.qty!=null?it.qty:'')+' '+(it.unit||'')+' × '+F(parseFloat(it.price)||0)+'＝'+F((parseFloat(it.qty)||0)*(parseFloat(it.price)||0))+(it.note?('（'+it.note+'）'):'');}
 // 把動作套到複本：{items, rmk, rows:[{act,ok,why,before,after,d}], bad}
-// opts（v6.0.196，選填）：{rmkBase: 這張報價用的條款範本全文}，rmkFix 改固定條款要用
+// opts（v6.0.197，選填）：{rmkBase: 這張報價用的條款範本全文}，rmkFix 改固定條款要用
 function _qchgStrip(line){return String(line||'').replace(/^\s*\d+\s*\.(?!\d)\s*/,'').trim();}
 function _qchgPlan(q,ops,F,opts){F=F||_fmt0;opts=opts||{};
   var src=(q&&q.items)||[],its=JSON.parse(JSON.stringify(src)),rmk=JSON.parse(JSON.stringify((q&&q.rmk)||{}));if(!Array.isArray(rmk.extra))rmk.extra=[];
@@ -62,7 +62,7 @@ function _qchgPlan(q,ops,F,opts){F=F||_fmt0;opts=opts||{};
       if(why){no(lbl,why);return;}
       var cb=o.estCost==null?null:+o.estCost;
       if(!('estCost' in nx))delete o.estCost;Object.assign(o,nx);var rs={act:lbl,ok:true,before:before,after:_qchgRowTxt(o,F),d:(parseFloat(o.qty)||0)*(parseFloat(o.price)||0)-a0};
-      if(ks.indexOf('estCost')>=0)rs.cost={b:cb,a:o.estCost==null?null:+o.estCost,price:parseFloat(o.price)||0};   // v6.0.196 畫面另外顯示成本改前→改後與改後毛利
+      if(ks.indexOf('estCost')>=0)rs.cost={b:cb,a:o.estCost==null?null:+o.estCost,price:parseFloat(o.price)||0};   // v6.0.197 畫面另外顯示成本改前→改後與改後毛利
       rows.push(rs);
     }else if(t==='rmk'){
       var k=String(op.key||'');if(!_qchgHas(_QCHG_RMK,k)){no('備註','不認得的欄位 '+k.slice(0,20));return;}
@@ -77,7 +77,7 @@ function _qchgPlan(q,ops,F,opts){F=F||_fmt0;opts=opts||{};
       if(t==='rmkDel'){ex[n].del=1;rows.push({act:lb,ok:true,before:cur,after:'（刪除）',d:0});return;}
       var tx2=String(op.text||'').trim().slice(0,300);if(!tx2){no(lb,'沒有內容（要刪請用刪除）');return;}
       ex[n].t=tx2;rows.push({act:lb,ok:true,before:cur,after:tx2,d:0,txt:1});
-    }else if(t==='rmkFix'){   // v6.0.196：改範本固定條款的字（只改這張報價，存在 rmk.ov['L'+範本第幾行]＝{from 原文, to 新文}；key 用 L 開頭，免得 Firebase 把數字 key 存成陣列；text 空白＝回復範本）
+    }else if(t==='rmkFix'){   // v6.0.197：改範本固定條款的字（只改這張報價，存在 rmk.ov['L'+範本第幾行]＝{from 原文, to 新文}；key 用 L 開頭，免得 Firebase 把數字 key 存成陣列；text 空白＝回復範本）
       var base=String(opts.rmkBase||''),mt=String(op.match||'').trim(),L=base.split('\n'),hits=[];
       if(!base){no('改固定條款','沒有條款範本，不能改');return;}
       if(!mt){no('改固定條款','要給 match（原本條文，不含編號）');return;}

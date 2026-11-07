@@ -9935,7 +9935,7 @@ async function newPage(browser, width, height) {
         // Lotion：草稿清單、前後對照、套用 → 開編輯頁存檔、草稿標已套用
         const oMark = window._draftMark; let marked = null; window._draftMark = (id, st, ex) => { marked = { id, st, ex }; return Promise.resolve(true); };
         DRAFTS = { dQC1aa: { id: 'dQC1aa', type: 'qchg', by: 'ai@example.com', byName: '陳軒', at: Date.now(), status: 'pending', summary: pushed.sm, payload: pushed.pl } };
-        { const it0 = []; _v6TodoItems(it0); out.list = !/6 項可套用/.test(_draftListHtml()) && it0.some((x) => x.type === 'dec_qchg' && /1 份待確認/.test(x.text)) && /6 項可套用/.test(_decCardHtml('qchg', DRAFTS.dQC1aa)); }   // v6.0.196 改走首頁拍板卡
+        { const it0 = []; _v6TodoItems(it0); out.list = !/6 項可套用/.test(_draftListHtml()) && it0.some((x) => x.type === 'dec_qchg' && /1 份待確認/.test(x.text)) && /6 項可套用/.test(_decCardHtml('qchg', DRAFTS.dQC1aa)); }   // v6.0.197 改走首頁拍板卡
         draftApply('dQC1aa');
         const md = document.getElementById('gen-confirm-modal').innerHTML;
         out.diff = /前後對照/.test(document.getElementById('gen-confirm-title').textContent) && /【減項】/.test(md) && /-30,000/.test(md) && /115,000/.test(md) && /120,750/.test(md) && document.getElementById('gen-confirm-ok').textContent === '套用';
@@ -9958,7 +9958,7 @@ async function newPage(browser, width, height) {
     check('AI 改單草稿：新增（含負數減項、接在指定列後）、改單價／備註、刪列、改備註條款數字與自訂條款；全部對位在原報價的複本上，原報價不動', r.plan, JSON.stringify(r));
     check('AI 改單草稿（審查）：同一列後加兩列照順序；重複條款照位置改；同一條兩個動作、繼承欄位名、空白說明擋下；編號重複不猜；送出只留白名單欄位；這台套用過不能再套', r.order && r.guard && r.dupCode && r.once, JSON.stringify(r));
     check('AI 改單草稿：說明不一樣／找不到／數量 0／同列兩個動作／不認得的動作都擋下；唯讀帳號送出前先試算、對不上不送，草稿帶版次與未稅前後', r.bad && r.push, JSON.stringify(r));
-    check('AI 改單草稿：Lotion 拍板卡（v6.0.196 起不在 AI 草稿清單）、前後對照表（減項、未稅與含稅總計）、按「套用」開報價改好存檔、草稿標已套用；套用過再看就對不上、不能再套', r.list && r.diff && r.applied && r.stale && r.notAgain, JSON.stringify(r));
+    check('AI 改單草稿：Lotion 拍板卡（v6.0.197 起不在 AI 草稿清單）、前後對照表（減項、未稅與含稅總計）、按「套用」開報價改好存檔、草稿標已套用；套用過再看就對不上、不能再套', r.list && r.diff && r.applied && r.stale && r.notAgain, JSON.stringify(r));
     check('AI 改單草稿測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
@@ -11629,7 +11629,7 @@ async function newPage(browser, width, height) {
         _isReaderUser = false; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' };
         DRAFTS = {}; Object.keys(DB).forEach((k) => { if (DB[k].status === 'pending') DRAFTS[k] = DB[k]; });
         DRAFTS_OLD = { dold0001: DB.dold0001 };
-        delete _DEC_DRAFT_TYPES.qchg; const h = _draftListHtml(); _DEC_DRAFT_TYPES.qchg = 1; const box = document.createElement('div'); box.innerHTML = h;   // v6.0.196 改單走拍板卡；這裡只測清單的顯示（報價、得標狀態草稿同一個畫面）
+        delete _DEC_DRAFT_TYPES.qchg; const h = _draftListHtml(); _DEC_DRAFT_TYPES.qchg = 1; const box = document.createElement('div'); box.innerHTML = h;   // v6.0.197 改單走拍板卡；這裡只測清單的顯示（報價、得標狀態草稿同一個畫面）
         const cards = box.querySelectorAll('.dr-meta');
         out.list = cards.length === 3 && /1151101 範例案/.test(h) && /建立 /.test(h) && /依 V3 改，報價目前 V3/.test(h) && !/舊改單<\/div><div style="display:flex/.test(h) && box.querySelectorAll('details.dr-old').length === 1 && /較早 1 筆已被這筆取代/.test(h) && /舊改單/.test(box.querySelector('details.dr-old').innerHTML);
         // 舊版本留下的重複 pending：管理員端自動收成最新一筆
@@ -11706,7 +11706,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── v6.0.196 AI 改單開放成本單價與條款文字（含範本固定條款），改走首頁拍板卡：逐項改前→改後、成本旁改後毛利、條款標紅 ──
+  // ── v6.0.197 AI 改單開放成本單價與條款文字（含範本固定條款），改走首頁拍板卡：逐項改前→改後、成本旁改後毛利、條款標紅 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -11734,9 +11734,9 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.196 AI 改單拍板卡：成本單價改前→改後＋這列與整張改後毛利（只給管理員）、條款標紅差異；不在 AI 草稿清單', r.detail && r.noCost && r.card, JSON.stringify(r));
-    check('v6.0.196 範本固定條款改字：只改這張報價（rmk.ov），範本那一條改過就不套；成本寫進工項', r.rmk && r.safe, JSON.stringify(r));
-    check('v6.0.196 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.197 AI 改單拍板卡：成本單價改前→改後＋這列與整張改後毛利（只給管理員）、條款標紅差異；不在 AI 草稿清單', r.detail && r.noCost && r.card, JSON.stringify(r));
+    check('v6.0.197 範本固定條款改字：只改這張報價（rmk.ov），範本那一條改過就不套；成本寫進工項', r.rmk && r.safe, JSON.stringify(r));
+    check('v6.0.197 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 

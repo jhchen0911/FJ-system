@@ -185,10 +185,10 @@
               ".validate": "newData.isString() && newData.val().matches(/^(draft|ok|rejected)$/)"
             },
             "dir": {
-              ".validate": "newData.isString() && newData.val().matches(/^(in|out|xfer|)$/)"
+              ".validate": "newData.isString() && (newData.val() === '' || newData.val().matches(/^(in|out|xfer)$/))"
             },
             "truckType": {
-              ".validate": "newData.isString() && newData.val().matches(/^(flat|crane|)$/)"
+              ".validate": "newData.isString() && (newData.val() === '' || newData.val().matches(/^(flat|crane)$/))"
             },
             "_mt": {
               ".validate": "newData.isNumber()"

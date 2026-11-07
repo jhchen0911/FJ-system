@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.196';
+var APP_VERSION='v6.0.197';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -2539,7 +2539,7 @@ function _rmkBuild(base,c,edit){
   c=c||{};var rows=[];
   var ov=(c.ov&&typeof c.ov==='object'&&!Array.isArray(c.ov))?c.ov:null;
   String(base||'').split('\n').forEach(function(line,li){
-    // v6.0.196：這張報價改過的固定條款（q.rmk.ov[範本第幾行]＝{from,to}；範本那一行跟 from 一樣才換，範本改過就不套，避免換錯條）
+    // v6.0.197：這張報價改過的固定條款（q.rmk.ov[範本第幾行]＝{from,to}；範本那一行跟 from 一樣才換，範本改過就不套，避免換錯條）
     var oo=ov&&ov['L'+li];if(oo&&line.indexOf('【')<0&&FJC.qd.strip(line)===String(oo.from||'')&&String(oo.to||'').trim()){var pm=line.match(/^(\s*\d+\s*\.(?!\d)\s*)/);line=(pm?pm[1]:'')+String(oo.to).trim();}
     var toks=line.match(/【[A-Z_]+】/g)||[],t=line;
     if(line.includes('【LOAD】'))t=c.load?line.replace('【LOAD】',c.load):(edit?line.replace('【LOAD】','_____'):null);
@@ -40758,7 +40758,7 @@ function _qchgNum(v){return FJC.qd.num(v);}
 function _qchgFind(its,ref){return FJC.qd.find(its,ref);}
 function _qchgSub(its){return FJC.qd.sub(its);}
 function _qchgRowTxt(it){return FJC.qd.rowTxt(it,fmt);}
-function _qchgPlan(q,ops){return FJC.qd.plan(q,ops,fmt,{rmkBase:_rmkBaseFor(q,P.rmkBase||'')});}   // v6.0.196 固定條款改字要用這張報價的範本
+function _qchgPlan(q,ops){return FJC.qd.plan(q,ops,fmt,{rmkBase:_rmkBaseFor(q,P.rmkBase||'')});}   // v6.0.197 固定條款改字要用這張報價的範本
 function _qchgClean(ops){return FJC.qd.clean(ops);}
 // 唯讀帳號（AI）送改單草稿：spec＝{qid, ops, summary}；回傳 Promise<{ok, id?, why?, plan?}>（先在本機試算過，對不上就不送）
 function fyQuoteChange(spec){
@@ -40809,7 +40809,7 @@ function _qchgOpen(id){
     _qchgApply(id);
   },false,null,true,plan.bad?{ok:'關閉',cancel:'取消'}:{ok:'套用',cancel:'先不要'});
 }
-function _qchgApply(id,noSave){   // noSave（v6.0.196 拍板卡「修改」）：改好放進編輯頁、不存
+function _qchgApply(id,noSave){   // noSave（v6.0.197 拍板卡「修改」）：改好放進編輯頁、不存
   if(_roDeny())return false;
   var d=DRAFTS[id];if(!d||d.status!=='pending')return false;var pl=(d.payload&&typeof d.payload==='object')?d.payload:{};
   var q=Q.find(function(x){return x.id===pl.qid;});if(!q){toast('找不到這張報價');return false;}
@@ -42202,7 +42202,7 @@ _decReg('qdup',{
     showConfirm('報價編號 '+esc(g.code)+'：哪張保留原號？','<div style="font-size:12.5px">'+opts+'</div><div style="font-size:11.5px;color:var(--b4);margin-top:6px">其他張改成下一個空號。</div>',function(){
       var r=document.querySelector('input[name="qdup-keep"]:checked');var k=r?r.value:g.keep;if(_qdupApply(g.code,k,'報價編號重號（Lotion 改選保留）'))_decRefresh('qdup');},false,null,true);}
 });
-// ══════════ v6.0.196 AI 改單草稿改走首頁拍板卡（Lotion 11/07 經陳軒：開放成本單價、條款文字（含範本固定條款）；逐項改前→改後、成本旁顯示改後毛利、條款標紅差異）══════════
+// ══════════ v6.0.197 AI 改單草稿改走首頁拍板卡（Lotion 11/07 經陳軒：開放成本單價、條款文字（含範本固定條款）；逐項改前→改後、成本旁顯示改後毛利、條款標紅差異）══════════
 // 確認＝跟原本「套用」一樣（_qchgApply：開報價、改好、儲存；存成功才標已套用）；退回＝寫原因；修改＝改好放進編輯頁、不存（自己看過再按儲存）
 function _qchgGross(its){   // 跟 calcT 同一套：有填成本單價逐項算，沒填的照倍率推估
   var sub=0,known=0,unk=0;(its||[]).forEach(function(it){if(!it||it.sec||_isSpare(it))return;var q=parseFloat(it.qty)||0,p=parseFloat(it.price)||0,c=parseFloat(it.estCost)||0;sub+=q*p;if(q>0&&c>0)known+=q*c;else if(p>0)unk+=q*p;});
