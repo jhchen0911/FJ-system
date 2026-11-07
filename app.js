@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.193';
+var APP_VERSION='v6.0.194';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -1999,6 +1999,7 @@ function _saveQCore(){
     payDue:existingQ?.payDue||'',
     parentId:existingQ?.parentId||'',
     ..._qEditorFields(t)};
+  if(!existingQ&&q.code&&_qCodeTaken(q.code,q.id)){var _nc=_qCodeNextFree(q.code,q.id);if(_nc){toast('編號 '+q.code+' 已經有別張報價用了，這張改成 '+_nc);q.codeLog=[{from:q.code,to:_nc,at:Date.now(),by:_meEmail()||'本機',why:'存檔時發現重號'}];q.code=_nc;try{var _fe=document.getElementById('fc');if(_fe)_fe.value=_nc;}catch(e){_err('saveQ.code',e);}}}   // v6.0.194 新報價存檔時再查一次編號（開表單時算的號可能已被別台用掉）
   if(!existingQ&&!q.rentEnd)q.rentEnd='removeDone';   // v6.0.107 新報價：報價條件第 14 條租期結束日＝拆除（拔除）完成日；舊案沒有此欄＝拔除第一天
   if(!existingQ&&!q.payDefV)q.payDefV=2;   // Lotion 10/21：新專案放款日預設 20 日；舊專案（無此欄）＝截止日
   if(!existingQ&&!q.instV)q.instV=2;   // Lotion 10/21：新專案包商裝設％空白＝跟業主；舊專案（無此欄）維持原本 90%
@@ -4187,7 +4188,7 @@ function addAddendum(id){
   const copy={};
   _ADDENDUM_KEEP.forEach(function(k){if(src[k]!==undefined)copy[k]=JSON.parse(JSON.stringify(src[k]));});
   copy.id=Date.now().toString();
-  copy.code=genQuoteCode();
+  copy.code=genQuoteCode();delete copy.codeLog;delete copy.codeDupOk;   // v6.0.194 改號紀錄不跟著複製
   copy.parentId=id;
   copy.awarded=false;copy.payDue='';copy.costs=[];copy.exs=[];
   copy.name=(src.name||'未命名')+' (追加)';copy.payDefV=2;copy.instV=2;   // 新專案
@@ -5819,7 +5820,7 @@ function _copyQDo(id){
   const q=Q.find(x=>x.id===id);if(!q)return;
   const copy=JSON.parse(JSON.stringify(q));
   copy.id=Date.now().toString();
-  copy.code=genQuoteCode();
+  copy.code=genQuoteCode();delete copy.codeLog;delete copy.codeDupOk;   // v6.0.194 改號紀錄不跟著複製
   // Reset awarded status
   copy.awarded=false;copy.payDue='';copy.costs=[];
   // Set date to today
@@ -40749,7 +40750,7 @@ function fyQuoteChange(spec){
   try{
     if(!_fbUser)return Promise.resolve({ok:false,why:'要登入'});
     var q=spec.qid?Q.find(function(x){return x.id===spec.qid;}):null;
-    if(!q&&spec.code){var hit=Q.filter(function(x){return x&&x.code===spec.code;});if(hit.length>1)return Promise.resolve({ok:false,why:'報價編號 '+spec.code+' 有 '+hit.length+' 張，請改用 qid'});q=hit[0]||null;}   // 審查：編號重複不猜
+    if(!q&&spec.code){var hit=_qByCodeAll(spec.code);if(hit.length>1)return Promise.resolve({ok:false,why:'報價編號 '+spec.code+' 有 '+hit.length+' 張（含改號前用過這個號的），請改用 qid'});q=hit[0]||null;}   // 審查：編號重複不猜
     if(!q)return Promise.resolve({ok:false,why:'找不到這張報價（qid 或 code）'});
     var plan=_qchgPlan(q,spec.ops);
     if(plan.bad)return Promise.resolve({ok:false,why:plan.rows.filter(function(r){return !r.ok;}).map(function(r){return r.act+'：'+r.why;}).join('；'),plan:plan.rows});
@@ -41524,7 +41525,7 @@ function _qvfPlan(q,spec,opts){
   spec=spec||{};var ex=spec.expect||{},hist=(Q_HISTORY[q.id]||[]),sa0=+spec.srcSavedAt||0;
   var checks=[],ck=function(n,label,ok,info){checks.push({n:n,label:label,ok:!!ok,info:info||''});};
   var src=hist.find(function(e){return e&&e.savedAt===sa0&&e.snapshot;})||null,sn=src?src.snapshot:{};
-  ck(1,'來源屬於這張報價',!!src&&sn.id===q.id&&String(sn.code||'')===String(q.code||'')&&!src.formal&&!src.pre&&!src.backfill,src?('快照編號 '+(sn.code||'—')+(src.formal?'；是正式版':'')+(src.pre?'；是還原前備份':'')):'找不到這個存檔時間的快照');
+  ck(1,'來源屬於這張報價',!!src&&sn.id===q.id&&(String(sn.code||'')===String(q.code||'')||_qCodeWas(q,sn.code))&&!src.formal&&!src.pre&&!src.backfill,src?('快照編號 '+(sn.code||'—')+(src.formal?'；是正式版':'')+(src.pre?'；是還原前備份':'')):'找不到這個存檔時間的快照');
   var need=['rows','sub','tax','total','date'].filter(function(k){return ex[k]==null||ex[k]==='';});
   ck(0,'核對數字有給齊',!need.length,need.length?('缺 '+need.join('、')):'');
   ck(2,'報價日',!!src&&String(sn.date||'')===String(ex.date||''),'快照 '+(sn.date||'—')+'／應為 '+(ex.date||'—'));
@@ -41589,7 +41590,7 @@ function fyQuoteVerFix(spec){
   try{
     if(!_fbUser)return Promise.resolve({ok:false,why:'要登入'});
     var q=spec.qid?Q.find(function(x){return x.id===spec.qid;}):null;
-    if(!q&&spec.code){var hit=Q.filter(function(x){return x&&x.code===spec.code;});if(hit.length>1)return Promise.resolve({ok:false,why:'報價編號 '+spec.code+' 有 '+hit.length+' 張，請改用 qid'});q=hit[0]||null;}
+    if(!q&&spec.code){var hit=_qByCodeAll(spec.code);if(hit.length>1)return Promise.resolve({ok:false,why:'報價編號 '+spec.code+' 有 '+hit.length+' 張（含改號前用過這個號的），請改用 qid'});q=hit[0]||null;}
     if(!q)return Promise.resolve({ok:false,why:'找不到這張報價（qid 或 code）'});
     var ps={srcSavedAt:+(spec.fromSnapshotSavedAt||spec.srcSavedAt)||0,expect:spec.expect||{},cmpQid:spec.cmpQid||'',ver:spec.ver,verDate:spec.verDate?String(spec.verDate).slice(0,10):''};
     var plan=_qvfPlan(q,ps);
@@ -42129,6 +42130,60 @@ _decReg('lbxSug',{
       _decRefresh('lbxSug');toast('改好了，回到卡片按「確認」');
     },false,null,true);
   }
+});
+// ══════════ v6.0.194 報價編號重號（陳軒轉報價線 11/07：兩張報價都是 115110702）══════════
+// 原因：新報價編號在「開表單那一刻」用這台裝置手上的報價算（genQuoteCode＝今天民國年月日＋當天最大流水號 +1）；
+//   兩台裝置還沒同步、或表單開很久才存（中間別台已存了同號），就會撞號。
+// 修：①存檔時再查一次，新報價撞號就自動改下一個空號（_saveQCore）；②已經重號的，總覽拍板卡讓 Lotion 決定哪張改號（預設較晚建立的改）。
+// 改號只改報價本身的 code（留 q.codeLog）；已經寄出的報價單、詢價單號、合約編號是當時的文字，不回頭改。
+function _qCodeTaken(code,exceptId){code=String(code||'').trim();if(!code)return false;return (Q||[]).some(function(x){return x&&x.id!==exceptId&&String(x.code||'').trim()===code;});}
+function _qCodeNextFree(code,exceptId,also){
+  var m=String(code||'').trim().match(/^(\d{7})(\d+)$/);if(!m)return '';var pre=m[1],w=Math.max(2,m[2].length),mx=0;
+  (Q||[]).forEach(function(x){if(!x)return;var c=String(x.code||'').trim();if(c.indexOf(pre)===0&&/^\d+$/.test(c.slice(pre.length))){var n=parseInt(c.slice(pre.length),10);if(n>mx)mx=n;}});
+  (also||[]).forEach(function(c){c=String(c||'');if(c.indexOf(pre)===0){var n=parseInt(c.slice(pre.length),10);if(n>mx)mx=n;}});
+  return pre+String(mx+1).padStart(w,'0');
+}
+function _qCodeWas(q,code){code=String(code||'').trim();return !!code&&Array.isArray(q&&q.codeLog)&&q.codeLog.some(function(e){return e&&String(e.from||'')===code;});}
+// 依編號找報價：現在用這個號的＋改號前用過這個號的（審查：舊號不能靜悄悄對到另一張）
+function _qByCodeAll(code){code=String(code||'').trim();if(!code)return [];return (Q||[]).filter(function(x){return x&&(String(x.code||'').trim()===code||_qCodeWas(x,code));});}
+function _qCreatedAt(q){var n=parseInt(q&&q.id,10);return (!isNaN(n)&&n>1e12)?n:((q&&q._mt)||0);}
+function _qdupGroups(){
+  var by={};(Q||[]).forEach(function(q){if(!q||!q.id||q.deleted)return;var c=String(q.code||'').trim();if(!c)return;(by[c]=by[c]||[]).push(q);});
+  return Object.keys(by).filter(function(k){return by[k].length>1&&!by[k].every(function(q){return q.codeDupOk===k;});})
+    .map(function(k){var qs=by[k].slice().sort(function(a,b){return _qCreatedAt(a)-_qCreatedAt(b);});   // 審查：預設保留已得標 ＞ 送出過 ＞ 最早建立（已經印給業主的號不要改）
+      var rank=function(q){return (q.awarded?2:0)+((Array.isArray(q.sendLog)&&q.sendLog.length)?1:0);},keep=qs.slice().sort(function(a,b){return rank(b)-rank(a)||_qCreatedAt(a)-_qCreatedAt(b);})[0];return {code:k,qs:qs,keep:keep.id};});
+}
+function _qdupInfo(q){
+  var sl=Array.isArray(q.sendLog)?q.sendLog.filter(function(e){return e&&e.archived!==false;}).length:0,sent=Array.isArray(q.sendLog)?q.sendLog.length:0;
+  var t=(q.t&&q.t.total)||0,ca=_qCreatedAt(q);
+  return esc(q.name||'未命名')+'（'+esc(q.client||'—')+'）<br><span style="color:var(--b4)">建立 '+(ca?esc(new Date(ca).toLocaleString('zh-TW')):'—')+'・V'+(q.ver||1)+'・含稅 '+fmt(Math.round(t))+(q.awarded?'・<b>已得標</b>':'')+(sent?'・匯出／送出過 '+sent+' 次':'・沒送出過')+'</span>';
+}
+function _qdupApply(code,keepId,why){
+  var g=_qdupGroups().find(function(x){return x.code===code;});if(!g){toast('這組已經不重號了');return true;}
+  if(!g.qs.some(function(q){return q.id===keepId;}))keepId=g.keep;
+  var used=[],now=Date.now(),me=_meEmail()||'本機',done=[];
+  g.qs.forEach(function(q){if(q.id===keepId)return;var nc=_qCodeNextFree(code,q.id,used);if(!nc){return;}used.push(nc);
+    if(!Array.isArray(q.codeLog))q.codeLog=[];q.codeLog.push({from:code,to:nc,at:now,by:me,why:String(why||'報價編號重號').slice(0,100)});q.code=nc;_touch(q);done.push(nc);});
+  if(!done.length){toast('編號格式不是「民國年月日＋流水號」，請到報價單手動改');return false;}
+  persist();try{_markDirty();}catch(e){_err('_qdupApply',e);}try{renderList();}catch(e){_err('_qdupApply.list',e);}
+  toast('已改號：'+code+' → '+done.join('、'));return true;
+}
+_decReg('qdup',{
+  title:'報價編號重號',todo:function(n){return '報價編號重號 '+n+' 組：決定哪張改號';},sub:'確認＝建議保留的那張留原號、其他改下一個空號；修改＝改選要保留原號的那張；退回＝保持重號（這組不再列）',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},
+  list:_qdupGroups,key:function(g){return g.code;},
+  head:function(g){return '編號 '+g.code+' 有 '+g.qs.length+' 張報價';},
+  body:function(g){var k=g.qs.find(function(q){return q.id===g.keep;});return '<div style="font-size:11.5px;color:var(--b4)">建議保留：'+esc((k&&k.name)||'')+'（已得標／送出過／最早建立優先）；其他改成 '+esc(_qCodeNextFree(g.code,'',[])||'（無法自動編號）')+' 起</div>';},
+  detail:function(g){var nx=[],L='<div style="font-size:12.5px;line-height:1.7">';
+    g.qs.forEach(function(q){var keep=q.id===g.keep,nc=keep?'':_qCodeNextFree(g.code,q.id,nx);if(nc)nx.push(nc);
+      L+='<div style="border-top:1px dashed var(--b1);padding-top:4px;margin-top:4px"><b>'+(keep?'保留 '+esc(g.code):('改成 '+esc(nc||'（請手動改）')))+'</b>：'+_qdupInfo(q)+'</div>';});
+    return L+'<div style="color:var(--b4);margin-top:6px">已經寄給業主的報價單、詢價單號、合約編號是當時印的文字，不會跟著改；送出過的那張建議保留原號（用「修改」改選）。</div></div>';},
+  ok:function(g){return _qdupApply(g.code,g.keep);},
+  reject:function(g,why){g.qs.forEach(function(q){q.codeDupOk=g.code;_touch(q);});persist();try{_markDirty();}catch(e){_err('qdup.reject',e);}return true;},
+  edit:function(g){
+    var opts=g.qs.map(function(q){return '<label style="display:block;margin:4px 0"><input type="radio" name="qdup-keep" value="'+esc(q.id)+'"'+(q.id===g.keep?' checked':'')+'> 保留原號：'+_qdupInfo(q)+'</label>';}).join('');
+    showConfirm('報價編號 '+esc(g.code)+'：哪張保留原號？','<div style="font-size:12.5px">'+opts+'</div><div style="font-size:11.5px;color:var(--b4);margin-top:6px">其他張改成下一個空號。</div>',function(){
+      var r=document.querySelector('input[name="qdup-keep"]:checked');var k=r?r.value:g.keep;if(_qdupApply(g.code,k,'報價編號重號（Lotion 改選保留）'))_decRefresh('qdup');},false,null,true);}
 });
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

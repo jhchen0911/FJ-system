@@ -11030,6 +11030,41 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.194 報價編號重號：存檔時再查一次；已重號的拍板卡決定哪張改號 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q;
+      try {
+        const mk = (id, code, name) => ({ id: id, code: code, name: name, client: '甲', date: '2026-11-07', items: [], exs: [], rmk: {}, t: { total: 1000 }, _mt: 1 });
+        Q = [mk('1794032294140', '115110702', '範例甲案'), mk('1794035885555', '115110702', '範例乙案'), mk('1794030000000', '115110703', '範例丙案')];
+        Q[0].sendLog = [{ what: 'PDF', archived: true }];
+        const G = _qdupGroups(); out.group = G.length === 1 && G[0].code === '115110702' && G[0].keep === '1794032294140';
+        out.todo = (function () { const it = []; _v6TodoItems(it); return it.some(x => x.type === 'dec_qdup'); })();
+        out.detail = /保留 115110702/.test(_DEC.qdup.detail(G[0])) && /改成 115110704/.test(_DEC.qdup.detail(G[0]));
+        out.apply = _DEC.qdup.ok(G[0]) === true && Q[0].code === '115110702' && Q[1].code === '115110704' && Q[1].codeLog[0].from === '115110702' && !_qdupGroups().length;
+        out.byCode = _qByCodeAll('115110702').length === 2 && _qCodeWas(Q[1], '115110702');   // 審查：改號後舊號查得到兩張（不靜悄悄對到另一張）
+        // 改選保留較晚那張
+        Q[1].code = '115110702'; delete Q[1].codeLog;
+        out.keepLater = _qdupApply('115110702', '1794035885555', 'test') === true && Q[1].code === '115110702' && Q[0].code === '115110704';
+        // 退回＝保持重號、不再列
+        Q[0].code = '115110702'; out.reject = _DEC.qdup.reject(_qdupGroups()[0], '') === true && !_qdupGroups().length;
+        // 審查：預設保留已得標／送出過的；三張同號改成兩個不同的新號；格式不對不動
+        Q = [mk('1794032294140', '115110902', '範例甲案'), mk('1794035885555', '115110902', '範例乙案'), mk('1794039999999', '115110902', '範例丙案')]; Q[2].awarded = true;
+        const G3 = _qdupGroups()[0]; out.keepAward = G3.keep === '1794039999999' && _DEC.qdup.ok(G3) === true && Q[2].code === '115110902' && Q[0].code === '115110903' && Q[1].code === '115110904';
+        Q = [mk('1', 'ABC-1', '範例甲案'), mk('2', 'ABC-1', '範例乙案')]; out.badFmt = _qdupApply('ABC-1', '1') === false && Q[1].code === 'ABC-1';
+        // 存檔時再查：開表單時算的號被別台用掉 → 自動改下一號
+        Q = [mk('1794032294140', '115110801', '範例甲案')];
+        newQ(); document.getElementById('fc').value = '115110801'; document.getElementById('fn').value = '範例新案'; saveQ();
+        const nq = Q.find(q => q.name === '範例新案'); out.save = !!nq && nq.code === '115110802' && nq.codeLog[0].why === '存檔時發現重號' && Q.find(q => q.name === '範例甲案').code === '115110801';
+        out.gen = genQuoteCode().length >= 9;
+      } finally { Q = keepQ; }
+      return out;
+    });
+    check('v6.0.194 報價編號重號：拍板卡列出重號組、預設保留最早那張其他改下一個空號、可改選保留哪張、退回不再列、新報價存檔撞號自動改號', r.group && r.todo && r.detail && r.apply && r.byCode && r.keepAward && r.badFmt && r.keepLater && r.reject && r.save && r.gen, JSON.stringify(r));
+    check('v6.0.194 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.192 第 6 步 6-1b：舊提前放款轉成分次付款（拍板卡；轉換前後已付／未付合計一樣才轉）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
