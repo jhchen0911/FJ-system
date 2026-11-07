@@ -276,6 +276,18 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const g4 = V.gate({ needHuman: true }, { qid: 'q', cid: 'c' }, null);
   check('請款辨識 核准前的擋：沒選專案／分包卡、黃色欄位沒點、對不到的列沒選、題目沒答、重複沒寫原因、辨識失敗要人工（第 8 題）', g0.length === 5 && g1.length === 0 && g2.length === 1 && g3.length === 0 && g4.length === 1, JSON.stringify({ g0, g2, g4 }));
 }
+// ── AI 改單草稿（calc/qdraft.js，v6.0.186 從 app.js 搬出；雲端 fyDraft 共用）──
+{
+  const D = require(path.join(__dirname, '..', 'calc', 'qdraft.js')).qd;
+  const q = { items: [{ desc: '假工項A\n細節', unit: '支', qty: 10, price: 1000 }, { desc: '段落', sec: true }, { desc: '假工項B', unit: 'M', qty: 5, price: 200 }, { desc: '備用', qty: 1, price: 999, spare: true }], rmk: { extra: ['舊條款'] } };
+  const p1 = D.plan(q, [{ op: 'set', idx: 0, match: '假工項A', fields: { qty: 12 } }, { op: 'add', item: { desc: '假減項', unit: '式', qty: 1, price: -500 }, after: { match: '假工項B' } }, { op: 'del', match: '假工項B' }, { op: 'rmkAdd', text: '新條款' }]);
+  const t1 = D.totals(p1.items, 5);
+  check('AI 改單 plan：改數量、接在某列後新增減項、刪列、加條款；原報價不動；小計不含段落與備用', !p1.bad && q.items[0].qty === 10 && p1.items.length === 4 && p1.items[2].desc === '假減項' && t1.sub === 11500 && t1.tax === 575 && t1.total === 12075 && p1.rmk.extra.join('|') === '舊條款|新條款');
+  const p2 = D.plan(q, [{ op: 'set', idx: 0, match: '不對的說明', fields: { qty: 1 } }, { op: 'set', match: '假工項B', fields: { constructor: 1 } }, { op: 'zap' }]);
+  check('AI 改單 plan：對不上、非白名單欄位、不認得的動作都記為不通過', p2.bad === 3 && D.plan(q, []).bad === 1);
+  const c = D.clean([{ op: 'set', idx: '0', match: 'x', fields: { qty: '3', hack: 1 }, extra: 'y' }]);
+  check('AI 改單 clean：只留白名單欄位、數字轉型', JSON.stringify(c) === '{"op":"set","idx":0,"match":"x","fields":{"qty":3}}'.replace(/^/, '[').replace(/$/, ']'));
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');
