@@ -339,6 +339,21 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const c = D.clean([{ op: 'set', idx: '0', match: 'x', fields: { qty: '3', hack: 1 }, extra: 'y' }]);
   check('AI 改單 clean：只留白名單欄位、數字轉型', JSON.stringify(c) === '{"op":"set","idx":0,"match":"x","fields":{"qty":3}}'.replace(/^/, '[').replace(/$/, ']'));
 }
+// ── v6.0.197 AI 改單：成本單價（estCost）、範本固定條款改字（rmkFix）──
+{
+  const D = require(path.join(__dirname, '..', 'calc', 'qdraft.js')).qd;
+  const base = '1. 本報價有效期限 30 天\n2. 載重 【LOAD】 噸\n6. 本工程無保固及保留款\n7. 本工程無保固及保留款';
+  const q = { items: [{ desc: '假工項A', unit: '支', qty: 10, price: 1000, estCost: 600 }], rmk: {} };
+  const p1 = D.plan(q, [{ op: 'set', idx: 0, match: '假工項A', fields: { estCost: 700 } }, { op: 'rmkFix', match: '本報價有效期限 30 天', text: '本報價有效期限 60 天' }], null, { rmkBase: base });
+  check('AI 改單 成本單價：改前→改後記在列上（給畫面算毛利）；固定條款改字存 rmk.ov[範本第幾行]={from,to}', !p1.bad && p1.items[0].estCost === 700 && p1.rows[0].cost.b === 600 && p1.rows[0].cost.a === 700 && JSON.stringify(p1.rmk.ov) === '{"L0":{"from":"本報價有效期限 30 天","to":"本報價有效期限 60 天"}}' && p1.rows[1].txt === 1 && q.items[0].estCost === 600);
+  check('AI 改單 clean：成本給錯字不會變成清掉（留著給 plan 擋）', D.plan({ items: [{ desc: 'A', qty: 1, price: 1, estCost: 5 }] }, D.clean([{ op: 'set', idx: 0, match: 'A', fields: { estCost: 'abc' } }])).bad === 1);
+  const p2 = D.plan(q, [{ op: 'rmkFix', match: '本工程無保固及保留款', text: 'x' }, { op: 'rmkFix', match: '載重 【LOAD】 噸', text: 'x' }, { op: 'set', idx: 0, match: '假工項A', fields: { estCost: -1 } }], null, { rmkBase: base });
+  check('AI 改單 擋下：兩條一樣對不出、有填數字的條款、成本負數；沒給範本不能改條款', p2.bad === 3 && D.plan(q, [{ op: 'rmkFix', match: '本報價有效期限 30 天', text: 'y' }]).bad === 1);
+  const q3 = { items: [{ desc: '假工項A', qty: 1, price: 1, estCost: 5 }], rmk: { ov: { L0: { from: '本報價有效期限 30 天', to: '60 天版' } } } };
+  const p3 = D.plan(q3, [{ op: 'rmkFix', match: '60 天版', text: '' }, { op: 'set', idx: 0, match: '假工項A', fields: { estCost: '' } }], null, { rmkBase: base });
+  check('AI 改單 回復：條款用改過的字也對得到、text 空白＝回復範本；成本給空白＝清掉', !p3.bad && !('L0' in p3.rmk.ov) && !('estCost' in p3.items[0]) && p3.rows[1].cost.a === null);
+  check('AI 改單 clean：成本欄與 rmkFix 留下、轉數字', JSON.stringify(D.clean([{ op: 'set', idx: 0, fields: { estCost: '70' } }, { op: 'rmkFix', match: 'a', text: 'b', x: 1 }, { op: 'add', item: { desc: 'd', qty: 1, price: 2, estCost: '1' } }])) === '[{"op":"set","idx":0,"fields":{"estCost":70}},{"op":"rmkFix","match":"a","text":"b"},{"op":"add","item":{"desc":"d","unit":"","qty":1,"price":2,"note":"","estCost":1}}]');
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');
