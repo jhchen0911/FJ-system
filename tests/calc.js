@@ -35,6 +35,14 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   check('租金單位：M天、片月', MV.rentFor(2, 'M天', 100, 0, 3) === 600 && MV.rentFor(300, '片月', 0, 10, 15) === 1500 && MV.days('2026-11-25', '2026-11-10') === 0);
 }
 
+// ── 資料庫規則：正規表示式不能有空的選項（Firebase 規則語法不接受 (a|) 這種寫法，v6.0.195 部署失敗）──
+{
+  const rules = require('fs').readFileSync(path.join(__dirname, '..', 'database.rules.json'), 'utf8');
+  const res = [...rules.matchAll(/matches\(\/(.*?)\/\)/g)].map(m => m[1]);
+  const bad = res.filter(r => /\|\)|\(\||\|\|/.test(r));
+  check('資料庫規則的正規表示式沒有空的選項（|) 或 (| 或 ||）', res.length > 5 && !bad.length, bad.join(' ; '));
+}
+
 // 稅率：空白＝5、0 合法
 check('稅率：空白＝5%、0 是免稅、字串照讀', I.taxR('') === 5 && I.taxR(null) === 5 && I.taxR(0) === 0 && I.taxR('8') === 8 && I.taxM(5) === 1.05 && I.taxM(0) === 1);
 // 請款合計：未稅 100,000、稅 5%、保留款 10%、清潔費 10‰
