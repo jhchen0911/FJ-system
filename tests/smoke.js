@@ -2891,7 +2891,7 @@ async function newPage(browser, width, height) {
         advEl.value='50000';_spRecalc();
         document.getElementById('gen-confirm-ok').click();
         const per=cM.periods[0],pp=PAYABLES.find(p=>p.id==='paycM_p1');
-        out.per=!!per&&per.amt===68750&&per.adv===50000&&per.due==='2026-10-26'&&!!pp&&pp.amount===18750&&/抵扣預付款 52,500（含稅）/.test(pp.note);   // v6.0.114：抵扣改含稅口徑（50,000／120,000 × 已付含稅預付 126,000）
+        out.per=!!per&&per.amt===68750&&per.adv===50000&&per.due==='2026-10-27'&&!!pp&&pp.amount===18750&&/抵扣預付款 52,500（含稅）/.test(pp.note);   // v6.0.114：抵扣改含稅口徑（50,000／120,000 × 已付含稅預付 126,000）
         const stM=_subStat(cM);out.stat=stM.advPaid===120000&&stM.advUsed===50000&&stM.advLeft===70000&&stM.payN===3;
         delSubAdvance('cM',_subAdvs(cM)[0].id);out.delBlock=_subAdvs(cM).length===2;
         delSubAdvance('cM',_subAdvs(cM)[1].id);document.getElementById('gen-confirm-ok').click();out.delOk=_subAdvs(cM).length===1&&!PAYABLES.some(p=>p.costAdv&&p.amount===20000);
@@ -3350,7 +3350,7 @@ async function newPage(browser, width, height) {
               out.kpi=/1 家/.test(h)&&/預估 NT\$ 123,750/.test(h)&&/本期已登錄/.test(h)&&/押保留款/.test(h)&&/5,500/.test(h);
               out.follow=/跟隨 甲乙工程行/.test(h)&&/介紹費／抽成/.test(h);
               out.all=/全部分包合約/.test(h)&&/220,000/.test(h)&&/55,000/.test(h)&&/25%/.test(h)&&/第1期 2026-08-25/.test(h);
-              out.cutLine=/本期計價截止 <b>2026-09-25<\/b>/.test(h)&&/放款日 <b>2026-10-26<\/b>/.test(h);
+              out.cutLine=/本期計價截止 <b>2026-09-25<\/b>/.test(h)&&/放款日 <b>2026-10-27<\/b>/.test(h);
               // 篩選
               vbFilter('st','follow');out.filter=/大明哥/.test(document.getElementById('vb-root').innerHTML)&&!/>甲乙工程行<\/b>/.test(document.getElementById('vb-root').innerHTML.split('全部分包合約')[1]);
               vbFilter('st','');vbFilter('kw','不存在');out.filterEmpty=/沒有符合的分包合約/.test(document.getElementById('vb-root').innerHTML);vbFilter('kw','');
@@ -3773,9 +3773,9 @@ async function newPage(browser, width, height) {
           document.getElementById('rp-invno').value='AB11223344';
           md.style.display='none';_rpSave();
           const per=cR.periods&&cR.periods[0];
-          out.saved=!!per&&per.no===1&&per.rows.length===2&&per.amt===28040&&per.invNo==='AB11223344'&&per.due==='2026-10-26'&&cR.rows.length===2&&cR.rows[1].preset==='損耗賠償'&&cR.amt===28040;
+          out.saved=!!per&&per.no===1&&per.rows.length===2&&per.amt===28040&&per.invNo==='AB11223344'&&per.due==='2026-10-27'&&cR.rows.length===2&&cR.rows[1].preset==='損耗賠償'&&cR.amt===28040;
           const pay=PAYABLES.find(p=>p.id==='pay'+cR.id+'_p1');
-          out.pay=!!pay&&Math.round(parseFloat(pay.amount))===28040&&pay.vat===true&&pay.category==='material'&&/租金請款/.test(pay.note)&&pay.date==='2026-10-26'&&PAYABLES.filter(p=>p.costId===cR.id).length===1;
+          out.pay=!!pay&&Math.round(parseFloat(pay.amount))===28040&&pay.vat===true&&pay.category==='material'&&/租金請款/.test(pay.note)&&pay.date==='2026-10-27'&&PAYABLES.filter(p=>p.costId===cR.id).length===1;
           out.estAfter=_rentEstimate(q,cR).from==='2026-09-25'&&_rentEstimate(q,cR).est===960*Math.max(0,_dDiff('2026-09-25',localToday()));
           out.status=_vbRows().find(x=>x.c&&x.c.id===cR.id).status==='billed';
           out.costTotal=_projCostTotal(q)===28040;
@@ -8587,13 +8587,13 @@ async function newPage(browser, width, height) {
     _salesCommSync(Q.find(q => q.id === 'qS3')); const sp = PAYABLES.find(p => p.id === 'pay_sales_qS3');
     out.salesAmt = sp && sp.amount; out.salesPlanned = !!(sp && sp.planned && !sp.date && !_apList().includes(sp));
     INV.push({ id: 'iS3', quoteId: 'qS3', project: '範例工程S3', periodNo: 1, date: '2026-11-05', items: [] }); _salesCommSync(Q.find(q => q.id === 'qS3'));
-    const sp2 = PAYABLES.find(p => p.id === 'pay_sales_qS3'); out.salesDue = sp2 && !sp2.planned && sp2.date === '2026-12-25' && _apList().includes(sp2);
+    const sp2 = PAYABLES.find(p => p.id === 'pay_sales_qS3'); out.salesDue = sp2 && !sp2.planned && sp2.date === '2026-12-28' && _apList().includes(sp2);
     window.toast = oT;
   } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
   return out;
 });
 
-    check('v6.0.114 批次 G3（Lotion 10/27）：業務抽成＝合約未稅 × 抽成率（合約含稅 3,357,900 → 5% 為 159,900）；第一期請款單送出前只是「預計」，不算待付；送出（11/05）後才到期（次月 25 日）', r.salesAmt === 159900 && r.salesPlanned && r.salesDue && !r.err, JSON.stringify({ salesAmt: r.salesAmt, salesPlanned: r.salesPlanned, salesDue: r.salesDue }));
+    check('v6.0.114 批次 G3（Lotion 10/27）：業務抽成＝合約未稅 × 抽成率（合約含稅 3,357,900 → 5% 為 159,900）；第一期請款單送出前只是「預計」，不算待付；送出（11/05）後才到期（次月 25 日；12/25 行憲紀念日＋週末順延 12/28，v6.0.193）', r.salesAmt === 159900 && r.salesPlanned && r.salesDue && !r.err, JSON.stringify({ salesAmt: r.salesAmt, salesPlanned: r.salesPlanned, salesDue: r.salesDue }));
     check('v6.0.114 批次 G3：分期成本卡（預付款＋兩期）都已付後，在別張報價與這張報價各按儲存，已付筆數與付款帳本不變（原本 3 筆剩 1 筆）', r.paidBefore === 3 && r.paidAfter === 3 && r.plBefore === 3 && r.plAfter === 3 && !r.err, JSON.stringify(r));
     check('v6.0.114 批次 G3：已付應付不立墓碑、付款帳本不刪；自動流程硬刪會被存檔前救回；應付管理不能直接刪已付；被刪後重建成待付的依付款稽核恢復已付（金額不同只提醒）', r.tombBlock === 'blocked' && r.plKept && r.vanishBack && r.heal && r.healAsk && r.delBlock && r.deltaNoIncl && r.deltaEff === Math.round(10000 * 1.05) && r.p1Kept === 210000 && r.importNoGuard && !r.err, JSON.stringify(r));
     check('v6.0.114 批次 G3（D）：預付款抵扣用含稅口徑——預付款 359,988 未稅＝377,987 含稅，兩期抵扣含稅合計剛好 377,987，總付款＝兩期含稅 735,000，期別備註標含稅', r.advIncl === 377987 && r.totalPaid === r.netIncl && r.p1 === 210000 && r.p2 === 147013 && r.note1 === '抵扣預付款 210,000（含稅）' && !r.err, JSON.stringify(r));
@@ -11099,25 +11099,28 @@ async function newPage(browser, width, height) {
       const out = {}; const keep = { h: P.holidays, m: P.makeupDays, d: P.vendorPayDay, y: P.vendorPayDelay };
       try {
         P.vendorPayDay = 25; P.vendorPayDelay = 1; P.holidays = ''; P.makeupDays = '';
+        out.def = _vendorDueDate('2026-09-10') === '2026-10-27' && _vendorDueDate('2027-01-10') === '2027-02-25' && _vendorDueDate('2027-01-20', true) === '2027-02-25' && !_holMissing(new Date(2026, 10, 7)).length && _payHolidays().hol.length === 33;   // v6.0.193 內建 2026／2027：10/25 週日→10/26 光復節補假→10/27
+        P.holidays = '（無）';
         out.plain = _vendorDueDate('2026-10-10') === '2026-11-25' && _vendorDueDate('2026-09-10') === '2026-10-26' && _vendorDueDate('2026-03-31') === '2026-04-27';   // 平日不動；10/25 週日→10/26；4/25 週六→4/27
         P.holidays = '2026-11-25 測試假日\n2026/11/26 名稱'; out.hol = _vendorDueDate('2026-10-10') === '2026-11-27' && _payHolidays().hol.length === 2;
         P.makeupDays = '2026-04-25'; out.makeup = _vendorDueDate('2026-03-31') === '2026-04-25';
-        P.holidays = ''; P.makeupDays = '';
+        P.holidays = '（無）'; P.makeupDays = '';
         const yy = new Date().getFullYear(); out.todo1 = (function () { const it = []; _v6TodoItems(it); return it.some(x => x.type === 'hol_missing'); })();
         P.holidays = yy + '-01-01\n' + (yy + 1) + '-01-01'; out.todo2 = (function () { const it = []; _v6TodoItems(it); return !it.some(x => x.type === 'hol_missing'); })();
-        P.holidays = ''; out.miss = JSON.stringify(_holMissing(new Date(2026, 10, 7))) === JSON.stringify([2026, 2027]) && JSON.stringify(_holMissing(new Date(2026, 5, 1))) === JSON.stringify([2026]);
+        P.holidays = '（無）'; out.miss = JSON.stringify(_holMissing(new Date(2026, 10, 7))) === JSON.stringify([2026, 2027]) && JSON.stringify(_holMissing(new Date(2026, 5, 1))) === JSON.stringify([2026]);
         // 合約／詢價文字：新的才加「遇假日順延」，舊單重印一字不變
         const q = { id: 'qS188', name: '範例S188', items: [], costs: [] };
         out.rfqOld = !/順延/.test(_rfqCondLines({ cond: {} }).join ? _rfqCondLines({ cond: {} }).join('') : String(_rfqCondLines({ cond: {} })));
         out.rfqNew = /遇假日順延至次一工作日/.test(String(_rfqCondLines({ cond: {}, payRoll: 1 })));
         out.sctOld = !/順延/.test(_sctPayTxt({ id: 'c1', rows: [] }, {}, q)) && /遇假日順延至次一工作日/.test(_sctPayTxt({ id: 'c1', rows: [], payRoll: 1 }, {}, q));
-        P.holidays = ''; out.keep = _vendorDueKeep('2026-10-25', '2026-09-10') === '2026-10-25' && _vendorDueKeep('', '2026-09-10') === '2026-10-26' && _vendorDueKeep('2026-10-26', '2026-09-10') === '2026-10-26' && _vendorDueKeep('2026-10-25', '2026-10-10') === '2026-11-25';   // 抽成／佣金舊到期日不整批移動、起算日變了才重算
+        P.holidays = '（無）'; out.keep = _vendorDueKeep('2026-10-25', '2026-09-10') === '2026-10-25' && _vendorDueKeep('', '2026-09-10') === '2026-10-26' && _vendorDueKeep('2026-10-26', '2026-09-10') === '2026-10-26' && _vendorDueKeep('2026-10-25', '2026-10-10') === '2026-11-25';   // 抽成／佣金舊到期日不整批移動、起算日變了才重算
         go('params'); prmTab('cost'); out.ui = !!document.getElementById('pholidays') && !!document.getElementById('pmakeup');
+        P.holidays = ''; syncParamsUI(); out.defUi = document.getElementById('pholidays').value === _HOL_DEF && (doSaveP(), P.holidays === '');   // 空白顯示內建；原樣存回＝仍跟著內建
         document.getElementById('pholidays').value = '2027-01-01 元旦'; doSaveP(); out.save = P.holidays === '2027-01-01 元旦';
       } finally { P.holidays = keep.h; P.makeupDays = keep.m; P.vendorPayDay = keep.d; P.vendorPayDelay = keep.y; }
       return out;
     });
-    check('v6.0.188 放款日遇假日順延：週末→下一個工作日、國定假日清單、補班週六照常、缺明年假日總覽提醒、抽成佣金舊到期日不整批移動、新詢價單／新分包合約才寫順延條文、參數頁可存', r.plain && r.hol && r.makeup && r.todo1 && r.todo2 && r.miss && r.rfqOld && r.rfqNew && r.sctOld && r.keep && r.ui && r.save, JSON.stringify(r));
+    check('v6.0.188 放款日遇假日順延：週末→下一個工作日、國定假日清單、補班週六照常、缺明年假日總覽提醒、抽成佣金舊到期日不整批移動、新詢價單／新分包合約才寫順延條文、參數頁可存', r.def && r.defUi && r.plain && r.hol && r.makeup && r.todo1 && r.todo2 && r.miss && r.rfqOld && r.rfqNew && r.sctOld && r.keep && r.ui && r.save, JSON.stringify(r));
     check('v6.0.188 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

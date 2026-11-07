@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.192';
+var APP_VERSION='v6.0.193';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -828,7 +828,7 @@ function doSaveP(){
   P.vendorPayDay=(function(){var v=parseInt(gv('pvpayday'));return (v>=1&&v<=31)?v:25;})();
   P.vendorPayDelay=(function(){var v=parseInt(gv('pvpaydelay'));return isNaN(v)?1:Math.max(0,Math.min(6,v));})();
   P.vendorCutDay=(function(){var v=parseInt(gv('pvcutday'));return (v>=1&&v<=31)?v:25;})();   // v5.443
-  if(document.getElementById('pholidays'))P.holidays=String(gv('pholidays')||'');   // v6.0.188 國定假日／補行上班日（放款日順延）
+  if(document.getElementById('pholidays')){var _hv=String(gv('pholidays')||'');P.holidays=(_hv.trim()===_HOL_DEF.trim())?'':_hv;}   // 跟內建預設一樣＝存空白（之後內建補新年度會跟著更新）   // v6.0.188 國定假日／補行上班日（放款日順延）
   if(document.getElementById('pmakeup'))P.makeupDays=String(gv('pmakeup')||'');
   P.subPayOnBill=gv('pvsubbill')!=='0';
   P.openingCash=parseFloat(gv('popen'))||0;
@@ -935,7 +935,7 @@ function syncParamsUI(){
   try{rFixedCosts();}catch(e){_err('syncParamsUI',e);}
   try{var _rr=P.matRentRate||{};[['h300','H300',3],['h350','H350',4],['h400','H400',5]].forEach(function(x){var e=document.getElementById('pmat-'+x[0]);if(e)e.value=(_rr[x[1]]!=null?_rr[x[1]]:x[2]);});var _pf=document.getElementById('pmat-factor');if(_pf)_pf.value=(P.matRentFactor!=null?P.matRentFactor:0.8);var _pl=document.getElementById('pmat-loss');if(_pl)_pl.value=(P.matLossAccrue===false?'0':'1');var _pt=document.getElementById('pmat-trans');if(_pt)_pt.value=(P.matTransRate!=null?P.matTransRate:450);}catch(e){_err('syncParamsUI.mat',e);}   // v6
   try{var _pk=document.getElementById('paikey');if(_pk)_pk.value='';}catch(e){_err('syncParamsUI',e);}   // v6.0.118：不再顯示／保存金鑰
-  try{var _pe=document.getElementById('pequip');if(_pe)_pe.value=(P.equipList||[]).join('\n');var _pg=document.getElementById('pdrgap');if(_pg)_pg.value=(P.drGapDays==null?3:P.drGapDays);var _pd=document.getElementById('pvpayday');if(_pd)_pd.value=(P.vendorPayDay||25);var _pm=document.getElementById('pvpaydelay');if(_pm)_pm.value=(P.vendorPayDelay==null?1:P.vendorPayDelay);var _pc=document.getElementById('pvcutday');if(_pc)_pc.value=(P.vendorCutDay||25);var _ph=document.getElementById('pholidays');if(_ph)_ph.value=(P.holidays||'');var _pk=document.getElementById('pmakeup');if(_pk)_pk.value=(P.makeupDays||'');var _pb=document.getElementById('pvsubbill');if(_pb)_pb.value=(P.subPayOnBill===false?'0':'1');}catch(e){_err('syncParamsUI',e);}
+  try{var _pe=document.getElementById('pequip');if(_pe)_pe.value=(P.equipList||[]).join('\n');var _pg=document.getElementById('pdrgap');if(_pg)_pg.value=(P.drGapDays==null?3:P.drGapDays);var _pd=document.getElementById('pvpayday');if(_pd)_pd.value=(P.vendorPayDay||25);var _pm=document.getElementById('pvpaydelay');if(_pm)_pm.value=(P.vendorPayDelay==null?1:P.vendorPayDelay);var _pc=document.getElementById('pvcutday');if(_pc)_pc.value=(P.vendorCutDay||25);var _ph=document.getElementById('pholidays');if(_ph)_ph.value=_holText();var _pk=document.getElementById('pmakeup');if(_pk)_pk.value=(P.makeupDays||'');var _pb=document.getElementById('pvsubbill');if(_pb)_pb.value=(P.subPayOnBill===false?'0':'1');}catch(e){_err('syncParamsUI',e);}
   const m={pc:'company',pt:'taxid',pb:'boss',pco:'contact',ptel:'tel',pem:'email',pad:'addr',
     ptax:'tax',prmrate:'removeRate',pohd:'overheadPct',plabor:'laborDayRate',popen:'openingCash',popendate:'openingDate',popres:'opReserveMonths',popresamt:'opReserveAmt',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
   };
@@ -21359,7 +21359,14 @@ function _vendorDueDate(d,noRoll){
 // 每次重算日期的自動應付（抽成、佣金）：已存的到期日是同一個起算日算出來的（順延前或後）就保留，不因 v6.0.188 或改假日清單整批移動
 function _vendorDueKeep(cur,from){var nd=_vendorDueDate(from);if(cur&&(cur===nd||cur===_vendorDueDate(from,true)))return cur;return nd;}
 function _holParse(t){var a=[];String(t||'').split(/\r?\n/).forEach(function(l){var m=String(l).trim().match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);if(m)a.push(m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0'));});return a;}
-function _payHolidays(){return {hol:_holParse(P.holidays),mk:_holParse(P.makeupDays)};}
+// v6.0.193 內建預設：人事行政總處「政府行政機關辦公日曆表」（data.gov.tw 資料集 14718）官方 CSV 的週一～五放假日（含補假）；
+//   2026：dgpa.gov.tw/FileConversion?filename=dgpa/files/202506/a52331bd-a189-466b-b0f0-cae3062bbf74.csv
+//   2027：dgpa.gov.tw/FileConversion?filename=dgpa/files/202607/f538b1ff-ba60-4c63-9477-10db8e6612d1.csv
+//   兩年都沒有週六補班。參數格空白＝用這份；有填就照填的（覆寫），每年新公告出來在這裡補下一年。
+var _HOL_DEF='2026-01-01\n2026-02-16\n2026-02-17\n2026-02-18\n2026-02-19\n2026-02-20\n2026-02-27\n2026-04-03\n2026-04-06\n2026-05-01\n2026-06-19\n2026-09-25\n2026-09-28\n2026-10-09\n2026-10-26\n2026-12-25\n'
+  +'2027-01-01\n2027-02-04\n2027-02-05\n2027-02-08\n2027-02-09\n2027-02-10\n2027-03-01\n2027-04-05\n2027-04-06\n2027-04-30\n2027-06-09\n2027-09-15\n2027-09-28\n2027-10-11\n2027-10-25\n2027-12-24\n2027-12-31';
+function _holText(){return String(P.holidays||'').trim()?String(P.holidays):_HOL_DEF;}
+function _payHolidays(){return {hol:_holParse(_holText()),mk:_holParse(P.makeupDays)};}
 // 今年或（11 月起）明年的國定假日還沒填 → 總覽提醒（只提醒，不擋）
 function _holMissing(now){now=now||new Date();var y=now.getFullYear(),h=_payHolidays().hol,need=[y];if(now.getMonth()>=10)need.push(y+1);
   return need.filter(function(yy){return !h.some(function(d){return d.slice(0,4)===String(yy);});});}
