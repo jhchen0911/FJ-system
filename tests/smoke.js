@@ -11029,6 +11029,48 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.187 第 6 步 6-1a：同一筆應付分次付款（付款視窗填這次付多少；撤銷留紀錄；合併聯集；部分已付不被刪）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const W = ms => new Promise(res => setTimeout(res, ms));
+      const keep = JSON.parse(JSON.stringify(PAYABLES)), oP = window.prompt;
+      try {
+        PAYABLES = PAYABLES.filter(x => !/^payS187/.test(x.id));
+        PAYABLES.push({ id: 'payS187_p1', costId: 'S187', costPeriod: 1, quoteId: 'qS187', to: '乙工程行', amount: 1097250, vat: true, date: '2026-11-25', status: 'pending', project: '範例S187', note: '第1期計價' });
+        const ap0 = _apTotal();
+        payMarkPaid('payS187_p1', '2026-10-05'); await W(30);
+        document.getElementById('pmp-amt').value = '9999999'; document.getElementById('gen-confirm-ok').click(); await W(30);
+        out.overBlocked = document.getElementById('gen-confirm-modal').style.display !== 'none';
+        document.getElementById('pmp-amt').value = '576056'; document.getElementById('gen-confirm-ok').click(); await W(30);
+        const p = PAYABLES.find(x => x.id === 'payS187_p1');
+        out.part = p.status === 'pending' && FJC.pay.paysOf(p).length === 1 && _payLeft(p) === 576057 && _payPartial(p) && ap0 - _apTotal() === 576056;
+        out.line = /已付 576,056／餘額 576,057/.test(_payPartLine(p));
+        // 自動重算刪不掉部分已付
+        out.tomb = _tomb('payables', 'payS187_p1') === false && _payLocked(p);
+        // 合併：另一台加了一筆付款、本機撤銷了第一筆 → 聯集，撤銷的不復活
+        const other = JSON.parse(JSON.stringify(p)); other.pays.push({ id: 'zz', amt: 1000, date: '2026-10-20', at: Date.now() + 5 });
+        window.prompt = () => '付錯金額'; payVoidLastPart('payS187_p1'); await W(30);
+        const merged = _payStatusReconcile(p, other);
+        out.union = FJC.pay.paysOf(merged).length === 1 && FJC.pay.paysOf(merged)[0].id === 'zz' && merged.pays.length === 2;
+        // 付清：最後一次也記一筆，已付合計＝全額
+        payMarkPaid('payS187_p1', '2026-11-25'); await W(30);
+        out.defLeft = +document.getElementById('pmp-amt').value === 1152113;
+        document.getElementById('pmp-amt').value = '576056'; document.getElementById('gen-confirm-ok').click(); await W(30);
+        payMarkPaid('payS187_p1', '2026-11-25'); await W(30); document.getElementById('gen-confirm-ok').click(); await W(30);
+        out.full = p.status === 'paid' && p.paidDate === '2026-11-25' && _payPaidSum(p) === 1152113 && _payLeft(p) === 0 && _payPaidIn(p, '2026-11') === 1152113 && _payPaidIn(p, '2026-10') === 0;
+        // 改回未付＝撤銷最後一筆（要原因），回到部分已付
+        payUnmark('payS187_p1'); await W(30);
+        out.unmark = p.status === 'pending' && _payPaidSum(p) === 576056 && _payLeft(p) === 576057;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      window.prompt = oP; PAYABLES = keep; try { savePayables(); } catch (e) { /* 可忽略 */ }
+      return out;
+    });
+    check('v6.0.187 分次付款：付款視窗填這次付多少（超過餘額擋下）、部分已付顯示已付／餘額、應付總額只算餘額、自動重算刪不掉、跨裝置付款紀錄聯集且撤銷不復活、付清記最後一筆、改回未付＝撤銷最後一筆', r.overBlocked && r.part && r.line && r.tomb && r.union && r.defLeft && r.full && r.unmark, JSON.stringify(r));
+    check('v6.0.187 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.184 熱修：本機私有資料時間戳已最新、但這次開頁還沒讀過私有資料 → 也要下載一次（補登卡「私有資料還沒下載完」一直 ✗）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

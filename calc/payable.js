@@ -84,7 +84,41 @@
   function advPayId(cid, a) { return 'pay' + cid + '_a' + a.id; }
   function earlyId(cid, per, e) { return 'pay' + cid + '_p' + per.no + '_e' + e.id; }
 
-  var pay = { eff: eff, vatAmt: vatAmt, retention: retention, invoice: invoice, retRate: retRate, periods: periods, advs: advs, staged: staged, inst: inst,
+  // v6.0.187 第 6 步 6-1a：同一筆應付分次付款（p.pays＝[{id, amt 含稅, date, at, by, note}]）
+  function paysOf(p) { return (p && Array.isArray(p.pays)) ? p.pays.filter(function (x) { return x && !x.void && num(x.amt) > 0; }) : []; }   // 撤銷的付款留著（void），跨裝置合併才不會復活
+  // 已付合計（含稅）：整筆已付＝全額；部分已付＝付款紀錄加總（不超過全額）
+  function paidSum(p, tR) {
+    if (!p) return 0;
+    var e = eff(p, tR);
+    if (p.status === 'paid') return e;
+    var s = paysOf(p).reduce(function (a, x) { return a + Math.round(num(x.amt)); }, 0);
+    return Math.min(s, e);
+  }
+  // 餘額（含稅）＝全額－已付合計，不另外四捨五入；作廢、已付為 0
+  function left(p, tR) {
+    if (!p || p.voidAt || p.status === 'paid') return 0;
+    return Math.max(0, eff(p, tR) - paidSum(p, tR));
+  }
+  // 某期間（日期字首，例 '2026' 或 '2026-11'）實際付出的現金（含稅）：有付款紀錄看紀錄日期；沒有紀錄的整筆已付看 paidDate（缺就 date）
+  function paidIn(p, prefix, tR) {
+    if (!p) return 0;
+    prefix = String(prefix || '');
+    var ps = paysOf(p);
+    if (ps.length) {
+      var cap = eff(p, tR), run = 0, out = 0;
+      ps.slice().sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')) || (num(a.at) - num(b.at)); }).forEach(function (x) {
+        var a2 = Math.min(Math.round(num(x.amt)), Math.max(0, cap - run)); run += a2;
+        if (String(x.date || '').indexOf(prefix) === 0) out += a2;
+      });
+      if (p.status === 'paid' && run < cap && String(p.paidDate || p.date || '').indexOf(prefix) === 0) out += cap - run;   // 整筆標已付、紀錄少於全額：差額算在實付日
+      return out;
+    }
+    if (p.status !== 'paid') return 0;
+    return String(p.paidDate || p.date || '').indexOf(prefix) === 0 ? eff(p, tR) : 0;
+  }
+  function partial(p, tR) { return !!p && p.status !== 'paid' && !p.voidAt && paidSum(p, tR) > 0; }
+
+  var pay = { paysOf: paysOf, paidSum: paidSum, left: left, paidIn: paidIn, partial: partial, eff: eff, vatAmt: vatAmt, retention: retention, invoice: invoice, retRate: retRate, periods: periods, advs: advs, staged: staged, inst: inst,
     prInst: prInst, rowPrice: rowPrice, periodCalc: periodCalc, advInclAlloc: advInclAlloc, overStat: overStat, payId: payId, advPayId: advPayId, earlyId: earlyId };
   var FJC = root.FJC || (root.FJC = {});
   FJC.pay = pay;

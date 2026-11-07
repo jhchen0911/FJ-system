@@ -283,5 +283,19 @@
   "savedQty": 30,
   "savedRate": 70,
   "savedTotal": 22050
+ },
+ "C40": {
+  "eff": 1152113,
+  "after1": {
+   "status": "pending",
+   "paid": 576056,
+   "left": 576057
+  },
+  "status2": "paid",
+  "pays": 2,
+  "paid2": 1152113,
+  "left2": 0,
+  "oct": 576056,
+  "nov": 576057
  }
 }
