@@ -1,0 +1,61 @@
+<title>進退料統整表設計</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>:root{--bg:#f5f6f2;--surface:#fff;--fg:#1f2620;--muted:#5f6a62;--rule:#d7ddd5;--accent:#1c6937;--note:#f6ecd8;--noteb:#c99a3c;
+--font-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;--font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121714;--surface:#1a211d;--fg:#e3eae5;--muted:#9aa79f;--rule:#2c3731;--accent:#6cc28a;--note:#372b14;--noteb:#8a6a2a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121714;--surface:#1a211d;--fg:#e3eae5;--muted:#9aa79f;--rule:#2c3731;--accent:#6cc28a;--note:#372b14;--noteb:#8a6a2a;color-scheme:dark}
+*{box-sizing:border-box}body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.75}
+.wrap{max-width:860px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 40px}
+h1{font-size:1.55rem;margin:0 0 10px;text-wrap:balance}h2{font-size:1.15rem;margin:30px 0 10px;text-wrap:balance}h3{font-size:1rem;margin:20px 0 8px}
+p,li{overflow-wrap:anywhere}ul,ol{padding-left:1.3em}li.sub{margin-left:1.2em;list-style:circle}
+a{color:var(--accent)}code{font-family:var(--font-mono);font-size:.88em;background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:0 4px}
+pre{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:12px 14px;overflow-x:auto;font-family:var(--font-mono);font-size:.85rem;line-height:1.6}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--rule);border-radius:12px;margin:10px 0}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:.9rem}th,td{padding:9px 12px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top}
+th{font-size:.82rem;color:var(--muted)}tr:last-child td{border-bottom:none}
+.note{background:var(--note);border:1px solid var(--noteb);border-radius:12px;padding:12px 14px;font-size:.92rem;margin:10px 0}
+.theme{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));width:36px;height:36px;border-radius:50%;border:1px solid var(--rule);background:var(--surface);color:var(--fg);cursor:pointer}
+.report-credit{margin-top:48px;padding-top:20px;border-top:1px solid var(--rule);font-size:.8rem;line-height:1.9;color:var(--muted);text-align:center}
+.report-credit a{color:inherit}.report-credit .brandline{display:block;font-weight:700;color:var(--fg);margin-bottom:8px;text-decoration:none;font-size:.92rem}
+.report-credit .tagline-row{display:block;margin-bottom:8px}.report-credit .tagline{font-style:normal;color:var(--fg);font-weight:500}
+.report-credit .links{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 18px}@media(max-width:520px){.report-credit .sep{display:none}.report-credit .tagline{display:block}}</style>
+<button class="theme" id="theme" type="button" aria-label="切換深淺色">◐</button>
+<main class="wrap">
+<h1>進退料統整表 設計＋決策題</h1>
+<div class="note">2026-11-07 FJ 主線。需求：my-agent <code>400_Project/workflow/2026-11-04_進退料統整表_需求.md</code>（第五節加碼 5 項 Lotion 已確認全做）＋ Lotion 11/05 對 6 題的回覆（第 3 題改成「退料提醒」）。<br>前一份分析：<code>docs/進退料統整表_銜接分析.md</code>（11/04，對照 v6.0.173；這份接在 v6.0.194 之後，以這份為準）。<br>排程照需求：<b>先做後端資料和首頁卡片</b>，每案「材料」分頁與全公司總表的畫面跟第 7 步一起換。範例全是假資料。</div>
+<h2>一句話</h2>
+<p>工務拍簽收單 → AI 讀 → 首頁卡片確認 → 寫進「進退料簿」（每一趟一筆）。之後台帳、租料批次、租金、退料提醒、租賃商對帳、業主逾期租金比對，都由系統照這本簿子自己算。</p>
+<pre>工務拍簽收單（智慧收件，已有）
+   │ AI 讀欄位；讀不出的標黃
+   ▼
+首頁卡片「簽收單待確認」（工務＋Lotion；卡片上沒有金額）
+   │ 確認
+   ▼
+進退料簿（新，每趟一筆）──── 金額那一半（只給 Lotion）
+   ├─ 自有料 → 台帳自動改（三種情況改成卡片等 Lotion）
+   ├─ 租賃料 → 租料批次自動建／結 → 租金成本
+   │            ├─ 退料提醒（拔除完成還在場 &gt; 3 天；工務看得到多付租金）
+   │            ├─ 計租日期差 ≥ 1 天提醒（金額只給 Lotion）
+   │            └─ 租賃商請款核對（第 6 步廠商請款卡上顯示差額）
+   ├─ 轉場 → 一筆寫兩案（A 退、B 進），租期接續
+   └─ 結案 → 回寫單價庫（租期、每趟運費、損耗、吊車）→ 下次報價用</pre>
+<h2>一、已定案（不用再問）</h2>
+<div class="tbl"><table><thead><tr><th>項目</th><th>定案</th><th>來源</th></tr></thead><tbody><tr><td>拍照流程</td><td>拍完直接進首頁卡片，拍照那一步只顯示「已收到，待確認」</td><td>11/05 第 1 題</td></tr><tr><td>業主逾期租金</td><td>照合約（日報拔除進度）算；進退料簿退場日只拿來比對，差超過參數天數提醒</td><td>11/05 第 2 題</td></tr><tr><td>退料提醒</td><td>拔除完成或階段完工，這批料還在場超過 3 天（參數）→「退料提醒」給工務＋Lotion；寫已多付租金、每天再增加多少（<b>這個金額工務看得到</b>）；超過 7 天升級成 Lotion 緊急卡；每月統整「租料閒置浪費」</td><td>11/05 第 3 題</td></tr><tr><td>計租日期</td><td>簽收單日期跟租賃商計租起訖差 1 天以上就提醒，「可能多算 N 天、約 NT$ X」金額只給 Lotion</td><td>11/05 第 4 題</td></tr><tr><td>自有料台帳</td><td>確認就自動改；只有三種情況卡片等 Lotion：倉庫找不到同規格、退場比工地上多、歸倉「要修／報廢」</td><td>11/05 第 5 題</td></tr><tr><td>車型</td><td>跨縣市→平板；同縣市且要現場卸貨→吊板；運費累積 3 個月後依實際比價；倉庫縣市放參數、可空（豐有目前沒有倉庫）</td><td>11/05 第 6 題</td></tr><tr><td>誰看什麼</td><td>工務看得到、拍、按確認；運費、租金、賠償、吊車費看不到（退料提醒的多付租金例外）</td><td>需求第二節</td></tr></tbody></table></div>
+<h2>二、資料怎麼存（工務能寫、看不到錢）</h2>
+<p>一筆拆兩半，同一個編號：</p>
+<div class="tbl"><table><thead><tr><th>存哪</th><th>內容</th><th>誰讀寫</th></tr></thead><tbody><tr><td><code>fydata/shared/matMoves/&lt;id&gt;</code>（新，逐筆同步）</td><td>日期、方向（進場／退場／轉場）、自有或租賃、材料規格長度、支數、從哪到哪、運輸公司、車型、車號、趟數、同車編號、租賃商、批次、租賃商單號、短少／損壞、吊車有無與誰叫、照片、簽收人、歸倉狀況、AI 信心（哪欄標黃）、狀態（待確認／已確認／退回）</td><td>工務、Lotion；規則白名單擋金額欄位；已確認的只有管理員能改</td></tr><tr><td><code>fydata/private/matMoveFin</code>（新）</td><td>運費、每趟單價、運費算哪案／同車分攤、租金單價與單位、計租起訖、賠償、吊車費、套用紀錄（改了哪幾列台帳、哪個批次）</td><td>只有管理員（＋唯讀帳號，比照台帳）</td></tr></tbody></table></div>
+<ul><li><b>套用器</b>（台帳、租料批次、租金）跑在<b>管理員裝置</b>：私有資料下載完跑一次，之後收到新確認再跑；冪等（內容沒變不重套，變了先撤再套）。跟現在材料位置清單同一模式。</li><li><b>舊資料</b>：日報裡已勾「已登錄」的簽收單 → 進退料簿標已確認、<b>不再動台帳</b>（避免扣兩次）；沒勾的 → 變成首頁待確認卡。舊租料批次沒有簽收單的不補建，只標「舊批次（無簽收單）」。舊欄位一律保留。</li><li><b>規則要改</b>（database.rules.json，推 main 自動發布）。</li></ul>
+<h2>三、分批（每批一個版號，照改版流程：測試、另一模型審查、Lotion 說「上線」）</h2>
+<div class="tbl"><table><thead><tr><th>批</th><th>內容</th><th>給誰看得到</th><th>依賴</th></tr></thead><tbody><tr><td><b>M1 資料＋遷移</b></td><td>兩個新集合、規則、<code>calc/matmove.js</code>（在場量、趟數、M 數、單位換算、租金天數，Node 可測）、舊簽收單遷移、備份涵蓋</td><td>看不到（地基）</td><td>無</td></tr><tr><td><b>M2 首頁卡片＋AI 多讀欄位</b></td><td>AI 多讀：自有／租賃、運輸公司、車型、租賃商單號、短少損壞、吊車、簽收人、歸倉狀況、逐欄信心；拍照只顯示「已收到」；首頁「簽收單待確認 N 張」卡片（確認／退回／修改，黃色欄要點過）</td><td>工務＋Lotion</td><td>M1</td></tr><tr><td><b>M3 自有料台帳自動改</b></td><td>套用器（從現在的調撥／歸還抽出不開視窗的版本）；三種例外出卡給 Lotion；轉場台帳改案</td><td>Lotion（例外卡）</td><td>M2</td></tr><tr><td><b>M4 租料批次＋退料提醒</b></td><td>租料進退場自動建／結批次、轉場租期接續；分段單價（16M 以上另一段）；退料提醒＋7 天升級；計租日期差提醒；業主逾期租金比對提醒</td><td>工務＋Lotion</td><td>M2；會動租金成本，合成樣本答案要更新並寫明</td></tr><tr><td><b>M5 防錯</b></td><td>進退加總對不起來、同一張單重複、運輸請款趟數不符 → 卡片；雲端每日也跑（calc 共用）</td><td>Lotion</td><td>M1；趟數那條等 M6</td></tr><tr><td><b>M6 租賃商請款核對</b></td><td>第 6 步廠商請款卡（租賃類）加「進退料簿核算：應付 X、請款 Y、差 Z」＋逐批明細；運輸公司趟數核對</td><td>Lotion</td><td>M4</td></tr><tr><td><b>M7 結案回寫＋閒置浪費月統整</b></td><td>結案寫回單價庫（實際租期、每趟運費依地區車型、損耗率、吊車費）；每月「租料閒置浪費」各案各批（後端算，畫面第 7 步）</td><td>Lotion</td><td>M4</td></tr><tr><td><b>M8 租或買、自有優先、車型建議</b></td><td>同規格累計租金接近買一批 → 建議評估買料卡（只提醒，接買租決策）；新案同規格先建議自有料；車型建議＋運費比價（資料滿 3 個月才開）</td><td>Lotion</td><td>M7</td></tr></tbody></table></div>
+<p>建議順序 M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8。<b>M1＋M2＋M3 做完工務就能開始用</b>，Lotion 不用再一張張按「帶入」。M4 做完退料提醒就會開始省租金。</p>
+<h2>四、要 Lotion 決定的（能用預設的都已經用了，只剩這 4 題）</h2>
+<div class="tbl"><table><thead><tr><th>題</th><th>要決定什麼</th><th>建議（預設）</th><th>理由</th></tr></thead><tbody><tr><td>1</td><td><b>工地直接轉場，運費預設算哪一案</b></td><td><b>算進場的那一案（B 案）</b>，卡片上可改</td><td>料是為 B 案載的；A 案拔除已完成、運費不該再加在 A 案成本</td></tr><tr><td>2</td><td><b>同一台車載兩案，運費怎麼分</b></td><td><b>依 M 數分</b>（需求寫依支數；同車常常長短不一，用 M 數比較接近實際載重）</td><td>例：12m×20 支和 6m×20 支同車，依支數各一半，依 M 數 2：1；擇一即可，之後可改</td></tr><tr><td>3</td><td><b>租賃單價分段（16M 以上另一段）怎麼存</b></td><td><b>每個租賃商一張單價表</b>（規格×長度區間×單位：片／月、M／月、M／天），參數頁維護；租料批次帶入，個案可改</td><td>11/04 寬大核對就是依租賃商的分段單價；放在租賃商身上，換案不用重填</td></tr><tr><td>4</td><td><b>退料提醒、閒置浪費的「多付租金」怎麼算</b></td><td><b>從拔除完成日（日報）算到退場日（簽收單），× 這批租金單價</b>；工務看到「約多付 NT$ X、每天再加 NT$ Y」</td><td>照 11/05 第 3 題；拔除完成前在場是正常使用，不算浪費</td></tr></tbody></table></div>
+<div class="note">其他細節（欄位、規則、遷移、卡片樣子）照第二節做，不再另外問；做到 M2 卡片時會先給畫面截圖。</div>
+<h2>五、跟其他工作的關係</h2>
+<ul><li><b>第 6 步</b>：6-1（分次付款）已上線；6-2a 雲端比對照 Q5 等一個月請款週期才啟用。進退料不卡第 6 步，只有 M6 要用第 6 步的廠商請款卡（已上線）。</li><li><b>第 7 步</b>：每案「材料」分頁、全公司總表（篩工地、材料、租賃商、運輸公司、日期）的畫面在第 7 步一起換；M1～M8 先把資料、後端、首頁卡片做好。</li><li><b>自有機具事業部</b>（11/07 需求草稿）排在進退料之後，會共用 <code>calc/matmove.js</code> 的進退場與租期算法。</li></ul>
+<footer class="report-credit"><a class="brandline" href="https://shifu.tw/course/trial/ai-agent-bootcamp">《超級 AI 個體》AI Agent 陪跑課</a>
+<span class="tagline-row"><em class="tagline">工作交給 AI，時間留給自己</em><span class="sep">｜</span><span>此提案報告由<a href="https://raymondhouch.com/">雷蒙（侯智薰）</a>設計</span></span>
+<span class="links"><a href="https://ai.lifehacker.tw">學習資源站 ai.lifehacker.tw</a><a href="https://works.lifehacker.tw">學員作品集 works.lifehacker.tw</a></span></footer>
+</main>
+<script>document.getElementById('theme').onclick=function(){var r=document.documentElement;var d=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=d?'light':'dark';try{localStorage.setItem('rp-theme',r.dataset.theme)}catch(e){}};try{var t=localStorage.getItem('rp-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}</script>
