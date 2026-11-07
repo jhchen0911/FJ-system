@@ -205,4 +205,23 @@ module.exports = [
       return { eff: _payEff(p), after1, status2: p.status, pays: FJC.pay.paysOf(p).length, paid2: _payPaidSum(p), left2: _payLeft(p), oct: _payPaidIn(p, '2026-10'), nov: _payPaidIn(p, '2026-11') };
     }
   }
+  ,{
+    id: 'C41', items: [], status: '正確',
+    title: '第 6 步 6-1b：舊提前放款（預付款 1,050,000 已付＋第 1 期抵扣後 1,050,000 待付）轉成同一筆應付分次付款',
+    hand: '轉換前後這家已付合計 1,050,000、未付合計 1,050,000 都不變；轉換後第 1 期一筆應付含稅 2,100,000、付款紀錄 10/05 付 1,050,000、餘額 1,050,000；原預付款應付金額歸零留底',
+    run: async () => {
+      Q.push({ id: 'qC41', name: '範例工程C41', client: '甲營造', items: [], _mt: 1, costs: [{ id: 'C41', type: 'sub', vendor: '乙工程行', cat: '打設', date: '2026-09-01', amt: 0, invoice: true, retRate: 0,
+        rows: [{ id: 'r1', linkedItemIdx: -1, desc: '打設', qty: 200, unitPrice: 10000 }],
+        periods: [{ no: 1, date: '2026-10-25', from: '2026-10-01', to: '2026-10-25', rows: [{ rid: 'r1', qty: 200 }], adv: 1000000, due: '2026-11-25', ts: 1, mt: 1 }],
+        advances: [{ id: 'e41', date: '2026-10-05', amt: 1000000, fromPeriod: 1, ts: 1 }] }] });
+      const q = Q.find(x => x.id === 'qC41'), c = q.costs[0];
+      syncCostToPayable(q, c);
+      const A = PAYABLES.find(x => x.id === _subAdvPayId('C41', { id: 'e41' })); A.status = 'paid'; A.paidDate = '2026-10-05'; A.paidAt = 1;
+      const fam = () => PAYABLES.filter(x => x.costId === 'C41');
+      const tot = () => fam().reduce((t, x) => ({ paid: t.paid + _payPaidSum(x), left: t.left + _payLeft(x) }), { paid: 0, left: 0 });
+      const before = tot(); const ok = _ecvApply('qC41', 'C41'); const after = tot();
+      const P = PAYABLES.find(x => x.id === _subPayId('C41', { no: 1 }));
+      return { before, ok, after, eff: _payEff(P), status: P.status, pays: FJC.pay.paysOf(P).map(x => [x.date, x.amt]), left: _payLeft(P), advAmt: A.amount, advVoid: !!A.voidAt };
+    }
+  }
 ];

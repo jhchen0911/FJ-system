@@ -297,5 +297,27 @@
   "left2": 0,
   "oct": 576056,
   "nov": 576057
+ },
+ "C41": {
+  "before": {
+   "paid": 1050000,
+   "left": 1050000
+  },
+  "ok": true,
+  "after": {
+   "paid": 1050000,
+   "left": 1050000
+  },
+  "eff": 2100000,
+  "status": "pending",
+  "pays": [
+   [
+    "2026-10-05",
+    1050000
+   ]
+  ],
+  "left": 1050000,
+  "advAmt": 0,
+  "advVoid": true
  }
 }

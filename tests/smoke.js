@@ -11029,6 +11029,69 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.192 第 6 步 6-1b：舊提前放款轉成分次付款（拍板卡；轉換前後已付／未付合計一樣才轉）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepP = PAYABLES;
+      try {
+        window._payGuardOff = true;
+        const mk = (cid, aid) => ({ id: cid, type: 'sub', vendor: '乙工程行' + cid, cat: '打設', date: '2026-09-01', amt: 0, invoice: true, retRate: 0,
+          rows: [{ id: 'r1', linkedItemIdx: -1, desc: '打設', qty: 100, unitPrice: 10000 }],
+          periods: [{ no: 1, date: '2026-10-25', from: '2026-10-01', to: '2026-10-25', rows: [{ rid: 'r1', qty: 100 }], adv: 500000, due: '2026-11-25', ts: 1, mt: 1 }],
+          advances: [{ id: aid, date: '2026-10-05', amt: 500000, fromPeriod: 1, ts: 1 }] });
+        Q = [{ id: 'qE192', name: '範例E192', client: '甲', items: [], costs: [mk('cA', 'eA'), mk('cB', 'eB'), mk('cC', 'eC')], _mt: 1 }];
+        PAYABLES = [];
+        Q[0].costs.forEach(c => syncCostToPayable(Q[0], c));
+        const pay = id => PAYABLES.find(p => p.id === id);
+        const aA = pay(_subAdvPayId('cA', { id: 'eA' })), pA = pay(_subPayId('cA', { no: 1 }));
+        out.setup = !!aA && !!pA && _payEff(aA) === 525000 && _payEff(pA) === 525000;
+        ['cA', 'cB'].forEach(cid => { const a = pay(_subAdvPayId(cid, { id: 'e' + cid.slice(1) })); a.status = 'paid'; a.paidDate = '2026-10-05'; a.paidAt = 1; });
+        const pB = pay(_subPayId('cB', { no: 1 })); pB.status = 'paid'; pB.paidDate = '2026-11-25'; pB.paidAt = 2;
+        const L = _ecvList(); const g = id => L.find(x => x.cid === id);
+        out.plan = L.length === 3 && g('cA').ok && g('cB').ok && !g('cC').ok && /還沒付/.test(g('cC').why) && g('cA').before.paid === 525000 && g('cA').before.left === 525000 && g('cB').before.paid === 1050000;
+        out.todo = (function () { const it = []; _v6TodoItems(it); return it.some(x => x.type === 'dec_earlyConv' && /3 家/.test(x.text)); })();
+        out.detail = /已付合計 525,000 → 525,000/.test(_ecvDetailHtml(g('cA'))) && /不能轉/.test(_ecvDetailHtml(g('cC')));
+        // ① 期別待付：轉成一筆應付＋一筆付款紀錄（部分已付）
+        out.applyA = _ecvApply('qE192', 'cA') === true;
+        const cA = Q[0].costs[0], pA2 = pay(_subPayId('cA', { no: 1 })), aA2 = pay(_subAdvPayId('cA', { id: 'eA' }));
+        out.afterA = cA.advances.length === 0 && cA.advConv.length === 1 && cA.periods[0].adv === 0 && _payEff(pA2) === 1050000 && _payPaidSum(pA2) === 525000 && _payLeft(pA2) === 525000 && pA2.status === 'pending'
+          && pA2.pays.length === 1 && pA2.pays[0].date === '2026-10-05' && !!aA2 && aA2.voidAt > 0 && aA2.amount === 0 && aA2.convTo === pA2.id && aA2.convFrom.amount === 500000 && _payPaidSum(aA2) === 0;
+        out.cashIn = _payPaidIn(pA2, '2026-10') === 525000;
+        // ② 期別已付：直接是整筆已付，不另立差額筆
+        out.applyB = _ecvApply('qE192', 'cB') === true;
+        const pB2 = pay(_subPayId('cB', { no: 1 }));
+        out.afterB = pB2.status === 'paid' && _payEff(pB2) === 1050000 && _payPaidSum(pB2) === 1050000 && !PAYABLES.some(p => p.deltaOf) && PAYABLES.filter(p => p.costId === 'cB').reduce((s, p) => s + _payPaidSum(p), 0) === 1050000;
+        // ③ 重算不變（不復活預付款、不出差額筆）
+        Q[0].costs.forEach(c => syncCostToPayable(Q[0], c));
+        out.stable = _payPaidSum(pay(_subPayId('cA', { no: 1 }))) === 525000 && !!pay(_subAdvPayId('cA', { id: 'eA' })) && !PAYABLES.some(p => p.deltaOf) && Q[0].costs[0].advances.length === 0 && PAYABLES.filter(p => p.costId === 'cA').reduce((s, p) => s + _payLeft(p), 0) === 525000;
+        // ④ 不能轉的不准確認；退回＝保持舊做法、不再列
+        out.blockC = _ecvApply('qE192', 'cC') === false && Q[0].costs[2].advances.length === 1;
+        out.reject = _DEC.earlyConv.reject(g('cC'), '先不轉') === true && !_ecvList().length && Q[0].costs[2].advConvSkip.why === '先不轉';
+        // ⑤ 審查 H1：別台舊資料把預付款帶回來（預付款又在、那一期又扣著）→ 重算自動收回，不出差額筆、合計不變
+        const cA3 = Q[0].costs[0]; cA3.advances.push(JSON.parse(JSON.stringify(cA3.advConv[0]))); delete cA3.advances[0].convAt; cA3.periods[0].adv = 500000;
+        syncCostToPayable(Q[0], cA3);
+        out.heal = cA3.advances.length === 0 && cA3.periods[0].adv === 0 && cA3.advConv.length === 1 && !PAYABLES.some(p => p.deltaOf) && PAYABLES.filter(p => p.costId === 'cA').reduce((s, p) => s + _payPaidSum(p), 0) === 525000 && _payEff(pay(_subPayId('cA', { no: 1 }))) === 1050000;
+        out.src = (function () { const s = _paySource(pay(_subAdvPayId('cA', { id: 'eA' }))); return !!s && s.auto === true && !s.orphan; })();
+        // ⑥ 審查 H2：套用後驗證失敗 → 整家還原，連付款帳本也還原（全額抵扣的期別：轉換時新建並自動已付）
+        Q[0].costs.push({ id: 'cD', type: 'sub', vendor: '丁工程行', cat: '打設', date: '2026-09-01', amt: 0, invoice: true, retRate: 0, rows: [{ id: 'r1', linkedItemIdx: -1, desc: '打設', qty: 100, unitPrice: 10000 }],
+          periods: [{ no: 1, date: '2026-10-25', rows: [{ rid: 'r1', qty: 100 }], adv: 1000000, due: '2026-11-25', ts: 1, mt: 1 }], advances: [{ id: 'eD', date: '2026-10-05', amt: 1000000, fromPeriod: 1, ts: 1 }] });
+        syncCostToPayable(Q[0], Q[0].costs[3]);
+        const aD = pay(_subAdvPayId('cD', { id: 'eD' })); aD.status = 'paid'; aD.paidDate = '2026-10-05'; aD.paidAt = 3;
+        const pidD = _subPayId('cD', { no: 1 }); out.dPlan = !pay(pidD) && _ecvPlan(Q[0], Q[0].costs[3]).ok;
+        const oT = window._ecvTot; let n = 0; window._ecvTot = function (L) { const t = oT(L); n++; return n >= 3 ? { paid: t.paid + 1, left: t.left } : t; };
+        let rb; try { rb = _ecvApply('qE192', 'cD'); } finally { window._ecvTot = oT; }
+        savePayables();
+        const aD2 = pay(_subAdvPayId('cD', { id: 'eD' })), cD = Q[0].costs[3];
+        out.undo = rb === false && cD.advances.length === 1 && cD.periods[0].adv === 1000000 && !!aD2 && aD2.status === 'paid' && aD2.amount === 1000000 && !aD2.voidAt && !aD2.convTo && !pay(pidD) && !PAID_LOG[pidD];
+        out.redo = _ecvApply('qE192', 'cD') === true && pay(pidD).status === 'paid' && _payEff(pay(pidD)) === 1050000 && PAYABLES.filter(p => p.costId === 'cD').reduce((s, p) => s + _payPaidSum(p), 0) === 1050000;
+      } finally { Q = keepQ; PAYABLES = keepP; window._payGuardOff = false; }
+      return out;
+    });
+    check('v6.0.192 舊提前放款轉分次付款：拍板卡列出、待付期別變一筆應付＋付款紀錄、已付期別整筆已付不出差額筆、原預付款作廢留底、重算不變、不能轉的擋下、退回不再列、別台舊資料帶回自動收回、還原連帳本一起', r.setup && r.plan && r.todo && r.detail && r.applyA && r.afterA && r.cashIn && r.applyB && r.afterB && r.stable && r.blockC && r.reject && r.heal && r.src && r.dPlan && r.undo && r.redo, JSON.stringify(r));
+    check('v6.0.192 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
