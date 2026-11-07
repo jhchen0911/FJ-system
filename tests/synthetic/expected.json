@@ -264,9 +264,9 @@
   "stillHeld": 1
  },
  "C35": {
-  "dueBefore": "2026-10-25",
+  "dueBefore": "2026-10-26",
   "periodDueAfter": "2026-11-25",
-  "payDateAfter": "2026-10-25"
+  "payDateAfter": "2026-10-26"
  },
  "C36": {
   "tplInstPct": 70,
@@ -283,5 +283,19 @@
   "savedQty": 30,
   "savedRate": 70,
   "savedTotal": 22050
+ },
+ "C40": {
+  "eff": 1152113,
+  "after1": {
+   "status": "pending",
+   "paid": 576056,
+   "left": 576057
+  },
+  "status2": "paid",
+  "pays": 2,
+  "paid2": 1152113,
+  "left2": 0,
+  "oct": 576056,
+  "nov": 576057
  }
 }

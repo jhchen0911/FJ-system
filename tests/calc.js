@@ -56,6 +56,26 @@ fs0.readdirSync(calcDir).filter(f => /\.js$/.test(f)).forEach(f => {
 });
 
 // ── 應付與分包計價（calc/payable.js）──
+{ // v6.0.188 第 6 步 6-1p：放款日遇假日順延到下一個工作日
+  const ok1 = PY.nextWorkday('2026-11-25', [], []) === '2026-11-25' && PY.nextWorkday('2026-04-25', [], []) === '2026-04-27' && PY.nextWorkday('2026-10-25', [], []) === '2026-10-26';   // 平日不動、週六→週一、週日→週一
+  const ok2 = PY.nextWorkday('2027-02-05', ['2027-02-05', '2027-02-08'], []) === '2027-02-09';   // 週五假日→跳過週末→週一也放假→週二
+  const ok3 = PY.nextWorkday('2026-12-26', [], ['2026-12-26']) === '2026-12-26' && PY.isWorkday('2026-12-26', [], ['2026-12-26']) && !PY.isWorkday('2026-12-27', [], []);   // 補行上班的週六照常
+  const ok4 = PY.nextWorkday('2026-12-31', ['2026-12-31', '2027-01-01'], []) === '2027-01-04' && PY.nextWorkday('', [], []) === '' && PY.nextWorkday('bad', [], []) === 'bad';   // 跨年；空值不動
+  check('v6.0.188 放款日順延：平日不動、週末→週一、連續假日跳到第一個工作日、補班週六照常、跨年、空值不動', ok1 && ok2 && ok3 && ok4, JSON.stringify({ ok1, ok2, ok3, ok4 }));
+}
+{ // v6.0.187 第 6 步 6-1a：同一筆應付分次付款
+  const p = { amount: 1097250, vat: true, status: 'pending', pays: [{ id: 'a', amt: 576056, date: '2026-10-05', at: 1 }] };
+  const ok1 = PY.eff(p, 5) === 1152113 && PY.paidSum(p, 5) === 576056 && PY.left(p, 5) === 576057 && PY.partial(p, 5) && PY.paidIn(p, '2026-10', 5) === 576056 && PY.paidIn(p, '2026-11', 5) === 0;
+  const v = Object.assign({}, p, { pays: [{ id: 'a', amt: 576056, date: '2026-10-05', void: true }] });
+  const ok2 = PY.paidSum(v, 5) === 0 && PY.left(v, 5) === 1152113 && !PY.partial(v, 5);
+  const full = Object.assign({}, p, { status: 'paid', paidDate: '2026-11-25', pays: [{ id: 'a', amt: 576056, date: '2026-10-05' }, { id: 'b', amt: 576057, date: '2026-11-25' }] });
+  const ok3 = PY.paidSum(full, 5) === 1152113 && PY.left(full, 5) === 0 && PY.paidIn(full, '2026-10', 5) === 576056 && PY.paidIn(full, '2026-11', 5) === 576057 && PY.paidIn(full, '2026', 5) === 1152113;
+  const old = { amount: 100000, vat: true, status: 'paid', paidDate: '2026-09-30' };   // 舊資料沒有付款紀錄：整筆照實付日
+  const ok4 = PY.paidSum(old, 5) === 105000 && PY.left(old, 5) === 0 && PY.paidIn(old, '2026-09', 5) === 105000 && PY.paidIn(old, '2026-10', 5) === 0;
+  const over = { amount: 1000, vat: false, status: 'pending', pays: [{ id: 'x', amt: 1500, date: '2026-01-01' }] };   // 付超過：已付合計不超過全額
+  const ok5 = PY.paidSum(over, 5) === 1000 && PY.left(over, 5) === 0 && PY.left({ amount: 1000, vat: false, voidAt: 1 }, 5) === 0;
+  check('v6.0.187 分次付款：已付合計／餘額／某月實付；撤銷（void）不算；舊資料整筆照實付日；付超過不超過全額', ok1 && ok2 && ok3 && ok4 && ok5, JSON.stringify({ ok1, ok2, ok3, ok4, ok5 }));
+}
 check('應付含稅：1,000 未稅×1.05＝1,050；未稅應付照原額；有含稅 incl 用 incl', PY.eff({ amount: 1000 }, 5) === 1050 && PY.eff({ amount: 1000, vat: false }, 5) === 1000 && PY.eff({ amount: 1000, incl: 1049 }, 5) === 1049 && PY.vatAmt({ amount: 1000 }, 5) === 50);
 check('廠商保留款：含稅 10,500×5%＝525；已付不計', PY.retention({ amount: 10000, retentionPct: 5 }, 5) === 525 && PY.retention({ amount: 10000, retentionPct: 5, status: 'paid' }, 5) === 0);
 const card = { id: 'c1', invoice: true, retRate: 5, rows: [{ id: 'r1', qty: 1000, unitPrice: 1000 }, { id: 'r2', qty: 40, unitPrice: 500, stage: 1, inst: 70 }],

@@ -2321,7 +2321,9 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
           <div class="f"><label>拔除／拆除期請款率 (%)</label><input id="prmrate" type="number" value="30" min="0" max="100"><div class="hint">分批請款時（例如打設／裝設 70%、拔除／拆除 30%），請款單的施工數量統計用這個請款率判斷本期屬於「拔除／拆除期」。若貴司拔除／拆除期的請款率不是 30%，改成實際值即可；也可以在請款單各工項直接指定「期別」，指定過的以指定為準</div></div>
           <div class="f"><label>標準點工日薪 (NT$)</label><input id="plabor" type="number" value="2800" min="0"><div class="hint">供「日報出工 vs 已記點工成本」勾稽用：專案勾稽表會以 日報累計工數×此日薪 估算應有點工成本，少記超過兩成即示警。0＝不勾稽</div></div>
           <div class="f"><label>自有機具清單</label><textarea id="pequip" rows="3" placeholder="一行一台，例如：&#10;SH490 長臂震動機&#10;PC200 挖土機" style="font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);width:100%;box-sizing:border-box"></textarea><div class="hint">工作日報「本日使用自有機具」會列出這些機具供逐台勾選並填時數；出工月結報表統計每台稼動天數與時數</div></div>
-          <div class="f"><label>廠商放款日（每月幾號）</label><input id="pvpayday" type="number" value="25" min="1" max="31"><div class="hint">承包成本建立時的應付到期日＝成本日期（合約／進場日）之次月此日；例：本月計價、下月 25 日放款</div></div>
+          <div class="f"><label>廠商放款日（每月幾號）</label><input id="pvpayday" type="number" value="25" min="1" max="31"><div class="hint">承包成本建立時的應付到期日＝成本日期（合約／進場日）之次月此日；例：本月計價、下月 25 日放款；遇週末或下面的國定假日順延到下一個工作日</div></div>
+          <div class="f"><label>國定假日（放款日順延用）</label><textarea id="pholidays" rows="4" placeholder="每行一個日期，例：2027-01-01 元旦"></textarea><div class="hint">週末自動判斷，這裡只填週一到週五放假的日子（含補假）；每年照人事行政總處公告補一次</div></div>
+          <div class="f"><label>補行上班日</label><textarea id="pmakeup" rows="2" placeholder="週六要上班的日子，例：2027-02-20"></textarea><div class="hint">週六補班那天照常放款</div></div>
           <div class="f"><label>廠商放款月延（月）</label><input id="pvpaydelay" type="number" value="1" min="0" max="6"><div class="hint">0＝當月放款、1＝次月（預設）、2＝隔兩個月</div></div>
           <div class="f"><label>廠商計價截止日（每月幾號）</label><input id="pvcutday" type="number" value="25" min="1" max="31"><div class="hint">分包「本期計價」預設的計價日／期間迄＝最近一次截止日（例：25 日截止、次月 25 日放款）</div></div>
           <div class="f"><label>承包成本未計價前不掛應付</label><select id="pvsubbill"><option value="1">是（預設）——按「本期計價」後才逐期產生應付</option><option value="0">否——建立承包成本即掛整筆應付</option></select><div class="hint">廠商月底計價、次月放款：登錄發包不會馬上出現整筆匯款；預付款另掛應付並在各期抵扣</div></div>
@@ -2840,7 +2842,7 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
 <script src="calc/route.js?v=6.0.181" defer></script>
 <script src="calc/todo.js?v=6.0.181" defer></script>
 <script src="calc/vbill.js?v=6.0.181" defer></script>
-<script src="app.js?v=6.0.185" defer></script>
+<script src="app.js?v=6.0.189" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
