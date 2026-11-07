@@ -11582,7 +11582,7 @@ async function newPage(browser, width, height) {
         _isReaderUser = false; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' };
         DRAFTS = {}; Object.keys(DB).forEach((k) => { if (DB[k].status === 'pending') DRAFTS[k] = DB[k]; });
         DRAFTS_OLD = { dold0001: DB.dold0001 };
-        const h = _draftListHtml(); const box = document.createElement('div'); box.innerHTML = h;
+        delete _DEC_DRAFT_TYPES.qchg; const h = _draftListHtml(); _DEC_DRAFT_TYPES.qchg = 1; const box = document.createElement('div'); box.innerHTML = h;   // v6.0.196 改單走拍板卡；這裡只測清單的顯示（報價、得標狀態草稿同一個畫面）
         const cards = box.querySelectorAll('.dr-meta');
         out.list = cards.length === 3 && /1151101 範例案/.test(h) && /建立 /.test(h) && /依 V3 改，報價目前 V3/.test(h) && !/舊改單<\/div><div style="display:flex/.test(h) && box.querySelectorAll('details.dr-old').length === 1 && /較早 1 筆已被這筆取代/.test(h) && /舊改單/.test(box.querySelector('details.dr-old').innerHTML);
         // 舊版本留下的重複 pending：管理員端自動收成最新一筆
