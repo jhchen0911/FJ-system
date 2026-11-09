@@ -1174,6 +1174,7 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
         <div class="trow grand"><label>總計</label><span id="ttot">NT$ 0</span></div>
         <div class="trow" id="tcost-row" style="display:none;border-top:1px dashed var(--ym);padding-top:4px"><label style="color:#e65100;font-size:11px">預估成本 <svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg>內部</label><span id="tcost" style="color:#e65100;font-size:12px">NT$ 0</span></div>
         <div class="trow" id="tmgn-row" style="display:none"><label style="color:#e65100;font-size:11px">預估毛利 <svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg>內部</label><span id="tmgn" style="font-size:12px;font-weight:900">NT$ 0</span></div>
+        <div id="q-p3" style="display:none;border-top:1px dashed var(--ym);padding-top:4px;margin-top:2px"></div>
         <div id="tcost-warn" style="display:none;font-size:10.5px;line-height:1.5;color:var(--red);background:var(--redl);border:1px solid #f3c4bf;border-radius:var(--r6);padding:6px 8px;margin-top:4px"></div>
       </div>
     </div>
@@ -2906,9 +2907,10 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
 <script src="calc/route.js?v=6.0.181" defer></script>
 <script src="calc/todo.js?v=6.0.181" defer></script>
 <script src="calc/vbill.js?v=6.0.181" defer></script>
+<script src="calc/bidstat.js?v=6.0.213" defer></script>
 <script src="calc/qdraft.js?v=6.0.197" defer></script>
 <script src="calc/matmove.js?v=6.0.195" defer></script>
-<script src="app.js?v=6.0.212" defer></script><script src="beta.js?v=6.0.212" defer></script>
+<script src="app.js?v=6.0.213" defer></script><script src="beta.js?v=6.0.213" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">

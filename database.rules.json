@@ -312,7 +312,7 @@
         ".validate": "newData.hasChild('version') && newData.child('version').isString()",
         "$other": {
           ".validate": true,
-          ".read": "auth != null && auth.token.email != null && root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && ($other === 'version' || $other === 'uploadedAt' || $other === 'uploadedBy' || $other === 'uploadedVer' || $other === 'uploadedDev' || $other === 'quoteSens' || $other === 'qHistSens' || $other === 'payables' || $other === 'expenses' || $other === 'costHist' || $other === 'upaCostDB' || $other === 'shareProfit' || $other === 'matLedger' || $other === 'matMoveFin' || $other === 'dealHist' || $other === 'paidLog' || $other === 'payAudit')"
+          ".read": "auth != null && auth.token.email != null && root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && ($other === 'version' || $other === 'uploadedAt' || $other === 'uploadedBy' || $other === 'uploadedVer' || $other === 'uploadedDev' || $other === 'quoteSens' || $other === 'qHistSens' || $other === 'payables' || $other === 'expenses' || $other === 'costHist' || $other === 'upaCostDB' || $other === 'shareProfit' || $other === 'matLedger' || $other === 'matMoveFin' || $other === 'dealHist' || $other === 'paidLog' || $other === 'payAudit' || $other === 'bidStats')"
         }
       },
       "access": {

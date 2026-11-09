@@ -70,3 +70,16 @@ test('v6.0.197 改單可改成本單價與固定條款（範本照報價新舊�
   assert.ok(r.rec, r.err);   // 舊報價（id 時間在切換前）用舊範本
   assert.strictEqual(D.rmkBaseFor({ id: String(Date.UTC(2027, 0, 1)) }, rp), '6. 本工程無保固及保留款');
 });
+
+test('v6.0.213 底價／目標成交價：報價單 fields.floor／target、改單 payload.prices；未稅正數才收，沒帶就沒有', () => {
+  const f = { name: '假丙案', items: [{ desc: 'a', unit: '式', qty: 1, price: 900 }] };
+  const r = D.build(Object.assign({}, base, { body: { type: 'quote', payload: { fields: Object.assign({}, f, { floor: 800.4, target: '880', junk: 1 }) }, expect: { sub: 900, tax: 45, total: 945 } } }));
+  assert.ok(r.rec, r.err); assert.strictEqual(r.rec.payload.fields.floor, 800); assert.strictEqual(r.rec.payload.fields.target, 880); assert.ok(!('junk' in r.rec.payload.fields));
+  const r0 = D.build(Object.assign({}, base, { body: { type: 'quote', payload: { fields: Object.assign({}, f, { floor: -1, target: 'x' }) }, expect: { sub: 900, tax: 45, total: 945 } } }));
+  assert.ok(!('floor' in r0.rec.payload.fields) && !('target' in r0.rec.payload.fields));
+  const ops = [{ op: 'set', idx: 0, match: '假工項A', fields: { qty: 12 } }];
+  const q = D.build(Object.assign({}, base, { body: { type: 'qchg', payload: { qid: 'q1', ops, prices: { target: 12000 } }, expect: { sub: 13000, tax: 650, total: 13650 } } }));
+  assert.deepStrictEqual(q.rec.payload.prices, { target: 12000 });
+  const q0 = D.build(Object.assign({}, base, { body: { type: 'qchg', payload: { qid: 'q1', ops }, expect: { sub: 13000, tax: 650, total: 13650 } } }));
+  assert.ok(!('prices' in q0.rec.payload));
+});

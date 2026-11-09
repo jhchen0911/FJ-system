@@ -12366,6 +12366,69 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.213 改版第 7 步③（7b）：報價結果、底價／目標成交價、同類工項得標率與建議 ──
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepH = Q_HISTORY, oU = window._fbUser, oA = window._isAdminUser;
+      try {
+        window.toast = () => {}; P.tax = 5;
+        const mkq = (id, desc, price, extra) => Object.assign({ id, code: id, name: '範例' + id, client: '甲營造', date: '2026-11-10', exs: [], rmk: {}, _mt: 1, costs: [], items: [{ desc, unit: '支', qty: 10, price, estCost: 700 }] }, extra || {});
+        Q = [mkq('qB1', '鋼軌樁打設', 1000), mkq('qB2', '鋼軌樁打設', 1000), mkq('qB0', '鋼軌樁打設', 1000, { date: '2026-10-01', awarded: true })];
+        Q.forEach((q) => { q.t = { sub: 10000, tax: 500, total: 10500 }; });
+        Q_HISTORY = { qB1: [{ savedAt: 1, formal: true, ver: 1, snapshot: { items: [{ desc: '鋼軌樁打設', qty: 10, price: 1100 }], t: { sub: 11000 } } }] };
+        // 得標：自動記成交價；報價＝第一個送出的版次
+        const _aq = document.getElementById('award-qid'), _ap = document.getElementById('award-paydue'); _aq.value = 'qB1'; if (_ap) _ap.value = '25';
+        confirmAward(); try { closeModal('award-modal'); } catch (e) { /* 可忽略 */ }
+        const b1 = Q.find((q) => q.id === 'qB1').bidRes || {};
+        out.won = b1.res === 'won' && b1.quoted === 11000 && b1.final === 10000 && b1.src === 'auto';
+        // 沒得標：對手價（含稅）轉未稅
+        markQuoteLost('qB2'); await T(30); document.getElementById('ql-price').value = '10500'; document.getElementById('gen-confirm-ok').click(); await T(30);
+        const b2 = Q.find((q) => q.id === 'qB2').bidRes || {};
+        out.lost = b2.res === 'lost' && b2.rival === 10000 && b2.final === null;
+        // 只存在 private：shared 抽走、private 帶著；給業主的報價單不會有
+        const q1 = Q.find((q) => q.id === 'qB1'); q1.price3 = { floor: 8888, target: 9999 };
+        const sh = _stripQuoteSens(q1), pv = _extractQuoteSens(q1);
+        out.priv = !('bidRes' in sh) && !('price3' in sh) && pv.bidRes.final === 10000 && pv.price3.target === 9999;
+        const c = JSON.parse(JSON.stringify(sh)); _applyQuoteSens(c, pv); out.back = c.bidRes.final === 10000 && c.price3.floor === 8888;
+        const doc = _docOut('quote', { q: q1 }).html; out.noDoc = !/8,888|8888|9,999|9999/.test(doc) && !/底價|目標成交/.test(doc);
+        // 報價頁內部面板：管理員看得到成本、底價、目標、報價、毛利率；一般員工看不到
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        loadQ('qB1'); go('editor'); await T(200); rTots();
+        const el = document.getElementById('q-p3');
+        out.panel = el.style.display !== 'none' && /底價/.test(el.textContent) && /NT\$ 8,888/.test(el.textContent) && /目標成交價/.test(el.textContent) && /毛利率/.test(el.textContent) && /成本/.test(el.textContent) && /滿 5 筆才給建議/.test(el.textContent);
+        _fbUser = { email: 'staff@example.com', uid: 's' }; _isAdminUser = false; rTots(); out.staffHide = el.style.display === 'none';
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        // 同類滿 5 筆：顯示得標率與建議
+        for (let i = 3; i <= 6; i++) { const q = mkq('qB' + i, '鋼軌樁打設', 1000, { bidStatus: 'lost' }); q.t = { sub: 10000 }; Q.push(q); }
+        rTots(); out.ready = /「鋼軌樁」得標率 \d+(\.\d)?%、建議目標價調 [-+]?\d/.test(el.textContent);
+        // 給報價線的統計：只有類別與比例
+        const ex = _bidStatsExport(); out.export = ex.cats.some((c) => c.cat === 'rail' && c.n >= 5) && !/範例|甲營造/.test(JSON.stringify(ex)) && _privatePayload().data.bidStats.cats.length > 0;
+        // 拍板卡：今天以後的報價、沒記到的才出現；舊報價（10/01）不出現
+        const L = _qresList().map((q) => q.id);
+        out.card = L.indexOf('qB3') >= 0 && L.indexOf('qB1') < 0 && L.indexOf('qB0') < 0 && L.indexOf('qB2') < 0;
+        const q3 = Q.find((q) => q.id === 'qB3'); _DEC.qres.ok(q3);
+        out.cardOk = q3.bidRes.res === 'lost' && q3.bidRes.rivalSkip === 1 && _qresList().indexOf(q3) < 0;
+        const q4 = Q.find((q) => q.id === 'qB4'); _DEC.qres.reject(q4); out.cardSkip = q4.bidRes.skip === 1 && _qresList().indexOf(q4) < 0;
+        out.detail = /對手價/.test(_DEC.qres.detail(Q.find((q) => q.id === 'qB5')));
+        // AI 草稿帶的底價／目標成交價：存檔時寫進報價
+        loadQ('qB2'); window._draftApplying = { id: 'dX', kind: 'quote', target: 'qB2', price3: _draftP3({ floor: '7000', target: 7500.6 }) }; saveQ();
+        const p3 = Q.find((q) => q.id === 'qB2').price3 || {}; out.draftP3 = p3.floor === 7000 && p3.target === 7501 && p3.src === 'draft' && _draftP3({ floor: -1 }) === null;
+        // 改回洽談中：清掉沒得標紀錄
+        const q6 = Q.find((q) => q.id === 'qB6'); q6.bidStatus = 'void'; cycleBidStatus('qB6'); out.reset = !q6.bidRes;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      window._draftApplying = null; _fbUser = oU; _isAdminUser = oA; Q = keepQ; Q_HISTORY = keepH;
+      return out;
+    });
+    check('v6.0.213 報價結果：得標自動記成交價（報價＝第一個送出版次）、沒得標記對手價（含稅轉未稅）、改回洽談中清掉', r.won && r.lost && r.reset, JSON.stringify(r));
+    check('v6.0.213 報價結果／底價／目標價只在 private（shared 抽走、private 補回），給業主的報價單完全沒有', r.priv && r.back && r.noDoc, JSON.stringify(r));
+    check('v6.0.213 報價頁：管理員看成本、底價、目標成交價、報價、毛利率；同類滿 5 筆顯示得標率與建議調幅；一般員工看不到', r.panel && r.staffHide && r.ready, JSON.stringify(r));
+    check('v6.0.213 拍板卡「報價結果待補」：只列今天以後、沒記到的；確認／退回；AI 草稿帶底價目標價存檔寫入；統計匯出只有類別與比例', r.card && r.cardOk && r.cardSkip && r.detail && r.draftP3 && r.export, JSON.stringify(r));
+    check('v6.0.213 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

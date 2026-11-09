@@ -362,6 +362,20 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('AI 改單 回復：條款用改過的字也對得到、text 空白＝回復範本；成本給空白＝清掉', !p3.bad && !('L0' in p3.rmk.ov) && !('estCost' in p3.items[0]) && p3.rows[1].cost.a === null);
   check('AI 改單 clean：成本欄與 rmkFix 留下、轉數字', JSON.stringify(D.clean([{ op: 'set', idx: 0, fields: { estCost: '70' } }, { op: 'rmkFix', match: 'a', text: 'b', x: 1 }, { op: 'add', item: { desc: 'd', qty: 1, price: 2, estCost: '1' } }])) === '[{"op":"set","idx":0,"fields":{"estCost":70}},{"op":"rmkFix","match":"a","text":"b"},{"op":"add","item":{"desc":"d","unit":"","qty":1,"price":2,"note":"","estCost":1}}]');
 }
+// 報價結果統計（v6.0.213 第 7 步③，FJC.bid）
+{
+  const B = require('../calc/bidstat.js');
+  check('報價結果 工項類別：鋼板樁／鋼軌樁／H型鋼樁／支撐／構台／其他', B.itemCat('鋼板樁打設 IV型') === 'sheet' && B.itemCat('鋼軌樁打設') === 'rail' && B.itemCat('H型鋼樁 H300×300') === 'hpile' && B.itemCat('水平支撐（第一層）') === 'strut' && B.itemCat('構台組立') === 'deck' && B.itemCat('動員費') === 'other');
+  check('報價結果 一張報價的類別＝金額最大的那類（段落、備用、減項不算）', B.quoteCat([{ sec: true, desc: '鋼板樁' }, { desc: '鋼軌樁', qty: 10, price: 100 }, { desc: '水平支撐', qty: 1, price: 2000 }, { desc: '鋼板樁', qty: 1, price: 99999, spare: true }, { desc: '鋼板樁', qty: 1, price: -5000 }]) === 'strut');
+  check('報價結果 讓價：報價 1,000,000 → 成交 950,000＝讓 50,000（5%）；缺任一個不算', JSON.stringify(B.concede(1000000, 950000)) === '{"amt":50000,"pct":5}' && B.concede(0, 1).pct === null && B.concede(100, '').amt === null);
+  const mk = (cat, res, q, f) => ({ cat, res, quoted: q, final: f });
+  const st = B.stats([mk('rail', 'won', 100, 95), mk('rail', 'won', 100, 90), mk('rail', 'lost', 100), mk('rail', 'lost', 100), mk('rail', 'void', 100), mk('sheet', 'won', 100, 100)]);
+  const r = st.find(x => x.cat === 'rail');
+  check('報價結果 統計：流標不算分母；得標率、得標案平均讓價；未滿 5 筆不給建議', r.n === 4 && r.won === 2 && r.winRate === 50 && r.avgConcedePct === 7.5 && r.ready === false && r.suggestPct === null);
+  const five = [mk('h', 'won', 100, 94), mk('h', 'won', 100, 96), mk('h', 'lost', 100), mk('h', 'lost', 100), mk('h', 'lost', 100)];
+  check('報價結果 建議：滿 5 筆＝−平均讓價，得標率 <40% 再 −2%（40%＝不加）', B.stats(five)[0].suggestPct === -5 && B.stats(five.concat([mk('h', 'lost', 100)]))[0].suggestPct === -7);
+  check('報價結果 建議：得標率 >80% 改 +2%；上下限 ±15%', B.suggest({ n: 10, winRate: 90, avgConcedePct: 1 }) === 1 && B.suggest({ n: 10, winRate: 10, avgConcedePct: 30 }) === -15 && B.suggest({ n: 4, winRate: 10, avgConcedePct: 3 }) === null);
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');
