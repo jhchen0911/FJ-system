@@ -366,6 +366,7 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
 {
   const B = require('../calc/bidstat.js');
   check('報價結果 工項類別：鋼板樁／鋼軌樁／H型鋼樁／支撐／構台／其他', B.itemCat('鋼板樁打設 IV型') === 'sheet' && B.itemCat('鋼軌樁打設') === 'rail' && B.itemCat('H型鋼樁 H300×300') === 'hpile' && B.itemCat('水平支撐（第一層）') === 'strut' && B.itemCat('構台組立') === 'deck' && B.itemCat('動員費') === 'other');
+  check('報價結果 工項類別：支撐、構台寫了 H 型鋼尺寸也不算 H型鋼樁', ['水平支撐 H300x300x10x15 租賃', 'H型鋼支撐架設', '圍令 H350', '斜撐 H250'].every(d => B.itemCat(d) === 'strut') && B.itemCat('構台 H型鋼') === 'deck' && B.itemCat('中間樁 H300') === 'hpile');
   check('報價結果 一張報價的類別＝金額最大的那類（段落、備用、減項不算）', B.quoteCat([{ sec: true, desc: '鋼板樁' }, { desc: '鋼軌樁', qty: 10, price: 100 }, { desc: '水平支撐', qty: 1, price: 2000 }, { desc: '鋼板樁', qty: 1, price: 99999, spare: true }, { desc: '鋼板樁', qty: 1, price: -5000 }]) === 'strut');
   check('報價結果 讓價：報價 1,000,000 → 成交 950,000＝讓 50,000（5%）；缺任一個不算', JSON.stringify(B.concede(1000000, 950000)) === '{"amt":50000,"pct":5}' && B.concede(0, 1).pct === null && B.concede(100, '').amt === null);
   const mk = (cat, res, q, f) => ({ cat, res, quoted: q, final: f });

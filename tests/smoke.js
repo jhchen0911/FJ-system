@@ -12417,6 +12417,14 @@ async function newPage(browser, width, height) {
         const p3 = Q.find((q) => q.id === 'qB2').price3 || {}; out.draftP3 = p3.floor === 7000 && p3.target === 7501 && p3.src === 'draft' && _draftP3({ floor: -1 }) === null;
         // 改回洽談中：清掉沒得標紀錄
         const q6 = Q.find((q) => q.id === 'qB6'); q6.bidStatus = 'void'; cycleBidStatus('qB6'); out.reset = !q6.bidRes;
+        // 審查修正：結果照現在的狀態（取消得標的舊紀錄不算得標）、版次快照不帶、只帶一個價時另一個留著、進版後看第一次報價日
+        const qx = mkq('qBX', '鋼軌樁打設', 1000, { bidRes: { res: 'won', quoted: 1, final: 1 } }); qx.t = { sub: 10000 }; Q.push(qx);
+        out.stale = !_bidRecs().some((x) => x.qid === 'qBX');
+        out.snap = !('bidRes' in _qhSnapOf(q1)) && !('price3' in _qhSnapOf(q1));
+        loadQ('qB2'); window._draftApplying = { id: 'dY', kind: 'quote', target: 'qB2', price3: _draftP3({ target: 7600 }) }; saveQ();
+        const p3b = Q.find((q) => q.id === 'qB2').price3 || {}; out.merge = p3b.floor === 7000 && p3b.target === 7600;
+        const qo = mkq('qBO', '鋼軌樁打設', 1000, { date: '2026-11-12', date0: '2026-10-01', bidStatus: 'lost' }); Q.push(qo); out.date0 = _qresList().indexOf(qo) < 0;
+        out.strut = FJC.bid.itemCat('水平支撐 H300x300') === 'strut';
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       window._draftApplying = null; _fbUser = oU; _isAdminUser = oA; Q = keepQ; Q_HISTORY = keepH;
       return out;
@@ -12425,7 +12433,49 @@ async function newPage(browser, width, height) {
     check('v6.0.213 報價結果／底價／目標價只在 private（shared 抽走、private 補回），給業主的報價單完全沒有', r.priv && r.back && r.noDoc, JSON.stringify(r));
     check('v6.0.213 報價頁：管理員看成本、底價、目標成交價、報價、毛利率；同類滿 5 筆顯示得標率與建議調幅；一般員工看不到', r.panel && r.staffHide && r.ready, JSON.stringify(r));
     check('v6.0.213 拍板卡「報價結果待補」：只列今天以後、沒記到的；確認／退回；AI 草稿帶底價目標價存檔寫入；統計匯出只有類別與比例', r.card && r.cardOk && r.cardSkip && r.detail && r.draftP3 && r.export, JSON.stringify(r));
+    check('v6.0.213 審查修正：取消得標的舊紀錄不算得標、版次快照不帶結果與底價、只帶一個價時另一個留著、進版後看第一次報價日、支撐寫 H 型鋼不算樁', r.stale && r.snap && r.merge && r.date0 && r.strut, JSON.stringify(r));
     check('v6.0.213 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.214 改版第 7 步④（7d）：帳務 4 塊（收／付／發票與支出／金流）＋金流一行固定在最上面 ──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async (W) => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const oU = window._fbUser, oA = window._isAdminUser, keepP = PAYABLES.slice();
+      try {
+        window.toast = () => {}; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        PAYABLES.push({ id: 'pD1', to: '範例廠商', date: localToday(), amount: 1000, status: 'unpaid', _mt: 1 });
+        go('acct'); acctTab('ap'); await T(150);
+        const tb = document.getElementById('acct-tabs');
+        const big = Array.prototype.map.call(tb.querySelectorAll('[data-ag]'), (b) => b.textContent);
+        out.groups = JSON.stringify(big) === JSON.stringify(['收', '付', '發票與支出', '金流']);
+        out.sub = /廠商請款/.test(tb.textContent) && /應付/.test(tb.textContent) && tb.querySelector('[data-at="ap"]').style.background.indexOf('var(--g)') >= 0;
+        // 點「收」→ 到收那塊（業主請款或上次停的頁）；再點「付」→ 回到上次停的「應付」
+        tb.querySelector('[data-ag="in"]').click(); await T(80); out.inGo = _acctTab === 'own' || _acctTab === 'ar';
+        document.querySelector('#acct-tabs [data-ag="out"]').click(); await T(80); out.remember = _acctTab === 'ap';
+        document.querySelector('#acct-tabs [data-ag="cash"]').click(); await T(80); out.cash = _acctTab === 'cash' && !document.querySelector('#acct-tabs [data-at]');
+        // 金流一行：跟金流預測頁同一套算法
+        const line = document.getElementById('acct-cash1');
+        const b0 = _cfBucket(new Date(), 0);
+        out.line = !!line && line.textContent.indexOf('NT$ ' + fmt(Math.round(_availableCash()))) >= 0 && line.textContent.indexOf('預計付 NT$ ' + fmt(Math.round(b0.outgoing))) >= 0 && b0.outgoing >= 1000;
+        out.kpiHide = getComputedStyle(document.getElementById('finance-kpis')).display === 'none';
+        out.noScroll = document.documentElement.scrollWidth <= W + 1;
+        // 一般員工看不到金流那一行
+        _fbUser = { email: 'staff@example.com', uid: 's' }; _isAdminUser = false; acctTab('ar'); await T(60); out.staff = !document.getElementById('acct-cash1');
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        // 舊選單：照舊 8 個分頁、KPI 卡回來
+        localStorage.setItem('fy_nav_old', '1'); _nav5Apply(); acctTab('ap'); await T(80);
+        out.old = document.querySelectorAll('#acct-tabs [data-ag]').length === 0 && document.querySelectorAll('#acct-tabs button').length === 8 && getComputedStyle(document.getElementById('finance-kpis')).display !== 'none';
+        localStorage.removeItem('fy_nav_old'); _nav5Apply();
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      PAYABLES.length = 0; keepP.forEach((p) => PAYABLES.push(p)); _fbUser = oU; _isAdminUser = oA;
+      return out;
+    }, W);
+    check('v6.0.214 帳務 4 塊（寬 ' + W + '）：上方收／付／發票與支出／金流，有好幾頁的下面一排小分頁、記得上次停的頁；舊選單照舊 8 個分頁', r.groups && r.sub && r.inGo && r.remember && r.cash && r.old && r.noScroll, JSON.stringify(r));
+    check('v6.0.214 金流一行（寬 ' + W + '）：可動用資金、未來 30 天預計收／付跟金流預測同一套算法；KPI 卡收起；一般員工看不到', r.line && r.kpiHide && r.staff, JSON.stringify(r));
+    check('v6.0.214 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
