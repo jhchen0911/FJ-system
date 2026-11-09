@@ -11544,6 +11544,12 @@ async function newPage(browser, width, height) {
         out.found = L.length === 1 && L[0].b.id === m2.id && L[0].a.id === m1.id && /品項支數完全一樣/.test(_DEC.mvDup.body(L[0]));
         // 退回＝不是重複 → 不再問
         out.notDup = _DEC.mvDup.reject(L[0]) === true && m2.dupOk === m1.id && !_decItems('mvDup').length;
+        // 審查：記過不是重複後，前一張被改過（順序對調）也不再問
+        m1._mt = Date.now(); m1.okAt = Date.now(); out.flip = !_decItems('mvDup').length; m1._mt = 1001; m1.okAt = 1001;
+        // 同號但方向不同（進場單、退場單）不算
+        const rIn = mk({ own: false, st: 'draft', date: '2026-11-04', dir: 'in', qid: 'qA208', rentVendor: '範例乙', rentSlipNo: '77', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 10 }], okAt: 0 });
+        const rOut = mk({ own: false, st: 'draft', date: '2026-11-08', dir: 'out', qid: 'qA208', rentVendor: '範例乙', rentSlipNo: '77', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 10 }], okAt: 0 });
+        out.dirDiff = !_decItems('mvDup').length; rIn.st = 'rejected'; rOut.st = 'rejected';
         // ② 租料同一張簽收單號（日期打錯也抓得到）
         const r1 = mk({ own: false, date: '2026-11-02', dir: 'in', qid: 'qA208', rentVendor: '範例租賃股份有限公司', rentSlipNo: 'A-0012', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 50 }] });
         const r2 = mk({ own: false, st: 'draft', date: '2026-11-03', dir: 'in', qid: 'qA208', rentVendor: '範例租賃', rentSlipNo: 'A 0012', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 50 }], okAt: 0 });
@@ -11562,7 +11568,7 @@ async function newPage(browser, width, height) {
       } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; }
       return out;
     });
-    check('v6.0.208 進退料 M5 重複登錄：同日同方向同工地品項支數一樣出卡、只差支數不算、同租賃商同簽收單號（日期不同）也抓、退回＝不是重複不再問、確認＝作廢後面那張、已改過台帳的作廢後出撤回卡還原', r.applied && r.found && r.notDup && r.slipNo && r.voidDraft && r.double && r.okDup && r.undo, JSON.stringify(r));
+    check('v6.0.208 進退料 M5 重複登錄：同日同方向同工地品項支數一樣出卡、只差支數不算、同租賃商同簽收單號（日期不同）也抓、退回＝不是重複不再問、確認＝作廢後面那張、已改過台帳的作廢後出撤回卡還原', r.applied && r.found && r.notDup && r.flip && r.dirDiff && r.slipNo && r.voidDraft && r.double && r.okDup && r.undo, JSON.stringify(r));
     check('v6.0.208 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

@@ -43089,13 +43089,13 @@ _decReg('mvStartUnknown',{
 // 卡片 mvDup（工務＋Lotion；後面那張已確認的只有管理員能作廢）：確認＝是重複，作廢後面那張（已改過台帳的會出「撤回重改」卡還原）；退回＝不是重複（記在後面那張 dupOk，不再問）；修改＝改後面那張
 function _mvDupSig(m){var it=(m.items||[]).map(function(x){return [String(x.name||'').trim(),_mvSpecKey(x)||'',_mvNum(x.len),_mvNum(x.qty)].join('~');}).sort();
   return JSON.stringify([m.date||'',m.dir||'',m.dir==='xfer'?(m.fromQid||'')+'>'+(m.toQid||''):(m.qid||''),m.own===true?1:m.own===false?0:'',it]);}
-function _mvDupKeys(m){var k=[];if(!(m.items||[]).length)return k;k.push('s|'+_mvDupSig(m));var no=String(m.rentSlipNo||'').toUpperCase().replace(/[^0-9A-Z\u4e00-\u9fff]/g,'');   /* 只比字母數字（A-0012＝A 0012） */if(no&&m.rentVendor)k.push('n|'+_mvVendKey(m.rentVendor)+'|'+no);return k;}
+function _mvDupKeys(m){var k=[];if(!(m.items||[]).length)return k;k.push('s|'+_mvDupSig(m));var no=String(m.rentSlipNo||'').toUpperCase().replace(/[^0-9A-Z\u4e00-\u9fff]/g,'');   /* 只比字母數字（A-0012＝A 0012） */if(no&&m.rentVendor)k.push('n|'+_mvVendKey(m.rentVendor)+'|'+(m.dir||'')+'|'+no);   /* 審查：加方向（進場單、退場單可能同號） */return k;}
 function _mvDupOrd(m){return [m.st==='ok'?0:1,(m.okAt||(m.src&&m.src.at)||m._mt||0),String(m.id)];}
 function _mvDupCmp(a,b){var x=_mvDupOrd(a),y=_mvDupOrd(b);return x[0]-y[0]||x[1]-y[1]||(x[2]<y[2]?-1:x[2]>y[2]?1:0);}
 function _mvDupPairs(){var by={},out=[],seen={};
   (MAT_MOVES||[]).filter(function(m){return m&&(m.st==='draft'||m.st==='ok')&&!m.legacy;}).slice().sort(_mvDupCmp).forEach(function(m){
     _mvDupKeys(m).forEach(function(k){var a=by[k];if(!a){by[k]=m;return;}if(a.id===m.id||seen[m.id])return;
-      var ok=String(m.dupOk||'').split(',');if(ok.indexOf(a.id)>=0)return;seen[m.id]=1;out.push({id:m.id,a:a,b:m,why:k.charAt(0)==='n'?('同一張簽收單號 '+(m.rentSlipNo||'')):'同日期、同方向、同工地、品項支數完全一樣'});});});
+      if(String(m.dupOk||'').split(',').indexOf(a.id)>=0||String(a.dupOk||'').split(',').indexOf(m.id)>=0)return;   /* 審查：兩張任一張記過「不是重複」就不再問（改過、確認後前後順序會換） */seen[m.id]=1;out.push({id:m.id,a:a,b:m,why:k.charAt(0)==='n'?('同一張簽收單號 '+(m.rentSlipNo||'')):'同日期、同方向、同工地、品項支數完全一樣'});});});
   return out;}
 _decReg('mvDup',{
   title:'簽收單可能重複登錄',todo:function(n){return '簽收單可能重複 '+n+' 張（同一張登錄兩次）';},sub:'確認＝是重複，作廢後面那張；退回＝不是重複；修改＝改後面那張',
