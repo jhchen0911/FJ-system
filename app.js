@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.207';
+var APP_VERSION='v6.0.208';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -42532,7 +42532,7 @@ function _mvSlipsOf(q){if(!q)return [];return (MAT_MOVES||[]).filter(function(m)
 var _MV_HOLD={nostock:'倉庫找不到同規格或不夠',over:'退場比工地上多',cond:'歸倉要修／報廢／有損壞',proj:'找不到工地',rentPick:'對到好幾張（或名稱相近的）租賃單',rentOver:'租料退場比在場多',rentDup:'可能已經手動帶入過',rentBilled:'要拆的租料批次已經請過款'};
 function _mvFin(id,mk){var f=MAT_MOVE_FIN[id];if((!f||typeof f!=='object')&&mk)f=MAT_MOVE_FIN[id]={};return (f&&typeof f==='object')?f:null;}
 function _mvSpecKey(it){var s=String((it&&it.spec)||'').toUpperCase().replace(/[\s　]/g,'');return _matSpecOf(s)||(s?s:_matSpecOf(String((it&&it.name)||'')));}
-function _mvHash(m){var s=JSON.stringify([m.date,m.dir,m.qid,m.fromQid||'',m.toQid||'',m.own,(m.items||[]).map(function(it){return [it.name||'',it.spec||'',_mvNum(it.len),_mvNum(it.qty),_mvNum(it.short),_mvNum(it.dmg),it.cond||''];})]),h=5381;for(var i=0;i<s.length;i++)h=((h*33)^s.charCodeAt(i))>>>0;return h.toString(36);}
+function _mvHash(m){var s=JSON.stringify([m.date,m.dir,m.qid,m.fromQid||'',m.toQid||'',m.own,(m.items||[]).map(function(it){return [it.name||'',it.spec||'',_mvNum(it.len),_mvNum(it.qty),_mvNum(it.short),_mvNum(it.dmg),it.cond||''];})])+(m.st==='rejected'?'|void':''),h=5381;   /* v6.0.208：已套用的單被作廢（重複）也算改過 → 出撤回重改卡 */for(var i=0;i<s.length;i++)h=((h*33)^s.charCodeAt(i))>>>0;return h.toString(36);}
 // 一列簽收單 → 台帳候選列：規格（H300、50KG/M…）＋長度一樣；品名分得出型鋼／支撐就照品名，同規格只有一種品名就直接用
 function _mvLedMatch(rows,it){
   var sk=_mvSpecKey(it),ln=_mvNum(it.len),nk=_matNameOf(it.name||'');
@@ -43083,6 +43083,34 @@ _decReg('mvStartUnknown',{
   ok:function(e){var t=_mvTagOf(e.qid,e.rt);if(!(t&&t.item)){toast('還沒指定，請按「修改」');return false;}return true;},
   reject:function(e,why){_mvTagSet(e.qid,e.rt,{keep:1,why:String(why||'不用提醒').slice(0,200)});return true;},
   edit:function(e){var q=(Q||[]).find(function(x){return x&&x.id===e.qid;});var L=q?_m6Items(q):[];if(!L.length){toast('這案沒有工項可以指定');return;}e=Object.assign({},e,{items:L.map(function(o){return {key:o.key,label:String(o.it.desc||'').split('\n')[0].slice(0,40)};})});_mvItemPick(e);}
+});
+// ══════════ v6.0.208 進退料 M5 防錯①：同一張簽收單重複登錄 ══════════
+// 判斷「可能重複」（嚴格，寧可少抓不亂抓）：①同租賃商＋同一張簽收單號 ②或 同日期＋同方向＋同工地＋同自有／租料＋品項規格長度支數完全一樣（順序不管）
+// 卡片 mvDup（工務＋Lotion；後面那張已確認的只有管理員能作廢）：確認＝是重複，作廢後面那張（已改過台帳的會出「撤回重改」卡還原）；退回＝不是重複（記在後面那張 dupOk，不再問）；修改＝改後面那張
+function _mvDupSig(m){var it=(m.items||[]).map(function(x){return [String(x.name||'').trim(),_mvSpecKey(x)||'',_mvNum(x.len),_mvNum(x.qty)].join('~');}).sort();
+  return JSON.stringify([m.date||'',m.dir||'',m.dir==='xfer'?(m.fromQid||'')+'>'+(m.toQid||''):(m.qid||''),m.own===true?1:m.own===false?0:'',it]);}
+function _mvDupKeys(m){var k=[];if(!(m.items||[]).length)return k;k.push('s|'+_mvDupSig(m));var no=String(m.rentSlipNo||'').toUpperCase().replace(/[^0-9A-Z\u4e00-\u9fff]/g,'');   /* 只比字母數字（A-0012＝A 0012） */if(no&&m.rentVendor)k.push('n|'+_mvVendKey(m.rentVendor)+'|'+no);return k;}
+function _mvDupOrd(m){return [m.st==='ok'?0:1,(m.okAt||(m.src&&m.src.at)||m._mt||0),String(m.id)];}
+function _mvDupCmp(a,b){var x=_mvDupOrd(a),y=_mvDupOrd(b);return x[0]-y[0]||x[1]-y[1]||(x[2]<y[2]?-1:x[2]>y[2]?1:0);}
+function _mvDupPairs(){var by={},out=[],seen={};
+  (MAT_MOVES||[]).filter(function(m){return m&&(m.st==='draft'||m.st==='ok')&&!m.legacy;}).slice().sort(_mvDupCmp).forEach(function(m){
+    _mvDupKeys(m).forEach(function(k){var a=by[k];if(!a){by[k]=m;return;}if(a.id===m.id||seen[m.id])return;
+      var ok=String(m.dupOk||'').split(',');if(ok.indexOf(a.id)>=0)return;seen[m.id]=1;out.push({id:m.id,a:a,b:m,why:k.charAt(0)==='n'?('同一張簽收單號 '+(m.rentSlipNo||'')):'同日期、同方向、同工地、品項支數完全一樣'});});});
+  return out;}
+_decReg('mvDup',{
+  title:'簽收單可能重複登錄',todo:function(n){return '簽收單可能重複 '+n+' 張（同一張登錄兩次）';},sub:'確認＝是重複，作廢後面那張；退回＝不是重複；修改＝改後面那張',
+  canSee:function(){return !_isReaderUser;},
+  list:function(){var adm=_decIsAdmin();return _mvDupPairs().filter(function(x){return adm||x.b.st!=='ok';});},
+  key:function(x){return x.id;},
+  head:function(x){return (x.b.date||'')+'　'+(_MV_DIR[x.b.dir]||'方向？')+'　'+_mvWhere(x.b)+'　'+_mvSum(x.b);},
+  body:function(x){return '<div style="font-size:11.5px;color:#c62828">'+esc(x.why)+'；前一張'+(x.a.st==='ok'?'已確認':'待確認')+'（'+esc(x.a.date||'')+(x.a.signer?(' 簽收 '+esc(x.a.signer)):'')+'）</div>';},
+  detail:function(x){return '<div style="font-size:12px;font-weight:700;margin:2px 0 4px">後面這張（'+(x.b.st==='ok'?'已確認':'待確認')+'）</div>'+_mvDetailHtml(x.b)+'<div style="font-size:12px;font-weight:700;margin:10px 0 4px">前一張（'+(x.a.st==='ok'?'已確認':'待確認')+'）</div>'+_mvDetailHtml(x.a);},
+  ok:function(x){var m=_mvOf(x.b.id)||x.b;if(m.st==='ok'&&!_decIsAdmin()){toast('後面這張已確認，要請 Lotion 作廢');return false;}
+    var was=m.st;m.st='rejected';m.rejReason=('重複登錄（同 '+(x.a.date||'')+' 那張）').slice(0,200);_mvSave(m);try{_mvLogAdd('reject',m,{why:m.rejReason});}catch(e){_err('mvDup.log',e);}
+    toast(was==='ok'&&(_mvFin(m.id)||{}).applied?'已作廢；這張改過的台帳請到「撤回重改」卡片還原':'已作廢重複的那張');try{_decRefresh('mvRedo');}catch(e){_err('mvDup.refresh',e);}return true;},
+  reject:function(x){var m=_mvOf(x.b.id)||x.b;if(m.st==='ok'&&!_decIsAdmin()){toast('已確認的簽收單只有 Lotion 能改');return false;}
+    var L=String(m.dupOk||'').split(',').filter(Boolean);if(L.indexOf(x.a.id)<0)L.push(x.a.id);m.dupOk=L.slice(-10).join(',').slice(0,400);_mvSave(m);try{_mvLogAdd('edit',m,{why:'不是重複（和 '+(x.a.date||'')+' 那張不同）'});}catch(e){_err('mvDup.okLog',e);}return true;},
+  edit:function(x){_mvEdit(_mvOf(x.b.id)||x.b);}
 });
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

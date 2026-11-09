@@ -11522,6 +11522,50 @@ async function newPage(browser, width, height) {
     check('v6.0.207 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── v6.0.208 進退料 M5 防錯①：同一張簽收單重複登錄 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepM = MAT_MOVES, keepF = MAT_MOVE_FIN, keepL = MAT_LEDGER;
+      try {
+        MAT_MOVES = []; MAT_MOVE_FIN = {};
+        Q = [{ id: 'qA208', name: '範例A208', client: '甲', awarded: true, items: [], _mt: 1 }];
+        MAT_LEDGER = [{ id: 'K1', name: '型鋼', spec: 'H300', len: 9, qty: 30, loc: '公司倉庫', date: '2026-01-01', price: 30, uw: 94, _mt: 1 }];
+        const at = id => MAT_LEDGER.filter(x => x.projQid === id).reduce((s, x) => s + x.qty, 0);
+        let n = 0; const mk = (o) => { const m = Object.assign({ id: 'mv_d208_' + (++n), st: 'ok', own: true, conf: {}, _mt: 1000 + n, okAt: 1000 + n }, o); MAT_MOVES.push(m); return m; };
+        const it = () => [{ name: '型鋼', spec: 'H300', len: 9, qty: 12 }];
+        const m1 = mk({ date: '2026-11-01', dir: 'in', qid: 'qA208', items: it() });
+        await _mvApplyAll({ local: true });
+        out.applied = at('qA208') === 12;
+        // ① 同一張又拍一次（待確認）：出卡；只有支數不同的不算
+        const m2 = mk({ st: 'draft', date: '2026-11-01', dir: 'in', qid: 'qA208', items: it(), okAt: 0 });
+        mk({ st: 'draft', date: '2026-11-01', dir: 'in', qid: 'qA208', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 11 }], okAt: 0 });
+        let L = _decItems('mvDup');
+        out.found = L.length === 1 && L[0].b.id === m2.id && L[0].a.id === m1.id && /品項支數完全一樣/.test(_DEC.mvDup.body(L[0]));
+        // 退回＝不是重複 → 不再問
+        out.notDup = _DEC.mvDup.reject(L[0]) === true && m2.dupOk === m1.id && !_decItems('mvDup').length;
+        // ② 租料同一張簽收單號（日期打錯也抓得到）
+        const r1 = mk({ own: false, date: '2026-11-02', dir: 'in', qid: 'qA208', rentVendor: '範例租賃股份有限公司', rentSlipNo: 'A-0012', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 50 }] });
+        const r2 = mk({ own: false, st: 'draft', date: '2026-11-03', dir: 'in', qid: 'qA208', rentVendor: '範例租賃', rentSlipNo: 'A 0012', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 50 }], okAt: 0 });
+        L = _decItems('mvDup');
+        out.slipNo = L.length === 1 && L[0].b.id === r2.id && L[0].a.id === r1.id && /簽收單號/.test(L[0].why);
+        // 確認＝是重複 → 後面那張作廢
+        out.voidDraft = _DEC.mvDup.ok(L[0]) === true && r2.st === 'rejected' && /重複登錄/.test(r2.rejReason) && !_decItems('mvDup').length;
+        // ③ 已確認、已改過台帳的重複單（後面那張）作廢 → 出「撤回重改」卡，確認後台帳還原
+        const m4 = mk({ date: '2026-11-01', dir: 'in', qid: 'qA208', items: it() });
+        await _mvApplyAll({ local: true });
+        out.double = at('qA208') === 24;
+        L = _decItems('mvDup');
+        const x = L.find(e => e.b.id === m4.id);
+        out.okDup = !!x && x.a.id === m1.id && _DEC.mvDup.ok(x) === true && m4.st === 'rejected' && !!_mvRedoState(m4);
+        out.undo = (await _DEC.mvRedo.ok(m4)) === true && at('qA208') === 12 && !_mvRedoState(m4);
+      } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; }
+      return out;
+    });
+    check('v6.0.208 進退料 M5 重複登錄：同日同方向同工地品項支數一樣出卡、只差支數不算、同租賃商同簽收單號（日期不同）也抓、退回＝不是重複不再問、確認＝作廢後面那張、已改過台帳的作廢後出撤回卡還原', r.applied && r.found && r.notDup && r.slipNo && r.voidDraft && r.double && r.okDup && r.undo, JSON.stringify(r));
+    check('v6.0.208 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.203 進退料 M4a：租料簽收單確認後自動建／結租料批次 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
