@@ -8,7 +8,6 @@
 //   node tools/fy-draft.js withdraw <草稿id> [--env test]
 //   node tools/fy-draft.js inbox     [--env test]     LINE 收件匣未歸檔的清單（v6.0.191）
 //   node tools/fy-draft.js inbox-suggest <收件id> --qid <報價id> | --case <案名> [--why 處理說明] [--note 備註]
-//   node tools/fy-draft.js bidstats  [--env test]     報價統計：工項類別、筆數、得標率、平均讓價比例、建議調幅（v6.0.214）
 //   node tools/fy-draft.js logout    [--env test]
 //
 // 預設連正式專案 jhchen-aed9a；--env test 連測試專案 fj-system-test（先在測試專案練習）。
@@ -31,7 +30,7 @@ function cfg() {
   const blk = src.slice(src.indexOf('const FB_CONFIGS'), src.indexOf('const FB_CONFIG ='));
   const part = blk.slice(blk.indexOf(ENV + ':'));
   const g = (k) => { const m = part.match(new RegExp(k + ':\\s*"([^"]+)"')); return m ? m[1] : ''; };
-  const c = { apiKey: g('apiKey'), projectId: g('projectId'), db: g('databaseURL') };
+  const c = { apiKey: g('apiKey'), projectId: g('projectId') };
   if (!c.apiKey || !c.projectId) die('讀不到 app.js 裡的 Firebase 設定（' + ENV + '）');
   return c;
 }
@@ -90,14 +89,6 @@ async function call(body) {
   if (cmd === 'mine') return call({ action: 'mine' });
   if (cmd === 'withdraw') { if (!args[1] || /^--/.test(args[1])) die('要給草稿 id'); return call({ action: 'withdraw', id: args[1] }); }
   if (cmd === 'inbox') return call({ action: 'inboxList' });
-  if (cmd === 'bidstats') {   // v6.0.214：讀 private 的 bidStats（管理員裝置上傳時算好；只有類別與比例，沒有案名、業主、金額）
-    if (!C.db) die('讀不到資料庫網址');
-    const tk = await idToken();
-    const r = await fetch(C.db.replace(/\/$/, '') + '/fydata/private/bidStats.json?auth=' + encodeURIComponent(tk));
-    const j = await r.json().catch(() => null);
-    if (!r.ok) die('讀不到報價統計（HTTP ' + r.status + '）');
-    return out(j || { ok: false, error: '還沒有統計（管理員裝置同步一次後才會有）' });
-  }
   if (cmd === 'inbox-suggest') {
     if (!args[1] || /^--/.test(args[1])) die('要給收件 id');
     const opt = (k) => { const i = args.indexOf('--' + k), v = i >= 0 ? String(args[i + 1] || '') : ''; return /^--/.test(v) ? '' : v; };   // 審查：下一個是旗標就當沒給
