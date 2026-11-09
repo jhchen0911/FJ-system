@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.211';
+var APP_VERSION='v6.0.212';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -716,6 +716,8 @@ function _goCore(p){
   // Activate nav for invoice sub-pages
   const navKey = (p==='invoice-edit'||p==='invoice-prev') ? 'invoice' : p;
   ['tn-'+navKey,'sn-'+navKey,'mn-'+navKey].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('active');});
+  try{_nav5Active(p);}catch(e){_err('go.nav5',e);}   // 改版第 7 步②：5 個入口亮哪一個
+  if(p==='more'){try{renderMorePage();}catch(e){_err('renderMorePage',e);}}
   // Page-specific init
   if(p==='dash')rDash();if(p==='customers')renderCustomers();if(p==='finance'){try{cleanDuplicatePayables();}catch(e){_err('top',e);}try{updateFinanceKPIs();switchFinanceTab('ar');}catch(e){_err('top',e);}}
   if(p==='costs'){try{renderCostsProjSelect();}catch(e){_err('top',e);}}
@@ -6322,6 +6324,7 @@ function updateDashTodo(){
   try{_v6TodoItems(items);}catch(e){_err('updateDashTodo.v6',e);}   // v6：待登錄廠商請款／本月未開單／自有材料在工地
   // 按緊急度排序
   items.sort(function(a,b){return (b.urgent?1:0)-(a.urgent?1:0);});
+  if(_nav5On()){try{_todayRender(el,badge,items);return;}catch(e){_err('updateDashTodo.today',e);}}   // 改版第 7 步②：今天要做的事（舊選單照舊列表）
 
   if(!items.length){
     el.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--b3)"><svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 本月無待辦事項</div>';
@@ -29828,7 +29831,9 @@ function navPages(){
 // 平板頂欄：由 navPages 產生（原本是寫死的 12 顆按鈕）
 function renderTopNav(){
   var nav=document.getElementById('top-nav');if(!nav)return;
-  nav.innerHTML=navPages().map(function(p){
+  var _ps=navPages();
+  if(_nav5On())_ps=[{id:'dash',label:'今天'},{id:'proj',label:'專案'},{id:'quotes',label:'報價'},{id:'acct',label:'帳務'},{id:'more',label:'更多'}].filter(function(p){return canAccess(p.id);});   // 改版第 7 步②
+  nav.innerHTML=_ps.map(function(p){
     return '<button type="button" class="tnav" id="tn-'+p.id+'" onclick="go(\''+p.id+'\')">'+esc(p.label)+'</button>';
   }).join('');
   // 重繪後補回目前頁面的 active 狀態
@@ -29947,6 +29952,7 @@ function renderMobMore(){
   // 智慧收件不列在此（v5.311 使用者指示：總覽的相機鈕已是入口，更多選單不重複）
   h+=title('工具')+grid(
       '<button type="button" id="mn-sync" class="mob-more-btn mob-more-btn-accent" onclick="fbUploadWithConflictCheck();toggleMobMore()"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-cloud"/></svg></span><span>同步</span></button>');
+  if(!_nav5On())h+=grid('<button type="button" id="mn-nav5" class="mob-more-btn" onclick="navUseOld(false);toggleMobMore()"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg></span><span>改用新版選單</span></button>');   // 改版第 7 步②：舊選單改回新版
   h+='<div class="mob-more-ver" style="text-align:center;font-size:10.5px;color:var(--b4);margin-top:4px;padding:0">豐有工程管理系統 '+esc(APP_VERSION)+'</div>';   // 批次 D：手機版在「更多」最下方顯示版次
   box.innerHTML=h;
 }
@@ -43024,6 +43030,155 @@ function _mvRentPickEdit(m){var f=_mvFin(m.id)||{},h=((f.hold&&f.hold.list)||[])
   var html=h.map(function(x,i){return '<div class="f"><label>'+esc(x.it||'')+'：'+esc(x.msg||'')+'</label><select id="mvp-'+i+'" style="width:100%">'+(x.opts||[]).map(function(id){if(id==='__new')return '<option value="__new">（不是同一家：新建一張租賃單）</option>';var o=find(id);return o?('<option value="'+esc(id)+'">'+esc((o.rt.vendor||'')+' '+_matLabel(o.rt)+'　'+(o.rt.pf||'')+'　在場 '+_rfmt(_mvRentOpenM(o.rt))+' M')+'</option>'):'';}).join('')+'</select></div>';}).join('');
   showConfirm('要掛哪一張租賃單',html,function(){var g=_mvFin(m.id,true);g.rentPick=g.rentPick||{};h.forEach(function(x,i){var v=gv('mvp-'+i);if(v)g.rentPick[x.ix]=v;});delete g.hold;g._mt=Date.now();saveMatMoveFin();
     var rf=function(){try{_decRefresh('mvHold');}catch(e){_err('_mvRentPickEdit',e);}};if(_mvApplyOk())_mvApplyAll().then(rf);else setTimeout(rf,50);},false,null,false);}
+// ══════════ 改版第 7 步②：5 個入口（今天、專案、報價、帳務、更多）＋「今天要做的事」（v6.0.212）══════════
+// 桌面左側與手機下方列都只放 5 個；其餘頁面收在「更多」（page-more）。舊選單保留：「更多 › 切回舊版選單」＝本機 fy_nav_old='1'，
+// 舊選單最下面有「改用新版選單」切回來。只換選單與首頁的呈現，頁面本身、資料、權限都不動（canAccess 照舊）。
+function _nav5On(){try{return localStorage.getItem('fy_nav_old')!=='1';}catch(e){return true;}}
+function _nav5Apply(){
+  try{document.body.classList.toggle('nav5',_nav5On());}catch(e){_err('_nav5Apply',e);}
+  try{renderTopNav();}catch(e){_err('_nav5Apply.top',e);}
+}
+var _NAV5=['dash','proj','quotes','acct','more'];
+// 不在 5 個入口裡的頁面 → 亮「更多」；專案底下的頁（發包、材料、成本…）亮「專案」；帳務底下亮「帳務」
+function _nav5Key(p){
+  if(_NAV5.indexOf(p)>=0)return p;
+  if(p==='editor'||p==='preview')return 'quotes';
+  if(p==='invoice-edit'||p==='invoice-prev')return 'acct';
+  var pg=(typeof ALL_PAGES!=='undefined'?ALL_PAGES:[]).find(function(x){return x.id===p;});
+  if(pg&&pg.parent==='proj')return 'proj';
+  if(pg&&pg.parent==='acct')return 'acct';
+  return 'more';
+}
+function _nav5Active(p){
+  if(!_nav5On())return;
+  var k=_nav5Key(p);
+  ['sn-','mn-','tn-'].forEach(function(pre){var e=document.getElementById(pre+k);if(e)e.classList.add('active');});
+  if(k==='acct'){var b=document.getElementById('mnb-acct');if(b)b.classList.add('active');}
+}
+function _navMoreTap(){if(_nav5On())go('more');else toggleMobMore();}
+// 切回舊版（記次數：只記次數與日期，不記人）
+function navUseOld(old){
+  try{localStorage.setItem('fy_nav_old',old?'1':'0');}catch(e){_err('navUseOld',e);}
+  if(old){try{var n=JSON.parse(localStorage.getItem('fy_nav_old_n')||'{}');var d=localToday();n[d]=(n[d]||0)+1;localStorage.setItem('fy_nav_old_n',JSON.stringify(n));}catch(e){_err('navUseOld.n',e);}}
+  _nav5Apply();try{renderMobMore();}catch(e){_err('navUseOld.mob',e);}
+  go('dash');toast(old?'已切回舊版選單（舊選單最下面可以再改回新版）':'已改用新版選單：今天、專案、報價、帳務、更多');
+}
+// 「更多」的內容：需求書第二節入口 5（平常收起的那一區）
+var _MORE_SECS=[
+  {t:'常用',it:[{go:'quickcost',l:'日報．支出',i:'pencil'}]},
+  {t:'計算工具',it:[{go:'matest',me:'shoring',l:'擋土支撐全套（材料估算）',i:'box'},{go:'rebar',l:'鋼筋籠檢料',i:'scale'},{go:'grout',l:'根固砂漿',i:'hardhat'},{go:'backfill',l:'背填材料',i:'wrench'},{go:'lifeline',l:'安全母索',i:'link'},{go:'upa',l:'單價分析',i:'calc'},{go:'plan',l:'施工計畫書',i:'contract'}]},
+  {t:'材料庫存（公司）',it:[{go:'materials',l:'材料庫存．購置',i:'box'}]},
+  {t:'客戶．廠商．人員',it:[{go:'contacts',l:'客戶．廠商',i:'users'},{go:'workers',l:'人員進場資料',i:'users'},{go:'contracts',l:'合約管理',i:'contract'}]},
+  {t:'經營報表',it:[{go:'reports',l:'經營報表（公司數字）',i:'trend'}]},
+  {t:'設定',it:[{go:'params',l:'參數設定',i:'sliders'},{go:'staff',l:'人員管理',i:'users'},{go:'roles',l:'角色權限',i:'lock'},{fn:'health',page:'reports',l:'資料健檢',i:'check'},{fn:'trash',l:'已刪資料還原',i:'refresh'},{fn:'sync',l:'同步',i:'cloud'}]}
+];
+var _MORE_FN={
+  health:function(){go('reports');try{showReport('health');}catch(e){_err('more.health',e);}},
+  trash:function(){try{openTrash();}catch(e){_err('more.trash',e);}},
+  sync:function(){try{fbUploadWithConflictCheck();}catch(e){_err('more.sync',e);}},
+  old:function(){navUseOld(true);}
+};
+function _moreVisible(it){
+  var pid=it.go||it.page;
+  if(it.fn==='trash'&&typeof openTrash!=='function')return false;
+  if(it.fn==='trash'&&_isReaderUser)return false;
+  return !pid||canAccess(pid);
+}
+function renderMorePage(){
+  var box=document.getElementById('more-body');if(!box)return;
+  var ic=function(n){return '<svg class="ic" aria-hidden="true"><use href="#i-'+n+'"/></svg>';};
+  var h=_MORE_SECS.map(function(sec){
+    var its=sec.it.filter(_moreVisible);if(!its.length)return '';
+    return '<div class="more-sec"><h3>'+esc(sec.t)+'</h3><div class="more-grid">'+its.map(function(it){
+      return '<button type="button" class="more-it"'+(it.go?' data-go="'+esc(it.go)+'"':'')+(it.me?' data-me="'+esc(it.me)+'"':'')+(it.fn?' data-fn="'+esc(it.fn)+'"':'')+'>'+ic(it.i)+'<span>'+esc(it.l)+'</span></button>';
+    }).join('')+'</div></div>';
+  }).join('');
+  h+='<div class="more-sec"><h3>切回舊版</h3><div class="more-grid"><button type="button" class="more-it" data-fn="old">'+ic('refresh')+'<span>切回舊版選單</span></button></div>'
+    +'<div style="font-size:11px;color:var(--b3);margin-top:6px">舊選單的頁面都還在；切回後在舊選單最下面可以再改回新版。</div></div>'
+    +'<div style="text-align:center;font-size:10.5px;color:var(--b4);margin-top:8px">豐有工程管理系統 '+esc(APP_VERSION)+'</div>';
+  box.innerHTML=h;
+  if(!box._wired){box._wired=1;box.addEventListener('click',function(e){   // 事件綁定（不寫在 HTML 字串裡，健檢 3 #11）
+    var b=e.target.closest&&e.target.closest('.more-it');if(!b)return;
+    var fn=b.getAttribute('data-fn'),g=b.getAttribute('data-go'),me=b.getAttribute('data-me');
+    if(fn&&_MORE_FN[fn]){_MORE_FN[fn]();return;}
+    if(me){try{_meTab=me;}catch(x){_err('more.me',x);}}
+    if(g)go(g);
+  });}
+}
+// ── 今天要做的事：決策卡（要拍板，點進去確認／退回／修改）＋提醒卡（只有「已處理」「延後」）──
+// 只處理呈現：待辦清單照舊由 updateDashTodo／_v6TodoItems 算（含雲端待辦），這裡分類、合併同案、收起不急的、套用本機延後。
+function _tdIsDec(it){var t=String(it&&it.type||'');return /^dec_|draft|sync_cf|conflict/.test(t);}
+function _tdKey(it){return String(it.type||'')+'|'+String(it.jump||'')+'|'+String(it.text||'').replace(/[\d（）()天日期後逾今]+/g,'');}   // 同一個跳轉（例如都到應付頁）的不同筆，靠文字（去掉天數）分開
+function _tdSig(it){return String(it.text||'').replace(/\d+/g,'#')+'|'+String(it.sub||'');}
+function _tdSnzGet(){try{return JSON.parse(localStorage.getItem('fy_today_snz')||'{}')||{};}catch(e){return {};}}
+function _tdSnzSet(o){try{localStorage.setItem('fy_today_snz',JSON.stringify(o));}catch(e){_err('_tdSnzSet',e);}}
+// 延後到某天以前不顯示；已處理＝內容（數字除外）沒變就 30 天內不再顯示，內容變了（例如金額不同）會再出現
+function _tdHidden(it,snz,today){
+  var x=snz[_tdKey(it)];if(!x)return false;
+  if(x.until&&today<x.until)return true;
+  if(x.done&&x.sig===_tdSig(it)&&_dDiff(x.done,today)<30)return true;
+  return false;
+}
+function _tdCaseOf(it){
+  if(it.qid){var q=Q.find(function(x){return x.id===it.qid;});if(q&&q.name)return q.name;}
+  var t=String(it.text||''),best='';
+  (Q||[]).forEach(function(q){var n=String(q&&q.name||'');if(n.length>best.length&&n.length>=2&&t.indexOf(n)===0)best=n;});
+  return best;
+}
+var _tdCur=[];
+function _todayRender(el,badge,items){
+  var today=localToday(),snz=_tdSnzGet(),ro=!!_isReaderUser;
+  var vis=items.filter(function(it){return !_tdHidden(it,snz,today);});
+  var hid=items.length-vis.length;
+  _tdCur=vis;
+  var dec=vis.filter(_tdIsDec),rem=vis.filter(function(it){return !_tdIsDec(it);});
+  // 同一案的提醒合併成一張
+  var groups=[],gi={};
+  rem.forEach(function(it,ri){var c=_tdCaseOf(it),k=c?(c+'|'+(it.urgent?1:0)):('#'+ri);if(gi[k]==null){gi[k]=groups.length;groups.push({c:c,its:[]});}groups[gi[k]].its.push(it);});
+  var now=groups.filter(function(g){return g.its.some(function(it){return it.urgent;});}),later=groups.filter(function(g){return !g.its.some(function(it){return it.urgent;});});
+  var row=function(it,inGroup){
+    var i=_tdCur.indexOf(it);
+    return '<div class="td-row"><div class="td-main" data-i="'+i+'"><div class="td-t">'+esc(it.text||'')+(it.extra||'')+'</div>'+(it.sub?'<div class="td-s"'+(it.color?' style="color:'+it.color+'"':'')+'>'+it.sub+'</div>':'')+'</div>'
+      +((!_tdIsDec(it)&&!ro)?'<div class="td-acts"><button type="button" data-act="done" data-i="'+i+'">已處理</button><button type="button" data-act="later" data-i="'+i+'">延後</button></div>':'')+'</div>';
+  };
+  var card=function(kind,title,its,urg){
+    if(its.length===1)return '<div class="td-card'+(urg?' urg':'')+'"><div class="td-row"><span class="td-kind '+kind+'">'+(kind==='dec'?'要拍板':'提醒')+'</span><div style="flex:1;min-width:0">'+row(its[0])+'</div></div></div>';
+    return '<div class="td-card'+(urg?' urg':'')+'"><div class="td-row"><span class="td-kind '+kind+'">'+(kind==='dec'?'要拍板':'提醒')+'</span><div style="flex:1;min-width:0"><div class="td-t" style="font-weight:700">'+esc(title||'')+'　'+its.length+' 件</div><div class="td-sub">'+its.map(function(it){return row(it,true);}).join('')+'</div></div></div></div>';
+  };
+  var h='';
+  dec.forEach(function(it){h+=card('dec','',[it],it.urgent);});
+  now.forEach(function(g){h+=card('rem',g.c,g.its,true);});
+  if(!h)h='<div style="padding:14px;font-size:13px;color:var(--b4)"><svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 今天沒有要確認的事</div>';
+  if(later.length){var n=later.reduce(function(a,g){return a+g.its.length;},0);h+='<details class="td-later"><summary>之後的 '+n+' 件</summary>'+later.map(function(g){return card('rem',g.c,g.its,false);}).join('')+'</details>';}
+  if(hid)h+='<div style="padding:6px 14px 8px;font-size:11px;color:var(--b3)">已處理或延後的 '+hid+' 件先收起來了</div>';
+  el.innerHTML=h;
+  if(badge){var cnt=dec.length+now.reduce(function(a,g){return a+g.its.length;},0);badge.textContent=cnt+'項';badge.style.display=cnt?'':'none';}
+  if(!el._tdWired){el._tdWired=1;el.addEventListener('click',_todayClick);}
+}
+function _todayClick(e){
+  var b=e.target.closest&&e.target.closest('[data-act],.td-main');if(!b)return;
+  var it=_tdCur[+b.getAttribute('data-i')];if(!it)return;
+  var act=b.getAttribute('data-act');
+  if(act==='done'){var o=_tdSnzGet();o[_tdKey(it)]={done:localToday(),sig:_tdSig(it)};_tdSnzSet(o);toast('已處理，先收起來（內容有變會再出現）');updateDashTodo();return;}
+  if(act==='later'){_todayLater(it);return;}
+  if(it.jump){try{(new Function(it.jump))();}catch(x){_err('_todayClick',x);}}
+}
+// 延後：明天／3 天後／下週一／自選日期
+function _todayLater(it){
+  var t=localToday(),dow=new Date(t+'T00:00:00').getDay(),mon=_dAdd(t,((8-dow)%7)||7);
+  var opts=[['明天',_dAdd(t,1)],['3 天後',_dAdd(t,3)],['下週一',mon]];
+  var h='<div style="font-size:12.5px;color:var(--b5);margin-bottom:8px">'+esc(it.text||'')+'</div>'
+    +opts.map(function(o,i){return '<label style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:13px"><input type="radio" name="td-later" value="'+o[1]+'"'+(i===0?' checked':'')+'> '+o[0]+'（'+o[1]+'）</label>';}).join('')
+    +'<label style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:13px"><input type="radio" name="td-later" value="pick"> 自選 <input type="date" id="td-later-d" min="'+_dAdd(t,1)+'" style="font-size:13px;padding:4px 6px"></label>';
+  showConfirm('延後到哪一天？',h,function(){
+    var r=document.querySelector('input[name="td-later"]:checked'),v=r?r.value:'';
+    if(v==='pick')v=(document.getElementById('td-later-d')||{}).value||'';
+    if(!v||v<=t){toast('請選明天以後的日期');return;}
+    var o=_tdSnzGet();o[_tdKey(it)]={until:v};_tdSnzSet(o);toast('延後到 '+v);updateDashTodo();
+  },false);
+}
+_nav5Apply();
+try{var _dmn=document.getElementById('dash-more-num');if(_dmn)_dmn.addEventListener('click',function(){go('reports');});}catch(e){_err('dash-more-num',e);}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
@@ -43192,6 +43347,8 @@ function applyRoleUI(){
     // 隱藏 mob-nav
     const mn=document.getElementById('mn-'+page.id);
     if(mn)mn.style.display=hidden?'none':'';
+    const mnb=document.getElementById('mnb-'+page.id);   // 改版第 7 步②：手機下方列的「帳務」
+    if(mnb)mnb.style.display=hidden?'none':'';
     // 隱藏儀表板快捷按鈕
     try{
       document.querySelectorAll('#dash-shortcuts button').forEach(btn=>{

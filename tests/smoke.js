@@ -12287,6 +12287,77 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.212 改版第 7 步②：5 個入口＋今天要做的事＋更多＋切回舊版 ──
+  for (const [W, H] of [[1440, 900], [390, 844], [900, 768]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async (W) => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      try {
+        window.toast = () => {};
+        const sel = W <= 767 ? '.mob-nav>*' : (W < 1024 ? '#top-nav>*' : '.sidebar>*');
+        const vis = () => Array.prototype.filter.call(document.querySelectorAll(sel), (e) => e.offsetParent || getComputedStyle(e).display !== 'none' && e.getClientRects().length).map((e) => (e.innerText || e.textContent).trim().replace(/\s+\d+$/, ''));
+        out.nav5 = document.body.classList.contains('nav5');
+        out.vis = vis();
+        out.five = JSON.stringify(out.vis) === JSON.stringify(['今天', '專案', '報價', '帳務', '更多']);
+        // 更多：其餘頁面收在這裡（含合約管理、安全母索），點了進得去
+        go('more'); await T(100);
+        const mb = document.getElementById('more-body');
+        out.more = /合約管理/.test(mb.textContent) && /安全母索/.test(mb.textContent) && /客戶．廠商/.test(mb.textContent) && /經營報表/.test(mb.textContent) && /切回舊版選單/.test(mb.textContent);
+        out.moreActive = (document.getElementById(W <= 767 ? 'mn-more' : (W < 1024 ? 'tn-more' : 'sn-more')) || {}).classList?.contains('active');
+        mb.querySelector('[data-go="lifeline"]').click(); await T(150);
+        out.lifeline = document.getElementById('page-matest').classList.contains('active');
+        out.noScroll = document.documentElement.scrollWidth <= W + 1;
+        // 今天要做的事：決策卡／提醒卡；同案合併；不急的收在「之後的 N 件」；已處理／延後
+        localStorage.removeItem('fy_today_snz');
+        Q.push({ id: 'qN5', name: '範例工程N5', client: '甲', awarded: true, items: [], costs: [], _mt: 1 });
+        const its = [
+          { type: 'dec_vendorBill', urgent: true, jump: "window.__n5=1", text: '廠商請款待確認 2 筆', sub: '' },
+          { type: 'x_a', urgent: true, jump: "window.__n5a=1", text: '範例工程N5 租期 3 天後到期', sub: '' },
+          { type: 'x_b', urgent: true, jump: "window.__n5b=1", text: '範例工程N5 本月要請款', sub: '' },
+          { type: 'x_c', urgent: false, jump: "window.__n5c=1", text: '範例乙 保留款 20 天後到期', sub: '' }];
+        const el = document.getElementById('dash-todo-list'); go('dash'); await T(50);
+        _todayRender(el, null, its);
+        out.dec = el.querySelectorAll('.td-kind.dec').length === 1 && !el.querySelector('.td-card .td-kind.dec ~ div [data-act]');
+        out.merge = /範例工程N5　2 件/.test(el.textContent);
+        out.later = /之後的 1 件/.test(el.querySelector('details.td-later summary').textContent) && !el.querySelector('details.td-later').open;
+        el.querySelector('.td-main[data-i="0"]').click(); out.jump = window.__n5 === 1;
+        // 已處理：收起來
+        const doneBtn = Array.prototype.find.call(el.querySelectorAll('[data-act="done"]'), (b) => _tdCur[+b.dataset.i].type === 'x_a');
+        const oUD = window.updateDashTodo; window.updateDashTodo = () => _todayRender(el, null, its);
+        doneBtn.click(); out.done = !/租期 3 天後到期/.test(el.textContent) && /已處理或延後的 1 件/.test(el.textContent);
+        // 內容變了（數字以外）會再出現
+        its[1].text = '範例工程N5 租期改了 3 天後到期'; _todayRender(el, null, its); out.reappear = /租期改了/.test(el.textContent);
+        // 延後：選明天 → 今天不顯示
+        const lb = Array.prototype.find.call(el.querySelectorAll('[data-act="later"]'), (b) => _tdCur[+b.dataset.i].type === 'x_b');
+        lb.click(); await T(60);
+        out.laterOpts = /明天/.test(document.getElementById('gen-confirm-msg').textContent) && /3 天後/.test(document.getElementById('gen-confirm-msg').textContent) && /下週一/.test(document.getElementById('gen-confirm-msg').textContent) && /自選/.test(document.getElementById('gen-confirm-msg').textContent);
+        document.getElementById('gen-confirm-ok').click(); await T(60);
+        out.snoozed = !/本月要請款/.test(el.textContent) && _tdSnzGet()[_tdKey(its[2])].until === _dAdd(localToday(), 1);
+        window.updateDashTodo = oUD;
+        // 沒有事
+        _todayRender(el, null, []); out.empty = /今天沒有要確認的事/.test(el.textContent);
+        // 唯讀帳號：看得到卡片、沒有按鈕
+        const oR = _isReaderUser; _isReaderUser = true; localStorage.removeItem('fy_today_snz'); _todayRender(el, null, its); out.ro = /本月要請款/.test(el.textContent) && !el.querySelector('[data-act]'); _isReaderUser = oR;
+        // 首頁公司數字收起來，只留一行連到經營報表
+        out.kpiHidden = getComputedStyle(document.getElementById('dash-kpis')).display === 'none' && document.getElementById('dash-more-num').offsetParent !== null;
+        // 切回舊版：舊選單回來、次數 +1；再改回新版
+        localStorage.removeItem('fy_nav_old_n');
+        navUseOld(true); await T(60);
+        out.old = !document.body.classList.contains('nav5') && (W >= 1024 ? getComputedStyle(document.getElementById('sn-contacts')).display !== 'none' : W > 767 ? document.querySelectorAll('#top-nav>*').length > 5 : getComputedStyle(document.getElementById('mn-quickcost')).display !== 'none');
+        out.oldCount = Object.values(JSON.parse(localStorage.getItem('fy_nav_old_n') || '{}')).reduce((a, b) => a + b, 0) === 1;
+        navUseOld(false); await T(60);
+        out.back = document.body.classList.contains('nav5') && JSON.stringify(vis()) === JSON.stringify(['今天', '專案', '報價', '帳務', '更多']);
+        Q = Q.filter((q) => q.id !== 'qN5');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    }, W);
+    check('v6.0.212 5 個入口（寬 ' + W + '）：選單只有今天、專案、報價、帳務、更多；更多收其餘頁面（含合約管理、安全母索）且點得進去、不左右捲', r.nav5 && r.five && r.more && r.moreActive && r.lifeline && r.noScroll, JSON.stringify(r));
+    if (W === 1440) check('v6.0.212 今天要做的事：決策卡／提醒卡分開、同案合併、不急的收在「之後的 N 件」、已處理（內容變了再出現）、延後（明天／3 天後／下週一／自選）、沒事顯示「今天沒有要確認的事」、唯讀看得到沒有按鈕、公司數字收成一行', r.dec && r.merge && r.later && r.jump && r.done && r.reappear && r.laterOpts && r.snoozed && r.empty && r.ro && r.kpiHidden, JSON.stringify(r));
+    check('v6.0.212 切回舊版（寬 ' + W + '）：舊選單回來、記一次次數、可以再改回新版', r.old && r.oldCount && r.back, JSON.stringify(r));
+    check('v6.0.212 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
