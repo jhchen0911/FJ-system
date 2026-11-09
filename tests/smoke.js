@@ -12451,6 +12451,65 @@ async function newPage(browser, width, height) {
     check('v6.0.206 6-2a 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.213 報價得標率紀錄（小批次線，7b 後端）：得標／沒得標／流標／取消得標都記、讓價與對手價、拍板卡補資料、統計跟雲端 bidStats 一樣、底價目標價走 private、不改報價金額 ──
+  {
+    const DR = require('../functions/ops/drafts.js');
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const o = {};
+      try {
+        const mk = (id, name, desc, price, extra) => Object.assign({ id, name, client: '假業主', date: '2026-11-10', items: [{ desc, unit: '支', qty: 10, price }], t: { sub: price * 10, tax: price / 2, total: price * 10.5 }, costs: [] }, extra || {});
+        Q = [mk('bq1', '假得標案', 'H型鋼樁打設', 1000), mk('bq2', '假沒得標案', 'H型鋼樁打設', 2000), mk('bq3', '假流標案', '水平支撐組立', 500), mk('bq4', '假等很久案', '構台組立', 300, { date: '2026-11-10' }), mk('bq5', '假舊案', 'H型鋼樁', 100, { date: '2026-01-01', awarded: true })];
+        CONTRACTS = [{ id: 'bc1', linkedQid: 'bq1', amount: 9975 }];
+        Q_HISTORY = { bq1: [{ savedAt: 1, formal: true, ver: 1, snapshot: { t: { total: 11550 } } }] };
+        const before = JSON.stringify(Q.map((q) => [q.items, q.t]));
+        // 得標：確認得標視窗
+        try { openAwardDetail('bq1'); confirmAward(); } catch (e) { o.awardErr = String(e).slice(0, 200); }
+        const q1 = Q.find((q) => q.id === 'bq1'); o.won = !!(q1.bid && q1.bid.res === 'won' && q1.bid.first === 11550);
+        const v1 = _bidView(q1); o.wonView = v1 && v1.price === 9975 && v1.conc === 1575 && v1.concPct === 13.6;
+        // 沒得標：未得標視窗填對手價
+        markQuoteLost('bq2'); const el = document.getElementById('ql-price'); if (el) el.value = '19000';
+        const okBtn = Array.from(document.querySelectorAll('button')).reverse().find((b) => /確認|確定|儲存/.test(b.textContent || '') && b.offsetParent); if (okBtn) okBtn.click();
+        const q2 = Q.find((q) => q.id === 'bq2'); o.lost = !!(q2.bid && q2.bid.res === 'lost' && q2.bid.rival === 19000 && _bidView(q2).gapPct === 10.5);
+        // 流標（從待回覆切到議價中、再切兩次：未得標視窗 → 用流標）
+        const q3 = Q.find((q) => q.id === 'bq3'); q3.bidStatus = 'lost'; cycleBidStatus('bq3'); o.void = q3.bidStatus === 'void' && q3.bid && q3.bid.res === 'void';
+        // 取消得標 → 紀錄移到 bidHist
+        q1.awarded = false; _bidRecSync(q1); o.revoke = !q1.bid && Array.isArray(q1.bidHist) && q1.bidHist[0].res === 'won';
+        q1.awarded = true; _bidRecSync(q1);
+        o.oldNotBack = !Q.find((q) => q.id === 'bq5').bid;   // 舊案不補
+        o.amountsSame = JSON.stringify(Q.map((q) => [q.items, q.t])) === before;   // 記錄不改任何報價金額與工項
+        // 拍板卡：沒得標沒對手價、送出 60 天沒結果
+        q2.bid.rival = null; delete q2.lostPrice;
+        const today = localToday; localToday = () => '2027-02-01';
+        const L = _DEC.bidFill.list(); o.cards = L.map((x) => x.k + '|' + x.qid).sort().join(',');
+        o.detail = typeof _DEC.bidFill.detail === 'function' && /對手價/.test(_DEC.bidFill.detail(L.find((x) => x.k === 'rival')));
+        await _DEC.bidFill.ok(L.find((x) => x.k === 'stale')); const q4 = Q.find((q) => q.id === 'bq4'); o.staleOk = q4.bidStatus === 'lost' && q4.bid && q4.bid.res === 'lost' && q4.lostReason === '未回應';
+        await _DEC.bidFill.reject(L.find((x) => x.k === 'rival'), '重複報價'); o.skip = !!q2.bid.skip && _DEC.bidFill.list().every((x) => x.qid !== 'bq2');
+        localToday = today;
+        // 統計（前端）＋給雲端比
+        delete q2.bid.skip; q2.lostPrice = 19000; _bidRecSync(q2);
+        o.stats = FJC.bid.exportRows(_bidKindStats());
+        o.sugg = _bidSuggestFor(q1).map((x) => x.kind + ':' + x.n).join(',');
+        o.Q = JSON.parse(JSON.stringify(Q)); o.CT = JSON.parse(JSON.stringify(CONTRACTS));
+        // 底價／目標成交價：private、不印在報價單
+        q1.bidAim = { floor: 8000, target: 9500 };
+        const st = _stripQuoteSens(q1), ex = _extractQuoteSens(q1), back = JSON.parse(JSON.stringify(st)); _applyQuoteSens(back, ex, false);
+        o.aimPriv = !('bidAim' in st) && ex.bidAim && ex.bidAim.floor === 8000 && back.bidAim && back.bidAim.target === 9500;
+        let doc = ''; try { doc = _buildQuoteDocHTML(q1); } catch (e) { doc = 'ERR ' + e; }
+        o.aimNotPrinted = !!doc && !/8,000|9,500/.test(doc.replace(/<[^>]+>/g, ''));
+        o.aimClean = JSON.stringify(_bidAimClean({ floor: '100', target: 90 })) === 'null' && JSON.stringify(_bidAimClean({ target: '1000.4' })) === '{"target":1000}';
+      } catch (e) { o.err = String(e && e.stack || e).slice(0, 500); }
+      return o;
+    });
+    const cloud = r.Q ? DR.bidStats(r.Q.map((q) => { const c = Object.assign({}, q); delete c.costs; return c; }), r.CT, {}) : null;
+    check('v6.0.213 得標率：確認得標自動記（第一版總價、成交價＝合約、讓價）；未得標視窗記對手價；流標也記；取消得標移到歷史；舊案不補', !r.err && r.won && r.wonView && r.lost && r.void && r.revoke && r.oldNotBack, r.err || JSON.stringify(r).slice(0, 600));
+    check('v6.0.213 得標率：記錄不改任何報價的工項與金額', !r.err && r.amountsSame, r.err || '');
+    check('v6.0.213 得標率：拍板卡 bidFill 列沒得標沒對手價、送出 60 天沒結果的（舊案不湧進來）；確認＝記沒得標（未回應）、退回＝不記進統計', !r.err && r.cards === 'rival|bq2,stale|bq4' && r.detail && r.staleOk && r.skip, r.err || JSON.stringify({ cards: r.cards, detail: r.detail, staleOk: r.staleOk, skip: r.skip }));
+    check('v6.0.213 得標率：前端統計跟雲端 bidStats（給報價線）逐值一樣；報價頁建議函式 _bidSuggestFor 有每個類別', !r.err && !!cloud && JSON.stringify(cloud.kinds) === JSON.stringify(r.stats) && /hpile:\d/.test(r.sugg), JSON.stringify({ cloud: cloud && cloud.kinds, web: r.stats, sugg: r.sugg }));
+    check('v6.0.213 底價／目標成交價走 private（quoteSens）、不印在報價單；格式檢查跟雲端一樣', !r.err && r.aimPriv && r.aimNotPrinted && r.aimClean, JSON.stringify({ aimPriv: r.aimPriv, aimNotPrinted: r.aimNotPrinted, aimClean: r.aimClean, awardErr: r.awardErr }));
+    check('v6.0.213 得標率測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
