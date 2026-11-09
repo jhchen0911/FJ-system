@@ -11403,6 +11403,53 @@ async function newPage(browser, width, height) {
     check('v6.0.194 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── v6.0.201 舊提前放款轉換差 1 元（Lotion 11/09 範例案：200,000＋177,988 提前、第 1 期 174,838 舊版算法已付）：保留實際付款總額、三次付款各一筆 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepP = PAYABLES;
+      try {
+        window._payGuardOff = true;
+        const c = { id: 'cH201', type: 'sub', vendor: '範例工程行', cat: '打設', date: '2026-09-01', amt: 0, invoice: true, retRate: 0,
+          rows: [{ id: 'r1', linkedItemIdx: -1, desc: '打設', qty: 1, unitPrice: 526500 }],
+          periods: [{ no: 1, date: '2026-10-25', rows: [{ rid: 'r1', qty: 1 }], adv: 359988, due: '2026-10-25', ts: 1, mt: 1 }],
+          advances: [{ id: 'e1', date: '2026-09-09', amt: 190476, fromPeriod: 1, ts: 1 }, { id: 'e2', date: '2026-10-05', amt: 169512, fromPeriod: 1, ts: 1 }] };
+        Q = [{ id: 'qH201', name: '範例H201', client: '甲', items: [], costs: [c], _mt: 1 }]; PAYABLES = [];
+        syncCostToPayable(Q[0], c);
+        const pay = id => PAYABLES.find(x => x.id === id);
+        const a1 = pay(_subAdvPayId('cH201', { id: 'e1' })), a2 = pay(_subAdvPayId('cH201', { id: 'e2' })), p1 = pay(_subPayId('cH201', { no: 1 }));
+        [[a1, '2026-09-09'], [a2, '2026-10-05'], [p1, '2026-10-25']].forEach(([x, d], i) => { x.status = 'paid'; x.paidDate = d; x.paidAt = i + 1; });
+        p1.incl = 174838;   // 舊版算法算出、已付的那一期（比現在的算法多 1 元）
+        out.setup = _payEff(a1) === 200000 && _payEff(a2) === 177988 && _payEff(p1) === 174838;
+        const pl = _ecvPlan(Q[0], c);
+        out.plan = pl.ok && pl.before.paid === 552826 && pl.after.paid === 552826 && pl.fix && pl.fix[1].v === 552826 && pl.fix[1].was === 552825;
+        out.apply = _ecvApply('qH201', 'cH201') === true;
+        const P = pay(_subPayId('cH201', { no: 1 }));
+        out.total = _payEff(P) === 552826 && _payPaidSum(P) === 552826 && _payLeft(P) === 0 && P.status === 'paid';
+        out.pays = JSON.stringify((P.pays || []).map(x => [x.date, x.amt])) === JSON.stringify([['2026-09-09', 200000], ['2026-10-05', 177988], ['2026-10-25', 174838]]);
+        out.cash = _payPaidIn(P, '2026-09') === 200000 && _payPaidIn(P, '2026-10') === 352826;
+        // 之後自動重算：照實際付的總額、不出差額筆
+        syncCostToPayable(Q[0], c); syncCostToPayable(Q[0], c);
+        const P2 = pay(_subPayId('cH201', { no: 1 }));
+        out.stable = _payEff(P2) === 552826 && !PAYABLES.some(x => x.deltaOf) && c.periods[0].inclFix.v === 552826;
+        // 期別金額之後被改：釘住的總額失效、照算
+        c.periods[0].rows[0].qty = 0.9; syncCostToPayable(Q[0], c);
+        out.stale = _payEff(pay(_subPayId('cH201', { no: 1 }))) !== 552826 || PAYABLES.some(x => x.deltaOf);
+        // 差太多（不是零頭）照樣擋下
+        const c3 = JSON.parse(JSON.stringify(Object.assign({}, c, { id: 'cK201' }))); delete c3.advConv; delete c3.periods[0].inclFix; c3.periods[0].rows[0].qty = 1; c3.periods[0].adv = 359988;
+        c3.advances = [{ id: 'k1', date: '2026-09-09', amt: 190476, fromPeriod: 1, ts: 1 }, { id: 'k2', date: '2026-10-05', amt: 169512, fromPeriod: 1, ts: 1 }];
+        Q[0].costs.push(c3); syncCostToPayable(Q[0], c3);
+        [_subAdvPayId('cK201', { id: 'k1' }), _subAdvPayId('cK201', { id: 'k2' }), _subPayId('cK201', { no: 1 })].forEach((id, i) => { const x = pay(id); x.status = 'paid'; x.paidDate = '2026-10-2' + i; x.paidAt = 9 + i; });
+        pay(_subPayId('cK201', { no: 1 })).incl = 174900;
+        const pk = _ecvPlan(Q[0], c3);
+        out.bigGap = pk.ok === false && /對不上/.test(pk.why);
+      } finally { Q = keepQ; PAYABLES = keepP; window._payGuardOff = false; }
+      return out;
+    });
+    check('v6.0.201 舊提前放款轉換差 1 元：零頭差保留實際付款總額（552,826）、三次付款各一筆（日期金額照原紀錄）、每月實付正確、之後重算不變不出差額筆、期別改了才照算、差太多照樣擋下', r.setup && r.plan && r.apply && r.total && r.pays && r.cash && r.stable && r.stale && r.bigGap, JSON.stringify(r));
+    check('v6.0.201 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.192 第 6 步 6-1b：舊提前放款轉成分次付款（拍板卡；轉換前後已付／未付合計一樣才轉）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
