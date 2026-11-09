@@ -11443,10 +11443,27 @@ async function newPage(browser, width, height) {
         pay(_subPayId('cK201', { no: 1 })).incl = 174900;
         const pk = _ecvPlan(Q[0], c3);
         out.bigGap = pk.ok === false && /對不上/.test(pk.why);
+        // 審查：那一期還沒付（轉換後已付 377,988、未付 174,838，含稅總額照實際）
+        const c4 = JSON.parse(JSON.stringify(c3)); c4.id = 'cU201'; c4.advances = [{ id: 'u1', date: '2026-09-09', amt: 190476, fromPeriod: 1, ts: 1 }, { id: 'u2', date: '2026-10-05', amt: 169512, fromPeriod: 1, ts: 1 }];
+        Q[0].costs.push(c4); syncCostToPayable(Q[0], c4);
+        [['u1', '2026-09-09'], ['u2', '2026-10-05']].forEach(([id, d], i) => { const x = pay(_subAdvPayId('cU201', { id })); x.status = 'paid'; x.paidDate = d; x.paidAt = 20 + i; });
+        pay(_subPayId('cU201', { no: 1 })).incl = 174838;
+        const pu = _ecvPlan(Q[0], c4);
+        out.unpaidPlan = pu.ok && pu.before.paid === 377988 && pu.before.left === 174838 && pu.after.left === 174838 && /含稅照實際付款合計 552,826/.test(_ecvDetailHtml(pu)) && /差 1 元/.test(_ecvDetailHtml(pu));
+        out.unpaid = _ecvApply('qH201', 'cU201') === true && (function () { const P = pay(_subPayId('cU201', { no: 1 })); return _payEff(P) === 552826 && _payPaidSum(P) === 377988 && _payLeft(P) === 174838 && P.status === 'pending' && P.pays.length === 2; })();
+        // 審查：套用失敗要整家還原（含 inclFix）
+        const c5 = JSON.parse(JSON.stringify(c3)); c5.id = 'cV201'; c5.advances = [{ id: 'v1', date: '2026-09-09', amt: 190476, fromPeriod: 1, ts: 1 }, { id: 'v2', date: '2026-10-05', amt: 169512, fromPeriod: 1, ts: 1 }];
+        Q[0].costs.push(c5); syncCostToPayable(Q[0], c5);
+        ['v1', 'v2'].forEach((id, i) => { const x = pay(_subAdvPayId('cV201', { id })); x.status = 'paid'; x.paidDate = '2026-10-0' + (i + 1); x.paidAt = 30 + i; });
+        pay(_subPayId('cV201', { no: 1 })).incl = 174838;
+        const oS = window.syncCostToPayable; window.syncCostToPayable = function () { throw new Error('測試：故意失敗'); };
+        const ra = _ecvApply('qH201', 'cV201'); window.syncCostToPayable = oS;
+        const c5b = Q[0].costs.find(x => x.id === 'cV201');
+        out.undo = ra === false && c5b.advances.length === 2 && !c5b.periods[0].inclFix && !(c5b.advConv || []).length && pay(_subAdvPayId('cV201', { id: 'v1' })).status === 'paid' && !pay(_subAdvPayId('cV201', { id: 'v1' })).voidAt;
       } finally { Q = keepQ; PAYABLES = keepP; window._payGuardOff = false; }
       return out;
     });
-    check('v6.0.201 舊提前放款轉換差 1 元：零頭差保留實際付款總額（552,826）、三次付款各一筆（日期金額照原紀錄）、每月實付正確、之後重算不變不出差額筆、期別改了才照算、差太多照樣擋下', r.setup && r.plan && r.apply && r.total && r.pays && r.cash && r.stable && r.stale && r.bigGap, JSON.stringify(r));
+    check('v6.0.201 舊提前放款轉換差 1 元：零頭差保留實際付款總額（552,826）、三次付款各一筆（日期金額照原紀錄）、每月實付正確、之後重算不變不出差額筆、期別改了才照算、差太多照樣擋下', r.setup && r.plan && r.apply && r.total && r.pays && r.cash && r.stable && r.stale && r.bigGap && r.unpaidPlan && r.unpaid && r.undo, JSON.stringify(r));
     check('v6.0.201 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

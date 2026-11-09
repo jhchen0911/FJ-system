@@ -33562,7 +33562,7 @@ function _syncSubPeriodPayables(q,c){
         var _tm=_taxM(),_ei=_subEarly(per).reduce(function(a2,e){return a2+Math.round(Math.round(parseFloat(e.amt)||0)*_tm);},0);
         p.incl=Math.max(0,Math.round(k.net*_tm)-_advI[per.no]-_ei);
       }
-      if(!per.isRet&&per.inclFix&&_subInvoice(c)&&Math.round(+per.inclFix.pay)===Math.round(amt))p.incl=Math.round(+per.inclFix.v);   // v6.0.201 舊提前放款轉換：含稅總額照實際付的（期別金額之後被改就失效、照算）
+      if(!per.isRet&&per.inclFix&&_subInvoice(c)&&Math.round(+per.inclFix.pay)===Math.round(amt)&&(per.inclFix.net==null||Math.round(+per.inclFix.net)===Math.round(+k.net||0))&&(per.inclFix.tr==null||+per.inclFix.tr===+_taxR()))p.incl=Math.round(+per.inclFix.v);   // v6.0.201 舊提前放款轉換：含稅總額照實際付的（期別金額之後被改就失效、照算）
       put(p,old,idx);
       if(per.invNo)p.invNo=per.invNo;
     }
@@ -41984,7 +41984,7 @@ function _ecvPlan(q,c){
     h.amount=amt;h.vat=inv;if(incl==null)delete h.incl;else h.incl=incl;
     // v6.0.201：轉換保留實際付款總額（Lotion 11/09 鴻玉案）——提前放款與期別各自四捨五入過，整期重算含稅常差 1～2 元；差在零頭內就把含稅總額釘在實際付的
     var T=pays[pr.no].reduce(function(s,x){return s+x.amt;},0)+oEff,E0=FJC.pay.eff(h,tR);
-    if(inv&&T>0&&E0!==T&&Math.abs(E0-T)<=pays[pr.no].length+1){h.incl=T;(pl.fix=pl.fix||{})[pr.no]={v:T,pay:amt,was:E0};}
+    if(inv&&T>0&&E0!==T&&Math.abs(E0-T)<=pays[pr.no].length+1){h.incl=T;(pl.fix=pl.fix||{})[pr.no]={v:T,pay:amt,net:Math.round(+k2.net||0),tr:tR,was:E0};}
     var eff=FJC.pay.eff(h,tR),add=pays[pr.no].reduce(function(s,x){return s+x.amt;},0);
     h.pays=(FJC.pay.paysOf(h)).concat(pays[pr.no].map(function(x){return {id:'cv'+x.from,amt:x.amt,date:x.date};}));
     if(oPaid&&oEff>0)h.pays.push({id:'cvp'+pid,amt:oEff,date:String(old.paidDate||old.date||'').slice(0,10)});   // 轉換前已付的那一期也留一筆付款紀錄（三次付款各一筆）
@@ -42019,6 +42019,7 @@ function _ecvDetailHtml(pl){
       +'<div>轉換前：預付款（提前放款）含稅 '+fmt(r.aEff)+'，已付 '+esc(r.aDates.join('、'))+'；第'+r.no+'期應付 '+fmt(r.pBefore)+'（'+esc(r.pStatus)+'）</div>'
       +'<div>轉換後：第'+r.no+'期一筆應付 '+fmt(r.newEff)+'（'+esc(r.newStatus)+'）；付款紀錄 '+esc(r.aDates.join('、'))+' 付 '+fmt(r.aEff)+'；原預付款應付作廢留底</div></div>';
   });
+  Object.keys(pl.fix||{}).forEach(function(n){var x=pl.fix[n];L+='<div style="margin-top:4px;color:#8a6d00">第'+n+'期含稅照實際付款合計 '+fmt(x.v)+'（整期重新算是 '+fmt(x.was)+'，差 '+fmt(Math.abs(x.v-x.was))+' 元，是以前各筆分開四捨五入的零頭；不重新算、照實際付的）</div>';});   // v6.0.201 審查：調整要讓 Lotion 看得到
   if(pl.before)L+='<div style="border-top:1px solid var(--b1);margin-top:6px;padding-top:4px">這家已付合計 '+fmt(pl.before.paid)+' → '+fmt(pl.after.paid)+'；未付合計 '+fmt(pl.before.left)+' → '+fmt(pl.after.left)+(pl.ok?'　<b style="color:var(--g3)">✓ 一樣</b>':'')+'</div>';
   return L+'</div>';
 }
@@ -42047,7 +42048,7 @@ function _ecvApply(qid,cid){
       A.convFrom={amount:A.amount,incl:A.incl,vat:A.vat,status:A.status,paidDate:A.paidDate,note:A.note};
       A.amount=0;delete A.incl;A.voidAt=now;A.convTo=_subPayId(c.id,per);A.note='已轉成第'+per.no+'期應付的付款紀錄（原：'+(A.convFrom.note||'預付款')+'）';_touch(A);});
     Object.keys(byNo).forEach(function(n){var per=_subPeriods(c).find(function(p){return !p.isRet&&String(p.no)===String(n);});per.adv=Math.max(0,Math.round(parseFloat(per.adv)||0)-byNo[n]);per.mt=now;
-      if(pl.fix&&pl.fix[n])per.inclFix={v:pl.fix[n].v,pay:pl.fix[n].pay,was:pl.fix[n].was,at:now,why:'6-1b 轉換保留實際付款總額'};});   // v6.0.201 重算時照實際付的含稅總額
+      if(pl.fix&&pl.fix[n])per.inclFix={v:pl.fix[n].v,pay:pl.fix[n].pay,net:pl.fix[n].net,tr:pl.fix[n].tr,was:pl.fix[n].was,at:now,why:'6-1b 轉換保留實際付款總額'};});   // v6.0.201 重算時照實際付的含稅總額
     c.advConv=(Array.isArray(c.advConv)?c.advConv:[]).concat(conv.map(function(a){return Object.assign({},a,{convAt:now,convBy:me,v:APP_VERSION});}));
     c.advances=_subAdvs(c).filter(function(a){return pl.conv.indexOf(a.id)<0;});_touch(c);
     // 已付的期別應付：金額照轉換後先寫好（否則重算會當成「已付後改金額」另立差額筆）
@@ -42071,14 +42072,14 @@ function _ecvApply(qid,cid){
   }catch(e){_err('_ecvApply',e);return undo('發生錯誤');}
 }
 _decReg('earlyConv',{
-  title:'舊提前放款轉成分次付款',todo:function(n){return '舊提前放款 '+n+' 家：轉成同一筆應付分次付款';},sub:'確認＝轉（已付合計不變；會把最低版本設成 v6.0.192，舊版手機要重新整理）；退回＝保持舊做法',
+  title:'舊提前放款轉成分次付款',todo:function(n){return '舊提前放款 '+n+' 家：轉成同一筆應付分次付款';},sub:'確認＝轉（已付合計不變；會把最低版本設成 v6.0.192（有零頭調整的設 v6.0.201），舊版手機要重新整理）；退回＝保持舊做法',
   canSee:function(){return !_isReaderUser&&_decIsAdmin()&&!(typeof _fbUser!=='undefined'&&_fbUser&&_QH_SENS===null);},   // 私有資料（成本、應付）下載完才算
   list:_ecvList,key:function(x){return x.qid+'|'+x.cid;},
   head:function(x){return (x.vendor||'（未填廠商）')+'／'+x.project+'：'+x.n+' 筆提前放款'+(x.ok?'':'（不能轉）');},
   body:function(x){return '<div style="font-size:11.5px;color:'+(x.ok?'var(--b4)':'var(--r,#c62828)')+'">'+(x.ok?('轉換前後已付合計 '+fmt(x.before.paid)+'、未付合計 '+fmt(x.before.left)+' 不變'):esc(x.why))+'</div>';},
   detail:_ecvDetailHtml,
   ok:function(x){   // 審查 H1：舊版（v6.0.192 以前）裝置不懂轉換、會把預付款重建成差額 → 確認前先把雲端最低版本設到 v6.0.192（舊版裝置停止上傳、要重新整理）
-    var need='v6.0.192';
+    var need=x&&x.fix?'v6.0.201':'v6.0.192';   // v6.0.201 審查：有零頭調整的要 201 以上才認得期別 inclFix（舊版會把含稅重算回去）
     if(typeof _fbUser!=='undefined'&&_fbUser&&typeof _fbDb!=='undefined'&&_fbDb&&_verNum(_MIN_VER)<_verNum(need)){
       return _fbDb.ref('fydata/minVer').set(need).then(function(){_MIN_VER=need;return _ecvApply(x.qid,x.cid);}).catch(function(e){_err('earlyConv.minVer',e);toast('設不了最低版本（'+need+'），這次先不轉');return false;});}
     return _ecvApply(x.qid,x.cid);},
