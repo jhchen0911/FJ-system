@@ -14,7 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-function arg(name, def) { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : def; }
+function arg(name, def) { const i = process.argv.indexOf('--' + name); const v = i > 0 ? process.argv[i + 1] : undefined; return (v && !/^--/.test(v)) ? v : def; }
 const ARGS = process.argv.slice(2);
 const DEF_EXPECT = path.join(__dirname, '..', '..', 'tests', 'synthetic', 'docs.json');
 
@@ -80,8 +80,8 @@ async function capture(page, mode) {
     window.toast = function () { };
     const take = (key, fn) => {
       last = null;
-      try { fn(); } catch (e) { errors.push(key + '：' + String(e && e.message || e).slice(0, 120)); return; }
-      if (last) docs[key] = last; else if (mode === 'fixture') errors.push(key + '：沒有交出列印內容');
+      try { fn(); } catch (e) { errors.push(key + '：' + (mode === 'fixture' ? String(e && e.message || e).slice(0, 120) : '執行出錯（' + String(e && e.name || 'Error') + '）')); return; }   // 快照模式不印錯誤內容（可能含真實資料）
+      if (last) docs[key] = last; else if (mode === 'fixture') errors.push(key + '：沒有交出列印內容'); else docs[key] = { html: '（沒有交出列印內容）', fn: '', ls: null };   // 快照：沒交出的也列一筆，比對時兩邊要一樣
     };
     const qs = (Q || []).filter(q => q && q.id);
     qs.forEach(q => {

@@ -11411,7 +11411,7 @@ function _docPvRender(host,o){
   var ls=!!o.ls,W=_pdfContentPx(ls),MG=Math.round(10*96/25.4),GAP=16;
   var sm=o.html.match(/<style[^>]*>([\s\S]*?)<\/style>/i),bm=o.html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   var sr=host.shadowRoot||host.attachShadow({mode:'open'});
-  var norm='.page-wrap{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}#inv-doc{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}thead{display:table-header-group}';
+  var norm='.page-wrap{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}#inv-doc{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}thead{display:table-header-group}tr,.page-footer,.stamp-row,.stamp-box{break-inside:avoid;page-break-inside:avoid}.dpv-root{margin:0!important;padding:0!important}';   // 同 _printViaIframe 的正規化
   // 匯出時單據是放在主畫面 body 底下排版的（字型、字級、行高從 body 繼承）：預覽根元素先套 body 的同一組值，單據自己的 html／body 樣式再蓋上去
   var bs=getComputedStyle(document.body),inh='font-family:'+bs.fontFamily+';font-size:'+bs.fontSize+';line-height:'+bs.lineHeight+';color:'+bs.color+';letter-spacing:'+bs.letterSpacing+';font-weight:'+bs.fontWeight;
   // 匯出時主畫面的全站樣式（表格、標題等）也會套到單據上：預覽同樣先放一份（只在預覽框裡，不外漏）
@@ -11444,9 +11444,9 @@ function _docPv(host,kind,ctx){
   if(!host)return 0;
   try{
     var o=_docOut(kind,ctx);if(!o){host.style.height='0px';return 0;}
-    var n=_docPvRender(host,o);
+    host._dpvO=o;var n=_docPvRender(host,o);
     var imgs=host.shadowRoot?host.shadowRoot.querySelectorAll('img'):[],left=0;
-    Array.prototype.forEach.call(imgs,function(im){if(!im.complete){left++;im.addEventListener('load',function(){if(--left===0)try{_docPvRender(host,o);}catch(e){_err('_docPv.img',e);}},{once:true});}});
+    Array.prototype.forEach.call(imgs,function(im){if(!im.complete){left++;im.addEventListener('load',function(){if(--left===0&&host._dpvO===o)try{_docPvRender(host,o);}catch(e){_err('_docPv.img',e);}},{once:true});}});   // 期間又改過內容就不用舊的重排
     return n;
   }catch(e){_err('_docPv',e);return 0;}
 }
