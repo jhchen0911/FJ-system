@@ -7646,8 +7646,8 @@ function exportData(){
     let _sens=null;try{_sens=_sensBackupOf(data);}catch(e){_err('exportData.sens',e);}
     delete data.hr;delete data.payslips;delete data.petty;
     try{data.workers=(data.workers||[]).map(function(w){return _wkSplit(w).pub;});data.sensSplit=1;}catch(e){_err('exportData.wk',e);}
-    try{data.paidLog=PAID_LOG;data.payAudit=PAY_AUDIT;data.devId=_devId();data.appVersion=APP_VERSION;}catch(e){_err('exportData.audit',e);}
-    try{data.matMoveLog=MAT_MOVE_LOG;data.matAudit=MAT_AUDIT;}catch(e){_err('exportData.mvlog',e);}   // v6.0.200 進退料追溯紀錄   // v6.0.89
+    try{data.paidLog=PAID_LOG;data.payAudit=PAY_AUDIT;data.devId=_devId();data.appVersion=APP_VERSION;}catch(e){_err('exportData.audit',e);}   // v6.0.89
+    try{data.matMoveLog=MAT_MOVE_LOG;data.matAudit=MAT_AUDIT;}catch(e){_err('exportData.mvlog',e);}   // v6.0.200 進退料追溯紀錄
     const json=JSON.stringify(data,null,2);
     const blob=new Blob([json],{type:'application/json'});
     const url=URL.createObjectURL(blob);
@@ -10771,8 +10771,8 @@ function _pullPrivate(cb){
     try{_pullRelayCosts();}catch(e){_err('_pullPrivate',e);}
     try{_pullRelayExpenses();}catch(e){_err('_pullPrivate',e);}
     try{_salesCommBoot();}catch(e){_err('_pullPrivate.sales',e);}
-    try{_mvApplySoon(3000);}catch(e){_err('_pullPrivate.mv',e);}
-    try{_mvLogPull();}catch(e){_err('_pullPrivate.mvlog',e);}   // v6.0.200 追溯紀錄   // v6.0.199 進退料 M3：私有資料下載完再套用（台帳要是最新的）
+    try{_mvApplySoon(3000);}catch(e){_err('_pullPrivate.mv',e);}   // v6.0.199 進退料 M3：私有資料下載完再套用（台帳要是最新的）
+    try{_mvLogPull();}catch(e){_err('_pullPrivate.mvlog',e);}   // v6.0.200 追溯紀錄
     try{_wkSensPull();}catch(e){_err('_pullPrivate.wk',e);}   // v6.0.118 健檢2 #5
     try{_tombReqPull();}catch(e){_err('_pullPrivate.tomb',e);}   // v6.0.118 健檢2 #3
     if(cb)cb(true);
@@ -42695,10 +42695,10 @@ function _mvMe(){return (typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||
 function _mvFieldTxt(m,k){var v=m&&m[k];if(k==='dir')return _MV_DIR[v]||'';if(k==='qid'||k==='fromQid'||k==='toQid')return v?(_mvQName(v)||v):'';if(k==='own')return v===true?'自有料':(v===false?'租賃料':'');if(k==='truckType')return _MV_TT[v]||'';
   if(k==='lift')return v?((v.has?'有':'沒有')+(v.by?('（'+v.by+'）'):'')):'';if(k==='items')return (v||[]).map(function(it){return [it.name||'',it.spec||'',(_mvNum(it.len)>0?(it.len+'M'):''),(_mvNum(it.qty)?String(it.qty):''),(it.short?('短少'+it.short):''),(it.dmg?('損壞'+it.dmg):''),(it.cond?_MV_COND[it.cond]:'')].filter(Boolean).join(' ');}).join('；');/* 單位不比（重新解析會補「支」，不算修改） */return v==null?'':String(v);}
 function _mvDiff(a,b){return Object.keys(_MV_FL).map(function(k){return [_MV_FL[k],_mvFieldTxt(a,k).slice(0,300),_mvFieldTxt(b,k).slice(0,300)];}).filter(function(x){return x[1]!==x[2];});}
-function _mvLogSave(){try{localStorage.setItem('fy_matmovelog',JSON.stringify(MAT_MOVE_LOG));localStorage.setItem('fy_mataudit',JSON.stringify(MAT_AUDIT));}catch(e){_err('_mvLogSave',e);}}
+function _mvLogSave(){var nb=function(k,v){return k==='_busy'?undefined:v;};try{localStorage.setItem('fy_matmovelog',JSON.stringify(MAT_MOVE_LOG,nb));localStorage.setItem('fy_mataudit',JSON.stringify(MAT_AUDIT,nb));}catch(e){_err('_mvLogSave',e);}}   // 審查：送出中的旗標不存，重新整理後照樣重送
 function _mvLogPut(arr,pre,kind,m,extra){
   var e={id:pre+Date.now().toString(36)+Math.random().toString(36).slice(2,7),mvId:String(m.id),at:Date.now(),by:_mvMe(),kind:kind};
-  Object.keys(extra||{}).forEach(function(k){if(extra[k]!=null&&extra[k]!=='')e[k]=extra[k];});
+  Object.keys(extra||{}).forEach(function(k){if(extra[k]!=null&&extra[k]!=='')e[k]=extra[k];});if(e.why)e.why=String(e.why).slice(0,280);   // 審查：規則上限 300 字
   e._p=1;arr.push(e);_mvLogSave();try{_mvLogFlush();}catch(x){_err('_mvLogPut',x);}return e;
 }
 function _mvLogAdd(kind,m,extra){return _mvLogPut(MAT_MOVE_LOG,'ml_',kind,m,extra);}
@@ -42708,26 +42708,28 @@ function _mvLogFlush(){
   if(typeof _fbDb==='undefined'||!_fbDb||typeof _fbUser==='undefined'||!_fbUser||_isReaderUser||window.FY_BETA)return;
   [['fydata/matMoveLog',MAT_MOVE_LOG],['fydata/matAudit',MAT_AUDIT]].forEach(function(p){(p[1]||[]).forEach(function(e){
     if(!e||!e._p||e._busy)return;e._busy=1;var o=JSON.parse(JSON.stringify(e));delete o._p;delete o._busy;delete o._fail;
-    _fbDb.ref(p[0]+'/'+e.id).set(o).then(function(){delete e._p;delete e._busy;_mvLogSave();}).catch(function(err){delete e._busy;delete e._p;e._fail=1;_mvLogSave();console.warn('[進退料紀錄] '+e.id+' 沒送上去，只留在這台',err&&err.message);});
+    _fbDb.ref(p[0]+'/'+e.id).set(o).then(function(){delete e._p;delete e._busy;_mvLogSave();}).catch(function(err){delete e._busy;var perm=/permission/i.test(String((err&&(err.code||err.message))||''));if(perm){delete e._p;e._fail=1;}_mvLogSave();console.warn('[進退料紀錄] '+e.id+(perm?' 被規則擋下，只留在這台':' 這次沒送上去，3 分鐘後重送'),err&&err.message);});   // 審查：斷線等暫時失敗下一輪重送；被規則擋下才只留本機
   });});
 }
 function _mvLogPull(){
   if(typeof _fbDb==='undefined'||!_fbDb||typeof _fbUser==='undefined'||!_fbUser)return;
   var mg=function(arr,v){var have={};arr.forEach(function(e){if(e&&e.id)have[e.id]=e;});Object.keys(v||{}).forEach(function(k){var r=v[k];if(!r||!r.id)return;if(!have[r.id])arr.push(r);else if(have[r.id]._p){delete have[r.id]._p;}});_mvLogSave();};
-  _fbDb.ref('fydata/matMoveLog').once('value').then(function(sn){mg(MAT_MOVE_LOG,sn&&sn.val());}).catch(function(e){console.warn('[進退料紀錄] 修改紀錄讀不到',e&&e.message);});
-  if(_shWholeOk())_fbDb.ref('fydata/matAudit').once('value').then(function(sn){mg(MAT_AUDIT,sn&&sn.val());}).catch(function(e){console.warn('[進退料紀錄] 台帳紀錄讀不到',e&&e.message);});
+  // 審查：只抓上次之後的（依時間索引），員工裝置也每 3 分鐘補抓一次
+  var since=function(arr){var t=0;(arr||[]).forEach(function(e){if(e&&!e._p&&!e._fail&&+e.at>t)t=+e.at;});return Math.max(0,t-600000);};
+  _fbDb.ref('fydata/matMoveLog').orderByChild('at').startAt(since(MAT_MOVE_LOG)).once('value').then(function(sn){mg(MAT_MOVE_LOG,sn&&sn.val());}).catch(function(e){console.warn('[進退料紀錄] 修改紀錄讀不到',e&&e.message);});
+  if(_shWholeOk())_fbDb.ref('fydata/matAudit').orderByChild('at').startAt(since(MAT_AUDIT)).once('value').then(function(sn){mg(MAT_AUDIT,sn&&sn.val());}).catch(function(e){console.warn('[進退料紀錄] 台帳紀錄讀不到',e&&e.message);});
 }
-try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{_mvLogPull();_mvLogFlush();}catch(e){_err('_mvLog.boot',e);}},6000);});setInterval(function(){try{_mvLogFlush();}catch(e){_err('_mvLog.tick',e);}},180000);}catch(e){_err('_mvLog.timer',e);}
+try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{_mvLogPull();_mvLogFlush();}catch(e){_err('_mvLog.boot',e);}},6000);});setInterval(function(){try{_mvLogFlush();_mvLogPull();}catch(e){_err('_mvLog.tick',e);}},180000);}catch(e){_err('_mvLog.timer',e);}
 // 台帳紀錄內容：動到的列（改前→改後支數、位置）＋這張單的使用段／損耗金額
 function _mvRowsOf(ids,beforeOf){return ids.slice(0,60).map(function(id){var cur=(MAT_LEDGER||[]).find(function(r){return r&&r.id===id;}),b=beforeOf(id);var lb=cur||b||{};
   return {lid:id,lb:_matLabel(lb).slice(0,80),loc0:b?String(b.projQid?(b.loc||'工地'):(b.loc||'公司倉庫')).slice(0,40):'',q0:b?(+b.qty||0):0,loc1:cur?String(cur.projQid?(cur.loc||'工地'):(cur.loc||'公司倉庫')).slice(0,40):'',q1:cur?(+cur.qty||0):0};});}
 function _mvMoneyOf(id){var a=[];(Q||[]).forEach(function(q){var mm=q&&q.mat;if(!mm)return;(mm.use||[]).forEach(function(u){if(u&&u.mvId===id)a.push({k:'使用段',qid:q.id,qty:+u.qty||0,days:+u.days||0,amt:+u.amt||0});});(mm.loss||[]).forEach(function(l){if(l&&l.mvId===id)a.push({k:'損耗',qid:q.id,qty:+l.qty||0,uc:+l.unitCost||0,amt:+l.amt||0});});});return a.slice(0,60);}
 function _mvTs(t){var d=new Date(+t||0),p=function(n){return (n<10?'0':'')+n;};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());}
 function _mvAuditLine(e,showMvLink){
-  var h='<div style="padding:4px 0;border-bottom:1px dotted var(--b1)"><b>'+esc(_mvTs(e.at))+'</b>　'+esc(e.by||'')+'　<span style="color:#1565C0">'+esc(_MVA_KIND[e.kind]||e.kind)+'</span>'+(showMvLink?'　<a href="#" onclick="_mvShow(\''+esc(e.mvId)+'\');return false">看簽收單</a>':'');
+  var h='<div style="padding:4px 0;border-bottom:1px dotted var(--b1)"><b>'+esc(_mvTs(e.at))+'</b>　'+esc(e.by||'')+'　<span style="color:#1565C0">'+esc(_MVA_KIND[e.kind]||e.kind)+'</span>'+(showMvLink?'　<a href="#" onclick="_mvShow(\''+escq(e.mvId)+'\');return false">看簽收單</a>':'');
   if(e.why)h+='<div style="color:var(--b4)">原因：'+esc(e.why)+'</div>';
-  (e.rows||[]).forEach(function(r){h+='<div>・台帳 '+esc(r.lb||r.lid)+'：'+(r.loc0?esc(r.loc0)+' ':'')+r.q0+' 支 → '+(r.loc1?esc(r.loc1)+' ':'')+r.q1+' 支　<span style="color:var(--b3);font-size:10.5px">'+esc(r.lid)+'</span></div>';});
-  (e.money||[]).forEach(function(x){h+='<div>・'+esc(x.k)+' '+esc(_mvQName(x.qid)||'')+' '+x.qty+' 支'+(x.days?(' '+x.days+' 天'):'')+'　NT$ '+fmt(x.amt)+'</div>';});
+  (e.rows||[]).forEach(function(r){h+='<div>・台帳 '+esc(r.lb||r.lid)+'：'+(r.loc0?esc(String(r.loc0))+' ':'')+(Number(r.q0)||0)+' 支 → '+(r.loc1?esc(String(r.loc1))+' ':'')+(Number(r.q1)||0)+' 支　<span style="color:var(--b3);font-size:10.5px">'+esc(r.lid)+'</span></div>';});
+  (e.money||[]).forEach(function(x){h+='<div>・'+esc(String(x.k||''))+' '+esc(String(_mvQName(x.qid)||''))+' '+(Number(x.qty)||0)+' 支'+(Number(x.days)?(' '+Number(x.days)+' 天'):'')+'　NT$ '+fmt(Number(x.amt)||0)+'</div>';});
   return h+'</div>';
 }
 // 歷史（簽收單明細用）：修改紀錄給大家看；台帳紀錄（有金額）只給管理員
