@@ -12216,6 +12216,77 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.210 改版第 7 步①：共用 A4 單據引擎（報價、請款、合約、詢價單、保留款退還單）──
+  {
+    const { page, errors } = await newPage(browser, 1920, 1080);
+    const r = await page.evaluate(async () => {
+      const out = {}; const W = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepI = INV, keepV = VENDORS, keepP = JSON.stringify(P);
+      try {
+        window.toast = () => {};
+        Object.assign(P, { company: '範例工程有限公司', addr: '範例路 1 號', tel: '02-0000-0000', taxid: '87654321', boss: '張範例', tax: 5 });
+        const items = [{ sec: true, desc: '一、擋土' }];
+        for (let i = 0; i < 70; i++) items.push(i % 14 === 13 ? { sec: true, desc: '分區 ' + i } : { desc: '範例工項 ' + i + (i % 4 === 0 ? '\n第二行說明' : ''), unit: 'M', qty: String(10 + i), price: '100', estCost: 77777, note: i % 3 ? '' : '備註' });
+        Q = [{ id: 'qE1', code: 'E01', name: '範例工程E', client: '甲營造', date: '2026-10-01', awarded: true, exs: [], rmk: {}, _mt: 1, items,
+          costs: [{ id: 'cE1', type: 'sub', vendor: '乙工程行', rows: [{ linkedItemIdx: 1, qty: 10, unitPrice: 80 }, { lump: true, desc: '機具進出場', qty: 1, unitPrice: 30000 }] }],
+          rfqs: [{ id: 'rE1', no: 'RFQ-E01-01', date: '2026-10-05', scope: '打設', deadline: '2026-10-12', status: 'open', vendors: [], items: [{ idx: 1, desc: '範例工項 0', unit: 'M', qty: 10 }] }], deduct: { ret: 5 } }];
+        VENDORS = [{ id: 'vE1', name: '乙工程行', taxid: '12345675', addr: '範例街 2 號', contact: '李', phone: '02-1111-1111' }];
+        const iv = { id: 'iE1', sourceQid: 'qE1', quoteId: 'qE1', project: '範例工程E', client: '甲營造', periodNo: 1, date: '2026-10-25', retention: true, retentionPct: 5, items: [] };
+        for (let i = 0; i < 60; i++) iv.items.push({ type: 'item', desc: '範例工項 ' + i, unit: 'M', contractPrice: 100, contractQty: 50, prevQty: 0, curQty: 5, payRate: 100 });
+        const rr = { id: 'irE1', kind: 'retReturn', project: '範例工程E', client: '甲營造', quoteId: 'qE1', date: '2026-12-20', periodNo: '退', items: [], totals: { curTotal: 0, tax: 0, total: 0, retention: 0 }, retRet: { amt: 1000, rows: [{ periodNo: 1, date: '2026-10-25', pct: 5, amt: 1000 }], holds: [], cond: '' } };
+        INV = [iv, rr]; _recalcInvAmounts(iv);
+        loadQ('qE1'); Q[0].t = calcT();
+        const q = Q[0];
+        out.kinds = ['quote', 'quoteNative', 'inv', 'invEditor', 'invNative', 'rfq', 'subContract', 'retReturn'].every(k => FY_DOCS[k] && typeof FY_DOCS[k].out === 'function');
+        // 預覽的切頁＝匯出 PDF 的切頁（同一個 _pdfPlanPages；匯出路徑照 _printViaIframe 的 inner 重建）
+        const plan = async (o) => {
+          const A4W = _pdfContentPx(o.ls), sm = o.html.match(/<style[^>]*>([\s\S]*?)<\/style>/i), bm = o.html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+          const fr = document.createElement('div'); fr.style.cssText = 'position:fixed;left:0;top:0';
+          const inner = document.createElement('div'); inner.style.cssText = 'background:#fff;width:' + A4W + 'px;margin:0 auto;box-sizing:border-box;';
+          const st = document.createElement('style'); st.textContent = sm ? sm[1] : ''; inner.appendChild(st);
+          const nm = document.createElement('style'); nm.textContent = '.page-wrap{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}#inv-doc{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}thead{display:table-header-group}tr,.page-footer,.stamp-row,.stamp-box{break-inside:avoid;page-break-inside:avoid}body{margin:0!important;padding:0!important}'; inner.appendChild(nm);
+          inner.insertAdjacentHTML('beforeend', bm ? bm[1] : o.html); fr.appendChild(inner); document.body.appendChild(fr); await W(30);
+          const pe = _pdfPlanPages({ width: A4W, height: inner.scrollHeight }, inner, Math.max(A4W, inner.scrollWidth), !!o.ls); fr.remove();
+          const host = document.createElement('div'); host.style.width = '600px'; document.body.appendChild(host); _docPvRender(host, o); const pv = host._dpvPlan; host.remove();
+          return JSON.stringify(pe.pages.map(x => [x.s, x.e, x.hd])) === JSON.stringify(pv.pages.map(x => [x.s, x.e, x.hd])) ? pv.pages.length : -1;
+        };
+        out.pages = {};
+        for (const [k, c] of [['quote', { q }], ['inv', { inv: iv }], ['rfq', { q, r: q.rfqs[0] }], ['subContract', { q, c: q.costs[0], f: { no: 'E01-S01', date: '2026-10-10', fine: 1, ins: 0, court: '範例地方法院' } }], ['retReturn', { inv: rr }]]) out.pages[k] = await plan(_docOut(k, c));
+        out.same = Object.values(out.pages).every(n => n > 0) && out.pages.quote > 1 && out.pages.inv > 1;
+        // 報價編輯頁：右邊即時預覽，改欄位跟著變，內部成本不出現
+        go('editor'); await W(700);
+        const qh = document.getElementById('q-pv');
+        out.qpv = !!qh && +qh.getAttribute('data-pages') > 1;
+        const fn = document.getElementById('fn'); fn.value = '範例工程E改名'; fn.dispatchEvent(new Event('input', { bubbles: true })); await W(700);
+        const qt = qh.shadowRoot.textContent;
+        out.qlive = qt.includes('範例工程E改名') && !qt.includes('77777') && !/毛利|成本單價/.test(qt);
+        saveQ(); await W(50);
+        // 請款單編輯頁
+        loadInvoice('iE1'); go('invoice-edit'); await W(700);
+        out.ipv = +document.getElementById('inv-pv').getAttribute('data-pages') > 1;
+        // 視窗：詢價單、分包合約書（左邊填、右邊預覽）
+        _rfqQid = 'qE1'; eid = 'qE1'; rfqEdit('rE1'); await W(500);
+        const rh = document.getElementById('rfq-pv'); out.rpv = !!rh && +rh.getAttribute('data-pages') >= 1;
+        const sc = document.getElementById('rfq-scope'); sc.value = '範例範圍改字'; sc.dispatchEvent(new Event('input', { bubbles: true })); await W(600);
+        out.rlive = rh.shadowRoot.textContent.includes('範例範圍改字');
+        document.getElementById('gen-confirm-modal').style.display = 'none';
+        openSubContractDoc('cE1'); await W(500);
+        const sh = document.getElementById('sct-pv'); out.spv = !!sh && +sh.getAttribute('data-pages') >= 1;
+        const sp = document.getElementById('sct-special'); sp.value = '範例特約改字'; sp.dispatchEvent(new Event('input', { bubbles: true })); await W(600);
+        out.slive = sh.shadowRoot.textContent.includes('範例特約改字');
+        document.getElementById('gen-confirm-modal').style.display = 'none';
+        // 預覽樣式不外漏到主畫面（詢價單的 th 綠底只在預覽框裡）
+        out.noLeak = !Array.prototype.some.call(document.querySelectorAll('head style,body>style'), s => /分項工程詢價單|\.dpv-root/.test(s.textContent));
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; INV = keepI; VENDORS = keepV; try { Object.assign(P, JSON.parse(keepP)); } catch (e) { /* 可忽略 */ }
+      return out;
+    });
+    check('v6.0.210 A4 單據引擎：8 種單據同一個出件表；預覽切頁＝匯出 PDF 切頁（報價、請款多頁含續頁表頭、詢價單、合約書、保留款退還單）', r.kinds && r.same, JSON.stringify(r));
+    check('v6.0.210 A4 單據引擎：報價／請款編輯頁右邊即時預覽（改了就變、內部成本不出現）；詢價單、合約書視窗左填右看', r.qpv && r.qlive && r.ipv && r.rpv && r.rlive && r.spv && r.slive && r.noLeak, JSON.stringify(r));
+    check('v6.0.210 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

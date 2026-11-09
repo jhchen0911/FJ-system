@@ -1,0 +1,70 @@
+{
+ "docs": {
+  "inv:iDOC1": {
+   "html": "53d9d183f14fe183ddab313bfbfe3f97",
+   "fn": "9d574b4bac4fe235334cc8d87bf7a34e",
+   "ls": true,
+   "len": 23524
+  },
+  "inv:iDOC2": {
+   "html": "f347b5d5ea52bad0154d38b3311c085b",
+   "fn": "a33a83896455a43361c1c61bc6408e4f",
+   "ls": true,
+   "len": 23554
+  },
+  "invEditor:iDOC1": {
+   "html": "a5df1c83ab6e8bf313b21c42612d2430",
+   "fn": "9d574b4bac4fe235334cc8d87bf7a34e",
+   "ls": true,
+   "len": 23587
+  },
+  "invEditor:iDOC2": {
+   "html": "43eb8cb92efcda240091ac3a9507e5f9",
+   "fn": "a33a83896455a43361c1c61bc6408e4f",
+   "ls": true,
+   "len": 23617
+  },
+  "invNative:iDOC1": {
+   "html": "d3078df3f67a5a4e55815e76da46b98e",
+   "fn": "9d574b4bac4fe235334cc8d87bf7a34e",
+   "ls": null,
+   "len": 23679
+  },
+  "invNative:iDOC2": {
+   "html": "9bffb96dcecf577e14b3faaa5153c6fe",
+   "fn": "a33a83896455a43361c1c61bc6408e4f",
+   "ls": null,
+   "len": 23709
+  },
+  "quote:qDOC1": {
+   "html": "953c9e4faeb9f07a7353ddf96b89a150",
+   "fn": "238015a99069250a4e88845471c7e03e",
+   "ls": false,
+   "len": 21378
+  },
+  "quoteNative:qDOC1": {
+   "html": "94e18ca28a3b2942da61749804770dba",
+   "fn": "238015a99069250a4e88845471c7e03e",
+   "ls": null,
+   "len": 21874
+  },
+  "retReturn:irDOC1": {
+   "html": "9d8fc3e41f5da9d2b31486cdee4d6de9",
+   "fn": "75b9256deddebd524ee7f729d76713df",
+   "ls": false,
+   "len": 2508
+  },
+  "rfq:qDOC1:rDOC1": {
+   "html": "0874af20b796803b138b5ce361352269",
+   "fn": "66bd537276519939d31770c9ac99a474",
+   "ls": false,
+   "len": 3860
+  },
+  "subContract:qDOC1:cDOC1": {
+   "html": "79082c8133c5a30dad0e5a5db5f883e9",
+   "fn": "11b141136213627bc05e0bfa94971136",
+   "ls": false,
+   "len": 5064
+  }
+ }
+}

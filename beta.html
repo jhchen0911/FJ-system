@@ -633,6 +633,8 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
 .me-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
 .me-tab{padding:8px 16px;border-radius:20px;border:1px solid var(--b2);background:var(--w);font-weight:700;color:var(--b4);cursor:pointer;font-family:inherit;font-size:13px}
 .me-tab.on{background:var(--g);color:#fff;border-color:var(--g)}
+.doc-pv{position:relative;overflow:hidden;background:#e9ecea;border-radius:8px;min-height:120px}.dpv-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}.dpv-r{position:sticky;top:0}@media(max-width:999px){.dpv-cols{grid-template-columns:minmax(0,1fr)}.dpv-r{position:static}}.doc-pv-hint{font-size:11px;color:var(--b3);margin-top:6px}
+.doc-pvcard{max-width:780px}@media(min-width:1760px){.doc-pvcard{max-width:none}#page-editor>.pad,#page-invoice-edit>.pad{display:grid;grid-template-columns:minmax(0,1fr) 500px;column-gap:14px;align-items:start}#page-editor>.pad>*,#page-invoice-edit>.pad>*{grid-column:1}#page-editor>.pad>.doc-pvcard,#page-invoice-edit>.pad>.doc-pvcard{grid-column:2;grid-row:1/span 40;position:sticky;top:64px;max-height:calc(100vh - 76px);overflow:auto}}
 #page-matest .me-pv{position:relative;overflow:hidden;background:#e9ecea;border-radius:8px;padding:0;min-height:120px}
 #page-matest .me-chips{display:flex;flex-wrap:wrap;gap:4px 6px}#page-matest .me-chip{display:inline-flex;gap:4px;align-items:center;font-size:12.5px;padding:3px 8px;border:1px solid var(--b2);border-radius:14px;background:#fff;white-space:nowrap}#page-matest .me-chip input{width:15px;height:15px;min-height:0;margin:0;flex:none}
 @media(max-width:767px){#page-matest .me-pv{cursor:zoom-in}}
@@ -1149,6 +1151,8 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
     </div>
     <!-- 施工成本卡片 -->
     <!-- 施工成本已移至獨立「施工成本」頁（自專案總覽/合約/應付進入），v5.228 -->
+    <!-- 改版第 7 步①：共用 A4 單據引擎——右邊即時 A4 預覽（與匯出 PDF 同一份內容與分頁） -->
+    <div class="card doc-pvcard" id="q-pv-card"><div class="ch green"><div class="cht">A4 預覽：報價單（給業主的樣子）</div></div><div class="cb" style="padding-top:0"><div id="q-pv" class="doc-pv"></div><div class="doc-pv-hint">預覽與「匯出 PDF」同一份內容與分頁（左邊改了馬上跟著變；內部成本不會出現）</div></div></div>
   </div>
 </div>
 
@@ -2824,6 +2828,8 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
         <div class="trow" id="inv-einv-amt" style="display:none;justify-content:flex-end;font-size:11px;color:var(--b5);padding-top:2px"><span></span></div>
       </div>
     </div>
+    <!-- 改版第 7 步①：右邊即時 A4 預覽（與匯出 PDF 同一份） -->
+    <div class="card doc-pvcard" id="inv-pv-card"><div class="ch green"><div class="cht">A4 預覽：請款單</div></div><div class="cb" style="padding-top:0"><div id="inv-pv" class="doc-pv"></div><div class="doc-pv-hint">預覽與「匯出 PDF」同一份內容與分頁（左邊改了馬上跟著變）</div></div></div>
 
   </div>
 </div>
@@ -2867,7 +2873,7 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
 <script src="calc/vbill.js?v=6.0.181" defer></script>
 <script src="calc/qdraft.js?v=6.0.197" defer></script>
 <script src="calc/matmove.js?v=6.0.195" defer></script>
-<script src="app.js?v=6.0.203" defer></script><script src="beta.js?v=6.0.203" defer></script>
+<script src="app.js?v=6.0.210" defer></script><script src="beta.js?v=6.0.210" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
