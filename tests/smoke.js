@@ -11074,6 +11074,17 @@ async function newPage(browser, width, height) {
         window._decIsAdmin = function () { return false; };
         const dw = await Promise.resolve(_mvDetailHtml(m));
         out.histStaff = /支數少算/.test(dw) && /車號：AAA-1 → AAA-2/.test(dw) && !/自動改台帳|撤回上次|NT\$/.test(dw);
+        // Lotion 11/09 第 2 題 B：唯讀帳號看得到台帳紀錄與金額，但一筆都寫不出去
+        const oR = _isReaderUser, oDb = _fbDb, oU = _fbUser; let wrote = 0;
+        _isReaderUser = true;
+        const dr = await Promise.resolve(_mvDetailHtml(m));
+        out.histReader = /自動改台帳/.test(dr) && /撤回上次改的台帳/.test(dr) && /台帳 型鋼 H300/.test(dr);
+        _fbDb = { ref: function () { return { set: function () { wrote++; return Promise.resolve(); }, orderByChild: function () { return { startAt: function () { return { once: function () { return Promise.resolve({ val: function () { return null; } }); } }; } }; } }; } };
+        _fbUser = { email: 'reader@example.com' };
+        MAT_MOVE_LOG.push({ id: 'ml_readertest1', mvId: m.id, at: Date.now(), by: 'reader@example.com', kind: 'edit', _p: 1 });
+        _mvLogFlush();
+        out.readerNoWrite = wrote === 0;
+        _isReaderUser = oR; _fbDb = oDb; _fbUser = oU; MAT_MOVE_LOG.pop();
         window._decIsAdmin = oAd;
         // 台帳列的歷史在既有視窗裡（倉庫列「編輯」、工地列「歸還／損耗」），可以點回簽收單
         let box = '';
@@ -11093,7 +11104,7 @@ async function newPage(browser, width, height) {
       } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; MAT_MOVE_LOG = keepLog; MAT_AUDIT = keepA; window.showConfirm = oC; window._decIsAdmin = oAd; }
       return out;
     });
-    check('v6.0.200 進退料追溯：建立／修改（改前→改後、原因）／確認都留紀錄、已確認的單修改原因必填、自動改台帳與撤回重改留台帳紀錄、簽收單明細看歷史（工務看不到台帳與金額）、台帳列在既有視窗看歷史並可點回簽收單', r.create && r.draftEdit && r.confirm && r.apply && r.needWhy && r.okEdit && r.undo && r.histAdmin && r.histStaff && r.ledHist && r.siteHist && r.keep && r.notInSync, JSON.stringify(r));
+    check('v6.0.200 進退料追溯：建立／修改（改前→改後、原因）／確認都留紀錄、已確認的單修改原因必填、自動改台帳與撤回重改留台帳紀錄、簽收單明細看歷史（工務看不到台帳與金額、唯讀帳號看得到但寫不出去）、台帳列在既有視窗看歷史並可點回簽收單', r.create && r.draftEdit && r.confirm && r.apply && r.needWhy && r.okEdit && r.undo && r.histAdmin && r.histStaff && r.histReader && r.readerNoWrite && r.ledHist && r.siteHist && r.keep && r.notInSync, JSON.stringify(r));
     check('v6.0.200 追溯測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

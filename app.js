@@ -42686,11 +42686,12 @@ _decReg('mvRedo',{
 });
 // ══════════ v6.0.200 追溯紀錄（Lotion 11/09 M3b 追加）：簽收單每次建立／修改／確認／退回、台帳每次自動改／撤回／重改／轉人工，都留一筆刪不掉的紀錄 ══════════
 // 修改紀錄 MAT_MOVE_LOG → fydata/matMoveLog/<id>（工務也看得到：誰、何時、欄位改前→改後、原因；沒有金額）
-// 台帳紀錄 MAT_AUDIT → fydata/matAudit/<id>（只有管理員：哪幾列台帳支數改前→改後、使用段／損耗金額）
+// 台帳紀錄 MAT_AUDIT → fydata/matAudit/<id>（管理員寫；管理員與唯讀帳號讀（Lotion 11/09 第 2 題 B）：哪幾列台帳支數改前→改後、使用段／損耗金額）
 // 兩個節點規則都是「只能新增、不能改、不能刪」（連管理員從系統也刪不掉）；不進回收筒；全量備份與伺服器每日備份都包含。
 var _MVL_KIND={create:'建立（拍照）',edit:'修改',confirm:'確認',reject:'退回'};
 var _MVA_KIND={apply:'自動改台帳',force:'例外卡確認改台帳',holdReject:'例外卡退回（不動台帳）',undo:'撤回上次改的台帳',redoManual:'無法自動重改，轉人工核對',redoReject:'不重改（台帳維持）'};
 var _MV_FL={date:'日期',dir:'方向',qid:'工地',fromQid:'轉出工地',toQid:'轉入工地',own:'自有或租賃',from:'從哪裡',to:'到哪裡',carrier:'運輸公司',truckType:'車型',truck:'車號',trips:'趟數',rentVendor:'租賃商',rentSlipNo:'租賃商單號',signer:'簽收人',lift:'吊車／怪手',items:'品項'};
+function _mvAuditVis(){return !!_isReaderUser||_decIsAdmin();}   // Lotion 11/09 第 2 題 B：台帳紀錄（含金額）管理員與唯讀帳號看得到，工務看不到
 function _mvMe(){return (typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機';}
 function _mvFieldTxt(m,k){var v=m&&m[k];if(k==='dir')return _MV_DIR[v]||'';if(k==='qid'||k==='fromQid'||k==='toQid')return v?(_mvQName(v)||v):'';if(k==='own')return v===true?'自有料':(v===false?'租賃料':'');if(k==='truckType')return _MV_TT[v]||'';
   if(k==='lift')return v?((v.has?'有':'沒有')+(v.by?('（'+v.by+'）'):'')):'';if(k==='items')return (v||[]).map(function(it){return [it.name||'',it.spec||'',(_mvNum(it.len)>0?(it.len+'M'):''),(_mvNum(it.qty)?String(it.qty):''),(it.short?('短少'+it.short):''),(it.dmg?('損壞'+it.dmg):''),(it.cond?_MV_COND[it.cond]:'')].filter(Boolean).join(' ');}).join('；');/* 單位不比（重新解析會補「支」，不算修改） */return v==null?'':String(v);}
@@ -42717,7 +42718,7 @@ function _mvLogPull(){
   // 審查：只抓上次之後的（依時間索引），員工裝置也每 3 分鐘補抓一次
   var since=function(arr){var t=0;(arr||[]).forEach(function(e){if(e&&!e._p&&!e._fail&&+e.at>t)t=+e.at;});return Math.max(0,t-600000);};
   _fbDb.ref('fydata/matMoveLog').orderByChild('at').startAt(since(MAT_MOVE_LOG)).once('value').then(function(sn){mg(MAT_MOVE_LOG,sn&&sn.val());}).catch(function(e){console.warn('[進退料紀錄] 修改紀錄讀不到',e&&e.message);});
-  if(_shWholeOk())_fbDb.ref('fydata/matAudit').orderByChild('at').startAt(since(MAT_AUDIT)).once('value').then(function(sn){mg(MAT_AUDIT,sn&&sn.val());}).catch(function(e){console.warn('[進退料紀錄] 台帳紀錄讀不到',e&&e.message);});
+  if(_shWholeOk()||_isReaderUser)_fbDb.ref('fydata/matAudit').orderByChild('at').startAt(since(MAT_AUDIT)).once('value').then(function(sn){mg(MAT_AUDIT,sn&&sn.val());}).catch(function(e){console.warn('[進退料紀錄] 台帳紀錄讀不到',e&&e.message);});
 }
 try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{_mvLogPull();_mvLogFlush();}catch(e){_err('_mvLog.boot',e);}},6000);});setInterval(function(){try{_mvLogFlush();_mvLogPull();}catch(e){_err('_mvLog.tick',e);}},180000);}catch(e){_err('_mvLog.timer',e);}
 // 台帳紀錄內容：動到的列（改前→改後支數、位置）＋這張單的使用段／損耗金額
@@ -42735,13 +42736,13 @@ function _mvAuditLine(e,showMvLink){
 // 歷史（簽收單明細用）：修改紀錄給大家看；台帳紀錄（有金額）只給管理員
 function _mvHistHtml(mvId){
   var L=(MAT_MOVE_LOG||[]).filter(function(e){return e&&e.mvId===mvId;}).map(function(e){return {at:e.at,h:'<div style="padding:4px 0;border-bottom:1px dotted var(--b1)"><b>'+esc(_mvTs(e.at))+'</b>　'+esc(e.by||'')+'　'+esc(_MVL_KIND[e.kind]||e.kind)+(e.why?('<div style="color:var(--b4)">原因：'+esc(e.why)+'</div>'):'')+(e.diff||[]).map(function(d){return '<div>・'+esc(d[0])+'：'+esc(d[1]||'（空）')+' → '+esc(d[2]||'（空）')+'</div>';}).join('')+'</div>'};});
-  if(!_isReaderUser&&_decIsAdmin())L=L.concat((MAT_AUDIT||[]).filter(function(e){return e&&e.mvId===mvId;}).map(function(e){return {at:e.at,h:_mvAuditLine(e,false)};}));
+  if(_mvAuditVis())L=L.concat((MAT_AUDIT||[]).filter(function(e){return e&&e.mvId===mvId;}).map(function(e){return {at:e.at,h:_mvAuditLine(e,false)};}));
   if(!L.length)return '';
   return '<div style="font-size:12px;line-height:1.55;margin-top:8px"><div style="font-weight:700">歷史</div>'+L.sort(function(a,b){return a.at-b.at;}).map(function(x){return x.h;}).join('')+'</div>';
 }
 // 台帳某一列的歷史（只有管理員；放在既有的「編輯」「歸還／損耗」視窗裡，不另加按鈕）
 function _mvLedHistHtml(lr){
-  if(!lr||_isReaderUser||!_decIsAdmin())return '';
+  if(!lr||!_mvAuditVis())return '';
   var L=(MAT_AUDIT||[]).filter(function(e){return e&&((e.rows||[]).some(function(r){return r&&r.lid===lr.id;})||(lr.mvId&&e.mvId===lr.mvId));}).sort(function(a,b){return a.at-b.at;});
   if(!L.length)return '';
   return '<div style="font-size:11.5px;line-height:1.55;margin-top:10px"><div style="font-weight:700">這一列的歷史（簽收單自動改台帳）</div>'+L.map(function(e){return _mvAuditLine(e,true);}).join('')+'</div>';

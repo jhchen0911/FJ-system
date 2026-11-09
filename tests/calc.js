@@ -47,7 +47,8 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const R = JSON.parse(require('fs').readFileSync(path.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
   const L = R.matMoveLog, A = R.matAudit;
   const once = n => n && n.$lid && /!data\.exists\(\) && newData\.exists\(\)/.test(n.$lid['.write']) && /newData\.child\('by'\)\.val\(\) === auth\.token\.email/.test(n.$lid['.validate']) && n.$lid.$other && n.$lid.$other['.validate'] === 'false';
-  check('v6.0.200 進退料追溯紀錄規則：只能新增、不能改刪、寫的人要是自己；台帳紀錄只給管理員讀、修改紀錄不收金額欄位', once(L) && once(A) && !/access/.test(A['.read']) && !L.$lid.amt && !L.$lid.money);
+  const RD = "root.child('fydata/readers')";
+  check('v6.0.200 進退料追溯紀錄規則：只能新增、不能改刪、寫的人要是自己；台帳紀錄管理員＋唯讀帳號讀（Lotion 11/09 第 2 題 B）、工務讀不到、唯讀帳號寫不進去；修改紀錄不收其他欄位', once(L) && once(A) && !/access/.test(A['.read']) && A['.read'].includes('|| ' + RD) && A.$lid['.write'].includes('!' + RD) && !A.$lid['.write'].includes('|| ' + RD) && L.$lid['.write'].includes('!' + RD));
 }
 
 // 稅率：空白＝5、0 合法
