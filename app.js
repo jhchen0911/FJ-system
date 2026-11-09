@@ -35113,9 +35113,9 @@ function renderHealthReport(el){
   var rows;try{rows=_healthRows();}catch(e){_err('renderHealthReport',e);el.innerHTML='<div style="padding:20px;color:var(--red)">健檢失敗：'+esc(e.message)+'</div>';return;}
   var warn=rows.filter(function(r){return r.sev==='warn';}).length,info=rows.length-warn;
   var cnt={quotes:(Q||[]).length,inv:(INV||[]).length,ct:(CONTRACTS||[]).length,pay:(PAYABLES||[]).length,logs:(Q||[]).reduce(function(a,q){return a+((q&&q.dailyLogs)||[]).length;},0),costs:(Q||[]).reduce(function(a,q){return a+((q&&q.costs)||[]).length;},0)};
-  if(!renderHealthReport._bkAt||Date.now()-renderHealthReport._bkAt>60000){renderHealthReport._bkAt=Date.now();_bkHealthLoad(function(){var c=document.getElementById('bk-health-card');if(c)c.outerHTML=_bkHealthHtml();});_pnlLoad(function(){var c=document.getElementById('pnl-snap-card');if(c)c.outerHTML=_pnlSnapHtml();});}   // 審查：每次打開都讀最新一次雲端結果（一分鐘內不重讀）；5c 損益快照同
+  if(!renderHealthReport._bkAt||Date.now()-renderHealthReport._bkAt>60000){renderHealthReport._bkAt=Date.now();_bkHealthLoad(function(){var c=document.getElementById('bk-health-card');if(c)c.outerHTML=_bkHealthHtml();});_pnlLoad(function(){var c=document.getElementById('pnl-snap-card');if(c)c.outerHTML=_pnlSnapHtml();});_pcmpLoad(function(){var c=document.getElementById('pay-cmp-card');if(c)c.outerHTML=_pcmpHtml();});}   // 審查：每次打開都讀最新一次雲端結果（一分鐘內不重讀）；5c 損益快照同
   if(!renderHealthReport._bkRAt||Date.now()-renderHealthReport._bkRAt>60000){renderHealthReport._bkRAt=Date.now();_bkRemindLoad(function(){var c=document.getElementById('bk-remind-card');if(c)c.outerHTML=_bkRemindHtml();});}   // 5b
-  var h=_bkHealthHtml()+_bkRemindHtml()+_pnlSnapHtml()+'<div class="card"><div class="cb">'
+  var h=_bkHealthHtml()+_bkRemindHtml()+_pnlSnapHtml()+_pcmpHtml()+'<div class="card"><div class="cb">'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><b style="font-size:14px">資料健檢</b>'
     +'<span style="font-size:12px;color:var(--b4)">報價 '+cnt.quotes+'・請款單 '+cnt.inv+'・合約 '+cnt.ct+'・成本 '+cnt.costs+'・日報 '+cnt.logs+'・應付 '+cnt.pay+'</span>'
     +'<span style="margin-left:auto;font-size:12.5px;font-weight:700;color:'+(warn?'#c62828':'var(--g3)')+'">'+(rows.length?('需處理 '+warn+'・提醒 '+info):'✓ 沒有發現問題')+'</span>'
@@ -40829,9 +40829,10 @@ function _bkWatch(){
   if(!_fbDb||!_fbUser||_bkWatch._on)return;_bkWatch._on=1;
   try{_bkRef=_fbDb.ref('fydata/todo');_bkRef.on('value',function(s){BK_TODO=s.val()||{};try{if(document.getElementById('page-dash')&&document.getElementById('page-dash').classList.contains('active'))updateDashTodo();}catch(e){_err('_bkWatch.dash',e);}},function(e){_bkWatch._on=0;_bkRef=null;_err('_bkWatch.todo',e);});}catch(e){_bkWatch._on=0;_err('_bkWatch',e);}   // 審查：讀取被拒（規則還沒發布）下次登入再試
   _bkHealthLoad();
+  try{_pcmpLoad();}catch(e){_err('_bkWatch.pcmp',e);}   // 6-2a 雲端應付比對（只有管理員讀得到；拍板卡要知道開關）
 }
 // 審查：登出時清掉（同一台裝置換人登入，不能看到上一個人的健檢明細）
-function _bkOff(){try{if(_bkRef)_bkRef.off();}catch(e){_err('_bkOff',e);}PNL_SNAP={latest:null,close:null,ok:false};_bkRef=null;_bkWatch._on=0;BK_TODO={};BK_HEALTH=null;BK_REMIND=null;}
+function _bkOff(){try{if(_bkRef)_bkRef.off();}catch(e){_err('_bkOff',e);}PNL_SNAP={latest:null,close:null,ok:false};PAY_CMP={ok:false,cfg:{},latest:null,days:{}};_bkRef=null;_bkWatch._on=0;BK_TODO={};BK_HEALTH=null;BK_REMIND=null;}
 function _bkHealthLoad(cb){
   if(!_fbDb||!_fbUser){if(cb)cb();return;}
   _fbDb.ref('fydata/health/latest').once('value').then(function(s){BK_HEALTH=s.val()||null;if(cb)cb();}).catch(function(){/* 可忽略：一般員工讀不到健檢明細 */if(cb)cb();});
@@ -42091,6 +42092,92 @@ _decReg('earlyConv',{
     return _ecvApply(x.qid,x.cid);},
   reject:function(x,why){var f=_ecvFind(x.qid,x.cid);if(!f.c)return false;f.c.advConvSkip={at:Date.now(),by:_meEmail()||'本機',why:String(why||'保持舊做法').slice(0,200)};_touch(f.c);_touch(f.q);persist();try{_markDirty();}catch(e){_err('earlyConv.reject',e);}return true;},
   edit:function(x){try{var m=document.getElementById('fy-modal');if(m)m.remove();}catch(e){/* 可忽略 */}openProjectCosts(x.qid);}
+});
+// ══════════ 第 6 步 6-2a：衍生應付的雲端比對（小批次線；先比對、不改應付）══════════
+// 雲端 payCompare（functions/ops/paycmp.js，每天 07:40）用同一套算法重算第一批自動應付（分包期別、保留款退還、提前放款、預付款、介紹費、業務抽成、業主端佣金），
+//   跟網頁存的應付逐筆比，結果寫 fydata/private/payCompare（latest 明細、days 每天摘要、cfg 開關）。網頁照舊寫應付，這裡只讀。
+// 開關預設關：等一個完整月請款週期（6-1 分次付款 11/07 上線 → 11/25 截止、12/25 放款）後，首頁拍板卡 payCmpOn 問 Lotion 要不要開。
+// 資料健檢「☁ 雲端應付比對」卡：最後一次結果、連續一致天數（能解釋的時間差不中斷，要 28 天且跨過一次 25 日才可以準備切換 6-2b）、不一致明細。
+// 手動跑一次（測試專案驗收）：主控台 payCmpRun()，不加按鈕（第 11 條）。
+var PAY_CMP={ok:false,cfg:{},latest:null,days:{}};
+var _PCMP_ASK_FROM='2026-12-26',_PCMP_STREAK=28;
+var _PCMP_KIND={period:'計價期別',ret:'保留款退還',early:'提前放款',adv:'預付款',intro:'介紹費',sales:'業務抽成',comm:'業主端佣金',extra:'網頁多一筆'};
+var _PCMP_WHY={missing:'網頁沒有這筆',extra:'雲端算不出來（網頁有一筆沒付的）',void:'網頁已作廢',amount:'金額',to:'付給誰',vat:'開不開發票',incl:'含稅金額'};
+function _pcmpCan(){try{return !!(_fbUser&&isAdmin(_fbUser.email)&&!_isReaderUser);}catch(e){return false;}}
+function _pcmpLoad(cb){
+  if(!_fbDb||!_pcmpCan()){if(cb)cb();return;}
+  _fbDb.ref('fydata/private/payCompare').once('value').then(function(s){var v=s.val()||{};PAY_CMP={ok:true,cfg:v.cfg||{},latest:v.latest||null,days:v.days||{}};if(cb)cb();try{updateDashTodo();}catch(e){_err('_pcmpLoad.dash',e);}})
+    .catch(function(e){/* 可忽略：讀不到 private（不是管理員） */PAY_CMP.ok=false;void e;if(cb)cb();});
+}
+// 跟 functions/ops/paycmp.js 的 streak 同一套：從最近一天往回數，ok 才算、沒跑的那天中斷；這段期間要跨過一次截止日（預設 25 日）
+function _pcmpStreak(days,today,cutDay){
+  var n=0,d=today,cross=false,cd=parseInt(cutDay)||25;
+  for(var i=0;i<70;i++){var r=days&&days[d];if(!r||!r.ok)break;n++;if(+d.slice(8,10)===cd)cross=true;var t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()-1);d=t.toISOString().slice(0,10);}
+  return {n:n,cross:cross,ready:n>=_PCMP_STREAK&&cross};
+}
+function _pcmpLastDay(days){var ks=Object.keys(days||{}).sort();return ks.length?ks[ks.length-1]:'';}
+function _pcmpVal(o){if(!o)return '—';var a=[];if(o.to!=null&&o.to!=='')a.push(esc(String(o.to)));if(o.amount!=null)a.push(fmt(Math.round(+o.amount||0)));if(o.incl!=null)a.push('含稅 '+fmt(o.incl));if(o.vat!=null)a.push(o.vat?'開發票':'不開');return a.join('・')||'—';}
+function _pcmpHtml(){
+  if(_fbUser&&!_pcmpCan())return '';   // 只有管理員（明細有金額、廠商名稱）
+  var head='<div class="card" id="pay-cmp-card"><div class="cb"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px"><b style="font-size:14px">☁ 雲端應付比對</b><span style="font-size:11.5px;color:var(--b4)">第 6 步 6-2a・雲端重算一份自動應付跟網頁比・不改應付</span></div>';
+  var C=PAY_CMP.cfg||{},L=PAY_CMP.latest;
+  var st=C.on?('<b style="color:var(--g3)">已開始</b>'+(C.at?'（'+esc(new Date(+C.at).toLocaleDateString('zh-TW'))+(C.by?' '+esc(String(C.by)):'')+'）':'')+(C.startDay?'，'+esc(String(C.startDay))+' 起每天 07:40 比':'，每天 07:40 比'))
+    :('<b>還沒開始</b>（'+esc(String(C.askFrom||_PCMP_ASK_FROM))+' 起首頁會問要不要開；等 6-1 分次付款跑過一個完整月請款）');
+  var h=head+'<div style="font-size:12px;margin-bottom:4px">'+st+'</div>';
+  if(!L)return h+'<div style="font-size:12px;color:var(--b3)">雲端還沒有比對結果'+(C.on?'（明天 07:40 第一次）':'')+'</div></div></div>';
+  var n=L.n||{},sk=_pcmpStreak(PAY_CMP.days,_pcmpLastDay(PAY_CMP.days),P.vendorCutDay);
+  h+='<div style="font-size:12px;color:var(--b4);margin-bottom:4px">最後一次：'+esc(new Date(+L.at||0).toLocaleString('zh-TW'))+(L.manual?'（手動，不算進連續天數）':'')+'</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;font-size:12px;margin-bottom:6px">'
+    +'<span class="bdg">應有 '+(n.exp||0)+' 筆</span><span class="bdg" style="color:var(--g3)">一致 '+(n.ok||0)+'</span><span class="bdg">已付不重算 '+(n.skip||0)+'</span>'
+    +'<span class="bdg" style="color:'+(n.bad?'var(--red)':'var(--b4)')+'">不一致 '+(n.bad||0)+'</span><span class="bdg">剛改過（可解釋）'+(n.explained||0)+'</span></div>'
+    +'<div style="font-size:12px;margin-bottom:6px">連續一致 <b>'+sk.n+'</b>／'+_PCMP_STREAK+' 天・'+(sk.cross?'已跨過 '+(parseInt(P.vendorCutDay)||25)+' 日請款':'還沒跨過 '+(parseInt(P.vendorCutDay)||25)+' 日請款')
+    +(sk.ready?'・<b style="color:var(--g3)">可以準備切換（6-2b，要 Lotion 確認）</b>':'')+'</div>';
+  var it=(L.items||[]);
+  if(it.length){
+    h+='<table class="tbl" style="width:100%;font-size:12px"><thead><tr><th style="text-align:left">工程</th><th style="text-align:left">種類</th><th style="text-align:left">差在哪</th><th style="text-align:left">雲端算</th><th style="text-align:left">網頁存</th></tr></thead><tbody>'
+      +it.slice(0,50).map(function(x){var why=String(x.why||'').split(',').map(function(w){return _PCMP_WHY[w]||w;}).join('、');
+        return '<tr><td>'+esc(String(x.name||x.qid||''))+'</td><td>'+esc(_PCMP_KIND[x.kind]||x.kind||'')+'</td><td style="color:'+(x.explained?'var(--b4)':'var(--red)')+'">'+esc(why)+(x.explained?'（剛改過）':'')+'</td><td>'+_pcmpVal(x.cloud)+'</td><td>'+_pcmpVal(x.web)+'</td></tr>';}).join('')
+      +'</tbody></table>'+(it.length>50?'<div style="font-size:11.5px;color:var(--b4)">只列前 50 筆，共 '+it.length+' 筆</div>':'');
+  }
+  return h+'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">比對對象、金額（已付後的差額筆合計）、含稅（只比沒付的）、開不開發票；到期日不比（網頁保留舊期別的到期日）。36 小時內改過的算「剛改過」，不中斷連續天數。</div></div></div>';
+}
+function payCmpRun(){   // 主控台用（測試專案驗收）：不管開關跑一次，只寫最後結果
+  if(_roDeny())return;if(!_fbUser){toast('請先登入');return;}
+  toast('雲端應付比對中…');
+  _fbUser.getIdToken().then(function(tok){return fetch(_fnUrl('payCmpNow'),{method:'POST',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},body:'{}'});})
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j&&j.error&&j.error.message)||('HTTP '+r.status));return j;});})
+    .then(function(j){toast('應付比對完成：不一致 '+((j.n&&j.n.bad)||0)+' 筆');_pcmpLoad(function(){var c=document.getElementById('pay-cmp-card');if(c)c.outerHTML=_pcmpHtml();});})
+    .catch(function(e){toast('應付比對失敗：'+(e&&e.message||'')+'（雲端程式部署了嗎？）');});
+}
+function _pcmpCfgSet(o){
+  if(!_fbDb||!_pcmpCan())return Promise.resolve(false);
+  return _fbDb.ref('fydata/private/payCompare/cfg').update(o).then(function(){PAY_CMP.cfg=Object.assign({},PAY_CMP.cfg||{},o);return true;}).catch(function(e){_err('_pcmpCfgSet',e);toast('存不進雲端：'+(e&&e.message||''));return false;});
+}
+function _pcmpDetailHtml(){
+  return '<div style="font-size:12.5px;line-height:1.7">'
+    +'<div><b>開始以後每天 07:40</b>，雲端用跟網頁同一套算法重算一份「應該有的自動應付」，跟網頁存的逐筆比，結果放在 經營報表 › 資料健檢「☁ 雲端應付比對」。</div>'
+    +'<div style="margin-top:4px"><b>比哪些</b>：分包每期計價、保留款退還、提前放款、預付款、介紹費、業務抽成、業主端佣金（薪資、勞健保、零用金、稅費第二批）。</div>'
+    +'<div style="margin-top:4px"><b>不會動到什麼</b>：應付照舊由網頁產生、付款照舊在網頁按；雲端只讀、只寫比對結果。</div>'
+    +'<div style="margin-top:4px"><b>之後</b>：連續 4 週一致（36 小時內剛改過的不算不一致）、中間跨過一次 25 日請款，才會再問要不要切換成雲端產生應付（6-2b）。</div>'
+    +'<div style="margin-top:4px;color:var(--b4)">退回＝兩週後再問；修改＝指定從哪一天開始比。</div></div>';
+}
+function _pcmpAddDays(d,n){var t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+n);return t.toISOString().slice(0,10);}
+_decReg('payCmpOn',{
+  title:'開始雲端應付比對',todo:function(){return '雲端應付比對：要不要開始（第 6 步 6-2a，不改應付）';},sub:'確認＝明天 07:40 起雲端每天重算一份自動應付跟網頁比；退回＝兩週後再問；修改＝指定開始日期',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin()&&!!_fbUser&&PAY_CMP.ok;},
+  list:function(){var C=PAY_CMP.cfg||{};if(!PAY_CMP.ok||C.on)return [];return localToday()>=String(C.askFrom||_PCMP_ASK_FROM)?[{k:'payCmpOn'}]:[];},
+  key:function(x){return x.k;},
+  head:function(){return '雲端應付比對（先比對、不改應付）';},
+  body:function(){return '<div style="font-size:11.5px;color:var(--b4)">6-1 分次付款已跑過一個完整月請款；開始比對以後，連續 4 週一致才會再問要不要切換。</div>';},
+  detail:_pcmpDetailHtml,
+  ok:function(){return _pcmpCfgSet({on:true,at:Date.now(),by:_meEmail()||'',startDay:null});},
+  reject:function(x,why){return _pcmpCfgSet({askFrom:_pcmpAddDays(localToday(),14),rejAt:Date.now(),rejWhy:String(why||'').slice(0,200)});},
+  edit:function(){
+    _modal('雲端應付比對：從哪一天開始','<div class="f"><label>開始日期（那天 07:40 第一次比）</label><input type="date" id="pcmp-start" value="'+esc(_pcmpAddDays(localToday(),1))+'" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8)"></div>',function(){
+      var v=String((document.getElementById('pcmp-start')||{}).value||'');if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){toast('請選日期');return false;}
+      _pcmpCfgSet({on:true,at:Date.now(),by:_meEmail()||'',startDay:v}).then(function(ok){if(ok)toast('已設定：'+v+' 起每天比對');_decRefresh('payCmpOn');});
+    });
+  }
 });
 // ══════════ v6.0.191 LINE 收件：AI 建議歸檔 → 總覽一張拍板卡一次確認（陳軒轉 Lotion 11/07：6 件未歸檔要一件一件按）══════════
 // AI 帳號（tools/fy-draft.js inbox-suggest）處理過的收件寫 x.sug={qid,caseName,note,why,by,at}；這裡把全部建議收成一張卡：

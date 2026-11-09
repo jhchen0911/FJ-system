@@ -486,6 +486,52 @@ exports.pnlSnapNow = onRequest({ region: REGION, cors: ['https://jhchen0911.gith
     res.json(Object.assign({ ok: true }, await runPnl(Date.now())));
   } catch (e) { console.error('pnlSnapNow', e); res.status(500).json({ error: { message: '損益快照失敗' } }); }
 });
+// ══════════ 第 6 步 6-2a：衍生應付的雲端比對（小批次線；先比對、不寫應付）══════════
+// payCompare 每天 07:40（台北）：開關 fydata/private/payCompare/cfg.on 沒開（預設）就什麼都不做；開了才用同一套算法（functions/ops/paycmp.js）重算第一批自動應付，
+//   跟網頁存的 fydata/private/payables 逐筆比 → 結果寫 fydata/private/payCompare/latest（明細最多 200 筆）、每天摘要 payCompare/days/<日期>（留 70 天）。
+//   不寫應付、不寫總覽待辦（只有比對失敗寫一筆後端待辦）。連續 4 週一致（能解釋的時間差不中斷）、中間跨過一次 25 日請款 → 資料健檢卡顯示「可以準備切換」，切換是 6-2b。
+// 開關由首頁拍板卡（payCmpOn）打開；cfg.startDay 是延後開始日（拍板卡「修改」）。
+// payCmpNow：管理員手動跑一次（測試專案驗收用；不管開關、只寫 latest 並標 manual，不算進連續天數）。
+const payCmpCore = require('./ops/paycmp.js');
+async function runPayCmp(now, manual) {
+  const db = admin.database();
+  const val = (p) => db.ref(p).once('value').then((s) => s.val() || {});
+  const cfg = await val('fydata/private/payCompare/cfg'), day = payCmpCore.tpeYmd(now);
+  if (!manual && (!cfg.on || (cfg.startDay && day < String(cfg.startDay)))) return { off: true };
+  const [quotes, invoices, contracts, params, quoteSens, payables] = await Promise.all([
+    val('fydata/shared/quotes'), val('fydata/shared/invoices'), val('fydata/shared/contracts'), val('fydata/shared/params'),
+    val('fydata/private/quoteSens'), val('fydata/private/payables'),
+  ]);
+  const r = payCmpCore.compare({ quotes, invoices, contracts, params, quoteSens, payables }, now);
+  if (manual) r.manual = true;
+  await db.ref('fydata/private/payCompare/latest').set(JSON.parse(JSON.stringify(r)));   // 去掉 undefined
+  if (!manual) {
+    await db.ref('fydata/private/payCompare/days/' + day).set({ ok: r.ok, exp: r.n.exp, diff: r.n.diff, bad: r.n.bad, at: now });
+    const keys = Object.keys(await val('fydata/private/payCompare/days')).sort();
+    for (const k of keys.slice(0, Math.max(0, keys.length - payCmpCore.DAYS_KEEP))) await db.ref('fydata/private/payCompare/days/' + k).remove();
+  }
+  console.log('[應付比對]', day, '應有', r.n.exp, '一致', r.n.ok, '不一致', r.n.bad, '可解釋', r.n.explained);
+  return { day, n: r.n, ok: r.ok };
+}
+exports.payCompare = onSchedule({ schedule: '40 7 * * *', timeZone: TZ, region: REGION, memory: '1GiB', timeoutSeconds: 300 }, async () => {
+  const db = admin.database();
+  try { await runPayCmp(Date.now(), false); await db.ref('fydata/todo/paycmp').set(null); }
+  catch (e) {
+    console.error('payCompare', e);
+    await db.ref('fydata/todo/paycmp').set({ fail: { id: 'paycmp_fail', src: 'paycmp', key: 'fail', urgent: false, text: '雲端應付比對今天沒跑成功', sub: '經營報表 › 資料健檢「☁ 雲端應付比對」', go: 'health', at: Date.now() } }).catch((e2) => console.error('payCompare.todo', e2));
+  }
+});
+exports.payCmpNow = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], memory: '1GiB', timeoutSeconds: 300 }, async (req, res) => {
+  try {
+    if (req.method !== 'POST') { res.status(405).json({ error: { message: '只接受 POST' } }); return; }
+    const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
+    if (!m) { res.status(401).json({ error: { message: '需要登入' } }); return; }
+    const t = await admin.auth().verifyIdToken(m[1]);
+    const role = t.fy || roleOf(t.email, await lists());
+    if (role !== 'admin') { res.status(403).json({ error: { message: '只有管理員可以手動執行' } }); return; }
+    res.json(Object.assign({ ok: true }, await runPayCmp(Date.now(), true)));
+  } catch (e) { console.error('payCmpNow', e); res.status(500).json({ error: { message: '應付比對失敗' } }); }
+});
 // ══════════ 改版第 5 步 5d：整體日報（#8）、實際進度回填（#9）、待辦同步 Google 工作表（#21） ══════════
 // #8 每天 21:30（台北）：讀已確認的日報（報價的 dailyLogs）→ 豐有內部群組（lineCfg/groups/<gid>.audience='internal'）直接推 LINE；
 //    有營造廠的群組（沒設定也算）只建「整體日報」草稿（type dailyOut）給 Lotion 自己轉發。每個群組每天只處理一次（fydata/dailyOut/<日期>/<gid>）。
