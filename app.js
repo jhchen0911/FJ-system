@@ -29843,6 +29843,7 @@ function renderTopNav(){
       var _id=_cur.id.replace(/^page-/,'');
       if(_id==='invoice-edit'||_id==='invoice-prev')_id='invoice';
       var _b=document.getElementById('tn-'+_id);if(_b)_b.classList.add('active');
+      try{_nav5Active(_id);}catch(e){_err('renderTopNav.nav5',e);}   // 改版第 7 步②：子頁（施工成本等）亮所屬的入口
     }
   }catch(e){_err('renderTopNav',e);}
 }
@@ -43050,6 +43051,7 @@ function _nav5Key(p){
   return 'more';
 }
 function _nav5Active(p){
+  try{var _mb=document.getElementById('mnb-acct');if(_mb)_mb.classList.remove('active');}catch(e){_err('_nav5Active',e);}   // _goCore 只清 mn- 開頭的
   if(!_nav5On())return;
   var k=_nav5Key(p);
   ['sn-','mn-','tn-'].forEach(function(pre){var e=document.getElementById(pre+k);if(e)e.classList.add('active');});
@@ -43107,8 +43109,8 @@ function renderMorePage(){
 }
 // ── 今天要做的事：決策卡（要拍板，點進去確認／退回／修改）＋提醒卡（只有「已處理」「延後」）──
 // 只處理呈現：待辦清單照舊由 updateDashTodo／_v6TodoItems 算（含雲端待辦），這裡分類、合併同案、收起不急的、套用本機延後。
-function _tdIsDec(it){var t=String(it&&it.type||'');return /^dec_|draft|sync_cf|conflict/.test(t);}
-function _tdKey(it){return String(it.type||'')+'|'+String(it.jump||'')+'|'+String(it.text||'').replace(/[\d（）()天日期後逾今]+/g,'');}   // 同一個跳轉（例如都到應付頁）的不同筆，靠文字（去掉天數）分開
+function _tdIsDec(it){var t=String(it&&it.type||'');return /^dec_|draft|sync_cf|conflict|^tomb_hold$|^vp_check$|^ai_held$/.test(t);}   // 刪除申請、付包商款核准、暫存通知：要人處理，不給「已處理／延後」
+function _tdKey(it){return String(it.type||'')+'|'+String(it.id||it.qid||'')+'|'+String(it.jump||'')+'|'+String(it.text||'').replace(/[（(][^）)]*[天到期過][^）)]*[）)]/g,'').replace(/還剩\s*\d+\s*天|\d+\s*天後|逾期\s*\d+\s*天|已\s*\d+\s*天/g,'');}   // 只去掉每天會變的天數（括號裡的「N 天後」「已過期」等），日期、廠商、金額留著，同一家不同筆不會一起被延後   // 同一個跳轉（例如都到應付頁）的不同筆，靠文字（去掉天數）分開
 function _tdSig(it){return String(it.text||'').replace(/\d+/g,'#')+'|'+String(it.sub||'');}
 function _tdSnzGet(){try{return JSON.parse(localStorage.getItem('fy_today_snz')||'{}')||{};}catch(e){return {};}}
 function _tdSnzSet(o){try{localStorage.setItem('fy_today_snz',JSON.stringify(o));}catch(e){_err('_tdSnzSet',e);}}
@@ -43122,7 +43124,7 @@ function _tdHidden(it,snz,today){
 function _tdCaseOf(it){
   if(it.qid){var q=Q.find(function(x){return x.id===it.qid;});if(q&&q.name)return q.name;}
   var t=String(it.text||''),best='';
-  (Q||[]).forEach(function(q){var n=String(q&&q.name||'');if(n.length>best.length&&n.length>=2&&t.indexOf(n)===0)best=n;});
+  (Q||[]).forEach(function(q){var n=String(q&&q.name||'');if(n.length>best.length&&n.length>=2&&t.indexOf(n)>=0)best=n;});   // 案名出現在文字裡就算（有的提醒前面有「本月要請款：」等字）
   return best;
 }
 var _tdCur=[];

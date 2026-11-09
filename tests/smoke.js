@@ -3626,7 +3626,7 @@ async function newPage(browser, width, height) {
           INV.length=0;INV.push({id:'i616',quoteId:'q616',project:'待辦測試案',client:'業主',periodNo:1,date:_dAdd(ym+'-01',-10),items:[],totals:{total:100000},received:0});
           PAYABLES.length=0;
           go('dash');
-          const t=document.getElementById('dash-todo-list').innerHTML;
+          const t=document.getElementById('dash-todo-list').innerHTML+(_nav5On()?' '+_tdCur.map(x=>x.jump).join(' '):'');   // v6.0.212 新首頁：跳轉改事件綁定，不寫在 HTML 裡
           out.todo=/待登錄廠商請款：甲乙工程行/.test(t)&&/本月尚未開單：待辦測試案/.test(t)&&/自有材料在工地：待辦測試案 10 支，最久 130 天（請確認是否該歸還）/.test(t)&&/_rfqTab='mat'/.test(t)&&/invTab\('vendor'\)/.test(t);
           out.shortcut=!document.getElementById('dash-shortcuts');   // v6.0.33 總覽捷徑卡移除（底部列／側欄已有）
           Q=[];INV.length=0;MAT_LEDGER.length=0;
@@ -9118,7 +9118,7 @@ async function newPage(browser, width, height) {
         out.btn = !document.getElementById('ai-notify-btn');   /* v6.0.175：按鈕移到人員管理 › LINE 機器人卡 */
         out.noFloat = /ai-notify-btn/.test(String(renderLineBox));
         const gw = g.getBoundingClientRect().width, kw = kg ? kg.getBoundingClientRect().width : 0;
-        out.full = kg && Math.abs(kw - gw) < 2; out.w = [gw, kw];
+        out.full = kg && (getComputedStyle(kg).display === 'none' || Math.abs(kw - gw) < 2); out.w = [gw, kw];   // v6.0.212 新首頁：統計卡收到「看公司數字」（不顯示也算過）
         _isReaderUser = false;
         /* 立即重跑 → 提醒卡跟著重讀，雲端回報的失敗原因要出現 */
         let reads = 0; const vals = { 'fydata/health/latest': null, 'fydata/health/remind': null, 'fydata/health/remindErr': { at: 1, msg: 'value argument contains undefined' } };
@@ -12347,10 +12347,18 @@ async function newPage(browser, width, height) {
         out.oldCount = Object.values(JSON.parse(localStorage.getItem('fy_nav_old_n') || '{}')).reduce((a, b) => a + b, 0) === 1;
         navUseOld(false); await T(60);
         out.back = document.body.classList.contains('nav5') && JSON.stringify(vis()) === JSON.stringify(['今天', '專案', '報價', '帳務', '更多']);
+        // 審查修正：帳務亮過再換頁不會一直亮；同一家廠商不同筆應付延後不會互相影響；刪除申請等不給延後
+        go('acct'); await T(30); go('quotes'); await T(30);
+        out.hl = !document.getElementById('mnb-acct').classList.contains('active');
+        out.keys = _tdKey({ type: 'pay_due', jump: 'x', text: '廠商A 2026-11-12（3天後）' }) !== _tdKey({ type: 'pay_due', jump: 'x', text: '廠商A 2026-11-20（11天後）' })
+          && _tdKey({ type: 'pay_due', jump: 'x', text: '廠商A 2026-11-12（3天後）' }) === _tdKey({ type: 'pay_due', jump: 'x', text: '廠商A 2026-11-12（2天後）' });
+        out.noSnz = _tdIsDec({ type: 'tomb_hold' }) && _tdIsDec({ type: 'vp_check' });
+        out.caseIn = _tdCaseOf({ text: '本月要請款：範例工程N5 第 2 期' }) === '範例工程N5';
         Q = Q.filter((q) => q.id !== 'qN5');
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     }, W);
+    check('v6.0.212 審查修正（寬 ' + W + '）：帳務不會一直亮、同家廠商不同筆延後分開、刪除申請／付包商款核准不給延後、案名在中間也合併', r.hl && r.keys && r.noSnz && r.caseIn, JSON.stringify(r));
     check('v6.0.212 5 個入口（寬 ' + W + '）：選單只有今天、專案、報價、帳務、更多；更多收其餘頁面（含合約管理、安全母索）且點得進去、不左右捲', r.nav5 && r.five && r.more && r.moreActive && r.lifeline && r.noScroll, JSON.stringify(r));
     if (W === 1440) check('v6.0.212 今天要做的事：決策卡／提醒卡分開、同案合併、不急的收在「之後的 N 件」、已處理（內容變了再出現）、延後（明天／3 天後／下週一／自選）、沒事顯示「今天沒有要確認的事」、唯讀看得到沒有按鈕、公司數字收成一行', r.dec && r.merge && r.later && r.jump && r.done && r.reappear && r.laterOpts && r.snoozed && r.empty && r.ro && r.kpiHidden, JSON.stringify(r));
     check('v6.0.212 切回舊版（寬 ' + W + '）：舊選單回來、記一次次數、可以再改回新版', r.old && r.oldCount && r.back, JSON.stringify(r));
