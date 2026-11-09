@@ -12244,7 +12244,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── 第 6 步 6-2a 雲端應付比對：同一份假資料，前端實際產生的自動應付（syncCostToPayable／_salesCommSyncAll／_commSyncAll）跟雲端 functions/ops/paycmp.js 重算的逐筆一致；改一筆抓得到；卡片、拍板卡 ──
+  // ── v6.0.206 第 6 步 6-2a 雲端應付比對：同一份假資料，前端實際產生的自動應付（syncCostToPayable／_salesCommSyncAll／_commSyncAll）跟雲端 functions/ops/paycmp.js 重算的逐筆一致；改一筆抓得到；卡片、拍板卡 ──
   {
     const PC = require('../functions/ops/paycmp.js');
     const D = {
@@ -12317,14 +12317,14 @@ async function newPage(browser, width, height) {
       }, { res: bad, day: '2026-12-25' });
       cardOk = !c2.err && c2.off && c2.card; decOk = !c2.err && c2.ask && c2.wait && c2.on;
       const ns = JSON.stringify(PC.streak({ '2026-12-25': { ok: true }, '2026-12-24': { ok: true }, '2026-12-23': { ok: false } }, '2026-12-25', 25));
-      check('6-2a 卡片：還沒開始／有結果時顯示連續一致天數、不一致明細；前端連續天數算法跟雲端一樣', cardOk && c2.streak === ns, JSON.stringify(c2));
-      check('6-2a 啟用開關：拍板卡 payCmpOn 只在開關關著、日期到了（預設 2026-12-26 起）才出現，有完整說明（detail）', decOk, JSON.stringify(c2));
+      check('v6.0.206 6-2a 卡片：還沒開始／有結果時顯示連續一致天數、不一致明細；前端連續天數算法跟雲端一樣', cardOk && c2.streak === ns, JSON.stringify(c2));
+      check('v6.0.206 6-2a 啟用開關：拍板卡 payCmpOn 只在開關關著、日期到了（預設 2026-12-26 起）才出現，有完整說明（detail）', decOk, JSON.stringify(c2));
     }
     const ids = res ? (res.n.exp + '筆') : '';
-    check('6-2a 雲端重算的自動應付跟前端實際產生的逐筆一致（分包期別含分段列、預付款抵扣含稅、提前放款、保留款退還、租賃期別、預付款、介紹費、業務抽成每營收％與每單位、業主端佣金固定額與營收％；自付、沒計價、沒得標的不掛）',
+    check('v6.0.206 6-2a 雲端重算的自動應付跟前端實際產生的逐筆一致（分包期別含分段列、預付款抵扣含稅、提前放款、保留款退還、租賃期別、預付款、介紹費、業務抽成每營收％與每單位、業主端佣金固定額與營收％；自付、沒計價、沒得標的不掛）',
       !r.err && res && res.n.bad === 0 && res.n.diff === 0 && res.n.exp >= 10 && res.n.ok === res.n.exp, r.err || (ids + ' ' + JSON.stringify(res && res.items).slice(0, 600) + ' 前端：' + JSON.stringify((r.pay || []).map((p) => p.id + '=' + p.amount + (p.incl != null ? '/' + p.incl : '')))));
-    check('6-2a 改一筆金額、刪一筆佣金 → 雲端比對抓得到（不一致 2 筆，不算剛改過）', !!bad && bad.n.bad === 2 && bad.items.some((x) => x.id === 'paypk1_p2' && /amount/.test(x.why)) && bad.items.some((x) => x.id === 'comm_pq1_m1' && x.why === 'missing'), JSON.stringify(bad && bad.items));
-    check('6-2a 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.206 6-2a 改一筆金額、刪一筆佣金 → 雲端比對抓得到（不一致 2 筆，不算剛改過）', !!bad && bad.n.bad === 2 && bad.items.some((x) => x.id === 'paypk1_p2' && /amount/.test(x.why)) && bad.items.some((x) => x.id === 'comm_pq1_m1' && x.why === 'missing'), JSON.stringify(bad && bad.items));
+    check('v6.0.206 6-2a 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
   await browser.close();
