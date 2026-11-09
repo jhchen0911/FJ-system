@@ -11035,7 +11035,7 @@ async function newPage(browser, width, height) {
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
-      const out = {}; const keepQ = Q, keepM = MAT_MOVES, keepF = MAT_MOVE_FIN, keepL = MAT_LEDGER, keepLog = MAT_MOVE_LOG, keepA = MAT_AUDIT, oC = window.showConfirm, oAd = window._decIsAdmin;
+      const out = {}; const keepQ = Q, keepM = MAT_MOVES, keepF = MAT_MOVE_FIN, keepL = MAT_LEDGER, keepLog = MAT_MOVE_LOG, keepA = MAT_AUDIT, oC = window.showConfirm, oAd = window._decIsAdmin, kR = _isReaderUser, kDb = _fbDb, kU = _fbUser, kW = window._shWholeOk;
       try {
         MAT_MOVES = []; MAT_MOVE_FIN = {}; MAT_MOVE_LOG = []; MAT_AUDIT = [];
         Q = [{ id: 'qT200', name: '範例T200', client: '甲', awarded: true, items: [], _mt: 1 }];
@@ -11084,6 +11084,12 @@ async function newPage(browser, width, height) {
         MAT_MOVE_LOG.push({ id: 'ml_readertest1', mvId: m.id, at: Date.now(), by: 'reader@example.com', kind: 'edit', _p: 1 });
         _mvLogFlush();
         out.readerNoWrite = wrote === 0;
+        // 拉紀錄：唯讀帳號會讀台帳紀錄；工務（非管理員、非唯讀）只讀修改紀錄
+        const paths = []; _fbDb = { ref: function (p) { paths.push(p); return { orderByChild: function () { return { startAt: function () { return { once: function () { return Promise.resolve({ val: function () { return null; } }); } }; } }; } }; } };
+        _mvLogPull(); const pR = paths.slice(); paths.length = 0;
+        _isReaderUser = false; const oW = window._shWholeOk; window._shWholeOk = function () { return false; };
+        _mvLogPull(); const pS = paths.slice(); window._shWholeOk = oW;
+        out.pullGate = pR.indexOf('fydata/matAudit') >= 0 && pS.indexOf('fydata/matAudit') < 0 && pS.indexOf('fydata/matMoveLog') >= 0;
         _isReaderUser = oR; _fbDb = oDb; _fbUser = oU; MAT_MOVE_LOG.pop();
         window._decIsAdmin = oAd;
         // 台帳列的歷史在既有視窗裡（倉庫列「編輯」、工地列「歸還／損耗」），可以點回簽收單
@@ -11101,10 +11107,10 @@ async function newPage(browser, width, height) {
         ['matMoveLog', 'matAudit'].forEach(function (k) { const src = []; const dst = k === 'matMoveLog' ? MAT_MOVE_LOG : MAT_AUDIT; src.forEach(() => {}); });
         out.keep = n0 >= 7;
         const sy = _syncPayload().data; out.notInSync = !('matMoveLog' in sy) && !('matAudit' in sy);   // 不走整包同步（雲端各寫一筆、只能新增）
-      } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; MAT_MOVE_LOG = keepLog; MAT_AUDIT = keepA; window.showConfirm = oC; window._decIsAdmin = oAd; }
+      } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; MAT_MOVE_LOG = keepLog; MAT_AUDIT = keepA; window.showConfirm = oC; window._decIsAdmin = oAd; _isReaderUser = kR; _fbDb = kDb; _fbUser = kU; window._shWholeOk = kW; }
       return out;
     });
-    check('v6.0.200 進退料追溯：建立／修改（改前→改後、原因）／確認都留紀錄、已確認的單修改原因必填、自動改台帳與撤回重改留台帳紀錄、簽收單明細看歷史（工務看不到台帳與金額、唯讀帳號看得到但寫不出去）、台帳列在既有視窗看歷史並可點回簽收單', r.create && r.draftEdit && r.confirm && r.apply && r.needWhy && r.okEdit && r.undo && r.histAdmin && r.histStaff && r.histReader && r.readerNoWrite && r.ledHist && r.siteHist && r.keep && r.notInSync, JSON.stringify(r));
+    check('v6.0.200 進退料追溯：建立／修改（改前→改後、原因）／確認都留紀錄、已確認的單修改原因必填、自動改台帳與撤回重改留台帳紀錄、簽收單明細看歷史（工務看不到台帳與金額、唯讀帳號看得到但寫不出去）、台帳列在既有視窗看歷史並可點回簽收單', r.create && r.draftEdit && r.confirm && r.apply && r.needWhy && r.okEdit && r.undo && r.histAdmin && r.histStaff && r.histReader && r.readerNoWrite && r.pullGate && r.ledHist && r.siteHist && r.keep && r.notInSync, JSON.stringify(r));
     check('v6.0.200 追溯測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
