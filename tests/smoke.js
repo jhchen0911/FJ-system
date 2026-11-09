@@ -11442,7 +11442,7 @@ async function newPage(browser, width, height) {
         MAT_TAGS[_mvTagId('qP204', 'ra')].ack = D(-4);   // 4 天前按的
         out.ackAgain = _mvIdleList().find(e => e.id === 'qP204|ra').level === 'warn';
         _DEC.mvIdleUrg.reject(g('qQ204|rd'), '業主要求保留');
-        out.keep = _mvIdleList().find(e => e.id === 'qQ204|rd').level === 'keep' && !_decItems('mvIdleUrg').some(e => e.id === 'qQ204|rd');
+        out.keep = !_mvIdleList().some(e => e.id === 'qQ204|rd') && !_decItems('mvIdleUrg').some(e => e.id === 'qQ204|rd');
         // 還沒拔完的不提醒；退完的不列
         Q[1].dailyLogs = [logs[0]];
         out.notYet = !_mvIdleList().some(e => e.id === 'qQ204|rd');
@@ -11451,10 +11451,24 @@ async function newPage(browser, width, height) {
         // 支撐類等分層定案：不提醒
         Q[0].mat.rents.push(R('rs', { name: '支撐', spec: 'H350', len: 9 }));
         out.strut = !_mvIdleList().some(e => e.id === 'qP204|rs');
+        // 審查修正：拔除完成後才進場的批次從進場日起算、還沒到進場日的不算；單價空白不寫 NT$ 0；指定了非樁類工項照那個工項起算（不卡在緊急卡）
+        Q = [mkQ('qR204', [R('re', { name: '鋼板樁', spec: 'IV', len: 9, item: 'qR204:1', batches: [{ id: 'e1', d: D(-45), m: 90, o: '' }, { id: 'e2', d: D(-2), m: 90, o: '' }, { id: 'e3', d: D(3), m: 90, o: '' }] }),
+          R('rz', { name: '鋼板樁', spec: 'IV', len: 9, item: 'qR204:1', rate: 0 }), R('rx', { name: '覆工板', spec: '', len: 3 })],
+          [items[0], items[1], { desc: '地盤改良 灌漿', qty: 1, unit: '式', price: 1, cat: 'both' }])];
+        Q[0].dailyLogs = logs.concat([{ date: D(-5), progressRows: [{ itemIdx: 2, qty: 1, ph: 'remove' }] }]);
+        const L3 = _mvIdleList(), g3 = id => L3.find(e => e.id === id);
+        out.late = g3('qR204|re').openM === 180 && g3('qR204|re').cost === 90 * 5 + 90 * 2 && g3('qR204|re').perDay === 180;
+        out.noRate = /月租單價空白/.test(_mvIdleMoney(g3('qR204|rz'))) && !/NT\$ 0/.test(_mvIdleMoney(g3('qR204|rz')));
+        out.unkBefore = g3('qR204|rx').need === 'unknown';
+        _mvTagSet('qR204', 'rx', { item: 'qR204:2' });
+        const gx = _mvIdleList().find(e => e.id === 'qR204|rx');
+        out.unkPicked = !!gx && gx.need !== 'unknown' && gx.start === D(-5) && gx.level === 'warn';
+        _mvTagSet('qR204', 'rx', { item: '', keep: 1 });
+        out.unkKeep = !_mvIdleList().some(e => e.id === 'qR204|rx' && e.need === 'unknown');
       } finally { Q = keepQ; MAT_TAGS = keepT; }
       return out;
     });
-    check('v6.0.204 進退料 M4b 樁類退料提醒：對到工項用該工項拔除完成、只對到樁類用樁類全部拔完保底並出卡指定、只有一個樁類工項自動用、都對不到出緊急卡、補指定後改用工項、超過 3 天提醒（工務看得到多付租金）／7 天緊急、已安排退料 3 天後再提醒、業主要求留不再提醒、支撐類等分層', r.item && r.cat && r.single && r.unknown && r.cards && r.picked && r.ack && r.ackAgain && r.keep && r.notYet && r.returned && r.strut, JSON.stringify(r));
+    check('v6.0.204 進退料 M4b 樁類退料提醒：對到工項用該工項拔除完成、只對到樁類用樁類全部拔完保底並出卡指定、只有一個樁類工項自動用、都對不到出緊急卡、補指定後改用工項、超過 3 天提醒（工務看得到多付租金）／7 天緊急、已安排退料 3 天後再提醒、業主要求留不再提醒、支撐類等分層', r.item && r.cat && r.single && r.unknown && r.cards && r.picked && r.ack && r.ackAgain && r.keep && r.notYet && r.returned && r.strut && r.late && r.noRate && r.unkBefore && r.unkPicked && r.unkKeep, JSON.stringify(r));
     check('v6.0.204 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
