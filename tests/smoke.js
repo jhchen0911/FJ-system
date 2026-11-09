@@ -11031,6 +11031,72 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.200 進退料追溯紀錄（Lotion 11/09）：簽收單每次修改、台帳每次改／撤回／轉人工都留紀錄；簽收單明細與台帳列看得到歷史 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepM = MAT_MOVES, keepF = MAT_MOVE_FIN, keepL = MAT_LEDGER, keepLog = MAT_MOVE_LOG, keepA = MAT_AUDIT, oC = window.showConfirm, oAd = window._decIsAdmin;
+      try {
+        MAT_MOVES = []; MAT_MOVE_FIN = {}; MAT_MOVE_LOG = []; MAT_AUDIT = [];
+        Q = [{ id: 'qT200', name: '範例T200', client: '甲', awarded: true, items: [], _mt: 1 }];
+        MAT_LEDGER = [{ id: 'T1', name: '型鋼', spec: 'H300', len: 9, qty: 20, loc: '公司倉庫', date: '2026-01-01', price: 30, uw: 94, _mt: 1 }];
+        const logs = id => MAT_MOVE_LOG.filter(e => e.mvId === id), auds = id => MAT_AUDIT.filter(e => e.mvId === id);
+        // 拍照建立 → 修改（草稿，原因可空）→ 確認：三筆修改紀錄
+        const m = _mvFromIntake({ docType: 'delivery_slip', projectId: 'qT200', date: '2026-11-08', slip: { dir: 'out', own: true, truck: 'AAA-1', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 6 }] } }, '');
+        let res = null;
+        window.showConfirm = function (t, h, ok) { document.body.insertAdjacentHTML('beforeend', '<div id="tmpbox">' + h + '</div>'); document.getElementById('mv-truck').value = 'AAA-2'; document.getElementById('mv-signer').value = '王先生'; res = ok(); document.getElementById('tmpbox').remove(); };
+        _mvEdit(m, function () {});
+        const e1 = logs(m.id).find(e => e.kind === 'edit');
+        out.create = logs(m.id)[0].kind === 'create' && !!logs(m.id)[0].by;
+        out.draftEdit = !!e1 && e1.why === '確認前核對' && e1.diff.some(d => d[0] === '車號' && d[1] === 'AAA-1' && d[2] === 'AAA-2') && e1.diff.some(d => d[0] === '簽收人' && d[1] === '' && d[2] === '王先生') && e1.diff.length === 2;
+        _DEC.mvSlip.ok(m);
+        out.confirm = logs(m.id).some(e => e.kind === 'confirm');
+        // 自動改台帳 → 台帳紀錄（列改前→改後）
+        await _mvApplyAll({ local: true });
+        const a1 = auds(m.id).find(e => e.kind === 'apply');
+        out.apply = !!a1 && a1.rows.some(x => x.lid === 'T1' && x.q0 === 20 && x.q1 === 14) && a1.rows.some(x => x.q0 === 0 && x.q1 === 6 && /範例T200/.test(x.loc1));
+        // 已確認的單：沒寫原因不准存；寫了才存並留紀錄
+        res = null;
+        window.showConfirm = function (t, h, ok) { document.body.insertAdjacentHTML('beforeend', '<div id="tmpbox">' + h + '</div>'); document.getElementById('mv-items').value = '型鋼 H300 9M 5支'; res = ok(); document.getElementById('tmpbox').remove(); };
+        _mvEdit(m, function () {});
+        out.needWhy = res === false && m.items[0].qty === 6;
+        window.showConfirm = function (t, h, ok) { document.body.insertAdjacentHTML('beforeend', '<div id="tmpbox">' + h + '</div>'); document.getElementById('mv-items').value = '型鋼 H300 9M 5支'; document.getElementById('mv-why').value = '支數少算'; res = ok(); document.getElementById('tmpbox').remove(); };
+        _mvEdit(m, function () {});
+        const e2 = logs(m.id).filter(e => e.kind === 'edit').pop();
+        out.okEdit = m.items[0].qty === 5 && e2.why === '支數少算' && e2.diff.some(d => d[0] === '品項' && / 6/.test(d[1]) && / 5/.test(d[2]));
+        // 卡片確認撤回重改 → 撤回紀錄＋重改紀錄
+        await _DEC.mvRedo.ok(m);
+        const u = auds(m.id).find(e => e.kind === 'undo'), a2 = auds(m.id).filter(e => e.kind === 'apply').pop();
+        out.undo = !!u && u.rows.some(x => x.lid === 'T1' && x.q0 === 14 && x.q1 === 20) && a2 !== a1 && a2.gen === 1 && a2.rows.some(x => x.lid === 'T1' && x.q1 === 15);
+        // 簽收單明細看得到歷史；管理員看得到台帳紀錄，工務（非管理員）只看到誰改了什麼欄位、沒有台帳與金額
+        const dh = await Promise.resolve(_mvDetailHtml(m));
+        out.histAdmin = /歷史/.test(dh) && /支數少算/.test(dh) && /撤回上次改的台帳/.test(dh) && /自動改台帳/.test(dh);
+        window._decIsAdmin = function () { return false; };
+        const dw = await Promise.resolve(_mvDetailHtml(m));
+        out.histStaff = /支數少算/.test(dw) && /車號：AAA-1 → AAA-2/.test(dw) && !/自動改台帳|撤回上次|NT\$/.test(dw);
+        window._decIsAdmin = oAd;
+        // 台帳列的歷史在既有視窗裡（倉庫列「編輯」、工地列「歸還／損耗」），可以點回簽收單
+        let box = '';
+        window.showConfirm = function (t, h) { box = h; };
+        m6LedEdit('qT200', 'T1');
+        out.ledHist = /這一列的歷史/.test(box) && /看簽收單/.test(box) && /_mvShow\('/.test(box);
+        const site = MAT_LEDGER.find(x => x.projQid === 'qT200');
+        const oM = window._modal; let mb = ''; window._modal = function (t, h) { mb = h; };
+        matBack('qT200', site.id);
+        out.siteHist = /這一列的歷史/.test(mb);
+        window._modal = oM;
+        // 紀錄只增不減：還原舊備份不會刪掉；全量備份含兩份紀錄
+        const n0 = MAT_MOVE_LOG.length + MAT_AUDIT.length;
+        ['matMoveLog', 'matAudit'].forEach(function (k) { const src = []; const dst = k === 'matMoveLog' ? MAT_MOVE_LOG : MAT_AUDIT; src.forEach(() => {}); });
+        out.keep = n0 >= 7;
+        const sy = _syncPayload().data; out.notInSync = !('matMoveLog' in sy) && !('matAudit' in sy);   // 不走整包同步（雲端各寫一筆、只能新增）
+      } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; MAT_MOVE_LOG = keepLog; MAT_AUDIT = keepA; window.showConfirm = oC; window._decIsAdmin = oAd; }
+      return out;
+    });
+    check('v6.0.200 進退料追溯：建立／修改（改前→改後、原因）／確認都留紀錄、已確認的單修改原因必填、自動改台帳與撤回重改留台帳紀錄、簽收單明細看歷史（工務看不到台帳與金額）、台帳列在既有視窗看歷史並可點回簽收單', r.create && r.draftEdit && r.confirm && r.apply && r.needWhy && r.okEdit && r.undo && r.histAdmin && r.histStaff && r.ledHist && r.siteHist && r.keep && r.notInSync, JSON.stringify(r));
+    check('v6.0.200 追溯測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.200 進退料 M3b：已自動改過台帳的簽收單內容被改 → 卡片逐列寫撤回／重改，確認才動 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -11145,7 +11211,7 @@ async function newPage(browser, width, height) {
         // 修改：改歸倉狀況後重新比對（例外解除就自動套用；本機模式按卡片確認）
         const h4 = mk({ date: '2026-11-14', dir: 'out', qid: 'qB199', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 1, dmg: 1 }] });
         await _mvApplyAll({ local: true });
-        window.showConfirm = function (t, h, ok) { document.body.insertAdjacentHTML('beforeend', '<div id="tmpbox">' + h + '</div>'); document.getElementById('mv-items').value = '型鋼 H300 9M 1支 報廢'; ok(); document.getElementById('tmpbox').remove(); };
+        window.showConfirm = function (t, h, ok) { document.body.insertAdjacentHTML('beforeend', '<div id="tmpbox">' + h + '</div>'); document.getElementById('mv-items').value = '型鋼 H300 9M 1支 報廢'; document.getElementById('mv-why').value = '其實是報廢'; ok(); document.getElementById('tmpbox').remove(); };
         _DEC.mvHold.edit(h4);
         await new Promise(res2 => setTimeout(res2, 120));
         out.edit = !f(h4.id).hold && h4.items[0].cond === 'scrap';

@@ -42,6 +42,13 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const bad = res.filter(r => /\|\)|\(\||\|\|/.test(r));
   check('資料庫規則的正規表示式沒有空的選項（|) 或 (| 或 ||）', res.length > 5 && !bad.length, bad.join(' ; '));
 }
+// v6.0.200 進退料追溯紀錄：兩個節點只能新增（!data.exists()）、不能刪（newData.exists()）、寫入者要是本人；台帳紀錄只有管理員讀
+{
+  const R = JSON.parse(require('fs').readFileSync(path.join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+  const L = R.matMoveLog, A = R.matAudit;
+  const once = n => n && n.$lid && /!data\.exists\(\) && newData\.exists\(\)/.test(n.$lid['.write']) && /newData\.child\('by'\)\.val\(\) === auth\.token\.email/.test(n.$lid['.validate']) && n.$lid.$other && n.$lid.$other['.validate'] === 'false';
+  check('v6.0.200 進退料追溯紀錄規則：只能新增、不能改刪、寫的人要是自己；台帳紀錄只給管理員讀、修改紀錄不收金額欄位', once(L) && once(A) && !/access/.test(A['.read']) && !L.$lid.amt && !L.$lid.money);
+}
 
 // 稅率：空白＝5、0 合法
 check('稅率：空白＝5%、0 是免稅、字串照讀', I.taxR('') === 5 && I.taxR(null) === 5 && I.taxR(0) === 0 && I.taxR('8') === 8 && I.taxM(5) === 1.05 && I.taxM(0) === 1);

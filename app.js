@@ -5407,6 +5407,7 @@ function importData(file){
         if(data.customers)CUSTOMERS=arr(data.customers);
         if(data.workers){WORKERS=arr(data.workers);try{_wkGraft();}catch(e2){_err('importData.wkGraft',e2);}try{localStorage.setItem('fy_workers',JSON.stringify(WORKERS));}catch(e2){_err('importData.workers',e2);}}   // 5a：一般備份的人員不含證件 → 接回本機留的證件
         if(data.projects){PROJECTS=arr(data.projects);try{localStorage.setItem('fy_projects',JSON.stringify(PROJECTS));}catch(e2){_err('importData.projects',e2);}}   // 4a（舊備份沒有 → 保留現值，下面 _prjSync 依報價補建）
+        ['matMoveLog','matAudit'].forEach(function(k){var src=data[k];if(!Array.isArray(src))return;var dst=k==='matMoveLog'?MAT_MOVE_LOG:MAT_AUDIT,have={};dst.forEach(function(e){if(e&&e.id)have[e.id]=1;});src.forEach(function(e){if(e&&e.id&&!have[e.id])dst.push(e);});try{_mvLogSave();}catch(e2){_err('importData.mvlog',e2);}});   // v6.0.200 追溯紀錄：只增不減（還原備份也不刪）
         if(data.matMoves){MAT_MOVES=arr(data.matMoves);try{localStorage.setItem('fy_matmoves',JSON.stringify(MAT_MOVES));}catch(e2){_err('importData.matMoves',e2);}}   // v6.0.195（舊備份沒有 → 保留現值）
         if(data.matMoveFin&&typeof data.matMoveFin==='object'&&!Array.isArray(data.matMoveFin)){MAT_MOVE_FIN=data.matMoveFin;try{localStorage.setItem('fy_matmovefin',JSON.stringify(MAT_MOVE_FIN));}catch(e2){_err('importData.matMoveFin',e2);}}
         if(data.costHist){COST_HIST=arr(data.costHist);try{localStorage.setItem('fy_cost_hist',JSON.stringify(COST_HIST));}catch(e2){_err('importData',e2);}}
@@ -7645,7 +7646,8 @@ function exportData(){
     let _sens=null;try{_sens=_sensBackupOf(data);}catch(e){_err('exportData.sens',e);}
     delete data.hr;delete data.payslips;delete data.petty;
     try{data.workers=(data.workers||[]).map(function(w){return _wkSplit(w).pub;});data.sensSplit=1;}catch(e){_err('exportData.wk',e);}
-    try{data.paidLog=PAID_LOG;data.payAudit=PAY_AUDIT;data.devId=_devId();data.appVersion=APP_VERSION;}catch(e){_err('exportData.audit',e);}   // v6.0.89
+    try{data.paidLog=PAID_LOG;data.payAudit=PAY_AUDIT;data.devId=_devId();data.appVersion=APP_VERSION;}catch(e){_err('exportData.audit',e);}
+    try{data.matMoveLog=MAT_MOVE_LOG;data.matAudit=MAT_AUDIT;}catch(e){_err('exportData.mvlog',e);}   // v6.0.200 進退料追溯紀錄   // v6.0.89
     const json=JSON.stringify(data,null,2);
     const blob=new Blob([json],{type:'application/json'});
     const url=URL.createObjectURL(blob);
@@ -8162,6 +8164,7 @@ var TOMBS={};try{TOMBS=JSON.parse(localStorage.getItem('fy_tombs')||'{}');}catch
 var PROJECTS=[];try{var _prx=localStorage.getItem('fy_projects');if(_prx)PROJECTS=JSON.parse(_prx)||[];}catch(e){_err('projects.load',e);PROJECTS=[];}   // 改版第 4 步 4a 專案資料集
 var MAT_MOVES=[];try{var _mvx=localStorage.getItem('fy_matmoves');if(_mvx)MAT_MOVES=JSON.parse(_mvx)||[];}catch(e){_err('matMoves.load',e);MAT_MOVES=[];}   // v6.0.195 進退料簿（shared，逐筆；不含金額）
 var MAT_MOVE_FIN={};try{var _mfx=localStorage.getItem('fy_matmovefin');if(_mfx)MAT_MOVE_FIN=JSON.parse(_mfx)||{};}catch(e){_err('matMoveFin.load',e);MAT_MOVE_FIN={};}   // v6.0.195 進退料金額那一半（private，以進退料 id 為鍵）
+var MAT_MOVE_LOG=[],MAT_AUDIT=[];try{MAT_MOVE_LOG=JSON.parse(localStorage.getItem('fy_matmovelog')||'[]')||[];MAT_AUDIT=JSON.parse(localStorage.getItem('fy_mataudit')||'[]')||[];}catch(e){_err('matMoveLog.load',e);}   // v6.0.200 進退料追溯紀錄（只增不減）
 function _tomb(coll,id,moved){   // moved：改編號（舊 id 換新 id，付款帳本已搬過去）→ 舊 id 照樣立墓碑
   if(!id)return false;
   if(coll==='payables'&&!moved){
@@ -10768,7 +10771,8 @@ function _pullPrivate(cb){
     try{_pullRelayCosts();}catch(e){_err('_pullPrivate',e);}
     try{_pullRelayExpenses();}catch(e){_err('_pullPrivate',e);}
     try{_salesCommBoot();}catch(e){_err('_pullPrivate.sales',e);}
-    try{_mvApplySoon(3000);}catch(e){_err('_pullPrivate.mv',e);}   // v6.0.199 進退料 M3：私有資料下載完再套用（台帳要是最新的）
+    try{_mvApplySoon(3000);}catch(e){_err('_pullPrivate.mv',e);}
+    try{_mvLogPull();}catch(e){_err('_pullPrivate.mvlog',e);}   // v6.0.200 追溯紀錄   // v6.0.199 進退料 M3：私有資料下載完再套用（台帳要是最新的）
     try{_wkSensPull();}catch(e){_err('_pullPrivate.wk',e);}   // v6.0.118 健檢2 #5
     try{_tombReqPull();}catch(e){_err('_pullPrivate.tomb',e);}   // v6.0.118 健檢2 #3
     if(cb)cb(true);
@@ -32664,6 +32668,7 @@ function matBack(qid,lid){
     +'<label>損耗認列單價（$/支）<input id="mb-uc" type="number" inputmode="decimal" value="'+(uc||'')+'" placeholder="購置單價" style="'+IN+'"></label>'
     +'<label>歸還實際長度（M）<input id="mb-len" type="number" inputmode="decimal" step="any" value="'+(lr.len||'')+'" style="'+IN+'"></label>'
     +'</div><div style="font-size:11px;color:var(--b4);margin-top:8px">切過的料填實際長度，會以新長度回倉庫（原長度留在備註）。歸還＋損耗的支數會結算這段使用天數進內部攤提；損耗支以購置單價認列為本案成本（不入應付）並自台帳扣除。</div>';
+  try{html+=_mvLedHistHtml(lr);}catch(e){_err('matBack.hist',e);}   // v6.0.200 追溯
   _modal('歸還／損耗：'+(q.name||''),html,function(){
     var date=gv('mb-date')||localToday(),back=Math.round(parseFloat(gv('mb-back'))||0),loss=Math.round(parseFloat(gv('mb-loss'))||0),ucv=Math.round(parseFloat(gv('mb-uc'))||0);
     var have=parseFloat(lr.qty)||0;
@@ -35945,6 +35950,7 @@ function m6LedEdit(qid,lid){
     +'<div class="fg fg2" style="gap:8px"><div class="f"><label>進貨日</label><input id="ml-date" type="date" value="'+esc(lr.date||'')+'" style="'+IN+'"></div><div class="f"><label>類型</label><select id="ml-kind" style="'+IN+'"><option'+(lr.kind==='一次性'?'':' selected')+'>重複性</option><option'+(lr.kind==='一次性'?' selected':'')+'>一次性</option></select></div></div>'
     +'<div class="fg fg2" style="gap:8px"><div class="f"><label>購置單價（$/kg；沒單位重時＝$/支）</label><input id="ml-price" type="number" inputmode="decimal" step="any" value="'+esc(String(lr.price==null?'':lr.price))+'" style="'+IN+'"></div><div class="f"><label>備註</label><input id="ml-note" value="'+esc(lr.note||'')+'" style="'+IN+'"></div></div>'
     +'<div style="font-size:11px;color:var(--b4);margin-top:4px">單位重依品項規格自動帶（H300 93／H350 135／H400 172 kg/m）；損耗認列與購租分析用到購置單價。'+(pre?'<br><b style="color:#1565C0">進貨後會自動調撥到本案工地。</b>':'')+'</div>';
+  if(lid){try{html+=_mvLedHistHtml(lr);}catch(e){_err('m6LedEdit.hist',e);}}   // v6.0.200 追溯：這一列被哪張簽收單動過
   showConfirm((lid?'編輯台帳：':'進貨：')+'公司倉庫',html,function(){
     var name=(gv('ml-name')||'').trim(),spec=(gv('ml-spec')||'').trim(),len=parseFloat(gv('ml-len')),qty=Math.round(parseFloat(gv('ml-qty'))||0);
     if(!name||!(qty>0)){toast('請填品項與支數');m6LedEdit(qid,lid);return;}
@@ -42313,6 +42319,7 @@ function _mvFromIntake(r,du,qid){
   var own=(typeof s.own==='boolean')?s.own:d.own;if(typeof own==='boolean')mv.own=own;
   if(s.lift&&typeof s.lift==='object'&&s.lift.has!=null)mv.lift={has:!!s.lift.has,by:String(s.lift.by||'').slice(0,30)};
   MAT_MOVES.push(mv);saveMatMoves();if(qid)_ikSetLastProj(qid);
+  try{_mvLogAdd('create',mv,{});}catch(e){_err('_mvFromIntake.log',e);}   // v6.0.200 追溯
   toast('已收到，待確認（首頁「簽收單待確認」）');
   return mv;
 }
@@ -42333,6 +42340,7 @@ function _mvItemsParse(txt){
     var sh=l.match(/短少\s*(\d+(?:\.\d+)?)/),dm=l.match(/損壞\s*(\d+(?:\.\d+)?)/),cd=l.match(/(可用|要修|報廢)\s*$/);
     var base=l.replace(/短少\s*\d+(?:\.\d+)?/,'').replace(/損壞\s*\d+(?:\.\d+)?/,'').replace(/(可用|要修|報廢)\s*$/,'').trim();
     var it=(_ikSlipItemsParse(base)||[])[0]||{name:base};
+    if(it.spec&&_mvNum(it.len)>0)it.spec=String(it.spec).replace(/(^|\s)\d+(?:\.\d+)?\s*[Mm米](?=\s|$)/,' ').replace(/\s+/g,' ').trim();   /* v6.0.200：長度不留在規格裡（修改存檔時規格會變成「H300 9M」、長度重複） */
     if(sh)it.short=parseFloat(sh[1]);if(dm)it.dmg=parseFloat(dm[1]);if(cd)it.cond={'可用':'ok','要修':'repair','報廢':'scrap'}[cd[1]];
     return it;
   });
@@ -42354,6 +42362,7 @@ function _mvDetailHtml(m){
     +Y('signer','簽收人',esc(m.signer||''),low('signer'))
     +Y('品項','品項',esc(_mvItemsTxt(m.items)).replace(/\n/g,'<br>')+'<div style="color:var(--b4)">合計 '+esc(_mvSum(m))+'</div>',low('items'));
   h+='</div>';
+  try{h+=_mvHistHtml(m.id);}catch(e){_err('_mvDetailHtml.hist',e);}   // v6.0.200 追溯：歷史
   if(!m.photo)return h+'<div style="font-size:12px;color:var(--b3);margin-top:6px">（沒有照片）</div>';
   return _photoGet(m.photo).then(function(du){_MV_PH_OK[m.id]=!!du;return (du?'<img src="'+du+'" style="width:100%;max-height:360px;object-fit:contain;border:1px solid var(--b1);border-radius:8px;margin-bottom:6px" onclick="_viewFile(\'簽收單\',this.src)">':'<div style="font-size:12px;color:#b26a00;margin-bottom:6px">照片尚未同步到這台裝置（可以先核對文字）</div>')+h;}).catch(function(e){_err('_mvDetailHtml',e);return h;});
 }
@@ -42374,8 +42383,11 @@ function _mvEdit(m,after){
     +'<div class="fg fg2"><div class="f"><label>卸貨吊車／怪手</label>'+sel('mv-lift',{y:'有',n:'沒有'},m.lift?(m.lift.has?'y':'n'):'',true)+'</div><div class="f"><label>誰叫的</label><input id="mv-liftby" value="'+esc((m.lift&&m.lift.by)||'')+'"></div></div>'
     +'<div class="f"><label>簽收人</label><input id="mv-signer" value="'+esc(m.signer||'')+'"></div>'
     +'<div class="f"><label>品名 規格 長度 數量（一行一項；退場可加「短少2 損壞1」、歸倉可加「可用／要修／報廢」）</label><textarea id="mv-items" rows="5" style="'+IN+';font-size:13px">'+esc(_mvItemsTxt(m.items))+'</textarea></div>'
-    +'<div style="font-size:11.5px;color:var(--b4)">按確定＝這張的欄位都核對過（黃色清掉）；還要回卡片按「確認」才寫進進退料簿。</div>',
+    +'<div class="f"><label>修改原因'+(m.st==='ok'?'（必填）':'（選填）')+'</label><input id="mv-why" placeholder="'+(m.st==='ok'?'例：車號看錯、支數少算':'確認前核對')+'"></div>'
+    +'<div style="font-size:11.5px;color:var(--b4)">按確定＝這張的欄位都核對過（黃色清掉）；還要回卡片按「確認」才寫進進退料簿。每次修改都會留紀錄（誰、何時、改前→改後、原因），刪不掉。</div>',
     function(){
+      var why=String(gv('mv-why')||'').trim().slice(0,200);if(m.st==='ok'&&!why){toast('已確認的簽收單要寫修改原因');return false;}   // v6.0.200 追溯（Lotion 11/09）
+      var _b4=JSON.parse(JSON.stringify(m));
       var dir=gv('mv-dir')||'',ow=gv('mv-own');
       m.date=gv('mv-date')||m.date;m.dir=_MV_DIR[dir]?dir:'';
       if(m.dir==='xfer'){m.fromQid=gv('mv-fq')||'';m.toQid=gv('mv-tq')||'';m.qid=m.toQid;}else{m.qid=gv('mv-qid')||'';delete m.fromQid;delete m.toQid;}
@@ -42384,7 +42396,7 @@ function _mvEdit(m,after){
       m.trips=Math.max(1,Math.round(_mvNum(gv('mv-trips')))||1);m.rentVendor=gv('mv-rv')||'';m.rentSlipNo=gv('mv-rs')||'';m.signer=gv('mv-signer')||'';
       var lf=gv('mv-lift');if(lf)m.lift={has:lf==='y',by:gv('mv-liftby')||''};else delete m.lift;
       var _oi=m.items||[];m.items=_mvItemsClean(_mvItemsParse(gv('mv-items')));m.items.forEach(function(it,i){if(_oi[i]&&_oi[i].batch&&!it.batch)it.batch=_oi[i].batch;});m.conf={};   // 租料批次對應跟著原列
-      _mvSave(m);if(typeof after==='function'){try{after();}catch(e){_err('_mvEdit.after',e);}}else setTimeout(function(){try{_decRefresh('mvSlip');}catch(e){_err('_mvEdit.refresh',e);}},50);   // v6.0.199 例外卡修改後重新比對
+      _mvSave(m);try{var _df=_mvDiff(_b4,m);if(_df.length||why)_mvLogAdd('edit',m,{why:why||(m.st==='ok'?'':'確認前核對'),diff:_df.slice(0,30)});}catch(e){_err('_mvEdit.log',e);}if(typeof after==='function'){try{after();}catch(e){_err('_mvEdit.after',e);}}else setTimeout(function(){try{_decRefresh('mvSlip');}catch(e){_err('_mvEdit.refresh',e);}},50);   // v6.0.199 例外卡修改後重新比對
     },false,null,true);
 }
 _decReg('mvSlip',{
@@ -42396,8 +42408,8 @@ _decReg('mvSlip',{
   body:function(m){var y=_mvYellow(m);return '<div style="font-size:11.5px;color:'+(y.length?'#b26a00':'var(--b4)')+'">'+(y.length?('黃色 '+y.length+' 項要核對'):'欄位都齊了')+(m.carrier?('　運輸：'+esc(m.carrier)):'')+(m.truck?('　車號 '+esc(m.truck)):'')+'</div>';},
   detail:_mvDetailHtml,
   ok:function(m){if(m.photo&&!_MV_PH_OK[m.id]){toast('簽收單照片還沒同步到這台，等照片出現再確認');return false;}var y=_mvYellow(m);if(y.length){toast('還有黃色欄位：'+y.slice(0,3).join('、')+'，請先按「修改」核對');return false;}
-    m.st='ok';m.okBy=(typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機';m.okAt=Date.now();_mvSave(m);toast('已寫進進退料簿');try{_mvApplySoon(300);}catch(e){_err('mvSlip.apply',e);}return true;},   // v6.0.199 自有料確認後自動改台帳（管理員裝置）
-  reject:function(m,why){m.st='rejected';m.rejReason=String(why||'退回').slice(0,200);_mvSave(m);return true;},
+    m.st='ok';m.okBy=(typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機';m.okAt=Date.now();_mvSave(m);try{_mvLogAdd('confirm',m);}catch(e){_err('mvSlip.log',e);}toast('已寫進進退料簿');try{_mvApplySoon(300);}catch(e){_err('mvSlip.apply',e);}return true;},   // v6.0.199 自有料確認後自動改台帳（管理員裝置）
+  reject:function(m,why){m.st='rejected';m.rejReason=String(why||'退回').slice(0,200);_mvSave(m);try{_mvLogAdd('reject',m,{why:m.rejReason});}catch(e){_err('mvSlip.rejLog',e);}return true;},
   edit:_mvEdit
 });
 // 材料．運輸頁的簽收單清單（M3 自動套用前的過渡）：新簽收單（進退料簿裡、不是舊日報搬來的）換成舊格式一起列
@@ -42501,6 +42513,7 @@ function _mvDo(m,ops,forced){
   var aft={};Object.keys(before).concat(rec.map(function(x){return x.to;}).filter(Boolean)).forEach(function(id){var x=MAT_LEDGER.find(function(r){return r&&r.id===id;});aft[id]=x?(+x._mt||0):0;});
   var f=_mvFin(m.id,true);f.applied={at:now,by:(typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機',dev:(typeof _devId==='function'?_devId():''),h:_mvHash(m),ops:rec.slice(0,120),g:+f.undone||0,v:200,qs:Object.keys(qs),ul:_mvUlSig(m.id),snap:{b:Object.keys(before).map(function(k){return before[k];}),a:aft}};if(forced)f.applied.forced=1;   // v6.0.200 snap：改前的台帳列＋改後每列的修改時間（之後沒被動過才准自動撤回）
   delete f.hold;f._mt=now;
+  try{_mvAuditAdd(forced?'force':'apply',m,{rows:_mvRowsOf(Object.keys(aft),function(id){return before[id]||null;}),money:_mvMoneyOf(m.id),gen:+f.undone||0});}catch(e){_err('_mvDo.audit',e);}   // v6.0.200 追溯
   saveMatLedger();saveMatMoveFin();try{persist();_immediateUpload();}catch(e){_err('_mvDo',e);}
   return rec;
 }
@@ -42564,7 +42577,7 @@ _decReg('mvHold',{
   ok:function(m){if(m.photo&&!_MV_PH_OK[m.id]){toast('簽收單照片還沒同步到這台，等照片出現再確認');return false;}
     if(_mvPlan(m,true).holds.length){toast('找不到工地，請按「修改」選工地');return false;}
     return _mvApplyOne(m,true).then(function(r){if(r==='ok'){toast('已照簽收單改台帳');try{updateDashTodo();}catch(e){_err('mvHold.ok',e);}return true;}toast(r==='skip'?'另一台裝置正在處理這筆，稍後再看':'還是對不上，請按「修改」');return false;});},
-  reject:function(m,why){var f=_mvFin(m.id,true);f.skip={at:Date.now(),by:(typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機',why:String(why||'退回').slice(0,200)};f._mt=Date.now();saveMatMoveFin();return true;},
+  reject:function(m,why){var f=_mvFin(m.id,true);f.skip={at:Date.now(),by:(typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機',why:String(why||'退回').slice(0,200)};f._mt=Date.now();saveMatMoveFin();try{_mvAuditAdd('holdReject',m,{why:f.skip.why});}catch(e){_err('mvHold.rejLog',e);}return true;},
   edit:function(m){_mvEdit(m,function(){var f=_mvFin(m.id);if(f&&f.hold){delete f.hold;f._mt=Date.now();saveMatMoveFin();}var _rf=function(){try{_decRefresh('mvHold');}catch(e){_err('mvHold.edit',e);}};if(_mvApplyOk())_mvApplyAll().then(_rf);else setTimeout(_rf,50);});}
 });
 // ══════════ v6.0.200 進退料 M3b：已自動改過台帳的簽收單，內容又被改 → 首頁卡片「撤回什麼、重改什麼」（Lotion 11/09 第 5 題）══════════
@@ -42622,7 +42635,9 @@ function _mvRedoSim(m){
 }
 function _mvUndoApply(m){
   var f=_mvFin(m.id),A=f.applied,now=Date.now();
+  var _ids=Object.keys((A.snap&&A.snap.a)||{}),_pre={};_ids.forEach(function(id){var x=(MAT_LEDGER||[]).find(function(r){return r&&r.id===id;});if(x)_pre[id]=JSON.parse(JSON.stringify(x));});var _mo=_mvMoneyOf(m.id);   // v6.0.200 追溯：撤回前的樣子
   MAT_LEDGER=_mvUndoOn(MAT_LEDGER,m,false);
+  try{_mvAuditAdd('undo',m,{rows:_mvRowsOf(_ids,function(id){return _pre[id]||null;}),money:_mo,gen:+f.undone||0});}catch(e){_err('_mvUndoApply.audit',e);}
   (Q||[]).forEach(function(q){var mm=q&&q.mat;if(!mm)return;var u0=(mm.use||[]).length,l0=(mm.loss||[]).length;
     mm.use=(mm.use||[]).filter(function(u){return !(u&&u.mvId===m.id);});mm.loss=(mm.loss||[]).filter(function(l){return !(l&&l.mvId===m.id);});
     if(mm.use.length!==u0||mm.loss.length!==l0){_touch(mm);_touch(q);try{_matAmortSync(q);_matLossSync(q);}catch(e){_err('_mvUndoApply.sync',e);}}});
@@ -42657,7 +42672,7 @@ _decReg('mvRedo',{
     if(!_mvRedoReady()){toast('台帳資料還在下載，等一下再確認');return false;}
     var st=_mvRedoState(m),f=_mvFin(m.id),h=_mvHash(m);if(!st)return true;
     if(m.photo&&!_MV_PH_OK[m.id]){toast('簽收單照片還沒同步到這台，等照片出現再確認');return false;}
-    if(!st.can){f.redoManual=h;f._mt=Date.now();saveMatMoveFin();toast('已改成資料健檢提醒，請人工核對台帳');return true;}
+    if(!st.can){f.redoManual=h;f._mt=Date.now();saveMatMoveFin();try{_mvAuditAdd('redoManual',m,{why:st.why});}catch(e){_err('mvRedo.manualLog',e);}toast('已改成資料健檢提醒，請人工核對台帳');return true;}
     var g=+f.undone||0;
     return _mvLock(m.id,false,'~u'+g).then(function(got){
       var s2=_mvRedoState(m);if(!got||!s2||!s2.can){toast(!got?'另一台裝置正在處理這筆，稍後再看':'台帳剛被動過，請重新展開明細');return false;}
@@ -42666,9 +42681,70 @@ _decReg('mvRedo',{
       return _mvApplyOne(m,false).then(function(r){toast(r==='ok'?'已撤回並照新內容重改台帳':(r==='hold'?'已撤回；新內容對不上台帳，改到「自有料台帳待你決定」卡':'已撤回，重改稍後自動進行'));try{updateDashTodo();}catch(e){_err('mvRedo.ok',e);}return true;});
     });
   },
-  reject:function(m,why){var f=_mvFin(m.id,true);f.redoAck=_mvHash(m);f.redoWhy=String(why||'不重改').slice(0,200);f._mt=Date.now();saveMatMoveFin();return true;},
+  reject:function(m,why){var f=_mvFin(m.id,true);f.redoAck=_mvHash(m);f.redoWhy=String(why||'不重改').slice(0,200);f._mt=Date.now();saveMatMoveFin();try{_mvAuditAdd('redoReject',m,{why:f.redoWhy});}catch(e){_err('mvRedo.rejLog',e);}return true;},
   edit:function(m){_mvEdit(m,function(){setTimeout(function(){try{_decRefresh('mvRedo');}catch(e){_err('mvRedo.edit',e);}},50);});}
 });
+// ══════════ v6.0.200 追溯紀錄（Lotion 11/09 M3b 追加）：簽收單每次建立／修改／確認／退回、台帳每次自動改／撤回／重改／轉人工，都留一筆刪不掉的紀錄 ══════════
+// 修改紀錄 MAT_MOVE_LOG → fydata/matMoveLog/<id>（工務也看得到：誰、何時、欄位改前→改後、原因；沒有金額）
+// 台帳紀錄 MAT_AUDIT → fydata/matAudit/<id>（只有管理員：哪幾列台帳支數改前→改後、使用段／損耗金額）
+// 兩個節點規則都是「只能新增、不能改、不能刪」（連管理員從系統也刪不掉）；不進回收筒；全量備份與伺服器每日備份都包含。
+var _MVL_KIND={create:'建立（拍照）',edit:'修改',confirm:'確認',reject:'退回'};
+var _MVA_KIND={apply:'自動改台帳',force:'例外卡確認改台帳',holdReject:'例外卡退回（不動台帳）',undo:'撤回上次改的台帳',redoManual:'無法自動重改，轉人工核對',redoReject:'不重改（台帳維持）'};
+var _MV_FL={date:'日期',dir:'方向',qid:'工地',fromQid:'轉出工地',toQid:'轉入工地',own:'自有或租賃',from:'從哪裡',to:'到哪裡',carrier:'運輸公司',truckType:'車型',truck:'車號',trips:'趟數',rentVendor:'租賃商',rentSlipNo:'租賃商單號',signer:'簽收人',lift:'吊車／怪手',items:'品項'};
+function _mvMe(){return (typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機';}
+function _mvFieldTxt(m,k){var v=m&&m[k];if(k==='dir')return _MV_DIR[v]||'';if(k==='qid'||k==='fromQid'||k==='toQid')return v?(_mvQName(v)||v):'';if(k==='own')return v===true?'自有料':(v===false?'租賃料':'');if(k==='truckType')return _MV_TT[v]||'';
+  if(k==='lift')return v?((v.has?'有':'沒有')+(v.by?('（'+v.by+'）'):'')):'';if(k==='items')return (v||[]).map(function(it){return [it.name||'',it.spec||'',(_mvNum(it.len)>0?(it.len+'M'):''),(_mvNum(it.qty)?String(it.qty):''),(it.short?('短少'+it.short):''),(it.dmg?('損壞'+it.dmg):''),(it.cond?_MV_COND[it.cond]:'')].filter(Boolean).join(' ');}).join('；');/* 單位不比（重新解析會補「支」，不算修改） */return v==null?'':String(v);}
+function _mvDiff(a,b){return Object.keys(_MV_FL).map(function(k){return [_MV_FL[k],_mvFieldTxt(a,k).slice(0,300),_mvFieldTxt(b,k).slice(0,300)];}).filter(function(x){return x[1]!==x[2];});}
+function _mvLogSave(){try{localStorage.setItem('fy_matmovelog',JSON.stringify(MAT_MOVE_LOG));localStorage.setItem('fy_mataudit',JSON.stringify(MAT_AUDIT));}catch(e){_err('_mvLogSave',e);}}
+function _mvLogPut(arr,pre,kind,m,extra){
+  var e={id:pre+Date.now().toString(36)+Math.random().toString(36).slice(2,7),mvId:String(m.id),at:Date.now(),by:_mvMe(),kind:kind};
+  Object.keys(extra||{}).forEach(function(k){if(extra[k]!=null&&extra[k]!=='')e[k]=extra[k];});
+  e._p=1;arr.push(e);_mvLogSave();try{_mvLogFlush();}catch(x){_err('_mvLogPut',x);}return e;
+}
+function _mvLogAdd(kind,m,extra){return _mvLogPut(MAT_MOVE_LOG,'ml_',kind,m,extra);}
+function _mvAuditAdd(kind,m,extra){return _mvLogPut(MAT_AUDIT,'ma_',kind,m,extra);}
+// 上傳：每筆各寫一次（規則只准新增）；被拒（例如沒登入時建的、by 不是自己）就只留在這台、不再重送
+function _mvLogFlush(){
+  if(typeof _fbDb==='undefined'||!_fbDb||typeof _fbUser==='undefined'||!_fbUser||_isReaderUser||window.FY_BETA)return;
+  [['fydata/matMoveLog',MAT_MOVE_LOG],['fydata/matAudit',MAT_AUDIT]].forEach(function(p){(p[1]||[]).forEach(function(e){
+    if(!e||!e._p||e._busy)return;e._busy=1;var o=JSON.parse(JSON.stringify(e));delete o._p;delete o._busy;delete o._fail;
+    _fbDb.ref(p[0]+'/'+e.id).set(o).then(function(){delete e._p;delete e._busy;_mvLogSave();}).catch(function(err){delete e._busy;delete e._p;e._fail=1;_mvLogSave();console.warn('[進退料紀錄] '+e.id+' 沒送上去，只留在這台',err&&err.message);});
+  });});
+}
+function _mvLogPull(){
+  if(typeof _fbDb==='undefined'||!_fbDb||typeof _fbUser==='undefined'||!_fbUser)return;
+  var mg=function(arr,v){var have={};arr.forEach(function(e){if(e&&e.id)have[e.id]=e;});Object.keys(v||{}).forEach(function(k){var r=v[k];if(!r||!r.id)return;if(!have[r.id])arr.push(r);else if(have[r.id]._p){delete have[r.id]._p;}});_mvLogSave();};
+  _fbDb.ref('fydata/matMoveLog').once('value').then(function(sn){mg(MAT_MOVE_LOG,sn&&sn.val());}).catch(function(e){console.warn('[進退料紀錄] 修改紀錄讀不到',e&&e.message);});
+  if(_shWholeOk())_fbDb.ref('fydata/matAudit').once('value').then(function(sn){mg(MAT_AUDIT,sn&&sn.val());}).catch(function(e){console.warn('[進退料紀錄] 台帳紀錄讀不到',e&&e.message);});
+}
+try{document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){try{_mvLogPull();_mvLogFlush();}catch(e){_err('_mvLog.boot',e);}},6000);});setInterval(function(){try{_mvLogFlush();}catch(e){_err('_mvLog.tick',e);}},180000);}catch(e){_err('_mvLog.timer',e);}
+// 台帳紀錄內容：動到的列（改前→改後支數、位置）＋這張單的使用段／損耗金額
+function _mvRowsOf(ids,beforeOf){return ids.slice(0,60).map(function(id){var cur=(MAT_LEDGER||[]).find(function(r){return r&&r.id===id;}),b=beforeOf(id);var lb=cur||b||{};
+  return {lid:id,lb:_matLabel(lb).slice(0,80),loc0:b?String(b.projQid?(b.loc||'工地'):(b.loc||'公司倉庫')).slice(0,40):'',q0:b?(+b.qty||0):0,loc1:cur?String(cur.projQid?(cur.loc||'工地'):(cur.loc||'公司倉庫')).slice(0,40):'',q1:cur?(+cur.qty||0):0};});}
+function _mvMoneyOf(id){var a=[];(Q||[]).forEach(function(q){var mm=q&&q.mat;if(!mm)return;(mm.use||[]).forEach(function(u){if(u&&u.mvId===id)a.push({k:'使用段',qid:q.id,qty:+u.qty||0,days:+u.days||0,amt:+u.amt||0});});(mm.loss||[]).forEach(function(l){if(l&&l.mvId===id)a.push({k:'損耗',qid:q.id,qty:+l.qty||0,uc:+l.unitCost||0,amt:+l.amt||0});});});return a.slice(0,60);}
+function _mvTs(t){var d=new Date(+t||0),p=function(n){return (n<10?'0':'')+n;};return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());}
+function _mvAuditLine(e,showMvLink){
+  var h='<div style="padding:4px 0;border-bottom:1px dotted var(--b1)"><b>'+esc(_mvTs(e.at))+'</b>　'+esc(e.by||'')+'　<span style="color:#1565C0">'+esc(_MVA_KIND[e.kind]||e.kind)+'</span>'+(showMvLink?'　<a href="#" onclick="_mvShow(\''+esc(e.mvId)+'\');return false">看簽收單</a>':'');
+  if(e.why)h+='<div style="color:var(--b4)">原因：'+esc(e.why)+'</div>';
+  (e.rows||[]).forEach(function(r){h+='<div>・台帳 '+esc(r.lb||r.lid)+'：'+(r.loc0?esc(r.loc0)+' ':'')+r.q0+' 支 → '+(r.loc1?esc(r.loc1)+' ':'')+r.q1+' 支　<span style="color:var(--b3);font-size:10.5px">'+esc(r.lid)+'</span></div>';});
+  (e.money||[]).forEach(function(x){h+='<div>・'+esc(x.k)+' '+esc(_mvQName(x.qid)||'')+' '+x.qty+' 支'+(x.days?(' '+x.days+' 天'):'')+'　NT$ '+fmt(x.amt)+'</div>';});
+  return h+'</div>';
+}
+// 歷史（簽收單明細用）：修改紀錄給大家看；台帳紀錄（有金額）只給管理員
+function _mvHistHtml(mvId){
+  var L=(MAT_MOVE_LOG||[]).filter(function(e){return e&&e.mvId===mvId;}).map(function(e){return {at:e.at,h:'<div style="padding:4px 0;border-bottom:1px dotted var(--b1)"><b>'+esc(_mvTs(e.at))+'</b>　'+esc(e.by||'')+'　'+esc(_MVL_KIND[e.kind]||e.kind)+(e.why?('<div style="color:var(--b4)">原因：'+esc(e.why)+'</div>'):'')+(e.diff||[]).map(function(d){return '<div>・'+esc(d[0])+'：'+esc(d[1]||'（空）')+' → '+esc(d[2]||'（空）')+'</div>';}).join('')+'</div>'};});
+  if(!_isReaderUser&&_decIsAdmin())L=L.concat((MAT_AUDIT||[]).filter(function(e){return e&&e.mvId===mvId;}).map(function(e){return {at:e.at,h:_mvAuditLine(e,false)};}));
+  if(!L.length)return '';
+  return '<div style="font-size:12px;line-height:1.55;margin-top:8px"><div style="font-weight:700">歷史</div>'+L.sort(function(a,b){return a.at-b.at;}).map(function(x){return x.h;}).join('')+'</div>';
+}
+// 台帳某一列的歷史（只有管理員；放在既有的「編輯」「歸還／損耗」視窗裡，不另加按鈕）
+function _mvLedHistHtml(lr){
+  if(!lr||_isReaderUser||!_decIsAdmin())return '';
+  var L=(MAT_AUDIT||[]).filter(function(e){return e&&((e.rows||[]).some(function(r){return r&&r.lid===lr.id;})||(lr.mvId&&e.mvId===lr.mvId));}).sort(function(a,b){return a.at-b.at;});
+  if(!L.length)return '';
+  return '<div style="font-size:11.5px;line-height:1.55;margin-top:10px"><div style="font-weight:700">這一列的歷史（簽收單自動改台帳）</div>'+L.map(function(e){return _mvAuditLine(e,true);}).join('')+'</div>';
+}
+function _mvShow(id){var m=_mvOf(id);if(!m){toast('找不到這張簽收單');return;}Promise.resolve(_mvDetailHtml(m)).then(function(h){_modal('簽收單 '+(m.date||'')+'　'+(_MV_DIR[m.dir]||''),'<div style="max-height:70vh;overflow:auto">'+h+'</div>',function(){});}).catch(function(e){_err('_mvShow',e);});}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
