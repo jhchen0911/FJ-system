@@ -11240,13 +11240,13 @@ async function newPage(browser, width, height) {
         mk({ date: '2026-11-15', dir: 'in', qid: 'qA199', legacy: 1, items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 1 }] });
         mk({ date: '2026-11-15', dir: 'in', qid: 'qA199', st: 'draft', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 1 }] });
         res = await _mvApplyAll({ local: true });
-        out.skip = res.n === 0 && JSON.stringify(MAT_LEDGER.map(x => [x.id, x.qty])) === n0;
+        out.skip = res.n === 0 && JSON.stringify(MAT_LEDGER.map(x => [x.id, x.qty])) === n0;   // v6.0.203：那張租賃料沒填租賃商 → 例外卡、不動；台帳一律不動
         // 舊日報簽收單搬來的：套用後原單也勾已登錄（材料頁不再出現「帶入」）；自有料新單在材料頁是已處理
         Q[0].dailyLogs = [{ id: 'dl', date: '2026-11-16', slips: [{ id: 'sX', date: '2026-11-16', dir: 'out', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 2 }], at: 1 }] }];
         mk({ id: 'mv_sX', date: '2026-11-16', dir: 'in', qid: 'qA199', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 2 }], src: { slipId: 'sX' } });
         await _mvApplyAll({ local: true });
         out.oldSlip = Q[0].dailyLogs[0].slips[0].done === true && at('qA199') === 2;
-        out.bridge = _mvSlipsOf(Q[0]).filter(s => s.dir === 'out' || s.dir === 'back').every(s => s.done) && _mvSlipsOf(Q[0]).some(s => s.dir === 'rentIn' && !s.done);   // 租賃料 M4 前照舊帶入
+        out.bridge = _mvSlipsOf(Q[0]).every(s => s.done);   // v6.0.203 起租賃料也自動套用，材料頁不再出現「帶入」
         // 套用後內容被改 → v6.0.200 起出「台帳要不要重改」卡
         const mA = _mvOf('mv_sX'); mA.items[0].qty = 3;
         out.health = !!_mvRedoState(mA) && _decItems('mvRedo').some(x => x.id === 'mv_sX');
@@ -11311,7 +11311,7 @@ async function newPage(browser, width, height) {
         out.route = _ikSlipSave('qN198', { date: '2026-11-07', slip: { dir: 'out', items: [{ name: 'H型鋼', len: 12, qty: 10 }] } }, '') === true && MAT_MOVES.some(x => x.qid === 'qN198' && x.st === 'draft' && x.own === true) && !(Q[1].dailyLogs || []).length;
         // 材料．運輸頁過渡：已確認的新簽收單列在簽收單清單，勾已登錄＝legacy
         const sl = _m6Slips(Q[0]); const s0 = sl.find(x => x.id === m.id);
-        out.bridge = !!s0 && s0.dir === 'rentOut' && s0.done === false && s0.vendor === '範例租賃';
+        out.bridge = !!s0 && s0.dir === 'rentOut' && s0.done === true && s0.vendor === '範例租賃';   // v6.0.203 起租料也自動套用（不再帶入）
         window._m6Re = window._m6Re || function () {}; m6SlipDone('qM198', m.id, true);
         out.legacy = _mvOf(m.id).legacy === 1 && _m6Slips(Q[0]).find(x => x.id === m.id).done === true;
       } finally { Q = keepQ; MAT_MOVES = keepM; window.showConfirm = oC; }
@@ -11401,6 +11401,72 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.194 報價編號重號：拍板卡列出重號組、預設保留最早那張其他改下一個空號、可改選保留哪張、退回不再列、新報價存檔撞號自動改號', r.group && r.todo && r.detail && r.apply && r.byCode && r.keepAward && r.badFmt && r.keepLater && r.reject && r.save && r.gen, JSON.stringify(r));
     check('v6.0.194 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── v6.0.203 進退料 M4a：租料簽收單確認後自動建／結租料批次 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepM = MAT_MOVES, keepF = MAT_MOVE_FIN, keepLog = MAT_MOVE_LOG, keepA = MAT_AUDIT;
+      try {
+        MAT_MOVES = []; MAT_MOVE_FIN = {}; MAT_MOVE_LOG = []; MAT_AUDIT = [];
+        Q = [{ id: 'qR203', name: '範例R203', client: '甲', awarded: true, items: [], costs: [], _mt: 1, mat: { rows: [], use: [], loss: [], rents: [
+            { id: 'rt1', vendor: '範例租賃有限公司', name: '鋼板樁', spec: 'IV', len: 9, rate: 30, cm: 900, pf: '2026-10-01', mode: 'day', batches: [] }] } },
+          { id: 'qS203', name: '範例S203', client: '甲', awarded: true, items: [], costs: [], _mt: 1, mat: { rows: [], use: [], loss: [], rents: [] } }];
+        const mk = (o) => { const m = Object.assign({ id: 'mv_' + Math.random().toString(36).slice(2, 8), st: 'ok', own: false, rentVendor: '範例租賃', conf: {}, _mt: Date.now() }, o); MAT_MOVES.push(m); return m; };
+        const rt = id => Q[0].mat.rents.find(x => x.id === id), open = r => r.batches.filter(b => !b.o).reduce((s, b) => s + b.m, 0);
+        // 進場：對到「範例租賃有限公司」那張（名稱去掉有限公司也對得到），新增一批 50 片×9M＝450M
+        const a = mk({ date: '2026-10-05', dir: 'in', qid: 'qR203', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 50 }] });
+        let res = await _mvApplyAll({ local: true });
+        out.in = res.n === 1 && rt('rt1').batches.length === 1 && rt('rt1').batches[0].m === 450 && rt('rt1').batches[0].d === '2026-10-05' && rt('rt1').batches[0].mvIn === a.id;
+        out.cost = (Q[0].costs || []).some(c => /^rent:/.test(c._fromMat || ''));
+        // 第二批進場 30 片＝270M、再部分退場 60 片＝540M（先結最早那批 450、第二批拆 90、留 180）
+        mk({ date: '2026-10-08', dir: 'in', qid: 'qR203', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 30 }] });
+        await _mvApplyAll({ local: true });
+        const o1 = mk({ date: '2026-11-01', dir: 'out', qid: 'qR203', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 60, short: 0 }] });
+        await _mvApplyAll({ local: true });
+        const bs = rt('rt1').batches;
+        out.out = open(rt('rt1')) === 180 && bs.some(b => b.d === '2026-10-05' && b.o === '2026-11-01' && b.m === 450) && bs.some(b => b.d === '2026-10-08' && b.o === '2026-11-01' && b.m === 90 && b.splitFrom) && bs.some(b => b.d === '2026-10-08' && !b.o && b.m === 180);
+        // 對不到租賃單：自動建一張、月租單價空著 → 首頁「月租單價待補」卡
+        const n1 = mk({ date: '2026-10-10', dir: 'in', qid: 'qR203', items: [{ name: '型鋼', spec: 'H300', len: 12, qty: 10 }] });
+        await _mvApplyAll({ local: true });
+        const auto = Q[0].mat.rents.find(x => x.auto && x.mvId === n1.id);
+        out.auto = !!auto && auto.spec === 'H300' && auto.len === 12 && auto.batches[0].m === 120 && !(auto.rate > 0) && _decItems('mvRentRate').length === 1;
+        auto.rate = 25; out.rateOk = _DEC.mvRentRate.list().length === 0;
+        // 退場比在場多 → 例外卡、批次不動
+        const s0 = JSON.stringify(rt('rt1').batches);
+        const ov = mk({ date: '2026-11-02', dir: 'out', qid: 'qR203', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 99 }] });
+        await _mvApplyAll({ local: true });
+        out.over = (MAT_MOVE_FIN[ov.id].hold.list[0].k === 'rentOver') && JSON.stringify(rt('rt1').batches) === s0 && _decItems('mvHold').some(x => x.id === ov.id);
+        // 對到好幾張 → 例外卡，修改選一張後套用
+        Q[0].mat.rents.push({ id: 'rt2', vendor: '範例租賃', name: '鋼板樁', spec: 'IV', len: 9, rate: 28, cm: 300, pf: '2026-10-20', mode: 'day', batches: [] });
+        const pk = mk({ date: '2026-11-03', dir: 'in', qid: 'qR203', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 10 }] });
+        await _mvApplyAll({ local: true });
+        out.pickHold = MAT_MOVE_FIN[pk.id].hold.list[0].k === 'rentPick' && /2 張/.test(MAT_MOVE_FIN[pk.id].hold.list[0].msg);
+        const oC = window.showConfirm; window.showConfirm = function (t, h, ok) { document.body.insertAdjacentHTML('beforeend', '<div id="tmpbox">' + h + '</div>'); document.getElementById('mvp-0').value = 'rt2'; ok(); document.getElementById('tmpbox').remove(); };
+        _DEC.mvHold.edit(pk); window.showConfirm = oC;
+        await _mvApplyAll({ local: true });
+        out.picked = !!MAT_MOVE_FIN[pk.id].applied && rt('rt2').batches.length === 1 && rt('rt2').batches[0].m === 90;
+        // 轉場：A 結 90M、B 沒有這家 → 自動建一張（月租照轉出那張）
+        const x = mk({ date: '2026-11-05', dir: 'xfer', fromQid: 'qR203', toQid: 'qS203', qid: 'qS203', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 10 }] });
+        MAT_MOVE_FIN[x.id] = { rentPick: { 0: 'rt2' }, _mt: 1 };
+        await _mvApplyAll({ local: true });
+        const B = Q[1].mat.rents[0];
+        out.xfer = !!MAT_MOVE_FIN[x.id].applied && open(rt('rt2')) === 0 && !!B && B.rate === 28 && B.batches[0].d === '2026-11-05' && B.batches[0].m === 90 && B.batches[0].xferFrom === 'rt2';
+        // 撤回重改：退場那張改成 50 片＝450M → 卡片可以自動重改；確認後只結第一批、第二批 270M 照舊在場
+        o1.items[0].qty = 50; _touch(o1);
+        const st = _mvRedoState(o1);
+        out.redoCan = !!st && st.can === true && /還原租賃單/.test(await Promise.resolve(_DEC.mvRedo.detail(o1)));
+        out.redo = (await _DEC.mvRedo.ok(o1)) === true && open(rt('rt1')) === 270 && !!MAT_MOVE_FIN[o1.id].applied && MAT_MOVE_FIN[o1.id].applied.g === 1;
+        // 材料頁：租料簽收單也不再出現「帶入」
+        out.bridge = _mvSlipsOf(Q[0]).every(s => s.done);
+        // 卡片與明細沒有金額給工務（月租卡只有管理員）
+        out.rateCardAdmin = /_decIsAdmin/.test(String(_DEC.mvRentRate.canSee));
+      } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_MOVE_LOG = keepLog; MAT_AUDIT = keepA; }
+      return out;
+    });
+    check('v6.0.203 進退料 M4a：租料進場自動新增批次、退場從最早的批次先結（部分退場拆批）、對不到租賃單自動建一張（月租待補卡）、退場比在場多出卡、對到好幾張出卡可選、轉場 A 結 B 起算、撤回重改、材料頁不再帶入', r.in && r.cost && r.out && r.auto && r.rateOk && r.over && r.pickHold && r.picked && r.xfer && r.redoCan && r.redo && r.bridge && r.rateCardAdmin, JSON.stringify(r));
+    check('v6.0.203 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
   // ── v6.0.202 熱修：同一毫秒連續改同一列台帳（一輪自動套用一次處理好幾張單），也要看得出「之後又被動過」──
