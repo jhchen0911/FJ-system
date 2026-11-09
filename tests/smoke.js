@@ -12492,13 +12492,16 @@ async function newPage(browser, width, height) {
         o.sugg = _bidSuggestFor(q1).map((x) => x.kind + ':' + x.n).join(',');
         o.Q = JSON.parse(JSON.stringify(Q)); o.CT = JSON.parse(JSON.stringify(CONTRACTS));
         // 底價／目標成交價：private、不印在報價單
+        const docNoAim = (function () { const c = JSON.parse(JSON.stringify(q1)); delete c.bid; delete c.bidHist; delete c.bidAim; try { return _buildQuoteDocHTML(c); } catch (e) { return 'ERR'; } })();
         q1.bidAim = { floor: 8000, target: 9500 };
         const st = _stripQuoteSens(q1), ex = _extractQuoteSens(q1), back = JSON.parse(JSON.stringify(st)); _applyQuoteSens(back, ex, false);
         o.aimPriv = !('bidAim' in st) && ex.bidAim && ex.bidAim.floor === 8000 && back.bidAim && back.bidAim.target === 9500;
         o.bidPriv = !('bid' in st) && !('bidHist' in st) && ex.bid && ex.bid.res === 'won' && back.bid && back.bid.first === 11550 && Array.isArray(back.bidHist);
         const sn = _qhSnapOf(q1); o.noSnap = !('bid' in sn) && !('bidAim' in sn) && !('bidHist' in sn);
         let doc = ''; try { doc = _buildQuoteDocHTML(q1); } catch (e) { doc = 'ERR ' + e; }
-        o.aimNotPrinted = !!doc && !/8,000|9,500/.test(doc.replace(/<[^>]+>/g, ''));
+        o.aimNotPrinted = !!doc && doc === docNoAim;   // 審查：有沒有得標結果、底價目標價，報價單逐字一樣
+        let sp = ''; try { sp = JSON.stringify(_sharedPayload()); } catch (e) { sp = 'ERR ' + e; }
+        o.notShared = !!sp && !/bidAim|"bidHist"|"bid":\{/.test(sp) && /假得標案/.test(sp);
         o.aimClean = JSON.stringify(_bidAimClean({ floor: '100', target: 90 })) === 'null' && JSON.stringify(_bidAimClean({ target: '1000.4' })) === '{"target":1000}';
       } catch (e) { o.err = String(e && e.stack || e).slice(0, 500); }
       return o;
@@ -12509,7 +12512,7 @@ async function newPage(browser, width, height) {
     check('v6.0.218 得標率：記錄不改任何報價的工項與金額', !r.err && r.amountsSame, r.err || '');
     check('v6.0.218 得標率：拍板卡 bidFill 列沒得標沒對手價、送出 60 天沒結果的（舊案不湧進來）；確認＝記沒得標（未回應）、退回＝不記進統計', !r.err && r.cards === 'rival|bq2,stale|bq4' && r.detail && r.staleOk && r.skip, r.err || JSON.stringify({ cards: r.cards, detail: r.detail, staleOk: r.staleOk, skip: r.skip }));
     check('v6.0.218 得標率：前端統計跟雲端 bidStats（給報價線）逐值一樣；報價頁建議函式 _bidSuggestFor 有每個類別', !r.err && !!cloud && JSON.stringify(cloud.kinds) === JSON.stringify(r.stats) && /hpile:\d/.test(r.sugg), JSON.stringify({ cloud: cloud && cloud.kinds, web: r.stats, sugg: r.sugg }));
-    check('v6.0.218 底價／目標成交價、得標結果（讓價、對手價）走 private（quoteSens）、版次快照不帶、不印在報價單；格式檢查跟雲端一樣', !r.err && r.aimPriv && r.bidPriv && r.noSnap && r.aimNotPrinted && r.aimClean, JSON.stringify({ aimPriv: r.aimPriv, bidPriv: r.bidPriv, noSnap: r.noSnap, aimNotPrinted: r.aimNotPrinted, aimClean: r.aimClean, awardErr: r.awardErr }));
+    check('v6.0.218 底價／目標成交價、得標結果（讓價、對手價）走 private（quoteSens）、版次快照不帶、不印在報價單；格式檢查跟雲端一樣', !r.err && r.aimPriv && r.bidPriv && r.noSnap && r.aimNotPrinted && r.notShared && r.aimClean, JSON.stringify({ notShared: r.notShared, aimPriv: r.aimPriv, bidPriv: r.bidPriv, noSnap: r.noSnap, aimNotPrinted: r.aimNotPrinted, aimClean: r.aimClean, awardErr: r.awardErr }));
     check('v6.0.218 得標率測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }

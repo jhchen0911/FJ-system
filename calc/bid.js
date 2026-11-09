@@ -11,16 +11,18 @@
   var num = function (v) { var n = parseFloat(v); return isFinite(n) ? n : 0; };
   var r1 = function (v) { return Math.round(v * 10) / 10; };
   var KINDS = { hpile: 'H 型鋼樁', railpile: '鋼軌樁', sheet: '鋼板樁', midpile: '中間樁', strut: '水平支撐', deck: '構台', prepile: '預壘樁', anchor: '地錨', ccp: 'CCP 固結樁', rcpile: 'RC 基樁', rope: '安全母索', other: '其他' };
-  // 工項類別：看說明第一行的關鍵字（順序有差：中間樁要在 H 型鋼樁前面、各種樁要在「支撐」前面）
+  // 工項類別：看說明第一行「最先出現」的關鍵字（審查：「H型鋼樁（含中間樁）」是 H 型鋼樁、「H型鋼樁（全套管施工）」也是）；
+  //   同一個位置才看清單順序。「擋土支撐」是工程名稱不是水平支撐。
   var RULES = [
     ['rope', /安全母索|母索/], ['deck', /構台/], ['midpile', /中間[樁柱]/], ['sheet', /鋼板樁/], ['railpile', /鋼軌樁/], ['prepile', /預壘樁/],
-    ['ccp', /CCP|固結樁/i], ['anchor', /地錨/], ['rcpile', /基樁|RC\s*樁|全套管|鑽掘樁/i], ['hpile', /H\s*型?\s*鋼\s*排?\s*樁|H\s*樁|排樁/i],
-    ['strut', /水平支撐|支撐|圍令|斜撐|角撐|千斤頂/],
+    ['ccp', /CCP|固結樁/i], ['anchor', /地錨/], ['rcpile', /基樁|RC\s*排?\s*樁|全套管|鑽掘樁/i],
+    ['hpile', /H\s*[型形]?\s*鋼\s*排?\s*樁|H\s*\d+\s*[x×X＊*]\s*\d+[^樁\n]*樁|H\s*樁|排樁/i],
+    ['strut', /水平支撐|(?:^|[^土])支撐|圍令|斜撐|角撐|千斤頂/],
   ];
   function kind(desc) {
-    var d = String(desc || '').split('\n')[0];
-    for (var i = 0; i < RULES.length; i++) if (RULES[i][1].test(d)) return RULES[i][0];
-    return 'other';
+    var d = String(desc || '').split('\n')[0], best = null, bi = Infinity;
+    for (var i = 0; i < RULES.length; i++) { var m = RULES[i][1].exec(d); if (m && m.index < bi) { bi = m.index; best = RULES[i][0]; } }
+    return best || 'other';
   }
   // 這張報價有哪些類別（只算一般工項：段落、備用單價、減項不算），依未稅金額由大到小
   function kindsOf(items) {
@@ -32,9 +34,14 @@
     });
     return Object.keys(m).map(function (k) { return { kind: k, amt: Math.round(m[k]) }; }).sort(function (a, b) { return b.amt - a.amt || (a.kind < b.kind ? -1 : 1); });
   }
+  // 統計用的類別：佔這張報價未稅金額 minShare（預設 10%）以上的才算（審查：H 型鋼樁案裡一小項安全母索不該算一筆母索樣本）
+  function mainKinds(items, minShare) {
+    var ks = kindsOf(items), tot = ks.reduce(function (a, k) { return a + k.amt; }, 0), ms = minShare == null ? 0.1 : num(minShare);
+    return ks.filter(function (k) { return tot > 0 && k.amt / tot >= ms; }).map(function (k) { return k.kind; });
+  }
   // 第一個正式版的含稅總價：歷史版次裡版次最小的正式版；沒有正式版用最舊的一筆；都沒有用現在的總價
   function firstOf(hist, curTotal) {
-    var H = (hist || []).filter(function (h) { return h && h.snapshot && h.snapshot.t && num(h.snapshot.t.total) > 0; });
+    var H = (Array.isArray(hist) ? hist : Object.values(hist || {})).filter(function (h) { return h && h.snapshot && h.snapshot.t && num(h.snapshot.t.total) > 0; });
     var F = H.filter(function (h) { return h.formal; }).sort(function (a, b) { return (num(a.ver) - num(b.ver)) || (num(a.savedAt) - num(b.savedAt)); });
     if (F.length) return Math.round(num(F[0].snapshot.t.total));
     if (H.length) { H.sort(function (a, b) { return num(a.savedAt) - num(b.savedAt); }); return Math.round(num(H[0].snapshot.t.total)); }
@@ -62,7 +69,7 @@
     var t = Object.assign({ lo: 40, hi: 60, maxDown: 10, maxUp: 5 }, tune || {}), v = 0;
     if (st.rate < t.lo) v = -Math.min(t.maxDown, (st.gapPct != null && st.gapPct > 0) ? st.gapPct / 2 : (t.lo - st.rate) / 10);
     else if (st.rate > t.hi) v = Math.min(t.maxUp, (st.rate - t.hi) / 10);
-    v = Math.round(v * 2) / 2;
+    v = (v < 0 ? -1 : 1) * Math.round(Math.abs(v) * 2) / 2;   // 審查：正負對稱（-2.25 → -2.5，跟 +2.25 → +2.5 一樣）
     return v === 0 ? 0 : v;   // 不要 -0
   }
   // 統計：rows＝[{kinds:['hpile',…], v:view(q)}]；流標（void）不算；opt＝{minN:5, tune}
@@ -85,7 +92,7 @@
   function exportRows(st) {
     return (st || []).map(function (s) { return { kind: s.kind, label: s.label, n: s.n, won: s.won, lost: s.lost, rate: s.rate, concPct: s.concPct, gapPct: s.gapPct, ready: s.ready, adjPct: s.adjPct }; });
   }
-  var bid = { KINDS: KINDS, kind: kind, kindsOf: kindsOf, firstOf: firstOf, resOf: resOf, view: view, suggest: suggest, stats: stats, exportRows: exportRows };
+  var bid = { KINDS: KINDS, kind: kind, kindsOf: kindsOf, mainKinds: mainKinds, firstOf: firstOf, resOf: resOf, view: view, suggest: suggest, stats: stats, exportRows: exportRows };
   var FJC = root.FJC || (root.FJC = {});
   FJC.bid = bid;
   if (typeof module !== 'undefined' && module.exports) module.exports = FJC;

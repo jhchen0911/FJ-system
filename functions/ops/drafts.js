@@ -135,7 +135,7 @@ function bidStats(quotes, contracts, params, quoteSens) {
   const ctAmt = (q) => { const c = CT.find((x) => x.linkedQid === q.id) || CT.find((x) => x.name && x.name === q.name); return c ? (parseFloat(c.amount) || 0) : 0; };   // 同 _ctAmtOf
   const rows = Q.filter((q) => !q.parentId && q.bid && q.bid.res && !q.bid.skip).map((q) => {
     const items = []; [q].concat(Q.filter((x) => x.parentId === q.id)).forEach((x) => (Array.isArray(x.items) ? x.items : Object.values(x.items || {})).forEach((it) => items.push(it)));
-    return { kinds: BID.kindsOf(items).map((k) => k.kind), v: BID.view(q, { ctAmt: ctAmt(q) }) };
+    return { kinds: BID.mainKinds(items), v: BID.view(q, { ctAmt: ctAmt(q) }) };   // 同前端：佔 10% 以上的類別才算
   });
   const t = (params && params.bidTune && typeof params.bidTune === 'object') ? params.bidTune : {};
   const opt = { minN: parseInt(t.minN) || 5, tune: { lo: t.lo != null ? +t.lo : 40, hi: t.hi != null ? +t.hi : 60, maxDown: t.maxDown != null ? +t.maxDown : 10, maxUp: t.maxUp != null ? +t.maxUp : 5 } };

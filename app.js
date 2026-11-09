@@ -28085,9 +28085,10 @@ function restoreQVersion(qid,versionIdx,savedAt){
       if(editing){try{cur=Object.assign(JSON.parse(JSON.stringify(Q[idx])),_qEditorFields());unsaved=true;}catch(e){_err('restoreQVersion.cur',e);cur=Q[idx];}}
       var _okB=false;try{_okB=saveQVersion(qid,cur,{pre:true,unsaved:unsaved});}catch(e){_err('restoreQVersion',e);}
       if(!_okB){toast('還原前備份存不進這台裝置（儲存空間可能滿了），已取消還原：請先匯出備份或清理自動存檔');return;}   // 審查：空間滿時備份只在記憶體，重新整理就不見
-      const _keep={sendLog:Q[idx].sendLog,verFix:Q[idx].verFix,bid:Q[idx].bid,bidHist:Q[idx].bidHist,bidWait:Q[idx].bidWait,bidAim:Q[idx].bidAim};   // v6.0.218 得標結果、底價目標價也屬於這張報價   // v6.0.180：匯出紀錄、補登版次規則屬於這張報價，不跟著快照倒回去
+      const _keep={sendLog:Q[idx].sendLog,verFix:Q[idx].verFix,bid:Q[idx].bid,bidHist:Q[idx].bidHist,bidWait:Q[idx].bidWait,bidAim:Q[idx].bidAim};   // v6.0.218 得標結果、底價目標價也屬於這張報價（還原後再照還原後的得標狀態對一次 _bidRecSync）   // v6.0.180：匯出紀錄、補登版次規則屬於這張報價，不跟著快照倒回去
       Q[idx]={...snapshot,id:qid,ver:Math.max(curVer,snapshot.ver||1)};  // 版號不倒退
       Object.keys(_keep).forEach(function(k){if(_keep[k]!=null)Q[idx][k]=_keep[k];else delete Q[idx][k];});
+      try{_bidRecSync(Q[idx]);}catch(e){_err('restoreQVersion.bid',e);}   // 審查：還原成得標前的版次 → 得標紀錄移到 bidHist
       _touch(Q[idx]); // 快照裡的 _mt 是舊值，不蓋新戳記的話雲端同步會把還原吃掉
       persist();renderList();rDash();
       // 編輯頁若正開著這張報價單，重新載入還原後的內容，避免舊畫面覆蓋還原結果
@@ -42226,7 +42227,7 @@ function _bidRecSync(q,src){
 function _bidRecRows(){
   return (Q||[]).filter(function(q){return q&&!q.parentId&&q.bid&&q.bid.res&&!q.bid.skip;}).map(function(q){
     var all=[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;})),items=[];all.forEach(function(x){(x.items||[]).forEach(function(it){items.push(it);});});
-    return {qid:q.id,kinds:FJC.bid.kindsOf(items).map(function(k){return k.kind;}),v:_bidView(q)};});
+    return {qid:q.id,kinds:FJC.bid.mainKinds(items),v:_bidView(q)};});   // 審查：佔 10% 以上的類別才算一筆樣本
 }
 function _bidTune(){var t=(P&&P.bidTune&&typeof P.bidTune==='object')?P.bidTune:{};return {minN:parseInt(t.minN)||5,tune:{lo:t.lo!=null?+t.lo:40,hi:t.hi!=null?+t.hi:60,maxDown:t.maxDown!=null?+t.maxDown:10,maxUp:t.maxUp!=null?+t.maxUp:5}};}
 function _bidKindStats(){var o=_bidTune();return FJC.bid.stats(_bidRecRows(),o);}
@@ -42265,7 +42266,7 @@ _decReg('bidFill',{
   detail:_bidFillDetail,
   ok:function(x){var q=_bidQ(x.qid);if(!q)return false;
     if(x.k==='rival'){if(!q.bid)return false;q.bid.noRival=true;_touch(q);persist();return true;}
-    q.bidStatus='lost';q.lostReason='未回應';delete q.lostPrice;_bidRecSync(q,'card');_touch(q);persist();try{renderList();}catch(e){_err('bidFill.ok',e);}return true;},
+    q.bidStatus='lost';q.lostReason='未回應';delete q.lostPrice;_bidRecSync(q,'card');if(q.bid)q.bid.noRival=true;/* 審查：業主沒回應本來就沒有對手價，不再出第二張卡 */_touch(q);persist();try{renderList();}catch(e){_err('bidFill.ok',e);}return true;},
   reject:function(x,why){var q=_bidQ(x.qid);if(!q)return false;
     if(x.k==='rival'){if(!q.bid)return false;q.bid.skip={at:Date.now(),why:String(why||'').slice(0,200)};_touch(q);persist();return true;}
     q.bidWait=localToday();_touch(q);persist();return true;},
