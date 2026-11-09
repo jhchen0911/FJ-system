@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.204';
+var APP_VERSION='v6.0.207';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -42896,7 +42896,7 @@ function _mvIdleRefresh(){['mvIdle','mvIdleUrg','mvItemPick','mvStartUnknown'].f
 function _mvItemDone(o){if(!o)return '';try{var pg=_itemProgress(o.q,o.i);return pg.removeDone||pg.stageRemove||'';}catch(e){_err('_mvItemDone',e);return '';}}
 // 退料提醒用的分類：構台（構台柱、構台梁、覆工板）自己一類（Lotion 11/09 選 A），其餘照 _m6ItemKind
 function _mvIdleKind(it){var d=String((it&&it.desc)||'');if(/構台|覆工/.test(d))return 'deck';return _m6ItemKind(it);}
-function _mvKindName(k){return k==='deck'?'構台':'樁類';}
+function _mvKindName(k){return k==='deck'?'構台':(k==='strut'?'支撐':'樁類');}
 function _mvPileItems(q,kind){kind=kind||'pile';return _m6Items(q).filter(function(o){return _mvIdleKind(o.it)===kind;});}
 function _mvRentKind(q,rt,tag){var key=(tag&&tag.item)||rt.item||'',o=key?_m6ItemBy(q,key):null;if(o){var k0=_mvIdleKind(o.it);return k0==='strut'||k0==='deck'?k0:'pile';}   /* 有指定工項：照那個工項的拔除完成起算（不是支撐類、構台就當樁類算） */
   return _mvIdleKind({desc:[rt.name||'',rt.spec||''].join(' ')})||'';}
@@ -42904,7 +42904,7 @@ function _mvRentKind(q,rt,tag){var key=(tag&&tag.item)||rt.item||'',o=key?_m6Ite
 function _mvIdleOf(q,rt,today){
   var openM=_mvRentOpenM(rt,today);if(!(openM>0))return null;var tag=_mvTagOf(q.id,rt.id),kind=_mvRentKind(q,rt,tag);
   var e={id:q.id+'|'+rt.id,qid:q.id,rt:rt.id,proj:q.name||'',vendor:rt.vendor||'',label:_matLabel(rt),openM:openM,kind:kind,start:'',why:'',days:0,level:'',cost:0,perDay:0,need:''};
-  if(kind==='strut')return null;   // 支撐類等分層定案（Lotion 11/09）
+  /* 支撐類（v6.0.207，Lotion 11/09 分層選 A）：報價分層列＝每層一個工項，跟樁類一樣對工項／指定／出卡（保底＝支撐工項全部拆完）；只列一項＝整項拆完才起算。日報不改 */
   if(tag&&tag.keep&&!kind)return null;   /* 判斷不出類別、已按「這批不用提醒」 */
   if(!kind){e.need='unknown';e.level='unknown';return e;}
   var key=(tag&&tag.item)||rt.item||'',o=key?_m6ItemBy(q,key):null,piles=_mvPileItems(q,kind),kn=_mvKindName(kind);
@@ -42944,7 +42944,7 @@ function _mvIdleDetail(e){return '<div style="font-size:12.5px;line-height:1.7">
   +(MAT_IDLE_AT&&!_shWholeOk()?('<span style="font-size:11px;color:var(--b4)">（清單 '+esc(_dtFmtShort(MAT_IDLE_AT))+' 更新）</span><br>'):'')+'<span style="color:var(--b4)">確認＝已安排退料（3 天內不再提醒）；退回＝業主要求先留在工地（寫原因，不再提醒）；修改＝指定這批料屬於哪個工項</span></div>';}
 function _mvIdleBy(id){return _mvIdleAll().find(function(x){return x.id===id;})||null;}
 function _mvItemPick(e){
-  var L=(e.items&&e.items.length)?e.items:_mvPileItems((Q||[]).find(function(q){return q&&q.id===e.qid;})||{items:[]},e.kind==='deck'?'deck':'pile').map(function(p){return {key:p.key,label:String(p.it.desc||'').split('\n')[0].slice(0,40)};});
+  var L=(e.items&&e.items.length)?e.items:_mvPileItems((Q||[]).find(function(q){return q&&q.id===e.qid;})||{items:[]},(e.kind==='deck'||e.kind==='strut')?e.kind:'pile').map(function(p){return {key:p.key,label:String(p.it.desc||'').split('\n')[0].slice(0,40)};});
   if(!L.length){toast('這案沒有'+_mvKindName(e.kind)+'工項可以指定');return;}
   showConfirm('這批租料屬於哪個工項？','<div style="font-size:12px;color:var(--b4);margin-bottom:6px">'+esc(_mvIdleHead(e))+'</div><select id="mvi-item" style="width:100%">'+L.map(function(x){return '<option value="'+esc(x.key)+'"'+(x.key===e.item?' selected':'')+'>'+esc(x.label)+'</option>';}).join('')+'</select>',
     function(){var v=gv('mvi-item');if(!v)return false;_mvTagSet(e.qid,e.rt,{item:v,noPick:''});toast('已指定工項，之後從這個工項拔除完成那天起算');setTimeout(function(){['mvIdle','mvIdleUrg','mvItemPick'].forEach(function(k){try{_decRefresh(k);}catch(x){_err('_mvItemPick',x);}});},50);},false,null,false);
