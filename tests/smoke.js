@@ -12216,6 +12216,34 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.205 品牌色換新（Lotion 11/09：名片原檔色值 綠 #006935、橘 #F8B72E、炭灰 #292B2D）：單一來源 FY_BRAND、畫面 :root 一致、程式裡沒有舊色、Logo 換新 ──
+  {
+    const fs = require('fs'), pth = require('path'), R = pth.join(__dirname, '..');
+    const app = fs.readFileSync(pth.join(R, 'app.js'), 'utf8'), idx = fs.readFileSync(pth.join(R, 'index.html'), 'utf8'), man = fs.readFileSync(pth.join(R, 'manifest.json'), 'utf8');
+    const OLD = /#(1a6b3f|145730|0e3d22|155530|1a5a2a|e8941a|d4820f|1c6937|ffae48)\b/i;
+    const stat = { appOld: OLD.test(app.replace(/^var FY_LOGO=.*$/m, '')), idxOld: OLD.test(idx), manOld: OLD.test(man), oldLogo: /\/9j\/4AAQSkZJRgABAQEAYABgAAD\/4QKyRXhpZgAATU0/.test(app + idx) };
+    { const fb = (app.match(/^var FY_BRAND=\{([^}]*)\}/m) || [, ''])[1], gv = (k) => ((fb.match(new RegExp('\\b' + k + ":'(#[0-9A-Fa-f]{6})'")) || [])[1] || '').toLowerCase(), rv = (k) => ((idx.match(new RegExp('--' + k + ':(#[0-9A-Fa-f]{6})')) || [])[1] || '').toLowerCase();
+      stat.rootSame = ['g', 'g2', 'g3', 'y', 'y2'].every((k) => gv(k) && gv(k) === rv(k)); }   // index.html :root 寫死的值（開頁第一眼）跟 FY_BRAND 一樣
+    check('v6.0.205 程式、畫面、App 圖示設定裡沒有舊品牌色（#1a6b3f／#0e3d22／#e8941a 等、作廢的 #1C6937／#FFAE48），也沒有舊 Logo', !stat.appOld && !stat.idxOld && !stat.manOld && !stat.oldLogo && stat.rootSame, JSON.stringify(stat));
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const cs = getComputedStyle(document.documentElement), v = (k) => cs.getPropertyValue(k).trim().toLowerCase();
+        out.brand = FY_BRAND.g === '#006935' && FY_BRAND.y.toLowerCase() === '#f8b72e' && FY_BRAND.ink.toLowerCase() === '#292b2d';
+        out.root = v('--g') === FY_BRAND.g.toLowerCase() && v('--g2') === FY_BRAND.g2.toLowerCase() && v('--g3') === FY_BRAND.g3.toLowerCase() && v('--y') === FY_BRAND.y.toLowerCase() && v('--y2') === FY_BRAND.y2.toLowerCase();
+        out.logo = /^data:image\/png;base64,/.test(FY_LOGO) && /^data:image\/png;base64,/.test(document.querySelector('.brand-icon img').src);
+        const q = { id: 'qBC1', code: '1151109', name: '範例案', client: '假業主', date: '2026-11-09', items: [{ desc: '假工項', unit: '支', qty: 1, price: 1000 }], exs: [], rmk: {}, ver: 1 };
+        const h = String(_buildQuoteDocHTML(q) || '');
+        out.doc = /#006935/i.test(h) && !/#1a6b3f/i.test(h) && h.indexOf(FY_LOGO.slice(0, 80)) >= 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
+      return out;
+    });
+    check('v6.0.205 品牌色單一來源：FY_BRAND 是名片色值、畫面 :root 的 --g／--g2／--g3／--y／--y2 跟它一致；Logo 是新的去背 PNG；報價單用新綠、新 Logo', r.brand && r.root && r.logo && r.doc, JSON.stringify(r));
+    check('v6.0.205 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
