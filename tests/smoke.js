@@ -12216,7 +12216,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── v6.0.210 改版第 7 步①：共用 A4 單據引擎（報價、請款、合約、詢價單、保留款退還單）──
+  // ── v6.0.211 改版第 7 步①：共用 A4 單據引擎（報價、請款、合約、詢價單、保留款退還單）──
   {
     const { page, errors } = await newPage(browser, 1920, 1080);
     const r = await page.evaluate(async () => {
@@ -12281,9 +12281,9 @@ async function newPage(browser, width, height) {
       Q = keepQ; INV = keepI; VENDORS = keepV; try { Object.assign(P, JSON.parse(keepP)); } catch (e) { /* 可忽略 */ }
       return out;
     });
-    check('v6.0.210 A4 單據引擎：8 種單據同一個出件表；預覽切頁＝匯出 PDF 切頁（報價、請款多頁含續頁表頭、詢價單、合約書、保留款退還單）', r.kinds && r.same, JSON.stringify(r));
-    check('v6.0.210 A4 單據引擎：報價／請款編輯頁右邊即時預覽（改了就變、內部成本不出現）；詢價單、合約書視窗左填右看', r.qpv && r.qlive && r.ipv && r.rpv && r.rlive && r.spv && r.slive && r.noLeak, JSON.stringify(r));
-    check('v6.0.210 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.211 A4 單據引擎：8 種單據同一個出件表；預覽切頁＝匯出 PDF 切頁（報價、請款多頁含續頁表頭、詢價單、合約書、保留款退還單）', r.kinds && r.same, JSON.stringify(r));
+    check('v6.0.211 A4 單據引擎：報價／請款編輯頁右邊即時預覽（改了就變、內部成本不出現）；詢價單、合約書視窗左填右看', r.qpv && r.qlive && r.ipv && r.rpv && r.rlive && r.spv && r.slive && r.noLeak, JSON.stringify(r));
+    check('v6.0.211 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
