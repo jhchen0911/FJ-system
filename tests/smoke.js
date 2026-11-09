@@ -8952,7 +8952,7 @@ async function newPage(browser, width, height) {
         out.slip = !!MV && MV.dir === 'in' && MV.own === false && MV.rentVendor === '丙料場' && MV.items[0].qty === 12 && MV.items[0].len === 9 && MV.truck === 'KLA-1234' && /^ph:/.test(MV.photo);
         if (MV) { MV.st = 'ok'; MV.okAt = Date.now(); }
         const mh = _m6SlipsHtml(Q[0]);
-        out.slipList = /材料簽收單/.test(mh) && /1 張待登錄/.test(mh) && /2026-10：1 趟/.test(mh) && /帶入租料進場/.test(mh);
+        out.slipList = /材料簽收單/.test(mh) && !/張待登錄/.test(mh) && /2026-10：1 趟/.test(mh) && !/帶入租料進場/.test(mh);   // v6.0.203 起租料簽收單確認後算已處理：列出、算趟數，不再是「待登錄」、已處理的不出現「帶入」（會重複加）
         out.slipRow = !(L.slips || []).length;
         const pr = _ikSlipItemsParse('鋼板樁 IV型 12M 30支\n角鐵 5');
         out.parse = pr[0].name === '鋼板樁' && pr[0].len === 12 && pr[0].qty === 30 && pr[0].unit === '支' && pr[1].qty === 5;
@@ -11458,8 +11458,8 @@ async function newPage(browser, width, height) {
         const st = _mvRedoState(o1);
         out.redoCan = !!st && st.can === true && /還原租賃單/.test(await Promise.resolve(_DEC.mvRedo.detail(o1)));
         out.redo = (await _DEC.mvRedo.ok(o1)) === true && open(rt('rt1')) === 270 && !!MAT_MOVE_FIN[o1.id].applied && MAT_MOVE_FIN[o1.id].applied.g === 1;
-        // 材料頁：租料簽收單也不再出現「帶入」
-        out.bridge = _mvSlipsOf(Q[0]).every(s => s.done);
+        // 材料頁：租料簽收單也不再出現「帶入」（自動處理過的顯示「已自動登錄」，不給帶入按鈕，免得重複加）
+        out.bridge = _mvSlipsOf(Q[0]).every(s => s.done) && (function () { const h = _m6SlipsHtml(Q[0]); return /已自動登錄/.test(h) && !/帶入租料進場|帶入租料退場/.test(h); })();
         // 審查：上線前手動帶入過（同日同 M、沒有簽收單編號）→ 出卡，不重複加；確認＝掛上簽收單、不另加一批
         rt('rt1').batches.push({ id: 'bman', d: '2026-11-10', m: 90, n: 10, o: '' });
         const dp = mk({ date: '2026-11-10', dir: 'in', qid: 'qR203', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 10 }] });

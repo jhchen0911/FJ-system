@@ -39371,6 +39371,8 @@ function _m6SlipFind(q,sid){if(/^mv_/.test(String(sid||''))){var mv=_mvOf(sid);r
 function _m6SlipM(s){return Math.round((s.items||[]).reduce(function(a,it){return a+(parseFloat(it.len)||0)*(parseFloat(it.qty)||0);},0)*100)/100;}
 function _m6SlipN(s){return (s.items||[]).reduce(function(a,it){return a+(parseFloat(it.qty)||0);},0);}
 function _m6SlipTrips(list){var k={};list.forEach(function(s){k[(s.date||'')+'|'+String(s.truck||s.id).replace(/\s/g,'')]=1;});return Object.keys(k).length;}
+// v6.0.203：這張簽收單已經由進退料簿自動處理（新簽收單、或舊單搬家後已套用）→ 不再給「帶入」（會重複加）
+function _m6SlipAuto(s){try{var mv=s.fromMove?_mvOf(s.id):(MAT_MOVES||[]).find(function(m){return m&&m.src&&m.src.slipId===String(s.id);});if(!mv)return false;var f=_mvFin(mv.id);return !!(f&&f.applied);}catch(e){_err('_m6SlipAuto',e);return false;}}
 function _m6SlipsHtml(q){
   var L=_m6Slips(q);if(!L.length)return '';
   var todo=L.filter(function(s){return !s.done;}).length;
@@ -39378,17 +39380,17 @@ function _m6SlipsHtml(q){
   var monTxt=Object.keys(mon).sort().reverse().slice(0,3).map(function(k){return k+'：'+_m6SlipTrips(mon[k])+' 趟';}).join('　');
   var rows=L.slice(0,40).map(function(s){
     var items=(s.items||[]).map(function(it){return esc([it.name,it.spec,(parseFloat(it.len)>0?(it.len+'M'):''),(it.qty!==''&&it.qty!=null?(it.qty+(it.unit||'')):'')].filter(Boolean).join(' '));}).join('、');
-    var act=s.dir==='other'?'':'<button type="button" class="btn btn-xs" onclick="m6SlipAct(\''+q.id+'\',\''+s.id+'\')">'+({out:'帶入調撥',back:'帶入歸還',rentIn:'帶入租料進場',rentOut:'帶入租料退場'}[s.dir]||'')+'</button>';
+    var _auto=_m6SlipAuto(s),act=(s.dir==='other'||s.done)?'':'<button type="button" class="btn btn-xs" onclick="m6SlipAct(\''+q.id+'\',\''+s.id+'\')">'+({out:'帶入調撥',back:'帶入歸還',rentIn:'帶入租料進場',rentOut:'帶入租料退場'}[s.dir]||'')+'</button>';
     return '<div class="m6-slip" data-sid="'+esc(s.id)+'" style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px dotted var(--b1);font-size:12.5px'+(s.done?';opacity:.55':'')+'">'
       +'<div style="flex:1;min-width:0"><b>'+esc(s.date||'')+'</b>　'+esc((_IK_DIRS[s.dir]||'其他').split('（')[0])+(s.truck?('　車號 '+esc(s.truck)):'')
       +'<div style="font-size:11.5px;color:var(--b4)">'+esc(s.from||'?')+' → '+esc(s.to||'?')+(s.vendor?('　'+esc(s.vendor)):'')+'</div>'
       +(items?'<div style="font-size:11.5px">'+items+'</div>':'')+'</div>'
       +'<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0">'
       +'<button type="button" class="btn btn-xs" onclick="m6SlipPhoto(\''+q.id+'\',\''+s.id+'\')">照片</button>'+act
-      +'<label style="font-size:11px;display:flex;gap:4px;align-items:center"><input type="checkbox" '+(s.done?'checked':'')+' onchange="m6SlipDone(\''+q.id+'\',\''+s.id+'\',this.checked)" style="width:15px;height:15px"> 已登錄</label></div></div>';
+      +(_auto?'<span style="font-size:11px;color:var(--g3)">已自動登錄</span>':('<label style="font-size:11px;display:flex;gap:4px;align-items:center"><input type="checkbox" '+(s.done?'checked':'')+' onchange="m6SlipDone(\''+q.id+'\',\''+s.id+'\',this.checked)" style="width:15px;height:15px"> 已登錄</label>'))+'</div></div>';
   }).join('');
   return '<div class="card" id="m6-slips" style="margin-top:12px"><div style="font-weight:700;font-size:14px">材料簽收單'+(todo?('<span style="color:#b26a00;font-size:12px;font-weight:600">　'+todo+' 張待登錄</span>'):'')+'</div>'
-    +'<div style="font-size:11.5px;color:var(--b4);margin:2px 0 6px">工地用黃色相機拍的簽收單。按「帶入」把日期、M 數帶進原本的調撥／歸還／租料畫面，存檔後勾「已登錄」。運費趟數（同日同車號算一趟）：'+monTxt+'</div>'
+    +'<div style="font-size:11.5px;color:var(--b4);margin:2px 0 6px">工地用黃色相機拍的簽收單。首頁確認後系統自動改台帳／租料批次（標「已自動登錄」）；還沒自動處理的舊單才按「帶入」，存檔後勾「已登錄」。運費趟數（同日同車號算一趟）：'+monTxt+'</div>'
     +rows+'</div>';
 }
 function m6SlipPhoto(qid,sid){
