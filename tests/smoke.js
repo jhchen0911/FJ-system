@@ -12451,7 +12451,7 @@ async function newPage(browser, width, height) {
     check('v6.0.206 6-2a 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.213 報價得標率紀錄（小批次線，7b 後端）：得標／沒得標／流標／取消得標都記、讓價與對手價、拍板卡補資料、統計跟雲端 bidStats 一樣、底價目標價走 private、不改報價金額 ──
+  // ── v6.0.218 報價得標率紀錄（小批次線，7b 後端）：得標／沒得標／流標／取消得標都記、讓價與對手價、拍板卡補資料、統計跟雲端 bidStats 一樣、底價目標價走 private、不改報價金額 ──
   {
     const DR = require('../functions/ops/drafts.js');
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -12495,19 +12495,22 @@ async function newPage(browser, width, height) {
         q1.bidAim = { floor: 8000, target: 9500 };
         const st = _stripQuoteSens(q1), ex = _extractQuoteSens(q1), back = JSON.parse(JSON.stringify(st)); _applyQuoteSens(back, ex, false);
         o.aimPriv = !('bidAim' in st) && ex.bidAim && ex.bidAim.floor === 8000 && back.bidAim && back.bidAim.target === 9500;
+        o.bidPriv = !('bid' in st) && !('bidHist' in st) && ex.bid && ex.bid.res === 'won' && back.bid && back.bid.first === 11550 && Array.isArray(back.bidHist);
+        const sn = _qhSnapOf(q1); o.noSnap = !('bid' in sn) && !('bidAim' in sn) && !('bidHist' in sn);
         let doc = ''; try { doc = _buildQuoteDocHTML(q1); } catch (e) { doc = 'ERR ' + e; }
         o.aimNotPrinted = !!doc && !/8,000|9,500/.test(doc.replace(/<[^>]+>/g, ''));
         o.aimClean = JSON.stringify(_bidAimClean({ floor: '100', target: 90 })) === 'null' && JSON.stringify(_bidAimClean({ target: '1000.4' })) === '{"target":1000}';
       } catch (e) { o.err = String(e && e.stack || e).slice(0, 500); }
       return o;
     });
-    const cloud = r.Q ? DR.bidStats(r.Q.map((q) => { const c = Object.assign({}, q); delete c.costs; return c; }), r.CT, {}) : null;
-    check('v6.0.213 得標率：確認得標自動記（第一版總價、成交價＝合約、讓價）；未得標視窗記對手價；流標也記；取消得標移到歷史；舊案不補', !r.err && r.won && r.wonView && r.lost && r.void && r.revoke && r.oldNotBack, r.err || JSON.stringify(r).slice(0, 600));
-    check('v6.0.213 得標率：記錄不改任何報價的工項與金額', !r.err && r.amountsSame, r.err || '');
-    check('v6.0.213 得標率：拍板卡 bidFill 列沒得標沒對手價、送出 60 天沒結果的（舊案不湧進來）；確認＝記沒得標（未回應）、退回＝不記進統計', !r.err && r.cards === 'rival|bq2,stale|bq4' && r.detail && r.staleOk && r.skip, r.err || JSON.stringify({ cards: r.cards, detail: r.detail, staleOk: r.staleOk, skip: r.skip }));
-    check('v6.0.213 得標率：前端統計跟雲端 bidStats（給報價線）逐值一樣；報價頁建議函式 _bidSuggestFor 有每個類別', !r.err && !!cloud && JSON.stringify(cloud.kinds) === JSON.stringify(r.stats) && /hpile:\d/.test(r.sugg), JSON.stringify({ cloud: cloud && cloud.kinds, web: r.stats, sugg: r.sugg }));
-    check('v6.0.213 底價／目標成交價走 private（quoteSens）、不印在報價單；格式檢查跟雲端一樣', !r.err && r.aimPriv && r.aimNotPrinted && r.aimClean, JSON.stringify({ aimPriv: r.aimPriv, aimNotPrinted: r.aimNotPrinted, aimClean: r.aimClean, awardErr: r.awardErr }));
-    check('v6.0.213 得標率測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    // 雲端拿到的形狀：共用區報價不含 bid（在 private quoteSens）
+    const cloud = r.Q ? DR.bidStats(r.Q.map((q) => { const c = Object.assign({}, q); delete c.costs; delete c.bid; delete c.bidHist; return c; }), r.CT, {}, Object.fromEntries(r.Q.filter((q) => q.bid).map((q) => [q.id, { bid: q.bid }]))) : null;
+    check('v6.0.218 得標率：確認得標自動記（第一版總價、成交價＝合約、讓價）；未得標視窗記對手價；流標也記；取消得標移到歷史；舊案不補', !r.err && r.won && r.wonView && r.lost && r.void && r.revoke && r.oldNotBack, r.err || JSON.stringify(r).slice(0, 600));
+    check('v6.0.218 得標率：記錄不改任何報價的工項與金額', !r.err && r.amountsSame, r.err || '');
+    check('v6.0.218 得標率：拍板卡 bidFill 列沒得標沒對手價、送出 60 天沒結果的（舊案不湧進來）；確認＝記沒得標（未回應）、退回＝不記進統計', !r.err && r.cards === 'rival|bq2,stale|bq4' && r.detail && r.staleOk && r.skip, r.err || JSON.stringify({ cards: r.cards, detail: r.detail, staleOk: r.staleOk, skip: r.skip }));
+    check('v6.0.218 得標率：前端統計跟雲端 bidStats（給報價線）逐值一樣；報價頁建議函式 _bidSuggestFor 有每個類別', !r.err && !!cloud && JSON.stringify(cloud.kinds) === JSON.stringify(r.stats) && /hpile:\d/.test(r.sugg), JSON.stringify({ cloud: cloud && cloud.kinds, web: r.stats, sugg: r.sugg }));
+    check('v6.0.218 底價／目標成交價、得標結果（讓價、對手價）走 private（quoteSens）、版次快照不帶、不印在報價單；格式檢查跟雲端一樣', !r.err && r.aimPriv && r.bidPriv && r.noSnap && r.aimNotPrinted && r.aimClean, JSON.stringify({ aimPriv: r.aimPriv, bidPriv: r.bidPriv, noSnap: r.noSnap, aimNotPrinted: r.aimNotPrinted, aimClean: r.aimClean, awardErr: r.awardErr }));
+    check('v6.0.218 得標率測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
   await browser.close();
