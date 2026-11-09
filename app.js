@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.214';
+var APP_VERSION='v6.0.216';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo||!FJC.bid){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -6329,7 +6329,7 @@ function updateDashTodo(){
   try{_v6TodoItems(items);}catch(e){_err('updateDashTodo.v6',e);}   // v6：待登錄廠商請款／本月未開單／自有材料在工地
   // 按緊急度排序
   items.sort(function(a,b){return (b.urgent?1:0)-(a.urgent?1:0);});
-  if(_nav5On()){try{_todayRender(el,badge,items);return;}catch(e){_err('updateDashTodo.today',e);}}   // 改版第 7 步②：今天要做的事（舊選單照舊列表）
+  if(_v7New('dash')){try{_todayRender(el,badge,items);return;}catch(e){_err('updateDashTodo.today',e);}}   // 改版第 7 步②：今天要做的事（舊選單照舊列表）
 
   if(!items.length){
     el.innerHTML='<div style="padding:10px 14px;font-size:12px;color:var(--b3)"><svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 本月無待辦事項</div>';
@@ -26501,6 +26501,7 @@ function renderPayables(){
 }
 
 function updateFinanceKPIs(){
+  try{var _t1=document.getElementById('acct-top'),_c1=document.getElementById('acct-cash1');if(_t1&&(_c1||_v7New('acct'))){if(_c1)_c1.remove();if(_v7New('acct'))_t1.insertAdjacentHTML('afterbegin',_acctCashLineHtml());}}catch(e){_err('updateFinanceKPIs.cash1',e);}   // v6.0.214 審查：收款／付款後、雲端資料進來後，帳務最上面那一行跟著更新
   const el=document.getElementById('finance-kpis');if(!el)return;
   const now=Date.now();
   const taxRate=_taxM();
@@ -32357,6 +32358,13 @@ function renderProj(){
   try{if(q.mat){_matAmortSync(q);_matLossSync(q);}}catch(e){_err('renderProj.mat',e);}   // v6 內部攤提天數每日變動 → 開頁先同步
   var st;try{st=_pjStat(q);}catch(e){_err('renderProj',e);root.innerHTML=top+'<div style="padding:20px;color:var(--red)">彙總失敗：'+esc(e.message)+'</div>';return;}
   window._pjOpenSet=q.closed?['close','inv']:(_PJ_STAGE_OPEN[_pjActiveStage(q,st)]||null);   // v6.0.30 只有目前階段預設展開
+  if(_v7New('proj')){   // 改版第 7 步⑤：直的流程步驟條
+    root.innerHTML=top+_pjHeadHtml(q,st)+_pjTodoHtml(q,st)+_pj7Html(q,st);
+    if(!root._pj7Wired){root._pj7Wired=1;root.addEventListener('click',_pj7Click);}
+    try{if(typeof _mstack==='function')_mstack(root);}catch(e){_err('renderProj.mstack',e);}
+    try{_lineImgFill(root);}catch(e){_err('renderProj.line',e);}
+    return;
+  }
   var h=top+_pjHeadHtml(q,st)+_pjTimelineHtml(q,st)+_pjTodoHtml(q,st)
     +_pjSection('items','合約工項與進度',_pjItemsHtml(q,st),'',!(q.items||[]).some(function(it){return it&&!it.sec;}))
     +_pjSection('inv','業主計價',_pjInvHtml(q,st),'',!st.invs.length&&!st.rent.length)
@@ -32985,7 +32993,7 @@ function _acctCashLineHtml(){
     +'<span>未來 30 天：預計收 <b>NT$ '+fmt(Math.round(b.incoming))+'</b>'+(b.overdue?'（含逾期 NT$ '+fmt(Math.round(b.overdue))+'）':'')+'、預計付 <b>NT$ '+fmt(Math.round(b.outgoing))+'</b></span></div>';
 }
 function _acctTabsHtml(){
-  if(_nav5On())return _acctGrpTabsHtml();   // 7d：4 塊
+  if(_v7New('acct'))return _acctGrpTabsHtml();   // 7d：4 塊
   return _ACCT_TABS.filter(function(t){return (t[0]!=='petty'&&t[0]!=='pay')||_acctCanPay();}).map(function(t){var on=_acctTab===t[0];
     return '<button type="button" class="btn btn-sm" onclick="acctTab(\''+t[0]+'\')" style="min-width:0;flex:1 1 0;'+(on?'background:var(--g);color:#fff;border-color:var(--g)':'background:var(--w);color:var(--g3);border-color:var(--gm)')+'">'+t[1]+'</button>';}).join('');
 }
@@ -34669,7 +34677,7 @@ function _pjSection(id,title,body,extra,empty){
 function _pjTodoItems(q,st){
   var items=[],today=localToday(),qn=q.name||'';
   var add=function(text,sub,js,label,urgent){items.push({text:text,sub:sub||'',js:js,label:label,urgent:!!urgent});};
-  var scroll=function(id){return "localStorage.setItem('pj_open_"+id+"','1');renderProj();setTimeout(function(){var e=document.getElementById('pj-sec-"+id+"');if(e)e.scrollIntoView({behavior:'smooth',block:'start'})},60)";};
+  var scroll=function(id){return "localStorage.setItem('pj_open_"+id+"','1');localStorage.setItem('pj7_open_"+id+"','1');renderProj();setTimeout(function(){var e=document.getElementById('pj-sec-"+id+"');if(e)e.scrollIntoView({behavior:'smooth',block:'start'})},60)";};
   if(q.closed)return items;
   // 日報太久沒填
   try{var g=_drGapState(q,today,P.drGapDays||3);if(g)add(g.kind==='resume'?('預計復工日已過，尚無日報（最後 '+g.last+'）'):('已 '+g.days+' 天沒有日報（最後 '+g.last+'）'),'','drGoReport(\''+q.id+'\')','填日報',g.days>=7);}catch(e){_err('_pjTodoItems',e);}
@@ -35221,7 +35229,7 @@ function acctTab(t,noRender){
   _acctTab=t;try{localStorage.setItem('fy_acctTab',t);}catch(e){_err('acctTab',e);}
   var tb=document.getElementById('acct-tabs');if(tb){tb.innerHTML=_acctTabsHtml();if(!tb._agWired){tb._agWired=1;tb.addEventListener('click',_acctTabsClick);}}
   try{var o=JSON.parse(localStorage.getItem('fy_acctGrpSub')||'{}')||{};o[_acctGrpOf(t)]=t;localStorage.setItem('fy_acctGrpSub',JSON.stringify(o));}catch(e){_err('acctTab.grp',e);}
-  try{var top=document.getElementById('acct-top');if(top){var c1=document.getElementById('acct-cash1');if(c1)c1.remove();if(_nav5On())top.insertAdjacentHTML('afterbegin',_acctCashLineHtml());var fk=document.getElementById('finance-kpis');if(fk)fk.classList.toggle('n5-hide',true);}}catch(e){_err('acctTab.cash1',e);}   // 7d：金流一行固定在最上面；KPI 卡收起（舊選單照舊顯示）
+  try{var top=document.getElementById('acct-top');if(top){var c1=document.getElementById('acct-cash1');if(c1)c1.remove();if(_v7New('acct'))top.insertAdjacentHTML('afterbegin',_acctCashLineHtml());var fk=document.getElementById('finance-kpis');if(fk)fk.classList.toggle('n5a-hide',true);}}catch(e){_err('acctTab.cash1',e);}   // 7d：金流一行固定在最上面；KPI 卡收起（舊選單照舊顯示）
   _ACCT_TABS.forEach(function(x){var p=document.getElementById('acct-p-'+x[0]);if(p)p.style.display=(x[0]===t)?'':'none';});
   var fm={ar:'finance-ar',ap:'finance-payable',cash:'finance-cashflow'};
   if(fm[t]){var fp=document.getElementById(fm[t]);if(fp)fp.style.display='block';}
@@ -43086,8 +43094,21 @@ function _mvRentPickEdit(m){var f=_mvFin(m.id)||{},h=((f.hold&&f.hold.list)||[])
 // 桌面左側與手機下方列都只放 5 個；其餘頁面收在「更多」（page-more）。舊選單保留：「更多 › 切回舊版選單」＝本機 fy_nav_old='1'，
 // 舊選單最下面有「改用新版選單」切回來。只換選單與首頁的呈現，頁面本身、資料、權限都不動（canAccess 照舊）。
 function _nav5On(){try{return localStorage.getItem('fy_nav_old')!=='1';}catch(e){return true;}}
+// 改版第 7 步⑥（7e，Lotion 11/09 第 9 題 A）：每一頁各自切回舊版＋整站切回。本機 fy_v7old＝{dash:1, proj:1, acct:1}（哪幾頁用舊版）
+var _V7_PAGES=[['dash','今天（首頁）'],['proj','專案'],['acct','帳務']];
+function _v7OldMap(){try{return JSON.parse(localStorage.getItem('fy_v7old')||'{}')||{};}catch(e){return {};}}
+function _v7New(pg){return _nav5On()&&!_v7OldMap()[pg];}
+function v7PageOld(pg,old){
+  var m=_v7OldMap();if(old)m[pg]=1;else delete m[pg];
+  try{localStorage.setItem('fy_v7old',JSON.stringify(m));}catch(e){_err('v7PageOld',e);}
+  if(old){try{var n=JSON.parse(localStorage.getItem('fy_nav_old_n')||'{}');var k=localToday()+'|'+pg;n[k]=(n[k]||0)+1;localStorage.setItem('fy_nav_old_n',JSON.stringify(n));}catch(e){_err('v7PageOld.n',e);}}
+  _nav5Apply();
+  var lb=(_V7_PAGES.find(function(x){return x[0]===pg;})||[pg,pg])[1];
+  toast(lb+(old?' 改用舊版畫面':' 改回新版畫面'));
+  try{renderMorePage();}catch(e){_err('v7PageOld.more',e);}
+}
 function _nav5Apply(){
-  try{document.body.classList.toggle('nav5',_nav5On());}catch(e){_err('_nav5Apply',e);}
+  try{document.body.classList.toggle('nav5',_nav5On());var _om=_v7OldMap();_V7_PAGES.forEach(function(x){document.body.classList.toggle('v7old-'+x[0],!!_om[x[0]]);});}catch(e){_err('_nav5Apply',e);}
   try{renderTopNav();}catch(e){_err('_nav5Apply.top',e);}
 }
 var _NAV5=['dash','proj','quotes','acct','more'];
@@ -43146,13 +43167,16 @@ function renderMorePage(){
       return '<button type="button" class="more-it"'+(it.go?' data-go="'+esc(it.go)+'"':'')+(it.me?' data-me="'+esc(it.me)+'"':'')+(it.fn?' data-fn="'+esc(it.fn)+'"':'')+'>'+ic(it.i)+'<span>'+esc(it.l)+'</span></button>';
     }).join('')+'</div></div>';
   }).join('');
-  h+='<div class="more-sec"><h3>切回舊版</h3><div class="more-grid"><button type="button" class="more-it" data-fn="old">'+ic('refresh')+'<span>切回舊版選單</span></button></div>'
+  var om=_v7OldMap();
+  h+='<div class="more-sec"><h3>切回舊版</h3><div class="more-grid">'+_V7_PAGES.map(function(x){return '<button type="button" class="more-it" data-v7="'+x[0]+'">'+ic('refresh')+'<span>'+esc(x[1])+'：'+(om[x[0]]?'目前舊版，改回新版':'切回舊版')+'</span></button>';}).join('')
+    +'<button type="button" class="more-it" data-fn="old">'+ic('refresh')+'<span>整站切回舊版選單</span></button></div>'
     +'<div style="font-size:11px;color:var(--b3);margin-top:6px">舊選單的頁面都還在；切回後在舊選單最下面可以再改回新版。</div></div>'
     +'<div style="text-align:center;font-size:10.5px;color:var(--b4);margin-top:8px">豐有工程管理系統 '+esc(APP_VERSION)+'</div>';
   box.innerHTML=h;
   if(!box._wired){box._wired=1;box.addEventListener('click',function(e){   // 事件綁定（不寫在 HTML 字串裡，健檢 3 #11）
     var b=e.target.closest&&e.target.closest('.more-it');if(!b)return;
-    var fn=b.getAttribute('data-fn'),g=b.getAttribute('data-go'),me=b.getAttribute('data-me');
+    var fn=b.getAttribute('data-fn'),g=b.getAttribute('data-go'),me=b.getAttribute('data-me'),v7=b.getAttribute('data-v7');
+    if(v7){v7PageOld(v7,!_v7OldMap()[v7]);return;}
     if(fn&&_MORE_FN[fn]){_MORE_FN[fn]();return;}
     if(me){try{_meTab=me;}catch(x){_err('more.me',x);}}
     if(g)go(g);
@@ -43335,6 +43359,62 @@ _decReg('qres',{
       q.bidRes=b;_touch(q);persist();try{_markDirty();}catch(e){_err('qres.edit',e);}_decRefresh('qres');toast('已記下報價結果');
     },false,null,true);}
 });
+// ══════════ 改版第 7 步⑤（7c）：專案一案一頁＝直的流程步驟條（v6.0.215，Lotion 11/09 第 7 題 A）══════════
+// 新選單（nav5）時 renderProj 改出 _pj7Html：14 步一步一行——做完的一行（✓＋一句話）、現在這一步展開、還沒到的只顯示名稱；
+// 每步展開的內容就是原本的區塊（合約與文件、發包、進度、日報、現場追加、業主計價、完工與結案），區塊 id（pj-sec-*）不變，總覽待辦跳過來照樣找得到。
+// 還沒有畫面的步驟（辦證、送審文件、派工）先寫一句話說明在哪裡處理；成本、工項明細收在最下面「其他明細」。舊選單照舊原本的版面。
+function _pj7Steps(q,st){
+  var last=st.logs[0],adds=(q.addons||[]).length,stage=false;try{stage=_projStageDone(q);}catch(e){_err('_pj7Steps.stage',e);}
+  var billedOk=st.invs.length>0&&st.base>0&&st.billed+st.retHeld>=st.base*0.995;
+  var matN=(q.mat&&Array.isArray(q.mat.rows))?q.mat.rows.length:0;
+  return [
+    {k:'docs',l:'合約',done:!!st.ct,info:st.ct?((st.ct.code?st.ct.code+'　':'')+'NT$ '+fmt(st.ct.amount||0)):'還沒建立合約',body:function(){return _pjDocsHtml(q,st);}},
+    {k:'sub',l:'發包',done:st.subs.length>0,info:st.subs.length?('分包 '+st.subs.length+' 家 NT$ '+fmt(st.subTotal)):(st.rfqs.length?'詢價 '+st.rfqs.length+' 張、還沒得標':'還沒發包'),body:function(){return _pjSubHtml(q,st);}},
+    {k:'permit',l:'辦證',na:1,info:'在系統外辦理（進場文件）'},
+    {k:'subm',l:'送審文件',na:1,info:'計算書、圖說、計畫書、材料送審：下一版放進這一步；現在照舊在「更多 › 施工計畫書」'},
+    {k:'sched',l:'排程',done:_pjHasPlan(q),info:_pjHasPlan(q)?'已排預定進度':'還沒排預定進度',body:function(){return _pjSchedHtml(q,st);}},
+    {k:'mat',l:'材料',done:matN>0,info:matN?('材料需求 '+matN+' 項（在「發包」裡的材料．運輸）'):'還沒有材料需求'},
+    {k:'dispatch',l:'派工',na:1,info:'派工板：下一版'},
+    {k:'addon',l:'追加',done:true,info:adds?('現場追加 '+adds+' 筆'):'沒有現場追加',body:adds?function(){return _pjAddonHtml(q);}:null},
+    {k:'log',l:'日報',done:stage||st.physPct>=99.5,info:st.logs.length?('日報 '+st.logs.length+' 篇・最近 '+(last.date||'')+(st.hasRep?('・進度 '+Math.round(st.physPct)+'%'):'')):'還沒有日報',body:function(){return _pjLogHtml(q,st);}},
+    {k:'inv',l:'請款',done:billedOk,info:st.invs.length?('已請 '+st.invs.length+' 期 NT$ '+fmt(st.billed)+(st.ar>0?('・待收 '+fmt(st.ar)):'')):'還沒請款',body:function(){return _pjInvHtml(q,st);}},
+    {k:'remove',l:'拆除拔樁',done:stage&&!st.rent.length,info:st.rent.length?('租期已過 '+st.rent.length+' 項（看「請款」的逾期租金）'):(stage?'已完工':'施工中')},
+    {k:'settle',l:'完工結算',done:st.done,info:st.done?'合約已完工結算':'還沒完工結算'},
+    {k:'ret',l:'保留款',done:!!q.closed||(st.done&&st.retHeld<=0),info:st.retHeld>0?('預扣中 NT$ '+fmt(st.retHeld)):'沒有預扣保留款'},
+    {k:'close',l:'結案',done:!!q.closed,info:q.closed?('已結案 '+(q.closedAt?new Date(q.closedAt).toLocaleDateString('zh-TW'):'')):(st.done?'可以結案':'進行中'),body:function(){return _pjCloseHtml(q,st);}}
+  ];
+}
+function _pj7Cur(steps){for(var i=0;i<steps.length;i++){if(!steps[i].done&&!steps[i].na)return i;}return -1;}
+function _pj7Open(k){try{return localStorage.getItem('pj7_open_'+k);}catch(e){return null;}}
+function _pj7Html(q,st){
+  var S=_pj7Steps(q,st),cur=_pj7Cur(S);
+  var h='<div class="card pj7" style="margin-top:10px"><div class="cb" style="padding:6px 0">';
+  S.forEach(function(s,i){
+    var isCur=i===cur,v=_pj7Open(s.k),open=!!s.body&&((isCur&&v!=='0')||v==='1');
+    var mark=s.na?'·':(s.done?'✓':(isCur?'▶':'○')),clr=s.na?'var(--b3)':(s.done?'var(--g3)':(isCur?'#e65100':'var(--b3)'));
+    var showInfo=s.done||isCur||s.na;
+    h+='<div class="pj7-step'+(isCur?' cur':'')+'" id="pj-sec-'+s.k+'" style="border-top:'+(i?'1px solid var(--b1)':'0')+';'+(isCur?'background:#fff8f0;':'')+'">'
+      +'<div class="pj7-hd" data-pj7="'+s.k+'" style="display:flex;gap:8px;align-items:baseline;padding:9px 14px;'+(s.body?'cursor:pointer':'')+'">'
+      +'<span style="flex:0 0 16px;font-weight:900;color:'+clr+'">'+mark+'</span>'
+      +'<span style="flex:0 0 auto;font-weight:'+(isCur?'900':'700')+';color:'+(s.done||isCur?'var(--b5)':'var(--b3)')+';font-size:13.5px">'+esc(s.l)+'</span>'
+      +(showInfo?'<span style="flex:1;min-width:0;font-size:12px;color:var(--b4);overflow-wrap:anywhere">'+esc(s.info||'')+'</span>':'<span style="flex:1"></span>')
+      +(s.body?'<span class="ar" style="flex:0 0 auto;color:var(--b3)">'+(open?'▾':'▸')+'</span>':'')+'</div>'
+      +(open?'<div id="pj-body-'+s.k+'" style="padding:0 14px 12px">'+s.body()+'</div>':'')+'</div>';
+  });
+  h+='</div></div>';
+  window._pjOpenSet=[];   // 其他明細預設收起
+  h+='<div style="font-size:12px;font-weight:700;color:var(--b4);margin:14px 2px 0">其他明細</div>'
+    +_pjSection('items','合約工項與進度',_pjItemsHtml(q,st),'',!(q.items||[]).some(function(it){return it&&!it.sec;}))
+    +_pjSection('cost','施工成本統計',_pjCostHtml(q,st),'',!st.all.some(function(x){return (x.costs||[]).length;}));
+  return h;
+}
+function _pj7Click(e){
+  var hd=e.target.closest&&e.target.closest('.pj7-hd');if(!hd)return;
+  var k=hd.getAttribute('data-pj7'),box=hd.parentNode;if(!box.querySelector('.ar'))return;
+  var open=!!document.getElementById('pj-body-'+k);
+  try{localStorage.setItem('pj7_open_'+k,open?'0':'1');}catch(x){_err('_pj7Click',x);}
+  renderProj();
+}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
