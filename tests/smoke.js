@@ -11460,12 +11460,38 @@ async function newPage(browser, width, height) {
         out.redo = (await _DEC.mvRedo.ok(o1)) === true && open(rt('rt1')) === 270 && !!MAT_MOVE_FIN[o1.id].applied && MAT_MOVE_FIN[o1.id].applied.g === 1;
         // 材料頁：租料簽收單也不再出現「帶入」
         out.bridge = _mvSlipsOf(Q[0]).every(s => s.done);
+        // 審查：上線前手動帶入過（同日同 M、沒有簽收單編號）→ 出卡，不重複加；確認＝掛上簽收單、不另加一批
+        rt('rt1').batches.push({ id: 'bman', d: '2026-11-10', m: 90, n: 10, o: '' });
+        const dp = mk({ date: '2026-11-10', dir: 'in', qid: 'qR203', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 10 }] });
+        MAT_MOVE_FIN[dp.id] = { rentPick: { 0: 'rt1' }, _mt: 1 };
+        await _mvApplyAll({ local: true });
+        out.dupHold = MAT_MOVE_FIN[dp.id].hold && MAT_MOVE_FIN[dp.id].hold.list[0].k === 'rentDup';
+        const nB = rt('rt1').batches.length;
+        out.dupLink = (await _DEC.mvHold.ok(dp)) === true && rt('rt1').batches.length === nB && rt('rt1').batches.find(b => b.id === 'bman').mvIn === dp.id;
+        // 審查：租賃商名稱只是相近（「範例租賃」vs「範例租賃二廠」）→ 出卡問是不是同一家（可以選新建）
+        const lz = mk({ date: '2026-11-11', dir: 'in', qid: 'qR203', rentVendor: '範例租賃二廠', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 5 }] });
+        await _mvApplyAll({ local: true });
+        out.loose = MAT_MOVE_FIN[lz.id].hold && MAT_MOVE_FIN[lz.id].hold.list[0].k === 'rentPick' && MAT_MOVE_FIN[lz.id].hold.list[0].opts.indexOf('__new') >= 0;
+        // 審查：同一張單同一種料寫兩行 → 只建一張新租賃單
+        const two = mk({ date: '2026-11-12', dir: 'in', qid: 'qS203', rentVendor: '另一家租賃', items: [{ name: '型鋼', spec: 'H350', len: 12, qty: 4 }, { name: '型鋼', spec: 'H350', len: 12, qty: 6 }] });
+        await _mvApplyAll({ local: true });
+        const nw = Q[1].mat.rents.filter(x => x.mvId === two.id);
+        out.oneNew = nw.length === 1 && nw[0].batches[0].m === 120;
+        // 審查：撤回只還原批次，手改的合約 M 數不動
+        nw[0].cm = 999; two.items[1].qty = 5; _touch(two);
+        out.undoKeep = !!_mvRedoState(two) && (await _DEC.mvRedo.ok(two)) === true && (function () { const L = Q[1].mat.rents.filter(x => x.mvId === two.id); return L.length === 1 && L[0].batches[0].m === 108; })();
+        // 審查：要拆的那一批已經請過款 → 出卡先問
+        const rc = Q[0].costs.find(c => c._fromMat === 'rent:範例租賃有限公司'); rc.periods = [{ no: 1, rows: [{ rid: 'rb_' + rt('rt1').batches.find(b => !b.o && b.id !== 'bman').id, qty: 180 }] }];
+        const bl = mk({ date: '2026-11-15', dir: 'out', qid: 'qR203', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 2 }] });
+        MAT_MOVE_FIN[bl.id] = { rentPick: { 0: 'rt1' }, _mt: 1 };
+        await _mvApplyAll({ local: true });
+        out.billed = MAT_MOVE_FIN[bl.id].hold && MAT_MOVE_FIN[bl.id].hold.list[0].k === 'rentBilled';
         // 卡片與明細沒有金額給工務（月租卡只有管理員）
         out.rateCardAdmin = /_decIsAdmin/.test(String(_DEC.mvRentRate.canSee));
       } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_MOVE_LOG = keepLog; MAT_AUDIT = keepA; }
       return out;
     });
-    check('v6.0.203 進退料 M4a：租料進場自動新增批次、退場從最早的批次先結（部分退場拆批）、對不到租賃單自動建一張（月租待補卡）、退場比在場多出卡、對到好幾張出卡可選、轉場 A 結 B 起算、撤回重改、材料頁不再帶入', r.in && r.cost && r.out && r.auto && r.rateOk && r.over && r.pickHold && r.picked && r.xfer && r.redoCan && r.redo && r.bridge && r.rateCardAdmin, JSON.stringify(r));
+    check('v6.0.203 進退料 M4a：租料進場自動新增批次、退場從最早的批次先結（部分退場拆批）、對不到租賃單自動建一張（月租待補卡）、退場比在場多出卡、對到好幾張出卡可選、轉場 A 結 B 起算、撤回重改、材料頁不再帶入', r.in && r.cost && r.out && r.auto && r.rateOk && r.over && r.pickHold && r.picked && r.xfer && r.redoCan && r.redo && r.bridge && r.rateCardAdmin && r.dupHold && r.dupLink && r.loose && r.oneNew && r.undoKeep && r.billed, JSON.stringify(r));
     check('v6.0.203 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

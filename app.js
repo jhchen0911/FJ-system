@@ -42433,7 +42433,7 @@ function _mvSlipsOf(q){if(!q)return [];return (MAT_MOVES||[]).filter(function(m)
 // 進場＝公司倉庫 → 工地（同 matOut，先進先出）；退場＝工地 → 公司倉庫（同 matBack：結算使用段；短少＝損耗）；轉場＝A 工地 → B 工地（A 結算使用段、B 從轉場日起算）。
 // 例外（整筆不動台帳，出卡 mvHold 給 Lotion）：①倉庫找不到同規格或不夠 ②退場／轉出比工地上多 ③歸倉要修／報廢／有損壞。
 // 防重複扣：同一筆先在雲端 fydata/private/mvLock/<id> 搶鎖（transaction），搶到的裝置才套用；套用紀錄 MAT_MOVE_FIN[id].applied 跟台帳同一次上傳。
-var _MV_HOLD={nostock:'倉庫找不到同規格或不夠',over:'退場比工地上多',cond:'歸倉要修／報廢／有損壞',proj:'找不到工地',rentPick:'對到好幾張租賃單',rentOver:'租料退場比在場多'};
+var _MV_HOLD={nostock:'倉庫找不到同規格或不夠',over:'退場比工地上多',cond:'歸倉要修／報廢／有損壞',proj:'找不到工地',rentPick:'對到好幾張（或名稱相近的）租賃單',rentOver:'租料退場比在場多',rentDup:'可能已經手動帶入過',rentBilled:'要拆的租料批次已經請過款'};
 function _mvFin(id,mk){var f=MAT_MOVE_FIN[id];if((!f||typeof f!=='object')&&mk)f=MAT_MOVE_FIN[id]={};return (f&&typeof f==='object')?f:null;}
 function _mvSpecKey(it){var s=String((it&&it.spec)||'').toUpperCase().replace(/[\s　]/g,'');return _matSpecOf(s)||(s?s:_matSpecOf(String((it&&it.name)||'')));}
 function _mvHash(m){var s=JSON.stringify([m.date,m.dir,m.qid,m.fromQid||'',m.toQid||'',m.own,(m.items||[]).map(function(it){return [it.name||'',it.spec||'',_mvNum(it.len),_mvNum(it.qty),_mvNum(it.short),_mvNum(it.dmg),it.cond||''];})]),h=5381;for(var i=0;i<s.length;i++)h=((h*33)^s.charCodeAt(i))>>>0;return h.toString(36);}
@@ -42586,8 +42586,8 @@ _decReg('mvHold',{
   body:function(m){var f=_mvFin(m.id)||{},hs=(f.hold&&f.hold.list)||[],k={};hs.forEach(function(x){k[_MV_HOLD[x.k]||x.k]=1;});return '<div style="font-size:11.5px;color:#b26a00">'+esc(Object.keys(k).join('、'))+'</div>';},
   detail:_mvHoldDetail,
   ok:function(m){if(m.photo&&!_MV_PH_OK[m.id]){toast('簽收單照片還沒同步到這台，等照片出現再確認');return false;}
-    if((m.own===false?_mvRentPlan(m,true):_mvPlan(m,true)).holds.some(function(h){return h.k==='proj'||h.k==='rentPick'||h.k==='rentOver';})){var _hk=(m.own===false?_mvRentPlan(m,true):_mvPlan(m,true)).holds[0].k;toast(_hk==='rentPick'?'對到好幾張租賃單，請按「修改」選一張':(_hk==='rentOver'?'工地上沒有這家這種租料在場，請按「修改」核對簽收單或「退回」':'找不到工地，請按「修改」選工地'));return false;}
-    return _mvApplyOne(m,true).then(function(r){if(r==='ok'){toast('已照簽收單改台帳');try{updateDashTodo();}catch(e){_err('mvHold.ok',e);}return true;}toast(r==='skip'?'另一台裝置正在處理這筆，稍後再看':'還是對不上，請按「修改」');return false;});},
+    var _fp=(m.own===false?_mvRentPlan(m,true):_mvPlan(m,true));if(_fp.holds.length){var _hk=_fp.holds[0].k;toast(_hk==='rentOver'?'工地上沒有這家這種租料在場，請按「修改」核對簽收單或「退回」':'找不到工地或租賃商，請按「修改」');return false;}   // 審查：其他例外（選哪張、重複、已請款）＝確認照明細寫的做
+    return _mvApplyOne(m,true).then(function(r){if(r==='ok'){toast(m.own===false?'已照簽收單改租料批次':'已照簽收單改台帳');try{updateDashTodo();}catch(e){_err('mvHold.ok',e);}return true;}toast(r==='skip'?'另一台裝置正在處理這筆，稍後再看':'還是對不上，請按「修改」');return false;});},
   reject:function(m,why){var f=_mvFin(m.id,true);f.skip={at:Date.now(),by:(typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機',why:String(why||'退回').slice(0,200)};f._mt=Date.now();saveMatMoveFin();try{_mvAuditAdd('holdReject',m,{why:f.skip.why});}catch(e){_err('mvHold.rejLog',e);}return true;},
   edit:function(m){var _fh=_mvFin(m.id)||{};if(((_fh.hold&&_fh.hold.list)||[]).some(function(x){return x.k==='rentPick';})){_mvRentPickEdit(m);return;}_mvEdit(m,function(){var f=_mvFin(m.id);if(f&&f.hold){delete f.hold;f._mt=Date.now();saveMatMoveFin();}var _rf=function(){try{_decRefresh('mvHold');}catch(e){_err('mvHold.edit',e);}};if(_mvApplyOk())_mvApplyAll().then(_rf);else setTimeout(_rf,50);});}
 });
@@ -42767,12 +42767,15 @@ function _mvShow(id){var m=_mvOf(id);if(!m){toast('找不到這張簽收單');re
 // 對位：同一案、同租賃商、同規格同長度的租賃單（q.mat.rents）。對到一張＝進場新增一批／退場由最早的批次先結（部分退場就拆批）／轉場＝A 結、B 從轉場日起算。
 // 對不到＝自動建一張租賃單（月租單價空著 → 首頁「租料月租單價待補」卡）；對到好幾張＝出卡讓 Lotion 選（例外卡 mvHold 的 rentPick，可用「修改」選）。
 // 退場比在場多＝出卡（rentOver），租料批次不動。租金單價照每張租賃單現在的月租（不分段；16M 加價是運費，見 M6）。
-function _mvVendKey(s){return String(s||'').replace(/[\s　]/g,'').replace(/(股份)?有限公司|企業社|工程行|實業|商行$/g,'');}
-function _mvRentOf(q,vendor){var vk=_mvVendKey(vendor);return _m6Arr(_matQ(q),'rents').filter(function(rt){var k=_mvVendKey(rt.vendor);return !!vk&&!!k&&(k===vk||k.indexOf(vk)>=0||vk.indexOf(k)>=0);});}
+function _mvVendKey(s){return String(s||'').replace(/[\s　()（）]/g,'').replace(/(股份有限公司|有限公司|企業社|工程行|實業社|商行)$/,'');}   // 審查：只去掉結尾的公司型態
+function _mvRentOf(q,vendor,loose){var vk=_mvVendKey(vendor);return _m6Arr(_matQ(q),'rents').filter(function(rt){var k=_mvVendKey(rt.vendor);if(!vk||!k)return false;if(k===vk)return !loose;return !!loose&&Math.min(k.length,vk.length)>=3&&(k.indexOf(vk)>=0||vk.indexOf(k)>=0);});}   // 審查：名稱要一樣才算同一家；只是相近的（loose）出卡讓 Lotion 選
 function _mvRentOpenM(rt){return Math.round((rt.batches||[]).reduce(function(s,b){return s+(b&&b.d&&!b.o?(parseFloat(b.m)||0):0);},0)*100)/100;}
-function _mvRentSig(rt){return rt?JSON.stringify([rt.vendor||'',rt.spec||'',rt.len,rt.rate,(rt.batches||[]).map(function(b){return [b.id,b.d||'',b.m,b.n,b.o||''];})]):'';}
+function _mvRentSig(rt){return rt?JSON.stringify([rt.vendor||'',rt.spec||'',rt.len,rt.rate,(rt.batches||[]).map(function(b){return [b.id,b.d||'',b.m,b.n,b.o||'',b.shortM||0,b.splitFrom||''];})]):'';}
+// 這一批有沒有被租金請款期別用過（施工成本租賃卡 periods 的列 rid＝'rb_'+批次 id）
+function _mvRentBilled(q,rt,b){var c=(q.costs||[]).find(function(x){return x&&x._fromMat==='rent:'+String(rt.vendor||'').trim();});if(!c)return false;return (c.periods||[]).some(function(per){return (per.rows||[]).some(function(r){return r&&r.rid==='rb_'+b.id&&(parseFloat(r.qty)||parseFloat(r.amt)||0)>0;});});}
 function _mvRentPlan(m,forced){
-  var H=[],ops=[],usedM={},Qof=function(id){return (Q||[]).find(function(x){return x&&x.id===id;})||null;},f=_mvFin(m.id)||{},pick=f.rentPick||{};
+  var H=[],ops=[],usedM={},newBy={},Qof=function(id){return (Q||[]).find(function(x){return x&&x.id===id;})||null;},f=_mvFin(m.id)||{},pick=f.rentPick||{};
+  var addNew=function(o){var k=o.qid+'|'+_mvSpecKey(o.it)+'|'+_mvNum(o.it.len)+'|'+_matNameOf(o.it.name||'');if(newBy[k]){newBy[k].M=Math.round((newBy[k].M+o.M)*100)/100;newBy[k].n=(+newBy[k].n||0)+(+o.n||0);return;}newBy[k]=o;ops.push(o);};   // 審查：同一張單同一種料兩行只建一張租賃單
   var lab=function(it){return _mvItemsTxt([it]);};
   var A=m.dir==='xfer'?Qof(m.fromQid):Qof(m.qid),B=m.dir==='xfer'?Qof(m.toQid):null;
   if(!m.dir||!A||(m.dir==='xfer'&&(!B||B===A)))return {ops:[],holds:[{k:'proj',msg:'找不到工地'}]};
@@ -42783,21 +42786,28 @@ function _mvRentPlan(m,forced){
     var chosen=function(L,q){if(L.length===1)return L[0];var p=pick[ix]&&L.find(function(rt){return rt.id===pick[ix];});if(p)return p;
       if(forced&&L.length)return L.slice().sort(function(a,b){var da=((a.batches||[])[0]||{}).d||'9',db=((b.batches||[])[0]||{}).d||'9';return da.localeCompare(db);})[0];return null;};
     if(m.dir==='in'){var L1=cand(A,false);
-      if(!L1.length){ops.push({t:'rNew',qid:A.id,it:it,M:M,n:n,ix:ix});return;}
+      if(!L1.length){var LL=_mvLedMatch(_mvRentOf(A,m.rentVendor,true),it).rows;   // 名稱相近的租賃單：出卡讓 Lotion 選（或新建）
+        if(LL.length&&pick[ix]==null&&!forced){H.push({k:'rentPick',it:lab(it),msg:'租賃商名稱相近（'+LL.map(function(rt){return rt.vendor;}).join('、')+'），是同一家嗎？',ix:ix,opts:LL.map(function(rt){return rt.id;}).concat(['__new'])});return;}
+        var rp=LL.find(function(rt){return rt.id===pick[ix];});if(rp){ops.push({t:'rIn',qid:A.id,rt:rp.id,M:M,n:n,ix:ix});return;}
+        addNew({t:'rNew',qid:A.id,it:it,M:M,n:n,ix:ix});return;}
       var r1=chosen(L1,A);if(!r1){H.push({k:'rentPick',it:lab(it),msg:'這家有 '+L1.length+' 張同規格的租賃單，要掛哪一張？',ix:ix,opts:L1.map(function(rt){return rt.id;})});return;}
-      ops.push({t:'rIn',qid:A.id,rt:r1.id,M:M,n:n,ix:ix});return;}
+      if(!f.dupOk&&(r1.batches||[]).some(function(b){return b&&!b.mvIn&&b.d===m.date&&Math.abs((parseFloat(b.m)||0)-M)<0.01;})&&!forced){H.push({k:'rentDup',it:lab(it),msg:'這張租賃單已經有 '+m.date+' '+_rfmt(M)+' M 的手動批次（可能已經「帶入」過）'});return;}   // 審查：上線前手動帶入過的不重複加
+      ops.push({t:'rIn',qid:A.id,rt:r1.id,M:M,n:n,ix:ix,dupLink:forced&&(r1.batches||[]).some(function(b){return b&&!b.mvIn&&b.d===m.date&&Math.abs((parseFloat(b.m)||0)-M)<0.01;})});return;}
     // out／xfer：從 A 的在場批次結掉（短少的也一起結、標短少，賠償在請款核對處理）
     var need=Math.round((M+Msh)*100)/100,L2=cand(A,true);
     if(!L2.length){H.push({k:'rentOver',it:lab(it),msg:'工地上沒有這家這種租料在場'});return;}
     var r2=chosen(L2,A);if(!r2){H.push({k:'rentPick',it:lab(it),msg:'這家有 '+L2.length+' 張同規格的租料在場，要結哪一張？',ix:ix,opts:L2.map(function(rt){return rt.id;})});return;}
     var have=_mvRentOpenM(r2)-(usedM[r2.id]||0);
     if(need>have+0.01&&!forced){H.push({k:'rentOver',it:lab(it),msg:'退場 '+_rfmt(need)+' M，在場只有 '+_rfmt(have)+' M'});return;}
-    var cl=Math.min(need,have);usedM[r2.id]=(usedM[r2.id]||0)+cl;
+    var cl=Math.min(need,have);
+    if(!forced&&!f.billOk){var lft=cl,sp=null;(r2.batches||[]).filter(function(b){return b&&b.d&&!b.o;}).sort(function(a,c){return String(a.d).localeCompare(String(c.d));}).forEach(function(b){if(lft<=0.001||sp)return;var bm=parseFloat(b.m)||0;if(bm>lft+0.001)sp=b;else lft-=bm;});
+      if(sp&&_mvRentBilled(A,r2,sp)){H.push({k:'rentBilled',it:lab(it),msg:'要拆的那一批（'+sp.d+' '+_rfmt(sp.m)+' M）已經有租金請款期別，拆開會改到請款的剩餘量'});return;}}   // 審查：拆已請款的批次先問
+    usedM[r2.id]=(usedM[r2.id]||0)+cl;
     ops.push({t:'rOut',qid:A.id,rt:r2.id,M:cl,shM:Math.min(Msh,cl),n:n,ix:ix});
     if(m.dir==='xfer'){var L3=cand(B,false),r3=L3.length===1?L3[0]:(pick['b'+ix]&&L3.find(function(rt){return rt.id===pick['b'+ix];}))||null;
       if(L3.length>1&&!r3&&!forced){H.push({k:'rentPick',it:lab(it),msg:'轉入的工地這家有 '+L3.length+' 張同規格的租賃單，要掛哪一張？',ix:'b'+ix,opts:L3.map(function(rt){return rt.id;})});return;}
-      if(!r3&&L3.length)r3=L3[0];
-      ops.push(r3?{t:'rIn',qid:B.id,rt:r3.id,M:Math.max(0,M-Math.min(Msh,cl)),n:n,ix:ix,xferFrom:r2.id}:{t:'rNew',qid:B.id,it:it,M:Math.max(0,M-Math.min(Msh,cl)),n:n,ix:ix,xferFrom:r2.id,rate:r2.rate,rateD:r2.rateD,mode:r2.mode});}
+      if(!r3&&L3.length)r3=L3.slice().sort(function(a,b){return String(((a.batches||[])[0]||{}).d||'9').localeCompare(String(((b.batches||[])[0]||{}).d||'9'));})[0];   // 審查：選最早那張
+      if(r3)ops.push({t:'rIn',qid:B.id,rt:r3.id,M:Math.max(0,M-Math.min(Msh,cl)),n:n,ix:ix,xferFrom:r2.id});else addNew({t:'rNew',qid:B.id,it:it,M:Math.max(0,M-Math.min(Msh,cl)),n:n,ix:ix,xferFrom:r2.id,rate:r2.rate,rateD:r2.rateD,mode:r2.mode});}
   });
   return {ops:ops,holds:H};
 }
@@ -42815,6 +42825,7 @@ function _mvRentDo(m,ops,forced){
     if(o.t==='rNew'){var it=o.it||{},rt={id:_m6Id('rn'),vendor:String(m.rentVendor||'').trim(),name:it.name||_matNameOf(it.spec||''),spec:it.spec||'',len:_mvNum(it.len)||'',rate:o.rate||'',rateD:o.rateD||'',cm:o.M,pf:date,pt:'',mode:o.mode||'day',note:'簽收單自動建立（'+date+'）'+(o.rate?'':'，月租單價待補'),auto:1,mvId:m.id,batches:[]};
       rt.batches.push({id:_m6Id('b'),d:date,m:o.M,n:o.n||'',o:'',mvIn:m.id,xferFrom:o.xferFrom||undefined});rents.push(rt);rsnap[q.id+'|'+rt.id]={qid:q.id,rt:rt.id,before:null};rec.push({t:'rNew',qid:q.id,rt:rt.id,M:o.M});return;}
     var rt2=rents.find(function(r){return r.id===o.rt;});if(!rt2)return;snap(q,rt2);if(!Array.isArray(rt2.batches))rt2.batches=[];
+    if(o.t==='rIn'&&o.dupLink){var db=rt2.batches.find(function(b){return b&&!b.mvIn&&b.d===date&&Math.abs((parseFloat(b.m)||0)-o.M)<0.01;});if(db){db.mvIn=m.id;rec.push({t:'rLink',qid:q.id,rt:rt2.id,M:o.M});return;}}   // 手動帶入過的那批：只掛上簽收單，不重複加
     if(o.t==='rIn'){rt2.batches.push({id:_m6Id('b'),d:date,m:o.M,n:o.n||'',o:'',mvIn:m.id,xferFrom:o.xferFrom||undefined});rt2.batches.sort(function(a,c){return String(a.d).localeCompare(String(c.d));});rec.push({t:'rIn',qid:q.id,rt:rt2.id,M:o.M});return;}
     if(o.t==='rOut'){var left=o.M,shLeft=o.shM||0;
       rt2.batches.filter(function(b){return b&&b.d&&!b.o;}).sort(function(a,c){return String(a.d).localeCompare(String(c.d));}).forEach(function(b){if(left<=0.001)return;var bm=parseFloat(b.m)||0;
@@ -42835,7 +42846,7 @@ function _mvRentRedoState(m,f){var s=f.applied.rsnap||[],bad=[];s.forEach(functi
   return bad.length?{can:false,why:'租賃單「'+bad.slice(0,3).join('」「')+'」自動改過之後又被別張單或手動改過'}:{can:true};}
 function _mvRentUndoTxt(m){var f=_mvFin(m.id);return (f.applied.rsnap||[]).map(function(x){return x.before?('還原租賃單 '+(x.before.vendor||'')+' '+_matLabel(x.before)+'（'+_mvQName(x.qid)+'）的進退場批次'):('刪除這張簽收單自動建的租賃單（'+_mvQName(x.qid)+'）');});}
 function _mvRentUndo(m){var f=_mvFin(m.id),qs={};(f.applied.rsnap||[]).forEach(function(x){var q=(Q||[]).find(function(y){return y&&y.id===x.qid;});if(!q)return;var m2=_matQ(q),R=_m6Arr(m2,'rents'),i=R.findIndex(function(r){return r.id===x.rt;});
-  if(x.before){if(i>=0)R[i]=JSON.parse(JSON.stringify(x.before));else R.push(JSON.parse(JSON.stringify(x.before)));}else if(i>=0)R.splice(i,1);qs[q.id]=q;});
+  if(x.before){if(i>=0)R[i].batches=JSON.parse(JSON.stringify(x.before.batches||[]));else R.push(JSON.parse(JSON.stringify(x.before)));}else if(i>=0)R.splice(i,1);qs[q.id]=q;});   // 審查：只還原批次，合約 M 數、預計退場、備註等手改的不動
   Object.keys(qs).forEach(function(k){try{_m6Save(qs[k]);}catch(e){_err('_mvRentUndo.save',e);}});}
 // 首頁卡：自動建的租賃單月租單價待補（只有管理員）
 function _mvRateList(){var L=[];(Q||[]).forEach(function(q){if(!q||!q.mat)return;_m6Arr(q.mat,'rents').forEach(function(rt){if(rt&&rt.auto&&!(parseFloat(rt.rate)>0)&&!rt.rateSkip)L.push({q:q,rt:rt});});});return L;}
@@ -42853,7 +42864,7 @@ _decReg('mvRentRate',{
 // 例外卡「要掛哪一張」：修改＝選租賃單
 function _mvRentPickEdit(m){var f=_mvFin(m.id)||{},h=((f.hold&&f.hold.list)||[]).filter(function(x){return x.k==='rentPick';});if(!h.length){_mvEdit(m);return;}
   var Qs=(Q||[]),find=function(id){var o=null;Qs.forEach(function(q){if(q&&q.mat)_m6Arr(q.mat,'rents').forEach(function(rt){if(rt.id===id)o={q:q,rt:rt};});});return o;};
-  var html=h.map(function(x,i){return '<div class="f"><label>'+esc(x.it||'')+'：'+esc(x.msg||'')+'</label><select id="mvp-'+i+'" style="width:100%">'+(x.opts||[]).map(function(id){var o=find(id);return o?('<option value="'+esc(id)+'">'+esc((o.rt.vendor||'')+' '+_matLabel(o.rt)+'　'+(o.rt.pf||'')+'　在場 '+_rfmt(_mvRentOpenM(o.rt))+' M')+'</option>'):'';}).join('')+'</select></div>';}).join('');
+  var html=h.map(function(x,i){return '<div class="f"><label>'+esc(x.it||'')+'：'+esc(x.msg||'')+'</label><select id="mvp-'+i+'" style="width:100%">'+(x.opts||[]).map(function(id){if(id==='__new')return '<option value="__new">（不是同一家：新建一張租賃單）</option>';var o=find(id);return o?('<option value="'+esc(id)+'">'+esc((o.rt.vendor||'')+' '+_matLabel(o.rt)+'　'+(o.rt.pf||'')+'　在場 '+_rfmt(_mvRentOpenM(o.rt))+' M')+'</option>'):'';}).join('')+'</select></div>';}).join('');
   showConfirm('要掛哪一張租賃單',html,function(){var g=_mvFin(m.id,true);g.rentPick=g.rentPick||{};h.forEach(function(x,i){var v=gv('mvp-'+i);if(v)g.rentPick[x.ix]=v;});delete g.hold;g._mt=Date.now();saveMatMoveFin();
     var rf=function(){try{_decRefresh('mvHold');}catch(e){_err('_mvRentPickEdit',e);}};if(_mvApplyOk())_mvApplyAll().then(rf);else setTimeout(rf,50);},false,null,false);}
 function _modal(title,bodyHtml,onOk){
