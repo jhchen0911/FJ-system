@@ -11417,7 +11417,7 @@ async function newPage(browser, width, height) {
         const items = [{ desc: 'H型鋼樁 H300 L=9M', qty: 10, unit: '支', price: 1, cat: 'both' }, { desc: '鋼板樁 IV型 L=9M', qty: 50, unit: '片', price: 1, cat: 'both' }];
         const mkQ = (id, rents, its) => ({ id, name: '範例' + id, client: '甲', awarded: true, items: its || items, dailyLogs: logs, costs: [], _mt: 1, mat: { rows: [], use: [], loss: [], rents } });
         const R = (id, o) => Object.assign({ id, vendor: '範例租賃', rate: 30, cm: 900, pf: D(-45), mode: 'day', batches: [{ id: 'b' + id, d: D(-45), m: 450, n: 50, o: '' }] }, o);
-        Q = [mkQ('qP204', [R('ra', { name: '鋼板樁', spec: 'IV', len: 9, item: 'qP204:1' }), R('rb', { name: '型鋼', spec: 'H300', len: 9 }), R('rc', { name: '覆工板', spec: '', len: 3 })]),
+        Q = [mkQ('qP204', [R('ra', { name: '鋼板樁', spec: 'IV', len: 9, item: 'qP204:1' }), R('rb', { name: '型鋼', spec: 'H300', len: 9 }), R('rc', { name: '鋪路鐵板', spec: '', len: 3 })]),
           mkQ('qQ204', [R('rd', { name: '型鋼', spec: 'H300', len: 9 })], [items[0]])];
         const L = _mvIdleList(), g = id => L.find(e => e.id === id);
         // ① 對到工項（租賃單選了鋼板樁那項）：5 天前拔完 → 5 天 → 提醒；金額＝450M×30/30×5
@@ -11453,7 +11453,7 @@ async function newPage(browser, width, height) {
         out.strut = !_mvIdleList().some(e => e.id === 'qP204|rs');
         // 審查修正：拔除完成後才進場的批次從進場日起算、還沒到進場日的不算；單價空白不寫 NT$ 0；指定了非樁類工項照那個工項起算（不卡在緊急卡）
         Q = [mkQ('qR204', [R('re', { name: '鋼板樁', spec: 'IV', len: 9, item: 'qR204:1', batches: [{ id: 'e1', d: D(-45), m: 90, o: '' }, { id: 'e2', d: D(-2), m: 90, o: '' }, { id: 'e3', d: D(3), m: 90, o: '' }] }),
-          R('rz', { name: '鋼板樁', spec: 'IV', len: 9, item: 'qR204:1', rate: 0 }), R('rx', { name: '覆工板', spec: '', len: 3 })],
+          R('rz', { name: '鋼板樁', spec: 'IV', len: 9, item: 'qR204:1', rate: 0 }), R('rx', { name: '鋪路鐵板', spec: '', len: 3 })],
           [items[0], items[1], { desc: '地盤改良 灌漿', qty: 1, unit: '式', price: 1, cat: 'both' }])];
         Q[0].dailyLogs = logs.concat([{ date: D(-5), progressRows: [{ itemIdx: 2, qty: 1, ph: 'remove' }] }]);
         const L3 = _mvIdleList(), g3 = id => L3.find(e => e.id === id);
@@ -11465,10 +11465,21 @@ async function newPage(browser, width, height) {
         out.unkPicked = !!gx && gx.need !== 'unknown' && gx.start === D(-5) && gx.level === 'warn';
         _mvTagSet('qR204', 'rx', { item: '', keep: 1 });
         out.unkKeep = !_mvIdleList().some(e => e.id === 'qR204|rx' && e.need === 'unknown');
+        // 構台自己一類（Lotion 11/09 選 A）：覆工板跟構台工項拆除完成起算；沒有構台工項＝出卡指定；樁類工項拔完不影響構台料
+        Q = [mkQ('qT204', [R('rk', { name: '覆工板', spec: '', len: 2 }), R('rh', { name: '型鋼', spec: 'H300', len: 9 })],
+          [items[0], { desc: '構台 H350 型鋼柱梁組立', qty: 1, unit: '式', price: 1, cat: 'both' }]), mkQ('qU204', [R('rn', { name: '覆工板', spec: '', len: 2 })], [items[0]])];
+        Q[0].dailyLogs = [logs[0], logs[1]];   // 樁類 10 天前拔完、構台還沒拆
+        let L4 = _mvIdleList(), g4 = id => L4.find(e => e.id === id);
+        out.deckWait = !g4('qT204|rk') && g4('qT204|rh').level === 'urgent' && g4('qT204|rh').start === D(-10);
+        Q[0].dailyLogs = [logs[0], logs[1], { date: D(-4), progressRows: [{ itemIdx: 1, qty: 1, ph: 'remove' }] }];   // 構台 4 天前拆完
+        L4 = _mvIdleList();
+        out.deck = g4('qT204|rk') === undefined && L4.find(e => e.id === 'qT204|rk').start === D(-4) && L4.find(e => e.id === 'qT204|rk').level === 'warn' && L4.find(e => e.id === 'qT204|rk').kind === 'deck';
+        const n = L4.find(e => e.id === 'qU204|rn');
+        out.deckPick = !!n && n.need === 'pick' && n.kind === 'deck' && !n.start && _decItems('mvItemPick').some(e => e.id === 'qU204|rn') && /找不到構台工項/.test(_DEC.mvItemPick.body(n));
       } finally { Q = keepQ; MAT_TAGS = keepT; }
       return out;
     });
-    check('v6.0.204 進退料 M4b 樁類退料提醒：對到工項用該工項拔除完成、只對到樁類用樁類全部拔完保底並出卡指定、只有一個樁類工項自動用、都對不到出緊急卡、補指定後改用工項、超過 3 天提醒（工務看得到多付租金）／7 天緊急、已安排退料 3 天後再提醒、業主要求留不再提醒、支撐類等分層', r.item && r.cat && r.single && r.unknown && r.cards && r.picked && r.ack && r.ackAgain && r.keep && r.notYet && r.returned && r.strut && r.late && r.noRate && r.unkBefore && r.unkPicked && r.unkKeep, JSON.stringify(r));
+    check('v6.0.204 進退料 M4b 樁類／構台退料提醒（構台自己一類）：對到工項用該工項拔除完成、只對到樁類用樁類全部拔完保底並出卡指定、只有一個樁類工項自動用、都對不到出緊急卡、補指定後改用工項、超過 3 天提醒（工務看得到多付租金）／7 天緊急、已安排退料 3 天後再提醒、業主要求留不再提醒、支撐類等分層', r.item && r.cat && r.single && r.unknown && r.cards && r.picked && r.ack && r.ackAgain && r.keep && r.notYet && r.returned && r.strut && r.late && r.noRate && r.unkBefore && r.unkPicked && r.unkKeep && r.deckWait && r.deck && r.deckPick, JSON.stringify(r));
     check('v6.0.204 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
