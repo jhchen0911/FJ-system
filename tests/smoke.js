@@ -11403,7 +11403,7 @@ async function newPage(browser, width, height) {
     check('v6.0.194 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
-  // ── v6.0.204 進退料 M4b：樁類租料退料提醒（對到工項／只對到樁類／都對不到、之後補指定）──
+  // ── v6.0.207 進退料 M4b：樁類租料退料提醒（對到工項／只對到樁類／都對不到、之後補指定）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -11480,8 +11480,8 @@ async function newPage(browser, width, height) {
       } finally { Q = keepQ; MAT_TAGS = keepT; }
       return out;
     });
-    check('v6.0.204 進退料 M4b 樁類／構台退料提醒（構台自己一類）：對到工項用該工項拔除完成、只對到樁類用樁類全部拔完保底並出卡指定、只有一個樁類工項自動用、都對不到出緊急卡、補指定後改用工項、超過 3 天提醒（工務看得到多付租金）／7 天緊急、已安排退料 3 天後再提醒、業主要求留不再提醒、支撐類 v6.0.207 起另測', r.item && r.cat && r.single && r.unknown && r.cards && r.picked && r.ack && r.ackAgain && r.keep && r.notYet && r.returned && r.strut && r.late && r.noRate && r.unkBefore && r.unkPicked && r.unkKeep && r.deckWait && r.deck && r.deckPick, JSON.stringify(r));
-    check('v6.0.204 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    check('v6.0.207 進退料 M4b 樁類／構台退料提醒（構台自己一類）：對到工項用該工項拔除完成、只對到樁類用樁類全部拔完保底並出卡指定、只有一個樁類工項自動用、都對不到出緊急卡、補指定後改用工項、超過 3 天提醒（工務看得到多付租金）／7 天緊急、已安排退料 3 天後再提醒、業主要求留不再提醒、支撐類 v6.0.207 起另測', r.item && r.cat && r.single && r.unknown && r.cards && r.picked && r.ack && r.ackAgain && r.keep && r.notYet && r.returned && r.strut && r.late && r.noRate && r.unkBefore && r.unkPicked && r.unkKeep && r.deckWait && r.deck && r.deckPick, JSON.stringify(r));
+    check('v6.0.207 M4b 樁類／構台 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
   // ── v6.0.207 進退料 M4b 支撐分層（Lotion 11/09 選 A：照報價分層；只列一項＝整項拆完才起算）──
@@ -12335,6 +12335,122 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.205 品牌色換新（Lotion 11/09：名片原檔色值 綠 #006935、橘 #F8B72E、炭灰 #292B2D）：單一來源 FY_BRAND、畫面 :root 一致、程式裡沒有舊色、Logo 換新 ──
+  {
+    const fs = require('fs'), pth = require('path'), R = pth.join(__dirname, '..');
+    const app = fs.readFileSync(pth.join(R, 'app.js'), 'utf8'), idx = fs.readFileSync(pth.join(R, 'index.html'), 'utf8'), man = fs.readFileSync(pth.join(R, 'manifest.json'), 'utf8');
+    const OLD = /#(1a6b3f|145730|0e3d22|155530|1a5a2a|e8941a|d4820f|1c6937|ffae48)\b|rgba\((26,107,63|232,148,26|14,61,34),|FF0E3D22/i;
+    const stat = { appOld: OLD.test(app.replace(/^var FY_LOGO=.*$/m, '')), idxOld: OLD.test(idx), manOld: OLD.test(man), oldLogo: /\/9j\/4AAQSkZJRgABAQEAYABgAAD\/4QKyRXhpZgAATU0/.test(app + idx) };
+    { const fb = (app.match(/^var FY_BRAND=\{([^}]*)\}/m) || [, ''])[1], gv = (k) => ((fb.match(new RegExp('\\b' + k + ":'(#[0-9A-Fa-f]{6})'")) || [])[1] || '').toLowerCase(), rv = (k) => ((idx.match(new RegExp('--' + k + ':(#[0-9A-Fa-f]{6})')) || [])[1] || '').toLowerCase();
+      stat.rootSame = ['g', 'g2', 'g3', 'y', 'y2'].every((k) => gv(k) && gv(k) === rv(k)); }   // index.html :root 寫死的值（開頁第一眼）跟 FY_BRAND 一樣
+    check('v6.0.205 程式、畫面、App 圖示設定裡沒有舊品牌色（#1a6b3f／#0e3d22／#e8941a 等、作廢的 #1C6937／#FFAE48），也沒有舊 Logo', !stat.appOld && !stat.idxOld && !stat.manOld && !stat.oldLogo && stat.rootSame, JSON.stringify(stat));
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const cs = getComputedStyle(document.documentElement), v = (k) => cs.getPropertyValue(k).trim().toLowerCase();
+        out.brand = FY_BRAND.g === '#006935' && FY_BRAND.y.toLowerCase() === '#f8b72e' && FY_BRAND.ink.toLowerCase() === '#292b2d';
+        out.root = v('--g') === FY_BRAND.g.toLowerCase() && v('--g2') === FY_BRAND.g2.toLowerCase() && v('--g3') === FY_BRAND.g3.toLowerCase() && v('--y') === FY_BRAND.y.toLowerCase() && v('--y2') === FY_BRAND.y2.toLowerCase();
+        out.logo = /^data:image\/png;base64,/.test(FY_LOGO) && /^data:image\/png;base64,/.test(document.querySelector('.brand-icon img').src);
+        const q = { id: 'qBC1', code: '1151109', name: '範例案', client: '假業主', date: '2026-11-09', items: [{ desc: '假工項', unit: '支', qty: 1, price: 1000 }], exs: [], rmk: {}, ver: 1 };
+        const h = String(_buildQuoteDocHTML(q) || '');
+        out.doc = /#006935/i.test(h) && !/#1a6b3f/i.test(h) && h.indexOf(FY_LOGO.slice(0, 80)) >= 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
+      return out;
+    });
+    check('v6.0.205 品牌色單一來源：FY_BRAND 是名片色值、畫面 :root 的 --g／--g2／--g3／--y／--y2 跟它一致；Logo 是新的去背 PNG；報價單用新綠、新 Logo', r.brand && r.root && r.logo && r.doc, JSON.stringify(r));
+    check('v6.0.205 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.206 第 6 步 6-2a 雲端應付比對：同一份假資料，前端實際產生的自動應付（syncCostToPayable／_salesCommSyncAll／_commSyncAll）跟雲端 functions/ops/paycmp.js 重算的逐筆一致；改一筆抓得到；卡片、拍板卡 ──
+  {
+    const PC = require('../functions/ops/paycmp.js');
+    const D = {
+      params: { tax: 5, removeRate: 30, sales: [{ id: 's1', name: '假業務甲', commMode: 'rev', commVal: 1 }, { id: 's2', name: '假業務乙', commMode: 'unit', commVal: 200, commUnit: '支' }] },
+      quotes: [
+        { id: 'pq1', name: '假比對甲案', awarded: true, salesId: 's1', t: { total: 105000, sub: 100000 }, items: [{ desc: '假樁甲', unit: '支', qty: 10, price: 10000 }] },
+        { id: 'pq2', name: '假比對乙案', awarded: true, salesId: 's2', t: { total: 52500, sub: 50000 }, items: [{ desc: '假樁乙', unit: '支', qty: 20, price: 2500 }] },
+        { id: 'pq3', name: '假比對丙案', awarded: false, salesId: 's1', t: { total: 21000 }, items: [] },
+      ],
+      costs: {
+        pq1: [
+          { id: 'pk1', type: 'sub', vendor: '假包商甲', invoice: true, retRate: 5, amt: 50000, rows: [{ id: 'pr1', unitPrice: 1000, qty: 50 }, { id: 'pr2', unitPrice: 500, qty: 20, stage: true }],
+            periods: [{ no: 1, date: '2026-10-25', due: '2026-11-25', rows: [{ rid: 'pr1', qty: 10 }, { rid: 'pr2', qi: 4, qr: 0 }], adv: 1000, early: [{ id: 'e1', amt: 2000, date: '2026-10-10' }] },
+              { no: 2, date: '2026-11-25', due: '2026-12-25', rows: [{ rid: 'pr1', qty: 20 }], adv: 1000 }, { no: 3, isRet: true, amt: 1500, date: '2026-12-25' }],
+            advances: [{ id: 'a1', amt: 2000, date: '2026-09-01' }] },
+          { id: 'pk2', type: 'sub', vendor: '假介紹人', isIntro: true, introPay: 'first', introCalc: 'lump', introAmt: 5000, invoice: false, amt: 5000, rows: [{ id: 'pr3', qty: 1, unitPrice: 5000 }] },
+          { id: 'pk3', type: 'own', rental: true, vendor: '假租賃商', amt: 6000, rows: [{ id: 'pr4', unitPrice: 200, qty: 10 }], periods: [{ no: 1, date: '2026-10-31', rows: [{ rid: 'pr4', qty: 10 }] }] },
+          { id: 'pk4', type: 'sub', vendor: '假包商丁', amt: 9000, rows: [{ id: 'pr5', unitPrice: 900, qty: 10 }] },   // 沒計價：不掛應付
+        ],
+        pq2: [{ id: 'pk5', type: 'sub', vendor: '公司支出（自付）', amt: 100, rows: [{ id: 'pr6', unitPrice: 100, qty: 1 }], periods: [{ no: 1, date: '2026-10-25', rows: [{ rid: 'pr6', qty: 1 }] }] }],
+      },
+      comms: { pq1: [{ id: 'm1', name: '假中間人', mode: 'amt', val: 1500 }], pq2: [{ id: 'm2', name: '假中間人乙', mode: 'rev', val: 2 }, { id: 'm3', name: '假中間人丙', mode: 'profit', val: 10 }] },
+      invoices: [
+        { id: 'pv1', quoteId: 'pq1', project: '假比對甲案', date: '2026-10-30', periodNo: 1, totals: { total: 21000 }, items: [] },
+        { id: 'pv2', quoteId: 'pq2', project: '假比對乙案', date: '2026-10-30', periodNo: 1, totals: { total: 10500 }, items: [{ desc: '假樁乙', unit: '支', contractQty: 20, curQty: 6, contractPrice: 2500 }] },
+      ],
+      contracts: [{ id: 'pc1', linkedQid: 'pq1', amount: 210000, signDate: '2026-09-01' }],
+    };
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate((D) => {
+      const out = {};
+      try {
+        Object.assign(P, D.params);
+        Q = D.quotes.map((q) => Object.assign({}, JSON.parse(JSON.stringify(q)), { costs: JSON.parse(JSON.stringify(D.costs[q.id] || [])), comms: JSON.parse(JSON.stringify((D.comms || {})[q.id] || [])) }));
+        INV = D.invoices.map((x) => Object.assign({}, x)); CONTRACTS = D.contracts.map((x) => Object.assign({}, x)); PAYABLES = [];
+        Q.forEach((q) => (q.costs || []).forEach((c) => syncCostToPayable(q, c)));
+        _salesCommSyncAll(); _commSyncAll();
+        // 已付之後計價又改了（審查）：第 2 期付清 → 數量 20 改 22 → 網頁保留已付本體、另立差額筆 _d1
+        const p2 = PAYABLES.find((p) => p.id === 'paypk1_p2'); p2.status = 'paid'; p2.paidDate = '2026-12-25';
+        const q1 = Q.find((q) => q.id === 'pq1'), k1 = q1.costs.find((c) => c.id === 'pk1'); k1.periods[1].rows[0].qty = 22;
+        syncCostToPayable(q1, k1);
+        out.delta = PAYABLES.some((p) => p.deltaOf === 'paypk1_p2');
+        out.pay = JSON.parse(JSON.stringify(PAYABLES)); out.Q = JSON.parse(JSON.stringify(Q));
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    }, D);
+    let res = null, bad = null, cardOk = false, decOk = false;
+    if (!r.err) {
+      // 雲端拿到的是 RTDB 形狀：共用區報價（不含成本）＋ private quoteSens（成本卡、佣金），以 id 為 key
+      const keyed = (a) => Object.fromEntries(a.map((x) => [x.id, x]));
+      const sh = r.Q.map((q) => { const c = Object.assign({}, q); delete c.costs; delete c.comms; delete c.comm; return c; });
+      const sens = Object.fromEntries(r.Q.map((q) => [q.id, { costs: q.costs || [], comms: q.comms || [], _mt: 1 }]));
+      const cin = (pay) => ({ params: D.params, quotes: keyed(sh), quoteSens: sens, invoices: keyed(D.invoices), contracts: keyed(D.contracts), payables: keyed(pay) });
+      const now = Date.now() + 3 * 86400000;   // 三天後比：不算「剛改過」
+      res = PC.compare(cin(r.pay), now);
+      const pay2 = JSON.parse(JSON.stringify(r.pay)); const t = pay2.find((p) => p.id === 'paypk1_p2'); if (t) t.amount += 7;
+      pay2.splice(pay2.findIndex((p) => p.id === 'comm_pq1_m1'), 1);
+      bad = PC.compare(cin(pay2), now);
+      const c2 = await page.evaluate(({ res, day }) => {
+        const o = {};
+        try {
+          PAY_CMP = { ok: true, cfg: {}, latest: null, days: {} };
+          _fbUser = { email: 'jhchen0911@gmail.com', getIdToken: () => Promise.resolve('x') }; _isAdminUser = true;
+          o.off = /還沒開始/.test(_pcmpHtml());
+          PAY_CMP.latest = res; PAY_CMP.days = {}; PAY_CMP.days[day] = { ok: true };
+          const h = _pcmpHtml(); o.card = /雲端應付比對/.test(h) && /連續一致 <b>1<\/b>/.test(h) && /不一致 2/.test(h) && /金額/.test(h);
+          // 拍板卡：還沒到 12/26 不問；開關關著、日期到了才問；開了就不問
+          PAY_CMP.cfg = { askFrom: '2000-01-01' }; o.ask = _DEC.payCmpOn.list().length === 1 && typeof _DEC.payCmpOn.detail === 'function';
+          PAY_CMP.cfg = { askFrom: '2999-01-01' }; o.wait = _DEC.payCmpOn.list().length === 0;
+          PAY_CMP.cfg = { on: true }; o.on = _DEC.payCmpOn.list().length === 0;
+          o.streak = JSON.stringify(_pcmpStreak({ '2026-12-25': { ok: true }, '2026-12-24': { ok: true }, '2026-12-23': { ok: false } }, '2026-12-25', 25));
+          _fbUser = null; PAY_CMP = { ok: false, cfg: {}, latest: null, days: {} };
+        } catch (e) { o.err = String(e && e.stack || e).slice(0, 300); }
+        return o;
+      }, { res: bad, day: '2026-12-25' });
+      cardOk = !c2.err && c2.off && c2.card; decOk = !c2.err && c2.ask && c2.wait && c2.on;
+      const ns = JSON.stringify(PC.streak({ '2026-12-25': { ok: true }, '2026-12-24': { ok: true }, '2026-12-23': { ok: false } }, '2026-12-25', 25));
+      check('v6.0.206 6-2a 卡片：還沒開始／有結果時顯示連續一致天數、不一致明細；前端連續天數算法跟雲端一樣', cardOk && c2.streak === ns, JSON.stringify(c2));
+      check('v6.0.206 6-2a 啟用開關：拍板卡 payCmpOn 只在開關關著、日期到了（預設 2026-12-26 起）才出現，有完整說明（detail）', decOk, JSON.stringify(c2));
+    }
+    const ids = res ? (res.n.exp + '筆') : '';
+    check('v6.0.206 6-2a 雲端重算的自動應付跟前端實際產生的逐筆一致（分包期別含分段列、預付款抵扣含稅、提前放款、保留款退還、已付後改計價的差額筆、租賃期別、預付款、介紹費、業務抽成每營收％與每單位、業主端佣金固定額／營收％／毛利％；自付、沒計價、沒得標的不掛）',
+      !r.err && r.delta && res && res.n.bad === 0 && res.n.diff === 0 && res.n.exp >= 12 && res.n.ok === res.n.exp && (r.pay || []).some((p) => p.id === 'comm_pq2_m3' && p.amount === 4990), r.err || (ids + ' ' + JSON.stringify(res && res.items).slice(0, 600) + ' 前端：' + JSON.stringify((r.pay || []).map((p) => p.id + '=' + p.amount + (p.incl != null ? '/' + p.incl : '')))));
+    check('v6.0.206 6-2a 改一筆金額、刪一筆佣金 → 雲端比對抓得到（不一致 2 筆，不算剛改過）', !!bad && bad.n.bad === 2 && bad.items.some((x) => x.id === 'paypk1_p2' && /amount/.test(x.why)) && bad.items.some((x) => x.id === 'comm_pq1_m1' && x.why === 'missing'), JSON.stringify(bad && bad.items));
+    check('v6.0.206 6-2a 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
