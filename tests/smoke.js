@@ -11031,6 +11031,65 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.200 進退料 M3b：已自動改過台帳的簽收單內容被改 → 卡片逐列寫撤回／重改，確認才動 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepM = MAT_MOVES, keepF = MAT_MOVE_FIN, keepL = MAT_LEDGER;
+      try {
+        MAT_MOVES = []; MAT_MOVE_FIN = {};
+        Q = [{ id: 'qA200', name: '範例A200', client: '甲', awarded: true, items: [], _mt: 1 }, { id: 'qB200', name: '範例B200', client: '甲', awarded: true, items: [], _mt: 1 }];
+        MAT_LEDGER = [{ id: 'K1', name: '型鋼', spec: 'H300', len: 9, qty: 30, loc: '公司倉庫', date: '2026-01-01', price: 30, uw: 94, _mt: 1 }];
+        const at = id => MAT_LEDGER.filter(x => x.projQid === id).reduce((s, x) => s + x.qty, 0);
+        const wh = () => MAT_LEDGER.filter(x => !x.projQid).reduce((s, x) => s + x.qty, 0);
+        const f = id => MAT_MOVE_FIN[id] || {};
+        const mk = (o) => { const m = Object.assign({ id: 'mv_' + Math.random().toString(36).slice(2, 8), st: 'ok', own: true, conf: {}, _mt: Date.now() }, o); MAT_MOVES.push(m); return m; };
+        // ① 進場 12 → 改成 10：卡片逐列寫撤回／重改；確認後台帳＝10
+        const m1 = mk({ date: '2026-11-01', dir: 'in', qid: 'qA200', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 12 }] });
+        await _mvApplyAll({ local: true });
+        out.snap = !!f(m1.id).applied.snap && f(m1.id).applied.snap.b.length === 1 && at('qA200') === 12;
+        out.noCard = !_decItems('mvRedo').length;
+        m1.items[0].qty = 10; _touch(m1);
+        const st = _mvRedoState(m1);
+        out.card = !!st && st.can && (function () { const it = []; _v6TodoItems(it); return it.some(x => x.type === 'dec_mvRedo'); })();
+        const det = await Promise.resolve(_DEC.mvRedo.detail(m1));
+        out.detail = /撤回上次自動改的/.test(det) && /還原 型鋼 H300 L=9M：公司倉庫 18 支 → 公司倉庫 30 支/.test(det) && /刪除上次自動移過去的 型鋼 H300 L=9M 12 支/.test(det) && /倉庫 型鋼 H300 L=9M 10 支 → 範例A200/.test(det) && !/NT\$/.test(det);
+        out.notYet = at('qA200') === 12;   // 還沒確認不動
+        out.ok = (await _DEC.mvRedo.ok(m1)) === true && at('qA200') === 10 && wh() === 20 && f(m1.id).undone === 1 && f(m1.id).applied.g === 1 && f(m1.id).prev.length === 1 && !_mvRedoState(m1) && (Q[0].mat.use || []).every(u => u.mvId !== m1.id || true);
+        // ② 舊裝置的舊套用紀錄（第 0 代、比較新）合併進來：不復活
+        const old = JSON.parse(JSON.stringify(f(m1.id).prev[0].applied)); old.g = 0;
+        _applySensColls({ matMoveFin: { [m1.id]: { _mt: Date.now() + 99999, applied: old } } }, TOMBS);
+        out.merge = f(m1.id).applied.g === 1 && f(m1.id).undone === 1 && f(m1.id).applied.h === _mvHash(m1);
+        // ③ 退場（短少 1）套用後，台帳又被別張單動過 → 無法自動重改；確認＝改成資料健檢提醒
+        const m2 = mk({ date: '2026-11-05', dir: 'out', qid: 'qA200', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 4, short: 1 }] });
+        await _mvApplyAll({ local: true });
+        out.out = at('qA200') === 5 && Q[0].mat.loss.some(l => l.mvId === m2.id);
+        const m3 = mk({ date: '2026-11-06', dir: 'out', qid: 'qA200', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 1 }] });   // 從同一列工地料再退 1 支
+        await _mvApplyAll({ local: true });
+        m2.items[0].short = 0; _touch(m2);
+        const s2 = _mvRedoState(m2);
+        out.cant = !!s2 && s2.can === false && /又被別張單或手動改過/.test(s2.why) && /無法自動重改/.test(await Promise.resolve(_DEC.mvRedo.detail(m2)));
+        const L0 = JSON.stringify(MAT_LEDGER.map(x => [x.id, x.qty]));
+        out.manual = (await _DEC.mvRedo.ok(m2)) === true && JSON.stringify(MAT_LEDGER.map(x => [x.id, x.qty])) === L0 && _healthAddMv([]).some(x => /無法自動重改 1 筆/.test(x.msg)) && !_mvRedoState(m2);
+        // ④ 退回＝台帳維持、不再列
+        m3.items[0].qty = 2; _touch(m3);
+        out.reject = !!_mvRedoState(m3) && _DEC.mvRedo.reject(m3, '維持') === true && !_mvRedoState(m3) && at('qA200') === 4;
+        // ⑤ 改成對不上（倉庫不夠）→ 撤回後改到例外卡
+        const m4 = mk({ date: '2026-11-07', dir: 'in', qid: 'qB200', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 2 }] });
+        await _mvApplyAll({ local: true });
+        const b4 = at('qB200'); m4.items[0].qty = 99; _touch(m4);
+        out.toHold = /撤回後改到「自有料台帳待你決定」卡/.test(await Promise.resolve(_DEC.mvRedo.detail(m4))) && (await _DEC.mvRedo.ok(m4)) === true && at('qB200') === b4 - 2 && f(m4.id).hold && _decItems('mvHold').some(x => x.id === m4.id);
+        // ⑥ v6.0.200 以前套用（沒有改前紀錄）→ 無法自動重改
+        const m5 = mk({ date: '2026-11-08', dir: 'in', qid: 'qA200', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 1 }] });
+        MAT_MOVE_FIN[m5.id] = { _mt: 1, applied: { at: 1, h: 'zz', ops: [] } };
+        out.legacy = (_mvRedoState(m5) || {}).can === false && /v6.0.200 以前/.test(_mvRedoState(m5).why);
+      } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; }
+      return out;
+    });
+    check('v6.0.200 進退料 M3b：已自動改過台帳的簽收單被改 → 卡片逐列寫撤回／重改、確認才動、台帳被動過＝無法自動重改轉資料健檢、退回維持、對不上轉例外卡、撤回後舊套用紀錄不復活', r.snap && r.noCard && r.card && r.detail && r.notYet && r.ok && r.merge && r.out && r.cant && r.manual && r.reject && r.toHold && r.legacy, JSON.stringify(r));
+    check('v6.0.200 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.199 進退料統整表 M3：自有料確認後自動改台帳；三種例外出卡給 Lotion ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -11100,9 +11159,10 @@ async function newPage(browser, width, height) {
         await _mvApplyAll({ local: true });
         out.oldSlip = Q[0].dailyLogs[0].slips[0].done === true && at('qA199') === 2;
         out.bridge = _mvSlipsOf(Q[0]).filter(s => s.dir === 'out' || s.dir === 'back').every(s => s.done) && _mvSlipsOf(Q[0]).some(s => s.dir === 'rentIn' && !s.done);   // 租賃料 M4 前照舊帶入
-        // 健檢：套用後內容被改
+        // 套用後內容被改 → v6.0.200 起出「台帳要不要重改」卡
         const mA = _mvOf('mv_sX'); mA.items[0].qty = 3;
-        out.health = _healthAddMv([]).some(x => /內容又被改 1 筆/.test(x.msg));
+        out.health = !!_mvRedoState(mA) && _decItems('mvRedo').some(x => x.id === 'mv_sX');
+        mA.items[0].qty = 2;
         // 審查：型鋼／支撐同規格同長度不准混用（寧可出卡）；套用紀錄合併只增不減
         MAT_LEDGER.push({ id: 'LS', name: '支撐', spec: 'H400', len: 7, qty: 4, loc: '公司倉庫', _mt: 1 });
         const hn = mk({ date: '2026-11-17', dir: 'in', qid: 'qA199', items: [{ name: 'H型鋼', spec: 'H400', len: 7, qty: 1 }] });

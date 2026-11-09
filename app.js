@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.199';
+var APP_VERSION='v6.0.200';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -10532,7 +10532,7 @@ function _applySensColls(data,tombs){
     }catch(e){_err('_applySensColls',e);}
   }
   if(data.matMoveFin&&typeof data.matMoveFin==='object'&&!Array.isArray(data.matMoveFin)){   // v6.0.195 進退料金額：以進退料 id 為鍵、_mt 新者勝
-    try{Object.keys(data.matMoveFin).forEach(function(k){var r=data.matMoveFin[k],l=MAT_MOVE_FIN[k];if(!r||typeof r!=='object')return;if(!l||((r._mt)||0)>=((l._mt)||0)){var nr=r;if(l&&(l.applied&&!r.applied||l.skip&&!r.skip)){nr=JSON.parse(JSON.stringify(r));if(l.applied&&!nr.applied){nr.applied=l.applied;delete nr.hold;}if(l.skip&&!nr.skip)nr.skip=l.skip;}MAT_MOVE_FIN[k]=nr;}else if(r.applied&&!l.applied){l.applied=r.applied;delete l.hold;}else if(r.skip&&!l.skip)l.skip=r.skip;/* v6.0.199 審查：套用／退回紀錄只增不減（舊裝置清 hold 不能把別台的套用紀錄蓋掉） */});localStorage.setItem('fy_matmovefin',JSON.stringify(MAT_MOVE_FIN));}catch(e){_err('_applyCloud.matMoveFin',e);}
+    try{Object.keys(data.matMoveFin).forEach(function(k){var r=data.matMoveFin[k],l=MAT_MOVE_FIN[k];if(!r||typeof r!=='object')return;MAT_MOVE_FIN[k]=_mvFinMerge(l,r);/* v6.0.199 審查：套用／退回紀錄只增不減；v6.0.200 撤回過的（undone 代數）舊套用紀錄不再復活 */});localStorage.setItem('fy_matmovefin',JSON.stringify(MAT_MOVE_FIN));}catch(e){_err('_applyCloud.matMoveFin',e);}
   }
     if(data.matLedger){
     // 自有材料台帳合併：以 id 為鍵、_mt 新者勝，尊重刪除墓碑
@@ -42283,8 +42283,8 @@ function _healthAddMv(R){
   var L=(MAT_MOVES||[]).filter(Boolean),dr=L.filter(function(m){return m.st==='draft';}).length,bad=L.filter(function(m){return m.st==='ok'&&!m.dir;}).length;
   if(bad)R.push({sev:'warn',area:'進退料簿',msg:'已確認但方向空白 '+bad+' 筆（共 '+L.length+' 筆，待確認 '+dr+'）',fix:'M2 上線後到首頁卡片補方向'});
   // v6.0.199 M3：套用後內容被改過（台帳沒跟著改）、損耗單價待補
-  var F=(typeof MAT_MOVE_FIN!=='undefined'&&MAT_MOVE_FIN)||{},chg=L.filter(function(m){var f=F[m.id];return f&&f.applied&&f.applied.h&&f.applied.h!==_mvHash(m);}).length;
-  if(chg)R.push({sev:'warn',area:'進退料簿',msg:'已改過台帳的簽收單，之後內容又被改 '+chg+' 筆（台帳沒有跟著改）',fix:'到材料．運輸頁核對台帳'});
+  var F=(typeof MAT_MOVE_FIN!=='undefined'&&MAT_MOVE_FIN)||{},chg=L.filter(function(m){var f=F[m.id];return f&&f.applied&&f.applied.h&&f.redoManual===_mvHash(m);}).length;   // v6.0.200 拍板卡按過「無法自動重改」的
+  if(chg)R.push({sev:'warn',area:'進退料簿',msg:'簽收單改過、台帳無法自動重改 '+chg+' 筆（要人工核對）',fix:'到材料．運輸頁核對台帳'});
   var luc=0;(Q||[]).forEach(function(q){((q&&q.mat&&q.mat.loss)||[]).forEach(function(l){if(l&&l.mvId&&!(l.unitCost>0))luc++;});});
   if(luc)R.push({sev:'info',area:'進退料簿',msg:'簽收單短少／報廢的損耗沒有購置單價 '+luc+' 筆（損耗成本記 0）',fix:'到台帳補購置單價後，在材料頁改損耗單價'});
   return R;
@@ -42479,6 +42479,7 @@ function _mvDo(m,ops,forced){
   var date=m.date||localToday(),rec=[],qs={},now=Date.now(),Qof=function(id){return (Q||[]).find(function(x){return x&&x.id===id;})||null;};
   var nid=function(p){return p+now.toString(36)+Math.random().toString(36).slice(2,6);};
   var newRow=function(o,q,extra){var it=o.it||{};var r={id:nid('ml'),name:it.name||_matNameOf(it.spec||''),spec:it.spec||'',len:_mvNum(it.len)||'',qty:o.n,unit:it.unit||'支',mvId:m.id};Object.keys(extra).forEach(function(k){r[k]=extra[k];});_touch(r);MAT_LEDGER.push(r);return r;};
+  var before={};ops.forEach(function(o){if(o.lid&&!before[o.lid]){var x=MAT_LEDGER.find(function(r){return r&&r.id===o.lid;});if(x)before[o.lid]=JSON.parse(JSON.stringify(x));}});   // v6.0.200 改前紀錄（撤回重改用）
   ops.forEach(function(o){
     var lr=o.lid?MAT_LEDGER.find(function(x){return x.id===o.lid;}):null;if(o.lid&&!lr)return;
     var q=Qof(o.qid);if(!q)return;var mm=_matQ(q);qs[q.id]=q;
@@ -42497,22 +42498,25 @@ function _mvDo(m,ops,forced){
   Object.keys(qs).forEach(function(k){var q=qs[k];_touch(q.mat);_touch(q);try{_matAmortSync(q);_matLossSync(q);}catch(e){_err('_mvDo.sync',e);}});
   // 舊日報簽收單搬來的：原單也勾已登錄，材料頁不再出現「帶入」
   if(m.src&&m.src.slipId){(Q||[]).forEach(function(q){(q.dailyLogs||[]).forEach(function(L){(L&&L.slips||[]).forEach(function(s){if(s&&String(s.id)===String(m.src.slipId)&&!s.done){s.done=true;s.doneAt=now;s.doneBy='自動套用（進退料簿）';_touch(q);}});});});}
-  var f=_mvFin(m.id,true);f.applied={at:now,by:(typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機',dev:(typeof _devId==='function'?_devId():''),h:_mvHash(m),ops:rec.slice(0,120)};if(forced)f.applied.forced=1;
+  var aft={};Object.keys(before).concat(rec.map(function(x){return x.to;}).filter(Boolean)).forEach(function(id){var x=MAT_LEDGER.find(function(r){return r&&r.id===id;});aft[id]=x?(+x._mt||0):0;});
+  var f=_mvFin(m.id,true);f.applied={at:now,by:(typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機',dev:(typeof _devId==='function'?_devId():''),h:_mvHash(m),ops:rec.slice(0,120),g:+f.undone||0,qs:Object.keys(qs),snap:{b:Object.keys(before).map(function(k){return before[k];}),a:aft}};if(forced)f.applied.forced=1;   // v6.0.200 snap：改前的台帳列＋改後每列的修改時間（之後沒被動過才准自動撤回）
   delete f.hold;f._mt=now;
   saveMatLedger();saveMatMoveFin();try{persist();_immediateUpload();}catch(e){_err('_mvDo',e);}
   return rec;
 }
 // 雲端搶鎖：沒有雲端（本機模式）直接放行；同一台裝置可以重搶自己的鎖
-function _mvLock(id,release){
+function _mvLock(id,release,sfx){
   if(typeof _fbDb==='undefined'||!_fbDb||typeof _fbUser==='undefined'||!_fbUser)return Promise.resolve(true);
-  var ref=_fbDb.ref('fydata/private/mvLock/'+id),dev=_devId();
+  var ref=_fbDb.ref('fydata/private/mvLock/'+id+(sfx||'')),dev=_devId();   // v6.0.200 撤回後重改用新的鎖（~代數）
   if(release)return ref.transaction(function(cur){if(cur&&cur.dev!==dev)return;return null;}).then(function(){return true;}).catch(function(e){_err('_mvLock.release',e);return false;});
   var me={by:String(_fbUser.email||''),dev:dev,at:Date.now()},STALE=2*3600e3;   // 審查：別台搶到鎖超過 2 小時還沒套用完（關掉、沒傳上去）→ 可以接手；接手前先看雲端有沒有套用紀錄
   var tx=ref.transaction(function(cur){if(cur&&cur.dev&&cur.dev!==dev&&!(Date.now()-(+cur.at||0)>STALE))return;return me;}).then(function(r){
     if(!(r&&r.committed))return false;
     return _fbDb.ref('fydata/private/matMoveFin/'+id).once('value').then(function(sn){var v=sn&&sn.val&&sn.val();
-      if(v&&(v.applied||v.skip)){var f=_mvFin(id,true);if(v.applied)f.applied=v.applied;if(v.skip)f.skip=v.skip;delete f.hold;try{localStorage.setItem('fy_matmovefin',JSON.stringify(MAT_MOVE_FIN));}catch(e){_err('_mvLock.fin',e);}return false;}
-      return true;});
+      if(v&&typeof v==='object'){MAT_MOVE_FIN[id]=_mvFinMerge(MAT_MOVE_FIN[id],v);try{localStorage.setItem('fy_matmovefin',JSON.stringify(MAT_MOVE_FIN));}catch(e){_err('_mvLock.fin',e);}}
+      var cur=MAT_MOVE_FIN[id]||{};
+      if(sfx&&/^~u/.test(sfx))return !!cur.applied;   // v6.0.200 撤回鎖：別台已經撤回過（沒有套用紀錄了）就不要再撤
+      return !(cur.applied||cur.skip);});
   }).catch(function(e){_err('_mvLock',e);return false;});
   return Promise.race([tx,new Promise(function(res){setTimeout(function(){res(false);},8000);})]);   // 審查：沒網路時 transaction 不會回來 → 8 秒當作沒搶到，下一輪再試
 }
@@ -42529,12 +42533,13 @@ function _mvApplyAll(opts){
 }
 // 套一筆：搶鎖 → 再檢查一次 → 算計畫 → 有例外記 hold 並放鎖；沒有就改台帳。回傳 'ok'／'hold'／'skip'
 function _mvApplyOne(m,forced){
-  return _mvLock(m.id).then(function(got){
+  var gen=+((_mvFin(m.id)||{}).undone)||0,sfx=gen?('~'+gen):'';
+  return _mvLock(m.id,false,sfx).then(function(got){
     if(!got)return 'skip';
     var f=_mvFin(m.id);if(f&&f.applied)return 'skip';
-    if(!forced&&!_mvApplyCand(m))return _mvLock(m.id,true).then(function(){return 'skip';});   // 審查：搶到鎖卻不套用要放掉
+    if(!forced&&!_mvApplyCand(m))return _mvLock(m.id,true,sfx).then(function(){return 'skip';});   // 審查：搶到鎖卻不套用要放掉
     var pl=_mvPlan(m,!!forced);
-    if(pl.holds.length&&!forced||pl.holds.some(function(h){return h.k==='proj';})){var g=_mvFin(m.id,true);g.hold={at:Date.now(),list:pl.holds.slice(0,30)};g._mt=Date.now();saveMatMoveFin();return _mvLock(m.id,true).then(function(){return 'hold';});}
+    if(pl.holds.length&&!forced||pl.holds.some(function(h){return h.k==='proj';})){var g=_mvFin(m.id,true);g.hold={at:Date.now(),list:pl.holds.slice(0,30)};g._mt=Date.now();saveMatMoveFin();return _mvLock(m.id,true,sfx).then(function(){return 'hold';});}
     _mvDo(m,pl.ops,!!forced);return 'ok';
   });
 }
@@ -42561,6 +42566,101 @@ _decReg('mvHold',{
     return _mvApplyOne(m,true).then(function(r){if(r==='ok'){toast('已照簽收單改台帳');try{updateDashTodo();}catch(e){_err('mvHold.ok',e);}return true;}toast(r==='skip'?'另一台裝置正在處理這筆，稍後再看':'還是對不上，請按「修改」');return false;});},
   reject:function(m,why){var f=_mvFin(m.id,true);f.skip={at:Date.now(),by:(typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機',why:String(why||'退回').slice(0,200)};f._mt=Date.now();saveMatMoveFin();return true;},
   edit:function(m){_mvEdit(m,function(){var f=_mvFin(m.id);if(f&&f.hold){delete f.hold;f._mt=Date.now();saveMatMoveFin();}var _rf=function(){try{_decRefresh('mvHold');}catch(e){_err('mvHold.edit',e);}};if(_mvApplyOk())_mvApplyAll().then(_rf);else setTimeout(_rf,50);});}
+});
+// ══════════ v6.0.200 進退料 M3b：已自動改過台帳的簽收單，內容又被改 → 首頁卡片「撤回什麼、重改什麼」（Lotion 11/09 第 5 題）══════════
+// 套用時存改前台帳列（applied.snap.b）＋改後每列修改時間（snap.a）。內容被改（雜湊不同）時：那幾列之後都沒被動過 → 卡片逐列寫撤回／重改，確認才動；
+// 被別張單或手動動過 → 卡片寫「無法自動重改」，確認＝改成資料健檢提醒（redoManual）人工處理。退回＝不重改、台帳維持現狀（redoAck）。
+// 撤回：改前列放回（_restoredAt）、自動新增的列刪掉（墓碑）、本案使用段／損耗（mvId）刪掉；套用紀錄移到 prev、undone 代數 +1（舊裝置的舊套用紀錄合併時不會復活）。
+function _mvFinMerge(l,r){
+  if(!l||typeof l!=='object')return r;if(!r||typeof r!=='object')return l;
+  var nw=((+r._mt||0)>=(+l._mt||0))?r:l,od=nw===r?l:r,o=JSON.parse(JSON.stringify(nw));
+  var U=Math.max(+l.undone||0,+r.undone||0);if(U)o.undone=U;
+  var A=[nw.applied,od.applied].filter(function(a){return a&&(+a.g||0)>=U;})[0];
+  if(A){o.applied=JSON.parse(JSON.stringify(A));delete o.hold;}else delete o.applied;
+  if(!o.skip&&od.skip)o.skip=od.skip;
+  ['redoAck','redoManual','redoWhy'].forEach(function(k){if(o[k]==null&&od[k]!=null)o[k]=od[k];});
+  var pv={};[].concat(l.prev||[],r.prev||[]).forEach(function(p){if(p&&p.applied)pv[(p.applied.at||0)+'|'+(p.undoneAt||0)]=p;});
+  var P=Object.keys(pv).map(function(k){return pv[k];}).sort(function(a,b){return (a.undoneAt||0)-(b.undoneAt||0);}).slice(-5);if(P.length)o.prev=P;
+  return o;
+}
+function _mvRedoState(m){
+  if(!m)return null;var f=_mvFin(m.id);if(!f||!f.applied||!f.applied.h)return null;var h=_mvHash(m);
+  if(f.applied.h===h||f.redoAck===h||f.redoManual===h)return null;
+  var s=f.applied.snap;if(!s||!s.a)return {can:false,why:'這筆是 v6.0.200 以前自動改的，沒有留改前的台帳紀錄'};
+  var bad=[];Object.keys(s.a).forEach(function(id){var cur=(MAT_LEDGER||[]).find(function(r){return r&&r.id===id;}),want=+s.a[id]||0;
+    if(want?(!cur||(+cur._mt||0)!==want):!!cur)bad.push(cur||(s.b||[]).find(function(x){return x&&x.id===id;})||{name:id});});
+  if(bad.length)return {can:false,why:'台帳「'+bad.slice(0,3).map(function(r){return _matLabel(r)+(r.loc?('，'+r.loc):'');}).join('」「')+'」自動改過之後又被別張單或手動改過'};
+  return {can:true};
+}
+// 撤回（L＝台帳陣列，sim＝試算時不立墓碑、不戳時間、不動報價）
+function _mvUndoOn(L,m,sim){
+  var f=_mvFin(m.id),s=f.applied.snap,bIds={},now=Date.now();(s.b||[]).forEach(function(r){bIds[r.id]=1;});
+  Object.keys(s.a).forEach(function(id){if(bIds[id])return;var i=L.findIndex(function(r){return r&&r.id===id;});if(i<0)return;if(!sim)_tomb('matLedger',id);L.splice(i,1);});
+  (s.b||[]).forEach(function(b){var c=JSON.parse(JSON.stringify(b)),i=L.findIndex(function(r){return r&&r.id===b.id;});if(!sim){_touch(c);c._restoredAt=Math.max(now,+c._mt||0);}if(i>=0)L[i]=c;else L.push(c);});
+  return L;
+}
+function _mvUndoTxt(m){
+  var f=_mvFin(m.id),s=f.applied.snap,bIds={},out=[];(s.b||[]).forEach(function(r){bIds[r.id]=1;});
+  (s.b||[]).forEach(function(b){var cur=(MAT_LEDGER||[]).find(function(r){return r&&r.id===b.id;});out.push('還原 '+_matLabel(b)+'：'+(cur?((cur.loc||'公司倉庫')+' '+cur.qty+' 支'):'（已扣光）')+' → '+(b.loc||'公司倉庫')+' '+b.qty+' 支');});
+  Object.keys(s.a).forEach(function(id){if(bIds[id])return;var cur=(MAT_LEDGER||[]).find(function(r){return r&&r.id===id;});if(cur)out.push('刪除上次自動移過去的 '+_matLabel(cur)+' '+cur.qty+' 支（'+(cur.loc||'公司倉庫')+'）');});
+  var nu=0,nl=0;(Q||[]).forEach(function(q){var mm=q&&q.mat;if(!mm)return;(mm.use||[]).forEach(function(u){if(u&&u.mvId===m.id)nu++;});(mm.loss||[]).forEach(function(l){if(l&&l.mvId===m.id)nl++;});});
+  if(nu||nl)out.push('刪除這張單產生的內部攤提使用段 '+nu+' 筆'+(nl?('、損耗 '+nl+' 筆'):''));
+  return out;
+}
+// 試算：撤回後照新內容會怎麼改（換掉台帳全域變數一下，同步程式、不會被別的程式碰到）
+function _mvRedoSim(m){
+  var keep=MAT_LEDGER,res={redo:[],holds:[],none:false};
+  try{MAT_LEDGER=_mvUndoOn(JSON.parse(JSON.stringify(keep||[])),m,true);
+    if(!(m.st==='ok'&&m.own===true&&!m.legacy))res.none=true;else{var pl=_mvPlan(m,false);res.redo=_mvOpsTxt(pl.ops);res.holds=pl.holds;}
+  }catch(e){_err('_mvRedoSim',e);}finally{MAT_LEDGER=keep;}
+  return res;
+}
+function _mvUndoApply(m){
+  var f=_mvFin(m.id),A=f.applied,now=Date.now();
+  MAT_LEDGER=_mvUndoOn(MAT_LEDGER,m,false);
+  (Q||[]).forEach(function(q){var mm=q&&q.mat;if(!mm)return;var u0=(mm.use||[]).length,l0=(mm.loss||[]).length;
+    mm.use=(mm.use||[]).filter(function(u){return !(u&&u.mvId===m.id);});mm.loss=(mm.loss||[]).filter(function(l){return !(l&&l.mvId===m.id);});
+    if(mm.use.length!==u0||mm.loss.length!==l0){_touch(mm);_touch(q);try{_matAmortSync(q);_matLossSync(q);}catch(e){_err('_mvUndoApply.sync',e);}}});
+  var pa=JSON.parse(JSON.stringify(A));delete pa.snap;
+  f.prev=(f.prev||[]).concat([{applied:pa,undoneAt:now,by:(typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機'}]).slice(-5);
+  f.undone=(+f.undone||0)+1;delete f.applied;delete f.redoManual;delete f.redoAck;f._mt=now;
+  saveMatLedger();saveMatMoveFin();try{persist();_immediateUpload();}catch(e){_err('_mvUndoApply',e);}
+}
+function _mvRedoList(){return (MAT_MOVES||[]).filter(function(m){return !!_mvRedoState(m);}).sort(function(a,b){return String(a.date||'').localeCompare(String(b.date||''));});}
+function _mvRedoDetail(m){
+  var st=_mvRedoState(m)||{},h='<div style="font-size:12.5px;line-height:1.6">';
+  if(!st.can){h+='<div style="font-weight:700;color:#c62828">無法自動重改</div><div>'+esc(st.why||'')+'</div><div style="font-size:11.5px;color:var(--b4);margin-top:4px">按「確認」改成資料健檢提醒，請到材料．運輸頁人工核對台帳；按「退回」＝台帳維持現在的樣子、不再提醒。</div>';}
+  else{var sm=_mvRedoSim(m),u=_mvUndoTxt(m);
+    h+='<div style="font-weight:700">① 撤回上次自動改的：</div>'+(u.length?u.map(function(t){return '<div>・'+esc(t)+'</div>';}).join(''):'<div style="color:var(--b3)">（沒有要撤回的）</div>');
+    h+='<div style="font-weight:700;margin-top:8px">② 照新內容重改：</div>';
+    if(sm.none)h+='<div>這張現在不是「已確認的自有料」，只撤回、不重改</div>';
+    else if(sm.holds.length)h+='<div style="color:#b26a00">新內容對不上台帳（'+esc(sm.holds.map(function(x){return (_MV_HOLD[x.k]||x.k)+(x.it?('：'+x.it):'');}).join('；'))+'），撤回後改到「自有料台帳待你決定」卡</div>';
+    else h+=(sm.redo.length?sm.redo.map(function(t){return '<div>・'+esc(t)+'</div>';}).join(''):'<div style="color:var(--b3)">（沒有要改的）</div>');
+    h+='<div style="font-size:11.5px;color:var(--b4);margin-top:6px">按「確認」才會動台帳；按「退回」＝不重改，台帳維持現在的樣子。</div>';}
+  h+='<hr style="border:none;border-top:1px solid var(--b1);margin:8px 0"></div>';
+  return Promise.resolve(_mvDetailHtml(m)).then(function(x){return h+x;});
+}
+_decReg('mvRedo',{
+  title:'簽收單改過、台帳要不要重改',todo:function(n){return '簽收單改過、台帳要不要重改 '+n+' 筆';},sub:'確認＝撤回上次自動改的、照新內容重改（無法自動重改的改成資料健檢提醒）；退回＝台帳維持現狀；修改＝再改簽收單',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},
+  list:_mvRedoList,key:function(m){return m.id;},
+  head:function(m){return (m.date||'')+'　'+(_MV_DIR[m.dir]||'')+'　'+_mvWhere(m)+'　'+_mvSum(m);},
+  body:function(m){var st=_mvRedoState(m)||{};return '<div style="font-size:11.5px;color:'+(st.can?'var(--b4)':'#c62828')+'">'+(st.can?'可以自動撤回再重改':('無法自動重改：'+esc(st.why||'')))+'</div>';},
+  detail:_mvRedoDetail,
+  ok:function(m){
+    var st=_mvRedoState(m),f=_mvFin(m.id),h=_mvHash(m);if(!st)return true;
+    if(m.photo&&!_MV_PH_OK[m.id]){toast('簽收單照片還沒同步到這台，等照片出現再確認');return false;}
+    if(!st.can){f.redoManual=h;f._mt=Date.now();saveMatMoveFin();toast('已改成資料健檢提醒，請人工核對台帳');return true;}
+    var g=+f.undone||0;
+    return _mvLock(m.id,false,'~u'+g).then(function(got){
+      var s2=_mvRedoState(m);if(!got||!s2||!s2.can){toast(!got?'另一台裝置正在處理這筆，稍後再看':'台帳剛被動過，請重新展開明細');return false;}
+      _mvUndoApply(m);
+      if(!_mvApplyCand(m)){toast('已撤回（這張現在不是已確認的自有料，不重改）');return true;}
+      return _mvApplyOne(m,false).then(function(r){toast(r==='ok'?'已撤回並照新內容重改台帳':(r==='hold'?'已撤回；新內容對不上台帳，改到「自有料台帳待你決定」卡':'已撤回，重改稍後自動進行'));try{updateDashTodo();}catch(e){_err('mvRedo.ok',e);}return true;});
+    });
+  },
+  reject:function(m,why){var f=_mvFin(m.id,true);f.redoAck=_mvHash(m);f.redoWhy=String(why||'不重改').slice(0,200);f._mt=Date.now();saveMatMoveFin();return true;},
+  edit:function(m){_mvEdit(m,function(){setTimeout(function(){try{_decRefresh('mvRedo');}catch(e){_err('mvRedo.edit',e);}},50);});}
 });
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
