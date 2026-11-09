@@ -41499,9 +41499,12 @@ function _decReload(kind,id){var c=_decCardEl(id);if(!c)return;var det=c.querySe
 function _decItems(kind){var k=_DEC[kind];if(!k)return [];try{if(k.canSee&&!k.canSee())return [];return (k.list()||[]).filter(Boolean);}catch(e){_err('_decItems.'+kind,e);return [];}}
 function _decTodoItems(items,ic){
   ic=ic||function(h){return '<svg class="ic ib" aria-hidden="true"><use href="#'+h+'"/></svg>';};
-  Object.keys(_DEC).forEach(function(kind){var k=_DEC[kind],L=_decItems(kind);if(!L.length)return;
-    items.push({type:'dec_'+kind,urgent:!!k.urgent,jump:"openDecList('"+kind+"')",icon:ic('i-doc'),color:'#2e7d32',text:k.todo(L.length),sub:esc(k.sub||'點進去逐張：確認／退回／修改')});});
+  _DEC_PASS={};   /* 同一輪待辦重算時，幾種卡共用的清單只算一次（例：退料提醒四種卡） */
+  try{Object.keys(_DEC).forEach(function(kind){var k=_DEC[kind],L=_decItems(kind);if(!L.length)return;
+    items.push({type:'dec_'+kind,urgent:!!k.urgent,jump:"openDecList('"+kind+"')",icon:ic('i-doc'),color:'#2e7d32',text:k.todo(L.length),sub:esc(k.sub||'點進去逐張：確認／退回／修改')});});}
+  finally{_DEC_PASS=null;}
 }
+var _DEC_PASS=null;
 function _decCardHtml(kind,it){
   var k=_DEC[kind],id=String(k.key(it)),rd=!!_DEC_READY[kind+'|'+id];
   var B=function(act,l,c,x){return '<button type="button" class="btn btn-sm'+(c?' '+c:'')+'"'+(x||'')+' onclick="decAct(\''+escq(kind)+'\',\''+escq(id)+'\',\''+act+'\')">'+l+'</button>';};
@@ -43070,7 +43073,7 @@ function _mvShow(id){var m=_mvOf(id);if(!m){toast('找不到這張簽收單');re
 // 退場比在場多＝出卡（rentOver），租料批次不動。租金單價照每張租賃單現在的月租（不分段；16M 加價是運費，見 M6）。
 function _mvVendKey(s){return String(s||'').replace(/[\s　()（）]/g,'').replace(/(股份有限公司|有限公司|企業社|工程行|實業社|商行)$/,'');}   // 審查：只去掉結尾的公司型態
 function _mvRentOf(q,vendor,loose){var vk=_mvVendKey(vendor);return _m6Arr(_matQ(q),'rents').filter(function(rt){var k=_mvVendKey(rt.vendor);if(!vk||!k)return false;if(k===vk)return !loose;return !!loose&&Math.min(k.length,vk.length)>=3&&(k.indexOf(vk)>=0||vk.indexOf(k)>=0);});}   // 審查：名稱要一樣才算同一家；只是相近的（loose）出卡讓 Lotion 選
-function _mvRentOpenM(rt){return Math.round((rt.batches||[]).reduce(function(s,b){return s+(b&&b.d&&!b.o?(parseFloat(b.m)||0):0);},0)*100)/100;}
+function _mvRentOpenM(rt,asOf){return Math.round((rt.batches||[]).reduce(function(s,b){return s+(b&&b.d&&!b.o&&(!asOf||b.d<=asOf)?(parseFloat(b.m)||0):0);},0)*100)/100;}   /* asOf：只算這天以前進場的（退料提醒用；簽收單對位不帶） */
 function _mvRentSig(rt){return rt?JSON.stringify([rt.vendor||'',rt.spec||'',rt.len,rt.rate,(rt.batches||[]).map(function(b){return [b.id,b.d||'',b.m,b.n,b.o||'',b.shortM||0,b.splitFrom||''];})]):'';}
 // 這一批有沒有被租金請款期別用過（施工成本租賃卡 periods 的列 rid＝'rb_'+批次 id）
 function _mvRentBilled(q,rt,b){var c=(q.costs||[]).find(function(x){return x&&x._fromMat==='rent:'+String(rt.vendor||'').trim();});if(!c)return false;return (c.periods||[]).some(function(per){return (per.rows||[]).some(function(r){return r&&r.rid==='rb_'+b.id&&(parseFloat(r.qty)||parseFloat(r.amt)||0)>0;});});}

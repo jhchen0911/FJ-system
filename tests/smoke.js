@@ -11404,6 +11404,125 @@ async function newPage(browser, width, height) {
     check('v6.0.194 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── v6.0.207 進退料 M4b：樁類租料退料提醒（對到工項／只對到樁類／都對不到、之後補指定）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepT = MAT_TAGS;
+      try {
+        MAT_TAGS = {};
+        const TD = localToday(), D = n => _dAdd(TD, n);   // 測試時鐘的今天；拔除完成日用「今天往前 N 天」
+        const logs = [{ date: D(-45), progressRows: [{ itemIdx: 0, qty: 10, ph: 'install' }, { itemIdx: 1, qty: 50, ph: 'install' }] },
+          { date: D(-10), progressRows: [{ itemIdx: 0, qty: 10, ph: 'remove' }] },          // H 型鋼樁 10 天前拔完
+          { date: D(-5), progressRows: [{ itemIdx: 1, qty: 50, ph: 'remove' }] }];         // 鋼板樁 5 天前拔完
+        const items = [{ desc: 'H型鋼樁 H300 L=9M', qty: 10, unit: '支', price: 1, cat: 'both' }, { desc: '鋼板樁 IV型 L=9M', qty: 50, unit: '片', price: 1, cat: 'both' }];
+        const mkQ = (id, rents, its) => ({ id, name: '範例' + id, client: '甲', awarded: true, items: its || items, dailyLogs: logs, costs: [], _mt: 1, mat: { rows: [], use: [], loss: [], rents } });
+        const R = (id, o) => Object.assign({ id, vendor: '範例租賃', rate: 30, cm: 900, pf: D(-45), mode: 'day', batches: [{ id: 'b' + id, d: D(-45), m: 450, n: 50, o: '' }] }, o);
+        Q = [mkQ('qP204', [R('ra', { name: '鋼板樁', spec: 'IV', len: 9, item: 'qP204:1' }), R('rb', { name: '型鋼', spec: 'H300', len: 9 }), R('rc', { name: '鋪路鐵板', spec: '', len: 3 })]),
+          mkQ('qQ204', [R('rd', { name: '型鋼', spec: 'H300', len: 9 })], [items[0]])];
+        const L = _mvIdleList(), g = id => L.find(e => e.id === id);
+        // ① 對到工項（租賃單選了鋼板樁那項）：5 天前拔完 → 5 天 → 提醒；金額＝450M×30/30×5
+        out.item = g('qP204|ra').start === D(-5) && g('qP204|ra').days === 5 && g('qP204|ra').level === 'warn' && g('qP204|ra').cost === 2250 && g('qP204|ra').perDay === 450;
+        // ② 只對到樁類（這案有兩個樁類工項）：出卡指定，保底＝樁類全部拔完（5 天前）
+        out.cat = g('qP204|rb').need === 'pick' && g('qP204|rb').start === D(-5) && /保底/.test(g('qP204|rb').why) && g('qP204|rb').items.length === 2;
+        // 這案只有一個樁類工項 → 自動用它（10 天前拔完 → 緊急）
+        out.single = g('qQ204|rd').start === D(-10) && g('qQ204|rd').level === 'urgent' && !g('qQ204|rd').need;
+        // ③ 都對不到（覆工板）→ Lotion 緊急卡
+        out.unknown = g('qP204|rc').need === 'unknown' && _decItems('mvStartUnknown').some(e => e.id === 'qP204|rc');
+        // 卡片：提醒（工務看得到金額）、緊急、指定工項
+        out.cards = _decItems('mvIdle').some(e => e.id === 'qP204|ra') && _decItems('mvIdleUrg').some(e => e.id === 'qQ204|rd') && _decItems('mvItemPick').some(e => e.id === 'qP204|rb')
+          && /已多付約 NT\$ 2,250，每天再加約 NT\$ 450/.test(_DEC.mvIdle.body(g('qP204|ra')));
+        // 之後補指定：rb 指定成 H 型鋼樁那項 → 改用 10 天前起算、不再出指定卡
+        const oC = window.showConfirm; window.showConfirm = function (t, h, ok) { document.body.insertAdjacentHTML('beforeend', '<div id="tmpbox">' + h + '</div>'); document.getElementById('mvi-item').value = 'qP204:0'; ok(); document.getElementById('tmpbox').remove(); };
+        _DEC.mvItemPick.edit(g('qP204|rb')); window.showConfirm = oC;
+        const L2 = _mvIdleList(), g2 = id => L2.find(e => e.id === id);
+        out.picked = g2('qP204|rb').start === D(-10) && !g2('qP204|rb').need && g2('qP204|rb').level === 'urgent' && !_decItems('mvItemPick').some(e => e.id === 'qP204|rb');
+        // 已安排退料：3 天內不提醒、之後再提醒；業主要求留：不再提醒
+        _DEC.mvIdle.ok(g('qP204|ra'));
+        out.ack = _mvIdleList().find(e => e.id === 'qP204|ra').level === 'ack' && !_decItems('mvIdle').some(e => e.id === 'qP204|ra');
+        MAT_TAGS[_mvTagId('qP204', 'ra')].ack = D(-4);   // 4 天前按的
+        out.ackAgain = _mvIdleList().find(e => e.id === 'qP204|ra').level === 'warn';
+        _DEC.mvIdleUrg.reject(g('qQ204|rd'), '業主要求保留');
+        out.keep = !_mvIdleList().some(e => e.id === 'qQ204|rd') && !_decItems('mvIdleUrg').some(e => e.id === 'qQ204|rd');
+        // 還沒拔完的不提醒；退完的不列
+        Q[1].dailyLogs = [logs[0]];
+        out.notYet = !_mvIdleList().some(e => e.id === 'qQ204|rd');
+        Q[0].mat.rents[0].batches[0].o = D(-1);
+        out.returned = !_mvIdleList().some(e => e.id === 'qP204|ra');
+        // 支撐類（v6.0.207 起提醒）：這案沒有支撐工項 → 判斷不出起算日
+        Q[0].mat.rents.push(R('rs', { name: '支撐', spec: 'H350', len: 9 }));
+        out.strut = _mvIdleList().some(e => e.id === 'qP204|rs' && e.need === 'unknown');
+        // 審查修正：拔除完成後才進場的批次從進場日起算、還沒到進場日的不算；單價空白不寫 NT$ 0；指定了非樁類工項照那個工項起算（不卡在緊急卡）
+        Q = [mkQ('qR204', [R('re', { name: '鋼板樁', spec: 'IV', len: 9, item: 'qR204:1', batches: [{ id: 'e1', d: D(-45), m: 90, o: '' }, { id: 'e2', d: D(-2), m: 90, o: '' }, { id: 'e3', d: D(3), m: 90, o: '' }] }),
+          R('rz', { name: '鋼板樁', spec: 'IV', len: 9, item: 'qR204:1', rate: 0 }), R('rx', { name: '鋪路鐵板', spec: '', len: 3 })],
+          [items[0], items[1], { desc: '地盤改良 灌漿', qty: 1, unit: '式', price: 1, cat: 'both' }])];
+        Q[0].dailyLogs = logs.concat([{ date: D(-5), progressRows: [{ itemIdx: 2, qty: 1, ph: 'remove' }] }]);
+        const L3 = _mvIdleList(), g3 = id => L3.find(e => e.id === id);
+        out.late = g3('qR204|re').openM === 180 && g3('qR204|re').cost === 90 * 5 + 90 * 2 && g3('qR204|re').perDay === 180;
+        out.noRate = /月租單價空白/.test(_mvIdleMoney(g3('qR204|rz'))) && !/NT\$ 0/.test(_mvIdleMoney(g3('qR204|rz')));
+        out.unkBefore = g3('qR204|rx').need === 'unknown';
+        _mvTagSet('qR204', 'rx', { item: 'qR204:2' });
+        const gx = _mvIdleList().find(e => e.id === 'qR204|rx');
+        out.unkPicked = !!gx && gx.need !== 'unknown' && gx.start === D(-5) && gx.level === 'warn';
+        _mvTagSet('qR204', 'rx', { item: '', keep: 1 });
+        out.unkKeep = !_mvIdleList().some(e => e.id === 'qR204|rx' && e.need === 'unknown');
+        // 構台自己一類（Lotion 11/09 選 A）：覆工板跟構台工項拆除完成起算；沒有構台工項＝出卡指定；樁類工項拔完不影響構台料
+        Q = [mkQ('qT204', [R('rk', { name: '覆工板', spec: '', len: 2 }), R('rh', { name: '型鋼', spec: 'H300', len: 9 })],
+          [items[0], { desc: '構台 H350 型鋼柱梁組立', qty: 1, unit: '式', price: 1, cat: 'both' }]), mkQ('qU204', [R('rn', { name: '覆工板', spec: '', len: 2 })], [items[0]])];
+        const dk0 = { date: D(-45), progressRows: [{ itemIdx: 0, qty: 10, ph: 'install' }, { itemIdx: 1, qty: 1, ph: 'install' }] };
+        Q[0].dailyLogs = [dk0, logs[1]];   // 樁類 10 天前拔完、構台還沒拆
+        let L4 = _mvIdleList(), g4 = id => L4.find(e => e.id === id);
+        out.deckWait = !g4('qT204|rk') && g4('qT204|rh').level === 'urgent' && g4('qT204|rh').start === D(-10);
+        Q[0].dailyLogs = [dk0, logs[1], { date: D(-4), progressRows: [{ itemIdx: 1, qty: 1, ph: 'remove' }] }];   // 構台 4 天前拆完
+        L4 = _mvIdleList();
+        out.deck = L4.find(e => e.id === 'qT204|rk').start === D(-4) && L4.find(e => e.id === 'qT204|rk').level === 'warn' && L4.find(e => e.id === 'qT204|rk').kind === 'deck';
+        const n = L4.find(e => e.id === 'qU204|rn');
+        out.deckPick = !!n && n.need === 'pick' && n.kind === 'deck' && !n.start && _decItems('mvItemPick').some(e => e.id === 'qU204|rn') && /找不到構台工項/.test(_DEC.mvItemPick.body(n));
+      } finally { Q = keepQ; MAT_TAGS = keepT; }
+      return out;
+    });
+    check('v6.0.207 進退料 M4b 樁類／構台退料提醒（構台自己一類）：對到工項用該工項拔除完成、只對到樁類用樁類全部拔完保底並出卡指定、只有一個樁類工項自動用、都對不到出緊急卡、補指定後改用工項、超過 3 天提醒（工務看得到多付租金）／7 天緊急、已安排退料 3 天後再提醒、業主要求留不再提醒、支撐類 v6.0.207 起另測', r.item && r.cat && r.single && r.unknown && r.cards && r.picked && r.ack && r.ackAgain && r.keep && r.notYet && r.returned && r.strut && r.late && r.noRate && r.unkBefore && r.unkPicked && r.unkKeep && r.deckWait && r.deck && r.deckPick, JSON.stringify(r));
+    check('v6.0.207 M4b 樁類／構台 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── v6.0.207 進退料 M4b 支撐分層（Lotion 11/09 選 A：照報價分層；只列一項＝整項拆完才起算）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepT = MAT_TAGS;
+      try {
+        MAT_TAGS = {};
+        const TD = localToday(), D = n => _dAdd(TD, n);
+        const its = [{ desc: '第1層 水平支撐 H350', qty: 100, unit: 'M', price: 1, cat: 'both' }, { desc: '第2層 水平支撐 H350', qty: 100, unit: 'M', price: 1, cat: 'both' }];
+        const ins = { date: D(-60), progressRows: [{ itemIdx: 0, qty: 100, ph: 'install' }, { itemIdx: 1, qty: 100, ph: 'install' }] };
+        const mkQ = (id, rents, items, logs) => ({ id, name: '範例' + id, client: '甲', awarded: true, items, dailyLogs: logs, costs: [], _mt: 1, mat: { rows: [], use: [], loss: [], rents } });
+        const R = (id, o) => Object.assign({ id, vendor: '範例租賃', rate: 30, cm: 900, pf: D(-60), mode: 'day', batches: [{ id: 'b' + id, d: D(-60), m: 100, n: 10, o: '' }] }, o);
+        // 分層：第2層 10 天前拆完、第1層 4 天前拆完
+        const logs = [ins, { date: D(-10), progressRows: [{ itemIdx: 1, qty: 100, ph: 'remove' }] }, { date: D(-4), progressRows: [{ itemIdx: 0, qty: 100, ph: 'remove' }] }];
+        Q = [mkQ('qS207', [R('s2', { name: '支撐', spec: 'H350', len: 9, item: 'qS207:1' }), R('sx', { name: '支撐', spec: 'H350', len: 9 })], its, logs),
+          mkQ('qO207', [R('so', { name: '支撐', spec: 'H350', len: 9 })], [{ desc: '水平支撐 H350（含圍令）', qty: 200, unit: 'M', price: 1, cat: 'both' }],
+            [{ date: D(-60), progressRows: [{ itemIdx: 0, qty: 200, ph: 'install' }] }, { date: D(-10), progressRows: [{ itemIdx: 0, qty: 100, ph: 'remove' }] }])];
+        let L = _mvIdleList(), g = id => L.find(e => e.id === id);
+        // 指定第2層 → 從第2層拆完（10 天前）起算 → 緊急
+        out.layer = g('qS207|s2') && g('qS207|s2').kind === 'strut' && g('qS207|s2').start === D(-10) && g('qS207|s2').level === 'urgent';
+        // 沒指定、有兩層 → 出卡指定；保底＝支撐全部拆完（4 天前）
+        out.pick = g('qS207|sx') && g('qS207|sx').need === 'pick' && g('qS207|sx').start === D(-4) && /支撐工項全部拔除完成/.test(g('qS207|sx').why) && /2 個支撐工項/.test(_DEC.mvItemPick.body(g('qS207|sx')));
+        // 只列一項：拆了一半不起算
+        out.oneHalf = !L.some(e => e.id === 'qO207|so');
+        Q[1].dailyLogs.push({ date: D(-5), progressRows: [{ itemIdx: 0, qty: 100, ph: 'remove' }] });
+        L = _mvIdleList();
+        out.oneDone = !!g('qO207|so') && g('qO207|so').start === D(-5) && g('qO207|so').level === 'warn' && !g('qO207|so').need;
+        // 補指定第1層 → 改從 4 天前起算、不再出指定卡
+        _mvTagSet('qS207', 'sx', { item: 'qS207:0' });
+        L = _mvIdleList();
+        out.picked = g('qS207|sx').start === D(-4) && !g('qS207|sx').need && g('qS207|sx').level === 'warn';
+      } finally { Q = keepQ; MAT_TAGS = keepT; }
+      return out;
+    });
+    check('v6.0.207 進退料支撐分層：報價分層列照那一層拆除完成起算、沒指定出卡（保底支撐全部拆完）、補指定後改用那一層、只列一項的等整項拆完', r.layer && r.pick && r.oneHalf && r.oneDone && r.picked, JSON.stringify(r));
+    check('v6.0.207 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.203 進退料 M4a：租料簽收單確認後自動建／結租料批次 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
