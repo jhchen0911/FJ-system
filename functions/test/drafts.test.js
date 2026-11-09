@@ -94,7 +94,7 @@ test('v6.0.218 得標率統計給報價線：只有主報價、有結果、沒�
     b: { id: 'b', name: '乙', bidStatus: 'lost', t: { total: 120 }, lostPrice: 100, items: [{ desc: 'H型鋼樁打設', qty: 1, price: 120 }], bid: { res: 'lost', first: 120 } },
     c: { id: 'c', name: '丙', bidStatus: 'lost', t: { total: 50 }, items: [{ desc: 'H型鋼樁打設', qty: 1, price: 50 }], bid: { res: 'lost', skip: { at: 1 } } },
     d: { id: 'd', name: '丁', t: { total: 50 }, items: [{ desc: 'H型鋼樁', qty: 1, price: 50 }] },
-    e: { id: 'e', parentId: 'a', name: '甲追加', items: [{ desc: '水平支撐', qty: 1, price: 10 }] },
+    e: { id: 'e', parentId: 'a', name: '甲追加', items: [{ desc: '水平支撐', qty: 1, price: 30 }] },   // 30／130＝23%，佔 10% 以上才算
   };
   const r = D.bidStats(qs, { k: { linkedQid: 'a', amount: 99 } }, {});
   assert.strictEqual(r.n, 2); assert.strictEqual(r.minN, 5);
