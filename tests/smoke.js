@@ -46,6 +46,7 @@ async function newPage(browser, width, height) {
   await page.goto(INDEX);
   await page.waitForTimeout(2500);
   await page.evaluate(() => { window._costEditAll = true; });   // v6.0.29 施工成本頁測試時全展開
+  await page.evaluate(() => { localStorage.setItem('fy_v7old', '{"proj":1}'); });   // v6.0.216：既有的工程專案測試驗的是原本版面（「切回舊版」那一版）；新版 14 步流程另有測試（自己切回新版）
   return { page, errors };
 }
 
@@ -12603,6 +12604,7 @@ async function newPage(browser, width, height) {
       const keepQ = Q, keepC = CONTRACTS.slice();
       try {
         window.toast = () => {};
+        localStorage.removeItem('fy_v7old');
         Object.keys(localStorage).filter((k) => /^pj7_open_/.test(k)).forEach((k) => localStorage.removeItem(k));
         Q = [{ id: 'qP7', name: '範例工程P7', client: '甲營造', code: 'P7', date: '2026-10-01', awarded: true, items: [{ desc: '鋼軌樁打設', unit: '支', qty: 100, price: 1000 }], costs: [], _mt: 1, dailyLogs: [{ id: 'd1', date: '2026-10-20', progressRows: [{ itemIdx: 0, qty: 30 }], photos: [] }] }];
         CONTRACTS.push({ id: 'cP7', linkedQid: 'qP7', name: '範例工程P7', amount: 105000, code: 'C-P7' });
