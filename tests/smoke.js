@@ -11083,10 +11083,15 @@ async function newPage(browser, width, height) {
         const m5 = mk({ date: '2026-11-08', dir: 'in', qid: 'qA200', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 1 }] });
         MAT_MOVE_FIN[m5.id] = { _mt: 1, applied: { at: 1, h: 'zz', ops: [] } };
         out.legacy = (_mvRedoState(m5) || {}).can === false && /v6.0.200 以前/.test(_mvRedoState(m5).why);
+        // 審查：這張單產生的使用段之後被手動改過 → 無法自動重改（撤回會弄丟手改的）
+        const m6 = mk({ date: '2026-11-09', dir: 'out', qid: 'qA200', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 1 }] });
+        await _mvApplyAll({ local: true });
+        const u6 = Q[0].mat.use.find(u => u.mvId === m6.id); u6.amt += 100; m6.items[0].qty = 2; _touch(m6);
+        out.ulEdit = !!u6 && (_mvRedoState(m6) || {}).can === false && /手動改過/.test(_mvRedoState(m6).why);
       } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; }
       return out;
     });
-    check('v6.0.200 進退料 M3b：已自動改過台帳的簽收單被改 → 卡片逐列寫撤回／重改、確認才動、台帳被動過＝無法自動重改轉資料健檢、退回維持、對不上轉例外卡、撤回後舊套用紀錄不復活', r.snap && r.noCard && r.card && r.detail && r.notYet && r.ok && r.merge && r.out && r.cant && r.manual && r.reject && r.toHold && r.legacy, JSON.stringify(r));
+    check('v6.0.200 進退料 M3b：已自動改過台帳的簽收單被改 → 卡片逐列寫撤回／重改、確認才動、台帳被動過＝無法自動重改轉資料健檢、退回維持、對不上轉例外卡、撤回後舊套用紀錄不復活', r.snap && r.noCard && r.card && r.detail && r.notYet && r.ok && r.merge && r.out && r.cant && r.manual && r.reject && r.toHold && r.legacy && r.ulEdit, JSON.stringify(r));
     check('v6.0.200 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
