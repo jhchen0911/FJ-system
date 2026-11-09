@@ -11468,12 +11468,13 @@ async function newPage(browser, width, height) {
         // 構台自己一類（Lotion 11/09 選 A）：覆工板跟構台工項拆除完成起算；沒有構台工項＝出卡指定；樁類工項拔完不影響構台料
         Q = [mkQ('qT204', [R('rk', { name: '覆工板', spec: '', len: 2 }), R('rh', { name: '型鋼', spec: 'H300', len: 9 })],
           [items[0], { desc: '構台 H350 型鋼柱梁組立', qty: 1, unit: '式', price: 1, cat: 'both' }]), mkQ('qU204', [R('rn', { name: '覆工板', spec: '', len: 2 })], [items[0]])];
-        Q[0].dailyLogs = [logs[0], logs[1]];   // 樁類 10 天前拔完、構台還沒拆
+        const dk0 = { date: D(-45), progressRows: [{ itemIdx: 0, qty: 10, ph: 'install' }, { itemIdx: 1, qty: 1, ph: 'install' }] };
+        Q[0].dailyLogs = [dk0, logs[1]];   // 樁類 10 天前拔完、構台還沒拆
         let L4 = _mvIdleList(), g4 = id => L4.find(e => e.id === id);
         out.deckWait = !g4('qT204|rk') && g4('qT204|rh').level === 'urgent' && g4('qT204|rh').start === D(-10);
-        Q[0].dailyLogs = [logs[0], logs[1], { date: D(-4), progressRows: [{ itemIdx: 1, qty: 1, ph: 'remove' }] }];   // 構台 4 天前拆完
+        Q[0].dailyLogs = [dk0, logs[1], { date: D(-4), progressRows: [{ itemIdx: 1, qty: 1, ph: 'remove' }] }];   // 構台 4 天前拆完
         L4 = _mvIdleList();
-        out.deck = g4('qT204|rk') === undefined && L4.find(e => e.id === 'qT204|rk').start === D(-4) && L4.find(e => e.id === 'qT204|rk').level === 'warn' && L4.find(e => e.id === 'qT204|rk').kind === 'deck';
+        out.deck = L4.find(e => e.id === 'qT204|rk').start === D(-4) && L4.find(e => e.id === 'qT204|rk').level === 'warn' && L4.find(e => e.id === 'qT204|rk').kind === 'deck';
         const n = L4.find(e => e.id === 'qU204|rn');
         out.deckPick = !!n && n.need === 'pick' && n.kind === 'deck' && !n.start && _decItems('mvItemPick').some(e => e.id === 'qU204|rn') && /找不到構台工項/.test(_DEC.mvItemPick.body(n));
       } finally { Q = keepQ; MAT_TAGS = keepT; }
