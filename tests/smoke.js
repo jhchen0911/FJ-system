@@ -46,7 +46,7 @@ async function newPage(browser, width, height) {
   await page.goto(INDEX);
   await page.waitForTimeout(2500);
   await page.evaluate(() => { window._costEditAll = true; });   // v6.0.29 施工成本頁測試時全展開
-  await page.evaluate(() => { localStorage.setItem('fy_v7old', '{"proj":1}'); });   // v6.0.216：既有的工程專案測試驗的是原本版面（「切回舊版」那一版）；新版 14 步流程另有測試（自己切回新版）
+  await page.evaluate(() => { localStorage.setItem('fy_v7old', '{"proj":1,"acct":1}'); });   // v6.0.216：既有的工程專案、帳務測試驗的是原本版面（「切回舊版」那一版）；新版（14 步流程、帳務 4 塊）另有測試（自己切回新版）
   return { page, errors };
 }
 
@@ -12641,6 +12641,7 @@ async function newPage(browser, width, height) {
       const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
       const oU = window._fbUser, oA = window._isAdminUser, keepP = PAYABLES.slice();
       try {
+        localStorage.removeItem('fy_v7old');
         window.toast = () => {}; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
         PAYABLES.push({ id: 'pD1', to: '範例廠商', date: localToday(), amount: 1000, status: 'unpaid', _mt: 1 });
         go('acct'); acctTab('ap'); await T(150);
