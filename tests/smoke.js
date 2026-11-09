@@ -12220,7 +12220,7 @@ async function newPage(browser, width, height) {
   {
     const fs = require('fs'), pth = require('path'), R = pth.join(__dirname, '..');
     const app = fs.readFileSync(pth.join(R, 'app.js'), 'utf8'), idx = fs.readFileSync(pth.join(R, 'index.html'), 'utf8'), man = fs.readFileSync(pth.join(R, 'manifest.json'), 'utf8');
-    const OLD = /#(1a6b3f|145730|0e3d22|155530|1a5a2a|e8941a|d4820f|1c6937|ffae48)\b/i;
+    const OLD = /#(1a6b3f|145730|0e3d22|155530|1a5a2a|e8941a|d4820f|1c6937|ffae48)\b|rgba\((26,107,63|232,148,26|14,61,34),|FF0E3D22/i;
     const stat = { appOld: OLD.test(app.replace(/^var FY_LOGO=.*$/m, '')), idxOld: OLD.test(idx), manOld: OLD.test(man), oldLogo: /\/9j\/4AAQSkZJRgABAQEAYABgAAD\/4QKyRXhpZgAATU0/.test(app + idx) };
     { const fb = (app.match(/^var FY_BRAND=\{([^}]*)\}/m) || [, ''])[1], gv = (k) => ((fb.match(new RegExp('\\b' + k + ":'(#[0-9A-Fa-f]{6})'")) || [])[1] || '').toLowerCase(), rv = (k) => ((idx.match(new RegExp('--' + k + ':(#[0-9A-Fa-f]{6})')) || [])[1] || '').toLowerCase();
       stat.rootSame = ['g', 'g2', 'g3', 'y', 'y2'].every((k) => gv(k) && gv(k) === rv(k)); }   // index.html :root 寫死的值（開頁第一眼）跟 FY_BRAND 一樣

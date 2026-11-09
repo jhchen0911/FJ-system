@@ -19,7 +19,7 @@
 :root{
   --g:#006935;--g2:#00562b;--g3:#003d1e;   /* v6.0.205 品牌色（名片原檔色值）；跟 app.js 的 FY_BRAND 一致（冒煙測試檢查），改色兩處一起改 */
   --gl:#e8f5ee;--gm:#c3e6d0;
-  --y:#F8B72E;--y2:#E0A21C;--yl:#fef8ec;--ym:#fde4a8;--yd:#7a4800;
+  --y:#F8B72E;--y2:#E0A21C;--yl:#fef8ec;--ym:#fde4a8;--yd:#7a4800;--ink:#292B2D;
   --w:#ffffff;--b0:#f5f6f8;--b1:#ebedf0;--b2:#d8dce3;--b3:#6f7684;--b4:#575f6c;--b5:#1f2937;   /* v5.317 b3/b4 加深：原 b3 #a8aeba 於白底對比僅 2.2:1；現為 4.56:1／5.9:1，達 WCAG AA */
   --red:#c0392b;--redl:#fdf0ef;
   --r4:4px;--r6:6px;--r8:8px;--r10:10px;--r12:12px;--r14:14px;
@@ -68,11 +68,11 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
 .btn:active{transform:scale(.97);opacity:.85}
 
 /* 主要動作：深綠 */
-.btn-g{background:var(--g);border-color:var(--g);color:#fff;font-weight:600;box-shadow:0 1px 4px rgba(26,107,63,.25)}
-.btn-g:hover{background:var(--g2);border-color:var(--g2);box-shadow:0 2px 8px rgba(26,107,63,.3)}
+.btn-g{background:var(--g);border-color:var(--g);color:#fff;font-weight:600;box-shadow:0 1px 4px rgba(0,105,53,.25)}
+.btn-g:hover{background:var(--g2);border-color:var(--g2);box-shadow:0 2px 8px rgba(0,105,53,.3)}
 
 /* 次要強調：金黃（儲存、確認） */
-.btn-y{background:var(--y);border-color:var(--y);color:#fff;font-weight:700;box-shadow:0 1px 4px rgba(232,148,26,.25)}
+.btn-y{background:var(--y);border-color:var(--y);color:var(--ink);font-weight:700;box-shadow:0 1px 4px rgba(248,183,46,.25)}
 .btn-y:hover{background:var(--y2);border-color:var(--y2)}
 
 /* 危險動作：紅框 */
@@ -119,7 +119,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
 .f{display:flex;flex-direction:column;gap:4px}
 .f label{font-size:11px;font-weight:700;color:var(--b3);letter-spacing:.04em;text-transform:uppercase}
 .f input,.f select,.f textarea{padding:7px 10px;border:1px solid var(--b2);border-radius:var(--r6);font-size:13px;background:var(--w);color:var(--b5);font-family:inherit;transition:border-color var(--transition),box-shadow var(--transition);-webkit-appearance:none}
-.f input:focus,.f select:focus,.f textarea:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px rgba(26,107,63,.08)}
+.f input:focus,.f select:focus,.f textarea:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 3px rgba(0,105,53,.08)}
 .f input:hover:not(:focus),.f select:hover:not(:focus),.f textarea:hover:not(:focus){border-color:var(--b3)}
 .f input[type=checkbox]{padding:0;border:none;background:transparent;width:16px;height:16px;cursor:pointer;accent-color:var(--g);flex-shrink:0;-webkit-appearance:checkbox;appearance:checkbox}
 .f input[type=number]{text-align:right}
@@ -153,7 +153,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
 .tbl td{padding:4px 6px;vertical-align:middle}
 .tbl td input{width:100%;padding:5px 7px;border:1px solid transparent;border-radius:var(--r4);font-size:12.5px;background:transparent;color:var(--b5);font-family:inherit;height:30px;transition:var(--transition)}
 .tbl td input:hover{border-color:var(--b2);background:var(--w)}
-.tbl td input:focus{outline:none;border-color:var(--g);background:var(--w);box-shadow:0 0 0 2px rgba(26,107,63,.07)}
+.tbl td input:focus{outline:none;border-color:var(--g);background:var(--w);box-shadow:0 0 0 2px rgba(0,105,53,.07)}
 .tbl td.idx{text-align:center;color:var(--b3);font-size:11px;width:32px}
 .tbl td.r{text-align:right;font-variant-numeric:tabular-nums;padding-right:10px}
 .tbl td.del{width:28px;text-align:center}
@@ -178,7 +178,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
   table.mst tbody{display:block}
   table.mst tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:9px 10px;align-items:stretch;
     border:1px solid var(--b1);border-radius:var(--r8);padding:10px 11px;margin-bottom:9px;background:var(--w);
-    box-shadow:0 1px 3px rgba(14,61,34,.05)}
+    box-shadow:0 1px 3px rgba(0,61,30,.05)}
   table.mst tbody tr:hover td{background:transparent}
   table.mst tbody tr.tt,table.mst tbody tr[style*="background"]{background:var(--gl)}
   table.mst tbody td{border:none!important;padding:0!important;min-width:0;overflow:hidden;
@@ -270,7 +270,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
 .kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;padding:16px 20px 0}.dash-greet{padding:16px 20px 0;font-size:19px;font-weight:800;color:var(--b5)}/* v5.332：原本固定 5 欄，只有 4 張卡時右邊留一格空白，跟下方 4 顆捷徑對不齊；改 auto-fit 讓卡片自動填滿整列。白底與底線一併移除，與頁面同底色。 */
 .kpi{border:1px solid var(--b1);border-radius:var(--r10);padding:12px 14px;background:var(--w);transition:box-shadow var(--transition)}
 .kpi:hover{box-shadow:var(--shadow-md);cursor:default}
-.kpi.hi{border-color:var(--gm);background:var(--gl);box-shadow:0 1px 4px rgba(26,107,63,.1)}
+.kpi.hi{border-color:var(--gm);background:var(--gl);box-shadow:0 1px 4px rgba(0,105,53,.1)}
 .kpi.yel{border-color:var(--ym);background:var(--yl)}
 .kl{font-size:11px;font-weight:700;color:var(--b4);letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px}
 .kv{font-size:19px;font-weight:800;color:var(--b5);line-height:1.15}
@@ -309,7 +309,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
 /* ═══ 額外費用列 ═══ */
 .ex-row{display:grid;grid-template-columns:1fr 115px 95px 28px;gap:5px;align-items:center;margin-bottom:5px}
 .ex-row input{padding:5px 8px;border:1px solid var(--b2);border-radius:var(--r6);font-size:12.5px;color:var(--b5);font-family:inherit;width:100%;height:30px;background:var(--w)}
-.ex-row input:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 2px rgba(26,107,63,.07)}
+.ex-row input:focus{outline:none;border-color:var(--g);box-shadow:0 0 0 2px rgba(0,105,53,.07)}
 .ex-total{display:flex;justify-content:space-between;padding:8px 0 0;border-top:1px solid var(--b1);margin-top:4px;font-size:13px;font-weight:700;color:var(--yd)}
 
 /* ═══ 利潤表格 ═══ */
@@ -482,7 +482,7 @@ svg.fj-chart{cursor:zoom-in}
 .mob-jump-chip.active{background:var(--gl);border-color:var(--gm);color:var(--g3);font-weight:700}
 
 /* ═══ 手機版 FAB ═══ */
-.mob-fab{display:none;position:fixed;right:18px;bottom:calc(var(--mob) + max(env(safe-area-inset-bottom),4px) + 12px);z-index:200;width:54px;height:54px;border-radius:50%;background:var(--g);color:#fff;border:none;font-size:26px;cursor:pointer;font-family:inherit;box-shadow:0 4px 16px rgba(26,107,63,.4);align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+.mob-fab{display:none;position:fixed;right:18px;bottom:calc(var(--mob) + max(env(safe-area-inset-bottom),4px) + 12px);z-index:200;width:54px;height:54px;border-radius:50%;background:var(--g);color:#fff;border:none;font-size:26px;cursor:pointer;font-family:inherit;box-shadow:0 4px 16px rgba(0,105,53,.4);align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;transition:transform .12s}
 .mob-fab:active{transform:scale(.91)}
 .mob-fab-cam{display:none;position:fixed;left:18px;bottom:calc(var(--mob) + max(env(safe-area-inset-bottom),4px) + 12px);z-index:200;width:54px;height:54px;border-radius:50%;background:#1a3a6b;color:#fff;border:none;font-size:24px;cursor:pointer;font-family:inherit;box-shadow:0 4px 16px rgba(26,58,107,.4);align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;transition:transform .12s}
 .mob-fab-cam:active{transform:scale(.91)}
@@ -1287,7 +1287,7 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
 #page-rebar input:focus,#page-rebar select:focus,#page-grout input:focus,#page-grout select:focus,#page-matest .me-tool input:focus,#page-matest .me-tool select:focus,
 #page-backfill input:focus,#page-backfill select:focus,#page-progress input:focus,#page-progress select:focus,#page-matest .me-tool input:focus,#page-matest .me-tool select:focus,
 #page-lifeline input:focus,#page-lifeline select:focus,#page-matest .me-tool input:focus,#page-matest .me-tool select:focus{
-  border-color:var(--g3);outline:none;box-shadow:0 0 0 3px rgba(14,61,34,.08)}
+  border-color:var(--g3);outline:none;box-shadow:0 0 0 3px rgba(0,61,30,.08)}
 #page-backfill input[type=checkbox],#page-progress input[type=checkbox],#page-lifeline input[type=checkbox],#page-matest .me-tool input[type=checkbox]{width:18px;height:18px;accent-color:var(--g3)}
 #page-rebar .tbl input,#page-progress .tbl input,#page-progress .tbl select,#page-backfill .tbl input,#page-backfill .tbl select,#page-lifeline .tbl input,#page-matest .me-tool .tbl input,#page-matest .me-tool .tbl select{height:32px;font-size:12.5px;padding:5px 8px}
 #page-progress .tbl th,#page-backfill .tbl th,#page-lifeline .tbl th,#page-matest .me-tool .tbl th{white-space:nowrap}
@@ -2640,8 +2640,8 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
               <th rowspan="2" style="width:24px;color:#fff;white-space:nowrap;vertical-align:middle;padding:4px 3px">項次</th>
               <th rowspan="2" style="color:#fff;vertical-align:middle;text-align:left;padding:4px 6px">工程項目</th>
               <th rowspan="2" style="width:36px;color:#fff;white-space:nowrap;vertical-align:middle;padding:4px 3px">單位</th>
-              <th colspan="2" style="text-align:center;background:#155530;color:#fff;white-space:nowrap;padding:4px 4px">合約內容</th>
-              <th colspan="3" style="text-align:center;background:#1a5a2a;color:#fff;border-left:2px solid rgba(255,255,255,0.2);white-space:nowrap;padding:4px 4px">本期估驗</th>
+              <th colspan="2" style="text-align:center;background:var(--g2);color:#fff;white-space:nowrap;padding:4px 4px">合約內容</th>
+              <th colspan="3" style="text-align:center;background:var(--g2);color:#fff;border-left:2px solid rgba(255,255,255,0.2);white-space:nowrap;padding:4px 4px">本期估驗</th>
             <th colspan="2" style="text-align:center;background:#1a3a6b;color:#fff;border-left:2px solid rgba(255,255,255,0.2);white-space:nowrap;padding:4px 4px">前期累計</th>
             <th rowspan="2" style="width:52px;color:#fff;white-space:nowrap;vertical-align:middle;padding:4px 3px">請款%</th>
               <th rowspan="2" style="width:60px;color:#fff;white-space:nowrap;vertical-align:middle;padding:4px 4px">備註</th>
@@ -2844,7 +2844,7 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
   <button type="button" class="mnav active" id="mn-dash" onclick="go('dash')"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg></span>總覽</button>
   <button type="button" class="mnav" id="mn-quickcost" onclick="go('quickcost')"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></span>日報</button>
   <button type="button" class="mnav" id="mn-proj" onclick="go('proj')" style="position:relative">
-    <span style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;background:var(--g);border-radius:50%;margin-top:-16px;box-shadow:0 3px 12px rgba(26,107,63,.4);border:3px solid var(--w)"><svg class="ic" aria-hidden="true" style="width:21px;height:21px;stroke:#fff;stroke-width:2"><use href="#i-contract"/></svg></span>
+    <span style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;background:var(--g);border-radius:50%;margin-top:-16px;box-shadow:0 3px 12px rgba(0,105,53,.4);border:3px solid var(--w)"><svg class="ic" aria-hidden="true" style="width:21px;height:21px;stroke:#fff;stroke-width:2"><use href="#i-contract"/></svg></span>
     <span style="font-size:9px;color:var(--g);font-weight:700;margin-top:1px">專案</span>
   </button>
   <button type="button" class="mnav" id="mn-quotes" onclick="go('quotes')"><span class="mnav-ic"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span>報價</button>
