@@ -362,7 +362,7 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('AI 改單 回復：條款用改過的字也對得到、text 空白＝回復範本；成本給空白＝清掉', !p3.bad && !('L0' in p3.rmk.ov) && !('estCost' in p3.items[0]) && p3.rows[1].cost.a === null);
   check('AI 改單 clean：成本欄與 rmkFix 留下、轉數字', JSON.stringify(D.clean([{ op: 'set', idx: 0, fields: { estCost: '70' } }, { op: 'rmkFix', match: 'a', text: 'b', x: 1 }, { op: 'add', item: { desc: 'd', qty: 1, price: 2, estCost: '1' } }])) === '[{"op":"set","idx":0,"fields":{"estCost":70}},{"op":"rmkFix","match":"a","text":"b"},{"op":"add","item":{"desc":"d","unit":"","qty":1,"price":2,"note":"","estCost":1}}]');
 }
-// 報價結果統計（v6.0.213 第 7 步③，FJC.bid）
+// 報價結果統計（v6.0.214 第 7 步③，FJC.bid）
 {
   const B = require('../calc/bidstat.js');
   check('報價結果 工項類別：鋼板樁／鋼軌樁／H型鋼樁／支撐／構台／其他', B.itemCat('鋼板樁打設 IV型') === 'sheet' && B.itemCat('鋼軌樁打設') === 'rail' && B.itemCat('H型鋼樁 H300×300') === 'hpile' && B.itemCat('水平支撐（第一層）') === 'strut' && B.itemCat('構台組立') === 'deck' && B.itemCat('動員費') === 'other');

@@ -20,7 +20,7 @@ function rmkBaseFor(q, rp) {
 }
 function arr(x) { return Array.isArray(x) ? x.filter(Boolean) : (x && typeof x === 'object' ? Object.values(x).filter(Boolean) : []); }
 // 找報價：qid 優先；只給報價編號時要唯一
-// v6.0.213 底價／目標成交價：未稅、正數才收；都沒有＝null
+// v6.0.214 底價／目標成交價：未稅、正數才收；都沒有＝null
 function price3(o) {
   o = (o && typeof o === 'object') ? o : {};
   const f = N(o.floor), t = N(o.target), r = {};
@@ -68,7 +68,7 @@ function build(o) {
     const t0 = D.totals(q.items, taxR), t1 = D.totals(plan.items, taxR);
     const ee = expectOk(b.expect, t1); if (ee) return { err: ee, detail: plan.rows };
     payload = { qid: q.id, code: S(q.code, 60), baseVer: q.ver || 1, baseMt: q._mt || 0, ops };
-    const p3q = price3(pl.prices); if (p3q) payload.prices = p3q;   // v6.0.213 底價／目標成交價（選填）
+    const p3q = price3(pl.prices); if (p3q) payload.prices = p3q;   // v6.0.214 底價／目標成交價（選填）
     summary = (S(b.summary, 140).trim() || (S(q.code, 40) + ' ' + S(q.name, 60) + ' V' + (q.ver || 1) + ' 改單 ' + plan.rows.length + ' 項')) + '（未稅 ' + fmt(t0.sub) + ' → ' + fmt(t1.sub) + '）';
   } else if (type === 'quote') {
     const base = S(pl.base, 80); let bq = null;
@@ -88,7 +88,7 @@ function build(o) {
     }
     const t = D.totals(fields.items, taxR), ee = expectOk(b.expect, t); if (ee) return { err: ee };
     fields.t = t;
-    const p3 = price3(f0); if (p3) { if (p3.floor) fields.floor = p3.floor; if (p3.target) fields.target = p3.target; }   // v6.0.213 底價／目標成交價（選填，未稅）
+    const p3 = price3(f0); if (p3) { if (p3.floor) fields.floor = p3.floor; if (p3.target) fields.target = p3.target; }   // v6.0.214 底價／目標成交價（選填，未稅）
     payload = { base, baseMt: bq ? (bq._mt || 0) : 0, baseName: bq ? S(bq.name, 200) : '', fields };
     summary = (base ? '修改：' : '新報價：') + S(fields.name, 80) + '／' + S(fields.client, 60) + '　合計 NT$ ' + fmt(t.total);
   } else {

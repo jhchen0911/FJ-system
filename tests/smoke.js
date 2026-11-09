@@ -3626,7 +3626,7 @@ async function newPage(browser, width, height) {
           INV.length=0;INV.push({id:'i616',quoteId:'q616',project:'待辦測試案',client:'業主',periodNo:1,date:_dAdd(ym+'-01',-10),items:[],totals:{total:100000},received:0});
           PAYABLES.length=0;
           go('dash');
-          const t=document.getElementById('dash-todo-list').innerHTML+(_nav5On()?' '+_tdCur.map(x=>x.jump).join(' '):'');   // v6.0.212 新首頁：跳轉改事件綁定，不寫在 HTML 裡
+          const t=document.getElementById('dash-todo-list').innerHTML+(_nav5On()?' '+_tdCur.map(x=>x.jump).join(' '):'');   // v6.0.213 新首頁：跳轉改事件綁定，不寫在 HTML 裡
           out.todo=/待登錄廠商請款：甲乙工程行/.test(t)&&/本月尚未開單：待辦測試案/.test(t)&&/自有材料在工地：待辦測試案 10 支，最久 130 天（請確認是否該歸還）/.test(t)&&/_rfqTab='mat'/.test(t)&&/invTab\('vendor'\)/.test(t);
           out.shortcut=!document.getElementById('dash-shortcuts');   // v6.0.33 總覽捷徑卡移除（底部列／側欄已有）
           Q=[];INV.length=0;MAT_LEDGER.length=0;
@@ -9118,7 +9118,7 @@ async function newPage(browser, width, height) {
         out.btn = !document.getElementById('ai-notify-btn');   /* v6.0.175：按鈕移到人員管理 › LINE 機器人卡 */
         out.noFloat = /ai-notify-btn/.test(String(renderLineBox));
         const gw = g.getBoundingClientRect().width, kw = kg ? kg.getBoundingClientRect().width : 0;
-        out.full = kg && (getComputedStyle(kg).display === 'none' || Math.abs(kw - gw) < 2); out.w = [gw, kw];   // v6.0.212 新首頁：統計卡收到「看公司數字」（不顯示也算過）
+        out.full = kg && (getComputedStyle(kg).display === 'none' || Math.abs(kw - gw) < 2); out.w = [gw, kw];   // v6.0.213 新首頁：統計卡收到「看公司數字」（不顯示也算過）
         _isReaderUser = false;
         /* 立即重跑 → 提醒卡跟著重讀，雲端回報的失敗原因要出現 */
         let reads = 0; const vals = { 'fydata/health/latest': null, 'fydata/health/remind': null, 'fydata/health/remindErr': { at: 1, msg: 'value argument contains undefined' } };
@@ -12216,7 +12216,123 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── v6.0.211 改版第 7 步①：共用 A4 單據引擎（報價、請款、合約、詢價單、保留款退還單）──
+  // ── v6.0.205 品牌色換新（Lotion 11/09：名片原檔色值 綠 #006935、橘 #F8B72E、炭灰 #292B2D）：單一來源 FY_BRAND、畫面 :root 一致、程式裡沒有舊色、Logo 換新 ──
+  {
+    const fs = require('fs'), pth = require('path'), R = pth.join(__dirname, '..');
+    const app = fs.readFileSync(pth.join(R, 'app.js'), 'utf8'), idx = fs.readFileSync(pth.join(R, 'index.html'), 'utf8'), man = fs.readFileSync(pth.join(R, 'manifest.json'), 'utf8');
+    const OLD = /#(1a6b3f|145730|0e3d22|155530|1a5a2a|e8941a|d4820f|1c6937|ffae48)\b|rgba\((26,107,63|232,148,26|14,61,34),|FF0E3D22/i;
+    const stat = { appOld: OLD.test(app.replace(/^var FY_LOGO=.*$/m, '')), idxOld: OLD.test(idx), manOld: OLD.test(man), oldLogo: /\/9j\/4AAQSkZJRgABAQEAYABgAAD\/4QKyRXhpZgAATU0/.test(app + idx) };
+    { const fb = (app.match(/^var FY_BRAND=\{([^}]*)\}/m) || [, ''])[1], gv = (k) => ((fb.match(new RegExp('\\b' + k + ":'(#[0-9A-Fa-f]{6})'")) || [])[1] || '').toLowerCase(), rv = (k) => ((idx.match(new RegExp('--' + k + ':(#[0-9A-Fa-f]{6})')) || [])[1] || '').toLowerCase();
+      stat.rootSame = ['g', 'g2', 'g3', 'y', 'y2'].every((k) => gv(k) && gv(k) === rv(k)); }   // index.html :root 寫死的值（開頁第一眼）跟 FY_BRAND 一樣
+    check('v6.0.205 程式、畫面、App 圖示設定裡沒有舊品牌色（#1a6b3f／#0e3d22／#e8941a 等、作廢的 #1C6937／#FFAE48），也沒有舊 Logo', !stat.appOld && !stat.idxOld && !stat.manOld && !stat.oldLogo && stat.rootSame, JSON.stringify(stat));
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        const cs = getComputedStyle(document.documentElement), v = (k) => cs.getPropertyValue(k).trim().toLowerCase();
+        out.brand = FY_BRAND.g === '#006935' && FY_BRAND.y.toLowerCase() === '#f8b72e' && FY_BRAND.ink.toLowerCase() === '#292b2d';
+        out.root = v('--g') === FY_BRAND.g.toLowerCase() && v('--g2') === FY_BRAND.g2.toLowerCase() && v('--g3') === FY_BRAND.g3.toLowerCase() && v('--y') === FY_BRAND.y.toLowerCase() && v('--y2') === FY_BRAND.y2.toLowerCase();
+        out.logo = /^data:image\/png;base64,/.test(FY_LOGO) && /^data:image\/png;base64,/.test(document.querySelector('.brand-icon img').src);
+        const q = { id: 'qBC1', code: '1151109', name: '範例案', client: '假業主', date: '2026-11-09', items: [{ desc: '假工項', unit: '支', qty: 1, price: 1000 }], exs: [], rmk: {}, ver: 1 };
+        const h = String(_buildQuoteDocHTML(q) || '');
+        out.doc = /#006935/i.test(h) && !/#1a6b3f/i.test(h) && h.indexOf(FY_LOGO.slice(0, 80)) >= 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
+      return out;
+    });
+    check('v6.0.205 品牌色單一來源：FY_BRAND 是名片色值、畫面 :root 的 --g／--g2／--g3／--y／--y2 跟它一致；Logo 是新的去背 PNG；報價單用新綠、新 Logo', r.brand && r.root && r.logo && r.doc, JSON.stringify(r));
+    check('v6.0.205 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.206 第 6 步 6-2a 雲端應付比對：同一份假資料，前端實際產生的自動應付（syncCostToPayable／_salesCommSyncAll／_commSyncAll）跟雲端 functions/ops/paycmp.js 重算的逐筆一致；改一筆抓得到；卡片、拍板卡 ──
+  {
+    const PC = require('../functions/ops/paycmp.js');
+    const D = {
+      params: { tax: 5, removeRate: 30, sales: [{ id: 's1', name: '假業務甲', commMode: 'rev', commVal: 1 }, { id: 's2', name: '假業務乙', commMode: 'unit', commVal: 200, commUnit: '支' }] },
+      quotes: [
+        { id: 'pq1', name: '假比對甲案', awarded: true, salesId: 's1', t: { total: 105000, sub: 100000 }, items: [{ desc: '假樁甲', unit: '支', qty: 10, price: 10000 }] },
+        { id: 'pq2', name: '假比對乙案', awarded: true, salesId: 's2', t: { total: 52500, sub: 50000 }, items: [{ desc: '假樁乙', unit: '支', qty: 20, price: 2500 }] },
+        { id: 'pq3', name: '假比對丙案', awarded: false, salesId: 's1', t: { total: 21000 }, items: [] },
+      ],
+      costs: {
+        pq1: [
+          { id: 'pk1', type: 'sub', vendor: '假包商甲', invoice: true, retRate: 5, amt: 50000, rows: [{ id: 'pr1', unitPrice: 1000, qty: 50 }, { id: 'pr2', unitPrice: 500, qty: 20, stage: true }],
+            periods: [{ no: 1, date: '2026-10-25', due: '2026-11-25', rows: [{ rid: 'pr1', qty: 10 }, { rid: 'pr2', qi: 4, qr: 0 }], adv: 1000, early: [{ id: 'e1', amt: 2000, date: '2026-10-10' }] },
+              { no: 2, date: '2026-11-25', due: '2026-12-25', rows: [{ rid: 'pr1', qty: 20 }], adv: 1000 }, { no: 3, isRet: true, amt: 1500, date: '2026-12-25' }],
+            advances: [{ id: 'a1', amt: 2000, date: '2026-09-01' }] },
+          { id: 'pk2', type: 'sub', vendor: '假介紹人', isIntro: true, introPay: 'first', introCalc: 'lump', introAmt: 5000, invoice: false, amt: 5000, rows: [{ id: 'pr3', qty: 1, unitPrice: 5000 }] },
+          { id: 'pk3', type: 'own', rental: true, vendor: '假租賃商', amt: 6000, rows: [{ id: 'pr4', unitPrice: 200, qty: 10 }], periods: [{ no: 1, date: '2026-10-31', rows: [{ rid: 'pr4', qty: 10 }] }] },
+          { id: 'pk4', type: 'sub', vendor: '假包商丁', amt: 9000, rows: [{ id: 'pr5', unitPrice: 900, qty: 10 }] },   // 沒計價：不掛應付
+        ],
+        pq2: [{ id: 'pk5', type: 'sub', vendor: '公司支出（自付）', amt: 100, rows: [{ id: 'pr6', unitPrice: 100, qty: 1 }], periods: [{ no: 1, date: '2026-10-25', rows: [{ rid: 'pr6', qty: 1 }] }] }],
+      },
+      comms: { pq1: [{ id: 'm1', name: '假中間人', mode: 'amt', val: 1500 }], pq2: [{ id: 'm2', name: '假中間人乙', mode: 'rev', val: 2 }, { id: 'm3', name: '假中間人丙', mode: 'profit', val: 10 }] },
+      invoices: [
+        { id: 'pv1', quoteId: 'pq1', project: '假比對甲案', date: '2026-10-30', periodNo: 1, totals: { total: 21000 }, items: [] },
+        { id: 'pv2', quoteId: 'pq2', project: '假比對乙案', date: '2026-10-30', periodNo: 1, totals: { total: 10500 }, items: [{ desc: '假樁乙', unit: '支', contractQty: 20, curQty: 6, contractPrice: 2500 }] },
+      ],
+      contracts: [{ id: 'pc1', linkedQid: 'pq1', amount: 210000, signDate: '2026-09-01' }],
+    };
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate((D) => {
+      const out = {};
+      try {
+        Object.assign(P, D.params);
+        Q = D.quotes.map((q) => Object.assign({}, JSON.parse(JSON.stringify(q)), { costs: JSON.parse(JSON.stringify(D.costs[q.id] || [])), comms: JSON.parse(JSON.stringify((D.comms || {})[q.id] || [])) }));
+        INV = D.invoices.map((x) => Object.assign({}, x)); CONTRACTS = D.contracts.map((x) => Object.assign({}, x)); PAYABLES = [];
+        Q.forEach((q) => (q.costs || []).forEach((c) => syncCostToPayable(q, c)));
+        _salesCommSyncAll(); _commSyncAll();
+        // 已付之後計價又改了（審查）：第 2 期付清 → 數量 20 改 22 → 網頁保留已付本體、另立差額筆 _d1
+        const p2 = PAYABLES.find((p) => p.id === 'paypk1_p2'); p2.status = 'paid'; p2.paidDate = '2026-12-25';
+        const q1 = Q.find((q) => q.id === 'pq1'), k1 = q1.costs.find((c) => c.id === 'pk1'); k1.periods[1].rows[0].qty = 22;
+        syncCostToPayable(q1, k1);
+        out.delta = PAYABLES.some((p) => p.deltaOf === 'paypk1_p2');
+        out.pay = JSON.parse(JSON.stringify(PAYABLES)); out.Q = JSON.parse(JSON.stringify(Q));
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    }, D);
+    let res = null, bad = null, cardOk = false, decOk = false;
+    if (!r.err) {
+      // 雲端拿到的是 RTDB 形狀：共用區報價（不含成本）＋ private quoteSens（成本卡、佣金），以 id 為 key
+      const keyed = (a) => Object.fromEntries(a.map((x) => [x.id, x]));
+      const sh = r.Q.map((q) => { const c = Object.assign({}, q); delete c.costs; delete c.comms; delete c.comm; return c; });
+      const sens = Object.fromEntries(r.Q.map((q) => [q.id, { costs: q.costs || [], comms: q.comms || [], _mt: 1 }]));
+      const cin = (pay) => ({ params: D.params, quotes: keyed(sh), quoteSens: sens, invoices: keyed(D.invoices), contracts: keyed(D.contracts), payables: keyed(pay) });
+      const now = Date.now() + 3 * 86400000;   // 三天後比：不算「剛改過」
+      res = PC.compare(cin(r.pay), now);
+      const pay2 = JSON.parse(JSON.stringify(r.pay)); const t = pay2.find((p) => p.id === 'paypk1_p2'); if (t) t.amount += 7;
+      pay2.splice(pay2.findIndex((p) => p.id === 'comm_pq1_m1'), 1);
+      bad = PC.compare(cin(pay2), now);
+      const c2 = await page.evaluate(({ res, day }) => {
+        const o = {};
+        try {
+          PAY_CMP = { ok: true, cfg: {}, latest: null, days: {} };
+          _fbUser = { email: 'jhchen0911@gmail.com', getIdToken: () => Promise.resolve('x') }; _isAdminUser = true;
+          o.off = /還沒開始/.test(_pcmpHtml());
+          PAY_CMP.latest = res; PAY_CMP.days = {}; PAY_CMP.days[day] = { ok: true };
+          const h = _pcmpHtml(); o.card = /雲端應付比對/.test(h) && /連續一致 <b>1<\/b>/.test(h) && /不一致 2/.test(h) && /金額/.test(h);
+          // 拍板卡：還沒到 12/26 不問；開關關著、日期到了才問；開了就不問
+          PAY_CMP.cfg = { askFrom: '2000-01-01' }; o.ask = _DEC.payCmpOn.list().length === 1 && typeof _DEC.payCmpOn.detail === 'function';
+          PAY_CMP.cfg = { askFrom: '2999-01-01' }; o.wait = _DEC.payCmpOn.list().length === 0;
+          PAY_CMP.cfg = { on: true }; o.on = _DEC.payCmpOn.list().length === 0;
+          o.streak = JSON.stringify(_pcmpStreak({ '2026-12-25': { ok: true }, '2026-12-24': { ok: true }, '2026-12-23': { ok: false } }, '2026-12-25', 25));
+          _fbUser = null; PAY_CMP = { ok: false, cfg: {}, latest: null, days: {} };
+        } catch (e) { o.err = String(e && e.stack || e).slice(0, 300); }
+        return o;
+      }, { res: bad, day: '2026-12-25' });
+      cardOk = !c2.err && c2.off && c2.card; decOk = !c2.err && c2.ask && c2.wait && c2.on;
+      const ns = JSON.stringify(PC.streak({ '2026-12-25': { ok: true }, '2026-12-24': { ok: true }, '2026-12-23': { ok: false } }, '2026-12-25', 25));
+      check('v6.0.206 6-2a 卡片：還沒開始／有結果時顯示連續一致天數、不一致明細；前端連續天數算法跟雲端一樣', cardOk && c2.streak === ns, JSON.stringify(c2));
+      check('v6.0.206 6-2a 啟用開關：拍板卡 payCmpOn 只在開關關著、日期到了（預設 2026-12-26 起）才出現，有完整說明（detail）', decOk, JSON.stringify(c2));
+    }
+    const ids = res ? (res.n.exp + '筆') : '';
+    check('v6.0.206 6-2a 雲端重算的自動應付跟前端實際產生的逐筆一致（分包期別含分段列、預付款抵扣含稅、提前放款、保留款退還、已付後改計價的差額筆、租賃期別、預付款、介紹費、業務抽成每營收％與每單位、業主端佣金固定額／營收％／毛利％；自付、沒計價、沒得標的不掛）',
+      !r.err && r.delta && res && res.n.bad === 0 && res.n.diff === 0 && res.n.exp >= 12 && res.n.ok === res.n.exp && (r.pay || []).some((p) => p.id === 'comm_pq2_m3' && p.amount === 4990), r.err || (ids + ' ' + JSON.stringify(res && res.items).slice(0, 600) + ' 前端：' + JSON.stringify((r.pay || []).map((p) => p.id + '=' + p.amount + (p.incl != null ? '/' + p.incl : '')))));
+    check('v6.0.206 6-2a 改一筆金額、刪一筆佣金 → 雲端比對抓得到（不一致 2 筆，不算剛改過）', !!bad && bad.n.bad === 2 && bad.items.some((x) => x.id === 'paypk1_p2' && /amount/.test(x.why)) && bad.items.some((x) => x.id === 'comm_pq1_m1' && x.why === 'missing'), JSON.stringify(bad && bad.items));
+    check('v6.0.206 6-2a 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+  // ── v6.0.212 改版第 7 步①：共用 A4 單據引擎（報價、請款、合約、詢價單、保留款退還單）──
   {
     const { page, errors } = await newPage(browser, 1920, 1080);
     const r = await page.evaluate(async () => {
@@ -12281,13 +12397,13 @@ async function newPage(browser, width, height) {
       Q = keepQ; INV = keepI; VENDORS = keepV; try { Object.assign(P, JSON.parse(keepP)); } catch (e) { /* 可忽略 */ }
       return out;
     });
-    check('v6.0.211 A4 單據引擎：8 種單據同一個出件表；預覽切頁＝匯出 PDF 切頁（報價、請款多頁含續頁表頭、詢價單、合約書、保留款退還單）', r.kinds && r.same, JSON.stringify(r));
-    check('v6.0.211 A4 單據引擎：報價／請款編輯頁右邊即時預覽（改了就變、內部成本不出現）；詢價單、合約書視窗左填右看', r.qpv && r.qlive && r.ipv && r.rpv && r.rlive && r.spv && r.slive && r.noLeak, JSON.stringify(r));
-    check('v6.0.211 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.212 A4 單據引擎：8 種單據同一個出件表；預覽切頁＝匯出 PDF 切頁（報價、請款多頁含續頁表頭、詢價單、合約書、保留款退還單）', r.kinds && r.same, JSON.stringify(r));
+    check('v6.0.212 A4 單據引擎：報價／請款編輯頁右邊即時預覽（改了就變、內部成本不出現）；詢價單、合約書視窗左填右看', r.qpv && r.qlive && r.ipv && r.rpv && r.rlive && r.spv && r.slive && r.noLeak, JSON.stringify(r));
+    check('v6.0.212 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.212 改版第 7 步②：5 個入口＋今天要做的事＋更多＋切回舊版 ──
+  // ── v6.0.213 改版第 7 步②：5 個入口＋今天要做的事＋更多＋切回舊版 ──
   for (const [W, H] of [[1440, 900], [390, 844], [900, 768]]) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async (W) => {
@@ -12358,15 +12474,15 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     }, W);
-    check('v6.0.212 審查修正（寬 ' + W + '）：帳務不會一直亮、同家廠商不同筆延後分開、刪除申請／付包商款核准不給延後、案名在中間也合併', r.hl && r.keys && r.noSnz && r.caseIn, JSON.stringify(r));
-    check('v6.0.212 5 個入口（寬 ' + W + '）：選單只有今天、專案、報價、帳務、更多；更多收其餘頁面（含合約管理、安全母索）且點得進去、不左右捲', r.nav5 && r.five && r.more && r.moreActive && r.lifeline && r.noScroll, JSON.stringify(r));
-    if (W === 1440) check('v6.0.212 今天要做的事：決策卡／提醒卡分開、同案合併、不急的收在「之後的 N 件」、已處理（內容變了再出現）、延後（明天／3 天後／下週一／自選）、沒事顯示「今天沒有要確認的事」、唯讀看得到沒有按鈕、公司數字收成一行', r.dec && r.merge && r.later && r.jump && r.done && r.reappear && r.laterOpts && r.snoozed && r.empty && r.ro && r.kpiHidden, JSON.stringify(r));
-    check('v6.0.212 切回舊版（寬 ' + W + '）：舊選單回來、記一次次數、可以再改回新版', r.old && r.oldCount && r.back, JSON.stringify(r));
-    check('v6.0.212 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.213 審查修正（寬 ' + W + '）：帳務不會一直亮、同家廠商不同筆延後分開、刪除申請／付包商款核准不給延後、案名在中間也合併', r.hl && r.keys && r.noSnz && r.caseIn, JSON.stringify(r));
+    check('v6.0.213 5 個入口（寬 ' + W + '）：選單只有今天、專案、報價、帳務、更多；更多收其餘頁面（含合約管理、安全母索）且點得進去、不左右捲', r.nav5 && r.five && r.more && r.moreActive && r.lifeline && r.noScroll, JSON.stringify(r));
+    if (W === 1440) check('v6.0.213 今天要做的事：決策卡／提醒卡分開、同案合併、不急的收在「之後的 N 件」、已處理（內容變了再出現）、延後（明天／3 天後／下週一／自選）、沒事顯示「今天沒有要確認的事」、唯讀看得到沒有按鈕、公司數字收成一行', r.dec && r.merge && r.later && r.jump && r.done && r.reappear && r.laterOpts && r.snoozed && r.empty && r.ro && r.kpiHidden, JSON.stringify(r));
+    check('v6.0.213 切回舊版（寬 ' + W + '）：舊選單回來、記一次次數、可以再改回新版', r.old && r.oldCount && r.back, JSON.stringify(r));
+    check('v6.0.213 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.213 改版第 7 步③（7b）：報價結果、底價／目標成交價、同類工項得標率與建議 ──
+  // ── v6.0.214 改版第 7 步③（7b）：報價結果、底價／目標成交價、同類工項得標率與建議 ──
   {
     const { page, errors } = await newPage(browser, 1440, 900);
     const r = await page.evaluate(async () => {
@@ -12429,16 +12545,16 @@ async function newPage(browser, width, height) {
       window._draftApplying = null; _fbUser = oU; _isAdminUser = oA; Q = keepQ; Q_HISTORY = keepH;
       return out;
     });
-    check('v6.0.213 報價結果：得標自動記成交價（報價＝第一個送出版次）、沒得標記對手價（含稅轉未稅）、改回洽談中清掉', r.won && r.lost && r.reset, JSON.stringify(r));
-    check('v6.0.213 報價結果／底價／目標價只在 private（shared 抽走、private 補回），給業主的報價單完全沒有', r.priv && r.back && r.noDoc, JSON.stringify(r));
-    check('v6.0.213 報價頁：管理員看成本、底價、目標成交價、報價、毛利率；同類滿 5 筆顯示得標率與建議調幅；一般員工看不到', r.panel && r.staffHide && r.ready, JSON.stringify(r));
-    check('v6.0.213 拍板卡「報價結果待補」：只列今天以後、沒記到的；確認／退回；AI 草稿帶底價目標價存檔寫入；統計匯出只有類別與比例', r.card && r.cardOk && r.cardSkip && r.detail && r.draftP3 && r.export, JSON.stringify(r));
-    check('v6.0.213 審查修正：取消得標的舊紀錄不算得標、版次快照不帶結果與底價、只帶一個價時另一個留著、進版後看第一次報價日、支撐寫 H 型鋼不算樁', r.stale && r.snap && r.merge && r.date0 && r.strut, JSON.stringify(r));
-    check('v6.0.213 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.214 報價結果：得標自動記成交價（報價＝第一個送出版次）、沒得標記對手價（含稅轉未稅）、改回洽談中清掉', r.won && r.lost && r.reset, JSON.stringify(r));
+    check('v6.0.214 報價結果／底價／目標價只在 private（shared 抽走、private 補回），給業主的報價單完全沒有', r.priv && r.back && r.noDoc, JSON.stringify(r));
+    check('v6.0.214 報價頁：管理員看成本、底價、目標成交價、報價、毛利率；同類滿 5 筆顯示得標率與建議調幅；一般員工看不到', r.panel && r.staffHide && r.ready, JSON.stringify(r));
+    check('v6.0.214 拍板卡「報價結果待補」：只列今天以後、沒記到的；確認／退回；AI 草稿帶底價目標價存檔寫入；統計匯出只有類別與比例', r.card && r.cardOk && r.cardSkip && r.detail && r.draftP3 && r.export, JSON.stringify(r));
+    check('v6.0.214 審查修正：取消得標的舊紀錄不算得標、版次快照不帶結果與底價、只帶一個價時另一個留著、進版後看第一次報價日、支撐寫 H 型鋼不算樁', r.stale && r.snap && r.merge && r.date0 && r.strut, JSON.stringify(r));
+    check('v6.0.214 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.214 改版第 7 步④（7d）：帳務 4 塊（收／付／發票與支出／金流）＋金流一行固定在最上面 ──
+  // ── v6.0.215 改版第 7 步④（7d）：帳務 4 塊（收／付／發票與支出／金流）＋金流一行固定在最上面 ──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async (W) => {
@@ -12473,13 +12589,13 @@ async function newPage(browser, width, height) {
       PAYABLES.length = 0; keepP.forEach((p) => PAYABLES.push(p)); _fbUser = oU; _isAdminUser = oA;
       return out;
     }, W);
-    check('v6.0.214 帳務 4 塊（寬 ' + W + '）：上方收／付／發票與支出／金流，有好幾頁的下面一排小分頁、記得上次停的頁；舊選單照舊 8 個分頁', r.groups && r.sub && r.inGo && r.remember && r.cash && r.old && r.noScroll, JSON.stringify(r));
-    check('v6.0.214 金流一行（寬 ' + W + '）：可動用資金、未來 30 天預計收／付跟金流預測同一套算法；KPI 卡收起；一般員工看不到', r.line && r.kpiHide && r.staff, JSON.stringify(r));
-    check('v6.0.214 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.215 帳務 4 塊（寬 ' + W + '）：上方收／付／發票與支出／金流，有好幾頁的下面一排小分頁、記得上次停的頁；舊選單照舊 8 個分頁', r.groups && r.sub && r.inGo && r.remember && r.cash && r.old && r.noScroll, JSON.stringify(r));
+    check('v6.0.215 金流一行（寬 ' + W + '）：可動用資金、未來 30 天預計收／付跟金流預測同一套算法；KPI 卡收起；一般員工看不到', r.line && r.kpiHide && r.staff, JSON.stringify(r));
+    check('v6.0.215 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.215 改版第 7 步⑤（7c）：專案一案一頁＝直的流程步驟條 ──
+  // ── v6.0.216 改版第 7 步⑤（7c）：專案一案一頁＝直的流程步驟條 ──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async (W) => {
@@ -12515,12 +12631,12 @@ async function newPage(browser, width, height) {
       Q = keepQ; CONTRACTS.length = 0; keepC.forEach((c) => CONTRACTS.push(c));
       return out;
     }, W);
-    check('v6.0.215 專案步驟條（寬 ' + W + '）：14 步一步一行、只展開現在這步、做完的一行、還沒到的只顯示名稱、點了展開／收起、待辦跳轉找得到、其他明細收在下面、舊選單照舊', r.n14 && r.cur && r.doneLine && r.pendName && r.toggle && r.toggle2 && r.jump && r.other && r.noScroll && r.old, JSON.stringify(r));
-    check('v6.0.215 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.216 專案步驟條（寬 ' + W + '）：14 步一步一行、只展開現在這步、做完的一行、還沒到的只顯示名稱、點了展開／收起、待辦跳轉找得到、其他明細收在下面、舊選單照舊', r.n14 && r.cur && r.doneLine && r.pendName && r.toggle && r.toggle2 && r.jump && r.other && r.noScroll && r.old, JSON.stringify(r));
+    check('v6.0.216 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.216 改版第 7 步⑥（7e）：每一頁各自切回舊版＋整站切回 ──
+  // ── v6.0.217 改版第 7 步⑥（7e）：每一頁各自切回舊版＋整站切回 ──
   {
     const { page, errors } = await newPage(browser, 1440, 900);
     const r = await page.evaluate(async () => {
@@ -12555,8 +12671,8 @@ async function newPage(browser, width, height) {
       Q = keepQ; localStorage.removeItem('fy_v7old'); _nav5Apply();
       return out;
     });
-    check('v6.0.216 切回舊版：更多裡每一頁（今天、專案、帳務）各自切回、選單維持 5 個、其他頁不受影響、記次數；整站切回三頁都舊版', r.list && r.acctOld && r.navStill && r.dashNew && r.label && r.dashOld && r.projOld && r.projNew && r.count && r.back && r.allOld, JSON.stringify(r));
-    check('v6.0.216 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.217 切回舊版：更多裡每一頁（今天、專案、帳務）各自切回、選單維持 5 個、其他頁不受影響、記次數；整站切回三頁都舊版', r.list && r.acctOld && r.navStill && r.dashNew && r.label && r.dashOld && r.projOld && r.projNew && r.count && r.back && r.allOld, JSON.stringify(r));
+    check('v6.0.217 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 

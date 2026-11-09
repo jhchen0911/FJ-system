@@ -8,7 +8,7 @@
 //   node tools/fy-draft.js withdraw <草稿id> [--env test]
 //   node tools/fy-draft.js inbox     [--env test]     LINE 收件匣未歸檔的清單（v6.0.191）
 //   node tools/fy-draft.js inbox-suggest <收件id> --qid <報價id> | --case <案名> [--why 處理說明] [--note 備註]
-//   node tools/fy-draft.js bidstats  [--env test]     報價統計：工項類別、筆數、得標率、平均讓價比例、建議調幅（v6.0.213）
+//   node tools/fy-draft.js bidstats  [--env test]     報價統計：工項類別、筆數、得標率、平均讓價比例、建議調幅（v6.0.214）
 //   node tools/fy-draft.js logout    [--env test]
 //
 // 預設連正式專案 jhchen-aed9a；--env test 連測試專案 fj-system-test（先在測試專案練習）。
@@ -90,7 +90,7 @@ async function call(body) {
   if (cmd === 'mine') return call({ action: 'mine' });
   if (cmd === 'withdraw') { if (!args[1] || /^--/.test(args[1])) die('要給草稿 id'); return call({ action: 'withdraw', id: args[1] }); }
   if (cmd === 'inbox') return call({ action: 'inboxList' });
-  if (cmd === 'bidstats') {   // v6.0.213：讀 private 的 bidStats（管理員裝置上傳時算好；只有類別與比例，沒有案名、業主、金額）
+  if (cmd === 'bidstats') {   // v6.0.214：讀 private 的 bidStats（管理員裝置上傳時算好；只有類別與比例，沒有案名、業主、金額）
     if (!C.db) die('讀不到資料庫網址');
     const tk = await idToken();
     const r = await fetch(C.db.replace(/\/$/, '') + '/fydata/private/bidStats.json?auth=' + encodeURIComponent(tk));
