@@ -498,11 +498,11 @@ async function runPayCmp(now, manual) {
   const val = (p) => db.ref(p).once('value').then((s) => s.val() || {});
   const cfg = await val('fydata/private/payCompare/cfg'), day = payCmpCore.tpeYmd(now);
   if (!manual && (!cfg.on || (cfg.startDay && day < String(cfg.startDay)))) return { off: true };
-  const [quotes, invoices, contracts, params, quoteSens, payables] = await Promise.all([
+  const [quotes, invoices, contracts, params, quoteSens, payables, paidLog] = await Promise.all([
     val('fydata/shared/quotes'), val('fydata/shared/invoices'), val('fydata/shared/contracts'), val('fydata/shared/params'),
-    val('fydata/private/quoteSens'), val('fydata/private/payables'),
+    val('fydata/private/quoteSens'), val('fydata/private/payables'), val('fydata/private/paidLog'),
   ]);
-  const r = payCmpCore.compare({ quotes, invoices, contracts, params, quoteSens, payables }, now);
+  const r = payCmpCore.compare({ quotes, invoices, contracts, params, quoteSens, payables, paidLog }, now);
   if (manual) r.manual = true;
   await db.ref('fydata/private/payCompare/latest').set(JSON.parse(JSON.stringify(r)));   // 去掉 undefined
   if (!manual) {
@@ -515,7 +515,7 @@ async function runPayCmp(now, manual) {
 }
 exports.payCompare = onSchedule({ schedule: '40 7 * * *', timeZone: TZ, region: REGION, memory: '1GiB', timeoutSeconds: 300 }, async () => {
   const db = admin.database();
-  try { await runPayCmp(Date.now(), false); await db.ref('fydata/todo/paycmp').set(null); }
+  try { const r = await runPayCmp(Date.now(), false); if (!r.off) await db.ref('fydata/todo/paycmp').set(null); }   // 審查：開關沒開＝一筆都不寫
   catch (e) {
     console.error('payCompare', e);
     await db.ref('fydata/todo/paycmp').set({ fail: { id: 'paycmp_fail', src: 'paycmp', key: 'fail', urgent: false, text: '雲端應付比對今天沒跑成功', sub: '經營報表 › 資料健檢「☁ 雲端應付比對」', go: 'health', at: Date.now() } }).catch((e2) => console.error('payCompare.todo', e2));

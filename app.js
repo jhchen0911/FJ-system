@@ -42125,7 +42125,7 @@ function _pcmpHtml(){
     :('<b>還沒開始</b>（'+esc(String(C.askFrom||_PCMP_ASK_FROM))+' 起首頁會問要不要開；等 6-1 分次付款跑過一個完整月請款）');
   var h=head+'<div style="font-size:12px;margin-bottom:4px">'+st+'</div>';
   if(!L)return h+'<div style="font-size:12px;color:var(--b3)">雲端還沒有比對結果'+(C.on?'（明天 07:40 第一次）':'')+'</div></div></div>';
-  var n=L.n||{},sk=_pcmpStreak(PAY_CMP.days,_pcmpLastDay(PAY_CMP.days),P.vendorCutDay);
+  var n0=L.n||{},n={};['exp','ok','skip','bad','explained'].forEach(function(k){n[k]=Math.max(0,parseInt(n0[k])||0);});var sk=_pcmpStreak(PAY_CMP.days,_pcmpLastDay(PAY_CMP.days),P.vendorCutDay);
   h+='<div style="font-size:12px;color:var(--b4);margin-bottom:4px">最後一次：'+esc(new Date(+L.at||0).toLocaleString('zh-TW'))+(L.manual?'（手動，不算進連續天數）':'')+'</div>'
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;font-size:12px;margin-bottom:6px">'
     +'<span class="bdg">應有 '+(n.exp||0)+' 筆</span><span class="bdg" style="color:var(--g3)">一致 '+(n.ok||0)+'</span><span class="bdg">已付不重算 '+(n.skip||0)+'</span>'

@@ -27,14 +27,22 @@ function tpeYmd(ts) { return new Date(ts + 8 * 3600 * 1000).toISOString().slice(
 function uFix(u) { if (u == null) return ''; return String(u).replace(/[Mm]\s*[2²㎡](?![0-9])/g, 'm²').replace(/㎡/g, 'm²'); }   // 同前端 _uFix
 const SALES_MODES = { rev: 1, profit: 1, amt: 1, unit: 1 };   // 同前端 _SALES_MODES 的鍵
 
+// 成本卡裡的陣列（明細列、期別、期別明細、提前放款、預付款）也可能被 RTDB 存成物件
+function normCost(c) {
+  if (!c || typeof c !== 'object') return c;
+  const o = Object.assign({}, c);
+  ['rows', 'periods', 'advances'].forEach((k) => { if (o[k] != null) o[k] = arr(o[k]); });
+  if (o.periods) o.periods = o.periods.map((per) => { const x = Object.assign({}, per); if (x.rows != null) x.rows = arr(x.rows); if (x.early != null) x.early = arr(x.early); return x; });
+  return o;
+}
 // 報價：共用區的報價＋private 的 quoteSens（成本卡、業務抽成、佣金、成本單價、報價成本合計）——同前端 _applyQuoteSensAll 之後的 Q
 function mergeQuotes(sharedQuotes, quoteSens) {
   const S = {}; Object.keys(quoteSens || {}).forEach((k) => { S[decKey(k)] = quoteSens[k]; });
   return arr(sharedQuotes).filter((q) => q && q.id).map((q) => {
     const s = S[q.id], c = Object.assign({}, q); if (!s) return c;
-    if (Array.isArray(s.costs)) c.costs = s.costs;
+    if (s.costs) c.costs = arr(s.costs).map(normCost);   // 審查：RTDB 有洞的陣列會回物件 → 一律 arr()
     if (s.comm && typeof s.comm === 'object') c.comm = s.comm;
-    if (Array.isArray(s.comms)) c.comms = s.comms; else if (s.referral) c.referral = s.referral;
+    if (s.comms && arr(s.comms).length) c.comms = arr(s.comms); else if (s.referral) c.referral = s.referral;
     if (s.t && typeof s.t === 'object') c.t = Object.assign({}, q.t || {}, s.t);
     c._sensMt = num(s._mt);
     return c;
@@ -43,7 +51,9 @@ function mergeQuotes(sharedQuotes, quoteSens) {
 
 function ctx(inp0) {
   const inp = deepDec(inp0 || {});
-  const P = inp.params || {}, Q = mergeQuotes(inp.quotes, inp.quoteSens), INV = arr(inp.invoices).map((i) => FJC.todo.invUnpack(i)), CT = arr(inp.contracts), PAY = arr(inp.payables);
+  const P = Object.assign({}, inp.params || {}), Q = mergeQuotes(inp.quotes, inp.quoteSens), INV = arr(inp.invoices).map((i) => FJC.todo.invUnpack(i)), CT = arr(inp.contracts), PAY = arr(inp.payables);
+  if (P.sales != null) P.sales = arr(P.sales);
+  const PAID = inp.paidLog || {};   // 付款帳本（已付的最後防線）：網頁 _payPaidAny 也看它
   const taxR = FJC.inv.taxR(P.tax), taxM = FJC.inv.taxM(P.tax);
   const removeRate = (() => { const v = P.removeRate; if (v == null || v === '') return 30; const x = parseFloat(v); return isNaN(x) ? 30 : Math.max(0, Math.min(100, x)); })();
   const instDef = Math.max(0, 100 - removeRate);
@@ -55,7 +65,7 @@ function ctx(inp0) {
   const wonAmt = (q) => { const a = ctAmtOf(q); return (a > 0 ? a : num(q.t && q.t.total)) + addsWonAmt(q); };
   const invsOfQuote = (q) => { const nm = String(q.name || '').trim(), seen = {}, out = []; INV.forEach((i) => { if (!i || seen[i.id]) return; const hit = i.quoteId === q.id || i.sourceQid === q.id || (!i.quoteId && !i.sourceQid && nm && String(i.project || '').trim() === nm); if (hit) { seen[i.id] = 1; out.push(i); } }); return out; };
   const invsOfQuoteAll = (q) => { const seen = {}, out = []; [q].concat(kids(q)).forEach((qq) => invsOfQuote(qq).forEach((i) => { if (i.kind === 'retReturn') return; if (!seen[i.id]) { seen[i.id] = 1; out.push(i); } })); return out; };
-  return { P, Q, INV, CT, PAY, taxR, taxM, instDef, today, kids, ctOf, ctAmtOf, wonAmt, invsOfQuoteAll };
+  return { P, Q, INV, CT, PAY, PAID, taxR, taxM, instDef, today, kids, ctOf, ctAmtOf, wonAmt, invsOfQuoteAll };
 }
 
 // ── 分包期別、保留款退還、提前放款、預付款（同 _syncSubPeriodPayables；開頭的修復 _advPayHeal 等是改資料的，存回去之後雲端讀到的就是修好的）──
@@ -166,12 +176,12 @@ function commExpect(C, q, out) {
 // ── 全部算一次 → 跟網頁比 ──
 function expectAll(C) {
   const webById = {}; C.PAY.forEach((p) => { if (p && p.id) webById[p.id] = p; });
-  const out = [], scope = { cids: {}, qids: {} };
+  const out = [], scope = { cids: {}, qids: {}, intro: {} };
   C.Q.forEach((q) => {
     arr(q.costs).forEach((c) => {
       if (!c || !c.id) return;
       // 同 syncCostToPayable 的分派
-      if (c.type === 'sub' && c.isIntro && !introFollows(c)) { scope.cids[c.id] = q.id; subExpect(C, q, c, webById, out); introExpect(C, q, c, out); return; }
+      if (c.type === 'sub' && c.isIntro && !introFollows(c)) { scope.cids[c.id] = q.id; scope.intro[c.id] = 1; subExpect(C, q, c, webById, out); introExpect(C, q, c, out); return; }
       if (c.type === 'own' && c.rental) { scope.cids[c.id] = q.id; if (FJC.pay.periods(c).length) subExpect(C, q, c, webById, out); return; }
       if (c.type === 'sub' && (FJC.pay.periods(c).length || FJC.pay.advs(c).length)) { scope.cids[c.id] = q.id; subExpect(C, q, c, webById, out); return; }
       // 其他（沒計價的分包、自有材料整筆）不在第一批
@@ -180,41 +190,51 @@ function expectAll(C) {
   });
   return { out, webById, scope };
 }
-const locked = (p) => !!p && (p.status === 'paid' || FJC.pay.paysOf(p).length > 0);
+const paidHard = (p, PAID) => { if (!p) return false; if (p.status === 'paid') return true; const l = PAID && PAID[p.id]; return !!(l && (+l.paidAt || 0) > (+l.unpaidAt || 0)); };   // 同前端 _payPaidHard
+const locked = (p, PAID) => !!p && (paidHard(p, PAID) || FJC.pay.paysOf(p).length > 0);   // 同前端 _payPaidAny／_payLocked
 function inScopeWeb(p, scope) {   // 網頁存的應付，哪些是第一批的自動應付
   const id = String(p.id || '');
   if (p.deltaOf) return false;   // 差額筆跟著本體算
   let m = id.match(/^pay_sales_(.+)$/); if (m) return !!scope.qids[m[1]];
-  m = id.match(/^comm_(.+)$/); if (m) return Object.keys(scope.qids).some((qid) => m[1] === qid || m[1].indexOf(qid + '_') === 0);
-  if (p.costId && scope.cids[p.costId] && id.indexOf('pay' + p.costId + '_') === 0) return true;
+  if (/^comm_/.test(id)) { if (p.quoteId) return !!scope.qids[p.quoteId]; return Object.keys(scope.qids).some((qid) => id === 'comm_' + qid || id.indexOf('comm_' + qid + '_') === 0); }   // 審查：先看 quoteId，報價 id 含底線也不會認錯
+  if (p.costId && scope.cids[p.costId] && id.indexOf('pay' + p.costId + '_') === 0) {
+    if (id === 'pay' + p.costId + '_intro' && !scope.intro[p.costId]) return false;   // 審查：網頁 keep 永遠留著 _intro（改成跟隨後的舊筆不會刪）
+    return true;
+  }
   return false;
 }
 function compare(inp, now) {
   now = now || Date.now();
   const C = ctx(Object.assign({}, inp, { now })), { out, webById, scope } = expectAll(C);
   const qById = {}; C.Q.forEach((q) => { qById[q.id] = q; });
+  // 審查：「剛改過」只看跟應付有關的：這筆應付自己、成本卡（quoteSens）、這案的請款單、合約；報價本身的修改時間（每天的日報都會動）不算
+  const relMt = {}; const bump = (qid, t) => { if (qid && num(t) > num(relMt[qid])) relMt[qid] = num(t); };
+  C.Q.forEach((q) => { bump(q.id, q._sensMt); if (q.parentId) bump(q.parentId, q._sensMt); });
+  C.INV.forEach((i) => { const t = num(i._mt || i.updatedAt); [i.quoteId, i.sourceQid].forEach((id) => { if (id) { bump(id, t); const q = qById[id]; if (q && q.parentId) bump(q.parentId, t); } }); if (!i.quoteId && !i.sourceQid && i.project) C.Q.forEach((q) => { if (String(q.name || '').trim() === String(i.project).trim()) bump(q.id, t); }); });
+  C.CT.forEach((c) => { const t = num(c._mt || c.updatedAt); if (c.linkedQid) bump(c.linkedQid, t); else C.Q.forEach((q) => { if (c.name && q.name === c.name) bump(q.id, t); }); });
   const fam = {}; C.PAY.forEach((p) => { if (p && p.deltaOf) (fam[p.deltaOf] = fam[p.deltaOf] || []).push(p); });
   const exp = {}; out.forEach((e) => { exp[e.id] = e; });
-  const recent = (w, qid) => { const q = qById[qid] || {}; const t = Math.max(num(w && (w._mt || w.updatedAt)), num(q._mt), num(q._sensMt)); return t > 0 && now - t < EXPLAIN_MS; };
+  const recent = (w, qid) => { const t = Math.max(num(w && w._mt), num(w && w.updatedAt), num(relMt[qid])); return t > 0 && now - t < EXPLAIN_MS; };
   const items = []; let ok = 0, skip = 0;
   const add = (o) => { o.explained = recent(webById[o.id], o.qid); o.name = (qById[o.qid] && qById[o.qid].name) || ''; items.push(o); };
   out.forEach((e) => {
     const w = webById[e.id];
     if (!w) { add({ id: e.id, kind: e.kind, qid: e.qid, why: 'missing', cloud: { to: e.to, amount: e.amount } }); return; }
     if (w.voidAt) { add({ id: e.id, kind: e.kind, qid: e.qid, why: 'void', cloud: { amount: e.amount }, web: { amount: num(w.amount) } }); return; }
-    if ((e.kind === 'sales' || e.kind === 'comm') && locked(w)) { skip++; return; }   // 已付（含付過一部分）網頁不再重算
+    if ((e.kind === 'sales' || e.kind === 'comm') && locked(w, C.PAID)) { skip++; return; }   // 已付（含付過一部分）網頁不再重算
     const tot = Math.round(num(w.amount) + (fam[e.id] || []).reduce((a, d) => a + num(d.amount), 0));
     const diffs = [];
     if (tot !== Math.round(e.amount)) diffs.push('amount');
-    if (String(w.to || '') !== String(e.to || '')) diffs.push('to');
-    if (!w.vatManual && !!w.vat !== !!e.vat && e.kind !== 'sales' && e.kind !== 'comm') diffs.push('vat');
-    if (!locked(w) && (w.incl == null ? null : Math.round(+w.incl)) !== (e.incl == null ? null : e.incl)) diffs.push('incl');
+    const paidBody = e.kind !== 'intro' && w.status === 'paid';   // 審查：已付的期別／保留款／提前放款／預付款網頁不再改對象和稅別（只另立差額）→ 只比金額
+    if (!paidBody && String(w.to || '') !== String(e.to || '')) diffs.push('to');
+    if (!paidBody && !w.vatManual && !!w.vat !== !!e.vat && e.kind !== 'sales' && e.kind !== 'comm') diffs.push('vat');
+    if (!locked(w, C.PAID) && (w.incl == null ? null : Math.round(+w.incl)) !== (e.incl == null ? null : e.incl)) diffs.push('incl');
     if (!diffs.length) { ok++; return; }
     add({ id: e.id, kind: e.kind, qid: e.qid, why: diffs.join(','), cloud: { to: e.to, amount: e.amount, vat: !!e.vat, incl: e.incl == null ? null : e.incl }, web: { to: w.to || '', amount: tot, vat: !!w.vat, incl: w.incl == null ? null : Math.round(+w.incl) } });
   });
   C.PAY.forEach((p) => {
     if (!p || !p.id || exp[p.id] || !inScopeWeb(p, scope)) return;
-    if (locked(p) || p.convTo || p.voidAt) { skip++; return; }   // 已付、已轉換、已作廢的網頁都留著，不算多出來
+    if (locked(p, C.PAID) || p.convTo || p.voidAt) { skip++; return; }   // 已付、已轉換、已作廢的網頁都留著，不算多出來
     const qid = p.quoteId || scope.cids[p.costId] || '';
     add({ id: p.id, kind: 'extra', qid, why: 'extra', web: { to: p.to || '', amount: Math.round(num(p.amount)) } });
   });

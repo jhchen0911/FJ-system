@@ -12266,7 +12266,7 @@ async function newPage(browser, width, height) {
         ],
         pq2: [{ id: 'pk5', type: 'sub', vendor: '公司支出（自付）', amt: 100, rows: [{ id: 'pr6', unitPrice: 100, qty: 1 }], periods: [{ no: 1, date: '2026-10-25', rows: [{ rid: 'pr6', qty: 1 }] }] }],
       },
-      comms: { pq1: [{ id: 'm1', name: '假中間人', mode: 'amt', val: 1500 }], pq2: [{ id: 'm2', name: '假中間人乙', mode: 'rev', val: 2 }] },
+      comms: { pq1: [{ id: 'm1', name: '假中間人', mode: 'amt', val: 1500 }], pq2: [{ id: 'm2', name: '假中間人乙', mode: 'rev', val: 2 }, { id: 'm3', name: '假中間人丙', mode: 'profit', val: 10 }] },
       invoices: [
         { id: 'pv1', quoteId: 'pq1', project: '假比對甲案', date: '2026-10-30', periodNo: 1, totals: { total: 21000 }, items: [] },
         { id: 'pv2', quoteId: 'pq2', project: '假比對乙案', date: '2026-10-30', periodNo: 1, totals: { total: 10500 }, items: [{ desc: '假樁乙', unit: '支', contractQty: 20, curQty: 6, contractPrice: 2500 }] },
@@ -12282,6 +12282,11 @@ async function newPage(browser, width, height) {
         INV = D.invoices.map((x) => Object.assign({}, x)); CONTRACTS = D.contracts.map((x) => Object.assign({}, x)); PAYABLES = [];
         Q.forEach((q) => (q.costs || []).forEach((c) => syncCostToPayable(q, c)));
         _salesCommSyncAll(); _commSyncAll();
+        // 已付之後計價又改了（審查）：第 2 期付清 → 數量 20 改 22 → 網頁保留已付本體、另立差額筆 _d1
+        const p2 = PAYABLES.find((p) => p.id === 'paypk1_p2'); p2.status = 'paid'; p2.paidDate = '2026-12-25';
+        const q1 = Q.find((q) => q.id === 'pq1'), k1 = q1.costs.find((c) => c.id === 'pk1'); k1.periods[1].rows[0].qty = 22;
+        syncCostToPayable(q1, k1);
+        out.delta = PAYABLES.some((p) => p.deltaOf === 'paypk1_p2');
         out.pay = JSON.parse(JSON.stringify(PAYABLES)); out.Q = JSON.parse(JSON.stringify(Q));
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
@@ -12321,8 +12326,8 @@ async function newPage(browser, width, height) {
       check('v6.0.206 6-2a 啟用開關：拍板卡 payCmpOn 只在開關關著、日期到了（預設 2026-12-26 起）才出現，有完整說明（detail）', decOk, JSON.stringify(c2));
     }
     const ids = res ? (res.n.exp + '筆') : '';
-    check('v6.0.206 6-2a 雲端重算的自動應付跟前端實際產生的逐筆一致（分包期別含分段列、預付款抵扣含稅、提前放款、保留款退還、租賃期別、預付款、介紹費、業務抽成每營收％與每單位、業主端佣金固定額與營收％；自付、沒計價、沒得標的不掛）',
-      !r.err && res && res.n.bad === 0 && res.n.diff === 0 && res.n.exp >= 10 && res.n.ok === res.n.exp, r.err || (ids + ' ' + JSON.stringify(res && res.items).slice(0, 600) + ' 前端：' + JSON.stringify((r.pay || []).map((p) => p.id + '=' + p.amount + (p.incl != null ? '/' + p.incl : '')))));
+    check('v6.0.206 6-2a 雲端重算的自動應付跟前端實際產生的逐筆一致（分包期別含分段列、預付款抵扣含稅、提前放款、保留款退還、已付後改計價的差額筆、租賃期別、預付款、介紹費、業務抽成每營收％與每單位、業主端佣金固定額／營收％／毛利％；自付、沒計價、沒得標的不掛）',
+      !r.err && r.delta && res && res.n.bad === 0 && res.n.diff === 0 && res.n.exp >= 12 && res.n.ok === res.n.exp && (r.pay || []).some((p) => p.id === 'comm_pq2_m3' && p.amount === 4990), r.err || (ids + ' ' + JSON.stringify(res && res.items).slice(0, 600) + ' 前端：' + JSON.stringify((r.pay || []).map((p) => p.id + '=' + p.amount + (p.incl != null ? '/' + p.incl : '')))));
     check('v6.0.206 6-2a 改一筆金額、刪一筆佣金 → 雲端比對抓得到（不一致 2 筆，不算剛改過）', !!bad && bad.n.bad === 2 && bad.items.some((x) => x.id === 'paypk1_p2' && /amount/.test(x.why)) && bad.items.some((x) => x.id === 'comm_pq1_m1' && x.why === 'missing'), JSON.stringify(bad && bad.items));
     check('v6.0.206 6-2a 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();

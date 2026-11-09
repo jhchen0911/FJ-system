@@ -104,3 +104,30 @@ test('連續一致天數：能解釋的不中斷、沒跑的那天中斷、要�
   days['2026-12-10'] = { ok: false }; s = PC.streak(days, '2026-12-20', 25); assert.strictEqual(s.n, 10); assert.ok(!s.ready);
   delete days['2026-12-10']; s = PC.streak(days, '2026-12-20', 25); assert.strictEqual(s.n, 10);
 });
+
+test('審查修正：報價自己的修改時間（日報）不算剛改過；成本卡剛改過才算', () => {
+  const d = base(); const { w } = fill(d); w.payc1_p2.amount += 1; d.payables = w;
+  d.quotes.qa._mt = NOW - 3600000;   // 今天寫了日報
+  let r = PC.compare(d, NOW); assert.strictEqual(r.items.find((x) => x.id === 'payc1_p2').explained, false);
+  d.quoteSens.qa._mt = NOW - 3600000;   // 成本卡剛改
+  r = PC.compare(d, NOW); assert.strictEqual(r.items.find((x) => x.id === 'payc1_p2').explained, true);
+});
+
+test('審查修正：已付的期別改了廠商名稱不算不一致（網頁不改已付的對象）；介紹費已付照比', () => {
+  const d = base(); const { w } = fill(d); w.payc1_p2.status = 'paid'; w.payc1_p2.to = '舊名字'; d.payables = w;
+  assert.strictEqual(PC.compare(d, NOW).n.bad, 0);
+});
+
+test('審查修正：RTDB 把陣列存成物件（成本卡、期別、業務名冊）也照算', () => {
+  const d = base(); const { w } = fill(d); d.payables = w;
+  const s = d.quoteSens.qa; s.costs = Object.assign({}, s.costs); s.costs['0'] = Object.assign({}, s.costs['0'], { periods: Object.assign({}, s.costs['0'].periods) });
+  d.params.sales = { 0: d.params.sales[0] }; s.comms = { 0: s.comms[0] };
+  const r = PC.compare(d, NOW); assert.strictEqual(r.n.bad, 0, JSON.stringify(r.items)); assert.strictEqual(r.n.ok, 7);
+});
+
+test('審查修正：付款帳本記已付的抽成不重算；改成跟隨的舊介紹費網頁留著不算多出來；佣金 id 先看 quoteId', () => {
+  const d = base(); const { w } = fill(d); w.pay_sales_qa.amount = 1; d.paidLog = { pay_sales_qa: { paidAt: 5, unpaidAt: 0 } };
+  d.quoteSens.qa.costs[1].introPay = 'follow'; d.payables = w;
+  const r = PC.compare(d, NOW);
+  assert.ok(!r.items.some((x) => x.id === 'pay_sales_qa' || x.id === 'payc2_intro'), JSON.stringify(r.items));
+});
