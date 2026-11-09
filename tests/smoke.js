@@ -11403,6 +11403,35 @@ async function newPage(browser, width, height) {
     check('v6.0.194 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── v6.0.202 熱修：同一毫秒連續改同一列台帳（一輪自動套用一次處理好幾張單），也要看得出「之後又被動過」──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepM = MAT_MOVES, keepF = MAT_MOVE_FIN, keepL = MAT_LEDGER, keepLog = MAT_MOVE_LOG, keepA = MAT_AUDIT, RD = Date.now;
+      try {
+        MAT_MOVES = []; MAT_MOVE_FIN = {}; MAT_MOVE_LOG = []; MAT_AUDIT = [];
+        Q = [{ id: 'qS202', name: '範例S202', client: '甲', awarded: true, items: [], _mt: 1 }];
+        MAT_LEDGER = [{ id: 'S1', name: '型鋼', spec: 'H300', len: 9, qty: 20, loc: '公司倉庫', date: '2026-01-01', _mt: 1 }];
+        const mk = (o) => { const m = Object.assign({ id: 'mv_' + Math.random().toString(36).slice(2, 8), st: 'ok', own: true, conf: {}, _mt: 5 }, o); MAT_MOVES.push(m); return m; };
+        const T = RD.call(Date); Date.now = function () { return T; };   // 時間停住：兩張單在同一毫秒套用
+        const a = mk({ date: '2026-11-01', dir: 'in', qid: 'qS202', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 8 }] });
+        const b = mk({ date: '2026-11-02', dir: 'in', qid: 'qS202', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 5 }] });
+        await _mvApplyAll({ local: true });
+        Date.now = RD;
+        out.applied = !!MAT_MOVE_FIN[a.id].applied && !!MAT_MOVE_FIN[b.id].applied && MAT_LEDGER.find(x => x.id === 'S1').qty === 7;
+        a.items[0].qty = 6; _touch(a);
+        const st = _mvRedoState(a);
+        out.cant = !!st && st.can === false && /又被別張單或手動改過/.test(st.why);   // 倉庫那一列 S1 被 b 又扣了 5 支（修改時間可能一樣，但內容不一樣）
+        // 沒被動過的照樣可以自動重改
+        b.items[0].qty = 4; _touch(b);
+        out.can = (_mvRedoState(b) || {}).can === true;
+      } finally { Date.now = RD; Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; MAT_MOVE_LOG = keepLog; MAT_AUDIT = keepA; }
+      return out;
+    });
+    check('v6.0.202 熱修：同一毫秒連改同一列台帳也看得出被動過（內容指紋）→ 無法自動重改；沒被動過的照樣可以', r.applied && r.cant && r.can, JSON.stringify(r));
+    check('v6.0.202 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.201 舊提前放款轉換差 1 元（Lotion 11/09 範例案：200,000＋177,988 提前、第 1 期 174,838 舊版算法已付）：保留實際付款總額、三次付款各一筆 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -12101,6 +12130,7 @@ async function newPage(browser, width, height) {
   console.log('\n豐有工程管理系統．冒煙測試\n' + '─'.repeat(64));
   results.forEach(r => console.log((r.ok ? '  ✓ ' : '  ✗ ') + pad(r.name) + (r.detail ? '  ' + r.detail : '')));
   console.log('─'.repeat(64));
+  if (failed) { console.log('沒過的項目：'); results.filter(r => !r.ok).forEach(r => console.log('  ✗ ' + r.name + (r.detail ? '  ' + r.detail.slice(0, 600) : ''))); }   // v6.0.202：失敗的再列一次在最後
   console.log(`  ${results.length - failed} / ${results.length} 通過` + (failed ? `　✗ ${failed} 項失敗` : '　全部通過'));
-  process.exit(failed ? 1 : 0);
+  const _code = failed ? 1 : 0; process.stdout.write('', () => process.exit(_code));   // v6.0.202：等輸出寫完再結束（CI 記錄之前會被截斷、看不到哪一項沒過）
 })().catch(e => { console.error('測試執行失敗：', e); process.exit(1); });
