@@ -42608,7 +42608,7 @@ function _mvFinMerge(l,r){
   return o;
 }
 // 這張單產生的使用段／損耗指紋（審查：之後被手動改過單價、支數，撤回會把手改的弄丟 → 改成無法自動重改）
-function _mvRowSig(r){return r?[r.qty,r.loc||'',r.projQid||'',r.outDate||'',r.len,r.spec||'',r.name||'',r.cond||'',r.matRowId||''].join('|'):'';}   // v6.0.202 台帳列內容指紋（支數、位置、工地、調撥日、規格…）
+function _mvRowSig(r){return r?[r.qty,r.loc||'',r.projQid||'',r.outDate||'',r.len,r.spec||'',r.name||'',r.cond||'',r.matRowId||'',r.note||'',r.adapt||'',r.adaptPer||'',r.adaptNote||''].join('|'):'';}   // v6.0.202 台帳列內容指紋（支數、位置、工地、調撥日、規格…）
 function _mvUlSig(id){var a=[];(Q||[]).forEach(function(q){var mm=q&&q.mat;if(!mm)return;(mm.use||[]).forEach(function(u){if(u&&u.mvId===id)a.push(['u',u.id,u.qty,u.days,u.rate,u.amt].join(':'));});(mm.loss||[]).forEach(function(l){if(l&&l.mvId===id)a.push(['l',l.id,l.qty,l.unitCost,l.amt].join(':'));});});return a.sort().join('|');}
 function _mvRedoState(m){
   if(!m)return null;var f=_mvFin(m.id);if(!f||!f.applied||!f.applied.h)return null;var h=_mvHash(m);
