@@ -110,3 +110,19 @@ test('v6.0.209 得標率統計：得標結果放在 private quoteSens 也讀得�
   const r = D.bidStats(qs, {}, {}, { a: { bid: { res: 'won', first: 120 } } });
   assert.strictEqual(r.n, 1); assert.strictEqual(r.kinds[0].kind, 'sheet'); assert.strictEqual(r.kinds[0].concPct, 16.7);
 });
+
+test('v6.0.225 合約條件卡 ownerCard：清成純資料、版本不對或沒有內容不收、同案較晚的取代較早的', () => {
+  const card = { schema: 'fj-contract-card/1', project: '假甲案', retention: { pct: { value: 5, source: 'contract', evidence: { clause: '第 8 條', quote: '保留款 5%' } } },
+    rent: { includedDays: { value: 60, evidence: { clause: '第 12 條', quote: '含 60 天租期' } }, hack: function () { return 1; } }, billing: { cutoffDay: { value: 25 } } };
+  const r = D.build(Object.assign({}, base, { body: { type: 'ownerCard', payload: { qid: 'q1', card, fname: '假甲案_合約條件卡.json' } } }));
+  assert.ok(r.rec, r.err);
+  assert.strictEqual(r.rec.payload.qid, 'q1'); assert.strictEqual(r.rec.payload.card.rent.includedDays.value, 60);
+  assert.ok(!('hack' in r.rec.payload.card.rent));
+  assert.match(r.rec.summary, /假甲案：合約條件卡/);
+  assert.match(D.build(Object.assign({}, base, { body: { type: 'ownerCard', payload: { qid: 'q1', card: { schema: 'fj-contract-card/9', rent: {} } } } })).err, /不支援/);
+  assert.match(D.build(Object.assign({}, base, { body: { type: 'ownerCard', payload: { qid: 'q1', card: { project: 'x' } } } })).err, /至少要有/);
+  assert.match(D.build(Object.assign({}, base, { body: { type: 'ownerCard', payload: { qid: 'q1', card: { rent: { 'a.b': 1 } } } } })).err, /不合法/);
+  assert.match(D.build(Object.assign({}, base, { body: { type: 'ownerCard', payload: { qid: 'qX', card } } })).err, /找不到/);
+  const old = Object.assign({}, r.rec, { id: 'dold0001', at: 500 });
+  assert.deepStrictEqual(D.superseded(r.rec, { dold0001: old }), ['dold0001']);
+});

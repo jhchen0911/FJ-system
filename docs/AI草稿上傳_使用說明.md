@@ -88,6 +88,19 @@ Lotion：總覽待辦「AI 草稿」→ 只看到最新一筆（舊的可展開�
 - `lostReason` 只能是：價格過高／規格不符／工期不符／業主關係／未回應／其他。
 - 得標狀態沒有金額，不用 `expect`。
 
+### 3b. 合約條件卡（type `ownerCard`，v6.0.225）
+
+contract-check 產出的合約條件卡（格式 `fj-contract-card/1`）整份放進 `card`：
+
+```json
+{ "type": "ownerCard", "payload": { "qid": "（報價 id）", "fname": "○○案_合約條件卡.json", "card": { "schema": "fj-contract-card/1", "project": "…", "owner": "…", "retention": { … }, "billing": { … }, "rent": { … } } } }
+```
+
+- 每欄照原本格式 `{value, source, evidence:{clause, quote}, note}`；**租期起算 `rent.startRule`、含租期天數 `rent.includedDays` 一定要讀出來**，卡片沒寫的話 FJ 會標紅請 Lotion 對合約。
+- 新欄位 `rent.lateRate`（逾期租金單價）：寫合約裡的單價與單位，FJ 拿來跟報價工項的逾期租金單價比，只存在卡片上。
+- 雲端只收純資料（欄位名稱只能英數 `_` `-`，上限約 60KB），不用 `expect`。同一案再送一張，舊的會被標成已取代。
+- Lotion 在 FJ 今天頁的「合約條件卡」拍板卡看逐欄值與條次原文（跟專案不同的標紅、舊值 → 新值），按確認才寫進專案；合約未載明（豐有預設）的欄位不寫。
+
 ### 4. 底價、目標成交價（v6.0.209，改單、報價單都可以帶）
 
 ```json
@@ -139,7 +152,7 @@ AI 處理過的 LINE 收件（下載了、交給報價線了、建了草稿）�
 
 ## 四、哪些不走這個工具
 
-- 只開 `qchg`、`quote`、`bid` 三種。發票照片、客戶·廠商、補登版次等照舊從網頁或原本的方式送。
+- 只開 `qchg`、`quote`、`bid`、`ownerCard` 四種。發票照片、客戶·廠商、補登版次等照舊從網頁或原本的方式送。
 - 這個工具只能寫草稿，**不能改正式資料**；正式資料一律要 Lotion 在 FJ 按確認。
 
 ## 五、出問題

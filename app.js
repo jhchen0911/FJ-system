@@ -38633,7 +38633,7 @@ var _CARD_FIELDS=[
   {k:'billing.cashPct',l:'現金比例',op:'cashPct',u:'%'},{k:'billing.chequeDays',l:'期票天數',op:'ticketDays',u:'天'},
   {k:'billing.instPct',l:'裝設（打設）完成請款％',u:'%'},{k:'billing.removePct',l:'拆除（拔除）完成請款％',u:'%'},{k:'billing.itemOverrides',l:'個別工項例外'},
   {k:'retention.pct',l:'保留款％',u:'%'},{k:'retention.release',l:'保留款退還條件'},
-  {k:'rent.startRule',l:'租期起算'},{k:'rent.endMode',l:'租期結束日'},{k:'rent.includedDays',l:'含租期天數',u:'天'},{k:'rent.batchRule',l:'分次拔除算法'},
+  {k:'rent.startRule',l:'租期起算'},{k:'rent.endMode',l:'租期結束日'},{k:'rent.includedDays',l:'含租期天數',u:'天'},{k:'rent.lateRate',l:'逾期租金單價'},{k:'rent.batchRule',l:'分次拔除算法'},
   {k:'deductions',l:'其他扣款'},{k:'penalty',l:'逾期罰款'},{k:'delivery',l:'請款單交付'},{k:'invoiceRule',l:'發票開法'}];
 var _CARD_APPLY={'billing.cutoffDay':1,'billing.payMonthOffset':1,'billing.payDay':1,'billing.cashPct':1,'billing.chequeDays':1,'billing.instPct':1,'billing.itemOverrides':1,'retention.pct':1,'retention.release':1,'rent.endMode':1,'ownerType':1};
 var _CARD_DEF={'billing.cutoffDay':25,'billing.payMonthOffset':1,'billing.payDay':20,'billing.cashPct':0,'billing.chequeDays':30,'billing.instPct':70,'billing.removePct':30,'retention.pct':0};
@@ -38735,9 +38735,9 @@ function _cardSetOne(q,k,v,reason){
   if(k==='rent.endMode'){q.rentEnd=(v==='removeDone')?'removeDone':'removeFirst';return;}
   if(k==='ownerType'){var c=(CUSTOMERS||[]).find(function(x){return x&&x.name===q.client;});if(c&&_OWNER_TYPES.indexOf(v)>=0){c.ownerType=v;c._mt=Date.now();try{saveCustomers();}catch(e){_err('_cardSetOne',e);}}return;}
 }
-function _cardApply(){
+function _cardApply(pk){   // pk（v6.0.225，可省略）：拍板卡直接給要寫入的欄位，不讀畫面勾選
   var cx=_cardCtx;if(!cx)return;var q=Q.find(function(x){return x.id===cx.qid;});if(!q)return;
-  var picked=Array.prototype.map.call(document.querySelectorAll('.cc-pick'),function(c){return c.checked?c.getAttribute('data-k'):null;}).filter(Boolean);
+  var picked=Array.isArray(pk)?pk.slice():Array.prototype.map.call(document.querySelectorAll('.cc-pick'),function(c){return c.checked?c.getAttribute('data-k'):null;}).filter(Boolean);
   if(!picked.length){toast('沒有勾選任何欄位，未寫入');_cardCtx=null;return;}
   var by=(typeof _meEmail==='function'?_meEmail():'')||'';
   var old=(q.ownerCard&&q.ownerCard.fields)||{},fields={};Object.keys(old).forEach(function(k){fields[k]=old[k];});   // 審查第 2 輪：重複匯入時保留上次已寫入欄位的來源與證據
@@ -38747,7 +38747,7 @@ function _cardApply(){
   log.push({at:Date.now(),by:by,act:'import',file:cx.fname,n:picked.length});
   q.ownerCard={schema:cx.card.schema||'fj-contract-card/1',file:cx.fname,importedAt:Date.now(),by:by,project:cx.card.project||'',owner:cx.card.owner||'',fields:fields,log:log.slice(-100)};
   _touch(q);try{persist();_immediateUpload();}catch(e){_err('_cardApply',e);}
-  _cardCtx=null;try{renderProj();}catch(e){_err('_cardApply',e);}
+  _cardCtx=null;try{_draftAppliedFor('card',q.id,false);}catch(e){_err('_cardApply.draft',e);}try{renderProj();}catch(e){_err('_cardApply',e);}
   toast('已匯入合約條件卡：寫入 '+picked.filter(function(k){return _CARD_APPLY[k];}).length+' 欄、存卡片 '+picked.filter(function(k){return !_CARD_APPLY[k];}).length+' 欄');
 }
 // 卡片來源欄位的證據（滑過看條次原文）
@@ -38813,7 +38813,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // 安全規則（database.rules.json 的 fydata/drafts）：唯讀名冊與管理員可讀；唯讀帳號只能新增 by＝自己的 pending 草稿，舊的只能把自己的 pending 改成 withdrawn／superseded（v6.0.189）；狀態只有管理員能改；欄位型別與大小有上限。
 // 記錄：{id,type:'quote'|'bid'|'irPhoto',by,byName,at,status:'pending'|'applied'|'rejected',summary,payload,(doneAt,doneBy,resultId,reason)}
 var DRAFTS={},DRAFTS_OLD={};   // DRAFTS_OLD（v6.0.189）：已被取代的草稿（管理員展開看舊版用，最近 60 筆）
-var _DRAFT_T={qchg:'改單',quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）',contact:'客戶·廠商',dailyOut:'整體日報（請複製轉發）',vendorBill:'廠商請款',qverfix:'補登版次',qsend:'代匯出報價',frtRate:'運費價格表',matBill:'租賃／運費請款',steelPrice:'中鋼盤價'};   // v6.0.138 客戶·廠商草稿   // v6.0.110 LINE 機器人草稿
+var _DRAFT_T={ownerCard:'合約條件卡',qchg:'改單',quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）',contact:'客戶·廠商',dailyOut:'整體日報（請複製轉發）',vendorBill:'廠商請款',qverfix:'補登版次',qsend:'代匯出報價',frtRate:'運費價格表',matBill:'租賃／運費請款',steelPrice:'中鋼盤價'};   // v6.0.138 客戶·廠商草稿   // v6.0.110 LINE 機器人草稿
 var _draftOn=false,_draftErrAt=0,_draftRefs=[],_draftHealing={};
 var _DRAFT_ID=/^[A-Za-z0-9_-]{4,40}$/;
 var _DRAFT_IMG=/^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+\/=]+$/;
@@ -39053,6 +39053,11 @@ function draftApply(id){
       _draftMark(id,'applied',{resultId:q2.id});close();toast('已套用得標狀態');
     },false);
     return;
+  }
+  if(d.type==='ownerCard'){   // v6.0.225 合約條件卡草稿：舊選單走原本的匯入對照表（逐欄打勾）
+    var qc=Q.find(function(x){return x.id===pl.qid;});if(!qc){toast('找不到這張報價');return;}
+    if(!_decIsAdmin()){toast('合約條件卡存在管理員資料區，只有管理員可以套用');return;}
+    close();window._draftApplying={id:id,kind:'card',target:qc.id};try{_cardPreview(qc,pl.card||{},_draftS(pl.fname)||'AI 草稿');}catch(e){window._draftApplying=null;toast('合約條件卡讀取失敗：'+((e&&e.message)||''));}return;
   }
   if(d.type==='addon'||d.type==='dailyLog'){_lineDraftApply(d,close);return;}   // v6.0.110 LINE 機器人
   if(d.type==='contact'){_draftContactApply(id,pl,close);return;}   // v6.0.138
@@ -41576,7 +41581,7 @@ function decAct(kind,id,act){
 //   確認／修改＝走原本的套用流程（draftApply：開報價編輯頁、得標視窗、發票紀錄、現場追加、客戶廠商表單），存檔成功才標已套用（_draftAppliedFor）；退回＝標 rejected。
 //   卡片只給建議，正式資料都要 Lotion 在下一個視窗按儲存／確定才寫入。
 var _DRAFT_OLD6=['quote','bid','irPhoto','addon','contact'];   // 施工日報 dailyLog 由主線做成帶工項數量的拍板卡（主線 11/10 協調），這裡不收
-function _draftViaDec6(t){try{return _DRAFT_OLD6.indexOf(t)>=0&&_nav5On();}catch(e){return false;}}
+function _draftViaDec6(t){try{return (_DRAFT_OLD6.indexOf(t)>=0||t==='ownerCard')&&_nav5On();}catch(e){return false;}}   // v6.0.225 合約條件卡也走拍板卡
 function _d6Pl(d){return (d&&d.payload&&typeof d.payload==='object')?d.payload:{};}
 function _d6Meta(d){var S=_draftS,who=S(d.byName||d.by).slice(0,60),cs=_draftCase(d),vn=_draftVerNote(d);
   return '<div style="font-size:11.5px;color:var(--b4);overflow-wrap:anywhere">'+esc(S(_DRAFT_T[d.type]||d.type))+'　'+esc(who)+'　'+esc(new Date(+d.at||0).toLocaleString('zh-TW'))+(cs?'　<b>'+esc(cs)+'</b>':'')+(vn?'　'+esc(vn):'')+'</div>';}
@@ -41633,6 +41638,78 @@ function _d6Detail(d){
   }
   return h;
 }
+// ══════════ v6.0.225 合約條件拍板卡（陳軒全流程盤點第 9 名，從主線移過來；第 2 層：卡片只給建議，看過明細才能確認）══════════
+// contract-check 產出的合約條件卡（fj-contract-card/1）由 AI 用 tools/fy-draft.js 上傳成草稿 type ownerCard（雲端 functions/ops/drafts.js cardClean 清成純資料）。
+//   卡片明細：保留款、放款規則、請款比例、租期（起算、含租期天數、結束日、逾期租金單價）逐欄列值＋條次原文；
+//   跟專案現在的值不同標紅、列舊值 → 新值；租期起算、含租期天數一定列（卡片沒寫也列出來標紅，寶山 60／90 天的教訓）。
+//   確認＝合約寫到的欄位（來源 contract／manual）照 v6.0.111 同一套寫進專案（_cardApply），合約未載明（豐有預設）的不寫；舊選單照舊走匯入對照表逐欄打勾。
+var _OC_GROUPS=[['保留款',['retention.pct','retention.release']],['放款規則',['billing.cutoffDay','billing.payMonthOffset','billing.payDay','billing.cashPct','billing.chequeDays']],
+  ['請款比例',['billing.instPct','billing.removePct','billing.itemOverrides']],['租期',['rent.startRule','rent.includedDays','rent.endMode','rent.lateRate','rent.batchRule']]];
+var _OC_MUST={'rent.startRule':1,'rent.includedDays':1};
+function _ocQ(d){var pl=_d6Pl(d);return (Q||[]).find(function(x){return x&&x.id===pl.qid;})||null;}
+function _ocF(d,q){var pl=_d6Pl(d),F=_cardParse(pl.card||{});if(q&&F['billing.payDay']&&F['billing.payDay'].source==='default'){var cu=F['billing.cutoffDay']?parseFloat(F['billing.cutoffDay'].value):null;F['billing.payDay'].value=_payDayDef(q,cu);}return F;}   // 同 _cardPreview
+function _ocUniq(a){var o=[];a.forEach(function(x){if(x!==''&&x!=null&&o.indexOf(x)<0)o.push(x);});return o;}
+// 專案現在的值（文字）；沒有就空字串
+function _ocCur(q,k){
+  var op=q.ownerPay||{},dd=q.deduct||{},f=_CARD_FIELDS.find(function(x){return x.k===k;})||{};
+  var has=function(v){return v!=null&&v!=='';};
+  if(f.op)return has(op[f.op])?String(op[f.op]):'';
+  if(k==='billing.instPct')return has(op.instPct)?String(op.instPct):'';
+  if(k==='billing.itemOverrides')return Array.isArray(op.itemOv)&&op.itemOv.length?_cardValTxt(k,op.itemOv):'';
+  if(k==='retention.pct')return has(dd.ret)?String(dd.ret):'';
+  if(k==='retention.release')return has(dd.retCond)?String(dd.retCond):'';
+  if(k==='rent.endMode')return q.rentEnd?_cardValTxt(k,q.rentEnd):'';
+  if(k==='rent.includedDays')return _ocUniq((q.items||[]).filter(function(it){return it&&!it.sec;}).map(function(it){var n=_rentDaysOf(it);return n>0?String(n):'';})).join('／');   // 報價工項「含 XX 天租期」
+  if(k==='rent.lateRate')return _ocUniq((q.items||[]).filter(function(it){return it&&!it.sec&&parseFloat(it.ot)>0;}).map(function(it){return String(parseFloat(it.ot))+(it.otUnit?(' '+_uFix(it.otUnit)):'');})).join('／');
+  var pc=q.ownerCard&&q.ownerCard.fields&&q.ownerCard.fields[k];return pc&&has(pc.value)?_cardValTxt(k,pc.value):'';
+}
+function _ocNew(k,x){var f=_CARD_FIELDS.find(function(y){return y.k===k;})||{};return _cardValTxt(k,x.value)+(f.u&&typeof x.value!=='object'?(' '+f.u):'');}
+function _ocSame(k,cur,x){if(!cur)return true;var a=String(cur).trim(),b=_cardValTxt(k,x.value);if(a===b)return true;var na=parseFloat(a),nb=parseFloat(b);if(!isNaN(na)&&!isNaN(nb)&&String(na)===a&&String(nb)===b)return na===nb;
+  if(k==='rent.includedDays'||k==='rent.lateRate'){var p=a.split('／');return p.length===1&&parseFloat(p[0])===parseFloat(b);}return false;}
+// 確認時會寫進專案的欄位：會寫的欄位（_CARD_APPLY）而且是合約寫到的（不寫豐有預設）
+function _ocPick(F){return Object.keys(F).filter(function(k){return F[k].source!=='default';});}
+function _ocDetail(d){
+  var q=_ocQ(d),pl=_d6Pl(d);if(!q)return '<div style="color:var(--red);font-size:12.5px">找不到這張報價，請退回</div>';
+  var F;try{F=_ocF(d,q);}catch(e){return '<div style="color:var(--red);font-size:12.5px">合約條件卡讀不出來（'+esc((e&&e.message)||'')+'），請退回</div>';}
+  var card=pl.card||{},mism=[];if(card.project&&q.name&&String(q.name).indexOf(card.project)<0)mism.push('工程「'+esc(card.project)+'」');if(card.owner&&q.client&&String(q.client).indexOf(card.owner)<0)mism.push('業主「'+esc(card.owner)+'」');
+  var nDiff=0,nMiss=0,SL={contract:'合約',default:'合約未載明（豐有預設）',manual:'手動'};
+  var rows=_OC_GROUPS.map(function(g){
+    var tr=g[1].map(function(k){var f=_CARD_FIELDS.find(function(y){return y.k===k;})||{l:k},x=F[k],cur=_ocCur(q,k);
+      if(!x){if(!_OC_MUST[k])return '';nMiss++;return '<tr style="background:#ffebee"><td style="padding:4px 6px;white-space:nowrap">'+esc(f.l)+'</td><td style="padding:4px 6px;color:#b71c1c;font-weight:700" colspan="2">合約條件卡沒寫這欄，請對合約確認'+(cur?'（專案現在：'+esc(cur)+'）':'')+'</td></tr>';}
+      var same=_ocSame(k,cur,x),dflt=x.source==='default',ap=!!_CARD_APPLY[k],w=_cardWarn(k,x.value,F),ev=x.evidence||{};if(!same&&!dflt)nDiff++;
+      var val=!same?('<span style="color:#b71c1c;font-weight:700">'+esc(cur)+' → '+esc(_ocNew(k,x))+'</span>'):('<b>'+esc(_ocNew(k,x))+'</b>'+(cur?'':' <span style="font-size:11px;color:var(--b4)">（專案原本沒有）</span>'));
+      return '<tr style="border-bottom:1px solid var(--b1);background:'+(!same&&!dflt?'#ffebee':dflt?'#fff8e1':'var(--w)')+'"><td style="padding:4px 6px;white-space:nowrap;vertical-align:top">'+esc(f.l)+'<div style="font-size:10.5px;color:var(--b3)">'+(dflt?'不寫入':ap?'寫入專案':'存卡片')+'</div></td>'
+        +'<td style="padding:4px 6px;vertical-align:top;overflow-wrap:anywhere">'+val+(w?'<div style="font-size:11px;color:#c62828">'+esc(w)+'</div>':'')+'<div style="font-size:10.5px;color:var(--b4)">'+esc(SL[x.source]||x.source)+'</div></td>'
+        +'<td style="padding:4px 6px;font-size:11.5px;color:var(--b5);vertical-align:top;overflow-wrap:anywhere">'+(ev.clause?'<b>'+esc(ev.clause)+'</b> ':'')+(ev.quote?'「'+esc(ev.quote)+'」':'')+(x.note?'<div style="color:var(--b4)">'+esc(x.note)+'</div>':'')+'</td></tr>';}).join('');
+    return tr?'<tr><td colspan="3" style="padding:6px 6px 2px;font-weight:700;background:var(--gl)">'+esc(g[0])+'</td></tr>'+tr:'';}).join('');
+  var imp=0;try{imp=_cardRecvImpact(q,F);}catch(e){_err('_ocDetail.impact',e);}
+  return (mism.length?'<div style="background:#ffebee;color:#b71c1c;border-radius:8px;padding:6px 9px;font-size:12px;margin:4px 0">卡片的'+mism.join('、')+'跟這案「'+esc(q.name||'')+'／'+esc(q.client||'')+'」不同，請確認沒有傳錯案子</div>':'')
+    +'<div style="font-size:12.5px;margin:4px 0">工程：<b>'+esc(q.name||'')+'</b>　業主：'+esc(q.client||'')+'　'+(nDiff?'<b style="color:#b71c1c">跟專案不同 '+nDiff+' 欄</b>':'跟專案沒有不同')+(nMiss?'　<b style="color:#b71c1c">缺 '+nMiss+' 欄</b>':'')+'</div>'
+    +(imp?'<div style="background:#fff8e1;color:#7a5a00;border-radius:8px;padding:6px 9px;font-size:12px;margin:4px 0">寫入放款規則後，<b>'+imp+'</b> 張還沒收款的請款單預計收款日會跟著變</div>':'')
+    +'<table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed"><colgroup><col style="width:28%"><col style="width:34%"><col></colgroup><thead><tr><th style="text-align:left;padding:4px 6px">欄位</th><th style="text-align:left;padding:4px 6px">值（紅＝專案現在 → 合約）</th><th style="text-align:left;padding:4px 6px">條次原文</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-top:6px">確認＝合約寫到的欄位寫進專案（放款規則、裝設％、保留款、退還條件、租期結束日、個別工項例外）；黃底＝合約未載明，不寫入；其他欄位存在合約條件卡供查看。修改＝開原本的對照表逐欄勾。</div>';
+}
+function _ocOk(d){
+  var x=DRAFTS[d.id];if(!x||x.status!=='pending'){toast('這張草稿已經處理過了');return false;}
+  if(!_decIsAdmin()){toast('只有管理員可以寫入合約條件');return false;}
+  var q=_ocQ(x);if(!q){toast('找不到這張報價，請退回');return false;}
+  var F;try{F=_ocF(x,q);}catch(e){toast('合約條件卡讀不出來，請退回');return false;}
+  var pk=_ocPick(F);if(!pk.length){toast('卡片沒有合約寫到的欄位，請退回');return false;}
+  var pl=_d6Pl(x);
+  return Promise.resolve(_draftMark(x.id,'applied',{resultId:q.id})).then(function(m){if(m===false){toast('草稿標記沒成功，沒有寫入');return false;}   // 先標已套用再寫，避免寫了兩次
+    _cardCtx={qid:q.id,card:pl.card||{},F:F,fname:_draftS(pl.fname)||'AI 草稿'};_cardApply(pk);return true;});
+}
+_decReg('drf_ownerCard',{
+  title:'合約條件卡',todo:function(n){return '合約條件卡 '+n+' 張待確認';},sub:'確認＝合約寫到的欄位寫進專案；跟專案不同的標紅',
+  canSee:function(){return !_isReaderUser&&_nav5On()&&_decIsAdmin();},
+  list:function(){return Object.keys(DRAFTS||{}).map(function(k){return DRAFTS[k];}).filter(function(d){return d&&d.type==='ownerCard'&&d.status==='pending'&&_DRAFT_ID.test(_draftS(d.id));}).sort(function(a,b){return (a.at||0)-(b.at||0);});},
+  key:function(d){return d.id;},head:function(d){return _draftS(d.summary).slice(0,200);},
+  body:function(d){return _d6Meta(d);},
+  detail:function(d){return _ocDetail(d);},
+  ok:function(d){return _ocOk(d);},
+  reject:function(d,why){return _draftMark(d.id,'rejected',{reason:why||''}).then(function(m){return m!==false;});},
+  edit:function(d){draftApply(d.id);}
+});
 // ══════════ v6.0.225 得標拍板卡一次做完（陳軒 11/10 新佇列第 2 件；第 2 層：看過明細才能確認）══════════
 // bid 草稿「改成得標」：卡片明細列出確認後會做的事（標得標＋得標率紀錄、成交單價回寫、建合約、請款單草稿、專案），
 //   請款截止日在卡上填（預設這案原本的，沒有就空白＝跟舊得標視窗一樣不填）；確認＝直接走 confirmAward（同一套，不另寫一份），不再跳得標視窗。

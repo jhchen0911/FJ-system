@@ -13347,6 +13347,40 @@ async function newPage(browser, width, height) {
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.225 合約條件拍板卡（陳軒全流程盤點第 9 名）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keep = { Q: Q, D: DRAFTS };
+      try {
+        localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_v7old');
+        window.toast = () => {}; window._immediateUpload = () => {};
+        window._draftMark = (id, st, ex) => { if (DRAFTS[id]) { DRAFTS[id].status = st; DRAFTS[id].ex = ex; } return Promise.resolve(true); };
+        Q = [{ id: 'qO1', code: 'O01', name: '範例合約案', client: '範例營造甲', awarded: true, items: [{ desc: '範例鋼軌樁', note: '含60天租期', unit: '支', qty: '10', price: '1000', ot: '12', otUnit: '支/天' }], exs: [], rmk: {}, ownerPay: { cut: 25 }, deduct: { ret: 5 }, _mt: 1 }];
+        const card = { schema: 'fj-contract-card/1', project: '範例合約案', owner: '範例營造甲',
+          retention: { pct: { value: 3, source: 'contract', evidence: { clause: '第 8 條', quote: '每期保留 3%' } } },
+          billing: { cutoffDay: { value: 25, source: 'contract', evidence: { clause: '第 5 條', quote: '每月 25 日估驗' } } },
+          rent: { includedDays: { value: 90, source: 'contract', evidence: { clause: '第 12 條', quote: '含 90 天租期' } }, endMode: { value: 'removeDone', source: 'contract', evidence: { clause: '第 12 條', quote: '以拔除完成日為租期結束' } }, lateRate: { value: 15, source: 'contract', evidence: { clause: '第 13 條', quote: '逾期每支每天 15 元' } } } };
+        DRAFTS = { dCard001: { id: 'dCard001', type: 'ownerCard', by: 'ai@example.com', byName: 'AI', at: Date.now() - 1000, status: 'pending', summary: '範例合約案：合約條件卡', payload: { qid: 'qO1', card, fname: 'card.json' } } };
+        const items = []; _v6TodoItems(items);
+        out.card = items.some((x) => x.type === 'dec_drf_ownerCard') && !_draftPending().some((d) => d.type === 'ownerCard');
+        localStorage.setItem('fy_nav_old', '1'); out.oldList = _draftPending().some((d) => d.type === 'ownerCard'); localStorage.removeItem('fy_nav_old');
+        const x = document.createElement('div'); x.innerHTML = await Promise.resolve(_DEC.drf_ownerCard.detail(DRAFTS.dCard001)); const t = x.textContent;
+        out.detail = /5 → 3/.test(t) && /60 → 90 天/.test(t) && /12 支\/天 → 15/.test(t) && /第 12 條/.test(t) && /含 90 天租期/.test(t) && /租期起算/.test(t) && /合約條件卡沒寫這欄/.test(t) && /跟專案不同 3 欄/.test(t);
+        out.noDiffCut = !/25 → 25/.test(t);
+        const ok = await Promise.resolve(_DEC.drf_ownerCard.ok(DRAFTS.dCard001)); const q = Q[0];
+        out.applied = ok === true && DRAFTS.dCard001.status === 'applied' && q.deduct.ret === 3 && q.rentEnd === 'removeDone' && q.ownerPay.cut === 25 && q.ownerCard && q.ownerCard.fields['rent.includedDays'].value === 90 && q.ownerCard.fields['rent.includedDays'].applied === true;
+        out.noDefault = q.ownerPay.day == null && q.ownerPay.delay == null && q.ownerCard.fields['billing.payDay'].applied === false;   // 合約未載明的（豐有預設）不寫
+        out.again = (await Promise.resolve(_DEC.drf_ownerCard.ok(DRAFTS.dCard001))) === false;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keep.Q; DRAFTS = keep.D;
+      return out;
+    });
+    check('v6.0.225 合約條件拍板卡：今天頁出卡（舊選單照舊在 AI 草稿清單）；明細逐欄列值＋條次原文，跟專案不同標紅列舊值→新值，租期起算／含租期天數一定列；確認寫進專案、合約未載明的不寫', !r.err && r.card && r.oldList && r.detail && r.noDiffCut && r.applied && r.noDefault && r.again, JSON.stringify(r));
+    check('v6.0.225 合約條件拍板卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.225 得標拍板卡一次做完（陳軒 11/10 新佇列第 2 件）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
