@@ -13235,6 +13235,47 @@ async function newPage(browser, width, height) {
     check('v6.0.221 送審文件測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.221 改版第 7 步 7c 加碼③：包商評分（結案後拍板卡、五項 1～5 分、廠商清單看得到平均）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepP = PROJECTS, keepV = VENDORS.slice(), oU = _fbUser, oA = _isAdminUser;
+      try {
+        window.toast = () => {};
+        Q = [{ id: 'qV1', name: '範例工程V1', client: '甲營造', code: 'V1', date: '2026-09-01', awarded: true, closed: true, closedAt: Date.now() - 86400000, _mt: 1, items: [{ desc: '鋼軌樁打設', unit: '支', qty: 10, price: 1000 }],
+          costs: [{ id: 'c1', type: 'sub', vendor: '乙工程行', rows: [] }, { id: 'c2', type: 'sub', vendor: '丙吊車', rows: [] }, { id: 'c3', type: 'sub', vendor: '乙工程行', followOf: 'c1', rows: [] }] },
+          { id: 'qV2', name: '範例工程V2', client: '甲營造', code: 'V2', date: '2026-01-01', awarded: true, closed: true, closedAt: Date.now() - 200 * 86400000, _mt: 1, items: [], costs: [{ id: 'c9', type: 'sub', vendor: '丁鋼構', rows: [] }] },
+          { id: 'qV3', name: '範例工程V3', client: '甲營造', code: 'V3', date: '2026-10-01', awarded: true, _mt: 1, items: [], costs: [{ id: 'c8', type: 'sub', vendor: '戊工程', rows: [] }] }];
+        PROJECTS = []; _prjSync();
+        VENDORS.length = 0; VENDORS.push({ id: 'vv1', name: '乙工程行', type: 'sub' });
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        const L = _decItems('vendorEval');
+        out.list = L.length === 2 && L.map((x) => x.v).sort().join(',') === '丙吊車,乙工程行';   // 結案 90 天內、跟隨計價不重複、施工中不算
+        // 確認＝開打分數視窗；少評一項擋下
+        out.open = _DEC.vendorEval.ok(L.find((x) => x.v === '乙工程行')) === 'open' && !!document.getElementById('fy-modal');
+        ['q', 't', 'sa', 'c'].forEach((k) => { document.querySelector('input[name="ve-' + k + '"][value="4"]').checked = true; });
+        document.getElementById('fy-modal-o').click(); await T(40);
+        out.miss = !!document.getElementById('fy-modal') && !_veOf(_prjOfQ('qV1'), '乙工程行');
+        document.querySelector('input[name="ve-p"][value="5"]').checked = true; document.getElementById('ve-note').value = '配合好'; document.getElementById('fy-modal-o').click(); await T(40);
+        const e = _veOf(_prjOfQ('qV1'), '乙工程行');
+        out.saved = !!e && e.s.p === 5 && e.s.q === 4 && e.note === '配合好' && !document.getElementById('fy-modal') && _decItems('vendorEval').length === 1;
+        out.avg = JSON.stringify(_veAvg('乙工程行')) === JSON.stringify({ avg: 4.2, n: 1 });
+        // 退回＝這家不評
+        _DEC.vendorEval.reject(_decItems('vendorEval')[0], '只做一天'); out.skip = _decItems('vendorEval').length === 0 && _veAvg('丙吊車') === null;
+        // 廠商清單看得到平均
+        renderVendors2(); await T(40); out.chip = /★ 4\.2（1 案）/.test(document.body.innerHTML);
+        // 一般員工看不到這張卡
+        _isAdminUser = false; _prjOfQ('qV1').vendorEval = {}; out.staff = _decItems('vendorEval').length === 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; PROJECTS = keepP; VENDORS.length = 0; keepV.forEach((v) => VENDORS.push(v)); _fbUser = oU; _isAdminUser = oA;
+      try { const m = document.getElementById('fy-modal'); if (m) m.remove(); } catch (x) { /* 可忽略 */ }
+      return out;
+    });
+    check('v6.0.221 包商評分：結案 90 天內每家分包一張拍板卡（管理員）、五項都要評、存專案、平均分數、退回＝不評、廠商清單看得到平均、員工看不到', !r.err && r.list && r.open && r.miss && r.saved && r.avg && r.skip && r.chip && r.staff, JSON.stringify(r));
+    check('v6.0.221 包商評分測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

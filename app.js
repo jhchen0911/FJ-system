@@ -29803,7 +29803,7 @@ function renderVendors2(){
     <div class="ql" style="cursor:default">
       <div class="qdot" style="background:${typeClr[v.type]||'var(--b2)'}"></div>
       <div class="qm">
-        <div class="qt">${esc(v.name||'未命名')} <span style="font-size:11px;color:${typeClr[v.type]}">${typeMap[v.type]||''}</span></div>
+        <div class="qt">${esc(v.name||'未命名')} <span style="font-size:11px;color:${typeClr[v.type]}">${typeMap[v.type]||''}</span> ${_veChip(v.name)}</div>
         <div class="qsb">${v.contact?esc(v.contact):''}${v.phone?' ／ '+esc(v.phone):''}${v.items?' ／ '+esc(v.items):''}${v.payTermCash!=null?' ／ <svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg>'+v.payTermCash+'%'+(v.payTermTicket?'+票'+v.payTermTicket+'天':''):''}</div>
         ${v.bankAcct?'<div class="qsb">'+_bankLine(v.name)+'</div>':''}
       </div>
@@ -44073,6 +44073,49 @@ function sdocDel(qid,id){
     _sdocSave(p2,m);
   });
 }
+// ══════════ 改版第 7 步 7c 加碼③：包商評分（v6.0.221，估時表題 C 建議：品質、工期、安全、配合度、價格各 1～5 分＋一句話）══════════
+// 結案後（90 天內）每家分包出一張拍板卡 vendorEval（管理員）：確認／修改＝打分數視窗，退回＝這家不評；存專案 p.vendorEval[<廠商鍵>]＝{v,s:{q,t,sa,c,p},note,at,by}（shared，只有分數與一句話）
+// 平均分數 _veAvg(廠商名)：廠商清單看得到（全公司各案平均）
+var _VE_ITEMS=[['q','品質'],['t','工期'],['sa','安全'],['c','配合度'],['p','價格']];
+function _veKey(v){var d=String(v||'').trim(),h=5381;for(var k=0;k<d.length;k++)h=((h*33)^d.charCodeAt(k))>>>0;return 'v'+h.toString(36);}
+function _veVendors(q){var o=[];[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;})).forEach(function(x){(x.costs||[]).forEach(function(c){var v=String((c&&c.vendor)||'').trim();if(c&&c.type==='sub'&&!c.followOf&&v&&o.indexOf(v)<0)o.push(v);});});return o;}
+function _veOf(p,v){var m=(p&&p.vendorEval&&typeof p.vendorEval==='object')?p.vendorEval:{};return m[_veKey(v)]||null;}
+function _veScore(e){if(!e||!e.s)return null;var n=0,t=0;_VE_ITEMS.forEach(function(k){var x=parseInt(e.s[k[0]]);if(x>=1&&x<=5){n++;t+=x;}});return n?t/n:null;}
+function _veAvg(v){var L=[];(PROJECTS||[]).forEach(function(p){if(!p||p.voidAt)return;var e=_veOf(p,v),sc=_veScore(e);if(sc!=null&&!e.skip)L.push(sc);});
+  return L.length?{avg:Math.round(L.reduce(function(a,b){return a+b;},0)/L.length*10)/10,n:L.length}:null;}
+function _veChip(v){var a=_veAvg(v);return a?('<span style="font-size:11px;color:#b26a00;font-weight:700;white-space:nowrap">★ '+a.avg+'（'+a.n+' 案）</span>'):'';}
+function _veList(){var out=[],lim=Date.now()-90*864e5;
+  (Q||[]).forEach(function(q){if(!q||q.parentId||!q.closed)return;var at=+q.closedAt||0;if(at&&at<lim)return;var p=_prjOfQ(q.id);if(!p||p.voidAt)return;
+    _veVendors(q).forEach(function(v){if(!_veOf(p,v))out.push({qid:q.id,v:v});});});
+  return out;}
+function _veSave(qid,v,rec){var p=_prjOfQ(qid);if(!p)return false;var m=Object.assign({},(p.vendorEval&&typeof p.vendorEval==='object')?p.vendorEval:{});
+  m[_veKey(v)]=Object.assign({v:String(v).slice(0,80),at:Date.now(),by:_mvMe()},rec);p.vendorEval=m;p._mt=Date.now();saveProjects();return true;}
+function _veModal(x){
+  var q=(Q||[]).find(function(y){return y&&y.id===x.qid;})||{},e=_veOf(_prjOfQ(x.qid),x.v)||{},sv=e.s||{};
+  var row=function(k){return '<div style="display:flex;align-items:center;gap:8px;margin:6px 0;flex-wrap:wrap"><span style="flex:0 0 56px;font-size:13px;font-weight:700">'+k[1]+'</span>'
+    +[1,2,3,4,5].map(function(n){return '<label style="display:inline-flex;align-items:center;gap:2px;font-size:13px"><input type="radio" name="ve-'+k[0]+'" value="'+n+'"'+(parseInt(sv[k[0]])===n?' checked':'')+'>'+n+'</label>';}).join('')+'</div>';};
+  _modal('包商評分：'+esc(x.v),'<div style="font-size:12px;color:var(--b4);margin-bottom:6px">'+esc(q.name||'')+'　1＝很差、3＝普通、5＝很好</div>'+_VE_ITEMS.map(row).join('')
+    +'<div class="f" style="margin-top:8px"><label>一句話（選填）</label><input id="ve-note" maxlength="120" value="'+esc(e.note||'')+'" style="width:100%;box-sizing:border-box"></div>',function(){
+    var s2={},miss=[];_VE_ITEMS.forEach(function(k){var c=document.querySelector('input[name="ve-'+k[0]+'"]:checked');if(c)s2[k[0]]=parseInt(c.value);else miss.push(k[1]);});
+    if(miss.length){toast('還沒評：'+miss.join('、'));return false;}
+    _veSave(x.qid,x.v,{s:s2,note:String(gv('ve-note')||'').trim().slice(0,120)});toast('已記 '+x.v+' 的評分');
+    try{_decRefresh('vendorEval');}catch(er){_err('_veModal.refresh',er);}
+  });
+}
+_decReg('vendorEval',{
+  title:'包商評分',todo:function(n){return '結案的包商評分 '+n+' 家';},sub:'確認／修改＝打分數（品質、工期、安全、配合度、價格）；退回＝這家不評',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},
+  list:_veList,
+  key:function(x){return x.qid+'|'+_veKey(x.v);},
+  head:function(x){var q=(Q||[]).find(function(y){return y&&y.id===x.qid;})||{};return x.v+'（'+(q.name||'')+'）';},
+  body:function(){return '<div style="font-size:11.5px;color:var(--b4)">工程已結案，幫這家分包打個分數，之後發包選廠商用得到</div>';},
+  detail:function(x){var q=(Q||[]).find(function(y){return y&&y.id===x.qid;})||{},a=_veAvg(x.v);
+    var cs=(q.costs||[]).filter(function(c){return c&&c.type==='sub'&&String(c.vendor||'').trim()===x.v;});
+    return '<div style="font-size:12.5px">工程：'+esc(q.name||'')+'<br>分包：'+esc(x.v)+'（'+cs.length+' 張分包卡）'+(a?('<br>以前的平均：★ '+a.avg+'（'+a.n+' 案）'):'<br>以前還沒評過')+'</div>';},
+  ok:function(x){_veModal(x);return 'open';},
+  reject:function(x,why){return _veSave(x.qid,x.v,{skip:1,why:String(why||'不評').slice(0,120)});},
+  edit:function(x){_veModal(x);}
+});
 function stlSet(el){
   if(_isReaderUser){toast('唯讀帳號不能修改');return;}
   var qid=el.getAttribute('data-qid'),k=el.getAttribute('data-stl'),p=_prjOfQ(qid);if(!p||!k)return;
