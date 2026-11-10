@@ -12962,6 +12962,14 @@ async function newPage(browser, width, height) {
           out.head[k] = h.length === 1 && h[0].innerHTML.includes(FY_LOGO) && h[0].innerHTML.includes(FY_WORDMARK) && /範例工程有限公司/.test(h[0].textContent) && /統一編號 87654321/.test(h[0].textContent) && /範例路 1 號/.test(h[0].textContent) && h[0].textContent.includes(title[k]);
         }
         out.allHead = Object.values(out.head).every(Boolean);
+        // v6.0.216 公司資料只印在頁首一次（頁尾不再重印）；Email 在頁首；合約雙方簽章欄的地址不算重複
+        P.email = 'fy@example.tw'; out.once = {};
+        for (const k of Object.keys(ctx)) {
+          const o = _docOut(k, ctx[k]); const d = document.createElement('div'); d.innerHTML = (o.html.match(/<body[^>]*>([\s\S]*)<\/body>/i) || [0, o.html])[1]; d.querySelectorAll('style,script').forEach((x) => x.remove());
+          const t = d.textContent, n = (re) => (t.match(re) || []).length, hd = d.querySelector('.fy-dochead');
+          out.once[k] = n(/範例路 1 號/g) === (k === 'subContract' ? 2 : 1) && n(/02-0000-0000/g) === (k === 'subContract' ? 2 : 1) && !!hd && hd.textContent.includes('Email fy@example.tw') && !d.querySelector('.company-bar');
+        }
+        out.noDup = Object.values(out.once).every(Boolean);
         out.oldGone = !/豐有工程報價單/.test(_docOut('quote', ctx.quote).html);
         // 分包合約：條文 .pdf-cut 可換頁 → 第 1 頁要填滿（原本印完明細表就換頁、下半頁空白）
         const o = _docOut('subContract', ctx.subContract), A4W = _pdfContentPx(false), sm = o.html.match(/<style[^>]*>([\s\S]*?)<\/style>/i), bm = o.html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
@@ -12978,6 +12986,7 @@ async function newPage(browser, width, height) {
       return out;
     });
     check('v6.0.214 單據頁首統一：報價單、請款單、詢價單、分包合約書、保留款退還單都是同一個頁首（LOGO＋名片字樣＋公司全名／統一編號／地址＋單據名稱）', !r.err && r.allHead && r.oldGone, JSON.stringify(r));
+    check('v6.0.216 單據頁尾不再重印公司資料：五種單據地址、電話只在頁首一次（合約雙方簽章欄除外）、Email 在頁首', !r.err && r.noDup, JSON.stringify(r.once));
     check('v6.0.214 分包合約書：條文可以換頁，第 1 頁填滿（不再印完明細就換頁、下半頁空白）', !r.err && r.cuts >= 10 && r.full, JSON.stringify({ cuts: r.cuts, fill: r.fill, n: r.n, err: r.err }));
     check('v6.0.214 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();

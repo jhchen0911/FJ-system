@@ -21,7 +21,7 @@
 2. **改完直接 commit + push 部署，不用徵詢**（使用者已授權：改好→列出改動明細→部署，使用者自行上線測試）
 3. Commit 訊息格式：`vX.XXX：一句話摘要`＋條列改動內容（繁體中文）
 4. **修改任何記錄物件（合約/請款單/報價）的欄位時，必須同時 `obj._mt=Date.now()`**，否則跨裝置同步時舊資料會蓋掉新值
-12. **品牌色單一來源（v6.0.205 Lotion 11/09 定案，名片原檔色值）**：綠 #006935、橘 #F8B72E、炭灰 #292B2D（舊 #1C6937／#FFAE48 作廢）。程式一律用 `app.js` 開頭的 `FY_BRAND`（g／g2／g3／y／y2／ink），列印／PDF 單據寫 `'+FY_BRAND.g+'` 或 `${FY_BRAND.g}`，**不准再寫死色碼**；畫面用 index.html `:root` 的 `--g`／`--g2`／`--g3`／`--y`／`--y2`（值要跟 FY_BRAND 一樣，冒煙測試檢查，也檢查程式裡沒有舊色）。Logo 一律用 `FY_LOGO`（去背 PNG）；**對外單據頁首一律用 `_docHeadHtml`**（v6.0.214：LOGO＋名片字樣 `FY_WORDMARK`＋公司全名／統一編號／地址／電話，右邊單據名稱；報價、請款、詢價、分包合約、保留款退還單）
+12. **品牌色單一來源（v6.0.205 Lotion 11/09 定案，名片原檔色值）**：綠 #006935、橘 #F8B72E、炭灰 #292B2D（舊 #1C6937／#FFAE48 作廢）。程式一律用 `app.js` 開頭的 `FY_BRAND`（g／g2／g3／y／y2／ink），列印／PDF 單據寫 `'+FY_BRAND.g+'` 或 `${FY_BRAND.g}`，**不准再寫死色碼**；畫面用 index.html `:root` 的 `--g`／`--g2`／`--g3`／`--y`／`--y2`（值要跟 FY_BRAND 一樣，冒煙測試檢查，也檢查程式裡沒有舊色）。Logo 一律用 `FY_LOGO`（去背 PNG）；**對外單據頁首一律用 `_docHeadHtml`**（v6.0.214：LOGO＋名片字樣 `FY_WORDMARK`＋公司全名／統一編號／地址／電話／Email，右邊單據名稱；報價、請款、詢價、分包合約、保留款退還單）；**公司資料只印頁首一次，頁尾不准再印**（v6.0.216；合約雙方簽章欄、請款單匯款戶名不算）
 5. 內部欄位（成本單價 estCost、毛利）**絕不能出現在給業主的報價單/請款單列印**（列印用 `_buildQuoteDocHTML`／`buildInvPreview`）
 6. 金額慣例：工項單價為未稅；合約金額與請款總計為含稅（稅率 `P.tax`，預設 5%）
 8. **匯出 PDF 的大原則（所有頁面一體適用，v5.392 起全站統一走同一引擎）**：
@@ -149,7 +149,7 @@
 
 ## 測試
 
-`tests/smoke.js`（1039 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（1040 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。`package.json` 釘死 playwright 版本（v6.0.103 起 1.64.1＝Chrome 156），CI 與本機才用同一瀏覽器；升級 playwright 要當成一次改版、跑過冒煙再推。雲端容器裝不到新瀏覽器時，可從 storage.googleapis.com 的 chrome-for-testing-public 下載同版 chrome-headless-shell，用 `CHROMIUM_PATH` 指定。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
