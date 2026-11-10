@@ -44547,7 +44547,10 @@ function _pj7InvHtml(q,st){
 function _acctInvState(v){
   var today=localToday(),d='';try{var e=_invExpectedDate(v);d=(e&&e.date)||'';}catch(x){_err('_acctInvState',x);}
   var od=!!(d&&d<today);
-  return {due:d,od:od,label:od?'逾期待收':(v.invNo?'已開發票・待收':'待收'),col:od?'var(--red)':'#b26a00'};
+  // v6.0.226：主線請款單狀態（_invStOf／_INV_ST_T：草稿／已送業主／業主已確認／已開發票／已收款）上線後自動改用；還沒上線照舊
+  var st='';try{if(typeof window._invStOf==='function'&&window._INV_ST_T)st=window._invStOf(v)||'';}catch(e){_err('_acctInvState.st',e);st='';}
+  if(st&&window._INV_ST_T[st])return {due:d,od:od,st:st,label:(od?'逾期・':'')+window._INV_ST_T[st]+(st==='draft'?'':'・待收'),col:od?'var(--red)':(st==='draft'?'#757575':'#b26a00')};
+  return {due:d,od:od,st:'',label:od?'逾期待收':(v.invNo?'已開發票・待收':'待收'),col:od?'var(--red)':'#b26a00'};
 }
 function _acctLedRows(kind){
   var rows=[];
@@ -44555,7 +44558,7 @@ function _acctLedRows(kind){
     (INV||[]).forEach(function(v){if(!v||v.kind==='retReturn'||v.voidAt||v.receivedConfirmed)return;var ar=0;try{ar=_invAR(v);}catch(e){_err('_acctLedRows.ar',e);}if(!(ar>0))return;
       var s=_acctInvState(v);
       rows.push({id:v.id,who:v.client||'',what:(v.project||'')+'　第 '+(v.periodNo||'?')+' 期',amt:ar,date:s.due||v.date||'',state:s.label,col:s.col,urg:s.od,
-        next:'登錄收款',fn:"openReceiptModal('"+escq(v.id)+"')",open:"loadInvoice('"+escq(v.id)+"')"});});
+        next:s.st==='draft'?'打開請款單':'登錄收款',fn:s.st==='draft'?("loadInvoice('"+escq(v.id)+"')"):("openReceiptModal('"+escq(v.id)+"')"),open:"loadInvoice('"+escq(v.id)+"')"});});   // 還是草稿＝先送出，不是收款
   } else {
     var today=localToday();
     (PAYABLES||[]).forEach(function(p){if(!p||p.status==='paid'||p.voidAt||p.planned)return;var left=0;try{left=_payLeft(p);}catch(e){_err('_acctLedRows.ap',e);}if(!(left>0))return;

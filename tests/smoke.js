@@ -13765,6 +13765,14 @@ async function newPage(browser, width, height) {
         acctTab('ar'); await T(120);
         const la = document.querySelector('#acct-p-ar > .acct-led');
         out.ar = !!la && /範例營造/.test(la.textContent) && /第 2 期/.test(la.textContent) && /逾期待收/.test(la.textContent) && /登錄收款/.test(la.querySelector('button').textContent) && !document.querySelector('#acct-p-ap > .acct-led');
+        // 主線請款單狀態上線後（_invStOf／_INV_ST_T）自動改用：草稿＝打開請款單、其他＝狀態＋待收
+        const hadSt = typeof window._invStOf === 'function', oSt = window._invStOf, oT = window._INV_ST_T;
+        if (!hadSt) { window._INV_ST_T = { draft: '草稿', sent: '已送業主', ok: '業主已確認', einv: '已開發票', paid: '已收款' }; window._invStOf = (v) => v.st || 'sent';
+          INV[0].st = 'draft'; acctTab('ar'); await T(60); const l1 = document.querySelector('#acct-p-ar > .acct-led').textContent;
+          INV[0].st = 'ok'; acctTab('ar'); await T(60); const l2 = document.querySelector('#acct-p-ar > .acct-led').textContent;
+          out.stHook = /逾期・草稿/.test(l1) && /打開請款單/.test(l1) && /逾期・業主已確認・待收/.test(l2) && /登錄收款/.test(l2);
+          delete INV[0].st; window._invStOf = oSt; window._INV_ST_T = oT; if (oSt === undefined) { delete window._invStOf; delete window._INV_ST_T; } acctTab('ar'); await T(40);
+        } else out.stHook = true;
         out.noScroll = document.documentElement.scrollWidth <= W + 1;
         // 唯讀：看得到帳本、沒有按鈕
         const oR = _isReaderUser; _isReaderUser = true; acctTab('ar'); await T(60);
@@ -13777,7 +13785,7 @@ async function newPage(browser, width, height) {
       PAYABLES.length = 0; keepP.forEach((p) => PAYABLES.push(p)); INV.length = 0; keepI.forEach((v) => INV.push(v)); _fbUser = oU; _isAdminUser = oA;
       return out;
     }, W);
-    check('v6.0.225 帳務帳本（寬 ' + W + '）：付＝待付一筆一列（逾期在前、已付不列）、只有一顆「付款」，收＝待收請款單「登錄收款」；舊清單收在「⋯ 更多」打開才看到；付款後帳本更新；唯讀沒有按鈕；舊選單沒有帳本', !r.err && r.ap && r.oneBtn && r.fold && r.unfold && r.refresh && r.search && r.ar && r.noScroll && r.ro && r.old, JSON.stringify(r));
+    check('v6.0.225 帳務帳本（寬 ' + W + '）：付＝待付一筆一列（逾期在前、已付不列）、只有一顆「付款」，收＝待收請款單「登錄收款」；舊清單收在「⋯ 更多」打開才看到；付款後帳本更新；唯讀沒有按鈕；舊選單沒有帳本', !r.err && r.ap && r.oneBtn && r.fold && r.unfold && r.refresh && r.search && r.stHook && r.ar && r.noScroll && r.ro && r.old, JSON.stringify(r));
     check('v6.0.225 帳務帳本測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
