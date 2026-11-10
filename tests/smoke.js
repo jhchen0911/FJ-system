@@ -13347,6 +13347,54 @@ async function newPage(browser, width, height) {
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.225 報價已送出紀錄＋7 天沒回音追問卡（陳軒 11/10 新佇列第 3 件）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keep = { Q: Q, C: CUSTOMERS.slice() };
+      try {
+        window.toast = () => {};
+        const d = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+        const keepFrom = _QSENT_FROM; _QSENT_FROM = Date.now() - 5 * 86400000;   // 測試頁時鐘固定在過去
+        const at = Date.now() - 60000;
+        CUSTOMERS.length = 0; CUSTOMERS.push({ id: 'cS1', name: '範例營造甲', contact: '範例王先生', tel: '02-1234-5678', email: 'a@example.com' });
+        Q = [{ id: 'qS1', code: 'S01', name: '範例送出案', client: '範例營造甲', contact: '', phone: '0912-000-111', items: [], t: { total: 10500 }, ver: 2, _mt: 1, bidStatus: '', sendLog: [{ at, what: 'PDF', mode: 'formal', archived: true, ver: 2 }] },
+             { id: 'qS2', code: 'S02', name: '範例舊匯出', client: '範例營造甲', items: [], _mt: 1, sendLog: [{ at: _QSENT_FROM - 86400000, what: 'PDF', mode: 'only', ver: 1 }] },
+             { id: 'qS3', code: 'S03', name: '範例已得標', client: '範例營造甲', items: [], _mt: 1, awarded: true, sendLog: [{ at, what: 'PDF', mode: 'only', ver: 1 }] }];
+        const ids = () => _qSentRows().map((x) => x.q.id).join(',');
+        out.rows = ids() === 'qS1';   // 上線前的匯出、已得標的不問
+        const x = document.createElement('div'); x.innerHTML = _DEC.qSent.detail(_qSentRows()[0]); const t = x.textContent;
+        out.detail = /範例送出案/.test(t) && /範例王先生/.test(t) && /0912-000-111/.test(t) && /10,500/.test(t) && x.querySelectorAll('input[type=radio]').length === 4 && !!x.querySelector('input[type=date]');
+        qSentIn('qS1', 'how', 'Email'); qSentIn('qS1', 'date', d(-9));
+        const okr = _DEC.qSent.ok(_qSentRows()[0]);
+        out.ok = okr === true && Q[0].sent.how === 'Email' && Q[0].sent.date === d(-9) && Q[0].sent.ver === 2 && ids() === '';
+        // 未來日期不收
+        Q[0].sendLog.push({ at: Date.now(), what: 'PDF', mode: 'formal', archived: true, ver: 3 }); qSentIn('qS1', 'date', d(3));
+        out.future = _DEC.qSent.ok(_qSentRows()[0]) === false;
+        // 退回＝這次沒送，下次再匯出才問
+        out.rej = _DEC.qSent.reject(_qSentRows()[0]) === true && ids() === '';
+        // 送出 9 天沒回音 → 追問卡；文字不用「您」、不提包商
+        const a = _qAskRows(); out.ask = a.length === 1 && a[0].q.id === 'qS1' && a[0].days === 9;
+        const y = document.createElement('div'); y.innerHTML = _DEC.qAsk.detail(a[0]); const t2 = y.textContent, txt = _qAskText(Q[0]);
+        out.askDetail = /9 天/.test(t2) && /a@example\.com/.test(t2) && /02-1234-5678/.test(t2) && /範例送出案/.test(txt) && /S01/.test(txt) && !/您/.test(txt) && !/包商/.test(txt);
+        out.askOk = _DEC.qAsk.ok(a[0]) === true && Q[0].sent.askAt === d(0) && Q[0].sent.askN === 1 && _qAskRows().length === 0;
+        Q[0].sent.askAt = d(-8); out.again = _qAskRows().length === 1;
+        out.noAsk = _DEC.qAsk.reject(_qAskRows()[0]) === true && Q[0].sent.noAsk === true && _qAskRows().length === 0;
+        // 有結果（議價中）就不追
+        Q[0].sent.noAsk = false; Q[0].bidStatus = 'nego'; out.result = _qAskRows().length === 0;
+        // 版次快照不帶送出紀錄
+        out.snap = !('sent' in _qhSnapOf(Q[0]));
+        _QSENT_FROM = keepFrom;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keep.Q; CUSTOMERS.length = 0; keep.C.forEach((c) => CUSTOMERS.push(c));
+      return out;
+    });
+    check('v6.0.225 報價已送出紀錄：匯出後出卡填送出日期與方式（LINE／Email／親送／郵寄），上線前的匯出與已得標不問；退回＝這次沒送；版次快照不帶', !r.err && r.rows && r.detail && r.ok && r.future && r.rej && r.snap, JSON.stringify(r));
+    check('v6.0.225 報價送出 7 天沒回音：出追問卡附業主聯絡方式與追問文字（不用「您」、不提包商）；確認＝複製並 7 天後再問；退回＝不再追；有結果就不追', !r.err && r.ask && r.askDetail && r.askOk && r.again && r.noAsk && r.result, JSON.stringify(r));
+    check('v6.0.225 報價送出卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.225 合約條件拍板卡（陳軒全流程盤點第 9 名）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -13441,7 +13489,7 @@ async function newPage(browser, width, height) {
         // 新選單：舊「保留款可請退」那列不再出現（由卡涵蓋）
         const it = []; _v6TodoItems(it); out.one = it.some((x) => x.type === 'dec_retAsk') && !it.some((x) => x.type === 'ret_due' && /範例完工案/.test(x.text));
         const h = await Promise.resolve(_DEC.retAsk.detail(L[0])); const x = document.createElement('div'); x.innerHTML = h;
-        out.detail = /完工驗收後 3 個月無息退還/.test(x.textContent) && /2026-07-31/.test(x.textContent) && /78,750/.test(x.textContent) && /範例完工案追加/.test(x.textContent) && !!x.querySelector('iframe[srcdoc]') && /保留款退還請款單/.test(x.querySelector('iframe').getAttribute('srcdoc')) && /範例營造甲 您好/.test(x.textContent);
+        out.detail = /完工驗收後 3 個月無息退還/.test(x.textContent) && /2026-07-31/.test(x.textContent) && /78,750/.test(x.textContent) && /範例完工案追加/.test(x.textContent) && !!x.querySelector('iframe[srcdoc]') && /保留款退還請款單/.test(x.querySelector('iframe').getAttribute('srcdoc')) && /範例營造甲 好：/.test(x.textContent) && !/您/.test(x.textContent);
         // 退回＝這次不請，金額沒變不再出；確認＝開保留款退還請款單（存一張 retReturn）
         await _DEC.retAsk.reject(L[0], '先不請'); out.skip = _DEC.retAsk.list().length === 0 && Q[0].deduct.retAskSkip.amt === 78750;
         // 審查：退回之後，舊的「保留款可請退」待辦也不能跑回來

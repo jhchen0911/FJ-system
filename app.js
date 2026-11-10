@@ -5855,7 +5855,7 @@ function _copyQDo(id){
   // Append (複製) to name
   copy.name=(copy.name||'未命名')+' (複製)';copy.payDefV=2;copy.instV=2;delete copy.ownerCard;delete copy._ocPriv;   // 新專案
   // 健檢1 #7：複製報價＝新的一張報價，不帶原案的專案狀態（追加案關聯、結案、版次、日報、詢價、材料、佣金、得標結果…）
-  ['parentId','closed','closedAt','ver','date0','dailyLogs','rfqs','mat','comms','comm','referral','confirmFiles','addons','siteHist','bidStatus','lostReason','lostPrice','lostNote','rentEnd','ownerDoc','matEst','measure','plan','sendLog','verFix','bid','bidHist','bidWait','bidAim'].forEach(function(k){delete copy[k];});   // v6.0.180 匯出紀錄、補登版次規則屬於原報價
+  ['parentId','closed','closedAt','ver','date0','dailyLogs','rfqs','mat','comms','comm','referral','confirmFiles','addons','siteHist','bidStatus','lostReason','lostPrice','lostNote','rentEnd','ownerDoc','matEst','measure','plan','sendLog','verFix','bid','bidHist','bidWait','bidAim','sent','sentHist','sentSkipAt'].forEach(function(k){delete copy[k];});   // v6.0.180 匯出紀錄、補登版次規則屬於原報價
   copy._mt=Date.now();
   Q.unshift(copy);
   persist();
@@ -28244,7 +28244,7 @@ function restoreQVersion(qid,versionIdx,savedAt){
       if(editing){try{cur=Object.assign(JSON.parse(JSON.stringify(Q[idx])),_qEditorFields());unsaved=true;}catch(e){_err('restoreQVersion.cur',e);cur=Q[idx];}}
       var _okB=false;try{_okB=saveQVersion(qid,cur,{pre:true,unsaved:unsaved});}catch(e){_err('restoreQVersion',e);}
       if(!_okB){toast('還原前備份存不進這台裝置（儲存空間可能滿了），已取消還原：請先匯出備份或清理自動存檔');return;}   // 審查：空間滿時備份只在記憶體，重新整理就不見
-      const _keep={sendLog:Q[idx].sendLog,verFix:Q[idx].verFix,bid:Q[idx].bid,bidHist:Q[idx].bidHist,bidWait:Q[idx].bidWait,bidAim:Q[idx].bidAim};   // v6.0.209 得標結果、底價目標價也屬於這張報價（還原後再照還原後的得標狀態對一次 _bidRecSync）   // v6.0.180：匯出紀錄、補登版次規則屬於這張報價，不跟著快照倒回去
+      const _keep={sent:Q[idx].sent,sentHist:Q[idx].sentHist,sentSkipAt:Q[idx].sentSkipAt,sendLog:Q[idx].sendLog,verFix:Q[idx].verFix,bid:Q[idx].bid,bidHist:Q[idx].bidHist,bidWait:Q[idx].bidWait,bidAim:Q[idx].bidAim};   // v6.0.209 得標結果、底價目標價也屬於這張報價（還原後再照還原後的得標狀態對一次 _bidRecSync）   // v6.0.180：匯出紀錄、補登版次規則屬於這張報價，不跟著快照倒回去
       Q[idx]={...snapshot,id:qid,ver:Math.max(curVer,snapshot.ver||1)};  // 版號不倒退
       Object.keys(_keep).forEach(function(k){if(_keep[k]!=null)Q[idx][k]=_keep[k];else delete Q[idx][k];});
       try{_bidRecSync(Q[idx]);}catch(e){_err('restoreQVersion.bid',e);}   // 審查：還原成得標前的版次 → 得標紀錄移到 bidHist
@@ -41638,6 +41638,73 @@ function _d6Detail(d){
   }
   return h;
 }
+// ══════════ v6.0.225 報價「已送出」紀錄＋7 天沒回音追問卡（陳軒 11/10 新佇列第 3 件；第 11 條：不在報價頁加按鈕，走今天頁拍板卡）══════════
+// ① qSent「報價匯出了，送出了嗎？」：報價有匯出紀錄（q.sendLog，_QSENT_FROM 之後）、這次匯出還沒記送出 → 卡片填送出日期與方式（LINE／Email／親送／郵寄）
+//    確認＝寫 q.sent={date,how,ver,at,by}（舊的進 q.sentHist）；退回＝這次匯出沒送（q.sentSkipAt＝那次匯出時間，下次再匯出才再問）
+// ② qAsk「○○案報價送出 N 天沒回音」：q.sent.date（或上次追問 q.sent.askAt）過 _QASK_DAYS 天、還沒有結果（沒得標、狀態待回覆、沒有得標率紀錄結果）
+//    明細＝業主聯絡方式（報價的聯絡人／電話＋客戶資料）＋追問草稿（對外語氣：不用「您」、不提包商）；確認＝複製文字並記 q.sent.askAt（再過 7 天沒回音再問）；
+//    退回＝不用再追（q.sent.noAsk）；修改＝改文字再複製
+var _QSENT_FROM=Date.parse('2026-11-10T00:00:00+08:00'),_QASK_DAYS=7,_QSENT_HOW=['LINE','Email','親送','郵寄'],_QSENT_IN={},_QASK_TXT={};
+function qSentIn(qid,k,v){(_QSENT_IN[qid]=_QSENT_IN[qid]||{})[k]=String(v==null?'':v).slice(0,20);}
+function _qSentLast(q){var L=(q&&Array.isArray(q.sendLog))?q.sendLog:[],last=null;L.forEach(function(e){if(e&&(+e.at||0)>=_QSENT_FROM&&(!last||(+e.at||0)>=(+last.at||0)))last=e;});return last;}
+function _qNoResult(q){return !!q&&!q.awarded&&!(q.bidStatus)&&!(q.bid&&q.bid.res)&&!q.closed;}
+function _qSentRows(){
+  return (Q||[]).filter(function(q){if(!q||!_qNoResult(q))return false;var e=_qSentLast(q);if(!e)return false;var at=+e.at||0;
+    if(q.sent&&(+q.sent.at||0)>=at)return false;if((+q.sentSkipAt||0)>=at)return false;return true;})
+    .map(function(q){return {q:q,e:_qSentLast(q)};}).sort(function(a,b){return (+a.e.at||0)-(+b.e.at||0);});
+}
+function _qDaysSince(d){var t=new Date(String(d||'').slice(0,10)+'T00:00:00'),n=new Date(localToday()+'T00:00:00');return isNaN(t)?0:Math.floor((n-t)/86400000);}
+function _qAskRows(){
+  return (Q||[]).filter(function(q){var s=q&&q.sent;if(!s||!s.date||s.noAsk||!_qNoResult(q))return false;return _qDaysSince(s.askAt||s.date)>=_QASK_DAYS;})
+    .map(function(q){return {q:q,days:_qDaysSince(q.sent.date)};}).sort(function(a,b){return b.days-a.days;});
+}
+function _qContact(q){var c=(CUSTOMERS||[]).find(function(x){return x&&x.name===q.client;})||{},R=[];
+  var add=function(l,v){v=String(v||'').trim();if(v&&!R.some(function(r){return r[1]===v;}))R.push([l,v]);};
+  add('聯絡人（報價）',q.contact);add('電話（報價）',q.phone);add('聯絡人',c.contact);add('公司電話',c.tel);add('工地電話',c.siteTel);add('公司窗口',c.companyContact);add('Email',c.email);
+  return R;}
+function _qMD(d){var m=String(d||'').match(/^\d{4}-(\d{2})-(\d{2})/);return m?(+m[1])+'/'+(+m[2]):String(d||'');}
+function _qAskText(q){
+  if(_QASK_TXT[q.id]!=null)return _QASK_TXT[q.id];
+  var who=String(q.contact||((CUSTOMERS||[]).find(function(x){return x&&x.name===q.client;})||{}).contact||'').trim(),s=q.sent||{};
+  return (who?who+' 好，':'')+'豐有工程這邊想跟進一下：'+_qMD(s.date)+' '+(s.how==='LINE'?'LINE 傳過去的':s.how==='Email'?'寄過去的':'送上的')+'「'+String(q.name||'')+'」報價'+(q.code?'（編號 '+q.code+'）':'')
+    +'，不知道目前評估得怎麼樣？\n如果數量、工法或工期需要調整，跟我們說一聲，馬上配合修改。謝謝！';
+}
+function _qTbl(rows){return '<div style="display:grid;grid-template-columns:max-content 1fr;gap:3px 10px;font-size:12.5px;margin:4px 0">'+rows.map(function(r){return '<div style="color:var(--b4);white-space:nowrap">'+esc(r[0])+'</div><div style="overflow-wrap:anywhere">'+esc(r[1])+'</div>';}).join('')+'</div>';}
+_decReg('qSent',{
+  title:'報價匯出了，送出了嗎？',todo:function(n){return '報價送出紀錄 '+n+' 張待補';},sub:'確認＝記下送出日期與方式；送出 7 天沒回音會提醒追問',
+  canSee:function(){return _decIsAdmin();},
+  list:function(){return _qSentRows();},
+  key:function(r){return r.q.id;},head:function(r){return String(r.q.code||'')+' '+String(r.q.name||'')+'　'+String(r.q.client||'');},
+  body:function(r){return '<div style="font-size:11.5px;color:var(--b4)">'+esc(new Date(+r.e.at||0).toLocaleString('zh-TW'))+' 匯出 '+esc(r.e.what||'PDF')+'（V'+esc(String(r.e.ver||1))+'）</div>';},
+  detail:function(r){var q=r.q,e=r.e,i=_QSENT_IN[q.id]||{},dt=i.date||_ymd(+e.at||Date.now()),how=i.how||(q.sent&&q.sent.how)||'LINE',t=(q.t&&q.t.total)||0;
+    return _qTbl([['工程',String(q.name||'')],['業主',String(q.client||'')],['報價編號',String(q.code||'')],['版次','V'+(e.ver||1)],['含稅合計','NT$ '+fmt(Math.round(t))],['匯出',new Date(+e.at||0).toLocaleString('zh-TW')+' '+(e.what||'PDF')+(e.archived?'（已封存）':'（沒封存）')]].concat(_qContact(q)))
+      +'<div style="display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:12.5px;margin-top:6px"><span>送出方式</span>'
+      +_QSENT_HOW.map(function(h){return '<label style="display:inline-flex;align-items:center;gap:4px"><input type="radio" name="qsent-how-'+esc(q.id)+'" value="'+esc(h)+'"'+(h===how?' checked':'')+' onchange="qSentIn(\''+esc(q.id)+'\',\'how\',this.value)">'+esc(h)+'</label>';}).join('')
+      +'<span>日期</span><input type="date" value="'+esc(dt)+'" onchange="qSentIn(\''+esc(q.id)+'\',\'date\',this.value)" style="padding:4px 6px;border:1px solid var(--b2);border-radius:6px;font-size:13px"></div>'
+      +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">確認後過 '+_QASK_DAYS+' 天還沒結果，今天頁會出追問卡（附業主聯絡方式與追問文字）。沒送出就按退回。</div>';},
+  ok:function(r){var q=r.q,e=r.e,i=_QSENT_IN[q.id]||{},dt=i.date||_ymd(+e.at||Date.now()),how=i.how||(q.sent&&q.sent.how)||'LINE';
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){toast('送出日期不對');return false;}if(dt>localToday()){toast('送出日期不能是未來');return false;}if(_QSENT_HOW.indexOf(how)<0){toast('請選送出方式');return false;}
+    if(q.sent){if(!Array.isArray(q.sentHist))q.sentHist=[];q.sentHist.push(q.sent);if(q.sentHist.length>20)q.sentHist=q.sentHist.slice(-20);}
+    q.sent={date:dt,how:how,ver:e.ver||q.ver||1,at:Date.now(),by:_meEmail()||'本機'};delete _QSENT_IN[q.id];
+    _touch(q);persist();toast('已記下 '+_qMD(dt)+' '+how+' 送出');return true;},
+  reject:function(r){r.q.sentSkipAt=+r.e.at||Date.now();delete _QSENT_IN[r.q.id];_touch(r.q);persist();return true;},
+  edit:function(r){try{loadQ(r.q.id);}catch(e){_err('qSent.edit',e);}}
+});
+_decReg('qAsk',{
+  title:'報價送出沒回音',todo:function(n){return '報價送出 '+_QASK_DAYS+' 天沒回音 '+n+' 案';},sub:'確認＝複製追問文字（再過 7 天沒回音再提醒）；退回＝這案不用再追',
+  canSee:function(){return _decIsAdmin();},
+  list:function(){return _qAskRows();},
+  key:function(r){return r.q.id;},head:function(r){return String(r.q.name||'')+' 報價送出 '+r.days+' 天沒回音';},
+  body:function(r){var s=r.q.sent||{};return '<div style="font-size:11.5px;color:var(--b4)">'+esc(String(r.q.client||''))+'　'+esc(_qMD(s.date))+' '+esc(s.how||'')+' 送出'+(s.askAt?'，'+esc(_qMD(s.askAt))+' 追問過':'')+'</div>';},
+  detail:function(r){var q=r.q,s=q.sent||{},ct=_qContact(q);
+    return _qTbl([['工程',String(q.name||'')],['業主',String(q.client||'')],['報價編號',String(q.code||'')],['送出',_qMD(s.date)+' '+(s.how||'')+'（V'+(s.ver||1)+'）'],['已經',r.days+' 天']].concat(s.askAt?[['上次追問',String(s.askAt)]]:[]))
+      +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">業主聯絡方式</div>'+(ct.length?_qTbl(ct):'<div style="font-size:12px;color:var(--red)">報價和客戶資料都沒有聯絡方式</div>')
+      +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">追問文字（確認＝複製）</div><div style="white-space:pre-wrap;font-size:12.5px;background:var(--gl);border-radius:6px;padding:6px 8px;overflow-wrap:anywhere">'+esc(_qAskText(q))+'</div>';},
+  ok:function(r){var q=r.q,t=_qAskText(q);try{if(navigator.clipboard)navigator.clipboard.writeText(t).catch(function(e){_err('qAsk.copy',e);});}catch(e){_err('qAsk.copy',e);}
+    q.sent.askAt=localToday();q.sent.askN=(+q.sent.askN||0)+1;delete _QASK_TXT[q.id];_touch(q);persist();toast('已複製追問文字');return true;},
+  reject:function(r){r.q.sent.noAsk=true;delete _QASK_TXT[r.q.id];_touch(r.q);persist();return true;},
+  edit:function(r){var q=r.q;_modal('修改追問文字','<textarea id="qask-txt" style="width:100%;min-height:160px;font-size:13px;font-family:inherit">'+esc(_qAskText(q))+'</textarea>',function(){var v=String((document.getElementById('qask-txt')||{}).value||'').trim();if(!v){toast('文字不能空白');return false;}_QASK_TXT[q.id]=v.slice(0,1000);try{_decRefresh('qAsk');}catch(e){_err('qAsk.edit',e);}});}
+});
 // ══════════ v6.0.225 合約條件拍板卡（陳軒全流程盤點第 9 名，從主線移過來；第 2 層：卡片只給建議，看過明細才能確認）══════════
 // contract-check 產出的合約條件卡（fj-contract-card/1）由 AI 用 tools/fy-draft.js 上傳成草稿 type ownerCard（雲端 functions/ops/drafts.js cardClean 清成純資料）。
 //   卡片明細：保留款、放款規則、請款比例、租期（起算、含租期天數、結束日、逾期租金單價）逐欄列值＋條次原文；
@@ -41876,7 +41943,7 @@ function _retAskEnd(r){var ct=(CONTRACTS||[]).find(function(c){return c&&c.name=
   return {end:(ct&&ct.end)||'',closed:cl,status:ct?ct.status:''};}
 function _retAskLine(r){
   var e=_retAskEnd(r),amt=r.ask?r.ask.amt:(r.pending+r.hold),cond=String(((r.q.deduct||{}).retCond)||'').trim();
-  return (r.client||'')+' 您好：\n本公司承攬「'+(r.proj||'')+'」'+(e.end||e.closed?'已於 '+(e.end||e.closed)+' 完工':'已完工')+'，'
+  return (r.client||'')+' 好：\n本公司承攬「'+(r.proj||'')+'」'+(e.end||e.closed?'已於 '+(e.end||e.closed)+' 完工':'已完工')+'，'
     +(cond?'依合約保留款退還條件（'+cond.slice(0,120)+'），':'')+'各期扣留之保留款合計 NT$ '+fmt(amt)+' 已到期。\n附上保留款退還請款單，再麻煩協助辦理退還，謝謝。\n豐有工程有限公司';
 }
 _decReg('retAsk',{
@@ -41993,7 +42060,7 @@ _decReg('dailyOut',{
 //   正式版次 savedAt 晚於來源、號碼 ≥ N 的一律 +1；其他地方記的版號：舊號 > N → +1；舊號 = N 且建立時間晚於來源 → N+1；其餘不變（refs 記原值與新值）。
 // 入口：唯讀帳號（AI）在主控台 fyQuoteVerFix(spec) → 草稿 qverfix → 首頁拍板卡（_decReg('qverfix')）→ Lotion 確認才套用（_qvfApply，套用前再驗一次）。
 // 防漏（不加按鈕）：每次匯出記 q.sendLog；「只匯出」另存一份 sent:true 永久保留；還原前內容匯出過沒封存就先封存；唯讀帳號匯出送 qsend 卡；資料健檢兩項。
-function _qhSnapOf(q){var c=JSON.parse(JSON.stringify(q||{}));delete c.sendLog;delete c.verFix;delete c.bid;delete c.bidHist;delete c.bidWait;delete c.bidAim;return c;}   // 版次快照不帶匯出紀錄與補登規則（屬於報價本身）
+function _qhSnapOf(q){var c=JSON.parse(JSON.stringify(q||{}));delete c.sendLog;delete c.sent;delete c.sentHist;delete c.sentSkipAt;delete c.verFix;delete c.bid;delete c.bidHist;delete c.bidWait;delete c.bidAim;return c;}   // 版次快照不帶匯出紀錄與補登規則（屬於報價本身）
 function _qSigHash(sig){return sig==null?null:_collHash(String(sig));}
 function _qHashOf(q){try{return _qSigHash(_qSendSig(q));}catch(e){_err('_qHashOf',e);return null;}}
 function _qSendLogAdd(q,o){
