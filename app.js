@@ -44545,11 +44545,10 @@ _decReg('dlQty',{
   body:function(d){var o=_dlOf(d),R=o.plan.rows,n=R.filter(function(r){return r.itemIdx>=0;}).length,u=R.length-n,ov=R.filter(function(r){return r.over;}).length;
     return '<div style="font-size:11.5px;color:'+(ov||u?'#b26a00':'var(--b4)')+'">'+(o.q?('工項數量 '+n+' 列'+(u?'，待確認 '+u+' 列':'')+(ov?'，<b style="color:#c62828">超過合約 '+ov+' 列</b>':'')):'先按「修改」選工程')+'</div>';},
   detail:function(d){var o=_dlOf(d),ex=o.q?_ldExisting(o.q,o.dt):null;
-    return '<div style="font-size:12.5px;line-height:1.7">'+(o.pl.backfill?'<div style="color:#b26a00">補傳：'+esc(_draftS(o.pl.recvDate).slice(5))+' 才收到</div>':'')+(ex?'<div style="color:#b26a00">'+esc(o.dt)+' 已經有一筆日報，確認會合併進去</div>':'')
+    return _d6LineImgs(o.photos).then(function(ph){return '<div style="font-size:12.5px;line-height:1.7">'+(o.pl.backfill?'<div style="color:#b26a00">補傳：'+esc(_draftS(o.pl.recvDate).slice(5))+' 才收到</div>':'')+(ex?'<div style="color:#b26a00">'+esc(o.dt)+' 已經有一筆日報，確認會合併進去</div>':'')
       +'<b>LINE 原文</b><div style="white-space:pre-wrap;background:var(--b0,#f6f6f6);padding:6px 8px;border-radius:6px">'+esc(o.txt||'（沒有文字）')+'</div>'
-      +(o.photos.length?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">'+o.photos.slice(0,6).map(function(p){return '<img data-lpath="'+esc(p)+'" alt="" style="width:88px;height:88px;object-fit:cover;border-radius:6px;background:var(--b1)">';}).join('')+'</div>':'')
-      +'<div style="margin-top:8px"><b>拆出的工項數量</b>（規則拆解，請核對原文）</div>'+(o.q?_dlRowsHtml(o.plan):'<div style="color:#c62828">對不到工程，請按「修改」選工程</div>')+'</div>';},
-  after:function(b){try{_lineImgFill(b);}catch(e){_err('dlQty.after',e);}},
+      +ph   /* 審查：照片先換成網址（data-lpath 在拍板卡明細不會被填，確認會鎖住） */
+      +'<div style="margin-top:8px"><b>拆出的工項數量</b>（規則拆解，請核對原文）</div>'+(o.q?_dlRowsHtml(o.plan):'<div style="color:#c62828">對不到工程，請按「修改」選工程</div>')+'</div>';});},
   ok:function(d){var o=_dlOf(d);if(!o.q){toast('對不到工程，請按「修改」選工程');return false;}
     if(d._dlWritten)return Promise.resolve(_draftMark(d.id,'applied',{resultId:o.q.id})).then(function(m){return m!==false;});   /* 審查：寫過了只補標記，不重寫 */
     var qr=o.plan.rows.filter(function(r){return r.itemIdx>=0&&r.qty>0;}).map(function(r){return {itemIdx:r.itemIdx,qty:r.qty,ph:r.ph||'install',batchDone:!!r.batchDone};});
@@ -44788,26 +44787,27 @@ _decReg('dunning',{
 // ══════════ 待編號 現場追加卡（陳軒派工 11/10，盤點第 7 名）：追加確認後 → 給主任的 LINE 確認文字 → 主任簽認才帶進請款 ══════════
 // 一張追加兩段：①還沒傳給主任＝卡片附「給主任的 LINE 確認文字」，確認＝複製並記 a.askAt；②傳了還沒簽認＝確認＝記簽認 a.signed（誰、何時、依據），退回＝主任不認 a.signDeny
 // 請款單草稿卡：已確認但還沒簽認的追加標黃，簽認了的列成「可以請款」（請款單上加列仍由 Lotion 做，系統不改金額）
-function _adList(){var out=[];(Q||[]).forEach(function(q){if(!q||!q.awarded||q.closed)return;(q.addons||[]).forEach(function(a){if(a&&a.status==='confirmed'&&!a.signed&&!a.signDeny)out.push({q:q,a:a});});});return out;}
-function _adMsg(q,a){var who=(q&&(q.siteContact||q.contact))||'主任';return who+' 您好：\n「'+(q.name||'')+'」'+(a.date?a.date.slice(5).replace('-','/')+' ':'')+'現場追加：'+String(a.text||'').replace(/^#?追加\s*/,'').slice(0,200)+(a.qty!=null?'，數量 '+a.qty+(a.unit||''):'')+'。\n麻煩您確認，確認後我們會列入本期請款，謝謝。';}
+function _adList(){var out=[];(Q||[]).forEach(function(q){if(!q||!q.awarded||q.closed||q.parentId)return;var last='';try{var L=_ibInvs(q);last=String((L[0]&&L[0].date)||'');}catch(e){_err('_adList',e);}
+    (q.addons||[]).forEach(function(a){if(a&&a.status==='confirmed'&&!a.signed&&!a.signDeny&&String(a.date||'')>last)out.push({q:q,a:a});});});return out;}   /* 審查：只看主約、最後一張請款單之後的（舊的不洗版） */
+function _adCopy(t){return new Promise(function(res){var fail=function(){try{_modal('請手動複製','<textarea rows="6" style="width:100%;box-sizing:border-box">'+esc(t)+'</textarea>',function(){});}catch(e){_err('_adCopy',e);}res(false);};try{if(!navigator.clipboard||!navigator.clipboard.writeText)return fail();navigator.clipboard.writeText(t).then(function(){res(true);},fail);}catch(e){_err('_adCopy',e);fail();}});}   /* 複製失敗就把文字顯示出來 */
+function _adMsg(q,a){var who=(q&&q.contact)||'主任';return who+' 您好：\n「'+(q.name||'')+'」'+(a.date?a.date.slice(5).replace('-','/')+' ':'')+'現場追加：'+String(a.text||'').replace(/^#?追加\s*/,'').slice(0,200)+(a.qty!=null?'，數量 '+a.qty+(a.unit||''):'')+'。\n麻煩您確認，確認後我們會列入本期請款，謝謝。';}
 function _adSet(q,a,patch){Object.assign(a,patch);_touch(q);persist();}
 _decReg('addonSign',{
   title:'現場追加（主任簽認）',todo:function(n){return '現場追加待主任簽認 '+n+' 筆';},sub:'還沒傳：確認＝複製給主任的 LINE 文字；已傳：確認＝主任簽認了（記下來，可以請款）、退回＝主任不認；修改＝改給主任的文字再複製',
   canSee:function(){return !_isReaderUser&&_decIsAdmin();},list:_adList,key:function(x){return x.q.id+'|'+x.a.id+'|'+(x.a.askAt?1:0);},
   head:function(x){return String(x.q.name||'').slice(0,20)+'　'+String(x.a.date||'').slice(5)+' 追加';},
   body:function(x){return '<div style="font-size:11.5px;color:#b26a00">'+esc(String(x.a.text||'').slice(0,40))+(x.a.qty!=null?'　'+esc(String(x.a.qty))+esc(x.a.unit||''):'')+'　'+(x.a.askAt?'已傳給主任，等簽認':'還沒傳給主任')+'</div>';},
-  detail:function(x){var a=x.a;return '<div style="font-size:12.5px;line-height:1.7"><b>追加內容</b>：'+esc(a.text||'')+(a.qty!=null?'，'+esc(String(a.qty))+esc(a.unit||''):'')+'（'+esc(a.date||'')+'，'+(a.confirmedBy?esc(a.confirmedBy)+' 確認':'已確認')+'）'
-    +((a.photos||[]).length?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'+a.photos.slice(0,6).map(function(p){return '<img data-lpath="'+esc(String(p))+'" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:6px;background:var(--b1)">';}).join('')+'</div>':'')
+  detail:function(x){var a=x.a;return _d6LineImgs(a.photos||[]).then(function(ph){return '<div style="font-size:12.5px;line-height:1.7"><b>追加內容</b>：'+esc(a.text||'')+(a.qty!=null?'，'+esc(String(a.qty))+esc(a.unit||''):'')+'（'+esc(a.date||'')+'，'+(a.confirmedBy?esc(a.confirmedBy)+' 確認':'已確認')+'）'
+    +ph   /* 審查：照片先換成網址再顯示（data-lpath 在拍板卡明細裡不會被填，確認會一直鎖住） */
     +(a.askAt?'<div style="margin-top:6px;color:#b26a00">'+esc(new Date(+a.askAt).toLocaleString('zh-TW',{hour12:false}))+' 已複製給主任的確認文字，等主任回覆。主任回了「確認」就按確認記簽認。</div>':'')
     +'<div style="margin-top:6px"><b>給主任的 LINE 文字</b>'+(a.askAt?'（再傳一次可按修改）':'（確認＝複製，請自己貼到 LINE）')+'<div style="white-space:pre-wrap;background:var(--b0,#f6f6f6);padding:6px 8px;border-radius:6px">'+esc(a.askTxt||_adMsg(x.q,a))+'</div></div>'
-    +'<div style="color:var(--b4);margin-top:4px">主任簽認後，這筆追加會在請款單草稿卡列成「可以請款」；沒簽認的標黃。</div></div>';},
-  after:function(b){try{_lineImgFill(b);}catch(e){_err('addonSign.after',e);}},
-  ok:function(x){var a=x.a;if(!a.askAt){var t=a.askTxt||_adMsg(x.q,a);return new Promise(function(res){try{navigator.clipboard.writeText(t).then(function(){_adSet(x.q,a,{askAt:Date.now(),askBy:_meEmail()||'本機'});toast('已複製給主任的文字');res(true);},function(){toast('複製失敗，請按「修改」');res(false);});}catch(e){_err('addonSign.copy',e);res(false);}});}
+    +'<div style="color:var(--b4);margin-top:4px">主任簽認後，這筆追加會在請款單草稿卡列成「可以請款」；沒簽認的標黃。還沒傳就要結掉（例如已經請過、不需要簽認）請按退回。</div></div>';});},
+  ok:function(x){var a=x.a;if(!a.askAt){var t=a.askTxt||_adMsg(x.q,a);return _adCopy(t).then(function(ok){if(!ok)return false;_adSet(x.q,a,{askAt:Date.now(),askBy:_meEmail()||'本機'});toast('已複製給主任的文字');return true;});}
     _adSet(x.q,a,{signed:{at:Date.now(),by:_meEmail()||'本機',how:'主任 LINE 回覆確認（Lotion 在首頁卡片記）'}});toast('已記主任簽認，下一期請款可以列入');return true;},
-  reject:function(x,why){if(!x.a.askAt){toast('還沒傳給主任；不追加請到工程專案處理');return false;}_adSet(x.q,x.a,{signDeny:{at:Date.now(),by:_meEmail()||'本機',why:String(why||'主任不認').slice(0,200)}});return true;},
+  reject:function(x,why){_adSet(x.q,x.a,{signDeny:{at:Date.now(),by:_meEmail()||'本機',why:String(why||(x.a.askAt?'主任不認':'不需簽認／已處理')).slice(0,200),stage:x.a.askAt?'asked':'notAsked'}});return true;},   /* 審查：還沒傳也可以結掉（不需簽認），記在哪一段結的 */
   edit:function(x){var a=x.a,IN='width:100%;padding:6px 8px;border:1px solid var(--b2);border-radius:6px;font-family:inherit;font-size:12.5px;box-sizing:border-box';
     showConfirm('給主任的 LINE 文字','<textarea id="ad-msg" rows="6" style="'+IN+'">'+esc(a.askTxt||_adMsg(x.q,a))+'</textarea><div style="font-size:11px;color:var(--b4);margin-top:4px">按確認＝存下這段文字並複製。</div>',
-      function(){var t=gv('ad-msg')||'';try{navigator.clipboard.writeText(t).then(function(){_adSet(x.q,a,{askTxt:t.slice(0,1000),askAt:Date.now(),askBy:_meEmail()||'本機'});toast('已複製');try{_decRefresh('addonSign');}catch(e){_err('addonSign.ref',e);}},function(){toast('複製失敗');});}catch(e){_err('addonSign.edit',e);}},false,null,false);}
+      function(){var t=gv('ad-msg')||'';_adCopy(t).then(function(ok){if(!ok)return;_adSet(x.q,a,{askTxt:t.slice(0,1000),askAt:Date.now(),askBy:_meEmail()||'本機'});toast('已複製');try{_decRefresh('addonSign');}catch(e){_err('addonSign.ref',e);}});},false,null,false);}
 });
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

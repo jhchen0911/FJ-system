@@ -11684,8 +11684,8 @@ async function newPage(browser, width, height) {
         DRAFTS = { dq111111: { id: 'dq111111', type: 'dailyLog', by: 'line-bot', at: 1, status: 'pending', summary: '施工日報', payload: { qid: 'qD', date: '2026-10-14', answers: ['1. 今日打設鋼板樁，共8支\n2. H300 型鋼樁打設 5 支，北側這段完成\n3. 地錨 4 處\n4. 人數 6人'], photos: ['line/group/G1/2026-10-14/p1.jpg'] } } };
         const L = _decItems('dlQty');
         out.card = L.length === 1 && /待確認 1 列/.test(_DEC.dlQty.body(L[0])) && /超過合約 1 列/.test(_DEC.dlQty.body(L[0]));
-        const det = _DEC.dlQty.detail(L[0]);
-        out.detail = /今日打設鋼板樁/.test(det) && /33 ／ 30/.test(det) && /超過合約/.test(det) && /待確認/.test(det) && /data-lpath="line\/group/.test(det) && /不算工項：/.test(det) === false;
+        const det = await _DEC.dlQty.detail(L[0]);
+        out.detail = /今日打設鋼板樁/.test(det) && /33 ／ 30/.test(det) && /超過合約/.test(det) && /待確認/.test(det) && /alt="現場照片"/.test(det) && /不算工項：/.test(det) === false;
         out.notInList = !/今日打設鋼板樁/.test(_draftListHtml());
         out.ok = (await _DEC.dlQty.ok(L[0])) === true && DRAFTS.dq111111.status === 'applied';
         const D = Q[0].dailyLogs.find(x => x.date === '2026-10-14'), pr = (D && D.progressRows) || [];
@@ -11701,7 +11701,7 @@ async function newPage(browser, width, height) {
         out.edit = !!D2 && D2.progressRows.some(r => r.itemIdx === 1 && r.qty === 7 && r.ph === 'remove') && DRAFTS.dq222222.status === 'applied';
         // 審查：這天已經有同工項的數量 → 加上去，不能蓋掉；卡片先講
         DRAFTS.dq444444 = { id: 'dq444444', type: 'dailyLog', by: 'line-bot', at: 4, status: 'pending', summary: '施工日報', payload: { qid: 'qD', date: '2026-10-14', answers: ['下午鋼板樁打設 4 支'], photos: ['line/group/G1/2026-10-14/p1.jpg'] } };
-        out.dayHadCard = /這天已有 8，會加上去/.test(_DEC.dlQty.detail(DRAFTS.dq444444));
+        out.dayHadCard = /這天已有 8，會加上去/.test(await _DEC.dlQty.detail(DRAFTS.dq444444));
         await _DEC.dlQty.ok(DRAFTS.dq444444);
         const D3 = Q[0].dailyLogs.find(x => x.date === '2026-10-14'), r0 = D3.progressRows.filter(x => x.itemIdx === 0);
         out.dayAdd = r0.length === 1 && r0[0].qty === 12 && D3.linePhotos.length === 1;
@@ -11877,23 +11877,27 @@ async function newPage(browser, width, height) {
       const out = {}; const keepQ = Q, keepI = INV;
       try {
         try { Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.resolve() }, configurable: true }); } catch (e) { /* 可忽略 */ }
-        Q = [{ id: 'qA', name: '測試追加案', awarded: true, siteContact: '王主任', ownerPay: { cut: 18 }, items: [{ desc: '鋼板樁 打設', unit: '支', qty: 100, price: 1000 }], t: { total: 0 },
+        Q = [{ id: 'qA', name: '測試追加案', awarded: true, contact: '王主任', ownerPay: { cut: 18 }, items: [{ desc: '鋼板樁 打設', unit: '支', qty: 100, price: 1000 }], t: { total: 0 },
           dailyLogs: [{ id: 'l1', date: '2026-10-05', progressRows: [{ itemIdx: 0, qty: 20 }] }],
           addons: [{ id: 'a1', date: '2026-10-08', text: '#追加 背填砂 3 車', qty: 3, unit: '車', status: 'confirmed' }, { id: 'a2', date: '2026-10-09', text: '待確認的', status: 'pending' }] }];
         INV = [];
         const L = _decItems('addonSign');
-        out.list = L.length === 1 && /還沒傳給主任/.test(_DEC.addonSign.body(L[0])) && /王主任 您好/.test(_DEC.addonSign.detail(L[0])) && /背填砂 3 車/.test(_DEC.addonSign.detail(L[0]));
-        out.rejFirst = _DEC.addonSign.reject(L[0], 'x') === false;   // 還沒傳不能記「主任不認」
+        out.list = L.length === 1 && /還沒傳給主任/.test(_DEC.addonSign.body(L[0])) && /王主任 您好/.test(await _DEC.addonSign.detail(L[0])) && /背填砂 3 車/.test(await _DEC.addonSign.detail(L[0]));
         out.ask = (await _DEC.addonSign.ok(L[0])) === true && !!Q[0].addons[0].askAt && !Q[0].addons[0].signed;
         _todoBuild(true); let det = _DEC.invDraft.detail(_decItems('invDraft')[0]);
         out.yellow = /主任還沒簽認，這期先不請/.test(det) && !/主任已簽認/.test(det);
         const L2 = _decItems('addonSign'); out.stage2 = L2.length === 1 && /已傳給主任，等簽認/.test(_DEC.addonSign.body(L2[0]));
         out.sign = (await _DEC.addonSign.ok(L2[0])) === true && !!Q[0].addons[0].signed && !_decItems('addonSign').length;
         det = _DEC.invDraft.detail(_decItems('invDraft')[0]); out.green = /主任已簽認，可以請款/.test(det) && !/這期先不請/.test(det);
+        // 還沒傳也可以結掉（不需簽認）；最後一張請款單之前的舊追加不列
+        Q[0].addons.push({ id: 'a3', date: '2026-10-10', text: '另一筆', status: 'confirmed' }, { id: 'a4', date: '2026-09-01', text: '舊的', status: 'confirmed' });
+        INV = [{ id: 'iA', project: '測試追加案', quoteId: 'qA', periodNo: 1, date: '2026-09-25', totals: {} }];
+        const L3 = _decItems('addonSign'); out.oldSkip = L3.length === 1 && L3[0].a.id === 'a3';
+        out.rejFirst = _DEC.addonSign.reject(L3[0], '') === true && Q[0].addons[2].signDeny.stage === 'notAsked' && !_decItems('addonSign').length;
       } finally { Q = keepQ; INV = keepI; }
       return out;
     });
-    check('現場追加卡：已確認的追加附給主任的 LINE 文字（確認＝複製並記已傳）→ 已傳後確認＝記主任簽認；還沒傳不能記不認；請款單草稿卡沒簽認的標黃、簽認了列成可以請款', Object.values(r).length === 7 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('現場追加卡：已確認的追加附給主任的 LINE 文字（確認＝複製並記已傳）→ 已傳後確認＝記主任簽認；還沒傳不能記不認；請款單草稿卡沒簽認的標黃、簽認了列成可以請款', Object.values(r).length === 8 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('現場追加卡 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
