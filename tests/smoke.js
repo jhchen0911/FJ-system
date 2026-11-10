@@ -13276,6 +13276,38 @@ async function newPage(browser, width, height) {
     check('v6.0.221 包商評分測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.221 改版第 7 步 7c 加碼④：分段拔樁（只顯示；批次與計費天數直接用 FJC.todo.rentStatus／rentBatchList，Lotion 11/10 口徑）──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepP = PROJECTS;
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old');
+        Object.keys(localStorage).filter((k) => /^pj7_open_/.test(k)).forEach((k) => localStorage.removeItem(k));
+        Q = [{ id: 'qR1', name: '範例工程R1', client: '甲營造', code: 'R1', date: '2026-07-01', awarded: true, rentEnd: 'removeDone', _mt: 1, costs: [],
+          items: [{ desc: '鋼軌樁打設及拔除（租期 30 天）', unit: '支', qty: 100, price: 1000, ot: '20' }],
+          dailyLogs: [{ id: 'a', date: '2026-08-01', progressRows: [{ itemIdx: 0, qty: 100, ph: 'install' }] },
+            { id: 'b', date: '2026-09-10', progressRows: [{ itemIdx: 0, qty: 40, ph: 'remove', batchDone: true }] },
+            { id: 'c', date: '2026-09-20', progressRows: [{ itemIdx: 0, qty: 60, ph: 'remove', batchDone: true }] }] }];
+        PROJECTS = []; _prjSync();
+        localStorage.setItem('pj7_open_remove', '1'); openProj('qR1'); await T(200);
+        const box = document.getElementById('pj-body-remove'), tx = box ? box.textContent.replace(/\s+/g, ' ') : '';
+        const st = FJC.todo.rentStatus(Q[0], 0, null, localToday());
+        // 100×(9/1～9/10＝10 天)＋60×(9/11～9/20＝10 天)＝40×10＋60×20＝1600 支·天 × 20 元
+        out.calc = st && st.qtyDays === 1600 && st.amount === 32000 && st.batches.length === 2 && st.batches[0].days === 10 && st.batches[1].days === 20;
+        out.show = /第 1 批/.test(tx) && /2026-09-10/.test(tx) && /第 2 批/.test(tx) && /2026-09-20/.test(tx) && /逾期租金約 NT\$ 32,000/.test(tx) && /拔除完成日（分批/.test(tx);
+        const tds = Array.from(box.querySelectorAll('tbody tr')).map((tr) => Array.from(tr.children).map((td) => td.textContent.replace(/^.*?：|\s/g, '')).join('|'));
+        out.rows = tds.length === 2 && /40\|10$/.test(tds[0]) && /60\|20$/.test(tds[1]);
+        out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; PROJECTS = keepP; localStorage.removeItem('pj7_open_remove');
+      return out;
+    });
+    check('v6.0.221 分段拔樁（寬 ' + W + '）：拆除拔樁那一步列出每批完成日、支數、逾期計費天數（含完成當天、下一批隔天起算），數字跟請款用的同一份算法', !r.err && r.calc && r.show && r.rows && r.noHScroll, JSON.stringify(r));
+    check('v6.0.221 分段拔樁測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

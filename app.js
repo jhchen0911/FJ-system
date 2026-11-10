@@ -392,7 +392,7 @@ function _rentStatus(q,idx,endDate){return FJC.todo.rentStatus(q,idx,endDate,loc
 // v6.0.107 拔除完成日模式的分批逾期：期間 [startISO, endISO]（含頭含尾）內的「支·天」
 //   批次＝日報拔除列勾「本次拔除完成」的那天為該批完成日、上次勾選到這次之間的拔除數量為該批數量；
 //   沒有任何勾選＝每天的拔除各算一批；拔除階段完工日報＝其餘全部在那天完成。
-//   每批計到完成日前一天（完成當天已拔走）；尚未完成的數量計到 endISO（含）。
+//   每批計到完成日（含完成當天），下一批從上一批完成日隔天起算（Lotion 11/10 口徑：100 支、第一批拔 40 支＝100 支×到第一批完成日的逾期天數，其餘 60 支再從隔天算到第二批完成日）；尚未完成的數量計到 endISO（含）。
 function _rentBatchList(pg){return FJC.todo.rentBatchList(pg);}   // 5b：calc/todo.js
 function _rentBatchQtyDays(pg,qty,startISO,endISO){return FJC.todo.rentBatchQtyDays(pg,qty,startISO,endISO);}   // 5b：calc/todo.js
 // v6.0.107 租期結束日口徑（報價條件第 14 條）：q.rentEnd＝'removeFirst' 拔除（拆除）第一天（舊案預設）／'removeDone' 拔除（拆除）完成日（新報價預設）
@@ -43927,7 +43927,7 @@ function _pj7Steps(q,st){
     {k:'addon',l:'追加',done:true,info:adds?('現場追加 '+adds+' 筆'):'沒有現場追加',body:adds?function(){return _pjAddonHtml(q);}:null},
     {k:'log',l:'日報',done:stage||st.physPct>=99.5,info:st.logs.length?('日報 '+st.logs.length+' 篇・最近 '+(last.date||'')+(st.hasRep?('・進度 '+Math.round(st.physPct)+'%'):'')):'還沒有日報',body:function(){return _pjLogHtml(q,st);}},
     {k:'inv',l:'請款',done:billedOk,info:st.invs.length?('已請 '+st.invs.length+' 期 NT$ '+fmt(st.billed)+(st.ar>0?('・待收 '+fmt(st.ar)):'')):'還沒請款',body:function(){return _pjInvHtml(q,st);}},
-    {k:'remove',l:'拆除拔樁',done:stage&&!st.rent.length,info:st.rent.length?('租期已過 '+st.rent.length+' 項（看「請款」的逾期租金）'):(stage?'已完工':'施工中')},
+    {k:'remove',l:'拆除拔樁',done:stage&&!st.rent.length,info:st.rent.length?('租期已過 '+st.rent.length+' 項（看「請款」的逾期租金）'):(stage?'已完工':'施工中'),body:function(){return _pjRemoveHtml(q);}},
     {k:'settle',l:'完工結算',done:st.done,info:_stlInfo(q)||(st.done?'合約已完工結算':'還沒完工結算（營造廠結算書來了，在這裡逐項填數量對帳）'),body:function(){return _pjSettleHtml(q);}},
     {k:'ret',l:'保留款',done:!!q.closed||(st.done&&st.retHeld<=0),info:st.retHeld>0?('預扣中 NT$ '+fmt(st.retHeld)):'沒有預扣保留款'},
     {k:'close',l:'結案',done:!!q.closed,info:q.closed?('已結案 '+(q.closedAt?new Date(q.closedAt).toLocaleDateString('zh-TW'):'')):(st.done?'可以結案':'進行中'),body:function(){return _pjCloseHtml(q,st);}}
@@ -44116,6 +44116,30 @@ _decReg('vendorEval',{
   reject:function(x,why){return _veSave(x.qid,x.v,{skip:1,why:String(why||'不評').slice(0,120)});},
   edit:function(x){_veModal(x);}
 });
+// ══════════ 改版第 7 步 7c 加碼④：分段拔樁（v6.0.221，只顯示；Lotion 11/10：分階段計逾期租金本來就有，不加新規則、不改算法）══════════
+// 專案「拆除拔樁」那一步列出每個有租期的工項、每一批（完成日、支數、逾期計費天數），資料直接用 FJC.todo.rentStatus（拔除完成日模式的 batches＝rentBatchQtyDays）
+// 與 rentBatchList（還沒逾期也列已完成的批次），不另算一份
+function _pjRemoveHtml(q){
+  var L=[];try{L=FJC.todo.rentScan(q,null,localToday())||[];}catch(e){_err('_pjRemoveHtml',e);}
+  L=L.slice().sort(function(a,b){return a.idx-b.idx;});
+  if(!L.length)return '<div style="font-size:12px;color:var(--b3)">沒有約定租期的工項，或日報還沒登錄打設</div>';
+  var mode=_rentEndMode(q),h='<div style="font-size:12px;color:var(--b4);margin:2px 0 8px">租期結束日：'+(mode==='removeDone'?'拔除完成日（分批：每批計到該批完成日，下一批從隔天起算）':'拔除第一天')+'。逾期租金在「請款」那一步照這裡的批次請。</div>';
+  L.forEach(function(s){
+    var pg=_itemProgress(q,s.idx),B=_rentBatchList(pg);
+    h+='<div style="margin:8px 0 4px;font-size:12.5px;font-weight:800;color:var(--b5)">'+esc(s.desc)+'</div>'
+      +'<div style="font-size:11.5px;color:var(--b4);margin-bottom:4px">租期 '+s.days+' 天・打設完成 '+esc(s.installDate||'')+'・到期 '+esc(s.expiry||'')+(s.overDays>0?('・<b style="color:var(--red)">已逾期 '+s.overDays+' 天</b>'):'・還沒逾期')
+      +(s.amount>0?('・逾期租金約 NT$ '+fmt(s.amount)):'')+'</div>';
+    var rows=[];
+    if(s.batches&&s.batches.length){s.batches.forEach(function(b){rows.push([b.open?'還沒拔完':('第 '+b.no+' 批'),b.open?'—':esc(b.date||''),_rfmt(b.qty),String(b.days)]);});}
+    else{var n=0;B.closed.forEach(function(b){n++;rows.push(['第 '+n+' 批',esc(b.date),_rfmt(b.qty),'—']);});
+      if(B.stage)rows.push(['拔除階段完工',esc(B.stage),B.open>0?_rfmt(B.open):'—','—']);
+      else if(B.open>0)rows.push([B.closed.length?'還沒勾完成':'已拔（還沒勾完成）','—',_rfmt(B.open),'—']);}
+    h+=rows.length?_pjTable([{t:'批次'},{t:'完成日'},{t:'支數',r:1},{t:'逾期計費天數',r:1}],rows)
+      :'<div style="font-size:11.5px;color:var(--b3)">還沒開始拔除</div>';
+    if(mode==='removeDone'&&B.noTick&&(pg.remLogs||[]).length)h+='<div style="font-size:11px;color:#b26a00;margin-top:2px">日報的拔除列沒有勾「本次拔除完成」，每天的拔除各算一批</div>';
+  });
+  return h;
+}
 function stlSet(el){
   if(_isReaderUser){toast('唯讀帳號不能修改');return;}
   var qid=el.getAttribute('data-qid'),k=el.getAttribute('data-stl'),p=_prjOfQ(qid);if(!p||!k)return;
