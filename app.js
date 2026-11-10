@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.221';
+var APP_VERSION='v6.0.224';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -39129,25 +39129,15 @@ function _lineDraftApply(d,close){
     +'<div class="f"><label>日報日期'+(back?'（補傳）':'')+'</label><input id="ld-date" type="date" max="'+localToday()+'" value="'+esc(d0)+'" oninput="_ldDupHint(\''+escq(q.id)+'\')"></div>'
     +'<div id="ld-dup" style="font-size:12px;color:var(--red);margin:4px 0"></div>'
     +'<div class="f"><label>日報內容（可改）</label><textarea id="ld-txt" rows="6" style="width:100%;box-sizing:border-box">'+esc(txt)+'</textarea></div>'
+    +_dlRowsEditHtml(q,_dlPlan(q,txt).rows)
     +(_lineArr(pl.dayTexts).length?('<details style="font-size:11.5px;color:var(--b4);margin-top:6px"><summary>當天群組其他文字（'+_lineArr(pl.dayTexts).length+' 則）</summary><div style="white-space:pre-wrap">'+esc(_lineArr(pl.dayTexts).join('\n'))+'</div></details>'):'')
     +'<div style="font-size:11px;color:var(--b4);margin-top:6px">照片 '+photos.length+' 張會掛在這筆日報（LINE 照片）。這天已經有日報時，會先問你要合併還是取消。</div>',function(){
       var t=(gv('ld-txt')||'').trim(),dt=gv('ld-date')||'';
       if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){toast('請選日報日期');return false;}
       if(!Array.isArray(q.dailyLogs))q.dailyLogs=[];
       var ex=_ldExisting(q,dt);
-      var write=function(){
-        // 審查：寫進使用者確認的那筆（ex）；沒有確認過的日報才併進只有照片的那筆，都沒有就新建
-        var L0=ex||q.dailyLogs.find(function(L){return L&&L.date===dt&&!L.stopFrom&&L.photoOnly;});
-        // LINE 文字存成日報的「備註列」（itemIdx:-1）：之後再用日報表單提交時 _drMergeLog 會由列重算 progress，備註列不會被洗掉
-        var row={itemIdx:-1,qty:'',note:'【LINE】'+(back?('（'+S(pl.recvDate).slice(5)+' 補傳）'):'')+t};
-        if(L0){
-          if(!(L0.progressRows||[]).length&&L0.progress)L0.progressRows=[{itemIdx:-1,qty:'',note:String(L0.progress)}];   // 舊日報只有文字：先轉成備註列保留
-          _drMergeLog(q,L0,{progressRows:[row]});L0.linePhotos=(L0.linePhotos||[]).concat(photos).slice(0,30);
-        }
-        else q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:dt,workers:0,subWorkers:0,crews:[],progress:row.note,progressRows:[row],photos:[],linePhotos:photos.slice(0,30),equip:[],status:'work',by:'LINE 機器人（'+_meEmail()+' 確認）',src:'line',ts:Date.now()});
-        if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120);
-        _touch(q);persist();_draftMark(d.id,'applied',{resultId:q.id});close();toast('已寫入 '+dt+' 施工日報');
-      };
+      var qr=_dlRowsRead();   // v6.0.224 拆出的工項數量（表格裡改過的）
+      var write=function(){_dlWrite(q,d,dt,t,qr,photos);close();toast('已寫入 '+dt+' 施工日報'+(qr.length?('（工項數量 '+qr.length+' 筆）'):''));};
       if(!ex){write();return;}
       // v6.0.121 同工地同一天已有確認過的日報：不自動合併，問清楚（取消＝草稿保留待確認）
       setTimeout(function(){showConfirm('重複，請確認：'+dt+' 已有日報',
@@ -41481,7 +41471,7 @@ function gtasksAuth(){
 var _DEC={},_DEC_BUSY={},_DEC_OPEN={},_DEC_READY={};   // v6.0.179：卡片預設收起；展開過且明細裡的照片／PDF 載入完成（_DEC_READY）才能按確認
 function _decIsAdmin(){try{return !_fbUser||(!!_isAdminUser&&!_isReaderUser);}catch(e){return false;}}
 function _decFieldsHtml(fs){var adm=_decIsAdmin();return '<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12.5px">'+(fs||[]).filter(function(f){return f&&(!f.money||adm);}).map(function(f){return '<div style="color:var(--b4)">'+esc(String(f.label||''))+'</div><div>'+esc(String(f.value==null?'':f.value))+'</div>';}).join('')+'</div>';}
-var _DEC_DRAFT_TYPES={qchg:1,dailyOut:1,vendorBill:1,qverfix:1,qsend:1,frtRate:1,matBill:1,steelPrice:1};   // 走拍板卡的草稿類型：AI 草稿清單（_draftPending）不再列
+var _DEC_DRAFT_TYPES={qchg:1,dailyOut:1,vendorBill:1,qverfix:1,qsend:1,frtRate:1,matBill:1,steelPrice:1,dailyLog:1};   // 走拍板卡的草稿類型：AI 草稿清單（_draftPending）不再列
 function _decReg(kind,spec){
   if(!spec||typeof spec.detail!=='function'){_err('_decReg',new Error(kind+'：沒有 detail，不准註冊（確認前一定要看得到完整內容）'));return false;}
   _DEC[kind]=spec;return true;
@@ -44185,6 +44175,62 @@ _decReg('steelPrice',{
   edit:function(d){var o=_m8StlClean(d.payload),H=(o.items.find(function(i){return i.cat==='H';})||{}).pct,P=(o.items.find(function(i){return i.cat==='P';})||{}).pct,IN='width:100%;padding:5px 7px;border:1px solid var(--b2);border-radius:6px';
     showConfirm('改中鋼盤價','<div class="fg fg2" style="gap:8px"><div class="f"><label>月份（YYYY-MM）</label><input id="stl-ym" value="'+esc(o.ym)+'" style="'+IN+'"></div><div class="f"><label>H 型鋼漲跌（%）</label><input id="stl-h" type="number" step="any" value="'+esc(H==null?'':String(H))+'" style="'+IN+'"></div><div class="f"><label>鋼板漲跌（%）</label><input id="stl-p" type="number" step="any" value="'+esc(P==null?'':String(P))+'" style="'+IN+'"></div></div>',
       function(){var it=[];if(gv('stl-h')!=='')it.push({cat:'H型鋼',pct:gv('stl-h')});if(gv('stl-p')!=='')it.push({cat:'鋼板',pct:gv('stl-p')});d.payload=Object.assign({},d.payload,{ym:gv('stl-ym'),items:it,edited:1});setTimeout(function(){try{if(_DEC.steelPrice.ok(d))_decRefresh('steelPrice');}catch(e){_err('steelPrice.edit',e);}},50);},false,null,false);}
+});
+// ══════════ v6.0.224 請款鏈 2：LINE 日報草稿帶工項數量（陳軒派工 11/10，Lotion 定案「拆數量、Lotion 確認才入帳」；第 2 層）══════════
+// LINE 日報草稿（type dailyLog）改走首頁拍板卡 dlQty：FJC.dl.parse 把回報文字拆成「工項＋數量＋打設或拔除＋本段完成」，
+// 卡片附原文、照片、每列累計（已確認的日報＋這次）跟合約數量比（超過標紅）；拆不出來的標「待確認」不猜。確認才寫進日報 progressRows。
+function _dlItems(q){return (q&&Array.isArray(q.items))?q.items:[];}
+function _dlPlan(q,text){var P0=FJC.dl.parse(text,_dlItems(q)),its=_dlItems(q);
+  P0.rows.forEach(function(r){if(!(r.itemIdx>=0))return;var it=its[r.itemIdx]||{};r.name=String(it.desc||'').split('\n')[0].slice(0,40);r.target=Math.abs(parseFloat(it.qty)||0);r.iu=String(it.unit||'');
+    r.before=FJC.dl.cumOf(q.dailyLogs,r.itemIdx,r.ph,function(x){return _prPhase(q,x);});r.after=Math.round((r.before+r.qty)*1000)/1000;r.over=r.target>0&&r.after>r.target+1e-9;});
+  return P0;}
+var _DL_PH_T={install:'打設',remove:'拔除'};
+function _dlRowsHtml(P0){if(!P0.rows.length)return '<div style="color:var(--b4)">文字裡沒有拆出工項數量（只會存成文字備註）</div>';
+  return '<table style="width:100%;font-size:12px;border-collapse:collapse"><tr><th style="text-align:left">工項</th><th>數量</th><th>打設／拔除</th><th>累計／合約</th></tr>'+P0.rows.map(function(r){
+    if(!(r.itemIdx>=0))return '<tr style="background:#fff8e1"><td style="padding:2px 4px"><b style="color:#b26a00">待確認</b>：'+esc(r.text)+'<div style="font-size:11px;color:#b26a00">'+esc(r.why)+'</div></td><td style="text-align:center">'+esc(String(r.qty))+' '+esc(r.unit)+'</td><td style="text-align:center">'+esc(_DL_PH_T[r.ph]||'')+'</td><td></td></tr>';
+    return '<tr'+(r.over?' style="background:#ffebee"':'')+'><td style="padding:2px 4px">'+esc(r.name)+'<div style="font-size:11px;color:var(--b4)">原文：'+esc(r.text)+'</div></td><td style="text-align:center">'+esc(String(r.qty))+' '+esc(r.iu||r.unit)+'</td><td style="text-align:center">'+esc(_DL_PH_T[r.ph]||'')+(r.batchDone?'<br><span style="font-size:11px">本段完成</span>':'')+'</td><td style="text-align:center;'+(r.over?'color:#c62828;font-weight:700':'')+'">'+esc(String(r.after))+' ／ '+esc(String(r.target||'—'))+(r.over?'<br>超過合約':'')+'</td></tr>';}).join('')+'</table>'
+    +(P0.skip.length?'<div style="font-size:11px;color:var(--b4);margin-top:4px">不算工項：'+esc(P0.skip.join('、'))+'</div>':'');}
+// 確認視窗（修改）裡可以改的表格：每列選工項、數量、打設／拔除、本段完成；「不記」＝這列只留在文字裡
+function _dlRowsEditHtml(q,rows){var its=_dlItems(q),IN='padding:3px 5px;border:1px solid var(--b2);border-radius:6px;font-size:12px';if(!rows.length)return '';
+  var opt=function(sel){return '<option value="-1">（不記）</option>'+its.map(function(it,i){if(!it||it.sec||it.spare||!String(it.desc||'').trim())return '';return '<option value="'+i+'"'+(i===sel?' selected':'')+'>'+esc(String(it.desc).split('\n')[0].slice(0,30))+'</option>';}).join('');};
+  return '<div style="font-size:12px;font-weight:700;margin-top:8px">拆出的工項數量（確認才寫進日報）</div>'+rows.map(function(r){return '<div class="ldq-row" style="border:1px solid var(--b1);border-radius:8px;padding:6px;margin-top:4px'+(r.itemIdx>=0?'':';background:#fff8e1')+'"><div style="font-size:11px;color:var(--b4)">'+(r.itemIdx>=0?'':'<b style="color:#b26a00">待確認</b> ')+'原文：'+esc(r.text)+'</div>'
+    +'<select class="ldq-i" style="'+IN+';width:100%;margin:3px 0">'+opt(r.itemIdx)+'</select><div style="display:flex;gap:6px;align-items:center"><input class="ldq-q" type="number" inputmode="decimal" value="'+esc(String(r.qty))+'" style="'+IN+';width:80px"><select class="ldq-p" style="'+IN+'"><option value="install"'+(r.ph!=='remove'?' selected':'')+'>打設</option><option value="remove"'+(r.ph==='remove'?' selected':'')+'>拔除</option></select><label style="font-size:12px"><input type="checkbox" class="ldq-d"'+(r.batchDone?' checked':'')+'> 本段完成</label></div></div>';}).join('');}
+function _dlRowsRead(){var out=[];document.querySelectorAll('.ldq-row').forEach(function(el){var i=parseInt((el.querySelector('.ldq-i')||{}).value,10),qty=parseFloat((el.querySelector('.ldq-q')||{}).value);if(i>=0&&qty>0)out.push({itemIdx:i,qty:qty,ph:(el.querySelector('.ldq-p')||{}).value==='remove'?'remove':'install',batchDone:!!(el.querySelector('.ldq-d')||{}).checked});});return out;}
+// 寫進日報：LINE 文字一列備註（itemIdx -1）＋確認過的工項數量列（note 記「【LINE】」）
+function _dlWrite(q,d,dt,t,qr,photos){var S=_draftS,pl=(d.payload&&typeof d.payload==='object')?d.payload:{},back=!!pl.backfill;if(!Array.isArray(q.dailyLogs))q.dailyLogs=[];
+  // 審查：寫進使用者確認的那筆（ex）；沒有確認過的日報才併進只有照片的那筆，都沒有就新建
+  var ex=_ldExisting(q,dt),L0=ex||q.dailyLogs.find(function(L){return L&&L.date===dt&&!L.stopFrom&&L.photoOnly;});
+  // LINE 文字存成日報的「備註列」（itemIdx:-1）：之後再用日報表單提交時 _drMergeLog 會由列重算 progress，備註列不會被洗掉
+  var row={itemIdx:-1,qty:'',note:'【LINE】'+(back?('（'+S(pl.recvDate).slice(5)+' 補傳）'):'')+t};
+  var rows=[row].concat((qr||[]).map(function(r){return {itemIdx:r.itemIdx,qty:r.qty,ph:r.ph,batchDone:!!r.batchDone,note:'【LINE】'};}));
+  if(L0){
+    if(!(L0.progressRows||[]).length&&L0.progress)L0.progressRows=[{itemIdx:-1,qty:'',note:String(L0.progress)}];   // 舊日報只有文字：先轉成備註列保留
+    _drMergeLog(q,L0,{progressRows:rows});L0.linePhotos=(L0.linePhotos||[]).concat(photos).slice(0,30);
+  }
+  else q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:dt,workers:0,subWorkers:0,crews:[],progress:row.note,progressRows:rows,photos:[],linePhotos:photos.slice(0,30),equip:[],status:'work',by:'LINE 機器人（'+_meEmail()+' 確認）',src:'line',ts:Date.now()});
+  if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120);
+  _touch(q);persist();return _draftMark(d.id,'applied',{resultId:q.id});}
+function _dlOf(d){var S=_draftS,pl=(d&&d.payload&&typeof d.payload==='object')?d.payload:{},q=(Q||[]).find(function(x){return x&&x.id===pl.qid;})||null,txt=_lineArr(pl.answers).join('\n');
+  var dt=/^\d{4}-\d{2}-\d{2}$/.test(S(pl.date))?S(pl.date):localToday();return {pl:pl,q:q,txt:txt,dt:dt,plan:q?_dlPlan(q,txt):{rows:[],skip:[]},photos:_lineArr(pl.photos).filter(function(x){return /^line\//.test(x);})};}
+_decReg('dlQty',{
+  title:'施工日報（LINE）',todo:function(n){return 'LINE 施工日報待確認 '+n+' 筆';},sub:'確認＝照卡片寫進日報（工項數量＋文字）；待確認的列只留在文字裡；修改＝逐列選工項、改數量、改日期；退回＝不寫',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},
+  list:function(){return Object.keys(DRAFTS||{}).map(function(k){return DRAFTS[k];}).filter(function(d){return d&&d.type==='dailyLog'&&d.status==='pending'&&_DRAFT_ID.test(_draftS(d.id));});},
+  key:function(d){return d.id;},
+  head:function(d){var o=_dlOf(d);return (o.q?String(o.q.name||'').slice(0,20):'工地待分類（'+_draftS(o.pl.site).slice(0,10)+'）')+'　'+o.dt;},
+  body:function(d){var o=_dlOf(d),R=o.plan.rows,n=R.filter(function(r){return r.itemIdx>=0;}).length,u=R.length-n,ov=R.filter(function(r){return r.over;}).length;
+    return '<div style="font-size:11.5px;color:'+(ov||u?'#b26a00':'var(--b4)')+'">'+(o.q?('工項數量 '+n+' 列'+(u?'，待確認 '+u+' 列':'')+(ov?'，<b style="color:#c62828">超過合約 '+ov+' 列</b>':'')):'先按「修改」選工程')+'</div>';},
+  detail:function(d){var o=_dlOf(d),ex=o.q?_ldExisting(o.q,o.dt):null;
+    return '<div style="font-size:12.5px;line-height:1.7">'+(o.pl.backfill?'<div style="color:#b26a00">補傳：'+esc(_draftS(o.pl.recvDate).slice(5))+' 才收到</div>':'')+(ex?'<div style="color:#b26a00">'+esc(o.dt)+' 已經有一筆日報，確認會合併進去</div>':'')
+      +'<b>LINE 原文</b><div style="white-space:pre-wrap;background:var(--b0,#f6f6f6);padding:6px 8px;border-radius:6px">'+esc(o.txt||'（沒有文字）')+'</div>'
+      +(o.photos.length?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">'+o.photos.slice(0,6).map(function(p){return '<img data-lpath="'+esc(p)+'" alt="" style="width:88px;height:88px;object-fit:cover;border-radius:6px;background:var(--b1)">';}).join('')+'</div>':'')
+      +'<div style="margin-top:8px"><b>拆出的工項數量</b>（規則拆解，請核對原文）</div>'+(o.q?_dlRowsHtml(o.plan):'<div style="color:#c62828">對不到工程，請按「修改」選工程</div>')+'</div>';},
+  after:function(b){try{_lineImgFill(b);}catch(e){_err('dlQty.after',e);}},
+  ok:function(d){var o=_dlOf(d);if(!o.q){toast('對不到工程，請按「修改」選工程');return false;}
+    var qr=o.plan.rows.filter(function(r){return r.itemIdx>=0&&r.qty>0;}).map(function(r){return {itemIdx:r.itemIdx,qty:r.qty,ph:r.ph||'install',batchDone:!!r.batchDone};});
+    return Promise.resolve(_dlWrite(o.q,d,o.dt,o.txt,qr,o.photos)).then(function(m){toast('已寫入 '+o.dt+' 施工日報'+(qr.length?'（工項數量 '+qr.length+' 筆）':''));return m!==false;});},
+  reject:function(d,why){_draftMark(d.id,'rejected',{reason:String(why||'不寫').slice(0,200)});return true;},
+  edit:function(d){_lineDraftApply(d,function(){try{_decRefresh('dlQty');}catch(e){_err('dlQty.edit',e);}});}
 });
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

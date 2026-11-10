@@ -8150,7 +8150,7 @@ async function newPage(browser, width, height) {
         /* 1. 現場追加草稿 → 確認 → q.addons（不進請款單） */
         DRAFTS = { dl5551: { id: 'dl5551', type: 'addon', by: 'line-bot', byName: 'LINE 機器人', at: 1, status: 'pending', summary: '現場追加：內湖興中路　鋼板樁 12 支', payload: { qid: 'qL', groupId: 'Gsite9999', date: '2026-10-22', text: '#追加 鋼板樁 12 支', qty: 12, unit: '支', photos: ['line/group/Gsite9999/2026-10-22/p1.jpg', 'javascript:alert(1)'] } },
           dd99992026: { id: 'dd99992026', type: 'dailyLog', by: 'line-bot', at: 2, status: 'pending', summary: '施工日報', payload: { qid: 'qL', groupId: 'Gsite9999', date: '2026-10-22', answers: ['1. 打設 H 型鋼 8 支'], dayTexts: ['早安'], photos: ['line/group/Gsite9999/2026-10-22/p2.jpg'], replied: true } } };
-        const lh = _draftListHtml(); out.list = /現場追加（LINE）/.test(lh) && /data-lpath="line\/group/.test(lh) && /打設 H 型鋼/.test(lh);
+        const lh = _draftListHtml(); out.list = /現場追加（LINE）/.test(lh) && /data-lpath="line\/group/.test(lh) && !/打設 H 型鋼/.test(lh) && _DEC.dlQty.list().some(d => d.id === 'dd99992026');   // v6.0.224 施工日報改走拍板卡 dlQty
         draftApply('dl5551'); document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 30));
         const q = Q[0]; out.addon = (q.addons || []).length === 1 && q.addons[0].qty === 12 && q.addons[0].status === 'confirmed' && q.addons[0].photos.length === 1 && DRAFTS.dl5551.status === 'applied' && !!q._mt;
         /* 2. 施工日報草稿 → 確認 → q.dailyLogs */
@@ -11622,6 +11622,43 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.208 進退料 M5 進出數量對不上：只算已確認、轉場兩邊都算、退得比進得多馬上出卡（沒改好不能確認）、自有租料分開、退回寫原因不再問、沒結案的剩料不出卡、結案後還有剩出卡、已安排 3 天後再問', r.none && r.neg && r.negOkBlock && r.negFixed && r.ownSplit && r.negKeep && r.norm && r.notClosed && r.left && r.ack && r.again && r.keep, JSON.stringify(r));
     check('v6.0.208 數量對不上 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── v6.0.224 請款鏈 2：LINE 日報草稿帶工項數量 → 拍板卡 dlQty（拆出工項＋數量＋打設／拔除＋本段完成；累計跟合約比、超過標紅；待確認不猜；確認才寫 progressRows）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepD = DRAFTS, keepMark = window._draftMark, keepP = window.persist;
+      try {
+        window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        Q = [{ id: 'qD', name: '測試日報案', awarded: true, t: { total: 0 }, items: [{ desc: '鋼板樁 III型 L=12M 打設', unit: '支', qty: 30 }, { desc: '鋼板樁 III型 L=12M 拔除', unit: '支', qty: 30 }, { desc: 'H型鋼樁 H300 L=15M 打設＋拔除', unit: '支', qty: 20 }],
+          dailyLogs: [{ id: 'dx', date: '2026-10-10', progressRows: [{ itemIdx: 0, qty: 25 }] }] }];
+        DRAFTS = { dq111111: { id: 'dq111111', type: 'dailyLog', by: 'line-bot', at: 1, status: 'pending', summary: '施工日報', payload: { qid: 'qD', date: '2026-10-14', answers: ['1. 今日打設鋼板樁，共8支\n2. H300 型鋼樁打設 5 支，北側這段完成\n3. 地錨 4 處\n4. 人數 6人'], photos: ['line/group/G1/2026-10-14/p1.jpg'] } } };
+        const L = _decItems('dlQty');
+        out.card = L.length === 1 && /待確認 1 列/.test(_DEC.dlQty.body(L[0])) && /超過合約 1 列/.test(_DEC.dlQty.body(L[0]));
+        const det = _DEC.dlQty.detail(L[0]);
+        out.detail = /今日打設鋼板樁/.test(det) && /33 ／ 30/.test(det) && /超過合約/.test(det) && /待確認/.test(det) && /data-lpath="line\/group/.test(det) && /不算工項：/.test(det) === false;
+        out.notInList = !/今日打設鋼板樁/.test(_draftListHtml());
+        out.ok = (await _DEC.dlQty.ok(L[0])) === true && DRAFTS.dq111111.status === 'applied';
+        const D = Q[0].dailyLogs.find(x => x.date === '2026-10-14'), pr = (D && D.progressRows) || [];
+        out.rows = pr.length === 3 && pr[0].itemIdx === -1 && /【LINE】1\. 今日打設鋼板樁/.test(pr[0].note) && pr[1].itemIdx === 0 && pr[1].qty === 8 && pr[1].ph === 'install' && !pr[1].batchDone && pr[2].itemIdx === 2 && pr[2].qty === 5 && pr[2].batchDone === true && D.linePhotos.length === 1 && !!Q[0]._mt;
+        out.cum = _itemProgress(Q[0], 0).instQty === 33 || FJC.dl.cumOf(Q[0].dailyLogs, 0, 'install', x => _prPhase(Q[0], x)) === 33;
+        // 修改：確認視窗裡可以逐列改工項／數量（地錨那列選「不記」）
+        DRAFTS.dq222222 = { id: 'dq222222', type: 'dailyLog', by: 'line-bot', at: 2, status: 'pending', summary: '施工日報', payload: { qid: 'qD', date: '2026-10-15', answers: ['鋼板樁拔除 6 支'], photos: [] } };
+        _DEC.dlQty.edit(DRAFTS.dq222222); await new Promise(res => setTimeout(res, 60));
+        const qi = document.querySelector('.ldq-row .ldq-q'); out.editUi = !!qi && qi.value === '6' && document.querySelector('.ldq-row .ldq-i').value === '1';
+        if (qi) qi.value = '7';
+        document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 60));
+        const D2 = Q[0].dailyLogs.find(x => x.date === '2026-10-15');
+        out.edit = !!D2 && D2.progressRows.some(r => r.itemIdx === 1 && r.qty === 7 && r.ph === 'remove') && DRAFTS.dq222222.status === 'applied';
+        // 對不到工程：確認不寫
+        DRAFTS.dq333333 = { id: 'dq333333', type: 'dailyLog', by: 'line-bot', at: 3, status: 'pending', summary: '施工日報', payload: { qid: '', unmatched: true, site: '某地', date: '2026-10-15', answers: ['打設 3 支'] } };
+        out.unmatched = /先按「修改」選工程/.test(_DEC.dlQty.body(DRAFTS.dq333333)) && _DEC.dlQty.ok(DRAFTS.dq333333) === false && DRAFTS.dq333333.status === 'pending';
+      } finally { Q = keepQ; DRAFTS = keepD; window._draftMark = keepMark; }
+      return out;
+    });
+    check('v6.0.224 LINE 日報草稿拍板卡：拆出工項數量（打設／拔除、本段完成）、累計跟合約比超過標紅、拆不出的標待確認不寫、附原文與照片、不再列在 AI 草稿清單；確認才寫 progressRows；修改可逐列改；對不到工程不寫', Object.values(r).length === 9 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
   // ── v6.0.221 進退料 M8b：鋼價追蹤 → 建議調整買價（中鋼盤價草稿為主、主計總處指數備援、都沒有出保底卡）──

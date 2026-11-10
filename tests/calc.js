@@ -440,6 +440,19 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('每 M 重量：H 型鋼 CNS 1490／JIS G 3192:2014（H300＝93、H350＝135、H400＝172，H300x300 也認得）', MV.kgPerM('H300') === 93 && MV.kgPerM('H350') === 135 && MV.kgPerM('H400') === 172 && MV.kgPerM('H300x300') === 93 && MV.kgPerM('h 350') === 135);
   check('每 M 重量：鋼板樁 JIS（III＝60、IV＝76.1、FSP-IV 也認得）、鋼軌（50KG/M＝50.4）、不認得的回 null', MV.kgPerM('III') === 60 && MV.kgPerM('FSP-IV') === 76.1 && MV.kgPerM('IV') === 76.1 && MV.kgPerM('50KG/M') === 50.4 && MV.kgPerM('37kg') === 37.2 && MV.kgPerM('覆工板') === null && MV.kgPerM('') === null);
 }
+// ── v6.0.224 請款鏈 2：LINE 日報文字拆工項數量（calc/dailyparse.js）。合成日報 tests/synthetic/daily-line.json：cases 12 則（寫規則時用的）＋ holdout 8 則（規則寫好才加；第一次跑 6/10，修 4 條通則後全對，已不算盲測）
+{
+  const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl, F = require(path.join(__dirname, 'synthetic', 'daily-line.json'));
+  const score = (set) => { let ok = 0, tot = 0, miss = []; F[set].forEach((c, i) => { const R = DL.parse(c.text, F.items).rows; tot += c.expect.length; if (R.length !== c.expect.length) miss.push(set + i + ' 列數 ' + R.length + '≠' + c.expect.length);
+    c.expect.forEach((e, j) => { const r = R[j]; if (r && r.itemIdx === e[0] && r.qty === e[1] && (e[0] < 0 || r.ph === e[2]) && r.batchDone === e[3]) ok++; else miss.push(set + i + '#' + j); }); }); return { ok, tot, miss }; };
+  const a = score('cases'), b = score('holdout');
+  console.log('  （LINE 日報拆數量準確度：cases ' + a.ok + '/' + a.tot + '、holdout ' + b.ok + '/' + b.tot + '）');
+  check('LINE 日報拆數量：合成日報 20 則逐列對（工項、數量、打設／拔除、本段完成；對不到或兩個一樣像＝待確認 -1）', !a.miss.length && !b.miss.length, a.miss.concat(b.miss).join('、'));
+  const its = F.items;
+  check('LINE 日報拆數量：規格數字（H350）、L=12M、第 2 層、怪手 1 台、人數不算數量；國字數量（十五支）', DL.parse('H350 支撐 架設 72 公尺', its).rows[0].qty === 72 && DL.parse('鋼板樁打設 L=12M 共 8 支', its).rows[0].qty === 8 && !DL.parse('怪手1台', its).rows.length && DL.cn2n('十五') === 15 && DL.cn2n('二十') === 20 && DL.cn2n('三') === 3);
+  const logs = [{ date: '2026-11-01', progressRows: [{ itemIdx: 0, qty: 100 }, { itemIdx: 0, qty: 5, ph: 'remove' }] }, { date: '2026-11-02', photoOnly: true, progressRows: [{ itemIdx: 0, qty: 9 }] }];
+  check('LINE 日報拆數量：累計只算確認過的日報（只有照片的不算）、打設拔除分開', DL.cumOf(logs, 0, 'install', (r) => r.ph === 'remove' ? 'remove' : 'install') === 100 && DL.cumOf(logs, 0, 'remove', (r) => r.ph === 'remove' ? 'remove' : 'install') === 5);
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');
