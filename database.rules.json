@@ -172,6 +172,9 @@
             "rejReason": {
               ".validate": "newData.isString()"
             },
+            "dupOk": {
+              ".validate": "newData.isString() && newData.val().length <= 400"
+            },
             "by": {
               ".validate": "newData.isString()"
             },
