@@ -154,3 +154,10 @@ test('v6.0.227 詢價收件 inquiry：要工程名稱、來信或圖說；附件
   assert.match(D.build(Object.assign({}, base, { body: { type: 'inquiry', payload: { name: 'x' } } })).err, /至少要有/);
   assert.match(D.build(Object.assign({}, base, { body: { type: 'inquiry', payload: { name: 'x', mail: 'y', munger: { verdict: '好' } } } })).err, /只能是/);
 });
+
+test('v6.0.227 報價草稿可帶 est（成本單價）與 issues（圖說疑義）', () => {
+  const f = { name: '假丁案', items: [{ desc: '工項甲', unit: '支', qty: 2, price: 500 }] };
+  const r = D.build(Object.assign({}, base, { body: { type: 'quote', payload: { fields: f, est: [{ i: 0, cost: 350 }], issues: ['S2 與 A1 開挖深度不一致', 3] }, expect: { sub: 1000, tax: 50, total: 1050 } } }));
+  assert.ok(r.rec, r.err); assert.deepStrictEqual(r.rec.payload.est, [{ i: 0, cost: 350 }]); assert.deepStrictEqual(r.rec.payload.issues, ['S2 與 A1 開挖深度不一致']);
+  assert.match(D.build(Object.assign({}, base, { body: { type: 'quote', payload: { fields: f, est: [{ i: 5, cost: 1 }] }, expect: { sub: 1000, tax: 50, total: 1050 } } })).err, /i 不對/);
+});

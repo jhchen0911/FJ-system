@@ -13347,6 +13347,40 @@ async function newPage(browser, width, height) {
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.227 報價拍板卡加強（陳軒 11/10 晚佇列第 2 件）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keep = { Q: Q.slice(), D: DRAFTS, DH: DEAL_HIST, CH: COST_HIST };
+      try {
+        localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_v7old');
+        window.toast = () => {}; window._immediateUpload = () => {}; window._fbWriteAll = () => {};
+        window._draftMark = (id, st, ex) => { if (DRAFTS[id]) { DRAFTS[id].status = st; DRAFTS[id].ex = ex; } return Promise.resolve(true); };
+        DEAL_HIST = [{ rid: 'x#0', key: _normName('範例水平支撐組立'), desc: '範例水平支撐組立', unit: '噸', price: 6000, date: '2026-01-01' }, { rid: 'y#0', key: _normName('範例水平支撐組立'), desc: '範例水平支撐組立', unit: '噸', price: 6000, date: '2026-02-01' }];
+        COST_HIST = [];
+        const f = { code: '1159901', client: '範例營造甲', name: '範例草稿報價', date: '2026-11-10', items: [{ sec: true, desc: '一、擋土' }, { desc: '範例鋼樁打設', unit: '支', qty: 10, price: 1000 }, { desc: '範例水平支撐組立', unit: '噸', qty: 10, price: 4000 }], t: { sub: 50000, tax: 2500, total: 52500 } };
+        DRAFTS = { dQd0001: { id: 'dQd0001', type: 'quote', by: 'ai@example.com', byName: 'AI', at: Date.now() - 1000, status: 'pending', summary: '新報價：範例草稿報價',
+          payload: { base: '', fields: f, est: [{ i: 1, cost: 700 }, { i: 2, cost: 4200 }], issues: ['S2 開挖深度 8.5M 與 A1 的 8.0M 不一致'], aim: { floor: 48000, target: 51000 } } } };
+        const x = document.createElement('div'); x.innerHTML = await Promise.resolve(_DEC.drf_quote.detail(DRAFTS.dQd0001)); const t = x.textContent;
+        out.prices = /底價NT\$ 48,000/.test(t) && /目標成交價NT\$ 51,000/.test(t) && /報價NT\$ 52,500/.test(t);
+        // 成本 10×700＋10×4,200＝49,000，毛利 1,000（2%）
+        out.gross = /NT\$ 49,000/.test(t) && /NT\$ 1,000（2%）/.test(t);
+        out.abn = /第 3 列 範例水平支撐組立/.test(t) && /比成交均價低 33%/.test(t) && /單價低於成本 4,200/.test(t) && !/第 2 列/.test(t);
+        out.issues = /S2 開挖深度 8\.5M/.test(t) && /直接存成正式報價/.test(t);
+        const n0 = Q.length;
+        const ok = await Promise.resolve(_DEC.drf_quote.ok(DRAFTS.dQd0001));
+        const q = Q.find((y) => y.name === '範例草稿報價');
+        out.saved = ok === true && Q.length === n0 + 1 && !!q && q.items.length === 3 && q.items[1].estCost === 700 && q.items[2].estCost === 4200 && DRAFTS.dQd0001.status === 'applied' && !!q.bidAim && q.bidAim.floor === 48000;
+        out.again = (await Promise.resolve(_DEC.drf_quote.ok(DRAFTS.dQd0001))) === false && Q.length === n0 + 1;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keep.Q; DRAFTS = keep.D; DEAL_HIST = keep.DH; COST_HIST = keep.CH;
+      return out;
+    });
+    check('v6.0.227 報價拍板卡加強：明細有三個價、毛利（成本單價來源）、異常單元（跟成交單價庫比 ±15%、低於成本）、圖說疑義；確認直接存成正式報價（成本單價、底價目標價一起存）', !r.err && r.prices && r.gross && r.abn && r.issues && r.saved && r.again, JSON.stringify(r));
+    check('v6.0.227 報價拍板卡加強測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.227 詢價收件卡（陳軒 11/10 晚佇列第 1 件）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

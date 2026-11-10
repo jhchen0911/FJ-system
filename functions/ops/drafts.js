@@ -170,6 +170,10 @@ function build(o) {
     fields.t = t;
     payload = { base, baseMt: bq ? (bq._mt || 0) : 0, baseName: bq ? S(bq.name, 200) : '', fields };
     const am = aimClean(pl.aim); if (am.err) return { err: am.err }; if (am.aim) payload.aim = am.aim;
+    // v6.0.227 報價拍板卡加強：est＝AI 估的成本單價（未稅，[{i, cost}]，i＝fields.items 第幾列；只有管理員看得到）、issues＝圖說疑義文字
+    const est = []; for (const x of arr(pl.est).slice(0, 300)) { const i = parseInt(x && x.i, 10), c = D.num(x && x.cost); if (!(i >= 0 && i < fields.items.length) || fields.items[i].sec) return { err: 'est 第 ' + (est.length + 1) + ' 筆的 i 不對' }; if (c == null || c < 0 || c > 1e9) return { err: 'est 第 ' + (i + 1) + ' 列成本單價不對' }; est.push({ i, cost: c }); }
+    if (est.length) payload.est = est;
+    const iss = arr(pl.issues).filter((t) => typeof t === 'string').map((t) => S(t, 300).trim()).filter(Boolean).slice(0, 30); if (iss.length) payload.issues = iss;
     summary = (base ? '修改：' : '新報價：') + S(fields.name, 80) + '／' + S(fields.client, 60) + '　合計 NT$ ' + fmt(t.total);
   } else if (type === 'inquiry') {
     const ic = inqClean(pl); if (ic.err) return { err: ic.err };
