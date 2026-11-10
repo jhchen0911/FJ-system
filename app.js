@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.212';
+var APP_VERSION='v6.0.213';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -11361,7 +11361,7 @@ function _toolPv(id,title,proj,body,opts){
   var h=document.getElementById(id);if(!h)return 0;
   try{return _a4Pv(h,_toolDocCss(opts),_toolDocHtml(title,proj,body),{landscape:!!(opts&&opts.landscape),cls:'page-wrap'});}catch(e){_err('_toolPv',e);return 0;}
 }
-// ══════════ 改版第 7 步①：共用 A4 單據引擎——報價、請款、合約、詢價單（v6.0.211）══════════
+// ══════════ 改版第 7 步①：共用 A4 單據引擎——報價、請款、合約、詢價單（v6.0.212）══════════
 // 一張單據＝一個「出件」函式（out），交出 {html 完整文件, fname 檔名, ls 橫式, native 原生列印}；
 // 「匯出 PDF」（_docPrint → _printViaIframe）與「右邊即時預覽」（_docPv）都用同一份 html，所以預覽＝PDF。
 // 各 out 的內容就是原本列印函式的內容（逐字搬過來），印出來一字不差：tools/golden/doc-print.js 逐張比指紋（tests/synthetic/docs.json）。
@@ -43031,7 +43031,7 @@ function _mvRentPickEdit(m){var f=_mvFin(m.id)||{},h=((f.hold&&f.hold.list)||[])
   var html=h.map(function(x,i){return '<div class="f"><label>'+esc(x.it||'')+'：'+esc(x.msg||'')+'</label><select id="mvp-'+i+'" style="width:100%">'+(x.opts||[]).map(function(id){if(id==='__new')return '<option value="__new">（不是同一家：新建一張租賃單）</option>';var o=find(id);return o?('<option value="'+esc(id)+'">'+esc((o.rt.vendor||'')+' '+_matLabel(o.rt)+'　'+(o.rt.pf||'')+'　在場 '+_rfmt(_mvRentOpenM(o.rt))+' M')+'</option>'):'';}).join('')+'</select></div>';}).join('');
   showConfirm('要掛哪一張租賃單',html,function(){var g=_mvFin(m.id,true);g.rentPick=g.rentPick||{};h.forEach(function(x,i){var v=gv('mvp-'+i);if(v)g.rentPick[x.ix]=v;});delete g.hold;g._mt=Date.now();saveMatMoveFin();
     var rf=function(){try{_decRefresh('mvHold');}catch(e){_err('_mvRentPickEdit',e);}};if(_mvApplyOk())_mvApplyAll().then(rf);else setTimeout(rf,50);},false,null,false);}
-// ══════════ 改版第 7 步②：5 個入口（今天、專案、報價、帳務、更多）＋「今天要做的事」（v6.0.212）══════════
+// ══════════ 改版第 7 步②：5 個入口（今天、專案、報價、帳務、更多）＋「今天要做的事」（v6.0.213）══════════
 // 桌面左側與手機下方列都只放 5 個；其餘頁面收在「更多」（page-more）。舊選單保留：「更多 › 切回舊版選單」＝本機 fy_nav_old='1'，
 // 舊選單最下面有「改用新版選單」切回來。只換選單與首頁的呈現，頁面本身、資料、權限都不動（canAccess 照舊）。
 function _nav5On(){try{return localStorage.getItem('fy_nav_old')!=='1';}catch(e){return true;}}
@@ -43148,9 +43148,12 @@ function _todayRender(el,badge,items){
     return '<div class="td-card'+(urg?' urg':'')+'"><div class="td-row"><span class="td-kind '+kind+'">'+(kind==='dec'?'要拍板':'提醒')+'</span><div style="flex:1;min-width:0"><div class="td-t" style="font-weight:700">'+esc(title||'')+'　'+its.length+' 件</div><div class="td-sub">'+its.map(function(it){return row(it,true);}).join('')+'</div></div></div></div>';
   };
   var h='';
+  // Lotion 11/10：手機下方列維持 5 個入口，日報改成「今天」最上面固定一張卡（工務一點就進日報）；看得到日報頁、不是唯讀帳號才顯示
+  var dr=false;try{dr=!ro&&canAccess('quickcost');}catch(e){_err('_todayRender.dr',e);}
+  if(dr)h+='<div class="td-card td-dr"><div class="td-row"><span class="td-kind rem" style="background:#e6f2ea;color:var(--g3)">日報</span><div class="td-main" data-act="dr" style="flex:1;min-width:0"><div class="td-t" style="font-weight:700">寫今天的日報 ›</div><div class="td-s">出工、進度、照片、支出</div></div></div></div>';
   dec.forEach(function(it){h+=card('dec','',[it],it.urgent);});
   now.forEach(function(g){h+=card('rem',g.c,g.its,true);});
-  if(!h)h='<div style="padding:14px;font-size:13px;color:var(--b4)"><svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 今天沒有要確認的事</div>';
+  if(!dec.length&&!now.length)h+='<div style="padding:14px;font-size:13px;color:var(--b4)"><svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 今天沒有要確認的事</div>';
   if(later.length){var n=later.reduce(function(a,g){return a+g.its.length;},0);h+='<details class="td-later"><summary>之後的 '+n+' 件</summary>'+later.map(function(g){return card('rem',g.c,g.its,false);}).join('')+'</details>';}
   if(hid)h+='<div style="padding:6px 14px 8px;font-size:11px;color:var(--b3)">已處理或延後的 '+hid+' 件先收起來了</div>';
   el.innerHTML=h;
@@ -43159,6 +43162,7 @@ function _todayRender(el,badge,items){
 }
 function _todayClick(e){
   var b=e.target.closest&&e.target.closest('[data-act],.td-main');if(!b)return;
+  if(b.getAttribute('data-act')==='dr'){go('quickcost');try{rQuickCost();}catch(x){_err('_todayClick.dr',x);}return;}   // 寫今天的日報
   var it=_tdCur[+b.getAttribute('data-i')];if(!it)return;
   var act=b.getAttribute('data-act');
   if(act==='done'){var o=_tdSnzGet();o[_tdKey(it)]={done:localToday(),sig:_tdSig(it)};_tdSnzSet(o);toast('已處理，先收起來（內容有變會再出現）');updateDashTodo();return;}
