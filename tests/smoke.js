@@ -7008,7 +7008,7 @@ async function newPage(browser, width, height) {
         const row = _retentionRows().find(x => x.proj === q.name);
         out.over = !!row && row.overdue && row.cond === q.deduct.retCond && row.pending === 15750;
         renderRetention(); const rl = document.getElementById('finance-retention-list'); out.ovHtml = !rl || (/已過期未退/.test(rl.innerHTML) && /拆除拔除完成/.test(rl.innerHTML) && /產生保留款退還請款單/.test(rl.innerHTML));
-        const items = []; _v6TodoItems(items); out.todo = items.some(x => x.type === 'ret_due' && /保留款測試案/.test(x.text));
+        const items = []; _v6TodoItems(items); out.todo = items.some(x => (x.type === 'ret_due' && /保留款測試案/.test(x.text)) || x.type === 'dec_retAsk');   // v6.0.224 新選單改由保留款請回卡
         /* 3-4 累計（含本期）／已退 */
         INV.find(x => x.id === 'RT1').retentionReturned = true;
         const cm = _retCum(INV.find(x => x.id === 'RT3'), 5250); out.cum = cm.acc === 15750 && cm.back === 5250 && _retCumTxt(cm) === '累計保留款（含本期）NT$ 15,750，已退 NT$ 5,250';
@@ -8058,7 +8058,7 @@ async function newPage(browser, width, height) {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
       const out = {};
-      try {
+      try {   localStorage.setItem('fy_nav_old', '1');   // v6.0.224：這段測的是舊選單的 AI 草稿清單（新選單改走拍板卡）
         const oT = window.toast; let msg = ''; window.toast = m => { msg = m; };
         const store = {};
         const mockDb = { ref: p => ({ set: v => { store[p] = JSON.parse(JSON.stringify(v)); return Promise.resolve(); }, update: v => { store[p] = Object.assign(store[p] || {}, v); return Promise.resolve(); }, on: () => {}, once: () => Promise.resolve({ val: () => null }) }) };
@@ -8139,7 +8139,7 @@ async function newPage(browser, width, height) {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
       const out = {};
-      try {
+      try {   localStorage.setItem('fy_nav_old', '1');   // v6.0.224：這段測的是舊選單的 AI 草稿清單（新選單改走拍板卡）
         const oT = window.toast; window.toast = () => {};
         const store = {}, cfg = { owners: {}, groups: {}, pending: { users: { Uabc123: { text: '你好', at: 1 } }, groups: { Gsite9999: { at: 1 } } } };
         const get = p => p.replace(/^fydata\/lineCfg\/?/, '').split('/').filter(Boolean).reduce((o, k) => (o == null ? undefined : o[k]), cfg);
@@ -10470,7 +10470,7 @@ async function newPage(browser, width, height) {
         Q[2].deduct.retDue = '2099-01-01'; out.manual = _retDueOf(Q[2]).src === 'manual' && _retDueOf(Q[2]).date === '2099-01-01'; delete Q[2].deduct.retDue;
         // 總覽：既有提醒照舊、5b 新增「可以確認結案」「租期 7 天內到期」
         go('dash'); updateDashTodo(); const t = document.getElementById('dash-todo-list').textContent;
-        out.dash = /提醒甲」1 個工項租期已逾期/.test(t) && /提醒甲 第\?期 逾期 5 天未收款/.test(t) && /保留款逾期未退：提醒丙/.test(t) && /可以確認結案：提醒丁/.test(t) && /「提醒乙」1 個工項租期 \d 天內到期/.test(t) && /提醒丁 報價已進版至 v2/.test(t);
+        out.dash = /提醒甲」1 個工項租期已逾期/.test(t) && /提醒甲 第\?期 逾期 5 天未收款/.test(t) && (/保留款逾期未退：提醒丙/.test(t) || /保留款到期可請回/.test(t)) && (/可以確認結案：提醒丁/.test(t) || /可以確認結案 \d+ 案/.test(t)) && /「提醒乙」1 個工項租期 \d 天內到期/.test(t) && /提醒丁 報價已進版至 v2/.test(t);
         out.data = { quotes: Q.map(q => { const c = JSON.parse(JSON.stringify(q)); delete c.rfqs; return c; }), invoices: INV, sens: { t4: { rfqs: Q[3].rfqs } }, now: Date.now() };   // 測試頁的時鐘是假的（2026-10-15），雲端要用同一個「現在」
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
       window.toast = oT; return out;
@@ -13388,6 +13388,25 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.224 結案拍板卡：可以結案才出卡（沒收完的不出）；明細有完工、各期收款、包商已付、材料退完、結案損益、超支工項、逐工項實際成本 CSV；確認走原本結案流程；退回先不結案；新選單舊待辦不重複、舊選單照舊', !r.err && r.list && r.one && r.detail && r.csv && r.ov && r.ok && r.skip && r.old, JSON.stringify(r));
     check('v6.0.224 結案拍板卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+  // ── v6.0.224 請款單匯款資料分 4 行（戶名／銀行／分行（代碼）／帳號）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      try {
+        out.parse = JSON.stringify(_bankParts('國泰世華建成分行(013)')) === JSON.stringify({ bank: '國泰世華', branch: '建成分行', code: '013' }) && _bankParts('奇怪的字串').bank === '奇怪的字串' && _bankParts('玉山銀行板橋分行（808）').branch === '板橋分行';
+        const iv = { id: 'iB1', project: '範例案', client: '範例營造', periodNo: 1, date: '2026-10-25', items: [], totals: { curTotal: 1000, tax: 50, total: 1050 } };
+        iv.items = [{ type: 'item', desc: '範例工項', unit: 'M', contractPrice: 100, contractQty: 10, curQty: 10, payRate: 100 }]; INV.push(iv); loadInvoice('iB1'); buildInvPreview();
+        const h = document.getElementById('inv-prev-html').innerHTML, d = document.createElement('div'); d.innerHTML = h; const t = d.textContent;
+        const b = _coBank(), bp = _bankParts(b.bank);
+        out.doc = t.indexOf('戶名：' + P.company) >= 0 && t.indexOf('銀行：' + bp.bank) >= 0 && t.indexOf('分行：' + bp.branch + '（' + bp.code + '）') >= 0 && t.indexOf('帳號：' + b.account) >= 0; INV.pop();
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 300); }
+      return out;
+    });
+    check('v6.0.224 請款單匯款資料 4 行：戶名／銀行／分行（代碼）／帳號，銀行欄一整串只在顯示時拆，拆不出來整串放銀行', !r.err && r.parse && r.doc, JSON.stringify(r));
+    check('v6.0.224 匯款資料測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
   await browser.close();

@@ -4749,7 +4749,7 @@ function buildInvPreview(srcInv){
       </tr>
       <tr>
         <td style="color:#555;font-weight:700;padding:4px 0;vertical-align:top">匯款資料</td>
-        <td style="padding:4px 10px;line-height:1.7">${esc(P.company)}<br>${esc(_coBank().bank)}<br>帳號：${esc(_coBank().account)}${(()=>{const cp=parseInt(giv('inv-cash-pct'))||0;const td=parseInt(giv('inv-ticket-days'))||0;return(cp||td)?`<br><span style="color:#888;font-size:9px">付款條件：現金${cp||100}%${td?' + '+td+'天期票':''}</span>`:'';})()}</td>
+        <td style="padding:4px 10px;line-height:1.7">${(()=>{const b=_coBank(),bp=_bankParts(b.bank);return '戶名：'+esc(P.company)+'<br>銀行：'+esc(bp.bank)+(bp.branch?'<br>分行：'+esc(bp.branch)+(bp.code?'（'+esc(bp.code)+'）':''):(bp.code?'（'+esc(bp.code)+'）':''))+'<br>帳號：'+esc(b.account);})()}${(()=>{const cp=parseInt(giv('inv-cash-pct'))||0;const td=parseInt(giv('inv-ticket-days'))||0;return(cp||td)?`<br><span style="color:#888;font-size:9px">付款條件：現金${cp||100}%${td?' + '+td+'天期票':''}</span>`:'';})()}</td>
         <td style="color:#555;font-weight:700;padding:4px 0;text-align:right;vertical-align:top;white-space:nowrap">寄送方式</td>
         <td style="padding:4px 10px">${sendOpts}</td>
       </tr>
@@ -39376,6 +39376,16 @@ function invUnlock(){
 var BANK=null,_bankOn=false;
 var _CO_BANK_DEF={bank:'國泰世華建成分行(013)',account:'031035008864'};
 function _bankKey(name){return encodeURIComponent(String(name||'').trim()).replace(/\./g,'%2E').slice(0,300)||'_';}
+// v6.0.224 請款單匯款資料分 4 行（Lotion 11/10）：銀行欄是一整串（例：國泰世華建成分行(013)），只在顯示時拆成 銀行／分行（代碼），資料不動；拆不出來就整串放在「銀行」
+var _BANK_NAMES=['國泰世華','中國信託','台北富邦','臺北富邦','玉山','台新','永豐','兆豐','華南','第一','彰化','土地','合作金庫','臺灣','台灣','上海','元大','凱基','遠東','聯邦','新光','陽信','三信','板信','京城','王道','樂天','將來','中華郵政','郵局','渣打','匯豐','花旗','星展','安泰','華泰','台中','高雄','臺灣中小企業','台灣中小企業','臺企','台企'];
+function _bankParts(str){
+  var t=String(str||'').trim(),m=t.match(/^(.*?)\s*[（(]\s*(\d{3,7})\s*[)）]\s*$/),code='',body=t;if(m){body=m[1].trim();code=m[2];}
+  var bank='',br='';
+  for(var i=0;i<_BANK_NAMES.length;i++){var n=_BANK_NAMES[i];if(body.indexOf(n)===0){var rest=body.slice(n.length).replace(/^(商業銀行|銀行)/,'');var bk=body.slice(0,body.length-rest.length);if(rest){bank=bk;br=rest;}break;}}
+  if(!bank){var m2=body.match(/^(.*?(?:銀行|郵局|農會|合作社))(.+)$/);if(m2){bank=m2[1];br=m2[2];}}
+  if(!bank)return {bank:t,branch:'',code:''};
+  return {bank:bank,branch:br,code:code};
+}
 function _coBank(){
   var c=BANK&&BANK.migrated&&BANK.company;
   if(c&&c.account)return {bank:c.bank||'',account:c.account,at:c.at||0,by:c.by||''};
