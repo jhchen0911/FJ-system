@@ -34,3 +34,16 @@ test('#26 送審沒核可 → 不能排進場；核可的不擋', () => {
   assert.deepStrictEqual(ks, ['p_a_mat_s2']);
   assert.ok(/不能排進場：H 型鋼/.test(t.p_a_mat_s2.text) && !t.p_a_mat_s2.urgent);
 });
+
+test('接線：送審文件第 7 步線形狀（cat 材料送審＋st ok）也算核可；檔名含材料名稱也算', () => {
+  const P = [{ id: 'p1', sched: [{ id: 's1', kind: 'material', item: 'H350', start: '2026-12-01' }, { id: 's2', kind: 'material', item: '鋼板樁', start: '2026-12-01' }], docs: { d1: { id: 'd1', name: 'H350 材質證明.pdf', cat: '材料送審', st: 'ok' }, d2: { id: 'd2', name: '鋼板樁送審.pdf', cat: '材料送審', st: 'wait' } } }];
+  const out = S.matBlock(P, '2026-11-20');
+  assert.deepStrictEqual(Object.keys(out), ['p1_mat_s2']);
+});
+test('接線：build 預設不出「還沒建整案排程」卡；schedCount 數有填排程的專案', () => {
+  const P = [{ id: 'p1' }, { id: 'p2', sched: [{ id: 'x', kind: 'permit', name: '開挖許可', start: '2026-11-25' }] }, { id: 'p3', voidAt: 1 }];
+  const a = S.build(P, '2026-11-20'), b = S.build(P, '2026-11-20', { noSched: true });
+  assert.ok(!Object.keys(a).some((k) => /nosched/.test(k)) && Object.keys(a).length === 1);
+  assert.ok(Object.keys(b).some((k) => /p1_nosched/.test(k)));
+  assert.deepStrictEqual(S.schedCount(P), { live: 2, withSched: 1 });
+});

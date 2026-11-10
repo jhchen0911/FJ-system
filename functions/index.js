@@ -532,6 +532,37 @@ exports.payCmpNow = onRequest({ region: REGION, cors: ['https://jhchen0911.githu
     res.json(Object.assign({ ok: true }, await runPayCmp(Date.now(), true)));
   } catch (e) { console.error('payCmpNow', e); res.status(500).json({ error: { message: '應付比對失敗' } }); }
 });
+// ══════════ 5d #25、#26：排程倒推提醒、材料送審擋進場（Lotion 11/11：先關著，電腦端在測試專案測過再開）══════════
+// schedRemind 每天 07:10：開關 fydata/private/schedCfg/on 沒開＝什麼都不做（也不清 fydata/todo/sched）；開了才算，結果整個寫 fydata/todo/sched（解決了就消失）。
+// schedCfg.noSched＝true 才出「還沒建整案排程」卡（預設不出）。schedRemindNow：管理員手動跑一次，不管開關、只寫 schedCfg/last（筆數、前 20 筆內容、有填排程的專案數），不寫待辦。
+const schedCore = require('./ops/sched.js');
+async function runSched(now, manual) {
+  const db = admin.database();
+  const val = (p) => db.ref(p).once('value').then((s) => s.val() || {});
+  const cfg = await val('fydata/private/schedCfg');
+  if (!manual && !cfg.on) return { off: true };
+  const projects = await val('fydata/shared/projects'), today = payCmpCore.tpeYmd(now);
+  const out = schedCore.build(projects, today, { noSched: !!cfg.noSched }), keys = Object.keys(out);
+  const last = { at: now, today, manual: !!manual, n: keys.length, count: schedCore.schedCount(projects), sample: keys.slice(0, 20).map((k) => ({ key: k, text: out[k].text, sub: out[k].sub })) };
+  await db.ref('fydata/private/schedCfg/last').set(JSON.parse(JSON.stringify(last)));
+  if (!manual) await db.ref('fydata/todo/sched').set(keys.length ? JSON.parse(JSON.stringify(out)) : null);
+  console.log('[排程倒推]', today, manual ? '手動' : '排程', '筆數', keys.length, JSON.stringify(last.count));
+  return last;
+}
+exports.schedRemind = onSchedule({ schedule: '10 7 * * *', timeZone: TZ, region: REGION, memory: '512MiB', timeoutSeconds: 120 }, async () => {
+  try { await runSched(Date.now(), false); } catch (e) { console.error('schedRemind', e); }
+});
+exports.schedRemindNow = onRequest({ region: REGION, cors: ['https://jhchen0911.github.io'], memory: '512MiB', timeoutSeconds: 120 }, async (req, res) => {
+  try {
+    if (req.method !== 'POST') { res.status(405).json({ error: { message: '只接受 POST' } }); return; }
+    const m = String(req.headers.authorization || '').match(/^Bearer (.+)$/);
+    if (!m) { res.status(401).json({ error: { message: '需要登入' } }); return; }
+    const t = await admin.auth().verifyIdToken(m[1]);
+    const role = t.fy || roleOf(t.email, await lists());
+    if (role !== 'admin') { res.status(403).json({ error: { message: '只有管理員可以手動執行' } }); return; }
+    res.json(Object.assign({ ok: true }, await runSched(Date.now(), true)));
+  } catch (e) { console.error('schedRemindNow', e); res.status(500).json({ error: { message: '排程倒推試算失敗' } }); }
+});
 // ══════════ 改版第 5 步 5d：整體日報（#8）、實際進度回填（#9）、待辦同步 Google 工作表（#21） ══════════
 // #8 每天 21:30（台北）：讀已確認的日報（報價的 dailyLogs）→ 豐有內部群組（lineCfg/groups/<gid>.audience='internal'）直接推 LINE；
 //    有營造廠的群組（沒設定也算）只建「整體日報」草稿（type dailyOut）給 Lotion 自己轉發。每個群組每天只處理一次（fydata/dailyOut/<日期>/<gid>）。

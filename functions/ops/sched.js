@@ -1,6 +1,7 @@
 // 改版第 5 步 5d #25、#26：排程倒推提醒、材料送審擋進場（純邏輯；單元測試 functions/test/sched.test.js）
-// 寫好、不啟用（需求書：5 寫好、7c 啟用）——整案排程與送審文件的畫面 7c 才做，index.js 沒有排程會呼叫這裡。
-// 7c 啟用時：把 ENABLED 改 true、index.js 每天讀 fydata/shared/projects 跑 backward()＋matBlock()，結果寫 fydata/todo/sched。
+// 接線（Lotion 11/11：先關著，電腦端在測試專案測過再開）：index.js 排程 schedRemind 每天 07:10 讀開關 fydata/private/schedCfg/on，沒開什麼都不做；
+//   開了才讀 fydata/shared/projects 跑 backward()＋matBlock()，結果整個寫 fydata/todo/sched。schedRemindNow＝管理員手動跑一次（只寫 schedCfg/last，不寫待辦）。
+//   測試步驟見 docs/sched_測試專案驗證.md。ENABLED 只保留給舊測試，實際開關看資料庫。
 // 預設資料形狀（專案 p._PRJ_SLOTS 的 sched／docs；7c 定案時若欄位不同，改這裡的讀法即可，測試一起改）：
 //   p.sched = [{ id, name, kind: 'permit'|'material'|'engineer'|'work', start: 'YYYY-MM-DD', lead: 提前天數, doneAt?, item?（材料名稱） }]
 //   p.docs  = [{ id, kind: 'matSubmit', item: 材料名稱, approvedAt?: 'YYYY-MM-DD' }]
@@ -38,10 +39,11 @@ function matBlock(projects, today) {
   const out = {};
   arr(projects).forEach((p) => {
     if (!p || !p.id || p.voidAt || p.closedAt) return;
-    const ok = {}; arr(p.docs).forEach((d) => { if (d && d.kind === 'matSubmit' && d.approvedAt && d.item) ok[String(d.item).trim()] = 1; });
+    const okNames = approvedMat(p);
     arr(p.sched).forEach((s) => {
       if (!s || s.kind !== 'material' || s.doneAt || !s.item) return;
-      if (ok[String(s.item).trim()]) return;
+      const it = String(s.item).trim();
+      if (okNames.some((n) => n === it || n.indexOf(it) >= 0)) return;   // 第 7 步線的送審文件：檔名含材料名稱也算
       if (s.start && dayDiff(today, s.start) > 60) return;   // 兩個月以後的先不吵
       const k = safeKey(p.id + '_mat_' + (s.id || s.item));
       out[k] = { src: 'sched', key: k, urgent: !!s.start && dayDiff(today, s.start) <= 7, text: '不能排進場：' + String(s.item).slice(0, 30) + ' 材料送審還沒核可', sub: '專案 ' + (p.no || p.id) + ' › 送審文件', go: 'dash' };
@@ -50,4 +52,24 @@ function matBlock(projects, today) {
   return out;
 }
 
-module.exports = { ENABLED, backward, matBlock, LEAD_DEF };
+// 已核可的材料送審：舊預設形狀 {kind:'matSubmit', item, approvedAt}；第 7 步線（v6.0.225）送審文件 p.docs[id]={name, cat:'材料送審', st:'ok'（已核定）}
+function approvedMat(p) {
+  const out = [];
+  arr(p && p.docs).forEach((d) => {
+    if (!d) return;
+    if (d.kind === 'matSubmit' && d.approvedAt && d.item) out.push(String(d.item).trim());
+    else if (d.cat === '材料送審' && d.st === 'ok') out.push(String(d.item || d.name || '').trim());
+  });
+  return out.filter(Boolean);
+}
+// 有填整案排程的專案數（測試時看「是不是全部都還沒建」）
+function schedCount(projects) { let n = 0, m = 0; arr(projects).forEach((p) => { if (!p || !p.id || p.voidAt || p.closedAt) return; n++; if (arr(p.sched).length) m++; }); return { live: n, withSched: m }; }
+// 一次算完：opt.noSched＝要不要出「還沒建整案排程」卡（預設不出，免得每個專案都一張）
+function build(projects, today, opt) {
+  opt = opt || {};
+  const out = Object.assign({}, backward(projects, today), matBlock(projects, today));
+  if (!opt.noSched) Object.keys(out).forEach((k) => { if (/_nosched$/.test(k)) delete out[k]; });
+  return out;
+}
+
+module.exports = { ENABLED, backward, matBlock, LEAD_DEF, approvedMat, schedCount, build };

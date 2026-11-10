@@ -11901,6 +11901,14 @@ async function newPage(browser, width, height) {
     check('現場追加卡 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── 待編號 排程倒推提醒＋材料送審擋進場：雲端接線、開關預設關（Lotion 11/11）──
+  {
+    const fs = require('fs'), path = require('path'), R = path.join(__dirname, '..');
+    const ix = fs.readFileSync(path.join(R, 'functions', 'index.js'), 'utf8'), ap = fs.readFileSync(path.join(R, 'app.js'), 'utf8');
+    check('排程倒推提醒：雲端 schedRemind 每天 07:10 看開關 fydata/private/schedCfg/on（沒開什麼都不做）、schedRemindNow 只限管理員且不寫待辦；主控台 fySchedRun／fySchedSet；驗證步驟文件存在',
+      /exports\.schedRemind = onSchedule\(\{ schedule: '10 7 \* \* \*'/.test(ix) && /if \(!manual && !cfg\.on\) return \{ off: true \}/.test(ix) && /role !== 'admin'[^]*?runSched\(Date\.now\(\), true\)/.test(ix) && /if \(!manual\) await db\.ref\('fydata\/todo\/sched'\)/.test(ix)
+      && /window\.fySchedRun=function/.test(ap) && /fydata\/private\/schedCfg'\)\.update/.test(ap) && fs.existsSync(path.join(R, 'docs', 'sched_測試專案驗證.md')));
+  }
   // ── v6.0.221 進退料 M8b：鋼價追蹤 → 建議調整買價（中鋼盤價草稿為主、主計總處指數備援、都沒有出保底卡）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

@@ -45172,6 +45172,13 @@ _decReg('addonSign',{
     showConfirm('給主任的 LINE 文字','<textarea id="ad-msg" rows="6" style="'+IN+'">'+esc(a.askTxt||_adMsg(x.q,a))+'</textarea><div style="font-size:11px;color:var(--b4);margin-top:4px">按確認＝存下這段文字並複製。</div>',
       function(){var t=gv('ad-msg')||'';_adCopy(t).then(function(ok){if(!ok)return;_adSet(x.q,a,{askTxt:t.slice(0,1000),askAt:Date.now(),askBy:_meEmail()||'本機'});toast('已複製');try{_decRefresh('addonSign');}catch(e){_err('addonSign.ref',e);}});},false,null,false);}
 });
+// ══════════ 待編號 排程倒推提醒＋材料送審擋進場（5d #25、#26）的主控台開關（Lotion 11/11：先關著，電腦端在測試專案測過再開；步驟 docs/sched_測試專案驗證.md）══════════
+// fySchedRun()＝管理員叫雲端 schedRemindNow 試算一次（不管開關、不寫待辦，結果在 fydata/private/schedCfg/last 與回傳值）；fySchedSet({on:true|false, noSched:true|false})＝開／關（每天 07:10 排程看這個）
+window.fySchedRun=function(){if(_roDeny())return Promise.resolve({ok:false,why:'唯讀帳號'});if(!_fbUser)return Promise.resolve({ok:false,why:'請先登入'});
+  return _fbUser.getIdToken().then(function(tok){return fetch(_fnUrl('schedRemindNow'),{method:'POST',headers:{'Authorization':'Bearer '+tok,'Content-Type':'application/json'},body:'{}'});})
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j&&j.error&&j.error.message)||('HTTP '+r.status));return j;});}).catch(function(e){_err('fySchedRun',e);return {ok:false,why:String(e&&e.message||e)};});};
+window.fySchedSet=function(o){o=(o&&typeof o==='object')?o:{};if(_roDeny()||!_decIsAdmin()||!_fbDb)return Promise.resolve({ok:false,why:'只有管理員、要登入'});var u={};if('on' in o)u.on=!!o.on;if('noSched' in o)u.noSched=!!o.noSched;u.setAt=Date.now();u.setBy=_meEmail()||'';
+  return _fbDb.ref('fydata/private/schedCfg').update(u).then(function(){return {ok:true,set:u};}).catch(function(e){_err('fySchedSet',e);return {ok:false,why:String(e&&e.message||e)};});};
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
