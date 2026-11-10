@@ -73,7 +73,7 @@ function _docHeadHtml(o){o=o||{};var info=[P.company||'豐有工程有限公司'
 // v6.0.220 單據頁尾（Lotion 11/10）：一行小字「地址｜Email」，整份單據只出現一次——PDF 引擎把 .fy-docfoot 從內文拿出來，
 //   貼在最後一頁下緣 10mm 留白裡，多頁時頁碼排在同一行右邊（_pdfPlanPages 記 plan.foot、_pdfAddPaged 貼、_docPvRender 預覽同樣）
 function _docFootHtml(){var t=[P.addr?('地址 '+P.addr):'',P.email?('Email '+P.email):''].filter(Boolean).map(function(x){return esc(String(x));}).join('｜');
-  return t?'<div class="fy-docfoot" style="font-size:8.5px;color:#777;line-height:1.3;padding-top:3px;white-space:nowrap;overflow:hidden">'+t+'</div>':'';}
+  return t?'<div class="fy-docfoot" style="font-size:8.5px;color:#777;line-height:1.3;padding:3px 64px 0 0;white-space:nowrap;overflow:hidden">'+t+'</div>':'';}
 // 版本標籤統一由 APP_VERSION 帶入（避免多處寫死漂移）
 try{var _bv=document.getElementById('brand-ver');if(_bv)_bv.textContent=APP_VERSION;}catch(e){_err('top',e);}
 try{var _sv=document.getElementById('sync-app-ver');if(_sv)_sv.textContent='（程式版本 '+APP_VERSION+'）';}catch(e){_err('top',e);}
@@ -35214,7 +35214,7 @@ function _pdfCapturePages(inner,cvs,plan,opts,onProgress){
     var j=jobs[i++];var y=j.s/K,h=(j.e-j.s)/K;if(!(h>0))return next();
     if(onProgress){try{onProgress(i,jobs.length);}catch(e){_err('_pdfCapturePages',e);}}
     var ftEl=j.key==='ft'?inner.querySelector('.fy-docfoot'):null;   // v6.0.220 頁尾直接擷取那一行（不靠整份的位移）
-    var o2=ftEl?{useCORS:true,allowTaint:true,backgroundColor:'#ffffff',logging:false,imageTimeout:0,scale:_PDF_PAGE_SCALE,onclone:opts&&opts.onclone}:Object.assign({},opts,{scale:_PDF_PAGE_SCALE,x:0,y:y,height:h});
+    var o2=ftEl?Object.assign({},opts,{scale:_PDF_PAGE_SCALE}):Object.assign({},opts,{scale:_PDF_PAGE_SCALE,x:0,y:y,height:h});
     return html2canvas(ftEl||inner,o2).then(function(c){
       var du=c.toDataURL('image/jpeg',q);
       if(j.key==='hd')plan.hdImg=du;else if(j.key==='ft')plan.footImg=du;else plan.pages[j.key].img=du;
