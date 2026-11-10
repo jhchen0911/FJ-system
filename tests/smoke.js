@@ -46,7 +46,7 @@ async function newPage(browser, width, height) {
   await page.goto(INDEX);
   await page.waitForTimeout(2500);
   await page.evaluate(() => { window._costEditAll = true; });   // v6.0.29 施工成本頁測試時全展開
-  await page.evaluate(() => { localStorage.setItem('fy_v7old', '{"proj":1,"acct":1}'); });   // v6.0.217：既有的工程專案、帳務測試驗的是原本版面（「切回舊版」那一版）；新版（14 步流程、帳務 4 塊）另有測試（自己切回新版）
+  await page.evaluate(() => { localStorage.setItem('fy_v7old', '{"proj":1,"acct":1}'); });   // v6.0.218：既有的工程專案、帳務測試驗的是原本版面（「切回舊版」那一版）；新版（14 步流程、帳務 4 塊）另有測試（自己切回新版）
   return { page, errors };
 }
 
@@ -12880,7 +12880,7 @@ async function newPage(browser, width, height) {
     check('v6.0.210 M7 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.215 改版第 7 步③（7b 畫面）：報價頁總計框內部面板（後端 _bidAimOf／_bidSuggestFor 由小批次線做，這裡用假函式驗顯示）──
+  // ── v6.0.216 改版第 7 步③（7b 畫面）：報價頁總計框內部面板（後端 _bidAimOf／_bidSuggestFor 由小批次線做，這裡用假函式驗顯示）──
   {
     const { page, errors } = await newPage(browser, 1440, 900);
     const r = await page.evaluate(async () => {
@@ -12908,12 +12908,12 @@ async function newPage(browser, width, height) {
       delete window._bidAimOf; delete window._bidSuggestFor; _fbUser = oU; _isAdminUser = oA; Q = keepQ;
       return out;
     });
-    check('v6.0.215 報價頁內部面板：這張沒有底價、目標價、這類工項也還沒有結果就不顯示；有底價／目標成交價就和報價（含稅）一起列；同類工項得標率與建議（沒滿 5 筆照實說）；一般員工看不到；不會印在報價單', r.none && r.panel && r.sug && r.staff && r.safe && r.noDoc, JSON.stringify(r));
-    check('v6.0.215 測試無 JS 錯誤', errors.filter((e) => !/壞掉/.test(e)).length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.216 報價頁內部面板：這張沒有底價、目標價、這類工項也還沒有結果就不顯示；有底價／目標成交價就和報價（含稅）一起列；同類工項得標率與建議（沒滿 5 筆照實說）；一般員工看不到；不會印在報價單', r.none && r.panel && r.sug && r.staff && r.safe && r.noDoc, JSON.stringify(r));
+    check('v6.0.216 測試無 JS 錯誤', errors.filter((e) => !/壞掉/.test(e)).length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.216 改版第 7 步④（7d）：帳務 4 塊（收／付／發票與支出／金流）＋金流一行固定在最上面 ──
+  // ── v6.0.217 改版第 7 步④（7d）：帳務 4 塊（收／付／發票與支出／金流）＋金流一行固定在最上面 ──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async (W) => {
@@ -12949,13 +12949,13 @@ async function newPage(browser, width, height) {
       PAYABLES.length = 0; keepP.forEach((p) => PAYABLES.push(p)); _fbUser = oU; _isAdminUser = oA;
       return out;
     }, W);
-    check('v6.0.216 帳務 4 塊（寬 ' + W + '）：上方收／付／發票與支出／金流，有好幾頁的下面一排小分頁、記得上次停的頁；舊選單照舊 8 個分頁', r.groups && r.sub && r.inGo && r.remember && r.cash && r.old && r.noScroll, JSON.stringify(r));
-    check('v6.0.216 金流一行（寬 ' + W + '）：可動用資金、未來 30 天預計收／付跟金流預測同一套算法；KPI 卡收起；一般員工看不到', r.line && r.kpiHide && r.staff, JSON.stringify(r));
-    check('v6.0.216 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.217 帳務 4 塊（寬 ' + W + '）：上方收／付／發票與支出／金流，有好幾頁的下面一排小分頁、記得上次停的頁；舊選單照舊 8 個分頁', r.groups && r.sub && r.inGo && r.remember && r.cash && r.old && r.noScroll, JSON.stringify(r));
+    check('v6.0.217 金流一行（寬 ' + W + '）：可動用資金、未來 30 天預計收／付跟金流預測同一套算法；KPI 卡收起；一般員工看不到', r.line && r.kpiHide && r.staff, JSON.stringify(r));
+    check('v6.0.217 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.217 改版第 7 步⑤（7c）：專案一案一頁＝直的流程步驟條 ──
+  // ── v6.0.218 改版第 7 步⑤（7c）：專案一案一頁＝直的流程步驟條 ──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async (W) => {
@@ -12992,12 +12992,12 @@ async function newPage(browser, width, height) {
       Q = keepQ; CONTRACTS.length = 0; keepC.forEach((c) => CONTRACTS.push(c));
       return out;
     }, W);
-    check('v6.0.217 專案步驟條（寬 ' + W + '）：14 步一步一行、只展開現在這步、做完的一行、還沒到的只顯示名稱、點了展開／收起、待辦跳轉找得到、其他明細收在下面、舊選單照舊', r.n14 && r.cur && r.doneLine && r.pendName && r.toggle && r.toggle2 && r.jump && r.other && r.noScroll && r.old, JSON.stringify(r));
-    check('v6.0.217 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.218 專案步驟條（寬 ' + W + '）：14 步一步一行、只展開現在這步、做完的一行、還沒到的只顯示名稱、點了展開／收起、待辦跳轉找得到、其他明細收在下面、舊選單照舊', r.n14 && r.cur && r.doneLine && r.pendName && r.toggle && r.toggle2 && r.jump && r.other && r.noScroll && r.old, JSON.stringify(r));
+    check('v6.0.218 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.218 改版第 7 步⑥（7e）：每一頁各自切回舊版＋整站切回 ──
+  // ── v6.0.219 改版第 7 步⑥（7e）：每一頁各自切回舊版＋整站切回 ──
   {
     const { page, errors } = await newPage(browser, 1440, 900);
     const r = await page.evaluate(async () => {
@@ -13034,9 +13034,9 @@ async function newPage(browser, width, height) {
       Q = keepQ; localStorage.removeItem('fy_v7old'); _nav5Apply();
       return out;
     });
-    check('v6.0.218 切回舊版：更多裡每一頁（今天、專案、帳務）各自切回、選單維持 5 個、其他頁不受影響、記次數；整站切回三頁都舊版', r.list && r.acctOld && r.navStill && r.dashNew && r.label && r.dashOld && r.projOld && r.projNew && r.count && r.back && r.allOld, JSON.stringify(r));
-    check('v6.0.218 更多 › 計算工具第一格名稱是「擋土支撐全套」（Lotion 11/10 拿掉「（材料估算）」）', !!r.shoringLbl, JSON.stringify({ shoringLbl: r.shoringLbl, err: r.err }));
-    check('v6.0.218 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.219 切回舊版：更多裡每一頁（今天、專案、帳務）各自切回、選單維持 5 個、其他頁不受影響、記次數；整站切回三頁都舊版', r.list && r.acctOld && r.navStill && r.dashNew && r.label && r.dashOld && r.projOld && r.projNew && r.count && r.back && r.allOld, JSON.stringify(r));
+    check('v6.0.219 更多 › 計算工具第一格名稱是「擋土支撐全套」（Lotion 11/10 拿掉「（材料估算）」）', !!r.shoringLbl, JSON.stringify({ shoringLbl: r.shoringLbl, err: r.err }));
+    check('v6.0.219 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
