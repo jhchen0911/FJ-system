@@ -41852,6 +41852,51 @@ _decReg('preflight',{
   reject:function(r){_pfMark(r,'',true);return true;},
   edit:function(r){try{_m6Qid=r.q.id;go('mat6');}catch(e){_err('preflight.edit',e);}}
 });
+// ══════════ 進場前 7 天人員辦證缺件提醒（陳軒 11/11；框架先做，人員資料還沒進系統）══════════
+// 分包卡進場日（c.entryDate）在今天～7 天後 → 每個進場一張「○○案進場前 N 天，缺 ○ 人 ○ 文件」。
+//   要的文件：預設 _CREW_DOC_DEF，參數頁可改（P.crewDocReq＝[[key,名稱],…]），單案另加（q.crewDocReq，例：科學園區要入廠證）。
+//   人員資料（之後由人員／辦證功能填）：分包卡 c.crew＝[{name, role, docs:{<key>:{ok:true, exp:'YYYY-MM-DD'}}}]（q.costs 走 private，個資不進一般資料）。
+//   缺＝沒有這份、或到期日早於進場日；名單沒登記＝整張卡標「人員名單還沒登記」（P.crewDocOn 打開才查沒登記的卡；現在人員資料還沒進系統，預設關）。
+//   確認＝複製催廠商補件的 LINE 文字（只寫人名與文件名稱）並記 q.crewAck[卡片id]＝{date,miss}（缺的內容變了才再出）；退回＝這次不用；修改＝開施工成本頁。
+var _CREW_DOC_DEF=[['ins','勞保／職災保險'],['edu','一般安全衛生教育訓練'],['med','一般體格檢查']];
+function _crewReq(q){var base=Array.isArray(P&&P.crewDocReq)&&P.crewDocReq.length?P.crewDocReq:_CREW_DOC_DEF,ex=Array.isArray(q&&q.crewDocReq)?q.crewDocReq:[],seen={},out=[];
+  base.concat(ex).forEach(function(d){if(!Array.isArray(d)||!d[0]||seen[d[0]])return;seen[d[0]]=1;out.push([String(d[0]),String(d[1]||d[0])]);});return out;}
+function _crewCheck(q,c,date){var req=_crewReq(q),crew=Array.isArray(c.crew)?c.crew.filter(function(p){return p&&String(p.name||'').trim();}):[];
+  var people=crew.map(function(p){var docs=p.docs&&typeof p.docs==='object'?p.docs:{},miss=req.filter(function(r){var d=docs[r[0]];return !(d&&d.ok&&(!d.exp||String(d.exp)>=date));}).map(function(r){var d=docs[r[0]];return {k:r[0],l:r[1],exp:d&&d.ok&&d.exp&&String(d.exp)<date?d.exp:''};});return {name:String(p.name),role:String(p.role||''),miss:miss};});
+  var mp=people.filter(function(p){return p.miss.length;});
+  return {req:req,people:people,noList:!crew.length,missPeople:mp.length,missDocs:mp.reduce(function(a,p){return a+p.miss.length;},0),sig:crew.length?mp.map(function(p){return p.name+':'+p.miss.map(function(m){return m.k;}).join(',');}).join('|'):'nolist'};}
+function _crewRows(){var out=[],today=localToday(),lim=_dAdd(today,7);
+  (Q||[]).forEach(function(q){if(!q||!q.awarded||q.closed)return;var ak=q.crewAck||{};
+    (q.costs||[]).forEach(function(c){if(!c||c.type!=='sub'||!c.entryDate||c.mergedInto)return;var d=String(c.entryDate).slice(0,10);if(d<today||d>lim)return;
+      if(!Array.isArray(c.crew)&&!(P&&P.crewDocOn))return;   // 人員資料還沒進系統：參數 P.crewDocOn 打開、或這張卡登記過名單，才出（不然每個進場都出「名單沒登記」）
+      var k=_crewCheck(q,c,d);if(!k.noList&&!k.missDocs)return;var a=ak[c.id];if(a&&a.date===d&&a.sig===k.sig)return;
+      out.push({q:q,c:c,date:d,left:_dDiff(today,d),k:k,key:q.id+'|'+c.id});});});
+  return out.sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:0;});}
+function _crewText(r){var c=r.c,k=r.k,v=(VENDORS||[]).find(function(x){return x&&x.name===c.vendor;})||{},who=String(v.contact||c.vendor||'').trim();
+  var L=[(who?who+' 好，':'')+'豐有工程提醒：'+_qMD(r.date)+'「'+String(r.q.name||'')+'」進場，人員資料還要補：'];
+  if(k.noList)L.push('・進場人員名單（姓名，和每個人的'+k.req.map(function(x){return x[1];}).join('、')+'）');
+  else k.people.filter(function(p){return p.miss.length;}).forEach(function(p){L.push('・'+p.name+'：'+p.miss.map(function(m){return m.l+(m.exp?'（'+_qMD(m.exp)+' 到期）':'');}).join('、'));});
+  L.push('麻煩在 '+_qMD(_dAdd(r.date,-2))+' 前傳過來，我們好先辦入場，謝謝！');return L.join('\n');}
+function _crewHead(r){return String(r.q.name||'')+' 進場前 '+r.left+' 天，'+(r.k.noList?'人員名單還沒登記':'缺 '+r.k.missPeople+' 人 '+r.k.missDocs+' 份文件');}
+function _crewDetail(r){var k=r.k,ok='<span style="color:var(--g3);font-weight:700">✓</span>';
+  var body=k.noList?'<div style="font-size:12.5px;color:#b71c1c;font-weight:700;margin-top:6px">這張分包卡還沒登記進場人員名單</div>'
+    :'<table class="tbl" style="font-size:12px;width:100%;margin-top:6px;table-layout:fixed"><thead><tr><th>人員</th>'+k.req.map(function(x){return '<th style="text-align:center">'+esc(x[1])+'</th>';}).join('')+'</tr></thead><tbody>'
+      +k.people.map(function(p){return '<tr><td style="overflow-wrap:anywhere">'+esc(p.name)+(p.role?'<div style="font-size:10.5px;color:var(--b4)">'+esc(p.role)+'</div>':'')+'</td>'+k.req.map(function(x){var m=p.miss.find(function(y){return y.k===x[0];});return '<td style="text-align:center">'+(m?'<span style="color:#b71c1c;font-weight:700">'+(m.exp?_qMD(m.exp)+' 到期':'缺')+'</span>':ok)+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table>';
+  return _qTbl([['工程',String(r.q.name||'')],['進場',_qMD(r.date)+'（'+(r.left===0?'今天':r.left+' 天後')+'）'],['分包',String(r.c.vendor||'')],['要的文件',k.req.map(function(x){return x[1];}).join('、')]])+body
+    +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">催補件的 LINE 文字（確認＝複製）</div><div style="white-space:pre-wrap;font-size:12.5px;background:var(--gl);border-radius:6px;padding:6px 8px;overflow-wrap:anywhere">'+esc(_crewText(r))+'</div>'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">確認＝複製並記已催（缺的內容變了才再出）；要的文件可在參數頁或這案另外設定。</div>';}
+function _crewMark(r,skip){var q=r.q;if(!q.crewAck||typeof q.crewAck!=='object')q.crewAck={};q.crewAck[r.c.id]={date:r.date,sig:r.k.sig,at:Date.now(),by:_meEmail()||'本機'};if(skip)q.crewAck[r.c.id].skip=1;_touch(q);persist();}
+_decReg('crewDocs',{
+  title:'進場前人員辦證',todo:function(n){return '進場前人員辦證缺件 '+n+' 件';},sub:'進場前 7 天，列出缺哪些人、哪些文件，附催補件的 LINE 文字',
+  canSee:function(){return _decIsAdmin();},
+  list:function(){return _crewRows();},
+  key:function(r){return r.key;},head:function(r){return _crewHead(r);},
+  body:function(r){return '<div style="font-size:11.5px;color:var(--b4)">'+esc(String(r.c.vendor||''))+'</div>';},
+  detail:function(r){return _crewDetail(r);},
+  ok:function(r){var t=_crewText(r);try{if(navigator.clipboard)navigator.clipboard.writeText(t).catch(function(e){_err('crewDocs.copy',e);});}catch(e){_err('crewDocs.copy',e);}_crewMark(r,false);toast('已複製，記下已催');return true;},
+  reject:function(r){_crewMark(r,true);return true;},
+  edit:function(r){try{openProjectCosts(r.q.id);}catch(e){_err('crewDocs.edit',e);}}
+});
 // ══════════ v6.0.227 報價拍板卡加強（陳軒 11/10 晚佇列第 2 件；第 2 層：卡片只給建議）══════════
 // AI 報價草稿卡（drf_quote）明細多三塊：①三個價（底價、目標成交價＝payload.aim，報價＝草稿含稅合計）；②毛利（成本單價：AI 給的 payload.est ＞ 原報價同名工項的 estCost ＞ 歷史實際成本 _histCostFor；只有管理員看）；
 //   ③異常單元（單價跟成交單價庫 _dealPriceFor 平均偏差超過 ±15%、或低於成本）；④圖說疑義（payload.issues）。

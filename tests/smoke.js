@@ -13347,6 +13347,42 @@ async function newPage(browser, width, height) {
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── 進場前 7 天人員辦證缺件提醒（陳軒 11/11，框架）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keep = { Q: Q, V: VENDORS.slice(), R: P.crewDocReq, O: P.crewDocOn };
+      try {
+        window.toast = () => {}; delete P.crewDocReq;
+        const d = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+        VENDORS.length = 0; VENDORS.push({ id: 'vC1', name: '範例工程行甲', contact: '範例陳師傅', _mt: 1 });
+        Q = [{ id: 'qC1', name: '範例辦證案', client: '範例營造甲', awarded: true, _mt: 1, items: [], crewDocReq: [['gate', '入廠證']],
+          costs: [{ id: 'cC1', type: 'sub', vendor: '範例工程行甲', entryDate: d(5), rows: [], crew: [
+            { name: '範例甲', role: '領班', docs: { ins: { ok: true }, edu: { ok: true }, med: { ok: true, exp: d(30) }, gate: { ok: true } } },
+            { name: '範例乙', docs: { ins: { ok: true }, edu: { ok: true, exp: d(2) } } }] },
+            { id: 'cC2', type: 'sub', vendor: '範例工程行乙', entryDate: d(3), rows: [] },
+            { id: 'cC3', type: 'sub', vendor: '範例工程行丙', entryDate: d(12), rows: [] }] }];
+        out.gate = _crewRows().length === 1 && _crewRows()[0].c.id === 'cC1';   // 開關沒開：只有登記過名單的卡
+        P.crewDocOn = true;
+        const rows = _crewRows();
+        out.rows = rows.length === 2 && rows[0].c.id === 'cC2' && rows[0].k.noList && rows[1].c.id === 'cC1';
+        const a = rows[1]; out.count = a.k.missPeople === 1 && a.k.missDocs === 3 && /缺 1 人 3 份文件/.test(_crewHead(a)) && /進場前 5 天/.test(_crewHead(a));   // 乙：教育訓練進場前到期、體檢、入廠證
+        const x = document.createElement('div'); x.innerHTML = _DEC.crewDocs.detail(a); const t = x.textContent, txt = _crewText(a);
+        out.detail = /入廠證/.test(t) && /範例甲/.test(t) && /範例乙/.test(t) && /到期/.test(t) && /範例陳師傅 好/.test(txt) && /範例乙：一般安全衛生教育訓練（.+到期）、一般體格檢查、入廠證/.test(txt) && !/範例甲：/.test(txt);
+        out.noList = /人員名單還沒登記/.test(_crewHead(rows[0])) && /進場人員名單/.test(_crewText(rows[0]));
+        out.ok = _DEC.crewDocs.ok(a) === true && Q[0].crewAck.cC1.date === d(5) && _crewRows().length === 1;
+        Q[0].costs[0].crew[1].docs.med = { ok: true }; out.changed = _crewRows().length === 2;   // 缺的內容變了 → 再出
+        Q[0].costs[0].crew[1].docs = { ins: { ok: true }, edu: { ok: true }, med: { ok: true }, gate: { ok: true } }; out.allOk = _crewRows().length === 1;
+        P.crewDocReq = [['ins', '勞保']]; out.param = _crewReq(Q[0]).map((x) => x[0]).join() === 'ins,gate';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keep.Q; VENDORS.length = 0; keep.V.forEach((x) => VENDORS.push(x)); if (keep.R === undefined) delete P.crewDocReq; else P.crewDocReq = keep.R; if (keep.O === undefined) delete P.crewDocOn; else P.crewDocOn = keep.O;
+      return out;
+    });
+    check('進場前 7 天人員辦證缺件卡：7 天內進場才出；缺＝沒有或進場前到期；名單沒登記也出；文件清單可在參數頁與單案加；催補件文字只寫人名與文件；確認記已催，缺的變了再出', !r.err && r.gate && r.rows && r.count && r.detail && r.noList && r.ok && r.changed && r.allOk && r.param, JSON.stringify(r));
+    check('人員辦證缺件卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.227 進場前到位確認卡＋結案包商評鑑（陳軒 11/10 晚佇列第 5、6 件）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
