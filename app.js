@@ -43919,7 +43919,8 @@ function _pj7Steps(q,st){
     {k:'docs',l:'合約',done:!!st.ct,info:st.ct?((st.ct.code?st.ct.code+'　':'')+'NT$ '+fmt(st.ct.amount||0)):'還沒建立合約',body:function(){return _pjDocsHtml(q,st);}},
     {k:'sub',l:'發包',done:st.subs.length>0,info:st.subs.length?('分包 '+st.subs.length+' 家 NT$ '+fmt(st.subTotal)):(st.rfqs.length?'詢價 '+st.rfqs.length+' 張、還沒得標':'還沒發包'),body:function(){return _pjSubHtml(q,st);}},
     {k:'permit',l:'辦證',na:1,info:'在系統外辦理（進場文件）'},
-    {k:'subm',l:'送審文件',na:1,info:'計算書、圖說、計畫書、材料送審：下一版放進這一步；現在照舊在「更多 › 施工計畫書」'},
+    (function(){var D=_sdocList(_prjOfQ(q.id));   // 沒有文件＝這案不走系統送審，不算「現在這一步」；有文件＝全部核定才算做完
+      return {k:'subm',l:'送審文件',na:D.length?0:1,done:D.length>0&&D.every(function(d){return d.st==='ok';}),info:_sdocInfo(q)||'計算書、圖說、計畫書、材料送審：點開上傳、記送審狀態',body:function(){return _pjSubmHtml(q);}};})(),
     {k:'sched',l:'排程',done:_pjHasPlan(q),info:_pjHasPlan(q)?'已排預定進度':'還沒排預定進度',body:function(){return _pjSchedHtml(q,st);}},
     {k:'mat',l:'材料',done:matN>0,info:matN?('材料需求 '+matN+' 項（在「發包」裡的材料．運輸）'):'還沒有材料需求'},
     {k:'dispatch',l:'派工',na:1,info:'派工板：下一版'},
@@ -43994,6 +43995,83 @@ function _pjSettleHtml(q){
     +(s&&s.at?('<span style="color:var(--b3)">　最後填寫 '+esc(new Date(s.at).toLocaleString('zh-TW'))+(s.by?('（'+esc(s.by)+'）'):'')+'</span>'):'')+'</div>';
   return head+_pjTable([{t:'工項'},{t:'單位'},{t:'豐有已請',r:1},{t:'日報累計',r:1},{t:'結算書',r:1},{t:'差多少',r:1},{t:'金額影響（未稅）',r:1},{t:'可能原因'}],rows,
     R.filled?['合計','','','','','',(R.sumAmt>0?'+':'')+fmt(R.sumAmt),'']:null);
+}
+// ══════════ 改版第 7 步 7c 加碼②：送審文件（v6.0.221，估時表題 B 建議：工務和管理員都能傳、都能看；唯讀帳號只能看）══════════
+// 檔案放 Storage projects/<專案id>/docs/（4a 規則：員工可傳、單檔 50 MB；員工與唯讀帳號可讀）；清單存專案 p.docs[<文件id>]＝{name,path,cat,st,at,by,size,url}（shared，規則要 name 與 path）
+// 類別 _SDOC_CATS；狀態 送審中／已核定／退回修改（_SDOC_ST，清單上直接選）；刪除＝先確認、檔案一起刪
+var _SDOC_CATS=['計算書','施工圖說','施工計畫書','材料送審','變更簽認','完工結算書','其他'];
+var _SDOC_ST={wait:'送審中',ok:'已核定',back:'退回修改'};
+var _SDOC_MAX=_PRJ_DOC_MAX;
+function _sdocList(p){return _prjArr(p&&p.docs).filter(function(d){return d&&d.id&&d.name;}).sort(function(a,b){return (b.at||0)-(a.at||0);});}
+function _sdocInfo(q){var p=_prjOfQ(q.id),L=_sdocList(p);if(!L.length)return '';var n={wait:0,ok:0,back:0};L.forEach(function(d){n[d.st in n?d.st:'wait']++;});
+  return L.length+' 份'+['ok','wait','back'].filter(function(k){return n[k];}).map(function(k){return '・'+_SDOC_ST[k]+' '+n[k];}).join('');}
+function _pjSubmHtml(q){
+  var p=_prjOfQ(q.id);if(!p)return '<div style="font-size:12px;color:var(--b3)">還沒有專案資料（得標後才有）</div>';
+  var ro=!!_isReaderUser,L=_sdocList(p),h='';
+  if(!ro)h+='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0 8px"><select id="sdoc-cat-'+esc(p.id)+'" style="flex:0 0 auto">'+_SDOC_CATS.map(function(c){return '<option>'+esc(c)+'</option>';}).join('')+'</select>'
+    +'<button type="button" class="btn sm" onclick="sdocPick(\''+esc(q.id)+'\')">上傳文件</button><span style="font-size:11px;color:var(--b3)">PDF、圖片、Word、Excel、DWG，單檔 50 MB 以內；要登入雲端帳號</span></div>';
+  if(!L.length)return h+'<div style="font-size:12px;color:var(--b3)">還沒有送審文件</div>';
+  var by={};L.forEach(function(d){var c=_SDOC_CATS.indexOf(d.cat)>=0?d.cat:'其他';(by[c]=by[c]||[]).push(d);});
+  _SDOC_CATS.forEach(function(c){var A=by[c];if(!A)return;
+    h+='<div style="font-size:12px;font-weight:800;color:var(--b5);margin:8px 0 4px">'+esc(c)+'（'+A.length+'）</div>';
+    A.forEach(function(d){var st=d.st in _SDOC_ST?d.st:'wait',clr=st==='ok'?'var(--g3)':(st==='back'?'var(--red)':'#b26a00');
+      h+='<div class="sdoc-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--b1)">'
+        +'<a href="javascript:void(0)" onclick="sdocOpen(\''+esc(q.id)+'\',\''+esc(d.id)+'\')" style="flex:1 1 180px;min-width:0;font-size:12.5px;font-weight:700;color:var(--b5);overflow-wrap:anywhere">'+esc(d.name)+'</a>'
+        +'<span style="font-size:11px;color:var(--b3)">'+esc(d.at?new Date(d.at).toLocaleDateString('zh-TW'):'')+(d.by?('・'+esc(String(d.by).split('@')[0])):'')+(d.size?('・'+Math.max(1,Math.round(d.size/1024))+' KB'):'')+'</span>'
+        +(ro?'<span style="font-size:11.5px;font-weight:700;color:'+clr+'">'+_SDOC_ST[st]+'</span>'
+          :('<select data-sdoc="'+esc(d.id)+'" onchange="sdocSt(\''+esc(q.id)+'\',this)" style="font-size:11.5px;color:'+clr+'">'+Object.keys(_SDOC_ST).map(function(k){return '<option value="'+k+'"'+(k===st?' selected':'')+'>'+_SDOC_ST[k]+'</option>';}).join('')+'</select>'
+            +'<button type="button" class="btn sm ghost" onclick="sdocDel(\''+esc(q.id)+'\',\''+esc(d.id)+'\')" style="color:var(--red)">刪除</button>'))
+        +'</div>';});
+  });
+  return h;
+}
+function _sdocSave(p,docs){p.docs=docs;p._mt=Date.now();saveProjects();try{renderProj();}catch(e){_err('_sdocSave',e);}}
+function _sdocMap(p){var m={};_prjArr(p.docs).forEach(function(d){if(d&&d.id)m[d.id]=d;});return m;}
+function sdocPick(qid){
+  if(_isReaderUser){toast('唯讀帳號不能上傳');return;}
+  if(!_stOk()){toast('要登入雲端帳號才能上傳送審文件');return;}
+  var p=_prjOfQ(qid);if(!p)return;var sel=document.getElementById('sdoc-cat-'+p.id),cat=sel?sel.value:'其他';
+  var inp=document.createElement('input');inp.type='file';inp.accept='.pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.dwg';inp.style.display='none';
+  inp.onchange=function(){var f=inp.files&&inp.files[0];inp.remove();if(f)_sdocPut(qid,f,cat);};
+  document.body.appendChild(inp);inp.click();
+}
+function _sdocPut(qid,f,cat){
+  var p=_prjOfQ(qid);if(!p||!f)return Promise.resolve(false);
+  if(f.size>_SDOC_MAX){toast('檔案太大（單檔上限 50 MB）');return Promise.resolve(false);}
+  var now=Date.now(),id='d'+now.toString(36)+Math.random().toString(36).slice(2,5);
+  var safe=String(f.name||'file').replace(/[^\w.\-一-鿿（）()]/g,'_').slice(0,80);
+  var path='projects/'+p.id+'/docs/'+now+'_'+safe;
+  toast('上傳中…');
+  return new Promise(function(res){
+    try{var task=_fbStorage.ref(path).put(f);
+      task.on('state_changed',null,function(err){toast('上傳失敗（'+((err&&err.code)||'未知')+'）');res(false);},function(){
+        task.snapshot.ref.getDownloadURL().then(function(url){
+          var p2=_prjOfQ(qid);if(!p2){res(false);return;}var m=_sdocMap(p2);
+          m[id]={id:id,name:String(f.name||safe).slice(0,120),path:path,cat:_SDOC_CATS.indexOf(cat)>=0?cat:'其他',st:'wait',at:now,by:_mvMe(),size:f.size||0,url:url};
+          _sdocSave(p2,m);toast('已上傳：'+(f.name||''));res(true);
+        }).catch(function(e){_err('_sdocPut.url',e);toast('取得檔案連結失敗');res(false);});
+      });
+    }catch(e){_err('_sdocPut',e);toast('上傳失敗');res(false);}
+  });
+}
+function sdocSt(qid,el){
+  if(_isReaderUser)return;var p=_prjOfQ(qid);if(!p)return;var m=_sdocMap(p),d=m[el.getAttribute('data-sdoc')];if(!d)return;
+  var v=el.value in _SDOC_ST?el.value:'wait';if(d.st===v)return;
+  m[d.id]=Object.assign({},d,{st:v,stAt:Date.now(),stBy:_mvMe()});_sdocSave(p,m);toast('已改成「'+_SDOC_ST[v]+'」');
+}
+function sdocOpen(qid,id){
+  var p=_prjOfQ(qid),d=p&&_sdocMap(p)[id];if(!d)return;
+  if(d.url){window.open(d.url,'_blank');return;}
+  if(!_fbStorage||!_fbUser){toast('要登入才看得到檔案');return;}
+  _fbStorage.ref(d.path).getDownloadURL().then(function(u){window.open(u,'_blank');}).catch(function(e){_err('sdocOpen',e);toast('找不到檔案');});
+}
+function sdocDel(qid,id){
+  if(_isReaderUser)return;var p=_prjOfQ(qid),d=p&&_sdocMap(p)[id];if(!d)return;
+  showConfirm('刪除送審文件','確定刪除「'+esc(d.name)+'」？檔案會一起刪掉，不能復原。',function(){
+    var p2=_prjOfQ(qid);if(!p2)return;var m=_sdocMap(p2);delete m[id];
+    if(d.path&&!_stDel(d.path))toast('檔案要登入才刪得掉，先從清單拿掉');
+    _sdocSave(p2,m);
+  });
 }
 function stlSet(el){
   if(_isReaderUser){toast('唯讀帳號不能修改');return;}

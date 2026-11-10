@@ -13187,6 +13187,54 @@ async function newPage(browser, width, height) {
     check('v6.0.221 完工結算測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.221 改版第 7 步 7c 加碼②：送審文件（專案「送審文件」那一步上傳、分類、送審狀態、刪除；雲端檔案用假的 Storage 驗流程）──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepP = PROJECTS, oU = _fbUser, oS = _fbStorage, oRo = _roState, oC = window.showConfirm;
+      const put = [], del = [];
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old');
+        Object.keys(localStorage).filter((k) => /^pj7_open_/.test(k)).forEach((k) => localStorage.removeItem(k));
+        Q = [{ id: 'qD1', name: '範例工程D1', client: '甲營造', code: 'D1', date: '2026-10-01', awarded: true, _mt: 1, costs: [], items: [{ desc: '鋼軌樁打設', unit: '支', qty: 10, price: 1000 }] }];
+        PROJECTS = []; _prjSync();
+        openProj('qD1'); await T(200);
+        const hd0 = document.querySelector('.pj7-hd[data-pj7="subm"]').textContent;
+        out.optional = hd0.indexOf('·') >= 0 && document.querySelector('.pj7-step.cur').id !== 'pj-sec-subm';   // 沒有文件不算現在這一步
+        // 沒登入：不能上傳
+        _fbUser = null; let msg = ''; window.toast = (m) => { msg = m; }; sdocPick('qD1'); out.needLogin = /登入/.test(msg); window.toast = () => {};
+        // 假的雲端 Storage
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _roState = 'rw';
+        _fbStorage = { ref: (path) => ({ put: (f) => { put.push(path); const t = { snapshot: { ref: { getDownloadURL: () => Promise.resolve('https://example.invalid/' + encodeURIComponent(path)) } }, on: (ev, a, bad, ok) => setTimeout(ok, 5) }; return t; }, delete: () => { del.push(path); return Promise.resolve(); }, getDownloadURL: () => Promise.resolve('u') }) };
+        const f = new File(['%PDF-1.4 test'], '結構計算書 第1版.pdf', { type: 'application/pdf' });
+        out.up = await _sdocPut('qD1', f, '計算書');
+        const p = _prjOfQ('qD1'), L = _sdocList(p);
+        out.rec = L.length === 1 && L[0].cat === '計算書' && L[0].st === 'wait' && /^projects\/p_qD1\/docs\//.test(L[0].path) && put[0] === L[0].path && !!L[0].url;
+        out.big = (await _sdocPut('qD1', { name: 'x.pdf', size: 60 * 1024 * 1024 }, '其他')) === false && _sdocList(_prjOfQ('qD1')).length === 1;
+        localStorage.setItem('pj7_open_subm', '1'); renderProj(); await T(100);
+        const body = document.getElementById('pj-body-subm');
+        out.list = !!body && /結構計算書 第1版\.pdf/.test(body.textContent) && /計算書（1）/.test(body.textContent);
+        // 改狀態：已核定 → 這一步做完
+        const sel = body.querySelector('select[data-sdoc]'); sel.value = 'ok'; sdocSt('qD1', sel); await T(80);
+        out.st = _sdocList(_prjOfQ('qD1'))[0].st === 'ok' && document.querySelector('.pj7-hd[data-pj7="subm"]').textContent.indexOf('✓') >= 0;
+        // 唯讀帳號：看得到清單與狀態、沒有上傳／刪除
+        const oR = _isReaderUser; _isReaderUser = true; renderProj(); await T(80);
+        const b2 = document.getElementById('pj-body-subm');
+        out.ro = /已核定/.test(b2.textContent) && !b2.querySelector('select[data-sdoc]') && !/上傳文件|刪除/.test(b2.textContent); _isReaderUser = oR; renderProj(); await T(80);
+        // 刪除：先確認、檔案一起刪
+        window.showConfirm = (t, m, ok) => ok();
+        sdocDel('qD1', _sdocList(_prjOfQ('qD1'))[0].id); await T(80);
+        out.del = _sdocList(_prjOfQ('qD1')).length === 0 && del.length === 1 && del[0] === put[0];
+        out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; PROJECTS = keepP; _fbUser = oU; _fbStorage = oS; _roState = oRo; window.showConfirm = oC; localStorage.removeItem('pj7_open_subm');
+      return out;
+    });
+    check('v6.0.221 送審文件（寬 ' + W + '）：沒文件不算現在這一步、要登入才能傳、存 projects/<專案>/docs/、超過 50 MB 擋下、依類別列、改狀態（全部核定＝做完）、唯讀只能看、刪除連檔案一起刪', !r.err && r.optional && r.needLogin && r.up && r.rec && r.big && r.list && r.st && r.ro && r.del && r.noHScroll, JSON.stringify(r));
+    check('v6.0.221 送審文件測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
