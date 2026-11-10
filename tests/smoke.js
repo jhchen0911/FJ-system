@@ -13853,7 +13853,9 @@ async function newPage(browser, width, height) {
         const a2 = _prjOfQ('qSA').settle.ai; out.append = a2.id === a.id && a2.rows.length === 4 && a2.imgs.length === 2;
         const L = _decItems('stlAi'); out.card = L.length === 1;
         const det = await Promise.resolve(_DEC.stlAi.detail(L[0]));
-        out.detail = /<img/.test(det) && /對到合約工項 2 項/.test(det) && /-5,000/.test(det) && /沒對到合約工項/.test(det) && /安全母索/.test(det) && (det.match(/<img/g) || []).length === 2;
+        out.detail = /<img/.test(det) && /對到合約工項 2 項/.test(det) && /-5,000/.test(det) && /沒對到合約工項/.test(det) && /安全母索/.test(det) && (det.match(/<img/g) || []).length === 2 && /日報累計/.test(det) && /1 項跟合約數量不同/.test(det);
+        const ops = _stlQchgOps(Q[0], _prjOfQ('qSA').settle.ai.rows.filter((x) => x.key && x.qty != null)); out.qchg = ops.length === 1 && ops[0].op === 'set' && ops[0].idx === 0 && ops[0].match === '鋼軌樁打設' && ops[0].fields.qty === 85;
+        out.pdf = _ikIsPdf({ type: 'application/pdf', name: 'a.pdf' }) && _ikIsPdf({ type: '', name: '結算書.PDF' }) && !_ikIsPdf({ type: 'image/jpeg', name: 'a.jpg' });
         // 手機：拍板卡展開不左右捲
         openDecList('stlAi'); await T(100); try { decToggle('stlAi', _DEC.stlAi.key(L[0]), true); } catch (e) { /* 可忽略 */ } await T(400);
         out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
@@ -13878,7 +13880,7 @@ async function newPage(browser, width, height) {
       Q = keepQ; INV = keepI; PROJECTS = keepP; localStorage.removeItem('pj7_open_settle');
       return out;
     });
-    check('v6.0.226 結算書 AI 拍板卡（寬 ' + W + '）：拍照建草稿不直接寫、對到 2 項／沒對到 1 項、明細有原圖與 -5,000 差異、確認才寫進差異表、手填不弄掉紀錄、退回不寫、手機不左右捲', !r.err && r.draft && r.append && r.card && r.detail && r.noHScroll && r.ok && r.keep && r.reject && r.noQid && r.type, JSON.stringify(r));
+    check('v6.0.226 結算書 AI 拍板卡（寬 ' + W + '）：拍照建草稿不直接寫、對到 2 項／沒對到 1 項、明細有原圖與 -5,000 差異、確認才寫進差異表、手填不弄掉紀錄、退回不寫、手機不左右捲', !r.err && r.draft && r.append && r.card && r.detail && r.noHScroll && r.qchg && r.pdf && r.ok && r.keep && r.reject && r.noQid && r.type, JSON.stringify(r));
     check('v6.0.226 結算書 AI 拍板卡測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }

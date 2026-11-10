@@ -27498,15 +27498,25 @@ function _ikSubHit(name){
   // 完全相同，或賣方全名包含分包廠商名（至少 3 個字，「乙工程行有限公司」⊃「乙工程行」）；兩個字的簡稱不比，免得誤判
   return _ikSubVendors().find(function(v){var b=_nrm(v);return b&&(a===b||(b.length>=3&&a.indexOf(b)>=0));})||'';
 }
+function _ikIsPdf(f){return !!f&&(/^application\/pdf$/.test(f.type||'')||/\.pdf$/i.test(f.name||''));}
+// PDF 逐頁畫成 JPEG（最多 6 頁、寬約 1400px），每頁當一張照片進佇列
+function _ikPdfPages(f){
+  return _ensurePdfJs().then(function(lib){return f.arrayBuffer().then(function(buf){return lib.getDocument({data:new Uint8Array(buf)}).promise;}).then(function(doc){
+    var n=Math.min(doc.numPages||0,6),out=[],base=String(f.name||'file').replace(/\.pdf$/i,'');
+    var one=function(i){if(i>n)return Promise.resolve(out);return doc.getPage(i).then(function(pg){var v0=pg.getViewport({scale:1}),sc=Math.min(3,1400/(v0.width||1400)),v=pg.getViewport({scale:sc});
+      var c=document.createElement('canvas');c.width=Math.ceil(v.width);c.height=Math.ceil(v.height);var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
+      return pg.render({canvasContext:x,viewport:v}).promise.then(function(){return new Promise(function(res){c.toBlob(function(b){if(b){try{out.push(new File([b],base+'_p'+i+'.jpg',{type:'image/jpeg'}));}catch(e){b.name=base+'_p'+i+'.jpg';out.push(b);}}res();},'image/jpeg',0.85);});});}).then(function(){return one(i+1);});};
+    return one(1);});});
+}
 function smartIntake(){
   if(_roDeny())return;   // 唯讀帳號不寫日報
   if(!_aiOn()){toast(_aiOffMsg());return;}
   var inp=document.getElementById('intake-input');
   if(!inp){
     inp=document.createElement('input');
-    inp.type='file';inp.id='intake-input';inp.accept='image/*';inp.multiple=true;inp.style.display='none';
+    inp.type='file';inp.id='intake-input';inp.accept='image/*,application/pdf';inp.multiple=true;inp.style.display='none';   // v6.0.226：PDF（例如營造廠結算書）逐頁轉成圖片再辨識
     inp.onchange=function(){
-      var fs=[].slice.call(this.files||[]).filter(function(f){return /^image\//.test(f.type||'image/');}).slice(0,12);this.value='';
+      var fs=[].slice.call(this.files||[]).filter(function(f){return /^image\//.test(f.type||'image/')||_ikIsPdf(f);}).slice(0,12);this.value='';
       if(!fs.length)return;
       _ikQueue=fs;_ikBatch={n:fs.length,i:0,photoQid:''};
       _ikNext();
@@ -27518,7 +27528,9 @@ function smartIntake(){
 // 處理佇列下一張：「其餘也是施工照片」勾選後，剩下的不再送 AI，直接放同一工地日報
 function _ikNext(){
   if(!_ikQueue.length){_ikBatch=null;return;}
-  var f=_ikQueue.shift();if(_ikBatch)_ikBatch.i++;
+  var f=_ikQueue.shift();
+  if(_ikIsPdf(f)){toast('PDF 轉成圖片中…');_ikPdfPages(f).then(function(L){if(!L.length){toast('這個 PDF 讀不出頁面');_ikNext();return;}if(_ikBatch)_ikBatch.n+=L.length-1;_ikQueue=L.concat(_ikQueue);_ikNext();}).catch(function(e){_err('_ikNext.pdf',e);toast('PDF 讀取失敗');_ikNext();});return;}
+  if(_ikBatch)_ikBatch.i++;
   _fileToDataUrl(f,1400).then(function(du){
     if(_ikBatch&&_ikBatch.photoQid){_ikSitePhotos(_ikBatch.photoQid,[du],_ikBatch.photoDate||localToday(),true);_ikNext();return;}
     aiClassifyDoc(du);
@@ -44660,13 +44672,14 @@ function _stlAiDetail(it){
   var body=L.map(function(x){var c=x.key&&by[x.key];if(c)used[x.key]=1;
     var dif=c?(Math.abs(c.diff)>1e-6?'<b style="color:'+(c.diff<0?'var(--red)':'#1565C0')+'">'+(c.diff>0?'+':'')+_rfmt(c.diff)+'</b>':'<span style="color:var(--g3)">相符</span>'):'—';
     return '<tr><td>'+esc(x.text)+(x.unit?'（'+esc(x.unit)+'）':'')+'</td><td style="text-align:right">'+(x.qty==null?'<span style="color:var(--red)">沒讀到</span>':_rfmt(x.qty))+'</td>'
-      +'<td>'+(c?esc(c.desc)+(cnt[x.key]>1?'<div style="color:var(--red);font-size:11px">有 '+cnt[x.key]+' 列對到這項，要先修改</div>':''):'<span style="color:#b26a00">沒對到合約工項（確認時不寫入）</span>')+'</td><td style="text-align:right">'+(c?_rfmt(c.billedQty):'—')+'</td><td style="text-align:right">'+dif+'</td>'
+      +'<td>'+(c?esc(c.desc)+(cnt[x.key]>1?'<div style="color:var(--red);font-size:11px">有 '+cnt[x.key]+' 列對到這項，要先修改</div>':''):'<span style="color:#b26a00">沒對到合約工項（確認時不寫入）</span>')+'</td><td style="text-align:right">'+(c?_rfmt(c.billedQty):'—')+'</td><td style="text-align:right">'+(c&&c.dailyQty!=null?_rfmt(c.dailyQty):'—')+'</td><td style="text-align:right">'+dif+'</td>'
       +'<td style="text-align:right;white-space:nowrap">'+(c&&c.amt?('<b style="color:'+(c.amt<0?'var(--red)':'#1565C0')+'">'+(c.amt>0?'+':'')+fmt(c.amt)+'</b>'):'—')+'</td></tr>';}).join('');
   var miss=R.rows.filter(function(x){return !used[x.key]&&x.stmtQty==null;}).map(function(x){return esc(x.desc);});
   var nOk=L.filter(function(x){return x.key&&x.qty!=null;}).length;
   var tb='<div style="font-size:12px;margin:8px 0 4px"><b>AI 讀到 '+L.length+' 項・對到合約工項 '+nOk+' 項</b>'+(a.low?'<span style="color:var(--red)">　AI 說這張不太清楚，請逐項對照原圖</span>':'')+'</div>'
-    +'<table class="tbl" style="font-size:12px"><thead><tr><th>結算書品名</th><th style="text-align:right">結算書數量</th><th>對到的合約工項</th><th style="text-align:right">豐有已請</th><th style="text-align:right">差異</th><th style="text-align:right">金額影響（未稅）</th></tr></thead><tbody>'+body+'</tbody></table>'
+    +'<table class="tbl" style="font-size:12px"><thead><tr><th>結算書品名</th><th style="text-align:right">結算書數量</th><th>對到的合約工項</th><th style="text-align:right">累計請款</th><th style="text-align:right">日報累計</th><th style="text-align:right">差異</th><th style="text-align:right">金額影響（未稅）</th></tr></thead><tbody>'+body+'</tbody></table>'
     +'<div style="font-size:12px;margin-top:6px">確認後整張合計：'+(R.nDiff?('差異 '+R.nDiff+' 項、金額影響（未稅）<b style="color:'+(R.sumAmt<0?'var(--red)':'#1565C0')+'">'+(R.sumAmt>0?'+':'')+fmt(R.sumAmt)+'</b>'):'<span style="color:var(--g3)">全部相符</span>')+'</div>'
+    +(function(){var n=_stlQchgOps(q,L.filter(function(x){return x.key&&x.qty!=null;})).length;return n?'<div style="font-size:11.5px;color:#1565C0;margin-top:4px">其中 '+n+' 項跟合約數量不同：確認後另建「改單草稿」，在今天頁再確認才改合約金額</div>':'';})()
     +(miss.length?'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">結算書上沒有的合約工項：'+miss.slice(0,8).join('、')+(miss.length>8?' 等 '+miss.length+' 項':'')+'</div>':'');
   var I=_stlAiImgs(a);if(!I.length)return '';   // 沒有原圖＝不解鎖確認
   return Promise.all(I.map(function(x){return _vbSrcUrl(x.url);})).then(function(U){
@@ -44686,8 +44699,23 @@ function _stlAiOk(it){
   var q=Q.find(function(x){return x.id===it.qid;}),ok={};if(!q)return false;_stlCalc(q).rows.forEach(function(x){ok[x.key]=1;});
   var put=_stlAiRows(a).filter(function(x){return x.key&&ok[x.key]&&x.qty!=null;});if(!put.length){toast('沒有對到合約工項的數量，請按「修改」選對應工項');return false;}
   var dup={},dd=put.filter(function(x){if(dup[x.key])return true;dup[x.key]=1;return false;});if(dd.length){toast('有 '+dd.length+' 列對到同一個合約工項，請按「修改」選清楚');return false;}
-  return _stlAiSave(it,function(s,na){var m=Object.assign({},(s&&s.q)||{});put.forEach(function(x){m[x.key]=x.qty;});
+  var done=_stlAiSave(it,function(s,na){var m=Object.assign({},(s&&s.q)||{});put.forEach(function(x){m[x.key]=x.qty;});
     na.st='done';na.doneAt=Date.now();na.doneBy=_mvMe();return {q:m,at:na.doneAt,by:na.doneBy};});
+  if(done)try{_stlQchg(q,put);}catch(e){_err('_stlAiOk.qchg',e);}
+  return done;
+}
+// 結算書數量跟合約（報價工項）數量不一樣的：建一份改單草稿（只改數量），今天頁「改單草稿」卡再確認才改合約；不自動改報價
+function _stlQchgOps(q,put){
+  var by={};_stlCalc(q).rows.forEach(function(r){by[r.key]=r;});var ops=[];
+  put.forEach(function(x){var r=by[x.key];if(!r)return;var it=(q.items||[])[r.idx];if(!it)return;var cq=parseFloat(it.qty)||0;if(Math.abs(cq-x.qty)<1e-6)return;
+    ops.push({op:'set',idx:r.idx,match:String(it.desc||'').split('\n')[0].trim(),fields:{qty:x.qty}});});
+  return ops;
+}
+function _stlQchg(q,put){
+  var ops=_stlQchgOps(q,put);if(!ops.length)return Promise.resolve(null);
+  if(typeof fyQuoteChange!=='function'||!_fbUser){toast('結算書有 '+ops.length+' 項跟合約數量不同；要改合約請登入後到報價頁改');return Promise.resolve(null);}
+  return fyQuoteChange({qid:q.id,ops:ops,summary:(q.code||'')+' '+(q.name||'')+' 依營造廠結算書改數量 '+ops.length+' 項'}).then(function(r){
+    if(r&&r.ok)toast('結算書有 '+ops.length+' 項跟合約數量不同：已建改單草稿，在「今天」確認才會改合約');else toast('改單草稿沒建成：'+((r&&r.why)||'').slice(0,60));return r;});
 }
 function _stlAiReject(it,why){return _stlAiSave(it,function(s,na){na.st='rejected';na.why=String(why||'').slice(0,200);na.doneAt=Date.now();na.doneBy=_mvMe();});}
 // 修改：逐列改數量、選對應的合約工項；存回草稿、卡片留著，看過差異再確認
