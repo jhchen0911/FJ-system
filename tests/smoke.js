@@ -13383,6 +13383,40 @@ async function newPage(browser, width, height) {
     check('v6.0.221 時段列法測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.221 Lotion 11/10：今天頁跟錢有關的卡不給「已處理／延後」，只有「去處理」；純通知的卡照舊有「已處理」──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old');
+        const el = document.createElement('div'); document.body.appendChild(el);
+        const its = [
+          { type: 'bill_month', urgent: true, jump: 'window.__m1=1', text: '範例甲 本月要請款', sub: '' },
+          { type: 'recv', urgent: true, jump: 'window.__m2=1', text: '範例乙 第 2 期逾期未收款', sub: '' },
+          { type: 'pay_overdue', urgent: true, jump: 'window.__m3=1', text: '付包商款逾期', sub: '' },
+          { type: 'rent_over', urgent: true, jump: 'window.__m4=1', text: '範例丙 逾期租金', sub: '' },
+          { type: 'ret_due', urgent: true, jump: 'window.__m5=1', text: '範例丁 保留款可請退', sub: '' },
+          { type: 'ct_exp', urgent: true, jump: 'window.__n1=1', text: '範例戊 合約到期', sub: '' }];
+        // 以前在錢的卡按過「已處理」：照樣出現
+        const k0 = _tdKey(its[0]); localStorage.setItem('fy_today_snz', JSON.stringify({ [k0]: { done: localToday(), sig: _tdSig(its[0]) } }));
+        _todayRender(el, null, its); await T(20);
+        const rowOf = (txt) => Array.prototype.find.call(el.querySelectorAll('.td-row'), (r) => r.querySelector('.td-main') && r.querySelector('.td-main').textContent.indexOf(txt) >= 0);
+        const money = ['本月要請款', '逾期未收款', '付包商款逾期', '逾期租金', '保留款可請退'];
+        out.noDone = money.every((t) => { const r = rowOf(t); return r && !r.querySelector('[data-act="done"]') && !r.querySelector('[data-act="later"]') && !!r.querySelector('[data-act="go"]'); });
+        out.oldSnz = /本月要請款/.test(el.textContent);
+        const n = rowOf('合約到期'); out.notice = !!n && !!n.querySelector('[data-act="done"]') && !!n.querySelector('[data-act="later"]');
+        rowOf('本月要請款').querySelector('[data-act="go"]').click(); await T(20); out.go = window.__m1 === 1;
+        // 唯讀帳號：沒有按鈕
+        const oR = _isReaderUser; _isReaderUser = true; _todayRender(el, null, its); out.ro = !el.querySelector('[data-act]'); _isReaderUser = oR;
+        el.remove(); localStorage.removeItem('fy_today_snz');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.221 今天頁：錢的卡（請款、收款、付款、逾期租金、保留款）沒有「已處理／延後」只有「去處理」、以前按過已處理的照樣出現；純通知卡照舊；唯讀沒有按鈕', !r.err && r.noDone && r.oldSnz && r.notice && r.go && r.ro, JSON.stringify(r));
+    check('v6.0.221 今天頁錢的卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

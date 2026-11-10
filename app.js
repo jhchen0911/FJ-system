@@ -43511,11 +43511,16 @@ function renderMorePage(){
 // 只處理呈現：待辦清單照舊由 updateDashTodo／_v6TodoItems 算（含雲端待辦），這裡分類、合併同案、收起不急的、套用本機延後。
 function _tdIsDec(it){var t=String(it&&it.type||'');return /^dec_|draft|sync_cf|conflict|^tomb_hold$|^vp_check$|^ai_held$/.test(t);}   // 刪除申請、付包商款核准、暫存通知：要人處理，不給「已處理／延後」
 function _tdKey(it){return String(it.type||'')+'|'+String(it.id||it.qid||'')+'|'+String(it.jump||'')+'|'+String(it.text||'').replace(/[（(][^）)]*[天到期過][^）)]*[）)]/g,'').replace(/還剩\s*\d+\s*天|\d+\s*天後|逾期\s*\d+\s*天|已\s*\d+\s*天/g,'');}   // 只去掉每天會變的天數（括號裡的「N 天後」「已過期」等），日期、廠商、金額留著，同一家不同筆不會一起被延後   // 同一個跳轉（例如都到應付頁）的不同筆，靠文字（去掉天數）分開
+// Lotion 11/10：跟錢有關的卡不給「已處理」「延後」，只有「去處理」；事情真的做完（單開了、錢收了、款付了）卡片才會消失——這些卡本來就是從資料算出來的（請款單存在、收款登錄、應付已付就不再出現）
+//   請款：本月要請款 bill_month／inv_month／待送請款 inv_submit；收款：recv／逾期 overdue；保留款可請退 ret_due；逾期租金 rent_over；付款：pay_due／pay_overdue／期票 tk_due／薪資 hr_pay
+var _TD_MONEY=/^(bill_month|inv_month|inv_submit|recv|overdue|ret_due|rent_over|pay_due|pay_overdue|tk_due|hr_pay)$/;
+function _tdIsMoney(it){return _TD_MONEY.test(String(it&&it.type||''));}
 function _tdSig(it){return String(it.text||'').replace(/\d+/g,'#')+'|'+String(it.sub||'');}
 function _tdSnzGet(){try{return JSON.parse(localStorage.getItem('fy_today_snz')||'{}')||{};}catch(e){return {};}}
 function _tdSnzSet(o){try{localStorage.setItem('fy_today_snz',JSON.stringify(o));}catch(e){_err('_tdSnzSet',e);}}
 // 延後到某天以前不顯示；已處理＝內容（數字除外）沒變就 30 天內不再顯示，內容變了（例如金額不同）會再出現
 function _tdHidden(it,snz,today){
+  if(_tdIsMoney(it))return false;   // 以前按過「已處理／延後」的錢的卡也照樣出現，做完才消失
   var x=snz[_tdKey(it)];if(!x)return false;
   if(x.until&&today<x.until)return true;
   if(x.done&&x.sig===_tdSig(it)&&_dDiff(x.done,today)<30)return true;
@@ -43541,7 +43546,8 @@ function _todayRender(el,badge,items){
   var row=function(it,inGroup){
     var i=_tdCur.indexOf(it);
     return '<div class="td-row"><div class="td-main" data-i="'+i+'"><div class="td-t">'+esc(it.text||'')+(it.extra||'')+'</div>'+(it.sub?'<div class="td-s"'+(it.color?' style="color:'+it.color+'"':'')+'>'+it.sub+'</div>':'')+'</div>'
-      +((!_tdIsDec(it)&&!ro)?'<div class="td-acts"><button type="button" data-act="done" data-i="'+i+'">已處理</button><button type="button" data-act="later" data-i="'+i+'">延後</button></div>':'')+'</div>';
+      +((!_tdIsDec(it)&&!ro)?(_tdIsMoney(it)?(it.jump?'<div class="td-acts"><button type="button" data-act="go" data-i="'+i+'">去處理</button></div>':'')
+        :'<div class="td-acts"><button type="button" data-act="done" data-i="'+i+'">已處理</button><button type="button" data-act="later" data-i="'+i+'">延後</button></div>'):'')+'</div>';
   };
   var card=function(kind,title,its,urg){
     if(its.length===1)return '<div class="td-card'+(urg?' urg':'')+'"><div class="td-row"><span class="td-kind '+kind+'">'+(kind==='dec'?'要拍板':'提醒')+'</span><div style="flex:1;min-width:0">'+row(its[0])+'</div></div></div>';
@@ -43565,6 +43571,7 @@ function _todayClick(e){
   if(b.getAttribute('data-act')==='dr'){go('quickcost');try{rQuickCost();}catch(x){_err('_todayClick.dr',x);}return;}   // 寫今天的日報
   var it=_tdCur[+b.getAttribute('data-i')];if(!it)return;
   var act=b.getAttribute('data-act');
+  if((act==='done'||act==='later')&&_tdIsMoney(it))return;   // 錢的卡不能收起來
   if(act==='done'){var o=_tdSnzGet();o[_tdKey(it)]={done:localToday(),sig:_tdSig(it)};_tdSnzSet(o);toast('已處理，先收起來（內容有變會再出現）');updateDashTodo();return;}
   if(act==='later'){_todayLater(it);return;}
   if(it.jump){try{(new Function(it.jump))();}catch(x){_err('_todayClick',x);}}
