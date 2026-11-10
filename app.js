@@ -41559,12 +41559,12 @@ function decAct(kind,id,act){
   Promise.resolve(p).then(function(done){fin();if(done==='open')return;   /* v6.0.179：已開下一個視窗（期別），存檔時才標已套用 */if(done===false){toast(act==='reject'?'退回沒成功，這張還留著':'沒有完成，這張還留著');return;}if(act==='reject')toast('已退回');_decRefresh(kind);})
     .catch(function(e){fin();_err('decAct.'+act,e);toast(act==='reject'?'退回失敗':'確認失敗');});
 }
-// ══════════ v6.0.224 舊 AI 草稿 6 種改走拍板卡（陳軒派工第 6 名，Lotion 11/10 定案）══════════
-// 報價 quote、得標 bid、發票照片 irPhoto、現場追加 addon、施工日報 dailyLog、客戶廠商 contact：新選單時一律在今天頁出拍板卡，
-//   展開看過明細才能確認（v6.0.179 規則），AI 草稿清單（_draftPending）不再列這 6 種；舊選單（更多 › 切回舊版）照舊走 AI 草稿清單。
+// ══════════ v6.0.224 舊 AI 草稿 5 種改走拍板卡（陳軒派工第 6 名，Lotion 11/10 定案）══════════
+// 報價 quote、得標 bid、發票照片 irPhoto、現場追加 addon、客戶廠商 contact（施工日報 dailyLog 歸主線）：新選單時一律在今天頁出拍板卡，
+//   展開看過明細才能確認（v6.0.179 規則），AI 草稿清單（_draftPending）不再列這 5 種；舊選單（更多 › 切回舊版）照舊走 AI 草稿清單。
 //   確認／修改＝走原本的套用流程（draftApply：開報價編輯頁、得標視窗、發票紀錄、現場追加、客戶廠商表單），存檔成功才標已套用（_draftAppliedFor）；退回＝標 rejected。
 //   卡片只給建議，正式資料都要 Lotion 在下一個視窗按儲存／確定才寫入。
-var _DRAFT_OLD6=['quote','bid','irPhoto','addon','dailyLog','contact'];
+var _DRAFT_OLD6=['quote','bid','irPhoto','addon','contact'];   // 施工日報 dailyLog 由主線做成帶工項數量的拍板卡（主線 11/10 協調），這裡不收
 function _draftViaDec6(t){try{return _DRAFT_OLD6.indexOf(t)>=0&&_nav5On();}catch(e){return false;}}
 function _d6Pl(d){return (d&&d.payload&&typeof d.payload==='object')?d.payload:{};}
 function _d6Meta(d){var S=_draftS,who=S(d.byName||d.by).slice(0,60),cs=_draftCase(d),vn=_draftVerNote(d);

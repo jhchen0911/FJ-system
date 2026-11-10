@@ -13257,7 +13257,7 @@ async function newPage(browser, width, height) {
         // A：新選單時 6 種各一張拍板卡、AI 草稿清單那一列不出現（今天頁只有一套）
         const items = []; _v6TodoItems(items);
         const types = items.map((x) => x.type);
-        out.cards = ['quote', 'bid', 'irPhoto', 'addon', 'dailyLog', 'contact'].every((t) => types.indexOf('dec_drf_' + t) >= 0) && types.indexOf('ai_draft') < 0 && _draftPending().length === 0;
+        out.cards = ['quote', 'bid', 'irPhoto', 'addon', 'contact'].every((t) => types.indexOf('dec_drf_' + t) >= 0) && types.indexOf('dec_drf_dailyLog') < 0 && _draftPending().length === 1 && _draftPending()[0].type === 'dailyLog';   // 施工日報歸主線
         // 展開明細前不能確認；明細有完整內容
         openDecList('drf_quote'); await T(60);
         const okb = () => document.querySelector('#dec-box .dec-ok');
@@ -13269,7 +13269,7 @@ async function newPage(browser, width, height) {
         const det = async (kind, id) => { const h = await Promise.resolve(_DEC[kind].detail(DRAFTS[id])); const x = document.createElement('div'); x.innerHTML = h; return x; };
         out.bid = /未得標/.test((await det('drf_bid', 'dBid0001')).textContent);
         out.con = /範例廠商丁/.test((await det('drf_contact', 'dCon0001')).textContent);
-        out.line = /今天打 5 支/.test((await det('drf_dailyLog', 'dLog0001')).textContent) && /範例追加 3 支/.test((await det('drf_addon', 'dAdd0001')).textContent);
+        out.line = /範例追加 3 支/.test((await det('drf_addon', 'dAdd0001')).textContent);
         // 舊選單：卡片收起、AI 草稿清單照舊
         localStorage.setItem('fy_nav_old', '1'); const it2 = []; _v6TodoItems(it2); out.old = it2.some((x) => x.type === 'ai_draft') && !it2.some((x) => /^dec_drf_/.test(x.type)) && _draftPending().length === 8; localStorage.removeItem('fy_nav_old');
         // 退回：標 rejected、照片不留
@@ -13309,7 +13309,7 @@ async function newPage(browser, width, height) {
       INV.length = 0; keepI.forEach((x) => INV.push(x)); INVOICE_RECS.length = 0; keepR.forEach((x) => INVOICE_RECS.push(x)); DRAFTS = keepD;
       return out;
     });
-    check('v6.0.224 舊 AI 草稿 6 種改拍板卡：報價、得標、發票照片、現場追加、施工日報、客戶廠商各一張卡；今天頁不再有 AI 草稿那列；展開看過明細才能確認；退回照舊；舊選單照舊走 AI 草稿清單', !r.err && r.cards && r.locked && r.qDetail && r.bid && r.con && r.line && r.old && r.rej, JSON.stringify(r));
+    check('v6.0.224 舊 AI 草稿 5 種改拍板卡：報價、得標、發票照片、現場追加、客戶廠商各一張卡（施工日報歸主線）；展開看過明細才能確認；退回照舊；舊選單照舊走 AI 草稿清單', !r.err && r.cards && r.locked && r.qDetail && r.bid && r.con && r.line && r.old && r.rej, JSON.stringify(r));
     check('v6.0.224 發票對帳卡：買受人＋金額對上自動對到那一期打勾；差多少標紅；對不到列前 3 期讓 Lotion 選、沒選不能存；確認存發票紀錄（關聯期別、稅額、照片）＋請款單記交付方式與日期；同號碼不重存', !r.err && r.auto && r.pick3 && r.bad && r.noPick && r.saved && r.dup && r.reissue && r.need && r.mis && r.misOk && r.markFail, JSON.stringify(r));
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
