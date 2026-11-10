@@ -81,7 +81,7 @@
   function rentActual(batches, asOf) {
     var m = 0, md = 0, open = 0;
     (batches || []).forEach(function (b) {
-      if (!b || !b.d) return; var to = b.o || asOf; if (!b.o) open++;
+      if (!b || !b.d) return; var to = b.o || asOf; if (!b.o && (!asOf || String(b.d) <= String(asOf))) open++;
       if (!to || String(to) < String(b.d)) return;
       var bm = num(b.m); m += bm; md += bm * days(b.d, to);
     });

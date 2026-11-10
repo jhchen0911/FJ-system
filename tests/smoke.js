@@ -12465,20 +12465,24 @@ async function newPage(browser, width, height) {
                      { id: 'mv_b', st: 'ok', dir: 'out', qid: 'm7q', own: true, date: '2026-11-30', truck: 'AB-2', truckType: 'crane', lift: 'self', items: [{ name: 'H型鋼', spec: 'H300', len: 12, qty: 9, short: 1 }] }];
         MAT_MOVE_FIN = {}; MAT_HIST = {};
         const rec = _mhBuild(Q[0]);
-        o.rec = rec.county === '臺中市' && rec.rents.length === 2 && rec.rents[0].avgDays === 60 && rec.rents[0].pmd === 4 && rec.rents[0].upaKey === 'hsteel.H300.rent' && rec.rents[0].upaVal === 4
-          && rec.rents[1].upaKey === 'rail.rent.9' && rec.rents[1].upaVal === 9 && rec.loss[0].rate === 10 && rec.trips === 2 && rec.byTruck.flat === 1 && rec.byTruck.crane === 1 && rec.lift === 1 && rec.fare === null && rec.crane === null;
+        o.rec = rec.county === '臺中市' && rec.rents.length === 2 && rec.rents[0].avgDays === 60 && rec.rents[0].pmd === 4 && rec.rents[0].upaKey === 'hsteel|H300|rent' && rec.rents[0].upaVal === 4
+          && rec.rents[1].upaKey === 'rail|rent|9' && rec.rents[1].upaVal === 9 && rec.loss[0].rate === 10 && rec.trips === 2 && rec.byTruck.flat === 1 && rec.byTruck.crane === 1 && rec.lift === 1 && rec.fare === null && rec.crane === null;
         o.recTxt = JSON.stringify(rec).slice(0, 400);
         MAT_MOVE_FIN = { mv_a: { fare: 8000 }, mv_b: { fare: 9000, crane: 5000 } };   // M6 之後填的運費、吊車費
         const rec2 = _mhBuild(Q[0]); o.fare = rec2.fare === 17000 && rec2.crane === 5000;
         MAT_MOVE_FIN = {};
         o.write = _mhWrite(Q[0]) === true && !!MAT_HIST.m7q && _mhWrite(Q[0]) === false;   // 內容沒變不重寫
         o.notClosed = _mhWrite(Object.assign({}, Q[0], { closed: false })) === false;
+        MAT_HIST.m7q = JSON.parse(JSON.stringify(MAT_HIST.m7q, (k, v) => v === null ? undefined : v)); o.noChurn = _mhWrite(Q[0]) === false;
+        const ref = (n, sp, len, kind) => _mhUpaRef({ name: n, spec: sp, len: len }, kind);
+        o.refs = (ref('H型鋼', 'H300', 9, 'strut') || {}).key === 'strut|rent|H300' && (ref('鋼軌', '', 12.5, 'pile') || {}).key === 'rail|rent|12.5' && ref('鋼板樁', 'SP-III', 9, 'pile') === null && ref('H型鋼', '2H300', 9, 'strut') === null;
+        const r125 = UPA_COST_DB.rail.rent['12.5']; o.set125 = _mhUpaSet(['rail', 'rent', '12.5'], 9.5) === true && UPA_COST_DB.rail.rent['12.5'] === 9.5 && _mhUpaSet(['rail', 'rent'], 1) === false; UPA_COST_DB.rail.rent['12.5'] = r125;
         // 單價庫比對拍板卡：H300 實績 4 vs 單價庫 3 → 出卡；鋼軌 9M 實績 9 vs 單價庫 6 → 出卡；沒按確認不改
         const L = _DEC.mhUpa.list(); o.cards = L.map((x) => x.key).sort().join(',');
         o.noAuto = JSON.stringify(UPA_COST_DB) === upa0;
         o.detail = /結案實績平均/.test(_DEC.mhUpa.detail(L[0]));
-        const h = L.find((x) => x.key === 'hsteel.H300.rent'); await _DEC.mhUpa.ok(h); o.updated = UPA_COST_DB.hsteel.H300.rent === 4;
-        const rl = L.find((x) => x.key === 'rail.rent.9'); await _DEC.mhUpa.reject(rl); o.rejected = P.mhSkip && P.mhSkip['rail.rent.9'] === 9 && !_DEC.mhUpa.list().some((x) => x.key === 'rail.rent.9');
+        const h = L.find((x) => x.key === 'hsteel|H300|rent'); await _DEC.mhUpa.ok(h); o.updated = UPA_COST_DB.hsteel.H300.rent === 4;
+        const rl = L.find((x) => x.key === 'rail|rent|9'); await _DEC.mhUpa.reject(rl); o.rejected = P.mhSkip && P.mhSkip['rail|rent|9'] === 9 && !_DEC.mhUpa.list().some((x) => x.key === 'rail|rent|9');
         o.stats = JSON.stringify(_mhStats());
         // 每月閒置浪費：起算日用退料提醒那一套（這裡直接給拔除完成日）
         const real = _mvIdleStartOf; o.noStart = real(Q[0], Q[0].mat.rents[0]) === '';
@@ -12487,14 +12491,17 @@ async function newPage(browser, width, height) {
         _mvIdleStartOf = real;
         o.idle = m11.n === 1 && m11.rows[0].cost === 4800 && m11.rows[0].days === 10 && m11.total === 4800 && m10.n === 0;   // 11/20→11/30 10 天 × 120M × 120/30
         o.idleTxt = JSON.stringify(m11).slice(0, 300);
+        Q[0].mat.rents[0].batches[0].o = ''; _mvIdleStartOf = (q, rt) => rt.id === 'rt1' ? '2026-11-20' : '';
+        const c11 = _mvIdleMonth('2026-11', '2027-01-15'), c12 = _mvIdleMonth('2026-12', '2027-01-15'); _mvIdleStartOf = real; Q[0].mat.rents[0].batches[0].o = '2026-11-30';
+        o.clip = c11.rows.length === 1 && c11.rows[0].days === 11 && c12.n === 0;
         // 業主要求先留（退料提醒按「先留」）不算浪費
         MAT_TAGS[_mvTagId('m7q', 'rt1')] = { keep: 1 }; _mvIdleStartOf = () => '2026-11-20'; o.keep = _mvIdleMonth('2026-11', '2026-12-05').n === 0 || _mvIdleMonth('2026-11', '2026-12-05').rows.every((x) => x.rt !== 'rt1'); _mvIdleStartOf = real; delete MAT_TAGS[_mvTagId('m7q', 'rt1')];
       } catch (e) { o.err = String(e && e.stack || e).slice(0, 500); }
       return o;
     });
-    check('v6.0.210 M7 結案實績：工地縣市、每張租料單實際租期（M 數加權）與每 M 每天租金、對到單價庫欄位、損耗率、趟數（平板／吊板）、吊車次數；運費吊車費等 M6 填了就自動算', !r.err && r.rec && r.fare && r.write && r.notClosed, r.err || JSON.stringify(r).slice(0, 700));
-    check('v6.0.210 M7 單價庫比對：差 5% 以上出拍板卡、不自動改；確認＝改成實績平均、退回＝實績沒變不再問', !r.err && r.cards === 'hsteel.H300.rent,rail.rent.9' && r.noAuto && r.detail && r.updated && r.rejected, JSON.stringify({ cards: r.cards, noAuto: r.noAuto, detail: r.detail, updated: r.updated, rejected: r.rejected }));
-    check('v6.0.210 M7 每月租料閒置浪費：拔除完成日起算、已退場的算到退場日、切在月份裡；沒拔完不算；業主要求先留的不算', !r.err && r.idle && r.noStart && r.keep, JSON.stringify({ idle: r.idle, noStart: r.noStart, keep: r.keep, t: r.idleTxt }));
+    check('v6.0.210 M7 結案實績：工地縣市、每張租料單實際租期（M 數加權）與每 M 每天租金、對到單價庫欄位、損耗率、趟數（平板／吊板）、吊車次數；運費吊車費等 M6 填了就自動算', !r.err && r.rec && r.fare && r.write && r.notClosed && r.noChurn && r.refs && r.set125, r.err || JSON.stringify(r).slice(0, 700));
+    check('v6.0.210 M7 單價庫比對：差 5% 以上出拍板卡、不自動改；確認＝改成實績平均、退回＝實績沒變不再問', !r.err && r.cards === 'hsteel|H300|rent,rail|rent|9' && r.noAuto && r.detail && r.updated && r.rejected, JSON.stringify({ cards: r.cards, noAuto: r.noAuto, detail: r.detail, updated: r.updated, rejected: r.rejected }));
+    check('v6.0.210 M7 每月租料閒置浪費：拔除完成日起算、已退場的算到退場日、切在月份裡；沒拔完不算；業主要求先留的不算', !r.err && r.idle && r.noStart && r.keep && r.clip, JSON.stringify({ clip: r.clip, idle: r.idle, noStart: r.noStart, keep: r.keep, t: r.idleTxt }));
     check('v6.0.210 M7 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
