@@ -8150,7 +8150,7 @@ async function newPage(browser, width, height) {
         /* 1. 現場追加草稿 → 確認 → q.addons（不進請款單） */
         DRAFTS = { dl5551: { id: 'dl5551', type: 'addon', by: 'line-bot', byName: 'LINE 機器人', at: 1, status: 'pending', summary: '現場追加：內湖興中路　鋼板樁 12 支', payload: { qid: 'qL', groupId: 'Gsite9999', date: '2026-10-22', text: '#追加 鋼板樁 12 支', qty: 12, unit: '支', photos: ['line/group/Gsite9999/2026-10-22/p1.jpg', 'javascript:alert(1)'] } },
           dd99992026: { id: 'dd99992026', type: 'dailyLog', by: 'line-bot', at: 2, status: 'pending', summary: '施工日報', payload: { qid: 'qL', groupId: 'Gsite9999', date: '2026-10-22', answers: ['1. 打設 H 型鋼 8 支'], dayTexts: ['早安'], photos: ['line/group/Gsite9999/2026-10-22/p2.jpg'], replied: true } } };
-        const lh = _draftListHtml(); out.list = /現場追加（LINE）/.test(lh) && /data-lpath="line\/group/.test(lh) && /打設 H 型鋼/.test(lh);
+        const lh = _draftListHtml(); out.list = /現場追加（LINE）/.test(lh) && /data-lpath="line\/group/.test(lh) && !/打設 H 型鋼/.test(lh) && _DEC.dlQty.list().some(d => d.id === 'dd99992026');   // v6.0.227 施工日報改走拍板卡 dlQty
         draftApply('dl5551'); document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 30));
         const q = Q[0]; out.addon = (q.addons || []).length === 1 && q.addons[0].qty === 12 && q.addons[0].status === 'confirmed' && q.addons[0].photos.length === 1 && DRAFTS.dl5551.status === 'applied' && !!q._mt;
         /* 2. 施工日報草稿 → 確認 → q.dailyLogs */
@@ -11624,6 +11624,283 @@ async function newPage(browser, width, height) {
     check('v6.0.208 數量對不上 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── v6.0.229 鋼價來源改版（Lotion 11/10）：H 型鋼／鋼軌樁／鋼板樁看東和、覆工板看中鋼熱軋；每噸調整金額換算每公斤（不算 %）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepF = MAT_MOVE_FIN, keepD = DRAFTS, keepT = MAT_TAGS, keepTd = window.localToday, keepMark = window._draftMark, keepI = STEEL_IDX;
+      try {
+        MAT_MOVE_FIN = {}; DRAFTS = {}; MAT_TAGS = {}; STEEL_IDX = null;
+        window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        _m8Save({ kind: 'm8cfg', cats: [{ id: 'h', name: 'H 型鋼', unit: 'kg', price: 25, ref: { ym: '2026-09' } }, { id: 'sp', name: '鋼板樁', unit: 'kg', price: 30, ref: { ym: '2026-09' } }, { id: 'deck', name: '覆工板', unit: '片', price: 4000, ref: { ym: '2026-09' } }], salvage: '', store: '' });
+        window.localToday = () => '2026-11-10';
+        out.line = _m8StlLine(_m8Cats().find(x => x.id === 'sp')) === 'H' && _m8StlLine(_m8Cats().find(x => x.id === 'deck')) === 'P' && _m8StlLine({ id: 'rail', unit: 'kg' }) === 'H';
+        out.bad = (await fySteelPriceDraft({ ym: '2026-11', items: [{ cat: 'H型鋼' }] })).ok === false;
+        const o = _m8StlClean({ ym: '2026-11', items: [{ cat: 'H型鋼', perTon: 400, src: '東和鋼鐵', date: '2026-10-20', url: 'https://example.com/a' }, { cat: '鋼板樁', perTon: 400, date: '2026-11-02' }, { cat: '熱軋鋼捲', perTon: 300, src: '中鋼', date: '2026-11-05' }] });
+        out.clean = o.items.length === 3 && o.items[0].cat === 'H' && o.items[0].perTon === 400 && o.items[1].cat === 'H' && o.items[1].src === '東和鋼鐵' && o.items[2].cat === 'P' && o.items[2].src === '中鋼';
+        DRAFTS.dst1 = { id: 'dst1', type: 'steelPrice', by: 'ai@example.com', at: 1, status: 'pending', summary: '', payload: o };
+        out.card = /每噸 \+400 元/.test(_DEC.steelPrice.body(DRAFTS.dst1)) && /每公斤 \+0\.4/.test(_DEC.steelPrice.detail(DRAFTS.dst1));
+        out.ok = _DEC.steelPrice.ok(DRAFTS.dst1) === true && _m8Csc().months['2026-11'].adj.length === 3;
+        // 重複確認同一張（同日同金額同來源）不會重複加
+        DRAFTS.dst2 = { id: 'dst2', type: 'steelPrice', by: 'ai@example.com', at: 2, status: 'pending', summary: '', payload: _m8StlClean({ ym: '2026-11', items: [{ cat: 'H型鋼', perTon: 400, src: '東和鋼鐵', date: '2026-10-20' }] }) };
+        _DEC.steelPrice.ok(DRAFTS.dst2); out.dedupe = _m8Csc().months['2026-11'].adj.length === 3;
+        // 建議：H 型鋼 25 + (400+400)/1000 = 25.8（+3.2%，不到 5% 不出卡）；再漲兩次 400 → 26.6（+6.4%）出卡
+        const ch = _m8SteelChg(_m8Cats().find(x => x.id === 'h'));
+        out.calc = ch && ch.sug === 25.8 && ch.pct === 3.2 && /東和鋼鐵 H 型鋼盤價/.test(ch.src) && _decItems('m8Steel').some(x => /H 型鋼/.test(x.spec) && x.sug === 25.8);   // Lotion 11/10：每次調價都出卡（不等 5%）
+        _DEC.m8Steel.ok(_decItems('m8Steel').find(x => /H 型鋼/.test(x.spec)));
+        DRAFTS.dst3 = { id: 'dst3', type: 'steelPrice', by: 'ai@example.com', at: 3, status: 'pending', summary: '', payload: _m8StlClean({ ym: '2026-11', items: [{ cat: 'H型鋼', perTon: 400, date: '2026-11-06' }, { cat: 'H型鋼', perTon: 400, date: '2026-11-08' }] }) };
+        _DEC.steelPrice.ok(DRAFTS.dst3);
+        const L = _decItems('m8Steel'), hc = L.find(x => /H 型鋼/.test(x.spec));
+        out.card2 = !!hc && hc.sug === 26.6 && /每噸 \+400 元 → 每公斤 \+0\.4/.test(_DEC.m8Steel.detail(hc)) && /換算：每噸調整金額 ÷ 1000/.test(_DEC.m8Steel.detail(hc));
+        // 審查：同一個月又調一次 → 確認過的卡要再問；下個月的盤（月初公布）現在就算
+        _DEC.m8Steel.ok(hc); out.ackKeep = !_decItems('m8Steel').some(x => /H 型鋼/.test(x.spec));
+        DRAFTS.dst4 = { id: 'dst4', type: 'steelPrice', by: 'ai@example.com', at: 4, status: 'pending', summary: '', payload: _m8StlClean({ ym: '2026-12', items: [{ cat: 'H型鋼', perTon: 400, date: '2026-11-09' }] }) };
+        _DEC.steelPrice.ok(DRAFTS.dst4); const h2 = _decItems('m8Steel').find(x => /H 型鋼/.test(x.spec));
+        out.reAlert = !!h2 && h2.sug === 27 && h2.ym === '2026-12';
+        // 填價那個月：公告日期在填價日之後的才算
+        const cc = { id: 'h', name: 'H', unit: 'kg', price: 20, ref: { ym: '2026-11', d: '2026-11-07' } }, c2 = _m8SteelChg(cc);
+        out.sameMonth = !!c2 && c2.sug === 20.8 && c2.steps.length === 2;   // 11 月只算 11-07 之後的 11-08；12 月盤的 11-09 也算；10-20、11-02、11-06 在填價前不算
+        out.cleanRe = _m8StlClean({ ym: '2026-11', items: [null, { cat: 'HR 熱軋', perTon: 100 }, { cat: '冷軋', perTon: 100 }, { cat: 'H300', perTon: 100 }] }).items.map(i => i.cat).join() === 'P,P,H';
+        // 覆工板（每片）不拿每噸金額換算
+        out.deck = !L.some(x => /覆工板/.test(x.spec));
+        // 舊格式（pct）照收
+        out.old = _m8StlClean({ ym: '2026-11', items: [{ cat: 'H型鋼', pct: 2.5 }] }).items[0].pct === 2.5;
+      } finally { MAT_MOVE_FIN = keepF; DRAFTS = keepD; MAT_TAGS = keepT; window.localToday = keepTd; window._draftMark = keepMark; STEEL_IDX = keepI; }
+      return out;
+    });
+    check('v6.0.229 鋼價來源：H 型鋼／鋼軌樁／鋼板樁看東和、覆工板看中鋼熱軋；草稿可帶每噸調整金額＋來源＋日期＋網址；確認累加進這個月（不重複）；建議買價＝現價＋每噸金額÷1000、每次調價都出卡、卡片寫換算；覆工板每片不換算；舊 % 格式照收', Object.values(r).length === 14 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.229 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── v6.0.227 請款鏈 2：LINE 日報草稿帶工項數量 → 拍板卡 dlQty（拆出工項＋數量＋打設／拔除＋本段完成；累計跟合約比、超過標紅；待確認不猜；確認才寫 progressRows）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepD = DRAFTS, keepMark = window._draftMark, keepP = window.persist;
+      try {
+        window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        Q = [{ id: 'qD', name: '測試日報案', awarded: true, t: { total: 0 }, items: [{ desc: '鋼板樁 III型 L=12M 打設', unit: '支', qty: 30 }, { desc: '鋼板樁 III型 L=12M 拔除', unit: '支', qty: 30 }, { desc: 'H型鋼樁 H300 L=15M 打設＋拔除', unit: '支', qty: 20 }],
+          dailyLogs: [{ id: 'dx', date: '2026-10-10', progressRows: [{ itemIdx: 0, qty: 25 }] }] }];
+        DRAFTS = { dq111111: { id: 'dq111111', type: 'dailyLog', by: 'line-bot', at: 1, status: 'pending', summary: '施工日報', payload: { qid: 'qD', date: '2026-10-14', answers: ['1. 今日打設鋼板樁，共8支\n2. H300 型鋼樁打設 5 支，北側這段完成\n3. 地錨 4 處\n4. 人數 6人'], photos: ['line/group/G1/2026-10-14/p1.jpg'] } } };
+        const L = _decItems('dlQty');
+        out.card = L.length === 1 && /待確認 1 列/.test(_DEC.dlQty.body(L[0])) && /超過合約 1 列/.test(_DEC.dlQty.body(L[0]));
+        const det = await _DEC.dlQty.detail(L[0]);
+        out.detail = /今日打設鋼板樁/.test(det) && /33 ／ 30/.test(det) && /超過合約/.test(det) && /待確認/.test(det) && /alt="現場照片"/.test(det) && /不算工項：/.test(det) === false;
+        out.notInList = !/今日打設鋼板樁/.test(_draftListHtml());
+        out.ok = (await _DEC.dlQty.ok(L[0])) === true && DRAFTS.dq111111.status === 'applied';
+        const D = Q[0].dailyLogs.find(x => x.date === '2026-10-14'), pr = (D && D.progressRows) || [];
+        out.rows = pr.length === 3 && pr[0].itemIdx === -1 && /【LINE】1\. 今日打設鋼板樁/.test(pr[0].note) && pr[1].itemIdx === 0 && pr[1].qty === 8 && pr[1].ph === 'install' && !pr[1].batchDone && pr[2].itemIdx === 2 && pr[2].qty === 5 && !pr[2].batchDone && /H型鋼樁 H300/.test(pr[2].desc) && D.linePhotos.length === 1 && !!Q[0]._mt;   // 本段完成照日報表單：只有「拔除完成日」口徑的拔除列才記
+        out.cum = _itemProgress(Q[0], 0).instQty === 33 || FJC.dl.cumOf(Q[0].dailyLogs, 0, 'install', x => _prPhase(Q[0], x)) === 33;
+        // 修改：確認視窗裡可以逐列改工項／數量（地錨那列選「不記」）
+        DRAFTS.dq222222 = { id: 'dq222222', type: 'dailyLog', by: 'line-bot', at: 2, status: 'pending', summary: '施工日報', payload: { qid: 'qD', date: '2026-10-15', answers: ['鋼板樁拔除 6 支'], photos: [] } };
+        _DEC.dlQty.edit(DRAFTS.dq222222); await new Promise(res => setTimeout(res, 60));
+        const qi = document.querySelector('.ldq-row .ldq-q'); out.editUi = !!qi && qi.value === '6' && document.querySelector('.ldq-row .ldq-i').value === '1';
+        if (qi) qi.value = '7';
+        document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 60));
+        const D2 = Q[0].dailyLogs.find(x => x.date === '2026-10-15');
+        out.edit = !!D2 && D2.progressRows.some(r => r.itemIdx === 1 && r.qty === 7 && r.ph === 'remove') && DRAFTS.dq222222.status === 'applied';
+        // 審查：這天已經有同工項的數量 → 加上去，不能蓋掉；卡片先講
+        DRAFTS.dq444444 = { id: 'dq444444', type: 'dailyLog', by: 'line-bot', at: 4, status: 'pending', summary: '施工日報', payload: { qid: 'qD', date: '2026-10-14', answers: ['下午鋼板樁打設 4 支'], photos: ['line/group/G1/2026-10-14/p1.jpg'] } };
+        out.dayHadCard = /這天已有 8，會加上去/.test(await _DEC.dlQty.detail(DRAFTS.dq444444));
+        await _DEC.dlQty.ok(DRAFTS.dq444444);
+        const D3 = Q[0].dailyLogs.find(x => x.date === '2026-10-14'), r0 = D3.progressRows.filter(x => x.itemIdx === 0);
+        out.dayAdd = r0.length === 1 && r0[0].qty === 12 && D3.linePhotos.length === 1;
+        // 寫過但標記失敗 → 再按確認只補標記、不重寫
+        window._draftMark = () => Promise.resolve(false);
+        DRAFTS.dq555555 = { id: 'dq555555', type: 'dailyLog', by: 'line-bot', at: 5, status: 'pending', summary: '施工日報', payload: { qid: 'qD', date: '2026-10-16', answers: ['鋼板樁打設 2 支'], photos: [] } };
+        const f1 = await _DEC.dlQty.ok(DRAFTS.dq555555);
+        window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        const f2 = await _DEC.dlQty.ok(DRAFTS.dq555555), D5 = Q[0].dailyLogs.filter(x => x.date === '2026-10-16');
+        out.noDouble = f1 === false && f2 === true && D5.length === 1 && D5[0].progressRows.filter(x => x.itemIdx === 0)[0].qty === 2;
+        // 對不到工程：確認不寫
+        DRAFTS.dq333333 = { id: 'dq333333', type: 'dailyLog', by: 'line-bot', at: 3, status: 'pending', summary: '施工日報', payload: { qid: '', unmatched: true, site: '某地', date: '2026-10-15', answers: ['打設 3 支'] } };
+        out.unmatched = /先按「修改」選工程/.test(_DEC.dlQty.body(DRAFTS.dq333333)) && _DEC.dlQty.ok(DRAFTS.dq333333) === false && DRAFTS.dq333333.status === 'pending';
+      } finally { Q = keepQ; DRAFTS = keepD; window._draftMark = keepMark; }
+      return out;
+    });
+    check('v6.0.227 LINE 日報草稿拍板卡：拆出工項數量（打設／拔除、本段完成）、累計跟合約比超過標紅、拆不出的標待確認不寫、附原文與照片、不再列在 AI 草稿清單；確認才寫 progressRows；修改可逐列改；對不到工程不寫', Object.values(r).length === 12 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.227 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── v6.0.226 請款鏈 1：請款單狀態（草稿→已送業主→業主已確認→已開發票→已收款）、舊單推算清單卡、業主確認卡＋發票照抄範例 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepI = INV, keepR = INVOICE_RECS, keepD = DRAFTS, keepC = CUSTOMERS, keepP = P.invStInit, keepMark = window._draftMark;
+      try {
+        DRAFTS = {}; window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        CUSTOMERS = [{ id: 'c1', name: '甲營造', taxid: '12345678' }];
+        const T = { curTotal: 100000, tax: 5000, retention: 0, cleanGross: 0, grand: 105000 };
+        INV = [
+          { id: 'i1', project: '測試甲案', client: '甲營造', periodNo: 1, date: '2026-09-25', quoteId: 'q1', totals: T, receivedConfirmed: true, receivedDate: '2026-10-20' },
+          { id: 'i2', project: '測試甲案', client: '甲營造', periodNo: 2, date: '2026-10-25', quoteId: 'q1', totals: T },
+          { id: 'i3', project: '測試甲案', client: '甲營造', periodNo: 3, date: '2026-11-25', quoteId: 'q1', totals: T },
+          { id: 'r1', project: '測試甲案', kind: 'retReturn', totals: {} }];
+        INVOICE_RECS = [{ id: 'e1', linkedInvId: 'i2', number: 'AB12345678', date: '2026-10-28', status: 'issued' }];
+        delete P.invStInit;
+        // 舊單推算：收齊＝已收款、有發票＝已開發票、其他＝已送業主；保留款退還單不算；還沒確認前不寫紀錄
+        out.infer = _invStOf(INV[0]) === 'paid' && _invStOf(INV[1]) === 'einv' && _invStOf(INV[2]) === 'sent' && _invStInitRows().length === 3;
+        out.noSyncYet = _invStSync() === 0 && !INV[2].stLast;
+        const L = _decItems('invStInit');
+        out.initCard = L.length === 1 && /已收款 1 張/.test(_DEC.invStInit.body(L[0])) && /AB12345678/.test(_DEC.invStInit.detail(L[0]));
+        out.initOk = _DEC.invStInit.ok(L[0]) === true && P.invStInit > 0 && INV[2].stLast === 'sent' && /舊單推算/.test(INV[2].stLog[0].why) && !_decItems('invStInit').length && !INV[3].stLast;
+        // 業主確認卡：對到最近一張「已送業主」的（沒給期別）
+        out.badDraft = (await fyInvOkDraft({ qid: 'q1' })).ok === false;
+        DRAFTS.dok1 = { id: 'dok1', type: 'invOk', by: 'ai@example.com', at: 1, status: 'pending', summary: '', payload: _invOkClean({ qid: 'q1', text: '第3期數量沒問題，請開發票', from: '王主任' }) };
+        const K = _decItems('invOk');
+        out.okCard = K.length === 1 && _invOkInv(K[0]).id === 'i3' && /第3期數量沒問題/.test(_DEC.invOk.detail(K[0])) && /12345678/.test(_DEC.invOk.detail(K[0])) && /NT\$ 100,000/.test(_DEC.invOk.detail(K[0]));
+        window._draftMark = () => Promise.resolve(false);
+        out.markFail = (await _DEC.invOk.ok(K[0])) === false && _invStOf(INV[2]) === 'sent' && !INV[2].ownerOk;   // 草稿標記失敗：請款單不動
+        window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        const ok = await _DEC.invOk.ok(K[0]);
+        out.okDone = ok === 'open' && _invStOf(INV[2]) === 'ok' && INV[2].stLast === 'ok' && /王主任/.test(INV[2].stLog.slice(-1)[0].why) && DRAFTS.dok1.status === 'applied' && INV[2].ownerOk.from === '王主任';
+        const cp = _invCopyOf(INV[2]);
+        out.copy = cp.buyer === '甲營造' && cp.taxid === '12345678' && cp.item === '測試甲案 第3期工程款' && cp.net === 100000 && cp.tax === 5000 && cp.gross === 105000;
+        // 業主要改數量 → 不改狀態、打開請款單去改、留紀錄
+        DRAFTS.dok2 = { id: 'dok2', type: 'invOk', by: 'ai@example.com', at: 2, status: 'pending', summary: '', payload: _invOkClean({ invId: 'i2', text: '鋼板樁打設請改成 80 支', change: [{ desc: '鋼板樁打設', qty: '80' }] }) };
+        const K2 = _decItems('invOk').find(d => d.id === 'dok2');
+        out.chg = /業主要改 1 列/.test(_DEC.invOk.body(K2)) && (await _DEC.invOk.ok(K2)) === 'open' && _invStOf(INV[1]) === 'einv' && /業主要改 1 列/.test(INV[1].stLog.slice(-1)[0].why) && INV[1].stLast === 'einv' && /已經已開發票/.test(_DEC.invOk.detail(K2));
+        // 對位：案名只用部分字、對到兩個工程就不猜；期別要是數字
+        INV.push({ id: 'x1', project: '測試甲案二期', periodNo: 1, totals: T, stLast: 'sent' });
+        out.find = _invOkFind(_invOkClean({ caseName: '測試甲' })) === null && (_invOkFind(_invOkClean({ caseName: '測試甲案', periodNo: 3 })) || {}).id === 'i3' && _invOkClean({ periodNo: '第3期' }).periodNo === 0 && _invOkFind(_invOkClean({ qid: 'q1', periodNo: 9 })) === null;
+        INV.pop();
+        // 事實變了自動記：發票作廢 → 回到業主已確認以前的狀態（i2 沒確認過＝已送業主）；收齊 → 已收款
+        INVOICE_RECS[0].status = 'cancelled'; const n1 = _invStSync();
+        out.sync = n1 === 1 && INV[1].stLast === 'sent' && /^自動/.test(INV[1].stLog.slice(-1)[0].why) && INV[1].stLog.slice(-1)[0].by === '系統';
+        INV[2].receivedConfirmed = true; _invStSync();
+        out.paid = INV[2].stLast === 'paid' && _invStDone(INV[2], 'ok') && _invStDone(INV[2], 'paid') && !_invStDone(INV[1], 'ok') && _invStDone(INV[1], 'send');
+        // 新開的請款單：記一筆「新的請款單」
+        INV.push({ id: 'i4', project: '測試乙案', periodNo: 1, totals: T }); _invStSync();
+        // 逐張改：舊單推算修改的選擇要經過確認才寫
+        delete P.invStInit; INV.push({ id: 'i5', project: '測試丙案', periodNo: 1, totals: T });
+        out.initEdit = _DEC.invStInit.ok(null, { i5: 'ok' }) === true && _invStOf(INV[5]) === 'ok' && /Lotion 逐張改/.test(INV[5].stLog[0].why);
+        out.newInv = INV[4].stLast === 'sent' && /新的請款單/.test(INV[4].stLog[0].why);
+        out.chip = /已收款/.test(_invStChip(INV[2])) && _invStChip(INV[3]) === '';
+      } finally { INV = keepI; INVOICE_RECS = keepR; DRAFTS = keepD; CUSTOMERS = keepC; if (keepP) P.invStInit = keepP; else delete P.invStInit; window._draftMark = keepMark; }
+      return out;
+    });
+    check('v6.0.226 請款單狀態：舊單推算（收齊＝已收款、有發票＝已開發票、其他＝已送業主，保留款退還單不算）列清單給 Lotion 確認一次才記；業主確認卡對到最近一張已送業主、確認＝業主已確認＋發票照抄範例（買受人、統編、品名、未稅、稅額、含稅）；業主要改數量＝打開請款單、不改狀態；發票作廢／收齊／新單自動記紀錄（誰、何時、依據）；做完了沒 _invStDone', Object.values(r).length === 16 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.226 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── v6.0.228 請款鏈 3：請款單草稿卡 invDraft（截止前 5 天、附日報來源／累計／上一期／追加／保留款；確認＝開第 N 期、狀態草稿）→ invSend（確認＝已送業主＋PDF＋送業主文字）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepI = INV, keepPr = window.printInvById, keepM = window._modal;
+      try {
+        let printed = ''; window.printInvById = (id) => { printed = id; }; window._modal = () => {};
+        Q = [{ id: 'qB', name: '測試請款案', awarded: true, client: '甲營造', ownerPay: { cut: 18 }, items: [{ desc: '鋼板樁 III型 打設', unit: '支', qty: 100, price: 1000 }],
+          dailyLogs: [{ id: 'l1', date: '2026-10-05', progressRows: [{ itemIdx: 0, qty: 20 }] }, { id: 'l2', date: '2026-10-12', progressRows: [{ itemIdx: 0, qty: 15 }] }],
+          addons: [{ id: 'a1', date: '2026-10-10', text: '追加背填', status: 'confirmed', qty: 3, unit: 'M3' }], t: { total: 0 } }];
+        INV = [];
+        _todoBuild(true);
+        const L = _decItems('invDraft');
+        out.card = L.length === 1 && /截止 10-18/.test(_DEC.invDraft.head(L[0]));
+        const det = L.length ? _DEC.invDraft.detail(L[0]) : '';
+        out.detail = /第 1 期/.test(det) && /10-05 20、10-12 15/.test(det) && /打設 35<br>／ 100/.test(det) && !/超過合約/.test(det) && /按「儲存」/.test(det) && /追加背填/.test(det) && /主任還沒簽認，這期先不請/.test(det) && /保留款 0%/.test(det);
+        out.ok = (await _DEC.invDraft.ok(L[0])) === 'open' && INV.length === 1 && _invStOf(INV[0]) === 'draft' && /請款單草稿卡確認/.test(INV[0].stLog.slice(-1)[0].why);
+        _todoBuild(true);
+        out.gone = !_decItems('invDraft').length;
+        const S = _decItems('invSend');
+        out.send0 = S.length === 1 && (await _DEC.invSend.ok(S[0])) === false && _invStOf(INV[0]) === 'draft';   // 金額 0 不送
+        INV[0].totals = { curTotal: 35000, tax: 1750, retention: 0, grand: 36750 };
+        out.msg = /測試請款案」第 1 期請款單/.test(_DEC.invSend.detail(S[0])) && /NT\$ 36,750/.test(_DEC.invSend.detail(S[0]));
+        out.send = (await _DEC.invSend.ok(S[0])) === 'open' && _invStOf(INV[0]) === 'sent' && /確認送出/.test(INV[0].stLog.slice(-1)[0].why);
+        await new Promise(res => setTimeout(res, 120)); out.pdf = printed === INV[0].id && !_decItems('invSend').length;
+        // 退回＝這期不請
+        INV = []; _todoBuild(true); const L2 = _decItems('invDraft');
+        out.skip = L2.length === 1 && _DEC.invDraft.reject(L2[0], '業主說月底一起') === true && Q[0].billSkip['2026-10-18'].why === '業主說月底一起' && !_decItems('invDraft').length;
+        const T5 = []; _todo5cItems(T5); out.skipTodo = !T5.some(x => x.type === 'bill_month');   // 退回後總覽「本月要請款」也不再出
+        // 打設＋拔除的工項：累計分開比，不會誤報超過合約
+        delete Q[0].billSkip; Q[0].items[0].desc = '鋼板樁 III型 打設＋拔除'; Q[0].dailyLogs.push({ id: 'l3', date: '2026-10-13', progressRows: [{ itemIdx: 0, qty: 30, ph: 'remove' }] }); _todoBuild(true);
+        const det3 = _DEC.invDraft.detail(_decItems('invDraft')[0]); out.phase = /打設 35<br>拔除 30<br>／ 100/.test(det3) && !/超過合約/.test(det3);
+        // 草稿待送出：退回＝3 天後再提醒
+        INV = [{ id: 'ix', project: '測試請款案', quoteId: 'qB', periodNo: 2, st: 'draft', stLast: 'draft', totals: { grand: 100 } }];
+        out.snooze = _isList().length === 1 && _DEC.invSend.reject(INV[0], '等業主') === true && !_isList().length && INV[0].sendSnz === '2026-10-18' && /先不送：等業主/.test(INV[0].stLog.slice(-1)[0].why);
+      } finally { Q = keepQ; INV = keepI; window.printInvById = keepPr; window._modal = keepM; }
+      return out;
+    });
+    check('v6.0.228 請款單草稿卡：截止前 5 天出卡（附哪幾天的日報、日報累計／合約、已確認追加標黃、保留款）、確認＝開第 N 期且狀態草稿、開了就不再出；草稿待送出卡：金額 0 不送、確認＝已送業主＋PDF＋送業主文字；退回＝這期不請', Object.values(r).length === 12 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.228 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── v6.0.230 請款鏈 4：收款登錄卡 recvIn（AI 讀匯款／期票 → 確認＝打開收款視窗帶好數字，視窗確認才入帳）＋逾期催款卡 dunning ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepI = INV, keepD = DRAFTS, keepMark = window._draftMark, keepTd = window.localToday;
+      try {
+        DRAFTS = {}; window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        const T = { curTotal: 100000, tax: 5000, retention: 0, cleanGross: 0, total: 105000, grand: 105000 };
+        INV = [{ id: 'r1', project: '測試收款案', client: '甲營造', periodNo: 1, date: '2026-09-25', quoteId: 'qR', totals: T, payDue: '2026-09-25', expectedRecvDate: '2026-10-05' },
+               { id: 'r2', project: '測試收款案', client: '甲營造', periodNo: 2, date: '2026-10-25', quoteId: 'qR', totals: T, expectedRecvDate: '2026-11-30' }];
+        out.bad = (await fyRecvDraft({ qid: 'qR' })).ok === false && (await fyRecvDraft({ qid: 'qR', amt: 100, kind: 'ticket' })).ok === false;
+        const o = _rvClean({ qid: 'qR', kind: 'cash', amt: 104970, date: '2026-10-12', fee: 30 });
+        out.find = _rvFind(o).id === 'r1';   // 沒給期別＝最早一張還有應收的
+        DRAFTS.rv111111 = { id: 'rv111111', type: 'recvSlip', by: 'ai@example.com', at: 1, status: 'pending', summary: '', payload: Object.assign(o, { invId: 'r1' }) };
+        const L = _decItems('recvIn');
+        out.card = L.length === 1 && /收齊/.test(_DEC.recvIn.body(L[0])) && /匯費 NT\$ 30/.test(_DEC.recvIn.detail(L[0]));
+        out.open = _DEC.recvIn.ok(L[0]) === 'open' && document.getElementById('receipt-amount').value === '104970' && document.getElementById('receipt-fee').value === '30' && document.getElementById('receipt-date').value === '2026-10-12' && INV[0].receivedConfirmed !== true && DRAFTS.rv111111.status === 'pending';
+        confirmReceipt();
+        out.saved = INV[0].receivedConfirmed === true && _invStOf(INV[0]) === 'paid' && DRAFTS.rv111111.status === 'applied' && (INV[0].receipts || []).some(x => x.amt === 104970);
+        // 期票：差額、扣款沒寫原因要提醒
+        DRAFTS.rv222222 = { id: 'rv222222', type: 'recvSlip', by: 'ai@example.com', at: 2, status: 'pending', summary: '', payload: _rvClean({ invId: 'r2', kind: 'ticket', amt: 60000, date: '2026-11-05', dueDate: '2027-01-05', ticketNo: 'AB001', deduct: 500 }) };
+        const det2 = _DEC.recvIn.detail(DRAFTS.rv222222);
+        out.diff = /還差 NT\$ 44,500/.test(det2) && /有扣款但沒寫原因/.test(det2) && /到期 2027-01-05/.test(det2);
+        _DEC.recvIn.ok(DRAFTS.rv222222); closeReceiptModal();
+        out.cancel = DRAFTS.rv222222.status === 'pending' && _RV_APPLY === null;   // 收款視窗取消＝草稿留著
+        // 催款：過了預計收款日還有應收
+        window.localToday = () => '2026-12-10';
+        const D = _decItems('dunning');
+        out.dun = D.length === 1 && D[0].inv.id === 'r2' && /逾期 10 天/.test(_DEC.dunning.head(D[0])) && /預計收款日 2026-11-30/.test(_DEC.dunning.detail(D[0]));
+        try { Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.resolve() }, configurable: true }); } catch (e) { /* 可忽略 */ }
+        out.dunOk = (await _DEC.dunning.ok(D[0])) === true && INV[1].dunLog.length === 1 && INV[1].dunLog[0].next === '2026-12-17' && !_decItems('dunning').length;
+        window.localToday = () => '2026-12-18'; out.again = _decItems('dunning').length === 1;
+        INV[1].st = 'draft'; delete INV[1].stLast; out.noDraft = !_decItems('dunning').length; delete INV[1].st;   // 還沒送業主的草稿不催
+        // 先前只填總額（沒有收款明細）→ 卡片補一列先前的，金流不漏
+        INV.push({ id: 'r3', project: '測試收款案', periodNo: 3, quoteId: 'qR', totals: T, received: '50000', receivedDate: '2026-12-01' });
+        DRAFTS.rv333333 = { id: 'rv333333', type: 'recvSlip', by: 'ai@example.com', at: 3, status: 'pending', summary: '', payload: _rvClean({ invId: 'r3', amt: 55000, date: '2026-12-15' }) };
+        _DEC.recvIn.ok(DRAFTS.rv333333); out.legacy = document.getElementById('receipt-amount').value === '105000' && _rcptList.length === 2 && _rcptList[0].amt === 50000;
+        openReceiptModal('r2'); out.switchClr = _RV_APPLY === null; closeReceiptModal();   // 換期別重新打開＝不算卡片帶的數字
+      } finally { INV = keepI; DRAFTS = keepD; window._draftMark = keepMark; window.localToday = keepTd; }
+      return out;
+    });
+    check('請款鏈 4 收款登錄卡：AI 讀匯款／期票對到最早有應收的那期、列差額（匯費、扣款要寫原因）；確認＝打開收款視窗帶好數字、視窗確認才入帳並標已套用、收齊狀態變已收款；取消＝草稿留著；逾期催款卡附預計收款日怎麼算、確認＝複製並記一筆、7 天後再提醒', Object.values(r).length === 13 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('請款鏈 4 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── v6.0.231 現場追加卡 addonSign：已確認的追加 → 複製給主任的 LINE 文字 → 主任簽認才列成可以請款 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepI = INV;
+      try {
+        try { Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.resolve() }, configurable: true }); } catch (e) { /* 可忽略 */ }
+        Q = [{ id: 'qA', name: '測試追加案', awarded: true, contact: '王主任', ownerPay: { cut: 18 }, items: [{ desc: '鋼板樁 打設', unit: '支', qty: 100, price: 1000 }], t: { total: 0 },
+          dailyLogs: [{ id: 'l1', date: '2026-10-05', progressRows: [{ itemIdx: 0, qty: 20 }] }],
+          addons: [{ id: 'a1', date: '2026-10-08', text: '#追加 背填砂 3 車', qty: 3, unit: '車', status: 'confirmed' }, { id: 'a2', date: '2026-10-09', text: '待確認的', status: 'pending' }] }];
+        INV = [];
+        const L = _decItems('addonSign');
+        out.list = L.length === 1 && /還沒傳給主任/.test(_DEC.addonSign.body(L[0])) && /王主任 您好/.test(await _DEC.addonSign.detail(L[0])) && /背填砂 3 車/.test(await _DEC.addonSign.detail(L[0]));
+        out.ask = (await _DEC.addonSign.ok(L[0])) === true && !!Q[0].addons[0].askAt && !Q[0].addons[0].signed;
+        _todoBuild(true); let det = _DEC.invDraft.detail(_decItems('invDraft')[0]);
+        out.yellow = /主任還沒簽認，這期先不請/.test(det) && !/主任已簽認/.test(det);
+        const L2 = _decItems('addonSign'); out.stage2 = L2.length === 1 && /已傳給主任，等簽認/.test(_DEC.addonSign.body(L2[0]));
+        out.sign = (await _DEC.addonSign.ok(L2[0])) === true && !!Q[0].addons[0].signed && !_decItems('addonSign').length;
+        det = _DEC.invDraft.detail(_decItems('invDraft')[0]); out.green = /主任已簽認，可以請款/.test(det) && !/這期先不請/.test(det);
+        // 還沒傳也可以結掉（不需簽認）；最後一張請款單之前的舊追加不列
+        Q[0].addons.push({ id: 'a3', date: '2026-10-10', text: '另一筆', status: 'confirmed' }, { id: 'a4', date: '2026-09-01', text: '舊的', status: 'confirmed' });
+        INV = [{ id: 'iA', project: '測試追加案', quoteId: 'qA', periodNo: 1, date: '2026-09-25', totals: {} }];
+        const L3 = _decItems('addonSign'); out.oldSkip = L3.length === 1 && L3[0].a.id === 'a3';
+        out.rejFirst = _DEC.addonSign.reject(L3[0], '') === true && Q[0].addons[2].signDeny.stage === 'notAsked' && !_decItems('addonSign').length;
+      } finally { Q = keepQ; INV = keepI; }
+      return out;
+    });
+    check('現場追加卡：已確認的追加附給主任的 LINE 文字（確認＝複製並記已傳）→ 已傳後確認＝記主任簽認；還沒傳不能記不認；請款單草稿卡沒簽認的標黃、簽認了列成可以請款', Object.values(r).length === 8 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('現場追加卡 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.221 進退料 M8b：鋼價追蹤 → 建議調整買價（中鋼盤價草稿為主、主計總處指數備援、都沒有出保底卡）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -11649,13 +11926,13 @@ async function newPage(browser, width, height) {
         out.idx = L.length === 1 && L[0].pct === 6 && L[0].sug === 21.2 && L[0].spec === 'H 型鋼' && /主計總處/.test(L[0].src) && /只建議，不會自動改/.test(_DEC.m8Steel.detail(L[0]));
         // ② 中鋼盤價草稿：確認才記；這個月有中鋼資料就改用中鋼（H 開頭看 H 型鋼）：+2% → 不到 5% 不出卡
         DRAFTS.dstl1 = { id: 'dstl1', type: 'steelPrice', by: 'ai@example.com', at: 1, status: 'pending', summary: '', payload: { ym: '2026-10', url: 'https://example.com/n', items: [{ cat: 'H型鋼', pct: 2 }, { cat: '鋼板', pct: -1 }] } };
-        out.draftCard = _decItems('steelPrice').length === 1 && /H 型鋼 \+2%/.test(_DEC.steelPrice.body(DRAFTS.dstl1));
+        out.draftCard = _decItems('steelPrice').length === 1 && /H型鋼 \+2%/.test(_DEC.steelPrice.body(DRAFTS.dstl1));   // v6.0.229 文字改「H型鋼 +2%（來源）」
         out.draftOk = _DEC.steelPrice.ok(DRAFTS.dstl1) === true && _m8Csc().months['2026-10'].H === 2 && DRAFTS.dstl1.status === 'applied';
-        out.cscSmall = !_decItems('m8Steel').length;
+        out.cscSmall = _decItems('m8Steel').length === 1 && _decItems('m8Steel')[0].pct === 2;   // v6.0.229 Lotion 11/10：每次調價都出卡（不等 5%）
         // 加上 9 月 +4% → 累計 1.04×1.02＝+6.1% → 出卡、來源寫中鋼
         MAT_MOVE_FIN.steelCsc.months['2026-09'] = { H: 4, P: 0 };
         L = _decItems('m8Steel');
-        out.csc = L.length === 1 && L[0].pct === 6.1 && /中鋼盤價/.test(L[0].src) && L[0].sug === 21.22;
+        out.csc = L.length === 1 && L[0].pct === 6.1 && /盤價/.test(L[0].src) && L[0].sug === 21.22;   // v6.0.229 H 型鋼來源改東和
         out.ack = _DEC.m8Steel.ok(L[0]) === true && !_decItems('m8Steel').length;
         // ③ 保底卡：16 日以後、兩個來源都沒有新資料
         window.localToday = () => '2026-12-20';
@@ -13290,7 +13567,7 @@ async function newPage(browser, width, height) {
         // A：新選單時 6 種各一張拍板卡、AI 草稿清單那一列不出現（今天頁只有一套）
         const items = []; _v6TodoItems(items);
         const types = items.map((x) => x.type);
-        out.cards = ['quote', 'bid', 'irPhoto', 'addon', 'contact'].every((t) => types.indexOf('dec_drf_' + t) >= 0) && types.indexOf('dec_drf_dailyLog') < 0 && _draftPending().length === 1 && _draftPending()[0].type === 'dailyLog';   // 施工日報歸主線
+        out.cards = ['quote', 'bid', 'irPhoto', 'addon', 'contact'].every((t) => types.indexOf('dec_drf_' + t) >= 0) && types.indexOf('dec_drf_dailyLog') < 0 && _draftPending().length === 0 && _DEC.dlQty.list().length === 1;   // 施工日報歸主線（主線 dlQty 拍板卡，新舊選單都不進 AI 草稿清單）
         // 展開明細前不能確認；明細有完整內容
         openDecList('drf_quote'); await T(60);
         const okb = () => document.querySelector('#dec-box .dec-ok');
@@ -13304,7 +13581,7 @@ async function newPage(browser, width, height) {
         out.con = /範例廠商丁/.test((await det('drf_contact', 'dCon0001')).textContent);
         out.line = /範例追加 3 支/.test((await det('drf_addon', 'dAdd0001')).textContent);
         // 舊選單：卡片收起、AI 草稿清單照舊
-        localStorage.setItem('fy_nav_old', '1'); const it2 = []; _v6TodoItems(it2); out.old = it2.some((x) => x.type === 'ai_draft') && !it2.some((x) => /^dec_drf_/.test(x.type)) && _draftPending().length === 8; localStorage.removeItem('fy_nav_old');
+        localStorage.setItem('fy_nav_old', '1'); const it2 = []; _v6TodoItems(it2); out.old = it2.some((x) => x.type === 'ai_draft') && !it2.some((x) => /^dec_drf_/.test(x.type)) && _draftPending().length === 7;   // 施工日報走主線 dlQty 卡 localStorage.removeItem('fy_nav_old');
         // 退回：標 rejected、照片不留
         await _DEC.drf_bid.reject(DRAFTS.dBid0001, '不用'); out.rej = DRAFTS.dBid0001.status === 'rejected';
         // B：買受人＋金額都對 → 自動對到第 3 期、打勾
