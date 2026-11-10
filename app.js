@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.228';
+var APP_VERSION='v6.0.231';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -2729,7 +2729,7 @@ try{var _invLoaded=_invStoreRead();if(_invLoaded){INV=_invLoaded;const _before=I
 function _salesCommOk(){try{return !window._applyingCloud&&(!_fbUser||(_isAdminUser&&!_isReaderUser&&typeof _privReadOk!=='undefined'&&_privReadOk===true));}catch(e){return false;}}   // 審查：只在讀得到 private 的管理員裝置（或未登入的本機模式）重算，免得用不完整的應付蓋掉雲端
 function _salesCommBoot(){if(_salesCommBoot._done)return;setTimeout(function(){if(_salesCommBoot._done||!_salesCommOk())return;_salesCommBoot._done=1;_salesCommSoon();},1500);}   // 批次 G4：開機（私有資料下載完）後重算一次抽成，改版後的算法不必等人去開報表
 function _salesCommSoon(){if(!_salesCommOk())return;clearTimeout(_salesCommSoon._t);_salesCommSoon._t=setTimeout(function(){if(!_salesCommOk())return;try{_salesCommSyncAll();}catch(e){_err('_salesCommSoon',e);}try{_commSyncAll();}catch(e){_err('_salesCommSoon.comm',e);}},800);}   // 批次 G3（Lotion 10/27）：開第一期請款單／簽合約後抽成才到期
-function saveInv(){try{_salesCommSoon();}catch(e){_err('saveInv.sales',e);}try{_invStSoon();}catch(e){_err('saveInv.st',e);}   /* v6.0.225 請款單狀態跟著事實記紀錄 */
+function saveInv(){try{_salesCommSoon();}catch(e){_err('saveInv.sales',e);}try{_invStSoon();}catch(e){_err('saveInv.st',e);}   /* v6.0.226 請款單狀態跟著事實記紀錄 */
   // 儲存前自動清理空白資料（確保 badge 與列表一致）
   INV=INV.filter(function(inv){return inv&&(inv.project||inv.client||inv.id);});
   _invStoreWrite(); try{_autoUpload();}catch(e){_err('saveInv',e);}}
@@ -10417,7 +10417,7 @@ function _applyCloud(data){
   try{_rmk14Migrate();}catch(e){_err('_applyCloud.rmk14',e);}   // v6.0.138 備註第 14 條
   try{_qhApplyFixAll({cloud:true});}catch(e){_err('_applyCloud.qvf',e);}   // v6.0.180 補登版次規則：每台合併後重套（不把舊號碼傳回去）
   setTimeout(function(){try{_prjSync();}catch(e){_err('_applyCloud.prj',e);}},600);
-  setTimeout(function(){try{_invStSoon();}catch(e){_err('_applyCloud.invSt',e);}},700);   /* v6.0.225 */
+  setTimeout(function(){try{_invStSoon();}catch(e){_err('_applyCloud.invSt',e);}},700);   /* v6.0.226 */
   try{_cfAfterApply();}catch(e){_err('_applyCloud.cf',e);}   // 4b 三方合併的結果要上傳   // 4a：雲端報價合併完才對帳（等 _applyingCloud 解除，補建的才會上傳）
   return true;
 }
@@ -39141,7 +39141,7 @@ function _lineDraftApply(d,close){
       if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){toast('請選日報日期');return false;}
       if(!Array.isArray(q.dailyLogs))q.dailyLogs=[];
       var ex=_ldExisting(q,dt);
-      var qr=_dlRowsRead();   // v6.0.226 拆出的工項數量（表格裡改過的）
+      var qr=_dlRowsRead();   // v6.0.227 拆出的工項數量（表格裡改過的）
       var write=function(){_dlWrite(q,d,dt,t,qr,photos);close();toast('已寫入 '+dt+' 施工日報'+(qr.length?('（工項數量 '+qr.length+' 筆）'):''));};
       if(!ex){write();return;}
       // v6.0.121 同工地同一天已有確認過的日報：不自動合併，問清楚（取消＝草稿保留待確認）
@@ -41382,7 +41382,7 @@ function _todo5cItems(items){
   var v=_todoBuild();
   var ic=function(h){return '<svg class="ic ib" aria-hidden="true"><use href="#'+h+'"/></svg>';};
   if(v){
-    (v.bill||[]).forEach(function(b){try{var _bq=(Q||[]).find(function(x){return x&&x.id===b.qid;});if(_bq&&_bq.billSkip&&_bq.billSkip[b.cutDate])return;}catch(e){_err('_todo5cItems.skip',e);}   /* v6.0.227：請款單草稿卡退回＝這期不請，提醒也不再出 */items.push({type:'bill_month',urgent:b.left<=1,jump:"openProj('"+escq(b.qid)+"')",icon:ic('i-receipt'),color:'#0D47A1',
+    (v.bill||[]).forEach(function(b){try{var _bq=(Q||[]).find(function(x){return x&&x.id===b.qid;});if(_bq&&_bq.billSkip&&_bq.billSkip[b.cutDate])return;}catch(e){_err('_todo5cItems.skip',e);}   /* v6.0.228：請款單草稿卡退回＝這期不請，提醒也不再出 */items.push({type:'bill_month',urgent:b.left<=1,jump:"openProj('"+escq(b.qid)+"')",icon:ic('i-receipt'),color:'#0D47A1',
       text:'本月要請款：'+esc(b.name)+'（'+(b.left===0?'今天':b.left+' 天後')+'截止 '+esc(b.cutDate.slice(5))+'）',sub:b.items.slice(0,3).map(function(x){return esc(x.desc.slice(0,14))+' '+fmt(x.qty)+esc(x.unit);}).join('、')+(b.items.length>3?' 等 '+b.items.length+' 項':'')});});
     (v.overrun||[]).forEach(function(o){var mx=o.rows.reduce(function(a,r){return Math.max(a,r.pct);},0);
       items.push({type:'overrun',urgent:mx>=130,jump:"openProj('"+escq(o.qid)+"')",icon:ic('i-warn'),color:'var(--red)',text:'超支提醒：'+esc(o.name)+' '+o.n+' 個工項實際成本超過報價成本 10%（最高 '+mx+'%）',sub:o.rows.slice(0,2).map(function(r){return esc(r.desc.slice(0,14))+' '+r.pct+'%';}).join('、')});});
@@ -44403,7 +44403,7 @@ function _m8PrmSave(){var c=_m8Cfg(),ym=String(localToday()).slice(0,7),oldC={};
   for(var i=0;i<tr.length;i++){var r=tr[i],nm=String((r.querySelector('.m8-cn')||{}).value||'').trim();if(!nm)continue;var id=r.getAttribute('data-id')||('c'+Date.now().toString(36)+(n++));
     var o=oldC[id]||{},pr=String((r.querySelector('.m8-cp')||{}).value||'').trim(),pv=pr===''?'':Math.max(0,parseFloat(pr)||0),x={id:id,name:nm.slice(0,20),unit:(r.querySelector('.m8-cu')||{}).value||'kg',price:pv};
     var d=_m8CatDef().find(function(z){return z.id===id;});if(d)x.note=d.note;else x.pat=String((r.querySelector('.m8-ct')||{}).value||'').trim().slice(0,20);
-    x.ref=(pv!==''&&pv>0)?((o.ref&&String(o.price)===String(pv))?o.ref:{ym:ym,d:localToday(),idx:(typeof _m8IdxAt==='function'?_m8IdxAt(ym):null)}):null;   /* v6.0.228 審查：記日子，同月填價之後的調整也算 */   /* 鋼價追蹤的起點＝這個價錢填進來的月份（沒改價就不動） */
+    x.ref=(pv!==''&&pv>0)?((o.ref&&String(o.price)===String(pv))?o.ref:{ym:ym,d:localToday(),idx:(typeof _m8IdxAt==='function'?_m8IdxAt(ym):null)}):null;   /* v6.0.229 審查：記日子，同月填價之後的調整也算 */   /* 鋼價追蹤的起點＝這個價錢填進來的月份（沒改價就不動） */
     cats.push(x);}
   var b={},sp=document.querySelectorAll('#m8-ovr .m8-sp'),bp=document.querySelectorAll('#m8-ovr .m8-bp');
   for(var j=0;j<sp.length;j++){var k=_m8Key({spec:sp[j].value}),v=parseFloat(bp[j].value);if(k&&v>0)b[k.slice(0,20)]=v;}
@@ -44427,10 +44427,10 @@ function _m8YmNext(ym){var y=+ym.slice(0,4),m=+ym.slice(5,7);return m===12?(y+1)
 function _m8Csc(){var c=MAT_MOVE_FIN['steelCsc'];return (c&&c.kind==='steelCsc')?c:{kind:'steelCsc',months:{}};}
 function _m8IdxAt(ym){var s=(STEEL_IDX&&STEEL_IDX.series)||{},ks=Object.keys(s).filter(function(k){return k<=ym;}).sort();return ks.length?s[ks[ks.length-1]]:null;}
 // 某材料類別從填價那個月到現在的漲跌（％）與來源（v6.0.221：建議調整的是類別的每公斤價）
-// v6.0.228 Lotion 11/10：H 型鋼、鋼軌樁、鋼板樁看東和鋼鐵盤價（線 H）；覆工板等板類看中鋼熱軋（線 P）
+// v6.0.229 Lotion 11/10：H 型鋼、鋼軌樁、鋼板樁看東和鋼鐵盤價（線 H）；覆工板等板類看中鋼熱軋（線 P）
 function _m8StlLine(cat){if(!cat)return 'H';if(cat.id==='h'||cat.id==='rail'||cat.id==='sp')return 'H';if(/^deck/.test(String(cat.id))||cat.unit==='片')return 'P';return /板(?!樁)|捲|熱軋/.test(String(cat.name||'')+String(cat.pat||''))?'P':'H';}
 var _M8_LINE_T={H:'東和鋼鐵 H 型鋼盤價',P:'中鋼熱軋鋼捲盤價'};
-// 某個月某一線的調整：舊格式 r.H／r.P＝漲跌 %；新格式 r.adj＝[{line,perTon,src,date,url}]（每噸調整金額，v6.0.228）
+// 某個月某一線的調整：舊格式 r.H／r.P＝漲跌 %；新格式 r.adj＝[{line,perTon,src,date,url}]（每噸調整金額，v6.0.229）
 function _m8MonthSteps(r,ln){var out=[];if(!r)return out;var p=parseFloat(r[ln]);if(isFinite(p))out.push({pct:p,src:r[ln+'src']||r.src||'中鋼盤價',url:r[ln+'url']||r.url||''});(Array.isArray(r.adj)?r.adj:[]).filter(function(a){return a&&a.line===ln&&isFinite(parseFloat(a.perTon));}).sort(function(a,b){return String(a.date||'')<String(b.date||'')?-1:1;}).forEach(function(a){out.push({perTon:parseFloat(a.perTon),src:a.src||'',date:a.date||'',url:a.url||''});});return out;}   /* 審查：照公告日期排；% 的來源分線記 */
 function _m8SteelChg(cat){var ref=cat&&cat.ref;if(!ref||!ref.ym)return null;var now=_m8Ym(),cs=_m8Csc().months||{},k2=_m8StlLine(cat),bp=parseFloat(cat.price)||0;
   // 審查：不看「這個月／上個月有沒有資料」，看填價之後有沒有適用的調整（下個月的盤也算，中鋼月初公布）；填價那個月，公告日期在填價日之後的每噸調整也算
@@ -44470,7 +44470,7 @@ _decReg('m8SteelNone',{
   edit:function(){go('params');setTimeout(function(){try{prmTab('cost');}catch(e){_err('m8SteelNone.edit',e);}},80);}
 });
 // 鋼價草稿：HQ 在主控台 fySteelPriceDraft({ym:'2026-12',items:[{cat:'H型鋼',perTon:400,src:'東和鋼鐵',date:'2026-12-03',url:'…'},{cat:'熱軋鋼捲',perTon:300,src:'中鋼',date:'2026-11-05',url:'…'}],note:'…'})（舊格式 pct 照收）
-// v6.0.228：每項可以帶漲跌 %（pct）或每噸調整金額（perTon，元）＋來源（src：東和／中鋼）、公告日期（date）、網址（url）
+// v6.0.229：每項可以帶漲跌 %（pct）或每噸調整金額（perTon，元）＋來源（src：東和／中鋼）、公告日期（date）、網址（url）
 function _m8StlClean(p){p=(p&&typeof p==='object')?p:{};var ym=/^\d{4}-\d{2}$/.test(_draftS(p.ym))?p.ym:'',o={ym:ym,src:_draftS(p.src).slice(0,40),url:_draftS(p.url).slice(0,300),note:_draftS(p.note).slice(0,300),items:[]};
   (Array.isArray(p.items)?p.items:[]).slice(0,20).forEach(function(it){if(!it||typeof it!=='object')return;var ct=_draftS(it.cat).trim(),cat=(ct==='P'||ct==='H')?ct:(/鋼板樁|型鋼|鋼軌/.test(ct)?'H':(/熱軋|冷軋|鍍鋅|捲|板/.test(ct)?'P':(/^H(\d|$|\s*型)/i.test(ct)?'H':'')));   /* 審查：先認鋼板樁／型鋼，再認鋼捲類，最後 H 開頭＋數字（HR 熱軋不算 H） */   /* 審查：清過一次的代號 P 再清要認得（原本鋼板那項確認時會被丟掉） */   /* 審查：H 只認開頭或「型鋼」；鋼板樁算 H（東和） */
     var pct=parseFloat(it&&it.pct),pt=parseFloat(it&&it.perTon),x={cat:cat,text:_draftS(it.text||it.cat).slice(0,60),src:_draftS(it.src||o.src||(cat==='H'?'東和鋼鐵':'中鋼')).slice(0,40),date:/^\d{4}-\d{2}-\d{2}$/.test(_draftS(it.date))?it.date:'',url:_draftS(it.url||o.url).slice(0,300)};
@@ -44487,14 +44487,14 @@ _decReg('steelPrice',{
   detail:function(d){var o=_m8StlClean(d.payload),had=(_m8Csc().months||{})[o.ym];return '<div style="font-size:12.5px;line-height:1.7">'+esc(o.ym)+'<br>'+o.items.map(function(i){return esc(i.text||'')+'：'+esc(_m8StlItemTxt(i))+(i.perTon!=null?'＝每公斤 '+(i.perTon>0?'+':'')+(Math.round(i.perTon/10)/100):'')+(i.date?'（'+esc(i.date)+' 公告）':'')+(i.url?'<br><span style="font-size:11px;color:var(--b4)">'+esc(i.url)+'</span>':'');}).join('<br>')
     +(o.note?('<br>'+esc(o.note)):'')+(had?'<br><span style="color:#b26a00">這個月已經記過，確認會加進去（同一天同金額的不重複；漲跌 % 會取代）</span>':'')+'<div style="color:var(--b4);margin-top:4px">H 型鋼、鋼軌樁、鋼板樁看東和；覆工板等板類看中鋼熱軋。記下來只用來建議調整買價，不會自動改。</div></div>';},
   ok:function(d){var o=_m8StlClean(d.payload);if(!o.ym||!o.items.length){toast('草稿內容不完整，請按「修改」');return false;}var c=_m8Csc();c.months=Object.assign({},c.months||{});var r=Object.assign({},c.months[o.ym]||{});r.at=Date.now();r.draft=d.id;var adj=Array.isArray(r.adj)?r.adj.slice():[];
-    o.items.forEach(function(i){if(i.perTon!=null){var a={line:i.cat,perTon:i.perTon,src:i.src,date:i.date,url:i.url,draft:d.id};if(!adj.some(function(z){return (z.draft===d.id&&z.line===a.line&&z.perTon===a.perTon&&z.date===a.date)||(a.date&&z.line===a.line&&z.perTon===a.perTon&&z.date===a.date&&z.src===a.src);}))adj.push(a);}else{r[i.cat]=i.pct;r[i.cat+'src']=i.src||'中鋼盤價';r[i.cat+'url']=i.url||o.url;}});   /* 審查：同一張草稿再確認不重複；沒寫日期的不合併 */   /* v6.0.228：每噸調整金額累加進這個月（同一天同金額同來源不重複）；漲跌 % 照舊取代 */
+    o.items.forEach(function(i){if(i.perTon!=null){var a={line:i.cat,perTon:i.perTon,src:i.src,date:i.date,url:i.url,draft:d.id};if(!adj.some(function(z){return (z.draft===d.id&&z.line===a.line&&z.perTon===a.perTon&&z.date===a.date)||(a.date&&z.line===a.line&&z.perTon===a.perTon&&z.date===a.date&&z.src===a.src);}))adj.push(a);}else{r[i.cat]=i.pct;r[i.cat+'src']=i.src||'中鋼盤價';r[i.cat+'url']=i.url||o.url;}});   /* 審查：同一張草稿再確認不重複；沒寫日期的不合併 */   /* v6.0.229：每噸調整金額累加進這個月（同一天同金額同來源不重複）；漲跌 % 照舊取代 */
     if(adj.length)r.adj=adj.slice(-20);c.months[o.ym]=r;c._mt=Date.now();MAT_MOVE_FIN['steelCsc']=c;saveMatMoveFin();_draftMark(d.id,'applied',d.payload&&d.payload.edited?{resultId:'steelCsc|'+o.ym,payload:d.payload}:{resultId:'steelCsc|'+o.ym});   /* 審查：改過數字的連同改後內容寫回草稿（留紀錄） */try{_decRefresh('m8Steel');}catch(e){_err('steelPrice.ok',e);}return true;},
   reject:function(d,why){_draftMark(d.id,'rejected',{reason:String(why||'不記').slice(0,200)});return true;},
   edit:function(d){var o=_m8StlClean(d.payload),fi=function(c){return o.items.find(function(i){return i.cat===c;})||{};},Hi=fi('H'),Pi=fi('P'),IN='width:100%;padding:5px 7px;border:1px solid var(--b2);border-radius:6px',v=function(x){return esc(x==null?'':String(x));};
     showConfirm('改鋼價盤價','<div class="fg fg2" style="gap:8px"><div class="f"><label>月份（YYYY-MM）</label><input id="stl-ym" value="'+esc(o.ym)+'" style="'+IN+'"></div><div class="f"><label>H 型鋼每噸調整（元，東和）</label><input id="stl-ht" type="number" step="any" value="'+v(Hi.perTon)+'" style="'+IN+'"></div><div class="f"><label>H 型鋼漲跌（%）（沒有每噸金額才填）</label><input id="stl-h" type="number" step="any" value="'+v(Hi.pct)+'" style="'+IN+'"></div><div class="f"><label>熱軋鋼捲每噸調整（元，中鋼）</label><input id="stl-pt" type="number" step="any" value="'+v(Pi.perTon)+'" style="'+IN+'"></div><div class="f"><label>鋼板漲跌（%）（沒有每噸金額才填）</label><input id="stl-p" type="number" step="any" value="'+v(Pi.pct)+'" style="'+IN+'"></div></div>',
       function(){var it=[];if(gv('stl-ht')!=='')it.push({cat:'H型鋼',perTon:gv('stl-ht'),src:Hi.src,date:Hi.date,url:Hi.url});else if(gv('stl-h')!=='')it.push({cat:'H型鋼',pct:gv('stl-h'),src:Hi.src,url:Hi.url});if(gv('stl-pt')!=='')it.push({cat:'鋼板',perTon:gv('stl-pt'),src:Pi.src,date:Pi.date,url:Pi.url});else if(gv('stl-p')!=='')it.push({cat:'鋼板',pct:gv('stl-p'),src:Pi.src,url:Pi.url});var rest=o.items.filter(function(x){return x!==Hi&&x!==Pi;});d.payload=Object.assign({},d.payload,{ym:gv('stl-ym'),items:it.concat(rest),edited:1});   /* 審查：只改第一筆 H／P，其他筆保留 */setTimeout(function(){try{if(_DEC.steelPrice.ok(d))_decRefresh('steelPrice');}catch(e){_err('steelPrice.edit',e);}},50);},false,null,false);}
 });
-// ══════════ v6.0.226 請款鏈 2：LINE 日報草稿帶工項數量（陳軒派工 11/10，Lotion 定案「拆數量、Lotion 確認才入帳」；第 2 層）══════════
+// ══════════ v6.0.227 請款鏈 2：LINE 日報草稿帶工項數量（陳軒派工 11/10，Lotion 定案「拆數量、Lotion 確認才入帳」；第 2 層）══════════
 // LINE 日報草稿（type dailyLog）改走首頁拍板卡 dlQty：FJC.dl.parse 把回報文字拆成「工項＋數量＋打設或拔除＋本段完成」，
 // 卡片附原文、照片、每列累計（已確認的日報＋這次）跟合約數量比（超過標紅）；拆不出來的標「待確認」不猜。確認才寫進日報 progressRows。
 function _dlItems(q){return (q&&Array.isArray(q.items))?q.items:[];}
@@ -44556,7 +44556,7 @@ _decReg('dlQty',{
   reject:function(d,why){_draftMark(d.id,'rejected',{reason:String(why||'不寫').slice(0,200)});return true;},
   edit:function(d){_lineDraftApply(d,function(){try{_decRefresh('dlQty');}catch(e){_err('dlQty.edit',e);}});}
 });
-// ══════════ v6.0.225 請款鏈 1：請款單狀態＋業主確認卡＋發票照抄範例（陳軒派工 11/10，Lotion 定案；第 2 層：只建議、Lotion 確認）══════════
+// ══════════ v6.0.226 請款鏈 1：請款單狀態＋業主確認卡＋發票照抄範例（陳軒派工 11/10，Lotion 定案；第 2 層：只建議、Lotion 確認）══════════
 // 五個狀態：草稿 → 已送業主 → 業主已確認 → 已開發票 → 已收款。
 //   「草稿／已送業主／業主已確認」是人決定的（inv.st，只在拍板卡確認時寫）；「已開發票／已收款」看事實（有關聯發票紀錄、收款已收齊），事實沒了就退回。
 //   每次狀態變了記一筆 inv.stLog {st,at,by,why}（最多 30 筆），inv.stLast＝上次記的狀態。舊單（上線前開的）先列清單給 Lotion 確認一次（P.invStInit）。
@@ -44650,7 +44650,7 @@ _decReg('invOk',{
     showConfirm('換對到的請款單','<select id="iok-sel" style="'+IN+'">'+L.map(function(x){return '<option value="'+esc(x.id)+'"'+(cur&&cur.id===x.id?' selected':'')+'>'+esc(x.project||'')+' 第'+esc(String(x.periodNo||'?'))+'期（'+_INV_ST_T[_invStOf(x)]+'）</option>';}).join('')+'</select>',
       function(){d.payload=Object.assign({},d.payload,{invId:gv('iok-sel'),edited:1});setTimeout(function(){try{_decRefresh('invOk');}catch(e){_err('invOk.edit',e);}},50);},false,null,false);}
 });
-// ══════════ v6.0.227 請款鏈 3：請款單草稿卡（陳軒派工 11/10，Lotion 定案；第 2 層：系統不自己開單，卡片確認才開）══════════
+// ══════════ v6.0.228 請款鏈 3：請款單草稿卡（陳軒派工 11/10，Lotion 定案；第 2 層：系統不自己開單，卡片確認才開）══════════
 // 兩張卡：
 //   invDraft：請款截止日前 5 天（FJC.todo.monthBill，跟「本月要請款」提醒同一套），附每工項本期數量（列出哪幾天的日報）、累計跟合約比、
 //     上一期數量、已確認的現場追加（標黃：還沒有業主簽認紀錄）、保留款、稅率；確認＝開第 N 期請款單（pjNewInv：沒有請款單從報價建第 1 期，
@@ -44715,7 +44715,7 @@ _decReg('invSend',{
   reject:function(inv,why){inv.sendSnz=_dAdd(localToday(),3);_invStLog(inv,_invStOf(inv),'先不送'+(why?'：'+String(why).slice(0,80):'')+'（'+inv.sendSnz+' 再提醒）',null,true);_invStSyncing=true;try{saveInv();}finally{_invStSyncing=false;}return true;},
   edit:function(inv){try{loadInvoice(inv.id);go('invoice-edit');}catch(e){_err('invSend.edit',e);}}
 });
-// ══════════ 待編號 請款鏈 4：收款登錄卡＋逾期催款卡（陳軒派工 11/10，盤點第 5 名；第 2 層：系統不自己記收款，卡片確認後打開收款視窗，Lotion 在視窗按確認才入帳）══════════
+// ══════════ v6.0.230 請款鏈 4：收款登錄卡＋逾期催款卡（陳軒派工 11/10，盤點第 5 名；第 2 層：系統不自己記收款，卡片確認後打開收款視窗，Lotion 在視窗按確認才入帳）══════════
 // 收款草稿 type recvSlip：AI 讀匯款截圖／期票照片 → 主控台 fyRecvDraft({invId 或 qid／caseName＋periodNo, kind:'cash'|'ticket', amt, date, ticketNo, bank, dueDate, fee, deduct, deductWhy, photos, note})
 function _rvClean(p){p=(p&&typeof p==='object')?p:{};var n=function(v){var x=parseFloat(v);return isFinite(x)&&x>=0&&x<1e9?Math.round(x):0;},dt=function(v){v=_draftS(v);return /^\d{4}-\d{2}-\d{2}$/.test(v)?v:'';};
   var o=_invOkClean(p);   // 共用業主確認卡的對位欄位（invId／qid／caseName／periodNo／photos）
@@ -44784,7 +44784,7 @@ _decReg('dunning',{
   reject:function(x,why){_dnLog(x.inv,'skip',why||'先不催');return true;},
   edit:function(x){try{openDunning(x.inv.id);_dnLog(x.inv,'opened','打開催款視窗（改文字後複製）');}catch(e){_err('dunning.edit',e);}}
 });
-// ══════════ 待編號 現場追加卡（陳軒派工 11/10，盤點第 7 名）：追加確認後 → 給主任的 LINE 確認文字 → 主任簽認才帶進請款 ══════════
+// ══════════ v6.0.231 現場追加卡（陳軒派工 11/10，盤點第 7 名）：追加確認後 → 給主任的 LINE 確認文字 → 主任簽認才帶進請款 ══════════
 // 一張追加兩段：①還沒傳給主任＝卡片附「給主任的 LINE 確認文字」，確認＝複製並記 a.askAt；②傳了還沒簽認＝確認＝記簽認 a.signed（誰、何時、依據），退回＝主任不認 a.signDeny
 // 請款單草稿卡：已確認但還沒簽認的追加標黃，簽認了的列成「可以請款」（請款單上加列仍由 Lotion 做，系統不改金額）
 function _adList(){var out=[];(Q||[]).forEach(function(q){if(!q||!q.awarded||q.closed||q.parentId)return;var last='';try{var L=_ibInvs(q);last=String((L[0]&&L[0].date)||'');}catch(e){_err('_adList',e);}
