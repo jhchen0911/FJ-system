@@ -440,7 +440,7 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('每 M 重量：H 型鋼 CNS 1490／JIS G 3192:2014（H300＝93、H350＝135、H400＝172，H300x300 也認得）', MV.kgPerM('H300') === 93 && MV.kgPerM('H350') === 135 && MV.kgPerM('H400') === 172 && MV.kgPerM('H300x300') === 93 && MV.kgPerM('h 350') === 135);
   check('每 M 重量：鋼板樁 JIS（III＝60、IV＝76.1、FSP-IV 也認得）、鋼軌（50KG/M＝50.4）、不認得的回 null', MV.kgPerM('III') === 60 && MV.kgPerM('FSP-IV') === 76.1 && MV.kgPerM('IV') === 76.1 && MV.kgPerM('50KG/M') === 50.4 && MV.kgPerM('37kg') === 37.2 && MV.kgPerM('覆工板') === null && MV.kgPerM('') === null);
 }
-// ── v6.0.224 請款鏈 2：LINE 日報文字拆工項數量（calc/dailyparse.js）。合成日報 tests/synthetic/daily-line.json：cases 12 則（寫規則時用的）＋ holdout 8 則（規則寫好才加；第一次跑 6/10，修 4 條通則後全對，已不算盲測）
+// ── v6.0.226 請款鏈 2：LINE 日報文字拆工項數量（calc/dailyparse.js）。合成日報 tests/synthetic/daily-line.json：cases 12 則（寫規則時用的）＋ holdout 8 則（規則寫好才加；第一次跑 6/10，修 4 條通則後全對，已不算盲測）
 {
   const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl, F = require(path.join(__dirname, 'synthetic', 'daily-line.json'));
   const score = (set) => { let ok = 0, tot = 0, miss = []; F[set].forEach((c, i) => { const R = DL.parse(c.text, F.items).rows; tot += c.expect.length; if (R.length !== c.expect.length) miss.push(set + i + ' 列數 ' + R.length + '≠' + c.expect.length);

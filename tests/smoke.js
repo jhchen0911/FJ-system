@@ -8150,7 +8150,7 @@ async function newPage(browser, width, height) {
         /* 1. 現場追加草稿 → 確認 → q.addons（不進請款單） */
         DRAFTS = { dl5551: { id: 'dl5551', type: 'addon', by: 'line-bot', byName: 'LINE 機器人', at: 1, status: 'pending', summary: '現場追加：內湖興中路　鋼板樁 12 支', payload: { qid: 'qL', groupId: 'Gsite9999', date: '2026-10-22', text: '#追加 鋼板樁 12 支', qty: 12, unit: '支', photos: ['line/group/Gsite9999/2026-10-22/p1.jpg', 'javascript:alert(1)'] } },
           dd99992026: { id: 'dd99992026', type: 'dailyLog', by: 'line-bot', at: 2, status: 'pending', summary: '施工日報', payload: { qid: 'qL', groupId: 'Gsite9999', date: '2026-10-22', answers: ['1. 打設 H 型鋼 8 支'], dayTexts: ['早安'], photos: ['line/group/Gsite9999/2026-10-22/p2.jpg'], replied: true } } };
-        const lh = _draftListHtml(); out.list = /現場追加（LINE）/.test(lh) && /data-lpath="line\/group/.test(lh) && !/打設 H 型鋼/.test(lh) && _DEC.dlQty.list().some(d => d.id === 'dd99992026');   // v6.0.224 施工日報改走拍板卡 dlQty
+        const lh = _draftListHtml(); out.list = /現場追加（LINE）/.test(lh) && /data-lpath="line\/group/.test(lh) && !/打設 H 型鋼/.test(lh) && _DEC.dlQty.list().some(d => d.id === 'dd99992026');   // v6.0.226 施工日報改走拍板卡 dlQty
         draftApply('dl5551'); document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 30));
         const q = Q[0]; out.addon = (q.addons || []).length === 1 && q.addons[0].qty === 12 && q.addons[0].status === 'confirmed' && q.addons[0].photos.length === 1 && DRAFTS.dl5551.status === 'applied' && !!q._mt;
         /* 2. 施工日報草稿 → 確認 → q.dailyLogs */
@@ -11624,7 +11624,7 @@ async function newPage(browser, width, height) {
     check('v6.0.208 數量對不上 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
-  // ── v6.0.226 鋼價來源改版（Lotion 11/10）：H 型鋼／鋼軌樁／鋼板樁看東和、覆工板看中鋼熱軋；每噸調整金額換算每公斤（不算 %）──
+  // ── v6.0.228 鋼價來源改版（Lotion 11/10）：H 型鋼／鋼軌樁／鋼板樁看東和、覆工板看中鋼熱軋；每噸調整金額換算每公斤（不算 %）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -11668,11 +11668,11 @@ async function newPage(browser, width, height) {
       } finally { MAT_MOVE_FIN = keepF; DRAFTS = keepD; MAT_TAGS = keepT; window.localToday = keepTd; window._draftMark = keepMark; STEEL_IDX = keepI; }
       return out;
     });
-    check('v6.0.226 鋼價來源：H 型鋼／鋼軌樁／鋼板樁看東和、覆工板看中鋼熱軋；草稿可帶每噸調整金額＋來源＋日期＋網址；確認累加進這個月（不重複）；建議買價＝現價＋每噸金額÷1000、每次調價都出卡、卡片寫換算；覆工板每片不換算；舊 % 格式照收', Object.values(r).length === 14 && Object.values(r).every(Boolean), JSON.stringify(r));
-    check('v6.0.226 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    check('v6.0.228 鋼價來源：H 型鋼／鋼軌樁／鋼板樁看東和、覆工板看中鋼熱軋；草稿可帶每噸調整金額＋來源＋日期＋網址；確認累加進這個月（不重複）；建議買價＝現價＋每噸金額÷1000、每次調價都出卡、卡片寫換算；覆工板每片不換算；舊 % 格式照收', Object.values(r).length === 14 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.228 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
-  // ── v6.0.224 請款鏈 2：LINE 日報草稿帶工項數量 → 拍板卡 dlQty（拆出工項＋數量＋打設／拔除＋本段完成；累計跟合約比、超過標紅；待確認不猜；確認才寫 progressRows）──
+  // ── v6.0.226 請款鏈 2：LINE 日報草稿帶工項數量 → 拍板卡 dlQty（拆出工項＋數量＋打設／拔除＋本段完成；累計跟合約比、超過標紅；待確認不猜；確認才寫 progressRows）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -11718,11 +11718,11 @@ async function newPage(browser, width, height) {
       } finally { Q = keepQ; DRAFTS = keepD; window._draftMark = keepMark; }
       return out;
     });
-    check('v6.0.224 LINE 日報草稿拍板卡：拆出工項數量（打設／拔除、本段完成）、累計跟合約比超過標紅、拆不出的標待確認不寫、附原文與照片、不再列在 AI 草稿清單；確認才寫 progressRows；修改可逐列改；對不到工程不寫', Object.values(r).length === 12 && Object.values(r).every(Boolean), JSON.stringify(r));
-    check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    check('v6.0.226 LINE 日報草稿拍板卡：拆出工項數量（打設／拔除、本段完成）、累計跟合約比超過標紅、拆不出的標待確認不寫、附原文與照片、不再列在 AI 草稿清單；確認才寫 progressRows；修改可逐列改；對不到工程不寫', Object.values(r).length === 12 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.226 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
-  // ── v6.0.223 請款鏈 1：請款單狀態（草稿→已送業主→業主已確認→已開發票→已收款）、舊單推算清單卡、業主確認卡＋發票照抄範例 ──
+  // ── v6.0.225 請款鏈 1：請款單狀態（草稿→已送業主→業主已確認→已開發票→已收款）、舊單推算清單卡、業主確認卡＋發票照抄範例 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -11779,11 +11779,11 @@ async function newPage(browser, width, height) {
       } finally { INV = keepI; INVOICE_RECS = keepR; DRAFTS = keepD; CUSTOMERS = keepC; if (keepP) P.invStInit = keepP; else delete P.invStInit; window._draftMark = keepMark; }
       return out;
     });
-    check('v6.0.223 請款單狀態：舊單推算（收齊＝已收款、有發票＝已開發票、其他＝已送業主，保留款退還單不算）列清單給 Lotion 確認一次才記；業主確認卡對到最近一張已送業主、確認＝業主已確認＋發票照抄範例（買受人、統編、品名、未稅、稅額、含稅）；業主要改數量＝打開請款單、不改狀態；發票作廢／收齊／新單自動記紀錄（誰、何時、依據）；做完了沒 _invStDone', Object.values(r).length === 16 && Object.values(r).every(Boolean), JSON.stringify(r));
-    check('v6.0.223 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    check('v6.0.225 請款單狀態：舊單推算（收齊＝已收款、有發票＝已開發票、其他＝已送業主，保留款退還單不算）列清單給 Lotion 確認一次才記；業主確認卡對到最近一張已送業主、確認＝業主已確認＋發票照抄範例（買受人、統編、品名、未稅、稅額、含稅）；業主要改數量＝打開請款單、不改狀態；發票作廢／收齊／新單自動記紀錄（誰、何時、依據）；做完了沒 _invStDone', Object.values(r).length === 16 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.225 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
-  // ── v6.0.225 請款鏈 3：請款單草稿卡 invDraft（截止前 5 天、附日報來源／累計／上一期／追加／保留款；確認＝開第 N 期、狀態草稿）→ invSend（確認＝已送業主＋PDF＋送業主文字）──
+  // ── v6.0.227 請款鏈 3：請款單草稿卡 invDraft（截止前 5 天、附日報來源／累計／上一期／追加／保留款；確認＝開第 N 期、狀態草稿）→ invSend（確認＝已送業主＋PDF＋送業主文字）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -11821,8 +11821,8 @@ async function newPage(browser, width, height) {
       } finally { Q = keepQ; INV = keepI; window.printInvById = keepPr; window._modal = keepM; }
       return out;
     });
-    check('v6.0.225 請款單草稿卡：截止前 5 天出卡（附哪幾天的日報、日報累計／合約、已確認追加標黃、保留款）、確認＝開第 N 期且狀態草稿、開了就不再出；草稿待送出卡：金額 0 不送、確認＝已送業主＋PDF＋送業主文字；退回＝這期不請', Object.values(r).length === 12 && Object.values(r).every(Boolean), JSON.stringify(r));
-    check('v6.0.225 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    check('v6.0.227 請款單草稿卡：截止前 5 天出卡（附哪幾天的日報、日報累計／合約、已確認追加標黃、保留款）、確認＝開第 N 期且狀態草稿、開了就不再出；草稿待送出卡：金額 0 不送、確認＝已送業主＋PDF＋送業主文字；退回＝這期不請', Object.values(r).length === 12 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.227 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
   // ── v6.0.221 進退料 M8b：鋼價追蹤 → 建議調整買價（中鋼盤價草稿為主、主計總處指數備援、都沒有出保底卡）──
@@ -11850,13 +11850,13 @@ async function newPage(browser, width, height) {
         out.idx = L.length === 1 && L[0].pct === 6 && L[0].sug === 21.2 && L[0].spec === 'H 型鋼' && /主計總處/.test(L[0].src) && /只建議，不會自動改/.test(_DEC.m8Steel.detail(L[0]));
         // ② 中鋼盤價草稿：確認才記；這個月有中鋼資料就改用中鋼（H 開頭看 H 型鋼）：+2% → 不到 5% 不出卡
         DRAFTS.dstl1 = { id: 'dstl1', type: 'steelPrice', by: 'ai@example.com', at: 1, status: 'pending', summary: '', payload: { ym: '2026-10', url: 'https://example.com/n', items: [{ cat: 'H型鋼', pct: 2 }, { cat: '鋼板', pct: -1 }] } };
-        out.draftCard = _decItems('steelPrice').length === 1 && /H型鋼 \+2%/.test(_DEC.steelPrice.body(DRAFTS.dstl1));   // v6.0.226 文字改「H型鋼 +2%（來源）」
+        out.draftCard = _decItems('steelPrice').length === 1 && /H型鋼 \+2%/.test(_DEC.steelPrice.body(DRAFTS.dstl1));   // v6.0.228 文字改「H型鋼 +2%（來源）」
         out.draftOk = _DEC.steelPrice.ok(DRAFTS.dstl1) === true && _m8Csc().months['2026-10'].H === 2 && DRAFTS.dstl1.status === 'applied';
-        out.cscSmall = _decItems('m8Steel').length === 1 && _decItems('m8Steel')[0].pct === 2;   // v6.0.226 Lotion 11/10：每次調價都出卡（不等 5%）
+        out.cscSmall = _decItems('m8Steel').length === 1 && _decItems('m8Steel')[0].pct === 2;   // v6.0.228 Lotion 11/10：每次調價都出卡（不等 5%）
         // 加上 9 月 +4% → 累計 1.04×1.02＝+6.1% → 出卡、來源寫中鋼
         MAT_MOVE_FIN.steelCsc.months['2026-09'] = { H: 4, P: 0 };
         L = _decItems('m8Steel');
-        out.csc = L.length === 1 && L[0].pct === 6.1 && /盤價/.test(L[0].src) && L[0].sug === 21.22;   // v6.0.226 H 型鋼來源改東和
+        out.csc = L.length === 1 && L[0].pct === 6.1 && /盤價/.test(L[0].src) && L[0].sug === 21.22;   // v6.0.228 H 型鋼來源改東和
         out.ack = _DEC.m8Steel.ok(L[0]) === true && !_decItems('m8Steel').length;
         // ③ 保底卡：16 日以後、兩個來源都沒有新資料
         window.localToday = () => '2026-12-20';
