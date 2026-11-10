@@ -465,6 +465,12 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   }
   check('v6.0.222 分段拔樁時段：隨機 300 組（勾／沒勾完成、還沒拔完、拔除階段完工、各種請款期間）支·天都跟原本一樣', bad === 0, '不一樣 ' + bad + ' 組');
 }
+// ── v6.0.221 各規格每 M 重量（材料買價每公斤換算每 M）──
+{
+  const MV = require(path.join(__dirname, '..', 'calc', 'matmove.js')).mv;
+  check('每 M 重量：H 型鋼 CNS 1490／JIS G 3192:2014（H300＝93、H350＝135、H400＝172，H300x300 也認得）', MV.kgPerM('H300') === 93 && MV.kgPerM('H350') === 135 && MV.kgPerM('H400') === 172 && MV.kgPerM('H300x300') === 93 && MV.kgPerM('h 350') === 135);
+  check('每 M 重量：鋼板樁 JIS（III＝60、IV＝76.1、FSP-IV 也認得）、鋼軌（50KG/M＝50.4）、不認得的回 null', MV.kgPerM('III') === 60 && MV.kgPerM('FSP-IV') === 76.1 && MV.kgPerM('IV') === 76.1 && MV.kgPerM('50KG/M') === 50.4 && MV.kgPerM('37kg') === 37.2 && MV.kgPerM('覆工板') === null && MV.kgPerM('') === null);
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');
