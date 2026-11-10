@@ -43,6 +43,18 @@ function cleanItems(its) {
   });
 }
 
+// v6.0.209 底價／目標成交價（含稅，選填）：payload.aim＝{floor, target}；只有管理員看得到（套用後存在報價的 private 欄位 bidAim）
+function aimClean(x) {
+  if (x == null) return { aim: null };
+  if (typeof x !== 'object') return { err: 'aim 要是 {floor, target}' };
+  const one = (v, k) => { if (v == null || v === '') return null; const n = D.num(v); if (n == null || !(n > 0) || n > 1e10) return k; return Math.round(n); };
+  const f = one(x.floor, 'floor'), t = one(x.target, 'target');
+  if (f === 'floor') return { err: '底價（aim.floor）要是大於 0 的含稅金額' };
+  if (t === 'target') return { err: '目標成交價（aim.target）要是大於 0 的含稅金額' };
+  if (f == null && t == null) return { aim: null };
+  if (f != null && t != null && f > t) return { err: '底價不能高於目標成交價' };
+  const o = {}; if (f != null) o.floor = f; if (t != null) o.target = t; return { aim: o };
+}
 // body＝{type, payload, summary?, expect}；回傳 {rec} 或 {err, detail?}
 function build(o) {
   const { email, name, body, quotes, taxR, now, id } = o, rp = o.rmkParams || {};
@@ -60,6 +72,7 @@ function build(o) {
     const t0 = D.totals(q.items, taxR), t1 = D.totals(plan.items, taxR);
     const ee = expectOk(b.expect, t1); if (ee) return { err: ee, detail: plan.rows };
     payload = { qid: q.id, code: S(q.code, 60), baseVer: q.ver || 1, baseMt: q._mt || 0, ops };
+    const am = aimClean(pl.aim); if (am.err) return { err: am.err }; if (am.aim) payload.aim = am.aim;
     summary = (S(b.summary, 140).trim() || (S(q.code, 40) + ' ' + S(q.name, 60) + ' V' + (q.ver || 1) + ' 改單 ' + plan.rows.length + ' 項')) + '（未稅 ' + fmt(t0.sub) + ' → ' + fmt(t1.sub) + '）';
   } else if (type === 'quote') {
     const base = S(pl.base, 80); let bq = null;
@@ -80,6 +93,7 @@ function build(o) {
     const t = D.totals(fields.items, taxR), ee = expectOk(b.expect, t); if (ee) return { err: ee };
     fields.t = t;
     payload = { base, baseMt: bq ? (bq._mt || 0) : 0, baseName: bq ? S(bq.name, 200) : '', fields };
+    const am = aimClean(pl.aim); if (am.err) return { err: am.err }; if (am.aim) payload.aim = am.aim;
     summary = (base ? '修改：' : '新報價：') + S(fields.name, 80) + '／' + S(fields.client, 60) + '　合計 NT$ ' + fmt(t.total);
   } else {
     const f = findQuote(quotes, { qid: S(pl.qid, 80), code: S(pl.code, 60) }); if (f.err) return { err: f.err };
@@ -111,4 +125,20 @@ function mine(all, email) {
   return Object.keys(all || {}).map((k) => all[k]).filter((d) => d && d.status === 'pending' && String(d.by || '').toLowerCase() === em)
     .sort((a, b) => (+a.at || 0) - (+b.at || 0)).map((d) => ({ id: d.id, type: d.type, at: d.at, summary: d.summary }));
 }
-module.exports = { rmkBaseFor, TYPES, MAX_PENDING, build, superseded, withdrawErr, mine, expectOk, findQuote };
+// v6.0.209 報價得標率統計給報價線讀（action bidStats）：跟前端 _bidRecRows／_bidTune／_bidKindStats 一行對一行（冒煙測試同一份假資料兩邊比）
+let BID = null; try { BID = require('../calc/bid.js').bid; } catch (e) { BID = require('../../calc/bid.js').bid; }
+function bidStats(quotes, contracts, params, quoteSens) {
+  // 得標結果 q.bid 存在 private 的 quoteSens（跟前端 _applyQuoteSens 一樣接回去；key 已經 deepDec 過）
+  const SS = quoteSens || {};
+  const Q = (Array.isArray(quotes) ? quotes : Object.values(quotes || {})).filter((q) => q && q.id).map((q) => { const s = SS[q.id]; return (s && s.bid && typeof s.bid === 'object') ? Object.assign({}, q, { bid: s.bid }) : q; });
+  const CT = (Array.isArray(contracts) ? contracts : Object.values(contracts || {})).filter(Boolean);
+  const ctAmt = (q) => { const c = CT.find((x) => x.linkedQid === q.id) || CT.find((x) => x.name && x.name === q.name); return c ? (parseFloat(c.amount) || 0) : 0; };   // 同 _ctAmtOf
+  const rows = Q.filter((q) => !q.parentId && q.bid && q.bid.res && !q.bid.skip).map((q) => {
+    const items = []; [q].concat(Q.filter((x) => x.parentId === q.id)).forEach((x) => (Array.isArray(x.items) ? x.items : Object.values(x.items || {})).forEach((it) => items.push(it)));
+    return { kinds: BID.mainKinds(items), v: BID.view(q, { ctAmt: ctAmt(q) }) };   // 同前端：佔 10% 以上的類別才算
+  });
+  const t = (params && params.bidTune && typeof params.bidTune === 'object') ? params.bidTune : {};
+  const opt = { minN: parseInt(t.minN) || 5, tune: { lo: t.lo != null ? +t.lo : 40, hi: t.hi != null ? +t.hi : 60, maxDown: t.maxDown != null ? +t.maxDown : 10, maxUp: t.maxUp != null ? +t.maxUp : 5 } };
+  return { n: rows.length, minN: opt.minN, kinds: BID.exportRows(BID.stats(rows, opt)) };
+}
+module.exports = { bidStats, aimClean, rmkBaseFor, TYPES, MAX_PENDING, build, superseded, withdrawErr, mine, expectOk, findQuote };
