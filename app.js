@@ -41743,7 +41743,7 @@ function _rentAskText(g){
 }
 function _rentAskDetail(g){
   var q=g.q,rows=g.list.map(function(x){var it=(q.items||[])[x.idx]||{},d=_rentDaysOf(it),ot=parseFloat(it.ot)||0;
-    return '<tr><td style="overflow-wrap:anywhere">'+esc(x.desc)+'</td><td style="text-align:right">'+esc(String(it.qty||''))+' '+esc(it.unit||'')+'</td><td style="text-align:right">'+(d?d+' 天':'')+'</td><td style="text-align:right;white-space:nowrap">'+esc(_qMD(x.expiry))+'<div style="font-size:10.5px;color:'+(x.left<=2?'var(--red)':'var(--b4)')+'">'+(x.left===0?'今天':x.left+' 天後')+'</div></td><td style="text-align:right">'+(ot?fmt(ot)+(it.otUnit?' '+esc(_uFix(it.otUnit)):''):'<span style="color:var(--red)">沒填</span>')+'</td></tr>';}).join('');
+    return '<tr><td style="overflow-wrap:anywhere">'+esc(x.desc)+'</td><td class="dnw" style="text-align:right">'+esc(String(it.qty||''))+' '+esc(it.unit||'')+'</td><td class="dnw" style="text-align:right">'+(d?d+' 天':'')+'</td><td class="dnw" style="text-align:right;white-space:nowrap">'+esc(_qMD(x.expiry))+'<div style="font-size:10.5px;color:'+(x.left<=2?'var(--red)':'var(--b4)')+'">'+(x.left===0?'今天':x.left+' 天後')+'</div></td><td style="text-align:right">'+(ot?fmt(ot)+(it.otUnit?' '+esc(_uFix(it.otUnit)):''):'<span style="color:var(--red)">沒填</span>')+'</td></tr>';}).join('');
   var ct=_qContact(q);
   return _qTbl([['工程',String(q.name||'')],['業主',String(q.client||'')],['租期結束算法',_rentEndMode(q)==='removeDone'?'拔除完成日':'拔除第一天']])
     +'<table class="tbl" style="font-size:12px;width:100%;margin-top:6px;table-layout:fixed"><thead><tr><th>工項</th><th style="text-align:right">數量</th><th style="text-align:right">含租期</th><th style="text-align:right">到期</th><th style="text-align:right">逾期租金</th></tr></thead><tbody>'+rows+'</tbody></table>'
@@ -41786,7 +41786,7 @@ function _overAskDetail(g){
     +'<table class="tbl" style="font-size:12px;width:100%;margin-top:6px;table-layout:fixed"><colgroup><col style="width:30%"><col><col><col><col><col></colgroup><thead><tr><th>工項</th><th style="text-align:right">報價成本</th><th style="text-align:right">實際</th><th style="text-align:right">數量差</th><th style="text-align:right">單價差</th><th style="text-align:right">租期差</th></tr></thead><tbody>'+body
     +'<tr style="font-weight:700"><td>合計</td><td class="dnw" style="'+nw+'">'+fmt(sum('plan'))+'</td><td class="dnw" style="'+nw+'">'+fmt(sum('act'))+'</td>'+cell(sum('qtyD'))+cell(sum('unitD'))+cell(sum('rentD'))+'</tr></tbody></table>'
     +'<div style="font-size:11px;color:var(--b4);margin-top:4px">報價成本＝報價數量×成本單價。數量差＝多做的數量×成本單價；租期差＝租金類成本裡逾期天數那一段；單價差＝其餘（包商單價、料價、損耗）。三塊加起來＝實際－報價成本。</div>'
-    +'<input placeholder="原因（例：業主追加 6 支、拔除延後 20 天）" value="'+esc((_OVERASK_IN[k]||''))+'" oninput="_OVERASK_IN[\''+esc(k)+'\']=String(this.value).slice(0,200)" style="width:100%;box-sizing:border-box;margin-top:6px;padding:6px 8px;border:1px solid var(--b2);border-radius:6px;font-size:13px">'
+    +'<input placeholder="原因（例：業主追加 6 支、拔除延後 20 天）" value="'+esc((_OVERASK_IN[k]||''))+'" oninput="_OVERASK_IN[\''+escq(k)+'\']=String(this.value).slice(0,200)" style="width:100%;box-sizing:border-box;margin-top:6px;padding:6px 8px;border:1px solid var(--b2);border-radius:6px;font-size:13px">'
     +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">確認＝記「已知道」和原因（超支再多 5% 才再出）；退回＝先不處理（一樣不再出，除非再多 5%）。</div>';
 }
 function _overAskMark(g,why){var q=g.q;if(!q.overAck||typeof q.overAck!=='object')q.overAck={};g.rows.forEach(function(r){q.overAck[r.idx]={pct:r.pct,why:why,at:Date.now(),by:_meEmail()||'本機'};});delete _OVERASK_IN[q.id];_touch(q);persist();}
@@ -41837,7 +41837,7 @@ function _pfDetail(row){
     +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">機具</div>'+eqH
     +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">人員</div><div style="font-size:12px">'+esc(k.crew.vendor||'（沒有廠商）')+(k.crew.contact?'　'+esc(k.crew.contact):'')+(k.crew.phone?'　'+esc(k.crew.phone):'　<span style="color:#b71c1c">廠商名冊沒有電話</span>')+'　<span style="color:#b26a00">待廠商回覆確認</span></div>'
     +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">'+(miss?'催的 LINE 文字（有 '+miss+' 項還沒到位）':'確認進場的 LINE 文字')+'</div><div style="white-space:pre-wrap;font-size:12.5px;background:var(--gl);border-radius:6px;padding:6px 8px;overflow-wrap:anywhere">'+esc(_pfText(row,k))+'</div>'
-    +'<input placeholder="備註（例：廠商回覆 OK、材料 11/12 下午到）" value="'+esc(i.note||'')+'" oninput="(_PF_IN[\''+esc(row.key)+'\']=_PF_IN[\''+esc(row.key)+'\']||{}).note=String(this.value).slice(0,200)" style="width:100%;box-sizing:border-box;margin-top:6px;padding:6px 8px;border:1px solid var(--b2);border-radius:6px;font-size:13px">'
+    +'<input placeholder="備註（例：廠商回覆 OK、材料 11/12 下午到）" value="'+esc(i.note||'')+'" oninput="(_PF_IN[\''+escq(row.key)+'\']=_PF_IN[\''+escq(row.key)+'\']||{}).note=String(this.value).slice(0,200)" style="width:100%;box-sizing:border-box;margin-top:6px;padding:6px 8px;border:1px solid var(--b2);border-radius:6px;font-size:13px">'
     +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">確認＝複製 LINE 文字並記「已確認到位」（這個進場日不再出卡）；改進場日要到施工成本的分包卡改。</div>';
 }
 function _pfMark(row,note,skip){var q=row.q;if(!q.pfAck||typeof q.pfAck!=='object')q.pfAck={};q.pfAck[row.c.id]={date:row.date,at:Date.now(),by:_meEmail()||'本機',note:String(note||'').slice(0,200)};if(skip)q.pfAck[row.c.id].skip=1;delete _PF_IN[row.key];_touch(q);persist();}
@@ -41929,9 +41929,9 @@ function _inqDetail(d){
     +((pl.missing||[]).length?'<div style="font-weight:700;font-size:12.5px;margin-top:6px;color:#b71c1c">缺的資料</div><ul style="margin:2px 0;padding-left:20px;font-size:12px;color:#b71c1c">'+pl.missing.map(function(t){return '<li>'+esc(_draftS(t))+'</li>';}).join('')+'</ul>':'')
     +(_inqAsk(d)?'<div style="font-weight:700;font-size:12.5px;margin-top:6px">索取資料訊息（確認時一起複製）</div><div style="white-space:pre-wrap;font-size:12.5px;background:var(--gl);border-radius:6px;padding:6px 8px;overflow-wrap:anywhere">'+esc(_inqAsk(d))+'</div>':'')
     +'<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:12.5px;margin-top:8px"><b>決定</b>'
-    +[['yes','接'],['cond','有條件接']].map(function(o){return '<label style="display:inline-flex;gap:4px;align-items:center"><input type="radio" name="inq-'+esc(d.id)+'" value="'+o[0]+'"'+(dec===o[0]?' checked':'')+' onchange="inqIn(\''+esc(d.id)+'\',\'dec\',this.value)">'+o[1]+'</label>';}).join('')
+    +[['yes','接'],['cond','有條件接']].map(function(o){return '<label style="display:inline-flex;gap:4px;align-items:center"><input type="radio" name="inq-'+esc(d.id)+'" value="'+o[0]+'"'+(dec===o[0]?' checked':'')+' onchange="inqIn(\''+escq(d.id)+'\',\'dec\',this.value)">'+o[1]+'</label>';}).join('')
     +'<span style="color:var(--b4)">不接＝按退回</span></div>'
-    +'<input placeholder="有條件接：條件（例：工期延到 60 天、不含夜間）" value="'+esc(i.cond||'')+'" oninput="inqIn(\''+esc(d.id)+'\',\'cond\',this.value)" style="width:100%;box-sizing:border-box;margin-top:6px;padding:6px 8px;border:1px solid var(--b2);border-radius:6px;font-size:13px">'
+    +'<input placeholder="有條件接：條件（例：工期延到 60 天、不含夜間）" value="'+esc(i.cond||'')+'" oninput="inqIn(\''+escq(d.id)+'\',\'cond\',this.value)" style="width:100%;box-sizing:border-box;margin-top:6px;padding:6px 8px;border:1px solid var(--b2);border-radius:6px;font-size:13px">'
     +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">確認＝建報價單殼（取報價編號、帶入工程資訊與來信摘要），之後在報價頁填工項。</div>';
 }
 function _inqOk(d){
@@ -42058,7 +42058,7 @@ function _rfqcDetail(row){
     +'<table class="tbl" style="font-size:12px;width:100%;margin-top:6px;table-layout:fixed"><thead><tr><th style="text-align:left">工項（未稅單價）</th>'+th+'</tr></thead><tbody>'+body+tot+'</tbody></table>'
     +(notes?'<div style="font-weight:700;font-size:12.5px;margin-top:6px">範圍差異與條件</div>'+notes:'')
     +'<div style="background:#e8f5e9;border-radius:8px;padding:6px 9px;font-size:12.5px;margin-top:6px">建議得標：<b>'+esc(s.v.name)+'</b>　'+esc(s.why)+(s.full?'':'<div style="color:#b71c1c">請先補齊漏報的工項，或拆開發包</div>')+'</div>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;margin-top:6px"><span>選定：</span>'+vs.map(function(v){var i=r.vendors.indexOf(v);return '<label style="display:inline-flex;gap:4px;align-items:center"><input type="radio" name="rfqc-'+esc(row.key)+'" value="'+i+'"'+(i===sel?' checked':'')+' onchange="rfqcPick(\''+esc(row.key)+'\',this.value)">'+esc(v.name)+'</label>';}).join('')+'</div>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;margin-top:6px"><span>選定：</span>'+vs.map(function(v){var i=r.vendors.indexOf(v);return '<label style="display:inline-flex;gap:4px;align-items:center"><input type="radio" name="rfqc-'+esc(row.key)+'" value="'+i+'"'+(i===sel?' checked':'')+' onchange="rfqcPick(\''+escq(row.key)+'\',this.value)">'+esc(v.name)+'</label>';}).join('')+'</div>'
     +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">確認＝開「評估得標」帶入選的廠商與原因，在那裡填簽約日、進場日後按確定才建分包成本卡；退回＝等更多家回價。</div>';
 }
 function _rfqcOk(row){
@@ -42121,8 +42121,8 @@ _decReg('qSent',{
   detail:function(r){var q=r.q,e=r.e,i=_QSENT_IN[q.id]||{},dt=i.date||_ymd(+e.at||Date.now()),how=i.how||(q.sent&&q.sent.how)||'LINE',t=(q.t&&q.t.total)||0;
     return _qTbl([['工程',String(q.name||'')],['業主',String(q.client||'')],['報價編號',String(q.code||'')],['版次','V'+(e.ver||1)],['含稅合計','NT$ '+fmt(Math.round(t))],['匯出',new Date(+e.at||0).toLocaleString('zh-TW')+' '+(e.what||'PDF')+(e.archived?'（已封存）':'（沒封存）')]].concat(_qContact(q)))
       +'<div style="display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:12.5px;margin-top:6px"><span>送出方式</span>'
-      +_QSENT_HOW.map(function(h){return '<label style="display:inline-flex;align-items:center;gap:4px"><input type="radio" name="qsent-how-'+esc(q.id)+'" value="'+esc(h)+'"'+(h===how?' checked':'')+' onchange="qSentIn(\''+esc(q.id)+'\',\'how\',this.value)">'+esc(h)+'</label>';}).join('')
-      +'<span>日期</span><input type="date" value="'+esc(dt)+'" onchange="qSentIn(\''+esc(q.id)+'\',\'date\',this.value)" style="padding:4px 6px;border:1px solid var(--b2);border-radius:6px;font-size:13px"></div>'
+      +_QSENT_HOW.map(function(h){return '<label style="display:inline-flex;align-items:center;gap:4px"><input type="radio" name="qsent-how-'+esc(q.id)+'" value="'+esc(h)+'"'+(h===how?' checked':'')+' onchange="qSentIn(\''+escq(q.id)+'\',\'how\',this.value)">'+esc(h)+'</label>';}).join('')
+      +'<span>日期</span><input type="date" value="'+esc(dt)+'" onchange="qSentIn(\''+escq(q.id)+'\',\'date\',this.value)" style="padding:4px 6px;border:1px solid var(--b2);border-radius:6px;font-size:13px"></div>'
       +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">確認後過 '+_QASK_DAYS+' 天還沒結果，今天頁會出追問卡（附業主聯絡方式與追問文字）。沒送出就按退回。</div>';},
   ok:function(r){var q=r.q,e=r.e,i=_QSENT_IN[q.id]||{},dt=i.date||_ymd(+e.at||Date.now()),how=i.how||(q.sent&&q.sent.how)||'LINE';
     if(!/^\d{4}-\d{2}-\d{2}$/.test(dt)){toast('送出日期不對');return false;}if(dt>localToday()){toast('送出日期不能是未來');return false;}if(_QSENT_HOW.indexOf(how)<0){toast('請選送出方式');return false;}
@@ -42238,7 +42238,7 @@ function _bidCardPlan(d,q){
     +li(inv?'請款單：已有，不重建':'建第一期請款單草稿')
     +li('建專案（案號）')
     +'</ol><div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>請款截止日：每月</span>'
-    +'<input type="number" min="1" max="31" inputmode="numeric" value="'+esc(pd)+'" placeholder="不填" oninput="bidcPd(\''+esc(d.id)+'\',this.value)" style="width:70px;text-align:center;padding:5px 6px;border:1px solid var(--b2);border-radius:6px;font-size:13px">'
+    +'<input type="number" min="1" max="31" inputmode="numeric" value="'+esc(pd)+'" placeholder="不填" oninput="bidcPd(\''+escq(d.id)+'\',this.value)" style="width:70px;text-align:center;padding:5px 6px;border:1px solid var(--b2);border-radius:6px;font-size:13px">'
     +'<span>日前送件（截止日前 3 天提醒，可空白）</span></div></div>';
 }
 function _bidCardOk(d){
@@ -42488,8 +42488,8 @@ function _cevVendors(q){var seen={},out=[];_retAskFam(q).forEach(function(x){(x.
 function _cevHtml(q){var vs=_cevVendors(q);if(!vs.length)return '';var cur=_CEV[q.id]||{};
   return '<div style="font-weight:700;font-size:13px;margin:10px 0 2px">五、包商評鑑（1～5 分，可不評）</div>'+vs.map(function(n,vi){var v=(VENDORS||[]).find(function(x){return x&&x.name===n;}),old=v&&Array.isArray(v.evals)?v.evals.find(function(e){return e&&e.qid===q.id;}):null,o=cur[vi]||{};
     return '<div style="border:1px solid var(--b1);border-radius:8px;padding:6px 8px;margin-top:4px;font-size:12.5px"><b>'+esc(n)+'</b>'+(old?'<span style="font-size:11px;color:var(--b4)">（已評過：品質 '+old.q+'、準時 '+old.t+'、配合 '+old.c+'，再評會覆蓋）</span>':'')
-      +'<div style="display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:4px">'+_CEV_K.map(function(k){var val=o[k[0]]!=null?o[k[0]]:'';return '<label style="display:inline-flex;gap:4px;align-items:center">'+k[1]+'<select onchange="cevSet(\''+esc(q.id)+'\','+vi+',\''+k[0]+'\',this.value)" style="padding:3px 4px;border:1px solid var(--b2);border-radius:6px;font-size:13px"><option value="">—</option>'+[5,4,3,2,1].map(function(x){return '<option value="'+x+'"'+(+val===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></label>';}).join('')+'</div>'
-      +'<input placeholder="一句話（選填）" value="'+esc(o.note||'')+'" oninput="cevSet(\''+esc(q.id)+'\','+vi+',\'note\',this.value)" style="width:100%;box-sizing:border-box;margin-top:4px;padding:4px 6px;border:1px solid var(--b2);border-radius:6px;font-size:12.5px"></div>';}).join('');}
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:4px">'+_CEV_K.map(function(k){var val=o[k[0]]!=null?o[k[0]]:'';return '<label style="display:inline-flex;gap:4px;align-items:center">'+k[1]+'<select onchange="cevSet(\''+escq(q.id)+'\','+vi+',\''+k[0]+'\',this.value)" style="padding:3px 4px;border:1px solid var(--b2);border-radius:6px;font-size:13px"><option value="">—</option>'+[5,4,3,2,1].map(function(x){return '<option value="'+x+'"'+(+val===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></label>';}).join('')+'</div>'
+      +'<input placeholder="一句話（選填）" value="'+esc(o.note||'')+'" oninput="cevSet(\''+escq(q.id)+'\','+vi+',\'note\',this.value)" style="width:100%;box-sizing:border-box;margin-top:4px;padding:4px 6px;border:1px solid var(--b2);border-radius:6px;font-size:12.5px"></div>';}).join('');}
 function _cevSave(q){var vs=_cevVendors(q),cur=_CEV[q.id]||{},todo=[];
   for(var vi=0;vi<vs.length;vi++){var o=cur[vi]||{},n=_CEV_K.filter(function(k){return o[k[0]]>=1&&o[k[0]]<=5;}).length;if(!n&&!o.note)continue;if(n<3){toast(vs[vi]+'：品質、準時、配合三題都要填');return false;}todo.push({name:vs[vi],o:o});}
   if(!todo.length)return true;
