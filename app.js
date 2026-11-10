@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.215';
+var APP_VERSION='v6.0.216';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -38757,7 +38757,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // 安全規則（database.rules.json 的 fydata/drafts）：唯讀名冊與管理員可讀；唯讀帳號只能新增 by＝自己的 pending 草稿，舊的只能把自己的 pending 改成 withdrawn／superseded（v6.0.189）；狀態只有管理員能改；欄位型別與大小有上限。
 // 記錄：{id,type:'quote'|'bid'|'irPhoto',by,byName,at,status:'pending'|'applied'|'rejected',summary,payload,(doneAt,doneBy,resultId,reason)}
 var DRAFTS={},DRAFTS_OLD={};   // DRAFTS_OLD（v6.0.189）：已被取代的草稿（管理員展開看舊版用，最近 60 筆）
-var _DRAFT_T={qchg:'改單',quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）',contact:'客戶·廠商',dailyOut:'整體日報（請複製轉發）',vendorBill:'廠商請款',qverfix:'補登版次',qsend:'代匯出報價',frtRate:'運費價格表',matBill:'租賃／運費請款'};   // v6.0.138 客戶·廠商草稿   // v6.0.110 LINE 機器人草稿
+var _DRAFT_T={qchg:'改單',quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）',contact:'客戶·廠商',dailyOut:'整體日報（請複製轉發）',vendorBill:'廠商請款',qverfix:'補登版次',qsend:'代匯出報價',frtRate:'運費價格表',matBill:'租賃／運費請款',steelPrice:'中鋼盤價'};   // v6.0.138 客戶·廠商草稿   // v6.0.110 LINE 機器人草稿
 var _draftOn=false,_draftErrAt=0,_draftRefs=[],_draftHealing={};
 var _DRAFT_ID=/^[A-Za-z0-9_-]{4,40}$/;
 var _DRAFT_IMG=/^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+\/=]+$/;
@@ -41426,7 +41426,7 @@ function gtasksAuth(){
 var _DEC={},_DEC_BUSY={},_DEC_OPEN={},_DEC_READY={};   // v6.0.179：卡片預設收起；展開過且明細裡的照片／PDF 載入完成（_DEC_READY）才能按確認
 function _decIsAdmin(){try{return !_fbUser||(!!_isAdminUser&&!_isReaderUser);}catch(e){return false;}}
 function _decFieldsHtml(fs){var adm=_decIsAdmin();return '<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12.5px">'+(fs||[]).filter(function(f){return f&&(!f.money||adm);}).map(function(f){return '<div style="color:var(--b4)">'+esc(String(f.label||''))+'</div><div>'+esc(String(f.value==null?'':f.value))+'</div>';}).join('')+'</div>';}
-var _DEC_DRAFT_TYPES={qchg:1,dailyOut:1,vendorBill:1,qverfix:1,qsend:1,frtRate:1,matBill:1};   // 走拍板卡的草稿類型：AI 草稿清單（_draftPending）不再列
+var _DEC_DRAFT_TYPES={qchg:1,dailyOut:1,vendorBill:1,qverfix:1,qsend:1,frtRate:1,matBill:1,steelPrice:1};   // 走拍板卡的草稿類型：AI 草稿清單（_draftPending）不再列
 function _decReg(kind,spec){
   if(!spec||typeof spec.detail!=='function'){_err('_decReg',new Error(kind+'：沒有 detail，不准註冊（確認前一定要看得到完整內容）'));return false;}
   _DEC[kind]=spec;return true;
@@ -43932,10 +43932,78 @@ function _m8PrmHtml(){var c=_m8Cfg(),IN='width:100%;padding:5px 7px;border:1px s
     +'<button type="button" class="btn bp" style="margin-top:8px" onclick="_m8PrmSave()">儲存買價表</button>';}
 function _m8PrmSave(){var c=_m8Cfg(),b={},sp=document.querySelectorAll('#m8-buy .m8-sp'),bp=document.querySelectorAll('#m8-buy .m8-bp');
   for(var i=0;i<sp.length;i++){var k=_m8Key({spec:sp[i].value}),v=parseFloat(bp[i].value);if(k&&v>0)b[k.slice(0,20)]=v;}
+  var old=c.buy||{},ym=String(localToday()).slice(0,7);c.ref=Object.assign({},c.ref||{});Object.keys(b).forEach(function(k){if(!c.ref[k]||old[k]!==b[k])c.ref[k]={ym:ym,idx:(typeof _m8IdxAt==='function'?_m8IdxAt(ym):null)};});Object.keys(c.ref).forEach(function(k){if(!b[k])delete c.ref[k];});   /* v6.0.216 記填價那個月與當時鋼價指數（鋼價追蹤的起點） */
   c.buy=b;var sv=gv('m8-sv');c.salvage=sv===''?'':Math.max(0,Math.min(100,parseFloat(sv)||0));var st=gv('m8-st');c.store=st===''?'':Math.max(0,parseFloat(st)||0);_m8Save(c);toast('已存買價表');
   var el=document.getElementById('m8-prm-body');if(el)el.innerHTML=_m8PrmHtml();try{['m8Rvb','m8Cum','m8Qtr'].forEach(function(k){_decRefresh(k);});}catch(e){_err('_m8PrmSave',e);}}
 function _m8PrmCard(){if(_isReaderUser||!_decIsAdmin())return null;var d=document.createElement('div');d.className='card';d.id='m8-prm-card';
   d.innerHTML='<div class="ch green"><div class="cht">材料買價（租還是買）</div></div><div class="cb" id="m8-prm-body">'+_m8PrmHtml()+'</div>';return d;}
+// ══════════ v6.0.216 進退料 M8b：鋼價追蹤 → 建議調整買價（Lotion 11/10：中鋼盤價為主、主計總處指數備援、只建議不自動改）══════════
+// ①中鋼盤價：Lotion-HQ 每月讀中鋼新聞稿 → 主控台 fySteelPriceDraft(…) 送「鋼價草稿」（type steelPrice）→ 拍板卡 steelPrice 確認才記進 MAT_MOVE_FIN['steelCsc'].months[YYYY-MM]
+// ②主計總處營造工程物價指數（金屬製品類）：雲端每月抓（functions steelIndexMonthly）→ fydata/private/steelIdx（管理員裝置讀進 STEEL_IDX）
+// ③買價表存檔時，每個規格記「填價那個月」與當時指數（m8cfg.ref[規格]＝{ym, idx}）；之後漲跌 ≥ 5% 出卡 m8Steel：寫來源、漲跌、建議買價
+//   中鋼這個月或上個月有資料就用中鋼（H 開頭的規格看 H 型鋼、其他看鋼板），沒有才用指數；卡片寫明用的是哪個來源
+// ④每月 16 日以後兩個來源都沒有新資料 → 保底卡 m8SteelNone 請 Lotion 手動看一下
+var STEEL_IDX=null,_M8_STEEL_PCT=5;
+function _m8SteelPull(){if(typeof _fbDb==='undefined'||!_fbDb||!_decIsAdmin()||_isReaderUser)return;_fbDb.ref('fydata/private/steelIdx').once('value').then(function(sn){STEEL_IDX=(sn&&sn.val())||{};try{['m8Steel','m8SteelNone'].forEach(function(k){_decRefresh(k);});}catch(e){_err('_m8SteelPull.refresh',e);}}).catch(function(e){console.warn('[鋼價] 指數讀不到',e&&e.message);});}
+try{document.addEventListener('DOMContentLoaded',function(){[15000,90000].forEach(function(ms){setTimeout(function(){try{_m8SteelPull();}catch(e){_err('_m8Steel.boot',e);}},ms);});});setInterval(function(){try{_m8SteelPull();}catch(e){_err('_m8Steel.tick',e);}},6*3600000);}catch(e){_err('_m8Steel.timer',e);}
+function _m8Ym(d){return String(d||localToday()).slice(0,7);}
+function _m8YmPrev(ym){var y=+ym.slice(0,4),m=+ym.slice(5,7);return m===1?(y-1)+'-12':y+'-'+String(m-1).padStart(2,'0');}
+function _m8Csc(){var c=MAT_MOVE_FIN['steelCsc'];return (c&&c.kind==='steelCsc')?c:{kind:'steelCsc',months:{}};}
+function _m8IdxAt(ym){var s=(STEEL_IDX&&STEEL_IDX.series)||{},ks=Object.keys(s).filter(function(k){return k<=ym;}).sort();return ks.length?s[ks[ks.length-1]]:null;}
+function _m8Cat(sp){return /^H/i.test(String(sp||''))?'H':'P';}
+// 某規格從填價那個月到現在的漲跌（％）與來源
+function _m8SteelChg(sp){var c=_m8Cfg(),ref=(c.ref||{})[sp];if(!ref||!ref.ym)return null;var now=_m8Ym(),cs=_m8Csc().months||{},cat=_m8Cat(sp);
+  var fresh=!!(cs[now]||cs[_m8YmPrev(now)]);
+  if(fresh){var f=1,last='',ms=Object.keys(cs).filter(function(k){return k>ref.ym;}).sort();ms.forEach(function(k){var p=parseFloat((cs[k]||{})[cat]);if(isFinite(p)){f*=1+p/100;last=k;}});
+    if(last)return {pct:Math.round((f-1)*1000)/10,src:'中鋼盤價（'+(cat==='H'?'H 型鋼':'鋼板')+'，'+ref.ym+' 之後到 '+last+'）',ym:last};}
+  var L=STEEL_IDX&&STEEL_IDX.latest,r0=ref.idx||_m8IdxAt(ref.ym);if(L&&L.ym>ref.ym&&r0>0)return {pct:Math.round((L.v/r0-1)*1000)/10,src:'主計總處營造工程物價指數（金屬製品類，'+ref.ym+' '+r0+' → '+L.ym+' '+L.v+'）',ym:L.ym};
+  return null;}
+function _m8SteelList(){var c=_m8Cfg(),L=[];Object.keys(c.buy||{}).forEach(function(sp){var bp=parseFloat(c.buy[sp])||0;if(!(bp>0))return;var x=_m8SteelChg(sp);if(!x||Math.abs(x.pct)<_M8_STEEL_PCT)return;
+  var k='stl_'+sp+'_'+x.ym.replace('-','');if(_m8AckOf(k))return;L.push({id:k,spec:sp,bp:bp,pct:x.pct,src:x.src,ym:x.ym,sug:Math.round(bp*(1+x.pct/100))});});return L;}
+_decReg('m8Steel',{
+  title:'鋼價變了，買價表要不要調',todo:function(n){return '鋼價漲跌超過 '+_M8_STEEL_PCT+'%：建議調整買價 '+n+' 種規格';},sub:'確認＝知道了（我自己改）；退回＝不用調；修改＝打開買價表',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},list:_m8SteelList,key:function(x){return x.id;},
+  head:function(x){return x.spec+'　'+(x.pct>0?'漲 ':'跌 ')+Math.abs(x.pct)+'%';},
+  body:function(x){return '<div style="font-size:11.5px;color:#b26a00">建議買價每 M '+fmt(x.bp)+' → '+fmt(x.sug)+'；來源：'+esc(x.src.split('（')[0])+'</div>';},
+  detail:function(x){return '<div style="font-size:12.5px;line-height:1.7">'+esc(x.spec)+'：現在買價每 M '+fmt(x.bp)+'，鋼價從你填價那個月到現在'+(x.pct>0?'漲':'跌')+' <b>'+Math.abs(x.pct)+'%</b><br>建議改成每 M <b>'+fmt(x.sug)+'</b><br>來源：'+esc(x.src)+'<div style="color:var(--b4);margin-top:4px">只建議，不會自動改。要改請按「修改」打開買價表。</div></div>';},
+  ok:function(x){_m8Ack(x.id,{at:localToday()});return true;},
+  reject:function(x,why){_m8Ack(x.id,{keep:1,why:String(why||'不用調').slice(0,200)});return true;},
+  edit:function(){go('params');setTimeout(function(){try{prmTab('cost');}catch(e){_err('m8Steel.edit',e);}},80);}
+});
+function _m8SteelNoneList(){var c=_m8Cfg();if(!Object.keys(c.buy||{}).length)return [];var td=localToday(),now=_m8Ym(td);if(+td.slice(8,10)<16)return [];
+  var cs=_m8Csc().months||{};if(cs[now]||cs[_m8YmPrev(now)])return [];
+  var L=STEEL_IDX&&STEEL_IDX.latest;if(L&&L.ym>=_m8YmPrev(_m8YmPrev(now)))return [];   /* 主計總處通常晚 1～2 個月公布 */
+  if(STEEL_IDX===null)return [];   /* 還沒讀到雲端（或沒登入）不出卡 */
+  var k='stlnone_'+now.replace('-','');if(_m8AckOf(k))return [];
+  return [{id:k,ym:now,err:STEEL_IDX&&STEEL_IDX.err&&STEEL_IDX.err.msg||'',idx:L||null}];}
+_decReg('m8SteelNone',{
+  title:'這個月鋼價沒有資料',todo:function(){return '這個月鋼價兩個來源都沒資料，請手動看一下';},sub:'確認＝我看過了；退回＝這個月不用看；修改＝打開買價表',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},list:_m8SteelNoneList,key:function(x){return x.id;},
+  head:function(x){return x.ym+'　中鋼盤價、主計總處指數都沒有新資料';},
+  body:function(){return '<div style="font-size:11.5px;color:#b26a00">中鋼盤價草稿這個月還沒上傳，主計總處指數也沒更新</div>';},
+  detail:function(x){return '<div style="font-size:12.5px;line-height:1.7">中鋼盤價：這個月和上個月都沒有鋼價草稿（請 Lotion-HQ 照 docs/鋼價草稿_電腦端操作.md 上傳）<br>主計總處指數：'+(x.idx?('最新只到 '+esc(x.idx.ym)):'沒有資料')+(x.err?('（雲端抓取錯誤：'+esc(x.err)+'）'):'')+'<br><span style="color:var(--b4)">可以自己看一下鋼價行情，有需要就到參數頁改買價。</span></div>';},
+  ok:function(x){_m8Ack(x.id,{at:localToday()});return true;},reject:function(x){_m8Ack(x.id,{at:localToday()});return true;},
+  edit:function(){go('params');setTimeout(function(){try{prmTab('cost');}catch(e){_err('m8SteelNone.edit',e);}},80);}
+});
+// 鋼價草稿（中鋼盤價）：HQ 在主控台 fySteelPriceDraft({ym:'2026-11',url:'…',items:[{cat:'H型鋼',pct:2.5},{cat:'鋼板',pct:-1}],note:'…'})
+function _m8StlClean(p){p=(p&&typeof p==='object')?p:{};var ym=/^\d{4}-\d{2}$/.test(_draftS(p.ym))?p.ym:'',o={ym:ym,src:'中鋼盤價',url:_draftS(p.url).slice(0,300),note:_draftS(p.note).slice(0,300),items:[]};
+  (Array.isArray(p.items)?p.items:[]).slice(0,10).forEach(function(it){var cat=/H|型鋼/i.test(_draftS(it&&it.cat))?'H':(/板/.test(_draftS(it&&it.cat))?'P':'');var pct=parseFloat(it&&it.pct);if(cat&&isFinite(pct)&&Math.abs(pct)<50)o.items.push({cat:cat,pct:Math.round(pct*100)/100,text:_draftS(it.text||it.cat).slice(0,60)});});return o;}
+window.fySteelPriceDraft=function(p){var o=_m8StlClean(p);if(!o.ym||!o.items.length)return Promise.resolve({ok:false,why:'要有月份 ym（YYYY-MM）與至少一項 H型鋼／鋼板的漲跌 pct（%）'});
+  return _draftPush('steelPrice',o,('中鋼盤價 '+o.ym+'：'+o.items.map(function(i){return (i.cat==='H'?'H型鋼 ':'鋼板 ')+(i.pct>0?'+':'')+i.pct+'%';}).join('、')).slice(0,200)).then(function(ok){return {ok:!!ok};});};
+_decReg('steelPrice',{
+  title:'中鋼盤價（AI 讀的）',todo:function(n){return '中鋼盤價待確認 '+n+' 筆';},sub:'確認＝記下這個月的漲跌；退回＝不記；修改＝改數字再記',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},
+  list:function(){return Object.keys(DRAFTS||{}).map(function(k){return DRAFTS[k];}).filter(function(d){return d&&d.type==='steelPrice'&&d.status==='pending'&&_DRAFT_ID.test(_draftS(d.id));});},
+  key:function(d){return d.id;},head:function(d){var o=_m8StlClean(d.payload);return '中鋼盤價 '+o.ym;},
+  body:function(d){var o=_m8StlClean(d.payload);return '<div style="font-size:11.5px;color:var(--b4)">'+esc(o.items.map(function(i){return (i.cat==='H'?'H 型鋼 ':'鋼板 ')+(i.pct>0?'+':'')+i.pct+'%';}).join('、'))+'</div>';},
+  detail:function(d){var o=_m8StlClean(d.payload),had=(_m8Csc().months||{})[o.ym];return '<div style="font-size:12.5px;line-height:1.7">'+esc(o.ym)+'　'+o.items.map(function(i){return esc(i.text||'')+'：'+(i.pct>0?'+':'')+i.pct+'%';}).join('<br>')
+    +(o.url?('<br>新聞稿：'+esc(o.url)):'')+(o.note?('<br>'+esc(o.note)):'')+(had?'<br><span style="color:#b26a00">這個月已經記過一次，確認會取代</span>':'')+'<div style="color:var(--b4);margin-top:4px">記下來只用來建議調整買價，不會自動改。</div></div>';},
+  ok:function(d){var o=_m8StlClean(d.payload);if(!o.ym||!o.items.length){toast('草稿內容不完整，請按「修改」');return false;}var c=_m8Csc();c.months=Object.assign({},c.months||{});var r={src:'中鋼盤價',url:o.url,draft:d.id,at:Date.now()};o.items.forEach(function(i){r[i.cat]=i.pct;});c.months[o.ym]=r;c._mt=Date.now();MAT_MOVE_FIN['steelCsc']=c;saveMatMoveFin();_draftMark(d.id,'applied',{resultId:'steelCsc|'+o.ym});try{_decRefresh('m8Steel');}catch(e){_err('steelPrice.ok',e);}return true;},
+  reject:function(d,why){_draftMark(d.id,'rejected',{reason:String(why||'不記').slice(0,200)});return true;},
+  edit:function(d){var o=_m8StlClean(d.payload),H=(o.items.find(function(i){return i.cat==='H';})||{}).pct,P=(o.items.find(function(i){return i.cat==='P';})||{}).pct,IN='width:100%;padding:5px 7px;border:1px solid var(--b2);border-radius:6px';
+    showConfirm('改中鋼盤價','<div class="fg fg2" style="gap:8px"><div class="f"><label>月份（YYYY-MM）</label><input id="stl-ym" value="'+esc(o.ym)+'" style="'+IN+'"></div><div class="f"><label>H 型鋼漲跌（%）</label><input id="stl-h" type="number" step="any" value="'+esc(H==null?'':String(H))+'" style="'+IN+'"></div><div class="f"><label>鋼板漲跌（%）</label><input id="stl-p" type="number" step="any" value="'+esc(P==null?'':String(P))+'" style="'+IN+'"></div></div>',
+      function(){var it=[];if(gv('stl-h')!=='')it.push({cat:'H型鋼',pct:gv('stl-h')});if(gv('stl-p')!=='')it.push({cat:'鋼板',pct:gv('stl-p')});d.payload=Object.assign({},d.payload,{ym:gv('stl-ym'),items:it});setTimeout(function(){try{if(_DEC.steelPrice.ok(d))_decRefresh('steelPrice');}catch(e){_err('steelPrice.edit',e);}},50);},false,null,false);}
+});
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');

@@ -11622,6 +11622,52 @@ async function newPage(browser, width, height) {
     check('v6.0.208 數量對不上 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── v6.0.216 進退料 M8b：鋼價追蹤 → 建議調整買價（中鋼盤價草稿為主、主計總處指數備援、都沒有出保底卡）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepF = MAT_MOVE_FIN, keepD = DRAFTS, keepT = MAT_TAGS, keepTd = window.localToday, keepMark = window._draftMark, keepI = STEEL_IDX;
+      try {
+        MAT_MOVE_FIN = {}; DRAFTS = {}; MAT_TAGS = {};
+        window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        window.localToday = () => '2026-10-20';
+        STEEL_IDX = { latest: { ym: '2026-10', v: 106 }, series: { '2026-08': 100, '2026-09': 103, '2026-10': 106 } };
+        // 買價表存檔：記填價那個月與當時指數
+        _m8Save({ kind: 'm8cfg', buy: {}, salvage: '', store: '' });
+        go('params'); prmTab('cost');
+        window.localToday = () => '2026-08-05';
+        const sp = document.querySelector('#m8-buy .m8-sp'), bp = document.querySelector('#m8-buy .m8-bp');
+        sp.value = 'H300'; bp.value = '600'; _m8PrmSave();
+        out.ref = _m8Cfg().ref.H300.ym === '2026-08' && _m8Cfg().ref.H300.idx === 100;
+        window.localToday = () => '2026-10-20';
+        // ① 沒有中鋼資料 → 用主計總處指數：100 → 106 漲 6% → 建議 636
+        let L = _decItems('m8Steel');
+        out.idx = L.length === 1 && L[0].pct === 6 && L[0].sug === 636 && /主計總處/.test(L[0].src) && /只建議，不會自動改/.test(_DEC.m8Steel.detail(L[0]));
+        // ② 中鋼盤價草稿：確認才記；這個月有中鋼資料就改用中鋼（H 開頭看 H 型鋼）：+2% → 不到 5% 不出卡
+        DRAFTS.dstl1 = { id: 'dstl1', type: 'steelPrice', by: 'ai@example.com', at: 1, status: 'pending', summary: '', payload: { ym: '2026-10', url: 'https://example.com/n', items: [{ cat: 'H型鋼', pct: 2 }, { cat: '鋼板', pct: -1 }] } };
+        out.draftCard = _decItems('steelPrice').length === 1 && /H 型鋼 \+2%/.test(_DEC.steelPrice.body(DRAFTS.dstl1));
+        out.draftOk = _DEC.steelPrice.ok(DRAFTS.dstl1) === true && _m8Csc().months['2026-10'].H === 2 && DRAFTS.dstl1.status === 'applied';
+        out.cscSmall = !_decItems('m8Steel').length;
+        // 加上 9 月 +4% → 累計 1.04×1.02＝+6.1% → 出卡、來源寫中鋼
+        MAT_MOVE_FIN.steelCsc.months['2026-09'] = { H: 4, P: 0 };
+        L = _decItems('m8Steel');
+        out.csc = L.length === 1 && L[0].pct === 6.1 && /中鋼盤價/.test(L[0].src) && L[0].sug === 637;
+        out.ack = _DEC.m8Steel.ok(L[0]) === true && !_decItems('m8Steel').length;
+        // ③ 保底卡：16 日以後、兩個來源都沒有新資料
+        window.localToday = () => '2026-12-20';
+        STEEL_IDX = { latest: { ym: '2026-10', v: 106 }, series: {} };
+        out.noneOk = !_decItems('m8SteelNone').length;   // 指數晚 1～2 個月公布，10 月資料在 12 月還算新
+        STEEL_IDX = { latest: { ym: '2026-09', v: 103 }, series: {}, err: { msg: 'HTTP 503' } };
+        const N = _decItems('m8SteelNone');
+        out.none = N.length === 1 && /HTTP 503/.test(_DEC.m8SteelNone.detail(N[0])) && /鋼價草稿_電腦端操作/.test(_DEC.m8SteelNone.detail(N[0]));
+        window.localToday = () => '2026-12-10'; out.noneEarly = !_decItems('m8SteelNone').length;
+      } finally { MAT_MOVE_FIN = keepF; DRAFTS = keepD; MAT_TAGS = keepT; window.localToday = keepTd; window._draftMark = keepMark; STEEL_IDX = keepI; }
+      return out;
+    });
+    check('v6.0.216 進退料 M8b 鋼價追蹤：買價存檔記起點、沒有中鋼資料用主計總處指數、中鋼盤價草稿確認才記、有中鋼資料改用中鋼（累乘）、漲跌 5% 以上出卡寫來源與建議買價、只建議不自動改、16 日以後兩個來源都沒資料出保底卡', r.ref && r.idx && r.draftCard && r.draftOk && r.cscSmall && r.csc && r.ack && r.noneOk && r.none && r.noneEarly, JSON.stringify(r));
+    check('v6.0.216 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.211 進退料 M6：租賃與運費請款核對（Lotion 11/10 四題全 A；照 11/04 寬大 9/18 的實際算式）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -12361,7 +12407,7 @@ async function newPage(browser, width, height) {
     check('v6.0.180 撤銷補登（主控台）號碼還原、舊裝置蓋掉報價也不復活、補登後已封存新版就不准撤銷、再補一次結果一樣；唯讀帳號不能套用', r.undo && r.undoDur && r.undoRefuse && r.redo && r.ro, JSON.stringify(r));
     check('v6.0.180 防漏：每次匯出記 sendLog；只匯出另存永久紀錄（同內容只存一次）；還原前內容匯出過沒封存→先封存成正式版', r.only && r.onlyOnce && r.restore, JSON.stringify(r));
     check('v6.0.180 資料健檢：匯出過沒封存內容已改掉（封存後消失）、合約金額對不上任何正式版次；唯讀帳號匯出送 qsend 卡（只送工項條款與基本欄位、跟正式版相同不送）、確認＝封存；同內容重複匯出不再動報價；複製報價不帶紀錄', r.health1 && r.health1b && r.health2 && r.reader && r.qsend && r.sameQuiet && r.copy, JSON.stringify(r));
-    check('v6.0.180 資料庫規則：草稿類型加 qverfix、qsend（其他類型保留；v6.0.211 再加 frtRate、matBill）', /\|vendorBill\|qverfix\|qsend(\|[A-Za-z]+)*\)\$/.test(dv) && /\|frtRate\|matBill\)\$/.test(dv) && /quote\|qchg\|bid\|irPhoto\|addon\|dailyLog\|contact/.test(dv));
+    check('v6.0.180 資料庫規則：草稿類型加 qverfix、qsend（其他類型保留；v6.0.211 再加 frtRate、matBill）', /\|vendorBill\|qverfix\|qsend(\|[A-Za-z]+)*\)\$/.test(dv) && /\|frtRate\|matBill(\|[A-Za-z]+)*\)\$/.test(dv) && /\|steelPrice/.test(dv) && /quote\|qchg\|bid\|irPhoto\|addon\|dailyLog\|contact/.test(dv));
     check('v6.0.180 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }

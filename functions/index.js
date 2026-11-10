@@ -784,3 +784,22 @@ exports.fyDraft = onRequest({ region: REGION, cors: ['https://jhchen0911.github.
     res.status(500).json({ error: { message: 'AI 草稿服務錯誤' } });
   }
 });
+
+// ══════════ M8b（v6.0.216）鋼價追蹤備援：每月 8、15、25 日 06:55（台北）抓主計總處營造工程物價指數（金屬製品類）══════════
+// 寫 fydata/private/steelIdx（{at,src,url,item,latest:{ym,v},series}）；抓不到或格式變了寫 fydata/private/steelIdx/err（FJ 出保底卡請 Lotion 手動更新）。
+// 主要來源中鋼盤價由 Lotion-HQ 每月上傳「鋼價草稿」（type steelPrice），不在這裡抓。
+const steelCore = require('./ops/steel.js');
+exports.steelIndexMonthly = onSchedule({ schedule: '55 6 8,15,25 * *', timeZone: TZ, region: REGION, timeoutSeconds: 120 }, async () => {
+  const db = admin.database(), now = Date.now();
+  try {
+    const r = await fetch(steelCore.URL);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const series = steelCore.parse(await r.text()), rec = steelCore.build(series, now);
+    if (!rec.latest) throw new Error('XML 裡找不到金屬製品類的月資料（格式可能改了）');
+    await db.ref('fydata/private/steelIdx').set(rec);
+    console.log('[鋼價指數]', rec.latest.ym, rec.latest.v);
+  } catch (e) {
+    console.error('steelIndexMonthly', e);
+    await db.ref('fydata/private/steelIdx/err').set({ at: now, msg: String((e && e.message) || e).slice(0, 200) });
+  }
+});
