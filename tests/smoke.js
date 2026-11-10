@@ -13875,7 +13875,7 @@ async function newPage(browser, width, height) {
         out.calc = st && st.qtyDays === 1600 && st.amount === 32000 && st.batches.length === 2 && st.batches[0].days === 10 && st.batches[1].days === 20;
         out.show = /時段 1/.test(tx) && /2026-09-01～2026-09-10/.test(tx) && /時段 2/.test(tx) && /2026-09-11～2026-09-20/.test(tx) && /逾期租金約 NT\$ 32,000/.test(tx) && /拔除完成日（分段/.test(tx) && /第 1 批/.test(tx) && /拔完後還在場/.test(tx);
         const TB = box.querySelectorAll('table'), rowsOf = (t) => Array.from(t.querySelectorAll('tbody tr')).map((tr) => Array.from(tr.children).map((td) => td.textContent.replace(/^.*?：|\s/g, '')).join('|'));
-        const bt = rowsOf(TB[0]);   // v6.0.226 每一批：日期、支數、拔完後還在場
+        const bt = rowsOf(TB[0]);   // v6.0.232 每一批：日期、支數、拔完後還在場
         out.batch = TB.length === 2 && bt.length === 2 && /2026-09-10\|40\|60$/.test(bt[0]) && /2026-09-20\|60\|0$/.test(bt[1]) && !box.querySelector('input,select');
         const tds = rowsOf(TB[1]);
         out.rows = out.batch && tds.length === 2 && /100\|10\|20,000$/.test(tds[0]) && /60\|10\|12,000$/.test(tds[1]);   // 時段列法：在場 100 支 10 天、在場 60 支 10 天
@@ -14119,7 +14119,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── v6.0.226 結算書拍照 → AI 讀數量 → 今天頁拍板卡（原圖＋差異）→ 確認才寫進完工結算差異表 ──
+  // ── v6.0.232 結算書拍照 → AI 讀數量 → 今天頁拍板卡（原圖＋差異）→ 確認才寫進完工結算差異表 ──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async () => {
@@ -14172,12 +14172,12 @@ async function newPage(browser, width, height) {
       Q = keepQ; INV = keepI; PROJECTS = keepP; localStorage.removeItem('pj7_open_settle');
       return out;
     });
-    check('v6.0.226 結算書 AI 拍板卡（寬 ' + W + '）：拍照建草稿不直接寫、對到 2 項／沒對到 1 項、明細有原圖與 -5,000 差異、確認才寫進差異表、手填不弄掉紀錄、退回不寫、手機不左右捲', !r.err && r.draft && r.append && r.card && r.detail && r.noHScroll && r.qchg && r.pdf && r.stay && r.qcArg && r.ok && r.keep && r.reject && r.noQid && r.type, JSON.stringify(r));
-    check('v6.0.226 結算書 AI 拍板卡測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.232 結算書 AI 拍板卡（寬 ' + W + '）：拍照建草稿不直接寫、對到 2 項／沒對到 1 項、明細有原圖與 -5,000 差異、確認才寫進差異表、手填不弄掉紀錄、退回不寫、手機不左右捲', !r.err && r.draft && r.append && r.card && r.detail && r.noHScroll && r.qchg && r.pdf && r.stay && r.qcArg && r.ok && r.keep && r.reject && r.noQid && r.type, JSON.stringify(r));
+    check('v6.0.232 結算書 AI 拍板卡測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.226 送審文件三張拍板卡：歸檔記版次、業主回覆、技師計算書比對（只比數量）──
+  // ── v6.0.232 送審文件三張拍板卡：歸檔記版次、業主回覆、技師計算書比對（只比數量）──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async () => {
@@ -14226,8 +14226,8 @@ async function newPage(browser, width, height) {
       try { const md = document.getElementById('fy-modal'); if (md) md.remove(); } catch (x) { /* 可忽略 */ }
       return out;
     });
-    check('v6.0.226 送審文件卡（寬 ' + W + '）：檔名／上一版猜版次、歸檔確認、業主回覆對到同版次並改已核定、技師計算書差異 1 項 +20,000 與改單動作、只比數量不做安全判斷、手機不左右捲、唯讀看不到', !r.err && r.ver && r.arcList && r.arcDet && r.arcOk && r.reply && r.ownDet && r.ownOk && r.calc && r.ops && r.noHScroll && r.unit && r.verRe && r.calcOk && r.noWait && r.types && r.ro, JSON.stringify(r));
-    check('v6.0.226 送審文件卡測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.232 送審文件卡（寬 ' + W + '）：檔名／上一版猜版次、歸檔確認、業主回覆對到同版次並改已核定、技師計算書差異 1 項 +20,000 與改單動作、只比數量不做安全判斷、手機不左右捲、唯讀看不到', !r.err && r.ver && r.arcList && r.arcDet && r.arcOk && r.reply && r.ownDet && r.ownOk && r.calc && r.ops && r.noHScroll && r.unit && r.verRe && r.calcOk && r.noWait && r.types && r.ro, JSON.stringify(r));
+    check('v6.0.232 送審文件卡測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 

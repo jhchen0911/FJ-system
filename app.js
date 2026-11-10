@@ -27517,7 +27517,7 @@ function smartIntake(){
   var inp=document.getElementById('intake-input');
   if(!inp){
     inp=document.createElement('input');
-    inp.type='file';inp.id='intake-input';inp.accept='image/*,application/pdf';inp.multiple=true;inp.style.display='none';   // v6.0.226：PDF（例如營造廠結算書）逐頁轉成圖片再辨識
+    inp.type='file';inp.id='intake-input';inp.accept='image/*,application/pdf';inp.multiple=true;inp.style.display='none';   // v6.0.232：PDF（例如營造廠結算書）逐頁轉成圖片再辨識
     inp.onchange=function(){
       var fs=[].slice.call(this.files||[]).filter(function(f){return /^image\//.test(f.type||'image/')||_ikIsPdf(f);}).slice(0,12);this.value='';
       if(!fs.length)return;
@@ -27642,7 +27642,7 @@ function _intakeConfirm(r,du){
       var ok=_intakeRoute(ty,qid,r2,du);
       if(ok===false)return false;
       // 帳務類會另外開畫面（應付、費用表單、施工成本），佇列停在這裡，免得下一張的確認視窗蓋掉
-      if(ty!=='site_photo'&&ty!=='delivery_slip'&&ty!=='other'&&ty!=='settle_doc'&&ty!=='owner_reply'&&_ikQueue.length){   /* v6.0.226 審查：結算書多頁、業主回覆不開視窗，其餘照常逐張 */var n=_ikQueue.length;_ikQueue=[];_ikBatch=null;setTimeout(function(){toast('其餘 '+n+' 張請再按一次相機');},1500);return;}
+      if(ty!=='site_photo'&&ty!=='delivery_slip'&&ty!=='other'&&ty!=='settle_doc'&&ty!=='owner_reply'&&_ikQueue.length){   /* v6.0.232 審查：結算書多頁、業主回覆不開視窗，其餘照常逐張 */var n=_ikQueue.length;_ikQueue=[];_ikBatch=null;setTimeout(function(){toast('其餘 '+n+' 張請再按一次相機');},1500);return;}
       setTimeout(_ikNext,250);
     },false,function(){setTimeout(_ikNext,250);},true);
   setTimeout(function(){try{_ikRenderExtra();}catch(e){_err('_intakeConfirm',e);}},80);
@@ -27721,7 +27721,7 @@ function _intakeRoute(type,qid,r,du){
   if(type!=='other'&&!_ikAdmin()){toast('這類單據要由管理員登錄');return false;}
   if(qid)_ikSetLastProj(qid);
   if(type==='settle_doc')return _stlFromIntake(qid,r,du);
-  if(type==='owner_reply')return _sdocReplyFromIntake(qid,r,du);   // v6.0.226 業主回覆送審 → 今天頁拍板卡   // v6.0.226 結算書 → 今天頁拍板卡
+  if(type==='owner_reply')return _sdocReplyFromIntake(qid,r,du);   // v6.0.232 業主回覆送審 → 今天頁拍板卡   // v6.0.232 結算書 → 今天頁拍板卡
   if(type==='work_confirm'){
     if(!qid){toast('請選擇歸屬專案');return;}
     _projAttachFile(qid,'confirm','智慧收件_確認單_'+today+'.jpg',du);
@@ -44311,7 +44311,7 @@ function _pj7Click(e){
 function _stlKey(it,i){var d=String((it&&it.desc)||'').split('\n')[0].trim(),h=5381;for(var k=0;k<d.length;k++)h=((h*33)^d.charCodeAt(k))>>>0;return 'i'+i+'_'+h.toString(36);}
 function _stlOf(q){var p=q&&_prjOfQ(q.id);return (p&&p.settle&&typeof p.settle==='object')?p.settle:null;}
 function _stlCalc(q,m2){
-  var s=_stlOf(q),m=Object.assign({},(s&&s.q)||{},m2||{}),rec=[];   // m2：v6.0.226 結算書 AI 讀到的數量（只算、不寫）
+  var s=_stlOf(q),m=Object.assign({},(s&&s.q)||{},m2||{}),rec=[];   // m2：v6.0.232 結算書 AI 讀到的數量（只算、不寫）
  try{rec=_qtyRecon(q);}catch(e){_err('_stlCalc',e);}
   var rows=rec.map(function(r){var it=(q.items||[])[r.idx]||{},k=_stlKey(it,r.idx),v=m[k];
     return {idx:r.idx,key:k,desc:r.desc,unit:r.unit,price:parseFloat(it.price)||0,stmtQty:(v==null||v==='')?null:v,billedQty:r.billQ,dailyQty:r.hasDaily?r.reported:null,addQty:0};});
@@ -44391,7 +44391,7 @@ function _sdocPut(qid,f,cat){
           var p2=_prjOfQ(qid);if(!p2){res(false);return;}var m=_sdocMap(p2);
           m[id]={id:id,name:String(f.name||safe).slice(0,120),path:path,cat:_SDOC_CATS.indexOf(cat)>=0?cat:'其他',st:'wait',at:now,by:_mvMe(),size:f.size||0,url:url};
           try{var g=_sdocVerGuess(p2,m[id]);m[id].ver=g.ver;m[id].verSrc=g.src;}catch(e3){_err('_sdocPut.ver',e3);}   // 審查：版次跟上傳一起存，不多存一次
-          _sdocSave(p2,m);toast('已上傳：'+(f.name||''));try{_sdocAfterPut(qid,id,f);}catch(e2){_err('_sdocPut.after',e2);}res(true);   // v6.0.226 猜版次、計算書讀數量 → 今天頁拍板卡
+          _sdocSave(p2,m);toast('已上傳：'+(f.name||''));try{_sdocAfterPut(qid,id,f);}catch(e2){_err('_sdocPut.after',e2);}res(true);   // v6.0.232 猜版次、計算書讀數量 → 今天頁拍板卡
         }).catch(function(e){_err('_sdocPut.url',e);toast('取得檔案連結失敗');res(false);});
       });
     }catch(e){_err('_sdocPut',e);toast('上傳失敗');res(false);}
@@ -44476,7 +44476,7 @@ function _pjRemoveHtml(q){
     var sg=null;if(s.batches&&s.batches.length){try{sg=FJC.todo.rentSegments(pg,s.qty,_dAdd(s.expiry,1),s.endDate);}catch(e){_err('_pjRemoveHtml.seg',e);}}
     if(sg&&sg.segs.length){   // v6.0.225 Lotion 11/10：跟請款單同一種「時段」列法
       sg.segs.forEach(function(g){rows.push(['時段 '+g.no,esc(g.from)+'～'+esc(g.to),_rfmt(g.qty),String(g.days),s.otPrice?fmt(Math.round(g.qty*g.days*s.otPrice)):'—']);});
-      // v6.0.226 陳軒 11/10：先列每一批（日期、支數、拔完後還在場），跟時段列同一份資料（_rentBatchList＝rentSegments 用的分批），只顯示
+      // v6.0.232 陳軒 11/10：先列每一批（日期、支數、拔完後還在場），跟時段列同一份資料（_rentBatchList＝rentSegments 用的分批），只顯示
       var left=parseFloat(s.qty)||0,br=B.closed.map(function(b,i){left=Math.max(0,left-(parseFloat(b.qty)||0));return ['第 '+(i+1)+' 批',esc(b.date),_rfmt(b.qty),_rfmt(left)];});
       if(B.open>0)br.push([B.stage?'拔除階段完工':'還沒勾完成',B.stage?esc(B.stage):'—',_rfmt(B.open),'—']);
       if(br.length)h+='<div style="font-size:11.5px;color:var(--b4);margin:2px 0">每一批</div>'+_pjTable([{t:'批次'},{t:'拔完日'},{t:'支數',r:1},{t:'拔完後還在場',r:1}],br);
@@ -44543,7 +44543,7 @@ function _pj7InvHtml(q,st){
 function _acctInvState(v){
   var today=localToday(),d='';try{var e=_invExpectedDate(v);d=(e&&e.date)||'';}catch(x){_err('_acctInvState',x);}
   var od=!!(d&&d<today);
-  // v6.0.226：主線請款單狀態（_invStOf／_INV_ST_T：草稿／已送業主／業主已確認／已開發票／已收款）上線後自動改用；還沒上線照舊
+  // v6.0.232：主線請款單狀態（_invStOf／_INV_ST_T：草稿／已送業主／業主已確認／已開發票／已收款）上線後自動改用；還沒上線照舊
   var st='';try{if(typeof window._invStOf==='function'&&window._INV_ST_T)st=window._invStOf(v)||'';}catch(e){_err('_acctInvState.st',e);st='';}
   if(st&&window._INV_ST_T[st])return {due:d,od:od,st:st,label:(od?'逾期・':'')+window._INV_ST_T[st]+(st==='draft'?'':'・待收'),col:od?'var(--red)':(st==='draft'?'#757575':'#b26a00')};
   return {due:d,od:od,st:'',label:od?'逾期待收':(v.invNo?'已開發票・待收':'待收'),col:od?'var(--red)':'#b26a00'};
@@ -44630,7 +44630,7 @@ function _tdRfqVerSub(q){
 function _tdCfSub(){
   try{return esc((SYNC_CONFLICTS||[]).slice(0,2).map(function(x){return (_CF_COLL_NAME[x.coll]||x.coll)+'「'+(x.name||x.id)+'」的'+(_CF_FIELD_NAME[x.field]||x.field);}).join('、')+(function(){var ks={};(SYNC_CONFLICTS||[]).forEach(function(x){ks[x.kept]=1;});var k=Object.keys(ks);return k.length===1?('；目前先用'+(k[0]==='cloud'?'另一台':'這台')+'的'):'';})());}catch(e){_err('_tdCfSub',e);return '點這裡選要用哪一個';}
 }
-// ══════════ v6.0.226 第 7 步 7c：結算書拍照 → AI 讀數量 → 今天頁拍板卡（附原圖與差異）→ Lotion 確認才寫進結算差異表 ══════════
+// ══════════ v6.0.232 第 7 步 7c：結算書拍照 → AI 讀數量 → 今天頁拍板卡（附原圖與差異）→ Lotion 確認才寫進結算差異表 ══════════
 // 存在專案 p.settle.ai（規則已允許 settle 底下任何欄位，不加新節點）：{id,at,by,file,url,rows:[{text,qty,unit,key}],low,st:'pending'|'done'|'rejected',why,doneAt,doneBy}
 //   key＝對到的合約工項（_stlKey），空＝沒對到；確認只寫有對到的列進 p.settle.q，跟手填同一份資料、同一張差異表
 function _stlAiMatch(q,text,unit){
@@ -44747,7 +44747,7 @@ _decReg('stlAi',{
   detail:function(it){return _stlAiDetail(it);},
   ok:function(it){return _stlAiOk(it);},reject:function(it,why){return _stlAiReject(it,why);},edit:function(it){_stlAiEdit(it);}
 });
-// ══════════ v6.0.226 第 7 步 7c：送審文件三張拍板卡（陳軒 11/10 派工；第 3 層＝只做紀錄與比對，不做任何安全判斷）══════════
+// ══════════ v6.0.232 第 7 步 7c：送審文件三張拍板卡（陳軒 11/10 派工；第 3 層＝只做紀錄與比對，不做任何安全判斷）══════════
 // 都存在專案送審文件那一筆 p.docs[id]（規則 docs/$d 只要求 name、path，其他欄位照存，不加節點）：
 //   ① 歸檔 sdocArc：上傳後系統依檔名（v3／第 3 版／R3）或同類上一版＋1 猜版次 d.ver、d.verSrc；確認＝d.verOk；修改＝改類別／版次；退回＝d.verSkip（不記版次）
 //   ② 業主回覆 sdocOwner：智慧收件「業主／營造廠回覆送審結果」→ 對到送審中的文件 d.reply={st:'pending',res:'ok'|'back',ver,note,url,guess}；確認＝d.st 改成已核定／退回修改
@@ -44902,7 +44902,7 @@ function stlSet(el){
   if(raw!==''&&!isFinite(v)){toast('請填數字');return;}
   var s=(p.settle&&typeof p.settle==='object')?p.settle:{};var m=Object.assign({},s.q||{});
   if(v==null)delete m[k];else m[k]=Math.round(v*1000)/1000;
-  p.settle=Object.assign({},s,{q:m,at:Date.now(),by:_mvMe()});p._mt=Date.now();saveProjects();   // v6.0.226：保留 p.settle.ai
+  p.settle=Object.assign({},s,{q:m,at:Date.now(),by:_mvMe()});p._mt=Date.now();saveProjects();   // v6.0.232：保留 p.settle.ai
   var all=[].slice.call(document.querySelectorAll('input[data-stl]')),i=all.indexOf(el);
   renderProj();
   try{var nx=document.querySelectorAll('input[data-stl]')[i+1];if(nx)nx.focus();}catch(x){_err('stlSet.focus',x);}
