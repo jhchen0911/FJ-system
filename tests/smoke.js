@@ -13259,7 +13259,7 @@ async function newPage(browser, width, height) {
     check('v6.0.214 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.223 改版第 7 步 7c 加碼①：完工結算差異表（專案「完工結算」那一步逐項填結算書數量，跟累計請款比）──
+  // ── v6.0.225 改版第 7 步 7c 加碼①：完工結算差異表（專案「完工結算」那一步逐項填結算書數量，跟累計請款比）──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async () => {
@@ -13299,11 +13299,11 @@ async function newPage(browser, width, height) {
       Q = keepQ; INV = keepI; PROJECTS = keepP; localStorage.removeItem('pj7_open_settle');
       return out;
     });
-    check('v6.0.223 完工結算差異表（寬 ' + W + '）：合約工項都列、逐項填結算書數量算出差多少與金額影響（未稅）、存在專案只存數量、清空＝刪掉、唯讀看得到不能改、手機不左右捲', !r.err && r.rows && r.saved && r.diff && r.info && r.clear && r.ro && r.noHScroll, JSON.stringify(r));
-    check('v6.0.223 完工結算測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.225 完工結算差異表（寬 ' + W + '）：合約工項都列、逐項填結算書數量算出差多少與金額影響（未稅）、存在專案只存數量、清空＝刪掉、唯讀看得到不能改、手機不左右捲', !r.err && r.rows && r.saved && r.diff && r.info && r.clear && r.ro && r.noHScroll, JSON.stringify(r));
+    check('v6.0.225 完工結算測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.223 改版第 7 步 7c 加碼②：送審文件（專案「送審文件」那一步上傳、分類、送審狀態、刪除；雲端檔案用假的 Storage 驗流程）──
+  // ── v6.0.225 改版第 7 步 7c 加碼②：送審文件（專案「送審文件」那一步上傳、分類、送審狀態、刪除；雲端檔案用假的 Storage 驗流程）──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async () => {
@@ -13347,11 +13347,11 @@ async function newPage(browser, width, height) {
       Q = keepQ; PROJECTS = keepP; _fbUser = oU; _fbStorage = oS; _roState = oRo; window.showConfirm = oC; localStorage.removeItem('pj7_open_subm');
       return out;
     });
-    check('v6.0.223 送審文件（寬 ' + W + '）：沒文件不算現在這一步、要登入才能傳、存 projects/<專案>/docs/、超過 50 MB 擋下、依類別列、改狀態（全部核定＝做完）、唯讀只能看、刪除連檔案一起刪', !r.err && r.optional && r.needLogin && r.up && r.rec && r.big && r.list && r.st && r.ro && r.del && r.noHScroll, JSON.stringify(r));
-    check('v6.0.223 送審文件測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.225 送審文件（寬 ' + W + '）：沒文件不算現在這一步、要登入才能傳、存 projects/<專案>/docs/、超過 50 MB 擋下、依類別列、改狀態（全部核定＝做完）、唯讀只能看、刪除連檔案一起刪', !r.err && r.optional && r.needLogin && r.up && r.rec && r.big && r.list && r.st && r.ro && r.del && r.noHScroll, JSON.stringify(r));
+    check('v6.0.225 送審文件測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.223 改版第 7 步 7c 加碼③：包商評分（結案後拍板卡、五項 1～5 分、廠商清單看得到平均）──
+  // ── v6.0.225 改版第 7 步 7c 加碼③：包商評分（結案後拍板卡、五項 1～5 分、廠商清單看得到平均）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -13389,11 +13389,11 @@ async function newPage(browser, width, height) {
       try { const m = document.getElementById('fy-modal'); if (m) m.remove(); } catch (x) { /* 可忽略 */ }
       return out;
     });
-    check('v6.0.223 包商評分：結案 90 天內每家分包一張拍板卡（管理員）、五項都要評、存專案、平均分數、退回＝不評、廠商清單看得到平均、員工看不到', !r.err && r.list && r.open && r.miss && r.saved && r.avg && r.skip && r.chip && r.staff, JSON.stringify(r));
-    check('v6.0.223 包商評分測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.225 包商評分：結案 90 天內每家分包一張拍板卡（管理員）、五項都要評、存專案、平均分數、退回＝不評、廠商清單看得到平均、員工看不到', !r.err && r.list && r.open && r.miss && r.saved && r.avg && r.skip && r.chip && r.staff, JSON.stringify(r));
+    check('v6.0.225 包商評分測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.223 改版第 7 步 7c 加碼④：分段拔樁（只顯示；批次與計費天數直接用 FJC.todo.rentStatus／rentBatchList，Lotion 11/10 口徑）──
+  // ── v6.0.225 改版第 7 步 7c 加碼④：分段拔樁（只顯示；批次與計費天數直接用 FJC.todo.rentStatus／rentBatchList，Lotion 11/10 口徑）──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async () => {
@@ -13421,11 +13421,11 @@ async function newPage(browser, width, height) {
       Q = keepQ; PROJECTS = keepP; localStorage.removeItem('pj7_open_remove');
       return out;
     });
-    check('v6.0.223 分段拔樁（寬 ' + W + '）：拆除拔樁那一步照時段列（時段起訖、在場支數、天數、逾期租金），支·天跟請款用的同一份算法', !r.err && r.calc && r.show && r.rows && r.noHScroll, JSON.stringify(r));
-    check('v6.0.223 分段拔樁測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.225 分段拔樁（寬 ' + W + '）：拆除拔樁那一步照時段列（時段起訖、在場支數、天數、逾期租金），支·天跟請款用的同一份算法', !r.err && r.calc && r.show && r.rows && r.noHScroll, JSON.stringify(r));
+    check('v6.0.225 分段拔樁測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.223 Lotion 11/10：分段拔樁的逾期租金請款單改照「時段」列（一個時段一列；金額不變；跨期接續；折讓扣在時段列；已開發票的舊單照舊）──
+  // ── v6.0.225 Lotion 11/10：分段拔樁的逾期租金請款單改照「時段」列（一個時段一列；金額不變；跨期接續；折讓扣在時段列；已開發票的舊單照舊）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(() => {
@@ -13468,11 +13468,11 @@ async function newPage(browser, width, height) {
       Q = keepQ; INV.length = 0; keepI.forEach((v) => INV.push(v));
       return out;
     });
-    check('v6.0.223 分段拔樁請款單照時段列：一個時段一列（起訖、在場支數、天數、單價、金額）、金額跟原本一樣、重算不重複、折讓扣在時段列、跨期接續不重複不漏、已開發票的舊單照舊', !r.err && r.rows && r.desc && r.sum && r.again && r.disc && r.cross && r.issuedKeep, JSON.stringify(r));
-    check('v6.0.223 時段列法測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.225 分段拔樁請款單照時段列：一個時段一列（起訖、在場支數、天數、單價、金額）、金額跟原本一樣、重算不重複、折讓扣在時段列、跨期接續不重複不漏、已開發票的舊單照舊', !r.err && r.rows && r.desc && r.sum && r.again && r.disc && r.cross && r.issuedKeep, JSON.stringify(r));
+    check('v6.0.225 時段列法測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.223 Lotion 11/10：今天頁跟錢有關的卡不給「已處理／延後」，只有「去處理」；純通知的卡照舊有「已處理」──
+  // ── v6.0.225 Lotion 11/10：今天頁跟錢有關的卡不給「已處理／延後」，只有「去處理」；純通知的卡照舊有「已處理」──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -13502,11 +13502,11 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.223 今天頁：錢的卡（請款、收款、付款、逾期租金、保留款）沒有「已處理／延後」只有「去處理」、以前按過已處理的照樣出現；純通知卡照舊；唯讀沒有按鈕', !r.err && r.noDone && r.oldSnz && r.notice && r.go && r.ro, JSON.stringify(r));
-    check('v6.0.223 今天頁錢的卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.225 今天頁：錢的卡（請款、收款、付款、逾期租金、保留款）沒有「已處理／延後」只有「去處理」、以前按過已處理的照樣出現；純通知卡照舊；唯讀沒有按鈕', !r.err && r.noDone && r.oldSnz && r.notice && r.go && r.ro, JSON.stringify(r));
+    check('v6.0.225 今天頁錢的卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.223 專案頁「請款」那一步只讀：合約條件摘要、每期狀態、一顆「下一步」，輸入與按鈕收進「⋯ 更多」──
+  // ── v6.0.225 專案頁「請款」那一步只讀：合約條件摘要、每期狀態、一顆「下一步」，輸入與按鈕收進「⋯ 更多」──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async () => {
@@ -13542,11 +13542,11 @@ async function newPage(browser, width, height) {
       Q = keepQ; INV.length = 0; keepI.forEach((v) => INV.push(v)); PROJECTS = keepP; localStorage.removeItem('pj7_open_inv');
       return out;
     });
-    check('v6.0.223 專案頁請款那一步只讀（寬 ' + W + '）：合約條件摘要、每期狀態、只有一顆「下一步」（逾期先登錄收款）、輸入與按鈕收在「⋯ 更多」、收款後下一步換掉、唯讀沒有按鈕', !r.err && r.terms && r.period && r.next && r.noInputs && r.after && r.toggle && r.ro && r.noHScroll, JSON.stringify(r));
-    check('v6.0.223 專案頁請款只讀測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.225 專案頁請款那一步只讀（寬 ' + W + '）：合約條件摘要、每期狀態、只有一顆「下一步」（逾期先登錄收款）、輸入與按鈕收在「⋯ 更多」、收款後下一步換掉、唯讀沒有按鈕', !r.err && r.terms && r.period && r.next && r.noInputs && r.after && r.toggle && r.ro && r.noHScroll, JSON.stringify(r));
+    check('v6.0.225 專案頁請款只讀測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.223 第 7 步④ 帳務帳本：收／付最上面一筆一列、一顆「下一步」，舊清單收進「⋯ 更多」；唯讀沒有按鈕；舊選單照舊 ──
+  // ── v6.0.225 第 7 步④ 帳務帳本：收／付最上面一筆一列、一顆「下一步」，舊清單收進「⋯ 更多」；唯讀沒有按鈕；舊選單照舊 ──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async (W) => {
@@ -13591,12 +13591,12 @@ async function newPage(browser, width, height) {
       PAYABLES.length = 0; keepP.forEach((p) => PAYABLES.push(p)); INV.length = 0; keepI.forEach((v) => INV.push(v)); _fbUser = oU; _isAdminUser = oA;
       return out;
     }, W);
-    check('v6.0.223 帳務帳本（寬 ' + W + '）：付＝待付一筆一列（逾期在前、已付不列）、只有一顆「付款」，收＝待收請款單「登錄收款」；舊清單收在「⋯ 更多」打開才看到；付款後帳本更新；唯讀沒有按鈕；舊選單沒有帳本', !r.err && r.ap && r.oneBtn && r.fold && r.unfold && r.refresh && r.search && r.ar && r.noScroll && r.ro && r.old, JSON.stringify(r));
-    check('v6.0.223 帳務帳本測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.225 帳務帳本（寬 ' + W + '）：付＝待付一筆一列（逾期在前、已付不列）、只有一顆「付款」，收＝待收請款單「登錄收款」；舊清單收在「⋯ 更多」打開才看到；付款後帳本更新；唯讀沒有按鈕；舊選單沒有帳本', !r.err && r.ap && r.oneBtn && r.fold && r.unfold && r.refresh && r.search && r.ar && r.noScroll && r.ro && r.old, JSON.stringify(r));
+    check('v6.0.225 帳務帳本測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.223 第 7 步⑤ 首頁提醒卡第二行＝算好的結論（合約到期、可以結案、報價進版、同步衝突） ──
+  // ── v6.0.225 第 7 步⑤ 首頁提醒卡第二行＝算好的結論（合約到期、可以結案、報價進版、同步衝突） ──
   {
     const { page, errors } = await newPage(browser, 1440, 900);
     const r = await page.evaluate(async () => {
@@ -13622,12 +13622,12 @@ async function newPage(browser, width, height) {
       Q = keepQ; CONTRACTS.length = 0; keepC.forEach((c) => CONTRACTS.push(c)); SYNC_CONFLICTS = keepS;
       return out;
     });
-    check('v6.0.223 首頁提醒卡第二行是算好的結論：合約到期（日報還在＝要展延／日報停了＝確認完工）、同步衝突列出哪筆哪個欄位、可以結案列出實收與應付', !r.err && r.ct && r.ct2 && r.cf && r.close && r.wired, JSON.stringify(r));
-    check('v6.0.223 首頁提醒卡結論測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.225 首頁提醒卡第二行是算好的結論：合約到期（日報還在＝要展延／日報停了＝確認完工）、同步衝突列出哪筆哪個欄位、可以結案列出實收與應付', !r.err && r.ct && r.ct2 && r.cf && r.close && r.wired, JSON.stringify(r));
+    check('v6.0.225 首頁提醒卡結論測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.223 第 7 步⑥ 報價頁新選單拿掉「↺ 清除」「進版」（送出時自動封存進版），舊選單照舊 ──
+  // ── v6.0.225 第 7 步⑥ 報價頁新選單拿掉「↺ 清除」「進版」（送出時自動封存進版），舊選單照舊 ──
   {
     const { page, errors } = await newPage(browser, 1440, 900);
     const r = await page.evaluate(async () => {
@@ -13643,8 +13643,8 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     });
-    check('v6.0.223 報價頁新選單拿掉「清除」「進版」、儲存與議價還在；舊選單照舊', !r.err && r.newOff && r.oldOn, JSON.stringify(r));
-    check('v6.0.223 報價頁按鈕測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.225 報價頁新選單拿掉「清除」「進版」、儲存與議價還在；舊選單照舊', !r.err && r.newOff && r.oldOn, JSON.stringify(r));
+    check('v6.0.225 報價頁按鈕測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 

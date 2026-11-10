@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.223';
+var APP_VERSION='v6.0.225';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -5730,7 +5730,7 @@ function calcInvDays(){
       const cleanDesc=(desc)=>{
         let c=desc.replace(/（[^）]*）/g,'').replace(/\([^)]*\)/g,'');
         c=c.replace(/[\s、，,]*[打設拔除裝設拆除施工安裝完成]+[\s、，,]*/g,' ');
-        c=c.replace(/(^|\s)[及與和](?=\s|$)/g,' ');   // v6.0.223：「打設及拔除」拿掉動作後剩下的「及」
+        c=c.replace(/(^|\s)[及與和](?=\s|$)/g,' ');   // v6.0.225：「打設及拔除」拿掉動作後剩下的「及」
         c=c.replace(/[、，\s]+$|^[、，\s]+/g,'').replace(/\s{2,}/g,' ').trim();
         return c;
       };
@@ -5756,7 +5756,7 @@ function calcInvDays(){
       // v6.0.107 拔除完成日模式：分批計算「支·天」（每批計到該批拔除完成日，未拔完的計到本期截止日）
       let _bq=null;try{const _q=_invQuote();if(_q&&_rentEndMode(_q)==='removeDone'){const _ix=(_q.items||[]).findIndex(it=>it&&!it.sec&&_invKey(it.desc)===_invKey(selDesc));if(_ix>=0)_bq=_rentBatchQtyDays(_itemProgress(_q,_ix),srcQty,_isoD(billStart),_isoD(claimDate));}}catch(e){_err('calcInvDays.batch',e);}
       const overAmt=_bq?Math.round(srcPrice*_bq.qtyDays):Math.round(srcPrice*srcQty*billDays);
-      // v6.0.223 Lotion 11/10：分段拔樁照「時段」列（時段起訖、在場支數、天數、單價、金額）；支·天跟 _bq 一定一樣（calc/todo.js rentSegments，單元測試證明）
+      // v6.0.225 Lotion 11/10：分段拔樁照「時段」列（時段起訖、在場支數、天數、單價、金額）；支·天跟 _bq 一定一樣（calc/todo.js rentSegments，單元測試證明）
       //   已開發票或已收款的請款單重算時照舊列法（只影響新產生的列）
       let _sg=null;try{const _q=_invQuote();const _noSeg=_recSaved&&(_recSaved.invNo||_recSaved.receivedConfirmed)&&existIdx>=0&&!(invItems[existIdx]._ovAlg>=4);
         if(_bq&&!_noSeg){const _ix=(_q.items||[]).findIndex(it=>it&&!it.sec&&_invKey(it.desc)===_invKey(selDesc));const _r=FJC.todo.rentSegments(_itemProgress(_q,_ix),srcQty,_isoD(billStart),_isoD(claimDate));if(Math.abs(_r.qtyDays-_bq.qtyDays)<1e-6)_sg=_r.segs;else _err('calcInvDays.seg',new Error('時段支·天跟分批不一樣，改回分批列法'));}}catch(e){_err('calcInvDays.seg',e);}
@@ -5769,7 +5769,7 @@ function calcInvDays(){
         payRate:100,note:'逾期租金',otPrice:0,otUnit:'',
         _ovKey:selDesc,_ovStart:_isoD(billStart),_ovEnd:_isoD(claimDate),_ovBasis:_rentEndMode(_invQuote()),_ovAlg:3};   // _ovAlg：Lotion 10/21 新算法（完成當天計租、本批完成切批）   // v6.0.107 租期結束日口徑
       if(_sg&&_sg.length){
-        // v6.0.223 Lotion 11/10：一個時段一列（時段起訖、在場支數、天數、單價、金額）；折讓天數照舊扣在各自的時段列上（invRentDisc 一般列）
+        // v6.0.225 Lotion 11/10：一個時段一列（時段起訖、在場支數、天數、單價、金額）；折讓天數照舊扣在各自的時段列上（invRentDisc 一般列）
         //   _ovEnd 一律＝本期請至日（下一期從隔天接著算，_rentBilledUntil 不變）；時段日期另存 _ovSegFrom／_ovSegTo
         const _old=invItems.filter(function(x,ii){return ii!==itemIdx&&x&&x.type==='rental'&&x._ovKey===selDesc;});
         const _keepDisc={};_old.forEach(function(x){if(x._ovSegFrom&&(parseFloat(x.discDays)||0)>0)_keepDisc[x._ovSegFrom]={d:x.discDays,n:x.discNote,l:x.discLog};});
@@ -5782,7 +5782,7 @@ function calcInvDays(){
         const _at=invItems.findIndex(x=>x.type!=='sec'&&x.desc===selDesc);
         invItems.splice(_at+1,0,..._rows);
       } else if(existIdx>=0){
-        // v6.0.223 審查：原本是時段列（_ovAlg 4）、現在改回一列（例如租期口徑改成拔除第一天）→ 其他時段列一起刪，不重複請
+        // v6.0.225 審查：原本是時段列（_ovAlg 4）、現在改回一列（例如租期口徑改成拔除第一天）→ 其他時段列一起刪，不重複請
         const _keep=invItems[existIdx];
         Object.keys(_ow).forEach(function(k){_keep[k]=_ow[k];});['_ovSeg','_ovSegFrom','_ovSegTo'].forEach(function(k){delete _keep[k];});
         for(let ii=invItems.length-1;ii>=0;ii--){const x=invItems[ii];if(ii!==itemIdx&&x!==_keep&&x&&x.type==='rental'&&x._ovKey===selDesc)invItems.splice(ii,1);}
@@ -26376,7 +26376,7 @@ function _togglePayVatCore(pid,on){
   try{rDash();}catch(e){_err('togglePayVat',e);}
 }
 function renderPayables(){
-  try{_acctLedRefresh();}catch(e){_err('renderPayables.led',e);}   // v6.0.223 帳本跟著更新（付款、收款後）
+  try{_acctLedRefresh();}catch(e){_err('renderPayables.led',e);}   // v6.0.225 帳本跟著更新（付款、收款後）
   try{if(_paidLogSync())savePayables();}catch(e){_err('renderPayables.paidLog',e);}   // v6.0.89 顯示前先與付款帳本對帳
   const el=document.getElementById('payable-list');if(!el)return;
   const catMap={material:'材料費',labor:'人工費',equipment:'機具費',subcontract:'協力廠商',salary:'薪資／勞健保',petty:'零用金',other:'其他'};
@@ -35286,7 +35286,7 @@ function acctTab(t,noRender){
     else if(t==='inv'){renderInvoiceRecords();renderLedger();}
     else if(t==='petty'||t==='pay'){renderPayroll();}
   }catch(e){_err('acctTab.'+t,e);}
-  try{_acctLedMount(t);}catch(e){_err('acctTab.led',e);}   // v6.0.223 第 7 步④ 帳本（新選單）
+  try{_acctLedMount(t);}catch(e){_err('acctTab.led',e);}   // v6.0.225 第 7 步④ 帳本（新選單）
   try{if(typeof _mstack==='function')_mstack(document.getElementById('acct-root'));}catch(e){_err('acctTab',e);}
 }
 function _acctSyncFinance(tab){
@@ -43438,7 +43438,7 @@ function v7PageOld(pg,old){
   try{renderMorePage();}catch(e){_err('v7PageOld.more',e);}
 }
 function _nav5Apply(){
-  try{document.querySelectorAll('#page-editor [data-q7off]').forEach(function(b){b.classList.toggle('q7-off',_v7New('editor'));});}catch(e){_err('_nav5Apply.q7',e);}   // v6.0.223 審查：切換選單時報價頁按鈕跟著變
+  try{document.querySelectorAll('#page-editor [data-q7off]').forEach(function(b){b.classList.toggle('q7-off',_v7New('editor'));});}catch(e){_err('_nav5Apply.q7',e);}   // v6.0.225 審查：切換選單時報價頁按鈕跟著變
   try{document.body.classList.toggle('nav5',_nav5On());var _om=_v7OldMap();_V7_PAGES.forEach(function(x){document.body.classList.toggle('v7old-'+x[0],!!_om[x[0]]);});}catch(e){_err('_nav5Apply',e);}
   try{renderTopNav();}catch(e){_err('_nav5Apply.top',e);}
 }
@@ -43521,7 +43521,7 @@ function _tdKey(it){return String(it.type||'')+'|'+String(it.id||it.qid||'')+'|'
 //   請款：本月要請款 bill_month／inv_month／待送請款 inv_submit；收款：recv／逾期 overdue；保留款可請退 ret_due；逾期租金 rent_over；付款：pay_due／pay_overdue／期票 tk_due／薪資 hr_pay
 var _TD_MONEY=/^(bill_month|inv_month|inv_submit|recv|overdue|ret_due|rent_over|pay_due|pay_overdue|tk_due|hr_pay)$/;
 function _tdIsMoney(it){return _TD_MONEY.test(String(it&&it.type||''));}
-function _tdSig(it){return String(it.text||'').replace(/\d+/g,'#')+'|'+String(it.sub||'').replace(/\d+/g,'#');}   // v6.0.223 審查：第二行是算好的數字（實收、日期），數字變了不算新的一張
+function _tdSig(it){return String(it.text||'').replace(/\d+/g,'#')+'|'+String(it.sub||'').replace(/\d+/g,'#');}   // v6.0.225 審查：第二行是算好的數字（實收、日期），數字變了不算新的一張
 function _tdSnzGet(){try{return JSON.parse(localStorage.getItem('fy_today_snz')||'{}')||{};}catch(e){return {};}}
 function _tdSnzSet(o){try{localStorage.setItem('fy_today_snz',JSON.stringify(o));}catch(e){_err('_tdSnzSet',e);}}
 // 延後到某天以前不顯示；已處理＝內容（數字除外）沒變就 30 天內不再顯示，內容變了（例如金額不同）會再出現
@@ -43926,7 +43926,7 @@ try{setInterval(function(){try{_mbAutoTick();}catch(e){_err('_mbAuto.tick',e);}}
 // 後端（報價結果紀錄、同類工項得標率、AI 草稿帶的底價／目標成交價）由小批次線做（v6.0.209 起，_bidAimOf／_bidSuggestFor，口徑含稅）；
 // 這裡只負責顯示：還沒上線（函式不存在）或這張沒有資料就不顯示。只給內部（_permHideProfit 的人看不到），不會印在任何對外文件。
 function _qP3Render(t){
-  try{document.querySelectorAll('#page-editor [data-q7off]').forEach(function(b){b.classList.toggle('q7-off',_v7New('editor'));});}catch(e){_err('_qP3Render.bar',e);}   // v6.0.223 第 7 步⑥：新選單拿掉「清除」「進版」（送出時自動封存進版；清除＝列表的新增）
+  try{document.querySelectorAll('#page-editor [data-q7off]').forEach(function(b){b.classList.toggle('q7-off',_v7New('editor'));});}catch(e){_err('_qP3Render.bar',e);}   // v6.0.225 第 7 步⑥：新選單拿掉「清除」「進版」（送出時自動封存進版；清除＝列表的新增）
   var el=document.getElementById('q-p3');if(!el)return;
   if(_permHideProfit()){el.style.display='none';el.innerHTML='';return;}
   var q0=Q.find(function(x){return x.id===eid;})||{},q=Object.assign({},q0,{items:items||[]});
@@ -44005,7 +44005,7 @@ function _pj7Click(e){
   try{localStorage.setItem('pj7_open_'+k,open?'0':'1');}catch(x){_err('_pj7Click',x);}
   renderProj();
 }
-// ══════════ 改版第 7 步 7c 加碼①：完工結算差異表（v6.0.223，估時表題 A 建議：結算書數量在專案「完工結算」那一步逐項手填）══════════
+// ══════════ 改版第 7 步 7c 加碼①：完工結算差異表（v6.0.225，估時表題 A 建議：結算書數量在專案「完工結算」那一步逐項手填）══════════
 // 存在專案資料 p.settle（shared；只存數量 q:{工項鍵:數量}、填的人與時間，不存金額）；工項鍵＝列號＋說明第一行雜湊（_stlKey），工項改說明就要重填
 // 算法 FJC.settle.diff（calc/settle.js）：結算書數量 − 豐有累計請款數量（_qtyRecon 的 billQ）、× 未稅單價＝金額影響（未稅）＋可能原因；日報累計一起比
 function _stlKey(it,i){var d=String((it&&it.desc)||'').split('\n')[0].trim(),h=5381;for(var k=0;k<d.length;k++)h=((h*33)^d.charCodeAt(k))>>>0;return 'i'+i+'_'+h.toString(36);}
@@ -44037,7 +44037,7 @@ function _pjSettleHtml(q){
   return head+_pjTable([{t:'工項'},{t:'單位'},{t:'豐有已請',r:1},{t:'日報累計',r:1},{t:'結算書',r:1},{t:'差多少',r:1},{t:'金額影響（未稅）',r:1},{t:'可能原因'}],rows,
     R.filled?['合計','','','','','',(R.sumAmt>0?'+':'')+fmt(R.sumAmt),'']:null);
 }
-// ══════════ 改版第 7 步 7c 加碼②：送審文件（v6.0.223，估時表題 B 建議：工務和管理員都能傳、都能看；唯讀帳號只能看）══════════
+// ══════════ 改版第 7 步 7c 加碼②：送審文件（v6.0.225，估時表題 B 建議：工務和管理員都能傳、都能看；唯讀帳號只能看）══════════
 // 檔案放 Storage projects/<專案id>/docs/（4a 規則：員工可傳、單檔 50 MB；員工與唯讀帳號可讀）；清單存專案 p.docs[<文件id>]＝{name,path,cat,st,at,by,size,url}（shared，規則要 name 與 path）
 // 類別 _SDOC_CATS；狀態 送審中／已核定／退回修改（_SDOC_ST，清單上直接選）；刪除＝先確認、檔案一起刪
 var _SDOC_CATS=['計算書','施工圖說','施工計畫書','材料送審','變更簽認','完工結算書','其他'];
@@ -44114,7 +44114,7 @@ function sdocDel(qid,id){
     _sdocSave(p2,m);
   });
 }
-// ══════════ 改版第 7 步 7c 加碼③：包商評分（v6.0.223，估時表題 C 建議：品質、工期、安全、配合度、價格各 1～5 分＋一句話）══════════
+// ══════════ 改版第 7 步 7c 加碼③：包商評分（v6.0.225，估時表題 C 建議：品質、工期、安全、配合度、價格各 1～5 分＋一句話）══════════
 // 結案後（90 天內）每家分包出一張拍板卡 vendorEval（管理員）：確認／修改＝打分數視窗，退回＝這家不評；存專案 p.vendorEval[<廠商鍵>]＝{v,s:{q,t,sa,c,p},note,at,by}（shared，只有分數與一句話）
 // 平均分數 _veAvg(廠商名)：廠商清單看得到（全公司各案平均）
 var _VE_ITEMS=[['q','品質'],['t','工期'],['sa','安全'],['c','配合度'],['p','價格']];
@@ -44157,7 +44157,7 @@ _decReg('vendorEval',{
   reject:function(x,why){return _veSave(x.qid,x.v,{skip:1,why:String(why||'不評').slice(0,120)});},
   edit:function(x){_veModal(x);}
 });
-// ══════════ 改版第 7 步 7c 加碼④：分段拔樁（v6.0.223，只顯示；Lotion 11/10：分階段計逾期租金本來就有，不加新規則、不改算法）══════════
+// ══════════ 改版第 7 步 7c 加碼④：分段拔樁（v6.0.225，只顯示；Lotion 11/10：分階段計逾期租金本來就有，不加新規則、不改算法）══════════
 // 專案「拆除拔樁」那一步列出每個有租期的工項、每一批（完成日、支數、逾期計費天數），資料直接用 FJC.todo.rentStatus（拔除完成日模式的 batches＝rentBatchQtyDays）
 // 與 rentBatchList（還沒逾期也列已完成的批次），不另算一份
 function _pjRemoveHtml(q){
@@ -44172,7 +44172,7 @@ function _pjRemoveHtml(q){
       +(s.amount>0?('・逾期租金約 NT$ '+fmt(s.amount)):'')+'</div>';
     var rows=[];
     var sg=null;if(s.batches&&s.batches.length){try{sg=FJC.todo.rentSegments(pg,s.qty,_dAdd(s.expiry,1),s.endDate);}catch(e){_err('_pjRemoveHtml.seg',e);}}
-    if(sg&&sg.segs.length){   // v6.0.223 Lotion 11/10：跟請款單同一種「時段」列法
+    if(sg&&sg.segs.length){   // v6.0.225 Lotion 11/10：跟請款單同一種「時段」列法
       sg.segs.forEach(function(g){rows.push(['時段 '+g.no,esc(g.from)+'～'+esc(g.to),_rfmt(g.qty),String(g.days),s.otPrice?fmt(Math.round(g.qty*g.days*s.otPrice)):'—']);});
       h+=_pjTable([{t:'時段'},{t:'起訖'},{t:'在場支數',r:1},{t:'天數',r:1},{t:'逾期租金',r:1}],rows);
       var dn=B.closed.map(function(b,i){return '第 '+(i+1)+' 批 '+esc(b.date)+' 拔完 '+_rfmt(b.qty)+' 支';});
@@ -44189,7 +44189,7 @@ function _pjRemoveHtml(q){
   });
   return h;
 }
-// ══════════ 改版第 7 步：專案頁「請款」那一步只讀（v6.0.223，陳軒 11/10 依 Lotion 大原則：前端只顯示走到哪、一顆「下一步」）══════════
+// ══════════ 改版第 7 步：專案頁「請款」那一步只讀（v6.0.225，陳軒 11/10 依 Lotion 大原則：前端只顯示走到哪、一顆「下一步」）══════════
 // 上面：合約條件摘要（保留款、清潔費、放款規則、裝設請款％、租期結束日口徑、保留款退還條件）＋每一期走到哪個狀態（已收／待收／逾期）＋一顆「下一步」
 // 下一步的順序：①有逾期沒收的 → 登錄那期收款 ②這期該請款（＝今天頁「本月要請款」同一份 FJC.todo.monthBill）→ 開下一期請款單 ③有待收的 → 登錄收款
 //   ④完工、有保留款可退 → 產生（或打開）保留款退還請款單 ⑤都沒有 → 顯示「目前沒有要做的」
@@ -44234,7 +44234,7 @@ function _pj7InvHtml(q,st){
   h+='<details class="pj7-more" style="margin-top:8px"><summary style="font-size:12px;color:var(--b4);cursor:pointer">⋯ 更多（合約條件設定、每期請款單、收款、信封、新增請款單）</summary><div style="margin-top:8px">'+_pjInvHtml(q,st)+'</div></details>';
   return h;
 }
-// ── v6.0.223 第 7 步④ 帳務頁帳本（新選單）：收／付兩個分頁最上面一張帳本，一筆一列（對象、期別、金額、狀態、一顆「下一步」）；
+// ── v6.0.225 第 7 步④ 帳務頁帳本（新選單）：收／付兩個分頁最上面一張帳本，一筆一列（對象、期別、金額、狀態、一顆「下一步」）；
 //    舊的完整清單收進「⋯ 更多」。請款單狀態現在由這裡推（有沒有開發票、預計收款日過了沒），主線把請款單狀態欄做好後只改 _acctInvState 一處
 function _acctInvState(v){
   var today=localToday(),d='';try{var e=_invExpectedDate(v);d=(e&&e.date)||'';}catch(x){_err('_acctInvState',x);}
@@ -44298,7 +44298,7 @@ function _acctLedMount(t){
   p.classList.toggle('led-fold',!(window._acctLedOpen||{})[t]);
   _acctLedUnfoldIfFilter(t,p);
 }
-// ── v6.0.223 第 7 步⑤ 首頁提醒卡第二行＝系統算好的結論與證據（不是固定說明文字） ──
+// ── v6.0.225 第 7 步⑤ 首頁提醒卡第二行＝系統算好的結論與證據（不是固定說明文字） ──
 function _tdCtExpSub(ct,days){
   try{var q=(Q||[]).find(function(x){return x&&(x.id===ct.linkedQid||(!ct.linkedQid&&x.name===ct.name));});if(!q)return '';
     var last='';(q.dailyLogs||[]).forEach(function(L){if(L&&L.date&&L.date>last)last=L.date;});
@@ -44832,7 +44832,7 @@ function renderFinanceSearch(){
 }
 
 function renderFinanceAR(){
-  try{_acctLedRefresh();}catch(e){_err('renderFinanceAR.led',e);}   // v6.0.223 帳本跟著更新（付款、收款後）
+  try{_acctLedRefresh();}catch(e){_err('renderFinanceAR.led',e);}   // v6.0.225 帳本跟著更新（付款、收款後）
   const el=document.getElementById('finance-ar-list');if(!el)return;
   const srch=(document.getElementById('finance-search')?.value||'').toLowerCase();
   const now=Date.now();
