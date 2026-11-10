@@ -11651,6 +11651,15 @@ async function newPage(browser, width, height) {
         _DEC.steelPrice.ok(DRAFTS.dst3);
         const L = _decItems('m8Steel'), hc = L.find(x => /H 型鋼/.test(x.spec));
         out.card2 = !!hc && hc.sug === 26.6 && /每噸 \+400 元 → 每公斤 \+0\.4/.test(_DEC.m8Steel.detail(hc)) && /換算：每噸調整金額 ÷ 1000/.test(_DEC.m8Steel.detail(hc));
+        // 審查：同一個月又調一次 → 確認過的卡要再問；下個月的盤（月初公布）現在就算
+        _DEC.m8Steel.ok(hc); out.ackKeep = !_decItems('m8Steel').some(x => /H 型鋼/.test(x.spec));
+        DRAFTS.dst4 = { id: 'dst4', type: 'steelPrice', by: 'ai@example.com', at: 4, status: 'pending', summary: '', payload: _m8StlClean({ ym: '2026-12', items: [{ cat: 'H型鋼', perTon: 400, date: '2026-11-09' }] }) };
+        _DEC.steelPrice.ok(DRAFTS.dst4); const h2 = _decItems('m8Steel').find(x => /H 型鋼/.test(x.spec));
+        out.reAlert = !!h2 && h2.sug === 27 && h2.ym === '2026-12';
+        // 填價那個月：公告日期在填價日之後的才算
+        const cc = { id: 'h', name: 'H', unit: 'kg', price: 20, ref: { ym: '2026-11', d: '2026-11-07' } }, c2 = _m8SteelChg(cc);
+        out.sameMonth = !!c2 && c2.sug === 20.8 && c2.steps.length === 2;   // 11 月只算 11-07 之後的 11-08；12 月盤的 11-09 也算；10-20、11-02、11-06 在填價前不算
+        out.cleanRe = _m8StlClean({ ym: '2026-11', items: [null, { cat: 'HR 熱軋', perTon: 100 }, { cat: '冷軋', perTon: 100 }, { cat: 'H300', perTon: 100 }] }).items.map(i => i.cat).join() === 'P,P,H';
         // 覆工板（每片）不拿每噸金額換算
         out.deck = !L.some(x => /覆工板/.test(x.spec));
         // 舊格式（pct）照收
@@ -11658,7 +11667,7 @@ async function newPage(browser, width, height) {
       } finally { MAT_MOVE_FIN = keepF; DRAFTS = keepD; MAT_TAGS = keepT; window.localToday = keepTd; window._draftMark = keepMark; STEEL_IDX = keepI; }
       return out;
     });
-    check('v6.0.226 鋼價來源：H 型鋼／鋼軌樁／鋼板樁看東和、覆工板看中鋼熱軋；草稿可帶每噸調整金額＋來源＋日期＋網址；確認累加進這個月（不重複）；建議買價＝現價＋每噸金額÷1000、卡片寫換算；覆工板每片不換算；舊 % 格式照收', Object.values(r).length === 10 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.226 鋼價來源：H 型鋼／鋼軌樁／鋼板樁看東和、覆工板看中鋼熱軋；草稿可帶每噸調整金額＋來源＋日期＋網址；確認累加進這個月（不重複）；建議買價＝現價＋每噸金額÷1000、卡片寫換算；覆工板每片不換算；舊 % 格式照收', Object.values(r).length === 14 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('v6.0.226 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
