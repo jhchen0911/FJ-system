@@ -7001,7 +7001,7 @@ function receiptHoldReturn(){
     toast('已登錄保留款退還 NT$ '+fmt(pend));
   });
 }
-function closeReceiptModal(){
+function closeReceiptModal(){try{_RV_APPLY=null;}catch(e){/* 可忽略 */}
   document.getElementById('receipt-modal').style.display='none';
 }
 function confirmReceipt(){
@@ -7037,6 +7037,7 @@ function confirmReceipt(){
   renderInvList();
   try{updateDashTodo();}catch(e){_err('confirmReceipt',e);}
   try{updateFinanceKPIs();}catch(e){_err('confirmReceipt',e);}
+  try{if(_RV_APPLY&&_RV_APPLY.inv===invId){_draftMark(_RV_APPLY.draft,'applied',{resultId:'recv|'+invId});_RV_APPLY=null;}}catch(e){_err('confirmReceipt.draft',e);}   /* 收款登錄卡打開的：存檔才標已套用 */
   closeReceiptModal();
   const _offTxt=off.sum>0?('（抵銷 '+fmt(off.sum)+'：'
     +[off.fee?'匯費'+fmt(off.fee):'',off.deduct?'扣款'+fmt(off.deduct):'',off.hold?'保留款'+fmt(off.hold):'',off.allow?'折讓'+fmt(off.allow):'']
@@ -38815,7 +38816,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // 記錄：{id,type:'quote'|'bid'|'irPhoto',by,byName,at,status:'pending'|'applied'|'rejected',summary,payload,(doneAt,doneBy,resultId,reason)}
 var DRAFTS={},DRAFTS_OLD={};   // DRAFTS_OLD（v6.0.189）：已被取代的草稿（管理員展開看舊版用，最近 60 筆）
 var _DRAFT_T={qchg:'改單',quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）',contact:'客戶·廠商',dailyOut:'整體日報（請複製轉發）',vendorBill:'廠商請款',qverfix:'補登版次',qsend:'代匯出報價',frtRate:'運費價格表',matBill:'租賃／運費請款',steelPrice:'鋼價盤價'};   // v6.0.138 客戶·廠商草稿   // v6.0.110 LINE 機器人草稿
-var _DRAFT_T={qchg:'改單',quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）',contact:'客戶·廠商',dailyOut:'整體日報（請複製轉發）',vendorBill:'廠商請款',qverfix:'補登版次',qsend:'代匯出報價',frtRate:'運費價格表',matBill:'租賃／運費請款',steelPrice:'鋼價盤價',invOk:'業主回覆請款單'};   // v6.0.138 客戶·廠商草稿   // v6.0.110 LINE 機器人草稿
+var _DRAFT_T={qchg:'改單',quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）',contact:'客戶·廠商',dailyOut:'整體日報（請複製轉發）',vendorBill:'廠商請款',qverfix:'補登版次',qsend:'代匯出報價',frtRate:'運費價格表',matBill:'租賃／運費請款',steelPrice:'鋼價盤價',invOk:'業主回覆請款單',recvSlip:'收款（匯款／期票）'};   // v6.0.138 客戶·廠商草稿   // v6.0.110 LINE 機器人草稿
 var _draftOn=false,_draftErrAt=0,_draftRefs=[],_draftHealing={};
 var _DRAFT_ID=/^[A-Za-z0-9_-]{4,40}$/;
 var _DRAFT_IMG=/^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+\/=]+$/;
@@ -41484,7 +41485,7 @@ function gtasksAuth(){
 var _DEC={},_DEC_BUSY={},_DEC_OPEN={},_DEC_READY={};   // v6.0.179：卡片預設收起；展開過且明細裡的照片／PDF 載入完成（_DEC_READY）才能按確認
 function _decIsAdmin(){try{return !_fbUser||(!!_isAdminUser&&!_isReaderUser);}catch(e){return false;}}
 function _decFieldsHtml(fs){var adm=_decIsAdmin();return '<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12.5px">'+(fs||[]).filter(function(f){return f&&(!f.money||adm);}).map(function(f){return '<div style="color:var(--b4)">'+esc(String(f.label||''))+'</div><div>'+esc(String(f.value==null?'':f.value))+'</div>';}).join('')+'</div>';}
-var _DEC_DRAFT_TYPES={qchg:1,dailyOut:1,vendorBill:1,qverfix:1,qsend:1,frtRate:1,matBill:1,steelPrice:1,dailyLog:1,invOk:1};   // 走拍板卡的草稿類型：AI 草稿清單（_draftPending）不再列
+var _DEC_DRAFT_TYPES={qchg:1,dailyOut:1,vendorBill:1,qverfix:1,qsend:1,frtRate:1,matBill:1,steelPrice:1,dailyLog:1,invOk:1,recvSlip:1};   // 走拍板卡的草稿類型：AI 草稿清單（_draftPending）不再列
 function _decReg(kind,spec){
   if(!spec||typeof spec.detail!=='function'){_err('_decReg',new Error(kind+'：沒有 detail，不准註冊（確認前一定要看得到完整內容）'));return false;}
   _DEC[kind]=spec;return true;
@@ -44711,6 +44712,72 @@ _decReg('invSend',{
     return 'open';},
   reject:function(inv,why){inv.sendSnz=_dAdd(localToday(),3);_invStLog(inv,_invStOf(inv),'先不送'+(why?'：'+String(why).slice(0,80):'')+'（'+inv.sendSnz+' 再提醒）',null,true);_invStSyncing=true;try{saveInv();}finally{_invStSyncing=false;}return true;},
   edit:function(inv){try{loadInvoice(inv.id);go('invoice-edit');}catch(e){_err('invSend.edit',e);}}
+});
+// ══════════ 待編號 請款鏈 4：收款登錄卡＋逾期催款卡（陳軒派工 11/10，盤點第 5 名；第 2 層：系統不自己記收款，卡片確認後打開收款視窗，Lotion 在視窗按確認才入帳）══════════
+// 收款草稿 type recvSlip：AI 讀匯款截圖／期票照片 → 主控台 fyRecvDraft({invId 或 qid／caseName＋periodNo, kind:'cash'|'ticket', amt, date, ticketNo, bank, dueDate, fee, deduct, deductWhy, photos, note})
+function _rvClean(p){p=(p&&typeof p==='object')?p:{};var n=function(v){var x=parseFloat(v);return isFinite(x)&&x>=0&&x<1e9?Math.round(x):0;},dt=function(v){v=_draftS(v);return /^\d{4}-\d{2}-\d{2}$/.test(v)?v:'';};
+  var o=_invOkClean(p);   // 共用業主確認卡的對位欄位（invId／qid／caseName／periodNo／photos）
+  return {invId:o.invId,qid:o.qid,caseName:o.caseName,periodNo:o.periodNo,photos:o.photos,kind:_draftS(p.kind)==='ticket'?'ticket':'cash',amt:n(p.amt),date:dt(p.date),ticketNo:_draftS(p.ticketNo).slice(0,40),bank:_draftS(p.bank).slice(0,40),dueDate:dt(p.dueDate),fee:n(p.fee),deduct:n(p.deduct),deductWhy:_draftS(p.deductWhy).slice(0,120),note:_draftS(p.note).slice(0,300)};}
+// 對位：沒給期別＝同案最早一張還有應收的（收款通常先收舊的）
+function _rvFind(o){var L=(INV||[]).filter(_invStDoc);if(o.invId){var a=L.find(function(x){return x.id===o.invId;});if(a)return a;}
+  var same=_invOkFind(Object.assign({},o,{periodNo:o.periodNo||0,invId:''}));if(o.periodNo)return same;
+  var pool;if(o.qid)pool=L.filter(function(x){return x.quoteId===o.qid||x.sourceQid===o.qid;});else if(o.caseName){var cn=String(o.caseName).trim();pool=L.filter(function(x){return String(x.project||'').trim()===cn;});}else pool=[];
+  pool=pool.filter(function(x){return _invAR(x)>0;}).sort(function(a,b){return (parseInt(a.periodNo)||0)-(parseInt(b.periodNo)||0);});return pool[0]||null;}
+window.fyRecvDraft=function(p){var o=_rvClean(p);if(!(o.amt>0))return Promise.resolve({ok:false,why:'要有收款金額 amt'});if(o.kind==='ticket'&&!o.dueDate)return Promise.resolve({ok:false,why:'期票要有到期日 dueDate'});
+  var inv=_rvFind(o);if(!inv)return Promise.resolve({ok:false,why:'對不到請款單：請給 invId，或 qid／caseName（＋periodNo）'});o.invId=inv.id;
+  return _draftPush('recvSlip',o,(String(inv.project||'').slice(0,30)+' 第'+(inv.periodNo||'?')+'期 '+(o.kind==='ticket'?'期票':'匯款')+' NT$ '+o.amt).slice(0,200)).then(function(ok){return {ok:!!ok,invId:inv.id,periodNo:inv.periodNo};});};
+// 差額：應收 −（這筆＋匯費＋扣款）
+function _rvDiff(inv,o){var ar=_invAR(inv);return {ar:ar,got:o.amt+o.fee+o.deduct,left:Math.round(ar-(o.amt+o.fee+o.deduct))};}
+var _RV_APPLY=null;   // 收款視窗是從哪張草稿打開的（confirmReceipt 存檔成功才標已套用）
+_decReg('recvIn',{
+  title:'收款登錄（AI 讀的）',todo:function(n){return '收款待登錄 '+n+' 筆';},sub:'確認＝打開收款視窗並帶好數字，在視窗按確認才入帳；退回＝不是這一期／不採用；修改＝換對到的期別',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},
+  list:function(){return Object.keys(DRAFTS||{}).map(function(k){return DRAFTS[k];}).filter(function(d){return d&&d.type==='recvSlip'&&d.status==='pending'&&_DRAFT_ID.test(_draftS(d.id));});},
+  key:function(d){return d.id;},
+  head:function(d){var inv=_rvFind(_rvClean(d.payload));return inv?(inv.project||'')+' 第'+(inv.periodNo||'?')+'期':'對不到請款單';},
+  body:function(d){var o=_rvClean(d.payload),inv=_rvFind(o),df=inv?_rvDiff(inv,o):null;return '<div style="font-size:11.5px;color:'+(df&&df.left!==0?'#b26a00':'var(--b4)')+'">'+(o.kind==='ticket'?'期票':'匯款')+' NT$ '+fmt(o.amt)+(df?(df.left===0?'，收齊':(df.left>0?'，還差 NT$ '+fmt(df.left):'，多收 NT$ '+fmt(-df.left))):'')+'</div>';},
+  detail:function(d){var o=_rvClean(d.payload),inv=_rvFind(o);if(!inv)return '<div style="color:#c62828">對不到請款單，請按「修改」選期別</div>';var df=_rvDiff(inv,o);
+    return '<div style="font-size:12.5px;line-height:1.7">'+o.photos.map(function(u){return '<img src="'+esc(u)+'" style="max-width:100%;margin-bottom:6px;border-radius:6px">';}).join('')
+      +'<b>AI 讀到的</b>：'+(o.kind==='ticket'?'期票':'匯款')+' NT$ '+fmt(o.amt)+'，'+esc(o.date||'（沒讀到日期）')+(o.kind==='ticket'?('，票號 '+esc(o.ticketNo||'—')+'，到期 '+esc(o.dueDate)):'')+(o.bank?'，'+esc(o.bank):'')
+      +(o.fee?'<br>匯費 NT$ '+fmt(o.fee):'')+(o.deduct?'<br>扣款 NT$ '+fmt(o.deduct)+'（'+esc(o.deductWhy||'原因沒寫，請確認')+'）':'')+(o.note?'<br>'+esc(o.note):'')
+      +'<div style="margin-top:6px"><b>對到的請款單</b>：'+esc(inv.project||'')+' 第'+esc(String(inv.periodNo||'?'))+'期，應收 NT$ '+fmt(df.ar)+'，現在狀態：'+_INV_ST_T[_invStOf(inv)]+'</div>'
+      +'<div style="margin-top:4px;'+(df.left!==0?'color:#b26a00':'')+'">這筆＋匯費＋扣款＝NT$ '+fmt(df.got)+'，'+(df.left===0?'<b>收齊</b>，確認後狀態會變「已收款」':(df.left>0?'<b>還差 NT$ '+fmt(df.left)+'</b>，記成部分收款':'<b>多了 NT$ '+fmt(-df.left)+'</b>，請確認是不是收到別期的'))+'</div>'
+      +((o.deduct&&!o.deductWhy)?'<div style="color:#c62828">有扣款但沒寫原因，請到收款視窗備註寫清楚</div>':'')
+      +'<div style="color:var(--b4);margin-top:4px">確認後打開收款視窗，數字已經帶好（累加在原本已收的上面）；在視窗按確認才入帳。</div></div>';},
+  ok:function(d){var o=_rvClean(d.payload),inv=_rvFind(o);if(!inv){toast('對不到請款單，請按「修改」');return false;}
+    try{openReceiptModal(inv.id);}catch(e){_err('recvIn.open',e);return false;}
+    var g=function(id){return document.getElementById(id);},addv=function(id,v){var el=g(id);if(el&&v)el.value=String((parseFloat(el.value)||0)+v);};
+    addv('receipt-amount',o.amt);addv('receipt-fee',o.fee);addv('receipt-deduct',o.deduct);
+    if(o.date&&g('receipt-date'))g('receipt-date').value=o.date;
+    var nt=g('receipt-note');if(nt){var add=(o.kind==='ticket'?'期票 '+(o.ticketNo||''):'匯款')+' '+o.amt+(o.deduct?'；扣款 '+o.deduct+(o.deductWhy?'（'+o.deductWhy+'）':''):'')+'（AI 收款草稿）';nt.value=(nt.value?nt.value+'；':'')+add;}
+    try{_rcptList.push({id:'r'+Date.now().toString(36),kind:o.kind,amt:o.amt,date:o.date||localToday(),ticketNo:o.ticketNo,bank:o.bank,dueDate:o.kind==='ticket'?o.dueDate:'',status:o.kind==='ticket'?'hold':'cleared'});_rcptRender();}catch(e){_err('recvIn.rcpt',e);}
+    try{_receiptCalc();}catch(e){_err('recvIn.calc',e);}
+    _RV_APPLY={draft:d.id,inv:inv.id};return 'open';},
+  reject:function(d,why){_draftMark(d.id,'rejected',{reason:String(why||'不是這一期／不採用').slice(0,200)});return true;},
+  edit:function(d){var cur=_rvFind(_rvClean(d.payload)),IN='width:100%;padding:5px 7px;border:1px solid var(--b2);border-radius:6px',L=(INV||[]).filter(function(x){return _invStDoc(x)&&(!cur||x.quoteId===cur.quoteId||x.project===cur.project);});if(!L.length)L=(INV||[]).filter(_invStDoc);
+    showConfirm('換對到的請款單','<select id="rv-sel" style="'+IN+'">'+L.map(function(x){return '<option value="'+esc(x.id)+'"'+(cur&&cur.id===x.id?' selected':'')+'>'+esc(x.project||'')+' 第'+esc(String(x.periodNo||'?'))+'期（應收 '+fmt(_invAR(x))+'）</option>';}).join('')+'</select>',
+      function(){d.payload=Object.assign({},d.payload,{invId:gv('rv-sel'),edited:1});setTimeout(function(){try{_decRefresh('recvIn');}catch(e){_err('recvIn.edit',e);}},50);},false,null,false);}
+});
+// ── 逾期催款卡：過了預計收款日還有應收；確認＝複製催款文字並記一筆（7 天內不再出）──
+function _dnList(){var td=localToday(),out=[];(INV||[]).forEach(function(inv){if(!_invStDoc(inv)||!(_invAR(inv)>0))return;var due='';try{due=_invDueISO(inv);}catch(e){_err('_dnList',e);}if(!due||due>=td)return;
+    var L=Array.isArray(inv.dunLog)?inv.dunLog:[],last=L.length?L[L.length-1]:null;if(last&&last.next&&last.next>td)return;out.push({inv:inv,due:due,days:FJC.todo.dDiff?FJC.todo.dDiff(due,td):0,last:last});});
+  return out.sort(function(a,b){return a.due<b.due?-1:1;});}
+function _dnRuleHtml(inv){var e=null,R=null;try{e=_invExpectedDate(inv);R=_recvRuleOf(inv);}catch(x){_err('_dnRuleHtml',x);}
+  var src=e&&e.src==='manual'?'手動指定（'+esc((inv.recvOv&&inv.recvOv.why)||'')+'）':e&&e.src==='rule'?('放款規則：'+esc(_recvRuleTxt(R))+'（請款日 '+esc(inv.date||'')+'）'):'請款單上的預計收款日／估驗日推定';
+  return '預計收款日 '+esc((e&&e.date)||'')+'，怎麼算的：'+src;}
+function _dnLog(inv,kind,why){inv.dunLog=(Array.isArray(inv.dunLog)?inv.dunLog:[]).concat([{at:Date.now(),by:_meEmail()||'本機',kind:kind,why:String(why||'').slice(0,120),next:_dAdd(localToday(),7)}]).slice(-20);_touch(inv);_invStSyncing=true;try{saveInv();}finally{_invStSyncing=false;}}
+_decReg('dunning',{
+  title:'逾期未收款',todo:function(n){return '逾期未收款 '+n+' 筆，要不要催';},sub:'確認＝複製催款文字並記一筆（7 天後還沒收再提醒）；退回＝先不催（7 天後再提醒）；修改＝改文字再複製',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},list:_dnList,key:function(x){return x.inv.id+'|'+((x.last&&x.last.at)||0);},
+  head:function(x){return String(x.inv.project||'').slice(0,24)+' 第'+(x.inv.periodNo||'?')+'期　逾期 '+x.days+' 天';},
+  body:function(x){return '<div style="font-size:11.5px;color:#c62828">應收 NT$ '+fmt(_invAR(x.inv))+(x.last?'，上次催款 '+esc(new Date(+x.last.at).toLocaleDateString('zh-TW')):'')+'</div>';},
+  detail:function(x){var t='';try{t=_dunningText(x.inv);}catch(e){_err('dunning.detail',e);}var L=Array.isArray(x.inv.dunLog)?x.inv.dunLog:[];
+    return '<div style="font-size:12.5px;line-height:1.7">'+_dnRuleHtml(x.inv)+'，已經逾期 '+x.days+' 天，應收 NT$ '+fmt(_invAR(x.inv))
+      +'<div style="margin-top:6px"><b>催款文字（確認＝複製）</b><div style="white-space:pre-wrap;background:var(--b0,#f6f6f6);padding:6px 8px;border-radius:6px">'+esc(t)+'</div></div>'
+      +(L.length?'<div style="margin-top:6px"><b>催款紀錄</b><br>'+L.slice().reverse().map(function(r){return esc(new Date(+r.at).toLocaleString('zh-TW',{hour12:false}))+' '+esc(r.by||'')+' '+(r.kind==='skip'?'先不催':'催款')+(r.why?'：'+esc(r.why):'');}).join('<br>')+'</div>':'')+'</div>';},
+  ok:function(x){var t='';try{t=_dunningText(x.inv);}catch(e){_err('dunning.ok',e);}try{navigator.clipboard.writeText(t).then(function(){toast('催款文字已複製');},function(){toast('複製失敗，請按修改手動複製');});}catch(e){_err('dunning.copy',e);}_dnLog(x.inv,'sent','複製催款文字');return true;},
+  reject:function(x,why){_dnLog(x.inv,'skip',why||'先不催');return true;},
+  edit:function(x){try{openDunning(x.inv.id);_dnLog(x.inv,'sent','改文字後複製');}catch(e){_err('dunning.edit',e);}}
 });
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

@@ -11825,6 +11825,44 @@ async function newPage(browser, width, height) {
     check('v6.0.227 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── 待編號 請款鏈 4：收款登錄卡 recvIn（AI 讀匯款／期票 → 確認＝打開收款視窗帶好數字，視窗確認才入帳）＋逾期催款卡 dunning ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepI = INV, keepD = DRAFTS, keepMark = window._draftMark, keepTd = window.localToday;
+      try {
+        DRAFTS = {}; window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        const T = { curTotal: 100000, tax: 5000, retention: 0, cleanGross: 0, total: 105000, grand: 105000 };
+        INV = [{ id: 'r1', project: '測試收款案', client: '甲營造', periodNo: 1, date: '2026-09-25', quoteId: 'qR', totals: T, payDue: '2026-09-25', expectedRecvDate: '2026-10-05' },
+               { id: 'r2', project: '測試收款案', client: '甲營造', periodNo: 2, date: '2026-10-25', quoteId: 'qR', totals: T, expectedRecvDate: '2026-11-30' }];
+        out.bad = (await fyRecvDraft({ qid: 'qR' })).ok === false && (await fyRecvDraft({ qid: 'qR', amt: 100, kind: 'ticket' })).ok === false;
+        const o = _rvClean({ qid: 'qR', kind: 'cash', amt: 104970, date: '2026-10-12', fee: 30 });
+        out.find = _rvFind(o).id === 'r1';   // 沒給期別＝最早一張還有應收的
+        DRAFTS.rv111111 = { id: 'rv111111', type: 'recvSlip', by: 'ai@example.com', at: 1, status: 'pending', summary: '', payload: Object.assign(o, { invId: 'r1' }) };
+        const L = _decItems('recvIn');
+        out.card = L.length === 1 && /收齊/.test(_DEC.recvIn.body(L[0])) && /匯費 NT\$ 30/.test(_DEC.recvIn.detail(L[0]));
+        out.open = _DEC.recvIn.ok(L[0]) === 'open' && document.getElementById('receipt-amount').value === '104970' && document.getElementById('receipt-fee').value === '30' && document.getElementById('receipt-date').value === '2026-10-12' && INV[0].receivedConfirmed !== true && DRAFTS.rv111111.status === 'pending';
+        confirmReceipt();
+        out.saved = INV[0].receivedConfirmed === true && _invStOf(INV[0]) === 'paid' && DRAFTS.rv111111.status === 'applied' && (INV[0].receipts || []).some(x => x.amt === 104970);
+        // 期票：差額、扣款沒寫原因要提醒
+        DRAFTS.rv222222 = { id: 'rv222222', type: 'recvSlip', by: 'ai@example.com', at: 2, status: 'pending', summary: '', payload: _rvClean({ invId: 'r2', kind: 'ticket', amt: 60000, date: '2026-11-05', dueDate: '2027-01-05', ticketNo: 'AB001', deduct: 500 }) };
+        const det2 = _DEC.recvIn.detail(DRAFTS.rv222222);
+        out.diff = /還差 NT\$ 44,500/.test(det2) && /有扣款但沒寫原因/.test(det2) && /到期 2027-01-05/.test(det2);
+        _DEC.recvIn.ok(DRAFTS.rv222222); closeReceiptModal();
+        out.cancel = DRAFTS.rv222222.status === 'pending' && _RV_APPLY === null;   // 收款視窗取消＝草稿留著
+        // 催款：過了預計收款日還有應收
+        window.localToday = () => '2026-12-10';
+        const D = _decItems('dunning');
+        out.dun = D.length === 1 && D[0].inv.id === 'r2' && /逾期 10 天/.test(_DEC.dunning.head(D[0])) && /預計收款日 2026-11-30/.test(_DEC.dunning.detail(D[0]));
+        out.dunOk = _DEC.dunning.ok(D[0]) === true && INV[1].dunLog.length === 1 && INV[1].dunLog[0].next === '2026-12-17' && !_decItems('dunning').length;
+        window.localToday = () => '2026-12-18'; out.again = _decItems('dunning').length === 1;
+      } finally { INV = keepI; DRAFTS = keepD; window._draftMark = keepMark; window.localToday = keepTd; }
+      return out;
+    });
+    check('請款鏈 4 收款登錄卡：AI 讀匯款／期票對到最早有應收的那期、列差額（匯費、扣款要寫原因）；確認＝打開收款視窗帶好數字、視窗確認才入帳並標已套用、收齊狀態變已收款；取消＝草稿留著；逾期催款卡附預計收款日怎麼算、確認＝複製並記一筆、7 天後再提醒', Object.values(r).length === 10 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('請款鏈 4 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.221 進退料 M8b：鋼價追蹤 → 建議調整買價（中鋼盤價草稿為主、主計總處指數備援、都沒有出保底卡）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
