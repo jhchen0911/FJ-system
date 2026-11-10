@@ -14041,7 +14041,7 @@ async function newPage(browser, width, height) {
         // 收：待收請款單、逾期在前、下一步＝登錄收款
         acctTab('ar'); await T(120);
         const la = document.querySelector('#acct-p-ar > .acct-led');
-        out.ar = !!la && /範例營造/.test(la.textContent) && /第 2 期/.test(la.textContent) && /逾期待收/.test(la.textContent) && /登錄收款/.test(la.querySelector('button').textContent) && !document.querySelector('#acct-p-ap > .acct-led');
+        out.ar = !!la && /範例營造/.test(la.textContent) && /第 2 期/.test(la.textContent) && /逾期/.test(la.textContent) && /待收/.test(la.textContent) && (typeof window._invStOf !== "function" || /已送業主/.test(la.textContent)) && /登錄收款/.test(la.querySelector('button').textContent) && !document.querySelector('#acct-p-ap > .acct-led');
         // 主線請款單狀態上線後（_invStOf／_INV_ST_T）自動改用：草稿＝打開請款單、其他＝狀態＋待收
         const hadSt = typeof window._invStOf === 'function', oSt = window._invStOf, oT = window._INV_ST_T;
         if (!hadSt) { window._INV_ST_T = { draft: '草稿', sent: '已送業主', ok: '業主已確認', einv: '已開發票', paid: '已收款' }; window._invStOf = (v) => v.st || 'sent';
