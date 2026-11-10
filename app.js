@@ -41346,6 +41346,7 @@ function _todo5bItems(items){
   var ic=function(h){return '<svg class="ic ib" aria-hidden="true"><use href="#'+h+'"/></svg>';};
   if(!(_nav5On()&&_decIsAdmin()))(v.close||[]).forEach(function(x){items.push({type:'close_ready',urgent:false,jump:"openProj('"+x.qid+"')",icon:ic('i-check'),color:'var(--g3)',text:'可以確認結案：'+esc(x.name),sub:'保留款收回／尾款收齊、包商結清、材料退完'});});
   var by={};(v.rentSoon||[]).forEach(function(x){(by[x.qid]=by[x.qid]||{name:x.name,qid:x.qid,list:[]}).list.push(x);});
+  if(_nav5On()&&_decIsAdmin())by={};   // v6.0.227 新選單＋管理員：改由「租期快到期」拍板卡（附問業主的 LINE 文字）
   Object.keys(by).forEach(function(k){var g=by[k],min=Math.min.apply(null,g.list.map(function(x){return x.left;}));
     items.push({type:'rent_soon',urgent:min<=2,jump:"openProj('"+g.qid+"')",icon:ic('i-clock'),color:'#b26a00',text:'「'+esc(g.name)+'」'+g.list.length+' 個工項租期 '+(min===0?'今天':min+' 天內')+'到期',sub:'到期日 '+esc(g.list[0].expiry)+'；要延租或安排拔除'});});
 }
@@ -41397,7 +41398,7 @@ function _todo5cItems(items){
   if(v){
     (v.bill||[]).forEach(function(b){items.push({type:'bill_month',urgent:b.left<=1,jump:"openProj('"+escq(b.qid)+"')",icon:ic('i-receipt'),color:'#0D47A1',
       text:'本月要請款：'+esc(b.name)+'（'+(b.left===0?'今天':b.left+' 天後')+'截止 '+esc(b.cutDate.slice(5))+'）',sub:b.items.slice(0,3).map(function(x){return esc(x.desc.slice(0,14))+' '+fmt(x.qty)+esc(x.unit);}).join('、')+(b.items.length>3?' 等 '+b.items.length+' 項':'')});});
-    (v.overrun||[]).forEach(function(o){var mx=o.rows.reduce(function(a,r){return Math.max(a,r.pct);},0);
+    (_nav5On()&&_decIsAdmin()?[]:(v.overrun||[])).forEach(function(o){var mx=o.rows.reduce(function(a,r){return Math.max(a,r.pct);},0);
       items.push({type:'overrun',urgent:mx>=130,jump:"openProj('"+escq(o.qid)+"')",icon:ic('i-warn'),color:'var(--red)',text:'超支提醒：'+esc(o.name)+' '+o.n+' 個工項實際成本超過報價成本 10%（最高 '+mx+'%）',sub:o.rows.slice(0,2).map(function(r){return esc(r.desc.slice(0,14))+' '+r.pct+'%';}).join('、')});});
   }
   try{var vp=_vpPending();if(vp.length){var bad=0,rc={};vp.forEach(function(p){var k=_vpCheck(p,rc);if(k&&k.bad)bad++;});
@@ -41701,6 +41702,82 @@ _decReg('rfqDraft',{
   ok:function(r){return _rfqdOk(r);},
   reject:function(r){var q=r.q;if(!q.rfqDSkip||typeof q.rfqDSkip!=='object')q.rfqDSkip={};q.rfqDSkip[r.kind]=Date.now();_touch(q);persist();return true;},
   edit:function(r){try{_rfqQid=r.q.id;_rfqTab='rfq';go('rfq');setTimeout(function(){try{rfqNew();}catch(e){_err('rfqDraft.edit',e);}},60);}catch(e){_err('rfqDraft.edit',e);}}
+});
+// ══════════ v6.0.227 租期快到期卡＋超支拆解卡（陳軒 11/10 晚佇列第 3、4 件；新選單＋管理員時取代舊待辦 rent_soon／overrun）══════════
+// ① rentAsk：租期 7 天內到期（_todoBuild().rentSoon，還沒開始拔除）→ 每案一張：工項、到期日、含租期天數、逾期租金單價、業主聯絡方式、問什麼時候拔除的 LINE 草稿（對外語氣：不用「您」、不提包商）
+//    確認＝複製文字＋記「已問」q.rentAsked[工項]＝{expiry,at}（同一個到期日不再問）；退回＝這次不用問（一樣記，標 skip）；修改＝改文字
+// ② overAsk：超支（_todoBuild().overrun，實際成本 ≧ 報價成本 110%）→ 每案一張，逐工項拆成三塊（加起來＝實際成本－報價數量×成本單價）：
+//    數量差＝（實際數量－報價數量）×成本單價；租期差＝租金類成本（卡片 rental 或科目含「租金」）× 逾期天數÷（含租期＋逾期天數）；單價差＝其餘
+//    確認＝記「已知道」＋原因（q.overAck[工項]＝{pct,why,at}；超支比例再多 5% 才再出）；退回＝一樣記但不寫原因；修改＝開工程專案
+var _RENTASK_TXT={},_OVERASK_IN={};
+function _rentAskRows(){var v=null;try{v=_todoBuild();}catch(e){_err('_rentAskRows',e);}if(!v)return [];var by={};
+  (v.rentSoon||[]).forEach(function(x){var q=(Q||[]).find(function(y){return y&&y.id===x.qid;});if(!q)return;var a=(q.rentAsked||{})[x.idx];if(a&&a.expiry===x.expiry)return;(by[x.qid]=by[x.qid]||{q:q,list:[]}).list.push(x);});
+  return Object.keys(by).map(function(k){var g=by[k];g.left=Math.min.apply(null,g.list.map(function(x){return x.left;}));return g;}).sort(function(a,b){return a.left-b.left;});}
+function _rentAskText(g){
+  if(_RENTASK_TXT[g.q.id]!=null)return _RENTASK_TXT[g.q.id];
+  var q=g.q,who=String(q.contact||((CUSTOMERS||[]).find(function(x){return x&&x.name===q.client;})||{}).contact||'').trim();
+  var its=g.list.map(function(x){var it=(q.items||[])[x.idx]||{},d=_rentDaysOf(it);return '・'+x.desc+(d?' 含 '+d+' 天租期':'')+'，'+_qMD(x.expiry)+' 到期';}).join('\n');
+  return (who?who+' 好，':'')+'豐有工程這邊先確認一下「'+String(q.name||'')+'」的租期：\n'+its+'\n想請問預計什麼時候可以開始拔除？我們好先排好機具和人力，謝謝！';
+}
+function _rentAskDetail(g){
+  var q=g.q,rows=g.list.map(function(x){var it=(q.items||[])[x.idx]||{},d=_rentDaysOf(it),ot=parseFloat(it.ot)||0;
+    return '<tr><td style="overflow-wrap:anywhere">'+esc(x.desc)+'</td><td style="text-align:right">'+esc(String(it.qty||''))+' '+esc(it.unit||'')+'</td><td style="text-align:right">'+(d?d+' 天':'')+'</td><td style="text-align:right;white-space:nowrap">'+esc(_qMD(x.expiry))+'<div style="font-size:10.5px;color:'+(x.left<=2?'var(--red)':'var(--b4)')+'">'+(x.left===0?'今天':x.left+' 天後')+'</div></td><td style="text-align:right">'+(ot?fmt(ot)+(it.otUnit?' '+esc(_uFix(it.otUnit)):''):'<span style="color:var(--red)">沒填</span>')+'</td></tr>';}).join('');
+  var ct=_qContact(q);
+  return _qTbl([['工程',String(q.name||'')],['業主',String(q.client||'')],['租期結束算法',_rentEndMode(q)==='removeDone'?'拔除完成日':'拔除第一天']])
+    +'<table class="tbl" style="font-size:12px;width:100%;margin-top:6px;table-layout:fixed"><thead><tr><th>工項</th><th style="text-align:right">數量</th><th style="text-align:right">含租期</th><th style="text-align:right">到期</th><th style="text-align:right">逾期租金</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">業主聯絡方式</div>'+(ct.length?_qTbl(ct):'<div style="font-size:12px;color:var(--red)">報價和客戶資料都沒有聯絡方式</div>')
+    +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">問業主的 LINE 文字（確認＝複製）</div><div style="white-space:pre-wrap;font-size:12.5px;background:var(--gl);border-radius:6px;padding:6px 8px;overflow-wrap:anywhere">'+esc(_rentAskText(g))+'</div>'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">確認＝複製並記「已問」（同一個到期日不再出卡）；要延租就到工程專案改。</div>';
+}
+function _rentAskMark(g,skip){var q=g.q;if(!q.rentAsked||typeof q.rentAsked!=='object')q.rentAsked={};g.list.forEach(function(x){q.rentAsked[x.idx]={expiry:x.expiry,at:Date.now(),by:_meEmail()||'本機'};if(skip)q.rentAsked[x.idx].skip=1;});delete _RENTASK_TXT[q.id];_touch(q);persist();}
+_decReg('rentAsk',{
+  title:'租期快到期',todo:function(n){return '租期 7 天內到期 '+n+' 案';},sub:'確認＝複製問業主拔除時間的 LINE 文字並記已問',
+  canSee:function(){return _decIsAdmin();},
+  list:function(){return _rentAskRows();},
+  key:function(g){return g.q.id;},head:function(g){return '「'+String(g.q.name||'')+'」'+g.list.length+' 個工項租期 '+(g.left===0?'今天':g.left+' 天內')+'到期';},
+  body:function(g){return '<div style="font-size:11.5px;color:var(--b4)">'+esc(String(g.q.client||''))+'　最早 '+esc(_qMD(g.list.map(function(x){return x.expiry;}).sort()[0]))+'</div>';},
+  detail:function(g){return _rentAskDetail(g);},
+  ok:function(g){var t=_rentAskText(g);try{if(navigator.clipboard)navigator.clipboard.writeText(t).catch(function(e){_err('rentAsk.copy',e);});}catch(e){_err('rentAsk.copy',e);}_rentAskMark(g,false);toast('已複製，記下已問業主');return true;},
+  reject:function(g){_rentAskMark(g,true);return true;},
+  edit:function(g){var q=g.q;_modal('修改問業主的文字','<textarea id="rentask-txt" style="width:100%;min-height:160px;font-size:13px;font-family:inherit">'+esc(_rentAskText(g))+'</textarea>',function(){var v=String((document.getElementById('rentask-txt')||{}).value||'').trim();if(!v){toast('文字不能空白');return false;}_RENTASK_TXT[q.id]=v.slice(0,1000);try{_decRefresh('rentAsk');}catch(e){_err('rentAsk.edit',e);}});}
+});
+function _overSplit(q,o){
+  var em=null;try{em=FJC.todo.actQtyMap(q,(INV||[]).filter(function(i){return i&&(i.quoteId===q.id||(!i.quoteId&&i.project===q.name));}));}catch(e){_err('_overSplit.qty',e);}
+  var it=(q.items||[])[o.idx]||{},c0=parseFloat(it.estCost)||0,q0=Math.abs(parseFloat(it.qty)||0),qa=em?FJC.todo.effQty(em,it):q0,act=o.act;
+  var rentAct=0;(q.costs||[]).forEach(function(c){if(!c)return;var isR=!!c.rental||/租金/.test(String(c.cat||''));if(!isR)return;
+    if(c.type==='sub'&&c.rows&&c.rows.length)c.rows.forEach(function(r){if(+r.linkedItemIdx===o.idx)rentAct+=(parseFloat(r.qty)||0)*(parseFloat(r.unitPrice)||0);});else if(+c.linkedItemIdx===o.idx)rentAct+=parseFloat(c.amt)||0;});
+  var rs=null;try{rs=FJC.todo.rentStatus(q,o.idx,null,localToday());}catch(e){_err('_overSplit.rent',e);}
+  var rentD=(rs&&rs.overDays>0&&rentAct>0)?Math.round(rentAct*rs.overDays/(rs.days+rs.overDays)):0;
+  var qtyD=Math.round((qa-q0)*c0),tot=Math.round(act-q0*c0),unitD=tot-qtyD-rentD;
+  return {desc:o.desc,q0:q0,qa:qa,unit:it.unit||'',c0:c0,ca:qa>0?Math.round(act/qa*100)/100:0,act:Math.round(act),plan:Math.round(q0*c0),qtyD:qtyD,unitD:unitD,rentD:rentD,tot:tot,pct:o.pct,overDays:rs?rs.overDays:0,rentAct:Math.round(rentAct),idx:o.idx};
+}
+function _overAskRows(){var v=null;try{v=_todoBuild();}catch(e){_err('_overAskRows',e);}if(!v)return [];
+  return (v.overrun||[]).map(function(o){var q=(Q||[]).find(function(y){return y&&y.id===o.qid;});if(!q)return null;var ak=q.overAck||{};
+    var rows=o.rows.filter(function(r){var a=ak[r.idx];return !(a&&r.pct<(+a.pct||0)+5);});return rows.length?{q:q,rows:rows}:null;}).filter(Boolean);}
+function _overAskDetail(g){
+  var q=g.q,sp=g.rows.map(function(r){return _overSplit(q,r);}),k=g.q.id;
+  var cell=function(v){return '<td style="text-align:right;'+(v>0?'color:#b71c1c;font-weight:700':'')+'">'+(v?(v>0?'+':'')+fmt(v):'0')+'</td>';};
+  var body=sp.map(function(x){return '<tr><td style="overflow-wrap:anywhere">'+esc(x.desc)+'<div style="font-size:10.5px;color:var(--b4)">報價 '+fmt(x.q0)+' → 實際 '+fmt(x.qa)+' '+esc(x.unit)+'；成本單價 '+fmt(x.c0)+' → '+fmt(x.ca)+(x.overDays?'；逾期 '+x.overDays+' 天':'')+'</div></td><td style="text-align:right">'+fmt(x.plan)+'</td><td style="text-align:right">'+fmt(x.act)+'<div style="font-size:10.5px;color:var(--b4)">'+x.pct+'%</div></td>'+cell(x.qtyD)+cell(x.unitD)+cell(x.rentD)+'</tr>';}).join('');
+  var sum=function(f){return sp.reduce(function(a,x){return a+x[f];},0);};
+  var big=[['數量差',sum('qtyD')],['單價差',sum('unitD')],['租期差',sum('rentD')]].sort(function(a,b){return b[1]-a[1];})[0];
+  return _qTbl([['工程',String(q.name||'')],['超支工項',sp.length+' 項'],['最主要',big[1]>0?big[0]+' NT$ '+fmt(big[1]):'—']])
+    +'<table class="tbl" style="font-size:12px;width:100%;margin-top:6px;table-layout:fixed"><colgroup><col style="width:32%"><col><col><col><col><col></colgroup><thead><tr><th>工項</th><th style="text-align:right">報價成本</th><th style="text-align:right">實際</th><th style="text-align:right">數量差</th><th style="text-align:right">單價差</th><th style="text-align:right">租期差</th></tr></thead><tbody>'+body
+    +'<tr style="font-weight:700"><td>合計</td><td style="text-align:right">'+fmt(sum('plan'))+'</td><td style="text-align:right">'+fmt(sum('act'))+'</td>'+cell(sum('qtyD'))+cell(sum('unitD'))+cell(sum('rentD'))+'</tr></tbody></table>'
+    +'<div style="font-size:11px;color:var(--b4);margin-top:4px">報價成本＝報價數量×成本單價。數量差＝多做的數量×成本單價；租期差＝租金類成本裡逾期天數那一段；單價差＝其餘（包商單價、料價、損耗）。三塊加起來＝實際－報價成本。</div>'
+    +'<input placeholder="原因（例：業主追加 6 支、拔除延後 20 天）" value="'+esc((_OVERASK_IN[k]||''))+'" oninput="_OVERASK_IN[\''+esc(k)+'\']=String(this.value).slice(0,200)" style="width:100%;box-sizing:border-box;margin-top:6px;padding:6px 8px;border:1px solid var(--b2);border-radius:6px;font-size:13px">'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">確認＝記「已知道」和原因（超支再多 5% 才再出）；退回＝先不處理（一樣不再出，除非再多 5%）。</div>';
+}
+function _overAskMark(g,why){var q=g.q;if(!q.overAck||typeof q.overAck!=='object')q.overAck={};g.rows.forEach(function(r){q.overAck[r.idx]={pct:r.pct,why:why,at:Date.now(),by:_meEmail()||'本機'};});delete _OVERASK_IN[q.id];_touch(q);persist();}
+_decReg('overAsk',{
+  title:'超支',todo:function(n){return '超支 '+n+' 案待確認原因';},sub:'拆成數量差、單價差、租期差；確認＝記已知道和原因',
+  canSee:function(){return _decIsAdmin();},
+  list:function(){return _overAskRows();},
+  key:function(g){return g.q.id;},head:function(g){var mx=g.rows.reduce(function(a,r){return Math.max(a,r.pct);},0);return '超支：'+String(g.q.name||'')+' '+g.rows.length+' 個工項（最高 '+mx+'%）';},
+  body:function(g){return '<div style="font-size:11.5px;color:var(--b4)">'+esc(g.rows.slice(0,2).map(function(r){return r.desc.slice(0,14)+' '+r.pct+'%';}).join('、'))+'</div>';},
+  detail:function(g){return _overAskDetail(g);},
+  ok:function(g){var why=String(_OVERASK_IN[g.q.id]||'').trim();if(!why){toast('請寫一句原因');return false;}_overAskMark(g,why);toast('已記下');return true;},
+  reject:function(g,why){_overAskMark(g,'');return true;},
+  edit:function(g){try{openProj(g.q.id);}catch(e){_err('overAsk.edit',e);}}
 });
 // ══════════ v6.0.227 報價拍板卡加強（陳軒 11/10 晚佇列第 2 件；第 2 層：卡片只給建議）══════════
 // AI 報價草稿卡（drf_quote）明細多三塊：①三個價（底價、目標成交價＝payload.aim，報價＝草稿含稅合計）；②毛利（成本單價：AI 給的 payload.est ＞ 原報價同名工項的 estCost ＞ 歷史實際成本 _histCostFor；只有管理員看）；

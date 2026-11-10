@@ -10470,7 +10470,7 @@ async function newPage(browser, width, height) {
         Q[2].deduct.retDue = '2099-01-01'; out.manual = _retDueOf(Q[2]).src === 'manual' && _retDueOf(Q[2]).date === '2099-01-01'; delete Q[2].deduct.retDue;
         // 總覽：既有提醒照舊、5b 新增「可以確認結案」「租期 7 天內到期」
         go('dash'); updateDashTodo(); const t = document.getElementById('dash-todo-list').textContent;
-        out.dash = /提醒甲」1 個工項租期已逾期/.test(t) && /提醒甲 第\?期 逾期 5 天未收款/.test(t) && (/保留款逾期未退：提醒丙/.test(t) || /保留款到期可請回/.test(t)) && (/可以確認結案：提醒丁/.test(t) || /可以確認結案 \d+ 案/.test(t)) && /「提醒乙」1 個工項租期 \d 天內到期/.test(t) && /提醒丁 報價已進版至 v2/.test(t);
+        out.dash = /提醒甲」1 個工項租期已逾期/.test(t) && /提醒甲 第\?期 逾期 5 天未收款/.test(t) && (/保留款逾期未退：提醒丙/.test(t) || /保留款到期可請回/.test(t)) && (/可以確認結案：提醒丁/.test(t) || /可以確認結案 \d+ 案/.test(t)) && (/「提醒乙」1 個工項租期 \d 天內到期/.test(t) || /租期 7 天內到期 \d+ 案/.test(t)) && /提醒丁 報價已進版至 v2/.test(t);
         out.data = { quotes: Q.map(q => { const c = JSON.parse(JSON.stringify(q)); delete c.rfqs; return c; }), invoices: INV, sens: { t4: { rfqs: Q[3].rfqs } }, now: Date.now() };   // 測試頁的時鐘是假的（2026-10-15），雲端要用同一個「現在」
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 600); }
       window.toast = oT; return out;
@@ -10510,7 +10510,7 @@ async function newPage(browser, width, height) {
         // 付包商款核對：廠商累計請款 30 > 日報 22 → 差異；核准記人與時間
         const k = _vpCheck(PAYABLES[0]); out.vp = !!k && k.bad >= 1 && k.rows[0].vb === 30 && k.rows[0].reported === 22;
         go('dash'); updateDashTodo(); const t = document.getElementById('dash-todo-list').textContent;
-        out.dash = /本月要請款：月請甲/.test(t) && /超支提醒：月請甲 1 個工項/.test(t) && /付包商款待核准 1 筆（1 筆數量有差異）/.test(t);
+        out.dash = /本月要請款：月請甲/.test(t) && (/超支提醒：月請甲 1 個工項/.test(t) || /超支 \d+ 案待確認原因/.test(t)) && /付包商款待核准 1 筆（1 筆數量有差異）/.test(t);
         openVendorPayCheck('payc1_p1'); const mh = document.getElementById('gen-confirm-modal').innerHTML;
         out.modal = /廠商請款累計超過日報回報量/.test(mh) && document.getElementById('gen-confirm-ok').textContent === '有差異，仍核准';
         document.getElementById('gen-confirm-ok').click();
@@ -13345,6 +13345,45 @@ async function newPage(browser, width, height) {
     check('v6.0.224 舊 AI 草稿 5 種改拍板卡：報價、得標、發票照片、現場追加、客戶廠商各一張卡（施工日報歸主線）；展開看過明細才能確認；退回照舊；舊選單照舊走 AI 草稿清單', !r.err && r.cards && r.locked && r.qDetail && r.bid && r.con && r.line && r.old && r.rej, JSON.stringify(r));
     check('v6.0.224 發票對帳卡：買受人＋金額對上自動對到那一期打勾；差多少標紅；對不到列前 3 期讓 Lotion 選、沒選不能存；確認存發票紀錄（關聯期別、稅額、照片）＋請款單記交付方式與日期；同號碼不重存', !r.err && r.auto && r.pick3 && r.bad && r.noPick && r.saved && r.dup && r.reissue && r.need && r.mis && r.misOk && r.markFail, JSON.stringify(r));
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+  // ── v6.0.227 租期快到期卡＋超支拆解卡（陳軒 11/10 晚佇列第 3、4 件）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keep = { Q: Q, I: INV.slice(), C: CUSTOMERS.slice(), tb: window._todoBuild };
+      try {
+        localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_v7old');
+        window.toast = () => {};
+        const d = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+        CUSTOMERS.length = 0; CUSTOMERS.push({ id: 'cT1', name: '範例營造甲', contact: '範例張主任', tel: '02-2222-3333' });
+        Q = [{ id: 'qT1', code: 'T01', name: '範例租期案', client: '範例營造甲', awarded: true, _mt: 1,
+          items: [{ desc: '範例鋼樁打設', note: '含60天租期', unit: '支', qty: '20', price: '3000', ot: '12', otUnit: '支/天', estCost: '1800' }, { desc: '範例支撐組立', unit: '噸', qty: '10', price: '500', estCost: '100' }],
+          costs: [{ id: 'k1', type: 'sub', vendor: '範例工程行', rows: [{ linkedItemIdx: 1, qty: 12, unitPrice: 125 }] }] }];
+        INV.length = 0; INV.push({ id: 'iT1', quoteId: 'qT1', project: '範例租期案', items: [{ desc: '範例支撐組立', origContractQty: 10, contractQty: 12 }], totals: {}, _mt: 1 });
+        window._todoBuild = () => ({ rentSoon: [{ qid: 'qT1', name: '範例租期案', idx: 0, desc: '範例鋼樁打設', expiry: d(3), left: 3 }], overrun: [{ qid: 'qT1', name: '範例租期案', n: 1, rows: [{ idx: 1, desc: '範例支撐組立', est: 1200, act: 1500, pct: 125 }] }], close: [], bill: [] });
+        const items = []; _v6TodoItems(items);
+        out.cards = items.some((x) => x.type === 'dec_rentAsk') && items.some((x) => x.type === 'dec_overAsk') && !items.some((x) => x.type === 'rent_soon' || x.type === 'overrun');
+        const g = _rentAskRows()[0]; const x = document.createElement('div'); x.innerHTML = _DEC.rentAsk.detail(g); const t = x.textContent, txt = _rentAskText(g);
+        out.rentDetail = /範例鋼樁打設/.test(t) && /60 天/.test(t) && /3 天後/.test(t) && /12 支\/天/.test(t) && /範例張主任/.test(t) && /02-2222-3333/.test(t) && /範例張主任 好/.test(txt) && /什麼時候可以開始拔除/.test(txt) && !/您/.test(txt) && !/包商/.test(txt);
+        out.rentOk = _DEC.rentAsk.ok(g) === true && Q[0].rentAsked[0].expiry === d(3) && _rentAskRows().length === 0;
+        // 超支 1,500：報價成本 10×100＝1,000；數量差（12－10）×100＝200；單價差＝300；租期差 0
+        const o = _overAskRows()[0]; const sp = _overSplit(Q[0], o.rows[0]);
+        out.split = sp.plan === 1000 && sp.act === 1500 && sp.qtyD === 200 && sp.unitD === 300 && sp.rentD === 0 && sp.qtyD + sp.unitD + sp.rentD === sp.act - sp.plan;
+        const y = document.createElement('div'); y.innerHTML = _DEC.overAsk.detail(o); const t2 = y.textContent;
+        out.overDetail = /數量差/.test(t2) && /\+200/.test(t2) && /\+300/.test(t2) && /報價 10 → 實際 12/.test(t2) && !!y.querySelector('input');
+        out.needWhy = _DEC.overAsk.ok(o) === false;
+        _OVERASK_IN.qT1 = '業主追加 2 噸'; out.overOk = _DEC.overAsk.ok(o) === true && Q[0].overAck[1].why === '業主追加 2 噸' && _overAskRows().length === 0;
+        window._todoBuild = () => ({ rentSoon: [], overrun: [{ qid: 'qT1', name: '範例租期案', n: 1, rows: [{ idx: 1, desc: '範例支撐組立', est: 1200, act: 1700, pct: 131 }] }], close: [], bill: [] });
+        out.again = _overAskRows().length === 1;   // 再多 5% 以上再出
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keep.Q; INV.length = 0; keep.I.forEach((x) => INV.push(x)); CUSTOMERS.length = 0; keep.C.forEach((x) => CUSTOMERS.push(x)); window._todoBuild = keep.tb;
+      return out;
+    });
+    check('v6.0.227 租期快到期卡：新選單取代舊待辦；明細有工項、含租期、到期日、逾期租金、業主聯絡方式、問拔除時間的 LINE 文字（不用「您」、不提包商）；確認＝複製並記已問', !r.err && r.cards && r.rentDetail && r.rentOk, JSON.stringify(r));
+    check('v6.0.227 超支拆解卡：拆成數量差、單價差、租期差（加起來＝實際－報價成本）；確認要寫原因、記已知道；再多 5% 才再出', !r.err && r.split && r.overDetail && r.needWhy && r.overOk && r.again, JSON.stringify(r));
+    check('v6.0.227 租期／超支卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
   // ── v6.0.227 報價拍板卡加強（陳軒 11/10 晚佇列第 2 件）──
