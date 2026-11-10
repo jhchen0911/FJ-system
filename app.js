@@ -43239,7 +43239,7 @@ function _mvTagSet(qid,rid,patch){
 }
 function _mvTagPull(){if(typeof _fbDb==='undefined'||!_fbDb||typeof _fbUser==='undefined'||!_fbUser)return;
   _fbDb.ref('fydata/matTags').once('value').then(function(sn){var v=(sn&&sn.val())||{};Object.keys(v).forEach(function(k){var r=v[k],l=MAT_TAGS[k];if(r&&(!l||(+r._mt||0)>=(+l._mt||0)))MAT_TAGS[k]=r;});try{localStorage.setItem('fy_mattags',JSON.stringify(MAT_TAGS));}catch(e){_err('_mvTagPull',e);}_mvIdleRefresh();}).catch(function(e){console.warn('[退料提醒] 指定讀不到',e&&e.message);});
-  if(!_shWholeOk())_fbDb.ref('fydata/matIdle').once('value').then(function(sn){var v=sn&&sn.val();MAT_IDLE_SH=(v&&Array.isArray(v.list))?v.list:(v&&v.list?Object.values(v.list):[]);MAT_IDLE_AT=(v&&+v.at)||0;_mvIdleRefresh();}).catch(function(e){console.warn('[退料提醒] 清單讀不到',e&&e.message);});}
+  if(!_shWholeOk())_fbDb.ref('fydata/matIdle').once('value').then(function(sn){var v=sn&&sn.val();MAT_IDLE_SH=(v&&Array.isArray(v.list))?v.list:(v&&v.list?Object.values(v.list):[]);M8_OWN_SH=(v&&Array.isArray(v.own))?v.own:(v&&v.own?Object.values(v.own):[]);MAT_IDLE_AT=(v&&+v.at)||0;_mvIdleRefresh();}).catch(function(e){console.warn('[退料提醒] 清單讀不到',e&&e.message);});}
 function _mvIdleRefresh(){['mvIdle','mvIdleUrg','mvItemPick','mvStartUnknown'].forEach(function(k){try{_decRefresh(k);}catch(e){_err('_mvIdleRefresh',e);}});}
 // 某工項的拔除完成日（日報）
 function _mvItemDone(o){if(!o)return '';try{var pg=_itemProgress(o.q,o.i);return pg.removeDone||pg.stageRemove||'';}catch(e){_err('_mvItemDone',e);return '';}}
@@ -43281,8 +43281,9 @@ function _mvIdleAll(){if(_shWholeOk()||!(typeof _fbUser!=='undefined'&&_fbUser))
 // 管理員裝置：算好整份傳上去（內容沒變不傳）
 function _mvIdlePush(){
   if(!(typeof _fbDb!=='undefined'&&_fbDb&&typeof _fbUser!=='undefined'&&_fbUser&&_shWholeOk()&&_privReadOk===true)||window.FY_BETA)return;
-  var L=_mvIdleList(),h=_collHash(L);if(localStorage.getItem('fy_matidle_hash')===h)return;
-  _fbDb.ref('fydata/matIdle').set({at:Date.now(),by:_mvMe(),list:_cleanEnc({v:L}).v||[]}).then(function(){try{localStorage.setItem('fy_matidle_hash',h);}catch(e){/* 可忽略 */}}).catch(function(e){console.warn('[退料提醒] 清單沒傳上去',e&&e.message);});
+  var L=_mvIdleList(),O=[];try{O=_m8OwnList().map(function(x){return {id:x.id,rows:x.rows,truck:x.truck?{type:x.truck.type,why:''}:null};});}catch(e){_err('_mvIdlePush.m8',e);}   /* v6.0.214 自有料比對（沒有金額）一起傳給員工裝置 */
+  var h=_collHash({l:L,o:O});if(localStorage.getItem('fy_matidle_hash')===h)return;
+  _fbDb.ref('fydata/matIdle').set({at:Date.now(),by:_mvMe(),list:_cleanEnc({v:L}).v||[],own:_cleanEnc({v:O}).v||[]}).then(function(){try{localStorage.setItem('fy_matidle_hash',h);}catch(e){/* 可忽略 */}}).catch(function(e){console.warn('[退料提醒] 清單沒傳上去',e&&e.message);});
 }
 try{document.addEventListener('DOMContentLoaded',function(){[8000,25000,60000].forEach(function(ms){setTimeout(function(){try{_mvTagPull();_mvIdlePush();}catch(e){_err('_mvIdle.boot',e);}},ms);});});   /* 登入通常要幾秒，多試幾次 */
   setInterval(function(){try{_mvTagPull();_mvIdlePush();}catch(e){_err('_mvIdle.tick',e);}},180000);}catch(e){_err('_mvIdle.timer',e);}
@@ -43828,39 +43829,46 @@ try{setInterval(function(){try{_mbAutoTick();}catch(e){_err('_mbAuto.tick',e);}}
 // ④每季前 14 天一張統整卡 m8Qtr：上一季租金最高的前 5 種規格
 function _m8Cfg(){var c=MAT_MOVE_FIN['m8cfg'];return (c&&c.kind==='m8cfg')?c:{kind:'m8cfg',buy:{},salvage:'',store:'',acks:{}};}
 function _m8Save(c){c.kind='m8cfg';c._mt=Date.now();c.by=_mvMe();MAT_MOVE_FIN['m8cfg']=c;saveMatMoveFin();}
-function _m8Ack(k,v){var c=_m8Cfg();c.acks=Object.assign({},c.acks||{});c.acks[k]=v;_m8Save(c);}
+function _m8Ack(k,v){_mvTagSet('m8',k.replace(/[^A-Za-z0-9_-]/g,''),v.keep?{keep:1,why:v.why||''}:{ack:v.at||localToday()});}   /* 審查：確認紀錄放共用 matTags（逐筆，不會被另一台的買價表存檔蓋掉） */
+function _m8AckOf(k){var t=_mvTagOf('m8',k.replace(/[^A-Za-z0-9_-]/g,''));return t?{keep:t.keep,at:t.ack}:null;}
+function _m8Key(x){var k=_mvSpecKey(x)||String((x&&x.spec)||'').toUpperCase().replace(/[\s　]/g,'');return k.replace(/^FSP-?/,'');}   /* 審查：FSP-IV＝IV */
+function _m8RateD(sp){var rs=[];(Q||[]).forEach(function(q){if(q&&q.mat)_m6Arr(q.mat,'rents').forEach(function(rt){if(_m8Key(rt)===sp&&(parseFloat(rt.rate)||0)>0)rs.push(rt);});});if(!rs.length)return 0;rs.sort(function(a,b){return String(b.pf||'').localeCompare(String(a.pf||''));});return Math.round(parseFloat(rs[0].rate)/30*100)/100;}   /* 審查：跟買價表同一套規格寫法 */
 function _m8Rentable(it){var k=_mvIdleKind(it);return k==='pile'||k==='strut'||k==='deck';}
-function _m8Need(q){var L=[];_m6Items(q).forEach(function(o){if(!_m8Rentable(o.it))return;var mt=_m6ItemMat(o.it),qty=parseFloat(mt.qty)||0,len=parseFloat(mt.len)||0;if(!qty)return;
-  L.push({key:o.key,name:mt.name,spec:_mvSpecKey(mt)||mt.spec||'',len:len,qty:qty,m:Math.round(qty*len*100)/100,days:FJC.todo.rentDaysOf(o.it)||0,label:String(o.it.desc||'').split('\n')[0].slice(0,40)});});return L;}
+function _m8Need(q){var L=[];_m6Items(q).forEach(function(o){if(!_m8Rentable(o.it))return;if(!_matSpecOf(o.it.desc||''))return;   /* 審查：工項看不出規格就不算（不用預設 H350） */var mt=_m6ItemMat(o.it),qty=parseFloat(mt.qty)||0,len=parseFloat(mt.len)||0;if(!qty)return;
+  L.push({key:o.key,name:mt.name,spec:_m8Key(mt),len:len,qty:qty,m:Math.round(qty*len*100)/100,days:FJC.todo.rentDaysOf(o.it)||0,label:String(o.it.desc||'').split('\n')[0].slice(0,40)});});return L;}
 function _m8Started(q){var ids=[q.id].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;}).map(function(x){return x.id;}));
   if((Q||[]).some(function(x){return x&&ids.indexOf(x.id)>=0&&x.mat&&_m6Arr(x.mat,'rents').some(function(rt){return (rt.batches||[]).length;});}))return true;
   return (MAT_MOVES||[]).some(function(m){return m&&m.st==='ok'&&(ids.indexOf(m.qid)>=0||ids.indexOf(m.toQid)>=0);});}
-function _m8Fresh(){return (Q||[]).filter(function(q){return q&&q.awarded&&!q.parentId&&!q.closed&&!_m8Started(q);});}
+function _m8AwAt(q){try{var p=_prjOfQ(q.id);if(p&&p.awAt)return +p.awAt;}catch(e){_err('_m8AwAt',e);}return _prjAwAt(q);}
+function _m8Fresh(){var lim=Date.now()-60*864e5;return (Q||[]).filter(function(q){return q&&q.awarded&&!q.parentId&&!q.closed&&_m8AwAt(q)>=lim&&!_m8Started(q);});}   /* 審查：只看 60 天內得標的（上線當天不會整批跳出舊案） */
 function _m8Stock(n){var W=(MAT_LEDGER||[]).filter(function(r){return r&&r.name&&!r.projQid&&(!r.loc||r.loc==='公司倉庫')&&(parseFloat(r.qty)||0)>0&&r.cond!=='repair'&&r.cond!=='scrap';});
   return _mvLedMatch(W,{name:n.name,spec:n.spec,len:n.len}).rows.reduce(function(s,r){return s+(parseFloat(r.qty)||0);},0);}
 function _m8Truck(q){var p=[q.loc,q.name].filter(Boolean).join(' '),mx=0;_frtAll().forEach(function(t){var k=FJC.mv.frtRegion(t,p,'mult');if(k&&(t.mult||{})[k]>mx)mx=t.mult[k];});return mx?FJC.mv.truckFor(mx):null;}
 // ① 自有料
+var M8_OWN_SH=null;
+function _m8OwnAll(){if(_shWholeOk()||!(typeof _fbUser!=='undefined'&&_fbUser))return _m8OwnList();   /* 員工裝置讀不到台帳：讀管理員算好的那份（fydata/matIdle 的 own，沒有金額） */
+  return (M8_OWN_SH||[]).filter(function(x){var t=_mvTagOf(x.id,'m8own');return !(t&&(t.keep||t.ack));}).map(function(x){var q=(Q||[]).find(function(y){return y&&y.id===x.id;});return q?Object.assign({},x,{q:q}):null;}).filter(Boolean);}
 function _m8OwnList(){var L=[];_m8Fresh().forEach(function(q){var t=_mvTagOf(q.id,'m8own');if(t&&(t.keep||t.ack))return;
   var rows=_m8Need(q).map(function(n){var st=_m8Stock(n);return st>0?{label:n.name+' '+n.spec+(n.len?(' L='+n.len+'M'):''),need:n.qty,stock:st}:null;}).filter(Boolean);
   if(rows.length)L.push({id:q.id,q:q,rows:rows,truck:_m8Truck(q)});});return L;}
-function _m8SlipNote(m){try{if(!m||m.own!==false||m.dir!=='in')return '';var r=(m.items||[]).map(function(it){var st=_m8Stock({name:it.name,spec:_mvSpecKey(it)||it.spec,len:_mvNum(it.len)});return st>0?((it.name||'')+' '+(it.spec||'')+' 倉庫有 '+_rfmt(st)+' 支'):'';}).filter(Boolean);
+function _m8SlipNote(m){try{if(!m||m.own!==false||m.dir!=='in')return '';var r=(m.items||[]).map(function(it){var st=_m8Stock({name:it.name,spec:it.spec,len:_mvNum(it.len)});return st>0?((it.name||'')+' '+(it.spec||'')+' 倉庫有 '+_rfmt(st)+' 支'):'';}).filter(Boolean);
   return r.length?('<div style="font-size:11.5px;color:#b26a00">租料進場，但'+esc(r.join('、'))+'（可考慮用自有料）</div>'):'';}catch(e){_err('_m8SlipNote',e);return '';}}
 _decReg('m8Own',{
   title:'得標了：倉庫有自有料可以用',todo:function(n){return '得標案倉庫有自有料可用 '+n+' 案（租料前先看）';},sub:'確認＝會安排用自有料；退回＝不用（寫原因）；修改＝打開工程專案',
-  canSee:function(){return !_isReaderUser;},list:_m8OwnList,key:function(x){return x.id;},
+  canSee:function(){return !_isReaderUser;},list:_m8OwnAll,key:function(x){return x.id;},
   head:function(x){return (x.q.name||'')+'　倉庫有 '+x.rows.length+' 種同規格料';},
-  body:function(x){return '<div style="font-size:11.5px;color:var(--b4)">'+esc(x.rows.slice(0,3).map(function(r){return r.label+' 要 '+_rfmt(r.need)+'／倉庫 '+_rfmt(r.stock)+' 支';}).join('；'))+(x.truck?('；運送建議：'+(x.truck.type==='flat'?'平板車':'吊板車')+'（'+esc(x.truck.why)+'）'):'')+'</div>';},
+  body:function(x){return '<div style="font-size:11.5px;color:var(--b4)">'+esc(x.rows.slice(0,3).map(function(r){return r.label+' 要 '+_rfmt(r.need)+'／倉庫 '+_rfmt(r.stock)+' 支';}).join('；'))+(x.truck?('；運送建議：'+(x.truck.type==='flat'?'平板車':'吊板車')+(_decIsAdmin()?('（'+esc(x.truck.why)+'）'):'')):'')+'</div>';},
   detail:function(x){return '<div style="font-size:12.5px;line-height:1.7">'+x.rows.map(function(r){return esc(r.label)+'：這案要 '+_rfmt(r.need)+' 支，倉庫可用 '+_rfmt(r.stock)+' 支'+(r.stock>=r.need?'（夠）':'（不夠，差 '+_rfmt(r.need-r.stock)+' 支要租）');}).join('<br>')
-    +(x.truck?('<br>運送建議：<b>'+(x.truck.type==='flat'?'平板車':'吊板車')+'</b>（'+esc(x.truck.why)+'）'):'')+'<div style="color:var(--b4);margin-top:4px">只算倉庫裡「可用」的（要修、報廢的不算）。</div></div>';},
+    +(x.truck?('<br>運送建議：<b>'+(x.truck.type==='flat'?'平板車':'吊板車')+'</b>'+(_decIsAdmin()?('（'+esc(x.truck.why)+'）'):'')):'')+'<div style="color:var(--b4);margin-top:4px">只算倉庫裡「可用」的（要修、報廢的不算）。</div></div>';},
   ok:function(x){_mvTagSet(x.q.id,'m8own',{ack:localToday()});toast('已記：會安排用自有料');return true;},
   reject:function(x,why){_mvTagSet(x.q.id,'m8own',{keep:1,why:String(why||'不用').slice(0,200)});return true;},
   edit:function(x){openProj(x.q.id);}
 });
 // ② 租還是買（進料前）
-function _m8Pipe(spec,excl){var L=[];(Q||[]).forEach(function(q){if(!q||q.parentId||q.closed||q.id===excl)return;var on=q.awarded?!_m8Started(q):(!q.bidStatus||q.bidStatus==='nego');if(!on)return;
+function _m8Pipe(spec,excl){var L=[];(Q||[]).forEach(function(q){if(!q||q.parentId||q.closed||q.id===excl)return;var on=q.awarded?!_m8Started(q):(q.bidStatus==='nego'||(!q.bidStatus&&_prjDay(q.date)>=Date.now()-90*864e5));   /* 審查：報價中＝議價中，或 90 天內的待回覆 */if(!on)return;
   _m8Need(q).forEach(function(n){if(n.spec===spec)L.push({qid:q.id,name:q.name||'',awarded:!!q.awarded,m:n.m,days:n.days});});});return L;}
 function _m8RvbOf(q){var c=_m8Cfg(),S={};_m8Need(q).forEach(function(n){if(!(parseFloat((c.buy||{})[n.spec])>0))return;(S[n.spec]=S[n.spec]||[]).push(n);});
-  return Object.keys(S).map(function(sp){var mine=S[sp].map(function(n){return {m:n.m,days:n.days};}),oth=_m8Pipe(sp,q.id),rateD=_m6MarketRateD(sp);
+  return Object.keys(S).map(function(sp){var mine=S[sp].map(function(n){return {m:n.m,days:n.days};}),oth=_m8Pipe(sp,q.id),rateD=_m8RateD(sp);
     var r=FJC.mv.rentVsBuy({needs:mine.concat(oth),rateD:rateD,buyPerM:c.buy[sp],salvage:parseFloat(c.salvage)||0,store:c.store});
     return {spec:sp,mineM:mine.reduce(function(s,n){return s+n.m;},0),noDays:mine.some(function(n){return !n.days;}),oth:oth,rateD:rateD,r:r};});}
 _decReg('m8Rvb',{
@@ -43878,12 +43886,12 @@ _decReg('m8Rvb',{
   edit:function(){go('params');setTimeout(function(){try{prmTab('cost');}catch(e){_err('m8Rvb.edit',e);}},80);}
 });
 // ③ 進料後累計租金
-function _m8CumOf(sp,from,to){var tot=0;(Q||[]).forEach(function(q){if(!q||!q.mat)return;_m6Arr(q.mat,'rents').forEach(function(rt){if(_mvSpecKey(rt)!==sp&&_mvSpecKey({spec:rt.spec,name:rt.name})!==sp)return;tot+=FJC.mv.rentPeriod(rt.batches,from,to,parseFloat(rt.rate)||0).amt;});});return tot;}
+function _m8CumOf(sp,from,to){var tot=0;(Q||[]).forEach(function(q){if(!q||!q.mat)return;_m6Arr(q.mat,'rents').forEach(function(rt){if(_m8Key(rt)!==sp)return;tot+=FJC.mv.rentPeriod(rt.batches,from,to,parseFloat(rt.rate)||0).amt;});});return tot;}
 function _m8CumList(){var c=_m8Cfg(),td=localToday(),fr=_dAdd(td,-365),L=[];
-  Object.keys(c.buy||{}).forEach(function(sp){var bp=parseFloat(c.buy[sp])||0;if(!(bp>0))return;var ak=(c.acks||{})['cum_'+sp];if(ak&&(ak.keep||(ak.at&&FJC.mv.days(ak.at,td)<30)))return;
+  Object.keys(c.buy||{}).forEach(function(sp){var bp=parseFloat(c.buy[sp])||0;if(!(bp>0))return;var ak=_m8AckOf('cum_'+sp);if(ak&&(ak.keep||(ak.at&&FJC.mv.days(ak.at,td)<30)))return;
     var pipe=_m8Pipe(sp,''),bm=0;pipe.forEach(function(o){if(o.m>bm)bm=o.m;});
-    (Q||[]).forEach(function(q){if(q&&q.mat)_m6Arr(q.mat,'rents').forEach(function(rt){if(_mvSpecKey(rt)===sp){var a=_m6RentArrived(rt);if(a>bm)bm=a;}});});
-    var cum=_m8CumOf(sp,fr,td),rateD=_m6MarketRateD(sp),fut=pipe.reduce(function(s,o){return s+o.m*o.days*rateD;},0),buy=bm*bp;
+    (Q||[]).forEach(function(q){if(q&&q.mat)_m6Arr(q.mat,'rents').forEach(function(rt){if(_m8Key(rt)===sp){var a=_m6RentArrived(rt);if(a>bm)bm=a;}});});
+    var cum=_m8CumOf(sp,fr,td),rateD=_m8RateD(sp),fut=pipe.reduce(function(s,o){return s+o.m*o.days*rateD;},0),buy=bm*bp;
     var a=FJC.mv.buyAlert({cum:cum,buy:buy,future:fut,futureN:pipe.length});if(!a.show)return;
     var sv=Math.round(buy*(parseFloat(c.salvage)||0)/100);
     L.push({id:'cum_'+sp,spec:sp,cum:cum,buy:Math.round(buy),bm:bm,fut:Math.round(fut),n:pipe.length,a:a,sv:sv,store:c.store});});return L;}
@@ -43901,8 +43909,8 @@ _decReg('m8Cum',{
 // ④ 每季統整
 function _m8QtrKey(td){var y=+td.slice(0,4),m=+td.slice(5,7),q=Math.floor((m-1)/3);return q===0?((y-1)+'Q4'):(y+'Q'+q);}
 function _m8QtrRange(k){var y=+k.slice(0,4),q=+k.slice(5);var m0=(q-1)*3+1,fr=y+'-'+String(m0).padStart(2,'0')+'-01',ny=q===4?y+1:y,nm=q===4?1:m0+3;return {from:fr,to:_dAdd(ny+'-'+String(nm).padStart(2,'0')+'-01',-1)};}
-function _m8QtrList(){var td=localToday(),m=+td.slice(5,7),d=+td.slice(8,10);if((m-1)%3!==0||d>14)return [];var k=_m8QtrKey(td),c=_m8Cfg();if((c.acks||{})['qtr_'+k])return [];
-  var R=_m8QtrRange(k),S={};(Q||[]).forEach(function(q){if(q&&q.mat)_m6Arr(q.mat,'rents').forEach(function(rt){var sp=_mvSpecKey(rt)||rt.spec||'';if(!sp)return;S[sp]=(S[sp]||0)+FJC.mv.rentPeriod(rt.batches,R.from,R.to,parseFloat(rt.rate)||0).amt;});});
+function _m8QtrList(){var td=localToday(),m=+td.slice(5,7),d=+td.slice(8,10);if((m-1)%3!==0||d>14)return [];var k=_m8QtrKey(td),c=_m8Cfg();if(_m8AckOf('qtr_'+k))return [];
+  var R=_m8QtrRange(k),S={};(Q||[]).forEach(function(q){if(q&&q.mat)_m6Arr(q.mat,'rents').forEach(function(rt){var sp=_m8Key(rt);if(!sp)return;S[sp]=(S[sp]||0)+FJC.mv.rentPeriod(rt.batches,R.from,R.to,parseFloat(rt.rate)||0).amt;});});
   var top=Object.keys(S).map(function(k){return {spec:k,amt:S[k]};}).filter(function(x){return x.amt>0;}).sort(function(a,b){return b.amt-a.amt;}).slice(0,5);
   return top.length?[{id:'qtr_'+k,k:k,R:R,top:top}]:[];}
 _decReg('m8Qtr',{
@@ -43915,7 +43923,7 @@ _decReg('m8Qtr',{
   edit:function(){go('params');setTimeout(function(){try{prmTab('cost');}catch(e){_err('m8Qtr.edit',e);}},80);}
 });
 // 參數頁：買價表（只有管理員看得到；放「成本與廠商」最下面）
-function _m8Specs(){var S={},c=_m8Cfg();Object.keys(c.buy||{}).forEach(function(k){S[k]=1;});(Q||[]).forEach(function(q){if(!q)return;if(q.mat)_m6Arr(q.mat,'rents').forEach(function(rt){var k=_mvSpecKey(rt);if(k)S[k]=1;});});return Object.keys(S).sort();}
+function _m8Specs(){var S={},c=_m8Cfg();Object.keys(c.buy||{}).forEach(function(k){S[k]=1;});(Q||[]).forEach(function(q){if(!q)return;if(q.mat)_m6Arr(q.mat,'rents').forEach(function(rt){var k=_m8Key(rt);if(k)S[k]=1;});});return Object.keys(S).sort();}
 function _m8PrmHtml(){var c=_m8Cfg(),IN='width:100%;padding:5px 7px;border:1px solid var(--b2);border-radius:6px;font-family:inherit';
   return '<div style="font-size:11.5px;color:var(--b4);margin-bottom:6px">給「租還是買」提醒用；只有你看得到。規格寫法跟租賃單一樣（例：H300、H350、IV）。</div>'
     +'<table style="width:100%;font-size:12.5px"><thead><tr><th style="text-align:left">規格</th><th style="text-align:left">每 M 買價（未稅）</th></tr></thead><tbody id="m8-buy">'
@@ -43924,7 +43932,7 @@ function _m8PrmHtml(){var c=_m8Cfg(),IN='width:100%;padding:5px 7px;border:1px s
     +'<div class="f"><label>每批存放＋進出倉成本（元；沒有倉庫就空白）</label><input id="m8-st" type="number" inputmode="decimal" value="'+esc(String(c.store===0?'0':(c.store||'')))+'" style="'+IN+'"></div></div>'
     +'<button type="button" class="btn bp" style="margin-top:8px" onclick="_m8PrmSave()">儲存買價表</button>';}
 function _m8PrmSave(){var c=_m8Cfg(),b={},sp=document.querySelectorAll('#m8-buy .m8-sp'),bp=document.querySelectorAll('#m8-buy .m8-bp');
-  for(var i=0;i<sp.length;i++){var k=_mvSpecKey({spec:sp[i].value})||String(sp[i].value||'').trim().toUpperCase(),v=parseFloat(bp[i].value);if(k&&v>0)b[k.slice(0,20)]=v;}
+  for(var i=0;i<sp.length;i++){var k=_m8Key({spec:sp[i].value}),v=parseFloat(bp[i].value);if(k&&v>0)b[k.slice(0,20)]=v;}
   c.buy=b;var sv=gv('m8-sv');c.salvage=sv===''?'':Math.max(0,Math.min(100,parseFloat(sv)||0));var st=gv('m8-st');c.store=st===''?'':Math.max(0,parseFloat(st)||0);_m8Save(c);toast('已存買價表');
   var el=document.getElementById('m8-prm-body');if(el)el.innerHTML=_m8PrmHtml();try{['m8Rvb','m8Cum','m8Qtr'].forEach(function(k){_decRefresh(k);});}catch(e){_err('_m8PrmSave',e);}}
 function _m8PrmCard(){if(_isReaderUser||!_decIsAdmin())return null;var d=document.createElement('div');d.className='card';d.id='m8-prm-card';

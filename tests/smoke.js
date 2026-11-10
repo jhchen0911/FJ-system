@@ -11694,6 +11694,10 @@ async function newPage(browser, width, height) {
         // ① 得標後還沒進料：倉庫自有料比對（要修的不算）＋車型建議；已進料的案子（丙）不出
         let O = _decItems('m8Own'), o = O.find(x => x.id === 'qA214');
         out.own = O.length === 1 && !!o && o.rows[0].stock === 30 && o.rows[0].need === 10 && o.truck.type === 'flat' && /平板車/.test(_DEC.m8Own.body(o)) && !/NT\$/.test(_DEC.m8Own.detail(o));
+        // 審查：60 天前得標的舊案不出（上線當天不會整批跳出）；規格 FSP-IV＝IV
+        Q.push({ id: 'qD214', name: '範例舊案', date: '2025-01-01', client: '甲', awarded: true, items: [it], _mt: 1 });
+        out.old = !_decItems('m8Own').some(x => x.id === 'qD214') && _m8Key({ spec: 'FSP-IV' }) === 'IV' && _m8Key({ spec: 'H300x300' }) === 'H300';
+        Q.pop();
         out.ownAck = _DEC.m8Own.ok(o) === true && !_decItems('m8Own').length;
         // 租料進場簽收單再比一次（第二道防線）
         out.slip = /倉庫有 30 支/.test(_m8SlipNote({ own: false, dir: 'in', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 10 }] }));
@@ -11725,7 +11729,7 @@ async function newPage(browser, width, height) {
       } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; MAT_TAGS = keepT; window.localToday = keepTd; }
       return out;
     });
-    check('v6.0.214 進退料 M8a：得標未進料出自有料卡（要修的不算、不放金額、附車型建議）、租料進場再比一次、租還是買（沒填買價不出、含報價中同規格、存放成本未填）、累計租金 60% 出卡＋預估 80% 才建議買料、每季前 14 天統整前 5 名、參數頁買價表', r.own && r.ownAck && r.slip && r.noBuy && r.rvb && r.cumNo && r.cum && r.cumAck && r.qtr && r.qtrOff && r.prm, JSON.stringify(r));
+    check('v6.0.214 進退料 M8a：得標未進料出自有料卡（要修的不算、不放金額、附車型建議）、租料進場再比一次、租還是買（沒填買價不出、含報價中同規格、存放成本未填）、累計租金 60% 出卡＋預估 80% 才建議買料、每季前 14 天統整前 5 名、參數頁買價表', r.own && r.old && r.ownAck && r.slip && r.noBuy && r.rvb && r.cumNo && r.cum && r.cumAck && r.qtr && r.qtrOff && r.prm, JSON.stringify(r));
     check('v6.0.214 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
