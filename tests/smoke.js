@@ -13143,6 +13143,50 @@ async function newPage(browser, width, height) {
     check('v6.0.214 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.221 改版第 7 步 7c 加碼①：完工結算差異表（專案「完工結算」那一步逐項填結算書數量，跟累計請款比）──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepI = INV, keepP = PROJECTS;
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old');
+        Object.keys(localStorage).filter((k) => /^pj7_open_/.test(k)).forEach((k) => localStorage.removeItem(k));
+        Q = [{ id: 'qS1', name: '範例工程S1', client: '甲營造', code: 'S1', date: '2026-10-01', awarded: true, _mt: 1, costs: [],
+          items: [{ desc: '鋼軌樁打設', unit: '支', qty: 100, price: 1000 }, { desc: '水平支撐組立', unit: 'M', qty: 50, price: 500 }, { desc: '安全母索', unit: '式', qty: 1, price: 20000 }],
+          dailyLogs: [{ id: 'd1', date: '2026-10-20', progressRows: [{ itemIdx: 0, qty: 90 }] }] }];
+        INV = [{ id: 'iS1', quoteId: 'qS1', project: '範例工程S1', period: 1, items: [{ desc: '鋼軌樁打設', unit: '支', curQty: 90, price: 1000 }, { desc: '水平支撐組立', unit: 'M', curQty: 50, price: 500 }], _mt: 1 }];
+        PROJECTS = [];
+        _prjSync();
+        localStorage.setItem('pj7_open_settle', '1');
+        openProj('qS1'); await T(200);
+        const box = document.getElementById('pj-body-settle');
+        const ins = box ? box.querySelectorAll('input[data-stl]') : [];
+        out.rows = ins.length === 3;   // 合約工項都列（安全母索還沒請也列，結算書可能有）
+        out.emptyOk = !!box && !/金額影響（未稅）\+|差異 \d/.test(box.textContent.replace(/金額影響（未稅）\s*$/, ''));
+        // 結算書：鋼軌樁 85（比已請 90 少 5 → -5,000）、水平支撐 50（相符）
+        ins[0].value = '85'; stlSet(ins[0]); await T(120);
+        const ins2 = document.querySelectorAll('#pj-body-settle input[data-stl]'); ins2[1].value = '50'; stlSet(ins2[1]); await T(120);
+        const p = _prjOfQ('qS1');
+        out.saved = !!p && !!p.settle && Object.values(p.settle.q).sort().join(',') === '50,85' && !!p.settle.at && !('amt' in p.settle) && !JSON.stringify(p.settle).includes('5000');
+        const tx = document.getElementById('pj-body-settle').textContent;
+        out.diff = /-5/.test(tx) && /-5,000/.test(tx) && /業主扣減或少算/.test(tx) && /相符/.test(tx) && /已填 2／3 項/.test(tx) && /結算書未列此工項/.test(tx);
+        out.info = /結算書已填 2／3 項・差異 1 項、金額影響（未稅）-5,000/.test(_stlInfo(Q[0]));   // 步驟標題那一行（輪到這一步才顯示）
+        // 清空一格＝刪掉那項
+        const ins3 = document.querySelectorAll('#pj-body-settle input[data-stl]'); ins3[1].value = ''; stlSet(ins3[1]); await T(120);
+        out.clear = Object.keys(_prjOfQ('qS1').settle.q).length === 1;
+        out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
+        // 唯讀帳號：看得到、不能改
+        const oR = _isReaderUser; _isReaderUser = true; renderProj(); await T(80);
+        out.ro = !document.querySelector('#pj-body-settle input[data-stl]') && /85/.test(document.getElementById('pj-body-settle').textContent); _isReaderUser = oR;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; INV = keepI; PROJECTS = keepP; localStorage.removeItem('pj7_open_settle');
+      return out;
+    });
+    check('v6.0.221 完工結算差異表（寬 ' + W + '）：合約工項都列、逐項填結算書數量算出差多少與金額影響（未稅）、存在專案只存數量、清空＝刪掉、唯讀看得到不能改、手機不左右捲', !r.err && r.rows && r.saved && r.diff && r.info && r.clear && r.ro && r.noHScroll, JSON.stringify(r));
+    check('v6.0.221 完工結算測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

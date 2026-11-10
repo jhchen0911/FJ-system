@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.219';
+var APP_VERSION='v6.0.221';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -43927,7 +43927,7 @@ function _pj7Steps(q,st){
     {k:'log',l:'日報',done:stage||st.physPct>=99.5,info:st.logs.length?('日報 '+st.logs.length+' 篇・最近 '+(last.date||'')+(st.hasRep?('・進度 '+Math.round(st.physPct)+'%'):'')):'還沒有日報',body:function(){return _pjLogHtml(q,st);}},
     {k:'inv',l:'請款',done:billedOk,info:st.invs.length?('已請 '+st.invs.length+' 期 NT$ '+fmt(st.billed)+(st.ar>0?('・待收 '+fmt(st.ar)):'')):'還沒請款',body:function(){return _pjInvHtml(q,st);}},
     {k:'remove',l:'拆除拔樁',done:stage&&!st.rent.length,info:st.rent.length?('租期已過 '+st.rent.length+' 項（看「請款」的逾期租金）'):(stage?'已完工':'施工中')},
-    {k:'settle',l:'完工結算',done:st.done,info:st.done?'合約已完工結算':'還沒完工結算'},
+    {k:'settle',l:'完工結算',done:st.done,info:_stlInfo(q)||(st.done?'合約已完工結算':'還沒完工結算（營造廠結算書來了，在這裡逐項填數量對帳）'),body:function(){return _pjSettleHtml(q);}},
     {k:'ret',l:'保留款',done:!!q.closed||(st.done&&st.retHeld<=0),info:st.retHeld>0?('預扣中 NT$ '+fmt(st.retHeld)):'沒有預扣保留款'},
     {k:'close',l:'結案',done:!!q.closed,info:q.closed?('已結案 '+(q.closedAt?new Date(q.closedAt).toLocaleDateString('zh-TW'):'')):(st.done?'可以結案':'進行中'),body:function(){return _pjCloseHtml(q,st);}}
   ];
@@ -43962,6 +43962,50 @@ function _pj7Click(e){
   var open=!!document.getElementById('pj-body-'+k);
   try{localStorage.setItem('pj7_open_'+k,open?'0':'1');}catch(x){_err('_pj7Click',x);}
   renderProj();
+}
+// ══════════ 改版第 7 步 7c 加碼①：完工結算差異表（v6.0.221，估時表題 A 建議：結算書數量在專案「完工結算」那一步逐項手填）══════════
+// 存在專案資料 p.settle（shared；只存數量 q:{工項鍵:數量}、填的人與時間，不存金額）；工項鍵＝列號＋說明第一行雜湊（_stlKey），工項改說明就要重填
+// 算法 FJC.settle.diff（calc/settle.js）：結算書數量 − 豐有累計請款數量（_qtyRecon 的 billQ）、× 未稅單價＝金額影響（未稅）＋可能原因；日報累計一起比
+function _stlKey(it,i){var d=String((it&&it.desc)||'').split('\n')[0].trim(),h=5381;for(var k=0;k<d.length;k++)h=((h*33)^d.charCodeAt(k))>>>0;return 'i'+i+'_'+h.toString(36);}
+function _stlOf(q){var p=q&&_prjOfQ(q.id);return (p&&p.settle&&typeof p.settle==='object')?p.settle:null;}
+function _stlCalc(q){
+  var s=_stlOf(q),m=(s&&s.q)||{},rec=[];try{rec=_qtyRecon(q);}catch(e){_err('_stlCalc',e);}
+  var rows=rec.map(function(r){var it=(q.items||[])[r.idx]||{},k=_stlKey(it,r.idx),v=m[k];
+    return {idx:r.idx,key:k,desc:r.desc,unit:r.unit,price:parseFloat(it.price)||0,stmtQty:(v==null||v==='')?null:v,billedQty:r.billQ,dailyQty:r.hasDaily?r.reported:null,addQty:0};});
+  var res=FJC.settle.diff(rows);
+  res.rows.forEach(function(x,i){x.key=rows[i].key;});
+  res.filled=rows.filter(function(r){return r.stmtQty!=null;}).length;res.total=rows.length;
+  return res;
+}
+function _stlInfo(q){try{var R=_stlCalc(q);if(!R.filled)return '';return '結算書已填 '+R.filled+'／'+R.total+' 項・'+(R.nDiff?('差異 '+R.nDiff+' 項、金額影響（未稅）'+(R.sumAmt>0?'+':'')+fmt(R.sumAmt)):'全部相符');}catch(e){_err('_stlInfo',e);return '';}}
+function _pjSettleHtml(q){
+  var R=_stlCalc(q),s=_stlOf(q),ed=!_isReaderUser&&!!_prjOfQ(q.id);
+  if(!R.total)return '<div style="font-size:12px;color:var(--b3)">這個工程沒有可以結算的工項</div>';
+  var rows=R.rows.map(function(x){
+    var has=x.stmtQty!=null;
+    var inp=ed?'<input type="number" step="any" inputmode="decimal" data-stl="'+esc(x.key)+'" data-qid="'+esc(q.id)+'" onchange="stlSet(this)" value="'+(has?esc(String(x.stmtQty)):'')+'" placeholder="結算書數量" style="width:90px;text-align:right">':(has?_rfmt(x.stmtQty):'—');
+    var dif=has?(Math.abs(x.diff)>1e-6?'<b style="color:'+(x.diff<0?'var(--red)':'#1565C0')+'">'+(x.diff>0?'+':'')+_rfmt(x.diff)+'</b>':'<span style="color:var(--g3)">相符</span>'):'—';
+    var amt=has&&x.amt?('<b style="color:'+(x.amt<0?'var(--red)':'#1565C0')+'">'+(x.amt>0?'+':'')+fmt(x.amt)+'</b>'):'—';
+    var why=(has||R.filled)?(x.reasons||[]).map(esc).join('<br>'):'';
+    return [esc(x.desc),esc(x.unit),_rfmt(x.billedQty),x.dailyQty==null?'—':_rfmt(x.dailyQty),inp,dif,amt,'<span style="font-size:11px;color:var(--b4)">'+why+'</span>'];
+  });
+  var head='<div style="font-size:12px;color:var(--b4);margin:2px 0 8px">把營造廠結算書上的數量逐項填進「結算書」欄，系統跟豐有累計請款比，算出差多少、金額影響（未稅）和可能原因。'
+    +(R.filled?('<b style="color:var(--b5)">已填 '+R.filled+'／'+R.total+' 項；'+(R.nDiff?('差異 '+R.nDiff+' 項，金額影響（未稅）'+(R.sumAmt>0?'+':'')+'NT$ '+fmt(R.sumAmt)):'全部相符')+'</b>'):'')
+    +(s&&s.at?('<span style="color:var(--b3)">　最後填寫 '+esc(new Date(s.at).toLocaleString('zh-TW'))+(s.by?('（'+esc(s.by)+'）'):'')+'</span>'):'')+'</div>';
+  return head+_pjTable([{t:'工項'},{t:'單位'},{t:'豐有已請',r:1},{t:'日報累計',r:1},{t:'結算書',r:1},{t:'差多少',r:1},{t:'金額影響（未稅）',r:1},{t:'可能原因'}],rows,
+    R.filled?['合計','','','','','',(R.sumAmt>0?'+':'')+fmt(R.sumAmt),'']:null);
+}
+function stlSet(el){
+  if(_isReaderUser){toast('唯讀帳號不能修改');return;}
+  var qid=el.getAttribute('data-qid'),k=el.getAttribute('data-stl'),p=_prjOfQ(qid);if(!p||!k)return;
+  var raw=String(el.value||'').trim(),v=raw===''?null:parseFloat(raw);
+  if(raw!==''&&!isFinite(v)){toast('請填數字');return;}
+  var s=(p.settle&&typeof p.settle==='object')?p.settle:{};var m=Object.assign({},s.q||{});
+  if(v==null)delete m[k];else m[k]=Math.round(v*1000)/1000;
+  p.settle={q:m,at:Date.now(),by:_mvMe()};p._mt=Date.now();saveProjects();
+  var all=[].slice.call(document.querySelectorAll('input[data-stl]')),i=all.indexOf(el);
+  renderProj();
+  try{var nx=document.querySelectorAll('input[data-stl]')[i+1];if(nx)nx.focus();}catch(x){_err('stlSet.focus',x);}
 }
 // ══════════ v6.0.215 進退料 M8a：租還是買、自有料優先、車型建議（Lotion 11/10 定案）══════════
 // 設定（只有 Lotion）：MAT_MOVE_FIN['m8cfg']＝{kind:'m8cfg', buy:{規格:每 M 買價}, salvage:殘值率%, store:每批存放＋進出倉成本（空白＝沒填）, acks:{}}；參數頁「成本與廠商」最下面一張卡
