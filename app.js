@@ -41327,7 +41327,7 @@ function _bkRemindHtml(){
 function _todo5bItems(items){
   var v=_todoBuild();if(!v)return;
   var ic=function(h){return '<svg class="ic ib" aria-hidden="true"><use href="#'+h+'"/></svg>';};
-  (v.close||[]).forEach(function(x){items.push({type:'close_ready',urgent:false,jump:"openProj('"+x.qid+"')",icon:ic('i-check'),color:'var(--g3)',text:'可以確認結案：'+esc(x.name),sub:'保留款收回／尾款收齊、包商結清、材料退完'});});
+  if(!(_nav5On()&&_decIsAdmin()))(v.close||[]).forEach(function(x){items.push({type:'close_ready',urgent:false,jump:"openProj('"+x.qid+"')",icon:ic('i-check'),color:'var(--g3)',text:'可以確認結案：'+esc(x.name),sub:'保留款收回／尾款收齊、包商結清、材料退完'});});
   var by={};(v.rentSoon||[]).forEach(function(x){(by[x.qid]=by[x.qid]||{name:x.name,qid:x.qid,list:[]}).list.push(x);});
   Object.keys(by).forEach(function(k){var g=by[k],min=Math.min.apply(null,g.list.map(function(x){return x.left;}));
     items.push({type:'rent_soon',urgent:min<=2,jump:"openProj('"+g.qid+"')",icon:ic('i-clock'),color:'#b26a00',text:'「'+esc(g.name)+'」'+g.list.length+' 個工項租期 '+(min===0?'今天':min+' 天內')+'到期',sub:'到期日 '+esc(g.list[0].expiry)+'；要延租或安排拔除'});});
@@ -41769,6 +41769,65 @@ _decReg('retAsk',{
     showConfirm('修改給業主的 LINE 文字','<textarea id="ra-edit" data-ro-ok="1" style="width:100%;min-height:200px;box-sizing:border-box;font-size:12.5px">'+esc(t)+'</textarea><div style="font-size:11.5px;color:var(--b4);margin-top:4px">按確定先存起來，回到卡片再按「確認」才開請款單並複製</div>',function(){_RETASK_TXT[r.q.id]=String(gv('ra-edit')||'').slice(0,2000);_decReload('retAsk',r.q.id);},false,null,true);}
 });
 var _RETASK_TXT={};
+// ══════════ v6.0.224 結案拍板卡（陳軒全流程盤點第 10 名，Lotion 11/10；第 2 層：卡片只給證據）══════════
+// 「可以確認結案」（FJC.todo.build 的 close：尾款收齊或保留款收回、包商結清、材料退完）改成今天頁一張卡：
+//   明細＝三項結案條件的證據（各期請款收款、未退保留款、應付已付、工地材料）＋結案損益（請款未稅－施工成本）＋超支工項（實際成本 ≧ 報價成本 110%，同 5c）＋實際成本 CSV（逐工項）。
+//   確認＝走原本的結案（pjCloseAll：結算、結案、實績單價回寫單價庫、結案實績），還會再出一次確認視窗；退回＝這次先不結案（q.closeSkip，30 天內不再問）；修改＝打開工程專案。
+function _closeAskRows(){var v=null;try{v=_todoBuild();}catch(e){_err('_closeAskRows',e);}if(!v)return [];
+  return (v.close||[]).map(function(x){return (Q||[]).find(function(q){return q&&q.id===x.qid;});}).filter(function(q){if(!q||q.closed)return false;var sk=q.closeSkip;return !(sk&&(Date.now()-(+sk.at||0))<30*86400000);});}
+function _closeAskData(q){
+  var st=_pjStat(q),ids=st.all.map(function(x){return x.id;}),tx=_taxM();
+  var invs=st.invs.filter(function(i){return i.kind!=='retReturn';}).map(function(i){return {no:i.periodNo,date:i.date,gross:Math.round(_invGrossOf(i)),rcv:Math.round(_invRcv(i)),ar:Math.round(_invAR(i))};});
+  var ret=0;try{ret=_retPendRows(q).amt;}catch(e){_err('_closeAskData.ret',e);}
+  var pays=st.pays.filter(function(p){return !p.voidAt&&!p.planned;}),unpaid=pays.filter(function(p){return p.status!=='paid'&&(parseFloat(p.amount)||0)>0;});
+  var byV={};pays.forEach(function(p){var k=p.to||'（未填）',o=byV[k]=byV[k]||{to:k,n:0,eff:0,paid:0};o.n++;o.eff+=_payEff(p);o.paid+=_payPaidSum(p);});
+  var mats=(typeof MAT_LEDGER!=='undefined'?MAT_LEDGER:[]).filter(function(r){return r&&r.name&&(r.projQid===q.id||(!r.projQid&&q.name&&r.loc===q.name))&&(parseFloat(r.qty)||0)>0&&r.kind!=='一次性';});
+  var revNet=Math.round(st.billedGross/tx),cost=Math.round(st.costNet),gross=revNet-cost;
+  var U=(INV||[]).map(function(i){return _invUnpack(i);}).filter(function(i){return i.kind!=='retReturn'&&ids.some(function(id){return i.quoteId===id||i.sourceQid===id;});});
+  var ov=[];try{ov=FJC.todo.overrun(q,U,1.1);}catch(e){_err('_closeAskData.ov',e);}
+  var ci={map:{},unassigned:0};try{ci=FJC.todo.costByItem(q);}catch(e){_err('_closeAskData.ci',e);}
+  var stage=null;(q.dailyLogs||[]).forEach(function(L){if(L&&L.status==='stage'&&L.stageOf==='remove'){var d=L.stageDate||L.date||'';if(!stage||d>stage)stage=d;}});
+  return {st:st,invs:invs,ret:ret,pays:pays,unpaid:unpaid,byV:Object.keys(byV).map(function(k){return byV[k];}),mats:mats,revNet:revNet,cost:cost,gross:gross,ov:ov,ci:ci,ct:st.ct,stage:stage};
+}
+function _closeAskCsv(q,D){
+  var rows=[['工程','工項','單位','報價數量','報價成本單價','實際成本（未稅）']];
+  (q.items||[]).forEach(function(it,i){if(!it||it.sec)return;rows.push([q.name||'',String(it.desc||'').split('\n')[0],it.unit||'',it.qty||'',it.estCost||'',Math.round(D.ci.map[i]||0)]);});
+  if(D.ci.unassigned)rows.push([q.name||'','（沒有對到工項的成本）','','','',Math.round(D.ci.unassigned)]);
+  var cell=function(v){var t=String(v==null?'':v);if(typeof v==='string'&&/^[=+\-@]/.test(t))t="'"+t;return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
+  return '﻿'+rows.map(function(r){return r.map(cell).join(',');}).join('\n');
+}
+_decReg('closeAsk',{
+  title:'可以結案',todo:function(n){return '可以確認結案 '+n+' 案';},sub:'確認＝走結案流程（結算、實績單價回寫單價庫）；退回＝先不結案',urgent:false,
+  canSee:function(){return _decIsAdmin();},
+  list:function(){return _closeAskRows();},
+  key:function(q){return q.id;},head:function(q){return '可以結案：'+(q.code?q.code+' ':'')+(q.name||'');},
+  body:function(q){return '<div style="font-size:11.5px;color:var(--b4)">尾款／保留款收齊、包商結清、材料退完（展開看證據）</div>';},
+  detail:function(q){
+    var D=_closeAskData(q),adm=_decIsAdmin(),ok='<b style="color:var(--g)">✓</b> ',bad='<b style="color:var(--red)">✗</b> ';
+    var h='<div style="font-weight:700;font-size:13px;margin:2px 0">一、結案條件</div>';
+    h+='<div style="font-size:12.5px">'+(D.ct&&(D.ct.status==='completed'||D.ct.status==='done')?ok+'合約已完工'+(D.ct.end?'（'+esc(D.ct.end)+'）':''):D.stage?ok+'拔除完成 '+esc(D.stage):'— 完工：合約沒標完工')+'</div>';
+    var arSum=D.invs.reduce(function(a,x){return a+x.ar;},0);
+    h+='<div style="font-size:12.5px">'+(arSum?bad:ok)+'業主請款 '+D.invs.length+' 期，未收 NT$ '+fmt(arSum)+'；未退保留款 NT$ '+fmt(D.ret)+'</div>'
+      +'<table class="tbl" style="font-size:12px;width:100%"><thead><tr><th>期別</th><th>日期</th><th style="text-align:right">請款（含稅）</th><th style="text-align:right">已收</th><th style="text-align:right">未收</th></tr></thead><tbody>'
+      +D.invs.map(function(x){return '<tr><td>第 '+esc(String(x.no||'?'))+' 期</td><td>'+esc(x.date||'')+'</td><td style="text-align:right">'+fmt(x.gross)+'</td><td style="text-align:right">'+fmt(x.rcv)+'</td><td style="text-align:right'+(x.ar?';color:var(--red)':'')+'">'+fmt(x.ar)+'</td></tr>';}).join('')+'</tbody></table>';
+    h+='<div style="font-size:12.5px;margin-top:6px">'+(D.unpaid.length?bad:ok)+'包商與應付 '+D.pays.length+' 筆，未付 '+D.unpaid.length+' 筆</div>'
+      +(D.byV.length?'<div style="display:grid;grid-template-columns:1fr max-content;gap:2px 10px;font-size:12px">'+D.byV.map(function(v){return '<div style="overflow-wrap:anywhere">'+esc(v.to)+'（'+v.n+' 筆）</div><div style="text-align:right">'+(adm?'已付 '+fmt(Math.round(v.paid))+'／'+fmt(Math.round(v.eff)):(v.paid>=v.eff-1?'已付清':'未付清'))+'</div>';}).join('')+'</div>':'');
+    h+='<div style="font-size:12.5px;margin-top:6px">'+(D.mats.length?bad:ok)+'工地材料：'+(D.mats.length?D.mats.length+' 筆還在工地（'+D.mats.slice(0,4).map(function(r){return esc(r.name)+' '+esc(String(r.qty));}).join('、')+'）':'都退完了')+'</div>';
+    if(adm){
+      h+='<div style="font-weight:700;font-size:13px;margin:10px 0 2px">二、結案損益（未稅）</div><div style="display:grid;grid-template-columns:max-content 1fr;gap:2px 10px;font-size:12.5px">'
+        +'<div style="color:var(--b4)">請款營收</div><div>NT$ '+fmt(D.revNet)+'</div><div style="color:var(--b4)">施工成本</div><div>NT$ '+fmt(D.cost)+'</div>'
+        +'<div style="color:var(--b4)">毛利</div><div style="font-weight:800;color:'+(D.gross>=0?'var(--g3)':'var(--red)')+'">NT$ '+fmt(D.gross)+(D.revNet?'（'+(Math.round(D.gross/D.revNet*1000)/10)+'%）':'')+'</div></div>';
+      h+='<div style="font-weight:700;font-size:13px;margin:10px 0 2px">三、超支工項（實際成本 ≧ 報價成本 110%）</div>'
+        +(D.ov.length?'<table class="tbl" style="font-size:12px;width:100%"><thead><tr><th>工項</th><th style="text-align:right">報價成本</th><th style="text-align:right">實際</th><th style="text-align:right">％</th></tr></thead><tbody>'+D.ov.map(function(o){return '<tr><td style="overflow-wrap:anywhere">'+esc(o.desc)+'</td><td style="text-align:right">'+fmt(o.est)+'</td><td style="text-align:right">'+fmt(o.act)+'</td><td style="text-align:right;color:var(--red);font-weight:700">'+o.pct+'%</td></tr>';}).join('')+'</tbody></table>':'<div style="font-size:12.5px;color:var(--g3)">沒有超支的工項</div>');
+      h+='<div style="font-size:12.5px;margin-top:8px">四、實際成本：<a download="'+esc((q.name||'工程')+'_實際成本_'+localToday()+'.csv')+'" href="data:text/csv;charset=utf-8,'+encodeURIComponent(_closeAskCsv(q,D))+'">下載逐工項 CSV</a></div>';
+    }
+    h+='<div style="font-size:11.5px;color:var(--b4);margin-top:8px">確認＝打開原本的結案視窗（結算追加減、結案、各工項實績單價回寫單價庫、材料結案實績），在那裡再按一次確定。</div>';
+    return h;
+  },
+  ok:function(q){if(_roDeny())return false;pjCloseAll(q.id);return 'open';},
+  reject:function(q,why){if(_roDeny())return false;q.closeSkip={at:Date.now(),why:String(why||'').slice(0,200),by:_meEmail()};_touch(q);persist();try{updateDashTodo();}catch(e){_err('closeAsk.rej',e);}return true;},
+  edit:function(q){var m=document.getElementById('fy-modal');if(m)m.remove();openProj(q.id);}
+});
 function _retAskCopy(t){try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast('LINE 文字已複製');},function(){/* 可忽略：剪貼簿被擋 */});}catch(e){_err('_retAskCopy',e);}}
 // ── 整體日報（5d #8，雲端 dailyReport 建的 dailyOut 草稿）：確認＝複製文字並標已轉發、退回＝不轉發、修改＝改文字再複製 ──
 _decReg('dailyOut',{

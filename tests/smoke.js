@@ -13350,6 +13350,41 @@ async function newPage(browser, width, height) {
     check('v6.0.224 保留款請回卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.224 結案拍板卡（陳軒全流程盤點第 10 名）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keepI = INV.slice(), keepC = CONTRACTS, keepQ = Q, keepP = PAYABLES.slice();
+      try {
+        localStorage.removeItem('fy_nav_old'); window.toast = () => {}; let closeCalled = null; window.pjCloseAll = (id) => { closeCalled = id; };
+        Q = [{ id: 'qZ1', code: 'Z01', name: '範例可結案', client: '範例營造甲', awarded: true, items: [{ desc: '範例樁', unit: '支', qty: '10', price: '1000', estCost: '500' }, { desc: '範例支撐', unit: '噸', qty: '2', price: '3000', estCost: '1000' }], exs: [], rmk: {}, _mt: 1,
+          costs: [{ id: 'cZ1', type: 'sub', vendor: '範例廠商丁', rows: [{ linkedItemIdx: 0, qty: 10, unitPrice: 450 }, { linkedItemIdx: 1, qty: 2, unitPrice: 1500 }] }] },
+          { id: 'qZ2', code: 'Z02', name: '範例沒收完', client: '範例營造乙', awarded: true, items: [], exs: [], rmk: {}, _mt: 1 }];
+        INV.length = 0;
+        INV.push({ id: 'iZ1', quoteId: 'qZ1', project: '範例可結案', client: '範例營造甲', periodNo: 1, date: '2026-08-25', items: [], totals: { curTotal: 16000, tax: 800, total: 16800 }, received: '16800', receivedConfirmed: true, _mt: 1 });
+        INV.push({ id: 'iZ2', quoteId: 'qZ2', project: '範例沒收完', client: '範例營造乙', periodNo: 1, date: '2026-08-25', items: [], totals: { curTotal: 1000, tax: 50, total: 1050 }, received: '0', _mt: 1 });
+        CONTRACTS = [{ id: 'kZ1', name: '範例可結案', linkedQid: 'qZ1', status: 'completed', end: '2026-08-31', amount: 16800, _mt: 1 }, { id: 'kZ2', name: '範例沒收完', linkedQid: 'qZ2', status: 'completed', amount: 1050, _mt: 1 }];
+        PAYABLES.length = 0; PAYABLES.push({ id: 'pZ1', quoteId: 'qZ1', costId: 'cZ1', to: '範例廠商丁', amount: 7500, vat: true, status: 'paid', paidDate: '2026-09-05', paidAt: Date.now() - 864e5, _mt: 1 });
+        _todoBuildC = null;
+        const L = _DEC.closeAsk.list(); out.list = L.length === 1 && L[0].id === 'qZ1';
+        const it = []; _v6TodoItems(it); out.one = it.some((x) => x.type === 'dec_closeAsk') && !it.some((x) => x.type === 'close_ready');
+        const x = document.createElement('div'); x.innerHTML = _DEC.closeAsk.detail(L[0]); const t = x.textContent;
+        out.detail = /合約已完工/.test(t) && /未收 NT\$ 0/.test(t) && /未付 0 筆/.test(t) && /都退完了/.test(t) && /請款營收/.test(t) && /NT\$ 16,000/.test(t) && /施工成本/.test(t) && !!x.querySelector('a[download][href^="data:text/csv"]');
+        const csv = decodeURIComponent(x.querySelector('a[download]').getAttribute('href').split(',').slice(1).join(','));
+        out.csv = /範例樁,支,10,500,4500/.test(csv) && /範例支撐,噸,2,1000,3000/.test(csv);
+        out.ov = /範例支撐/.test(t) && /150%/.test(t);   // 實際 3000 ≧ 報價成本 2000 的 110%
+        out.ok = _DEC.closeAsk.ok(L[0]) === 'open' && closeCalled === 'qZ1';
+        await _DEC.closeAsk.reject(L[0], '等驗收'); out.skip = _DEC.closeAsk.list().length === 0 && !!Q[0].closeSkip;
+        localStorage.setItem('fy_nav_old', '1'); delete Q[0].closeSkip; _todoBuildC = null; const it2 = []; _v6TodoItems(it2); out.old = it2.some((x) => x.type === 'close_ready'); localStorage.removeItem('fy_nav_old');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      INV.length = 0; keepI.forEach((x) => INV.push(x)); CONTRACTS = keepC; Q = keepQ; PAYABLES.length = 0; keepP.forEach((p) => PAYABLES.push(p));
+      return out;
+    });
+    check('v6.0.224 結案拍板卡：可以結案才出卡（沒收完的不出）；明細有完工、各期收款、包商已付、材料退完、結案損益、超支工項、逐工項實際成本 CSV；確認走原本結案流程；退回先不結案；新選單舊待辦不重複、舊選單照舊', !r.err && r.list && r.one && r.detail && r.csv && r.ov && r.ok && r.skip && r.old, JSON.stringify(r));
+    check('v6.0.224 結案拍板卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
