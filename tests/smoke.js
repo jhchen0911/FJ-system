@@ -11572,6 +11572,49 @@ async function newPage(browser, width, height) {
     check('v6.0.208 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── v6.0.208 進退料 M5 防錯②：進出數量對不上（Lotion 11/10 選 A）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepM = MAT_MOVES, keepT = MAT_TAGS;
+      try {
+        MAT_TAGS = {}; MAT_MOVES = [];
+        Q = [{ id: 'qA208b', name: '範例甲', client: '甲', awarded: true, items: [], _mt: 1 }, { id: 'qB208b', name: '範例乙', client: '甲', awarded: true, items: [], _mt: 1 }];
+        let n = 0; const mk = o => { const m = Object.assign({ id: 'mv_b208_' + (++n), st: 'ok', own: true, conf: {}, _mt: 1 }, o); MAT_MOVES.push(m); return m; };
+        const H = q => [{ name: '型鋼', spec: 'H300', len: 9, qty: q }];
+        mk({ date: '2026-11-01', dir: 'in', qid: 'qA208b', items: H(20) });
+        mk({ date: '2026-11-03', dir: 'xfer', fromQid: 'qA208b', toQid: 'qB208b', items: H(5) });
+        const o1 = mk({ date: '2026-11-05', dir: 'out', qid: 'qA208b', items: H(15) });
+        mk({ st: 'draft', date: '2026-11-06', dir: 'out', qid: 'qA208b', items: H(9) });   // 待確認的不算
+        // 平常：甲 20−5−15＝0、乙 5 在場（沒結案）→ 都不出卡
+        out.none = !_decItems('mvNeg').length && !_decItems('mvLeft').length;
+        // ① 退的比送進去多 → 馬上出卡
+        o1.items[0].qty = 17;
+        let N = _decItems('mvNeg');
+        out.neg = N.length === 1 && N[0].qid === 'qA208b' && N[0].n === -2 && /在場 -2 支/.test(_DEC.mvNeg.head(N[0])) && /−17 支/.test(_DEC.mvNeg.detail(N[0]));
+        out.negOkBlock = _DEC.mvNeg.ok(N[0]) === false;
+        o1.items[0].qty = 15; out.negFixed = !_decItems('mvNeg').length;
+        // 租料和自有料分開算
+        mk({ own: false, date: '2026-11-05', dir: 'out', qid: 'qA208b', items: H(3) });
+        N = _decItems('mvNeg'); out.ownSplit = N.length === 1 && /租料/.test(N[0].label) && N[0].n === -3;
+        out.negKeep = _DEC.mvNeg.reject(N[0], '料從別案直接過來') === true && !_decItems('mvNeg').length;
+        // ② 結案前乙還有 5 支不出卡（交給退料提醒）；結案後出卡
+        out.notClosed = !_decItems('mvLeft').length;
+        Q[1].closed = true;
+        let Lf = _decItems('mvLeft');
+        out.left = Lf.length === 1 && Lf[0].qid === 'qB208b' && Lf[0].n === 5;
+        // 確認＝已安排（3 天內不再問）；退回＝寫原因不再問
+        out.ack = _DEC.mvLeft.ok(Lf[0]) === true && !_decItems('mvLeft').length;
+        MAT_TAGS[_mvTagId('qB208b', Lf[0].tid)].ack = _dAdd(localToday(), -4);
+        out.again = _decItems('mvLeft').length === 1;
+        out.keep = _DEC.mvLeft.reject(Lf[0], '留給下一案') === true && !_decItems('mvLeft').length;
+      } finally { Q = keepQ; MAT_MOVES = keepM; MAT_TAGS = keepT; }
+      return out;
+    });
+    check('v6.0.208 進退料 M5 進出數量對不上：只算已確認、轉場兩邊都算、退得比進得多馬上出卡（沒改好不能確認）、自有租料分開、退回寫原因不再問、沒結案的剩料不出卡、結案後還有剩出卡、已安排 3 天後再問', r.none && r.neg && r.negOkBlock && r.negFixed && r.ownSplit && r.negKeep && r.notClosed && r.left && r.ack && r.again && r.keep, JSON.stringify(r));
+    check('v6.0.208 數量對不上 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.203 進退料 M4a：租料簽收單確認後自動建／結租料批次 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

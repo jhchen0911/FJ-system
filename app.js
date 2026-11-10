@@ -43112,6 +43112,52 @@ _decReg('mvDup',{
     var L=String(m.dupOk||'').split(',').filter(Boolean);if(L.indexOf(x.a.id)<0)L.push(x.a.id);m.dupOk=L.slice(-10).join(',').slice(0,400);_mvSave(m);try{_mvLogAdd('edit',m,{why:'不是重複（和 '+(x.a.date||'')+' 那張不同）'});}catch(e){_err('mvDup.okLog',e);}return true;},
   edit:function(x){_mvEdit(_mvOf(x.b.id)||x.b);}
 });
+// ══════════ v6.0.208 進退料 M5 防錯②：進出數量對不上（Lotion 11/10 選 A）══════════
+// 每個工地 × 每種料（品名＋規格＋長度，自有／租料分開）：進場＋轉入 − 退場 − 轉出 ＝ 在場支數（只算已確認的簽收單）
+// ①在場變負的（退得比送進去多）→ 馬上出卡 mvNeg（工務＋Lotion，沒有金額）；②結案時還有剩 → 出卡 mvLeft（結案前的剩料交給 M4b 退料提醒，不重複）
+// 卡片狀態記在 fydata/matTags（id＝bal_…），工務、Lotion 都能寫
+function _mvBalKey(it,own){return [String(it.name||'').trim(),_mvSpecKey(it)||'',_mvNum(it.len),own===true?'自有':own===false?'租料':''].join('|');}
+function _mvBalLab(k){var p=k.split('|');return p[0]+' '+p[1]+(p[2]&&p[2]!=='0'?(' L='+p[2]+'M'):'')+(p[3]?('（'+p[3]+'）'):'');}
+function _mvBalHash(k){var h=5381;for(var i=0;i<k.length;i++)h=((h*33)^k.charCodeAt(i))>>>0;return 'b'+h.toString(36);}
+function _mvBalances(){var B={};
+  (MAT_MOVES||[]).forEach(function(m){if(!m||m.st!=='ok')return;var add=function(qid,sg){if(!qid)return;(m.items||[]).forEach(function(it){var n=_mvNum(it.qty);if(!n)return;var k=_mvBalKey(it,m.own),o=(B[qid]=B[qid]||{})[k]=B[qid][k]||{n:0,ids:[]};o.n+=sg*n;if(o.ids.indexOf(m.id)<0)o.ids.push(m.id);});};
+    if(m.dir==='in')add(m.qid,1);else if(m.dir==='out')add(m.qid,-1);else if(m.dir==='xfer'){add(m.fromQid,-1);add(m.toQid,1);}});
+  return B;}
+function _mvQClosed(qid){var q=(Q||[]).find(function(x){return x&&x.id===qid;});if(!q)return false;if(q.closed)return true;var p=q.parentId&&(Q||[]).find(function(x){return x&&x.id===q.parentId;});return !!(p&&p.closed);}
+function _mvBalList(kind){var B=_mvBalances(),L=[],today=localToday();
+  Object.keys(B).forEach(function(qid){Object.keys(B[qid]).forEach(function(k){var o=B[qid][k],n=Math.round(o.n*100)/100;
+    var neg=n<0,left=n>0&&_mvQClosed(qid);if(kind==='neg'?!neg:!left)return;
+    var tid=_mvBalHash(k+(neg?'|neg':'|left')),t=_mvTagOf(qid,tid);if(t&&t.keep)return;if(t&&t.ack&&FJC.mv.days(t.ack,today)<_MV_IDLE_WARN)return;
+    L.push({id:qid+'|'+tid,qid:qid,tid:tid,key:k,n:n,ids:o.ids.slice(-20),label:_mvBalLab(k)});});});
+  return L.sort(function(a,b){return String(_mvQName(a.qid)).localeCompare(String(_mvQName(b.qid)));});}
+function _mvBalDetail(x){var rows=x.ids.map(_mvOf).filter(Boolean).sort(function(a,b){return String(a.date||'').localeCompare(String(b.date||''));});
+  return '<div style="font-size:12.5px;line-height:1.7">'+esc(_mvQName(x.qid))+'　'+esc(x.label)+'：在場 <b>'+_rfmt(x.n)+'</b> 支<br>'
+    +rows.map(function(m){var n=0;(m.items||[]).forEach(function(it){if(_mvBalKey(it,m.own)===x.key)n+=_mvNum(it.qty);});var sg=m.dir==='in'||(m.dir==='xfer'&&m.toQid===x.qid)?'+':'−';return esc(m.date||'')+'　'+(_MV_DIR[m.dir]||'')+'　'+sg+_rfmt(n)+' 支'+(m.signer?('　簽收 '+esc(m.signer)):'');}).join('<br>')+'</div>';}
+function _mvBalEdit(x){var L=x.ids.map(_mvOf).filter(Boolean);if(!L.length){toast('找不到相關的簽收單');return;}
+  if(L.length===1){_mvEdit(L[0]);return;}
+  showConfirm('要改哪一張簽收單？','<select id="mvb-pick" style="width:100%">'+L.map(function(m){return '<option value="'+esc(m.id)+'">'+esc((m.date||'')+'　'+(_MV_DIR[m.dir]||'')+'　'+_mvSum(m))+'</option>';}).join('')+'</select>',function(){var m=_mvOf(gv('mvb-pick'));if(m)setTimeout(function(){_mvEdit(m);},50);},false,null,false);}
+_decReg('mvNeg',{
+  title:'退的比送進去的多',todo:function(n){return '進退料數量變負的 '+n+' 項（退得比送進去多，可能漏登進場單）';},sub:'確認＝已補登／改好；退回＝寫原因（例：料從別案直接過來）；修改＝改簽收單',
+  canSee:function(){return !_isReaderUser;},
+  list:function(){return _mvBalList('neg');},key:function(x){return x.id;},
+  head:function(x){return _mvQName(x.qid)+'　'+x.label+'　在場 '+_rfmt(x.n)+' 支';},
+  body:function(){return '<div style="font-size:11.5px;color:#c62828">退場（轉出）加起來比進場（轉入）多，通常是漏拍進場單或支數登錯</div>';},
+  detail:_mvBalDetail,
+  ok:function(x){var B=_mvBalances(),o=(B[x.qid]||{})[x.key];if(o&&o.n<0){toast('數量還是負的，請先按「修改」補登或改簽收單');return false;}return true;},
+  reject:function(x,why){_mvTagSet(x.qid,x.tid,{keep:1,why:String(why||'不用處理').slice(0,200)});return true;},
+  edit:_mvBalEdit
+});
+_decReg('mvLeft',{
+  title:'結案了還有料沒退',todo:function(n){return '結案的工地還有料沒退 '+n+' 項';},sub:'確認＝已安排退料或補登（3 天後再檢查）；退回＝寫原因（例：留給下一案、已報廢）；修改＝改簽收單',
+  canSee:function(){return !_isReaderUser;},
+  list:function(){return _mvBalList('left');},key:function(x){return x.id;},
+  head:function(x){return _mvQName(x.qid)+'　'+x.label+'　還在場 '+_rfmt(x.n)+' 支';},
+  body:function(){return '<div style="font-size:11.5px;color:#b26a00">工程已結案，進退料簿上這種料還沒退完</div>';},
+  detail:_mvBalDetail,
+  ok:function(x){_mvTagSet(x.qid,x.tid,{ack:localToday()});toast('已記：安排退料或補登（3 天後還沒對上會再提醒）');return true;},
+  reject:function(x,why){_mvTagSet(x.qid,x.tid,{keep:1,why:String(why||'不用處理').slice(0,200)});return true;},
+  edit:_mvBalEdit
+});
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
