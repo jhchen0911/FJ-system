@@ -162,7 +162,25 @@
     });
     return { amt: tot, rows: rows };
   }
-  var mv = { itemM: itemM, fromSlipDir: fromSlipDir, itemKey: itemKey, onSite: onSite, trips: trips, itemKg: itemKg, shareByKg: shareByKg, days: days, rentFor: rentFor, idleRent: idleRent, perMDay: perMDay, rentActual: rentActual, idleInMonth: idleInMonth, lossOf: lossOf, frtRegion: frtRegion, frtPerM: frtPerM, freightTrip: freightTrip, billDiff: billDiff, rentPeriod: rentPeriod };
+  // ── v6.0.215 M8 租還是買（Lotion 11/10）──
+  // 進料前整體評估：needs＝[{m, days}]（這案＋全公司同規格的需求：M 數 × 預估租期天數）、rateD＝每 M 每天租金、buyPerM＝每 M 買價、salvage＝殘值率（%）、store＝存放＋進出倉成本（null＝沒填）
+  //   買的批量＝需求裡最大的一筆 M 數（料可以一案用完再給下一案）；買的淨成本＝買價 × 批量 ×（1 − 殘值率）＋ 存放成本
+  function rentVsBuy(o) {
+    o = o || {}; var rent = 0, maxM = 0;
+    (o.needs || []).forEach(function (n) { var m = num(n && n.m), d = num(n && n.days); rent += m * d * num(o.rateD); if (m > maxM) maxM = m; });
+    var buy = maxM * num(o.buyPerM), sv = buy * num(o.salvage) / 100, st = o.store == null || o.store === '' ? null : num(o.store);
+    var net = buy - sv + (st || 0);
+    return { rent: Math.round(rent), buyM: r2(maxM), buy: Math.round(buy), salvage: Math.round(sv), store: st, net: Math.round(net), suggestBuy: buy > 0 && rent >= net && net > 0 };
+  }
+  // 進料後累計租金提醒（Lotion 11/10 定案）：累計 ≥ 買價 60% 出卡；加上之後案子的預估租金 > 80% 而且之後還有案子要用 → 建議買料，否則持續觀察
+  function buyAlert(o) {
+    o = o || {}; var b = num(o.buy); if (!(b > 0)) return { show: false, ratio: 0, proj: 0, advice: '' };
+    var ratio = num(o.cum) / b, proj = (num(o.cum) + num(o.future)) / b;
+    return { show: ratio >= 0.6, ratio: Math.round(ratio * 1000) / 10, proj: Math.round(proj * 1000) / 10, advice: proj > 0.8 && num(o.futureN) > 0 ? '建議買料' : '持續觀察' };
+  }
+  // 車型建議（Lotion 11/10 第 4 題 A）：運費價格表的地區加成 ≥ 1.6 算遠 → 平板車；近的 → 吊板車
+  function truckFor(mult) { var m = num(mult); return m >= 1.6 ? { type: 'flat', why: '遠（地區加成 ×' + m + '）' } : { type: 'crane', why: m > 0 ? '近（地區加成 ×' + m + '）' : '近' }; }
+  var mv = { itemM: itemM, fromSlipDir: fromSlipDir, itemKey: itemKey, onSite: onSite, trips: trips, itemKg: itemKg, shareByKg: shareByKg, days: days, rentFor: rentFor, idleRent: idleRent, perMDay: perMDay, rentActual: rentActual, idleInMonth: idleInMonth, lossOf: lossOf, frtRegion: frtRegion, frtPerM: frtPerM, freightTrip: freightTrip, billDiff: billDiff, rentPeriod: rentPeriod, rentVsBuy: rentVsBuy, buyAlert: buyAlert, truckFor: truckFor };
   if (typeof module !== 'undefined' && module.exports) module.exports = { mv: mv };
   if (root) { root.FJC = root.FJC || {}; root.FJC.mv = mv; }
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

@@ -11679,6 +11679,62 @@ async function newPage(browser, width, height) {
     check('v6.0.211 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── v6.0.215 進退料 M8a：得標後自有料優先、租還是買、累計租金 60%／80%、每季統整、車型建議（Lotion 11/10）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepM = MAT_MOVES, keepF = MAT_MOVE_FIN, keepL = MAT_LEDGER, keepT = MAT_TAGS, keepTd = window.localToday;
+      try {
+        MAT_MOVES = []; MAT_MOVE_FIN = {}; MAT_TAGS = {};
+        const TD = localToday(), D = n => _dAdd(TD, n);
+        MAT_LEDGER = [{ id: 'K1', name: '型鋼', spec: 'H300', len: 9, qty: 30, loc: '公司倉庫', date: '2026-01-01', price: 30, uw: 94, _mt: 1 }, { id: 'K2', name: '型鋼', spec: 'H300', len: 9, qty: 5, loc: '公司倉庫', cond: 'repair', _mt: 1 }];
+        const it = { desc: 'H型鋼樁 H300 L=9M（租期 120 天）', qty: 10, unit: '支', price: 1, cat: 'both' };
+        Q = [{ id: 'qA214', name: '範例甲', loc: '台中市西屯區', client: '甲', awarded: true, items: [it], _mt: 1 },
+          { id: 'qB214', name: '範例乙', client: '甲', awarded: false, bidStatus: 'nego', items: [Object.assign({}, it, { qty: 20 })], _mt: 1 },
+          { id: 'qC214', name: '範例丙', client: '甲', awarded: true, items: [it], _mt: 1, mat: { rows: [], use: [], loss: [], rents: [{ id: 'rc', vendor: '範例租賃', name: '型鋼', spec: 'H300', len: 9, rate: 30, batches: [{ id: 'bc', d: D(-200), m: 270, o: '' }] }] } }];
+        MAT_MOVE_FIN['frt_x'] = { id: 'frt_x', kind: 'frt', vendor: '範例運輸', base: { '台中': 16000 }, mult: { '台中': 1.8 }, perM: [], lenAdd: [] };
+        // ① 得標後還沒進料：倉庫自有料比對（要修的不算）＋車型建議；已進料的案子（丙）不出
+        let O = _decItems('m8Own'), o = O.find(x => x.id === 'qA214');
+        out.own = O.length === 1 && !!o && o.rows[0].stock === 30 && o.rows[0].need === 10 && o.truck.type === 'flat' && /平板車/.test(_DEC.m8Own.body(o)) && !/NT\$/.test(_DEC.m8Own.detail(o));
+        // 審查：60 天前得標的舊案不出（上線當天不會整批跳出）；規格 FSP-IV＝IV
+        Q.push({ id: 'qD214', name: '範例舊案', date: '2025-01-01', client: '甲', awarded: true, items: [it], _mt: 1 });
+        out.old = !_decItems('m8Own').some(x => x.id === 'qD214') && _m8Key({ spec: 'FSP-IV' }) === 'IV' && _m8Key({ spec: 'H300x300' }) === 'H300';
+        Q.pop();
+        out.ownAck = _DEC.m8Own.ok(o) === true && !_decItems('m8Own').length;
+        // 租料進場簽收單再比一次（第二道防線）
+        out.slip = /倉庫有 30 支/.test(_m8SlipNote({ own: false, dir: 'in', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 10 }] }));
+        // ② 租還是買：沒填買價不出卡；填了才出（這案＋報價中乙）
+        out.noBuy = !_decItems('m8Rvb').length;
+        _m8Save({ kind: 'm8cfg', buy: { H300: 600 }, salvage: 30, store: '', acks: {} });
+        const R = _decItems('m8Rvb'), rv = R[0];
+        out.rvb = R.length === 1 && rv.id === 'qA214' && rv.rows[0].oth.length === 1 && rv.rows[0].rateD === 1 && rv.rows[0].r.rent === (90 * 120 + 180 * 120) && /存放成本未填/.test(_DEC.m8Rvb.detail(rv)) && /不會自動下單/.test(_DEC.m8Rvb.detail(rv));
+        // ③ 累計租金：丙 270M × 1 元 × 201 天＝54,270；買一批＝最大 270M × 600＝162,000 → 33%，不出卡
+        out.cumNo = !_decItems('m8Cum').length;
+        MAT_MOVE_FIN.m8cfg.buy.H300 = 300;   // 買一批 81,000 → 67%：出卡；之後還有甲（已得標未進料）＋乙（報價中）→ 預估 > 80% → 建議買料
+        let C = _decItems('m8Cum');
+        out.cum = C.length === 1 && C[0].a.ratio >= 60 && C[0].a.advice === '建議買料' && /存放成本未填/.test(_DEC.m8Cum.detail(C[0])) && /殘值約/.test(_DEC.m8Cum.detail(C[0]));
+        out.cumAck = _DEC.m8Cum.ok(C[0]) === true && !_decItems('m8Cum').length;
+        // ④ 每季統整：每季第一個月 1～14 日才出
+        window.localToday = () => '2027-01-05';
+        const Qt = _decItems('m8Qtr');
+        out.qtr = Qt.length === 1 && Qt[0].k === '2026Q4' && Qt[0].top[0].spec === 'H300' && /買價每 M 300/.test(_DEC.m8Qtr.detail(Qt[0]));
+        window.localToday = () => '2027-01-20'; out.qtrOff = !_decItems('m8Qtr').length;
+        window.localToday = keepTd;
+        // 參數頁買價表（只有管理員）：改值存檔
+        go('params'); prmTab('cost');
+        const card = document.getElementById('m8-prm-card');
+        const ins = card ? card.querySelectorAll('#m8-buy .m8-bp') : [];
+        if (ins.length) ins[0].value = '650';
+        document.getElementById('m8-sv').value = '25'; document.getElementById('m8-st').value = '';
+        _m8PrmSave();
+        out.prm = !!card && _m8Cfg().buy.H300 === 650 && _m8Cfg().salvage === 25 && _m8Cfg().store === '';
+      } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; MAT_TAGS = keepT; window.localToday = keepTd; }
+      return out;
+    });
+    check('v6.0.215 進退料 M8a：得標未進料出自有料卡（要修的不算、不放金額、附車型建議）、租料進場再比一次、租還是買（沒填買價不出、含報價中同規格、存放成本未填）、累計租金 60% 出卡＋預估 80% 才建議買料、每季前 14 天統整前 5 名、參數頁買價表', r.own && r.old && r.ownAck && r.slip && r.noBuy && r.rvb && r.cumNo && r.cum && r.cumAck && r.qtr && r.qtrOff && r.prm, JSON.stringify(r));
+    check('v6.0.215 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.203 進退料 M4a：租料簽收單確認後自動建／結租料批次 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
