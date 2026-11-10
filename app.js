@@ -43116,11 +43116,14 @@ _decReg('mvDup',{
 // 每個工地 × 每種料（品名＋規格＋長度，自有／租料分開）：進場＋轉入 − 退場 − 轉出 ＝ 在場支數（只算已確認的簽收單）
 // ①在場變負的（退得比送進去多）→ 馬上出卡 mvNeg（工務＋Lotion，沒有金額）；②結案時還有剩 → 出卡 mvLeft（結案前的剩料交給 M4b 退料提醒，不重複）
 // 卡片狀態記在 fydata/matTags（id＝bal_…），工務、Lotion 都能寫
-function _mvBalKey(it,own){return [String(it.name||'').trim(),_mvSpecKey(it)||'',_mvNum(it.len),own===true?'自有':own===false?'租料':''].join('|');}
-function _mvBalLab(k){var p=k.split('|');return p[0]+' '+p[1]+(p[2]&&p[2]!=='0'?(' L='+p[2]+'M'):'')+(p[3]?('（'+p[3]+'）'):'');}
+function _mvBalKey(it,own,isM){var nm=String(it.name||'').trim();return [(_matNameOf(nm)||nm),_mvSpecKey(it)||'',_mvNum(it.len),own?'自有':'租料'].join('|')+(isM?'|M':'');}   /* 審查：品名照台帳的歸類（H型鋼／H型鋼樁同一種）；單位寫 M 的另外一格算 M */
+function _mvIsMU(it){return /^(M|m|米|公尺|ｍ|Ｍ)$/.test(String(it.unit||'').trim());}   /* 單位寫 M＝數量是 M 數，跟支數分開算 */
+function _mvOwnOf(m){return m.own===true||(m.own!==false&&!m.rentVendor);}   /* 審查：舊流程搬來的沒有 own，看有沒有租賃商 */
+function _mvBalLab(k){var p=k.split('|');return p[0]+' '+p[1]+(p[2]&&p[2]!=='0'?(' L='+p[2]+'M'):'')+(p[3]?('（'+p[3]+'）'):'')+(p[4]==='M'?'（以 M 計）':'');}
+function _mvBalU(x){return /\|M$/.test(x.key)?' M':' 支';}
 function _mvBalHash(k){var h=5381;for(var i=0;i<k.length;i++)h=((h*33)^k.charCodeAt(i))>>>0;return 'b'+h.toString(36);}
 function _mvBalances(){var B={};
-  (MAT_MOVES||[]).forEach(function(m){if(!m||m.st!=='ok')return;var add=function(qid,sg){if(!qid)return;(m.items||[]).forEach(function(it){var n=_mvNum(it.qty);if(!n)return;var k=_mvBalKey(it,m.own),o=(B[qid]=B[qid]||{})[k]=B[qid][k]||{n:0,ids:[]};o.n+=sg*n;if(o.ids.indexOf(m.id)<0)o.ids.push(m.id);});};
+  (MAT_MOVES||[]).forEach(function(m){if(!m||m.st!=='ok')return;var add=function(qid,sg){if(!qid)return;(m.items||[]).forEach(function(it){var n=_mvNum(it.qty),isM=_mvIsMU(it);if(!n)return;var k=_mvBalKey(it,_mvOwnOf(m),isM),o=(B[qid]=B[qid]||{})[k]=B[qid][k]||{n:0,ids:[]};o.n+=sg*n;if(o.ids.indexOf(m.id)<0)o.ids.push(m.id);});};
     if(m.dir==='in')add(m.qid,1);else if(m.dir==='out')add(m.qid,-1);else if(m.dir==='xfer'){add(m.fromQid,-1);add(m.toQid,1);}});
   return B;}
 function _mvQClosed(qid){var q=(Q||[]).find(function(x){return x&&x.id===qid;});if(!q)return false;if(q.closed)return true;var p=q.parentId&&(Q||[]).find(function(x){return x&&x.id===q.parentId;});return !!(p&&p.closed);}
@@ -43131,8 +43134,8 @@ function _mvBalList(kind){var B=_mvBalances(),L=[],today=localToday();
     L.push({id:qid+'|'+tid,qid:qid,tid:tid,key:k,n:n,ids:o.ids.slice(-20),label:_mvBalLab(k)});});});
   return L.sort(function(a,b){return String(_mvQName(a.qid)).localeCompare(String(_mvQName(b.qid)));});}
 function _mvBalDetail(x){var rows=x.ids.map(_mvOf).filter(Boolean).sort(function(a,b){return String(a.date||'').localeCompare(String(b.date||''));});
-  return '<div style="font-size:12.5px;line-height:1.7">'+esc(_mvQName(x.qid))+'　'+esc(x.label)+'：在場 <b>'+_rfmt(x.n)+'</b> 支<br>'
-    +rows.map(function(m){var n=0;(m.items||[]).forEach(function(it){if(_mvBalKey(it,m.own)===x.key)n+=_mvNum(it.qty);});var sg=m.dir==='in'||(m.dir==='xfer'&&m.toQid===x.qid)?'+':'−';return esc(m.date||'')+'　'+(_MV_DIR[m.dir]||'')+'　'+sg+_rfmt(n)+' 支'+(m.signer?('　簽收 '+esc(m.signer)):'');}).join('<br>')+'</div>';}
+  return '<div style="font-size:12.5px;line-height:1.7">'+esc(_mvQName(x.qid))+'　'+esc(x.label)+'：在場 <b>'+_rfmt(x.n)+'</b>'+_mvBalU(x)+'<br>'
+    +rows.map(function(m){var n=0;(m.items||[]).forEach(function(it){var q=_mvNum(it.qty),isM=_mvIsMU(it);if(_mvBalKey(it,_mvOwnOf(m),isM)===x.key)n+=q;});var sg=m.dir==='in'||(m.dir==='xfer'&&m.toQid===x.qid)?'+':'−';return esc(m.date||'')+'　'+(_MV_DIR[m.dir]||'')+'　'+sg+_rfmt(n)+_mvBalU(x)+(m.signer?('　簽收 '+esc(m.signer)):'');}).join('<br>')+'</div>';}
 function _mvBalEdit(x){var L=x.ids.map(_mvOf).filter(Boolean);if(!L.length){toast('找不到相關的簽收單');return;}
   if(L.length===1){_mvEdit(L[0]);return;}
   showConfirm('要改哪一張簽收單？','<select id="mvb-pick" style="width:100%">'+L.map(function(m){return '<option value="'+esc(m.id)+'">'+esc((m.date||'')+'　'+(_MV_DIR[m.dir]||'')+'　'+_mvSum(m))+'</option>';}).join('')+'</select>',function(){var m=_mvOf(gv('mvb-pick'));if(m)setTimeout(function(){_mvEdit(m);},50);},false,null,false);}
@@ -43140,7 +43143,7 @@ _decReg('mvNeg',{
   title:'退的比送進去的多',todo:function(n){return '進退料數量變負的 '+n+' 項（退得比送進去多，可能漏登進場單）';},sub:'確認＝已補登／改好；退回＝寫原因（例：料從別案直接過來）；修改＝改簽收單',
   canSee:function(){return !_isReaderUser;},
   list:function(){return _mvBalList('neg');},key:function(x){return x.id;},
-  head:function(x){return _mvQName(x.qid)+'　'+x.label+'　在場 '+_rfmt(x.n)+' 支';},
+  head:function(x){return _mvQName(x.qid)+'　'+x.label+'　在場 '+_rfmt(x.n)+_mvBalU(x);},
   body:function(){return '<div style="font-size:11.5px;color:#c62828">退場（轉出）加起來比進場（轉入）多，通常是漏拍進場單或支數登錯</div>';},
   detail:_mvBalDetail,
   ok:function(x){var B=_mvBalances(),o=(B[x.qid]||{})[x.key];if(o&&o.n<0){toast('數量還是負的，請先按「修改」補登或改簽收單');return false;}return true;},
@@ -43151,7 +43154,7 @@ _decReg('mvLeft',{
   title:'結案了還有料沒退',todo:function(n){return '結案的工地還有料沒退 '+n+' 項';},sub:'確認＝已安排退料或補登（3 天後再檢查）；退回＝寫原因（例：留給下一案、已報廢）；修改＝改簽收單',
   canSee:function(){return !_isReaderUser;},
   list:function(){return _mvBalList('left');},key:function(x){return x.id;},
-  head:function(x){return _mvQName(x.qid)+'　'+x.label+'　還在場 '+_rfmt(x.n)+' 支';},
+  head:function(x){return _mvQName(x.qid)+'　'+x.label+'　還在場 '+_rfmt(x.n)+_mvBalU(x);},
   body:function(){return '<div style="font-size:11.5px;color:#b26a00">工程已結案，進退料簿上這種料還沒退完</div>';},
   detail:_mvBalDetail,
   ok:function(x){_mvTagSet(x.qid,x.tid,{ack:localToday()});toast('已記：安排退料或補登（3 天後還沒對上會再提醒）');return true;},

@@ -11598,6 +11598,12 @@ async function newPage(browser, width, height) {
         mk({ own: false, date: '2026-11-05', dir: 'out', qid: 'qA208b', items: H(3) });
         N = _decItems('mvNeg'); out.ownSplit = N.length === 1 && /租料/.test(N[0].label) && N[0].n === -3;
         out.negKeep = _DEC.mvNeg.reject(N[0], '料從別案直接過來') === true && !_decItems('mvNeg').length;
+        // 審查：品名寫法不同（H型鋼／H型鋼樁）算同一種；舊流程搬來的（沒有 own、沒有租賃商）算自有；單位寫 M 的另一格
+        mk({ date: '2026-11-07', dir: 'in', qid: 'qB208b', items: [{ name: 'H型鋼樁', spec: 'H300', len: 9, qty: 4 }], legacy: 1, own: undefined });
+        mk({ date: '2026-11-08', dir: 'out', qid: 'qB208b', items: [{ name: '型鋼', spec: 'H300', len: 9, qty: 4 }] });
+        mk({ date: '2026-11-08', dir: 'out', qid: 'qB208b', items: [{ name: '鋼板樁', spec: 'IV', len: 9, qty: 18, unit: 'M' }] });
+        N = _decItems('mvNeg'); out.norm = N.length === 1 && /以 M 計/.test(N[0].label) && N[0].n === -18 && / M$/.test(_DEC.mvNeg.head(N[0]));
+        MAT_MOVES.pop();
         // ② 結案前乙還有 5 支不出卡（交給退料提醒）；結案後出卡
         out.notClosed = !_decItems('mvLeft').length;
         Q[1].closed = true;
@@ -11611,7 +11617,7 @@ async function newPage(browser, width, height) {
       } finally { Q = keepQ; MAT_MOVES = keepM; MAT_TAGS = keepT; }
       return out;
     });
-    check('v6.0.208 進退料 M5 進出數量對不上：只算已確認、轉場兩邊都算、退得比進得多馬上出卡（沒改好不能確認）、自有租料分開、退回寫原因不再問、沒結案的剩料不出卡、結案後還有剩出卡、已安排 3 天後再問', r.none && r.neg && r.negOkBlock && r.negFixed && r.ownSplit && r.negKeep && r.notClosed && r.left && r.ack && r.again && r.keep, JSON.stringify(r));
+    check('v6.0.208 進退料 M5 進出數量對不上：只算已確認、轉場兩邊都算、退得比進得多馬上出卡（沒改好不能確認）、自有租料分開、退回寫原因不再問、沒結案的剩料不出卡、結案後還有剩出卡、已安排 3 天後再問', r.none && r.neg && r.negOkBlock && r.negFixed && r.ownSplit && r.negKeep && r.norm && r.notClosed && r.left && r.ack && r.again && r.keep, JSON.stringify(r));
     check('v6.0.208 數量對不上 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
