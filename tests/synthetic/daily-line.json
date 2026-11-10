@@ -335,5 +335,176 @@
     ]
    ]
   }
+ ],
+ "adversarial_note": "第二個模型審查時找的刁鑽寫法（一段兩個數量、打設拔除同句、規格不符、千分位、範圍、累計、全形、國字百）；結果要對或標待確認，不准錯得很有把握",
+ "adversarial": [
+  {
+   "text": "今日打設H300 8支 鋼板樁 20支",
+   "expect": [
+    [
+     2,
+     8,
+     "install",
+     false
+    ],
+    [
+     0,
+     20,
+     "install",
+     false
+    ]
+   ]
+  },
+  {
+   "text": "鋼板樁III型 拔除 20支 H300 打設 6支",
+   "expect": [
+    [
+     1,
+     20,
+     "remove",
+     false
+    ],
+    [
+     2,
+     6,
+     "install",
+     false
+    ]
+   ]
+  },
+  {
+   "text": "鋼板樁III型打設 20支，明日拆除 10支",
+   "expect": [
+    [
+     0,
+     20,
+     "install",
+     false
+    ],
+    [
+     -1,
+     10,
+     "remove",
+     false
+    ]
+   ]
+  },
+  {
+   "text": "昨天打設的鋼板樁今天拔除 5支",
+   "expect": [
+    [
+     -1,
+     5,
+     "remove",
+     false
+    ]
+   ]
+  },
+  {
+   "text": "鋼板樁 III 型 打 20 支 拔 5 支",
+   "expect": [
+    [
+     0,
+     20,
+     "install",
+     false
+    ],
+    [
+     1,
+     5,
+     "remove",
+     false
+    ]
+   ]
+  },
+  {
+   "text": "鋼板樁 IV型 打設 5支",
+   "expect": [
+    [
+     -1,
+     5,
+     "install",
+     false
+    ]
+   ]
+  },
+  {
+   "text": "鋼板樁 III型 打設 1,200 支",
+   "expect": [
+    [
+     0,
+     1200,
+     "install",
+     false
+    ]
+   ]
+  },
+  {
+   "text": "鋼板樁 III型 打設 20-25支",
+   "expect": [
+    [
+     -1,
+     25,
+     "install",
+     false
+    ]
+   ]
+  },
+  {
+   "text": "鋼板樁III型打設 8支，累計 28支",
+   "expect": [
+    [
+     0,
+     8,
+     "install",
+     false
+    ],
+    [
+     -1,
+     28,
+     "install",
+     false
+    ]
+   ]
+  },
+  {
+   "text": "鋼板樁III型打設 １５支",
+   "expect": [
+    [
+     0,
+     15,
+     "install",
+     false
+    ]
+   ]
+  },
+  {
+   "text": "鋼板樁打設 一百二十支",
+   "expect": [
+    [
+     0,
+     120,
+     "install",
+     false
+    ]
+   ]
+  },
+  {
+   "text": "H300 打設 3支，續拔 2支",
+   "expect": [
+    [
+     2,
+     3,
+     "install",
+     false
+    ],
+    [
+     2,
+     2,
+     "remove",
+     false
+    ]
+   ]
+  }
  ]
 }

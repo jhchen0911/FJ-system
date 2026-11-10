@@ -11641,7 +11641,7 @@ async function newPage(browser, width, height) {
         out.notInList = !/今日打設鋼板樁/.test(_draftListHtml());
         out.ok = (await _DEC.dlQty.ok(L[0])) === true && DRAFTS.dq111111.status === 'applied';
         const D = Q[0].dailyLogs.find(x => x.date === '2026-10-14'), pr = (D && D.progressRows) || [];
-        out.rows = pr.length === 3 && pr[0].itemIdx === -1 && /【LINE】1\. 今日打設鋼板樁/.test(pr[0].note) && pr[1].itemIdx === 0 && pr[1].qty === 8 && pr[1].ph === 'install' && !pr[1].batchDone && pr[2].itemIdx === 2 && pr[2].qty === 5 && pr[2].batchDone === true && D.linePhotos.length === 1 && !!Q[0]._mt;
+        out.rows = pr.length === 3 && pr[0].itemIdx === -1 && /【LINE】1\. 今日打設鋼板樁/.test(pr[0].note) && pr[1].itemIdx === 0 && pr[1].qty === 8 && pr[1].ph === 'install' && !pr[1].batchDone && pr[2].itemIdx === 2 && pr[2].qty === 5 && !pr[2].batchDone && /H型鋼樁 H300/.test(pr[2].desc) && D.linePhotos.length === 1 && !!Q[0]._mt;   // 本段完成照日報表單：只有「拔除完成日」口徑的拔除列才記
         out.cum = _itemProgress(Q[0], 0).instQty === 33 || FJC.dl.cumOf(Q[0].dailyLogs, 0, 'install', x => _prPhase(Q[0], x)) === 33;
         // 修改：確認視窗裡可以逐列改工項／數量（地錨那列選「不記」）
         DRAFTS.dq222222 = { id: 'dq222222', type: 'dailyLog', by: 'line-bot', at: 2, status: 'pending', summary: '施工日報', payload: { qid: 'qD', date: '2026-10-15', answers: ['鋼板樁拔除 6 支'], photos: [] } };
@@ -11651,13 +11651,26 @@ async function newPage(browser, width, height) {
         document.getElementById('gen-confirm-ok').click(); await new Promise(res => setTimeout(res, 60));
         const D2 = Q[0].dailyLogs.find(x => x.date === '2026-10-15');
         out.edit = !!D2 && D2.progressRows.some(r => r.itemIdx === 1 && r.qty === 7 && r.ph === 'remove') && DRAFTS.dq222222.status === 'applied';
+        // 審查：這天已經有同工項的數量 → 加上去，不能蓋掉；卡片先講
+        DRAFTS.dq444444 = { id: 'dq444444', type: 'dailyLog', by: 'line-bot', at: 4, status: 'pending', summary: '施工日報', payload: { qid: 'qD', date: '2026-10-14', answers: ['下午鋼板樁打設 4 支'], photos: ['line/group/G1/2026-10-14/p1.jpg'] } };
+        out.dayHadCard = /這天已有 8，會加上去/.test(_DEC.dlQty.detail(DRAFTS.dq444444));
+        await _DEC.dlQty.ok(DRAFTS.dq444444);
+        const D3 = Q[0].dailyLogs.find(x => x.date === '2026-10-14'), r0 = D3.progressRows.filter(x => x.itemIdx === 0);
+        out.dayAdd = r0.length === 1 && r0[0].qty === 12 && D3.linePhotos.length === 1;
+        // 寫過但標記失敗 → 再按確認只補標記、不重寫
+        window._draftMark = () => Promise.resolve(false);
+        DRAFTS.dq555555 = { id: 'dq555555', type: 'dailyLog', by: 'line-bot', at: 5, status: 'pending', summary: '施工日報', payload: { qid: 'qD', date: '2026-10-16', answers: ['鋼板樁打設 2 支'], photos: [] } };
+        const f1 = await _DEC.dlQty.ok(DRAFTS.dq555555);
+        window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        const f2 = await _DEC.dlQty.ok(DRAFTS.dq555555), D5 = Q[0].dailyLogs.filter(x => x.date === '2026-10-16');
+        out.noDouble = f1 === false && f2 === true && D5.length === 1 && D5[0].progressRows.filter(x => x.itemIdx === 0)[0].qty === 2;
         // 對不到工程：確認不寫
         DRAFTS.dq333333 = { id: 'dq333333', type: 'dailyLog', by: 'line-bot', at: 3, status: 'pending', summary: '施工日報', payload: { qid: '', unmatched: true, site: '某地', date: '2026-10-15', answers: ['打設 3 支'] } };
         out.unmatched = /先按「修改」選工程/.test(_DEC.dlQty.body(DRAFTS.dq333333)) && _DEC.dlQty.ok(DRAFTS.dq333333) === false && DRAFTS.dq333333.status === 'pending';
       } finally { Q = keepQ; DRAFTS = keepD; window._draftMark = keepMark; }
       return out;
     });
-    check('v6.0.224 LINE 日報草稿拍板卡：拆出工項數量（打設／拔除、本段完成）、累計跟合約比超過標紅、拆不出的標待確認不寫、附原文與照片、不再列在 AI 草稿清單；確認才寫 progressRows；修改可逐列改；對不到工程不寫', Object.values(r).length === 9 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.224 LINE 日報草稿拍板卡：拆出工項數量（打設／拔除、本段完成）、累計跟合約比超過標紅、拆不出的標待確認不寫、附原文與照片、不再列在 AI 草稿清單；確認才寫 progressRows；修改可逐列改；對不到工程不寫', Object.values(r).length === 12 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

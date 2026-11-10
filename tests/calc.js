@@ -445,11 +445,11 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl, F = require(path.join(__dirname, 'synthetic', 'daily-line.json'));
   const score = (set) => { let ok = 0, tot = 0, miss = []; F[set].forEach((c, i) => { const R = DL.parse(c.text, F.items).rows; tot += c.expect.length; if (R.length !== c.expect.length) miss.push(set + i + ' 列數 ' + R.length + '≠' + c.expect.length);
     c.expect.forEach((e, j) => { const r = R[j]; if (r && r.itemIdx === e[0] && r.qty === e[1] && (e[0] < 0 || r.ph === e[2]) && r.batchDone === e[3]) ok++; else miss.push(set + i + '#' + j); }); }); return { ok, tot, miss }; };
-  const a = score('cases'), b = score('holdout');
-  console.log('  （LINE 日報拆數量準確度：cases ' + a.ok + '/' + a.tot + '、holdout ' + b.ok + '/' + b.tot + '）');
-  check('LINE 日報拆數量：合成日報 20 則逐列對（工項、數量、打設／拔除、本段完成；對不到或兩個一樣像＝待確認 -1）', !a.miss.length && !b.miss.length, a.miss.concat(b.miss).join('、'));
+  const a = score('cases'), b = score('holdout'), c3 = score('adversarial');
+  console.log('  （LINE 日報拆數量準確度：cases ' + a.ok + '/' + a.tot + '、holdout ' + b.ok + '/' + b.tot + '、審查刁鑽寫法 ' + c3.ok + '/' + c3.tot + '）');
+  check('LINE 日報拆數量：合成日報 32 則逐列對（工項、數量、打設／拔除、本段完成；對不到、兩個一樣像、範圍、累計、昨天明天＝待確認 -1）', !a.miss.length && !b.miss.length && !c3.miss.length, a.miss.concat(b.miss, c3.miss).join('、'));
   const its = F.items;
-  check('LINE 日報拆數量：規格數字（H350）、L=12M、第 2 層、怪手 1 台、人數不算數量；國字數量（十五支）', DL.parse('H350 支撐 架設 72 公尺', its).rows[0].qty === 72 && DL.parse('鋼板樁打設 L=12M 共 8 支', its).rows[0].qty === 8 && !DL.parse('怪手1台', its).rows.length && DL.cn2n('十五') === 15 && DL.cn2n('二十') === 20 && DL.cn2n('三') === 3);
+  check('LINE 日報拆數量：規格數字（H350）、L=12M、第 2 層、怪手 1 台、人數不算數量；國字數量（十五支）', DL.parse('H350 支撐 架設 72 公尺', its).rows[0].qty === 72 && DL.parse('鋼板樁打設 L=12M 共 8 支', its).rows[0].qty === 8 && !DL.parse('怪手1台', its).rows.length && DL.cn2n('十五') === 15 && DL.cn2n('二十') === 20 && DL.cn2n('三') === 3 && DL.cn2n('一百') === 100 && DL.cn2n('兩百三十') === 230 && DL.norm('１,２００') === '1200');
   const logs = [{ date: '2026-11-01', progressRows: [{ itemIdx: 0, qty: 100 }, { itemIdx: 0, qty: 5, ph: 'remove' }] }, { date: '2026-11-02', photoOnly: true, progressRows: [{ itemIdx: 0, qty: 9 }] }];
   check('LINE 日報拆數量：累計只算確認過的日報（只有照片的不算）、打設拔除分開', DL.cumOf(logs, 0, 'install', (r) => r.ph === 'remove' ? 'remove' : 'install') === 100 && DL.cumOf(logs, 0, 'remove', (r) => r.ph === 'remove' ? 'remove' : 'install') === 5);
 }
