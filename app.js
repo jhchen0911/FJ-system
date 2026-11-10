@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.213';
+var APP_VERSION='v6.0.214';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -11365,7 +11365,7 @@ function _toolPv(id,title,proj,body,opts){
   var h=document.getElementById(id);if(!h)return 0;
   try{return _a4Pv(h,_toolDocCss(opts),_toolDocHtml(title,proj,body),{landscape:!!(opts&&opts.landscape),cls:'page-wrap'});}catch(e){_err('_toolPv',e);return 0;}
 }
-// ══════════ 改版第 7 步①：共用 A4 單據引擎——報價、請款、合約、詢價單（v6.0.212）══════════
+// ══════════ 改版第 7 步①：共用 A4 單據引擎——報價、請款、合約、詢價單（v6.0.213）══════════
 // 一張單據＝一個「出件」函式（out），交出 {html 完整文件, fname 檔名, ls 橫式, native 原生列印}；
 // 「匯出 PDF」（_docPrint → _printViaIframe）與「右邊即時預覽」（_docPv）都用同一份 html，所以預覽＝PDF。
 // 各 out 的內容就是原本列印函式的內容（逐字搬過來），印出來一字不差：tools/golden/doc-print.js 逐張比指紋（tests/synthetic/docs.json）。
@@ -43246,7 +43246,7 @@ _decReg('mvStartUnknown',{
   reject:function(e,why){_mvTagSet(e.qid,e.rt,{keep:1,why:String(why||'不用提醒').slice(0,200)});return true;},
   edit:function(e){var q=(Q||[]).find(function(x){return x&&x.id===e.qid;});var L=q?_m6Items(q):[];if(!L.length){toast('這案沒有工項可以指定');return;}e=Object.assign({},e,{items:L.map(function(o){return {key:o.key,label:String(o.it.desc||'').split('\n')[0].slice(0,40)};})});_mvItemPick(e);}
 });
-// ══════════ 改版第 7 步②：5 個入口（今天、專案、報價、帳務、更多）＋「今天要做的事」（v6.0.213）══════════
+// ══════════ 改版第 7 步②：5 個入口（今天、專案、報價、帳務、更多）＋「今天要做的事」（v6.0.214）══════════
 // 桌面左側與手機下方列都只放 5 個；其餘頁面收在「更多」（page-more）。舊選單保留：「更多 › 切回舊版選單」＝本機 fy_nav_old='1'，
 // 舊選單最下面有「改用新版選單」切回來。只換選單與首頁的呈現，頁面本身、資料、權限都不動（canAccess 照舊）。
 function _nav5On(){try{return localStorage.getItem('fy_nav_old')!=='1';}catch(e){return true;}}
