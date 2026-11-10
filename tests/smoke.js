@@ -11817,7 +11817,7 @@ async function newPage(browser, width, height) {
         document.getElementById('m8-sv').value = '25'; document.getElementById('m8-st').value = '';
         _m8PrmSave();
         out.prm = !!card && _m8BuyPerM('H300') === 650 && _m8BuyPerM('H350') === 30 * 135 && _m8BuyPerM('IV') === 0 && _m8Cfg().salvage === 25 && _m8Cfg().store === ''
-          && _m8Cats().length === 5 && _m8CatFor('H588').name === '特殊型鋼' && _m8Cats().find(x => x.id === 'h').ref.ym === TD.slice(0, 7) && !('buy' in _m8Cfg());
+          && _m8Cats().length === 6 && _m8CatFor('H588').name === '特殊型鋼' && _m8Cats().find(x => x.id === 'h').ref.ym === TD.slice(0, 7) && !('buy' in _m8Cfg());
       } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; MAT_TAGS = keepT; window.localToday = keepTd; }
       return out;
     });
