@@ -4,7 +4,7 @@
 const FJC = require('../calc/qdraft.js');
 const D = FJC.qd;
 
-const TYPES = { qchg: 1, quote: 1, bid: 1, ownerCard: 1, rfqReply: 1, inquiry: 1 };   // v6.0.232 ownerCard＝合約條件卡（contract-check 產出的 fj-contract-card/1）
+const TYPES = { qchg: 1, quote: 1, bid: 1, ownerCard: 1, rfqReply: 1, inquiry: 1 };   // v6.0.233 ownerCard＝合約條件卡（contract-check 產出的 fj-contract-card/1）
 const MAX_PENDING = 50;   // 每個送件人同時待確認的上限   // 只開這三種；其他草稿照舊從網頁送
 const BID_TO = { awarded: '得標', '': '待回覆', nego: '議價中', lost: '未得標', void: '流標' };
 const LOST = ['價格過高', '規格不符', '工期不符', '業主關係', '未回應', '其他'];
@@ -75,7 +75,7 @@ function inqClean(pl) {
   }
   return { p };
 }
-// v6.0.232 廠商回價（rfqReply）：AI 讀廠商回傳的報價（照片／PDF）→ 草稿。詢價單在 private（這裡讀不到），只對報價工項；詢價單號 rno 由 FJ 端再對。
+// v6.0.233 廠商回價（rfqReply）：AI 讀廠商回傳的報價（照片／PDF）→ 草稿。詢價單在 private（這裡讀不到），只對報價工項；詢價單號 rno 由 FJ 端再對。
 //   prices：[{idx 或 match（工項說明第一行的一段）, price（未稅單價）}]；lump：{total, idxs 或 match[]}（一式）；extras：[{name, amt}]（豐有要提供的材料／隱藏成本）；diffs：範圍差異文字
 function itemIdx(q, x) {
   const its = arr(q.items);
@@ -108,7 +108,7 @@ function replyClean(q, pl) {
   out.diffs = arr(pl.diffs).slice(0, 20).filter((t) => typeof t === 'string').map((t) => S(t, 200)).filter((t) => t.trim());
   return { p: out };
 }
-// v6.0.232 合約條件卡（fj-contract-card/1）：只收純資料（字串≤2000、陣列≤50、物件≤60 欄、深度≤6；鍵名只能英數 _ -，資料庫不收 . $ # [ ] /）
+// v6.0.233 合約條件卡（fj-contract-card/1）：只收純資料（字串≤2000、陣列≤50、物件≤60 欄、深度≤6；鍵名只能英數 _ -，資料庫不收 . $ # [ ] /）
 const CARD_TOP = ['billing', 'retention', 'rent'];
 function cardClean(card) {
   if (!card || typeof card !== 'object' || Array.isArray(card)) return { err: '要附 card：contract-check 產出的合約條件卡（JSON 物件）' };
@@ -170,7 +170,7 @@ function build(o) {
     fields.t = t;
     payload = { base, baseMt: bq ? (bq._mt || 0) : 0, baseName: bq ? S(bq.name, 200) : '', fields };
     const am = aimClean(pl.aim); if (am.err) return { err: am.err }; if (am.aim) payload.aim = am.aim;
-    // v6.0.232 報價拍板卡加強：est＝AI 估的成本單價（未稅，[{i, cost}]，i＝fields.items 第幾列；只有管理員看得到）、issues＝圖說疑義文字
+    // v6.0.233 報價拍板卡加強：est＝AI 估的成本單價（未稅，[{i, cost}]，i＝fields.items 第幾列；只有管理員看得到）、issues＝圖說疑義文字
     const est = []; for (const x of arr(pl.est).slice(0, 300)) { const i = parseInt(x && x.i, 10), c = D.num(x && x.cost); if (!(i >= 0 && i < fields.items.length) || !fields.items[i] || fields.items[i].sec) return { err: 'est 第 ' + (est.length + 1) + ' 筆的 i 不對' }; if (c == null || c < 0 || c > 1e9) return { err: 'est 第 ' + (i + 1) + ' 列成本單價不對' }; est.push({ i, cost: c }); }
     if (est.length) payload.est = est;
     const iss = arr(pl.issues).filter((t) => typeof t === 'string').map((t) => S(t, 300).trim()).filter(Boolean).slice(0, 30); if (iss.length) payload.issues = iss;

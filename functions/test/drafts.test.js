@@ -111,7 +111,7 @@ test('v6.0.209 得標率統計：得標結果放在 private quoteSens 也讀得�
   assert.strictEqual(r.n, 1); assert.strictEqual(r.kinds[0].kind, 'sheet'); assert.strictEqual(r.kinds[0].concPct, 16.7);
 });
 
-test('v6.0.232 合約條件卡 ownerCard：清成純資料、版本不對或沒有內容不收、同案較晚的取代較早的', () => {
+test('v6.0.233 合約條件卡 ownerCard：清成純資料、版本不對或沒有內容不收、同案較晚的取代較早的', () => {
   const card = { schema: 'fj-contract-card/1', project: '假甲案', retention: { pct: { value: 5, source: 'contract', evidence: { clause: '第 8 條', quote: '保留款 5%' } } },
     rent: { includedDays: { value: 60, evidence: { clause: '第 12 條', quote: '含 60 天租期' } }, hack: function () { return 1; } }, billing: { cutoffDay: { value: 25 } } };
   const r = D.build(Object.assign({}, base, { body: { type: 'ownerCard', payload: { qid: 'q1', card, fname: '假甲案_合約條件卡.json' } } }));
@@ -127,7 +127,7 @@ test('v6.0.232 合約條件卡 ownerCard：清成純資料、版本不對或沒�
   assert.deepStrictEqual(D.superseded(r.rec, { dold0001: old }), ['dold0001']);
 });
 
-test('v6.0.232 廠商回價 rfqReply：對報價工項（idx 或說明一段）、一式要列涵蓋工項、沒得標不收', () => {
+test('v6.0.233 廠商回價 rfqReply：對報價工項（idx 或說明一段）、一式要列涵蓋工項、沒得標不收', () => {
   const qs = Object.assign({}, quotes, { k5: { id: 'q5', code: 'W01', name: '假得標案', awarded: true, items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 10, price: 3000 }, { desc: 'H型鋼樁拔除', qty: 10, price: 1000 }, { desc: '水平支撐', qty: 100, price: 500 }] } });
   const b0 = Object.assign({}, base, { quotes: qs });
   const r = D.build(Object.assign({}, b0, { body: { type: 'rfqReply', payload: { qid: 'q5', rno: 'RFQ-W01-01', vendor: { name: '假廠商甲', tel: '02-0000-0000' }, prices: [{ match: '打設', price: 2500 }, { idx: 1, price: 800 }], extras: [{ name: '水泥', amt: 3000 }, { name: '', amt: 1 }], diffs: ['不含引孔'] } } }));
@@ -143,7 +143,7 @@ test('v6.0.232 廠商回價 rfqReply：對報價工項（idx 或說明一段）�
   assert.match(D.build(Object.assign({}, b0, { body: { type: 'rfqReply', payload: { qid: 'q5', vendor: { name: 'x' }, prices: [{ idx: 9, price: 1 }] } } })).err, /不在這張報價/);
 });
 
-test('v6.0.232 詢價收件 inquiry：要工程名稱、來信或圖說；附件只收 https 連結；munger 結論白名單、風險最多 3 個', () => {
+test('v6.0.233 詢價收件 inquiry：要工程名稱、來信或圖說；附件只收 https 連結；munger 結論白名單、風險最多 3 個', () => {
   const r = D.build(Object.assign({}, base, { body: { type: 'inquiry', payload: { name: '假詢價案', client: '假營造', mail: '請報擋土支撐', drawings: [{ name: 'A1 平面圖', url: 'https://example.com/a1.pdf' }, { name: 'S2', url: 'javascript:alert(1)' }, 'S3 斷面圖'],
     missing: ['地質報告'], ask: '麻煩補地質報告', munger: { verdict: '有條件接', line: '工期太趕', risks: ['a', 'b', 'c', 'd'] } } } }));
   assert.ok(r.rec, r.err);
@@ -155,7 +155,7 @@ test('v6.0.232 詢價收件 inquiry：要工程名稱、來信或圖說；附件
   assert.match(D.build(Object.assign({}, base, { body: { type: 'inquiry', payload: { name: 'x', mail: 'y', munger: { verdict: '好' } } } })).err, /只能是/);
 });
 
-test('v6.0.232 報價草稿可帶 est（成本單價）與 issues（圖說疑義）', () => {
+test('v6.0.233 報價草稿可帶 est（成本單價）與 issues（圖說疑義）', () => {
   const f = { name: '假丁案', items: [{ desc: '工項甲', unit: '支', qty: 2, price: 500 }] };
   const r = D.build(Object.assign({}, base, { body: { type: 'quote', payload: { fields: f, est: [{ i: 0, cost: 350 }], issues: ['S2 與 A1 開挖深度不一致', 3] }, expect: { sub: 1000, tax: 50, total: 1050 } } }));
   assert.ok(r.rec, r.err); assert.deepStrictEqual(r.rec.payload.est, [{ i: 0, cost: 350 }]); assert.deepStrictEqual(r.rec.payload.issues, ['S2 與 A1 開挖深度不一致']);
