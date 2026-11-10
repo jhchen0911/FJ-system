@@ -13120,7 +13120,7 @@ async function newPage(browser, width, height) {
         for (const k of Object.keys(ctx)) {
           const o = _docOut(k, ctx[k]); const d = document.createElement('div'); d.innerHTML = (o.html.match(/<body[^>]*>([\s\S]*)<\/body>/i) || [0, o.html])[1];
           const h = d.querySelectorAll('.fy-dochead');
-          out.head[k] = h.length === 1 && h[0].innerHTML.includes(FY_LOGO) && h[0].innerHTML.includes(FY_WORDMARK) && /範例工程有限公司/.test(h[0].textContent) && /統一編號 87654321/.test(h[0].textContent) && /範例路 1 號/.test(h[0].textContent) && h[0].textContent.includes(title[k]);
+          out.head[k] = h.length === 1 && h[0].innerHTML.includes(FY_LOGO) && h[0].innerHTML.includes(FY_WORDMARK) && /範例工程有限公司/.test(h[0].textContent) && /範例工程有限公司｜統編 87654321｜電話 02-0000-0000/.test(h[0].textContent) && !/範例路 1 號/.test(h[0].textContent) && h[0].textContent.includes(title[k]);   // v6.0.220 頁首第 2 行只放全名｜統編｜電話
         }
         out.allHead = Object.values(out.head).every(Boolean);
         // v6.0.220 公司資料只印在頁首一次（頁尾不再重印）；Email 在頁首；合約雙方簽章欄的地址不算重複
@@ -13128,7 +13128,7 @@ async function newPage(browser, width, height) {
         for (const k of Object.keys(ctx)) {
           const o = _docOut(k, ctx[k]); const d = document.createElement('div'); d.innerHTML = (o.html.match(/<body[^>]*>([\s\S]*)<\/body>/i) || [0, o.html])[1]; d.querySelectorAll('style,script').forEach((x) => x.remove());
           const t = d.textContent, n = (re) => (t.match(re) || []).length, hd = d.querySelector('.fy-dochead');
-          out.once[k] = n(/範例路 1 號/g) === (k === 'subContract' ? 2 : 1) && n(/02-0000-0000/g) === (k === 'subContract' ? 2 : 1) && !!hd && hd.textContent.includes('Email fy@example.tw') && !d.querySelector('.company-bar');
+          out.once[k] = n(/範例路 1 號/g) === (k === 'subContract' ? 2 : 1) && n(/02-0000-0000/g) === (k === 'subContract' ? 2 : 1) && !!hd && !/fy@example\.tw|範例路/.test(hd.textContent) && d.querySelectorAll('.fy-docfoot').length === 1 && d.querySelector('.fy-docfoot').textContent === '地址 範例路 1 號｜Email fy@example.tw' && n(/fy@example\.tw/g) === (k === 'rfq' ? 2 : 1) && !d.querySelector('.company-bar');   // v6.0.220 地址、Email 只在頁尾一次（詢價單回傳方式另寫 Email）
         }
         out.noDup = Object.values(out.once).every(Boolean);
         out.oldGone = !/豐有工程報價單/.test(_docOut('quote', ctx.quote).html);
@@ -13142,12 +13142,19 @@ async function newPage(browser, width, height) {
         const pageH = A4W * 277 / 190, p1 = pl.pages[0].e - pl.pages[0].s;
         out.fill = Math.round(p1 / pageH * 100); out.n = pl.pages.length;
         out.full = pl.pages.length > 1 && p1 / pageH >= 0.85;
+        // v6.0.220 頁尾 .fy-docfoot 不算內文：切頁記下 foot、內文到頁尾上緣為止；預覽最後一頁下緣有頁尾、頁碼同一行右邊、其他頁沒有頁尾
+        out.foot = !!pl.foot && pl.foot.e > pl.foot.s && pl.pages[pl.pages.length - 1].e <= pl.foot.s && (pl.foot.e - pl.foot.s) < pl.marg;
+        const ph = document.createElement('div'); ph.style.width = '700px'; document.body.appendChild(ph); _docPvRender(ph, o);
+        const pgs = ph.shadowRoot.querySelectorAll('.dpv-pg'), last = pgs[pgs.length - 1], ftIn = (el) => Array.prototype.some.call(el.querySelectorAll('.dpv-clip'), (c) => { const r = c.getBoundingClientRect(), f = c.querySelector('.fy-docfoot').getBoundingClientRect(); return f.top >= r.top - 1 && f.bottom <= r.bottom + 1 && f.height > 0; });
+        const pn = last.querySelector('.dpv-n');
+        out.pvFoot = pgs.length === out.n && ftIn(last) && !ftIn(pgs[0]) && !!pn && pn.style.textAlign === 'right' && /2 \/ 2/.test(pn.textContent); ph.remove();
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       Q = keepQ; INV = keepI; VENDORS = keepV; try { Object.assign(P, JSON.parse(keepP)); } catch (e) { /* 可忽略 */ }
       return out;
     });
     check('v6.0.214 單據頁首統一：報價單、請款單、詢價單、分包合約書、保留款退還單都是同一個頁首（LOGO＋名片字樣＋公司全名／統一編號／地址＋單據名稱）', !r.err && r.allHead && r.oldGone, JSON.stringify(r));
-    check('v6.0.220 單據頁尾不再重印公司資料：五種單據地址、電話只在頁首一次（合約雙方簽章欄除外）、Email 在頁首', !r.err && r.noDup, JSON.stringify(r.once));
+    check('v6.0.220 頁首頁尾（Lotion 11/10）：頁首第 2 行只有全名｜統編｜電話；地址｜Email 只在頁尾一次；五種單據都一樣（合約簽章欄除外）', !r.err && r.noDup && r.allHead, JSON.stringify(r.once));
+    check('v6.0.220 頁尾貼在最後一頁下緣留白：切頁不算內文、預覽只有最後一頁有、多頁頁碼同一行右邊', !r.err && r.foot && r.pvFoot, JSON.stringify({ foot: r.foot, pvFoot: r.pvFoot, n: r.n, err: r.err }));
     check('v6.0.214 分包合約書：條文可以換頁，第 1 頁填滿（不再印完明細就換頁、下半頁空白）', !r.err && r.cuts >= 10 && r.full, JSON.stringify({ cuts: r.cuts, fill: r.fill, n: r.n, err: r.err }));
     check('v6.0.214 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
