@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.217';
+var APP_VERSION='v6.0.218';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -1140,7 +1140,7 @@ function rTots(){
     }else{cr.style.display='none';mr.style.display='none';}
   }
   try{_qMeasChip(t);}catch(e){_err('rTots.meas',e);}   // v6.0.160 圖面覆核
-  try{_qP3Render(t);}catch(e){_err('rTots.p3',e);}   // v6.0.214 底價／目標成交價／同類得標率
+  try{_qP3Render(t);}catch(e){_err('rTots.p3',e);}   // v6.0.215 底價／目標成交價／同類得標率
   // v5.395：異常成本提示——哪幾項成本單價比報價單價高 3 倍以上，直接點名
   const wr=document.getElementById('tcost-warn');
   if(wr){
@@ -26506,7 +26506,7 @@ function renderPayables(){
 }
 
 function updateFinanceKPIs(){
-  try{var _t1=document.getElementById('acct-top'),_c1=document.getElementById('acct-cash1');if(_t1&&(_c1||_v7New('acct'))){if(_c1)_c1.remove();if(_v7New('acct'))_t1.insertAdjacentHTML('afterbegin',_acctCashLineHtml());}}catch(e){_err('updateFinanceKPIs.cash1',e);}   // v6.0.215 審查：收款／付款後、雲端資料進來後，帳務最上面那一行跟著更新
+  try{var _t1=document.getElementById('acct-top'),_c1=document.getElementById('acct-cash1');if(_t1&&(_c1||_v7New('acct'))){if(_c1)_c1.remove();if(_v7New('acct'))_t1.insertAdjacentHTML('afterbegin',_acctCashLineHtml());}}catch(e){_err('updateFinanceKPIs.cash1',e);}   // v6.0.216 審查：收款／付款後、雲端資料進來後，帳務最上面那一行跟著更新
   const el=document.getElementById('finance-kpis');if(!el)return;
   const now=Date.now();
   const taxRate=_taxM();
@@ -26814,7 +26814,7 @@ function renderCashForecast(){
     +'</div></div>';
 }
 
-// 金流預測一個區間（d＝從今天起第幾天，30 天一段）：預計收、預計付、逾期（0-30 那段含逾期未收／未付）；金流頁與帳務頂端那一行共用（v6.0.215）
+// 金流預測一個區間（d＝從今天起第幾天，30 天一段）：預計收、預計付、逾期（0-30 那段含逾期未收／未付）；金流頁與帳務頂端那一行共用（v6.0.216）
 function _cfBucket(now,d){
   const from=new Date(now.getTime()+d*86400000);
   const to=new Date(now.getTime()+(d+30)*86400000);
@@ -32969,7 +32969,7 @@ function _acctMount(){
   try{['pay','petty'].forEach(function(k){var el=P_[k];var mo=new MutationObserver(function(){try{_mstack(el);}catch(e){_err('_acctMount',e);}});mo.observe(el,{childList:true,subtree:true});});}catch(e){_err('_acctMount',e);}   // 手機堆疊（原 page-payroll 在觀察清單）
   return true;
 }
-// 改版第 7 步④（7d，v6.0.215，Lotion 11/09 第 6 題 A）：新選單（nav5）時 8 個分頁收成 4 塊——收／付／發票與支出／金流，上方 4 個大分頁、
+// 改版第 7 步④（7d，v6.0.216，Lotion 11/09 第 6 題 A）：新選單（nav5）時 8 個分頁收成 4 塊——收／付／發票與支出／金流，上方 4 個大分頁、
 // 有好幾頁的那塊下面再一排小分頁；每塊記得上次停在哪一頁（本機 fy_acctGrpSub）。舊選單照舊 8 個分頁。
 var _ACCT_GRP=[['in','收',['own','ar']],['out','付',['vb','ap','petty','pay']],['doc','發票與支出',['inv']],['cash','金流',['cash']]];
 function _acctTabVis(t){return (t!=='petty'&&t!=='pay')||_acctCanPay();}
@@ -43881,8 +43881,8 @@ _decReg('mvBill',{
   edit:function(d){showConfirm('照我們算的付？','<div style="font-size:12.5px">整張改成照進退料簿＋價格表算的金額 NT$ '+fmt(_mbView(d).calc)+'（未稅）記錄。</div>',function(){if(_mbApply(d,'calc'))setTimeout(function(){try{_decRefresh('mvBill');}catch(e){_err('mvBill.edit',e);}},50);},false,null,false);}
 });
 try{setInterval(function(){try{_mbAutoTick();}catch(e){_err('_mbAuto.tick',e);}},180000);}catch(e){_err('_mbAuto.timer',e);}
-// ══════════ 改版第 7 步③（7b 畫面，v6.0.214）：報價頁總計框的內部面板 ══════════
-// 後端（報價結果紀錄、同類工項得標率、AI 草稿帶的底價／目標成交價）由小批次線做（v6.0.218 起，_bidAimOf／_bidSuggestFor，口徑含稅）；
+// ══════════ 改版第 7 步③（7b 畫面，v6.0.215）：報價頁總計框的內部面板 ══════════
+// 後端（報價結果紀錄、同類工項得標率、AI 草稿帶的底價／目標成交價）由小批次線做（v6.0.209 起，_bidAimOf／_bidSuggestFor，口徑含稅）；
 // 這裡只負責顯示：還沒上線（函式不存在）或這張沒有資料就不顯示。只給內部（_permHideProfit 的人看不到），不會印在任何對外文件。
 function _qP3Render(t){
   var el=document.getElementById('q-p3');if(!el)return;
@@ -43906,7 +43906,7 @@ function _qP3Render(t){
   el.innerHTML=h;el.style.display=h?'':'none';
 }
 
-// ══════════ 改版第 7 步⑤（7c）：專案一案一頁＝直的流程步驟條（v6.0.216，Lotion 11/09 第 7 題 A）══════════
+// ══════════ 改版第 7 步⑤（7c）：專案一案一頁＝直的流程步驟條（v6.0.217，Lotion 11/09 第 7 題 A）══════════
 // 新選單（nav5）時 renderProj 改出 _pj7Html：14 步一步一行——做完的一行（✓＋一句話）、現在這一步展開、還沒到的只顯示名稱；
 // 每步展開的內容就是原本的區塊（合約與文件、發包、進度、日報、現場追加、業主計價、完工與結案），區塊 id（pj-sec-*）不變，總覽待辦跳過來照樣找得到。
 // 還沒有畫面的步驟（辦證、送審文件、派工）先寫一句話說明在哪裡處理；成本、工項明細收在最下面「其他明細」。舊選單照舊原本的版面。
