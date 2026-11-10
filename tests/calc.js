@@ -423,6 +423,17 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const r = MV.rentPeriod([{ id: 'a', d: '2026-09-01', m: 90, o: '' }, { id: 'b', d: '2026-09-20', m: 30, o: '2026-09-25' }, { id: 'c', d: '2026-10-02', m: 9 }], '2026-09-01', '2026-09-30', 30);
   check('M6 租金期間：含頭含尾、中途進退場只算在場天數、期間外的批次不算', r.amt === 2880 && r.rows.length === 2 && r.rows[1].days === 6, JSON.stringify(r));
 }
+// ── v6.0.214 M8 租還是買、累計租金提醒、車型建議 ──
+{
+  const MV = require(path.join(__dirname, '..', 'calc', 'matmove.js')).mv;
+  const a = MV.rentVsBuy({ needs: [{ m: 300, days: 120 }, { m: 200, days: 90 }], rateD: 1, buyPerM: 600, salvage: 30, store: null });
+  check('M8 進料前評估：租金＝Σ M×天×日租、買的批量＝最大一筆、淨成本扣殘值、存放沒填＝null', a.rent === 54000 && a.buyM === 300 && a.buy === 180000 && a.net === 126000 && a.store === null && !a.suggestBuy, JSON.stringify(a));
+  const b = MV.rentVsBuy({ needs: [{ m: 300, days: 500 }], rateD: 1, buyPerM: 600, salvage: 30, store: 5000 });
+  check('M8 進料前評估：租金超過買的淨成本 → 建議買', b.suggestBuy && b.net === 131000, JSON.stringify(b));
+  const c1 = MV.buyAlert({ cum: 50000, buy: 100000 }), c2 = MV.buyAlert({ cum: 65000, buy: 100000, future: 20000, futureN: 1 }), c3 = MV.buyAlert({ cum: 65000, buy: 100000, future: 20000, futureN: 0 }), c4 = MV.buyAlert({ cum: 65000, buy: 100000, future: 10000, futureN: 2 });
+  check('M8 累計租金：未到 60% 不出卡；≥60% 出卡；預估 >80% 而且之後還有案子才建議買料，否則持續觀察', !c1.show && c2.show && c2.advice === '建議買料' && c3.advice === '持續觀察' && c4.advice === '持續觀察' && c2.ratio === 65 && c2.proj === 85, JSON.stringify([c2, c3, c4]));
+  check('M8 車型建議：地區加成 1.6 以上平板車、以下吊板車', MV.truckFor(1.8).type === 'flat' && MV.truckFor(1.6).type === 'flat' && MV.truckFor(1.4).type === 'crane' && MV.truckFor(0).type === 'crane');
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');

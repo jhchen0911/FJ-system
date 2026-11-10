@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.213';
+var APP_VERSION='v6.0.214';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -33088,7 +33088,7 @@ function _prmMount(){
   var fx=document.getElementById('fixed-cost-rows');var fxBlock=fx&&fx.parentElement;if(fxBlock)cBill.querySelector('.cb').appendChild(fxBlock);
   if(cTax)cTax.remove();
   G('bill').appendChild(cBill);if(cRmk)G('bill').appendChild(cRmk);
-  G('cost').appendChild(cCost);G('cash').appendChild(cCash);
+  G('cost').appendChild(cCost);try{var c8=_m8PrmCard();if(c8)G('cost').appendChild(c8);}catch(e){_err('_prmMount.m8',e);}   /* v6.0.214 M8 買價表 */G('cash').appendChild(cCash);
   if(cUpa){G('upa').appendChild(cUpa);_prmFoldUpa(cUpa);}
   [cSync,cExp,cRes,cSto].forEach(function(c){if(c)G('sys').appendChild(c);});
   return true;
@@ -33117,6 +33117,7 @@ function prmTab(g){
   var q=document.getElementById('prm-q');if(q&&q.value){q.value='';prmSearch('');}
   var tb=document.getElementById('prm-tabs');if(tb)tb.innerHTML=_prmTabsHtml();
   _PRM_GROUPS.forEach(function(x){var el=document.getElementById('prm-g-'+x[0]);if(el)el.style.display=(x[0]===g)?'':'none';});
+  if(g==='cost'){var m8=document.getElementById('m8-prm-body');if(m8)try{m8.innerHTML=_m8PrmHtml();}catch(e){_err('prmTab.m8',e);}}   /* v6.0.214 每次打開都重畫買價表（規格清單跟著租賃單） */
   var sub=document.querySelector('#page-params .ph-s');if(sub)sub.textContent=({co:'公司基本資料、匯款帳戶、印章、智慧辨識金鑰',bill:'稅率、管理費率、分期請款比例、備註條款模板、固定成本推算',cost:'點工日薪、自有機具、廠商計價與放款週期、日報提醒、自有材料內部租金攤提',cash:'期初現金與基準日、營運週轉保留——影響金流水位與分潤上限',upa:'單價分析用的成本單價與係數（另有「儲存」鈕）',sys:'雲端同步、備份匯出匯入、資料救援、本機儲存空間'})[g]+'。修改後按右上「儲存並套用」';
 }
 // 搜尋：跨分頁找參數名稱／欄位 id；命中的欄位所在卡片與小節自動展開
@@ -42769,7 +42770,7 @@ _decReg('mvSlip',{
   list:function(){return (MAT_MOVES||[]).filter(function(m){return m&&m.st==='draft';}).sort(function(a,b){return String(a.date||'').localeCompare(String(b.date||''))||((a._mt||0)-(b._mt||0));});},
   key:function(m){return m.id;},
   head:function(m){return (m.date||'')+'　'+(_MV_DIR[m.dir]||'方向？')+'　'+_mvWhere(m)+'　'+_mvSum(m);},
-  body:function(m){var y=_mvYellow(m);return '<div style="font-size:11.5px;color:'+(y.length?'#b26a00':'var(--b4)')+'">'+(y.length?('黃色 '+y.length+' 項要核對'):'欄位都齊了')+(m.carrier?('　運輸：'+esc(m.carrier)):'')+(m.truck?('　車號 '+esc(m.truck)):'')+'</div>';},
+  body:function(m){var y=_mvYellow(m);return '<div style="font-size:11.5px;color:'+(y.length?'#b26a00':'var(--b4)')+'">'+(y.length?('黃色 '+y.length+' 項要核對'):'欄位都齊了')+(m.carrier?('　運輸：'+esc(m.carrier)):'')+(m.truck?('　車號 '+esc(m.truck)):'')+'</div>'+_m8SlipNote(m);},   /* v6.0.214 租料進場再比一次倉庫（第二道防線） */
   detail:_mvDetailHtml,
   ok:function(m){if(m.photo&&!_MV_PH_OK[m.id]){toast('簽收單照片還沒同步到這台，等照片出現再確認');return false;}var y=_mvYellow(m);if(y.length){toast('還有黃色欄位：'+y.slice(0,3).join('、')+'，請先按「修改」核對');return false;}
     m.st='ok';m.okBy=(typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||'本機';m.okAt=Date.now();_mvSave(m);try{_mvLogAdd('confirm',m);}catch(e){_err('mvSlip.log',e);}toast('已寫進進退料簿');try{_mvApplySoon(300);}catch(e){_err('mvSlip.apply',e);}return true;},   // v6.0.199 自有料確認後自動改台帳（管理員裝置）
@@ -43819,6 +43820,115 @@ _decReg('mvBill',{
   edit:function(d){showConfirm('照我們算的付？','<div style="font-size:12.5px">整張改成照進退料簿＋價格表算的金額 NT$ '+fmt(_mbView(d).calc)+'（未稅）記錄。</div>',function(){if(_mbApply(d,'calc'))setTimeout(function(){try{_decRefresh('mvBill');}catch(e){_err('mvBill.edit',e);}},50);},false,null,false);}
 });
 try{setInterval(function(){try{_mbAutoTick();}catch(e){_err('_mbAuto.tick',e);}},180000);}catch(e){_err('_mbAuto.timer',e);}
+// ══════════ v6.0.214 進退料 M8a：租還是買、自有料優先、車型建議（Lotion 11/10 定案）══════════
+// 設定（只有 Lotion）：MAT_MOVE_FIN['m8cfg']＝{kind:'m8cfg', buy:{規格:每 M 買價}, salvage:殘值率%, store:每批存放＋進出倉成本（空白＝沒填）, acks:{}}；參數頁「成本與廠商」最下面一張卡
+// ①得標後、還沒進料：倉庫自有料比對卡 m8Own（工務＋Lotion，不放金額；附車型建議）；租料進場簽收單待確認卡再比一次（第二道防線）
+// ②得標後、還沒進料：租還是買整體評估卡 m8Rvb（Lotion；這案＋其他已得標未進料、報價中同規格的需求 × 預估租期 × 租金行情 vs 買價）
+// ③進料後：同規格近 12 個月累計租金 ≥ 買價 60% 出卡 m8Cum；加上之後案子的預估租金 > 80% 而且之後還有案子要用 → 建議買料，否則持續觀察；列殘值、存放成本
+// ④每季前 14 天一張統整卡 m8Qtr：上一季租金最高的前 5 種規格
+function _m8Cfg(){var c=MAT_MOVE_FIN['m8cfg'];return (c&&c.kind==='m8cfg')?c:{kind:'m8cfg',buy:{},salvage:'',store:'',acks:{}};}
+function _m8Save(c){c.kind='m8cfg';c._mt=Date.now();c.by=_mvMe();MAT_MOVE_FIN['m8cfg']=c;saveMatMoveFin();}
+function _m8Ack(k,v){var c=_m8Cfg();c.acks=Object.assign({},c.acks||{});c.acks[k]=v;_m8Save(c);}
+function _m8Rentable(it){var k=_mvIdleKind(it);return k==='pile'||k==='strut'||k==='deck';}
+function _m8Need(q){var L=[];_m6Items(q).forEach(function(o){if(!_m8Rentable(o.it))return;var mt=_m6ItemMat(o.it),qty=parseFloat(mt.qty)||0,len=parseFloat(mt.len)||0;if(!qty)return;
+  L.push({key:o.key,name:mt.name,spec:_mvSpecKey(mt)||mt.spec||'',len:len,qty:qty,m:Math.round(qty*len*100)/100,days:FJC.todo.rentDaysOf(o.it)||0,label:String(o.it.desc||'').split('\n')[0].slice(0,40)});});return L;}
+function _m8Started(q){var ids=[q.id].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;}).map(function(x){return x.id;}));
+  if((Q||[]).some(function(x){return x&&ids.indexOf(x.id)>=0&&x.mat&&_m6Arr(x.mat,'rents').some(function(rt){return (rt.batches||[]).length;});}))return true;
+  return (MAT_MOVES||[]).some(function(m){return m&&m.st==='ok'&&(ids.indexOf(m.qid)>=0||ids.indexOf(m.toQid)>=0);});}
+function _m8Fresh(){return (Q||[]).filter(function(q){return q&&q.awarded&&!q.parentId&&!q.closed&&!_m8Started(q);});}
+function _m8Stock(n){var W=(MAT_LEDGER||[]).filter(function(r){return r&&r.name&&!r.projQid&&(!r.loc||r.loc==='公司倉庫')&&(parseFloat(r.qty)||0)>0&&r.cond!=='repair'&&r.cond!=='scrap';});
+  return _mvLedMatch(W,{name:n.name,spec:n.spec,len:n.len}).rows.reduce(function(s,r){return s+(parseFloat(r.qty)||0);},0);}
+function _m8Truck(q){var p=[q.loc,q.name].filter(Boolean).join(' '),mx=0;_frtAll().forEach(function(t){var k=FJC.mv.frtRegion(t,p,'mult');if(k&&(t.mult||{})[k]>mx)mx=t.mult[k];});return mx?FJC.mv.truckFor(mx):null;}
+// ① 自有料
+function _m8OwnList(){var L=[];_m8Fresh().forEach(function(q){var t=_mvTagOf(q.id,'m8own');if(t&&(t.keep||t.ack))return;
+  var rows=_m8Need(q).map(function(n){var st=_m8Stock(n);return st>0?{label:n.name+' '+n.spec+(n.len?(' L='+n.len+'M'):''),need:n.qty,stock:st}:null;}).filter(Boolean);
+  if(rows.length)L.push({id:q.id,q:q,rows:rows,truck:_m8Truck(q)});});return L;}
+function _m8SlipNote(m){try{if(!m||m.own!==false||m.dir!=='in')return '';var r=(m.items||[]).map(function(it){var st=_m8Stock({name:it.name,spec:_mvSpecKey(it)||it.spec,len:_mvNum(it.len)});return st>0?((it.name||'')+' '+(it.spec||'')+' 倉庫有 '+_rfmt(st)+' 支'):'';}).filter(Boolean);
+  return r.length?('<div style="font-size:11.5px;color:#b26a00">租料進場，但'+esc(r.join('、'))+'（可考慮用自有料）</div>'):'';}catch(e){_err('_m8SlipNote',e);return '';}}
+_decReg('m8Own',{
+  title:'得標了：倉庫有自有料可以用',todo:function(n){return '得標案倉庫有自有料可用 '+n+' 案（租料前先看）';},sub:'確認＝會安排用自有料；退回＝不用（寫原因）；修改＝打開工程專案',
+  canSee:function(){return !_isReaderUser;},list:_m8OwnList,key:function(x){return x.id;},
+  head:function(x){return (x.q.name||'')+'　倉庫有 '+x.rows.length+' 種同規格料';},
+  body:function(x){return '<div style="font-size:11.5px;color:var(--b4)">'+esc(x.rows.slice(0,3).map(function(r){return r.label+' 要 '+_rfmt(r.need)+'／倉庫 '+_rfmt(r.stock)+' 支';}).join('；'))+(x.truck?('；運送建議：'+(x.truck.type==='flat'?'平板車':'吊板車')+'（'+esc(x.truck.why)+'）'):'')+'</div>';},
+  detail:function(x){return '<div style="font-size:12.5px;line-height:1.7">'+x.rows.map(function(r){return esc(r.label)+'：這案要 '+_rfmt(r.need)+' 支，倉庫可用 '+_rfmt(r.stock)+' 支'+(r.stock>=r.need?'（夠）':'（不夠，差 '+_rfmt(r.need-r.stock)+' 支要租）');}).join('<br>')
+    +(x.truck?('<br>運送建議：<b>'+(x.truck.type==='flat'?'平板車':'吊板車')+'</b>（'+esc(x.truck.why)+'）'):'')+'<div style="color:var(--b4);margin-top:4px">只算倉庫裡「可用」的（要修、報廢的不算）。</div></div>';},
+  ok:function(x){_mvTagSet(x.q.id,'m8own',{ack:localToday()});toast('已記：會安排用自有料');return true;},
+  reject:function(x,why){_mvTagSet(x.q.id,'m8own',{keep:1,why:String(why||'不用').slice(0,200)});return true;},
+  edit:function(x){openProj(x.q.id);}
+});
+// ② 租還是買（進料前）
+function _m8Pipe(spec,excl){var L=[];(Q||[]).forEach(function(q){if(!q||q.parentId||q.closed||q.id===excl)return;var on=q.awarded?!_m8Started(q):(!q.bidStatus||q.bidStatus==='nego');if(!on)return;
+  _m8Need(q).forEach(function(n){if(n.spec===spec)L.push({qid:q.id,name:q.name||'',awarded:!!q.awarded,m:n.m,days:n.days});});});return L;}
+function _m8RvbOf(q){var c=_m8Cfg(),S={};_m8Need(q).forEach(function(n){if(!(parseFloat((c.buy||{})[n.spec])>0))return;(S[n.spec]=S[n.spec]||[]).push(n);});
+  return Object.keys(S).map(function(sp){var mine=S[sp].map(function(n){return {m:n.m,days:n.days};}),oth=_m8Pipe(sp,q.id),rateD=_m6MarketRateD(sp);
+    var r=FJC.mv.rentVsBuy({needs:mine.concat(oth),rateD:rateD,buyPerM:c.buy[sp],salvage:parseFloat(c.salvage)||0,store:c.store});
+    return {spec:sp,mineM:mine.reduce(function(s,n){return s+n.m;},0),noDays:mine.some(function(n){return !n.days;}),oth:oth,rateD:rateD,r:r};});}
+_decReg('m8Rvb',{
+  title:'得標了：這批料用租還是買',todo:function(n){return '得標案進料前評估租還是買 '+n+' 案';},sub:'確認＝已評估；退回＝不用評估（寫原因）；修改＝改買價表',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},
+  list:function(){return _m8Fresh().filter(function(q){var t=_mvTagOf(q.id,'m8rvb');return !(t&&(t.keep||t.ack));}).map(function(q){return {id:q.id,q:q,rows:_m8RvbOf(q)};}).filter(function(x){return x.rows.length;});},
+  key:function(x){return x.id;},head:function(x){return (x.q.name||'')+'　'+x.rows.map(function(r){return r.spec;}).join('、');},
+  body:function(x){var b=x.rows.filter(function(r){return r.r.suggestBuy;});return '<div style="font-size:11.5px;color:'+(b.length?'#c62828':'var(--b4)')+'">'+(b.length?('建議評估買：'+b.map(function(r){return r.spec;}).join('、')):'目前看起來用租比較划算')+'</div>';},
+  detail:function(x){var c=_m8Cfg();return '<div style="font-size:12.5px;line-height:1.7">'+x.rows.map(function(r){return '<div style="border-top:1px dotted var(--b1);padding:3px 0"><b>'+esc(r.spec)+'</b>：這案 '+_rfmt(r.mineM)+' M'+(r.noDays?'（有工項沒寫租期，以 0 天計）':'')+'，其他已得標未進料／報價中 '+r.oth.length+' 案（'+_rfmt(r.oth.reduce(function(s,o){return s+o.m;},0))+' M）'
+    +'<br>租：'+(r.rateD?('租金行情每 M 每天 '+_rfmt(r.rateD)+' → 預估租金 NT$ '+fmt(r.r.rent)):'沒有租金行情（找不到同規格的租賃單）')
+    +'<br>買：'+_rfmt(r.r.buyM)+' M × '+fmt(c.buy[r.spec])+' ＝ NT$ '+fmt(r.r.buy)+'，殘值 −'+fmt(r.r.salvage)+'（'+(c.salvage||0)+'%），存放 '+(r.r.store==null?'<span style="color:#b26a00">存放成本未填</span>':fmt(r.r.store))+' → 淨成本 NT$ '+fmt(r.r.net)
+    +'<br><b>'+(r.r.suggestBuy?'建議評估買料':'用租')+'</b></div>';}).join('')+'<div style="color:var(--b4);margin-top:4px">系統只給建議，不會自動下單。</div></div>';},
+  ok:function(x){_mvTagSet(x.q.id,'m8rvb',{ack:localToday()});return true;},
+  reject:function(x,why){_mvTagSet(x.q.id,'m8rvb',{keep:1,why:String(why||'不用評估').slice(0,200)});return true;},
+  edit:function(){go('params');setTimeout(function(){try{prmTab('cost');}catch(e){_err('m8Rvb.edit',e);}},80);}
+});
+// ③ 進料後累計租金
+function _m8CumOf(sp,from,to){var tot=0;(Q||[]).forEach(function(q){if(!q||!q.mat)return;_m6Arr(q.mat,'rents').forEach(function(rt){if(_mvSpecKey(rt)!==sp&&_mvSpecKey({spec:rt.spec,name:rt.name})!==sp)return;tot+=FJC.mv.rentPeriod(rt.batches,from,to,parseFloat(rt.rate)||0).amt;});});return tot;}
+function _m8CumList(){var c=_m8Cfg(),td=localToday(),fr=_dAdd(td,-365),L=[];
+  Object.keys(c.buy||{}).forEach(function(sp){var bp=parseFloat(c.buy[sp])||0;if(!(bp>0))return;var ak=(c.acks||{})['cum_'+sp];if(ak&&(ak.keep||(ak.at&&FJC.mv.days(ak.at,td)<30)))return;
+    var pipe=_m8Pipe(sp,''),bm=0;pipe.forEach(function(o){if(o.m>bm)bm=o.m;});
+    (Q||[]).forEach(function(q){if(q&&q.mat)_m6Arr(q.mat,'rents').forEach(function(rt){if(_mvSpecKey(rt)===sp){var a=_m6RentArrived(rt);if(a>bm)bm=a;}});});
+    var cum=_m8CumOf(sp,fr,td),rateD=_m6MarketRateD(sp),fut=pipe.reduce(function(s,o){return s+o.m*o.days*rateD;},0),buy=bm*bp;
+    var a=FJC.mv.buyAlert({cum:cum,buy:buy,future:fut,futureN:pipe.length});if(!a.show)return;
+    var sv=Math.round(buy*(parseFloat(c.salvage)||0)/100);
+    L.push({id:'cum_'+sp,spec:sp,cum:cum,buy:Math.round(buy),bm:bm,fut:Math.round(fut),n:pipe.length,a:a,sv:sv,store:c.store});});return L;}
+_decReg('m8Cum',{
+  title:'同規格租金快到買價了',todo:function(n){return '同規格累計租金達買價 60% 以上 '+n+' 種';},sub:'確認＝知道了（30 天後再提醒）；退回＝不用再提醒（寫原因）；修改＝改買價表',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},list:_m8CumList,key:function(x){return x.id;},
+  head:function(x){return x.spec+'　近 12 個月租金 '+x.a.ratio+'%（'+x.a.advice+'）';},
+  body:function(x){return '<div style="font-size:11.5px;color:'+(x.a.advice==='建議買料'?'#c62828':'#b26a00')+'">累計 NT$ '+fmt(x.cum)+'／買一批 NT$ '+fmt(x.buy)+'；加上之後 '+x.n+' 案預估 '+x.a.proj+'%</div>';},
+  detail:function(x){return '<div style="font-size:12.5px;line-height:1.7">'+esc(x.spec)+'：近 12 個月全公司累計租金 NT$ '+fmt(x.cum)+'<br>買一批（'+_rfmt(x.bm)+' M）NT$ '+fmt(x.buy)+'，殘值約 NT$ '+fmt(x.sv)+'，存放＋進出倉 '+(x.store===''||x.store==null?'<span style="color:#b26a00">存放成本未填</span>':('NT$ '+fmt(x.store)))
+    +'<br>之後還有 '+x.n+' 案要用（已得標未進料、報價中），預估再租 NT$ '+fmt(x.fut)+' → 合計 '+x.a.proj+'%<br><b>'+x.a.advice+'</b><div style="color:var(--b4);margin-top:4px">60% 出卡；預估超過 80% 而且之後還有案子要用才寫「建議買料」。系統只給建議，不會自動下單。</div></div>';},
+  ok:function(x){_m8Ack(x.id,{at:localToday()});return true;},
+  reject:function(x,why){_m8Ack(x.id,{keep:1,why:String(why||'').slice(0,200)});return true;},
+  edit:function(){go('params');setTimeout(function(){try{prmTab('cost');}catch(e){_err('m8Cum.edit',e);}},80);}
+});
+// ④ 每季統整
+function _m8QtrKey(td){var y=+td.slice(0,4),m=+td.slice(5,7),q=Math.floor((m-1)/3);return q===0?((y-1)+'Q4'):(y+'Q'+q);}
+function _m8QtrRange(k){var y=+k.slice(0,4),q=+k.slice(5);var m0=(q-1)*3+1,fr=y+'-'+String(m0).padStart(2,'0')+'-01',ny=q===4?y+1:y,nm=q===4?1:m0+3;return {from:fr,to:_dAdd(ny+'-'+String(nm).padStart(2,'0')+'-01',-1)};}
+function _m8QtrList(){var td=localToday(),m=+td.slice(5,7),d=+td.slice(8,10);if((m-1)%3!==0||d>14)return [];var k=_m8QtrKey(td),c=_m8Cfg();if((c.acks||{})['qtr_'+k])return [];
+  var R=_m8QtrRange(k),S={};(Q||[]).forEach(function(q){if(q&&q.mat)_m6Arr(q.mat,'rents').forEach(function(rt){var sp=_mvSpecKey(rt)||rt.spec||'';if(!sp)return;S[sp]=(S[sp]||0)+FJC.mv.rentPeriod(rt.batches,R.from,R.to,parseFloat(rt.rate)||0).amt;});});
+  var top=Object.keys(S).map(function(k){return {spec:k,amt:S[k]};}).filter(function(x){return x.amt>0;}).sort(function(a,b){return b.amt-a.amt;}).slice(0,5);
+  return top.length?[{id:'qtr_'+k,k:k,R:R,top:top}]:[];}
+_decReg('m8Qtr',{
+  title:'每季租金統整',todo:function(){return '上一季租金最高的 5 種規格（每季統整）';},sub:'確認＝看過了；退回＝看過了；修改＝改買價表',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},list:_m8QtrList,key:function(x){return x.id;},
+  head:function(x){return x.k+'　租金前 5 名';},
+  body:function(x){return '<div style="font-size:11.5px;color:var(--b4)">'+esc(x.top.map(function(t){return t.spec+' '+fmt(t.amt);}).join('、'))+'</div>';},
+  detail:function(x){var c=_m8Cfg();return '<div style="font-size:12.5px;line-height:1.7">'+esc(x.R.from)+'～'+esc(x.R.to)+'<br>'+x.top.map(function(t,i){var bp=parseFloat((c.buy||{})[t.spec])||0;return (i+1)+'. '+esc(t.spec)+'：NT$ '+fmt(t.amt)+(bp?('（買價每 M '+fmt(bp)+'）'):'（買價表沒填）');}).join('<br>')+'</div>';},
+  ok:function(x){_m8Ack(x.id,{at:localToday()});return true;},reject:function(x){_m8Ack(x.id,{at:localToday()});return true;},
+  edit:function(){go('params');setTimeout(function(){try{prmTab('cost');}catch(e){_err('m8Qtr.edit',e);}},80);}
+});
+// 參數頁：買價表（只有管理員看得到；放「成本與廠商」最下面）
+function _m8Specs(){var S={},c=_m8Cfg();Object.keys(c.buy||{}).forEach(function(k){S[k]=1;});(Q||[]).forEach(function(q){if(!q)return;if(q.mat)_m6Arr(q.mat,'rents').forEach(function(rt){var k=_mvSpecKey(rt);if(k)S[k]=1;});});return Object.keys(S).sort();}
+function _m8PrmHtml(){var c=_m8Cfg(),IN='width:100%;padding:5px 7px;border:1px solid var(--b2);border-radius:6px;font-family:inherit';
+  return '<div style="font-size:11.5px;color:var(--b4);margin-bottom:6px">給「租還是買」提醒用；只有你看得到。規格寫法跟租賃單一樣（例：H300、H350、IV）。</div>'
+    +'<table style="width:100%;font-size:12.5px"><thead><tr><th style="text-align:left">規格</th><th style="text-align:left">每 M 買價（未稅）</th></tr></thead><tbody id="m8-buy">'
+    +_m8Specs().concat(['']).map(function(k){return '<tr><td><input class="m8-sp" value="'+esc(k)+'" style="'+IN+'"></td><td><input class="m8-bp" type="number" inputmode="decimal" value="'+esc(String((c.buy||{})[k]||''))+'" style="'+IN+'"></td></tr>';}).join('')+'</tbody></table>'
+    +'<div class="fg fg2" style="gap:8px;margin-top:8px"><div class="f"><label>鋼材殘值率（%，用完還能賣回買價的幾成）</label><input id="m8-sv" type="number" inputmode="decimal" value="'+esc(String(c.salvage||''))+'" style="'+IN+'"></div>'
+    +'<div class="f"><label>每批存放＋進出倉成本（元；沒有倉庫就空白）</label><input id="m8-st" type="number" inputmode="decimal" value="'+esc(String(c.store===0?'0':(c.store||'')))+'" style="'+IN+'"></div></div>'
+    +'<button type="button" class="btn bp" style="margin-top:8px" onclick="_m8PrmSave()">儲存買價表</button>';}
+function _m8PrmSave(){var c=_m8Cfg(),b={},sp=document.querySelectorAll('#m8-buy .m8-sp'),bp=document.querySelectorAll('#m8-buy .m8-bp');
+  for(var i=0;i<sp.length;i++){var k=_mvSpecKey({spec:sp[i].value})||String(sp[i].value||'').trim().toUpperCase(),v=parseFloat(bp[i].value);if(k&&v>0)b[k.slice(0,20)]=v;}
+  c.buy=b;var sv=gv('m8-sv');c.salvage=sv===''?'':Math.max(0,Math.min(100,parseFloat(sv)||0));var st=gv('m8-st');c.store=st===''?'':Math.max(0,parseFloat(st)||0);_m8Save(c);toast('已存買價表');
+  var el=document.getElementById('m8-prm-body');if(el)el.innerHTML=_m8PrmHtml();try{['m8Rvb','m8Cum','m8Qtr'].forEach(function(k){_decRefresh(k);});}catch(e){_err('_m8PrmSave',e);}}
+function _m8PrmCard(){if(_isReaderUser||!_decIsAdmin())return null;var d=document.createElement('div');d.className='card';d.id='m8-prm-card';
+  d.innerHTML='<div class="ch green"><div class="cht">材料買價（租還是買）</div></div><div class="cb" id="m8-prm-body">'+_m8PrmHtml()+'</div>';return d;}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
