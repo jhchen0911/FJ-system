@@ -409,6 +409,20 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('AI 改單 回復：條款用改過的字也對得到、text 空白＝回復範本；成本給空白＝清掉', !p3.bad && !('L0' in p3.rmk.ov) && !('estCost' in p3.items[0]) && p3.rows[1].cost.a === null);
   check('AI 改單 clean：成本欄與 rmkFix 留下、轉數字', JSON.stringify(D.clean([{ op: 'set', idx: 0, fields: { estCost: '70' } }, { op: 'rmkFix', match: 'a', text: 'b', x: 1 }, { op: 'add', item: { desc: 'd', qty: 1, price: 2, estCost: '1' } }])) === '[{"op":"set","idx":0,"fields":{"estCost":70}},{"op":"rmkFix","match":"a","text":"b"},{"op":"add","item":{"desc":"d","unit":"","qty":1,"price":2,"note":"","estCost":1}}]');
 }
+// ── v6.0.211 M6 運費價格表、請款核對、租金期間（照 11/04 寬大請款核對的實際數字）──
+{
+  const MV = require(path.join(__dirname, '..', 'calc', 'matmove.js')).mv;
+  const T = { base: { '新竹': 9000, '台中': 16000, '台中市中科': 16000 }, mult: { '台中': 1.8, '新竹': 1.6 }, perM: [{ pat: 'H300', rate: 30 }, { pat: 'H350', rate: 40 }, { pat: '鋼板樁', rate: 18 }], lenAdd: [{ min: 13, add: 10 }, { min: 16, add: 20 }], waitHr: 2000 };
+  const a = MV.freightTrip(T, { place: '台中市中科園區', items: [{ name: '型鋼', spec: 'H300', len: 13.83, qty: 25, m: 345.74 }, { name: '型鋼', spec: 'H300', len: 16.04, qty: 3, m: 48.13 }] });
+  check('M6 運費：13M／16M 長度加價、地區加成（寬大 9/18：345.74×40×1.8＝24,893、48.13×50×1.8＝4,332）', a.lines[0].amt === 24893 && a.lines[1].amt === 4332 && a.amt === 29225 && a.region === '台中市中科', JSON.stringify(a.lines));
+  const b = MV.freightTrip(T, { place: '新竹縣寶山', items: [{ name: '型鋼', spec: 'H350', len: 4.7, qty: 13, m: 61.15 }], waitH: 3 });
+  check('M6 運費：低於基本台收基本台（61.15×40×1.6＝3,914 → 9,000）＋等待 3 小時×2,000', b.useBase && b.amt === 15000 && b.byM === 3914, JSON.stringify(b));
+  const c = MV.freightTrip(T, { place: '南投', items: [{ name: '千斤頂', spec: '', len: 0, qty: 8 }] });
+  check('M6 運費：價格表沒有的地區、品項會標出來', c.noRegion && c.miss.length === 1, JSON.stringify(c));
+  check('M6 請款差額：一張單差 100 以內不出卡（11/10 第 3 題 A）', MV.billDiff(29300, 29225).ok && !MV.billDiff(29400, 29225).ok && MV.billDiff(29400, 29225).diff === 175);
+  const r = MV.rentPeriod([{ id: 'a', d: '2026-09-01', m: 90, o: '' }, { id: 'b', d: '2026-09-20', m: 30, o: '2026-09-25' }, { id: 'c', d: '2026-10-02', m: 9 }], '2026-09-01', '2026-09-30', 30);
+  check('M6 租金期間：含頭含尾、中途進退場只算在場天數、期間外的批次不算', r.amt === 2880 && r.rows.length === 2 && r.rows[1].days === 6, JSON.stringify(r));
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');
