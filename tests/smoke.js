@@ -13450,11 +13450,19 @@ async function newPage(browser, width, height) {
         const q = Q.find((y) => y.name === '範例草稿報價');
         out.saved = ok === true && Q.length === n0 + 1 && !!q && q.items.length === 3 && q.items[1].estCost === 700 && q.items[2].estCost === 4200 && DRAFTS.dQd0001.status === 'applied' && !!q.bidAim && q.bidAim.floor === 48000;
         out.again = (await Promise.resolve(_DEC.drf_quote.ok(DRAFTS.dQd0001))) === false && Q.length === n0 + 1;
+        // 修改既有報價：原報價手填的成本優先（AI 估的不蓋）；原報價被改過或有成本會對不到 → 開編輯頁，不直接存
+        const bq = { id: 'qQB1', code: '1159902', name: '範例既有報價', client: '範例營造甲', items: [{ desc: '範例鋼樁打設', unit: '支', qty: '10', price: '1000', estCost: '650' }, { desc: '範例舊工項', unit: '式', qty: '1', price: '500', estCost: '300' }], _mt: 5 };
+        Q.push(bq);
+        DRAFTS.dQd0002 = { id: 'dQd0002', type: 'quote', by: 'ai@example.com', at: Date.now(), status: 'pending', summary: '修改', payload: { base: 'qQB1', baseMt: 5, fields: { name: '範例既有報價', client: '範例營造甲', items: [{ desc: '範例鋼樁打設', unit: '支', qty: 12, price: 1000 }], t: { sub: 12000, tax: 600, total: 12600 } }, est: [{ i: 0, cost: 700 }] } };
+        const an = _qdAnalyze(DRAFTS.dQd0002);
+        out.basePref = an.rows[0].cost === 650 && /不採用/.test(an.rows[0].src) && an.lost.length === 1 && an.lost[0] === '範例舊工項';
+        const ok2 = await Promise.resolve(_DEC.drf_quote.ok(DRAFTS.dQd0002));
+        out.openInstead = ok2 === 'open' && DRAFTS.dQd0002.status === 'pending' && Q.find((y) => y.id === 'qQB1').items.length === 2;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       Q = keep.Q; DRAFTS = keep.D; DEAL_HIST = keep.DH; COST_HIST = keep.CH;
       return out;
     });
-    check('v6.0.227 報價拍板卡加強：明細有三個價、毛利（成本單價來源）、異常單元（跟成交單價庫比 ±15%、低於成本）、圖說疑義；確認直接存成正式報價（成本單價、底價目標價一起存）', !r.err && r.prices && r.gross && r.abn && r.issues && r.saved && r.again, JSON.stringify(r));
+    check('v6.0.227 報價拍板卡加強：明細有三個價、毛利（成本單價來源）、異常單元（跟成交單價庫比 ±15%、低於成本）、圖說疑義；確認直接存成正式報價（成本單價、底價目標價一起存）', !r.err && r.prices && r.gross && r.abn && r.issues && r.saved && r.again && r.basePref && r.openInstead, JSON.stringify(r));
     check('v6.0.227 報價拍板卡加強測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -13483,7 +13491,7 @@ async function newPage(browser, width, height) {
         out.needCond = (await Promise.resolve(_DEC.drf_inquiry.ok(DRAFTS.dInq001))) === false && Q.length === 1;
         inqIn('dInq001', 'cond', '工期延到 45 天');
         const ok = await Promise.resolve(_DEC.drf_inquiry.ok(DRAFTS.dInq001)); const q = Q[0];
-        out.ok = ok === true && Q.length === 2 && q.name === '範例新詢價' && q.client === '範例營造甲' && /^\d{9,}$/.test(q.code) && q.items.length === 0 && q.inq.dec === 'cond' && q.inq.cond === '工期延到 45 天' && q.inq.drawings.length === 2 && DRAFTS.dInq001.status === 'applied' && DRAFTS.dInq001.ex.resultId === q.id;
+        out.ok = ok === true && Q.length === 2 && q.name === '範例新詢價' && q.client === '範例營造甲' && /^\d{9,}$/.test(q.code) && q.items.length === 0 && DRAFTS.dInq001.ex.dec === 'cond' && DRAFTS.dInq001.ex.cond === '工期延到 45 天' && !('munger' in q.inq) && !('dec' in q.inq) && q.inq.drawings.length === 2 && DRAFTS.dInq001.status === 'applied' && DRAFTS.dInq001.ex.resultId === q.id;
         out.rej = (await _DEC.drf_inquiry.reject(DRAFTS.dInq002, '量太小')) === true && DRAFTS.dInq002.status === 'rejected' && DRAFTS.dInq002.ex.dec === 'no';
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       Q = keep.Q; DRAFTS = keep.D;
