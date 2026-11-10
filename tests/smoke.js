@@ -11672,6 +11672,8 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.224 LINE 日報草稿拍板卡：拆出工項數量（打設／拔除、本段完成）、累計跟合約比超過標紅、拆不出的標待確認不寫、附原文與照片、不再列在 AI 草稿清單；確認才寫 progressRows；修改可逐列改；對不到工程不寫', Object.values(r).length === 12 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.223 請款鏈 1：請款單狀態（草稿→已送業主→業主已確認→已開發票→已收款）、舊單推算清單卡、業主確認卡＋發票照抄範例 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -11731,6 +11733,41 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.223 請款單狀態：舊單推算（收齊＝已收款、有發票＝已開發票、其他＝已送業主，保留款退還單不算）列清單給 Lotion 確認一次才記；業主確認卡對到最近一張已送業主、確認＝業主已確認＋發票照抄範例（買受人、統編、品名、未稅、稅額、含稅）；業主要改數量＝打開請款單、不改狀態；發票作廢／收齊／新單自動記紀錄（誰、何時、依據）；做完了沒 _invStDone', Object.values(r).length === 16 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('v6.0.223 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── v6.0.225 請款鏈 3：請款單草稿卡 invDraft（截止前 5 天、附日報來源／累計／上一期／追加／保留款；確認＝開第 N 期、狀態草稿）→ invSend（確認＝已送業主＋PDF＋送業主文字）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepI = INV, keepPr = window.printInvById, keepM = window._modal;
+      try {
+        let printed = ''; window.printInvById = (id) => { printed = id; }; window._modal = () => {};
+        Q = [{ id: 'qB', name: '測試請款案', awarded: true, client: '甲營造', ownerPay: { cut: 18 }, items: [{ desc: '鋼板樁 III型 打設', unit: '支', qty: 100, price: 1000 }],
+          dailyLogs: [{ id: 'l1', date: '2026-10-05', progressRows: [{ itemIdx: 0, qty: 20 }] }, { id: 'l2', date: '2026-10-12', progressRows: [{ itemIdx: 0, qty: 15 }] }],
+          addons: [{ id: 'a1', date: '2026-10-10', text: '追加背填', status: 'confirmed', qty: 3, unit: 'M3' }], t: { total: 0 } }];
+        INV = [];
+        _todoBuild(true);
+        const L = _decItems('invDraft');
+        out.card = L.length === 1 && /截止 10-18/.test(_DEC.invDraft.head(L[0]));
+        const det = L.length ? _DEC.invDraft.detail(L[0]) : '';
+        out.detail = /第 1 期/.test(det) && /10-05 20、10-12 15/.test(det) && /35 ／ 100/.test(det) && /追加背填/.test(det) && /還沒有業主簽認紀錄/.test(det) && /保留款 0%/.test(det);
+        out.ok = (await _DEC.invDraft.ok(L[0])) === 'open' && INV.length === 1 && _invStOf(INV[0]) === 'draft' && /請款單草稿卡確認/.test(INV[0].stLog.slice(-1)[0].why);
+        _todoBuild(true);
+        out.gone = !_decItems('invDraft').length;
+        const S = _decItems('invSend');
+        out.send0 = S.length === 1 && (await _DEC.invSend.ok(S[0])) === false && _invStOf(INV[0]) === 'draft';   // 金額 0 不送
+        INV[0].totals = { curTotal: 35000, tax: 1750, retention: 0, grand: 36750 };
+        out.msg = /測試請款案」第 1 期請款單/.test(_DEC.invSend.detail(S[0])) && /NT\$ 36,750/.test(_DEC.invSend.detail(S[0]));
+        out.send = (await _DEC.invSend.ok(S[0])) === 'open' && _invStOf(INV[0]) === 'sent' && /確認送出/.test(INV[0].stLog.slice(-1)[0].why);
+        await new Promise(res => setTimeout(res, 120)); out.pdf = printed === INV[0].id && !_decItems('invSend').length;
+        // 退回＝這期不請
+        INV = []; _todoBuild(true); const L2 = _decItems('invDraft');
+        out.skip = L2.length === 1 && _DEC.invDraft.reject(L2[0], '業主說月底一起') === true && Q[0].billSkip['2026-10-18'].why === '業主說月底一起' && !_decItems('invDraft').length;
+      } finally { Q = keepQ; INV = keepI; window.printInvById = keepPr; window._modal = keepM; }
+      return out;
+    });
+    check('v6.0.225 請款單草稿卡：截止前 5 天出卡（附哪幾天的日報、日報累計／合約、已確認追加標黃、保留款）、確認＝開第 N 期且狀態草稿、開了就不再出；草稿待送出卡：金額 0 不送、確認＝已送業主＋PDF＋送業主文字；退回＝這期不請', Object.values(r).length === 9 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.225 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
   // ── v6.0.221 進退料 M8b：鋼價追蹤 → 建議調整買價（中鋼盤價草稿為主、主計總處指數備援、都沒有出保底卡）──
