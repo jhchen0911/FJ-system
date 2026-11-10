@@ -12983,10 +12983,10 @@ async function newPage(browser, width, height) {
         go('acct'); acctTab('ap'); await T(150);
         const tb = document.getElementById('acct-tabs');
         const big = Array.prototype.map.call(tb.querySelectorAll('[data-ag]'), (b) => b.textContent);
-        out.groups = JSON.stringify(big) === JSON.stringify(['收', '付', '發票與支出', '金流']);
-        out.sub = /廠商請款/.test(tb.textContent) && /應付/.test(tb.textContent) && tb.querySelector('[data-at="ap"]').style.background.indexOf('var(--g)') >= 0;
+        out.groups = JSON.stringify(big) === JSON.stringify(['應收', '應付', '發票與支出', '金流']);   // v6.0.221 改名
+        out.sub = /廠商款/.test(tb.textContent) && /零用金/.test(tb.textContent) && !tb.querySelector('[data-at="vb"]') && tb.querySelector('[data-at="ap"]').style.background.indexOf('var(--g)') >= 0;   // v6.0.221 廠商請款併進廠商款
         // 點「收」→ 到收那塊（業主請款或上次停的頁）；再點「付」→ 回到上次停的「應付」
-        tb.querySelector('[data-ag="in"]').click(); await T(80); out.inGo = _acctTab === 'own' || _acctTab === 'ar';
+        tb.querySelector('[data-ag="in"]').click(); await T(80); out.inGo = _acctTab === 'ar' && !document.querySelector('#acct-tabs [data-at]');   // v6.0.221 應收只有一張清單
         document.querySelector('#acct-tabs [data-ag="out"]').click(); await T(80); out.remember = _acctTab === 'ap';
         document.querySelector('#acct-tabs [data-ag="cash"]').click(); await T(80); out.cash = _acctTab === 'cash' && !document.querySelector('#acct-tabs [data-at]');
         // 金流一行：跟金流預測頁同一套算法
@@ -13168,6 +13168,64 @@ async function newPage(browser, width, height) {
     check('v6.0.220 頁尾貼在最後一頁下緣留白：切頁不算內文、PDF 與預覽都只有最後一頁有、多頁頁碼同一行右邊；沒有地址 Email 不出頁尾、頁碼照舊置中', !r.err && r.foot && r.pvFoot && r.pdfFoot && r.pdfNoFoot && r.noFootHtml, JSON.stringify({ foot: r.foot, pvFoot: r.pvFoot, pdfFoot: r.pdfFoot, pdfNoFoot: r.pdfNoFoot, noFootHtml: r.noFootHtml, n: r.n, err: r.err }));
     check('v6.0.214 分包合約書：條文可以換頁，第 1 頁填滿（不再印完明細就換頁、下半頁空白）', !r.err && r.cuts >= 10 && r.full, JSON.stringify({ cuts: r.cuts, fill: r.fill, n: r.n, err: r.err }));
     check('v6.0.214 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+  // ── v6.0.221 帳務新選單：收→應收、付→應付；業主請款＋應收併成一張清單、廠商請款＋應付併成「廠商款」（只改畫面）──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async (W) => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const oU = window._fbUser, oA = window._isAdminUser, keepP = PAYABLES.slice(), keepI = INV.slice();
+      try {
+        localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_recv5f'); _nav5Apply(); _recv5F = 'unpaid';
+        window.toast = () => {}; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        const d = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+        const mk = (id, client, project, no, date, total, o) => Object.assign({ id, client, project, periodNo: no, date, items: [], totals: { curTotal: Math.round(total / 1.05), tax: total - Math.round(total / 1.05), total }, _mt: 1 }, o || {});
+        INV.length = 0;
+        INV.push(mk('iR1', '範例營造甲', '範例案A', 4, d(-60), 105000, { recvOv: { date: d(-21), reason: 'x' } }));
+        INV.push(mk('iR2', '範例營造甲', '範例案B', 5, d(-10), 210000, { recvOv: { date: d(20), reason: 'x' } }));
+        INV.push(mk('iR3', '範例企業乙', '範例案C', 1, d(-90), 52500, { receivedConfirmed: true }));
+        _invStoreWrite();
+        go('acct'); acctTab('own'); await T(150);   // 舊分頁鍵「業主請款」→ 新選單轉成應收
+        const rv = document.getElementById('recv5'), txt = rv ? rv.textContent : '';
+        out.merged = _acctTab === 'ar' && !!rv && rv.style.display !== 'none' && getComputedStyle(document.getElementById('finance-ar')).display === 'none' && /新增請款單/.test(txt);
+        const chips = Array.prototype.map.call(rv.querySelectorAll('button[onclick^="recv5Filter"]'), (b) => b.textContent);
+        const un = _arList().filter((i) => i.client.indexOf('範例') === 0);
+        out.chips = chips.length === 4 && /^全部 3/.test(chips[0]) && chips[1] === '未收 ' + un.length + '（' + fmt(un.reduce((a, i) => a + _invAR(i), 0)) + '）' && /^逾期 1/.test(chips[2]) && /^已收 1/.test(chips[3]);
+        // 預設未收：依業主分組、逾期那筆有催款、每筆 PDF／編輯／收款／✉；已收的不在
+        out.unpaid = /範例營造甲/.test(txt) && !/範例案C/.test(txt) && rv.querySelectorAll('button[onclick^="openDunning"]').length === 1 && rv.querySelectorAll('button[onclick^="printInvById"]').length === 2 && rv.querySelectorAll('button[onclick^="openReceiptModal"]').length === 2 && rv.querySelectorAll('button[onclick^="openEnvelope"]').length === 2 && /逾期 21 天/.test(txt) && /未收 NT\$ 315,000/.test(txt);
+        recv5Filter('paid'); await T(40); out.paid = /範例案C/.test(rv.textContent) && !rv.querySelector('button[onclick^="openReceiptModal"]') && /已收清/.test(rv.textContent);
+        recv5Filter('overdue'); await T(40); out.od = /範例案A/.test(rv.textContent) && !/範例案B/.test(rv.textContent);
+        recv5Filter('all'); await T(40); out.all = rv.querySelectorAll('button[onclick^="printInvById"]').length === 3;
+        const fs = document.getElementById('finance-search'); fs.value = '範例案B'; renderFinanceAR(); out.srch = /範例案B/.test(rv.textContent) && !/範例案A/.test(rv.textContent); fs.value = ''; recv5Filter('unpaid');
+        // 廠商款：分組選單收起、篩選只留 全部／待付／逾期／已付、依廠商分組；廠商請款頁的分包合約總表收在下面；舊分頁鍵「廠商請款」轉來這裡
+        PAYABLES.length = 0;
+        PAYABLES.push({ id: 'pR1', to: '範例廠商丁', project: '範例案A', amount: 1000, vat: true, date: d(-3), status: 'pending', _mt: 1 });
+        PAYABLES.push({ id: 'pR2', to: '範例廠商丁', project: '範例案B', amount: 2000, vat: true, date: d(9), status: 'pending', _mt: 1 });
+        PAYABLES.push({ id: 'pR3', to: '範例廠商戊', project: '範例案A', amount: 3000, vat: true, date: d(-30), status: 'paid', paidDate: d(-20), _mt: 1 });
+        window._payAging = undefined; acctTab('vb'); await T(150);
+        const pl = document.getElementById('payable-list'), pt = pl.textContent, ph = document.getElementById('pay5');
+        out.vbGo = _acctTab === 'ap' && !!ph && /本期計價截止/.test(ph.textContent) && /放款日/.test(ph.textContent) && document.getElementById('payable-group-mode').style.visibility === 'hidden';
+        out.payChips = /待付 2/.test(pt) && /逾期 1/.test(pt) && /已付 1/.test(pt) && !/7日內/.test(pt) && window._payAging === 'unpaid';
+        out.byVendor = pl.querySelectorAll('[data-gkey^="vendor:"]').length === 1 && /範例廠商丁/.test(pt);   // 待付：只有丁
+        window._payAging = 'all'; renderPayables(); await T(40); out.byVendor = out.byVendor && pl.querySelectorAll('[data-gkey^="vendor:"]').length === 2; window._payAging = 'unpaid';
+        // 核對：分包期別待核准的才有（同一套 _vpPending）
+        const vp0 = window._vpPending; window._vpPending = () => [PAYABLES[0]]; renderPayables(); await T(40);
+        out.check = pl.querySelectorAll('button[onclick^="openVendorPayCheck"]').length === 1; window._vpPending = vp0;
+        // 舊選單：8 個分頁、合併清單收起、廠商請款頁照舊（全部分包合約有搜尋框）
+        localStorage.setItem('fy_nav_old', '1'); _nav5Apply(); acctTab('own'); await T(100);
+        out.old = _acctTab === 'own' && document.querySelectorAll('#acct-tabs button').length === 8 && document.getElementById('recv5').style.display === 'none';
+        acctTab('ap'); await T(60); out.oldPay = /7日內/.test(document.getElementById('payable-list').textContent) && document.getElementById('payable-group-mode').style.visibility === '';
+        acctTab('vb'); await T(100); out.oldVb = _acctTab === 'vb' && !!document.getElementById('vb-kw');
+        localStorage.removeItem('fy_nav_old'); _nav5Apply(); acctTab('ar'); await T(60);
+        out.noScroll = document.documentElement.scrollWidth <= W + 1;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      PAYABLES.length = 0; keepP.forEach((p) => PAYABLES.push(p)); INV.length = 0; keepI.forEach((i) => INV.push(i)); try { _invStoreWrite(); } catch (e) { /* 可忽略 */ } _fbUser = oU; _isAdminUser = oA;
+      return out;
+    }, W);
+    check('v6.0.221 帳務應收（寬 ' + W + '）：業主請款＋應收一張清單，篩選 全部／未收／逾期／已收（預設未收，金額同 _arList），依業主分組、PDF／編輯／收款／✉、逾期有催款、新增在最上面、搜尋照用', !r.err && r.merged && r.chips && r.unpaid && r.paid && r.od && r.all && r.srch && r.noScroll, JSON.stringify(r));
+    check('v6.0.221 帳務應付 › 廠商款（寬 ' + W + '）：廠商請款＋應付一張清單，依廠商分組、篩選 全部／待付／逾期／已付、核對、計價截止與放款日；舊選單照舊', !r.err && r.vbGo && r.payChips && r.byVendor && r.check && r.old && r.oldPay && r.oldVb, JSON.stringify(r));
+    check('v6.0.221 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
   await browser.close();

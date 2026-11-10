@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.220';
+var APP_VERSION='v6.0.221';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -4472,6 +4472,7 @@ function renderInvList(){
     el.innerHTML=_rows.join('');
   }
   st('inv-sub','\u5171 '+INV.length+' \u4efd\u8acb\u6b3e\u55ae');
+  try{if(_v7New('acct')&&document.getElementById('recv5'))_recv5Render();}catch(e){_err('renderInvList.n5',e);}   // v6.0.221 新選單：請款單改了，合併清單跟著更新
   updBadge();
   updateInvPageBanners();
   try{updateInvStats();}catch(e){_err('top',e);}
@@ -26357,6 +26358,9 @@ function _togglePayVatCore(pid,on){
 function renderPayables(){
   try{if(_paidLogSync())savePayables();}catch(e){_err('renderPayables.paidLog',e);}   // v6.0.89 顯示前先與付款帳本對帳
   const el=document.getElementById('payable-list');if(!el)return;
+  const n5=_v7New('acct');   // v6.0.221 新選單「廠商款」：依廠商分組、篩選只留 全部／待付／逾期／已付（預設待付）、每筆加「核對」
+  if(n5&&(!window._payAging||window._payAging==='w7'||window._payAging==='later'))window._payAging='unpaid';
+  try{var _ph=document.getElementById('pay5');if(_ph)_ph.innerHTML=n5?_pay5HeadHtml():'';}catch(e){_err('renderPayables.n5',e);}
   const catMap={material:'材料費',labor:'人工費',equipment:'機具費',subcontract:'協力廠商',salary:'薪資／勞健保',petty:'零用金',other:'其他'};
   const srch=(document.getElementById('finance-search')?.value||'').toLowerCase();
   const _voidN=PAYABLES.filter(p=>p&&p.voidAt).length;   // 健檢1 #20 作廢（取消得標）的應付：預設不列
@@ -26399,8 +26403,8 @@ function renderPayables(){
       +chip('all','全部','var(--g3)')
       +chip('unpaid','待付 '+pend.length+'（'+sum(pend)+'）','var(--g3)')
       +chip('overdue','逾期 '+cnt.overdue+'（'+sum(gOverdue)+'）','var(--red)')
-      +chip('w7','7日內 '+cnt.w7+'（'+sum(gW7)+'）','#b45309')
-      +chip('later','7日後 '+cnt.later+'（'+sum(gLater)+'）','var(--b4)')
+      +(n5?'':chip('w7','7日內 '+cnt.w7+'（'+sum(gW7)+'）','#b45309')
+      +chip('later','7日後 '+cnt.later+'（'+sum(gLater)+'）','var(--b4)'))
       +chip('paid','已付 '+cnt.paid,'var(--g)')
       +(_voidN?('<button type="button" onclick="window._payShowVoid=!window._payShowVoid;renderPayables()" title="取消得標時作廢的抽成／佣金應付（金額已歸零，留紀錄）" style="font-family:inherit;font-size:12px;padding:0 12px;height:36px;border-radius:99px;cursor:pointer;border:1px dashed var(--b2);background:#fff;color:var(--b3)">'+(window._payShowVoid?'隱藏':'顯示')+'已作廢 '+_voidN+'</button>'):'')
       +'</div>';
@@ -26414,7 +26418,7 @@ function renderPayables(){
     return new Date(a.date||'2999-12-31')-new Date(b.date||'2999-12-31'); // 未付：日期近的排前
   });
   // 廠商分組模式判斷
-  var _payMode=document.getElementById('payable-group-mode')?document.getElementById('payable-group-mode').value:'project';
+  var _payMode=n5?'vendor':(document.getElementById('payable-group-mode')?document.getElementById('payable-group-mode').value:'project');
   if(_payMode==='vendor'||_payMode==='project'){
     // 依廠商 / 依合約(工程) 分組，群組可收合
     if(!window._payGroupState)window._payGroupState={};
@@ -26462,6 +26466,7 @@ function renderPayables(){
           +'<span class="bdg '+(p.status==='paid'?'ok':'warn')+'">'+(p.status==='paid'?'✓ 已付款':'待付款')+'</span>'+_payLedgerWarn(p)+'</div>'
           +'<div style="display:flex;gap:4px;margin-left:8px;flex-wrap:wrap;align-items:center">'
           +(p.status!=='paid'?'<button type="button" class="btn btn-xs" style="border-color:var(--g);color:var(--g)" onclick="payMarkPaid(\''+p.id+'\',null,_payAfterMark)">✓ 付款</button>'+_payVendorAllBtn(p):'<button type="button" class="btn btn-xs" style="border-color:#ffcc80;color:#b45309" title="誤標已付：改回待付款（會問一次）" onclick="payUnmark(\''+p.id+'\')">改回未付</button>'+(_payDateEditable(p)?'<button type="button" class="btn btn-xs" title="只改這一筆的實付日期" onclick="payEditPaidDate(\''+p.id+'\')">改付款日</button>':''))   // v6
+          +(n5&&_pay5CanCheck(p)?'<button type="button" class="btn btn-xs" style="border-color:#1565C0;color:#1565C0" title="付包商款核對：日報量、廠商請款、業主已請" onclick="openVendorPayCheck(\''+escq(p.id)+'\')">核對</button>':'')   // v6.0.221
           +_payAuditBtn(p)   // v6.0.89.0.72 付款先問實付日；已付可改回
           +_lrsPayBtn(p)   // v6.0.140 勞報單
         +(_payQidOf(p)?'<button type="button" class="btn btn-xs" style="border-color:#e65100;color:#e65100" title="開啟來源施工成本" onclick="openProjectCosts(\''+_payQidOf(p)+'\')"><svg class="ic ib" aria-hidden="true"><use href="#i-hardhat"/></svg> 成本</button>':'')
@@ -32661,6 +32666,26 @@ function _vbStatusChip(r){
   return (r.rental?'<span style="display:inline-block;border-radius:99px;padding:1px 7px;font-size:10px;font-weight:700;color:#8a6d00;background:#FFF8E1;margin-right:3px">租賃</span>':'')+'<span style="display:inline-block;border-radius:99px;padding:1px 8px;font-size:10.5px;font-weight:700;color:'+m[1]+';background:'+m[2]+';white-space:nowrap">'+esc(m[0])+'</span>';
 }
 function _vbItems(r){return (r.c.rows||[]).map(function(x){if(x.lump)return '一式';var it=(x.linkedItemIdx>=0&&r.q.items)?r.q.items[x.linkedItemIdx]:null;return it?String(it.desc||'').split('\n')[0].slice(0,16):(x.desc||'');}).filter(Boolean).join('、')+(function(){try{var rq=r.c.rfqId&&_rfqs(r.q).find(function(y){return y.id===r.c.rfqId;});var d=rq&&_rfqQuoteDiff(r.q,rq);return d&&d.any?('　⚠ 報價已進版至 v'+d.ver+'，本分包工項仍是舊版'):'';}catch(e){_err('_vbItems',e);return '';}})();}
+// 全部分包合約（v6.0.221 從 renderVendorBilling 抽出，新選單廠商款的總表共用；plain＝不放搜尋與篩選）
+function _vbContractsCard(rows,plain){
+  var h='';
+  var kw=plain?'':String(_vbFilter.kw||'').trim().toLowerCase(),sf=plain?'':(_vbFilter.st||'');
+  var list=rows.filter(function(r){if(sf&&r.status!==sf)return false;if(!kw)return true;return (r.pname+' '+r.c.vendor+' '+_vbItems(r)).toLowerCase().indexOf(kw)>=0;});
+  h+='<div class="card" style="padding:12px 14px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><div style="font-weight:800;font-size:14px">全部分包合約</div>'
+    +(plain?'</div>':'<input id="vb-kw" type="search" placeholder="搜尋專案／廠商／工項" value="'+esc(_vbFilter.kw||'')+'" oninput="vbFilter(\'kw\',this.value)" style="flex:1;min-width:140px;padding:6px 10px;border:1px solid var(--b2);border-radius:var(--r8);font-size:12.5px;font-family:inherit;background:var(--w)">'
+    +'<select onchange="vbFilter(\'st\',this.value)" style="font-size:12px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit">'+[['','全部狀態'],['pending','待登錄'],['billed','本期已登錄'],['idle','本期無新量'],['follow','跟隨主約'],['done','已請完']].map(function(o){return '<option value="'+o[0]+'"'+(sf===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></div>');
+  if(!list.length)h+='<div style="font-size:12px;color:var(--b3)">'+(rows.length?'沒有符合的分包合約':'尚無分包合約。在工程專案的「發包」得標後，或施工成本頁新增承包成本，即會列在這裡。')+'</div>';
+  else h+=_pjTable([{t:'專案'},{t:'廠商／工項'},{t:'發包額（未稅）',r:1},{t:'已請累計',r:1},{t:'已付（含稅）',r:1},{t:'未付（含稅）',r:1},{t:'押保留款',r:1},{t:'最近期別'},{t:'狀態'},{t:''}],list.map(function(r){
+    var pct=r.st.total>0?Math.round(r.st.billed/r.st.total*100):0;
+    var over=_subOverStat(r.c);
+    return [esc(r.pname),'<b>'+esc(r.c.vendor)+'</b><div style="font-size:10.5px;color:var(--b4)">'+(r.rental?esc((r.c.rows||[]).map(function(x){return x.desc||x.preset||'';}).filter(Boolean).slice(0,3).join('、')):esc(_vbItems(r)))+(r.c.followOf?'<div style="color:#1565C0">介紹費／抽成，跟隨主約同期同量</div>':'')+'</div>',r.rental?'<span style="color:var(--b4)">依期請款</span>':fmt(r.st.total),
+      fmt(r.st.billed)+'<div style="font-size:10.5px;color:'+(pct>100?'#1565C0':'var(--b4)')+'">'+pct+'%'+(over.overAmt?('・實作超量 '+fmt(over.overAmt)):'')+'</div>',fmt(r.st.paid),'<span style="color:'+(r.st.unpaid?'var(--red)':'var(--b5)')+'">'+fmt(r.st.unpaid)+'</span>',fmt(Math.max(0,r.st.retHeld)),
+      r.last?('第'+r.last.no+'期 '+esc(r.last.date||'')+'<div style="font-size:10.5px;color:var(--b4)">到期 '+esc(r.last.due||'')+'</div>'):'<span style="color:var(--b3)">—</span>',_vbStatusChip(r),
+      _pjBtn("openProj('"+r.q.id+"')",'開啟工程','border-color:#1565C0;color:#1565C0')];}),
+    ['合計','',fmt(list.reduce(function(a,r){return a+r.st.total;},0)),fmt(list.reduce(function(a,r){return a+r.st.billed;},0)),fmt(list.reduce(function(a,r){return a+r.st.paid;},0)),fmt(list.reduce(function(a,r){return a+r.st.unpaid;},0)),fmt(list.reduce(function(a,r){return a+Math.max(0,r.st.retHeld);},0)),'','','']);
+  h+='</div>';
+  return h;
+}
 function renderVendorBilling(keepScroll){
   var root=document.getElementById('vb-root');if(!root)return;
   var rows=_vbRows(),cut=_vendorCutDate(localToday()),due=_vendorDueDate(cut);
@@ -32694,22 +32719,7 @@ function renderVendorBilling(keepScroll){
       _pjBtn("openProj('"+r.q.id+"')",'開啟工程')];}),
     ['合計','','','',fmt(sumCur),'','',fmt(curPers.reduce(function(a,x){var k=_subPeriodCalc(x.r.c,x.p);return a+(_subInvoice(x.r.c)?Math.round(k.pay*_taxM()):k.pay);},0)),'','','','']);
   h+='</div>';
-  // 3) 全部分包合約
-  var kw=String(_vbFilter.kw||'').trim().toLowerCase(),sf=_vbFilter.st||'';
-  var list=rows.filter(function(r){if(sf&&r.status!==sf)return false;if(!kw)return true;return (r.pname+' '+r.c.vendor+' '+_vbItems(r)).toLowerCase().indexOf(kw)>=0;});
-  h+='<div class="card" style="padding:12px 14px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><div style="font-weight:800;font-size:14px">全部分包合約</div>'
-    +'<input id="vb-kw" type="search" placeholder="搜尋專案／廠商／工項" value="'+esc(_vbFilter.kw||'')+'" oninput="vbFilter(\'kw\',this.value)" style="flex:1;min-width:140px;padding:6px 10px;border:1px solid var(--b2);border-radius:var(--r8);font-size:12.5px;font-family:inherit;background:var(--w)">'
-    +'<select onchange="vbFilter(\'st\',this.value)" style="font-size:12px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit">'+[['','全部狀態'],['pending','待登錄'],['billed','本期已登錄'],['idle','本期無新量'],['follow','跟隨主約'],['done','已請完']].map(function(o){return '<option value="'+o[0]+'"'+(sf===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></div>';
-  if(!list.length)h+='<div style="font-size:12px;color:var(--b3)">'+(rows.length?'沒有符合的分包合約':'尚無分包合約。在工程專案的「發包」得標後，或施工成本頁新增承包成本，即會列在這裡。')+'</div>';
-  else h+=_pjTable([{t:'專案'},{t:'廠商／工項'},{t:'發包額（未稅）',r:1},{t:'已請累計',r:1},{t:'已付（含稅）',r:1},{t:'未付（含稅）',r:1},{t:'押保留款',r:1},{t:'最近期別'},{t:'狀態'},{t:''}],list.map(function(r){
-    var pct=r.st.total>0?Math.round(r.st.billed/r.st.total*100):0;
-    var over=_subOverStat(r.c);
-    return [esc(r.pname),'<b>'+esc(r.c.vendor)+'</b><div style="font-size:10.5px;color:var(--b4)">'+(r.rental?esc((r.c.rows||[]).map(function(x){return x.desc||x.preset||'';}).filter(Boolean).slice(0,3).join('、')):esc(_vbItems(r)))+(r.c.followOf?'<div style="color:#1565C0">介紹費／抽成，跟隨主約同期同量</div>':'')+'</div>',r.rental?'<span style="color:var(--b4)">依期請款</span>':fmt(r.st.total),
-      fmt(r.st.billed)+'<div style="font-size:10.5px;color:'+(pct>100?'#1565C0':'var(--b4)')+'">'+pct+'%'+(over.overAmt?('・實作超量 '+fmt(over.overAmt)):'')+'</div>',fmt(r.st.paid),'<span style="color:'+(r.st.unpaid?'var(--red)':'var(--b5)')+'">'+fmt(r.st.unpaid)+'</span>',fmt(Math.max(0,r.st.retHeld)),
-      r.last?('第'+r.last.no+'期 '+esc(r.last.date||'')+'<div style="font-size:10.5px;color:var(--b4)">到期 '+esc(r.last.due||'')+'</div>'):'<span style="color:var(--b3)">—</span>',_vbStatusChip(r),
-      _pjBtn("openProj('"+r.q.id+"')",'開啟工程','border-color:#1565C0;color:#1565C0')];}),
-    ['合計','',fmt(list.reduce(function(a,r){return a+r.st.total;},0)),fmt(list.reduce(function(a,r){return a+r.st.billed;},0)),fmt(list.reduce(function(a,r){return a+r.st.paid;},0)),fmt(list.reduce(function(a,r){return a+r.st.unpaid;},0)),fmt(list.reduce(function(a,r){return a+Math.max(0,r.st.retHeld);},0)),'','','']);
-  h+='</div>';
+  h+=_vbContractsCard(rows);
   var y=keepScroll?window.scrollY:null;
   root.innerHTML=h;
   if(keepScroll){var kwEl=document.getElementById('vb-kw');if(kwEl&&document.activeElement!==kwEl){try{kwEl.focus();kwEl.setSelectionRange(kwEl.value.length,kwEl.value.length);}catch(e){/* 可忽略 */}}if(y!=null)window.scrollTo(0,y);}
@@ -32977,22 +32987,98 @@ function _acctMount(){
 }
 // 改版第 7 步④（7d，v6.0.217，Lotion 11/09 第 6 題 A）：新選單（nav5）時 8 個分頁收成 4 塊——收／付／發票與支出／金流，上方 4 個大分頁、
 // 有好幾頁的那塊下面再一排小分頁；每塊記得上次停在哪一頁（本機 fy_acctGrpSub）。舊選單照舊 8 個分頁。
-var _ACCT_GRP=[['in','收',['own','ar']],['out','付',['vb','ap','petty','pay']],['doc','發票與支出',['inv']],['cash','金流',['cash']]];
+var _ACCT_GRP=[['in','應收',['own','ar']],['out','應付',['vb','ap','petty','pay']],['doc','發票與支出',['inv']],['cash','金流',['cash']]];   // v6.0.221 Lotion 11/10：收→應收、付→應付
+// v6.0.221 新選單：業主請款＋應收併成一張「應收」清單（_recv5Render）、廠商請款＋應付併成「廠商款」（renderPayables 新選單樣式＋_pay5HeadHtml）；
+//   舊分頁鍵照收（go('invoice') 等仍是 own／vb），新選單時轉成合併後那頁。舊選單 8 個分頁不動
+var _ACCT_MERGED={own:'ar',vb:'ap'},_ACCT_LAB5={ap:'廠商款'};
 function _acctTabVis(t){return (t!=='petty'&&t!=='pay')||_acctCanPay();}
 function _acctGrpOf(t){var g=_ACCT_GRP.find(function(x){return x[2].indexOf(t)>=0;});return g?g[0]:'in';}
-function _acctGrpSub(g){var o={};try{o=JSON.parse(localStorage.getItem('fy_acctGrpSub')||'{}')||{};}catch(e){_err('_acctGrpSub',e);}var G=_ACCT_GRP.find(function(x){return x[0]===g;});if(!G)return 'own';var L=G[2].filter(_acctTabVis);return L.indexOf(o[g])>=0?o[g]:L[0];}
+function _acctGrpSub(g){var o={};try{o=JSON.parse(localStorage.getItem('fy_acctGrpSub')||'{}')||{};}catch(e){_err('_acctGrpSub',e);}var G=_ACCT_GRP.find(function(x){return x[0]===g;});if(!G)return 'own';var L=G[2].filter(function(t){return _acctTabVis(t)&&!_ACCT_MERGED[t];});return L.indexOf(o[g])>=0?o[g]:L[0];}
 function _acctGrpTabsHtml(){
   var cur=_acctGrpOf(_acctTab),lab={};_ACCT_TABS.forEach(function(t){lab[t[0]]=t[1];});
   var B=function(attr,val,txt,on,big){return '<button type="button" class="btn btn-sm" '+attr+'="'+val+'" style="min-width:0;flex:1 1 0;'+(big?'font-size:14px;padding:9px 4px;':'')+(on?'background:var(--g);color:#fff;border-color:var(--g)':'background:var(--w);color:var(--g3);border-color:var(--gm)')+'">'+txt+'</button>';};
   var h='<div style="display:flex;gap:6px;width:100%">'+_ACCT_GRP.map(function(g){return B('data-ag',g[0],g[1],g[0]===cur,1);}).join('')+'</div>';
-  var G=_ACCT_GRP.find(function(x){return x[0]===cur;}),sub=G[2].filter(_acctTabVis);
-  if(sub.length>1)h+='<div style="display:flex;gap:6px;width:100%;margin-top:6px">'+sub.map(function(t){return B('data-at',t,lab[t],t===_acctTab,0);}).join('')+'</div>';
+  var G=_ACCT_GRP.find(function(x){return x[0]===cur;}),sub=G[2].filter(function(t){return _acctTabVis(t)&&!_ACCT_MERGED[t];});
+  if(sub.length>1)h+='<div style="display:flex;gap:6px;width:100%;margin-top:6px">'+sub.map(function(t){return B('data-at',t,_ACCT_LAB5[t]||lab[t],t===_acctTab,0);}).join('')+'</div>';
   return h;
 }
 function _acctTabsClick(e){
   var b=e.target.closest&&e.target.closest('[data-ag],[data-at]');if(!b)return;
   var g=b.getAttribute('data-ag'),t=b.getAttribute('data-at');
   if(g)acctTab(_acctGrpSub(g));else if(t)acctTab(t);
+}
+// ── v6.0.221 新選單帳務合併（Lotion 11/10）：只改畫面，金額一律用原本的 _invAR／_invExpectedDate／_payLeft 等，不另算 ──
+// 新選單時：應收頁上方放合併清單 #recv5、原本應收清單收起；廠商款頁上方放 #pay5（計價截止／放款日、待登錄、分包合約總表）、分組選單收起
+function _acct5Wrap(n5){
+  var ar=document.getElementById('acct-p-ar'),ap=document.getElementById('acct-p-ap');
+  if(ar&&!document.getElementById('recv5')){var d=document.createElement('div');d.id='recv5';ar.insertBefore(d,ar.firstChild);}
+  if(ap&&!document.getElementById('pay5')){var d2=document.createElement('div');d2.id='pay5';ap.insertBefore(d2,ap.firstChild);}
+  var r5=document.getElementById('recv5'),p5=document.getElementById('pay5'),fa=document.getElementById('finance-ar'),gm=document.getElementById('payable-group-mode');
+  if(r5)r5.style.display=n5?'':'none';if(p5)p5.style.display=n5?'':'none';
+  if(fa)fa.classList.toggle('n5a-hide',!!n5);if(gm)gm.style.visibility=n5?'hidden':'';
+}
+var _recv5F=(function(){try{return localStorage.getItem('fy_recv5f')||'unpaid';}catch(e){return 'unpaid';}})();
+function recv5Filter(k){_recv5F=k;try{localStorage.setItem('fy_recv5f',k);}catch(e){_err('recv5Filter',e);}_recv5Render();}
+// 一張請款單在合併清單裡的狀態（跟原本應收清單同一套：未收＝_invAR>0、逾期＝預計收款日已過）
+function _recv5St(inv,now){
+  if(inv.kind==='retReturn'){var R=inv.retRet||{};return {ret:1,open:!R.done,od:false,odDays:0,amt:Math.round(parseFloat(R.amt)||0),due:''};}
+  var ar=_invAR(inv),od=false,odDays=0,due='';
+  if(ar>0){var ex=_invExpectedDate(inv);if(ex){var q=ex.date.split('-'),t=new Date(parseInt(q[0]),parseInt(q[1])-1,parseInt(q[2])).getTime();od=t<now;if(od)odDays=Math.floor((now-t)/86400000);due='預計'+ex.date+(ex.est?'（推定）':'');}}
+  return {open:ar>0,od:od,odDays:odDays,amt:ar>0?ar:Math.round(((inv.totals||{}).total)||0),ar:ar,due:due};
+}
+function _recv5Render(){
+  var el=document.getElementById('recv5');if(!el)return;
+  var srch=(document.getElementById('finance-search')||{}).value;srch=String(srch||'').toLowerCase();
+  var now=Date.now(),all=(INV||[]).filter(function(inv){return inv&&(!srch||[(inv.client||''),(inv.project||'')].some(function(v){return v.toLowerCase().indexOf(srch)>=0;}));});
+  var rows=all.map(function(inv){return {inv:inv,s:_recv5St(inv,now)};});
+  var open=rows.filter(function(r){return r.s.open;}),od=rows.filter(function(r){return r.s.od;}),done=rows.filter(function(r){return !r.s.open;});
+  var sum=function(a){return fmt(a.reduce(function(x,r){return x+r.s.amt;},0));};
+  var f=_recv5F,show=f==='all'?rows:f==='overdue'?od:f==='paid'?done:open;
+  var chip=function(k,lb,clr){var on=f===k;return '<button type="button" onclick="recv5Filter(\''+k+'\')" style="font-family:inherit;font-size:12.5px;padding:0 12px;height:36px;border-radius:99px;cursor:pointer;border:1.5px solid '+clr+';'+(on?'background:'+clr+';color:#fff':'background:var(--w);color:'+clr)+'">'+lb+'</button>';};
+  var h='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><button type="button" class="btn btn-sm btn-g" onclick="newInvoice()">＋ 新增請款單</button></div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px">'+chip('all','全部 '+rows.length,'var(--g3)')+chip('unpaid','未收 '+open.length+'（'+sum(open)+'）','var(--g3)')+chip('overdue','逾期 '+od.length+'（'+sum(od)+'）','var(--red)')+chip('paid','已收 '+done.length,'var(--g)')+'</div>';
+  if(!show.length){el.innerHTML=h+'<div class="empty"><div class="empty-ic"><svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg></div><p>'+(srch?'找不到符合「'+esc(srch)+'」的請款單':(f==='paid'?'還沒有已收清的請款單':f==='overdue'?'沒有逾期的請款單':f==='all'?'尚無請款單，按上方「新增請款單」開始':'目前無應收帳款，所有款項已收齊'))+'</p></div>';return;}
+  var by={},order=[];show.forEach(function(r){var k=r.inv.client||'未知業主';if(!by[k]){by[k]=[];order.push(k);}by[k].push(r);});
+  var rk=function(r){return r.s.od?0:r.s.open?1:2;};
+  h+=order.map(function(cl){
+    var L=by[cl].slice().sort(function(a,b){return rk(a)-rk(b)||String(b.inv.date||'').localeCompare(String(a.inv.date||''));});
+    var un=L.filter(function(r){return r.s.open;}).reduce(function(x,r){return x+r.s.amt;},0);
+    var items=L.map(function(r){
+      var inv=r.inv,st=r.s,id=escq(inv.id||'');
+      if(st.ret)return '<div style="border-top:1px solid var(--b1)">'+_retReturnCard(inv)+'</div>';
+      var cashPct=inv.cashPct||100,td=inv.ticketDays||0,terms=cashPct<100||td>0,part=st.open&&_invRcvOwner(inv)>0;
+      var bdg=!st.open?'<div style="font-size:10.5px;color:var(--g);font-weight:700">✓ 已收款</div>':st.od?'<div style="font-size:10px;color:var(--red);font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 逾期 '+st.odDays+' 天</div>':part?'<div style="font-size:10px;color:#b26a00;font-weight:700">部分收款</div>':'';
+      return '<div style="padding:8px 14px;border-top:1px solid var(--b1);display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap">'
+        +'<div style="flex:1;min-width:140px"><div style="font-size:12px;font-weight:700;color:var(--b5)">'+esc(inv.project||'?')+' 第'+esc(String(inv.periodNo||'?'))+'期'+(inv.month?'（'+esc(inv.month)+'）':'')+'</div>'
+        +'<div style="font-size:11px;color:var(--b4)">'+esc(inv.date||'—')+(st.due?' ／ '+esc(st.due):'')+'</div>'
+        +(terms?'<div style="font-size:10px;margin-top:2px;color:'+FY_BRAND.g+';background:var(--gl);border-radius:4px;padding:1px 6px;display:inline-block">現金'+cashPct+'%'+(td?'・票期 '+td+' 天':'')+'</div>':'')+'</div>'
+        +'<div style="text-align:right;flex-shrink:0"><div style="font-size:13px;font-weight:700;color:'+(st.od?'var(--red)':'var(--b5)')+'">NT$ '+fmt(st.amt)+'</div>'
+        +(st.open&&st.amt!==Math.round(((inv.totals||{}).total)||0)?'<div style="font-size:10px;color:var(--b4)">請款 NT$ '+fmt(Math.round(((inv.totals||{}).total)||0))+'</div>':'')+bdg
+        +(_invEinvOf(inv.id)?'<div style="font-size:10px;color:#1a3a6b"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 已開票</div>':'')+'</div>'
+        +'<div style="display:flex;gap:4px;align-self:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">'
+        +(st.od?'<button type="button" onclick="openDunning(\''+id+'\')" class="btn btn-xs" style="border-color:var(--red);color:var(--red)"><svg class="ic ib" aria-hidden="true"><use href="#i-bell"/></svg> 催款</button>':'')
+        +'<button type="button" class="btn btn-xs btn-g" title="查看／匯出 PDF（預覽內下載）" onclick="printInvById(\''+id+'\')">PDF</button>'
+        +'<button type="button" class="btn btn-xs" onclick="loadInvoice(\''+id+'\');go(\'invoice-edit\')"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 編輯</button>'
+        +(st.open?'<button type="button" class="btn btn-xs" style="border-color:var(--gm);color:var(--g3)" onclick="openReceiptModal(\''+id+'\',event)">收款</button>':'')
+        +'<button type="button" class="btn btn-xs" title="列印信封" onclick="openEnvelope(\''+id+'\')">✉</button>'
+        +'</div></div>';
+    }).join('');
+    return '<div style="border:1px solid var(--b1);border-radius:var(--r10);margin-bottom:10px;overflow:hidden"><div style="background:var(--gl);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px">'
+      +'<span style="font-weight:700;color:var(--g3)"><svg class="ic ib" aria-hidden="true"><use href="#i-user"/></svg> '+esc(cl)+'</span>'
+      +'<span style="font-weight:800;color:'+(un?'#c8890a':'var(--g)')+'">'+(un?'未收 NT$ '+fmt(un):'已收清')+'</span></div>'+items+'</div>';
+  }).join('');
+  el.innerHTML=h;
+}
+// 廠商款：本期計價截止／放款日（每月 25 日）＋還沒變成應付的「待登錄廠商請款」＋分包合約總表（收合）；金額與原本廠商請款頁同一套
+function _pay5CanCheck(p){try{return _vpPending().indexOf(p)>=0;}catch(e){_err('_pay5CanCheck',e);return false;}}
+function _pay5HeadHtml(){
+  var rows=[];try{rows=_vbRows();}catch(e){_err('_pay5Head',e);}
+  var cut=_vendorCutDate(localToday()),due=_vendorDueDate(cut),pend=rows.filter(function(r){return r.status==='pending';});
+  var h='<div style="font-size:12px;color:var(--b4);margin-bottom:8px">本期計價截止 <b>'+esc(cut)+'</b>（每月 '+(parseInt(P.vendorCutDay)||25)+' 日）・放款日 <b>'+esc(due)+'</b></div>';
+  if(pend.length)h+='<div class="card" style="margin-bottom:12px;padding:12px 14px"><div style="font-weight:800;font-size:14px;margin-bottom:6px;color:#E65100">待登錄廠商請款 '+pend.length+' 家 <span style="font-size:11px;font-weight:400;color:var(--b4)">日報已完成、尚未計價（登錄在工程專案）</span></div>'
+    +_pjTable([{t:'專案'},{t:'廠商／工項'},{t:'預估本期',r:1},{t:''}],pend.map(function(r){return [esc(r.pname),'<b>'+esc(r.c.vendor)+'</b><div style="font-size:10.5px;color:var(--b4)">'+esc(_vbItems(r))+'</div>','<b style="color:#E65100">'+fmt(r.est.est)+'</b>',_pjBtn("openProj('"+r.q.id+"')",'開啟工程','border-color:#E65100;color:#E65100')];}))+'</div>';
+  if(rows.length)h+='<details style="margin-bottom:12px"><summary style="cursor:pointer;font-size:12.5px;font-weight:700;color:var(--g3);padding:4px 0">分包合約總表（發包額、已請累計、押保留款）'+rows.length+' 筆</summary>'+_vbContractsCard(rows,true)+'</details>';
+  return h;
 }
 // 金流一行（固定在帳務最上面）：可動用資金、未來 30 天預計收／付——跟金流預測頁同一套算法（_availableCash、_cfBucket）
 function _acctCashLineHtml(){
@@ -35243,6 +35329,7 @@ function acctTab(t,noRender){
   if(t==='share'){go('reports');try{showReport('share');}catch(e){_err('acctTab.share',e);}return;}   // 分潤 → 經營報表
   if(!/^(own|vb|ar|ap|cash|inv|petty|pay)$/.test(t||''))t='own';
   if((t==='petty'||t==='pay')&&!_acctCanPay()){toast('薪資．零用金僅限管理員');t='ar';}
+  var n5=_v7New('acct');if(n5&&_ACCT_MERGED[t])t=_ACCT_MERGED[t];   // v6.0.221 新選單：業主請款→應收、廠商請款→廠商款
   _acctTab=t;try{localStorage.setItem('fy_acctTab',t);}catch(e){_err('acctTab',e);}
   var tb=document.getElementById('acct-tabs');if(tb){tb.innerHTML=_acctTabsHtml();if(!tb._agWired){tb._agWired=1;tb.addEventListener('click',_acctTabsClick);}}
   try{var o=JSON.parse(localStorage.getItem('fy_acctGrpSub')||'{}')||{};o[_acctGrpOf(t)]=t;localStorage.setItem('fy_acctGrpSub',JSON.stringify(o));}catch(e){_err('acctTab.grp',e);}
@@ -35251,6 +35338,7 @@ function acctTab(t,noRender){
   var fm={ar:'finance-ar',ap:'finance-payable',cash:'finance-cashflow'};
   if(fm[t]){var fp=document.getElementById(fm[t]);if(fp)fp.style.display='block';}
   if(t==='ar'){var fr=document.getElementById('finance-retention');if(fr){fr.style.display='block';fr.style.marginTop='18px';}}
+  try{_acct5Wrap(n5);}catch(e){_err('acctTab.n5',e);}
   if(t==='own')_invTab='owner';else if(t==='vb')_invTab='vendor';try{if(t==='own'||t==='vb')localStorage.setItem('fy_invTab',_invTab);}catch(e){_err('acctTab',e);}
   var sub=document.getElementById('acct-sub');if(sub)sub.textContent=({own:'對業主請款／估驗',vb:'分包廠商每月請款工作台（登錄動作在工程專案）',ar:'業主應收・票據・催款・保留款（業主押我方／我方押廠商）',ap:'廠商／薪資／零用金應付・付款確認',cash:'90 天資金水位預測',inv:'銷項發票紀錄・月份進銷項與稅額・日常費用',petty:'員工零用金月結',pay:'人員薪資條與勞健保'})[t]||'';
   if(noRender)return;
@@ -35258,8 +35346,8 @@ function acctTab(t,noRender){
   try{
     if(t==='own'){_invWrapSync('owner');renderInvList();updateInvPageBanners();try{updateInvStats();}catch(e){_err('acctTab.own',e);}try{_invMonthBanner();}catch(e){_err('acctTab',e);}try{_vbBadge();}catch(e){_err('acctTab',e);}}
     else if(t==='vb'){_invWrapSync('vendor');renderVendorBilling();try{_vbBadge();}catch(e){_err('acctTab',e);}}
-    else if(t==='ar'){renderFinanceAR();try{renderRetention();}catch(e){_err('acctTab.ret',e);}}
-    else if(t==='ap'){try{cleanDuplicatePayables();}catch(e){_err('acctTab.dup',e);}renderPayables();}
+    else if(t==='ar'){renderFinanceAR();try{renderRetention();}catch(e){_err('acctTab.ret',e);}}   // 新選單：renderFinanceAR 開頭畫合併清單
+    else if(t==='ap'){try{cleanDuplicatePayables();}catch(e){_err('acctTab.dup',e);}renderPayables();}   // 新選單：renderPayables 畫廠商款樣式
     else if(t==='cash'){renderCashflow();}
     else if(t==='inv'){renderInvoiceRecords();renderLedger();}
     else if(t==='petty'||t==='pay'){renderPayroll();}
@@ -44365,6 +44453,7 @@ function renderFinanceSearch(){
 }
 
 function renderFinanceAR(){
+  if(_v7New('acct')&&document.getElementById('recv5')){try{_recv5Render();}catch(e){_err('renderFinanceAR.n5',e);}}   // v6.0.221 新選單：合併的應收清單
   const el=document.getElementById('finance-ar-list');if(!el)return;
   const srch=(document.getElementById('finance-search')?.value||'').toLowerCase();
   const now=Date.now();
