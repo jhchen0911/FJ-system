@@ -11651,14 +11651,21 @@ async function newPage(browser, width, height) {
         DRAFTS.dok1 = { id: 'dok1', type: 'invOk', by: 'ai@example.com', at: 1, status: 'pending', summary: '', payload: _invOkClean({ qid: 'q1', text: '第3期數量沒問題，請開發票', from: '王主任' }) };
         const K = _decItems('invOk');
         out.okCard = K.length === 1 && _invOkInv(K[0]).id === 'i3' && /第3期數量沒問題/.test(_DEC.invOk.detail(K[0])) && /12345678/.test(_DEC.invOk.detail(K[0])) && /NT\$ 100,000/.test(_DEC.invOk.detail(K[0]));
-        const ok = _DEC.invOk.ok(K[0]);
+        window._draftMark = () => Promise.resolve(false);
+        out.markFail = (await _DEC.invOk.ok(K[0])) === false && _invStOf(INV[2]) === 'sent' && !INV[2].ownerOk;   // 草稿標記失敗：請款單不動
+        window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        const ok = await _DEC.invOk.ok(K[0]);
         out.okDone = ok === 'open' && _invStOf(INV[2]) === 'ok' && INV[2].stLast === 'ok' && /王主任/.test(INV[2].stLog.slice(-1)[0].why) && DRAFTS.dok1.status === 'applied' && INV[2].ownerOk.from === '王主任';
         const cp = _invCopyOf(INV[2]);
         out.copy = cp.buyer === '甲營造' && cp.taxid === '12345678' && cp.item === '測試甲案 第3期工程款' && cp.net === 100000 && cp.tax === 5000 && cp.gross === 105000;
         // 業主要改數量 → 不改狀態、打開請款單去改、留紀錄
         DRAFTS.dok2 = { id: 'dok2', type: 'invOk', by: 'ai@example.com', at: 2, status: 'pending', summary: '', payload: _invOkClean({ invId: 'i2', text: '鋼板樁打設請改成 80 支', change: [{ desc: '鋼板樁打設', qty: '80' }] }) };
         const K2 = _decItems('invOk').find(d => d.id === 'dok2');
-        out.chg = /業主要改 1 列/.test(_DEC.invOk.body(K2)) && _DEC.invOk.ok(K2) === 'open' && _invStOf(INV[1]) === 'einv' && /業主要改 1 列/.test(INV[1].stLog.slice(-1)[0].why);
+        out.chg = /業主要改 1 列/.test(_DEC.invOk.body(K2)) && (await _DEC.invOk.ok(K2)) === 'open' && _invStOf(INV[1]) === 'einv' && /業主要改 1 列/.test(INV[1].stLog.slice(-1)[0].why) && INV[1].stLast === 'einv' && /已經已開發票/.test(_DEC.invOk.detail(K2));
+        // 對位：案名只用部分字、對到兩個工程就不猜；期別要是數字
+        INV.push({ id: 'x1', project: '測試甲案二期', periodNo: 1, totals: T, stLast: 'sent' });
+        out.find = _invOkFind(_invOkClean({ caseName: '測試甲' })) === null && (_invOkFind(_invOkClean({ caseName: '測試甲案', periodNo: 3 })) || {}).id === 'i3' && _invOkClean({ periodNo: '第3期' }).periodNo === 0 && _invOkFind(_invOkClean({ qid: 'q1', periodNo: 9 })) === null;
+        INV.pop();
         // 事實變了自動記：發票作廢 → 回到業主已確認以前的狀態（i2 沒確認過＝已送業主）；收齊 → 已收款
         INVOICE_RECS[0].status = 'cancelled'; const n1 = _invStSync();
         out.sync = n1 === 1 && INV[1].stLast === 'sent' && /^自動/.test(INV[1].stLog.slice(-1)[0].why) && INV[1].stLog.slice(-1)[0].by === '系統';
@@ -11666,12 +11673,15 @@ async function newPage(browser, width, height) {
         out.paid = INV[2].stLast === 'paid' && _invStDone(INV[2], 'ok') && _invStDone(INV[2], 'paid') && !_invStDone(INV[1], 'ok') && _invStDone(INV[1], 'send');
         // 新開的請款單：記一筆「新的請款單」
         INV.push({ id: 'i4', project: '測試乙案', periodNo: 1, totals: T }); _invStSync();
+        // 逐張改：舊單推算修改的選擇要經過確認才寫
+        delete P.invStInit; INV.push({ id: 'i5', project: '測試丙案', periodNo: 1, totals: T });
+        out.initEdit = _DEC.invStInit.ok(null, { i5: 'ok' }) === true && _invStOf(INV[5]) === 'ok' && /Lotion 逐張改/.test(INV[5].stLog[0].why);
         out.newInv = INV[4].stLast === 'sent' && /新的請款單/.test(INV[4].stLog[0].why);
         out.chip = /已收款/.test(_invStChip(INV[2])) && _invStChip(INV[3]) === '';
       } finally { INV = keepI; INVOICE_RECS = keepR; DRAFTS = keepD; CUSTOMERS = keepC; if (keepP) P.invStInit = keepP; else delete P.invStInit; window._draftMark = keepMark; }
       return out;
     });
-    check('v6.0.223 請款單狀態：舊單推算（收齊＝已收款、有發票＝已開發票、其他＝已送業主，保留款退還單不算）列清單給 Lotion 確認一次才記；業主確認卡對到最近一張已送業主、確認＝業主已確認＋發票照抄範例（買受人、統編、品名、未稅、稅額、含稅）；業主要改數量＝打開請款單、不改狀態；發票作廢／收齊／新單自動記紀錄（誰、何時、依據）；做完了沒 _invStDone', Object.values(r).length === 13 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.223 請款單狀態：舊單推算（收齊＝已收款、有發票＝已開發票、其他＝已送業主，保留款退還單不算）列清單給 Lotion 確認一次才記；業主確認卡對到最近一張已送業主、確認＝業主已確認＋發票照抄範例（買受人、統編、品名、未稅、稅額、含稅）；業主要改數量＝打開請款單、不改狀態；發票作廢／收齊／新單自動記紀錄（誰、何時、依據）；做完了沒 _invStDone', Object.values(r).length === 16 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('v6.0.223 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
