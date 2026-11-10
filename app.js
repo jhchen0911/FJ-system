@@ -44673,7 +44673,9 @@ function _ibDetailHtml(b){var q=_ibQ(b.qid);if(!q)return '';var invs=_ibInvs(q),
   var ret=0;try{ret=_ownerRetPct(q)||0;}catch(e){_err('_ibDetail.ret',e);}
   return '<div style="font-size:12.5px;line-height:1.7">第 '+n+' 期（'+(last?'上一期第 '+esc(String(last.periodNo||'?'))+' 期 '+esc(last.date||''):'第一張請款單')+'；截止 '+esc(b.cutDate)+'，'+(b.left===0?'今天':b.left+' 天後')+'）'
     +'<table style="width:100%;font-size:12px;border-collapse:collapse;table-layout:fixed;word-break:break-all;margin-top:4px"><tr><th style="text-align:left;width:46%">工項</th><th>本期</th><th>上一期</th><th>日報累計／合約</th></tr>'+rows+'</table>'
-    +(ad.length?'<div style="background:#fff8e1;border-radius:6px;padding:6px 8px;margin-top:6px"><b style="color:#b26a00">現場追加（已確認，還沒有業主簽認紀錄）</b><br>'+ad.map(function(a){return esc(a.date||'')+' '+esc(String(a.text||'').slice(0,60))+(a.qty!=null?'（'+esc(String(a.qty))+esc(a.unit||'')+'）':'');}).join('<br>')+'<div style="font-size:11px;color:#b26a00">要不要請、請多少，開單後在請款單上加列</div></div>':'')
+    +(function(){var line=function(a){return esc(a.date||'')+' '+esc(String(a.text||'').slice(0,60))+(a.qty!=null?'（'+esc(String(a.qty))+esc(a.unit||'')+'）':'');},un=ad.filter(function(a){return !a.signed&&!a.signDeny;}),sg=ad.filter(function(a){return a.signed;});   /* 現場追加卡：簽認了才帶進請款 */
+      return (un.length?'<div style="background:#fff8e1;border-radius:6px;padding:6px 8px;margin-top:6px"><b style="color:#b26a00">現場追加（已確認，主任還沒簽認，這期先不請）</b><br>'+un.map(line).join('<br>')+'<div style="font-size:11px;color:#b26a00">到首頁「現場追加（主任簽認）」卡傳給主任</div></div>':'')
+        +(sg.length?'<div style="background:#e8f5e9;border-radius:6px;padding:6px 8px;margin-top:6px"><b style="color:'+FY_BRAND.g+'">現場追加（主任已簽認，可以請款）</b><br>'+sg.map(line).join('<br>')+'<div style="font-size:11px;color:var(--b4)">開單後在請款單上加列（系統不自己改金額）</div></div>':'');})()
     +'<div style="margin-top:6px">保留款 '+ret+'%、稅率 '+esc(String((P&&P.tax!=null)?P.tax:5))+'%（照專案設定）。逾期租金：開單時依日報自動列入，請在請款單上確認。</div>'
     +'<div style="color:var(--b4);margin-top:4px">確認＝開第 '+n+' 期請款單（狀態「草稿」）並打開編輯頁：本期數量依日報帶到今天（'+esc(localToday().slice(5))+'），之後到截止日的日報要在請款單上補；金額照請款單算法。<b>檢查後按「儲存」</b>，才會出現在「請款單草稿待送出」。</div></div>';}
 _decReg('invDraft',{
@@ -44782,6 +44784,30 @@ _decReg('dunning',{
     return new Promise(function(res){try{navigator.clipboard.writeText(t).then(function(){toast('催款文字已複製');_dnLog(x.inv,'sent','複製催款文字');res(true);},function(){toast('複製失敗，請按「修改」手動複製');res(false);});}catch(e){_err('dunning.copy',e);toast('複製失敗，請按「修改」手動複製');res(false);}});},   /* 審查：複製成功才記一筆 */
   reject:function(x,why){_dnLog(x.inv,'skip',why||'先不催');return true;},
   edit:function(x){try{openDunning(x.inv.id);_dnLog(x.inv,'opened','打開催款視窗（改文字後複製）');}catch(e){_err('dunning.edit',e);}}
+});
+// ══════════ 待編號 現場追加卡（陳軒派工 11/10，盤點第 7 名）：追加確認後 → 給主任的 LINE 確認文字 → 主任簽認才帶進請款 ══════════
+// 一張追加兩段：①還沒傳給主任＝卡片附「給主任的 LINE 確認文字」，確認＝複製並記 a.askAt；②傳了還沒簽認＝確認＝記簽認 a.signed（誰、何時、依據），退回＝主任不認 a.signDeny
+// 請款單草稿卡：已確認但還沒簽認的追加標黃，簽認了的列成「可以請款」（請款單上加列仍由 Lotion 做，系統不改金額）
+function _adList(){var out=[];(Q||[]).forEach(function(q){if(!q||!q.awarded||q.closed)return;(q.addons||[]).forEach(function(a){if(a&&a.status==='confirmed'&&!a.signed&&!a.signDeny)out.push({q:q,a:a});});});return out;}
+function _adMsg(q,a){var who=(q&&(q.siteContact||q.contact))||'主任';return who+' 您好：\n「'+(q.name||'')+'」'+(a.date?a.date.slice(5).replace('-','/')+' ':'')+'現場追加：'+String(a.text||'').replace(/^#?追加\s*/,'').slice(0,200)+(a.qty!=null?'，數量 '+a.qty+(a.unit||''):'')+'。\n麻煩您確認，確認後我們會列入本期請款，謝謝。';}
+function _adSet(q,a,patch){Object.assign(a,patch);_touch(q);persist();}
+_decReg('addonSign',{
+  title:'現場追加（主任簽認）',todo:function(n){return '現場追加待主任簽認 '+n+' 筆';},sub:'還沒傳：確認＝複製給主任的 LINE 文字；已傳：確認＝主任簽認了（記下來，可以請款）、退回＝主任不認；修改＝改給主任的文字再複製',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},list:_adList,key:function(x){return x.q.id+'|'+x.a.id+'|'+(x.a.askAt?1:0);},
+  head:function(x){return String(x.q.name||'').slice(0,20)+'　'+String(x.a.date||'').slice(5)+' 追加';},
+  body:function(x){return '<div style="font-size:11.5px;color:#b26a00">'+esc(String(x.a.text||'').slice(0,40))+(x.a.qty!=null?'　'+esc(String(x.a.qty))+esc(x.a.unit||''):'')+'　'+(x.a.askAt?'已傳給主任，等簽認':'還沒傳給主任')+'</div>';},
+  detail:function(x){var a=x.a;return '<div style="font-size:12.5px;line-height:1.7"><b>追加內容</b>：'+esc(a.text||'')+(a.qty!=null?'，'+esc(String(a.qty))+esc(a.unit||''):'')+'（'+esc(a.date||'')+'，'+(a.confirmedBy?esc(a.confirmedBy)+' 確認':'已確認')+'）'
+    +((a.photos||[]).length?'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">'+a.photos.slice(0,6).map(function(p){return '<img data-lpath="'+esc(String(p))+'" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:6px;background:var(--b1)">';}).join('')+'</div>':'')
+    +(a.askAt?'<div style="margin-top:6px;color:#b26a00">'+esc(new Date(+a.askAt).toLocaleString('zh-TW',{hour12:false}))+' 已複製給主任的確認文字，等主任回覆。主任回了「確認」就按確認記簽認。</div>':'')
+    +'<div style="margin-top:6px"><b>給主任的 LINE 文字</b>'+(a.askAt?'（再傳一次可按修改）':'（確認＝複製，請自己貼到 LINE）')+'<div style="white-space:pre-wrap;background:var(--b0,#f6f6f6);padding:6px 8px;border-radius:6px">'+esc(a.askTxt||_adMsg(x.q,a))+'</div></div>'
+    +'<div style="color:var(--b4);margin-top:4px">主任簽認後，這筆追加會在請款單草稿卡列成「可以請款」；沒簽認的標黃。</div></div>';},
+  after:function(b){try{_lineImgFill(b);}catch(e){_err('addonSign.after',e);}},
+  ok:function(x){var a=x.a;if(!a.askAt){var t=a.askTxt||_adMsg(x.q,a);return new Promise(function(res){try{navigator.clipboard.writeText(t).then(function(){_adSet(x.q,a,{askAt:Date.now(),askBy:_meEmail()||'本機'});toast('已複製給主任的文字');res(true);},function(){toast('複製失敗，請按「修改」');res(false);});}catch(e){_err('addonSign.copy',e);res(false);}});}
+    _adSet(x.q,a,{signed:{at:Date.now(),by:_meEmail()||'本機',how:'主任 LINE 回覆確認（Lotion 在首頁卡片記）'}});toast('已記主任簽認，下一期請款可以列入');return true;},
+  reject:function(x,why){if(!x.a.askAt){toast('還沒傳給主任；不追加請到工程專案處理');return false;}_adSet(x.q,x.a,{signDeny:{at:Date.now(),by:_meEmail()||'本機',why:String(why||'主任不認').slice(0,200)}});return true;},
+  edit:function(x){var a=x.a,IN='width:100%;padding:6px 8px;border:1px solid var(--b2);border-radius:6px;font-family:inherit;font-size:12.5px;box-sizing:border-box';
+    showConfirm('給主任的 LINE 文字','<textarea id="ad-msg" rows="6" style="'+IN+'">'+esc(a.askTxt||_adMsg(x.q,a))+'</textarea><div style="font-size:11px;color:var(--b4);margin-top:4px">按確認＝存下這段文字並複製。</div>',
+      function(){var t=gv('ad-msg')||'';try{navigator.clipboard.writeText(t).then(function(){_adSet(x.q,a,{askTxt:t.slice(0,1000),askAt:Date.now(),askBy:_meEmail()||'本機'});toast('已複製');try{_decRefresh('addonSign');}catch(e){_err('addonSign.ref',e);}},function(){toast('複製失敗');});}catch(e){_err('addonSign.edit',e);}},false,null,false);}
 });
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

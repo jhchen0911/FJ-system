@@ -11798,7 +11798,7 @@ async function newPage(browser, width, height) {
         const L = _decItems('invDraft');
         out.card = L.length === 1 && /截止 10-18/.test(_DEC.invDraft.head(L[0]));
         const det = L.length ? _DEC.invDraft.detail(L[0]) : '';
-        out.detail = /第 1 期/.test(det) && /10-05 20、10-12 15/.test(det) && /打設 35<br>／ 100/.test(det) && !/超過合約/.test(det) && /按「儲存」/.test(det) && /追加背填/.test(det) && /還沒有業主簽認紀錄/.test(det) && /保留款 0%/.test(det);
+        out.detail = /第 1 期/.test(det) && /10-05 20、10-12 15/.test(det) && /打設 35<br>／ 100/.test(det) && !/超過合約/.test(det) && /按「儲存」/.test(det) && /追加背填/.test(det) && /主任還沒簽認，這期先不請/.test(det) && /保留款 0%/.test(det);
         out.ok = (await _DEC.invDraft.ok(L[0])) === 'open' && INV.length === 1 && _invStOf(INV[0]) === 'draft' && /請款單草稿卡確認/.test(INV[0].stLog.slice(-1)[0].why);
         _todoBuild(true);
         out.gone = !_decItems('invDraft').length;
@@ -11868,6 +11868,33 @@ async function newPage(browser, width, height) {
     });
     check('請款鏈 4 收款登錄卡：AI 讀匯款／期票對到最早有應收的那期、列差額（匯費、扣款要寫原因）；確認＝打開收款視窗帶好數字、視窗確認才入帳並標已套用、收齊狀態變已收款；取消＝草稿留著；逾期催款卡附預計收款日怎麼算、確認＝複製並記一筆、7 天後再提醒', Object.values(r).length === 13 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('請款鏈 4 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── 待編號 現場追加卡 addonSign：已確認的追加 → 複製給主任的 LINE 文字 → 主任簽認才列成可以請款 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepI = INV;
+      try {
+        try { Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.resolve() }, configurable: true }); } catch (e) { /* 可忽略 */ }
+        Q = [{ id: 'qA', name: '測試追加案', awarded: true, siteContact: '王主任', ownerPay: { cut: 18 }, items: [{ desc: '鋼板樁 打設', unit: '支', qty: 100, price: 1000 }], t: { total: 0 },
+          dailyLogs: [{ id: 'l1', date: '2026-10-05', progressRows: [{ itemIdx: 0, qty: 20 }] }],
+          addons: [{ id: 'a1', date: '2026-10-08', text: '#追加 背填砂 3 車', qty: 3, unit: '車', status: 'confirmed' }, { id: 'a2', date: '2026-10-09', text: '待確認的', status: 'pending' }] }];
+        INV = [];
+        const L = _decItems('addonSign');
+        out.list = L.length === 1 && /還沒傳給主任/.test(_DEC.addonSign.body(L[0])) && /王主任 您好/.test(_DEC.addonSign.detail(L[0])) && /背填砂 3 車/.test(_DEC.addonSign.detail(L[0]));
+        out.rejFirst = _DEC.addonSign.reject(L[0], 'x') === false;   // 還沒傳不能記「主任不認」
+        out.ask = (await _DEC.addonSign.ok(L[0])) === true && !!Q[0].addons[0].askAt && !Q[0].addons[0].signed;
+        _todoBuild(true); let det = _DEC.invDraft.detail(_decItems('invDraft')[0]);
+        out.yellow = /主任還沒簽認，這期先不請/.test(det) && !/主任已簽認/.test(det);
+        const L2 = _decItems('addonSign'); out.stage2 = L2.length === 1 && /已傳給主任，等簽認/.test(_DEC.addonSign.body(L2[0]));
+        out.sign = (await _DEC.addonSign.ok(L2[0])) === true && !!Q[0].addons[0].signed && !_decItems('addonSign').length;
+        det = _DEC.invDraft.detail(_decItems('invDraft')[0]); out.green = /主任已簽認，可以請款/.test(det) && !/這期先不請/.test(det);
+      } finally { Q = keepQ; INV = keepI; }
+      return out;
+    });
+    check('現場追加卡：已確認的追加附給主任的 LINE 文字（確認＝複製並記已傳）→ 已傳後確認＝記主任簽認；還沒傳不能記不認；請款單草稿卡沒簽認的標黃、簽認了列成可以請款', Object.values(r).length === 7 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('現場追加卡 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
   // ── v6.0.221 進退料 M8b：鋼價追蹤 → 建議調整買價（中鋼盤價草稿為主、主計總處指數備援、都沒有出保底卡）──

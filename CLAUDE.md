@@ -117,6 +117,7 @@
 | 請款單狀態（請款鏈 1，v6.0.225） | 首頁拍板卡 invStInit（舊單推算，一次）、invOk（業主回覆請款單）；請款單列表狀態標籤 | `_INV_ST`／`_invStOf`（草稿→已送業主→業主已確認→已開發票→已收款；前三個人決定 `inv.st`，後兩個看發票紀錄／收齊）`_invStSet` `_invStSync`／`_invStSoon`（事實變了自動記，管理員裝置，`P.invStInit` 之後才記）`_invStLog` `_invStDone(inv,step)`（給今天頁判斷做完了沒）`_invStChip`；業主確認 `fyInvOkDraft`（主控台送草稿 invOk）`_invOkFind`（沒給期別＝最近一張已送業主）；發票照抄範例 `openInvCopy`／`_invCopyOf`（本期發票應開金額） | `inv.st`／`inv.stLog`／`inv.stLast`／`inv.ownerOk`（INV，shared）、草稿 type invOk |
 | 請款單草稿卡（請款鏈 3，v6.0.227） | 首頁拍板卡 invDraft（截止前 5 天）、invSend（草稿待送出） | `_ibList`（`FJC.todo.monthBill`）`_ibDetailHtml`（日報來源 `_ibSrc`、上一期 `_ibPrevQty`、追加、保留款）確認＝`pjNewInv`＋狀態草稿；退回 `q.billSkip`；`_isList`／`_isMsg`（送業主文字）確認＝已送業主＋`printInvById` | `q.billSkip`（shared）、INV 狀態 |
 | 收款登錄＋逾期催款（請款鏈 4） | 首頁拍板卡 recvIn（草稿 type recvSlip）、dunning | `fyRecvDraft`／`_rvClean`／`_rvFind`（沒給期別＝最早有應收的）`_rvDiff`；確認＝`openReceiptModal` 帶好數字，`confirmReceipt` 存檔才標已套用（`_RV_APPLY`）；催款 `_dnList`／`_dnRuleHtml`／`_dnLog`（`inv.dunLog`，7 天再提醒） | 草稿 recvSlip、`inv.dunLog`（INV） |
+| 現場追加簽認 | 首頁拍板卡 addonSign | `_adList` `_adMsg`（給主任的 LINE 文字）`_adSet`；兩段：複製記 `a.askAt` → 主任簽認 `a.signed`／不認 `a.signDeny`；請款單草稿卡沒簽認標黃、簽認列可以請款 | `q.addons[]`（shared） |
 | 廠商請款 | `acct` › 廠商請款 | `renderVendorBilling` `_vbRows` `vbOpenPeriod` | 讀 `q.costs` |
 | 帳務 | `acct`（分頁 ar／ap／cash／inv／petty／pay／own／vb；`go('finance'|'ledger'|'payroll')` 轉來；**v6.0.217 新選單時收成 4 塊**：收／付／發票與支出／金流 `_ACCT_GRP`／`_acctGrpTabsHtml`，最上面金流一行 `_acctCashLineHtml`（與金流預測共用 `_cfBucket`）） | `acctTab` `_acctMount`（搬入舊頁元素）`renderPayables` `renderCashForecast` `renderRetention` `_expForm`（費用．發票） | `PAYABLES`、`EXPENSES`（private） |
 | 薪資．零用金 | `acct` › pay／petty（權限看 `payroll`） | `hrEdit` `psGenerate` `_hrSyncPayables` `pcGenerate` `_pcCalc` | `HR`／`PAYSLIPS`／`PETTY`（private） |
@@ -157,7 +158,7 @@
 
 ## 測試
 
-`tests/smoke.js`（1079 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（1081 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。`package.json` 釘死 playwright 版本（v6.0.103 起 1.64.1＝Chrome 156），CI 與本機才用同一瀏覽器；升級 playwright 要當成一次改版、跑過冒煙再推。雲端容器裝不到新瀏覽器時，可從 storage.googleapis.com 的 chrome-for-testing-public 下載同版 chrome-headless-shell，用 `CHROMIUM_PATH` 指定。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
