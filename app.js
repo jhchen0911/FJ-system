@@ -5730,6 +5730,7 @@ function calcInvDays(){
       const cleanDesc=(desc)=>{
         let c=desc.replace(/（[^）]*）/g,'').replace(/\([^)]*\)/g,'');
         c=c.replace(/[\s、，,]*[打設拔除裝設拆除施工安裝完成]+[\s、，,]*/g,' ');
+        c=c.replace(/(^|\s)[及與和](?=\s|$)/g,' ');   // v6.0.221：「打設及拔除」拿掉動作後剩下的「及」
         c=c.replace(/[、，\s]+$|^[、，\s]+/g,'').replace(/\s{2,}/g,' ').trim();
         return c;
       };
@@ -5755,6 +5756,10 @@ function calcInvDays(){
       // v6.0.107 拔除完成日模式：分批計算「支·天」（每批計到該批拔除完成日，未拔完的計到本期截止日）
       let _bq=null;try{const _q=_invQuote();if(_q&&_rentEndMode(_q)==='removeDone'){const _ix=(_q.items||[]).findIndex(it=>it&&!it.sec&&_invKey(it.desc)===_invKey(selDesc));if(_ix>=0)_bq=_rentBatchQtyDays(_itemProgress(_q,_ix),srcQty,_isoD(billStart),_isoD(claimDate));}}catch(e){_err('calcInvDays.batch',e);}
       const overAmt=_bq?Math.round(srcPrice*_bq.qtyDays):Math.round(srcPrice*srcQty*billDays);
+      // v6.0.221 Lotion 11/10：分段拔樁照「時段」列（時段起訖、在場支數、天數、單價、金額）；支·天跟 _bq 一定一樣（calc/todo.js rentSegments，單元測試證明）
+      //   已開發票或已收款的請款單重算時照舊列法（只影響新產生的列）
+      let _sg=null;try{const _q=_invQuote();const _noSeg=_recSaved&&(_recSaved.invNo||_recSaved.receivedConfirmed)&&existIdx>=0&&!(invItems[existIdx]._ovAlg>=4);
+        if(_bq&&!_noSeg){const _ix=(_q.items||[]).findIndex(it=>it&&!it.sec&&_invKey(it.desc)===_invKey(selDesc));const _r=FJC.todo.rentSegments(_itemProgress(_q,_ix),srcQty,_isoD(billStart),_isoD(claimDate));if(Math.abs(_r.qtyDays-_bq.qtyDays)<1e-6)_sg=_r.segs;else _err('calcInvDays.seg',new Error('時段支·天跟分批不一樣，改回分批列法'));}}catch(e){_err('calcInvDays.seg',e);}
       // 租用型正規寫法：單價＝逾期租金單價、數量＝合約數量、天數＝本期新增逾期天數
       // 審查修正：分批模式標題
       const _ow={type:'rental',desc:_bq?(baseDesc+'  逾期租金：'+fmtMD(billStart)+'～'+fmtMD(claimDate)+'（分批，見計算式）'):overLabel,unit:_bq?(srcUnit+'·天'):srcUnit,
@@ -5763,14 +5768,27 @@ function calcInvDays(){
         curQty:_bq?_bq.qtyDays:srcQty,curDays:_bq?0:billDays,curAmt:overAmt,_ovBatches:_bq?_bq.rows:undefined,_ovNoTick:_bq?!!_bq.noTick:undefined,
         payRate:100,note:'逾期租金',otPrice:0,otUnit:'',
         _ovKey:selDesc,_ovStart:_isoD(billStart),_ovEnd:_isoD(claimDate),_ovBasis:_rentEndMode(_invQuote()),_ovAlg:3};   // _ovAlg：Lotion 10/21 新算法（完成當天計租、本批完成切批）   // v6.0.107 租期結束日口徑
-      if(existIdx>=0){
+      if(_sg&&_sg.length){
+        // v6.0.221 Lotion 11/10：一個時段一列（時段起訖、在場支數、天數、單價、金額）；折讓天數照舊扣在各自的時段列上（invRentDisc 一般列）
+        //   _ovEnd 一律＝本期請至日（下一期從隔天接著算，_rentBilledUntil 不變）；時段日期另存 _ovSegFrom／_ovSegTo
+        const _old=invItems.filter(function(x,ii){return ii!==itemIdx&&x&&x.type==='rental'&&x._ovKey===selDesc;});
+        const _keepDisc={};_old.forEach(function(x){if(x._ovSegFrom&&(parseFloat(x.discDays)||0)>0)_keepDisc[x._ovSegFrom]={d:x.discDays,n:x.discNote,l:x.discLog};});
+        const _md=function(d){return d?String(d).slice(5).replace('-','/'):'';};
+        const _rows=_sg.map(function(g){var r={type:'rental',desc:baseDesc+'  逾期租金 時段'+g.no+'：'+_md(g.from)+'～'+_md(g.to)+'（在場 '+_qfmt(g.qty)+' '+srcUnit+'，'+g.days+'天）',unit:srcUnit,
+          contractPrice:srcPrice,contractQty:g.qty,prevQty:0,prevAmt:0,curQty:g.qty,curDays:g.days,curAmt:Math.round(srcPrice*g.qty*g.days),payRate:100,note:'逾期租金',otPrice:0,otUnit:'',
+          _ovKey:selDesc,_ovSeg:g.no,_ovSegFrom:g.from,_ovSegTo:g.to,_ovStart:_isoD(billStart),_ovEnd:_isoD(claimDate),_ovBasis:_rentEndMode(_invQuote()),_ovAlg:4};
+          var kd=_keepDisc[g.from];if(kd&&kd.d<g.days){r.discDays=kd.d;if(kd.n)r.discNote=kd.n;if(kd.l)r.discLog=kd.l;}return r;});
+        for(let ii=invItems.length-1;ii>=0;ii--){if(_old.indexOf(invItems[ii])>=0)invItems.splice(ii,1);}
+        const _at=invItems.findIndex(x=>x.type!=='sec'&&x.desc===selDesc);
+        invItems.splice(_at+1,0,..._rows);
+      } else if(existIdx>=0){
         Object.keys(_ow).forEach(function(k){invItems[existIdx][k]=_ow[k];});
       } else {
         invItems.splice(itemIdx+1,0,_ow);
       }
       rInvItems();
       try{autoSaveInv();}catch(e){_err('top',e);}   // v5.336：插列即存檔，離頁不再遺失
-      const otDetail=srcPrice?`（$${srcPrice}×${srcQty}${srcUnit}×${billDays}天=NT$${overAmt.toLocaleString()}）`:'（請手動填入金額）';
+      const otDetail=!srcPrice?'（請手動填入金額）':(_sg&&_sg.length?`（分 ${_sg.length} 個時段，合計 NT$${overAmt.toLocaleString()}）`:`（$${srcPrice}×${srcQty}${srcUnit}×${billDays}天=NT$${overAmt.toLocaleString()}）`);
       toast(`已插入逾期租金工項 ${otDetail}`);
     }
   }
@@ -44132,13 +44150,21 @@ function _pjRemoveHtml(q){
   var L=[];try{L=FJC.todo.rentScan(q,null,localToday())||[];}catch(e){_err('_pjRemoveHtml',e);}
   L=L.slice().sort(function(a,b){return a.idx-b.idx;});
   if(!L.length)return '<div style="font-size:12px;color:var(--b3)">沒有約定租期的工項，或日報還沒登錄打設</div>';
-  var mode=_rentEndMode(q),h='<div style="font-size:12px;color:var(--b4);margin:2px 0 8px">租期結束日：'+(mode==='removeDone'?'拔除完成日（分批：每批計到該批完成日，下一批從隔天起算）':'拔除第一天')+'。逾期租金在「請款」那一步照這裡的批次請。</div>';
+  var mode=_rentEndMode(q),h='<div style="font-size:12px;color:var(--b4);margin:2px 0 8px">租期結束日：'+(mode==='removeDone'?'拔除完成日（分段：每個時段在場的支數 × 天數，時段＝上一批完成日隔天到這一批完成日）':'拔除第一天')+'。逾期租金在「請款」那一步照這裡的批次請。</div>';
   L.forEach(function(s){
     var pg=_itemProgress(q,s.idx),B=_rentBatchList(pg);
     h+='<div style="margin:8px 0 4px;font-size:12.5px;font-weight:800;color:var(--b5)">'+esc(s.desc)+'</div>'
       +'<div style="font-size:11.5px;color:var(--b4);margin-bottom:4px">租期 '+s.days+' 天・打設完成 '+esc(s.installDate||'')+'・到期 '+esc(s.expiry||'')+(s.overDays>0?('・<b style="color:var(--red)">已逾期 '+s.overDays+' 天</b>'):'・還沒逾期')
       +(s.amount>0?('・逾期租金約 NT$ '+fmt(s.amount)):'')+'</div>';
     var rows=[];
+    var sg=null;if(s.batches&&s.batches.length){try{sg=FJC.todo.rentSegments(pg,s.qty,_dAdd(s.expiry,1),s.endDate);}catch(e){_err('_pjRemoveHtml.seg',e);}}
+    if(sg&&sg.segs.length){   // v6.0.221 Lotion 11/10：跟請款單同一種「時段」列法
+      sg.segs.forEach(function(g){rows.push(['時段 '+g.no,esc(g.from)+'～'+esc(g.to),_rfmt(g.qty),String(g.days),s.otPrice?fmt(Math.round(g.qty*g.days*s.otPrice)):'—']);});
+      h+=_pjTable([{t:'時段'},{t:'起訖'},{t:'在場支數',r:1},{t:'天數',r:1},{t:'逾期租金',r:1}],rows);
+      var dn=B.closed.map(function(b,i){return '第 '+(i+1)+' 批 '+esc(b.date)+' 拔完 '+_rfmt(b.qty)+' 支';});
+      if(dn.length)h+='<div style="font-size:11px;color:var(--b3);margin-top:2px">'+dn.join('、')+'</div>';
+      return;
+    }
     if(s.batches&&s.batches.length){s.batches.forEach(function(b){rows.push([b.open?'還沒拔完':('第 '+b.no+' 批'),b.open?'—':esc(b.date||''),_rfmt(b.qty),String(b.days)]);});}
     else{var n=0;B.closed.forEach(function(b){n++;rows.push(['第 '+n+' 批',esc(b.date),_rfmt(b.qty),'—']);});
       if(B.stage)rows.push(['拔除階段完工',esc(B.stage),B.open>0?_rfmt(B.open):'—','—']);

@@ -13324,16 +13324,63 @@ async function newPage(browser, width, height) {
         const st = FJC.todo.rentStatus(Q[0], 0, null, localToday());
         // 100×(9/1～9/10＝10 天)＋60×(9/11～9/20＝10 天)＝40×10＋60×20＝1600 支·天 × 20 元
         out.calc = st && st.qtyDays === 1600 && st.amount === 32000 && st.batches.length === 2 && st.batches[0].days === 10 && st.batches[1].days === 20;
-        out.show = /第 1 批/.test(tx) && /2026-09-10/.test(tx) && /第 2 批/.test(tx) && /2026-09-20/.test(tx) && /逾期租金約 NT\$ 32,000/.test(tx) && /拔除完成日（分批/.test(tx);
+        out.show = /時段 1/.test(tx) && /2026-09-01～2026-09-10/.test(tx) && /時段 2/.test(tx) && /2026-09-11～2026-09-20/.test(tx) && /逾期租金約 NT\$ 32,000/.test(tx) && /拔除完成日（分段/.test(tx) && /第 1 批 2026-09-10 拔完 40 支/.test(tx);
         const tds = Array.from(box.querySelectorAll('tbody tr')).map((tr) => Array.from(tr.children).map((td) => td.textContent.replace(/^.*?：|\s/g, '')).join('|'));
-        out.rows = tds.length === 2 && /40\|10$/.test(tds[0]) && /60\|20$/.test(tds[1]);
+        out.rows = tds.length === 2 && /100\|10\|20,000$/.test(tds[0]) && /60\|10\|12,000$/.test(tds[1]);   // 時段列法：在場 100 支 10 天、在場 60 支 10 天
         out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       Q = keepQ; PROJECTS = keepP; localStorage.removeItem('pj7_open_remove');
       return out;
     });
-    check('v6.0.221 分段拔樁（寬 ' + W + '）：拆除拔樁那一步列出每批完成日、支數、逾期計費天數（含完成當天、下一批隔天起算），數字跟請款用的同一份算法', !r.err && r.calc && r.show && r.rows && r.noHScroll, JSON.stringify(r));
+    check('v6.0.221 分段拔樁（寬 ' + W + '）：拆除拔樁那一步照時段列（時段起訖、在場支數、天數、逾期租金），支·天跟請款用的同一份算法', !r.err && r.calc && r.show && r.rows && r.noHScroll, JSON.stringify(r));
     check('v6.0.221 分段拔樁測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+  // ── v6.0.221 Lotion 11/10：分段拔樁的逾期租金請款單改照「時段」列（一個時段一列；金額不變；跨期接續；折讓扣在時段列；已開發票的舊單照舊）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {}; const keepQ = Q, keepI = INV.slice();
+      const seg = (id, per, date, extra) => { INV.push(Object.assign({ id, quoteId: 'SMKSEG', project: '分段案', client: '範例案場', periodNo: per, date,
+        items: [{ type: 'item', desc: '鋼軌樁打設及拔除', unit: '支', contractPrice: 1000, contractQty: 100, curQty: 0, curAmt: 0, payRate: 100, otPrice: 20, otUnit: '$/支/天' }] }, extra || {}));
+        loadInvoice(id); document.getElementById('inv-rental-item').value = '鋼軌樁打設及拔除'; invRentalPick();
+        document.getElementById('inv-claim-date').value = date; calcInvDays(); return invItems.filter((x) => x.type === 'rental'); };
+      try {
+        window.toast = () => {};
+        Q = [{ id: 'SMKSEG', name: '分段案', client: '範例案場', date: '2026-07-01', status: 'won', awarded: true, rentEnd: 'removeDone', t: {},
+          items: [{ desc: '鋼軌樁打設及拔除', unit: '支', qty: '100', price: '1000', note: '含30天租期', ot: '20$/支/天', otu: '$/支/天' }],
+          dailyLogs: [{ date: '2026-08-01', progressRows: [{ itemIdx: 0, qty: 100, ph: 'install' }] },
+            { date: '2026-09-10', progressRows: [{ itemIdx: 0, qty: 40, ph: 'remove', batchDone: true }] },
+            { date: '2026-09-20', progressRows: [{ itemIdx: 0, qty: 60, ph: 'remove', batchDone: true }] }] }];
+        INV.length = 0;
+        // ① 一期請到 9/30：兩個時段兩列，100×10＋60×10＝40×10＋60×20
+        const R1 = seg('SG1', 1, '2026-09-30');
+        out.rows = R1.length === 2 && R1[0].curQty === 100 && R1[0].curDays === 10 && R1[0].curAmt === 20000 && R1[1].curQty === 60 && R1[1].curDays === 10 && R1[1].curAmt === 12000;
+        out.desc = /逾期租金 時段1：09\/01～09\/10（在場 100 支，10天）/.test(R1[0].desc) && /時段2：09\/11～09\/20（在場 60 支，10天）/.test(R1[1].desc);
+        out.sum = R1.reduce((a, x) => a + _invRowAmt(x), 0) === 20 * FJC.todo.rentBatchQtyDays(_itemProgress(Q[0], 0), 100, '2026-09-01', '2026-09-30').qtyDays;
+        // 重算不會變成 4 列
+        calcInvDays(); out.again = invItems.filter((x) => x.type === 'rental').length === 2;
+        // 折讓扣在時段 2（一般列折讓天數）
+        const R1b = invItems.filter((x) => x.type === 'rental'); R1b[1].discDays = 3; out.disc = _invRowAmt(R1b[1]) === 60 * 7 * 20;
+        // ② 跨期：第 1 期請到 9/15、第 2 期 9/16 起接著算；兩期合計＝不切期
+        INV.length = 0; const A = seg('SA1', 1, '2026-09-15'); autoSaveInv();
+        const B = seg('SA2', 2, '2026-09-30');
+        out.cross = A.length === 2 && A[1].curQty === 60 && A[1].curDays === 5 && B.length === 1 && B[0]._ovSegFrom === '2026-09-16' && B[0].curDays === 5
+          && A.concat(B).reduce((a, x) => a + _invRowAmt(x), 0) === 32000;
+        // ③ 已開發票、舊列法（單列分批）的請款單重算：照舊單列
+        INV.length = 0;
+        INV.push({ id: 'SOLD', quoteId: 'SMKSEG', project: '分段案', client: '範例案場', periodNo: 1, date: '2026-09-30', invNo: 'AB12345678',
+          items: [{ type: 'item', desc: '鋼軌樁打設及拔除', unit: '支', contractPrice: 1000, contractQty: 100, curQty: 0, curAmt: 0, payRate: 100, otPrice: 20, otUnit: '$/支/天' },
+            { type: 'rental', desc: '鋼軌樁 逾期租金：9/1～9/30（分批，見計算式）', unit: '支·天', contractPrice: 20, contractQty: 1600, curQty: 1600, curDays: 0, curAmt: 32000, payRate: 100, _ovKey: '鋼軌樁打設及拔除', _ovAlg: 3, _ovBatches: [{ no: 1, date: '2026-09-10', qty: 40, days: 10 }, { no: 2, date: '2026-09-20', qty: 60, days: 20 }], _ovStart: '2026-09-01', _ovEnd: '2026-09-30' }] });
+        loadInvoice('SOLD'); document.getElementById('inv-rental-item').value = '鋼軌樁打設及拔除'; invRentalPick();
+        document.getElementById('inv-claim-date').value = '2026-09-30'; calcInvDays();
+        const R3 = invItems.filter((x) => x.type === 'rental'); out.issuedKeep = R3.length === 1 && R3[0]._ovAlg === 3 && R3[0].curAmt === 32000 && /第1批/.test(_invCalcText(R3[0]));
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; INV.length = 0; keepI.forEach((v) => INV.push(v));
+      return out;
+    });
+    check('v6.0.221 分段拔樁請款單照時段列：一個時段一列（起訖、在場支數、天數、單價、金額）、金額跟原本一樣、重算不重複、折讓扣在時段列、跨期接續不重複不漏、已開發票的舊單照舊', !r.err && r.rows && r.desc && r.sum && r.again && r.disc && r.cross && r.issuedKeep, JSON.stringify(r));
+    check('v6.0.221 時段列法測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
   await browser.close();
