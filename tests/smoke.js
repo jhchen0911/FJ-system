@@ -795,7 +795,8 @@ async function newPage(browser, width, height) {
       out.noOverflow = plan.pages.every((p, i) =>
         (p.e - p.s) + (i === 0 ? 0 : plan.marg) + plan.marg + (p.hd ? plan.hd.e - plan.hd.s : 0) <= plan.PAGE + 1);
       const _cbH = Math.round(_pdfContentBottom(root) * 2);   // v6.0.23 文件高度＝內容底緣（.page-wrap 的下內距不算）
-      out.contiguous = plan.pages[0].s === 0 && Math.abs(plan.pages[plan.pages.length - 1].e - _cbH) <= 2 && _cbH <= H
+      const _endH = plan.foot ? plan.foot.s : _cbH;   // v6.0.220 頁尾 .fy-docfoot 不算內文：內文到頁尾上緣、頁尾到內容底緣
+      out.contiguous = plan.pages[0].s === 0 && Math.abs(plan.pages[plan.pages.length - 1].e - _endH) <= 2 && (!plan.foot || Math.abs(plan.foot.e - _cbH) <= 2) && _cbH <= H
         && plan.pages.every((p, i) => i === 0 || p.s === plan.pages[i - 1].e);
       out.repeatHead = plan.pages.slice(1).some(p => p.hd === true);
       // 切點必須是某一列的下緣（±2px 容差）
