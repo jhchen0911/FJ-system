@@ -162,7 +162,7 @@
     });
     return { amt: tot, rows: rows };
   }
-  // ── v6.0.214 M8 租還是買（Lotion 11/10）──
+  // ── v6.0.215 M8 租還是買（Lotion 11/10）──
   // 進料前整體評估：needs＝[{m, days}]（這案＋全公司同規格的需求：M 數 × 預估租期天數）、rateD＝每 M 每天租金、buyPerM＝每 M 買價、salvage＝殘值率（%）、store＝存放＋進出倉成本（null＝沒填）
   //   買的批量＝需求裡最大的一筆 M 數（料可以一案用完再給下一案）；買的淨成本＝買價 × 批量 ×（1 − 殘值率）＋ 存放成本
   function rentVsBuy(o) {

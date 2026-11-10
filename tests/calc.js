@@ -423,7 +423,7 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const r = MV.rentPeriod([{ id: 'a', d: '2026-09-01', m: 90, o: '' }, { id: 'b', d: '2026-09-20', m: 30, o: '2026-09-25' }, { id: 'c', d: '2026-10-02', m: 9 }], '2026-09-01', '2026-09-30', 30);
   check('M6 租金期間：含頭含尾、中途進退場只算在場天數、期間外的批次不算', r.amt === 2880 && r.rows.length === 2 && r.rows[1].days === 6, JSON.stringify(r));
 }
-// ── v6.0.214 M8 租還是買、累計租金提醒、車型建議 ──
+// ── v6.0.215 M8 租還是買、累計租金提醒、車型建議 ──
 {
   const MV = require(path.join(__dirname, '..', 'calc', 'matmove.js')).mv;
   const a = MV.rentVsBuy({ needs: [{ m: 300, days: 120 }, { m: 200, days: 90 }], rateD: 1, buyPerM: 600, salvage: 30, store: null });

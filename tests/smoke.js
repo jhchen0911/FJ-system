@@ -3937,7 +3937,8 @@ async function newPage(browser, width, height) {
           const html=document.getElementById('inv-prev-html').innerHTML;
           // 表頭：LOGO 與公司名同一列（flex）
           const doc=document.getElementById('inv-doc');out.id=!!doc;
-          const hd=doc&&doc.querySelector('.inv-hd');out.hd=!!hd&&getComputedStyle(hd).display==='flex'&&hd.children.length===2&&hd.children[0].tagName==='IMG'&&/豐有|公司/.test(hd.children[1].textContent||'')&&parseFloat(getComputedStyle(hd.children[0]).height)<=34;
+          // v6.0.214 頁首統一：.fy-dochead（左 LOGO＋名片字樣＋公司資料、右單據名稱）
+          const hd=doc&&doc.querySelector('.fy-dochead');out.hd=!!hd&&getComputedStyle(hd).display==='flex'&&hd.children.length===2&&hd.children[0].querySelector('img')&&/豐有|公司/.test(hd.children[0].textContent||'')&&/工程請款單/.test(hd.children[1].textContent||'')&&parseFloat(getComputedStyle(hd.children[0].querySelector('img')).height)<=44;
           // 列印：內距歸零 ＋ 內容底緣只算有內容的元素 → 8 列＋計算式＋頁尾仍是一頁（原本第二頁整張空白）
           const host=document.createElement('div');host.style.cssText='position:absolute;left:-9999px;top:0;width:1046px;background:#fff';
           host.innerHTML='<style>#inv-doc{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}</style>'+html;document.body.appendChild(host);
@@ -3956,7 +3957,7 @@ async function newPage(browser, width, height) {
           INV.length=0;Q=[];invEid=null;invItems=[];
           return out;
     });
-    check('請款單表頭：外框 #inv-doc、LOGO 與公司名同一列（flex、LOGO ≤34px）', r.id && r.hd);
+    check('請款單表頭：外框 #inv-doc、v6.0.214 統一頁首（flex、LOGO ≤44px、右邊工程請款單）', r.id && r.hd);
     check('分頁：8 列＋計算式＋頁尾的請款單在列印正規化後為一頁（不再多一張空白頁）', r.onePage && r.cbLtH, 'H=' + r.H + ' pages=' + r.pages);
     check('分頁：外框下內距不算文件高度（內容 600px＋內距 200px → 一頁）；真正超過仍分頁且續頁重印表頭', r.padOne && r.twoPages);
     check('v6.0.23 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
@@ -11677,7 +11678,7 @@ async function newPage(browser, width, height) {
     check('v6.0.211 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
-  // ── v6.0.214 進退料 M8a：得標後自有料優先、租還是買、累計租金 60%／80%、每季統整、車型建議（Lotion 11/10）──
+  // ── v6.0.215 進退料 M8a：得標後自有料優先、租還是買、累計租金 60%／80%、每季統整、車型建議（Lotion 11/10）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -11729,8 +11730,8 @@ async function newPage(browser, width, height) {
       } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; MAT_TAGS = keepT; window.localToday = keepTd; }
       return out;
     });
-    check('v6.0.214 進退料 M8a：得標未進料出自有料卡（要修的不算、不放金額、附車型建議）、租料進場再比一次、租還是買（沒填買價不出、含報價中同規格、存放成本未填）、累計租金 60% 出卡＋預估 80% 才建議買料、每季前 14 天統整前 5 名、參數頁買價表', r.own && r.old && r.ownAck && r.slip && r.noBuy && r.rvb && r.cumNo && r.cum && r.cumAck && r.qtr && r.qtrOff && r.prm, JSON.stringify(r));
-    check('v6.0.214 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    check('v6.0.215 進退料 M8a：得標未進料出自有料卡（要修的不算、不放金額、附車型建議）、租料進場再比一次、租還是買（沒填買價不出、含報價中同規格、存放成本未填）、累計租金 60% 出卡＋預估 80% 才建議買料、每季前 14 天統整前 5 名、參數頁買價表', r.own && r.old && r.ownAck && r.slip && r.noBuy && r.rvb && r.cumNo && r.cum && r.cumAck && r.qtr && r.qtrOff && r.prm, JSON.stringify(r));
+    check('v6.0.215 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
   // ── v6.0.203 進退料 M4a：租料簽收單確認後自動建／結租料批次 ──
@@ -12932,6 +12933,53 @@ async function newPage(browser, width, height) {
     check('v6.0.210 M7 單價庫比對：差 5% 以上出拍板卡、不自動改；確認＝改成實績平均、退回＝實績沒變不再問', !r.err && r.cards === 'hsteel|H300|rent,rail|rent|9' && r.noAuto && r.detail && r.updated && r.rejected, JSON.stringify({ cards: r.cards, noAuto: r.noAuto, detail: r.detail, updated: r.updated, rejected: r.rejected }));
     check('v6.0.210 M7 每月租料閒置浪費：拔除完成日起算、已退場的算到退場日、切在月份裡；沒拔完不算；業主要求先留的不算', !r.err && r.idle && r.noStart && r.keep && r.clip, JSON.stringify({ clip: r.clip, idle: r.idle, noStart: r.noStart, keep: r.keep, t: r.idleTxt }));
     check('v6.0.210 M7 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+  // ── v6.0.214 單據頁首統一（報價、請款、詢價、分包合約、保留款退還）＋ 分包合約第 1 頁不再半頁空白 ──
+  {
+    const { page, errors } = await newPage(browser, 1600, 1000);
+    const r = await page.evaluate(async () => {
+      const out = {}; const W = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepI = INV, keepV = VENDORS, keepP = JSON.stringify(P);
+      try {
+        Object.assign(P, { company: '範例工程有限公司', addr: '範例路 1 號', tel: '02-0000-0000', taxid: '87654321', boss: '張範例', tax: 5 });
+        const items = [{ sec: true, desc: '一、擋土' }];
+        for (let i = 0; i < 6; i++) items.push({ desc: '範例工項 ' + i, unit: 'M', qty: '10', price: '100' });
+        Q = [{ id: 'qH1', code: 'H01', name: '範例工程H', client: '甲營造', date: '2026-10-01', awarded: true, exs: [], rmk: {}, _mt: 1, items,
+          costs: [{ id: 'cH1', type: 'sub', vendor: '乙工程行', rows: [{ linkedItemIdx: 1, qty: 10, unitPrice: 80 }, { linkedItemIdx: 2, qty: 10, unitPrice: 80 }] }],
+          rfqs: [{ id: 'rH1', no: 'RFQ-H01-01', date: '2026-10-05', scope: '打設', deadline: '2026-10-12', status: 'open', vendors: [], items: [{ idx: 1, desc: '範例工項 0', unit: 'M', qty: 10 }] }], deduct: { ret: 5 } }];
+        VENDORS = [{ id: 'vH1', name: '乙工程行', taxid: '12345675', addr: '範例街 2 號', contact: '李', phone: '02-1111-1111' }];
+        const iv = { id: 'iH1', sourceQid: 'qH1', quoteId: 'qH1', project: '範例工程H', client: '甲營造', periodNo: 1, date: '2026-10-25', items: [] };
+        for (let i = 0; i < 4; i++) iv.items.push({ type: 'item', desc: '範例工項 ' + i, unit: 'M', contractPrice: 100, contractQty: 50, prevQty: 0, curQty: 5, payRate: 100 });
+        const rr = { id: 'irH1', kind: 'retReturn', project: '範例工程H', client: '甲營造', quoteId: 'qH1', date: '2026-12-20', periodNo: '退', items: [], totals: { curTotal: 0, tax: 0, total: 0, retention: 0 }, retRet: { amt: 1000, rows: [{ periodNo: 1, date: '2026-10-25', pct: 5, amt: 1000 }], holds: [], cond: '' } };
+        INV = [iv, rr]; _recalcInvAmounts(iv); loadQ('qH1'); Q[0].t = calcT();
+        const q = Q[0], ctx = { quote: { q }, inv: { inv: iv }, rfq: { q, r: q.rfqs[0] }, subContract: { q, c: q.costs[0], f: { no: 'H01-S01', date: '2026-10-10', fine: 1, ins: 0, court: '範例地方法院' } }, retReturn: { inv: rr } };
+        const title = { quote: '報價單', inv: '工程請款單', rfq: '分項工程詢價單', subContract: '工程承攬合約書', retReturn: '保留款退還請款單' };
+        out.head = {};
+        for (const k of Object.keys(ctx)) {
+          const o = _docOut(k, ctx[k]); const d = document.createElement('div'); d.innerHTML = (o.html.match(/<body[^>]*>([\s\S]*)<\/body>/i) || [0, o.html])[1];
+          const h = d.querySelectorAll('.fy-dochead');
+          out.head[k] = h.length === 1 && h[0].innerHTML.includes(FY_LOGO) && h[0].innerHTML.includes(FY_WORDMARK) && /範例工程有限公司/.test(h[0].textContent) && /統一編號 87654321/.test(h[0].textContent) && /範例路 1 號/.test(h[0].textContent) && h[0].textContent.includes(title[k]);
+        }
+        out.allHead = Object.values(out.head).every(Boolean);
+        out.oldGone = !/豐有工程報價單/.test(_docOut('quote', ctx.quote).html);
+        // 分包合約：條文 .pdf-cut 可換頁 → 第 1 頁要填滿（原本印完明細表就換頁、下半頁空白）
+        const o = _docOut('subContract', ctx.subContract), A4W = _pdfContentPx(false), sm = o.html.match(/<style[^>]*>([\s\S]*?)<\/style>/i), bm = o.html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+        const inner = document.createElement('div'); inner.style.cssText = 'position:fixed;left:0;top:0;background:#fff;width:' + A4W + 'px;box-sizing:border-box';
+        inner.innerHTML = '<style>' + (sm ? sm[1] : '') + '</style><style>.page-wrap{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}body{margin:0!important}</style>' + (bm ? bm[1] : o.html);
+        document.body.appendChild(inner); await W(60);
+        out.cuts = inner.querySelectorAll('.art.pdf-cut').length;
+        const pl = _pdfPlanPages({ width: A4W, height: inner.scrollHeight }, inner, A4W, false); inner.remove();
+        const pageH = A4W * 277 / 190, p1 = pl.pages[0].e - pl.pages[0].s;
+        out.fill = Math.round(p1 / pageH * 100); out.n = pl.pages.length;
+        out.full = pl.pages.length > 1 && p1 / pageH >= 0.85;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; INV = keepI; VENDORS = keepV; try { Object.assign(P, JSON.parse(keepP)); } catch (e) { /* 可忽略 */ }
+      return out;
+    });
+    check('v6.0.214 單據頁首統一：報價單、請款單、詢價單、分包合約書、保留款退還單都是同一個頁首（LOGO＋名片字樣＋公司全名／統一編號／地址＋單據名稱）', !r.err && r.allHead && r.oldGone, JSON.stringify(r));
+    check('v6.0.214 分包合約書：條文可以換頁，第 1 頁填滿（不再印完明細就換頁、下半頁空白）', !r.err && r.cuts >= 10 && r.full, JSON.stringify({ cuts: r.cuts, fill: r.fill, n: r.n, err: r.err }));
+    check('v6.0.214 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
   await browser.close();
