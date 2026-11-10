@@ -13540,6 +13540,8 @@ async function newPage(browser, width, height) {
         // 付款後帳本跟著少一列
         PAYABLES.find((p) => p.id === 'pL1').status = 'paid'; renderPayables(); await T(60);
         out.refresh = document.querySelectorAll('#acct-p-ap > .acct-led .acct-led-row').length === 1;
+        // 搜尋時自動打開完整清單（審查）
+        const fs = document.getElementById('finance-search'); if (fs) { fs.value = '範例'; renderPayables(); await T(60); out.search = document.getElementById('payable-list').offsetParent !== null; fs.value = ''; window._acctLedOpen = {}; acctTab('ap'); await T(60); out.search = out.search && document.getElementById('payable-list').offsetParent === null; } else out.search = true;
         // 收：待收請款單、逾期在前、下一步＝登錄收款
         acctTab('ar'); await T(120);
         const la = document.querySelector('#acct-p-ar > .acct-led');
@@ -13556,7 +13558,7 @@ async function newPage(browser, width, height) {
       PAYABLES.length = 0; keepP.forEach((p) => PAYABLES.push(p)); INV.length = 0; keepI.forEach((v) => INV.push(v)); _fbUser = oU; _isAdminUser = oA;
       return out;
     }, W);
-    check('v6.0.222 帳務帳本（寬 ' + W + '）：付＝待付一筆一列（逾期在前、已付不列）、只有一顆「付款」，收＝待收請款單「登錄收款」；舊清單收在「⋯ 更多」打開才看到；付款後帳本更新；唯讀沒有按鈕；舊選單沒有帳本', !r.err && r.ap && r.oneBtn && r.fold && r.unfold && r.refresh && r.ar && r.noScroll && r.ro && r.old, JSON.stringify(r));
+    check('v6.0.222 帳務帳本（寬 ' + W + '）：付＝待付一筆一列（逾期在前、已付不列）、只有一顆「付款」，收＝待收請款單「登錄收款」；舊清單收在「⋯ 更多」打開才看到；付款後帳本更新；唯讀沒有按鈕；舊選單沒有帳本', !r.err && r.ap && r.oneBtn && r.fold && r.unfold && r.refresh && r.search && r.ar && r.noScroll && r.ro && r.old, JSON.stringify(r));
     check('v6.0.222 帳務帳本測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }

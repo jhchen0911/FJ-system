@@ -43438,6 +43438,7 @@ function v7PageOld(pg,old){
   try{renderMorePage();}catch(e){_err('v7PageOld.more',e);}
 }
 function _nav5Apply(){
+  try{document.querySelectorAll('#page-editor [data-q7off]').forEach(function(b){b.classList.toggle('q7-off',_v7New('editor'));});}catch(e){_err('_nav5Apply.q7',e);}   // v6.0.222 審查：切換選單時報價頁按鈕跟著變
   try{document.body.classList.toggle('nav5',_nav5On());var _om=_v7OldMap();_V7_PAGES.forEach(function(x){document.body.classList.toggle('v7old-'+x[0],!!_om[x[0]]);});}catch(e){_err('_nav5Apply',e);}
   try{renderTopNav();}catch(e){_err('_nav5Apply.top',e);}
 }
@@ -43520,7 +43521,7 @@ function _tdKey(it){return String(it.type||'')+'|'+String(it.id||it.qid||'')+'|'
 //   請款：本月要請款 bill_month／inv_month／待送請款 inv_submit；收款：recv／逾期 overdue；保留款可請退 ret_due；逾期租金 rent_over；付款：pay_due／pay_overdue／期票 tk_due／薪資 hr_pay
 var _TD_MONEY=/^(bill_month|inv_month|inv_submit|recv|overdue|ret_due|rent_over|pay_due|pay_overdue|tk_due|hr_pay)$/;
 function _tdIsMoney(it){return _TD_MONEY.test(String(it&&it.type||''));}
-function _tdSig(it){return String(it.text||'').replace(/\d+/g,'#')+'|'+String(it.sub||'');}
+function _tdSig(it){return String(it.text||'').replace(/\d+/g,'#')+'|'+String(it.sub||'').replace(/\d+/g,'#');}   // v6.0.222 審查：第二行是算好的數字（實收、日期），數字變了不算新的一張
 function _tdSnzGet(){try{return JSON.parse(localStorage.getItem('fy_today_snz')||'{}')||{};}catch(e){return {};}}
 function _tdSnzSet(o){try{localStorage.setItem('fy_today_snz',JSON.stringify(o));}catch(e){_err('_tdSnzSet',e);}}
 // 延後到某天以前不顯示；已處理＝內容（數字除外）沒變就 30 天內不再顯示，內容變了（例如金額不同）會再出現
@@ -44251,7 +44252,7 @@ function _acctLedRows(kind){
     var today=localToday();
     (PAYABLES||[]).forEach(function(p){if(!p||p.status==='paid'||p.voidAt||p.planned)return;var left=0;try{left=_payLeft(p);}catch(e){_err('_acctLedRows.ap',e);}if(!(left>0))return;
       var od=!!(p.date&&p.date<today),part=false;try{part=_payPartial(p);}catch(e){_err('_acctLedRows.part',e);}
-      rows.push({id:p.id,who:p.to||'（未填對象）',what:(p.project||'')+((p.note&&!p.project)?p.note.slice(0,30):''),amt:left,date:p.date||'',state:(od?'逾期待付':'待付')+(part?'・付過一部分':''),col:od?'var(--red)':'#b26a00',urg:od,
+      rows.push({id:p.id,who:p.to||'（未填對象）',what:[p.project||'',(p.note||'').slice(0,30)].filter(Boolean).join('・'),amt:left,date:p.date||'',state:(od?'逾期待付':'待付')+(part?'・付過一部分':''),col:od?'var(--red)':'#b26a00',urg:od,
         next:'付款',fn:"payMarkPaid('"+escq(p.id)+"')",open:''});});
   }
   rows.sort(function(a,b){if(a.urg!==b.urg)return a.urg?-1:1;return String(a.date||'9999').localeCompare(String(b.date||'9999'));});
@@ -44277,8 +44278,17 @@ function _acctLedFold(kind,open){
   window._acctLedOpen=window._acctLedOpen||{};window._acctLedOpen[kind]=!!open;
   var p=document.getElementById('acct-p-'+kind);if(p)p.classList.toggle('led-fold',!open);
 }
+function _acctLedFiltering(k){
+  var q=((document.getElementById('finance-search')||{}).value||'').trim();
+  return !!q||(k==='ap'&&!!window._payAging&&_payAging!=='all');
+}
+function _acctLedUnfoldIfFilter(k,p){
+  if(!_acctLedFiltering(k))return;   // 審查：有搜尋字或帳齡篩選＝要看完整清單，自動打開「⋯ 更多」
+  window._acctLedOpen=window._acctLedOpen||{};window._acctLedOpen[k]=true;p.classList.remove('led-fold');
+  var d=p.querySelector(':scope>.acct-led details.acct-led-more');if(d)d.open=true;
+}
 function _acctLedRefresh(){
-  ['ar','ap'].forEach(function(k){var p=document.getElementById('acct-p-'+k);var o=p&&p.querySelector(':scope>.acct-led');if(o)o.outerHTML=_acctLedHtml(k);});
+  ['ar','ap'].forEach(function(k){var p=document.getElementById('acct-p-'+k);var o=p&&p.querySelector(':scope>.acct-led');if(!o||p.style.display==='none')return;o.outerHTML=_acctLedHtml(k);_acctLedUnfoldIfFilter(k,p);});
 }
 function _acctLedMount(t){
   ['ar','ap'].forEach(function(k){var p=document.getElementById('acct-p-'+k);if(!p)return;var old=p.querySelector(':scope>.acct-led');if(old)old.remove();p.classList.remove('led-fold');});
@@ -44286,6 +44296,7 @@ function _acctLedMount(t){
   var p=document.getElementById('acct-p-'+t);if(!p)return;
   p.insertAdjacentHTML('afterbegin',_acctLedHtml(t));
   p.classList.toggle('led-fold',!(window._acctLedOpen||{})[t]);
+  _acctLedUnfoldIfFilter(t,p);
 }
 // ── v6.0.222 第 7 步⑤ 首頁提醒卡第二行＝系統算好的結論與證據（不是固定說明文字） ──
 function _tdCtExpSub(ct,days){
@@ -44293,7 +44304,7 @@ function _tdCtExpSub(ct,days){
     var last='';(q.dailyLogs||[]).forEach(function(L){if(L&&L.date&&L.date>last)last=L.date;});
     var gap=last?Math.round((Date.parse(localToday())-Date.parse(last))/864e5):null,n=_invsOfQuoteAll(q).length;
     var ev=(last?('最近一篇日報 '+last):'沒有日報')+'・已請款 '+n+' 期';
-    var con=(last&&gap<=14)?'工地還在做 → 合約要展延':(days<0?'日報已停 → 確認是否完工、合約改已完成':'');
+    var con=(last&&gap<=14)?(days<0?'工地還在做 → 合約要展延':'工地還在做 → 到期前要展延'):(days<0?'日報已停 → 確認是否完工、合約改已完成':'');
     return esc(con?(con+'｜'+ev):ev);
   }catch(e){_err('_tdCtExpSub',e);return '';}
 }
@@ -44310,7 +44321,7 @@ function _tdRfqVerSub(q){
   }catch(e){_err('_tdRfqVerSub',e);return '到發包同步';}
 }
 function _tdCfSub(){
-  try{return esc((SYNC_CONFLICTS||[]).slice(0,2).map(function(x){return (_CF_COLL_NAME[x.coll]||x.coll)+'「'+(x.name||x.id)+'」的'+(_CF_FIELD_NAME[x.field]||x.field);}).join('、')+'；目前先用'+((SYNC_CONFLICTS[0]||{}).kept==='cloud'?'另一台':'這台')+'的');}catch(e){_err('_tdCfSub',e);return '點這裡選要用哪一個';}
+  try{return esc((SYNC_CONFLICTS||[]).slice(0,2).map(function(x){return (_CF_COLL_NAME[x.coll]||x.coll)+'「'+(x.name||x.id)+'」的'+(_CF_FIELD_NAME[x.field]||x.field);}).join('、')+(function(){var ks={};(SYNC_CONFLICTS||[]).forEach(function(x){ks[x.kept]=1;});var k=Object.keys(ks);return k.length===1?('；目前先用'+(k[0]==='cloud'?'另一台':'這台')+'的'):'';})());}catch(e){_err('_tdCfSub',e);return '點這裡選要用哪一個';}
 }
 function stlSet(el){
   if(_isReaderUser){toast('唯讀帳號不能修改');return;}
