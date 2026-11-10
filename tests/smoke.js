@@ -3626,7 +3626,7 @@ async function newPage(browser, width, height) {
           INV.length=0;INV.push({id:'i616',quoteId:'q616',project:'待辦測試案',client:'業主',periodNo:1,date:_dAdd(ym+'-01',-10),items:[],totals:{total:100000},received:0});
           PAYABLES.length=0;
           go('dash');
-          const t=document.getElementById('dash-todo-list').innerHTML+(_nav5On()?' '+_tdCur.map(x=>x.jump).join(' '):'');   // v6.0.214 新首頁：跳轉改事件綁定，不寫在 HTML 裡
+          const t=document.getElementById('dash-todo-list').innerHTML+(_nav5On()?' '+_tdCur.map(x=>x.jump).join(' '):'');   // v6.0.213 新首頁：跳轉改事件綁定，不寫在 HTML 裡
           out.todo=/待登錄廠商請款：甲乙工程行/.test(t)&&/本月尚未開單：待辦測試案/.test(t)&&/自有材料在工地：待辦測試案 10 支，最久 130 天（請確認是否該歸還）/.test(t)&&/_rfqTab='mat'/.test(t)&&/invTab\('vendor'\)/.test(t);
           out.shortcut=!document.getElementById('dash-shortcuts');   // v6.0.33 總覽捷徑卡移除（底部列／側欄已有）
           Q=[];INV.length=0;MAT_LEDGER.length=0;
@@ -9118,7 +9118,7 @@ async function newPage(browser, width, height) {
         out.btn = !document.getElementById('ai-notify-btn');   /* v6.0.175：按鈕移到人員管理 › LINE 機器人卡 */
         out.noFloat = /ai-notify-btn/.test(String(renderLineBox));
         const gw = g.getBoundingClientRect().width, kw = kg ? kg.getBoundingClientRect().width : 0;
-        out.full = kg && (getComputedStyle(kg).display === 'none' || Math.abs(kw - gw) < 2); out.w = [gw, kw];   // v6.0.214 新首頁：統計卡收到「看公司數字」（不顯示也算過）
+        out.full = kg && (getComputedStyle(kg).display === 'none' || Math.abs(kw - gw) < 2); out.w = [gw, kw];   // v6.0.213 新首頁：統計卡收到「看公司數字」（不顯示也算過）
         _isReaderUser = false;
         /* 立即重跑 → 提醒卡跟著重讀，雲端回報的失敗原因要出現 */
         let reads = 0; const vals = { 'fydata/health/latest': null, 'fydata/health/remind': null, 'fydata/health/remindErr': { at: 1, msg: 'value argument contains undefined' } };
@@ -12550,7 +12550,7 @@ async function newPage(browser, width, height) {
     check('v6.0.206 6-2a 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.213 改版第 7 步①：共用 A4 單據引擎（報價、請款、合約、詢價單、保留款退還單）──
+  // ── v6.0.212 改版第 7 步①：共用 A4 單據引擎（報價、請款、合約、詢價單、保留款退還單）──
   {
     const { page, errors } = await newPage(browser, 1920, 1080);
     const r = await page.evaluate(async () => {
@@ -12615,13 +12615,13 @@ async function newPage(browser, width, height) {
       Q = keepQ; INV = keepI; VENDORS = keepV; try { Object.assign(P, JSON.parse(keepP)); } catch (e) { /* 可忽略 */ }
       return out;
     });
-    check('v6.0.213 A4 單據引擎：8 種單據同一個出件表；預覽切頁＝匯出 PDF 切頁（報價、請款多頁含續頁表頭、詢價單、合約書、保留款退還單）', r.kinds && r.same, JSON.stringify(r));
-    check('v6.0.213 A4 單據引擎：報價／請款編輯頁右邊即時預覽（改了就變、內部成本不出現）；詢價單、合約書視窗左填右看', r.qpv && r.qlive && r.ipv && r.rpv && r.rlive && r.spv && r.slive && r.noLeak, JSON.stringify(r));
-    check('v6.0.213 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.212 A4 單據引擎：8 種單據同一個出件表；預覽切頁＝匯出 PDF 切頁（報價、請款多頁含續頁表頭、詢價單、合約書、保留款退還單）', r.kinds && r.same, JSON.stringify(r));
+    check('v6.0.212 A4 單據引擎：報價／請款編輯頁右邊即時預覽（改了就變、內部成本不出現）；詢價單、合約書視窗左填右看', r.qpv && r.qlive && r.ipv && r.rpv && r.rlive && r.spv && r.slive && r.noLeak, JSON.stringify(r));
+    check('v6.0.212 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
-  // ── v6.0.214 改版第 7 步②：5 個入口＋今天要做的事＋更多＋切回舊版 ──
+  // ── v6.0.213 改版第 7 步②：5 個入口＋今天要做的事＋更多＋切回舊版 ──
   for (const [W, H] of [[1440, 900], [390, 844], [900, 768]]) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async (W) => {
@@ -12695,11 +12695,11 @@ async function newPage(browser, width, height) {
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       return out;
     }, W);
-    check('v6.0.214 審查修正（寬 ' + W + '）：帳務不會一直亮、同家廠商不同筆延後分開、刪除申請／付包商款核准不給延後、案名在中間也合併', r.hl && r.keys && r.noSnz && r.caseIn, JSON.stringify(r));
-    check('v6.0.214 5 個入口（寬 ' + W + '）：選單只有今天、專案、報價、帳務、更多；更多收其餘頁面（含合約管理、安全母索）且點得進去、不左右捲', r.nav5 && r.five && r.more && r.moreActive && r.lifeline && r.noScroll, JSON.stringify(r));
-    if (W === 1440) check('v6.0.214 今天要做的事：決策卡／提醒卡分開、同案合併、不急的收在「之後的 N 件」、已處理（內容變了再出現）、延後（明天／3 天後／下週一／自選）、沒事顯示「今天沒有要確認的事」、唯讀看得到沒有按鈕、公司數字收成一行、最上面固定「寫今天的日報」（Lotion 11/10）', r.dec && r.merge && r.later && r.jump && r.done && r.reappear && r.laterOpts && r.snoozed && r.empty && r.ro && r.kpiHidden && r.drCard && r.drGo, JSON.stringify(r));
-    check('v6.0.214 切回舊版（寬 ' + W + '）：舊選單回來、記一次次數、可以再改回新版', r.old && r.oldCount && r.back, JSON.stringify(r));
-    check('v6.0.214 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.213 審查修正（寬 ' + W + '）：帳務不會一直亮、同家廠商不同筆延後分開、刪除申請／付包商款核准不給延後、案名在中間也合併', r.hl && r.keys && r.noSnz && r.caseIn, JSON.stringify(r));
+    check('v6.0.213 5 個入口（寬 ' + W + '）：選單只有今天、專案、報價、帳務、更多；更多收其餘頁面（含合約管理、安全母索）且點得進去、不左右捲', r.nav5 && r.five && r.more && r.moreActive && r.lifeline && r.noScroll, JSON.stringify(r));
+    if (W === 1440) check('v6.0.213 今天要做的事：決策卡／提醒卡分開、同案合併、不急的收在「之後的 N 件」、已處理（內容變了再出現）、延後（明天／3 天後／下週一／自選）、沒事顯示「今天沒有要確認的事」、唯讀看得到沒有按鈕、公司數字收成一行、最上面固定「寫今天的日報」（Lotion 11/10）', r.dec && r.merge && r.later && r.jump && r.done && r.reappear && r.laterOpts && r.snoozed && r.empty && r.ro && r.kpiHidden && r.drCard && r.drGo, JSON.stringify(r));
+    check('v6.0.213 切回舊版（寬 ' + W + '）：舊選單回來、記一次次數、可以再改回新版', r.old && r.oldCount && r.back, JSON.stringify(r));
+    check('v6.0.213 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
