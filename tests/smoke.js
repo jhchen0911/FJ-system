@@ -11672,6 +11672,65 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.224 LINE 日報草稿拍板卡：拆出工項數量（打設／拔除、本段完成）、累計跟合約比超過標紅、拆不出的標待確認不寫、附原文與照片、不再列在 AI 草稿清單；確認才寫 progressRows；修改可逐列改；對不到工程不寫', Object.values(r).length === 12 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+  // ── v6.0.223 請款鏈 1：請款單狀態（草稿→已送業主→業主已確認→已開發票→已收款）、舊單推算清單卡、業主確認卡＋發票照抄範例 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepI = INV, keepR = INVOICE_RECS, keepD = DRAFTS, keepC = CUSTOMERS, keepP = P.invStInit, keepMark = window._draftMark;
+      try {
+        DRAFTS = {}; window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        CUSTOMERS = [{ id: 'c1', name: '甲營造', taxid: '12345678' }];
+        const T = { curTotal: 100000, tax: 5000, retention: 0, cleanGross: 0, grand: 105000 };
+        INV = [
+          { id: 'i1', project: '測試甲案', client: '甲營造', periodNo: 1, date: '2026-09-25', quoteId: 'q1', totals: T, receivedConfirmed: true, receivedDate: '2026-10-20' },
+          { id: 'i2', project: '測試甲案', client: '甲營造', periodNo: 2, date: '2026-10-25', quoteId: 'q1', totals: T },
+          { id: 'i3', project: '測試甲案', client: '甲營造', periodNo: 3, date: '2026-11-25', quoteId: 'q1', totals: T },
+          { id: 'r1', project: '測試甲案', kind: 'retReturn', totals: {} }];
+        INVOICE_RECS = [{ id: 'e1', linkedInvId: 'i2', number: 'AB12345678', date: '2026-10-28', status: 'issued' }];
+        delete P.invStInit;
+        // 舊單推算：收齊＝已收款、有發票＝已開發票、其他＝已送業主；保留款退還單不算；還沒確認前不寫紀錄
+        out.infer = _invStOf(INV[0]) === 'paid' && _invStOf(INV[1]) === 'einv' && _invStOf(INV[2]) === 'sent' && _invStInitRows().length === 3;
+        out.noSyncYet = _invStSync() === 0 && !INV[2].stLast;
+        const L = _decItems('invStInit');
+        out.initCard = L.length === 1 && /已收款 1 張/.test(_DEC.invStInit.body(L[0])) && /AB12345678/.test(_DEC.invStInit.detail(L[0]));
+        out.initOk = _DEC.invStInit.ok(L[0]) === true && P.invStInit > 0 && INV[2].stLast === 'sent' && /舊單推算/.test(INV[2].stLog[0].why) && !_decItems('invStInit').length && !INV[3].stLast;
+        // 業主確認卡：對到最近一張「已送業主」的（沒給期別）
+        out.badDraft = (await fyInvOkDraft({ qid: 'q1' })).ok === false;
+        DRAFTS.dok1 = { id: 'dok1', type: 'invOk', by: 'ai@example.com', at: 1, status: 'pending', summary: '', payload: _invOkClean({ qid: 'q1', text: '第3期數量沒問題，請開發票', from: '王主任' }) };
+        const K = _decItems('invOk');
+        out.okCard = K.length === 1 && _invOkInv(K[0]).id === 'i3' && /第3期數量沒問題/.test(_DEC.invOk.detail(K[0])) && /12345678/.test(_DEC.invOk.detail(K[0])) && /NT\$ 100,000/.test(_DEC.invOk.detail(K[0]));
+        window._draftMark = () => Promise.resolve(false);
+        out.markFail = (await _DEC.invOk.ok(K[0])) === false && _invStOf(INV[2]) === 'sent' && !INV[2].ownerOk;   // 草稿標記失敗：請款單不動
+        window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        const ok = await _DEC.invOk.ok(K[0]);
+        out.okDone = ok === 'open' && _invStOf(INV[2]) === 'ok' && INV[2].stLast === 'ok' && /王主任/.test(INV[2].stLog.slice(-1)[0].why) && DRAFTS.dok1.status === 'applied' && INV[2].ownerOk.from === '王主任';
+        const cp = _invCopyOf(INV[2]);
+        out.copy = cp.buyer === '甲營造' && cp.taxid === '12345678' && cp.item === '測試甲案 第3期工程款' && cp.net === 100000 && cp.tax === 5000 && cp.gross === 105000;
+        // 業主要改數量 → 不改狀態、打開請款單去改、留紀錄
+        DRAFTS.dok2 = { id: 'dok2', type: 'invOk', by: 'ai@example.com', at: 2, status: 'pending', summary: '', payload: _invOkClean({ invId: 'i2', text: '鋼板樁打設請改成 80 支', change: [{ desc: '鋼板樁打設', qty: '80' }] }) };
+        const K2 = _decItems('invOk').find(d => d.id === 'dok2');
+        out.chg = /業主要改 1 列/.test(_DEC.invOk.body(K2)) && (await _DEC.invOk.ok(K2)) === 'open' && _invStOf(INV[1]) === 'einv' && /業主要改 1 列/.test(INV[1].stLog.slice(-1)[0].why) && INV[1].stLast === 'einv' && /已經已開發票/.test(_DEC.invOk.detail(K2));
+        // 對位：案名只用部分字、對到兩個工程就不猜；期別要是數字
+        INV.push({ id: 'x1', project: '測試甲案二期', periodNo: 1, totals: T, stLast: 'sent' });
+        out.find = _invOkFind(_invOkClean({ caseName: '測試甲' })) === null && (_invOkFind(_invOkClean({ caseName: '測試甲案', periodNo: 3 })) || {}).id === 'i3' && _invOkClean({ periodNo: '第3期' }).periodNo === 0 && _invOkFind(_invOkClean({ qid: 'q1', periodNo: 9 })) === null;
+        INV.pop();
+        // 事實變了自動記：發票作廢 → 回到業主已確認以前的狀態（i2 沒確認過＝已送業主）；收齊 → 已收款
+        INVOICE_RECS[0].status = 'cancelled'; const n1 = _invStSync();
+        out.sync = n1 === 1 && INV[1].stLast === 'sent' && /^自動/.test(INV[1].stLog.slice(-1)[0].why) && INV[1].stLog.slice(-1)[0].by === '系統';
+        INV[2].receivedConfirmed = true; _invStSync();
+        out.paid = INV[2].stLast === 'paid' && _invStDone(INV[2], 'ok') && _invStDone(INV[2], 'paid') && !_invStDone(INV[1], 'ok') && _invStDone(INV[1], 'send');
+        // 新開的請款單：記一筆「新的請款單」
+        INV.push({ id: 'i4', project: '測試乙案', periodNo: 1, totals: T }); _invStSync();
+        // 逐張改：舊單推算修改的選擇要經過確認才寫
+        delete P.invStInit; INV.push({ id: 'i5', project: '測試丙案', periodNo: 1, totals: T });
+        out.initEdit = _DEC.invStInit.ok(null, { i5: 'ok' }) === true && _invStOf(INV[5]) === 'ok' && /Lotion 逐張改/.test(INV[5].stLog[0].why);
+        out.newInv = INV[4].stLast === 'sent' && /新的請款單/.test(INV[4].stLog[0].why);
+        out.chip = /已收款/.test(_invStChip(INV[2])) && _invStChip(INV[3]) === '';
+      } finally { INV = keepI; INVOICE_RECS = keepR; DRAFTS = keepD; CUSTOMERS = keepC; if (keepP) P.invStInit = keepP; else delete P.invStInit; window._draftMark = keepMark; }
+      return out;
+    });
+    check('v6.0.223 請款單狀態：舊單推算（收齊＝已收款、有發票＝已開發票、其他＝已送業主，保留款退還單不算）列清單給 Lotion 確認一次才記；業主確認卡對到最近一張已送業主、確認＝業主已確認＋發票照抄範例（買受人、統編、品名、未稅、稅額、含稅）；業主要改數量＝打開請款單、不改狀態；發票作廢／收齊／新單自動記紀錄（誰、何時、依據）；做完了沒 _invStDone', Object.values(r).length === 16 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.223 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
   // ── v6.0.221 進退料 M8b：鋼價追蹤 → 建議調整買價（中鋼盤價草稿為主、主計總處指數備援、都沒有出保底卡）──
