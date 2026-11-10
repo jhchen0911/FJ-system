@@ -8,7 +8,7 @@
 //   node tools/fy-draft.js withdraw <草稿id> [--env test]
 //   node tools/fy-draft.js inbox     [--env test]     LINE 收件匣未歸檔的清單（v6.0.191）
 //   node tools/fy-draft.js inbox-suggest <收件id> --qid <報價id> | --case <案名> [--why 處理說明] [--note 備註]
-//   node tools/fy-draft.js bid-stats [--env test]     報價得標率統計：各工項類別筆數、得標率、平均讓價、建議目標價 ±%（v6.0.208）
+//   node tools/fy-draft.js bid-stats [--env test]     報價得標率統計：各工項類別筆數、得標率、平均讓價、建議目標價 ±%（v6.0.209）
 //   node tools/fy-draft.js logout    [--env test]
 //
 // 預設連正式專案 jhchen-aed9a；--env test 連測試專案 fj-system-test（先在測試專案練習）。

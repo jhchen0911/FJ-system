@@ -750,7 +750,7 @@ exports.fyDraft = onRequest({ region: REGION, cors: ['https://jhchen0911.github.
       await ref.update(u);
       res.status(200).json({ ok: true, id: c.id }); return;
     }
-    // v6.0.208 報價得標率統計（給報價線；只有類別、筆數、得標率、平均讓價比例、建議 ±%，沒有案名與金額）
+    // v6.0.209 報價得標率統計（給報價線；只有類別、筆數、得標率、平均讓價比例、建議 ±%，沒有案名與金額）
     if (act === 'bidStats') {
       const [qs, cts, bt, sens] = await Promise.all([
         db.ref('fydata/shared/quotes').once('value').then((s) => pnlCore.deepDec(s.val() || {})),

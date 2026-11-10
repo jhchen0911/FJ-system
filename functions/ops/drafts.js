@@ -43,7 +43,7 @@ function cleanItems(its) {
   });
 }
 
-// v6.0.208 底價／目標成交價（含稅，選填）：payload.aim＝{floor, target}；只有管理員看得到（套用後存在報價的 private 欄位 bidAim）
+// v6.0.209 底價／目標成交價（含稅，選填）：payload.aim＝{floor, target}；只有管理員看得到（套用後存在報價的 private 欄位 bidAim）
 function aimClean(x) {
   if (x == null) return { aim: null };
   if (typeof x !== 'object') return { err: 'aim 要是 {floor, target}' };
@@ -125,7 +125,7 @@ function mine(all, email) {
   return Object.keys(all || {}).map((k) => all[k]).filter((d) => d && d.status === 'pending' && String(d.by || '').toLowerCase() === em)
     .sort((a, b) => (+a.at || 0) - (+b.at || 0)).map((d) => ({ id: d.id, type: d.type, at: d.at, summary: d.summary }));
 }
-// v6.0.208 報價得標率統計給報價線讀（action bidStats）：跟前端 _bidRecRows／_bidTune／_bidKindStats 一行對一行（冒煙測試同一份假資料兩邊比）
+// v6.0.209 報價得標率統計給報價線讀（action bidStats）：跟前端 _bidRecRows／_bidTune／_bidKindStats 一行對一行（冒煙測試同一份假資料兩邊比）
 let BID = null; try { BID = require('../calc/bid.js').bid; } catch (e) { BID = require('../../calc/bid.js').bid; }
 function bidStats(quotes, contracts, params, quoteSens) {
   // 得標結果 q.bid 存在 private 的 quoteSens（跟前端 _applyQuoteSens 一樣接回去；key 已經 deepDec 過）
