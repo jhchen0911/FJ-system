@@ -11624,6 +11624,44 @@ async function newPage(browser, width, height) {
     check('v6.0.208 數量對不上 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── v6.0.226 鋼價來源改版（Lotion 11/10）：H 型鋼／鋼軌樁／鋼板樁看東和、覆工板看中鋼熱軋；每噸調整金額換算每公斤（不算 %）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepF = MAT_MOVE_FIN, keepD = DRAFTS, keepT = MAT_TAGS, keepTd = window.localToday, keepMark = window._draftMark, keepI = STEEL_IDX;
+      try {
+        MAT_MOVE_FIN = {}; DRAFTS = {}; MAT_TAGS = {}; STEEL_IDX = null;
+        window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        _m8Save({ kind: 'm8cfg', cats: [{ id: 'h', name: 'H 型鋼', unit: 'kg', price: 25, ref: { ym: '2026-09' } }, { id: 'sp', name: '鋼板樁', unit: 'kg', price: 30, ref: { ym: '2026-09' } }, { id: 'deck', name: '覆工板', unit: '片', price: 4000, ref: { ym: '2026-09' } }], salvage: '', store: '' });
+        window.localToday = () => '2026-11-10';
+        out.line = _m8StlLine(_m8Cats().find(x => x.id === 'sp')) === 'H' && _m8StlLine(_m8Cats().find(x => x.id === 'deck')) === 'P' && _m8StlLine({ id: 'rail', unit: 'kg' }) === 'H';
+        out.bad = (await fySteelPriceDraft({ ym: '2026-11', items: [{ cat: 'H型鋼' }] })).ok === false;
+        const o = _m8StlClean({ ym: '2026-11', items: [{ cat: 'H型鋼', perTon: 400, src: '東和鋼鐵', date: '2026-10-20', url: 'https://example.com/a' }, { cat: '鋼板樁', perTon: 400, date: '2026-11-02' }, { cat: '熱軋鋼捲', perTon: 300, src: '中鋼', date: '2026-11-05' }] });
+        out.clean = o.items.length === 3 && o.items[0].cat === 'H' && o.items[0].perTon === 400 && o.items[1].cat === 'H' && o.items[1].src === '東和鋼鐵' && o.items[2].cat === 'P' && o.items[2].src === '中鋼';
+        DRAFTS.dst1 = { id: 'dst1', type: 'steelPrice', by: 'ai@example.com', at: 1, status: 'pending', summary: '', payload: o };
+        out.card = /每噸 \+400 元/.test(_DEC.steelPrice.body(DRAFTS.dst1)) && /每公斤 \+0\.4/.test(_DEC.steelPrice.detail(DRAFTS.dst1));
+        out.ok = _DEC.steelPrice.ok(DRAFTS.dst1) === true && _m8Csc().months['2026-11'].adj.length === 3;
+        // 重複確認同一張（同日同金額同來源）不會重複加
+        DRAFTS.dst2 = { id: 'dst2', type: 'steelPrice', by: 'ai@example.com', at: 2, status: 'pending', summary: '', payload: _m8StlClean({ ym: '2026-11', items: [{ cat: 'H型鋼', perTon: 400, src: '東和鋼鐵', date: '2026-10-20' }] }) };
+        _DEC.steelPrice.ok(DRAFTS.dst2); out.dedupe = _m8Csc().months['2026-11'].adj.length === 3;
+        // 建議：H 型鋼 25 + (400+400)/1000 = 25.8（+3.2%，不到 5% 不出卡）；再漲兩次 400 → 26.6（+6.4%）出卡
+        const ch = _m8SteelChg(_m8Cats().find(x => x.id === 'h'));
+        out.calc = ch && ch.sug === 25.8 && ch.pct === 3.2 && /東和鋼鐵 H 型鋼盤價/.test(ch.src) && !_decItems('m8Steel').length;
+        DRAFTS.dst3 = { id: 'dst3', type: 'steelPrice', by: 'ai@example.com', at: 3, status: 'pending', summary: '', payload: _m8StlClean({ ym: '2026-11', items: [{ cat: 'H型鋼', perTon: 400, date: '2026-11-06' }, { cat: 'H型鋼', perTon: 400, date: '2026-11-08' }] }) };
+        _DEC.steelPrice.ok(DRAFTS.dst3);
+        const L = _decItems('m8Steel'), hc = L.find(x => /H 型鋼/.test(x.spec));
+        out.card2 = !!hc && hc.sug === 26.6 && /每噸 \+400 元 → 每公斤 \+0\.4/.test(_DEC.m8Steel.detail(hc)) && /換算：每噸調整金額 ÷ 1000/.test(_DEC.m8Steel.detail(hc));
+        // 覆工板（每片）不拿每噸金額換算
+        out.deck = !L.some(x => /覆工板/.test(x.spec));
+        // 舊格式（pct）照收
+        out.old = _m8StlClean({ ym: '2026-11', items: [{ cat: 'H型鋼', pct: 2.5 }] }).items[0].pct === 2.5;
+      } finally { MAT_MOVE_FIN = keepF; DRAFTS = keepD; MAT_TAGS = keepT; window.localToday = keepTd; window._draftMark = keepMark; STEEL_IDX = keepI; }
+      return out;
+    });
+    check('v6.0.226 鋼價來源：H 型鋼／鋼軌樁／鋼板樁看東和、覆工板看中鋼熱軋；草稿可帶每噸調整金額＋來源＋日期＋網址；確認累加進這個月（不重複）；建議買價＝現價＋每噸金額÷1000、卡片寫換算；覆工板每片不換算；舊 % 格式照收', Object.values(r).length === 10 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.226 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.221 進退料 M8b：鋼價追蹤 → 建議調整買價（中鋼盤價草稿為主、主計總處指數備援、都沒有出保底卡）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -11649,13 +11687,13 @@ async function newPage(browser, width, height) {
         out.idx = L.length === 1 && L[0].pct === 6 && L[0].sug === 21.2 && L[0].spec === 'H 型鋼' && /主計總處/.test(L[0].src) && /只建議，不會自動改/.test(_DEC.m8Steel.detail(L[0]));
         // ② 中鋼盤價草稿：確認才記；這個月有中鋼資料就改用中鋼（H 開頭看 H 型鋼）：+2% → 不到 5% 不出卡
         DRAFTS.dstl1 = { id: 'dstl1', type: 'steelPrice', by: 'ai@example.com', at: 1, status: 'pending', summary: '', payload: { ym: '2026-10', url: 'https://example.com/n', items: [{ cat: 'H型鋼', pct: 2 }, { cat: '鋼板', pct: -1 }] } };
-        out.draftCard = _decItems('steelPrice').length === 1 && /H 型鋼 \+2%/.test(_DEC.steelPrice.body(DRAFTS.dstl1));
+        out.draftCard = _decItems('steelPrice').length === 1 && /H型鋼 \+2%/.test(_DEC.steelPrice.body(DRAFTS.dstl1));   // v6.0.226 文字改「H型鋼 +2%（來源）」
         out.draftOk = _DEC.steelPrice.ok(DRAFTS.dstl1) === true && _m8Csc().months['2026-10'].H === 2 && DRAFTS.dstl1.status === 'applied';
         out.cscSmall = !_decItems('m8Steel').length;
         // 加上 9 月 +4% → 累計 1.04×1.02＝+6.1% → 出卡、來源寫中鋼
         MAT_MOVE_FIN.steelCsc.months['2026-09'] = { H: 4, P: 0 };
         L = _decItems('m8Steel');
-        out.csc = L.length === 1 && L[0].pct === 6.1 && /中鋼盤價/.test(L[0].src) && L[0].sug === 21.22;
+        out.csc = L.length === 1 && L[0].pct === 6.1 && /盤價/.test(L[0].src) && L[0].sug === 21.22;   // v6.0.226 H 型鋼來源改東和
         out.ack = _DEC.m8Steel.ok(L[0]) === true && !_decItems('m8Steel').length;
         // ③ 保底卡：16 日以後、兩個來源都沒有新資料
         window.localToday = () => '2026-12-20';
