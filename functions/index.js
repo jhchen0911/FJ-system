@@ -785,7 +785,7 @@ exports.fyDraft = onRequest({ region: REGION, cors: ['https://jhchen0911.github.
   }
 });
 
-// ══════════ M8b（v6.0.216）鋼價追蹤備援：每月 8、15、25 日 06:55（台北）抓主計總處營造工程物價指數（金屬製品類）══════════
+// ══════════ M8b（v6.0.221）鋼價追蹤備援：每月 8、15、25 日 06:55（台北）抓主計總處營造工程物價指數（金屬製品類）══════════
 // 寫 fydata/private/steelIdx（{at,src,url,item,latest:{ym,v},series}）；抓不到或格式變了寫 fydata/private/steelIdx/err（FJ 出保底卡請 Lotion 手動更新）。
 // 主要來源中鋼盤價由 Lotion-HQ 每月上傳「鋼價草稿」（type steelPrice），不在這裡抓。
 const steelCore = require('./ops/steel.js');

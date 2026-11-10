@@ -46,6 +46,7 @@ async function newPage(browser, width, height) {
   await page.goto(INDEX);
   await page.waitForTimeout(2500);
   await page.evaluate(() => { window._costEditAll = true; });   // v6.0.29 施工成本頁測試時全展開
+  await page.evaluate(() => { localStorage.setItem('fy_v7old', '{"proj":1,"acct":1}'); });   // v6.0.218：既有的工程專案、帳務測試驗的是原本版面（「切回舊版」那一版）；新版（14 步流程、帳務 4 塊）另有測試（自己切回新版）
   return { page, errors };
 }
 
@@ -11622,7 +11623,7 @@ async function newPage(browser, width, height) {
     check('v6.0.208 數量對不上 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
-  // ── v6.0.216 進退料 M8b：鋼價追蹤 → 建議調整買價（中鋼盤價草稿為主、主計總處指數備援、都沒有出保底卡）──
+  // ── v6.0.221 進退料 M8b：鋼價追蹤 → 建議調整買價（中鋼盤價草稿為主、主計總處指數備援、都沒有出保底卡）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -11666,8 +11667,8 @@ async function newPage(browser, width, height) {
       } finally { MAT_MOVE_FIN = keepF; DRAFTS = keepD; MAT_TAGS = keepT; window.localToday = keepTd; window._draftMark = keepMark; STEEL_IDX = keepI; }
       return out;
     });
-    check('v6.0.216 進退料 M8b 鋼價追蹤：買價存檔記起點、沒有中鋼資料用主計總處指數、中鋼盤價草稿確認才記、有中鋼資料改用中鋼（累乘）、漲跌 5% 以上出卡寫來源與建議買價、只建議不自動改、16 日以後兩個來源都沒資料出保底卡', r.ref && r.refKeep && r.idx && r.draftCard && r.draftOk && r.cscSmall && r.csc && r.ack && r.noneOk && r.none && r.noneEarly, JSON.stringify(r));
-    check('v6.0.216 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    check('v6.0.221 進退料 M8b 鋼價追蹤：買價存檔記起點、沒有中鋼資料用主計總處指數、中鋼盤價草稿確認才記、有中鋼資料改用中鋼（累乘）、漲跌 5% 以上出卡寫來源與建議買價、只建議不自動改、16 日以後兩個來源都沒資料出保底卡', r.ref && r.refKeep && r.idx && r.draftCard && r.draftOk && r.cscSmall && r.csc && r.ack && r.noneOk && r.none && r.noneEarly, JSON.stringify(r));
+    check('v6.0.221 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
   // ── v6.0.211 進退料 M6：租賃與運費請款核對（Lotion 11/10 四題全 A；照 11/04 寬大 9/18 的實際算式）──
@@ -12991,6 +12992,166 @@ async function newPage(browser, width, height) {
     check('v6.0.210 M7 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.216 改版第 7 步③（7b 畫面）：報價頁總計框內部面板（後端 _bidAimOf／_bidSuggestFor 由小批次線做，這裡用假函式驗顯示）──
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, oU = window._fbUser, oA = window._isAdminUser;
+      try {
+        window.toast = () => {}; P.tax = 5;
+        Q = [{ id: 'qB1', code: 'B1', name: '範例B1', client: '甲營造', date: '2026-11-10', exs: [], rmk: {}, _mt: 1, costs: [], items: [{ desc: '鋼軌樁打設', unit: '支', qty: 10, price: 1000, estCost: 700 }] }];
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        loadQ('qB1'); go('editor'); await T(200);
+        const el = document.getElementById('q-p3');
+        rTots(); out.none = el.style.display === 'none';   // 這張沒有底價、目標價，這類工項也還沒有任何一筆結果：不顯示（v6.0.209 後端已上線，用真的函式）
+        const oS = window._bidSuggestFor; window._bidSuggestFor = () => [{ kind: 'railpile', label: '鋼軌樁', n: 0, rate: null, ready: false, adjPct: null }]; rTots(); out.none = out.none && el.style.display === 'none' && !/0 筆/.test(el.textContent); window._bidSuggestFor = oS;
+        window._bidAimOf = (q) => (q && q.id === 'qB1' ? { floor: 9000, target: 9800 } : null);
+        window._bidSuggestFor = () => [{ kind: 'railpile', label: '鋼軌樁', n: 6, rate: 33.3, ready: true, adjPct: -6.5 }, { kind: 'strut', label: '水平支撐', n: 2, rate: 50, ready: false, adjPct: null }];
+        rTots();
+        const tx = el.textContent;
+        out.panel = el.style.display !== 'none' && /底價（含稅）NT\$ 9,000/.test(tx) && /目標成交價（含稅）NT\$ 9,800/.test(tx) && /報價（含稅）NT\$ 10,500/.test(tx);
+        out.sug = /「鋼軌樁」得標率 33.3%、建議目標價調 -6.5%（6 筆）/.test(tx) && /「水平支撐」目前 2 筆，滿 5 筆才給建議/.test(tx) && /只是建議，不會改報價/.test(tx);
+        _fbUser = { email: 'staff@example.com', uid: 's' }; _isAdminUser = false; rTots(); out.staff = el.style.display === 'none';
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        window._bidAimOf = () => { throw new Error('壞掉'); }; rTots(); out.safe = true;
+        const doc = _docOut('quote', { q: Q[0] }).html; out.noDoc = !/9,000|9,800|底價|目標成交/.test(doc);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      delete window._bidAimOf; delete window._bidSuggestFor; _fbUser = oU; _isAdminUser = oA; Q = keepQ;
+      return out;
+    });
+    check('v6.0.216 報價頁內部面板：這張沒有底價、目標價、這類工項也還沒有結果就不顯示；有底價／目標成交價就和報價（含稅）一起列；同類工項得標率與建議（沒滿 5 筆照實說）；一般員工看不到；不會印在報價單', r.none && r.panel && r.sug && r.staff && r.safe && r.noDoc, JSON.stringify(r));
+    check('v6.0.216 測試無 JS 錯誤', errors.filter((e) => !/壞掉/.test(e)).length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.217 改版第 7 步④（7d）：帳務 4 塊（收／付／發票與支出／金流）＋金流一行固定在最上面 ──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async (W) => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const oU = window._fbUser, oA = window._isAdminUser, keepP = PAYABLES.slice();
+      try {
+        localStorage.removeItem('fy_v7old');
+        window.toast = () => {}; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        PAYABLES.push({ id: 'pD1', to: '範例廠商', date: localToday(), amount: 1000, status: 'unpaid', _mt: 1 });
+        go('acct'); acctTab('ap'); await T(150);
+        const tb = document.getElementById('acct-tabs');
+        const big = Array.prototype.map.call(tb.querySelectorAll('[data-ag]'), (b) => b.textContent);
+        out.groups = JSON.stringify(big) === JSON.stringify(['收', '付', '發票與支出', '金流']);
+        out.sub = /廠商請款/.test(tb.textContent) && /應付/.test(tb.textContent) && tb.querySelector('[data-at="ap"]').style.background.indexOf('var(--g)') >= 0;
+        // 點「收」→ 到收那塊（業主請款或上次停的頁）；再點「付」→ 回到上次停的「應付」
+        tb.querySelector('[data-ag="in"]').click(); await T(80); out.inGo = _acctTab === 'own' || _acctTab === 'ar';
+        document.querySelector('#acct-tabs [data-ag="out"]').click(); await T(80); out.remember = _acctTab === 'ap';
+        document.querySelector('#acct-tabs [data-ag="cash"]').click(); await T(80); out.cash = _acctTab === 'cash' && !document.querySelector('#acct-tabs [data-at]');
+        // 金流一行：跟金流預測頁同一套算法
+        const line = document.getElementById('acct-cash1');
+        const b0 = _cfBucket(new Date(), 0);
+        out.line = !!line && line.textContent.indexOf('NT$ ' + fmt(Math.round(_availableCash()))) >= 0 && line.textContent.indexOf('預計付 NT$ ' + fmt(Math.round(b0.outgoing))) >= 0 && b0.outgoing >= 1000;
+        out.kpiHide = getComputedStyle(document.getElementById('finance-kpis')).display === 'none';
+        out.noScroll = document.documentElement.scrollWidth <= W + 1;
+        // 一般員工看不到金流那一行
+        _fbUser = { email: 'staff@example.com', uid: 's' }; _isAdminUser = false; acctTab('ar'); await T(60); out.staff = !document.getElementById('acct-cash1');
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        // 舊選單：照舊 8 個分頁、KPI 卡回來
+        localStorage.setItem('fy_nav_old', '1'); _nav5Apply(); acctTab('ap'); await T(80);
+        out.old = document.querySelectorAll('#acct-tabs [data-ag]').length === 0 && document.querySelectorAll('#acct-tabs button').length === 8 && getComputedStyle(document.getElementById('finance-kpis')).display !== 'none';
+        localStorage.removeItem('fy_nav_old'); _nav5Apply();
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      PAYABLES.length = 0; keepP.forEach((p) => PAYABLES.push(p)); _fbUser = oU; _isAdminUser = oA;
+      return out;
+    }, W);
+    check('v6.0.217 帳務 4 塊（寬 ' + W + '）：上方收／付／發票與支出／金流，有好幾頁的下面一排小分頁、記得上次停的頁；舊選單照舊 8 個分頁', r.groups && r.sub && r.inGo && r.remember && r.cash && r.old && r.noScroll, JSON.stringify(r));
+    check('v6.0.217 金流一行（寬 ' + W + '）：可動用資金、未來 30 天預計收／付跟金流預測同一套算法；KPI 卡收起；一般員工看不到', r.line && r.kpiHide && r.staff, JSON.stringify(r));
+    check('v6.0.217 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.218 改版第 7 步⑤（7c）：專案一案一頁＝直的流程步驟條 ──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async (W) => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepC = CONTRACTS.slice();
+      try {
+        window.toast = () => {};
+        localStorage.removeItem('fy_v7old');
+        Object.keys(localStorage).filter((k) => /^pj7_open_/.test(k)).forEach((k) => localStorage.removeItem(k));
+        Q = [{ id: 'qP7', name: '範例工程P7', client: '甲營造', code: 'P7', date: '2026-10-01', awarded: true, items: [{ desc: '鋼軌樁打設', unit: '支', qty: 100, price: 1000 }], costs: [], _mt: 1, dailyLogs: [{ id: 'd1', date: '2026-10-20', progressRows: [{ itemIdx: 0, qty: 30 }], photos: [] }] }];
+        CONTRACTS.push({ id: 'cP7', linkedQid: 'qP7', name: '範例工程P7', amount: 105000, code: 'C-P7' });
+        openProj('qP7'); await T(200);
+        const hd = Array.prototype.map.call(document.querySelectorAll('.pj7-hd'), (e) => e.textContent);
+        out.n14 = hd.length === 14 && ['合約', '發包', '辦證', '送審文件', '排程', '材料', '派工', '追加', '日報', '請款', '拆除拔樁', '完工結算', '保留款', '結案'].every((l, i) => hd[i].indexOf(l) >= 0);
+        const cur = document.querySelector('.pj7-step.cur');
+        out.cur = !!cur && cur.id === 'pj-sec-sub' && !!document.getElementById('pj-body-sub') && document.querySelectorAll('.pj7-step [id^="pj-body-"]').length === 1;
+        out.doneLine = /合約C-P7/.test(hd[0].replace(/\s/g, '')) && hd[0].indexOf('✓') >= 0;
+        out.pendName = hd[9].indexOf('還沒請款') < 0 && hd[9].indexOf('○') >= 0;   // 還沒到：只顯示名稱
+        // 點一下展開別步（日報）、再點收起
+        document.querySelector('.pj7-hd[data-pj7="log"]').click(); await T(120);
+        out.toggle = !!document.getElementById('pj-body-log');
+        document.querySelector('.pj7-hd[data-pj7="log"]').click(); await T(120);
+        out.toggle2 = !document.getElementById('pj-body-log');
+        // 總覽待辦跳過來（pj_open／pj7_open＝1）照樣展開並找得到 pj-sec-*
+        localStorage.setItem('pj7_open_inv', '1'); renderProj(); await T(80); out.jump = !!document.getElementById('pj-body-inv') && !!document.getElementById('pj-sec-inv');
+        out.other = !!document.getElementById('pj-sec-items') && !!document.getElementById('pj-sec-cost');
+        out.noScroll = document.documentElement.scrollWidth <= W + 1;
+        // 舊選單：原本的 8 步時間軸版面
+        localStorage.setItem('fy_nav_old', '1'); _nav5Apply(); renderProj(); await T(80);
+        out.old = !document.querySelector('.pj7') && !!document.getElementById('pj-sec-log');
+        localStorage.removeItem('fy_nav_old'); _nav5Apply();
+        Object.keys(localStorage).filter((k) => /^pj7_open_/.test(k)).forEach((k) => localStorage.removeItem(k));
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; CONTRACTS.length = 0; keepC.forEach((c) => CONTRACTS.push(c));
+      return out;
+    }, W);
+    check('v6.0.218 專案步驟條（寬 ' + W + '）：14 步一步一行、只展開現在這步、做完的一行、還沒到的只顯示名稱、點了展開／收起、待辦跳轉找得到、其他明細收在下面、舊選單照舊', r.n14 && r.cur && r.doneLine && r.pendName && r.toggle && r.toggle2 && r.jump && r.other && r.noScroll && r.old, JSON.stringify(r));
+    check('v6.0.218 測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.219 改版第 7 步⑥（7e）：每一頁各自切回舊版＋整站切回 ──
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q;
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old_n'); _nav5Apply();
+        go('more'); await T(80);
+        const mb = document.getElementById('more-body');
+        out.list = ['dash', 'proj', 'acct'].every((k) => !!mb.querySelector('[data-v7="' + k + '"]')) && /整站切回舊版選單/.test(mb.textContent);
+        // Lotion 11/10：計算工具第一格只寫「擋土支撐全套」（拿掉「（材料估算）」）
+        out.shoringLbl = [...mb.querySelectorAll('.more-it')].some((b) => b.textContent.trim() === '擋土支撐全套') && !/擋土支撐全套（材料估算）/.test(mb.textContent);
+        // 只把帳務切回舊版：帳務 8 個分頁、首頁與專案還是新版、選單還是 5 個
+        mb.querySelector('[data-v7="acct"]').click(); await T(80);
+        go('acct'); acctTab('ap'); await T(100);
+        out.acctOld = document.querySelectorAll('#acct-tabs [data-ag]').length === 0 && document.querySelectorAll('#acct-tabs button').length >= 6 && !document.getElementById('acct-cash1') && getComputedStyle(document.getElementById('finance-kpis')).display !== 'none';
+        out.navStill = document.body.classList.contains('nav5');
+        go('dash'); updateDashTodo(); await T(60);
+        out.dashNew = getComputedStyle(document.getElementById('dash-kpis')).display === 'none';
+        out.label = /目前舊版，改回新版/.test((go('more'), document.getElementById('more-body').querySelector('[data-v7="acct"]').textContent));
+        // 首頁切回舊版：統計卡、本月待辦回來
+        v7PageOld('dash', true); go('dash'); await T(80);
+        out.dashOld = getComputedStyle(document.getElementById('dash-kpis')).display !== 'none' && getComputedStyle(document.getElementById('dash-more-num').parentNode).display === 'none';
+        // 專案切回舊版：原本的時間軸版面
+        Q = [{ id: 'qE7', name: '範例E7', client: '甲', awarded: true, items: [{ desc: '鋼軌樁', unit: '支', qty: 1, price: 1 }], costs: [], _mt: 1 }];
+        v7PageOld('proj', true); openProj('qE7'); await T(120); out.projOld = !document.querySelector('.pj7');
+        v7PageOld('proj', false); renderProj(); await T(80); out.projNew = !!document.querySelector('.pj7');
+        out.count = Object.keys(JSON.parse(localStorage.getItem('fy_nav_old_n') || '{}')).filter((k) => /\|(acct|dash|proj)$/.test(k)).length === 3;
+        v7PageOld('dash', false); v7PageOld('acct', false);
+        out.back = Object.keys(_v7OldMap()).length === 0 && _v7New('dash') && _v7New('acct');
+        // 整站切回舊版：三頁都用舊版
+        navUseOld(true); out.allOld = !_v7New('dash') && !_v7New('proj') && !_v7New('acct'); navUseOld(false);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; localStorage.removeItem('fy_v7old'); _nav5Apply();
+      return out;
+    });
+    check('v6.0.219 切回舊版：更多裡每一頁（今天、專案、帳務）各自切回、選單維持 5 個、其他頁不受影響、記次數；整站切回三頁都舊版', r.list && r.acctOld && r.navStill && r.dashNew && r.label && r.dashOld && r.projOld && r.projNew && r.count && r.back && r.allOld, JSON.stringify(r));
+    check('v6.0.219 更多 › 計算工具第一格名稱是「擋土支撐全套」（Lotion 11/10 拿掉「（材料估算）」）', !!r.shoringLbl, JSON.stringify({ shoringLbl: r.shoringLbl, err: r.err }));
+    check('v6.0.219 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.214 單據頁首統一（報價、請款、詢價、分包合約、保留款退還）＋ 分包合約第 1 頁不再半頁空白 ──
   {
     const { page, errors } = await newPage(browser, 1600, 1000);

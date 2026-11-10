@@ -638,6 +638,10 @@ body.fy-ro #prm-backup-card,body.fy-ro #prm-rescue-card{display:none!important}
 body.nav5 .sidebar>:not([data-n5]){display:none!important}
 body.nav5 .mob-nav>:not([data-n5]){display:none!important}
 body.nav5 .n5-hide{display:none!important}
+/* 7e：每頁各自切回舊版（body.v7old-頁名） */
+body.nav5:not(.v7old-dash) .n5d-hide,body.nav5:not(.v7old-dash) .n5d-old{display:none!important}
+body:not(.nav5) .n5d-only,body.v7old-dash .n5d-only{display:none!important}
+body.nav5:not(.v7old-acct) .n5a-hide{display:none!important}
 body:not(.nav5) .n5-only{display:none!important}
 body.nav5 #mn-dash{order:1}body.nav5 #mn-proj{order:2}body.nav5 #mn-quotes{order:3}body.nav5 #mnb-acct{order:4}body.nav5 #mn-more{order:5}
 body.nav5 #mn-proj>span:first-child{width:auto!important;height:auto!important;background:none!important;margin-top:0!important;box-shadow:none!important;border:0!important;border-radius:0!important}
@@ -807,7 +811,7 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
 <div class="page active" id="page-dash">
   <div id="pay-reminder-banner" style="display:none;padding:10px 18px 0"></div>
   <div id="dash-greet" class="dash-greet"></div>
-  <div class="kgrid n5-hide" id="dash-kpis"></div>
+  <div class="kgrid n5d-hide" id="dash-kpis"></div>
   <div class="pad" style="display:flex;flex-direction:column;gap:12px">
 
     <!-- 通知提醒 -->
@@ -818,19 +822,19 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
     <!-- 本月待辦（快捷鍵下方） -->
     <div class="card" style="margin-bottom:0" id="dash-todo-card">
       <div class="ch green" style="padding:8px 14px">
-        <div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> <span class="n5-hide">本月待辦</span><span class="n5-only">今天要做的事</span></div>
+        <div class="cht"><svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg> <span class="n5d-old">本月待辦</span><span class="n5d-only">今天要做的事</span></div>
         <span id="dash-todo-badge" style="font-size:11px;background:rgba(255,255,255,.25);color:#fff;border-radius:10px;padding:1px 8px;display:none"></span>
       </div>
       <div id="dash-todo-list" style="padding:4px 0"></div>
     </div>
 
     <!-- 經營儀表板（最近報價前） -->
-    <div id="dash-gates" class="n5-hide"></div>
+    <div id="dash-gates" class="n5d-hide"></div>
 
     <!-- 改版第 7 步②：首頁只留「今天要做的事」；公司數字收到「更多 › 經營報表」 -->
-    <div class="n5-only" style="text-align:center;padding:4px 0 8px"><a href="javascript:void(0)" id="dash-more-num" style="font-size:13px;color:var(--g3);font-weight:700;text-decoration:none">看公司數字 ›</a></div>
+    <div class="n5d-only" style="text-align:center;padding:4px 0 8px"><a href="javascript:void(0)" id="dash-more-num" style="font-size:13px;color:var(--g3);font-weight:700;text-decoration:none">看公司數字 ›</a></div>
     <!-- 最近報價 -->
-    <div class="n5-hide">
+    <div class="n5d-hide">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <span style="font-size:14px;font-weight:700"><svg class="ic ib" aria-hidden="true"><use href="#i-doc"/></svg> 最近報價</span>
         <button type="button" class="btn btn-sm" onclick="go('quotes')">查看全部 →</button>
@@ -1163,6 +1167,7 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
         <div class="trow grand"><label>總計</label><span id="ttot">NT$ 0</span></div>
         <div class="trow" id="tcost-row" style="display:none;border-top:1px dashed var(--ym);padding-top:4px"><label style="color:#e65100;font-size:11px">預估成本 <svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg>內部</label><span id="tcost" style="color:#e65100;font-size:12px">NT$ 0</span></div>
         <div class="trow" id="tmgn-row" style="display:none"><label style="color:#e65100;font-size:11px">預估毛利 <svg class="ic ib" aria-hidden="true"><use href="#i-lock"/></svg>內部</label><span id="tmgn" style="font-size:12px;font-weight:900">NT$ 0</span></div>
+        <div id="q-p3" style="display:none;border-top:1px dashed var(--ym);padding-top:4px;margin-top:2px"></div>
         <div id="tcost-warn" style="display:none;font-size:10.5px;line-height:1.5;color:var(--red);background:var(--redl);border:1px solid #f3c4bf;border-radius:var(--r6);padding:6px 8px;margin-top:4px"></div>
       </div>
     </div>
@@ -2896,9 +2901,9 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
 <script src="calc/todo.js?v=6.0.181" defer></script>
 <script src="calc/vbill.js?v=6.0.181" defer></script>
 <script src="calc/qdraft.js?v=6.0.197" defer></script>
-<script src="calc/matmove.js?v=6.0.215" defer></script>
+<script src="calc/matmove.js?v=6.0.221" defer></script>
 <script src="calc/bid.js?v=6.0.209" defer></script>
-<script src="app.js?v=6.0.216" defer></script>
+<script src="app.js?v=6.0.221" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
