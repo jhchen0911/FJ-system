@@ -12304,7 +12304,7 @@ async function newPage(browser, width, height) {
     check('v6.0.180 撤銷補登（主控台）號碼還原、舊裝置蓋掉報價也不復活、補登後已封存新版就不准撤銷、再補一次結果一樣；唯讀帳號不能套用', r.undo && r.undoDur && r.undoRefuse && r.redo && r.ro, JSON.stringify(r));
     check('v6.0.180 防漏：每次匯出記 sendLog；只匯出另存永久紀錄（同內容只存一次）；還原前內容匯出過沒封存→先封存成正式版', r.only && r.onlyOnce && r.restore, JSON.stringify(r));
     check('v6.0.180 資料健檢：匯出過沒封存內容已改掉（封存後消失）、合約金額對不上任何正式版次；唯讀帳號匯出送 qsend 卡（只送工項條款與基本欄位、跟正式版相同不送）、確認＝封存；同內容重複匯出不再動報價；複製報價不帶紀錄', r.health1 && r.health1b && r.health2 && r.reader && r.qsend && r.sameQuiet && r.copy, JSON.stringify(r));
-    check('v6.0.180 資料庫規則：草稿類型加 qverfix、qsend（其他類型保留）', /\|vendorBill\|qverfix\|qsend\)\$/.test(dv) && /quote\|qchg\|bid\|irPhoto\|addon\|dailyLog\|contact/.test(dv));
+    check('v6.0.180 資料庫規則：草稿類型加 qverfix、qsend（其他類型保留；v6.0.211 再加 frtRate、matBill）', /\|vendorBill\|qverfix\|qsend(\|[A-Za-z]+)*\)\$/.test(dv) && /\|frtRate\|matBill\)\$/.test(dv) && /quote\|qchg\|bid\|irPhoto\|addon\|dailyLog\|contact/.test(dv));
     check('v6.0.180 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
