@@ -13513,6 +13513,54 @@ async function newPage(browser, width, height) {
     check('v6.0.222 專案頁請款只讀測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.222 第 7 步④ 帳務帳本：收／付最上面一筆一列、一顆「下一步」，舊清單收進「⋯ 更多」；唯讀沒有按鈕；舊選單照舊 ──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async (W) => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const oU = window._fbUser, oA = window._isAdminUser, keepP = PAYABLES.slice(), keepI = INV.slice();
+      try {
+        localStorage.removeItem('fy_v7old'); window._acctLedOpen = {};
+        window.toast = () => {}; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        PAYABLES.length = 0; INV.length = 0;
+        PAYABLES.push({ id: 'pL1', to: '範例廠商甲', project: '範例工程L', date: '2026-01-05', amount: 1000, vat: false, status: 'unpaid', _mt: 1 });
+        PAYABLES.push({ id: 'pL2', to: '範例廠商乙', project: '範例工程L', date: '2099-01-05', amount: 2000, vat: false, status: 'unpaid', _mt: 1 });
+        PAYABLES.push({ id: 'pL3', to: '範例廠商丙', date: '2026-01-05', amount: 500, vat: false, status: 'paid', paidDate: '2026-01-05', _mt: 1 });
+        INV.push({ id: 'iL1', project: '範例工程L', client: '範例營造', periodNo: 2, date: '2026-01-01', expectedRecvDate: '2026-02-01', items: [], totals: { sub: 10000, tax: 500, total: 10500 }, _mt: 1 });
+        go('acct'); acctTab('ap'); await T(150);
+        const led = document.querySelector('#acct-p-ap > .acct-led');
+        const rows = led ? led.querySelectorAll('.acct-led-row') : [];
+        out.ap = rows.length === 2 && /範例廠商甲/.test(rows[0].textContent) && /逾期待付/.test(rows[0].textContent) && /範例廠商乙/.test(rows[1].textContent) && !/範例廠商丙/.test(led.textContent);
+        out.oneBtn = Array.prototype.every.call(rows, (x) => x.querySelectorAll('button').length === 1 && /付款/.test(x.querySelector('button').textContent));
+        const pl = document.getElementById('payable-list');
+        out.fold = !!pl && pl.offsetParent === null;
+        led.querySelector('details.acct-led-more').open = true; await T(80);
+        out.unfold = document.getElementById('payable-list').offsetParent !== null;
+        led.querySelector('details.acct-led-more').open = false; await T(80);
+        // 付款後帳本跟著少一列
+        PAYABLES.find((p) => p.id === 'pL1').status = 'paid'; renderPayables(); await T(60);
+        out.refresh = document.querySelectorAll('#acct-p-ap > .acct-led .acct-led-row').length === 1;
+        // 收：待收請款單、逾期在前、下一步＝登錄收款
+        acctTab('ar'); await T(120);
+        const la = document.querySelector('#acct-p-ar > .acct-led');
+        out.ar = !!la && /範例營造/.test(la.textContent) && /第 2 期/.test(la.textContent) && /逾期待收/.test(la.textContent) && /登錄收款/.test(la.querySelector('button').textContent) && !document.querySelector('#acct-p-ap > .acct-led');
+        out.noScroll = document.documentElement.scrollWidth <= W + 1;
+        // 唯讀：看得到帳本、沒有按鈕
+        const oR = _isReaderUser; _isReaderUser = true; acctTab('ar'); await T(60);
+        out.ro = !!document.querySelector('#acct-p-ar > .acct-led .acct-led-row') && !document.querySelector('#acct-p-ar > .acct-led button'); _isReaderUser = oR;
+        // 舊選單：沒有帳本、清單照舊
+        localStorage.setItem('fy_nav_old', '1'); _nav5Apply(); acctTab('ap'); await T(80);
+        out.old = !document.querySelector('.acct-led') && !document.querySelector('.led-fold');
+        localStorage.removeItem('fy_nav_old'); _nav5Apply();
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      PAYABLES.length = 0; keepP.forEach((p) => PAYABLES.push(p)); INV.length = 0; keepI.forEach((v) => INV.push(v)); _fbUser = oU; _isAdminUser = oA;
+      return out;
+    }, W);
+    check('v6.0.222 帳務帳本（寬 ' + W + '）：付＝待付一筆一列（逾期在前、已付不列）、只有一顆「付款」，收＝待收請款單「登錄收款」；舊清單收在「⋯ 更多」打開才看到；付款後帳本更新；唯讀沒有按鈕；舊選單沒有帳本', !r.err && r.ap && r.oneBtn && r.fold && r.unfold && r.refresh && r.ar && r.noScroll && r.ro && r.old, JSON.stringify(r));
+    check('v6.0.222 帳務帳本測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
