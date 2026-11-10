@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.223';
+var APP_VERSION='v6.0.222';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -44074,22 +44074,22 @@ _decReg('m8Qtr',{
   edit:function(){go('params');setTimeout(function(){try{prmTab('cost');}catch(e){_err('m8Qtr.edit',e);}},80);}
 });
 // 參數頁：材料買價（v6.0.221 Lotion 11/10 改版：依「材料類別」填每公斤價，系統用 FJC.mv.kgPerM 換算每 M；個別規格可覆寫；只有管理員看得到）
-function _m8CatDef(){return [{id:'h',name:'H 型鋼',unit:'kg',note:'樁、支撐、圍令、中間樁共用'},{id:'rail',name:'鋼軌樁',unit:'kg',note:''},{id:'sp',name:'鋼板樁',unit:'kg',note:''},{id:'deck',name:'覆工板 2M',unit:'片',note:'2M×1M，每片價'},{id:'deck3',name:'覆工板 3M',unit:'片',note:'3M×1M，每片價'}];}   /* v6.0.223 Lotion 11/10：覆工板分 2M、3M；舊的「覆工板」（id deck）沿用成 2M（系統預設規格 2M×1M） */   /* 用函式：參數頁在 app.js 載入途中就會建，var 那時還沒有值 */
+function _m8CatDef(){return [{id:'h',name:'H 型鋼',unit:'kg',note:'樁、支撐、圍令、中間樁共用'},{id:'rail',name:'鋼軌樁',unit:'kg',note:''},{id:'sp',name:'鋼板樁',unit:'kg',note:''},{id:'deck',name:'覆工板 2M',unit:'片',note:'2M×1M，每片價'},{id:'deck3',name:'覆工板 3M',unit:'片',note:'3M×1M，每片價'}];}   /* v6.0.222 Lotion 11/10：覆工板分 2M、3M；舊的「覆工板」（id deck）沿用成 2M（系統預設規格 2M×1M） */   /* 用函式：參數頁在 app.js 載入途中就會建，var 那時還沒有值 */
 function _m8Cats(){var c=_m8Cfg(),L=(Array.isArray(c.cats)&&c.cats.length)?c.cats:[];var have={};L.forEach(function(x){if(x&&x.id)have[x.id]=1;});
   var S={};L.forEach(function(x){if(x&&x.id)S[x.id]=x;});var D=_m8CatDef(),isD={};D.forEach(function(d){isD[d.id]=1;});
   return D.map(function(d){var x=S[d.id];return x?Object.assign({},x,{name:d.name,note:d.note,unit:d.unit}):Object.assign({},d,{price:''});}).concat(L.filter(function(x){return x&&!isD[x.id];}));}   /* 內建類別照程式順序、名稱／說明／單位跟著程式（舊存的「覆工板」顯示成「覆工板 2M」），自訂類別接在後面 */   /* 內建類別名稱跟著程式（舊存的「覆工板」顯示成「覆工板 2M」） */
 function _m8Ovr(){var c=_m8Cfg();return Object.assign({},c.buy||{},c.ovr||{});}
-function _m8OvrU(sp){var u=(_m8Cfg().ovrU||{})[sp];return u==='片'?'片':'M';}   /* v6.0.223：覆寫的單位（每 M／每片），沒填＝每 M */   /* 舊版依規格填的買價（c.buy）保留成覆寫 */
+function _m8OvrU(sp){var u=(_m8Cfg().ovrU||{})[sp];return u==='片'?'片':'M';}   /* v6.0.222：覆寫的單位（每 M／每片），沒填＝每 M */   /* 舊版依規格填的買價（c.buy）保留成覆寫 */
 // 規格 → 類別：H 開頭＝H 型鋼；II／III／IV／VL／IIw…＝鋼板樁；xxKG＝鋼軌樁；覆工＝覆工板；自訂類別看「比對文字」（規格或品名含這幾個字）
 function _m8CatFor(sp,name){var k=String(sp||'').toUpperCase(),n=String(name||''),L=_m8Cats();
   var by=function(id){return L.find(function(x){return x.id===id;})||null;};
   var cu=L.find(function(x){return x.pat&&(k.indexOf(String(x.pat).toUpperCase())>=0||n.indexOf(x.pat)>=0);});if(cu)return cu;
-  if(/^H\d/.test(k))return by('h');if(/^(II|III|IV|V|VL|IIW|IIIW|IVW)$/.test(k))return by('sp');if(/\d{2}KG/.test(k)||/鋼軌/.test(n))return by('rail');if(/覆工/.test(n+k)){var z=_m8DeckSize(k)||_m8DeckSize(n);return z==='3'?by('deck3'):z==='2'?by('deck'):null;}return null;}   /* v6.0.223：看不出 2M／3M 就不套 */
+  if(/^H\d/.test(k))return by('h');if(/^(II|III|IV|V|VL|IIW|IIIW|IVW)$/.test(k))return by('sp');if(/\d{2}KG/.test(k)||/鋼軌/.test(n))return by('rail');if(/覆工/.test(n+k)){var z=_m8DeckSize(k)||_m8DeckSize(n);return z==='3'?by('deck3'):z==='2'?by('deck'):null;}return null;}   /* v6.0.222：看不出 2M／3M 就不套 */
 // 覆工板尺寸：先看規格、再看品名；只認獨立的 2M／3M（前後不是數字，13M、32mm 不算）或 2000／3000；第一個出現的為準
 function _m8DeckSize(t){var m=/(?:^|[^\d.])([23])(?:\.0)?\s*M(?![A-Z\d])|(?:^|[^\d.])([23])000(?!\d)/.exec(String(t||'').toUpperCase());return m?(m[1]||m[2]):'';}
 // 這個規格每 M 買價：覆寫優先；否則類別每公斤價 × 每 M 重量（非 kg 單位的類別換不成每 M → 0）
 function _m8BuyPerM(sp,name){var o=parseFloat(_m8Ovr()[sp]);if(o>0)return _m8OvrU(sp)==='M'?o:0;var c=_m8CatFor(sp,name);if(!c||!(parseFloat(c.price)>0)||c.unit!=='kg')return 0;var kg=FJC.mv.kgPerM(sp);return kg?Math.round(parseFloat(c.price)*kg*100)/100:0;}
-// v6.0.223：以片計價的買價（覆寫填每片 ＞ 類別每片價）；不是以片計的回 0
+// v6.0.222：以片計價的買價（覆寫填每片 ＞ 類別每片價）；不是以片計的回 0
 function _m8BuyPiece(sp,name){var o=parseFloat(_m8Ovr()[sp]);if(o>0&&_m8OvrU(sp)==='片')return o;var c=_m8CatFor(sp,name);return c&&c.unit==='片'&&parseFloat(c.price)>0?parseFloat(c.price):0;}
 function _m8BuyHow(sp,name){var o=parseFloat(_m8Ovr()[sp]);if(o>0)return '覆寫每 '+_m8OvrU(sp)+' '+fmt(o);var c=_m8CatFor(sp,name),kg=FJC.mv.kgPerM(sp);return c&&kg&&parseFloat(c.price)>0?(c.name+' 每公斤 '+c.price+' × '+kg+' kg/M'):'買價表沒填';}
 function _m8PricedSpecs(){var S={};Object.keys(_m8Ovr()).forEach(function(k){S[k]=1;});(Q||[]).forEach(function(q){if(!q)return;if(q.mat)_m6Arr(q.mat,'rents').forEach(function(rt){var k=_m8Key(rt);if(k)S[k]=1;});});

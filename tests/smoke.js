@@ -11672,7 +11672,7 @@ async function newPage(browser, width, height) {
     check('v6.0.221 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
-  // ── v6.0.223 材料買價：覆工板分 2M／3M（舊的「覆工板」價錢帶到 2M）、個別規格覆寫可以每片計 ──
+  // ── v6.0.222 材料買價：覆工板分 2M／3M（舊的「覆工板」價錢帶到 2M）、個別規格覆寫可以每片計 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -11701,8 +11701,8 @@ async function newPage(browser, width, height) {
       } finally { MAT_MOVE_FIN = keepF; }
       return out;
     });
-    check('v6.0.223 材料買價覆工板分 2M／3M：舊「覆工板」價錢帶到 2M、3M 空白；規格或品名看得出 2M／3M 才套、看不出不套（13M、32mm、12000 不算）；內建類別順序固定、單位不能改；每片價不混進每 M；個別規格覆寫可選每片、每 M 照舊', r.mig && r.match && r.noFalse && r.order && r.piece && r.ui && r.save && r.perM, JSON.stringify(r));
-    check('v6.0.223 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    check('v6.0.222 材料買價覆工板分 2M／3M：舊「覆工板」價錢帶到 2M、3M 空白；規格或品名看得出 2M／3M 才套、看不出不套（13M、32mm、12000 不算）；內建類別順序固定、單位不能改；每片價不混進每 M；個別規格覆寫可選每片、每 M 照舊', r.mig && r.match && r.noFalse && r.order && r.piece && r.ui && r.save && r.perM, JSON.stringify(r));
+    check('v6.0.222 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
   // ── v6.0.211 進退料 M6：租賃與運費請款核對（Lotion 11/10 四題全 A；照 11/04 寬大 9/18 的實際算式）──
