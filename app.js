@@ -41625,22 +41625,24 @@ function _d6Detail(d){
 // AI 讀的發票照片（irPhoto 草稿：號碼、日期、買受人、含稅金額）→ 自動找「哪一案、第幾期請款單」→ 跟本期發票應開金額（_einvSplit(_invEinvGross(inv))，
 //   同 issueInvoiceForInv）比：相符打勾、不符標紅寫差多少。對不到（或不只一張像）就列最可能的 3 期讓 Lotion 選，不自己猜。
 //   確認＝存成發票紀錄（關聯那一期）＋請款單記交付方式 inv.sendMethod（AI 建議，可改）與交付日期 inv.sendDate（新欄位）。
-var _IRREC_SEL={},_IRREC_SEND=['親送','郵寄工地','郵寄公司'];
-function _irNorm(v){return _draftS(v).replace(/(股份)?有限公司|企業社|工程行|營造|建設|[\s（）()]/g,'');}
+var _IRREC_SEL={},_IRREC_IN={},_IRREC_SEND=['親送','郵寄工地','郵寄公司'];   // _IRREC_IN：卡片上改過的交付方式／日期／金額不符確認（重畫明細不重設）
+function irRecIn(did,k,v){(_IRREC_IN[did]=_IRREC_IN[did]||{})[k]=v;}
+function _irNorm(v){return _draftS(v).replace(/(股份)?有限公司|企業社|[\s（）()]/g,'');}   // 審查：營造、建設不去掉（大成營造≠大成建設）
+function _irSameCo(a,b){if(!a||!b)return false;if(a===b)return true;var s2=a.length<b.length?a:b,l2=a.length<b.length?b:a;return s2.length>=3&&l2.indexOf(s2)===0;}   // 簡稱要 3 個字以上、而且是開頭
 function _irCands(pl){
   var cl=_irNorm(pl.client),amt=Math.round(+pl.amount||0),dt=/^\d{4}-\d{2}-\d{2}$/.test(_draftS(pl.date))?new Date(pl.date).getTime():0,note=_draftS(pl.note);
-  return (INV||[]).filter(function(inv){return inv&&inv.kind!=='retReturn'&&!_invEinvOf(inv.id);}).map(function(inv){
+  return (INV||[]).filter(function(inv){return inv&&inv.kind!=='retReturn';}).map(function(inv){   // 審查：已開發票的期別也一起比（標出來、不能選），免得真正那期已開過時被同金額的別期頂替
     var ev=_einvSplit(_invEinvGross(inv)),c2=_irNorm(inv.client),sc=0,why=[];
-    if(cl&&c2&&(cl===c2||cl.indexOf(c2)>=0||c2.indexOf(cl)>=0)){sc+=40;why.push('買受人');}
+    if(_irSameCo(cl,c2)){sc+=40;why.push('買受人');}
     if(amt&&ev.gross&&Math.abs(ev.gross-amt)<=1){sc+=50;why.push('金額');}else if(amt&&ev.gross&&Math.abs(ev.gross-amt)/ev.gross<0.02){sc+=15;why.push('金額接近');}
     if(note&&((inv.project&&note.indexOf(inv.project)>=0)||(inv.periodNo&&new RegExp('第\\s*'+inv.periodNo+'\\s*期').test(note)))){sc+=15;why.push('備註');}
     var id=inv.date?new Date(inv.date).getTime():0;if(dt&&id){var dd=(dt-id)/86400000;if(dd>=-5&&dd<=60){sc+=10;why.push('日期');}}
-    return {inv:inv,ev:ev,sc:sc,why:why};
+    return {inv:inv,ev:ev,sc:sc,why:why,has:!!_invEinvOf(inv.id)};
   }).filter(function(c){return c.sc>0;}).sort(function(a,b){return b.sc-a.sc||String(b.inv.date||'').localeCompare(String(a.inv.date||''));});
 }
 // 自動對到：買受人＋金額都對、而且只有這一張（第二名分數明顯低）；否則回 null（讓 Lotion 從前 3 名選）
-function _irAuto(C){if(!C.length)return null;var a=C[0];if(a.why.indexOf('買受人')<0||a.why.indexOf('金額')<0)return null;if(C[1]&&C[1].sc>=a.sc-10)return null;return a;}
-function _irPick(d){var C=_irCands(_d6Pl(d)),sel=_IRREC_SEL[d.id];if(sel){var h=C.find(function(c){return c.inv.id===sel;});if(h)return {c:h,C:C,auto:false};var inv=(INV||[]).find(function(x){return x.id===sel;});if(inv)return {c:{inv:inv,ev:_einvSplit(_invEinvGross(inv)),why:[]},C:C,auto:false};}var a=_irAuto(C);return {c:a,C:C,auto:!!a};}
+function _irAuto(C){if(!C.length)return null;var a=C[0];if(a.has||a.why.indexOf('買受人')<0||a.why.indexOf('金額')<0)return null;if(C[1]&&C[1].sc>=a.sc-10)return null;return a;}   // 分數最高那期已開過發票＝不自動（可能是重開）
+function _irPick(d){var C=_irCands(_d6Pl(d)),sel=_IRREC_SEL[d.id];if(sel){var h=C.find(function(c){return c.inv.id===sel&&!c.has;});if(h)return {c:h,C:C,auto:false};}var a=_irAuto(C);return {c:a,C:C,auto:!!a};}
 function _irSendSug(pl,inv){var v=_draftS(pl.sendMethod);if(_IRREC_SEND.indexOf(v)>=0)return {v:v,why:'AI 從照片／信件判斷'};
   if(inv&&_IRREC_SEND.indexOf(inv.sendMethod)>=0)return {v:inv.sendMethod,why:'這期請款單原本記的'};
   var last=(INV||[]).filter(function(x){return inv&&x&&x.client===inv.client&&_IRREC_SEND.indexOf(x.sendMethod)>=0;}).sort(function(a,b){return String(b.date||'').localeCompare(String(a.date||''));})[0];
@@ -41650,6 +41652,7 @@ function _irRecDetail(d){
   var dup=(INVOICE_RECS||[]).find(function(r){return r&&pl.number&&String(r.number||'').toUpperCase()===S(pl.number).toUpperCase();});
   var h=(_draftImgOk(pl.file)?'<img src="'+esc(pl.file)+'" alt="發票照片" style="max-width:100%;max-height:360px;border-radius:6px;display:block;margin:4px 0">':'<div style="color:var(--red);font-size:12px">照片格式不正確，請退回</div>')
     +_d6Tbl([['發票號碼',S(pl.number)||'（沒讀到）'],['發票日期',S(pl.date)],['買受人',S(pl.client)],['含稅金額',amt?'NT$ '+fmt(amt):'（沒讀到）'],['備註',S(pl.note)]]);
+  if(!S(pl.number)||!(amt>0))h+='<div style="font-size:12.5px;color:var(--red);font-weight:700;margin:4px 0">AI 沒讀到'+(!S(pl.number)?'發票號碼':'')+(!S(pl.number)&&!(amt>0)?'、':'')+(!(amt>0)?'金額':'')+'，不能直接存：請按「修改」補上，或退回</div>';
   if(dup)h+='<div style="font-size:12.5px;color:var(--red);font-weight:700;margin:4px 0">這個發票號碼已經有發票紀錄了（'+esc(S(dup.date))+'），不能再存一次，請退回</div>';
   var box='<div id="irrec-'+esc(d.id)+'" style="border:1px solid var(--b1);border-radius:var(--r8);padding:8px 10px;margin-top:6px">';
   if(c){
@@ -41658,14 +41661,15 @@ function _irRecDetail(d){
       +'<div style="font-size:12.5px;margin-top:4px">本期發票應開：含稅 NT$ '+fmt(c.ev.gross)+'（未稅 '+fmt(c.ev.gross-c.ev.tax)+'＋稅 '+fmt(c.ev.tax)+'）</div>'
       +(ok?'<div style="font-size:13px;color:var(--g);font-weight:800;margin-top:4px">✓ 金額相符</div>'
         :'<div style="font-size:13px;color:var(--red);font-weight:800;margin-top:4px">✗ 金額不符：發票 NT$ '+fmt(amt)+'，應開 NT$ '+fmt(c.ev.gross)+'，'+(diff>0?'多開':'少開')+' NT$ '+fmt(Math.abs(diff))+'</div>');
-    var sg=_irSendSug(pl,c.inv),sd=/^\d{4}-\d{2}-\d{2}$/.test(S(pl.sendDate))?S(pl.sendDate):(c.inv.sendDate||localToday());
-    box+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;margin-top:6px"><label>交付方式 <select id="irrec-send-'+esc(d.id)+'" data-ro-ok="1">'+_IRREC_SEND.map(function(v){return '<option'+(v===sg.v?' selected':'')+'>'+v+'</option>';}).join('')+'</select></label>'
+    var sg=_irSendSug(pl,c.inv),IN=_IRREC_IN[d.id]||{},sv=_IRREC_SEND.indexOf(IN.send)>=0?IN.send:sg.v,sd=IN.date||(/^\d{4}-\d{2}-\d{2}$/.test(S(pl.sendDate))?S(pl.sendDate):(c.inv.sendDate||localToday()));
+    box+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px;margin-top:6px"><label>交付方式 <select id="irrec-send-'+esc(d.id)+'" data-ro-ok="1" onchange="irRecIn(\''+id+'\',\'send\',this.value)">'+_IRREC_SEND.map(function(v){return '<option'+(v===sv?' selected':'')+'>'+v+'</option>';}).join('')+'</select></label>'
       +'<span style="color:var(--b4);font-size:11.5px">建議：'+esc(sg.v)+'（'+esc(sg.why)+'）</span>'
-      +'<label>交付日期 <input type="date" id="irrec-date-'+esc(d.id)+'" data-ro-ok="1" value="'+esc(sd)+'"></label></div>';
+      +'<label>交付日期 <input type="date" id="irrec-date-'+esc(d.id)+'" data-ro-ok="1" value="'+esc(sd)+'" onchange="irRecIn(\''+id+'\',\'date\',this.value)"></label></div>'
+      +(ok?'':'<label style="display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--red);margin-top:6px"><input type="checkbox" id="irrec-mis-'+esc(d.id)+'" data-ro-ok="1"'+(IN.mis?' checked':'')+' onchange="irRecIn(\''+id+'\',\'mis\',this.checked)">金額不符，我核對過，照發票金額存</label>');
   }else box+='<div style="font-size:12.5px;color:#b26a00;font-weight:700">對不到是哪一期，請從下面選一期（不會自己猜）</div>';
   var top=P0.C.slice(0,3);
   if(!P0.auto||P0.C.length>1)box+='<div style="font-size:12px;margin-top:6px;color:var(--b4)">最可能的'+(top.length?' '+top.length+' 期':'：沒有找到相近的請款單（買受人、金額都對不上）')+'</div>'
-    +top.map(function(x){var on=c&&c.inv.id===x.inv.id;return '<label style="display:flex;gap:6px;align-items:flex-start;font-size:12.5px;padding:4px 0;border-top:1px dashed var(--b1)"><input type="radio" name="irrec-'+esc(d.id)+'" data-ro-ok="1" '+(on?'checked ':'')+'onchange="irRecPick(\''+id+'\',\''+escq(x.inv.id)+'\')"><span>'+esc(S(x.inv.project))+' 第'+esc(S(x.inv.periodNo))+'期　'+esc(S(x.inv.client))+'　應開 NT$ '+fmt(x.ev.gross)+'<span style="color:var(--b4)">（'+esc(x.why.join('、'))+'）</span></span></label>';}).join('');
+    +top.map(function(x){var on=c&&c.inv.id===x.inv.id;return '<label style="display:flex;gap:6px;align-items:flex-start;font-size:12.5px;padding:4px 0;border-top:1px dashed var(--b1)'+(x.has?';color:var(--b3)':'')+'"><input type="radio" name="irrec-'+esc(d.id)+'" data-ro-ok="1" '+(on?'checked ':'')+(x.has?'disabled ':'')+'onchange="irRecPick(\''+id+'\',\''+escq(x.inv.id)+'\')"><span>'+esc(S(x.inv.project))+' 第'+esc(S(x.inv.periodNo))+'期　'+esc(S(x.inv.client))+'　應開 NT$ '+fmt(x.ev.gross)+'<span style="color:var(--b4)">（'+esc(x.why.join('、'))+'）</span>'+(x.has?'<b style="color:#b26a00">　這期已開過發票（'+esc(S((_invEinvOf(x.inv.id)||{}).number))+'），要重開請到發票紀錄處理</b>':'')+'</span></label>';}).join('');
   box+='<div style="font-size:11.5px;color:var(--b4);margin-top:6px">確認＝存成發票紀錄並關聯到這一期、請款單記交付方式與日期。照片會一起存。</div></div>';
   return h+box;
 }
@@ -41673,7 +41677,9 @@ function irRecPick(did,invId){_IRREC_SEL[did]=invId;try{_decReload('drf_irPhoto'
 function _irRecOk(d){
   if(_roDeny())return false;var S=_draftS,pl=_d6Pl(d),c=_irPick(d).c;
   if(!_draftImgOk(pl.file)){toast('照片格式不正確，請退回');return false;}
+  if(!S(pl.number)||!((+pl.amount||0)>0)){toast('沒讀到發票號碼或金額：請按「修改」補上');return false;}
   if(!c){toast('先選這張發票是哪一期');return false;}
+  if(Math.abs(Math.round(+pl.amount||0)-c.ev.gross)>1&&!(_IRREC_IN[d.id]||{}).mis){toast('金額不符：要照發票金額存，請先勾「我核對過」');return false;}
   if((INVOICE_RECS||[]).some(function(r){return r&&pl.number&&String(r.number||'').toUpperCase()===S(pl.number).toUpperCase();})){toast('這個發票號碼已經存過了');return false;}
   if(_invEinvOf(c.inv.id)){toast('這一期已經有發票紀錄了');return false;}
   var amt=Math.round(+pl.amount||0),sp=_einvSplit(amt);
@@ -41682,13 +41688,16 @@ function _irRecOk(d){
   var id=Date.now().toString(),ir={id:id,_mt:Date.now(),_by:_meEmail(),number:S(pl.number).toUpperCase().slice(0,20),date:/^\d{4}-\d{2}-\d{2}$/.test(S(pl.date))?S(pl.date):localToday(),client:S(pl.client).slice(0,100)||c.inv.client||'',
     amount:amt,taxAmt:sp.tax,linkedInvId:c.inv.id,status:'issued',note:(S(pl.note).slice(0,260)+(S(pl.note)?'；':'')+'發票對帳卡確認').slice(0,300),updatedAt:Date.now(),fileUrl:'',fileData:pl.file,fileName:S(pl.fileName).replace(/[^\w.\-一-鿿]/g,'').slice(0,60)||'發票照片.jpg',
     srcDraft:d.id,expGross:c.ev.gross,deliver:sm,deliverDate:sd};
+  // 審查：先把草稿標成已套用（雲端寫得進去才寫正式資料），避免寫了紀錄、草稿卻卡住重試不了
+  return _draftMark(d.id,'applied',{resultId:id}).then(function(m){if(m===false)return false;
   INVOICE_RECS.unshift(ir);saveInvoiceRecs();
   c.inv.sendMethod=sm;c.inv.sendDate=sd;_touch(c.inv);try{saveInv();}catch(e){_err('_irRecOk.inv',e);}
   // 請款單「已開發票」狀態：主線 v6.0.223 依發票紀錄自己判斷（linkedInvId＋非作廢，saveInvoiceRecs 後自動記），這裡不用另外設
   try{logActivity('發票','發票對帳卡：'+ir.number+' → '+(c.inv.project||'')+' 第'+(c.inv.periodNo||'?')+'期');}catch(e){_err('_irRecOk.log',e);}
-  delete _IRREC_SEL[d.id];
+  delete _IRREC_SEL[d.id];delete _IRREC_IN[d.id];
   try{renderInvoiceRecords();renderInvList();renderFinanceAR();}catch(e){_err('_irRecOk.render',e);}
-  return _draftMark(d.id,'applied',{resultId:id}).then(function(m){toast('已存成發票紀錄並關聯到 '+(c.inv.project||'')+' 第'+(c.inv.periodNo||'?')+'期');return m!==false;});
+  try{_onSave();}catch(e){_err('_irRecOk.onSave',e);}
+  toast('已存成發票紀錄並關聯到 '+(c.inv.project||'')+' 第'+(c.inv.periodNo||'?')+'期');return true;});
 }
 // 修改＝走原本的發票紀錄表單（帶入照片與欄位，關聯期別先帶選定的那期），存檔才標已套用
 function _irRecEdit(d){var c=_irPick(d).c;draftApply(d.id);if(c){var sel=document.getElementById('ir-linked-inv');if(sel)sel.value=c.inv.id;}}
@@ -41700,8 +41709,8 @@ _DRAFT_OLD6.forEach(function(t){
     key:function(d){return d.id;},head:function(d){return _draftS(d.summary).slice(0,200);},
     body:function(d){return _d6Meta(d);},
     detail:function(d){return _d6Detail(d);},
-    ok:function(d){if(t==='irPhoto'&&typeof _irRecOk==='function')return _irRecOk(d);draftApply(d.id);return 'open';},   // 開下一個視窗，存檔成功才標已套用
-    reject:function(d,why){var x={reason:why||''};if(t==='irPhoto')x['payload/file']=null;return _draftMark(d.id,'rejected',x).then(function(m){return m!==false;});},   // 同舊清單：退回的發票照片不留
+    ok:function(d){if(t==='irPhoto'&&typeof _irRecOk==='function')return _irRecOk(d);var x=DRAFTS[d.id];if(!x||x.status!=='pending'){toast('這張草稿已經處理過了');return false;}draftApply(d.id);return 'open';},   // 開下一個視窗，存檔成功才標已套用
+    reject:function(d,why){delete _IRREC_SEL[d.id];delete _IRREC_IN[d.id];var x={reason:why||''};if(t==='irPhoto')x['payload/file']=null;return _draftMark(d.id,'rejected',x).then(function(m){return m!==false;});},   // 同舊清單：退回的發票照片不留
     edit:function(d){if(t==='irPhoto'&&typeof _irRecEdit==='function'){_irRecEdit(d);return;}draftApply(d.id);}
   });
 });

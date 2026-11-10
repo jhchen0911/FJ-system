@@ -13293,12 +13293,24 @@ async function newPage(browser, width, height) {
         // 同一個號碼再存一次 → 擋
         DRAFTS.dIrDup01 = D('dIrDup01', 'irPhoto', { file: IMG, number: 'AB12345678', date: d(0), client: '範例營造甲', amount: 52500 }, 'dup'); _IRREC_SEL.dIrDup01 = 'iC2';
         out.dup = _irRecOk(DRAFTS.dIrDup01) === false && INVOICE_RECS.length === 1 && /已經有發票紀錄/.test((await det('drf_irPhoto', 'dIrDup01')).textContent);
+        // 審查：真正那期已開過發票 → 不自動對到同金額的別期、那期標「已開過」不能選；沒讀到號碼／金額不能存；金額不符要勾「我核對過」
+        INV.push(mk('iC4', '範例營造甲股份有限公司', '範例工程甲', 4, d(-3), 105000));
+        DRAFTS.dIrRe001 = D('dIrRe001', 'irPhoto', { file: IMG, number: 'GH00001111', date: d(0), client: '範例營造甲', amount: g1 }, 're');
+        const x5 = await det('drf_irPhoto', 'dIrRe001');
+        out.reissue = !/自動對到/.test(x5.textContent) && /這期已開過發票/.test(x5.textContent) && !!x5.querySelector('input[type=radio][disabled]');
+        DRAFTS.dIrNoN01 = D('dIrNoN01', 'irPhoto', { file: IMG, number: '', date: d(0), client: '範例營造甲', amount: 0 }, 'non'); _IRREC_SEL.dIrNoN01 = 'iC4';
+        out.need = _irRecOk(DRAFTS.dIrNoN01) === false && /沒讀到發票號碼、金額/.test((await det('drf_irPhoto', 'dIrNoN01')).textContent);
+        _IRREC_SEL.dIrBad01 = 'iC4'; out.mis = _irRecOk(DRAFTS.dIrBad01) === false && INVOICE_RECS.length === 1 && !!(await det('drf_irPhoto', 'dIrBad01')).querySelector('#irrec-mis-dIrBad01');
+        irRecIn('dIrBad01', 'mis', true); out.misOk = (await _irRecOk(DRAFTS.dIrBad01)) === true && INVOICE_RECS.length === 2 && INVOICE_RECS[0].linkedInvId === 'iC4' && INVOICE_RECS[0].amount === g1 + 500;
+        // 雲端標記失敗 → 不寫正式資料
+        window._draftMark = () => Promise.resolve(false); DRAFTS.dIrFl001 = D('dIrFl001', 'irPhoto', { file: IMG, number: 'JK22223333', date: d(0), client: '範例企業乙', amount: _einvSplit(_invEinvGross(INV[2])).gross }, 'fail'); _IRREC_SEL.dIrFl001 = 'iC3';
+        out.markFail = (await _irRecOk(DRAFTS.dIrFl001)) === false && INVOICE_RECS.length === 2 && !_invEinvOf('iC3');
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       INV.length = 0; keepI.forEach((x) => INV.push(x)); INVOICE_RECS.length = 0; keepR.forEach((x) => INVOICE_RECS.push(x)); DRAFTS = keepD;
       return out;
     });
     check('v6.0.224 舊 AI 草稿 6 種改拍板卡：報價、得標、發票照片、現場追加、施工日報、客戶廠商各一張卡；今天頁不再有 AI 草稿那列；展開看過明細才能確認；退回照舊；舊選單照舊走 AI 草稿清單', !r.err && r.cards && r.locked && r.qDetail && r.bid && r.con && r.line && r.old && r.rej, JSON.stringify(r));
-    check('v6.0.224 發票對帳卡：買受人＋金額對上自動對到那一期打勾；差多少標紅；對不到列前 3 期讓 Lotion 選、沒選不能存；確認存發票紀錄（關聯期別、稅額、照片）＋請款單記交付方式與日期；同號碼不重存', !r.err && r.auto && r.pick3 && r.bad && r.noPick && r.saved && r.dup, JSON.stringify(r));
+    check('v6.0.224 發票對帳卡：買受人＋金額對上自動對到那一期打勾；差多少標紅；對不到列前 3 期讓 Lotion 選、沒選不能存；確認存發票紀錄（關聯期別、稅額、照片）＋請款單記交付方式與日期；同號碼不重存', !r.err && r.auto && r.pick3 && r.bad && r.noPick && r.saved && r.dup && r.reissue && r.need && r.mis && r.misOk && r.markFail, JSON.stringify(r));
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
