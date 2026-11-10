@@ -11854,12 +11854,19 @@ async function newPage(browser, width, height) {
         window.localToday = () => '2026-12-10';
         const D = _decItems('dunning');
         out.dun = D.length === 1 && D[0].inv.id === 'r2' && /逾期 10 天/.test(_DEC.dunning.head(D[0])) && /預計收款日 2026-11-30/.test(_DEC.dunning.detail(D[0]));
-        out.dunOk = _DEC.dunning.ok(D[0]) === true && INV[1].dunLog.length === 1 && INV[1].dunLog[0].next === '2026-12-17' && !_decItems('dunning').length;
+        try { Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.resolve() }, configurable: true }); } catch (e) { /* 可忽略 */ }
+        out.dunOk = (await _DEC.dunning.ok(D[0])) === true && INV[1].dunLog.length === 1 && INV[1].dunLog[0].next === '2026-12-17' && !_decItems('dunning').length;
         window.localToday = () => '2026-12-18'; out.again = _decItems('dunning').length === 1;
+        INV[1].st = 'draft'; delete INV[1].stLast; out.noDraft = !_decItems('dunning').length; delete INV[1].st;   // 還沒送業主的草稿不催
+        // 先前只填總額（沒有收款明細）→ 卡片補一列先前的，金流不漏
+        INV.push({ id: 'r3', project: '測試收款案', periodNo: 3, quoteId: 'qR', totals: T, received: '50000', receivedDate: '2026-12-01' });
+        DRAFTS.rv333333 = { id: 'rv333333', type: 'recvSlip', by: 'ai@example.com', at: 3, status: 'pending', summary: '', payload: _rvClean({ invId: 'r3', amt: 55000, date: '2026-12-15' }) };
+        _DEC.recvIn.ok(DRAFTS.rv333333); out.legacy = document.getElementById('receipt-amount').value === '105000' && _rcptList.length === 2 && _rcptList[0].amt === 50000;
+        openReceiptModal('r2'); out.switchClr = _RV_APPLY === null; closeReceiptModal();   // 換期別重新打開＝不算卡片帶的數字
       } finally { INV = keepI; DRAFTS = keepD; window._draftMark = keepMark; window.localToday = keepTd; }
       return out;
     });
-    check('請款鏈 4 收款登錄卡：AI 讀匯款／期票對到最早有應收的那期、列差額（匯費、扣款要寫原因）；確認＝打開收款視窗帶好數字、視窗確認才入帳並標已套用、收齊狀態變已收款；取消＝草稿留著；逾期催款卡附預計收款日怎麼算、確認＝複製並記一筆、7 天後再提醒', Object.values(r).length === 10 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('請款鏈 4 收款登錄卡：AI 讀匯款／期票對到最早有應收的那期、列差額（匯費、扣款要寫原因）；確認＝打開收款視窗帶好數字、視窗確認才入帳並標已套用、收齊狀態變已收款；取消＝草稿留著；逾期催款卡附預計收款日怎麼算、確認＝複製並記一筆、7 天後再提醒', Object.values(r).length === 13 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('請款鏈 4 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
