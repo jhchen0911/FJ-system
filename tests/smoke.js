@@ -13378,6 +13378,53 @@ async function newPage(browser, width, height) {
     check('v6.0.225 詢價單草稿卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.225 廠商回價卡＋比價卡（陳軒 11/10 新佇列第 5 件）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keep = { Q: Q, D: DRAFTS, V: VENDORS.slice() };
+      try {
+        localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_v7old');
+        window.toast = () => {}; window._immediateUpload = () => {};
+        window._draftMark = (id, st, ex) => { if (DRAFTS[id]) { DRAFTS[id].status = st; DRAFTS[id].ex = ex; } return Promise.resolve(true); };
+        Q = [{ id: 'qV1', code: 'V01', name: '範例比價案', client: '範例營造甲', awarded: true, ver: 1, _mt: 1,
+          items: [{ desc: 'H型鋼樁打設', unit: '支', qty: '10', price: '3000' }, { desc: 'H型鋼樁拔除', unit: '支', qty: '10', price: '1500' }],
+          rfqs: [{ id: 'rV1', no: 'RFQ-V01-01', scope: 'H 型鋼樁', status: 'open', deadline: '2099-12-31', vendors: [], cond: { cashPct: 50, ticketPct: 50, ticketDays: 60, ret: 5, valid: 30 },
+            items: [{ idx: 0, desc: 'H型鋼樁打設', unit: '支', qty: 10, per: '', len: 0, tpl: 'gen' }, { idx: 1, desc: 'H型鋼樁拔除', unit: '支', qty: 10, per: '', len: 0, tpl: 'gen' }] }] }];
+        const D = (id, pl) => ({ id, type: 'rfqReply', by: 'ai@example.com', byName: 'AI', at: Date.now() - 1000, status: 'pending', summary: 'reply ' + id, payload: Object.assign({ qid: 'qV1', qName: '範例比價案' }, pl) });
+        DRAFTS = {
+          dRfA001: D('dRfA001', { rno: 'RFQ-V01-01', vendor: { name: '範例廠商甲', tel: '02-1111-2222' }, prices: [{ idx: 0, price: 2500 }, { idx: 1, price: 1000 }], diffs: ['不含引孔'], extras: [] }),
+          dRfB001: D('dRfB001', { vendor: { name: '範例廠商乙' }, prices: [{ idx: 0, price: 2300 }, { idx: 1, price: 1100 }], extras: [{ name: '水泥', amt: 5000 }] }),
+          dRfX001: D('dRfX001', { rno: 'RFQ-V01-09', vendor: { name: '範例廠商丙' }, prices: [{ idx: 0, price: 1 }] }),
+        };
+        const items = []; _v6TodoItems(items);
+        out.card = items.some((x) => x.type === 'dec_drf_rfqReply') && !_draftPending().some((d) => d.type === 'rfqReply');
+        const x = document.createElement('div'); x.innerHTML = _DEC.drf_rfqReply.detail(DRAFTS.dRfA001); const t = x.textContent;
+        out.detail = /範例廠商甲/.test(t) && /RFQ-V01-01/.test(t) && /2,500/.test(t) && /3,000/.test(t) && /NT\$ 35,000/.test(t) && /範圍差異：不含引孔/.test(t);
+        const y = document.createElement('div'); y.innerHTML = _DEC.drf_rfqReply.detail(DRAFTS.dRfX001); out.bad = /找不到還在詢價的「RFQ-V01-09」/.test(y.textContent) && (await Promise.resolve(_DEC.drf_rfqReply.ok(DRAFTS.dRfX001))) === false;
+        out.okA = (await Promise.resolve(_DEC.drf_rfqReply.ok(DRAFTS.dRfA001))) === true && Q[0].rfqs[0].vendors.length === 1 && Q[0].rfqs[0].vendors[0].status === 'quoted' && Q[0].rfqs[0].vendors[0].prices[0] === 2500 && /不含引孔/.test(Q[0].rfqs[0].vendors[0].note) && DRAFTS.dRfA001.status === 'applied';
+        out.oneNoCmp = _rfqcRows().length === 0;   // 1 家、還沒過期限：不出比價卡
+        out.okB = (await Promise.resolve(_DEC.drf_rfqReply.ok(DRAFTS.dRfB001))) === true && Q[0].rfqs[0].vendors.length === 2;   // 沒給詢價單號：涵蓋工項唯一一張就對上
+        const rows = _rfqcRows(); out.cmp = rows.length === 1;
+        const z = document.createElement('div'); z.innerHTML = _DEC.rfqCmp.detail(rows[0]); const t3 = z.textContent;
+        // 甲 35,000；乙 34,000＋水泥 5,000＝39,000 → 建議甲
+        out.cmpDetail = /35,000/.test(t3) && /39,000/.test(t3) && /建議得標：範例廠商甲/.test(t3) && /少 NT\$ 4,000/.test(t3) && z.querySelectorAll('input[type=radio]').length === 2;
+        // 確認＝開評估得標、帶入選的廠商與原因
+        let opened = null; const keepAw = window.rfqAward; window.rfqAward = (rid) => { opened = rid; const d = document.createElement('div'); d.id = 'tmp-aw'; d.innerHTML = '<input type="radio" name="rfq-win" value="0"><input type="radio" name="rfq-win" value="1"><textarea id="rfq-reason"></textarea>'; document.body.appendChild(d); };
+        rfqcPick(rows[0].key, 1); const ok = _DEC.rfqCmp.ok(rows[0]); await new Promise((res) => setTimeout(res, 80));
+        out.open = ok === 'open' && opened === 'rV1' && document.querySelector('input[name=rfq-win][value="1"]').checked && /建議是 範例廠商甲/.test(document.getElementById('rfq-reason').value);
+        document.getElementById('tmp-aw').remove(); window.rfqAward = keepAw;
+        out.rej = _DEC.rfqCmp.reject(rows[0]) === true && _rfqcRows().length === 0;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keep.Q; DRAFTS = keep.D; VENDORS.length = 0; keep.V.forEach((v) => VENDORS.push(v));
+      return out;
+    });
+    check('v6.0.225 廠商回價卡：AI 回價草稿在今天頁出卡；明細有逐項單價、我方報價單價、合計、範圍差異（標紅）；對不到詢價單不准確認；確認記進詢價單', !r.err && r.card && r.detail && r.bad && r.okA && r.okB, JSON.stringify(r));
+    check('v6.0.225 比價卡：回價 2 家才出；比價表含豐有提供材料、建議全部涵蓋裡最低；確認開評估得標帶入選的廠商與原因；退回等更多家', !r.err && r.oneNoCmp && r.cmp && r.cmpDetail && r.open && r.rej, JSON.stringify(r));
+    check('v6.0.225 廠商回價／比價卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.225 報價已送出紀錄＋7 天沒回音追問卡（陳軒 11/10 新佇列第 3 件）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

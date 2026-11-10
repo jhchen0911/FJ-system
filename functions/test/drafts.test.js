@@ -126,3 +126,19 @@ test('v6.0.225 合約條件卡 ownerCard：清成純資料、版本不對或沒�
   const old = Object.assign({}, r.rec, { id: 'dold0001', at: 500 });
   assert.deepStrictEqual(D.superseded(r.rec, { dold0001: old }), ['dold0001']);
 });
+
+test('v6.0.225 廠商回價 rfqReply：對報價工項（idx 或說明一段）、一式要列涵蓋工項、沒得標不收', () => {
+  const qs = Object.assign({}, quotes, { k5: { id: 'q5', code: 'W01', name: '假得標案', awarded: true, items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 10, price: 3000 }, { desc: 'H型鋼樁拔除', qty: 10, price: 1000 }, { desc: '水平支撐', qty: 100, price: 500 }] } });
+  const b0 = Object.assign({}, base, { quotes: qs });
+  const r = D.build(Object.assign({}, b0, { body: { type: 'rfqReply', payload: { qid: 'q5', rno: 'RFQ-W01-01', vendor: { name: '假廠商甲', tel: '02-0000-0000' }, prices: [{ match: '打設', price: 2500 }, { idx: 1, price: 800 }], extras: [{ name: '水泥', amt: 3000 }, { name: '', amt: 1 }], diffs: ['不含引孔'] } } }));
+  assert.ok(r.rec, r.err);
+  assert.deepStrictEqual(r.rec.payload.prices, [{ idx: 0, price: 2500 }, { idx: 1, price: 800 }]);
+  assert.deepStrictEqual(r.rec.payload.extras, [{ name: '水泥', amt: 3000 }]);
+  assert.match(r.rec.summary, /假廠商甲 回價 RFQ-W01-01/);
+  const L = D.build(Object.assign({}, b0, { body: { type: 'rfqReply', payload: { qid: 'q5', vendor: { name: '假廠商乙' }, lump: { total: 50000, match: ['水平支撐'] } } } }));
+  assert.ok(L.rec, L.err); assert.deepStrictEqual(L.rec.payload.lump, { total: 50000, idxs: [2] });
+  assert.match(D.build(Object.assign({}, b0, { body: { type: 'rfqReply', payload: { qid: 'q5', vendor: { name: 'x' }, prices: [{ match: 'H型鋼樁', price: 1 }] } } })).err, /對到 2 個/);
+  assert.match(D.build(Object.assign({}, b0, { body: { type: 'rfqReply', payload: { qid: 'q5', vendor: { name: 'x' } } } })).err, /沒有任何單價/);
+  assert.match(D.build(Object.assign({}, b0, { body: { type: 'rfqReply', payload: { qid: 'q1', vendor: { name: 'x' }, prices: [{ idx: 0, price: 1 }] } } })).err, /還沒得標/);
+  assert.match(D.build(Object.assign({}, b0, { body: { type: 'rfqReply', payload: { qid: 'q5', vendor: { name: 'x' }, prices: [{ idx: 9, price: 1 }] } } })).err, /不在這張報價/);
+});
