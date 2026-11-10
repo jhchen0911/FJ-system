@@ -33053,7 +33053,7 @@ function _recv5Render(){
         +'<div style="font-size:11px;color:var(--b4)">'+esc(inv.date||'—')+(st.due?' ／ '+esc(st.due):'')+'</div>'
         +(terms?'<div style="font-size:10px;margin-top:2px;color:'+FY_BRAND.g+';background:var(--gl);border-radius:4px;padding:1px 6px;display:inline-block">現金'+cashPct+'%'+(td?'・票期 '+td+' 天':'')+'</div>':'')+'</div>'
         +'<div style="text-align:right;flex-shrink:0"><div style="font-size:13px;font-weight:700;color:'+(st.od?'var(--red)':'var(--b5)')+'">NT$ '+fmt(st.amt)+'</div>'
-        +(st.open&&st.amt!==Math.round(((inv.totals||{}).total)||0)?'<div style="font-size:10px;color:var(--b4)">請款 NT$ '+fmt(Math.round(((inv.totals||{}).total)||0))+'</div>':'')+bdg
+        +(st.open&&st.amt!==Math.round(((inv.totals||{}).total)||0)?'<div style="font-size:10px;color:var(--b4)">請款 NT$ '+fmt(Math.round(((inv.totals||{}).total)||0))+'</div>':'')+(st.open&&terms&&cashPct<100?'<div style="font-size:10px;color:var(--b4)">現金 NT$ '+fmt(Math.round(st.amt*cashPct/100))+'</div>':'')+bdg   // 同原本應收：現金部分
         +(_invEinvOf(inv.id)?'<div style="font-size:10px;color:#1a3a6b"><svg class="ic ib" aria-hidden="true"><use href="#i-receipt"/></svg> 已開票</div>':'')+'</div>'
         +'<div style="display:flex;gap:4px;align-self:center;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">'
         +(st.od?'<button type="button" onclick="openDunning(\''+id+'\')" class="btn btn-xs" style="border-color:var(--red);color:var(--red)"><svg class="ic ib" aria-hidden="true"><use href="#i-bell"/></svg> 催款</button>':'')
