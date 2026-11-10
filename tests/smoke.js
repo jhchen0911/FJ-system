@@ -13500,6 +13500,7 @@ async function newPage(browser, width, height) {
         INV[0].receivedConfirmed = true; INV[0].receivedAmt = 31500; renderProj(); await T(100);
         const tx2 = document.getElementById('pj-body-inv').textContent.replace(/\s+/g, ' ');
         out.after = /✓ 已收/.test(tx2) && !/登錄第 1 期收款/.test(tx2);
+        pjInvPaidToggle('qI1'); out.toggle = !!document.querySelector('#pj-body-inv .pj7-next') && !!document.querySelector('#pj-body-inv details.pj7-more[open]'); pjInvPaidToggle('qI1');
         // 唯讀帳號：看得到「下一步」說明、沒有按鈕
         const oR = _isReaderUser; _isReaderUser = true; renderProj(); await T(80);
         out.ro = !document.querySelector('#pj-body-inv .pj7-next button'); _isReaderUser = oR;
@@ -13508,7 +13509,7 @@ async function newPage(browser, width, height) {
       Q = keepQ; INV.length = 0; keepI.forEach((v) => INV.push(v)); PROJECTS = keepP; localStorage.removeItem('pj7_open_inv');
       return out;
     });
-    check('v6.0.222 專案頁請款那一步只讀（寬 ' + W + '）：合約條件摘要、每期狀態、只有一顆「下一步」（逾期先登錄收款）、輸入與按鈕收在「⋯ 更多」、收款後下一步換掉、唯讀沒有按鈕', !r.err && r.terms && r.period && r.next && r.noInputs && r.after && r.ro && r.noHScroll, JSON.stringify(r));
+    check('v6.0.222 專案頁請款那一步只讀（寬 ' + W + '）：合約條件摘要、每期狀態、只有一顆「下一步」（逾期先登錄收款）、輸入與按鈕收在「⋯ 更多」、收款後下一步換掉、唯讀沒有按鈕', !r.err && r.terms && r.period && r.next && r.noInputs && r.after && r.toggle && r.ro && r.noHScroll, JSON.stringify(r));
     check('v6.0.222 專案頁請款只讀測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
