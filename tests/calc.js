@@ -45,6 +45,20 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   check('v6.0.209 得標率：40～60% 不動；沒有對手價時低得標率照差距推', st.adjPct === 0 && B.suggest({ ready: true, rate: 10, gapPct: null }) === -3 && B.suggest({ ready: true, rate: 0, gapPct: 50 }) === -10);
   check('v6.0.209 得標率：給報價線的統計只有數字、沒有案名金額', eq(Object.keys(B.exportRows([st])[0]).sort(), ['adjPct', 'concPct', 'gapPct', 'kind', 'label', 'lost', 'n', 'rate', 'ready', 'won'].sort()));
 }
+// ── 進退料 M7（calc/matmove.js，v6.0.210 小批次線）：結案實績、每月閒置浪費 ──
+{
+  const MV = require(path.join(__dirname, '..', 'calc', 'matmove.js')).mv;
+  check('v6.0.210 M7：租金換成每 M 每天（M月÷30、M天照用、片月換不了）', MV.perMDay(30, 'M月') === 1 && MV.perMDay(2, 'M天') === 2 && MV.perMDay(5, '片月') === null && MV.perMDay(0) === null);
+  const ra = MV.rentActual([{ d: '2026-10-01', o: '2026-10-31', m: 100 }, { d: '2026-10-11', m: 50 }, { d: '', m: 9 }], '2026-11-10');
+  check('v6.0.210 M7：實際租期依 M 數加權（還沒退的算到結案日）', ra.m === 150 && ra.mDays === 4500 && ra.avgDays === 30 && ra.open === 1, JSON.stringify(ra));
+  const im = MV.idleInMonth({ ym: '2026-10', start: '2026-10-20', batches: [{ id: 'a', d: '2026-10-01', o: '2026-11-05', m: 10 }, { id: 'b', d: '2026-10-25', m: 20 }, { id: 'c', d: '2026-09-01', o: '2026-10-15', m: 99 }], asOf: '2026-11-10', rate: 30, unit: 'M月' });
+  check('v6.0.210 M7：某月閒置＝拔除完成日（或這批進場日較晚者）到退場日，切在這個月；拔除前就退的那批不算', im.cost === 260 && im.mDays === 260 && im.rows.length === 2 && im.rows[0].days === 12 && im.rows[1].days === 7, JSON.stringify(im));
+  const im2 = MV.idleInMonth({ ym: '2026-11', start: '2026-10-20', batches: [{ id: 'a', d: '2026-10-01', o: '2026-11-05', m: 10 }, { id: 'b', d: '2026-10-25', m: 20 }], asOf: '2026-11-10', rate: 30, unit: 'M月' });
+  check('v6.0.210 M7：下個月接著算到退場日／今天；沒有拔除完成日＝0', im2.cost === 40 + 180 && MV.idleInMonth({ ym: '2026-10', start: '', batches: [{ d: '2026-10-01', m: 1 }], asOf: '2026-11-01', rate: 30 }).cost === 0, JSON.stringify(im2));
+  const lo = MV.lossOf([{ st: 'ok', dir: 'in', qid: 'q', own: true, items: [{ name: 'H', spec: '300', len: 12, qty: 10 }] }, { st: 'draft', dir: 'out', qid: 'q', items: [{ name: 'H', spec: '300', len: 12, qty: 10 }] },
+    { st: 'ok', dir: 'out', qid: 'q', own: true, items: [{ name: 'H', spec: '300', len: 12, qty: 8, short: 1, dmg: 1, cond: 'repair' }] }, { st: 'ok', dir: 'xfer', fromQid: 'x', toQid: 'q', items: [{ name: 'H', spec: '300', len: 12, qty: 10 }] }], 'q');
+  check('v6.0.210 M7：損耗率＝(短少＋損壞)÷進場（轉場進來也算進場；草稿不算）', lo.length === 1 && lo[0].inQty === 20 && lo[0].short === 1 && lo[0].dmg === 1 && lo[0].repair === 8 && lo[0].rate === 10, JSON.stringify(lo));
+}
 // ── 進退料簿（calc/matmove.js，v6.0.195 進退料統整表 M1）──
 {
   const MV = require(path.join(__dirname, '..', 'calc', 'matmove.js')).mv;
