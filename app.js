@@ -43960,7 +43960,7 @@ function _pj7Steps(q,st){
     {k:'dispatch',l:'派工',na:1,info:'派工板：下一版'},
     {k:'addon',l:'追加',done:true,info:adds?('現場追加 '+adds+' 筆'):'沒有現場追加',body:adds?function(){return _pjAddonHtml(q);}:null},
     {k:'log',l:'日報',done:stage||st.physPct>=99.5,info:st.logs.length?('日報 '+st.logs.length+' 篇・最近 '+(last.date||'')+(st.hasRep?('・進度 '+Math.round(st.physPct)+'%'):'')):'還沒有日報',body:function(){return _pjLogHtml(q,st);}},
-    {k:'inv',l:'請款',done:billedOk,info:st.invs.length?('已請 '+st.invs.length+' 期 NT$ '+fmt(st.billed)+(st.ar>0?('・待收 '+fmt(st.ar)):'')):'還沒請款',body:function(){return _pjInvHtml(q,st);}},
+    {k:'inv',l:'請款',done:billedOk,info:st.invs.length?('已請 '+st.invs.length+' 期 NT$ '+fmt(st.billed)+(st.ar>0?('・待收 '+fmt(st.ar)):'')):'還沒請款',body:function(){return _pj7InvHtml(q,st);}},
     {k:'remove',l:'拆除拔樁',done:stage&&!st.rent.length,info:st.rent.length?('租期已過 '+st.rent.length+' 項（看「請款」的逾期租金）'):(stage?'已完工':'施工中'),body:function(){return _pjRemoveHtml(q);}},
     {k:'settle',l:'完工結算',done:st.done,info:_stlInfo(q)||(st.done?'合約已完工結算':'還沒完工結算（營造廠結算書來了，在這裡逐項填數量對帳）'),body:function(){return _pjSettleHtml(q);}},
     {k:'ret',l:'保留款',done:!!q.closed||(st.done&&st.retHeld<=0),info:st.retHeld>0?('預扣中 NT$ '+fmt(st.retHeld)):'沒有預扣保留款'},
@@ -44180,6 +44180,51 @@ function _pjRemoveHtml(q){
       :'<div style="font-size:11.5px;color:var(--b3)">還沒開始拔除</div>';
     if(mode==='removeDone'&&B.noTick&&(pg.remLogs||[]).length)h+='<div style="font-size:11px;color:#b26a00;margin-top:2px">日報的拔除列沒有勾「本次拔除完成」，每天的拔除各算一批</div>';
   });
+  return h;
+}
+// ══════════ 改版第 7 步：專案頁「請款」那一步只讀（v6.0.221，陳軒 11/10 依 Lotion 大原則：前端只顯示走到哪、一顆「下一步」）══════════
+// 上面：合約條件摘要（保留款、清潔費、放款規則、裝設請款％、租期結束日口徑、保留款退還條件）＋每一期走到哪個狀態（已收／待收／逾期）＋一顆「下一步」
+// 下一步的順序：①有逾期沒收的 → 登錄那期收款 ②這期該請款（＝今天頁「本月要請款」同一份 FJC.todo.monthBill）→ 開下一期請款單 ③有待收的 → 登錄收款
+//   ④完工、有保留款可退 → 產生（或打開）保留款退還請款單 ⑤都沒有 → 顯示「目前沒有要做的」
+// 原本的輸入框、下拉、按鈕（_pjInvHtml）全部收進「⋯ 更多」，功能不變；主線的請款單狀態欄上線後再把狀態換成那一份
+function _pj7InvTerms(q){
+  var d=_pjDeduct(q),dd=q.deduct||{},o=q.ownerPay||{},L=[];
+  L.push('保留款 '+(d.ret==null?'不扣':(d.ret+'%')));
+  if(d.cleanBase==='once'?d.cleanPct>0:d.clean>0)L.push('清潔費 '+(d.cleanBase==='once'?('合約未稅 × '+d.cleanPct+'%（第一期一次扣）'):(d.clean+'%（每期）')));
+  var R=null;try{R=_recvRuleOf({quoteId:q.id,project:q.name,client:q.client});}catch(e){_err('_pj7InvTerms.recv',e);}
+  L.push(R?('放款：'+_recvRuleTxt(R)):'放款規則還沒設定（預計收款日照請款單付款條件）');
+  try{var ip=(o.instPct!=null&&o.instPct!=='')?parseFloat(o.instPct):_ownerInstRef(q).pct;if(ip>0&&ip<100)L.push('裝設請款 '+ip+'%');}catch(e){_err('_pj7InvTerms.inst',e);}
+  L.push('租期結束日：'+(_rentEndMode(q)==='removeDone'?'拔除完成日（分段計）':'拔除第一天'));
+  if(dd.retCond)L.push('保留款退還：'+String(dd.retCond).slice(0,60));
+  return L;
+}
+function _pj7InvNext(q,st){
+  var today=localToday(),unpaid=st.invs.filter(function(v){return !v.receivedConfirmed&&_invAR(v)>0;}).sort(function(a,b){return (parseInt(a.periodNo)||0)-(parseInt(b.periodNo)||0);});
+  var dueOf=function(v){try{var e=_invExpectedDate(v);return (e&&e.date)||'';}catch(e2){_err('_pj7InvNext.due',e2);return '';}};
+  var od=unpaid.find(function(v){var d=dueOf(v);return d&&d<today;});
+  if(od)return {l:'登錄第 '+(od.periodNo||'?')+' 期收款',why:'預計 '+dueOf(od)+' 收款，已經過了，待收 NT$ '+fmt(_invAR(od)),fn:"openReceiptModal('"+escq(od.id)+"')",urg:1};
+  var b=null;try{var v=_todoBuild();b=((v&&v.bill)||[]).find(function(x){return x.qid===q.id;});}catch(e){_err('_pj7InvNext.bill',e);}
+  if(b){var nx=st.invs.reduce(function(m,v){return Math.max(m,parseInt(v.periodNo)||0);},0)+1;
+    return {l:'開第 '+nx+' 期請款單',why:'這期 '+b.cutDate+' 截止（還有 '+b.left+' 天），日報有 '+b.items.length+' 個工項的新數量還沒請'+(st.rent.length?('；另有 '+st.rent.length+' 項逾期租金可一起請'):''),fn:"pjNewInv('"+escq(q.id)+"')"};}
+  if(unpaid.length){var u=unpaid[0],d=dueOf(u);return {l:'登錄第 '+(u.periodNo||'?')+' 期收款',why:'待收 NT$ '+fmt(_invAR(u))+(d?('，預計 '+d):''),fn:"openReceiptModal('"+escq(u.id)+"')"};}
+  try{var rd=_retOpenDoc(q);if(rd)return {l:'打開保留款退還請款單',why:'退還請款單已開、還沒收到退款',fn:"openRetReturnDoc('"+escq(rd.id)+"')"};
+    if(st.done&&_retPendRows(q).amt)return {l:'產生保留款退還請款單',why:'已完工結算，保留款 NT$ '+fmt(_retPendRows(q).amt)+' 可以請退',fn:"retReturnCreate('"+escq(q.id)+"')"};}catch(e){_err('_pj7InvNext.ret',e);}
+  return null;
+}
+function _pj7InvHtml(q,st){
+  var ro=!!_isReaderUser,today=localToday(),h='';
+  h+='<div style="font-size:12px;color:var(--b4);background:var(--b0);border:1px solid var(--b1);border-radius:var(--r8);padding:7px 10px;margin-bottom:8px"><b style="color:var(--b5)">合約條件</b>　'+_pj7InvTerms(q).map(esc).join('・')+'</div>';
+  var invs=st.invs.slice().sort(function(a,b){return (parseInt(a.periodNo)||0)-(parseInt(b.periodNo)||0);});
+  if(invs.length){
+    h+='<div style="font-size:12px;margin-bottom:8px">'+invs.map(function(v){var ar=_invAR(v),paid=!!v.receivedConfirmed||!(ar>0),d='';if(!paid){try{var e=_invExpectedDate(v);d=(e&&e.date)||'';}catch(x){_err('_pj7InvHtml',x);}}
+      var od=d&&d<today,stx=paid?'<span style="color:var(--g3);font-weight:700">✓ 已收</span>':('<span style="color:'+(od?'var(--red)':'#b26a00')+';font-weight:700">'+(od?'逾期待收':'待收')+' NT$ '+fmt(ar)+'</span>'+(d?('<span style="color:var(--b4)">（預計 '+esc(d)+'）</span>'):''));
+      return '<div class="pj7-inv" style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;padding:4px 0;border-bottom:1px solid var(--b1)"><b style="flex:0 0 52px">第 '+esc(String(v.periodNo||'?'))+' 期</b><span style="color:var(--b4)">'+esc(v.date||'')+'</span><span style="flex:1;text-align:right">NT$ '+fmt((v.totals&&v.totals.total)||0)+'</span><span>'+stx+'</span></div>';}).join('')+'</div>';
+  } else h+='<div style="font-size:12px;color:var(--b3);margin-bottom:8px">還沒有請款單</div>';
+  var nx=_pj7InvNext(q,st);
+  h+='<div class="pj7-next" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 10px;border-radius:var(--r8);background:'+(nx?(nx.urg?'#fdecea':'#fff8f0'):'#f1f8f3')+'">'
+    +(nx?('<div style="flex:1 1 200px;font-size:12.5px"><b>下一步：'+esc(nx.l)+'</b><div style="font-size:11.5px;color:var(--b4)">'+esc(nx.why)+'</div></div>'+(ro?'':'<button type="button" class="btn sm" data-pj7next="1" onclick="'+nx.fn+'">'+esc(nx.l)+'</button>'))
+      :'<div style="font-size:12.5px;color:var(--g3)"><b>目前沒有要做的</b>（這期不用請款、沒有待收的）</div>')+'</div>';
+  h+='<details class="pj7-more" style="margin-top:8px"><summary style="font-size:12px;color:var(--b4);cursor:pointer">⋯ 更多（合約條件設定、每期請款單、收款、信封、新增請款單）</summary><div style="margin-top:8px">'+_pjInvHtml(q,st)+'</div></details>';
   return h;
 }
 function stlSet(el){

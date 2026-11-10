@@ -13417,6 +13417,45 @@ async function newPage(browser, width, height) {
     check('v6.0.221 今天頁錢的卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.221 專案頁「請款」那一步只讀：合約條件摘要、每期狀態、一顆「下一步」，輸入與按鈕收進「⋯ 更多」──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepI = INV.slice(), keepP = PROJECTS;
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old');
+        Object.keys(localStorage).filter((k) => /^pj7_open_/.test(k)).forEach((k) => localStorage.removeItem(k));
+        Q = [{ id: 'qI1', name: '範例工程I1', client: '甲營造', code: 'I1', date: '2026-07-01', awarded: true, _mt: 1, costs: [], deduct: { ret: 5, retCond: '驗收後 30 日內退還' }, ownerPay: { cut: 25, delay: 1, day: 10 },
+          items: [{ desc: '鋼軌樁打設', unit: '支', qty: 100, price: 1000 }], dailyLogs: [{ id: 'd1', date: '2026-09-20', progressRows: [{ itemIdx: 0, qty: 40 }] }] }];
+        INV.length = 0;
+        INV.push({ id: 'iI1', quoteId: 'qI1', project: '範例工程I1', client: '甲營造', periodNo: 1, date: '2026-08-25', items: [{ type: 'item', desc: '鋼軌樁打設', unit: '支', contractPrice: 1000, contractQty: 100, curQty: 30, curAmt: 30000, payRate: 100 }], totals: { sub: 30000, tax: 1500, total: 31500 }, expectedRecvDate: '2026-09-10', _mt: 1 });
+        PROJECTS = []; _prjSync();
+        localStorage.setItem('pj7_open_inv', '1'); openProj('qI1'); await T(200);
+        const box = document.getElementById('pj-body-inv'), tx = box ? box.textContent.replace(/\s+/g, ' ') : '';
+        out.terms = /合約條件/.test(tx) && /保留款 5%/.test(tx) && /放款：每月 25 日截止/.test(tx) && /保留款退還：驗收後 30 日內退還/.test(tx);
+        out.period = /第 1 期/.test(tx) && /逾期待收/.test(tx);
+        const nb = box.querySelectorAll('.pj7-next button');
+        out.next = nb.length === 1 && /登錄第 1 期收款/.test(nb[0].textContent) && /已經過了/.test(tx);
+        // 上面沒有輸入框、下拉；全部在「⋯ 更多」裡
+        const top = Array.from(box.children).filter((c) => !c.matches('details.pj7-more'));
+        out.noInputs = top.every((c) => !c.querySelector('input,select')) && !!box.querySelector('details.pj7-more input') && !box.querySelector('details.pj7-more').open;
+        // 收款登錄後：下一步換成別的（這期該請款）或沒事
+        INV[0].receivedConfirmed = true; INV[0].receivedAmt = 31500; renderProj(); await T(100);
+        const tx2 = document.getElementById('pj-body-inv').textContent.replace(/\s+/g, ' ');
+        out.after = /✓ 已收/.test(tx2) && !/登錄第 1 期收款/.test(tx2);
+        // 唯讀帳號：看得到「下一步」說明、沒有按鈕
+        const oR = _isReaderUser; _isReaderUser = true; renderProj(); await T(80);
+        out.ro = !document.querySelector('#pj-body-inv .pj7-next button'); _isReaderUser = oR;
+        out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; INV.length = 0; keepI.forEach((v) => INV.push(v)); PROJECTS = keepP; localStorage.removeItem('pj7_open_inv');
+      return out;
+    });
+    check('v6.0.221 專案頁請款那一步只讀（寬 ' + W + '）：合約條件摘要、每期狀態、只有一顆「下一步」（逾期先登錄收款）、輸入與按鈕收在「⋯ 更多」、收款後下一步換掉、唯讀沒有按鈕', !r.err && r.terms && r.period && r.next && r.noInputs && r.after && r.ro && r.noHScroll, JSON.stringify(r));
+    check('v6.0.221 專案頁請款只讀測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
