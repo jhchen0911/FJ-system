@@ -795,7 +795,8 @@ async function newPage(browser, width, height) {
       out.noOverflow = plan.pages.every((p, i) =>
         (p.e - p.s) + (i === 0 ? 0 : plan.marg) + plan.marg + (p.hd ? plan.hd.e - plan.hd.s : 0) <= plan.PAGE + 1);
       const _cbH = Math.round(_pdfContentBottom(root) * 2);   // v6.0.23 文件高度＝內容底緣（.page-wrap 的下內距不算）
-      out.contiguous = plan.pages[0].s === 0 && Math.abs(plan.pages[plan.pages.length - 1].e - _cbH) <= 2 && _cbH <= H
+      const _endH = plan.foot ? plan.foot.s : _cbH;   // v6.0.220 頁尾 .fy-docfoot 不算內文：內文到頁尾上緣、頁尾到內容底緣
+      out.contiguous = plan.pages[0].s === 0 && Math.abs(plan.pages[plan.pages.length - 1].e - _endH) <= 2 && (!plan.foot || Math.abs(plan.foot.e - _cbH) <= 2) && _cbH <= H
         && plan.pages.every((p, i) => i === 0 || p.s === plan.pages[i - 1].e);
       out.repeatHead = plan.pages.slice(1).some(p => p.hd === true);
       // 切點必須是某一列的下緣（±2px 容差）
@@ -13176,9 +13177,17 @@ async function newPage(browser, width, height) {
         for (const k of Object.keys(ctx)) {
           const o = _docOut(k, ctx[k]); const d = document.createElement('div'); d.innerHTML = (o.html.match(/<body[^>]*>([\s\S]*)<\/body>/i) || [0, o.html])[1];
           const h = d.querySelectorAll('.fy-dochead');
-          out.head[k] = h.length === 1 && h[0].innerHTML.includes(FY_LOGO) && h[0].innerHTML.includes(FY_WORDMARK) && /範例工程有限公司/.test(h[0].textContent) && /統一編號 87654321/.test(h[0].textContent) && /範例路 1 號/.test(h[0].textContent) && h[0].textContent.includes(title[k]);
+          out.head[k] = h.length === 1 && h[0].innerHTML.includes(FY_LOGO) && h[0].innerHTML.includes(FY_WORDMARK) && /範例工程有限公司/.test(h[0].textContent) && /範例工程有限公司｜統編 87654321｜電話 02-0000-0000/.test(h[0].textContent) && !/範例路 1 號/.test(h[0].textContent) && h[0].textContent.includes(title[k]);   // v6.0.220 頁首第 2 行只放全名｜統編｜電話
         }
         out.allHead = Object.values(out.head).every(Boolean);
+        // v6.0.220 公司資料只印在頁首一次（頁尾不再重印）；Email 在頁首；合約雙方簽章欄的地址不算重複
+        P.email = 'fy@example.tw'; out.once = {};
+        for (const k of Object.keys(ctx)) {
+          const o = _docOut(k, ctx[k]); const d = document.createElement('div'); d.innerHTML = (o.html.match(/<body[^>]*>([\s\S]*)<\/body>/i) || [0, o.html])[1]; d.querySelectorAll('style,script').forEach((x) => x.remove());
+          const t = d.textContent, n = (re) => (t.match(re) || []).length, hd = d.querySelector('.fy-dochead');
+          out.once[k] = n(/範例路 1 號/g) === (k === 'subContract' ? 2 : 1) && n(/02-0000-0000/g) === (k === 'subContract' ? 2 : 1) && !!hd && !/fy@example\.tw|範例路/.test(hd.textContent) && d.querySelectorAll('.fy-docfoot').length === 1 && d.querySelector('.fy-docfoot').textContent === '地址 範例路 1 號｜Email fy@example.tw' && n(/fy@example\.tw/g) === (k === 'rfq' ? 2 : 1) && !d.querySelector('.company-bar');   // v6.0.220 地址、Email 只在頁尾一次（詢價單回傳方式另寫 Email）
+        }
+        out.noDup = Object.values(out.once).every(Boolean);
         out.oldGone = !/豐有工程報價單/.test(_docOut('quote', ctx.quote).html);
         // 分包合約：條文 .pdf-cut 可換頁 → 第 1 頁要填滿（原本印完明細表就換頁、下半頁空白）
         const o = _docOut('subContract', ctx.subContract), A4W = _pdfContentPx(false), sm = o.html.match(/<style[^>]*>([\s\S]*?)<\/style>/i), bm = o.html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
@@ -13190,11 +13199,29 @@ async function newPage(browser, width, height) {
         const pageH = A4W * 277 / 190, p1 = pl.pages[0].e - pl.pages[0].s;
         out.fill = Math.round(p1 / pageH * 100); out.n = pl.pages.length;
         out.full = pl.pages.length > 1 && p1 / pageH >= 0.85;
+        // v6.0.220 頁尾 .fy-docfoot 不算內文：切頁記下 foot、內文到頁尾上緣為止；預覽最後一頁下緣有頁尾、頁碼同一行右邊、其他頁沒有頁尾
+        out.foot = !!pl.foot && pl.foot.e > pl.foot.s && pl.pages[pl.pages.length - 1].e <= pl.foot.s && (pl.foot.e - pl.foot.s) < pl.marg;
+        const ph = document.createElement('div'); ph.style.width = '700px'; document.body.appendChild(ph); _docPvRender(ph, o);
+        const pgs = ph.shadowRoot.querySelectorAll('.dpv-pg'), last = pgs[pgs.length - 1], ftIn = (el) => Array.prototype.some.call(el.querySelectorAll('.dpv-clip'), (c) => { const r = c.getBoundingClientRect(), f = c.querySelector('.fy-docfoot').getBoundingClientRect(); return f.top >= r.top - 1 && f.bottom <= r.bottom + 1 && f.height > 0; });
+        const pn = last.querySelector('.dpv-n');
+        // 審查：貼頁本身——假的 pdf 記下 addImage／text：頁尾只在最後一頁、落在下緣 10mm 留白裡；頁碼靠右同一行；沒有頁尾的照舊置中
+        const mk = (W2, H2) => { const c = document.createElement('canvas'); c.width = W2; c.height = H2; return c; };
+        const rec = () => { const L = { img: [], txt: [], pg: 1 }; return { L, addPage() { L.pg++; }, addImage(d, t, x, y, w, h) { L.img.push({ pg: L.pg, y, h }); }, setFontSize() {}, setTextColor() {}, text(t, x, y, o) { L.txt.push({ pg: L.pg, t, x, y, a: o && o.align }); } }; };
+        const MX = _pdfMargPt(), A4 = _pdfPt(false), cv = mk(600, 2400);
+        const pf = rec(); _pdfAddPaged(pf, cv, A4.w, A4.h, 1, { pages: [{ s: 0, e: 1000 }, { s: 1000, e: 1800 }], marg: 30, hd: null, foot: { s: 1800, e: 1812 } }, 0.8);
+        const fi = pf.L.img.filter((x) => x.pg === 2 && x.y > A4.h - MX - 1);
+        out.pdfFoot = fi.length === 1 && fi[0].y + fi[0].h <= A4.h + 0.5 && pf.L.img.filter((x) => x.pg === 1 && x.y > A4.h - MX - 1).length === 0 && pf.L.txt.length === 2 && pf.L.txt.every((t) => t.a === 'right' && t.x === A4.w - MX && t.y > A4.h - MX);
+        const pq = rec(); _pdfAddPaged(pq, cv, A4.w, A4.h, 1, { pages: [{ s: 0, e: 1000 }, { s: 1000, e: 1800 }], marg: 30, hd: null }, 0.8);
+        out.pdfNoFoot = pq.L.img.length === 2 && pq.L.txt.every((t) => t.a === 'center');
+        P.addr = ''; P.email = ''; out.noFootHtml = _docFootHtml() === ''; P.addr = '範例路 1 號'; P.email = 'fy@example.tw';
+        out.pvFoot = pgs.length === out.n && ftIn(last) && !ftIn(pgs[0]) && !!pn && pn.style.textAlign === 'right' && /2 \/ 2/.test(pn.textContent); ph.remove();
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       Q = keepQ; INV = keepI; VENDORS = keepV; try { Object.assign(P, JSON.parse(keepP)); } catch (e) { /* 可忽略 */ }
       return out;
     });
     check('v6.0.214 單據頁首統一：報價單、請款單、詢價單、分包合約書、保留款退還單都是同一個頁首（LOGO＋名片字樣＋公司全名／統一編號／地址＋單據名稱）', !r.err && r.allHead && r.oldGone, JSON.stringify(r));
+    check('v6.0.220 頁首頁尾（Lotion 11/10）：頁首第 2 行只有全名｜統編｜電話；地址｜Email 只在頁尾一次；五種單據都一樣（合約簽章欄除外）', !r.err && r.noDup && r.allHead, JSON.stringify(r.once));
+    check('v6.0.220 頁尾貼在最後一頁下緣留白：切頁不算內文、PDF 與預覽都只有最後一頁有、多頁頁碼同一行右邊；沒有地址 Email 不出頁尾、頁碼照舊置中', !r.err && r.foot && r.pvFoot && r.pdfFoot && r.pdfNoFoot && r.noFootHtml, JSON.stringify({ foot: r.foot, pvFoot: r.pvFoot, pdfFoot: r.pdfFoot, pdfNoFoot: r.pdfNoFoot, noFootHtml: r.noFootHtml, n: r.n, err: r.err }));
     check('v6.0.214 分包合約書：條文可以換頁，第 1 頁填滿（不再印完明細就換頁、下半頁空白）', !r.err && r.cuts >= 10 && r.full, JSON.stringify({ cuts: r.cuts, fill: r.fill, n: r.n, err: r.err }));
     check('v6.0.214 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
