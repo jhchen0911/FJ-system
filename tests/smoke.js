@@ -13372,16 +13372,18 @@ async function newPage(browser, width, height) {
         cevSet('qP1', 0, 'c', 3); cevSet('qP1', 0, 'note', '準時進場');
         let closed = 0; window.pjCloseAll = () => { closed++; };
         const ok = _DEC.closeAsk.ok(Q[0]);
-        const v = VENDORS.find((y) => y.name === '範例工程行甲');
-        out.saved = ok === 'open' && closed === 1 && v.evals.length === 1 && v.evals[0].q === 5 && v.evals[0].t === 4 && v.evals[0].c === 3 && v.evals[0].qid === 'qP1' && !VENDORS.find((y) => y.name === '範例工程行乙');
+        const v = VENDORS.find((y) => y.name === '範例工程行甲'), ce = Q[0].costs[0].eval;
+        // Lotion 11/11：分數只給管理員看 → 存在分包成本卡（private），不放廠商名冊
+        out.saved = ok === 'open' && closed === 1 && !!ce && ce.q === 5 && ce.t === 4 && ce.c === 3 && ce.note === '準時進場' && !v.evals && !Q[0].costs[1].eval && !VENDORS.find((y) => y.name === '範例工程行乙');
+        out.priv = !('costs' in _stripQuoteSens(Q[0])) && _cevOfVendor('範例工程行甲').length === 1;
         cevSet('qP1', 0, 'q', 2); cevSet('qP1', 0, 't', 2); cevSet('qP1', 0, 'c', 2); _cevSave(Q[0]);
-        out.over = v.evals.length === 1 && v.evals[0].q === 2;
+        out.over = Q[0].costs[0].eval.q === 2 && _cevOfVendor('範例工程行甲').length === 1;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       Q = keep.Q; VENDORS.length = 0; keep.V.forEach((x) => VENDORS.push(x)); window.pjCloseAll = keep.pc;
       return out;
     });
     check('v6.0.227 進場前到位確認卡：進場日 2 天內出卡；材料（還缺多少）、機具（進場日在不在場）、人員（廠商電話）；催的 LINE 文字不放金額；確認記已確認', !r.err && r.rows && r.detail && r.ok, JSON.stringify(r));
-    check('v6.0.227 結案卡包商評鑑：品質／準時／配合 1～5 分，評了要三題都填；確認存進廠商紀錄（同案再評覆蓋）再開結案視窗；不評的廠商不動', !r.err && r.evHtml && r.need3 && r.saved && r.over, JSON.stringify(r));
+    check('v6.0.227 結案卡包商評鑑：品質／準時／配合 1～5 分，評了要三題都填；確認存進分包成本卡（只有管理員讀得到，同案再評覆蓋）再開結案視窗；不評的廠商不動', !r.err && r.evHtml && r.need3 && r.saved && r.priv && r.over, JSON.stringify(r));
     check('v6.0.227 進場／評鑑卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }

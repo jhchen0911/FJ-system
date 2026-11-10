@@ -42481,23 +42481,28 @@ _decReg('closeAsk',{
   edit:function(q){var m=document.getElementById('fy-modal');if(m)m.remove();openProj(q.id);}
 });
 // v6.0.227 結案卡加包商評鑑（陳軒 11/10 晚佇列第 6 件）：這案（含追加）的分包卡廠商，品質／準時／配合各 1～5 分（可不評；評了就三題都要填）
-//   存在廠商紀錄 VENDORS[].evals（{qid,qname,at,by,q,t,c,note}；同一案再評＝覆蓋），廠商名冊沒有的先補進名冊。結案視窗按取消，評鑑一樣留著。
+//   Lotion 11/11：分數只給管理員看 → 存在分包成本卡 c.eval（q.costs 走 private，員工讀不到），不放廠商名冊；同一案再評＝覆蓋。廠商歷來評鑑由 _cevOfVendor 從各案成本卡彙整。
+//   結案視窗按取消，評鑑一樣留著。
 var _CEV={},_CEV_K=[['q','品質'],['t','準時'],['c','配合']];
 function cevSet(qid,vi,k,v){var o=((_CEV[qid]=_CEV[qid]||{})[vi]=_CEV[qid][vi]||{});o[k]=k==='note'?String(v||'').slice(0,100):(parseInt(v,10)||0);}
+function _cevCards(q,name){var out=[];_retAskFam(q).forEach(function(x){(x.costs||[]).forEach(function(c){if(c&&c.type==='sub'&&!c.mergedInto&&String(c.vendor||'').trim()===name)out.push({q:x,c:c});});});return out;}
 function _cevVendors(q){var seen={},out=[];_retAskFam(q).forEach(function(x){(x.costs||[]).forEach(function(c){var n=String(c&&c.type==='sub'&&!c.mergedInto&&c.vendor||'').trim();if(n&&!seen[n]){seen[n]=1;out.push(n);}});});return out;}
-function _cevHtml(q){var vs=_cevVendors(q);if(!vs.length)return '';var cur=_CEV[q.id]||{};
-  return '<div style="font-weight:700;font-size:13px;margin:10px 0 2px">五、包商評鑑（1～5 分，可不評）</div>'+vs.map(function(n,vi){var v=(VENDORS||[]).find(function(x){return x&&x.name===n;}),old=v&&Array.isArray(v.evals)?v.evals.find(function(e){return e&&e.qid===q.id;}):null,o=cur[vi]||{};
+function _cevOld(q,name){var e=null;_cevCards(q,name).forEach(function(x){if(x.c.eval&&(!e||(+x.c.eval.at||0)>(+e.at||0)))e=x.c.eval;});return e;}
+// 某家廠商歷來評鑑（只有讀得到成本的管理員裝置有資料）：[{qid,qname,q,t,c,note,at}]，同一案只算一次
+function _cevOfVendor(name){var by={};(Q||[]).forEach(function(q){(q&&q.costs||[]).forEach(function(c){if(c&&c.type==='sub'&&String(c.vendor||'').trim()===name&&c.eval){var m=q.parentId||q.id;if(!by[m]||(+c.eval.at||0)>(+by[m].at||0))by[m]=Object.assign({qid:m,qname:q.name||''},c.eval);}});});return Object.keys(by).map(function(k){return by[k];});}
+function _cevHtml(q){var vs=_cevVendors(q);if(!vs.length||!_decIsAdmin())return '';var cur=_CEV[q.id]||{};
+  return '<div style="font-weight:700;font-size:13px;margin:10px 0 2px">五、包商評鑑（1～5 分，可不評；只有管理員看得到）</div>'+vs.map(function(n,vi){var old=_cevOld(q,n),o=cur[vi]||{};
     return '<div style="border:1px solid var(--b1);border-radius:8px;padding:6px 8px;margin-top:4px;font-size:12.5px"><b>'+esc(n)+'</b>'+(old?'<span style="font-size:11px;color:var(--b4)">（已評過：品質 '+old.q+'、準時 '+old.t+'、配合 '+old.c+'，再評會覆蓋）</span>':'')
       +'<div style="display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:4px">'+_CEV_K.map(function(k){var val=o[k[0]]!=null?o[k[0]]:'';return '<label style="display:inline-flex;gap:4px;align-items:center">'+k[1]+'<select onchange="cevSet(\''+escq(q.id)+'\','+vi+',\''+k[0]+'\',this.value)" style="padding:3px 4px;border:1px solid var(--b2);border-radius:6px;font-size:13px"><option value="">—</option>'+[5,4,3,2,1].map(function(x){return '<option value="'+x+'"'+(+val===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></label>';}).join('')+'</div>'
       +'<input placeholder="一句話（選填）" value="'+esc(o.note||'')+'" oninput="cevSet(\''+escq(q.id)+'\','+vi+',\'note\',this.value)" style="width:100%;box-sizing:border-box;margin-top:4px;padding:4px 6px;border:1px solid var(--b2);border-radius:6px;font-size:12.5px"></div>';}).join('');}
-function _cevSave(q){var vs=_cevVendors(q),cur=_CEV[q.id]||{},todo=[];
+function _cevSave(q){if(!_decIsAdmin())return true;var vs=_cevVendors(q),cur=_CEV[q.id]||{},todo=[];
   for(var vi=0;vi<vs.length;vi++){var o=cur[vi]||{},n=_CEV_K.filter(function(k){return o[k[0]]>=1&&o[k[0]]<=5;}).length;if(!n&&!o.note)continue;if(n<3){toast(vs[vi]+'：品質、準時、配合三題都要填');return false;}todo.push({name:vs[vi],o:o});}
   if(!todo.length)return true;
-  var me=_meEmail()||'本機',chg=false;
-  todo.forEach(function(x){var v=(VENDORS||[]).find(function(y){return y&&y.name===x.name;});if(!v){try{v=_vendorEnsure(x.name,'sub');}catch(e){_err('_cevSave.ensure',e);}}if(!v)return;
-    if(!Array.isArray(v.evals))v.evals=[];v.evals=v.evals.filter(function(e){return e&&e.qid!==q.id;});v.evals.push({qid:q.id,qname:String(q.name||'').slice(0,60),at:Date.now(),by:me,q:x.o.q,t:x.o.t,c:x.o.c,note:String(x.o.note||'')});if(v.evals.length>100)v.evals=v.evals.slice(-100);v._mt=Date.now();chg=true;});
-  if(chg){try{saveVendors();}catch(e){_err('_cevSave',e);}toast('已存 '+todo.length+' 家包商評鑑');}
-  delete _CEV[q.id];return true;}
+  var me=_meEmail()||'本機',touched={};
+  todo.forEach(function(x){var ev={q:x.o.q,t:x.o.t,c:x.o.c,note:String(x.o.note||''),at:Date.now(),by:me};_cevCards(q,x.name).forEach(function(k){k.c.eval=JSON.parse(JSON.stringify(ev));touched[k.q.id]=k.q;});});
+  Object.keys(touched).forEach(function(id){_touch(touched[id]);});
+  try{persist();}catch(e){_err('_cevSave',e);}
+  toast('已存 '+todo.length+' 家包商評鑑');delete _CEV[q.id];return true;}
 function _retAskCopy(t){try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast('LINE 文字已複製');},function(){/* 可忽略：剪貼簿被擋 */});}catch(e){_err('_retAskCopy',e);}}
 // ── 整體日報（5d #8，雲端 dailyReport 建的 dailyOut 草稿）：確認＝複製文字並標已轉發、退回＝不轉發、修改＝改文字再複製 ──
 _decReg('dailyOut',{
