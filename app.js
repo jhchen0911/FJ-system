@@ -44678,8 +44678,8 @@ function _stlAiDetail(it){
   var body=L.map(function(x){var c=x.key&&by[x.key];if(c)used[x.key]=1;
     var dif=c?(Math.abs(c.diff)>1e-6?'<b style="color:'+(c.diff<0?'var(--red)':'#1565C0')+'">'+(c.diff>0?'+':'')+_rfmt(c.diff)+'</b>':'<span style="color:var(--g3)">相符</span>'):'—';
     return '<tr><td>'+esc(x.text)+(x.unit?'（'+esc(x.unit)+'）':'')+'</td><td style="text-align:right">'+(x.qty==null?'<span style="color:var(--red)">沒讀到</span>':_rfmt(x.qty))+'</td>'
-      +'<td>'+(c?esc(c.desc)+(cnt[x.key]>1?'<div style="color:var(--red);font-size:11px">有 '+cnt[x.key]+' 列對到這項，要先修改</div>':''):'<span style="color:#b26a00">沒對到合約工項（確認時不寫入）</span>')+'</td><td style="text-align:right">'+(c?_rfmt(c.billedQty):'—')+'</td><td style="text-align:right">'+(c&&c.dailyQty!=null?_rfmt(c.dailyQty):'—')+'</td><td style="text-align:right">'+dif+'</td>'
-      +'<td style="text-align:right;white-space:nowrap">'+(c&&c.amt?('<b style="color:'+(c.amt<0?'var(--red)':'#1565C0')+'">'+(c.amt>0?'+':'')+fmt(c.amt)+'</b>'):'—')+'</td></tr>';}).join('');
+      +'<td>'+(c?esc(c.desc)+(cnt[x.key]>1?'<div style="color:var(--red);font-size:11px">有 '+cnt[x.key]+' 列對到這項，要先修改</div>':''):'<span style="color:#b26a00">沒對到合約工項（確認時不寫入）</span>')+'</td><td style="text-align:right">'+(c?_rfmt(c.billedQty):'—')+'</td><td style="text-align:right">'+(c&&c.dailyQty!=null?_rfmt(c.dailyQty):'—')+'</td><td class="nw" style="text-align:right">'+dif+'</td>'
+      +'<td class="nw" style="text-align:right">'+(c&&c.amt?('<b style="color:'+(c.amt<0?'var(--red)':'#1565C0')+'">'+(c.amt>0?'+':'')+fmt(c.amt)+'</b>'):'—')+'</td></tr>';}).join('');
   var miss=R.rows.filter(function(x){return !used[x.key]&&x.stmtQty==null;}).map(function(x){return esc(x.desc);});
   var nOk=L.filter(function(x){return x.key&&x.qty!=null;}).length;
   var tb='<div style="font-size:12px;margin:8px 0 4px"><b>AI 讀到 '+L.length+' 項・對到合約工項 '+nOk+' 項</b>'+(a.low?'<span style="color:var(--red)">　AI 說這張不太清楚，請逐項對照原圖</span>':'')+'</div>'
@@ -44879,8 +44879,8 @@ _decReg('sdocCalc',{
       +'<table class="tbl" style="font-size:12px"><thead><tr><th>計算書品名</th><th style="text-align:right">計算書數量</th><th>對到的報價工項</th><th style="text-align:right">報價數量</th><th style="text-align:right">差異</th><th style="text-align:right">金額影響（未稅）</th></tr></thead><tbody>'
       +R.rows.map(function(r){return '<tr><td>'+esc(r.text)+(r.unit?'（'+esc(r.unit)+'）':'')+'</td><td style="text-align:right">'+(r.qty==null?'<span style="color:var(--red)">沒讀到</span>':_rfmt(r.qty))+'</td>'
         +'<td>'+(r.it?esc(r.it.desc)+(r.uBad?'<div style="color:var(--red);font-size:11px">單位不同（'+esc(r.unit||'')+'／'+esc(r.it.unit||'')+'），不比</div>':'')+(r.dup?'<div style="color:var(--red);font-size:11px">有好幾列對到這項，要先修改</div>':''):'<span style="color:#b26a00">沒對到報價工項</span>')+'</td><td style="text-align:right">'+(r.it?_rfmt(r.it.qty):'—')+'</td>'
-        +'<td style="text-align:right">'+(r.diff?'<b style="color:'+C(r.diff)+'">'+(r.diff>0?'+':'')+_rfmt(r.diff)+'</b>':(r.it&&r.qty!=null?'<span style="color:var(--g3)">相符</span>':'—'))+'</td>'
-        +'<td style="text-align:right;white-space:nowrap">'+(r.amt?'<b style="color:'+C(r.amt)+'">'+(r.amt>0?'+':'')+fmt(r.amt)+'</b>':'—')+'</td></tr>';}).join('')+'</tbody></table>'
+        +'<td class="nw" style="text-align:right">'+(r.diff?'<b style="color:'+C(r.diff)+'">'+(r.diff>0?'+':'')+_rfmt(r.diff)+'</b>':(r.it&&r.qty!=null?'<span style="color:var(--g3)">相符</span>':'—'))+'</td>'
+        +'<td class="nw" style="text-align:right">'+(r.amt?'<b style="color:'+C(r.amt)+'">'+(r.amt>0?'+':'')+fmt(r.amt)+'</b>':'—')+'</td></tr>';}).join('')+'</tbody></table>'
       +'<div style="font-size:12px;margin-top:6px">'+(R.nDiff?('差異 '+R.nDiff+' 項、金額影響（未稅）<b style="color:'+C(R.sumAmt)+'">'+(R.sumAmt>0?'+':'')+fmt(R.sumAmt)+'</b>；確認後另建「改單草稿」，在今天頁再確認才改報價'):'<span style="color:var(--g3)">對到的工項數量都跟報價相符</span>')+'</div>';
     return _sdocPvHtml(g.d.url,g.d.name).then(function(pv){return pv?pv+tb:'';});},
   ok:function(it){var g=_sdocGet(it);if(!g.d||!g.q)return false;var R=_sdocCalcCmp(g.q,g.d.calc);if(R.rows.some(function(r){return r.dup;})){toast('有好幾列對到同一個報價工項，請按「修改」選清楚');return false;}
