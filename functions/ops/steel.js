@@ -3,7 +3,7 @@
 // 主要來源是中鋼盤價：由 Lotion-HQ 每月讀新聞稿做成「鋼價草稿」上傳（docs/鋼價草稿_電腦端操作.md），不在這裡抓。
 'use strict';
 const URL = 'https://ws.dgbas.gov.tw/001/Upload/461/relfile/11525/230553/pr0501a1m.xml';
-const ITEM = /^\(四\)金屬製品類/;
+const ITEM = /^[(（]四[)）]金屬製品類/;   // 全形、半形括號都認
 // XML → { 'YYYY-MM': 指數 }（只取月資料的原始值）
 function parse(xml) {
   const out = {}, re = /<Obs>\s*<Item>([^<]+)<\/Item>\s*<TIME_PERIOD>(\d{4})M(\d{2})<\/TIME_PERIOD>\s*<FREQ>M<\/FREQ>\s*<TYPE>原始值<\/TYPE>\s*<Item_VALUE>([^<]*)<\/Item_VALUE>\s*<\/Obs>/g;

@@ -792,7 +792,7 @@ const steelCore = require('./ops/steel.js');
 exports.steelIndexMonthly = onSchedule({ schedule: '55 6 8,15,25 * *', timeZone: TZ, region: REGION, timeoutSeconds: 120 }, async () => {
   const db = admin.database(), now = Date.now();
   try {
-    const r = await fetch(steelCore.URL);
+    const r = await fetch(steelCore.URL, { signal: AbortSignal.timeout(30000) });   // 審查：30 秒沒回應就算失敗
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const series = steelCore.parse(await r.text()), rec = steelCore.build(series, now);
     if (!rec.latest) throw new Error('XML 裡找不到金屬製品類的月資料（格式可能改了）');

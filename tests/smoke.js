@@ -11633,16 +11633,18 @@ async function newPage(browser, width, height) {
         window.localToday = () => '2026-10-20';
         STEEL_IDX = { latest: { ym: '2026-10', v: 106 }, series: { '2026-08': 100, '2026-09': 103, '2026-10': 106 } };
         // 買價表存檔：記填價那個月與當時指數
-        _m8Save({ kind: 'm8cfg', buy: {}, salvage: '', store: '' });
+        _m8Save({ kind: 'm8cfg', salvage: '', store: '' });
         go('params'); prmTab('cost');
         window.localToday = () => '2026-08-05';
-        const sp = document.querySelector('#m8-buy .m8-sp'), bp = document.querySelector('#m8-buy .m8-bp');
-        sp.value = 'H300'; bp.value = '600'; _m8PrmSave();
-        out.ref = _m8Cfg().ref.H300.ym === '2026-08' && _m8Cfg().ref.H300.idx === 100;
+        document.querySelector('#m8-cats tr[data-id="h"] .m8-cp').value = '20'; _m8PrmSave();
+        const h = () => _m8Cats().find(x => x.id === 'h');
+        out.ref = h().ref.ym === '2026-08' && h().ref.idx === 100;
+        window.localToday = () => '2026-09-05'; prmTab('cost'); _m8PrmSave();
+        out.refKeep = h().ref.ym === '2026-08';   // 沒改價，起點不動
         window.localToday = () => '2026-10-20';
         // ① 沒有中鋼資料 → 用主計總處指數：100 → 106 漲 6% → 建議 636
         let L = _decItems('m8Steel');
-        out.idx = L.length === 1 && L[0].pct === 6 && L[0].sug === 636 && /主計總處/.test(L[0].src) && /只建議，不會自動改/.test(_DEC.m8Steel.detail(L[0]));
+        out.idx = L.length === 1 && L[0].pct === 6 && L[0].sug === 21.2 && L[0].spec === 'H 型鋼' && /主計總處/.test(L[0].src) && /只建議，不會自動改/.test(_DEC.m8Steel.detail(L[0]));
         // ② 中鋼盤價草稿：確認才記；這個月有中鋼資料就改用中鋼（H 開頭看 H 型鋼）：+2% → 不到 5% 不出卡
         DRAFTS.dstl1 = { id: 'dstl1', type: 'steelPrice', by: 'ai@example.com', at: 1, status: 'pending', summary: '', payload: { ym: '2026-10', url: 'https://example.com/n', items: [{ cat: 'H型鋼', pct: 2 }, { cat: '鋼板', pct: -1 }] } };
         out.draftCard = _decItems('steelPrice').length === 1 && /H 型鋼 \+2%/.test(_DEC.steelPrice.body(DRAFTS.dstl1));
@@ -11651,7 +11653,7 @@ async function newPage(browser, width, height) {
         // 加上 9 月 +4% → 累計 1.04×1.02＝+6.1% → 出卡、來源寫中鋼
         MAT_MOVE_FIN.steelCsc.months['2026-09'] = { H: 4, P: 0 };
         L = _decItems('m8Steel');
-        out.csc = L.length === 1 && L[0].pct === 6.1 && /中鋼盤價/.test(L[0].src) && L[0].sug === 637;
+        out.csc = L.length === 1 && L[0].pct === 6.1 && /中鋼盤價/.test(L[0].src) && L[0].sug === 21.22;
         out.ack = _DEC.m8Steel.ok(L[0]) === true && !_decItems('m8Steel').length;
         // ③ 保底卡：16 日以後、兩個來源都沒有新資料
         window.localToday = () => '2026-12-20';
@@ -11664,7 +11666,7 @@ async function newPage(browser, width, height) {
       } finally { MAT_MOVE_FIN = keepF; DRAFTS = keepD; MAT_TAGS = keepT; window.localToday = keepTd; window._draftMark = keepMark; STEEL_IDX = keepI; }
       return out;
     });
-    check('v6.0.216 進退料 M8b 鋼價追蹤：買價存檔記起點、沒有中鋼資料用主計總處指數、中鋼盤價草稿確認才記、有中鋼資料改用中鋼（累乘）、漲跌 5% 以上出卡寫來源與建議買價、只建議不自動改、16 日以後兩個來源都沒資料出保底卡', r.ref && r.idx && r.draftCard && r.draftOk && r.cscSmall && r.csc && r.ack && r.noneOk && r.none && r.noneEarly, JSON.stringify(r));
+    check('v6.0.216 進退料 M8b 鋼價追蹤：買價存檔記起點、沒有中鋼資料用主計總處指數、中鋼盤價草稿確認才記、有中鋼資料改用中鋼（累乘）、漲跌 5% 以上出卡寫來源與建議買價、只建議不自動改、16 日以後兩個來源都沒資料出保底卡', r.ref && r.refKeep && r.idx && r.draftCard && r.draftOk && r.cscSmall && r.csc && r.ack && r.noneOk && r.none && r.noneEarly, JSON.stringify(r));
     check('v6.0.216 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
@@ -11768,15 +11770,23 @@ async function newPage(browser, width, height) {
         // 參數頁買價表（只有管理員）：改值存檔
         go('params'); prmTab('cost');
         const card = document.getElementById('m8-prm-card');
-        const ins = card ? card.querySelectorAll('#m8-buy .m8-bp') : [];
-        if (ins.length) ins[0].value = '650';
+        // 舊版依規格填的（buy.H300）轉成覆寫；類別填每公斤價 → 用標準單位重換算每 M（H350＝137 kg/M）
+        const ov = card ? card.querySelector('#m8-ovr .m8-bp') : null;
+        out.ovrMig = !!ov && ov.value === '300' && card.querySelector('#m8-ovr .m8-sp').value === 'H300';
+        if (ov) ov.value = '650';
+        const hRow = card.querySelector('#m8-cats tr[data-id="h"]'); hRow.querySelector('.m8-cp').value = '30';
+        // ＋新增類別
+        m8CatAdd(); const nr = [...document.querySelectorAll('#m8-cats tr')].pop();
+        nr.querySelector('.m8-cn').value = '特殊型鋼'; nr.querySelector('.m8-ct').value = 'H588'; nr.querySelector('.m8-cp').value = '35';
+        document.querySelector('#m8-ovr .m8-bp').value = '650';
         document.getElementById('m8-sv').value = '25'; document.getElementById('m8-st').value = '';
         _m8PrmSave();
-        out.prm = !!card && _m8Cfg().buy.H300 === 650 && _m8Cfg().salvage === 25 && _m8Cfg().store === '';
+        out.prm = !!card && _m8BuyPerM('H300') === 650 && _m8BuyPerM('H350') === 30 * 137 && _m8BuyPerM('IV') === 0 && _m8Cfg().salvage === 25 && _m8Cfg().store === ''
+          && _m8Cats().length === 5 && _m8CatFor('H588').name === '特殊型鋼' && _m8Cats().find(x => x.id === 'h').ref.ym === TD.slice(0, 7) && !('buy' in _m8Cfg());
       } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; MAT_TAGS = keepT; window.localToday = keepTd; }
       return out;
     });
-    check('v6.0.215 進退料 M8a：得標未進料出自有料卡（要修的不算、不放金額、附車型建議）、租料進場再比一次、租還是買（沒填買價不出、含報價中同規格、存放成本未填）、累計租金 60% 出卡＋預估 80% 才建議買料、每季前 14 天統整前 5 名、參數頁買價表', r.own && r.old && r.ownAck && r.slip && r.noBuy && r.rvb && r.cumNo && r.cum && r.cumAck && r.qtr && r.qtrOff && r.prm, JSON.stringify(r));
+    check('v6.0.215 進退料 M8a：得標未進料出自有料卡（要修的不算、不放金額、附車型建議）、租料進場再比一次、租還是買（沒填買價不出、含報價中同規格、存放成本未填）、累計租金 60% 出卡＋預估 80% 才建議買料、每季前 14 天統整前 5 名、參數頁買價表', r.own && r.old && r.ownAck && r.slip && r.noBuy && r.rvb && r.cumNo && r.cum && r.cumAck && r.qtr && r.qtrOff && r.ovrMig && r.prm, JSON.stringify(r));
     check('v6.0.215 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

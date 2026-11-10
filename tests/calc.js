@@ -434,6 +434,12 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('M8 累計租金：未到 60% 不出卡；≥60% 出卡；預估 >80% 而且之後還有案子才建議買料，否則持續觀察', !c1.show && c2.show && c2.advice === '建議買料' && c3.advice === '持續觀察' && c4.advice === '持續觀察' && c2.ratio === 65 && c2.proj === 85, JSON.stringify([c2, c3, c4]));
   check('M8 車型建議：地區加成 1.6 以上平板車、以下吊板車', MV.truckFor(1.8).type === 'flat' && MV.truckFor(1.6).type === 'flat' && MV.truckFor(1.4).type === 'crane' && MV.truckFor(0).type === 'crane');
 }
+// ── v6.0.216 各規格每 M 重量（材料買價每公斤換算每 M）──
+{
+  const MV = require(path.join(__dirname, '..', 'calc', 'matmove.js')).mv;
+  check('每 M 重量：H 型鋼 JIS G 3192（H300＝94、H350＝137、H400＝172，H300x300 也認得）', MV.kgPerM('H300') === 94 && MV.kgPerM('H350') === 137 && MV.kgPerM('H400') === 172 && MV.kgPerM('H300x300') === 94 && MV.kgPerM('h 350') === 137);
+  check('每 M 重量：鋼板樁 JIS（III＝60、IV＝76.1、FSP-IV 也認得）、鋼軌（50KG/M＝50.4）、不認得的回 null', MV.kgPerM('III') === 60 && MV.kgPerM('FSP-IV') === 76.1 && MV.kgPerM('IV') === 76.1 && MV.kgPerM('50KG/M') === 50.4 && MV.kgPerM('37kg') === 37.2 && MV.kgPerM('覆工板') === null && MV.kgPerM('') === null);
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');
