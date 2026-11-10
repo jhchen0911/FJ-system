@@ -11621,6 +11621,58 @@ async function newPage(browser, width, height) {
     check('v6.0.208 數量對不上 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── v6.0.211 進退料 M6：租賃與運費請款核對（Lotion 11/10 四題全 A；照 11/04 寬大 9/18 的實際算式）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepM = MAT_MOVES, keepF = MAT_MOVE_FIN, keepD = DRAFTS, keepMark = window._draftMark;
+      try {
+        MAT_MOVES = []; MAT_MOVE_FIN = {}; DRAFTS = {};
+        window._draftMark = function (id, st, ex) { Object.assign(DRAFTS[id], { status: st }, ex || {}); return Promise.resolve(true); };
+        const D = (id, type, payload) => { DRAFTS[id] = { id, type, by: 'ai@example.com', at: 1, status: 'pending', summary: '', payload }; return DRAFTS[id]; };
+        Q = [{ id: 'qT211', name: '範例中科', loc: '台中市中科園區', client: '甲', awarded: true, items: [], _mt: 1,
+          mat: { rows: [], use: [], loss: [], rents: [{ id: 'rt1', vendor: '範例租賃股份有限公司', name: '鋼板樁', spec: 'IV', len: 9, rate: 30, batches: [{ id: 'b1', d: '2026-09-03', m: 90, o: '' }] }] } }];
+        // ① 價格表草稿 → 拍板卡 → 存
+        const T = { vendor: '範例起重', validTo: '2024-12-31', base: { '台中': 16000, '新竹': 9000 }, mult: { '台中': 1.8, '新竹': 1.6 }, perM: [{ pat: 'H300', rate: 30 }], lenAdd: [{ min: 13, add: 10 }, { min: 16, add: 20 }], waitHr: 2000 };
+        const fd = D('dfrt211a', 'frtRate', T);
+        out.rateCard = _decItems('frtRate').length === 1 && /到 2024-12-31/.test(_DEC.frtRate.head(fd)) && /還沒有價格表/.test(_DEC.frtRate.body(fd));
+        out.rateSaved = _DEC.frtRate.ok(fd) === true && !!_frtOf('範例起重股份有限公司') && _frtOf('範例起重').perM[0].rate === 30 && fd.status === 'applied';
+        // 過期出卡；確認＝已要新的（30 天內不再問）
+        out.exp = _decItems('frtExp').length === 1 && _DEC.frtExp.ok(_decItems('frtExp')[0]) === true && !_decItems('frtExp').length;
+        // ② 運費請款：寬大 9/18 用加成 3 → 我們照 1.8 算 29,225，差 21,374 → 出卡
+        const m1 = { id: 'mv_t211_1', st: 'ok', own: false, date: '2026-09-18', dir: 'in', qid: 'qT211', carrier: '範例起重', truck: 'KEG-1598', items: [{ name: '型鋼', spec: 'H300', len: 13.83, qty: 25 }, { name: '型鋼', spec: 'H300', len: 16.04, qty: 3 }], _mt: 1 };
+        m1.items[0].m = 345.74; m1.items[1].m = 48.13; MAT_MOVES.push(m1);
+        const bd = D('dbil211a', 'matBill', { vendor: '範例起重有限公司', kind: 'freight', from: '2026-09-01', to: '2026-09-30', rows: [{ date: '2026-09-18', truck: 'KEG 1598', text: 'H300 13M 以上', m: 361.49, amt: 43379 }, { date: '2026-09-18', truck: 'KEG-1598', text: 'H300 16M 以上', m: 48.13, amt: 7220, crane: 3000 }] });
+        let v = _mbView(bd);
+        out.calc = v.bill === 50599 && v.calc === 29225 && v.diff === 21374 && !v.quiet && _decItems('mvBill').length === 1 && /24893|345.74M×40×1.8/.test(_DEC.mvBill.detail(bd).replace(/,/g, ''));
+        // 退回＝先問廠商：擬好的詢問文字（請款 vs 我們依價目表算），草稿標退回
+        out.ask = /請款 50,599，我們依價目表算 29,225/.test(_mbAskTxt(v)) && !/包商/.test(_mbAskTxt(v));
+        // 修改＝照我們算的付 → 每趟運費寫進進退料簿（M7 讀 fare／crane）
+        out.payCalc = _mbApply(bd, 'calc') === true && MAT_MOVE_FIN[m1.id].fare === 29225 && MAT_MOVE_FIN[m1.id].crane === 3000 && MAT_MOVE_FIN[m1.id].fareSrc === 'calc' && MAT_MOVE_FIN['bill_dbil211a'].pay === 29225 && bd.status === 'applied';
+        // ③ 差 100 以內、沒有疑點 → 不出卡，自動照請款單記錄
+        const m2 = Object.assign({}, m1, { id: 'mv_t211_2', date: '2026-09-24', truck: 'KLK-6681' });
+        MAT_MOVES.push(m2);
+        const bq = D('dbil211b', 'matBill', { vendor: '範例起重', kind: 'freight', from: '2026-09-01', to: '2026-09-30', rows: [{ date: '2026-09-24', truck: 'KLK-6681', amt: 29300 }] });
+        out.quiet = _mbView(bq).quiet && !_decItems('mvBill').length;
+        _mbAutoTick();
+        out.auto = bq.status === 'applied' && MAT_MOVE_FIN[m2.id].fare === 29300 && MAT_MOVE_FIN[m2.id].fareSrc === 'bill';
+        // 找不到簽收單的趟次一定出卡
+        const bn = D('dbil211c', 'matBill', { vendor: '範例起重', kind: 'freight', from: '2026-10-01', to: '2026-10-31', rows: [{ date: '2026-10-02', truck: 'KLK-6681', amt: 9000 }] });
+        out.noSlip = !_mbView(bn).quiet && /找不到這趟的簽收單/.test(_mbView(bn).flags.join());
+        bn.status = 'rejected';
+        // ④ 租金：計租起算日跟簽收單進場日差 3 天 → 標出（只有 Lotion 看得到）；金額照進退場天數算
+        const br = D('dbil211d', 'matBill', { vendor: '範例租賃', kind: 'rent', from: '2026-09-01', to: '2026-09-30', rows: [{ text: '鋼板樁 IV', spec: 'IV', start: '2026-09-01', end: '2026-09-30', amt: 2700 }] });
+        v = _mbView(br);
+        out.rent = v.calc === 2520 && /進場 2026-09-03，請款從 2026-09-01 起算/.test(v.flags.join()) && !v.quiet;
+        // 確認＝照請款單付
+        out.payBill = _DEC.mvBill.ok(br) === true && br.status === 'applied' && MAT_MOVE_FIN['bill_dbil211d'].pay === 2700 && MAT_MOVE_FIN['bill_dbil211d'].mode === 'bill';
+      } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; DRAFTS = keepD; window._draftMark = keepMark; }
+      return out;
+    });
+    check('v6.0.211 進退料 M6 請款核對：價格表草稿確認才存、過期出卡、運費照價格表算（長度加價＋地區加成，寬大 9/18 算 29,225）差額出卡、先問廠商附詢問文字、照我們算的付寫進每趟運費／吊車費、差 100 以內自動照請款單、找不到簽收單出卡、租金計租日差超過 1 天標出、照請款單付', r.rateCard && r.rateSaved && r.exp && r.calc && r.ask && r.payCalc && r.quiet && r.auto && r.noSlip && r.rent && r.payBill, JSON.stringify(r));
+    check('v6.0.211 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.203 進退料 M4a：租料簽收單確認後自動建／結租料批次 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

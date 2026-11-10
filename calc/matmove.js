@@ -74,7 +74,48 @@
     o = o || {}; var to = o.outDate || o.today, d = days(o.pullDone, to);
     return { days: d, cost: rentFor(o.rate, o.unit, o.m, o.n, d), perDay: rentFor(o.rate, o.unit, o.m, o.n, 1) };
   }
-  var mv = { itemM: itemM, fromSlipDir: fromSlipDir, itemKey: itemKey, onSite: onSite, trips: trips, itemKg: itemKg, shareByKg: shareByKg, days: days, rentFor: rentFor, idleRent: idleRent };
+  // ── v6.0.211 M6 運費價格表（每家運輸公司一張，Lotion 11/10 第 1 題 A）──
+  // tbl＝{base:{地區:基本台元}, mult:{地區:加成倍數}, perM:[{pat:'H300',rate:30}], lenAdd:[{min:13,add:10},{min:16,add:20}], waitHr:每小時等待費}
+  function S(v) { return v == null ? '' : String(v); }
+  function nz(s) { return S(s).toUpperCase().replace(/[\s　×*xX\-－_]/g, ''); }
+  // 工地地址／地名 → 價格表的地區（名字出現在地址裡、取最長的那個）
+  function frtRegion(tbl, place, only) {
+    var p = S(place), best = '', ks = only ? Object.keys((tbl && tbl[only]) || {}) : Object.keys((tbl && tbl.base) || {}).concat(Object.keys((tbl && tbl.mult) || {}));
+    ks.forEach(function (k) { if (k && p.indexOf(k) >= 0 && k.length > best.length) best = k; });
+    return best;
+  }
+  // 一種料的每 M 單價＝規格單價（pat 出現在規格／品名裡、取最長）＋長度加價（長度 ≥ min 的最大那一級）
+  function frtPerM(tbl, it) {
+    var t = nz(S(it && it.spec) + ' ' + S(it && it.name)), rate = 0, pl = -1, add = 0, amin = -1, L = num(it && it.len);
+    ((tbl && tbl.perM) || []).forEach(function (r) { var k = nz(r && r.pat); if (k && t.indexOf(k) >= 0 && k.length > pl) { pl = k.length; rate = num(r.rate); } });
+    ((tbl && tbl.lenAdd) || []).forEach(function (r) { var mn = num(r && r.min); if (mn > 0 && L >= mn && mn > amin) { amin = mn; add = num(r.add); } });
+    return { rate: rate, add: add, hit: pl >= 0 };
+  }
+  // 一趟車的運費＝max(基本台, Σ M 數 ×（每 M 單價＋長度加價）× 地區加成) ＋ 等待小時 × 每小時等待費
+  function freightTrip(tbl, trip) {
+    trip = trip || {}; var region = frtRegion(tbl, trip.place), rb = frtRegion(tbl, trip.place, 'base'), rm = frtRegion(tbl, trip.place, 'mult');   // 基本台、加成各自找最長的地名（台中市中科的基本台＋台中的加成）
+    var base = num(((tbl && tbl.base) || {})[rb]), mult = num(((tbl && tbl.mult) || {})[rm]) || 1;
+    var lines = [], miss = [], byM = 0;
+    (trip.items || []).forEach(function (it) {
+      var m = num(it && it.m) || itemM(it), r = frtPerM(tbl, it);
+      if (!r.hit) { miss.push(S(it && it.name) + ' ' + S(it && it.spec)); return; }
+      var a = m * (r.rate + r.add) * mult; byM += a; lines.push({ name: S(it.name), spec: S(it.spec), len: num(it.len), m: r2(m), rate: r.rate, add: r.add, mult: mult, amt: Math.round(a) });
+    });
+    var wait = num(trip.waitH) * num(tbl && tbl.waitHr), core = Math.max(base, Math.round(byM));
+    return { region: region, base: base, mult: mult, byM: Math.round(byM), useBase: base > Math.round(byM), wait: Math.round(wait), amt: Math.round(core + wait), lines: lines, miss: miss, noRegion: !region };
+  }
+  // 一張請款單：請款金額 vs 我們算的，差在容許範圍內（Lotion 11/10 第 3 題 A：一張單差 NT$100 以內）就不出卡
+  function billDiff(billAmt, calcAmt, tol) { var d = Math.round(num(billAmt) - num(calcAmt)); return { diff: d, ok: Math.abs(d) <= (tol == null ? 100 : num(tol)) }; }
+  // 租金：這段請款期間（含頭含尾）每批在場天數 × M 數 × 月租／30；批次 d＝進場、o＝退場（空白＝還在場）
+  function rentPeriod(batches, from, to, rate) {
+    var tot = 0, rows = [];
+    (batches || []).forEach(function (b) {
+      if (!b || !b.d) return; var s = b.d > from ? b.d : from, e = b.o && b.o < to ? b.o : to; if (s > e) return;
+      var d = days(s, e) + 1, a = Math.round(num(rate) * num(b.m) * d / 30); tot += a; rows.push({ id: S(b.id), from: s, to: e, days: d, m: num(b.m), amt: a });
+    });
+    return { amt: tot, rows: rows };
+  }
+  var mv = { itemM: itemM, fromSlipDir: fromSlipDir, itemKey: itemKey, onSite: onSite, trips: trips, itemKg: itemKg, shareByKg: shareByKg, days: days, rentFor: rentFor, idleRent: idleRent, frtRegion: frtRegion, frtPerM: frtPerM, freightTrip: freightTrip, billDiff: billDiff, rentPeriod: rentPeriod };
   if (typeof module !== 'undefined' && module.exports) module.exports = { mv: mv };
   if (root) { root.FJC = root.FJC || {}; root.FJC.mv = mv; }
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
