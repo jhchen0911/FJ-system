@@ -88,7 +88,7 @@
     }
     return { qtyDays: tot, rows: rows, noTick: !!B.noTick && (!!((pg && pg.remLogs) || []).length || !!(pg && pg.removeDone) || !!B.stage) };
   }
-  // v6.0.221 Lotion 11/10：分段拔樁的逾期租金改照「時段」列（金額不變）——時段 1＝起算日到第一批完成日（含），在場＝全部；
+  // v6.0.222 Lotion 11/10：分段拔樁的逾期租金改照「時段」列（金額不變）——時段 1＝起算日到第一批完成日（含），在場＝全部；
   // 時段 k＝上一批完成日隔天到這一批完成日（含），在場＝還沒拔走的支數；最後還沒拔完的算到 endISO。完成日早於起算日的批次＝0 天（直接扣掉在場量）。
   // 跟 rentBatchQtyDays 同一份批次（同 pg、qty、期間），回傳 { qtyDays（一定等於 rentBatchQtyDays 的 qtyDays）, segs:[{no,from,to,qty,days}] }
   function rentSegments(pg, qty, startISO, endISO) {
