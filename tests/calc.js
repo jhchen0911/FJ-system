@@ -12,6 +12,53 @@ const results = [];
 const check = (name, ok, info) => results.push({ name, ok: !!ok, info: info || '' });
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
+// ── 報價得標率紀錄（calc/bid.js，v6.0.209 小批次線，7b 後端）──
+{
+  const B = require(path.join(__dirname, '..', 'calc', 'bid.js')).bid;
+  check('v6.0.209 得標率：工項類別看說明第一行（中間樁在 H 型鋼樁前、樁在支撐前）',
+    B.kind('H型鋼樁打設 H300×300') === 'hpile' && B.kind('H型鋼中間樁打設') === 'midpile' && B.kind('鋼板樁 IV 型\n含運') === 'sheet' && B.kind('水平支撐組立（含圍令）') === 'strut'
+    && B.kind('構台組立') === 'deck' && B.kind('安全母索') === 'rope' && B.kind('預壘樁 Ø50') === 'prepile' && B.kind('地錨') === 'anchor' && B.kind('雜項') === 'other' && B.kind('') === 'other');
+  check('v6.0.209 得標率（審查）：最先出現的關鍵字優先、「擋土支撐」不算水平支撐、H 形／H300x300 鋼樁、RC 排樁',
+    B.kind('H型鋼樁(含中間樁)') === 'hpile' && B.kind('H型鋼樁(全套管施工)') === 'hpile' && B.kind('RC排樁') === 'rcpile' && B.kind('H形鋼樁') === 'hpile' && B.kind('H300x300鋼樁打設') === 'hpile'
+    && B.kind('擋土支撐工程 H型鋼樁') === 'hpile' && B.kind('H型鋼支撐') === 'strut' && B.kind('支撐拆除') === 'strut' && B.kind('CCP排樁') === 'ccp');
+  check('v6.0.209 得標率（審查）：統計只算佔 10% 以上的類別；建議值正負對稱；歷史是物件也讀得到',
+    eq(B.mainKinds([{ desc: 'H型鋼樁', qty: 1, price: 95 }, { desc: '安全母索', qty: 1, price: 5 }]), ['hpile']) && eq(B.mainKinds([{ desc: 'H型鋼樁', qty: 1, price: 85 }, { desc: '安全母索', qty: 1, price: 15 }]), ['hpile', 'rope'])
+    && B.suggest({ ready: true, rate: 10, gapPct: 4.5 }) === -2.5 && B.firstOf({ a: { formal: true, ver: 1, snapshot: { t: { total: 7 } } } }, 1) === 7);
+  const items = [{ desc: '段落', sec: true }, { desc: 'H型鋼樁打設', qty: 10, price: 1000 }, { desc: '水平支撐', qty: 1, price: 30000 }, { desc: 'H型鋼樁拔除', qty: 10, price: 500 }, { desc: '備用', qty: 1, price: 999, spare: true }, { desc: '減項', qty: 1, price: -100 }];
+  check('v6.0.209 得標率：一張報價的類別依未稅金額由大到小，段落／備用單價／減項不算', eq(B.kindsOf(items), [{ kind: 'strut', amt: 30000 }, { kind: 'hpile', amt: 15000 }]), JSON.stringify(B.kindsOf(items)));
+  const hist = [{ savedAt: 3, formal: true, ver: 2, snapshot: { t: { total: 90000 } } }, { savedAt: 1, formal: true, ver: 1, snapshot: { t: { total: 105000 } } }, { savedAt: 0, snapshot: { t: { total: 120000 } } }];
+  check('v6.0.209 得標率：第一個正式版的總價（版次最小的正式版；沒有正式版用最舊；都沒有用現在）', B.firstOf(hist, 80000) === 105000 && B.firstOf([hist[2]], 80000) === 120000 && B.firstOf([], 80000) === 80000);
+  const won = { awarded: true, t: { total: 98000 }, bid: { res: 'won', first: 105000 } }, lost = { bidStatus: 'lost', lostPrice: 90000, t: { total: 99000 }, bid: { res: 'lost', first: 99000 } };
+  const vw = B.view(won, { ctAmt: 94500 }), vl = B.view(lost, {});
+  check('v6.0.209 得標率：得標＝成交價用主約合約金額、讓價＝第一版－成交；沒得標＝我方最後報價、對手價沿用舊欄位、比對手高幾 %',
+    vw.price === 94500 && vw.conc === 10500 && vw.concPct === 10 && vl.price === 99000 && vl.rival === 90000 && vl.gapPct === 10 && B.view(won, {}).price === 98000 && B.view({ t: {} }, {}) === null, JSON.stringify([vw, vl]));
+  check('v6.0.209 得標率：現在的結果（得標／沒得標／流標／還沒決定）', B.resOf(won) === 'won' && B.resOf(lost) === 'lost' && B.resOf({ bidStatus: 'void' }) === 'void' && B.resOf({ bidStatus: 'nego' }) === '' && B.resOf(null) === '');
+  const row = (res, concPct, gapPct) => ({ kinds: ['hpile'], v: { res, concPct, gapPct } });
+  const four = [row('won', 5), row('lost', null, 12), row('lost', null, 8), row('lost', null, null)];
+  let st = B.stats(four)[0];
+  check('v6.0.209 得標率：不滿 5 筆不給建議', st.n === 4 && st.ready === false && st.adjPct === null && st.rate === 25);
+  st = B.stats(four.concat([row('lost', null, null), row('void')]))[0];
+  check('v6.0.209 得標率：滿 5 筆、得標率低於 40% → 建議降價＝平均比對手高的一半（流標不算）', st.n === 5 && st.ready && st.rate === 20 && st.gapPct === 10 && st.adjPct === -5, JSON.stringify(st));
+  st = B.stats([row('won', 3), row('won', 1), row('won', 2), row('won', 0), row('lost')])[0];
+  check('v6.0.209 得標率：得標率高於 60% → 建議往上（每多 10% 加 1%，最多 5%）；平均讓價', st.rate === 80 && st.adjPct === 2 && st.concPct === 1.5, JSON.stringify(st));
+  st = B.stats([row('won'), row('won'), row('lost'), row('lost'), row('won')])[0];
+  check('v6.0.209 得標率：40～60% 不動；沒有對手價時低得標率照差距推', st.adjPct === 0 && B.suggest({ ready: true, rate: 10, gapPct: null }) === -3 && B.suggest({ ready: true, rate: 0, gapPct: 50 }) === -10);
+  check('v6.0.209 得標率：給報價線的統計只有數字、沒有案名金額', eq(Object.keys(B.exportRows([st])[0]).sort(), ['adjPct', 'concPct', 'gapPct', 'kind', 'label', 'lost', 'n', 'rate', 'ready', 'won'].sort()));
+}
+// ── 進退料 M7（calc/matmove.js，v6.0.210 小批次線）：結案實績、每月閒置浪費 ──
+{
+  const MV = require(path.join(__dirname, '..', 'calc', 'matmove.js')).mv;
+  check('v6.0.210 M7：租金換成每 M 每天（M月÷30、M天照用、片月換不了）', MV.perMDay(30, 'M月') === 1 && MV.perMDay(2, 'M天') === 2 && MV.perMDay(5, '片月') === null && MV.perMDay(0) === null);
+  const ra = MV.rentActual([{ d: '2026-10-01', o: '2026-10-31', m: 100 }, { d: '2026-10-11', m: 50 }, { d: '', m: 9 }], '2026-11-10');
+  check('v6.0.210 M7：實際租期依 M 數加權（還沒退的算到結案日）', ra.m === 150 && ra.mDays === 4500 && ra.avgDays === 30 && ra.open === 1, JSON.stringify(ra));
+  const im = MV.idleInMonth({ ym: '2026-10', start: '2026-10-20', batches: [{ id: 'a', d: '2026-10-01', o: '2026-11-05', m: 10 }, { id: 'b', d: '2026-10-25', m: 20 }, { id: 'c', d: '2026-09-01', o: '2026-10-15', m: 99 }], asOf: '2026-11-10', rate: 30, unit: 'M月' });
+  check('v6.0.210 M7：某月閒置＝拔除完成日（或這批進場日較晚者）到退場日，切在這個月；拔除前就退的那批不算', im.cost === 260 && im.mDays === 260 && im.rows.length === 2 && im.rows[0].days === 12 && im.rows[1].days === 7, JSON.stringify(im));
+  const im2 = MV.idleInMonth({ ym: '2026-11', start: '2026-10-20', batches: [{ id: 'a', d: '2026-10-01', o: '2026-11-05', m: 10 }, { id: 'b', d: '2026-10-25', m: 20 }], asOf: '2026-11-10', rate: 30, unit: 'M月' });
+  check('v6.0.210 M7：下個月接著算到退場日／今天；沒有拔除完成日＝0', im2.cost === 40 + 180 && MV.idleInMonth({ ym: '2026-10', start: '', batches: [{ d: '2026-10-01', m: 1 }], asOf: '2026-11-01', rate: 30 }).cost === 0, JSON.stringify(im2));
+  const lo = MV.lossOf([{ st: 'ok', dir: 'in', qid: 'q', own: true, items: [{ name: 'H', spec: '300', len: 12, qty: 10 }] }, { st: 'draft', dir: 'out', qid: 'q', items: [{ name: 'H', spec: '300', len: 12, qty: 10 }] },
+    { st: 'ok', dir: 'out', qid: 'q', own: true, items: [{ name: 'H', spec: '300', len: 12, qty: 8, short: 1, dmg: 1, cond: 'repair' }] }, { st: 'ok', dir: 'xfer', fromQid: 'x', toQid: 'q', items: [{ name: 'H', spec: '300', len: 12, qty: 10 }] }], 'q');
+  check('v6.0.210 M7：損耗率＝(短少＋損壞)÷進場（轉場進來也算進場；草稿不算）', lo.length === 1 && lo[0].inQty === 20 && lo[0].short === 1 && lo[0].dmg === 1 && lo[0].repair === 8 && lo[0].rate === 10, JSON.stringify(lo));
+}
 // ── 進退料簿（calc/matmove.js，v6.0.195 進退料統整表 M1）──
 {
   const MV = require(path.join(__dirname, '..', 'calc', 'matmove.js')).mv;

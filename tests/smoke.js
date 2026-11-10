@@ -12606,6 +12606,125 @@ async function newPage(browser, width, height) {
     check('v6.0.206 6-2a 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.209 報價得標率紀錄（小批次線，7b 後端）：得標／沒得標／流標／取消得標都記、讓價與對手價、拍板卡補資料、統計跟雲端 bidStats 一樣、底價目標價走 private、不改報價金額 ──
+  {
+    const DR = require('../functions/ops/drafts.js');
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const o = {};
+      try {
+        const mk = (id, name, desc, price, extra) => Object.assign({ id, name, client: '假業主', date: '2026-11-10', items: [{ desc, unit: '支', qty: 10, price }], t: { sub: price * 10, tax: price / 2, total: price * 10.5 }, costs: [] }, extra || {});
+        Q = [mk('bq1', '假得標案', 'H型鋼樁打設', 1000), mk('bq2', '假沒得標案', 'H型鋼樁打設', 2000), mk('bq3', '假流標案', '水平支撐組立', 500), mk('bq4', '假等很久案', '構台組立', 300, { date: '2026-11-10' }), mk('bq5', '假舊案', 'H型鋼樁', 100, { date: '2026-01-01', awarded: true })];
+        CONTRACTS = [{ id: 'bc1', linkedQid: 'bq1', amount: 9975 }];
+        Q_HISTORY = { bq1: [{ savedAt: 1, formal: true, ver: 1, snapshot: { t: { total: 11550 } } }] };
+        const before = JSON.stringify(Q.map((q) => [q.items, q.t]));
+        // 得標：確認得標視窗
+        try { openAwardDetail('bq1'); confirmAward(); } catch (e) { o.awardErr = String(e).slice(0, 200); }
+        const q1 = Q.find((q) => q.id === 'bq1'); o.won = !!(q1.bid && q1.bid.res === 'won' && q1.bid.first === 11550);
+        const v1 = _bidView(q1); o.wonView = v1 && v1.price === 9975 && v1.conc === 1575 && v1.concPct === 13.6;
+        // 沒得標：未得標視窗填對手價
+        markQuoteLost('bq2'); const el = document.getElementById('ql-price'); if (el) el.value = '19000';
+        const okBtn = Array.from(document.querySelectorAll('button')).reverse().find((b) => /確認|確定|儲存/.test(b.textContent || '') && b.offsetParent); if (okBtn) okBtn.click();
+        const q2 = Q.find((q) => q.id === 'bq2'); o.lost = !!(q2.bid && q2.bid.res === 'lost' && q2.bid.rival === 19000 && _bidView(q2).gapPct === 10.5);
+        // 流標（從待回覆切到議價中、再切兩次：未得標視窗 → 用流標）
+        const q3 = Q.find((q) => q.id === 'bq3'); q3.bidStatus = 'lost'; cycleBidStatus('bq3'); o.void = q3.bidStatus === 'void' && q3.bid && q3.bid.res === 'void';
+        // 取消得標 → 紀錄移到 bidHist
+        q1.awarded = false; _bidRecSync(q1); o.revoke = !q1.bid && Array.isArray(q1.bidHist) && q1.bidHist[0].res === 'won';
+        q1.awarded = true; _bidRecSync(q1);
+        o.oldNotBack = !Q.find((q) => q.id === 'bq5').bid;   // 舊案不補
+        o.amountsSame = JSON.stringify(Q.map((q) => [q.items, q.t])) === before;   // 記錄不改任何報價金額與工項
+        // 拍板卡：沒得標沒對手價、送出 60 天沒結果
+        q2.bid.rival = null; delete q2.lostPrice;
+        const today = localToday; localToday = () => '2027-02-01';
+        const L = _DEC.bidFill.list(); o.cards = L.map((x) => x.k + '|' + x.qid).sort().join(',');
+        o.detail = typeof _DEC.bidFill.detail === 'function' && /對手價/.test(_DEC.bidFill.detail(L.find((x) => x.k === 'rival')));
+        await _DEC.bidFill.ok(L.find((x) => x.k === 'stale')); const q4 = Q.find((q) => q.id === 'bq4'); o.staleOk = q4.bidStatus === 'lost' && q4.bid && q4.bid.res === 'lost' && q4.lostReason === '未回應';
+        await _DEC.bidFill.reject(L.find((x) => x.k === 'rival'), '重複報價'); o.skip = !!q2.bid.skip && _DEC.bidFill.list().every((x) => x.qid !== 'bq2');
+        localToday = today;
+        // 統計（前端）＋給雲端比
+        delete q2.bid.skip; q2.lostPrice = 19000; _bidRecSync(q2);
+        o.stats = FJC.bid.exportRows(_bidKindStats());
+        o.sugg = _bidSuggestFor(q1).map((x) => x.kind + ':' + x.n).join(',');
+        o.Q = JSON.parse(JSON.stringify(Q)); o.CT = JSON.parse(JSON.stringify(CONTRACTS));
+        // 底價／目標成交價：private、不印在報價單
+        const docNoAim = (function () { const c = JSON.parse(JSON.stringify(q1)); delete c.bid; delete c.bidHist; delete c.bidAim; try { return _buildQuoteDocHTML(c); } catch (e) { return 'ERR'; } })();
+        q1.bidAim = { floor: 8000, target: 9500 };
+        const st = _stripQuoteSens(q1), ex = _extractQuoteSens(q1), back = JSON.parse(JSON.stringify(st)); _applyQuoteSens(back, ex, false);
+        o.aimPriv = !('bidAim' in st) && ex.bidAim && ex.bidAim.floor === 8000 && back.bidAim && back.bidAim.target === 9500;
+        o.bidPriv = !('bid' in st) && !('bidHist' in st) && ex.bid && ex.bid.res === 'won' && back.bid && back.bid.first === 11550 && Array.isArray(back.bidHist);
+        const sn = _qhSnapOf(q1); o.noSnap = !('bid' in sn) && !('bidAim' in sn) && !('bidHist' in sn);
+        let doc = ''; try { doc = _buildQuoteDocHTML(q1); } catch (e) { doc = 'ERR ' + e; }
+        o.aimNotPrinted = !!doc && doc === docNoAim;   // 審查：有沒有得標結果、底價目標價，報價單逐字一樣
+        let sp = ''; try { sp = JSON.stringify(_sharedPayload()); } catch (e) { sp = 'ERR ' + e; }
+        o.notShared = !!sp && !/bidAim|"bidHist"|"bid":\{/.test(sp) && /假得標案/.test(sp);
+        o.aimClean = JSON.stringify(_bidAimClean({ floor: '100', target: 90 })) === 'null' && JSON.stringify(_bidAimClean({ target: '1000.4' })) === '{"target":1000}';
+      } catch (e) { o.err = String(e && e.stack || e).slice(0, 500); }
+      return o;
+    });
+    // 雲端拿到的形狀：共用區報價不含 bid（在 private quoteSens）
+    const cloud = r.Q ? DR.bidStats(r.Q.map((q) => { const c = Object.assign({}, q); delete c.costs; delete c.bid; delete c.bidHist; return c; }), r.CT, {}, Object.fromEntries(r.Q.filter((q) => q.bid).map((q) => [q.id, { bid: q.bid }]))) : null;
+    check('v6.0.209 得標率：確認得標自動記（第一版總價、成交價＝合約、讓價）；未得標視窗記對手價；流標也記；取消得標移到歷史；舊案不補', !r.err && r.won && r.wonView && r.lost && r.void && r.revoke && r.oldNotBack, r.err || JSON.stringify(r).slice(0, 600));
+    check('v6.0.209 得標率：記錄不改任何報價的工項與金額', !r.err && r.amountsSame, r.err || '');
+    check('v6.0.209 得標率：拍板卡 bidFill 列沒得標沒對手價、送出 60 天沒結果的（舊案不湧進來）；確認＝記沒得標（未回應）、退回＝不記進統計', !r.err && r.cards === 'rival|bq2,stale|bq4' && r.detail && r.staleOk && r.skip, r.err || JSON.stringify({ cards: r.cards, detail: r.detail, staleOk: r.staleOk, skip: r.skip }));
+    check('v6.0.209 得標率：前端統計跟雲端 bidStats（給報價線）逐值一樣；報價頁建議函式 _bidSuggestFor 有每個類別', !r.err && !!cloud && JSON.stringify(cloud.kinds) === JSON.stringify(r.stats) && /hpile:\d/.test(r.sugg), JSON.stringify({ cloud: cloud && cloud.kinds, web: r.stats, sugg: r.sugg }));
+    check('v6.0.209 底價／目標成交價、得標結果（讓價、對手價）走 private（quoteSens）、版次快照不帶、不印在報價單；格式檢查跟雲端一樣', !r.err && r.aimPriv && r.bidPriv && r.noSnap && r.aimNotPrinted && r.notShared && r.aimClean, JSON.stringify({ notShared: r.notShared, aimPriv: r.aimPriv, bidPriv: r.bidPriv, noSnap: r.noSnap, aimNotPrinted: r.aimNotPrinted, aimClean: r.aimClean, awardErr: r.awardErr }));
+    check('v6.0.209 得標率測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+  // ── v6.0.210 進退料 M7（小批次線）：結案實績回寫（租期、損耗、趟數；運費吊車費等 M6）、單價庫比對拍板卡（只有按確認才改）、每月租料閒置浪費 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const o = {};
+      try {
+        UPA_COST_DB.hsteel.H300.rent = 3; const upa0 = JSON.stringify(UPA_COST_DB);
+        Q = [{ id: 'm7q', name: '假結案甲', loc: '台中市西屯區假路 1 號', awarded: true, closed: true, closedAt: Date.parse('2026-12-01T04:00:00Z'), items: [{ desc: 'H型鋼樁 H300 拔除', unit: '支', qty: 10, price: 100 }], costs: [],
+          mat: { rents: [{ id: 'rt1', vendor: '假租賃商', name: 'H型鋼', spec: 'H300', len: 12, rate: 120, batches: [{ id: 'b1', d: '2026-10-01', o: '2026-11-30', m: 120 }] },
+                         { id: 'rt2', vendor: '假租賃商', name: '鋼軌', spec: '50kg', len: 9, rate: 30, batches: [{ id: 'b2', d: '2026-10-01', o: '2026-10-31', m: 90 }] }] } }];
+        MAT_MOVES = [{ id: 'mv_a', st: 'ok', dir: 'in', qid: 'm7q', own: true, date: '2026-10-01', truck: 'AB-1', truckType: 'flat', items: [{ name: 'H型鋼', spec: 'H300', len: 12, qty: 10 }] },
+                     { id: 'mv_b', st: 'ok', dir: 'out', qid: 'm7q', own: true, date: '2026-11-30', truck: 'AB-2', truckType: 'crane', lift: 'self', items: [{ name: 'H型鋼', spec: 'H300', len: 12, qty: 9, short: 1 }] }];
+        MAT_MOVE_FIN = {}; MAT_HIST = {};
+        const rec = _mhBuild(Q[0]);
+        o.rec = rec.county === '臺中市' && rec.rents.length === 2 && rec.rents[0].avgDays === 60 && rec.rents[0].pmd === 4 && rec.rents[0].upaKey === 'hsteel|H300|rent' && rec.rents[0].upaVal === 4
+          && rec.rents[1].upaKey === 'rail|rent|9' && rec.rents[1].upaVal === 9 && rec.loss[0].rate === 10 && rec.trips === 2 && rec.byTruck.flat === 1 && rec.byTruck.crane === 1 && rec.lift === 1 && rec.fare === null && rec.crane === null;
+        o.recTxt = JSON.stringify(rec).slice(0, 400);
+        MAT_MOVE_FIN = { mv_a: { fare: 8000 }, mv_b: { fare: 9000, crane: 5000 } };   // M6 之後填的運費、吊車費
+        const rec2 = _mhBuild(Q[0]); o.fare = rec2.fare === 17000 && rec2.crane === 5000;
+        MAT_MOVE_FIN = {};
+        o.write = _mhWrite(Q[0]) === true && !!MAT_HIST.m7q && _mhWrite(Q[0]) === false;   // 內容沒變不重寫
+        o.notClosed = _mhWrite(Object.assign({}, Q[0], { closed: false })) === false;
+        MAT_HIST.m7q = JSON.parse(JSON.stringify(MAT_HIST.m7q, (k, v) => v === null ? undefined : v)); o.noChurn = _mhWrite(Q[0]) === false;
+        const ref = (n, sp, len, kind) => _mhUpaRef({ name: n, spec: sp, len: len }, kind);
+        o.refs = (ref('H型鋼', 'H300', 9, 'strut') || {}).key === 'strut|rent|H300' && (ref('鋼軌', '', 12.5, 'pile') || {}).key === 'rail|rent|12.5' && ref('鋼板樁', 'SP-III', 9, 'pile') === null && ref('H型鋼', '2H300', 9, 'strut') === null;
+        const r125 = UPA_COST_DB.rail.rent['12.5']; o.set125 = _mhUpaSet(['rail', 'rent', '12.5'], 9.5) === true && UPA_COST_DB.rail.rent['12.5'] === 9.5 && _mhUpaSet(['rail', 'rent'], 1) === false; UPA_COST_DB.rail.rent['12.5'] = r125;
+        // 單價庫比對拍板卡：H300 實績 4 vs 單價庫 3 → 出卡；鋼軌 9M 實績 9 vs 單價庫 6 → 出卡；沒按確認不改
+        const L = _DEC.mhUpa.list(); o.cards = L.map((x) => x.key).sort().join(',');
+        o.noAuto = JSON.stringify(UPA_COST_DB) === upa0;
+        o.detail = /結案實績平均/.test(_DEC.mhUpa.detail(L[0]));
+        const h = L.find((x) => x.key === 'hsteel|H300|rent'); await _DEC.mhUpa.ok(h); o.updated = UPA_COST_DB.hsteel.H300.rent === 4;
+        const rl = L.find((x) => x.key === 'rail|rent|9'); await _DEC.mhUpa.reject(rl); o.rejected = P.mhSkip && P.mhSkip['rail|rent|9'] === 9 && !_DEC.mhUpa.list().some((x) => x.key === 'rail|rent|9');
+        o.stats = JSON.stringify(_mhStats());
+        // 每月閒置浪費：起算日用退料提醒那一套（這裡直接給拔除完成日）
+        const real = _mvIdleStartOf; o.noStart = real(Q[0], Q[0].mat.rents[0]) === '';
+        _mvIdleStartOf = (q, rt) => rt.id === 'rt1' ? '2026-11-20' : ''; 
+        const m11 = _mvIdleMonth('2026-11', '2026-12-05'), m10 = _mvIdleMonth('2026-10', '2026-12-05');
+        _mvIdleStartOf = real;
+        o.idle = m11.n === 1 && m11.rows[0].cost === 4800 && m11.rows[0].days === 10 && m11.total === 4800 && m10.n === 0;   // 11/20→11/30 10 天 × 120M × 120/30
+        o.idleTxt = JSON.stringify(m11).slice(0, 300);
+        Q[0].mat.rents[0].batches[0].o = ''; _mvIdleStartOf = (q, rt) => rt.id === 'rt1' ? '2026-11-20' : '';
+        const c11 = _mvIdleMonth('2026-11', '2027-01-15'), c12 = _mvIdleMonth('2026-12', '2027-01-15'); _mvIdleStartOf = real; Q[0].mat.rents[0].batches[0].o = '2026-11-30';
+        o.clip = c11.rows.length === 1 && c11.rows[0].days === 11 && c12.n === 0;
+        // 業主要求先留（退料提醒按「先留」）不算浪費
+        MAT_TAGS[_mvTagId('m7q', 'rt1')] = { keep: 1 }; _mvIdleStartOf = () => '2026-11-20'; o.keep = _mvIdleMonth('2026-11', '2026-12-05').n === 0 || _mvIdleMonth('2026-11', '2026-12-05').rows.every((x) => x.rt !== 'rt1'); _mvIdleStartOf = real; delete MAT_TAGS[_mvTagId('m7q', 'rt1')];
+      } catch (e) { o.err = String(e && e.stack || e).slice(0, 500); }
+      return o;
+    });
+    check('v6.0.210 M7 結案實績：工地縣市、每張租料單實際租期（M 數加權）與每 M 每天租金、對到單價庫欄位、損耗率、趟數（平板／吊板）、吊車次數；運費吊車費等 M6 填了就自動算', !r.err && r.rec && r.fare && r.write && r.notClosed && r.noChurn && r.refs && r.set125, r.err || JSON.stringify(r).slice(0, 700));
+    check('v6.0.210 M7 單價庫比對：差 5% 以上出拍板卡、不自動改；確認＝改成實績平均、退回＝實績沒變不再問', !r.err && r.cards === 'hsteel|H300|rent,rail|rent|9' && r.noAuto && r.detail && r.updated && r.rejected, JSON.stringify({ cards: r.cards, noAuto: r.noAuto, detail: r.detail, updated: r.updated, rejected: r.rejected }));
+    check('v6.0.210 M7 每月租料閒置浪費：拔除完成日起算、已退場的算到退場日、切在月份裡；沒拔完不算；業主要求先留的不算', !r.err && r.idle && r.noStart && r.keep && r.clip, JSON.stringify({ clip: r.clip, idle: r.idle, noStart: r.noStart, keep: r.keep, t: r.idleTxt }));
+    check('v6.0.210 M7 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
