@@ -5855,7 +5855,7 @@ function _copyQDo(id){
   // Append (複製) to name
   copy.name=(copy.name||'未命名')+' (複製)';copy.payDefV=2;copy.instV=2;delete copy.ownerCard;delete copy._ocPriv;   // 新專案
   // 健檢1 #7：複製報價＝新的一張報價，不帶原案的專案狀態（追加案關聯、結案、版次、日報、詢價、材料、佣金、得標結果…）
-  ['parentId','closed','closedAt','ver','date0','dailyLogs','rfqs','mat','comms','comm','referral','confirmFiles','addons','siteHist','bidStatus','lostReason','lostPrice','lostNote','rentEnd','ownerDoc','matEst','measure','plan','sendLog','verFix','bid','bidHist','bidWait','bidAim','sent','sentHist','sentSkipAt'].forEach(function(k){delete copy[k];});   // v6.0.180 匯出紀錄、補登版次規則屬於原報價
+  ['parentId','closed','closedAt','ver','date0','dailyLogs','rfqs','mat','comms','comm','referral','confirmFiles','addons','siteHist','bidStatus','lostReason','lostPrice','lostNote','rentEnd','ownerDoc','matEst','measure','plan','sendLog','verFix','bid','bidHist','bidWait','bidAim','sent','sentHist','sentSkipAt','inq'].forEach(function(k){delete copy[k];});   // v6.0.180 匯出紀錄、補登版次規則屬於原報價
   copy._mt=Date.now();
   Q.unshift(copy);
   persist();
@@ -38813,7 +38813,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 // 安全規則（database.rules.json 的 fydata/drafts）：唯讀名冊與管理員可讀；唯讀帳號只能新增 by＝自己的 pending 草稿，舊的只能把自己的 pending 改成 withdrawn／superseded（v6.0.189）；狀態只有管理員能改；欄位型別與大小有上限。
 // 記錄：{id,type:'quote'|'bid'|'irPhoto',by,byName,at,status:'pending'|'applied'|'rejected',summary,payload,(doneAt,doneBy,resultId,reason)}
 var DRAFTS={},DRAFTS_OLD={};   // DRAFTS_OLD（v6.0.189）：已被取代的草稿（管理員展開看舊版用，最近 60 筆）
-var _DRAFT_T={rfqReply:'廠商回價',ownerCard:'合約條件卡',qchg:'改單',quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）',contact:'客戶·廠商',dailyOut:'整體日報（請複製轉發）',vendorBill:'廠商請款',qverfix:'補登版次',qsend:'代匯出報價',frtRate:'運費價格表',matBill:'租賃／運費請款',steelPrice:'中鋼盤價'};   // v6.0.138 客戶·廠商草稿   // v6.0.110 LINE 機器人草稿
+var _DRAFT_T={inquiry:'詢價收件',rfqReply:'廠商回價',ownerCard:'合約條件卡',qchg:'改單',quote:'報價單',bid:'得標狀態',irPhoto:'發票照片',addon:'現場追加（LINE）',dailyLog:'施工日報（LINE）',contact:'客戶·廠商',dailyOut:'整體日報（請複製轉發）',vendorBill:'廠商請款',qverfix:'補登版次',qsend:'代匯出報價',frtRate:'運費價格表',matBill:'租賃／運費請款',steelPrice:'中鋼盤價'};   // v6.0.138 客戶·廠商草稿   // v6.0.110 LINE 機器人草稿
 var _draftOn=false,_draftErrAt=0,_draftRefs=[],_draftHealing={};
 var _DRAFT_ID=/^[A-Za-z0-9_-]{4,40}$/;
 var _DRAFT_IMG=/^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+\/=]+$/;
@@ -39054,6 +39054,7 @@ function draftApply(id){
     },false);
     return;
   }
+  if(d.type==='inquiry'){toast('詢價收件請切到新選單，在今天頁的「詢價收件」卡確認');return;}   // v6.0.227 只做了拍板卡
   if(d.type==='rfqReply'){toast('廠商回價請切到新選單，在今天頁的「廠商回價」卡確認');return;}   // v6.0.227 只做了拍板卡
   if(d.type==='ownerCard'){   // v6.0.227 合約條件卡草稿：舊選單走原本的匯入對照表（逐欄打勾）
     var qc=Q.find(function(x){return x.id===pl.qid;});if(!qc){toast('找不到這張報價');return;}
@@ -41582,7 +41583,7 @@ function decAct(kind,id,act){
 //   確認／修改＝走原本的套用流程（draftApply：開報價編輯頁、得標視窗、發票紀錄、現場追加、客戶廠商表單），存檔成功才標已套用（_draftAppliedFor）；退回＝標 rejected。
 //   卡片只給建議，正式資料都要 Lotion 在下一個視窗按儲存／確定才寫入。
 var _DRAFT_OLD6=['quote','bid','irPhoto','addon','contact'];   // 施工日報 dailyLog 由主線做成帶工項數量的拍板卡（主線 11/10 協調），這裡不收
-function _draftViaDec6(t){try{return (_DRAFT_OLD6.indexOf(t)>=0||t==='ownerCard'||t==='rfqReply')&&_nav5On();}catch(e){return false;}}   // v6.0.227 合約條件卡也走拍板卡
+function _draftViaDec6(t){try{return (_DRAFT_OLD6.indexOf(t)>=0||t==='ownerCard'||t==='rfqReply'||t==='inquiry')&&_nav5On();}catch(e){return false;}}   // v6.0.227 合約條件卡也走拍板卡
 function _d6Pl(d){return (d&&d.payload&&typeof d.payload==='object')?d.payload:{};}
 function _d6Meta(d){var S=_draftS,who=S(d.byName||d.by).slice(0,60),cs=_draftCase(d),vn=_draftVerNote(d);
   return '<div style="font-size:11.5px;color:var(--b4);overflow-wrap:anywhere">'+esc(S(_DRAFT_T[d.type]||d.type))+'　'+esc(who)+'　'+esc(new Date(+d.at||0).toLocaleString('zh-TW'))+(cs?'　<b>'+esc(cs)+'</b>':'')+(vn?'　'+esc(vn):'')+'</div>';}
@@ -41699,6 +41700,62 @@ _decReg('rfqDraft',{
   ok:function(r){return _rfqdOk(r);},
   reject:function(r){var q=r.q;if(!q.rfqDSkip||typeof q.rfqDSkip!=='object')q.rfqDSkip={};q.rfqDSkip[r.kind]=Date.now();_touch(q);persist();return true;},
   edit:function(r){try{_rfqQid=r.q.id;_rfqTab='rfq';go('rfq');setTimeout(function(){try{rfqNew();}catch(e){_err('rfqDraft.edit',e);}},60);}catch(e){_err('rfqDraft.edit',e);}}
+});
+// ══════════ v6.0.227 詢價收件卡（陳軒 11/10 晚佇列第 1 件，盤點第 1 項；需求書 #1 詢價登錄）══════════
+// HQ 的 inquiry-intake 讀業主來信 → tools/fy-draft.js 傳草稿 type inquiry（雲端 inqClean）：來信摘要、圖說清單（連結）、缺的資料、索取訊息草稿、munger-bid-decision 結論（一句話＋三個風險）
+//   卡片：接／有條件接（寫條件）二選一＋確認＝建報價單殼（genQuoteCode 取報價編號、工程資訊帶入、q.inq 存來信摘要與連結，不存檔案）並複製索取訊息；
+//   退回＝不接（原因記在草稿）；修改＝改索取訊息文字。同業主同工程名稱已有報價就標紅（不擋）。
+var _INQ_IN={};
+function inqIn(did,k,v){(_INQ_IN[did]=_INQ_IN[did]||{})[k]=String(v==null?'':v).slice(0,500);}
+function _inqLinks(L){return (Array.isArray(L)?L:[]).map(function(x){var nm=esc(_draftS(x&&x.name)||_draftS(x&&x.url)),u=_draftS(x&&x.url);
+  return '<li style="overflow-wrap:anywhere">'+(/^https:\/\/[^\s"'<>]+$/i.test(u)?'<a href="'+esc(u)+'" target="_blank" rel="noopener noreferrer">'+nm+'</a>':nm)+(x&&x.note?' <span style="color:var(--b4)">'+esc(_draftS(x.note))+'</span>':'')+'</li>';}).join('');}
+function _inqDup(pl){var n=_draftS(pl.name).trim(),c=_draftS(pl.client).trim();return (Q||[]).filter(function(q){return q&&n&&String(q.name||'').trim()===n&&(!c||!q.client||String(q.client).trim()===c);});}
+function _inqAsk(d){var i=_INQ_IN[d.id]||{};return i.ask!=null?i.ask:_draftS(_d6Pl(d).ask);}
+function _inqDetail(d){
+  var pl=_d6Pl(d),i=_INQ_IN[d.id]||{},m=pl.munger&&typeof pl.munger==='object'?pl.munger:null,dup=_inqDup(pl),dec=i.dec||(m&&m.verdict==='有條件接'?'cond':'yes');
+  return (dup.length?'<div style="background:#ffebee;color:#b71c1c;border-radius:8px;padding:6px 9px;font-size:12px;margin:4px 0">已經有同名報價：'+dup.map(function(q){return esc(String(q.code||'')+' '+String(q.name||''));}).join('、')+'，請確認不是同一件</div>':'')
+    +_qTbl([['業主',_draftS(pl.client)],['工程',_draftS(pl.name)],['地點',_draftS(pl.loc)],['聯絡人',_draftS(pl.contact)],['電話',_draftS(pl.phone)],['Email',_draftS(pl.email)],['收到',_draftS(pl.recv)],['報價期限',_draftS(pl.due)],['來源',_draftS(pl.src)]].filter(function(x){return x[1];}))
+    +(m?'<div style="border:1px solid var(--b2);border-radius:8px;padding:6px 9px;margin-top:6px;font-size:12.5px"><b>接案判斷（建議）：<span style="color:'+(m.verdict==='不接'?'#b71c1c':m.verdict==='接'?'var(--g3)':'#b26a00')+'">'+esc(m.verdict)+'</span></b>'+(m.line?'　'+esc(_draftS(m.line)):'')
+      +((m.risks||[]).length?'<ol style="margin:4px 0 0;padding-left:20px">'+m.risks.map(function(t){return '<li>'+esc(_draftS(t))+'</li>';}).join('')+'</ol>':'')+'</div>':'')
+    +(pl.mail?'<div style="font-weight:700;font-size:12.5px;margin-top:6px">來信摘要</div><div style="white-space:pre-wrap;font-size:12.5px;overflow-wrap:anywhere">'+esc(_draftS(pl.mail))+'</div>':'')
+    +((pl.drawings||[]).length?'<div style="font-weight:700;font-size:12.5px;margin-top:6px">圖說（'+pl.drawings.length+'）</div><ol style="margin:2px 0;padding-left:20px;font-size:12px">'+_inqLinks(pl.drawings)+'</ol>':'')
+    +((pl.files||[]).length?'<div style="font-weight:700;font-size:12.5px;margin-top:6px">其他附件</div><ul style="margin:2px 0;padding-left:20px;font-size:12px">'+_inqLinks(pl.files)+'</ul>':'')
+    +((pl.missing||[]).length?'<div style="font-weight:700;font-size:12.5px;margin-top:6px;color:#b71c1c">缺的資料</div><ul style="margin:2px 0;padding-left:20px;font-size:12px;color:#b71c1c">'+pl.missing.map(function(t){return '<li>'+esc(_draftS(t))+'</li>';}).join('')+'</ul>':'')
+    +(_inqAsk(d)?'<div style="font-weight:700;font-size:12.5px;margin-top:6px">索取資料訊息（確認時一起複製）</div><div style="white-space:pre-wrap;font-size:12.5px;background:var(--gl);border-radius:6px;padding:6px 8px;overflow-wrap:anywhere">'+esc(_inqAsk(d))+'</div>':'')
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:12.5px;margin-top:8px"><b>決定</b>'
+    +[['yes','接'],['cond','有條件接']].map(function(o){return '<label style="display:inline-flex;gap:4px;align-items:center"><input type="radio" name="inq-'+esc(d.id)+'" value="'+o[0]+'"'+(dec===o[0]?' checked':'')+' onchange="inqIn(\''+esc(d.id)+'\',\'dec\',this.value)">'+o[1]+'</label>';}).join('')
+    +'<span style="color:var(--b4)">不接＝按退回</span></div>'
+    +'<input placeholder="有條件接：條件（例：工期延到 60 天、不含夜間）" value="'+esc(i.cond||'')+'" oninput="inqIn(\''+esc(d.id)+'\',\'cond\',this.value)" style="width:100%;box-sizing:border-box;margin-top:6px;padding:6px 8px;border:1px solid var(--b2);border-radius:6px;font-size:13px">'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">確認＝建報價單殼（取報價編號、帶入工程資訊與來信摘要），之後在報價頁填工項。</div>';
+}
+function _inqOk(d){
+  var x=DRAFTS[d.id];if(!x||x.status!=='pending'){toast('這張草稿已經處理過了');return false;}
+  if(!_decIsAdmin()){toast('只有管理員可以建報價');return false;}
+  var pl=_d6Pl(x),i=_INQ_IN[x.id]||{},dec=i.dec||(pl.munger&&pl.munger.verdict==='有條件接'?'cond':'yes'),cond=String(i.cond||'').trim();
+  if(dec==='cond'&&!cond){toast('有條件接要寫條件');return false;}
+  var nm=_draftS(pl.name).trim();if(!nm){toast('沒有工程名稱，請退回');return false;}
+  var id=Date.now().toString(),code=genQuoteCode();try{if(_qCodeTaken(code,id)){var nc=_qCodeNextFree(code,id);if(nc)code=nc;}}catch(e){_err('_inqOk.code',e);}
+  var ask=_inqAsk(x);
+  return Promise.resolve(_draftMark(x.id,'applied',{resultId:id,dec:dec,cond:cond})).then(function(mk){if(mk===false){toast('草稿標記沒成功，沒有建報價');return false;}
+    try{
+      var q={id:id,code:code,date:localToday(),client:_draftS(pl.client).slice(0,100),name:nm.slice(0,120),loc:_draftS(pl.loc).slice(0,120),contact:_draftS(pl.contact).slice(0,40),phone:_draftS(pl.phone).slice(0,40),
+        items:[],exs:[],rmk:{},costs:[],t:{sub:0,tax:0,total:0},awarded:false,bidStatus:'',ver:1,
+        inq:{draft:x.id,at:Date.now(),by:_meEmail()||'本機',dec:dec,cond:cond,recv:_draftS(pl.recv),due:_draftS(pl.due),email:_draftS(pl.email),mail:_draftS(pl.mail).slice(0,2000),drawings:pl.drawings||[],files:pl.files||[],missing:pl.missing||[],munger:pl.munger||null,src:_draftS(pl.src)},_by:_meEmail()};
+      _touch(q);Q.unshift(q);persist();try{renderList();updateQuoteStats();}catch(e){_err('_inqOk.list',e);}
+      if(ask){try{if(navigator.clipboard)navigator.clipboard.writeText(ask).catch(function(e){_err('_inqOk.copy',e);});}catch(e){_err('_inqOk.copy',e);}}
+      delete _INQ_IN[x.id];toast('已建報價 '+code+(ask?'，索取資料訊息已複製':''));return true;
+    }catch(e){_err('_inqOk',e);_draftMark(x.id,'pending',{resultId:null});toast('建報價失敗，草稿改回待確認');return false;}});
+}
+_decReg('drf_inquiry',{
+  title:'詢價收件',todo:function(n){return '詢價收件 '+n+' 件待決定';},sub:'接／有條件接＝建報價單殼並複製索取資料訊息；不接＝退回',
+  canSee:function(){return !_isReaderUser&&_nav5On()&&_decIsAdmin();},
+  list:function(){return Object.keys(DRAFTS||{}).map(function(k){return DRAFTS[k];}).filter(function(d){return d&&d.type==='inquiry'&&d.status==='pending'&&_DRAFT_ID.test(_draftS(d.id));}).sort(function(a,b){return (a.at||0)-(b.at||0);});},
+  key:function(d){return d.id;},head:function(d){return _draftS(d.summary).slice(0,200);},
+  body:function(d){return _d6Meta(d);},
+  detail:function(d){return _inqDetail(d);},
+  ok:function(d){return _inqOk(d);},
+  reject:function(d,why){return _draftMark(d.id,'rejected',{reason:why||'',dec:'no'}).then(function(m){return m!==false;});},
+  edit:function(d){_modal('修改索取資料訊息','<textarea id="inq-ask" style="width:100%;min-height:160px;font-size:13px;font-family:inherit">'+esc(_inqAsk(d))+'</textarea>',function(){inqIn(d.id,'ask',String((document.getElementById('inq-ask')||{}).value||'').trim());try{_decRefresh('drf_inquiry');}catch(e){_err('inquiry.edit',e);}});}
 });
 // ══════════ v6.0.227 廠商回價卡＋比價卡（陳軒 11/10 新佇列第 5 件；第 2 層：卡片只給建議）══════════
 // ① rfqReply（草稿）：AI 讀廠商回傳的報價（照片／PDF）用 tools/fy-draft.js 上傳（雲端 replyClean 只對報價工項；詢價單在 private，這裡再對詢價單號 rno）

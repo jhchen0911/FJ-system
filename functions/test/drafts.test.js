@@ -142,3 +142,15 @@ test('v6.0.227 廠商回價 rfqReply：對報價工項（idx 或說明一段）�
   assert.match(D.build(Object.assign({}, b0, { body: { type: 'rfqReply', payload: { qid: 'q1', vendor: { name: 'x' }, prices: [{ idx: 0, price: 1 }] } } })).err, /還沒得標/);
   assert.match(D.build(Object.assign({}, b0, { body: { type: 'rfqReply', payload: { qid: 'q5', vendor: { name: 'x' }, prices: [{ idx: 9, price: 1 }] } } })).err, /不在這張報價/);
 });
+
+test('v6.0.227 詢價收件 inquiry：要工程名稱、來信或圖說；附件只收 https 連結；munger 結論白名單、風險最多 3 個', () => {
+  const r = D.build(Object.assign({}, base, { body: { type: 'inquiry', payload: { name: '假詢價案', client: '假營造', mail: '請報擋土支撐', drawings: [{ name: 'A1 平面圖', url: 'https://example.com/a1.pdf' }, { name: 'S2', url: 'javascript:alert(1)' }, 'S3 斷面圖'],
+    missing: ['地質報告'], ask: '麻煩補地質報告', munger: { verdict: '有條件接', line: '工期太趕', risks: ['a', 'b', 'c', 'd'] } } } }));
+  assert.ok(r.rec, r.err);
+  assert.deepStrictEqual(r.rec.payload.drawings, [{ name: 'A1 平面圖', url: 'https://example.com/a1.pdf' }, { name: 'S2' }, { name: 'S3 斷面圖' }]);
+  assert.strictEqual(r.rec.payload.munger.risks.length, 3);
+  assert.match(r.rec.summary, /詢價：假營造／假詢價案（建議有條件接）/);
+  assert.match(D.build(Object.assign({}, base, { body: { type: 'inquiry', payload: { mail: 'x' } } })).err, /工程名稱/);
+  assert.match(D.build(Object.assign({}, base, { body: { type: 'inquiry', payload: { name: 'x' } } })).err, /至少要有/);
+  assert.match(D.build(Object.assign({}, base, { body: { type: 'inquiry', payload: { name: 'x', mail: 'y', munger: { verdict: '好' } } } })).err, /只能是/);
+});

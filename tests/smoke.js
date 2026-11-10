@@ -13347,6 +13347,41 @@ async function newPage(browser, width, height) {
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.227 詢價收件卡（陳軒 11/10 晚佇列第 1 件）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keep = { Q: Q, D: DRAFTS };
+      try {
+        localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_v7old');
+        window.toast = () => {};
+        window._draftMark = (id, st, ex) => { if (DRAFTS[id]) { DRAFTS[id].status = st; DRAFTS[id].ex = ex; } return Promise.resolve(true); };
+        Q = [{ id: 'qI0', code: 'I00', name: '範例舊案', client: '範例營造甲', items: [], _mt: 1 }];
+        const D = (id, pl) => ({ id, type: 'inquiry', by: 'ai@example.com', byName: 'AI', at: Date.now() - 1000, status: 'pending', summary: '詢價：' + pl.name, payload: pl });
+        DRAFTS = {
+          dInq001: D('dInq001', { name: '範例新詢價', client: '範例營造甲', loc: '範例市', contact: '範例李先生', phone: '02-0000-1111', mail: '請報價擋土支撐，下週五前回覆', drawings: [{ name: 'A1 平面圖', url: 'https://example.com/a1.pdf' }, { name: 'S2 斷面圖' }], missing: ['地質鑽探報告'], ask: '李先生好，麻煩補地質鑽探報告，謝謝', munger: { verdict: '有條件接', line: '工期偏緊', risks: ['工期 30 天', '鄰房老舊', '付款 120 天票'] } }),
+          dInq002: D('dInq002', { name: '範例舊案', client: '範例營造甲', mail: '再報一次' }),
+        };
+        const items = []; _v6TodoItems(items);
+        out.card = items.some((x) => x.type === 'dec_drf_inquiry') && !_draftPending().some((d) => d.type === 'inquiry');
+        const x = document.createElement('div'); x.innerHTML = _DEC.drf_inquiry.detail(DRAFTS.dInq001); const t = x.textContent;
+        out.detail = /範例新詢價/.test(t) && /有條件接/.test(t) && /鄰房老舊/.test(t) && /地質鑽探報告/.test(t) && /A1 平面圖/.test(t) && !!x.querySelector('a[href="https://example.com/a1.pdf"][rel~="noopener"]') && /麻煩補地質鑽探報告/.test(t) && x.querySelectorAll('input[type=radio]').length === 2;
+        const y = document.createElement('div'); y.innerHTML = _DEC.drf_inquiry.detail(DRAFTS.dInq002); out.dup = /已經有同名報價/.test(y.textContent);
+        // 有條件接沒寫條件 → 不建
+        out.needCond = (await Promise.resolve(_DEC.drf_inquiry.ok(DRAFTS.dInq001))) === false && Q.length === 1;
+        inqIn('dInq001', 'cond', '工期延到 45 天');
+        const ok = await Promise.resolve(_DEC.drf_inquiry.ok(DRAFTS.dInq001)); const q = Q[0];
+        out.ok = ok === true && Q.length === 2 && q.name === '範例新詢價' && q.client === '範例營造甲' && /^\d{9,}$/.test(q.code) && q.items.length === 0 && q.inq.dec === 'cond' && q.inq.cond === '工期延到 45 天' && q.inq.drawings.length === 2 && DRAFTS.dInq001.status === 'applied' && DRAFTS.dInq001.ex.resultId === q.id;
+        out.rej = (await _DEC.drf_inquiry.reject(DRAFTS.dInq002, '量太小')) === true && DRAFTS.dInq002.status === 'rejected' && DRAFTS.dInq002.ex.dec === 'no';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keep.Q; DRAFTS = keep.D;
+      return out;
+    });
+    check('v6.0.227 詢價收件卡：今天頁出卡；明細有來信摘要、圖說連結、缺的資料、索取訊息、接案判斷（一句話＋三個風險）；同名報價標紅；有條件接要寫條件；確認建報價單殼取編號；退回＝不接', !r.err && r.card && r.detail && r.dup && r.needCond && r.ok && r.rej, JSON.stringify(r));
+    check('v6.0.227 詢價收件卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.227 發包詢價單草稿卡（陳軒 11/10 新佇列第 4 件）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

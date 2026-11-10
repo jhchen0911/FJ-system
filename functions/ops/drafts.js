@@ -4,7 +4,7 @@
 const FJC = require('../calc/qdraft.js');
 const D = FJC.qd;
 
-const TYPES = { qchg: 1, quote: 1, bid: 1, ownerCard: 1, rfqReply: 1 };   // v6.0.227 ownerCard＝合約條件卡（contract-check 產出的 fj-contract-card/1）
+const TYPES = { qchg: 1, quote: 1, bid: 1, ownerCard: 1, rfqReply: 1, inquiry: 1 };   // v6.0.227 ownerCard＝合約條件卡（contract-check 產出的 fj-contract-card/1）
 const MAX_PENDING = 50;   // 每個送件人同時待確認的上限   // 只開這三種；其他草稿照舊從網頁送
 const BID_TO = { awarded: '得標', '': '待回覆', nego: '議價中', lost: '未得標', void: '流標' };
 const LOST = ['價格過高', '規格不符', '工期不符', '業主關係', '未回應', '其他'];
@@ -54,6 +54,26 @@ function aimClean(x) {
   if (f == null && t == null) return { aim: null };
   if (f != null && t != null && f > t) return { err: '底價不能高於目標成交價' };
   const o = {}; if (f != null) o.floor = f; if (t != null) o.target = t; return { aim: o };
+}
+// 詢價收件（inquiry）：HQ inquiry-intake 讀業主來信 → 摘要、圖說清單、缺的資料、索取訊息草稿；有 munger-bid-decision 結論就附（一句話＋三個風險）
+//   附件只存連結（https），不存檔案
+const INQ_V = ['接', '有條件接', '不接'];
+function linkList(x, n) { return arr(x).slice(0, n).map((d) => (typeof d === 'string' ? { name: d } : d)).filter((d) => d && typeof d === 'object').map((d) => { const o = { name: S(d.name, 120).trim() }; const u = S(d.url, 500).trim(); if (/^https:\/\/[^\s"'<>]+$/i.test(u)) o.url = u; const nt = S(d.note, 120).trim(); if (nt) o.note = nt; return o; }).filter((d) => d.name || d.url); }
+function inqClean(pl) {
+  const name = S(pl.name, 120).trim(); if (!name) return { err: '要填工程名稱（name）' };
+  const p = { name, client: S(pl.client, 100).trim(), loc: S(pl.loc, 120).trim(), contact: S(pl.contact, 40).trim(), phone: S(pl.phone, 40).trim(), email: S(pl.email, 100).trim(),
+    recv: /^\d{4}-\d{2}-\d{2}$/.test(S(pl.recv, 10)) ? S(pl.recv, 10) : '', due: /^\d{4}-\d{2}-\d{2}$/.test(S(pl.due, 10)) ? S(pl.due, 10) : '',
+    mail: S(pl.mail, 2000).trim(), drawings: linkList(pl.drawings, 50), files: linkList(pl.files, 30),
+    missing: arr(pl.missing).slice(0, 30).filter((t) => typeof t === 'string').map((t) => S(t, 200).trim()).filter(Boolean),
+    ask: S(pl.ask, 1500).trim(), src: S(pl.src, 200).trim() };
+  if (!p.mail && !p.drawings.length) return { err: '至少要有來信摘要（mail）或圖說清單（drawings）' };
+  if (pl.munger != null) {
+    const m = (typeof pl.munger === 'object') ? pl.munger : {};
+    const v = S(m.verdict, 10).trim(); if (INQ_V.indexOf(v) < 0) return { err: 'munger.verdict 只能是：接／有條件接／不接' };
+    const risks = arr(m.risks).filter((t) => typeof t === 'string').map((t) => S(t, 200).trim()).filter(Boolean).slice(0, 3);
+    p.munger = { verdict: v, line: S(m.line, 200).trim(), risks };
+  }
+  return { p };
 }
 // v6.0.227 廠商回價（rfqReply）：AI 讀廠商回傳的報價（照片／PDF）→ 草稿。詢價單在 private（這裡讀不到），只對報價工項；詢價單號 rno 由 FJ 端再對。
 //   prices：[{idx 或 match（工項說明第一行的一段）, price（未稅單價）}]；lump：{total, idxs 或 match[]}（一式）；extras：[{name, amt}]（豐有要提供的材料／隱藏成本）；diffs：範圍差異文字
@@ -116,7 +136,7 @@ function build(o) {
   const { email, name, body, quotes, taxR, now, id } = o, rp = o.rmkParams || {};
   const b = (body && typeof body === 'object') ? body : {};
   const type = S(b.type, 20), pl = (b.payload && typeof b.payload === 'object') ? b.payload : {};
-  if (!TYPES[type]) return { err: '這個工具只收 qchg（改單）、quote（報價單）、bid（得標狀態）、ownerCard（合約條件卡）、rfqReply（廠商回價）；其他草稿請從網頁送' };
+  if (!TYPES[type]) return { err: '這個工具只收 qchg（改單）、quote（報價單）、bid（得標狀態）、ownerCard（合約條件卡）、rfqReply（廠商回價）、inquiry（詢價收件）；其他草稿請從網頁送' };
   if (!ID_RE.test(String(id || ''))) return { err: '草稿 id 不對' };
   let payload, summary;
   if (type === 'qchg') {
@@ -151,6 +171,10 @@ function build(o) {
     payload = { base, baseMt: bq ? (bq._mt || 0) : 0, baseName: bq ? S(bq.name, 200) : '', fields };
     const am = aimClean(pl.aim); if (am.err) return { err: am.err }; if (am.aim) payload.aim = am.aim;
     summary = (base ? '修改：' : '新報價：') + S(fields.name, 80) + '／' + S(fields.client, 60) + '　合計 NT$ ' + fmt(t.total);
+  } else if (type === 'inquiry') {
+    const ic = inqClean(pl); if (ic.err) return { err: ic.err };
+    payload = ic.p;
+    summary = S(b.summary, 140).trim() || ('詢價：' + (ic.p.client || '（業主未知）') + '／' + ic.p.name + (ic.p.munger ? '（建議' + ic.p.munger.verdict + '）' : ''));
   } else if (type === 'rfqReply') {
     const f = findQuote(quotes, { qid: S(pl.qid, 80), code: S(pl.code, 60) }); if (f.err) return { err: f.err };
     const q = f.q; if (!q) return { err: '找不到這張報價（qid 或 code）' };
@@ -210,4 +234,4 @@ function bidStats(quotes, contracts, params, quoteSens) {
   const opt = { minN: parseInt(t.minN) || 5, tune: { lo: t.lo != null ? +t.lo : 40, hi: t.hi != null ? +t.hi : 60, maxDown: t.maxDown != null ? +t.maxDown : 10, maxUp: t.maxUp != null ? +t.maxUp : 5 } };
   return { n: rows.length, minN: opt.minN, kinds: BID.exportRows(BID.stats(rows, opt)) };
 }
-module.exports = { replyClean, cardClean, bidStats, aimClean, rmkBaseFor, TYPES, MAX_PENDING, build, superseded, withdrawErr, mine, expectOk, findQuote };
+module.exports = { inqClean, replyClean, cardClean, bidStats, aimClean, rmkBaseFor, TYPES, MAX_PENDING, build, superseded, withdrawErr, mine, expectOk, findQuote };
