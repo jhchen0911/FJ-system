@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.207';
+var APP_VERSION='v6.0.210';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -34203,6 +34203,7 @@ function pjCloseAll(qid){
     if(willSettle){try{_settleContractDo(ct.id,orig,billed,ret);}catch(e){_err('pjCloseAll.settle',e);}}
     q.closed=true;q.closedAt=Date.now();_touch(q);
     var n=0;try{n=writeCostHist(q.id);}catch(e){_err('pjCloseAll.hist',e);}
+    try{_mhWrite(q);}catch(e){_err('pjCloseAll.matHist',e);}   // v6.0.210 M7 結案實績（租期、損耗、趟數）
     try{logActivity('專案','結案：'+(q.name||''));}catch(e){_err('pjCloseAll',e);}
     try{_introSync(q);}catch(e){_err('pjCloseAll.intro',e);}
     try{persist();_immediateUpload();}catch(e){_err('pjCloseAll',e);}
@@ -43084,6 +43085,130 @@ _decReg('mvStartUnknown',{
   reject:function(e,why){_mvTagSet(e.qid,e.rt,{keep:1,why:String(why||'不用提醒').slice(0,200)});return true;},
   edit:function(e){var q=(Q||[]).find(function(x){return x&&x.id===e.qid;});var L=q?_m6Items(q):[];if(!L.length){toast('這案沒有工項可以指定');return;}e=Object.assign({},e,{items:L.map(function(o){return {key:o.key,label:String(o.it.desc||'').split('\n')[0].slice(0,40)};})});_mvItemPick(e);}
 });
+// ══════════ v6.0.210 進退料 M7（小批次線）：結案實績回寫＋每月租料閒置浪費（Lotion 11/10 三題照建議 A A B）══════════
+// ① 結案實績 MAT_HIST[報價 id]（private：fydata/private/matHist/<id>，本機 fy_mathist）：結案（pjCloseAll）寫一份；管理員裝置開頁時補寫已結案還沒有的（冪等，內容沒變不重寫）。
+//    內容：工地縣市、每張租料單實際租期（M 數加權）與每 M 每天租金、各料損耗率（短少＋損壞÷進場）、趟數（平板／吊板）、吊車次數；
+//    每趟運費、吊車費（第 1 題 A）：等主線 M6 核對運輸請款時把金額填進每一趟（MAT_MOVE_FIN[進退料 id].fare／.crane），有資料就自動算進來，現在是 null。
+// ② 單價庫比對（第 2 題 A）：只記實際值；同一個單價庫欄位（H 型鋼／鋼軌樁／鋼板樁／支撐租金）累計實績跟單價庫差 5% 以上 → 首頁拍板卡 mhUpa：
+//    確認＝把單價庫改成實績平均、退回＝這次不改（實績再變才再問）、修改＝自己填。單價庫不會自動改。
+// ③ 每月租料閒置浪費（第 3 題 B）：管理員裝置開 FJ 時算這個月與上個月 → fydata/private/matIdleMonth/<YYYY-MM>（內容沒變不傳）；
+//    跟退料提醒同一套起算（拔除完成日，_mvIdleOf 的判斷），但已退場的批次也算到退場日（退料提醒只看還在場的）。畫面在第 7 步。
+var MAT_HIST={};try{MAT_HIST=JSON.parse(localStorage.getItem('fy_mathist')||'{}')||{};}catch(e){_err('matHist.load',e);MAT_HIST={};}
+var MAT_IDLE_MONTH={};try{MAT_IDLE_MONTH=JSON.parse(localStorage.getItem('fy_matidlemonth')||'{}')||{};}catch(e){_err('matIdleMonth.load',e);MAT_IDLE_MONTH={};}
+var _MH_V=1,_MH_DIFF=0.05;
+function _mhCounty(loc){var m=String(loc||'').replace(/台/g,'臺').match(/([一-龥]{2}[縣市])/);return m?m[1]:'';}
+function _mhCloud(){return !!(typeof _fbDb!=='undefined'&&_fbDb&&typeof _fbUser!=='undefined'&&_fbUser&&!_isReaderUser&&_isAdminUser&&!window.FY_BETA);}
+// 拔除完成日（閒置浪費的起算）：跟 _mvIdleOf 同一套（指定工項／租料單工項 → 那個工項拔除完成；對不到就看這一類工項全部拔完）。主線改 _mvIdleOf 的起算要同步改這裡
+function _mvIdleStartOf(q,rt){
+  var tag=_mvTagOf(q.id,rt.id),kind=_mvRentKind(q,rt,tag);if(!kind)return '';
+  var key=(tag&&tag.item)||rt.item||'',o=key?_m6ItemBy(q,key):null,piles=_mvPileItems(q,kind);
+  if(!o&&piles.length===1)o=piles[0];
+  if(o)return _mvItemDone(o)||'';
+  if(!piles.length)return '';
+  var ds=piles.map(_mvItemDone);return ds.every(Boolean)?ds.sort().slice(-1)[0]:'';
+}
+// 單價庫對應欄位（只做有租金欄的：H 型鋼樁／中間樁＝hsteel、支撐＝strut、鋼軌樁＝rail（$/支/天，依長度）、鋼板樁＝sheetpile（依長度））
+function _mhLenKey(obj,len){var ks=Object.keys(obj||{}).map(Number).filter(function(x){return !isNaN(x);}).sort(function(a,b){return a-b;});if(!ks.length)return null;var l=parseFloat(len)||0,f=ks[0];ks.forEach(function(k){if(k<=l+1e-6)f=k;});return String(f);}
+function _mhUpaRef(rt,kind){
+  var t=String((rt.name||'')+' '+(rt.spec||'')),len=parseFloat(rt.len)||0,db=UPA_COST_DB||{};
+  if(/鋼軌/.test(t)){var k=_mhLenKey(db.rail&&db.rail.rent,len);if(k==null||!(len>0))return null;return {key:'rail.rent.'+k,path:['rail','rent',k],label:'鋼軌樁 '+k+'M 租金',unit:'$/支/天',conv:function(pmd){return pmd*len;}};}
+  if(/鋼板樁|SP-?I/i.test(t)){var sp=/IV|Ⅳ/i.test(t)?'SP-IV':(/III|Ⅲ/i.test(t)?'SP-III':'');if(!sp||!db.sheetpile||!db.sheetpile[sp])return null;var k2=_mhLenKey(db.sheetpile[sp].rent,len);if(k2==null)return null;return {key:'sheetpile.'+sp+'.rent.'+k2,path:['sheetpile',sp,'rent',k2],label:'鋼板樁 '+sp+' '+k2+'M 租金',unit:'$/M/天',conv:function(pmd){return pmd;}};}
+  var h=t.match(/H\s*[型形]?\s*鋼?\s*(300|350|400|428)/i)||t.match(/H(300|350|400|428)/i);if(!h)return null;
+  if(kind==='strut'){var sk='h'+h[1];if(!db.strut||!db.strut.rent||db.strut.rent[sk]==null)return null;return {key:'strut.rent.'+sk,path:['strut','rent',sk],label:'支撐 H'+h[1]+' 租金',unit:'$/M/天',conv:function(pmd){return pmd;}};}
+  if(kind==='deck')return null;
+  var hk='H'+h[1];if(!db.hsteel||!db.hsteel[hk])return null;return {key:'hsteel.'+hk+'.rent',path:['hsteel',hk,'rent'],label:'H 型鋼 '+hk+' 租金',unit:'$/M/天',conv:function(pmd){return pmd;}};
+}
+function _mhGet(path){var o=UPA_COST_DB;for(var i=0;i<path.length;i++){if(o==null)return null;o=o[path[i]];}return o==null?null:(parseFloat(o)||0);}
+// 一案的結案實績
+function _mhBuild(q){
+  var today=localToday(),asOf=q.closedAt?_ymd(q.closedAt):today,m=(q.mat&&typeof q.mat==='object')?q.mat:{},rents=[];
+  (Array.isArray(m.rents)?m.rents:[]).forEach(function(rt){if(!rt)return;
+    var a=FJC.mv.rentActual(rt.batches,asOf);if(!(a.m>0))return;
+    var kind='';try{kind=_mvRentKind(q,rt,_mvTagOf(q.id,rt.id))||'';}catch(e){_err('_mhBuild.kind',e);}
+    var pmd=FJC.mv.perMDay(rt.rate,'M月')   /* 租料單 rate 一律是每 M 每月（mode 只管未滿月怎麼算） */,ref=_mhUpaRef(rt,kind);
+    rents.push({rt:rt.id,vendor:rt.vendor||'',label:_matLabel(rt),kind:kind,m:a.m,avgDays:a.avgDays,mDays:a.mDays,open:a.open,planDays:(rt.pf&&rt.pt)?FJC.mv.days(rt.pf,rt.pt):0,rate:parseFloat(rt.rate)||0,pmd:pmd==null?null:Math.round(pmd*1000)/1000,upaKey:ref?ref.key:'',upaVal:ref&&pmd!=null?Math.round(ref.conv(pmd)*100)/100:null});});
+  var mvs=(MAT_MOVES||[]).filter(function(x){return x&&x.st==='ok'&&(x.qid===q.id||x.toQid===q.id||x.fromQid===q.id);});
+  var fare=null,crane=null;mvs.forEach(function(x){var f=_mvFin(x.id);if(!f)return;if(parseFloat(f.fare)>0)fare=(fare||0)+Math.round(parseFloat(f.fare));if(parseFloat(f.crane)>0)crane=(crane||0)+Math.round(parseFloat(f.crane));});
+  var byTruck={};mvs.forEach(function(x){var k=x.truckType||'';if(k)byTruck[k]=(byTruck[k]||0)+1;});
+  var trips=0;try{trips=FJC.mv.trips(mvs);}catch(e){_err('_mhBuild.trips',e);trips=mvs.length;}
+  return {v:_MH_V,qid:q.id,name:q.name||'',county:_mhCounty(q.loc),closedAt:q.closedAt||0,rents:rents,loss:FJC.mv.lossOf(MAT_MOVES||[],q.id),
+    trips:typeof trips==='number'?trips:mvs.length,byTruck:byTruck,lift:mvs.filter(function(x){return !!x.lift;}).length,fare:fare,crane:crane};
+}
+function _mhSig(r){var c=JSON.parse(JSON.stringify(r||{}));delete c.at;return _collHash([c]);}
+function _mhSave(){try{localStorage.setItem('fy_mathist',JSON.stringify(MAT_HIST));}catch(e){_err('_mhSave',e);}}
+function _mhWrite(q){
+  if(!q||!q.closed)return false;var r=_mhBuild(q),old=MAT_HIST[q.id];
+  if(old&&_mhSig(old)===_mhSig(r))return false;
+  r.at=Date.now();MAT_HIST[q.id]=r;_mhSave();
+  if(_mhCloud()){try{_fbDb.ref('fydata/private/matHist/'+_fbEncKey(q.id)).set(JSON.parse(JSON.stringify(r))).catch(function(e){_err('_mhWrite.cloud',e);});}catch(e){_err('_mhWrite.cloud',e);}}
+  return true;
+}
+// 管理員裝置：已結案的案子補寫（結案後 90 天內內容變了也重寫：補退料、補請款）
+function _mhBackfill(){var n=0,now=Date.now();(Q||[]).forEach(function(q){if(!q||!q.closed||q.parentId)return;var old=MAT_HIST[q.id];if(old&&old.v===_MH_V&&now-(+q.closedAt||0)>90*86400000)return;try{if(_mhWrite(q))n++;}catch(e){_err('_mhBackfill',e);}});return n;}
+function _mhPull(cb){if(!_mhCloud()){if(cb)cb();return;}_fbDb.ref('fydata/private/matHist').once('value').then(function(s){var v=s.val()||{};Object.keys(v).forEach(function(k){var r=v[k];if(r&&r.qid&&(!MAT_HIST[r.qid]||(+r.at||0)>(+MAT_HIST[r.qid].at||0)))MAT_HIST[r.qid]=r;});_mhSave();if(cb)cb();}).catch(function(e){_err('_mhPull',e);if(cb)cb();});}
+// 單價庫比對：同一個單價庫欄位的實績（依 M 數加權平均）
+function _mhUpaCmp(){
+  var G={};Object.keys(MAT_HIST).forEach(function(id){var r=MAT_HIST[id];if(!r||!Array.isArray(r.rents))return;r.rents.forEach(function(x){if(!x||!x.upaKey||x.upaVal==null||!(x.m>0))return;var g=G[x.upaKey]||(G[x.upaKey]={key:x.upaKey,w:0,s:0,rows:[]});g.w+=x.m;g.s+=x.upaVal*x.m;g.rows.push({qid:r.qid,name:r.name,label:x.label,vendor:x.vendor,m:x.m,val:x.upaVal,avgDays:x.avgDays});});});
+  var skip=(P&&P.mhSkip&&typeof P.mhSkip==='object')?P.mhSkip:{},out=[];
+  Object.keys(G).sort().forEach(function(k){var g=G[k],path=k.split('.'),cur=_mhGet(path),act=Math.round(g.s/g.w*100)/100,n=g.rows.length;
+    var ok=cur!=null&&cur>0?Math.abs(act-cur)/cur>=_MH_DIFF:act>0;if(!ok)return;
+    if(skip[k]!=null&&Math.abs((parseFloat(skip[k])||0)-act)<0.005)return;   // 退回過、實績沒變 → 不再問
+    out.push({key:k,path:path,label:_mhKeyLabel(k),cur:cur,act:act,n:n,m:Math.round(g.w*100)/100,rows:g.rows});});
+  return out;
+}
+function _mhKeyLabel(k){var p=k.split('.');if(p[0]==='hsteel')return 'H 型鋼 '+p[1]+' 租金（$/M/天）';if(p[0]==='strut')return '支撐 '+String(p[2]||'').toUpperCase()+' 租金（$/M/天）';if(p[0]==='rail')return '鋼軌樁 '+p[2]+'M 租金（$/支/天）';if(p[0]==='sheetpile')return '鋼板樁 '+p[1]+' '+p[3]+'M 租金（$/M/天）';return k;}
+// 實績統計（M8 與報價參考）：各種料的平均實際租期、損耗率
+function _mhStats(){
+  var R={},L={};Object.keys(MAT_HIST).forEach(function(id){var r=MAT_HIST[id];if(!r)return;
+    (r.rents||[]).forEach(function(x){var k=x.label;var o=R[k]||(R[k]={label:k,n:0,m:0,mDays:0});o.n++;o.m+=x.m;o.mDays+=x.mDays;});
+    (r.loss||[]).forEach(function(x){var k=[x.name,x.spec,x.len].join('|');var o=L[k]||(L[k]={key:k,name:x.name,spec:x.spec,len:x.len,n:0,inQty:0,lost:0});o.n++;o.inQty+=x.inQty;o.lost+=x.short+x.dmg;});});
+  return {rent:Object.keys(R).sort().map(function(k){var o=R[k];return {label:o.label,n:o.n,m:Math.round(o.m*100)/100,avgDays:o.m>0?Math.round(o.mDays/o.m):0};}),
+    loss:Object.keys(L).sort().map(function(k){var o=L[k];return {key:o.key,name:o.name,spec:o.spec,len:o.len,n:o.n,inQty:Math.round(o.inQty*100)/100,rate:o.inQty>0?Math.round(o.lost/o.inQty*1000)/10:null};})};
+}
+function _mhUpaSet(path,v){var o=UPA_COST_DB;for(var i=0;i<path.length-1;i++){if(o[path[i]]==null||typeof o[path[i]]!=='object')return false;o=o[path[i]];}o[path[path.length-1]]=v;try{localStorage.setItem('fy_upa_cost',JSON.stringify(UPA_COST_DB));}catch(e){_err('_mhUpaSet',e);}try{_onSave();}catch(e){_err('_mhUpaSet.save',e);}return true;}
+function _mhCmpDetail(x){
+  var rows=(x.rows||[]).map(function(r){return '<tr><td>'+esc(r.name||'')+'</td><td>'+esc(r.label||'')+'</td><td>'+esc(r.vendor||'')+'</td><td style="text-align:right">'+fmt(r.m)+'</td><td style="text-align:right">'+esc(String(r.avgDays))+' 天</td><td style="text-align:right">'+esc(String(r.val))+'</td></tr>';}).join('');
+  return '<div style="font-size:12.5px;margin-bottom:6px">單價庫 <b>'+esc(_mhKeyLabel(x.key))+'</b>：現在 <b>'+esc(String(x.cur==null?'—':x.cur))+'</b>，結案實績平均（依 M 數加權）<b>'+esc(String(x.act))+'</b>（'+x.n+' 筆、'+fmt(x.m)+' M）</div>'
+    +'<table class="tbl" style="width:100%;font-size:12px"><thead><tr><th>工程</th><th>料</th><th>租賃商</th><th>M 數</th><th>實際租期</th><th>換算單價</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-top:6px">確認＝單價庫改成 '+esc(String(x.act))+'；退回＝這次不改（實績再變才再問）；修改＝自己填一個數字。單價庫只在這裡按確認才改。</div>';
+}
+_decReg('mhUpa',{
+  title:'單價庫跟結案實績不一樣',todo:function(n){return '單價庫租金跟結案實績差 5% 以上：'+n+' 項（M7）';},sub:'結案回寫：只記實績，要不要更新單價庫由你決定',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},
+  list:_mhUpaCmp,key:function(x){return x.key;},
+  head:function(x){return _mhKeyLabel(x.key);},
+  fields:function(x){return [{label:'單價庫現在',value:String(x.cur==null?'—':x.cur),money:true},{label:'結案實績平均',value:String(x.act)+'（'+x.n+' 筆）',money:true}];},
+  detail:_mhCmpDetail,
+  ok:function(x){var ok=_mhUpaSet(x.path,x.act);if(ok)toast('單價庫已更新：'+_mhKeyLabel(x.key)+' → '+x.act);return ok;},
+  reject:function(x){P.mhSkip=Object.assign({},P.mhSkip||{});P.mhSkip[x.key]=x.act;_salesSave();return true;   /* 存參數＋同步（同業務名冊的存法） */},
+  edit:function(x){
+    _modal('單價庫：'+_mhKeyLabel(x.key),'<div class="f"><label>新的單價</label><input id="mh-v" type="number" step="0.01" inputmode="decimal" value="'+esc(String(x.act))+'" style="width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);text-align:right"></div>',function(){
+      var v=parseFloat((document.getElementById('mh-v')||{}).value);if(!(v>0)){toast('請填大於 0 的數字');return false;}
+      _mhUpaSet(x.path,Math.round(v*100)/100);toast('單價庫已更新');_decRefresh('mhUpa');});
+  }
+});
+// ── 每月租料閒置浪費（後端算、畫面第 7 步）──
+function _mvIdleMonth(ym,asOf){
+  asOf=asOf||localToday();var rows=[],tot=0;
+  (Q||[]).forEach(function(q){if(!q||!q.mat)return;(Array.isArray(q.mat.rents)?q.mat.rents:[]).forEach(function(rt){if(!rt)return;
+    try{var tag=_mvTagOf(q.id,rt.id);if(tag&&tag.keep)return;   // 業主要求先留：不算浪費（跟退料提醒一樣）
+      var st=_mvIdleStartOf(q,rt);if(!st)return;
+      var r=FJC.mv.idleInMonth({ym:ym,start:st,batches:rt.batches,asOf:asOf,rate:rt.rate,unit:'M月'});if(!(r.cost>0||r.mDays>0))return;
+      rows.push({qid:q.id,proj:q.name||'',rt:rt.id,vendor:rt.vendor||'',label:_matLabel(rt),start:st,mDays:r.mDays,days:r.rows.reduce(function(a,b){return Math.max(a,b.days);},0),cost:r.cost,noRate:(parseFloat(rt.rate)||0)>0?0:1});tot+=r.cost;
+    }catch(e){_err('_mvIdleMonth',e);}});});
+  rows.sort(function(a,b){return b.cost-a.cost||String(a.qid).localeCompare(String(b.qid));});
+  return {ym:ym,asOf:asOf,total:tot,n:rows.length,rows:rows};
+}
+function _mvIdleMonthPush(){
+  if(!_mhCloud()||typeof _privReadOk==='undefined'||_privReadOk!==true)return;
+  var today=localToday(),cur=today.slice(0,7),d=new Date(cur+'-01T12:00:00Z');d.setUTCMonth(d.getUTCMonth()-1);var prev=d.toISOString().slice(0,7);
+  [prev,cur].forEach(function(ym){var r=_mvIdleMonth(ym,today),h=_collHash([{ym:r.ym,total:r.total,rows:r.rows}]);   // 算到今天；上個月的部分 idleInMonth 自己切在月底
+    var old=MAT_IDLE_MONTH[ym];if(old&&old.h===h)return;r.h=h;r.at=Date.now();MAT_IDLE_MONTH[ym]=r;
+    try{localStorage.setItem('fy_matidlemonth',JSON.stringify(MAT_IDLE_MONTH));}catch(e){_err('_mvIdleMonthPush.ls',e);}
+    try{_fbDb.ref('fydata/private/matIdleMonth/'+ym).set(JSON.parse(JSON.stringify(r))).catch(function(e){_err('_mvIdleMonthPush',e);});}catch(e){_err('_mvIdleMonthPush',e);}});
+}
+function _m7Boot(){if(!_mhCloud()||typeof _privReadOk==='undefined'||_privReadOk!==true)return;_mhPull(function(){try{_mhBackfill();}catch(e){_err('_m7Boot.mh',e);}try{_mvIdleMonthPush();}catch(e){_err('_m7Boot.idle',e);}});}
+try{document.addEventListener('DOMContentLoaded',function(){[12000,40000].forEach(function(ms){setTimeout(function(){try{_m7Boot();}catch(e){_err('_m7Boot',e);}},ms);});});setInterval(function(){try{_mvIdleMonthPush();}catch(e){_err('_m7.tick',e);}},600000);}catch(e){_err('_m7.timer',e);}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');

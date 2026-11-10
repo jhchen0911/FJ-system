@@ -74,7 +74,54 @@
     o = o || {}; var to = o.outDate || o.today, d = days(o.pullDone, to);
     return { days: d, cost: rentFor(o.rate, o.unit, o.m, o.n, d), perDay: rentFor(o.rate, o.unit, o.m, o.n, 1) };
   }
-  var mv = { itemM: itemM, fromSlipDir: fromSlipDir, itemKey: itemKey, onSite: onSite, trips: trips, itemKg: itemKg, shareByKg: shareByKg, days: days, rentFor: rentFor, idleRent: idleRent };
+  // ── M7（v6.0.210 小批次線）：結案實績與每月閒置浪費 ──
+  // 租金單價換成「每 M 每天」：rents 的 rate 單位是 M月（每 M 每月 30 天）、M天；片月沒有長度換不了 → null
+  function perMDay(rate, unit) { rate = num(rate); if (!(rate > 0)) return null; if (unit === 'M天') return rate; if (unit === '片月') return null; return rate / 30; }
+  // 一張租料單的實際租期：每批 M 數 × 在場天數（進場 d → 退場 o；還沒退用 asOf）；avgDays＝依 M 數加權的平均天數
+  function rentActual(batches, asOf) {
+    var m = 0, md = 0, open = 0;
+    (batches || []).forEach(function (b) {
+      if (!b || !b.d) return; var to = b.o || asOf; if (!b.o) open++;
+      if (!to || String(to) < String(b.d)) return;
+      var bm = num(b.m); m += bm; md += bm * days(b.d, to);
+    });
+    return { m: r2(m), mDays: r2(md), avgDays: m > 0 ? Math.round(md / m) : 0, open: open };
+  }
+  function ymStart(ym) { return String(ym).slice(0, 7) + '-01'; }
+  function ymNext(ym) { var y = +String(ym).slice(0, 4), m = +String(ym).slice(5, 7); return m === 12 ? (y + 1) + '-01-01' : y + '-' + String(m + 1).padStart(2, '0') + '-01'; }
+  // 某個月的閒置天數（Lotion 11/07 第 4 題：拔除完成日 → 退場日，× 租金）：每批從「拔除完成日」與「這批進場日」較晚的那天，到「退場日（還沒退＝asOf）」，
+  //   落在這個月 [1 日, 下月 1 日) 的天數。回傳 [{bid, m, days, cost}] 與合計；asOf 之後不算。
+  function idleInMonth(o) {
+    o = o || {}; var ms = ymStart(o.ym), me = ymNext(o.ym), out = [], tot = 0, td = 0;
+    if (!o.start) return { rows: out, cost: 0, mDays: 0 };
+    (o.batches || []).forEach(function (b) {
+      if (!b || !b.d) return;
+      var fr = b.d > o.start ? b.d : o.start, to = b.o || o.asOf; if (!to) return;
+      if (o.asOf && to > o.asOf) to = o.asOf;
+      var a = fr > ms ? fr : ms, z = to < me ? to : me, d = (z > a) ? days(a, z) : 0;
+      if (!(d > 0)) return;
+      var c = rentFor(o.rate, o.unit || 'M月', num(b.m), num(b.n), d);
+      out.push({ bid: b.id || '', m: r2(b.m), days: d, cost: c }); tot += c; td += num(b.m) * d;
+    });
+    return { rows: out, cost: tot, mDays: r2(td) };
+  }
+  // 損耗：某案已確認的進退料，同一種料（品名＋規格＋長度）進場多少、短少、損壞、要修、報廢 → 損耗率＝(短少＋損壞)／進場
+  function lossOf(moves, qid) {
+    var S = {};
+    (moves || []).forEach(function (mv) {
+      if (!mv || mv.st !== 'ok') return;
+      var inQ = (mv.dir === 'in' && mv.qid === qid) || (mv.dir === 'xfer' && mv.toQid === qid);
+      var outQ = (mv.dir === 'out' && mv.qid === qid) || (mv.dir === 'xfer' && mv.fromQid === qid);
+      if (!inQ && !outQ) return;
+      (mv.items || []).forEach(function (it) {
+        var k = itemKey(it), o = S[k] || (S[k] = { key: k, name: it.name || '', spec: it.spec || '', len: r2(it.len), own: mv.own, inQty: 0, outQty: 0, short: 0, dmg: 0, repair: 0, scrap: 0 });
+        if (inQ) o.inQty = r2(o.inQty + num(it.qty));
+        if (outQ) { o.outQty = r2(o.outQty + num(it.qty)); o.short = r2(o.short + num(it.short)); o.dmg = r2(o.dmg + num(it.dmg)); if (it.cond === 'repair') o.repair = r2(o.repair + num(it.qty)); if (it.cond === 'scrap') o.scrap = r2(o.scrap + num(it.qty)); }
+      });
+    });
+    return Object.keys(S).sort().map(function (k) { var o = S[k]; o.rate = o.inQty > 0 ? Math.round((o.short + o.dmg) / o.inQty * 1000) / 10 : null; return o; });
+  }
+  var mv = { itemM: itemM, fromSlipDir: fromSlipDir, itemKey: itemKey, onSite: onSite, trips: trips, itemKg: itemKg, shareByKg: shareByKg, days: days, rentFor: rentFor, idleRent: idleRent, perMDay: perMDay, rentActual: rentActual, idleInMonth: idleInMonth, lossOf: lossOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = { mv: mv };
   if (root) { root.FJC = root.FJC || {}; root.FJC.mv = mv; }
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
