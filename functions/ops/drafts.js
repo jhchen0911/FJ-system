@@ -4,7 +4,7 @@
 const FJC = require('../calc/qdraft.js');
 const D = FJC.qd;
 
-const TYPES = { qchg: 1, quote: 1, bid: 1, ownerCard: 1, rfqReply: 1 };   // v6.0.225 ownerCard＝合約條件卡（contract-check 產出的 fj-contract-card/1）
+const TYPES = { qchg: 1, quote: 1, bid: 1, ownerCard: 1, rfqReply: 1 };   // v6.0.227 ownerCard＝合約條件卡（contract-check 產出的 fj-contract-card/1）
 const MAX_PENDING = 50;   // 每個送件人同時待確認的上限   // 只開這三種；其他草稿照舊從網頁送
 const BID_TO = { awarded: '得標', '': '待回覆', nego: '議價中', lost: '未得標', void: '流標' };
 const LOST = ['價格過高', '規格不符', '工期不符', '業主關係', '未回應', '其他'];
@@ -55,7 +55,7 @@ function aimClean(x) {
   if (f != null && t != null && f > t) return { err: '底價不能高於目標成交價' };
   const o = {}; if (f != null) o.floor = f; if (t != null) o.target = t; return { aim: o };
 }
-// v6.0.225 廠商回價（rfqReply）：AI 讀廠商回傳的報價（照片／PDF）→ 草稿。詢價單在 private（這裡讀不到），只對報價工項；詢價單號 rno 由 FJ 端再對。
+// v6.0.227 廠商回價（rfqReply）：AI 讀廠商回傳的報價（照片／PDF）→ 草稿。詢價單在 private（這裡讀不到），只對報價工項；詢價單號 rno 由 FJ 端再對。
 //   prices：[{idx 或 match（工項說明第一行的一段）, price（未稅單價）}]；lump：{total, idxs 或 match[]}（一式）；extras：[{name, amt}]（豐有要提供的材料／隱藏成本）；diffs：範圍差異文字
 function itemIdx(q, x) {
   const its = arr(q.items);
@@ -88,7 +88,7 @@ function replyClean(q, pl) {
   out.diffs = arr(pl.diffs).slice(0, 20).filter((t) => typeof t === 'string').map((t) => S(t, 200)).filter((t) => t.trim());
   return { p: out };
 }
-// v6.0.225 合約條件卡（fj-contract-card/1）：只收純資料（字串≤2000、陣列≤50、物件≤60 欄、深度≤6；鍵名只能英數 _ -，資料庫不收 . $ # [ ] /）
+// v6.0.227 合約條件卡（fj-contract-card/1）：只收純資料（字串≤2000、陣列≤50、物件≤60 欄、深度≤6；鍵名只能英數 _ -，資料庫不收 . $ # [ ] /）
 const CARD_TOP = ['billing', 'retention', 'rent'];
 function cardClean(card) {
   if (!card || typeof card !== 'object' || Array.isArray(card)) return { err: '要附 card：contract-check 產出的合約條件卡（JSON 物件）' };

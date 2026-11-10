@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.225';
+var APP_VERSION='v6.0.227';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -38735,7 +38735,7 @@ function _cardSetOne(q,k,v,reason){
   if(k==='rent.endMode'){q.rentEnd=(v==='removeDone')?'removeDone':'removeFirst';return;}
   if(k==='ownerType'){var c=(CUSTOMERS||[]).find(function(x){return x&&x.name===q.client;});if(c&&_OWNER_TYPES.indexOf(v)>=0){c.ownerType=v;c._mt=Date.now();try{saveCustomers();}catch(e){_err('_cardSetOne',e);}}return;}
 }
-function _cardApply(pk){   // pk（v6.0.225，可省略）：拍板卡直接給要寫入的欄位，不讀畫面勾選
+function _cardApply(pk){   // pk（v6.0.227，可省略）：拍板卡直接給要寫入的欄位，不讀畫面勾選
   var cx=_cardCtx;if(!cx)return;var q=Q.find(function(x){return x.id===cx.qid;});if(!q)return;
   var picked=Array.isArray(pk)?pk.slice():Array.prototype.map.call(document.querySelectorAll('.cc-pick'),function(c){return c.checked?c.getAttribute('data-k'):null;}).filter(Boolean);
   if(!picked.length){toast('沒有勾選任何欄位，未寫入');_cardCtx=null;return;}
@@ -39054,8 +39054,8 @@ function draftApply(id){
     },false);
     return;
   }
-  if(d.type==='rfqReply'){toast('廠商回價請切到新選單，在今天頁的「廠商回價」卡確認');return;}   // v6.0.225 只做了拍板卡
-  if(d.type==='ownerCard'){   // v6.0.225 合約條件卡草稿：舊選單走原本的匯入對照表（逐欄打勾）
+  if(d.type==='rfqReply'){toast('廠商回價請切到新選單，在今天頁的「廠商回價」卡確認');return;}   // v6.0.227 只做了拍板卡
+  if(d.type==='ownerCard'){   // v6.0.227 合約條件卡草稿：舊選單走原本的匯入對照表（逐欄打勾）
     var qc=Q.find(function(x){return x.id===pl.qid;});if(!qc){toast('找不到這張報價');return;}
     if(!_decIsAdmin()){toast('合約條件卡存在管理員資料區，只有管理員可以套用');return;}
     close();window._draftApplying={id:id,kind:'card',target:qc.id};try{_cardPreview(qc,pl.card||{},_draftS(pl.fname)||'AI 草稿');}catch(e){window._draftApplying=null;toast('合約條件卡讀取失敗：'+((e&&e.message)||''));}return;
@@ -41582,7 +41582,7 @@ function decAct(kind,id,act){
 //   確認／修改＝走原本的套用流程（draftApply：開報價編輯頁、得標視窗、發票紀錄、現場追加、客戶廠商表單），存檔成功才標已套用（_draftAppliedFor）；退回＝標 rejected。
 //   卡片只給建議，正式資料都要 Lotion 在下一個視窗按儲存／確定才寫入。
 var _DRAFT_OLD6=['quote','bid','irPhoto','addon','contact'];   // 施工日報 dailyLog 由主線做成帶工項數量的拍板卡（主線 11/10 協調），這裡不收
-function _draftViaDec6(t){try{return (_DRAFT_OLD6.indexOf(t)>=0||t==='ownerCard'||t==='rfqReply')&&_nav5On();}catch(e){return false;}}   // v6.0.225 合約條件卡也走拍板卡
+function _draftViaDec6(t){try{return (_DRAFT_OLD6.indexOf(t)>=0||t==='ownerCard'||t==='rfqReply')&&_nav5On();}catch(e){return false;}}   // v6.0.227 合約條件卡也走拍板卡
 function _d6Pl(d){return (d&&d.payload&&typeof d.payload==='object')?d.payload:{};}
 function _d6Meta(d){var S=_draftS,who=S(d.byName||d.by).slice(0,60),cs=_draftCase(d),vn=_draftVerNote(d);
   return '<div style="font-size:11.5px;color:var(--b4);overflow-wrap:anywhere">'+esc(S(_DRAFT_T[d.type]||d.type))+'　'+esc(who)+'　'+esc(new Date(+d.at||0).toLocaleString('zh-TW'))+(cs?'　<b>'+esc(cs)+'</b>':'')+(vn?'　'+esc(vn):'')+'</div>';}
@@ -41613,7 +41613,7 @@ function _d6Detail(d){
     h+=_d6Tbl([['報價',q?(S(q.code)+' '+S(q.name)):'（找不到這張報價）'],['草稿依據',L[S(pl.from)]||S(pl.from)||'待回覆'],['改成',L[S(pl.to)]||S(pl.to)],['未得標原因',S(pl.lostReason)],['備註',S(pl.note)],['目前狀態',q?(q.awarded?'已得標':(L[q.bidStatus||'']||q.bidStatus)):'']]);
     if(q&&S(pl.from)!==(q.bidStatus||''))h+='<div style="font-size:12px;color:var(--red);font-weight:700;margin-top:4px">草稿建立後狀態已被改過</div>';
     if(q&&q.awarded)h+='<div style="font-size:12px;color:var(--red);font-weight:700;margin-top:4px">這案已得標：AI 草稿不能改已得標案件，請退回</div>';
-    if(q&&!q.awarded&&pl.to==='awarded')h+=_bidCardPlan(d,q);   // v6.0.225：確認一次做完得標、建合約、寫成交紀錄
+    if(q&&!q.awarded&&pl.to==='awarded')h+=_bidCardPlan(d,q);   // v6.0.227：確認一次做完得標、建合約、寫成交紀錄
     return h;
   }
   if(d.type==='irPhoto'){
@@ -41639,7 +41639,7 @@ function _d6Detail(d){
   }
   return h;
 }
-// ══════════ v6.0.225 發包詢價單草稿卡（陳軒 11/10 新佇列第 4 件；第 2 層：卡片只給建議，看過明細才能確認）══════════
+// ══════════ v6.0.227 發包詢價單草稿卡（陳軒 11/10 新佇列第 4 件；第 2 層：卡片只給建議，看過明細才能確認）══════════
 // 得標的案子（_m8AwAt 在 _RFQD_FROM 之後、還沒結案），報價工項還沒有任何詢價單涵蓋的（_rfqCoverOf 空），照工項類別（FJC.bid.kind）一類一張卡：
 //   「詢價單草稿：○○案 H 型鋼樁」明細＝工項、數量（有請款結算數量用結算的，同 rfqEdit）、工期（合約開工～完工）、付款條件（新詢價單預設＝營造廠背對背 _b2bDefCond，
 //   同 _rfqCond）＋背對背提醒、詢價單 A4 預覽（跟正式那張同一個出件 _docOut('rfq')）。
@@ -41700,7 +41700,7 @@ _decReg('rfqDraft',{
   reject:function(r){var q=r.q;if(!q.rfqDSkip||typeof q.rfqDSkip!=='object')q.rfqDSkip={};q.rfqDSkip[r.kind]=Date.now();_touch(q);persist();return true;},
   edit:function(r){try{_rfqQid=r.q.id;_rfqTab='rfq';go('rfq');setTimeout(function(){try{rfqNew();}catch(e){_err('rfqDraft.edit',e);}},60);}catch(e){_err('rfqDraft.edit',e);}}
 });
-// ══════════ v6.0.225 廠商回價卡＋比價卡（陳軒 11/10 新佇列第 5 件；第 2 層：卡片只給建議）══════════
+// ══════════ v6.0.227 廠商回價卡＋比價卡（陳軒 11/10 新佇列第 5 件；第 2 層：卡片只給建議）══════════
 // ① rfqReply（草稿）：AI 讀廠商回傳的報價（照片／PDF）用 tools/fy-draft.js 上傳（雲端 replyClean 只對報價工項；詢價單在 private，這裡再對詢價單號 rno）
 //    明細＝每項數量、廠商單價、我方報價單價、合計（同 _rfqVendorTotal）、豐有要提供的材料、範圍差異（標紅）、同一張詢價單其他家合計；
 //    確認＝寫進詢價單的廠商回價（同 _rfSave 的欄位，status quoted；同名廠商＝更新那家、議價清掉）；舊選單沒有這種草稿的套用畫面，一律走這張卡（只有新選單出卡）
@@ -41817,7 +41817,7 @@ _decReg('rfqCmp',{
   reject:function(r){r.r.cmpSkip=_rfqcFp(r.r);_touch(r.q);persist();return true;},
   edit:function(r){_rfqQid=r.q.id;_rfqTab='rfq';go('rfq');}
 });
-// ══════════ v6.0.225 報價「已送出」紀錄＋7 天沒回音追問卡（陳軒 11/10 新佇列第 3 件；第 11 條：不在報價頁加按鈕，走今天頁拍板卡）══════════
+// ══════════ v6.0.227 報價「已送出」紀錄＋7 天沒回音追問卡（陳軒 11/10 新佇列第 3 件；第 11 條：不在報價頁加按鈕，走今天頁拍板卡）══════════
 // ① qSent「報價匯出了，送出了嗎？」：報價有匯出紀錄（q.sendLog，_QSENT_FROM 之後）、這次匯出還沒記送出 → 卡片填送出日期與方式（LINE／Email／親送／郵寄）
 //    確認＝寫 q.sent={date,how,ver,at,by}（舊的進 q.sentHist）；退回＝這次匯出沒送（q.sentSkipAt＝那次匯出時間，下次再匯出才再問）
 // ② qAsk「○○案報價送出 N 天沒回音」：q.sent.date（或上次追問 q.sent.askAt）過 _QASK_DAYS 天、還沒有結果（沒得標、狀態待回覆、沒有得標率紀錄結果）
@@ -41884,7 +41884,7 @@ _decReg('qAsk',{
   reject:function(r){r.q.sent.noAsk=true;delete _QASK_TXT[r.q.id];_touch(r.q);persist();return true;},
   edit:function(r){var q=r.q;_modal('修改追問文字','<textarea id="qask-txt" style="width:100%;min-height:160px;font-size:13px;font-family:inherit">'+esc(_qAskText(q))+'</textarea>',function(){var v=String((document.getElementById('qask-txt')||{}).value||'').trim();if(!v){toast('文字不能空白');return false;}_QASK_TXT[q.id]=v.slice(0,1000);try{_decRefresh('qAsk');}catch(e){_err('qAsk.edit',e);}});}
 });
-// ══════════ v6.0.225 合約條件拍板卡（陳軒全流程盤點第 9 名，從主線移過來；第 2 層：卡片只給建議，看過明細才能確認）══════════
+// ══════════ v6.0.227 合約條件拍板卡（陳軒全流程盤點第 9 名，從主線移過來；第 2 層：卡片只給建議，看過明細才能確認）══════════
 // contract-check 產出的合約條件卡（fj-contract-card/1）由 AI 用 tools/fy-draft.js 上傳成草稿 type ownerCard（雲端 functions/ops/drafts.js cardClean 清成純資料）。
 //   卡片明細：保留款、放款規則、請款比例、租期（起算、含租期天數、結束日、逾期租金單價）逐欄列值＋條次原文；
 //   跟專案現在的值不同標紅、列舊值 → 新值；租期起算、含租期天數一定列（卡片沒寫也列出來標紅，寶山 60／90 天的教訓）。
@@ -41957,7 +41957,7 @@ _decReg('drf_ownerCard',{
   reject:function(d,why){return _draftMark(d.id,'rejected',{reason:why||''}).then(function(m){return m!==false;});},
   edit:function(d){draftApply(d.id);}
 });
-// ══════════ v6.0.225 得標拍板卡一次做完（陳軒 11/10 新佇列第 2 件；第 2 層：看過明細才能確認）══════════
+// ══════════ v6.0.227 得標拍板卡一次做完（陳軒 11/10 新佇列第 2 件；第 2 層：看過明細才能確認）══════════
 // bid 草稿「改成得標」：卡片明細列出確認後會做的事（標得標＋得標率紀錄、成交單價回寫、建合約、請款單草稿、專案），
 //   請款截止日在卡上填（預設這案原本的，沒有就空白＝跟舊得標視窗一樣不填）；確認＝直接走 confirmAward（同一套，不另寫一份），不再跳得標視窗。
 //   其他狀態（議價中／未得標／流標／待回覆）確認就直接套用，不再多一個確認框。

@@ -13347,7 +13347,7 @@ async function newPage(browser, width, height) {
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.225 發包詢價單草稿卡（陳軒 11/10 新佇列第 4 件）──
+  // ── v6.0.227 發包詢價單草稿卡（陳軒 11/10 新佇列第 4 件）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -13374,11 +13374,11 @@ async function newPage(browser, width, height) {
       Q = keep.Q; CONTRACTS.length = 0; keep.C.forEach((c) => CONTRACTS.push(c)); _RFQD_FROM = keep.F; window._docPrint = keep.dp;
       return out;
     });
-    check('v6.0.225 發包詢價單草稿卡：得標案還沒詢價的工項依類別出卡（備用單價不算）；明細有工項、數量、工期、付款條件、詢價單預覽；確認建詢價單並開 PDF；退回＝這類不發包；上線前得標的不出', !r.err && r.rows && r.detail && r.ok && r.left && r.again && r.rej && r.cut, JSON.stringify(r));
-    check('v6.0.225 詢價單草稿卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.227 發包詢價單草稿卡：得標案還沒詢價的工項依類別出卡（備用單價不算）；明細有工項、數量、工期、付款條件、詢價單預覽；確認建詢價單並開 PDF；退回＝這類不發包；上線前得標的不出', !r.err && r.rows && r.detail && r.ok && r.left && r.again && r.rej && r.cut, JSON.stringify(r));
+    check('v6.0.227 詢價單草稿卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.225 廠商回價卡＋比價卡（陳軒 11/10 新佇列第 5 件）──
+  // ── v6.0.227 廠商回價卡＋比價卡（陳軒 11/10 新佇列第 5 件）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -13420,12 +13420,12 @@ async function newPage(browser, width, height) {
       Q = keep.Q; DRAFTS = keep.D; VENDORS.length = 0; keep.V.forEach((v) => VENDORS.push(v)); _RFQD_FROM = keep.F;
       return out;
     });
-    check('v6.0.225 廠商回價卡：AI 回價草稿在今天頁出卡；明細有逐項單價、我方報價單價、合計、範圍差異（標紅）；對不到詢價單不准確認；確認記進詢價單', !r.err && r.card && r.detail && r.bad && r.okA && r.okB, JSON.stringify(r));
-    check('v6.0.225 比價卡：回價 2 家才出；比價表含豐有提供材料、建議全部涵蓋裡最低；確認開評估得標帶入選的廠商與原因；退回等更多家', !r.err && r.oneNoCmp && r.cmp && r.cmpDetail && r.open && r.rej, JSON.stringify(r));
-    check('v6.0.225 廠商回價／比價卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.227 廠商回價卡：AI 回價草稿在今天頁出卡；明細有逐項單價、我方報價單價、合計、範圍差異（標紅）；對不到詢價單不准確認；確認記進詢價單', !r.err && r.card && r.detail && r.bad && r.okA && r.okB, JSON.stringify(r));
+    check('v6.0.227 比價卡：回價 2 家才出；比價表含豐有提供材料、建議全部涵蓋裡最低；確認開評估得標帶入選的廠商與原因；退回等更多家', !r.err && r.oneNoCmp && r.cmp && r.cmpDetail && r.open && r.rej, JSON.stringify(r));
+    check('v6.0.227 廠商回價／比價卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.225 報價已送出紀錄＋7 天沒回音追問卡（陳軒 11/10 新佇列第 3 件）──
+  // ── v6.0.227 報價已送出紀錄＋7 天沒回音追問卡（陳軒 11/10 新佇列第 3 件）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -13468,12 +13468,12 @@ async function newPage(browser, width, height) {
       Q = keep.Q; CUSTOMERS.length = 0; keep.C.forEach((c) => CUSTOMERS.push(c));
       return out;
     });
-    check('v6.0.225 報價已送出紀錄：匯出後出卡填送出日期與方式（LINE／Email／親送／郵寄），上線前的匯出與已得標不問；退回＝這次沒送；版次快照不帶', !r.err && r.rows && r.detail && r.ok && r.future && r.rej && r.snap, JSON.stringify(r));
-    check('v6.0.225 報價送出 7 天沒回音：出追問卡附業主聯絡方式與追問文字（不用「您」、不提包商）；確認＝複製並 7 天後再問；退回＝不再追；有結果就不追', !r.err && r.ask && r.askDetail && r.askOk && r.again && r.noAsk && r.result, JSON.stringify(r));
-    check('v6.0.225 報價送出卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.227 報價已送出紀錄：匯出後出卡填送出日期與方式（LINE／Email／親送／郵寄），上線前的匯出與已得標不問；退回＝這次沒送；版次快照不帶', !r.err && r.rows && r.detail && r.ok && r.future && r.rej && r.snap, JSON.stringify(r));
+    check('v6.0.227 報價送出 7 天沒回音：出追問卡附業主聯絡方式與追問文字（不用「您」、不提包商）；確認＝複製並 7 天後再問；退回＝不再追；有結果就不追', !r.err && r.ask && r.askDetail && r.askOk && r.again && r.noAsk && r.result, JSON.stringify(r));
+    check('v6.0.227 報價送出卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.225 合約條件拍板卡（陳軒全流程盤點第 9 名）──
+  // ── v6.0.227 合約條件拍板卡（陳軒全流程盤點第 9 名）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -13505,11 +13505,11 @@ async function newPage(browser, width, height) {
       Q = keep.Q; DRAFTS = keep.D; CUSTOMERS.length = 0; keep.C.forEach((c) => CUSTOMERS.push(c));
       return out;
     });
-    check('v6.0.225 合約條件拍板卡：今天頁出卡（舊選單照舊在 AI 草稿清單）；明細逐欄列值＋條次原文，跟專案不同標紅列舊值→新值，租期起算／含租期天數一定列；確認寫進專案、合約未載明的不寫', !r.err && r.card && r.oldList && r.detail && r.noDiffCut && r.applied && r.noDefault && r.again && r.noOwnerType, JSON.stringify(r));
-    check('v6.0.225 合約條件拍板卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.227 合約條件拍板卡：今天頁出卡（舊選單照舊在 AI 草稿清單）；明細逐欄列值＋條次原文，跟專案不同標紅列舊值→新值，租期起算／含租期天數一定列；確認寫進專案、合約未載明的不寫', !r.err && r.card && r.oldList && r.detail && r.noDiffCut && r.applied && r.noDefault && r.again && r.noOwnerType, JSON.stringify(r));
+    check('v6.0.227 合約條件拍板卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.225 得標拍板卡一次做完（陳軒 11/10 新佇列第 2 件）──
+  // ── v6.0.227 得標拍板卡一次做完（陳軒 11/10 新佇列第 2 件）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -13543,8 +13543,8 @@ async function newPage(browser, width, height) {
       Q = keep.Q; CONTRACTS.length = 0; keep.C.forEach((c) => CONTRACTS.push(c)); INV.length = 0; keep.I.forEach((c) => INV.push(c)); DRAFTS = keep.D; PAYABLES.length = 0; keep.P.forEach((c) => PAYABLES.push(c));
       return out;
     });
-    check('v6.0.225 得標拍板卡：明細列出確認會做的事（得標、成交單價、建合約、請款單、專案）與請款截止日；確認一次做完不再跳得標視窗；其他狀態直接套用；已得標不准改', !r.err && r.plan && r.award && r.again && r.lost && r.block, JSON.stringify(r));
-    check('v6.0.225 得標拍板卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.227 得標拍板卡：明細列出確認會做的事（得標、成交單價、建合約、請款單、專案）與請款截止日；確認一次做完不再跳得標視窗；其他狀態直接套用；已得標不准改', !r.err && r.plan && r.award && r.again && r.lost && r.block, JSON.stringify(r));
+    check('v6.0.227 得標拍板卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
   // ── v6.0.224 保留款請回卡（陳軒全流程盤點第 8 名）──
