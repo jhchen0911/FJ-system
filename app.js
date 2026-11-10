@@ -27502,7 +27502,7 @@ function _ikIsPdf(f){return !!f&&(/^application\/pdf$/.test(f.type||'')||/\.pdf$
 // PDF 逐頁畫成 JPEG（最多 6 頁、寬約 1400px），每頁當一張照片進佇列
 function _ikPdfPages(f){
   return _ensurePdfJs().then(function(lib){return f.arrayBuffer().then(function(buf){return lib.getDocument({data:new Uint8Array(buf)}).promise;}).then(function(doc){
-    var n=Math.min(doc.numPages||0,6),out=[],base=String(f.name||'file').replace(/\.pdf$/i,'');
+    if((doc.numPages||0)>6)toast('PDF 共 '+doc.numPages+' 頁，只讀前 6 頁；其餘請另存成另一個 PDF 再選');var n=Math.min(doc.numPages||0,6),out=[],base=String(f.name||'file').replace(/\.pdf$/i,'');
     var one=function(i){if(i>n)return Promise.resolve(out);return doc.getPage(i).then(function(pg){var v0=pg.getViewport({scale:1}),sc=Math.min(3,1400/(v0.width||1400)),v=pg.getViewport({scale:sc});
       var c=document.createElement('canvas');c.width=Math.ceil(v.width);c.height=Math.ceil(v.height);var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
       return pg.render({canvasContext:x,viewport:v}).promise.then(function(){return new Promise(function(res){c.toBlob(function(b){if(b){try{out.push(new File([b],base+'_p'+i+'.jpg',{type:'image/jpeg'}));}catch(e){b.name=base+'_p'+i+'.jpg';out.push(b);}}res();},'image/jpeg',0.85);});});}).then(function(){return one(i+1);});};
@@ -27529,7 +27529,7 @@ function smartIntake(){
 function _ikNext(){
   if(!_ikQueue.length){_ikBatch=null;return;}
   var f=_ikQueue.shift();
-  if(_ikIsPdf(f)){toast('PDF 轉成圖片中…');_ikPdfPages(f).then(function(L){if(!L.length){toast('這個 PDF 讀不出頁面');_ikNext();return;}if(_ikBatch)_ikBatch.n+=L.length-1;_ikQueue=L.concat(_ikQueue);_ikNext();}).catch(function(e){_err('_ikNext.pdf',e);toast('PDF 讀取失敗');_ikNext();});return;}
+  if(_ikIsPdf(f)){toast('PDF 轉成圖片中…');_ikPdfPages(f).then(function(L){if(!_ikBatch){return;}/* 轉檔中按了取消 */if(!L.length){toast('這個 PDF 讀不出頁面');_ikBatch.n=Math.max(1,_ikBatch.n-1);_ikNext();return;}_ikBatch.n+=L.length-1;_ikQueue=L.concat(_ikQueue);_ikNext();}).catch(function(e){_err('_ikNext.pdf',e);toast('PDF 讀取失敗（有密碼或檔案壞了）');if(_ikBatch)_ikBatch.n=Math.max(1,_ikBatch.n-1);_ikNext();});return;}
   if(_ikBatch)_ikBatch.i++;
   _fileToDataUrl(f,1400).then(function(du){
     if(_ikBatch&&_ikBatch.photoQid){_ikSitePhotos(_ikBatch.photoQid,[du],_ikBatch.photoDate||localToday(),true);_ikNext();return;}
@@ -27639,7 +27639,7 @@ function _intakeConfirm(r,du){
       var ok=_intakeRoute(ty,qid,r2,du);
       if(ok===false)return false;
       // 帳務類會另外開畫面（應付、費用表單、施工成本），佇列停在這裡，免得下一張的確認視窗蓋掉
-      if(ty!=='site_photo'&&ty!=='delivery_slip'&&ty!=='other'&&_ikQueue.length){var n=_ikQueue.length;_ikQueue=[];_ikBatch=null;setTimeout(function(){toast('其餘 '+n+' 張請再按一次相機');},1500);return;}
+      if(ty!=='site_photo'&&ty!=='delivery_slip'&&ty!=='other'&&ty!=='settle_doc'&&ty!=='owner_reply'&&_ikQueue.length){   /* v6.0.226 審查：結算書多頁、業主回覆不開視窗，其餘照常逐張 */var n=_ikQueue.length;_ikQueue=[];_ikBatch=null;setTimeout(function(){toast('其餘 '+n+' 張請再按一次相機');},1500);return;}
       setTimeout(_ikNext,250);
     },false,function(){setTimeout(_ikNext,250);},true);
   setTimeout(function(){try{_ikRenderExtra();}catch(e){_err('_intakeConfirm',e);}},80);
@@ -44705,23 +44705,25 @@ function _stlAiOk(it){
   var q=Q.find(function(x){return x.id===it.qid;}),ok={};if(!q)return false;_stlCalc(q).rows.forEach(function(x){ok[x.key]=1;});
   var put=_stlAiRows(a).filter(function(x){return x.key&&ok[x.key]&&x.qty!=null;});if(!put.length){toast('沒有對到合約工項的數量，請按「修改」選對應工項');return false;}
   var dup={},dd=put.filter(function(x){if(dup[x.key])return true;dup[x.key]=1;return false;});if(dd.length){toast('有 '+dd.length+' 列對到同一個合約工項，請按「修改」選清楚');return false;}
-  var done=_stlAiSave(it,function(s,na){var m=Object.assign({},(s&&s.q)||{});put.forEach(function(x){m[x.key]=x.qty;});
-    na.st='done';na.doneAt=Date.now();na.doneBy=_mvMe();return {q:m,at:na.doneAt,by:na.doneBy};});
-  if(done)try{_stlQchg(q,put);}catch(e){_err('_stlAiOk.qchg',e);}
-  return done;
+  var fin=function(){return _stlAiSave(it,function(s,na){var m=Object.assign({},(s&&s.q)||{});put.forEach(function(x){m[x.key]=x.qty;});
+    na.st='done';na.doneAt=Date.now();na.doneBy=_mvMe();return {q:m,at:na.doneAt,by:na.doneBy};});};
+  if(!_stlQchgOps(q,put).length)return fin();
+  // 審查：跟合約數量不同＝先建改單草稿，建成才寫結算紀錄、關卡；沒登入或送不出去＝卡片留著
+  return _stlQchg(q,put).then(function(r){if(!(r&&r.ok))return false;return fin();});
 }
 // 結算書數量跟合約（報價工項）數量不一樣的：建一份改單草稿（只改數量），今天頁「改單草稿」卡再確認才改合約；不自動改報價
 function _stlQchgOps(q,put){
   var by={};_stlCalc(q).rows.forEach(function(r){by[r.key]=r;});var ops=[];
   put.forEach(function(x){var r=by[x.key];if(!r)return;var it=(q.items||[])[r.idx];if(!it)return;var cq=parseFloat(it.qty)||0;if(Math.abs(cq-x.qty)<1e-6)return;
+    if(!_unitSame(x.unit,it.unit))return;   // 審查：單位不同不改合約數量
     ops.push({op:'set',idx:r.idx,match:String(it.desc||'').split('\n')[0].trim(),fields:{qty:x.qty}});});
   return ops;
 }
 function _stlQchg(q,put){
   var ops=_stlQchgOps(q,put);if(!ops.length)return Promise.resolve(null);
-  if(typeof fyQuoteChange!=='function'||!_fbUser){toast('結算書有 '+ops.length+' 項跟合約數量不同；要改合約請登入後到報價頁改');return Promise.resolve(null);}
+  if(typeof fyQuoteChange!=='function'||!_fbUser){toast('結算書有 '+ops.length+' 項跟合約數量不同：要登入才能建改單草稿，卡片先留著');return Promise.resolve(null);}
   return fyQuoteChange({qid:q.id,ops:ops,summary:(q.code||'')+' '+(q.name||'')+' 依營造廠結算書改數量 '+ops.length+' 項'}).then(function(r){
-    if(r&&r.ok)toast('結算書有 '+ops.length+' 項跟合約數量不同：已建改單草稿，在「今天」確認才會改合約');else toast('改單草稿沒建成：'+((r&&r.why)||'').slice(0,60));return r;});
+    if(r&&r.ok)toast('結算書有 '+ops.length+' 項跟合約數量不同：已建改單草稿，在「今天」確認才會改合約');else toast('改單草稿沒建成：'+((r&&r.why)||'').slice(0,60)+'；卡片先留著');return r;});
 }
 function _stlAiReject(it,why){return _stlAiSave(it,function(s,na){na.st='rejected';na.why=String(why||'').slice(0,200);na.doneAt=Date.now();na.doneBy=_mvMe();});}
 // 修改：逐列改數量、選對應的合約工項；存回草稿、卡片留著，看過差異再確認
@@ -44757,7 +44759,7 @@ _decReg('stlAi',{
 //   ③ 技師計算書 sdocCalc：計算書類別上傳後 AI 讀數量表 d.calc={st:'pending',rows:[{text,qty,unit,key}]}，跟報價工項數量比；有差異確認後另建改單草稿（qchg）
 function _sdocVerN(v){var n=parseInt(String(v||'').replace(/\D/g,''),10);return n>0?n:0;}
 function _sdocVerGuess(p,d){
-  var nm=String(d.name||''),m=nm.match(/(?:^|[^a-z0-9])v\.?\s?(\d{1,3})(?!\d)/i)||nm.match(/第\s*(\d{1,3})\s*版/)||nm.match(/(?:^|[^a-z0-9])r(?:ev)?\.?\s?(\d{1,3})(?!\d)/i);
+  var nm=String(d.name||''),m=nm.match(/(?:^|[^a-z0-9])v\.?\s?(\d{1,3})(?!\d)/i)||nm.match(/第\s*(\d{1,3})\s*版/)||nm.match(/(?:^|[_\-\s（(])r(?:ev)?\.?\s?(\d{1,2})(?!\d)/i);
   if(m)return {ver:'v'+parseInt(m[1],10),src:'檔名'};
   var prev=_sdocList(p).filter(function(x){return x.id!==d.id&&x.cat===d.cat&&(x.at||0)<=(d.at||0)&&!x.verSkip;}),mx=0;prev.forEach(function(x){mx=Math.max(mx,_sdocVerN(x.ver));});
   return {ver:'v'+(Math.max(mx,prev.length)+1),src:prev.length?'同類上一版＋1':'同類第一份'};
@@ -44806,7 +44808,7 @@ function _sdocReplyFromIntake(qid,r,du){
   var W=_sdocList(p).filter(function(d){return (d.st||'wait')==='wait';});
   if(!W.length){toast('這個工程沒有送審中的文件，回覆先收在 LINE 收件匣／照片');return false;}
   var vn=_sdocVerN(ver),hit=W.filter(function(d){var okC=!txt||String(txt).indexOf(d.cat)>=0||String(d.name).indexOf(txt)>=0;var okV=!vn||_sdocVerN(d.ver)===vn;return okC&&okV;});
-  var d=hit.length===1?hit[0]:W[0],guess=hit.length!==1;
+  var d=hit.length===1?hit[0]:(hit[0]||W[0]),guess=hit.length!==1;if(d.reply&&d.reply.st==='pending')toast('這份文件已有一則還沒確認的回覆，用新的取代');
   var ok=_sdocUpd(qid,d.id,function(nd){nd.reply={st:'pending',at:Date.now(),by:_mvMe(),res:res,ver:ver,doc:txt,note:_draftS(rp.note||r.note).slice(0,80),url:du?_photoPut(du):'',file:'回覆_'+localToday()+'.jpg',guess:guess};});
   if(ok){toast('已收業主回覆：到「今天」的「業主回覆送審」確認');try{updateDashTodo();}catch(e){_err('_sdocReplyFromIntake',e);}}
   return ok;
@@ -44834,11 +44836,12 @@ _decReg('sdocOwner',{
       m[to]=Object.assign({},m[to],{reply:rp});_sdocSave(p,m);_decRefresh('sdocOwner');},false,null,true);}
 });
 // ③ 技師計算書：AI 讀數量表 → 跟報價工項數量比
+function _unitSame(a,b){a=_nrm(a);b=_nrm(b);if(!a||!b)return true;var M={'米':'m','公尺':'m','根':'支','只':'支'};a=M[a]||a;b=M[b]||b;return a===b;}   // 有一邊沒寫單位就不擋
 function _sdocCalcItems(q){var L=[];(q&&q.items||[]).forEach(function(it,i){if(!it||it.sec||it.spare)return;if(typeof _qNegLine==='function'&&_qNegLine(it))return;L.push({key:_stlKey(it,i),idx:i,desc:String(it.desc||'').split('\n')[0].trim(),unit:it.unit||'',qty:parseFloat(it.qty)||0,price:parseFloat(it.price)||0});});return L;}
 function _sdocCalcCmp(q,c){
   var by={};_sdocCalcItems(q).forEach(function(x){by[x.key]=x;});var cnt={};_prjArr(c&&c.rows).forEach(function(x){if(x&&x.key)cnt[x.key]=(cnt[x.key]||0)+1;});
-  var rows=_prjArr(c&&c.rows).filter(function(x){return x&&x.text;}).map(function(x){var it=x.key&&by[x.key];var diff=(it&&x.qty!=null)?Math.round((x.qty-it.qty)*1000)/1000:null;
-    return {text:x.text,unit:x.unit,qty:x.qty,key:x.key,it:it||null,diff:diff,amt:diff?Math.round(diff*it.price):0,dup:x.key&&cnt[x.key]>1};});
+  var rows=_prjArr(c&&c.rows).filter(function(x){return x&&x.text;}).map(function(x){var it=x.key&&by[x.key],uBad=!!(it&&!_unitSame(x.unit,it.unit));var diff=(it&&!uBad&&x.qty!=null)?Math.round((x.qty-it.qty)*1000)/1000:null;
+    return {text:x.text,unit:x.unit,qty:x.qty,key:x.key,it:it||null,uBad:uBad,diff:diff,amt:diff?Math.round(diff*it.price):0,dup:x.key&&cnt[x.key]>1};});
   var nd=rows.filter(function(r){return r.diff;}).length;return {rows:rows,nDiff:nd,sumAmt:rows.reduce(function(a,r){return a+r.amt;},0),nOk:rows.filter(function(r){return r.it&&r.qty!=null;}).length};
 }
 function _sdocCalcRead(qid,id,f){
@@ -44875,17 +44878,19 @@ _decReg('sdocCalc',{
     var tb='<div style="font-size:12px;margin:8px 0 4px"><b>只比數量，不做安全判斷</b>（結構安全由技師與 Lotion 把關）'+(g.d.calc.low?'<span style="color:var(--red)">　AI 說這份不太清楚，請逐項對照原檔</span>':'')+'</div>'
       +'<table class="tbl" style="font-size:12px"><thead><tr><th>計算書品名</th><th style="text-align:right">計算書數量</th><th>對到的報價工項</th><th style="text-align:right">報價數量</th><th style="text-align:right">差異</th><th style="text-align:right">金額影響（未稅）</th></tr></thead><tbody>'
       +R.rows.map(function(r){return '<tr><td>'+esc(r.text)+(r.unit?'（'+esc(r.unit)+'）':'')+'</td><td style="text-align:right">'+(r.qty==null?'<span style="color:var(--red)">沒讀到</span>':_rfmt(r.qty))+'</td>'
-        +'<td>'+(r.it?esc(r.it.desc)+(r.dup?'<div style="color:var(--red);font-size:11px">有好幾列對到這項，要先修改</div>':''):'<span style="color:#b26a00">沒對到報價工項</span>')+'</td><td style="text-align:right">'+(r.it?_rfmt(r.it.qty):'—')+'</td>'
+        +'<td>'+(r.it?esc(r.it.desc)+(r.uBad?'<div style="color:var(--red);font-size:11px">單位不同（'+esc(r.unit||'')+'／'+esc(r.it.unit||'')+'），不比</div>':'')+(r.dup?'<div style="color:var(--red);font-size:11px">有好幾列對到這項，要先修改</div>':''):'<span style="color:#b26a00">沒對到報價工項</span>')+'</td><td style="text-align:right">'+(r.it?_rfmt(r.it.qty):'—')+'</td>'
         +'<td style="text-align:right">'+(r.diff?'<b style="color:'+C(r.diff)+'">'+(r.diff>0?'+':'')+_rfmt(r.diff)+'</b>':(r.it&&r.qty!=null?'<span style="color:var(--g3)">相符</span>':'—'))+'</td>'
         +'<td style="text-align:right;white-space:nowrap">'+(r.amt?'<b style="color:'+C(r.amt)+'">'+(r.amt>0?'+':'')+fmt(r.amt)+'</b>':'—')+'</td></tr>';}).join('')+'</tbody></table>'
       +'<div style="font-size:12px;margin-top:6px">'+(R.nDiff?('差異 '+R.nDiff+' 項、金額影響（未稅）<b style="color:'+C(R.sumAmt)+'">'+(R.sumAmt>0?'+':'')+fmt(R.sumAmt)+'</b>；確認後另建「改單草稿」，在今天頁再確認才改報價'):'<span style="color:var(--g3)">對到的工項數量都跟報價相符</span>')+'</div>';
     return _sdocPvHtml(g.d.url,g.d.name).then(function(pv){return pv?pv+tb:'';});},
   ok:function(it){var g=_sdocGet(it);if(!g.d||!g.q)return false;var R=_sdocCalcCmp(g.q,g.d.calc);if(R.rows.some(function(r){return r.dup;})){toast('有好幾列對到同一個報價工項，請按「修改」選清楚');return false;}
     var ops=_sdocCalcOps(g.q,g.d.calc);
-    var ok=_sdocUpd(it.qid,it.id,function(d){if(!d.calc||d.calc.st!=='pending')return false;d.calc=Object.assign({},d.calc,{st:'done',doneAt:Date.now(),doneBy:_mvMe(),nDiff:R.nDiff,sumAmt:R.sumAmt});});
-    if(ok&&ops.length){if(typeof fyQuoteChange==='function'&&_fbUser)fyQuoteChange({qid:g.q.id,ops:ops,summary:(g.q.code||'')+' '+(g.q.name||'')+' 依技師計算書 '+(g.d.ver||'')+' 改數量 '+ops.length+' 項'}).then(function(r){toast(r&&r.ok?'已建改單草稿，在「今天」確認才會改報價':'改單草稿沒建成：'+((r&&r.why)||'').slice(0,60));}).catch(function(e){_err('sdocCalc.qchg',e);});
-      else toast('計算書有 '+ops.length+' 項跟報價數量不同；要改報價請登入後到報價頁改');}
-    return ok;},
+    var fin=function(){return _sdocUpd(it.qid,it.id,function(d){if(!d.calc||d.calc.st!=='pending')return false;d.calc=Object.assign({},d.calc,{st:'done',doneAt:Date.now(),doneBy:_mvMe(),nDiff:R.nDiff,sumAmt:R.sumAmt});});};
+    if(!ops.length)return fin();
+    // 審查：有差異＝先建改單草稿，建成才關卡（沒登入、送不出去＝卡片留著，之後再按）
+    if(typeof fyQuoteChange!=='function'||!_fbUser){toast('計算書有 '+ops.length+' 項跟報價數量不同：要登入才能建改單草稿，卡片先留著');return false;}
+    return fyQuoteChange({qid:g.q.id,ops:ops,summary:(g.q.code||'')+' '+(g.q.name||'')+' 依技師計算書 '+(g.d.ver||'')+' 改數量 '+ops.length+' 項'}).then(function(r){
+      if(!(r&&r.ok)){toast('改單草稿沒建成：'+((r&&r.why)||'').slice(0,60)+'；卡片先留著');return false;}toast('已建改單草稿，在「今天」確認才會改報價');return fin();});},
   reject:function(it,why){return _sdocUpd(it.qid,it.id,function(d){if(!d.calc)return false;d.calc=Object.assign({},d.calc,{st:'rejected',why:String(why||'').slice(0,200),doneAt:Date.now()});});},
   edit:function(it){var g=_sdocGet(it);if(!g.d||!g.q)return;var c=g.d.calc,opts=[{k:'',t:'（不比）'}].concat(_sdocCalcItems(g.q).map(function(x){return {k:x.key,t:x.desc.slice(0,40)};}));
     var IN='box-sizing:border-box;font-size:13px;padding:6px 7px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';

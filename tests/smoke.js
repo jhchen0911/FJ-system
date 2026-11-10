@@ -13872,7 +13872,11 @@ async function newPage(browser, width, height) {
         out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
         try { document.querySelector('#fy-modal .fy-mdl-x, #fy-modal [data-close]') && document.querySelector('#fy-modal .fy-mdl-x, #fy-modal [data-close]').click(); } catch (e) { /* 可忽略 */ }
         // 確認：只寫對到的兩項，差異表跟手填同一份
-        const done = _DEC.stlAi.ok(L[0]);
+        // 沒登入＝改單草稿建不成 → 卡片留著（審查）
+        const stay = await Promise.resolve(_DEC.stlAi.ok(L[0])); out.stay = stay === false && _decItems('stlAi').length === 1;
+        const oFQ = window.fyQuoteChange, oFU = window._fbUser; let qcArg = null; window.fyQuoteChange = async (sp) => { qcArg = sp; return { ok: true }; }; _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' };
+        const done = await Promise.resolve(_DEC.stlAi.ok(L[0]));
+        window.fyQuoteChange = oFQ; _fbUser = oFU; out.qcArg = !!qcArg && qcArg.qid === 'qSA' && qcArg.ops.length === 1 && qcArg.ops[0].fields.qty === 85;
         const s = _prjOfQ('qSA').settle;
         out.ok = done === true && s.ai.st === 'done' && Object.values(s.q).sort().join(',') === '50,85' && _decItems('stlAi').length === 0 && /差異 1 項、金額影響（未稅）-5,000/.test(_stlInfo(Q[0]));
         // 手填一格不會把 AI 紀錄弄掉
@@ -13891,7 +13895,7 @@ async function newPage(browser, width, height) {
       Q = keepQ; INV = keepI; PROJECTS = keepP; localStorage.removeItem('pj7_open_settle');
       return out;
     });
-    check('v6.0.226 結算書 AI 拍板卡（寬 ' + W + '）：拍照建草稿不直接寫、對到 2 項／沒對到 1 項、明細有原圖與 -5,000 差異、確認才寫進差異表、手填不弄掉紀錄、退回不寫、手機不左右捲', !r.err && r.draft && r.append && r.card && r.detail && r.noHScroll && r.qchg && r.pdf && r.ok && r.keep && r.reject && r.noQid && r.type, JSON.stringify(r));
+    check('v6.0.226 結算書 AI 拍板卡（寬 ' + W + '）：拍照建草稿不直接寫、對到 2 項／沒對到 1 項、明細有原圖與 -5,000 差異、確認才寫進差異表、手填不弄掉紀錄、退回不寫、手機不左右捲', !r.err && r.draft && r.append && r.card && r.detail && r.noHScroll && r.qchg && r.pdf && r.stay && r.qcArg && r.ok && r.keep && r.reject && r.noQid && r.type, JSON.stringify(r));
     check('v6.0.226 結算書 AI 拍板卡測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -13930,7 +13934,11 @@ async function newPage(browser, width, height) {
         const ops = _sdocCalcOps(Q[0], _sdocMap(_prjOfQ('qSD')).d3.calc); out.ops = ops.length === 1 && ops[0].idx === 0 && ops[0].fields.qty === 110 && ops[0].match === 'H型鋼樁打設';
         openDecList('sdocCalc'); await T(80); decToggle('sdocCalc', _DEC.sdocCalc.key(C[0]), true); await T(300);
         out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
-        _DEC.sdocCalc.ok(C[0]); out.calcOk = _sdocMap(_prjOfQ('qSD')).d3.calc.st === 'done' && _sdocMap(_prjOfQ('qSD')).d3.calc.nDiff === 1 && _decItems('sdocCalc').length === 0;
+        // 單位不同不比（120 支 對到 M 的工項）
+        const uq = _sdocCalcCmp(Q[0], { rows: [{ text: '水平支撐組立', unit: '支', qty: 120, key: _stlKey(Q[0].items[1], 1) }] }); out.unit = uq.nDiff === 0 && uq.rows[0].uBad && _sdocCalcOps(Q[0], { rows: [{ text: 'x', unit: '支', qty: 120, key: _stlKey(Q[0].items[1], 1) }] }).length === 0;
+        out.verRe = _sdocVerGuess(_prjOfQ('qSD'), { id: 'z', name: 'RC樁R25配筋.pdf', cat: '其他', at: 9 }).src !== '檔名' && _sdocVerGuess(_prjOfQ('qSD'), { id: 'z', name: '計算書_R2.pdf', cat: '其他', at: 9 }).ver === 'v2';
+        const oFQ2 = window.fyQuoteChange, oFU2 = window._fbUser; window.fyQuoteChange = async () => ({ ok: true }); _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' };
+        await Promise.resolve(_DEC.sdocCalc.ok(C[0])); window.fyQuoteChange = oFQ2; _fbUser = oFU2; out.calcOk = _sdocMap(_prjOfQ('qSD')).d3.calc.st === 'done' && _sdocMap(_prjOfQ('qSD')).d3.calc.nDiff === 1 && _decItems('sdocCalc').length === 0;
         // 沒有送審中的文件＝不建回覆
         out.noWait = _sdocReplyFromIntake('qSD', { reply: { doc: '計算書', ver: 'v9', result: 'ok' } }, PNG) === true;   // d1、d3 還在送審中
         out.types = !!_INTAKE_TYPES.owner_reply;
@@ -13941,7 +13949,7 @@ async function newPage(browser, width, height) {
       try { const md = document.getElementById('fy-modal'); if (md) md.remove(); } catch (x) { /* 可忽略 */ }
       return out;
     });
-    check('v6.0.226 送審文件卡（寬 ' + W + '）：檔名／上一版猜版次、歸檔確認、業主回覆對到同版次並改已核定、技師計算書差異 1 項 +20,000 與改單動作、只比數量不做安全判斷、手機不左右捲、唯讀看不到', !r.err && r.ver && r.arcList && r.arcDet && r.arcOk && r.reply && r.ownDet && r.ownOk && r.calc && r.ops && r.noHScroll && r.calcOk && r.noWait && r.types && r.ro, JSON.stringify(r));
+    check('v6.0.226 送審文件卡（寬 ' + W + '）：檔名／上一版猜版次、歸檔確認、業主回覆對到同版次並改已核定、技師計算書差異 1 項 +20,000 與改單動作、只比數量不做安全判斷、手機不左右捲、唯讀看不到', !r.err && r.ver && r.arcList && r.arcDet && r.arcOk && r.reply && r.ownDet && r.ownOk && r.calc && r.ops && r.noHScroll && r.unit && r.verRe && r.calcOk && r.noWait && r.types && r.ro, JSON.stringify(r));
     check('v6.0.226 送審文件卡測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
