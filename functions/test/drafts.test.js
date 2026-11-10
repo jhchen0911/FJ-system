@@ -70,3 +70,43 @@ test('v6.0.197 改單可改成本單價與固定條款（範本照報價新舊�
   assert.ok(r.rec, r.err);   // 舊報價（id 時間在切換前）用舊範本
   assert.strictEqual(D.rmkBaseFor({ id: String(Date.UTC(2027, 0, 1)) }, rp), '6. 本工程無保固及保留款');
 });
+
+test('v6.0.209 底價／目標成交價：選填、含稅、底價不能高於目標價；改單與報價單都收', () => {
+  assert.deepStrictEqual(D.aimClean(null), { aim: null });
+  assert.deepStrictEqual(D.aimClean({ floor: '1000000', target: 1100000.4 }), { aim: { floor: 1000000, target: 1100000 } });
+  assert.deepStrictEqual(D.aimClean({ target: 5 }), { aim: { target: 5 } });
+  assert.match(D.aimClean({ floor: 2, target: 1 }).err, /不能高於/);
+  assert.match(D.aimClean({ floor: -1 }).err, /floor/);
+  assert.match(D.aimClean('x').err, /aim/);
+  const ops = [{ op: 'set', idx: 0, match: '假工項A', fields: { qty: 12 } }];
+  const r = D.build(Object.assign({}, base, { body: { type: 'qchg', payload: { qid: 'q1', ops, aim: { floor: 12000, target: 13000 } }, expect: { sub: 13000, tax: 650, total: 13650 } } }));
+  assert.deepStrictEqual(r.rec.payload.aim, { floor: 12000, target: 13000 });
+  assert.match(D.build(Object.assign({}, base, { body: { type: 'qchg', payload: { qid: 'q1', ops, aim: { floor: 9, target: 1 } }, expect: { sub: 13000, tax: 650, total: 13650 } } })).err, /不能高於/);
+  const f = { name: '假丙案', items: [{ desc: '工項', unit: '支', qty: 2, price: 500 }] };
+  const r2 = D.build(Object.assign({}, base, { body: { type: 'quote', payload: { fields: f, aim: { target: 1000 } }, expect: { sub: 1000, tax: 50, total: 1050 } } }));
+  assert.deepStrictEqual(r2.rec.payload.aim, { target: 1000 });
+  assert.ok(!('aim' in D.build(Object.assign({}, base, { body: { type: 'quote', payload: { fields: f }, expect: { sub: 1000, tax: 50, total: 1050 } } })).rec.payload));
+});
+
+test('v6.0.209 得標率統計給報價線：只有主報價、有結果、沒被排除的；追加的工項算進主約；只回數字', () => {
+  const qs = {
+    a: { id: 'a', name: '甲', awarded: true, t: { total: 100 }, items: [{ desc: 'H型鋼樁打設', qty: 1, price: 100 }], bid: { res: 'won', first: 110 } },
+    b: { id: 'b', name: '乙', bidStatus: 'lost', t: { total: 120 }, lostPrice: 100, items: [{ desc: 'H型鋼樁打設', qty: 1, price: 120 }], bid: { res: 'lost', first: 120 } },
+    c: { id: 'c', name: '丙', bidStatus: 'lost', t: { total: 50 }, items: [{ desc: 'H型鋼樁打設', qty: 1, price: 50 }], bid: { res: 'lost', skip: { at: 1 } } },
+    d: { id: 'd', name: '丁', t: { total: 50 }, items: [{ desc: 'H型鋼樁', qty: 1, price: 50 }] },
+    e: { id: 'e', parentId: 'a', name: '甲追加', items: [{ desc: '水平支撐', qty: 1, price: 30 }] },   // 30／130＝23%，佔 10% 以上才算
+  };
+  const r = D.bidStats(qs, { k: { linkedQid: 'a', amount: 99 } }, {});
+  assert.strictEqual(r.n, 2); assert.strictEqual(r.minN, 5);
+  const h = r.kinds.find((k) => k.kind === 'hpile'), s = r.kinds.find((k) => k.kind === 'strut');
+  assert.strictEqual(h.n, 2); assert.strictEqual(h.rate, 50); assert.strictEqual(h.concPct, 10); assert.strictEqual(h.gapPct, 20); assert.strictEqual(h.ready, false);
+  assert.strictEqual(s.n, 1);
+  assert.ok(!JSON.stringify(r).includes('甲'));
+});
+
+test('v6.0.209 得標率統計：得標結果放在 private quoteSens 也讀得到', () => {
+  const qs = { a: { id: 'a', name: '甲', awarded: true, t: { total: 100 }, items: [{ desc: '鋼板樁', qty: 1, price: 100 }] } };
+  assert.strictEqual(D.bidStats(qs, {}, {}).n, 0);
+  const r = D.bidStats(qs, {}, {}, { a: { bid: { res: 'won', first: 120 } } });
+  assert.strictEqual(r.n, 1); assert.strictEqual(r.kinds[0].kind, 'sheet'); assert.strictEqual(r.kinds[0].concPct, 16.7);
+});

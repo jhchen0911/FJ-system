@@ -750,7 +750,17 @@ exports.fyDraft = onRequest({ region: REGION, cors: ['https://jhchen0911.github.
       await ref.update(u);
       res.status(200).json({ ok: true, id: c.id }); return;
     }
-    if (act !== 'submit') { res.status(400).json({ error: { message: 'action 要是 submit／mine／withdraw／inboxList／inboxSuggest' } }); return; }
+    // v6.0.209 報價得標率統計（給報價線；只有類別、筆數、得標率、平均讓價比例、建議 ±%，沒有案名與金額）
+    if (act === 'bidStats') {
+      const [qs, cts, bt, sens] = await Promise.all([
+        db.ref('fydata/shared/quotes').once('value').then((s) => pnlCore.deepDec(s.val() || {})),
+        db.ref('fydata/shared/contracts').once('value').then((s) => pnlCore.deepDec(s.val() || {})),
+        db.ref('fydata/shared/params/bidTune').once('value').then((s) => s.val()),
+        db.ref('fydata/private/quoteSens').once('value').then((s) => pnlCore.deepDec(s.val() || {})),   // 得標結果在 private（只回統計數字，不回原始紀錄）
+      ]);
+      res.status(200).json(Object.assign({ ok: true, at: Date.now() }, draftsCore.bidStats(qs, cts, { bidTune: bt }, sens))); return;
+    }
+    if (act !== 'submit') { res.status(400).json({ error: { message: 'action 要是 submit／mine／withdraw／inboxList／inboxSuggest／bidStats' } }); return; }
     const sz = JSON.stringify(body).length; if (sz > 400000) { res.status(413).json({ error: { message: '草稿太大（上限約 400KB）' } }); return; }
     const [quotes, tax, rname] = await Promise.all([
       db.ref('fydata/shared/quotes').once('value').then((s) => pnlCore.deepDec(s.val() || {})),
