@@ -43925,6 +43925,7 @@ try{setInterval(function(){try{_mbAutoTick();}catch(e){_err('_mbAuto.tick',e);}}
 // 後端（報價結果紀錄、同類工項得標率、AI 草稿帶的底價／目標成交價）由小批次線做（v6.0.209 起，_bidAimOf／_bidSuggestFor，口徑含稅）；
 // 這裡只負責顯示：還沒上線（函式不存在）或這張沒有資料就不顯示。只給內部（_permHideProfit 的人看不到），不會印在任何對外文件。
 function _qP3Render(t){
+  try{document.querySelectorAll('#page-editor [data-q7off]').forEach(function(b){b.classList.toggle('q7-off',_v7New('editor'));});}catch(e){_err('_qP3Render.bar',e);}   // v6.0.222 第 7 步⑥：新選單拿掉「清除」「進版」（送出時自動封存進版；清除＝列表的新增）
   var el=document.getElementById('q-p3');if(!el)return;
   if(_permHideProfit()){el.style.display='none';el.innerHTML='';return;}
   var q0=Q.find(function(x){return x.id===eid;})||{},q=Object.assign({},q0,{items:items||[]});

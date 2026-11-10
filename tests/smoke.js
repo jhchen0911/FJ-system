@@ -13592,6 +13592,27 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.222 第 7 步⑥ 報價頁新選單拿掉「↺ 清除」「進版」（送出時自動封存進版），舊選單照舊 ──
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old');
+        newQ(); go('editor'); await T(200);
+        const vis = (sel) => { const b = document.querySelector('#page-editor ' + sel); return !!b && b.offsetParent !== null; };
+        out.newOff = !vis('[onclick="newQ()"]') && !vis('[onclick="bumpQVersion(eid)"]') && vis('[onclick="saveQ()"]') && vis('[onclick="openNegotiateModal()"]');
+        localStorage.setItem('fy_nav_old', '1'); _nav5Apply(); rTots(); await T(80);
+        out.oldOn = vis('[onclick="newQ()"]') && vis('[onclick="bumpQVersion(eid)"]');
+        localStorage.removeItem('fy_nav_old'); _nav5Apply(); rTots();
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      return out;
+    });
+    check('v6.0.222 報價頁新選單拿掉「清除」「進版」、儲存與議價還在；舊選單照舊', !r.err && r.newOff && r.oldOn, JSON.stringify(r));
+    check('v6.0.222 報價頁按鈕測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
