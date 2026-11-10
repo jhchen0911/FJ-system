@@ -13896,6 +13896,56 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.226 送審文件三張拍板卡：歸檔記版次、業主回覆、技師計算書比對（只比數量）──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepP = PROJECTS;
+      const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old');
+        Q = [{ id: 'qSD', name: '範例工程SD', client: '甲營造', code: 'SD', date: '2026-10-01', awarded: true, _mt: 1, costs: [],
+          items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 100, price: 2000 }, { desc: '水平支撐組立', unit: 'M', qty: 300, price: 500 }] }];
+        PROJECTS = []; _prjSync(); const p = _prjOfQ('qSD');
+        const mk = (id, name, cat, at) => ({ id, name, path: 'projects/' + p.id + '/docs/' + at + '_' + name, cat, st: 'wait', at, by: 'x', size: 1, url: PNG });
+        p.docs = { d1: mk('d1', '施工圖說.pdf', '施工圖說', 1000), d2: mk('d2', '施工圖說_第3版.pdf', '施工圖說', 2000), d3: mk('d3', '計算書.pdf', '計算書', 3000) };
+        // ① 歸檔：檔名猜 v3；沒寫版次＝同類上一版＋1
+        _sdocAfterPut('qSD', 'd2', null); _sdocAfterPut('qSD', 'd3', null);
+        let m = _sdocMap(_prjOfQ('qSD'));
+        out.ver = m.d2.ver === 'v3' && m.d2.verSrc === '檔名' && m.d3.ver === 'v1' && !m.d1.ver;
+        const A = _decItems('sdocArc'); out.arcList = A.length === 2;
+        const da = await Promise.resolve(_DEC.sdocArc.detail(A[0])); out.arcDet = /<img|<iframe/.test(da) && /歷次/.test(da) && /v3/.test(da);
+        _DEC.sdocArc.ok(A[0]); out.arcOk = !!_sdocMap(_prjOfQ('qSD')).d2.verOk && _decItems('sdocArc').length === 1;
+        // ② 業主回覆：對到送審中、版次相同的那份
+        const ok2 = _sdocReplyFromIntake('qSD', { reply: { doc: '施工圖說', ver: 'v3', result: 'ok', note: '同意' } }, PNG);
+        m = _sdocMap(_prjOfQ('qSD')); out.reply = ok2 === true && m.d2.reply && m.d2.reply.st === 'pending' && !m.d2.reply.guess && !m.d1.reply;
+        const O = _decItems('sdocOwner'); const dob = await Promise.resolve(_DEC.sdocOwner.detail(O[0]));
+        out.ownDet = O.length === 1 && /<img/.test(dob) && /業主已確認 施工圖說 v3/.test(_DEC.sdocOwner.head(O[0]));
+        _DEC.sdocOwner.ok(O[0]); m = _sdocMap(_prjOfQ('qSD')); out.ownOk = m.d2.st === 'ok' && m.d2.reply.st === 'done' && _decItems('sdocOwner').length === 0;
+        // ③ 技師計算書：H 型鋼 110 支（報價 100，+10 支 × 2,000）、支撐 300 相符、多一列對不到
+        _sdocCalcSet('qSD', 'd3', { items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 110 }, { desc: '水平支撐組立', unit: 'M', qty: 300 }, { desc: '角撐', unit: '組', qty: 8 }] });
+        const C = _decItems('sdocCalc'); const dc = await Promise.resolve(_DEC.sdocCalc.detail(C[0]));
+        out.calc = C.length === 1 && /差異 1 項/.test(_DEC.sdocCalc.head(C[0])) && /\+20,000/.test(dc) && /不做安全判斷/.test(dc) && /沒對到報價工項/.test(dc) && /相符/.test(dc);
+        const ops = _sdocCalcOps(Q[0], _sdocMap(_prjOfQ('qSD')).d3.calc); out.ops = ops.length === 1 && ops[0].idx === 0 && ops[0].fields.qty === 110 && ops[0].match === 'H型鋼樁打設';
+        openDecList('sdocCalc'); await T(80); decToggle('sdocCalc', _DEC.sdocCalc.key(C[0]), true); await T(300);
+        out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
+        _DEC.sdocCalc.ok(C[0]); out.calcOk = _sdocMap(_prjOfQ('qSD')).d3.calc.st === 'done' && _sdocMap(_prjOfQ('qSD')).d3.calc.nDiff === 1 && _decItems('sdocCalc').length === 0;
+        // 沒有送審中的文件＝不建回覆
+        out.noWait = _sdocReplyFromIntake('qSD', { reply: { doc: '計算書', ver: 'v9', result: 'ok' } }, PNG) === true;   // d1、d3 還在送審中
+        out.types = !!_INTAKE_TYPES.owner_reply;
+        // 唯讀帳號看不到卡
+        const oR = _isReaderUser; _isReaderUser = true; out.ro = _decItems('sdocArc').length === 0 && _decItems('sdocOwner').length === 0; _isReaderUser = oR;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; PROJECTS = keepP;
+      try { const md = document.getElementById('fy-modal'); if (md) md.remove(); } catch (x) { /* 可忽略 */ }
+      return out;
+    });
+    check('v6.0.226 送審文件卡（寬 ' + W + '）：檔名／上一版猜版次、歸檔確認、業主回覆對到同版次並改已核定、技師計算書差異 1 項 +20,000 與改單動作、只比數量不做安全判斷、手機不左右捲、唯讀看不到', !r.err && r.ver && r.arcList && r.arcDet && r.arcOk && r.reply && r.ownDet && r.ownOk && r.calc && r.ops && r.noHScroll && r.calcOk && r.noWait && r.types && r.ro, JSON.stringify(r));
+    check('v6.0.226 送審文件卡測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

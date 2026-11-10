@@ -27477,7 +27477,7 @@ function expScan(){
   inp.click();
 }
 // ═══════════════════ 智慧收件匣：拍照 → 自動分類 → 確認 → 歸檔 ═══════════════════
-var _INTAKE_TYPES={site_photo:'施工照片（放進當天日報）',delivery_slip:'材料簽收單（進出場紀錄）',work_confirm:'工作確認單（帶入估驗）',vendor_quote:'廠商報價單（建立成本）',vendor_invoice:'廠商發票（應付登錄）',own_material:'自有成本（材料採購發票）',settle_doc:'營造廠結算書（完工結算數量）',transfer:'匯款紀錄（應付核實）',owner_invoice:'開給業主的發票',expense:'日常費用發票',other:'其他（手動處理）'};
+var _INTAKE_TYPES={site_photo:'施工照片（放進當天日報）',delivery_slip:'材料簽收單（進出場紀錄）',work_confirm:'工作確認單（帶入估驗）',vendor_quote:'廠商報價單（建立成本）',vendor_invoice:'廠商發票（應付登錄）',own_material:'自有成本（材料採購發票）',settle_doc:'營造廠結算書（完工結算數量）',owner_reply:'業主／營造廠回覆送審結果（核定、退回）',transfer:'匯款紀錄（應付核實）',owner_invoice:'開給業主的發票',expense:'日常費用發票',other:'其他（手動處理）'};
 function _nrm(x){return String(x||'').replace(/[\s()（）\-－_／/]/g,'').toLowerCase();}
 // v6.0.119 批次 I：智慧收件匣重新上線（手機總覽黃色相機）——一次可選多張，逐張 AI 分類 → 人按確認才寫入。
 //   新增「施工照片」（放進該工地當天日報）、「材料簽收單」（記在日報 slips，管理員在材料頁對應調撥／歸還／租料）；
@@ -27550,7 +27550,7 @@ async function aiClassifyDoc(du){
       headers:{'content-type':'application/json'},
       body:JSON.stringify({model:_AI_MODEL,max_tokens:1500,messages:[{role:'user',content:[
         {type:'image',source:{type:'base64',media_type:mt,data:b64}},
-        {type:'text',text:'你是台灣擋土支撐工程公司「豐有工程」的文件分類員。'+ctx+'\n判斷這張照片的類型並擷取資料。類型定義：site_photo=工地現場施工照片（機具、鋼樁、開挖、支撐、人員作業等，不是文件）；delivery_slip=材料簽收單／出貨單／送貨單／過磅單（寫著出發地、目的地、品名、規格、支數、車號）；work_confirm=工地工作確認單/估驗單(業主或監造簽認數量)；vendor_quote=廠商給我們的報價單；vendor_invoice=工程承攬廠商（分包）的計價請款單或發票（有工程款/計價性質）；own_material=公司自購工程材料耗材的發票（鋼索、母索、止水鈑、五金、油壓配件、租金運費等，賣方為材料行/租賃商）；transfer=匯款/轉帳證明；settle_doc=營造廠或業主給我們的完工結算書／結算明細表（逐項列出工項與結算數量，通常有「結算」字樣）；owner_invoice=我們開給業主的統一發票(賣方為豐有)；expense=日常消費發票收據；other=無法判斷。\n回覆第一個字元必須是 { ，最後一個字元必須是 } ，禁止任何說明文字。JSON：{"docType":"上述其一","projectId":"從進行中專案清單比對出的id（照片或單據上的工地名、地址對得上才填，無把握則空）","vendor":"對方名稱","isSub":是否為分包廠商開的工程款發票或請款單(true/false),"items":[{"desc":"工項名","unit":"單位","qty":數量,"price":單價(無則0)}]（confirm/quote/own_material/settle_doc需要——材料發票務必逐品項列出品名/單位/數量/單價,最多12筆；結算書照表上逐項列出工項名、單位、結算數量,最多60筆）,"slip":{"from":"出發地","to":"目的地","dir":"out=公司倉庫到工地|back=工地回公司倉庫|rentIn=租賃商料場到工地|rentOut=工地退回租賃商|other","own":自有料true／租賃料false／看不出來null,"carrier":"運輸公司","truckType":"flat=平板車|crane=吊板車|空字串","truck":"車號","trips":趟數數字,"rentVendor":"租賃商（租料才填）","rentSlipNo":"租賃商進退料單號","signer":"簽收人","lift":{"has":有沒有吊車或怪手卸貨true/false,"by":"誰叫的"},"items":[{"name":"品名","spec":"規格","len":單長公尺數字或0,"qty":數量,"unit":"單位","short":短少支數或0,"dmg":損壞支數或0,"cond":"ok|repair|scrap（退回倉庫才填）"}],"low":["讀不清楚或沒把握的欄位名，例 truck、items_0_qty"]}（只有 delivery_slip 要填）,"number":"發票號碼","date":"YYYY-MM-DD（民國年請轉西元）","amount":總金額數字,"tax":稅額數字,"note":"關鍵摘要20字內","confidence":"high|low"}'}]}]})
+        {type:'text',text:'你是台灣擋土支撐工程公司「豐有工程」的文件分類員。'+ctx+'\n判斷這張照片的類型並擷取資料。類型定義：site_photo=工地現場施工照片（機具、鋼樁、開挖、支撐、人員作業等，不是文件）；delivery_slip=材料簽收單／出貨單／送貨單／過磅單（寫著出發地、目的地、品名、規格、支數、車號）；work_confirm=工地工作確認單/估驗單(業主或監造簽認數量)；vendor_quote=廠商給我們的報價單；vendor_invoice=工程承攬廠商（分包）的計價請款單或發票（有工程款/計價性質）；own_material=公司自購工程材料耗材的發票（鋼索、母索、止水鈑、五金、油壓配件、租金運費等，賣方為材料行/租賃商）；transfer=匯款/轉帳證明；settle_doc=營造廠或業主給我們的完工結算書／結算明細表（逐項列出工項與結算數量，通常有「結算」字樣）；owner_reply=業主／營造廠／監造對我們送審文件（計算書、施工圖說、施工計畫書、材料送審）的回覆（核定函、審查意見、LINE 截圖寫「核准／同意／請修正」）；owner_invoice=我們開給業主的統一發票(賣方為豐有)；expense=日常消費發票收據；other=無法判斷。\n回覆第一個字元必須是 { ，最後一個字元必須是 } ，禁止任何說明文字。JSON：{"docType":"上述其一","projectId":"從進行中專案清單比對出的id（照片或單據上的工地名、地址對得上才填，無把握則空）","vendor":"對方名稱","isSub":是否為分包廠商開的工程款發票或請款單(true/false),"items":[{"desc":"工項名","unit":"單位","qty":數量,"price":單價(無則0)}]（confirm/quote/own_material/settle_doc需要——材料發票務必逐品項列出品名/單位/數量/單價,最多12筆；結算書照表上逐項列出工項名、單位、結算數量,最多60筆）,"slip":{"from":"出發地","to":"目的地","dir":"out=公司倉庫到工地|back=工地回公司倉庫|rentIn=租賃商料場到工地|rentOut=工地退回租賃商|other","own":自有料true／租賃料false／看不出來null,"carrier":"運輸公司","truckType":"flat=平板車|crane=吊板車|空字串","truck":"車號","trips":趟數數字,"rentVendor":"租賃商（租料才填）","rentSlipNo":"租賃商進退料單號","signer":"簽收人","lift":{"has":有沒有吊車或怪手卸貨true/false,"by":"誰叫的"},"items":[{"name":"品名","spec":"規格","len":單長公尺數字或0,"qty":數量,"unit":"單位","short":短少支數或0,"dmg":損壞支數或0,"cond":"ok|repair|scrap（退回倉庫才填）"}],"low":["讀不清楚或沒把握的欄位名，例 truck、items_0_qty"]}（只有 delivery_slip 要填）,"reply":{"doc":"回覆的是哪份文件（名稱或類別）","ver":"版次（例 v3，沒寫空字串）","result":"ok=核定同意|back=退回修改","note":"意見重點20字內"}（只有 owner_reply 要填）,"number":"發票號碼","date":"YYYY-MM-DD（民國年請轉西元）","amount":總金額數字,"tax":稅額數字,"note":"關鍵摘要20字內","confidence":"high|low"}'}]}]})
     });
     var d=await r.json();
     if(d.error){toast(''+(d.error.message||'').slice(0,60));_ikNext();return;}
@@ -27717,7 +27717,8 @@ function _intakeRoute(type,qid,r,du){
   if(type==='delivery_slip')return _ikSlipSave(qid,r,du);
   if(type!=='other'&&!_ikAdmin()){toast('這類單據要由管理員登錄');return false;}
   if(qid)_ikSetLastProj(qid);
-  if(type==='settle_doc')return _stlFromIntake(qid,r,du);   // v6.0.226 結算書 → 今天頁拍板卡
+  if(type==='settle_doc')return _stlFromIntake(qid,r,du);
+  if(type==='owner_reply')return _sdocReplyFromIntake(qid,r,du);   // v6.0.226 業主回覆送審 → 今天頁拍板卡   // v6.0.226 結算書 → 今天頁拍板卡
   if(type==='work_confirm'){
     if(!qid){toast('請選擇歸屬專案');return;}
     _projAttachFile(qid,'confirm','智慧收件_確認單_'+today+'.jpg',du);
@@ -44363,7 +44364,7 @@ function _pjSubmHtml(q){
     h+='<div style="font-size:12px;font-weight:800;color:var(--b5);margin:8px 0 4px">'+esc(c)+'（'+A.length+'）</div>';
     A.forEach(function(d){var st=d.st in _SDOC_ST?d.st:'wait',clr=st==='ok'?'var(--g3)':(st==='back'?'var(--red)':'#b26a00');
       h+='<div class="sdoc-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--b1)">'
-        +'<a href="javascript:void(0)" onclick="sdocOpen(\''+esc(q.id)+'\',\''+esc(d.id)+'\')" style="flex:1 1 180px;min-width:0;font-size:12.5px;font-weight:700;color:var(--b5);overflow-wrap:anywhere">'+esc(d.name)+'</a>'
+        +'<a href="javascript:void(0)" onclick="sdocOpen(\''+esc(q.id)+'\',\''+esc(d.id)+'\')" style="flex:1 1 180px;min-width:0;font-size:12.5px;font-weight:700;color:var(--b5);overflow-wrap:anywhere">'+(d.ver?'<span style="color:#1565C0">'+esc(d.ver)+'</span> ':'')+esc(d.name)+(d.reply&&d.reply.st==='pending'?' <span style="font-size:11px;color:#b26a00">（業主回覆待確認）</span>':'')+(d.calc&&d.calc.st==='done'?' <span style="font-size:11px;color:'+(d.calc.nDiff?'var(--red)':'var(--g3)')+'">（計算書'+(d.calc.nDiff?'差異 '+d.calc.nDiff+' 項':'數量相符')+'）</span>':'')+'</a>'
         +'<span style="font-size:11px;color:var(--b3)">'+esc(d.at?new Date(d.at).toLocaleDateString('zh-TW'):'')+(d.by?('・'+esc(String(d.by).split('@')[0])):'')+(d.size?('・'+Math.max(1,Math.round(d.size/1024))+' KB'):'')+'</span>'
         +(ro?'<span style="font-size:11.5px;font-weight:700;color:'+clr+'">'+_SDOC_ST[st]+'</span>'
           :('<select data-sdoc="'+esc(d.id)+'" onchange="sdocSt(\''+esc(q.id)+'\',this)" style="font-size:11.5px;color:'+clr+'">'+Object.keys(_SDOC_ST).map(function(k){return '<option value="'+k+'"'+(k===st?' selected':'')+'>'+_SDOC_ST[k]+'</option>';}).join('')+'</select>'
@@ -44395,7 +44396,7 @@ function _sdocPut(qid,f,cat){
         task.snapshot.ref.getDownloadURL().then(function(url){
           var p2=_prjOfQ(qid);if(!p2){res(false);return;}var m=_sdocMap(p2);
           m[id]={id:id,name:String(f.name||safe).slice(0,120),path:path,cat:_SDOC_CATS.indexOf(cat)>=0?cat:'其他',st:'wait',at:now,by:_mvMe(),size:f.size||0,url:url};
-          _sdocSave(p2,m);toast('已上傳：'+(f.name||''));res(true);
+          _sdocSave(p2,m);toast('已上傳：'+(f.name||''));try{_sdocAfterPut(qid,id,f);}catch(e2){_err('_sdocPut.after',e2);}res(true);   // v6.0.226 猜版次、計算書讀數量 → 今天頁拍板卡
         }).catch(function(e){_err('_sdocPut.url',e);toast('取得檔案連結失敗');res(false);});
       });
     }catch(e){_err('_sdocPut',e);toast('上傳失敗');res(false);}
@@ -44748,6 +44749,151 @@ _decReg('stlAi',{
     return [{label:'對到合約工項',value:_stlAiRows(a).filter(function(x){return x.key&&x.qty!=null;}).length+'／'+_stlAiRows(a).length+' 項'},{label:'差異',value:R.nDiff?(R.nDiff+' 項'):'全部相符'},{label:'金額影響（未稅）',value:(R.sumAmt>0?'+':'')+fmt(R.sumAmt),money:true}];},
   detail:function(it){return _stlAiDetail(it);},
   ok:function(it){return _stlAiOk(it);},reject:function(it,why){return _stlAiReject(it,why);},edit:function(it){_stlAiEdit(it);}
+});
+// ══════════ v6.0.226 第 7 步 7c：送審文件三張拍板卡（陳軒 11/10 派工；第 3 層＝只做紀錄與比對，不做任何安全判斷）══════════
+// 都存在專案送審文件那一筆 p.docs[id]（規則 docs/$d 只要求 name、path，其他欄位照存，不加節點）：
+//   ① 歸檔 sdocArc：上傳後系統依檔名（v3／第 3 版／R3）或同類上一版＋1 猜版次 d.ver、d.verSrc；確認＝d.verOk；修改＝改類別／版次；退回＝d.verSkip（不記版次）
+//   ② 業主回覆 sdocOwner：智慧收件「業主／營造廠回覆送審結果」→ 對到送審中的文件 d.reply={st:'pending',res:'ok'|'back',ver,note,url,guess}；確認＝d.st 改成已核定／退回修改
+//   ③ 技師計算書 sdocCalc：計算書類別上傳後 AI 讀數量表 d.calc={st:'pending',rows:[{text,qty,unit,key}]}，跟報價工項數量比；有差異確認後另建改單草稿（qchg）
+function _sdocVerN(v){var n=parseInt(String(v||'').replace(/\D/g,''),10);return n>0?n:0;}
+function _sdocVerGuess(p,d){
+  var nm=String(d.name||''),m=nm.match(/(?:^|[^a-z0-9])v\.?\s?(\d{1,3})(?!\d)/i)||nm.match(/第\s*(\d{1,3})\s*版/)||nm.match(/(?:^|[^a-z0-9])r(?:ev)?\.?\s?(\d{1,3})(?!\d)/i);
+  if(m)return {ver:'v'+parseInt(m[1],10),src:'檔名'};
+  var prev=_sdocList(p).filter(function(x){return x.id!==d.id&&x.cat===d.cat&&(x.at||0)<=(d.at||0)&&!x.verSkip;}),mx=0;prev.forEach(function(x){mx=Math.max(mx,_sdocVerN(x.ver));});
+  return {ver:'v'+(Math.max(mx,prev.length)+1),src:prev.length?'同類上一版＋1':'同類第一份'};
+}
+function _sdocUpd(qid,id,fn){var p=_prjOfQ(qid);if(!p)return false;var m=_sdocMap(p),d=m[id];if(!d)return false;var nd=Object.assign({},d);if(fn(nd,p)===false)return false;m[id]=nd;_sdocSave(p,m);return true;}
+function _sdocAfterPut(qid,id,f){
+  _sdocUpd(qid,id,function(d,p){var g=_sdocVerGuess(p,d);d.ver=g.ver;d.verSrc=g.src;});
+  var p=_prjOfQ(qid),d=p&&_sdocMap(p)[id];
+  if(d&&d.cat==='計算書'&&f&&(/pdf$/i.test(f.type||'')||/^image\//.test(f.type||''))&&f.size<20*1024*1024)try{_sdocCalcRead(qid,id,f);}catch(e){_err('_sdocAfterPut.calc',e);}
+}
+function _sdocCards(test){var L=[];(PROJECTS||[]).forEach(function(p){if(!p||p.voidAt)return;_sdocList(p).forEach(function(d){if(test(d))L.push({qid:p.qid,pid:p.id,id:d.id,at:d.at||0});});});return L.sort(function(a,b){return a.at-b.at;});}
+function _sdocGet(it){var p=_prjOfQ(it.qid);return {p:p,q:_prjMainQ(p),d:p&&_sdocMap(p)[it.id]};}
+// 原檔預覽：讀不到＝回空（拍板卡不解鎖確認）
+function _sdocPvHtml(url,name){
+  return _vbSrcUrl(url).then(function(u){if(!u)return '';
+    var pdf=/^data:application\/pdf/.test(u)||/\.pdf(\?|$)/i.test(String(name||''))||/%2Epdf|\.pdf/i.test(u.split('?')[0]);
+    return '<div style="font-size:12px;color:var(--b4);margin-bottom:3px">原檔：'+esc(String(name||'').slice(0,80))+'</div>'+(pdf?'<iframe src="'+esc(u)+'" style="width:100%;height:420px;border:1px solid var(--b1);border-radius:6px" title="原檔"></iframe>':'<img src="'+esc(u)+'" alt="原檔" style="max-width:100%;border:1px solid var(--b1);border-radius:6px">');});
+}
+function _sdocHistHtml(p,d){
+  var L=_sdocList(p).filter(function(x){return x.cat===d.cat&&!x.verSkip;}).sort(function(a,b){return (a.at||0)-(b.at||0);});
+  if(L.length<2)return '<div style="font-size:11.5px;color:var(--b4);margin-top:6px">這是「'+esc(d.cat)+'」第一份</div>';
+  return '<div style="font-size:12px;margin-top:8px"><b>「'+esc(d.cat)+'」歷次</b></div><table class="tbl" style="font-size:12px"><thead><tr><th>版次</th><th>檔名</th><th>上傳</th><th>狀態</th></tr></thead><tbody>'
+    +L.map(function(x){return '<tr'+(x.id===d.id?' style="background:#fff8f0"':'')+'><td>'+esc(x.ver||'—')+'</td><td style="overflow-wrap:anywhere">'+esc(x.name)+'</td><td>'+esc(x.at?new Date(x.at).toISOString().slice(0,10):'')+'</td><td>'+esc(_SDOC_ST[x.st]||'送審中')+'</td></tr>';}).join('')+'</tbody></table>';
+}
+// ① 歸檔
+_decReg('sdocArc',{
+  title:'送審文件歸檔',todo:function(n){return '送審文件歸檔 '+n+' 份';},sub:'系統依檔名或上一版猜好版次：確認＝記下版次；修改＝改類別或版次；退回＝不記版次',
+  canSee:function(){return !_isReaderUser;},
+  list:function(){return _sdocCards(function(d){return d.ver&&!d.verOk&&!d.verSkip;});},
+  key:function(it){return it.pid+'|'+it.id;},
+  head:function(it){var g=_sdocGet(it);return g.d?((g.q?g.q.name:'')+'：'+g.d.cat+' '+(g.d.ver||'')):'';},
+  fields:function(it){var g=_sdocGet(it);if(!g.d)return [];return [{label:'檔名',value:g.d.name},{label:'類別',value:g.d.cat},{label:'版次',value:(g.d.ver||'')+'（'+(g.d.verSrc||'')+'）'}];},
+  detail:function(it){var g=_sdocGet(it);if(!g.d)return '';return _sdocPvHtml(g.d.url,g.d.name).then(function(pv){return pv?pv+_sdocHistHtml(g.p,g.d):'';});},
+  ok:function(it){return _sdocUpd(it.qid,it.id,function(d){if(d.verOk)return false;d.verOk=Date.now();d.verBy=_mvMe();});},
+  reject:function(it,why){return _sdocUpd(it.qid,it.id,function(d){d.verSkip=Date.now();d.verSkipWhy=String(why||'').slice(0,200);});},
+  edit:function(it){var g=_sdocGet(it);if(!g.d)return;var IN='box-sizing:border-box;font-size:13px;padding:6px 7px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;width:100%';
+    showConfirm('修改送審文件歸檔','<div style="font-size:12px;margin-bottom:4px">類別</div><select id="sdoc-e-cat" style="'+IN+'">'+_SDOC_CATS.map(function(c){return '<option'+(c===g.d.cat?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select>'
+      +'<div style="font-size:12px;margin:8px 0 4px">版次</div><input id="sdoc-e-ver" value="'+esc(g.d.ver||'')+'" style="'+IN+'">',function(){
+      var c=(document.getElementById('sdoc-e-cat')||{}).value,v=String((document.getElementById('sdoc-e-ver')||{}).value||'').trim().slice(0,20);
+      if(_sdocUpd(it.qid,it.id,function(d){if(_SDOC_CATS.indexOf(c)>=0)d.cat=c;if(v){d.ver=/^\d+$/.test(v)?'v'+v:v;d.verSrc='手動';}}))_decRefresh('sdocArc');},false);}
+});
+// ② 業主回覆
+function _sdocReplyFromIntake(qid,r,du){
+  var p=_prjOfQ(qid);if(!qid||!p){toast('請選擇是哪個工程的回覆');return false;}
+  var rp=(r&&typeof r.reply==='object'&&r.reply)?r.reply:{},res=rp.result==='back'?'back':'ok',ver=_draftS(rp.ver).slice(0,20),txt=_draftS(rp.doc).slice(0,60);
+  var W=_sdocList(p).filter(function(d){return (d.st||'wait')==='wait';});
+  if(!W.length){toast('這個工程沒有送審中的文件，回覆先收在 LINE 收件匣／照片');return false;}
+  var vn=_sdocVerN(ver),hit=W.filter(function(d){var okC=!txt||String(txt).indexOf(d.cat)>=0||String(d.name).indexOf(txt)>=0;var okV=!vn||_sdocVerN(d.ver)===vn;return okC&&okV;});
+  var d=hit.length===1?hit[0]:W[0],guess=hit.length!==1;
+  var ok=_sdocUpd(qid,d.id,function(nd){nd.reply={st:'pending',at:Date.now(),by:_mvMe(),res:res,ver:ver,doc:txt,note:_draftS(rp.note||r.note).slice(0,80),url:du?_photoPut(du):'',file:'回覆_'+localToday()+'.jpg',guess:guess};});
+  if(ok){toast('已收業主回覆：到「今天」的「業主回覆送審」確認');try{updateDashTodo();}catch(e){_err('_sdocReplyFromIntake',e);}}
+  return ok;
+}
+_decReg('sdocOwner',{
+  title:'業主回覆送審',todo:function(n){return '業主回覆送審 '+n+' 件';},sub:'業主／營造廠的回覆對到送審中的文件：確認＝改成已核定或退回修改；修改＝換對應文件或結果；退回＝不算',
+  canSee:function(){return !_isReaderUser;},
+  list:function(){return _sdocCards(function(d){return d.reply&&d.reply.st==='pending';});},
+  key:function(it){return it.pid+'|'+it.id+'|'+((_sdocGet(it).d||{}).reply||{}).at;},
+  head:function(it){var g=_sdocGet(it);if(!g.d)return '';var r=g.d.reply;return (g.q?g.q.name:'')+'：業主'+(r.res==='back'?'退回修改 ':'已確認 ')+g.d.cat+' '+(g.d.ver||'');},
+  fields:function(it){var g=_sdocGet(it);if(!g.d)return [];var r=g.d.reply;return [{label:'對到的文件',value:g.d.name+(r.guess?'（系統猜的，請核對）':'')},{label:'回覆寫的版次',value:r.ver||'（沒寫）'},{label:'意見',value:r.note||'—'}];},
+  detail:function(it){var g=_sdocGet(it);if(!g.d)return '';var r=g.d.reply;
+    return _sdocPvHtml(r.url,'業主回覆').then(function(pv){if(!pv)return '';
+      var warn=(r.guess?'<div style="color:var(--red);font-size:12px;margin-top:6px">送審中的文件不只一份、對不準，系統先對到最新的一份；不對請按「修改」</div>':'')
+        +(r.ver&&_sdocVerN(r.ver)!==_sdocVerN(g.d.ver)?'<div style="color:var(--red);font-size:12px">回覆寫 '+esc(r.ver)+'，系統裡是 '+esc(g.d.ver||'沒有版次')+'</div>':'');
+      return pv+warn+_sdocHistHtml(g.p,g.d);});},
+  ok:function(it){return _sdocUpd(it.qid,it.id,function(d){if(!d.reply||d.reply.st!=='pending')return false;d.st=d.reply.res==='back'?'back':'ok';d.stAt=Date.now();d.stBy=_mvMe();d.reply=Object.assign({},d.reply,{st:'done',doneAt:d.stAt});});},
+  reject:function(it,why){return _sdocUpd(it.qid,it.id,function(d){if(!d.reply)return false;d.reply=Object.assign({},d.reply,{st:'rejected',why:String(why||'').slice(0,200),doneAt:Date.now()});});},
+  edit:function(it){var g=_sdocGet(it);if(!g.d)return;var W=_sdocList(g.p),IN='box-sizing:border-box;font-size:13px;padding:6px 7px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;width:100%';
+    showConfirm('修改業主回覆','<div style="font-size:12px;margin-bottom:4px">是哪一份文件的回覆</div><select id="sdoc-r-doc" style="'+IN+'">'+W.map(function(d){return '<option value="'+esc(d.id)+'"'+(d.id===g.d.id?' selected':'')+'>'+esc(d.cat+' '+(d.ver||'')+'｜'+d.name)+'</option>';}).join('')+'</select>'
+      +'<div style="font-size:12px;margin:8px 0 4px">結果</div><select id="sdoc-r-res" style="'+IN+'"><option value="ok"'+(g.d.reply.res!=='back'?' selected':'')+'>已核定</option><option value="back"'+(g.d.reply.res==='back'?' selected':'')+'>退回修改</option></select>',function(){
+      var to=(document.getElementById('sdoc-r-doc')||{}).value,res=(document.getElementById('sdoc-r-res')||{}).value==='back'?'back':'ok',rp=Object.assign({},g.d.reply,{res:res,guess:false});
+      var p=_prjOfQ(it.qid),m=_sdocMap(p);if(!m[to])return;
+      if(to!==g.d.id){var a=Object.assign({},m[g.d.id]);delete a.reply;m[g.d.id]=a;}
+      m[to]=Object.assign({},m[to],{reply:rp});_sdocSave(p,m);_decRefresh('sdocOwner');},false,null,true);}
+});
+// ③ 技師計算書：AI 讀數量表 → 跟報價工項數量比
+function _sdocCalcItems(q){var L=[];(q&&q.items||[]).forEach(function(it,i){if(!it||it.sec||it.spare)return;if(typeof _qNegLine==='function'&&_qNegLine(it))return;L.push({key:_stlKey(it,i),idx:i,desc:String(it.desc||'').split('\n')[0].trim(),unit:it.unit||'',qty:parseFloat(it.qty)||0,price:parseFloat(it.price)||0});});return L;}
+function _sdocCalcCmp(q,c){
+  var by={};_sdocCalcItems(q).forEach(function(x){by[x.key]=x;});var cnt={};_prjArr(c&&c.rows).forEach(function(x){if(x&&x.key)cnt[x.key]=(cnt[x.key]||0)+1;});
+  var rows=_prjArr(c&&c.rows).filter(function(x){return x&&x.text;}).map(function(x){var it=x.key&&by[x.key];var diff=(it&&x.qty!=null)?Math.round((x.qty-it.qty)*1000)/1000:null;
+    return {text:x.text,unit:x.unit,qty:x.qty,key:x.key,it:it||null,diff:diff,amt:diff?Math.round(diff*it.price):0,dup:x.key&&cnt[x.key]>1};});
+  var nd=rows.filter(function(r){return r.diff;}).length;return {rows:rows,nDiff:nd,sumAmt:rows.reduce(function(a,r){return a+r.amt;},0),nOk:rows.filter(function(r){return r.it&&r.qty!=null;}).length};
+}
+function _sdocCalcRead(qid,id,f){
+  if(!_aiOn())return Promise.resolve(false);
+  var q=_prjMainQ(_prjOfQ(qid));if(!q)return Promise.resolve(false);
+  var its=_sdocCalcItems(q).map(function(x){return x.desc+'（'+x.unit+'）';}).slice(0,60);
+  toast('AI 讀計算書的數量表中…');
+  return new Promise(function(res,rej){var rd=new FileReader();rd.onload=function(){res(String(rd.result));};rd.onerror=rej;rd.readAsDataURL(f);}).then(function(du){
+    var b64=du.split(',')[1],mt=(du.match(/^data:([^;]+)/)||[])[1]||'application/pdf';
+    var blk=/pdf/.test(mt)?{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}}:{type:'image',source:{type:'base64',media_type:mt,data:b64}};
+    return _aiFetch({method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({model:_AI_MODEL,max_tokens:3000,messages:[{role:'user',content:[blk,{type:'text',text:'這是技師給的擋土支撐結構計算書。只抽出材料或工項的「數量」（例如 H 型鋼樁幾支、支撐幾 M、中間樁幾支），不要做任何安全判斷或評論。報價工項清單供對照：'+JSON.stringify(its)+'\n回覆第一個字元必須是 { ，最後一個字元必須是 } ，禁止任何說明文字。JSON：{"items":[{"desc":"計算書上的工項或材料名","unit":"單位","qty":數量}],"confidence":"high|low"}，最多 60 筆。'}]}]})});
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.error){toast('計算書讀不出來：'+String(d.error.message||'').slice(0,40));return false;}
+    var j=_aiJson((d.content||[]).map(function(b){return b.text||'';}).join(''))||{};return _sdocCalcSet(qid,id,j);
+  }).catch(function(e){_err('_sdocCalcRead',e);toast('計算書讀取失敗');return false;});
+}
+function _sdocCalcSet(qid,id,j){
+  var q=_prjMainQ(_prjOfQ(qid));if(!q)return false;
+  var rows=(Array.isArray(j&&j.items)?j.items:[]).slice(0,60).map(function(it){it=it||{};var t=_draftS(it.desc).slice(0,120),u=_draftS(it.unit).slice(0,10),v=_aiNum(it.qty);return {text:t,unit:u,qty:isFinite(v)?Math.round(v*1000)/1000:null,key:_stlAiMatch(q,t,u)};}).filter(function(x){return x.text;});
+  if(!rows.length){toast('計算書沒讀到數量表');return false;}
+  var ok=_sdocUpd(qid,id,function(d){d.calc={st:'pending',at:Date.now(),rows:rows,low:j.confidence==='low'};});
+  if(ok){toast('技師計算書讀好了：到「今天」的「技師計算書回來」看比對');try{updateDashTodo();}catch(e){_err('_sdocCalcSet',e);}}
+  return ok;
+}
+function _sdocCalcOps(q,c){return _sdocCalcCmp(q,c).rows.filter(function(r){return r.it&&r.diff&&!r.dup;}).map(function(r){return {op:'set',idx:r.it.idx,match:r.it.desc,fields:{qty:r.qty}};});}
+_decReg('sdocCalc',{
+  title:'技師計算書回來',todo:function(n){return '技師計算書回來 '+n+' 份';},sub:'AI 讀了計算書的數量表、跟報價工項數量比（只比數量，不做安全判斷）：確認＝記下比對結果，有差異另建改單草稿；退回＝不用；修改＝改數量或對應工項',
+  canSee:function(){return _decIsAdmin();},
+  list:function(){return _sdocCards(function(d){return d.calc&&d.calc.st==='pending';});},
+  key:function(it){return it.pid+'|'+it.id+'|'+((_sdocGet(it).d||{}).calc||{}).at;},
+  head:function(it){var g=_sdocGet(it);if(!g.d||!g.q)return '';var R=_sdocCalcCmp(g.q,g.d.calc);return g.q.name+'：技師計算書 '+(g.d.ver||'')+(R.nDiff?('，差異 '+R.nDiff+' 項'):'，數量相符');},
+  fields:function(it){var g=_sdocGet(it);if(!g.d||!g.q)return [];var R=_sdocCalcCmp(g.q,g.d.calc);return [{label:'對到報價工項',value:R.nOk+'／'+R.rows.length+' 項'},{label:'差異',value:R.nDiff?(R.nDiff+' 項'):'相符'},{label:'金額影響（未稅）',value:(R.sumAmt>0?'+':'')+fmt(R.sumAmt),money:true}];},
+  detail:function(it){var g=_sdocGet(it);if(!g.d||!g.q)return '';var R=_sdocCalcCmp(g.q,g.d.calc),C=function(v){return v>0?'#1565C0':'var(--red)';};
+    var tb='<div style="font-size:12px;margin:8px 0 4px"><b>只比數量，不做安全判斷</b>（結構安全由技師與 Lotion 把關）'+(g.d.calc.low?'<span style="color:var(--red)">　AI 說這份不太清楚，請逐項對照原檔</span>':'')+'</div>'
+      +'<table class="tbl" style="font-size:12px"><thead><tr><th>計算書品名</th><th style="text-align:right">計算書數量</th><th>對到的報價工項</th><th style="text-align:right">報價數量</th><th style="text-align:right">差異</th><th style="text-align:right">金額影響（未稅）</th></tr></thead><tbody>'
+      +R.rows.map(function(r){return '<tr><td>'+esc(r.text)+(r.unit?'（'+esc(r.unit)+'）':'')+'</td><td style="text-align:right">'+(r.qty==null?'<span style="color:var(--red)">沒讀到</span>':_rfmt(r.qty))+'</td>'
+        +'<td>'+(r.it?esc(r.it.desc)+(r.dup?'<div style="color:var(--red);font-size:11px">有好幾列對到這項，要先修改</div>':''):'<span style="color:#b26a00">沒對到報價工項</span>')+'</td><td style="text-align:right">'+(r.it?_rfmt(r.it.qty):'—')+'</td>'
+        +'<td style="text-align:right">'+(r.diff?'<b style="color:'+C(r.diff)+'">'+(r.diff>0?'+':'')+_rfmt(r.diff)+'</b>':(r.it&&r.qty!=null?'<span style="color:var(--g3)">相符</span>':'—'))+'</td>'
+        +'<td style="text-align:right;white-space:nowrap">'+(r.amt?'<b style="color:'+C(r.amt)+'">'+(r.amt>0?'+':'')+fmt(r.amt)+'</b>':'—')+'</td></tr>';}).join('')+'</tbody></table>'
+      +'<div style="font-size:12px;margin-top:6px">'+(R.nDiff?('差異 '+R.nDiff+' 項、金額影響（未稅）<b style="color:'+C(R.sumAmt)+'">'+(R.sumAmt>0?'+':'')+fmt(R.sumAmt)+'</b>；確認後另建「改單草稿」，在今天頁再確認才改報價'):'<span style="color:var(--g3)">對到的工項數量都跟報價相符</span>')+'</div>';
+    return _sdocPvHtml(g.d.url,g.d.name).then(function(pv){return pv?pv+tb:'';});},
+  ok:function(it){var g=_sdocGet(it);if(!g.d||!g.q)return false;var R=_sdocCalcCmp(g.q,g.d.calc);if(R.rows.some(function(r){return r.dup;})){toast('有好幾列對到同一個報價工項，請按「修改」選清楚');return false;}
+    var ops=_sdocCalcOps(g.q,g.d.calc);
+    var ok=_sdocUpd(it.qid,it.id,function(d){if(!d.calc||d.calc.st!=='pending')return false;d.calc=Object.assign({},d.calc,{st:'done',doneAt:Date.now(),doneBy:_mvMe(),nDiff:R.nDiff,sumAmt:R.sumAmt});});
+    if(ok&&ops.length){if(typeof fyQuoteChange==='function'&&_fbUser)fyQuoteChange({qid:g.q.id,ops:ops,summary:(g.q.code||'')+' '+(g.q.name||'')+' 依技師計算書 '+(g.d.ver||'')+' 改數量 '+ops.length+' 項'}).then(function(r){toast(r&&r.ok?'已建改單草稿，在「今天」確認才會改報價':'改單草稿沒建成：'+((r&&r.why)||'').slice(0,60));}).catch(function(e){_err('sdocCalc.qchg',e);});
+      else toast('計算書有 '+ops.length+' 項跟報價數量不同；要改報價請登入後到報價頁改');}
+    return ok;},
+  reject:function(it,why){return _sdocUpd(it.qid,it.id,function(d){if(!d.calc)return false;d.calc=Object.assign({},d.calc,{st:'rejected',why:String(why||'').slice(0,200),doneAt:Date.now()});});},
+  edit:function(it){var g=_sdocGet(it);if(!g.d||!g.q)return;var c=g.d.calc,opts=[{k:'',t:'（不比）'}].concat(_sdocCalcItems(g.q).map(function(x){return {k:x.key,t:x.desc.slice(0,40)};}));
+    var IN='box-sizing:border-box;font-size:13px;padding:6px 7px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
+    var h=_prjArr(c.rows).map(function(x,i){return '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 0;border-top:1px solid var(--b1)"><div style="flex:1 1 100%;font-size:12.5px"><b>'+esc(x.text)+'</b>'+(x.unit?'（'+esc(x.unit)+'）':'')+'</div>'
+      +'<input type="number" step="any" inputmode="decimal" data-scq="'+i+'" value="'+(x.qty==null?'':esc(String(x.qty)))+'" style="'+IN+';width:100px;text-align:right"><select data-sck="'+i+'" style="'+IN+';flex:1 1 180px;min-width:0">'+opts.map(function(o){return '<option value="'+esc(o.k)+'"'+(o.k===(x.key||'')?' selected':'')+'>'+esc(o.t)+'</option>';}).join('')+'</select></div>';}).join('');
+    showConfirm('修改計算書讀到的數量',h,function(){var rows=_prjArr(c.rows).map(function(x,i){var qi=document.querySelector('[data-scq="'+i+'"]'),ki=document.querySelector('[data-sck="'+i+'"]'),raw=qi?String(qi.value||'').trim():'',v=raw===''?null:parseFloat(raw);
+      return Object.assign({},x,{qty:(v==null||!isFinite(v))?null:Math.round(v*1000)/1000,key:ki?ki.value:x.key});});
+      if(_sdocUpd(it.qid,it.id,function(d){d.calc=Object.assign({},d.calc,{rows:rows,editAt:Date.now()});}))_decRefresh('sdocCalc');},false,null,true);}
 });
 function stlSet(el){
   if(_isReaderUser){toast('唯讀帳號不能修改');return;}
