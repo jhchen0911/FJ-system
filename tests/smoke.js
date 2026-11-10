@@ -13347,6 +13347,37 @@ async function newPage(browser, width, height) {
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.225 發包詢價單草稿卡（陳軒 11/10 新佇列第 4 件）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keep = { Q: Q, C: CONTRACTS.slice(), F: _RFQD_FROM, dp: window._docPrint };
+      try {
+        window.toast = () => {}; window._immediateUpload = () => {}; _RFQD_FROM = 0;
+        let printed = null; window._docPrint = (k, c) => { printed = { k, no: c.r.no }; return {}; };
+        Q = [{ id: 'qR1', code: 'R01', name: '範例發包案', client: '範例營造甲', awarded: true, ver: 1, _mt: 1,
+          items: [{ desc: 'H型鋼樁打設\n（H300，L=12M）', unit: '支', qty: '40', price: '3000' }, { desc: 'H型鋼樁拔除', unit: '支', qty: '40', price: '1500' }, { desc: '水平支撐組立及拆除', unit: 'M', qty: '200', price: '800' }, { desc: '備用：H型鋼樁', unit: '支', qty: '1', price: '3000', spare: true }],
+          rfqs: [] }];
+        CONTRACTS.length = 0; CONTRACTS.push({ id: 'cR1', name: '範例發包案', linkedQid: 'qR1', start: '2099-01-05', end: '2099-03-31', amount: 1 });
+        const rows = _rfqdRows();
+        out.rows = rows.length === 2 && rows.some((x) => x.kind === 'hpile' && x.idx.join() === '0,1') && rows.some((x) => x.kind === 'strut' && x.idx.join() === '2');
+        const hp = rows.find((x) => x.kind === 'hpile');
+        const x = document.createElement('div'); x.innerHTML = _DEC.rfqDraft.detail(hp); const t = x.textContent;
+        out.detail = /H 型鋼樁/.test(t) && /H型鋼樁打設/.test(t) && /2099-01-05 ～ 2099-03-31/.test(t) && /計價方式/.test(t) && !!x.querySelector('iframe[srcdoc]') && /分項工程詢價單/.test(x.querySelector('iframe').getAttribute('srcdoc'));
+        out.ok = _DEC.rfqDraft.ok(hp) === true && Q[0].rfqs.length === 1 && Q[0].rfqs[0].items.map((i) => i.idx).join() === '0,1' && Q[0].rfqs[0].entry === '2099-01-05' && !!Q[0].rfqs[0].cond && printed && printed.k === 'rfq' && printed.no === Q[0].rfqs[0].no;
+        out.left = _rfqdRows().length === 1 && _rfqdRows()[0].kind === 'strut';
+        out.again = _DEC.rfqDraft.ok(hp) === false && Q[0].rfqs.length === 1;
+        out.rej = _DEC.rfqDraft.reject(_rfqdRows()[0]) === true && !!Q[0].rfqDSkip.strut && _rfqdRows().length === 0;
+        _RFQD_FROM = Date.now() + 86400000; Q[0].rfqDSkip = {}; out.cut = _rfqdRows().length === 0;   // 上線前得標的舊案不出
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keep.Q; CONTRACTS.length = 0; keep.C.forEach((c) => CONTRACTS.push(c)); _RFQD_FROM = keep.F; window._docPrint = keep.dp;
+      return out;
+    });
+    check('v6.0.225 發包詢價單草稿卡：得標案還沒詢價的工項依類別出卡（備用單價不算）；明細有工項、數量、工期、付款條件、詢價單預覽；確認建詢價單並開 PDF；退回＝這類不發包；上線前得標的不出', !r.err && r.rows && r.detail && r.ok && r.left && r.again && r.rej && r.cut, JSON.stringify(r));
+    check('v6.0.225 詢價單草稿卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.225 報價已送出紀錄＋7 天沒回音追問卡（陳軒 11/10 新佇列第 3 件）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

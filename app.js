@@ -41638,6 +41638,64 @@ function _d6Detail(d){
   }
   return h;
 }
+// ══════════ v6.0.225 發包詢價單草稿卡（陳軒 11/10 新佇列第 4 件；第 2 層：卡片只給建議，看過明細才能確認）══════════
+// 得標的案子（_m8AwAt 在 _RFQD_FROM 之後、還沒結案），報價工項還沒有任何詢價單涵蓋的（_rfqCoverOf 空），照工項類別（FJC.bid.kind）一類一張卡：
+//   「詢價單草稿：○○案 H 型鋼樁」明細＝工項、數量（有請款結算數量用結算的，同 rfqEdit）、工期（合約開工～完工）、付款條件（新詢價單預設＝營造廠背對背 _b2bDefCond，
+//   同 _rfqCond）＋背對背提醒、詢價單 A4 預覽（跟正式那張同一個出件 _docOut('rfq')）。
+//   確認＝建詢價單（同 _rfqSave 的欄位）＋開 PDF 給 Lotion 傳廠商；退回＝這類不發包（q.rfqDSkip[類別]）；修改＝開發包頁新增詢價單自己勾。
+var _RFQD_FROM=Date.parse('2026-11-10T00:00:00+08:00');
+function _rfqdKindL(k){var K=(typeof FJC!=='undefined'&&FJC.bid&&FJC.bid.KINDS)||{};return K[k]||(k==='other'?'其他工項':k);}
+function _rfqdRows(){
+  var out=[];
+  (Q||[]).forEach(function(q){
+    if(!q||!q.awarded||q.closed)return;var aw=0;try{aw=_m8AwAt(q);}catch(e){_err('_rfqdRows.aw',e);}if(!(aw>=_RFQD_FROM))return;
+    var by={},sk=(q.rfqDSkip&&typeof q.rfqDSkip==='object')?q.rfqDSkip:{};
+    (q.items||[]).forEach(function(it,i){if(!it||it.sec||_isSpare(it)||_qNegLine(it))return;if(!((parseFloat(it.qty)||0)>0))return;if(_rfqCoverOf(q,i,null).length)return;
+      var k=FJC.bid.kind(it.desc);if(sk[k])return;(by[k]=by[k]||[]).push(i);});
+    Object.keys(by).forEach(function(k){out.push({q:q,kind:k,label:_rfqdKindL(k),idx:by[k],key:q.id+'|'+k});});
+  });
+  return out;
+}
+function _rfqdCt(q){return (CONTRACTS||[]).find(function(c){return c&&c.linkedQid===q.id;})||null;}
+// 組一張詢價單（還沒存）：欄位跟 _rfqSave 一樣
+function _rfqdBuild(row){
+  var q=row.q,em=null;try{em=_effQtyMap(q);}catch(e){_err('_rfqdBuild',e);}
+  var items=row.idx.map(function(i){var it=q.items[i],ov=_ownerItemOv(q,it.desc),o={idx:i,desc:String(it.desc||'').trim(),unit:_uFix(it.unit||''),qty:Math.abs(em?_effQty(em,it):(parseFloat(it.qty)||0)),per:'',len:0,qd:String(it.desc||'').trim(),oq:parseFloat(it.qty)||0,scope:'',tpl:(ov&&_ovIsGrout(ov))?'grout':'gen'};if(ov)o.ov=ov;return o;});
+  var bb=_b2bDefCond(q),cond=Object.assign({cashPct:50,ticketPct:50,ticketDays:60,ret:(P.subRetDef!=null?P.subRetDef:5),valid:30,retWhen:'',extra:_RFQ_EXTRA_DEF.slice()},bb||{});   // 同 _rfqCond（新詢價單）
+  var ct=_rfqdCt(q),d7=_dAdd(localToday(),7);
+  return {id:'',no:_rfqNextNo(q),date:localToday(),vendors:[],status:'open',payRoll:1,quoteVer:q.ver||1,scope:row.label,deadline:d7,entry:(ct&&ct.start&&ct.start>localToday())?ct.start:'',contact:P.contact||'',tel:P.tel||'',cond:cond,items:items};
+}
+function _rfqdDetail(row){
+  var q=row.q,r=_rfqdBuild(row),ct=_rfqdCt(q),iss=[];try{iss=_b2bIssues(q,r.cond)||[];}catch(e){_err('_rfqdDetail.b2b',e);}
+  var lines=[];try{lines=_rfqCondLines(r);}catch(e){_err('_rfqdDetail.cond',e);}
+  var pv='';try{var o=_docOut('rfq',{q:q,r:r});if(o&&o.html)pv='<iframe title="詢價單預覽" srcdoc="'+esc(o.html)+'" style="width:100%;height:420px;border:1px solid var(--b2);border-radius:6px;background:#fff;margin-top:6px"></iframe>';}catch(e){_err('_rfqdDetail.pv',e);}
+  return _qTbl([['工程',String(q.name||'')],['業主',String(q.client||'')],['詢價範圍',row.label],['詢價單號',r.no+'（建立後）'],['工期',ct&&(ct.start||ct.end)?((ct.start||'？')+' ～ '+(ct.end||'？')):'合約沒填開工／完工日'],['預定進場',r.entry||'（沒填，廠商報價後再約）'],['回覆期限',r.deadline],['營造廠付款條件',_ownerTerms(q)?'有（背對背）':'沒設定，用公司預設']])
+    +'<table class="tbl" style="font-size:12px;width:100%;margin-top:6px"><thead><tr><th>工項</th><th>單位</th><th style="text-align:right">數量</th></tr></thead><tbody>'
+    +r.items.map(function(it){return '<tr><td style="overflow-wrap:anywhere">'+esc(it.desc.split('\n')[0])+(it.ov?'<div style="font-size:11px;color:#8a6d00">合約個別約定：'+esc(_payTplTxt(it.tpl,null,it.ov))+'</div>':'')+'</td><td>'+esc(it.unit)+'</td><td style="text-align:right">'+esc(String(it.qty))+'</td></tr>';}).join('')+'</tbody></table>'
+    +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">付款與詢價條件（印在詢價單上）</div><ol style="margin:2px 0;padding-left:20px;font-size:12px">'+lines.map(function(t){return '<li style="overflow-wrap:anywhere">'+esc(t)+'</li>';}).join('')+'</ol>'
+    +(iss.length?'<div style="font-size:12px;color:#b26a00;margin-top:4px">背對背提醒：'+iss.map(esc).join('；')+'</div>':'')
+    +pv+'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">確認＝建好這張詢價單並開 PDF（傳給廠商）；退回＝這類工項不發包；修改＝到發包頁自己勾工項、改條件。</div>';
+}
+function _rfqdOk(row){
+  var q=(Q||[]).find(function(x){return x&&x.id===row.q.id;});if(!q||!q.awarded){toast('這案已不是得標狀態');return false;}
+  var cur=_rfqdRows().find(function(x){return x.key===row.key;});if(!cur){toast('這類工項已經有詢價單了');return false;}
+  var r=_rfqdBuild(cur);r.id='rfq'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);r.ts=Date.now();r.mt=Date.now();
+  if(!Array.isArray(q.rfqs))q.rfqs=[];q.rfqs.push(r);
+  _touch(q);try{persist();_immediateUpload();}catch(e){_err('_rfqdOk',e);}
+  try{_docPrint('rfq',{q:q,r:r});}catch(e){_err('_rfqdOk.pdf',e);toast(r.no+' 已建立，PDF 沒開成功，請到發包頁匯出');return true;}
+  toast(r.no+' 已建立，PDF 傳給廠商；廠商回價後到發包頁填入');return true;
+}
+_decReg('rfqDraft',{
+  title:'發包詢價單草稿',todo:function(n){return '詢價單草稿 '+n+' 張待確認';},sub:'確認＝建詢價單並開 PDF 傳廠商；退回＝這類工項不發包',
+  canSee:function(){return _decIsAdmin();},
+  list:function(){return _rfqdRows();},
+  key:function(r){return r.key;},head:function(r){return '詢價單草稿：'+String(r.q.name||'')+' '+r.label;},
+  body:function(r){return '<div style="font-size:11.5px;color:var(--b4)">'+esc(String(r.q.client||''))+'　'+r.idx.length+' 個工項</div>';},
+  detail:function(r){return _rfqdDetail(r);},
+  ok:function(r){return _rfqdOk(r);},
+  reject:function(r){var q=r.q;if(!q.rfqDSkip||typeof q.rfqDSkip!=='object')q.rfqDSkip={};q.rfqDSkip[r.kind]=Date.now();_touch(q);persist();return true;},
+  edit:function(r){try{_rfqQid=r.q.id;_rfqTab='rfq';go('rfq');setTimeout(function(){try{rfqNew();}catch(e){_err('rfqDraft.edit',e);}},60);}catch(e){_err('rfqDraft.edit',e);}}
+});
 // ══════════ v6.0.225 報價「已送出」紀錄＋7 天沒回音追問卡（陳軒 11/10 新佇列第 3 件；第 11 條：不在報價頁加按鈕，走今天頁拍板卡）══════════
 // ① qSent「報價匯出了，送出了嗎？」：報價有匯出紀錄（q.sendLog，_QSENT_FROM 之後）、這次匯出還沒記送出 → 卡片填送出日期與方式（LINE／Email／親送／郵寄）
 //    確認＝寫 q.sent={date,how,ver,at,by}（舊的進 q.sentHist）；退回＝這次匯出沒送（q.sentSkipAt＝那次匯出時間，下次再匯出才再問）
