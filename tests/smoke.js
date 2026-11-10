@@ -13383,10 +13383,10 @@ async function newPage(browser, width, height) {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
       const out = {};
-      const keep = { Q: Q, D: DRAFTS, V: VENDORS.slice() };
+      const keep = { Q: Q, D: DRAFTS, V: VENDORS.slice(), F: _RFQD_FROM };
       try {
         localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_v7old');
-        window.toast = () => {}; window._immediateUpload = () => {};
+        window.toast = () => {}; window._immediateUpload = () => {}; _RFQD_FROM = 0;
         window._draftMark = (id, st, ex) => { if (DRAFTS[id]) { DRAFTS[id].status = st; DRAFTS[id].ex = ex; } return Promise.resolve(true); };
         Q = [{ id: 'qV1', code: 'V01', name: '範例比價案', client: '範例營造甲', awarded: true, ver: 1, _mt: 1,
           items: [{ desc: 'H型鋼樁打設', unit: '支', qty: '10', price: '3000' }, { desc: 'H型鋼樁拔除', unit: '支', qty: '10', price: '1500' }],
@@ -13417,7 +13417,7 @@ async function newPage(browser, width, height) {
         document.getElementById('tmp-aw').remove(); window.rfqAward = keepAw;
         out.rej = _DEC.rfqCmp.reject(rows[0]) === true && _rfqcRows().length === 0;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
-      Q = keep.Q; DRAFTS = keep.D; VENDORS.length = 0; keep.V.forEach((v) => VENDORS.push(v));
+      Q = keep.Q; DRAFTS = keep.D; VENDORS.length = 0; keep.V.forEach((v) => VENDORS.push(v)); _RFQD_FROM = keep.F;
       return out;
     });
     check('v6.0.225 廠商回價卡：AI 回價草稿在今天頁出卡；明細有逐項單價、我方報價單價、合計、範圍差異（標紅）；對不到詢價單不准確認；確認記進詢價單', !r.err && r.card && r.detail && r.bad && r.okA && r.okB, JSON.stringify(r));
@@ -13448,7 +13448,7 @@ async function newPage(browser, width, height) {
         const okr = _DEC.qSent.ok(_qSentRows()[0]);
         out.ok = okr === true && Q[0].sent.how === 'Email' && Q[0].sent.date === d(-9) && Q[0].sent.ver === 2 && ids() === '';
         // 未來日期不收
-        Q[0].sendLog.push({ at: Date.now(), what: 'PDF', mode: 'formal', archived: true, ver: 3 }); qSentIn('qS1', 'date', d(3));
+        Q[0].sendLog.push({ at: Date.now() + 1000, what: 'PDF', mode: 'formal', archived: true, ver: 3 }); qSentIn('qS1', 'date', d(3));
         out.future = _DEC.qSent.ok(_qSentRows()[0]) === false;
         // 退回＝這次沒送，下次再匯出才問
         out.rej = _DEC.qSent.reject(_qSentRows()[0]) === true && ids() === '';
@@ -13478,13 +13478,14 @@ async function newPage(browser, width, height) {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
       const out = {};
-      const keep = { Q: Q, D: DRAFTS };
+      const keep = { Q: Q, D: DRAFTS, C: CUSTOMERS.slice() };
       try {
         localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_v7old');
         window.toast = () => {}; window._immediateUpload = () => {};
         window._draftMark = (id, st, ex) => { if (DRAFTS[id]) { DRAFTS[id].status = st; DRAFTS[id].ex = ex; } return Promise.resolve(true); };
         Q = [{ id: 'qO1', code: 'O01', name: '範例合約案', client: '範例營造甲', awarded: true, items: [{ desc: '範例鋼軌樁', note: '含60天租期', unit: '支', qty: '10', price: '1000', ot: '12', otUnit: '支/天' }], exs: [], rmk: {}, ownerPay: { cut: 25 }, deduct: { ret: 5 }, _mt: 1 }];
-        const card = { schema: 'fj-contract-card/1', project: '範例合約案', owner: '範例營造甲',
+        CUSTOMERS.length = 0; CUSTOMERS.push({ id: 'cO1', name: '範例營造甲', ownerType: '營造廠' });
+        const card = { schema: 'fj-contract-card/1', project: '範例合約案', owner: '範例營造甲', ownerType: { value: '建設公司', source: 'contract' },
           retention: { pct: { value: 3, source: 'contract', evidence: { clause: '第 8 條', quote: '每期保留 3%' } } },
           billing: { cutoffDay: { value: 25, source: 'contract', evidence: { clause: '第 5 條', quote: '每月 25 日估驗' } } },
           rent: { includedDays: { value: 90, source: 'contract', evidence: { clause: '第 12 條', quote: '含 90 天租期' } }, endMode: { value: 'removeDone', source: 'contract', evidence: { clause: '第 12 條', quote: '以拔除完成日為租期結束' } }, lateRate: { value: 15, source: 'contract', evidence: { clause: '第 13 條', quote: '逾期每支每天 15 元' } } } };
@@ -13499,11 +13500,12 @@ async function newPage(browser, width, height) {
         out.applied = ok === true && DRAFTS.dCard001.status === 'applied' && q.deduct.ret === 3 && q.rentEnd === 'removeDone' && q.ownerPay.cut === 25 && q.ownerCard && q.ownerCard.fields['rent.includedDays'].value === 90 && q.ownerCard.fields['rent.includedDays'].applied === true;
         out.noDefault = q.ownerPay.day == null && q.ownerPay.delay == null && q.ownerCard.fields['billing.payDay'].applied === false;   // 合約未載明的（豐有預設）不寫
         out.again = (await Promise.resolve(_DEC.drf_ownerCard.ok(DRAFTS.dCard001))) === false;
+        out.noOwnerType = CUSTOMERS[0].ownerType === '營造廠';   // 卡片沒列的欄位不寫
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
-      Q = keep.Q; DRAFTS = keep.D;
+      Q = keep.Q; DRAFTS = keep.D; CUSTOMERS.length = 0; keep.C.forEach((c) => CUSTOMERS.push(c));
       return out;
     });
-    check('v6.0.225 合約條件拍板卡：今天頁出卡（舊選單照舊在 AI 草稿清單）；明細逐欄列值＋條次原文，跟專案不同標紅列舊值→新值，租期起算／含租期天數一定列；確認寫進專案、合約未載明的不寫', !r.err && r.card && r.oldList && r.detail && r.noDiffCut && r.applied && r.noDefault && r.again, JSON.stringify(r));
+    check('v6.0.225 合約條件拍板卡：今天頁出卡（舊選單照舊在 AI 草稿清單）；明細逐欄列值＋條次原文，跟專案不同標紅列舊值→新值，租期起算／含租期天數一定列；確認寫進專案、合約未載明的不寫', !r.err && r.card && r.oldList && r.detail && r.noDiffCut && r.applied && r.noDefault && r.again && r.noOwnerType, JSON.stringify(r));
     check('v6.0.225 合約條件拍板卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
