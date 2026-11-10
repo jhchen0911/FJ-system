@@ -664,6 +664,54 @@
             ".validate": "false"
           }
         }
+      },
+      "matIdle": {
+        ".read": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || root.child('fydata/access').child(auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())",
+        ".write": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())) && newData.exists()",
+        ".validate": "newData.hasChildren(['at','by']) && newData.child('by').val() === auth.token.email && newData.child('at').val() <= now + 600000"
+      },
+      "matTags": {
+        ".read": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || root.child('fydata/access').child(auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())",
+        "$tid": {
+          ".write": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || ((root.child('fydata/access').child(auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists()) && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())) && newData.exists()",
+          ".validate": "newData.hasChildren(['id','qid','rt','by','_mt']) && newData.child('id').val() === $tid && $tid.matches(/^[A-Za-z0-9_-]{1,120}$/) && newData.child('by').val() === auth.token.email && newData.child('_mt').isNumber() && newData.child('_mt').val() <= now + 600000",
+          "id": {
+            ".validate": "newData.isString()"
+          },
+          "qid": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "rt": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "item": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "ack": {
+            ".validate": "newData.isString() && newData.val().length <= 10"
+          },
+          "keep": {
+            ".validate": "newData.isNumber() || newData.isBoolean()"
+          },
+          "noPick": {
+            ".validate": "newData.isNumber() || newData.isBoolean()"
+          },
+          "why": {
+            ".validate": "newData.isString() && newData.val().length <= 300"
+          },
+          "by": {
+            ".validate": "newData.isString()"
+          },
+          "at": {
+            ".validate": "newData.isNumber()"
+          },
+          "_mt": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": "false"
+          }
+        }
       }
     }
   }
