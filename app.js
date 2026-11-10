@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.222';
+var APP_VERSION='v6.0.224';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -41559,7 +41559,7 @@ function decAct(kind,id,act){
   Promise.resolve(p).then(function(done){fin();if(done==='open')return;   /* v6.0.179：已開下一個視窗（期別），存檔時才標已套用 */if(done===false){toast(act==='reject'?'退回沒成功，這張還留著':'沒有完成，這張還留著');return;}if(act==='reject')toast('已退回');_decRefresh(kind);})
     .catch(function(e){fin();_err('decAct.'+act,e);toast(act==='reject'?'退回失敗':'確認失敗');});
 }
-// ══════════ v6.0.222 舊 AI 草稿 6 種改走拍板卡（陳軒派工第 6 名，Lotion 11/10 定案）══════════
+// ══════════ v6.0.224 舊 AI 草稿 6 種改走拍板卡（陳軒派工第 6 名，Lotion 11/10 定案）══════════
 // 報價 quote、得標 bid、發票照片 irPhoto、現場追加 addon、施工日報 dailyLog、客戶廠商 contact：新選單時一律在今天頁出拍板卡，
 //   展開看過明細才能確認（v6.0.179 規則），AI 草稿清單（_draftPending）不再列這 6 種；舊選單（更多 › 切回舊版）照舊走 AI 草稿清單。
 //   確認／修改＝走原本的套用流程（draftApply：開報價編輯頁、得標視窗、發票紀錄、現場追加、客戶廠商表單），存檔成功才標已套用（_draftAppliedFor）；退回＝標 rejected。
@@ -41569,7 +41569,7 @@ function _draftViaDec6(t){try{return _DRAFT_OLD6.indexOf(t)>=0&&_nav5On();}catch
 function _d6Pl(d){return (d&&d.payload&&typeof d.payload==='object')?d.payload:{};}
 function _d6Meta(d){var S=_draftS,who=S(d.byName||d.by).slice(0,60),cs=_draftCase(d),vn=_draftVerNote(d);
   return '<div style="font-size:11.5px;color:var(--b4);overflow-wrap:anywhere">'+esc(S(_DRAFT_T[d.type]||d.type))+'　'+esc(who)+'　'+esc(new Date(+d.at||0).toLocaleString('zh-TW'))+(cs?'　<b>'+esc(cs)+'</b>':'')+(vn?'　'+esc(vn):'')+'</div>';}
-function _d6Tbl(rows){return '<table class="tbl" style="font-size:12px;width:100%"><tbody>'+rows.filter(function(r){return r&&r[1]!=null&&String(r[1])!=='';}).map(function(r){return '<tr><td style="color:var(--b4);white-space:nowrap;width:1%">'+esc(r[0])+'</td><td style="overflow-wrap:anywhere">'+(r[2]?r[1]:esc(String(r[1])))+'</td></tr>';}).join('')+'</tbody></table>';}
+function _d6Tbl(rows){return '<div style="display:grid;grid-template-columns:max-content 1fr;gap:3px 10px;font-size:12.5px;margin:4px 0">'+rows.filter(function(r){return r&&r[1]!=null&&String(r[1])!=='';}).map(function(r){return '<div style="color:var(--b4);white-space:nowrap">'+esc(r[0])+'</div><div style="overflow-wrap:anywhere">'+(r[2]?r[1]:esc(String(r[1])))+'</div>';}).join('')+'</div>';}   // 手機不被 .dec-detail 表格換行規則擠成直排
 // LINE 照片：先換成下載網址再交給卡片（拍板卡要等照片載完才解鎖確認）；換不到的照樣放一張壞圖，確認就不會解鎖
 function _d6LineImgs(paths){
   paths=_lineArr(paths).filter(function(x){return /^line\//.test(x);}).slice(0,6);if(!paths.length)return Promise.resolve('');
@@ -41577,7 +41577,7 @@ function _d6LineImgs(paths){
     .then(function(us){return '<div style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0">'+us.map(function(u){return '<img src="'+esc(u||'data:,')+'" alt="現場照片" style="width:96px;height:96px;object-fit:cover;border-radius:6px;background:var(--b1)">';}).join('')+'</div>';});
 }
 function _d6Detail(d){
-  var S=_draftS,pl=_d6Pl(d),h=_d6Meta(d)+'<div style="font-size:13px;font-weight:700;margin:4px 0;overflow-wrap:anywhere">'+esc(S(d.summary).slice(0,300))+'</div>';
+  var S=_draftS,pl=_d6Pl(d),h=S(d.summary).length>200?'<div style="font-size:12.5px;margin:2px 0;overflow-wrap:anywhere">'+esc(S(d.summary).slice(0,300))+'</div>':'';   // 卡片標頭已有摘要與送件人，明細不再重複
   if(d.type==='quote'){
     var f=(pl.fields&&typeof pl.fields==='object')?pl.fields:{},base=pl.base?(Q||[]).find(function(x){return x.id===pl.base;}):null;
     var its=(Array.isArray(f.items)?f.items:[]).filter(function(it){return it&&typeof it==='object';});
@@ -41600,7 +41600,7 @@ function _d6Detail(d){
   }
   if(d.type==='irPhoto'){
     return Promise.resolve(typeof _irRecDetail==='function'?_irRecDetail(d):'').then(function(x){
-      if(x)return h+x;   // v6.0.222 B：發票對帳卡（對到期別、比應開金額）
+      if(x)return h+x;   // v6.0.224 B：發票對帳卡（對到期別、比應開金額）
       return h+(_draftImgOk(pl.file)?'<img src="'+esc(pl.file)+'" alt="發票照片" style="max-width:100%;max-height:360px;border-radius:6px;display:block;margin:4px 0">':'<div style="color:var(--red);font-size:12px">照片格式不正確，請退回</div>')
         +_d6Tbl([['發票號碼',S(pl.number)],['日期',S(pl.date)],['買受人',S(pl.client)],['含稅金額',(+pl.amount>0)?'NT$ '+fmt(+pl.amount):''],['備註',S(pl.note)]]);});
   }
@@ -41621,7 +41621,7 @@ function _d6Detail(d){
   }
   return h;
 }
-// ══════════ v6.0.222 發票對帳卡（陳軒派工第 3 名，Lotion 11/10 定案；第 2 層：卡片只給建議，Lotion 確認才寫入）══════════
+// ══════════ v6.0.224 發票對帳卡（陳軒派工第 3 名，Lotion 11/10 定案；第 2 層：卡片只給建議，Lotion 確認才寫入）══════════
 // AI 讀的發票照片（irPhoto 草稿：號碼、日期、買受人、含稅金額）→ 自動找「哪一案、第幾期請款單」→ 跟本期發票應開金額（_einvSplit(_invEinvGross(inv))，
 //   同 issueInvoiceForInv）比：相符打勾、不符標紅寫差多少。對不到（或不只一張像）就列最可能的 3 期讓 Lotion 選，不自己猜。
 //   確認＝存成發票紀錄（關聯那一期）＋請款單記交付方式 inv.sendMethod（AI 建議，可改）與交付日期 inv.sendDate（新欄位）。
@@ -41670,8 +41670,6 @@ function _irRecDetail(d){
   return h+box;
 }
 function irRecPick(did,invId){_IRREC_SEL[did]=invId;try{_decReload('drf_irPhoto',did);}catch(e){_err('irRecPick',e);}}
-// 主線之後會在請款單加「狀態」欄位：發票確認後要改成「已開發票」。現在先留掛勾，等主線狀態欄位上線再接（找 _invStatusSet）
-function _irInvStatusHook(inv){try{if(typeof _invStatusSet==='function')_invStatusSet(inv,'invoiced','發票對帳卡確認');}catch(e){_err('_irInvStatusHook',e);}}
 function _irRecOk(d){
   if(_roDeny())return false;var S=_draftS,pl=_d6Pl(d),c=_irPick(d).c;
   if(!_draftImgOk(pl.file)){toast('照片格式不正確，請退回');return false;}
@@ -41682,11 +41680,11 @@ function _irRecOk(d){
   var sm=gv('irrec-send-'+d.id)||_irSendSug(pl,c.inv).v,sd=gv('irrec-date-'+d.id)||localToday();
   if(_IRREC_SEND.indexOf(sm)<0)sm='親送';if(!/^\d{4}-\d{2}-\d{2}$/.test(sd))sd=localToday();
   var id=Date.now().toString(),ir={id:id,_mt:Date.now(),_by:_meEmail(),number:S(pl.number).toUpperCase().slice(0,20),date:/^\d{4}-\d{2}-\d{2}$/.test(S(pl.date))?S(pl.date):localToday(),client:S(pl.client).slice(0,100)||c.inv.client||'',
-    amount:amt,taxAmt:sp.tax,linkedInvId:c.inv.id,status:'issued',note:S(pl.note).slice(0,300),updatedAt:Date.now(),fileUrl:'',fileData:pl.file,fileName:S(pl.fileName).replace(/[^\w.\-一-鿿]/g,'').slice(0,60)||'發票照片.jpg',
+    amount:amt,taxAmt:sp.tax,linkedInvId:c.inv.id,status:'issued',note:(S(pl.note).slice(0,260)+(S(pl.note)?'；':'')+'發票對帳卡確認').slice(0,300),updatedAt:Date.now(),fileUrl:'',fileData:pl.file,fileName:S(pl.fileName).replace(/[^\w.\-一-鿿]/g,'').slice(0,60)||'發票照片.jpg',
     srcDraft:d.id,expGross:c.ev.gross,deliver:sm,deliverDate:sd};
   INVOICE_RECS.unshift(ir);saveInvoiceRecs();
   c.inv.sendMethod=sm;c.inv.sendDate=sd;_touch(c.inv);try{saveInv();}catch(e){_err('_irRecOk.inv',e);}
-  _irInvStatusHook(c.inv);
+  // 請款單「已開發票」狀態：主線 v6.0.223 依發票紀錄自己判斷（linkedInvId＋非作廢，saveInvoiceRecs 後自動記），這裡不用另外設
   try{logActivity('發票','發票對帳卡：'+ir.number+' → '+(c.inv.project||'')+' 第'+(c.inv.periodNo||'?')+'期');}catch(e){_err('_irRecOk.log',e);}
   delete _IRREC_SEL[d.id];
   try{renderInvoiceRecords();renderInvList();renderFinanceAR();}catch(e){_err('_irRecOk.render',e);}

@@ -13226,7 +13226,7 @@ async function newPage(browser, width, height) {
     check('v6.0.214 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
-  // ── v6.0.222 舊 AI 草稿 6 種改拍板卡＋發票對帳卡（陳軒派工，Lotion 11/10）──
+  // ── v6.0.224 舊 AI 草稿 6 種改拍板卡＋發票對帳卡（陳軒派工，Lotion 11/10）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -13297,9 +13297,9 @@ async function newPage(browser, width, height) {
       INV.length = 0; keepI.forEach((x) => INV.push(x)); INVOICE_RECS.length = 0; keepR.forEach((x) => INVOICE_RECS.push(x)); DRAFTS = keepD;
       return out;
     });
-    check('v6.0.222 舊 AI 草稿 6 種改拍板卡：報價、得標、發票照片、現場追加、施工日報、客戶廠商各一張卡；今天頁不再有 AI 草稿那列；展開看過明細才能確認；退回照舊；舊選單照舊走 AI 草稿清單', !r.err && r.cards && r.locked && r.qDetail && r.bid && r.con && r.line && r.old && r.rej, JSON.stringify(r));
-    check('v6.0.222 發票對帳卡：買受人＋金額對上自動對到那一期打勾；差多少標紅；對不到列前 3 期讓 Lotion 選、沒選不能存；確認存發票紀錄（關聯期別、稅額、照片）＋請款單記交付方式與日期；同號碼不重存', !r.err && r.auto && r.pick3 && r.bad && r.noPick && r.saved && r.dup, JSON.stringify(r));
-    check('v6.0.222 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('v6.0.224 舊 AI 草稿 6 種改拍板卡：報價、得標、發票照片、現場追加、施工日報、客戶廠商各一張卡；今天頁不再有 AI 草稿那列；展開看過明細才能確認；退回照舊；舊選單照舊走 AI 草稿清單', !r.err && r.cards && r.locked && r.qDetail && r.bid && r.con && r.line && r.old && r.rej, JSON.stringify(r));
+    check('v6.0.224 發票對帳卡：買受人＋金額對上自動對到那一期打勾；差多少標紅；對不到列前 3 期讓 Lotion 選、沒選不能存；確認存發票紀錄（關聯期別、稅額、照片）＋請款單記交付方式與日期；同號碼不重存', !r.err && r.auto && r.pick3 && r.bad && r.noPick && r.saved && r.dup, JSON.stringify(r));
+    check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
   await browser.close();
