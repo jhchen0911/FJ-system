@@ -6258,7 +6258,7 @@ function updateDashTodo(){
       icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-contract"/></svg>',
       color:days<0?'var(--red)':days<=7?'var(--yd)':'var(--g3)',
       text:days<0?('合約「'+(ct.name||'')+'」已於 '+_cEnd+' 到期'):('合約「'+(ct.name||'')+'」將於 '+days+' 天後到期（'+_cEnd+'）'),
-      sub:''});
+      sub:_tdCtExpSub(ct,days)});
   });
 
   // ── v5.380：三類「錢會晚拿或拿不到」的提醒 ──
@@ -33310,7 +33310,7 @@ function _v6TodoItems(items){
     });
   }catch(e){_err('_v6TodoItems.mat',e);}
   try{_bkTodoList().forEach(function(t){items.push({type:'bk_'+(t.src||'')+'_'+(t.key||''),urgent:!!t.urgent,jump:t.go==='health'?"go('reports');setTimeout(function(){showReport('health')},80)":t.go==='drafts'?'openDrafts()':t.go==='staff'?"go('staff')":"go('dash')",icon:ic('i-cloud'),color:'#6a1b9a',text:String(t.text||''),sub:esc(String(t.sub||''))});});}catch(e){_err('_v6TodoItems.bk',e);}   // 改版第 5 步 後端待辦（雲端寫、網頁只顯示）
-  try{if((SYNC_CONFLICTS||[]).length)items.push({type:'sync_conflict',urgent:true,jump:'openSyncConflicts()',icon:ic('i-warn'),color:'var(--red)',text:'同步衝突 '+SYNC_CONFLICTS.length+' 處：兩台裝置改了同一個欄位',sub:'點這裡選要用哪一個'});}catch(e){_err('_v6TodoItems.cf',e);}   // 4b
+  try{if((SYNC_CONFLICTS||[]).length)items.push({type:'sync_conflict',urgent:true,jump:'openSyncConflicts()',icon:ic('i-warn'),color:'var(--red)',text:'同步衝突 '+SYNC_CONFLICTS.length+' 處：兩台裝置改了同一個欄位',sub:_tdCfSub()});}catch(e){_err('_v6TodoItems.cf',e);}   // 4b
 }
 // ══════════ v6.0.17 經營報表：利潤分析併入報表中心（總覽分頁）、口徑統一（權責為主、現金為輔）、共用年度篩選 ══════════
 // 權責口徑＝請款（未稅）− 施工成本 − 公司費用 − 人事（與股東報表 _shRptYear 同一函式）；現金口徑＝實收 − 實付（同年度損益的淨現金流）。
@@ -38586,7 +38586,7 @@ function _rfqVerTodo(items){
     if(!q||q.parentId||q.closed||!q.awarded)return;
     var n=_rfqs(q).filter(function(r){return _rfqQuoteDiff(q,r).any;}).length;
     if(n)items.push({type:'rfq_ver',urgent:false,jump:"_rfqQid='"+q.id+"';_rfqTab='rfq';go('rfq')",icon:ic,color:'#b26a00',
-      text:(q.name||'')+' 報價已進版至 v'+(q.ver||1)+'，有 '+n+' 張詢價／分包尚未同步',sub:'到發包同步'});
+      text:(q.name||'')+' 報價已進版至 v'+(q.ver||1)+'，有 '+n+' 張詢價／分包尚未同步',sub:_tdRfqVerSub(q)});
   });
 }
 // 一式分包列：完成百分比（日報涵蓋工項回報量 ÷ 各工項報價數量合計）
@@ -41349,7 +41349,7 @@ function _bkRemindHtml(){
 function _todo5bItems(items){
   var v=_todoBuild();if(!v)return;
   var ic=function(h){return '<svg class="ic ib" aria-hidden="true"><use href="#'+h+'"/></svg>';};
-  (v.close||[]).forEach(function(x){items.push({type:'close_ready',urgent:false,jump:"openProj('"+x.qid+"')",icon:ic('i-check'),color:'var(--g3)',text:'可以確認結案：'+esc(x.name),sub:'保留款收回／尾款收齊、包商結清、材料退完'});});
+  (v.close||[]).forEach(function(x){items.push({type:'close_ready',urgent:false,jump:"openProj('"+x.qid+"')",icon:ic('i-check'),color:'var(--g3)',text:'可以確認結案：'+esc(x.name),sub:_tdCloseSub(x.qid)});});
   var by={};(v.rentSoon||[]).forEach(function(x){(by[x.qid]=by[x.qid]||{name:x.name,qid:x.qid,list:[]}).list.push(x);});
   Object.keys(by).forEach(function(k){var g=by[k],min=Math.min.apply(null,g.list.map(function(x){return x.left;}));
     items.push({type:'rent_soon',urgent:min<=2,jump:"openProj('"+g.qid+"')",icon:ic('i-clock'),color:'#b26a00',text:'「'+esc(g.name)+'」'+g.list.length+' 個工項租期 '+(min===0?'今天':min+' 天內')+'到期',sub:'到期日 '+esc(g.list[0].expiry)+'；要延租或安排拔除'});});
@@ -44285,6 +44285,31 @@ function _acctLedMount(t){
   var p=document.getElementById('acct-p-'+t);if(!p)return;
   p.insertAdjacentHTML('afterbegin',_acctLedHtml(t));
   p.classList.toggle('led-fold',!(window._acctLedOpen||{})[t]);
+}
+// ── v6.0.222 第 7 步⑤ 首頁提醒卡第二行＝系統算好的結論與證據（不是固定說明文字） ──
+function _tdCtExpSub(ct,days){
+  try{var q=(Q||[]).find(function(x){return x&&(x.id===ct.linkedQid||(!ct.linkedQid&&x.name===ct.name));});if(!q)return '';
+    var last='';(q.dailyLogs||[]).forEach(function(L){if(L&&L.date&&L.date>last)last=L.date;});
+    var gap=last?Math.round((Date.parse(localToday())-Date.parse(last))/864e5):null,n=_invsOfQuoteAll(q).length;
+    var ev=(last?('最近一篇日報 '+last):'沒有日報')+'・已請款 '+n+' 期';
+    var con=(last&&gap<=14)?'工地還在做 → 合約要展延':(days<0?'日報已停 → 確認是否完工、合約改已完成':'');
+    return esc(con?(con+'｜'+ev):ev);
+  }catch(e){_err('_tdCtExpSub',e);return '';}
+}
+function _tdCloseSub(qid){
+  try{var q=(Q||[]).find(function(x){return x&&x.id===qid;});if(!q)return '';
+    var invs=_invsOfQuoteAll(q),rc=invs.reduce(function(a,v){return a+(_invRcv(v)||0);},0);
+    var pays=(PAYABLES||[]).filter(function(p){return p&&(p.quoteId===q.id||(!p.quoteId&&p.project===q.name))&&!p.voidAt&&!p.planned;});
+    return esc('請款 '+invs.length+' 期全收（實收 NT$ '+fmt(rc)+'）・應付 '+pays.length+' 筆都付清・材料已退完');
+  }catch(e){_err('_tdCloseSub',e);return '';}
+}
+function _tdRfqVerSub(q){
+  try{var L=_rfqs(q).map(function(r){var d=_rfqQuoteDiff(q,r);return d.any?((r.vendor||r.no||'詢價單')+'：'+(d.diffs||[]).slice(0,2).map(_rfqDiffTxt).join('、')):'';}).filter(Boolean);
+    return esc(L.slice(0,2).join('；').slice(0,90))||'到發包同步';
+  }catch(e){_err('_tdRfqVerSub',e);return '到發包同步';}
+}
+function _tdCfSub(){
+  try{return esc((SYNC_CONFLICTS||[]).slice(0,2).map(function(x){return (_CF_COLL_NAME[x.coll]||x.coll)+'「'+(x.name||x.id)+'」的'+(_CF_FIELD_NAME[x.field]||x.field);}).join('、')+'；目前先用'+((SYNC_CONFLICTS[0]||{}).kept==='cloud'?'另一台':'這台')+'的');}catch(e){_err('_tdCfSub',e);return '點這裡選要用哪一個';}
 }
 function stlSet(el){
   if(_isReaderUser){toast('唯讀帳號不能修改');return;}

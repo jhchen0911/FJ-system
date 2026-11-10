@@ -13561,6 +13561,37 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.222 第 7 步⑤ 首頁提醒卡第二行＝算好的結論（合約到期、可以結案、報價進版、同步衝突） ──
+  {
+    const { page, errors } = await newPage(browser, 1440, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepC = CONTRACTS.slice(), keepS = SYNC_CONFLICTS;
+      try {
+        window.toast = () => {};
+        const d3 = new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10), past = new Date(Date.now() - 5 * 864e5).toISOString().slice(0, 10);
+        Q = [{ id: 'qT5', name: '範例工程T5', awarded: true, date: '2026-01-01', items: [], _mt: 1, dailyLogs: [{ id: 'd', date: d3 }] }];
+        CONTRACTS.length = 0; CONTRACTS.push({ id: 'cT5', name: '範例工程T5', linkedQid: 'qT5', end: past, status: 'active', _mt: 1 });
+        const s1 = _tdCtExpSub(CONTRACTS[0], -5);
+        out.ct = /工地還在做 → 合約要展延/.test(s1) && s1.indexOf('最近一篇日報 ' + d3) >= 0 && /已請款 0 期/.test(s1);
+        Q[0].dailyLogs = [{ id: 'd', date: '2026-01-02' }];
+        out.ct2 = /日報已停/.test(_tdCtExpSub(CONTRACTS[0], -5));
+        SYNC_CONFLICTS = [{ coll: 'quotes', id: 'qT5', field: 'name', name: '範例工程T5', kept: 'cloud' }];
+        const s2 = _tdCfSub(); out.cf = /範例工程T5/.test(s2) && /另一台/.test(s2);
+        out.close = /請款 0 期全收/.test(_tdCloseSub('qT5')) && /應付 0 筆都付清/.test(_tdCloseSub('qT5'));
+        // 首頁真的用到：合約到期卡第二行不是空的
+        const its = []; try { updateDashTodo(); } catch (e) { /* 可忽略 */ }
+        const t = (window._tdCur || []).find((x) => x.type === 'ct_exp');
+        out.wired = !!t && /日報已停/.test(t.sub || '');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; CONTRACTS.length = 0; keepC.forEach((c) => CONTRACTS.push(c)); SYNC_CONFLICTS = keepS;
+      return out;
+    });
+    check('v6.0.222 首頁提醒卡第二行是算好的結論：合約到期（日報還在＝要展延／日報停了＝確認完工）、同步衝突列出哪筆哪個欄位、可以結案列出實收與應付', !r.err && r.ct && r.ct2 && r.cf && r.close && r.wired, JSON.stringify(r));
+    check('v6.0.222 首頁提醒卡結論測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
