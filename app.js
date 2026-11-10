@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.224';
+var APP_VERSION='v6.0.225';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -41607,6 +41607,7 @@ function _d6Detail(d){
     h+=_d6Tbl([['報價',q?(S(q.code)+' '+S(q.name)):'（找不到這張報價）'],['草稿依據',L[S(pl.from)]||S(pl.from)||'待回覆'],['改成',L[S(pl.to)]||S(pl.to)],['未得標原因',S(pl.lostReason)],['備註',S(pl.note)],['目前狀態',q?(q.awarded?'已得標':(L[q.bidStatus||'']||q.bidStatus)):'']]);
     if(q&&S(pl.from)!==(q.bidStatus||''))h+='<div style="font-size:12px;color:var(--red);font-weight:700;margin-top:4px">草稿建立後狀態已被改過</div>';
     if(q&&q.awarded)h+='<div style="font-size:12px;color:var(--red);font-weight:700;margin-top:4px">這案已得標：AI 草稿不能改已得標案件，請退回</div>';
+    if(q&&!q.awarded&&pl.to==='awarded')h+=_bidCardPlan(d,q);   // v6.0.225：確認一次做完得標、建合約、寫成交紀錄
     return h;
   }
   if(d.type==='irPhoto'){
@@ -41631,6 +41632,47 @@ function _d6Detail(d){
     return h;
   }
   return h;
+}
+// ══════════ v6.0.225 得標拍板卡一次做完（陳軒 11/10 新佇列第 2 件；第 2 層：看過明細才能確認）══════════
+// bid 草稿「改成得標」：卡片明細列出確認後會做的事（標得標＋得標率紀錄、成交單價回寫、建合約、請款單草稿、專案），
+//   請款截止日在卡上填（預設這案原本的，沒有就空白＝跟舊得標視窗一樣不填）；確認＝直接走 confirmAward（同一套，不另寫一份），不再跳得標視窗。
+//   其他狀態（議價中／未得標／流標／待回覆）確認就直接套用，不再多一個確認框。
+var _BIDC_PD={};
+function bidcPd(did,v){_BIDC_PD[did]=String(v==null?'':v).replace(/[^\d]/g,'').slice(0,2);}
+function _bidCardPlan(d,q){
+  var tot=(q.t&&q.t.total)||0,ct=(CONTRACTS||[]).find(function(c){return c&&(c.linkedQid===q.id||(!c.linkedQid&&c.name&&c.name===q.name));}),inv=(INV||[]).find(function(x){return x&&x.sourceQid===q.id;});
+  var pd=_BIDC_PD[d.id]!=null?_BIDC_PD[d.id]:String(q.payDue||'');
+  var li=function(t){return '<li style="margin:2px 0">'+t+'</li>';};
+  return '<div style="margin-top:8px;padding:8px 10px;border:1px solid var(--b2);border-radius:8px;font-size:12.5px">'
+    +'<div style="font-weight:700;margin-bottom:4px">按「確認」會一次做完：</div><ol style="margin:0;padding-left:20px">'
+    +li('標成得標，寫得標率紀錄（成交金額 NT$ '+fmt(Math.round(tot))+' 含稅）')
+    +li('報價工項單價寫進成交單價庫')
+    +li(ct?'合約：已有「'+esc(ct.name||'')+'」，不重建':'建合約：'+esc(q.name||'')+'，NT$ '+fmt(Math.round(tot))+'（含稅）')
+    +li(inv?'請款單：已有，不重建':'建第一期請款單草稿')
+    +li('建專案（案號）')
+    +'</ol><div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>請款截止日：每月</span>'
+    +'<input type="number" min="1" max="31" inputmode="numeric" value="'+esc(pd)+'" placeholder="不填" oninput="bidcPd(\''+esc(d.id)+'\',this.value)" style="width:70px;text-align:center;padding:5px 6px;border:1px solid var(--b2);border-radius:6px;font-size:13px">'
+    +'<span>日前送件（截止日前 3 天提醒，可空白）</span></div></div>';
+}
+function _bidCardOk(d){
+  var x=DRAFTS[d.id];if(!x||x.status!=='pending'){toast('這張草稿已經處理過了');return false;}
+  var pl=_d6Pl(x),q=(Q||[]).find(function(y){return y&&y.id===pl.qid;});if(!q){toast('找不到這張報價，請退回');return false;}
+  var to=pl.to==null?'':pl.to;if(['awarded','','nego','lost','void'].indexOf(to)<0){toast('草稿的狀態值不正確，請退回');return false;}
+  if(q.awarded){toast('這案已得標：AI 草稿不能改已得標案件，請退回');return false;}
+  if(to==='awarded'){
+    var e1=document.getElementById('award-qid'),e2=document.getElementById('award-paydue');if(!e1||!e2){toast('得標欄位不見了，請重新整理');return false;}
+    var pd=_BIDC_PD[d.id]!=null?_BIDC_PD[d.id]:String(q.payDue||'');var n=parseInt(pd,10);if(pd&&!(n>=1&&n<=31)){toast('請款截止日要在 1～31');return false;}
+    e1.value=q.id;e2.value=pd?String(n):'';
+    window._draftApplying={id:x.id,kind:'award',target:q.id};
+    confirmAward();delete _BIDC_PD[d.id];
+    if(!q.awarded){window._draftApplying=null;return false;}
+    return true;
+  }
+  q.awarded=false;q.bidStatus=to;
+  if(to==='lost'){q.lostReason=_draftS(pl.lostReason).slice(0,20)||'其他';if(pl.note)q.lostNote=_draftS(pl.note).slice(0,200);}else{delete q.lostReason;delete q.lostPrice;delete q.lostNote;}
+  try{_bidRecSync(q,'draft');}catch(e){_err('_bidCardOk.rec',e);}
+  _touch(q);persist();try{renderList();updateQuoteStats();}catch(e){_err('_bidCardOk',e);}
+  return Promise.resolve(_draftMark(x.id,'applied',{resultId:q.id})).then(function(m){toast('已套用得標狀態');return m!==false;});
 }
 // ══════════ v6.0.224 發票對帳卡（陳軒派工第 3 名，Lotion 11/10 定案；第 2 層：卡片只給建議，Lotion 確認才寫入）══════════
 // AI 讀的發票照片（irPhoto 草稿：號碼、日期、買受人、含稅金額）→ 自動找「哪一案、第幾期請款單」→ 跟本期發票應開金額（_einvSplit(_invEinvGross(inv))，
@@ -41720,7 +41762,7 @@ _DRAFT_OLD6.forEach(function(t){
     key:function(d){return d.id;},head:function(d){return _draftS(d.summary).slice(0,200);},
     body:function(d){return _d6Meta(d);},
     detail:function(d){return _d6Detail(d);},
-    ok:function(d){if(t==='irPhoto'&&typeof _irRecOk==='function')return _irRecOk(d);var x=DRAFTS[d.id];if(!x||x.status!=='pending'){toast('這張草稿已經處理過了');return false;}draftApply(d.id);return 'open';},   // 開下一個視窗，存檔成功才標已套用
+    ok:function(d){if(t==='irPhoto'&&typeof _irRecOk==='function')return _irRecOk(d);if(t==='bid')return _bidCardOk(d);var x=DRAFTS[d.id];if(!x||x.status!=='pending'){toast('這張草稿已經處理過了');return false;}draftApply(d.id);return 'open';},   // 開下一個視窗，存檔成功才標已套用
     reject:function(d,why){delete _IRREC_SEL[d.id];delete _IRREC_IN[d.id];var x={reason:why||''};if(t==='irPhoto')x['payload/file']=null;return _draftMark(d.id,'rejected',x).then(function(m){return m!==false;});},   // 同舊清單：退回的發票照片不留
     edit:function(d){if(t==='irPhoto'&&typeof _irRecEdit==='function'){_irRecEdit(d);return;}draftApply(d.id);}
   });

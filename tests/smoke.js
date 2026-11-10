@@ -13347,6 +13347,44 @@ async function newPage(browser, width, height) {
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.225 得標拍板卡一次做完（陳軒 11/10 新佇列第 2 件）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keep = { Q: Q, C: CONTRACTS.slice(), I: INV.slice(), D: DRAFTS, P: PAYABLES.slice() };
+      try {
+        localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_v7old');
+        window.toast = () => {}; window._fbWriteAll = (a) => { try { a && a(); } catch (e) { /* 可忽略 */ } };
+        window._draftMark = (id, st, ex) => { if (DRAFTS[id]) { DRAFTS[id].status = st; DRAFTS[id].ex = ex; } return Promise.resolve(true); };
+        window.showConfirm = () => { out.sc = 1; };
+        const D = (id, payload) => ({ id, type: 'bid', by: 'ai@example.com', byName: 'AI', at: Date.now() - 1000, status: 'pending', summary: 'bid', payload });
+        Q = [{ id: 'qB1', code: 'B01', name: '範例得標案', client: '範例營造甲', date: '2026-10-01', items: [{ desc: '範例樁', unit: '支', qty: '10', price: '1000' }], exs: [], rmk: {}, t: { sub: 10000, tax: 500, total: 10500 }, _mt: 1, bidStatus: '', payDue: '20' },
+             { id: 'qB2', code: 'B02', name: '範例沒標到', client: '範例營造乙', date: '2026-10-01', items: [], exs: [], rmk: {}, t: { total: 5000 }, _mt: 1, bidStatus: '' }];
+        CONTRACTS.length = 0; INV.length = 0;
+        DRAFTS = { dBidW001: D('dBidW001', { qid: 'qB1', from: '', to: 'awarded' }), dBidL001: D('dBidL001', { qid: 'qB2', from: '', to: 'lost', lostReason: '價格' }) };
+        const x = document.createElement('div'); x.innerHTML = await Promise.resolve(_DEC.drf_bid.detail(DRAFTS.dBidW001)); const t = x.textContent;
+        out.plan = /一次做完/.test(t) && /建合約/.test(t) && /10,500/.test(t) && /成交單價/.test(t) && /請款單/.test(t) && x.querySelector('input[type=number]').value === '20';
+        bidcPd('dBidW001', '25');
+        const ok = await Promise.resolve(_DEC.drf_bid.ok(DRAFTS.dBidW001));
+        const q = Q.find((y) => y.id === 'qB1'), ct = CONTRACTS.find((c) => c.linkedQid === 'qB1');
+        out.award = ok === true && q.awarded === true && q.payDue === '25' && !!ct && ct.amount === 10500 && INV.some((i) => i.sourceQid === 'qB1') && DRAFTS.dBidW001.status === 'applied' && document.getElementById('award-modal').style.display !== 'flex';
+        // 再按一次：已處理過 → 不重做
+        out.again = (await Promise.resolve(_DEC.drf_bid.ok(DRAFTS.dBidW001))) === false && CONTRACTS.filter((c) => c.linkedQid === 'qB1').length === 1;
+        // 其他狀態：直接套用、不再跳確認框
+        const ok2 = await Promise.resolve(_DEC.drf_bid.ok(DRAFTS.dBidL001)); const q2 = Q.find((y) => y.id === 'qB2');
+        out.lost = ok2 === true && q2.bidStatus === 'lost' && q2.lostReason === '價格' && !q2.awarded && DRAFTS.dBidL001.status === 'applied' && !out.sc;
+        // 已得標的案子 → 不准改
+        DRAFTS.dBidX001 = D('dBidX001', { qid: 'qB1', from: '', to: 'lost' });
+        out.block = (await Promise.resolve(_DEC.drf_bid.ok(DRAFTS.dBidX001))) === false && q.awarded === true;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keep.Q; CONTRACTS.length = 0; keep.C.forEach((c) => CONTRACTS.push(c)); INV.length = 0; keep.I.forEach((c) => INV.push(c)); DRAFTS = keep.D; PAYABLES.length = 0; keep.P.forEach((c) => PAYABLES.push(c));
+      return out;
+    });
+    check('v6.0.225 得標拍板卡：明細列出確認會做的事（得標、成交單價、建合約、請款單、專案）與請款截止日；確認一次做完不再跳得標視窗；其他狀態直接套用；已得標不准改', !r.err && r.plan && r.award && r.again && r.lost && r.block, JSON.stringify(r));
+    check('v6.0.225 得標拍板卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.224 保留款請回卡（陳軒全流程盤點第 8 名）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
