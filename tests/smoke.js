@@ -13847,10 +13847,13 @@ async function newPage(browser, width, height) {
         PROJECTS = []; _prjSync();
         const ok1 = _stlFromIntake('qSA', { items: [{ desc: '鋼軌樁打設', unit: '支', qty: 85 }, { desc: '水平支撐組立', unit: 'M', qty: 50 }, { desc: '其他雜項', unit: '式', qty: 1 }], confidence: 'high' }, PNG);
         const p = _prjOfQ('qSA'), a = p && p.settle && p.settle.ai;
-        out.draft = ok1 === true && !!a && a.st === 'pending' && a.rows.length === 3 && !!a.rows[0].key && !!a.rows[1].key && !a.rows[2].key && /^ph:/.test(a.url) && !(p.settle.q && Object.keys(p.settle.q).length);
+        out.draft = ok1 === true && !!a && a.st === 'pending' && a.rows.length === 3 && !!a.rows[0].key && !!a.rows[1].key && !a.rows[2].key && /^ph:/.test(a.imgs[0].url) && !(p.settle.q && Object.keys(p.settle.q).length);
+        // 第 2 張（結算書第 2 頁）：併進同一張卡、重複的不再加
+        _stlFromIntake('qSA', { items: [{ desc: '鋼軌樁打設', unit: '支', qty: 85 }, { desc: '頁二雜項', unit: '式', qty: 2 }] }, PNG);
+        const a2 = _prjOfQ('qSA').settle.ai; out.append = a2.id === a.id && a2.rows.length === 4 && a2.imgs.length === 2;
         const L = _decItems('stlAi'); out.card = L.length === 1;
         const det = await Promise.resolve(_DEC.stlAi.detail(L[0]));
-        out.detail = /<img/.test(det) && /對到合約工項 2 項/.test(det) && /-5,000/.test(det) && /沒對到合約工項/.test(det) && /安全母索/.test(det);
+        out.detail = /<img/.test(det) && /對到合約工項 2 項/.test(det) && /-5,000/.test(det) && /沒對到合約工項/.test(det) && /安全母索/.test(det) && (det.match(/<img/g) || []).length === 2;
         // 手機：拍板卡展開不左右捲
         openDecList('stlAi'); await T(100); try { decToggle('stlAi', _DEC.stlAi.key(L[0]), true); } catch (e) { /* 可忽略 */ } await T(400);
         out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
@@ -13875,7 +13878,7 @@ async function newPage(browser, width, height) {
       Q = keepQ; INV = keepI; PROJECTS = keepP; localStorage.removeItem('pj7_open_settle');
       return out;
     });
-    check('v6.0.226 結算書 AI 拍板卡（寬 ' + W + '）：拍照建草稿不直接寫、對到 2 項／沒對到 1 項、明細有原圖與 -5,000 差異、確認才寫進差異表、手填不弄掉紀錄、退回不寫、手機不左右捲', !r.err && r.draft && r.card && r.detail && r.noHScroll && r.ok && r.keep && r.reject && r.noQid && r.type, JSON.stringify(r));
+    check('v6.0.226 結算書 AI 拍板卡（寬 ' + W + '）：拍照建草稿不直接寫、對到 2 項／沒對到 1 項、明細有原圖與 -5,000 差異、確認才寫進差異表、手填不弄掉紀錄、退回不寫、手機不左右捲', !r.err && r.draft && r.append && r.card && r.detail && r.noHScroll && r.ok && r.keep && r.reject && r.noQid && r.type, JSON.stringify(r));
     check('v6.0.226 結算書 AI 拍板卡測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }

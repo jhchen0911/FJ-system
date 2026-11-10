@@ -44628,17 +44628,26 @@ function _stlAiMatch(q,text,unit){
   return tie?'':best;   // 兩個工項一樣像＝不猜，讓 Lotion 在「修改」選
 }
 function _stlAiOf(p){var a=p&&p.settle&&p.settle.ai;return (a&&typeof a==='object'&&a.id)?a:null;}
+function _stlAiImgs(a){var L=_prjArr(a&&a.imgs).filter(function(x){return x&&typeof x==='object';});if(!L.length&&a&&(a.url||a.file))L=[{file:a.file,url:a.url}];return L;}
 function _stlAiRows(a){return _prjArr(a&&a.rows).filter(function(r){return r&&typeof r==='object';});}
 function _stlFromIntake(qid,r,du){
   if(!qid){toast('請選擇這張結算書是哪個工程');return false;}
-  var q=Q.find(function(x){return x.id===qid;}),p=_prjOfQ(qid);if(!q||!p){toast('這個工程還沒有專案資料（得標後才有）');return false;}
+  var p=_prjOfQ(qid),q=_prjMainQ(p);if(!q||!p){toast('這個工程還沒有專案資料（得標後才有）');return false;}   // 審查：追加案也對主約的工項（結算差異表只看主約）
   var rows=(Array.isArray(r.items)?r.items:[]).slice(0,60).map(function(it){it=it||{};var t=_draftS(it.desc).slice(0,120),u=_draftS(it.unit).slice(0,10),v=_aiNum(it.qty);
     return {text:t,qty:isFinite(v)?Math.round(v*1000)/1000:null,unit:u,key:_stlAiMatch(q,t,u)};}).filter(function(x){return x.text;});
   if(!rows.length){toast('沒讀到結算書的工項，請改用專案頁手填');return false;}
-  var s=(p.settle&&typeof p.settle==='object')?p.settle:{},now=Date.now();
-  p.settle=Object.assign({},s,{ai:{id:'sa'+now.toString(36),at:now,by:_mvMe(),file:'結算書_'+localToday()+'.jpg',url:du?_photoPut(du):'',rows:rows,low:r.confidence==='low',st:'pending'}});
-  p._mt=now;saveProjects();
-  toast('已讀結算書 '+rows.length+' 項：到「今天」的「結算書待確認」看原圖和差異後確認');
+  var s=(p.settle&&typeof p.settle==='object')?p.settle:{},now=Date.now(),old=_stlAiOf(p),img={file:'結算書_'+localToday()+'_'+now.toString(36).slice(-4)+'.jpg',url:du?_photoPut(du):''};
+  if(old&&old.st==='pending'){   // 審查：結算書好幾頁、一次拍好幾張＝併成同一張卡（同品名同工項的不重複），不蓋掉前一張
+    var have={},prev=_stlAiRows(old);prev.forEach(function(x){have[_nrm(x.text)+'|'+(x.key||'')]=1;});
+    var add=rows.filter(function(x){var k=_nrm(x.text)+'|'+(x.key||'');if(have[k])return false;have[k]=1;return true;});
+    p.settle=Object.assign({},s,{ai:Object.assign({},old,{rows:prev.concat(add).slice(0,120),imgs:_stlAiImgs(old).concat([img]).slice(0,10),low:!!(old.low||r.confidence==='low'),at2:now})});
+    p._mt=now;saveProjects();
+    toast('結算書第 '+_stlAiImgs(p.settle.ai).length+' 張：多讀到 '+add.length+' 項，併進同一張「結算書待確認」');
+  }else{
+    p.settle=Object.assign({},s,{ai:{id:'sa'+now.toString(36),at:now,by:_mvMe(),imgs:[img],rows:rows,low:r.confidence==='low',st:'pending'}});
+    p._mt=now;saveProjects();
+    toast('已讀結算書 '+rows.length+' 項：到「今天」的「結算書待確認」看原圖和差異後確認');
+  }
   try{updateDashTodo();}catch(e){_err('_stlFromIntake',e);}
   return true;
 }
@@ -44647,11 +44656,11 @@ function _stlAiCalc(q,a){var m={};_stlAiRows(a).forEach(function(x){if(x.key&&x.
 function _stlAiDetail(it){
   var p=_prjOfQ(it.qid),q=Q.find(function(x){return x.id===it.qid;}),a=_stlAiOf(p);if(!p||!q||!a)return '';
   var R=_stlAiCalc(q,a),by={};R.rows.forEach(function(x){by[x.key]=x;});
-  var L=_stlAiRows(a),used={};
+  var L=_stlAiRows(a),used={},cnt={};L.forEach(function(x){if(x.key)cnt[x.key]=(cnt[x.key]||0)+1;});
   var body=L.map(function(x){var c=x.key&&by[x.key];if(c)used[x.key]=1;
     var dif=c?(Math.abs(c.diff)>1e-6?'<b style="color:'+(c.diff<0?'var(--red)':'#1565C0')+'">'+(c.diff>0?'+':'')+_rfmt(c.diff)+'</b>':'<span style="color:var(--g3)">相符</span>'):'—';
     return '<tr><td>'+esc(x.text)+(x.unit?'（'+esc(x.unit)+'）':'')+'</td><td style="text-align:right">'+(x.qty==null?'<span style="color:var(--red)">沒讀到</span>':_rfmt(x.qty))+'</td>'
-      +'<td>'+(c?esc(c.desc):'<span style="color:#b26a00">沒對到合約工項（確認時不寫入）</span>')+'</td><td style="text-align:right">'+(c?_rfmt(c.billedQty):'—')+'</td><td style="text-align:right">'+dif+'</td>'
+      +'<td>'+(c?esc(c.desc)+(cnt[x.key]>1?'<div style="color:var(--red);font-size:11px">有 '+cnt[x.key]+' 列對到這項，要先修改</div>':''):'<span style="color:#b26a00">沒對到合約工項（確認時不寫入）</span>')+'</td><td style="text-align:right">'+(c?_rfmt(c.billedQty):'—')+'</td><td style="text-align:right">'+dif+'</td>'
       +'<td style="text-align:right;white-space:nowrap">'+(c&&c.amt?('<b style="color:'+(c.amt<0?'var(--red)':'#1565C0')+'">'+(c.amt>0?'+':'')+fmt(c.amt)+'</b>'):'—')+'</td></tr>';}).join('');
   var miss=R.rows.filter(function(x){return !used[x.key]&&x.stmtQty==null;}).map(function(x){return esc(x.desc);});
   var nOk=L.filter(function(x){return x.key&&x.qty!=null;}).length;
@@ -44659,7 +44668,10 @@ function _stlAiDetail(it){
     +'<table class="tbl" style="font-size:12px"><thead><tr><th>結算書品名</th><th style="text-align:right">結算書數量</th><th>對到的合約工項</th><th style="text-align:right">豐有已請</th><th style="text-align:right">差異</th><th style="text-align:right">金額影響（未稅）</th></tr></thead><tbody>'+body+'</tbody></table>'
     +'<div style="font-size:12px;margin-top:6px">確認後整張合計：'+(R.nDiff?('差異 '+R.nDiff+' 項、金額影響（未稅）<b style="color:'+(R.sumAmt<0?'var(--red)':'#1565C0')+'">'+(R.sumAmt>0?'+':'')+fmt(R.sumAmt)+'</b>'):'<span style="color:var(--g3)">全部相符</span>')+'</div>'
     +(miss.length?'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">結算書上沒有的合約工項：'+miss.slice(0,8).join('、')+(miss.length>8?' 等 '+miss.length+' 項':'')+'</div>':'');
-  return _vbSrcHtml({src:{file:a.file,url:a.url}}).then(function(img){return img+tb;});
+  var I=_stlAiImgs(a);if(!I.length)return '';   // 沒有原圖＝不解鎖確認
+  return Promise.all(I.map(function(x){return _vbSrcUrl(x.url);})).then(function(U){
+    if(U.some(function(u){return !u;}))return '';   // 審查：有一張這台讀不到＝回空、確認不解鎖（v6.0.180 規則）
+    return I.map(function(x,i){return '<div style="font-size:12px;color:var(--b4);margin:6px 0 3px">原圖 '+(I.length>1?(i+1)+'／'+I.length+'：':'')+esc(_draftS(x.file).slice(0,80))+'</div><img src="'+esc(U[i])+'" alt="結算書原圖" style="max-width:100%;border:1px solid var(--b1);border-radius:6px">';}).join('')+tb;});
 }
 function _stlAiSave(it,fn){
   var p=_prjOfQ(it.qid),a=_stlAiOf(p);if(!p||!a||a.id!==it.aid||a.st!=='pending'){toast('這張已經處理過了');return false;}
@@ -44671,7 +44683,9 @@ function _stlAiSave(it,fn){
 }
 function _stlAiOk(it){
   var p=_prjOfQ(it.qid),a=_stlAiOf(p);if(!a)return false;
-  var put=_stlAiRows(a).filter(function(x){return x.key&&x.qty!=null;});if(!put.length){toast('沒有對到合約工項的數量，請按「修改」選對應工項');return false;}
+  var q=Q.find(function(x){return x.id===it.qid;}),ok={};if(!q)return false;_stlCalc(q).rows.forEach(function(x){ok[x.key]=1;});
+  var put=_stlAiRows(a).filter(function(x){return x.key&&ok[x.key]&&x.qty!=null;});if(!put.length){toast('沒有對到合約工項的數量，請按「修改」選對應工項');return false;}
+  var dup={},dd=put.filter(function(x){if(dup[x.key])return true;dup[x.key]=1;return false;});if(dd.length){toast('有 '+dd.length+' 列對到同一個合約工項，請按「修改」選清楚');return false;}
   return _stlAiSave(it,function(s,na){var m=Object.assign({},(s&&s.q)||{});put.forEach(function(x){m[x.key]=x.qty;});
     na.st='done';na.doneAt=Date.now();na.doneBy=_mvMe();return {q:m,at:na.doneAt,by:na.doneBy};});
 }
@@ -44679,7 +44693,7 @@ function _stlAiReject(it,why){return _stlAiSave(it,function(s,na){na.st='rejecte
 // 修改：逐列改數量、選對應的合約工項；存回草稿、卡片留著，看過差異再確認
 function _stlAiEdit(it){
   var p=_prjOfQ(it.qid),q=Q.find(function(x){return x.id===it.qid;}),a=_stlAiOf(p);if(!p||!q||!a)return;
-  var opts=[{k:'',t:'（不寫入）'}];(q.items||[]).forEach(function(x,i){if(x&&!x.sec&&!x.spare)opts.push({k:_stlKey(x,i),t:String(x.desc||'').split('\n')[0].slice(0,40)});});
+  var opts=[{k:'',t:'（不寫入）'}];_stlCalc(q).rows.forEach(function(x){opts.push({k:x.key,t:String(x.desc||'').split('\n')[0].slice(0,40)});});
   var IN='box-sizing:border-box;font-size:13px;padding:6px 7px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   var h='<div style="font-size:12px;color:var(--b4);margin-bottom:8px">對照原圖改數量、選這一列是哪個合約工項；存好後回到卡片看差異再按確認。</div>'
     +_stlAiRows(a).map(function(x,i){return '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 0;border-top:1px solid var(--b1)"><div style="flex:1 1 100%;font-size:12.5px"><b>'+esc(x.text)+'</b>'+(x.unit?'（'+esc(x.unit)+'）':'')+'</div>'
@@ -44689,7 +44703,7 @@ function _stlAiEdit(it){
     var rows=_stlAiRows(a).map(function(x,i){var qi=document.querySelector('[data-sai-q="'+i+'"]'),ki=document.querySelector('[data-sai-k="'+i+'"]');
       var raw=qi?String(qi.value||'').trim():'',v=raw===''?null:parseFloat(raw);return Object.assign({},x,{qty:(v==null||!isFinite(v))?null:Math.round(v*1000)/1000,key:ki?ki.value:x.key});});
     if(_stlAiSave(it,function(s,na){na.rows=rows;na.editAt=Date.now();na.editBy=_mvMe();}))_decRefresh('stlAi');
-  });
+  },false,null,true);
 }
 _decReg('stlAi',{
   title:'結算書待確認',todo:function(n){return '結算書待確認 '+n+' 張';},sub:'AI 讀了營造廠結算書的數量：展開看原圖和差異 → 確認＝寫進完工結算差異表；退回＝不用；修改＝改數量或對應工項',
