@@ -6245,6 +6245,7 @@ function updateDashTodo(){
   try{
     _retentionRows().forEach(function(r){
       if(!r.due)return;
+      if(_retAskCovers(r))return;   // v6.0.224 新選單改由保留款請回卡
       var pend=r.pending+r.hold;
       items.push({type:'ret_due',urgent:true,
         jump:"go('finance');setTimeout(function(){switchFinanceTab('retention')},250)",
@@ -33260,7 +33261,7 @@ function _v6TodoItems(items){
   try{if(_decIsAdmin()){var _hm=_holMissing();if(_hm.length)items.push({type:'hol_missing',urgent:false,jump:"_prmTab='cost';go('params')",icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-clock"/></svg>',color:'#b26a00',text:'補 '+_hm.join('、')+' 年國定假日',sub:'參數 › 成本與廠商：包商放款日遇假日要順延，照人事行政總處公告貼上'});}}catch(e){_err('_v6TodoItems.hol',e);}   // v6.0.188 6-1p
   try{_todo5cItems(items);}catch(e){_err('_v6TodoItems.5c',e);}   // 5c   // v6.0.109 報價進版、詢價／分包未同步
   try{
-    _retentionRows().filter(function(r){return r.overdue&&!r.due;}).forEach(function(r){   // 已完工的由「保留款可請退」待辦涵蓋，不重複
+    _retentionRows().filter(function(r){return r.overdue&&!r.due&&!_retAskCovers(r);}).forEach(function(r){   // 已完工的由「保留款可請退」待辦涵蓋，不重複；v6.0.224 新選單改由保留款請回卡
       items.push({type:'ret_due',urgent:true,jump:"go('finance');setTimeout(function(){switchFinanceTab('retention')},150)",icon:ic('i-lock'),color:'var(--red)',
         text:'保留款逾期未退：'+r.proj+'（預計 '+r.retDue+' 退還）',sub:'NT$ '+fmt(r.pending+r.hold)});
     });
@@ -41714,6 +41715,61 @@ _DRAFT_OLD6.forEach(function(t){
     edit:function(d){if(t==='irPhoto'&&typeof _irRecEdit==='function'){_irRecEdit(d);return;}draftApply(d.id);}
   });
 });
+// ══════════ v6.0.224 保留款請回卡（陳軒全流程盤點第 8 名，Lotion 11/10；第 2 層：卡片只給建議）══════════
+// 保留款已到期（合約完工還押著，或預計退還日已過）、而且還沒開保留款退還請款單 → 今天頁一張卡：
+//   明細＝未退保留款逐期、退還條件原文（專案扣款設定 q.deduct.retCond）、完工日（合約 end／結案日）、預計退還日怎麼算的、
+//   要開的保留款退還請款單長怎樣（跟正式那張同一個出件 _docOut('retReturn')，iframe 預覽）、給業主的 LINE 文字草稿。
+//   確認＝開保留款退還請款單（retReturnCreate：存一張 kind:'retReturn'、開 PDF 預覽）＋複製 LINE 文字；退回＝這次不請（q.deduct.retAskSkip，金額變了或 30 天後再問）；修改＝改 LINE 文字再確認。
+//   新選單時舊的「保留款可請退」「保留款逾期未退」兩列待辦改由這張卡涵蓋（不重複）。
+function _retAskRows(){
+  var R=[];try{R=_retentionRows();}catch(e){_err('_retAskRows',e);return [];}
+  var today=localToday();
+  return R.filter(function(r){
+    if(!r.q||!(r.pending+r.hold>0))return false;
+    if(!(r.due||(r.retDue&&r.retDue<=today)))return false;
+    try{if(_retOpenDoc(r.q))return false;}catch(e){_err('_retAskRows.open',e);}
+    var pr=_retPendRows(r.q);if(!pr.amt)return false;r.ask=pr;
+    var sk=(r.q.deduct||{}).retAskSkip;if(sk&&sk.amt===pr.amt&&(Date.now()-(+sk.at||0))<30*86400000)return false;
+    return true;
+  });
+}
+function _retAskCovers(r){try{return _nav5On()&&!!r&&!!r.q&&_retAskRows().some(function(x){return x.q===r.q;});}catch(e){return false;}}
+function _retAskEnd(r){var ct=(CONTRACTS||[]).find(function(c){return c&&(c.linkedQid===r.q.id||c.name===r.proj);});
+  return {end:(ct&&ct.end)||'',closed:r.q.closed&&r.q.closedAt?String(new Date(r.q.closedAt).toISOString()).slice(0,10):'',status:ct?ct.status:''};}
+function _retAskLine(r){
+  var e=_retAskEnd(r),amt=r.ask?r.ask.amt:(r.pending+r.hold),cond=String(((r.q.deduct||{}).retCond)||'').trim();
+  return (r.client||'')+' 您好：\n本公司承攬「'+(r.proj||'')+'」'+(e.end||e.closed?'已於 '+(e.end||e.closed)+' 完工':'已完工')+'，'
+    +(cond?'依合約保留款退還條件（'+cond.slice(0,120)+'），':'')+'各期扣留之保留款合計 NT$ '+fmt(amt)+' 已到期。\n附上保留款退還請款單，再麻煩協助辦理退還，謝謝。\n豐有工程有限公司';
+}
+_decReg('retAsk',{
+  title:'保留款到期，要請回',todo:function(n){return '保留款到期可請回 '+n+' 案';},sub:'確認＝開保留款退還請款單＋複製給業主的 LINE 文字',
+  canSee:function(){return _decIsAdmin();},
+  list:function(){return _retAskRows();},
+  key:function(r){return r.q.id;},
+  head:function(r){return (r.proj||'')+'：保留款 NT$ '+fmt(r.ask.amt)+' 到期';},
+  body:function(r){var e=_retAskEnd(r);return '<div style="font-size:11.5px;color:var(--b4)">業主 '+esc(r.client||'')+'　'+(r.due?'合約已完工':'預計退還日 '+esc(r.retDue)+' 已到')+(e.end?'　完工 '+esc(e.end):'')+'</div>';},
+  detail:function(r){
+    var e=_retAskEnd(r),dd=r.q.deduct||{},pr=r.ask,cond=String(dd.retCond||'').trim();
+    var tmp={id:'retAskPv',kind:'retReturn',project:r.proj||'',client:r.client||'',quoteId:r.q.id,date:localToday(),periodNo:'退',items:[],totals:{curTotal:0,tax:0,total:0,retention:0},retRet:{amt:pr.amt,rows:pr.rows,holds:pr.holds,cond:cond,done:false,doneDate:''}};
+    var html='';try{html=_docOut('retReturn',{inv:tmp}).html;}catch(x){_err('retAsk.doc',x);}
+    return '<div style="display:grid;grid-template-columns:max-content 1fr;gap:3px 10px;font-size:12.5px">'
+      +'<div style="color:var(--b4)">退還條件原文</div><div style="overflow-wrap:anywhere">'+(cond?esc(cond):'<span style="color:#b26a00">專案沒有填退還條件</span>')+'</div>'
+      +'<div style="color:var(--b4)">完工日</div><div>'+esc(e.end||'（合約沒填完工日）')+(e.closed?'　結案 '+esc(e.closed):'')+'</div>'
+      +'<div style="color:var(--b4)">預計退還日</div><div>'+esc(_retDueHint(r.q)||r.retDue||'—')+'</div></div>'
+      +'<table class="tbl" style="font-size:12px;width:100%;margin-top:6px"><thead><tr><th>期別</th><th>日期</th><th>保留款</th></tr></thead><tbody>'
+      +pr.rows.map(function(x){return '<tr><td>第 '+esc(String(x.periodNo))+' 期</td><td>'+esc(x.date)+'</td><td style="text-align:right">'+fmt(x.amt)+'（'+esc(String(x.pct))+'%）</td></tr>';}).join('')
+      +pr.holds.map(function(x){return '<tr><td>第 '+esc(String(x.periodNo))+' 期（業主當場扣）</td><td>'+esc(x.date)+'</td><td style="text-align:right">'+fmt(x.amt)+'</td></tr>';}).join('')
+      +'<tr><td colspan="2"><b>合計</b></td><td style="text-align:right"><b>NT$ '+fmt(pr.amt)+'</b></td></tr></tbody></table>'
+      +(html?'<div style="font-size:12px;color:var(--b4);margin-top:6px">要開的保留款退還請款單（預覽）</div><iframe title="保留款退還請款單預覽" sandbox="allow-same-origin" style="width:100%;height:360px;border:1px solid var(--b1);border-radius:6px;background:#fff" srcdoc="'+esc(html)+'"></iframe>':'')
+      +'<div style="font-size:12px;color:var(--b4);margin-top:6px">給業主的 LINE 文字（確認時複製）</div><div style="font-size:12.5px;white-space:pre-wrap;border:1px dashed var(--b1);border-radius:6px;padding:6px 8px">'+esc((_RETASK_TXT[r.q.id]!=null?_RETASK_TXT[r.q.id]:_retAskLine(r)))+'</div>';
+  },
+  ok:function(r){if(_roDeny())return false;var t=_RETASK_TXT[r.q.id]!=null?_RETASK_TXT[r.q.id]:_retAskLine(r);_retAskCopy(t);delete _RETASK_TXT[r.q.id];retReturnCreate(r.q.id);try{updateDashTodo();}catch(e){_err('retAsk.ok',e);}return 'open';},
+  reject:function(r,why){if(_roDeny())return false;r.q.deduct=r.q.deduct||{};r.q.deduct.retAskSkip={at:Date.now(),amt:r.ask.amt,why:String(why||'').slice(0,200),by:_meEmail()};_touch(r.q);persist();try{updateDashTodo();}catch(e){_err('retAsk.rej',e);}return true;},
+  edit:function(r){var t=_RETASK_TXT[r.q.id]!=null?_RETASK_TXT[r.q.id]:_retAskLine(r);
+    showConfirm('修改給業主的 LINE 文字','<textarea id="ra-edit" data-ro-ok="1" style="width:100%;min-height:200px;box-sizing:border-box;font-size:12.5px">'+esc(t)+'</textarea><div style="font-size:11.5px;color:var(--b4);margin-top:4px">按確定先存起來，回到卡片再按「確認」才開請款單並複製</div>',function(){_RETASK_TXT[r.q.id]=String(gv('ra-edit')||'').slice(0,2000);_decReload('retAsk',r.q.id);},false,null,true);}
+});
+var _RETASK_TXT={};
+function _retAskCopy(t){try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast('LINE 文字已複製');},function(){/* 可忽略：剪貼簿被擋 */});}catch(e){_err('_retAskCopy',e);}}
 // ── 整體日報（5d #8，雲端 dailyReport 建的 dailyOut 草稿）：確認＝複製文字並標已轉發、退回＝不轉發、修改＝改文字再複製 ──
 _decReg('dailyOut',{
   title:'整體日報待轉發',todo:function(n){return '整體日報 '+n+' 份待轉發（營造廠群組）';},sub:'確認＝複製文字貼到 LINE 群組；退回＝這份不轉',

@@ -13314,6 +13314,42 @@ async function newPage(browser, width, height) {
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.224 保留款請回卡（陳軒全流程盤點第 8 名）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepI = INV.slice(), keepC = CONTRACTS, keepQ = Q;
+      try {
+        localStorage.removeItem('fy_nav_old'); window.toast = () => {}; let opened = null; window._docPrint = (k, c) => { opened = c && c.inv; };
+        Q = [{ id: 'qR1', code: 'R01', name: '範例完工案', client: '範例營造甲', items: [], exs: [], rmk: {}, _mt: 1, deduct: { ret: 5, retCond: '完工驗收後 3 個月無息退還' } }, { id: 'qR2', code: 'R02', name: '範例施工中', client: '範例營造乙', items: [], exs: [], rmk: {}, _mt: 1 }];
+        INV.length = 0;
+        INV.push({ id: 'wR1', quoteId: 'qR1', project: '範例完工案', client: '範例營造甲', periodNo: 1, date: '2026-05-25', retention: true, retentionPct: 5, totals: { curTotal: 1000000, total: 1050000 }, _mt: 1 });
+        INV.push({ id: 'wR2', quoteId: 'qR1', project: '範例完工案', client: '範例營造甲', periodNo: 2, date: '2026-06-25', retention: true, retentionPct: 5, totals: { curTotal: 400000, total: 420000 }, _mt: 1 });
+        INV.push({ id: 'wR3', quoteId: 'qR2', project: '範例施工中', client: '範例營造乙', periodNo: 1, date: '2026-06-25', retention: true, retentionPct: 5, totals: { curTotal: 200000, total: 210000 }, _mt: 1 });
+        CONTRACTS = [{ id: 'cR1', name: '範例完工案', linkedQid: 'qR1', status: 'completed', end: '2026-07-31', amount: 1, _mt: 1 }, { id: 'cR2', name: '範例施工中', linkedQid: 'qR2', status: 'active', amount: 1, _mt: 1 }];
+        const L = _DEC.retAsk.list();
+        out.list = L.length === 1 && L[0].q.id === 'qR1' && L[0].ask.amt === 73500;
+        // 新選單：舊「保留款可請退」那列不再出現（由卡涵蓋）
+        const it = []; _v6TodoItems(it); out.one = it.some((x) => x.type === 'dec_retAsk') && !it.some((x) => x.type === 'ret_due' && /範例完工案/.test(x.text));
+        const h = await Promise.resolve(_DEC.retAsk.detail(L[0])); const x = document.createElement('div'); x.innerHTML = h;
+        out.detail = /完工驗收後 3 個月無息退還/.test(x.textContent) && /2026-07-31/.test(x.textContent) && /73,500/.test(x.textContent) && !!x.querySelector('iframe[srcdoc]') && /保留款退還請款單/.test(x.querySelector('iframe').getAttribute('srcdoc')) && /範例營造甲 您好/.test(x.textContent);
+        // 退回＝這次不請，金額沒變不再出；確認＝開保留款退還請款單（存一張 retReturn）
+        await _DEC.retAsk.reject(L[0], '先不請'); out.skip = _DEC.retAsk.list().length === 0 && Q[0].deduct.retAskSkip.amt === 73500;
+        delete Q[0].deduct.retAskSkip;
+        const res = _DEC.retAsk.ok(_DEC.retAsk.list()[0]);
+        const doc = INV.find((v) => v.kind === 'retReturn');
+        out.ok = res === 'open' && !!doc && doc.retRet.amt === 73500 && doc.retRet.cond === '完工驗收後 3 個月無息退還' && !!opened && _DEC.retAsk.list().length === 0;
+        // 舊選單：卡不出（canSee 照舊，只是舊待辦不被吃掉）
+        INV.splice(INV.indexOf(doc), 1); const rowR = _retentionRows().find((x) => x.q && x.q.id === 'qR1'); out.newCov = _retAskCovers(rowR) === true; localStorage.setItem('fy_nav_old', '1'); out.old = _retAskCovers(rowR) === false; localStorage.removeItem('fy_nav_old');   // 舊選單：舊待辦「保留款可請退」照舊
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      INV.length = 0; keepI.forEach((x) => INV.push(x)); CONTRACTS = keepC; Q = keepQ;
+      return out;
+    });
+    check('v6.0.224 保留款請回卡：已完工或過了預計退還日、還沒開退還單才出卡；明細有退還條件原文、完工日、逐期金額、請款單預覽、LINE 文字；退回這次不請；確認開保留款退還請款單；新選單舊待辦不重複', !r.err && r.list && r.one && r.detail && r.skip && r.ok && r.newCov && r.old, JSON.stringify(r));
+    check('v6.0.224 保留款請回卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
