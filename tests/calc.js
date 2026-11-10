@@ -434,6 +434,37 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('M8 累計租金：未到 60% 不出卡；≥60% 出卡；預估 >80% 而且之後還有案子才建議買料，否則持續觀察', !c1.show && c2.show && c2.advice === '建議買料' && c3.advice === '持續觀察' && c4.advice === '持續觀察' && c2.ratio === 65 && c2.proj === 85, JSON.stringify([c2, c3, c4]));
   check('M8 車型建議：地區加成 1.6 以上平板車、以下吊板車', MV.truckFor(1.8).type === 'flat' && MV.truckFor(1.6).type === 'flat' && MV.truckFor(1.4).type === 'crane' && MV.truckFor(0).type === 'crane');
 }
+// v6.0.225 Lotion 11/10：分段拔樁逾期租金改照「時段」列，金額（支·天）一定要跟原本的 rentBatchQtyDays 一樣
+{
+  const TD = require('../calc/todo.js').todo || require('../calc/todo.js');
+  const T = TD.rentSegments ? TD : TD.todo;
+  const same = (pg, qty, a, b) => { const s = T.rentSegments(pg, qty, a, b), o = T.rentBatchQtyDays(pg, qty, a, b); return Math.abs(s.qtyDays - o.qtyDays) < 1e-6 ? s : null; };
+  // ① 2 段：100 支，11/10 拔 40、11/25 拔 60，逾期 11/1 起算 → 100×10 ＋ 60×15 ＝ 40×10 ＋ 60×25
+  const p2 = { cum: 100, remLogs: [{ date: '2026-11-10', qty: 40, done: true }, { date: '2026-11-25', qty: 60, done: true }] };
+  const s2 = same(p2, 100, '2026-11-01', '2026-11-30');
+  check('v6.0.225 分段拔樁時段：2 段（100×10＋60×15＝40×10＋60×25＝1900 支·天）', !!s2 && s2.qtyDays === 1900 && JSON.stringify(s2.segs.map((x) => [x.from, x.to, x.qty, x.days])) === JSON.stringify([['2026-11-01', '2026-11-10', 100, 10], ['2026-11-11', '2026-11-25', 60, 15]]), JSON.stringify(s2 && s2.segs));
+  // ② 3 段：30／30／40，第三段 11/28
+  const p3 = { cum: 100, remLogs: [{ date: '2026-11-05', qty: 30, done: true }, { date: '2026-11-15', qty: 30, done: true }, { date: '2026-11-28', qty: 40, done: true }] };
+  const s3 = same(p3, 100, '2026-11-01', '2026-11-30');
+  check('v6.0.225 分段拔樁時段：3 段（在場 100→70→40，各段天數接續、不重複不漏）', !!s3 && s3.segs.length === 3 && s3.segs.map((x) => x.qty).join() === '100,70,40' && s3.segs.map((x) => x.days).join() === '5,10,13' && s3.qtyDays === 100 * 5 + 70 * 10 + 40 * 13, JSON.stringify(s3 && s3.segs));
+  // ③ 跨請款期：第一期 11/1～11/20（還沒拔完的算到 11/20），第二期 11/21～11/30 接著算；兩期加起來＝不切期
+  const a = same(p2, 100, '2026-11-01', '2026-11-20'), b = same(p2, 100, '2026-11-21', '2026-11-30'), all = same(p2, 100, '2026-11-01', '2026-11-30');
+  check('v6.0.225 分段拔樁時段：跨請款期（期中截斷、下一期從隔天接著算，兩期合計＝不切期）', !!a && !!b && !!all && a.qtyDays + b.qtyDays === all.qtyDays && a.segs[a.segs.length - 1].to === '2026-11-20' && a.segs[a.segs.length - 1].qty === 60 && b.segs.length === 1 && b.segs[0].from === '2026-11-21' && b.segs[0].to === '2026-11-25' && b.segs[0].qty === 60, JSON.stringify({ a: a && a.segs, b: b && b.segs }));
+  // ④ 第一段早於逾期起算日：40 支 10/25 就拔完 → 時段 1＝0 天（不列），從 11/1 起算 60 支
+  const pE = { cum: 100, remLogs: [{ date: '2026-10-25', qty: 40, done: true }, { date: '2026-11-25', qty: 60, done: true }] };
+  const sE = same(pE, 100, '2026-11-01', '2026-11-30');
+  check('v6.0.225 分段拔樁時段：第一段早於起算日（那段 0 天不列，從起算日開始算剩下的 60 支）', !!sE && sE.segs.length === 1 && sE.segs[0].from === '2026-11-01' && sE.segs[0].qty === 60 && sE.segs[0].days === 25 && sE.qtyDays === 1500, JSON.stringify(sE && sE.segs));
+  // ⑤ 還沒拔完、日報沒勾完成、拔除階段完工：都跟原本一樣（隨機 300 組比對）
+  let bad = 0, seed = 7; const rnd = (n) => { seed = (seed * 9301 + 49297) % 233280; return Math.floor(seed / 233280 * n); };
+  for (let k = 0; k < 300; k++) {
+    const nb = 1 + rnd(4), logs = []; let left = 100, d = 1;
+    for (let j = 0; j < nb && left > 0; j++) { d += rnd(12); const q = j === nb - 1 && rnd(2) ? left : Math.min(left, 5 + rnd(40)); left -= q; logs.push({ date: '2026-11-' + String(Math.min(d, 28)).padStart(2, '0'), qty: q, done: rnd(4) > 0 }); }
+    const pg = { cum: 100, remLogs: logs, removeDone: left <= 0 ? logs[logs.length - 1].date : '', stageRemove2: rnd(10) === 0 ? '2026-11-26' : '' };
+    const st = '2026-11-' + String(1 + rnd(10)).padStart(2, '0'), en = '2026-11-' + String(15 + rnd(15)).padStart(2, '0');
+    if (!same(pg, 100, st, en)) bad++;
+  }
+  check('v6.0.225 分段拔樁時段：隨機 300 組（勾／沒勾完成、還沒拔完、拔除階段完工、各種請款期間）支·天都跟原本一樣', bad === 0, '不一樣 ' + bad + ' 組');
+}
 // ── v6.0.221 各規格每 M 重量（材料買價每公斤換算每 M）──
 {
   const MV = require(path.join(__dirname, '..', 'calc', 'matmove.js')).mv;

@@ -88,6 +88,22 @@
     }
     return { qtyDays: tot, rows: rows, noTick: !!B.noTick && (!!((pg && pg.remLogs) || []).length || !!(pg && pg.removeDone) || !!B.stage) };
   }
+  // v6.0.225 Lotion 11/10：分段拔樁的逾期租金改照「時段」列（金額不變）——時段 1＝起算日到第一批完成日（含），在場＝全部；
+  // 時段 k＝上一批完成日隔天到這一批完成日（含），在場＝還沒拔走的支數；最後還沒拔完的算到 endISO。完成日早於起算日的批次＝0 天（直接扣掉在場量）。
+  // 跟 rentBatchQtyDays 同一份批次（同 pg、qty、期間），回傳 { qtyDays（一定等於 rentBatchQtyDays 的 qtyDays）, segs:[{no,from,to,qty,days}] }
+  function rentSegments(pg, qty, startISO, endISO) {
+    var bq = rentBatchQtyDays(pg, qty, startISO, endISO), rows = bq.rows.slice(), segs = [], tot = 0;
+    var onsite = rows.reduce(function (a, r) { return a + (parseFloat(r.qty) || 0); }, 0);
+    var cur = startISO, n = 0;
+    var push = function (to, q) { var d = Math.max(0, dDiff(cur, to) + 1); if (d > 0 && q > 0) { n++; segs.push({ no: n, from: cur, to: to, qty: Math.round(q * 1000) / 1000, days: d }); tot += q * d; } };
+    rows.filter(function (r) { return !r.open && r.date; }).sort(function (a, b) { return String(a.date) < String(b.date) ? -1 : (String(a.date) > String(b.date) ? 1 : 0); }).forEach(function (r) {
+      if (cur > endISO) return;
+      if (r.date >= cur) { var to = r.date < endISO ? r.date : endISO; push(to, onsite); cur = dAdd(to, 1); }
+      onsite -= (parseFloat(r.qty) || 0);
+    });
+    if (onsite > 1e-9 && cur <= endISO) push(endISO, onsite);
+    return { qtyDays: Math.round(tot * 1000) / 1000, segs: segs, base: bq };
+  }
   // today：今天（YYYY-MM-DD，由呼叫端給）
   function rentStatus(q, idx, endDate, today) {
     var it = ((q && q.items) || [])[idx]; if (!it || it.sec) return null;
@@ -473,7 +489,7 @@
     return out;
   }
   var todo = { dAdd: dAdd, dDiff: dDiff, itemCat: itemCat, rentDaysOf: rentDaysOf, prPhase: prPhase, itemProgress: itemProgress, rentEndMode: rentEndMode, rentOldQty: rentOldQty,
-    rentBatchList: rentBatchList, rentBatchQtyDays: rentBatchQtyDays, rentStatus: rentStatus, rentScan: rentScan, rentTodos: rentTodos, rentSoon: rentSoon,
+    rentBatchList: rentBatchList, rentBatchQtyDays: rentBatchQtyDays, rentSegments: rentSegments, rentStatus: rentStatus, rentScan: rentScan, rentTodos: rentTodos, rentSoon: rentSoon,
     recvRule: recvRule, byRule: byRule, expectedDate: expectedDate, recvTodos: recvTodos, looseDate: looseDate,
     retMonths: retMonths, addMonths: addMonths, retDue: retDue, closeReady: closeReady,
     rfqKey: rfqKey, rfqGL: rfqGL, rfqBaseVer: rfqBaseVer, rfqQuoteDiff: rfqQuoteDiff, rfqVerTodos: rfqVerTodos, ticketTodos: ticketTodos, build: build,
