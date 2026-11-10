@@ -41721,21 +41721,30 @@ _DRAFT_OLD6.forEach(function(t){
 //   要開的保留款退還請款單長怎樣（跟正式那張同一個出件 _docOut('retReturn')，iframe 預覽）、給業主的 LINE 文字草稿。
 //   確認＝開保留款退還請款單（retReturnCreate：存一張 kind:'retReturn'、開 PDF 預覽）＋複製 LINE 文字；退回＝這次不請（q.deduct.retAskSkip，金額變了或 30 天後再問）；修改＝改 LINE 文字再確認。
 //   新選單時舊的「保留款可請退」「保留款逾期未退」兩列待辦改由這張卡涵蓋（不重複）。
-function _retAskRows(){
+// 審查：追加案的保留款算回主約（一張卡＝一個主約，金額＝主約＋追加各報價未退保留款加總；確認時每張有未退的報價各開一張退還請款單）
+function _retAskFam(q){if(!q)return [];var m=q.parentId?((Q||[]).find(function(x){return x.id===q.parentId;})||q):q;return [m].concat((Q||[]).filter(function(x){return x&&x.parentId===m.id;}));}
+var _retAskC=null;
+function _retAskAll(){var fp='';try{fp=_todoBuildFp();}catch(e){_err('_retAskAll.fp',e);}if(_retAskC&&_retAskC.fp===fp&&Date.now()-_retAskC.at<1500)return _retAskC.v;var v=_retAskDueRows2();_retAskC={at:Date.now(),v:v,fp:fp};return v;}   // 審查：同一輪待辦重算只算一次
+function _retAskDueRows2(){
   var R=[];try{R=_retentionRows();}catch(e){_err('_retAskRows',e);return [];}
-  var today=localToday();
-  return R.filter(function(r){
-    if(!r.q||!(r.pending+r.hold>0))return false;
-    if(!(r.due||(r.retDue&&r.retDue<=today)))return false;
-    try{if(_retOpenDoc(r.q))return false;}catch(e){_err('_retAskRows.open',e);}
-    var pr=_retPendRows(r.q);if(!pr.amt)return false;r.ask=pr;
-    var sk=(r.q.deduct||{}).retAskSkip;if(sk&&sk.amt===pr.amt&&(Date.now()-(+sk.at||0))<30*86400000)return false;
-    return true;
+  var today=localToday(),by={},out=[];
+  R.forEach(function(r){if(!r.q||!(r.pending+r.hold>0))return;if(!(r.due||(r.retDue&&r.retDue<=today)))return;
+    var fam=_retAskFam(r.q),m=fam[0];if(by[m.id])return;by[m.id]=1;
+    var pr={rows:[],holds:[],amt:0,byQ:[]};fam.forEach(function(q){var x=_retPendRows(q);if(!x.amt)return;pr.byQ.push({q:q,amt:x.amt});pr.amt+=x.amt;
+      x.rows.forEach(function(y){pr.rows.push(Object.assign({qname:q===m?'':(q.name||'追加')},y));});x.holds.forEach(function(y){pr.holds.push(Object.assign({qname:q===m?'':(q.name||'追加')},y));});});
+    if(!pr.amt)return;
+    var open=false;fam.forEach(function(q){try{if(_retOpenDoc(q))open=true;}catch(e){_err('_retAskRows.open',e);}});
+    var sk=(m.deduct||{}).retAskSkip,skip=!!(sk&&sk.amt===pr.amt&&(Date.now()-(+sk.at||0))<30*86400000);
+    out.push({q:m,fam:fam,proj:m.name||r.proj,client:r.client||m.client||'',due:r.due,retDue:r.retDue,ask:pr,open:open,skip:skip});
   });
+  return out;
 }
-function _retAskCovers(r){try{return _nav5On()&&!!r&&!!r.q&&_retAskRows().some(function(x){return x.q===r.q;});}catch(e){return false;}}
-function _retAskEnd(r){var ct=(CONTRACTS||[]).find(function(c){return c&&(c.linkedQid===r.q.id||c.name===r.proj);});
-  return {end:(ct&&ct.end)||'',closed:r.q.closed&&r.q.closedAt?String(new Date(r.q.closedAt).toISOString()).slice(0,10):'',status:ct?ct.status:''};}
+function _retAskRows(){return _retAskAll().filter(function(x){return !x.open&&!x.skip;});}
+// 新選單＋管理員：到期的保留款一律由卡處理（出卡、退回後 30 天內不問、已開退還單）→ 舊「可請退／逾期未退」待辦不再出
+function _retAskCovers(r){try{if(!_nav5On()||!_decIsAdmin()||!r||!r.q)return false;var m=_retAskFam(r.q)[0];return _retAskAll().some(function(x){return x.q===m;});}catch(e){return false;}}
+function _retAskEnd(r){var ct=(CONTRACTS||[]).find(function(c){return c&&c.name===r.proj;})||(CONTRACTS||[]).find(function(c){return c&&c.linkedQid===r.q.id;});   // 審查：跟 _retentionRows 判斷完工同一份合約（名稱優先）
+  var cl='';try{if(r.q.closed&&r.q.closedAt){var dt=new Date(r.q.closedAt);if(!isNaN(dt))cl=_ymd(dt.getTime());}}catch(e){_err('_retAskEnd',e);}
+  return {end:(ct&&ct.end)||'',closed:cl,status:ct?ct.status:''};}
 function _retAskLine(r){
   var e=_retAskEnd(r),amt=r.ask?r.ask.amt:(r.pending+r.hold),cond=String(((r.q.deduct||{}).retCond)||'').trim();
   return (r.client||'')+' 您好：\n本公司承攬「'+(r.proj||'')+'」'+(e.end||e.closed?'已於 '+(e.end||e.closed)+' 完工':'已完工')+'，'
@@ -41757,14 +41766,16 @@ _decReg('retAsk',{
       +'<div style="color:var(--b4)">完工日</div><div>'+esc(e.end||'（合約沒填完工日）')+(e.closed?'　結案 '+esc(e.closed):'')+'</div>'
       +'<div style="color:var(--b4)">預計退還日</div><div>'+esc(_retDueHint(r.q)||r.retDue||'—')+'</div></div>'
       +'<table class="tbl" style="font-size:12px;width:100%;margin-top:6px"><thead><tr><th>期別</th><th>日期</th><th>保留款</th></tr></thead><tbody>'
-      +pr.rows.map(function(x){return '<tr><td>第 '+esc(String(x.periodNo))+' 期</td><td>'+esc(x.date)+'</td><td style="text-align:right">'+fmt(x.amt)+'（'+esc(String(x.pct))+'%）</td></tr>';}).join('')
-      +pr.holds.map(function(x){return '<tr><td>第 '+esc(String(x.periodNo))+' 期（業主當場扣）</td><td>'+esc(x.date)+'</td><td style="text-align:right">'+fmt(x.amt)+'</td></tr>';}).join('')
+      +pr.rows.map(function(x){return '<tr><td>'+(x.qname?esc(x.qname)+' ':'')+'第 '+esc(String(x.periodNo))+' 期</td><td>'+esc(x.date)+'</td><td style="text-align:right">'+fmt(x.amt)+'（'+esc(String(x.pct))+'%）</td></tr>';}).join('')
+      +pr.holds.map(function(x){return '<tr><td>'+(x.qname?esc(x.qname)+' ':'')+'第 '+esc(String(x.periodNo))+' 期（業主當場扣）</td><td>'+esc(x.date)+'</td><td style="text-align:right">'+fmt(x.amt)+'</td></tr>';}).join('')
       +'<tr><td colspan="2"><b>合計</b></td><td style="text-align:right"><b>NT$ '+fmt(pr.amt)+'</b></td></tr></tbody></table>'
       +(html?'<div style="font-size:12px;color:var(--b4);margin-top:6px">要開的保留款退還請款單（預覽）</div><iframe title="保留款退還請款單預覽" sandbox="allow-same-origin" style="width:100%;height:360px;border:1px solid var(--b1);border-radius:6px;background:#fff" srcdoc="'+esc(html)+'"></iframe>':'')
       +'<div style="font-size:12px;color:var(--b4);margin-top:6px">給業主的 LINE 文字（確認時複製）</div><div style="font-size:12.5px;white-space:pre-wrap;border:1px dashed var(--b1);border-radius:6px;padding:6px 8px">'+esc((_RETASK_TXT[r.q.id]!=null?_RETASK_TXT[r.q.id]:_retAskLine(r)))+'</div>';
   },
-  ok:function(r){if(_roDeny())return false;var t=_RETASK_TXT[r.q.id]!=null?_RETASK_TXT[r.q.id]:_retAskLine(r);_retAskCopy(t);delete _RETASK_TXT[r.q.id];retReturnCreate(r.q.id);try{updateDashTodo();}catch(e){_err('retAsk.ok',e);}return 'open';},
-  reject:function(r,why){if(_roDeny())return false;r.q.deduct=r.q.deduct||{};r.q.deduct.retAskSkip={at:Date.now(),amt:r.ask.amt,why:String(why||'').slice(0,200),by:_meEmail()};_touch(r.q);persist();try{updateDashTodo();}catch(e){_err('retAsk.rej',e);}return true;},
+  ok:function(r){if(_roDeny())return false;var t=_RETASK_TXT[r.q.id]!=null?_RETASK_TXT[r.q.id]:_retAskLine(r);_retAskCopy(t);delete _RETASK_TXT[r.q.id];_retAskC=null;
+    r.ask.byQ.forEach(function(x){try{retReturnCreate(x.q.id);}catch(e){_err('retAsk.ok.create',e);}});   // 主約＋追加各有未退的，各開一張（同原本按鈕的口徑）
+    _retAskC=null;try{updateDashTodo();}catch(e){_err('retAsk.ok',e);}return 'open';},
+  reject:function(r,why){if(_roDeny())return false;r.q.deduct=r.q.deduct||{};r.q.deduct.retAskSkip={at:Date.now(),amt:r.ask.amt,why:String(why||'').slice(0,200)};_retAskC=null;_touch(r.q);persist();try{updateDashTodo();}catch(e){_err('retAsk.rej',e);}return true;},
   edit:function(r){var t=_RETASK_TXT[r.q.id]!=null?_RETASK_TXT[r.q.id]:_retAskLine(r);
     showConfirm('修改給業主的 LINE 文字','<textarea id="ra-edit" data-ro-ok="1" style="width:100%;min-height:200px;box-sizing:border-box;font-size:12.5px">'+esc(t)+'</textarea><div style="font-size:11.5px;color:var(--b4);margin-top:4px">按確定先存起來，回到卡片再按「確認」才開請款單並複製</div>',function(){_RETASK_TXT[r.q.id]=String(gv('ra-edit')||'').slice(0,2000);_decReload('retAsk',r.q.id);},false,null,true);}
 });
@@ -41778,7 +41789,7 @@ function _closeAskRows(){var v=null;try{v=_todoBuild();}catch(e){_err('_closeAsk
 function _closeAskData(q){
   var st=_pjStat(q),ids=st.all.map(function(x){return x.id;}),tx=_taxM();
   var invs=st.invs.filter(function(i){return i.kind!=='retReturn';}).map(function(i){return {no:i.periodNo,date:i.date,gross:Math.round(_invGrossOf(i)),rcv:Math.round(_invRcv(i)),ar:Math.round(_invAR(i))};});
-  var ret=0;try{ret=_retPendRows(q).amt;}catch(e){_err('_closeAskData.ret',e);}
+  var ret=0;try{st.all.forEach(function(x){ret+=_retPendRows(x).amt;});}catch(e){_err('_closeAskData.ret',e);}   // 審查：追加案的保留款也算
   var pays=st.pays.filter(function(p){return !p.voidAt&&!p.planned;}),unpaid=pays.filter(function(p){return p.status!=='paid'&&(parseFloat(p.amount)||0)>0;});
   var byV={};pays.forEach(function(p){var k=p.to||'（未填）',o=byV[k]=byV[k]||{to:k,n:0,eff:0,paid:0};o.n++;o.eff+=_payEff(p);o.paid+=_payPaidSum(p);});
   var mats=(typeof MAT_LEDGER!=='undefined'?MAT_LEDGER:[]).filter(function(r){return r&&r.name&&(r.projQid===q.id||(!r.projQid&&q.name&&r.loc===q.name))&&(parseFloat(r.qty)||0)>0&&r.kind!=='一次性';});
@@ -41791,9 +41802,10 @@ function _closeAskData(q){
 }
 function _closeAskCsv(q,D){
   var rows=[['工程','工項','單位','報價數量','報價成本單價','實際成本（未稅）']];
-  (q.items||[]).forEach(function(it,i){if(!it||it.sec)return;rows.push([q.name||'',String(it.desc||'').split('\n')[0],it.unit||'',it.qty||'',it.estCost||'',Math.round(D.ci.map[i]||0)]);});
-  if(D.ci.unassigned)rows.push([q.name||'','（沒有對到工項的成本）','','','',Math.round(D.ci.unassigned)]);
-  var cell=function(v){var t=String(v==null?'':v);if(typeof v==='string'&&/^[=+\-@]/.test(t))t="'"+t;return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
+  D.st.all.forEach(function(x){var ci={map:{},unassigned:0};try{ci=FJC.todo.costByItem(x);}catch(e){_err('_closeAskCsv',e);}   // 審查：主約＋追加都列
+    (x.items||[]).forEach(function(it,i){if(!it||it.sec)return;rows.push([x.name||'',String(it.desc||'').split('\n')[0],it.unit||'',it.qty||'',it.estCost||'',Math.round(ci.map[i]||0)]);});
+    if(ci.unassigned)rows.push([x.name||'','（沒有對到工項的成本）','','','',Math.round(ci.unassigned)]);});
+  var cell=function(v){var t=String(v==null?'':v);if(typeof v==='string'&&/^[=+\-@\t\r]/.test(t))t="'"+t;return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
   return '﻿'+rows.map(function(r){return r.map(cell).join(',');}).join('\n');
 }
 _decReg('closeAsk',{
@@ -41816,7 +41828,7 @@ _decReg('closeAsk',{
     if(adm){
       h+='<div style="font-weight:700;font-size:13px;margin:10px 0 2px">二、結案損益（未稅）</div><div style="display:grid;grid-template-columns:max-content 1fr;gap:2px 10px;font-size:12.5px">'
         +'<div style="color:var(--b4)">請款營收</div><div>NT$ '+fmt(D.revNet)+'</div><div style="color:var(--b4)">施工成本</div><div>NT$ '+fmt(D.cost)+'</div>'
-        +'<div style="color:var(--b4)">毛利</div><div style="font-weight:800;color:'+(D.gross>=0?'var(--g3)':'var(--red)')+'">NT$ '+fmt(D.gross)+(D.revNet?'（'+(Math.round(D.gross/D.revNet*1000)/10)+'%）':'')+'</div></div>';
+        +'<div style="color:var(--b4)">毛利（以已請款計）</div><div style="font-weight:800;color:'+(D.gross>=0?'var(--g3)':'var(--red)')+'">NT$ '+fmt(D.gross)+(D.revNet?'（'+(Math.round(D.gross/D.revNet*1000)/10)+'%）':'')+'</div></div>';
       h+='<div style="font-weight:700;font-size:13px;margin:10px 0 2px">三、超支工項（實際成本 ≧ 報價成本 110%）</div>'
         +(D.ov.length?'<table class="tbl" style="font-size:12px;width:100%"><thead><tr><th>工項</th><th style="text-align:right">報價成本</th><th style="text-align:right">實際</th><th style="text-align:right">％</th></tr></thead><tbody>'+D.ov.map(function(o){return '<tr><td style="overflow-wrap:anywhere">'+esc(o.desc)+'</td><td style="text-align:right">'+fmt(o.est)+'</td><td style="text-align:right">'+fmt(o.act)+'</td><td style="text-align:right;color:var(--red);font-weight:700">'+o.pct+'%</td></tr>';}).join('')+'</tbody></table>':'<div style="font-size:12.5px;color:var(--g3)">沒有超支的工項</div>');
       h+='<div style="font-size:12.5px;margin-top:8px">四、實際成本：<a download="'+esc((q.name||'工程')+'_實際成本_'+localToday()+'.csv')+'" href="data:text/csv;charset=utf-8,'+encodeURIComponent(_closeAskCsv(q,D))+'">下載逐工項 CSV</a></div>';
@@ -41825,7 +41837,7 @@ _decReg('closeAsk',{
     return h;
   },
   ok:function(q){if(_roDeny())return false;pjCloseAll(q.id);return 'open';},
-  reject:function(q,why){if(_roDeny())return false;q.closeSkip={at:Date.now(),why:String(why||'').slice(0,200),by:_meEmail()};_touch(q);persist();try{updateDashTodo();}catch(e){_err('closeAsk.rej',e);}return true;},
+  reject:function(q,why){if(_roDeny())return false;q.closeSkip={at:Date.now(),why:String(why||'').slice(0,200)};_touch(q);persist();try{updateDashTodo();}catch(e){_err('closeAsk.rej',e);}return true;},
   edit:function(q){var m=document.getElementById('fy-modal');if(m)m.remove();openProj(q.id);}
 });
 function _retAskCopy(t){try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast('LINE 文字已複製');},function(){/* 可忽略：剪貼簿被擋 */});}catch(e){_err('_retAskCopy',e);}}
