@@ -13226,6 +13226,82 @@ async function newPage(browser, width, height) {
     check('v6.0.214 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.222 舊 AI 草稿 6 種改拍板卡＋發票對帳卡（陳軒派工，Lotion 11/10）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepI = INV.slice(), keepR = INVOICE_RECS.slice(), keepD = DRAFTS;
+      try {
+        localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_v7old');
+        window.toast = () => {}; window._draftMark = (id, st, ex) => { if (DRAFTS[id]) { DRAFTS[id].status = st; DRAFTS[id].ex = ex; } return Promise.resolve(true); };
+        const IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+        const d = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+        Q = [{ id: 'qC1', code: 'C01', name: '範例工程甲', client: '範例營造甲', date: d(-30), items: [{ desc: '範例樁', unit: '支', qty: '1', price: '1000' }], exs: [], rmk: {}, _mt: 1, bidStatus: '' }];
+        INV.length = 0;
+        const mk = (id, client, project, no, date, total) => ({ id, client, project, periodNo: no, date, items: [], totals: { curTotal: Math.round(total / 1.05), tax: total - Math.round(total / 1.05), total }, _mt: 1 });
+        INV.push(mk('iC1', '範例營造甲股份有限公司', '範例工程甲', 3, d(-10), 105000), mk('iC2', '範例營造甲股份有限公司', '範例工程甲', 2, d(-40), 52500), mk('iC3', '範例企業乙有限公司', '範例工程乙', 1, d(-5), 210000));
+        INVOICE_RECS.length = 0;
+        const g1 = _einvSplit(_invEinvGross(INV[0])).gross;
+        const D = (id, type, payload, summary) => ({ id, type, by: 'ai@example.com', byName: 'AI', at: Date.now() - 1000, status: 'pending', summary, payload });
+        DRAFTS = {
+          dQuote01: D('dQuote01', 'quote', { base: '', fields: { code: 'C02', client: '範例營造丙', name: '範例新案', items: [{ desc: '範例工項', unit: 'M', qty: 10, price: 500 }] } }, '新報價 範例新案'),
+          dBid0001: D('dBid0001', 'bid', { qid: 'qC1', from: '', to: 'lost', lostReason: '價格' }, '範例工程甲：待回覆 → 未得標'),
+          dIrOk001: D('dIrOk001', 'irPhoto', { file: IMG, number: 'AB12345678', date: d(-1), client: '範例營造甲', amount: g1, note: '' }, '發票 AB12345678'),
+          dIrBad01: D('dIrBad01', 'irPhoto', { file: IMG, number: 'CD87654321', date: d(-1), client: '範例營造甲', amount: g1 + 500, note: '範例工程甲 第3期' }, '發票 CD87654321'),
+          dIrNo001: D('dIrNo001', 'irPhoto', { file: IMG, number: 'EF11112222', date: d(-1), client: '不認識的公司', amount: 777, note: '' }, '發票 EF11112222'),
+          dAdd0001: D('dAdd0001', 'addon', { qid: 'qC1', text: '範例追加 3 支', qty: 3, unit: '支', photos: [] }, '現場追加'),
+          dLog0001: D('dLog0001', 'dailyLog', { qid: 'qC1', answers: ['今天打 5 支', '明天續打'], photos: [] }, '施工日報'),
+          dCon0001: D('dCon0001', 'contact', { kind: 'vendor', name: '範例廠商丁', taxid: '12345675', tel: '02-1234-5678' }, '新廠商 範例廠商丁'),
+        };
+        // A：新選單時 6 種各一張拍板卡、AI 草稿清單那一列不出現（今天頁只有一套）
+        const items = []; _v6TodoItems(items);
+        const types = items.map((x) => x.type);
+        out.cards = ['quote', 'bid', 'irPhoto', 'addon', 'dailyLog', 'contact'].every((t) => types.indexOf('dec_drf_' + t) >= 0) && types.indexOf('ai_draft') < 0 && _draftPending().length === 0;
+        // 展開明細前不能確認；明細有完整內容
+        openDecList('drf_quote'); await T(60);
+        const okb = () => document.querySelector('#dec-box .dec-ok');
+        out.locked = !!okb() && okb().disabled;
+        decToggle('drf_quote', 'dQuote01', true); await T(300);
+        const qdet = document.querySelector('#dec-box .dec-detail').textContent;
+        out.qDetail = /範例工項/.test(qdet) && /5,000/.test(qdet) && !okb().disabled;
+        document.getElementById('fy-modal') && document.getElementById('fy-modal').remove();
+        const det = async (kind, id) => { const h = await Promise.resolve(_DEC[kind].detail(DRAFTS[id])); const x = document.createElement('div'); x.innerHTML = h; return x; };
+        out.bid = /未得標/.test((await det('drf_bid', 'dBid0001')).textContent);
+        out.con = /範例廠商丁/.test((await det('drf_contact', 'dCon0001')).textContent);
+        out.line = /今天打 5 支/.test((await det('drf_dailyLog', 'dLog0001')).textContent) && /範例追加 3 支/.test((await det('drf_addon', 'dAdd0001')).textContent);
+        // 舊選單：卡片收起、AI 草稿清單照舊
+        localStorage.setItem('fy_nav_old', '1'); const it2 = []; _v6TodoItems(it2); out.old = it2.some((x) => x.type === 'ai_draft') && !it2.some((x) => /^dec_drf_/.test(x.type)) && _draftPending().length === 8; localStorage.removeItem('fy_nav_old');
+        // 退回：標 rejected、照片不留
+        await _DEC.drf_bid.reject(DRAFTS.dBid0001, '不用'); out.rej = DRAFTS.dBid0001.status === 'rejected';
+        // B：買受人＋金額都對 → 自動對到第 3 期、打勾
+        const x1 = await det('drf_irPhoto', 'dIrOk001'), t1 = x1.textContent;
+        out.auto = /自動對到/.test(t1) && /範例工程甲 第3期/.test(t1) && /✓ 金額相符/.test(t1) && !!x1.querySelector('img');
+        // 金額差 500 → 不自動，列前 3 期讓 Lotion 選；選了第 3 期 → 標紅寫差多少
+        const x2 = await det('drf_irPhoto', 'dIrBad01');
+        out.pick3 = /對不到是哪一期/.test(x2.textContent) && x2.querySelectorAll('input[type=radio]').length >= 1 && x2.querySelectorAll('input[type=radio]').length <= 3;
+        _IRREC_SEL.dIrBad01 = 'iC1'; const x2b = await det('drf_irPhoto', 'dIrBad01');
+        out.bad = /✗ 金額不符/.test(x2b.textContent) && /多開 NT\$ 500/.test(x2b.textContent);
+        // 對不到又沒選 → 確認不成功、不存
+        out.noPick = (await det('drf_irPhoto', 'dIrNo001')).textContent.indexOf('對不到是哪一期') >= 0 && _irRecOk(DRAFTS.dIrNo001) === false && INVOICE_RECS.length === 0;
+        // 確認：存發票紀錄關聯第 3 期、稅額拆好、請款單記交付方式與日期、草稿標已套用
+        const host = document.createElement('div'); host.innerHTML = x1.innerHTML; document.body.appendChild(host);
+        document.getElementById('irrec-send-dIrOk001').value = '郵寄公司';
+        const ok = await _irRecOk(DRAFTS.dIrOk001); host.remove();
+        const rec = INVOICE_RECS[0];
+        out.saved = ok === true && !!rec && rec.linkedInvId === 'iC1' && rec.number === 'AB12345678' && rec.amount === g1 && rec.taxAmt === _einvSplit(g1).tax && rec.fileData === IMG && INV[0].sendMethod === '郵寄公司' && /^\d{4}-\d{2}-\d{2}$/.test(INV[0].sendDate) && DRAFTS.dIrOk001.status === 'applied' && _invEinvOf('iC1') === rec;
+        // 同一個號碼再存一次 → 擋
+        DRAFTS.dIrDup01 = D('dIrDup01', 'irPhoto', { file: IMG, number: 'AB12345678', date: d(0), client: '範例營造甲', amount: 52500 }, 'dup'); _IRREC_SEL.dIrDup01 = 'iC2';
+        out.dup = _irRecOk(DRAFTS.dIrDup01) === false && INVOICE_RECS.length === 1 && /已經有發票紀錄/.test((await det('drf_irPhoto', 'dIrDup01')).textContent);
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      INV.length = 0; keepI.forEach((x) => INV.push(x)); INVOICE_RECS.length = 0; keepR.forEach((x) => INVOICE_RECS.push(x)); DRAFTS = keepD;
+      return out;
+    });
+    check('v6.0.222 舊 AI 草稿 6 種改拍板卡：報價、得標、發票照片、現場追加、施工日報、客戶廠商各一張卡；今天頁不再有 AI 草稿那列；展開看過明細才能確認；退回照舊；舊選單照舊走 AI 草稿清單', !r.err && r.cards && r.locked && r.qDetail && r.bid && r.con && r.line && r.old && r.rej, JSON.stringify(r));
+    check('v6.0.222 發票對帳卡：買受人＋金額對上自動對到那一期打勾；差多少標紅；對不到列前 3 期讓 Lotion 選、沒選不能存；確認存發票紀錄（關聯期別、稅額、照片）＋請款單記交付方式與日期；同號碼不重存', !r.err && r.auto && r.pick3 && r.bad && r.noPick && r.saved && r.dup, JSON.stringify(r));
+    check('v6.0.222 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
