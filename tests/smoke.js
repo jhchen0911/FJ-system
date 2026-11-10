@@ -11690,18 +11690,18 @@ async function newPage(browser, width, height) {
         go('params'); prmTab('cost');
         out.ui = !!document.querySelector('#m8-cats tr[data-id="deck3"]') && document.querySelector('#m8-cats tr[data-id="deck"] .m8-cn').value === '覆工板 2M';
         document.querySelector('#m8-cats tr[data-id="deck3"] .m8-cp').value = '5500';
-        const sp = document.querySelectorAll('#m8-ovr .m8-sp'), bp = document.querySelectorAll('#m8-ovr .m8-bp'), ou = document.querySelectorAll('#m8-ovr .m8-ou'), i = sp.length - 1;
-        sp[i].value = '3M×1M'; bp[i].value = '6000'; ou[i].value = '片';
+        const sp = document.querySelectorAll('#m8-ovr .m8-sp'), bp = document.querySelectorAll('#m8-ovr .m8-bp'), i = sp.length - 1;
+        sp[i].value = '3M×1M'; bp[i].value = '6000';
         _m8PrmSave();
         out.save = _m8Cats().find(x => x.id === 'deck').price === 4000 && document.querySelector('#m8-cats tr[data-id="h"] .m8-cu').disabled && _m8Cats().find(x => x.id === 'deck3').price === 5500 && _m8OvrU('3M×1M') === '片' && _m8BuyPiece('3M×1M', '覆工板') === 6000 && _m8BuyPerM('3M×1M', '覆工板') === 0 && /覆寫每 片 6,000/.test(_m8BuyHow('3M×1M'));
         // 每 M 覆寫照舊
         const sp2 = document.querySelectorAll('#m8-ovr .m8-sp'), bp2 = document.querySelectorAll('#m8-ovr .m8-bp'), j = sp2.length - 1;
         sp2[j].value = 'H350'; bp2[j].value = '3300'; _m8PrmSave();
-        out.perM = _m8BuyPerM('H350') === 3300 && _m8OvrU('H350') === 'M' && _m8BuyPiece('3M×1M', '覆工板') === 6000;
+        out.perM = _m8BuyPerM('H350') === 3300 && _m8OvrU('H350') === 'M' && _m8OvrU('50KG/M') === 'M' && _m8OvrU('IV') === 'M' && !document.querySelector('#m8-ovr .m8-ou') && _m8BuyPiece('3M×1M', '覆工板') === 6000;
       } finally { MAT_MOVE_FIN = keepF; }
       return out;
     });
-    check('v6.0.222 材料買價覆工板分 2M／3M：舊「覆工板」價錢帶到 2M、3M 空白；規格或品名看得出 2M／3M 才套、看不出不套（13M、32mm、12000 不算）；內建類別順序固定、單位不能改；每片價不混進每 M；個別規格覆寫可選每片、每 M 照舊', r.mig && r.match && r.noFalse && r.order && r.piece && r.ui && r.save && r.perM, JSON.stringify(r));
+    check('v6.0.222 材料買價覆工板分 2M／3M：舊「覆工板」價錢帶到 2M、3M 空白；規格或品名看得出 2M／3M 才套、看不出不套（13M、32mm、12000 不算）；內建類別順序固定、單位不能改；每片價不混進每 M；個別規格覆寫單位系統自己判斷（覆工板尺寸＝每片、鋼材每 M，不多一個欄位）', r.mig && r.match && r.noFalse && r.order && r.piece && r.ui && r.save && r.perM, JSON.stringify(r));
     check('v6.0.222 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
