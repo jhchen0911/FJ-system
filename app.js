@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.232';
+var APP_VERSION='v6.0.233';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -33328,6 +33328,7 @@ function _v6TodoItems(items){
     });
   }catch(e){_err('_v6TodoItems.mat',e);}
   try{_bkTodoList().forEach(function(t){items.push({type:'bk_'+(t.src||'')+'_'+(t.key||''),urgent:!!t.urgent,jump:t.go==='health'?"go('reports');setTimeout(function(){showReport('health')},80)":t.go==='drafts'?'openDrafts()':t.go==='staff'?"go('staff')":"go('dash')",icon:ic('i-cloud'),color:'#6a1b9a',text:String(t.text||''),sub:esc(String(t.sub||''))});});}catch(e){_err('_v6TodoItems.bk',e);}   // 改版第 5 步 後端待辦（雲端寫、網頁只顯示）
+  try{var _ss=_syncStuckItem();if(_ss)items.push(_ss);}catch(e){_err('_v6TodoItems.stuck',e);}   // v6.0.233
   try{if((SYNC_CONFLICTS||[]).length)items.push({type:'sync_conflict',urgent:true,jump:'openSyncConflicts()',icon:ic('i-warn'),color:'var(--red)',text:'同步衝突 '+SYNC_CONFLICTS.length+' 處：兩台裝置改了同一個欄位',sub:_tdCfSub()});}catch(e){_err('_v6TodoItems.cf',e);}   // 4b
 }
 // ══════════ v6.0.17 經營報表：利潤分析併入報表中心（總覽分頁）、口徑統一（權責為主、現金為輔）、共用年度篩選 ══════════
@@ -35411,6 +35412,22 @@ function _pjJump(v){
 }
 
 // ── ④ 未同步指示 ──
+// v6.0.233 第 7 步 7e（陳軒 11/11）：「同步」改成自動——上傳失敗或還沒傳的，每分鐘自己重試；網路恢復馬上傳；不用到「更多」按「同步」
+function _syncCanAuto(){try{return !!(_fbUser&&_fbDb&&!_isReaderUser&&_roState==='rw'&&navigator.onLine!==false&&!window._applyingCloud);}catch(e){return false;}}
+function _syncDirtySince(){var ls=parseInt(localStorage.getItem('fy_last_local_save')||'0'),lt=parseInt(localStorage.getItem('fy_last_fb_sync')||'0');return (ls>lt)?ls:(localStorage.getItem('fy_pending_sync')==='1'||localStorage.getItem('fy_priv_pending')==='1'?(lt||ls||Date.now()):0);}
+function _syncAutoTick(){
+  if(!_syncCanAuto())return false;var d=false;try{d=_isDirty();}catch(e){_err('_syncAutoTick',e);return false;}
+  if(!d)return false;var since=_syncDirtySince();if(since&&Date.now()-since<20000)return false;   // 剛存的交給原本 3 秒後上傳
+  try{_pushCloud({silent:true});return true;}catch(e){_err('_syncAutoTick.push',e);return false;}
+}
+// 今天頁提醒：連上網路、登入了，還有資料超過 30 分鐘沒傳上去（自動重試也一直失敗）
+function _syncStuckItem(){
+  if(!_syncCanAuto())return null;var d=false;try{d=_isDirty();}catch(e){return null;}if(!d)return null;
+  var since=_syncDirtySince();if(!since||Date.now()-since<30*60000)return null;
+  var lt=parseInt(localStorage.getItem('fy_last_fb_sync')||'0'),mins=Math.round((Date.now()-since)/60000);
+  return {type:'sync_stuck',urgent:mins>=120,jump:'_immediateUpload()',icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg>',color:'var(--red)',
+    text:'這台有資料 '+(mins>=120?Math.round(mins/60)+' 小時':mins+' 分鐘')+'沒傳上雲端（自動重試沒成功）',sub:'上次成功同步：'+(lt?new Date(lt).toLocaleString('zh-TW'):'沒有紀錄')+'；點一下再試一次，還是不行請截圖給陳軒'};
+}
 function _syncChip(){
   var el=document.getElementById('sync-chip');
   if(!el){
@@ -35431,7 +35448,7 @@ function _syncChip(){
   if(txt){el.textContent=txt;el.style.background=bg;el.style.color='#fff';el.style.display='';}
   else el.style.display='none';
 }
-try{setInterval(_syncChip,4000);window.addEventListener('online',_syncChip);window.addEventListener('offline',_syncChip);document.addEventListener('DOMContentLoaded',function(){setTimeout(_syncChip,800);});}catch(e){_err('_syncChip',e);}
+try{setInterval(_syncChip,4000);setInterval(_syncAutoTick,60000);window.addEventListener('online',function(){setTimeout(_syncAutoTick,3000);});window.addEventListener('online',_syncChip);window.addEventListener('offline',_syncChip);document.addEventListener('DOMContentLoaded',function(){setTimeout(_syncChip,800);});}catch(e){_err('_syncChip',e);}
 
 // ── ⑤ 日報照片分離 ──
 var _PH_DB=(window.FY_TESTSITE?'test:':window.FY_BETA?'beta:':'')+'fy_photos',_phCache={};   // 改版第 0 步：測試站、beta 的照片庫與正式站分開
@@ -43787,6 +43804,7 @@ function _moreVisible(it){
   var pid=it.go||it.page;
   if(it.fn==='trash'&&typeof openTrash!=='function')return false;
   if(it.fn==='trash'&&_isReaderUser)return false;
+  if(it.fn==='sync')return false;   // v6.0.233：同步已自動（_syncAutoTick），更多頁不再放「同步」鈕；頂欄「未同步」小字點了仍可立即上傳
   return !pid||canAccess(pid);
 }
 function renderMorePage(){

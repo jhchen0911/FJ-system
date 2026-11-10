@@ -14231,6 +14231,44 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.233 第 7 步 7e：「同步」改成自動（每分鐘重試、連上網路馬上傳），更多頁不放「同步」；30 分鐘還沒傳上去＝今天頁提醒 ──
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const oU = window._fbUser, oD = window._fbDb, oS = window._roState, oP = window._pushCloud, oR = _isReaderUser;
+      const LS = ['fy_last_local_save', 'fy_last_fb_sync', 'fy_pending_sync', 'fy_priv_pending'].map((k) => [k, localStorage.getItem(k)]);
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); _nav5Apply();
+        go('more'); await T(80); out.noBtn = !/>同步</.test(document.getElementById('more-body').innerHTML) && /已刪資料還原/.test(document.getElementById('more-body').textContent);
+        let pushed = 0; window._pushCloud = () => { pushed++; };
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _fbDb = {}; _roState = 'rw'; _isReaderUser = false;
+        // 剛存（5 秒前）：交給原本 3 秒後上傳，不重複
+        localStorage.setItem('fy_last_fb_sync', String(Date.now() - 600000)); localStorage.setItem('fy_last_local_save', String(Date.now() - 5000)); localStorage.setItem('fy_pending_sync', '1');
+        out.fresh = _syncAutoTick() === false && pushed === 0;
+        // 一分鐘前存的還沒傳 → 自動重試
+        localStorage.setItem('fy_last_local_save', String(Date.now() - 60000));
+        out.retry = _syncAutoTick() === true && pushed === 1 && !_syncStuckItem();
+        // 40 分鐘沒傳上去 → 今天頁提醒（附上次成功時間）
+        localStorage.setItem('fy_last_fb_sync', String(Date.now() - 50 * 60000)); localStorage.setItem('fy_last_local_save', String(Date.now() - 40 * 60000));
+        const it = _syncStuckItem(); out.stuck = !!it && it.type === 'sync_stuck' && /40 分鐘沒傳上雲端/.test(it.text) && /上次成功同步/.test(it.sub);
+        // 沒有待上傳 → 不動作
+        localStorage.setItem('fy_last_fb_sync', String(Date.now())); localStorage.setItem('fy_last_local_save', String(Date.now() - 60000)); localStorage.removeItem('fy_pending_sync'); localStorage.removeItem('fy_priv_pending');
+        out.clean = _syncAutoTick() === false && !_syncStuckItem();
+        // 唯讀帳號不上傳
+        localStorage.setItem('fy_pending_sync', '1'); _isReaderUser = true; out.ro = _syncAutoTick() === false && !_syncStuckItem(); _isReaderUser = false;
+        // 舊選單（手機更多選單）照舊有同步
+        out.oldKeep = typeof fbUploadWithConflictCheck === 'function';
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      window._pushCloud = oP; _fbUser = oU; _fbDb = oD; _roState = oS; _isReaderUser = oR;
+      LS.forEach(([k, v]) => { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); });
+      return out;
+    });
+    check('v6.0.233 同步改自動：更多頁沒有「同步」鈕、剛存的不重複傳、一分鐘前沒傳的自動重試、30 分鐘以上今天頁提醒（附上次成功時間）、沒待傳不動作、唯讀不上傳', !r.err && r.noBtn && r.fresh && r.retry && r.stuck && r.clean && r.ro && r.oldKeep, JSON.stringify(r));
+    check('v6.0.233 同步改自動測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
