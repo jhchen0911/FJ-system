@@ -11646,7 +11646,8 @@ async function newPage(browser, width, height) {
         _DEC.steelPrice.ok(DRAFTS.dst2); out.dedupe = _m8Csc().months['2026-11'].adj.length === 3;
         // 建議：H 型鋼 25 + (400+400)/1000 = 25.8（+3.2%，不到 5% 不出卡）；再漲兩次 400 → 26.6（+6.4%）出卡
         const ch = _m8SteelChg(_m8Cats().find(x => x.id === 'h'));
-        out.calc = ch && ch.sug === 25.8 && ch.pct === 3.2 && /東和鋼鐵 H 型鋼盤價/.test(ch.src) && !_decItems('m8Steel').length;
+        out.calc = ch && ch.sug === 25.8 && ch.pct === 3.2 && /東和鋼鐵 H 型鋼盤價/.test(ch.src) && _decItems('m8Steel').some(x => /H 型鋼/.test(x.spec) && x.sug === 25.8);   // Lotion 11/10：每次調價都出卡（不等 5%）
+        _DEC.m8Steel.ok(_decItems('m8Steel').find(x => /H 型鋼/.test(x.spec)));
         DRAFTS.dst3 = { id: 'dst3', type: 'steelPrice', by: 'ai@example.com', at: 3, status: 'pending', summary: '', payload: _m8StlClean({ ym: '2026-11', items: [{ cat: 'H型鋼', perTon: 400, date: '2026-11-06' }, { cat: 'H型鋼', perTon: 400, date: '2026-11-08' }] }) };
         _DEC.steelPrice.ok(DRAFTS.dst3);
         const L = _decItems('m8Steel'), hc = L.find(x => /H 型鋼/.test(x.spec));
@@ -11667,7 +11668,7 @@ async function newPage(browser, width, height) {
       } finally { MAT_MOVE_FIN = keepF; DRAFTS = keepD; MAT_TAGS = keepT; window.localToday = keepTd; window._draftMark = keepMark; STEEL_IDX = keepI; }
       return out;
     });
-    check('v6.0.226 鋼價來源：H 型鋼／鋼軌樁／鋼板樁看東和、覆工板看中鋼熱軋；草稿可帶每噸調整金額＋來源＋日期＋網址；確認累加進這個月（不重複）；建議買價＝現價＋每噸金額÷1000、卡片寫換算；覆工板每片不換算；舊 % 格式照收', Object.values(r).length === 14 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.226 鋼價來源：H 型鋼／鋼軌樁／鋼板樁看東和、覆工板看中鋼熱軋；草稿可帶每噸調整金額＋來源＋日期＋網址；確認累加進這個月（不重複）；建議買價＝現價＋每噸金額÷1000、每次調價都出卡、卡片寫換算；覆工板每片不換算；舊 % 格式照收', Object.values(r).length === 14 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('v6.0.226 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
@@ -11851,7 +11852,7 @@ async function newPage(browser, width, height) {
         DRAFTS.dstl1 = { id: 'dstl1', type: 'steelPrice', by: 'ai@example.com', at: 1, status: 'pending', summary: '', payload: { ym: '2026-10', url: 'https://example.com/n', items: [{ cat: 'H型鋼', pct: 2 }, { cat: '鋼板', pct: -1 }] } };
         out.draftCard = _decItems('steelPrice').length === 1 && /H型鋼 \+2%/.test(_DEC.steelPrice.body(DRAFTS.dstl1));   // v6.0.226 文字改「H型鋼 +2%（來源）」
         out.draftOk = _DEC.steelPrice.ok(DRAFTS.dstl1) === true && _m8Csc().months['2026-10'].H === 2 && DRAFTS.dstl1.status === 'applied';
-        out.cscSmall = !_decItems('m8Steel').length;
+        out.cscSmall = _decItems('m8Steel').length === 1 && _decItems('m8Steel')[0].pct === 2;   // v6.0.226 Lotion 11/10：每次調價都出卡（不等 5%）
         // 加上 9 月 +4% → 累計 1.04×1.02＝+6.1% → 出卡、來源寫中鋼
         MAT_MOVE_FIN.steelCsc.months['2026-09'] = { H: 4, P: 0 };
         L = _decItems('m8Steel');

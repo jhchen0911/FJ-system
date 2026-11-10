@@ -44146,10 +44146,10 @@ function _m8SteelChg(cat){var ref=cat&&cat.ref;if(!ref||!ref.ym)return null;var 
     if(last){var srcT=_M8_LINE_T[k2]+'（'+ref.ym+' 之後到 '+last+'）';return {pct:Math.round((p/bp-1)*1000)/10,sug:Math.round(p*100)/100,src:srcT,ym:last,steps:steps};}}
   var L=STEEL_IDX&&STEEL_IDX.latest,r0=ref.idx||_m8IdxAt(ref.ym);if(L&&L.ym>ref.ym&&r0>0)return {pct:Math.round((L.v/r0-1)*1000)/10,src:'主計總處營造工程物價指數（金屬製品類，'+ref.ym+' '+r0+' → '+L.ym+' '+L.v+'）',ym:L.ym};
   return null;}
-function _m8SteelList(){var L=[];_m8Cats().forEach(function(cat){var bp=parseFloat(cat.price)||0;if(!(bp>0)||cat.unit!=='kg')return;var x=_m8SteelChg(cat);if(!x||Math.abs(x.pct)<_M8_STEEL_PCT)return;
+function _m8SteelList(){var L=[];_m8Cats().forEach(function(cat){var bp=parseFloat(cat.price)||0;if(!(bp>0)||cat.unit!=='kg')return;var x=_m8SteelChg(cat);if(!x)return;if((x.steps||[]).length?!(Math.abs(x.sug-bp)>0):Math.abs(x.pct)<_M8_STEEL_PCT)return;   /* Lotion 11/10：盤價每次調價都出卡（每多一筆調整就是新的一張）；只有主計總處指數備援才看累計 5% */
   var k='stl_'+String(cat.id).replace(/[^A-Za-z0-9]/g,'')+'_'+x.ym.replace('-','')+((x.steps||[]).length?'_'+x.steps.length:'');if(_m8AckOf(k))return;   /* 審查：同一個月又調一次要再問 */L.push({id:k,spec:cat.name,bp:bp,pct:x.pct,src:x.src,ym:x.ym,steps:x.steps||[],sug:x.sug!=null?x.sug:Math.round(bp*(1+x.pct/100)*100)/100});});return L;}
 _decReg('m8Steel',{
-  title:'鋼價變了，買價表要不要調',todo:function(n){return '鋼價漲跌超過 '+_M8_STEEL_PCT+'%：建議調整買價 '+n+' 種規格';},sub:'確認＝知道了（我自己改）；退回＝不用調；修改＝打開買價表',
+  title:'鋼價變了，買價表要不要調',todo:function(n){return '鋼價有調整：建議調整買價 '+n+' 種材料';},sub:'確認＝知道了（我自己改）；退回＝不用調；修改＝打開買價表',
   canSee:function(){return !_isReaderUser&&_decIsAdmin();},list:_m8SteelList,key:function(x){return x.id;},
   head:function(x){return x.spec+'　'+(x.pct>0?'漲 ':'跌 ')+Math.abs(x.pct)+'%';},
   body:function(x){return '<div style="font-size:11.5px;color:#b26a00">建議每公斤 '+x.bp+' → '+x.sug+'；來源：'+esc(x.src.split('（')[0])+'</div>';},
