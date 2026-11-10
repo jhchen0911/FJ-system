@@ -5782,13 +5782,16 @@ function calcInvDays(){
         const _at=invItems.findIndex(x=>x.type!=='sec'&&x.desc===selDesc);
         invItems.splice(_at+1,0,..._rows);
       } else if(existIdx>=0){
-        Object.keys(_ow).forEach(function(k){invItems[existIdx][k]=_ow[k];});
+        // v6.0.222 審查：原本是時段列（_ovAlg 4）、現在改回一列（例如租期口徑改成拔除第一天）→ 其他時段列一起刪，不重複請
+        const _keep=invItems[existIdx];
+        Object.keys(_ow).forEach(function(k){_keep[k]=_ow[k];});['_ovSeg','_ovSegFrom','_ovSegTo'].forEach(function(k){delete _keep[k];});
+        for(let ii=invItems.length-1;ii>=0;ii--){const x=invItems[ii];if(ii!==itemIdx&&x!==_keep&&x&&x.type==='rental'&&x._ovKey===selDesc)invItems.splice(ii,1);}
       } else {
         invItems.splice(itemIdx+1,0,_ow);
       }
       rInvItems();
       try{autoSaveInv();}catch(e){_err('top',e);}   // v5.336：插列即存檔，離頁不再遺失
-      const otDetail=!srcPrice?'（請手動填入金額）':(_sg&&_sg.length?`（分 ${_sg.length} 個時段，合計 NT$${overAmt.toLocaleString()}）`:`（$${srcPrice}×${srcQty}${srcUnit}×${billDays}天=NT$${overAmt.toLocaleString()}）`);
+      const otDetail=!srcPrice?'（請手動填入金額）':(_sg&&_sg.length?`（分 ${_sg.length} 個時段，合計 NT$${_sg.reduce((a,g)=>a+Math.round(srcPrice*g.qty*g.days),0).toLocaleString()}）`:`（$${srcPrice}×${srcQty}${srcUnit}×${billDays}天=NT$${overAmt.toLocaleString()}）`);
       toast(`已插入逾期租金工項 ${otDetail}`);
     }
   }
@@ -32472,7 +32475,7 @@ function _pjTable(heads,rows,foot){
 function _pjInvSettled(v){return !!v.receivedConfirmed&&!(_invAR(v)>0);}
 function pjInvPaidToggle(qid){
   window._pjInvPaidOpen=window._pjInvPaidOpen||{};window._pjInvPaidOpen[qid]=!window._pjInvPaidOpen[qid];
-  try{var q=Q.find(function(x){return x.id===qid;});var b=document.getElementById('pj-body-inv');if(q&&b)b.innerHTML=_pjInvHtml(q,_pjStat(q));}catch(e){_err('pjInvPaidToggle',e);}
+  try{var q=Q.find(function(x){return x.id===qid;});var b=document.getElementById('pj-body-inv');if(q&&b){var dt=b.querySelector('details.pj7-more');if(dt){b.innerHTML=_pj7InvHtml(q,_pjStat(q));var d2=b.querySelector('details.pj7-more');if(d2)d2.open=true;}else b.innerHTML=_pjInvHtml(q,_pjStat(q));}}catch(e){_err('pjInvPaidToggle',e);}
 }
 function _pjInvHtmlCore(q,st){
   var openPaid=!!(window._pjInvPaidOpen&&window._pjInvPaidOpen[q.id]);
