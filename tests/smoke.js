@@ -11750,7 +11750,7 @@ async function newPage(browser, width, height) {
         const L = _decItems('invDraft');
         out.card = L.length === 1 && /截止 10-18/.test(_DEC.invDraft.head(L[0]));
         const det = L.length ? _DEC.invDraft.detail(L[0]) : '';
-        out.detail = /第 1 期/.test(det) && /10-05 20、10-12 15/.test(det) && /35 ／ 100/.test(det) && /追加背填/.test(det) && /還沒有業主簽認紀錄/.test(det) && /保留款 0%/.test(det);
+        out.detail = /第 1 期/.test(det) && /10-05 20、10-12 15/.test(det) && /打設 35<br>／ 100/.test(det) && !/超過合約/.test(det) && /按「儲存」/.test(det) && /追加背填/.test(det) && /還沒有業主簽認紀錄/.test(det) && /保留款 0%/.test(det);
         out.ok = (await _DEC.invDraft.ok(L[0])) === 'open' && INV.length === 1 && _invStOf(INV[0]) === 'draft' && /請款單草稿卡確認/.test(INV[0].stLog.slice(-1)[0].why);
         _todoBuild(true);
         out.gone = !_decItems('invDraft').length;
@@ -11763,10 +11763,17 @@ async function newPage(browser, width, height) {
         // 退回＝這期不請
         INV = []; _todoBuild(true); const L2 = _decItems('invDraft');
         out.skip = L2.length === 1 && _DEC.invDraft.reject(L2[0], '業主說月底一起') === true && Q[0].billSkip['2026-10-18'].why === '業主說月底一起' && !_decItems('invDraft').length;
+        const T5 = []; _todo5cItems(T5); out.skipTodo = !T5.some(x => x.type === 'bill_month');   // 退回後總覽「本月要請款」也不再出
+        // 打設＋拔除的工項：累計分開比，不會誤報超過合約
+        delete Q[0].billSkip; Q[0].items[0].desc = '鋼板樁 III型 打設＋拔除'; Q[0].dailyLogs.push({ id: 'l3', date: '2026-10-13', progressRows: [{ itemIdx: 0, qty: 30, ph: 'remove' }] }); _todoBuild(true);
+        const det3 = _DEC.invDraft.detail(_decItems('invDraft')[0]); out.phase = /打設 35<br>拔除 30<br>／ 100/.test(det3) && !/超過合約/.test(det3);
+        // 草稿待送出：退回＝3 天後再提醒
+        INV = [{ id: 'ix', project: '測試請款案', quoteId: 'qB', periodNo: 2, st: 'draft', stLast: 'draft', totals: { grand: 100 } }];
+        out.snooze = _isList().length === 1 && _DEC.invSend.reject(INV[0], '等業主') === true && !_isList().length && INV[0].sendSnz === '2026-10-18' && /先不送：等業主/.test(INV[0].stLog.slice(-1)[0].why);
       } finally { Q = keepQ; INV = keepI; window.printInvById = keepPr; window._modal = keepM; }
       return out;
     });
-    check('v6.0.225 請款單草稿卡：截止前 5 天出卡（附哪幾天的日報、日報累計／合約、已確認追加標黃、保留款）、確認＝開第 N 期且狀態草稿、開了就不再出；草稿待送出卡：金額 0 不送、確認＝已送業主＋PDF＋送業主文字；退回＝這期不請', Object.values(r).length === 9 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.225 請款單草稿卡：截止前 5 天出卡（附哪幾天的日報、日報累計／合約、已確認追加標黃、保留款）、確認＝開第 N 期且狀態草稿、開了就不再出；草稿待送出卡：金額 0 不送、確認＝已送業主＋PDF＋送業主文字；退回＝這期不請', Object.values(r).length === 12 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('v6.0.225 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
