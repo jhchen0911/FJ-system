@@ -11672,6 +11672,39 @@ async function newPage(browser, width, height) {
     check('v6.0.221 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── v6.0.223 材料買價：覆工板分 2M／3M（舊的「覆工板」價錢帶到 2M）、個別規格覆寫可以每片計 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepF = MAT_MOVE_FIN;
+      try {
+        MAT_MOVE_FIN = {};
+        // 舊版存的：內建「覆工板」（id deck）每片 4000
+        _m8Save({ kind: 'm8cfg', cats: [{ id: 'h', name: 'H 型鋼', unit: 'kg', price: 25 }, { id: 'deck', name: '覆工板', unit: '片', price: 4000 }], salvage: '', store: '' });
+        const C = _m8Cats(), d2 = C.find(x => x.id === 'deck'), d3 = C.find(x => x.id === 'deck3');
+        out.mig = d2 && d2.name === '覆工板 2M' && d2.price === 4000 && d3 && d3.name === '覆工板 3M' && d3.price === '' && d3.unit === '片';
+        out.match = _m8CatFor('2M×1M', '覆工板').id === 'deck' && _m8CatFor('', '覆工板 3M×1M').id === 'deck3' && _m8CatFor('3000X1000', '鋼製覆工板').id === 'deck3' && _m8CatFor('', '覆工板') === null && _m8CatFor('H300', '型鋼 L=12M').id === 'h';
+        out.noFalse = _m8CatFor('', '覆工板 13M') === null && _m8CatFor('', '覆工板 t=32mm') === null && _m8CatFor('12000', '覆工板') === null && _m8CatFor('', '覆工板 2M×3M').id === 'deck' && _m8CatFor('3m×1m', '覆工板').id === 'deck3' && _m8CatFor('III', '鋼板樁').id === 'sp' && _m8CatFor('50KG/M', '鋼軌樁').id === 'rail';
+        out.order = _m8Cats().slice(0, 5).map(x => x.id).join() === 'h,rail,sp,deck,deck3';
+        out.piece = _m8BuyPiece('2M×1M', '覆工板') === 4000 && _m8BuyPerM('2M×1M', '覆工板') === 0 && _m8BuyPiece('H300', '型鋼') === 0;
+        go('params'); prmTab('cost');
+        out.ui = !!document.querySelector('#m8-cats tr[data-id="deck3"]') && document.querySelector('#m8-cats tr[data-id="deck"] .m8-cn').value === '覆工板 2M';
+        document.querySelector('#m8-cats tr[data-id="deck3"] .m8-cp').value = '5500';
+        const sp = document.querySelectorAll('#m8-ovr .m8-sp'), bp = document.querySelectorAll('#m8-ovr .m8-bp'), ou = document.querySelectorAll('#m8-ovr .m8-ou'), i = sp.length - 1;
+        sp[i].value = '3M×1M'; bp[i].value = '6000'; ou[i].value = '片';
+        _m8PrmSave();
+        out.save = _m8Cats().find(x => x.id === 'deck').price === 4000 && document.querySelector('#m8-cats tr[data-id="h"] .m8-cu').disabled && _m8Cats().find(x => x.id === 'deck3').price === 5500 && _m8OvrU('3M×1M') === '片' && _m8BuyPiece('3M×1M', '覆工板') === 6000 && _m8BuyPerM('3M×1M', '覆工板') === 0 && /覆寫每 片 6,000/.test(_m8BuyHow('3M×1M'));
+        // 每 M 覆寫照舊
+        const sp2 = document.querySelectorAll('#m8-ovr .m8-sp'), bp2 = document.querySelectorAll('#m8-ovr .m8-bp'), j = sp2.length - 1;
+        sp2[j].value = 'H350'; bp2[j].value = '3300'; _m8PrmSave();
+        out.perM = _m8BuyPerM('H350') === 3300 && _m8OvrU('H350') === 'M' && _m8BuyPiece('3M×1M', '覆工板') === 6000;
+      } finally { MAT_MOVE_FIN = keepF; }
+      return out;
+    });
+    check('v6.0.223 材料買價覆工板分 2M／3M：舊「覆工板」價錢帶到 2M、3M 空白；規格或品名看得出 2M／3M 才套、看不出不套（13M、32mm、12000 不算）；內建類別順序固定、單位不能改；每片價不混進每 M；個別規格覆寫可選每片、每 M 照舊', r.mig && r.match && r.noFalse && r.order && r.piece && r.ui && r.save && r.perM, JSON.stringify(r));
+    check('v6.0.223 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.211 進退料 M6：租賃與運費請款核對（Lotion 11/10 四題全 A；照 11/04 寬大 9/18 的實際算式）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
