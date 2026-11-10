@@ -13491,7 +13491,7 @@ async function newPage(browser, width, height) {
         // A：新選單時 6 種各一張拍板卡、AI 草稿清單那一列不出現（今天頁只有一套）
         const items = []; _v6TodoItems(items);
         const types = items.map((x) => x.type);
-        out.cards = ['quote', 'bid', 'irPhoto', 'addon', 'contact'].every((t) => types.indexOf('dec_drf_' + t) >= 0) && types.indexOf('dec_drf_dailyLog') < 0 && _draftPending().length === 1 && _draftPending()[0].type === 'dailyLog';   // 施工日報歸主線
+        out.cards = ['quote', 'bid', 'irPhoto', 'addon', 'contact'].every((t) => types.indexOf('dec_drf_' + t) >= 0) && types.indexOf('dec_drf_dailyLog') < 0 && _draftPending().length === 0 && _DEC.dlQty.list().length === 1;   // 施工日報歸主線（主線 dlQty 拍板卡，新舊選單都不進 AI 草稿清單）
         // 展開明細前不能確認；明細有完整內容
         openDecList('drf_quote'); await T(60);
         const okb = () => document.querySelector('#dec-box .dec-ok');
@@ -13505,7 +13505,7 @@ async function newPage(browser, width, height) {
         out.con = /範例廠商丁/.test((await det('drf_contact', 'dCon0001')).textContent);
         out.line = /範例追加 3 支/.test((await det('drf_addon', 'dAdd0001')).textContent);
         // 舊選單：卡片收起、AI 草稿清單照舊
-        localStorage.setItem('fy_nav_old', '1'); const it2 = []; _v6TodoItems(it2); out.old = it2.some((x) => x.type === 'ai_draft') && !it2.some((x) => /^dec_drf_/.test(x.type)) && _draftPending().length === 8; localStorage.removeItem('fy_nav_old');
+        localStorage.setItem('fy_nav_old', '1'); const it2 = []; _v6TodoItems(it2); out.old = it2.some((x) => x.type === 'ai_draft') && !it2.some((x) => /^dec_drf_/.test(x.type)) && _draftPending().length === 7;   // 施工日報走主線 dlQty 卡 localStorage.removeItem('fy_nav_old');
         // 退回：標 rejected、照片不留
         await _DEC.drf_bid.reject(DRAFTS.dBid0001, '不用'); out.rej = DRAFTS.dBid0001.status === 'rejected';
         // B：買受人＋金額都對 → 自動對到第 3 期、打勾
