@@ -44366,24 +44366,30 @@ _decReg('m8Qtr',{
   edit:function(){go('params');setTimeout(function(){try{prmTab('cost');}catch(e){_err('m8Qtr.edit',e);}},80);}
 });
 // 參數頁：材料買價（v6.0.221 Lotion 11/10 改版：依「材料類別」填每公斤價，系統用 FJC.mv.kgPerM 換算每 M；個別規格可覆寫；只有管理員看得到）
-function _m8CatDef(){return [{id:'h',name:'H 型鋼',unit:'kg',note:'樁、支撐、圍令、中間樁共用'},{id:'rail',name:'鋼軌樁',unit:'kg',note:''},{id:'sp',name:'鋼板樁',unit:'kg',note:''},{id:'deck',name:'覆工板',unit:'片',note:'每片價'}];}   /* 用函式：參數頁在 app.js 載入途中就會建，var 那時還沒有值 */
+function _m8CatDef(){return [{id:'h',name:'H 型鋼',unit:'kg',note:'樁、支撐、圍令、中間樁共用'},{id:'rail',name:'鋼軌樁',unit:'kg',note:''},{id:'sp',name:'鋼板樁',unit:'kg',note:''},{id:'deck',name:'覆工板 2M',unit:'片',note:'2M×1M，每片價'},{id:'deck3',name:'覆工板 3M',unit:'片',note:'3M×1M，每片價'}];}   /* v6.0.222 Lotion 11/10：覆工板分 2M、3M；舊的「覆工板」（id deck）沿用成 2M（系統預設規格 2M×1M） */   /* 用函式：參數頁在 app.js 載入途中就會建，var 那時還沒有值 */
 function _m8Cats(){var c=_m8Cfg(),L=(Array.isArray(c.cats)&&c.cats.length)?c.cats:[];var have={};L.forEach(function(x){if(x&&x.id)have[x.id]=1;});
-  return _m8CatDef().filter(function(d){return !have[d.id];}).map(function(d){return Object.assign({},d,{price:''});}).concat(L.filter(Boolean));}
-function _m8Ovr(){var c=_m8Cfg();return Object.assign({},c.buy||{},c.ovr||{});}   /* 舊版依規格填的買價（c.buy）保留成覆寫 */
+  var S={};L.forEach(function(x){if(x&&x.id)S[x.id]=x;});var D=_m8CatDef(),isD={};D.forEach(function(d){isD[d.id]=1;});
+  return D.map(function(d){var x=S[d.id];return x?Object.assign({},x,{name:d.name,note:d.note,unit:d.unit}):Object.assign({},d,{price:''});}).concat(L.filter(function(x){return x&&!isD[x.id];}));}   /* 內建類別照程式順序、名稱／說明／單位跟著程式（舊存的「覆工板」顯示成「覆工板 2M」），自訂類別接在後面 */   /* 內建類別名稱跟著程式（舊存的「覆工板」顯示成「覆工板 2M」） */
+function _m8Ovr(){var c=_m8Cfg();return Object.assign({},c.buy||{},c.ovr||{});}
+function _m8OvrU(sp){var c=_m8CatFor(sp,'');if(c)return c.unit==='片'?'片':'M';return (!/^H\d|KG|^(II|III|IV|V|VL|IIW|IIIW|IVW)$/i.test(String(sp||''))&&_m8DeckSize(sp))?'片':'M';}   /* v6.0.222：覆寫的單位系統自己判斷（覆工板尺寸＝每片，其餘每 M），不讓 Lotion 多填 */   /* 舊版依規格填的買價（c.buy）保留成覆寫 */
 // 規格 → 類別：H 開頭＝H 型鋼；II／III／IV／VL／IIw…＝鋼板樁；xxKG＝鋼軌樁；覆工＝覆工板；自訂類別看「比對文字」（規格或品名含這幾個字）
 function _m8CatFor(sp,name){var k=String(sp||'').toUpperCase(),n=String(name||''),L=_m8Cats();
   var by=function(id){return L.find(function(x){return x.id===id;})||null;};
   var cu=L.find(function(x){return x.pat&&(k.indexOf(String(x.pat).toUpperCase())>=0||n.indexOf(x.pat)>=0);});if(cu)return cu;
-  if(/^H\d/.test(k))return by('h');if(/^(II|III|IV|V|VL|IIW|IIIW|IVW)$/.test(k))return by('sp');if(/\d{2}KG/.test(k)||/鋼軌/.test(n))return by('rail');if(/覆工/.test(n+k))return by('deck');return null;}
+  if(/^H\d/.test(k))return by('h');if(/^(II|III|IV|V|VL|IIW|IIIW|IVW)$/.test(k))return by('sp');if(/\d{2}KG/.test(k)||/鋼軌/.test(n))return by('rail');if(/覆工/.test(n+k)){var z=_m8DeckSize(k)||_m8DeckSize(n);return z==='3'?by('deck3'):z==='2'?by('deck'):null;}return null;}   /* v6.0.222：看不出 2M／3M 就不套 */
+// 覆工板尺寸：先看規格、再看品名；只認獨立的 2M／3M（前後不是數字，13M、32mm 不算）或 2000／3000；第一個出現的為準
+function _m8DeckSize(t){var m=/(?:^|[^\d.])([23])(?:\.0)?\s*M(?![A-Z\d])|(?:^|[^\d.])([23])000(?!\d)/.exec(String(t||'').toUpperCase());return m?(m[1]||m[2]):'';}
 // 這個規格每 M 買價：覆寫優先；否則類別每公斤價 × 每 M 重量（非 kg 單位的類別換不成每 M → 0）
-function _m8BuyPerM(sp,name){var o=parseFloat(_m8Ovr()[sp]);if(o>0)return o;var c=_m8CatFor(sp,name);if(!c||!(parseFloat(c.price)>0)||c.unit!=='kg')return 0;var kg=FJC.mv.kgPerM(sp);return kg?Math.round(parseFloat(c.price)*kg*100)/100:0;}
-function _m8BuyHow(sp,name){var o=parseFloat(_m8Ovr()[sp]);if(o>0)return '覆寫每 M '+fmt(o);var c=_m8CatFor(sp,name),kg=FJC.mv.kgPerM(sp);return c&&kg&&parseFloat(c.price)>0?(c.name+' 每公斤 '+c.price+' × '+kg+' kg/M'):'買價表沒填';}
+function _m8BuyPerM(sp,name){var o=parseFloat(_m8Ovr()[sp]);if(o>0)return _m8OvrU(sp)==='M'?o:0;var c=_m8CatFor(sp,name);if(!c||!(parseFloat(c.price)>0)||c.unit!=='kg')return 0;var kg=FJC.mv.kgPerM(sp);return kg?Math.round(parseFloat(c.price)*kg*100)/100:0;}
+// v6.0.222：以片計價的買價（覆寫填每片 ＞ 類別每片價）；不是以片計的回 0
+function _m8BuyPiece(sp,name){var o=parseFloat(_m8Ovr()[sp]);if(o>0&&_m8OvrU(sp)==='片')return o;var c=_m8CatFor(sp,name);return c&&c.unit==='片'&&parseFloat(c.price)>0?parseFloat(c.price):0;}
+function _m8BuyHow(sp,name){var o=parseFloat(_m8Ovr()[sp]);if(o>0)return '覆寫每 '+_m8OvrU(sp)+' '+fmt(o);var c=_m8CatFor(sp,name),kg=FJC.mv.kgPerM(sp);return c&&kg&&parseFloat(c.price)>0?(c.name+' 每公斤 '+c.price+' × '+kg+' kg/M'):'買價表沒填';}
 function _m8PricedSpecs(){var S={};Object.keys(_m8Ovr()).forEach(function(k){S[k]=1;});(Q||[]).forEach(function(q){if(!q)return;if(q.mat)_m6Arr(q.mat,'rents').forEach(function(rt){var k=_m8Key(rt);if(k)S[k]=1;});});
   return Object.keys(S).filter(function(k){return _m8BuyPerM(k)>0;}).sort();}
 function _m8Specs(){var S={};Object.keys(_m8Ovr()).forEach(function(k){S[k]=1;});return Object.keys(S).sort();}
 function m8CatAdd(){var tb=document.getElementById('m8-cats');if(!tb)return;tb.insertAdjacentHTML('beforeend',_m8CatRow({id:'',name:'',unit:'kg',price:'',pat:''}));}   /* 審查：只加一列，不重畫（剛打的數字不會不見） */
 function _m8CatRow(x){var IN='width:100%;padding:5px 7px;border:1px solid var(--b2);border-radius:6px;font-family:inherit';var def=_m8CatDef().some(function(d){return d.id===x.id;});return '<tr data-id="'+esc(x.id||'')+'"><td><input class="m8-cn" value="'+esc(x.name||'')+'"'+(def?' readonly':'')+' style="'+IN+'">'+(x.note?('<div style="font-size:10.5px;color:var(--b4)">'+esc(x.note)+'</div>'):'')+'</td>'
-      +'<td><select class="m8-cu" style="'+IN+'">'+['kg','片','M','支'].map(function(u){return '<option'+(x.unit===u?' selected':'')+'>'+u+'</option>';}).join('')+'</select></td>'
+      +'<td><select class="m8-cu"'+(def?' disabled':'')+' style="'+IN+'">'+['kg','片','M','支'].map(function(u){return '<option'+(x.unit===u?' selected':'')+'>'+u+'</option>';}).join('')+'</select></td>'
       +'<td><input class="m8-cp" type="number" inputmode="decimal" value="'+esc(String(x.price||''))+'" style="'+IN+'"></td>'
       +'<td>'+(def?'<span style="font-size:11px;color:var(--b4)">內建</span>':'<input class="m8-ct" value="'+esc(x.pat||'')+'" placeholder="例：H588" style="'+IN+'">')+'</td></tr>';}
 function _m8PrmHtml(){var c=_m8Cfg(),IN='width:100%;padding:5px 7px;border:1px solid var(--b2);border-radius:6px;font-family:inherit',cats=_m8Cats(),ov=_m8Ovr();
@@ -44392,9 +44398,9 @@ function _m8PrmHtml(){var c=_m8Cfg(),IN='width:100%;padding:5px 7px;border:1px s
     +'<table style="width:100%;font-size:12.5px"><thead><tr><th style="text-align:left">材料類別</th><th style="text-align:left">單位</th><th style="text-align:left">單價（未稅）</th><th style="text-align:left">比對文字（自訂類別才填）</th></tr></thead><tbody id="m8-cats">'
     +rows.map(_m8CatRow).join('')+'</tbody></table>'
     +'<button type="button" class="btn" style="margin:6px 0 10px" onclick="m8CatAdd()">＋新增類別</button>'
-    +'<div style="font-size:12px;font-weight:700;margin-top:4px">個別規格覆寫（這個規格價格跟類別不同才填，每 M 價）</div>'
-    +'<table style="width:100%;font-size:12.5px"><thead><tr><th style="text-align:left">規格</th><th style="text-align:left">每 M 買價（未稅）</th></tr></thead><tbody id="m8-ovr">'
-    +_m8Specs().concat(['']).map(function(k){return '<tr><td><input class="m8-sp" value="'+esc(k)+'" style="'+IN+'"></td><td><input class="m8-bp" type="number" inputmode="decimal" value="'+esc(String(ov[k]||''))+'" style="'+IN+'"></td></tr>';}).join('')+'</tbody></table>'
+    +'<div style="font-size:12px;font-weight:700;margin-top:4px">個別規格覆寫（這個規格價格跟類別不同才填；鋼材填每 M 價，覆工板等填每片價）</div>'
+    +'<table style="width:100%;font-size:12.5px"><thead><tr><th style="text-align:left">規格</th><th style="text-align:left">單位（自動）</th><th style="text-align:left">買價（未稅）</th></tr></thead><tbody id="m8-ovr">'
+    +_m8Specs().concat(['']).map(function(k){var u=k?_m8OvrU(k):'';return '<tr><td><input class="m8-sp" value="'+esc(k)+'" style="'+IN+'"></td><td style="font-size:11.5px;color:var(--b4)">'+(u?'每 '+u:'自動判斷')+'</td><td><input class="m8-bp" type="number" inputmode="decimal" value="'+esc(String(ov[k]||''))+'" style="'+IN+'"></td></tr>';}).join('')+'</tbody></table>'
     +'<div class="fg fg2" style="gap:8px;margin-top:8px"><div class="f"><label>鋼材殘值率（%，用完還能賣回買價的幾成）</label><input id="m8-sv" type="number" inputmode="decimal" value="'+esc(String(c.salvage||''))+'" style="'+IN+'"></div>'
     +'<div class="f"><label>每批存放＋進出倉成本（元；沒有倉庫就空白）</label><input id="m8-st" type="number" inputmode="decimal" value="'+esc(String(c.store===0?'0':(c.store||'')))+'" style="'+IN+'"></div></div>'
     +'<button type="button" class="btn bp" style="margin-top:8px" onclick="_m8PrmSave()">儲存買價表</button>';}
