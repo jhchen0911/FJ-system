@@ -13211,7 +13211,7 @@ async function newPage(browser, width, height) {
         out.up = await _sdocPut('qD1', f, '計算書');
         const p = _prjOfQ('qD1'), L = _sdocList(p);
         out.rec = L.length === 1 && L[0].cat === '計算書' && L[0].st === 'wait' && /^projects\/p_qD1\/docs\//.test(L[0].path) && put[0] === L[0].path && !!L[0].url;
-        out.big = (await _sdocPut('qD1', { name: 'x.pdf', size: 60 * 1024 * 1024 }, '其他')) === false && _sdocList(_prjOfQ('qD1')).length === 1;
+        out.big = (await _sdocPut('qD1', { name: 'x.pdf', size: 50 * 1024 * 1024 }, '其他')) === false && _sdocList(_prjOfQ('qD1')).length === 1;
         localStorage.setItem('pj7_open_subm', '1'); renderProj(); await T(100);
         const body = document.getElementById('pj-body-subm');
         out.list = !!body && /結構計算書 第1版\.pdf/.test(body.textContent) && /計算書（1）/.test(body.textContent);
@@ -13246,12 +13246,13 @@ async function newPage(browser, width, height) {
         Q = [{ id: 'qV1', name: '範例工程V1', client: '甲營造', code: 'V1', date: '2026-09-01', awarded: true, closed: true, closedAt: Date.now() - 86400000, _mt: 1, items: [{ desc: '鋼軌樁打設', unit: '支', qty: 10, price: 1000 }],
           costs: [{ id: 'c1', type: 'sub', vendor: '乙工程行', rows: [] }, { id: 'c2', type: 'sub', vendor: '丙吊車', rows: [] }, { id: 'c3', type: 'sub', vendor: '乙工程行', followOf: 'c1', rows: [] }] },
           { id: 'qV2', name: '範例工程V2', client: '甲營造', code: 'V2', date: '2026-01-01', awarded: true, closed: true, closedAt: Date.now() - 200 * 86400000, _mt: 1, items: [], costs: [{ id: 'c9', type: 'sub', vendor: '丁鋼構', rows: [] }] },
+          { id: 'qV4', name: '範例工程V4', client: '甲營造', code: 'V4', date: '2025-01-01', awarded: true, closed: true, _mt: 1, items: [], costs: [{ id: 'c7', type: 'sub', vendor: '己工程', rows: [] }] },
           { id: 'qV3', name: '範例工程V3', client: '甲營造', code: 'V3', date: '2026-10-01', awarded: true, _mt: 1, items: [], costs: [{ id: 'c8', type: 'sub', vendor: '戊工程', rows: [] }] }];
         PROJECTS = []; _prjSync();
         VENDORS.length = 0; VENDORS.push({ id: 'vv1', name: '乙工程行', type: 'sub' });
         _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
         const L = _decItems('vendorEval');
-        out.list = L.length === 2 && L.map((x) => x.v).sort().join(',') === '丙吊車,乙工程行';   // 結案 90 天內、跟隨計價不重複、施工中不算
+        out.list = L.length === 2 && L.map((x) => x.v).sort().join(',') === '丙吊車,乙工程行';   // 結案 90 天內、跟隨計價不重複、施工中不算、舊結案沒有結案時間不算（審查）
         // 確認＝開打分數視窗；少評一項擋下
         out.open = _DEC.vendorEval.ok(L.find((x) => x.v === '乙工程行')) === 'open' && !!document.getElementById('fy-modal');
         ['q', 't', 'sa', 'c'].forEach((k) => { document.querySelector('input[name="ve-' + k + '"][value="4"]').checked = true; });

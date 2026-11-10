@@ -44037,7 +44037,7 @@ function sdocPick(qid){
 }
 function _sdocPut(qid,f,cat){
   var p=_prjOfQ(qid);if(!p||!f)return Promise.resolve(false);
-  if(f.size>_SDOC_MAX){toast('檔案太大（單檔上限 50 MB）');return Promise.resolve(false);}
+  if(f.size>=_SDOC_MAX){toast('檔案太大（單檔上限 50 MB）');return Promise.resolve(false);}
   var now=Date.now(),id='d'+now.toString(36)+Math.random().toString(36).slice(2,5);
   var safe=String(f.name||'file').replace(/[^\w.\-一-鿿（）()]/g,'_').slice(0,80);
   var path='projects/'+p.id+'/docs/'+now+'_'+safe;
@@ -44085,7 +44085,7 @@ function _veAvg(v){var L=[];(PROJECTS||[]).forEach(function(p){if(!p||p.voidAt)r
   return L.length?{avg:Math.round(L.reduce(function(a,b){return a+b;},0)/L.length*10)/10,n:L.length}:null;}
 function _veChip(v){var a=_veAvg(v);return a?('<span style="font-size:11px;color:#b26a00;font-weight:700;white-space:nowrap">★ '+a.avg+'（'+a.n+' 案）</span>'):'';}
 function _veList(){var out=[],lim=Date.now()-90*864e5;
-  (Q||[]).forEach(function(q){if(!q||q.parentId||!q.closed)return;var at=+q.closedAt||0;if(at&&at<lim)return;var p=_prjOfQ(q.id);if(!p||p.voidAt)return;
+  (Q||[]).forEach(function(q){if(!q||q.parentId||!q.closed)return;var at=+q.closedAt||0;if(!at||at<lim)return;   /* 審查：舊結案沒有結案時間＝不出卡（不然舊案每家分包都跑出來） */var p=_prjOfQ(q.id);if(!p||p.voidAt)return;
     _veVendors(q).forEach(function(v){if(!_veOf(p,v))out.push({qid:q.id,v:v});});});
   return out;}
 function _veSave(qid,v,rec){var p=_prjOfQ(qid);if(!p)return false;var m=Object.assign({},(p.vendorEval&&typeof p.vendorEval==='object')?p.vendorEval:{});
