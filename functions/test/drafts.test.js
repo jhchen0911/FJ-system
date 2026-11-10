@@ -71,7 +71,7 @@ test('v6.0.197 改單可改成本單價與固定條款（範本照報價新舊�
   assert.strictEqual(D.rmkBaseFor({ id: String(Date.UTC(2027, 0, 1)) }, rp), '6. 本工程無保固及保留款');
 });
 
-test('v6.0.218 底價／目標成交價：選填、含稅、底價不能高於目標價；改單與報價單都收', () => {
+test('v6.0.208 底價／目標成交價：選填、含稅、底價不能高於目標價；改單與報價單都收', () => {
   assert.deepStrictEqual(D.aimClean(null), { aim: null });
   assert.deepStrictEqual(D.aimClean({ floor: '1000000', target: 1100000.4 }), { aim: { floor: 1000000, target: 1100000 } });
   assert.deepStrictEqual(D.aimClean({ target: 5 }), { aim: { target: 5 } });
@@ -88,7 +88,7 @@ test('v6.0.218 底價／目標成交價：選填、含稅、底價不能高於�
   assert.ok(!('aim' in D.build(Object.assign({}, base, { body: { type: 'quote', payload: { fields: f }, expect: { sub: 1000, tax: 50, total: 1050 } } })).rec.payload));
 });
 
-test('v6.0.218 得標率統計給報價線：只有主報價、有結果、沒被排除的；追加的工項算進主約；只回數字', () => {
+test('v6.0.208 得標率統計給報價線：只有主報價、有結果、沒被排除的；追加的工項算進主約；只回數字', () => {
   const qs = {
     a: { id: 'a', name: '甲', awarded: true, t: { total: 100 }, items: [{ desc: 'H型鋼樁打設', qty: 1, price: 100 }], bid: { res: 'won', first: 110 } },
     b: { id: 'b', name: '乙', bidStatus: 'lost', t: { total: 120 }, lostPrice: 100, items: [{ desc: 'H型鋼樁打設', qty: 1, price: 120 }], bid: { res: 'lost', first: 120 } },
@@ -104,7 +104,7 @@ test('v6.0.218 得標率統計給報價線：只有主報價、有結果、沒�
   assert.ok(!JSON.stringify(r).includes('甲'));
 });
 
-test('v6.0.218 得標率統計：得標結果放在 private quoteSens 也讀得到', () => {
+test('v6.0.208 得標率統計：得標結果放在 private quoteSens 也讀得到', () => {
   const qs = { a: { id: 'a', name: '甲', awarded: true, t: { total: 100 }, items: [{ desc: '鋼板樁', qty: 1, price: 100 }] } };
   assert.strictEqual(D.bidStats(qs, {}, {}).n, 0);
   const r = D.bidStats(qs, {}, {}, { a: { bid: { res: 'won', first: 120 } } });

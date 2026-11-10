@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.218';
+var APP_VERSION='v6.0.208';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -2280,7 +2280,7 @@ function cycleBidStatus(qid){
   if(next==='lost'){markQuoteLost(qid);return;}
   q.bidStatus=next;
   if(next!=='lost'){delete q.lostReason;delete q.lostPrice;delete q.lostNote;}
-  try{_bidRecSync(q);}catch(e){_err('cycleBidStatus.bid',e);}   // v6.0.218
+  try{_bidRecSync(q);}catch(e){_err('cycleBidStatus.bid',e);}   // v6.0.208
   _touch(q);persist();renderList();try{updateQuoteStats();}catch(e){_err('cycleBidStatus',e);}
   toast('報價狀態：'+({'':'待回覆',nego:'議價中','void':'流標'})[next]);
 }
@@ -2296,7 +2296,7 @@ function markQuoteLost(qid){
       q.lostReason=gv('ql-reason')||'其他';
       q.lostNote=(gv('ql-note')||'').trim();
       var lp=parseFloat(gv('ql-price'));q.lostPrice=lp>0?lp:null;
-      try{_bidRecSync(q);}catch(e){_err('markQuoteLost.bid',e);}   // v6.0.218
+      try{_bidRecSync(q);}catch(e){_err('markQuoteLost.bid',e);}   // v6.0.208
       _touch(q);persist();renderList();try{updateQuoteStats();}catch(e){_err('markQuoteLost',e);}
       toast('已記錄未得標：'+q.lostReason+(q.lostNote?('｜'+q.lostNote):''));
     },false,null,true);
@@ -4974,7 +4974,7 @@ function confirmAward(){
   const q=Q.find(x=>x.id===id);if(!q)return;
   q.awarded=true;
   q.payDue=payDue;
-  try{_bidRecSync(q);}catch(e){_err('confirmAward.bid',e);}   // v6.0.218 得標率紀錄
+  try{_bidRecSync(q);}catch(e){_err('confirmAward.bid',e);}   // v6.0.208 得標率紀錄
   // 成交單價自動回寫：報價→議價→得標的最終單價進成交單價庫，供未來報價比對行情
   try{var _dn=writeDealHist(q);if(_dn)toast('已回寫 '+_dn+' 筆成交單價');}catch(e){_err('confirmAward',e);}
   // ── 專案獎金：存設定＋連動應付帳款（依實收進度分期支付）──
@@ -5324,7 +5324,7 @@ function revokeAward(id){
     if(pays2.some(_payPaidHard)){toast('抽成／佣金應付剛被標成已付，取消得標已中止');return;}
     var now=Date.now(),me=_meEmail();
     q2.awarded=false;q2.payDue='';
-    try{_bidRecSync(q2);}catch(e){_err('revokeAward.bid',e);}   // v6.0.218：取消得標 → 得標紀錄移到 bidHist
+    try{_bidRecSync(q2);}catch(e){_err('revokeAward.bid',e);}   // v6.0.208：取消得標 → 得標紀錄移到 bidHist
     q2.revokeLog=(Array.isArray(q2.revokeLog)?q2.revokeLog:[]).concat([{at:now,by:me,reason:r}]);
     _touch(q2); // 跨裝置同步：取消狀態必須獲勝，否則雲端舊資料會把「得標」蓋回來
     persist();
@@ -10414,7 +10414,7 @@ function _stripQuoteSens(q){
   delete c.costs;
   // v5.335 健檢F：referral（分潤約定）、matEst（材料估算含租金單價/運費）、
   // exs（舊版額外支出）也是成本面資料，一併抽走
-  delete c.referral;delete c.matEst;delete c.exs;delete c.rfqs;delete c.mat;delete c.comm;delete c.comms;delete c.ownerCard;delete c.bidAim;delete c.bid;delete c.bidHist;   /* v6.0.218 底價／目標成交價、得標結果（讓價、對手價屬競爭資訊，第 7 步線審查建議）只給管理員與唯讀帳號 */   /* Lotion 10/21：合約條件卡只給管理員與唯讀帳號 */   // v6 詢價單含廠商報價、材料調撥／攤提 → private；v6.0.74 業務抽成；v6.0.88 業主端佣金
+  delete c.referral;delete c.matEst;delete c.exs;delete c.rfqs;delete c.mat;delete c.comm;delete c.comms;delete c.ownerCard;delete c.bidAim;delete c.bid;delete c.bidHist;   /* v6.0.208 底價／目標成交價、得標結果（讓價、對手價屬競爭資訊，第 7 步線審查建議）只給管理員與唯讀帳號 */   /* Lotion 10/21：合約條件卡只給管理員與唯讀帳號 */   // v6 詢價單含廠商報價、材料調撥／攤提 → private；v6.0.74 業務抽成；v6.0.88 業主端佣金
   if(Array.isArray(c.items))c.items.forEach(function(it){if(it)delete it.estCost;});
   if(c.t){_Q_SENS_T.forEach(function(k){delete c.t[k];});delete c.t.ext;}
   return c;
@@ -10434,8 +10434,8 @@ function _extractQuoteSens(q){
   if(Array.isArray(q.rfqs)&&q.rfqs.length)out.rfqs=q.rfqs;   // v6
   if(q.mat&&typeof q.mat==='object')out.mat=q.mat;   // v6 材料
   if(q.comm&&typeof q.comm==='object')out.comm=q.comm;   // v6.0.74 業務抽成
-  if(q.bidAim&&typeof q.bidAim==='object')out.bidAim=q.bidAim;   // v6.0.218 底價／目標成交價
-  if(q.bid&&typeof q.bid==='object')out.bid=q.bid;   // v6.0.218 得標結果
+  if(q.bidAim&&typeof q.bidAim==='object')out.bidAim=q.bidAim;   // v6.0.208 底價／目標成交價
+  if(q.bid&&typeof q.bid==='object')out.bid=q.bid;   // v6.0.208 得標結果
   if(Array.isArray(q.bidHist)&&q.bidHist.length)out.bidHist=q.bidHist;
   if(q.ownerCard&&typeof q.ownerCard==='object')out.ownerCard=q.ownerCard;   // Lotion 10/21 合約條件卡 → private
   return out;
@@ -10466,7 +10466,7 @@ function _applyQuoteSens(q,s,fill){
   if(Array.isArray(s.rfqs)&&s.rfqs.length&&(!fill||!Array.isArray(q.rfqs)||!q.rfqs.length))q.rfqs=s.rfqs;   // v6
   if(s.mat&&typeof s.mat==='object'&&(!fill||q.mat==null))q.mat=s.mat;   // v6 材料
   if(s.comm&&typeof s.comm==='object'&&(!fill||q.comm==null))q.comm=s.comm;   // v6.0.74 業務抽成
-  if(s.bidAim&&typeof s.bidAim==='object'&&(!fill||q.bidAim==null))q.bidAim=s.bidAim;   // v6.0.218
+  if(s.bidAim&&typeof s.bidAim==='object'&&(!fill||q.bidAim==null))q.bidAim=s.bidAim;   // v6.0.208
   if(s.bid&&typeof s.bid==='object'&&(!fill||q.bid==null))q.bid=s.bid;
   if(Array.isArray(s.bidHist)&&s.bidHist.length&&(!fill||!Array.isArray(q.bidHist)||!q.bidHist.length))q.bidHist=s.bidHist;
   if(s.ownerCard&&typeof s.ownerCard==='object'&&(!fill||q.ownerCard==null)&&_ocCanKeep())q.ownerCard=s.ownerCard;   // Lotion 10/21
@@ -28085,7 +28085,7 @@ function restoreQVersion(qid,versionIdx,savedAt){
       if(editing){try{cur=Object.assign(JSON.parse(JSON.stringify(Q[idx])),_qEditorFields());unsaved=true;}catch(e){_err('restoreQVersion.cur',e);cur=Q[idx];}}
       var _okB=false;try{_okB=saveQVersion(qid,cur,{pre:true,unsaved:unsaved});}catch(e){_err('restoreQVersion',e);}
       if(!_okB){toast('還原前備份存不進這台裝置（儲存空間可能滿了），已取消還原：請先匯出備份或清理自動存檔');return;}   // 審查：空間滿時備份只在記憶體，重新整理就不見
-      const _keep={sendLog:Q[idx].sendLog,verFix:Q[idx].verFix,bid:Q[idx].bid,bidHist:Q[idx].bidHist,bidWait:Q[idx].bidWait,bidAim:Q[idx].bidAim};   // v6.0.218 得標結果、底價目標價也屬於這張報價（還原後再照還原後的得標狀態對一次 _bidRecSync）   // v6.0.180：匯出紀錄、補登版次規則屬於這張報價，不跟著快照倒回去
+      const _keep={sendLog:Q[idx].sendLog,verFix:Q[idx].verFix,bid:Q[idx].bid,bidHist:Q[idx].bidHist,bidWait:Q[idx].bidWait,bidAim:Q[idx].bidAim};   // v6.0.208 得標結果、底價目標價也屬於這張報價（還原後再照還原後的得標狀態對一次 _bidRecSync）   // v6.0.180：匯出紀錄、補登版次規則屬於這張報價，不跟著快照倒回去
       Q[idx]={...snapshot,id:qid,ver:Math.max(curVer,snapshot.ver||1)};  // 版號不倒退
       Object.keys(_keep).forEach(function(k){if(_keep[k]!=null)Q[idx][k]=_keep[k];else delete Q[idx][k];});
       try{_bidRecSync(Q[idx]);}catch(e){_err('restoreQVersion.bid',e);}   // 審查：還原成得標前的版次 → 得標紀錄移到 bidHist
@@ -38692,7 +38692,7 @@ function _draftMark(id,status,extra){
 function _draftAppliedFor(kind,recId,isNew){
   var a=window._draftApplying;if(!a||a.kind!==kind)return;
   if(a.target?a.target!==recId:!isNew)return;
-  if(kind==='quote'&&a.aim){var aq=(Q||[]).find(function(x){return x&&x.id===recId;});if(aq){aq.bidAim=a.aim;_touch(aq);try{persist();}catch(e){_err('_draftAppliedFor.aim',e);}}}   // v6.0.218 AI 草稿帶的底價／目標成交價：存檔成功才寫（private）
+  if(kind==='quote'&&a.aim){var aq=(Q||[]).find(function(x){return x&&x.id===recId;});if(aq){aq.bidAim=a.aim;_touch(aq);try{persist();}catch(e){_err('_draftAppliedFor.aim',e);}}}   // v6.0.208 AI 草稿帶的底價／目標成交價：存檔成功才寫（private）
   window._draftApplying=null;_draftMark(a.id,'applied',{resultId:recId});
 }
 function _draftReset(){
@@ -38829,7 +38829,7 @@ function draftApply(id){
     showConfirm('套用得標狀態草稿',esc(_draftS(d.summary))+chg,function(){
       q2.awarded=false;q2.bidStatus=pl.to||'';
       if(pl.to==='lost'){q2.lostReason=_draftS(pl.lostReason).slice(0,20)||'其他';if(pl.note)q2.lostNote=_draftS(pl.note).slice(0,200);}else{delete q2.lostReason;delete q2.lostPrice;delete q2.lostNote;}
-      try{_bidRecSync(q2,'draft');}catch(e){_err('draftApply.bid.rec',e);}   // v6.0.218
+      try{_bidRecSync(q2,'draft');}catch(e){_err('draftApply.bid.rec',e);}   // v6.0.208
       _touch(q2);persist();try{renderList();updateQuoteStats();}catch(e){_err('draftApply.bid',e);}
       _draftMark(id,'applied',{resultId:q2.id});close();toast('已套用得標狀態');
     },false);
@@ -42195,8 +42195,8 @@ _decReg('payCmpOn',{
     });
   }
 });
-// ══════════ v6.0.218 報價得標率紀錄（小批次線；7b 的後端，畫面由第 7 步線在報價頁做）══════════
-// 從 v6.0.218 起，每張主報價的結果記在 q.bid＝{res:'won'|'lost'|'void', at, first（第一個正式版的含稅總價）, rival（對手價含稅）, src, by}（private，隨 quoteSens；版次快照不帶、還原版次保留目前的）。
+// ══════════ v6.0.208 報價得標率紀錄（小批次線；7b 的後端，畫面由第 7 步線在報價頁做）══════════
+// 從 v6.0.208 起，每張主報價的結果記在 q.bid＝{res:'won'|'lost'|'void', at, first（第一個正式版的含稅總價）, rival（對手價含稅）, src, by}（private，隨 quoteSens；版次快照不帶、還原版次保留目前的）。
 //   記錄時機：確認得標 confirmAward、未得標 markQuoteLost、狀態切換 cycleBidStatus、得標狀態草稿套用、取消得標 revokeAward → 都呼叫 _bidRecSync(q)。
 //   之前已經有結果的舊報價不補（從今天起記）；結果改回「待回覆」時舊紀錄移到 q.bidHist（最多 10 筆）。
 //   成交價、讓價不存，讀的時候算（calc/bid.js 的 view）：得標＝主約合約金額（沒有合約用報價總計）；沒得標＝我方最後報價。
