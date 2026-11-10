@@ -11771,7 +11771,7 @@ async function newPage(browser, width, height) {
         // 參數頁買價表（只有管理員）：改值存檔
         go('params'); prmTab('cost');
         const card = document.getElementById('m8-prm-card');
-        // 舊版依規格填的（buy.H300）轉成覆寫；類別填每公斤價 → 用標準單位重換算每 M（H350＝137 kg/M）
+        // 舊版依規格填的（buy.H300）轉成覆寫；類別填每公斤價 → 用標準單位重換算每 M（H350＝135 kg/M）
         const ov = card ? card.querySelector('#m8-ovr .m8-bp') : null;
         out.ovrMig = !!ov && ov.value === '300' && card.querySelector('#m8-ovr .m8-sp').value === 'H300';
         if (ov) ov.value = '650';
@@ -11782,7 +11782,7 @@ async function newPage(browser, width, height) {
         document.querySelector('#m8-ovr .m8-bp').value = '650';
         document.getElementById('m8-sv').value = '25'; document.getElementById('m8-st').value = '';
         _m8PrmSave();
-        out.prm = !!card && _m8BuyPerM('H300') === 650 && _m8BuyPerM('H350') === 30 * 137 && _m8BuyPerM('IV') === 0 && _m8Cfg().salvage === 25 && _m8Cfg().store === ''
+        out.prm = !!card && _m8BuyPerM('H300') === 650 && _m8BuyPerM('H350') === 30 * 135 && _m8BuyPerM('IV') === 0 && _m8Cfg().salvage === 25 && _m8Cfg().store === ''
           && _m8Cats().length === 5 && _m8CatFor('H588').name === '特殊型鋼' && _m8Cats().find(x => x.id === 'h').ref.ym === TD.slice(0, 7) && !('buy' in _m8Cfg());
       } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; MAT_LEDGER = keepL; MAT_TAGS = keepT; window.localToday = keepTd; }
       return out;

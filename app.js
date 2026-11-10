@@ -44087,7 +44087,7 @@ function _m8CatRow(x){var IN='width:100%;padding:5px 7px;border:1px solid var(--
       +'<td>'+(def?'<span style="font-size:11px;color:var(--b4)">內建</span>':'<input class="m8-ct" value="'+esc(x.pat||'')+'" placeholder="例：H588" style="'+IN+'">')+'</td></tr>';}
 function _m8PrmHtml(){var c=_m8Cfg(),IN='width:100%;padding:5px 7px;border:1px solid var(--b2);border-radius:6px;font-family:inherit',cats=_m8Cats(),ov=_m8Ovr();
   var rows=cats;
-  return '<div style="font-size:11.5px;color:var(--b4);margin-bottom:6px">給「租還是買」提醒用；只有你看得到。依材料類別填每公斤價（覆工板等不是以公斤計的填每片價），系統用標準單位重（H300＝94、H350＝137、H400＝172 kg/M…）換算每 M 買價。</div>'
+  return '<div style="font-size:11.5px;color:var(--b4);margin-bottom:6px">給「租還是買」提醒用；只有你看得到。依材料類別填每公斤價（覆工板等不是以公斤計的填每片價），系統用標準單位重（H300＝93、H350＝135、H400＝172 kg/M…）換算每 M 買價。</div>'
     +'<table style="width:100%;font-size:12.5px"><thead><tr><th style="text-align:left">材料類別</th><th style="text-align:left">單位</th><th style="text-align:left">單價（未稅）</th><th style="text-align:left">比對文字（自訂類別才填）</th></tr></thead><tbody id="m8-cats">'
     +rows.map(_m8CatRow).join('')+'</tbody></table>'
     +'<button type="button" class="btn" style="margin:6px 0 10px" onclick="m8CatAdd()">＋新增類別</button>'
