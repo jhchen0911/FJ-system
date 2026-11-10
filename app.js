@@ -43212,7 +43212,7 @@ _decReg('frtExp',{
 });
 // ── 請款單核對 ──
 function _mbClean(p){p=(p&&typeof p==='object')?p:{};var D=function(x){x=_draftS(x).slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(x)?x:'';};
-  return {vendor:_draftS(p.vendor).trim().slice(0,60),kind:p.kind==='rent'?'rent':'freight',from:D(p.from),to:D(p.to),invNo:_draftS(p.invNo).slice(0,30),
+  return {nRows:Array.isArray(p.rows)?p.rows.length:0,vendor:_draftS(p.vendor).trim().slice(0,60),kind:p.kind==='rent'?'rent':'freight',from:D(p.from),to:D(p.to),invNo:_draftS(p.invNo).slice(0,30),
     rows:(Array.isArray(p.rows)?p.rows:[]).slice(0,120).map(function(r){r=(r&&typeof r==='object')?r:{};return {date:D(r.date),truck:_draftS(r.truck).slice(0,20),place:_draftS(r.place).slice(0,60),text:_draftS(r.text).slice(0,80),name:_draftS(r.name).slice(0,30),spec:_draftS(r.spec).slice(0,30),len:_mvNum(r.len),qty:_mvNum(r.qty),m:_mvNum(r.m),amt:Math.round(_mvNum(r.amt)),waitH:_mvNum(r.waitH),crane:Math.round(_mvNum(r.crane)),start:D(r.start),end:D(r.end)};}),
     tot:{sub:Math.round(_mvNum(p.tot&&p.tot.sub)),tax:Math.round(_mvNum(p.tot&&p.tot.tax)),total:Math.round(_mvNum(p.tot&&p.tot.total))}};}
 window.fyMatBillDraft=function(p){var b=_mbClean(p);if(!b.vendor||!b.rows.length)return Promise.resolve({ok:false,why:'要有廠商名稱與逐列'});
@@ -43223,22 +43223,30 @@ function _mbView(d){var b=_mbClean(d.payload),flags=[],notes=[],calc=0,bill=0,tr
   if(b.kind==='freight'){var tbl=_frtOf(b.vendor),vk=_mvVendKey(b.vendor);
     if(!tbl)flags.push('這家運輸公司還沒有價格表');else if(tbl.validTo&&tbl.validTo<td)notes.push('價格表 '+tbl.validTo+' 過期（照舊表算；過期另有卡片）');
     var G={};b.rows.forEach(function(r,i){var k=r.date+'|'+_mbTruck(r.truck);(G[k]=G[k]||{date:r.date,truck:r.truck,rows:[],amt:0,crane:0,waitH:0,place:''}).rows.push(i);G[k].amt+=r.amt;G[k].crane+=r.crane;G[k].waitH+=r.waitH;if(r.place)G[k].place=r.place;});
-    Object.keys(G).forEach(function(k){var g=G[k];
-      g.slips=(MAT_MOVES||[]).filter(function(m){return m&&m.st==='ok'&&m.date===g.date&&_mvVendKey(m.carrier)===vk&&(!_mbTruck(g.truck)||!_mbTruck(m.truck)||_mbTruck(m.truck)===_mbTruck(g.truck));});
+    var used={},GK=Object.keys(G).sort(function(a,b){return (_mbTruck(G[a].truck)?0:1)-(_mbTruck(G[b].truck)?0:1);});   /* 審查：有車號的先認簽收單，沒車號的只拿剩下的（不重複算、不互相蓋運費） */
+    GK.forEach(function(k){var g=G[k],tk=_mbTruck(g.truck);
+      g.slips=(MAT_MOVES||[]).filter(function(m){return m&&m.st==='ok'&&!used[m.id]&&m.date===g.date&&_mvVendKey(m.carrier)===vk&&(tk?(_mbTruck(m.truck)===tk||!_mbTruck(m.truck)):true);});
+      g.slips.forEach(function(m){used[m.id]=1;});
       g.why=[];if(!g.slips.length)g.why.push('進退料簿找不到這趟的簽收單');
+      g.slips.forEach(function(m){var f=MAT_MOVE_FIN[m.id];if(f&&f.fareBill&&f.fareBill!==d.id)g.why.push('這趟已經記過別張請款單的運費');});
+      if(g.crane)notes.push(g.date+' 吊車費 '+fmt(g.crane)+' 照請款單（價格表沒有吊車費）');
       if(tbl&&g.slips.length){var items=[];g.slips.forEach(function(m){(m.items||[]).forEach(function(it){items.push(it);});});
-        g.calc=FJC.mv.freightTrip(tbl,{place:g.place||_mbPlace(g.slips[0])+' '+(g.slips[0].dir==='out'?g.slips[0].to:g.slips[0].from),items:items,waitH:g.waitH});
+        g.calc=FJC.mv.freightTrip(tbl,{place:g.place||_mbPlace(g.slips[0]),items:items,waitH:g.waitH});   /* 審查：只用工地那一端（倉庫地名不參與比對） */
         if(g.calc.noRegion)g.why.push('價格表沒有這個地區');if(g.calc.miss.length)g.why.push('價格表沒有：'+g.calc.miss.slice(0,3).join('、'));}
-      bill+=g.amt;if(g.calc)calc+=g.calc.amt;else g.why.length||g.why.push('算不出來');
+      bill+=g.amt+g.crane;if(g.calc)calc+=g.calc.amt+g.crane;else g.why.length||g.why.push('算不出來');   /* 吊車費兩邊都照請款單（價格表沒有） */
       if(g.why.length)flags.push(g.date+' '+(g.truck||'')+'：'+g.why.join('；'));trips.push(g);});
   }else{var R=[];(Q||[]).forEach(function(q){if(!q||!q.mat)return;_m6Arr(q.mat,'rents').forEach(function(rt){if(_mvVendKey(rt.vendor)===_mvVendKey(b.vendor))R.push({q:q,rt:rt});});});
     if(!R.length)flags.push('找不到這家租賃商的租賃單');
     b.rows.forEach(function(r,i){var fr=r.start||b.from,to=r.end||b.to,key=_mvSpecKey(r),cand=R.filter(function(o){return !key||_mvSpecKey(o.rt)===key||_mvSpecKey({spec:o.rt.spec,name:o.rt.name})===key;}),o=cand.length===1?cand[0]:null,x={i:i,r:r,o:o,why:[]};
       if(!o)x.why.push(cand.length?'對到 '+cand.length+' 張租賃單':'對不到租賃單');
       else{x.calc=FJC.mv.rentPeriod(o.rt.batches,fr,to,parseFloat(o.rt.rate)||0);if(!(parseFloat(o.rt.rate)>0))x.why.push('租賃單月租空白');
-        (o.rt.batches||[]).forEach(function(bt){if(r.start&&bt.d&&bt.d>=b.from&&bt.d<=b.to&&Math.abs(FJC.mv.days(bt.d,r.start)||FJC.mv.days(r.start,bt.d))>1)x.why.push('進場 '+bt.d+'，請款從 '+r.start+' 起算');
-          if(r.end&&bt.o&&bt.o>=b.from&&bt.o<=b.to&&Math.abs(FJC.mv.days(bt.o,r.end)||FJC.mv.days(r.end,bt.o))>1)x.why.push('退場 '+bt.o+'，請款算到 '+r.end);});}
+        var ins=(o.rt.batches||[]).map(function(bt){return bt&&bt.d;}).filter(function(x){return x&&x>=b.from&&x<=b.to;}).sort(),outs=(o.rt.batches||[]).map(function(bt){return bt&&bt.o;}).filter(function(x){return x&&x>=b.from&&x<=b.to;}).sort();   /* 審查：期間內最早進場、最晚退場各比一次 */
+        var dd=function(a,c){return FJC.mv.days(a,c)||FJC.mv.days(c,a);};
+        if(r.start&&ins.length&&dd(ins[0],r.start)>1)x.why.push('進場 '+ins[0]+'，請款從 '+r.start+' 起算');
+        if(r.end&&outs.length&&dd(outs[outs.length-1],r.end)>1)x.why.push('退場 '+outs[outs.length-1]+'，請款算到 '+r.end);}
       bill+=r.amt;if(x.calc)calc+=x.calc.amt;if(x.why.length)flags.push('第 '+(i+1)+' 列 '+(r.text||r.spec||'')+'：'+x.why.join('；'));rents.push(x);});}
+  if(b.nRows>b.rows.length)flags.push('請款單有 '+b.nRows+' 列，只讀了前 '+b.rows.length+' 列');
+  if(b.tot.sub&&Math.abs(b.tot.sub-bill)>100)flags.push('逐列加起來 '+fmt(bill)+'，跟請款單小計 '+fmt(b.tot.sub)+' 對不上（可能有列沒讀到）');   /* 審查：漏讀的列不能被自動放行 */
   var df=FJC.mv.billDiff(bill,calc,100);
   return {d:d,b:b,trips:trips,rents:rents,bill:bill,calc:calc,diff:df.diff,flags:flags,notes:notes,quiet:df.ok&&!flags.length};}
 function _mbDetail(d){var v=_mbView(d),h='<div style="font-size:12.5px;line-height:1.6">請款 <b>'+fmt(v.bill)+'</b>｜我們算 <b>'+fmt(v.calc)+'</b>｜差 <b style="color:'+(Math.abs(v.diff)>100?'#c62828':'inherit')+'">'+fmt(v.diff)+'</b>（未稅）<br>'+(v.notes.length?('<span style="color:#b26a00">'+esc(v.notes.join('；'))+'</span><br>'):'');
@@ -43248,12 +43256,13 @@ function _mbDetail(d){var v=_mbView(d),h='<div style="font-size:12.5px;line-heig
 function _mbAskTxt(v){var L=[];if(v.b.kind==='freight')v.trips.forEach(function(g){if(g.calc&&Math.abs(g.amt-g.calc.amt)>0)L.push(g.date+' '+(g.truck||'')+'：請款 '+fmt(g.amt)+'，我們依價目表算 '+fmt(g.calc.amt));else if(!g.slips.length)L.push(g.date+' '+(g.truck||'')+'：我們這邊沒有這趟的簽收單');});
   else v.rents.forEach(function(x){if(x.calc&&x.calc.amt!==x.r.amt)L.push((x.r.text||x.r.spec||'')+'：請款 '+fmt(x.r.amt)+'，我們依進退場日期算 '+fmt(x.calc.amt));x.why.filter(function(w){return /進場|退場/.test(w);}).forEach(function(w){L.push((x.r.text||x.r.spec||'')+'：'+w);});});
   return '您好，'+(v.b.from?v.b.from.slice(0,7).replace('-','年')+'月':'這次')+'的請款單我們核對後有幾處想跟您確認：\n'+L.slice(0,12).map(function(t,i){return (i+1)+'. '+t;}).join('\n')+'\n再麻煩您協助確認，謝謝。';}
-function _mbApply(d,mode){var v=_mbView(d),now=Date.now(),me=_mvMe(),pay=mode==='calc'?v.calc:v.bill;
+var _MB_DONE={};
+function _mbApply(d,mode){if(!d||d.status!=='pending'||_MB_DONE[d.id]){toast('這張請款單已經處理過');return false;}var v=_mbView(d),now=Date.now(),me=_mvMe(),pay=mode==='calc'?v.calc:v.bill;
   if(mode==='calc'&&(v.b.kind==='freight'?v.trips.some(function(g){return !g.calc;}):v.rents.some(function(x){return !x.calc;}))){toast('有幾列算不出來，不能整張照我們算的付');return false;}
   if(v.b.kind==='freight')v.trips.forEach(function(g){if(!g.slips.length)return;var amt=mode==='calc'?g.calc.amt:g.amt,tm=g.slips.reduce(function(s,m){return s+(m.items||[]).reduce(function(a,it){return a+FJC.mv.itemM(it);},0);},0);
     var left=amt,leftC=g.crane;g.slips.forEach(function(m,i){var mm=(m.items||[]).reduce(function(a,it){return a+FJC.mv.itemM(it);},0),last=i===g.slips.length-1,sh=tm>0?mm/tm:1/g.slips.length;
       var a=last?left:Math.round(amt*sh),c=last?leftC:Math.round(g.crane*sh);left-=a;leftC-=c;var f=_mvFin(m.id,true);f.fare=a;if(g.crane)f.crane=c;f.fareSrc=mode;f.fareBill=d.id;f._mt=now;});});
-  MAT_MOVE_FIN['bill_'+d.id]={kind:'bill',vendor:v.b.vendor,bk:v.b.kind,from:v.b.from,to:v.b.to,mode:mode,bill:v.bill,calc:v.calc,diff:v.diff,pay:pay,at:now,by:me,_mt:now};saveMatMoveFin();
+  _MB_DONE[d.id]=1;MAT_MOVE_FIN['bill_'+d.id]={kind:'bill',vendor:v.b.vendor,bk:v.b.kind,from:v.b.from,to:v.b.to,mode:mode,bill:v.bill,calc:v.calc,diff:v.diff,pay:pay,at:now,by:me,_mt:now};saveMatMoveFin();
   _draftMark(d.id,'applied',{resultId:'mvbill|'+mode});toast((mode==='calc'?'照我們算的':'照請款單')+'：入帳金額 NT$ '+fmt(pay)+'（未稅），請在原本的租賃期別／費用登錄');return true;}
 var _MB_AUTO={};
 function _mbAutoTick(){if(!_decIsAdmin()||_isReaderUser)return;Object.keys(DRAFTS||{}).forEach(function(k){var d=DRAFTS[k];if(!d||d.type!=='matBill'||d.status!=='pending'||_MB_AUTO[d.id])return;try{if(_mbView(d).quiet){_MB_AUTO[d.id]=1;_mbApply(d,'bill');}}catch(e){_err('_mbAutoTick',e);}});}

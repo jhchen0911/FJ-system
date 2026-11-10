@@ -11644,11 +11644,11 @@ async function newPage(browser, width, height) {
         m1.items[0].m = 345.74; m1.items[1].m = 48.13; MAT_MOVES.push(m1);
         const bd = D('dbil211a', 'matBill', { vendor: '範例起重有限公司', kind: 'freight', from: '2026-09-01', to: '2026-09-30', rows: [{ date: '2026-09-18', truck: 'KEG 1598', text: 'H300 13M 以上', m: 361.49, amt: 43379 }, { date: '2026-09-18', truck: 'KEG-1598', text: 'H300 16M 以上', m: 48.13, amt: 7220, crane: 3000 }] });
         let v = _mbView(bd);
-        out.calc = v.bill === 50599 && v.calc === 29225 && v.diff === 21374 && !v.quiet && _decItems('mvBill').length === 1 && /24893|345.74M×40×1.8/.test(_DEC.mvBill.detail(bd).replace(/,/g, ''));
+        out.calc = v.bill === 53599 && v.calc === 32225 && v.diff === 21374 && /吊車費 3,000 照請款單/.test(v.notes.join()) && !v.quiet && _decItems('mvBill').length === 1 && /24893|345.74M×40×1.8/.test(_DEC.mvBill.detail(bd).replace(/,/g, ''));
         // 退回＝先問廠商：擬好的詢問文字（請款 vs 我們依價目表算），草稿標退回
         out.ask = /請款 50,599，我們依價目表算 29,225/.test(_mbAskTxt(v)) && !/包商/.test(_mbAskTxt(v));
         // 修改＝照我們算的付 → 每趟運費寫進進退料簿（M7 讀 fare／crane）
-        out.payCalc = _mbApply(bd, 'calc') === true && MAT_MOVE_FIN[m1.id].fare === 29225 && MAT_MOVE_FIN[m1.id].crane === 3000 && MAT_MOVE_FIN[m1.id].fareSrc === 'calc' && MAT_MOVE_FIN['bill_dbil211a'].pay === 29225 && bd.status === 'applied';
+        out.payCalc = _mbApply(bd, 'calc') === true && MAT_MOVE_FIN[m1.id].fare === 29225 && MAT_MOVE_FIN[m1.id].crane === 3000 && MAT_MOVE_FIN[m1.id].fareSrc === 'calc' && MAT_MOVE_FIN['bill_dbil211a'].pay === 32225 && bd.status === 'applied' && _mbApply(bd, 'bill') === false;   // 審查：同一張不能處理兩次
         // ③ 差 100 以內、沒有疑點 → 不出卡，自動照請款單記錄
         const m2 = Object.assign({}, m1, { id: 'mv_t211_2', date: '2026-09-24', truck: 'KLK-6681' });
         MAT_MOVES.push(m2);
@@ -11656,6 +11656,10 @@ async function newPage(browser, width, height) {
         out.quiet = _mbView(bq).quiet && !_decItems('mvBill').length;
         _mbAutoTick();
         out.auto = bq.status === 'applied' && MAT_MOVE_FIN[m2.id].fare === 29300 && MAT_MOVE_FIN[m2.id].fareSrc === 'bill';
+        // 審查：逐列加起來跟小計對不上（漏讀）→ 不自動放行；另一張請款單又記同一趟 → 標出
+        const bt = D('dbil211e', 'matBill', { vendor: '範例起重', kind: 'freight', from: '2026-09-01', to: '2026-09-30', tot: { sub: 60000 }, rows: [{ date: '2026-09-24', truck: 'KLK-6681', amt: 29300 }] });
+        out.subChk = !_mbView(bt).quiet && /跟請款單小計 60,000 對不上/.test(_mbView(bt).flags.join()) && /已經記過別張請款單的運費/.test(_mbView(bt).flags.join());
+        bt.status = 'rejected';
         // 找不到簽收單的趟次一定出卡
         const bn = D('dbil211c', 'matBill', { vendor: '範例起重', kind: 'freight', from: '2026-10-01', to: '2026-10-31', rows: [{ date: '2026-10-02', truck: 'KLK-6681', amt: 9000 }] });
         out.noSlip = !_mbView(bn).quiet && /找不到這趟的簽收單/.test(_mbView(bn).flags.join());
@@ -11669,7 +11673,7 @@ async function newPage(browser, width, height) {
       } finally { Q = keepQ; MAT_MOVES = keepM; MAT_MOVE_FIN = keepF; DRAFTS = keepD; window._draftMark = keepMark; }
       return out;
     });
-    check('v6.0.211 進退料 M6 請款核對：價格表草稿確認才存、過期出卡、運費照價格表算（長度加價＋地區加成，寬大 9/18 算 29,225）差額出卡、先問廠商附詢問文字、照我們算的付寫進每趟運費／吊車費、差 100 以內自動照請款單、找不到簽收單出卡、租金計租日差超過 1 天標出、照請款單付', r.rateCard && r.rateSaved && r.exp && r.calc && r.ask && r.payCalc && r.quiet && r.auto && r.noSlip && r.rent && r.payBill, JSON.stringify(r));
+    check('v6.0.211 進退料 M6 請款核對：價格表草稿確認才存、過期出卡、運費照價格表算（長度加價＋地區加成，寬大 9/18 算 29,225）差額出卡、先問廠商附詢問文字、照我們算的付寫進每趟運費／吊車費、差 100 以內自動照請款單、找不到簽收單出卡、租金計租日差超過 1 天標出、照請款單付', r.rateCard && r.rateSaved && r.exp && r.calc && r.ask && r.payCalc && r.quiet && r.auto && r.subChk && r.noSlip && r.rent && r.payBill, JSON.stringify(r));
     check('v6.0.211 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
