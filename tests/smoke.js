@@ -13347,6 +13347,44 @@ async function newPage(browser, width, height) {
     check('v6.0.224 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.227 進場前到位確認卡＋結案包商評鑑（陳軒 11/10 晚佇列第 5、6 件）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keep = { Q: Q, V: VENDORS.slice(), pc: window.pjCloseAll };
+      try {
+        window.toast = () => {};
+        const d = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+        VENDORS.length = 0; VENDORS.push({ id: 'vP1', name: '範例工程行甲', contact: '範例陳師傅', phone: '0911-222-333', _mt: 1 });
+        Q = [{ id: 'qP1', code: 'P01', name: '範例進場案', client: '範例營造甲', awarded: true, _mt: 1, items: [],
+          mat: { rows: [{ id: 'mr1', name: 'H300 鋼樁', spec: 'H300', len: 12, qty: 40, unit: '支' }], equip: [{ id: 'me1', name: '打樁機', vendor: '範例機械行', qty: 1, from: d(5), to: '' }, { id: 'me2', name: '吊車', qty: 1, from: d(-1) }], use: [], loss: [], trans: {} },
+          costs: [{ id: 'cP1', type: 'sub', vendor: '範例工程行甲', cat: '打設', entryDate: d(2), rows: [] }, { id: 'cP2', type: 'sub', vendor: '範例工程行乙', entryDate: d(9), rows: [] }] }];
+        const rows = _pfRows(); out.rows = rows.length === 1 && rows[0].c.id === 'cP1' && rows[0].left === 2;
+        const x = document.createElement('div'); x.innerHTML = _DEC.preflight.detail(rows[0]); const t = x.textContent, txt = _pfText(rows[0], _pfCheck(rows[0]));
+        out.detail = /H300 鋼樁 L=12M 需 40/.test(t) && /還缺 40/.test(t) && /打樁機/.test(t) && /才到/.test(t) && /吊車/.test(t) && /進場日在場/.test(t) && /範例陳師傅/.test(t) && /0911-222-333/.test(t) && /材料目前還差：H300 鋼樁 L=12M 40 支/.test(txt) && /打樁機/.test(txt) && !/NT\$/.test(txt);
+        out.ok = _DEC.preflight.ok(rows[0]) === true && Q[0].pfAck.cP1.date === d(2) && _pfRows().length === 0;
+        // 結案卡：包商評鑑（兩家：一家評、一家不評）
+        Q[0].costs[1].entryDate = '';
+        const ev = document.createElement('div'); ev.innerHTML = _cevHtml(Q[0]); out.evHtml = /五、包商評鑑/.test(ev.textContent) && ev.querySelectorAll('select').length === 6;
+        cevSet('qP1', 0, 'q', 5); cevSet('qP1', 0, 't', 4);
+        out.need3 = _cevSave(Q[0]) === false;
+        cevSet('qP1', 0, 'c', 3); cevSet('qP1', 0, 'note', '準時進場');
+        let closed = 0; window.pjCloseAll = () => { closed++; };
+        const ok = _DEC.closeAsk.ok(Q[0]);
+        const v = VENDORS.find((y) => y.name === '範例工程行甲');
+        out.saved = ok === 'open' && closed === 1 && v.evals.length === 1 && v.evals[0].q === 5 && v.evals[0].t === 4 && v.evals[0].c === 3 && v.evals[0].qid === 'qP1' && !VENDORS.find((y) => y.name === '範例工程行乙');
+        cevSet('qP1', 0, 'q', 2); cevSet('qP1', 0, 't', 2); cevSet('qP1', 0, 'c', 2); _cevSave(Q[0]);
+        out.over = v.evals.length === 1 && v.evals[0].q === 2;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keep.Q; VENDORS.length = 0; keep.V.forEach((x) => VENDORS.push(x)); window.pjCloseAll = keep.pc;
+      return out;
+    });
+    check('v6.0.227 進場前到位確認卡：進場日 2 天內出卡；材料（還缺多少）、機具（進場日在不在場）、人員（廠商電話）；催的 LINE 文字不放金額；確認記已確認', !r.err && r.rows && r.detail && r.ok, JSON.stringify(r));
+    check('v6.0.227 結案卡包商評鑑：品質／準時／配合 1～5 分，評了要三題都填；確認存進廠商紀錄（同案再評覆蓋）再開結案視窗；不評的廠商不動', !r.err && r.evHtml && r.need3 && r.saved && r.over, JSON.stringify(r));
+    check('v6.0.227 進場／評鑑卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.227 租期快到期卡＋超支拆解卡（陳軒 11/10 晚佇列第 3、4 件）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

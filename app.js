@@ -41779,6 +41779,57 @@ _decReg('overAsk',{
   reject:function(g,why){_overAskMark(g,'');return true;},
   edit:function(g){try{openProj(g.q.id);}catch(e){_err('overAsk.edit',e);}}
 });
+// ══════════ v6.0.227 進場前到位確認卡（陳軒 11/10 晚佇列第 5 件，preflight 暫停點七）══════════
+// 分包卡的進場日（c.entryDate，評估得標時填）在今天～2 天後 → 每個進場一張：材料（材料估算的需求列 q.mat.rows，_matShort＞0＝還缺）、
+//   機具（材料．運輸登記的設備租賃 q.mat.equip，進場日當天在場才算到）、人員（這張分包卡的廠商＋電話；要人確認，預設「待確認」）；
+//   有缺的附催的 LINE 文字（給廠商；不放金額）。確認＝記「已確認到位」q.pfAck[卡片id]＝進場日（附備註）；退回＝這次不用；修改＝開材料．運輸頁。
+var _PF_IN={};
+function _pfRows(){var out=[],today=localToday(),lim=_dAdd(today,2);
+  (Q||[]).forEach(function(q){if(!q||!q.awarded||q.closed)return;var ak=q.pfAck||{};
+    (q.costs||[]).forEach(function(c){if(!c||c.type!=='sub'||!c.entryDate||c.mergedInto)return;var d=String(c.entryDate).slice(0,10);if(d<today||d>lim)return;if(ak[c.id]&&ak[c.id].date===d)return;out.push({q:q,c:c,date:d,key:q.id+'|'+c.id,left:_dDiff(today,d)});});});
+  return out.sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:0;});}
+function _pfCheck(row){
+  var q=row.q,c=row.c,m=(q.mat&&typeof q.mat==='object')?q.mat:{},mat=[],eq=[];
+  (Array.isArray(m.rows)?m.rows:[]).forEach(function(r){if(!r||!((parseFloat(r.qty)||0)>0))return;var sh=0;try{sh=_matShort(q,r);}catch(e){_err('_pfCheck.mat',e);}
+    mat.push({name:String(r.name||r.spec||'材料')+(r.len?' L='+_rfmt(parseFloat(r.len)||0)+'M':''),need:parseFloat(r.qty)||0,short:sh,unit:r.unit||'支'});});
+  (Array.isArray(m.equip)?m.equip:[]).forEach(function(e){if(!e||!String(e.name||'').trim())return;var ok=(!e.from||String(e.from)<=row.date)&&(!e.to||String(e.to)>=row.date);eq.push({name:String(e.name),vendor:String(e.vendor||''),qty:e.qty||1,from:e.from||'',ok:ok});});
+  var v=(VENDORS||[]).find(function(x){return x&&x.name===c.vendor;})||{},ph=v.phone||v.tel||'';
+  return {mat:mat,eq:eq,crew:{vendor:c.vendor||'',contact:v.contact||'',phone:ph},matShort:mat.filter(function(x){return x.short>0;}),eqLate:eq.filter(function(x){return !x.ok;})};
+}
+function _pfText(row,k){
+  if(_PF_IN[row.key]&&_PF_IN[row.key].txt!=null)return _PF_IN[row.key].txt;
+  var q=row.q,c=row.c,who=String(k.crew.contact||k.crew.vendor||'').trim(),L=[];
+  L.push((who?who+' 好，':'')+'豐有工程確認一下：'+_qMD(row.date)+'「'+String(q.name||'')+'」進場，人員和機具都安排好了嗎？');
+  if(k.matShort.length)L.push('材料目前還差：'+k.matShort.map(function(x){return x.name+' '+fmt(x.short)+' '+x.unit;}).join('、')+'，進場前會再確認到位時間。');
+  if(k.eqLate.length)L.push('機具：'+k.eqLate.map(function(x){return x.name+(x.from?'（排 '+_qMD(x.from)+' 到）':'（還沒排）');}).join('、')+'，麻煩確認能不能配合進場日。');
+  L.push('有問題請先回覆，謝謝！');return L.join('\n');
+}
+function _pfDetail(row){
+  var k=_pfCheck(row),q=row.q,c=row.c,i=_PF_IN[row.key]||{};
+  var st=function(ok,t){return '<span style="font-weight:700;color:'+(ok?'var(--g3)':'#b71c1c')+'">'+(ok?'✓ ':'✗ ')+t+'</span>';};
+  var matH=k.mat.length?'<ul style="margin:2px 0;padding-left:20px;font-size:12px">'+k.mat.map(function(x){return '<li style="overflow-wrap:anywhere">'+esc(x.name)+' 需 '+fmt(x.need)+' '+esc(x.unit)+'　'+st(!x.short,x.short?'還缺 '+fmt(x.short):'到齊')+'</li>';}).join('')+'</ul>':'<div style="font-size:12px;color:var(--b4)">材料估算沒有需求列（沒用材料估算的案子不檢查）</div>';
+  var eqH=k.eq.length?'<ul style="margin:2px 0;padding-left:20px;font-size:12px">'+k.eq.map(function(x){return '<li style="overflow-wrap:anywhere">'+esc(x.name)+(x.vendor?'（'+esc(x.vendor)+'）':'')+' ×'+esc(String(x.qty))+'　'+st(x.ok,x.ok?'進場日在場':(x.from?_qMD(x.from)+' 才到':'沒排日期'))+'</li>';}).join('')+'</ul>':'<div style="font-size:12px;color:var(--b4)">沒有登記設備租賃（自有機具請自行確認）</div>';
+  var miss=k.matShort.length+k.eqLate.length;
+  return _qTbl([['工程',String(q.name||'')],['進場',_qMD(row.date)+'（'+(row.left===0?'今天':row.left+' 天後')+'）'],['分包',String(c.vendor||'')+(c.cat?'（'+c.cat+'）':'')]])
+    +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">材料</div>'+matH
+    +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">機具</div>'+eqH
+    +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">人員</div><div style="font-size:12px">'+esc(k.crew.vendor||'（沒有廠商）')+(k.crew.contact?'　'+esc(k.crew.contact):'')+(k.crew.phone?'　'+esc(k.crew.phone):'　<span style="color:#b71c1c">廠商名冊沒有電話</span>')+'　<span style="color:#b26a00">待廠商回覆確認</span></div>'
+    +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">'+(miss?'催的 LINE 文字（有 '+miss+' 項還沒到位）':'確認進場的 LINE 文字')+'</div><div style="white-space:pre-wrap;font-size:12.5px;background:var(--gl);border-radius:6px;padding:6px 8px;overflow-wrap:anywhere">'+esc(_pfText(row,k))+'</div>'
+    +'<input placeholder="備註（例：廠商回覆 OK、材料 11/12 下午到）" value="'+esc(i.note||'')+'" oninput="(_PF_IN[\''+esc(row.key)+'\']=_PF_IN[\''+esc(row.key)+'\']||{}).note=String(this.value).slice(0,200)" style="width:100%;box-sizing:border-box;margin-top:6px;padding:6px 8px;border:1px solid var(--b2);border-radius:6px;font-size:13px">'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">確認＝複製 LINE 文字並記「已確認到位」（這個進場日不再出卡）；改進場日要到施工成本的分包卡改。</div>';
+}
+function _pfMark(row,note,skip){var q=row.q;if(!q.pfAck||typeof q.pfAck!=='object')q.pfAck={};q.pfAck[row.c.id]={date:row.date,at:Date.now(),by:_meEmail()||'本機',note:String(note||'').slice(0,200)};if(skip)q.pfAck[row.c.id].skip=1;delete _PF_IN[row.key];_touch(q);persist();}
+_decReg('preflight',{
+  title:'進場前到位確認',todo:function(n){return '進場前到位確認 '+n+' 件';},sub:'材料、機具、人員到位了嗎；有缺附催的 LINE 文字',
+  canSee:function(){return _decIsAdmin();},
+  list:function(){return _pfRows();},
+  key:function(r){return r.key;},head:function(r){var k=_pfCheck(r),n=k.matShort.length+k.eqLate.length;return String(r.q.name||'')+' '+String(r.c.vendor||'')+' '+_qMD(r.date)+' 進場'+(n?'（'+n+' 項還沒到位）':'');},
+  body:function(r){return '<div style="font-size:11.5px;color:var(--b4)">'+(r.left===0?'今天':r.left+' 天後')+'進場</div>';},
+  detail:function(r){return _pfDetail(r);},
+  ok:function(r){var k=_pfCheck(r),t=_pfText(r,k);try{if(navigator.clipboard)navigator.clipboard.writeText(t).catch(function(e){_err('preflight.copy',e);});}catch(e){_err('preflight.copy',e);}_pfMark(r,(_PF_IN[r.key]||{}).note,false);toast('已複製，記下已確認');return true;},
+  reject:function(r){_pfMark(r,'',true);return true;},
+  edit:function(r){try{_m6Qid=r.q.id;go('mat6');}catch(e){_err('preflight.edit',e);}}
+});
 // ══════════ v6.0.227 報價拍板卡加強（陳軒 11/10 晚佇列第 2 件；第 2 層：卡片只給建議）══════════
 // AI 報價草稿卡（drf_quote）明細多三塊：①三個價（底價、目標成交價＝payload.aim，報價＝草稿含稅合計）；②毛利（成本單價：AI 給的 payload.est ＞ 原報價同名工項的 estCost ＞ 歷史實際成本 _histCostFor；只有管理員看）；
 //   ③異常單元（單價跟成交單價庫 _dealPriceFor 平均偏差超過 ±15%、或低於成本）；④圖說疑義（payload.issues）。
@@ -42394,13 +42445,32 @@ _decReg('closeAsk',{
         +(D.ov.length?'<table class="tbl" style="font-size:12px;width:100%"><thead><tr><th>工項</th><th style="text-align:right">報價成本</th><th style="text-align:right">實際</th><th style="text-align:right">％</th></tr></thead><tbody>'+D.ov.map(function(o){return '<tr><td style="overflow-wrap:anywhere">'+esc(o.desc)+'</td><td style="text-align:right">'+fmt(o.est)+'</td><td style="text-align:right">'+fmt(o.act)+'</td><td style="text-align:right;color:var(--red);font-weight:700">'+o.pct+'%</td></tr>';}).join('')+'</tbody></table>':'<div style="font-size:12.5px;color:var(--g3)">沒有超支的工項</div>');
       h+='<div style="font-size:12.5px;margin-top:8px">四、實際成本：<a download="'+esc((q.name||'工程')+'_實際成本_'+localToday()+'.csv')+'" href="data:text/csv;charset=utf-8,'+encodeURIComponent(_closeAskCsv(q,D))+'">下載逐工項 CSV</a></div>';
     }
-    h+='<div style="font-size:11.5px;color:var(--b4);margin-top:8px">確認＝打開原本的結案視窗（結算追加減、結案、各工項實績單價回寫單價庫、材料結案實績），在那裡再按一次確定。</div>';
+    h+=_cevHtml(q);   // v6.0.227 包商評鑑
+    h+='<div style="font-size:11.5px;color:var(--b4);margin-top:8px">確認＝存包商評鑑，再打開原本的結案視窗（結算追加減、結案、各工項實績單價回寫單價庫、材料結案實績），在那裡再按一次確定。</div>';
     return h;
   },
-  ok:function(q){if(_roDeny())return false;pjCloseAll(q.id);return 'open';},
+  ok:function(q){if(_roDeny())return false;if(_cevSave(q)===false)return false;pjCloseAll(q.id);return 'open';},
   reject:function(q,why){if(_roDeny())return false;q.closeSkip={at:Date.now(),why:String(why||'').slice(0,200)};_touch(q);persist();try{updateDashTodo();}catch(e){_err('closeAsk.rej',e);}return true;},
   edit:function(q){var m=document.getElementById('fy-modal');if(m)m.remove();openProj(q.id);}
 });
+// v6.0.227 結案卡加包商評鑑（陳軒 11/10 晚佇列第 6 件）：這案（含追加）的分包卡廠商，品質／準時／配合各 1～5 分（可不評；評了就三題都要填）
+//   存在廠商紀錄 VENDORS[].evals（{qid,qname,at,by,q,t,c,note}；同一案再評＝覆蓋），廠商名冊沒有的先補進名冊。結案視窗按取消，評鑑一樣留著。
+var _CEV={},_CEV_K=[['q','品質'],['t','準時'],['c','配合']];
+function cevSet(qid,vi,k,v){var o=((_CEV[qid]=_CEV[qid]||{})[vi]=_CEV[qid][vi]||{});o[k]=k==='note'?String(v||'').slice(0,100):(parseInt(v,10)||0);}
+function _cevVendors(q){var seen={},out=[];_retAskFam(q).forEach(function(x){(x.costs||[]).forEach(function(c){var n=String(c&&c.type==='sub'&&!c.mergedInto&&c.vendor||'').trim();if(n&&!seen[n]){seen[n]=1;out.push(n);}});});return out;}
+function _cevHtml(q){var vs=_cevVendors(q);if(!vs.length)return '';var cur=_CEV[q.id]||{};
+  return '<div style="font-weight:700;font-size:13px;margin:10px 0 2px">五、包商評鑑（1～5 分，可不評）</div>'+vs.map(function(n,vi){var v=(VENDORS||[]).find(function(x){return x&&x.name===n;}),old=v&&Array.isArray(v.evals)?v.evals.find(function(e){return e&&e.qid===q.id;}):null,o=cur[vi]||{};
+    return '<div style="border:1px solid var(--b1);border-radius:8px;padding:6px 8px;margin-top:4px;font-size:12.5px"><b>'+esc(n)+'</b>'+(old?'<span style="font-size:11px;color:var(--b4)">（已評過：品質 '+old.q+'、準時 '+old.t+'、配合 '+old.c+'，再評會覆蓋）</span>':'')
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:4px">'+_CEV_K.map(function(k){var val=o[k[0]]!=null?o[k[0]]:'';return '<label style="display:inline-flex;gap:4px;align-items:center">'+k[1]+'<select onchange="cevSet(\''+esc(q.id)+'\','+vi+',\''+k[0]+'\',this.value)" style="padding:3px 4px;border:1px solid var(--b2);border-radius:6px;font-size:13px"><option value="">—</option>'+[5,4,3,2,1].map(function(x){return '<option value="'+x+'"'+(+val===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></label>';}).join('')+'</div>'
+      +'<input placeholder="一句話（選填）" value="'+esc(o.note||'')+'" oninput="cevSet(\''+esc(q.id)+'\','+vi+',\'note\',this.value)" style="width:100%;box-sizing:border-box;margin-top:4px;padding:4px 6px;border:1px solid var(--b2);border-radius:6px;font-size:12.5px"></div>';}).join('');}
+function _cevSave(q){var vs=_cevVendors(q),cur=_CEV[q.id]||{},todo=[];
+  for(var vi=0;vi<vs.length;vi++){var o=cur[vi]||{},n=_CEV_K.filter(function(k){return o[k[0]]>=1&&o[k[0]]<=5;}).length;if(!n&&!o.note)continue;if(n<3){toast(vs[vi]+'：品質、準時、配合三題都要填');return false;}todo.push({name:vs[vi],o:o});}
+  if(!todo.length)return true;
+  var me=_meEmail()||'本機',chg=false;
+  todo.forEach(function(x){var v=(VENDORS||[]).find(function(y){return y&&y.name===x.name;});if(!v){try{v=_vendorEnsure(x.name,'sub');}catch(e){_err('_cevSave.ensure',e);}}if(!v)return;
+    if(!Array.isArray(v.evals))v.evals=[];v.evals=v.evals.filter(function(e){return e&&e.qid!==q.id;});v.evals.push({qid:q.id,qname:String(q.name||'').slice(0,60),at:Date.now(),by:me,q:x.o.q,t:x.o.t,c:x.o.c,note:String(x.o.note||'')});if(v.evals.length>100)v.evals=v.evals.slice(-100);v._mt=Date.now();chg=true;});
+  if(chg){try{saveVendors();}catch(e){_err('_cevSave',e);}toast('已存 '+todo.length+' 家包商評鑑');}
+  delete _CEV[q.id];return true;}
 function _retAskCopy(t){try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast('LINE 文字已複製');},function(){/* 可忽略：剪貼簿被擋 */});}catch(e){_err('_retAskCopy',e);}}
 // ── 整體日報（5d #8，雲端 dailyReport 建的 dailyOut 草稿）：確認＝複製文字並標已轉發、退回＝不轉發、修改＝改文字再複製 ──
 _decReg('dailyOut',{
