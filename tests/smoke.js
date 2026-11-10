@@ -13596,9 +13596,12 @@ async function newPage(browser, width, height) {
         const st = FJC.todo.rentStatus(Q[0], 0, null, localToday());
         // 100×(9/1～9/10＝10 天)＋60×(9/11～9/20＝10 天)＝40×10＋60×20＝1600 支·天 × 20 元
         out.calc = st && st.qtyDays === 1600 && st.amount === 32000 && st.batches.length === 2 && st.batches[0].days === 10 && st.batches[1].days === 20;
-        out.show = /時段 1/.test(tx) && /2026-09-01～2026-09-10/.test(tx) && /時段 2/.test(tx) && /2026-09-11～2026-09-20/.test(tx) && /逾期租金約 NT\$ 32,000/.test(tx) && /拔除完成日（分段/.test(tx) && /第 1 批 2026-09-10 拔完 40 支/.test(tx);
-        const tds = Array.from(box.querySelectorAll('tbody tr')).map((tr) => Array.from(tr.children).map((td) => td.textContent.replace(/^.*?：|\s/g, '')).join('|'));
-        out.rows = tds.length === 2 && /100\|10\|20,000$/.test(tds[0]) && /60\|10\|12,000$/.test(tds[1]);   // 時段列法：在場 100 支 10 天、在場 60 支 10 天
+        out.show = /時段 1/.test(tx) && /2026-09-01～2026-09-10/.test(tx) && /時段 2/.test(tx) && /2026-09-11～2026-09-20/.test(tx) && /逾期租金約 NT\$ 32,000/.test(tx) && /拔除完成日（分段/.test(tx) && /第 1 批/.test(tx) && /拔完後還在場/.test(tx);
+        const TB = box.querySelectorAll('table'), rowsOf = (t) => Array.from(t.querySelectorAll('tbody tr')).map((tr) => Array.from(tr.children).map((td) => td.textContent.replace(/^.*?：|\s/g, '')).join('|'));
+        const bt = rowsOf(TB[0]);   // v6.0.226 每一批：日期、支數、拔完後還在場
+        out.batch = TB.length === 2 && bt.length === 2 && /2026-09-10\|40\|60$/.test(bt[0]) && /2026-09-20\|60\|0$/.test(bt[1]) && !box.querySelector('input,select');
+        const tds = rowsOf(TB[1]);
+        out.rows = out.batch && tds.length === 2 && /100\|10\|20,000$/.test(tds[0]) && /60\|10\|12,000$/.test(tds[1]);   // 時段列法：在場 100 支 10 天、在場 60 支 10 天
         out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       Q = keepQ; PROJECTS = keepP; localStorage.removeItem('pj7_open_remove');

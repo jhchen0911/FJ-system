@@ -44480,9 +44480,11 @@ function _pjRemoveHtml(q){
     var sg=null;if(s.batches&&s.batches.length){try{sg=FJC.todo.rentSegments(pg,s.qty,_dAdd(s.expiry,1),s.endDate);}catch(e){_err('_pjRemoveHtml.seg',e);}}
     if(sg&&sg.segs.length){   // v6.0.225 Lotion 11/10：跟請款單同一種「時段」列法
       sg.segs.forEach(function(g){rows.push(['時段 '+g.no,esc(g.from)+'～'+esc(g.to),_rfmt(g.qty),String(g.days),s.otPrice?fmt(Math.round(g.qty*g.days*s.otPrice)):'—']);});
-      h+=_pjTable([{t:'時段'},{t:'起訖'},{t:'在場支數',r:1},{t:'天數',r:1},{t:'逾期租金',r:1}],rows);
-      var dn=B.closed.map(function(b,i){return '第 '+(i+1)+' 批 '+esc(b.date)+' 拔完 '+_rfmt(b.qty)+' 支';});
-      if(dn.length)h+='<div style="font-size:11px;color:var(--b3);margin-top:2px">'+dn.join('、')+'</div>';
+      // v6.0.226 陳軒 11/10：先列每一批（日期、支數、拔完後還在場），跟時段列同一份資料（_rentBatchList＝rentSegments 用的分批），只顯示
+      var left=parseFloat(s.qty)||0,br=B.closed.map(function(b,i){left=Math.max(0,left-(parseFloat(b.qty)||0));return ['第 '+(i+1)+' 批',esc(b.date),_rfmt(b.qty),_rfmt(left)];});
+      if(B.open>0)br.push([B.stage?'拔除階段完工':'還沒勾完成',B.stage?esc(B.stage):'—',_rfmt(B.open),'—']);
+      if(br.length)h+='<div style="font-size:11.5px;color:var(--b4);margin:2px 0">每一批</div>'+_pjTable([{t:'批次'},{t:'拔完日'},{t:'支數',r:1},{t:'拔完後還在場',r:1}],br);
+      h+='<div style="font-size:11.5px;color:var(--b4);margin:6px 0 2px">逾期租金時段（跟請款單同一種列法）</div>'+_pjTable([{t:'時段'},{t:'起訖'},{t:'在場支數',r:1},{t:'天數',r:1},{t:'逾期租金',r:1}],rows);
       return;
     }
     if(s.batches&&s.batches.length){s.batches.forEach(function(b){rows.push([b.open?'還沒拔完':('第 '+b.no+' 批'),b.open?'—':esc(b.date||''),_rfmt(b.qty),String(b.days)]);});}
