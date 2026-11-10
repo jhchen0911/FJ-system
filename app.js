@@ -44396,6 +44396,7 @@ function _sdocPut(qid,f,cat){
         task.snapshot.ref.getDownloadURL().then(function(url){
           var p2=_prjOfQ(qid);if(!p2){res(false);return;}var m=_sdocMap(p2);
           m[id]={id:id,name:String(f.name||safe).slice(0,120),path:path,cat:_SDOC_CATS.indexOf(cat)>=0?cat:'其他',st:'wait',at:now,by:_mvMe(),size:f.size||0,url:url};
+          try{var g=_sdocVerGuess(p2,m[id]);m[id].ver=g.ver;m[id].verSrc=g.src;}catch(e3){_err('_sdocPut.ver',e3);}   // 審查：版次跟上傳一起存，不多存一次
           _sdocSave(p2,m);toast('已上傳：'+(f.name||''));try{_sdocAfterPut(qid,id,f);}catch(e2){_err('_sdocPut.after',e2);}res(true);   // v6.0.226 猜版次、計算書讀數量 → 今天頁拍板卡
         }).catch(function(e){_err('_sdocPut.url',e);toast('取得檔案連結失敗');res(false);});
       });
@@ -44766,7 +44767,7 @@ function _sdocVerGuess(p,d){
 }
 function _sdocUpd(qid,id,fn){var p=_prjOfQ(qid);if(!p)return false;var m=_sdocMap(p),d=m[id];if(!d)return false;var nd=Object.assign({},d);if(fn(nd,p)===false)return false;m[id]=nd;_sdocSave(p,m);return true;}
 function _sdocAfterPut(qid,id,f){
-  _sdocUpd(qid,id,function(d,p){var g=_sdocVerGuess(p,d);d.ver=g.ver;d.verSrc=g.src;});
+  var p0=_prjOfQ(qid),d0=p0&&_sdocMap(p0)[id];if(d0&&!d0.ver)_sdocUpd(qid,id,function(d,p){var g=_sdocVerGuess(p,d);d.ver=g.ver;d.verSrc=g.src;});
   var p=_prjOfQ(qid),d=p&&_sdocMap(p)[id];
   if(d&&d.cat==='計算書'&&f&&(/pdf$/i.test(f.type||'')||/^image\//.test(f.type||''))&&f.size<20*1024*1024)try{_sdocCalcRead(qid,id,f);}catch(e){_err('_sdocAfterPut.calc',e);}
 }
