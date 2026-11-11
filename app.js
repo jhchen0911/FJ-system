@@ -5255,7 +5255,7 @@ function _invAutoDaily(inv){
   if(invItems.some(it=>it&&it.type==='item'&&(parseFloat(it.curQty)||0)>0))return 0;   // 已填過本期就不動
   const to=String(gv('inv-date')||'').slice(0,10)||localToday();
   const from=_invPrevPeriodDate(q,to);
-  let n=0;const _adds=[];
+  let n=0;const _adds=[],_back=[];
   invItems.forEach((it,k)=>{
     if(!it||it.type!=='item')return;
     const idx=_invItemQIdx(q,k);if(idx<0)return;
@@ -5275,7 +5275,7 @@ function _invAutoDaily(inv){
       ['rid','icSeen','note','internalNote','origContractQty','_qRetired','settledQty','prevPayRate'].forEach(f=>{delete r[f];});   /* 審查：拔除列不帶原列的備註、結算、統計 */
       _adds.push([k,r]);n++;return;
     }
-    if(it.phase==='remove'&&ins>0&&!(rem>0)&&cat.install){it.phase='install';it.payRate=_invPhasePct(q,q.items[idx],'install');v=ins;}   /* Lotion 11/11：上一期是拔除期、這期只有新的打設 → 改回打設照合約打設 % 請（同一期兩種都有走上面分兩列；只看明確記的期別，不靠請款 % 猜） */
+    if(it.phase==='remove'&&ins>0&&!(rem>0)&&cat.install){it.phase='install';it.payRate=_invPhasePct(q,q.items[idx],'install');v=ins;_back.push(String(it.desc||'').split('\n')[0].slice(0,14));}   /* Lotion 11/11：上一期是拔除期、這期只有新的打設 → 改回打設照合約打設 % 請（同一期兩種都有走上面分兩列；只看明確記的期別，不靠請款 % 猜） */
     else if(_isRemovePeriod(it))v=rem;
     else if(ins>0)v=ins;
     else if(rem>0&&cat.install&&cat.remove){it.phase='remove';it.payRate=_invPhasePct(q,q.items[idx],'remove');v=rem;}   // 健檢 H5：拔除那期＝100−合約裝設 %
@@ -5284,6 +5284,7 @@ function _invAutoDaily(inv){
   });
   _adds.reverse().forEach(a=>{invItems.splice(a[0]+1,0,a[1]);});
   if(_adds.length){try{toast('這期有打設也有拔除：另加 '+_adds.length+' 列（拔除）');}catch(e){_err('_invAutoDaily.toast',e);}}
+  if(_back.length){try{toast('上期拔除、這期改回打設：'+_back.join('、'));}catch(e){_err('_invAutoDaily.back',e);}}
   return n;
 }
 // 開單自動呈現逾期租金：依日報（打設最後一天次日起算、拔除第一天結束）掃描，
