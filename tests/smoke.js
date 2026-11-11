@@ -14727,7 +14727,7 @@ async function newPage(browser, width, height) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async () => {
       const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
-      const keepQ = Q, keepC = CUSTOMERS.slice(), keepH = JSON.parse(JSON.stringify(Q_HISTORY || {})), oR = window._isReaderUser, keepCf = SYNC_CONFLICTS.slice();
+      const keepQ = Q, keepI = INV.slice(), keepC = CUSTOMERS.slice(), keepH = JSON.parse(JSON.stringify(Q_HISTORY || {})), oR = window._isReaderUser, keepCf = SYNC_CONFLICTS.slice();
       const setV = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); };
       try {
         window._pushCloud = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); _nav5Apply();
@@ -14762,6 +14762,21 @@ async function newPage(browser, width, height) {
         out.custWait = !CUSTOMERS.some((c) => c.name === '戊營造');
         go('quotes'); await T(60);
         out.leave = CUSTOMERS.some((c) => c.name === '戊營造') && document.getElementById('page-quotes').classList.contains('active');
+        // 審查：每 3 秒只寫報價本身（請款單不動、修改時間不跳）；離開編輯頁才做連動（改名連動請款單）
+        loadQ('qA1'); await T(60);
+        INV.length = 0; INV.push({ id: 'iA1', sourceQid: 'qA1', quoteId: 'qA1', project: q0().name, periodNo: 1, items: [{ type: 'item', desc: 'H型鋼樁打設', contractPrice: 3000, contractQty: 12, curQty: 0 }], totals: { total: 0 }, _mt: 5 });
+        const imt = INV[0]._mt; setV('fn', '範例自動存（改名）'); _qAS.inAt = 0; _qASTick();
+        out.light = q0().name === '範例自動存（改名）' && INV[0]._mt === imt && INV[0].project !== '範例自動存（改名）';
+        const qmt = q0()._mt; _qAS.inAt = 0; _qASTick(); out.noopMt = q0()._mt === qmt;
+        go('quotes'); await T(60); out.cascade = INV[0].project === '範例自動存（改名）';
+        // 審查：別台改過（_qCloudTouched）→ 自動存檔不清，之後按儲存照樣會問
+        loadQ('qA1'); await T(60); window._qCloudTouched = true; Q[0] = Object.assign(q0(), { _mt: Date.now() + 99 });
+        setV('fl', '台南'); _qAS.inAt = 0; _qASTick(); out.sticky = window._qCloudTouched === true;
+        window._qCloudTouched = false; window._qSnap = null; go('quotes'); await T(40);
+        // 審查：編輯中被別台刪掉 → 不會被自動存檔救回來
+        loadQ('qA1'); await T(60); const keepA1 = Q.splice(Q.findIndex((x) => x.id === 'qA1'), 1)[0];
+        setV('fl', '屏東'); _qAS.inAt = 0; _qASTick(); out.noResurrect = !Q.some((x) => x.id === 'qA1') && /已被刪除/.test(document.getElementById('q-as-st').textContent);
+        window._qSnap = null; go('quotes'); await T(40); Q.unshift(keepA1); INV.length = 0;
         // 新報價：沒填工程名稱不存；填了才存、編號重號自動改下一號
         const n0 = Q.length; newQ(); await T(60); document.getElementById('fc').value = '115111101';
         _qAS.inAt = 0; _qASTick(); out.newWait = Q.length === n0 && /填了工程名稱就會自動存/.test(document.getElementById('q-as-st').textContent);
@@ -14776,10 +14791,10 @@ async function newPage(browser, width, height) {
         out.old = Q.find((x) => x.id === 'qB2').name === '別張' && !/已自動存/.test(document.getElementById('q-as-st').textContent);
         window._qSnap = null; go('quotes'); localStorage.removeItem('fy_v7old');
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
-      Q = keepQ; CUSTOMERS.length = 0; keepC.forEach((x) => CUSTOMERS.push(x)); Q_HISTORY = keepH; _isReaderUser = oR; SYNC_CONFLICTS = keepCf;
+      Q = keepQ; INV.length = 0; keepI.forEach((x) => INV.push(x)); CUSTOMERS.length = 0; keepC.forEach((x) => CUSTOMERS.push(x)); Q_HISTORY = keepH; _isReaderUser = oR; SYNC_CONFLICTS = keepCf;
       return out;
     });
-    check('報價自動存檔（寬 ' + W + '）：沒改不存、打字停 3 秒才存且留在編輯頁、日報成本不動、不留自動存檔版本、驗證沒過不存寫原因、別台改別欄兩邊都留、同欄記衝突、離開才加客戶、新報價填名稱才存且重號改號、唯讀與舊選單不自動存', !r.err && r.noChg && r.wait && r.saved && r.backup && r.invalid && r.items && r.backupOnce && r.merge && r.conflict && r.custWait && r.leave && r.newWait && r.newSaved && r.codeShown && r.newOnce && r.ro && r.old, JSON.stringify(r));
+    check('報價自動存檔（寬 ' + W + '）：沒改不存、打字停 3 秒才存且留在編輯頁、日報成本不動、不留自動存檔版本、驗證沒過不存寫原因、別台改別欄兩邊都留、同欄記衝突、離開才加客戶、新報價填名稱才存且重號改號、唯讀與舊選單不自動存', !r.err && r.noChg && r.wait && r.saved && r.backup && r.invalid && r.items && r.backupOnce && r.merge && r.conflict && r.custWait && r.leave && r.light && r.noopMt && r.cascade && r.sticky && r.noResurrect && r.newWait && r.newSaved && r.codeShown && r.newOnce && r.ro && r.old, JSON.stringify(r));
     check('報價自動存檔測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
