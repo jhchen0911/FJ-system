@@ -49,6 +49,12 @@ service firebase.storage {
       allow create, update: if isStaff() && request.resource.size < 50 * 1024 * 1024;
       allow delete: if isStaff();
     }
+    // 結案的日報照片（從即時資料庫 fydata/relay/photos 搬來，永久保留：只能新增、不能改或刪），單檔 15 MB
+    match /projects/{pid}/photos/{file} {
+      allow read: if isStaff() || isReader();
+      allow create: if isStaff() && request.resource.size < 15 * 1024 * 1024 && request.resource.contentType.matches('image/.*');
+      allow update, delete: if false;
+    }
     match /line/{rest=**} {
       allow read: if isStaff() || isReader();
       allow write: if false;

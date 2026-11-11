@@ -13787,6 +13787,64 @@ async function newPage(browser, width, height) {
     check('v6.0.233 報價拍板卡加強測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── 待編號 日報照片結案後搬到 Storage（Lotion 11/03、11/12）：假的即時資料庫＋假的 Storage 跑整條 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keep = { Q: Q.slice(), db: _fbDb, st: _fbStorage, u: _fbUser, adm: _isAdminUser, mv: PH_MOVED, P: P.phMoveSkip };
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_nav_old');
+        const tree = {}; const parts = (p) => p.split('/').filter(Boolean);
+        const get = (p) => { let o = tree; for (const k of parts(p)) { if (o == null || typeof o !== 'object') return null; o = o[k]; } return o === undefined ? null : JSON.parse(JSON.stringify(o)); };
+        const put = (p, v) => { const ks = parts(p); let o = tree; ks.slice(0, -1).forEach((k) => { if (typeof o[k] !== 'object' || o[k] == null) o[k] = {}; o = o[k]; }); if (v == null) delete o[ks[ks.length - 1]]; else o[ks[ks.length - 1]] = JSON.parse(JSON.stringify(v)); };
+        const noop = () => Promise.resolve();
+        const mkRef = (p) => new Proxy({ once: () => Promise.resolve({ val: () => get(p), exists: () => get(p) != null }), set: (v) => { put(p, v); return Promise.resolve(); }, remove: () => { put(p, null); return Promise.resolve(); }, on: () => {}, off: () => {}, child: (c) => mkRef(p + '/' + c) }, { get: (t, k) => (k in t ? t[k] : noop) });
+        _fbDb = new Proxy({ ref: (p) => mkRef(String(p || '')) }, { get: (t, k) => (k in t ? t[k] : noop) });
+        const files = {}; window._phmFiles = files;
+        _fbStorage = { ref: (p) => ({ put: (b) => { if (files[p]) return Promise.reject(new Error('規則：只能新增')); files[p] = b; return Promise.resolve({}); }, getDownloadURL: () => files[p] ? Promise.resolve(URL.createObjectURL(files[p])) : Promise.reject(new Error('404')) }) };
+        _fbUser = { email: 'admin@example.com', getIdToken: () => Promise.resolve('x') }; _isAdminUser = true; PH_MOVED = {}; delete P.phMoveSkip;
+        const cv = document.createElement('canvas'); cv.width = 40; cv.height = 30; const cx = cv.getContext('2d');
+        const du = (c) => { cx.fillStyle = c; cx.fillRect(0, 0, 40, 30); return cv.toDataURL('image/png'); };
+        const ph = { phA1: du('#c00'), phA2: du('#0c0'), phA3: du('#00c') };
+        Object.keys(ph).forEach((id) => put('fydata/relay/photos/' + id, { du: ph[id], ts: 1, by: 'x' }));
+        Q = [{ id: 'qPM1', name: '範例結案工地', closed: true, closedAt: 1, _mt: 1, items: [], dailyLogs: [{ id: 'L1', date: '2026-10-01', photos: ['ph:phA1', 'ph:phA2'] }, { id: 'L2', date: '2026-10-02', photos: ['ph:phA3', 'ph:phA1'] }] },
+          { id: 'qPM2', name: '範例施工中工地', _mt: 1, items: [], dailyLogs: [{ id: 'L3', date: '2026-10-03', photos: ['ph:phB1'] }] }];
+        out.todo0 = _phmTodo().length === 3;   // 施工中的不搬；同一張照片在兩天出現只搬一次
+        out.noCardYet = _phmRows().length === 0;
+        const res = []; for (let i = 0; i < 4; i++) res.push(await _phmTick());
+        out.moved = res.join() === 'moved,moved,moved,' && Object.keys(PH_MOVED).length === 3 && Object.keys(files).length === 3 && Object.keys(files).every((p) => /^projects\/p_qPM1\/photos\/phA\d_[0-9a-z]+\.png$/.test(p));
+        out.record = !!get('fydata/relay/photoMoved/phA1') && get('fydata/relay/photoMoved/phA1').len > 0 && /^[0-9a-f]{64}$/.test(get('fydata/relay/photoMoved/phA1').sha) && get('fydata/relay/photos/phA1') !== null;   // 搬完舊的還在
+        const g = _phmRows()[0]; out.card = !!g && g.ids.length === 3 && g.left.length === 3;
+        const items = []; _v6TodoItems(items); out.todo = items.some((x) => x.type === 'dec_phMove');
+        const x = document.createElement('div'); x.innerHTML = await _phmDetail(g); document.body.appendChild(x);
+        out.detail = x.querySelectorAll('img').length === 3 && new Set(Array.from(x.querySelectorAll('img')).map((i) => i.src)).size === 3 && /KB/.test(x.textContent) && /SHA-256/.test(x.textContent) && /Storage 那份永久保留/.test(x.textContent);
+        out.imgs = await _decWaitMedia(x); x.remove();
+        // 修改＝換一批（3 張全抽時集合一樣，種子要變）
+        _DEC.phMove.edit(g); out.repick = _PHM_PICK.qPM1 === 1;
+        // 確認＝刪即時資料庫舊照片；Storage 留著；之後 _photoGet 從 Storage 拿回來（清掉本機快取模擬別台裝置）
+        out.ok = (await _DEC.phMove.ok(g)) === true && get('fydata/relay/photos/phA1') === null && get('fydata/relay/photos/phA3') === null && Object.keys(files).length === 3 && !!get('fydata/relay/photoMoved/phA2').cleared && _phmRows().length === 0;
+        delete _phCache.phA2; try { await new Promise((res) => { const rq = indexedDB.open('fy_photos'); rq.onsuccess = () => { try { const db = rq.result; const tx = db.transaction(db.objectStoreNames[0], 'readwrite'); tx.objectStore(db.objectStoreNames[0]).delete('phA2'); tx.oncomplete = res; tx.onerror = res; } catch (e) { res(); } }; rq.onerror = res; }); } catch (e) { /* 可忽略 */ }
+        PH_MOVED = {}; const back = await _photoGet('ph:phA2'); out.fallback = back === ph.phA2;
+        // 還原：抄回即時資料庫、清掉 cleared
+        const n = await photoRestore('qPM1'); out.restore = n === 3 && get('fydata/relay/photos/phA1').du === ph.phA1 && !get('fydata/relay/photoMoved/phA1').cleared;
+        // 退回＝先不刪、30 天內不再問
+        PH_MOVED.phA1.cleared = 0; const g2 = _phmRows()[0]; out.reject = !!g2 && _DEC.phMove.reject(g2, '') === true && _phmRows().length === 0;
+        // 規則：Storage 只准新增（同一個檔名第二次上傳會被擋）→ 每次上傳的檔名都不同
+        out.uniq = new Set(Object.keys(files)).size === 3;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      Q = keep.Q; _fbDb = keep.db; _fbStorage = keep.st; _fbUser = keep.u; _isAdminUser = keep.adm; PH_MOVED = keep.mv; if (keep.P) P.phMoveSkip = keep.P; else delete P.phMoveSkip;
+      return out;
+    });
+    check('日報照片搬 Storage：只搬結案的案子、同一張只搬一次；每張上傳後重新下載比大小與 SHA-256 才記已搬；搬完舊的照留', !r.err && r.todo0 && r.noCardYet && r.moved && r.record && r.uniq, JSON.stringify(r));
+    check('日報照片搬 Storage：一案搬完出抽查卡（照片從 Storage 載入、全部載完才能確認）；確認＝刪即時資料庫舊照片、Storage 保留；修改換一批；退回先不刪', !r.err && r.card && r.todo && r.detail && r.imgs && r.repick && r.ok && r.reject, JSON.stringify(r));
+    check('日報照片搬 Storage：刪掉之後讀照片自動改從 Storage 取回；photoRestore 可抄回即時資料庫', !r.err && r.fallback && r.restore, JSON.stringify(r));
+    check('日報照片搬 Storage 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+    const SR2 = require('fs').readFileSync(require('path').join(__dirname, '..', 'storage.rules'), 'utf8'), re2 = /match \/projects\/\{pid\}\/photos\/\{file\} \{\s*allow read: if isStaff\(\) \|\| isReader\(\);\s*allow create: if isStaff\(\) && request\.resource\.size < 15 \* 1024 \* 1024 && request\.resource\.contentType\.matches\('image\/\.\*'\);\s*allow update, delete: if false;/;
+    const pg2 = await newPage(browser, 800, 600); const gen2 = await pg2.page.evaluate(() => _storageRulesText([], [])); await pg2.page.close();
+    check('日報照片搬 Storage：storage.rules 與「產生 Storage 規則」都有 projects/{pid}/photos（員工與唯讀可讀、員工只能新增圖片、不能改或刪）', re2.test(SR2) && re2.test(gen2), '');
+  }
   // ── 待編號 L2（上線後健檢）：AI 報價草稿沒對到報價殼、同業主已有同名報價 → 黃字警告；確認照樣新建；修改可併入舊報價 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

@@ -35511,7 +35511,7 @@ function _photoGet(p){
   return _phIdbGet(id).then(function(du){
     if(du){_phCache[id]=du;return du;}
     if(typeof _fbDb==='undefined'||!_fbDb)return '';
-    return _fbDb.ref(_phPath(id)).once('value').then(function(s){var v=s&&s.val();var d=(v&&v.du)||'';if(d){_phCache[id]=d;_phIdbPut(id,d);}return d;}).catch(function(){return '';});
+    return _fbDb.ref(_phPath(id)).once('value').then(function(s){var v=s&&s.val();var d=(v&&v.du)||'';if(d){_phCache[id]=d;_phIdbPut(id,d);}return d||_phmFetch(id);}).catch(function(){return _phmFetch(id);});   /* 結案搬到 Storage 的照片：即時資料庫沒有了改從 Storage 取 */
   });
 }
 // 同步可用的 img 屬性：有快取直接 src，否則先放佔位圖、由 _photoHydrate 補
@@ -38280,6 +38280,12 @@ function _storageRulesText(staff,readers){
     '      allow read: if isStaff() || isReader();',
     '      allow create, update: if isStaff() && request.resource.size < 50 * 1024 * 1024;',
     '      allow delete: if isStaff();',
+    '    }',
+    '    // 結案的日報照片（從即時資料庫搬來，永久保留：只能新增、不能改或刪），單檔 15 MB',
+    '    match /projects/{pid}/photos/{file} {',
+    '      allow read: if isStaff() || isReader();',
+    "      allow create: if isStaff() && request.resource.size < 15 * 1024 * 1024 && request.resource.contentType.matches('image/.*');",
+    '      allow update, delete: if false;',
     '    }',
     '    // LINE 機器人檔案（Cloud Functions 寫入；網頁只能讀）',
     '    match /line/{rest=**} {',
@@ -46395,6 +46401,79 @@ _decReg('addonSign',{
     showConfirm('給主任的 LINE 文字','<textarea id="ad-msg" rows="6" style="'+IN+'">'+esc(a.askTxt||_adMsg(x.q,a))+'</textarea><div style="font-size:11px;color:var(--b4);margin-top:4px">按確認＝存下這段文字並複製。</div>',
       function(){var t=gv('ad-msg')||'';_adCopy(t).then(function(ok){if(!ok)return;_adSet(x.q,a,{askTxt:t.slice(0,1000),askAt:Date.now(),askBy:_meEmail()||'本機'});toast('已複製');try{_decRefresh('addonSign');}catch(e){_err('addonSign.ref',e);}});},false,null,false);}
 });
+// ══════════ 待編號 日報照片結案後搬到 Storage（Lotion 11/03 定；11/12 Q2 權限跟現在一樣、Q3 抽查確認就刪資料庫舊照片）══════════
+// 結案（q.closed）的案子：日報照片（q.dailyLogs[].photos 的「ph:編號」）由管理員裝置在背景一張一張搬：
+//   即時資料庫 fydata/relay/photos/<id> → Storage projects/<專案 id>/photos/<id>.<副檔名>；上傳後重新下載回來比對大小與 SHA-256，一樣才記
+//   fydata/relay/photoMoved/<id>＝{path,len,sha,qid,at,by}（登入可讀；跟照片同一層權限）。日報裡的參照不改。
+// 一案全部搬完 → 首頁拍板卡 phMove：抽查 5 張（從 Storage 載入，全部載完才能確認）；確認＝刪即時資料庫的舊照片（記 cleared）；
+//   退回＝先不刪（兩邊都留，30 天後再問）；修改＝換一批抽查。Storage 永久保留（規則不准刪），主控台 photoRestore(報價id) 可抄回即時資料庫。
+// 讀照片 _photoGet：即時資料庫沒有了 → 查 photoMoved → 從 Storage 取回（使用的人看不出差別）。
+var PH_MOVED={},_PHM_PICK={},_PHM_BUSY=false;
+try{PH_MOVED=JSON.parse(localStorage.getItem('fy_phmoved')||'{}')||{};}catch(e){_err('phMoved.load',e);PH_MOVED={};}
+function _phmSave(){try{localStorage.setItem('fy_phmoved',JSON.stringify(PH_MOVED||{}));}catch(e){_err('_phmSave',e);}}
+function _phmOn(){try{return _phCanCloud()&&_decIsAdmin()&&typeof _fbStorage!=='undefined'&&!!_fbStorage;}catch(e){return false;}}
+function _phmLoad(){if(typeof _fbDb==='undefined'||!_fbDb||!_fbUser)return Promise.resolve(PH_MOVED);
+  return _fbDb.ref('fydata/relay/photoMoved').once('value').then(function(s){var v=(s&&s.val())||{};PH_MOVED=v;_phmSave();window._phmLoaded=1;return v;}).catch(function(e){_err('_phmLoad',e);return PH_MOVED;});}
+function _phmPath(q,id,du){var m=/^data:image\/(png|webp|gif)/.exec(String(du||''));return 'projects/'+_prjId(_prjMainQid(q.id))+'/photos/'+id+'_'+Date.now().toString(36)+'.'+(m?m[1]:'jpg');}   // 每次上傳一個新檔名（規則只准新增，重試不會撞到）
+function _phmRefs(q){var out=[];(q&&q.dailyLogs||[]).forEach(function(L){(L&&L.photos||[]).forEach(function(p){if(_phIsRef(p)&&out.indexOf(p)<0)out.push(p);});});return out;}
+function _phmTodo(){var out=[];(Q||[]).forEach(function(q){if(!q||!q.closed)return;_phmRefs(q).forEach(function(p){var id=p.slice(3);if(!PH_MOVED[id]&&!(window._PHM_MISS||{})[id])out.push({q:q,id:id});});});return out;}
+function _phmSha(buf){return crypto.subtle.digest('SHA-256',buf).then(function(h){return Array.prototype.map.call(new Uint8Array(h),function(b){return ('0'+b.toString(16)).slice(-2);}).join('');});}
+// 搬一張（回傳 Promise<'moved'|'miss'|'bad'|''>）；測試與排程都呼叫這個
+function _phmTick(){
+  if(_PHM_BUSY||!_phmOn())return Promise.resolve('');var t=_phmTodo()[0];if(!t)return Promise.resolve('');
+  _PHM_BUSY=true;var id=t.id,q=t.q,src={},fin=function(r){_PHM_BUSY=false;return r;};
+  return _fbDb.ref(_phPath(id)).once('value').then(function(s){var v=s&&s.val();var du=(v&&v.du)||'';
+    if(!du){(window._PHM_MISS=window._PHM_MISS||{})[id]=1;return 'miss';}   // 雲端沒有這張（還沒上傳的照片等下次）
+    src.path=_phmPath(q,id,du);
+    return fetch(du).then(function(r){return r.blob();}).then(function(b){src.blob=b;return b.arrayBuffer();}).then(function(buf){src.len=buf.byteLength;return _phmSha(buf);}).then(function(h){src.sha=h;
+      var ref=_fbStorage.ref(src.path);return Promise.resolve(ref.put(src.blob,{contentType:src.blob.type||'image/jpeg'})).then(function(){return ref.getDownloadURL();});})
+    .then(function(u){return fetch(u);}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();}).then(function(buf){return _phmSha(buf).then(function(h){return {len:buf.byteLength,sha:h};});})
+    .then(function(b){if(b.len!==src.len||b.sha!==src.sha){(window._PHM_MISS=window._PHM_MISS||{})[id]=1;_err('_phmTick',new Error('搬過去的照片跟原本不一樣：'+id));return 'bad';}   /* 這台這次不再試，舊照片照留 */
+      var rec={path:src.path,len:src.len,sha:src.sha,qid:q.id,at:Date.now(),by:String(_meEmail()||'').slice(0,80)};
+      return _fbDb.ref('fydata/relay/photoMoved/'+id).set(rec).then(function(){PH_MOVED[id]=rec;_phmSave();return 'moved';});});
+  }).then(fin,function(e){_err('_phmTick',e);return fin('');});
+}
+try{setInterval(function(){try{if(_phmOn()&&!document.hidden){(window._phmLoaded?Promise.resolve():_phmLoad()).then(function(){return _phmTick();}).then(function(r){if(r==='moved'&&!_phmTodo().length)try{updateDashTodo();}catch(e){_err('phMove.todo',e);}});}}catch(e){_err('phMove.tick',e);}},45000);}catch(e){_err('phMove.timer',e);}
+// 拍板卡：一案全部搬完、還沒清掉舊的
+function _phmRows(){var out=[],sk=(P.phMoveSkip||{});
+  (Q||[]).forEach(function(q){if(!q||!q.closed)return;var R=_phmRefs(q);if(!R.length)return;var ids=R.map(function(p){return p.slice(3);});
+    if(!ids.every(function(id){return PH_MOVED[id];}))return;var left=ids.filter(function(id){return !PH_MOVED[id].cleared;});if(!left.length)return;
+    if(sk[q.id]&&Date.now()-sk[q.id]<30*86400000)return;
+    out.push({q:q,ids:ids,left:left,len:ids.reduce(function(a,id){return a+(+PH_MOVED[id].len||0);},0)});});
+  return out;}
+function _phmPick(g){var k=g.q.id,seed=(_PHM_PICK[k]||0),L=g.ids.slice(),out=[],n=Math.min(5,L.length);for(var i=0;i<n;i++){var j=(seed*7+i*13+i*i)%L.length;out.push(L.splice(j,1)[0]);}return out;}
+function _phmUrl(id){var r=PH_MOVED[id];if(!r||!r.path||typeof _fbStorage==='undefined'||!_fbStorage)return Promise.resolve('');return Promise.resolve(_fbStorage.ref(r.path).getDownloadURL()).catch(function(e){_err('_phmUrl',e);return '';});}
+function _phmDetail(g){var pk=_phmPick(g);
+  return Promise.all(pk.map(_phmUrl)).then(function(us){if(us.some(function(u){return !u;}))return '<div style="color:var(--r,#c62828);font-size:12px">有照片從 Storage 拿不到，還不能確認（按修改換一批或稍後再試）</div>';
+    return _qTbl([['工程',String(g.q.name||'')],['日報照片',g.ids.length+' 張（還沒刪舊的 '+g.left.length+' 張）'],['大小',g.len>=1048576?(Math.round(g.len/1048576*10)/10)+' MB':Math.max(1,Math.round(g.len/1024))+' KB'],['比對','每張搬完都重新下載回來比大小和 SHA-256，全部一樣']])
+      +'<div style="font-weight:700;font-size:12.5px;margin:6px 0 2px">抽查 '+pk.length+' 張（從 Storage 載入）</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px">'
+      +us.map(function(u){return '<img src="'+esc(u)+'" alt="抽查照片" style="width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:6px;border:1px solid var(--b1)">';}).join('')+'</div>'
+      +'<div style="font-size:11.5px;color:var(--b4);margin-top:6px">確認＝刪掉即時資料庫的舊照片（Storage 那份永久保留，photoRestore 可還原）；退回＝先不刪，兩邊都留（30 天後再問）；修改＝換一批抽查。</div>';});}
+function _phmClear(g){var n=0,P2=[];
+  g.left.forEach(function(id){P2.push(_fbDb.ref(_phPath(id)).remove().then(function(){return _fbDb.ref('fydata/relay/photoMoved/'+id+'/cleared').set(Date.now());}).then(function(){PH_MOVED[id].cleared=Date.now();n++;}));});
+  return Promise.all(P2).then(function(){_phmSave();toast('已刪 '+n+' 張舊照片（Storage 保留）');return true;},function(e){_err('_phmClear',e);_phmSave();toast('有照片沒刪成功，這張卡會留著');return false;});}
+// 主控台：把某案（報價 id）搬走的照片抄回即時資料庫（還原）
+function photoRestore(qid){if(!_phmOn()){toast('要用管理員登入、連上網路');return Promise.resolve(0);}var q=(Q||[]).find(function(x){return x&&x.id===qid;});if(!q){toast('找不到這張報價');return Promise.resolve(0);}var n=0;
+  return _phmLoad().then(function(){return _phmRefs(q).map(function(p){return p.slice(3);}).filter(function(id){return PH_MOVED[id];}).reduce(function(pr,id){return pr.then(function(){
+    return _phmUrl(id).then(function(u){if(!u)throw new Error('Storage 拿不到 '+id);return fetch(u);}).then(function(r){return r.blob();}).then(function(b){return new Promise(function(res){var fr=new FileReader();fr.onload=function(){res(fr.result);};fr.readAsDataURL(b);});})
+      .then(function(du){return _fbDb.ref(_phPath(id)).set({du:du,ts:Date.now(),by:String(_meEmail()||''),restored:1});}).then(function(){return _fbDb.ref('fydata/relay/photoMoved/'+id+'/cleared').remove();}).then(function(){delete PH_MOVED[id].cleared;n++;});});},Promise.resolve());})
+    .then(function(){_phmSave();toast('已還原 '+n+' 張');return n;},function(e){_err('photoRestore',e);_phmSave();toast('還原沒有全部完成：'+String(e&&e.message||e).slice(0,60));return n;});}
+_decReg('phMove',{
+  title:'日報照片搬到 Storage',todo:function(n){return '結案日報照片已搬好 '+n+' 案：抽查後刪舊的';},sub:'確認＝刪即時資料庫舊照片（Storage 永久保留）；退回＝先不刪；修改＝換一批抽查',
+  canSee:function(){return _phmOn();},
+  list:function(){return _phmRows();},
+  key:function(g){return g.q.id;},
+  head:function(g){return '「'+String(g.q.name||'')+'」日報照片 '+g.ids.length+' 張已搬到 Storage';},
+  body:function(g){return '<div style="font-size:11.5px;color:var(--b4)">已逐張比對；抽查 5 張看得到再刪舊的</div>';},
+  detail:function(g){return _phmDetail(g);},
+  ok:function(g){return _phmClear(g);},
+  reject:function(g){P.phMoveSkip=Object.assign({},P.phMoveSkip||{});P.phMoveSkip[g.q.id]=Date.now();_salesSave();return true;},
+  edit:function(g){_PHM_PICK[g.q.id]=(_PHM_PICK[g.q.id]||0)+1;toast('換一批抽查');try{_decRefresh('phMove');}catch(e){_err('phMove.edit',e);}}
+});
+function _phmFetch(id){   // 即時資料庫沒有這張 → 從 Storage 取回（搬過的）
+  var r=PH_MOVED[id];var go=r?Promise.resolve(r):(typeof _fbDb!=='undefined'&&_fbDb?_fbDb.ref('fydata/relay/photoMoved/'+id).once('value').then(function(s){var v=s&&s.val();if(v){PH_MOVED[id]=v;_phmSave();}return v;}):Promise.resolve(null));
+  return go.then(function(v){if(!v||!v.path)return '';return _phmUrl(id).then(function(u){if(!u)return '';return fetch(u).then(function(x){return x.blob();}).then(function(b){return new Promise(function(res){var fr=new FileReader();fr.onload=function(){res(String(fr.result||''));};fr.onerror=function(){res('');};fr.readAsDataURL(b);});});});})
+    .then(function(du){if(du){_phCache[id]=du;_phIdbPut(id,du);}return du;}).catch(function(e){_err('_phmFetch',e);return '';});}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
