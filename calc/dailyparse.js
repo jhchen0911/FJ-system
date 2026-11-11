@@ -147,9 +147,14 @@
   function stripList(text) { var t = String(text || ''); if (!/【\s*本工地工項\s*】/.test(t)) return t; return t.replace(/【\s*本工地工項\s*】[^]*?(?=【|$)/g, ''); }
   var ACT_IN = /打設|施打|打入|裝設|安裝|架設|組立|鋪設|吊裝|打(?!完)|裝(?!完)/, ACT_RM = /拔除|拔樁|拔|拆除|拆|回收|撤除/;
   var NO_LINE = /^(\d{1,2})(?!\d|\.\d)\s*[.、)）:：]?\s*(?![支根片組處座孔台噸個顆段只式米公人位名工]|M(?![A-Za-z])|m(?![A-Za-z])|T(?![A-Za-z]))(.*)$/;
-  function _numIn(s) { var re = new RegExp('([0-9]+(?:\\.[0-9]+)?|[一二兩三四五六七八九十百]{1,5})\\s*(' + UNIT + ')?(?![A-Za-z0-9])', 'g'), m;
-    while ((m = re.exec(s))) { var pre = s.slice(Math.max(0, m.index - 2), m.index); if (/L\s*[=＝]?\s*$|長\s*$|深\s*$|第\s*$|每\s*$|[A-Za-z]$/i.test(pre)) continue; var n = cn2n(m[1]); if (n > 0) return { n: n, u: m[2] ? normUnit(m[2]) : '' }; }
-    return null; }
+  // 審查：「1 打設 H350 13M 12支」→ 取 12 支（有合約單位就優先取同單位的數字；沒有就跟 qtyOf 一樣，有支數不取 M）
+  function _numIn(s, iu) { var re = new RegExp('([0-9]+(?:\\.[0-9]+)?|[一二兩三四五六七八九十百]{1,5})\\s*(' + UNIT + ')?(?![A-Za-z0-9])', 'g'), m, all = [];
+    while ((m = re.exec(s))) { var pre = s.slice(Math.max(0, m.index - 2), m.index); if (/L\s*[=＝]?\s*$|長\s*$|深\s*$|第\s*$|每\s*$|[A-Za-z]$/i.test(pre)) continue; var n = cn2n(m[1]); if (n > 0) all.push({ n: n, u: m[2] ? normUnit(m[2]) : '' }); }
+    if (!all.length) return null; if (all.length === 1) return all[0];
+    var U = normUnit(iu || ''), same = U ? all.filter(function (x) { return x.u === U; }) : [];
+    if (same.length) return same[0];
+    var notM = all.filter(function (x) { return x.u && x.u !== 'M'; }); if (notM.length) return notM[0];
+    var bare = all.filter(function (x) { return !x.u; }); return bare.length ? bare[0] : all[0]; }
   // 清單上那一項還在報價的同一列（報價改過就用名稱找；找不到 → -1）
   function _listIdx(e, items) {
     if (!e) return -1; var lb = String(e.label || '').replace(/\s+/g, ' ').trim(), at = items[e.idx];
@@ -172,7 +177,7 @@
       var m = NO_LINE.exec(line);
       if (m && byNo[+m[1]]) {
         var e = byNo[+m[1]], rest = m[2] || '', idx = _listIdx(e, items), it = idx >= 0 ? items[idx] : null;
-        var q = _numIn(rest), ph = ACT_RM.test(rest) ? 'remove' : (ACT_IN.test(rest) ? 'install' : ''), bd = DONE.test(rest) && !NOT_DONE.test(rest), why = '', cand = null;
+        var q = _numIn(rest, it ? it.unit : e.unit), ph = ACT_RM.test(rest) ? 'remove' : (ACT_IN.test(rest) ? 'install' : ''), bd = DONE.test(rest) && !NOT_DONE.test(rest), why = '', cand = null;
         var c = it ? _cat2(it) : { i: 0, r: 0 }, iu = it ? String(it.unit || '') : String(e.unit || '');
         if (!ph && it) ph = (c.r && !c.i) ? 'remove' : (c.i && !c.r ? 'install' : '');
         if (idx < 0) why = '第 ' + e.no + ' 項（' + e.label + '）在報價裡找不到了（報價改過），請選';

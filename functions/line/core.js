@@ -510,7 +510,8 @@ async function dailyAsk(deps, now) {
     if (await deps.dbGet('fydata/lineDaily/' + gid + '/' + date + '/askedAt')) continue;   // 排程重跑：今天問過就不再問
     const blocks = [], lists = {};
     if (g.mode === 'company') {
-      for (const qid of await _coRecentSites(deps, cfg, gid, date)) { const L = await _askList(deps, qid); blocks.push({ site: String((cfg.sites[qid] || {}).name || '').replace(/^\s*[（(][^）)]*[）)]/, '').trim().slice(0, 40), list: L }); if (L.length) lists[qid] = L; }
+      let recent = []; try { recent = await _coRecentSites(deps, cfg, gid, date); } catch (e) { (deps.log || console.error)('line.coRecentSites', gid, e); }   // 審查：讀不到就只發空白範本，其他群組照問
+      for (const qid of recent) { const L = await _askList(deps, qid); blocks.push({ site: String((cfg.sites[qid] || {}).name || '').replace(/^\s*[（(][^）)]*[）)]/, '').trim().slice(0, 40), list: L }); if (L.length) lists[qid] = L; }
     } else { const L = await _askList(deps, g.qid); blocks.push({ site: siteName(g), list: L }); if (L.length) lists[g.qid] = L; }
     const txt = DL.askText(T.dailyFmtHead, blocks, md);
     if (!(await safePush(deps, gid, txt))) continue;   // 這個群組推不到（例如機器人被移出），其他群組照問
@@ -565,7 +566,8 @@ async function coCompile(deps, cfg, gid, date, now, late) {
     const bad = L.map(r => r.dateRaw).filter(Boolean);   // 有寫日期但超過 7 天／不合法 → 照收到日，草稿註明
     const photos = []; L.forEach(r => Object.keys(r.photos || {}).forEach(p => photos.push(r.photos[p])));
     // 補傳的另加收到日（MMDD），不跟那一天自己的草稿撞號
-    const lst = qid ? (((await deps.dbGet('fydata/lineDaily/' + gid + '/' + day + '/list/' + qid)) || (await deps.dbGet('fydata/lineDaily/' + gid + '/' + date + '/list/' + qid))) || null) : null;   // v6.0.234 那天問句的編號清單
+    // v6.0.234 編號清單：工務多半是複製「收到那天」的範本再改【日期】補報，先用收到那天的清單，沒有才用回報那天的（審查）
+    const lst = qid ? (((await deps.dbGet('fydata/lineDaily/' + gid + '/' + date + '/list/' + qid)) || (await deps.dbGet('fydata/lineDaily/' + gid + '/' + day + '/list/' + qid))) || null) : null;
     const id = qid ? ('dc' + gid.slice(-6) + qid.replace(/[^\w]/g, '').slice(-10) + day.replace(/-/g, '') + (back ? 'b' + date.slice(5).replace('-', '') : '') + (late ? 'L' : '')) : ('du' + gid.slice(-6) + String(L[0].key).replace(/[^\w]/g, '').slice(-16));
     await deps.createDraft({ id, type: 'dailyLog', by: 'line-bot', byName: 'LINE 機器人', at: now || Date.now(), status: 'pending',
       summary: ('施工日報' + (qid ? '' : '（待分類）') + '：' + L[0].site + '　' + day + (back ? '（補傳，' + date.slice(5) + ' 收到）' : '') + (bad.length ? '（內文日期「' + bad[0] + '」超過 7 天或不正確，先照收到日）' : '')).slice(0, 200),
