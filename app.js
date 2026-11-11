@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.233';
+var APP_VERSION='v6.0.234';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -41613,7 +41613,7 @@ function decAct(kind,id,act){
   var it=_decItems(kind).find(function(x){return String(k.key(x))===String(id);});if(!it){toast('這張已經處理過了');_decRefresh(kind);return;}
   if(act==='edit'){try{k.edit(it);}catch(e){_err('decAct.edit',e);}return;}
   if(act==='ok'&&!_DEC_READY[bk]){toast('先按「展開明細」看完整內容才能確認');return;}   // v6.0.179 Lotion 11/05
-  var r=null;if(act==='reject'){r=window.prompt('退回原因（選填）','');if(r==null)return;}
+  var r=null;if(act==='reject'&&!k.rejectSelf){r=window.prompt('退回原因（選填）','');if(r==null)return;}   // rejectSelf（v6.0.234）：卡片自己開退回視窗（例：日報卡要選錯在哪），回 'open'
   _DEC_BUSY[bk]=1;_decLock(kind,id,true);
   var fin=function(){delete _DEC_BUSY[bk];_decLock(kind,id,false);};
   var p;try{p=act==='reject'?k.reject(it,String(r).slice(0,200)):k.ok(it);}catch(e){p=Promise.reject(e);}   // 審查：同步丟錯也要解鎖
@@ -45893,8 +45893,47 @@ _decReg('dlQty',{
     if(d._dlWritten)return Promise.resolve(_draftMark(d.id,'applied',{resultId:o.q.id})).then(function(m){return m!==false;});   /* 審查：寫過了只補標記，不重寫 */
     var qr=o.plan.rows.filter(function(r){return r.itemIdx>=0&&r.qty>0;}).map(function(r){return {itemIdx:r.itemIdx,qty:r.qty,ph:r.ph||'install',batchDone:!!r.batchDone};});
     return Promise.resolve(_dlWrite(o.q,d,o.dt,o.txt,qr,o.photos)).then(function(m){toast('已寫入 '+o.dt+' 施工日報'+(qr.length?'（工項數量 '+qr.length+' 筆）':''));return m!==false;});},
-  reject:function(d,why){_draftMark(d.id,'rejected',{reason:String(why||'不寫').slice(0,200)});return true;},
+  rejectSelf:true,reject:function(d){_dlErrModal(d);return 'open';},   // v6.0.234（陳軒 11/11，Lotion 定案）：退回要選錯在哪（至少一項），記下來給規則改進用；拆數量的規則不動
   edit:function(d){_lineDraftApply(d,function(){try{_decRefresh('dlQty');}catch(e){_err('dlQty.edit',e);}});}
+});
+// ══════════ v6.0.234 LINE 日報「拆錯回報」＋每週統計卡（陳軒 11/11，Lotion 11/11 定案：退回一定要選至少一項；統計卡每週一出、沒有拆錯不出）══════════
+// 退回日報卡 → 視窗選錯在哪（工項對錯／數量錯／打設拔除弄反／其他，可複選）＋一句話 → 草稿標 rejected（ex.errs）＋記一筆 P.dlErr（參數 shared，只放工地、日期、錯的種類、
+//   一句話與 LINE 原文前 120 字，不放金額；留最近 300 筆）。之後改拆解規則看這份。
+// 每週統計卡 dlErrWeek（管理員）：上週一～週日有拆錯才出，從這週一開始出到按確認（P.dlErrAck[週一日期]）；明細＝各類幾則、每則的工地／日期／一句話／原文。
+var _DLERR_T=[['item','工項對錯'],['qty','數量錯'],['ph','打設／拔除弄反'],['other','其他']];
+function _dlErrModal(d){var o=_dlOf(d);
+  _modal('退回施工日報：錯在哪？','<div style="font-size:12px;color:var(--b4);margin-bottom:6px">'+esc(o.q?String(o.q.name||''):_draftS(o.pl.site))+'　'+esc(o.dt)+'。至少選一項（可複選），記下來給拆解規則改進用。</div>'
+    +_DLERR_T.map(function(t){return '<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin:6px 0"><input type="checkbox" class="dlerr-ck" value="'+t[0]+'" style="width:18px;height:18px">'+t[1]+'</label>';}).join('')
+    +'<div class="f" style="margin-top:6px"><label>一句話（選填）</label><input id="dlerr-note" maxlength="120" placeholder="例：「第一段拔除 40 支」被拆成打設" style="width:100%;box-sizing:border-box"></div>',function(){
+    var errs=Array.prototype.map.call(document.querySelectorAll('.dlerr-ck'),function(c){return c.checked?c.value:null;}).filter(Boolean);
+    if(!errs.length){toast('至少選一項錯在哪');return false;}
+    var note=String((document.getElementById('dlerr-note')||{}).value||'').trim().slice(0,120);
+    _dlErrSave(d,o,errs,note);
+  });}
+function _dlErrSave(d,o,errs,note){
+  var lbl=errs.map(function(k){return (_DLERR_T.find(function(t){return t[0]===k;})||[k,k])[1];}).join('、');
+  var rec={at:Date.now(),did:d.id,qid:o.q?o.q.id:'',site:o.q?String(o.q.name||'').slice(0,40):_draftS(o.pl.site).slice(0,40),date:o.dt,errs:errs,note:note,txt:String(o.txt||'').slice(0,120),by:_meEmail()||'本機'};
+  var L=Array.isArray(P.dlErr)?P.dlErr.slice():[];L.push(rec);P.dlErr=L.slice(-300);_salesSave();
+  return Promise.resolve(_draftMark(d.id,'rejected',{reason:('錯在：'+lbl+(note?'；'+note:'')).slice(0,200),errs:errs})).then(function(){try{_decRefresh('dlQty');}catch(e){_err('_dlErrSave',e);}toast('已退回，記下：'+lbl);});
+}
+function _dlWeekMon(ds){var t=new Date(String(ds).slice(0,10)+'T00:00:00'),wd=(t.getDay()+6)%7;t.setDate(t.getDate()-wd);return _ymd(t.getTime());}
+function _dlErrWeekRow(){var thisMon=_dlWeekMon(localToday()),lastMon=_dAdd(thisMon,-7),ak=(P.dlErrAck&&typeof P.dlErrAck==='object')?P.dlErrAck:{};if(ak[lastMon])return [];
+  var L=(Array.isArray(P.dlErr)?P.dlErr:[]).filter(function(r){var d=_ymd(+r.at||0);return d>=lastMon&&d<thisMon;});
+  if(!L.length)return [];var by={};_DLERR_T.forEach(function(t){by[t[0]]=0;});L.forEach(function(r){(r.errs||[]).forEach(function(k){by[k]=(by[k]||0)+1;});});
+  return [{week:lastMon,end:_dAdd(lastMon,6),list:L,by:by}];}
+_decReg('dlErrWeek',{
+  title:'本週拆錯統計',todo:function(){var r=_dlErrWeekRow()[0];return '上週 LINE 日報拆錯 '+(r?r.list.length:0)+' 則';},sub:'看過就按確認；改拆解規則用',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},
+  list:function(){return _dlErrWeekRow();},
+  key:function(r){return r.week;},head:function(r){return '本週拆錯 '+r.list.length+' 則（'+_qMD(r.week)+'～'+_qMD(r.end)+'）';},
+  body:function(r){return '<div style="font-size:11.5px;color:var(--b4)">'+_DLERR_T.filter(function(t){return r.by[t[0]];}).map(function(t){return t[1]+' '+r.by[t[0]];}).join('、')+'</div>';},
+  detail:function(r){return _qTbl(_DLERR_T.map(function(t){return [t[1],(r.by[t[0]]||0)+' 則'];}))
+    +'<div style="font-weight:700;font-size:12.5px;margin-top:6px">每一則</div>'+r.list.map(function(x){var l=(x.errs||[]).map(function(k){return (_DLERR_T.find(function(t){return t[0]===k;})||[k,k])[1];}).join('、');
+      return '<div style="border-top:1px solid var(--b1);padding:4px 0;font-size:12px;overflow-wrap:anywhere"><b>'+esc(x.site||'')+'</b>　'+esc(x.date||'')+'　<span style="color:#b71c1c">'+esc(l)+'</span>'+(x.note?'<div>'+esc(x.note)+'</div>':'')+(x.txt?'<div style="color:var(--b4);white-space:pre-wrap">'+esc(x.txt)+'</div>':'')+'</div>';}).join('')
+    +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">確認＝看過了（這週不再出）。要改拆解規則，把常錯的寫法轉給主線。</div>';},
+  ok:function(r){P.dlErrAck=Object.assign({},P.dlErrAck||{});P.dlErrAck[r.week]=Date.now();_salesSave();return true;},
+  reject:function(r){P.dlErrAck=Object.assign({},P.dlErrAck||{});P.dlErrAck[r.week]=Date.now();_salesSave();return true;},
+  edit:function(){toast('這張只是統計，看過按確認就好');}
 });
 // ══════════ v6.0.226 請款鏈 1：請款單狀態＋業主確認卡＋發票照抄範例（陳軒派工 11/10，Lotion 定案；第 2 層：只建議、Lotion 確認）══════════
 // 五個狀態：草稿 → 已送業主 → 業主已確認 → 已開發票 → 已收款。

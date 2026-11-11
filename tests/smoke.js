@@ -11722,6 +11722,46 @@ async function newPage(browser, width, height) {
     check('v6.0.227 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── v6.0.234 LINE 日報拆錯回報＋每週統計卡（陳軒 11/11，Lotion 定案）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 60));
+      const keepQ = Q, keepD = DRAFTS, keepE = P.dlErr, keepA = P.dlErrAck, keepPr = window.prompt;
+      try {
+        window.toast = () => {}; window._onSave = () => {};
+        window._draftMark = (id, st, ex) => { if (DRAFTS[id]) { DRAFTS[id].status = st; DRAFTS[id].ex = ex; } return Promise.resolve(true); };
+        let prompted = 0; window.prompt = () => { prompted++; return ''; };
+        P.dlErr = []; P.dlErrAck = {};
+        Q = [{ id: 'qE', name: '範例日報案', awarded: true, _mt: 1, items: [{ desc: 'H350 樁打設', unit: '支', qty: 40 }, { desc: 'H350 樁拔除', unit: '支', qty: 40 }], dailyLogs: [] }];
+        DRAFTS = { de111111: { id: 'de111111', type: 'dailyLog', by: 'line-bot', at: 1, status: 'pending', summary: '施工日報', payload: { qid: 'qE', date: '2026-11-10', answers: ['第一段拔除完成 40 支'] } } };
+        openDecList('dlQty'); await T(); decToggle('dlQty', 'de111111', true); await T(400);
+        decAct('dlQty', 'de111111', 'reject'); await T();
+        out.noPrompt = prompted === 0 && /錯在哪/.test((document.getElementById('fy-modal') || {}).textContent || '') && document.querySelectorAll('#fy-modal .dlerr-ck').length === 4;
+        document.getElementById('fy-modal-o').click(); await T();
+        out.need = !!document.getElementById('fy-modal') && DRAFTS.de111111.status === 'pending' && P.dlErr.length === 0;   // 沒選不能退回
+        document.querySelector('#fy-modal .dlerr-ck[value="ph"]').checked = true; document.getElementById('dlerr-note').value = '拔除被拆成打設';
+        document.getElementById('fy-modal-o').click(); await T(120);
+        const e = P.dlErr[0];
+        out.saved = DRAFTS.de111111.status === 'rejected' && JSON.stringify(DRAFTS.de111111.ex.errs) === '["ph"]' && /打設／拔除弄反/.test(DRAFTS.de111111.ex.reason) && !!e && e.site === '範例日報案' && e.note === '拔除被拆成打設' && /第一段拔除完成 40 支/.test(e.txt);
+        // 每週統計：上週有拆錯才出；這週的不算；確認後這週不再出
+        const mon = _dlWeekMon(localToday()), at = (ds) => new Date(ds + 'T10:00:00').getTime();
+        P.dlErr = [{ at: at(_dAdd(mon, -6)), site: '甲', date: 'x', errs: ['item'], note: '', txt: '' }, { at: at(_dAdd(mon, -2)), site: '乙', date: 'y', errs: ['qty', 'ph'], note: '一句話', txt: '' }, { at: at(mon), site: '丙', errs: ['qty'] }];
+        const w = _dlErrWeekRow();
+        out.week = w.length === 1 && w[0].list.length === 2 && w[0].by.item === 1 && w[0].by.qty === 1 && w[0].by.ph === 1 && /本週拆錯 2 則/.test(_DEC.dlErrWeek.head(w[0]));
+        const x = document.createElement('div'); x.innerHTML = _DEC.dlErrWeek.detail(w[0]); out.detail = /甲/.test(x.textContent) && /一句話/.test(x.textContent) && !/丙/.test(x.textContent);
+        out.ack = _DEC.dlErrWeek.ok(w[0]) === true && _dlErrWeekRow().length === 0;
+        P.dlErr = [{ at: at(mon), site: '丙', errs: ['qty'] }]; P.dlErrAck = {}; out.none = _dlErrWeekRow().length === 0;   // 上週沒有拆錯不出
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; DRAFTS = keepD; P.dlErr = keepE; P.dlErrAck = keepA; window.prompt = keepPr;
+      try { const m = document.getElementById('fy-modal'); if (m) m.remove(); } catch (x) { /* 可忽略 */ }
+      return out;
+    });
+    check('v6.0.234 日報拆錯回報：退回日報卡不跳舊的原因框，改選錯在哪（至少一項、可複選）＋一句話，記進拆錯紀錄；草稿標退回並帶錯的種類', !r.err && r.noPrompt && r.need && r.saved, JSON.stringify(r));
+    check('v6.0.234 本週拆錯統計卡：上週一～週日有拆錯才出、各類幾則＋每一則；確認後這週不再出；沒有拆錯不出', !r.err && r.week && r.detail && r.ack && r.none, JSON.stringify(r));
+    check('v6.0.234 拆錯回報測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.226 請款鏈 1：請款單狀態（草稿→已送業主→業主已確認→已開發票→已收款）、舊單推算清單卡、業主確認卡＋發票照抄範例 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
