@@ -228,6 +228,61 @@
     });
     return out;
   }
+  // ── 【人和機具】出工人名（薪資完整版用，Lotion 11/11 定「以 LINE 日報為主」）──
+  // crewOf(text, staff) → { heads, temps（點工人數，不對名冊）, people:[{raw, name, day, ot, off, staff, cand, sure, why}], machines:[{name, n}], raw, why:[] }
+  //   text：整則日報（有【人和機具】只看那段）或那段原文；staff：人員名冊名字陣列（可空）
+  //   寫法：「人 5（阿明、小陳半天、阿華加班 2）」「工人：阿明、小陳」「點工 2 人」；半天／半日／0.5＝day 0.5，加班 N（小時／H）＝ot N，請假／沒來＝off
+  //   名字跟名冊完全一樣才 sure；只像（互相包含）放 cand、不猜；人數跟名字數對不上 → why（給出工確認卡）
+  var CREW_HEAD = /(點工|臨時工|工人|人員|人數|師傅|人)\s*([:：])?\s*([0-9]+|[一二兩三四五六七八九十]{1,3})?\s*(?:人|名|位)?/g;
+  var CREW_MACH = /(怪手|挖土機|小山貓|山貓|吊車|發電機|空壓機|振動機|震動機|打樁機|拔樁機|電焊機|卡車|拖車|板車|鑽機|夾頭)\s*[:：]?\s*([0-9]+|[一二兩三四五六七八九十]{1,2})?\s*(?:台|部|輛|組)?/g;
+  function _crewTok(raw, staff) {
+    var t = String(raw || '').trim(), day = 1, ot = 0, off = false, why = '';
+    var mo = /加班\s*([0-9]+(?:\.[0-9]+)?|[一二兩三四五六七八九十]{1,2})\s*(?:小時|hr|HR|H|h|時)?/.exec(t);
+    if (mo) { ot = cn2n(mo[1]); t = t.replace(mo[0], ' '); } else if (/加班/.test(t)) { why = '加班沒寫幾小時'; t = t.replace(/加班/g, ' '); }
+    if (/半天|半日|0\.5\s*天?|半工/.test(t)) { day = 0.5; t = t.replace(/半天|半日|0\.5\s*天?|半工/g, ' '); }
+    if (/請假|沒來|休息|休假|缺勤/.test(t)) { off = true; day = 0; t = t.replace(/請假|沒來|休息|休假|缺勤/g, ' '); }
+    t = t.replace(/全天|整天|全日|一天/g, ' ').replace(/[（）()\[\]【】:：。.!！?？]/g, ' ').replace(/\s+/g, '').trim();
+    var name = t, hit = '', cand = [];
+    if (name && staff.length) {
+      if (staff.indexOf(name) >= 0) hit = name;
+      else cand = staff.filter(function (s) { return s && (s.indexOf(name) >= 0 || name.indexOf(s) >= 0); }).slice(0, 3);
+    }
+    if (!name) why = why || '看不出名字';
+    else if (name.length > 6) why = why || '名字太長，可能不是人名';
+    else if (staff.length && !hit) why = why || (cand.length ? '名冊沒有「' + name + '」，是不是 ' + cand.join('、') + '？' : '名冊沒有「' + name + '」');
+    return { raw: String(raw || '').trim().slice(0, 30), name: name, day: day, ot: ot, off: off, staff: hit, cand: cand, sure: !why, why: why };
+  }
+  function _crewSplit(list) {   // 「阿明、小陳半天／阿華加班 2」；空白分開的名字也拆（「阿明 阿華」），「阿華 請假」「阿華加班 2」不拆
+    var out = []; String(list || '').split(/[、,，\/／;；]+/).forEach(function (x) {
+      String(x).split(/\s+(?=[^\s0-9.一二兩三四五六七八九十半加請沒休缺全整小時hH])/).forEach(function (y) { if (String(y).trim()) out.push(y); }); });
+    return out;
+  }
+  function crewOf(text, staff) {
+    staff = (Array.isArray(staff) ? staff : []).map(function (x) { return String(x || '').trim(); }).filter(Boolean);
+    var t = String(text || '').replace(/\r/g, ''), S = sections(norm(t));
+    var body = S.tagged ? String(S.crew || '') : t, out = { heads: null, temps: 0, people: [], machines: [], raw: body.trim(), why: [] };
+    body.split('\n').forEach(function (line) {
+      line = line.replace(/^[\s　]*[-•・*]\s*/, '').trim(); if (!line || /^[（(]?\s*例/.test(line)) return;
+      var rest = line, m, cut = []; CREW_HEAD.lastIndex = 0;
+      while ((m = CREW_HEAD.exec(line))) {
+        var end = CREW_HEAD.lastIndex, n = m[3] ? cn2n(m[3]) : null, list = null, nx = line.slice(end).replace(/^\s+/, ''), sk = end + (line.slice(end).length - nx.length);
+        if (/^[（(]/.test(nx)) { var close = nx.search(/[）)]/); list = close > 0 ? nx.slice(1, close) : nx.slice(1); end = sk + (close > 0 ? close + 1 : nx.length); }
+        else if (m[2] || (n == null && /^[^\s0-9]/.test(nx) && m[1] !== '人')) { CREW_MACH.lastIndex = 0; var mm = CREW_MACH.exec(nx), stop = mm ? mm.index : nx.length; list = nx.slice(0, stop).replace(/[，,；;]\s*$/, ''); end = sk + stop; }
+        if (n == null && list == null) continue;
+        if (m[1] === '點工' || m[1] === '臨時工') { if (n != null) out.temps += n; if (list) _crewSplit(list).forEach(function (x) { var p = _crewTok(x, []); p.temp = true; p.sure = true; p.why = ''; out.people.push(p); }); }
+        else { if (n != null) out.heads = (out.heads || 0) + n; if (list) _crewSplit(list).forEach(function (x) { out.people.push(_crewTok(x, staff)); }); }
+        cut.push([m.index, end]); CREW_HEAD.lastIndex = Math.max(end, m.index + 1);
+      }
+      cut.reverse().forEach(function (c) { rest = rest.slice(0, c[0]) + ' ' + rest.slice(c[1]); });
+      CREW_MACH.lastIndex = 0;
+      while ((m = CREW_MACH.exec(rest))) out.machines.push({ name: m[1], n: m[2] ? cn2n(m[2]) : 1 });
+    });
+    var mine = out.people.filter(function (p) { return !p.temp; }), named = mine.filter(function (p) { return !p.off; }).length;
+    if (out.heads != null && mine.length && named !== out.heads) out.why.push('寫人 ' + out.heads + '，名字有 ' + named + ' 個，請確認');
+    if (out.heads && !mine.length) out.why.push('只寫人數 ' + out.heads + '，沒寫名字');
+    var seen = {}; mine.forEach(function (p) { var k = p.staff || p.name; if (k && seen[k]) { p.sure = false; p.why = p.why || '名字重複寫了兩次'; } seen[k] = 1; });
+    return out;
+  }
   // askText(head, blocks, ymd) → 17:30 問句：blocks＝[{site, list}]（一個群組好幾個工地＝好幾段，編號各自從 1 開始）
   function askText(head, blocks, md) {
     var B = (blocks && blocks.length) ? blocks : [{ site: '', list: [] }];
@@ -235,7 +290,7 @@
       return '【日期】' + md + '\n【工地】' + (b.site || '') + '\n' + (b.list && b.list.length ? '【本工地工項】\n' + b.list.map(function (e) { return e.no + ' ' + e.label; }).join('\n') + '\n' : '') + '【今天做了】\n\n【人和機具】\n\n【支出】\n\n【明天】\n\n【問題】\n';
     }).join('\n');
   }
-  var dl = { parse: parse, cumOf: cumOf, qtyOf: qtyOf, terms: terms, specs: specs, cn2n: cn2n, norm: norm, askList: askList, parseFmt: parseFmt, expOf: expOf, sections: sections, stripList: stripList, askText: askText };
+  var dl = { parse: parse, cumOf: cumOf, qtyOf: qtyOf, terms: terms, specs: specs, cn2n: cn2n, norm: norm, askList: askList, parseFmt: parseFmt, expOf: expOf, crewOf: crewOf, sections: sections, stripList: stripList, askText: askText };
   if (typeof module !== 'undefined' && module.exports) module.exports = { dl: dl };
   root.FJC = root.FJC || {}; root.FJC.dl = dl;
 })(typeof window !== 'undefined' ? window : globalThis);

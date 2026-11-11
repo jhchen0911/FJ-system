@@ -530,6 +530,19 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const P = DL.parseFmt(t, L, its), S = DL.sections(t);
   check('LINE 日報【人和機具】寫人名（「人 5（阿明、小陳…）」，給薪資出工名單預留）：不報錯、不變成工項數量、原文留在 crew 給小批次拆', P.rows.length === 1 && P.rows[0].qty === 5 && /阿明、小陳/.test(S.crew) && P.skip.some((x) => /阿明/.test(x)) && !DL.expOf(t).length);
 }
+{
+  const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl, st = ['阿明', '陳小明', '阿華', '王大同'];
+  const a = DL.crewOf('【今天做了】\n1 打設 5\n【人和機具】\n人 3（阿明、小陳半天、阿華加班 2）、怪手 1、吊車 1\n點工 2 人\n【支出】', st);
+  const P = (r) => r.people.map((p) => [p.name, p.day, p.ot, p.off, p.staff, p.sure].join('/')).join(',');
+  check('出工人名 crewOf：「人 3（阿明、小陳半天、阿華加班 2）」→ 名字、半天、加班時數；名冊對得到才 sure；點工另計不對名冊；機具另列',
+    a.heads === 3 && a.temps === 2 && P(a) === '阿明/1/0/false/阿明/true,小陳/0.5/0/false//false,阿華/1/2/false/阿華/true' && a.machines.length === 2 && a.machines[0].name === '怪手' && !a.why.length && /阿明、小陳半天/.test(a.raw), P(a) + JSON.stringify(a.why));
+  const b = DL.crewOf('【人和機具】\n工人：阿明、阿華 請假\n怪手 2 台', st), c = DL.crewOf('【人和機具】\n人二（阿明、小明）', st), d = DL.crewOf('【人和機具】\n人 4', st);
+  const e = DL.crewOf('【人和機具】\n人 3（阿明、阿明、王大同半日）', st), f = DL.crewOf('【人和機具】\n人 2（阿華加班）', st), g = DL.crewOf('【人和機具】\n人員：阿明 阿華 加班2H，吊車1台', st);
+  check('出工人名 crewOf 對不到就標原因不猜：請假＝off、像名冊的人放 cand、只寫人數、名字重複、加班沒寫時數、人數跟名字數對不上；空白分開的名字也拆',
+    b.people[1].off && b.people[1].day === 0 && b.machines[0].n === 2 && c.heads === 2 && c.people[1].cand[0] === '陳小明' && !c.people[1].sure && /只寫人數 4/.test(d.why[0]) && !e.people[1].sure && /重複/.test(e.people[1].why) && e.people[2].day === 0.5
+    && /加班沒寫幾小時/.test(f.people[0].why) && /寫人 2，名字有 1 個/.test(f.why[0]) && g.people.length === 2 && g.people[1].ot === 2 && g.machines[0].name === '吊車',
+    JSON.stringify([b.people, c.people[1], d.why, f.why, g.people.map((p) => p.name)]));
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');
