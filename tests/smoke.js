@@ -14659,6 +14659,8 @@ async function newPage(browser, width, height) {
         localStorage.setItem('fy_pending_sync', '1'); _isReaderUser = true; out.ro = _syncAutoTick() === false && !_syncStuckItem(); _isReaderUser = false;
         // 舊選單（手機更多選單）照舊有同步
         out.oldKeep = typeof fbUploadWithConflictCheck === 'function';
+        // 更多頁改名（Lotion 11/11）
+        const mbt = document.getElementById('more-body').textContent; out.rename = /經營報表/.test(mbt) && !/公司數字/.test(mbt) && /今天：切回舊版/.test(mbt) && !/今天（首頁）/.test(mbt);
         // 健檢：跟錢有關的提醒只留「去處理」（付包商款待核准、待登錄廠商請款、超支、自有材料攤提、雲端應付比對）
         out.money = ['vp_check', 'vb_pending', 'overrun', 'mat_site', 'bk_paycmp_x'].every((t) => _tdIsMoney({ type: t })) && !_tdIsMoney({ type: 'ct_exp' });
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
@@ -14666,7 +14668,7 @@ async function newPage(browser, width, height) {
       LS.forEach(([k, v]) => { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); });
       return out;
     });
-    check('v6.0.234 同步改自動：更多頁沒有「同步」鈕、剛存的不重複傳、一分鐘前沒傳的自動重試、30 分鐘以上今天頁提醒（附上次成功時間）、沒待傳不動作、唯讀不上傳', !r.err && r.noBtn && r.fresh && r.retry && r.stuck && r.clean && r.ro && r.oldKeep && r.money, JSON.stringify(r));
+    check('v6.0.234 同步改自動：更多頁沒有「同步」鈕、剛存的不重複傳、一分鐘前沒傳的自動重試、30 分鐘以上今天頁提醒（附上次成功時間）、沒待傳不動作、唯讀不上傳', !r.err && r.noBtn && r.fresh && r.retry && r.stuck && r.clean && r.ro && r.oldKeep && r.money && r.rename, JSON.stringify(r));
     check('v6.0.234 同步改自動測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }

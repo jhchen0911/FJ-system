@@ -44422,7 +44422,7 @@ _decReg('mvStartUnknown',{
 // 舊選單最下面有「改用新版選單」切回來。只換選單與首頁的呈現，頁面本身、資料、權限都不動（canAccess 照舊）。
 function _nav5On(){try{return localStorage.getItem('fy_nav_old')!=='1';}catch(e){return true;}}
 // 改版第 7 步⑥（7e，Lotion 11/09 第 9 題 A）：每一頁各自切回舊版＋整站切回。本機 fy_v7old＝{dash:1, proj:1, acct:1}（哪幾頁用舊版）
-var _V7_PAGES=[['dash','今天（首頁）'],['proj','專案'],['acct','帳務']];
+var _V7_PAGES=[['dash','今天'],['proj','專案'],['acct','帳務']];
 function _v7OldMap(){try{return JSON.parse(localStorage.getItem('fy_v7old')||'{}')||{};}catch(e){return {};}}
 function _v7New(pg){return _nav5On()&&!_v7OldMap()[pg];}
 function v7PageOld(pg,old){
@@ -44471,7 +44471,7 @@ var _MORE_SECS=[
   {t:'計算工具',it:[{go:'matest',me:'shoring',l:'擋土支撐全套',i:'box'},{go:'rebar',l:'鋼筋籠檢料',i:'scale'},{go:'grout',l:'根固砂漿',i:'hardhat'},{go:'backfill',l:'背填材料',i:'wrench'},{go:'lifeline',l:'安全母索',i:'link'},{go:'upa',l:'單價分析',i:'calc'},{go:'plan',l:'施工計畫書',i:'contract'}]},
   {t:'材料庫存（公司）',it:[{go:'materials',l:'材料庫存．購置',i:'box'}]},
   {t:'客戶．廠商．人員',it:[{go:'contacts',l:'客戶．廠商',i:'users'},{go:'workers',l:'人員進場資料',i:'users'},{go:'contracts',l:'合約管理',i:'contract'}]},
-  {t:'經營報表',it:[{go:'reports',l:'經營報表（公司數字）',i:'trend'}]},
+  {t:'經營報表',it:[{go:'reports',l:'經營報表',i:'trend'}]},
   {t:'設定',it:[{go:'params',l:'參數設定',i:'sliders'},{go:'staff',l:'人員管理',i:'users'},{go:'roles',l:'角色權限',i:'lock'},{fn:'health',page:'reports',l:'資料健檢',i:'check'},{fn:'trash',l:'已刪資料還原',i:'refresh'},{fn:'sync',l:'同步',i:'cloud'}]}
 ];
 var _MORE_FN={
