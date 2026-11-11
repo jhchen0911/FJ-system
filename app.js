@@ -45717,8 +45717,10 @@ function _cost7ListHtml(q){
       +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b style="font-size:13.5px">'+g[1]+'</b><span style="font-size:12px;color:var(--b4)">'+L.length+' 筆・小計 <b style="color:var(--b5)">NT$ '+fmt(sum)+'</b></span></div>';
     if(!L.length)h+='<div style="font-size:12px;color:var(--b3);padding:4px 0">沒有</div>';
     L.forEach(function(c){var amt=_cost7Amt(c),s=c.type==='sub'?_cost7SubSt(q,c):null,nm=c.vendor||c.desc||_costCatNorm(c.cat||'')||'成本';
+      if(_isQuickExtra(c)){var r0=(c.rows||[])[0]||{};nm=r0.desc||_costCatNorm(c.cat||'')||'支出';s={txt:(c.date?String(c.date).slice(5).replace('-','/')+'　':'')+(c.payer?(c.payer+' 付'):'公司付')+(c.noRcpt?'・缺收據':''),btn:null,warn:!!c.noRcpt};}
+      else if(c.rental){var pn=_subPeriods(c).filter(function(p){return !p.isRet;}).length;s={txt:'租賃合約・已請 '+pn+' 期',btn:null};}
       h+='<div class="cost7-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--b1);font-size:12.5px">'
-        +'<div style="flex:1 1 200px;min-width:0"><b>'+esc(nm)+'</b><div style="font-size:11.5px;color:'+(s&&s.btn?'#b26a00':'var(--b4)')+';overflow-wrap:anywhere">'+esc(s?s.txt:(_costCatNorm(c.cat||'')||''))+'</div></div>'
+        +'<div style="flex:1 1 200px;min-width:0"><b>'+esc(nm)+'</b><div style="font-size:11.5px;color:'+(s&&(s.btn||s.warn)?'#b26a00':'var(--b4)')+';overflow-wrap:anywhere">'+esc(s?s.txt:(_costCatNorm(c.cat||'')||''))+'</div></div>'
         +'<b style="flex:0 0 auto">NT$ '+fmt(amt)+'</b>'
         +((s&&s.btn&&!ro)?'<button type="button" class="btn sm" data-c7next="1" onclick="'+s.btn.fn+'">'+esc(s.btn.l)+'</button>':'')
         +'<button type="button" class="btn sm" data-c7more="1" aria-label="其他操作" onclick="cost7More(\''+escq(c.id)+'\')" style="padding:4px 9px">⋯</button></div>';});
@@ -45750,7 +45752,7 @@ function qcPayKindSet(k){var w=document.getElementById('qc-payer-wrap'),ps=docum
 function _qcPayInit(){
   var box=document.getElementById('qc-paykind');if(!box||box.getAttribute('data-init'))return;box.setAttribute('data-init','1');
   var def=_decIsAdmin()?'co':'adv';
-  box.innerHTML=[['petty','零用金'],['adv','代墊'],['co','公司付']].map(function(x){return '<label style="display:inline-flex;align-items:center;gap:4px;font-size:13.5px;margin-right:12px"><input type="radio" name="qc-paykind" value="'+x[0]+'"'+(x[0]===def?' checked':'')+' onchange="qcPayKindSet(this.value)" style="width:18px;height:18px">'+x[1]+'</label>';}).join('');
+  box.innerHTML=[['petty','零用金'],['adv','代墊'],['co','公司付']].map(function(x){return '<label style="display:inline-flex;align-items:center;gap:4px;font-size:13.5px;margin-right:12px"><input type="radio" name="qc-paykind" value="'+x[0]+'"'+(x[0]===def?' checked':'')+' onchange="qcPayKindSet(this.value)" style="-webkit-appearance:radio;appearance:auto;width:18px;height:18px;min-width:0;padding:0;margin:0;border:0;flex:0 0 auto;accent-color:var(--g)">'+x[1]+'</label>';}).join('');
   qcPayKindSet(def);
 }
 function qcRcpt(id){
