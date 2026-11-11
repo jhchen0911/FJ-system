@@ -5083,7 +5083,11 @@ function pullInvFromCustomer(){
 
 // 報價工項 → 請款工項（v5.428 抽出共用：建單與進版同步都走這裡）
 // 健檢 H5（Lotion 11/11）：打設＋拔除類工項的請款比例照合約自動帶——打設那期＝合約的裝設 %（沒寫用報價條件預設＝100−拆除請款%），拔除那期＝剩下的 %，累計不超過 100%
-function _invInstPct(q){var v=null;try{v=_instPctOfQ(q);}catch(e){_err('_invInstPct',e);}v=parseFloat(v);return isFinite(v)?Math.max(0,Math.min(100,v)):_instDef();}
+// Lotion 11/11 第 2 題：預設「打設、裝設 70%；拔除、拆除 30%」（＝公司請款設定 100−拆除%）；合約條件不一樣時出卡問，Lotion 確認後這一案才改用合約比例（q.billPct）
+function _invInstPct(q){var b=q&&q.billPct;if(b&&b.use==='contract'){var x=parseFloat(b.inst);if(isFinite(x))return Math.max(0,Math.min(100,x));}return _instDef();}
+function _invCtPct(q){var v=null;try{v=_instPctOfQ(q);}catch(e){_err('_invCtPct',e);return null;}v=parseFloat(v);return isFinite(v)?Math.max(0,Math.min(100,v)):null;}
+function _bpList(){var d=_instDef();return (Q||[]).filter(function(q){if(!q||!q.awarded||q.closed||q.parentId)return false;var c=_invCtPct(q);if(c==null||Math.abs(c-d)<0.01)return false;var b=q.billPct;return !(b&&Math.abs((parseFloat(b.ct)||0)-c)<0.01);});}
+
 // 審查：打設＋拔除工項的「期別」跟「請款 %」要一起動——改 % 成拔除那期的 % → 期別跟著變拔除；改期別 → % 跟著換成那一期的預設（原本是另一期的預設或 100 才換）
 function _invPhaseSync(i,by){var it=invItems&&invItems[i];if(!it||it.type!=='item')return;var q=null,k=-1;try{q=_invCurQuote();k=q?_invItemQIdx(q,i):-1;}catch(e){_err('_invPhaseSync',e);return;}var qit=(q&&k>=0)?q.items[k]:null;if(!qit)return;var c=_itemCat(qit);if(!(c.install&&c.remove))return;
   var pi=_invPhasePct(q,qit,'install'),pr=_invPhasePct(q,qit,'remove'),r=parseFloat(it.payRate!=null?it.payRate:100);
@@ -41118,7 +41122,7 @@ function _bkHealthLoad(cb){
 }
 // 後端待辦攤平成清單（fydata/todo/<來源>/<key>）
 function _bkTodoList(){
-  var out=[];Object.keys(BK_TODO||{}).forEach(function(src){var g=BK_TODO[src]||{};Object.keys(g).forEach(function(k){var t=g[k];if(t&&t.text)out.push(t);});});
+  var out=[];Object.keys(BK_TODO||{}).forEach(function(src){if(src==='money')return;var g=BK_TODO[src]||{};   /* v6.0.235：錢的卡只給 Google 工作表，今天頁自己有卡 */Object.keys(g).forEach(function(k){var t=g[k];if(t&&t.text)out.push(t);});});
   return out;
 }
 // 這台裝置用同樣規則算一次（並行比對用；規則同 functions/ops/health.js）
@@ -45232,7 +45236,7 @@ function _invStSync(){if(!(P&&P.invStInit)||!_decIsAdmin()||_isReaderUser)return
   (INV||[]).forEach(function(inv){if(!_invStDoc(inv))return;var cur=_invStOf(inv);if(inv.stLast===cur)return;_invStLog(inv,cur,inv.stLast?('自動：'+_invStWhy(inv,cur)):('新的請款單：'+_invStWhy(inv,cur)),'系統');n++;});
   if(n){_invStSyncing=true;try{saveInv();}finally{_invStSyncing=false;}}return n;}
 var _invStSyncing=false;
-function _invStSoon(){if(_invStSyncing)return;clearTimeout(_invStSoon._t);_invStSoon._t=setTimeout(function(){try{_invStSync();}catch(e){_err('_invStSoon',e);}},900);}
+function _invStSoon(){if(_invStSyncing)return;clearTimeout(_invStSoon._t);_invStSoon._t=setTimeout(function(){try{_icAutoBlank();}catch(e){_err('_invStSoon.blank',e);}try{_invStSync();}catch(e){_err('_invStSoon',e);}},900);}
 try{document.addEventListener('DOMContentLoaded',function(){setTimeout(_invStSoon,2500);});}catch(e){_err('invStBoot',e);}
 // 給第 7 步線：這張請款單「這一步做完了沒」（今天頁跟錢有關的卡，做完才消失）
 //   step：'send'＝已送業主以上、'ok'＝業主已確認以上、'einv'＝已開發票以上、'paid'＝已收款
@@ -45354,25 +45358,48 @@ _decReg('invDraft',{
   edit:function(b){try{openProj(b.qid);}catch(e){_err('invDraft.edit',e);}}
 });
 // ── 健檢 H4＋H5（11/11）：舊請款單檢查卡——得標時自動建的空白第 1 期（讓 Lotion 決定刪不刪）、累計請款超過 100% 的工項（只標紅，不改舊單）──
-function _icBlank(inv){if(!_invStDoc(inv)||inv.receivedConfirmed||(inv.receipts&&Object.keys(inv.receipts).length))return false;
-  if((parseInt(inv.periodNo)||1)>1||_invRcv(inv)>0||(parseFloat(inv.recvFee)||0)||(parseFloat(inv.recvDeduct)||0)||(parseFloat(inv.recvHold)||0)||inv.allow||(parseFloat(inv.holdRetAmt)||0)||inv.retentionSep||(parseFloat(inv.retentionReceivedAmt)||0))return false;   // 審查：只看第 1 期、沒有任何收款／扣款／保留款紀錄
-  if((inv.items||[]).some(function(it){return it&&it.type!=='sec'&&((parseFloat(it.prevQty)||0)>0||(parseFloat(it.prevAmt)||0)!==0);}))return false;try{if(_invEinvOf(inv.id))return false;}catch(e){_err('_icBlank',e);return false;}
-  return !(inv.items||[]).some(function(it){return it&&it.type!=='sec'&&((parseFloat(it.curQty)||0)>0||(parseFloat(it.curAmt)||0)!==0);})&&!(parseFloat((inv.totals||{}).total)>0);}
+// Lotion 11/11 第 1 題：完全沒動過的空白第 1 期（舊版得標時自動建的）不出卡，管理員裝置自動移到回收筒、記一筆；只要有一點內容的才出卡給 Lotion 看
+//   只處理「沒有狀態紀錄」的舊單（新版建的單一開始就有草稿紀錄，正在填的不會被收走）、建立超過 1 天、現在沒開在編輯頁
+function _icEmptyRows(inv){return !(inv.items||[]).some(function(it){return it&&it.type!=='sec'&&((parseFloat(it.curQty)||0)>0||(parseFloat(it.curAmt)||0)!==0||(parseFloat(it.prevQty)||0)>0||(parseFloat(it.prevAmt)||0)!==0);})&&!(parseFloat((inv.totals||{}).total)>0);}
+function _icMoney(inv){var e=null;try{e=_invEinvOf(inv.id);}catch(x){_err('_icMoney',x);return true;}return !!(inv.receivedConfirmed||(inv.receipts&&Object.keys(inv.receipts).length)||_invRcv(inv)>0||(parseFloat(inv.recvFee)||0)||(parseFloat(inv.recvDeduct)||0)||(parseFloat(inv.recvHold)||0)||inv.allow||(parseFloat(inv.holdRetAmt)||0)||inv.retentionSep||(parseFloat(inv.retentionReceivedAmt)||0)||e);}
+function _icContent(inv){var c=[];if(String(inv.note||'').trim())c.push('備註');if(inv.sendDate||inv.sendMethod&&inv.sendMethod!=='親送')c.push('送出紀錄');if(inv.ownerOk)c.push('業主回覆');if(Array.isArray(inv.dunLog)&&inv.dunLog.length)c.push('催款紀錄');if(_icMoney(inv))c.push('收款／發票紀錄');if(Array.isArray(inv.lockLog)&&inv.lockLog.length)c.push('解鎖紀錄');return c;}
+function _icOld(inv){if(!_invStDoc(inv)||(parseInt(inv.periodNo)||1)!==1||Array.isArray(inv.stLog)&&inv.stLog.some(function(x){return x&&x.st==='draft';}))return false;var t=parseInt(String(inv.id||'').replace(/\D/g,'').slice(0,13),10)||0;if(t&&Date.now()-t<864e5)return false;try{if(typeof invEid!=='undefined'&&invEid===inv.id)return false;}catch(e){_err('_icOld',e);}return _icEmptyRows(inv);}
+function _icBlank(inv){return _icOld(inv)&&!_icContent(inv).length;}   /* 完全沒動過 → 自動收 */
+function _icNear(inv){return _icOld(inv)&&_icContent(inv).length>0;}   /* 有一點內容 → 出卡 */
+function _icAutoBlank(){if(_isReaderUser||!_decIsAdmin())return 0;try{if(typeof _prjReady==='function'&&!_prjReady())return 0;}catch(e){_err('_icAutoBlank.ready',e);return 0;}
+  var L=(INV||[]).filter(_icBlank);if(!L.length)return 0;P.invAutoLog=(Array.isArray(P.invAutoLog)?P.invAutoLog:[]);
+  L.forEach(function(inv){try{_tomb('invoices',inv.id);}catch(e){_err('_icAutoBlank.tomb',e);return;}P.invAutoLog.push({at:Date.now(),by:_meEmail()||'本機',id:inv.id,project:String(inv.project||'').slice(0,60),periodNo:inv.periodNo||'1',date:inv.date||'',why:'完全沒動過的空白第 1 期（舊版得標時自動建的），移到回收筒'});});
+  var ids={};L.forEach(function(x){ids[x.id]=1;});INV=INV.filter(function(v){return !ids[v.id];});P.invAutoLog=P.invAutoLog.slice(-200);persistP();saveInv();return L.length;}
 function _icOver(inv){if(!_invStDoc(inv))return [];return (inv.items||[]).filter(function(it){var c=_invItemCumPct(it);return c!=null&&c>100.05;}).map(function(it){return {desc:String(it.desc||'').split('\n')[0].slice(0,40),pct:_invItemCumPct(it),rate:it.payRate!=null?it.payRate:100};});}
-function _icList(){var out=[];(INV||[]).forEach(function(inv){if(!inv||!inv.id)return;var ck=inv.icSeen||{};if(_icBlank(inv)&&!ck.blank)out.push({id:inv.id+'|blank',kind:'blank',inv:inv});var ov=_icOver(inv);if(ov.length&&!ck.over)out.push({id:inv.id+'|over',kind:'over',inv:inv,over:ov});});return out;}
+function _icList(){var out=[];(INV||[]).forEach(function(inv){if(!inv||!inv.id)return;var ck=inv.icSeen||{};if(_icNear(inv)&&!ck.blank)out.push({id:inv.id+'|blank',kind:'blank',inv:inv,has:_icContent(inv)});var ov=_icOver(inv);if(ov.length&&!ck.over)out.push({id:inv.id+'|over',kind:'over',inv:inv,over:ov});});return out;}
 function _icSeen(inv,k){inv.icSeen=Object.assign({},inv.icSeen||{});inv.icSeen[k]={at:Date.now(),by:_meEmail()||'本機'};_touch(inv);_invStSyncing=true;try{saveInv();}finally{_invStSyncing=false;}}
 _decReg('invChk',{
-  title:'舊請款單檢查',todo:function(n){return '舊請款單要看一下 '+n+' 張（空白單或累計超過 100%）';},sub:'空白單：確認＝刪除（進回收筒）、退回＝留著；超過 100%：確認＝看過了（舊單不改）、修改＝打開請款單',
+  title:'舊請款單檢查',todo:function(n){return '舊請款單要看一下 '+n+' 張（有內容的空白第 1 期、累計超過 100%）';},sub:'有內容的空白第 1 期：確認＝刪除（進回收筒；有收款發票的只記看過）、退回＝留著；超過 100%：確認＝看過了（舊單不改）、修改＝打開請款單',
   canSee:function(){return !_isReaderUser&&_decIsAdmin();},list:_icList,key:function(x){return x.id;},
   head:function(x){return String(x.inv.project||'').slice(0,24)+' 第'+(x.inv.periodNo||'?')+'期'+(x.kind==='blank'?'（空白）':'（超過 100%）');},
-  body:function(x){return x.kind==='blank'?'<div style="font-size:11.5px;color:#b26a00">沒有任何數量、金額 0（多半是得標時系統自動建的）</div>':'<div style="font-size:11.5px;color:#c62828">'+esc(x.over.map(function(o){return o.desc.slice(0,14)+' '+o.pct+'%';}).join('、'))+'</div>';},
+  body:function(x){return x.kind==='blank'?'<div style="font-size:11.5px;color:#b26a00">沒有數量、金額 0，但有'+esc(x.has.join('、'))+'</div>':'<div style="font-size:11.5px;color:#c62828">'+esc(x.over.map(function(o){return o.desc.slice(0,14)+' '+o.pct+'%';}).join('、'))+'</div>';},
   detail:function(x){var inv=x.inv;return '<div style="font-size:12.5px;line-height:1.7">'+esc(inv.project||'')+' 第 '+esc(String(inv.periodNo||'?'))+' 期　'+esc(inv.date||'')+'　狀態 '+esc(_INV_ST_T[_invStOf(inv)]||'')
-    +(x.kind==='blank'?'<div style="margin-top:6px">這張請款單沒有任何本期數量、金額是 0，也沒有收款、發票紀錄。舊版在得標時會自動建一張空白的第 1 期（新版起不再建），之後真的第一張就變成第 2 期。</div><div style="margin-top:4px">確認＝刪除這張（進回收筒，可以還原）；退回＝留著、不再問。</div>'
+    +(x.kind==='blank'?'<div style="margin-top:6px">這張第 1 期沒有任何數量、金額是 0，但有：<b>'+esc(x.has.join('、'))+'</b>。完全沒動過的空白單系統已經自動移到回收筒；這張有內容，所以留給你決定。</div><div style="margin-top:4px">'+(_icMoney(inv)?'這張有收款或發票紀錄，<b>不能從這裡刪</b>；確認＝看過了。':'確認＝刪除這張（進回收筒，可以還原）；退回＝留著、不再問。')+'</div>'
       :'<table style="width:100%;font-size:12px;border-collapse:collapse;table-layout:fixed;word-break:break-all;margin-top:4px"><tr><th style="text-align:left;width:56%">工項</th><th>這期請款 %</th><th>累計</th></tr>'+x.over.map(function(o){return '<tr style="background:#ffebee"><td style="padding:2px 4px">'+esc(o.desc)+'</td><td style="text-align:center">'+esc(String(o.rate))+'%</td><td style="text-align:center;color:#c62828;font-weight:700">'+o.pct+'%</td></tr>';}).join('')+'</table><div style="margin-top:4px">已經開出去的舊請款單不改。新的請款單起，打設＋拔除類工項照合約的 %（打設那期合約 %、拔除那期剩下的 %），累計不超過 100%。確認＝看過了。</div>')+'</div>';},
-  ok:function(x){var inv=x.inv;if(x.kind==='blank'){if(!_icBlank(inv)){toast('這張已經有數量或收款，不刪');return false;}try{_tomb('invoices',inv.id);}catch(e){_err('invChk.del',e);return false;}INV=INV.filter(function(v){return v.id!==inv.id;});saveInv();toast('已刪除空白請款單');return true;}
+  ok:function(x){var inv=x.inv;if(x.kind==='blank'){if(_icMoney(inv)){_icSeen(inv,'blank');return true;}if(!_icNear(inv)){toast('這張已經有數量了，不刪');return false;}try{_tomb('invoices',inv.id);}catch(e){_err('invChk.del',e);return false;}INV=INV.filter(function(v){return v.id!==inv.id;});saveInv();toast('已刪除空白請款單');return true;}
     _icSeen(inv,'over');return true;},
   reject:function(x){_icSeen(x.inv,x.kind);return true;},
   edit:function(x){try{loadInvoice(x.inv.id);go('invoice-edit');}catch(e){_err('invChk.edit',e);}}
+});
+_decReg('billPct',{
+  title:'請款比例跟合約不一樣',todo:function(n){return '請款比例要不要改用合約條件：'+n+' 案';},sub:'確認＝這一案之後的請款單改用合約的打設／拔除 %；退回＝照公司預設（打設 70%、拔除 30%）；修改＝打開工程專案',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},list:_bpList,key:function(q){return q.id+'|'+_invCtPct(q);},
+  head:function(q){return String(q.name||'').slice(0,24);},
+  body:function(q){var c=_invCtPct(q),d=_instDef();return '<div style="font-size:11.5px;color:#b26a00">合約寫打設 '+c+'%、拔除 '+Math.round((100-c)*100)/100+'%（公司預設 '+d+'%／'+Math.round((100-d)*100)/100+'%）</div>';},
+  detail:function(q){var c=_invCtPct(q),d=_instDef(),ref=null,ev='';try{ref=_ownerInstRef(q);}catch(e){_err('billPct.ref',e);}try{ev=_cardEv(q,'billing.instPct');}catch(e){_err('billPct.ev',e);}
+    var man=q.ownerPay&&q.ownerPay.instPct!=null&&q.ownerPay.instPct!=='';
+    return '<div style="font-size:12.5px;line-height:1.7">合約寫<b>打設 '+c+'%、拔除 '+Math.round((100-c)*100)/100+'%</b>，公司預設是打設 '+d+'%、拔除 '+Math.round((100-d)*100)/100+'%。要不要改用合約條件？'
+      +'<div style="margin-top:6px"><b>依據</b>：'+esc(man?'工程專案手動調整的裝設 %'+((q.ownerPay.instLog||[]).length?'（'+String((q.ownerPay.instLog.slice(-1)[0]||{}).why||'').slice(0,60)+'）':''):((ref&&ref.src)||''))+'</div>'
+      +(ev?'<div style="margin-top:4px;white-space:pre-wrap;background:var(--b0,#f6f6f6);padding:6px 8px;border-radius:6px">'+esc(ev)+'</div>':'<div style="margin-top:4px;color:var(--b4)">（沒有合約條件卡原文）</div>')
+      +'<div style="margin-top:6px;color:var(--b4)">確認＝這一案「之後新開的」請款單照合約比例帶；已經開出去的請款單不改。退回＝照公司預設，合約比例再變的話會再問。</div></div>';},
+  ok:function(q){var c=_invCtPct(q);if(c==null)return false;q.billPct={use:'contract',inst:c,ct:c,at:Date.now(),by:_meEmail()||'本機'};_touch(q);persist();toast('之後的請款單改用合約比例：打設 '+c+'%');return true;},
+  reject:function(q,why){var c=_invCtPct(q);q.billPct={use:'default',ct:c,at:Date.now(),by:_meEmail()||'本機',why:String(why||'').slice(0,120)};_touch(q);persist();return true;},
+  edit:function(q){try{openProj(q.id);}catch(e){_err('billPct.edit',e);}}
 });
 // ── 草稿 → 送業主 ──
 function _isList(){var td=localToday();return (INV||[]).filter(function(inv){return _invStDoc(inv)&&_invStOf(inv)==='draft'&&!(inv.sendSnz&&String(inv.sendSnz)>td);});}

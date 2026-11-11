@@ -71,4 +71,18 @@ function rtdbSafe(v) {
   }
   return v;
 }
-module.exports = { buildRemind, keysOf, tpeDay, rtdbSafe };
+// v6.0.235（Lotion 11/11 第 6 題：不寫金額，只寫「案名＋第幾期＋要做什麼」）：今天頁跟錢有關的卡 → fydata/todo/money → Google 工作表
+//   本月要請款（monthBill）、請款單草稿待送業主（st＝draft）、收款待登錄（AI 讀到的收款 recvSlip 草稿）、預計收款日到了（待收款）、逾期沒收（催款）
+//   FJ 今天頁自己有這幾張卡，總覽不重複列（前端 _bkTodoList 跳過 money）
+function moneyTodos(r, invoices, drafts) {
+  const out = {}, L = (r && r.list) || {}, byId = {};
+  arr(invoices).forEach((inv) => { if (inv && inv.id) byId[inv.id] = inv; });
+  const nm = (inv) => String((inv && inv.project) || '').slice(0, 40), per = (inv) => '第 ' + ((inv && inv.periodNo) || '?') + ' 期';
+  const put = (k, text, sub, urgent) => { out[String(k).replace(/[.#$/[\]]/g, '_').slice(0, 120)] = { src: 'money', key: k, text: text.slice(0, 200), sub: sub || '', urgent: !!urgent, go: 'dash' }; };
+  (L.bill || []).forEach((b) => put('bill_' + b.qid + '_' + b.cutDate, String(b.name || '').slice(0, 40) + '：本月要請款（截止 ' + String(b.cutDate || '').slice(5) + '）', 'FJ 今天頁「本月請款單草稿」卡', b.left <= 1));
+  arr(invoices).forEach((inv) => { if (inv && inv.id && inv.kind !== 'retReturn' && inv.st === 'draft' && !inv.receivedConfirmed) put('send_' + inv.id, nm(inv) + ' ' + per(inv) + '：請款單草稿待送業主', 'FJ 今天頁「請款單草稿待送出」卡', false); });
+  arr(drafts).forEach((d) => { if (!d || d.type !== 'recvSlip' || d.status !== 'pending') return; const pl = d.payload || {}, inv = byId[pl.invId]; put('rcv_' + d.id, (inv ? nm(inv) + ' ' + per(inv) : String(pl.qid ? '收款' : '收款')) + '：收款待登錄（匯款／期票已讀到）', 'FJ 今天頁「收款登錄」卡', false); });
+  (L.recv || []).forEach((x) => { const inv = byId[x.id]; if (!inv) return; if (x.d < 0) put('dun_' + x.id, nm(inv) + ' ' + per(inv) + '：逾期 ' + (-x.d) + ' 天沒收，要催款', 'FJ 今天頁「逾期催款」卡', -x.d >= 14); else put('due_' + x.id, nm(inv) + ' ' + per(inv) + '：' + (x.d <= 0 ? '今天' : '明天') + '預計收款，確認有沒有入帳', 'FJ 帳務 › 收', false); });
+  return out;
+}
+module.exports = { buildRemind, keysOf, tpeDay, rtdbSafe, moneyTodos };

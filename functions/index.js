@@ -391,6 +391,8 @@ async function runRemind() {
   try {
     r = todosCore.rtdbSafe(todosCore.buildRemind({ shared: { quotes, invoices, contracts, customers, params, qHistory }, priv: { payables, matLedger, quoteSens }, now }));   // v6.0.174：去掉 undefined／不合法鍵名，RTDB 才寫得進去
     await db.ref('fydata/health/remind').set(r);   // 並行比對期只寫這裡（不寫總覽待辦）
+    // v6.0.235 錢的卡 → fydata/todo/money（Google 工作表同步讀 fydata/todo；不寫金額）
+    try { const dr = await db.ref('fydata/drafts').orderByChild('status').equalTo('pending').once('value').then((s) => s.val() || {}); const mt = todosCore.rtdbSafe(todosCore.moneyTodos(r, Object.values(invoices || {}), Object.values(dr))); await db.ref('fydata/todo/money').set(Object.keys(mt).length ? mt : null); } catch (e) { console.error('runRemind.money', e); }
   } catch (e) {
     // v6.0.174：失敗原因寫進 fydata/health/remindErr（資料健檢卡顯示），不只留在 log
     await db.ref('fydata/health/remindErr').set({ at: now, msg: String((e && e.message) || e).slice(0, 300) }).catch((e2) => console.error('runRemind.err', e2));

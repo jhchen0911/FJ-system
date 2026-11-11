@@ -58,3 +58,19 @@ test('v6.0.174 looseDate：非 ISO 請款日期（/、.、民國年）各裝置�
   assert.strictEqual(f('12/31/2026'), '2026-12-31');   // 美式交給 new Date
   const ts = L('2026-09-30T20:00:00Z', null); assert.strictEqual(ts.getTime(), Date.parse('2026-09-30T20:00:00Z'));   // 帶時間照原本
 });
+
+test('v6.0.235 錢的卡 → fydata/todo/money：本月要請款、草稿待送業主、收款待登錄、預計收款、逾期催款；不寫金額', () => {
+  const T = require('../ops/todos.js');
+  const r = { list: { bill: [{ qid: 'q1', name: '範例案', cutDate: '2026-11-25', left: 3 }], recv: [{ id: 'i2', d: -20, date: '' }, { id: 'i3', d: 0, date: '2026-11-11' }] } };
+  const inv = [{ id: 'i1', project: '範例案', periodNo: 2, st: 'draft', totals: { total: 123456 } }, { id: 'i2', project: '範例案', periodNo: 1, totals: { total: 99999 } }, { id: 'i3', project: '乙案', periodNo: 4 }, { id: 'i4', project: '範例案', periodNo: 1, kind: 'retReturn', st: 'draft' }];
+  const m = T.moneyTodos(r, inv, [{ id: 'rv1', type: 'recvSlip', status: 'pending', payload: { invId: 'i2', amt: 50000 } }]);
+  const texts = Object.values(m).map((x) => x.text);
+  assert.equal(Object.keys(m).length, 5);
+  assert.ok(texts.some((t) => /範例案：本月要請款（截止 11-25）/.test(t)));
+  assert.ok(texts.some((t) => /範例案 第 2 期：請款單草稿待送業主/.test(t)));
+  assert.ok(texts.some((t) => /範例案 第 1 期：收款待登錄/.test(t)));
+  assert.ok(texts.some((t) => /範例案 第 1 期：逾期 20 天沒收，要催款/.test(t)));
+  assert.ok(texts.some((t) => /乙案 第 4 期：今天預計收款/.test(t)));
+  assert.ok(!JSON.stringify(m).match(/123456|99999|50000/), '不寫金額');
+  assert.ok(Object.values(m).every((x) => x.src === 'money'));
+});
