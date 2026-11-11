@@ -45355,7 +45355,7 @@ _decReg('invDraft',{
 });
 // ── 健檢 H4＋H5（11/11）：舊請款單檢查卡——得標時自動建的空白第 1 期（讓 Lotion 決定刪不刪）、累計請款超過 100% 的工項（只標紅，不改舊單）──
 function _icBlank(inv){if(!_invStDoc(inv)||inv.receivedConfirmed||(inv.receipts&&Object.keys(inv.receipts).length))return false;
-  if((parseInt(inv.periodNo)||1)>1||(parseFloat(inv.received)||0)||(parseFloat(inv.recvFee)||0)||(parseFloat(inv.recvDeduct)||0)||(parseFloat(inv.recvHold)||0)||inv.allow||(parseFloat(inv.holdRetAmt)||0)||inv.retentionSep||(parseFloat(inv.retentionReceivedAmt)||0))return false;   // 審查：只看第 1 期、沒有任何收款／扣款／保留款紀錄
+  if((parseInt(inv.periodNo)||1)>1||_invRcv(inv)>0||(parseFloat(inv.recvFee)||0)||(parseFloat(inv.recvDeduct)||0)||(parseFloat(inv.recvHold)||0)||inv.allow||(parseFloat(inv.holdRetAmt)||0)||inv.retentionSep||(parseFloat(inv.retentionReceivedAmt)||0))return false;   // 審查：只看第 1 期、沒有任何收款／扣款／保留款紀錄
   if((inv.items||[]).some(function(it){return it&&it.type!=='sec'&&((parseFloat(it.prevQty)||0)>0||(parseFloat(it.prevAmt)||0)!==0);}))return false;try{if(_invEinvOf(inv.id))return false;}catch(e){_err('_icBlank',e);return false;}
   return !(inv.items||[]).some(function(it){return it&&it.type!=='sec'&&((parseFloat(it.curQty)||0)>0||(parseFloat(it.curAmt)||0)!==0);})&&!(parseFloat((inv.totals||{}).total)>0);}
 function _icOver(inv){if(!_invStDoc(inv))return [];return (inv.items||[]).filter(function(it){var c=_invItemCumPct(it);return c!=null&&c>100.05;}).map(function(it){return {desc:String(it.desc||'').split('\n')[0].slice(0,40),pct:_invItemCumPct(it),rate:it.payRate!=null?it.payRate:100};});}
