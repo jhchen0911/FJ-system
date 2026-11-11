@@ -13660,6 +13660,80 @@ async function newPage(browser, width, height) {
     check('人員辦證缺件卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── v6.0.235 薪資完整版：出工確認卡、每月薪資草稿卡、零用金／代墊加進薪資（需求書 #19，Lotion 11/11）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keep = { Q: Q, HR: HR, PS: PAYSLIPS, PC: PETTY, PAY: PAYABLES.slice(), dl: FJC.dl.crewOf, skip: P.payDraftSkip };
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_nav_old');
+        // 主線 FJC.dl.crewOf 的介面（{people:[{raw,name,day,ot,off,staff,cand,sure,why}], why:[]}）；這裡用同介面的小替身，合併主線後改測真的
+        FJC.dl.crewOf = (text, staff) => { const people = String(text).replace(/^人\s*\d+\s*[（(]|[）)]\s*$/g, '').split('、').map((raw) => { let t = raw, day = 1, ot = 0; const m = /加班\s*(\d+)/.exec(t); if (m) { ot = +m[1]; t = t.replace(m[0], ''); } if (/半天/.test(t)) { day = 0.5; t = t.replace('半天', ''); } t = t.trim();
+          const hit = staff.indexOf(t) >= 0 ? t : '', cand = hit ? [] : staff.filter((s) => s && (s.indexOf(t) >= 0 || t.indexOf(s) >= 0));
+          return { raw, name: t, day, ot, off: false, staff: hit, cand, sure: !!hit, why: hit ? '' : '名冊沒有「' + t + '」' + (cand.length ? '，是不是 ' + cand.join('、') + '？' : '') }; }); return { people, why: [] }; };
+        HR = [{ id: 'h1', name: '範例阿明', payType: 'day', base: 2500, laborSelf: 600, healthSelf: 400, laborCo: 1500, healthCo: 1200, pettyQuota: 0, active: true },
+          { id: 'h2', name: '範例小陳', payType: 'day', base: 2000, otHourly: 300, pettyQuota: 0, active: true },
+          { id: 'h3', name: '範例阿華', payType: 'month', base: 36000, telAllow: 500, laborSelf: 800, healthSelf: 500, active: true }];
+        PAYSLIPS = []; PETTY = []; delete P.payDraftSkip;
+        const ym = _payYmPrev(), D = (i) => ym + '-' + String(i).padStart(2, '0');
+        Q = [{ id: 'qP1', code: 'P01', name: '範例甲工地', awarded: true, _mt: 1, items: [], dailyLogs: [], costs: [
+          { id: 'kx1', type: 'extra', payer: '範例小陳', date: D(5), amt: 1200, cat: '材料', rows: [{ desc: '範例五金代墊' }] },
+          { id: 'kx2', type: 'extra', payer: '範例阿明', date: D(6), amt: 600, cat: '雜支', rows: [{ desc: '範例便當' }] }] },
+          { id: 'qP2', code: 'P02', name: '範例乙工地', awarded: true, _mt: 1, items: [], dailyLogs: [], costs: [] }];
+        // 10 天日報：真的走 _dlWrite 寫日報（LINE 草稿確認那條路），【人和機具】→ log.att
+        for (let i = 1; i <= 10; i++) {
+          const a = '範例阿明' + ((i === 6 || i === 7) ? '半天' : '') + (i === 3 ? '加班 2' : i === 5 ? '加班 3' : ''), c = '範例小陳' + (i === 8 ? '加班 4' : '');
+          const ppl = [a, c].concat(i === 9 ? ['範例阿華加班 2'] : []);
+          _dlWrite(Q[0], { id: 'dP' + i, payload: {} }, D(i), '【日期】' + D(i) + '\n【今天做了】\n範例\n【人和機具】\n人 ' + ppl.length + '（' + ppl.join('、') + '）\n【明天】\n', [], []);
+        }
+        _dlWrite(Q[1], { id: 'dQ4', payload: {} }, D(4), '【人和機具】\n人 1（範例阿明半天加班 1）', [], []);   // 同一天兩個工地只算 1 天
+        _dlWrite(Q[1], { id: 'dQ11', payload: {} }, D(11), '【人和機具】\n人 2（阿明、範例路人）', [], []);   // 「阿明」只像名冊的範例阿明；「範例路人」名冊沒有
+        const L11 = Q[1].dailyLogs.find((L) => L.date === D(11));
+        out.ingest = Q[0].dailyLogs.length === 10 && Q[0].dailyLogs.every((L) => L.attOk === 1 && L.att.length >= 2) && L11 && L11.attAsk.length === 2 && !L11.attOk && L11.att.length === 0 && /人和機具/.test(Q[0].dailyLogs[0].crewText) === false && /範例阿明/.test(Q[0].dailyLogs[0].crewText);
+        const items = []; _v6TodoItems(items);
+        out.todo = items.some((x) => x.type === 'dec_attAsk') && items.some((x) => x.type === 'dec_payDraft') && items.some((x) => x.type === 'dec_payAdd') && !items.some((x) => x.type === 'hr_pay');
+        // 出工確認卡：只放人名、天數、加班，不放金額
+        const g = _attAskRows()[0]; const x = document.createElement('div'); x.innerHTML = _DEC.attAsk.detail(g); const t = x.textContent;
+        out.attDetail = /阿明/.test(t) && /範例路人/.test(t) && /名冊/.test(t) && !/NT\$|2,500|2500/.test(t) && !/\d,\d{3}/.test(t);
+        out.attOpen = _DEC.attAsk.ok(g) === 'open' && !!document.getElementById('att-p0');   // 有一個人名冊找不到 → 確認先開選人視窗
+        document.getElementById('att-p0').value = 'h1'; document.getElementById('att-p1').value = '';   // 阿明＝範例阿明；範例路人不算
+        document.querySelector('#fy-modal .fy-mdl-ok, #fy-modal .btn-g').click();
+        out.attSaved = L11.attOk === 1 && L11.att.length === 1 && L11.att[0].hrId === 'h1' && L11.attAsk.length === 0 && _attAskRows().length === 0;
+        try { const m = document.getElementById('fy-modal'); if (m) m.remove(); } catch (e) { /* 可忽略 */ }
+        // 零用金結算先有（月底結算過）：小陳沒定額，代墊 1,200 會變零用金應付
+        _pcBuild(_hrActive().find((p) => p.id === 'h2'), ym); _pcBuild(_hrActive().find((p) => p.id === 'h1'), ym); savePetty(); _hrSyncPayables(ym);
+        out.pettyBefore = (PAYABLES.find((p) => p.id === 'pay_pc_h2_' + ym) || {}).amount === 1200;
+        // 薪資草稿卡：還有代墊沒決定 → 不准確認
+        let dg = _payDraftList()[0]; out.blocked = _DEC.payDraft.ok(dg) === false && PAYSLIPS.length === 0;
+        const adds = _payAddRows(ym); out.addN = adds.length === 2;
+        const y = document.createElement('div'); y.innerHTML = _DEC.payAdd.detail(adds.find((a) => a.p.id === 'h2')); out.addDetail = /1,200/.test(y.textContent) && /不會付兩次/.test(y.textContent);
+        out.addOk = _DEC.payAdd.ok(adds.find((a) => a.p.id === 'h2')) === true && _DEC.payAdd.reject(adds.find((a) => a.p.id === 'h1'), '') === true && _payAddRows(ym).length === 0;
+        out.pettyAfter = !PAYABLES.some((p) => p.id === 'pay_pc_h2_' + ym) && (PAYABLES.find((p) => p.id === 'pay_pc_h1_' + ym) || {}).amount === 600;
+        dg = _payDraftList()[0];
+        const z = document.createElement('div'); z.innerHTML = _DEC.payDraft.detail(dg); const tz = z.textContent; out.draftHtml = z.innerHTML.length;
+        out.draftDetail = /沒有勞健保/.test(tz) && /月薪整月/.test(tz) && /半天 2/.test(tz) && /1\.34/.test(tz) && /乙工地/.test(tz);
+        const row = (id) => dg.rows.find((q) => q.p.id === id).s;
+        // 手算：阿明 10 天（1～10 號，6、7 號半天＝9 天＋11 號補 1 天）×2,500＝25,000；加班 2,616 → 27,616－1,000＝26,616
+        out.calc = row('h1').baseAmt === 25000 && row('h1').otAmt === 2616 && row('h1').net === 26616 && row('h2').net === 23006 && row('h2').noIns && row('h3').net === 35602;
+        out.ok = _DEC.payDraft.ok(dg) === true && PAYSLIPS.length === 3 && _payDraftList().length === 0;
+        _hrSyncPayables(ym);
+        const pay = (id) => (PAYABLES.find((p) => p.id === id) || {}).amount;
+        out.payables = pay('pay_ps_h1_' + ym) === 26616 && pay('pay_ps_h2_' + ym) === 23006 && pay('pay_ps_h3_' + ym) === 35602;
+        // 不付兩次：小陳這個月拿到的＝薪資 23,006（內含代墊 1,200），零用金應付沒有這筆
+        out.noDouble = PAYABLES.filter((p) => p.to === '範例小陳').reduce((a, p) => a + p.amount, 0) === 23006;
+        out.persisted = JSON.parse(localStorage.getItem('fy_payslips') || '[]').length === 3 && JSON.parse(localStorage.getItem('fy_hr') || '[]').find((h) => h.id === 'h2').payAdd[ym + '|kx1'] === 'add';
+        out.again = (() => { PAYSLIPS = []; P.payDraftSkip = {}; P.payDraftSkip[ym] = 1; const n = _payDraftList().length; return n === 0 && _payDraftOn(ym) === false && _DEC.payAdd.list().length === 0; })();   // 退回＝手動：卡不再出，舊的「薪資條尚未產生」提醒照原本條件出（canAccess payroll）
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      Q = keep.Q; HR = keep.HR; PAYSLIPS = keep.PS; PETTY = keep.PC; PAYABLES.length = 0; keep.PAY.forEach((x) => PAYABLES.push(x)); FJC.dl.crewOf = keep.dl; if (keep.skip) P.payDraftSkip = keep.skip; else delete P.payDraftSkip;
+      return out;
+    });
+    check('v6.0.235 出工：LINE 日報走 _dlWrite 寫入時【人和機具】拆成出工；對不到名冊的出出工確認卡（只有人名、天數、加班，不放金額），確認先開選人視窗、存好就消失', !r.err && r.ingest && r.todo && r.attDetail && r.attOpen && r.attSaved, JSON.stringify(r));
+    check('v6.0.235 零用金／代墊卡：每筆一張；加進薪資的那筆從零用金應付扣掉（不付兩次）、不加的照走零用金；還沒決定完薪資草稿不准確認', !r.err && r.pettyBefore && r.blocked && r.addN && r.addDetail && r.addOk && r.pettyAfter && r.noDouble, JSON.stringify(r));
+    check('v6.0.235 薪資草稿卡：3 人 10 天（半天、加班、同日兩工地、代墊）跟手算一樣；標沒有勞健保；確認＝產生正式薪資條與應付並存檔；退回＝這個月改手動、卡片不再出', !r.err && r.draftDetail && r.calc && r.ok && r.payables && r.persisted && r.again, JSON.stringify(r));
+    check('v6.0.235 薪資測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.233 進場前到位確認卡＋結案包商評鑑（陳軒 11/10 晚佇列第 5、6 件）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

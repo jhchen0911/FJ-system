@@ -6201,7 +6201,7 @@ function updateDashTodo(){
   try{
     if(typeof _hrActive==='function'&&canAccess('payroll')&&_hrActive().some(function(p){return p.h&&_hrNum(p.h.base)>0;})){
       var _pm=new Date();_pm.setDate(1);_pm.setMonth(_pm.getMonth()-1);var _pym=_pm.getFullYear()+'-'+String(_pm.getMonth()+1).padStart(2,'0');
-      if(!_psList(_pym).length)items.push({type:'hr_pay',urgent:false,jump:"go('payroll')",icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg>',color:'#b45309',
+      if(!_psList(_pym).length&&!_payDraftOn(_pym))items.push({type:'hr_pay',urgent:false,jump:"go('payroll')",icon:'<svg class="ic ib" aria-hidden="true"><use href="#i-wallet"/></svg>',color:'#b45309',
         text:_psYmText(_pym)+' 薪資條尚未產生',sub:'到「薪資．零用金」按「產生本月薪資條」，應付與金流預測會自動帶入'});
     }
   }catch(e){_err('todo.hr',e);}
@@ -30351,8 +30351,8 @@ function _hrPeople(){
 }
 function _hrActive(){return _hrPeople().filter(function(p){return p.active;});}
 function _hrMask(s){s=String(s||'');return s.length>4?(s.slice(0,2)+'＊＊＊＊'+s.slice(-2)):s;}
-var _HR_FIELDS=['name','title','hire','birth','sex','idNo','addr','phone','bank','emg','emgPhone','payType','base','telAllow','otherAllow','laborGrade','laborCo','laborSelf','healthGrade','healthCo','healthSelf','dep','pensionCo','pensionSelf','pettyQuota','memo'];
-var _HR_NUM=['base','telAllow','otherAllow','laborGrade','laborCo','laborSelf','healthGrade','healthCo','healthSelf','dep','pensionCo','pensionSelf','pettyQuota'];
+var _HR_FIELDS=['name','title','hire','birth','sex','idNo','addr','phone','bank','emg','emgPhone','payType','base','telAllow','otherAllow','laborGrade','laborCo','laborSelf','healthGrade','healthCo','healthSelf','dep','pensionCo','pensionSelf','pettyQuota','memo','otHourly'];
+var _HR_NUM=['base','telAllow','otherAllow','laborGrade','laborCo','laborSelf','healthGrade','healthCo','healthSelf','dep','pensionCo','pensionSelf','pettyQuota','otHourly'];
 function hrDel(id){
   if(_roDeny())return;
   var h=_hrById(id);if(!h)return;
@@ -30597,7 +30597,7 @@ function _pcBuild(p,ym){
   if(r.status!=='paid'){
     r.quota=_hrNum(h.pettyQuota);
     if(prev){r.carry=prev.remain;r.draw=prev.topup;}
-    r.items=_pcItems(p.name,ym);
+    r.items=_pcItems(p.name,ym).filter(function(it){return _payAddOf(h,ym,it)!=='add';});   // v6.0.235：薪資草稿卡選「加進這期薪資」的那筆不再算零用金（不付兩次）
     r.name=p.name;
   }
   _pcCalc(r);if(_recSig(r)!==before)_touch(r);return r;   // v5.441 內容沒變不戳 _mt
@@ -34956,6 +34956,7 @@ function hrEdit(id,sid){
    +'<div class="f"><label>計薪方式</label><select id="hr-paytype" style="'+IN+'" onchange="document.getElementById(\'hr-base-lb\').textContent=this.value===\'day\'?\'日薪\':\'月薪\'"><option value="month"'+(pt==='month'?' selected':'')+'>月薪</option><option value="day"'+(pt==='day'?' selected':'')+'>日薪</option></select></div></div>'
    +'<div class="fg fg2"><div class="f"><label id="hr-base-lb">'+(pt==='day'?'日薪':'月薪')+'</label><input id="hr-base" type="number" inputmode="decimal" value="'+esc(String(v('base')))+'" style="'+IN+'"></div>'
    +f('投保薪資（勞保＝健保級距）','hr-ig',ig,'number',' oninput="_hrIgSync()"')+'</div>'
+   +'<div class="fg fg2">'+f('加班時薪（空白＝日薪÷8、月薪÷240）','hr-oth',v('otHourly'),'number')+'<div class="f"><label>加班費</label><div style="font-size:12px;line-height:1.6;padding:4px 0;color:var(--b5)">勞基法：一天前 2 小時 × 1.34、之後 × 1.67</div></div></div>'
    +'<div class="fg fg2">'+f('眷口數（健保）','hr-dep',v('dep',0),'number',' oninput="_hrIgSync()"')+'<div class="f"><label>勞健保勞退（依費率自動算）</label><div id="hr-ins-pv" style="font-size:12px;line-height:1.7;padding:4px 0;color:var(--b5)">—</div></div></div>'
    +'<details class="prm-sec" style="margin-top:6px"><summary style="cursor:pointer;font-size:12px;color:var(--g3);font-weight:700">更多欄位（基本資料、津貼、保險金額明細、零用金定額）</summary>'
    +sec('基本資料',st?('登入帳號 '+esc(st.email||'')):'無登入帳號')
@@ -34979,7 +34980,7 @@ function hrEdit(id,sid){
     // 投保薪資 → 兩個級距；保險金額空白就依費率自動算
     var igv=g('hr-ig');if(igv){['hr-lg','hr-hg'].forEach(function(fid){var el=document.getElementById(fid);if(el&&(!el.value||el.getAttribute('data-auto')==='1'))el.value=igv;});}
     var needCalc=['hr-lco','hr-lself','hr-hco','hr-hself','hr-pco'].some(function(fid){return !g(fid);});if(needCalc)_hrFillIns(true);
-    var map={name:'hr-name',title:'hr-title',hire:'hr-hire',birth:'hr-birth',sex:'hr-sex',idNo:'hr-idno',addr:'hr-addr',phone:'hr-phone',bank:'hr-bank',emg:'hr-emg',emgPhone:'hr-emgphone',payType:'hr-paytype',base:'hr-base',telAllow:'hr-tel',otherAllow:'hr-other',laborGrade:'hr-lg',laborCo:'hr-lco',laborSelf:'hr-lself',healthGrade:'hr-hg',healthCo:'hr-hco',healthSelf:'hr-hself',dep:'hr-dep',pensionCo:'hr-pco',pensionSelf:'hr-pself',pettyQuota:'hr-petty',memo:'hr-memo'};
+    var map={name:'hr-name',title:'hr-title',hire:'hr-hire',birth:'hr-birth',sex:'hr-sex',idNo:'hr-idno',addr:'hr-addr',phone:'hr-phone',bank:'hr-bank',emg:'hr-emg',emgPhone:'hr-emgphone',payType:'hr-paytype',base:'hr-base',telAllow:'hr-tel',otherAllow:'hr-other',laborGrade:'hr-lg',laborCo:'hr-lco',laborSelf:'hr-lself',healthGrade:'hr-hg',healthCo:'hr-hco',healthSelf:'hr-hself',dep:'hr-dep',pensionCo:'hr-pco',pensionSelf:'hr-pself',pettyQuota:'hr-petty',memo:'hr-memo',otHourly:'hr-oth'};
     Object.keys(map).forEach(function(k){var val=g(map[k]);rec[k]=_HR_NUM.indexOf(k)>=0?(val===''?'':_hrNum(val)):val;});
     if(!st){var ac=document.getElementById('hr-active');rec.active=ac?!!ac.checked:true;}
     _touch(rec);
@@ -46103,6 +46104,7 @@ function _dlWrite(q,d,dt,t,qr,photos){var S=_draftS,pl=(d.payload&&typeof d.payl
     _drMergeLog(q,L0,{progressRows:rows});L0.linePhotos=(L0.linePhotos||[]).concat(photos.filter(function(p){return (L0.linePhotos||[]).indexOf(p)<0;})).slice(0,30);
   }
   else q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:dt,workers:0,subWorkers:0,crews:[],progress:row.note,progressRows:rows,photos:[],linePhotos:photos.slice(0,30),equip:[],status:'work',by:'LINE 機器人（'+_meEmail()+' 確認）',src:'line',ts:Date.now()});
+  try{var _crw=_attCrewText(t);if(_crw)_attIngest(q,L0||q.dailyLogs[0],_crw);}catch(e){_err('_dlWrite.att',e);}   /* v6.0.235 薪資：【人和機具】→ 出工 log.att（對不到的出出工確認卡） */
   if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120);
   _touch(q);persist();try{if(DRAFTS&&DRAFTS[d.id])DRAFTS[d.id]._dlWritten=1;}catch(e){_err('_dlWrite',e);}return _draftMark(d.id,'applied',{resultId:q.id});}
 function _dlOf(d){var S=_draftS,pl=(d&&d.payload&&typeof d.payload==='object')?d.payload:{},q=(Q||[]).find(function(x){return x&&x.id===pl.qid;})||null,txt=_lineArr(pl.answers).join('\n');
@@ -46379,6 +46381,153 @@ _decReg('addonSign',{
   edit:function(x){var a=x.a,IN='width:100%;padding:6px 8px;border:1px solid var(--b2);border-radius:6px;font-family:inherit;font-size:12.5px;box-sizing:border-box';
     showConfirm('給主任的 LINE 文字','<textarea id="ad-msg" rows="6" style="'+IN+'">'+esc(a.askTxt||_adMsg(x.q,a))+'</textarea><div style="font-size:11px;color:var(--b4);margin-top:4px">按確認＝存下這段文字並複製。</div>',
       function(){var t=gv('ad-msg')||'';_adCopy(t).then(function(ok){if(!ok)return;_adSet(x.q,a,{askTxt:t.slice(0,1000),askAt:Date.now(),askBy:_meEmail()||'本機'});toast('已複製');try{_decRefresh('addonSign');}catch(e){_err('addonSign.ref',e);}});},false,null,false);}
+});
+// ══════════ v6.0.235 薪資完整版（需求書 #19，Lotion 11/11；小批次線）══════════
+// 出工從 LINE 日報【人和機具】來（主線 FJC.dl.crewOf 解析）：對到名冊的寫 log.att，對不到的出「出工確認卡」（只有人名、天數、加班時數，不放金額）；
+// 每月一張「薪資草稿卡」（只有管理員）：日薪×出工天數（半天 0.5）、月薪整月、加班費照勞基法（FJC.hr.draftSlip）；確認才產生正式薪資條和應付；
+// 每一筆零用金／代墊一張卡：確認＝加進這期薪資（零用金結算就不再算這筆，不會付兩次）、退回＝不加（照走零用金）
+function _attStaff(){var out=[],cnt={};try{_hrActive().forEach(function(p){var n=String(p.name||'').trim();if(!n)return;cnt[n]=(cnt[n]||0)+1;out.push({id:p.id,name:n});});}catch(e){_err('_attStaff',e);}
+  return out.map(function(x){x.dup=cnt[x.name]>1;return x;});}
+function _attCrewText(t){var m=/【\s*人和機具\s*】([^【]*)/.exec(String(t||''));return m?m[1].trim().slice(0,600):'';}
+// 誰可以確認這個案子的出工：管理員＋這案的工務。工務名單（主線的專案工務名單）上線後只改這個函式，卡片不用改
+function _attReviewers(q){var L=[];try{var p=(typeof _prjOfQ==='function')?_prjOfQ(q):null,w=p&&(p.siteStaff||p.crewStaff);if(Array.isArray(w))L=w.map(function(x){return String((x&&x.email)||x||'').toLowerCase();}).filter(Boolean);}catch(e){_err('_attReviewers',e);}return L;}
+function _attCanSee(q){if(_decIsAdmin())return true;var me=String(_meEmail()||'').toLowerCase();return !!me&&_attReviewers(q).indexOf(me)>=0;}
+// 把一則日報的【人和機具】拆成出工：回傳有沒有改到 log（crewOf 還沒載入就先只存原文，之後 _attScan 再補）
+function _attIngest(q,log,crew){
+  if(!log)return false;var ch=false;
+  if(crew!=null){crew=String(crew||'').trim().slice(0,600);if(crew!==String(log.crewText||'')){log.crewText=crew;delete log.attAt;ch=true;}}
+  if(!log.crewText||log.attAt)return ch;
+  var dl=window.FJC&&FJC.dl;if(!dl||typeof dl.crewOf!=='function')return ch;
+  var S=_attStaff();if(!S.length)return ch;   // 名冊在管理員裝置才讀得到，其他裝置等管理員那邊補
+  var r;try{r=dl.crewOf(log.crewText,S.filter(function(x){return !x.dup;}).map(function(x){return x.name;}));}catch(e){_err('_attIngest',e);return ch;}
+  var byName={};S.forEach(function(x){if(!x.dup)byName[x.name]=x.id;});
+  var att=[],ask=[];
+  ((r&&r.people)||[]).forEach(function(p,i){if(!p||p.temp)return;
+    var hid=p.sure&&p.staff?byName[p.staff]:'';
+    if(hid&&!p.why){if(!p.off&&p.day>0)att.push({hrId:hid,name:p.staff,day:p.day,ot:+p.ot||0});return;}
+    var cand=(p.cand||[]).map(function(n){return byName[n];}).filter(Boolean);
+    S.forEach(function(x){if(x.dup&&x.name===p.name&&cand.indexOf(x.id)<0)cand.push(x.id);});   // 名冊同名兩個人：兩個都列，請人選
+    ask.push({i:i,raw:String(p.raw||'').slice(0,30),name:String(p.name||'').slice(0,12),day:p.off?0:(+p.day||0),ot:+p.ot||0,why:String(p.why||(cand.length>1?'名冊有兩個同名的人':'')).slice(0,80),cand:cand.slice(0,4)});
+  });
+  log.att=att;log.attAsk=ask;log.attWhy=((r&&r.why)||[]).map(function(w){return String(w).slice(0,80);}).slice(0,5);log.attAt=Date.now();
+  if(!ask.length&&!log.attWhy.length)log.attOk=1;else delete log.attOk;
+  return true;
+}
+// 管理員裝置：日報有【人和機具】原文但還沒拆過的（例：寫入時 crewOf 還沒上線），補拆一次（冪等：拆過就有 attAt）
+function _attScan(){if(!_decIsAdmin())return;var n=0;(Q||[]).forEach(function(q){var ch=false;(q&&q.dailyLogs||[]).forEach(function(L){if(L&&L.crewText&&!L.attAt&&_attIngest(q,L))ch=true;});if(ch){_touch(q);n++;}});if(n)try{persist();}catch(e){_err('_attScan',e);}}
+function _attPending(L){return !!(L&&L.attAt&&!L.attOk&&((L.attAsk||[]).length||(L.attWhy||[]).length));}
+function _attAskRows(){try{_attScan();}catch(e){_err('_attAskRows',e);}var out=[];
+  (Q||[]).forEach(function(q){if(!q||!_attCanSee(q))return;(q.dailyLogs||[]).forEach(function(L){if(_attPending(L))out.push({q:q,L:L});});});
+  return out.sort(function(a,b){return String(a.L.date).localeCompare(String(b.L.date));});}
+function _attName(id){var p=null;try{p=_hrPeople().find(function(x){return x.id===id;});}catch(e){_err('_attName',e);}return p?String(p.name||''):'';}
+function _attDayTxt(d){return d>=1?'一天':(d>0?'半天':'沒來');}
+function _attAskDetail(g){var L=g.L,nw='white-space:nowrap';
+  var ok=(L.att||[]).map(function(a){return '<tr><td>'+esc(a.name||_attName(a.hrId))+'</td><td class="dnw" style="'+nw+'">'+_attDayTxt(a.day)+'</td><td class="dnw" style="'+nw+'">'+(a.ot?a.ot+' 小時':'—')+'</td></tr>';}).join('');
+  var ask=(L.attAsk||[]).map(function(a){var c=(a.cand||[]).map(_attName).filter(Boolean);return '<tr style="background:#fff8e1"><td>'+esc(a.raw||a.name)+'</td><td class="dnw" style="'+nw+'">'+_attDayTxt(a.day)+'</td><td class="dnw" style="'+nw+'">'+(a.ot?a.ot+' 小時':'—')+'</td><td>'+esc(a.why||'')+(c.length?'<br><span style="color:var(--b4)">確認＝算成「'+esc(c[0])+'」'+(c.length>1?'（不只一個可能，請按修改選）':'')+'</span>':'<br><span style="color:var(--b4)">名冊找不到，請按修改選人或標不算</span>')+'</td></tr>';}).join('');
+  return '<div style="font-size:12px;margin-bottom:6px"><b>日報原文【人和機具】</b><div style="white-space:pre-wrap;background:var(--gl);padding:6px 8px;border-radius:6px;margin-top:2px">'+esc(L.crewText||'')+'</div></div>'
+    +((L.attWhy||[]).length?'<div style="font-size:12px;color:#b45309;margin-bottom:6px">'+L.attWhy.map(esc).join('<br>')+'</div>':'')
+    +(ask?'<div style="font-size:12px;font-weight:700;margin:4px 0 2px">要確認的人</div><table class="tbl" style="width:100%;font-size:12px"><thead><tr><th>日報寫</th><th>天數</th><th>加班</th><th>為什麼要確認</th></tr></thead><tbody>'+ask+'</tbody></table>':'')
+    +'<div style="font-size:12px;font-weight:700;margin:8px 0 2px">已對到名冊</div>'+(ok?'<table class="tbl" style="width:100%;font-size:12px"><thead><tr><th>人</th><th>天數</th><th>加班</th></tr></thead><tbody>'+ok+'</tbody></table>':'<div style="font-size:12px;color:var(--b3)">（沒有）</div>')
+    +'<div style="font-size:11.5px;color:var(--b4);margin-top:6px">這張卡只看人名、天數、加班時數；薪資金額在每月的薪資草稿卡，只有管理員看得到。點工／臨時工不算進薪資。</div>';}
+function _attSave(g,att,log){var L=g.L;L.att=att;L.attAsk=[];L.attOk=1;L.attBy=String(_meEmail()||'').slice(0,80);L.attLog=(L.attLog||[]).concat([{at:Date.now(),by:L.attBy,how:log}]).slice(-5);_touch(g.q);persist();return true;}
+function _attAddTo(att,hid,day,ot){if(!hid||!(day>0))return;var x=att.find(function(a){return a.hrId===hid;});if(x){x.day=Math.max(x.day,day);x.ot=(+x.ot||0)+(+ot||0);return;}att.push({hrId:hid,name:_attName(hid),day:day,ot:+ot||0});}
+function _attEdit(g){var L=g.L,S=_attStaff();
+  var opt=function(sel){return '<option value="">不算（點工／不是員工）</option>'+S.map(function(x){return '<option value="'+esc(x.id)+'"'+(x.id===sel?' selected':'')+'>'+esc(x.name)+(x.dup?'（同名）':'')+'</option>';}).join('');};
+  var rows=(L.attAsk||[]).map(function(a,i){return '<div style="border:1px solid var(--b1);border-radius:6px;padding:6px 8px;margin-bottom:6px;font-size:12.5px"><div style="margin-bottom:4px">日報寫：<b>'+esc(a.raw||a.name)+'</b>　<span style="color:#b45309">'+esc(a.why||'')+'</span></div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap"><select id="att-p'+i+'" style="flex:1;min-width:130px">'+opt((a.cand||[])[0]||'')+'</select>'
+    +'<select id="att-d'+i+'"><option value="1"'+(a.day>=1?' selected':'')+'>一天</option><option value="0.5"'+(a.day>0&&a.day<1?' selected':'')+'>半天</option><option value="0"'+(!(a.day>0)?' selected':'')+'>沒來</option></select>'
+    +'<input id="att-o'+i+'" type="number" inputmode="decimal" min="0" step="0.5" value="'+(a.ot||'')+'" placeholder="加班時數" style="width:90px"></div></div>';}).join('');
+  _modal(esc(String(g.q.name||''))+' '+esc(_qMD(L.date))+' 出工',(rows||'<div style="font-size:12.5px">沒有要選的人；確認＝照已對到名冊的寫入</div>')+'<div style="font-size:11.5px;color:var(--b4)">只改這一天的出工；人員名冊在帳務 › 薪資</div>',function(){
+    var att=(L.att||[]).map(function(a){return Object.assign({},a);});
+    (L.attAsk||[]).forEach(function(a,i){var hid=(document.getElementById('att-p'+i)||{}).value||'',d=parseFloat((document.getElementById('att-d'+i)||{}).value)||0,o=Math.max(0,parseFloat((document.getElementById('att-o'+i)||{}).value)||0);_attAddTo(att,hid,d,o);});
+    _attSave(g,att,'edit');toast('已記下出工');try{_decRefresh('attAsk');}catch(e){_err('_attEdit',e);}return true;});
+}
+_decReg('attAsk',{
+  title:'出工確認',todo:function(n){return 'LINE 日報出工待確認 '+n+' 筆';},sub:'日報【人和機具】有人對不到名冊或人數對不上；確認＝照卡片算出工、修改＝逐人選、退回＝這幾個人不算',
+  canSee:function(){return true;},   // 每案再看 _attCanSee（管理員＋該案工務）
+  list:function(){return _attAskRows();},
+  key:function(g){return g.q.id+'|'+g.L.id;},
+  head:function(g){var n=(g.L.attAsk||[]).length;return '「'+String(g.q.name||'')+'」'+_qMD(g.L.date)+' 出工'+(n?' '+n+' 人要確認':'人數對不上');},
+  body:function(g){return '<div style="font-size:11.5px;color:var(--b4);white-space:pre-wrap">'+esc(String(g.L.crewText||'').slice(0,80))+'</div>';},
+  detail:function(g){return _attAskDetail(g);},
+  ok:function(g){var A=g.L.attAsk||[];if(A.some(function(a){return (a.cand||[]).length!==1;})){_attEdit(g);return 'open';}
+    var att=(g.L.att||[]).map(function(a){return Object.assign({},a);});A.forEach(function(a){_attAddTo(att,a.cand[0],a.day,a.ot);});_attSave(g,att,'ok');toast('已記下出工');return true;},
+  reject:function(g){_attSave(g,(g.L.att||[]).slice(),'reject');return true;},
+  edit:function(g){_attEdit(g);}
+});
+// ── 每月薪資草稿 ──
+function _payYmPrev(){return _pcYmPrev(localToday().slice(0,7));}
+function _payDraftOn(ym){try{return _decIsAdmin()&&!((P.payDraftSkip||{})[ym]);}catch(e){return false;}}
+function _payAttLogs(){var out=[];(Q||[]).forEach(function(q){(q&&q.dailyLogs||[]).forEach(function(L){if(L&&(L.att||[]).length)out.push({date:L.date,site:String(q.name||''),att:L.att});});});return out;}
+function _payAttPend(ym){var n=0;(Q||[]).forEach(function(q){(q&&q.dailyLogs||[]).forEach(function(L){if(_attPending(L)&&String(L.date||'').slice(0,7)===ym)n++;});});return n;}
+// 零用金／代墊的決定存在人員薪資設定 h.payAdd（private，只有管理員讀得到）：鍵＝月份|來源 id，值 add＝加進薪資、no＝不加
+function _payAddKey(ym,it){return ym+'|'+String(it.cid||'');}
+function _payAddOf(h,ym,it){var m=h&&h.payAdd;return (m&&m[_payAddKey(ym,it)])||'';}
+function _payAddSet(p,ym,it,v){var h=p.h;if(!h)return false;var m=Object.assign({},h.payAdd||{}),cut=_pcYmPrev(_pcYmPrev(_pcYmPrev(ym)));
+  Object.keys(m).forEach(function(k){if(k.slice(0,7)<cut)delete m[k];});m[_payAddKey(ym,it)]=v;h.payAdd=m;_touch(h);saveHR();
+  try{var r=_pcOf(p.id,ym);if(r&&r.status!=='paid'){_pcBuild(p,ym);savePetty();}_hrSyncPayables(ym);}catch(e){_err('_payAddSet',e);}return true;}
+function _payAdds(p,ym){return _pcItems(p.name,ym).filter(function(it){return _payAddOf(p.h,ym,it)==='add';});}
+function _payPeople(){return _hrActive().filter(function(p){return p.h&&_hrNum(p.h.base)>0;});}
+function _payDraftOf(ym){
+  var logs=_payAttLogs(),rows=[];
+  _payPeople().forEach(function(p){if(PAYSLIPS.some(function(s){return s&&s.hrId===p.id&&s.ym===ym;}))return;
+    var att=FJC.hr.monthAtt(logs,ym,p.id),adds=_payAdds(p,ym),s=FJC.hr.draftSlip(p.h,att,adds.map(function(it){return {amt:it.amt,note:it.desc};}));
+    var prev=PAYSLIPS.find(function(x){return x&&x.hrId===p.id&&x.ym===_pcYmPrev(ym);})||null;
+    rows.push({p:p,att:att,s:s,adds:adds,prev:prev,noAtt:p.h.payType==='day'&&!(att.days>0),hadPrev:!!prev});});
+  return rows;}
+function _payAddRows(ym){var out=[];
+  _payPeople().forEach(function(p){if(PAYSLIPS.some(function(s){return s&&s.hrId===p.id&&s.ym===ym;}))return;var r=_pcOf(p.id,ym);if(r&&r.status==='paid')return;
+    _pcItems(p.name,ym).forEach(function(it){if(!it.cid||!(it.amt>0)||_payAddOf(p.h,ym,it))return;out.push({p:p,ym:ym,it:it});});});
+  return out;}
+function _payDraftList(){var ym=_payYmPrev();if(!_payDraftOn(ym))return [];var rows=_payDraftOf(ym);return rows.length?[{ym:ym,rows:rows}]:[];}
+function _payDraftDetail(g){var t={net:0,co:0};
+  var kv=function(k,v,b){return '<div style="color:var(--b4)">'+k+'</div><div class="dnw" style="text-align:right;white-space:nowrap'+(b?';font-weight:700':'')+'">'+v+'</div>';};
+  var blk=g.rows.map(function(r){var s=r.s,h=r.p.h,d=r.prev?s.net-(+r.prev.net||0):null;t.net+=s.net;t.co+=s.coCost;
+    var days=h.payType==='day'?(r.att.days+' 天'+(r.att.half?'（半天 '+r.att.half+' 次）':'')):'月薪整月';
+    var bySite={};r.att.rows.forEach(function(x){var k=x.sites.join('、')||'—';(bySite[k]=bySite[k]||[]).push(String(+x.date.slice(8))+(x.day<1?'半':'')+(x.ot?'+'+x.ot+'h':''));});
+    var src=Object.keys(bySite).map(function(k){return esc(k)+'：'+bySite[k].join(' ');}).join('<br>');
+    var flag=(s.noIns?'<span style="color:#b45309;font-weight:700;margin-left:6px">沒有勞健保</span>':'')+(r.noAtt?'<div style="color:#b45309;font-weight:700">'+(r.hadPrev?'上個月有領，':'')+'這個月沒有出工紀錄（底薪 0）</div>':'');
+    return '<div style="border:1px solid var(--b1);border-radius:6px;padding:6px 8px;margin-bottom:6px;font-size:12px'+(s.noIns||r.noAtt?';background:#fff8e1':'')+'"><div><b>'+esc(r.p.name)+'</b>'+flag+'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr auto;gap:1px 10px;margin-top:3px">'+kv('出工',days)+kv('底薪',fmt(s.baseAmt))+kv('加班',s.otH?s.otH+' 小時　'+fmt(s.otAmt):'—')+kv('津貼＋其他',fmt(s.tel+s.other)+(s.addAmt?'（含代墊 '+fmt(s.addAmt)+'）':''))+kv('應扣（勞健保自付）',fmt(s.ded))+kv('實發',fmt(s.net),1)+kv('比上個月',d==null?'—':(d>0?'+':'')+fmt(d))+'</div>'
+      +(src?'<div style="font-size:11px;color:var(--b4);margin-top:3px">出工日（半＝半天、+h＝加班）<br>'+src+'</div>':'')
+      +(r.adds.length?'<div style="font-size:11px;color:var(--b4);margin-top:2px">代墊加進：'+r.adds.map(function(a){return esc(_qMD(a.date)+' '+a.desc)+' '+fmt(a.amt);}).join('；')+'</div>':'')+'</div>';}).join('');
+  var pend=_payAttPend(g.ym),adds=_payAddRows(g.ym).length;
+  return ((pend||adds)?'<div style="font-size:12px;color:#b71c1c;font-weight:700;margin-bottom:6px">'+(pend?'還有 '+pend+' 筆出工待確認':'')+(pend&&adds?'、':'')+(adds?'還有 '+adds+' 筆零用金／代墊還沒決定加不加':'')+'，先處理完才能確認</div>':'')
+    +blk+'<div style="font-size:12px;margin-top:6px">實發合計 <b>NT$'+fmt(t.net)+'</b>　公司負擔勞健保勞退 NT$'+fmt(t.co)+'</div>'
+    +'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">日薪＝日薪 × 出工天數（半天算 0.5 天）；月薪照整月，請假扣薪按「修改」到薪資頁改；加班費每天照勞基法：前 2 小時 × 1.34、之後 × 1.67，時薪沒填用日薪 ÷ 8（月薪 ÷ 240）。確認後才產生正式薪資條和應付。</div>';}
+function _payDraftOk(g){var pend=_payAttPend(g.ym),adds=_payAddRows(g.ym).length;
+  if(pend||adds){toast('先處理'+(pend?'出工確認 '+pend+' 筆':'')+(pend&&adds?'、':'')+(adds?'零用金／代墊 '+adds+' 筆':''));return false;}
+  var rows=_payDraftOf(g.ym),n=0;
+  rows.forEach(function(r){var s=_psFromHR(r.p,g.ym);s.days=r.p.h.payType==='day'?r.att.days:0;s.extra=r.s.otAmt;s.other=_hrNum(r.p.h.otherAllow)+r.s.addAmt;
+    s.note=('出工 '+(r.p.h.payType==='day'?r.att.days+' 天':'整月')+(r.s.otH?'、加班 '+r.s.otH+' 小時':'')+(r.adds.length?'、代墊 '+r.adds.length+' 筆加進':'')).slice(0,120);s.src='draft';s.otH=r.s.otH;
+    _psCalc(s);PAYSLIPS.push(_touch(s));n++;});
+  if(!n)return false;savePayslips();try{_hrSyncPayables(g.ym);}catch(e){_err('_payDraftOk',e);}toast('已產生 '+n+' 筆正式薪資條與應付');return true;}
+_decReg('payDraft',{
+  title:'薪資草稿',todo:function(n){var g=_payDraftList()[0];return g?_psYmText(g.ym)+' 薪資草稿 '+g.rows.length+' 人待確認':'薪資草稿待確認';},sub:'確認＝產生正式薪資條和應付；退回＝這個月改成手動產生；修改＝到帳務 › 薪資',
+  canSee:function(){return _decIsAdmin();},
+  list:function(){return _payDraftList();},
+  key:function(g){return 'pay_'+g.ym;},
+  head:function(g){return _psYmText(g.ym)+' 薪資草稿 '+g.rows.length+' 人';},
+  fields:function(g){var t=g.rows.reduce(function(a,r){return a+r.s.net;},0),y=g.rows.filter(function(r){return r.s.noIns||r.noAtt;}).length;return [{label:'實發合計',value:'NT$'+fmt(t),money:true},{label:'要注意',value:y?y+' 人標黃色':'沒有'}];},
+  detail:function(g){return _payDraftDetail(g);},
+  ok:function(g){return _payDraftOk(g);},
+  reject:function(g){P.payDraftSkip=Object.assign({},P.payDraftSkip||{});P.payDraftSkip[g.ym]=1;_salesSave();toast('這個月改成到帳務 › 薪資手動產生');return true;},
+  edit:function(g){try{var m=document.getElementById('fy-modal');if(m)m.remove();}catch(e){_err('payDraft.edit',e);}go('payroll');setTimeout(function(){var el=document.getElementById('pr-ym');if(el){el.value=g.ym;renderPayroll();}},50);}
+});
+_decReg('payAdd',{
+  title:'零用金／代墊要不要加進薪資',todo:function(n){return '零用金／代墊 '+n+' 筆：要不要加進薪資';},sub:'確認＝加進這期薪資（零用金結算就不再算這筆）；退回＝不加，照走零用金',
+  canSee:function(){return _decIsAdmin();},
+  list:function(){var ym=_payYmPrev();return _payDraftOn(ym)?_payAddRows(ym):[];},
+  key:function(g){return g.p.id+'|'+_payAddKey(g.ym,g.it);},
+  head:function(g){return '「'+g.p.name+'」'+_qMD(g.it.date)+' '+String(g.it.desc||g.it.cat||'支出').slice(0,30);},
+  fields:function(g){return [{label:'金額',value:'NT$'+fmt(g.it.amt),money:true},{label:'工程',value:g.it.proj||'—'}];},
+  detail:function(g){var r=_pcOf(g.p.id,g.ym),q=_hrNum(g.p.h.pettyQuota);
+    return '<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12.5px"><div style="color:var(--b4)">人</div><div>'+esc(g.p.name)+'</div><div style="color:var(--b4)">日期</div><div>'+esc(g.it.date||'')+'</div><div style="color:var(--b4)">工程</div><div>'+esc(g.it.proj||'—')+'</div><div style="color:var(--b4)">項目</div><div>'+esc(g.it.desc||'')+(g.it.cat?'（'+esc(g.it.cat)+'）':'')+'</div><div style="color:var(--b4)">金額</div><div><b>NT$'+fmt(g.it.amt)+'</b></div>'
+      +'<div style="color:var(--b4)">零用金</div><div>'+(q>0?'定額 NT$'+fmt(q)+'／月':'沒有設定零用金定額')+(r?'，'+_psYmText(g.ym)+' 結算'+(r.status==='paid'?'已發放':'還沒發放'):'')+'</div></div>'
+      +'<div style="font-size:11.5px;color:var(--b4);margin-top:6px">確認＝這筆加進 '+esc(_psYmText(g.ym))+' 薪資的「其他」，零用金結算就扣掉這筆（同一筆不會付兩次）；退回＝不加，照走零用金補足／代墊。</div>';},
+  ok:function(g){_payAddSet(g.p,g.ym,g.it,'add');toast('已加進這期薪資草稿');return true;},
+  reject:function(g){_payAddSet(g.p,g.ym,g.it,'no');return true;},
+  edit:function(g){try{var m=document.getElementById('fy-modal');if(m)m.remove();}catch(e){_err('payAdd.edit',e);}go('payroll');setTimeout(function(){try{acctTab('petty');var el=document.getElementById('pr-ym');if(el){el.value=g.ym;renderPayroll();}}catch(e){_err('payAdd.edit2',e);}},50);}
 });
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
