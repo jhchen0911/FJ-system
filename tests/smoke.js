@@ -14781,6 +14781,9 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.235 報價自動存檔（寬 ' + W + '）：沒改不存、打字停 3 秒才存且留在編輯頁、日報成本不動、10 分鐘一份備份、驗證沒過不存寫原因、別台改別欄兩邊都留、同欄記衝突、離開才加客戶、新報價填名稱才存且重號改號、唯讀與舊選單不自動存', !r.err && r.noChg && r.wait && r.saved && r.backup && r.invalid && r.items && r.backupOnce && r.merge && r.conflict && r.custWait && r.leave && r.newWait && r.newSaved && r.codeShown && r.newOnce && r.ro && r.old, JSON.stringify(r));
     check('v6.0.235 報價自動存檔測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.234 審查修正：舊整筆應付付一部分照總額、介紹費不算施工成本、薪資／零用金照 id 判斷且唯讀帳號看不到、已收款要真的收了 ──
   {
     const { page, errors } = await newPage(browser, 390, 844);
