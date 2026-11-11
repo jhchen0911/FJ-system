@@ -136,6 +136,7 @@ html,body{height:100%;font-family:'Segoe UI','Noto Sans TC','PingFang TC',sans-s
 .dec-detail .tbl-wrap{overflow-x:visible}
 .dec-detail .tbl{min-width:0!important;width:100%;table-layout:auto}
 .dec-detail .tbl th,.dec-detail .tbl td{white-space:normal!important;word-break:break-word;overflow-wrap:anywhere}
+.dec-detail .tbl td.nw{white-space:nowrap!important;word-break:normal;overflow-wrap:normal}   /* v6.0.232 金額、差異不拆成兩行 */
 .dec-detail img,.dec-detail iframe,.dec-detail embed,.dec-detail object,.dec-detail video{max-width:100%}
 /* v5.317：只有真的橫向溢出（由 JS 加 .can-scroll）才顯示右緣漸層＋箭頭提示 */
 @media(max-width:767px){
@@ -2918,7 +2919,7 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
 <script src="calc/matmove.js?v=6.0.221" defer></script>
 <script src="calc/bid.js?v=6.0.209" defer></script>
 <script src="calc/dailyparse.js?v=6.0.227" defer></script>
-<script src="app.js?v=6.0.231" defer></script><script src="beta.js?v=6.0.231" defer></script>
+<script src="app.js?v=6.0.233" defer></script><script src="beta.js?v=6.0.233" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">
