@@ -167,12 +167,13 @@ test('擴充線 B 地層資料 geo：一批多案、只收白名單欄位；座�
   const r = D.build(Object.assign({}, base, { body: { type: 'geo', payload: { rows } } }));
   assert.ok(r.rec, r.err);
   assert.strictEqual(r.rec.type, 'geo'); assert.match(r.rec.summary, /地層資料 2 案（1 案座標有問題）/);
-  assert.deepStrictEqual(r.rec.payload.rows[0], { qid: '', code: '1151101', name: '', lat: 25, lng: 121.5, addr: '假市假區', soil: { fill: '1m', main: '假土層', n: '5~9', gw: 'GL-2m' }, src: '假資料夾' });
+  assert.deepStrictEqual(r.rec.payload.rows[0], { qid: '', code: '1151101', name: '', lat: 25, lng: 121.5, addr: '假市假區', soil: { fill: '1m', fillDepth: 1, layers: '假土層', nText: '5~9', gw: { obs: 'GL-2m', tmp: '', perm: '' } }, method: '', acc: '', unit: '', rptDate: '', rpt: '', folder: '', note: '', src: '假資料夾' });
+  assert.strictEqual(r.rec.payload.rows[1].lat, 121.5);   // 座標有問題的照收（卡片標不寫）
   assert.match(D.build(Object.assign({}, base, { body: { type: 'geo', payload: { rows: [{ lat: 25, lng: 121.5 }] } } })).err, /qid、code 或 name/);
   assert.match(D.build(Object.assign({}, base, { body: { type: 'geo', payload: { rows: Array.from({ length: 301 }, () => ({ code: 'a', lat: 25, lng: 121.5 })) } } })).err, /最多 300/);
   assert.match(D.build(Object.assign({}, base, { body: { type: 'geo', payload: {} } })).err, /要有 rows/);
   const qb = { type: 'quote', payload: { fields: { name: '假新案', client: '假業主', items: [{ desc: '假工項', unit: '式', qty: 1, price: 100 }] }, geo: { lat: 25.01, lng: 121.51, soil: { main: '假砂' } } }, expect: { sub: 100, tax: 5, total: 105 } };
   const q = D.build(Object.assign({}, base, { body: qb }));
-  assert.ok(q.rec, q.err); assert.strictEqual(q.rec.payload.geo.lat, 25.01); assert.strictEqual(q.rec.payload.geo.soil.main, '假砂');
+  assert.ok(q.rec, q.err); assert.strictEqual(q.rec.payload.geo.lat, 25.01); assert.strictEqual(q.rec.payload.geo.soil.layers, '假砂');
   assert.match(D.build(Object.assign({}, base, { body: Object.assign({}, qb, { payload: Object.assign({}, qb.payload, { geo: { lat: 35, lng: 139 } }) }) })).err, /geo：/);
 });

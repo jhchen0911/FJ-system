@@ -8,20 +8,34 @@
   // 台灣本島＋離島的大致範圍；超出就當成座標打錯（經緯度對調最常見）
   var BOX = { lat0: 21.5, lat1: 26.6, lng0: 118.0, lng1: 122.5 };
   function okLL(lat, lng) { return isFinite(lat) && isFinite(lng) && lat >= BOX.lat0 && lat <= BOX.lat1 && lng >= BOX.lng0 && lng <= BOX.lng1; }
-  // 一案的地層資料：只收白名單欄位、長度有上限；座標不合理回 err（不猜）
+  // 一案的地層資料：只收白名單欄位、長度有上限；座標不合理回 err（不猜）。
+  // 欄位對電腦端鑽探摘要 CSV（陳軒 11/12）：soil.fill 回填層文字、fillDepth 回填底深 m（範圍取最大值）、layers 主要土層（由上而下 →）、
+  //   nText N 值範圍、gw {obs 觀測, tmp 設計臨時, perm 設計永久}；method 抽取方式（PDF文字／OCR／轉引）、acc 座標來源（精度旗標）、
+  //   unit 鑽探單位、rptDate 報告日期、rpt 報告檔相對路徑、folder 案件資料夾、note 備註、src 來源說明。舊名 main／n／gw 字串照收。
+  function fillDepthOf(v, txt) {
+    var n = num(v); if (isFinite(n) && n > 0 && n < 100) return Math.round(n * 100) / 100;
+    var m = String(txt || '').replace(/[－−–—]/g, '-').match(/\d+(?:\.\d+)?(?=\s*m)/gi);   // 「GL-0～-2.8m」→ 2.8（取最大值）
+    if (!m) return null; var x = Math.max.apply(null, m.map(parseFloat)); return x > 0 && x < 100 ? x : null;
+  }
   function clean(g) {
     g = (g && typeof g === 'object') ? g : {};
+    var s = (g.soil && typeof g.soil === 'object') ? g.soil : {}, gw = s.gw, gwo = (gw && typeof gw === 'object') ? gw : { obs: gw };
+    var o = { lat: null, lng: null, addr: S(g.addr, 120),
+      soil: { fill: S(s.fill, 120), fillDepth: fillDepthOf(s.fillDepth, s.fill), layers: S(s.layers != null ? s.layers : s.main, 300), nText: S(s.nText != null ? s.nText : s.n, 200),
+        gw: { obs: S(gwo.obs, 60), tmp: S(gwo.tmp, 60), perm: S(gwo.perm, 60) } },
+      method: S(g.method, 20), acc: S(g.acc, 40), unit: S(g.unit, 60), rptDate: S(g.rptDate, 20), rpt: S(g.rpt, 200), folder: S(g.folder, 120), note: S(g.note, 300), src: S(g.src, 80) };
     var lat = num(g.lat), lng = num(g.lng);
+    if (g.lat == null || g.lat === '' || g.lng == null || g.lng === '') return { err: '沒有座標（電腦端查不到' + (o.acc ? '：' + o.acc : '') + '）', g: null, part: o };
     if (!okLL(lat, lng)) {
-      if (okLL(lng, lat)) return { err: '座標好像經緯度對調了（lat 要在 21.5～26.6、lng 要在 118～122.5）' };
-      return { err: '座標不在台灣範圍（lat 21.5～26.6、lng 118～122.5）' };
+      if (okLL(lng, lat)) return { err: '座標好像經緯度對調了（lat 要在 21.5～26.6、lng 要在 118～122.5）', part: o };
+      return { err: '座標不在台灣範圍（lat 21.5～26.6、lng 118～122.5）', part: o };
     }
-    var s = (g.soil && typeof g.soil === 'object') ? g.soil : {};
-    var o = { lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6, addr: S(g.addr, 120),
-      soil: { fill: S(s.fill, 60), main: S(s.main, 120), n: S(s.n, 60), gw: S(s.gw, 60) }, src: S(g.src, 80) };
+    o.lat = Math.round(lat * 1e6) / 1e6; o.lng = Math.round(lng * 1e6) / 1e6;
     return { g: o };
   }
-  function hasSoil(g) { var s = g && g.soil; return !!(s && (s.fill || s.main || s.n || s.gw)); }
+  // 要人工確認的：OCR 讀的數字、概略位置（里中心）
+  function needCheck(g) { var w = []; if (g && /OCR/i.test(g.method || '')) w.push('OCR 讀的數字要人工確認'); if (g && /里中心|概略/.test(g.acc || '')) w.push('位置是概略（' + g.acc + '）'); return w; }
+  function hasSoil(g) { var s = g && g.soil, w = s && s.gw; return !!(s && (s.fill || s.layers || s.main || s.nText || s.n || (w && (typeof w === 'object' ? (w.obs || w.tmp || w.perm) : w)))); }
   // 兩點距離（公里，haversine）
   function dist(a, b) {
     var R = 6371, rad = Math.PI / 180, dLat = (num(b.lat) - num(a.lat)) * rad, dLng = (num(b.lng) - num(a.lng)) * rad;
@@ -52,7 +66,7 @@
       return { x: Math.round((c + dx * k) * 10) / 10, y: Math.round((c - dy * k) * 10) / 10 };
     });
   }
-  var geo = { BOX: BOX, okLL: okLL, clean: clean, hasSoil: hasSoil, dist: dist, near: near, rate: rate, plot: plot };
+  var geo = { BOX: BOX, okLL: okLL, clean: clean, needCheck: needCheck, fillDepthOf: fillDepthOf, hasSoil: hasSoil, dist: dist, near: near, rate: rate, plot: plot };
   if (typeof module !== 'undefined' && module.exports) module.exports = { geo: geo };
   if (root) { root.FJC = root.FJC || {}; root.FJC.geo = geo; }
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

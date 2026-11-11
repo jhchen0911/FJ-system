@@ -554,8 +554,13 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const r = G.rate([{ res: 'won' }, { res: 'won' }, { res: 'lost' }, { res: 'open' }, { res: 'void' }]);
   check('擴充線 B 地層：接工率＝得標÷（得標＋未得標），未定、流標不算；沒有結果＝null', r.won === 2 && r.lost === 1 && r.rate === 66.7 && r.open === 1 && r.void === 1 && G.rate([{ res: 'open' }]).rate === null);
   const ok = G.clean({ lat: '25.0123456', lng: 121.5, addr: '某市某區', soil: { fill: '1.5m', main: '粉土質砂', n: '8~15', gw: 'GL-3m', x: 'drop' }, junk: 1 });
-  check('擴充線 B 地層：clean 只收白名單、座標取 6 位；經緯度對調、台灣以外回錯誤', ok.g && ok.g.lat === 25.012346 && ok.g.soil.main === '粉土質砂' && !('x' in ok.g.soil) && !('junk' in ok.g)
-    && /對調/.test(G.clean({ lat: 121.5, lng: 25 }).err) && /台灣/.test(G.clean({ lat: 35, lng: 139 }).err) && /台灣/.test(G.clean({}).err));
+  check('擴充線 B 地層：clean 只收白名單、座標取 6 位；經緯度對調、台灣以外回錯誤', ok.g && ok.g.lat === 25.012346 && ok.g.soil.layers === '粉土質砂' && ok.g.soil.gw.obs === 'GL-3m' && !('x' in ok.g.soil) && !('junk' in ok.g)
+    && /對調/.test(G.clean({ lat: 121.5, lng: 25 }).err) && /台灣/.test(G.clean({ lat: 35, lng: 139 }).err) && /沒有座標/.test(G.clean({}).err));
+  const c2 = G.clean({ lat: 25, lng: 121.5, soil: { fill: 'GL-0～-2.8m（回填土）', layers: '回填土(2.8)→粉土質砂(12)', nText: '5~12', gw: { obs: 'GL-3.2m', tmp: 'GL-2m', perm: 'GL-1m' } }, method: 'OCR', acc: '里中心概略' });
+  const c3 = G.clean({ lat: '', lng: '', acc: '查不到', soil: { layers: '黏土' } });
+  check('擴充線 B 地層（電腦端 CSV 欄位，陳軒 11/12）：回填底深取範圍最大值、地下水位分觀測／設計臨時／設計永久；OCR 與里中心概略要人工確認；沒有座標＝不寫但地層照清',
+    c2.g.soil.fillDepth === 2.8 && c2.g.soil.gw.perm === 'GL-1m' && G.needCheck(c2.g).length === 2 && G.needCheck({ method: 'PDF文字', acc: '報告TWD97孔位換算' }).length === 0
+    && /沒有座標/.test(c3.err) && c3.part.soil.layers === '黏土' && G.fillDepthOf('', '回填約 1.5 m') === 1.5, JSON.stringify(c2.g.soil));
   const pl = G.plot([{ lat: 25.0, lng: 121.5 }, { lat: 25.0 + 2 / 111.32, lng: 121.5 }], c0, 2, 240);
   check('擴充線 B 地層：點位圖圓心在中間、北朝上、半徑處貼圈邊', pl[0].x === 120 && pl[0].y === 120 && pl[1].x === 120 && Math.abs(pl[1].y - 10) < 0.2, JSON.stringify(pl));
 }

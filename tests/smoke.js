@@ -14008,11 +14008,11 @@ async function newPage(browser, width, height) {
           { id: 'qG4', code: 'G04', name: '範例待補案', items: [], _mt: 1 }, { id: 'qG5', code: 'G05', name: '範例舊案丙', items: [], _mt: 1 }];
         P.geoR = 2;
         DRAFTS = { dGeo001: { id: 'dGeo001', type: 'geo', by: 'ai@example.com', byName: 'AI', at: Date.now() - 1000, status: 'pending', summary: '地層資料 3 案',
-          payload: { rows: [{ code: 'G04', lat: 25.005, lng: 121.505, addr: '範例市範例區', soil: soil('粉土'), src: '範例資料夾' }, { code: 'G99', lat: 25.0, lng: 121.5 }, { code: 'G05', lat: 121.5, lng: 25.0 }] } } };
+          payload: { rows: [{ code: 'G04', lat: 25.005, lng: 121.505, addr: '範例市範例區', soil: soil('粉土'), src: '範例資料夾', method: 'OCR' }, { code: 'G99', lat: 25.0, lng: 121.5 }, { code: 'G05', lat: 121.5, lng: 25.0 }] } } };
         const items = []; _v6TodoItems(items);
         out.card = items.some((x) => x.type === 'dec_geoFix') && !_draftPending().some((d) => d.type === 'geo');
         const x = document.createElement('div'); x.innerHTML = _DEC.geoFix.detail(DRAFTS.dGeo001); const t = x.textContent;
-        out.detail = /寫入 1 案/.test(t) && /範例待補案/.test(t) && /找不到這案/.test(t) && /對調/.test(t) && /粉土/.test(t) && !!x.querySelector('a[href^="https://www.google.com/maps/search/"][rel~="noopener"]');
+        out.detail = /寫入 1 案/.test(t) && /OCR 讀的數字要人工確認/.test(t) && /範例待補案/.test(t) && /找不到這案/.test(t) && /對調/.test(t) && /粉土/.test(t) && !!x.querySelector('a[href^="https://www.google.com/maps/search/"][rel~="noopener"]');
         // 修改：把找不到的改對到 qG5、排除第 1 案 → 只寫 qG5
         DRAFTS.dGeo001.payload = Object.assign({}, DRAFTS.dGeo001.payload, { ov: { 0: { skip: true }, 1: { qid: 'qG5' } } });
         const pl = _geoPlan(DRAFTS.dGeo001); out.edit = pl[0].st === 'skip' && pl[1].st === 'new' && pl[1].q.id === 'qG5' && pl[2].st === 'bad';

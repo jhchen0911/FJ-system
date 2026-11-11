@@ -46627,8 +46627,10 @@ function _geoDraftG(g){if(!g||typeof g!=='object'||!window.FJC||!FJC.geo)return 
 function _geoRes(q){return q.awarded?'won':(q.bidStatus==='lost'?'lost':(q.bidStatus==='void'?'void':'open'));}
 var _GEO_RES_T={won:'得標',lost:'未得標',open:'未定',void:'流標'};
 function _geoList(){return (Q||[]).filter(function(q){return q&&q.id&&!q.parentId&&q.geo&&FJC.geo.okLL(+q.geo.lat,+q.geo.lng);})
-  .map(function(q){return {id:q.id,name:q.name||'',code:q.code||'',lat:+q.geo.lat,lng:+q.geo.lng,soil:q.geo.soil||{},res:_geoRes(q),date:q.date||''};});}
-function _geoSoilTxt(s){s=s||{};return [s.fill?'回填 '+s.fill:'',s.main?s.main:'',s.n?'N '+s.n:'',s.gw?'水位 '+s.gw:''].filter(Boolean).join('｜')||'（沒有地層資料）';}
+  .map(function(q){return {id:q.id,name:q.name||'',code:q.code||'',lat:+q.geo.lat,lng:+q.geo.lng,soil:q.geo.soil||{},method:q.geo.method||'',acc:q.geo.acc||'',res:_geoRes(q),date:q.date||''};});}
+function _geoGwTxt(w){if(!w)return '';if(typeof w!=='object')return '水位 '+w;var t=[w.obs?'觀測 '+w.obs:'',w.tmp?'設計臨時 '+w.tmp:'',w.perm?'設計永久 '+w.perm:''].filter(Boolean);return t.length?'水位 '+t.join('、'):'';}
+function _geoSoilTxt(s){s=s||{};var L=s.layers!=null&&s.layers!==''?s.layers:s.main,N=s.nText!=null&&s.nText!==''?s.nText:s.n;
+  return [s.fill?'回填 '+s.fill:(s.fillDepth?'回填底深 '+s.fillDepth+' m':''),L||'',N?'N '+N:'',_geoGwTxt(s.gw)].filter(Boolean).join('｜')||'（沒有地層資料）';}
 function _geoMapUrl(lat,lng){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent((+lat).toFixed(6)+','+(+lng).toFixed(6));}
 function _geoNear(q){if(!q||!q.geo||!window.FJC||!FJC.geo)return null;var pt={lat:+q.geo.lat,lng:+q.geo.lng};if(!FJC.geo.okLL(pt.lat,pt.lng))return null;
   var R=_geoR(),L=FJC.geo.near(_geoList(),pt,R,q.parentId||q.id);return {pt:pt,R:R,L:L,rate:FJC.geo.rate(L)};}
@@ -46650,7 +46652,7 @@ function _qGeoHtml(q){
   if(!N.L.length)return h+'<div style="color:var(--b3)">半徑內沒有已登錄地層的舊案。</div></div>';
   h+=_geoSvg(N,admin)+'<div style="font-size:10.5px;color:var(--b3);text-align:center">沒有底圖；點圓點開 Google 地圖'+(admin?'｜綠＝得標、紅＝未得標、灰＝未定或流標':'')+'</div>';
   h+='<ol style="margin:6px 0 0;padding-left:20px">'+N.L.map(function(x){return '<li style="overflow-wrap:anywhere"><b>'+esc(x.km.toFixed(2))+' km</b> '+esc(x.name)+(admin?'（'+_GEO_RES_T[x.res]+'）':'')
-    +' <a href="'+esc(_geoMapUrl(x.lat,x.lng))+'" target="_blank" rel="noopener" style="font-size:11px">地圖</a><br><span style="color:var(--b4)">'+esc(_geoSoilTxt(x.soil))+'</span></li>';}).join('')+'</ol>';
+    +' <a href="'+esc(_geoMapUrl(x.lat,x.lng))+'" target="_blank" rel="noopener" style="font-size:11px">地圖</a>'+(FJC.geo.needCheck(x).length?' <span style="font-size:11px;color:#b26a00">'+esc(FJC.geo.needCheck(x).join('；'))+'</span>':'')+'<br><span style="color:var(--b4)">'+esc(_geoSoilTxt(x.soil))+'</span></li>';}).join('')+'</ol>';
   return h+'</div>';
 }
 function _qGeoRender(){
@@ -46666,7 +46668,7 @@ function _geoFind(r){var S=_draftS,M=(Q||[]).filter(function(q){return q&&q.id&&
   return (id&&M.find(function(q){return q.id===id;}))||(cd&&M.find(function(q){return S(q.code).trim()===cd;}))||(nm&&M.find(function(q){return S(q.name).trim()===nm;}))||null;}
 function _geoClean(p){p=(p&&typeof p==='object')?p:{};var rows=Array.isArray(p.rows)?p.rows:(p.rows&&typeof p.rows==='object'?Object.values(p.rows):[]);
   return {rows:rows.slice(0,300).map(function(r){r=(r&&typeof r==='object')?r:{};var c=FJC.geo.clean(r);
-    return {qid:_draftS(r.qid).slice(0,80),code:_draftS(r.code).slice(0,60),name:_draftS(r.name).slice(0,120),g:c.g||null,err:c.err||''};}),
+    return {qid:_draftS(r.qid).slice(0,80),code:_draftS(r.code).slice(0,60),name:_draftS(r.name).slice(0,120),g:c.g||null,part:c.part||null,err:c.err||''};}),
     ov:(p.ov&&typeof p.ov==='object')?p.ov:{}};}
 window.fyGeoDraft=function(p){if(!window.FJC||!FJC.geo)return Promise.resolve({ok:false,why:'calc/geo.js 沒載入'});var o=_geoClean(p);if(!o.rows.length)return Promise.resolve({ok:false,why:'要有 rows（每案 qid 或 code、lat、lng、soil）'});
   var bad=o.rows.filter(function(r){return r.err;}).length;
@@ -46679,12 +46681,15 @@ function _geoPlan(d){var o=_geoClean(d&&d.payload),ov=o.ov;
 var _GEO_ST_T={new:'新增',upd:'更新（覆蓋舊值）',skip:'排除（不寫）',bad:'座標有問題（不寫）',none:'找不到這案（不寫）'};
 function _geoDetail(d){var L=_geoPlan(d),n=L.filter(function(x){return x.st==='new'||x.st==='upd';}).length;
   return '<div style="font-size:12px;line-height:1.6">確認後寫入 <b>'+n+'</b> 案；有問題的按「修改」排除或改對哪一案。座標由電腦端轉好，點「地圖」核對位置。</div>'
-    +L.map(function(x){var g=x.r.g,warn=x.st==='bad'||x.st==='none';
+    +L.map(function(x){var g=x.r.g||x.r.part,nc=g?FJC.geo.needCheck(g):[],warn=x.st==='bad'||x.st==='none'||(nc.length&&x.st!=='skip');
       return '<div style="border:1px solid '+(warn?'#ffcc80':'var(--b1)')+';background:'+(warn?'#fff8e1':(x.st==='skip'?'#f5f5f5':'#fff'))+';border-radius:8px;padding:6px 8px;margin-top:6px;font-size:12px;line-height:1.6;overflow-wrap:anywhere">'
         +'<b>'+(x.i+1)+'. '+esc(x.q?(x.q.name||'(未命名)'):(x.r.name||x.r.code||x.r.qid||'(沒有案名)'))+'</b>　<span style="color:'+(warn?'#b26a00':'var(--g3)')+'">'+esc(_GEO_ST_T[x.st])+'</span>'
         +(x.st==='bad'?'<br><span style="color:#b26a00">'+esc(x.r.err)+'</span>':'')
-        +(g?('<br>'+esc(g.addr||'（沒有地址）')+'　<a href="'+esc(_geoMapUrl(g.lat,g.lng))+'" target="_blank" rel="noopener">地圖 '+g.lat.toFixed(5)+','+g.lng.toFixed(5)+'</a>'
-          +'<br>地層：'+esc(_geoSoilTxt(g.soil))+(g.src?'<br><span style="color:var(--b4)">來源：'+esc(g.src)+'</span>':'')):'')
+        +(nc.length&&x.st!=='skip'?'<br><b style="color:#b26a00">⚠ '+esc(nc.join('；'))+'</b>':'')
+        +(g?('<br>'+esc(g.addr||'（沒有地址）')+(x.r.g?'　<a href="'+esc(_geoMapUrl(g.lat,g.lng))+'" target="_blank" rel="noopener">地圖 '+g.lat.toFixed(5)+','+g.lng.toFixed(5)+'</a>':'')
+          +(g.acc?'<br><span style="color:var(--b4)">座標來源：'+esc(g.acc)+'</span>':'')
+          +'<br>地層：'+esc(_geoSoilTxt(g.soil))
+          +'<br><span style="color:var(--b4)">'+esc([g.unit?'鑽探單位 '+g.unit:'',g.rptDate?'報告日期 '+g.rptDate:'',g.method?'抽取 '+g.method:'',g.folder?'資料夾 '+g.folder:'',g.rpt?'報告 '+g.rpt:'',g.src||'',g.note?'備註 '+g.note:''].filter(Boolean).join('｜'))+'</span>'):'')
         +(x.st==='upd'?'<br><span style="color:var(--b4)">舊值：'+esc(_geoSoilTxt(x.q.geo.soil))+'</span>':'')+'</div>';}).join('');}
 _decReg('geoFix',{
   title:'地層資料（電腦端整理的）',todo:function(n){return '地層資料待確認 '+n+' 批';},sub:'確認＝整批寫進各案；退回＝整批不寫；修改＝排除某幾案或改對哪一案',
