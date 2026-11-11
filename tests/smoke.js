@@ -8172,8 +8172,8 @@ async function newPage(browser, width, height) {
         out.owner = cfg.owners.Uabc123 && cfg.owners.Uabc123.name === 'Lotion' && !cfg.pending.users.Uabc123;
         await new Promise(res => setTimeout(res, 50)); document.getElementById('lg-q-Gsite9999').value = 'qL'; lineGroupSave('Gsite9999'); await new Promise(res => setTimeout(res, 60));
         out.group = cfg.groups.Gsite9999 && cfg.groups.Gsite9999.qid === 'qL' && cfg.groups.Gsite9999.daily === true && !cfg.pending.groups.Gsite9999;
-        await new Promise(res => setTimeout(res, 50)); document.querySelector('#line-box details').open = true; document.getElementById('lt-daily3').value = 'Lotion 定稿三句'; lineTextsSave(); await new Promise(res => setTimeout(res, 50));
-        out.texts = cfg.texts && cfg.texts.daily3 === 'Lotion 定稿三句';
+        await new Promise(res => setTimeout(res, 50)); document.querySelector('#line-box details').open = true; document.getElementById('lt-dailyFmtHead').value = 'Lotion 定稿說明'; lineTextsSave(); await new Promise(res => setTimeout(res, 50));
+        out.texts = cfg.texts && cfg.texts.dailyFmtHead === 'Lotion 定稿說明';
         linePushTest(); await new Promise(res => setTimeout(res, 30)); const pk = Object.keys(store).find(k => /^fydata\/linePush\//.test(k)); out.push = !!pk && store[pk].status === 'pending';
         /* 5. 唯讀帳號看不到 LINE 卡 */
         _isReaderUser = true; renderLineBox(); out.roHide = box.style.display === 'none'; _isReaderUser = false;
