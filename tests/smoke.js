@@ -11722,6 +11722,37 @@ async function newPage(browser, width, height) {
     check('v6.0.227 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── 審查第 6 點（Lotion 11/11 選「同一張加一列拔除」）：同一期打設、拔除都有 → 原列請打設、另加一列（拔除）照拔除 % 請；累計兩列合算；存檔後對報價不跑掉 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepI = INV;
+      try {
+        const d = (n) => _dAdd(localToday(), n);
+        Q = [{ id: 'qR', name: '拔除另列案', client: '合成營造', awarded: true, items: [{ desc: 'H型鋼樁 H300 打設＋拔除', unit: '支', qty: 100, price: 1000 }], dailyLogs: [] }];
+        INV = []; pjNewInv('qR');
+        const p1 = INV[0]; p1.date = d(-20); p1.items[0].curQty = 50; p1.items[0].payRate = 70; p1.items[0].phase = 'install'; _recalcInvAmounts(p1); _touch(p1); saveInv();
+        Q[0].dailyLogs = [{ id: 'a', date: d(-5), progressRows: [{ itemIdx: 0, qty: 40, ph: 'install' }] }, { id: 'b', date: d(-3), progressRows: [{ itemIdx: 0, qty: 20, ph: 'remove' }] }];
+        pjNewInv('qR');
+        await new Promise((res) => setTimeout(res, 300));
+        const main = invItems.find((x) => x && x.type === 'item' && !x.remOf), rem = invItems.find((x) => x && x.remOf);
+        out.rows = !!main && !!rem && main.curQty === 40 && main.payRate === 70 && rem.curQty === 20 && rem.payRate === 30 && rem.phase === 'remove' && /（拔除）/.test(rem.desc) && rem.remOf === 'H型鋼樁 H300 打設＋拔除';
+        const k = invItems.indexOf(rem);
+        out.map = _invItemQIdx(Q[0], k) === 0;
+        const c = _invItemCumPct(main, invItems);
+        out.cum = c != null && c === _invItemCumPct(rem, invItems) && Math.abs(c - Math.round(((parseFloat(main.prevQty) || 0) + 40 * 0.7 + 20 * 0.3) * 10) / 10) < 0.11;
+        saveInvoice();
+        const p2 = INV.find((x) => String(x.periodNo) === '2');
+        out.saved = !!p2 && p2.items.filter((x) => x && x.type === 'item').length === 2 && p2.items.some((x) => x.remOf && x.curQty === 20) && parseFloat(p2.totals.total) > 0;
+        // 拔除列的金額＝20 支 × 1,000 × 30%
+        const rr = p2.items.find((x) => x.remOf); out.amt = Math.round(parseFloat(rr.curAmt) || 0) === 6000;
+      } finally { Q = keepQ; INV = keepI; }
+      return out;
+    });
+    check('審查第 6 點：同一期打設 40、拔除 20 → 原列請打設 40（70%）、另加一列（拔除）請 20（30%，6,000）；累計兩列合算、存檔後拔除列還對得到報價那一項', Object.values(r).length === 5 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('審查第 6 點測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.226 請款鏈 1：請款單狀態（草稿→已送業主→業主已確認→已開發票→已收款）、舊單推算清單卡、業主確認卡＋發票照抄範例 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
