@@ -3096,6 +3096,7 @@ function settleInvItem(i){
   if(!ok)return;
   if(it.origContractQty==null)it.origContractQty=orig; // 保留原始合約數量
   it.contractQty=cum;
+  _invRemOf(it,invItems).forEach(function(rr){rr.contractQty=cum;});   /* 審查：拔除另列的合約數量一起改 */
   // v5.316：結算軌跡改存內部欄位。原本併入 note，而 note 會直接印在交給業主的估驗表上，
   // 等於把「合約 100 改成 85」的內部調整過程給業主看見。
   const tag='工項結算：原'+orig+'→實'+cum;
@@ -3616,7 +3617,7 @@ function rInvItems(){
       // 超請警示（不擋儲存）：前期+本期 > 合約數量 → 本期數量欄變紅
       function _chkOver(){
         const cq=parseFloat(invItems[i].contractQty)||0;
-        const cum=Math.round(((parseFloat(invItems[i].prevQty)||0)+_curW(invItems[i]))*100)/100;
+        const cum=Math.round(_invRemSibs(invItems[i],invItems).reduce((a,y)=>a+(parseFloat(y.prevQty)||0)+_curW(y),0)*100)/100;   /* 審查：拔除另列跟原列合算 */
         const inp2=tr.querySelector('input[data-f="curQty"]');
         if(!inp2)return;
         if(cq>0&&cum>cq+1e-9){   // _qRetired 只影響「仍是舊版」判斷，不關超請警示
@@ -3674,7 +3675,7 @@ function rInvItems(){
       const tdDel=document.createElement('td');
       tdDel.style.whiteSpace='nowrap';
       const delBtn=document.createElement('button');delBtn.className='dbtn';delBtn.textContent='✕';
-      delBtn.addEventListener('click',function(){invItems.splice(i,1);rInvItems();rInvTots();});
+      delBtn.addEventListener('click',function(){const _rr=_invRemOf(invItems[i],invItems);invItems.splice(i,1);_rr.forEach(r=>{const j=invItems.indexOf(r);if(j>=0)invItems.splice(j,1);});rInvItems();rInvTots();});   /* 審查：刪原列連拔除另列一起刪 */
       tdDel.appendChild(delBtn);tr.appendChild(tdDel);
     }
     // 拖動排序（drag to reorder）
@@ -3788,7 +3789,8 @@ function rInvTots(srcInv){
   // ★ 若 installCum=0 且非打設期（資料未從前期帶入），cum/pending 以 null 表示未知
   const installRows=[], removeRows=[];
   invItems.forEach(it=>{
-    if(it.type==='sec')return;
+    if(it.type==='sec'||it.remRid)return;   /* 審查：拔除另列併進原工項那一列 */
+    const _rrs=_invRemOf(it,invItems);
     const d=it.desc||'';
     // v5.377：改用明確的類別／期別欄位；未指定時才退回舊的關鍵字推定
     const _c=_itemCat(it);
@@ -3800,7 +3802,7 @@ function rInvTots(srcInv){
     const contract=parseFloat(it.contractQty)||0;
     const curQty=parseFloat(it.curQty)||0;
     const installCumPrev=parseFloat(it.installCum)||0;
-    const removeCumPrev=parseFloat(it.removeCum)||0;
+    const removeCumPrev=(parseFloat(it.removeCum)||0)+_rrs.reduce((a,y)=>a+(parseFloat(y.removeCum)||0),0);
     const shortDesc=d.length>30?d.substring(0,30)+'…':d;
 
     // ── 打設累積 ──
@@ -3824,11 +3826,11 @@ function rInvTots(srcInv){
     }
 
     // ── 拔除累積 ──
-    const remCur=_isRemove?curQty:0;
+    const remCur=(_isRemove?curQty:0)+_rrs.reduce((a,y)=>a+(parseFloat(y.curQty)||0),0);
     const remCum=removeCumPrev+remCur;
 
     // ── 拔除面板（有拔除記錄才顯示）──
-    if(hasRemove&&(remCum>0||_isRemove)){
+    if(hasRemove&&(remCum>0||_isRemove||_rrs.length)){
       // 拔除面板的「合約」參照欄 = 打設累積（若已知）
       const remContract=instDataKnown?instCum:null;
       const remPending=instDataKnown?Math.max(0,instCum-remCum):null;
@@ -3882,7 +3884,7 @@ function saveInvoice(){
     if(it.type==='sec')continue;
     if((parseFloat(it.curQty)||0)<0||((parseFloat(it.contractPrice)||0)<0&&!_invNegOk(it))){toast('數量／單價不可為負數');return;}   // 健檢1 #3／#1：議價尾差、調整列放行負單價
     const cq=parseFloat(it.contractQty)||0;
-    if(cq>0&&((parseFloat(it.prevQty)||0)+_curW(it))>cq+1e-9)_overN++;   // 審查修正：_qRetired 不關超請警示
+    if(!it.remRid&&cq>0&&_invRemSibs(it,invItems).reduce((a,y)=>a+(parseFloat(y.prevQty)||0)+_curW(y),0)>cq+1e-9)_overN++;   // 審查修正：_qRetired 不關超請警示；拔除另列跟原列合算
   }
   (invItems||[]).forEach(it=>{if(it&&it.type!=='sec')it.curAmt=_invRowAmt(it);});   // 健檢1 #4：存檔前以統一算法重算本期金額（不靠畫面是否重算過）
   const t=rInvTots();
@@ -5263,7 +5265,7 @@ function _invAutoDaily(inv){
       it.phase='install';it.payRate=_invPhasePct(q,q.items[idx],'install');it.curQty=ins;n++;
       if(!it.rid)it.rid='r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
       const r=JSON.parse(JSON.stringify(it));const d0=String(it.desc||'').split('\n');d0[0]=d0[0].trim()+'（拔除）';
-      Object.assign(r,{desc:d0[0],remOf:_invRowKey(it),remRid:it.rid,phase:'remove',payRate:_invPhasePct(q,q.items[idx],'remove'),prevQty:0,prevAmt:0,curQty:rem,curAmt:0,curDays:0,installCum:0,removeCum:0});
+      Object.assign(r,{desc:d0.join('\n'),remOf:_invRowKey(it),remRid:it.rid,phase:'remove',payRate:_invPhasePct(q,q.items[idx],'remove'),prevQty:0,prevAmt:0,curQty:rem,curAmt:0,curDays:0,installCum:0,removeCum:0});
       ['rid','icSeen','note','internalNote','origContractQty','_qRetired','settledQty','prevPayRate'].forEach(f=>{delete r[f];});   /* 審查：拔除列不帶原列的備註、結算、統計 */
       _adds.push([k,r]);n++;return;
     }
@@ -6818,13 +6820,15 @@ function rebuildCumulatives(inv){
         it.contractPrice=parseFloat(firstItem.contractPrice);
       }
     }
+    // 審查：拔除另列只有拔除量＝前幾期同一列（remRid 一樣）的本期數量加總，不用名稱推
+    if(it.remRid){let ra=0;prevInvs.forEach(prev=>{(prev.items||[]).forEach(x=>{if(x&&x.remRid===it.remRid)ra+=parseFloat(x.curQty)||0;});});it.installCum=0;it.removeCum=ra;return;}
     // 只修復 installCum=0 的工項（removeCum 有值不影響判斷）
     if((parseFloat(it.installCum)||0)>0)return;
 
     // 從前期累積重建
     let installAcc=0, removeAcc=0;
     prevInvs.forEach(prev=>{
-      const prevItem=(prev.items||[]).find(x=>x.type!=='sec'&&x.desc===it.desc);
+      const prevItem=(prev.items||[]).find(x=>x.type!=='sec'&&!x.remRid&&x.desc===it.desc);
       if(!prevItem)return;
       // 若前期也有 installCum 記錄，直接取最新前期的值（最省事）
       // 否則從 curQty + payRate 推算
@@ -6834,12 +6838,12 @@ function rebuildCumulatives(inv){
       const prevCurQty=parseFloat(prevItem.curQty)||0;
       if(prevInstallCum>0||prevRemoveCum>0){
         // 前期有記錄，用記錄值（加上本期貢獻）
-        installAcc=prevInstallCum+(prevRate!==30?prevCurQty:0);
-        removeAcc=prevRemoveCum+(prevRate===30?prevCurQty:0);
+        installAcc=prevInstallCum+(!_isRemovePeriod(prevItem)?prevCurQty:0);   /* 審查：照期別判斷（合約 60/40 時拔除不是 30%） */
+        removeAcc=prevRemoveCum+(_isRemovePeriod(prevItem)?prevCurQty:0);
       } else {
         // 前期也沒記錄，從 curQty + payRate 推算
-        installAcc+=(prevRate!==30?prevCurQty:0);
-        removeAcc+=(prevRate===30?prevCurQty:0);
+        installAcc+=(!_isRemovePeriod(prevItem)?prevCurQty:0);
+        removeAcc+=(_isRemovePeriod(prevItem)?prevCurQty:0);
       }
     });
 
@@ -22293,7 +22297,7 @@ function _qtyRecon(q){
     if(!same)return;
     (v.items||[]).forEach(function(x){
       if(!x||x.type==='sec')return;
-      var d=String(x.desc||'').split('\n')[0].trim();if(!d)return;
+      var d=x.remRid?_invRowKey(x):String(x.desc||'').split('\n')[0].trim();if(!d)return;   /* 審查：拔除另列算回原工項 */
       billed[d]=(billed[d]||0)+_curW(x);var _pr=(x.payRate==null||x.payRate==='')?100:parseFloat(x.payRate);if(!isFinite(_pr))_pr=100;billBy[d]=billBy[d]||{};billBy[d][_pr]=(billBy[d][_pr]||0)+(parseFloat(x.curQty)||0);   // v6.0.26 實際請款數量（不加權）
     });
   });
@@ -34304,7 +34308,7 @@ function pjNewInv(qid){
   var q=Q.find(function(x){return x.id===qid;});if(!q)return;
   var _bl=[],_nb=function(L){return L.filter(function(x){try{if(_icBlank(x)){_bl.push(x);return false;}}catch(e){_err('pjNewInv.blank',e);}return true;});};
   var list=_nb(_invsOfQuote(q));if(!list.length)list=_nb(_invsOfQuoteAll(q));   /* 審查：先拿掉舊版得標自動建的空白第 1 期再找（不然真的第一張變第 2 期） */
-  if(!list.length&&_bl.length){var b0=_bl[0];try{_invStSet(b0,'draft','舊版得標建的空白第 1 期，拿來當這次的第 1 期');}catch(e){_err('pjNewInv.reuse',e);}_touch(b0);saveInv();loadInvoice(b0.id);go('invoice-edit');toast('用原本的空白第 1 期開始填');return;}   /* 直接用那一張（不會多一張，也不會被自動收） */
+  if(!list.length&&_bl.length){var b0=_bl[0];try{_invStSet(b0,'draft','舊版得標建的空白第 1 期，拿來當這次的第 1 期');b0.date=localToday();}catch(e){_err('pjNewInv.reuse',e);}_touch(b0);saveInv();loadInvoice(b0.id);go('invoice-edit');toast('用原本的空白第 1 期開始填');return;}   /* 直接用那一張（不會多一張，也不會被自動收） */
   if(!list.length){var inv=buildInvFromQuote(q);INV.unshift(inv);saveInv();loadInvoice(inv.id);go('invoice-edit');toast('已從報價單建立第 1 期請款單');return;}
   var last=list.slice().sort(function(a,b){return (parseInt(b.periodNo)||0)-(parseInt(a.periodNo)||0)||String(b.date||'').localeCompare(String(a.date||''));})[0];
   addNextPeriod(last.id);
@@ -37161,7 +37165,7 @@ function _salesUnitQty(q,unit){
   all.forEach(function(x){var m=null;try{m=_effQtyMap(x);}catch(e){_err('_salesUnitQty',e);}
     (x.items||[]).forEach(function(it){if(!it||it.sec||_qNegLine(it)||_uFix(it.unit||'')!==u)return;contract+=Math.abs(_effQty(m,it))||0;descs[String(it.desc||'').trim()]=1;});});
   (INV||[]).forEach(function(i){if(!i)return;var same=(i.quoteId&&all.some(function(x){return x.id===i.quoteId;}))||String(i.project||'').trim()===String(q.name||'').trim();if(!same)return;
-    (i.items||[]).forEach(function(x){if(!x||x.type==='sec'||x.type==='rental'||x.neg)return;if(!descs[String(x.desc||'').trim()])return;billed+=_curW(x);});});
+    (i.items||[]).forEach(function(x){if(!x||x.type==='sec'||x.type==='rental'||x.neg)return;var _m=x.remRid?_invRemMain(x,i.items):null;if(!descs[String((_m||x).desc||'').trim()])return;billed+=_curW(x);});});   /* 審查：拔除另列算在原工項 */
   return {unit:u,contract:Math.round(contract*100)/100,billed:Math.round(billed*100)/100};
 }
 function _salesCommAmt(q){return _commAmtFor(q,_salesCommCfg(q));}   // 抽成總額（預估）

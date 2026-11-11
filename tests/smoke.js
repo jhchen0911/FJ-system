@@ -11756,10 +11756,13 @@ async function newPage(browser, width, height) {
         p2.date = d(-2); _touch(p2); saveInv(); pjNewInv('qR'); await new Promise((res) => setTimeout(res, 300));
         const m3 = invItems.find((x) => x && x.rid && !x.remRid), r3 = invItems.filter((x) => x && x.remRid);
         out.next = !!m3 && m3.phase === 'install' && m3.curQty === 5 && m3.payRate === 70 && r3.length === 1 && r3[0].curQty === 7 && r3[0].payRate === 30;
+        // 審查（第三次）：業務抽成「每單位×實作量」把拔除另列也算進已請量
+        saveInvoice(); const _exp = INV.filter((v) => v.quoteId === 'qR' || v.sourceQid === 'qR').reduce((t, v) => t + (v.items || []).filter((x) => x && x.type === 'item').reduce((a, x) => a + _curW(x), 0), 0);
+        out.sales = Math.abs(_salesUnitQty(Q[0], '支').billed - Math.round(_exp * 100) / 100) < 0.01 && _exp > 0;
       } finally { Q = keepQ; INV = keepI; }
       return out;
     });
-    check('審查第 6 點：同一期打設 40、拔除 20 → 原列請打設 40（70%）、另加一列（拔除）請 20（30%，6,000）；累計兩列合算、存檔後拔除列還對得到報價那一項', Object.values(r).length === 8 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('審查第 6 點：同一期打設 40、拔除 20 → 原列請打設 40（70%）、另加一列（拔除）請 20（30%，6,000）；累計兩列合算、存檔後拔除列還對得到報價那一項', Object.values(r).length === 9 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('審查第 6 點測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
