@@ -47,7 +47,7 @@
     return out; }
   // 跟 functions/ops/progress.js、calc/todo.js 的 itemCat 一樣
   function itemCat(it) { var c = it && it.cat; if (c === 'install') return { i: 1, r: 0 }; if (c === 'remove') return { i: 0, r: 1 }; if (c === 'both') return { i: 1, r: 1 }; if (c === 'other') return { i: 0, r: 0 };
-    var d = String((it && it.desc) || ''); return { i: /打設|裝設|安裝/.test(d) ? 1 : 0, r: /拔除|拆除/.test(d) ? 1 : 0 }; }
+    var d = String((it && it.desc) || ''); return { i: /打設|裝設|安裝|組立|鋪設|架設|吊裝|施打/.test(d) ? 1 : 0, r: /拔除|拆除/.test(d) ? 1 : 0 }; }   // 健檢 H2：字表跟 calc/todo.js itemCat 同一份
   function isLine(it) { return it && !it.sec && !it.spare && !(num(it.price) < 0 && num(it.qty) > 0) && String(it.desc || '').trim(); }
   // 一段文字裡的數量（排除 L=12M、第 2 層、長 9M、H300）
   function qtyOf(s) {
