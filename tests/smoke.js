@@ -1181,7 +1181,7 @@ async function newPage(browser, width, height) {
       // 日報欄位
       go('quickcost'); rQuickCost();
       const lbls = [...document.querySelectorAll('#page-quickcost label')].map(l => l.textContent.trim());
-      out.labels = lbls.some(t => /^出工/.test(t)) && document.querySelectorAll('#dr-crews .dr-crew').length === 2;   // v5.406 出工列取代兩欄人數
+      out.labels = lbls.some(t => /^出工/.test(t)) && (document.querySelectorAll('#dr-crews .dr-crew').length === 2 || (!!document.querySelector('#dr-crews .dr-lab') && document.querySelectorAll('#dr-crews .dr-crew').length === 1));   // 新選單：點工工班卡＋承包一列   // v5.406 出工列取代兩欄人數
       const sel = document.getElementById('dr-proj'); sel.value = 'qG'; sel.onchange();
       const row0 = document.getElementById('dr-prog-rows').firstElementChild;
       const ws = [...row0.children].filter(e => e.tagName !== 'BUTTON').map(e => e.getBoundingClientRect().width);
