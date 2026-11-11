@@ -11761,6 +11761,8 @@ async function newPage(browser, width, height) {
     });
     check('審查第 6 點：同一期打設 40、拔除 20 → 原列請打設 40（70%）、另加一列（拔除）請 20（30%，6,000）；累計兩列合算、存檔後拔除列還對得到報價那一項', Object.values(r).length === 8 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('審查第 6 點測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.235 新格式日報（Lotion 11/11）：草稿帶 17:30 的編號清單 fmtList → 卡片照編號對工項、單位照合約；【人和機具】不算；舊寫法照舊 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

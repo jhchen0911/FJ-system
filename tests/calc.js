@@ -511,6 +511,7 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('健檢 M2：「第一段拔除 40 支，這段拔完了」「…，這段拔完」都標本段完成', R('鋼板樁拔除 40 支，這段拔完了')[0].batchDone === true && R('第一段鋼板樁拔除 40 支，這段拔完了')[0].batchDone === true && R('鋼板樁拔除 40 支，這段拔完')[0].batchDone === true && R('鋼板樁拔除 40 支，這段還沒拔完')[0].batchDone === false);
   const c1 = T.closeReady({ q: { id: 'x', awarded: true }, hasRet: true, retLeft: 0, matLeft: 2, payLeft: 0 }), c2 = T.closeReady({ q: { id: 'x', awarded: true }, hasRet: true, retLeft: 0, matLeft: 0, payLeft: 0 });
   check('健檢：有保留款的案子材料還沒退完不出結案卡；退完才出', !c1.ok && c1.why.indexOf('mat') >= 0 && c2.ok);
+}
 // ── v6.0.235 新格式日報（Lotion 11/11）：17:30 範本帶工項編號；tests/synthetic/daily-line-fmt.json 新格式、舊格式、亂寫 28 則
 {
   const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl, F = require(path.join(__dirname, 'synthetic', 'daily-line.json')), G = require(path.join(__dirname, 'synthetic', 'daily-line-fmt.json'));
