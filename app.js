@@ -5031,7 +5031,7 @@ function confirmAward(){
   );
   // Auto-create invoice if not exists
   const existInv=INV.find(x=>x.sourceQid===id);
-  if(!existInv){
+  if(!existInv&&!window._awardNoInv){   // v6.0.233（陳軒 11/11 H4）：得標拍板卡不建空白第 1 期（不然真的第一張變第 2 期）
     const autoInv=buildInvFromQuote(q);
     INV.unshift(autoInv);saveInv();
     toast('已自動建立請款單草稿，請至請款單填寫估驗資訊');
@@ -38675,7 +38675,7 @@ var _CARD_FIELDS=[
   {k:'retention.pct',l:'保留款％',u:'%'},{k:'retention.release',l:'保留款退還條件'},
   {k:'rent.startRule',l:'租期起算'},{k:'rent.endMode',l:'租期結束日'},{k:'rent.includedDays',l:'含租期天數',u:'天'},{k:'rent.lateRate',l:'逾期租金單價'},{k:'rent.batchRule',l:'分次拔除算法'},
   {k:'deductions',l:'其他扣款'},{k:'penalty',l:'逾期罰款'},{k:'delivery',l:'請款單交付'},{k:'invoiceRule',l:'發票開法'}];
-var _CARD_APPLY={'billing.cutoffDay':1,'billing.payMonthOffset':1,'billing.payDay':1,'billing.cashPct':1,'billing.chequeDays':1,'billing.instPct':1,'billing.itemOverrides':1,'retention.pct':1,'retention.release':1,'rent.endMode':1,'ownerType':1};
+var _CARD_APPLY={'rent.includedDays':1,'rent.lateRate':1,'billing.cutoffDay':1,'billing.payMonthOffset':1,'billing.payDay':1,'billing.cashPct':1,'billing.chequeDays':1,'billing.instPct':1,'billing.itemOverrides':1,'retention.pct':1,'retention.release':1,'rent.endMode':1,'ownerType':1};
 var _CARD_DEF={'billing.cutoffDay':25,'billing.payMonthOffset':1,'billing.payDay':20,'billing.cashPct':0,'billing.chequeDays':30,'billing.instPct':70,'billing.removePct':30,'retention.pct':0};
 function _cardIsF(x){return !!(x&&typeof x==='object'&&!Array.isArray(x)&&('value' in x));}
 function _cardNorm(raw){   // 取一欄：欄位物件／欄位物件陣列／裸值 → {value,source,evidence,note}
@@ -38773,8 +38773,20 @@ function _cardSetOne(q,k,v,reason){
   if(k==='retention.pct'){q.deduct.ret=num(v)==null?'':num(v);return;}
   if(k==='retention.release'){q.deduct.retCond=String(v||'');return;}
   if(k==='rent.endMode'){q.rentEnd=(v==='removeDone')?'removeDone':'removeFirst';return;}
+  if(k==='rent.includedDays'||k==='rent.lateRate'){_cardRentSet(q,k,v);return;}   // v6.0.233（陳軒 11/11 M3）：寫進算租金用的工項欄位
   if(k==='ownerType'){var c=(CUSTOMERS||[]).find(function(x){return x&&x.name===q.client;});if(c&&_OWNER_TYPES.indexOf(v)>=0){c.ownerType=v;c._mt=Date.now();try{saveCustomers();}catch(e){_err('_cardSetOne',e);}}return;}
 }
+// 合約條件卡的含租期天數／逾期租金單價 → 寫進報價工項（算租金用的就是這兩個：工項備註「含 N 天租期」＝_rentDaysOf、逾期租金單價 it.ot）
+//   影響的工項＝報價裡有租期的工項（_rentDaysOf＞0）；天數：備註裡已有「含 N 天租期」就改數字，沒有就在備註後面加一句（備註優先於說明，_rentDaysOf 先讀備註）；單價只改數字、單位不動
+function _cardRentItems(q){return (q.items||[]).map(function(it,i){return {it:it,i:i};}).filter(function(x){return x.it&&!x.it.sec&&!_isSpare(x.it)&&!_qNegLine(x.it)&&_rentDaysOf(x.it)>0;});}
+function _cardRentPlan(q,k,v){var raw=(typeof v==='object'&&v)?v.value:v,m=String(raw==null?'':raw).match(/\d+(?:\.\d+)?/),n=m?parseFloat(m[0]):NaN;if(!(n>0))return [];   // 「逾期每支每日 12 元」這種文字也取得到數字
+  return _cardRentItems(q).map(function(x){var cur=k==='rent.includedDays'?_rentDaysOf(x.it):(parseFloat(x.it.ot)||0);return {i:x.i,desc:String(x.it.desc||'').split('\n')[0],from:cur,to:k==='rent.includedDays'?Math.round(n):n,unit:k==='rent.lateRate'?_uFix(x.it.otUnit||''):'天'};}).filter(function(x){return x.from!==x.to;});}
+function _cardRentSet(q,k,v){var pl=_cardRentPlan(q,k,v);if(!pl.length)return 0;
+  pl.forEach(function(x){var it=q.items[x.i];
+    if(k==='rent.lateRate'){it.ot=String(x.to);return;}
+    var nt=String(it.note||''),re=/(\d+(?:\.\d+)?)(\s*[天日]\s*[)）]?\s*租\s*期)/;
+    if(re.test(nt))it.note=nt.replace(re,String(x.to)+'$2');else it.note=(nt?nt+'；':'')+'含'+x.to+'天租期';});
+  return pl.length;}
 function _cardApply(pk){   // pk（v6.0.233，可省略）：拍板卡直接給要寫入的欄位，不讀畫面勾選
   var cx=_cardCtx;if(!cx)return;var q=Q.find(function(x){return x.id===cx.qid;});if(!q)return;
   var picked=Array.isArray(pk)?pk.slice():Array.prototype.map.call(document.querySelectorAll('.cc-pick'),function(c){return c.checked?c.getAttribute('data-k'):null;}).filter(Boolean);
@@ -42245,11 +42257,13 @@ function _ocDetail(d){
         +'<td style="padding:4px 6px;font-size:11.5px;color:var(--b5);vertical-align:top;overflow-wrap:anywhere">'+(ev.clause?'<b>'+esc(ev.clause)+'</b> ':'')+(ev.quote?'「'+esc(ev.quote)+'」':'')+(x.note?'<div style="color:var(--b4)">'+esc(x.note)+'</div>':'')+'</td></tr>';}).join('');
     return tr?'<tr><td colspan="3" style="padding:6px 6px 2px;font-weight:700;background:var(--gl)">'+esc(g[0])+'</td></tr>'+tr:'';}).join('');
   var imp=0;try{imp=_cardRecvImpact(q,F);}catch(e){_err('_ocDetail.impact',e);}
+  var rentPl=[];['rent.includedDays','rent.lateRate'].forEach(function(k){if(F[k]&&F[k].source!=='default')_cardRentPlan(q,k,F[k].value).forEach(function(x){rentPl.push((k==='rent.includedDays'?'含租期 ':'逾期租金 ')+x.desc+'：'+x.from+' → '+x.to+(x.unit?' '+x.unit:''));});});
   return (mism.length?'<div style="background:#ffebee;color:#b71c1c;border-radius:8px;padding:6px 9px;font-size:12px;margin:4px 0">卡片的'+mism.join('、')+'跟這案「'+esc(q.name||'')+'／'+esc(q.client||'')+'」不同，請確認沒有傳錯案子</div>':'')
     +'<div style="font-size:12.5px;margin:4px 0">工程：<b>'+esc(q.name||'')+'</b>　業主：'+esc(q.client||'')+'　'+(nDiff?'<b style="color:#b71c1c">跟專案不同 '+nDiff+' 欄</b>':'跟專案沒有不同')+(nMiss?'　<b style="color:#b71c1c">缺 '+nMiss+' 欄</b>':'')+'</div>'
     +(imp?'<div style="background:#fff8e1;color:#7a5a00;border-radius:8px;padding:6px 9px;font-size:12px;margin:4px 0">寫入放款規則後，<b>'+imp+'</b> 張還沒收款的請款單預計收款日會跟著變</div>':'')
+    +(rentPl.length?'<div style="background:#ffebee;color:#b71c1c;border-radius:8px;padding:6px 9px;font-size:12px;margin:4px 0"><b>確認後會改報價工項（算租金、逾期租金用的就是這些）：</b><ul style="margin:2px 0;padding-left:18px">'+rentPl.map(function(t){return '<li style="overflow-wrap:anywhere">'+esc(t)+'</li>';}).join('')+'</ul></div>':'')
     +'<table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed"><colgroup><col style="width:28%"><col style="width:34%"><col></colgroup><thead><tr><th style="text-align:left;padding:4px 6px">欄位</th><th style="text-align:left;padding:4px 6px">值（紅＝專案現在 → 合約）</th><th style="text-align:left;padding:4px 6px">條次原文</th></tr></thead><tbody>'+rows+'</tbody></table>'
-    +'<div style="font-size:11.5px;color:var(--b4);margin-top:6px">確認＝合約寫到的欄位寫進專案（放款規則、裝設％、保留款、退還條件、租期結束日、個別工項例外）；黃底＝合約未載明，不寫入；其他欄位存在合約條件卡供查看。修改＝開原本的對照表逐欄勾。</div>';
+    +'<div style="font-size:11.5px;color:var(--b4);margin-top:6px">確認＝合約寫到的欄位寫進專案（放款規則、裝設％、保留款、退還條件、租期結束日、個別工項例外、有租期工項的含租期天數與逾期租金單價）；黃底＝合約未載明，不寫入；其他欄位存在合約條件卡供查看。修改＝開原本的對照表逐欄勾。</div>';
 }
 function _ocOk(d){
   var x=DRAFTS[d.id];if(!x||x.status!=='pending'){toast('這張草稿已經處理過了');return false;}
@@ -42287,7 +42301,6 @@ function _bidCardPlan(d,q){
     +li('標成得標，寫得標率紀錄（成交金額 NT$ '+fmt(Math.round(tot))+' 含稅）')
     +li('報價工項單價寫進成交單價庫')
     +li(ct?'合約：已有「'+esc(ct.name||'')+'」，不重建':'建合約：'+esc(q.name||'')+'，NT$ '+fmt(Math.round(tot))+'（含稅）')
-    +li(inv?'請款單：已有，不重建':'建第一期請款單草稿')
     +li('建專案（案號）')
     +'</ol><div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>請款截止日：每月</span>'
     +'<input type="number" min="1" max="31" inputmode="numeric" value="'+esc(pd)+'" placeholder="不填" oninput="bidcPd(\''+escq(d.id)+'\',this.value)" style="width:70px;text-align:center;padding:5px 6px;border:1px solid var(--b2);border-radius:6px;font-size:13px">'
@@ -42303,7 +42316,7 @@ function _bidCardOk(d){
     var pd=_BIDC_PD[d.id]!=null?_BIDC_PD[d.id]:String(q.payDue||'');var n=parseInt(pd,10);if(pd&&!(n>=1&&n<=31)){toast('請款截止日要在 1～31');return false;}
     e1.value=q.id;e2.value=pd?String(n):'';
     window._draftApplying={id:x.id,kind:'award',target:q.id};
-    confirmAward();delete _BIDC_PD[d.id];
+    window._awardNoInv=true;try{confirmAward();}finally{window._awardNoInv=false;}delete _BIDC_PD[d.id];
     if(!q.awarded){window._draftApplying=null;return false;}
     return true;
   }
@@ -42532,29 +42545,22 @@ _decReg('closeAsk',{
   reject:function(q,why){if(_roDeny())return false;q.closeSkip={at:Date.now(),why:String(why||'').slice(0,200)};_touch(q);persist();try{updateDashTodo();}catch(e){_err('closeAsk.rej',e);}return true;},
   edit:function(q){var m=document.getElementById('fy-modal');if(m)m.remove();openProj(q.id);}
 });
-// v6.0.233 結案卡加包商評鑑（陳軒 11/10 晚佇列第 6 件）：這案（含追加）的分包卡廠商，品質／準時／配合各 1～5 分（可不評；評了就三題都要填）
-//   Lotion 11/11：分數只給管理員看 → 存在分包成本卡 c.eval（q.costs 走 private，員工讀不到），不放廠商名冊；同一案再評＝覆蓋。廠商歷來評鑑由 _cevOfVendor 從各案成本卡彙整。
-//   結案視窗按取消，評鑑一樣留著。
-var _CEV={},_CEV_K=[['q','品質'],['t','準時'],['c','配合']];
-function cevSet(qid,vi,k,v){var o=((_CEV[qid]=_CEV[qid]||{})[vi]=_CEV[qid][vi]||{});o[k]=k==='note'?String(v||'').slice(0,100):(parseInt(v,10)||0);}
-function _cevCards(q,name){var out=[];_retAskFam(q).forEach(function(x){(x.costs||[]).forEach(function(c){if(c&&c.type==='sub'&&!c.mergedInto&&String(c.vendor||'').trim()===name)out.push({q:x,c:c});});});return out;}
-function _cevVendors(q){var seen={},out=[];_retAskFam(q).forEach(function(x){(x.costs||[]).forEach(function(c){var n=String(c&&c.type==='sub'&&!c.mergedInto&&c.vendor||'').trim();if(n&&!seen[n]){seen[n]=1;out.push(n);}});});return out;}
-function _cevOld(q,name){var e=null;_cevCards(q,name).forEach(function(x){if(x.c.eval&&(!e||(+x.c.eval.at||0)>(+e.at||0)))e=x.c.eval;});return e;}
-// 某家廠商歷來評鑑（只有讀得到成本的管理員裝置有資料）：[{qid,qname,q,t,c,note,at}]，同一案只算一次
-function _cevOfVendor(name){var by={};(Q||[]).forEach(function(q){(q&&q.costs||[]).forEach(function(c){if(c&&c.type==='sub'&&String(c.vendor||'').trim()===name&&c.eval){var m=q.parentId||q.id;if(!by[m]||(+c.eval.at||0)>(+by[m].at||0))by[m]=Object.assign({qid:m,qname:q.name||''},c.eval);}});});return Object.keys(by).map(function(k){return by[k];});}
-function _cevHtml(q){var vs=_cevVendors(q);if(!vs.length||!_decIsAdmin())return '';var cur=_CEV[q.id]||{};
-  return '<div style="font-weight:700;font-size:13px;margin:10px 0 2px">五、包商評鑑（1～5 分，可不評；只有管理員看得到）</div>'+vs.map(function(n,vi){var old=_cevOld(q,n),o=cur[vi]||{};
-    return '<div style="border:1px solid var(--b1);border-radius:8px;padding:6px 8px;margin-top:4px;font-size:12.5px"><b>'+esc(n)+'</b>'+(old?'<span style="font-size:11px;color:var(--b4)">（已評過：品質 '+old.q+'、準時 '+old.t+'、配合 '+old.c+'，再評會覆蓋）</span>':'')
-      +'<div style="display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:4px">'+_CEV_K.map(function(k){var val=o[k[0]]!=null?o[k[0]]:'';return '<label style="display:inline-flex;gap:4px;align-items:center">'+k[1]+'<select onchange="cevSet(\''+escq(q.id)+'\','+vi+',\''+k[0]+'\',this.value)" style="padding:3px 4px;border:1px solid var(--b2);border-radius:6px;font-size:13px"><option value="">—</option>'+[5,4,3,2,1].map(function(x){return '<option value="'+x+'"'+(+val===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></label>';}).join('')+'</div>'
+// v6.0.233 結案卡加包商評鑑（陳軒 11/10 晚佇列第 6 件）：這案（含追加）的分包廠商，跟結案後的「包商評分」卡同一套（_VE_ITEMS 5 項、_veSave 存分包成本卡 c.eval，只有管理員看得到）；
+//   可不評；評了就 5 項都要填。結案視窗按取消，評鑑一樣留著。
+var _CEV={};
+function cevSet(qid,vi,k,v){var o=((_CEV[qid]=_CEV[qid]||{})[vi]=_CEV[qid][vi]||{});o[k]=k==='note'?String(v||'').slice(0,120):(parseInt(v,10)||0);}
+function _cevVendors(q){return _veVendors(q.parentId?((Q||[]).find(function(x){return x&&x.id===q.parentId;})||q):q);}
+function _cevOfVendor(name){var L=[];(PROJECTS||[]).forEach(function(p){if(!p||p.voidAt)return;var e=_veOf(p,name);if(e&&!e.skip)L.push(Object.assign({qid:p.qid},e));});return L;}
+function _cevHtml(q){var vs=_cevVendors(q);if(!vs.length||!_decIsAdmin())return '';var cur=_CEV[q.id]||{},p=_prjOfQ(q.id);
+  return '<div style="font-weight:700;font-size:13px;margin:10px 0 2px">五、包商評鑑（1～5 分，可不評；只有管理員看得到）</div>'+vs.map(function(n,vi){var old=p?_veOf(p,n):null,o=cur[vi]||{};
+    return '<div style="border:1px solid var(--b1);border-radius:8px;padding:6px 8px;margin-top:4px;font-size:12.5px"><b>'+esc(n)+'</b>'+(old&&old.s?'<span style="font-size:11px;color:var(--b4)">（已評過，再評會覆蓋）</span>':'')
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:4px">'+_VE_ITEMS.map(function(k){var val=o[k[0]]!=null?o[k[0]]:'';return '<label style="display:inline-flex;gap:4px;align-items:center">'+k[1]+'<select onchange="cevSet(\''+escq(q.id)+'\','+vi+',\''+k[0]+'\',this.value)" style="padding:3px 4px;border:1px solid var(--b2);border-radius:6px;font-size:13px"><option value="">—</option>'+[5,4,3,2,1].map(function(x){return '<option value="'+x+'"'+(+val===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></label>';}).join('')+'</div>'
       +'<input placeholder="一句話（選填）" value="'+esc(o.note||'')+'" oninput="cevSet(\''+escq(q.id)+'\','+vi+',\'note\',this.value)" style="width:100%;box-sizing:border-box;margin-top:4px;padding:4px 6px;border:1px solid var(--b2);border-radius:6px;font-size:12.5px"></div>';}).join('');}
 function _cevSave(q){if(!_decIsAdmin())return true;var vs=_cevVendors(q),cur=_CEV[q.id]||{},todo=[];
-  for(var vi=0;vi<vs.length;vi++){var o=cur[vi]||{},n=_CEV_K.filter(function(k){return o[k[0]]>=1&&o[k[0]]<=5;}).length;if(!n&&!o.note)continue;if(n<3){toast(vs[vi]+'：品質、準時、配合三題都要填');return false;}todo.push({name:vs[vi],o:o});}
+  for(var vi=0;vi<vs.length;vi++){var o=cur[vi]||{},n=_VE_ITEMS.filter(function(k){return o[k[0]]>=1&&o[k[0]]<=5;}).length;if(!n&&!o.note)continue;if(n<_VE_ITEMS.length){toast(vs[vi]+'：'+_VE_ITEMS.map(function(k){return k[1];}).join('、')+'都要填');return false;}todo.push({name:vs[vi],o:o});}
   if(!todo.length)return true;
-  var me=_meEmail()||'本機',touched={};
-  todo.forEach(function(x){var ev={q:x.o.q,t:x.o.t,c:x.o.c,note:String(x.o.note||''),at:Date.now(),by:me};_cevCards(q,x.name).forEach(function(k){k.c.eval=JSON.parse(JSON.stringify(ev));touched[k.q.id]=k.q;});});
-  Object.keys(touched).forEach(function(id){_touch(touched[id]);});
-  try{persist();}catch(e){_err('_cevSave',e);}
-  toast('已存 '+todo.length+' 家包商評鑑');delete _CEV[q.id];return true;}
+  var ok=0;todo.forEach(function(x){var s2={};_VE_ITEMS.forEach(function(k){s2[k[0]]=x.o[k[0]];});if(_veSave(q.id,x.name,{s:s2,note:String(x.o.note||'').trim().slice(0,120)}))ok++;});
+  toast('已存 '+ok+' 家包商評鑑');delete _CEV[q.id];return true;}
 function _retAskCopy(t){try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast('LINE 文字已複製');},function(){/* 可忽略：剪貼簿被擋 */});}catch(e){_err('_retAskCopy',e);}}
 // ── 整體日報（5d #8，雲端 dailyReport 建的 dailyOut 草稿）：確認＝複製文字並標已轉發、退回＝不轉發、修改＝改文字再複製 ──
 _decReg('dailyOut',{
@@ -45091,22 +45097,33 @@ function sdocDel(qid,id){
   });
 }
 // ══════════ 改版第 7 步 7c 加碼③：包商評分（v6.0.225，估時表題 C 建議：品質、工期、安全、配合度、價格各 1～5 分＋一句話）══════════
-// 結案後（90 天內）每家分包出一張拍板卡 vendorEval（管理員）：確認／修改＝打分數視窗，退回＝這家不評；存專案 p.vendorEval[<廠商鍵>]＝{v,s:{q,t,sa,c,p},note,at,by}（shared，只有分數與一句話）
-// 平均分數 _veAvg(廠商名)：廠商清單看得到（全公司各案平均）
+// 結案後（90 天內）每家分包出一張拍板卡 vendorEval（管理員）：確認／修改＝打分數視窗，退回＝這家不評；v6.0.233 起存分包成本卡 c.eval＝{v,s:{q,t,sa,c,p},note,at,by}（private，只有管理員看得到）
+// 平均分數 _veAvg(廠商名)：廠商清單只有管理員看得到 ★（全公司各案平均）
 var _VE_ITEMS=[['q','品質'],['t','工期'],['sa','安全'],['c','配合度'],['p','價格']];
 function _veKey(v){var d=String(v||'').trim(),h=5381;for(var k=0;k<d.length;k++)h=((h*33)^d.charCodeAt(k))>>>0;return 'v'+h.toString(36);}
 function _veVendors(q){var o=[];[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;})).forEach(function(x){(x.costs||[]).forEach(function(c){var v=String((c&&c.vendor)||'').trim();if(c&&c.type==='sub'&&!c.followOf&&v&&o.indexOf(v)<0)o.push(v);});});return o;}
-function _veOf(p,v){var m=(p&&p.vendorEval&&typeof p.vendorEval==='object')?p.vendorEval:{};return m[_veKey(v)]||null;}
+// v6.0.233 統一（陳軒 11/11 M5，Lotion 11/11：分數只給管理員看）：評分改存這家在這案（含追加）的分包成本卡 c.eval（q.costs 走 private），不再存專案 p.vendorEval（shared）；
+//   舊的 p.vendorEval 由管理員裝置搬進成本卡後刪掉（_veMigrate）；結案卡的包商評鑑（_cevSave）與這張卡寫同一個地方、同 5 項
+function _veCards(qid,v){var q=(Q||[]).find(function(x){return x&&x.id===qid;});if(!q)return [];var m=q.parentId?((Q||[]).find(function(x){return x&&x.id===q.parentId;})||q):q,out=[],nm=String(v||'').trim();
+  [m].concat((Q||[]).filter(function(x){return x&&x.parentId===m.id;})).forEach(function(x){(x.costs||[]).forEach(function(c){if(c&&c.type==='sub'&&!c.mergedInto&&String(c.vendor||'').trim()===nm)out.push({q:x,c:c});});});return out;}
+function _veOf(p,v){if(!p)return null;var e=null;_veCards(p.qid,v).forEach(function(k){if(k.c.eval&&(!e||(+k.c.eval.at||0)>(+e.at||0)))e=k.c.eval;});if(e)return e;
+  var m=(p.vendorEval&&typeof p.vendorEval==='object')?p.vendorEval:{};return m[_veKey(v)]||null;}   // 還沒搬的舊資料
+function _veMigrate(){if(!_decIsAdmin()||_isReaderUser)return;var chg=false;(PROJECTS||[]).forEach(function(p){if(!p||!p.vendorEval||typeof p.vendorEval!=='object'||!Object.keys(p.vendorEval).length)return;
+  var left={};Object.keys(p.vendorEval).forEach(function(k){var e=p.vendorEval[k];var cs=e&&e.v?_veCards(p.qid,e.v):[];if(!cs.length){left[k]=e;return;}var tq={};cs.forEach(function(x){if(!x.c.eval||(+x.c.eval.at||0)<(+e.at||0)){x.c.eval=JSON.parse(JSON.stringify(e));tq[x.q.id]=x.q;}});Object.keys(tq).forEach(function(i){_touch(tq[i]);});});
+  if(Object.keys(left).length)p.vendorEval=left;else delete p.vendorEval;p._mt=Date.now();chg=true;});
+  if(chg){try{persist();saveProjects();}catch(e){_err('_veMigrate',e);}}}
 function _veScore(e){if(!e||!e.s)return null;var n=0,t=0;_VE_ITEMS.forEach(function(k){var x=parseInt(e.s[k[0]]);if(x>=1&&x<=5){n++;t+=x;}});return n?t/n:null;}
 function _veAvg(v){var L=[];(PROJECTS||[]).forEach(function(p){if(!p||p.voidAt)return;var e=_veOf(p,v),sc=_veScore(e);if(sc!=null&&!e.skip)L.push(sc);});
   return L.length?{avg:Math.round(L.reduce(function(a,b){return a+b;},0)/L.length*10)/10,n:L.length}:null;}
-function _veChip(v){var a=_veAvg(v);return a?('<span style="font-size:11px;color:#b26a00;font-weight:700;white-space:nowrap">★ '+a.avg+'（'+a.n+' 案）</span>'):'';}
-function _veList(){var out=[],lim=Date.now()-90*864e5;
+function _veChip(v){if(!_decIsAdmin())return '';var a=_veAvg(v);return a?('<span style="font-size:11px;color:#b26a00;font-weight:700;white-space:nowrap">★ '+a.avg+'（'+a.n+' 案）</span>'):'';}
+function _veList(){var out=[],lim=Date.now()-90*864e5;try{_veMigrate();}catch(e){_err('_veList.mig',e);}
   (Q||[]).forEach(function(q){if(!q||q.parentId||!q.closed)return;var at=+q.closedAt||0;if(!at||at<lim)return;   /* 審查：舊結案沒有結案時間＝不出卡（不然舊案每家分包都跑出來） */var p=_prjOfQ(q.id);if(!p||p.voidAt)return;
     _veVendors(q).forEach(function(v){if(!_veOf(p,v))out.push({qid:q.id,v:v});});});
   return out;}
-function _veSave(qid,v,rec){var p=_prjOfQ(qid);if(!p)return false;var m=Object.assign({},(p.vendorEval&&typeof p.vendorEval==='object')?p.vendorEval:{});
-  m[_veKey(v)]=Object.assign({v:String(v).slice(0,80),at:Date.now(),by:_mvMe()},rec);p.vendorEval=m;p._mt=Date.now();saveProjects();return true;}
+function _veSave(qid,v,rec){if(!_decIsAdmin())return false;var cs=_veCards(qid,v);if(!cs.length)return false;var ev=Object.assign({v:String(v).slice(0,80),at:Date.now(),by:_mvMe()},rec),tq={};
+  cs.forEach(function(x){x.c.eval=JSON.parse(JSON.stringify(ev));tq[x.q.id]=x.q;});Object.keys(tq).forEach(function(i){_touch(tq[i]);});
+  var p=_prjOfQ(qid);if(p&&p.vendorEval&&p.vendorEval[_veKey(v)]){delete p.vendorEval[_veKey(v)];p._mt=Date.now();try{saveProjects();}catch(e){_err('_veSave.prj',e);}}
+  try{persist();}catch(e){_err('_veSave',e);}return true;}
 function _veModal(x){
   var q=(Q||[]).find(function(y){return y&&y.id===x.qid;})||{},e=_veOf(_prjOfQ(x.qid),x.v)||{},sv=e.s||{};
   var row=function(k){return '<div style="display:flex;align-items:center;gap:8px;margin:6px 0;flex-wrap:wrap"><span style="flex:0 0 56px;font-size:13px;font-weight:700">'+k[1]+'</span>'

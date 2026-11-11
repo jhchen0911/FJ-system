@@ -13679,24 +13679,30 @@ async function newPage(browser, width, height) {
         out.ok = _DEC.preflight.ok(rows[0]) === true && Q[0].pfAck.cP1.date === d(2) && _pfRows().length === 0;
         // 結案卡：包商評鑑（兩家：一家評、一家不評）
         Q[0].costs[1].entryDate = '';
-        const ev = document.createElement('div'); ev.innerHTML = _cevHtml(Q[0]); out.evHtml = /五、包商評鑑/.test(ev.textContent) && ev.querySelectorAll('select').length === 6;
+        const ev = document.createElement('div'); ev.innerHTML = _cevHtml(Q[0]); out.evHtml = /五、包商評鑑/.test(ev.textContent) && ev.querySelectorAll('select').length === 10;
+        PROJECTS.push({ id: 'p_qP1', qid: 'qP1', awAt: 1, createdAt: 1, vendorEval: {} });
         cevSet('qP1', 0, 'q', 5); cevSet('qP1', 0, 't', 4);
-        out.need3 = _cevSave(Q[0]) === false;
-        cevSet('qP1', 0, 'c', 3); cevSet('qP1', 0, 'note', '準時進場');
+        out.need3 = _cevSave(Q[0]) === false;   // 5 項都要填
+        ['sa', 'c', 'p'].forEach((k) => cevSet('qP1', 0, k, 3)); cevSet('qP1', 0, 'note', '準時進場');
         let closed = 0; window.pjCloseAll = () => { closed++; };
         const ok = _DEC.closeAsk.ok(Q[0]);
         const v = VENDORS.find((y) => y.name === '範例工程行甲'), ce = Q[0].costs[0].eval;
-        // Lotion 11/11：分數只給管理員看 → 存在分包成本卡（private），不放廠商名冊
-        out.saved = ok === 'open' && closed === 1 && !!ce && ce.q === 5 && ce.t === 4 && ce.c === 3 && ce.note === '準時進場' && !v.evals && !Q[0].costs[1].eval && !VENDORS.find((y) => y.name === '範例工程行乙');
-        out.priv = !('costs' in _stripQuoteSens(Q[0])) && _cevOfVendor('範例工程行甲').length === 1;
-        cevSet('qP1', 0, 'q', 2); cevSet('qP1', 0, 't', 2); cevSet('qP1', 0, 'c', 2); _cevSave(Q[0]);
-        out.over = Q[0].costs[0].eval.q === 2 && _cevOfVendor('範例工程行甲').length === 1;
+        // Lotion 11/11：分數只給管理員看 → 存在分包成本卡（private），跟「包商評分」卡同一套（5 項）
+        out.saved = ok === 'open' && closed === 1 && !!ce && ce.s.q === 5 && ce.s.t === 4 && ce.s.sa === 3 && ce.note === '準時進場' && !v.evals && !Q[0].costs[1].eval;
+        out.priv = !('costs' in _stripQuoteSens(Q[0])) && _cevOfVendor('範例工程行甲').length === 1 && _veAvg('範例工程行甲').n === 1 && !(PROJECTS.find((p) => p.id === 'p_qP1').vendorEval || {})[_veKey('範例工程行甲')];
+        // 舊的 p.vendorEval（shared）→ 管理員裝置搬進成本卡後刪掉
+        const pj = PROJECTS.find((p) => p.id === 'p_qP1'); pj.vendorEval = {}; pj.vendorEval[_veKey('範例工程行乙')] = { v: '範例工程行乙', s: { q: 4, t: 4, sa: 4, c: 4, p: 4 }, at: 5 };
+        Q[0].costs[1].vendor = '範例工程行乙'; _veMigrate();
+        out.mig = !!Q[0].costs[1].eval && Q[0].costs[1].eval.s.q === 4 && !pj.vendorEval;
+        // 廠商清單的 ★：只有管理員
+        const keepAdm = window._decIsAdmin; window._decIsAdmin = () => false; out.chipHide = _veChip('範例工程行甲') === ''; window._decIsAdmin = keepAdm; out.chipShow = /★/.test(_veChip('範例工程行甲'));
+        PROJECTS.splice(PROJECTS.findIndex((p) => p.id === 'p_qP1'), 1);
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       Q = keep.Q; VENDORS.length = 0; keep.V.forEach((x) => VENDORS.push(x)); window.pjCloseAll = keep.pc;
       return out;
     });
     check('v6.0.233 進場前到位確認卡：進場日 2 天內出卡；材料（還缺多少）、機具（進場日在不在場）、人員（廠商電話）；催的 LINE 文字不放金額；確認記已確認', !r.err && r.rows && r.detail && r.ok, JSON.stringify(r));
-    check('v6.0.233 結案卡包商評鑑：品質／準時／配合 1～5 分，評了要三題都填；確認存進分包成本卡（只有管理員讀得到，同案再評覆蓋）再開結案視窗；不評的廠商不動', !r.err && r.evHtml && r.need3 && r.saved && r.priv && r.over, JSON.stringify(r));
+    check('v6.0.233 結案卡包商評鑑：跟包商評分卡同一套 5 項、存分包成本卡（只有管理員讀得到）；舊的專案評分搬進成本卡；廠商清單 ★ 只給管理員；評了要全填；確認存完再開結案視窗', !r.err && r.evHtml && r.need3 && r.saved && r.priv && r.mig && r.chipHide && r.chipShow, JSON.stringify(r));
     check('v6.0.233 進場／評鑑卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -13963,18 +13969,19 @@ async function newPage(browser, width, height) {
         out.card = items.some((x) => x.type === 'dec_drf_ownerCard') && !_draftPending().some((d) => d.type === 'ownerCard');
         localStorage.setItem('fy_nav_old', '1'); out.oldList = _draftPending().some((d) => d.type === 'ownerCard'); localStorage.removeItem('fy_nav_old');
         const x = document.createElement('div'); x.innerHTML = await Promise.resolve(_DEC.drf_ownerCard.detail(DRAFTS.dCard001)); const t = x.textContent;
-        out.detail = /5 → 3/.test(t) && /60 → 90 天/.test(t) && /12 支\/天 → 15/.test(t) && /第 12 條/.test(t) && /含 90 天租期/.test(t) && /租期起算/.test(t) && /合約條件卡沒寫這欄/.test(t) && /跟專案不同 3 欄/.test(t);
+        out.detail = /5 → 3/.test(t) && /60 → 90 天/.test(t) && /12 支\/天 → 15/.test(t) && /第 12 條/.test(t) && /含 90 天租期/.test(t) && /租期起算/.test(t) && /合約條件卡沒寫這欄/.test(t) && /跟專案不同 3 欄/.test(t) && /確認後會改報價工項/.test(t) && /含租期 範例鋼軌樁：60 → 90 天/.test(t) && /逾期租金 範例鋼軌樁：12 → 15 支\/天/.test(t);
         out.noDiffCut = !/25 → 25/.test(t);
         const ok = await Promise.resolve(_DEC.drf_ownerCard.ok(DRAFTS.dCard001)); const q = Q[0];
         out.applied = ok === true && DRAFTS.dCard001.status === 'applied' && q.deduct.ret === 3 && q.rentEnd === 'removeDone' && q.ownerPay.cut === 25 && q.ownerCard && q.ownerCard.fields['rent.includedDays'].value === 90 && q.ownerCard.fields['rent.includedDays'].applied === true;
         out.noDefault = q.ownerPay.day == null && q.ownerPay.delay == null && q.ownerCard.fields['billing.payDay'].applied === false;   // 合約未載明的（豐有預設）不寫
         out.again = (await Promise.resolve(_DEC.drf_ownerCard.ok(DRAFTS.dCard001))) === false;
         out.noOwnerType = CUSTOMERS[0].ownerType === '營造廠';   // 卡片沒列的欄位不寫
+        out.rentItems = /含90天租期/.test(Q[0].items[0].note) && !/60天/.test(Q[0].items[0].note) && Q[0].items[0].ot === '15' && _rentDaysOf(Q[0].items[0]) === 90;   // 陳軒 11/11 M3：確認後寫進算租金用的工項欄位
       } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
       Q = keep.Q; DRAFTS = keep.D; CUSTOMERS.length = 0; keep.C.forEach((c) => CUSTOMERS.push(c));
       return out;
     });
-    check('v6.0.233 合約條件拍板卡：今天頁出卡（舊選單照舊在 AI 草稿清單）；明細逐欄列值＋條次原文，跟專案不同標紅列舊值→新值，租期起算／含租期天數一定列；確認寫進專案、合約未載明的不寫', !r.err && r.card && r.oldList && r.detail && r.noDiffCut && r.applied && r.noDefault && r.again && r.noOwnerType, JSON.stringify(r));
+    check('v6.0.233 合約條件拍板卡：今天頁出卡（舊選單照舊在 AI 草稿清單）；明細逐欄列值＋條次原文，跟專案不同標紅列舊值→新值，租期起算／含租期天數一定列；確認寫進專案、合約未載明的不寫', !r.err && r.card && r.oldList && r.detail && r.noDiffCut && r.applied && r.noDefault && r.again && r.noOwnerType && r.rentItems, JSON.stringify(r));
     check('v6.0.233 合約條件拍板卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -13995,11 +14002,11 @@ async function newPage(browser, width, height) {
         CONTRACTS.length = 0; INV.length = 0;
         DRAFTS = { dBidW001: D('dBidW001', { qid: 'qB1', from: '', to: 'awarded' }), dBidL001: D('dBidL001', { qid: 'qB2', from: '', to: 'lost', lostReason: '價格' }) };
         const x = document.createElement('div'); x.innerHTML = await Promise.resolve(_DEC.drf_bid.detail(DRAFTS.dBidW001)); const t = x.textContent;
-        out.plan = /一次做完/.test(t) && /建合約/.test(t) && /10,500/.test(t) && /成交單價/.test(t) && /請款單/.test(t) && x.querySelector('input[type=number]').value === '20';
+        out.plan = /一次做完/.test(t) && /建合約/.test(t) && /10,500/.test(t) && /成交單價/.test(t) && !/請款單/.test(t) && x.querySelector('input[type=number]').value === '20';
         bidcPd('dBidW001', '25');
         const ok = await Promise.resolve(_DEC.drf_bid.ok(DRAFTS.dBidW001));
         const q = Q.find((y) => y.id === 'qB1'), ct = CONTRACTS.find((c) => c.linkedQid === 'qB1');
-        out.award = ok === true && q.awarded === true && q.payDue === '25' && !!ct && ct.amount === 10500 && INV.some((i) => i.sourceQid === 'qB1') && DRAFTS.dBidW001.status === 'applied' && document.getElementById('award-modal').style.display !== 'flex';
+        out.award = ok === true && q.awarded === true && q.payDue === '25' && !!ct && ct.amount === 10500 && !INV.some((i) => i.sourceQid === 'qB1') && DRAFTS.dBidW001.status === 'applied' && document.getElementById('award-modal').style.display !== 'flex';
         // 再按一次：已處理過 → 不重做
         out.again = (await Promise.resolve(_DEC.drf_bid.ok(DRAFTS.dBidW001))) === false && CONTRACTS.filter((c) => c.linkedQid === 'qB1').length === 1;
         // 其他狀態：直接套用、不再跳確認框
@@ -14012,7 +14019,7 @@ async function newPage(browser, width, height) {
       Q = keep.Q; CONTRACTS.length = 0; keep.C.forEach((c) => CONTRACTS.push(c)); INV.length = 0; keep.I.forEach((c) => INV.push(c)); DRAFTS = keep.D; PAYABLES.length = 0; keep.P.forEach((c) => PAYABLES.push(c));
       return out;
     });
-    check('v6.0.233 得標拍板卡：明細列出確認會做的事（得標、成交單價、建合約、請款單、專案）與請款截止日；確認一次做完不再跳得標視窗；其他狀態直接套用；已得標不准改', !r.err && r.plan && r.award && r.again && r.lost && r.block, JSON.stringify(r));
+    check('v6.0.233 得標拍板卡：明細列出確認會做的事（得標、成交單價、建合約、專案；不建空白請款單）與請款截止日；確認一次做完不再跳得標視窗；其他狀態直接套用；已得標不准改', !r.err && r.plan && r.award && r.again && r.lost && r.block, JSON.stringify(r));
     check('v6.0.233 得標拍板卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -14230,6 +14237,7 @@ async function newPage(browser, width, height) {
         const e = _veOf(_prjOfQ('qV1'), '乙工程行');
         out.saved = !!e && e.s.p === 5 && e.s.q === 4 && e.note === '配合好' && !document.getElementById('fy-modal') && _decItems('vendorEval').length === 1;
         out.avg = JSON.stringify(_veAvg('乙工程行')) === JSON.stringify({ avg: 4.2, n: 1 });
+        out.priv = !!Q[0].costs[0].eval && Q[0].costs[0].eval.s.p === 5 && !((_prjOfQ('qV1').vendorEval || {})[_veKey('乙工程行')]);   // v6.0.233 統一：分數存分包成本卡（private），不存專案（shared）
         // 退回＝這家不評
         _DEC.vendorEval.reject(_decItems('vendorEval')[0], '只做一天'); out.skip = _decItems('vendorEval').length === 0 && _veAvg('丙吊車') === null;
         // 廠商清單看得到平均
@@ -14241,7 +14249,7 @@ async function newPage(browser, width, height) {
       try { const m = document.getElementById('fy-modal'); if (m) m.remove(); } catch (x) { /* 可忽略 */ }
       return out;
     });
-    check('v6.0.225 包商評分：結案 90 天內每家分包一張拍板卡（管理員）、五項都要評、存專案、平均分數、退回＝不評、廠商清單看得到平均、員工看不到', !r.err && r.list && r.open && r.miss && r.saved && r.avg && r.skip && r.chip && r.staff, JSON.stringify(r));
+    check('v6.0.225 包商評分：結案 90 天內每家分包一張拍板卡（管理員）、五項都要評、存專案、平均分數、退回＝不評、廠商清單看得到平均、員工看不到', !r.err && r.priv && r.list && r.open && r.miss && r.saved && r.avg && r.skip && r.chip && r.staff, JSON.stringify(r));
     check('v6.0.225 包商評分測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
