@@ -59,7 +59,7 @@ test('v6.0.174 looseDate：非 ISO 請款日期（/、.、民國年）各裝置�
   const ts = L('2026-09-30T20:00:00Z', null); assert.strictEqual(ts.getTime(), Date.parse('2026-09-30T20:00:00Z'));   // 帶時間照原本
 });
 
-test('v6.0.235 錢的卡 → fydata/todo/money：本月要請款、草稿待送業主、收款待登錄、預計收款、逾期催款；不寫金額', () => {
+test('v6.0.236 錢的卡 → fydata/todo/money：本月要請款、草稿待送業主、收款待登錄、預計收款、逾期催款；不寫金額', () => {
   const T = require('../ops/todos.js');
   const r = { list: { bill: [{ qid: 'q1', name: '範例案', cutDate: '2026-11-25', left: 3 }], recv: [{ id: 'i2', d: -20, date: '' }, { id: 'i3', d: 0, date: '2026-11-11' }] } };
   const inv = [{ id: 'i1', project: '範例案', periodNo: 2, st: 'draft', totals: { total: 123456 } }, { id: 'i2', project: '範例案', periodNo: 1, totals: { total: 99999 } }, { id: 'i3', project: '乙案', periodNo: 4 }, { id: 'i4', project: '範例案', periodNo: 1, kind: 'retReturn', st: 'draft' }];

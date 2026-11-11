@@ -8172,8 +8172,8 @@ async function newPage(browser, width, height) {
         out.owner = cfg.owners.Uabc123 && cfg.owners.Uabc123.name === 'Lotion' && !cfg.pending.users.Uabc123;
         await new Promise(res => setTimeout(res, 50)); document.getElementById('lg-q-Gsite9999').value = 'qL'; lineGroupSave('Gsite9999'); await new Promise(res => setTimeout(res, 60));
         out.group = cfg.groups.Gsite9999 && cfg.groups.Gsite9999.qid === 'qL' && cfg.groups.Gsite9999.daily === true && !cfg.pending.groups.Gsite9999;
-        await new Promise(res => setTimeout(res, 50)); document.querySelector('#line-box details').open = true; document.getElementById('lt-daily3').value = 'Lotion 定稿三句'; lineTextsSave(); await new Promise(res => setTimeout(res, 50));
-        out.texts = cfg.texts && cfg.texts.daily3 === 'Lotion 定稿三句';
+        await new Promise(res => setTimeout(res, 50)); document.querySelector('#line-box details').open = true; document.getElementById('lt-dailyFmtHead').value = 'Lotion 定稿說明'; lineTextsSave(); await new Promise(res => setTimeout(res, 50));
+        out.texts = cfg.texts && cfg.texts.dailyFmtHead === 'Lotion 定稿說明';
         linePushTest(); await new Promise(res => setTimeout(res, 30)); const pk = Object.keys(store).find(k => /^fydata\/linePush\//.test(k)); out.push = !!pk && store[pk].status === 'pending';
         /* 5. 唯讀帳號看不到 LINE 卡 */
         _isReaderUser = true; renderLineBox(); out.roHide = box.style.display === 'none'; _isReaderUser = false;
@@ -11761,6 +11761,131 @@ async function newPage(browser, width, height) {
     });
     check('審查第 6 點：同一期打設 40、拔除 20 → 原列請打設 40（70%）、另加一列（拔除）請 20（30%，6,000）；累計兩列合算、存檔後拔除列還對得到報價那一項', Object.values(r).length === 8 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('審查第 6 點測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+  // ── v6.0.235 新格式日報（Lotion 11/11）：草稿帶 17:30 的編號清單 fmtList → 卡片照編號對工項、單位照合約；【人和機具】不算；舊寫法照舊 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepD = DRAFTS, keepMark = window._draftMark;
+      try {
+        window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        Q = [{ id: 'qF', name: '新格式案', awarded: true, t: { total: 0 }, items: [{ desc: '鋼板樁 III型 L=12M 打設', unit: '支', qty: 30 }, { desc: '鋼板樁 III型 L=12M 拔除', unit: '支', qty: 30 }, { desc: '水平支撐 H350 組立＋拆除', unit: 'M', qty: 100 }], dailyLogs: [] }];
+        const list = FJC.dl.askList(Q[0].items, []);
+        const txt = '【日期】11/11\n【工地】新格式案\n【本工地工項】\n' + list.map(e => e.no + ' ' + e.label).join('\n') + '\n【今天做了】\n1 打設 12\n3 組立 36\n2 拔除 5支 這段拔完\n【人和機具】\n人 5、怪手 1\n【明天】\n續打\n【問題】\n無';
+        DRAFTS = { df111111: { id: 'df111111', type: 'dailyLog', by: 'line-bot', at: 1, status: 'pending', summary: '施工日報', payload: { qid: 'qF', date: '2026-11-11', answers: [txt], photos: [], fmtList: { qF: list } } } };
+        const det = await _DEC.dlQty.detail(DRAFTS.df111111);
+        out.detail = /原文：1 打設 12/.test(det) && /12 支/.test(det) && /36 M/.test(det) && /本段完成/.test(det) && /人和機具：人 5、怪手 1/.test(det) && !/待確認/.test(det);
+        out.ok = (await _DEC.dlQty.ok(DRAFTS.df111111)) === true;
+        const pr = (Q[0].dailyLogs.find(x => x.date === '2026-11-11') || {}).progressRows || [];
+        out.rows = pr.some(x => x.itemIdx === 0 && x.qty === 12 && x.ph === 'install') && pr.some(x => x.itemIdx === 2 && x.qty === 36) && pr.some(x => x.itemIdx === 1 && x.qty === 5 && x.ph === 'remove');
+        // 沒有 fmtList（舊草稿）或舊寫法：照名稱對
+        DRAFTS.df222222 = { id: 'df222222', type: 'dailyLog', by: 'line-bot', at: 2, status: 'pending', summary: '施工日報', payload: { qid: 'qF', date: '2026-11-12', answers: ['今天鋼板樁打設 6 支'], photos: [] } };
+        const d2 = await _DEC.dlQty.detail(DRAFTS.df222222); out.old = /6 支/.test(d2) && /鋼板樁 III型 L=12M 打設/.test(d2) && !/待確認/.test(d2);
+        // 編號寫了、單位跟合約不同 → 待確認
+        DRAFTS.df333333 = { id: 'df333333', type: 'dailyLog', by: 'line-bot', at: 3, status: 'pending', summary: '施工日報', payload: { qid: 'qF', date: '2026-11-13', answers: ['【今天做了】\n1 打設 12M'], photos: [], fmtList: { qF: list } } };
+        out.unit = /單位（M）跟合約（支）不同/.test(await _DEC.dlQty.detail(DRAFTS.df333333));
+        out.tl = typeof _LINE_TEXTS.dailyFmtHead === 'string' && !('daily3' in _LINE_TEXTS) && !('dailyCo' in _LINE_TEXTS);
+      } finally { Q = keepQ; DRAFTS = keepD; window._draftMark = keepMark; }
+      return out;
+    });
+    check('v6.0.235 新格式日報：卡片照 17:30 的工項編號對工項（單位照合約、這段拔完、人和機具不算工項）、確認寫進日報；舊草稿／舊寫法照名稱對；單位跟合約不同＝待確認；固定句子只剩範本說明', Object.values(r).length === 6 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.235 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── v6.0.235 LINE 日報【支出】→ 支出草稿卡 dlExp（確認才入帳；零用金／代墊記付款人、公司付空白；日報卡確認後支出還在）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepD = DRAFTS, keepMark = window._draftMark, keepSt = window._dlxStaff, keepL = LEXP, keepE = SITE_ENG;
+      try {
+        LEXP = {}; SITE_ENG = {};
+        window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        window._dlxStaff = () => ['系統管理員'];   // 人員名冊沒有小陳、阿明 → 標黃不准確認
+        out.staff = !_dlxReady({ amt: 600, pay: 'petty', who: '小陳', ti: 1 }) && /不在人員名冊/.test(_dlxWhat({ pay: 'petty', who: '小陳' }));
+        window._dlxStaff = () => ['小陳', '阿明'];
+        Q = [{ id: 'qX', name: '支出測試案', awarded: true, t: { total: 0 }, items: [{ desc: '鋼板樁 III型 打設', unit: '支', qty: 30 }], dailyLogs: [], costs: [] }];
+        const txt = '【今天做了】\n鋼板樁打設 5 支\n【支出】\n便當 5 個 600 零用金 小陳\n五金 1,250 代墊 阿明\n吊車費 8000 公司付\n涼水 300';
+        DRAFTS = { dx111111: { id: 'dx111111', type: 'dailyLog', by: 'line-bot', at: 1, status: 'pending', summary: '施工日報', payload: { qid: 'qX', date: '2026-11-11', answers: [txt], photos: [] } } };
+        let L = _decItems('dlExp');
+        out.card = L.length === 1 && L[0].rows.length === 4 && /4 筆，合計 NT\$ 10,150，1 筆要先修改/.test(_DEC.dlExp.body(L[0]));
+        const det = await _DEC.dlExp.detail(L[0]);
+        out.detail = /小陳 的零用金/.test(det) && /阿明 代墊，之後要還給 阿明/.test(det) && /公司直接付/.test(det) && /還沒寫付款方式/.test(det) && /便當/.test(det) && /五金零件/.test(det);
+        out.block = _DEC.dlExp.ok(L[0]) === false && !Q[0].costs.length;   // 有一筆沒寫付款方式 → 先不記
+        await _DEC.dlQty.ok(DRAFTS.dx111111);   // 日報卡先確認：支出寫進 fydata/lineExp（LEXP），支出卡還在
+        L = _decItems('dlExp'); out.queued = L.length === 1 && L[0].rows.length === 4 && Object.keys(LEXP.qX || {}).length === 4;
+        const rows = L[0].rows.map(x => x.pay ? x : Object.assign({}, x, { pay: 'co' }));
+        out.commit = _dlxCommit(L[0], rows) === 4 && Q[0].costs.length === 4 && Q[0].costs.find(c => c.amt === 600).payer === '小陳' && Q[0].costs.find(c => c.amt === 1250).payer === '阿明' && Q[0].costs.find(c => c.amt === 8000).payer === '' && Q[0].costs.every(c => c.src === 'quick' && !!c.lineKey && c.date === '2026-11-11') && !_decItems('dlExp').length && Object.values(LEXP.qX).every(x => x.done && (x.done.cid || x.done.skip));
+        out.petty = _pcItems('小陳', '2026-11').some(x => x.amt === 600);
+      } finally { Q = keepQ; DRAFTS = keepD; window._draftMark = keepMark; window._dlxStaff = keepSt; LEXP = keepL; SITE_ENG = keepE; _lxSave(); }
+      return out;
+    });
+    check('v6.0.235 LINE 日報支出卡：逐筆列原文、類別、金額、記成什麼（零用金／代墊要還給誰／公司付）；沒寫付款方式、人名不在人員名冊擋確認；日報卡確認後支出還在；確認才記成工地零星支出（付款人、日期照日報；零用金結算算得到）', Object.values(r).length === 7 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.235 LINE 日報支出卡測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── v6.0.235 LINE【支出】第 3、4 項：專案工務名單（管理員指定）、名單上的工務只看自己那一案、只能補零用金是誰／收據照片、確認記帳只有管理員；規則 siteEng／lineExp ──
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keep = { Q, DRAFTS, LEXP, SITE_ENG, adm: window._decIsAdmin, me: window._meEmail, st: window._dlxStaff, ls: window.listStaff, sc: window.showConfirm };
+      try {
+        LEXP = {}; SITE_ENG = {}; DRAFTS = {};
+        window._dlxStaff = () => ['小陳', '阿明'];
+        window.listStaff = () => [{ id: 's1', email: 'aming@example.com', name: '阿明', active: true }, { id: 's2', email: 'xiao.chen@example.com', name: '小陳', active: true }, { id: 's3', email: 'other@example.com', name: '路人', active: true }];
+        Q = [{ id: 'qA', name: '甲工地', awarded: true, t: { total: 0 }, items: [], dailyLogs: [], costs: [] }, { id: 'qA2', parentId: 'qA', name: '甲工地追加', awarded: true, t: { total: 0 }, items: [], dailyLogs: [], costs: [] }, { id: 'qB', name: '乙工地', awarded: true, t: { total: 0 }, items: [], dailyLogs: [], costs: [] }];
+        // 管理員在專案頁指定工務（真正的 pjEngEdit 存檔流程）
+        window.showConfirm = (t, body, ok) => { const d = document.createElement('div'); d.id = 'tmp-sc'; d.innerHTML = body; document.body.appendChild(d); document.querySelectorAll('.pje-c').forEach((el, i) => { el.checked = i === 0; }); ok(); d.remove(); };
+        pjEngEdit('qA2');   // 追加報價 → 名單掛主約 qA
+        out.list = _siteEngOf('qA').length === 1 && _siteEngOf('qA')[0].name === '阿明' && _isSiteEng('qA2', 'aming@example.com') && !_isSiteEng('qB', 'aming@example.com') && !_isSiteEng('qA', 'other@example.com') && !!JSON.parse(localStorage.getItem('fy_siteeng')).qA;
+        out.line = /工務<\/span><span>阿明<\/span>/.test(_pjEngLine(Q[0])) && /指定/.test(_pjEngLine(Q[0]));
+        // 雲端收到日報已寫進的支出（同 functions/line/core.js expQueue 的格式）：甲、乙各一則
+        LEXP = { qA: { dA1_0: { key: 'dA1#0', qid: 'qA', src: 'dA1', date: '2026-11-11', text: '便當 600 零用金', item: '便當', amt: 600, pay: 'petty', who: '', why: '零用金沒寫是誰', photos: [], at: 1, by: 'line-bot' }, dA1_1: { key: 'dA1#1', qid: 'qA', src: 'dA1', date: '2026-11-11', text: '五金 350 公司付', item: '五金', amt: 350, pay: 'co', who: '', why: '', photos: [], at: 1, by: 'line-bot' } },
+          qB: { dB1_0: { key: 'dB1#0', qid: 'qB', src: 'dB1', date: '2026-11-11', text: '涼水 300 公司付', item: '涼水', amt: 300, pay: 'co', who: '', why: '', photos: [], at: 1, by: 'line-bot' } } };
+        // ① 工務阿明：只看到甲；只有「修改」；卡片寫缺什麼
+        window._decIsAdmin = () => false; window._meEmail = () => 'aming@example.com';
+        let L = _decItems('dlExp');
+        out.engSee = L.length === 1 && L[0].qid === 'qA' && L[0].rows.length === 2;
+        const card = _decCardHtml('dlExp', L[0]);
+        out.engActs = /修改/.test(card) && !/退回/.test(card) && !/>確認</.test(card);
+        out.engMiss = /1 筆要先修改/.test(_DEC.dlExp.body(L[0])) && /便當 600：零用金是誰、收據照片/.test(_DEC.dlExp.body(L[0])) && /五金 350：收據照片/.test(_DEC.dlExp.body(L[0])) && /LINE 日報支出要補資料 1 則/.test(_DEC.dlExp.todo(1));
+        out.engNoOk = _dlxCommit(L[0], L[0].rows) === 0 && !Q[0].costs.length;
+        // ② 不在名單上的員工：一張都沒有
+        window._meEmail = () => 'other@example.com';
+        out.other = !_decItems('dlExp').length && !_DEC.dlExp.canSee();
+        // ③ 阿明補人名＋收據照片（真正的補資料視窗存檔）
+        window._meEmail = () => 'aming@example.com'; L = _decItems('dlExp');
+        const png = await new Promise(res => { const c = document.createElement('canvas'); c.width = 8; c.height = 8; c.getContext('2d').fillRect(0, 0, 8, 8); c.toBlob(b => res(new File([b], 'r.png', { type: 'image/png' }))); });
+        let saved = null;
+        window.showConfirm = (t, body, ok) => { const d = document.createElement('div'); d.innerHTML = body; document.body.appendChild(d); const rows = d.querySelectorAll('.dlxe-row'); rows[0].querySelector('.dlxe-w').value = '小陳'; const dt = new DataTransfer(); dt.items.add(png); rows[0].querySelector('.dlxe-p').files = dt.files; ok(); saved = d; };
+        _DEC.dlExp.edit(L[0]);
+        for (let i = 0; i < 40 && !(LEXP.qA.dA1_0.fix && LEXP.qA.dA1_0.fix.photos); i++) await new Promise(res => setTimeout(res, 50));
+        if (saved) saved.remove();
+        const fx = LEXP.qA.dA1_0.fix || {};
+        out.fix = fx.who === '小陳' && fx.by === 'aming@example.com' && (fx.photos || []).length === 1 && /^ph:ph[a-z0-9]+$/.test(fx.photos[0]) && !LEXP.qA.dA1_1.fix && LEXP.qA.dA1_0.amt === 600 && !LEXP.qA.dA1_0.done;
+        // ④ 管理員：甲乙都看得到，補過的人名帶進來、收據照片在明細；按確認才記成工地零星支出
+        window._decIsAdmin = () => true; window._meEmail = () => 'boss@example.com';
+        L = _decItems('dlExp');
+        const xa = L.find(x => x.qid === 'qA');
+        out.admSee = L.length === 2 && xa.rows.find(x => x.amt === 600).who === '小陳' && _dlxReady(xa.rows.find(x => x.amt === 600)) && /退回/.test(_decCardHtml('dlExp', xa));
+        const det = await _DEC.dlExp.detail(xa);
+        out.admDet = /工務補的收據照片/.test(det) && /這一案的工務：阿明/.test(det) && /小陳 的零用金/.test(det);
+        const sent = [], keepU = window._lxUpd; window._lxUpd = function (mq, k, obj) { sent.push({ k, obj }); return keepU(mq, k, obj); };
+        out.commit = _DEC.dlExp.ok(xa) === true && Q[0].costs.length === 2 && Q[0].costs.find(c => c.amt === 600).payer === '小陳' && (Q[0].costs.find(c => c.amt === 600).photos || []).length === 1 && LEXP.qA.dA1_0.done && LEXP.qA.dA1_0.done.cid && LEXP.qA.dA1_0.fix.who === '小陳' && _decItems('dlExp').length === 1;
+        // 審查：確認時只送 done（工務的 fix 署名是工務，整列重送會被規則擋）；上次雲端沒寫成功（done 不見）再按確認不會重記成本
+        out.onlyDone = sent.length === 2 && sent.every(x => x.obj.done && !('fix' in x.obj) && !('amt' in x.obj));
+        delete LEXP.qA.dA1_0.done; const again = _dlxCommit(xa, xa.rows.filter(r => r.amt === 600));
+        out.noDouble = again === 0 && Q[0].costs.length === 2 && LEXP.qA.dA1_0.done && LEXP.qA.dA1_0.done.cid === Q[0].costs.find(c => c.amt === 600).id;
+        window._lxUpd = keepU;
+      } finally { Q = keep.Q; DRAFTS = keep.DRAFTS; LEXP = keep.LEXP; SITE_ENG = keep.SITE_ENG; window._decIsAdmin = keep.adm; window._meEmail = keep.me; window._dlxStaff = keep.st; window.listStaff = keep.ls; window.showConfirm = keep.sc; _lxSave(); }
+      return out;
+    });
+    check('v6.0.235 LINE 支出工務名單：管理員在專案頁指定（追加掛主約）；工務只看自己那一案、只有「修改」補零用金是誰與收據照片；不在名單的看不到；管理員看得到補的資料、按確認才記帳（只送 done、不重記成本）', Object.values(r).length === 13 && Object.values(r).every(Boolean), JSON.stringify(r));
+    {
+      const R = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')), f = R.rules.fydata, se = f.siteEng, lx = f.lineExp;
+      const ok = /adminEmails/.test(se.$qid['.write']) && !/access/.test(se.$qid['.write']) && /access/.test(se['.read']) && /adminEmails/.test(lx['.read']) && !/access/.test(lx['.read']) && /fydata\/siteEng'\)\.child\(\$qid\)/.test(lx.$qid['.read']) && !/siteEng/.test(lx.$qid['.write'])
+        && /siteEng/.test(lx.$qid.$k.fix['.write']) && /!data\.parent\(\)\.child\('done'\)\.exists\(\)/.test(lx.$qid.$k.fix['.write']) && /newData\.child\('by'\)\.val\(\) === auth\.token\.email/.test(lx.$qid.$k.fix['.validate']) && lx.$qid.$k.fix.$other['.validate'] === 'false' && /readers/.test(lx.$qid['.read']);
+      check('v6.0.235 規則：工務名單 siteEng 管理員寫、員工可讀；LINE 支出 lineExp 只有管理員和那一案工務可讀（唯讀帳號不行）、工務只能寫 fix（處理過的不行、只能署名自己）', ok);
+    }
+    check('v6.0.235 LINE 支出工務名單測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
   // ── v6.0.226 請款鏈 1：請款單狀態（草稿→已送業主→業主已確認→已開發票→已收款）、舊單推算清單卡、業主確認卡＋發票照抄範例 ──

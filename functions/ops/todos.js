@@ -71,7 +71,7 @@ function rtdbSafe(v) {
   }
   return v;
 }
-// v6.0.235（Lotion 11/11 第 6 題：不寫金額，只寫「案名＋第幾期＋要做什麼」）：今天頁跟錢有關的卡 → fydata/todo/money → Google 工作表
+// v6.0.236（Lotion 11/11 第 6 題：不寫金額，只寫「案名＋第幾期＋要做什麼」）：今天頁跟錢有關的卡 → fydata/todo/money → Google 工作表
 //   本月要請款（monthBill）、請款單草稿待送業主（st＝draft）、收款待登錄（AI 讀到的收款 recvSlip 草稿）、預計收款日到了（待收款）、逾期沒收（催款）
 //   FJ 今天頁自己有這幾張卡，總覽不重複列（前端 _bkTodoList 跳過 money）
 function moneyTodos(r, invoices, drafts) {
