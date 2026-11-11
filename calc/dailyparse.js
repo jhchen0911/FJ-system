@@ -96,6 +96,7 @@
         if (cut.length < 2) { pieces.push(pc); return; } cut.forEach(function (e, i) { var t = pc.slice(last, i === cut.length - 1 ? pc.length : e).trim(); last = e; if (t) pieces.push(t); }); });
       pieces.forEach(function (pc) {
         var q = qtyOf(pc);
+        if (!q && DONE.test(pc) && !NOT_DONE.test(pc) && rows.length && !Object.keys(terms(pc)).length) { rows[rows.length - 1].batchDone = true; return; }   // v6.0.234：「這段拔完」本身有「拔」字，先當本段完成看
         if (!q) { if (phaseOf(pc)) linePh = phaseOf(pc); if (Object.keys(terms(pc)).length || phaseOf(pc)) ctx = (ctx + ' ' + pc).trim();
           else if (DONE.test(pc) && !NOT_DONE.test(pc) && rows.length) rows[rows.length - 1].batchDone = true;   // 「…20支，這段完成」
           return; }
@@ -115,7 +116,91 @@
   }
   // 累計（已確認的日報＋這次）跟合約數量比：logs＝q.dailyLogs，phOf(row)＝打設／拔除判斷（前端 _prPhase）
   function cumOf(logs, idx, ph, phOf) { var s = 0; (logs || []).forEach(function (L) { if (!L || L.photoOnly) return; (L.progressRows || []).forEach(function (r) { if (r && Number(r.itemIdx) === idx && num(r.qty) > 0 && (!phOf || phOf(r) === ph)) s += num(r.qty); }); }); return Math.round(s * 1000) / 1000; }
-  var dl = { parse: parse, cumOf: cumOf, qtyOf: qtyOf, terms: terms, specs: specs, cn2n: cn2n, norm: norm };
+  // ── 新格式（Lotion 11/11：「LINE 的日報直接改格式，讓系統好判斷，工務也不會混亂」）──
+  // askList(items, logs) → [{no, idx, label, unit}]：17:30 問句列的「本工地工項」（還沒做完的、短編號 1～N，最多 max 項）
+  //   做完＝能打設的打設累計 ≥ 合約數量、能拔除的拔除累計 ≥ 合約數量（兩種都不是的工項：任何數量累計 ≥ 合約數量）
+  function _cat2(it) { var c = itemCat(it), d = firstLine(it && it.desc); if (!c.i && /組立|鋪設|架設|吊裝/.test(d)) c = { i: 1, r: c.r }; return c; }
+  function _phOf(r) { return r && r.ph === 'remove' ? 'remove' : 'install'; }
+  function askList(items, logs, max) {
+    items = Array.isArray(items) ? items : []; max = max > 0 ? max : 15; var out = [];
+    items.forEach(function (it, i) {
+      if (out.length >= max || !isLine(it) || !(num(it.qty) > 0) || (it && it.cat === 'other')) return;   // 技師簽證這類（類別「其他」）不列
+      var c = _cat2(it), q = num(it.qty), ins = cumOf(logs, i, 'install', _phOf), rm = cumOf(logs, i, 'remove', _phOf);
+      var done = (c.i || c.r) ? ((!c.i || ins >= q - 1e-9) && (!c.r || rm >= q - 1e-9)) : (ins + rm >= q - 1e-9);
+      if (done) return;
+      out.push({ no: out.length + 1, idx: i, label: firstLine(it.desc).replace(/\s+/g, ' ').trim().slice(0, 30), unit: String(it.unit || '') });
+    });
+    return out;
+  }
+  var FMT_TAGS = { '日期': 'date', '工地': 'site', '本工地工項': 'list', '今天做了': 'today', '今天': 'today', '人和機具': 'crew', '明天': 'tomorrow', '問題': 'issue' };
+  var FMT_RE = /【\s*(本工地工項|今天做了|人和機具|日期|工地|今天|明天|問題)\s*】/g;
+  // sections(text) → {date, site, list, today, crew, tomorrow, issue, tagged}：沒有任何【】欄位＝tagged:false（舊寫法）
+  function sections(text) {
+    var t = String(text || '').replace(/\r/g, ''), out = { tagged: false }, segs = [], m; FMT_RE.lastIndex = 0;
+    while ((m = FMT_RE.exec(t))) segs.push({ k: FMT_TAGS[m[1]], s: m.index, e: FMT_RE.lastIndex });
+    if (!segs.length) return out;
+    out.tagged = true;
+    segs.forEach(function (g, i) { var v = t.slice(g.e, i + 1 < segs.length ? segs[i + 1].s : t.length).trim(); out[g.k] = (out[g.k] ? out[g.k] + '\n' : '') + v; });
+    return out;
+  }
+  // 範本的 【本工地工項】 那段（工項名稱可能有「追加」「變更」字樣）拿掉，給警報／追加判斷用
+  function stripList(text) { var t = String(text || ''); if (!/【\s*本工地工項\s*】/.test(t)) return t; return t.replace(/【\s*本工地工項\s*】[^]*?(?=【|$)/g, ''); }
+  var ACT_IN = /打設|施打|打入|裝設|安裝|架設|組立|鋪設|吊裝|打(?!完)|裝(?!完)/, ACT_RM = /拔除|拔樁|拔|拆除|拆|回收|撤除/;
+  var NO_LINE = /^(\d{1,2})(?!\d|\.\d)\s*[.、)）:：]?\s*(?![支根片組處座孔台噸個顆段只式米公人位名工]|M(?![A-Za-z])|m(?![A-Za-z])|T(?![A-Za-z]))(.*)$/;
+  function _numIn(s) { var re = new RegExp('([0-9]+(?:\\.[0-9]+)?|[一二兩三四五六七八九十百]{1,5})\\s*(' + UNIT + ')?(?![A-Za-z0-9])', 'g'), m;
+    while ((m = re.exec(s))) { var pre = s.slice(Math.max(0, m.index - 2), m.index); if (/L\s*[=＝]?\s*$|長\s*$|深\s*$|第\s*$|每\s*$|[A-Za-z]$/i.test(pre)) continue; var n = cn2n(m[1]); if (n > 0) return { n: n, u: m[2] ? normUnit(m[2]) : '' }; }
+    return null; }
+  // 清單上那一項還在報價的同一列（報價改過就用名稱找；找不到 → -1）
+  function _listIdx(e, items) {
+    if (!e) return -1; var lb = String(e.label || '').replace(/\s+/g, ' ').trim(), at = items[e.idx];
+    var same = function (it) { return isLine(it) && firstLine(it.desc).replace(/\s+/g, ' ').trim().slice(0, 30) === lb; };
+    if (at && same(at)) return e.idx;
+    var hits = []; items.forEach(function (it, i) { if (same(it)) hits.push(i); }); return hits.length === 1 ? hits[0] : -1;
+  }
+  // parseFmt(text, list, items) → 跟 parse 一樣的 {rows, skip}，另加 fmt（有沒有用新格式）、crew／tomorrow／issue（原文）
+  //   有【今天做了】（或舊的【今天】）→ 只拆那一段，一行一項：「編號＋動作＋數量（＋這段拔完）」照 list 對工項、單位照合約；
+  //   寫工項名稱的那行照 parse 的對位規則；【人和機具】不算工項數量；【本工地工項】是範本，不拆
+  //   沒有任何【】欄位（舊寫法、自由寫）→ 整段照 parse
+  function parseFmt(text, list, items) {
+    items = Array.isArray(items) ? items : []; list = Array.isArray(list) ? list : [];
+    var S = sections(norm(text));
+    if (!S.tagged || S.today == null) { var P0 = parse(text, items); P0.fmt = false; return P0; }
+    var rows = [], skip = [], byNo = {}; list.forEach(function (e) { if (e && e.no) byNo[e.no] = e; });
+    var LINES = []; String(S.today || '').split('\n').forEach(function (raw) { raw.split(/[，,、；;]\s*(?=\d{1,2}(?![\d.])\s*[.、)）:：]?\s*(?:打|拔|組|拆|裝|架|鋪|施|吊|回|撤|安))/).forEach(function (x) { LINES.push(x); }); });   // 「1 打設 12、2 拔除 3」一行寫兩項
+    LINES.forEach(function (raw) {
+      var line = raw.replace(/^[\s　]*[-•・*]\s*/, '').trim(); if (!line || /^[（(]?\s*例/.test(line) || /^[（(].*[）)]$/.test(line)) return;
+      var m = NO_LINE.exec(line);
+      if (m && byNo[+m[1]]) {
+        var e = byNo[+m[1]], rest = m[2] || '', idx = _listIdx(e, items), it = idx >= 0 ? items[idx] : null;
+        var q = _numIn(rest), ph = ACT_RM.test(rest) ? 'remove' : (ACT_IN.test(rest) ? 'install' : ''), bd = DONE.test(rest) && !NOT_DONE.test(rest), why = '', cand = null;
+        var c = it ? _cat2(it) : { i: 0, r: 0 }, iu = it ? String(it.unit || '') : String(e.unit || '');
+        if (!ph && it) ph = (c.r && !c.i) ? 'remove' : (c.i && !c.r ? 'install' : '');
+        if (idx < 0) why = '第 ' + e.no + ' 項（' + e.label + '）在報價裡找不到了（報價改過），請選';
+        else if (!q) why = '沒寫數量';
+        else if (!ph) why = '沒寫打設還是拔除';
+        else if (ph === 'remove' && !c.r && c.i) why = '這個工項只有打設，寫的是拔除';
+        else if (ph === 'install' && !c.i && c.r) why = '這個工項只有拔除，寫的是打設';
+        else if (q.u && iu && normUnit(iu) !== q.u) why = '寫的單位（' + q.u + '）跟合約（' + iu + '）不同';
+        else if (UNSURE.test(rest) || RANGE.test(rest)) why = RANGE.test(rest) ? '數量是範圍，請確認' : '「' + (rest.match(UNSURE) || [''])[0] + '」不一定是今天做的量，請確認';
+        if (why && idx >= 0) cand = [idx];
+        rows.push({ itemIdx: why ? -1 : idx, qty: q ? q.n : 0, unit: normUnit(iu) || (q && q.u) || '', ph: ph, batchDone: bd, text: line.slice(0, 120), sure: !why, why: why, cand: cand, no: e.no });
+        return;
+      }
+      var P1 = parse(line, items);
+      P1.rows.forEach(function (r) { rows.push(r); });
+      if (!P1.rows.length) skip.push(line.slice(0, 60));
+    });
+    String(S.crew || '').split('\n').forEach(function (l) { l = l.trim(); if (l && !/^[（(]?\s*例/.test(l)) skip.push('人和機具：' + l.slice(0, 60)); });
+    return { rows: rows, skip: skip, fmt: true, crew: S.crew || '', tomorrow: S.tomorrow || '', issue: S.issue || '' };
+  }
+  // askText(head, blocks, ymd) → 17:30 問句：blocks＝[{site, list}]（一個群組好幾個工地＝好幾段，編號各自從 1 開始）
+  function askText(head, blocks, md) {
+    var B = (blocks && blocks.length) ? blocks : [{ site: '', list: [] }];
+    return String(head || '') + '\n' + B.map(function (b) {
+      return '【日期】' + md + '\n【工地】' + (b.site || '') + '\n' + (b.list && b.list.length ? '【本工地工項】\n' + b.list.map(function (e) { return e.no + ' ' + e.label; }).join('\n') + '\n' : '') + '【今天做了】\n\n【人和機具】\n\n【明天】\n\n【問題】\n';
+    }).join('\n');
+  }
+  var dl = { parse: parse, cumOf: cumOf, qtyOf: qtyOf, terms: terms, specs: specs, cn2n: cn2n, norm: norm, askList: askList, parseFmt: parseFmt, sections: sections, stripList: stripList, askText: askText };
   if (typeof module !== 'undefined' && module.exports) module.exports = { dl: dl };
   root.FJC = root.FJC || {}; root.FJC.dl = dl;
 })(typeof window !== 'undefined' ? window : globalThis);

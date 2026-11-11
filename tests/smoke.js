@@ -11722,6 +11722,36 @@ async function newPage(browser, width, height) {
     check('v6.0.227 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── v6.0.234 新格式日報（Lotion 11/11）：草稿帶 17:30 的編號清單 fmtList → 卡片照編號對工項、單位照合約；【人和機具】不算；舊寫法照舊 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepD = DRAFTS, keepMark = window._draftMark;
+      try {
+        window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        Q = [{ id: 'qF', name: '新格式案', awarded: true, t: { total: 0 }, items: [{ desc: '鋼板樁 III型 L=12M 打設', unit: '支', qty: 30 }, { desc: '鋼板樁 III型 L=12M 拔除', unit: '支', qty: 30 }, { desc: '水平支撐 H350 組立＋拆除', unit: 'M', qty: 100 }], dailyLogs: [] }];
+        const list = FJC.dl.askList(Q[0].items, []);
+        const txt = '【日期】11/11\n【工地】新格式案\n【本工地工項】\n' + list.map(e => e.no + ' ' + e.label).join('\n') + '\n【今天做了】\n1 打設 12\n3 組立 36\n2 拔除 5支 這段拔完\n【人和機具】\n人 5、怪手 1\n【明天】\n續打\n【問題】\n無';
+        DRAFTS = { df111111: { id: 'df111111', type: 'dailyLog', by: 'line-bot', at: 1, status: 'pending', summary: '施工日報', payload: { qid: 'qF', date: '2026-11-11', answers: [txt], photos: [], fmtList: { qF: list } } } };
+        const det = await _DEC.dlQty.detail(DRAFTS.df111111);
+        out.detail = /原文：1 打設 12/.test(det) && /12 支/.test(det) && /36 M/.test(det) && /本段完成/.test(det) && /人和機具：人 5、怪手 1/.test(det) && !/待確認/.test(det);
+        out.ok = (await _DEC.dlQty.ok(DRAFTS.df111111)) === true;
+        const pr = (Q[0].dailyLogs.find(x => x.date === '2026-11-11') || {}).progressRows || [];
+        out.rows = pr.some(x => x.itemIdx === 0 && x.qty === 12 && x.ph === 'install') && pr.some(x => x.itemIdx === 2 && x.qty === 36) && pr.some(x => x.itemIdx === 1 && x.qty === 5 && x.ph === 'remove');
+        // 沒有 fmtList（舊草稿）或舊寫法：照名稱對
+        DRAFTS.df222222 = { id: 'df222222', type: 'dailyLog', by: 'line-bot', at: 2, status: 'pending', summary: '施工日報', payload: { qid: 'qF', date: '2026-11-12', answers: ['今天鋼板樁打設 6 支'], photos: [] } };
+        const d2 = await _DEC.dlQty.detail(DRAFTS.df222222); out.old = /6 支/.test(d2) && /鋼板樁 III型 L=12M 打設/.test(d2) && !/待確認/.test(d2);
+        // 編號寫了、單位跟合約不同 → 待確認
+        DRAFTS.df333333 = { id: 'df333333', type: 'dailyLog', by: 'line-bot', at: 3, status: 'pending', summary: '施工日報', payload: { qid: 'qF', date: '2026-11-13', answers: ['【今天做了】\n1 打設 12M'], photos: [], fmtList: { qF: list } } };
+        out.unit = /單位（M）跟合約（支）不同/.test(await _DEC.dlQty.detail(DRAFTS.df333333));
+        out.tl = typeof _LINE_TEXTS.dailyFmtHead === 'string' && !('daily3' in _LINE_TEXTS) && !('dailyCo' in _LINE_TEXTS);
+      } finally { Q = keepQ; DRAFTS = keepD; window._draftMark = keepMark; }
+      return out;
+    });
+    check('v6.0.234 新格式日報：卡片照 17:30 的工項編號對工項（單位照合約、這段拔完、人和機具不算工項）、確認寫進日報；舊草稿／舊寫法照名稱對；單位跟合約不同＝待確認；固定句子只剩範本說明', Object.values(r).length === 6 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.234 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.226 請款鏈 1：請款單狀態（草稿→已送業主→業主已確認→已開發票→已收款）、舊單推算清單卡、業主確認卡＋發票照抄範例 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

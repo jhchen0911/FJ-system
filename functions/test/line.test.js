@@ -85,7 +85,7 @@ test('③ 17:30 問三句只發給開啟日報的已綁定群組；20:00 整理�
   const d = mkDeps(CFG);
   const ask = Date.parse('2026-10-22T09:30:00Z');   // 台北 17:30
   assert.equal(await core.dailyAsk(d, ask), 1);
-  assert.equal(d.pushes[0].to, 'Gsite'); assert.match(d.pushes[0].text, /今天做了哪些/);
+  assert.equal(d.pushes[0].to, 'Gsite'); assert.match(d.pushes[0].text, /【日期】10\/22\n【工地】內湖興中路\n【今天做了】/);   // v6.0.234 新格式範本（沒有 getQuote＝不列工項）
   const g = { type: 'group', groupId: 'Gsite', userId: 'Uw' };
   await core.handleEvents([{ type: 'message', timestamp: ask - 3600000, source: g, message: { id: 'ph', type: 'image' } }], d);
   await core.handleEvents([{ type: 'message', timestamp: ask + 600000, source: g, message: { id: 'ans', type: 'text', text: '1. 打設 H 型鋼 8 支 2. 4 人、吊車 1 台 3. 無' } }], d);
@@ -113,10 +113,10 @@ test('推播佇列：pending → 推給擁有者並改 sent；已送出的不再
   assert.ok(!(await core.processPush('n1', { text: 'x', status: 'sent' }, d)));
 });
 
-test('固定句子可由 lineCfg.texts 覆寫', async () => {
-  const d = mkDeps(Object.assign({}, CFG, { texts: { daily3: 'Lotion 定稿的三句' } }));
+test('固定句子可由 lineCfg.texts 覆寫（v6.0.234 起 17:30 只有範本上面的說明 dailyFmtHead 可改）', async () => {
+  const d = mkDeps(Object.assign({}, CFG, { texts: { dailyFmtHead: 'Lotion 定稿的說明', daily3: '舊的三句不再用' } }));
   await core.dailyAsk(d, T0);
-  assert.equal(d.pushes[0].text, 'Lotion 定稿的三句');
+  assert.match(d.pushes[0].text, /^Lotion 定稿的說明\n【日期】/); assert.ok(!/舊的三句/.test(d.pushes[0].text));
 });
 
 // ── 批次 F 審查修正 ──
@@ -345,10 +345,7 @@ test('日期括號寫法（Lotion 11/1）：［］、[]、【】，後面接空�
 test('v6.0.122 範本：17:30 發的格式第一行【日期】帶當天日期；舊預設自動換新', async () => {
   const d = mkDeps(CO);
   await core.dailyAsk(d, Date.parse('2026-11-01T09:30:00Z'));
-  assert.match(d.pushes[0].text, /\n【日期】11\/01\n【工地】\n【今天】\n【明天】\n【問題】$/);
-  const d2 = mkDeps(Object.assign({}, CO, { texts: { dailyCo: '今天辛苦了，請照下面格式回報（一個工地一段，可以貼好幾段）：\n【工地】地名\n【今天】\n【明天】\n【問題】' } }));
-  await core.dailyAsk(d2, Date.parse('2026-11-01T09:30:00Z'));
-  assert.match(d2.pushes[0].text, /【日期】11\/01/);
+  assert.match(d.pushes[0].text, /\n【日期】11\/01\n【工地】\n【今天做了】\n\n【人和機具】\n\n【明天】\n\n【問題】\n$/);   // v6.0.234：最近 14 天沒人回報過工地＝空白一段
 });
 
 test('v6.0.122 解析：範本原樣、改成前一天、【日期】空白、工地全形／半形括號都對得到', async () => {
@@ -545,4 +542,58 @@ test('v6.0.178 審查：比案名晚到的同批檔（平行投遞／重送）�
   await core.handleEvents([f('b1', T0 + 90e3)], d);
   assert.equal(I.b1.batch, 'b1'); assert.equal(I.b1.note, '範例案 乙；業務假丙');
   assert.ok(!d.db.fydata.lineInboxBatch.Uowner.pendNext);   // 用過就清掉
+});
+
+// ── v6.0.234 新格式日報（Lotion 11/11）：17:30 預先填好範本、20:00 草稿帶編號清單、範本字不觸發追加 ──
+const Q1 = { id: 'q1', name: '內湖興中路', items: [{ desc: 'H型鋼樁 H350 L=13M 打設＋拔除', unit: '支', qty: 100 }, { desc: '追加 第一層支撐 H350 組立＋拆除', unit: 'M', qty: 300 }, { desc: '覆工板 鋪設', unit: '片', qty: 50 }], dailyLogs: [{ progressRows: [{ itemIdx: 2, qty: 50 }] }] };
+test('v6.0.234 工地群組：17:30 範本帶日期、工地、還沒做完的工項（短編號）；清單存 lineDaily；20:00 草稿帶 fmtList', async () => {
+  const d = mkDeps(CFG); d.getQuote = async (qid) => (qid === 'q1' ? Q1 : null);
+  const ask = Date.parse('2026-10-22T09:30:00Z');
+  assert.equal(await core.dailyAsk(d, ask), 1);
+  const t = d.pushes[0].text;
+  assert.match(t, /【日期】10\/22\n【工地】內湖興中路\n【本工地工項】\n1 H型鋼樁 H350 L=13M 打設＋拔除\n2 追加 第一層支撐 H350 組立＋拆除\n【今天做了】/);
+  assert.ok(!/覆工板/.test(t), '做完的工項不列');
+  const L = d.db.fydata.lineDaily.Gsite['2026-10-22'].list.q1; assert.equal(L.length, 2); assert.equal(L[1].idx, 1);
+  const g = { type: 'group', groupId: 'Gsite', userId: 'Uw' };
+  const reply = t.slice(t.indexOf('【日期】')).replace('【今天做了】\n', '【今天做了】\n1 打設 12\n').replace('【人和機具】\n', '【人和機具】\n人 5、怪手 1\n');
+  const r = await core.handleEvents([{ type: 'message', timestamp: ask + 600000, source: g, message: { id: 'a1', type: 'text', text: reply } }], d);
+  assert.ok(!r[0].addon, '範本工項名稱裡的「追加」不建追加草稿');
+  assert.ok(!Object.values(d.drafts).some((x) => x.type === 'addon'));
+  await core.dailyCompile(d, Date.parse('2026-10-22T12:00:00Z'));
+  const dr = Object.values(d.drafts).find((x) => x.type === 'dailyLog');
+  assert.ok(dr && dr.payload.fmtList && dr.payload.fmtList.q1.length === 2);
+  assert.ok(!/本工地工項/.test(dr.payload.answers[0]) && /1 打設 12/.test(dr.payload.answers[0]), '草稿文字拿掉範本工項清單');
+  // 【問題】寫追加、事故前兆字照舊
+  const r2 = await core.handleEvents([{ type: 'message', timestamp: ask + 700000, source: g, message: { id: 'a2', type: 'text', text: reply.replace('【問題】\n', '【問題】\n業主要追加 3 支，北側有裂縫') } }], d);
+  assert.ok(r2[0].addon && r2[0].alarm === '裂');
+});
+test('v6.0.234 公司大群組：最近 14 天回報過的工地各一段（最多 5 個，編號各自從 1 開始）；新欄位【今天做了】【人和機具】拆得出來、草稿帶該工地的清單', async () => {
+  const cfg = JSON.parse(JSON.stringify(CO)); cfg.sites = { q1: { name: '（範例）內湖興中路' }, q9: { name: '南港案' } };
+  const d = mkDeps(cfg); d.getQuote = async (qid) => (qid === 'q1' ? Q1 : { id: 'q9', items: [{ desc: '鋼板樁 III 打設', unit: '支', qty: 10 }], dailyLogs: [] });
+  const gid = Object.keys(cfg.groups)[0];
+  d.db.fydata = { lineCo: { [gid]: { '2026-10-20': { m1_0: { site: '南港', qid: 'q9' } }, '2026-10-21': { m2_0: { site: '內湖', qid: 'q1' } } } } };
+  const ask = Date.parse('2026-10-22T09:30:00Z');
+  await core.dailyAsk(d, ask);
+  const t = d.pushes[0].text;
+  assert.match(t, /【工地】內湖興中路\n【本工地工項】\n1 H型鋼樁[^]*【工地】南港案\n【本工地工項】\n1 鋼板樁 III 打設/);
+  const B = core.parseCoReport('【日期】10/22\n【工地】內湖興中路\n【本工地工項】\n1 追加 H350\n【今天做了】\n1 打設 12\n【人和機具】\n人 5\n【明天】\n續打\n【問題】\n無', '2026-10-22');
+  assert.equal(B.length, 1); assert.equal(B[0].today, '1 打設 12'); assert.equal(B[0].crew, '人 5'); assert.ok(!/追加/.test(B[0].today + B[0].issue));
+  const g = { type: 'group', groupId: gid, userId: 'Uw' };
+  const r = await core.handleEvents([{ type: 'message', timestamp: ask + 600000, source: g, message: { id: 'c1', type: 'text', text: '【日期】10/22\n【工地】內湖興中路\n【本工地工項】\n1 追加 H350\n【今天做了】\n1 打設 12\n【人和機具】\n人 5\n【明天】\n【問題】\n無' } }], d);
+  assert.ok(!Object.values(d.drafts).some((x) => x.type === 'addon'), '範本清單的追加不算');
+  assert.deepEqual(r[0].qids, ['q1']);
+  await core.dailyCompile(d, Date.parse('2026-10-22T12:00:00Z'));
+  const dr = Object.values(d.drafts).find((x) => x.type === 'dailyLog' && x.payload.qid === 'q1');
+  assert.ok(dr && dr.payload.fmtList.q1.length === 2 && /【人和機具】人 5/.test(dr.payload.answers[0]));
+});
+test('v6.0.234 舊格式照收：沒有【】的自由寫法照舊進草稿；舊的提醒句（三件事）自動換新', async () => {
+  const d = mkDeps(Object.assign({}, CFG, { texts: { remind: '昨天的施工日報還沒回，麻煩補一下三件事，謝謝。' } }));
+  const ask = Date.parse('2026-10-22T09:30:00Z'); await core.dailyAsk(d, ask);
+  await core.handleEvents([{ type: 'message', timestamp: ask + 600000, source: { type: 'group', groupId: 'Gsite', userId: 'Uw' }, message: { id: 'o1', type: 'text', text: '今天打設 H 型鋼 8 支，4 人' } }], d);
+  await core.dailyCompile(d, Date.parse('2026-10-22T12:00:00Z'));
+  assert.ok(Object.values(d.drafts).some((x) => x.type === 'dailyLog' && /打設 H 型鋼 8 支/.test(x.payload.answers[0])));
+  const d2 = mkDeps(Object.assign({}, CFG, { texts: { remind: '昨天的施工日報還沒回，麻煩補一下三件事，謝謝。' } }));
+  d2.db.fydata = { lineDaily: { Gsite: { '2026-10-21': { askedAt: 1, replied: false } } } };
+  await core.morningCheck(d2, Date.parse('2026-10-22T00:00:00Z'));
+  assert.ok(d2.pushes.some((p) => /照昨天的格式/.test(p.text)));
 });

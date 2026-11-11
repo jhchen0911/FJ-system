@@ -484,6 +484,28 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const logs = [{ date: '2026-11-01', progressRows: [{ itemIdx: 0, qty: 100 }, { itemIdx: 0, qty: 5, ph: 'remove' }] }, { date: '2026-11-02', photoOnly: true, progressRows: [{ itemIdx: 0, qty: 9 }] }];
   check('LINE 日報拆數量：累計只算確認過的日報（只有照片的不算）、打設拔除分開', DL.cumOf(logs, 0, 'install', (r) => r.ph === 'remove' ? 'remove' : 'install') === 100 && DL.cumOf(logs, 0, 'remove', (r) => r.ph === 'remove' ? 'remove' : 'install') === 5);
 }
+// ── v6.0.234 新格式日報（Lotion 11/11）：17:30 範本帶工項編號；tests/synthetic/daily-line-fmt.json 新格式、舊格式、亂寫 28 則
+{
+  const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl, F = require(path.join(__dirname, 'synthetic', 'daily-line.json')), G = require(path.join(__dirname, 'synthetic', 'daily-line-fmt.json'));
+  const list = DL.askList(F.items, []); let ok = 0, tot = 0; const miss = [];
+  G.cases.forEach((c, i) => { const R = DL.parseFmt(c.text, list, F.items).rows; tot += Math.max(1, c.expect.length); if (R.length !== c.expect.length) { miss.push(i + '（' + c.kind + '）列數 ' + R.length + '≠' + c.expect.length); return; } if (!c.expect.length) { ok++; return; }
+    c.expect.forEach((e, j) => { const r = R[j]; if (r.itemIdx === e[0] && r.qty === e[1] && (e[0] < 0 || r.ph === e[2]) && r.batchDone === e[3]) ok++; else miss.push(i + '#' + j + '（' + c.kind + '）'); }); });
+  console.log('  （新格式日報準確度：' + ok + '/' + tot + '，' + G.cases.length + ' 則）');
+  check('新格式日報：合成回報 ' + G.cases.length + ' 則逐列對（編號＋動作＋數量、單位照合約、這段拔完、工項名稱照舊對位；人和機具不算；範本清單、範例、清單沒有的編號不拆；單位不同、累計、範圍、動作跟工項不合＝待確認）', G.cases.length >= 20 && !miss.length, miss.join('、'));
+  const same = ['cases', 'holdout', 'adversarial'].every((k) => F[k].every((c) => JSON.stringify(DL.parseFmt(c.text, [], F.items).rows) === JSON.stringify(DL.parse(c.text, F.items).rows)));
+  check('新格式日報：舊寫法（沒有【】欄位）整段照原本的 parse，結果完全一樣（舊格式照收、不會被擋）', same);
+  const L2 = DL.askList(F.items, [{ progressRows: [{ itemIdx: 0, qty: 120 }, { itemIdx: 2, qty: 60 }] }]);
+  check('新格式日報：問句工項清單＝還沒做完的（打設做完的拿掉、打設＋拔除的要兩種都做完才拿掉）、分段標題和備用單價不列、編號 1～N 連號',
+    list.length === 9 && !L2.some((e) => e.idx === 0) && L2.some((e) => e.idx === 2) && L2.every((e, i) => e.no === i + 1) && !list.some((e) => F.items[e.idx].sec || F.items[e.idx].spare)
+    && !DL.askList([{ desc: '技師簽證', unit: '式', qty: 1, cat: 'other' }], []).length);
+  const moved = F.items.slice(); moved.splice(0, 0, { desc: '導溝開挖', unit: 'M', qty: 10 });   // 報價在問句之後多了一列：編號照名稱找回原工項
+  const rm = DL.parseFmt('【今天做了】\n1 打設 12', list, moved).rows[0];
+  const gone = DL.parseFmt('【今天做了】\n1 打設 12', list, F.items.slice(1)).rows[0];
+  check('新格式日報：問句之後報價改過（多一列）→ 照工項名稱找回同一項；那一項被刪了 → 待確認、不猜', rm.itemIdx === 1 && rm.qty === 12 && gone.itemIdx === -1 && /找不到/.test(gone.why));
+  const T = DL.askText('說明', [{ site: 'A 案', list: list.slice(0, 2) }, { site: 'B 案', list: list.slice(0, 1) }], '11/11');
+  check('新格式日報：一個群組好幾個工地＝好幾段【工地】，編號各自從 1 開始；範本的【本工地工項】不算回報內容（stripList）',
+    (T.match(/【工地】/g) || []).length === 2 && /【工地】B 案\n【本工地工項】\n1 /.test(T) && !/追加/.test(DL.stripList('【本工地工項】\n1 追加 H300\n【今天做了】\n1 打設 3')) && /打設 3/.test(DL.stripList('【本工地工項】\n1 追加 H300\n【今天做了】\n1 打設 3')));
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');

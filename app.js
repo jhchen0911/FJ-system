@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.232';
+var APP_VERSION='v6.0.234';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -39120,8 +39120,8 @@ function _draftOpenQuote(q,isEdit){
 // Cloud Functions（functions/line/）收 LINE 訊息：擁有者一對一的檔案 → Storage line/inbox；工地群組 → fydata/lineLog，
 // 現場追加與施工日報寫成草稿（fydata/drafts type addon／dailyLog）。這裡負責：草稿顯示與確認、LINE 設定卡（擁有者、群組綁定工程、固定句子）。
 // 設定 fydata/lineCfg：{owners:{<userId>:{name}}, groups:{<groupId>:{qid,name,daily}}, pending:{users:{},groups:{}}, texts:{inboxAck,daily3,remind,alarm,noReply2}}
-var _LINE_TEXTS={inboxAck:'收到，之後的檔案會一起收。傳完打一行案名就好。',inboxNote:'第 {no} 批 {n} 個檔案：{text}，已記下',inboxMore:'第 {no} 批補充：{text}，已記下',inboxNext:'好，接下來傳的檔案記成：{text}',inboxFail:'這個檔案沒存成功，請重傳：{name}',inboxBig:'這個檔案超過 {mb}MB 沒存，請改傳雲端連結：{name}',daily3:'今天辛苦了，麻煩回三件事：\n1. 今天做了哪些？（工項、數量）\n2. 幾個人、什麼機具？\n3. 有沒有問題、等待或追加？',remind:'昨天的施工日報還沒回，麻煩補一下三件事，謝謝。',alarm:'{site}工地群組出現「{word}」，請判斷是否停工。',noReply2:'{site}工地群組連兩天沒有回施工日報。',dailyCo:'今天辛苦了，請複製下面格式回報（一個工地一段，可以貼好幾段；補昨天的只改日期）：\n【日期】{date}\n【工地】\n【今天】\n【明天】\n【問題】'};
-var _LINE_TL={inboxAck:'收到檔案的回覆（同一批 3 分鐘內只回第一則，v6.0.153）',inboxNote:'傳完檔案打一行字的回覆（{no}＝今天第幾批、{n}＝這批檔案數、{text}＝打的字；打完這批就關閉，之後的檔案算新的一批，v6.0.178）',inboxMore:'這批已有案名後打「補充…」「備註…」的回覆（{no}＝第幾批、{text}＝補充的字）',inboxNext:'這批已有案名後打其他字的回覆＝下一批的案名（{text}＝打的字）',inboxFail:'檔案沒存成功的回覆（{name}＝檔名）',inboxBig:'檔案太大沒存的回覆（{mb}＝上限 MB、{name}＝檔名）',daily3:'17:30 在工地群組問的三句',remind:'隔天 08:00 沒回的提醒',alarm:'事故前兆通知 Lotion（{site} 工地、{word} 關鍵字）',noReply2:'連兩天沒回通知 Lotion',dailyCo:'17:30 在公司大群組發的回報格式（{date}＝當天日期，例 11/01）'};
+var _LINE_TEXTS={inboxAck:'收到，之後的檔案會一起收。傳完打一行案名就好。',inboxNote:'第 {no} 批 {n} 個檔案：{text}，已記下',inboxMore:'第 {no} 批補充：{text}，已記下',inboxNext:'好，接下來傳的檔案記成：{text}',inboxFail:'這個檔案沒存成功，請重傳：{name}',inboxBig:'這個檔案超過 {mb}MB 沒存，請改傳雲端連結：{name}',dailyFmtHead:'今天辛苦了，請複製【日期】以下整段，填好再傳（一個工地一段）：\n．今天做了：一行一項，編號＋打設／拔除／組立／拆除＋數量，例「1 打設 12」「1 拔除 40 這段拔完」，單位不用寫\n．人和機具：例「人 5、怪手 1、吊車 1」\n．問題：追加、等料、等吊車、有異狀都寫這裡',remind:'昨天的施工日報還沒回，麻煩照昨天的格式補一下，謝謝。',alarm:'{site}工地群組出現「{word}」，請判斷是否停工。',noReply2:'{site}工地群組連兩天沒有回施工日報。'};   // v6.0.234：17:30 改成預先填好的範本（日期、工地、本工地工項由系統帶），只剩上面的說明可改（dailyFmtHead）；舊的 daily3／dailyCo 不再用
+var _LINE_TL={inboxAck:'收到檔案的回覆（同一批 3 分鐘內只回第一則，v6.0.153）',inboxNote:'傳完檔案打一行字的回覆（{no}＝今天第幾批、{n}＝這批檔案數、{text}＝打的字；打完這批就關閉，之後的檔案算新的一批，v6.0.178）',inboxMore:'這批已有案名後打「補充…」「備註…」的回覆（{no}＝第幾批、{text}＝補充的字）',inboxNext:'這批已有案名後打其他字的回覆＝下一批的案名（{text}＝打的字）',inboxFail:'檔案沒存成功的回覆（{name}＝檔名）',inboxBig:'檔案太大沒存的回覆（{mb}＝上限 MB、{name}＝檔名）',dailyFmtHead:'17:30 日報範本上面的說明（工地群組、公司大群組都用；下面的【日期】【工地】【本工地工項】【今天做了】【人和機具】【明天】【問題】由系統自動帶，v6.0.234）',remind:'隔天 08:00 沒回的提醒',alarm:'事故前兆通知 Lotion（{site} 工地、{word} 關鍵字）',noReply2:'連兩天沒回通知 Lotion'};
 function _lineDraftBody(d){
   var S=_draftS,pl=(d.payload&&typeof d.payload==='object')?d.payload:{},q=Q.find(function(x){return x.id===pl.qid;});
   var ph=_lineArr(pl.photos).slice(0,6).map(function(path){return '<img data-lpath="'+esc(path)+'" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:6px;background:var(--b1)">';}).join('');
@@ -39171,7 +39171,7 @@ function _lineDraftApply(d,close){
     +'<div class="f"><label>日報日期'+(back?'（補傳）':'')+'</label><input id="ld-date" type="date" max="'+localToday()+'" value="'+esc(d0)+'" oninput="_ldDupHint(\''+escq(q.id)+'\')"></div>'
     +'<div id="ld-dup" style="font-size:12px;color:var(--red);margin:4px 0"></div>'
     +'<div class="f"><label>日報內容（可改）</label><textarea id="ld-txt" rows="6" style="width:100%;box-sizing:border-box">'+esc(txt)+'</textarea></div>'
-    +_dlRowsEditHtml(q,_dlPlan(q,txt).rows)
+    +_dlRowsEditHtml(q,_dlPlan(q,txt,null,_dlFmtList(pl,q)).rows)
     +(_lineArr(pl.dayTexts).length?('<details style="font-size:11.5px;color:var(--b4);margin-top:6px"><summary>當天群組其他文字（'+_lineArr(pl.dayTexts).length+' 則）</summary><div style="white-space:pre-wrap">'+esc(_lineArr(pl.dayTexts).join('\n'))+'</div></details>'):'')
     +'<div style="font-size:11px;color:var(--b4);margin-top:6px">照片 '+photos.length+' 張會掛在這筆日報（LINE 照片）。這天已經有日報時，會先問你要合併還是取消。</div>',function(){
       var t=(gv('ld-txt')||'').trim(),dt=gv('ld-date')||'';
@@ -39211,7 +39211,7 @@ function renderLineBox(){
   if(_lineCfgCache===null&&_fbDb){_lineCfgCache={};_fbDb.ref('fydata/lineCfg').once('value').then(function(sn){_lineCfgCache=sn.val()||{};renderLineBox();}).catch(function(e){_err('renderLineBox',e);_lineCfgCache={__err:1};renderLineBox();});}
   if(_lineCfgCache&&_lineCfgCache.__err){box.innerHTML='<div class="card"><div class="cb"><div style="font-weight:700;font-size:13.5px;margin-bottom:4px">LINE 機器人（陳軒｜AI 助理）</div><div style="font-size:12px;color:var(--red)">讀不到 LINE 設定：雲端規則尚未發布（見 docs/回國後部署清單_20261031.md 第 1 步）。</div><div style="margin-top:8px"><button type="button" class="btn btn-xs" onclick="_lineCfgCache=null;renderLineBox()">重新整理</button></div></div></div>';return;}
   var C=_lineCfgCache||{},own=C.owners||{},gr=C.groups||{},pu=(C.pending&&C.pending.users)||{},pg=(C.pending&&C.pending.groups)||{},tx=Object.assign({},_LINE_TEXTS,C.texts||{});
-  if(tx.dailyCo==='今天辛苦了，請照下面格式回報（一個工地一段，可以貼好幾段）：\n【工地】地名\n【今天】\n【明天】\n【問題】')tx.dailyCo=_LINE_TEXTS.dailyCo;   // v6.0.122 舊預設（沒有【日期】）→ 顯示新預設，雲端程式同樣換掉
+  if(tx.remind==='昨天的施工日報還沒回，麻煩補一下三件事，謝謝。')tx.remind=_LINE_TEXTS.remind;   // v6.0.234 舊預設 → 新預設（雲端程式同樣換掉）
   if(tx.inboxAck==='收到，{n} 個檔案，歸到哪一案？')tx.inboxAck=_LINE_TEXTS.inboxAck;   // v6.0.153 舊預設 → 顯示新預設（雲端程式同樣換掉）
   if(tx.inboxNote==='這批 {n} 個檔案：{text}，已記下')tx.inboxNote=_LINE_TEXTS.inboxNote;   // v6.0.178 舊預設 → 新預設（寫第幾批；雲端程式同樣換掉）
   var projs=(Q||[]).filter(function(q){return q&&q.awarded&&!q.closed&&!q.parentId;});
@@ -39230,7 +39230,7 @@ function renderLineBox(){
     +(Object.keys(gr).map(function(g){var v=gr[g]||{};return row('<b>'+esc(v.name||'')+'</b>'+sel('lg-q-'+k(g),v.mode==='company'?'__co':v.qid)+'<label style="font-size:11.5px"><input type="checkbox" id="lg-d-'+k(g)+'"'+(v.daily!==false?' checked':'')+'> 每天問日報</label>'+aud('lg-a-'+k(g),v.audience)+'<span style="margin-left:auto;display:flex;gap:4px">'+B("lineGroupSave('"+k(g)+"')",'儲存','btn-g')+B("lineGroupDel('"+k(g)+"')",'解除','btn-r')+'</span>');}).join('')||'<div style="font-size:12px;color:var(--b3)">尚未綁定（把機器人拉進工地群組，群組有人講話後會出現在下方）</div>')
     +(Object.keys(pg).length?('<div style="font-size:12px;margin-top:6px">待綁定的群組：</div>'+Object.keys(pg).map(function(g){return row('<span style="color:var(--b3)">'+esc(g.slice(0,10))+'…　'+esc(new Date((pg[g]&&(pg[g].lastAt||pg[g].at))||0).toLocaleString('zh-TW'))+'</span>'+sel('lg-q-'+k(g),'')+'<label style="font-size:11.5px"><input type="checkbox" id="lg-d-'+k(g)+'" checked> 每天問日報</label>'+aud('lg-a-'+k(g),'')+'<span style="margin-left:auto;display:flex;gap:4px">'+B("lineGroupSave('"+k(g)+"')",'綁定','btn-g')+B("linePendDel('groups','"+k(g)+"')",'忽略')+'</span>');}).join('')):'')
     +'<details style="margin-top:10px"><summary style="font-weight:700;font-size:12.5px;cursor:pointer">機器人固定句子（Lotion 定稿；群組裡只會發這些）</summary>'
-    +Object.keys(_LINE_TEXTS).map(function(t){return '<div class="f" style="margin-top:6px"><label>'+esc(_LINE_TL[t]||t)+'</label><textarea id="lt-'+t+'" rows="'+(t==='daily3'||t==='dailyCo'?5:2)+'" style="width:100%;box-sizing:border-box;font-size:12px">'+esc(tx[t])+'</textarea></div>';}).join('')
+    +Object.keys(_LINE_TEXTS).map(function(t){return '<div class="f" style="margin-top:6px"><label>'+esc(_LINE_TL[t]||t)+'</label><textarea id="lt-'+t+'" rows="'+(t==='dailyFmtHead'?5:2)+'" style="width:100%;box-sizing:border-box;font-size:12px">'+esc(tx[t])+'</textarea></div>';}).join('')
     +'<div style="text-align:right;margin-top:6px">'+B('lineTextsSave()','儲存固定句子','btn-g')+'</div></details>'
     +'<div id="gt-box">'+_gtBoxHtml()+'</div>'
     +'<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">'+B('linePushTest()','傳一則測試通知給擁有者')+B('_lineCfgCache=null;_gtStatus=null;renderLineBox()','重新整理')+'</div>'
@@ -45147,7 +45147,9 @@ _decReg('steelPrice',{
 // LINE 日報草稿（type dailyLog）改走首頁拍板卡 dlQty：FJC.dl.parse 把回報文字拆成「工項＋數量＋打設或拔除＋本段完成」，
 // 卡片附原文、照片、每列累計（已確認的日報＋這次）跟合約數量比（超過標紅）；拆不出來的標「待確認」不猜。確認才寫進日報 progressRows。
 function _dlItems(q){return (q&&Array.isArray(q.items))?q.items:[];}
-function _dlPlan(q,text,dt){var P0=FJC.dl.parse(text,_dlItems(q)),its=_dlItems(q),ex=dt?_ldExisting(q,dt):null;
+// v6.0.234 新格式（17:30 問句帶工項編號）：list＝那天問句的編號清單（草稿 payload.fmtList[報價id]），沒有就照名稱對；舊寫法照 parse
+function _dlFmtList(pl,q){var F=pl&&pl.fmtList;var L=F&&q&&F[q.id];return Array.isArray(L)?L:(L&&typeof L==='object'?Object.keys(L).map(function(k){return L[k];}):[]);}
+function _dlPlan(q,text,dt,list){var its=_dlItems(q),P0=FJC.dl.parseFmt?FJC.dl.parseFmt(text,list||[],its):FJC.dl.parse(text,its),ex=dt?_ldExisting(q,dt):null;
   P0.rows.forEach(function(r){if(!(r.itemIdx>=0))return;var it=its[r.itemIdx]||{};r.name=String(it.desc||'').split('\n')[0].slice(0,40);r.target=Math.abs(parseFloat(it.qty)||0);r.iu=String(it.unit||'');
     r.before=FJC.dl.cumOf(q.dailyLogs,r.itemIdx,r.ph,function(x){return _prPhase(q,x);});r.after=Math.round((r.before+r.qty)*1000)/1000;r.over=r.target>0&&r.after>r.target+1e-9;
     r.dayHad=ex?FJC.dl.cumOf([ex],r.itemIdx,r.ph,function(x){return _prPhase(q,x);}):0;});   /* 審查：這天已經有這個工項的數量 → 會加上去，卡片先講 */
@@ -45184,7 +45186,7 @@ function _dlWrite(q,d,dt,t,qr,photos){var S=_draftS,pl=(d.payload&&typeof d.payl
   if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120);
   _touch(q);persist();try{if(DRAFTS&&DRAFTS[d.id])DRAFTS[d.id]._dlWritten=1;}catch(e){_err('_dlWrite',e);}return _draftMark(d.id,'applied',{resultId:q.id});}
 function _dlOf(d){var S=_draftS,pl=(d&&d.payload&&typeof d.payload==='object')?d.payload:{},q=(Q||[]).find(function(x){return x&&x.id===pl.qid;})||null,txt=_lineArr(pl.answers).join('\n');
-  var dt=/^\d{4}-\d{2}-\d{2}$/.test(S(pl.date))?S(pl.date):localToday();return {pl:pl,q:q,txt:txt,dt:dt,plan:q?_dlPlan(q,txt,dt):{rows:[],skip:[]},photos:_lineArr(pl.photos).filter(function(x){return /^line\//.test(x);})};}
+  var dt=/^\d{4}-\d{2}-\d{2}$/.test(S(pl.date))?S(pl.date):localToday();return {pl:pl,q:q,txt:txt,dt:dt,plan:q?_dlPlan(q,txt,dt,_dlFmtList(pl,q)):{rows:[],skip:[]},photos:_lineArr(pl.photos).filter(function(x){return /^line\//.test(x);})};}
 _decReg('dlQty',{
   title:'施工日報（LINE）',todo:function(n){return 'LINE 施工日報待確認 '+n+' 筆';},sub:'確認＝照卡片寫進日報（工項數量＋文字）；待確認的列只留在文字裡；修改＝逐列選工項、改數量、改日期；退回＝不寫',
   canSee:function(){return !_isReaderUser&&_decIsAdmin();},
