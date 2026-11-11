@@ -45299,7 +45299,7 @@ function _acctLedHtml(kind){
   if(!rows.length)h+='<div style="font-size:12.5px;color:var(--g3);padding:6px 0"><b>'+(kind==='ar'?'這一類沒有請款單':'這一類沒有待付的款項')+'</b></div>';
   rows.slice(0,MAX).forEach(function(r){
     h+='<div class="acct-led-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--b1);font-size:12.5px">'
-      +'<div style="flex:1 1 220px;min-width:0"><b'+(r.open?(' style="cursor:pointer" onclick="'+r.open+'"'):'')+'>'+esc(r.who)+'</b><div style="font-size:11.5px;color:var(--b4);overflow-wrap:anywhere">'+esc(r.what)+(r.date?('・'+(kind==='ar'?'預計 ':'到期 ')+esc(r.date)):'')+'</div></div>'
+      +'<div style="flex:1 1 220px;min-width:0"><b'+(r.open?(' style="cursor:pointer" onclick="'+r.open+'"'):'')+'>'+esc(r.who)+'</b><div style="font-size:11.5px;color:var(--b4);overflow-wrap:anywhere">'+esc(r.what)+(r.date?((r.what?'・':'')+(kind==='ar'?'預計 ':'到期 ')+esc(r.date)):'')+'</div></div>'
       +'<div style="flex:0 0 auto;text-align:right"><b>NT$ '+fmt(r.amt)+'</b><div style="font-size:11px;color:'+r.col+';font-weight:700">'+esc(r.state)+'</div></div>'
       +((ro||!r.fn)?'':'<button type="button" class="btn sm" data-lednext="1" onclick="'+r.fn+'">'+esc(r.next)+'</button>')
       +(r.more?'<button type="button" class="btn sm" data-ledmore="1" aria-label="其他操作" onclick="'+r.more+'" style="padding:4px 9px">⋯</button>':'')+'</div>';});
