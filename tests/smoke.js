@@ -11957,7 +11957,12 @@ async function newPage(browser, width, height) {
         // 上一期是拔除期、這期只有新的打設日報：請款單請 0、卡片寫 10 → 對不上就不算成功
         Q = mk(); Q[0].items[0].desc = 'H型鋼樁 打設＋拔除'; INV = [{ id: 'p1x', project: '三天前案', quoteId: 'q3D', sourceQid: 'q3D', periodNo: '1', date: '2026-09-20', st: 'sent', stLast: 'sent', items: [{ type: 'item', desc: 'H型鋼樁 打設＋拔除', unit: '支', contractQty: 100, contractPrice: 1000, prevQty: 0, curQty: 5, payRate: 30, phase: 'remove' }], totals: { total: 1575 } }]; _todoBuild(true);
         const G = _decItems('invDraft')[0];
-        out.diff = !!G && (await _DEC.invDraft.ok(G)) === false && INV.length === 1 && /上一期是拔除期，這期只有打設/.test(_DEC.invDraft.body(G)) && /系統不會自動帶數量/.test(_DEC.invDraft.detail(G));   // 編輯頁不會自動帶（請款規則先不改，交 Lotion 決定）→ 擋確認、標要自己填，不會悄悄請 0
+        out.diff = !!G && !_ibBlocks(G).length && /上期拔除、這期改回打設/.test(_DEC.invDraft.detail(G)) && (await _DEC.invDraft.ok(G)) === true && (() => { const n = INV.find(x => x.periodNo === '2'), it = n && n.items.find(x => x.type === 'item'); return !!it && it.curQty === 10 && it.phase === 'install' && it.payRate === _invPhasePct(Q[0], Q[0].items[0], 'install'); })();   // Lotion 11/11：上一期拔除期、這期只有新打設 → 自動改回打設照打設 % 請、卡片寫明
+        // 保留款退還單不算上一期（Lotion 11/11）：退還單 10-05 開，10-03 的日報照樣算進這期
+        Q = mk(); Q[0].dailyLogs = [{ id: 'r1', date: '2026-10-03', progressRows: [{ itemIdx: 0, qty: 9 }] }];
+        INV = [{ id: 'rr1', kind: 'retReturn', project: '三天前案', quoteId: 'q3D', sourceQid: 'q3D', periodNo: '退', date: '2026-10-05', items: [], totals: { total: 0 } }]; _todoBuild(true);
+        const RR = _decItems('invDraft')[0];
+        out.retRet = !!RR && _ibRows(RR)[0].ni === 9 && (await _DEC.invDraft.ok(RR)) === true && (() => { const n = INV.find(x => x.kind !== 'retReturn'), it = n && n.items.find(x => x.type === 'item'); return !!it && it.curQty === 9; })();
         // 兩個第一行一樣的工項（A、B 區）：卡片跟請款單數量合起來比一樣、確認成功
         Q = mk(); Q[0].items = [{ desc: 'H型鋼樁 打設\nA 區', unit: '支', qty: 50, price: 1000 }, { desc: 'H型鋼樁 打設\nB 區', unit: '支', qty: 50, price: 1000 }];
         Q[0].dailyLogs = [{ id: 'k1', date: '2026-10-12', progressRows: [{ itemIdx: 0, qty: 6 }] }]; INV = []; _todoBuild(true);
@@ -11983,7 +11988,7 @@ async function newPage(browser, width, height) {
       } finally { Q = keepQ; INV = keepI; DRAFTS = keepD; }
       return out;
     });
-    check('請款單改兩下（審查修正）：日期與數量都停在截止日前 3 天（最晚昨天）、之後的日報下一期請到（不漏）；重用空白第 1 期算成功；下一期不沿用上一期合計；只有之後才有日報時不會存出 0 元單；有沒確認的日報、累計超過 100% 擋確認；存檔被擋或存出來的數量跟卡片不一樣不算成功；待送卡金額照工項重算；上一期是拔除期這期只有打設、說明沒有打設拔除字眼的工項（編輯頁不會自動帶）擋確認並標要自己填；同名工項合起來比、各自對上一期自己那一列', Object.values(r).length === 15 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('請款單改兩下（審查修正）：日期與數量都停在截止日前 3 天（最晚昨天）、之後的日報下一期請到（不漏）；重用空白第 1 期算成功；下一期不沿用上一期合計；只有之後才有日報時不會存出 0 元單；有沒確認的日報、累計超過 100% 擋確認；存檔被擋或存出來的數量跟卡片不一樣不算成功；待送卡金額照工項重算；說明沒有打設拔除字眼的工項（編輯頁不會自動帶）擋確認並標要自己填；同名工項合起來比、各自對上一期自己那一列；上一期拔除期這期只有打設自動改回打設；保留款退還單不算上一期', Object.values(r).length === 16 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('請款單改兩下（審查修正）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

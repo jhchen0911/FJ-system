@@ -5239,7 +5239,7 @@ function _invRenderSyncBanner(inv,q){
 function _invPrevPeriodDate(q,to){
   const curNo=parseInt(gv('inv-period-no'))||0;let from='';
   (INV||[]).forEach(v=>{
-    if(!v||v.id===invEid)return;
+    if(!v||v.id===invEid||v.kind==='retReturn')return;   /* Lotion 11/11：保留款退還單不算上一期（不然退還單之前的日報會少請） */
     const same=(v.quoteId===q.id)||(v.sourceQid===q.id)||(!v.quoteId&&String(v.project||'').trim()===String(q.name||'').trim());
     if(!same)return;
     if(curNo&&(parseInt(v.periodNo)||0)>=curNo)return;
@@ -5275,7 +5275,8 @@ function _invAutoDaily(inv){
       ['rid','icSeen','note','internalNote','origContractQty','_qRetired','settledQty','prevPayRate'].forEach(f=>{delete r[f];});   /* 審查：拔除列不帶原列的備註、結算、統計 */
       _adds.push([k,r]);n++;return;
     }
-    if(_isRemovePeriod(it))v=rem;
+    if(it.phase==='remove'&&ins>0&&!(rem>0)&&cat.install){it.phase='install';it.payRate=_invPhasePct(q,q.items[idx],'install');v=ins;}   /* Lotion 11/11：上一期是拔除期、這期只有新的打設 → 改回打設照合約打設 % 請（同一期兩種都有走上面分兩列；只看明確記的期別，不靠請款 % 猜） */
+    else if(_isRemovePeriod(it))v=rem;
     else if(ins>0)v=ins;
     else if(rem>0&&cat.install&&cat.remove){it.phase='remove';it.payRate=_invPhasePct(q,q.items[idx],'remove');v=rem;}   // 健檢 H5：拔除那期＝100−合約裝設 %
     else if(rem>0&&!cat.install)v=rem;
@@ -34312,7 +34313,7 @@ function _pjSubHtml(q,st){
 // ── 工程專案：業主計價「＋ 新增請款單」＝此合約下一期（沒有請款單才從報價建第 1 期）──
 function pjNewInv(qid){
   var q=Q.find(function(x){return x.id===qid;});if(!q)return;
-  var _bl=[],_nb=function(L){return L.filter(function(x){try{if(_icBlank(x)){_bl.push(x);return false;}}catch(e){_err('pjNewInv.blank',e);}return true;});};
+  var _bl=[],_nb=function(L){return L.filter(function(x){if(x&&x.kind==='retReturn')return false;try{if(_icBlank(x)){_bl.push(x);return false;}}catch(e){_err('pjNewInv.blank',e);}return true;});};   /* Lotion 11/11：保留款退還單不是一期請款單，不拿來接下一期 */
   var list=_nb(_invsOfQuote(q));if(!list.length)list=_nb(_invsOfQuoteAll(q));   /* 審查：先拿掉舊版得標自動建的空白第 1 期再找（不然真的第一張變第 2 期） */
   if(!list.length&&_bl.length){var b0=_bl[0];try{_invStSet(b0,'draft','舊版得標建的空白第 1 期，拿來當這次的第 1 期');b0.date=_invNewDate();}catch(e){_err('pjNewInv.reuse',e);}_touch(b0);saveInv();loadInvoice(b0.id);go('invoice-edit');toast('用原本的空白第 1 期開始填');return;}   /* 直接用那一張（不會多一張，也不會被自動收） */
   if(!list.length){var inv=buildInvFromQuote(q);if(_invNewDateOv)inv.date=_invNewDateOv;INV.unshift(inv);saveInv();loadInvoice(inv.id);go('invoice-edit');toast('已從報價單建立第 1 期請款單');return;}
@@ -46446,7 +46447,7 @@ function _ibStop(b){var s=_dAdd(b.cutDate,-_IB_LEAD),t=_dAdd(localToday(),-1);re
 function _ibPendLogs(q,stop){return Object.keys(DRAFTS||{}).map(function(k){return DRAFTS[k];}).filter(function(d){if(!d||d.type!=='dailyLog'||d.status!=='pending')return false;var pl=(d.payload&&typeof d.payload==='object')?d.payload:{},dt=String(pl.date||'');var qq=(Q||[]).find(function(x){return x&&x.id===pl.qid;});return (pl.qid===q.id||!!(qq&&qq.parentId===q.id))&&_DRAFT_ID.test(_draftS(d.id))&&/^\d{4}-\d{2}-\d{2}$/.test(dt)&&dt<=stop;});}
 // 不算拿來重用的舊空白第 1 期（那張會變成這期的第 1 期）
 function _ibPrevInvs(q){return _ibInvs(q).filter(function(x){try{return !_icBlank(x);}catch(e){_err('_ibPrevInvs',e);return true;}});}
-function _ibSince(q,stop){var d='',L=[];try{L=_invsOfQuote(q);if(!L.length)L=_invsOfQuoteAll(q);}catch(e){_err('_ibSince',e);}L=(L||[]).filter(function(x){try{return x&&!_icBlank(x);}catch(e){_err('_ibSince.blank',e);return true;}});   /* 審查：跟編輯頁 _invPrevPeriodDate 一樣也算保留款退還單的日期 */
+function _ibSince(q,stop){var d='',L=[];try{L=_invsOfQuote(q);if(!L.length)L=_invsOfQuoteAll(q);}catch(e){_err('_ibSince',e);}L=(L||[]).filter(function(x){try{return x&&x.kind!=='retReturn'&&!_icBlank(x);}catch(e){_err('_ibSince.blank',e);return true;}});   /* 跟編輯頁 _invPrevPeriodDate 一樣：保留款退還單不算上一期（Lotion 11/11） */
   L.forEach(function(x){var t=String(x.date||'').slice(0,10);if(t>d&&(!stop||t<stop))d=t;});return d;}   /* 跟 _invPrevPeriodDate 一樣只看數量截止日以前的 */
 function _ibLastIt(last,it,q,idx){var k=String((it&&it.desc)||'').split('\n')[0].trim(),f=function(t){return String(t||'').split('\n')[0].trim();};if(!last)return null;
   var n=0;if(q&&idx!=null)((q.items||[]).slice(0,idx)).forEach(function(y){if(y&&!y.sec&&f(y.desc)===k)n++;});   /* 審查：同名工項（第一行一樣）照第幾個對第幾列，跟 _invItemQIdx 同一套 */
@@ -46457,16 +46458,17 @@ function _ibRows(b){var q=_ibQ(b.qid);if(!q)return [];var last=_ibPrevInvs(q)[0]
     var ni=_dailyQtyBetween(q,it.desc,since,stop,'install',x.idx),nr=_dailyQtyBetween(q,it.desc,since,stop,'remove',x.idx);   /* 審查：數量跟編輯頁帶入同一套（舊日報用名稱比、負數更正列、四捨五入）；src 只拿來列哪幾天 */
     // 編輯頁不會自動帶數量的兩種（跟 _invAutoDaily 同一條；11/11 第四次審查：先不改請款金額規則，交 Lotion 決定）：說明沒有打設／拔除字眼的工項、上一期是拔除期這期只有打設 → 卡片數量照編輯頁算 0，另標「要手動填」並擋確認
     var lit=_ibLastIt(last,it,q,x.idx),pw=lit?_invRemSibs(lit,last.items).reduce(function(a,y){return a+(parseFloat(y.prevQty)||0)+_wQty(y.curQty,y.payRate);},0):0;
-    var cat=_itemCat(it),man=0,manWhy='';
+    var cat=_itemCat(it),man=0,manWhy='',back=false;
     if(!cat.install&&!cat.remove){man=Math.round((ni+nr)*100)/100;ni=0;nr=0;manWhy='工項說明沒有打設／拔除字眼';}
-    else{if(!cat.install&&ni>0)ni=0;if(!cat.remove&&nr>0)nr=0;if(lit&&_isRemovePeriod(lit)&&!_invRemOf(lit,last.items).length&&ni>0&&!(nr>0)){man=ni;ni=0;manWhy='上一期是拔除期，這期只有打設';}}
+    else{if(!cat.install&&ni>0)ni=0;if(!cat.remove&&nr>0)nr=0;if(lit&&_isRemovePeriod(lit)&&!_invRemOf(lit,last.items).length&&ni>0&&!(nr>0)){if(lit.phase==='remove')back=true;else{man=ni;ni=0;manWhy='上一期請款 % 跟拔除一樣但沒記期別，系統不會自動帶';}}}   /* Lotion 11/11：明確記拔除期的 → 編輯頁自動改回打設（卡片寫明）；只靠請款 % 猜的舊單照舊要自己填 */
     var pi=_invPhasePct(q,it,'install'),pr=_invPhasePct(q,it,'remove'),cum=cq>0?Math.round((pw+ni*pi/100+nr*pr/100)/cq*1000)/10:null;
-    return {x:x,it:it,lit:lit,src:src,ni:ni,nr:nr,man:man,manWhy:manWhy,cq:cq,pi:pi,pr:pr,cum:cum,over:cum!=null&&cum>100.05};});}
+    return {x:x,it:it,lit:lit,src:src,ni:ni,nr:nr,man:man,manWhy:manWhy,back:back,cq:cq,pi:pi,pr:pr,cum:cum,over:cum!=null&&cum>100.05};});}
 function _ibDetailHtml(b){var q=_ibQ(b.qid);if(!q)return '';var invs=_ibPrevInvs(q),last=invs[0]||null,n=last?(parseInt(last.periodNo)||0)+1:1,stop=_ibStop(b);
   var ph=function(r){return _prPhase(q,r);},all=_ibRows(b),rs=all.filter(function(r){return r.ni>0||r.nr>0;}),later=all.filter(function(r){return !(r.ni>0||r.nr>0)&&!(r.man>0);}),manu=all.filter(function(r){return r.man>0;});
   var rows=rs.map(function(r){var x=r.x,it=r.it,tg=Math.abs(parseFloat(it.qty)||0),ci=FJC.dl.cumOf(q.dailyLogs,x.idx,'install',ph),cr=FJC.dl.cumOf(q.dailyLogs,x.idx,'remove',ph),lo=tg>0&&(ci>tg+1e-9||cr>tg+1e-9),pv=r.lit?_invRemSibs(r.lit,last.items).reduce(function(a,y){return a+(parseFloat(y.curQty)||0);},0):null;
     var two=function(a,m){return (a?'打設 '+fmt(a):'')+(a&&m?'<br>':'')+(m?'拔除 '+fmt(m):'')||'0';};
     var pcs=(r.ni?'打設 '+r.pi+'%':'')+(r.ni&&r.nr?'<br>':'')+(r.nr?'拔除 '+r.pr+'%':'');
+    if(r.back)pcs+='<div style="color:#b26a00">上期拔除、這期改回打設（照合約打設 '+r.pi+'% 請）</div>';
     if(r.ni>0&&r.nr>0)pcs+='<div style="color:#b26a00">這期打設、拔除都有：請款單會另加一列「（拔除）」請 '+fmt(r.nr)+'（拔除 '+r.pr+'%）</div>';   /* 審查：卡片不要寫成兩種都會請 */
     return '<tr'+(r.over?' style="background:#ffebee"':'')+'><td style="padding:2px 4px">'+esc(x.desc)+'<div style="font-size:11px;color:var(--b4)">這期請 '+(pcs||'—')+'，累計 '+(r.cum==null?'—':'<b style="white-space:nowrap'+(r.over?';color:#c62828':'')+'">'+r.cum+'%</b>')+(r.over?'（超過 100%，要先按「修改」調整）':'')+'</div><div style="font-size:11px;color:var(--b4)">日報：'+(r.src.map(function(s){return esc(s.d.slice(5))+' '+(s.q?fmt(s.q):'')+(s.r?(s.q?'＋':'')+'拔'+fmt(s.r):'');}).join('、')||'—')+'</div></td><td style="text-align:center">'+two(r.ni,r.nr)+' '+esc(x.unit)+'</td><td style="text-align:center">'+(pv==null?'—':fmt(pv))+'</td><td style="text-align:center;'+(lo?'color:#c62828;font-weight:700':'')+'">'+two(ci,cr)+'<br>／ '+(tg?fmt(tg):'—')+(lo?'<br>日報超過合約':'')+'</td></tr>';}).join('');   /* 列底紅＝累計超過 100%（跟擋確認同一條）；右欄紅字＝日報累計超過合約數量（提醒，不擋） */
   var ad=((q.addons)||[]).filter(function(a){return a&&a.status==='confirmed'&&String(a.date||'')>String((last&&last.date)||'');});
