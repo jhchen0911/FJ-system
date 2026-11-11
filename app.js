@@ -46457,6 +46457,8 @@ function _ibDetailHtml(b){var q=_ibQ(b.qid);if(!q)return '';var invs=_ibInvs(q),
 // ── 請款單改兩下就好（Lotion 11/11，題 1～4 都照建議）：草稿卡「確認」＝建單＋照截止日存檔（走跟編輯頁儲存同一條 saveInvoice），
 //   之後出「待送業主」卡，卡上直接看存好的 A4 預覽，「確認」＝標已送業主＋複製給業主的文字＋出 PDF；「修改」才進編輯頁。
 //   擋確認（要先按修改）：累計超過 100%、現場追加還沒簽認；逾期租金不擋（卡上黃色標天數、金額）
+// 待送卡的請款單預覽：整頁（A4 橫式）等比縮小到卡片寬，手機也看得到金額欄
+function _ivsFit(f){try{var d=f.contentDocument,w=Math.max(d.documentElement.scrollWidth||0,1123),h=Math.max(d.documentElement.scrollHeight||0,400),box=f.parentNode,k=Math.min(1,(box.clientWidth||w)/w);f.style.width=w+'px';f.style.height=h+'px';f.style.transform='scale('+k+')';box.style.height=Math.ceil(h*k)+'px';}catch(e){_err('_ivsFit',e);}}
 function _ibBlocks(b){var q=_ibQ(b.qid),out=[];if(!q)return ['找不到工程'];var invs=_ibInvs(q),last=invs[0]||null,ph=function(r){return _prPhase(q,r);};
   (b.items||[]).forEach(function(x){var it=(q.items||[])[x.idx]||{},src=_ibSrc(q,x.idx,b.since||'',b.cutDate),cq=Math.abs(parseFloat(it.qty)||0);if(!(cq>0))return;
     var ni=src.reduce(function(a,s){return a+s.q;},0),nr=src.reduce(function(a,s){return a+s.r;},0);
@@ -46554,7 +46556,7 @@ _decReg('invSend',{
       +its.map(function(x){var cp=_invItemCumPct(x,inv.items),pr=x.payRate!=null?x.payRate:100;return '<tr'+(cp!=null&&cp>100.05?' style="background:#ffebee"':'')+'><td style="padding:2px 4px">'+esc(String(x.desc||'').split('\n')[0])+'<div style="font-size:11px;color:var(--b4)">這期請 '+esc(String(pr))+'%，累計 '+(cp==null?'—':'<b style="white-space:nowrap'+(cp>100.05?';color:#c62828':'')+'">'+cp+'%</b>')+'</div></td><td style="text-align:center">'+fmt(parseFloat(x.curQty)||0)+' '+esc(x.unit||'')+'</td><td style="text-align:right">'+fmt(parseFloat(x.curAmt)||0)+'</td></tr>';}).join('')+'</table>'
       +'<div style="margin-top:6px">本期未稅 NT$ '+fmt(t.curTotal||0)+'、稅 NT$ '+fmt(t.tax||0)+(t.retention?'、保留款 −NT$ '+fmt(t.retention):'')+'，<b>含稅 NT$ '+fmt(_isAmt(inv))+'</b>'+(pv?'（上一期第 '+esc(String(pv.periodNo||'?'))+' 期含稅 NT$ '+fmt(_isAmt(pv))+'）':'')+'</div>'
       +(_isAmt(inv)<=0?'<div style="color:#c62828">本期金額是 0，請先打開請款單確認數量再送</div>':'')
-      +(function(){var h='';try{var o=_docOut('inv',{inv:inv,quiet:true});h=(o&&o.html)||'';}catch(e){_err('invSend.pv',e);}return h?'<div style="margin-top:6px"><b>存好的請款單（就是要送的那張）</b><iframe srcdoc="'+esc(h)+'" style="width:100%;height:420px;border:1px solid var(--b1);border-radius:6px;background:#fff"></iframe></div>':'<div style="color:#c62828;margin-top:6px">請款單預覽出不來，請按「修改」打開請款單</div>';})()
+      +(function(){var h='';try{var o=_docOut('inv',{inv:inv,quiet:true});h=(o&&o.html)||'';}catch(e){_err('invSend.pv',e);}return h?'<div style="margin-top:6px"><b>存好的請款單（就是要送的那張，整頁縮小顯示）</b><div class="ivs-pv" style="width:100%;height:300px;overflow:hidden;border:1px solid var(--b1);border-radius:6px;background:#fff"><iframe srcdoc="'+esc(h)+'" onload="_ivsFit(this)" style="width:1123px;max-width:none;height:794px;border:0;transform-origin:0 0;background:#fff"></iframe></div></div>':'<div style="color:#c62828;margin-top:6px">請款單預覽出不來，請按「修改」打開請款單</div>';})()
       +'<div style="margin-top:6px"><b>送業主的文字（按確認就複製，不會自動傳）</b><div style="white-space:pre-wrap;background:var(--b0,#f6f6f6);padding:6px 8px;border-radius:6px">'+esc(_isMsg(inv))+'</div></div>'
       +'<div style="margin-top:6px"><b>狀態紀錄</b>'+_invStHistHtml(inv)+'</div></div>';},
   ok:function(inv){if(!(_isAmt(inv)>0)){toast('本期金額是 0，請按「修改」打開請款單');return false;}
