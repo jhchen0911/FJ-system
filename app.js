@@ -32534,10 +32534,10 @@ function _pjProgLines(txt){
 }
 function _pjLogHtml(q,st){
   var logs=st.logs.slice(0,6);
-  if(!logs.length)return '<div style="font-size:12px;color:var(--b3)">尚無日報</div>'+'<div style="margin-top:8px">'+_pjBtn("go('quickcost')",'填日報')+'</div>';
+  if(!logs.length)return '<div style="font-size:12px;color:var(--b3)">尚無日報</div>'+'<div style="margin-top:8px">'+_pjBtn("pjDailyOpen('"+escq(q.id)+"')",'填日報')+'</div>';
   var rows=logs.map(function(L){var x=st.all.find(function(y){return (y.dailyLogs||[]).indexOf(L)>=0;})||q;var r=_drLogRow(x,L);var stx=_drStatusText(L)||r.statusText;
     return [esc(r.date)+(r.weather?('<div style="font-size:10.5px;color:var(--b4)">'+esc(r.weather)+'</div>'):''),'<span style="color:'+(L.status&&L.status!=='work'?'#b26a00':'var(--g3)')+';font-weight:700">'+esc(stx)+'</span>',esc(r.crews||'—'),_pjProgLines(r.progress)];});
-  return _pjTable([{t:'日期'},{t:'狀態'},{t:'出工'},{t:'進度'}],rows)+'<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">'+_pjBtn("viewDailyReports('"+q.id+"')",'全部日報（篩選／匯出）')+_pjBtn("go('quickcost')",'填日報')+'</div>';
+  return _pjTable([{t:'日期'},{t:'狀態'},{t:'出工'},{t:'進度'}],rows)+'<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">'+_pjBtn("viewDailyReports('"+q.id+"')",'全部日報（篩選／匯出）')+_pjBtn("pjDailyOpen('"+escq(q.id)+"')",'填日報')+'</div>';
 }
 // 工程專案內直接設定介紹費（計價跟隨）
 function pjSetFollow(qid,cid,mainId){
@@ -44565,9 +44565,7 @@ function _todayRender(el,badge,items){
     return '<div class="td-card'+(urg?' urg':'')+'"><div class="td-row"><span class="td-kind '+kind+'">'+(kind==='dec'?'要拍板':'提醒')+'</span><div style="flex:1;min-width:0"><div class="td-t" style="font-weight:700">'+esc(title||'')+'　'+its.length+' 件</div><div class="td-sub">'+its.map(function(it){return row(it,true);}).join('')+'</div></div></div></div>';
   };
   var h='';
-  // Lotion 11/10：手機下方列維持 5 個入口，日報改成「今天」最上面固定一張卡（工務一點就進日報）；看得到日報頁、不是唯讀帳號才顯示
-  var dr=false;try{dr=!ro&&canAccess('quickcost');}catch(e){_err('_todayRender.dr',e);}
-  if(dr)h+='<div class="td-card td-dr"><div class="td-row"><span class="td-kind rem" style="background:#e6f2ea;color:var(--g3)">日報</span><div class="td-main" data-act="dr" style="flex:1;min-width:0"><div class="td-t" style="font-weight:700">寫今天的日報 ›</div><div class="td-s">出工、進度、照片、支出</div></div></div></div>';
+  // v6.0.234 Lotion 11/11：LINE 日報為主，今天頁不再放「寫今天的日報」卡；系統日報表單留著當備用，入口在專案頁（日報那一段「填日報」）與更多頁
   dec.forEach(function(it){h+=card('dec','',[it],it.urgent);});
   now.forEach(function(g){h+=card('rem',g.c,g.its,true);});
   if(!dec.length&&!now.length)h+='<div style="padding:14px;font-size:13px;color:var(--b4)"><svg class="ic ib" aria-hidden="true"><use href="#i-check"/></svg> 今天沒有要確認的事</div>';
@@ -44579,7 +44577,6 @@ function _todayRender(el,badge,items){
 }
 function _todayClick(e){
   var b=e.target.closest&&e.target.closest('[data-act],.td-main');if(!b)return;
-  if(b.getAttribute('data-act')==='dr'){go('quickcost');try{rQuickCost();}catch(x){_err('_todayClick.dr',x);}return;}   // 寫今天的日報
   var it=_tdCur[+b.getAttribute('data-i')];if(!it)return;
   var act=b.getAttribute('data-act');
   if((act==='done'||act==='later')&&_tdIsMoney(it))return;   // 錢的卡不能收起來
@@ -45745,6 +45742,12 @@ function _cost7ListHtml(q){
 // 工項：下拉選單（不打編號），清單與順序＝主線 LINE 日報範本的「本工地工項」（FJC.dl.askList：這案還沒做完的工項、照報價順序），畫面顯示「1．H型鋼樁…」，存的是工項本身（itemIdx）
 // 付款：零用金／代墊（誰）／公司付；預設看登入的人（工務＝代墊自己、管理員＝公司付）；零用金和代墊都記在那個人名下（跟 LINE 日報支出同一套，payer＝人名）
 // 收據照片選填；沒附的記在報價 q.rcptMiss（一般資料，工務看得到），今天頁「支出缺收據」提醒那個人補；補了由管理員裝置搬到成本卡 c.rcpt
+// v6.0.234：專案頁「填日報」＝開日報表單並帶好這個專案（日報與支出兩邊）
+function pjDailyOpen(qid){
+  go('quickcost');try{rQuickCost();}catch(e){_err('pjDailyOpen',e);}
+  try{var dp=document.getElementById('dr-proj');if(dp&&qid&&Array.from(dp.options).some(function(o){return o.value===qid;})){dp.value=qid;drRenderProgRows(true);}
+    var cp=document.getElementById('qc-proj');if(cp&&qid&&Array.from(cp.options).some(function(o){return o.value===qid;}))cp.value=qid;}catch(e){_err('pjDailyOpen.sel',e);}
+}
 function _drItemList(q){
   if(!q)return [];
   try{if(FJC.dl&&typeof FJC.dl.askList==='function')return FJC.dl.askList(q.items,q.dailyLogs,99);}catch(e){_err('_drItemList',e);}

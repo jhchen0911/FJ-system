@@ -13151,9 +13151,9 @@ async function newPage(browser, width, height) {
         window.updateDashTodo = oUD;
         // 沒有事
         _todayRender(el, null, []); out.empty = /今天沒有要確認的事/.test(el.textContent);
-        // Lotion 11/10：最上面固定一張「寫今天的日報」，點了進日報頁；唯讀帳號不顯示
-        out.drCard = !!el.querySelector('.td-dr') && el.querySelector('.td-card').classList.contains('td-dr');
-        el.querySelector('.td-dr .td-main').click(); await T(60); out.drGo = document.getElementById('page-quickcost').classList.contains('active'); go('dash'); await T(30);
+        // v6.0.234 Lotion 11/11：今天頁不再放「寫今天的日報」卡（LINE 日報為主）；專案頁「填日報」開表單並帶好專案
+        _todayRender(el, null, its); out.drCard = !el.querySelector('.td-dr') && !/寫今天的日報/.test(el.textContent);
+        { const k = Q.find((x) => x && !x.closed && x.awarded) || Q[0]; if (k) { pjDailyOpen(k.id); await T(60); const dp = document.getElementById('dr-proj'); out.drGo = document.getElementById('page-quickcost').classList.contains('active') && (!dp || !Array.from(dp.options).some((o) => o.value === k.id) || dp.value === k.id); } else { pjDailyOpen(''); await T(60); out.drGo = document.getElementById('page-quickcost').classList.contains('active'); } go('dash'); await T(30); }
         // 唯讀帳號：看得到卡片、沒有按鈕
         const oR = _isReaderUser; _isReaderUser = true; localStorage.removeItem('fy_today_snz'); _todayRender(el, null, its); out.ro = /本月要請款/.test(el.textContent) && !el.querySelector('[data-act]') && !el.querySelector('.td-dr'); _isReaderUser = oR;
         // 首頁公司數字收起來，只留一行連到經營報表
