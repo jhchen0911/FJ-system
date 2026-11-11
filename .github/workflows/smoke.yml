@@ -42,9 +42,10 @@ jobs:
           node-version: '20'
 
       - name: 安裝 playwright 與 chromium
+        # 11/11：GitHub runner 連不到 archive.ubuntu.com（DNS 暫時失敗），裝瀏覽器那一步失敗、測試沒跑到 → 同一步重試 4 次（間隔 30／60／90 秒），全部失敗才紅（不跳過測試）
         run: |
-          npm install --no-audit --no-fund
-          npx playwright install --with-deps chromium
+          for i in 1 2 3 4; do npm install --no-audit --no-fund && break; [ $i = 4 ] && exit 1; echo "npm install 失敗，第 $i 次重試"; sleep $((i*30)); done
+          for i in 1 2 3 4; do npx playwright install --with-deps chromium && break; [ $i = 4 ] && exit 1; echo "playwright 安裝失敗，第 $i 次重試"; sleep $((i*30)); done
 
       - name: 計算模組（Node 單獨跑，不開瀏覽器）
         run: npm run calc
