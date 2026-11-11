@@ -22526,14 +22526,14 @@ function buildCostAnalysisHtml(q){
     var execR=estAmt>0?Math.round(actAmt/estAmt*100):null;         // 執行率：實際/預估
     var mgn=quoteAmt-actAmt;
     var mgnR=quoteAmt>0&&actAmt>0?Math.round(mgn/quoteAmt*1000)/10:null;
-    var execClr=execR==null?'var(--b3)':execR>100?'var(--red)':execR>85?'#e65100':'var(--g3)';
+    var execClr=execR==null?'var(--b3)':execR>=110?'var(--red)':execR>85?'#e65100':'var(--g3)';   // v6.0.233：超支＝110%（跟今天頁超支提醒同一條線）
     var mgnClr=mgnR==null?'var(--b3)':mgnR<0?'var(--red)':mgnR<15?'#e65100':'var(--g3)';
     rows+='<tr style="border-bottom:1px solid var(--b1)">'
       +'<td style="padding:5px 8px;font-size:12px">'+esc((it.desc||'工項'+(i+1)).split('\n')[0].slice(0,26))+'</td>'
       +'<td style="padding:5px 8px;text-align:right">'+fmt(quoteAmt)+'</td>'
       +'<td style="padding:5px 8px;text-align:right;color:'+(estAmt?'var(--b5)':'var(--b3)')+'">'+(estAmt?fmt(Math.round(estAmt)):'—')+'</td>'
       +'<td style="padding:5px 8px;text-align:right;font-weight:700">'+(actAmt?fmt(Math.round(actAmt)):'—')+'</td>'
-      +'<td style="padding:5px 8px;text-align:right;font-weight:700;color:'+execClr+'">'+(execR!=null?execR+'%':'—')+'</td>'
+      +'<td style="padding:5px 8px;text-align:right;font-weight:700;color:'+execClr+'">'+(execR!=null?execR+'%':'—')+(execR>=110&&_cost7OvrKey()?'<div><a href="javascript:void(0)" onclick="openDecList(\''+_cost7OvrKey()+'\')" style="font-size:10.5px;font-weight:400;color:var(--red)">超支拆解</a></div>':'')+'</td>'
       +'<td style="padding:5px 8px;text-align:right;font-weight:700;color:'+mgnClr+'">'+(mgnR!=null?(fmt(Math.round(mgn))+'（'+mgnR+'%）'):'—')+'</td>'
       +'</tr>';
   });
@@ -22557,8 +22557,8 @@ function buildCostAnalysisHtml(q){
     +'<td></td>'
     +'<td style="padding:6px 8px;text-align:right;color:'+(totMgnR<0?'var(--red)':totMgnR<15?'#e65100':'var(--g3)')+'">'+fmt(Math.round(totMgn))+'（'+totMgnR+'%）</td>'
     +'</tr></tfoot></table></div>'
-    +'<div style="font-size:10.5px;color:var(--b3);margin-top:6px">執行率＝實際成本÷預估成本（>100% 紅字＝超支）；實際毛利＝報價複價−實際成本。未歸戶成本已計入合計毛利。</div>'
-    +'<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+    +'<div style="font-size:10.5px;color:var(--b3);margin-top:6px">執行率＝實際成本÷預估成本（≥110% 紅字＝超支）；實際毛利＝報價複價−實際成本。未歸戶成本已計入合計毛利。</div>'
+    +'<div class="cost-hist-row" style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
     +'<button type="button" onclick="var n=writeCostHist();toast(n?(\'已回寫 \'+n+\' 筆工項實績到歷史單價庫，下次報價自動提示\'):\'尚無可回寫的工項實績（需有實際成本且已歸戶）\')" style="border:1px solid var(--gm);background:var(--gl);color:var(--g3);border-radius:var(--r8);padding:7px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">回寫單價庫（結案復盤）</button>'
     +'<span style="font-size:10.5px;color:var(--b3)">單價庫目前累積 '+COST_HIST.length+' 筆工項實績；專案「標記結案」時也會自動回寫</span>'
     +'</div>';
@@ -24093,6 +24093,7 @@ function rCostItems(){
   const el=document.getElementById('cost-list');
   if(!el)return;
   const q=Q.find(x=>x.id===eid);
+  setTimeout(function(){try{_cost7Mount(Q.find(x=>x.id===eid));}catch(e){_err('rCostItems.c7',e);}},0);   // v6.0.233 新選單：結論＋工項／明細
   const costs=(q&&q.costs)||[];
 
   if(!costs.length){
@@ -32517,6 +32518,7 @@ function _pjCostHtml(q,st){
   try{h+=_costSummaryStrip(q,q.costs||[]);}catch(e){_err('_pjCostHtml',e);}
   try{h+=buildCostAnalysisHtml(q)||'';}catch(e){_err('_pjCostHtml.analysis',e);}
   if(st.adds.length)h+='<div style="font-size:11px;color:var(--b4);margin-top:4px">追加案的成本另計於各追加案；上方 KPI 已合併。</div>';
+  if(_cost7On())return h+'<details style="margin-top:8px"><summary style="font-size:12px;color:var(--b4);cursor:pointer">⋯ 更多</summary><div style="margin-top:6px">'+_pjBtn("openProjectCosts('"+q.id+"')",'施工成本明細（編輯）')+'</div></details>';   // v6.0.233
   return h+'<div style="margin-top:8px">'+_pjBtn("openProjectCosts('"+q.id+"')",'施工成本明細（編輯）','border-color:#e65100;color:#e65100')+'</div>';
 }
 // v6.0.12 日報進度逐行：工項名靠左、數量靠右且不拆行（手機一行一行模式亦同）
@@ -44900,6 +44902,62 @@ _decReg('sdocCalc',{
       return Object.assign({},x,{qty:(v==null||!isFinite(v))?null:Math.round(v*1000)/1000,key:ki?ki.value:x.key});});
       if(_sdocUpd(it.qid,it.id,function(d){d.calc=Object.assign({},d.calc,{rows:rows,editAt:Date.now()});}))_decRefresh('sdocCalc');},false,null,true);}
 });
+// ══════════ v6.0.233 第 7 步：施工成本頁照大原則（Lotion 11/11：「內容還是非常雜亂」）══════════
+// 新選單時：最上面一句結論（已發生成本、實際毛利、超支 N 項可展開）→ 兩個分頁「工項」（工項×報價／預估成本／實際成本／執行率／毛利，執行率 ≥110% 標紅＋超支拆解卡）
+//   與「明細」（原本的成本清單，依來源分組；新增成本與舊的分析頁收進「⋯ 更多」）；發包每一列只留一顆「下一步」（登錄廠商請款），其他收進「⋯」
+//   成本從卡片進來（廠商請款、租賃運費請款、日報支出）；「回寫單價庫」拿掉（結案時 pjCloseAll／結案卡自動回寫 writeCostHist）
+function _cost7On(){try{return _v7New('proj');}catch(e){return false;}}
+function _cost7OvrKey(){try{return Object.keys(_DEC||{}).find(function(k){return /ovr|overrun/i.test(k);})||'';}catch(e){return '';}}
+function _cost7Data(q){
+  var st=null;try{st=_pjStat(q);}catch(e){_err('_cost7Data.st',e);}
+  var tx=1+_taxR()/100,cost=Math.round((st&&st.costNet)||0),rev=Math.round(((st&&st.billedGross)||0)/tx);
+  var att=_costByItem(q),em=_actQtyMap(q),ov=[];
+  (q.items||[]).forEach(function(it,i){if(!it||it.sec||_isSpare(it)||(parseFloat(it.price)||0)<0)return;var est=_effQty(em,it)*(parseFloat(it.estCost)||0),act=att.map[i]||0;
+    if(est>0&&act>=est*1.1-1e-6)ov.push({desc:String(it.desc||'').split('\n')[0],pct:Math.round(act/est*100),over:Math.round(act-est)});});
+  return {cost:cost,rev:rev,gm:rev>0?Math.round((rev-cost)/rev*1000)/10:null,ov:ov};
+}
+function _cost7Head(q){
+  var D=_cost7Data(q),k=_cost7OvrKey();
+  var h='<div style="font-size:13.5px;line-height:1.7;background:#fff;border:1px solid var(--b1);border-radius:var(--r12);padding:10px 12px;margin-bottom:10px">'
+    +'已發生成本 <b>NT$ '+fmt(D.cost)+'</b>（未稅）・實際毛利 '+(D.gm==null?'<b>—</b><span style="font-size:11.5px;color:var(--b4)">（還沒請款）</span>':('<b style="color:'+(D.gm<0?'var(--red)':D.gm<15?'#e65100':'var(--g3)')+'">'+D.gm+'%</b><span style="font-size:11.5px;color:var(--b4)">（已請款未稅 '+fmt(D.rev)+'）</span>'))
+    +'・'+(D.ov.length?('<details style="display:inline"><summary style="display:inline;cursor:pointer;color:var(--red);font-weight:700">超支 '+D.ov.length+' 項</summary><div style="font-size:12px;margin-top:4px">'
+      +D.ov.map(function(o){return '<div>'+esc(o.desc)+'：執行率 <b style="color:var(--red)">'+o.pct+'%</b>（多 NT$ '+fmt(o.over)+'）</div>';}).join('')
+      +(k?'<button type="button" class="btn btn-xs" style="margin-top:4px" onclick="openDecList(\''+k+'\')">看超支拆解</button>':'')+'</div></details>'):'<span style="color:var(--g3);font-weight:700">沒有超支</span>')
+    +'</div>';
+  return h;
+}
+var _cost7Tab=(function(){try{return localStorage.getItem('fy_cost7tab')||'item';}catch(e){return 'item';}})();
+function cost7Tab(t){_cost7Tab=t==='list'?'list':'item';try{localStorage.setItem('fy_cost7tab',_cost7Tab);}catch(e){_err('cost7Tab',e);}window._costView='list';rCostItems();}
+function _cost7Mount(q){
+  var card=document.getElementById('cost-card');if(!card)return;
+  var box=document.getElementById('cost-v7');
+  if(!_cost7On()||!q){if(box)box.remove();card.classList.remove('cost7-on');card.style.display='';return;}
+  if(!box){box=document.createElement('div');box.id='cost-v7';card.parentNode.insertBefore(box,card);}
+  var T=function(k,l){var on=_cost7Tab===k;return '<button type="button" class="btn btn-sm" data-c7tab="'+k+'" onclick="cost7Tab(\''+k+'\')" style="flex:1 1 0;min-width:0;'+(on?'background:var(--g);color:#fff;border-color:var(--g)':'background:var(--w);color:var(--g3);border-color:var(--gm)')+'">'+l+'</button>';};
+  var h=_cost7Head(q)+'<div style="display:flex;gap:6px;margin-bottom:10px">'+T('item','工項')+T('list','明細')+'</div>';
+  if(_cost7Tab==='item'){h+='<div class="card cost7-item" style="padding:10px 12px">'+buildCostAnalysisHtml(q)+'</div>';card.style.display='none';}
+  else{card.style.display='';
+    h+='<details class="cost7-more" style="margin-bottom:8px"><summary style="font-size:12px;color:var(--b4);cursor:pointer">⋯ 更多（手動補成本、勾稽、數量對照、分包總表）</summary><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'
+      +(_isReaderUser?'':'<button type="button" class="btn btn-xs" onclick="costAddPick()">＋ 手動補一筆成本</button>')
+      +'<button type="button" class="btn btn-xs" onclick="setCostView(\'audit\')">成本勾稽</button><button type="button" class="btn btn-xs" onclick="setCostView(\'qty\')">數量對照</button><button type="button" class="btn btn-xs" onclick="setCostView(\'subs\')">分包總表</button>'
+      +'</div><div style="font-size:11px;color:var(--b3);margin-top:4px">成本平常從今天頁的卡片進來：廠商請款、租賃運費請款、日報支出</div></details>';}
+  box.innerHTML=h;card.classList.add('cost7-on');
+  try{if(typeof _mstack==='function')_mstack(box);}catch(e){_err('_cost7Mount.mstack',e);}   // 手機不左右捲：工項表堆成一列一張卡
+  if(_cost7Tab==='list')try{_cost7Compact(card);}catch(e){_err('_cost7Mount.compact',e);}
+}
+// 發包那一列：只留「登錄廠商請款」（或同步計價），其他按鈕收進「⋯」
+function _cost7Compact(root){
+  root.querySelectorAll('span[style*="margin-left:auto;display:flex;gap:4px;flex-wrap:wrap"]').forEach(function(g){
+    if(g.getAttribute('data-c7'))return;var bs=Array.prototype.filter.call(g.children,function(b){return b.tagName==='BUTTON';});if(bs.length<2)return;
+    var keep=bs.find(function(b){return /openSubPeriod|subFollowSync/.test(b.getAttribute('onclick')||'');})||bs[0];
+    var rest=document.createElement('span');rest.className='c7-rest';rest.style.cssText='display:none;gap:4px;flex-wrap:wrap';
+    bs.forEach(function(b){if(b!==keep)rest.appendChild(b);});
+    var m=document.createElement('button');m.type='button';m.textContent='⋯';m.setAttribute('aria-label','其他操作');m.setAttribute('data-c7more','1');
+    m.style.cssText='font-size:11px;padding:3px 10px;border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;cursor:pointer;font-family:inherit';
+    m.onclick=function(){rest.style.display=rest.style.display==='none'?'inline-flex':'none';};
+    g.appendChild(m);g.appendChild(rest);g.setAttribute('data-c7','1');
+  });
+}
 function stlSet(el){
   if(_isReaderUser){toast('唯讀帳號不能修改');return;}
   var qid=el.getAttribute('data-qid'),k=el.getAttribute('data-stl'),p=_prjOfQ(qid);if(!p||!k)return;

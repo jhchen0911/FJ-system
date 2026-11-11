@@ -14244,6 +14244,41 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.233 施工成本頁照大原則：一句結論＋「工項」「明細」兩頁、新增成本與回寫單價庫收起、手機不左右捲、舊選單照舊 ──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepI = INV.slice();
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_cost7tab'); _nav5Apply(); _cost7Tab = 'item';
+        Q = [{ id: 'qC7', name: '範例工程C7', client: '甲營造', code: 'C7', date: '2026-10-01', awarded: true, _mt: 1,
+          items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 100, price: 3000, estCost: 2000 }, { desc: '水平支撐組立', unit: 'M', qty: 300, price: 800, estCost: 500 }],
+          costs: [{ id: 'c1', type: 'sub', vendor: '範例打樁行', rows: [{ id: 'r1', linkedItemIdx: 0, qty: 100, unitPrice: 2300, desc: 'H型鋼樁打設' }] },
+            { id: 'c2', type: 'sub', vendor: '範例支撐行', rows: [{ id: 'r2', linkedItemIdx: 1, qty: 300, unitPrice: 450, desc: '水平支撐組立' }] }] }];
+        INV.length = 0; INV.push({ id: 'iC7', quoteId: 'qC7', project: '範例工程C7', periodNo: 1, items: [], totals: { sub: 400000, tax: 20000, total: 420000 }, _mt: 1 });
+        openProjectCosts('qC7'); await T(300);
+        const v = document.getElementById('cost-v7'), tx = v ? v.textContent.replace(/\s+/g, ' ') : '';
+        out.head = /已發生成本 NT\$ 365,000/.test(tx) && /實際毛利 8\.8%/.test(tx) && /超支 1 項/.test(tx) && /執行率 115%/.test(tx);
+        out.tabs = v.querySelectorAll('[data-c7tab]').length === 2 && document.getElementById('cost-card').style.display === 'none' && /H型鋼樁打設/.test(tx) && !/回寫單價庫/.test(v.innerText);
+        out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
+        cost7Tab('list'); await T(200);
+        const card = document.getElementById('cost-card');
+        out.list = card.style.display !== 'none' && card.classList.contains('cost7-on') && getComputedStyle(card.querySelector('.cost-tabs')).display === 'none'
+          && !!document.querySelector('#cost-v7 details.cost7-more [onclick="costAddPick()"]') && Array.from(card.querySelectorAll('[onclick="costAddPick()"]')).every((b) => b.offsetParent === null);
+        // 舊選單：沒有結論列、成本卡照舊
+        localStorage.setItem('fy_v7old', JSON.stringify({ proj: 1 })); _nav5Apply(); rCostItems(); await T(80);
+        out.old = !document.getElementById('cost-v7') && document.getElementById('cost-card').style.display !== 'none' && !document.getElementById('cost-card').classList.contains('cost7-on');
+        localStorage.removeItem('fy_v7old'); _nav5Apply(); localStorage.removeItem('fy_cost7tab');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; INV.length = 0; keepI.forEach((x) => INV.push(x));
+      return out;
+    });
+    check('v6.0.233 施工成本頁（寬 ' + W + '）：一句結論（已發生成本、實際毛利、超支 N 項）、工項／明細兩頁、新增成本收進「⋯ 更多」、回寫單價庫拿掉、手機不左右捲、舊選單照舊', !r.err && r.head && r.tabs && r.noHScroll && r.list && r.old, JSON.stringify(r));
+    check('v6.0.233 施工成本頁測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
