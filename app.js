@@ -43358,11 +43358,11 @@ _decReg('earlyConv',{
 // ══════════ 第 6 步 6-2a：衍生應付的雲端比對（小批次線；先比對、不改應付）══════════
 // 雲端 payCompare（functions/ops/paycmp.js，每天 07:40）用同一套算法重算第一批自動應付（分包期別、保留款退還、提前放款、預付款、介紹費、業務抽成、業主端佣金），
 //   跟網頁存的應付逐筆比，結果寫 fydata/private/payCompare（latest 明細、days 每天摘要、cfg 開關）。網頁照舊寫應付，這裡只讀。
-// 開關預設關：等一個完整月請款週期（6-1 分次付款 11/07 上線 → 11/25 截止、12/25 放款）後，首頁拍板卡 payCmpOn 問 Lotion 要不要開。
+// 開關預設關：11/25 這期付款做完、隔天 11/26 起首頁拍板卡 payCmpOn 問 Lotion 要不要開（Lotion 11/11，原訂 12/26）。
 // 資料健檢「☁ 雲端應付比對」卡：最後一次結果、連續一致天數（能解釋的時間差不中斷，要 28 天且跨過一次 25 日才可以準備切換 6-2b）、不一致明細。
 // 手動跑一次（測試專案驗收）：主控台 payCmpRun()，不加按鈕（第 11 條）。
 var PAY_CMP={ok:false,cfg:{},latest:null,days:{}};
-var _PCMP_ASK_FROM='2026-12-26',_PCMP_STREAK=28;
+var _PCMP_ASK_FROM='2026-11-26',   /* Lotion 11/11：11/25 這期付款做完隔天就問（原 12/26） */_PCMP_STREAK=28;
 var _PCMP_KIND={period:'計價期別',ret:'保留款退還',early:'提前放款',adv:'預付款',intro:'介紹費',sales:'業務抽成',comm:'業主端佣金',extra:'網頁多一筆'};
 var _PCMP_WHY={missing:'網頁沒有這筆',extra:'雲端算不出來（網頁有一筆沒付的）',void:'網頁已作廢',amount:'金額',to:'付給誰',vat:'開不開發票',incl:'含稅金額'};
 function _pcmpCan(){try{return !!(_fbUser&&isAdmin(_fbUser.email)&&!_isReaderUser);}catch(e){return false;}}
@@ -43384,7 +43384,7 @@ function _pcmpHtml(){
   var head='<div class="card" id="pay-cmp-card"><div class="cb"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px"><b style="font-size:14px">☁ 雲端應付比對</b><span style="font-size:11.5px;color:var(--b4)">第 6 步 6-2a・雲端重算一份自動應付跟網頁比・不改應付</span></div>';
   var C=PAY_CMP.cfg||{},L=PAY_CMP.latest;
   var st=C.on?('<b style="color:var(--g3)">已開始</b>'+(C.at?'（'+esc(new Date(+C.at).toLocaleDateString('zh-TW'))+(C.by?' '+esc(String(C.by)):'')+'）':'')+(C.startDay?'，'+esc(String(C.startDay))+' 起每天 07:40 比':'，每天 07:40 比'))
-    :('<b>還沒開始</b>（'+esc(String(C.askFrom||_PCMP_ASK_FROM))+' 起首頁會問要不要開；等 6-1 分次付款跑過一個完整月請款）');
+    :('<b>還沒開始</b>（'+esc(String(C.askFrom||_PCMP_ASK_FROM))+' 起首頁會問要不要開；11/25 這期付款做完隔天）');
   var h=head+'<div style="font-size:12px;margin-bottom:4px">'+st+'</div>';
   if(!L)return h+'<div style="font-size:12px;color:var(--b3)">雲端還沒有比對結果'+(C.on?'（明天 07:40 第一次）':'')+'</div></div></div>';
   var n0=L.n||{},n={};['exp','ok','skip','bad','explained'].forEach(function(k){n[k]=Math.max(0,parseInt(n0[k])||0);});var sk=_pcmpStreak(PAY_CMP.days,_pcmpLastDay(PAY_CMP.days),P.vendorCutDay);
@@ -43430,7 +43430,7 @@ _decReg('payCmpOn',{
   list:function(){var C=PAY_CMP.cfg||{};if(!PAY_CMP.ok||C.on)return [];return localToday()>=String(C.askFrom||_PCMP_ASK_FROM)?[{k:'payCmpOn'}]:[];},
   key:function(x){return x.k;},
   head:function(){return '雲端應付比對（先比對、不改應付）';},
-  body:function(){return '<div style="font-size:11.5px;color:var(--b4)">6-1 分次付款已跑過一個完整月請款；開始比對以後，連續 4 週一致才會再問要不要切換。</div>';},
+  body:function(){return '<div style="font-size:11.5px;color:var(--b4)">11/25 這期付款做完了；開始比對以後只並排看、不改應付，連續 4 週一致才會再問要不要切換。</div>';},
   detail:_pcmpDetailHtml,
   ok:function(){return _pcmpCfgSet({on:true,at:Date.now(),by:_meEmail()||'',startDay:null});},
   reject:function(x,why){return _pcmpCfgSet({askFrom:_pcmpAddDays(localToday(),14),rejAt:Date.now(),rejWhy:String(why||'').slice(0,200)});},
