@@ -523,6 +523,13 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
     a.amt === 600 && a.who === '小陳' && b2.amt === 1500 && c.amt === 1500 && c.item === '便當' && d.amt === 1250 && d.item === '五金' && e.item === '便當' && e.amt === 600 && f.item === '便當' && f.who === '小陳' && g.who === '阿明' && g.item === '五金' && !h.sure && /金額不確定/.test(h.why),
     JSON.stringify([a, b2, c, d, e, f, g, h].map((x) => [x.item, x.amt, x.who, x.why])));
 }
+{
+  const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl;
+  const its = [{ desc: '鋼板樁 III型 打設', unit: '支', qty: 30 }], L = DL.askList(its, []);
+  const t = '【今天做了】\n1 打設 5\n【人和機具】\n人 5（阿明、小陳、阿華、阿德、小王）、怪手 1、吊車 1\n點工 2 人\n【支出】\n【明天】';
+  const P = DL.parseFmt(t, L, its), S = DL.sections(t);
+  check('LINE 日報【人和機具】寫人名（「人 5（阿明、小陳…）」，給薪資出工名單預留）：不報錯、不變成工項數量、原文留在 crew 給小批次拆', P.rows.length === 1 && P.rows[0].qty === 5 && /阿明、小陳/.test(S.crew) && P.skip.some((x) => /阿明/.test(x)) && !DL.expOf(t).length);
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');
