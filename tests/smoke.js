@@ -3934,7 +3934,7 @@ async function newPage(browser, width, height) {
           const items=[];for(let k=0;k<8;k++)items.push({desc:'H型鋼樁 H300，L='+(10+k)+'M@80cm 打設、拔除（含水刀引孔）',unit:'支',qty:'40',price:String(26500+k*1000),sec:false,note:'含180天租期'});
           Q=[{id:'qH',code:'1150970',name:'範例科技廠A區',client:'庚辛企業有限公司',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:items}];
           const inv=buildInvFromQuote(Q[0]);inv.id='invH1';inv.date='2026-10-05';INV.push(inv);loadInvoice('invH1');
-          invItems[2].curQty=133;invItems[2].payRate=70;invItems[2].contractPrice=40500;invItems[4].curQty=1;invItems[4].contractPrice=80000;invItems[7].curQty=27;invItems[7].contractPrice=1500;invItems[4].payRate=100;invItems[7].payRate=100;   // 健檢 H5 起打設＋拔除工項預設照合約 %（70%）；這個版面測試沿用原本的 100% 列
+          invItems[2].curQty=133;invItems[2].payRate=70;invItems[2].contractPrice=40500;invItems[4].curQty=1;invItems[4].contractPrice=80000;invItems[7].curQty=27;invItems[7].contractPrice=1500;invItems[4].payRate=100;invItems[7].payRate=100;invItems[4].contractQty=0;invItems[7].contractQty=0;   // 健檢 H5 起打設＋拔除工項預設照合約；這期請／累計 % 那行只在有合約數量的列印（這兩列不測那行，測的是不多一張空白頁） %（70%）；這個版面測試沿用原本的 100% 列
           [2,4,7].forEach(i=>updateInvRowAmt(i));document.getElementById('inv-calc').checked=true;buildInvPreview();
           const html=document.getElementById('inv-prev-html').innerHTML;
           // 表頭：LOGO 與公司名同一列（flex）
