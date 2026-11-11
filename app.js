@@ -46453,21 +46453,40 @@ function _ibDetailHtml(b){var q=_ibQ(b.qid);if(!q)return '';var invs=_ibInvs(q),
         +(sg.length?'<div style="background:#e8f5e9;border-radius:6px;padding:6px 8px;margin-top:6px"><b style="color:'+FY_BRAND.g+'">現場追加（主任已簽認，可以請款）</b><br>'+sg.map(line).join('<br>')+'<div style="font-size:11px;color:var(--b4)">開單後在請款單上加列（系統不自己改金額）</div></div>':'');})()
     +((b.rent&&b.rent.length)?'<div style="background:#fff3e0;border-radius:6px;padding:6px 8px;margin-top:6px"><b style="color:#b26a00">逾期租金'+(b.rentOnly?'（這期只有逾期租金，沒有新的日報數量）':'')+'</b><br>'+b.rent.map(function(r){return esc(r.desc)+'：逾期累計 '+r.overDays+' 天（從到期日算到截止日 '+esc(r.end.slice(5))+'）累計約 NT$ '+fmt(r.amount);}).join('<br>')+'<div style="font-size:11px;color:#b26a00">這裡是從到期日起的累計，前幾期已經請過的部分開單時會自動扣掉（只列本期還沒列入的）；<b>還沒拔完的那一段算到開單那天</b>（不是截止日）；金額以請款單上的為準</div></div>':'')
     +'<div style="margin-top:6px">保留款 '+ret+'%、稅率 '+esc(String((P&&P.tax!=null)?P.tax:5))+'%（照專案設定）。'+((b.rent&&b.rent.length)?'':'逾期租金：開單時依日報自動列入，請在請款單上確認。')+'</div>'
-    +'<div style="color:var(--b4);margin-top:4px">確認＝開第 '+n+' 期請款單（狀態「草稿」）並打開編輯頁：本期數量依日報帶到今天（'+esc(localToday().slice(5))+'），之後到截止日的日報要在請款單上補；金額照請款單算法。<b>檢查後按「儲存」</b>，才會出現在「請款單草稿待送出」。</div></div>';}
+    +'<div style="color:var(--b4);margin-top:4px">確認＝直接開好第 '+n+' 期請款單並存檔（狀態「草稿」、日期＝截止日 '+esc(b.cutDate)+'），接著在「待送業主」卡看 PDF 後送出；修改＝打開編輯頁自己改。本期數量依日報帶到今天（'+esc(localToday().slice(5))+'），之後到截止日的日報要在請款單上補；金額照請款單算法。<b>檢查後按「儲存」</b>，才會出現在「請款單草稿待送出」。</div></div>';}
+// ── 請款單改兩下就好（Lotion 11/11，題 1～4 都照建議）：草稿卡「確認」＝建單＋照截止日存檔（走跟編輯頁儲存同一條 saveInvoice），
+//   之後出「待送業主」卡，卡上直接看存好的 A4 預覽，「確認」＝標已送業主＋複製給業主的文字＋出 PDF；「修改」才進編輯頁。
+//   擋確認（要先按修改）：累計超過 100%、現場追加還沒簽認；逾期租金不擋（卡上黃色標天數、金額）
+function _ibBlocks(b){var q=_ibQ(b.qid),out=[];if(!q)return ['找不到工程'];var invs=_ibInvs(q),last=invs[0]||null,ph=function(r){return _prPhase(q,r);};
+  (b.items||[]).forEach(function(x){var it=(q.items||[])[x.idx]||{},src=_ibSrc(q,x.idx,b.since||'',b.cutDate),cq=Math.abs(parseFloat(it.qty)||0);if(!(cq>0))return;
+    var ni=src.reduce(function(a,s){return a+s.q;},0),nr=src.reduce(function(a,s){return a+s.r;},0);
+    var lit=last?(last.items||[]).find(function(y){return y&&y.type!=='sec'&&!y.remRid&&String(y.desc||'').split('\n')[0].trim()===String(it.desc||'').split('\n')[0].trim();}):null;
+    var pw=lit?_invRemSibs(lit,last.items).reduce(function(a,y){return a+(parseFloat(y.prevQty)||0)+_wQty(y.curQty,y.payRate);},0):0;
+    var cum=(pw+ni*_invPhasePct(q,it,'install')/100+nr*_invPhasePct(q,it,'remove')/100)/cq*100;
+    if(cum>100.05)out.push(String(x.desc||'').slice(0,20)+' 累計 '+Math.round(cum*10)/10+'%（超過合約）');});
+  ((q.addons)||[]).filter(function(a){return a&&a.status==='confirmed'&&!a.signed&&!a.signDeny&&String(a.date||'')>String((last&&last.date)||'');}).forEach(function(a){out.push('現場追加 '+String(a.date||'')+' 主任還沒簽認');});
+  return out;}
+function _ibOpenEditor(b){var q=_ibQ(b.qid);if(!q){toast('找不到工程');return false;}var before=(INV||[]).length;try{pjNewInv(q.id);}catch(e){_err('_ibOpenEditor',e);return false;}
+  var inv=(INV||[])[0];if(!inv||(INV||[]).length<=before)return null;
+  var _w='請款單草稿卡：系統依日報開第 '+(inv.periodNo||'?')+' 期草稿（截止 '+b.cutDate+'）';if(inv.st==='draft')_invStLog(inv,'draft',_w,null,true);else _invStSet(inv,'draft',_w);
+  try{var de=document.getElementById('inv-date');if(de&&b.cutDate){de.value=b.cutDate;inv.date=b.cutDate;}}catch(e){_err('_ibOpenEditor.date',e);}   /* Lotion 題 2：請款單日期＝這期截止日 */
+  _invStSyncing=true;try{saveInv();}finally{_invStSyncing=false;}return inv;}
 _decReg('invDraft',{
-  title:'本月請款單草稿',todo:function(n){return '本月要請款：'+n+' 個工地的請款單草稿';},sub:'確認＝開這一期請款單（狀態草稿，數量依日報帶入）；退回＝這期不請；修改＝打開工程專案',
+  title:'本月請款單草稿',todo:function(n){return '本月要請款：'+n+' 個工地的請款單草稿';},sub:'確認＝開好這一期請款單並存檔（數量依日報、日期＝截止日）；退回＝這期不請；修改＝打開請款單編輯頁',
   canSee:function(){return !_isReaderUser&&_decIsAdmin();},list:_ibList,key:function(b){return b.qid+'|'+b.cutDate;},
   head:function(b){return String(b.name||'').slice(0,24)+'　截止 '+b.cutDate.slice(5);},
-  body:function(b){return '<div style="font-size:11.5px;color:var(--b4)">'+esc(b.items.slice(0,3).map(function(x){return x.desc.slice(0,14)+' '+fmt(x.qty)+x.unit;}).join('、'))+(b.items.length>3?' 等 '+b.items.length+' 項':'')+((b.rent&&b.rent.length)?(b.items.length?'；':'')+'逾期租金 '+b.rent.length+' 項':'')+'</div>';},
+  body:function(b){var bl=[];try{bl=_ibBlocks(b);}catch(e){_err('invDraft.body',e);}return (bl.length?'<div style="font-size:11.5px;color:#c62828">要先按「修改」：'+esc(bl.join('；'))+'</div>':'')+'<div style="font-size:11.5px;color:var(--b4)">'+esc(b.items.slice(0,3).map(function(x){return x.desc.slice(0,14)+' '+fmt(x.qty)+x.unit;}).join('、'))+(b.items.length>3?' 等 '+b.items.length+' 項':'')+((b.rent&&b.rent.length)?(b.items.length?'；':'')+'逾期租金 '+b.rent.length+' 項':'')+'</div>';},
   detail:_ibDetailHtml,
-  ok:function(b){var q=_ibQ(b.qid);if(!q){toast('找不到工程');return false;}var before=(INV||[]).length;
-    try{pjNewInv(q.id);}catch(e){_err('invDraft.ok',e);return false;}
-    var inv=(INV||[])[0];if(!inv||(INV||[]).length<=before){toast('沒有開成請款單');return false;}
-    var _w='請款單草稿卡確認：系統依日報開第 '+(inv.periodNo||'?')+' 期草稿（截止 '+b.cutDate+'）';if(inv.st==='draft')_invStLog(inv,'draft',_w,null,true);else _invStSet(inv,'draft',_w);   // 健檢 H3／H4：新單本來就是草稿，補記一筆依據
-    _invStSyncing=true;try{saveInv();}finally{_invStSyncing=false;}
-    try{_decRefresh('invSend');}catch(e){_err('invDraft.ok.ref',e);}return 'open';},
+  ok:function(b){var bl=_ibBlocks(b);if(bl.length){toast('這張要先按「修改」：'+bl[0]);return false;}
+    var inv=_ibOpenEditor(b);if(!inv){toast('沒有開成請款單');return false;}
+    try{saveInvoice();}catch(e){_err('invDraft.ok.save',e);toast('存檔沒成功，請在編輯頁檢查後按儲存');return 'open';}   /* 跟編輯頁按「儲存」同一條 */
+    var sv=(INV||[]).find(function(x){return x&&x.id===inv.id;});
+    if(!sv||!(_isAmt(sv)>0)){toast('本期金額是 0，請在編輯頁檢查數量後儲存');return 'open';}
+    try{go('dash');}catch(e){_err('invDraft.ok.go',e);}
+    toast('已存好第 '+(sv.periodNo||'?')+' 期請款單（含稅 NT$ '+fmt(_isAmt(sv))+'），在「待送業主」卡看 PDF 後送出');
+    try{_decRefresh('invSend');}catch(e){_err('invDraft.ok.ref',e);}return true;},
   reject:function(b,why){var q=_ibQ(b.qid);if(!q)return false;q.billSkip=Object.assign({},q.billSkip||{});q.billSkip[b.cutDate]={at:Date.now(),by:_meEmail()||'本機',why:String(why||'這期不請').slice(0,200)};_touch(q);persist();return true;},
-  edit:function(b){try{openProj(b.qid);}catch(e){_err('invDraft.edit',e);}}
+  edit:function(b){var inv=_ibOpenEditor(b);if(!inv)toast('沒有開成請款單');}   /* 修改＝打開這一期的編輯頁（自己檢查後按儲存） */
 });
 // ── 健檢 H4＋H5（11/11）：舊請款單檢查卡——得標時自動建的空白第 1 期（讓 Lotion 決定刪不刪）、累計請款超過 100% 的工項（只標紅，不改舊單）──
 // Lotion 11/11 第 1 題：完全沒動過的空白第 1 期（舊版得標時自動建的）不出卡，管理員裝置自動移到回收筒、記一筆；只要有一點內容的才出卡給 Lotion 看
@@ -46526,7 +46545,7 @@ function _isTot(inv){var t=(inv&&inv.totals)||{};if(parseFloat(t.total)>0||!inv|
 function _isAmt(inv){var t=(inv&&inv.totals)||{},v=parseFloat(t.total);if(!(v>0)&&inv&&Array.isArray(inv.items)){try{var c=JSON.parse(JSON.stringify(inv));_recalcInvAmounts(c);v=parseFloat(c.totals&&c.totals.total);}catch(e){_err('_isAmt',e);}}return v>0?Math.round(v):0;}
 function _isMsg(inv){var t=inv.totals||{};return (inv.client||'')+' 你好：\n豐有工程「'+(inv.project||'')+'」第 '+(inv.periodNo||'?')+' 期請款單如附件'+(inv.payDue?'（估驗日 '+inv.payDue+'）':'')+'，本期請款金額含稅 NT$ '+fmt(_isAmt(inv))+'。\n再麻煩確認，有問題請隨時告訴我們，謝謝。';}
 _decReg('invSend',{
-  title:'請款單草稿待送出',todo:function(n){return '請款單草稿待送出 '+n+' 張';},sub:'確認＝狀態改「已送業主」、出 PDF、給送業主的文字；修改＝打開請款單；退回＝先不送（3 天後再提醒）',
+  title:'請款單草稿待送出',todo:function(n){return '請款單草稿待送出 '+n+' 張';},sub:'確認＝狀態改「已送業主」、複製給業主的文字、出 PDF；明細看得到存好的請款單；修改＝打開請款單；退回＝先不送（3 天後再提醒）',
   canSee:function(){return !_isReaderUser&&_decIsAdmin();},list:_isList,key:function(inv){return inv.id;},
   head:function(inv){return String(inv.project||'').slice(0,24)+' 第'+(inv.periodNo||'?')+'期';},
   body:function(inv){var a=_isAmt(inv);return a>0?'<div style="font-size:11.5px;color:var(--b4)">含稅 NT$ '+fmt(a)+'</div>':'<div style="font-size:11.5px;color:#b26a00">還沒存檔（金額 0）：請按「修改」打開請款單檢查後儲存</div>';},
@@ -46535,12 +46554,13 @@ _decReg('invSend',{
       +its.map(function(x){var cp=_invItemCumPct(x,inv.items),pr=x.payRate!=null?x.payRate:100;return '<tr'+(cp!=null&&cp>100.05?' style="background:#ffebee"':'')+'><td style="padding:2px 4px">'+esc(String(x.desc||'').split('\n')[0])+'<div style="font-size:11px;color:var(--b4)">這期請 '+esc(String(pr))+'%，累計 '+(cp==null?'—':'<b style="white-space:nowrap'+(cp>100.05?';color:#c62828':'')+'">'+cp+'%</b>')+'</div></td><td style="text-align:center">'+fmt(parseFloat(x.curQty)||0)+' '+esc(x.unit||'')+'</td><td style="text-align:right">'+fmt(parseFloat(x.curAmt)||0)+'</td></tr>';}).join('')+'</table>'
       +'<div style="margin-top:6px">本期未稅 NT$ '+fmt(t.curTotal||0)+'、稅 NT$ '+fmt(t.tax||0)+(t.retention?'、保留款 −NT$ '+fmt(t.retention):'')+'，<b>含稅 NT$ '+fmt(_isAmt(inv))+'</b>'+(pv?'（上一期第 '+esc(String(pv.periodNo||'?'))+' 期含稅 NT$ '+fmt(_isAmt(pv))+'）':'')+'</div>'
       +(_isAmt(inv)<=0?'<div style="color:#c62828">本期金額是 0，請先打開請款單確認數量再送</div>':'')
-      +'<div style="margin-top:6px"><b>送業主的文字（確認後可複製，不會自動傳）</b><div style="white-space:pre-wrap;background:var(--b0,#f6f6f6);padding:6px 8px;border-radius:6px">'+esc(_isMsg(inv))+'</div></div>'
+      +(function(){var h='';try{var o=_docOut('inv',{inv:inv,quiet:true});h=(o&&o.html)||'';}catch(e){_err('invSend.pv',e);}return h?'<div style="margin-top:6px"><b>存好的請款單（就是要送的那張）</b><iframe srcdoc="'+esc(h)+'" style="width:100%;height:420px;border:1px solid var(--b1);border-radius:6px;background:#fff"></iframe></div>':'<div style="color:#c62828;margin-top:6px">請款單預覽出不來，請按「修改」打開請款單</div>';})()
+      +'<div style="margin-top:6px"><b>送業主的文字（按確認就複製，不會自動傳）</b><div style="white-space:pre-wrap;background:var(--b0,#f6f6f6);padding:6px 8px;border-radius:6px">'+esc(_isMsg(inv))+'</div></div>'
       +'<div style="margin-top:6px"><b>狀態紀錄</b>'+_invStHistHtml(inv)+'</div></div>';},
   ok:function(inv){if(!(_isAmt(inv)>0)){toast('本期金額是 0，請按「修改」打開請款單');return false;}
     _invStSet(inv,'sent','請款單草稿卡確認送出（PDF＋送業主文字）');_invStSyncing=true;try{saveInv();}finally{_invStSyncing=false;}
     var msg=_isMsg(inv);setTimeout(function(){try{printInvById(inv.id);}catch(e){_err('invSend.pdf',e);}},60);
-    setTimeout(function(){try{_modal('送業主的文字',''+'<div style="white-space:pre-wrap;font-size:13px">'+esc(msg)+'</div><div style="font-size:11.5px;color:var(--b4);margin-top:6px">按確定會複製；請自己貼到 LINE 或信件，附上剛才的 PDF。</div>',function(){try{navigator.clipboard.writeText(msg).then(function(){toast('已複製');},function(){toast('複製失敗，請手動複製');});}catch(e){_err('invSend.copy',e);}});}catch(e){_err('invSend.msg',e);}},400);
+    try{navigator.clipboard.writeText(msg).then(function(){toast('已標已送業主、複製給業主的文字；PDF 存好後貼到 LINE 或信件');},function(){toast('複製失敗：卡片上的文字請手動複製');});}catch(e){_err('invSend.copy',e);toast('複製失敗：卡片上的文字請手動複製');}   /* Lotion 題 4：按確認就複製，不再跳第二個視窗 */
     return 'open';},
   reject:function(inv,why){inv.sendSnz=_dAdd(localToday(),3);_invStLog(inv,_invStOf(inv),'先不送'+(why?'：'+String(why).slice(0,80):'')+'（'+inv.sendSnz+' 再提醒）',null,true);_invStSyncing=true;try{saveInv();}finally{_invStSyncing=false;}return true;},
   edit:function(inv){try{loadInvoice(inv.id);go('invoice-edit');}catch(e){_err('invSend.edit',e);}}
