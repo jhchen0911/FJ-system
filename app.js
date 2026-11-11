@@ -45642,7 +45642,8 @@ function _cost7On(){try{return _v7New('proj');}catch(e){return false;}}
 function _cost7OvrKey(){try{return Object.keys(_DEC||{}).find(function(k){return /ovr|overrun/i.test(k);})||'';}catch(e){return '';}}
 function _cost7Data(q){
   var st=null;try{st=_pjStat(q);}catch(e){_err('_cost7Data.st',e);}
-  var tx=1+_taxR()/100,cost=Math.round((st&&st.costNet)||0),rev=Math.round(((st&&st.billedGross)||0)/tx);
+  var tx=1+_taxR()/100,rev=Math.round(((st&&st.billedGross)||0)/tx);
+  var cost=((st&&st.all)||[q]).reduce(function(a,x){try{migrateCostRows(x);}catch(e){_err('_cost7Data.mig',e);}return a+(x.costs||[]).reduce(function(b,c){return b+(c&&!c.mergedInto?_cost7Inc(c):0);},0);},0);   // v6.0.234 已發生（發包只算已請款期別）
   var att=_costByItem(q),em=_actQtyMap(q),ov=[];
   (q.items||[]).forEach(function(it,i){if(!it||it.sec||_isSpare(it)||(parseFloat(it.price)||0)<0)return;var est=_effQty(em,it)*(parseFloat(it.estCost)||0),act=att.map[i]||0;
     if(est>0&&act>=est*1.1-1e-6)ov.push({desc:String(it.desc||'').split('\n')[0],pct:Math.round(act/est*100),over:Math.round(act-est)});});
@@ -45685,6 +45686,19 @@ var _COST7_G=[['sub','廠商請款'],['rent','租賃運費'],['quick','日報支
 function _cost7Grp(c){if(!c)return 'manual';if(c.type==='sub')return 'sub';if(_isQuickExtra(c))return 'quick';
   if(c.rental||c._fromMat||/租金|運費/.test(String(c.cat||'')+String((typeof _ownAutoCat==='function'&&c.type==='own')?(_ownAutoCat(c)||''):'')))return 'rent';return 'manual';}
 function _cost7Amt(c){try{recalcCostAmt(c);}catch(e){_err('_cost7Amt',e);}return Math.round(parseFloat(c.amt)||0);}
+// v6.0.234 Lotion 11/11（選 A）：已發生成本裡的發包只算已請款的期別；完全沒有期別、只有總額的舊發包卡照總額算（跟經營報表 _mgmtCostEntries 一樣），
+// 得標後建的發包卡（有對到報價工項的數量×單價）還沒請款＝0；舊的整筆應付已付也照總額。租賃有期別算期別、沒有照總額（同經營報表）
+function _cost7Legacy(c){
+  if((PAYABLES||[]).some(function(p){return p&&p.costId===c.id&&!p.deltaOf&&!p.voidAt&&p.status==='paid'&&String(p.id||'')==='pay'+c.id;}))return true;
+  return !(c.rows||[]).some(function(r){return r&&(r.lump||(parseInt(r.linkedItemIdx)>=0&&(parseFloat(r.unitPrice)||0)>0));});
+}
+function _cost7Inc(c){
+  if(!c)return 0;var tot=_cost7Amt(c);
+  if(c.type!=='sub'&&!c.rental)return tot;
+  var pers=_subPeriods(c).filter(function(p){return p&&!p.isRet;});
+  if(!pers.length)return (c.rental||_cost7Legacy(c))?tot:0;
+  return Math.round(pers.reduce(function(a,per){var k;try{k=_subPeriodCalc(c,per);}catch(e){_err('_cost7Inc',e);return a;}return a+(parseFloat(k.amt)||0);},0));
+}
 function _cost7NextCut(cur){var d=new Date(cur+'T00:00:00');var day=parseInt(P.vendorCutDay)||25;var n=new Date(d.getFullYear(),d.getMonth()+1,1);var last=new Date(n.getFullYear(),n.getMonth()+1,0).getDate();n.setDate(Math.min(day,last));return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
 // 這一期＝最近一次已過的計價截止日（_vendorCutDate）；有沒有登錄看期別迄日／日期 ≥ 截止日（再往前 5 天也算，廠商常提早幾天送）
 function _cost7SubSt(q,c){
@@ -45712,16 +45726,16 @@ function _cost7ListHtml(q){
   var ro=!!_isReaderUser,G={};_COST7_G.forEach(function(g){G[g[0]]=[];});
   (q.costs||[]).forEach(function(c){if(!c||c.mergedInto)return;G[_cost7Grp(c)].push(c);});
   var h='';
-  _COST7_G.forEach(function(g){var L=G[g[0]],sum=L.reduce(function(a,c){return a+_cost7Amt(c);},0);
+  _COST7_G.forEach(function(g){var L=G[g[0]],sum=L.reduce(function(a,c){return a+_cost7Inc(c);},0);
     h+='<div class="cost7-grp" data-g="'+g[0]+'" style="background:#fff;border:1px solid var(--b1);border-radius:var(--r12);padding:8px 12px;margin-bottom:10px">'
       +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b style="font-size:13.5px">'+g[1]+'</b><span style="font-size:12px;color:var(--b4)">'+L.length+' 筆・小計 <b style="color:var(--b5)">NT$ '+fmt(sum)+'</b></span></div>';
     if(!L.length)h+='<div style="font-size:12px;color:var(--b3);padding:4px 0">沒有</div>';
-    L.forEach(function(c){var amt=_cost7Amt(c),s=c.type==='sub'?_cost7SubSt(q,c):null,nm=c.vendor||c.desc||_costCatNorm(c.cat||'')||'成本';
+    L.forEach(function(c){var amt=_cost7Inc(c),tot=_cost7Amt(c),s=c.type==='sub'?_cost7SubSt(q,c):null,nm=c.vendor||c.desc||_costCatNorm(c.cat||'')||'成本';
       if(_isQuickExtra(c)){var r0=(c.rows||[])[0]||{};nm=r0.desc||_costCatNorm(c.cat||'')||'支出';s={txt:(c.date?String(c.date).slice(5).replace('-','/')+'　':'')+(c.payer?(c.payer+' 付'):'公司付')+(c.noRcpt?'・缺收據':''),btn:null,warn:!!c.noRcpt};}
       else if(c.rental){var pn=_subPeriods(c).filter(function(p){return !p.isRet;}).length;s={txt:'租賃合約・已請 '+pn+' 期',btn:null};}
       h+='<div class="cost7-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--b1);font-size:12.5px">'
         +'<div style="flex:1 1 200px;min-width:0"><b>'+esc(nm)+'</b><div style="font-size:11.5px;color:'+(s&&(s.btn||s.warn)?'#b26a00':'var(--b4)')+';overflow-wrap:anywhere">'+esc(s?s.txt:(_costCatNorm(c.cat||'')||''))+'</div></div>'
-        +'<b style="flex:0 0 auto">NT$ '+fmt(amt)+'</b>'
+        +((c.type==='sub'&&amt!==tot)?'<div style="flex:0 0 auto;text-align:right"><b>已請 NT$ '+fmt(amt)+'</b><div style="font-size:11px;color:var(--b4)">合約 NT$ '+fmt(tot)+'</div></div>':'<b style="flex:0 0 auto">NT$ '+fmt(amt)+'</b>')
         +((s&&s.btn&&!ro)?'<button type="button" class="btn sm" data-c7next="1" onclick="'+s.btn.fn+'">'+esc(s.btn.l)+'</button>':'')
         +'<button type="button" class="btn sm" data-c7more="1" aria-label="其他操作" onclick="cost7More(\''+escq(c.id)+'\')" style="padding:4px 9px">⋯</button></div>';});
     h+='</div>';});

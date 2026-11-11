@@ -14696,8 +14696,8 @@ async function newPage(browser, width, height) {
         window.toast = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_cost7tab'); _nav5Apply(); _cost7Tab = 'item';
         Q = [{ id: 'qC7', name: '範例工程C7', client: '甲營造', code: 'C7', date: '2026-10-01', awarded: true, _mt: 1,
           items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 100, price: 3000, estCost: 2000 }, { desc: '水平支撐組立', unit: 'M', qty: 300, price: 800, estCost: 500 }],
-          costs: [{ id: 'c1', type: 'sub', vendor: '範例打樁行', rows: [{ id: 'r1', linkedItemIdx: 0, qty: 100, unitPrice: 2300, desc: 'H型鋼樁打設' }] },
-            { id: 'c2', type: 'sub', vendor: '範例支撐行', rows: [{ id: 'r2', linkedItemIdx: 1, qty: 300, unitPrice: 450, desc: '水平支撐組立' }] }] }];
+          costs: [{ id: 'c1', type: 'sub', vendor: '範例打樁行', rows: [{ id: 'r1', linkedItemIdx: 0, qty: 100, unitPrice: 2300, desc: 'H型鋼樁打設' }], periods: [{ no: 1, date: '2026-10-25', to: '2026-10-25', rows: [{ rid: 'r1', qty: 100 }] }] },
+            { id: 'c2', type: 'sub', vendor: '範例支撐行', rows: [{ id: 'r2', linkedItemIdx: 1, qty: 300, unitPrice: 450, desc: '水平支撐組立' }], periods: [{ no: 1, date: '2026-10-25', to: '2026-10-25', rows: [{ rid: 'r2', qty: 300 }] }] }] }];   // v6.0.234：已發生成本只算已請款期別 → 兩家都請滿
         INV.length = 0; INV.push({ id: 'iC7', quoteId: 'qC7', project: '範例工程C7', periodNo: 1, items: [], totals: { sub: 400000, tax: 20000, total: 420000 }, _mt: 1 });
         openProjectCosts('qC7'); await T(300);
         const v = document.getElementById('cost-v7'), tx = v ? v.textContent.replace(/\s+/g, ' ') : '';
@@ -14754,6 +14754,9 @@ async function newPage(browser, width, height) {
         PAYABLES[0].status = 'paid'; PAYABLES[0].paidDate = localToday(); rCostItems(); await T(200);
         r2 = document.querySelectorAll('#cost-v7 .cost7-grp[data-g="sub"] .cost7-row')[1];
         out.subPaid = /本期已付，下期 \d\d\/\d\d 截止/.test(r2.textContent) && !r2.querySelector('[data-c7next]');
+        // Lotion 選 A：已發生成本＝已請款期別（打樁行還沒請＝0、支撐行請 100 M＝45,000），列上寫「已請／合約」
+        const r1t = document.querySelectorAll('#cost-v7 .cost7-grp[data-g="sub"] .cost7-row')[0].textContent;
+        out.inc = /已發生成本 NT\$ 46,200/.test(document.getElementById('cost-v7').textContent) && /已請 NT\$ 0/.test(r1t) && /合約 NT\$ 230,000/.test(r1t) && /已請 NT\$ 45,000/.test(r2.textContent) && /合約 NT\$ 135,000/.test(r2.textContent);
         // 「⋯」：預付款、合約書、計價紀錄、編輯、刪除
         r2.querySelector('[data-c7more]').click(); await T(60);
         const mt = (document.getElementById('fy-modal') || {}).textContent || ''; out.more = ['預付款', '合約書', '計價紀錄', '編輯', '刪除'].every((k) => mt.indexOf(k) >= 0);
@@ -14786,7 +14789,7 @@ async function newPage(browser, width, height) {
       try { const m = document.getElementById('fy-modal'); if (m) m.remove(); } catch (x) { /* 可忽略 */ }
       return out;
     });
-    check('v6.0.234 Lotion 回覆（寬 ' + W + '）：施工成本明細四組＋小計、發包列看這一期（登錄本期請款／去付款／本期已付下期截止）、⋯ 收預付合約書計價紀錄編輯刪除、帳務頁首收進⋯更多、日報工項清單＝本工地工項、管理員預設公司付、收據選填缺收據可補', !r.err && r.groups && r.subNew && r.subPay && r.subPaid && r.more && r.edit && r.noHScroll && r.acctHead && r.items && r.payAdm && r.rcptMiss && r.rcptCard && r.rcptHeal, JSON.stringify(r));
+    check('v6.0.234 Lotion 回覆（寬 ' + W + '）：施工成本明細四組＋小計、發包列看這一期（登錄本期請款／去付款／本期已付下期截止）、⋯ 收預付合約書計價紀錄編輯刪除、帳務頁首收進⋯更多、日報工項清單＝本工地工項、管理員預設公司付、收據選填缺收據可補', !r.err && r.groups && r.subNew && r.subPay && r.subPaid && r.inc && r.more && r.edit && r.noHScroll && r.acctHead && r.items && r.payAdm && r.rcptMiss && r.rcptCard && r.rcptHeal, JSON.stringify(r));
     check('v6.0.234 Lotion 回覆測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
