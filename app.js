@@ -1153,8 +1153,8 @@ function rTots(){
     }else{cr.style.display='none';mr.style.display='none';}
   }
   try{_qMeasChip(t);}catch(e){_err('rTots.meas',e);}   // v6.0.160 圖面覆核
-  try{_qP3Render(t);}catch(e){_err('rTots.p3',e);}
-  try{_qGeoRender();}catch(e){_err('rTots.geo',e);}   // 擴充線 B：附近舊案地層   // v6.0.216 底價／目標成交價／同類得標率
+  try{_qP3Render(t);}catch(e){_err('rTots.p3',e);}   // v6.0.216 底價／目標成交價／同類得標率
+  try{_qGeoRender();}catch(e){_err('rTots.geo',e);}   // 擴充線 B：附近舊案地層
   // v5.395：異常成本提示——哪幾項成本單價比報價單價高 3 倍以上，直接點名
   const wr=document.getElementById('tcost-warn');
   if(wr){
@@ -5878,7 +5878,7 @@ function _copyQDo(id){
   // Append (複製) to name
   copy.name=(copy.name||'未命名')+' (複製)';copy.payDefV=2;copy.instV=2;delete copy.ownerCard;delete copy._ocPriv;   // 新專案
   // 健檢1 #7：複製報價＝新的一張報價，不帶原案的專案狀態（追加案關聯、結案、版次、日報、詢價、材料、佣金、得標結果…）
-  ['parentId','closed','closedAt','ver','date0','dailyLogs','rfqs','mat','comms','comm','referral','confirmFiles','addons','siteHist','bidStatus','lostReason','lostPrice','lostNote','rentEnd','ownerDoc','matEst','measure','plan','sendLog','verFix','bid','bidHist','bidWait','bidAim','sent','sentHist','sentSkipAt','inq'].forEach(function(k){delete copy[k];});   // v6.0.180 匯出紀錄、補登版次規則屬於原報價
+  ['parentId','closed','closedAt','ver','date0','dailyLogs','rfqs','mat','comms','comm','referral','confirmFiles','addons','siteHist','bidStatus','lostReason','lostPrice','lostNote','rentEnd','ownerDoc','matEst','measure','plan','sendLog','verFix','bid','bidHist','bidWait','bidAim','geo','sent','sentHist','sentSkipAt','inq'].forEach(function(k){delete copy[k];});   // v6.0.180 匯出紀錄、補登版次規則屬於原報價
   copy._mt=Date.now();
   Q.unshift(copy);
   persist();
@@ -9581,16 +9581,17 @@ function _meLedRows(res,qid){
       if(!o){o=map[k]={name:it.name,unit:it.unit,qty:0,src:[],base:_meLedNorm(String(it.name).replace(/[（(].*$/,'').replace(/\s.*$/,'')),spec:_meLedSpec(it.name),inV:0,outV:0,hit:0};est.push(o);}
       o.qty+=it.quantity||0;if(o.src.indexOf(src)<0)o.src.push(src);
     });});
-  var mv={};try{mv=FJC.mv.ledger(MAT_MOVES,qid)||{};}catch(e){_err('_meLedRows',e);}
+  var mv={},noCalc=!(window.FJC&&FJC.mv&&typeof FJC.mv.ledger==='function');if(!noCalc){try{mv=FJC.mv.ledger(MAT_MOVES,qid)||{};}catch(e){_err('_meLedRows',e);noCalc=true;}}
   var extra=[];
   Object.keys(mv).forEach(function(k){var x=mv[k],nm=_meLedNorm(x.name),sp=_meLedSpec(x.spec)||_meLedSpec(x.name);
     var spOk=function(e){return !e.spec||e.spec===sp;};   // 先找同名，再找名稱互相包含（避免「副支撐擋片」搶走「支撐」）
-    var o=est.find(function(e){return e.base&&e.base===nm&&spOk(e);})||est.find(function(e){if(!e.base||e.base.length<2)return false;
-      return (nm.indexOf(e.base)>=0||(nm.length>=2&&e.base.indexOf(nm)>=0))&&spOk(e);});
+    var noCJK=function(t){return !/[\u3400-\u9fff]/.test(t);};   // 審查：只認「前面一樣、後面只差規格」（支撐座、副支撐擋片 → 另列，不算進支撐）
+    var o=est.find(function(e){return e.base&&e.base===nm&&spOk(e);})||est.find(function(e){if(!e.base||e.base.length<2||nm.length<2)return false;
+      return ((nm.indexOf(e.base)===0&&noCJK(nm.slice(e.base.length)))||(e.base.indexOf(nm)===0&&noCJK(e.base.slice(nm.length))))&&spOk(e);});
     if(!o){extra.push(x);return;}
     var isM=/^M/i.test(o.unit);o.inV+=isM?x.inM:x.inQ;o.outV+=isM?x.outM:x.outQ;o.hit++;});
   var wait=(MAT_MOVES||[]).filter(function(m){return m&&m.st!=='ok'&&(m.qid===qid||m.toQid===qid||m.fromQid===qid);}).length;
-  return {rows:est,extra:extra,wait:wait};
+  return {rows:est,extra:extra,wait:wait,noCalc:noCalc};
 }
 function _meLedgerHtml(res){
   var qid=window._matEstQid;if(!qid||!res)return '';
@@ -9606,7 +9607,7 @@ function _meLedgerHtml(res){
         +'<td class="r">'+f(o.inV)+'</td><td class="r">'+f(o.outV)+'</td><td class="r">'+f(on)+'</td>'
         +'<td class="r"'+(df<0?' style="color:#b26a00"':'')+'>'+(df>0?'+':'')+f(df)+'</td></tr>';});
     h+='</tbody></table></div>';
-  }else h+='<div style="font-size:12px;color:var(--b3)">還沒有確認過的簽收單。</div>';
+  }else h+=L.noCalc?'<div style="font-size:12px;color:#b26a00">進退料計算還沒載入（請重新整理兩次），先不顯示進場量。</div>':'<div style="font-size:12px;color:var(--b3)">還沒有確認過的簽收單。</div>';
   if(rest.length)h+='<details style="margin-top:6px;font-size:12px"><summary>其他 '+rest.length+' 種料還沒有簽收單（估算量與來源）</summary><div style="line-height:1.8;color:var(--b4);overflow-wrap:anywhere">'
     +rest.map(function(o){return esc(o.name)+' '+f(o.qty)+' '+esc(o.unit)+'（'+esc(o.src.join('＋'))+'）';}).join('、')+'</div></details>';
   if(L.extra.length)h+='<div style="font-size:11.5px;color:#b26a00;margin-top:6px">簽收單有、估算沒列：'+esc(L.extra.map(function(x){return x.name+(x.spec?' '+x.spec:'')+(x.len?' '+x.len+'M':'')+' 進'+x.inQ+'／退'+x.outQ;}).join('、'))+'</div>';
@@ -46664,26 +46665,34 @@ function _qGeoRender(){
 }
 // ── 草稿 type geo：{rows:[{qid|code|name, lat, lng, addr, soil:{fill,main,n,gw}, src}]}（一批最多 300 案）──
 function _geoFind(r){var S=_draftS,M=(Q||[]).filter(function(q){return q&&q.id&&!q.parentId;});
-  var id=S(r.qid).trim(),cd=S(r.code).trim(),nm=S(r.name).trim();
-  return (id&&M.find(function(q){return q.id===id;}))||(cd&&M.find(function(q){return S(q.code).trim()===cd;}))||(nm&&M.find(function(q){return S(q.name).trim()===nm;}))||null;}
-function _geoClean(p){p=(p&&typeof p==='object')?p:{};var rows=Array.isArray(p.rows)?p.rows:(p.rows&&typeof p.rows==='object'?Object.values(p.rows):[]);
+  var id=S(r.qid).trim(),cd=S(r.code).trim(),nm=S(r.name).trim(),x;
+  if(id&&(x=M.find(function(q){return q.id===id;})))return x;
+  if(cd&&(x=M.find(function(q){return S(q.code).trim()===cd;})))return x;
+  if(nm){var L=M.filter(function(q){return S(q.name).trim()===nm;});if(L.length===1)return L[0];if(L.length>1)return {__amb:L.length};}   // 審查：同名好幾張＝不猜，標黃請改對
+  return null;}
+function _geoClean(p){p=(p&&typeof p==='object')?p:{};if(!window.FJC||!FJC.geo)return {rows:[],ov:{}};var rows=Array.isArray(p.rows)?p.rows:(p.rows&&typeof p.rows==='object'?Object.values(p.rows):[]);
   return {rows:rows.slice(0,300).map(function(r){r=(r&&typeof r==='object')?r:{};var c=FJC.geo.clean(r);
     return {qid:_draftS(r.qid).slice(0,80),code:_draftS(r.code).slice(0,60),name:_draftS(r.name).slice(0,120),g:c.g||null,part:c.part||null,err:c.err||''};}),
     ov:(p.ov&&typeof p.ov==='object')?p.ov:{}};}
 window.fyGeoDraft=function(p){if(!window.FJC||!FJC.geo)return Promise.resolve({ok:false,why:'calc/geo.js 沒載入'});var o=_geoClean(p);if(!o.rows.length)return Promise.resolve({ok:false,why:'要有 rows（每案 qid 或 code、lat、lng、soil）'});
+  var noId=o.rows.findIndex(function(r){return !String(r.qid||r.code||r.name||'').trim();});if(noId>=0)return Promise.resolve({ok:false,why:'第 '+(noId+1)+' 案要有 qid、code 或 name 其中一個'});   // 跟雲端 geoClean 同一條規則
+  var raw=Array.isArray(p.rows)?p.rows:Object.values(p.rows||{});if(raw.length>300)return Promise.resolve({ok:false,why:'一批最多 300 案'});
   var bad=o.rows.filter(function(r){return r.err;}).length;
-  return _draftPush('geo',{rows:(p.rows||[]).slice(0,300)},('地層資料 '+o.rows.length+' 案'+(bad?'（'+bad+' 案座標有問題）':'')).slice(0,200)).then(function(ok){return {ok:!!ok,n:o.rows.length,bad:bad};});};
+  return _draftPush('geo',{rows:o.rows.map(function(r,i){var x=raw[i]||{};return Object.assign({qid:r.qid,code:r.code,name:r.name},r.g||r.part||{},r.g?{}:{lat:x.lat==null?null:x.lat,lng:x.lng==null?null:x.lng});})},('地層資料 '+o.rows.length+' 案'+(bad?'（'+bad+' 案座標有問題）':'')).slice(0,200)).then(function(ok){return {ok:!!ok,n:o.rows.length,bad:bad};});};
 // 每一列的處理結果：要寫哪一案、寫什麼；排除／找不到／座標錯誤的不寫
 function _geoPlan(d){var o=_geoClean(d&&d.payload),ov=o.ov;
-  return o.rows.map(function(r,i){var v=ov[i]||{},q=v.qid?(Q||[]).find(function(x){return x.id===v.qid;}):_geoFind(r);
-    var st=v.skip?'skip':(r.err?'bad':(!q?'none':(q.geo&&FJC.geo.okLL(+q.geo.lat,+q.geo.lng)?'upd':'new')));
-    return {i:i,r:r,q:q,st:st};});}
-var _GEO_ST_T={new:'新增',upd:'更新（覆蓋舊值）',skip:'排除（不寫）',bad:'座標有問題（不寫）',none:'找不到這案（不寫）'};
+  var used={};
+  return o.rows.map(function(r,i){var v=ov[i]||{},q=v.qid?(Q||[]).find(function(x){return x.id===v.qid;}):_geoFind(r),amb=0;
+    if(q&&q.__amb){amb=q.__amb;q=null;}
+    var st=v.skip?'skip':(r.err?'bad':(amb?'amb':(!q?'none':(used[q.id]?'dup':(q.geo&&FJC.geo.okLL(+q.geo.lat,+q.geo.lng)?'upd':'new')))));
+    if(q&&(st==='new'||st==='upd'))used[q.id]=1;
+    return {i:i,r:r,q:q,st:st,amb:amb};});}
+var _GEO_ST_T={new:'新增',upd:'更新（覆蓋舊值）',skip:'排除（不寫）',bad:'座標有問題（不寫）',none:'找不到這案（不寫）',amb:'同名報價好幾張（不寫，請按修改選哪一張）',dup:'跟前面同一案重複（不寫）'};
 function _geoDetail(d){var L=_geoPlan(d),n=L.filter(function(x){return x.st==='new'||x.st==='upd';}).length;
   return '<div style="font-size:12px;line-height:1.6">確認後寫入 <b>'+n+'</b> 案；有問題的按「修改」排除或改對哪一案。座標由電腦端轉好，點「地圖」核對位置。</div>'
-    +L.map(function(x){var g=x.r.g||x.r.part,nc=g?FJC.geo.needCheck(g):[],warn=x.st==='bad'||x.st==='none'||(nc.length&&x.st!=='skip');
+    +L.map(function(x){var g=x.r.g||x.r.part,nc=g?FJC.geo.needCheck(g):[],warn=/^(bad|none|amb|dup)$/.test(x.st)||(nc.length&&x.st!=='skip');
       return '<div style="border:1px solid '+(warn?'#ffcc80':'var(--b1)')+';background:'+(warn?'#fff8e1':(x.st==='skip'?'#f5f5f5':'#fff'))+';border-radius:8px;padding:6px 8px;margin-top:6px;font-size:12px;line-height:1.6;overflow-wrap:anywhere">'
-        +'<b>'+(x.i+1)+'. '+esc(x.q?(x.q.name||'(未命名)'):(x.r.name||x.r.code||x.r.qid||'(沒有案名)'))+'</b>　<span style="color:'+(warn?'#b26a00':'var(--g3)')+'">'+esc(_GEO_ST_T[x.st])+'</span>'
+        +'<b>'+(x.i+1)+'. '+esc(x.q?((x.q.code?x.q.code+' ':'')+(x.q.name||'(未命名)')):(x.r.name||x.r.code||x.r.qid||'(沒有案名)'))+'</b>　<span style="color:'+(warn?'#b26a00':'var(--g3)')+'">'+esc(_GEO_ST_T[x.st])+'</span>'
         +(x.st==='bad'?'<br><span style="color:#b26a00">'+esc(x.r.err)+'</span>':'')
         +(nc.length&&x.st!=='skip'?'<br><b style="color:#b26a00">⚠ '+esc(nc.join('；'))+'</b>':'')
         +(g?('<br>'+esc(g.addr||'（沒有地址）')+(x.r.g?'　<a href="'+esc(_geoMapUrl(g.lat,g.lng))+'" target="_blank" rel="noopener">地圖 '+g.lat.toFixed(5)+','+g.lng.toFixed(5)+'</a>':'')
