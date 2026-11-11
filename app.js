@@ -3789,7 +3789,8 @@ function rInvTots(srcInv){
   // ★ 若 installCum=0 且非打設期（資料未從前期帶入），cum/pending 以 null 表示未知
   const installRows=[], removeRows=[];
   invItems.forEach(it=>{
-    if(it.type==='sec'||it.remRid)return;   /* 審查：拔除另列併進原工項那一列 */
+    if(it.type==='sec')return;
+    if(it.remRid){const _mm=_invRemMain(it,invItems);if(_mm&&_itemCat(_mm).remove)return;}   /* 審查：拔除另列併進原工項那一列（找不到原列才自己列） */
     const _rrs=_invRemOf(it,invItems);
     const d=it.desc||'';
     // v5.377：改用明確的類別／期別欄位；未指定時才退回舊的關鍵字推定
@@ -3884,7 +3885,7 @@ function saveInvoice(){
     if(it.type==='sec')continue;
     if((parseFloat(it.curQty)||0)<0||((parseFloat(it.contractPrice)||0)<0&&!_invNegOk(it))){toast('數量／單價不可為負數');return;}   // 健檢1 #3／#1：議價尾差、調整列放行負單價
     const cq=parseFloat(it.contractQty)||0;
-    if(!it.remRid&&cq>0&&_invRemSibs(it,invItems).reduce((a,y)=>a+(parseFloat(y.prevQty)||0)+_curW(y),0)>cq+1e-9)_overN++;   // 審查修正：_qRetired 不關超請警示；拔除另列跟原列合算
+    if(!(it.remRid&&_invRemMain(it,invItems))&&cq>0&&_invRemSibs(it,invItems).reduce((a,y)=>a+(parseFloat(y.prevQty)||0)+_curW(y),0)>cq+1e-9)_overN++;   // 審查修正：_qRetired 不關超請警示；拔除另列跟原列合算
   }
   (invItems||[]).forEach(it=>{if(it&&it.type!=='sec')it.curAmt=_invRowAmt(it);});   // 健檢1 #4：存檔前以統一算法重算本期金額（不靠畫面是否重算過）
   const t=rInvTots();
@@ -6821,7 +6822,7 @@ function rebuildCumulatives(inv){
       }
     }
     // 審查：拔除另列只有拔除量＝前幾期同一列（remRid 一樣）的本期數量加總，不用名稱推
-    if(it.remRid){let ra=0;prevInvs.forEach(prev=>{(prev.items||[]).forEach(x=>{if(x&&x.remRid===it.remRid)ra+=parseFloat(x.curQty)||0;});});it.installCum=0;it.removeCum=ra;return;}
+    if(it.remRid){let ra=0;prevInvs.forEach(prev=>{(prev.items||[]).forEach(x=>{if(x&&x.remRid===it.remRid)ra+=parseFloat(x.curQty)||0;});});it.installCum=0;if(!((parseFloat(it.removeCum)||0)>0))it.removeCum=ra;return;}   /* 審查（第四次）：已經帶過來的不覆寫（改案名、手動修正不被蓋掉） */
     // 只修復 installCum=0 的工項（removeCum 有值不影響判斷）
     if((parseFloat(it.installCum)||0)>0)return;
 
@@ -22298,7 +22299,7 @@ function _qtyRecon(q){
     (v.items||[]).forEach(function(x){
       if(!x||x.type==='sec')return;
       var d=x.remRid?_invRowKey(x):String(x.desc||'').split('\n')[0].trim();if(!d)return;   /* 審查：拔除另列算回原工項 */
-      billed[d]=(billed[d]||0)+_curW(x);var _pr=(x.payRate==null||x.payRate==='')?100:parseFloat(x.payRate);if(!isFinite(_pr))_pr=100;billBy[d]=billBy[d]||{};billBy[d][_pr]=(billBy[d][_pr]||0)+(parseFloat(x.curQty)||0);   // v6.0.26 實際請款數量（不加權）
+      billed[d]=(billed[d]||0)+_curW(x);var _pr=(x.payRate==null||x.payRate==='')?100:parseFloat(x.payRate);if(!isFinite(_pr))_pr=100;billBy[d]=billBy[d]||{};var _bk=_isRemovePeriod(x)?'rm':_pr;billBy[d][_bk]=(billBy[d][_bk]||0)+(parseFloat(x.curQty)||0);   // v6.0.26 實際請款數量（不加權）
     });
   });
   (q.items||[]).forEach(function(it,i){
@@ -34330,9 +34331,9 @@ function _pjDocsHtml(q,st){
 function _pjBillCell(r){
   var by=r.billBy||{},ks=Object.keys(by).filter(function(k){return by[k]>0;});
   if(!ks.length)return r.bill?fmt(r.bill):'—';
-  var lab=function(k){k=parseFloat(k);return k===70?'打設':k===30?'拔除':k===100?'':(k+'%');};
-  var main=ks.map(function(k){var l=lab(k);return '<div style="white-space:nowrap">'+(l?('<span style="font-size:10.5px;color:var(--b4)">'+l+'</span> '):'')+'<b>'+fmt(Math.round(by[k]*100)/100)+'</b>'+(parseFloat(k)!==100?('<span style="font-size:10.5px;color:var(--b4)">（請 '+k+'%）</span>'):'')+'</div>';}).join('');
-  var w=Math.round((r.bill||0)*100)/100,anyW=ks.some(function(k){return parseFloat(k)!==100;});
+  var lab=function(k){if(k==='rm')return '拔除';k=parseFloat(k);return k===70?'打設':k===30?'拔除':k===100?'':(k+'%');};   /* 審查（第四次）：拔除期另一格 rm（打設跟拔除 % 一樣時不混在一起） */
+  var main=ks.map(function(k){var l=lab(k);return '<div style="white-space:nowrap">'+(l?('<span style="font-size:10.5px;color:var(--b4)">'+l+'</span> '):'')+'<b>'+fmt(Math.round(by[k]*100)/100)+'</b>'+(k!=='rm'&&parseFloat(k)!==100?('<span style="font-size:10.5px;color:var(--b4)">（請 '+k+'%）</span>'):'')+'</div>';}).join('');
+  var w=Math.round((r.bill||0)*100)/100,anyW=ks.some(function(k){return k==='rm'||parseFloat(k)!==100;});
   return main+(anyW?('<div style="font-size:10px;color:var(--b4)">計價量 '+_rfmt(w)+'</div>'):'');
 }
 // ── 材料租賃：預計退場＝預計進場＋合約租期天數（報價工項「含 N 天租期」）──
