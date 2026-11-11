@@ -514,6 +514,93 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const logs = [{ date: '2026-11-01', progressRows: [{ itemIdx: 0, qty: 100 }, { itemIdx: 0, qty: 5, ph: 'remove' }] }, { date: '2026-11-02', photoOnly: true, progressRows: [{ itemIdx: 0, qty: 9 }] }];
   check('LINE 日報拆數量：累計只算確認過的日報（只有照片的不算）、打設拔除分開', DL.cumOf(logs, 0, 'install', (r) => r.ph === 'remove' ? 'remove' : 'install') === 100 && DL.cumOf(logs, 0, 'remove', (r) => r.ph === 'remove' ? 'remove' : 'install') === 5);
 }
+// ── 健檢 11/11（陳軒合成案子跑整條請款抓到的）：H2 工項類別字表統一、M4 打設拔除兩列連起來停租、M1 只有逾期租金也出請款單草稿、M2 這段拔完了、有保留款的結案卡要材料退完
+{
+  const TD0 = require('../calc/todo.js'), T = TD0.itemCat ? TD0 : TD0.todo, PG = require('../functions/ops/progress.js'), DL = require('../calc/dailyparse.js').dl;
+  const descs = ['支撐 H350 組立及拆除', 'H型鋼樁 打設＋拔除', '覆工板 鋪設', '構台 架設', '鋼板樁 施打', '中間樁 吊裝', '鋼板樁 拔除', '支撐 拆除', '材料 回收', '技師簽證', '鋼軌樁 打設'];
+  const same = descs.every((d) => JSON.stringify(T.itemCat({ desc: d })) === JSON.stringify(PG.itemCat({ desc: d })));
+  const q = { items: [{ desc: '第一層支撐 H350 組立及拆除', unit: 'M', qty: 300 }], dailyLogs: [] };
+  const pr = DL.parse('第一層支撐組立 300M', q.items).rows[0];
+  check('健檢 H2：「組立及拆除」＝打設＋拔除（組立、鋪設、架設、施打、吊裝都算裝設）；calc/todo.js 跟 functions/ops/progress.js 字表一樣；日報「組立 300」記成打設，不會記成拆除',
+    same && T.itemCat({ desc: '支撐 H350 組立及拆除' }).install && T.itemCat({ desc: '支撐 H350 組立及拆除' }).remove && T.prPhase(q, { itemIdx: 0, qty: 300 }) === 'install' && pr && pr.itemIdx === 0 && pr.ph === 'install');
+  const q2 = { awarded: true, items: [{ desc: 'H型鋼樁 H300 打設', unit: '支', qty: 100, price: 500, note: '租期 60 天', ot: '10' }, { desc: 'H型鋼樁 H300 拔除', unit: '支', qty: 100, price: 200 }], dailyLogs: [{ date: '2026-01-01', progressRows: [{ itemIdx: 0, qty: 100 }] }, { date: '2026-03-15', progressRows: [{ itemIdx: 1, qty: 100 }] }] };
+  const r2 = T.rentStatus(q2, 0, '2026-06-30', '2026-06-30'), r2b = T.rentStatus(q2, 1, '2026-06-30', '2026-06-30');
+  const q3 = JSON.parse(JSON.stringify(q2)); q3.items.push({ desc: 'H型鋼樁 H300 拔除', unit: '支', qty: 50, price: 200 });   // 兩列一樣像＝不配對
+  check('健檢 M4：報價把打設、拔除分成兩列 → 拔除那列的日報讓租金停（1/1 打完、租期 60 天到 3/2，3/15 拔＝逾期 13 天 13,000）；兩列一樣像不配對；拔除那列不另算租期',
+    r2 && r2.removeFirst === '2026-03-15' && r2.overDays === 13 && r2.amount === 13000 && r2b === null && T.pairOf(q3, 0) === null);
+  const q4 = { id: 'q4', name: '只有逾期租金', awarded: true, items: [{ desc: 'H型鋼樁 H300 打設＋拔除', unit: '支', qty: 10, price: 500, note: '租期 30 天', ot: '20' }], dailyLogs: [{ date: '2026-09-01', progressRows: [{ itemIdx: 0, qty: 10 }] }] };
+  const mb = T.monthBill({ q: q4, invs: [{ date: '2026-10-24' }], cust: {}, def: { cut: 25 }, today: '2026-11-22' });
+  // 審查：拔完、上次請款之後沒有新的逾期天數 → 不再每個月出一張；規格寫在第 2 行不同（H300／H350）不配對；兩邊要互相配
+  const q5 = JSON.parse(JSON.stringify(q4)); q5.items[0].desc = 'H型鋼樁 H300 打設＋拔除'; q5.dailyLogs.push({ date: '2026-10-10', progressRows: [{ itemIdx: 0, qty: 10, ph: 'remove' }] });
+  const mb5 = T.monthBill({ q: q5, invs: [{ date: '2026-10-24' }], cust: {}, def: { cut: 25 }, today: '2026-11-22' });
+  const q6 = { items: [{ desc: 'H型鋼 打設\nH300', unit: '支', qty: 10 }, { desc: 'H型鋼 拔除\nH300', unit: '支', qty: 10 }, { desc: 'H型鋼 打設\nH350', unit: '支', qty: 5 }] };
+  check('審查：逾期租金拔完、上次請款後沒有新的逾期天數 → 不出只有租金的草稿卡；配對要規格一樣、兩邊互相配（H350 打設不會配到 H300 拔除）',
+    mb5 === null && T.pairOf(q6, 0) && T.pairOf(q6, 0).idx === 1 && T.pairOf(q6, 2) === null && T.pairOf(q6, 1).idx === 0 && (T.pairOf({ items: [{ desc: 'H型鋼 打設\nH300', unit: '支', qty: 10 }, { desc: 'H型鋼 拔除', unit: '支', qty: 10 }] }, 0) || {}).idx === 1, JSON.stringify([mb5, T.pairOf(q6, 2)]));   // 一邊沒寫規格照舊配得到
+  check('健檢 M1：這個月沒有新的日報、只有逾期租金 → 照樣出請款單草稿卡（rentOnly、列出逾期天數）', !!mb && mb.rentOnly && mb.items.length === 0 && mb.rent.length === 1 && mb.rent[0].overDays > 0 && mb.cutDate === '2026-11-25');
+  const R = (t) => DL.parse(t, [{ desc: '鋼板樁 III型 拔除', unit: '支', qty: 120 }]).rows;
+  check('健檢 M2：「第一段拔除 40 支，這段拔完了」「…，這段拔完」都標本段完成', R('鋼板樁拔除 40 支，這段拔完了')[0].batchDone === true && R('第一段鋼板樁拔除 40 支，這段拔完了')[0].batchDone === true && R('鋼板樁拔除 40 支，這段拔完')[0].batchDone === true && R('鋼板樁拔除 40 支，這段還沒拔完')[0].batchDone === false);
+  const c1 = T.closeReady({ q: { id: 'x', awarded: true }, hasRet: true, retLeft: 0, matLeft: 2, payLeft: 0 }), c2 = T.closeReady({ q: { id: 'x', awarded: true }, hasRet: true, retLeft: 0, matLeft: 0, payLeft: 0 });
+  check('健檢：有保留款的案子材料還沒退完不出結案卡；退完才出', !c1.ok && c1.why.indexOf('mat') >= 0 && c2.ok);
+}
+// ── v6.0.235 新格式日報（Lotion 11/11）：17:30 範本帶工項編號；tests/synthetic/daily-line-fmt.json 新格式、舊格式、亂寫 28 則
+{
+  const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl, F = require(path.join(__dirname, 'synthetic', 'daily-line.json')), G = require(path.join(__dirname, 'synthetic', 'daily-line-fmt.json'));
+  const list = DL.askList(F.items, []); let ok = 0, tot = 0; const miss = [];
+  G.cases.forEach((c, i) => { const R = DL.parseFmt(c.text, list, F.items).rows; tot += Math.max(1, c.expect.length); if (R.length !== c.expect.length) { miss.push(i + '（' + c.kind + '）列數 ' + R.length + '≠' + c.expect.length); return; } if (!c.expect.length) { ok++; return; }
+    c.expect.forEach((e, j) => { const r = R[j]; if (r.itemIdx === e[0] && r.qty === e[1] && (e[0] < 0 || r.ph === e[2]) && r.batchDone === e[3]) ok++; else miss.push(i + '#' + j + '（' + c.kind + '）'); }); });
+  console.log('  （新格式日報準確度：' + ok + '/' + tot + '，' + G.cases.length + ' 則）');
+  check('新格式日報：合成回報 ' + G.cases.length + ' 則逐列對（編號＋動作＋數量、單位照合約、這段拔完、工項名稱照舊對位；人和機具不算；範本清單、範例、清單沒有的編號不拆；單位不同、累計、範圍、動作跟工項不合＝待確認）', G.cases.length >= 20 && !miss.length, miss.join('、'));
+  const same = ['cases', 'holdout', 'adversarial'].every((k) => F[k].every((c) => JSON.stringify(DL.parseFmt(c.text, [], F.items).rows) === JSON.stringify(DL.parse(c.text, F.items).rows)));
+  check('新格式日報：舊寫法（沒有【】欄位）整段照原本的 parse，結果完全一樣（舊格式照收、不會被擋）', same);
+  const L2 = DL.askList(F.items, [{ progressRows: [{ itemIdx: 0, qty: 120 }, { itemIdx: 2, qty: 60 }] }]);
+  check('新格式日報：問句工項清單＝還沒做完的（打設做完的拿掉、打設＋拔除的要兩種都做完才拿掉）、分段標題和備用單價不列、編號 1～N 連號',
+    list.length === 9 && !L2.some((e) => e.idx === 0) && L2.some((e) => e.idx === 2) && L2.every((e, i) => e.no === i + 1) && !list.some((e) => F.items[e.idx].sec || F.items[e.idx].spare)
+    && !DL.askList([{ desc: '技師簽證', unit: '式', qty: 1, cat: 'other' }], []).length);
+  const moved = F.items.slice(); moved.splice(0, 0, { desc: '導溝開挖', unit: 'M', qty: 10 });   // 報價在問句之後多了一列：編號照名稱找回原工項
+  const rm = DL.parseFmt('【今天做了】\n1 打設 12', list, moved).rows[0];
+  const gone = DL.parseFmt('【今天做了】\n1 打設 12', list, F.items.slice(1)).rows[0];
+  check('新格式日報：問句之後報價改過（多一列）→ 照工項名稱找回同一項；那一項被刪了 → 待確認、不猜', rm.itemIdx === 1 && rm.qty === 12 && gone.itemIdx === -1 && /找不到/.test(gone.why));
+  const T = DL.askText('說明', [{ site: 'A 案', list: list.slice(0, 2) }, { site: 'B 案', list: list.slice(0, 1) }], '11/11');
+  check('新格式日報：一個群組好幾個工地＝好幾段【工地】，編號各自從 1 開始；範本的【本工地工項】不算回報內容（stripList）',
+    (T.match(/【工地】/g) || []).length === 2 && /【工地】B 案\n【本工地工項】\n1 /.test(T) && !/追加/.test(DL.stripList('【本工地工項】\n1 追加 H300\n【今天做了】\n1 打設 3')) && /打設 3/.test(DL.stripList('【本工地工項】\n1 追加 H300\n【今天做了】\n1 打設 3')));
+}
+// ── v6.0.235 LINE 日報【支出】（Lotion 11/11，選填）：一行一筆「項目＋金額＋付款方式」
+{
+  const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl;
+  const E = DL.expOf('【今天做了】\n1 打設 12\n【支出】\n便當 5 個 600 零用金\n五金 1,250 代墊 阿明\n吊車費 8000 公司付\n涼水 300\n加油 1500元 零用金 小陳\n例：便當 5 個 600 零用金\n雜支 代墊\n【明天】\n續打');
+  check('LINE 日報【支出】：金額不吃「5 個」這種數量、千分位、寫「元」優先；零用金／代墊 誰／公司付；沒寫付款方式、代墊沒寫是誰、沒金額＝待確認；範例行不算；【支出】不影響工項數量',
+    E.length === 6 && E[0].item === '便當' && E[0].amt === 600 && E[0].pay === 'petty' && E[1].amt === 1250 && E[1].pay === 'adv' && E[1].who === '阿明' && E[2].pay === 'co' && E[2].amt === 8000
+    && !E[3].sure && /付款方式/.test(E[3].why) && E[4].amt === 1500 && E[4].who === '小陳' && !E[5].sure && E[5].amt === 0
+    && DL.parseFmt('【今天做了】\n\n【支出】\n便當 5 個 600 零用金', [], [{ desc: '鋼板樁 打設', unit: '支', qty: 10 }]).rows.length === 0 && /【支出】/.test(DL.askText('', [{ site: 'A', list: [] }], '11/11')) && !DL.expOf('今天打設鋼板樁 20 支').length);
+}
+{
+  const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl;
+  const X = (t) => DL.expOf('【支出】\n' + t)[0];
+  const a = X('便當 600 11/11 零用金 小陳'), b2 = X('加油 1500 2 次 公司付'), c = X('便當 1500 台幣 公司付'), d = X('NT$1250 五金 公司付'), e = X('600 便當 零用金 小陳'), f = X('零用金 小陳 便當 600'), g = X('代墊 阿明先付 五金 300'), h = X('便當 600 300 零用金 小陳');
+  check('LINE 日報【支出】審查寫法：日期不是金額、「2 次」不是金額、台幣、NT$、金額寫前面、零用金寫前面、「阿明先付」、兩個沒標的數字＝金額不確定',
+    a.amt === 600 && a.who === '小陳' && b2.amt === 1500 && c.amt === 1500 && c.item === '便當' && d.amt === 1250 && d.item === '五金' && e.item === '便當' && e.amt === 600 && f.item === '便當' && f.who === '小陳' && g.who === '阿明' && g.item === '五金' && !h.sure && /金額不確定/.test(h.why),
+    JSON.stringify([a, b2, c, d, e, f, g, h].map((x) => [x.item, x.amt, x.who, x.why])));
+}
+{
+  const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl;
+  const its = [{ desc: '鋼板樁 III型 打設', unit: '支', qty: 30 }], L = DL.askList(its, []);
+  const t = '【今天做了】\n1 打設 5\n【人和機具】\n人 5（阿明、小陳、阿華、阿德、小王）、怪手 1、吊車 1\n點工 2 人\n【支出】\n【明天】';
+  const P = DL.parseFmt(t, L, its), S = DL.sections(t);
+  check('LINE 日報【人和機具】寫人名（「人 5（阿明、小陳…）」，給薪資出工名單預留）：不報錯、不變成工項數量、原文留在 crew 給小批次拆', P.rows.length === 1 && P.rows[0].qty === 5 && /阿明、小陳/.test(S.crew) && P.skip.some((x) => /阿明/.test(x)) && !DL.expOf(t).length);
+}
+{
+  const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl, st = ['阿明', '陳小明', '阿華', '王大同'];
+  const a = DL.crewOf('【今天做了】\n1 打設 5\n【人和機具】\n人 3（阿明、小陳半天、阿華加班 2）、怪手 1、吊車 1\n點工 2 人\n【支出】', st);
+  const P = (r) => r.people.map((p) => [p.name, p.day, p.ot, p.off, p.staff, p.sure].join('/')).join(',');
+  check('出工人名 crewOf：「人 3（阿明、小陳半天、阿華加班 2）」→ 名字、半天、加班時數；名冊對得到才 sure；點工另計不對名冊；機具另列',
+    a.heads === 3 && a.temps === 2 && P(a) === '阿明/1/0/false/阿明/true,小陳/0.5/0/false//false,阿華/1/2/false/阿華/true' && a.machines.length === 2 && a.machines[0].name === '怪手' && !a.why.length && /阿明、小陳半天/.test(a.raw), P(a) + JSON.stringify(a.why));
+  const b = DL.crewOf('【人和機具】\n工人：阿明、阿華 請假\n怪手 2 台', st), c = DL.crewOf('【人和機具】\n人二（阿明、小明）', st), d = DL.crewOf('【人和機具】\n人 4', st);
+  const e = DL.crewOf('【人和機具】\n人 3（阿明、阿明、王大同半日）', st), f = DL.crewOf('【人和機具】\n人 2（阿華加班）', st), g = DL.crewOf('【人和機具】\n人員：阿明 阿華 加班2H，吊車1台', st);
+  check('出工人名 crewOf 對不到就標原因不猜：請假＝off、像名冊的人放 cand、只寫人數、名字重複、加班沒寫時數、人數跟名字數對不上；空白分開的名字也拆',
+    b.people[1].off && b.people[1].day === 0 && b.machines[0].n === 2 && c.heads === 2 && c.people[1].cand[0] === '陳小明' && !c.people[1].sure && /只寫人數 4/.test(d.why[0]) && !e.people[1].sure && /重複/.test(e.people[1].why) && e.people[2].day === 0.5
+    && /加班沒寫幾小時/.test(f.people[0].why) && /寫人 2，名字有 1 個/.test(f.why[0]) && g.people.length === 2 && g.people[1].ot === 2 && g.machines[0].name === '吊車',
+    JSON.stringify([b.people, c.people[1], d.why, f.why, g.people.map((p) => p.name)]));
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');
