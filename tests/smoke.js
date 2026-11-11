@@ -11908,27 +11908,27 @@ async function newPage(browser, width, height) {
         Q = mk(); INV = []; _todoBuild(true);
         const B = _decItems('invDraft')[0]; const ib0 = _ibOpenEditor(B); saveInvoice();
         const ib = INV.find((x) => x.id === ib0.id), hb = norm((_docOut('inv', { inv: ib, quiet: true }) || {}).html);
-        out.same = !!ha && ha.length > 1000 && ha === hb && ia.totals.total === ib.totals.total && ia.date === ib.date && ia.date === '2026-10-15';
+        out.same = !!ha && ha.length > 1000 && ha === hb && ia.totals.total === ib.totals.total && ia.date === ib.date && ia.date === '2026-10-14';
         out.amt = ia.totals.total === Math.round((35 * 1000 + 10 * 300) * 1.05);
       } finally { Q = keepQ; INV = keepI; }
       return out;
     });
-    check('請款單改兩下：草稿卡按確認存的請款單跟編輯頁手動儲存的，交給 PDF 的內容一字不差（日期＝截止日前 3 天、金額照存檔算法）', Object.values(r).length === 3 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('請款單改兩下：草稿卡按確認存的請款單跟編輯頁手動儲存的，交給 PDF 的內容一字不差（日期＝截止日前 3 天（最晚昨天）、金額照存檔算法）', Object.values(r).length === 3 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('請款單改兩下測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
-  // ── 請款單改兩下（審查修正）：日期與數量都停在截止日前 3 天、之後的日報下一期請（不漏）；重用空白第 1 期也算成功；上一期合計不會當成這期金額 ──
+  // ── 請款單改兩下（審查修正）：日期與數量都停在截止日前 3 天（最晚昨天）、之後的日報下一期請（不漏）；重用空白第 1 期也算成功；上一期合計不會當成這期金額 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
-      const out = {}; const keepQ = Q, keepI = INV;
+      const out = {}; const keepQ = Q, keepI = INV, keepD = DRAFTS;
       try {
         const mk = () => [{ id: 'q3D', name: '三天前案', awarded: true, client: '合成營造', ownerPay: { cut: 18 }, items: [{ desc: 'H型鋼樁 打設', unit: '支', qty: 100, price: 1000 }],
           dailyLogs: [{ id: 'l1', date: '2026-10-12', progressRows: [{ itemIdx: 0, qty: 10 }] }, { id: 'l2', date: '2026-10-16', progressRows: [{ itemIdx: 0, qty: 7 }] }], t: { total: 0 } }];
         Q = mk(); INV = []; _todoBuild(true);
         const A = _decItems('invDraft')[0];
-        out.stop = _ibStop(A) === '2026-10-15' && /數量算到 10-15：H型鋼樁 打設 10支/.test(_DEC.invDraft.body(A)) && /10-15 之後才有日報的（算下一期）/.test(_DEC.invDraft.detail(A)) === false;
-        out.ok = (await _DEC.invDraft.ok(A)) === true && INV.length === 1 && INV[0].date === '2026-10-15' && INV[0].items.find(x => x.type === 'item').curQty === 10;
+        out.stop = _ibStop(A) === '2026-10-14' && /數量算到 10-14：H型鋼樁 打設 10支/.test(_DEC.invDraft.body(A)) && /10-14 之後才有日報的（算下一期）/.test(_DEC.invDraft.detail(A)) === false;
+        out.ok = (await _DEC.invDraft.ok(A)) === true && INV.length === 1 && INV[0].date === '2026-10-14' && INV[0].items.find(x => x.type === 'item').curQty === 10;
         // 下一期：從 10-15 隔天算起，10-16 的 7 支會被請到
         invEid = null; _invNewDateOv = '2026-11-12'; try { addNextPeriod(INV[0].id); } finally { _invNewDateOv = ''; } const n2 = INV.find(x => x.periodNo === '2');
         const e2 = invItems.find(x => x.type === 'item'); out.next = !!n2 && invEid === n2.id && n2.date === '2026-11-12' && e2.curQty === 7 && e2.prevQty === 10;   // 開單時日報帶進編輯頁（存檔才寫回）
@@ -11936,15 +11936,35 @@ async function newPage(browser, width, height) {
         // 第 1 期是舊版得標建的空白單：拿來重用，也算開成功
         Q = mk(); const b0 = buildInvFromQuote(Q[0]); b0.items.forEach(x => { x.curQty = 0; }); b0.date = '2026-09-01'; b0._mt = 1; b0.id = '1760000000000'; b0.sourceQid = 'q3D'; ['st', 'stLog', 'stLast'].forEach(k => delete b0[k]); invEid = null; INV = [b0]; _todoBuild(true);
         const B = _decItems('invDraft')[0];
-        out.reuse = !!B && (await _DEC.invDraft.ok(B)) === true && INV.length === 1 && INV[0].id === b0.id && INV[0].date === '2026-10-15';
-        // 只有截止日前 3 天之後才有日報：卡上寫沒有新數量，確認不會存出 0 元單當成功
+        out.reuse = !!B && (await _DEC.invDraft.ok(B)) === true && INV.length === 1 && INV[0].id === b0.id && INV[0].date === '2026-10-14';
+        // 只有截止日前 3 天（最晚昨天）之後才有日報：卡上寫沒有新數量，確認不會存出 0 元單當成功
         Q = mk(); Q[0].dailyLogs = [{ id: 'l9', date: '2026-10-16', progressRows: [{ itemIdx: 0, qty: 5 }] }]; INV = []; _todoBuild(true);
         const C = _decItems('invDraft')[0];
-        out.later = !!C && /沒有新數量/.test(_DEC.invDraft.body(C)) && /10-15 之後才有日報的（算下一期）：H型鋼樁 打設/.test(_DEC.invDraft.detail(C)) && (await _DEC.invDraft.ok(C)) === 'open';
-      } finally { Q = keepQ; INV = keepI; }
+        out.later = !!C && /沒有新數量/.test(_DEC.invDraft.body(C)) && /10-14 之後才有日報的（算下一期）：H型鋼樁 打設/.test(_DEC.invDraft.detail(C)) && (await _DEC.invDraft.ok(C)) === 'open';
+        // 還有沒確認的 LINE 日報（日期在數量截止日以前）：擋確認
+        Q = mk(); INV = []; DRAFTS = { dP1: { id: 'dP1', type: 'dailyLog', status: 'pending', payload: { qid: 'q3D', date: '2026-10-13', answers: ['1. 打設 5 支'] } } }; _todoBuild(true);
+        const D = _decItems('invDraft')[0];
+        out.pend = !!D && (await _DEC.invDraft.ok(D)) === false && INV.length === 0 && /LINE 日報沒確認（10-13）/.test(_DEC.invDraft.body(D));
+        DRAFTS = {};
+        // 累計超過 100%：擋確認、列底紅（同一條）
+        Q = mk(); Q[0].items[0].qty = 8; INV = []; _todoBuild(true);
+        const E = _decItems('invDraft')[0];
+        out.over = !!E && (await _DEC.invDraft.ok(E)) === false && INV.length === 0 && /累計 125%（超過合約）/.test(_DEC.invDraft.body(E)) && /background:#ffebee/.test(_DEC.invDraft.detail(E));
+        // 存檔被擋（缺工程名稱）：不算成功、打開編輯頁
+        Q = mk(); Q[0].name = ''; INV = []; _todoBuild(true);
+        const F = _decItems('invDraft')[0];
+        out.blocked = !!F && (await _DEC.invDraft.ok(F)) === 'open';
+        // 上一期是拔除期、這期只有新的打設日報：請款單請 0、卡片寫 10 → 對不上就不算成功
+        Q = mk(); Q[0].items[0].desc = 'H型鋼樁 打設＋拔除'; INV = [{ id: 'p1x', project: '三天前案', quoteId: 'q3D', sourceQid: 'q3D', periodNo: '1', date: '2026-09-20', st: 'sent', stLast: 'sent', items: [{ type: 'item', desc: 'H型鋼樁 打設＋拔除', unit: '支', contractQty: 100, contractPrice: 1000, prevQty: 0, curQty: 5, payRate: 30, phase: 'remove' }], totals: { total: 1575 } }]; _todoBuild(true);
+        const G = _decItems('invDraft')[0];
+        out.diff = !!G && (await _DEC.invDraft.ok(G)) === 'open' && INV.find(x => x.periodNo === '2' && x.id === invEid) != null;
+        // 合計舊了（編輯頁失焦自動存只存工項）：待送卡金額照工項重算，不信舊 totals
+        const st = { id: 'sx', project: '三天前案', quoteId: 'q3D', periodNo: '1', st: 'draft', stLast: 'draft', date: '2026-10-14', items: [{ type: 'item', desc: 'H型鋼樁 打設', unit: '支', contractQty: 100, contractPrice: 1000, prevQty: 0, curQty: 10, payRate: 100 }], totals: { total: 999 } };
+        out.stale = _isAmt(st) === 10500;
+      } finally { Q = keepQ; INV = keepI; DRAFTS = keepD; }
       return out;
     });
-    check('請款單改兩下（審查修正）：日期與數量都停在截止日前 3 天、之後的日報下一期請到（不漏）；重用空白第 1 期算成功；下一期不沿用上一期合計；只有之後才有日報時不會存出 0 元單', Object.values(r).length === 6 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('請款單改兩下（審查修正）：日期與數量都停在截止日前 3 天（最晚昨天）、之後的日報下一期請到（不漏）；重用空白第 1 期算成功；下一期不沿用上一期合計；只有之後才有日報時不會存出 0 元單；有沒確認的日報、累計超過 100% 擋確認；存檔被擋或存出來的數量跟卡片不一樣不算成功；待送卡金額照工項重算', Object.values(r).length === 11 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('請款單改兩下（審查修正）測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
@@ -12024,11 +12044,11 @@ async function newPage(browser, width, height) {
         const L = _decItems('invDraft');
         out.card = L.length === 1 && /截止 10-18/.test(_DEC.invDraft.head(L[0]));
         const det = L.length ? _DEC.invDraft.detail(L[0]) : '';
-        out.detail = /第 1 期/.test(det) && /10-05 20、10-12 15/.test(det) && /打設 35<br>／ 100/.test(det) && !/超過合約/.test(det) && /直接開好第 1 期請款單並存檔/.test(det) && /追加背填/.test(det) && /主任還沒簽認）/.test(det) && /數量算到 2026-10-15/.test(det) && /保留款 0%/.test(det);
+        out.detail = /第 1 期/.test(det) && /10-05 20、10-12 15/.test(det) && /打設 35<br>／ 100/.test(det) && !/超過合約/.test(det) && /直接開好第 1 期請款單並存檔/.test(det) && /追加背填/.test(det) && /主任還沒簽認）/.test(det) && /數量算到 2026-10-14/.test(det) && /保留款 0%/.test(det);
         // 請款單改兩下（Lotion 11/11）：追加還沒簽認＝擋確認（要先按修改）；拿掉之後確認＝直接建單＋存檔（日期＝截止日），不開編輯頁
         out.block = (await _DEC.invDraft.ok(L[0])) === false && INV.length === 0 && /要先按「修改」：現場追加/.test(_DEC.invDraft.body(L[0]));
         Q[0].addons = []; _todoBuild(true); const L1 = _decItems('invDraft');
-        out.ok = (await _DEC.invDraft.ok(L1[0])) === true && INV.length === 1 && _invStOf(INV[0]) === 'draft' && /請款單草稿卡/.test(INV[0].stLog.slice(-1)[0].why) && INV[0].date === '2026-10-15' && INV[0].totals.total === 36750;
+        out.ok = (await _DEC.invDraft.ok(L1[0])) === true && INV.length === 1 && _invStOf(INV[0]) === 'draft' && /請款單草稿卡/.test(INV[0].stLog.slice(-1)[0].why) && INV[0].date === '2026-10-14' && INV[0].totals.total === 36750;
         _todoBuild(true);
         out.gone = !_decItems('invDraft').length;
         const S = _decItems('invSend');
