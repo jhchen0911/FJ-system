@@ -214,6 +214,31 @@ check('廠商請款單價可核實覆寫、應付 id 規則', PY.rowPrice({ unit
   check('薪資單：日薪 1,500×22＝33,000＋津貼 500＋加班 1,000＝應發 34,500；扣 1,200；實發 33,300；公司負擔 5,480', s.baseAmt === 33000 && s.gross === 34500 && s.ded === 1200 && s.net === 33300 && s.coCost === 5480 && s.other === 0 && s.otherDed === 0);
   check('月薪：照底薪', H.slip({ payType: 'month', base: 40000 }).gross === 40000);
 }
+// ── 薪資草稿（v6.0.235，需求書 #19，Lotion 11/11：半天 0.5 天、勞基法加班 1.34／1.67、月薪整月、沒填加班時薪用日薪÷8）──
+// 合成資料：3 個人、10 天日報（有半天、加班、同一天兩個工地、代墊），跟手算逐項比
+{
+  const D = (i) => '2026-10-' + String(i).padStart(2, '0');
+  const logs = [];
+  for (let i = 1; i <= 10; i++) {
+    const att = [{ hrId: 'h1', day: (i === 6 || i === 7) ? 0.5 : 1, ot: i === 3 ? 2 : i === 5 ? 3 : 0 }, { hrId: 'h2', day: 1, ot: i === 8 ? 4 : 0 }];
+    if (i === 9) att.push({ hrId: 'h3', day: 1, ot: 2 });
+    logs.push({ date: D(i), site: '甲工地', att });
+  }
+  logs.push({ date: D(4), site: '乙工地', att: [{ hrId: 'h1', day: 0.5, ot: 1 }] });   // 阿明 10/4 下午到乙工地：當天只算 1 天，加班加總
+  logs.push({ date: '2026-09-30', site: '甲工地', att: [{ hrId: 'h1', day: 1 }] });     // 上個月的不算
+  const a1 = H.monthAtt(logs, '2026-10', 'h1'), a2 = H.monthAtt(logs, '2026-10', 'h2'), a3 = H.monthAtt(logs, '2026-10', 'h3');
+  check('薪資草稿出工：阿明 10 天裡 2 個半天＝9 天、同一天兩個工地只算 1 天、加班 6 小時；上個月不算', a1.days === 9 && a1.full === 8 && a1.half === 2 && a1.otH === 6 && a1.rows.find((r) => r.date === D(4)).sites.join() === '甲工地,乙工地', JSON.stringify(a1).slice(0, 200));
+  // 阿明：日薪 2,500、沒填加班時薪 → 312.5；10/3 加班 2 小時＝2×312.5×1.34＝837.5；10/4 加班 1 小時＝418.75；10/5 加班 3 小時＝837.5＋312.5×1.67＝1,359.375；合計 2,615.625 → 2,616
+  const s1 = H.draftSlip({ payType: 'day', base: 2500, laborSelf: 600, healthSelf: 400, laborCo: 1500, healthCo: 1200 }, a1);
+  check('阿明（日薪）：底薪 2,500×9＝22,500、加班費 2,616、應發 25,116、扣 1,000、實發 24,116', s1.baseAmt === 22500 && s1.otAmt === 2616 && s1.gross === 25116 && s1.ded === 1000 && s1.net === 24116 && s1.hourly === 312.5 && !s1.noIns, JSON.stringify(s1));
+  // 小陳：日薪 2,000、加班時薪 300；10/8 加班 4 小時＝2×300×1.34＋2×300×1.67＝804＋1,002＝1,806；代墊 1,200 加進這期；沒有勞健保
+  const s2 = H.draftSlip({ payType: 'day', base: 2000, otHourly: 300 }, a2, [{ amt: 1200, note: '10/5 代墊材料' }]);
+  check('小陳（日薪、有加班時薪、代墊加進薪資、沒勞健保）：20,000＋加班 1,806＋代墊 1,200＝23,006、實發 23,006、標沒有勞健保', s2.baseAmt === 20000 && s2.otAmt === 1806 && s2.addAmt === 1200 && s2.gross === 23006 && s2.net === 23006 && s2.noIns === true, JSON.stringify(s2));
+  // 阿華：月薪 36,000、只出工 1 天也照整月；10/9 加班 2 小時，時薪 36,000÷240＝150 → 2×150×1.34＝402
+  const s3 = H.draftSlip({ payType: 'month', base: 36000, telAllow: 500, laborSelf: 800, healthSelf: 500 }, a3);
+  check('阿華（月薪）：整月 36,000（不看出工）＋電話津貼 500＋加班 402＝36,902、扣 1,300、實發 35,602', s3.baseAmt === 36000 && s3.otAmt === 402 && s3.gross === 36902 && s3.net === 35602, JSON.stringify(s3));
+  check('加班費：0 小時＝0、2 小時內 ×1.34、超過 ×1.67；負數當 0', H.otPay(0, 300) === 0 && H.otPay(1, 300) === 402 && Math.abs(H.otPay(5, 100) - (268 + 501)) < 1e-9 && H.otPay(-2, 300) === 0);
+}
 // ── 期票現金比例、分包超量 ──
 check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超過 100＝1', I.cashPct({}) === 1 && I.cashPct({ cashPct: 0 }) === 1 && I.cashPct({ cashPct: 'x' }) === 1 && I.cashPct({ cashPct: 60 }) === 0.6 && I.cashPct({ cashPct: 150 }) === 1);
 {
