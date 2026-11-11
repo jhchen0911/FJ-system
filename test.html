@@ -680,7 +680,9 @@ details.me-sec{border:1px solid var(--b1);border-radius:var(--r8);margin:10px 0;
 details.me-sec>.me-secb{padding:8px 10px}
 details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--g3)}details.me-adv>div{margin-top:6px}
 .led-fold>:not(.acct-led):not(#finance-retention){display:none!important}   /* v6.0.225 帳務帳本：舊清單收進「更多」（保留款那塊照常顯示） */
-.q7-off{display:none!important}   /* v6.0.225 報價頁新選單拿掉的按鈕 */
+.q7-off{display:none!important}
+body.nav5:not(.v7old-acct) #page-acct.acct-ledon .ph .ph-r{display:none!important}   /* v6.0.234 帳務頁首 Excel／？收進帳本「⋯ 更多」 */
+.cost7-on .cost-tabs,.cost7-on [onclick="costAddPick()"],#cost-v7 .cost-hist-row{display:none!important}   /* v6.0.233 施工成本頁新選單：舊分頁、新增成本鈕、回寫單價庫收起 */   /* v6.0.225 報價頁新選單拿掉的按鈕 */
 </style>
 
   <!-- Firebase SDK -->
@@ -1444,8 +1446,10 @@ details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12
           <select id="qc-proj" onchange="rQuickCostItems()" style="width:100%;font-size:14px;padding:9px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit"></select>
         </div>
         <div class="f" style="margin-bottom:10px">
-          <label>支出人</label>
-          <select id="qc-payer" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit"></select>
+          <label>付款</label>
+          <div id="qc-paykind" style="margin:4px 0 6px"></div>
+          <div id="qc-payer-wrap"><label style="font-size:12px;color:var(--b4)">誰付的（零用金、代墊都記在他名下）</label>
+          <select id="qc-payer" style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--b2);border-radius:var(--r8);background:var(--w);font-family:inherit"></select></div>
         </div>
         <div class="f" style="margin-bottom:8px">
           <label>點類型新增一筆</label>
