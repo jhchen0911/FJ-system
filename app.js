@@ -36592,7 +36592,7 @@ function _payAdvInfo(p){
 
 // ══════════════ v6.0.45：預覽頁「返回」回到上一頁（不走瀏覽器歷史）（v645.js 區塊）══════════════
 // 本系統是單頁應用、換頁不寫瀏覽器歷史，預覽頁按 history.back() 會離開整個網站。改記上一個頁面 id。
-function go(p){try{var cur=document.querySelector('.page.active');if(cur&&cur.id){var id=cur.id.replace(/^page-/,'');if(id!==p)window._goPrev=id;}}catch(e){_err('go',e);}var r=_goCore.apply(this,arguments);try{_v7UseNote();}catch(e){_err('go.v7use',e);}return r;};   // 7e 舊頁進入次數
+function go(p){var _pk='';try{var cur=document.querySelector('.page.active');if(cur&&cur.id){var id=cur.id.replace(/^page-/,'');if(id!==p)window._goPrev=id;_pk=_V7USE_MAP[id]||id;}}catch(e){_err('go',e);}var r=_goCore.apply(this,arguments);try{_v7UseNote(_pk);}catch(e){_err('go.v7use',e);}return r;};   // 7e 舊頁進入次數（從別頁進來才算）
 function _prevBack(def){
   var p=window._goPrev;
   if(p&&p!=='preview'&&p!=='invoice-prev'&&document.getElementById('page-'+p))return go(p);
@@ -46536,12 +46536,13 @@ _decReg('addonSign',{
 // 每次進「有新版、但這個人在用舊版」的頁面就記一筆：fydata/v7oldUse/<帳號>/<頁面> = {n 總次數, last 最後進入時間, d:{日期:次數}（留最近 14 天）}
 // 每個帳號只能寫自己那一格（規則 database.rules.json），只有管理員讀得到；唯讀帳號不記。先記在本機 fy_v7use_pend，上傳成功才扣掉（離線不會漏）
 // 12/10 以後今天頁出卡（只有管理員）：一頁一列，確認＝這頁不再提供舊版（P.v7oldOff）、退回＝30 天後再問（P.v7oldAsk）
-var _V7USE_MAP={dash:'dash',proj:'proj',costs:'proj',rfq:'proj',mat6:'proj',acct:'acct',editor:'editor',quotes:'editor'};
-var _V7USE_NAME={dash:'今天',proj:'專案（含施工成本、發包、材料）',acct:'帳務',editor:'報價'};
+var _V7USE_MAP={dash:'dash',proj:'proj',costs:'proj',rfq:'proj',mat6:'proj',acct:'acct'};   // 只算有「切回舊版」的頁（審查：報價頁沒有單頁切換，確認了也沒作用）
+var _V7USE_NAME={dash:'今天',proj:'專案（含施工成本、發包、材料）',acct:'帳務'};
 var _V7USE_FROM='2026-12-10';
 var _V7USE=null,_v7UseBusy=false;
-function _v7UseNote(){
-  try{var a=document.querySelector('.page.active');if(!a||_isReaderUser)return;var k=_V7USE_MAP[a.id.replace(/^page-/,'')];if(!k||_v7New(k))return;
+function _v7UseNote(prevK){
+  try{var a=document.querySelector('.page.active');if(!a||_isReaderUser)return;var k=_V7USE_MAP[a.id.replace(/^page-/,'')];if(!k||_v7New(k)||_v7OldOff()[k])return;
+    if(prevK===k)return;   // 審查：同一頁重畫、轉頁、子頁之間移動不重算（只算真的「進來」）
     var P0=JSON.parse(localStorage.getItem('fy_v7use_pend')||'{}')||{},d=localToday(),x=P0[k]||(P0[k]={n:0,d:{}});x.n++;x.d[d]=(x.d[d]||0)+1;x.last=Date.now();
     localStorage.setItem('fy_v7use_pend',JSON.stringify(P0));_v7UseFlush();}catch(e){_err('_v7UseNote',e);}
 }
@@ -46557,7 +46558,7 @@ function _v7UseFlush(){
       localStorage.setItem('fy_v7use_pend',JSON.stringify(P1));});}))
     .catch(function(e){_err('_v7UseFlush',e);}).then(function(){_v7UseBusy=false;});
 }
-function _v7UseLoad(){if(!_fbDb||!_fbUser||!_decIsAdmin()||_isReaderUser)return;_fbDb.ref('fydata/v7oldUse').once('value').then(function(s){_V7USE=s.val()||{};try{updateDashTodo();}catch(e){_err('_v7UseLoad.todo',e);}}).catch(function(e){_err('_v7UseLoad',e);});}
+function _v7UseLoad(){if(!_fbDb||!_fbUser||!_decIsAdmin()||_isReaderUser)return;_fbDb.ref('fydata/v7oldUse').once('value').then(function(s){_V7USE=s.val()||{};try{updateDashTodo();}catch(e){_err('_v7UseLoad.todo',e);}}).catch(function(e){_err('_v7UseLoad',e);_v7UseRows._ld=0;});}   // 審查：讀不到下次再試
 function _v7OldOff(){return (P&&P.v7oldOff&&typeof P.v7oldOff==='object')?P.v7oldOff:{};}
 // 卡片：每一頁一列（有人用過舊版的頁）
 function _v7UseRows(){

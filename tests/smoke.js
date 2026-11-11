@@ -14959,7 +14959,7 @@ async function newPage(browser, width, height) {
   {
     const RF7 = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
     const ru = RF7.v7oldUse || {};
-    const rulesOk = !!ru['.read'] && !/fydata\/access/.test(ru['.read']) && ru.$who && /\$who === auth\.token\.email\.toLowerCase\(\)\.replace/.test(ru.$who['.write'] || '') && /readers/.test(ru.$who['.write'] || '') && ru.$who.$pg && ru.$who.$pg.$other && ru.$who.$pg.$other['.validate'] === 'false';
+    const rulesOk = !!ru['.read'] && !/fydata\/access/.test(ru['.read']) && ru.$who && /\$who === auth\.token\.email\.toLowerCase\(\)\.replace/.test(ru.$who['.write'] || '') && /\$who === auth/.test(ru.$who['.read'] || '') && /readers/.test(ru.$who['.write'] || '') && ru.$who.$pg && ru.$who.$pg.$other && ru.$who.$pg.$other['.validate'] === 'false';
     const { page, errors } = await newPage(browser, 390, 844);
     const r = await page.evaluate(async () => {
       const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 60));
@@ -14969,7 +14969,7 @@ async function newPage(browser, width, height) {
         _fbUser = null; _isReaderUser = false; _nav5Apply();
         // 進新版頁不記；切回舊版的頁每進一次記一次
         localStorage.setItem('fy_v7old', JSON.stringify({ proj: 1 })); _nav5Apply();
-        go('dash'); await T(); go('proj'); await T(); go('costs'); await T(); go('dash'); await T();
+        go('dash'); await T(); go('proj'); await T(); go('proj'); await T(); go('costs'); await T(); go('dash'); await T(); go('proj'); await T(); go('dash'); await T();
         const pend = JSON.parse(localStorage.getItem('fy_v7use_pend') || '{}');
         out.note = pend.proj && pend.proj.n === 2 && !pend.dash && pend.proj.d[localToday()] === 2;
         // 唯讀帳號不記
