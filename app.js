@@ -35292,6 +35292,7 @@ function acctTab(t,noRender){
   if(!/^(own|vb|ar|ap|cash|inv|petty|pay)$/.test(t||''))t='own';
   if((t==='petty'||t==='pay')&&!_acctCanPay()){toast('薪資．零用金僅限管理員');t='ar';}
   _acctTab=t;try{localStorage.setItem('fy_acctTab',t);}catch(e){_err('acctTab',e);}
+  try{var _pa=document.getElementById('page-acct');if(_pa)_pa.classList.toggle('acct-ledon',t==='ar'||t==='ap');}catch(e){_err('acctTab.ledon',e);}   // 審查：只有應收／應付（有帳本「⋯ 更多」）才把頁首 Excel／？收起來
   var tb=document.getElementById('acct-tabs');if(tb){tb.innerHTML=_acctTabsHtml();if(!tb._agWired){tb._agWired=1;tb.addEventListener('click',_acctTabsClick);}}
   try{var o=JSON.parse(localStorage.getItem('fy_acctGrpSub')||'{}')||{};o[_acctGrpOf(t)]=t;localStorage.setItem('fy_acctGrpSub',JSON.stringify(o));}catch(e){_err('acctTab.grp',e);}
   try{var top=document.getElementById('acct-top');if(top){var c1=document.getElementById('acct-cash1');if(c1)c1.remove();if(_v7New('acct'))top.insertAdjacentHTML('afterbegin',_acctCashLineHtml());var fk=document.getElementById('finance-kpis');if(fk)fk.classList.toggle('n5a-hide',true);}}catch(e){_err('acctTab.cash1',e);}   // 7d：金流一行固定在最上面；KPI 卡收起（舊選單照舊顯示）
@@ -45263,21 +45264,23 @@ function _acctInvState(v){
 }
 var _ACCT_LED_F={ar:[['all','全部'],['unpaid','未收'],['od','逾期'],['paid','已收']],ap:[['all','全部'],['vendor','廠商'],['petty','零用金'],['salary','薪資']]};
 function _acctLedF(kind){var d=kind==='ar'?'unpaid':'all',v='';try{v=localStorage.getItem('fy_acctLedF_'+kind)||'';}catch(e){_err('_acctLedF',e);}
-  var ok=_ACCT_LED_F[kind].map(function(x){return x[0];});if(kind==='ap'&&v==='salary'&&!_acctCanPay())v='';return ok.indexOf(v)>=0?v:d;}
+  var ok=_ACCT_LED_F[kind].map(function(x){return x[0];});if(kind==='ap'&&(v==='salary'||v==='petty')&&!_acctLedSal())v='';return ok.indexOf(v)>=0?v:d;}
 function acctLedSetF(kind,f){try{localStorage.setItem('fy_acctLedF_'+kind,f);}catch(e){_err('acctLedSetF',e);}_acctLedRefresh();}
-function _acctPayCat(p){var c=p&&p.category;return c==='salary'?'salary':(c==='petty'?'petty':'vendor');}
+function _acctPayCat(p){var c=p&&p.category,id=String((p&&p.id)||'');if(c==='salary'||/^pay_(ps|ins)_/.test(id))return 'salary';if(c==='petty'||/^pay_pc_/.test(id))return 'petty';return 'vendor';}   // 審查：舊資料沒有 category 的照 id 判斷
+// 帳本裡的薪資、零用金只給管理員（唯讀帳號也不顯示，審查 11/11）
+function _acctLedSal(){return _acctCanPay()&&!_isReaderUser;}
 function _acctLedRows(kind){
   var rows=[],f=_acctLedF(kind);
   if(kind==='ar'){
     (INV||[]).forEach(function(v){if(!v||v.kind==='retReturn'||v.voidAt)return;var ar=0;try{ar=_invAR(v);}catch(e){_err('_acctLedRows.ar',e);}
-      var paid=!!v.receivedConfirmed||!(ar>0);if(f==='paid'?!paid:(f!=='all'&&paid))return;
-      if(paid){var rc=0;try{rc=_invRcv(v);}catch(e){_err('_acctLedRows.rcv',e);}rows.push({id:v.id,who:v.client||'',what:(v.project||'')+'　第 '+(v.periodNo||'?')+' 期',amt:rc||((v.totals||{}).total||0),date:v.receivedDate||v.date||'',state:'已收款',col:'var(--g3)',urg:false,next:'',fn:'',more:"acctLedMore('ar','"+escq(v.id)+"')"});return;}
+      var rc0=0;try{rc0=_invRcv(v);}catch(e){_err('_acctLedRows.rc0',e);}var paid=!!v.receivedConfirmed||(!(ar>0)&&rc0>0);if(!paid&&!(ar>0))return;   /* 審查：金額 0、還沒收的不算已收 */if(f==='paid'?!paid:(f!=='all'&&paid))return;
+      if(paid){var rc=0;try{rc=_invRcv(v);}catch(e){_err('_acctLedRows.rcv',e);}rows.push({id:v.id,who:v.client||'',what:(v.project||'')+'　第 '+(v.periodNo||'?')+' 期',amt:rc||((v.totals||{}).total||0),date:v.receivedDate||v.date||'',state:'已收款',col:'var(--g3)',urg:false,paidRow:1,next:'',fn:'',more:"acctLedMore('ar','"+escq(v.id)+"')"});return;}
       var s=_acctInvState(v);if(f==='od'&&!s.od)return;
       rows.push({id:v.id,who:v.client||'',what:(v.project||'')+'　第 '+(v.periodNo||'?')+' 期',amt:ar,date:s.due||v.date||'',state:s.label,col:s.col,urg:s.od,
         next:s.st==='draft'?'打開請款單':'登錄收款',fn:s.st==='draft'?("loadInvoice('"+escq(v.id)+"')"):("openReceiptModal('"+escq(v.id)+"')"),open:"loadInvoice('"+escq(v.id)+"')",more:"acctLedMore('ar','"+escq(v.id)+"')"});});   // 還是草稿＝先送出，不是收款
   } else {
     var today=localToday();
-    (PAYABLES||[]).forEach(function(p){if(!p||p.status==='paid'||p.voidAt||p.planned)return;var cat=_acctPayCat(p);if(cat==='salary'&&!_acctCanPay())return;if(f!=='all'&&cat!==f)return;var left=0;try{left=_payLeft(p);}catch(e){_err('_acctLedRows.ap',e);}if(!(left>0))return;
+    (PAYABLES||[]).forEach(function(p){if(!p||p.status==='paid'||p.voidAt||p.planned)return;var cat=_acctPayCat(p);if((cat==='salary'||cat==='petty')&&!_acctLedSal())return;if(f!=='all'&&cat!==f)return;var left=0;try{left=_payLeft(p);}catch(e){_err('_acctLedRows.ap',e);}if(!(left>0))return;
       var od=!!(p.date&&p.date<today),part=false;try{part=_payPartial(p);}catch(e){_err('_acctLedRows.part',e);}
       rows.push({id:p.id,who:p.to||'（未填對象）',what:[p.project||'',(p.note||'').slice(0,30)].filter(Boolean).join('・'),amt:left,date:p.date||'',state:(od?'逾期待付':'待付')+(part?'・付過一部分':''),col:od?'var(--red)':'#b26a00',urg:od,
         next:'付款',fn:"payMarkPaid('"+escq(p.id)+"')",open:'',more:"acctLedMore('ap','"+escq(p.id)+"')",cat:cat});});
@@ -45286,9 +45289,9 @@ function _acctLedRows(kind){
   return rows;
 }
 function _acctLedHtml(kind){
-  var ro=!!_isReaderUser,rows=_acctLedRows(kind),MAX=30,sum=rows.reduce(function(s,r){return s+r.amt;},0),nod=rows.filter(function(r){return r.urg;}).length;
+  var ro=!!_isReaderUser,rows=_acctLedRows(kind),MAX=30,sum=rows.reduce(function(s,r){return s+(r.paidRow?0:r.amt);},0),nod=rows.filter(function(r){return r.urg;}).length;
   var h='<div class="acct-led" data-led="'+kind+'" style="background:#fff;border:1px solid var(--b1);border-radius:var(--r12);padding:10px 12px;margin-bottom:12px">';
-  var F=_acctLedF(kind),chips=_ACCT_LED_F[kind].filter(function(x){return x[0]!=='salary'||_acctCanPay();}).map(function(x){var on=x[0]===F;
+  var F=_acctLedF(kind),chips=_ACCT_LED_F[kind].filter(function(x){return (x[0]!=='salary'&&x[0]!=='petty')||_acctLedSal();}).map(function(x){var on=x[0]===F;
     return '<button type="button" class="btn btn-xs" data-ledf="'+x[0]+'" onclick="acctLedSetF(\''+kind+'\',\''+x[0]+'\')" style="padding:3px 10px;border-radius:99px;font-size:12px;'+(on?'background:var(--g);color:#fff;border-color:var(--g)':'background:var(--w);color:var(--g3);border-color:var(--gm)')+'">'+esc(x[1])+'</button>';}).join('');
   h+='<div class="acct-led-f" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+chips+'</div>';
   h+='<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px"><b style="font-size:14px">'+(kind==='ar'?'應收帳本':'應付帳本')+'</b>'
@@ -45303,12 +45306,12 @@ function _acctLedHtml(kind){
   if(rows.length>MAX)h+='<div style="font-size:11.5px;color:var(--b4);padding-top:6px">還有 '+(rows.length-MAX)+' 筆，在「⋯ 更多」的完整清單裡</div>';
   var op=!!(window._acctLedOpen||{})[kind];
   h+='<details class="acct-led-more" style="margin-top:8px"'+(op?' open':'')+' ontoggle="_acctLedFold(\''+kind+'\',this.open)"><summary style="font-size:12px;color:var(--b4);cursor:pointer">⋯ 更多（舊清單、匯出'+(kind==='ar'?'、業主請款單、保留款':'、廠商請款、零用金、薪資')+'）</summary>'
-    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+(kind==='ar'?[['own','業主請款單清單']]:[['vb','廠商請款工作台']].concat(_acctCanPay()?[['petty','零用金'],['pay','薪資']]:[])).map(function(x){return '<button type="button" class="btn btn-xs" onclick="acctTab(\''+x[0]+'\')">'+esc(x[1])+'</button>';}).join('')
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+(kind==='ar'?[['own','業主請款單清單']]:[['vb','廠商請款工作台']].concat(_acctLedSal()?[['petty','零用金'],['pay','薪資']]:[])).map(function(x){return '<button type="button" class="btn btn-xs" onclick="acctTab(\''+x[0]+'\')">'+esc(x[1])+'</button>';}).join('')
     +'<button type="button" class="btn btn-xs" onclick="exportFinanceCSV()">匯出 Excel</button><button type="button" class="btn btn-xs" onclick="showHelp(\'acct\')">說明</button></div></details>';   // v6.0.234 Lotion 第 3 題：頁首 Excel、？ 收進這裡
   return h+'</div>';
 }
 function acctLedMore(kind,id){
-  var B=function(fn,t){return '<button type="button" class="btn sm" style="width:100%;justify-content:flex-start;margin-bottom:6px" onclick="'+fn+';var m=document.getElementById(\'fy-modal\');if(m)m.remove();">'+esc(t)+'</button>';},h='';
+  var B=function(fn,t){return '<button type="button" class="btn sm" style="width:100%;justify-content:flex-start;margin-bottom:6px" onclick="var m=document.getElementById(\'fy-modal\');if(m)m.remove();'+fn+'">'+esc(t)+'</button>';},h='';
   if(kind==='ar'){var v=(INV||[]).find(function(x){return x&&x.id===id;});if(!v)return;var paid=!!v.receivedConfirmed;
     h=B("loadInvoice('"+escq(id)+"')",'打開請款單（編輯、列印）')+((paid||_isReaderUser)?'':B("openReceiptModal('"+escq(id)+"')",'登錄收款'))+B("openEnvelope('"+escq(id)+"')",'印信封');
     _modal(esc((v.project||'')+' 第 '+(v.periodNo||'?')+' 期'),h,function(){return true;});}
@@ -45636,7 +45639,7 @@ _decReg('sdocCalc',{
 //   與「明細」（原本的成本清單，依來源分組；新增成本與舊的分析頁收進「⋯ 更多」）；發包每一列只留一顆「下一步」（登錄廠商請款），其他收進「⋯」
 //   成本從卡片進來（廠商請款、租賃運費請款、日報支出）；「回寫單價庫」拿掉（結案時 pjCloseAll／結案卡自動回寫 writeCostHist）
 function _cost7On(){try{return _v7New('proj');}catch(e){return false;}}
-function _cost7OvrKey(){try{return Object.keys(_DEC||{}).find(function(k){return /ovr|overrun/i.test(k);})||'';}catch(e){return '';}}
+function _cost7OvrKey(){try{return (_DEC&&_DEC.overAsk)?'overAsk':'';}catch(e){_err('_cost7OvrKey',e);return '';}}
 function _cost7Data(q){
   var st=null;try{st=_pjStat(q);}catch(e){_err('_cost7Data.st',e);}
   var tx=1+_taxR()/100,rev=Math.round(((st&&st.billedGross)||0)/tx);
@@ -45644,12 +45647,12 @@ function _cost7Data(q){
   var att=_costByItem(q),em=_actQtyMap(q),ov=[];
   (q.items||[]).forEach(function(it,i){if(!it||it.sec||_isSpare(it)||(parseFloat(it.price)||0)<0)return;var est=_effQty(em,it)*(parseFloat(it.estCost)||0),act=att.map[i]||0;
     if(est>0&&act>=est*1.1-1e-6)ov.push({desc:String(it.desc||'').split('\n')[0],pct:Math.round(act/est*100),over:Math.round(act-est)});});
-  return {cost:cost,rev:rev,gm:rev>0?Math.round((rev-cost)/rev*1000)/10:null,ov:ov};
+  return {cost:cost,rev:rev,gm:rev>0?Math.round((rev-cost)/rev*1000)/10:null,ov:ov,addN:((st&&st.adds)||[]).length};
 }
 function _cost7Head(q){
   var D=_cost7Data(q),k=_cost7OvrKey();
   var h='<div style="font-size:13.5px;line-height:1.7;background:#fff;border:1px solid var(--b1);border-radius:var(--r12);padding:10px 12px;margin-bottom:10px">'
-    +'已發生成本 <b>NT$ '+fmt(D.cost)+'</b>（未稅）・實際毛利 '+(D.gm==null?'<b>—</b><span style="font-size:11.5px;color:var(--b4)">（還沒請款）</span>':('<b style="color:'+(D.gm<0?'var(--red)':D.gm<15?'#e65100':'var(--g3)')+'">'+D.gm+'%</b><span style="font-size:11.5px;color:var(--b4)">（已請款未稅 '+fmt(D.rev)+'）</span>'))
+    +'已發生成本 <b>NT$ '+fmt(D.cost)+'</b>（未稅'+(D.addN?'，含追加案 '+D.addN+' 件':'')+'）・實際毛利 '+(D.gm==null?'<b>—</b><span style="font-size:11.5px;color:var(--b4)">（還沒請款）</span>':('<b style="color:'+(D.gm<0?'var(--red)':D.gm<15?'#e65100':'var(--g3)')+'">'+D.gm+'%</b><span style="font-size:11.5px;color:var(--b4)">（已請款未稅 '+fmt(D.rev)+'）</span>'))
     +'・'+(D.ov.length?('<details style="display:inline"><summary style="display:inline;cursor:pointer;color:var(--red);font-weight:700">超支 '+D.ov.length+' 項</summary><div style="font-size:12px;margin-top:4px">'
       +D.ov.map(function(o){return '<div>'+esc(o.desc)+'：執行率 <b style="color:var(--red)">'+o.pct+'%</b>（多 NT$ '+fmt(o.over)+'）</div>';}).join('')
       +(k?'<button type="button" class="btn btn-xs" style="margin-top:4px" onclick="openDecList(\''+k+'\')">看超支拆解</button>':'')+'</div></details>'):'<span style="color:var(--g3);font-weight:700">沒有超支</span>')
@@ -45668,7 +45671,7 @@ function _cost7Mount(q){
   var h=_cost7Head(q)+'<div style="display:flex;gap:6px;margin-bottom:10px">'+T('item','工項')+T('list','明細')+'</div>';
   if(_cost7Tab==='item'){h+='<div class="card cost7-item" style="padding:10px 12px">'+buildCostAnalysisHtml(q)+'</div>';card.style.display='none';}
   else if(_cost7Tab==='list'){card.style.display='none';
-    h+=_cost7ListHtml(q)
+    h+=_cost7ListHtml(q)+(((_cost7Data(q).addN)||0)?'<div style="font-size:11.5px;color:var(--b4);margin:-4px 0 8px">上面「已發生成本」含追加案 '+_cost7Data(q).addN+' 件；追加案的明細到追加案自己的施工成本看</div>':'')
       +'<details class="cost7-more" style="margin-bottom:8px"><summary style="font-size:12px;color:var(--b4);cursor:pointer">⋯ 更多（手動補成本、勾稽、數量對照、分包總表、舊畫面）</summary><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'
       +(_isReaderUser?'':'<button type="button" class="btn btn-xs" onclick="costAddPick()">＋ 手動補一筆成本</button>')
       +'<button type="button" class="btn btn-xs" onclick="cost7Tab(\'edit\');setCostView(\'audit\')">成本勾稽</button><button type="button" class="btn btn-xs" onclick="cost7Tab(\'edit\');setCostView(\'qty\')">數量對照</button><button type="button" class="btn btn-xs" onclick="cost7Tab(\'edit\');setCostView(\'subs\')">分包總表</button><button type="button" class="btn btn-xs" onclick="cost7Tab(\'edit\')">成本卡（舊畫面、可編輯）</button>'
@@ -45686,11 +45689,12 @@ function _cost7Amt(c){try{recalcCostAmt(c);}catch(e){_err('_cost7Amt',e);}return
 // v6.0.234 Lotion 11/11（選 A）：已發生成本裡的發包只算已請款的期別；完全沒有期別、只有總額的舊發包卡照總額算（跟經營報表 _mgmtCostEntries 一樣），
 // 得標後建的發包卡（有對到報價工項的數量×單價）還沒請款＝0；舊的整筆應付已付也照總額。租賃有期別算期別、沒有照總額（同經營報表）
 function _cost7Legacy(c){
-  if((PAYABLES||[]).some(function(p){return p&&p.costId===c.id&&!p.deltaOf&&!p.voidAt&&p.status==='paid'&&String(p.id||'')==='pay'+c.id;}))return true;
+  if((PAYABLES||[]).some(function(p){if(!(p&&p.costId===c.id&&!p.deltaOf&&!p.voidAt&&String(p.id||'')==='pay'+c.id))return false;var ps=0;try{ps=_payPaidSum(p);}catch(e){_err('_cost7Legacy',e);}return p.status==='paid'||ps>0;}))return true;   // 舊的整筆應付付過（含付一部分）
   return !(c.rows||[]).some(function(r){return r&&(r.lump||(parseInt(r.linkedItemIdx)>=0&&(parseFloat(r.unitPrice)||0)>0));});
 }
 function _cost7Inc(c){
-  if(!c)return 0;var tot=_cost7Amt(c);
+  if(!c||_isIntroCard(c))return 0;   // 介紹費不算施工成本（跟經營報表 _mgmtCostEntries 一樣），明細照列
+  var tot=_cost7Amt(c);
   if(c.type!=='sub'&&!c.rental)return tot;
   var pers=_subPeriods(c).filter(function(p){return p&&!p.isRet;});
   if(!pers.length)return (c.rental||_cost7Legacy(c))?tot:0;
@@ -45732,7 +45736,7 @@ function _cost7ListHtml(q){
       else if(c.rental){var pn=_subPeriods(c).filter(function(p){return !p.isRet;}).length;s={txt:'租賃合約・已請 '+pn+' 期',btn:null};}
       h+='<div class="cost7-row" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--b1);font-size:12.5px">'
         +'<div style="flex:1 1 200px;min-width:0"><b>'+esc(nm)+'</b><div style="font-size:11.5px;color:'+(s&&(s.btn||s.warn)?'#b26a00':'var(--b4)')+';overflow-wrap:anywhere">'+esc(s?s.txt:(_costCatNorm(c.cat||'')||''))+'</div></div>'
-        +((c.type==='sub'&&amt!==tot)?'<div style="flex:0 0 auto;text-align:right"><b>已請 NT$ '+fmt(amt)+'</b><div style="font-size:11px;color:var(--b4)">合約 NT$ '+fmt(tot)+'</div></div>':'<b style="flex:0 0 auto">NT$ '+fmt(amt)+'</b>')
+        +(_isIntroCard(c)?'<div style="flex:0 0 auto;text-align:right"><b>NT$ '+fmt(tot)+'</b><div style="font-size:11px;color:var(--b4)">介紹費・不算施工成本</div></div>':(c.type==='sub'&&amt!==tot)?'<div style="flex:0 0 auto;text-align:right"><b>已請 NT$ '+fmt(amt)+'</b><div style="font-size:11px;color:var(--b4)">合約 NT$ '+fmt(tot)+'</div></div>':'<b style="flex:0 0 auto">NT$ '+fmt(amt)+'</b>')
         +((s&&s.btn&&!ro)?'<button type="button" class="btn sm" data-c7next="1" onclick="'+s.btn.fn+'">'+esc(s.btn.l)+'</button>':'')
         +'<button type="button" class="btn sm" data-c7more="1" aria-label="其他操作" onclick="cost7More(\''+escq(c.id)+'\')" style="padding:4px 9px">⋯</button></div>';});
     h+='</div>';});
