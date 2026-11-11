@@ -14706,7 +14706,8 @@ async function newPage(browser, width, height) {
         out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
         cost7Tab('list'); await T(200);
         const card = document.getElementById('cost-card');
-        out.list = card.style.display !== 'none' && card.classList.contains('cost7-on') && getComputedStyle(card.querySelector('.cost-tabs')).display === 'none'
+        // v6.0.234 Lotion 第 7 題：明細＝四組清單（舊成本卡收起，編輯才開），新增成本收進「⋯ 更多」
+        out.list = card.style.display === 'none' && card.classList.contains('cost7-on') && document.querySelectorAll('#cost-v7 .cost7-grp').length === 4
           && !!document.querySelector('#cost-v7 details.cost7-more [onclick="costAddPick()"]') && Array.from(card.querySelectorAll('[onclick="costAddPick()"]')).every((b) => b.offsetParent === null);
         // 舊選單：沒有結論列、成本卡照舊
         localStorage.setItem('fy_v7old', JSON.stringify({ proj: 1 })); _nav5Apply(); rCostItems(); await T(80);
