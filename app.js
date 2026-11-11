@@ -36592,7 +36592,7 @@ function _payAdvInfo(p){
 
 // ══════════════ v6.0.45：預覽頁「返回」回到上一頁（不走瀏覽器歷史）（v645.js 區塊）══════════════
 // 本系統是單頁應用、換頁不寫瀏覽器歷史，預覽頁按 history.back() 會離開整個網站。改記上一個頁面 id。
-function go(p){try{var cur=document.querySelector('.page.active');if(cur&&cur.id){var id=cur.id.replace(/^page-/,'');if(id!==p)window._goPrev=id;}}catch(e){_err('go',e);}return _goCore.apply(this,arguments);};
+function go(p){try{var cur=document.querySelector('.page.active');if(cur&&cur.id){var id=cur.id.replace(/^page-/,'');if(id!==p)window._goPrev=id;}}catch(e){_err('go',e);}var r=_goCore.apply(this,arguments);try{_v7UseNote();}catch(e){_err('go.v7use',e);}return r;};   // 7e 舊頁進入次數
 function _prevBack(def){
   var p=window._goPrev;
   if(p&&p!=='preview'&&p!=='invoice-prev'&&document.getElementById('page-'+p))return go(p);
@@ -44437,7 +44437,7 @@ _decReg('mvStartUnknown',{
 function _nav5On(){try{return localStorage.getItem('fy_nav_old')!=='1';}catch(e){return true;}}
 // 改版第 7 步⑥（7e，Lotion 11/09 第 9 題 A）：每一頁各自切回舊版＋整站切回。本機 fy_v7old＝{dash:1, proj:1, acct:1}（哪幾頁用舊版）
 var _V7_PAGES=[['dash','今天'],['proj','專案'],['acct','帳務']];
-function _v7OldMap(){try{return JSON.parse(localStorage.getItem('fy_v7old')||'{}')||{};}catch(e){return {};}}
+function _v7OldMap(){var m={};try{m=JSON.parse(localStorage.getItem('fy_v7old')||'{}')||{};}catch(e){m={};}try{var off=_v7OldOff();Object.keys(off).forEach(function(k){delete m[k];});}catch(e){_err('_v7OldMap.off',e);}return m;}   // 7e：Lotion 確認清掉的頁不再用舊版
 function _v7New(pg){return _nav5On()&&!_v7OldMap()[pg];}
 function v7PageOld(pg,old){
   var m=_v7OldMap();if(old)m[pg]=1;else delete m[pg];
@@ -44511,7 +44511,7 @@ function renderMorePage(){
     }).join('')+'</div></div>';
   }).join('');
   var om=_v7OldMap();
-  h+='<div class="more-sec"><h3>切回舊版</h3><div class="more-grid">'+_V7_PAGES.map(function(x){return '<button type="button" class="more-it" data-v7="'+x[0]+'">'+ic('refresh')+'<span>'+esc(x[1])+'：'+(om[x[0]]?'目前舊版，改回新版':'切回舊版')+'</span></button>';}).join('')
+  h+='<div class="more-sec"><h3>切回舊版</h3><div class="more-grid">'+_V7_PAGES.filter(function(x){return !_v7OldOff()[x[0]];}).map(function(x){return '<button type="button" class="more-it" data-v7="'+x[0]+'">'+ic('refresh')+'<span>'+esc(x[1])+'：'+(om[x[0]]?'目前舊版，改回新版':'切回舊版')+'</span></button>';}).join('')
     +'<button type="button" class="more-it" data-fn="old">'+ic('refresh')+'<span>整站切回舊版選單</span></button></div>'
     +'<div style="font-size:11px;color:var(--b3);margin-top:6px">舊選單的頁面都還在；切回後在舊選單最下面可以再改回新版。</div></div>'
     +'<div style="text-align:center;font-size:10.5px;color:var(--b4);margin-top:8px">豐有工程管理系統 '+esc(APP_VERSION)+'</div>';
@@ -46532,6 +46532,58 @@ _decReg('addonSign',{
     showConfirm('給主任的 LINE 文字','<textarea id="ad-msg" rows="6" style="'+IN+'">'+esc(a.askTxt||_adMsg(x.q,a))+'</textarea><div style="font-size:11px;color:var(--b4);margin-top:4px">按確認＝存下這段文字並複製。</div>',
       function(){var t=gv('ad-msg')||'';_adCopy(t).then(function(ok){if(!ok)return;_adSet(x.q,a,{askTxt:t.slice(0,1000),askAt:Date.now(),askBy:_meEmail()||'本機'});toast('已複製');try{_decRefresh('addonSign');}catch(e){_err('addonSign.ref',e);}});},false,null,false);}
 });
+// ══════════ 7e 舊頁進入次數改存雲端（Lotion 11/12 E1a）══════════
+// 每次進「有新版、但這個人在用舊版」的頁面就記一筆：fydata/v7oldUse/<帳號>/<頁面> = {n 總次數, last 最後進入時間, d:{日期:次數}（留最近 14 天）}
+// 每個帳號只能寫自己那一格（規則 database.rules.json），只有管理員讀得到；唯讀帳號不記。先記在本機 fy_v7use_pend，上傳成功才扣掉（離線不會漏）
+// 12/10 以後今天頁出卡（只有管理員）：一頁一列，確認＝這頁不再提供舊版（P.v7oldOff）、退回＝30 天後再問（P.v7oldAsk）
+var _V7USE_MAP={dash:'dash',proj:'proj',costs:'proj',rfq:'proj',mat6:'proj',acct:'acct',editor:'editor',quotes:'editor'};
+var _V7USE_NAME={dash:'今天',proj:'專案（含施工成本、發包、材料）',acct:'帳務',editor:'報價'};
+var _V7USE_FROM='2026-12-10';
+var _V7USE=null,_v7UseBusy=false;
+function _v7UseNote(){
+  try{var a=document.querySelector('.page.active');if(!a||_isReaderUser)return;var k=_V7USE_MAP[a.id.replace(/^page-/,'')];if(!k||_v7New(k))return;
+    var P0=JSON.parse(localStorage.getItem('fy_v7use_pend')||'{}')||{},d=localToday(),x=P0[k]||(P0[k]={n:0,d:{}});x.n++;x.d[d]=(x.d[d]||0)+1;x.last=Date.now();
+    localStorage.setItem('fy_v7use_pend',JSON.stringify(P0));_v7UseFlush();}catch(e){_err('_v7UseNote',e);}
+}
+function _v7UseFlush(){
+  if(_v7UseBusy||!_fbDb||!_fbUser||_isReaderUser)return;var me=_encEmailKey(_fbUser.email);if(!me)return;
+  var P0={};try{P0=JSON.parse(localStorage.getItem('fy_v7use_pend')||'{}')||{};}catch(e){P0={};}
+  var ks=Object.keys(P0).filter(function(k){return /^[a-z0-9]{1,20}$/.test(k)&&P0[k]&&P0[k].n>0;});if(!ks.length)return;
+  _v7UseBusy=true;var lim=_dAdd(localToday(),-13);
+  Promise.all(ks.map(function(k){var add=P0[k];
+    return _fbDb.ref('fydata/v7oldUse/'+me+'/'+k).transaction(function(cur){cur=cur||{};var d=Object.assign({},cur.d||{});Object.keys(add.d||{}).forEach(function(x){d[x]=(+d[x]||0)+(+add.d[x]||0);});Object.keys(d).forEach(function(x){if(x<lim)delete d[x];});
+      return {n:(+cur.n||0)+add.n,last:Math.max(+cur.last||0,+add.last||0),d:d};}).then(function(){var P1={};try{P1=JSON.parse(localStorage.getItem('fy_v7use_pend')||'{}')||{};}catch(e){P1={};}
+      var x=P1[k];if(x){x.n-=add.n;Object.keys(add.d||{}).forEach(function(dd){x.d[dd]=(x.d[dd]||0)-add.d[dd];if(!(x.d[dd]>0))delete x.d[dd];});if(!(x.n>0))delete P1[k];}
+      localStorage.setItem('fy_v7use_pend',JSON.stringify(P1));});}))
+    .catch(function(e){_err('_v7UseFlush',e);}).then(function(){_v7UseBusy=false;});
+}
+function _v7UseLoad(){if(!_fbDb||!_fbUser||!_decIsAdmin()||_isReaderUser)return;_fbDb.ref('fydata/v7oldUse').once('value').then(function(s){_V7USE=s.val()||{};try{updateDashTodo();}catch(e){_err('_v7UseLoad.todo',e);}}).catch(function(e){_err('_v7UseLoad',e);});}
+function _v7OldOff(){return (P&&P.v7oldOff&&typeof P.v7oldOff==='object')?P.v7oldOff:{};}
+// 卡片：每一頁一列（有人用過舊版的頁）
+function _v7UseRows(){
+  if(localToday()<_V7USE_FROM)return [];
+  if(!_V7USE){if(!_v7UseRows._ld){_v7UseRows._ld=1;_v7UseLoad();}return [];}
+  var by={},ask=(P&&P.v7oldAsk)||{},off=_v7OldOff(),d7=_dAdd(localToday(),-6);
+  Object.keys(_V7USE).forEach(function(who){var M=_V7USE[who]||{};Object.keys(M).forEach(function(k){var x=M[k]||{};if(!_V7USE_NAME[k]||off[k])return;
+    var r=by[k]||(by[k]={k:k,name:_V7USE_NAME[k],who:[],n:0,n7:0,last:0});var w7=Object.keys(x.d||{}).reduce(function(a,dd){return dd>=d7?a+(+x.d[dd]||0):a;},0);
+    r.who.push({who:String(who).replace(/,/g,'.'),n:+x.n||0,n7:w7,last:+x.last||0});r.n+=+x.n||0;r.n7+=w7;r.last=Math.max(r.last,+x.last||0);});});
+  return Object.keys(by).map(function(k){return by[k];}).filter(function(r){var a=+ask[r.k]||0;return !(a&&Date.now()<a);}).sort(function(a,b){return b.n7-a.n7||b.n-a.n;});
+}
+_decReg('v7old',{
+  title:'舊版頁面還有人用嗎',todo:function(n){return '舊版頁面使用次數 '+n+' 頁';},sub:'一頁一列；確認＝這頁不再提供舊版、退回＝30 天後再問',
+  canSee:function(){return _decIsAdmin();},
+  list:function(){return _v7UseRows();},
+  key:function(r){return r.k;},
+  head:function(r){return r.name+'：'+r.who.length+' 個帳號用舊版，最近 7 天進了 '+r.n7+' 次';},
+  body:function(r){return '<div style="font-size:11.5px;color:var(--b4)">累計 '+r.n+' 次・最後 '+esc(r.last?new Date(r.last).toLocaleString('zh-TW'):'—')+'</div>';},
+  detail:function(r){
+    return '<table style="width:100%;font-size:12.5px;border-collapse:collapse"><tr style="color:var(--b4)"><td>帳號</td><td class="nw" style="text-align:right">最近 7 天</td><td class="nw" style="text-align:right">累計</td><td>最後進入</td></tr>'
+      +r.who.sort(function(a,b){return b.n7-a.n7||b.n-a.n;}).map(function(w){var st=(listStaff()||[]).find(function(s){return String(s.email||'').toLowerCase()===w.who;});return '<tr style="border-top:1px solid var(--b1)"><td style="overflow-wrap:anywhere">'+esc((st&&st.name)||w.who)+'</td><td class="nw" style="text-align:right">'+w.n7+'</td><td class="nw" style="text-align:right">'+w.n+'</td><td>'+esc(w.last?new Date(w.last).toLocaleDateString('zh-TW'):'—')+'</td></tr>';}).join('')
+      +'</table><div style="font-size:11.5px;color:var(--b4);margin-top:6px">確認後：這頁的「切回舊版」拿掉，已經切回舊版的人下次開也會是新版（整站切回舊版選單另計）。</div>';},
+  ok:function(r){P.v7oldOff=Object.assign({},_v7OldOff());P.v7oldOff[r.k]=Date.now();_salesSave();try{_nav5Apply();}catch(e){_err('v7old.ok',e);}toast(r.name+' 不再提供舊版');return true;},
+  reject:function(r){P.v7oldAsk=Object.assign({},P.v7oldAsk||{});P.v7oldAsk[r.k]=Date.now()+30*864e5;_salesSave();return true;}
+});
+try{window.addEventListener('online',function(){setTimeout(_v7UseFlush,4000);});}catch(e){_err('v7use.online',e);}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');

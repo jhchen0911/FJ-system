@@ -14955,6 +14955,53 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── 7e 舊頁進入次數改存雲端（Lotion 11/12 E1a）──
+  {
+    const RF7 = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    const ru = RF7.v7oldUse || {};
+    const rulesOk = !!ru['.read'] && !/fydata\/access/.test(ru['.read']) && ru.$who && /\$who === auth\.token\.email\.toLowerCase\(\)\.replace/.test(ru.$who['.write'] || '') && /readers/.test(ru.$who['.write'] || '') && ru.$who.$pg && ru.$who.$pg.$other && ru.$who.$pg.$other['.validate'] === 'false';
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 60));
+      const oDb = window._fbDb, oU = window._fbUser, oA = window._isAdminUser, oR = window._isReaderUser, oP = JSON.parse(JSON.stringify({ off: P.v7oldOff, ask: P.v7oldAsk })), oFrom = _V7USE_FROM, oSave = window._salesSave;
+      try {
+        window.toast = () => {}; window._salesSave = () => {}; localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_v7use_pend'); delete P.v7oldOff; delete P.v7oldAsk;
+        _fbUser = null; _isReaderUser = false; _nav5Apply();
+        // 進新版頁不記；切回舊版的頁每進一次記一次
+        localStorage.setItem('fy_v7old', JSON.stringify({ proj: 1 })); _nav5Apply();
+        go('dash'); await T(); go('proj'); await T(); go('costs'); await T(); go('dash'); await T();
+        const pend = JSON.parse(localStorage.getItem('fy_v7use_pend') || '{}');
+        out.note = pend.proj && pend.proj.n === 2 && !pend.dash && pend.proj.d[localToday()] === 2;
+        // 唯讀帳號不記
+        _isReaderUser = true; go('proj'); await T(); out.ro = JSON.parse(localStorage.getItem('fy_v7use_pend') || '{}').proj.n === 2; _isReaderUser = false;
+        // 上傳：寫自己那一格，成功才扣掉本機
+        const writes = []; window._fbDb = { ref: (path) => ({ transaction: (fn) => { const v = fn({ n: 5, last: 1, d: { '2000-01-01': 3 } }); writes.push({ path, v }); return Promise.resolve({ committed: true }); } }) };
+        _fbUser = { email: 'Staff.A@example.com', uid: 's' }; _v7UseFlush(); await T(120);
+        out.flush = writes.length === 1 && writes[0].path === 'fydata/v7oldUse/staff,a@example,com/proj' && writes[0].v.n === 7 && writes[0].v.d[localToday()] === 2 && !writes[0].v.d['2000-01-01']
+          && !(JSON.parse(localStorage.getItem('fy_v7use_pend') || '{}').proj);
+        // 卡片：12/10 以前不出；之後一頁一列（只有管理員）
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        _V7USE = { 'staff,a@example,com': { proj: { n: 9, last: Date.now(), d: { [localToday()]: 4 } } }, 'staff,b@example,com': { proj: { n: 3, last: Date.now() - 864e5, d: {} }, acct: { n: 1, last: Date.now(), d: { [localToday()]: 1 } } } };
+        out.before = localToday() >= '2026-12-10' || _v7UseRows().length === 0;
+        _V7USE_FROM = '2000-01-01';
+        const rows = _v7UseRows();
+        out.rows = rows.length === 2 && rows[0].k === 'proj' && rows[0].who.length === 2 && rows[0].n === 12 && rows[0].n7 === 4 && /2 個帳號用舊版，最近 7 天進了 4 次/.test(_DEC.v7old.head(rows[0]));
+        out.detail = /staff\.a@example\.com/.test(_DEC.v7old.detail(rows[0]));
+        // 確認＝這頁不再提供舊版；退回＝30 天後再問
+        _DEC.v7old.ok(rows[0]);
+        out.off = !!P.v7oldOff.proj && !_v7OldMap().proj && _v7New('proj') && _v7UseRows().every((x) => x.k !== 'proj');
+        go('more'); await T(150); out.moreHidden = !/專案：切回舊版|專案：目前舊版/.test(document.getElementById('page-more').innerText) && /帳務：/.test(document.getElementById('page-more').innerText);
+        _DEC.v7old.reject(_v7UseRows()[0]); out.ask = _v7UseRows().length === 0 && P.v7oldAsk.acct > Date.now() + 29 * 864e5;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      window._fbDb = oDb; _fbUser = oU; _isAdminUser = oA; _isReaderUser = oR; P.v7oldOff = oP.off; P.v7oldAsk = oP.ask; if (!oP.off) delete P.v7oldOff; if (!oP.ask) delete P.v7oldAsk; _V7USE_FROM = oFrom; _V7USE = null; window._salesSave = oSave;
+      localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_v7use_pend'); _nav5Apply();
+      return out;
+    });
+    check('7e 舊頁進入次數：用舊版的頁每進一次記一次（新版不記、唯讀不記）、上傳到自己那一格成功才扣、12/10 前不出卡、之後一頁一列、確認＝不再提供舊版（更多頁也拿掉）、退回 30 天後再問；規則只能寫自己、只有管理員讀', rulesOk && !r.err && r.note && r.ro && r.flush && r.before && r.rows && r.detail && r.off && r.moreHidden && r.ask, JSON.stringify(Object.assign({ rulesOk }, r)));
+    check('7e 舊頁進入次數測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
