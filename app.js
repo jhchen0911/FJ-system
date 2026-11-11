@@ -22683,7 +22683,7 @@ function _drFillVendors(){
   if(dlb)dlb.innerHTML=_drVendorsOf(q,'labor').map(function(n){return '<option value="'+esc(n)+'">';}).join('');
 }
 function drRenderCrews(reset){
-  if(_drCrewNew()){if(reset){_drLab=[];_drOwn={};_drCrews=[{type:'sub',vendor:'',n:''}];}else{_drCrews=_drCrews.filter(function(c){return c&&(c.type==='sub'||(parseFloat(c.n)||0)>0||c.vendor);});if(!_drCrews.length)_drCrews=[{type:'sub',vendor:'',n:''}];}_drCrewNewRender();return;}   // 新選單：選工班 → 勾人
+  if(_drCrewNew()){if(reset){_drLab=[];_drOwn={};_drMoreOpen={};_drCrewLoaded='';_drCrews=[{type:'sub',vendor:'',n:''}];}else{_drCrews=_drCrews.filter(function(c){return c&&(c.type==='sub'||(parseFloat(c.n)||0)>0||c.vendor);});if(!_drCrews.length)_drCrews=[{type:'sub',vendor:'',n:''}];}_drCrewNewRender();return;}   // 新選單：選工班 → 勾人
   if(reset||!_drCrews.length)_drCrews=[{type:'labor',vendor:'',n:''},{type:'sub',vendor:'',n:''}];
   const box=document.getElementById('dr-crews');if(!box)return;
   const IN='font-size:14px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;min-width:0';
@@ -22701,12 +22701,17 @@ function drAddCrew(type){_drCrews.push({type:type||'sub',vendor:'',n:''});drRend
 // 舊日報沒有 crews → 由 workers／subWorkers／subVendor 還原
 function _crewsOf(L){
   if(L&&Array.isArray(L.crews)&&L.crews.length)return L.crews;
+  if(L&&L.crewV===2)return [];   // 審查：新格式沒有點工就是沒有（自家員工另記 ownPpl），不能拿人數當點工
   const out=[];
   if(L&&(parseFloat(L.workers)||0)>0)out.push({type:'labor',vendor:'',n:parseFloat(L.workers)||0});
   if(L&&((parseFloat(L.subWorkers)||0)>0||L.subVendor))out.push({type:'sub',vendor:L.subVendor||'',n:parseFloat(L.subWorkers)||0});
   return out;
 }
 function _crewsText(L){
+  var _own=(L&&L.ownPpl||[]).length;if(_own)return _crewsTextCore(L)+(_crewsTextCore(L)?'　':'')+'自家 '+_own+' 人';
+  return _crewsTextCore(L);
+}
+function _crewsTextCore(L){
   return _crewsOf(L).filter(function(c){return (parseFloat(c.n)||0)>0||c.vendor;}).map(function(c){return (c.type==='sub'?'承包':'點工')+' '+(parseFloat(c.n)||0)+' 人'+(c.vendor?('（'+esc(c.vendor)+'）'):'');}).join('　');
 }
 // crews → 相容欄位（workers／subWorkers／subVendor）
@@ -22956,8 +22961,9 @@ function _drMergeLog(q,L,e){
   });
   L.progressRows=rows;
   L.progress=rows.map(function(r){return (r.desc?(r.desc+(r.qty?(' '+r.qty+((q.items[r.itemIdx]||{}).unit||'')):'')):'')+(r.note?((r.desc?'；':'')+r.note):'');}).filter(Boolean).join('\n');
-  if((e.crews||[]).some(function(c){return (parseFloat(c&&c.n)||0)>0;})||(e.ownPpl||[]).length){L.crews=e.crews;L.workers=e.workers||0;L.subWorkers=e.subWorkers||0;L.subVendor=e.subVendor||'';
-    if(e.crewV){L.crewV=e.crewV;if((e.ownPpl||[]).length)L.ownPpl=e.ownPpl;else delete L.ownPpl;}}
+  // 審查：第二筆只有自家員工時不能把早上的點工／承包洗掉；載入既有日報再送出（crewFull）＝照畫面整個換，取消勾的人也會拿掉
+  if(e.crewFull||(e.crews||[]).some(function(c){return (parseFloat(c&&c.n)||0)>0;})){L.crews=e.crews||[];L.workers=e.workers||0;L.subWorkers=e.subWorkers||0;L.subVendor=e.subVendor||'';}
+  if(e.crewV){L.crewV=e.crewV;if(e.crewFull)L.ownPpl=(e.ownPpl||[]).slice();else if((e.ownPpl||[]).length){var _om={};(L.ownPpl||[]).concat(e.ownPpl).forEach(function(p){if(p&&p.wid)_om[p.wid]=p;});L.ownPpl=Object.keys(_om).map(function(k){return _om[k];});}}
   if((e.equip||[]).length){L.equip=e.equip;L.ownEquip=true;}else if(e.ownEquip)L.ownEquip=true;
   L.photos=L.photos||[];(e.photos||[]).forEach(function(p){if(L.photos.indexOf(p)<0)L.photos.push(p);});L.photos=L.photos.slice(0,12);   // v6.0.119 智慧收件可加到 12 張
   if(e.weather)L.weather=e.weather;if(e.backfillFrom)L.backfillFrom=e.backfillFrom;   // v6.0.33
@@ -22972,16 +22978,16 @@ function _drCollect(){
   if(!q)return null;
   const _nw=_drCrewNew(),ownPpl=_nw?_drPpList(_drOwn):null;
   const cw=_crewsApply({},_nw?_drCrewsNewOut():_drCrews);   // v5.406 出工列 → workers／subWorkers／subVendor；新選單：點工工班勾人（ppl）
-  const workers=cw.workers+(ownPpl?ownPpl.reduce(function(a,p){return a+p.day;},0):0),subWorkers=cw.subWorkers,subVendor=cw.subVendor;
+  const workers=cw.workers,subWorkers=cw.subWorkers,subVendor=cw.subVendor;   // 審查：自家員工不算進點工人數（K1）
   const rows=_drProgRows.filter(r=>(r.itemIdx>=0&&parseFloat(r.qty)>0)||((''+(r.note||'')).trim()!==''));
   const equip=Object.keys(_drEquip).map(function(n){return {name:n,hrs:parseFloat(_drEquip[n])||0};});   // v5.402 只勾機具也算有內容
   const status=gv('dr-status')||'work',stopReason=(gv('dr-stop-reason')||'').trim(),resumeDate=gv('dr-resume-date')||'';
   const stageOf=status==='stage'?(gv('dr-stage-of')||'install'):'',stageDate=status==='stage'?(gv('dr-stage-date')||gv('dr-date')||localToday()):'';   // v5.442
-  if(!workers&&!subWorkers&&!rows.length&&!_drPhotos.length&&!equip.length&&status==='work')return null;
+  if(!workers&&!subWorkers&&!(ownPpl&&ownPpl.length)&&!rows.length&&!_drPhotos.length&&!equip.length&&status==='work'&&!(_nw&&_drCrewLoaded===qid+'|'+(gv('dr-date')||'')))return null;
   const over=[];_drProgRows.forEach(function(_r,ri){const h=_drRowHint(ri);if(h.over)over.push(h.desc+' 累計 '+fmt(h.after)+' ＞ 合約 '+fmt(h.target));});
   const progRows=rows.map(r=>{const o={itemIdx:r.itemIdx,desc:r.itemIdx>=0?((q.items[r.itemIdx]||{}).desc||'').split('\n')[0]:'',qty:parseFloat(r.qty)||0,note:(r.note||'').trim(),ph:_drRowPhase(q,r)};if(r.batchDone&&o.ph==='remove')o.batchDone=true;return o;});   // v6.0.107 本批拔除完成
   const progressText=progRows.map(r=>(r.desc?(r.desc+(r.qty?(' '+r.qty+((q.items[r.itemIdx]||{}).unit||'')):'')):'')+(r.note?((r.desc?'；':'')+r.note):'')).filter(Boolean).join('\n');
-  return {qid:qid,name:q.name||'',workers:workers,subWorkers:subWorkers,subVendor:subVendor,crews:cw.crews,over:over,equip:equip,crewV:_nw?2:0,ownPpl:ownPpl||[],
+  return {qid:qid,name:q.name||'',workers:workers,subWorkers:subWorkers,subVendor:subVendor,crews:cw.crews,over:over,equip:equip,crewV:_nw?2:0,ownPpl:ownPpl||[],crewFull:(_nw&&_drCrewLoaded===qid+'|'+(gv('dr-date')||''))?1:0,
     status:status,stopReason:stopReason,resumeDate:resumeDate,stageOf:stageOf,stageDate:stageDate,
     ownEquip:!!document.getElementById('dr-own-equip')?.checked||equip.length>0,
     weather:gv('dr-weather')||'',backfillFrom:(document.getElementById('dr-backfill')||{}).checked?(gv('dr-backfill-from')||''):'',   // v6.0.33
@@ -23029,7 +23035,7 @@ function submitDailyReport(){
     const q=Q.find(x=>x.id===e.qid);if(!q)return;
     if(!q.dailyLogs)q.dailyLogs=[];
     // v5.442 同專案同日已有日報 → 合併（相同工項覆蓋、其餘新增），不再產生第二筆
-    try{if(e.crewV){var _sn=Object.assign({},q.crewSeen||{});(e.crews||[]).forEach(function(c){((c&&c.ppl)||[]).forEach(function(p){if(p.wid)_sn[p.wid]=date;});});(e.ownPpl||[]).forEach(function(p){if(p.wid)_sn[p.wid]=date;});q.crewSeen=_sn;}}catch(err){_err('submitDailyReport.seen',err);}   // 勾過的人下次排前面
+    try{if(e.crewV){var _sn=Object.assign({},q.crewSeen||{});(e.crews||[]).forEach(function(c){((c&&c.ppl)||[]).forEach(function(p){if(p.wid&&!(String(_sn[p.wid]||'')>date))_sn[p.wid]=date;});});(e.ownPpl||[]).forEach(function(p){if(p.wid&&!(String(_sn[p.wid]||'')>date))_sn[p.wid]=date;});q.crewSeen=_sn;}}catch(err){_err('submitDailyReport.seen',err);}   // 勾過的人下次排前面
     const ex=q.dailyLogs.find(function(L){return L&&L.date===date&&!L.stopFrom;});
     if(ex){const m=_drMergeLog(q,ex,e);merged.push((q.name||'')+'（覆蓋 '+m.rep+' 列、新增 '+m.add+' 列）');_touch(q);okN++;return;}
     q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:date,
@@ -46424,12 +46430,13 @@ function _attIngest(q,log,crew){
     S.forEach(function(x){if(x.dup&&x.name===p.name&&cand.indexOf(x.id)<0)cand.push(x.id);});   // 名冊同名兩個人：兩個都列，請人選
     ask.push({i:i,raw:String(p.raw||'').slice(0,30),name:String(p.name||'').slice(0,12),day:p.off?0:(+p.day||0),ot:+p.ot||0,why:String(p.why||(cand.length>1?'名冊有兩個同名的人':'')).slice(0,80),cand:cand.slice(0,4)});
   });
-  log.att=att;log.attAsk=ask;log.attWhy=((r&&r.why)||[]).map(function(w){return String(w).slice(0,80);}).slice(0,5);log.attAt=Date.now();
-  if(!ask.length&&!log.attWhy.length)log.attOk=1;else delete log.attOk;
+  var _fA=(log.att||[]).filter(function(a){return a&&a.src==='form'&&!att.some(function(b){return b.hrId===a.hrId;});}),_fK=(log.attAsk||[]).filter(function(a){return a&&a.src==='form';});   // 今天出工：日報表單勾的自家員工留著（兩邊各記各的，同一人以 LINE 為準）
+  log.att=att.concat(_fA);log.attAsk=ask.concat(_fK);log.attWhy=((r&&r.why)||[]).map(function(w){return String(w).slice(0,80);}).slice(0,5);log.attAt=Date.now();
+  if(!log.attAsk.length&&!log.attWhy.length)log.attOk=1;else delete log.attOk;
   return true;
 }
 // 管理員裝置：日報有【人和機具】原文但還沒拆過的（例：寫入時 crewOf 還沒上線），補拆一次（冪等：拆過就有 attAt）
-function _attScan(){if(!_decIsAdmin())return;var n=0;(Q||[]).forEach(function(q){var ch=false;(q&&q.dailyLogs||[]).forEach(function(L){if(L&&L.ownPpl&&_attOwnIngest(q,L)){ch=true;return;}if(L&&L.crewText&&!L.attAt&&_attIngest(q,L))ch=true;});   /* 今天出工：日報表單勾的自家員工優先 */if(ch){_touch(q);n++;}});if(n)try{persist();}catch(e){_err('_attScan',e);}}
+function _attScan(){if(!_decIsAdmin())return;var n=0;(Q||[]).forEach(function(q){var ch=false;(q&&q.dailyLogs||[]).forEach(function(L){if(L&&L.ownPpl&&_attOwnIngest(q,L))ch=true;if(L&&L.crewText&&!L.attAt&&_attIngest(q,L))ch=true;});   /* 今天出工：日報表單勾的自家員工優先 */if(ch){_touch(q);n++;}});if(n)try{persist();}catch(e){_err('_attScan',e);}}
 function _attPending(L){return !!(L&&L.attAt&&!L.attOk&&((L.attAsk||[]).length||(L.attWhy||[]).length));}
 function _attAskRows(){try{_attScan();}catch(e){_err('_attAskRows',e);}var out=[];
   (Q||[]).forEach(function(q){if(!q||!_attCanSee(q))return;(q.dailyLogs||[]).forEach(function(L){if(_attPending(L))out.push({q:q,L:L});});});
@@ -46551,7 +46558,7 @@ _decReg('payAdd',{
 // 自家員工（所屬公司＝豐有工程）另一組，標「員工」：記在日報 L.ownPpl，管理員裝置照薪資名冊名字寫進出工紀錄 L.att（小批次 small-pay 的薪資用，_attOwnIngest），不算點工錢（K1）。
 // 承包照舊填人數。錢：出工月結、成本勾稽的推估改成每人全天／半天×日薪＋加班費（FJC.hr.crewEst，I1）；日薪＝人員的日薪（只有管理員看得到、存 private 的 MAT_MOVE_FIN.wkRate，H1），沒填＝參數標準點工日薪。
 var _DR_OWN_CO='豐有工程';
-var _drLab=[],_drOwn={};
+var _drLab=[],_drOwn={},_drMoreOpen={},_drCoAsked={},_drCrewLoaded='';
 function _drCrewNew(){try{return _nav5On();}catch(e){_err('_drCrewNew',e);return false;}}
 function _wkKey(s){return _mvVendKey(s);}
 function _wkAct(){return (WORKERS||[]).filter(function(w){return w&&w.id&&w.name&&w.status!=='left';});}
@@ -46581,8 +46588,9 @@ function _drCrewNewRender(){
   if(!_drLab.length)_drLab=[{vendor:'',ppl:{}}];
   var vend=_drLabVendors(q),SEL='font-size:14px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w);min-width:0',h='';
   _drLab.forEach(function(g,gi){
-    var vk=_wkKey(g.vendor),mine=act.filter(function(w){return !_wkIsOwn(w)&&vk&&_wkKey(w.company)===vk;}).sort(sortW);
-    var others=act.filter(function(w){return !_wkIsOwn(w)&&!(vk&&_wkKey(w.company)===vk);}).sort(sortW),otOn=others.filter(function(w){return g.ppl[w.id];}),otOff=others.filter(function(w){return !g.ppl[w.id];});
+    var taken={};_drLab.forEach(function(g2,j){if(j!==gi)Object.keys(g2.ppl||{}).forEach(function(k){taken[k]=1;});});   // 審查：同一個人只能勾在一個工班
+    var vk=_wkKey(g.vendor),mine=act.filter(function(w){return !taken[w.id]&&!_wkIsOwn(w)&&vk&&_wkKey(w.company)===vk;}).sort(sortW);
+    var others=act.filter(function(w){return !taken[w.id]&&!_wkIsOwn(w)&&!(vk&&_wkKey(w.company)===vk);}).sort(sortW),otOn=others.filter(function(w){return g.ppl[w.id];}),otOff=others.filter(function(w){return !g.ppl[w.id];});
     var opts='<option value="">— 選點工工班 —</option>'+vend.map(function(n){return '<option value="'+esc(n)+'"'+(n===g.vendor?' selected':'')+'>'+esc(n)+'</option>';}).join('')+(g.vendor&&vend.indexOf(g.vendor)<0?'<option selected value="'+esc(g.vendor)+'">'+esc(g.vendor)+'</option>':'');
     var sum=Object.keys(g.ppl).reduce(function(a,k){return a+(+g.ppl[k].day||0);},0);
     h+='<div class="dr-lab" data-gi="'+gi+'" style="border:1px solid var(--b1);border-radius:var(--r8);padding:8px 10px;margin-bottom:8px;background:#fff">'
@@ -46592,7 +46600,7 @@ function _drCrewNewRender(){
     else{
       if(!mine.length)h+='<div style="font-size:12px;color:var(--b4);padding:6px 0 2px">人員進場資料裡沒有「所屬公司」是這家的人，可以從下面「其他人」勾</div>';
       h+=mine.map(function(w){return _drPRow('lab',gi,w,els);}).join('')+otOn.map(function(w){return _drPRow('lab',gi,w,els);}).join('');
-      if(otOff.length)h+='<details class="dr-lab-more" style="margin-top:4px"><summary style="font-size:12px;color:var(--b4);cursor:pointer">其他人（'+otOff.length+' 人）</summary>'+otOff.map(function(w){return _drPRow('lab',gi,w,els);}).join('')+'</details>';
+      if(otOff.length)h+='<details class="dr-lab-more" data-gi="'+gi+'"'+(_drMoreOpen[gi]?' open':'')+' ontoggle="_drMoreOpen['+gi+']=this.open" style="margin-top:4px"><summary style="font-size:12px;color:var(--b4);cursor:pointer">其他人（'+otOff.length+' 人）</summary>'+otOff.map(function(w){return _drPRow('lab',gi,w,els);}).join('')+'</details>';
       h+='<div style="font-size:11.5px;color:var(--b4);margin-top:4px">勾了 '+Object.keys(g.ppl).length+' 人・'+(Math.round(sum*10)/10)+' 人天</div>';
     }
     h+='</div>';
@@ -46610,6 +46618,7 @@ function _drCrewNewRender(){
     +'<button type="button" class="btn btn-xs btn-r" onclick="_drCrews.splice('+i+',1);_drCrewNewRender()" style="flex-shrink:0">✕</button></div>';}).join('')
     +'<button type="button" class="btn btn-xs" onclick="_drCrews.push({type:\'sub\',vendor:\'\',n:\'\'});_drCrewNewRender()" style="padding:6px 14px">＋ 承包</button>';
   box.innerHTML=h;
+  try{var dd=document.getElementById('dr-date');if(dd&&!dd._crewWired){dd._crewWired=1;dd.addEventListener('change',function(){if(_drCrewNew())_drCrewNewRender();});}}catch(e){_err('_drCrewNewRender.date',e);}
 }
 function drLabVendor(gi,v){var g=_drLab[gi];if(!g)return;g.vendor=String(v||'');_drCrewNewRender();}
 function drLabAdd(){_drLab.push({vendor:'',ppl:{}});_drCrewNewRender();}
@@ -46620,7 +46629,7 @@ function drPpTog(scope,gi,wid,on){
   S[wid]={day:1,ot:0};_drCrewNewRender();
   // G-1a：從「其他人」勾到某工班的人，第一次問一次要不要把他的公司改成這家
   if(scope!=='lab')return;var g=_drLab[gi],w=(WORKERS||[]).find(function(x){return x&&x.id===wid;});
-  if(!g||!g.vendor||!w||_wkKey(w.company)===_wkKey(g.vendor)||_isReaderUser)return;
+  if(!g||!g.vendor||!w||_wkKey(w.company)===_wkKey(g.vendor)||_isReaderUser||_drCoAsked[wid])return;_drCoAsked[wid]=1;
   showConfirm('改所屬公司？','把 <b>'+esc(w.name)+'</b> 的所屬公司'+(w.company?'從「'+esc(w.company)+'」':'')+'改成「'+esc(g.vendor)+'」？<div style="font-size:12px;color:var(--b4);margin-top:6px">改了以後，下次選這個工班就直接列出他。不改也沒關係，今天照樣算他在這個工班。</div>',
     function(){var w2=(WORKERS||[]).find(function(x){return x&&x.id===wid;});if(!w2)return;w2.company=g.vendor;_touch(w2);saveWorkers();toast('已把 '+w2.name+' 的公司改成 '+g.vendor);_drCrewNewRender();});
 }
@@ -46633,7 +46642,7 @@ function _drCrewsNewOut(){
   return out.concat(_drCrews.filter(function(c){return c&&((parseFloat(c.n)||0)>0||String(c.vendor||'').trim());}));
 }
 function _drCrewNewLoad(L){
-  _drLab=[];_drOwn={};_drCrews=[];
+  _drLab=[];_drOwn={};_drCrews=[];_drMoreOpen={};_drCrewLoaded=(gv('dr-proj')||'')+'|'+((L&&L.date)||'');
   _crewsOf(L).forEach(function(c){if(!c)return;if(c.type!=='sub'&&Array.isArray(c.ppl)&&c.ppl.length){var g={vendor:c.vendor||'',ppl:{}};c.ppl.forEach(function(p){if(p&&p.wid)g.ppl[p.wid]={day:+p.day===0.5?0.5:1,ot:+p.ot||0};});_drLab.push(g);}
     else _drCrews.push({type:c.type==='sub'?'sub':'labor',vendor:c.vendor||'',n:c.n||''});});
   (L&&L.ownPpl||[]).forEach(function(p){if(p&&p.wid)_drOwn[p.wid]={day:+p.day===0.5?0.5:1,ot:+p.ot||0};});
@@ -46658,7 +46667,11 @@ function _attOwnIngest(q,L){
     if(hid){att.push({hrId:hid,name:nm,day:+p.day,ot:+p.ot||0});return;}
     var cand=S.filter(function(x){return x.name===nm;}).map(function(x){return x.id;});
     ask.push({i:i,raw:nm.slice(0,30),name:nm.slice(0,12),day:+p.day,ot:+p.ot||0,why:cand.length>1?'名冊有兩個同名的人':'薪資名冊沒有這個名字',cand:cand.slice(0,4)});});
-  L.att=att;L.attAsk=ask;L.attWhy=[];L.attAt=Date.now();L.attOwnSig=sig;L.attSrc='form';if(!ask.length)L.attOk=1;else delete L.attOk;
+  att.forEach(function(a){a.src='form';});ask.forEach(function(a){a.src='form';});
+  // LINE【人和機具】拆出來的留著（同一人以 LINE 為準）；表單這邊整批換新
+  var tA=(L.att||[]).filter(function(a){return a&&a.src!=='form';}),tK=(L.attAsk||[]).filter(function(a){return a&&a.src!=='form';});
+  L.att=tA.concat(att.filter(function(a){return !tA.some(function(b){return b.hrId===a.hrId;});}));L.attAsk=tK.concat(ask);
+  if(!L.attWhy)L.attWhy=[];L.attAt=L.attAt||Date.now();L.attOwnSig=sig;if(!L.attAsk.length&&!L.attWhy.length)L.attOk=1;else delete L.attOk;
   return true;
 }
 function _modal(title,bodyHtml,onOk){

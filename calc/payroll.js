@@ -51,6 +51,19 @@
   //   沒有 ppl（舊日報只有人數）：人數 × 日薪（照舊，不會變 0）
   // 回傳 {site: {days, amt}}（days 留兩位小數、amt 四捨五入到元）
   function crewEst(logs) {
+    // 同一個人在同一案同一天出現兩次（例如勾在兩個工班）：只算一次（天數取最大、加班加總）
+    var seen = {}, L2 = [];
+    (logs || []).forEach(function (L) {
+      if (!L || !Array.isArray(L.ppl)) { L2.push(L); return; }
+      var ppl = [];
+      L.ppl.forEach(function (p) {
+        if (!p || !p.k) return; var key = String(L.date || '').slice(0, 10) + '|' + L.site + '|' + p.k, x = seen[key];
+        if (x) { x.day = Math.max(n(x.day), n(p.day)); x.ot = n(x.ot) + n(p.ot); return; }
+        x = seen[key] = { k: p.k, day: n(p.day), ot: n(p.ot), rate: p.rate, oh: p.oh }; ppl.push(x);
+      });
+      L2.push({ date: L.date, site: L.site, ppl: ppl });
+    });
+    logs = L2;
     var day = {};
     (logs || []).forEach(function (L) {
       if (!L || !Array.isArray(L.ppl)) return;

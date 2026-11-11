@@ -26,6 +26,7 @@ function logsOn(q, date) { return arr(q && q.dailyLogs).filter((L) => L && L.dat
 
 function crewsOf(L) {
   if (Array.isArray(L.crews) && L.crews.length) return L.crews.filter(Boolean);
+  if (L.crewV === 2) return [];   // 今天出工新格式：沒有點工就是沒有（自家員工另記 ownPpl），跟前端 _crewsOf 一樣
   const out = [];
   if (num(L.workers) > 0) out.push({ type: 'labor', vendor: '', n: num(L.workers) });
   if (num(L.subWorkers) > 0 || L.subVendor) out.push({ type: 'sub', vendor: S(L.subVendor), n: num(L.subWorkers) });

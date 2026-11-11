@@ -14944,7 +14944,7 @@ async function newPage(browser, width, height) {
         submitDailyReport(); await T(120);
         const L = Q[0].dailyLogs[0], lab = (L.crews || []).find((c) => c.type === 'labor'), sub = (L.crews || []).find((c) => c.type === 'sub');
         out.saved = L.crewV === 2 && lab && lab.vendor === '範例點工行' && lab.n === 2.5 && lab.ppl.length === 3 && lab.ppl.find((p) => p.wid === 'w2').day === 0.5 && lab.ppl.find((p) => p.wid === 'w2').ot === 3
-          && sub && sub.n === 4 && (L.ownPpl || []).length === 1 && L.ownPpl[0].wid === 'w4' && L.workers === 3.5 && Q[0].crewSeen && Q[0].crewSeen.w1 === day;
+          && sub && sub.n === 4 && (L.ownPpl || []).length === 1 && L.ownPpl[0].wid === 'w4' && L.workers === 2.5 && Q[0].crewSeen && Q[0].crewSeen.w1 === day;
         // 推估（手算）：甲案＝王小明 1 天但同一天也在乙案 → 0.5×2,800＝1,400；李大華半天 0.5×3,200＝1,600＋加班 3 小時（時薪 400：2×400×1.34＝1,072、1×400×1.67＝668）；陳阿土 1×2,800＝2,800
         //   ＝1,400＋1,600＋1,740＋2,800＝7,540，天數 0.5＋0.5＋1＝2；乙案＝王小明 0.5×2,800＝1,400；自家員工不算點工錢
         const E = _laborEstAll(null);
@@ -14958,12 +14958,24 @@ async function newPage(browser, width, height) {
         out.dle = (keep.crews.find((c) => c.type === 'labor').ppl || []).length === 3 && !chg.crews.find((c) => c.type === 'labor').ppl;
         // 管理員裝置：自家員工 → 薪資的出工紀錄（對到名冊）
         _attScan();
-        out.att = (L.att || []).length === 1 && L.att[0].hrId === 'h1' && L.att[0].day === 1 && L.att[0].ot === 1 && L.attOk === 1 && L.attSrc === 'form';
+        out.att = (L.att || []).length === 1 && L.att[0].hrId === 'h1' && L.att[0].day === 1 && L.att[0].ot === 1 && L.attOk === 1 && L.att[0].src === 'form';
         // 薪資名冊對不到的名字 → 出工確認卡（同 small-pay）
         const L2 = { date: day, ownPpl: [{ wid: 'w9', name: '名冊沒有', day: 0.5, ot: 0 }] }; _attOwnIngest(Q[0], L2);
         out.attAsk = (L2.att || []).length === 0 && (L2.attAsk || []).length === 1 && L2.attAsk[0].day === 0.5 && !L2.attOk;
         // 日薪只有管理員看得到（存 private）、人員表單管理員才有欄位
         out.rate = !!(MAT_MOVE_FIN.wkRate && MAT_MOVE_FIN.wkRate.rates && MAT_MOVE_FIN.wkRate.rates.w2 === 3200);
+        // 審查：同一天第二筆只勾自家員工 → 早上的點工／承包不能被洗掉；只有自家員工的日子不算點工
+        _drLab = []; _drOwn = {}; _drCrews = [{ type: 'sub', vendor: '', n: '' }]; _drCrewLoaded = ''; _drOwn.w4 = { day: 0.5, ot: 0 };
+        submitDailyReport(); await T(80);
+        const L3 = Q[0].dailyLogs.find((x) => x.date === day);
+        out.mergeKeep = (L3.crews || []).some((c) => c.type === 'labor' && (c.ppl || []).length === 3) && (L3.crews || []).some((c) => c.type === 'sub' && c.n === 4) && (L3.ownPpl || []).length === 1 && L3.ownPpl[0].day === 0.5;
+        const Lo = { date: '2026-10-05', crewV: 2, crews: [], workers: 0, ownPpl: [{ wid: 'w4', name: '林工務', day: 1, ot: 0 }] };
+        out.ownNoLabor = _crewsOf(Lo).length === 0 && !((_crewsText(Lo) || '').indexOf('點工') >= 0) && /自家 1 人/.test(_crewsText(Lo));
+        // 載入既有日報、取消勾自家員工再送出 → 整個換（自家員工拿掉，薪資出工也跟著拿掉）；LINE 拆出來的留著
+        L3.att = (L3.att || []).concat([{ hrId: 'h9', name: 'LINE來的', day: 1, ot: 0 }]);
+        _drCrewNewLoad(L3); _drCrewNewRender(); delete _drOwn.w4; submitDailyReport(); await T(80);
+        const L4 = Q[0].dailyLogs.find((x) => x.date === day); _attScan();
+        out.fullEdit = (L4.ownPpl || []).length === 0 && (L4.crews || []).some((c) => c.type === 'labor' && (c.ppl || []).length === 3) && !(L4.att || []).some((a) => a.hrId === 'h1') && (L4.att || []).some((a) => a.hrId === 'h9');
         // 舊選單：照舊「點工／承包＋人數」
         localStorage.setItem('fy_nav_old', '1'); _nav5Apply(); drRenderCrews(true); await T(40);
         out.old = !document.querySelector('#dr-crews .dr-lab') && document.querySelectorAll('#dr-crews .dr-crew select').length === 2;
@@ -14973,7 +14985,7 @@ async function newPage(browser, width, height) {
       try { document.querySelectorAll('#fy-modal').forEach((m) => m.remove()); } catch (x) { /* 可忽略 */ }
       return out;
     });
-    check('今天出工（寬 ' + W + '）：選工班列出這家的人（名字差空格括號也對到、離職不列）、自家員工另一組標員工、今天已在別案有標、其他人勾了問改公司、全天／半天／加班存進日報、人數＝人天、推估跟手算一樣（同人同天兩案平分）、舊日報人數×日薪、修改視窗保留名單、自家員工進薪資出工、日薪存 private、舊選單照舊、手機不左右捲', !r.err && r.list && r.elsewhere && r.ask && r.coChanged && r.noHScroll && r.saved && r.est && r.legacy && r.dle && r.att && r.attAsk && r.rate && r.old, JSON.stringify(r));
+    check('今天出工（寬 ' + W + '）：選工班列出這家的人（名字差空格括號也對到、離職不列）、自家員工另一組標員工、今天已在別案有標、其他人勾了問改公司、全天／半天／加班存進日報、人數＝人天、推估跟手算一樣（同人同天兩案平分）、舊日報人數×日薪、修改視窗保留名單、自家員工進薪資出工、日薪存 private、舊選單照舊、手機不左右捲', !r.err && r.list && r.elsewhere && r.ask && r.coChanged && r.noHScroll && r.saved && r.est && r.legacy && r.dle && r.att && r.attAsk && r.mergeKeep && r.ownNoLabor && r.fullEdit && r.rate && r.old, JSON.stringify(r));
     check('今天出工測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
