@@ -5261,8 +5261,7 @@ function _invAutoDaily(inv){
     const idx=_invItemQIdx(q,k);if(idx<0)return;
     const cat=_itemCat(q.items[idx]);
     const qd=q.items[idx].desc;
-    const _none=!cat.install&&!cat.remove;   /* 審查（11/11）：說明沒有打設／拔除字眼的工項（背填、開挖…）日報數量照樣帶入（原本永遠 0＝少請） */
-    const ins=(cat.install||_none)?_dailyQtyBetween(q,qd,from,to,_none?null:'install',idx):0;
+    const ins=cat.install?_dailyQtyBetween(q,qd,from,to,'install',idx):0;
     const rem=cat.remove?_dailyQtyBetween(q,qd,from,to,'remove',idx):0;
     let v=0;
     if(it.remRid){if(rem>0){it.phase='remove';it.payRate=_invPhasePct(q,q.items[idx],'remove');it.curQty=rem;n++;}return;}   /* 拔除列：只記拔除 */
@@ -5276,8 +5275,7 @@ function _invAutoDaily(inv){
       ['rid','icSeen','note','internalNote','origContractQty','_qRetired','settledQty','prevPayRate'].forEach(f=>{delete r[f];});   /* 審查：拔除列不帶原列的備註、結算、統計 */
       _adds.push([k,r]);n++;return;
     }
-    if(_isRemovePeriod(it)&&ins>0&&!(rem>0)&&cat.install){it.phase='install';it.payRate=_invPhasePct(q,q.items[idx],'install');v=ins;}   /* 審查：上一期是拔除期、這期只有新的打設 → 改回打設（原本只看拔除＝這期打設請 0、之後也請不到） */
-    else if(_isRemovePeriod(it))v=rem;
+    if(_isRemovePeriod(it))v=rem;
     else if(ins>0)v=ins;
     else if(rem>0&&cat.install&&cat.remove){it.phase='remove';it.payRate=_invPhasePct(q,q.items[idx],'remove');v=rem;}   // 健檢 H5：拔除那期＝100−合約裝設 %
     else if(rem>0&&!cat.install)v=rem;
@@ -46455,11 +46453,15 @@ function _ibLastIt(last,it){var k=String((it&&it.desc)||'').split('\n')[0].trim(
 function _ibRows(b){var q=_ibQ(b.qid);if(!q)return [];var last=_ibPrevInvs(q)[0]||null,stop=_ibStop(b),since=_ibSince(q,stop);
   return (b.items||[]).map(function(x){var it=(q.items||[])[x.idx]||{},src=_ibSrc(q,x.idx,since,stop),cq=Math.abs(parseFloat(it.qty)||0);
     var ni=_dailyQtyBetween(q,it.desc,since,stop,'install',x.idx),nr=_dailyQtyBetween(q,it.desc,since,stop,'remove',x.idx);   /* 審查：數量跟編輯頁帶入同一套（舊日報用名稱比、負數更正列、四捨五入）；src 只拿來列哪幾天 */
+    // 編輯頁不會自動帶數量的兩種（跟 _invAutoDaily 同一條；11/11 第四次審查：先不改請款金額規則，交 Lotion 決定）：說明沒有打設／拔除字眼的工項、上一期是拔除期這期只有打設 → 卡片數量照編輯頁算 0，另標「要手動填」並擋確認
     var lit=_ibLastIt(last,it),pw=lit?_invRemSibs(lit,last.items).reduce(function(a,y){return a+(parseFloat(y.prevQty)||0)+_wQty(y.curQty,y.payRate);},0):0;
+    var cat=_itemCat(it),man=0,manWhy='';
+    if(!cat.install&&!cat.remove){man=Math.round(src.reduce(function(a,s){return a+s.q+s.r;},0)*100)/100;ni=0;nr=0;manWhy='工項說明沒有打設／拔除字眼';}
+    else{if(!cat.install&&ni>0)ni=0;if(!cat.remove&&nr>0)nr=0;if(lit&&_isRemovePeriod(lit)&&!_invRemOf(lit,last.items).length&&ni>0&&!(nr>0)){man=ni;ni=0;manWhy='上一期是拔除期，這期只有打設';}}
     var pi=_invPhasePct(q,it,'install'),pr=_invPhasePct(q,it,'remove'),cum=cq>0?Math.round((pw+ni*pi/100+nr*pr/100)/cq*1000)/10:null;
-    return {x:x,it:it,src:src,ni:ni,nr:nr,cq:cq,pi:pi,pr:pr,cum:cum,over:cum!=null&&cum>100.05};});}
+    return {x:x,it:it,src:src,ni:ni,nr:nr,man:man,manWhy:manWhy,cq:cq,pi:pi,pr:pr,cum:cum,over:cum!=null&&cum>100.05};});}
 function _ibDetailHtml(b){var q=_ibQ(b.qid);if(!q)return '';var invs=_ibPrevInvs(q),last=invs[0]||null,n=last?(parseInt(last.periodNo)||0)+1:1,stop=_ibStop(b);
-  var ph=function(r){return _prPhase(q,r);},all=_ibRows(b),rs=all.filter(function(r){return r.ni>0||r.nr>0;}),later=all.filter(function(r){return !(r.ni>0||r.nr>0);});
+  var ph=function(r){return _prPhase(q,r);},all=_ibRows(b),rs=all.filter(function(r){return r.ni>0||r.nr>0;}),later=all.filter(function(r){return !(r.ni>0||r.nr>0)&&!(r.man>0);}),manu=all.filter(function(r){return r.man>0;});
   var rows=rs.map(function(r){var x=r.x,it=r.it,tg=Math.abs(parseFloat(it.qty)||0),ci=FJC.dl.cumOf(q.dailyLogs,x.idx,'install',ph),cr=FJC.dl.cumOf(q.dailyLogs,x.idx,'remove',ph),lo=tg>0&&(ci>tg+1e-9||cr>tg+1e-9),pv=_ibPrevQty(last,it.desc);
     var two=function(a,m){return (a?'打設 '+fmt(a):'')+(a&&m?'<br>':'')+(m?'拔除 '+fmt(m):'')||'0';};
     var pcs=(r.ni?'打設 '+r.pi+'%':'')+(r.ni&&r.nr?'<br>':'')+(r.nr?'拔除 '+r.pr+'%':'');
@@ -46469,6 +46471,7 @@ function _ibDetailHtml(b){var q=_ibQ(b.qid);if(!q)return '';var invs=_ibPrevInvs
   var ret=0;try{ret=_ownerRetPct(q)||0;}catch(e){_err('_ibDetail.ret',e);}
   return '<div style="font-size:12.5px;line-height:1.7">第 '+n+' 期（'+(last?'上一期第 '+esc(String(last.periodNo||'?'))+' 期 '+esc(last.date||''):'第一張請款單')+'；截止 '+esc(b.cutDate)+'，'+(b.left===0?'今天':b.left+' 天後')+'）<br><b>數量算到 '+esc(stop)+'</b>（請款單日期也是這天）</div>'
     +(rs.length?'<table style="width:100%;font-size:12px;border-collapse:collapse;table-layout:fixed;word-break:break-all;margin-top:4px"><tr><th style="text-align:left;width:46%">工項</th><th>本期</th><th>上一期</th><th>日報累計／合約</th></tr>'+rows+'</table>':'<div style="color:#b26a00;margin-top:4px">到 '+esc(stop.slice(5))+' 為止沒有新的日報數量</div>')
+    +(manu.length?'<div style="background:#ffebee;border-radius:6px;padding:6px 8px;margin-top:6px"><b style="color:#c62828">系統不會自動帶數量，要按「修改」自己填</b><br>'+manu.map(function(r){return esc(String(r.x.desc||'').slice(0,20))+'：日報 '+fmt(r.man)+' '+esc(r.x.unit||'')+'（'+esc(r.manWhy)+'）';}).join('<br>')+'</div>':'')
     +(later.length?'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">'+esc(stop.slice(5))+' 之後才有日報的（算下一期）：'+esc(later.map(function(r){return String(r.x.desc||'').slice(0,14);}).join('、'))+'</div>':'')
     +(function(){var line=function(a){return esc(a.date||'')+' '+esc(String(a.text||'').slice(0,60))+(a.qty!=null?'（'+esc(String(a.qty))+esc(a.unit||'')+'）':'');},un=ad.filter(function(a){return !a.signed&&!a.signDeny;}),sg=ad.filter(function(a){return a.signed;});   /* 現場追加卡：簽認了才帶進請款 */
       return (un.length?'<div style="background:#fff8e1;border-radius:6px;padding:6px 8px;margin-top:6px"><b style="color:#b26a00">現場追加（已確認，主任還沒簽認）</b><br>'+un.map(line).join('<br>')+'<div style="font-size:11px;color:#b26a00">先到首頁「現場追加（主任簽認）」卡傳給主任，簽好再按確認；不等簽認就按「修改」自己開單（這幾筆這期不請）</div></div>':'')
@@ -46485,7 +46488,7 @@ function _ivsFit(f,n){try{var box=f.parentNode,d=f.contentDocument;if(!box||!d||
 try{window.addEventListener('resize',function(){try{[].forEach.call(document.querySelectorAll('.ivs-pv iframe'),function(f){_ivsFit(f);});}catch(e){_err('_ivsFit.resize',e);}});}catch(e){_err('_ivsFit.on',e);}
 function _ibBlocks(b){var q=_ibQ(b.qid),out=[];if(!q)return ['找不到工程'];var last=_ibPrevInvs(q)[0]||null;
   var pd=_ibPendLogs(q,_ibStop(b));if(pd.length)out.push('還有 '+pd.length+' 則 LINE 日報沒確認（'+pd.map(function(d){return String((d.payload||{}).date||'').slice(5);}).join('、')+'），先到「施工日報」卡確認');
-  _ibRows(b).forEach(function(r){if(r.over&&(r.ni>0||r.nr>0))out.push(String(r.x.desc||'').slice(0,20)+' 累計 '+r.cum+'%（超過合約）');});
+  _ibRows(b).forEach(function(r){if(r.man>0)out.push(String(r.x.desc||'').slice(0,20)+' 日報有 '+fmt(r.man)+' 但系統不會自動帶（'+r.manWhy+'），要自己填');if(r.over&&(r.ni>0||r.nr>0))out.push(String(r.x.desc||'').slice(0,20)+' 累計 '+r.cum+'%（超過合約）');});
   ((q.addons)||[]).filter(function(a){return a&&a.status==='confirmed'&&!a.signed&&!a.signDeny&&String(a.date||'')>String((last&&last.date)||'');}).forEach(function(a){out.push('現場追加 '+String(a.date||'')+' 主任還沒簽認');});
   return out;}
 // 存好的請款單 vs 卡片（rows＝開單前算好的 _ibRows，開單後這張會變成「上一期」）：每個工項本期數量（打設＋拔除另列合起來）要一樣、累計不超過 100%；回傳不一樣的地方
