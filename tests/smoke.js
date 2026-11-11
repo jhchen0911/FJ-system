@@ -13151,9 +13151,9 @@ async function newPage(browser, width, height) {
         window.updateDashTodo = oUD;
         // 沒有事
         _todayRender(el, null, []); out.empty = /今天沒有要確認的事/.test(el.textContent);
-        // Lotion 11/10：最上面固定一張「寫今天的日報」，點了進日報頁；唯讀帳號不顯示
-        out.drCard = !!el.querySelector('.td-dr') && el.querySelector('.td-card').classList.contains('td-dr');
-        el.querySelector('.td-dr .td-main').click(); await T(60); out.drGo = document.getElementById('page-quickcost').classList.contains('active'); go('dash'); await T(30);
+        // v6.0.234 Lotion 11/11：今天頁不再放「寫今天的日報」卡（LINE 日報為主）；專案頁「填日報」開表單並帶好專案
+        _todayRender(el, null, its); out.drCard = !el.querySelector('.td-dr') && !/寫今天的日報/.test(el.textContent);
+        { const k = Q.find((x) => x && !x.closed && x.awarded) || Q[0]; if (k) { pjDailyOpen(k.id); await T(60); const dp = document.getElementById('dr-proj'); out.drGo = document.getElementById('page-quickcost').classList.contains('active') && (!dp || !Array.from(dp.options).some((o) => o.value === k.id) || dp.value === k.id); } else { pjDailyOpen(''); await T(60); out.drGo = document.getElementById('page-quickcost').classList.contains('active'); } go('dash'); await T(30); }
         // 唯讀帳號：看得到卡片、沒有按鈕
         const oR = _isReaderUser; _isReaderUser = true; localStorage.removeItem('fy_today_snz'); _todayRender(el, null, its); out.ro = /本月要請款/.test(el.textContent) && !el.querySelector('[data-act]') && !el.querySelector('.td-dr'); _isReaderUser = oR;
         // 首頁公司數字收起來，只留一行連到經營報表
@@ -13349,8 +13349,8 @@ async function newPage(browser, width, height) {
         go('acct'); acctTab('ap'); await T(150);
         const tb = document.getElementById('acct-tabs');
         const big = Array.prototype.map.call(tb.querySelectorAll('[data-ag]'), (b) => b.textContent);
-        out.groups = JSON.stringify(big) === JSON.stringify(['收', '付', '發票與支出', '金流']);
-        out.sub = /廠商請款/.test(tb.textContent) && /應付/.test(tb.textContent) && tb.querySelector('[data-at="ap"]').style.background.indexOf('var(--g)') >= 0;
+        out.groups = JSON.stringify(big) === JSON.stringify(['應收', '應付', '發票與支出', '金流']);   // v6.0.233 Lotion 11/11
+        out.sub = !tb.querySelector('[data-at]') && !/廠商請款|零用金/.test(tb.textContent);   // v6.0.233：下面那排小分頁拿掉
         // 點「收」→ 到收那塊（業主請款或上次停的頁）；再點「付」→ 回到上次停的「應付」
         tb.querySelector('[data-ag="in"]').click(); await T(80); out.inGo = _acctTab === 'own' || _acctTab === 'ar';
         document.querySelector('#acct-tabs [data-ag="out"]').click(); await T(80); out.remember = _acctTab === 'ap';
@@ -14501,7 +14501,7 @@ async function newPage(browser, width, height) {
         const led = document.querySelector('#acct-p-ap > .acct-led');
         const rows = led ? led.querySelectorAll('.acct-led-row') : [];
         out.ap = rows.length === 2 && /範例廠商甲/.test(rows[0].textContent) && /逾期待付/.test(rows[0].textContent) && /範例廠商乙/.test(rows[1].textContent) && !/範例廠商丙/.test(led.textContent);
-        out.oneBtn = Array.prototype.every.call(rows, (x) => x.querySelectorAll('button').length === 1 && /付款/.test(x.querySelector('button').textContent));
+        out.oneBtn = Array.prototype.every.call(rows, (x) => x.querySelectorAll('[data-lednext]').length === 1 && /付款/.test(x.querySelector('[data-lednext]').textContent) && x.querySelectorAll('[data-ledmore]').length === 1);
         const pl = document.getElementById('payable-list');
         out.fold = !!pl && pl.offsetParent === null;
         led.querySelector('details.acct-led-more').open = true; await T(80);
@@ -14515,7 +14515,7 @@ async function newPage(browser, width, height) {
         // 收：待收請款單、逾期在前、下一步＝登錄收款
         acctTab('ar'); await T(120);
         const la = document.querySelector('#acct-p-ar > .acct-led');
-        out.ar = !!la && /範例營造/.test(la.textContent) && /第 2 期/.test(la.textContent) && /逾期/.test(la.textContent) && /待收/.test(la.textContent) && (typeof window._invStOf !== "function" || /已送業主/.test(la.textContent)) && /登錄收款/.test(la.querySelector('button').textContent) && !document.querySelector('#acct-p-ap > .acct-led');
+        out.ar = !!la && /範例營造/.test(la.textContent) && /第 2 期/.test(la.textContent) && /逾期/.test(la.textContent) && /待收/.test(la.textContent) && (typeof window._invStOf !== "function" || /已送業主/.test(la.textContent)) && /登錄收款/.test(la.querySelector('[data-lednext]').textContent) && !document.querySelector('#acct-p-ap > .acct-led');
         // 主線請款單狀態上線後（_invStOf／_INV_ST_T）自動改用：草稿＝打開請款單、其他＝狀態＋待收
         const hadSt = typeof window._invStOf === 'function', oSt = window._invStOf, oT = window._INV_ST_T;
         if (!hadSt) { window._INV_ST_T = { draft: '草稿', sent: '已送業主', ok: '業主已確認', einv: '已開發票', paid: '已收款' }; window._invStOf = (v) => v.st || 'sent';
@@ -14527,7 +14527,20 @@ async function newPage(browser, width, height) {
         out.noScroll = document.documentElement.scrollWidth <= W + 1;
         // 唯讀：看得到帳本、沒有按鈕
         const oR = _isReaderUser; _isReaderUser = true; acctTab('ar'); await T(60);
-        out.ro = !!document.querySelector('#acct-p-ar > .acct-led .acct-led-row') && !document.querySelector('#acct-p-ar > .acct-led button'); _isReaderUser = oR;
+        out.ro = !!document.querySelector('#acct-p-ar > .acct-led .acct-led-row') && !document.querySelector('#acct-p-ar > .acct-led [data-lednext]'); _isReaderUser = oR;
+        // v6.0.233 篩選小籤：應收 全部／未收／逾期／已收；應付 全部／廠商／零用金／薪資（薪資只給管理員）
+        INV.push({ id: 'iL2', project: '範例工程L', client: '範例營造', periodNo: 1, date: '2025-12-01', items: [], totals: { sub: 1000, tax: 50, total: 1050 }, receivedConfirmed: true, receivedAmt: 1050, _mt: 1 });
+        acctLedSetF('ar', 'paid'); await T(40); const lp = document.querySelector('#acct-p-ar > .acct-led').textContent;
+        acctLedSetF('ar', 'unpaid'); await T(40); const lu = document.querySelector('#acct-p-ar > .acct-led').textContent;
+        out.chipsAr = /已收款/.test(lp) && !/第 2 期/.test(lp) && /第 2 期/.test(lu) && !/已收款/.test(lu) && document.querySelectorAll('#acct-p-ar .acct-led-f [data-ledf]').length === 4;
+        PAYABLES.push({ id: 'pL4', to: '範例員工', category: 'salary', date: '2026-01-05', amount: 30000, vat: false, status: 'unpaid', _mt: 1 });
+        acctTab('ap'); acctLedSetF('ap', 'salary'); await T(40); const ls = document.querySelector('#acct-p-ap > .acct-led').textContent;
+        acctLedSetF('ap', 'vendor'); await T(40); const lv = document.querySelector('#acct-p-ap > .acct-led').textContent;
+        const oA2 = _isAdminUser, oU2 = _fbUser; _isAdminUser = false; _fbUser = { email: 'staff@example.com', uid: 's' }; acctLedSetF('ap', 'all'); await T(40);
+        const staffChips = Array.from(document.querySelectorAll('#acct-p-ap .acct-led-f [data-ledf]')).map((b) => b.getAttribute('data-ledf')).join(',');
+        const staffTx = document.querySelector('#acct-p-ap > .acct-led').textContent; _isAdminUser = oA2; _fbUser = oU2;
+        out.chipsAp = /範例員工/.test(ls) && !/範例廠商乙/.test(ls) && /範例廠商乙/.test(lv) && !/範例員工/.test(lv) && staffChips === 'all,vendor' && !/範例員工/.test(staffTx);
+        localStorage.removeItem('fy_acctLedF_ar'); localStorage.removeItem('fy_acctLedF_ap');
         // 舊選單：沒有帳本、清單照舊
         localStorage.setItem('fy_nav_old', '1'); _nav5Apply(); acctTab('ap'); await T(80);
         out.old = !document.querySelector('.acct-led') && !document.querySelector('.led-fold');
@@ -14536,7 +14549,7 @@ async function newPage(browser, width, height) {
       PAYABLES.length = 0; keepP.forEach((p) => PAYABLES.push(p)); INV.length = 0; keepI.forEach((v) => INV.push(v)); _fbUser = oU; _isAdminUser = oA;
       return out;
     }, W);
-    check('v6.0.225 帳務帳本（寬 ' + W + '）：付＝待付一筆一列（逾期在前、已付不列）、只有一顆「付款」，收＝待收請款單「登錄收款」；舊清單收在「⋯ 更多」打開才看到；付款後帳本更新；唯讀沒有按鈕；舊選單沒有帳本', !r.err && r.ap && r.oneBtn && r.fold && r.unfold && r.refresh && r.search && r.stHook && r.ar && r.noScroll && r.ro && r.old, JSON.stringify(r));
+    check('v6.0.225 帳務帳本（寬 ' + W + '）：付＝待付一筆一列（逾期在前、已付不列）、只有一顆「付款」，收＝待收請款單「登錄收款」；舊清單收在「⋯ 更多」打開才看到；付款後帳本更新；唯讀沒有按鈕；舊選單沒有帳本', !r.err && r.ap && r.oneBtn && r.fold && r.unfold && r.refresh && r.search && r.stHook && r.ar && r.noScroll && r.ro && r.chipsAr && r.chipsAp && r.old, JSON.stringify(r));
     check('v6.0.225 帳務帳本測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
@@ -14702,6 +14715,190 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.232 送審文件卡（寬 ' + W + '）：檔名／上一版猜版次、歸檔確認、業主回覆對到同版次並改已核定、技師計算書差異 1 項 +20,000 與改單動作、只比數量不做安全判斷、手機不左右捲、唯讀看不到', !r.err && r.ver && r.arcList && r.arcDet && r.arcOk && r.reply && r.ownDet && r.ownOk && r.calc && r.ops && r.noHScroll && r.unit && r.verRe && r.calcOk && r.noWait && r.types && r.ro, JSON.stringify(r));
     check('v6.0.232 送審文件卡測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.234 第 7 步 7e：「同步」改成自動（每分鐘重試、連上網路馬上傳），更多頁不放「同步」；30 分鐘還沒傳上去＝今天頁提醒 ──
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const oU = window._fbUser, oD = window._fbDb, oS = window._roState, oP = window._pushCloud, oR = _isReaderUser;
+      const LS = ['fy_last_local_save', 'fy_last_fb_sync', 'fy_pending_sync', 'fy_priv_pending'].map((k) => [k, localStorage.getItem(k)]);
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); _nav5Apply();
+        go('more'); await T(80); out.noBtn = !/>同步</.test(document.getElementById('more-body').innerHTML) && /已刪資料還原/.test(document.getElementById('more-body').textContent);
+        let pushed = 0; window._pushCloud = () => { pushed++; };
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _fbDb = {}; _roState = 'rw'; _isReaderUser = false;
+        // 剛存（5 秒前）：交給原本 3 秒後上傳，不重複
+        localStorage.setItem('fy_last_fb_sync', String(Date.now() - 600000)); localStorage.setItem('fy_last_local_save', String(Date.now() - 5000)); localStorage.setItem('fy_pending_sync', '1');
+        out.fresh = _syncAutoTick() === false && pushed === 0;
+        // 一分鐘前存的還沒傳 → 自動重試
+        localStorage.setItem('fy_last_local_save', String(Date.now() - 60000));
+        out.retry = _syncAutoTick() === true && pushed === 1 && !_syncStuckItem();
+        // 40 分鐘沒傳上去 → 今天頁提醒（附上次成功時間）
+        localStorage.setItem('fy_last_fb_sync', String(Date.now() - 50 * 60000)); localStorage.setItem('fy_last_local_save', String(Date.now() - 40 * 60000));
+        const it = _syncStuckItem(); out.stuck = !!it && it.type === 'sync_stuck' && /40 分鐘沒傳上雲端/.test(it.text) && /上次成功同步/.test(it.sub);
+        // 沒有待上傳 → 不動作
+        localStorage.setItem('fy_last_fb_sync', String(Date.now())); localStorage.setItem('fy_last_local_save', String(Date.now() - 60000)); localStorage.removeItem('fy_pending_sync'); localStorage.removeItem('fy_priv_pending');
+        out.clean = _syncAutoTick() === false && !_syncStuckItem();
+        // 唯讀帳號不上傳
+        localStorage.setItem('fy_pending_sync', '1'); _isReaderUser = true; out.ro = _syncAutoTick() === false && !_syncStuckItem(); _isReaderUser = false;
+        // 舊選單（手機更多選單）照舊有同步
+        out.oldKeep = typeof fbUploadWithConflictCheck === 'function';
+        // 更多頁改名（Lotion 11/11）
+        const mbt = document.getElementById('more-body').textContent; out.rename = /經營報表/.test(mbt) && !/公司數字/.test(mbt) && /今天：切回舊版/.test(mbt) && !/今天（首頁）/.test(mbt);
+        // 健檢：跟錢有關的提醒只留「去處理」（付包商款待核准、待登錄廠商請款、超支、自有材料攤提、雲端應付比對）
+        out.money = ['vp_check', 'vb_pending', 'overrun', 'mat_site', 'bk_paycmp_x'].every((t) => _tdIsMoney({ type: t })) && !_tdIsMoney({ type: 'ct_exp' });
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      window._pushCloud = oP; _fbUser = oU; _fbDb = oD; _roState = oS; _isReaderUser = oR;
+      LS.forEach(([k, v]) => { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); });
+      return out;
+    });
+    check('v6.0.234 同步改自動：更多頁沒有「同步」鈕、剛存的不重複傳、一分鐘前沒傳的自動重試、30 分鐘以上今天頁提醒（附上次成功時間）、沒待傳不動作、唯讀不上傳', !r.err && r.noBtn && r.fresh && r.retry && r.stuck && r.clean && r.ro && r.oldKeep && r.money && r.rename, JSON.stringify(r));
+    check('v6.0.234 同步改自動測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.233 施工成本頁照大原則：一句結論＋「工項」「明細」兩頁、新增成本與回寫單價庫收起、手機不左右捲、舊選單照舊 ──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepI = INV.slice();
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_cost7tab'); _nav5Apply(); _cost7Tab = 'item';
+        Q = [{ id: 'qC7', name: '範例工程C7', client: '甲營造', code: 'C7', date: '2026-10-01', awarded: true, _mt: 1,
+          items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 100, price: 3000, estCost: 2000 }, { desc: '水平支撐組立', unit: 'M', qty: 300, price: 800, estCost: 500 }],
+          costs: [{ id: 'c1', type: 'sub', vendor: '範例打樁行', rows: [{ id: 'r1', linkedItemIdx: 0, qty: 100, unitPrice: 2300, desc: 'H型鋼樁打設' }], periods: [{ no: 1, date: '2026-10-25', to: '2026-10-25', rows: [{ rid: 'r1', qty: 100 }] }] },
+            { id: 'c2', type: 'sub', vendor: '範例支撐行', rows: [{ id: 'r2', linkedItemIdx: 1, qty: 300, unitPrice: 450, desc: '水平支撐組立' }], periods: [{ no: 1, date: '2026-10-25', to: '2026-10-25', rows: [{ rid: 'r2', qty: 300 }] }] }] }];   // v6.0.234：已發生成本只算已請款期別 → 兩家都請滿
+        INV.length = 0; INV.push({ id: 'iC7', quoteId: 'qC7', project: '範例工程C7', periodNo: 1, items: [], totals: { sub: 400000, tax: 20000, total: 420000 }, _mt: 1 });
+        openProjectCosts('qC7'); await T(300);
+        const v = document.getElementById('cost-v7'), tx = v ? v.textContent.replace(/\s+/g, ' ') : '';
+        out.head = /已發生成本 NT\$ 365,000/.test(tx) && /實際毛利 8\.8%/.test(tx) && /超支 1 項/.test(tx) && /執行率 115%/.test(tx);
+        out.tabs = v.querySelectorAll('[data-c7tab]').length === 2 && document.getElementById('cost-card').style.display === 'none' && /H型鋼樁打設/.test(tx) && !/回寫單價庫/.test(v.innerText);
+        out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
+        cost7Tab('list'); await T(200);
+        const card = document.getElementById('cost-card');
+        // v6.0.234 Lotion 第 7 題：明細＝四組清單（舊成本卡收起，編輯才開），新增成本收進「⋯ 更多」
+        out.list = card.style.display === 'none' && card.classList.contains('cost7-on') && document.querySelectorAll('#cost-v7 .cost7-grp').length === 4
+          && !!document.querySelector('#cost-v7 details.cost7-more [onclick="costAddPick()"]') && Array.from(card.querySelectorAll('[onclick="costAddPick()"]')).every((b) => b.offsetParent === null);
+        // 舊選單：沒有結論列、成本卡照舊
+        localStorage.setItem('fy_v7old', JSON.stringify({ proj: 1 })); _nav5Apply(); rCostItems(); await T(80);
+        out.old = !document.getElementById('cost-v7') && document.getElementById('cost-card').style.display !== 'none' && !document.getElementById('cost-card').classList.contains('cost7-on');
+        localStorage.removeItem('fy_v7old'); _nav5Apply(); localStorage.removeItem('fy_cost7tab');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; INV.length = 0; keepI.forEach((x) => INV.push(x));
+      return out;
+    });
+    check('v6.0.233 施工成本頁（寬 ' + W + '）：一句結論（已發生成本、實際毛利、超支 N 項）、工項／明細兩頁、新增成本收進「⋯ 更多」、回寫單價庫拿掉、手機不左右捲、舊選單照舊', !r.err && r.head && r.tabs && r.noHScroll && r.list && r.old, JSON.stringify(r));
+    check('v6.0.233 施工成本頁測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.234 審查修正：舊整筆應付付一部分照總額、介紹費不算施工成本、薪資／零用金照 id 判斷且唯讀帳號看不到、已收款要真的收了 ──
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepP = PAYABLES.slice(), keepI = INV.slice(), oR = window._isReaderUser, oU = window._fbUser;
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); _nav5Apply();
+        PAYABLES.length = 0; INV.length = 0;
+        const legacy = { id: 'cL1', type: 'sub', vendor: '舊廠商', rows: [{ id: 'x', linkedItemIdx: 0, qty: 10, unitPrice: 1000 }] };
+        PAYABLES.push({ id: 'paycL1', costId: 'cL1', amount: 10000, status: 'unpaid', pays: [{ amt: 4000, at: Date.now(), date: '2026-10-01' }], _mt: 1 });
+        out.partPaid = _cost7Inc(legacy) === 10000;
+        out.intro = _cost7Inc({ id: 'cI1', type: 'sub', isIntro: true, vendor: '介紹人', rows: [{ id: 'y', qty: 1, unitPrice: 5000 }] }) === 0;
+        PAYABLES.length = 0;
+        PAYABLES.push({ id: 'pay_ps_x1', to: '某員工', amount: 30000, status: 'unpaid', date: '2026-10-05', _mt: 1 });
+        PAYABLES.push({ id: 'pay_pc_x2', to: '零用金', amount: 3000, status: 'unpaid', date: '2026-10-05', _mt: 1 });
+        PAYABLES.push({ id: 'payV1_p1', to: '範例廠商', amount: 12000, status: 'unpaid', date: '2026-10-05', _mt: 1 });
+        out.cat = _acctPayCat(PAYABLES[0]) === 'salary' && _acctPayCat(PAYABLES[1]) === 'petty' && _acctPayCat(PAYABLES[2]) === 'vendor';
+        _fbUser = null; _isReaderUser = false; localStorage.removeItem('fy_acctLedF_ap');
+        out.admin = _acctLedRows('ap').length === 3;
+        _isReaderUser = true;
+        const rr = _acctLedRows('ap'), hh = _acctLedHtml('ap');
+        out.reader = rr.length === 1 && rr[0].who === '範例廠商' && !/30,000|3,000/.test(hh) && !/data-ledf="salary"|data-ledf="petty"/.test(hh);
+        _isReaderUser = false;
+        INV.push({ id: 'iZ0', project: '零元案', periodNo: 1, items: [], totals: { sub: 0, tax: 0, total: 0 }, _mt: 1 });
+        localStorage.setItem('fy_acctLedF_ar', 'paid'); out.zero = !_acctLedRows('ar').some((x) => x.id === 'iZ0'); localStorage.removeItem('fy_acctLedF_ar');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      PAYABLES.length = 0; keepP.forEach((x) => PAYABLES.push(x)); INV.length = 0; keepI.forEach((x) => INV.push(x)); _isReaderUser = oR; _fbUser = oU;
+      return out;
+    });
+    check('v6.0.234 審查修正：舊整筆應付付一部分照總額、介紹費不算施工成本、薪資／零用金照 id 判斷且唯讀帳號帳本看不到、金額 0 的單不算已收', !r.err && r.partPaid && r.intro && r.cat && r.admin && r.reader && r.zero, JSON.stringify(r));
+    check('v6.0.234 審查修正測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── v6.0.234 Lotion 11/11 回覆：施工成本明細四組＋發包列看這一期、帳務頁首收進「⋯ 更多」、日報表單（工項清單、付款方式、收據選填＋缺收據） ──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepI = INV.slice(), keepP = PAYABLES.slice(), oU = window._fbUser, oA = window._isAdminUser;
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); _nav5Apply();
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        const cut = _vendorCutDate(localToday());
+        Q = [{ id: 'qD4', name: '範例工程D4', client: '甲營造', code: 'D4', date: '2026-10-01', awarded: true, _mt: 1,
+          items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 100, price: 3000, estCost: 2000 }, { desc: '水平支撐組立', unit: 'M', qty: 300, price: 800, estCost: 500 }, { desc: '安全母索', unit: 'M', qty: 50, price: 100 }],
+          dailyLogs: [{ id: 'd1', date: '2026-10-05', progressRows: [{ itemIdx: 2, qty: 50, ph: 'install' }] }],
+          costs: [{ id: 'cA', type: 'sub', vendor: '範例打樁行', rows: [{ id: 'r1', linkedItemIdx: 0, qty: 100, unitPrice: 2300, desc: 'H型鋼樁打設' }] },
+            { id: 'cB', type: 'sub', vendor: '範例支撐行', rows: [{ id: 'r2', linkedItemIdx: 1, qty: 300, unitPrice: 450, desc: '水平支撐組立' }], periods: [{ no: 1, date: cut, to: cut, rows: [{ rid: 'r2', qty: 100 }] }] },
+            { id: 'cC', type: 'extra', vendor: '公司支出（自付）', src: 'quick', payer: '王小明', cat: '雜支', rows: [{ id: 'cC_0', subType: 'worker', desc: '油料', days: 1, dayRate: 1200, transport: 0 }], amt: 1200 },
+            { id: 'cD', type: 'own', cat: '材料租金', rental: true, rows: [{ id: 'cD_0', desc: '鋼板租金', qty: 1, unitPrice: 8000 }] }] }];
+        INV.length = 0; PAYABLES.length = 0;
+        openProjectCosts('qD4'); cost7Tab('list'); await T(250);
+        const G = Array.from(document.querySelectorAll('#cost-v7 .cost7-grp')).map((g) => g.getAttribute('data-g') + ':' + g.querySelectorAll('.cost7-row').length);
+        out.groups = JSON.stringify(G) === JSON.stringify(['sub:2', 'rent:1', 'quick:1', 'manual:0']) && /小計/.test(document.getElementById('cost-v7').textContent) && document.getElementById('cost-card').style.display === 'none';
+        const rows = Array.from(document.querySelectorAll('#cost-v7 .cost7-grp[data-g="sub"] .cost7-row'));
+        // 打樁行：這一期還沒登錄 → 登錄本期請款；支撐行：已登錄、應付還沒付 → 去付款（先讓應付存在）
+        out.subNew = /還沒登錄請款/.test(rows[0].textContent) && /登錄本期請款/.test((rows[0].querySelector('[data-c7next]') || {}).textContent || '') && !!rows[0].querySelector('[data-c7more]');
+        const cB = Q[0].costs[1], pid = _subPayId('cB', cB.periods[0]);
+        PAYABLES.push({ id: pid, to: '範例支撐行', amount: 45000, vat: false, status: 'unpaid', costId: 'cB', _mt: 1 });
+        rCostItems(); await T(200);
+        let r2 = document.querySelectorAll('#cost-v7 .cost7-grp[data-g="sub"] .cost7-row')[1];
+        out.subPay = /已登錄、還沒付/.test(r2.textContent) && /去付款/.test((r2.querySelector('[data-c7next]') || {}).textContent || '');
+        PAYABLES[0].status = 'paid'; PAYABLES[0].paidDate = localToday(); rCostItems(); await T(200);
+        r2 = document.querySelectorAll('#cost-v7 .cost7-grp[data-g="sub"] .cost7-row')[1];
+        out.subPaid = /本期已付，下期 \d\d\/\d\d 截止/.test(r2.textContent) && !r2.querySelector('[data-c7next]');
+        // Lotion 選 A：已發生成本＝已請款期別（打樁行還沒請＝0、支撐行請 100 M＝45,000），列上寫「已請／合約」
+        const r1t = document.querySelectorAll('#cost-v7 .cost7-grp[data-g="sub"] .cost7-row')[0].textContent;
+        out.inc = /已發生成本 NT\$ 46,200/.test(document.getElementById('cost-v7').textContent) && /已請 NT\$ 0/.test(r1t) && /合約 NT\$ 230,000/.test(r1t) && /已請 NT\$ 45,000/.test(r2.textContent) && /合約 NT\$ 135,000/.test(r2.textContent);
+        // 「⋯」：預付款、合約書、計價紀錄、編輯、刪除
+        r2.querySelector('[data-c7more]').click(); await T(60);
+        const mt = (document.getElementById('fy-modal') || {}).textContent || ''; out.more = ['預付款', '合約書', '計價紀錄', '編輯', '刪除'].every((k) => mt.indexOf(k) >= 0);
+        try { document.getElementById('fy-modal').remove(); } catch (x) { /* 可忽略 */ }
+        // 編輯＝舊畫面
+        cost7Edit('cB'); await T(200); out.edit = document.getElementById('cost-card').style.display !== 'none' && /回明細/.test(document.getElementById('cost-v7').textContent);
+        cost7Tab('item'); localStorage.removeItem('fy_cost7tab');
+        out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
+        // 帳務：頁首 Excel／？ 收進帳本「⋯ 更多」
+        go('acct'); acctTab('ar'); await T(150);
+        const phr = document.querySelector('#page-acct .ph .ph-r');
+        out.acctHead = (!phr || getComputedStyle(phr).display === 'none') && !!document.querySelector('#acct-p-ar details.acct-led-more [onclick="exportFinanceCSV()"]');
+        // 日報表單：工項清單＝還沒做完的、照報價順序，顯示「1．」；做完的安全母索不列
+        go('quickcost'); try { rQuickCost(); } catch (x) { /* 可忽略 */ } await T(150);
+        const dp = document.getElementById('dr-proj'); if (dp) { dp.value = 'qD4'; drRenderProgRows(true); }
+        const o = Array.from(document.querySelectorAll('#dr-prog-rows select option')).map((x) => x.textContent);
+        out.items = o.some((t) => /^1．H型鋼樁打設/.test(t)) && o.some((t) => /^2．水平支撐組立/.test(t)) && !o.some((t) => /安全母索/.test(t));
+        // 付款預設：管理員＝公司付；工務＝代墊（自己）
+        const pk = document.querySelector('input[name="qc-paykind"]:checked'); out.payAdm = !!pk && pk.value === 'co' && (gv('qc-payer') || '') === '';
+        // 收據：沒附＝記成缺收據（一般資料），今天頁出提醒，補了管理員裝置搬到成本卡
+        const qp = document.getElementById('qc-proj'); if (qp) qp.value = 'qD4';
+        _qcPending = [{ id: 'e1', ti: 0, amt: 500, note: '雜支測試', proj: 'qD4' }]; submitQuickCost(); await T(80);
+        const cNew = Q[0].costs[Q[0].costs.length - 1];
+        out.rcptMiss = cNew.noRcpt === 1 && !!Q[0].rcptMiss && !!Q[0].rcptMiss[cNew.id];
+        const it = _rcptTodoItem(); out.rcptCard = !!it && it.type === 'rcpt_miss' && /支出缺收據 1 筆/.test(it.text);
+        Q[0].rcptMiss[cNew.id].ph = 'ph:test123'; _rcptHeal();
+        out.rcptHeal = cNew.rcpt === 'ph:test123' && !cNew.noRcpt && !(Q[0].rcptMiss && Q[0].rcptMiss[cNew.id]) && !_rcptTodoItem();
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; INV.length = 0; keepI.forEach((x) => INV.push(x)); PAYABLES.length = 0; keepP.forEach((x) => PAYABLES.push(x)); _fbUser = oU; _isAdminUser = oA;
+      try { const m = document.getElementById('fy-modal'); if (m) m.remove(); } catch (x) { /* 可忽略 */ }
+      return out;
+    });
+    check('v6.0.234 Lotion 回覆（寬 ' + W + '）：施工成本明細四組＋小計、發包列看這一期（登錄本期請款／去付款／本期已付下期截止）、⋯ 收預付合約書計價紀錄編輯刪除、帳務頁首收進⋯更多、日報工項清單＝本工地工項、管理員預設公司付、收據選填缺收據可補', !r.err && r.groups && r.subNew && r.subPay && r.subPaid && r.inc && r.more && r.edit && r.noHScroll && r.acctHead && r.items && r.payAdm && r.rcptMiss && r.rcptCard && r.rcptHeal, JSON.stringify(r));
+    check('v6.0.234 Lotion 回覆測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 

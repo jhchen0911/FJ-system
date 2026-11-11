@@ -99,7 +99,7 @@
 
 | 模組 | 頁面 id（入口） | 主要函式 | 資料（同步節點） |
 |---|---|---|---|
-| 總覽（今天） | `dash` | `updateDashTodo` `_v6TodoItems` `_todoLongSub`；**5 個入口（v6.0.213 第 7 步②）**：body 加 nav5 這個 class（本機 `fy_nav_old`＝舊選單 `navUseOld`）、`_nav5Key`／`_nav5Active`、更多頁 `page-more` `renderMorePage`／`_MORE_SECS`；今天要做的事 `_todayRender`（決策卡／提醒卡、同案合併、之後的 N 件、已處理／延後 `_todayLater`，本機 `fy_today_snz`；錢的卡 `_TD_MONEY`／`_tdIsMoney` 只有「去處理」、做完才消失，v6.0.225） | 讀各集合 |
+| 總覽（今天） | `dash` | `updateDashTodo` `_v6TodoItems` `_todoLongSub`；**5 個入口（v6.0.213 第 7 步②）**：body 加 nav5 這個 class（本機 `fy_nav_old`＝舊選單 `navUseOld`）、`_nav5Key`／`_nav5Active`、更多頁 `page-more` `renderMorePage`／`_MORE_SECS`；今天要做的事 `_todayRender`（決策卡／提醒卡、同案合併、之後的 N 件、已處理／延後 `_todayLater`，本機 `fy_today_snz`；錢的卡 `_TD_MONEY`／`_tdIsMoney` 只有「去處理」、做完才消失，v6.0.225；v6.0.234 加付包商款待核准、待登錄廠商請款、超支、自有材料攤提、雲端應付比對；同步自動重試 `_syncAutoTick`、傳不上去提醒 `_syncStuckItem`） | 讀各集合 |
 | 報價 | `quotes`（列表 `renderList`）→ 編輯頁 | `rItems` `calcT` `saveQ` `loadQ` `_delQBlockers`（有已付應付／已收款或已開發票請款單不准刪）`revokeAward`（取消得標：原因必填、只刪 linkedQid 合約、抽成佣金作廢或擋下 `_revokePays`） 減項列 `_qNegLine`（單價負數、數量 > 0；PDF 標【減項】、請款單列帶 neg 旗標照扣、不推估成本、不進租期與分包詢價，v6.0.168）`applyNegotiate`（議價；金額或折扣 %、稅前價、預覽與套用共用 `_ngtPlan`，尾差併入工項單價不加列；報價稅額四捨五入到元，v6.0.152）`bumpQVersion`（版次；本體 `_qBumpDo`）報價編號重號（v6.0.194）：存檔再查 `_qCodeTaken`／`_qCodeNextFree`、拍板卡 qdup `_qdupGroups`／`_qdupApply`（`q.codeLog`、退回 `q.codeDupOk`）圖面覆核 `_qMeasChip`／`qMeasReview`（`q.measure`，v6.0.160；v6.0.175 起報價頁不放匯入鈕，量測檔在材料估算匯入時自動掛到綁定的報價）送出自動進版 `quoteSendPdf`／`quoteSendOwnerDoc`／`_qSendGate`（匯出前問「送出並封存／只匯出」，內容同上一正式版不重複封存，v6.0.159）`restoreQVersion`（還原前先另存「還原前備份」永久保留，`_qhPrune` 正式版次與備份不修剪，v6.0.148）`_rmkBuild`（備註條款產生器，依實際條目連號，v6.0.117；備用單價條文 `_rmkSpareTxt`／`_rmkSpareAuto` 依實際有填的項目編號、只有一項不編號，單張可改 `q.rmk.spareTxt`，v6.0.165）`_rmkBaseFor`／`_rmk14Migrate`（第 14 條切換前的舊報價印 `P.rmkBaseOld`，v6.0.138）`quoteViewPdf`（手機預覽等比縮放 `_prevFitApply`／`_prevZoomToggle`）`exportQuotePDF` `quoteImportOwner`／`_qiStart`（匯入業主詢價單 xlsx／docx／pdf）`quoteExportOwnerDoc`（回填） | `Q`（quotes，逐筆同步；`costs`／`items[].estCost`／`t.cost|gross|net`／`rfqs`／`mat` 由 `_stripQuoteSens` 抽到 private） |
 | 報價頁內部面板（7b 畫面，v6.0.216） | 報價編輯頁總計框 `#q-p3` | `_qP3Render`：底價／目標成交價（含稅）、報價、同類工項得標率與建議調幅；資料與算法由小批次線提供（_bidAimOf、_bidSuggestFor，v6.0.209 起；這類還沒有結果就不顯示） | — |
 | 案場細節 | 彈窗 `openSiteDet(qid)`（報價編輯、工程專案、材料估算、施工計畫書） | `_sdRender` `_sdCalc` `_sdToMatEst` `_sdEnsure` `siteBump` | `q.site`／`q.siteHist`（shared）；**圖面數量唯一來源** |
@@ -160,7 +160,7 @@
 
 ## 測試
 
-`tests/smoke.js`（1147 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
+`tests/smoke.js`（1159 項冒煙檢查）——每次 PR 由 `.github/workflows/smoke.yml` 自動執行。
 本機跑：`npm install && npx playwright install chromium && npm test`。測試以 file:// 開 `index.html`，同目錄要有 `app.js`（自製的 dry-run 複本兩個檔都要複製）。`package.json` 釘死 playwright 版本（v6.0.103 起 1.64.1＝Chrome 156），CI 與本機才用同一瀏覽器；升級 playwright 要當成一次改版、跑過冒煙再推。雲端容器裝不到新瀏覽器時，可從 storage.googleapis.com 的 chrome-for-testing-public 下載同版 chrome-headless-shell，用 `CHROMIUM_PATH` 指定。
 
 涵蓋：23 頁切換無 Console 錯誤、手機版無橫向捲動（甘特圖為允許的例外）、備用單價與議價口徑、
