@@ -46602,7 +46602,7 @@ function _drCrewNewRender(){
       if(!mine.length)h+='<div style="font-size:12px;color:var(--b4);padding:6px 0 2px">人員進場資料裡沒有「所屬公司」是這家的人，可以從下面「其他人」勾</div>';
       h+=mine.map(function(w){return _drPRow('lab',gi,w,els);}).join('')+otOn.map(function(w){return _drPRow('lab',gi,w,els);}).join('');
       if(otOff.length)h+='<details class="dr-lab-more" data-gi="'+gi+'"'+(_drMoreOpen[gi]?' open':'')+' ontoggle="_drMoreOpen['+gi+']=this.open" style="margin-top:4px"><summary style="font-size:12px;color:var(--b4);cursor:pointer">其他人（'+otOff.length+' 人）</summary>'+otOff.map(function(w){return _drPRow('lab',gi,w,els);}).join('')+'</details>';
-      h+='<div style="font-size:11.5px;color:var(--b4);margin-top:4px">勾了 '+Object.keys(g.ppl).length+' 人・'+(Math.round(sum*10)/10)+' 人天</div>';
+      h+='<div style="font-size:11.5px;color:var(--b4);margin-top:4px">'+((window._drCtx&&window._drCtx.noDay)?('排了 '+Object.keys(g.ppl).length+' 人'):('勾了 '+Object.keys(g.ppl).length+' 人・'+(Math.round(sum*10)/10)+' 人天'))+'</div>';
     }
     h+='</div>';
   });
