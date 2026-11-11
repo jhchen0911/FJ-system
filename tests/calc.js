@@ -515,6 +515,14 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
     && !E[3].sure && /付款方式/.test(E[3].why) && E[4].amt === 1500 && E[4].who === '小陳' && !E[5].sure && E[5].amt === 0
     && DL.parseFmt('【今天做了】\n\n【支出】\n便當 5 個 600 零用金', [], [{ desc: '鋼板樁 打設', unit: '支', qty: 10 }]).rows.length === 0 && /【支出】/.test(DL.askText('', [{ site: 'A', list: [] }], '11/11')) && !DL.expOf('今天打設鋼板樁 20 支').length);
 }
+{
+  const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl;
+  const X = (t) => DL.expOf('【支出】\n' + t)[0];
+  const a = X('便當 600 11/11 零用金 小陳'), b2 = X('加油 1500 2 次 公司付'), c = X('便當 1500 台幣 公司付'), d = X('NT$1250 五金 公司付'), e = X('600 便當 零用金 小陳'), f = X('零用金 小陳 便當 600'), g = X('代墊 阿明先付 五金 300'), h = X('便當 600 300 零用金 小陳');
+  check('LINE 日報【支出】審查寫法：日期不是金額、「2 次」不是金額、台幣、NT$、金額寫前面、零用金寫前面、「阿明先付」、兩個沒標的數字＝金額不確定',
+    a.amt === 600 && a.who === '小陳' && b2.amt === 1500 && c.amt === 1500 && c.item === '便當' && d.amt === 1250 && d.item === '五金' && e.item === '便當' && e.amt === 600 && f.item === '便當' && f.who === '小陳' && g.who === '阿明' && g.item === '五金' && !h.sure && /金額不確定/.test(h.why),
+    JSON.stringify([a, b2, c, d, e, f, g, h].map((x) => [x.item, x.amt, x.who, x.why])));
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');

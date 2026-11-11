@@ -39056,6 +39056,7 @@ function openDrafts(){
 function draftReject(id){
   if(_roDeny())return;var d=DRAFTS[id];if(!d)return;
   var r=window.prompt('退回原因（選填）','')||'';
+  if(d.type==='dailyLog'){try{var _o=_dlOf(d);if(_o.q&&_dlExpQueue(_o.q,d,_o.dt)){_touch(_o.q);persist();}}catch(e){_err('draftReject.exp',e);}}   /* v6.0.234 審查：日報退回，支出照樣留給支出卡 */
   _draftMark(id,'rejected',{reason:String(r).slice(0,200),'payload/file':null}).then(function(){var b=document.getElementById('draft-list-box');if(b)b.innerHTML=_draftListHtml();try{updateDashTodo();}catch(e){_err('draftReject',e);}toast('已退回');});
 }
 function draftApply(id){
@@ -45184,7 +45185,7 @@ function _dlWrite(q,d,dt,t,qr,photos){var S=_draftS,pl=(d.payload&&typeof d.payl
   }
   else q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:dt,workers:0,subWorkers:0,crews:[],progress:row.note,progressRows:rows,photos:[],linePhotos:photos.slice(0,30),equip:[],status:'work',by:'LINE 機器人（'+_meEmail()+' 確認）',src:'line',ts:Date.now()});
   if(q.dailyLogs.length>120)q.dailyLogs=q.dailyLogs.slice(0,120);
-  try{_dlExpQueue(q,d,dt);}catch(e){_err('_dlWrite.exp',e);}
+  try{_dlExpQueue(q,d,dt,t);}catch(e){_err('_dlWrite.exp',e);}   /* 審查：確認視窗改過的文字照改過的拆 */
   _touch(q);persist();try{if(DRAFTS&&DRAFTS[d.id])DRAFTS[d.id]._dlWritten=1;}catch(e){_err('_dlWrite',e);}return _draftMark(d.id,'applied',{resultId:q.id});}
 function _dlOf(d){var S=_draftS,pl=(d&&d.payload&&typeof d.payload==='object')?d.payload:{},q=(Q||[]).find(function(x){return x&&x.id===pl.qid;})||null,txt=_lineArr(pl.answers).join('\n');
   var dt=/^\d{4}-\d{2}-\d{2}$/.test(S(pl.date))?S(pl.date):localToday();return {pl:pl,q:q,txt:txt,dt:dt,plan:q?_dlPlan(q,txt,dt,_dlFmtList(pl,q)):{rows:[],skip:[]},photos:_lineArr(pl.photos).filter(function(x){return /^line\//.test(x);})};}
@@ -45205,7 +45206,7 @@ _decReg('dlQty',{
     if(d._dlWritten)return Promise.resolve(_draftMark(d.id,'applied',{resultId:o.q.id})).then(function(m){return m!==false;});   /* 審查：寫過了只補標記，不重寫 */
     var qr=o.plan.rows.filter(function(r){return r.itemIdx>=0&&r.qty>0;}).map(function(r){return {itemIdx:r.itemIdx,qty:r.qty,ph:r.ph||'install',batchDone:!!r.batchDone};});
     return Promise.resolve(_dlWrite(o.q,d,o.dt,o.txt,qr,o.photos)).then(function(m){toast('已寫入 '+o.dt+' 施工日報'+(qr.length?'（工項數量 '+qr.length+' 筆）':''));return m!==false;});},
-  reject:function(d,why){try{var o=_dlOf(d);if(o.q){_dlExpQueue(o.q,d,o.dt);_touch(o.q);persist();}}catch(e){_err('dlQty.reject.exp',e);}_draftMark(d.id,'rejected',{reason:String(why||'不寫').slice(0,200)});return true;},   /* 日報不寫，支出照樣留給支出卡 */
+  reject:function(d,why){try{var o=_dlOf(d);if(!o.q&&_dlxRowsOf(d).length){toast('這則有【支出】但還沒選工程：請先按「修改」選工程，支出才不會不見');return false;}if(o.q){_dlExpQueue(o.q,d,o.dt);_touch(o.q);persist();}}catch(e){_err('dlQty.reject.exp',e);}_draftMark(d.id,'rejected',{reason:String(why||'不寫').slice(0,200)});return true;},   /* 日報不寫，支出照樣留給支出卡 */
   edit:function(d){_lineDraftApply(d,function(){try{_decRefresh('dlQty');}catch(e){_err('dlQty.edit',e);}});}
 });
 // ══════════ v6.0.234 LINE 日報【支出】→ 支出草稿卡 dlExp（Lotion 11/11；第 2 層：確認才入帳，沒確認前不碰應付、零用金）══════════
@@ -45215,8 +45216,8 @@ _decReg('dlQty',{
 var _DLX_KW=[[/涼水|飲料|冰水|礦泉水|水$/,0],[/便當|餐|午餐|晚餐|早餐|點心/,1],[/機具|租機|吊車費|怪手/,2],[/點工|工資|人員|臨時工/,3],[/五金|零件|材料|螺絲|膠帶|鐵線|工具/,4],[/運費|運輸|貨運|拖車/,5],[/加油.*(工務車|車)|油錢.*車/,10],[/加油|柴油|汽油|油料/,6],[/維修.*(工務車|車)/,11],[/維修|修理/,7],[/住宿|旅館|飯店/,8],[/交通|高鐵|火車|計程車|客運/,9],[/停車/,12],[/過路|ETC|etag/i,13],[/電話/,14],[/禮品|交際|伴手禮/,15]];
 var _DLX_PAY={petty:'零用金',adv:'代墊',co:'公司付'};
 function _dlxType(item){var t=String(item||'');for(var i=0;i<_DLX_KW.length;i++){if(_DLX_KW[i][0].test(t))return _DLX_KW[i][1];}return 16;}   /* 16＝其他（要說明） */
-function _dlxRowsOf(d){var o=_dlOf(d);var R=(FJC.dl.expOf?FJC.dl.expOf(o.txt):[]);return R.map(function(r,i){return Object.assign({key:d.id+'#'+i,ti:_dlxType(r.item),date:o.dt},r);});}
-function _dlExpQueue(q,d,dt){var R=_dlxRowsOf(d);if(!R.length)return 0;q.lineExpQ=Object.assign({},q.lineExpQ||{});var o=_dlOf(d),n=0;
+function _dlxRowsOf(d,txt){var o=_dlOf(d);var R=(FJC.dl.expOf?FJC.dl.expOf(txt!=null?txt:o.txt):[]);return R.map(function(r,i){return Object.assign({key:d.id+'#'+i,ti:_dlxType(r.item),date:o.dt},r);});}
+function _dlExpQueue(q,d,dt,txt){var R=_dlxRowsOf(d,txt);if(!R.length)return 0;q.lineExpQ=Object.assign({},q.lineExpQ||{});var o=_dlOf(d),n=0;
   R.forEach(function(r){var k=_fbEncKey(r.key);if(q.lineExpQ[k]||(q.lineExpDone&&q.lineExpDone[k]))return;q.lineExpQ[k]=JSON.parse(JSON.stringify({key:r.key,src:d.id,date:dt||r.date,text:r.text,item:r.item,amt:r.amt,pay:r.pay,who:r.who,why:r.why,ti:r.ti,photos:o.photos.slice(0,6),at:Date.now()}));n++;});return n;}
 function _dlxDone(q,k){return !!(q&&q.lineExpDone&&q.lineExpDone[_fbEncKey(k)]);}
 function _dlxList(){var by={};
@@ -45225,14 +45226,17 @@ function _dlxList(){var by={};
   (Q||[]).forEach(function(q){var X=q&&q.lineExpQ;if(!X)return;Object.keys(X).forEach(function(k){var r=X[k];if(r&&r.key)add(q,Object.assign({},r),_lineArr(r.photos));});});
   return Object.keys(by).map(function(k){return by[k];});}
 function _dlxQ(x){return (Q||[]).find(function(q){return q&&q.id===x.qid;})||null;}
-function _dlxWhat(r){if(r.pay==='petty')return '工地零星支出（'+(r.who?r.who+' 的零用金':'零用金：<b style="color:#b26a00">還沒寫是誰的</b>')+'）';if(r.pay==='adv')return '工地零星支出（'+(r.who?esc(r.who)+' 代墊，之後要還給 '+esc(r.who):'代墊：<b style="color:#b26a00">沒寫是誰</b>')+'）';if(r.pay==='co')return '工地零星支出（公司直接付）';return '<b style="color:#b26a00">還沒寫付款方式</b>';}
-function _dlxRowHtml(r){var t=QC_TYPES[r.ti]||QC_TYPES[16],bad=!!r.why||(r.pay==='petty'&&!r.who);
+function _dlxWhat(r){if((r.pay==='petty'||r.pay==='adv')&&r.who&&!_dlxWhoOk(r.who))return '<b style="color:#b26a00">「'+esc(r.who)+'」不在人員名冊</b>（零用金結算對不到，請按「修改」改成名冊上的名字）';if(r.pay==='petty')return '工地零星支出（'+(r.who?esc(r.who)+' 的零用金':'零用金：<b style="color:#b26a00">還沒寫是誰的</b>')+'）';if(r.pay==='adv')return '工地零星支出（'+(r.who?esc(r.who)+' 代墊，之後要還給 '+esc(r.who):'代墊：<b style="color:#b26a00">沒寫是誰</b>')+'）';if(r.pay==='co')return '工地零星支出（公司直接付）';return '<b style="color:#b26a00">還沒寫付款方式</b>';}
+function _dlxRowHtml(r){var t=QC_TYPES[r.ti]||QC_TYPES[16],bad=!!r.why||!_dlxReady(r);
   return '<tr'+(bad?' style="background:#fff8e1"':'')+'><td style="padding:2px 4px">'+esc(r.item||'（沒寫項目）')+'<div style="font-size:11px;color:var(--b4)">原文：'+esc(r.text)+'</div>'+(r.why?'<div style="font-size:11px;color:#b26a00">'+esc(r.why)+'</div>':'')+'</td><td style="text-align:center">'+esc(t[0])+'<div style="font-size:11px;color:var(--b4)">'+esc(t[1])+'</div></td><td style="text-align:right">'+(r.amt?fmt(r.amt):'—')+'</td><td>'+_dlxWhat(r)+'<div style="font-size:11px;color:var(--b4)">'+esc(_DLX_PAY[r.pay]||'')+'</div></td></tr>';}
-function _dlxReady(r){return r.amt>0&&!!r.pay&&!((r.pay==='petty'||r.pay==='adv')&&!r.who);}
+// 審查：零用金結算 _pcItems 用人名完全一樣才對得到 → 零用金／代墊的人要在人員名冊裡（名冊是空的就不檢查）
+function _dlxStaff(){var L=[];try{L=_hrActive().map(function(p){return String(p.name||'').trim();}).filter(Boolean);}catch(e){_err('_dlxStaff',e);}return L;}
+function _dlxWhoOk(w){var L=_dlxStaff();return !L.length||L.indexOf(String(w||'').trim())>=0;}
+function _dlxReady(r){var t=QC_TYPES[r.ti];return r.amt>0&&!!r.pay&&!(t&&t[4]==='vendor')&&!((r.pay==='petty'||r.pay==='adv')&&!(r.who&&_dlxWhoOk(r.who)));}
 function _dlxCommit(x,rows){var q=_dlxQ(x);if(!q)return 0;var n=0;q.lineExpDone=Object.assign({},q.lineExpDone||{});
   rows.forEach(function(r){var k=_fbEncKey(r.key);if(q.lineExpDone[k])return;if(r.skip){q.lineExpDone[k]={at:Date.now(),by:_meEmail()||'本機',skip:1};return;}
     var res=_qcCommit({ti:r.ti,amt:r.amt,note:(r.item||'')+'（LINE 日報）',proj:q.id,payer:(r.pay==='co'?'':(r.who||'')),date:r.date});if(!res)return;
-    var c=q.costs[q.costs.length-1];if(c){c.src='line';c.lineKey=r.key;c.linePay=r.pay;}
+    var c=q.costs[q.costs.length-1];if(c){c.lineKey=r.key;c.linePay=r.pay;}   /* 審查：src 留 quick（當天支出清單、來源標示照舊認得），只多記 lineKey */
     q.lineExpDone[k]={at:Date.now(),by:_meEmail()||'本機',cid:c&&c.id,amt:r.amt};n++;});
   if(q.lineExpQ)rows.forEach(function(r){delete q.lineExpQ[_fbEncKey(r.key)];});
   _touch(q);persist();try{_immediateUpload();}catch(e){_err('_dlxCommit.up',e);}return n;}
@@ -45249,7 +45253,7 @@ _decReg('dlExp',{
   reject:function(x){_dlxCommit(x,x.rows.map(function(r){return Object.assign({},r,{skip:1});}));return true;},
   edit:function(x){var IN='padding:3px 5px;border:1px solid var(--b2);border-radius:6px;font-size:12px';
     var body='<div style="max-height:60vh;overflow:auto">'+x.rows.map(function(r,i){return '<div class="dlx-row" data-i="'+i+'" style="border:1px solid var(--b1);border-radius:8px;padding:6px;margin-top:4px"><div style="font-size:11px;color:var(--b4)">原文：'+esc(r.text)+'</div>'
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:3px"><select class="dlx-t" style="'+IN+'">'+QC_TYPES.map(function(t,j){return t[2]?'<option value="'+j+'"'+(j===r.ti?' selected':'')+'>'+esc(t[0])+'</option>':'';}).join('')+'</select>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:3px"><select class="dlx-t" style="'+IN+'">'+QC_TYPES.map(function(t,j){return t[4]==='vendor'?'':'<option value="'+j+'"'+(j===r.ti?' selected':'')+'>'+esc(t[0])+'</option>';}).join('')+'</select>'
       +'<input class="dlx-a" type="number" inputmode="numeric" value="'+esc(String(r.amt||''))+'" placeholder="金額" style="'+IN+';width:90px"><select class="dlx-p" style="'+IN+'"><option value="">付款方式</option>'+Object.keys(_DLX_PAY).map(function(k){return '<option value="'+k+'"'+(r.pay===k?' selected':'')+'>'+_DLX_PAY[k]+'</option>';}).join('')+'</select>'
       +'<input class="dlx-w" value="'+esc(r.who||'')+'" placeholder="誰（零用金／代墊）" style="'+IN+';width:110px"><label style="font-size:12px"><input type="checkbox" class="dlx-s"> 不記</label></div></div>';}).join('')+'</div>';
     showConfirm('修改 LINE 日報支出',body,function(){var rows=x.rows.map(function(r,i){var el=document.querySelector('.dlx-row[data-i="'+i+'"]');if(!el)return r;return Object.assign({},r,{ti:parseInt(el.querySelector('.dlx-t').value,10)||16,amt:Math.round(parseFloat(el.querySelector('.dlx-a').value)||0),pay:el.querySelector('.dlx-p').value,who:String(el.querySelector('.dlx-w').value||'').trim().slice(0,20),skip:el.querySelector('.dlx-s').checked?1:0});});

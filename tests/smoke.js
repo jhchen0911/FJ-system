@@ -11756,9 +11756,12 @@ async function newPage(browser, width, height) {
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
-      const out = {}; const keepQ = Q, keepD = DRAFTS, keepMark = window._draftMark;
+      const out = {}; const keepQ = Q, keepD = DRAFTS, keepMark = window._draftMark, keepSt = window._dlxStaff;
       try {
         window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        window._dlxStaff = () => ['系統管理員'];   // 人員名冊沒有小陳、阿明 → 標黃不准確認
+        out.staff = !_dlxReady({ amt: 600, pay: 'petty', who: '小陳', ti: 1 }) && /不在人員名冊/.test(_dlxWhat({ pay: 'petty', who: '小陳' }));
+        window._dlxStaff = () => ['小陳', '阿明'];
         Q = [{ id: 'qX', name: '支出測試案', awarded: true, t: { total: 0 }, items: [{ desc: '鋼板樁 III型 打設', unit: '支', qty: 30 }], dailyLogs: [], costs: [] }];
         const txt = '【今天做了】\n鋼板樁打設 5 支\n【支出】\n便當 5 個 600 零用金 小陳\n五金 1,250 代墊 阿明\n吊車費 8000 公司付\n涼水 300';
         DRAFTS = { dx111111: { id: 'dx111111', type: 'dailyLog', by: 'line-bot', at: 1, status: 'pending', summary: '施工日報', payload: { qid: 'qX', date: '2026-11-11', answers: [txt], photos: [] } } };
@@ -11770,12 +11773,12 @@ async function newPage(browser, width, height) {
         await _DEC.dlQty.ok(DRAFTS.dx111111);   // 日報卡先確認：支出搬到 q.lineExpQ，支出卡還在
         L = _decItems('dlExp'); out.queued = L.length === 1 && L[0].rows.length === 4 && Object.keys(Q[0].lineExpQ || {}).length === 4;
         const rows = L[0].rows.map(x => x.pay ? x : Object.assign({}, x, { pay: 'co' }));
-        out.commit = _dlxCommit(L[0], rows) === 4 && Q[0].costs.length === 4 && Q[0].costs.find(c => c.amt === 600).payer === '小陳' && Q[0].costs.find(c => c.amt === 1250).payer === '阿明' && Q[0].costs.find(c => c.amt === 8000).payer === '' && Q[0].costs.every(c => c.src === 'line' && c.date === '2026-11-11') && !_decItems('dlExp').length && !Object.keys(Q[0].lineExpQ).length;
+        out.commit = _dlxCommit(L[0], rows) === 4 && Q[0].costs.length === 4 && Q[0].costs.find(c => c.amt === 600).payer === '小陳' && Q[0].costs.find(c => c.amt === 1250).payer === '阿明' && Q[0].costs.find(c => c.amt === 8000).payer === '' && Q[0].costs.every(c => c.src === 'quick' && !!c.lineKey && c.date === '2026-11-11') && !_decItems('dlExp').length && !Object.keys(Q[0].lineExpQ).length;
         out.petty = _pcItems('小陳', '2026-11').some(x => x.amt === 600);
-      } finally { Q = keepQ; DRAFTS = keepD; window._draftMark = keepMark; }
+      } finally { Q = keepQ; DRAFTS = keepD; window._draftMark = keepMark; window._dlxStaff = keepSt; }
       return out;
     });
-    check('v6.0.234 LINE 日報支出卡：逐筆列原文、類別、金額、記成什麼（零用金／代墊要還給誰／公司付）；沒寫付款方式擋確認；日報卡確認後支出還在；確認才記成工地零星支出（付款人、日期照日報；零用金結算算得到）', Object.values(r).length === 6 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.234 LINE 日報支出卡：逐筆列原文、類別、金額、記成什麼（零用金／代墊要還給誰／公司付）；沒寫付款方式、人名不在人員名冊擋確認；日報卡確認後支出還在；確認才記成工地零星支出（付款人、日期照日報；零用金結算算得到）', Object.values(r).length === 7 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('v6.0.234 LINE 日報支出卡測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

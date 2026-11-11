@@ -200,22 +200,30 @@
   }
   // ── 【支出】（Lotion 11/11，選填）：一行一筆「項目＋金額＋付款方式（零用金／代墊 誰／公司付）」→ expOf 拆成支出草稿，Lotion 在卡片確認才入帳 ──
   //   金額＝不接數量單位（個、份、人、箱…）的數字，寫「元」的優先；付款方式沒寫、代墊沒寫是誰、沒寫金額 → why（卡片標黃，不猜）
-  var EXP_QTY_U = '個|份|人|支|箱|包|瓶|罐|台|趟|天|片|組|公斤|kg|KG|顆|條|捲|桶|張|盒|袋|件|杯';
+  var EXP_QTY_U = '個|份|人|支|箱|包|瓶|罐|台(?!幣)|趟|天|片|組|公斤|kg|KG|顆|條|捲|桶|張|盒|袋|件|杯|次|輛|公升|L|度|小時|hr';
+  var EXP_PAYW = /零用金|代墊|墊付|代付|公司付|公司出|公司帳|公司轉帳|月結/g;
   function expOf(text) {
     var S = sections(norm(text)), out = [];
     String(S.exp || '').split('\n').forEach(function (raw) {
-      var line = raw.replace(/^[\s　]*(?:\d+[.、)]|[-•・*])\s*/, '').trim(); if (!line || /^[（(]?\s*例/.test(line) || /^[（(].*[）)]$/.test(line)) return;
-      var re = new RegExp('(\\d+(?:\\.\\d+)?)\\s*(元|塊|' + EXP_QTY_U + ')?', 'g'), m, cand = [], first = -1;
-      while ((m = re.exec(line))) { if (first < 0) first = m.index; if (m[2] && m[2] !== '元' && m[2] !== '塊') continue; cand.push({ n: parseFloat(m[1]), yuan: !!m[2], at: m.index }); }
-      var pick = cand.filter(function (c) { return c.yuan; })[0] || cand[cand.length - 1] || null;
+      var line = raw.replace(/^[\s　]*(?:\d+[.、)]\s+|[-•・*]\s*)/, '').trim(); if (!line || /^[（(]?\s*例/.test(line) || /^[（(].*[）)]$/.test(line)) return;
+      // 審查：日期（11/11、11-11）不是金額；數量單位（個、次、公升…）後面的數字不是金額；寫「元／塊／$／NT」的優先；剩兩個以上沒標的數字＝金額不確定
+      var L2 = line.replace(/\d{1,4}\s*[\/／-]\s*\d{1,2}(?:\s*[\/／-]\s*\d{1,2})?/g, function (m) { return ' '.repeat(m.length); });
+      var re = new RegExp('(NT\\$|\\$|NT)?\\s*(\\d+(?:\\.\\d+)?)\\s*(元|塊|' + EXP_QTY_U + ')?', 'g'), m, cand = [], spans = [];
+      while ((m = re.exec(L2))) { if (!m[2]) { re.lastIndex++; continue; } spans.push([m.index, m.index + m[0].length]); if (m[3] && m[3] !== '元' && m[3] !== '塊') continue; cand.push({ n: parseFloat(m[2]), mark: !!(m[1] || m[3]) }); }
+      var marked = cand.filter(function (c) { return c.mark; }), pick = marked[0] || (cand.length === 1 ? cand[0] : (cand.length ? cand[cand.length - 1] : null)), unsure = !marked.length && cand.length > 1;
       var pay = '', who = '';
-      var mw = /(?:代墊|墊付|代付)\s*[:：]?\s*([^\s,，、0-9]{1,6})?/.exec(line);
-      if (/零用金/.test(line)) pay = 'petty';
-      else if (mw) { pay = 'adv'; who = (mw[1] || '').replace(/[的了]$/, ''); }
+      var mw = /(?:代墊|墊付|代付)\s*[:：]?\s*[（(]?\s*([^\s,，、0-9（）()]{1,4})/.exec(line), mp = /零用金\s*[:：]?\s*[（(]?\s*([^\s,，、0-9（）()]{1,4})/.exec(line);
+      if (/零用金/.test(line)) { pay = 'petty'; if (mp) who = mp[1]; }
+      else if (/代墊|墊付|代付/.test(line)) { pay = 'adv'; if (mw) who = mw[1]; }
       else if (/公司付|公司出|公司帳|月結|公司轉帳/.test(line)) pay = 'co';
-      var mp = /零用金\s*[:：]?\s*([^\s,，、0-9]{1,6})/.exec(line); if (pay === 'petty' && mp) who = mp[1];
-      var item = (first >= 0 ? line.slice(0, first) : line).replace(/零用金|代墊|墊付|代付|公司付|公司出|月結/g, '').replace(/[，,、:：\s]+$/, '').trim();
-      var why = !pick ? '沒寫金額' : (!pay ? '沒寫付款方式（零用金／代墊 誰／公司付）' : (pay === 'adv' && !who ? '代墊沒寫是誰' : ''));
+      who = who.replace(/(先付|先墊|付的|墊的|的|了|付)$/, '');
+      if (/代墊|墊付|代付|公司|月結/.test(who)) who = '';
+      // 審查：項目＝整行拿掉金額、數量、日期、付款方式、人名之後剩下的字（金額寫在前面也抓得到）
+      var item = line; spans.slice().reverse().forEach(function (sp) { item = item.slice(0, sp[0]) + ' ' + item.slice(sp[1]); });
+      item = item.replace(/\d{1,4}\s*[\/／-]\s*\d{1,2}(?:\s*[\/／-]\s*\d{1,2})?/g, ' ').replace(EXP_PAYW, ' ');
+      if (who) item = item.split(who).join(' ');
+      item = item.replace(/NT\$?|\$|新?台幣|先付|先墊|[，,、:：（）()]/g, ' ').replace(/\s+/g, ' ').trim();
+      var why = !pick ? '沒寫金額' : (unsure ? '金額不確定（有好幾個數字），請確認' : (!pay ? '沒寫付款方式（零用金／代墊 誰／公司付）' : ((pay === 'adv' || pay === 'petty') && !who ? (pay === 'adv' ? '代墊沒寫是誰' : '零用金沒寫是誰') : '')));
       out.push({ text: line.slice(0, 120), item: item.slice(0, 40), amt: pick ? Math.round(pick.n) : 0, pay: pay, who: who, sure: !why, why: why });
     });
     return out;
