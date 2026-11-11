@@ -2076,7 +2076,7 @@ function _saveQCore(){
           li.cat=qi.cat||'';                 // v5.377：類別以報價單為準
           li.otPrice=qi.ot?parseFloat((qi.ot.match(/^[\d.]+/)||[''])[0])||0:0;
           li.otUnit=qi.otu||li.otUnit||'';
-          (linkedInv.items||[]).forEach(function(rr){if(rr&&rr.remOf&&String(rr.remOf).trim()===String(li.desc||'').split('\n')[0].trim()){rr.contractPrice=li.contractPrice;rr.neg=li.neg;rr.contractQty=li.contractQty;rr.cat=li.cat;}});   // 審查第 6 點：拔除另列的那一列跟著改合約單價／數量
+          _invRemOf(li,linkedInv.items).forEach(function(rr){{rr.contractPrice=li.contractPrice;rr.neg=li.neg;rr.contractQty=li.contractQty;rr.cat=li.cat;}});   // 審查第 6 點：拔除另列的那一列跟著改合約單價／數量
         }
       });
       if(linkedInv===latestInv){
@@ -3041,6 +3041,7 @@ function settleInvItem(i){
   if(_inv&&_invLocked(_inv)){toast('這期已鎖住（'+_invLockWhy(_inv)+'），請在最新一期（未收款）做工項結算');return;}   // 健檢1 #1
   // v5.320：累計數量改跨「同案所有期別」取最大值。原本只算到目前這一期，
   // 回頭在舊期別按結算會把合約數量砍到該期為止的量（例如已做 95、卻被改成 40）。
+  if(it.remRid){toast('這一列是拔除另列，請在原工項那一列做工項結算');return;}   /* 審查：拔除另列跟原列一起算 */
   const _dsc=String(it.desc||'').trim();
   let _sib=[];
   try{
@@ -3054,11 +3055,11 @@ function settleInvItem(i){
     if(_inv&&v.id===_inv.id)return;
     (v.items||[]).forEach(function(x){
       if(x.type==='sec'||String(x.desc||'').trim()!==_dsc)return;
-      const c=(parseFloat(x.prevQty)||0)+_curW(x);
+      const c=_invRemSibs(x,v.items).reduce(function(a,y){return a+(parseFloat(y.prevQty)||0)+_curW(y);},0);
       if(c>_cumAll)_cumAll=c;
     });
   });
-  const cum=Math.round(Math.max(_cumAll,(parseFloat(it.prevQty)||0)+_curW(it))*100)/100;
+  const cum=Math.round(Math.max(_cumAll,_invRemSibs(it,invItems).reduce(function(a,y){return a+(parseFloat(y.prevQty)||0)+_curW(y);},0))*100)/100;
   if(cum<=0){toast('此工項尚無實作數量，無法結算');return;}
   // 健檢1 #5：打設＋拔除合一的工項，累計量依請款％加權（打設 70%＋拔除 30%），拔除沒完成前一定小於實作量，
   // 這時結算會把合約砍成 70%、之後拔除期又變超請 → 拔除完成（拔除累計＝打設累計）才准結算
@@ -3066,7 +3067,8 @@ function settleInvItem(i){
     const _c=_itemCat(it);
     if(_c.install&&_c.remove){
       const _rmNow=_isRemovePeriod(it),_cq=parseFloat(it.curQty)||0;
-      const _inst=(parseFloat(it.installCum)||0)+(_rmNow?0:_cq),_rem=(parseFloat(it.removeCum)||0)+(_rmNow?_cq:0);
+      let _inst=(parseFloat(it.installCum)||0)+(_rmNow?0:_cq),_rem=(parseFloat(it.removeCum)||0)+(_rmNow?_cq:0);
+      _invRemOf(it,invItems).forEach(function(rr){_rem+=(parseFloat(rr.removeCum)||0)+(parseFloat(rr.curQty)||0);});   // 審查：拔除另列的拔除量也算
       const _partial=(it.payRate!=null&&+it.payRate<100)||(it.prevPayRate!=null&&+it.prevPayRate<100);
       if(_inst>0?(_rem+1e-9<_inst):_partial){
         toast(_inst>0?('拔除尚未完成（已打設 '+fmt(_inst)+'、已拔除 '+fmt(_rem)+'），拔除完成後再做工項結算'):'這個工項分打設／拔除請款，查不到拔除進度，拔除完成後再做工項結算');
@@ -3301,9 +3303,13 @@ function _invDailySuggest(i){
 // 審查第 6 點（Lotion 11/11 選「同一張加一列拔除」）：同一期打設、拔除都有 → 另加一列「工項（拔除）」，列上 remOf＝原工項說明第一行；
 //   之後這個工項的拔除都記在這一列、原列只記打設；對報價用原列、累計 % 兩列合起來算
 function _invRowKey(it){return String((it&&it.remOf)||String((it&&it.desc)||'').split('\n')[0]).trim();}
+// 審查（第二次）：原列跟拔除列用專屬 id 連（原列 rid、拔除列 remRid），不靠名稱——同名不同規格的工項不會被加在一起
+function _invRemOf(main,list){return (main&&main.rid)?(list||[]).filter(function(x){return x&&x.type==='item'&&x.remRid===main.rid;}):[];}
+function _invRemMain(rr,list){return (rr&&rr.remRid)?((list||[]).find(function(x){return x&&x.rid===rr.remRid;})||null):null;}
+function _invRemSibs(it,list){var m=(it&&it.remRid)?_invRemMain(it,list):it;if(!m)return [it];return [m].concat(_invRemOf(m,list));}
 function _invItemQIdx(q,i){
   var it=invItems&&invItems[i];if(!q||!it)return -1;
-  if(it.remOf){var k0=invItems.findIndex(function(x){return x&&x.type!=='sec'&&!x.remOf&&String(x.desc||'').split('\n')[0].trim()===String(it.remOf).trim();});return k0>=0&&k0!==i?_invItemQIdx(q,k0):_qItemIdxByDesc(q,it.remOf);}var d=String(it.desc||'').split('\n')[0].trim();if(!d)return -1;
+  if(it.remRid){var _m=_invRemMain(it,invItems),k0=_m?invItems.indexOf(_m):-1;return k0>=0&&k0!==i?_invItemQIdx(q,k0):_qItemIdxByDesc(q,it.remOf||it.desc);}var d=String(it.desc||'').split('\n')[0].trim();if(!d)return -1;
   var n=0;for(var k=0;k<i;k++){var x=invItems[k];if(x&&x.type!=='sec'&&String(x.desc||'').split('\n')[0].trim()===d)n++;}
   var items=q.items||[],m=0;for(var j=0;j<items.length;j++){if(!items[j]||items[j].sec)continue;if(String(items[j].desc||'').split('\n')[0].trim()===d){if(m===n)return j;m++;}}
   return _qItemIdxByDesc(q,it.desc);
@@ -5134,7 +5140,7 @@ function _invUntouched(inv){
 // 報價現行工項 vs 請款工項的差異
 function _invQuoteDiff(inv,q){
   const qi=_invItemsFromQuote(q).filter(x=>x.type!=='sec');
-  const cur=((inv&&inv.items)||[]).filter(x=>x&&x.type==='item'&&!x.adjOf);   // 健檢1 #1：調整列不是報價工項
+  const cur=((inv&&inv.items)||[]).filter(x=>x&&x.type==='item'&&!x.adjOf&&!x.remRid);   // 健檢1 #1：調整列不是報價工項；拔除另列跟著原列，不算報價工項
   const cm={},qm={};
   cur.forEach(x=>{cm[_invKey(x.desc)]=x;});qi.forEach(x=>{qm[_invKey(x.desc)]=x;});
   const added=qi.filter(x=>!cm[_invKey(x.desc)]).map(x=>_invKey(x.desc));
@@ -5151,6 +5157,7 @@ function _invQuoteDiff(inv,q){
 function _invHasQty(x){return (parseFloat(x&&x.curQty)||0)>0||(parseFloat(x&&x.prevQty)||0)>0||(parseFloat(x&&x.prevAmt)||0)>0||(parseFloat(x&&x.curAmt)||0)>0;}
 function _invSyncItems(items,q){
   const fresh=_invItemsFromQuote(q),old=(items||[]).slice(),used={};
+  old.forEach((x,i)=>{if(x&&x.remRid)used[i]=1;});   /* 拔除另列：最後接回原列後面 */
   const out=fresh.map(f=>{
     if(f.type==='sec')return f;
     const k=_invKey(f.desc);
@@ -5168,6 +5175,9 @@ function _invSyncItems(items,q){
     if(x.type!=='item'){out.push(x);return;}
     if(hasQty)out.push(Object.assign({},x,{_qRetired:x._qRetired||(q.ver||1)}));   // v6.0.102：標記為「報價已刪、保留歷史數量」
   });
+  old.forEach(x=>{if(!x||!x.remRid)return;const mi=out.findIndex(y=>y&&y.rid===x.remRid);if(mi<0){if(_invHasQty(x))out.push(x);return;}const m=out[mi];
+    let at=mi+1;while(out[at]&&out[at].remRid===x.remRid)at++;
+    out.splice(at,0,Object.assign({},x,{contractPrice:m.contractPrice,contractQty:m.contractQty,cat:m.cat,neg:m.neg,unit:m.unit}));});   // 審查：拔除列跟著原列的單價、數量
   return out;
 }
 function _invApplyQuoteSync(inv,q){
@@ -5246,13 +5256,15 @@ function _invAutoDaily(inv){
     const ins=cat.install?_dailyQtyBetween(q,qd,from,to,'install',idx):0;
     const rem=cat.remove?_dailyQtyBetween(q,qd,from,to,'remove',idx):0;
     let v=0;
-    if(it.remOf){if(rem>0){it.phase='remove';it.payRate=_invPhasePct(q,q.items[idx],'remove');it.curQty=rem;n++;}return;}   /* 拔除列：只記拔除 */
-    const _sib=invItems.some(x=>x&&x.remOf&&String(x.remOf).trim()===_invRowKey(it));
+    if(it.remRid){if(rem>0){it.phase='remove';it.payRate=_invPhasePct(q,q.items[idx],'remove');it.curQty=rem;n++;}return;}   /* 拔除列：只記拔除 */
+    const _sib=_invRemOf(it,invItems).length>0;
     if(_sib){if(ins>0){it.phase='install';it.payRate=_invPhasePct(q,q.items[idx],'install');it.curQty=ins;n++;}return;}   /* 已經有拔除列：原列只記打設 */
-    if(cat.install&&cat.remove&&ins>0&&rem>0&&!_isRemovePeriod(it)){   /* 同一期兩種都有：原列請打設、另加一列請拔除 */
-      it.curQty=ins;n++;
+    if(cat.install&&cat.remove&&ins>0&&rem>0){   /* 同一期兩種都有：原列請打設（上一期是拔除期也改回打設）、另加一列請拔除 */
+      it.phase='install';it.payRate=_invPhasePct(q,q.items[idx],'install');it.curQty=ins;n++;
+      if(!it.rid)it.rid='r'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
       const r=JSON.parse(JSON.stringify(it));const d0=String(it.desc||'').split('\n');d0[0]=d0[0].trim()+'（拔除）';
-      Object.assign(r,{desc:d0.join('\n'),remOf:_invRowKey(it),phase:'remove',payRate:_invPhasePct(q,q.items[idx],'remove'),prevQty:0,prevAmt:0,curQty:rem,curAmt:0,curDays:0});delete r.icSeen;
+      Object.assign(r,{desc:d0[0],remOf:_invRowKey(it),remRid:it.rid,phase:'remove',payRate:_invPhasePct(q,q.items[idx],'remove'),prevQty:0,prevAmt:0,curQty:rem,curAmt:0,curDays:0,installCum:0,removeCum:0});
+      ['rid','icSeen','note','internalNote','origContractQty','_qRetired','settledQty','prevPayRate'].forEach(f=>{delete r[f];});   /* 審查：拔除列不帶原列的備註、結算、統計 */
       _adds.push([k,r]);n++;return;
     }
     if(_isRemovePeriod(it))v=rem;
@@ -34288,8 +34300,9 @@ function _pjSubHtml(q,st){
 // ── 工程專案：業主計價「＋ 新增請款單」＝此合約下一期（沒有請款單才從報價建第 1 期）──
 function pjNewInv(qid){
   var q=Q.find(function(x){return x.id===qid;});if(!q)return;
-  var list=_invsOfQuote(q);if(!list.length)list=_invsOfQuoteAll(q);
-  try{var _bl=list.filter(_icBlank);if(_bl.length){list=list.filter(function(x){return !_icBlank(x);});setTimeout(function(){try{_icAutoBlank();}catch(e){_err('pjNewInv.blank',e);}},0);}}catch(e){_err('pjNewInv.blank',e);}   /* 審查：舊版得標自動建的空白第 1 期不算（不然真的第一張變第 2 期）；那張照規則移到回收筒 */
+  var _bl=[],_nb=function(L){return L.filter(function(x){try{if(_icBlank(x)){_bl.push(x);return false;}}catch(e){_err('pjNewInv.blank',e);}return true;});};
+  var list=_nb(_invsOfQuote(q));if(!list.length)list=_nb(_invsOfQuoteAll(q));   /* 審查：先拿掉舊版得標自動建的空白第 1 期再找（不然真的第一張變第 2 期） */
+  if(!list.length&&_bl.length){var b0=_bl[0];try{_invStSet(b0,'draft','舊版得標建的空白第 1 期，拿來當這次的第 1 期');}catch(e){_err('pjNewInv.reuse',e);}_touch(b0);saveInv();loadInvoice(b0.id);go('invoice-edit');toast('用原本的空白第 1 期開始填');return;}   /* 直接用那一張（不會多一張，也不會被自動收） */
   if(!list.length){var inv=buildInvFromQuote(q);INV.unshift(inv);saveInv();loadInvoice(inv.id);go('invoice-edit');toast('已從報價單建立第 1 期請款單');return;}
   var last=list.slice().sort(function(a,b){return (parseInt(b.periodNo)||0)-(parseInt(a.periodNo)||0)||String(b.date||'').localeCompare(String(a.date||''));})[0];
   addNextPeriod(last.id);
@@ -34642,7 +34655,7 @@ function _autoSettle(q){
       ct.autoAdjSum=Math.round((+ct.autoAdjSum||0)+adj-prev);
       var tag='階段完工結算('+desc.slice(0,10)+')：'+_rfmt(orig)+'→'+_rfmt(a.qty);ct.note=ct.note?(ct.note+'　'+tag):tag;_touch(ct);ct.updatedAt=Date.now();ctCh=true;}
     try{_invsOfQuoteAll(q).forEach(function(inv){if(_invLocked(inv))return;   // 已收款／已開發票／已結案的期別不改（健檢1 #1）
-      (inv.items||[]).forEach(function(x){if(!x||x.type==='sec'||String(x.desc||'').trim()!==desc)return;if(x.origContractQty==null)x.origContractQty=parseFloat(x.contractQty)||orig;if((parseFloat(x.contractQty)||0)!==a.qty){x.contractQty=a.qty;invCh[inv.id]=inv;}});});}catch(e){_err('_autoSettle.inv',e);}
+      (inv.items||[]).forEach(function(x){if(!x||x.type==='sec'||String(x.desc||'').trim()!==desc)return;if(x.origContractQty==null)x.origContractQty=parseFloat(x.contractQty)||orig;if((parseFloat(x.contractQty)||0)!==a.qty){x.contractQty=a.qty;invCh[inv.id]=inv;}_invRemOf(x,inv.items).forEach(function(rr){if((parseFloat(rr.contractQty)||0)!==a.qty){rr.contractQty=a.qty;invCh[inv.id]=inv;}});});   /* 審查：拔除另列的合約數量一起改 */});}catch(e){_err('_autoSettle.inv',e);}
   });
   if(ctCh){try{saveContracts();}catch(e){_err('_autoSettle.ct',e);}}
   var ids=Object.keys(invCh);if(ids.length){ids.forEach(function(id){try{_recalcInvAmounts(invCh[id]);}catch(e){_err('_autoSettle',e);}_touch(invCh[id]);});try{saveInv();}catch(e){_err('_autoSettle.saveInv',e);}}
@@ -39397,7 +39410,7 @@ function _invRepriceDiff(inv,q,_match){
     var li=_match[i];if(!li||qi.sec)return;
     var c=Object.assign({},li,{contractPrice:parseFloat(qi.price)||0,neg:_qNegLine(qi)?1:0});
     d+=_invRowAmt(c)-_invRowAmt(li);
-    (inv.items||[]).forEach(function(rr){if(rr&&rr.remOf&&String(rr.remOf).trim()===String(li.desc||'').split('\n')[0].trim()){var c2=Object.assign({},rr,{contractPrice:parseFloat(qi.price)||0,neg:_qNegLine(qi)?1:0});d+=_invRowAmt(c2)-_invRowAmt(rr);}});   // 審查第 6 點：拔除另列也算差額
+    _invRemOf(li,inv.items).forEach(function(rr){{var c2=Object.assign({},rr,{contractPrice:parseFloat(qi.price)||0,neg:_qNegLine(qi)?1:0});d+=_invRowAmt(c2)-_invRowAmt(rr);}});   // 審查第 6 點：拔除另列也算差額
   });
   return Math.round(d);
 }
@@ -46263,13 +46276,13 @@ function _ibList(){var v=null;try{v=_todoBuild();}catch(e){_err('_ibList',e);}re
 function _ibInvs(q){var L=[];try{L=_invsOfQuote(q);if(!L.length)L=_invsOfQuoteAll(q);}catch(e){_err('_ibInvs',e);}return (L||[]).filter(function(x){return x&&x.kind!=='retReturn';}).sort(function(a,b){return (parseInt(b.periodNo)||0)-(parseInt(a.periodNo)||0)||String(b.date||'').localeCompare(String(a.date||''));});}
 // 這期每個工項是哪幾天的日報：since（上一張請款單日期）之後到截止日
 function _ibSrc(q,idx,since,to){var out=[];((q&&q.dailyLogs)||[]).forEach(function(L){var d=String((L&&L.date)||'');if(!d||d<=since||d>to||L.photoOnly)return;var s=0,rm=0;((L.progressRows)||[]).forEach(function(r){if(r&&Number(r.itemIdx)===idx&&(parseFloat(r.qty)||0)>0){if(_prPhase(q,r)==='remove')rm+=parseFloat(r.qty)||0;else s+=parseFloat(r.qty)||0;}});if(s>0||rm>0)out.push({d:d,q:Math.round(s*100)/100,r:Math.round(rm*100)/100});});return out.sort(function(a,b){return a.d<b.d?-1:1;});}   /* 審查：打設、拔除分開 */
-function _ibPrevQty(inv,desc){if(!inv)return null;var k=String(desc||'').split('\n')[0].trim(),it=(inv.items||[]).find(function(x){return x&&x.type!=='sec'&&String(x.desc||'').split('\n')[0].trim()===k;});return it?(parseFloat(it.curQty)||0):null;}
+function _ibPrevQty(inv,desc){if(!inv)return null;var k=String(desc||'').split('\n')[0].trim(),it=(inv.items||[]).find(function(x){return x&&x.type!=='sec'&&!x.remRid&&String(x.desc||'').split('\n')[0].trim()===k;});return it?_invRemSibs(it,inv.items).reduce(function(a,y){return a+(parseFloat(y.curQty)||0);},0):null;}   /* 審查：拔除另列一起算 */
 function _ibDetailHtml(b){var q=_ibQ(b.qid);if(!q)return '';var invs=_ibInvs(q),last=invs[0]||null,n=last?(parseInt(last.periodNo)||0)+1:1;
   var ph=function(r){return _prPhase(q,r);};
   var rows=b.items.map(function(x){var it=(q.items||[])[x.idx]||{},src=_ibSrc(q,x.idx,b.since||'',b.cutDate),tg=Math.abs(parseFloat(it.qty)||0),ci=FJC.dl.cumOf(q.dailyLogs,x.idx,'install',ph),cr=FJC.dl.cumOf(q.dailyLogs,x.idx,'remove',ph),over=tg>0&&(ci>tg+1e-9||cr>tg+1e-9),pv=_ibPrevQty(last,it.desc);
     var ni=src.reduce(function(a,s){return a+s.q;},0),nr=src.reduce(function(a,s){return a+s.r;},0);
     var two=function(a,r){return (a?'打設 '+fmt(Math.round(a*100)/100):'')+(a&&r?'<br>':'')+(r?'拔除 '+fmt(Math.round(r*100)/100):'')||'0';};
-    var lit=last?(last.items||[]).find(function(y){return y&&y.type!=='sec'&&String(y.desc||'').split('\n')[0].trim()===String(it.desc||'').split('\n')[0].trim();}):null,cq=Math.abs(parseFloat(it.qty)||0),pw=lit?(parseFloat(lit.prevQty)||0)+_wQty(lit.curQty,lit.payRate):0;
+    var lit=last?(last.items||[]).find(function(y){return y&&y.type!=='sec'&&String(y.desc||'').split('\n')[0].trim()===String(it.desc||'').split('\n')[0].trim();}):null,cq=Math.abs(parseFloat(it.qty)||0),pw=lit?_invRemSibs(lit,last.items).reduce(function(a,y){return a+(parseFloat(y.prevQty)||0)+_wQty(y.curQty,y.payRate);},0):0;
     var pi=_invPhasePct(q,it,'install'),pr=_invPhasePct(q,it,'remove'),tw=ni*pi/100+nr*pr/100,cum=cq>0?Math.round((pw+tw)/cq*1000)/10:null,pcs=(ni?'打設 '+pi+'%':'')+(ni&&nr?'<br>':'')+(nr?'拔除 '+pr+'%':'');
     if(cum!=null&&cum>100.05)over=true;
     if(ni>0&&nr>0)pcs+='<div style="color:#b26a00">這期打設、拔除都有：請款單會另加一列「（拔除）」請 '+fmt(Math.round(nr*100)/100)+'（拔除 '+pr+'%）</div>';   /* 審查：卡片不要寫成兩種都會請 */
@@ -46314,7 +46327,7 @@ function _icAutoBlank(){if(_isReaderUser||!_decIsAdmin())return 0;try{if(typeof 
   var L=(INV||[]).filter(_icBlank);if(!L.length)return 0;P.invAutoLog=(Array.isArray(P.invAutoLog)?P.invAutoLog:[]);
   L.forEach(function(inv){try{_tomb('invoices',inv.id);}catch(e){_err('_icAutoBlank.tomb',e);return;}P.invAutoLog.push({at:Date.now(),by:_meEmail()||'本機',id:inv.id,project:String(inv.project||'').slice(0,60),periodNo:inv.periodNo||'1',date:inv.date||'',why:'完全沒動過的空白第 1 期（舊版得標時自動建的），移到回收筒'});});
   var ids={};L.forEach(function(x){ids[x.id]=1;});INV=INV.filter(function(v){return !ids[v.id];});P.invAutoLog=P.invAutoLog.slice(-200);persistP();saveInv();return L.length;}
-function _icOver(inv){if(!_invStDoc(inv))return [];var _L=inv.items||[];return _L.filter(function(it){if(it&&it.remOf)return false;var c=_invItemCumPct(it,_L);return c!=null&&c>100.05;}).map(function(it){return {desc:String(it.desc||'').split('\n')[0].slice(0,40),pct:_invItemCumPct(it,_L),rate:it.payRate!=null?it.payRate:100};});}
+function _icOver(inv){if(!_invStDoc(inv))return [];var _L=inv.items||[];return _L.filter(function(it){if(it&&it.remRid)return false;var c=_invItemCumPct(it,_L);return c!=null&&c>100.05;}).map(function(it){return {desc:String(it.desc||'').split('\n')[0].slice(0,40),pct:_invItemCumPct(it,_L),rate:it.payRate!=null?it.payRate:100};});}
 function _icList(){var out=[];(INV||[]).forEach(function(inv){if(!inv||!inv.id)return;var ck=inv.icSeen||{};if(_icNear(inv)&&!ck.blank)out.push({id:inv.id+'|blank',kind:'blank',inv:inv,has:_icContent(inv)});var ov=_icOver(inv);if(ov.length&&!ck.over)out.push({id:inv.id+'|over',kind:'over',inv:inv,over:ov});});return out;}
 function _icSeen(inv,k){inv.icSeen=Object.assign({},inv.icSeen||{});inv.icSeen[k]={at:Date.now(),by:_meEmail()||'本機'};_touch(inv);_invStSyncing=true;try{saveInv();}finally{_invStSyncing=false;}}
 _decReg('invChk',{
@@ -46350,7 +46363,7 @@ function _isList(){var td=localToday();return (INV||[]).filter(function(inv){ret
 function _isPrev(inv){var L=(INV||[]).filter(function(x){return x&&x!==inv&&x.kind!=='retReturn'&&((inv.quoteId&&x.quoteId===inv.quoteId)||(!inv.quoteId&&x.project===inv.project))&&(parseInt(x.periodNo)||0)<(parseInt(inv.periodNo)||0);});return L.sort(function(a,b){return (parseInt(b.periodNo)||0)-(parseInt(a.periodNo)||0);})[0]||null;}
 // 健檢 H1（11/11）：請款單存檔的合計欄位是 totals.total（含稅、扣保留款與清潔費後），沒有 grand；沒存過金額的照存檔同一套重算
 // 審查：一式工項、負數量（減帳）、調整列不算 %
-function _invItemCumPct(it,list){var cq=parseFloat(it&&it.contractQty)||0;if(!(cq>0)||!it||it.type==='rental'||it.neg||it.adjOf||(parseFloat(it.contractPrice)||0)<0||/^式$/.test(String(it.unit||'').trim()))return null;var rows=[it];if(Array.isArray(list)){var k=_invRowKey(it);rows=list.filter(function(x){return x&&x.type==='item'&&_invRowKey(x)===k;});if(rows.indexOf(it)<0)rows.push(it);}return Math.round(rows.reduce(function(a,x){return a+(parseFloat(x.prevQty)||0)+_wQty(x.curQty,x.payRate);},0)/cq*1000)/10;}   /* list＝同一張的工項：拔除另列時兩列合起來算 */   // 健檢 H5：這個工項到這期為止請了合約的幾 %（依請款比例加權）
+function _invItemCumPct(it,list){var cq=parseFloat(it&&it.contractQty)||0;if(!(cq>0)||!it||it.type==='rental'||it.neg||it.adjOf||(parseFloat(it.contractPrice)||0)<0||/^式$/.test(String(it.unit||'').trim()))return null;var rows=Array.isArray(list)?_invRemSibs(it,list):[it];return Math.round(rows.reduce(function(a,x){return a+(parseFloat(x.prevQty)||0)+_wQty(x.curQty,x.payRate);},0)/cq*1000)/10;}   /* list＝同一張的工項：拔除另列時兩列合起來算 */   // 健檢 H5：這個工項到這期為止請了合約的幾 %（依請款比例加權）
 // 審查：卡上的未稅／稅／含稅都用同一份（沒存過金額就照存檔算法重算一份）
 function _isTot(inv){var t=(inv&&inv.totals)||{};if(parseFloat(t.total)>0||!inv||!Array.isArray(inv.items))return t;try{var c=JSON.parse(JSON.stringify(inv));_recalcInvAmounts(c);return c.totals||t;}catch(e){_err('_isTot',e);return t;}}
 function _isAmt(inv){var t=(inv&&inv.totals)||{},v=parseFloat(t.total);if(!(v>0)&&inv&&Array.isArray(inv.items)){try{var c=JSON.parse(JSON.stringify(inv));_recalcInvAmounts(c);v=parseFloat(c.totals&&c.totals.total);}catch(e){_err('_isAmt',e);}}return v>0?Math.round(v):0;}

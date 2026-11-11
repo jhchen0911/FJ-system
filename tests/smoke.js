@@ -11746,10 +11746,20 @@ async function newPage(browser, width, height) {
         out.saved = !!p2 && p2.items.filter((x) => x && x.type === 'item').length === 2 && p2.items.some((x) => x.remOf && x.curQty === 20) && parseFloat(p2.totals.total) > 0;
         // 拔除列的金額＝20 支 × 1,000 × 30%
         const rr = p2.items.find((x) => x.remOf); out.amt = Math.round(parseFloat(rr.curAmt) || 0) === 6000;
+        out.link = !!rr.remRid && p2.items.some((x) => x.rid === rr.remRid && !x.remRid) && !rr.note && !rr.installCum;
+        // 審查（第二次）：同名不同規格的兩列不會被加在一起算累計
+        const L2 = [{ type: 'item', desc: 'H型鋼 打設', contractQty: 50, curQty: 30, payRate: 100 }, { type: 'item', desc: 'H型鋼 打設', contractQty: 50, curQty: 30, payRate: 100 }];
+        out.dup = _invItemCumPct(L2[0], L2) === 60 && _invItemCumPct(L2[1], L2) === 60;
+        // 下一期：上一期原列是拔除期、這期兩種都有 → 原列改回打設、拔除照樣記在拔除列（不再多一列）
+        p2.items.find((x) => x.rid).phase = 'remove'; _touch(p2); saveInv();
+        Q[0].dailyLogs.push({ id: 'c', date: d(-1), progressRows: [{ itemIdx: 0, qty: 5, ph: 'install' }, { itemIdx: 0, qty: 7, ph: 'remove' }] });
+        p2.date = d(-2); _touch(p2); saveInv(); pjNewInv('qR'); await new Promise((res) => setTimeout(res, 300));
+        const m3 = invItems.find((x) => x && x.rid && !x.remRid), r3 = invItems.filter((x) => x && x.remRid);
+        out.next = !!m3 && m3.phase === 'install' && m3.curQty === 5 && m3.payRate === 70 && r3.length === 1 && r3[0].curQty === 7 && r3[0].payRate === 30;
       } finally { Q = keepQ; INV = keepI; }
       return out;
     });
-    check('審查第 6 點：同一期打設 40、拔除 20 → 原列請打設 40（70%）、另加一列（拔除）請 20（30%，6,000）；累計兩列合算、存檔後拔除列還對得到報價那一項', Object.values(r).length === 5 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('審查第 6 點：同一期打設 40、拔除 20 → 原列請打設 40（70%）、另加一列（拔除）請 20（30%，6,000）；累計兩列合算、存檔後拔除列還對得到報價那一項', Object.values(r).length === 8 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('審查第 6 點測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
@@ -11903,7 +11913,7 @@ async function newPage(browser, width, height) {
         out.keepSafe = _icAutoBlank() === 0 && INV.length === 3;
         INV = [blank({ id: '1700000000005' })]; pjNewInv('qH');
         await new Promise((res) => setTimeout(res, 50));
-        out.p1 = INV.length === 1 && INV[0].id !== '1700000000005' && String(INV[0].periodNo) === '1';
+        out.p1 = INV.length === 1 && INV[0].id === '1700000000005' && String(INV[0].periodNo) === '1' && _invStOf(INV[0]) === 'draft' && _icAutoBlank() === 0 && INV.length === 1;   // 直接用那張空白第 1 期（不多一張、之後也不會被收）
         // 審查：下一期不帶「看過超過 100%」的紀錄
         INV[0].icSeen = { over: { at: 1 } }; INV[0].lockLog = [{ at: 1 }]; addNextPeriod(INV[0].id); out.nextClean = !INV[0].icSeen && !INV[0].lockLog;
         // Lotion 第 2 題：預設 70／30；合約條件不一樣 → 出卡問，確認後這一案才改用

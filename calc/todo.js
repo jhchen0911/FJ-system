@@ -108,12 +108,16 @@
   // today：今天（YYYY-MM-DD，由呼叫端給）
   // 健檢 M4（11/11）：報價把打設、拔除分成兩列（「H型鋼 打設」「H型鋼 拔除」）→ 兩列連起來看：租期跟著打設那列、拔除那列的日報讓租金停
   //   配對＝一列只有打設、一列只有拔除，工項名稱拿掉動作字之後一樣、單位一樣，而且只有唯一一對
-  function _pairKey(it) { return String((it && it.desc) || '').replace(/打設|裝設|安裝|組立|鋪設|架設|吊裝|施打|拔除|拆除|回收|撤除|及|與|和|＋|\+|、|[\s　（）()]/g, '').toUpperCase(); }
+  function _pairClean(t) { return String(t || '').replace(/打設|裝設|安裝|組立|鋪設|架設|吊裝|施打|拔除|拆除|回收|撤除|及|與|和|＋|\+|、|[\s　（）()]/g, '').toUpperCase(); }
+  function _pairKey(it) { return _pairClean(String((it && it.desc) || '').split('\n')[0]); }
+  function _pairSpec(it) { return _pairClean(String((it && it.desc) || '').split('\n').slice(1).join('')); }
+  // 審查（第二次）：第 1 行一樣才配；第 2 行以後（規格）兩邊都有寫才比，一邊沒寫照舊配得到
+  function _pairSame(a, b) { if (_pairKey(a) !== _pairKey(b)) return false; var x = _pairSpec(a), y = _pairSpec(b); return !x || !y || x === y; }
   function _pairHits(q, idx) {
     var its = (q && q.items) || [], it = its[idx]; if (!it || it.sec) return null;
     var c = itemCat(it); if (c.install === c.remove) return null;
     var k = _pairKey(it), u = uFix(it.unit || ''); if (k.length < 2) return null;
-    var hits = []; its.forEach(function (x, j) { if (j === idx || !x || x.sec) return; var cx = itemCat(x); if (cx.install === c.install || cx.remove === c.remove) return; if (_pairKey(x) === k && uFix(x.unit || '') === u) hits.push(j); });
+    var hits = []; its.forEach(function (x, j) { if (j === idx || !x || x.sec) return; var cx = itemCat(x); if (cx.install === c.install || cx.remove === c.remove) return; if (_pairSame(x, it) && uFix(x.unit || '') === u) hits.push(j); });
     return hits.length === 1 ? { idx: hits[0], role: c.install ? 'install' : 'remove' } : null;
   }
   // 審查：兩邊互相只認得對方才算一對（不然 H350 打設會配到 H300 的拔除）；比對整段說明（規格寫在第 2 行也算）

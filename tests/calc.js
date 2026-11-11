@@ -505,7 +505,7 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const mb5 = T.monthBill({ q: q5, invs: [{ date: '2026-10-24' }], cust: {}, def: { cut: 25 }, today: '2026-11-22' });
   const q6 = { items: [{ desc: 'H型鋼 打設\nH300', unit: '支', qty: 10 }, { desc: 'H型鋼 拔除\nH300', unit: '支', qty: 10 }, { desc: 'H型鋼 打設\nH350', unit: '支', qty: 5 }] };
   check('審查：逾期租金拔完、上次請款後沒有新的逾期天數 → 不出只有租金的草稿卡；配對要規格一樣、兩邊互相配（H350 打設不會配到 H300 拔除）',
-    mb5 === null && T.pairOf(q6, 0) && T.pairOf(q6, 0).idx === 1 && T.pairOf(q6, 2) === null && T.pairOf(q6, 1).idx === 0, JSON.stringify([mb5, T.pairOf(q6, 2)]));
+    mb5 === null && T.pairOf(q6, 0) && T.pairOf(q6, 0).idx === 1 && T.pairOf(q6, 2) === null && T.pairOf(q6, 1).idx === 0 && (T.pairOf({ items: [{ desc: 'H型鋼 打設\nH300', unit: '支', qty: 10 }, { desc: 'H型鋼 拔除', unit: '支', qty: 10 }] }, 0) || {}).idx === 1, JSON.stringify([mb5, T.pairOf(q6, 2)]));   // 一邊沒寫規格照舊配得到
   check('健檢 M1：這個月沒有新的日報、只有逾期租金 → 照樣出請款單草稿卡（rentOnly、列出逾期天數）', !!mb && mb.rentOnly && mb.items.length === 0 && mb.rent.length === 1 && mb.rent[0].overDays > 0 && mb.cutDate === '2026-11-25');
   const R = (t) => DL.parse(t, [{ desc: '鋼板樁 III型 拔除', unit: '支', qty: 120 }]).rows;
   check('健檢 M2：「第一段拔除 40 支，這段拔完了」「…，這段拔完」都標本段完成', R('鋼板樁拔除 40 支，這段拔完了')[0].batchDone === true && R('第一段鋼板樁拔除 40 支，這段拔完了')[0].batchDone === true && R('鋼板樁拔除 40 支，這段拔完')[0].batchDone === true && R('鋼板樁拔除 40 支，這段還沒拔完')[0].batchDone === false);
