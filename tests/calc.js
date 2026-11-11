@@ -506,6 +506,15 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('新格式日報：一個群組好幾個工地＝好幾段【工地】，編號各自從 1 開始；範本的【本工地工項】不算回報內容（stripList）',
     (T.match(/【工地】/g) || []).length === 2 && /【工地】B 案\n【本工地工項】\n1 /.test(T) && !/追加/.test(DL.stripList('【本工地工項】\n1 追加 H300\n【今天做了】\n1 打設 3')) && /打設 3/.test(DL.stripList('【本工地工項】\n1 追加 H300\n【今天做了】\n1 打設 3')));
 }
+// ── v6.0.234 LINE 日報【支出】（Lotion 11/11，選填）：一行一筆「項目＋金額＋付款方式」
+{
+  const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl;
+  const E = DL.expOf('【今天做了】\n1 打設 12\n【支出】\n便當 5 個 600 零用金\n五金 1,250 代墊 阿明\n吊車費 8000 公司付\n涼水 300\n加油 1500元 零用金 小陳\n例：便當 5 個 600 零用金\n雜支 代墊\n【明天】\n續打');
+  check('LINE 日報【支出】：金額不吃「5 個」這種數量、千分位、寫「元」優先；零用金／代墊 誰／公司付；沒寫付款方式、代墊沒寫是誰、沒金額＝待確認；範例行不算；【支出】不影響工項數量',
+    E.length === 6 && E[0].item === '便當' && E[0].amt === 600 && E[0].pay === 'petty' && E[1].amt === 1250 && E[1].pay === 'adv' && E[1].who === '阿明' && E[2].pay === 'co' && E[2].amt === 8000
+    && !E[3].sure && /付款方式/.test(E[3].why) && E[4].amt === 1500 && E[4].who === '小陳' && !E[5].sure && E[5].amt === 0
+    && DL.parseFmt('【今天做了】\n\n【支出】\n便當 5 個 600 零用金', [], [{ desc: '鋼板樁 打設', unit: '支', qty: 10 }]).rows.length === 0 && /【支出】/.test(DL.askText('', [{ site: 'A', list: [] }], '11/11')) && !DL.expOf('今天打設鋼板樁 20 支').length);
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');

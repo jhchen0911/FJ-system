@@ -11752,6 +11752,33 @@ async function newPage(browser, width, height) {
     check('v6.0.234 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── v6.0.234 LINE 日報【支出】→ 支出草稿卡 dlExp（確認才入帳；零用金／代墊記付款人、公司付空白；日報卡確認後支出還在）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepQ = Q, keepD = DRAFTS, keepMark = window._draftMark;
+      try {
+        window._draftMark = function (id, st) { DRAFTS[id].status = st; return Promise.resolve(true); };
+        Q = [{ id: 'qX', name: '支出測試案', awarded: true, t: { total: 0 }, items: [{ desc: '鋼板樁 III型 打設', unit: '支', qty: 30 }], dailyLogs: [], costs: [] }];
+        const txt = '【今天做了】\n鋼板樁打設 5 支\n【支出】\n便當 5 個 600 零用金 小陳\n五金 1,250 代墊 阿明\n吊車費 8000 公司付\n涼水 300';
+        DRAFTS = { dx111111: { id: 'dx111111', type: 'dailyLog', by: 'line-bot', at: 1, status: 'pending', summary: '施工日報', payload: { qid: 'qX', date: '2026-11-11', answers: [txt], photos: [] } } };
+        let L = _decItems('dlExp');
+        out.card = L.length === 1 && L[0].rows.length === 4 && /4 筆，合計 NT\$ 10,150，1 筆要先修改/.test(_DEC.dlExp.body(L[0]));
+        const det = await _DEC.dlExp.detail(L[0]);
+        out.detail = /小陳 的零用金/.test(det) && /阿明 代墊，之後要還給 阿明/.test(det) && /公司直接付/.test(det) && /還沒寫付款方式/.test(det) && /便當/.test(det) && /五金零件/.test(det);
+        out.block = _DEC.dlExp.ok(L[0]) === false && !Q[0].costs.length;   // 有一筆沒寫付款方式 → 先不記
+        await _DEC.dlQty.ok(DRAFTS.dx111111);   // 日報卡先確認：支出搬到 q.lineExpQ，支出卡還在
+        L = _decItems('dlExp'); out.queued = L.length === 1 && L[0].rows.length === 4 && Object.keys(Q[0].lineExpQ || {}).length === 4;
+        const rows = L[0].rows.map(x => x.pay ? x : Object.assign({}, x, { pay: 'co' }));
+        out.commit = _dlxCommit(L[0], rows) === 4 && Q[0].costs.length === 4 && Q[0].costs.find(c => c.amt === 600).payer === '小陳' && Q[0].costs.find(c => c.amt === 1250).payer === '阿明' && Q[0].costs.find(c => c.amt === 8000).payer === '' && Q[0].costs.every(c => c.src === 'line' && c.date === '2026-11-11') && !_decItems('dlExp').length && !Object.keys(Q[0].lineExpQ).length;
+        out.petty = _pcItems('小陳', '2026-11').some(x => x.amt === 600);
+      } finally { Q = keepQ; DRAFTS = keepD; window._draftMark = keepMark; }
+      return out;
+    });
+    check('v6.0.234 LINE 日報支出卡：逐筆列原文、類別、金額、記成什麼（零用金／代墊要還給誰／公司付）；沒寫付款方式擋確認；日報卡確認後支出還在；確認才記成工地零星支出（付款人、日期照日報；零用金結算算得到）', Object.values(r).length === 6 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.234 LINE 日報支出卡測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── v6.0.226 請款鏈 1：請款單狀態（草稿→已送業主→業主已確認→已開發票→已收款）、舊單推算清單卡、業主確認卡＋發票照抄範例 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

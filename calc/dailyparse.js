@@ -132,8 +132,8 @@
     });
     return out;
   }
-  var FMT_TAGS = { '日期': 'date', '工地': 'site', '本工地工項': 'list', '今天做了': 'today', '今天': 'today', '人和機具': 'crew', '明天': 'tomorrow', '問題': 'issue' };
-  var FMT_RE = /【\s*(本工地工項|今天做了|人和機具|日期|工地|今天|明天|問題)\s*】/g;
+  var FMT_TAGS = { '日期': 'date', '工地': 'site', '本工地工項': 'list', '今天做了': 'today', '今天': 'today', '人和機具': 'crew', '支出': 'exp', '明天': 'tomorrow', '問題': 'issue' };
+  var FMT_RE = /【\s*(本工地工項|今天做了|人和機具|日期|工地|今天|支出|明天|問題)\s*】/g;
   // sections(text) → {date, site, list, today, crew, tomorrow, issue, tagged}：沒有任何【】欄位＝tagged:false（舊寫法）
   function sections(text) {
     var t = String(text || '').replace(/\r/g, ''), out = { tagged: false }, segs = [], m; FMT_RE.lastIndex = 0;
@@ -198,14 +198,36 @@
     String(S.crew || '').split('\n').forEach(function (l) { l = l.trim(); if (l && !/^[（(]?\s*例/.test(l)) skip.push('人和機具：' + l.slice(0, 60)); });
     return { rows: rows, skip: skip, fmt: true, crew: S.crew || '', tomorrow: S.tomorrow || '', issue: S.issue || '' };
   }
+  // ── 【支出】（Lotion 11/11，選填）：一行一筆「項目＋金額＋付款方式（零用金／代墊 誰／公司付）」→ expOf 拆成支出草稿，Lotion 在卡片確認才入帳 ──
+  //   金額＝不接數量單位（個、份、人、箱…）的數字，寫「元」的優先；付款方式沒寫、代墊沒寫是誰、沒寫金額 → why（卡片標黃，不猜）
+  var EXP_QTY_U = '個|份|人|支|箱|包|瓶|罐|台|趟|天|片|組|公斤|kg|KG|顆|條|捲|桶|張|盒|袋|件|杯';
+  function expOf(text) {
+    var S = sections(norm(text)), out = [];
+    String(S.exp || '').split('\n').forEach(function (raw) {
+      var line = raw.replace(/^[\s　]*(?:\d+[.、)]|[-•・*])\s*/, '').trim(); if (!line || /^[（(]?\s*例/.test(line) || /^[（(].*[）)]$/.test(line)) return;
+      var re = new RegExp('(\\d+(?:\\.\\d+)?)\\s*(元|塊|' + EXP_QTY_U + ')?', 'g'), m, cand = [], first = -1;
+      while ((m = re.exec(line))) { if (first < 0) first = m.index; if (m[2] && m[2] !== '元' && m[2] !== '塊') continue; cand.push({ n: parseFloat(m[1]), yuan: !!m[2], at: m.index }); }
+      var pick = cand.filter(function (c) { return c.yuan; })[0] || cand[cand.length - 1] || null;
+      var pay = '', who = '';
+      var mw = /(?:代墊|墊付|代付)\s*[:：]?\s*([^\s,，、0-9]{1,6})?/.exec(line);
+      if (/零用金/.test(line)) pay = 'petty';
+      else if (mw) { pay = 'adv'; who = (mw[1] || '').replace(/[的了]$/, ''); }
+      else if (/公司付|公司出|公司帳|月結|公司轉帳/.test(line)) pay = 'co';
+      var mp = /零用金\s*[:：]?\s*([^\s,，、0-9]{1,6})/.exec(line); if (pay === 'petty' && mp) who = mp[1];
+      var item = (first >= 0 ? line.slice(0, first) : line).replace(/零用金|代墊|墊付|代付|公司付|公司出|月結/g, '').replace(/[，,、:：\s]+$/, '').trim();
+      var why = !pick ? '沒寫金額' : (!pay ? '沒寫付款方式（零用金／代墊 誰／公司付）' : (pay === 'adv' && !who ? '代墊沒寫是誰' : ''));
+      out.push({ text: line.slice(0, 120), item: item.slice(0, 40), amt: pick ? Math.round(pick.n) : 0, pay: pay, who: who, sure: !why, why: why });
+    });
+    return out;
+  }
   // askText(head, blocks, ymd) → 17:30 問句：blocks＝[{site, list}]（一個群組好幾個工地＝好幾段，編號各自從 1 開始）
   function askText(head, blocks, md) {
     var B = (blocks && blocks.length) ? blocks : [{ site: '', list: [] }];
     return String(head || '') + '\n' + B.map(function (b) {
-      return '【日期】' + md + '\n【工地】' + (b.site || '') + '\n' + (b.list && b.list.length ? '【本工地工項】\n' + b.list.map(function (e) { return e.no + ' ' + e.label; }).join('\n') + '\n' : '') + '【今天做了】\n\n【人和機具】\n\n【明天】\n\n【問題】\n';
+      return '【日期】' + md + '\n【工地】' + (b.site || '') + '\n' + (b.list && b.list.length ? '【本工地工項】\n' + b.list.map(function (e) { return e.no + ' ' + e.label; }).join('\n') + '\n' : '') + '【今天做了】\n\n【人和機具】\n\n【支出】\n\n【明天】\n\n【問題】\n';
     }).join('\n');
   }
-  var dl = { parse: parse, cumOf: cumOf, qtyOf: qtyOf, terms: terms, specs: specs, cn2n: cn2n, norm: norm, askList: askList, parseFmt: parseFmt, sections: sections, stripList: stripList, askText: askText };
+  var dl = { parse: parse, cumOf: cumOf, qtyOf: qtyOf, terms: terms, specs: specs, cn2n: cn2n, norm: norm, askList: askList, parseFmt: parseFmt, expOf: expOf, sections: sections, stripList: stripList, askText: askText };
   if (typeof module !== 'undefined' && module.exports) module.exports = { dl: dl };
   root.FJC = root.FJC || {}; root.FJC.dl = dl;
 })(typeof window !== 'undefined' ? window : globalThis);

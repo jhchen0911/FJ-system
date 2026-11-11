@@ -33,7 +33,7 @@ const DEFAULT_TEXTS = {
   noReply2: '{site}工地群組連兩天沒有回施工日報。',
   dailyCo: '今天辛苦了，請複製下面格式回報（一個工地一段，可以貼好幾段；補昨天的只改日期）：\n【日期】{date}\n【工地】\n【今天】\n【明天】\n【問題】',
   // v6.0.234 新格式（Lotion 11/11 定案）：17:30 送預先填好的範本；這一段是範本上面的說明（工務只複製【日期】以下）
-  dailyFmtHead: '今天辛苦了，請複製【日期】以下整段，填好再傳（一個工地一段）：\n．今天做了：一行一項，編號＋打設／拔除／組立／拆除＋數量，例「1 打設 12」「1 拔除 40 這段拔完」，單位不用寫\n．人和機具：例「人 5、怪手 1、吊車 1」\n．問題：追加、等料、等吊車、有異狀都寫這裡',
+  dailyFmtHead: '今天辛苦了，請複製【日期】以下整段，填好再傳（一個工地一段）：\n．今天做了：一行一項，編號＋打設／拔除／組立／拆除＋數量，例「1 打設 12」「1 拔除 40 這段拔完」，單位不用寫\n．人和機具：例「人 5、怪手 1、吊車 1」\n．支出（選填）：一行一筆，項目＋金額＋零用金／代墊 誰／公司付，例「便當 5 個 600 零用金」「五金 1,250 代墊 阿明」，收據可以拍照傳\n．問題：追加、等料、等吊車、有異狀都寫這裡',
 };
 // v6.0.119～121 的舊預設（沒有【日期】）：存過固定句子沒改這句的，當成新預設（v6.0.122）
 const OLD_DAILYCO = '今天辛苦了，請照下面格式回報（一個工地一段，可以貼好幾段）：\n【工地】地名\n【今天】\n【明天】\n【問題】';
@@ -93,7 +93,7 @@ function groupOf(cfg, groupId) { const g = groupId && cfg && cfg.groups && cfg.g
 function siteName(g) { return (g && (g.name || g.qName)) || '（未命名）'; }
 // ── 公司大群組（v6.0.119 批次 I）：一個群組多個工地，工務用固定格式回報，依【工地】地名對到 FJ 專案 ──
 function coGroupOf(cfg, groupId) { const g = groupId && cfg && cfg.groups && cfg.groups[groupId]; return g && g.mode === 'company' ? g : null; }
-const CO_TAGS = { '工地': 'site', '今天': 'today', '今天做了': 'today', '人和機具': 'crew', '本工地工項': 'list', '明天': 'tomorrow', '問題': 'issue', '日期': 'date' };   // v6.0.234 新格式三個欄位
+const CO_TAGS = { '工地': 'site', '今天': 'today', '今天做了': 'today', '人和機具': 'crew', '支出': 'exp', '本工地工項': 'list', '明天': 'tomorrow', '問題': 'issue', '日期': 'date' };   // v6.0.234 新格式三個欄位
 // 補傳日期（v6.0.121）：一行只寫日期才算，例「10/31」「10/31 補」「10月31日 補傳」「日期：10/31」「2026/10/31」「115/10/31」
 //   （審查：避免「H300 1/2」「3/4 吋」這類規格被當成日期）；只認收到當天往前 7 天內（含當天），跨年回推
 const DATE_LINE = /^(?:日期\s*[:：]?\s*)?(?:(\d{2,4})\s*[\/年.-]\s*)?(\d{1,2})\s*[\/月.-]\s*(\d{1,2})\s*日?\s*(?:[（(]?\s*(?:補傳|補報|補)\s*[）)]?)?$/;
@@ -123,7 +123,7 @@ function parseCoReport(text, refYmd) {
   const t = String(text || '').replace(/\r/g, '');
   if (!/【\s*工地\s*】/.test(t)) return [];
   const out = []; let cur = null, key = '';
-  const re = /【\s*(本工地工項|今天做了|人和機具|工地|今天|明天|問題|日期)\s*】/g; let m; const segs = [];
+  const re = /【\s*(本工地工項|今天做了|人和機具|支出|工地|今天|明天|問題|日期)\s*】/g; let m; const segs = [];
   while ((m = re.exec(t))) { segs.push({ tag: m[1], start: m.index, end: re.lastIndex }); }
   let pre = null;   // 【工地】前面就先寫的欄位（順序寫反）→ 併到第一段
   // 日期：訊息開頭（第一個【】之前）寫的日期套用全部段落；【日期】套用它所在的段落與之後的段落
@@ -143,7 +143,7 @@ function parseCoReport(text, refYmd) {
       return;
     }
     if (key === 'site') {
-      cur = { site: val.split('\n')[0].trim().slice(0, 60), today: '', crew: '', tomorrow: '', issue: '', date: curDate, dateRaw: curRaw }; out.push(cur);
+      cur = { site: val.split('\n')[0].trim().slice(0, 60), today: '', crew: '', exp: '', tomorrow: '', issue: '', date: curDate, dateRaw: curRaw }; out.push(cur);
       const rest = val.split('\n').slice(1).join('\n').trim(); if (rest) cur.today = rest.slice(0, 1000);
       if (pre) { Object.keys(pre).forEach(k => { cur[k] = (pre[k] + (cur[k] ? '\n' + cur[k] : '')).slice(0, 1000); }); pre = null; }
     } else if (cur) cur[key] = (cur[key] ? cur[key] + '\n' : '') + val.slice(0, 1000);
@@ -151,7 +151,7 @@ function parseCoReport(text, refYmd) {
   });
   // 空白格式（把機器人的範本原樣貼回）、地名還是「地名」的段落不算
   const EMPTY = /^(無|没有|沒有|none|-|－|—)?$/i;
-  return out.filter(b => b.site && !/^(地名|地點|工地名稱?)$/.test(b.site) && !(EMPTY.test(b.today.trim()) && EMPTY.test(b.tomorrow.trim()) && EMPTY.test(b.issue.trim()) && EMPTY.test(String(b.crew || '').trim())));
+  return out.filter(b => b.site && !/^(地名|地點|工地名稱?)$/.test(b.site) && !(EMPTY.test(b.today.trim()) && EMPTY.test(b.tomorrow.trim()) && EMPTY.test(b.issue.trim()) && EMPTY.test(String(b.crew || '').trim()) && EMPTY.test(String(b.exp || '').trim())));
 }
 const _nrmSite = (x) => String(x || '').replace(/[\s()（）［］\[\]「」『』\-－_／/、，,.。]/g, '').toLowerCase();
 // 地名對專案：專案名稱（格式「（業主）地名工程名稱」）含地名、或地名含專案短名；只有唯一一案對得上才算，否則待分類
@@ -168,7 +168,7 @@ function matchSite(sites, site) {
   });
   return hits.length === 1 ? hits[0] : '';
 }
-function coBlockText(b) { return ['【今天】' + (b.today || '')].concat(b.crew ? ['【人和機具】' + b.crew] : []).concat(['【明天】' + (b.tomorrow || ''), '【問題】' + (b.issue || '')]).join('\n'); }   // v6.0.234 有寫人和機具才多一欄（前端只拆【今天】那段）
+function coBlockText(b) { return ['【今天】' + (b.today || '')].concat(b.crew ? ['【人和機具】' + b.crew] : []).concat(b.exp ? ['【支出】\n' + b.exp] : []).concat(['【明天】' + (b.tomorrow || ''), '【問題】' + (b.issue || '')]).join('\n'); }   // v6.0.234 有寫人和機具才多一欄（前端只拆【今天】那段）
 function extOf(msg) {
   if (msg.type === 'image') return 'jpg';
   if (msg.type === 'video') return 'mp4';
@@ -463,7 +463,7 @@ async function handleCoGroup(ev, msg, src, now, date, cfg, T, deps) {
     const b = blocks[i], qid = matchSite(cfg.sites, b.site);
     const photos = {}; prevPhotos.forEach(r => { photos[r.id] = r.path; });
     const day = b.date || date;   // 補傳：內文寫的日期；沒寫＝收到日期
-    await deps.dbSet(coPath + '/' + msg.id + '_' + i, { at: now, user, msgId: msg.id, site: b.site, qid, today: b.today, crew: b.crew || '', tomorrow: b.tomorrow, issue: b.issue, photos, day, dateRaw: b.dateRaw || '' });
+    await deps.dbSet(coPath + '/' + msg.id + '_' + i, { at: now, user, msgId: msg.id, site: b.site, qid, today: b.today, crew: b.crew || '', exp: b.exp || '', tomorrow: b.tomorrow, issue: b.issue, photos, day, dateRaw: b.dateRaw || '' });
     for (const r of prevPhotos) await deps.dbSet('fydata/lineLog/' + gid + '/' + date + '/' + r.id + '/claimed', msg.id + '_' + i);   // 一張照片只掛一個工地
     res.qids.push(qid);
     const all = stripTpl([b.today, b.tomorrow, b.issue].join('\n'), T);

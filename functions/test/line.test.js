@@ -345,7 +345,7 @@ test('日期括號寫法（Lotion 11/1）：［］、[]、【】，後面接空�
 test('v6.0.122 範本：17:30 發的格式第一行【日期】帶當天日期；舊預設自動換新', async () => {
   const d = mkDeps(CO);
   await core.dailyAsk(d, Date.parse('2026-11-01T09:30:00Z'));
-  assert.match(d.pushes[0].text, /\n【日期】11\/01\n【工地】\n【今天做了】\n\n【人和機具】\n\n【明天】\n\n【問題】\n$/);   // v6.0.234：最近 14 天沒人回報過工地＝空白一段
+  assert.match(d.pushes[0].text, /\n【日期】11\/01\n【工地】\n【今天做了】\n\n【人和機具】\n\n【支出】\n\n【明天】\n\n【問題】\n$/);   // v6.0.234：最近 14 天沒人回報過工地＝空白一段
 });
 
 test('v6.0.122 解析：範本原樣、改成前一天、【日期】空白、工地全形／半形括號都對得到', async () => {
@@ -596,4 +596,14 @@ test('v6.0.234 舊格式照收：沒有【】的自由寫法照舊進草稿；�
   d2.db.fydata = { lineDaily: { Gsite: { '2026-10-21': { askedAt: 1, replied: false } } } };
   await core.morningCheck(d2, Date.parse('2026-10-22T00:00:00Z'));
   assert.ok(d2.pushes.some((p) => /照昨天的格式/.test(p.text)));
+});
+
+test('v6.0.234 【支出】：範本有【支出】；公司群拆得出支出、跟著草稿文字走；說明行的「代墊」不算', async () => {
+  const B = core.parseCoReport('【日期】10/22\n【工地】內湖興中路\n【今天做了】\n1 打設 12\n【支出】\n便當 5 個 600 零用金\n【明天】\n【問題】\n無', '2026-10-22');
+  assert.equal(B.length, 1); assert.equal(B[0].exp, '便當 5 個 600 零用金');
+  const onlyExp = core.parseCoReport('【日期】10/22\n【工地】內湖興中路\n【今天做了】\n\n【支出】\n五金 300 公司付\n【明天】\n【問題】', '2026-10-22');
+  assert.equal(onlyExp.length, 1, '只有支出的段落也算回報');
+  const d = mkDeps(CFG); await core.dailyAsk(d, Date.parse('2026-10-22T09:30:00Z'));
+  assert.match(d.pushes[0].text, /【人和機具】\n\n【支出】\n\n【明天】/);
+  assert.match(core.DEFAULT_TEXTS.dailyFmtHead, /支出（選填）/);
 });
