@@ -6122,8 +6122,11 @@ async function newPage(browser, width, height) {
         Q.push({ id: qid, name: '折讓案', client: '範例案場', date: '2026-06-06', status: 'won',
           items: [{ desc: '第2層水平支撐 W=H400；S=H350', unit: 'M2', qty: '460', price: '1100', note: '含30天租期', ot: '7$/M2/天', otu: '$/M2/天' }],
           dailyLogs: [{ date: '2026-07-10', progressRows: [{ itemIdx: 0, qty: 460 }] }], t: {} });
-        INV.push({ id: 'SMKI73', quoteId: qid, project: '折讓案', client: '範例案場', periodNo: 1, date: '2026-08-22',
-          items: [{ type: 'item', desc: '第2層水平支撐 W=H400；S=H350', unit: 'M2', contractPrice: 1100, contractQty: 460, curQty: 0, curAmt: 0, payRate: 100, otPrice: 7, otUnit: '$/M2/天' }] });
+        // 11/11 審查修正後：沒有打設字眼的工項也照日報帶數量 → 支撐 460 在前一期已請（這個測試只看逾期租金折讓）
+        INV.push({ id: 'SMKI73a', quoteId: qid, project: '折讓案', client: '範例案場', periodNo: 1, date: '2026-07-20',
+          items: [{ type: 'item', desc: '第2層水平支撐 W=H400；S=H350', unit: 'M2', contractPrice: 1100, contractQty: 460, curQty: 460, curAmt: 506000, payRate: 100, otPrice: 7, otUnit: '$/M2/天' }] });
+        INV.push({ id: 'SMKI73', quoteId: qid, project: '折讓案', client: '範例案場', periodNo: 2, date: '2026-08-22',
+          items: [{ type: 'item', desc: '第2層水平支撐 W=H400；S=H350', unit: 'M2', contractPrice: 1100, contractQty: 460, prevQty: 460, prevAmt: 506000, curQty: 0, curAmt: 0, payRate: 100, otPrice: 7, otUnit: '$/M2/天' }] });
         loadInvoice('SMKI73');
         document.getElementById('inv-rental-item').value = '第2層水平支撐 W=H400；S=H350'; invRentalPick();
         document.getElementById('inv-claim-date').value = '2026-08-22'; calcInvDays();
