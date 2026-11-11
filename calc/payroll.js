@@ -20,14 +20,14 @@
   function otPay(h, hourly) { h = Math.max(0, n(h)); hourly = Math.max(0, n(hourly)); return Math.min(h, 2) * hourly * 1.34 + Math.max(h - 2, 0) * hourly * 1.67; }
   // 時薪：有填加班時薪用它；日薪 ÷ 8；月薪 ÷ 240（勞基法月薪換算 30 天 × 8 小時）
   function hourlyOf(h) { h = h || {}; if (n(h.otHourly) > 0) return n(h.otHourly); return h.payType === 'day' ? n(h.base) / 8 : n(h.base) / 240; }
-  // 這個月某人的出工：logs＝[{date, site, att:[{hrId, day(1／0.5／0), ot, off}]}]（各案日報攤平後傳進來）；同一天兩個工地只算一次（取 day 最大、加班加總）
+  // 這個月某人的出工：logs＝[{date, site, att:[{hrId, day(1／0.5／0), ot, off}]}]（各案日報攤平後傳進來）；同一天兩個工地的天數加總、最多 1 天（上午甲案半天＋下午乙案半天＝1 天，Lotion 11/11），加班加總
   function monthAtt(logs, ym, hrId) {
     var by = {};
     (logs || []).forEach(function (L) {
       var d = String((L && L.date) || '').slice(0, 10); if (d.slice(0, 7) !== ym) return;
       ((L && L.att) || []).forEach(function (a) {
         if (!a || a.hrId !== hrId) return; var x = by[d] || (by[d] = { date: d, day: 0, ot: 0, sites: [] });
-        x.day = Math.max(x.day, Math.max(0, Math.min(1, n(a.day)))); x.ot += Math.max(0, n(a.ot)); if (L.site && x.sites.indexOf(L.site) < 0) x.sites.push(String(L.site));
+        x.day = Math.min(1, x.day + Math.max(0, Math.min(1, n(a.day)))); x.ot += Math.max(0, n(a.ot)); if (L.site && x.sites.indexOf(L.site) < 0) x.sites.push(String(L.site));
       });
     });
     var rows = Object.keys(by).sort().map(function (k) { return by[k]; });

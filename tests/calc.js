@@ -237,6 +237,11 @@ check('廠商請款單價可核實覆寫、應付 id 規則', PY.rowPrice({ unit
   // 阿華：月薪 36,000、只出工 1 天也照整月；10/9 加班 2 小時，時薪 36,000÷240＝150 → 2×150×1.34＝402
   const s3 = H.draftSlip({ payType: 'month', base: 36000, telAllow: 500, laborSelf: 800, healthSelf: 500 }, a3);
   check('阿華（月薪）：整月 36,000（不看出工）＋電話津貼 500＋加班 402＝36,902、扣 1,300、實發 35,602', s3.baseAmt === 36000 && s3.otAmt === 402 && s3.gross === 36902 && s3.net === 35602, JSON.stringify(s3));
+  {   // Lotion 11/11：同一人同一天兩工地＝加總、最多 1 天
+    const one = (d1, d2) => H.monthAtt([{ date: '2026-10-02', site: '甲', att: [{ hrId: 'x', day: d1, ot: 1 }] }, { date: '2026-10-02', site: '乙', att: [{ hrId: 'x', day: d2, ot: 1 }] }], '2026-10', 'x');
+    const a = one(0.5, 0.5), b = one(1, 1), c = one(0.5, 1);
+    check('同一天兩工地：兩個半天＝1 天、兩個全天＝1 天、半天＋全天＝1 天；加班兩邊加總', a.days === 1 && a.full === 1 && a.half === 0 && b.days === 1 && c.days === 1 && a.otH === 2 && a.rows[0].sites.join() === '甲,乙', JSON.stringify([a.days, b.days, c.days, a.otH]));
+  }
   check('加班費：0 小時＝0、2 小時內 ×1.34、超過 ×1.67；負數當 0', H.otPay(0, 300) === 0 && H.otPay(1, 300) === 402 && Math.abs(H.otPay(5, 100) - (268 + 501)) < 1e-9 && H.otPay(-2, 300) === 0);
 }
 // ── 期票現金比例、分包超量 ──
