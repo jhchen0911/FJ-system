@@ -15048,6 +15048,19 @@ async function newPage(browser, width, height) {
         const Ln = Q[1].dailyLogs.find((L) => L.date === tmr);
         out.submit = Ln && Ln.crews.find((c) => c.type === 'labor').ppl[0].day === 0.5 && (Ln.ownPpl || [])[0].wid === 'w4' && (Ln.equip || []).some((e) => e.name === '吊車');
         const E = _laborEstAll((d) => d === tmr); out.est = E.qK2 && E.qK2.days === 0.5 && E.qK2.amt === Math.round(0.5 * (parseFloat(P.laborDayRate) || 0));
+        // 審查：清表單（加入清單）不再照派工重勾；改日期照那天的派工先勾
+        document.getElementById('dr-date').value = tmr; dp.value = 'qK2'; dp.onchange(); await T(60); out.re1 = !window._drDpFrom;   // 這天已經有日報 → 不照派工重勾
+        Q[1].dailyLogs = Q[1].dailyLogs.filter((L) => L.date !== tmr);
+        _drClearForm(); await T(40); out.clearNo = !_drLab.some((g) => Object.keys(g.ppl || {}).length) && !window._drDpFrom;
+        const dd = document.getElementById('dr-date'); dd.value = today; dd.dispatchEvent(new Event('change')); await T(40); dd.value = tmr; dd.dispatchEvent(new Event('change')); await T(60);
+        out.dateRe = !!(_drLab[0] && _drLab[0].ppl.w3) && window._drDpFrom === tmr;
+        // 審查：修改時單一工地「明天不派工」、清單沒有的機具不會被吃掉
+        delete PROJECTS[0].dispatch[tmr]; delete PROJECTS[1].dispatch[tmr]; Q[0].dailyLogs[0].equip = [{ name: '發電機（清單沒有）', hrs: 1 }];
+        go('dash'); await T(40); _DEC.dispatch.edit(_DEC.dispatch.list()[0]); await T(60);
+        out.eqKeep = !!document.querySelector('#dp-equip input.dp-eq[value="發電機（清單沒有）"]:checked');
+        _dpEdShow('qK2'); await T(30); document.getElementById('dp-skip').checked = true; document.getElementById('fy-modal-o').click(); await T(60);
+        _DEC.dispatch.ok(_DEC.dispatch.list()[0]); await T(30);
+        out.oneSkip = PROJECTS[1].dispatch[tmr].skip === 1 && !PROJECTS[0].dispatch[tmr].skip && PROJECTS[0].dispatch[tmr].equip.indexOf('發電機（清單沒有）') >= 0 && /▸ 範例派工乙\n  明天不派工/.test(copied);
         // ⑦ 唯讀帳號看不到卡
         _isReaderUser = true; out.ro = !_DEC.dispatch.canSee(); _isReaderUser = false;
         out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
@@ -15057,7 +15070,7 @@ async function newPage(browser, width, height) {
       try { document.querySelectorAll('#fy-modal').forEach((m) => m.remove()); } catch (x) { /* 可忽略 */ }
       return out;
     });
-    check('派工板（寬 ' + W + '）：下午 3 點後才出卡、很久沒動的工地不列、預設帶今天日報／沒有帶前一次派工、同人兩工地標黃、修改＝每個工地選工班勾人＋機具、確認存進專案並複製 LINE 文字、退回＝明天不派工、隔天日報先勾好（沒送出不算數）、送出後推估照日報、唯讀看不到、不左右捲', !r.err && r.before && r.list && r.def && r.dup && r.edTabs && r.edElse && r.edited && r.saved && r.proj && r.reject && r.prefill && r.notYet && r.submit && r.est && r.ro && r.noHScroll, JSON.stringify(r));
+    check('派工板（寬 ' + W + '）：下午 3 點後才出卡、很久沒動的工地不列、預設帶今天日報／沒有帶前一次派工、同人兩工地標黃、修改＝每個工地選工班勾人＋機具、確認存進專案並複製 LINE 文字、退回＝明天不派工、隔天日報先勾好（沒送出不算數）、送出後推估照日報、唯讀看不到、不左右捲', !r.err && r.before && r.list && r.def && r.dup && r.edTabs && r.edElse && r.edited && r.saved && r.proj && r.reject && r.prefill && r.notYet && r.submit && r.est && r.re1 && r.clearNo && r.dateRe && r.eqKeep && r.oneSkip && r.ro && r.noHScroll, JSON.stringify(r));
     check('派工板測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }

@@ -22995,7 +22995,7 @@ function _drCollect(){
 }
 function _drClearForm(){
   try{var ss=document.getElementById('dr-status');if(ss)ss.value='work';['dr-stop-reason','dr-resume-date','dr-stage-date','dr-weather','dr-backfill-from'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});var bf=document.getElementById('dr-backfill');if(bf){bf.checked=false;var bd=document.getElementById('dr-backfill-from');if(bd)bd.style.display='none';}_drStatusUI();}catch(e){_err('_drClearForm',e);}
-  drRenderCrews(true);
+  window._drNoDp=1;try{drRenderCrews(true);}finally{window._drNoDp=0;}window._drDpFrom='';   // 審查：清表單不再照派工重勾
   const oe=document.getElementById('dr-own-equip');if(oe)oe.checked=false;
   _drEquip={};_drRenderEquip();
   _drPhotos=[];drRenderPhotos();
@@ -46621,7 +46621,7 @@ function _drCrewNewRender(){
   if(!C&&window._drDpFrom)h='<div style="font-size:12px;color:var(--g3);background:var(--gl);border-radius:6px;padding:5px 8px;margin-bottom:6px">已照 '+esc(_dpMD(window._drDpFrom))+' 的派工先勾好，有不一樣的直接改（送出才算數）</div>'+h;
   box.innerHTML=h;
   if(C)return;
-  try{var dd=document.getElementById('dr-date');if(dd&&!dd._crewWired){dd._crewWired=1;dd.addEventListener('change',function(){if(_drCrewNew())_drCrewNewRender();});}}catch(e){_err('_drCrewNewRender.date',e);}
+  try{var dd=document.getElementById('dr-date');if(dd&&!dd._crewWired){dd._crewWired=1;dd.addEventListener('change',function(){if(!_drCrewNew())return;var any=_drLab.some(function(g){return Object.keys(g.ppl||{}).length;})||Object.keys(_drOwn||{}).length;if(!any||window._drDpFrom){_drLab=[];_drOwn={};_drCrews=[{type:'sub',vendor:'',n:''}];try{_dpPrefill();}catch(e){_err('dr-date.dp',e);}}_drCrewNewRender();});   /* 審查：改日期也照那天的派工先勾（已經自己勾了就不動） */}}catch(e){_err('_drCrewNewRender.date',e);}
 }
 function drLabVendor(gi,v){var g=_drLab[gi];if(!g)return;g.vendor=String(v||'');_drCrewNewRender();}
 function drLabAdd(){_drLab.push({vendor:'',ppl:{}});_drCrewNewRender();}
@@ -46694,7 +46694,7 @@ function _dpClean(x){x=x||{};var P2=function(L){return (Array.isArray(L)?L:_prjA
 // 有在動的工地：得標、沒結案、最近 14 天有日報或派工
 function _dpActive(){var lim=_dAdd(localToday(),-14);
   return (Q||[]).filter(function(q){if(!q||!q.awarded||q.closed||q.parentId)return false;var p=_prjOfQ(q.id);if(!p||p.voidAt)return false;
-    return (q.dailyLogs||[]).some(function(L){return L&&L.date>=lim;})||Object.keys(_dpMap(p)).some(function(d){return d>=lim;});});}
+    return (q.dailyLogs||[]).some(function(L){return L&&L.date>=lim;})||Object.keys(_dpMap(p)).some(function(d){var x=_dpMap(p)[d];return d>=lim&&x&&!x.skip;});});}   // 審查：不派工的那天不算「有在動」
 // 預設：今天日報實際出工；沒有就帶前一次的派工（P3a）
 function _dpDefault(q,date){
   var today=localToday(),L=(q.dailyLogs||[]).find(function(x){return x&&x.date===today&&!x.stopFrom&&(x.crewV===2||(x.crews||[]).length||(x.equip||[]).length);});
@@ -46708,7 +46708,7 @@ function _dpPlan(q,date){return _DP_DRAFT[date+'|'+q.id]||_dpDefault(q,date);}
 function _dpDup(date,qs){var m={};qs.forEach(function(q){var pl=_dpPlan(q,date);pl.crews.forEach(function(c){c.ppl.forEach(function(p){(m[p.wid]=m[p.wid]||{n:p.name,qs:[]}).qs.push(q.name||'');});});pl.own.forEach(function(p){(m[p.wid]=m[p.wid]||{n:p.name,qs:[]}).qs.push(q.name||'');});});
   var out={};Object.keys(m).forEach(function(k){if(m[k].qs.length>1)out[k]=m[k];});return out;}
 function _dpMD(d){var x=new Date(d+'T00:00:00');return (x.getMonth()+1)+'/'+x.getDate()+'（'+'日一二三四五六'[x.getDay()]+'）';}
-function _dpLines(pl){var L=[];pl.crews.forEach(function(c){L.push('點工 '+(c.vendor||'（沒選工班）')+'：'+c.ppl.map(function(p){return p.name;}).join('、'));});
+function _dpLines(pl){if(pl&&pl.skip)return ['明天不派工'];var L=[];pl.crews.forEach(function(c){L.push('點工 '+(c.vendor||'（沒選工班）')+'：'+c.ppl.map(function(p){return p.name;}).join('、'));});
   if(pl.own.length)L.push('自家：'+pl.own.map(function(p){return p.name;}).join('、'));
   pl.subs.forEach(function(c){L.push('承包 '+(c.vendor||'')+(c.n?' '+c.n+' 人':''));});
   if(pl.equip.length)L.push('機具：'+pl.equip.join('、'));return L;}
@@ -46721,7 +46721,7 @@ function _dpRows(){
 function _dpSave(it,skip){
   var by=String(_meEmail()||'').slice(0,80),nm=String(_meName()||'').slice(0,20),lim=_dAdd(localToday(),-_DP_KEEP),n=0;
   it.qs.forEach(function(q){var p=_prjOfQ(q.id);if(!p)return;var D=Object.assign({},_dpMap(p));Object.keys(D).forEach(function(d){if(d<lim)delete D[d];});
-    D[it.date]=Object.assign(skip?{skip:1}:_dpClean(_dpPlan(q,it.date)),{okAt:Date.now(),okBy:by,okName:nm});p.dispatch=D;p._mt=Date.now();delete _DP_DRAFT[it.date+'|'+q.id];n++;});
+    var pl0=_dpPlan(q,it.date);D[it.date]=Object.assign((skip||pl0.skip)?{skip:1}:_dpClean(pl0),{okAt:Date.now(),okBy:by,okName:nm});p.dispatch=D;p._mt=Date.now();delete _DP_DRAFT[it.date+'|'+q.id];n++;});
   if(n){try{saveProjects();}catch(e){_err('_dpSave',e);}}return n;
 }
 function _dpCopy(t){try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).catch(function(e){_err('_dpCopy',e);});}catch(e){_err('_dpCopy',e);}}
@@ -46731,7 +46731,9 @@ _decReg('dispatch',{
   list:function(){return _dpRows();},
   key:function(it){return it.date;},
   head:function(it){return '明天 '+_dpMD(it.date)+' 派工：'+it.qs.length+' 個工地';},
-  body:function(it){var dup=_dpDup(it.date,it.qs),dk=Object.keys(dup);return '<div style="font-size:11.5px;color:var(--b4)">預設帶今天日報的實際出工'+(dk.length?'　<b style="color:#b26a00">⚠ '+esc(dk.map(function(k){return dup[k].n;}).join('、'))+' 排了兩個工地</b>':'')+'</div>';},
+  body:function(it){var dup=_dpDup(it.date,it.qs),dk=Object.keys(dup),sr={log:0,prev:0,none:0,edit:0};it.qs.forEach(function(q){var pl=_dpPlan(q,it.date);sr[pl.src]=(sr[pl.src]||0)+1;});
+    var stx=[sr.log?sr.log+' 個帶今天日報':'',sr.prev?sr.prev+' 個帶前一次派工':'',sr.edit?sr.edit+' 個剛改的':'',sr.none?sr.none+' 個還沒有人':''].filter(Boolean).join('、');
+    return '<div style="font-size:11.5px;color:var(--b4)">'+esc(stx)+(dk.length?'　<b style="color:#b26a00">⚠ '+esc(dk.map(function(k){return dup[k].n;}).join('、'))+' 排了兩個工地</b>':'')+'</div>';},
   detail:function(it){
     var dup=_dpDup(it.date,it.qs);
     return it.qs.map(function(q){var pl=_dpPlan(q,it.date),L=_dpLines(pl),src=pl.src==='log'?'今天日報':pl.src==='prev'?(pl.from.slice(5).replace('-','/')+' 的派工'):(pl.src==='edit'?'剛改的':'還沒有');
@@ -46747,9 +46749,9 @@ _decReg('dispatch',{
 // 修改：每個工地一張「選工班→勾人」（跟日報同一套畫面）＋機具；暫時借用日報表單的勾選狀態，關掉視窗就還原
 var _dpEd=null;
 function _dpStOf(pl){var lab=pl.crews.map(function(c){var g={vendor:c.vendor,ppl:{}};c.ppl.forEach(function(p){g.ppl[p.wid]={day:1,ot:0};});return g;}),own={};pl.own.forEach(function(p){own[p.wid]={day:1,ot:0};});
-  return {lab:lab,own:own,subs:pl.subs.map(function(c){return {type:'sub',vendor:c.vendor,n:c.n||''};}),equip:pl.equip.slice()};}
+  return {lab:lab,own:own,subs:pl.subs.map(function(c){return {type:'sub',vendor:c.vendor,n:c.n||''};}),equip:pl.equip.slice(),skip:!!pl.skip};}
 function _dpEdStash(){if(!_dpEd)return;var st=_dpEd.st[_dpEd.cur];if(!st)return;st.lab=_drLab;st.own=_drOwn;st.subs=_drCrews;
-  st.equip=[].slice.call(document.querySelectorAll('#dp-equip input:checked')).map(function(x){return x.value;});}
+  st.equip=[].slice.call(document.querySelectorAll('#dp-equip input.dp-eq:checked')).map(function(x){return x.value;});var sk=document.getElementById('dp-skip');st.skip=!!(sk&&sk.checked);}
 function _dpEdElse(qid){var m={};Object.keys(_dpEd.st).forEach(function(k){if(k===qid)return;var st=_dpEd.st[k],q=(Q||[]).find(function(x){return x.id===k;});var nm=(q&&q.name)||'別案';
   (st.lab||[]).forEach(function(g){Object.keys(g.ppl||{}).forEach(function(w){m[w]=nm;});});Object.keys(st.own||{}).forEach(function(w){m[w]=nm;});});return m;}
 function _dpEdShow(qid){
@@ -46757,8 +46759,9 @@ function _dpEdShow(qid){
   _drLab=st.lab;_drOwn=st.own;_drCrews=st.subs.length?st.subs:[{type:'sub',vendor:'',n:''}];_drMoreOpen={};
   window._drCtx={box:'dp-crews',qid:qid,date:_dpEd.date,elsewhere:_dpEdElse(qid),elseLb:'明天已排在',noDay:1};
   var tb=document.getElementById('dp-tabs');if(tb)tb.innerHTML=_dpEd.qs.map(function(q){var on=q.id===qid;return '<button type="button" class="btn btn-xs" onclick="_dpEdShow(\''+escq(q.id)+'\')" style="'+(on?'background:var(--g);color:#fff;border-color:var(--g)':'')+'">'+esc(String(q.name||'').slice(0,14))+'</button>';}).join(' ');
-  var eq=document.getElementById('dp-equip'),L=(P.equipList||[]);
-  if(eq)eq.innerHTML='<div style="font-weight:700;font-size:13px;margin:8px 0 4px">機具</div>'+(L.length?L.map(function(n){return '<label style="display:inline-flex;align-items:center;gap:4px;margin:0 10px 6px 0;font-size:13px"><input type="checkbox" value="'+esc(n)+'"'+(st.equip.indexOf(n)>=0?' checked':'')+' style="-webkit-appearance:checkbox;appearance:auto;width:18px;height:18px;min-width:0;padding:0;margin:0;accent-color:var(--g)">'+esc(n)+'</label>';}).join(''):'<div style="font-size:12px;color:var(--b4)">參數設定「自有機具清單」填了機具，這裡就可以勾</div>');
+  var eq=document.getElementById('dp-equip'),L=(P.equipList||[]).slice();(st.equip||[]).forEach(function(n){if(L.indexOf(n)<0)L.push(n);});   // 審查：清單沒有的機具（日報或前一次派工帶來的）也列出來，不會被吃掉
+  if(eq)eq.innerHTML='<label style="display:flex;align-items:center;gap:6px;margin:8px 0;font-size:13px;color:#b26a00;font-weight:700"><input type="checkbox" id="dp-skip"'+(st.skip?' checked':'')+' style="-webkit-appearance:checkbox;appearance:auto;width:18px;height:18px;min-width:0;padding:0;margin:0;accent-color:var(--g)">這個工地明天不派工</label>'
+    +'<div style="font-weight:700;font-size:13px;margin:8px 0 4px">機具</div>'+(L.length?L.map(function(n){return '<label style="display:inline-flex;align-items:center;gap:4px;margin:0 10px 6px 0;font-size:13px"><input type="checkbox" class="dp-eq" value="'+esc(n)+'"'+(st.equip.indexOf(n)>=0?' checked':'')+' style="-webkit-appearance:checkbox;appearance:auto;width:18px;height:18px;min-width:0;padding:0;margin:0;accent-color:var(--g)">'+esc(n)+'</label>';}).join(''):'<div style="font-size:12px;color:var(--b4)">參數設定「自有機具清單」填了機具，這裡就可以勾</div>');
   _drCrewNewRender();
 }
 function _dpEdOpen(it){
@@ -46769,15 +46772,16 @@ function _dpEdOpen(it){
     try{_dpEdStash();Object.keys(_dpEd.st).forEach(function(k){var st=_dpEd.st[k],pl={src:'edit',crews:[],own:[],subs:[],equip:st.equip||[]};
       (st.lab||[]).forEach(function(g){var ppl=_drPpList(g.ppl).map(function(p){return {wid:p.wid,name:p.name};});if(ppl.length)pl.crews.push({vendor:g.vendor||'',ppl:ppl});});
       pl.own=_drPpList(st.own).map(function(p){return {wid:p.wid,name:p.name};});pl.subs=(st.subs||[]).filter(function(c){return c&&(String(c.vendor||'').trim()||(+c.n>0));}).map(function(c){return {vendor:String(c.vendor||'').trim(),n:+c.n||0};});
-      _DP_DRAFT[_dpEd.date+'|'+k]=pl;});}catch(e){_err('_dpEdOpen.ok',e);}
+      if(st.skip)pl.skip=1;_DP_DRAFT[_dpEd.date+'|'+k]=pl;});}catch(e){_err('_dpEdOpen.ok',e);}
     restore();try{_decRefresh('dispatch');}catch(e){_err('_dpEdOpen.ref',e);}return true;});
   try{var md=document.getElementById('fy-modal');if(md){var ob=new MutationObserver(function(){if(!document.body.contains(md)){ob.disconnect();if(_dpEd)restore();}});ob.observe(document.body,{childList:true});}}catch(e){_err('_dpEdOpen.obs',e);}
-  _dpEdShow(it.qs[0].id);
+  try{_dpEdShow(it.qs[0].id);}catch(e){_err('_dpEdOpen.show',e);restore();try{var m=document.getElementById('fy-modal');if(m)m.remove();}catch(x){/* 可忽略 */}toast('派工畫面打不開，請再試一次');}
 }
 // 隔天日報：照派工先勾好（P7a）；這天這案還沒有日報才帶
 function _dpPrefill(){
-  window._drDpFrom='';var qid=gv('dr-proj')||'',date=gv('dr-date')||localToday(),q=(Q||[]).find(function(x){return x.id===qid;});if(!q)return false;
+  window._drDpFrom='';if(window._drNoDp)return false;var qid=gv('dr-proj')||'',date=gv('dr-date')||localToday(),q=(Q||[]).find(function(x){return x.id===qid;});if(!q)return false;
   if((q.dailyLogs||[]).some(function(L){return L&&L.date===date&&!L.stopFrom;}))return false;
+  if((typeof _drList!=='undefined'?_drList:[]).some(function(e){return e&&e.qid===qid;}))return false;   // 審查：已經加進清單的不再重勾
   var d=_dpOf(qid,date);if(!d||d.skip)return false;var pl=_dpClean(d);if(!pl.crews.length&&!pl.own.length&&!pl.subs.length&&!pl.equip.length)return false;
   var st=_dpStOf(pl);_drLab=st.lab;_drOwn=st.own;_drCrews=st.subs.length?st.subs:[{type:'sub',vendor:'',n:''}];
   if(pl.equip.length){try{var oe=document.getElementById('dr-own-equip');if(oe)oe.checked=true;_drEquip={};pl.equip.forEach(function(n){_drEquip[n]=1;});_drRenderEquip();}catch(e){_err('_dpPrefill.eq',e);}}
