@@ -561,6 +561,8 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('擴充線 B 地層（電腦端 CSV 欄位，陳軒 11/12）：回填底深取範圍最大值、地下水位分觀測／設計臨時／設計永久；OCR 與里中心概略要人工確認；沒有座標＝不寫但地層照清',
     c2.g.soil.fillDepth === 2.8 && c2.g.soil.gw.perm === 'GL-1m' && G.needCheck(c2.g).length === 2 && G.needCheck({ method: 'PDF文字', acc: '報告TWD97孔位換算' }).length === 0
     && /沒有座標/.test(c3.err) && c3.part.soil.layers === '黏土' && G.fillDepthOf('', '回填約 1.5 m') === 1.5, JSON.stringify(c2.g.soil));
+  const c4 = G.clean({ lat: 25, lng: 121.5, folder: '假老案', fjStatus: 'FJ查無報價', res: '失標' }), c5 = G.clean({ lat: 25, lng: 121.5, res: '得標' }), c6 = G.clean({ lat: 25, lng: 121.5, res: '亂寫' });
+  check('擴充線 B-6 舊案地層：「FJ查無報價」＝old、CSV 結果得標／失標／報價中對成 won／lost／open，看不懂的不填', c4.g.old === true && c4.g.res === 'lost' && !c5.g.old && c5.g.res === 'won' && !('res' in c6.g));
   const pl = G.plot([{ lat: 25.0, lng: 121.5 }, { lat: 25.0 + 2 / 111.32, lng: 121.5 }], c0, 2, 240);
   check('擴充線 B 地層：點位圖圓心在中間、北朝上、半徑處貼圈邊', pl[0].x === 120 && pl[0].y === 120 && pl[1].x === 120 && Math.abs(pl[1].y - 10) < 0.2, JSON.stringify(pl));
 }

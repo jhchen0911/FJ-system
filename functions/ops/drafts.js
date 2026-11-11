@@ -141,7 +141,7 @@ function geoClean(pl) {
   const out = []; let bad = 0;
   for (let i = 0; i < all.length; i++) {
     const r = (all[i] && typeof all[i] === 'object') ? all[i] : {};
-    if (!String(r.qid || r.code || r.name || '').trim()) return { err: '第 ' + (i + 1) + ' 案要有 qid、code 或 name 其中一個' };
+    if (!String(r.qid || r.code || r.name || r.folder || '').trim()) return { err: '第 ' + (i + 1) + ' 案要有 qid、code、name 或 folder 其中一個' };
     const c = GEO.clean(r); if (c.err) bad++;
     const g = c.g || Object.assign({}, c.part || {}, { lat: geoNum(r.lat), lng: geoNum(r.lng) });   // 座標有問題或沒有的照收（地層一樣清過），卡片標「不寫」
     out.push(Object.assign({ qid: S(r.qid, 80), code: S(r.code, 60), name: S(r.name, 120) }, g));

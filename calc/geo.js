@@ -24,6 +24,11 @@
       soil: { fill: S(s.fill, 120), fillDepth: fillDepthOf(s.fillDepth, s.fill), layers: S(s.layers != null ? s.layers : s.main, 300), nText: S(s.nText != null ? s.nText : s.n, 200),
         gw: { obs: S(gwo.obs, 60), tmp: S(gwo.tmp, 60), perm: S(gwo.perm, 60) } },
       method: S(g.method, 20), acc: S(g.acc, 40), unit: S(g.unit, 60), rptDate: S(g.rptDate, 20), rpt: S(g.rpt, 200), folder: S(g.folder, 120), note: S(g.note, 300), src: S(g.src, 80) };
+    // 擴充線 B-6：不掛報價的舊案。old＝FJ 沒有報價（CSV 第 11 欄「FJ查無報價」或 old:true）；res＝當時結果（得標／失標／報價中／流標）
+    var fj = S(g.fjStatus, 20), rs = S(g.res, 20);
+    if (g.old === true || /查無報價/.test(fj)) o.old = true;
+    var rr = /^(won|得標)$/.test(rs) ? 'won' : (/^(lost|失標|未得標)$/.test(rs) ? 'lost' : (/^(void|流標)$/.test(rs) ? 'void' : (/^(open|報價中|未定)$/.test(rs) ? 'open' : '')));
+    if (rr) o.res = rr;
     var lat = num(g.lat), lng = num(g.lng);
     if (g.lat == null || g.lat === '' || g.lng == null || g.lng === '') return { err: '沒有座標（電腦端查不到' + (o.acc ? '：' + o.acc : '') + '）', g: null, part: o };
     if (!okLL(lat, lng)) {

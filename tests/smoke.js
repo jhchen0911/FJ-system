@@ -14027,6 +14027,16 @@ async function newPage(browser, width, height) {
         out.amb = p2[0].st === 'amb' && p2[1].st === 'new' && p2[2].st === 'dup' && /G04 範例待補案/.test(z.textContent) && /同名報價好幾張/.test(z.textContent);
         Q.splice(6, 2);
         out.draftNoId = (await fyGeoDraft({ rows: [{ lat: 25, lng: 121.5 }] })).ok === false && (await fyGeoDraft({ rows: { a: 1 } })).ok === false;
+        // B-6（Lotion 11/12）：FJ 沒有報價的舊案 → 舊案地層清單；得標與否照 CSV；再傳同一個資料夾＝更新
+        const keepGO = GEO_OLD; GEO_OLD = [];
+        const d3 = { id: 'dGeo003', type: 'geo', status: 'pending', payload: { rows: [{ folder: '範例老案資料夾', fjStatus: 'FJ查無報價', res: '失標', lat: 25.004, lng: 121.498, addr: '範例市老街', soil: soil('卵礫石層') }, { code: 'G04', fjStatus: 'FJ查無報價', lat: 25.0, lng: 121.5 }] } };
+        DRAFTS.dGeo003 = d3;
+        const p3 = _geoPlan(d3); out.oldPlan = p3[0].st === 'old' && p3[1].st === 'old' && p3[0].gid !== p3[1].gid;
+        const ok3 = await Promise.resolve(_DEC.geoFix.ok(d3));
+        out.oldOk = ok3 === true && GEO_OLD.length === 2 && GEO_OLD[0].res === 'lost' && GEO_OLD[0].name === '範例老案資料夾' && GEO_OLD[0]._mt > 0 && !('old' in GEO_OLD[0]) && !Q[4].geo;
+        const p4 = _geoPlan({ payload: { rows: [{ folder: '範例老案資料夾', fjStatus: 'FJ查無報價', lat: 25.004, lng: 121.498, soil: soil('改過') }] } }); out.oldUpd = p4[0].st === 'oldUpd';
+        out.oldSync = Array.isArray(_sharedPayload().data.geoOld) && _sharedPayload().data.geoOld.length === 2 && _SYNC_COLLS.indexOf('geoOld') >= 0;
+        GEO_OLD.splice(1, 1); const goSaved = GEO_OLD; GEO_OLD = keepGO;
         const mt0 = Q[5]._mt, ok = await Promise.resolve(_DEC.geoFix.ok(DRAFTS.dGeo001));
         out.ok = ok === true && Q[5].geo && Q[5].geo.lat === 25.0 && Q[5].geo.draft === 'dGeo001' && Q[5]._mt !== mt0 && !Q[4].geo && DRAFTS.dGeo001.status === 'applied';
         // 報價頁附近舊案：管理員看得到得標率；工務只看地層
@@ -14037,6 +14047,9 @@ async function newPage(browser, width, height) {
         window._decIsAdmin = () => false;
         const b = document.createElement('div'); b.innerHTML = _qGeoHtml(Q[0]); const tb = b.textContent;
         out.staff = !/接工率|得標/.test(tb) && /卵礫石/.test(tb);
+        GEO_OLD = goSaved; const o2 = document.createElement('div'); window._decIsAdmin = () => true; o2.innerHTML = _qGeoHtml(Q[0]);
+        out.oldList = /範例老案資料夾（舊案）（未得標）/.test(o2.textContent) && /卵礫石層/.test(o2.textContent) && /得標 1／未得標 2/.test(o2.textContent);
+        GEO_OLD = keepGO; window._decIsAdmin = () => false;
         P.geoR = 12; const c = document.createElement('div'); c.innerHTML = _qGeoHtml(Q[0]); out.radius = /附近 12 公里舊案（3 案）/.test(c.textContent);
         out.noGeo = _qGeoHtml(Q[4]) === '';
         out.snap = !('geo' in _qhSnapOf(Q[0]));
@@ -14047,7 +14060,7 @@ async function newPage(browser, width, height) {
       return out;
     });
     check('擴充線 B：地層草稿走今天頁拍板卡（不進 AI 草稿清單）；明細逐案列地址、座標（Google 地圖）、地層、找不到／座標對調不寫；修改可排除與改對案；確認才寫 q.geo 並更新 _mt',
-      r.card && r.detail && r.edit && r.ok && r.amb && r.draftNoId, JSON.stringify(r));
+      r.card && r.detail && r.edit && r.ok && r.amb && r.draftNoId && r.oldPlan && r.oldOk && r.oldUpd && r.oldSync && r.oldList, JSON.stringify(r));
     check('擴充線 B：報價頁附近舊案（半徑參數、預設 2 公里）；點位圖沒有底圖；得標率只有管理員看得到、工務只看地層；沒有座標不顯示；版次快照不帶 geo',
       r.admin && r.staff && r.radius && r.noGeo && r.snap && r.copy, JSON.stringify(r));
     check('擴充線 B 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
