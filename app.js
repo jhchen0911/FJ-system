@@ -7946,7 +7946,7 @@ function initFirebase(){
     _fbUser = user;
     _updateFbUI(!!user);
     if(user) _minVerWatch(_autoSyncOnLogin);
-    else { _aiHeldOff();_lrsOff();_lbxOff();_bkOff();_minVerOff();_isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{localStorage.removeItem('fy_priv_pending');}catch(e){/* 可忽略 */}   /* v6.0.116：登出清掉私有上傳失敗旗標，換人登入不會一直「未同步」 */try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
+    else { _aiHeldOff();_lrsOff();_lbxOff();_bkOff();_minVerOff();try{_lxOff();}catch(e){_err('initFirebase.lx',e);}_isOwnerUser=false;_isAdminUser=false;_isReaderUser=false;_roState='';try{localStorage.removeItem('fy_priv_pending');}catch(e){/* 可忽略 */}   /* v6.0.116：登出清掉私有上傳失敗旗標，換人登入不會一直「未同步」 */try{applyRoleUI();}catch(e){_err('initFirebase',e);} }   // v5.335：登出即收回頁面
   });
 }
 function initGoogleSignIn(){
@@ -35505,7 +35505,7 @@ function _photoHydrate(root){
     _photoGet(p).then(function(du){if(du)img.src=du;else{img.alt='照片尚未同步';img.title='照片尚未同步到這台裝置';}});
   });
 }
-function _photoPreload(list){return Promise.all((list||[]).filter(_phIsRef).map(function(p){return _photoGet(p).catch(function(){return '';});}));}
+function _photoPreload(list){return Promise.all((list||[]).filter(_phIsRef).map(function(p){return _photoGet(p).catch(function(e){_err('_dlxRcptHtml',e);return '';});}));}
 // 舊資料搬移：登入且連線時，把 dailyLogs 裡的 data: 照片搬出；報價只留參照
 function _photoMigrate(){
   if(!_phCanCloud())return 0;
@@ -45240,7 +45240,7 @@ function _siteEngNames(qid){return _siteEngOf(qid).map(function(r){return r.name
 // 登入後：管理員讀整份支出；工務只讀自己那幾案（規則也只放行那幾案）
 function _lxWatch(){
   if(!_lxCloud()||window._lxWatched)return;window._lxWatched=1;
-  _fbDb.ref('fydata/siteEng').on('value',function(sn){SITE_ENG=(sn&&sn.val())||{};_lxSave();_lxSubExp();try{updateDashTodo();}catch(e){_err('_lxWatch.todo',e);}},function(e){console.warn('[工務名單] 讀不到',e&&e.message);});
+  window._lxSeRef=_fbDb.ref('fydata/siteEng');window._lxSeRef.on('value',function(sn){SITE_ENG=(sn&&sn.val())||{};_lxSave();_lxSubExp();try{updateDashTodo();}catch(e){_err('_lxWatch.todo',e);}},function(e){console.warn('[工務名單] 讀不到',e&&e.message);});
 }
 function _lxSubExp(){
   if(!_lxCloud())return;var subs=window._lxSubs=window._lxSubs||{},want={};
@@ -45271,15 +45271,21 @@ function _dlxType(item){var t=String(item||'');for(var i=0;i<_DLX_KW.length;i++)
 function _dlxRowsOf(d,txt){var o=_dlOf(d);var R=(FJC.dl.expOf?FJC.dl.expOf(txt!=null?txt:o.txt):[]);return R.map(function(r,i){return Object.assign({key:d.id+'#'+i,ti:_dlxType(r.item),date:o.dt},r);});}
 function _lxK(key){return String(key).replace(/#/g,'_').replace(/[.$\[\]\/]/g,'-');}
 function _lxRow(mq,k){return ((LEXP||{})[mq]||{})[k]||null;}
+// 審查：管理員只寫有變的欄位（update），不重寫整列——工務補的 fix（署名是工務）不會被一起送上去而被規則擋掉，也不會蓋掉剛補的資料
+function _lxUpd(mq,k,obj){LEXP=LEXP||{};LEXP[mq]=Object.assign({},LEXP[mq]||{});LEXP[mq][k]=Object.assign({},LEXP[mq][k]||{},obj);_lxSave();
+  if(!_lxCloud())return Promise.resolve(true);return _fbDb.ref('fydata/lineExp/'+mq+'/'+k).update(obj).then(function(){return true;}).catch(function(e){_err('_lxUpd',e);toast('雲端沒寫成功（'+((e&&e.message)||'')+'），這台先記著');return false;});}
+var _LX_F=['qid','src','date','text','item','amt','pay','who','why','photos'];
+function _lxOff(){try{var subs=window._lxSubs||{};Object.keys(subs).forEach(function(k){try{subs[k].off();}catch(e){_err('_lxOff.sub',e);}});window._lxSubs={};if(window._lxSeRef){window._lxSeRef.off();window._lxSeRef=null;}}catch(e){_err('_lxOff',e);}
+  window._lxWatched=0;LEXP={};SITE_ENG={};try{localStorage.removeItem('fy_lineexp');localStorage.removeItem('fy_siteeng');}catch(e){_err('_lxOff.ls',e);}}   /* 審查：登出／換人登入不留上一個人的支出 */
 function _lxPut(mq,k,v){LEXP=LEXP||{};LEXP[mq]=Object.assign({},LEXP[mq]||{});if(v==null)delete LEXP[mq][k];else LEXP[mq][k]=v;_lxSave();return _lxCloudSet('fydata/lineExp/'+mq+'/'+k,v==null?null:v);}
 // 日報卡確認、退回、修改時（草稿的支出照最後的文字重拆）：管理員把列寫進 fydata/lineExp；處理過的不動，工務補過的 fix 保留
 //   雲端收到日報時已經寫過一次（functions/line/core.js expQueue），這裡補「還沒選工程的日報選好工程」與「改過文字」兩種
 function _dlExpQueue(q,d,dt,txt){var R=_dlxRowsOf(d,txt);var o=_dlOf(d),mq=_siteEngQid(q.id),n=0,src=d.id,keep={};
   R.forEach(function(r){var k=_lxK(r.key);keep[k]=1;var ex=_lxRow(mq,k);if(ex&&ex.done)return;
-    var row=JSON.parse(JSON.stringify({key:r.key,qid:q.id,src:src,date:dt||r.date,text:r.text,item:r.item,amt:r.amt,pay:r.pay,who:r.who,why:r.why,photos:o.photos.slice(0,6),at:(ex&&ex.at)||Date.now(),by:(ex&&ex.by)||_meEmail()||'本機'}));
-    if(ex&&ex.fix)row.fix=ex.fix;
-    if(ex&&JSON.stringify(Object.assign({},ex,{at:0}))===JSON.stringify(Object.assign({},row,{at:0})))return;
-    _lxPut(mq,k,row);n++;});
+    var row=JSON.parse(JSON.stringify({key:r.key,qid:q.id,src:src,date:dt||r.date,text:r.text,item:r.item,amt:r.amt,pay:r.pay,who:r.who,why:r.why,photos:o.photos.slice(0,6)}));
+    if(!ex){row.at=Date.now();row.by=_meEmail()||'本機';_lxUpd(mq,k,row);n++;return;}
+    var ch={};_LX_F.forEach(function(f){if(JSON.stringify(ex[f]==null?null:ex[f])!==JSON.stringify(row[f]==null?null:row[f]))ch[f]=row[f]==null?null:row[f];});   /* 審查：逐欄比（雲端回來的欄位順序不同），只送有變的 */
+    if(Object.keys(ch).length){_lxUpd(mq,k,ch);n++;}});
   Object.keys((LEXP||{})[mq]||{}).forEach(function(k){var r=LEXP[mq][k];if(r&&r.src===src&&!keep[k]&&!r.done&&!r.fix){_lxPut(mq,k,null);}});   /* 改過文字少了的那幾筆（沒人補過、還沒處理）拿掉 */
   return n;}
 function _dlxEff(r){var f=r.fix||{},o=Object.assign({},r,{ti:r.ti!=null?r.ti:_dlxType(r.item)});if(f.who){o.who=String(f.who).slice(0,20);if(/沒寫是誰/.test(o.why||''))o.why='';}o.rcpt=_lineArr(f.photos).filter(function(x){return /^ph:/.test(x);});return o;}
@@ -45301,11 +45307,12 @@ function _dlxReady(r){var t=QC_TYPES[r.ti];return r.amt>0&&!!r.pay&&!(t&&t[4]===
 function _dlxMiss(r){var m=[];if(!(r.amt>0))m.push('金額');if(!r.pay)m.push('付款方式');else if((r.pay==='petty'||r.pay==='adv')&&!(r.who&&_dlxWhoOk(r.who)))m.push(r.pay==='petty'?'零用金是誰':'代墊是誰');if(!(r.rcpt&&r.rcpt.length))m.push('收據照片');return m;}
 function _dlxCommit(x,rows){var q=_dlxQ(x);if(!q)return 0;if(!_decIsAdmin()){toast('記帳只有管理員能按');return 0;}var n=0,mq=_siteEngQid(q.id),me=_meEmail()||'本機';
   rows.forEach(function(r){var k=r._k||_lxK(r.key),ex=_lxRow(mq,k);if(ex&&ex.done)return;
-    var base=ex||JSON.parse(JSON.stringify({key:r.key,qid:q.id,src:r.src||x.id.split('|')[1],date:r.date,text:r.text,item:r.item,amt:r.amt,pay:r.pay,who:r.who,why:r.why,photos:_lineArr(x.photos).slice(0,6),at:Date.now(),by:me}));
-    if(r.skip){_lxPut(mq,k,Object.assign({},base,{done:{at:Date.now(),by:me,skip:1}}));return;}
+    var base=ex?{}:JSON.parse(JSON.stringify({key:r.key,qid:q.id,src:r.src||x.id.split('|')[1],date:r.date,text:r.text,item:r.item,amt:r.amt,pay:r.pay,who:r.who,why:r.why,photos:_lineArr(x.photos).slice(0,6),at:Date.now(),by:me}));   /* 已經有的列只補 done（不重送 fix） */
+    if(r.skip){_lxUpd(mq,k,Object.assign(base,{done:{at:Date.now(),by:me,skip:1}}));return;}
+    var dup=(q.costs||[]).find(function(c){return c&&c.lineKey===r.key;});if(dup){_lxUpd(mq,k,Object.assign(base,{done:{at:Date.now(),by:me,cid:dup.id||'',amt:dup.amt||r.amt}}));return;}   /* 審查：上次雲端沒寫成功、成本已記過 → 不重記，只補標處理過 */
     var res=_qcCommit({ti:r.ti,amt:r.amt,note:(r.item||'')+'（LINE 日報）',proj:q.id,payer:(r.pay==='co'?'':(r.who||'')),date:r.date});if(!res)return;
     var c=q.costs[q.costs.length-1];if(c){c.lineKey=r.key;c.linePay=r.pay;if(r.rcpt&&r.rcpt.length)c.photos=r.rcpt.slice(0,6);}   /* 審查：src 留 quick（當天支出清單、來源標示照舊認得），只多記 lineKey；工務補的收據照片跟著成本 */
-    _lxPut(mq,k,Object.assign({},base,{done:{at:Date.now(),by:me,cid:(c&&c.id)||'',amt:r.amt}}));n++;});
+    _lxUpd(mq,k,Object.assign(base,{done:{at:Date.now(),by:me,cid:(c&&c.id)||'',amt:r.amt}}));n++;});
   _touch(q);persist();try{_immediateUpload();}catch(e){_err('_dlxCommit.up',e);}return n;}
 // 工務補資料：零用金／代墊是誰、收據照片 → 只寫 fix（規則只放行這一段）
 function _dlxFixSave(x,fixes){var mq=_siteEngQid(x.qid),me=_meEmail()||'本機',jobs=[];

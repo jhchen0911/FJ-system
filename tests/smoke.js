@@ -11829,11 +11829,17 @@ async function newPage(browser, width, height) {
         out.admSee = L.length === 2 && xa.rows.find(x => x.amt === 600).who === '小陳' && _dlxReady(xa.rows.find(x => x.amt === 600)) && /退回/.test(_decCardHtml('dlExp', xa));
         const det = await _DEC.dlExp.detail(xa);
         out.admDet = /工務補的收據照片/.test(det) && /這一案的工務：阿明/.test(det) && /小陳 的零用金/.test(det);
+        const sent = [], keepU = window._lxUpd; window._lxUpd = function (mq, k, obj) { sent.push({ k, obj }); return keepU(mq, k, obj); };
         out.commit = _DEC.dlExp.ok(xa) === true && Q[0].costs.length === 2 && Q[0].costs.find(c => c.amt === 600).payer === '小陳' && (Q[0].costs.find(c => c.amt === 600).photos || []).length === 1 && LEXP.qA.dA1_0.done && LEXP.qA.dA1_0.done.cid && LEXP.qA.dA1_0.fix.who === '小陳' && _decItems('dlExp').length === 1;
+        // 審查：確認時只送 done（工務的 fix 署名是工務，整列重送會被規則擋）；上次雲端沒寫成功（done 不見）再按確認不會重記成本
+        out.onlyDone = sent.length === 2 && sent.every(x => x.obj.done && !('fix' in x.obj) && !('amt' in x.obj));
+        delete LEXP.qA.dA1_0.done; const again = _dlxCommit(xa, xa.rows.filter(r => r.amt === 600));
+        out.noDouble = again === 0 && Q[0].costs.length === 2 && LEXP.qA.dA1_0.done && LEXP.qA.dA1_0.done.cid === Q[0].costs.find(c => c.amt === 600).id;
+        window._lxUpd = keepU;
       } finally { Q = keep.Q; DRAFTS = keep.DRAFTS; LEXP = keep.LEXP; SITE_ENG = keep.SITE_ENG; window._decIsAdmin = keep.adm; window._meEmail = keep.me; window._dlxStaff = keep.st; window.listStaff = keep.ls; window.showConfirm = keep.sc; _lxSave(); }
       return out;
     });
-    check('v6.0.234 LINE 支出工務名單：管理員在專案頁指定（追加掛主約）；工務只看自己那一案、只有「修改」補零用金是誰與收據照片；不在名單的看不到；管理員看得到補的資料、按確認才記帳；規則 siteEng／lineExp', Object.values(r).length === 11 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.234 LINE 支出工務名單：管理員在專案頁指定（追加掛主約）；工務只看自己那一案、只有「修改」補零用金是誰與收據照片；不在名單的看不到；管理員看得到補的資料、按確認才記帳（只送 done、不重記成本）', Object.values(r).length === 13 && Object.values(r).every(Boolean), JSON.stringify(r));
     {
       const R = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')), f = R.rules.fydata, se = f.siteEng, lx = f.lineExp;
       const ok = /adminEmails/.test(se.$qid['.write']) && !/access/.test(se.$qid['.write']) && /access/.test(se['.read']) && /adminEmails/.test(lx['.read']) && !/access/.test(lx['.read']) && /fydata\/siteEng'\)\.child\(\$qid\)/.test(lx.$qid['.read']) && !/siteEng/.test(lx.$qid['.write'])
