@@ -14992,6 +14992,76 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── 派工板（Lotion 11/12：P1a／P2a／P3a／P4 每天都出／P5a／P6a／P7a）──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 60));
+      const keepQ = Q, keepP = PROJECTS, keepW = WORKERS.slice(), keepV = VENDORS.slice(), oA = window._isAdminUser, oU = window._fbUser, oR = window._isReaderUser, oEq = P.equipList, oClip = navigator.clipboard;
+      let copied = '';
+      try {
+        window.toast = () => {}; window._pushCloud = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); _nav5Apply();
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: (t) => { copied = t; return Promise.resolve(); } } });
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true; _isReaderUser = false; P.equipList = ['挖土機 PC200', '吊車'];
+        const today = localToday(), tmr = _dAdd(today, 1), d2 = _dAdd(today, -2);
+        Q = [{ id: 'qK1', name: '範例派工甲', client: '甲', awarded: true, _mt: 1, items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 10, price: 3000 }], costs: [],
+            dailyLogs: [{ id: 'd1', date: today, crewV: 2, workers: 2, crews: [{ type: 'labor', vendor: '範例點工行', n: 2, ppl: [{ wid: 'w1', name: '王小明', day: 1, ot: 0 }, { wid: 'w2', name: '李大華', day: 1, ot: 0 }] }, { type: 'sub', vendor: '範例承包', n: 3 }], ownPpl: [{ wid: 'w4', name: '林工務', day: 1, ot: 0 }], equip: [{ name: '挖土機 PC200', hrs: 1 }] }] },
+          { id: 'qK2', name: '範例派工乙', client: '乙', awarded: true, _mt: 1, items: [{ desc: '水平支撐', unit: 'M', qty: 10, price: 800 }], costs: [], dailyLogs: [{ id: 'd2', date: d2, workers: 1 }] },
+          { id: 'qK3', name: '很久沒動的案', client: '丙', awarded: true, _mt: 1, items: [], costs: [], dailyLogs: [{ id: 'd3', date: '2025-01-01', workers: 1 }] }];
+        PROJECTS = [{ id: 'p_qK1', qid: 'qK1', _mt: 1 }, { id: 'p_qK2', qid: 'qK2', _mt: 1, dispatch: { [d2]: { crews: [{ vendor: '範例點工行', ppl: [{ wid: 'w1', name: '王小明' }] }], own: [], subs: [], equip: [] } } }, { id: 'p_qK3', qid: 'qK3', _mt: 1 }];
+        VENDORS.length = 0; VENDORS.push({ id: 'v1', name: '範例點工行', type: '點工' });
+        WORKERS.length = 0; WORKERS.push({ id: 'w1', name: '王小明', company: '範例點工行', status: 'active' }, { id: 'w2', name: '李大華', company: '範例點工行', status: 'active' }, { id: 'w3', name: '陳阿土', company: '範例點工行', status: 'active' }, { id: 'w4', name: '林工務', company: '豐有工程', status: 'active' });
+        // ① 下午 3 點前不出、之後出（每天都出）；很久沒動的工地不列
+        window._dpForce = false; const h = new Date().getHours(); out.before = h >= 15 || _DEC.dispatch.list().length === 0;
+        window._dpForce = true; const L1 = _DEC.dispatch.list();
+        out.list = L1.length === 1 && L1[0].date === tmr && L1[0].qs.map((q) => q.id).join() === 'qK1,qK2';
+        // ② 預設：甲＝今天日報實際出工（點工、自家、承包、機具），乙＝前一次派工；王小明排了兩個工地 → 標黃
+        const det = _DEC.dispatch.detail(L1[0]);
+        out.def = /帶 今天日報/.test(det) && /點工 範例點工行：王小明、李大華/.test(det) && /自家：林工務/.test(det) && /承包 範例承包 3 人/.test(det) && /機具：挖土機 PC200/.test(det) && /帶 \d\d\/\d\d 的派工/.test(det);
+        out.dup = /⚠ 王小明 同時排了別的工地/.test(det) && /王小明 排了兩個工地/.test(_DEC.dispatch.body(L1[0]));
+        // ④ 修改：乙改成陳阿土、帶吊車（每個工地一張「選工班→勾人」）
+        _DEC.dispatch.edit(L1[0]); await T(80);
+        out.edTabs = document.querySelectorAll('#dp-tabs button').length === 2 && !!document.querySelector('#dp-crews .dr-lab');
+        _dpEdShow('qK2'); await T(40);
+        out.edElse = /今天已在 範例派工甲/.test(document.querySelector('#dp-crews .dr-pp[data-wid="w1"]').textContent);
+        drPpTog('lab', 0, 'w1', false); drPpTog('lab', 0, 'w3', true); document.querySelector('#dp-equip input[value="吊車"]').checked = true;
+        document.getElementById('fy-modal-o').click(); await T(80);
+        const det2 = _DEC.dispatch.detail(_DEC.dispatch.list()[0]);
+        out.edited = /點工 範例點工行：陳阿土/.test(det2) && /機具：吊車/.test(det2) && !/⚠ 王小明/.test(det2) && !window._drCtx;
+        // ③ 確認：存進專案（p.dispatch[明天]）＋複製 LINE 文字；卡片消失
+        _DEC.dispatch.ok(_DEC.dispatch.list()[0]); await T(40);
+        const s1 = PROJECTS[0].dispatch[tmr], s2 = PROJECTS[1].dispatch[tmr];
+        out.saved = s1 && s1.crews[0].ppl.length === 2 && s1.own[0].wid === 'w4' && s1.equip[0] === '挖土機 PC200' && s1.okBy === 'jhchen0911@gmail.com' && s2 && s2.crews[0].ppl[0].wid === 'w3'
+          && /【明天 .* 派工】/.test(copied) && /▸ 範例派工乙\n  點工 範例點工行：陳阿土/.test(copied) && _DEC.dispatch.list().length === 0;
+        out.proj = /最近 7 天派工 \d 天・明天已排/.test(_dpInfo(Q[0])) && /陳阿土/.test(_dpHtml(Q[1]));
+        // ⑤ 退回＝明天不派工
+        delete PROJECTS[0].dispatch[tmr]; delete PROJECTS[1].dispatch[tmr]; _DEC.dispatch.reject(_DEC.dispatch.list()[0]);
+        out.reject = PROJECTS[0].dispatch[tmr].skip === 1 && _DEC.dispatch.list().length === 0 && /明天不派工/.test(_dpInfo(Q[0]));
+        PROJECTS[1].dispatch[tmr] = { crews: [{ vendor: '範例點工行', ppl: [{ wid: 'w3', name: '陳阿土' }] }], own: [{ wid: 'w4', name: '林工務' }], subs: [], equip: ['吊車'], okAt: 1 };
+        // ⑥ 隔天日報：照派工先勾好（沒送出前不算數），改一個人再送出 → 推估照日報
+        go('quickcost'); await T(100); try { rQuickCost(); } catch (e) { /* 可忽略 */ }
+        document.getElementById('dr-date').value = tmr;
+        const dp = document.getElementById('dr-proj'); dp.value = 'qK2'; dp.onchange(); await T(80);
+        out.prefill = _drLab.length === 1 && !!_drLab[0].ppl.w3 && !!_drOwn.w4 && _drEquip['吊車'] === 1 && /已照 .* 的派工先勾好/.test(document.getElementById('dr-crews').textContent);
+        out.notYet = !(Q[1].dailyLogs || []).some((L) => L.date === tmr);
+        drPpDay('lab', 0, 'w3', 0.5); submitDailyReport(); await T(100);
+        const Ln = Q[1].dailyLogs.find((L) => L.date === tmr);
+        out.submit = Ln && Ln.crews.find((c) => c.type === 'labor').ppl[0].day === 0.5 && (Ln.ownPpl || [])[0].wid === 'w4' && (Ln.equip || []).some((e) => e.name === '吊車');
+        const E = _laborEstAll((d) => d === tmr); out.est = E.qK2 && E.qK2.days === 0.5 && E.qK2.amt === Math.round(0.5 * (parseFloat(P.laborDayRate) || 0));
+        // ⑦ 唯讀帳號看不到卡
+        _isReaderUser = true; out.ro = !_DEC.dispatch.canSee(); _isReaderUser = false;
+        out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      window._dpForce = false; Q = keepQ; PROJECTS = keepP; WORKERS.length = 0; keepW.forEach((x) => WORKERS.push(x)); VENDORS.length = 0; keepV.forEach((x) => VENDORS.push(x)); _isAdminUser = oA; _fbUser = oU; _isReaderUser = oR; P.equipList = oEq;
+      try { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: oClip }); } catch (x) { /* 可忽略 */ }
+      try { document.querySelectorAll('#fy-modal').forEach((m) => m.remove()); } catch (x) { /* 可忽略 */ }
+      return out;
+    });
+    check('派工板（寬 ' + W + '）：下午 3 點後才出卡、很久沒動的工地不列、預設帶今天日報／沒有帶前一次派工、同人兩工地標黃、修改＝每個工地選工班勾人＋機具、確認存進專案並複製 LINE 文字、退回＝明天不派工、隔天日報先勾好（沒送出不算數）、送出後推估照日報、唯讀看不到、不左右捲', !r.err && r.before && r.list && r.def && r.dup && r.edTabs && r.edElse && r.edited && r.saved && r.proj && r.reject && r.prefill && r.notYet && r.submit && r.est && r.ro && r.noHScroll, JSON.stringify(r));
+    check('派工板測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
