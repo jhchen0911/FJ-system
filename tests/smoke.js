@@ -13949,6 +13949,97 @@ async function newPage(browser, width, height) {
     check('v6.0.233 詢價收件卡測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── 擴充線 A①③（Lotion 11/11）：叫料單照圖面路數逐路列＋材料帳本（只算已確認的簽收單、只顯示數量）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {};
+      const keep = { Q: Q, M: MAT_EST, MV: MAT_MOVES, qid: window._matEstQid };
+      try {
+        Q = [{ id: 'qLed1', code: 'L01', name: '範例帳本案', items: [], _mt: 1 }];
+        MAT_EST = _shDefaults();
+        MAT_EST._routeRows = [{ ly: 1, id: 'V1', dir: '縱', wall: 24.6, dbl: '', combo: '', mids: '', cross: '', note: '' }, { ly: 1, id: 'V2', dir: '縱', wall: 24.6, dbl: '雙', combo: '', mids: '', cross: '', note: '' }];
+        const res = computeShoringFY(MAT_EST);
+        const st = res.staged.find((x) => x.stage === '第1層水平支撐'), st2 = res.staged.find((x) => x.stage === '第2層水平支撐');
+        out.routes = st && st.routes.length === 2 && st.routes[1].mult === 2 && st2 && st2.routes.length === 0;
+        const d = _meDoc('order', {}, res), x = document.createElement('div'); x.innerHTML = d.body; const t = x.textContent;
+        const pieces = st.routes[0].pieces.join('＋');
+        out.doc = /第1層水平支撐｜路數明細（依圖面逐路叫料）/.test(t) && t.indexOf('V1') >= 0 && t.indexOf(pieces) >= 0 && /×2（雙支撐）/.test(t) && /合計（定尺支數）/.test(t) && !/第2層水平支撐｜路數明細/.test(t);
+        out.brand = d.css.indexOf('#2e5e42') < 0 && d.css.indexOf(FY_BRAND.g) >= 0;
+        out.noMoney = !/NT\$|單價|金額/.test(t);
+        // 沒填路數明細＝叫料單不出逐路表（照舊）
+        const m0 = _shDefaults(), d0 = _meDoc('order', {}, computeShoringFY(m0)); out.noRt = d0.body.indexOf('路數明細（依圖面逐路叫料）') < 0;
+        // 材料帳本：掛專案才有；已確認的簽收單才算；草稿列「另有 N 張待確認」
+        window._matEstQid = '';
+        out.unbound = _meLedgerHtml(res) === '';
+        window._matEstQid = 'qLed1';
+        MAT_MOVES = [{ id: 'mv1', st: 'ok', dir: 'in', qid: 'qLed1', items: [{ name: '支撐', spec: 'H350', len: 12, qty: 10 }, { name: '神秘料', spec: '', len: 0, qty: 3 }] },
+          { id: 'mv2', st: 'ok', dir: 'out', qid: 'qLed1', items: [{ name: '支撐', spec: 'H350', len: 12, qty: 2 }] },
+          { id: 'mv3', st: 'draft', dir: 'in', qid: 'qLed1', items: [{ name: '支撐', spec: 'H350', len: 12, qty: 50 }] }];
+        const L = _meLedRows(res, 'qLed1'), sup = L.rows.find((o) => o.name === '支撐（H350）'), sub = L.rows.find((o) => o.name === '副支撐擋片');
+        out.led = sup && sup.inV === 120 && sup.outV === 24 && sup.src.indexOf('路數明細') >= 0 && sup.src.indexOf('估算') >= 0 && (!sub || sub.hit === 0) && L.extra.length === 1 && L.wait === 1;
+        const y = document.createElement('div'); y.innerHTML = _meLedgerHtml(res); const ty = y.textContent;
+        out.ledHtml = /材料帳本/.test(ty) && /神秘料/.test(ty) && /另有 1 張簽收單還沒確認/.test(ty) && !/NT\$/.test(ty) && !y.querySelector('button');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keep.Q; MAT_EST = keep.M; MAT_MOVES = keep.MV; window._matEstQid = keep.qid;
+      return out;
+    });
+    check('擴充線 A①：叫料單照路數明細逐路列（路號、定尺組合、雙支撐×2、合計支數）；沒填的層與沒填路數的案子照舊；叫料單改品牌綠、不出金額',
+      r.routes && r.doc && r.brand && r.noMoney && r.noRt, JSON.stringify(r));
+    check('擴充線 A③：材料帳本掛專案才有；數量來源、已進場／已退場只算已確認的簽收單；「副支撐擋片」不搶「支撐」；估算沒列的料與待確認張數另列；沒有按鈕、不出金額',
+      r.unbound && r.led && r.ledHtml, JSON.stringify(r));
+    check('擴充線 A 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+  // ── 擴充線 B（Lotion 11/11）：鑽探地層地圖——地層草稿拍板卡（一次確認全部、修改排除）＋報價頁附近舊案（得標率只有管理員）──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keep = { Q: Q, D: DRAFTS, adm: window._decIsAdmin, P: P.geoR };
+      try {
+        window.toast = () => {};
+        window._draftMark = (id, st, ex) => { if (DRAFTS[id]) { DRAFTS[id].status = st; DRAFTS[id].ex = ex; } return Promise.resolve(true); };
+        const soil = (m) => ({ fill: '1.5m', main: m, n: '8~15', gw: 'GL-3m' });
+        Q = [{ id: 'qG0', code: 'G00', name: '範例本案', items: [], geo: { lat: 25.0, lng: 121.5, soil: soil('粉土質砂') }, _mt: 1 },
+          { id: 'qG1', code: 'G01', name: '範例舊案甲', awarded: true, items: [], geo: { lat: 25.01, lng: 121.5, soil: soil('黏土') }, _mt: 1 },
+          { id: 'qG2', code: 'G02', name: '範例舊案乙', bidStatus: 'lost', items: [], geo: { lat: 25.0, lng: 121.515, soil: soil('卵礫石') }, _mt: 1 },
+          { id: 'qG3', code: 'G03', name: '範例遠方案', awarded: true, items: [], geo: { lat: 25.1, lng: 121.5, soil: soil('砂') }, _mt: 1 },
+          { id: 'qG4', code: 'G04', name: '範例待補案', items: [], _mt: 1 }, { id: 'qG5', code: 'G05', name: '範例舊案丙', items: [], _mt: 1 }];
+        P.geoR = 2;
+        DRAFTS = { dGeo001: { id: 'dGeo001', type: 'geo', by: 'ai@example.com', byName: 'AI', at: Date.now() - 1000, status: 'pending', summary: '地層資料 3 案',
+          payload: { rows: [{ code: 'G04', lat: 25.005, lng: 121.505, addr: '範例市範例區', soil: soil('粉土'), src: '範例資料夾' }, { code: 'G99', lat: 25.0, lng: 121.5 }, { code: 'G05', lat: 121.5, lng: 25.0 }] } } };
+        const items = []; _v6TodoItems(items);
+        out.card = items.some((x) => x.type === 'dec_geoFix') && !_draftPending().some((d) => d.type === 'geo');
+        const x = document.createElement('div'); x.innerHTML = _DEC.geoFix.detail(DRAFTS.dGeo001); const t = x.textContent;
+        out.detail = /寫入 1 案/.test(t) && /範例待補案/.test(t) && /找不到這案/.test(t) && /對調/.test(t) && /粉土/.test(t) && !!x.querySelector('a[href^="https://www.google.com/maps/search/"][rel~="noopener"]');
+        // 修改：把找不到的改對到 qG5、排除第 1 案 → 只寫 qG5
+        DRAFTS.dGeo001.payload = Object.assign({}, DRAFTS.dGeo001.payload, { ov: { 0: { skip: true }, 1: { qid: 'qG5' } } });
+        const pl = _geoPlan(DRAFTS.dGeo001); out.edit = pl[0].st === 'skip' && pl[1].st === 'new' && pl[1].q.id === 'qG5' && pl[2].st === 'bad';
+        const mt0 = Q[5]._mt, ok = await Promise.resolve(_DEC.geoFix.ok(DRAFTS.dGeo001));
+        out.ok = ok === true && Q[5].geo && Q[5].geo.lat === 25.0 && Q[5].geo.draft === 'dGeo001' && Q[5]._mt !== mt0 && !Q[4].geo && DRAFTS.dGeo001.status === 'applied';
+        // 報價頁附近舊案：管理員看得到得標率；工務只看地層
+        Q.splice(5, 1);
+        window._decIsAdmin = () => true;
+        const a = document.createElement('div'); a.innerHTML = _qGeoHtml(Q[0]); const ta = a.textContent;
+        out.admin = /附近 2 公里舊案（2 案）/.test(ta) && /接工率 50%/.test(ta) && /範例舊案甲/.test(ta) && !/範例遠方案/.test(ta) && a.querySelectorAll('svg circle').length === 3 && !a.querySelector('button') && /黏土/.test(ta);
+        window._decIsAdmin = () => false;
+        const b = document.createElement('div'); b.innerHTML = _qGeoHtml(Q[0]); const tb = b.textContent;
+        out.staff = !/接工率|得標/.test(tb) && /卵礫石/.test(tb);
+        P.geoR = 12; const c = document.createElement('div'); c.innerHTML = _qGeoHtml(Q[0]); out.radius = /附近 12 公里舊案（3 案）/.test(c.textContent);
+        out.noGeo = _qGeoHtml(Q[4]) === '';
+        out.snap = !('geo' in _qhSnapOf(Q[0]));
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keep.Q; DRAFTS = keep.D; window._decIsAdmin = keep.adm; P.geoR = keep.P;
+      return out;
+    });
+    check('擴充線 B：地層草稿走今天頁拍板卡（不進 AI 草稿清單）；明細逐案列地址、座標（Google 地圖）、地層、找不到／座標對調不寫；修改可排除與改對案；確認才寫 q.geo 並更新 _mt',
+      r.card && r.detail && r.edit && r.ok, JSON.stringify(r));
+    check('擴充線 B：報價頁附近舊案（半徑參數、預設 2 公里）；點位圖沒有底圖；得標率只有管理員看得到、工務只看地層；沒有座標不顯示；版次快照不帶 geo',
+      r.admin && r.staff && r.radius && r.noGeo && r.snap, JSON.stringify(r));
+    check('擴充線 B 測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.233 發包詢價單草稿卡（陳軒 11/10 新佇列第 4 件）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

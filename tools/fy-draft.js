@@ -3,7 +3,7 @@
 // 說明見 docs/AI草稿上傳_使用說明.md。只用 Node 18 以上內建的 fetch，不用裝套件。
 //
 //   node tools/fy-draft.js login     [--env test]     第一次用：輸入 AI 帳號密碼（不顯示、不存密碼，只存登入通行證）
-//   node tools/fy-draft.js submit 草稿.json [--env test]     type：qchg／quote／bid／ownerCard（合約條件卡）／rfqReply（廠商回價），v6.0.233
+//   node tools/fy-draft.js submit 草稿.json [--env test]     type：qchg／quote／bid／ownerCard（合約條件卡）／rfqReply（廠商回價），v6.0.233；geo（地層資料，擴充線 B）
 //   node tools/fy-draft.js mine      [--env test]     列出自己還在待確認的草稿
 //   node tools/fy-draft.js withdraw <草稿id> [--env test]
 //   node tools/fy-draft.js inbox     [--env test]     LINE 收件匣未歸檔的清單（v6.0.191）

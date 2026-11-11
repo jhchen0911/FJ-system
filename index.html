@@ -1166,6 +1166,7 @@ body.nav5:not(.v7old-acct) #page-acct.acct-ledon .ph .ph-r{display:none!importan
         <div id="tcost-warn" style="display:none;font-size:10.5px;line-height:1.5;color:var(--red);background:var(--redl);border:1px solid #f3c4bf;border-radius:var(--r6);padding:6px 8px;margin-top:4px"></div>
       </div>
     </div>
+    <div id="q-geo" class="card" style="display:none;margin-bottom:12px"></div><!-- 擴充線 B：附近舊案地層（唯讀，沒有按鈕） -->
     <!-- 施工成本卡片 -->
     <!-- 施工成本已移至獨立「施工成本」頁（自專案總覽/合約/應付進入），v5.228 -->
     <!-- 改版第 7 步①：共用 A4 單據引擎——右邊即時 A4 預覽（與匯出 PDF 同一份內容與分頁） -->
@@ -2374,6 +2375,7 @@ body.nav5:not(.v7old-acct) #page-acct.acct-ledon .ph .ph-r{display:none!importan
           <div class="f"><label>廠商計價截止日（每月幾號）</label><input id="pvcutday" type="number" value="25" min="1" max="31"><div class="hint">分包「本期計價」預設的計價日／期間迄＝最近一次截止日（例：25 日截止、次月 25 日放款）</div></div>
           <div class="f"><label>承包成本未計價前不掛應付</label><select id="pvsubbill"><option value="1">是（預設）——按「本期計價」後才逐期產生應付</option><option value="0">否——建立承包成本即掛整筆應付</option></select><div class="hint">廠商月底計價、次月放款：登錄發包不會馬上出現整筆匯款；預付款另掛應付並在各期抵扣</div></div>
           <div class="f"><label>日報未填提醒（天）</label><input id="pdrgap" type="number" value="3" min="0"><div class="hint">進行中專案連續 N 天沒有工作日報，總覽「本月待辦」提醒；0＝不提醒</div></div>
+          <div class="f"><label>報價附近舊案半徑（公里）</label><input id="pgeor" type="number" value="2" min="0.2" max="20" step="0.1"><div class="hint">報價編輯頁列出這個半徑內的舊案地層（與得標率，只有管理員看得到）；空白＝2</div></div>
           <div class="f"><label>期初現金 (NT$)</label><input id="popen" type="number" value="0"><div class="hint">基準日當天的銀行帳戶餘額。填 0 則水位只反映系統內的收付變化，不是真實帳戶餘額</div></div>
           <div class="f"><label>期初基準日</label><input id="popendate" type="date"><div class="hint"><b>務必與上面的餘額同一天</b>。系統只累加基準日<b>之後</b>的實收與付款——基準日當天以前的錢已經在餘額裡了。沒填基準日會把歷史實收整包再加一次，可動用資金會虛高（例：帳上 348 萬卻顯示 591 萬）。沒填實收日期的舊請款單一律視為期初之前</div></div>
           <div class="f"><label>營運週轉保留月數</label><input id="popres" type="number" value="3" min="0" max="24" step="1"><div class="hint">分潤上限會先扣掉「<b>下方公司固定成本明細合計</b> × 此月數」。<b>沒填固定成本明細＝保留金 0</b>，等於沒保留營運金。薪資、租金、機具貸款每月照付，這筆錢不能分掉</div></div>
@@ -2898,9 +2900,10 @@ body.nav5:not(.v7old-acct) #page-acct.acct-ledon .ph .ph-r{display:none!importan
 <script src="calc/todo.js?v=6.0.181" defer></script>
 <script src="calc/vbill.js?v=6.0.181" defer></script>
 <script src="calc/qdraft.js?v=6.0.197" defer></script>
-<script src="calc/matmove.js?v=6.0.221" defer></script>
+<script src="calc/matmove.js?v=6.0.236" defer></script>
 <script src="calc/bid.js?v=6.0.209" defer></script>
 <script src="calc/dailyparse.js?v=6.0.235" defer></script>
+<script src="calc/geo.js?v=6.0.236" defer></script>
 <script src="app.js?v=6.0.235" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->

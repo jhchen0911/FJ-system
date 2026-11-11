@@ -161,3 +161,18 @@ test('v6.0.233 報價草稿可帶 est（成本單價）與 issues（圖說疑義
   assert.ok(r.rec, r.err); assert.deepStrictEqual(r.rec.payload.est, [{ i: 0, cost: 350 }]); assert.deepStrictEqual(r.rec.payload.issues, ['S2 與 A1 開挖深度不一致']);
   assert.match(D.build(Object.assign({}, base, { body: { type: 'quote', payload: { fields: f, est: [{ i: 5, cost: 1 }] }, expect: { sub: 1000, tax: 50, total: 1050 } } })).err, /i 不對/);
 });
+
+test('擴充線 B 地層資料 geo：一批多案、只收白名單欄位；座標有問題的照收（卡片標不寫）；沒有案名或太多案不收；新報價可帶 geo', () => {
+  const rows = [{ code: '1151101', lat: 25.0, lng: 121.5, addr: '假市假區', soil: { fill: '1m', main: '假土層', n: '5~9', gw: 'GL-2m', bad: 'x' }, src: '假資料夾', junk: 1 }, { code: 'X9', lat: 121.5, lng: 25.0 }];
+  const r = D.build(Object.assign({}, base, { body: { type: 'geo', payload: { rows } } }));
+  assert.ok(r.rec, r.err);
+  assert.strictEqual(r.rec.type, 'geo'); assert.match(r.rec.summary, /地層資料 2 案（1 案座標有問題）/);
+  assert.deepStrictEqual(r.rec.payload.rows[0], { qid: '', code: '1151101', name: '', lat: 25, lng: 121.5, addr: '假市假區', soil: { fill: '1m', main: '假土層', n: '5~9', gw: 'GL-2m' }, src: '假資料夾' });
+  assert.match(D.build(Object.assign({}, base, { body: { type: 'geo', payload: { rows: [{ lat: 25, lng: 121.5 }] } } })).err, /qid、code 或 name/);
+  assert.match(D.build(Object.assign({}, base, { body: { type: 'geo', payload: { rows: Array.from({ length: 301 }, () => ({ code: 'a', lat: 25, lng: 121.5 })) } } })).err, /最多 300/);
+  assert.match(D.build(Object.assign({}, base, { body: { type: 'geo', payload: {} } })).err, /要有 rows/);
+  const qb = { type: 'quote', payload: { fields: { name: '假新案', client: '假業主', items: [{ desc: '假工項', unit: '式', qty: 1, price: 100 }] }, geo: { lat: 25.01, lng: 121.51, soil: { main: '假砂' } } }, expect: { sub: 100, tax: 5, total: 105 } };
+  const q = D.build(Object.assign({}, base, { body: qb }));
+  assert.ok(q.rec, q.err); assert.strictEqual(q.rec.payload.geo.lat, 25.01); assert.strictEqual(q.rec.payload.geo.soil.main, '假砂');
+  assert.match(D.build(Object.assign({}, base, { body: Object.assign({}, qb, { payload: Object.assign({}, qb.payload, { geo: { lat: 35, lng: 139 } }) }) })).err, /geo：/);
+});

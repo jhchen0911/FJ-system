@@ -843,6 +843,7 @@ function doSaveP(){
   try{var _mr={};[['H300',3],['H350',4],['H400',5]].forEach(function(x){var v=parseFloat(gv('pmat-'+x[0].toLowerCase()));_mr[x[0]]=isFinite(v)&&v>=0?v:x[1];});P.matRentRate=_mr;var _mf=parseFloat(gv('pmat-factor'));P.matRentFactor=(isFinite(_mf)&&_mf>0)?_mf:0.8;P.matLossAccrue=gv('pmat-loss')!=='0';var _mtr=parseFloat(gv('pmat-trans'));P.matTransRate=(isFinite(_mtr)&&_mtr>=0)?_mtr:450;}catch(e){_err('doSaveP.mat',e);}   // v6 自有材料內部租金
   P.equipList=String(gv('pequip')||'').split(/[\n,，、]/).map(function(t){return t.trim();}).filter(Boolean);   // v5.402
   P.drGapDays=(function(){var v=parseInt(gv('pdrgap'));return isNaN(v)?3:Math.max(0,v);})();
+  P.geoR=(function(){var v=parseFloat(gv('pgeor'));return (isFinite(v)&&v>=0.2&&v<=20)?Math.round(v*10)/10:2;})();   // 擴充線 B-5
   P.vendorPayDay=(function(){var v=parseInt(gv('pvpayday'));return (v>=1&&v<=31)?v:25;})();
   P.vendorPayDelay=(function(){var v=parseInt(gv('pvpaydelay'));return isNaN(v)?1:Math.max(0,Math.min(6,v));})();
   P.vendorCutDay=(function(){var v=parseInt(gv('pvcutday'));return (v>=1&&v<=31)?v:25;})();   // v5.443
@@ -953,7 +954,7 @@ function syncParamsUI(){
   try{rFixedCosts();}catch(e){_err('syncParamsUI',e);}
   try{var _rr=P.matRentRate||{};[['h300','H300',3],['h350','H350',4],['h400','H400',5]].forEach(function(x){var e=document.getElementById('pmat-'+x[0]);if(e)e.value=(_rr[x[1]]!=null?_rr[x[1]]:x[2]);});var _pf=document.getElementById('pmat-factor');if(_pf)_pf.value=(P.matRentFactor!=null?P.matRentFactor:0.8);var _pl=document.getElementById('pmat-loss');if(_pl)_pl.value=(P.matLossAccrue===false?'0':'1');var _pt=document.getElementById('pmat-trans');if(_pt)_pt.value=(P.matTransRate!=null?P.matTransRate:450);}catch(e){_err('syncParamsUI.mat',e);}   // v6
   try{var _pk=document.getElementById('paikey');if(_pk)_pk.value='';}catch(e){_err('syncParamsUI',e);}   // v6.0.118：不再顯示／保存金鑰
-  try{var _pe=document.getElementById('pequip');if(_pe)_pe.value=(P.equipList||[]).join('\n');var _pg=document.getElementById('pdrgap');if(_pg)_pg.value=(P.drGapDays==null?3:P.drGapDays);var _pd=document.getElementById('pvpayday');if(_pd)_pd.value=(P.vendorPayDay||25);var _pm=document.getElementById('pvpaydelay');if(_pm)_pm.value=(P.vendorPayDelay==null?1:P.vendorPayDelay);var _pc=document.getElementById('pvcutday');if(_pc)_pc.value=(P.vendorCutDay||25);var _ph=document.getElementById('pholidays');if(_ph)_ph.value=_holText();var _pk=document.getElementById('pmakeup');if(_pk)_pk.value=(P.makeupDays||'');var _pb=document.getElementById('pvsubbill');if(_pb)_pb.value=(P.subPayOnBill===false?'0':'1');}catch(e){_err('syncParamsUI',e);}
+  try{var _pe=document.getElementById('pequip');if(_pe)_pe.value=(P.equipList||[]).join('\n');var _pg=document.getElementById('pdrgap');if(_pg)_pg.value=(P.drGapDays==null?3:P.drGapDays);var _pgr=document.getElementById('pgeor');if(_pgr)_pgr.value=(P.geoR==null?2:P.geoR);var _pd=document.getElementById('pvpayday');if(_pd)_pd.value=(P.vendorPayDay||25);var _pm=document.getElementById('pvpaydelay');if(_pm)_pm.value=(P.vendorPayDelay==null?1:P.vendorPayDelay);var _pc=document.getElementById('pvcutday');if(_pc)_pc.value=(P.vendorCutDay||25);var _ph=document.getElementById('pholidays');if(_ph)_ph.value=_holText();var _pk=document.getElementById('pmakeup');if(_pk)_pk.value=(P.makeupDays||'');var _pb=document.getElementById('pvsubbill');if(_pb)_pb.value=(P.subPayOnBill===false?'0':'1');}catch(e){_err('syncParamsUI',e);}
   const m={pc:'company',pt:'taxid',pb:'boss',pco:'contact',ptel:'tel',pem:'email',pad:'addr',
     ptax:'tax',prmrate:'removeRate',pohd:'overheadPct',plabor:'laborDayRate',popen:'openingCash',popendate:'openingDate',popres:'opReserveMonths',popresamt:'opReserveAmt',pmul:'mult',ppro:'profit',ps1:'s1',ps2:'s2',ps3:'s3',
   };
@@ -1152,7 +1153,8 @@ function rTots(){
     }else{cr.style.display='none';mr.style.display='none';}
   }
   try{_qMeasChip(t);}catch(e){_err('rTots.meas',e);}   // v6.0.160 圖面覆核
-  try{_qP3Render(t);}catch(e){_err('rTots.p3',e);}   // v6.0.216 底價／目標成交價／同類得標率
+  try{_qP3Render(t);}catch(e){_err('rTots.p3',e);}
+  try{_qGeoRender();}catch(e){_err('rTots.geo',e);}   // 擴充線 B：附近舊案地層   // v6.0.216 底價／目標成交價／同類得標率
   // v5.395：異常成本提示——哪幾項成本單價比報價單價高 3 倍以上，直接點名
   const wr=document.getElementById('tcost-warn');
   if(wr){
@@ -8604,6 +8606,10 @@ function _meGtClear(inp,layers,lys){
   var pull=man?inp.gtPull1==='pull':c.pull;
   return {L:[c],c:c,pull:pull,man:man,deduct:pull?0:1,isDef:!!(c&&c.isDef)};
 }
+// 擴充線 A①（Lotion 11/11）：叫料單逐路列——每一路叫哪幾支定尺、短節、千斤頂伸長；只放數量（沒有金額），雙支撐標 ×2
+function _meRouteOrderRows(rt){
+  return (rt||[]).map(function(r){return {id:r.id||'?',dir:r.dir||'',wall:r.wall,net:r.net,pieces:(r.pieces||[]).slice(),mult:r.mult||1,shorts:(r.shorts||[]).slice(),jack:r.jack||0,joints:r.joints||0,warn:(r.warn||[]).length>0};});
+}
 function _meRouteNotes(d,i,gc,gtOn){
   var n=[],rt=d.rt||[];
   if(!rt.length)n.push('支撐長度與接頭為估算（未填路數明細）');
@@ -8973,6 +8979,7 @@ function computeShoringFY(inp){
     sAdd(st,'黃色立柱','支',d.yellow);
     if(_rt.n&&i2===_rt.lastLy)_rt.sp.rows.forEach(function(x){sAdd(st,'短節備品 '+x.len+'M（全案×1.1）','只',x.order-x.n);});
     st.notes=_meRouteNotes(d,i2,_gc,b('gtRopeDeduct'));
+    st.routes=_meRouteOrderRows(d.rt);   // 擴充線 A①：叫料單照圖面路數逐路列（Lotion 11/11）
     staged.push(st);
   });
   if(gantaiA>0||railLen>0){
@@ -9484,7 +9491,8 @@ function _meDoc(kind,opt,res){   // v6.0.154：叫料單／估價明細的內容
   }else{
     var _pick=_meStagePick(res,opt);
     (res.staged||[]).forEach(function(st,i){if(_pick.indexOf(i)<0)return;
-      addSecF('▸ '+st.stage,st.items.map(function(it){return {k:it.name,v:_shR0(it.quantity),u:it.unit};}).concat((st.notes||[]).map(function(t){return {sec:'※ '+t};})));});   // v6.0.158 路數明細／構台下淨空的提醒
+      addSecF('▸ '+st.stage,st.items.map(function(it){return {k:it.name,v:_shR0(it.quantity),u:it.unit};}).concat((st.notes||[]).map(function(t){return {sec:'※ '+t};})));   // v6.0.158 路數明細／構台下淨空的提醒
+      if((st.routes||[]).length)secs.push({h:'▸ '+st.stage+'｜路數明細（依圖面逐路叫料）',rt:st.routes});});   // 擴充線 A①
   }
   var cell=function(c){
     if(!c)return '<td class="e"></td><td class="e"></td><td class="e"></td>';
@@ -9494,6 +9502,7 @@ function _meDoc(kind,opt,res){   // v6.0.154：叫料單／估價明細的內容
   // v5.400：每一分類自成一張表、項目改 3～4 組並排（名稱都短就排 4 組、否則 3 組），版面更緊湊
   var det='';
   secs.forEach(function(sc){
+    if(sc.rt){det+=_meRouteOrderTbl(sc);return;}
     var maxLen=0;sc.rows.forEach(function(r){if(!r.sec)maxLen=Math.max(maxLen,String(r.k||'').length);});
     var ncol=kind==='order'?2:(maxLen<=11?4:3);   // v6.0.139 Lotion：叫料單改每列 2 組（4 組太密）
     var gw=100/ncol,cg='';
@@ -9518,18 +9527,91 @@ function _meDoc(kind,opt,res){   // v6.0.154：叫料單／估價明細的內容
   var _mefn=_toolFileName('matest',kind==='order'?'叫料單':'材料估算表',(q&&q.name)||'');
   var css=''
     +'@page{size:A4 landscape;margin:10mm}body,.medoc{font-family:"Microsoft JhengHei","PingFang TC",sans-serif;font-size:11px;color:#1a1a1a;margin:0}'
-    +'h1{font-size:17px;margin:0 0 4px;border-bottom:2px solid #2e5e42;padding-bottom:4px}'
-    +'h2{font-size:12.5px;margin:10px 0 4px;color:#2e5e42}'
+    +'h1{font-size:17px;margin:0 0 4px;border-bottom:2px solid '+FY_BRAND.g+';padding-bottom:4px}'
+    +'h2{font-size:12.5px;margin:10px 0 4px;color:'+FY_BRAND.g+'}'
     +'.meta{font-size:10px;color:#555;margin:2px 0}'
     +'table{width:100%;border-collapse:collapse;margin:2px 0;table-layout:fixed}thead{display:table-header-group}tr{page-break-inside:avoid}'
     +'th,td{border:0.6px solid #b5b5b5;padding:2.5px 5px;text-align:left;font-size:10.5px;line-height:1.35;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}'
-    +'th{background:#2e5e42;color:#fff;font-weight:700}th.r{text-align:right}'
+    +'th{background:'+FY_BRAND.g+';color:#fff;font-weight:700}th.r{text-align:right}'
     +'td.r{text-align:right;font-weight:700}td.u{color:#666;font-size:9.5px;white-space:normal;line-height:1.2}td.e{border-color:transparent}'
-    +'td.hd{background:#2e5e42;color:#fff;font-weight:700}td.sec{background:#eef4f0;font-weight:700;color:#2e5e42}td.stg{font-weight:700;color:#2e5e42;vertical-align:top}td.w{white-space:normal;line-height:1.6;padding:4px 6px}'
+    +'td.hd{background:'+FY_BRAND.g+';color:#fff;font-weight:700}td.sec{background:#eef4f0;font-weight:700;color:'+FY_BRAND.g+'}td.stg{font-weight:700;color:'+FY_BRAND.g+';vertical-align:top}td.w{white-space:normal;line-height:1.6;padding:4px 6px}'
     +'table.ord{margin:0 0 8px}table.ord td{font-size:12px;padding:5px 8px;line-height:1.4}table.ord td.u{font-size:11px}table.ord td.hd{font-size:12.5px;padding:5px 8px}'
     +'.apx td,.apx th{white-space:normal;text-overflow:clip}.apx tr.tt td{background:#f1f5f2}.apx .sub{font-size:10.5px;font-weight:400;color:#444}.apx .cond,.apx td.l{color:#333}'
+    +'table.rto td{white-space:normal;text-overflow:clip}table.rto th{font-size:11px;padding:4px 6px}table.rto tr.tt td{background:#f1f5f2}'
     +'';
   return {fn:_mefn,css:css,body:body};
+}
+// 擴充線 A①：叫料單逐路表（一路一列；定尺組合＝這一路要叫的料，雙支撐 ×2；合計列＝各路支數加總）
+function _meRouteOrderTbl(sc){
+  var f=function(x){return String(Math.round(x*100)/100);};
+  var h='<table class="z pdf-keep ord rto"><colgroup><col style="width:9%"><col style="width:7%"><col style="width:11%"><col style="width:33%"><col style="width:16%"><col style="width:12%"><col style="width:12%"></colgroup><thead>'
+    +'<tr><td colspan="7" class="hd">'+esc(sc.h)+'</td></tr>'
+    +'<tr><th>路</th><th>方向</th><th class="r">淨長 M</th><th>叫料（定尺組合）</th><th>短節</th><th class="r">千斤頂伸長</th><th class="r">接頭</th></tr></thead><tbody>';
+  var pcs={};
+  sc.rt.forEach(function(r){
+    (r.pieces||[]).forEach(function(p){var k=f(p);pcs[k]=(pcs[k]||0)+r.mult;});
+    h+='<tr><td>'+esc(r.id)+(r.warn?' ⚠':'')+'</td><td>'+esc(r.dir)+'</td><td class="r">'+esc(Number(r.net).toFixed(2))+'</td>'
+      +'<td>'+esc((r.pieces||[]).map(f).join('＋')||'—')+(r.mult>1?' <b>×'+r.mult+'（雙支撐）</b>':'')+'</td>'
+      +'<td>'+esc((r.shorts||[]).length?r.shorts.map(f).join('＋')+' M':'—')+'</td>'
+      +'<td class="r">'+(r.jack>0?esc(String(r.jack))+' cm':'—')+'</td><td class="r">'+esc(String(r.joints*r.mult))+'</td></tr>';
+  });
+  var ks=Object.keys(pcs).map(parseFloat).sort(function(a,b){return b-a;});
+  h+='<tr class="tt"><td colspan="3"><b>合計（定尺支數）</b></td><td colspan="4" class="w">'+esc(ks.map(function(k){return f(k)+' M × '+pcs[f(k)]+' 支';}).join('、'))+'</td></tr>';
+  return h+'</tbody></table>';
+}
+// 擴充線 A③（Lotion 11/11）：材料帳本——掛專案時，每種料一列：數量從哪來、估算、已進場、已退場、在場、差多少。
+//   只顯示數量（A-4）；進退料只算拍板卡確認過的簽收單（A-3，st==='ok'）；不加按鈕（第 11 條）
+function _meLedSrc(st,it,bound){   // 逐項：路數明細只影響支撐、短節、合板、螺絲；其他照案場細節（掛專案有案場細節）或估算
+  var rtItem=/^第\d+層水平支撐$/.test(st.stage||'')&&/^(支撐|短節|合板|長螺絲|短螺絲)/.test(String(it.name||''));
+  if(rtItem){
+    if((st.routes||[]).length)return (MAT_EST&&MAT_EST._routeSrc&&/\.json$/i.test(MAT_EST._routeSrc.file||''))?'圖面量測':'路數明細';
+    return '估算';
+  }
+  return bound?'案場細節':'估算';
+}
+function _meLedNorm(x){return String(x==null?'':x).replace(/[\s　]/g,'').replace(/[（(][^）)]*[）)]/g,'').toUpperCase();}
+function _meLedSpec(x){var m=String(x==null?'':x).toUpperCase().match(/2?H\d{3}/);return m?m[0].replace(/^2/,''):'';}
+function _meLedRows(res,qid){
+  var est=[],map={};
+  var bound=!!_matEstSiteQ();
+  (res.staged||[]).forEach(function(st){
+    (st.items||[]).forEach(function(it){
+      if(/備品/.test(it.name||''))return;var src=_meLedSrc(st,it,bound);
+      var k=it.name+'|'+it.unit,o=map[k];
+      if(!o){o=map[k]={name:it.name,unit:it.unit,qty:0,src:[],base:_meLedNorm(String(it.name).replace(/[（(].*$/,'').replace(/\s.*$/,'')),spec:_meLedSpec(it.name),inV:0,outV:0,hit:0};est.push(o);}
+      o.qty+=it.quantity||0;if(o.src.indexOf(src)<0)o.src.push(src);
+    });});
+  var mv={};try{mv=FJC.mv.ledger(MAT_MOVES,qid)||{};}catch(e){_err('_meLedRows',e);}
+  var extra=[];
+  Object.keys(mv).forEach(function(k){var x=mv[k],nm=_meLedNorm(x.name),sp=_meLedSpec(x.spec)||_meLedSpec(x.name);
+    var spOk=function(e){return !e.spec||e.spec===sp;};   // 先找同名，再找名稱互相包含（避免「副支撐擋片」搶走「支撐」）
+    var o=est.find(function(e){return e.base&&e.base===nm&&spOk(e);})||est.find(function(e){if(!e.base||e.base.length<2)return false;
+      return (nm.indexOf(e.base)>=0||(nm.length>=2&&e.base.indexOf(nm)>=0))&&spOk(e);});
+    if(!o){extra.push(x);return;}
+    var isM=/^M/i.test(o.unit);o.inV+=isM?x.inM:x.inQ;o.outV+=isM?x.outM:x.outQ;o.hit++;});
+  var wait=(MAT_MOVES||[]).filter(function(m){return m&&m.st!=='ok'&&(m.qid===qid||m.toQid===qid||m.fromQid===qid);}).length;
+  return {rows:est,extra:extra,wait:wait};
+}
+function _meLedgerHtml(res){
+  var qid=window._matEstQid;if(!qid||!res)return '';
+  var L=_meLedRows(res,qid),f=function(x){return fmt(Math.round(x*100)/100);};
+  if(!L.rows.length)return '';
+  var hit=L.rows.filter(function(o){return o.hit;}),rest=L.rows.filter(function(o){return !o.hit;});   // 手機不拉長：只列有簽收單的料，其他收成一行
+  var h='<div class="card me-led"><div class="ch green"><div class="cht">材料帳本</div></div><div class="cb">';
+  h+='<div style="font-size:11px;color:var(--b3);margin-bottom:4px">進退料只算已確認的簽收單；只有數量</div>';
+  if(hit.length){
+    h+='<div class="tbl-wrap"><table class="tbl"><thead><tr><th>材料</th><th>數量來源</th><th class="r">估算</th><th class="r">已進場</th><th class="r">已退場</th><th class="r">在場</th><th class="r">差（進場−估算）</th></tr></thead><tbody>';
+    hit.forEach(function(o){var on=o.inV-o.outV,df=o.inV-o.qty;
+      h+='<tr><td><b>'+esc(o.name)+'</b></td><td>'+esc(o.src.join('＋'))+'</td><td class="r">'+f(o.qty)+' '+esc(o.unit)+'</td>'
+        +'<td class="r">'+f(o.inV)+'</td><td class="r">'+f(o.outV)+'</td><td class="r">'+f(on)+'</td>'
+        +'<td class="r"'+(df<0?' style="color:#b26a00"':'')+'>'+(df>0?'+':'')+f(df)+'</td></tr>';});
+    h+='</tbody></table></div>';
+  }else h+='<div style="font-size:12px;color:var(--b3)">還沒有確認過的簽收單。</div>';
+  if(rest.length)h+='<details style="margin-top:6px;font-size:12px"><summary>其他 '+rest.length+' 種料還沒有簽收單（估算量與來源）</summary><div style="line-height:1.8;color:var(--b4);overflow-wrap:anywhere">'
+    +rest.map(function(o){return esc(o.name)+' '+f(o.qty)+' '+esc(o.unit)+'（'+esc(o.src.join('＋'))+'）';}).join('、')+'</div></details>';
+  if(L.extra.length)h+='<div style="font-size:11.5px;color:#b26a00;margin-top:6px">簽收單有、估算沒列：'+esc(L.extra.map(function(x){return x.name+(x.spec?' '+x.spec:'')+(x.len?' '+x.len+'M':'')+' 進'+x.inQ+'／退'+x.outQ;}).join('、'))+'</div>';
+  if(L.wait)h+='<div style="font-size:11.5px;color:var(--b3);margin-top:4px">另有 '+L.wait+' 張簽收單還沒確認，不算在內。</div>';
+  return h+'</div></div>';
 }
 function _meDocHtml(d){return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(d.fn)+'</title><style>'+d.css+'</style></head><body><div class="page-wrap">'+d.body+'</div></body></html>';}
 function matEstExportPDF(kind,opt){
@@ -9878,6 +9960,7 @@ function _matEstCalcCore(){
     basis+='</tbody></table></div></div>';
   }
   h+='<details class="me-sec"'+(_meSecOpen('basis',false)?' open':'')+' ontoggle="window._meSecTog&&_meSecTog(\'basis\',this.open)"><summary>計算依據（路數、各層明細）</summary>'+basis+'</details>';
+  h+=_meLedgerHtml(res);   // 擴充線 A③ 材料帳本（在預覽下面）
   el.innerHTML=h;
   _mePvRender();
   if(isMob()&&!_meAutoCalc)el.scrollIntoView({behavior:'smooth',block:'start'});
@@ -28286,7 +28369,7 @@ function restoreQVersion(qid,versionIdx,savedAt){
       if(editing){try{cur=Object.assign(JSON.parse(JSON.stringify(Q[idx])),_qEditorFields());unsaved=true;}catch(e){_err('restoreQVersion.cur',e);cur=Q[idx];}}
       var _okB=false;try{_okB=saveQVersion(qid,cur,{pre:true,unsaved:unsaved});}catch(e){_err('restoreQVersion',e);}
       if(!_okB){toast('還原前備份存不進這台裝置（儲存空間可能滿了），已取消還原：請先匯出備份或清理自動存檔');return;}   // 審查：空間滿時備份只在記憶體，重新整理就不見
-      const _keep={sent:Q[idx].sent,sentHist:Q[idx].sentHist,sentSkipAt:Q[idx].sentSkipAt,sendLog:Q[idx].sendLog,verFix:Q[idx].verFix,bid:Q[idx].bid,bidHist:Q[idx].bidHist,bidWait:Q[idx].bidWait,bidAim:Q[idx].bidAim};   // v6.0.209 得標結果、底價目標價也屬於這張報價（還原後再照還原後的得標狀態對一次 _bidRecSync）   // v6.0.180：匯出紀錄、補登版次規則屬於這張報價，不跟著快照倒回去
+      const _keep={sent:Q[idx].sent,sentHist:Q[idx].sentHist,sentSkipAt:Q[idx].sentSkipAt,sendLog:Q[idx].sendLog,verFix:Q[idx].verFix,bid:Q[idx].bid,bidHist:Q[idx].bidHist,bidWait:Q[idx].bidWait,bidAim:Q[idx].bidAim,geo:Q[idx].geo};   // v6.0.209 得標結果、底價目標價也屬於這張報價（還原後再照還原後的得標狀態對一次 _bidRecSync）   // v6.0.180：匯出紀錄、補登版次規則屬於這張報價，不跟著快照倒回去
       Q[idx]={...snapshot,id:qid,ver:Math.max(curVer,snapshot.ver||1)};  // 版號不倒退
       Object.keys(_keep).forEach(function(k){if(_keep[k]!=null)Q[idx][k]=_keep[k];else delete Q[idx][k];});
       try{_bidRecSync(Q[idx]);}catch(e){_err('restoreQVersion.bid',e);}   // 審查：還原成得標前的版次 → 得標紀錄移到 bidHist
@@ -33172,7 +33255,7 @@ function _prmMount(){
   var moveF=function(card,ids){var grid=card.querySelector('.fg');ids.forEach(function(id){var el=document.getElementById(id);var f=el&&el.closest('.f');if(f)grid.appendChild(f);});};
   if(cCo)G('co').appendChild(cCo);
   // 稅務設定 → 計價與報價／成本與廠商／資金
-  var cBill=mkCard('計價與報價','稅率、管理費率、分期請款比例、固定成本推算');moveF(cBill,['ptax','pohd','prmrate']);
+  var cBill=mkCard('計價與報價','稅率、管理費率、分期請款比例、固定成本推算');moveF(cBill,['ptax','pohd','prmrate','pgeor']);
   var cCost=mkCard('成本與廠商','點工、自有機具、廠商計價週期、日報提醒、自有材料內部租金');moveF(cCost,['plabor','pequip','pvcutday','pvpayday','pvpaydelay','pholidays','pmakeup','pvsubbill','pdrgap']);
   var rr=P.matRentRate||{};
   cCost.querySelector('.fg').insertAdjacentHTML('beforeend',
@@ -38991,6 +39074,7 @@ function _draftAppliedFor(kind,recId,isNew){
   var a=window._draftApplying;if(!a||a.kind!==kind)return;
   if(a.target?a.target!==recId:!isNew)return;
   if(kind==='quote'&&a.aim){var aq=(Q||[]).find(function(x){return x&&x.id===recId;});if(aq){aq.bidAim=a.aim;_touch(aq);try{persist();}catch(e){_err('_draftAppliedFor.aim',e);}}}   // v6.0.209 AI 草稿帶的底價／目標成交價：存檔成功才寫（private）
+  if(kind==='quote'&&a.geo){var gq=(Q||[]).find(function(x){return x&&x.id===recId;});if(gq){gq.geo=Object.assign({},a.geo,{at:Date.now(),draft:a.id});_touch(gq);try{persist();}catch(e){_err('_draftAppliedFor.geo',e);}}}   // 擴充線 B-1：報價線建檔帶的座標＋地層，存檔成功才寫
   window._draftApplying=null;_draftMark(a.id,'applied',{resultId:recId});
 }
 function _draftReset(){
@@ -39115,7 +39199,7 @@ function draftApply(id){
       var q=base?JSON.parse(JSON.stringify(base)):{id:'',awarded:false,costs:[]};
       Object.assign(q,JSON.parse(JSON.stringify(f)));
       _draftOpenQuote(q,!!base);
-      window._draftApplying={id:id,kind:'quote',target:base?base.id:null,aim:_bidAimClean(pl.aim)};
+      window._draftApplying={id:id,kind:'quote',target:base?base.id:null,aim:_bidAimClean(pl.aim),geo:_geoDraftG(pl.geo)};
     },false);
     return;
   }
@@ -41130,7 +41214,7 @@ function _qchgApply(id,noSave){   // noSave（v6.0.197 拍板卡「修改」）�
   try{var m=document.getElementById('fy-modal');if(m)m.remove();}catch(e){/* 可忽略 */}
   var c=JSON.parse(JSON.stringify(q));c.items=plan.items;c.rmk=plan.rmk;
   _draftOpenQuote(c,true);
-  window._draftApplying={id:id,kind:'quote',target:q.id,aim:_bidAimClean(pl.aim)};   // 要在開編輯頁之後設（loadQ 會清掉待套用旗標）；saveQ 存成功才標已套用
+  window._draftApplying={id:id,kind:'quote',target:q.id,aim:_bidAimClean(pl.aim),geo:_geoDraftG(pl.geo)};   // 要在開編輯頁之後設（loadQ 會清掉待套用旗標）；saveQ 存成功才標已套用
   if(noSave){toast('改單已放進編輯頁（還沒存）：看過後按「儲存」才生效');return false;}
   var mt0=q._mt||0;
   try{saveQ();}catch(e){_err('_qchgApply.save',e);}
@@ -41570,7 +41654,7 @@ function gtasksAuth(){
 var _DEC={},_DEC_BUSY={},_DEC_OPEN={},_DEC_READY={};   // v6.0.179：卡片預設收起；展開過且明細裡的照片／PDF 載入完成（_DEC_READY）才能按確認
 function _decIsAdmin(){try{return !_fbUser||(!!_isAdminUser&&!_isReaderUser);}catch(e){return false;}}
 function _decFieldsHtml(fs){var adm=_decIsAdmin();return '<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12.5px">'+(fs||[]).filter(function(f){return f&&(!f.money||adm);}).map(function(f){return '<div style="color:var(--b4)">'+esc(String(f.label||''))+'</div><div>'+esc(String(f.value==null?'':f.value))+'</div>';}).join('')+'</div>';}
-var _DEC_DRAFT_TYPES={qchg:1,dailyOut:1,vendorBill:1,qverfix:1,qsend:1,frtRate:1,matBill:1,steelPrice:1,dailyLog:1,invOk:1,recvSlip:1};   // 走拍板卡的草稿類型：AI 草稿清單（_draftPending）不再列
+var _DEC_DRAFT_TYPES={geo:1,qchg:1,dailyOut:1,vendorBill:1,qverfix:1,qsend:1,frtRate:1,matBill:1,steelPrice:1,dailyLog:1,invOk:1,recvSlip:1};   // 走拍板卡的草稿類型：AI 草稿清單（_draftPending）不再列
 function _decReg(kind,spec){
   if(!spec||typeof spec.detail!=='function'){_err('_decReg',new Error(kind+'：沒有 detail，不准註冊（確認前一定要看得到完整內容）'));return false;}
   _DEC[kind]=spec;return true;
@@ -41997,7 +42081,7 @@ function _qdOk(d){
   var check=a.stale||a.lost.length>0;   // 審查：原報價被改過、或有成本單價會不見 → 開編輯頁讓 Lotion 看過再存   // 存進報價的成本單價：AI 給的、原報價同名的（歷史實績只拿來看，不寫進去）
   var q=base?JSON.parse(JSON.stringify(base)):{id:'',awarded:false,costs:[]};
   Object.assign(q,JSON.parse(JSON.stringify(f)));q.items=f.items.filter(Boolean).map(function(it){var i=f.items.indexOf(it),o=JSON.parse(JSON.stringify(it));if(est[i]!=null)o.estCost=est[i];return o;});
-  try{_draftOpenQuote(q,!!base);window._draftApplying={id:x.id,kind:'quote',target:base?base.id:null,aim:_bidAimClean(pl.aim)};if(check){st('esub','AI 草稿：原報價被改過或有成本單價對不到，請檢查後按「儲存」');toast('請在編輯頁檢查後按儲存');return 'open';}saveQ();}catch(e){_err('_qdOk.save',e);window._draftApplying=null;toast('存檔失敗，草稿留著');return false;}   // 同舊流程：開編輯頁（newQ／loadQ 會清掉 _draftApplying）之後才設
+  try{_draftOpenQuote(q,!!base);window._draftApplying={id:x.id,kind:'quote',target:base?base.id:null,aim:_bidAimClean(pl.aim),geo:_geoDraftG(pl.geo)};if(check){st('esub','AI 草稿：原報價被改過或有成本單價對不到，請檢查後按「儲存」');toast('請在編輯頁檢查後按儲存');return 'open';}saveQ();}catch(e){_err('_qdOk.save',e);window._draftApplying=null;toast('存檔失敗，草稿留著');return false;}   // 同舊流程：開編輯頁（newQ／loadQ 會清掉 _draftApplying）之後才設
   if(window._draftApplying&&window._draftApplying.id===x.id){toast('報價沒存成功，請在編輯頁看原因後按儲存');return 'open';}   // 審查：留在編輯頁、_draftApplying 不清，之後按儲存一樣標已套用
   try{go('dash');}catch(e){_err('_qdOk.go',e);}
   return true;
@@ -42616,7 +42700,7 @@ _decReg('dailyOut',{
 //   正式版次 savedAt 晚於來源、號碼 ≥ N 的一律 +1；其他地方記的版號：舊號 > N → +1；舊號 = N 且建立時間晚於來源 → N+1；其餘不變（refs 記原值與新值）。
 // 入口：唯讀帳號（AI）在主控台 fyQuoteVerFix(spec) → 草稿 qverfix → 首頁拍板卡（_decReg('qverfix')）→ Lotion 確認才套用（_qvfApply，套用前再驗一次）。
 // 防漏（不加按鈕）：每次匯出記 q.sendLog；「只匯出」另存一份 sent:true 永久保留；還原前內容匯出過沒封存就先封存；唯讀帳號匯出送 qsend 卡；資料健檢兩項。
-function _qhSnapOf(q){var c=JSON.parse(JSON.stringify(q||{}));delete c.sendLog;delete c.sent;delete c.sentHist;delete c.sentSkipAt;delete c.verFix;delete c.bid;delete c.bidHist;delete c.bidWait;delete c.bidAim;return c;}   // 版次快照不帶匯出紀錄與補登規則（屬於報價本身）
+function _qhSnapOf(q){var c=JSON.parse(JSON.stringify(q||{}));delete c.sendLog;delete c.sent;delete c.sentHist;delete c.sentSkipAt;delete c.verFix;delete c.bid;delete c.bidHist;delete c.bidWait;delete c.bidAim;delete c.geo;return c;}   // 擴充線 B：地層座標也不進快照；版次快照不帶匯出紀錄與補登規則（屬於報價本身）
 function _qSigHash(sig){return sig==null?null:_collHash(String(sig));}
 function _qHashOf(q){try{return _qSigHash(_qSendSig(q));}catch(e){_err('_qHashOf',e);return null;}}
 function _qSendLogAdd(q,o){
@@ -46531,6 +46615,101 @@ _decReg('addonSign',{
   edit:function(x){var a=x.a,IN='width:100%;padding:6px 8px;border:1px solid var(--b2);border-radius:6px;font-family:inherit;font-size:12.5px;box-sizing:border-box';
     showConfirm('給主任的 LINE 文字','<textarea id="ad-msg" rows="6" style="'+IN+'">'+esc(a.askTxt||_adMsg(x.q,a))+'</textarea><div style="font-size:11px;color:var(--b4);margin-top:4px">按確認＝存下這段文字並複製。</div>',
       function(){var t=gv('ad-msg')||'';_adCopy(t).then(function(ok){if(!ok)return;_adSet(x.q,a,{askTxt:t.slice(0,1000),askAt:Date.now(),askBy:_meEmail()||'本機'});toast('已複製');try{_decRefresh('addonSign');}catch(e){_err('addonSign.ref',e);}});},false,null,false);}
+});
+// ══════════ 擴充線 B：鑽探地層地圖（最小版，Lotion 11/11）══════════
+// 每案 q.geo＝{lat,lng,addr,soil:{fill 回填層,main 主要土層,n N 值,gw 地下水位},src,at,draft}（shared，隨報價逐筆同步；沒有金額）。
+// 來源：①舊案＝電腦端（Lotion-HQ）從本機案件資料夾抽地層摘要、自己把地址轉成座標（B-1），送草稿 type geo（一批多案）→ 拍板卡 geoFix 一次確認全部、有問題用修改排除（B-4）；
+//      ②新報價＝報價線的報價草稿 payload.geo，存檔成功才寫（_draftAppliedFor）。
+// 報價編輯頁 #q-geo：半徑 P.geoR（預設 2 公里，B-5）內的舊案——點位圖沒有底圖、每點可開 Google 地圖（B-2）；得標率只有管理員看得到、工務只看地層（B-3）。
+// 算法在 calc/geo.js（FJC.geo），接工率＝得標 ÷（得標＋未得標），跟 _bidStat 同一套。
+function _geoR(){var v=parseFloat(P&&P.geoR);return (isFinite(v)&&v>=0.2&&v<=20)?v:2;}
+function _geoDraftG(g){if(!g||typeof g!=='object'||!window.FJC||!FJC.geo)return null;var r=FJC.geo.clean(g);return r.err?null:r.g;}
+function _geoRes(q){return q.awarded?'won':(q.bidStatus==='lost'?'lost':(q.bidStatus==='void'?'void':'open'));}
+var _GEO_RES_T={won:'得標',lost:'未得標',open:'未定',void:'流標'};
+function _geoList(){return (Q||[]).filter(function(q){return q&&q.id&&!q.parentId&&q.geo&&FJC.geo.okLL(+q.geo.lat,+q.geo.lng);})
+  .map(function(q){return {id:q.id,name:q.name||'',code:q.code||'',lat:+q.geo.lat,lng:+q.geo.lng,soil:q.geo.soil||{},res:_geoRes(q),date:q.date||''};});}
+function _geoSoilTxt(s){s=s||{};return [s.fill?'回填 '+s.fill:'',s.main?s.main:'',s.n?'N '+s.n:'',s.gw?'水位 '+s.gw:''].filter(Boolean).join('｜')||'（沒有地層資料）';}
+function _geoMapUrl(lat,lng){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent((+lat).toFixed(6)+','+(+lng).toFixed(6));}
+function _geoNear(q){if(!q||!q.geo||!window.FJC||!FJC.geo)return null;var pt={lat:+q.geo.lat,lng:+q.geo.lng};if(!FJC.geo.okLL(pt.lat,pt.lng))return null;
+  var R=_geoR(),L=FJC.geo.near(_geoList(),pt,R,q.parentId||q.id);return {pt:pt,R:R,L:L,rate:FJC.geo.rate(L)};}
+function _geoSvg(N,admin){
+  var W=240,c=W/2,pad=10,P0=FJC.geo.plot(N.L,N.pt,N.R,W),col={won:FY_BRAND.g,lost:'#c62828',open:'#9e9e9e',void:'#9e9e9e'};
+  var h='<svg viewBox="0 0 '+W+' '+W+'" width="100%" style="max-width:260px;display:block;margin:0 auto" role="img" aria-label="附近舊案點位圖">'
+    +'<circle cx="'+c+'" cy="'+c+'" r="'+(c-pad)+'" fill="#f4f7f5" stroke="'+FY_BRAND.g+'" stroke-dasharray="4 3"/>'
+    +'<text x="'+c+'" y="'+(pad+12)+'" font-size="10" text-anchor="middle" fill="#777">北｜半徑 '+N.R+' km</text>';
+  N.L.forEach(function(x,i){var p=P0[i];h+='<a href="'+esc(_geoMapUrl(x.lat,x.lng))+'" target="_blank" rel="noopener"><circle cx="'+p.x+'" cy="'+p.y+'" r="6" fill="'+(admin?col[x.res]:'#607d8b')+'" stroke="#fff" stroke-width="1.5"><title>'+esc(x.name+'（'+x.km+' km）')+'</title></circle>'
+    +'<text x="'+(p.x+8)+'" y="'+(p.y+4)+'" font-size="10" fill="#333">'+(i+1)+'</text></a>';});
+  h+='<a href="'+esc(_geoMapUrl(N.pt.lat,N.pt.lng))+'" target="_blank" rel="noopener"><text x="'+c+'" y="'+(c+5)+'" font-size="16" text-anchor="middle" fill="'+FY_BRAND.y+'" stroke="'+FY_BRAND.ink+'" stroke-width="0.6">★<title>本案</title></text></a>';
+  return h+'</svg>';
+}
+function _qGeoHtml(q){
+  var N=_geoNear(q);if(!N)return '';var admin=_decIsAdmin();
+  var h='<div class="ch green"><div class="cht">附近 '+N.R+' 公里舊案（'+N.L.length+' 案）</div></div><div class="cb" style="font-size:12.5px;line-height:1.7">'
+    +'<div>本案地層：'+esc(_geoSoilTxt(q.geo.soil))+'</div>';
+  if(admin){var r=N.rate;h+='<div style="font-weight:700;color:var(--g3)">這區 得標 '+r.won+'／未得標 '+r.lost+(r.open?'／未定 '+r.open:'')+'　接工率 '+(r.rate==null?'—（還沒有結果）':r.rate+'%')+'</div>';}
+  if(!N.L.length)return h+'<div style="color:var(--b3)">半徑內沒有已登錄地層的舊案。</div></div>';
+  h+=_geoSvg(N,admin)+'<div style="font-size:10.5px;color:var(--b3);text-align:center">沒有底圖；點圓點開 Google 地圖'+(admin?'｜綠＝得標、紅＝未得標、灰＝未定或流標':'')+'</div>';
+  h+='<ol style="margin:6px 0 0;padding-left:20px">'+N.L.map(function(x){return '<li style="overflow-wrap:anywhere"><b>'+esc(x.km.toFixed(2))+' km</b> '+esc(x.name)+(admin?'（'+_GEO_RES_T[x.res]+'）':'')
+    +' <a href="'+esc(_geoMapUrl(x.lat,x.lng))+'" target="_blank" rel="noopener" style="font-size:11px">地圖</a><br><span style="color:var(--b4)">'+esc(_geoSoilTxt(x.soil))+'</span></li>';}).join('')+'</ol>';
+  return h+'</div>';
+}
+function _qGeoRender(){
+  var el=document.getElementById('q-geo');if(!el)return;
+  var q=(typeof eid!=='undefined'&&eid)?(Q||[]).find(function(x){return x.id===eid;}):null;
+  if(q&&q.parentId&&!q.geo){var pq=(Q||[]).find(function(x){return x.id===q.parentId;});if(pq&&pq.geo)q=pq;}   // 追加報價用主約的座標
+  var h='';try{h=q?_qGeoHtml(q):'';}catch(e){_err('_qGeoRender',e);h='';}
+  el.innerHTML=h;el.style.display=h?'':'none';
+}
+// ── 草稿 type geo：{rows:[{qid|code|name, lat, lng, addr, soil:{fill,main,n,gw}, src}]}（一批最多 300 案）──
+function _geoFind(r){var S=_draftS,M=(Q||[]).filter(function(q){return q&&q.id&&!q.parentId;});
+  var id=S(r.qid).trim(),cd=S(r.code).trim(),nm=S(r.name).trim();
+  return (id&&M.find(function(q){return q.id===id;}))||(cd&&M.find(function(q){return S(q.code).trim()===cd;}))||(nm&&M.find(function(q){return S(q.name).trim()===nm;}))||null;}
+function _geoClean(p){p=(p&&typeof p==='object')?p:{};var rows=Array.isArray(p.rows)?p.rows:(p.rows&&typeof p.rows==='object'?Object.values(p.rows):[]);
+  return {rows:rows.slice(0,300).map(function(r){r=(r&&typeof r==='object')?r:{};var c=FJC.geo.clean(r);
+    return {qid:_draftS(r.qid).slice(0,80),code:_draftS(r.code).slice(0,60),name:_draftS(r.name).slice(0,120),g:c.g||null,err:c.err||''};}),
+    ov:(p.ov&&typeof p.ov==='object')?p.ov:{}};}
+window.fyGeoDraft=function(p){if(!window.FJC||!FJC.geo)return Promise.resolve({ok:false,why:'calc/geo.js 沒載入'});var o=_geoClean(p);if(!o.rows.length)return Promise.resolve({ok:false,why:'要有 rows（每案 qid 或 code、lat、lng、soil）'});
+  var bad=o.rows.filter(function(r){return r.err;}).length;
+  return _draftPush('geo',{rows:(p.rows||[]).slice(0,300)},('地層資料 '+o.rows.length+' 案'+(bad?'（'+bad+' 案座標有問題）':'')).slice(0,200)).then(function(ok){return {ok:!!ok,n:o.rows.length,bad:bad};});};
+// 每一列的處理結果：要寫哪一案、寫什麼；排除／找不到／座標錯誤的不寫
+function _geoPlan(d){var o=_geoClean(d&&d.payload),ov=o.ov;
+  return o.rows.map(function(r,i){var v=ov[i]||{},q=v.qid?(Q||[]).find(function(x){return x.id===v.qid;}):_geoFind(r);
+    var st=v.skip?'skip':(r.err?'bad':(!q?'none':(q.geo&&FJC.geo.okLL(+q.geo.lat,+q.geo.lng)?'upd':'new')));
+    return {i:i,r:r,q:q,st:st};});}
+var _GEO_ST_T={new:'新增',upd:'更新（覆蓋舊值）',skip:'排除（不寫）',bad:'座標有問題（不寫）',none:'找不到這案（不寫）'};
+function _geoDetail(d){var L=_geoPlan(d),n=L.filter(function(x){return x.st==='new'||x.st==='upd';}).length;
+  return '<div style="font-size:12px;line-height:1.6">確認後寫入 <b>'+n+'</b> 案；有問題的按「修改」排除或改對哪一案。座標由電腦端轉好，點「地圖」核對位置。</div>'
+    +L.map(function(x){var g=x.r.g,warn=x.st==='bad'||x.st==='none';
+      return '<div style="border:1px solid '+(warn?'#ffcc80':'var(--b1)')+';background:'+(warn?'#fff8e1':(x.st==='skip'?'#f5f5f5':'#fff'))+';border-radius:8px;padding:6px 8px;margin-top:6px;font-size:12px;line-height:1.6;overflow-wrap:anywhere">'
+        +'<b>'+(x.i+1)+'. '+esc(x.q?(x.q.name||'(未命名)'):(x.r.name||x.r.code||x.r.qid||'(沒有案名)'))+'</b>　<span style="color:'+(warn?'#b26a00':'var(--g3)')+'">'+esc(_GEO_ST_T[x.st])+'</span>'
+        +(x.st==='bad'?'<br><span style="color:#b26a00">'+esc(x.r.err)+'</span>':'')
+        +(g?('<br>'+esc(g.addr||'（沒有地址）')+'　<a href="'+esc(_geoMapUrl(g.lat,g.lng))+'" target="_blank" rel="noopener">地圖 '+g.lat.toFixed(5)+','+g.lng.toFixed(5)+'</a>'
+          +'<br>地層：'+esc(_geoSoilTxt(g.soil))+(g.src?'<br><span style="color:var(--b4)">來源：'+esc(g.src)+'</span>':'')):'')
+        +(x.st==='upd'?'<br><span style="color:var(--b4)">舊值：'+esc(_geoSoilTxt(x.q.geo.soil))+'</span>':'')+'</div>';}).join('');}
+_decReg('geoFix',{
+  title:'地層資料（電腦端整理的）',todo:function(n){return '地層資料待確認 '+n+' 批';},sub:'確認＝整批寫進各案；退回＝整批不寫；修改＝排除某幾案或改對哪一案',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},
+  list:function(){return Object.keys(DRAFTS||{}).map(function(k){return DRAFTS[k];}).filter(function(d){return d&&d.type==='geo'&&d.status==='pending'&&_DRAFT_ID.test(_draftS(d.id));});},
+  key:function(d){return d.id;},
+  head:function(d){return '地層資料 '+_geoPlan(d).length+' 案';},
+  body:function(d){var L=_geoPlan(d),c={};L.forEach(function(x){c[x.st]=(c[x.st]||0)+1;});return '<div style="font-size:11.5px;color:var(--b4)">'+esc(Object.keys(c).map(function(k){return _GEO_ST_T[k].replace(/（.*$/,'')+' '+c[k];}).join('、'))+'</div>';},
+  detail:function(d){return _geoDetail(d);},
+  ok:function(d){var L=_geoPlan(d).filter(function(x){return x.st==='new'||x.st==='upd';});
+    if(!L.length){toast('這批沒有可以寫入的案子（全部排除或有問題），請按「修改」或「退回」');return false;}
+    var now=Date.now();L.forEach(function(x){x.q.geo=Object.assign({},x.r.g,{at:now,draft:d.id});_touch(x.q);});
+    try{persist();}catch(e){_err('geoFix.ok',e);toast('存檔失敗');return false;}
+    _draftMark(d.id,'applied',Object.assign({resultId:'geo|'+L.length},d.payload&&d.payload.ov&&Object.keys(d.payload.ov).length?{payload:d.payload}:{}));
+    toast('已寫入 '+L.length+' 案的地層資料');return true;},
+  reject:function(d,why){_draftMark(d.id,'rejected',{reason:String(why||'不寫').slice(0,200)});return true;},
+  edit:function(d){var L=_geoPlan(d),opts=(Q||[]).filter(function(q){return q&&q.id&&!q.parentId;}).slice().sort(function(a,b){return String(b.date||'').localeCompare(String(a.date||''));}).slice(0,300);
+    var IN='width:100%;box-sizing:border-box;font-size:13px;padding:6px 8px;border:1px solid var(--b2);border-radius:var(--r8)';
+    showConfirm('修改地層資料',L.map(function(x){return '<div style="border:1px solid var(--b1);border-radius:8px;padding:6px 8px;margin-top:6px;font-size:12px">'
+      +'<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" class="geo-skip" data-i="'+x.i+'"'+(x.st==='skip'?' checked':'')+' style="width:18px;height:18px"> 排除 <b>'+(x.i+1)+'. '+esc(x.r.name||x.r.code||x.r.qid||'')+'</b></label>'
+      +'<select class="geo-q" data-i="'+x.i+'" style="'+IN+';margin-top:4px"><option value="">（自動對：'+esc(x.q?x.q.name:'找不到')+'）</option>'
+      +opts.map(function(q){return '<option value="'+esc(q.id)+'"'+(((d.payload.ov||{})[x.i]||{}).qid===q.id?' selected':'')+'>'+esc((q.code?q.code+' ':'')+(q.name||''))+'</option>';}).join('')+'</select></div>';}).join(''),
+      function(){var ov={};document.querySelectorAll('.geo-skip').forEach(function(el){var i=+el.getAttribute('data-i');if(el.checked)(ov[i]=ov[i]||{}).skip=true;});
+        document.querySelectorAll('.geo-q').forEach(function(el){var i=+el.getAttribute('data-i');if(el.value)(ov[i]=ov[i]||{}).qid=el.value;});
+        d.payload=Object.assign({},d.payload,{ov:ov,edited:true});_decRefresh('geoFix');toast('已改好，請再看一次明細後按確認');},false,null,true);}
 });
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();

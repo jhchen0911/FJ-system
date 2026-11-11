@@ -4,7 +4,7 @@
 const FJC = require('../calc/qdraft.js');
 const D = FJC.qd;
 
-const TYPES = { qchg: 1, quote: 1, bid: 1, ownerCard: 1, rfqReply: 1, inquiry: 1 };   // v6.0.233 ownerCard＝合約條件卡（contract-check 產出的 fj-contract-card/1）
+const TYPES = { qchg: 1, quote: 1, bid: 1, ownerCard: 1, rfqReply: 1, inquiry: 1, geo: 1 };   // 擴充線 B：geo＝電腦端整理的舊案地層＋座標（一批多案）   // v6.0.233 ownerCard＝合約條件卡（contract-check 產出的 fj-contract-card/1）
 const MAX_PENDING = 50;   // 每個送件人同時待確認的上限   // 只開這三種；其他草稿照舊從網頁送
 const BID_TO = { awarded: '得標', '': '待回覆', nego: '議價中', lost: '未得標', void: '流標' };
 const LOST = ['價格過高', '規格不符', '工期不符', '業主關係', '未回應', '其他'];
@@ -131,12 +131,29 @@ function cardClean(card) {
   if (JSON.stringify(out).length > 60000) return { err: '合約條件卡太大（上限約 60KB）' };
   return { card: out, n };
 }
+// 擴充線 B：地層資料（跟前端 _geoClean／FJC.geo.clean 同一份算法）；rows 每列 {qid|code|name, lat, lng, addr, soil:{fill,main,n,gw}, src}
+let GEO = null; try { GEO = require('../calc/geo.js').geo; } catch (e) { GEO = require('../../calc/geo.js').geo; }
+function geoNum(v) { const n = parseFloat(v); return isFinite(n) ? n : null; }
+function geoClean(pl) {
+  const all = arr(pl && pl.rows);
+  if (!all.length) return { err: '要有 rows（每案 qid 或 code、lat、lng、soil）' };
+  if (all.length > 300) return { err: '一批最多 300 案' };
+  const out = []; let bad = 0;
+  for (let i = 0; i < all.length; i++) {
+    const r = (all[i] && typeof all[i] === 'object') ? all[i] : {};
+    if (!String(r.qid || r.code || r.name || '').trim()) return { err: '第 ' + (i + 1) + ' 案要有 qid、code 或 name 其中一個' };
+    const c = GEO.clean(r); if (c.err) bad++;
+    const g = c.g || { lat: geoNum(r.lat), lng: geoNum(r.lng), addr: S(r.addr, 120), soil: {}, src: S(r.src, 80) };   // 座標有問題的照收，卡片標「不寫」
+    out.push(Object.assign({ qid: S(r.qid, 80), code: S(r.code, 60), name: S(r.name, 120) }, g));
+  }
+  return { p: { rows: out }, n: out.length, bad };
+}
 // body＝{type, payload, summary?, expect}；回傳 {rec} 或 {err, detail?}
 function build(o) {
   const { email, name, body, quotes, taxR, now, id } = o, rp = o.rmkParams || {};
   const b = (body && typeof body === 'object') ? body : {};
   const type = S(b.type, 20), pl = (b.payload && typeof b.payload === 'object') ? b.payload : {};
-  if (!TYPES[type]) return { err: '這個工具只收 qchg（改單）、quote（報價單）、bid（得標狀態）、ownerCard（合約條件卡）、rfqReply（廠商回價）、inquiry（詢價收件）；其他草稿請從網頁送' };
+  if (!TYPES[type]) return { err: '這個工具只收 qchg（改單）、quote（報價單）、bid（得標狀態）、ownerCard（合約條件卡）、rfqReply（廠商回價）、inquiry（詢價收件）、geo（地層資料）；其他草稿請從網頁送' };
   if (!ID_RE.test(String(id || ''))) return { err: '草稿 id 不對' };
   let payload, summary;
   if (type === 'qchg') {
@@ -174,7 +191,12 @@ function build(o) {
     const est = []; for (const x of arr(pl.est).slice(0, 300)) { const i = parseInt(x && x.i, 10), c = D.num(x && x.cost); if (!(i >= 0 && i < fields.items.length) || !fields.items[i] || fields.items[i].sec) return { err: 'est 第 ' + (est.length + 1) + ' 筆的 i 不對' }; if (c == null || c < 0 || c > 1e9) return { err: 'est 第 ' + (i + 1) + ' 列成本單價不對' }; est.push({ i, cost: c }); }
     if (est.length) payload.est = est;
     const iss = arr(pl.issues).filter((t) => typeof t === 'string').map((t) => S(t, 300).trim()).filter(Boolean).slice(0, 30); if (iss.length) payload.issues = iss;
+    if (pl.geo && typeof pl.geo === 'object') { const gg = GEO.clean(pl.geo); if (gg.err) return { err: 'geo：' + gg.err }; payload.geo = gg.g; }   // 擴充線 B-1：新報價帶座標＋地層
     summary = (base ? '修改：' : '新報價：') + S(fields.name, 80) + '／' + S(fields.client, 60) + '　合計 NT$ ' + fmt(t.total);
+  } else if (type === 'geo') {
+    const gc = geoClean(pl); if (gc.err) return { err: gc.err };
+    payload = gc.p;
+    summary = S(b.summary, 140).trim() || ('地層資料 ' + gc.n + ' 案' + (gc.bad ? '（' + gc.bad + ' 案座標有問題）' : ''));
   } else if (type === 'inquiry') {
     const ic = inqClean(pl); if (ic.err) return { err: ic.err };
     payload = ic.p;
@@ -238,4 +260,4 @@ function bidStats(quotes, contracts, params, quoteSens) {
   const opt = { minN: parseInt(t.minN) || 5, tune: { lo: t.lo != null ? +t.lo : 40, hi: t.hi != null ? +t.hi : 60, maxDown: t.maxDown != null ? +t.maxDown : 10, maxUp: t.maxUp != null ? +t.maxUp : 5 } };
   return { n: rows.length, minN: opt.minN, kinds: BID.exportRows(BID.stats(rows, opt)) };
 }
-module.exports = { inqClean, replyClean, cardClean, bidStats, aimClean, rmkBaseFor, TYPES, MAX_PENDING, build, superseded, withdrawErr, mine, expectOk, findQuote };
+module.exports = { geoClean, inqClean, replyClean, cardClean, bidStats, aimClean, rmkBaseFor, TYPES, MAX_PENDING, build, superseded, withdrawErr, mine, expectOk, findQuote };

@@ -543,6 +543,32 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
     && /加班沒寫幾小時/.test(f.people[0].why) && /寫人 2，名字有 1 個/.test(f.why[0]) && g.people.length === 2 && g.people[1].ot === 2 && g.machines[0].name === '吊車',
     JSON.stringify([b.people, c.people[1], d.why, f.why, g.people.map((p) => p.name)]));
 }
+// ── 擴充線 B：鑽探地層地圖（calc/geo.js）──
+{
+  const G = require(path.join(__dirname, '..', 'calc', 'geo.js')).geo;
+  const c0 = { lat: 25.0, lng: 121.5 };
+  check('擴充線 B 地層：距離（緯度 0.01° ≈ 1.11 km、同點 0）', Math.abs(G.dist(c0, { lat: 25.01, lng: 121.5 }) - 1.112) < 0.01 && G.dist(c0, c0) === 0);
+  const L = [{ id: 'a', lat: 25.01, lng: 121.5, res: 'won' }, { id: 'b', lat: 25.0, lng: 121.515, res: 'lost' }, { id: 'c', lat: 25.03, lng: 121.5, res: 'won' }, { id: 'me', lat: 25.0, lng: 121.5, res: 'open' }, { id: 'x', lat: 0, lng: 0 }];
+  const n2 = G.near(L, c0, 2, 'me'), n4 = G.near(L, c0, 4, 'me');
+  check('擴充線 B 地層：半徑 2 公里內由近到遠、排除自己與壞座標；半徑可調', eq(n2.map((x) => x.id), ['a', 'b']) && n2[0].km === 1.11 && eq(n4.map((x) => x.id), ['a', 'b', 'c']), JSON.stringify(n2));
+  const r = G.rate([{ res: 'won' }, { res: 'won' }, { res: 'lost' }, { res: 'open' }, { res: 'void' }]);
+  check('擴充線 B 地層：接工率＝得標÷（得標＋未得標），未定、流標不算；沒有結果＝null', r.won === 2 && r.lost === 1 && r.rate === 66.7 && r.open === 1 && r.void === 1 && G.rate([{ res: 'open' }]).rate === null);
+  const ok = G.clean({ lat: '25.0123456', lng: 121.5, addr: '某市某區', soil: { fill: '1.5m', main: '粉土質砂', n: '8~15', gw: 'GL-3m', x: 'drop' }, junk: 1 });
+  check('擴充線 B 地層：clean 只收白名單、座標取 6 位；經緯度對調、台灣以外回錯誤', ok.g && ok.g.lat === 25.012346 && ok.g.soil.main === '粉土質砂' && !('x' in ok.g.soil) && !('junk' in ok.g)
+    && /對調/.test(G.clean({ lat: 121.5, lng: 25 }).err) && /台灣/.test(G.clean({ lat: 35, lng: 139 }).err) && /台灣/.test(G.clean({}).err));
+  const pl = G.plot([{ lat: 25.0, lng: 121.5 }, { lat: 25.0 + 2 / 111.32, lng: 121.5 }], c0, 2, 240);
+  check('擴充線 B 地層：點位圖圓心在中間、北朝上、半徑處貼圈邊', pl[0].x === 120 && pl[0].y === 120 && pl[1].x === 120 && Math.abs(pl[1].y - 10) < 0.2, JSON.stringify(pl));
+}
+// ── 擴充線 A③：材料帳本的進場／退場合計（FJC.mv.ledger）──
+{
+  const MV = require(path.join(__dirname, '..', 'calc', 'matmove.js')).mv;
+  const mv = [{ st: 'ok', dir: 'in', qid: 'q1', items: [{ name: '支撐', spec: 'H350', len: 12, qty: 10 }] },
+    { st: 'ok', dir: 'out', qid: 'q1', items: [{ name: '支撐', spec: 'H350', len: 12, qty: 3, short: 1 }] },
+    { st: 'draft', dir: 'in', qid: 'q1', items: [{ name: '支撐', spec: 'H350', len: 12, qty: 99 }] },
+    { st: 'ok', dir: 'xfer', fromQid: 'q2', toQid: 'q1', items: [{ name: '支撐', spec: 'H350', len: 12, qty: 2 }] }];
+  const g = MV.ledger(mv, 'q1')['支撐|H350|12'], os = MV.onSite(mv, 'q1')['支撐|H350|12'];
+  check('擴充線 A③ 材料帳本：只算已確認；轉入算進場、短少算退場；進場−退場＝在場量（跟 onSite 一致）', g.inQ === 12 && g.outQ === 4 && g.inM === 144 && g.outM === 48 && os.qty === g.inQ - g.outQ, JSON.stringify(g));
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');

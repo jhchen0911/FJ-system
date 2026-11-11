@@ -30,6 +30,25 @@
     });
     return out;
   }
+  // 擴充線 A③（Lotion 11/11）：某案進場／退場合計（只算已確認的；轉入算進場、轉出算退場；短少的算退場）。回傳 {鍵:{name,spec,len,inQ,outQ,inM,outM}}
+  function ledger(moves, qid) {
+    var out = {};
+    (moves || []).forEach(function (mv) {
+      if (!mv || mv.st !== 'ok') return;
+      var sign = 0;
+      if (mv.dir === 'in' && mv.qid === qid) sign = 1;
+      else if (mv.dir === 'out' && mv.qid === qid) sign = -1;
+      else if (mv.dir === 'xfer') { if (mv.toQid === qid) sign = 1; else if (mv.fromQid === qid) sign = -1; }
+      if (!sign) return;
+      (mv.items || []).forEach(function (it) {
+        var k = itemKey(it), o = out[k] || (out[k] = { name: it.name || '', spec: it.spec || '', len: r2(it.len), inQ: 0, outQ: 0, inM: 0, outM: 0 });
+        var q = num(it.qty) + (sign < 0 ? num(it.short) : 0);
+        if (sign > 0) o.inQ = r2(o.inQ + q); else o.outQ = r2(o.outQ + q);
+        o.inM = r2(o.inQ * o.len); o.outM = r2(o.outQ * o.len);
+      });
+    });
+    return out;
+  }
   // 趟數：同一天同一車號算一趟；沒填車號的每筆一趟
   function trips(moves) {
     var seen = {}, n = 0;
@@ -196,7 +215,7 @@
     return s;
   }
   function kgPerM(spec) { var v = KGM[kgKey(spec)]; return v == null ? null : v; }
-  var mv = { itemM: itemM, fromSlipDir: fromSlipDir, itemKey: itemKey, onSite: onSite, trips: trips, itemKg: itemKg, shareByKg: shareByKg, days: days, rentFor: rentFor, idleRent: idleRent, perMDay: perMDay, rentActual: rentActual, idleInMonth: idleInMonth, lossOf: lossOf, frtRegion: frtRegion, frtPerM: frtPerM, freightTrip: freightTrip, billDiff: billDiff, rentPeriod: rentPeriod, rentVsBuy: rentVsBuy, buyAlert: buyAlert, truckFor: truckFor, kgPerM: kgPerM, kgKey: kgKey };
+  var mv = { itemM: itemM, fromSlipDir: fromSlipDir, itemKey: itemKey, onSite: onSite, ledger: ledger, trips: trips, itemKg: itemKg, shareByKg: shareByKg, days: days, rentFor: rentFor, idleRent: idleRent, perMDay: perMDay, rentActual: rentActual, idleInMonth: idleInMonth, lossOf: lossOf, frtRegion: frtRegion, frtPerM: frtPerM, freightTrip: freightTrip, billDiff: billDiff, rentPeriod: rentPeriod, rentVsBuy: rentVsBuy, buyAlert: buyAlert, truckFor: truckFor, kgPerM: kgPerM, kgKey: kgKey };
   if (typeof module !== 'undefined' && module.exports) module.exports = { mv: mv };
   if (root) { root.FJC = root.FJC || {}; root.FJC.mv = mv; }
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
