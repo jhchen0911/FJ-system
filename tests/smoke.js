@@ -14721,6 +14721,75 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.234 Lotion 11/11 回覆：施工成本明細四組＋發包列看這一期、帳務頁首收進「⋯ 更多」、日報表單（工項清單、付款方式、收據選填＋缺收據） ──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepI = INV.slice(), keepP = PAYABLES.slice(), oU = window._fbUser, oA = window._isAdminUser;
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); _nav5Apply();
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        const cut = _vendorCutDate(localToday());
+        Q = [{ id: 'qD4', name: '範例工程D4', client: '甲營造', code: 'D4', date: '2026-10-01', awarded: true, _mt: 1,
+          items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 100, price: 3000, estCost: 2000 }, { desc: '水平支撐組立', unit: 'M', qty: 300, price: 800, estCost: 500 }, { desc: '安全母索', unit: 'M', qty: 50, price: 100 }],
+          dailyLogs: [{ id: 'd1', date: '2026-10-05', progressRows: [{ itemIdx: 2, qty: 50, ph: 'install' }] }],
+          costs: [{ id: 'cA', type: 'sub', vendor: '範例打樁行', rows: [{ id: 'r1', linkedItemIdx: 0, qty: 100, unitPrice: 2300, desc: 'H型鋼樁打設' }] },
+            { id: 'cB', type: 'sub', vendor: '範例支撐行', rows: [{ id: 'r2', linkedItemIdx: 1, qty: 300, unitPrice: 450, desc: '水平支撐組立' }], periods: [{ no: 1, date: cut, to: cut, rows: [{ rid: 'r2', qty: 100 }] }] },
+            { id: 'cC', type: 'extra', vendor: '公司支出（自付）', src: 'quick', payer: '王小明', cat: '雜支', rows: [{ id: 'cC_0', subType: 'worker', desc: '油料', days: 1, dayRate: 1200, transport: 0 }], amt: 1200 },
+            { id: 'cD', type: 'own', cat: '材料租金', rental: true, rows: [{ id: 'cD_0', desc: '鋼板租金', qty: 1, unitPrice: 8000 }] }] }];
+        INV.length = 0; PAYABLES.length = 0;
+        openProjectCosts('qD4'); cost7Tab('list'); await T(250);
+        const G = Array.from(document.querySelectorAll('#cost-v7 .cost7-grp')).map((g) => g.getAttribute('data-g') + ':' + g.querySelectorAll('.cost7-row').length);
+        out.groups = JSON.stringify(G) === JSON.stringify(['sub:2', 'rent:1', 'quick:1', 'manual:0']) && /小計/.test(document.getElementById('cost-v7').textContent) && document.getElementById('cost-card').style.display === 'none';
+        const rows = Array.from(document.querySelectorAll('#cost-v7 .cost7-grp[data-g="sub"] .cost7-row'));
+        // 打樁行：這一期還沒登錄 → 登錄本期請款；支撐行：已登錄、應付還沒付 → 去付款（先讓應付存在）
+        out.subNew = /還沒登錄請款/.test(rows[0].textContent) && /登錄本期請款/.test((rows[0].querySelector('[data-c7next]') || {}).textContent || '') && !!rows[0].querySelector('[data-c7more]');
+        const cB = Q[0].costs[1], pid = _subPayId('cB', cB.periods[0]);
+        PAYABLES.push({ id: pid, to: '範例支撐行', amount: 45000, vat: false, status: 'unpaid', costId: 'cB', _mt: 1 });
+        rCostItems(); await T(200);
+        let r2 = document.querySelectorAll('#cost-v7 .cost7-grp[data-g="sub"] .cost7-row')[1];
+        out.subPay = /已登錄、還沒付/.test(r2.textContent) && /去付款/.test((r2.querySelector('[data-c7next]') || {}).textContent || '');
+        PAYABLES[0].status = 'paid'; PAYABLES[0].paidDate = localToday(); rCostItems(); await T(200);
+        r2 = document.querySelectorAll('#cost-v7 .cost7-grp[data-g="sub"] .cost7-row')[1];
+        out.subPaid = /本期已付，下期 \d\d\/\d\d 截止/.test(r2.textContent) && !r2.querySelector('[data-c7next]');
+        // 「⋯」：預付款、合約書、計價紀錄、編輯、刪除
+        r2.querySelector('[data-c7more]').click(); await T(60);
+        const mt = (document.getElementById('fy-modal') || {}).textContent || ''; out.more = ['預付款', '合約書', '計價紀錄', '編輯', '刪除'].every((k) => mt.indexOf(k) >= 0);
+        try { document.getElementById('fy-modal').remove(); } catch (x) { /* 可忽略 */ }
+        // 編輯＝舊畫面
+        cost7Edit('cB'); await T(200); out.edit = document.getElementById('cost-card').style.display !== 'none' && /回明細/.test(document.getElementById('cost-v7').textContent);
+        cost7Tab('item'); localStorage.removeItem('fy_cost7tab');
+        out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
+        // 帳務：頁首 Excel／？ 收進帳本「⋯ 更多」
+        go('acct'); acctTab('ar'); await T(150);
+        const phr = document.querySelector('#page-acct .ph .ph-r');
+        out.acctHead = (!phr || getComputedStyle(phr).display === 'none') && !!document.querySelector('#acct-p-ar details.acct-led-more [onclick="exportFinanceCSV()"]');
+        // 日報表單：工項清單＝還沒做完的、照報價順序，顯示「1．」；做完的安全母索不列
+        go('quickcost'); try { rQuickCost(); } catch (x) { /* 可忽略 */ } await T(150);
+        const dp = document.getElementById('dr-proj'); if (dp) { dp.value = 'qD4'; drRenderProgRows(true); }
+        const o = Array.from(document.querySelectorAll('#dr-prog-rows select option')).map((x) => x.textContent);
+        out.items = o.some((t) => /^1．H型鋼樁打設/.test(t)) && o.some((t) => /^2．水平支撐組立/.test(t)) && !o.some((t) => /安全母索/.test(t));
+        // 付款預設：管理員＝公司付；工務＝代墊（自己）
+        const pk = document.querySelector('input[name="qc-paykind"]:checked'); out.payAdm = !!pk && pk.value === 'co' && (gv('qc-payer') || '') === '';
+        // 收據：沒附＝記成缺收據（一般資料），今天頁出提醒，補了管理員裝置搬到成本卡
+        const qp = document.getElementById('qc-proj'); if (qp) qp.value = 'qD4';
+        _qcPending = [{ id: 'e1', ti: 0, amt: 500, note: '雜支測試', proj: 'qD4' }]; submitQuickCost(); await T(80);
+        const cNew = Q[0].costs[Q[0].costs.length - 1];
+        out.rcptMiss = cNew.noRcpt === 1 && !!Q[0].rcptMiss && !!Q[0].rcptMiss[cNew.id];
+        const it = _rcptTodoItem(); out.rcptCard = !!it && it.type === 'rcpt_miss' && /支出缺收據 1 筆/.test(it.text);
+        Q[0].rcptMiss[cNew.id].ph = 'ph:test123'; _rcptHeal();
+        out.rcptHeal = cNew.rcpt === 'ph:test123' && !cNew.noRcpt && !(Q[0].rcptMiss && Q[0].rcptMiss[cNew.id]) && !_rcptTodoItem();
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; INV.length = 0; keepI.forEach((x) => INV.push(x)); PAYABLES.length = 0; keepP.forEach((x) => PAYABLES.push(x)); _fbUser = oU; _isAdminUser = oA;
+      try { const m = document.getElementById('fy-modal'); if (m) m.remove(); } catch (x) { /* 可忽略 */ }
+      return out;
+    });
+    check('v6.0.234 Lotion 回覆（寬 ' + W + '）：施工成本明細四組＋小計、發包列看這一期（登錄本期請款／去付款／本期已付下期截止）、⋯ 收預付合約書計價紀錄編輯刪除、帳務頁首收進⋯更多、日報工項清單＝本工地工項、管理員預設公司付、收據選填缺收據可補', !r.err && r.groups && r.subNew && r.subPay && r.subPaid && r.more && r.edit && r.noHScroll && r.acctHead && r.items && r.payAdm && r.rcptMiss && r.rcptCard && r.rcptHeal, JSON.stringify(r));
+    check('v6.0.234 Lotion 回覆測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);
