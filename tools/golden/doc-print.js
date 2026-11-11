@@ -4,10 +4,13 @@
 //   node tools/golden/doc-print.js --expect tests/synthetic/docs.json      （CI：合成樣本，跟標準答案逐張比對）
 //   node tools/golden/doc-print.js --update                                （只在「這次就是要改單據內容」的 PR 用）
 //   node tools/golden/doc-print.js --cmp <改前.json> <改後.json>           （黃金樣本：main 與分支各跑一次再比）
+//   加 --norm-brand：材料估算（matOrder／matQuote）先把品牌綠 #006935 換回舊色 #2e5e42 再算指紋（擴充線 A-5 改色是預期差異；
+//                    這樣比 main 時，沒填路數明細的叫料單應該一字不差，只有有填路數明細的會不同）
 //
 // 做法：開一個斷網、時鐘固定的無頭瀏覽器，載入資料（沒給 --snapshot ＝ 內建假資料；給了＝用系統自己的「匯入備份」載入快照），
 //      把「匯出 PDF」「原生列印」最後交給引擎的那一份完整 HTML 攔下來（不真的產生 PDF），每張單據算 md5。
-//      攔的是每個列印入口（報價單、原生列印、請款單（列表與編輯器兩條路）、詢價單、分包工程承攬合約書、保留款退還請款單），
+//      攔的是每個列印入口（報價單、原生列印、請款單（列表與編輯器兩條路）、詢價單、分包工程承攬合約書、保留款退還請款單、
+//      材料估算的叫料單與估價明細（擴充線 A，matEstExportPDF；每張報價存的 q.matEst＋假資料兩張：有／沒有路數明細）），
 //      所以底層怎麼重構都沒關係：只要入口交出去的內容一字不差，指紋就相同。
 //      輸出只有「單據種類:id → 指紋」，不含案名、金額、內容（快照的真實資料不會出現在結果檔）。
 const fs = require('fs');
@@ -66,12 +69,21 @@ function fixture() {
     totals: { curTotal: 0, tax: 0, total: 0, retention: 0 }, retRet: { amt: 12000, rows: [{ periodNo: 1, date: '2026-10-25', pct: 5, amt: 7000 }, { periodNo: 2, date: '2026-11-25', pct: 5, amt: 4000 }], holds: [{ periodNo: 2, date: '2026-12-05', amt: 1000 }], cond: '完工驗收後 60 日', done: false } };
   const vendors = [{ id: 'vDOC1', name: '乙工程行', taxid: '12345675', addr: '新北市範例區範例街 2 號', contact: '李老闆', boss: '李老闆', phone: '02-2222-3333' }];
   const P0 = { company: '範例工程有限公司', addr: '台北市範例區範例路 100 號', tel: '02-8888-0000', email: 'demo@example.com', taxid: '87654321', boss: '張範例', tax: 5 };
-  return { Q: [q], INV: [inv1, inv2, ret], VENDORS: vendors, P: P0 };
+  // 擴充線 A：材料估算（叫料單）兩張——沒填路數明細（照舊估算）、有填路數明細（逐路表）；不掛報價，其他單據不受影響
+  const ME = [
+    { key: 'demo-plain', inputs: { layers: 3 } },
+    { key: 'demo-route', inputs: { layers: 3, _routeRows: [
+      { ly: 1, id: 'V1', dir: '縱', wall: 24.6, dbl: '', combo: '', mids: '6.8,12.9,18.6', cross: '', note: '' },
+      { ly: 1, id: 'V2', dir: '縱', wall: 24.6, dbl: '雙', combo: '', mids: '', cross: '', note: '' },
+      { ly: 1, id: 'H1', dir: '橫', wall: 17.35, dbl: '', combo: '', mids: '', cross: '', note: '' },
+      { ly: 2, id: 'H2', dir: '橫', wall: 30.8, dbl: '', combo: '10+9.5+9.5', mids: '', cross: '', note: '手改' }] } },
+  ];
+  return { Q: [q], INV: [inv1, inv2, ret], VENDORS: vendors, P: P0, ME };
 }
 
 // 在頁面裡執行：攔下列印入口交出去的 HTML
-async function capture(page, mode) {
-  return page.evaluate(async (mode) => {
+async function capture(page, mode, me) {
+  return page.evaluate(async ([mode, me]) => {
     const docs = {}, errors = [];
     let last = null;
     window._printViaIframe = function (html, fn, ls) { last = { html: String(html), fn: String(fn || ''), ls: !!ls }; };
@@ -113,8 +125,23 @@ async function capture(page, mode) {
         });
       });
     });
+    // 擴充線 A：材料估算叫料單（matEstExportPDF('order')）＋估價明細（'quote'）；每張報價存的估算，假資料另外兩張不掛報價
+    if (typeof matEstExportPDF === 'function' && typeof _matEstNorm === 'function') {
+      const meRun = (key, qid, inputs) => {
+        const keepM = MAT_EST, keepQ = window._matEstQid, keepR = window._matEstRes;
+        try {
+          MAT_EST = _matEstNorm(JSON.parse(JSON.stringify(Object.assign(_shDefaults(), inputs || {}))));
+          window._matEstQid = qid || ''; window._matEstRes = null;
+          take('matOrder:' + key, () => matEstExportPDF('order', {}));
+          window._matEstRes = null;
+          take('matQuote:' + key, () => matEstExportPDF('quote', { basis: true }));
+        } finally { MAT_EST = keepM; window._matEstQid = keepQ; window._matEstRes = keepR; }
+      };
+      qs.forEach(q => { if (q.matEst && q.matEst.inputs && typeof q.matEst.inputs === 'object') meRun(q.id, q.id, q.matEst.inputs); });
+      if (mode === 'fixture') (me || []).forEach(x => meRun(x.key, '', x.inputs));
+    }
     return { docs, errors };
-  }, mode);
+  }, [mode, me]);
 }
 
 module.exports = { fixture };
@@ -163,11 +190,13 @@ if (require.main === module) (async () => {
     }, fixture());
     await page.waitForTimeout(300);
   }
-  const r = await capture(page, mode);
+  const r = await capture(page, mode, SNAP ? [] : fixture().ME);
   await browser.close();
   const md5 = s => crypto.createHash('md5').update(s, 'utf8').digest('hex');
   const out = { kind: 'fy-doc-print', mode, at: new Date().toISOString(), docs: {}, errors: r.errors.concat(pageErrs.map(e => 'page：' + e)) };
-  Object.keys(r.docs).sort().forEach(k => { const d = r.docs[k]; out.docs[k] = { html: md5(d.html), fn: md5(d.fn), ls: d.ls, len: d.html.length }; });
+  const NORM = ARGS.includes('--norm-brand');
+  Object.keys(r.docs).sort().forEach(k => { const d = r.docs[k], h = (NORM && /^mat(Order|Quote):/.test(k)) ? d.html.split('#006935').join('#2e5e42') : d.html; out.docs[k] = { html: md5(h), fn: md5(d.fn), ls: d.ls, len: h.length }; });
+  if (NORM) out.normBrand = true;
   if (UPDATE) { fs.writeFileSync(DEF_EXPECT, JSON.stringify({ docs: out.docs }, null, 1) + '\n'); console.log('已更新 ' + path.relative(process.cwd(), DEF_EXPECT) + '（' + Object.keys(out.docs).length + ' 張）'); return; }
   if (OUT) { fs.writeFileSync(OUT, JSON.stringify(out, null, 1) + '\n'); console.log('已寫入 ' + OUT + '：' + Object.keys(out.docs).length + ' 張單據' + (out.errors.length ? '，' + out.errors.length + ' 個錯誤' : '')); }
   if (EXPECT) { const exp = JSON.parse(fs.readFileSync(EXPECT, 'utf8')); process.exit(report(exp, out, '標準答案', '這次') ? 1 : 0); }

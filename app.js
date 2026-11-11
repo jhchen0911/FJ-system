@@ -9539,7 +9539,7 @@ function _meDoc(kind,opt,res){   // v6.0.154：叫料單／估價明細的內容
     +'td.hd{background:'+FY_BRAND.g+';color:#fff;font-weight:700}td.sec{background:#eef4f0;font-weight:700;color:'+FY_BRAND.g+'}td.stg{font-weight:700;color:'+FY_BRAND.g+';vertical-align:top}td.w{white-space:normal;line-height:1.6;padding:4px 6px}'
     +'table.ord{margin:0 0 8px}table.ord td{font-size:12px;padding:5px 8px;line-height:1.4}table.ord td.u{font-size:11px}table.ord td.hd{font-size:12.5px;padding:5px 8px}'
     +'.apx td,.apx th{white-space:normal;text-overflow:clip}.apx tr.tt td{background:#f1f5f2}.apx .sub{font-size:10.5px;font-weight:400;color:#444}.apx .cond,.apx td.l{color:#333}'
-    +'table.rto td{white-space:normal;text-overflow:clip}table.rto th{font-size:11px;padding:4px 6px}table.rto tr.tt td{background:#f1f5f2}'
+    +(secs.some(function(x){return x.rt;})?'table.rto td{white-space:normal;text-overflow:clip}table.rto th{font-size:11px;padding:4px 6px}table.rto tr.tt td{background:#f1f5f2}':'')   // 擴充線 A①：有逐路表才加（沒填路數的叫料單跟改前只差品牌色）
     +'';
   return {fn:_mefn,css:css,body:body};
 }
