@@ -14722,6 +14722,68 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.235 報價頁自動存檔（Lotion 11/11：A1 填了工程名稱就存、B1 同一格兩台都改＝用較新的＋同步衝突、C1 儲存鈕並排）──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepC = CUSTOMERS.slice(), keepH = JSON.parse(JSON.stringify(Q_HISTORY || {})), oR = window._isReaderUser, keepCf = SYNC_CONFLICTS.slice();
+      const setV = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); };
+      try {
+        window._pushCloud = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); _nav5Apply();
+        _isReaderUser = false; SYNC_CONFLICTS = [];
+        Q = [{ id: 'qA1', code: 'A1', name: '範例自動存', client: '甲營造', loc: '桃園', date: '2026-11-01', _mt: 1000, _by: 'x@example.com',
+          items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 10, price: 3000 }], costs: [{ id: 'c1', type: 'own', rows: [] }], dailyLogs: [{ id: 'd1', date: '2026-11-02' }] },
+          { id: 'qB2', code: '115111101', name: '別張', client: '乙', items: [], _mt: 1 }];
+        loadQ('qA1'); await T(80);
+        const q0 = () => Q.find((x) => x.id === 'qA1');
+        // 沒改＝不存
+        const mt0 = q0()._mt; _qAS.inAt = 0; _qASTick(); out.noChg = q0()._mt === mt0;
+        // 打字 → 3 秒內不存、超過就存，而且留在編輯頁、日報與成本還在
+        setV('fn', '範例自動存（改）'); _qASTick(); out.wait = q0().name === '範例自動存';
+        _qAS.inAt = Date.now() - 4000; _qASTick();
+        out.saved = q0().name === '範例自動存（改）' && document.getElementById('page-editor').classList.contains('active') && (q0().dailyLogs || []).length === 1 && (q0().costs || []).length === 1
+          && /已自動存/.test(document.getElementById('q-as-st').textContent);
+        out.backup = (Q_HISTORY.qA1 || []).filter((e) => e && !e.formal && e.note === '自動存檔').length === 1;
+        // 驗證沒過：不存，頁首寫原因
+        items[0].qty = -5; _qAS.inAt = 0; _qASTick();
+        out.invalid = q0().items[0].qty === 10 && /沒存：數量不可為負數/.test(document.getElementById('q-as-st').textContent);
+        items[0].qty = 12; _qAS.inAt = 0; _qASTick(); out.items = q0().items[0].qty === 12;
+        out.backupOnce = (Q_HISTORY.qA1 || []).filter((e) => e && e.note === '自動存檔').length === 1;   // 10 分鐘內只留一份
+        // 別台改了別的欄位（地點）、這台改業主 → 兩個都留下、沒有衝突
+        Q[0] = Object.assign({}, q0(), { loc: '新竹（別台改）', _mt: Date.now() + 5, _by: 'other@example.com' });
+        setV('fcl', '丙營造'); _qAS.inAt = 0; _qASTick();
+        out.merge = q0().loc === '新竹（別台改）' && q0().client === '丙營造' && !SYNC_CONFLICTS.length;
+        // 別台也改了業主 → 用這台的（較新）、記一筆同步衝突
+        Q[0] = Object.assign({}, q0(), { client: '丁營造（別台）', _mt: Date.now() + 5, _by: 'other@example.com' });
+        setV('fcl', '戊營造'); _qAS.inAt = 0; _qASTick();
+        out.conflict = q0().client === '戊營造' && SYNC_CONFLICTS.length === 1 && SYNC_CONFLICTS[0].field === 'client' && SYNC_CONFLICTS[0].theirs === '丁營造（別台）' && SYNC_CONFLICTS[0].kept === 'local';
+        // 自動存的時候不自動加客戶；離開編輯頁才加
+        out.custWait = !CUSTOMERS.some((c) => c.name === '戊營造');
+        go('quotes'); await T(60);
+        out.leave = CUSTOMERS.some((c) => c.name === '戊營造') && document.getElementById('page-quotes').classList.contains('active');
+        // 新報價：沒填工程名稱不存；填了才存、編號重號自動改下一號
+        const n0 = Q.length; newQ(); await T(60); document.getElementById('fc').value = '115111101';
+        _qAS.inAt = 0; _qASTick(); out.newWait = Q.length === n0 && /填了工程名稱就會自動存/.test(document.getElementById('q-as-st').textContent);
+        setV('fn', '新報價甲'); _qAS.inAt = 0; _qASTick();
+        const nq = Q.find((x) => x.name === '新報價甲');
+        out.newSaved = Q.length === n0 + 1 && !!nq && eid === nq.id && nq.code === '115111102' && (nq.codeLog || []).length === 1;
+        out.codeShown = document.getElementById('fc').value === '115111102' && /編號改成 115111102/.test(document.getElementById('q-as-st').textContent);
+        setV('fl', '台中'); _qAS.inAt = 0; _qASTick(); const nq2 = Q.find((x) => x.name === '新報價甲'); out.newOnce = Q.length === n0 + 1 && nq2.loc === '台中' && nq2.code === '115111102';
+        // 唯讀帳號、舊選單：不自動存
+        go('quotes'); loadQ('qB2'); await T(60); _isReaderUser = true; setV('fn', '唯讀改'); _qAS.inAt = 0; _qASTick(); out.ro = Q.find((x) => x.id === 'qB2').name === '別張'; window._qSnap = null; go('quotes'); await T(30); _isReaderUser = false;
+        localStorage.setItem('fy_v7old', JSON.stringify({ editor: 1 })); loadQ('qB2'); await T(60); setV('fn', '舊選單改'); _qAS.inAt = 0; _qASTick();
+        out.old = Q.find((x) => x.id === 'qB2').name === '別張' && !/已自動存/.test(document.getElementById('q-as-st').textContent);
+        window._qSnap = null; go('quotes'); localStorage.removeItem('fy_v7old');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; CUSTOMERS.length = 0; keepC.forEach((x) => CUSTOMERS.push(x)); Q_HISTORY = keepH; _isReaderUser = oR; SYNC_CONFLICTS = keepCf;
+      return out;
+    });
+    check('v6.0.235 報價自動存檔（寬 ' + W + '）：沒改不存、打字停 3 秒才存且留在編輯頁、日報成本不動、10 分鐘一份備份、驗證沒過不存寫原因、別台改別欄兩邊都留、同欄記衝突、離開才加客戶、新報價填名稱才存且重號改號、唯讀與舊選單不自動存', !r.err && r.noChg && r.wait && r.saved && r.backup && r.invalid && r.items && r.backupOnce && r.merge && r.conflict && r.custWait && r.leave && r.newWait && r.newSaved && r.codeShown && r.newOnce && r.ro && r.old, JSON.stringify(r));
+    check('v6.0.235 報價自動存檔測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.234 Lotion 11/11 回覆：施工成本明細四組＋發包列看這一期、帳務頁首收進「⋯ 更多」、日報表單（工項清單、付款方式、收據選填＋缺收據） ──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);

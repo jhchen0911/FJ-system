@@ -705,6 +705,7 @@ function _goCore(p){
   try{
     var _curPg=document.querySelector('.page.active');
     var _curId=_curPg?_curPg.id:'';
+    if(_curId==='page-editor'&&p!=='editor'&&p!=='preview'){try{if(_qASOn())_qASRun('leave');}catch(ex){_err('go.qas',ex);}}   // 報價自動存檔：離開前先存
     if(_curId==='page-editor'&&p!=='editor'&&p!=='preview'&&window._qSnap!=null&&JSON.stringify(items)!==window._qSnap){
       var _tgt=p;
       showConfirm('尚未儲存','此報價單有未儲存的變更，離開將遺失。',
@@ -826,6 +827,7 @@ function newQ(){
   st('etitle','新增報價');st('esub','填寫工程資訊與報價明細');
   go('editor');
   try{_draftBarSync();}catch(e){_err('newQ.draft',e);}   // v6.0.109
+  try{_qASReset();}catch(e){_err('newQ.as',e);}
 }
 
 // ════════════════════ PARAMS SYNC ════════════════════
@@ -1983,16 +1985,18 @@ function upEx(){
 }
 
 // ════════════════════ SAVE/LOAD ════════════════════
-function _saveQCore(){
-  if(_roDeny())return;   // v6.0.108 唯讀帳號
+function _saveQCore(o){
+  const auto=!!(o&&o.auto);   // 自動存檔（_qASRun）：不跳視窗、不跳頁、只寫改過的欄位；回傳 {err} 或 {ok}
+  if(auto){if(_isReaderUser)return {err:'唯讀帳號'};}else if(_roDeny())return;   // v6.0.108 唯讀帳號
+  const _fail=function(m,fid){if(!auto){toast(m);if(fid){const el=document.getElementById(fid);if(el)el.focus();}}return {err:m};};
   // 儲存驗證（最低限度）：必填與數值合理性
-  if(!(gv('fn')||'').trim()){toast('請填寫「工程名稱」再儲存');const el=document.getElementById('fn');if(el)el.focus();return;}
+  if(!(gv('fn')||'').trim())return _fail(auto?'工程名稱是空的':'請填寫「工程名稱」再儲存','fn');
   for(const it of (items||[])){
     if(it.sec)continue;
     // v5.315：議價尾差列是系統產生的折讓，可為負值（原本會被擋下，導致議價後整張報價單存不了）
     if(it.desc===NGT_ADJ_DESC)continue;
-    if((parseFloat(it.qty)||0)<0){toast('數量不可為負數（要減項請把單價打成負數）');return;}
-    if((parseFloat(it.price)||0)<0&&!((parseFloat(it.qty)||0)>0)){toast('減項列（負數單價）的數量要大於 0');return;}   // 減項 hotfix
+    if((parseFloat(it.qty)||0)<0)return _fail('數量不可為負數（要減項請把單價打成負數）');
+    if((parseFloat(it.price)||0)<0&&!((parseFloat(it.qty)||0)>0))return _fail('減項列（負數單價）的數量要大於 0');   // 減項 hotfix
   }
   const t=calcT();
   // 施工成本從 Q 陣列讀取現有資料（addCostItem 直接更新 q.costs）
@@ -2000,7 +2004,7 @@ function _saveQCore(){
   // v5.375 編輯衝突偵測：這張報價在你編輯期間被雲端同步換成別人的版本了嗎？
   // 有的話先問過，不要無聲覆蓋掉對方的修改。
   const _eb=window._qEditBase;
-  if(eid&&_eb&&_eb.id===eid&&window._qCloudTouched&&existingQ&&(existingQ._mt||0)>(_eb.mt||0)&&!window._qForceSave){
+  if(!auto&&eid&&_eb&&_eb.id===eid&&window._qCloudTouched&&existingQ&&(existingQ._mt||0)>(_eb.mt||0)&&!window._qForceSave){   // 自動存檔不問：只寫改過的欄位，同欄位記同步衝突
     const _who=existingQ.__cloudBy?('（'+esc(existingQ.__cloudBy)+'）'):'';
     showConfirm('這張報價在你編輯期間被更新過',
       '同步下來的版本'+_who+'比你開始編輯時新（'+new Date(existingQ._mt).toLocaleString('zh-TW')+'）。<br><br>'
@@ -2012,13 +2016,15 @@ function _saveQCore(){
   const existingCosts=existingQ?JSON.parse(JSON.stringify(existingQ.costs||[])):JSON.parse(JSON.stringify(costs||[]));
   // v5.310：以展開保留所有非編輯頁欄位（dailyLogs/confirmFiles/matEst/bidStatus/ver/closed/referral…），
   // 再以編輯頁欄位覆寫——修正儲存報價會清空日報/材料估算/確認單的重大缺陷
-  const q={...(existingQ||{}),
+  let q;
+  if(auto&&existingQ){_qASBackup(existingQ);q=_qASMerge(existingQ,_qEditorFields(t));q._mt=Date.now();q._by=_meEmail();}   // 自動存檔：只寫這台改過的欄位
+  else q={...(existingQ||{}),
     id:eid||Date.now().toString(),_mt:Date.now(),_by:_meEmail(),rmk:JSON.parse(JSON.stringify(rmkCustom)),costs:existingCosts,
     awarded:existingQ?.awarded||false,
     payDue:existingQ?.payDue||'',
     parentId:existingQ?.parentId||'',
     ..._qEditorFields(t)};
-  if(!existingQ&&q.code&&_qCodeTaken(q.code,q.id)){var _nc=_qCodeNextFree(q.code,q.id);if(_nc){toast('編號 '+q.code+' 已經有別張報價用了，這張改成 '+_nc);q.codeLog=[{from:q.code,to:_nc,at:Date.now(),by:_meEmail()||'本機',why:'存檔時發現重號'}];q.code=_nc;try{var _fe=document.getElementById('fc');if(_fe)_fe.value=_nc;}catch(e){_err('saveQ.code',e);}}}   // v6.0.194 新報價存檔時再查一次編號（開表單時算的號可能已被別台用掉）
+  if(!existingQ&&q.code&&_qCodeTaken(q.code,q.id)){var _nc=_qCodeNextFree(q.code,q.id);if(_nc){toast('編號 '+q.code+' 已經有別張報價用了，這張改成 '+_nc);q.codeLog=[{from:q.code,to:_nc,at:Date.now(),by:_meEmail()||'本機',why:'存檔時發現重號'}];q.code=_nc;if(auto)_qAS.note='編號改成 '+_nc+'（原本的已有別張用了）';try{var _fe=document.getElementById('fc');if(_fe)_fe.value=_nc;}catch(e){_err('saveQ.code',e);}}}   // v6.0.194 新報價存檔時再查一次編號（開表單時算的號可能已被別台用掉）
   if(!existingQ&&!q.rentEnd)q.rentEnd='removeDone';   // v6.0.107 新報價：報價條件第 14 條租期結束日＝拆除（拔除）完成日；舊案沒有此欄＝拔除第一天
   if(!existingQ&&!q.payDefV)q.payDefV=2;   // Lotion 10/21：新專案放款日預設 20 日；舊專案（無此欄）＝截止日
   if(!existingQ&&!q.instV)q.instV=2;   // Lotion 10/21：新專案包商裝設％空白＝跟業主；舊專案（無此欄）維持原本 90%
@@ -2132,15 +2138,11 @@ function _saveQCore(){
       }
     }
   }catch(e){_err('top',e);}
-  // 業主不在客戶清單 → 自動新增到客戶管理（免手動維護）
-  try{
-    if(q.client&&q.client.trim()&&!CUSTOMERS.find(c=>c.name===q.client.trim())){
-      CUSTOMERS.push({id:'cu'+Date.now(),name:q.client.trim(),contact:q.contact||'',tel:q.phone||'',taxid:q.taxid||'',addr:'',note:'由報價單自動建立',_mt:Date.now()});
-      saveCustomers();
-      toast('已自動將「'+q.client.trim()+'」加入客戶管理');
-    }
-  }catch(e){_err('top',e);}
-  try{logActivity('報價','儲存報價：'+(gv('fn')||'未命名'));}catch(e){_err('top',e);}
+  // 業主不在客戶清單 → 自動新增到客戶管理（免手動維護）；自動存檔時等離開編輯頁才做（不然打到一半的名字也會被加進去）
+  if(!auto||(o&&o.leave)){
+    try{_qAutoCustomer(q);}catch(e){_err('top',e);}
+    try{logActivity('報價',(auto?'自動存檔：':'儲存報價：')+(gv('fn')||'未命名'));}catch(e){_err('top',e);}
+  }
   // 批次同步所有施工成本到應付帳款
   // 重要：不可在同步前預先刪除（會把已付款狀態一起刪掉）。
   // 改為：先逐筆同步（syncCostToPayable 會比對舊記錄並保留付款狀態+去重），再清除已刪成本的殘留。
@@ -2171,10 +2173,18 @@ function _saveQCore(){
   // v5.317：儲存成功後更新快照，否則離開時仍會跳「尚未儲存，離開將遺失」假警告
   //（久了使用者不信任這個提示，真的沒存時反而被誤放行）
   window._qSnap=JSON.stringify(items);
+  if(auto){eid=q.id;try{var _f2=_qEditorFields(t);_qAS.base=JSON.parse(JSON.stringify(_f2));_qAS.last=_qASFp(_f2);}catch(e){_err('saveQ.asBase',e);}_markDirty();_pushCloud({silent:true});return {ok:true};}
   // 立刻跳頁，Firebase 在背景同步
   go('quotes');
   _markDirty();
   _pushCloud({silent:true});
+}
+function _qAutoCustomer(q){
+  if(q&&q.client&&q.client.trim()&&!CUSTOMERS.find(c=>c.name===q.client.trim())){
+    CUSTOMERS.push({id:'cu'+Date.now(),name:q.client.trim(),contact:q.contact||'',tel:q.phone||'',taxid:q.taxid||'',addr:'',note:'由報價單自動建立',_mt:Date.now()});
+    saveCustomers();
+    toast('已自動將「'+q.client.trim()+'」加入客戶管理');
+  }
 }
 function _loadQCore(id){
   const q=Q.find(x=>x.id===id);if(!q)return;
@@ -2446,6 +2456,7 @@ function updBadge(){
   try{if(typeof checkNotifications==='function')checkNotifications();}catch(e){_err('updBadge',e);}
 }
 function toast(msg){
+  if(window._toastMute)return;   // 報價自動存檔：存檔過程的提示不跳
   document.querySelectorAll('.toast').forEach(e=>e.remove());
   const n=document.createElement('div');n.className='toast';n.textContent=msg;
   document.body.appendChild(n);
@@ -35083,8 +35094,8 @@ function _qiPanelRender(doc){
     +'</div>';
 }
 function quoteOwnerDocRemove(){var q=Q.find(function(x){return x.id===eid;});_qOwnerDraft=null;if(q&&q.ownerDoc){delete q.ownerDoc;_touch(q);try{persist();}catch(e){_err('quoteOwnerDocRemove',e);}}(items||[]).forEach(function(it){if(it)delete it.oKey;});_qiPanelRender(null);toast('已移除與業主檔的連結（工項保留）');}
-function saveQ(){var r=_saveQCore.apply(this,arguments);try{if(_qOwnerDraft&&eid){var q=Q.find(function(x){return x.id===eid;});if(q){q.ownerDoc=_qOwnerDraft;_qOwnerDraft=null;_touch(q);persist();}}}catch(e){_err('saveQ.ownerDoc',e);}return r;};
-function loadQ(id){var r=_loadQCore.apply(this,arguments);try{var q=Q.find(function(x){return x.id===id;});_qOwnerDraft=null;_qiPanelRender(q&&q.ownerDoc?q.ownerDoc:null);}catch(e){_err('loadQ',e);}return r;};
+function saveQ(o){var au=!!(o&&o.auto),r;if(au)window._toastMute=(window._toastMute||0)+1;try{r=_saveQCore(o);}finally{if(au)window._toastMute=Math.max(0,(window._toastMute||1)-1);}try{if(_qOwnerDraft&&eid){var q=Q.find(function(x){return x.id===eid;});if(q){q.ownerDoc=_qOwnerDraft;_qOwnerDraft=null;_touch(q);persist();}}}catch(e){_err('saveQ.ownerDoc',e);}return r;};
+function loadQ(id){var r=_loadQCore.apply(this,arguments);try{var q=Q.find(function(x){return x.id===id;});_qOwnerDraft=null;_qiPanelRender(q&&q.ownerDoc?q.ownerDoc:null);}catch(e){_err('loadQ',e);}try{_qASReset();}catch(e){_err('loadQ.as',e);}return r;};
 function _qiWrites(doc,its){
   var w=[],sub=0;
   its.forEach(function(it){if(!it||it.sec||it.oKey==null)return;var row=(doc.rows||[]).find(function(r){return r.key===it.oKey&&!r.sec;});if(!row)return;var q=parseFloat(it.qty)||0,p=parseFloat(it.price)||0,a=Math.round(q*p);sub+=a;
@@ -46376,6 +46387,64 @@ _decReg('addonSign',{
     showConfirm('給主任的 LINE 文字','<textarea id="ad-msg" rows="6" style="'+IN+'">'+esc(a.askTxt||_adMsg(x.q,a))+'</textarea><div style="font-size:11px;color:var(--b4);margin-top:4px">按確認＝存下這段文字並複製。</div>',
       function(){var t=gv('ad-msg')||'';_adCopy(t).then(function(ok){if(!ok)return;_adSet(x.q,a,{askTxt:t.slice(0,1000),askAt:Date.now(),askBy:_meEmail()||'本機'});toast('已複製');try{_decRefresh('addonSign');}catch(e){_err('addonSign.ref',e);}});},false,null,false);}
 });
+// ══════════ 報價頁自動存檔（第 7 步，Lotion 11/11：A1 填了工程名稱就開始存、B1 兩台改到同一格＝先用較新的＋今天頁「同步衝突」卡、C1「儲存」鈕先並排兩週）══════════
+// 新選單＋可寫的帳號才自動存（舊選單、唯讀帳號、AI 草稿套用中照舊手動存）。改完 3 秒沒再動就存；離開編輯頁、切到別的 App 立刻存。
+// 只寫這台改過的欄位（跟開頁或上次存的基準比），別台改的其他欄位不會被蓋掉；同一欄位別台也改了 → 用這台的（較新）、記一筆同步衝突讓 Lotion 選。
+// 跟上次存的一樣不存；驗證沒過不存、頁首小字寫原因；新報價填了工程名稱才存。會吵的事（自動加客戶、操作紀錄）只在離開編輯頁時做。
+// 每張報價 10 分鐘最多留一份「自動存檔」備份（存之前的那版），版本歷史照舊修剪（最多 10 份）。
+var _qAS={base:null,last:'',inAt:0,bakAt:{},tick:0};
+function _qASOn(){try{return _v7New('editor')&&!_isReaderUser&&!(window._draftApplying&&window._draftApplying.kind==='quote')&&!window._draftQ;}catch(e){_err('_qASOn',e);return false;}}
+function _qASFp(f){var o={};Object.keys(f||{}).forEach(function(k){if(k!=='t')o[k]=f[k];});return JSON.stringify(o);}
+function _qASReset(){
+  try{var f=_qEditorFields(calcT());_qAS.base=eid?JSON.parse(JSON.stringify(f)):{};_qAS.last=eid?_qASFp(f):'';_qAS.inAt=0;_qASSt('');}catch(e){_err('_qASReset',e);}
+}
+function _qASSt(txt,warn){var el=document.getElementById('q-as-st');if(!el)return;if(!_qASOn()){el.textContent='';el.style.display='none';return;}
+  el.style.display=txt?'':'none';el.textContent=txt||'';el.style.color=warn?'#b26a00':'var(--g3)';}
+// 同一欄位別台也改了：記成同步衝突（跟 _recMerge3 同一份清單、同一張卡）
+function _qASConflict(cur,k,mine,theirs){
+  try{var big=(JSON.stringify(mine)||'').length+(JSON.stringify(theirs)||'').length>_CF_BIG;
+    var x={coll:'quotes',id:cur.id,field:k,name:_cfName('quotes',cur),mine:mine===undefined?null:mine,theirs:big?null:(theirs===undefined?null:theirs),big:big?1:0,kept:'local',by:cur._by||'',at:_srvNow()};
+    SYNC_CONFLICTS=SYNC_CONFLICTS.filter(function(y){return !(y.coll===x.coll&&y.id===x.id&&y.field===x.field);});SYNC_CONFLICTS.unshift(x);_cfSave();
+  }catch(e){_err('_qASConflict',e);}
+}
+// 自動存檔那一次要寫回報價的內容：existing＝目前資料（可能已被雲端換過），cur＝編輯頁欄位；回傳新物件
+function _qASMerge(existing,cur){
+  var B=_qAS.base||{},q=Object.assign({},existing),n=0;
+  Object.keys(cur).forEach(function(k){if(k==='t')return;var a=JSON.stringify(cur[k]),b=JSON.stringify(B[k]);if(a===b)return;n++;
+    var c=JSON.stringify(existing[k]);if(c!==b&&c!==a)_qASConflict(existing,k,cur[k],existing[k]);
+    q[k]=JSON.parse(a===undefined?'null':a);});
+  if(n||JSON.stringify(existing.t)!==JSON.stringify(cur.t))q.t=cur.t;
+  return q;
+}
+function _qASBackup(existing){
+  try{if(!existing||!existing.id)return;var now=Date.now();if(now-(_qAS.bakAt[existing.id]||0)<600000)return;_qAS.bakAt[existing.id]=now;saveQVersion(existing.id,existing,{note:'自動存檔'});}catch(e){_err('_qASBackup',e);}
+}
+function _qASRun(why){
+  if(!_qASOn())return false;
+  var pg=document.querySelector('.page.active');if(why!=='leave'&&(!pg||pg.id!=='page-editor'))return false;
+  var f;try{f=_qEditorFields(calcT());}catch(e){_err('_qASRun.fields',e);return false;}
+  var fp=_qASFp(f);
+  if(fp===_qAS.last){if(why==='leave'&&_qAS.pend)_qASLeaveDone();return true;}
+  if(!eid&&!(f.name||'').trim()){_qASSt('填了工程名稱就會自動存',false);return false;}
+  var r=null;try{r=saveQ({auto:true,leave:why==='leave'});}catch(e){_err('_qASRun',e);_qASSt('沒存：存檔時出錯',true);return false;}
+  if(r&&r.err){_qASSt('沒存：'+r.err,true);return false;}
+  _qAS.pend=why!=='leave';
+  var d=new Date();_qASSt('已自動存 '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+(_qAS.note?'・'+_qAS.note:''),false);_qAS.note='';
+  return true;
+}
+// 離開編輯頁：自動存的時候略過的事補做（業主自動加進客戶、操作紀錄）
+function _qASLeaveDone(){_qAS.pend=false;var q=(Q||[]).find(function(x){return x&&x.id===eid;});if(!q)return;try{_qAutoCustomer(q);}catch(e){_err('_qASLeaveDone.cust',e);}try{logActivity('報價','自動存檔：'+(q.name||'未命名'));}catch(e){_err('_qASLeaveDone.log',e);}}
+// 每 3 秒看一次：編輯頁內容變了、而且 3 秒內沒再打字 → 存（按鈕改的工項、排序、刪除也算）
+function _qASTick(){
+  try{if(!_qASOn())return;var pg=document.querySelector('.page.active');if(!pg||pg.id!=='page-editor')return;
+    if(_qAS.inAt&&Date.now()-_qAS.inAt<3000)return;_qASRun('tick');}catch(e){_err('_qASTick',e);}
+}
+function _qASBoot(){
+  if(_qAS.tick)return;_qAS.tick=setInterval(_qASTick,3000);
+  document.addEventListener('input',function(e){var pg=document.getElementById('page-editor');if(pg&&e.target&&pg.contains(e.target))_qAS.inAt=Date.now();},true);
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden'){try{var pg=document.querySelector('.page.active');if(pg&&pg.id==='page-editor')_qASRun('hide');}catch(e){_err('_qASBoot.hide',e);}}});
+}
+try{_qASBoot();}catch(e){_err('_qASBoot',e);}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
