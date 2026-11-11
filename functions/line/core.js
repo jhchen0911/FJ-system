@@ -531,6 +531,26 @@ function _dayContent(logs, askedAt) {
   return { texts, photos, allTexts };
 }
 
+// v6.0.234 LINE【支出】第 3、4 項（Lotion 11/11 題 3＝A）：日報草稿一建好就把【支出】放進 fydata/lineExp/<主報價 id>/<草稿id_序號>，
+//   這一案的工務當天就能在 FJ 補零用金是誰、收據照片；記帳仍要管理員在 FJ 拍板卡確認。列的鍵、內容跟前端 _dlExpQueue 一樣（同一份 calc/dailyparse.js 的 expOf）
+async function expQueue(deps, d) {
+  try {
+    const pl = (d && d.payload) || {}; if (!pl.qid || !DL || !DL.expOf) return 0;
+    const R = DL.expOf((Array.isArray(pl.answers) ? pl.answers : []).join('\n')); if (!R.length) return 0;
+    let mq = pl.qid;
+    try { const q = deps.getQuote ? await deps.getQuote(pl.qid) : null; if (q && q.parentId) mq = String(q.parentId); } catch (e) { (deps.log || console.error)('line.expQueue.q', pl.qid, e); }
+    const photos = (Array.isArray(pl.photos) ? pl.photos : []).filter(p => /^line\//.test(String(p))).slice(0, 6);
+    let n = 0;
+    for (let i = 0; i < R.length; i++) {
+      const r = R[i], path = 'fydata/lineExp/' + mq + '/' + d.id + '_' + i;
+      if (await deps.dbGet(path)) continue;   // 已經有（前端先寫了、或排程重跑）就不動
+      await deps.dbSet(path, JSON.parse(JSON.stringify({ key: d.id + '#' + i, qid: pl.qid, src: d.id, date: pl.date, text: r.text, item: r.item, amt: r.amt, pay: r.pay, who: r.who, why: r.why, photos, at: d.at || Date.now(), by: 'line-bot' })));
+      n++;
+    }
+    return n;
+  } catch (e) { (deps.log || console.error)('line.expQueue', e); return 0; }
+}
+
 // ── 20:00 整理成日報草稿 ──
 async function dailyCompile(deps, now) {
   const cfg = (await deps.getCfg()) || {}; const date = tpeDate(now);
@@ -545,9 +565,10 @@ async function dailyCompile(deps, now) {
     const replied = !!day.askedAt && c.texts.length > 0;   // 當天沒問（17:30 排程沒跑）就不算回了
     await deps.dbSet('fydata/lineDaily/' + gid + '/' + date + '/replied', replied);
     if (!replied && !c.photos.length && !c.allTexts.length) continue;
-    await deps.createDraft({ id: 'dd' + gid.slice(-8) + date.replace(/-/g, ''), type: 'dailyLog', by: 'line-bot', byName: 'LINE 機器人', at: now || Date.now(), status: 'pending',
+    const rec1 = { id: 'dd' + gid.slice(-8) + date.replace(/-/g, ''), type: 'dailyLog', by: 'line-bot', byName: 'LINE 機器人', at: now || Date.now(), status: 'pending',
       summary: ('施工日報：' + siteName(g) + '　' + date + (replied ? '' : '（尚未回三句）')).slice(0, 200),
-      payload: { qid: g.qid, groupId: gid, date, answers: day.askedAt ? c.texts.map(x => stripTpl(x, textsOf(cfg))) : [], dayTexts: c.allTexts.slice(-30), photos: c.photos.slice(0, 20), replied, fmtList: day.list || null } });
+      payload: { qid: g.qid, groupId: gid, date, answers: day.askedAt ? c.texts.map(x => stripTpl(x, textsOf(cfg))) : [], dayTexts: c.allTexts.slice(-30), photos: c.photos.slice(0, 20), replied, fmtList: day.list || null } };
+    if (await deps.createDraft(rec1)) await expQueue(deps, rec1);
     n++;
   }
   return n;
@@ -569,9 +590,10 @@ async function coCompile(deps, cfg, gid, date, now, late) {
     // v6.0.234 編號清單：工務多半是複製「收到那天」的範本再改【日期】補報，先用收到那天的清單，沒有才用回報那天的（審查）
     const lst = qid ? (((await deps.dbGet('fydata/lineDaily/' + gid + '/' + date + '/list/' + qid)) || (await deps.dbGet('fydata/lineDaily/' + gid + '/' + day + '/list/' + qid))) || null) : null;
     const id = qid ? ('dc' + gid.slice(-6) + qid.replace(/[^\w]/g, '').slice(-10) + day.replace(/-/g, '') + (back ? 'b' + date.slice(5).replace('-', '') : '') + (late ? 'L' : '')) : ('du' + gid.slice(-6) + String(L[0].key).replace(/[^\w]/g, '').slice(-16));
-    await deps.createDraft({ id, type: 'dailyLog', by: 'line-bot', byName: 'LINE 機器人', at: now || Date.now(), status: 'pending',
+    const rec2 = { id, type: 'dailyLog', by: 'line-bot', byName: 'LINE 機器人', at: now || Date.now(), status: 'pending',
       summary: ('施工日報' + (qid ? '' : '（待分類）') + '：' + L[0].site + '　' + day + (back ? '（補傳，' + date.slice(5) + ' 收到）' : '') + (bad.length ? '（內文日期「' + bad[0] + '」超過 7 天或不正確，先照收到日）' : '')).slice(0, 200),
-      payload: { qid, site: L[0].site, unmatched: !qid, groupId: gid, date: day, backfill: back, recvDate: date, dateBad: bad.slice(0, 3), answers: L.map(r => coBlockText(r)), dayTexts: [], photos: photos.slice(0, 20), replied: true, fmtList: lst ? { [qid]: lst } : null } });
+      payload: { qid, site: L[0].site, unmatched: !qid, groupId: gid, date: day, backfill: back, recvDate: date, dateBad: bad.slice(0, 3), answers: L.map(r => coBlockText(r)), dayTexts: [], photos: photos.slice(0, 20), replied: true, fmtList: lst ? { [qid]: lst } : null } };
+    if (await deps.createDraft(rec2)) await expQueue(deps, rec2);
     for (const r of L) await deps.dbSet('fydata/lineCo/' + gid + '/' + date + '/' + r.key + '/compiled', id);
     n++;
   }
@@ -620,4 +642,4 @@ async function processPush(id, rec, deps) {
   return n > 0;
 }
 
-module.exports = { MAX_FILE_BYTES, INBOX_BUDGET_MS, BATCH_GAP_MS, NOTE_WIN_MS, verifySignature, handleEvents, dailyAsk, dailyCompile, morningCheck, processPush, pushOwners, isAddon, alarmWord, parseQty, parseCoReport, parseMD, matchSite, tpeDate, addDays, fill, DEFAULT_TEXTS, ALARM_WORDS, stripTpl };
+module.exports = { expQueue, MAX_FILE_BYTES, INBOX_BUDGET_MS, BATCH_GAP_MS, NOTE_WIN_MS, verifySignature, handleEvents, dailyAsk, dailyCompile, morningCheck, processPush, pushOwners, isAddon, alarmWord, parseQty, parseCoReport, parseMD, matchSite, tpeDate, addDays, fill, DEFAULT_TEXTS, ALARM_WORDS, stripTpl };

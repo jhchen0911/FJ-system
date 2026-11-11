@@ -164,3 +164,18 @@ Lotion 11/11 定：薪資的出工名單以 LINE 日報為主，判斷不出來�
 | 人 4 | why：只寫人數 4，沒寫名字 |
 
 出工確認卡由小批次做（`sure:false` 或 `why` 有東西就出卡），本函式只拆、不寫任何資料。
+
+## 七、專案工務名單（共用函式，小批次出工確認卡也讀）
+
+Lotion 11/11 第 7 題定：「這一案的工務」由 Lotion 在每個專案指定（專案頁標題下「工務 阿明、小陳 [指定]」，只有管理員有「指定」，從人員名冊裡有登入帳號的人勾選）。
+
+- 資料：`fydata/siteEng/<主報價 id>/<email 鍵>` ＝ `{ name, email, at, by }`；管理員寫、員工登入就讀得到（唯讀帳號也讀得到名單）
+- 本機：`SITE_ENG`（`fy_siteeng`），登入後 `_lxWatch()` 即時更新
+- 函式（app.js，報價 id 傳主報價或追加都可以，會自動換成主約）：
+  - `_siteEngOf(qid)` → `[{ key, name, email, at }]`（照指定先後排）
+  - `_isSiteEng(qid, email)` → true／false（email 不給＝目前登入的人）
+  - `_mySiteQids()` → 目前登入的人是哪幾案的工務（主報價 id 陣列）
+  - `_siteEngQid(qid)` → 名單所在的主報價 id
+- 出工確認卡用法：`crewOf` 拆出來 `sure:false` 的人，卡片給 `_siteEngOf(qid)` 的人和管理員看
+
+還沒確認的 LINE 支出放 `fydata/lineExp/<主報價 id>/<草稿id_序號>`：雲端整理成日報草稿那一刻就寫進來；只有管理員和名單上的工務讀得到；工務只能補 `fix`（零用金／代墊是誰、收據照片），按確認記帳只有管理員。

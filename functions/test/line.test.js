@@ -607,3 +607,22 @@ test('v6.0.234 【支出】：範本有【支出】；公司群拆得出支出�
   assert.match(d.pushes[0].text, /【人和機具】\n\n【支出】\n\n【明天】/);
   assert.match(core.DEFAULT_TEXTS.dailyFmtHead, /支出（選填）/);
 });
+
+test('v6.0.234 LINE【支出】：日報草稿建好就把支出放進 fydata/lineExp/<主報價>/<草稿id_序號>（追加報價放主約底下）；已經有的不覆蓋；草稿已存在不重寫', async () => {
+  const d = mkDeps({ owners: {}, groups: { Gadd: { qid: 'qa1', name: '追加案' } } });
+  d.createDraft = async (rec) => { if (d.drafts[rec.id]) return false; d.drafts[rec.id] = rec; return true; };
+  d.getQuote = async (id) => (id === 'qa1' ? { id: 'qa1', parentId: 'qm1', items: [] } : null);
+  const ask = Date.parse('2026-10-22T09:30:00Z');
+  await core.dailyAsk(d, ask);
+  const g = { type: 'group', groupId: 'Gadd', userId: 'Uw' };
+  await core.handleEvents([{ type: 'message', timestamp: ask + 600000, source: g, message: { id: 'a1', type: 'text', text: '【今天做了】\n無\n【支出】\n便當 600 零用金 小陳\n五金 350 公司付' } }], d);
+  await core.dailyCompile(d, Date.parse('2026-10-22T12:00:00Z'));
+  const X = d.db.fydata.lineExp && d.db.fydata.lineExp.qm1, ks = Object.keys(X || {}).sort();
+  assert.equal(ks.length, 2);
+  assert.ok(/_0$/.test(ks[0]) && X[ks[0]].amt === 600 && X[ks[0]].who === '小陳' && X[ks[0]].pay === 'petty' && X[ks[0]].qid === 'qa1' && /#0$/.test(X[ks[0]].key) && X[ks[0]].src === ks[0].replace(/_0$/, ''));
+  assert.ok(X[ks[1]].amt === 350 && X[ks[1]].pay === 'co');
+  X[ks[0]].fix = { who: '阿明', by: 'e', at: 1 };
+  const dr = Object.values(d.drafts)[0];
+  assert.equal(await core.expQueue(d, dr), 0);   // 已經有的不動（工務補的 fix 留著）
+  assert.equal(X[ks[0]].fix.who, '阿明');
+});

@@ -715,6 +715,46 @@
             ".validate": "false"
           }
         }
+      },
+      "siteEng": {
+        ".read": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || ((root.child('fydata/access').child(auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists()) && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()))",
+        "$qid": {
+          ".write": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()))",
+          "$ek": {
+            ".validate": "newData.hasChildren(['name','email','at','by']) && newData.child('name').isString() && newData.child('name').val().length <= 20 && newData.child('email').isString() && newData.child('email').val().toLowerCase().replace('.', ',') === $ek && newData.child('at').isNumber() && newData.child('by').isString()"
+          }
+        }
+      },
+      "lineExp": {
+        ".read": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()))",
+        "$qid": {
+          ".read": "auth != null && auth.token.email != null && ((auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists())) || (root.child('fydata/siteEng').child($qid).child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && (root.child('fydata/access').child(auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists())))",
+          ".write": "auth != null && auth.token.email != null && (auth.token.email === 'jhchen0911@gmail.com' || (root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists()))",
+          "$k": {
+            ".validate": "!newData.exists() || (newData.hasChildren(['key','qid','src','at']) && newData.child('key').isString() && newData.child('qid').isString() && newData.child('src').isString())",
+            "fix": {
+              ".write": "auth != null && auth.token.email != null && (root.child('fydata/siteEng').child($qid).child(auth.token.email.toLowerCase().replace('.', ',')).exists() && !root.child('fydata/readers').child(auth.token.email.toLowerCase().replace('.', ',')).exists() && (root.child('fydata/access').child(auth.token.email.toLowerCase().replace('.', ',')).exists() || root.child('fydata/adminEmails').child(auth.token.email.toLowerCase().replace('.', ',')).exists())) && data.parent().exists() && !data.parent().child('done').exists() && newData.exists()",
+              ".validate": "newData.hasChildren(['by','at']) && newData.child('by').val() === auth.token.email && newData.child('at').isNumber() && newData.child('at').val() <= now + 600000 && (!newData.hasChild('who') || (newData.child('who').isString() && newData.child('who').val().length <= 20))",
+              "photos": {
+                "$i": {
+                  ".validate": "newData.isString() && newData.val().matches(/^ph:[a-z0-9]{6,40}$/)"
+                }
+              },
+              "who": {
+                ".validate": "newData.isString()"
+              },
+              "by": {
+                ".validate": "newData.isString()"
+              },
+              "at": {
+                ".validate": "newData.isNumber()"
+              },
+              "$other": {
+                ".validate": "false"
+              }
+            }
+          }
+        }
       }
     }
   }
