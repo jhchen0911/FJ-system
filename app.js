@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.235';
+var APP_VERSION='v6.0.234';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -2017,7 +2017,7 @@ function _saveQCore(o){
   // v5.310：以展開保留所有非編輯頁欄位（dailyLogs/confirmFiles/matEst/bidStatus/ver/closed/referral…），
   // 再以編輯頁欄位覆寫——修正儲存報價會清空日報/材料估算/確認單的重大缺陷
   let q;
-  if(auto&&existingQ){_qASBackup(existingQ);q=_qASMerge(existingQ,_qEditorFields(t));q._mt=Date.now();q._by=_meEmail();}   // 自動存檔：只寫這台改過的欄位
+  if(auto&&existingQ){q=_qASMerge(existingQ,_qEditorFields(t));q._mt=Date.now();q._by=_meEmail();}   // 自動存檔：只寫這台改過的欄位
   else q={...(existingQ||{}),
     id:eid||Date.now().toString(),_mt:Date.now(),_by:_meEmail(),rmk:JSON.parse(JSON.stringify(rmkCustom)),costs:existingCosts,
     awarded:existingQ?.awarded||false,
@@ -2174,6 +2174,7 @@ function _saveQCore(o){
   //（久了使用者不信任這個提示，真的沒存時反而被誤放行）
   window._qSnap=JSON.stringify(items);
   if(auto){eid=q.id;try{var _f2=_qEditorFields(t);_qAS.base=JSON.parse(JSON.stringify(_f2));_qAS.last=_qASFp(_f2);}catch(e){_err('saveQ.asBase',e);}_markDirty();_pushCloud({silent:true});return {ok:true};}
+  try{var _f3=_qEditorFields(t);_qAS.base=JSON.parse(JSON.stringify(_f3));_qAS.last=_qASFp(_f3);_qAS.pend=false;}catch(e){_err('saveQ.asBase2',e);}   // 手動存了：離開時不用再自動存一次
   // 立刻跳頁，Firebase 在背景同步
   go('quotes');
   _markDirty();
@@ -46395,7 +46396,7 @@ _decReg('addonSign',{
 // 新選單＋可寫的帳號才自動存（舊選單、唯讀帳號、AI 草稿套用中照舊手動存）。改完 3 秒沒再動就存；離開編輯頁、切到別的 App 立刻存。
 // 只寫這台改過的欄位（跟開頁或上次存的基準比），別台改的其他欄位不會被蓋掉；同一欄位別台也改了 → 用這台的（較新）、記一筆同步衝突讓 Lotion 選。
 // 跟上次存的一樣不存；驗證沒過不存、頁首小字寫原因；新報價填了工程名稱才存。會吵的事（自動加客戶、操作紀錄）只在離開編輯頁時做。
-// 每張報價 10 分鐘最多留一份「自動存檔」備份（存之前的那版），版本歷史照舊修剪（最多 10 份）。
+// 不留「自動存檔」版本（早先定的：版本歷史只放正式版次與還原前備份）；救命靠同步衝突卡與送出時的正式版次。
 var _qAS={base:null,last:'',inAt:0,bakAt:{},tick:0};
 function _qASOn(){try{return _v7New('editor')&&!_isReaderUser&&!(window._draftApplying&&window._draftApplying.kind==='quote')&&!window._draftQ;}catch(e){_err('_qASOn',e);return false;}}
 function _qASFp(f){var o={};Object.keys(f||{}).forEach(function(k){if(k!=='t')o[k]=f[k];});return JSON.stringify(o);}
@@ -46411,17 +46412,14 @@ function _qASConflict(cur,k,mine,theirs){
     SYNC_CONFLICTS=SYNC_CONFLICTS.filter(function(y){return !(y.coll===x.coll&&y.id===x.id&&y.field===x.field);});SYNC_CONFLICTS.unshift(x);_cfSave();
   }catch(e){_err('_qASConflict',e);}
 }
-// 自動存檔那一次要寫回報價的內容：existing＝目前資料（可能已被雲端換過），cur＝編輯頁欄位；回傳新物件
+// 自動存檔那一次要寫回報價的內容：existing＝目前資料（可能已被雲端換過），cur＝編輯頁欄位；只改這台改過的欄位（改在原物件上）
 function _qASMerge(existing,cur){
-  var B=_qAS.base||{},q=Object.assign({},existing),n=0;
+  var B=_qAS.base||{},q=existing,n=0;   // 直接改原本那筆（別處拿著同一個物件的不會變成舊的）
   Object.keys(cur).forEach(function(k){if(k==='t')return;var a=JSON.stringify(cur[k]),b=JSON.stringify(B[k]);if(a===b)return;n++;
     var c=JSON.stringify(existing[k]);if(c!==b&&c!==a)_qASConflict(existing,k,cur[k],existing[k]);
     q[k]=JSON.parse(a===undefined?'null':a);});
   if(n||JSON.stringify(existing.t)!==JSON.stringify(cur.t))q.t=cur.t;
   return q;
-}
-function _qASBackup(existing){
-  try{if(!existing||!existing.id)return;var now=Date.now();if(now-(_qAS.bakAt[existing.id]||0)<600000)return;_qAS.bakAt[existing.id]=now;saveQVersion(existing.id,existing,{note:'自動存檔'});}catch(e){_err('_qASBackup',e);}
 }
 function _qASRun(why){
   if(!_qASOn())return false;

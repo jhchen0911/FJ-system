@@ -14722,7 +14722,7 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
-  // ── v6.0.235 報價頁自動存檔（Lotion 11/11：A1 填了工程名稱就存、B1 同一格兩台都改＝用較新的＋同步衝突、C1 儲存鈕並排）──
+  // ── 報價頁自動存檔（版號推 main 時編）（Lotion 11/11：A1 填了工程名稱就存、B1 同一格兩台都改＝用較新的＋同步衝突、C1 儲存鈕並排）──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);
     const r = await page.evaluate(async () => {
@@ -14744,12 +14744,12 @@ async function newPage(browser, width, height) {
         _qAS.inAt = Date.now() - 4000; _qASTick();
         out.saved = q0().name === '範例自動存（改）' && document.getElementById('page-editor').classList.contains('active') && (q0().dailyLogs || []).length === 1 && (q0().costs || []).length === 1
           && /已自動存/.test(document.getElementById('q-as-st').textContent);
-        out.backup = (Q_HISTORY.qA1 || []).filter((e) => e && !e.formal && e.note === '自動存檔').length === 1;
+        out.backup = !(Q_HISTORY.qA1 || []).some((e) => e && !e.formal && !e.pre && !e.sent);   // 不留自動存檔版本
         // 驗證沒過：不存，頁首寫原因
         items[0].qty = -5; _qAS.inAt = 0; _qASTick();
         out.invalid = q0().items[0].qty === 10 && /沒存：數量不可為負數/.test(document.getElementById('q-as-st').textContent);
         items[0].qty = 12; _qAS.inAt = 0; _qASTick(); out.items = q0().items[0].qty === 12;
-        out.backupOnce = (Q_HISTORY.qA1 || []).filter((e) => e && e.note === '自動存檔').length === 1;   // 10 分鐘內只留一份
+        out.backupOnce = !(Q_HISTORY.qA1 || []).length;
         // 別台改了別的欄位（地點）、這台改業主 → 兩個都留下、沒有衝突
         Q[0] = Object.assign({}, q0(), { loc: '新竹（別台改）', _mt: Date.now() + 5, _by: 'other@example.com' });
         setV('fcl', '丙營造'); _qAS.inAt = 0; _qASTick();
@@ -14779,8 +14779,8 @@ async function newPage(browser, width, height) {
       Q = keepQ; CUSTOMERS.length = 0; keepC.forEach((x) => CUSTOMERS.push(x)); Q_HISTORY = keepH; _isReaderUser = oR; SYNC_CONFLICTS = keepCf;
       return out;
     });
-    check('v6.0.235 報價自動存檔（寬 ' + W + '）：沒改不存、打字停 3 秒才存且留在編輯頁、日報成本不動、10 分鐘一份備份、驗證沒過不存寫原因、別台改別欄兩邊都留、同欄記衝突、離開才加客戶、新報價填名稱才存且重號改號、唯讀與舊選單不自動存', !r.err && r.noChg && r.wait && r.saved && r.backup && r.invalid && r.items && r.backupOnce && r.merge && r.conflict && r.custWait && r.leave && r.newWait && r.newSaved && r.codeShown && r.newOnce && r.ro && r.old, JSON.stringify(r));
-    check('v6.0.235 報價自動存檔測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('報價自動存檔（寬 ' + W + '）：沒改不存、打字停 3 秒才存且留在編輯頁、日報成本不動、不留自動存檔版本、驗證沒過不存寫原因、別台改別欄兩邊都留、同欄記衝突、離開才加客戶、新報價填名稱才存且重號改號、唯讀與舊選單不自動存', !r.err && r.noChg && r.wait && r.saved && r.backup && r.invalid && r.items && r.backupOnce && r.merge && r.conflict && r.custWait && r.leave && r.newWait && r.newSaved && r.codeShown && r.newOnce && r.ro && r.old, JSON.stringify(r));
+    check('報價自動存檔測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
