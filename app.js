@@ -45154,6 +45154,20 @@ function _veModal(x){
     try{_decRefresh('vendorEval');}catch(er){_err('_veModal.refresh',er);}
   });
 }
+_decReg('vendorEval',{
+  title:'包商評分',todo:function(n){return '結案的包商評分 '+n+' 家';},sub:'確認／修改＝打分數（品質、工期、安全、配合度、價格）；退回＝這家不評',
+  canSee:function(){return !_isReaderUser&&_decIsAdmin();},
+  list:_veList,
+  key:function(x){return x.qid+'|'+_veKey(x.v);},
+  head:function(x){var q=(Q||[]).find(function(y){return y&&y.id===x.qid;})||{};return x.v+'（'+(q.name||'')+'）';},
+  body:function(){return '<div style="font-size:11.5px;color:var(--b4)">工程已結案，幫這家分包打個分數，之後發包選廠商用得到</div>';},
+  detail:function(x){var q=(Q||[]).find(function(y){return y&&y.id===x.qid;})||{},a=_veAvg(x.v);
+    var cs=(q.costs||[]).filter(function(c){return c&&c.type==='sub'&&String(c.vendor||'').trim()===x.v;});
+    return '<div style="font-size:12.5px">工程：'+esc(q.name||'')+'<br>分包：'+esc(x.v)+'（'+cs.length+' 張分包卡）'+(a?('<br>以前的平均：★ '+a.avg+'（'+a.n+' 案）'):'<br>以前還沒評過')+'</div>';},
+  ok:function(x){_veModal(x);return 'open';},
+  reject:function(x,why){return _veSave(x.qid,x.v,{skip:1,why:String(why||'不評').slice(0,120)});},
+  edit:function(x){_veModal(x);}
+});
 // ══════════ 改版第 7 步 7c 加碼④：分段拔樁（v6.0.225，只顯示；Lotion 11/10：分階段計逾期租金本來就有，不加新規則、不改算法）══════════
 // 專案「拆除拔樁」那一步列出每個有租期的工項、每一批（完成日、支數、逾期計費天數），資料直接用 FJC.todo.rentStatus（拔除完成日模式的 batches＝rentBatchQtyDays）
 // 與 rentBatchList（還沒逾期也列已完成的批次），不另算一份
