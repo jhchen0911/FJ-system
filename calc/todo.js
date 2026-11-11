@@ -108,14 +108,16 @@
   // today：今天（YYYY-MM-DD，由呼叫端給）
   // 健檢 M4（11/11）：報價把打設、拔除分成兩列（「H型鋼 打設」「H型鋼 拔除」）→ 兩列連起來看：租期跟著打設那列、拔除那列的日報讓租金停
   //   配對＝一列只有打設、一列只有拔除，工項名稱拿掉動作字之後一樣、單位一樣，而且只有唯一一對
-  function _pairKey(it) { return String((it && it.desc) || '').split('\n')[0].replace(/打設|裝設|安裝|組立|鋪設|架設|吊裝|施打|拔除|拆除|回收|撤除|及|與|和|＋|\+|、|[\s　（）()]/g, '').toUpperCase(); }
-  function pairOf(q, idx) {
+  function _pairKey(it) { return String((it && it.desc) || '').replace(/打設|裝設|安裝|組立|鋪設|架設|吊裝|施打|拔除|拆除|回收|撤除|及|與|和|＋|\+|、|[\s　（）()]/g, '').toUpperCase(); }
+  function _pairHits(q, idx) {
     var its = (q && q.items) || [], it = its[idx]; if (!it || it.sec) return null;
     var c = itemCat(it); if (c.install === c.remove) return null;
     var k = _pairKey(it), u = uFix(it.unit || ''); if (k.length < 2) return null;
     var hits = []; its.forEach(function (x, j) { if (j === idx || !x || x.sec) return; var cx = itemCat(x); if (cx.install === c.install || cx.remove === c.remove) return; if (_pairKey(x) === k && uFix(x.unit || '') === u) hits.push(j); });
     return hits.length === 1 ? { idx: hits[0], role: c.install ? 'install' : 'remove' } : null;
   }
+  // 審查：兩邊互相只認得對方才算一對（不然 H350 打設會配到 H300 的拔除）；比對整段說明（規格寫在第 2 行也算）
+  function pairOf(q, idx) { var a = _pairHits(q, idx); if (!a) return null; var b = _pairHits(q, a.idx); return (b && b.idx === idx) ? a : null; }
   function rentStatus(q, idx, endDate, today) {
     var it = ((q && q.items) || [])[idx]; if (!it || it.sec) return null;
     if ((parseFloat(it.qty) || 0) <= 0 || (parseFloat(it.price) || 0) < 0) return null;   // 減帳列（負數量）、減項列（負數單價）沒有租期
@@ -436,7 +438,7 @@
     var items = Object.keys(qty).map(function (k) { var it = (q.items || [])[+k] || {}; return { idx: +k, desc: String(it.desc || '').split('\n')[0], unit: uFix(it.unit || ''), qty: Math.round(qty[k] * 100) / 100 }; })
       .filter(function (x) { var it = (q.items || [])[x.idx]; return it && !it.sec && !((parseFloat(it.price) || 0) < 0); });
     // 健檢 M1（11/11）：只有逾期租金、沒有新日報的月份也要出請款單草稿（逾期租金單獨觸發）
-    var rent = []; try { rent = rentScan(q, cy.end, o.today).filter(function (x) { return x && x.overDays > 0; }).map(function (x) { return { idx: x.idx, desc: String(x.desc || '').split('\n')[0], overDays: x.overDays, amount: x.amount || 0, end: cy.end }; }); } catch (e) { rent = []; }
+    var rent = []; try { rent = rentScan(q, cy.end, o.today).filter(function (x) { return x && x.overDays > 0 && (!last || String(x.endDate || '') > last); }).map(function (x) { return { idx: x.idx, desc: String(x.desc || '').split('\n')[0], overDays: x.overDays, amount: x.amount || 0, end: cy.end }; }); } catch (e) { rent = []; if (o.log) o.log('monthBill.rent', e); }   // 審查：上次請款之後還有逾期天數才算（拔完、已請過的不會每個月再出一張）
     if (!items.length && !rent.length) return null;
     return { qid: q.id, name: q.name || '', cutDate: cy.end, left: left, since: last, items: items, rent: rent, rentOnly: !items.length };
   }

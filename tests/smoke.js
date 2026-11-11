@@ -11854,8 +11854,8 @@ async function newPage(browser, width, height) {
         // H4：得標不建空白第 1 期（程式裡不再有自動建單）；舊的空白單、累計超過 100% 的單出檢查卡
         const src = String(confirmAward);
         out.noAuto = !/buildInvFromQuote\(q\)/.test(src);
-        INV = [{ id: '1700000000001', project: '健檢請款案', quoteId: 'qH', periodNo: '1', date: '2026-10-01', items: [{ type: 'item', desc: 'H型鋼樁', contractQty: 100, curQty: 0, curAmt: 0 }], totals: { total: 0 } },
-          { id: '1700000000002', project: '乙案', quoteId: 'qZ', periodNo: '1', date: '2026-10-01', note: '業主說下個月再請', items: [{ type: 'item', desc: 'H型鋼樁', contractQty: 100, curQty: 0, curAmt: 0 }], totals: { total: 0 } },
+        INV = [{ id: '1700000000001', project: '健檢請款案', quoteId: 'qH', sourceQid: 'qH', periodNo: '1', date: '2026-10-01', items: [{ type: 'item', desc: 'H型鋼樁', contractQty: 100, curQty: 0, curAmt: 0 }], totals: { total: 0 } },
+          { id: '1700000000002', project: '乙案', quoteId: 'qZ', sourceQid: 'qZ', periodNo: '1', date: '2026-10-01', note: '業主說下個月再請', items: [{ type: 'item', desc: 'H型鋼樁', contractQty: 100, curQty: 0, curAmt: 0 }], totals: { total: 0 } },
           { id: 'over1', project: '健檢請款案', quoteId: 'qH', periodNo: '3', date: '2026-10-20', items: [{ type: 'item', desc: 'H型鋼樁 H300 打設＋拔除', contractQty: 100, prevQty: 100, curQty: 100, payRate: 30, curAmt: 30000 }], totals: { total: 31500 } }];
         P.invAutoLog = [];
         out.auto = _icAutoBlank() === 1 && !INV.some(x => x.id === '1700000000001') && P.invAutoLog.length === 1 && /空白第 1 期/.test(P.invAutoLog[0].why) && INV.some(x => x.id === '1700000000002');   // 完全沒動過＝自動收；有備註的不動
@@ -11866,15 +11866,27 @@ async function newPage(browser, width, height) {
         out.chkOk = _DEC.invChk.ok(bb) === true && !INV.some(x => x.id === '1700000000002') && _DEC.invChk.ok(ob) === true && INV[0].items[0].payRate === 30 && !_icList().length;   // 超過的舊單不改，只記看過
         // 新版建的單有草稿紀錄＝正在填的，不會被自動收
         INV = []; pjNewInv('qH'); out.newKeep = _icAutoBlank() === 0 && INV.length === 1;
+        // 審查：還原過的、手打的空白單（沒有報價來源或 11/12 以後建的）不收；舊空白第 1 期還在時開請款單＝新的第 1 期
+        const blank = (o) => Object.assign({ project: '健檢請款案', quoteId: 'qH', sourceQid: 'qH', periodNo: '1', date: '2026-10-01', items: [{ type: 'item', desc: 'H型鋼樁', contractQty: 100, curQty: 0, curAmt: 0 }], totals: { total: 0 } }, o);
+        INV = [blank({ id: '1700000000003', _restoredAt: Date.now() }), blank({ id: '1700000000004', sourceQid: '' }), blank({ id: String(Date.parse('2026-11-13T00:00:00+08:00')) })];
+        out.keepSafe = _icAutoBlank() === 0 && INV.length === 3;
+        INV = [blank({ id: '1700000000005' })]; pjNewInv('qH');
+        await new Promise((res) => setTimeout(res, 50));
+        out.p1 = INV.length === 1 && INV[0].id !== '1700000000005' && String(INV[0].periodNo) === '1';
+        // 審查：下一期不帶「看過超過 100%」的紀錄
+        INV[0].icSeen = { over: { at: 1 } }; INV[0].lockLog = [{ at: 1 }]; addNextPeriod(INV[0].id); out.nextClean = !INV[0].icSeen && !INV[0].lockLog;
         // Lotion 第 2 題：預設 70／30；合約條件不一樣 → 出卡問，確認後這一案才改用
         Q[0].ownerPay = Object.assign({}, Q[0].ownerPay, { instPct: 90 });
         const B = _decItems('billPct');
         out.pctAsk = B.length === 1 && /合約寫打設 90%、拔除 10%/.test(_DEC.billPct.body(B[0])) && _invInstPct(Q[0]) === 70;
         out.pctOk = _DEC.billPct.ok(B[0]) === true && _invInstPct(Q[0]) === 90 && !_decItems('billPct').length && _invPhasePct(Q[0], Q[0].items[0], 'remove') === 10;
+        // 審查：請款 % 下拉選單跟自動帶的 % 同一套（合約 90 → 90％打設、10％拔除，不是 30）
+        const _keepCur = window._invCurQuote; window._invCurQuote = () => Q[0];
+        try { const O = _invRateOpts({ payRate: 90 }).map((x) => x[1]).join('|'); out.opts = /90%打設/.test(O) && /10%拔除/.test(O) && !/30%拔除/.test(O); } finally { window._invCurQuote = _keepCur; }
       } finally { Q = keepQ; INV = keepI; P.removeRate = keepRR; }
       return out;
     });
-    check('健檢 11/11 請款整條：待送卡金額照真正存檔算（totals.total）；打設＋拔除工項預設 70／30、卡片寫這期 %／累計 %；開下一期從草稿開始；得標不建空白單；完全沒動過的空白第 1 期自動進回收筒、有內容的出卡、新版建的不收；累計超過 100% 的舊單標紅不改；合約比例不一樣出卡問、確認後才改用', Object.values(r).length === 12 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('健檢 11/11 請款整條：待送卡金額照真正存檔算（totals.total）；打設＋拔除工項預設 70／30、卡片寫這期 %／累計 %；開下一期從草稿開始；得標不建空白單；完全沒動過的空白第 1 期自動進回收筒、有內容的出卡、新版建的不收；累計超過 100% 的舊單標紅不改；合約比例不一樣出卡問、確認後才改用', Object.values(r).length === 16 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('健檢 11/11 請款整條測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

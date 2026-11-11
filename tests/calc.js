@@ -500,6 +500,12 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
     r2 && r2.removeFirst === '2026-03-15' && r2.overDays === 13 && r2.amount === 13000 && r2b === null && T.pairOf(q3, 0) === null);
   const q4 = { id: 'q4', name: '只有逾期租金', awarded: true, items: [{ desc: 'H型鋼樁 H300 打設＋拔除', unit: '支', qty: 10, price: 500, note: '租期 30 天', ot: '20' }], dailyLogs: [{ date: '2026-09-01', progressRows: [{ itemIdx: 0, qty: 10 }] }] };
   const mb = T.monthBill({ q: q4, invs: [{ date: '2026-10-24' }], cust: {}, def: { cut: 25 }, today: '2026-11-22' });
+  // 審查：拔完、上次請款之後沒有新的逾期天數 → 不再每個月出一張；規格寫在第 2 行不同（H300／H350）不配對；兩邊要互相配
+  const q5 = JSON.parse(JSON.stringify(q4)); q5.items[0].desc = 'H型鋼樁 H300 打設＋拔除'; q5.dailyLogs.push({ date: '2026-10-10', progressRows: [{ itemIdx: 0, qty: 10, ph: 'remove' }] });
+  const mb5 = T.monthBill({ q: q5, invs: [{ date: '2026-10-24' }], cust: {}, def: { cut: 25 }, today: '2026-11-22' });
+  const q6 = { items: [{ desc: 'H型鋼 打設\nH300', unit: '支', qty: 10 }, { desc: 'H型鋼 拔除\nH300', unit: '支', qty: 10 }, { desc: 'H型鋼 打設\nH350', unit: '支', qty: 5 }] };
+  check('審查：逾期租金拔完、上次請款後沒有新的逾期天數 → 不出只有租金的草稿卡；配對要規格一樣、兩邊互相配（H350 打設不會配到 H300 拔除）',
+    mb5 === null && T.pairOf(q6, 0) && T.pairOf(q6, 0).idx === 1 && T.pairOf(q6, 2) === null && T.pairOf(q6, 1).idx === 0, JSON.stringify([mb5, T.pairOf(q6, 2)]));
   check('健檢 M1：這個月沒有新的日報、只有逾期租金 → 照樣出請款單草稿卡（rentOnly、列出逾期天數）', !!mb && mb.rentOnly && mb.items.length === 0 && mb.rent.length === 1 && mb.rent[0].overDays > 0 && mb.cutDate === '2026-11-25');
   const R = (t) => DL.parse(t, [{ desc: '鋼板樁 III型 拔除', unit: '支', qty: 120 }]).rows;
   check('健檢 M2：「第一段拔除 40 支，這段拔完了」「…，這段拔完」都標本段完成', R('鋼板樁拔除 40 支，這段拔完了')[0].batchDone === true && R('第一段鋼板樁拔除 40 支，這段拔完了')[0].batchDone === true && R('鋼板樁拔除 40 支，這段拔完')[0].batchDone === true && R('鋼板樁拔除 40 支，這段還沒拔完')[0].batchDone === false);
