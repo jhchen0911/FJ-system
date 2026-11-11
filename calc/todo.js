@@ -19,7 +19,8 @@
     if (c === 'both') return { install: true, remove: true };
     if (c === 'other') return { install: false, remove: false };
     var d = String((it && it.desc) || '');
-    return { install: d.indexOf('打設') >= 0 || d.indexOf('裝設') >= 0 || d.indexOf('安裝') >= 0, remove: d.indexOf('拔除') >= 0 || d.indexOf('拆除') >= 0 };
+    // 健檢 H2（11/11）：組立、鋪設、架設、吊裝、施打也算裝設（「組立及拆除」原本被判成只有拆除，組立數量記成拆除）；跟 calc/dailyparse.js、functions/ops/progress.js 同一份字表（tests/calc.js 比對）
+    return { install: ['打設', '裝設', '安裝', '組立', '鋪設', '架設', '吊裝', '施打'].some(function (w) { return d.indexOf(w) >= 0; }), remove: ['拔除', '拆除'].some(function (w) { return d.indexOf(w) >= 0; }) };
   }
   function rentDaysOf(it) {
     if (!it) return 0;
@@ -105,11 +106,32 @@
     return { qtyDays: Math.round(tot * 1000) / 1000, segs: segs, base: bq };
   }
   // today：今天（YYYY-MM-DD，由呼叫端給）
+  // 健檢 M4（11/11）：報價把打設、拔除分成兩列（「H型鋼 打設」「H型鋼 拔除」）→ 兩列連起來看：租期跟著打設那列、拔除那列的日報讓租金停
+  //   配對＝一列只有打設、一列只有拔除，工項名稱拿掉動作字之後一樣、單位一樣，而且只有唯一一對
+  function _pairClean(t) { return String(t || '').replace(/打設|裝設|安裝|組立|鋪設|架設|吊裝|施打|拔除|拆除|回收|撤除|及|與|和|＋|\+|、|[\s　（）()]/g, '').toUpperCase(); }
+  function _pairKey(it) { return _pairClean(String((it && it.desc) || '').split('\n')[0]); }
+  function _pairSpec(it) { return _pairClean(String((it && it.desc) || '').split('\n').slice(1).join('')); }
+  // 審查（第二次）：第 1 行一樣才配；第 2 行以後（規格）兩邊都有寫才比，一邊沒寫照舊配得到
+  function _pairSame(a, b) { if (_pairKey(a) !== _pairKey(b)) return false; var x = _pairSpec(a), y = _pairSpec(b); return !x || !y || x === y; }
+  function _pairHits(q, idx) {
+    var its = (q && q.items) || [], it = its[idx]; if (!it || it.sec) return null;
+    var c = itemCat(it); if (c.install === c.remove) return null;
+    var k = _pairKey(it), u = uFix(it.unit || ''); if (k.length < 2) return null;
+    var hits = []; its.forEach(function (x, j) { if (j === idx || !x || x.sec) return; var cx = itemCat(x); if (cx.install === c.install || cx.remove === c.remove) return; if (_pairSame(x, it) && uFix(x.unit || '') === u) hits.push(j); });
+    return hits.length === 1 ? { idx: hits[0], role: c.install ? 'install' : 'remove' } : null;
+  }
+  // 審查：兩邊互相只認得對方才算一對（不然 H350 打設會配到 H300 的拔除）；比對整段說明（規格寫在第 2 行也算）
+  function pairOf(q, idx) { var a = _pairHits(q, idx); if (!a) return null; var b = _pairHits(q, a.idx); return (b && b.idx === idx) ? a : null; }
   function rentStatus(q, idx, endDate, today) {
     var it = ((q && q.items) || [])[idx]; if (!it || it.sec) return null;
     if ((parseFloat(it.qty) || 0) <= 0 || (parseFloat(it.price) || 0) < 0) return null;   // 減帳列（負數量）、減項列（負數單價）沒有租期
-    var days = rentDaysOf(it); if (days <= 0) return null;
+    var pr = pairOf(q, idx), its0 = (q && q.items) || [];
+    var days = rentDaysOf(it);
+    if (pr && pr.role === 'install' && days <= 0) { days = rentDaysOf(its0[pr.idx]); if (days > 0 && !(parseFloat((String(it.ot || '').match(/[\d.]+/) || [0])[0]) > 0)) it = Object.assign({}, it, { ot: its0[pr.idx].ot, otu: its0[pr.idx].otu }); }   // 審查：租期、逾期單價寫在拔除那列也算
+    if (days <= 0) return null;
+    if (pr && pr.role === 'remove' && (rentDaysOf(its0[pr.idx]) > 0 || days > 0)) return null;   // 健檢 M4：租期一律算在打設那列（拔除那列不另算）
     var pg = itemProgress(q, idx);
+    if (pr) { var pg2 = itemProgress(q, pr.idx); if (!pg.removeFirst && pg2.removeFirst) pg = Object.assign({}, pg, { removeFirst: pg2.removeFirst, removeLast: pg2.removeLast, removeDone: pg2.removeDone, remLogs: pg2.remLogs, stageRemove2: pg2.stageRemove2, stageRemove: pg2.stageRemove, removeCum: pg2.removeCum, pairIdx: pr.idx }); }
     var base = pg.installLast || pg.doneDate || pg.last;
     if (!base) return null;
     var start = dAdd(base, 1);
@@ -122,7 +144,7 @@
     var price = parseFloat((String(it.ot || '').match(/[\d.]+/) || [0])[0]) || 0;
     var qty = Math.abs(parseFloat(it.qty) || 0);
     if (mode !== 'removeDone') qty = rentOldQty(pg, qty);
-    var head = { idx: idx, desc: String(it.desc || '').split('\n')[0], unit: it.unit || '', days: days, installDate: base, removeFirst: pg.removeFirst || '', estimated: !pg.doneDate, cum: pg.cum, target: pg.target,
+    var head = { pairIdx: pr ? pr.idx : null, idx: idx, desc: String(it.desc || '').split('\n')[0], unit: it.unit || '', days: days, installDate: base, removeFirst: pg.removeFirst || '', estimated: !pg.doneDate, cum: pg.cum, target: pg.target,
       start: start, expiry: expiry, endDate: end, overDays: over, endMode: mode, removeDone: pg.removeDone || '' };
     if (mode === 'removeDone' && over > 0) {
       var bq = rentBatchQtyDays(pg, qty, dAdd(expiry, 1), end);
@@ -266,7 +288,7 @@
     if (!q || q.closed || !q.awarded || q.parentId) return null;
     var why = [];
     if (o.payLeft > 0) why.push('pay');
-    if (o.hasRet) { if (o.retLeft > 0) why.push('ret'); }
+    if (o.hasRet) { if (o.retLeft > 0) why.push('ret'); if (o.matLeft > 0) why.push('mat'); }   // 健檢（11/11）：有保留款的案子也要材料退完才出結案卡
     else {
       if (!(o.invs || []).length || (o.invs || []).some(function (x) { return x.ar > 0; })) why.push('recv');
       if (!o.allDone) why.push('done');
@@ -419,8 +441,10 @@
     });
     var items = Object.keys(qty).map(function (k) { var it = (q.items || [])[+k] || {}; return { idx: +k, desc: String(it.desc || '').split('\n')[0], unit: uFix(it.unit || ''), qty: Math.round(qty[k] * 100) / 100 }; })
       .filter(function (x) { var it = (q.items || [])[x.idx]; return it && !it.sec && !((parseFloat(it.price) || 0) < 0); });
-    if (!items.length) return null;
-    return { qid: q.id, name: q.name || '', cutDate: cy.end, left: left, since: last, items: items };
+    // 健檢 M1（11/11）：只有逾期租金、沒有新日報的月份也要出請款單草稿（逾期租金單獨觸發）
+    var rent = []; try { rent = rentScan(q, cy.end, o.today).filter(function (x) { return x && x.overDays > 0 && (!last || String(x.endDate || '') > last); }).map(function (x) { return { idx: x.idx, desc: String(x.desc || '').split('\n')[0], overDays: x.overDays, amount: x.amount || 0, end: cy.end }; }); } catch (e) { rent = []; if (o.log) o.log('monthBill.rent', e); }   // 審查：上次請款之後還有逾期天數才算（拔完、已請過的不會每個月再出一張）
+    if (!items.length && !rent.length) return null;
+    return { qid: q.id, name: q.name || '', cutDate: cy.end, left: left, since: last, items: items, rent: rent, rentOnly: !items.length };
   }
 
   // ── 全部提醒一次算（雲端 dailyTodos 與前端並行比對共用）──
@@ -488,7 +512,7 @@
     });
     return out;
   }
-  var todo = { dAdd: dAdd, dDiff: dDiff, itemCat: itemCat, rentDaysOf: rentDaysOf, prPhase: prPhase, itemProgress: itemProgress, rentEndMode: rentEndMode, rentOldQty: rentOldQty,
+  var todo = { pairOf: pairOf, dAdd: dAdd, dDiff: dDiff, itemCat: itemCat, rentDaysOf: rentDaysOf, prPhase: prPhase, itemProgress: itemProgress, rentEndMode: rentEndMode, rentOldQty: rentOldQty,
     rentBatchList: rentBatchList, rentBatchQtyDays: rentBatchQtyDays, rentSegments: rentSegments, rentStatus: rentStatus, rentScan: rentScan, rentTodos: rentTodos, rentSoon: rentSoon,
     recvRule: recvRule, byRule: byRule, expectedDate: expectedDate, recvTodos: recvTodos, looseDate: looseDate,
     retMonths: retMonths, addMonths: addMonths, retDue: retDue, closeReady: closeReady,
