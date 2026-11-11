@@ -3934,7 +3934,7 @@ async function newPage(browser, width, height) {
           const items=[];for(let k=0;k<8;k++)items.push({desc:'H型鋼樁 H300，L='+(10+k)+'M@80cm 打設、拔除（含水刀引孔）',unit:'支',qty:'40',price:String(26500+k*1000),sec:false,note:'含180天租期'});
           Q=[{id:'qH',code:'1150970',name:'範例科技廠A區',client:'庚辛企業有限公司',date:'2026-09-01',awarded:true,exs:[],rmk:{},_mt:1,items:items}];
           const inv=buildInvFromQuote(Q[0]);inv.id='invH1';inv.date='2026-10-05';INV.push(inv);loadInvoice('invH1');
-          invItems[2].curQty=133;invItems[2].payRate=70;invItems[2].contractPrice=40500;invItems[4].curQty=1;invItems[4].contractPrice=80000;invItems[7].curQty=27;invItems[7].contractPrice=1500;
+          invItems[2].curQty=133;invItems[2].payRate=70;invItems[2].contractPrice=40500;invItems[4].curQty=1;invItems[4].contractPrice=80000;invItems[7].curQty=27;invItems[7].contractPrice=1500;invItems[4].payRate=100;invItems[7].payRate=100;   // 健檢 H5 起打設＋拔除工項預設照合約 %（70%）；這個版面測試沿用原本的 100% 列
           [2,4,7].forEach(i=>updateInvRowAmt(i));document.getElementById('inv-calc').checked=true;buildInvPreview();
           const html=document.getElementById('inv-prev-html').innerHTML;
           // 表頭：LOGO 與公司名同一列（flex）
@@ -11925,7 +11925,7 @@ async function newPage(browser, width, height) {
           addons: [{ id: 'a1', date: '2026-10-08', text: '#追加 背填砂 3 車', qty: 3, unit: '車', status: 'confirmed' }, { id: 'a2', date: '2026-10-09', text: '待確認的', status: 'pending' }] }];
         INV = [];
         const L = _decItems('addonSign');
-        out.list = L.length === 1 && /還沒傳給主任/.test(_DEC.addonSign.body(L[0])) && /王主任 您好/.test(await _DEC.addonSign.detail(L[0])) && /背填砂 3 車/.test(await _DEC.addonSign.detail(L[0]));
+        out.list = L.length === 1 && /還沒傳給主任/.test(_DEC.addonSign.body(L[0])) && /王主任 你好/.test(await _DEC.addonSign.detail(L[0])) && /背填砂 3 車/.test(await _DEC.addonSign.detail(L[0]));
         out.ask = (await _DEC.addonSign.ok(L[0])) === true && !!Q[0].addons[0].askAt && !Q[0].addons[0].signed;
         _todoBuild(true); let det = _DEC.invDraft.detail(_decItems('invDraft')[0]);
         out.yellow = /主任還沒簽認，這期先不請/.test(det) && !/主任已簽認/.test(det);
@@ -13689,7 +13689,7 @@ async function newPage(browser, width, height) {
         // 新選單：舊「保留款可請退」那列不再出現（由卡涵蓋）
         const it = []; _v6TodoItems(it); out.one = it.some((x) => x.type === 'dec_retAsk') && !it.some((x) => x.type === 'ret_due' && /範例完工案/.test(x.text));
         const h = await Promise.resolve(_DEC.retAsk.detail(L[0])); const x = document.createElement('div'); x.innerHTML = h;
-        out.detail = /完工驗收後 3 個月無息退還/.test(x.textContent) && /2026-07-31/.test(x.textContent) && /78,750/.test(x.textContent) && /範例完工案追加/.test(x.textContent) && !!x.querySelector('iframe[srcdoc]') && /保留款退還請款單/.test(x.querySelector('iframe').getAttribute('srcdoc')) && /範例營造甲 您好/.test(x.textContent);
+        out.detail = /完工驗收後 3 個月無息退還/.test(x.textContent) && /2026-07-31/.test(x.textContent) && /78,750/.test(x.textContent) && /範例完工案追加/.test(x.textContent) && !!x.querySelector('iframe[srcdoc]') && /保留款退還請款單/.test(x.querySelector('iframe').getAttribute('srcdoc')) && /範例營造甲 你好/.test(x.textContent);
         // 退回＝這次不請，金額沒變不再出；確認＝開保留款退還請款單（存一張 retReturn）
         await _DEC.retAsk.reject(L[0], '先不請'); out.skip = _DEC.retAsk.list().length === 0 && Q[0].deduct.retAskSkip.amt === 78750;
         // 審查：退回之後，舊的「保留款可請退」待辦也不能跑回來
