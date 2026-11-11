@@ -4,7 +4,7 @@
 const FJC = require('../calc/qdraft.js');
 const D = FJC.qd;
 
-const TYPES = { qchg: 1, quote: 1, bid: 1 };
+const TYPES = { qchg: 1, quote: 1, bid: 1, ownerCard: 1, rfqReply: 1, inquiry: 1 };   // v6.0.233 ownerCard＝合約條件卡（contract-check 產出的 fj-contract-card/1）
 const MAX_PENDING = 50;   // 每個送件人同時待確認的上限   // 只開這三種；其他草稿照舊從網頁送
 const BID_TO = { awarded: '得標', '': '待回覆', nego: '議價中', lost: '未得標', void: '流標' };
 const LOST = ['價格過高', '規格不符', '工期不符', '業主關係', '未回應', '其他'];
@@ -55,12 +55,88 @@ function aimClean(x) {
   if (f != null && t != null && f > t) return { err: '底價不能高於目標成交價' };
   const o = {}; if (f != null) o.floor = f; if (t != null) o.target = t; return { aim: o };
 }
+// 詢價收件（inquiry）：HQ inquiry-intake 讀業主來信 → 摘要、圖說清單、缺的資料、索取訊息草稿；有 munger-bid-decision 結論就附（一句話＋三個風險）
+//   附件只存連結（https），不存檔案
+const INQ_V = ['接', '有條件接', '不接'];
+function linkList(x, n) { return arr(x).slice(0, n).map((d) => (typeof d === 'string' ? { name: d } : d)).filter((d) => d && typeof d === 'object').map((d) => { const o = { name: S(d.name, 120).trim() }; const u = S(d.url, 500).trim(); if (/^https:\/\/[^\s"'<>]+$/i.test(u)) o.url = u; const nt = S(d.note, 120).trim(); if (nt) o.note = nt; return o; }).filter((d) => d.name || d.url); }
+function inqClean(pl) {
+  const name = S(pl.name, 120).trim(); if (!name) return { err: '要填工程名稱（name）' };
+  const p = { name, client: S(pl.client, 100).trim(), loc: S(pl.loc, 120).trim(), contact: S(pl.contact, 40).trim(), phone: S(pl.phone, 40).trim(), email: S(pl.email, 100).trim(),
+    recv: /^\d{4}-\d{2}-\d{2}$/.test(S(pl.recv, 10)) ? S(pl.recv, 10) : '', due: /^\d{4}-\d{2}-\d{2}$/.test(S(pl.due, 10)) ? S(pl.due, 10) : '',
+    mail: S(pl.mail, 2000).trim(), drawings: linkList(pl.drawings, 50), files: linkList(pl.files, 30),
+    missing: arr(pl.missing).slice(0, 30).filter((t) => typeof t === 'string').map((t) => S(t, 200).trim()).filter(Boolean),
+    ask: S(pl.ask, 1500).trim(), src: S(pl.src, 200).trim() };
+  if (!p.mail && !p.drawings.length) return { err: '至少要有來信摘要（mail）或圖說清單（drawings）' };
+  if (pl.munger != null) {
+    const m = (typeof pl.munger === 'object') ? pl.munger : {};
+    const v = S(m.verdict, 10).trim(); if (INQ_V.indexOf(v) < 0) return { err: 'munger.verdict 只能是：接／有條件接／不接' };
+    const risks = arr(m.risks).filter((t) => typeof t === 'string').map((t) => S(t, 200).trim()).filter(Boolean).slice(0, 3);
+    p.munger = { verdict: v, line: S(m.line, 200).trim(), risks };
+  }
+  return { p };
+}
+// v6.0.233 廠商回價（rfqReply）：AI 讀廠商回傳的報價（照片／PDF）→ 草稿。詢價單在 private（這裡讀不到），只對報價工項；詢價單號 rno 由 FJ 端再對。
+//   prices：[{idx 或 match（工項說明第一行的一段）, price（未稅單價）}]；lump：{total, idxs 或 match[]}（一式）；extras：[{name, amt}]（豐有要提供的材料／隱藏成本）；diffs：範圍差異文字
+function itemIdx(q, x) {
+  const its = arr(q.items);
+  if (x.idx != null && x.idx !== '') { const i = parseInt(x.idx, 10); if (!(i >= 0 && i < its.length) || !its[i] || its[i].sec) return { err: '工項 idx ' + S(x.idx, 10) + ' 不在這張報價' }; return { i }; }
+  const m = S(x.match, 60).replace(/\s+/g, ''); if (!m) return { err: '每一項要給 idx 或 match' };
+  const hit = []; its.forEach((it, i) => { if (it && !it.sec && !it.spare && String(it.desc || '').split('\n')[0].replace(/\s+/g, '').indexOf(m) >= 0) hit.push(i); });
+  if (hit.length !== 1) return { err: '「' + m + '」對到 ' + hit.length + ' 個工項，請改用 idx' };
+  return { i: hit[0] };
+}
+function replyClean(q, pl) {
+  const v = (pl.vendor && typeof pl.vendor === 'object') ? pl.vendor : {};
+  const name = S(v.name, 80).trim(); if (!name) return { err: '要填廠商名稱（vendor.name）' };
+  const out = { rno: S(pl.rno, 40).trim(), vendor: { name, contact: S(v.contact, 40), tel: S(v.tel, 40), taxid: S(v.taxid, 10) }, recv: /^\d{4}-\d{2}-\d{2}$/.test(S(pl.recv, 10)) ? S(pl.recv, 10) : '', prices: [], note: S(pl.note, 300), src: S(pl.src, 200) };
+  const seen = {};
+  for (const x of arr(pl.prices).slice(0, 100)) {
+    const r = itemIdx(q, x || {}); if (r.err) return { err: r.err };
+    const p = D.num(x.price); if (p == null || !(p >= 0) || p > 1e8) return { err: '第 ' + (r.i + 1) + ' 項單價不對' };
+    if (seen[r.i]) return { err: '第 ' + (r.i + 1) + ' 項重複' }; seen[r.i] = 1;
+    out.prices.push({ idx: r.i, price: p });
+  }
+  if (pl.lump != null) {
+    const L = (typeof pl.lump === 'object') ? pl.lump : {}; const t = D.num(L.total); if (t == null || !(t > 0) || t > 1e10) return { err: '一式總價（lump.total）要大於 0' };
+    const idxs = [];
+    for (const x of arr(L.idxs).map((i) => ({ idx: i })).concat(arr(L.match).map((m) => ({ match: m }))).slice(0, 100)) { const r = itemIdx(q, x); if (r.err) return { err: r.err }; if (seen[r.i]) return { err: '第 ' + (r.i + 1) + ' 項同時有單價和一式' }; if (idxs.indexOf(r.i) < 0) idxs.push(r.i); }
+    if (!idxs.length) return { err: '一式要列涵蓋哪些工項（lump.idxs 或 lump.match）' };
+    out.lump = { total: t, idxs };
+  }
+  if (!out.prices.length && !out.lump) return { err: '沒有任何單價或一式總價' };
+  out.extras = arr(pl.extras).slice(0, 20).map((e) => ({ name: S(e && e.name, 60), amt: D.num(e && e.amt) || 0 })).filter((e) => e.name.trim() && e.amt > 0);
+  out.diffs = arr(pl.diffs).slice(0, 20).filter((t) => typeof t === 'string').map((t) => S(t, 200)).filter((t) => t.trim());
+  return { p: out };
+}
+// v6.0.233 合約條件卡（fj-contract-card/1）：只收純資料（字串≤2000、陣列≤50、物件≤60 欄、深度≤6；鍵名只能英數 _ -，資料庫不收 . $ # [ ] /）
+const CARD_TOP = ['billing', 'retention', 'rent'];
+function cardClean(card) {
+  if (!card || typeof card !== 'object' || Array.isArray(card)) return { err: '要附 card：contract-check 產出的合約條件卡（JSON 物件）' };
+  if (card.schema != null && card.schema !== 'fj-contract-card/1') return { err: '合約條件卡格式版本 ' + S(card.schema, 40) + ' 不支援（需要 fj-contract-card/1）' };
+  if (!CARD_TOP.some((k) => card[k] && typeof card[k] === 'object')) return { err: '合約條件卡至少要有 billing、retention、rent 其中一段' };
+  let bad = '';
+  const cl = (v, d) => {
+    if (bad) return null;
+    if (v == null) return null;
+    if (typeof v === 'string') return v.slice(0, 2000);
+    if (typeof v === 'number') return isFinite(v) ? v : null;
+    if (typeof v === 'boolean') return v;
+    if (d > 6) { bad = '合約條件卡層數太深'; return null; }
+    if (Array.isArray(v)) return v.slice(0, 50).map((x) => cl(x, d + 1)).filter((x) => x != null);
+    if (typeof v === 'object') { const o = {}; Object.keys(v).slice(0, 60).forEach((k) => { if (!/^[A-Za-z0-9_-]{1,40}$/.test(k)) { bad = '合約條件卡欄位名稱「' + S(k, 40) + '」不合法'; return; } const x = cl(v[k], d + 1); if (x != null) o[k] = x; }); return o; }
+    return null;
+  };
+  const out = cl(card, 0); if (bad) return { err: bad };
+  let n = 0; CARD_TOP.forEach((k) => { if (out[k] && typeof out[k] === 'object') n += Object.keys(out[k]).length; });
+  if (JSON.stringify(out).length > 60000) return { err: '合約條件卡太大（上限約 60KB）' };
+  return { card: out, n };
+}
 // body＝{type, payload, summary?, expect}；回傳 {rec} 或 {err, detail?}
 function build(o) {
   const { email, name, body, quotes, taxR, now, id } = o, rp = o.rmkParams || {};
   const b = (body && typeof body === 'object') ? body : {};
   const type = S(b.type, 20), pl = (b.payload && typeof b.payload === 'object') ? b.payload : {};
-  if (!TYPES[type]) return { err: '這個工具只收 qchg（改單）、quote（報價單）、bid（得標狀態）；其他草稿請從網頁送' };
+  if (!TYPES[type]) return { err: '這個工具只收 qchg（改單）、quote（報價單）、bid（得標狀態）、ownerCard（合約條件卡）、rfqReply（廠商回價）、inquiry（詢價收件）；其他草稿請從網頁送' };
   if (!ID_RE.test(String(id || ''))) return { err: '草稿 id 不對' };
   let payload, summary;
   if (type === 'qchg') {
@@ -94,7 +170,28 @@ function build(o) {
     fields.t = t;
     payload = { base, baseMt: bq ? (bq._mt || 0) : 0, baseName: bq ? S(bq.name, 200) : '', fields };
     const am = aimClean(pl.aim); if (am.err) return { err: am.err }; if (am.aim) payload.aim = am.aim;
+    // v6.0.233 報價拍板卡加強：est＝AI 估的成本單價（未稅，[{i, cost}]，i＝fields.items 第幾列；只有管理員看得到）、issues＝圖說疑義文字
+    const est = []; for (const x of arr(pl.est).slice(0, 300)) { const i = parseInt(x && x.i, 10), c = D.num(x && x.cost); if (!(i >= 0 && i < fields.items.length) || !fields.items[i] || fields.items[i].sec) return { err: 'est 第 ' + (est.length + 1) + ' 筆的 i 不對' }; if (c == null || c < 0 || c > 1e9) return { err: 'est 第 ' + (i + 1) + ' 列成本單價不對' }; est.push({ i, cost: c }); }
+    if (est.length) payload.est = est;
+    const iss = arr(pl.issues).filter((t) => typeof t === 'string').map((t) => S(t, 300).trim()).filter(Boolean).slice(0, 30); if (iss.length) payload.issues = iss;
     summary = (base ? '修改：' : '新報價：') + S(fields.name, 80) + '／' + S(fields.client, 60) + '　合計 NT$ ' + fmt(t.total);
+  } else if (type === 'inquiry') {
+    const ic = inqClean(pl); if (ic.err) return { err: ic.err };
+    payload = ic.p;
+    summary = S(b.summary, 140).trim() || ('詢價：' + (ic.p.client || '（業主未知）') + '／' + ic.p.name + (ic.p.munger ? '（建議' + ic.p.munger.verdict + '）' : ''));
+  } else if (type === 'rfqReply') {
+    const f = findQuote(quotes, { qid: S(pl.qid, 80), code: S(pl.code, 60) }); if (f.err) return { err: f.err };
+    const q = f.q; if (!q) return { err: '找不到這張報價（qid 或 code）' };
+    if (!q.awarded) return { err: '這案還沒得標，不能填廠商回價' };
+    const rr = replyClean(q, pl); if (rr.err) return { err: rr.err };
+    payload = Object.assign({ qid: q.id, qName: S(q.name, 200) }, rr.p);
+    summary = S(b.summary, 140).trim() || (S(q.name, 60) + '：' + rr.p.vendor.name + ' 回價 ' + (rr.p.rno || '') + '（' + (rr.p.lump ? '一式 ' + fmt(rr.p.lump.total) : rr.p.prices.length + ' 項單價') + '）');
+  } else if (type === 'ownerCard') {
+    const f = findQuote(quotes, { qid: S(pl.qid, 80), code: S(pl.code, 60) }); if (f.err) return { err: f.err };
+    const q = f.q; if (!q) return { err: '找不到這張報價（qid 或 code）' };
+    const cc = cardClean(pl.card); if (cc.err) return { err: cc.err };
+    payload = { qid: q.id, qName: S(q.name, 200), fname: S(pl.fname, 120), card: cc.card };
+    summary = S(b.summary, 140).trim() || (S(q.name, 80) + '：合約條件卡（' + cc.n + ' 欄）');
   } else {
     const f = findQuote(quotes, { qid: S(pl.qid, 80), code: S(pl.code, 60) }); if (f.err) return { err: f.err };
     const q = f.q; if (!q) return { err: '找不到這張報價（qid 或 code）' };
@@ -141,4 +238,4 @@ function bidStats(quotes, contracts, params, quoteSens) {
   const opt = { minN: parseInt(t.minN) || 5, tune: { lo: t.lo != null ? +t.lo : 40, hi: t.hi != null ? +t.hi : 60, maxDown: t.maxDown != null ? +t.maxDown : 10, maxUp: t.maxUp != null ? +t.maxUp : 5 } };
   return { n: rows.length, minN: opt.minN, kinds: BID.exportRows(BID.stats(rows, opt)) };
 }
-module.exports = { bidStats, aimClean, rmkBaseFor, TYPES, MAX_PENDING, build, superseded, withdrawErr, mine, expectOk, findQuote };
+module.exports = { inqClean, replyClean, cardClean, bidStats, aimClean, rmkBaseFor, TYPES, MAX_PENDING, build, superseded, withdrawErr, mine, expectOk, findQuote };
