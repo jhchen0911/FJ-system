@@ -4,7 +4,7 @@ const { chromium } = require('playwright'); const path = require('path');
 const ROOT = process.argv[2], OUT = process.argv[3];
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH });
-  const pg = await b.newPage({ viewport: { width: 900, height: 1100 }, deviceScaleFactor: 2 });
+  const W = parseInt(process.env.DRILL_W || '900', 10); const pg = await b.newPage({ viewport: { width: W, height: W < 500 ? 844 : 1100 }, deviceScaleFactor: 2, isMobile: W < 500, hasTouch: W < 500 });
   const errs = []; pg.on('pageerror', (e) => errs.push(String(e))); pg.on('console', (m) => { if (m.type() === 'error' && !/Failed to load|ERR_|CORS/.test(m.text())) errs.push(m.text()); });
   await pg.goto('file://' + path.join(ROOT, 'index.html')); await pg.waitForTimeout(2500);
   const log = [];

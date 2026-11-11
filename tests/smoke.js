@@ -11841,7 +11841,7 @@ async function newPage(browser, width, height) {
         const v1 = INV[0], it0 = v1.items[0], it1 = v1.items[1];
         out.h5 = it0.payRate === 70 && it0.phase === 'install' && it1.payRate === 100 && _invStOf(v1) === 'draft';
         invItems.forEach(it => { if (it && it.type === 'item') it.curQty = (/H型鋼/.test(it.desc) ? 40 : 10); }); saveInvoice();
-        out.amt = _isAmt(INV[0]) === Math.round((40 * 1000 * 0.7 + 10 * 200) * 1.05) && /這期請 70%，累計 <b>28%<\/b>/.test(_DEC.invSend.detail(INV[0]));
+        out.amt = _isAmt(INV[0]) === Math.round((40 * 1000 * 0.7 + 10 * 200) * 1.05) && /這期請 70%，累計 <b[^>]*>28%<\/b>/.test(_DEC.invSend.detail(INV[0]));
         // H3：上一期已送業主、業主確認、催過款 → 開下一期從草稿開始
         INV[0].st = 'ok'; INV[0].stLast = 'ok'; INV[0].ownerOk = { from: '業主', text: 'OK' }; INV[0].dunLog = [{ at: 1 }]; INV[0].sendSnz = '2099-01-01';
         addNextPeriod(INV[0].id);
