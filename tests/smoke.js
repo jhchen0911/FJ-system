@@ -13787,6 +13787,51 @@ async function newPage(browser, width, height) {
     check('v6.0.233 報價拍板卡加強測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
+  // ── 待編號 L2（上線後健檢）：AI 報價草稿沒對到報價殼、同業主已有同名報價 → 黃字警告；確認照樣新建；修改可併入舊報價 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {};
+      const keep = { Q: Q.slice(), D: DRAFTS };
+      try {
+        localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_v7old');
+        window.toast = () => {}; window._immediateUpload = () => {}; window._fbWriteAll = () => {};
+        window._draftMark = (id, st, ex) => { if (DRAFTS[id]) { DRAFTS[id].status = st; DRAFTS[id].ex = ex; } return Promise.resolve(true); };
+        const old = { id: 'qL2old', code: '1150001', name: '範例同名工程', client: '範例營造甲', date: '2026-10-30', items: [{ desc: '範例鋼樁打設', unit: '支', qty: '5', price: '900', estCost: '600' }], _mt: 7 };
+        Q.push(old);
+        const f = { code: '1159911', client: '範例營造甲', name: '範例同名工程', date: '2026-11-12', items: [{ desc: '範例鋼樁打設', unit: '支', qty: 10, price: 1000 }] };
+        const mk = (id) => ({ id, type: 'quote', by: 'ai@example.com', byName: 'AI', at: Date.now() - 1000, status: 'pending', summary: '新報價：範例同名工程', payload: { base: '', fields: JSON.parse(JSON.stringify(f)) } });
+        DRAFTS = { dQL20001: mk('dQL20001'), dQL20002: mk('dQL20002') };
+        const card = document.createElement('div'); card.innerHTML = _DEC.drf_quote.body(DRAFTS.dQL20001);
+        const x = document.createElement('div'); x.innerHTML = await Promise.resolve(_DEC.drf_quote.detail(DRAFTS.dQL20001)); const t = x.textContent;
+        out.warn = /同名報價：1150001 範例同名工程/.test(card.textContent) && /同名報價：1150001 範例同名工程（2026-10-30）/.test(t) && /會多一張同名報價/.test(t) && /新報價/.test(t);
+        out.noWarnOther = (() => { const d = mk('dQL20003'); d.payload.fields.client = '範例營造乙'; DRAFTS.dQL20003 = d; const ok = _qdDupHtml(d) === ''; delete DRAFTS.dQL20003; return ok; })();
+        // A：確認＝照樣新建（多一張同名）
+        const n0 = Q.length;
+        const okA = await Promise.resolve(_DEC.drf_quote.ok(DRAFTS.dQL20001));
+        out.newOne = okA === true && Q.length === n0 + 1 && Q.filter((q) => q.name === '範例同名工程').length === 2 && DRAFTS.dQL20001.status === 'applied' && Q.find((q) => q.id === 'qL2old').items[0].qty === '5';
+        // 修改＝選併入舊的 → 卡片改成「修改 1150001」→ 確認＝蓋掉舊那張，不多一張
+        Q = Q.filter((q) => !(q.name === '範例同名工程' && q.id !== 'qL2old'));
+        _DEC.drf_quote.edit(DRAFTS.dQL20002);
+        out.modal = !!document.querySelector('input[name="qd-dup"][value="qL2old"]') && !!document.querySelector('input[name="qd-dup"][value=""]');
+        document.querySelector('input[name="qd-dup"][value="qL2old"]').checked = true;
+        document.querySelector('#fy-modal .fy-mdl-ok, #fy-modal .btn-g').click();
+        const y = document.createElement('div'); y.innerHTML = await Promise.resolve(_DEC.drf_quote.detail(DRAFTS.dQL20002)); const t2 = y.textContent;
+        out.merged = /修改 1150001 範例同名工程（修改時選的同名報價）/.test(t2) && !/會多一張同名報價/.test(t2);
+        const n1 = Q.length;
+        const okB = await Promise.resolve(_DEC.drf_quote.ok(DRAFTS.dQL20002));
+        const oq = Q.find((q) => q.id === 'qL2old');
+        out.mergeSaved = okB === true && Q.length === n1 && oq.code === '1150001' && /編號1150001/.test(t2) && oq.items[0].qty === 10 && String(oq.items[0].estCost) === '600' && DRAFTS.dQL20002.status === 'applied' && JSON.parse(localStorage.getItem('fy6_q') || '[]').some((q) => q.id === 'qL2old' && +q.items[0].qty === 10);
+        try { const m = document.getElementById('fy-modal'); if (m) m.remove(); } catch (e) { /* 可忽略 */ }
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keep.Q; DRAFTS = keep.D; try { persist(); } catch (e) { /* 可忽略 */ }
+      return out;
+    });
+    check('L2 同名報價：AI 報價草稿沒對到報價殼、同業主有同名報價 → 卡片與明細黃字警告（別的業主不警告）；確認＝照樣新建一張', !r.err && r.warn && r.noWarnOther && r.newOne, JSON.stringify(r));
+    check('L2 同名報價：修改＝選「併入」舊報價 → 明細改成修改那張、確認蓋掉舊那張（成本單價保留、不多一張、存檔）', !r.err && r.modal && r.merged && r.mergeSaved, JSON.stringify(r));
+    check('L2 同名報價測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.233 詢價收件卡（陳軒 11/10 晚佇列第 1 件）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

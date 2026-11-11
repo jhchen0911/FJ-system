@@ -39095,7 +39095,7 @@ function draftReject(id){
   _draftMark(id,'rejected',{reason:String(r).slice(0,200),'payload/file':null}).then(function(){var b=document.getElementById('draft-list-box');if(b)b.innerHTML=_draftListHtml();try{updateDashTodo();}catch(e){_err('draftReject',e);}toast('已退回');});
 }
 function draftApply(id){
-  if(_roDeny())return;var d=DRAFTS[id];if(!d||d.status!=='pending'||!_DRAFT_ID.test(_draftS(id)))return;var pl=(d.payload&&typeof d.payload==='object')?d.payload:{};
+  if(_roDeny())return;var d=DRAFTS[id];if(!d||d.status!=='pending'||!_DRAFT_ID.test(_draftS(id)))return;var pl=_d6Pl(d);   /* L2：選了併入同名報價時 base 用選的那張 */
   var close=function(){var m=document.getElementById('fy-modal');if(m)m.remove();};
   if(d.type==='qchg'){_qchgOpen(id);return;}   // AI 改單草稿：前後對照、套用
   if(d.type==='quote'){
@@ -41652,7 +41652,22 @@ function decAct(kind,id,act){
 //   卡片只給建議，正式資料都要 Lotion 在下一個視窗按儲存／確定才寫入。
 var _DRAFT_OLD6=['quote','bid','irPhoto','addon','contact'];   // 施工日報 dailyLog 由主線做成帶工項數量的拍板卡（主線 11/10 協調），這裡不收
 function _draftViaDec6(t){try{return (_DRAFT_OLD6.indexOf(t)>=0||t==='ownerCard'||t==='rfqReply'||t==='inquiry')&&_nav5On();}catch(e){return false;}}   // v6.0.233 合約條件卡也走拍板卡
-function _d6Pl(d){return (d&&d.payload&&typeof d.payload==='object')?d.payload:{};}
+function _d6Pl(d){var p=(d&&d.payload&&typeof d.payload==='object')?d.payload:{};var m=d&&d.type==='quote'&&_QD_MERGE[d.id];if(!m)return p;var f=(p.fields&&typeof p.fields==='object')?p.fields:{};return Object.assign({},p,{base:m.id,baseMt:m.mt,fields:Object.assign({},f,{code:m.code})});}   /* 併入同名報價：報價編號留舊那張的 */
+// L2（上線後健檢，Lotion 11/12）：AI 報價草稿沒對到報價殼、但同業主已有同名報價 → 卡片黃字警告；確認照樣新建；修改＝選「併入那張」（只記在這台，_QD_MERGE）或「還是新建」
+var _QD_MERGE={};
+function _qdDup(d){var p=(d&&d.payload&&typeof d.payload==='object')?d.payload:{};if(p.base||_QD_MERGE[d.id])return [];var f=(p.fields&&typeof p.fields==='object')?p.fields:{};
+  return _inqDup({name:f.name,client:f.client}).filter(function(q){return q&&q.id;});}
+function _qdDupHtml(d,short){var L=_qdDup(d);if(!L.length)return '';
+  var t=L.map(function(q){return esc(String(q.code||'')+' '+String(q.name||''))+(short?'':'（'+esc(String(q.date||''))+(q.awarded?'，已得標':'')+'）');}).join('、');
+  return '<div style="background:#fff8e1;color:#8a5a00;border-radius:8px;padding:6px 9px;font-size:12px;margin:4px 0">同一業主已經有同名報價：'+t+(short?'':'。確認＝照樣新建一張（會多一張同名報價）；要改那張請按「修改」選「併入」')+'</div>';}
+function _qdDupEdit(d){var L=_qdDup(d);
+  _modal('同名報價：併入還是新建','<div style="font-size:12.5px;margin-bottom:6px">這張 AI 報價草稿跟下面的報價同業主、同工程名稱：</div>'
+    +L.map(function(q,i){return '<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:6px 0"><input type="radio" name="qd-dup" value="'+esc(q.id)+'"'+(i===0?' checked':'')+'><span>併入 <b>'+esc(String(q.code||''))+'</b> '+esc(String(q.name||''))+'<br><span style="font-size:11.5px;color:var(--b4)">'+esc(String(q.date||''))+(q.awarded?'，已得標':'')+'；確認時用草稿蓋掉這張的工程資訊與工項（成本單價同名工項保留）</span></span></label>';}).join('')
+    +'<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin:6px 0"><input type="radio" name="qd-dup" value=""><span>還是新建一張（開編輯頁自己改）</span></label>',function(){
+    var el=document.querySelector('input[name="qd-dup"]:checked'),v=el?el.value:'';
+    if(!v){setTimeout(function(){draftApply(d.id);},0);return true;}
+    var q=(Q||[]).find(function(x){return x&&x.id===v;});if(!q){toast('那張報價已經不在了');return false;}
+    _QD_MERGE[d.id]={id:q.id,mt:q._mt||0,code:String(q.code||'')};toast('已改成修改 '+String(q.code||'')+'，看過明細再按確認');try{_decRefresh('drf_quote');}catch(e){_err('_qdDupEdit',e);}return true;});}
 function _d6Meta(d){var S=_draftS,who=S(d.byName||d.by).slice(0,60),cs=_draftCase(d),vn=_draftVerNote(d);
   return '<div style="font-size:11.5px;color:var(--b4);overflow-wrap:anywhere">'+esc(S(_DRAFT_T[d.type]||d.type))+'　'+esc(who)+'　'+esc(new Date(+d.at||0).toLocaleString('zh-TW'))+(cs?'　<b>'+esc(cs)+'</b>':'')+(vn?'　'+esc(vn):'')+'</div>';}
 function _d6Tbl(rows){return '<div style="display:grid;grid-template-columns:max-content 1fr;gap:3px 10px;font-size:12.5px;margin:4px 0">'+rows.filter(function(r){return r&&r[1]!=null&&String(r[1])!=='';}).map(function(r){return '<div style="color:var(--b4);white-space:nowrap">'+esc(r[0])+'</div><div style="overflow-wrap:anywhere">'+(r[2]?r[1]:esc(String(r[1])))+'</div>';}).join('')+'</div>';}   // 手機不被 .dec-detail 表格換行規則擠成直排
@@ -41668,7 +41683,7 @@ function _d6Detail(d){
     var f=(pl.fields&&typeof pl.fields==='object')?pl.fields:{},base=pl.base?(Q||[]).find(function(x){return x.id===pl.base;}):null;
     var its=(Array.isArray(f.items)?f.items:[]).filter(function(it){return it&&typeof it==='object';});
     var sub=its.reduce(function(a,it){return a+(it.sec?0:(parseFloat(it.qty)||0)*(parseFloat(it.price)||0));},0);
-    h+=_d6Tbl([['報價',base?'修改 '+S(base.code)+' '+S(base.name):'新報價'],['編號',S(f.code)],['業主',S(f.client)],['工程',S(f.name)],['地點',S(f.loc)],['日期',S(f.date)]]);
+    h+=_qdDupHtml(d);h+=_d6Tbl([['報價',base?'修改 '+S(base.code)+' '+S(base.name)+(_QD_MERGE[d.id]?'（修改時選的同名報價）':''):'新報價'],['編號',S(f.code)],['業主',S(f.client)],['工程',S(f.name)],['地點',S(f.loc)],['日期',S(f.date)]]);
     if(base&&(base._mt||0)>(pl.baseMt||0))h+='<div style="font-size:12px;color:var(--red);font-weight:700;margin:4px 0">原報價在草稿建立後被改過，套用會用草稿內容蓋掉工程資訊與工項</div>';
     h+='<table class="tbl" style="font-size:12px;width:100%;margin-top:6px"><thead><tr><th>工項</th><th>單位</th><th style="text-align:right">數量</th><th style="text-align:right">單價</th><th style="text-align:right">複價</th></tr></thead><tbody>'
       +its.slice(0,200).map(function(it){return it.sec?'<tr><td colspan="5" style="font-weight:700;background:var(--gl)">'+esc(S(it.desc).slice(0,120))+'</td></tr>':'<tr><td style="overflow-wrap:anywhere">'+esc(S(it.desc).slice(0,200))+'</td><td>'+esc(S(it.unit))+'</td><td class="dnw" style="text-align:right;white-space:nowrap;font-size:11px">'+esc(S(it.qty))+'</td><td class="dnw" style="text-align:right;white-space:nowrap;font-size:11px">'+fmt(parseFloat(it.price)||0)+'</td><td class="dnw" style="text-align:right;white-space:nowrap;font-size:11px">'+fmt(Math.round((parseFloat(it.qty)||0)*(parseFloat(it.price)||0)))+'</td></tr>';}).join('')
@@ -42437,11 +42452,11 @@ _DRAFT_OLD6.forEach(function(t){
     canSee:function(){return !_isReaderUser&&_nav5On();},
     list:function(){return Object.keys(DRAFTS||{}).map(function(k){return DRAFTS[k];}).filter(function(d){return d&&d.type===t&&d.status==='pending'&&_DRAFT_ID.test(_draftS(d.id));}).sort(function(a,b){return (a.at||0)-(b.at||0);});},
     key:function(d){return d.id;},head:function(d){return _draftS(d.summary).slice(0,200);},
-    body:function(d){return _d6Meta(d);},
+    body:function(d){return _d6Meta(d)+(t==='quote'?_qdDupHtml(d,true):'');},
     detail:function(d){return _d6Detail(d);},
     ok:function(d){if(t==='irPhoto'&&typeof _irRecOk==='function')return _irRecOk(d);if(t==='bid')return _bidCardOk(d);if(t==='quote')return _qdOk(d);var x=DRAFTS[d.id];if(!x||x.status!=='pending'){toast('這張草稿已經處理過了');return false;}draftApply(d.id);return 'open';},   // 開下一個視窗，存檔成功才標已套用
     reject:function(d,why){delete _IRREC_SEL[d.id];delete _IRREC_IN[d.id];var x={reason:why||''};if(t==='irPhoto')x['payload/file']=null;return _draftMark(d.id,'rejected',x).then(function(m){return m!==false;});},   // 同舊清單：退回的發票照片不留
-    edit:function(d){if(t==='irPhoto'&&typeof _irRecEdit==='function'){_irRecEdit(d);return;}draftApply(d.id);}
+    edit:function(d){if(t==='irPhoto'&&typeof _irRecEdit==='function'){_irRecEdit(d);return;}if(t==='quote'&&_qdDup(d).length){_qdDupEdit(d);return;}draftApply(d.id);}
   });
 });
 // ══════════ v6.0.224 保留款請回卡（陳軒全流程盤點第 8 名，Lotion 11/10；第 2 層：卡片只給建議）══════════
