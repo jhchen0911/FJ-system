@@ -14902,6 +14902,82 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── 日報「今天出工」：選工班 → 勾人（Lotion 11/11 D1／E1／F2／G-1a／G-2a／H1／I1／J1／K1）──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepW = WORKERS.slice(), keepV = VENDORS.slice(), keepF = JSON.parse(JSON.stringify(MAT_MOVE_FIN || {})), oStaff = window._attStaff, oA = window._isAdminUser, oU = window._fbUser, oRate = P.laborDayRate;
+      try {
+        window.toast = () => {}; window._pushCloud = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); _nav5Apply();
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true; P.laborDayRate = 2800;
+        const day = localToday();
+        Q = [{ id: 'qK1', name: '範例出工甲', client: '甲', awarded: true, _mt: 1, items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 10, price: 3000 }], costs: [], dailyLogs: [] },
+          { id: 'qK2', name: '範例出工乙', client: '乙', awarded: true, _mt: 1, items: [{ desc: '水平支撐', unit: 'M', qty: 10, price: 800 }], costs: [],
+            dailyLogs: [{ id: 'dx', date: day, workers: 1, crewV: 2, crews: [{ type: 'labor', vendor: '範例點工行', n: 1, ppl: [{ wid: 'w1', name: '王小明', day: 1, ot: 0 }] }] }] }];
+        VENDORS.length = 0; VENDORS.push({ id: 'v1', name: '範例點工行', type: '點工' }, { id: 'v2', name: '範例人力有限公司' });
+        WORKERS.length = 0;
+        WORKERS.push({ id: 'w1', name: '王小明', company: '範例點工行', status: 'active' }, { id: 'w2', name: '李大華', company: '範例 點工行', status: 'active' },
+          { id: 'w3', name: '陳阿土', company: '範例人力', status: 'active' }, { id: 'w4', name: '林工務', company: '豐有工程有限公司', status: 'active' }, { id: 'w5', name: '離職的', company: '範例點工行', status: 'left' });
+        _wkRateSet('w2', 3200);   // 管理員設的日薪（private）
+        window._attStaff = () => [{ id: 'h1', name: '林工務' }];   // 薪資名冊（管理員裝置才讀得到）
+        go('quickcost'); await T(120); try { rQuickCost(); } catch (e) { /* 可忽略 */ }
+        const dp = document.getElementById('dr-proj'); dp.value = 'qK1'; dp.onchange(); await T(80);
+        // 選工班 → 列出這家的人（名字差空格括號也對得到；離職的不列；自家員工另一組）
+        drLabVendor(0, '範例點工行'); await T(40);
+        const box = document.getElementById('dr-crews'), g0 = box.querySelector('.dr-lab[data-gi="0"]');
+        const vis = Array.from(g0.querySelectorAll(':scope > .dr-pp')).map((x) => x.getAttribute('data-wid'));
+        out.list = JSON.stringify(vis.sort()) === JSON.stringify(['w1', 'w2']) && !!g0.querySelector('details.dr-lab-more') && /陳阿土/.test(g0.querySelector('details.dr-lab-more').textContent) && !/離職的/.test(box.textContent)
+          && /林工務/.test(box.querySelector('.dr-own').textContent) && /員工/.test(box.querySelector('.dr-own').textContent);
+        out.elsewhere = /今天已在 範例出工乙/.test(g0.querySelector('.dr-pp[data-wid="w1"]').textContent);
+        // 勾：王小明全天、李大華半天加班 3 小時；從「其他人」勾陳阿土 → 問要不要改公司（確認＝改）
+        drPpTog('lab', 0, 'w1', true); drPpTog('lab', 0, 'w2', true); drPpDay('lab', 0, 'w2', 0.5); drPpOt('lab', 0, 'w2', 3);
+        drPpTog('lab', 0, 'w3', true); await T(60);
+        const cf = document.getElementById('confirm-modal') || document.querySelector('.modal-ov.open,#fy-confirm');
+        const okb = Array.from(document.querySelectorAll('button')).find((b) => b.offsetParent && /^確定|^確認/.test((b.textContent || '').trim()) && /改所屬公司|所屬公司/.test(document.body.innerText));
+        out.ask = !!okb; if (okb) okb.click(); await T(60);
+        out.coChanged = WORKERS.find((w) => w.id === 'w3').company === '範例點工行';
+        drPpTog('own', 0, 'w4', true); drPpOt('own', 0, 'w4', 1);
+        // 承包照舊填人數
+        _drCrews[0].vendor = '範例承包'; _drCrews[0].n = 4;
+        out.noHScroll = document.documentElement.scrollWidth <= window.innerWidth + 1;
+        submitDailyReport(); await T(120);
+        const L = Q[0].dailyLogs[0], lab = (L.crews || []).find((c) => c.type === 'labor'), sub = (L.crews || []).find((c) => c.type === 'sub');
+        out.saved = L.crewV === 2 && lab && lab.vendor === '範例點工行' && lab.n === 2.5 && lab.ppl.length === 3 && lab.ppl.find((p) => p.wid === 'w2').day === 0.5 && lab.ppl.find((p) => p.wid === 'w2').ot === 3
+          && sub && sub.n === 4 && (L.ownPpl || []).length === 1 && L.ownPpl[0].wid === 'w4' && L.workers === 3.5 && Q[0].crewSeen && Q[0].crewSeen.w1 === day;
+        // 推估（手算）：甲案＝王小明 1 天但同一天也在乙案 → 0.5×2,800＝1,400；李大華半天 0.5×3,200＝1,600＋加班 3 小時（時薪 400：2×400×1.34＝1,072、1×400×1.67＝668）；陳阿土 1×2,800＝2,800
+        //   ＝1,400＋1,600＋1,740＋2,800＝7,540，天數 0.5＋0.5＋1＝2；乙案＝王小明 0.5×2,800＝1,400；自家員工不算點工錢
+        const E = _laborEstAll(null);
+        out.est = E.qK1 && E.qK1.days === 2 && E.qK1.amt === 7540 && E.qK2 && E.qK2.days === 0.5 && E.qK2.amt === 1400;
+        // 舊日報只有人數：照舊人數×標準日薪，不會變 0
+        Q[0].dailyLogs.push({ id: 'dold', date: '2026-10-01', workers: 3 });
+        const E2 = _laborEstAll(null); out.legacy = E2.qK1.days === 5 && E2.qK1.amt === 7540 + 8400;
+        // 日報修改視窗只改別的、人數沒變：名單留著；人數改了＝以人數為準
+        const keep = _crewsApply(Object.assign({}, L), (L.crews || []).map((c) => ({ type: c.type, vendor: c.vendor, n: c.n })));
+        const chg = _crewsApply(Object.assign({}, L), (L.crews || []).map((c) => ({ type: c.type, vendor: c.vendor, n: c.type === 'labor' ? 5 : c.n })));
+        out.dle = (keep.crews.find((c) => c.type === 'labor').ppl || []).length === 3 && !chg.crews.find((c) => c.type === 'labor').ppl;
+        // 管理員裝置：自家員工 → 薪資的出工紀錄（對到名冊）
+        _attScan();
+        out.att = (L.att || []).length === 1 && L.att[0].hrId === 'h1' && L.att[0].day === 1 && L.att[0].ot === 1 && L.attOk === 1 && L.attSrc === 'form';
+        // 薪資名冊對不到的名字 → 出工確認卡（同 small-pay）
+        const L2 = { date: day, ownPpl: [{ wid: 'w9', name: '名冊沒有', day: 0.5, ot: 0 }] }; _attOwnIngest(Q[0], L2);
+        out.attAsk = (L2.att || []).length === 0 && (L2.attAsk || []).length === 1 && L2.attAsk[0].day === 0.5 && !L2.attOk;
+        // 日薪只有管理員看得到（存 private）、人員表單管理員才有欄位
+        out.rate = !!(MAT_MOVE_FIN.wkRate && MAT_MOVE_FIN.wkRate.rates && MAT_MOVE_FIN.wkRate.rates.w2 === 3200);
+        // 舊選單：照舊「點工／承包＋人數」
+        localStorage.setItem('fy_nav_old', '1'); _nav5Apply(); drRenderCrews(true); await T(40);
+        out.old = !document.querySelector('#dr-crews .dr-lab') && document.querySelectorAll('#dr-crews .dr-crew select').length === 2;
+        localStorage.removeItem('fy_nav_old'); _nav5Apply();
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      Q = keepQ; WORKERS.length = 0; keepW.forEach((x) => WORKERS.push(x)); VENDORS.length = 0; keepV.forEach((x) => VENDORS.push(x)); MAT_MOVE_FIN = keepF; window._attStaff = oStaff; _isAdminUser = oA; _fbUser = oU; P.laborDayRate = oRate;
+      try { document.querySelectorAll('#fy-modal').forEach((m) => m.remove()); } catch (x) { /* 可忽略 */ }
+      return out;
+    });
+    check('今天出工（寬 ' + W + '）：選工班列出這家的人（名字差空格括號也對到、離職不列）、自家員工另一組標員工、今天已在別案有標、其他人勾了問改公司、全天／半天／加班存進日報、人數＝人天、推估跟手算一樣（同人同天兩案平分）、舊日報人數×日薪、修改視窗保留名單、自家員工進薪資出工、日薪存 private、舊選單照舊、手機不左右捲', !r.err && r.list && r.elsewhere && r.ask && r.coChanged && r.noHScroll && r.saved && r.est && r.legacy && r.dle && r.att && r.attAsk && r.rate && r.old, JSON.stringify(r));
+    check('今天出工測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   await browser.close();
 
   const pad = s => (s + '                                                            ').slice(0, 44);

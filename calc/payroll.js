@@ -45,7 +45,37 @@
     s.noIns = !(n(h.laborSelf) || n(h.healthSelf) || n(h.laborCo) || n(h.healthCo));
     return s;
   }
-  var hr = { num: n, slip: slip, otPay: otPay, hourlyOf: hourlyOf, monthAtt: monthAtt, draftSlip: draftSlip };
+  // ── 點工出工推估（第 7 步「今天出工」，Lotion 11/11 F2／J1）──
+  // logs＝[{date, site, ppl:[{k 人, day 1／0.5, ot 加班時數, rate 日薪, oh 加班時薪（可空）}] 或 null, workers 舊日報人數, rate 舊日報用的日薪}]
+  //   有 ppl（新格式）：每人每天 day × 日薪＋加班費（otPay；時薪沒填＝日薪÷8）；同一人同一天在幾個工地＝那天的天數（取最大）平分給各工地（J1），加班算在填的那一案
+  //   沒有 ppl（舊日報只有人數）：人數 × 日薪（照舊，不會變 0）
+  // 回傳 {site: {days, amt}}（days 留兩位小數、amt 四捨五入到元）
+  function crewEst(logs) {
+    var day = {};
+    (logs || []).forEach(function (L) {
+      if (!L || !Array.isArray(L.ppl)) return;
+      L.ppl.forEach(function (p) {
+        var d = Math.max(0, Math.min(1, n(p && p.day))); if (!(d > 0) || !p.k) return;
+        var key = String(L.date || '').slice(0, 10) + '|' + p.k, x = day[key] || (day[key] = { max: 0, sites: {} });
+        x.max = Math.max(x.max, d); x.sites[String(L.site)] = 1;
+      });
+    });
+    var by = {};
+    (logs || []).forEach(function (L) {
+      if (!L) return; var o = by[L.site] || (by[L.site] = { days: 0, amt: 0 });
+      if (Array.isArray(L.ppl)) {
+        L.ppl.forEach(function (p) {
+          if (!p || !p.k) return; var rate = Math.max(0, n(p.rate)), oh = n(p.oh) > 0 ? n(p.oh) : rate / 8;
+          var d = Math.max(0, Math.min(1, n(p.day))), x = day[String(L.date || '').slice(0, 10) + '|' + p.k];
+          var share = (d > 0 && x) ? x.max / Object.keys(x.sites).length : 0;
+          o.days += share; o.amt += share * rate + otPay(p.ot, oh);
+        });
+      } else { var w = Math.max(0, n(L.workers)); o.days += w; o.amt += w * Math.max(0, n(L.rate)); }
+    });
+    Object.keys(by).forEach(function (k) { by[k].days = Math.round(by[k].days * 100) / 100; by[k].amt = Math.round(by[k].amt); });
+    return by;
+  }
+  var hr = { num: n, slip: slip, otPay: otPay, hourlyOf: hourlyOf, monthAtt: monthAtt, draftSlip: draftSlip, crewEst: crewEst };
   var FJC = root.FJC || (root.FJC = {});
   FJC.hr = hr;
   if (typeof module !== 'undefined' && module.exports) module.exports = FJC;

@@ -22683,6 +22683,7 @@ function _drFillVendors(){
   if(dlb)dlb.innerHTML=_drVendorsOf(q,'labor').map(function(n){return '<option value="'+esc(n)+'">';}).join('');
 }
 function drRenderCrews(reset){
+  if(_drCrewNew()){if(reset){_drLab=[];_drOwn={};_drCrews=[{type:'sub',vendor:'',n:''}];}else{_drCrews=_drCrews.filter(function(c){return c&&(c.type==='sub'||(parseFloat(c.n)||0)>0||c.vendor);});if(!_drCrews.length)_drCrews=[{type:'sub',vendor:'',n:''}];}_drCrewNewRender();return;}   // 新選單：選工班 → 勾人
   if(reset||!_drCrews.length)_drCrews=[{type:'labor',vendor:'',n:''},{type:'sub',vendor:'',n:''}];
   const box=document.getElementById('dr-crews');if(!box)return;
   const IN='font-size:14px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;min-width:0';
@@ -22710,7 +22711,12 @@ function _crewsText(L){
 }
 // crews → 相容欄位（workers／subWorkers／subVendor）
 function _crewsApply(L,crews){
-  const cs=(crews||[]).map(function(c){return {type:c.type==='sub'?'sub':'labor',vendor:String(c.vendor||'').trim(),n:parseFloat(c.n)||0};}).filter(function(c){return c.n>0||c.vendor;});
+  const prev=Array.isArray(L.crews)?L.crews:[];
+  const cs=(crews||[]).map(function(c){var o={type:c.type==='sub'?'sub':'labor',vendor:String(c.vendor||'').trim(),n:parseFloat(c.n)||0};
+    var pp=Array.isArray(c.ppl)?c.ppl:null;   // 今天出工的人員名單；日報修改視窗只改人數時，人數沒變就保留原名單（改了＝以人數為準）
+    if(!pp&&o.type==='labor'){var pv=prev.find(function(x){return x&&x.type!=='sub'&&Array.isArray(x.ppl)&&String(x.vendor||'').trim()===o.vendor&&(parseFloat(x.n)||0)===o.n;});if(pv)pp=pv.ppl;}
+    if(pp&&pp.length&&o.type==='labor')o.ppl=pp.map(function(p){return {wid:String(p.wid||''),name:String(p.name||'').slice(0,20),day:+p.day===0.5?0.5:1,ot:Math.max(0,+p.ot||0)};});
+    return o;}).filter(function(c){return c.n>0||c.vendor;});
   L.crews=cs;
   L.workers=cs.filter(function(c){return c.type==='labor';}).reduce(function(a,c){return a+c.n;},0);
   L.subWorkers=cs.filter(function(c){return c.type==='sub';}).reduce(function(a,c){return a+c.n;},0);
@@ -22925,8 +22931,9 @@ function drLoadExisting(){
   _drProgRows=(L.progressRows||[]).map(function(r){return {itemIdx:Number(r.itemIdx),qty:r.qty||'',note:r.note||'',ph:r.ph||'',batchDone:!!r.batchDone};});
   if(!_drProgRows.length)_drProgRows=[{itemIdx:-1,qty:'',note:''}];
   drRenderProgRows();
-  _drCrews=_crewsOf(L).map(function(c){return {type:c.type||'labor',vendor:c.vendor||'',n:c.n||''};});
-  if(_drCrews.length)drRenderCrews();else drRenderCrews(true);
+  if(_drCrewNew()){_drCrewNewLoad(L);_drCrewNewRender();}
+  else{_drCrews=_crewsOf(L).map(function(c){return {type:c.type||'labor',vendor:c.vendor||'',n:c.n||''};});
+  if(_drCrews.length)drRenderCrews();else drRenderCrews(true);}
   _drEquip={};(L.equip||[]).forEach(function(e){if(e&&e.name)_drEquip[e.name]=e.hrs||'';});
   var oe=document.getElementById('dr-own-equip');if(oe)oe.checked=!!L.ownEquip;
   var eb=document.getElementById('dr-equip-box');if(eb)eb.style.display=L.ownEquip?'':'none';
@@ -22949,7 +22956,8 @@ function _drMergeLog(q,L,e){
   });
   L.progressRows=rows;
   L.progress=rows.map(function(r){return (r.desc?(r.desc+(r.qty?(' '+r.qty+((q.items[r.itemIdx]||{}).unit||'')):'')):'')+(r.note?((r.desc?'；':'')+r.note):'');}).filter(Boolean).join('\n');
-  if((e.crews||[]).some(function(c){return (parseFloat(c&&c.n)||0)>0;})){L.crews=e.crews;L.workers=e.workers||0;L.subWorkers=e.subWorkers||0;L.subVendor=e.subVendor||'';}
+  if((e.crews||[]).some(function(c){return (parseFloat(c&&c.n)||0)>0;})||(e.ownPpl||[]).length){L.crews=e.crews;L.workers=e.workers||0;L.subWorkers=e.subWorkers||0;L.subVendor=e.subVendor||'';
+    if(e.crewV){L.crewV=e.crewV;if((e.ownPpl||[]).length)L.ownPpl=e.ownPpl;else delete L.ownPpl;}}
   if((e.equip||[]).length){L.equip=e.equip;L.ownEquip=true;}else if(e.ownEquip)L.ownEquip=true;
   L.photos=L.photos||[];(e.photos||[]).forEach(function(p){if(L.photos.indexOf(p)<0)L.photos.push(p);});L.photos=L.photos.slice(0,12);   // v6.0.119 智慧收件可加到 12 張
   if(e.weather)L.weather=e.weather;if(e.backfillFrom)L.backfillFrom=e.backfillFrom;   // v6.0.33
@@ -22962,8 +22970,9 @@ function _drCollect(){
   const qid=document.getElementById('dr-proj')?.value;
   const q=Q.find(x=>x.id===qid);
   if(!q)return null;
-  const cw=_crewsApply({},_drCrews);   // v5.406 出工列 → workers／subWorkers／subVendor
-  const workers=cw.workers,subWorkers=cw.subWorkers,subVendor=cw.subVendor;
+  const _nw=_drCrewNew(),ownPpl=_nw?_drPpList(_drOwn):null;
+  const cw=_crewsApply({},_nw?_drCrewsNewOut():_drCrews);   // v5.406 出工列 → workers／subWorkers／subVendor；新選單：點工工班勾人（ppl）
+  const workers=cw.workers+(ownPpl?ownPpl.reduce(function(a,p){return a+p.day;},0):0),subWorkers=cw.subWorkers,subVendor=cw.subVendor;
   const rows=_drProgRows.filter(r=>(r.itemIdx>=0&&parseFloat(r.qty)>0)||((''+(r.note||'')).trim()!==''));
   const equip=Object.keys(_drEquip).map(function(n){return {name:n,hrs:parseFloat(_drEquip[n])||0};});   // v5.402 只勾機具也算有內容
   const status=gv('dr-status')||'work',stopReason=(gv('dr-stop-reason')||'').trim(),resumeDate=gv('dr-resume-date')||'';
@@ -22972,7 +22981,7 @@ function _drCollect(){
   const over=[];_drProgRows.forEach(function(_r,ri){const h=_drRowHint(ri);if(h.over)over.push(h.desc+' 累計 '+fmt(h.after)+' ＞ 合約 '+fmt(h.target));});
   const progRows=rows.map(r=>{const o={itemIdx:r.itemIdx,desc:r.itemIdx>=0?((q.items[r.itemIdx]||{}).desc||'').split('\n')[0]:'',qty:parseFloat(r.qty)||0,note:(r.note||'').trim(),ph:_drRowPhase(q,r)};if(r.batchDone&&o.ph==='remove')o.batchDone=true;return o;});   // v6.0.107 本批拔除完成
   const progressText=progRows.map(r=>(r.desc?(r.desc+(r.qty?(' '+r.qty+((q.items[r.itemIdx]||{}).unit||'')):'')):'')+(r.note?((r.desc?'；':'')+r.note):'')).filter(Boolean).join('\n');
-  return {qid:qid,name:q.name||'',workers:workers,subWorkers:subWorkers,subVendor:subVendor,crews:cw.crews,over:over,equip:equip,
+  return {qid:qid,name:q.name||'',workers:workers,subWorkers:subWorkers,subVendor:subVendor,crews:cw.crews,over:over,equip:equip,crewV:_nw?2:0,ownPpl:ownPpl||[],
     status:status,stopReason:stopReason,resumeDate:resumeDate,stageOf:stageOf,stageDate:stageDate,
     ownEquip:!!document.getElementById('dr-own-equip')?.checked||equip.length>0,
     weather:gv('dr-weather')||'',backfillFrom:(document.getElementById('dr-backfill')||{}).checked?(gv('dr-backfill-from')||''):'',   // v6.0.33
@@ -23020,10 +23029,11 @@ function submitDailyReport(){
     const q=Q.find(x=>x.id===e.qid);if(!q)return;
     if(!q.dailyLogs)q.dailyLogs=[];
     // v5.442 同專案同日已有日報 → 合併（相同工項覆蓋、其餘新增），不再產生第二筆
+    try{if(e.crewV){var _sn=Object.assign({},q.crewSeen||{});(e.crews||[]).forEach(function(c){((c&&c.ppl)||[]).forEach(function(p){if(p.wid)_sn[p.wid]=date;});});(e.ownPpl||[]).forEach(function(p){if(p.wid)_sn[p.wid]=date;});q.crewSeen=_sn;}}catch(err){_err('submitDailyReport.seen',err);}   // 勾過的人下次排前面
     const ex=q.dailyLogs.find(function(L){return L&&L.date===date&&!L.stopFrom;});
     if(ex){const m=_drMergeLog(q,ex,e);merged.push((q.name||'')+'（覆蓋 '+m.rep+' 列、新增 '+m.add+' 列）');_touch(q);okN++;return;}
     q.dailyLogs.unshift({id:'d'+Date.now()+Math.random().toString(36).slice(2,5),date:date,
-      workers:e.workers,subWorkers:e.subWorkers||0,subVendor:e.subVendor||'',crews:e.crews||[],progress:e.progress,progressRows:e.progressRows,photos:e.photos,
+      workers:e.workers,subWorkers:e.subWorkers||0,subVendor:e.subVendor||'',crews:e.crews||[],crewV:e.crewV||undefined,ownPpl:(e.ownPpl&&e.ownPpl.length)?e.ownPpl:undefined,progress:e.progress,progressRows:e.progressRows,photos:e.photos,
       ownEquip:e.ownEquip,equip:e.equip||[],
       status:e.status||'work',stopReason:e.stopReason||'',resumeDate:e.resumeDate||'',stageOf:e.stageOf||'',stageDate:e.stageDate||'',weather:e.weather||'',backfillFrom:e.backfillFrom||'',
       by:((typeof _fbUser!=='undefined'&&_fbUser&&_fbUser.email)||''),ts:Date.now()});
@@ -23330,20 +23340,21 @@ function buildCostAuditHtml(q){
   // v5.317 日報出工 vs 已記點工成本：日報只寫 dailyLogs，不產生任何成本，
   // 漏鍵點工＝純漏計成本，利潤會虛增。這裡以標準日薪估算應有金額並提示差額。
   (function(){
-    var wk=0;(q.dailyLogs||[]).forEach(function(L){wk+=parseFloat(L.workers)||0;});
+    var _ea=(_laborEstAll(null)[q.id])||{days:0,amt:0};   // 今天出工：全天／半天／加班（舊日報＝人數×標準日薪）
+    var wk=_ea.days;
     if(!wk)return;
     var rate=parseFloat(P.laborDayRate)||0;
-    var should=wk*rate;
+    var should=_ea.amt;
     var got=0;(q.costs||[]).forEach(function(c){if(c.type==='labor')got+=parseFloat(c.amt)||0;});
     var gap=should-got;
-    var warn=rate>0&&should>0&&gap>should*0.2;   // 少記超過兩成才示警
+    var warn=should>0&&gap>should*0.2;   // 少記超過兩成才示警
     if(warn)issues++;
     rows+='<tr style="border-bottom:1px solid var(--b1)'+(warn?';background:#fff8ec':'')+'">'
       +'<td style="padding:5px 8px;font-size:12px">日報出工</td>'
       +'<td style="padding:5px 8px;font-size:11px;color:var(--b4)">自有／點工累計 '+fmt(wk)+' 工（承包廠商出工不計）'+(rate?('／標準日薪 '+fmt(rate)):'')+'</td>'
       +'<td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">'+fmt(got)+'</td>'
       +'<td style="padding:5px 8px;font-size:11.5px;font-weight:700;color:'+(warn?'#e65100':'var(--g3)')+'">'
-        +(rate<=0?'未設定標準日薪（參數設定）'
+        +(should<=0?'未設定標準日薪（參數設定）'
           :warn?('<svg class="ic ib" aria-hidden="true"><use href="#i-warn"/></svg> 點工成本可能少記約 '+fmt(gap)+'（估算應有 '+fmt(should)+'）')
           :'✓ 點工成本與出工紀錄相符')+'</td>'
       +'<td style="padding:5px 8px;text-align:right;white-space:nowrap"><button type="button" onclick="viewDailyReports(\''+q.id+'\')" style="font-size:11px;padding:2px 10px;border:1px solid var(--b2);background:var(--w);color:var(--b5);border-radius:99px;cursor:pointer;font-family:inherit">日報</button> '
@@ -28639,13 +28650,15 @@ function renderLaborReport(el,year,month){
     var k=String(name||'').trim()||'（未命名）';
     return rows[k]=rows[k]||{proj:k,days:0,logN:0,laborCost:0,laborN:0};
   };
+  var _E=_laborEstAll(inRange);   // 今天出工：每人全天／半天×日薪＋加班（舊日報＝人數×標準日薪），同一人同一天兩案平分
   (Q||[]).forEach(function(q){
+    var _e=_E[q.id];
     (q.dailyLogs||[]).forEach(function(d){
       if(!d||!inRange(d.date))return;
-      var w=parseFloat(d.workers)||0;if(!w)return;
-      var o=get(q.name);
-      o.days+=w;o.logN++;
+      if(!(parseFloat(d.workers)||0)&&!(d.crewV===2))return;
+      get(q.name).logN++;
     });
+    if(_e&&(_e.days>0||_e.amt>0)){var _o=get(q.name);_o.days+=_e.days;_o.est=(_o.est||0)+_e.amt;}
     (q.costs||[]).forEach(function(c){
       if(!c||c.type!=='labor'||!inRange(c.date))return;
       try{recalcCostAmt(c);}catch(e){_err('renderLaborReport',e);}
@@ -28665,7 +28678,7 @@ function renderLaborReport(el,year,month){
   var rate=parseFloat(P.laborDayRate)||0;
   var totD=0,totC=0,totEst=0;
   var body=list.map(function(r){
-    var est=rate>0?r.days*rate:0;
+    var est=r.est||0;
     totD+=r.days;totC+=r.laborCost;totEst+=est;
     var gap=est>0?((r.laborCost-est)/est*100):null;
     var warn=gap!=null&&Math.abs(gap)>20&&r.days>0;
@@ -28674,7 +28687,7 @@ function renderLaborReport(el,year,month){
     return '<tr style="border-bottom:1px solid var(--b1)'+(warn?';background:#fff8ec':'')+'">'
       +'<td style="padding:6px 8px"><b>'+esc(r.proj)+'</b><br><span style="font-size:10.5px;color:var(--b3)">'+r.logN+' 篇日報'+(r.laborN?('　'+r.laborN+' 筆點工'):'')+'</span></td>'
       +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">'+fmt(r.days)+' 工</td>'
-      +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;color:'+(rate?'var(--b5)':'var(--b3)')+'">'+(rate?fmt(Math.round(est)):'—')+'</td>'
+      +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;color:'+(est?'var(--b5)':'var(--b3)')+'">'+(est?fmt(Math.round(est)):'—')+'</td>'
       +'<td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">'+fmt(Math.round(r.laborCost))+'</td>'
       +'<td style="padding:6px 8px;text-align:right">'+gapTxt+'</td></tr>';
   }).join('');
@@ -30935,6 +30948,7 @@ function _wkRenderEdit(root){
     +'<div class="fg fg3">'+f('emg','緊急聯絡人')+f('emgRel','關係')+f('emgPhone','緊急聯絡電話','tel')+'</div>'
     +'<div class="fg fg3">'+f('company','所屬公司','text',' list="wk-co-list"')+f('title','工種／職稱')+sel('status','狀態',['active','left'])+'</div>'
     +'<datalist id="wk-co-list"><option value="豐有工程"></option>'+(typeof VENDORS!=='undefined'?VENDORS:[]).map(function(v){return '<option value="'+esc(v.name||'')+'"></option>';}).join('')+'</datalist>'
+    +(_decIsAdmin()?'<div class="f"><label>日薪 <span style="font-size:11px;color:var(--b4)">— 只有管理員看得到；點工推估用，空白＝標準點工日薪 '+fmt(parseFloat(P.laborDayRate)||0)+'</span></label><input id="wk-rate" type="number" inputmode="numeric" min="0" step="100" value="'+(_wkRates()[w.id]||'')+'" style="'+IN+'"></div>':'')
     +f('memo','備註')
     +sec('證件文件','點格子上傳，影像自動壓縮；體檢／藥檢可傳 PDF（3MB 內）')
     +'<div id="wk-docs" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">'+_WK_DOCS.map(docCard).join('')+'</div>'
@@ -31006,6 +31020,7 @@ function wkSave(){
   var i=WORKERS.findIndex(function(w){return w&&w.id===_wkDraft.id;});
   if(i>=0)WORKERS[i]=_wkDraft;else WORKERS.push(_wkDraft);
   saveWorkers();
+  try{var _re=document.getElementById('wk-rate');if(_re&&_decIsAdmin())_wkRateSet(_wkDraft.id,_re.value);}catch(e){_err('wkSave.rate',e);}   // 今天出工：日薪存 private（MAT_MOVE_FIN.wkRate）
   _wkEditId=null;_wkDraft=null;
   renderWorkers();toast('已儲存人員資料');
   try{updateDashTodo();}catch(e){_err('wkSave',e);}
@@ -46414,7 +46429,7 @@ function _attIngest(q,log,crew){
   return true;
 }
 // 管理員裝置：日報有【人和機具】原文但還沒拆過的（例：寫入時 crewOf 還沒上線），補拆一次（冪等：拆過就有 attAt）
-function _attScan(){if(!_decIsAdmin())return;var n=0;(Q||[]).forEach(function(q){var ch=false;(q&&q.dailyLogs||[]).forEach(function(L){if(L&&L.crewText&&!L.attAt&&_attIngest(q,L))ch=true;});if(ch){_touch(q);n++;}});if(n)try{persist();}catch(e){_err('_attScan',e);}}
+function _attScan(){if(!_decIsAdmin())return;var n=0;(Q||[]).forEach(function(q){var ch=false;(q&&q.dailyLogs||[]).forEach(function(L){if(L&&L.ownPpl&&_attOwnIngest(q,L)){ch=true;return;}if(L&&L.crewText&&!L.attAt&&_attIngest(q,L))ch=true;});   /* 今天出工：日報表單勾的自家員工優先 */if(ch){_touch(q);n++;}});if(n)try{persist();}catch(e){_err('_attScan',e);}}
 function _attPending(L){return !!(L&&L.attAt&&!L.attOk&&((L.attAsk||[]).length||(L.attWhy||[]).length));}
 function _attAskRows(){try{_attScan();}catch(e){_err('_attAskRows',e);}var out=[];
   (Q||[]).forEach(function(q){if(!q||!_attCanSee(q))return;(q.dailyLogs||[]).forEach(function(L){if(_attPending(L))out.push({q:q,L:L});});});
@@ -46529,6 +46544,123 @@ _decReg('payAdd',{
   reject:function(g){_payAddSet(g.p,g.ym,g.it,'no');return true;},
   edit:function(g){try{var m=document.getElementById('fy-modal');if(m)m.remove();}catch(e){_err('payAdd.edit',e);}go('payroll');setTimeout(function(){try{acctTab('petty');var el=document.getElementById('pr-ym');if(el){el.value=g.ym;renderPayroll();}}catch(e){_err('payAdd.edit2',e);}},50);}
 });
+// ══════════ 日報「今天出工」：選工班 → 勾人（第 7 步，Lotion 11/11 D1／E1／F2／G-1a／G-2a／H1／I1／J1／K1）══════════
+// 新選單才用新畫面（舊選單照舊「點工／承包＋人數」）。點工：先從廠商名單選「哪個工班」，列出人員進場資料「所屬公司」對到這家的人給工務勾
+// （名字比對用 _mvVendKey：去空格、括號、結尾的有限公司／企業社／工程行…）；其他人收在「其他人」，從那裡勾到某工班的人，第一次問一次要不要把他的公司改成這家（G-1a）。
+// 每個人：全天／半天、加班時數；人數＝勾的人天（半天 0.5）。今天已經在別案日報勾過的人標「今天已在○○案」（照樣可勾、兩案各一半，G-2a／J1）。
+// 自家員工（所屬公司＝豐有工程）另一組，標「員工」：記在日報 L.ownPpl，管理員裝置照薪資名冊名字寫進出工紀錄 L.att（小批次 small-pay 的薪資用，_attOwnIngest），不算點工錢（K1）。
+// 承包照舊填人數。錢：出工月結、成本勾稽的推估改成每人全天／半天×日薪＋加班費（FJC.hr.crewEst，I1）；日薪＝人員的日薪（只有管理員看得到、存 private 的 MAT_MOVE_FIN.wkRate，H1），沒填＝參數標準點工日薪。
+var _DR_OWN_CO='豐有工程';
+var _drLab=[],_drOwn={};
+function _drCrewNew(){try{return _nav5On();}catch(e){_err('_drCrewNew',e);return false;}}
+function _wkKey(s){return _mvVendKey(s);}
+function _wkAct(){return (WORKERS||[]).filter(function(w){return w&&w.id&&w.name&&w.status!=='left';});}
+function _wkIsOwn(w){return _wkKey(w&&w.company)===_wkKey(_DR_OWN_CO);}
+function _wkRates(){var x=(typeof MAT_MOVE_FIN!=='undefined'&&MAT_MOVE_FIN)?MAT_MOVE_FIN.wkRate:null;return (x&&x.rates)||{};}
+function _wkRateOf(wid){var r=parseFloat(_wkRates()[wid]);return r>0?r:(parseFloat(P.laborDayRate)||0);}
+function _wkRateSet(wid,v){if(!_decIsAdmin()||!wid)return;var R=Object.assign({},_wkRates()),n=parseFloat(v),old=R[wid];if(n>0)R[wid]=n;else delete R[wid];if(R[wid]===old)return;MAT_MOVE_FIN.wkRate={_mt:Date.now(),rates:R};saveMatMoveFin();}
+function _drLabVendors(q){var a=_drVendorsOf(q,'labor').slice();(VENDORS||[]).forEach(function(v){var n=v&&v.name;if(n&&a.indexOf(n)<0)a.push(n);});return a;}
+// 今天已經在別案日報勾過的人：{wid: 案名}
+function _drElsewhere(qid,date){var m={};(Q||[]).forEach(function(q){if(!q||q.id===qid)return;(q.dailyLogs||[]).forEach(function(L){if(!L||L.date!==date)return;var add=function(p){if(p&&p.wid&&(+p.day>0))m[p.wid]=q.name||'別案';};(L.crews||[]).forEach(function(c){((c&&c.ppl)||[]).forEach(add);});(L.ownPpl||[]).forEach(add);});});return m;}
+function _drPpState(scope,gi){return scope==='own'?_drOwn:((_drLab[gi]||{}).ppl||{});}
+function _drPRow(scope,gi,w,els){
+  var S=_drPpState(scope,gi),st=S[w.id],on=!!st,arg="'"+scope+"',"+gi+",'"+escq(w.id)+"'";
+  var h='<div class="dr-pp" data-wid="'+esc(w.id)+'" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:5px 0;border-top:1px solid var(--b1);font-size:13px">'
+    +'<label style="display:inline-flex;align-items:center;gap:6px;flex:1 1 150px;min-width:0;cursor:pointer"><input type="checkbox" class="dr-pp-on"'+(on?' checked':'')+' onchange="drPpTog('+arg+',this.checked)" style="-webkit-appearance:checkbox;appearance:auto;width:18px;height:18px;min-width:0;padding:0;margin:0;flex:0 0 auto;accent-color:var(--g)">'
+    +'<b>'+esc(w.name)+'</b>'+(scope==='own'?'<span style="font-size:11px;background:var(--gl);color:var(--g3);border-radius:99px;padding:1px 7px">員工</span>':'')
+    +(els[w.id]?'<span style="font-size:11px;color:#b26a00">今天已在 '+esc(els[w.id])+'</span>':'')+'</label>';
+  if(on){var R=function(v,l){return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:12.5px"><input type="radio" name="dr-pp-'+scope+gi+'-'+esc(w.id)+'"'+((+st.day)===v?' checked':'')+' onchange="drPpDay('+arg+','+v+')" style="-webkit-appearance:radio;appearance:auto;width:16px;height:16px;min-width:0;padding:0;margin:0;flex:0 0 auto;accent-color:var(--g)">'+l+'</label>';};
+    h+='<span style="display:inline-flex;gap:8px;align-items:center">'+R(1,'全天')+R(0.5,'半天')
+      +'<label style="display:inline-flex;align-items:center;gap:3px;font-size:12.5px">加班<input type="number" inputmode="decimal" min="0" step="0.5" value="'+(st.ot||'')+'" oninput="drPpOt('+arg+',this.value)" style="width:56px;font-size:13px;padding:4px 6px;border:1px solid var(--b2);border-radius:6px;text-align:right">時</label></span>';}
+  return h+'</div>';
+}
+function _drCrewNewRender(){
+  var box=document.getElementById('dr-crews');if(!box)return;
+  var qid=gv('dr-proj')||'',q=(Q||[]).find(function(x){return x.id===qid;}),date=gv('dr-date')||localToday(),els=_drElsewhere(qid,date),seen=(q&&q.crewSeen)||{};
+  var act=_wkAct(),sortW=function(a,b){return String(seen[b.id]||'').localeCompare(String(seen[a.id]||''))||String(a.name).localeCompare(String(b.name),'zh-Hant');};
+  if(!_drLab.length)_drLab=[{vendor:'',ppl:{}}];
+  var vend=_drLabVendors(q),SEL='font-size:14px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;background:var(--w);min-width:0',h='';
+  _drLab.forEach(function(g,gi){
+    var vk=_wkKey(g.vendor),mine=act.filter(function(w){return !_wkIsOwn(w)&&vk&&_wkKey(w.company)===vk;}).sort(sortW);
+    var others=act.filter(function(w){return !_wkIsOwn(w)&&!(vk&&_wkKey(w.company)===vk);}).sort(sortW),otOn=others.filter(function(w){return g.ppl[w.id];}),otOff=others.filter(function(w){return !g.ppl[w.id];});
+    var opts='<option value="">— 選點工工班 —</option>'+vend.map(function(n){return '<option value="'+esc(n)+'"'+(n===g.vendor?' selected':'')+'>'+esc(n)+'</option>';}).join('')+(g.vendor&&vend.indexOf(g.vendor)<0?'<option selected value="'+esc(g.vendor)+'">'+esc(g.vendor)+'</option>':'');
+    var sum=Object.keys(g.ppl).reduce(function(a,k){return a+(+g.ppl[k].day||0);},0);
+    h+='<div class="dr-lab" data-gi="'+gi+'" style="border:1px solid var(--b1);border-radius:var(--r8);padding:8px 10px;margin-bottom:8px;background:#fff">'
+      +'<div style="display:flex;gap:6px;align-items:center"><span style="font-weight:700;color:#E65100;font-size:13px;flex:0 0 auto">點工</span><select class="dr-lab-v" onchange="drLabVendor('+gi+',this.value)" style="flex:1 1 0;'+SEL+'">'+opts+'</select>'
+      +(_drLab.length>1?'<button type="button" class="btn btn-xs btn-r" onclick="drLabDel('+gi+')" style="flex-shrink:0">✕</button>':'')+'</div>';
+    if(!g.vendor)h+='<div style="font-size:12px;color:var(--b4);padding:6px 0 2px">先選哪個工班，下面就會列出這個工班的人</div>';
+    else{
+      if(!mine.length)h+='<div style="font-size:12px;color:var(--b4);padding:6px 0 2px">人員進場資料裡沒有「所屬公司」是這家的人，可以從下面「其他人」勾</div>';
+      h+=mine.map(function(w){return _drPRow('lab',gi,w,els);}).join('')+otOn.map(function(w){return _drPRow('lab',gi,w,els);}).join('');
+      if(otOff.length)h+='<details class="dr-lab-more" style="margin-top:4px"><summary style="font-size:12px;color:var(--b4);cursor:pointer">▸ 其他人（'+otOff.length+' 人）</summary>'+otOff.map(function(w){return _drPRow('lab',gi,w,els);}).join('')+'</details>';
+      h+='<div style="font-size:11.5px;color:var(--b4);margin-top:4px">勾了 '+Object.keys(g.ppl).length+' 人・'+fmt(sum)+' 人天</div>';
+    }
+    h+='</div>';
+  });
+  h+='<button type="button" class="btn btn-xs" onclick="drLabAdd()" style="padding:6px 14px;margin-bottom:10px">＋ 再加一個點工工班</button>';
+  var own=act.filter(_wkIsOwn).sort(sortW);
+  h+='<div class="dr-own" style="border:1px solid var(--b1);border-radius:var(--r8);padding:8px 10px;margin-bottom:8px;background:#fff"><div style="font-weight:700;color:var(--g3);font-size:13px">自家員工 <span style="font-weight:400;font-size:11px;color:var(--b4)">— 記進薪資的出工，不算點工錢</span></div>'
+    +(own.length?own.map(function(w){return _drPRow('own',0,w,els);}).join(''):'<div style="font-size:12px;color:var(--b4);padding:6px 0 2px">人員進場資料「所屬公司」填豐有工程的人會列在這裡</div>')+'</div>';
+  var IN='font-size:14px;padding:8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit;min-width:0';
+  h+='<div style="font-weight:700;color:#1565C0;font-size:13px;margin:4px 0">承包 <span style="font-weight:400;font-size:11px;color:var(--b4)">— 照舊填人數</span></div>';
+  h+=_drCrews.map(function(c,i){return '<div class="dr-crew" style="display:flex;gap:5px;margin-bottom:5px;align-items:center">'
+    +(c.type==='labor'?'<span style="flex:0 0 auto;font-size:12px;color:#E65100">點工（舊）</span>':'')
+    +'<input value="'+esc(c.vendor||'')+'" list="dr-sub-vendor-list" placeholder="承包廠商" oninput="_drCrews['+i+'].vendor=this.value" style="flex:1 1 0;'+IN+'">'
+    +'<input type="number" inputmode="numeric" value="'+(c.n||'')+'" placeholder="人數" oninput="_drCrews['+i+'].n=this.value" style="flex:0 0 76px;padding-left:4px;padding-right:6px;text-align:right;font-weight:700;'+IN+'">'
+    +'<button type="button" class="btn btn-xs btn-r" onclick="_drCrews.splice('+i+',1);_drCrewNewRender()" style="flex-shrink:0">✕</button></div>';}).join('')
+    +'<button type="button" class="btn btn-xs" onclick="_drCrews.push({type:\'sub\',vendor:\'\',n:\'\'});_drCrewNewRender()" style="padding:6px 14px">＋ 承包</button>';
+  box.innerHTML=h;
+}
+function drLabVendor(gi,v){var g=_drLab[gi];if(!g)return;g.vendor=String(v||'');_drCrewNewRender();}
+function drLabAdd(){_drLab.push({vendor:'',ppl:{}});_drCrewNewRender();}
+function drLabDel(gi){_drLab.splice(gi,1);_drCrewNewRender();}
+function drPpTog(scope,gi,wid,on){
+  var S=scope==='own'?_drOwn:((_drLab[gi]||{}).ppl);if(!S)return;
+  if(!on){delete S[wid];_drCrewNewRender();return;}
+  S[wid]={day:1,ot:0};_drCrewNewRender();
+  // G-1a：從「其他人」勾到某工班的人，第一次問一次要不要把他的公司改成這家
+  if(scope!=='lab')return;var g=_drLab[gi],w=(WORKERS||[]).find(function(x){return x&&x.id===wid;});
+  if(!g||!g.vendor||!w||_wkKey(w.company)===_wkKey(g.vendor)||_isReaderUser)return;
+  showConfirm('改所屬公司？','把 <b>'+esc(w.name)+'</b> 的所屬公司'+(w.company?'從「'+esc(w.company)+'」':'')+'改成「'+esc(g.vendor)+'」？<div style="font-size:12px;color:var(--b4);margin-top:6px">改了以後，下次選這個工班就直接列出他。不改也沒關係，今天照樣算他在這個工班。</div>',
+    function(){var w2=(WORKERS||[]).find(function(x){return x&&x.id===wid;});if(!w2)return;w2.company=g.vendor;_touch(w2);saveWorkers();toast('已把 '+w2.name+' 的公司改成 '+g.vendor);_drCrewNewRender();});
+}
+function drPpDay(scope,gi,wid,v){var S=_drPpState(scope,gi);if(S[wid]){S[wid].day=v;_drCrewNewRender();}}
+function drPpOt(scope,gi,wid,v){var S=_drPpState(scope,gi);if(S[wid])S[wid].ot=Math.max(0,parseFloat(v)||0);}
+function _drPpList(S){return Object.keys(S||{}).map(function(k){var w=(WORKERS||[]).find(function(x){return x&&x.id===k;})||{};var d=+S[k].day===0.5?0.5:1;return {wid:k,name:String(w.name||'').slice(0,20),day:d,ot:Math.round((+S[k].ot||0)*10)/10};}).filter(function(p){return p.name;});}
+// 送出：點工工班 → crews（type labor、n＝人天、ppl 名單）＋承包；自家員工 → ownPpl
+function _drCrewsNewOut(){
+  var out=_drLab.map(function(g){var ppl=_drPpList(g.ppl);if(!ppl.length)return null;return {type:'labor',vendor:String(g.vendor||'').trim(),n:ppl.reduce(function(a,p){return a+p.day;},0),ppl:ppl};}).filter(Boolean);
+  return out.concat(_drCrews.filter(function(c){return c&&((parseFloat(c.n)||0)>0||String(c.vendor||'').trim());}));
+}
+function _drCrewNewLoad(L){
+  _drLab=[];_drOwn={};_drCrews=[];
+  _crewsOf(L).forEach(function(c){if(!c)return;if(c.type!=='sub'&&Array.isArray(c.ppl)&&c.ppl.length){var g={vendor:c.vendor||'',ppl:{}};c.ppl.forEach(function(p){if(p&&p.wid)g.ppl[p.wid]={day:+p.day===0.5?0.5:1,ot:+p.ot||0};});_drLab.push(g);}
+    else _drCrews.push({type:c.type==='sub'?'sub':'labor',vendor:c.vendor||'',n:c.n||''});});
+  (L&&L.ownPpl||[]).forEach(function(p){if(p&&p.wid)_drOwn[p.wid]={day:+p.day===0.5?0.5:1,ot:+p.ot||0};});
+  if(!_drCrews.length)_drCrews=[{type:'sub',vendor:'',n:''}];
+}
+// 點工推估：全公司這段期間的日報一起算（同一人同一天兩案才分得到），回傳 {報價 id: {days, amt}}
+function _laborEstAll(inRange){
+  var logs=[],dr=parseFloat(P.laborDayRate)||0;
+  (Q||[]).forEach(function(q){(q&&q.dailyLogs||[]).forEach(function(L){if(!L||(inRange&&!inRange(L.date)))return;
+    if(L.crewV===2){var ppl=[];(L.crews||[]).forEach(function(c){if(!c||c.type==='sub')return;if(Array.isArray(c.ppl)&&c.ppl.length)c.ppl.forEach(function(p){if(p)ppl.push({k:p.wid||p.name,day:p.day,ot:p.ot,rate:_wkRateOf(p.wid)});});else if((+c.n||0)>0)logs.push({date:L.date,site:q.id,workers:+c.n,rate:dr});});
+      if(ppl.length)logs.push({date:L.date,site:q.id,ppl:ppl});}
+    else{var w=parseFloat(L.workers)||0;if(w)logs.push({date:L.date,site:q.id,workers:w,rate:dr});}});});
+  try{return FJC.hr.crewEst(logs);}catch(e){_err('_laborEstAll',e);return {};}
+}
+// 管理員裝置：日報表單勾的自家員工 → 薪資的出工紀錄（照薪資名冊名字；對不到的進「出工確認卡」，同 small-pay）
+function _attOwnIngest(q,L){
+  if(!L||!Array.isArray(L.ownPpl))return false;var sig=JSON.stringify(L.ownPpl);if(L.attOwnSig===sig)return false;
+  var S=_attStaff();if(!S.length)return false;
+  var byName={};S.forEach(function(x){if(!x.dup)byName[x.name]=x.id;});
+  var att=[],ask=[];
+  L.ownPpl.forEach(function(p,i){if(!p||!(+p.day>0))return;var nm=String(p.name||'').trim(),hid=byName[nm];
+    if(hid){att.push({hrId:hid,name:nm,day:+p.day,ot:+p.ot||0});return;}
+    var cand=S.filter(function(x){return x.name===nm;}).map(function(x){return x.id;});
+    ask.push({i:i,raw:nm.slice(0,30),name:nm.slice(0,12),day:+p.day,ot:+p.ot||0,why:cand.length>1?'名冊有兩個同名的人':'薪資名冊沒有這個名字',cand:cand.slice(0,4)});});
+  L.att=att;L.attAsk=ask;L.attWhy=[];L.attAt=Date.now();L.attOwnSig=sig;L.attSrc='form';if(!ask.length)L.attOk=1;else delete L.attOk;
+  return true;
+}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
