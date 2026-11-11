@@ -113,7 +113,7 @@ function _qchgClean(ops){
 }
   function totals(its, taxR) { var sub = _qchgSub(its), tr = taxR == null ? 5 : (+taxR || 0), tax = Math.round(sub * tr / 100); return { sub: sub, tax: tax, total: sub + tax }; }
   // 同一件草稿的鍵（v6.0.189 取代舊草稿用；前端 _draftKey 與雲端 fyDraft 共用）：同送件人＋同種＋同報價（新報價用報價編號；補登再分版次）
-  var SUP_T = { quote: 1, qchg: 1, bid: 1, qverfix: 1 };
+  var SUP_T = { quote: 1, qchg: 1, bid: 1, qverfix: 1, ownerCard: 1 };   // v6.0.233 合約條件卡：同一案較晚送的取代較早的
   function draftKey(d) {
     if (!d || !SUP_T[d.type]) return ''; var pl = (d.payload && typeof d.payload === 'object') ? d.payload : {}, S = function (v) { return v == null ? '' : String(v); };
     var q = S(pl.qid || pl.base).slice(0, 80); if (!q && d.type === 'quote') { var c = S(pl.fields && pl.fields.code).trim(); if (c) q = 'code:' + c.slice(0, 60); }
