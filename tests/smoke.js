@@ -13349,8 +13349,8 @@ async function newPage(browser, width, height) {
         go('acct'); acctTab('ap'); await T(150);
         const tb = document.getElementById('acct-tabs');
         const big = Array.prototype.map.call(tb.querySelectorAll('[data-ag]'), (b) => b.textContent);
-        out.groups = JSON.stringify(big) === JSON.stringify(['收', '付', '發票與支出', '金流']);
-        out.sub = /廠商請款/.test(tb.textContent) && /應付/.test(tb.textContent) && tb.querySelector('[data-at="ap"]').style.background.indexOf('var(--g)') >= 0;
+        out.groups = JSON.stringify(big) === JSON.stringify(['應收', '應付', '發票與支出', '金流']);   // v6.0.233 Lotion 11/11
+        out.sub = !tb.querySelector('[data-at]') && !/廠商請款|零用金/.test(tb.textContent);   // v6.0.233：下面那排小分頁拿掉
         // 點「收」→ 到收那塊（業主請款或上次停的頁）；再點「付」→ 回到上次停的「應付」
         tb.querySelector('[data-ag="in"]').click(); await T(80); out.inGo = _acctTab === 'own' || _acctTab === 'ar';
         document.querySelector('#acct-tabs [data-ag="out"]').click(); await T(80); out.remember = _acctTab === 'ap';
@@ -13985,7 +13985,7 @@ async function newPage(browser, width, height) {
         const led = document.querySelector('#acct-p-ap > .acct-led');
         const rows = led ? led.querySelectorAll('.acct-led-row') : [];
         out.ap = rows.length === 2 && /範例廠商甲/.test(rows[0].textContent) && /逾期待付/.test(rows[0].textContent) && /範例廠商乙/.test(rows[1].textContent) && !/範例廠商丙/.test(led.textContent);
-        out.oneBtn = Array.prototype.every.call(rows, (x) => x.querySelectorAll('button').length === 1 && /付款/.test(x.querySelector('button').textContent));
+        out.oneBtn = Array.prototype.every.call(rows, (x) => x.querySelectorAll('[data-lednext]').length === 1 && /付款/.test(x.querySelector('[data-lednext]').textContent) && x.querySelectorAll('[data-ledmore]').length === 1);
         const pl = document.getElementById('payable-list');
         out.fold = !!pl && pl.offsetParent === null;
         led.querySelector('details.acct-led-more').open = true; await T(80);
@@ -13999,7 +13999,7 @@ async function newPage(browser, width, height) {
         // 收：待收請款單、逾期在前、下一步＝登錄收款
         acctTab('ar'); await T(120);
         const la = document.querySelector('#acct-p-ar > .acct-led');
-        out.ar = !!la && /範例營造/.test(la.textContent) && /第 2 期/.test(la.textContent) && /逾期/.test(la.textContent) && /待收/.test(la.textContent) && (typeof window._invStOf !== "function" || /已送業主/.test(la.textContent)) && /登錄收款/.test(la.querySelector('button').textContent) && !document.querySelector('#acct-p-ap > .acct-led');
+        out.ar = !!la && /範例營造/.test(la.textContent) && /第 2 期/.test(la.textContent) && /逾期/.test(la.textContent) && /待收/.test(la.textContent) && (typeof window._invStOf !== "function" || /已送業主/.test(la.textContent)) && /登錄收款/.test(la.querySelector('[data-lednext]').textContent) && !document.querySelector('#acct-p-ap > .acct-led');
         // 主線請款單狀態上線後（_invStOf／_INV_ST_T）自動改用：草稿＝打開請款單、其他＝狀態＋待收
         const hadSt = typeof window._invStOf === 'function', oSt = window._invStOf, oT = window._INV_ST_T;
         if (!hadSt) { window._INV_ST_T = { draft: '草稿', sent: '已送業主', ok: '業主已確認', einv: '已開發票', paid: '已收款' }; window._invStOf = (v) => v.st || 'sent';
@@ -14011,7 +14011,20 @@ async function newPage(browser, width, height) {
         out.noScroll = document.documentElement.scrollWidth <= W + 1;
         // 唯讀：看得到帳本、沒有按鈕
         const oR = _isReaderUser; _isReaderUser = true; acctTab('ar'); await T(60);
-        out.ro = !!document.querySelector('#acct-p-ar > .acct-led .acct-led-row') && !document.querySelector('#acct-p-ar > .acct-led button'); _isReaderUser = oR;
+        out.ro = !!document.querySelector('#acct-p-ar > .acct-led .acct-led-row') && !document.querySelector('#acct-p-ar > .acct-led [data-lednext]'); _isReaderUser = oR;
+        // v6.0.233 篩選小籤：應收 全部／未收／逾期／已收；應付 全部／廠商／零用金／薪資（薪資只給管理員）
+        INV.push({ id: 'iL2', project: '範例工程L', client: '範例營造', periodNo: 1, date: '2025-12-01', items: [], totals: { sub: 1000, tax: 50, total: 1050 }, receivedConfirmed: true, receivedAmt: 1050, _mt: 1 });
+        acctLedSetF('ar', 'paid'); await T(40); const lp = document.querySelector('#acct-p-ar > .acct-led').textContent;
+        acctLedSetF('ar', 'unpaid'); await T(40); const lu = document.querySelector('#acct-p-ar > .acct-led').textContent;
+        out.chipsAr = /已收款/.test(lp) && !/第 2 期/.test(lp) && /第 2 期/.test(lu) && !/已收款/.test(lu) && document.querySelectorAll('#acct-p-ar .acct-led-f [data-ledf]').length === 4;
+        PAYABLES.push({ id: 'pL4', to: '範例員工', category: 'salary', date: '2026-01-05', amount: 30000, vat: false, status: 'unpaid', _mt: 1 });
+        acctTab('ap'); acctLedSetF('ap', 'salary'); await T(40); const ls = document.querySelector('#acct-p-ap > .acct-led').textContent;
+        acctLedSetF('ap', 'vendor'); await T(40); const lv = document.querySelector('#acct-p-ap > .acct-led').textContent;
+        const oA2 = _isAdminUser, oU2 = _fbUser; _isAdminUser = false; _fbUser = { email: 'staff@example.com', uid: 's' }; acctLedSetF('ap', 'all'); await T(40);
+        const staffChips = Array.from(document.querySelectorAll('#acct-p-ap .acct-led-f [data-ledf]')).map((b) => b.getAttribute('data-ledf')).join(',');
+        const staffTx = document.querySelector('#acct-p-ap > .acct-led').textContent; _isAdminUser = oA2; _fbUser = oU2;
+        out.chipsAp = /範例員工/.test(ls) && !/範例廠商乙/.test(ls) && /範例廠商乙/.test(lv) && !/範例員工/.test(lv) && staffChips === 'all,vendor,petty' && !/範例員工/.test(staffTx);
+        localStorage.removeItem('fy_acctLedF_ar'); localStorage.removeItem('fy_acctLedF_ap');
         // 舊選單：沒有帳本、清單照舊
         localStorage.setItem('fy_nav_old', '1'); _nav5Apply(); acctTab('ap'); await T(80);
         out.old = !document.querySelector('.acct-led') && !document.querySelector('.led-fold');
@@ -14020,7 +14033,7 @@ async function newPage(browser, width, height) {
       PAYABLES.length = 0; keepP.forEach((p) => PAYABLES.push(p)); INV.length = 0; keepI.forEach((v) => INV.push(v)); _fbUser = oU; _isAdminUser = oA;
       return out;
     }, W);
-    check('v6.0.225 帳務帳本（寬 ' + W + '）：付＝待付一筆一列（逾期在前、已付不列）、只有一顆「付款」，收＝待收請款單「登錄收款」；舊清單收在「⋯ 更多」打開才看到；付款後帳本更新；唯讀沒有按鈕；舊選單沒有帳本', !r.err && r.ap && r.oneBtn && r.fold && r.unfold && r.refresh && r.search && r.stHook && r.ar && r.noScroll && r.ro && r.old, JSON.stringify(r));
+    check('v6.0.225 帳務帳本（寬 ' + W + '）：付＝待付一筆一列（逾期在前、已付不列）、只有一顆「付款」，收＝待收請款單「登錄收款」；舊清單收在「⋯ 更多」打開才看到；付款後帳本更新；唯讀沒有按鈕；舊選單沒有帳本', !r.err && r.ap && r.oneBtn && r.fold && r.unfold && r.refresh && r.search && r.stHook && r.ar && r.noScroll && r.ro && r.chipsAr && r.chipsAp && r.old, JSON.stringify(r));
     check('v6.0.225 帳務帳本測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
