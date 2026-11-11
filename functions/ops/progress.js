@@ -23,7 +23,8 @@ function itemCat(it) {
   if (c === 'both') return { install: true, remove: true };
   if (c === 'other') return { install: false, remove: false };
   const d = String((it && it.desc) || '');
-  return { install: d.indexOf('打設') >= 0 || d.indexOf('裝設') >= 0 || d.indexOf('安裝') >= 0, remove: d.indexOf('拔除') >= 0 || d.indexOf('拆除') >= 0 };
+  // 健檢 H2（11/11）：組立、鋪設、架設、吊裝、施打也算裝設（「組立及拆除」原本被判成只有拆除，組立數量記成拆除）；跟 calc/dailyparse.js、functions/ops/progress.js 同一份字表（tests/calc.js 比對）
+    return { install: ['打設', '裝設', '安裝', '組立', '鋪設', '架設', '吊裝', '施打'].some(function (w) { return d.indexOf(w) >= 0; }), remove: ['拔除', '拆除', '回收', '撤除'].some(function (w) { return d.indexOf(w) >= 0; }) };
 }
 // 跟前端 _prPhase 一樣
 function phaseOf(it, r) {

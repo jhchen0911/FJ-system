@@ -484,6 +484,28 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const logs = [{ date: '2026-11-01', progressRows: [{ itemIdx: 0, qty: 100 }, { itemIdx: 0, qty: 5, ph: 'remove' }] }, { date: '2026-11-02', photoOnly: true, progressRows: [{ itemIdx: 0, qty: 9 }] }];
   check('LINE 日報拆數量：累計只算確認過的日報（只有照片的不算）、打設拔除分開', DL.cumOf(logs, 0, 'install', (r) => r.ph === 'remove' ? 'remove' : 'install') === 100 && DL.cumOf(logs, 0, 'remove', (r) => r.ph === 'remove' ? 'remove' : 'install') === 5);
 }
+// ── 健檢 11/11（陳軒合成案子跑整條請款抓到的）：H2 工項類別字表統一、M4 打設拔除兩列連起來停租、M1 只有逾期租金也出請款單草稿、M2 這段拔完了、有保留款的結案卡要材料退完
+{
+  const TD0 = require('../calc/todo.js'), T = TD0.itemCat ? TD0 : TD0.todo, PG = require('../functions/ops/progress.js'), DL = require('../calc/dailyparse.js').dl;
+  const descs = ['支撐 H350 組立及拆除', 'H型鋼樁 打設＋拔除', '覆工板 鋪設', '構台 架設', '鋼板樁 施打', '中間樁 吊裝', '鋼板樁 拔除', '支撐 拆除', '材料 回收', '技師簽證', '鋼軌樁 打設'];
+  const same = descs.every((d) => JSON.stringify(T.itemCat({ desc: d })) === JSON.stringify(PG.itemCat({ desc: d })));
+  const q = { items: [{ desc: '第一層支撐 H350 組立及拆除', unit: 'M', qty: 300 }], dailyLogs: [] };
+  const pr = DL.parse('第一層支撐組立 300M', q.items).rows[0];
+  check('健檢 H2：「組立及拆除」＝打設＋拔除（組立、鋪設、架設、施打、吊裝都算裝設）；calc/todo.js 跟 functions/ops/progress.js 字表一樣；日報「組立 300」記成打設，不會記成拆除',
+    same && T.itemCat({ desc: '支撐 H350 組立及拆除' }).install && T.itemCat({ desc: '支撐 H350 組立及拆除' }).remove && T.prPhase(q, { itemIdx: 0, qty: 300 }) === 'install' && pr && pr.itemIdx === 0 && pr.ph === 'install');
+  const q2 = { awarded: true, items: [{ desc: 'H型鋼樁 H300 打設', unit: '支', qty: 100, price: 500, note: '租期 60 天', ot: '10' }, { desc: 'H型鋼樁 H300 拔除', unit: '支', qty: 100, price: 200 }], dailyLogs: [{ date: '2026-01-01', progressRows: [{ itemIdx: 0, qty: 100 }] }, { date: '2026-03-15', progressRows: [{ itemIdx: 1, qty: 100 }] }] };
+  const r2 = T.rentStatus(q2, 0, '2026-06-30', '2026-06-30'), r2b = T.rentStatus(q2, 1, '2026-06-30', '2026-06-30');
+  const q3 = JSON.parse(JSON.stringify(q2)); q3.items.push({ desc: 'H型鋼樁 H300 拔除', unit: '支', qty: 50, price: 200 });   // 兩列一樣像＝不配對
+  check('健檢 M4：報價把打設、拔除分成兩列 → 拔除那列的日報讓租金停（1/1 打完、租期 60 天到 3/2，3/15 拔＝逾期 13 天 13,000）；兩列一樣像不配對；拔除那列不另算租期',
+    r2 && r2.removeFirst === '2026-03-15' && r2.overDays === 13 && r2.amount === 13000 && r2b === null && T.pairOf(q3, 0) === null);
+  const q4 = { id: 'q4', name: '只有逾期租金', awarded: true, items: [{ desc: 'H型鋼樁 H300 打設＋拔除', unit: '支', qty: 10, price: 500, note: '租期 30 天', ot: '20' }], dailyLogs: [{ date: '2026-09-01', progressRows: [{ itemIdx: 0, qty: 10 }] }] };
+  const mb = T.monthBill({ q: q4, invs: [{ date: '2026-10-24' }], cust: {}, def: { cut: 25 }, today: '2026-11-22' });
+  check('健檢 M1：這個月沒有新的日報、只有逾期租金 → 照樣出請款單草稿卡（rentOnly、列出逾期天數）', !!mb && mb.rentOnly && mb.items.length === 0 && mb.rent.length === 1 && mb.rent[0].overDays > 0 && mb.cutDate === '2026-11-25');
+  const R = (t) => DL.parse(t, [{ desc: '鋼板樁 III型 拔除', unit: '支', qty: 120 }]).rows;
+  check('健檢 M2：「第一段拔除 40 支，這段拔完了」「…，這段拔完」都標本段完成', R('鋼板樁拔除 40 支，這段拔完了')[0].batchDone === true && R('第一段鋼板樁拔除 40 支，這段拔完了')[0].batchDone === true && R('鋼板樁拔除 40 支，這段拔完')[0].batchDone === true && R('鋼板樁拔除 40 支，這段還沒拔完')[0].batchDone === false);
+  const c1 = T.closeReady({ q: { id: 'x', awarded: true }, hasRet: true, retLeft: 0, matLeft: 2, payLeft: 0 }), c2 = T.closeReady({ q: { id: 'x', awarded: true }, hasRet: true, retLeft: 0, matLeft: 0, payLeft: 0 });
+  check('健檢：有保留款的案子材料還沒退完不出結案卡；退完才出', !c1.ok && c1.why.indexOf('mat') >= 0 && c2.ok);
+}
 // 每個 calc 檔都要：index.html 載入（在 app.js 之前）、sw.js 的 CALC_FILES 有列（離線才開得起來）
 {
   const fs = require('fs'), R = path.join(__dirname, '..');

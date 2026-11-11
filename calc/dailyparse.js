@@ -47,7 +47,7 @@
     return out; }
   // 跟 functions/ops/progress.js、calc/todo.js 的 itemCat 一樣
   function itemCat(it) { var c = it && it.cat; if (c === 'install') return { i: 1, r: 0 }; if (c === 'remove') return { i: 0, r: 1 }; if (c === 'both') return { i: 1, r: 1 }; if (c === 'other') return { i: 0, r: 0 };
-    var d = String((it && it.desc) || ''); return { i: /打設|裝設|安裝/.test(d) ? 1 : 0, r: /拔除|拆除/.test(d) ? 1 : 0 }; }
+    var d = String((it && it.desc) || ''); return { i: /打設|裝設|安裝|組立|鋪設|架設|吊裝|施打/.test(d) ? 1 : 0, r: /拔除|拆除|回收|撤除/.test(d) ? 1 : 0 }; }   // 健檢 H2：字表跟 calc/todo.js itemCat 同一份
   function isLine(it) { return it && !it.sec && !it.spare && !(num(it.price) < 0 && num(it.qty) > 0) && String(it.desc || '').trim(); }
   // 一段文字裡的數量（排除 L=12M、第 2 層、長 9M、H300）
   function qtyOf(s) {
@@ -96,6 +96,7 @@
         if (cut.length < 2) { pieces.push(pc); return; } cut.forEach(function (e, i) { var t = pc.slice(last, i === cut.length - 1 ? pc.length : e).trim(); last = e; if (t) pieces.push(t); }); });
       pieces.forEach(function (pc) {
         var q = qtyOf(pc);
+        if (!q && DONE.test(pc) && !NOT_DONE.test(pc) && rows.length && !Object.keys(terms(pc)).length) { rows[rows.length - 1].batchDone = true; return; }   // v6.0.234：「這段拔完」本身有「拔」字，先當本段完成看
         if (!q) { if (phaseOf(pc)) linePh = phaseOf(pc); if (Object.keys(terms(pc)).length || phaseOf(pc)) ctx = (ctx + ' ' + pc).trim();
           else if (DONE.test(pc) && !NOT_DONE.test(pc) && rows.length) rows[rows.length - 1].batchDone = true;   // 「…20支，這段完成」
           return; }
