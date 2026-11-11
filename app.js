@@ -43837,7 +43837,7 @@ function _tdIsDec(it){var t=String(it&&it.type||'');return /^dec_|draft|sync_cf|
 function _tdKey(it){return String(it.type||'')+'|'+String(it.id||it.qid||'')+'|'+String(it.jump||'')+'|'+String(it.text||'').replace(/[（(][^）)]*[天到期過][^）)]*[）)]/g,'').replace(/還剩\s*\d+\s*天|\d+\s*天後|逾期\s*\d+\s*天|已\s*\d+\s*天/g,'');}   // 只去掉每天會變的天數（括號裡的「N 天後」「已過期」等），日期、廠商、金額留著，同一家不同筆不會一起被延後   // 同一個跳轉（例如都到應付頁）的不同筆，靠文字（去掉天數）分開
 // Lotion 11/10：跟錢有關的卡不給「已處理」「延後」，只有「去處理」；事情真的做完（單開了、錢收了、款付了）卡片才會消失——這些卡本來就是從資料算出來的（請款單存在、收款登錄、應付已付就不再出現）
 //   請款：本月要請款 bill_month／inv_month／待送請款 inv_submit；收款：recv／逾期 overdue；保留款可請退 ret_due；逾期租金 rent_over；付款：pay_due／pay_overdue／期票 tk_due／薪資 hr_pay
-var _TD_MONEY=/^(bill_month|inv_month|inv_submit|recv|overdue|ret_due|rent_over|pay_due|pay_overdue|tk_due|hr_pay)$/;
+var _TD_MONEY=/^(bill_month|inv_month|inv_submit|recv|overdue|ret_due|rent_over|pay_due|pay_overdue|tk_due|hr_pay|vp_check|vb_pending|overrun|mat_site|bk_paycmp.*)$/;   // v6.0.233 健檢：付包商款待核准、待登錄廠商請款、超支、自有材料攤提、雲端應付比對也是錢的卡
 function _tdIsMoney(it){return _TD_MONEY.test(String(it&&it.type||''));}
 function _tdSig(it){return String(it.text||'').replace(/\d+/g,'#')+'|'+String(it.sub||'').replace(/\d+/g,'#');}   // v6.0.225 審查：第二行是算好的數字（實收、日期），數字變了不算新的一張
 function _tdSnzGet(){try{return JSON.parse(localStorage.getItem('fy_today_snz')||'{}')||{};}catch(e){return {};}}
@@ -44434,49 +44434,14 @@ function sdocDel(qid,id){
     _sdocSave(p2,m);
   });
 }
-// ══════════ 改版第 7 步 7c 加碼③：包商評分（v6.0.225，估時表題 C 建議：品質、工期、安全、配合度、價格各 1～5 分＋一句話）══════════
-// 結案後（90 天內）每家分包出一張拍板卡 vendorEval（管理員）：確認／修改＝打分數視窗，退回＝這家不評；存專案 p.vendorEval[<廠商鍵>]＝{v,s:{q,t,sa,c,p},note,at,by}（shared，只有分數與一句話）
-// 平均分數 _veAvg(廠商名)：廠商清單看得到（全公司各案平均）
-var _VE_ITEMS=[['q','品質'],['t','工期'],['sa','安全'],['c','配合度'],['p','價格']];
-function _veKey(v){var d=String(v||'').trim(),h=5381;for(var k=0;k<d.length;k++)h=((h*33)^d.charCodeAt(k))>>>0;return 'v'+h.toString(36);}
-function _veVendors(q){var o=[];[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;})).forEach(function(x){(x.costs||[]).forEach(function(c){var v=String((c&&c.vendor)||'').trim();if(c&&c.type==='sub'&&!c.followOf&&v&&o.indexOf(v)<0)o.push(v);});});return o;}
-function _veOf(p,v){var m=(p&&p.vendorEval&&typeof p.vendorEval==='object')?p.vendorEval:{};return m[_veKey(v)]||null;}
-function _veScore(e){if(!e||!e.s)return null;var n=0,t=0;_VE_ITEMS.forEach(function(k){var x=parseInt(e.s[k[0]]);if(x>=1&&x<=5){n++;t+=x;}});return n?t/n:null;}
-function _veAvg(v){var L=[];(PROJECTS||[]).forEach(function(p){if(!p||p.voidAt)return;var e=_veOf(p,v),sc=_veScore(e);if(sc!=null&&!e.skip)L.push(sc);});
-  return L.length?{avg:Math.round(L.reduce(function(a,b){return a+b;},0)/L.length*10)/10,n:L.length}:null;}
-function _veChip(v){var a=_veAvg(v);return a?('<span style="font-size:11px;color:#b26a00;font-weight:700;white-space:nowrap">★ '+a.avg+'（'+a.n+' 案）</span>'):'';}
-function _veList(){var out=[],lim=Date.now()-90*864e5;
-  (Q||[]).forEach(function(q){if(!q||q.parentId||!q.closed)return;var at=+q.closedAt||0;if(!at||at<lim)return;   /* 審查：舊結案沒有結案時間＝不出卡（不然舊案每家分包都跑出來） */var p=_prjOfQ(q.id);if(!p||p.voidAt)return;
-    _veVendors(q).forEach(function(v){if(!_veOf(p,v))out.push({qid:q.id,v:v});});});
-  return out;}
-function _veSave(qid,v,rec){var p=_prjOfQ(qid);if(!p)return false;var m=Object.assign({},(p.vendorEval&&typeof p.vendorEval==='object')?p.vendorEval:{});
-  m[_veKey(v)]=Object.assign({v:String(v).slice(0,80),at:Date.now(),by:_mvMe()},rec);p.vendorEval=m;p._mt=Date.now();saveProjects();return true;}
-function _veModal(x){
-  var q=(Q||[]).find(function(y){return y&&y.id===x.qid;})||{},e=_veOf(_prjOfQ(x.qid),x.v)||{},sv=e.s||{};
-  var row=function(k){return '<div style="display:flex;align-items:center;gap:8px;margin:6px 0;flex-wrap:wrap"><span style="flex:0 0 56px;font-size:13px;font-weight:700">'+k[1]+'</span>'
-    +[1,2,3,4,5].map(function(n){return '<label style="display:inline-flex;align-items:center;gap:2px;font-size:13px"><input type="radio" name="ve-'+k[0]+'" value="'+n+'"'+(parseInt(sv[k[0]])===n?' checked':'')+'>'+n+'</label>';}).join('')+'</div>';};
-  _modal('包商評分：'+esc(x.v),'<div style="font-size:12px;color:var(--b4);margin-bottom:6px">'+esc(q.name||'')+'　1＝很差、3＝普通、5＝很好</div>'+_VE_ITEMS.map(row).join('')
-    +'<div class="f" style="margin-top:8px"><label>一句話（選填）</label><input id="ve-note" maxlength="120" value="'+esc(e.note||'')+'" style="width:100%;box-sizing:border-box"></div>',function(){
-    var s2={},miss=[];_VE_ITEMS.forEach(function(k){var c=document.querySelector('input[name="ve-'+k[0]+'"]:checked');if(c)s2[k[0]]=parseInt(c.value);else miss.push(k[1]);});
-    if(miss.length){toast('還沒評：'+miss.join('、'));return false;}
-    _veSave(x.qid,x.v,{s:s2,note:String(gv('ve-note')||'').trim().slice(0,120)});toast('已記 '+x.v+' 的評分');
-    try{_decRefresh('vendorEval');}catch(er){_err('_veModal.refresh',er);}
-  });
+// v6.0.233 陳軒 11/11（上線後健檢 M5）：包商評鑑統一用小批次那一套（結案卡裡評、存在分包成本卡 c.eval、只有管理員看得到）；
+//   第 7 步線原本的評分卡（vendorEval，存在一般資料 p.vendorEval、廠商清單員工也看得到 ★）拿掉。廠商清單的分數改讀小批次的 _cevOfVendor，只給管理員看。
+function _veChip(v){
+  try{if(!_decIsAdmin()||_isReaderUser||typeof window._cevOfVendor!=='function')return '';var L=window._cevOfVendor(v)||[],t=0,n=0;
+    L.forEach(function(e){var k=['q','t','c'].map(function(x){return parseFloat(e&&e[x]);}).filter(function(x){return x>=1&&x<=5;});if(k.length){t+=k.reduce(function(a,b){return a+b;},0)/k.length;n++;}});
+    return n?('<span style="font-size:11px;color:#b26a00;font-weight:700;white-space:nowrap">★ '+(Math.round(t/n*10)/10)+'（'+n+' 案）</span>'):'';
+  }catch(e){_err('_veChip',e);return '';}
 }
-_decReg('vendorEval',{
-  title:'包商評分',todo:function(n){return '結案的包商評分 '+n+' 家';},sub:'確認／修改＝打分數（品質、工期、安全、配合度、價格）；退回＝這家不評',
-  canSee:function(){return !_isReaderUser&&_decIsAdmin();},
-  list:_veList,
-  key:function(x){return x.qid+'|'+_veKey(x.v);},
-  head:function(x){var q=(Q||[]).find(function(y){return y&&y.id===x.qid;})||{};return x.v+'（'+(q.name||'')+'）';},
-  body:function(){return '<div style="font-size:11.5px;color:var(--b4)">工程已結案，幫這家分包打個分數，之後發包選廠商用得到</div>';},
-  detail:function(x){var q=(Q||[]).find(function(y){return y&&y.id===x.qid;})||{},a=_veAvg(x.v);
-    var cs=(q.costs||[]).filter(function(c){return c&&c.type==='sub'&&String(c.vendor||'').trim()===x.v;});
-    return '<div style="font-size:12.5px">工程：'+esc(q.name||'')+'<br>分包：'+esc(x.v)+'（'+cs.length+' 張分包卡）'+(a?('<br>以前的平均：★ '+a.avg+'（'+a.n+' 案）'):'<br>以前還沒評過')+'</div>';},
-  ok:function(x){_veModal(x);return 'open';},
-  reject:function(x,why){return _veSave(x.qid,x.v,{skip:1,why:String(why||'不評').slice(0,120)});},
-  edit:function(x){_veModal(x);}
-});
 // ══════════ 改版第 7 步 7c 加碼④：分段拔樁（v6.0.225，只顯示；Lotion 11/10：分階段計逾期租金本來就有，不加新規則、不改算法）══════════
 // 專案「拆除拔樁」那一步列出每個有租期的工項、每一批（完成日、支數、逾期計費天數），資料直接用 FJC.todo.rentStatus（拔除完成日模式的 batches＝rentBatchQtyDays）
 // 與 rentBatchList（還沒逾期也列已完成的批次），不另算一份
