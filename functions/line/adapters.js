@@ -50,6 +50,20 @@ function mkDeps(token) {
     },
     dbSet: async (path, val) => { await db.ref(path).set(val); },
     dbGet: async path => (await db.ref(path).once('value')).val(),
+    // v6.0.235 17:30 日報問句列工項：報價（RTDB 的 key 可能被編碼、陣列可能存成物件）
+    getQuote: async (qid) => {
+      const enc = String(qid).replace(/\./g, '~d~').replace(/#/g, '~h~').replace(/\$/g, '~s~').replace(/\//g, '~sl~').replace(/\[/g, '~lb~').replace(/\]/g, '~rb~');   // 同前端 _fbEncKey
+      let raw = (await db.ref('fydata/shared/quotes/' + enc).once('value')).val();
+      if (!raw || raw.id !== qid) {   // 還沒改逐筆存的舊格式（整包陣列）：整包讀一次找 id
+        const all = (await db.ref('fydata/shared/quotes').once('value')).val() || {};
+        raw = Object.keys(all).map((k) => all[k]).find((x) => x && x.id === qid) || null;
+      }
+      if (!raw) return null;
+      const q = require('../ops/pnl.js').deepDec(raw);
+      const arr = (x) => Array.isArray(x) ? x : (x && typeof x === 'object' ? Object.keys(x).sort((a, b) => +a - +b).map((k) => x[k]) : []);
+      q.items = arr(q.items); q.dailyLogs = arr(q.dailyLogs).filter(Boolean).map((L) => Object.assign({}, L, { progressRows: arr(L.progressRows) }));
+      return q;
+    },
     reply: (replyToken, text) => lineJson(LINE_API + '/message/reply', { replyToken, messages: [{ type: 'text', text: String(text).slice(0, 4900) }] }),
     push: (to, text) => lineJson(LINE_API + '/message/push', { to, messages: [{ type: 'text', text: String(text).slice(0, 4900) }] }),
     // v6.0.134 本月已用的推播則數（LINE 官方帳號額度）；查不到回 null
