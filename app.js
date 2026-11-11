@@ -46389,8 +46389,8 @@ _decReg('addonSign',{
 function _attStaff(){var out=[],cnt={};try{_hrActive().forEach(function(p){var n=String(p.name||'').trim();if(!n)return;cnt[n]=(cnt[n]||0)+1;out.push({id:p.id,name:n});});}catch(e){_err('_attStaff',e);}
   return out.map(function(x){x.dup=cnt[x.name]>1;return x;});}
 function _attCrewText(t){var m=/【\s*人和機具\s*】([^【]*)/.exec(String(t||''));return m?m[1].trim().slice(0,600):'';}
-// 誰可以確認這個案子的出工：管理員＋這案的工務。工務名單（主線的專案工務名單）上線後只改這個函式，卡片不用改
-function _attReviewers(q){var L=[];try{var p=(typeof _prjOfQ==='function')?_prjOfQ(q):null,w=p&&(p.siteStaff||p.crewStaff);if(Array.isArray(w))L=w.map(function(x){return String((x&&x.email)||x||'').toLowerCase();}).filter(Boolean);}catch(e){_err('_attReviewers',e);}return L;}
+// 誰可以確認這個案子的出工：管理員＋這案的工務（主線 _siteEngOf）；名單來源改了只改這個函式，卡片不用改
+function _attReviewers(q){try{if(q&&typeof _siteEngOf==='function')return _siteEngOf(q.id).map(function(r){return String(r.email||'').toLowerCase();}).filter(Boolean);}catch(e){_err('_attReviewers',e);}return [];}   // 主線專案工務名單（_siteEngOf，fydata/siteEng）上線前回空＝只有管理員
 function _attCanSee(q){if(_decIsAdmin())return true;var me=String(_meEmail()||'').toLowerCase();return !!me&&_attReviewers(q).indexOf(me)>=0;}
 // 把一則日報的【人和機具】拆成出工：回傳有沒有改到 log（crewOf 還沒載入就先只存原文，之後 _attScan 再補）
 function _attIngest(q,log,crew){
