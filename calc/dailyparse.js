@@ -47,7 +47,7 @@
     return out; }
   // 跟 functions/ops/progress.js、calc/todo.js 的 itemCat 一樣
   function itemCat(it) { var c = it && it.cat; if (c === 'install') return { i: 1, r: 0 }; if (c === 'remove') return { i: 0, r: 1 }; if (c === 'both') return { i: 1, r: 1 }; if (c === 'other') return { i: 0, r: 0 };
-    var d = String((it && it.desc) || ''); return { i: /打設|裝設|安裝/.test(d) ? 1 : 0, r: /拔除|拆除/.test(d) ? 1 : 0 }; }
+    var d = String((it && it.desc) || ''); return { i: /打設|裝設|安裝|組立|鋪設|架設|吊裝|施打/.test(d) ? 1 : 0, r: /拔除|拆除/.test(d) ? 1 : 0 }; }   // 健檢 H2：字表跟 calc/todo.js itemCat 同一份
   function isLine(it) { return it && !it.sec && !it.spare && !(num(it.price) < 0 && num(it.qty) > 0) && String(it.desc || '').trim(); }
   // 一段文字裡的數量（排除 L=12M、第 2 層、長 9M、H300）
   function qtyOf(s) {
@@ -96,6 +96,7 @@
         if (cut.length < 2) { pieces.push(pc); return; } cut.forEach(function (e, i) { var t = pc.slice(last, i === cut.length - 1 ? pc.length : e).trim(); last = e; if (t) pieces.push(t); }); });
       pieces.forEach(function (pc) {
         var q = qtyOf(pc);
+        if (!q && DONE.test(pc) && !NOT_DONE.test(pc) && rows.length && !Object.keys(terms(pc)).length) { rows[rows.length - 1].batchDone = true; return; }   // v6.0.235：「這段拔完」本身有「拔」字，先當本段完成看
         if (!q) { if (phaseOf(pc)) linePh = phaseOf(pc); if (Object.keys(terms(pc)).length || phaseOf(pc)) ctx = (ctx + ' ' + pc).trim();
           else if (DONE.test(pc) && !NOT_DONE.test(pc) && rows.length) rows[rows.length - 1].batchDone = true;   // 「…20支，這段完成」
           return; }
@@ -115,7 +116,181 @@
   }
   // 累計（已確認的日報＋這次）跟合約數量比：logs＝q.dailyLogs，phOf(row)＝打設／拔除判斷（前端 _prPhase）
   function cumOf(logs, idx, ph, phOf) { var s = 0; (logs || []).forEach(function (L) { if (!L || L.photoOnly) return; (L.progressRows || []).forEach(function (r) { if (r && Number(r.itemIdx) === idx && num(r.qty) > 0 && (!phOf || phOf(r) === ph)) s += num(r.qty); }); }); return Math.round(s * 1000) / 1000; }
-  var dl = { parse: parse, cumOf: cumOf, qtyOf: qtyOf, terms: terms, specs: specs, cn2n: cn2n, norm: norm };
+  // ── 新格式（Lotion 11/11：「LINE 的日報直接改格式，讓系統好判斷，工務也不會混亂」）──
+  // askList(items, logs) → [{no, idx, label, unit}]：17:30 問句列的「本工地工項」（還沒做完的、短編號 1～N，最多 max 項）
+  //   做完＝能打設的打設累計 ≥ 合約數量、能拔除的拔除累計 ≥ 合約數量（兩種都不是的工項：任何數量累計 ≥ 合約數量）
+  function _cat2(it) { var c = itemCat(it), d = firstLine(it && it.desc); if (!c.i && /組立|鋪設|架設|吊裝/.test(d)) c = { i: 1, r: c.r }; return c; }
+  function _phOf(r) { return r && r.ph === 'remove' ? 'remove' : 'install'; }
+  function askList(items, logs, max) {
+    items = Array.isArray(items) ? items : []; max = max > 0 ? max : 15; var out = [];
+    items.forEach(function (it, i) {
+      if (out.length >= max || !isLine(it) || !(num(it.qty) > 0) || (it && it.cat === 'other')) return;   // 技師簽證這類（類別「其他」）不列
+      var c = _cat2(it), q = num(it.qty), ins = cumOf(logs, i, 'install', _phOf), rm = cumOf(logs, i, 'remove', _phOf);
+      var done = (c.i || c.r) ? ((!c.i || ins >= q - 1e-9) && (!c.r || rm >= q - 1e-9)) : (ins + rm >= q - 1e-9);
+      if (done) return;
+      out.push({ no: out.length + 1, idx: i, label: firstLine(it.desc).replace(/\s+/g, ' ').trim().slice(0, 30), unit: String(it.unit || '') });
+    });
+    return out;
+  }
+  var FMT_TAGS = { '日期': 'date', '工地': 'site', '本工地工項': 'list', '今天做了': 'today', '今天': 'today', '人和機具': 'crew', '支出': 'exp', '明天': 'tomorrow', '問題': 'issue' };
+  var FMT_RE = /【\s*(本工地工項|今天做了|人和機具|日期|工地|今天|支出|明天|問題)\s*】/g;
+  // sections(text) → {date, site, list, today, crew, tomorrow, issue, tagged}：沒有任何【】欄位＝tagged:false（舊寫法）
+  function sections(text) {
+    var t = String(text || '').replace(/\r/g, ''), out = { tagged: false }, segs = [], m; FMT_RE.lastIndex = 0;
+    while ((m = FMT_RE.exec(t))) segs.push({ k: FMT_TAGS[m[1]], s: m.index, e: FMT_RE.lastIndex });
+    if (!segs.length) return out;
+    out.tagged = true;
+    segs.forEach(function (g, i) { var v = t.slice(g.e, i + 1 < segs.length ? segs[i + 1].s : t.length).trim(); out[g.k] = (out[g.k] ? out[g.k] + '\n' : '') + v; });
+    return out;
+  }
+  // 範本的 【本工地工項】 那段（工項名稱可能有「追加」「變更」字樣）拿掉，給警報／追加判斷用
+  function stripList(text) { var t = String(text || ''); if (!/【\s*本工地工項\s*】/.test(t)) return t; return t.replace(/【\s*本工地工項\s*】[^]*?(?=【|$)/g, ''); }
+  var ACT_IN = /打設|施打|打入|裝設|安裝|架設|組立|鋪設|吊裝|打(?!完)|裝(?!完)/, ACT_RM = /拔除|拔樁|拔|拆除|拆|回收|撤除/;
+  var NO_LINE = /^(\d{1,2})(?!\d|\.\d)\s*[.、)）:：]?\s*(?![支根片組處座孔台噸個顆段只式米公人位名工]|M(?![A-Za-z])|m(?![A-Za-z])|T(?![A-Za-z]))(.*)$/;
+  // 審查：「1 打設 H350 13M 12支」→ 取 12 支（有合約單位就優先取同單位的數字；沒有就跟 qtyOf 一樣，有支數不取 M）
+  function _numIn(s, iu) { var re = new RegExp('([0-9]+(?:\\.[0-9]+)?|[一二兩三四五六七八九十百]{1,5})\\s*(' + UNIT + ')?(?![A-Za-z0-9])', 'g'), m, all = [];
+    while ((m = re.exec(s))) { var pre = s.slice(Math.max(0, m.index - 2), m.index); if (/L\s*[=＝]?\s*$|長\s*$|深\s*$|第\s*$|每\s*$|[A-Za-z]$/i.test(pre)) continue; var n = cn2n(m[1]); if (n > 0) all.push({ n: n, u: m[2] ? normUnit(m[2]) : '' }); }
+    if (!all.length) return null; if (all.length === 1) return all[0];
+    var U = normUnit(iu || ''), same = U ? all.filter(function (x) { return x.u === U; }) : [];
+    if (same.length) return same[0];
+    var notM = all.filter(function (x) { return x.u && x.u !== 'M'; }); if (notM.length) return notM[0];
+    var bare = all.filter(function (x) { return !x.u; }); return bare.length ? bare[0] : all[0]; }
+  // 清單上那一項還在報價的同一列（報價改過就用名稱找；找不到 → -1）
+  function _listIdx(e, items) {
+    if (!e) return -1; var lb = String(e.label || '').replace(/\s+/g, ' ').trim(), at = items[e.idx];
+    var same = function (it) { return isLine(it) && firstLine(it.desc).replace(/\s+/g, ' ').trim().slice(0, 30) === lb; };
+    if (at && same(at)) return e.idx;
+    var hits = []; items.forEach(function (it, i) { if (same(it)) hits.push(i); }); return hits.length === 1 ? hits[0] : -1;
+  }
+  // parseFmt(text, list, items) → 跟 parse 一樣的 {rows, skip}，另加 fmt（有沒有用新格式）、crew／tomorrow／issue（原文）
+  //   有【今天做了】（或舊的【今天】）→ 只拆那一段，一行一項：「編號＋動作＋數量（＋這段拔完）」照 list 對工項、單位照合約；
+  //   寫工項名稱的那行照 parse 的對位規則；【人和機具】不算工項數量；【本工地工項】是範本，不拆
+  //   沒有任何【】欄位（舊寫法、自由寫）→ 整段照 parse
+  function parseFmt(text, list, items) {
+    items = Array.isArray(items) ? items : []; list = Array.isArray(list) ? list : [];
+    var S = sections(norm(text));
+    if (!S.tagged || S.today == null) { var P0 = parse(text, items); P0.fmt = false; return P0; }
+    var rows = [], skip = [], byNo = {}; list.forEach(function (e) { if (e && e.no) byNo[e.no] = e; });
+    var LINES = []; String(S.today || '').split('\n').forEach(function (raw) { raw.split(/[，,、；;]\s*(?=\d{1,2}(?![\d.])\s*[.、)）:：]?\s*(?:打|拔|組|拆|裝|架|鋪|施|吊|回|撤|安))/).forEach(function (x) { LINES.push(x); }); });   // 「1 打設 12、2 拔除 3」一行寫兩項
+    LINES.forEach(function (raw) {
+      var line = raw.replace(/^[\s　]*[-•・*]\s*/, '').trim(); if (!line || /^[（(]?\s*例/.test(line) || /^[（(].*[）)]$/.test(line)) return;
+      var m = NO_LINE.exec(line);
+      if (m && byNo[+m[1]]) {
+        var e = byNo[+m[1]], rest = m[2] || '', idx = _listIdx(e, items), it = idx >= 0 ? items[idx] : null;
+        var q = _numIn(rest, it ? it.unit : e.unit), ph = ACT_RM.test(rest) ? 'remove' : (ACT_IN.test(rest) ? 'install' : ''), bd = DONE.test(rest) && !NOT_DONE.test(rest), why = '', cand = null;
+        var c = it ? _cat2(it) : { i: 0, r: 0 }, iu = it ? String(it.unit || '') : String(e.unit || '');
+        if (!ph && it) ph = (c.r && !c.i) ? 'remove' : (c.i && !c.r ? 'install' : '');
+        if (idx < 0) why = '第 ' + e.no + ' 項（' + e.label + '）在報價裡找不到了（報價改過），請選';
+        else if (!q) why = '沒寫數量';
+        else if (!ph) why = '沒寫打設還是拔除';
+        else if (ph === 'remove' && !c.r && c.i) why = '這個工項只有打設，寫的是拔除';
+        else if (ph === 'install' && !c.i && c.r) why = '這個工項只有拔除，寫的是打設';
+        else if (q.u && iu && normUnit(iu) !== q.u) why = '寫的單位（' + q.u + '）跟合約（' + iu + '）不同';
+        else if (UNSURE.test(rest) || RANGE.test(rest)) why = RANGE.test(rest) ? '數量是範圍，請確認' : '「' + (rest.match(UNSURE) || [''])[0] + '」不一定是今天做的量，請確認';
+        if (why && idx >= 0) cand = [idx];
+        rows.push({ itemIdx: why ? -1 : idx, qty: q ? q.n : 0, unit: normUnit(iu) || (q && q.u) || '', ph: ph, batchDone: bd, text: line.slice(0, 120), sure: !why, why: why, cand: cand, no: e.no });
+        return;
+      }
+      var P1 = parse(line, items);
+      P1.rows.forEach(function (r) { rows.push(r); });
+      if (!P1.rows.length) skip.push(line.slice(0, 60));
+    });
+    String(S.crew || '').split('\n').forEach(function (l) { l = l.trim(); if (l && !/^[（(]?\s*例/.test(l)) skip.push('人和機具：' + l.slice(0, 60)); });
+    return { rows: rows, skip: skip, fmt: true, crew: S.crew || '', tomorrow: S.tomorrow || '', issue: S.issue || '' };
+  }
+  // ── 【支出】（Lotion 11/11，選填）：一行一筆「項目＋金額＋付款方式（零用金／代墊 誰／公司付）」→ expOf 拆成支出草稿，Lotion 在卡片確認才入帳 ──
+  //   金額＝不接數量單位（個、份、人、箱…）的數字，寫「元」的優先；付款方式沒寫、代墊沒寫是誰、沒寫金額 → why（卡片標黃，不猜）
+  var EXP_QTY_U = '個|份|人|支|箱|包|瓶|罐|台(?!幣)|趟|天|片|組|公斤|kg|KG|顆|條|捲|桶|張|盒|袋|件|杯|次|輛|公升|L|度|小時|hr';
+  var EXP_PAYW = /零用金|代墊|墊付|代付|公司付|公司出|公司帳|公司轉帳|月結/g;
+  function expOf(text) {
+    var S = sections(norm(text)), out = [];
+    String(S.exp || '').split('\n').forEach(function (raw) {
+      var line = raw.replace(/^[\s　]*(?:\d+[.、)]\s+|[-•・*]\s*)/, '').trim(); if (!line || /^[（(]?\s*例/.test(line) || /^[（(].*[）)]$/.test(line)) return;
+      // 審查：日期（11/11、11-11）不是金額；數量單位（個、次、公升…）後面的數字不是金額；寫「元／塊／$／NT」的優先；剩兩個以上沒標的數字＝金額不確定
+      var L2 = line.replace(/\d{1,4}\s*[\/／-]\s*\d{1,2}(?:\s*[\/／-]\s*\d{1,2})?/g, function (m) { return ' '.repeat(m.length); });
+      var re = new RegExp('(NT\\$|\\$|NT)?\\s*(\\d+(?:\\.\\d+)?)\\s*(元|塊|' + EXP_QTY_U + ')?', 'g'), m, cand = [], spans = [];
+      while ((m = re.exec(L2))) { if (!m[2]) { re.lastIndex++; continue; } spans.push([m.index, m.index + m[0].length]); if (m[3] && m[3] !== '元' && m[3] !== '塊') continue; cand.push({ n: parseFloat(m[2]), mark: !!(m[1] || m[3]) }); }
+      var marked = cand.filter(function (c) { return c.mark; }), pick = marked[0] || (cand.length === 1 ? cand[0] : (cand.length ? cand[cand.length - 1] : null)), unsure = !marked.length && cand.length > 1;
+      var pay = '', who = '';
+      var mw = /(?:代墊|墊付|代付)\s*[:：]?\s*[（(]?\s*([^\s,，、0-9（）()]{1,4})/.exec(line), mp = /零用金\s*[:：]?\s*[（(]?\s*([^\s,，、0-9（）()]{1,4})/.exec(line);
+      if (/零用金/.test(line)) { pay = 'petty'; if (mp) who = mp[1]; }
+      else if (/代墊|墊付|代付/.test(line)) { pay = 'adv'; if (mw) who = mw[1]; }
+      else if (/公司付|公司出|公司帳|月結|公司轉帳/.test(line)) pay = 'co';
+      who = who.replace(/(先付|先墊|付的|墊的|的|了|付)$/, '');
+      if (/代墊|墊付|代付|公司|月結/.test(who)) who = '';
+      // 審查：項目＝整行拿掉金額、數量、日期、付款方式、人名之後剩下的字（金額寫在前面也抓得到）
+      var item = line; spans.slice().reverse().forEach(function (sp) { item = item.slice(0, sp[0]) + ' ' + item.slice(sp[1]); });
+      item = item.replace(/\d{1,4}\s*[\/／-]\s*\d{1,2}(?:\s*[\/／-]\s*\d{1,2})?/g, ' ').replace(EXP_PAYW, ' ');
+      if (who) item = item.split(who).join(' ');
+      item = item.replace(/NT\$?|\$|新?台幣|先付|先墊|[，,、:：（）()]/g, ' ').replace(/\s+/g, ' ').trim();
+      var why = !pick ? '沒寫金額' : (unsure ? '金額不確定（有好幾個數字），請確認' : (!pay ? '沒寫付款方式（零用金／代墊 誰／公司付）' : ((pay === 'adv' || pay === 'petty') && !who ? (pay === 'adv' ? '代墊沒寫是誰' : '零用金沒寫是誰') : '')));
+      out.push({ text: line.slice(0, 120), item: item.slice(0, 40), amt: pick ? Math.round(pick.n) : 0, pay: pay, who: who, sure: !why, why: why });
+    });
+    return out;
+  }
+  // ── 【人和機具】出工人名（薪資完整版用，Lotion 11/11 定「以 LINE 日報為主」）──
+  // crewOf(text, staff) → { heads, temps（點工人數，不對名冊）, people:[{raw, name, day, ot, off, staff, cand, sure, why}], machines:[{name, n}], raw, why:[] }
+  //   text：整則日報（有【人和機具】只看那段）或那段原文；staff：人員名冊名字陣列（可空）
+  //   寫法：「人 5（阿明、小陳半天、阿華加班 2）」「工人：阿明、小陳」「點工 2 人」；半天／半日／0.5＝day 0.5，加班 N（小時／H）＝ot N，請假／沒來＝off
+  //   名字跟名冊完全一樣才 sure；只像（互相包含）放 cand、不猜；人數跟名字數對不上 → why（給出工確認卡）
+  var CREW_HEAD = /(點工|臨時工|工人|人員|人數|師傅|人)\s*([:：])?\s*([0-9]+|[一二兩三四五六七八九十]{1,3})?\s*(?:人|名|位)?/g;
+  var CREW_MACH = /(怪手|挖土機|小山貓|山貓|吊車|發電機|空壓機|振動機|震動機|打樁機|拔樁機|電焊機|卡車|拖車|板車|鑽機|夾頭)\s*[:：]?\s*([0-9]+|[一二兩三四五六七八九十]{1,2})?\s*(?:台|部|輛|組)?/g;
+  function _crewTok(raw, staff) {
+    var t = String(raw || '').trim(), day = 1, ot = 0, off = false, why = '';
+    var mo = /加班\s*([0-9]+(?:\.[0-9]+)?|[一二兩三四五六七八九十]{1,2})\s*(?:小時|hr|HR|H|h|時)?/.exec(t);
+    if (mo) { ot = cn2n(mo[1]); t = t.replace(mo[0], ' '); } else if (/加班/.test(t)) { why = '加班沒寫幾小時'; t = t.replace(/加班/g, ' '); }
+    if (/半天|半日|0\.5\s*天?|半工/.test(t)) { day = 0.5; t = t.replace(/半天|半日|0\.5\s*天?|半工/g, ' '); }
+    if (/請假|沒來|休息|休假|缺勤/.test(t)) { off = true; day = 0; t = t.replace(/請假|沒來|休息|休假|缺勤/g, ' '); }
+    t = t.replace(/全天|整天|全日|一天/g, ' ').replace(/[（）()\[\]【】:：。.!！?？]/g, ' ').replace(/\s+/g, '').trim();
+    var name = t, hit = '', cand = [];
+    if (name && staff.length) {
+      if (staff.indexOf(name) >= 0) hit = name;
+      else cand = staff.filter(function (s) { return s && (s.indexOf(name) >= 0 || name.indexOf(s) >= 0); }).slice(0, 3);
+    }
+    if (!name) why = why || '看不出名字';
+    else if (name.length > 6) why = why || '名字太長，可能不是人名';
+    else if (staff.length && !hit) why = why || (cand.length ? '名冊沒有「' + name + '」，是不是 ' + cand.join('、') + '？' : '名冊沒有「' + name + '」');
+    return { raw: String(raw || '').trim().slice(0, 30), name: name, day: day, ot: ot, off: off, staff: hit, cand: cand, sure: !why, why: why };
+  }
+  function _crewSplit(list) {   // 「阿明、小陳半天／阿華加班 2」；空白分開的名字也拆（「阿明 阿華」），「阿華 請假」「阿華加班 2」不拆
+    var out = []; String(list || '').split(/[、,，\/／;；]+/).forEach(function (x) {
+      String(x).split(/\s+(?=[^\s0-9.一二兩三四五六七八九十半加請沒休缺全整小時hH])/).forEach(function (y) { if (String(y).trim()) out.push(y); }); });
+    return out;
+  }
+  function crewOf(text, staff) {
+    staff = (Array.isArray(staff) ? staff : []).map(function (x) { return String(x || '').trim(); }).filter(Boolean);
+    var t = String(text || '').replace(/\r/g, ''), S = sections(norm(t));
+    var body = S.tagged ? String(S.crew || '') : t, out = { heads: null, temps: 0, people: [], machines: [], raw: body.trim(), why: [] };
+    body.split('\n').forEach(function (line) {
+      line = line.replace(/^[\s　]*[-•・*]\s*/, '').trim(); if (!line || /^[（(]?\s*例/.test(line)) return;
+      var rest = line, m, cut = []; CREW_HEAD.lastIndex = 0;
+      while ((m = CREW_HEAD.exec(line))) {
+        var end = CREW_HEAD.lastIndex, n = m[3] ? cn2n(m[3]) : null, list = null, nx = line.slice(end).replace(/^\s+/, ''), sk = end + (line.slice(end).length - nx.length);
+        if (/^[（(]/.test(nx)) { var close = nx.search(/[）)]/); list = close > 0 ? nx.slice(1, close) : nx.slice(1); end = sk + (close > 0 ? close + 1 : nx.length); }
+        else if (m[2] || (n == null && /^[^\s0-9]/.test(nx) && m[1] !== '人')) { CREW_MACH.lastIndex = 0; var mm = CREW_MACH.exec(nx), stop = mm ? mm.index : nx.length; list = nx.slice(0, stop).replace(/[，,；;]\s*$/, ''); end = sk + stop; }
+        if (n == null && list == null) continue;
+        if (m[1] === '點工' || m[1] === '臨時工') { if (n != null) out.temps += n; if (list) _crewSplit(list).forEach(function (x) { var p = _crewTok(x, []); p.temp = true; p.sure = true; p.why = ''; out.people.push(p); }); }
+        else { if (n != null) out.heads = (out.heads || 0) + n; if (list) _crewSplit(list).forEach(function (x) { out.people.push(_crewTok(x, staff)); }); }
+        cut.push([m.index, end]); CREW_HEAD.lastIndex = Math.max(end, m.index + 1);
+      }
+      cut.reverse().forEach(function (c) { rest = rest.slice(0, c[0]) + ' ' + rest.slice(c[1]); });
+      CREW_MACH.lastIndex = 0;
+      while ((m = CREW_MACH.exec(rest))) out.machines.push({ name: m[1], n: m[2] ? cn2n(m[2]) : 1 });
+    });
+    var mine = out.people.filter(function (p) { return !p.temp; }), named = mine.filter(function (p) { return !p.off; }).length;
+    if (out.heads != null && mine.length && named !== out.heads) out.why.push('寫人 ' + out.heads + '，名字有 ' + named + ' 個，請確認');
+    if (out.heads && !mine.length) out.why.push('只寫人數 ' + out.heads + '，沒寫名字');
+    var seen = {}; mine.forEach(function (p) { var k = p.staff || p.name; if (k && seen[k]) { p.sure = false; p.why = p.why || '名字重複寫了兩次'; } seen[k] = 1; });
+    return out;
+  }
+  // askText(head, blocks, ymd) → 17:30 問句：blocks＝[{site, list}]（一個群組好幾個工地＝好幾段，編號各自從 1 開始）
+  function askText(head, blocks, md) {
+    var B = (blocks && blocks.length) ? blocks : [{ site: '', list: [] }];
+    return String(head || '') + '\n' + B.map(function (b) {
+      return '【日期】' + md + '\n【工地】' + (b.site || '') + '\n' + (b.list && b.list.length ? '【本工地工項】\n' + b.list.map(function (e) { return e.no + ' ' + e.label; }).join('\n') + '\n' : '') + '【今天做了】\n\n【人和機具】\n\n【支出】\n\n【明天】\n\n【問題】\n';
+    }).join('\n');
+  }
+  var dl = { parse: parse, cumOf: cumOf, qtyOf: qtyOf, terms: terms, specs: specs, cn2n: cn2n, norm: norm, askList: askList, parseFmt: parseFmt, expOf: expOf, crewOf: crewOf, sections: sections, stripList: stripList, askText: askText };
   if (typeof module !== 'undefined' && module.exports) module.exports = { dl: dl };
   root.FJC = root.FJC || {}; root.FJC.dl = dl;
 })(typeof window !== 'undefined' ? window : globalThis);
