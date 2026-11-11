@@ -43,7 +43,7 @@ jobs:
 
       # 11/11：GitHub runner 連不到 archive.ubuntu.com（DNS 暫時失敗）超過 1.5 小時，裝瀏覽器那一步失敗、測試沒跑到。
       #   ① 瀏覽器快取（key 跟著 package.json 的 playwright 版本走，升級就換新快取）
-      #   ② 每一步重試 4 次（間隔 30／60／90 秒）
+      #   ② 每一步重試（間隔 30／60 秒）；走 apt 的每次最多 6 分鐘（DNS 不通時 apt 會卡很久，不然 40 分鐘工作上限會先到）
       #   ③ apt 一直不通的退路：改用 Playwright 自己的 CDN 下載瀏覽器（不走 apt），系統套件用 runner 本來裝好的；
       #      缺套件就讓測試自己紅（測試一項都不跳過）
       - name: 快取 playwright 瀏覽器
@@ -61,10 +61,10 @@ jobs:
           retry 4 npm install --no-audit --no-fund
           if [ "$PW_HIT" = "true" ]; then
             echo "瀏覽器快取命中，只補系統套件"
-            retry 4 npx playwright install-deps chromium || echo "::warning::apt 不通，改用 runner 內建系統套件"
+            retry 2 timeout 360 npx playwright install-deps chromium || echo "::warning::apt 不通，改用 runner 內建系統套件"
             retry 4 npx playwright install chromium
           else
-            if ! retry 4 npx playwright install --with-deps chromium; then
+            if ! retry 2 timeout 360 npx playwright install --with-deps chromium; then
               echo "::warning::apt 不通，改用 runner 內建系統套件"
               retry 4 npx playwright install chromium
             fi
