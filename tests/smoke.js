@@ -1373,6 +1373,7 @@ async function newPage(browser, width, height) {
         dailyLogs: [{ id: 'dOld', date: '2026-08-20', workers: 2, subWorkers: 5, subVendor: '丙承包', progressRows: [{ itemIdx: 0, desc: 'H型鋼樁 H300 L=9M 打設', qty: 30, note: '' }], progress: '', photos: [] },
                     { id: 'dNew', date: '2026-09-02', workers: 0, subWorkers: 0, subVendor: '', progressRows: [{ itemIdx: 0, desc: 'H型鋼樁 H300 L=9M 打設', qty: 20, note: '' }], progress: '', photos: [] }] }];
       INV.length = 0; CONTRACTS.splice(0); PAYABLES.length = 0;
+      localStorage.setItem('fy_nav_old', '1'); _nav5Apply();   // 今天出工：新選單改成選工班勾人；這裡測舊選單的「點工／承包＋人數」
       // 舊日報（無 crews）照樣還原成兩列
       out.legacy = _crewsOf(Q[0].dailyLogs[0]).length === 2 && /點工 2 人/.test(_crewsText(Q[0].dailyLogs[0])) && /承包 5 人（丙承包）/.test(_crewsText(Q[0].dailyLogs[0]));
       go('quickcost'); rQuickCost();
@@ -1407,6 +1408,7 @@ async function newPage(browser, width, height) {
       go('finance'); renderCashForecast();
       const cf = document.getElementById('cashflow-forecast').innerHTML;
       out.cf = /預估付款：丙承包／廠商列案（日報已完成未計價/.test(cf) && /15,750/.test(cf);
+      localStorage.removeItem('fy_nav_old'); _nav5Apply();
       return out;
     });
     check('日報：出工改廠商列（預設點工＋承包兩列、可新增），舊日報照樣還原', r.legacy && r.twoRows && r.dl && r.cleared);
