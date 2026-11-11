@@ -14465,7 +14465,7 @@ async function newPage(browser, width, height) {
         const oA2 = _isAdminUser, oU2 = _fbUser; _isAdminUser = false; _fbUser = { email: 'staff@example.com', uid: 's' }; acctLedSetF('ap', 'all'); await T(40);
         const staffChips = Array.from(document.querySelectorAll('#acct-p-ap .acct-led-f [data-ledf]')).map((b) => b.getAttribute('data-ledf')).join(',');
         const staffTx = document.querySelector('#acct-p-ap > .acct-led').textContent; _isAdminUser = oA2; _fbUser = oU2;
-        out.chipsAp = /範例員工/.test(ls) && !/範例廠商乙/.test(ls) && /範例廠商乙/.test(lv) && !/範例員工/.test(lv) && staffChips === 'all,vendor,petty' && !/範例員工/.test(staffTx);
+        out.chipsAp = /範例員工/.test(ls) && !/範例廠商乙/.test(ls) && /範例廠商乙/.test(lv) && !/範例員工/.test(lv) && staffChips === 'all,vendor' && !/範例員工/.test(staffTx);
         localStorage.removeItem('fy_acctLedF_ar'); localStorage.removeItem('fy_acctLedF_ap');
         // 舊選單：沒有帳本、清單照舊
         localStorage.setItem('fy_nav_old', '1'); _nav5Apply(); acctTab('ap'); await T(80);
