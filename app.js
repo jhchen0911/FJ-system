@@ -4239,6 +4239,9 @@ function addAddendum(id){
 }
 
 // ── 新增下一期請款單 ──
+// 請款單草稿卡開單時先指定日期（＝本期數量截止日），開單時的日報自動帶入才會算到同一天；其他地方開單＝今天
+var _invNewDateOv='';
+function _invNewDate(){return _invNewDateOv||localToday();}
 function addNextPeriod(id){
   const src=INV.find(x=>x.id===id);if(!src)return;
   const nextPeriod=(parseInt(src.periodNo)||1)+1;
@@ -4246,7 +4249,7 @@ function addNextPeriod(id){
   const next=JSON.parse(JSON.stringify(src));
   next.id=Date.now().toString();
   next.periodNo=String(nextPeriod);
-  next.date=localToday();   // v5.387：估驗日期自動帶當天（仍可手動改）
+  next.date=_invNewDate();   // v5.387：估驗日期自動帶當天（仍可手動改）；請款單草稿卡開的＝數量截止日
   next.month='';
   next.received='';
   next.note='';
@@ -4293,6 +4296,7 @@ function addNextPeriod(id){
       note:''
     });
   });
+  try{_recalcInvAmounts(next);}catch(e){_err('addNextPeriod.tot',e);}   /* 審查：合計不沿用上一期（本期數量清空後重算） */
   INV.unshift(next);saveInv();
   loadInvoice(next.id);
   go('invoice-edit');
@@ -4899,9 +4903,10 @@ function printInvById(id){
 function _docInvOut(_inv,c){   // 請款單（以該筆記錄為準，不讀編輯器畫面）
   var _savedEid=invEid,_savedItems=invItems?JSON.parse(JSON.stringify(invItems)):[];
   invEid=_inv.id;invItems=JSON.parse(JSON.stringify(_inv.items||[]));
+  var _pvEl=document.getElementById('inv-prev-html'),_pvOld=_pvEl?_pvEl.innerHTML:'';
   buildInvPreview(_inv);   // 保留款等設定以該筆記錄為準，不讀編輯器畫面
   var h=document.getElementById('inv-prev-html')?.innerHTML||'';
-  invEid=_savedEid;invItems=_savedItems;
+  invEid=_savedEid;invItems=_savedItems;if(_pvEl)_pvEl.innerHTML=_pvOld;   /* 審查：卡片預覽不蓋掉編輯頁上正在看的那張 */
   if(!h){if(!(c&&c.quiet))toast('請款單內容為空');return null;}
   var proj=_inv.project||'工程',pno=_inv.periodNo||'',dt=(_inv.date||localToday()).replace(/-/g,'');
   var title=proj+'_請款單'+(pno?'第'+pno+'期':'')+'_'+dt;
@@ -34309,8 +34314,8 @@ function pjNewInv(qid){
   var q=Q.find(function(x){return x.id===qid;});if(!q)return;
   var _bl=[],_nb=function(L){return L.filter(function(x){try{if(_icBlank(x)){_bl.push(x);return false;}}catch(e){_err('pjNewInv.blank',e);}return true;});};
   var list=_nb(_invsOfQuote(q));if(!list.length)list=_nb(_invsOfQuoteAll(q));   /* 審查：先拿掉舊版得標自動建的空白第 1 期再找（不然真的第一張變第 2 期） */
-  if(!list.length&&_bl.length){var b0=_bl[0];try{_invStSet(b0,'draft','舊版得標建的空白第 1 期，拿來當這次的第 1 期');b0.date=localToday();}catch(e){_err('pjNewInv.reuse',e);}_touch(b0);saveInv();loadInvoice(b0.id);go('invoice-edit');toast('用原本的空白第 1 期開始填');return;}   /* 直接用那一張（不會多一張，也不會被自動收） */
-  if(!list.length){var inv=buildInvFromQuote(q);INV.unshift(inv);saveInv();loadInvoice(inv.id);go('invoice-edit');toast('已從報價單建立第 1 期請款單');return;}
+  if(!list.length&&_bl.length){var b0=_bl[0];try{_invStSet(b0,'draft','舊版得標建的空白第 1 期，拿來當這次的第 1 期');b0.date=_invNewDate();}catch(e){_err('pjNewInv.reuse',e);}_touch(b0);saveInv();loadInvoice(b0.id);go('invoice-edit');toast('用原本的空白第 1 期開始填');return;}   /* 直接用那一張（不會多一張，也不會被自動收） */
+  if(!list.length){var inv=buildInvFromQuote(q);if(_invNewDateOv)inv.date=_invNewDateOv;INV.unshift(inv);saveInv();loadInvoice(inv.id);go('invoice-edit');toast('已從報價單建立第 1 期請款單');return;}
   var last=list.slice().sort(function(a,b){return (parseInt(b.periodNo)||0)-(parseInt(a.periodNo)||0)||String(b.date||'').localeCompare(String(a.date||''));})[0];
   addNextPeriod(last.id);
 }
@@ -46434,58 +46439,70 @@ function _ibInvs(q){var L=[];try{L=_invsOfQuote(q);if(!L.length)L=_invsOfQuoteAl
 // 這期每個工項是哪幾天的日報：since（上一張請款單日期）之後到截止日
 function _ibSrc(q,idx,since,to){var out=[];((q&&q.dailyLogs)||[]).forEach(function(L){var d=String((L&&L.date)||'');if(!d||d<=since||d>to||L.photoOnly)return;var s=0,rm=0;((L.progressRows)||[]).forEach(function(r){if(r&&Number(r.itemIdx)===idx&&(parseFloat(r.qty)||0)>0){if(_prPhase(q,r)==='remove')rm+=parseFloat(r.qty)||0;else s+=parseFloat(r.qty)||0;}});if(s>0||rm>0)out.push({d:d,q:Math.round(s*100)/100,r:Math.round(rm*100)/100});});return out.sort(function(a,b){return a.d<b.d?-1:1;});}   /* 審查：打設、拔除分開 */
 function _ibPrevQty(inv,desc){if(!inv)return null;var k=String(desc||'').split('\n')[0].trim(),it=(inv.items||[]).find(function(x){return x&&x.type!=='sec'&&!x.remRid&&String(x.desc||'').split('\n')[0].trim()===k;});return it?_invRemSibs(it,inv.items).reduce(function(a,y){return a+(parseFloat(y.curQty)||0);},0):null;}   /* 審查：拔除另列一起算 */
-function _ibDetailHtml(b){var q=_ibQ(b.qid);if(!q)return '';var invs=_ibInvs(q),last=invs[0]||null,n=last?(parseInt(last.periodNo)||0)+1:1;
-  var ph=function(r){return _prPhase(q,r);};
-  var rows=b.items.map(function(x){var it=(q.items||[])[x.idx]||{},src=_ibSrc(q,x.idx,b.since||'',b.cutDate),tg=Math.abs(parseFloat(it.qty)||0),ci=FJC.dl.cumOf(q.dailyLogs,x.idx,'install',ph),cr=FJC.dl.cumOf(q.dailyLogs,x.idx,'remove',ph),over=tg>0&&(ci>tg+1e-9||cr>tg+1e-9),pv=_ibPrevQty(last,it.desc);
-    var ni=src.reduce(function(a,s){return a+s.q;},0),nr=src.reduce(function(a,s){return a+s.r;},0);
-    var two=function(a,r){return (a?'打設 '+fmt(Math.round(a*100)/100):'')+(a&&r?'<br>':'')+(r?'拔除 '+fmt(Math.round(r*100)/100):'')||'0';};
-    var lit=last?(last.items||[]).find(function(y){return y&&y.type!=='sec'&&String(y.desc||'').split('\n')[0].trim()===String(it.desc||'').split('\n')[0].trim();}):null,cq=Math.abs(parseFloat(it.qty)||0),pw=lit?_invRemSibs(lit,last.items).reduce(function(a,y){return a+(parseFloat(y.prevQty)||0)+_wQty(y.curQty,y.payRate);},0):0;
-    var pi=_invPhasePct(q,it,'install'),pr=_invPhasePct(q,it,'remove'),tw=ni*pi/100+nr*pr/100,cum=cq>0?Math.round((pw+tw)/cq*1000)/10:null,pcs=(ni?'打設 '+pi+'%':'')+(ni&&nr?'<br>':'')+(nr?'拔除 '+pr+'%':'');
-    if(cum!=null&&cum>100.05)over=true;
-    if(ni>0&&nr>0)pcs+='<div style="color:#b26a00">這期打設、拔除都有：請款單會另加一列「（拔除）」請 '+fmt(Math.round(nr*100)/100)+'（拔除 '+pr+'%）</div>';   /* 審查：卡片不要寫成兩種都會請 */
-    return '<tr'+(over?' style="background:#ffebee"':'')+'><td style="padding:2px 4px">'+esc(x.desc)+'<div style="font-size:11px;color:var(--b4)">這期請 '+(pcs||'—')+'，累計 '+(cum==null?'—':'<b style="white-space:nowrap'+(cum>100.05?';color:#c62828':'')+'">'+cum+'%</b>')+(cum!=null&&cum>100.05?'（超過 100%，開單後請調整）':'')+'</div><div style="font-size:11px;color:var(--b4)">日報：'+(src.map(function(s){return esc(s.d.slice(5))+' '+(s.q?fmt(s.q):'')+(s.r?(s.q?'＋':'')+'拔'+fmt(s.r):'');}).join('、')||'—')+'</div></td><td style="text-align:center">'+two(ni,nr)+' '+esc(x.unit)+'</td><td style="text-align:center">'+(pv==null?'—':fmt(pv))+'</td><td style="text-align:center;'+(over?'color:#c62828;font-weight:700':'')+'">'+two(ci,cr)+'<br>／ '+(tg?fmt(tg):'—')+(over?'<br>超過合約':'')+'</td></tr>';}).join('');
+// Lotion 11/11（題 2 改）：請款單日期＝本期數量算到的那天＝截止日前 3 天（留時間送業主確認）；在那之前就按確認＝今天。
+//   下一期從這張的日期隔天的日報算起（_invPrevPeriodDate／monthBill 的 since 都是上一張的日期），中間不會漏請
+var _IB_LEAD=3;
+function _ibStop(b){var s=_dAdd(b.cutDate,-_IB_LEAD),t=localToday();return t<s?t:s;}
+function _ibLastIt(last,it){var k=String((it&&it.desc)||'').split('\n')[0].trim();return last?((last.items||[]).find(function(y){return y&&y.type!=='sec'&&!y.remRid&&String(y.desc||'').split('\n')[0].trim()===k;})||null):null;}
+// 本期每個工項（日報算到 _ibStop）：卡片列表、紅字、擋確認用同一份
+function _ibRows(b){var q=_ibQ(b.qid);if(!q)return [];var last=_ibInvs(q)[0]||null,stop=_ibStop(b);
+  return (b.items||[]).map(function(x){var it=(q.items||[])[x.idx]||{},src=_ibSrc(q,x.idx,b.since||'',stop),cq=Math.abs(parseFloat(it.qty)||0);
+    var ni=Math.round(src.reduce(function(a,s){return a+s.q;},0)*100)/100,nr=Math.round(src.reduce(function(a,s){return a+s.r;},0)*100)/100;
+    var lit=_ibLastIt(last,it),pw=lit?_invRemSibs(lit,last.items).reduce(function(a,y){return a+(parseFloat(y.prevQty)||0)+_wQty(y.curQty,y.payRate);},0):0;
+    var pi=_invPhasePct(q,it,'install'),pr=_invPhasePct(q,it,'remove'),cum=cq>0?Math.round((pw+ni*pi/100+nr*pr/100)/cq*1000)/10:null;
+    return {x:x,it:it,src:src,ni:ni,nr:nr,cq:cq,pi:pi,pr:pr,cum:cum,over:cum!=null&&cum>100.05};});}
+function _ibDetailHtml(b){var q=_ibQ(b.qid);if(!q)return '';var invs=_ibInvs(q),last=invs[0]||null,n=last?(parseInt(last.periodNo)||0)+1:1,stop=_ibStop(b);
+  var ph=function(r){return _prPhase(q,r);},all=_ibRows(b),rs=all.filter(function(r){return r.ni>0||r.nr>0;}),later=all.filter(function(r){return !(r.ni>0||r.nr>0);});
+  var rows=rs.map(function(r){var x=r.x,it=r.it,tg=Math.abs(parseFloat(it.qty)||0),ci=FJC.dl.cumOf(q.dailyLogs,x.idx,'install',ph),cr=FJC.dl.cumOf(q.dailyLogs,x.idx,'remove',ph),lo=tg>0&&(ci>tg+1e-9||cr>tg+1e-9),pv=_ibPrevQty(last,it.desc);
+    var two=function(a,m){return (a?'打設 '+fmt(a):'')+(a&&m?'<br>':'')+(m?'拔除 '+fmt(m):'')||'0';};
+    var pcs=(r.ni?'打設 '+r.pi+'%':'')+(r.ni&&r.nr?'<br>':'')+(r.nr?'拔除 '+r.pr+'%':'');
+    if(r.ni>0&&r.nr>0)pcs+='<div style="color:#b26a00">這期打設、拔除都有：請款單會另加一列「（拔除）」請 '+fmt(r.nr)+'（拔除 '+r.pr+'%）</div>';   /* 審查：卡片不要寫成兩種都會請 */
+    return '<tr'+(r.over?' style="background:#ffebee"':'')+'><td style="padding:2px 4px">'+esc(x.desc)+'<div style="font-size:11px;color:var(--b4)">這期請 '+(pcs||'—')+'，累計 '+(r.cum==null?'—':'<b style="white-space:nowrap'+(r.over?';color:#c62828':'')+'">'+r.cum+'%</b>')+(r.over?'（超過 100%，要先按「修改」調整）':'')+'</div><div style="font-size:11px;color:var(--b4)">日報：'+(r.src.map(function(s){return esc(s.d.slice(5))+' '+(s.q?fmt(s.q):'')+(s.r?(s.q?'＋':'')+'拔'+fmt(s.r):'');}).join('、')||'—')+'</div></td><td style="text-align:center">'+two(r.ni,r.nr)+' '+esc(x.unit)+'</td><td style="text-align:center">'+(pv==null?'—':fmt(pv))+'</td><td style="text-align:center;'+(lo?'color:#c62828;font-weight:700':'')+'">'+two(ci,cr)+'<br>／ '+(tg?fmt(tg):'—')+(lo?'<br>日報超過合約':'')+'</td></tr>';}).join('');   /* 列底紅＝累計超過 100%（跟擋確認同一條）；右欄紅字＝日報累計超過合約數量（提醒，不擋） */
   var ad=((q.addons)||[]).filter(function(a){return a&&a.status==='confirmed'&&String(a.date||'')>String((last&&last.date)||'');});
   var ret=0;try{ret=_ownerRetPct(q)||0;}catch(e){_err('_ibDetail.ret',e);}
-  return '<div style="font-size:12.5px;line-height:1.7">第 '+n+' 期（'+(last?'上一期第 '+esc(String(last.periodNo||'?'))+' 期 '+esc(last.date||''):'第一張請款單')+'；截止 '+esc(b.cutDate)+'，'+(b.left===0?'今天':b.left+' 天後')+'）'
-    +'<table style="width:100%;font-size:12px;border-collapse:collapse;table-layout:fixed;word-break:break-all;margin-top:4px"><tr><th style="text-align:left;width:46%">工項</th><th>本期</th><th>上一期</th><th>日報累計／合約</th></tr>'+rows+'</table>'
+  return '<div style="font-size:12.5px;line-height:1.7">第 '+n+' 期（'+(last?'上一期第 '+esc(String(last.periodNo||'?'))+' 期 '+esc(last.date||''):'第一張請款單')+'；截止 '+esc(b.cutDate)+'，'+(b.left===0?'今天':b.left+' 天後')+'）<br><b>數量算到 '+esc(stop)+'</b>（請款單日期也是這天）</div>'
+    +(rs.length?'<table style="width:100%;font-size:12px;border-collapse:collapse;table-layout:fixed;word-break:break-all;margin-top:4px"><tr><th style="text-align:left;width:46%">工項</th><th>本期</th><th>上一期</th><th>日報累計／合約</th></tr>'+rows+'</table>':'<div style="color:#b26a00;margin-top:4px">到 '+esc(stop.slice(5))+' 為止沒有新的日報數量</div>')
+    +(later.length?'<div style="font-size:11.5px;color:var(--b4);margin-top:4px">'+esc(stop.slice(5))+' 之後才有日報的（算下一期）：'+esc(later.map(function(r){return String(r.x.desc||'').slice(0,14);}).join('、'))+'</div>':'')
     +(function(){var line=function(a){return esc(a.date||'')+' '+esc(String(a.text||'').slice(0,60))+(a.qty!=null?'（'+esc(String(a.qty))+esc(a.unit||'')+'）':'');},un=ad.filter(function(a){return !a.signed&&!a.signDeny;}),sg=ad.filter(function(a){return a.signed;});   /* 現場追加卡：簽認了才帶進請款 */
-      return (un.length?'<div style="background:#fff8e1;border-radius:6px;padding:6px 8px;margin-top:6px"><b style="color:#b26a00">現場追加（已確認，主任還沒簽認，這期先不請）</b><br>'+un.map(line).join('<br>')+'<div style="font-size:11px;color:#b26a00">到首頁「現場追加（主任簽認）」卡傳給主任</div></div>':'')
+      return (un.length?'<div style="background:#fff8e1;border-radius:6px;padding:6px 8px;margin-top:6px"><b style="color:#b26a00">現場追加（已確認，主任還沒簽認）</b><br>'+un.map(line).join('<br>')+'<div style="font-size:11px;color:#b26a00">先到首頁「現場追加（主任簽認）」卡傳給主任，簽好再按確認；不等簽認就按「修改」自己開單（這幾筆這期不請）</div></div>':'')
         +(sg.length?'<div style="background:#e8f5e9;border-radius:6px;padding:6px 8px;margin-top:6px"><b style="color:'+FY_BRAND.g+'">現場追加（主任已簽認，可以請款）</b><br>'+sg.map(line).join('<br>')+'<div style="font-size:11px;color:var(--b4)">開單後在請款單上加列（系統不自己改金額）</div></div>':'');})()
     +((b.rent&&b.rent.length)?'<div style="background:#fff3e0;border-radius:6px;padding:6px 8px;margin-top:6px"><b style="color:#b26a00">逾期租金'+(b.rentOnly?'（這期只有逾期租金，沒有新的日報數量）':'')+'</b><br>'+b.rent.map(function(r){return esc(r.desc)+'：逾期累計 '+r.overDays+' 天（從到期日算到截止日 '+esc(r.end.slice(5))+'）累計約 NT$ '+fmt(r.amount);}).join('<br>')+'<div style="font-size:11px;color:#b26a00">這裡是從到期日起的累計，前幾期已經請過的部分開單時會自動扣掉（只列本期還沒列入的）；<b>還沒拔完的那一段算到開單那天</b>（不是截止日）；金額以請款單上的為準</div></div>':'')
     +'<div style="margin-top:6px">保留款 '+ret+'%、稅率 '+esc(String((P&&P.tax!=null)?P.tax:5))+'%（照專案設定）。'+((b.rent&&b.rent.length)?'':'逾期租金：開單時依日報自動列入，請在請款單上確認。')+'</div>'
-    +'<div style="color:var(--b4);margin-top:4px">確認＝直接開好第 '+n+' 期請款單並存檔（狀態「草稿」、日期＝截止日 '+esc(b.cutDate)+'），接著在「待送業主」卡看 PDF 後送出；修改＝打開編輯頁自己改。本期數量依日報帶到今天（'+esc(localToday().slice(5))+'），之後到截止日的日報要在請款單上補；金額照請款單算法。<b>檢查後按「儲存」</b>，才會出現在「請款單草稿待送出」。</div></div>';}
-// ── 請款單改兩下就好（Lotion 11/11，題 1～4 都照建議）：草稿卡「確認」＝建單＋照截止日存檔（走跟編輯頁儲存同一條 saveInvoice），
+    +'<div style="color:var(--b4);margin-top:4px">確認＝直接開好第 '+n+' 期請款單並存檔（狀態「草稿」），接著在「請款單草稿待送出」卡看 PDF 後送出；修改＝打開編輯頁自己改。請款單日期和本期數量都停在 '+esc(stop)+'（截止日前 '+_IB_LEAD+' 天，留時間給業主確認），之後的日報算下一期，不會漏請；金額照請款單算法。</div>';}
+// ── 請款單改兩下就好（Lotion 11/11，題 1～4 都照建議）：草稿卡「確認」＝建單＋存檔（走跟編輯頁儲存同一條 saveInvoice），
 //   之後出「待送業主」卡，卡上直接看存好的 A4 預覽，「確認」＝標已送業主＋複製給業主的文字＋出 PDF；「修改」才進編輯頁。
 //   擋確認（要先按修改）：累計超過 100%、現場追加還沒簽認；逾期租金不擋（卡上黃色標天數、金額）
-// 待送卡的請款單預覽：整頁（A4 橫式）等比縮小到卡片寬，手機也看得到金額欄
-function _ivsFit(f){try{var d=f.contentDocument,w=Math.max(d.documentElement.scrollWidth||0,1123),h=Math.max(d.documentElement.scrollHeight||0,400),box=f.parentNode,k=Math.min(1,(box.clientWidth||w)/w);f.style.width=w+'px';f.style.height=h+'px';f.style.transform='scale('+k+')';box.style.height=Math.ceil(h*k)+'px';}catch(e){_err('_ivsFit',e);}}
-function _ibBlocks(b){var q=_ibQ(b.qid),out=[];if(!q)return ['找不到工程'];var invs=_ibInvs(q),last=invs[0]||null,ph=function(r){return _prPhase(q,r);};
-  (b.items||[]).forEach(function(x){var it=(q.items||[])[x.idx]||{},src=_ibSrc(q,x.idx,b.since||'',b.cutDate),cq=Math.abs(parseFloat(it.qty)||0);if(!(cq>0))return;
-    var ni=src.reduce(function(a,s){return a+s.q;},0),nr=src.reduce(function(a,s){return a+s.r;},0);
-    var lit=last?(last.items||[]).find(function(y){return y&&y.type!=='sec'&&!y.remRid&&String(y.desc||'').split('\n')[0].trim()===String(it.desc||'').split('\n')[0].trim();}):null;
-    var pw=lit?_invRemSibs(lit,last.items).reduce(function(a,y){return a+(parseFloat(y.prevQty)||0)+_wQty(y.curQty,y.payRate);},0):0;
-    var cum=(pw+ni*_invPhasePct(q,it,'install')/100+nr*_invPhasePct(q,it,'remove')/100)/cq*100;
-    if(cum>100.05)out.push(String(x.desc||'').slice(0,20)+' 累計 '+Math.round(cum*10)/10+'%（超過合約）');});
+// 待送卡的請款單預覽：整頁（A4 橫式）等比縮小到卡片寬，手機也看得到金額欄；卡片收著（寬 0）時等打開再算，轉向／改視窗大小重算
+function _ivsFit(f,n){try{var box=f.parentNode,d=f.contentDocument;if(!box||!d||!d.documentElement)return;if(!box.clientWidth){if((n||0)<40)setTimeout(function(){_ivsFit(f,(n||0)+1);},250);return;}
+  var w=Math.max(d.documentElement.scrollWidth||0,1123),h=Math.max(d.documentElement.scrollHeight||0,400),k=Math.min(1,box.clientWidth/w);f.style.width=w+'px';f.style.height=h+'px';f.style.transform='scale('+k+')';box.style.height=Math.ceil(h*k)+'px';}catch(e){_err('_ivsFit',e);}}
+try{window.addEventListener('resize',function(){try{[].forEach.call(document.querySelectorAll('.ivs-pv iframe'),function(f){_ivsFit(f);});}catch(e){_err('_ivsFit.resize',e);}});}catch(e){_err('_ivsFit.on',e);}
+function _ibBlocks(b){var q=_ibQ(b.qid),out=[];if(!q)return ['找不到工程'];var last=_ibInvs(q)[0]||null;
+  _ibRows(b).forEach(function(r){if(r.over&&(r.ni>0||r.nr>0))out.push(String(r.x.desc||'').slice(0,20)+' 累計 '+r.cum+'%（超過合約）');});
   ((q.addons)||[]).filter(function(a){return a&&a.status==='confirmed'&&!a.signed&&!a.signDeny&&String(a.date||'')>String((last&&last.date)||'');}).forEach(function(a){out.push('現場追加 '+String(a.date||'')+' 主任還沒簽認');});
   return out;}
-function _ibOpenEditor(b){var q=_ibQ(b.qid);if(!q){toast('找不到工程');return false;}var before=(INV||[]).length;try{pjNewInv(q.id);}catch(e){_err('_ibOpenEditor',e);return false;}
-  var inv=(INV||[])[0];if(!inv||(INV||[]).length<=before)return null;
-  var _w='請款單草稿卡：系統依日報開第 '+(inv.periodNo||'?')+' 期草稿（截止 '+b.cutDate+'）';if(inv.st==='draft')_invStLog(inv,'draft',_w,null,true);else _invStSet(inv,'draft',_w);
-  try{var de=document.getElementById('inv-date');if(de&&b.cutDate){de.value=b.cutDate;inv.date=b.cutDate;}}catch(e){_err('_ibOpenEditor.date',e);}   /* Lotion 題 2：請款單日期＝這期截止日 */
+// 開這一期（日期先指定＝數量截止日，開單時日報自動帶入就算到同一天）；回傳開好的那張（新建的，或拿來重用的空白第 1 期）
+function _ibOpenEditor(b){var q=_ibQ(b.qid);if(!q){toast('找不到工程');return false;}var stop=_ibStop(b),ids={};(INV||[]).forEach(function(x){if(x&&x.id)ids[x.id]=1;});
+  _invNewDateOv=stop;try{pjNewInv(q.id);}catch(e){_err('_ibOpenEditor',e);return false;}finally{_invNewDateOv='';}
+  var inv=invEid?(INV||[]).find(function(x){return x&&x.id===invEid;}):null;
+  if(!inv||!((inv.quoteId===q.id||inv.sourceQid===q.id))||(ids[inv.id]&&!(String(inv.periodNo)==='1'&&inv.date===stop)))return null;   /* 審查：重用空白第 1 期時張數不變，用編輯頁開著的那張判斷 */
+  var _w='請款單草稿卡：系統依日報開第 '+(inv.periodNo||'?')+' 期草稿（截止 '+b.cutDate+'，數量算到 '+stop+'）';if(inv.st==='draft')_invStLog(inv,'draft',_w,null,true);else _invStSet(inv,'draft',_w);
+  try{var de=document.getElementById('inv-date');if(de&&de.value!==stop){de.value=stop;inv.date=stop;}}catch(e){_err('_ibOpenEditor.date',e);}   /* 保險：開單流程已帶好日期，這裡只補沒帶到的 */
   _invStSyncing=true;try{saveInv();}finally{_invStSyncing=false;}return inv;}
 _decReg('invDraft',{
-  title:'本月請款單草稿',todo:function(n){return '本月要請款：'+n+' 個工地的請款單草稿';},sub:'確認＝開好這一期請款單並存檔（數量依日報、日期＝截止日）；退回＝這期不請；修改＝打開請款單編輯頁',
+  title:'本月請款單草稿',todo:function(n){return '本月要請款：'+n+' 個工地的請款單草稿';},sub:'確認＝開好這一期請款單並存檔（日期和數量都停在截止日前 3 天）；退回＝這期不請；修改＝打開請款單編輯頁',
   canSee:function(){return !_isReaderUser&&_decIsAdmin();},list:_ibList,key:function(b){return b.qid+'|'+b.cutDate;},
   head:function(b){return String(b.name||'').slice(0,24)+'　截止 '+b.cutDate.slice(5);},
-  body:function(b){var bl=[];try{bl=_ibBlocks(b);}catch(e){_err('invDraft.body',e);}return (bl.length?'<div style="font-size:11.5px;color:#c62828">要先按「修改」：'+esc(bl.join('；'))+'</div>':'')+'<div style="font-size:11.5px;color:var(--b4)">'+esc(b.items.slice(0,3).map(function(x){return x.desc.slice(0,14)+' '+fmt(x.qty)+x.unit;}).join('、'))+(b.items.length>3?' 等 '+b.items.length+' 項':'')+((b.rent&&b.rent.length)?(b.items.length?'；':'')+'逾期租金 '+b.rent.length+' 項':'')+'</div>';},
+  body:function(b){var bl=[],rs=[];try{bl=_ibBlocks(b);rs=_ibRows(b).filter(function(r){return r.ni>0||r.nr>0;});}catch(e){_err('invDraft.body',e);}return (bl.length?'<div style="font-size:11.5px;color:#c62828">要先按「修改」：'+esc(bl.join('；'))+'</div>':'')+'<div style="font-size:11.5px;color:var(--b4)">數量算到 '+esc(_ibStop(b).slice(5))+'：'+esc(rs.slice(0,3).map(function(r){return String(r.x.desc||'').slice(0,14)+' '+fmt(Math.round((r.ni+r.nr)*100)/100)+(r.x.unit||'');}).join('、')||'沒有新數量')+(rs.length>3?' 等 '+rs.length+' 項':'')+((b.rent&&b.rent.length)?'；逾期租金 '+b.rent.length+' 項':'')+'</div>';},
   detail:_ibDetailHtml,
   ok:function(b){var bl=_ibBlocks(b);if(bl.length){toast('這張要先按「修改」：'+bl[0]);return false;}
     var inv=_ibOpenEditor(b);if(!inv){toast('沒有開成請款單');return false;}
-    try{saveInvoice();}catch(e){_err('invDraft.ok.save',e);toast('存檔沒成功，請在編輯頁檢查後按儲存');return 'open';}   /* 跟編輯頁按「儲存」同一條 */
+    try{saveInvoice();}catch(e){_err('invDraft.ok.save',e);}   /* 跟編輯頁按「儲存」同一條 */
     var sv=(INV||[]).find(function(x){return x&&x.id===inv.id;});
-    if(!sv||!(_isAmt(sv)>0)){toast('本期金額是 0，請在編輯頁檢查數量後儲存');return 'open';}
+    if(!sv||sv===inv){toast('存檔沒成功，請在編輯頁檢查後按儲存');try{loadInvoice(inv.id);go('invoice-edit');}catch(e){_err('invDraft.ok.open',e);}return 'open';}   /* 審查：saveInvoice 成功會換成新的一筆；沒換＝被擋下（缺欄位、負數等） */
+    var amt=0;try{var c=JSON.parse(JSON.stringify(sv));_recalcInvAmounts(c);amt=Math.round(parseFloat(c.totals&&c.totals.total)||0);}catch(e){_err('invDraft.ok.amt',e);}   /* 審查：照工項重算，不看可能沿用的合計 */
+    if(!(amt>0)){toast('本期金額是 0，請在編輯頁檢查數量後儲存');try{loadInvoice(sv.id);go('invoice-edit');}catch(e){_err('invDraft.ok.open0',e);}return 'open';}
     try{go('dash');}catch(e){_err('invDraft.ok.go',e);}
-    toast('已存好第 '+(sv.periodNo||'?')+' 期請款單（含稅 NT$ '+fmt(_isAmt(sv))+'），在「待送業主」卡看 PDF 後送出');
+    toast('已存好第 '+(sv.periodNo||'?')+' 期請款單（含稅 NT$ '+fmt(amt)+'），在「請款單草稿待送出」卡看 PDF 後送出');
     try{_decRefresh('invSend');}catch(e){_err('invDraft.ok.ref',e);}return true;},
   reject:function(b,why){var q=_ibQ(b.qid);if(!q)return false;q.billSkip=Object.assign({},q.billSkip||{});q.billSkip[b.cutDate]={at:Date.now(),by:_meEmail()||'本機',why:String(why||'這期不請').slice(0,200)};_touch(q);persist();return true;},
   edit:function(b){var inv=_ibOpenEditor(b);if(!inv)toast('沒有開成請款單');}   /* 修改＝打開這一期的編輯頁（自己檢查後按儲存） */
@@ -46556,14 +46573,14 @@ _decReg('invSend',{
       +its.map(function(x){var cp=_invItemCumPct(x,inv.items),pr=x.payRate!=null?x.payRate:100;return '<tr'+(cp!=null&&cp>100.05?' style="background:#ffebee"':'')+'><td style="padding:2px 4px">'+esc(String(x.desc||'').split('\n')[0])+'<div style="font-size:11px;color:var(--b4)">這期請 '+esc(String(pr))+'%，累計 '+(cp==null?'—':'<b style="white-space:nowrap'+(cp>100.05?';color:#c62828':'')+'">'+cp+'%</b>')+'</div></td><td style="text-align:center">'+fmt(parseFloat(x.curQty)||0)+' '+esc(x.unit||'')+'</td><td style="text-align:right">'+fmt(parseFloat(x.curAmt)||0)+'</td></tr>';}).join('')+'</table>'
       +'<div style="margin-top:6px">本期未稅 NT$ '+fmt(t.curTotal||0)+'、稅 NT$ '+fmt(t.tax||0)+(t.retention?'、保留款 −NT$ '+fmt(t.retention):'')+'，<b>含稅 NT$ '+fmt(_isAmt(inv))+'</b>'+(pv?'（上一期第 '+esc(String(pv.periodNo||'?'))+' 期含稅 NT$ '+fmt(_isAmt(pv))+'）':'')+'</div>'
       +(_isAmt(inv)<=0?'<div style="color:#c62828">本期金額是 0，請先打開請款單確認數量再送</div>':'')
-      +(function(){var h='';try{var o=_docOut('inv',{inv:inv,quiet:true});h=(o&&o.html)||'';}catch(e){_err('invSend.pv',e);}return h?'<div style="margin-top:6px"><b>存好的請款單（就是要送的那張，整頁縮小顯示）</b><div class="ivs-pv" style="width:100%;height:300px;overflow:hidden;border:1px solid var(--b1);border-radius:6px;background:#fff"><iframe srcdoc="'+esc(h)+'" onload="_ivsFit(this)" style="width:1123px;max-width:none;height:794px;border:0;transform-origin:0 0;background:#fff"></iframe></div></div>':'<div style="color:#c62828;margin-top:6px">請款單預覽出不來，請按「修改」打開請款單</div>';})()
+      +(function(){var h='';try{var o=_docOut('inv',{inv:inv,quiet:true});h=(o&&o.html)||'';}catch(e){_err('invSend.pv',e);}return h?'<div style="margin-top:6px"><b>存好的請款單（就是要送的那張，整頁縮小顯示）</b><div class="ivs-pv" style="width:100%;height:300px;overflow:hidden;border:1px solid var(--b1);border-radius:6px;background:#fff"><iframe sandbox="allow-same-origin" srcdoc="'+esc(h)+'" onload="_ivsFit(this)" style="width:1123px;max-width:none;height:794px;border:0;transform-origin:0 0;background:#fff"></iframe></div></div>':'<div style="color:#c62828;margin-top:6px">請款單預覽出不來，請按「修改」打開請款單</div>';})()
       +'<div style="margin-top:6px"><b>送業主的文字（按確認就複製，不會自動傳）</b><div style="white-space:pre-wrap;background:var(--b0,#f6f6f6);padding:6px 8px;border-radius:6px">'+esc(_isMsg(inv))+'</div></div>'
       +'<div style="margin-top:6px"><b>狀態紀錄</b>'+_invStHistHtml(inv)+'</div></div>';},
   ok:function(inv){if(!(_isAmt(inv)>0)){toast('本期金額是 0，請按「修改」打開請款單');return false;}
     _invStSet(inv,'sent','請款單草稿卡確認送出（PDF＋送業主文字）');_invStSyncing=true;try{saveInv();}finally{_invStSyncing=false;}
     var msg=_isMsg(inv);setTimeout(function(){try{printInvById(inv.id);}catch(e){_err('invSend.pdf',e);}},60);
     try{navigator.clipboard.writeText(msg).then(function(){toast('已標已送業主、複製給業主的文字；PDF 存好後貼到 LINE 或信件');},function(){toast('複製失敗：卡片上的文字請手動複製');});}catch(e){_err('invSend.copy',e);toast('複製失敗：卡片上的文字請手動複製');}   /* Lotion 題 4：按確認就複製，不再跳第二個視窗 */
-    return 'open';},
+    return true;},   /* 審查：已改「已送業主」，卡片收掉 */
   reject:function(inv,why){inv.sendSnz=_dAdd(localToday(),3);_invStLog(inv,_invStOf(inv),'先不送'+(why?'：'+String(why).slice(0,80):'')+'（'+inv.sendSnz+' 再提醒）',null,true);_invStSyncing=true;try{saveInv();}finally{_invStSyncing=false;}return true;},
   edit:function(inv){try{loadInvoice(inv.id);go('invoice-edit');}catch(e){_err('invSend.edit',e);}}
 });
