@@ -1,5 +1,5 @@
 {
- "note": "v6.0.234 新格式日報（Lotion 11/11）：17:30 範本帶工項編號（list＝askList(items,[]) 由 tests/calc.js 現算），expect＝[工項 index, 數量, 打設/拔除, 本段完成]；-1＝待確認。新格式、舊格式、亂寫都有。items 跟 daily-line.json 同一份",
+ "note": "v6.0.235 新格式日報（Lotion 11/11）：17:30 範本帶工項編號（list＝askList(items,[]) 由 tests/calc.js 現算），expect＝[工項 index, 數量, 打設/拔除, 本段完成]；-1＝待確認。新格式、舊格式、亂寫都有。items 跟 daily-line.json 同一份",
  "cases": [
   {
    "kind": "新格式",

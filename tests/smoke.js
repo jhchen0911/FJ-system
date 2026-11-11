@@ -11722,7 +11722,7 @@ async function newPage(browser, width, height) {
     check('v6.0.227 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
-  // ── v6.0.234 新格式日報（Lotion 11/11）：草稿帶 17:30 的編號清單 fmtList → 卡片照編號對工項、單位照合約；【人和機具】不算；舊寫法照舊 ──
+  // ── v6.0.235 新格式日報（Lotion 11/11）：草稿帶 17:30 的編號清單 fmtList → 卡片照編號對工項、單位照合約；【人和機具】不算；舊寫法照舊 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -11748,11 +11748,11 @@ async function newPage(browser, width, height) {
       } finally { Q = keepQ; DRAFTS = keepD; window._draftMark = keepMark; }
       return out;
     });
-    check('v6.0.234 新格式日報：卡片照 17:30 的工項編號對工項（單位照合約、這段拔完、人和機具不算工項）、確認寫進日報；舊草稿／舊寫法照名稱對；單位跟合約不同＝待確認；固定句子只剩範本說明', Object.values(r).length === 6 && Object.values(r).every(Boolean), JSON.stringify(r));
-    check('v6.0.234 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    check('v6.0.235 新格式日報：卡片照 17:30 的工項編號對工項（單位照合約、這段拔完、人和機具不算工項）、確認寫進日報；舊草稿／舊寫法照名稱對；單位跟合約不同＝待確認；固定句子只剩範本說明', Object.values(r).length === 6 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.235 測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
-  // ── v6.0.234 LINE 日報【支出】→ 支出草稿卡 dlExp（確認才入帳；零用金／代墊記付款人、公司付空白；日報卡確認後支出還在）──
+  // ── v6.0.235 LINE 日報【支出】→ 支出草稿卡 dlExp（確認才入帳；零用金／代墊記付款人、公司付空白；日報卡確認後支出還在）──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
     const r = await page.evaluate(async () => {
@@ -11779,11 +11779,11 @@ async function newPage(browser, width, height) {
       } finally { Q = keepQ; DRAFTS = keepD; window._draftMark = keepMark; window._dlxStaff = keepSt; LEXP = keepL; SITE_ENG = keepE; _lxSave(); }
       return out;
     });
-    check('v6.0.234 LINE 日報支出卡：逐筆列原文、類別、金額、記成什麼（零用金／代墊要還給誰／公司付）；沒寫付款方式、人名不在人員名冊擋確認；日報卡確認後支出還在；確認才記成工地零星支出（付款人、日期照日報；零用金結算算得到）', Object.values(r).length === 7 && Object.values(r).every(Boolean), JSON.stringify(r));
-    check('v6.0.234 LINE 日報支出卡測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    check('v6.0.235 LINE 日報支出卡：逐筆列原文、類別、金額、記成什麼（零用金／代墊要還給誰／公司付）；沒寫付款方式、人名不在人員名冊擋確認；日報卡確認後支出還在；確認才記成工地零星支出（付款人、日期照日報；零用金結算算得到）', Object.values(r).length === 7 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.235 LINE 日報支出卡測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
-  // ── v6.0.234 LINE【支出】第 3、4 項：專案工務名單（管理員指定）、名單上的工務只看自己那一案、只能補零用金是誰／收據照片、確認記帳只有管理員；規則 siteEng／lineExp ──
+  // ── v6.0.235 LINE【支出】第 3、4 項：專案工務名單（管理員指定）、名單上的工務只看自己那一案、只能補零用金是誰／收據照片、確認記帳只有管理員；規則 siteEng／lineExp ──
   {
     const { page, errors } = await newPage(browser, 390, 844);
     const r = await page.evaluate(async () => {
@@ -11839,14 +11839,14 @@ async function newPage(browser, width, height) {
       } finally { Q = keep.Q; DRAFTS = keep.DRAFTS; LEXP = keep.LEXP; SITE_ENG = keep.SITE_ENG; window._decIsAdmin = keep.adm; window._meEmail = keep.me; window._dlxStaff = keep.st; window.listStaff = keep.ls; window.showConfirm = keep.sc; _lxSave(); }
       return out;
     });
-    check('v6.0.234 LINE 支出工務名單：管理員在專案頁指定（追加掛主約）；工務只看自己那一案、只有「修改」補零用金是誰與收據照片；不在名單的看不到；管理員看得到補的資料、按確認才記帳（只送 done、不重記成本）', Object.values(r).length === 13 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('v6.0.235 LINE 支出工務名單：管理員在專案頁指定（追加掛主約）；工務只看自己那一案、只有「修改」補零用金是誰與收據照片；不在名單的看不到；管理員看得到補的資料、按確認才記帳（只送 done、不重記成本）', Object.values(r).length === 13 && Object.values(r).every(Boolean), JSON.stringify(r));
     {
       const R = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')), f = R.rules.fydata, se = f.siteEng, lx = f.lineExp;
       const ok = /adminEmails/.test(se.$qid['.write']) && !/access/.test(se.$qid['.write']) && /access/.test(se['.read']) && /adminEmails/.test(lx['.read']) && !/access/.test(lx['.read']) && /fydata\/siteEng'\)\.child\(\$qid\)/.test(lx.$qid['.read']) && !/siteEng/.test(lx.$qid['.write'])
         && /siteEng/.test(lx.$qid.$k.fix['.write']) && /!data\.parent\(\)\.child\('done'\)\.exists\(\)/.test(lx.$qid.$k.fix['.write']) && /newData\.child\('by'\)\.val\(\) === auth\.token\.email/.test(lx.$qid.$k.fix['.validate']) && lx.$qid.$k.fix.$other['.validate'] === 'false' && /readers/.test(lx.$qid['.read']);
-      check('v6.0.234 規則：工務名單 siteEng 管理員寫、員工可讀；LINE 支出 lineExp 只有管理員和那一案工務可讀（唯讀帳號不行）、工務只能寫 fix（處理過的不行、只能署名自己）', ok);
+      check('v6.0.235 規則：工務名單 siteEng 管理員寫、員工可讀；LINE 支出 lineExp 只有管理員和那一案工務可讀（唯讀帳號不行）、工務只能寫 fix（處理過的不行、只能署名自己）', ok);
     }
-    check('v6.0.234 LINE 支出工務名單測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    check('v6.0.235 LINE 支出工務名單測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
   // ── v6.0.226 請款鏈 1：請款單狀態（草稿→已送業主→業主已確認→已開發票→已收款）、舊單推算清單卡、業主確認卡＋發票照抄範例 ──

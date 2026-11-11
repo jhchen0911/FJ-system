@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.236';
+var APP_VERSION='v6.0.235';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -8122,7 +8122,7 @@ function _autoSyncOnLogin(){
     try{_lrsWatch();}catch(e){_err('_autoSyncOnLogin.lrs',e);}
     try{_lbxWatch();}catch(e){_err('_autoSyncOnLogin.lbx',e);}   // v6.0.144 LINE 收件匣（只有管理員）   // v6.0.140 勞報單（只有管理員）   // v6.0.134 LINE 額度暫停時只記在 FJ 的 AI 通知
     try{_bankWatch();}catch(e){_err('_autoSyncOnLogin.bank',e);}
-    try{_lxWatch();[8000,30000].forEach(function(ms){setTimeout(function(){try{_lxSubExp();}catch(e){_err('_autoSyncOnLogin.lx2',e);}},ms);});}catch(e){_err('_autoSyncOnLogin.lx',e);}   // v6.0.234 工務名單＋LINE 支出（管理員整份、工務只讀自己那幾案）   // v6.0.118 匯款帳號
+    try{_lxWatch();[8000,30000].forEach(function(ms){setTimeout(function(){try{_lxSubExp();}catch(e){_err('_autoSyncOnLogin.lx2',e);}},ms);});}catch(e){_err('_autoSyncOnLogin.lx',e);}   // v6.0.235 工務名單＋LINE 支出（管理員整份、工務只讀自己那幾案）   // v6.0.118 匯款帳號
     setTimeout(function(){try{_wkSensPull();_tombReqPull();}catch(e){_err('_autoSyncOnLogin.h',e);}},4000);   // _wkSensPull 內判斷誰讀得到（管理員／進場權限／唯讀帳號）   // 審查 🔴4：不必等雲端有更新才收投遞／刪除申請
     if(ro){
       _readerApply();
@@ -32618,7 +32618,7 @@ function _qcCommit(e){
   var t=QC_TYPES[e.ti]||QC_TYPES[0];
   var amt=Math.round(parseFloat(e.amt)||0);if(amt<=0)return null;
   var desc=(e.note||'').trim()||t[0];
-  var payer=(e.payer!=null?String(e.payer):(gv('qc-payer')||'')).trim();   // v6.0.234 LINE 支出卡帶入付款人（零用金／代墊的人）；沒帶＝表單上的
+  var payer=(e.payer!=null?String(e.payer):(gv('qc-payer')||'')).trim();   // v6.0.235 LINE 支出卡帶入付款人（零用金／代墊的人）；沒帶＝表單上的
   var review=!!t[3]&&t[4]!=='vendor',isV=t[4]==='vendor',vend=(e.vendor||'').trim();
   if(e.proj==='__co__'){
     var ex={id:'E'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),seller:vend,number:'',date:localToday(),amount:amt,tax:0,note:desc,cat:t[1],payer:payer,payBy:payer?'staff':'company',src:'quick',ts:Date.now()};
@@ -39094,7 +39094,7 @@ function openDrafts(){
 function draftReject(id){
   if(_roDeny())return;var d=DRAFTS[id];if(!d)return;
   var r=window.prompt('退回原因（選填）','')||'';
-  if(d.type==='dailyLog'){try{var _o=_dlOf(d);if(_o.q&&_dlExpQueue(_o.q,d,_o.dt)){_touch(_o.q);persist();}}catch(e){_err('draftReject.exp',e);}}   /* v6.0.234 審查：日報退回，支出照樣留給支出卡 */
+  if(d.type==='dailyLog'){try{var _o=_dlOf(d);if(_o.q&&_dlExpQueue(_o.q,d,_o.dt)){_touch(_o.q);persist();}}catch(e){_err('draftReject.exp',e);}}   /* v6.0.235 審查：日報退回，支出照樣留給支出卡 */
   _draftMark(id,'rejected',{reason:String(r).slice(0,200),'payload/file':null}).then(function(){var b=document.getElementById('draft-list-box');if(b)b.innerHTML=_draftListHtml();try{updateDashTodo();}catch(e){_err('draftReject',e);}toast('已退回');});
 }
 function draftApply(id){
@@ -39166,8 +39166,8 @@ function _draftOpenQuote(q,isEdit){
 // Cloud Functions（functions/line/）收 LINE 訊息：擁有者一對一的檔案 → Storage line/inbox；工地群組 → fydata/lineLog，
 // 現場追加與施工日報寫成草稿（fydata/drafts type addon／dailyLog）。這裡負責：草稿顯示與確認、LINE 設定卡（擁有者、群組綁定工程、固定句子）。
 // 設定 fydata/lineCfg：{owners:{<userId>:{name}}, groups:{<groupId>:{qid,name,daily}}, pending:{users:{},groups:{}}, texts:{inboxAck,daily3,remind,alarm,noReply2}}
-var _LINE_TEXTS={inboxAck:'收到，之後的檔案會一起收。傳完打一行案名就好。',inboxNote:'第 {no} 批 {n} 個檔案：{text}，已記下',inboxMore:'第 {no} 批補充：{text}，已記下',inboxNext:'好，接下來傳的檔案記成：{text}',inboxFail:'這個檔案沒存成功，請重傳：{name}',inboxBig:'這個檔案超過 {mb}MB 沒存，請改傳雲端連結：{name}',dailyFmtHead:'今天辛苦了，請複製【日期】以下整段，填好再傳（一個工地一段）：\n．今天做了：一行一項，編號＋打設／拔除／組立／拆除＋數量，例「1 打設 12」「1 拔除 40 這段拔完」，單位不用寫\n．人和機具：例「人 5、怪手 1、吊車 1」\n．支出（選填）：一行一筆，項目＋金額＋零用金／代墊 誰／公司付，例「便當 5 個 600 零用金」「五金 1,250 代墊 阿明」，收據可以拍照傳\n．問題：追加、等料、等吊車、有異狀都寫這裡',remind:'昨天的施工日報還沒回，麻煩照昨天的格式補一下，謝謝。',alarm:'{site}工地群組出現「{word}」，請判斷是否停工。',noReply2:'{site}工地群組連兩天沒有回施工日報。'};   // v6.0.234：17:30 改成預先填好的範本（日期、工地、本工地工項由系統帶），只剩上面的說明可改（dailyFmtHead）；舊的 daily3／dailyCo 不再用
-var _LINE_TL={inboxAck:'收到檔案的回覆（同一批 3 分鐘內只回第一則，v6.0.153）',inboxNote:'傳完檔案打一行字的回覆（{no}＝今天第幾批、{n}＝這批檔案數、{text}＝打的字；打完這批就關閉，之後的檔案算新的一批，v6.0.178）',inboxMore:'這批已有案名後打「補充…」「備註…」的回覆（{no}＝第幾批、{text}＝補充的字）',inboxNext:'這批已有案名後打其他字的回覆＝下一批的案名（{text}＝打的字）',inboxFail:'檔案沒存成功的回覆（{name}＝檔名）',inboxBig:'檔案太大沒存的回覆（{mb}＝上限 MB、{name}＝檔名）',dailyFmtHead:'17:30 日報範本上面的說明（工地群組、公司大群組都用；下面的【日期】【工地】【本工地工項】【今天做了】【人和機具】【明天】【問題】由系統自動帶，v6.0.234）',remind:'隔天 08:00 沒回的提醒',alarm:'事故前兆通知 Lotion（{site} 工地、{word} 關鍵字）',noReply2:'連兩天沒回通知 Lotion'};
+var _LINE_TEXTS={inboxAck:'收到，之後的檔案會一起收。傳完打一行案名就好。',inboxNote:'第 {no} 批 {n} 個檔案：{text}，已記下',inboxMore:'第 {no} 批補充：{text}，已記下',inboxNext:'好，接下來傳的檔案記成：{text}',inboxFail:'這個檔案沒存成功，請重傳：{name}',inboxBig:'這個檔案超過 {mb}MB 沒存，請改傳雲端連結：{name}',dailyFmtHead:'今天辛苦了，請複製【日期】以下整段，填好再傳（一個工地一段）：\n．今天做了：一行一項，編號＋打設／拔除／組立／拆除＋數量，例「1 打設 12」「1 拔除 40 這段拔完」，單位不用寫\n．人和機具：例「人 5、怪手 1、吊車 1」\n．支出（選填）：一行一筆，項目＋金額＋零用金／代墊 誰／公司付，例「便當 5 個 600 零用金」「五金 1,250 代墊 阿明」，收據可以拍照傳\n．問題：追加、等料、等吊車、有異狀都寫這裡',remind:'昨天的施工日報還沒回，麻煩照昨天的格式補一下，謝謝。',alarm:'{site}工地群組出現「{word}」，請判斷是否停工。',noReply2:'{site}工地群組連兩天沒有回施工日報。'};   // v6.0.235：17:30 改成預先填好的範本（日期、工地、本工地工項由系統帶），只剩上面的說明可改（dailyFmtHead）；舊的 daily3／dailyCo 不再用
+var _LINE_TL={inboxAck:'收到檔案的回覆（同一批 3 分鐘內只回第一則，v6.0.153）',inboxNote:'傳完檔案打一行字的回覆（{no}＝今天第幾批、{n}＝這批檔案數、{text}＝打的字；打完這批就關閉，之後的檔案算新的一批，v6.0.178）',inboxMore:'這批已有案名後打「補充…」「備註…」的回覆（{no}＝第幾批、{text}＝補充的字）',inboxNext:'這批已有案名後打其他字的回覆＝下一批的案名（{text}＝打的字）',inboxFail:'檔案沒存成功的回覆（{name}＝檔名）',inboxBig:'檔案太大沒存的回覆（{mb}＝上限 MB、{name}＝檔名）',dailyFmtHead:'17:30 日報範本上面的說明（工地群組、公司大群組都用；下面的【日期】【工地】【本工地工項】【今天做了】【人和機具】【明天】【問題】由系統自動帶，v6.0.235）',remind:'隔天 08:00 沒回的提醒',alarm:'事故前兆通知 Lotion（{site} 工地、{word} 關鍵字）',noReply2:'連兩天沒回通知 Lotion'};
 function _lineDraftBody(d){
   var S=_draftS,pl=(d.payload&&typeof d.payload==='object')?d.payload:{},q=Q.find(function(x){return x.id===pl.qid;});
   var ph=_lineArr(pl.photos).slice(0,6).map(function(path){return '<img data-lpath="'+esc(path)+'" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:6px;background:var(--b1)">';}).join('');
@@ -39257,7 +39257,7 @@ function renderLineBox(){
   if(_lineCfgCache===null&&_fbDb){_lineCfgCache={};_fbDb.ref('fydata/lineCfg').once('value').then(function(sn){_lineCfgCache=sn.val()||{};renderLineBox();}).catch(function(e){_err('renderLineBox',e);_lineCfgCache={__err:1};renderLineBox();});}
   if(_lineCfgCache&&_lineCfgCache.__err){box.innerHTML='<div class="card"><div class="cb"><div style="font-weight:700;font-size:13.5px;margin-bottom:4px">LINE 機器人（陳軒｜AI 助理）</div><div style="font-size:12px;color:var(--red)">讀不到 LINE 設定：雲端規則尚未發布（見 docs/回國後部署清單_20261031.md 第 1 步）。</div><div style="margin-top:8px"><button type="button" class="btn btn-xs" onclick="_lineCfgCache=null;renderLineBox()">重新整理</button></div></div></div>';return;}
   var C=_lineCfgCache||{},own=C.owners||{},gr=C.groups||{},pu=(C.pending&&C.pending.users)||{},pg=(C.pending&&C.pending.groups)||{},tx=Object.assign({},_LINE_TEXTS,C.texts||{});
-  if(tx.remind==='昨天的施工日報還沒回，麻煩補一下三件事，謝謝。')tx.remind=_LINE_TEXTS.remind;   // v6.0.234 舊預設 → 新預設（雲端程式同樣換掉）
+  if(tx.remind==='昨天的施工日報還沒回，麻煩補一下三件事，謝謝。')tx.remind=_LINE_TEXTS.remind;   // v6.0.235 舊預設 → 新預設（雲端程式同樣換掉）
   if(tx.inboxAck==='收到，{n} 個檔案，歸到哪一案？')tx.inboxAck=_LINE_TEXTS.inboxAck;   // v6.0.153 舊預設 → 顯示新預設（雲端程式同樣換掉）
   if(tx.inboxNote==='這批 {n} 個檔案：{text}，已記下')tx.inboxNote=_LINE_TEXTS.inboxNote;   // v6.0.178 舊預設 → 新預設（寫第幾批；雲端程式同樣換掉）
   var projs=(Q||[]).filter(function(q){return q&&q.awarded&&!q.closed&&!q.parentId;});
@@ -41617,7 +41617,7 @@ function _decTodoItems(items,ic){
   finally{_DEC_PASS=null;}
 }
 var _DEC_PASS=null;
-// v6.0.234：spec.acts(it)→['reject','edit','ok'] 的子集（例：工務只能「修改」補資料），沒給＝三顆都有
+// v6.0.235：spec.acts(it)→['reject','edit','ok'] 的子集（例：工務只能「修改」補資料），沒給＝三顆都有
 function _decActs(kind,it){var k=_DEC[kind];try{var A=k&&k.acts?k.acts(it):null;return Array.isArray(A)?A:['reject','edit','ok'];}catch(e){_err('_decActs.'+kind,e);return ['edit'];}}
 function _decCardHtml(kind,it){
   var k=_DEC[kind],id=String(k.key(it)),rd=!!_DEC_READY[kind+'|'+id],A=_decActs(kind,it);
@@ -46075,7 +46075,7 @@ _decReg('steelPrice',{
 // LINE 日報草稿（type dailyLog）改走首頁拍板卡 dlQty：FJC.dl.parse 把回報文字拆成「工項＋數量＋打設或拔除＋本段完成」，
 // 卡片附原文、照片、每列累計（已確認的日報＋這次）跟合約數量比（超過標紅）；拆不出來的標「待確認」不猜。確認才寫進日報 progressRows。
 function _dlItems(q){return (q&&Array.isArray(q.items))?q.items:[];}
-// v6.0.234 新格式（17:30 問句帶工項編號）：list＝那天問句的編號清單（草稿 payload.fmtList[報價id]），沒有就照名稱對；舊寫法照 parse
+// v6.0.235 新格式（17:30 問句帶工項編號）：list＝那天問句的編號清單（草稿 payload.fmtList[報價id]），沒有就照名稱對；舊寫法照 parse
 function _dlFmtList(pl,q){var F=pl&&pl.fmtList;var L=F&&q&&F[q.id];return Array.isArray(L)?L:(L&&typeof L==='object'?Object.keys(L).map(function(k){return L[k];}):[]);}
 function _dlPlan(q,text,dt,list){var its=_dlItems(q),P0=FJC.dl.parseFmt?FJC.dl.parseFmt(text,list||[],its):FJC.dl.parse(text,its),ex=dt?_ldExisting(q,dt):null;
   P0.rows.forEach(function(r){if(!(r.itemIdx>=0))return;var it=its[r.itemIdx]||{};r.name=String(it.desc||'').split('\n')[0].slice(0,40);r.target=Math.abs(parseFloat(it.qty)||0);r.iu=String(it.unit||'');
@@ -46136,10 +46136,10 @@ _decReg('dlQty',{
   reject:function(d,why){try{var o=_dlOf(d);if(!o.q&&_dlxRowsOf(d).length){toast('這則有【支出】但還沒選工程：請先按「修改」選工程，支出才不會不見');return false;}if(o.q){_dlExpQueue(o.q,d,o.dt);_touch(o.q);persist();}}catch(e){_err('dlQty.reject.exp',e);}_draftMark(d.id,'rejected',{reason:String(why||'不寫').slice(0,200)});return true;},   /* 日報不寫，支出照樣留給支出卡 */
   edit:function(d){_lineDraftApply(d,function(){try{_decRefresh('dlQty');}catch(e){_err('dlQty.edit',e);}});}
 });
-// ══════════ v6.0.234 LINE 日報【支出】→ 支出草稿卡 dlExp（Lotion 11/11；第 2 層：確認才入帳，沒確認前不碰應付、零用金）══════════
+// ══════════ v6.0.235 LINE 日報【支出】→ 支出草稿卡 dlExp（Lotion 11/11；第 2 層：確認才入帳，沒確認前不碰應付、零用金）══════════
 // 每一行「項目＋金額＋付款方式」（FJC.dl.expOf）→ 卡片寫明對到哪一案、記成哪一類（QC_TYPES）、付款方式：
 //   零用金／代墊 → 記成工地零星支出、付款人＝那個人（零用金結算 _pcItems 會算進他的支出，代墊＝他先付、要還）；公司付 → 付款人空白（公司直接付）
-// ── v6.0.234 LINE【支出】第 3、4 項（Lotion 11/11 題 1～3 都選 A）──
+// ── v6.0.235 LINE【支出】第 3、4 項（Lotion 11/11 題 1～3 都選 A）──
 // 工務名單：fydata/siteEng/<主報價 id>/<email 鍵>＝{name,email,at,by}（管理員在專案頁「工務」那行指定、登入可讀）；共用函式 _siteEngOf／_isSiteEng／_mySiteQids（小批次出工確認卡也讀）
 // 還沒確認的支出：fydata/lineExp/<主報價 id>/<草稿id_序號>（雲端整理成日報草稿那一刻就寫進來；規則只讓管理員和這一案的工務讀）
 //   列：{key,qid,src,date,text,item,amt,pay,who,why,photos,at}；工務只能寫 fix＝{who,photos（收據照片 ph: 參照）,by,at}；管理員確認或退回寫 done＝{at,by,cid,amt,skip}

@@ -85,7 +85,7 @@ test('③ 17:30 問三句只發給開啟日報的已綁定群組；20:00 整理�
   const d = mkDeps(CFG);
   const ask = Date.parse('2026-10-22T09:30:00Z');   // 台北 17:30
   assert.equal(await core.dailyAsk(d, ask), 1);
-  assert.equal(d.pushes[0].to, 'Gsite'); assert.match(d.pushes[0].text, /【日期】10\/22\n【工地】內湖興中路\n【今天做了】/);   // v6.0.234 新格式範本（沒有 getQuote＝不列工項）
+  assert.equal(d.pushes[0].to, 'Gsite'); assert.match(d.pushes[0].text, /【日期】10\/22\n【工地】內湖興中路\n【今天做了】/);   // v6.0.235 新格式範本（沒有 getQuote＝不列工項）
   const g = { type: 'group', groupId: 'Gsite', userId: 'Uw' };
   await core.handleEvents([{ type: 'message', timestamp: ask - 3600000, source: g, message: { id: 'ph', type: 'image' } }], d);
   await core.handleEvents([{ type: 'message', timestamp: ask + 600000, source: g, message: { id: 'ans', type: 'text', text: '1. 打設 H 型鋼 8 支 2. 4 人、吊車 1 台 3. 無' } }], d);
@@ -113,7 +113,7 @@ test('推播佇列：pending → 推給擁有者並改 sent；已送出的不再
   assert.ok(!(await core.processPush('n1', { text: 'x', status: 'sent' }, d)));
 });
 
-test('固定句子可由 lineCfg.texts 覆寫（v6.0.234 起 17:30 只有範本上面的說明 dailyFmtHead 可改）', async () => {
+test('固定句子可由 lineCfg.texts 覆寫（v6.0.235 起 17:30 只有範本上面的說明 dailyFmtHead 可改）', async () => {
   const d = mkDeps(Object.assign({}, CFG, { texts: { dailyFmtHead: 'Lotion 定稿的說明', daily3: '舊的三句不再用' } }));
   await core.dailyAsk(d, T0);
   assert.match(d.pushes[0].text, /^Lotion 定稿的說明\n【日期】/); assert.ok(!/舊的三句/.test(d.pushes[0].text));
@@ -345,7 +345,7 @@ test('日期括號寫法（Lotion 11/1）：［］、[]、【】，後面接空�
 test('v6.0.122 範本：17:30 發的格式第一行【日期】帶當天日期；舊預設自動換新', async () => {
   const d = mkDeps(CO);
   await core.dailyAsk(d, Date.parse('2026-11-01T09:30:00Z'));
-  assert.match(d.pushes[0].text, /\n【日期】11\/01\n【工地】\n【今天做了】\n\n【人和機具】\n\n【支出】\n\n【明天】\n\n【問題】\n$/);   // v6.0.234：最近 14 天沒人回報過工地＝空白一段
+  assert.match(d.pushes[0].text, /\n【日期】11\/01\n【工地】\n【今天做了】\n\n【人和機具】\n\n【支出】\n\n【明天】\n\n【問題】\n$/);   // v6.0.235：最近 14 天沒人回報過工地＝空白一段
 });
 
 test('v6.0.122 解析：範本原樣、改成前一天、【日期】空白、工地全形／半形括號都對得到', async () => {
@@ -544,9 +544,9 @@ test('v6.0.178 審查：比案名晚到的同批檔（平行投遞／重送）�
   assert.ok(!d.db.fydata.lineInboxBatch.Uowner.pendNext);   // 用過就清掉
 });
 
-// ── v6.0.234 新格式日報（Lotion 11/11）：17:30 預先填好範本、20:00 草稿帶編號清單、範本字不觸發追加 ──
+// ── v6.0.235 新格式日報（Lotion 11/11）：17:30 預先填好範本、20:00 草稿帶編號清單、範本字不觸發追加 ──
 const Q1 = { id: 'q1', name: '內湖興中路', items: [{ desc: 'H型鋼樁 H350 L=13M 打設＋拔除', unit: '支', qty: 100 }, { desc: '追加 第一層支撐 H350 組立＋拆除', unit: 'M', qty: 300 }, { desc: '覆工板 鋪設', unit: '片', qty: 50 }], dailyLogs: [{ progressRows: [{ itemIdx: 2, qty: 50 }] }] };
-test('v6.0.234 工地群組：17:30 範本帶日期、工地、還沒做完的工項（短編號）；清單存 lineDaily；20:00 草稿帶 fmtList', async () => {
+test('v6.0.235 工地群組：17:30 範本帶日期、工地、還沒做完的工項（短編號）；清單存 lineDaily；20:00 草稿帶 fmtList', async () => {
   const d = mkDeps(CFG); d.getQuote = async (qid) => (qid === 'q1' ? Q1 : null);
   const ask = Date.parse('2026-10-22T09:30:00Z');
   assert.equal(await core.dailyAsk(d, ask), 1);
@@ -567,7 +567,7 @@ test('v6.0.234 工地群組：17:30 範本帶日期、工地、還沒做完的�
   const r2 = await core.handleEvents([{ type: 'message', timestamp: ask + 700000, source: g, message: { id: 'a2', type: 'text', text: reply.replace('【問題】\n', '【問題】\n業主要追加 3 支，北側有裂縫') } }], d);
   assert.ok(r2[0].addon && r2[0].alarm === '裂');
 });
-test('v6.0.234 公司大群組：最近 14 天回報過的工地各一段（最多 5 個，編號各自從 1 開始）；新欄位【今天做了】【人和機具】拆得出來、草稿帶該工地的清單', async () => {
+test('v6.0.235 公司大群組：最近 14 天回報過的工地各一段（最多 5 個，編號各自從 1 開始）；新欄位【今天做了】【人和機具】拆得出來、草稿帶該工地的清單', async () => {
   const cfg = JSON.parse(JSON.stringify(CO)); cfg.sites = { q1: { name: '（範例）內湖興中路' }, q9: { name: '南港案' } };
   const d = mkDeps(cfg); d.getQuote = async (qid) => (qid === 'q1' ? Q1 : { id: 'q9', items: [{ desc: '鋼板樁 III 打設', unit: '支', qty: 10 }], dailyLogs: [] });
   const gid = Object.keys(cfg.groups)[0];
@@ -586,7 +586,7 @@ test('v6.0.234 公司大群組：最近 14 天回報過的工地各一段（最�
   const dr = Object.values(d.drafts).find((x) => x.type === 'dailyLog' && x.payload.qid === 'q1');
   assert.ok(dr && dr.payload.fmtList.q1.length === 2 && /【人和機具】人 5/.test(dr.payload.answers[0]));
 });
-test('v6.0.234 舊格式照收：沒有【】的自由寫法照舊進草稿；舊的提醒句（三件事）自動換新', async () => {
+test('v6.0.235 舊格式照收：沒有【】的自由寫法照舊進草稿；舊的提醒句（三件事）自動換新', async () => {
   const d = mkDeps(Object.assign({}, CFG, { texts: { remind: '昨天的施工日報還沒回，麻煩補一下三件事，謝謝。' } }));
   const ask = Date.parse('2026-10-22T09:30:00Z'); await core.dailyAsk(d, ask);
   await core.handleEvents([{ type: 'message', timestamp: ask + 600000, source: { type: 'group', groupId: 'Gsite', userId: 'Uw' }, message: { id: 'o1', type: 'text', text: '今天打設 H 型鋼 8 支，4 人' } }], d);
@@ -598,7 +598,7 @@ test('v6.0.234 舊格式照收：沒有【】的自由寫法照舊進草稿；�
   assert.ok(d2.pushes.some((p) => /照昨天的格式/.test(p.text)));
 });
 
-test('v6.0.234 【支出】：範本有【支出】；公司群拆得出支出、跟著草稿文字走；說明行的「代墊」不算', async () => {
+test('v6.0.235 【支出】：範本有【支出】；公司群拆得出支出、跟著草稿文字走；說明行的「代墊」不算', async () => {
   const B = core.parseCoReport('【日期】10/22\n【工地】內湖興中路\n【今天做了】\n1 打設 12\n【支出】\n便當 5 個 600 零用金\n【明天】\n【問題】\n無', '2026-10-22');
   assert.equal(B.length, 1); assert.equal(B[0].exp, '便當 5 個 600 零用金');
   const onlyExp = core.parseCoReport('【日期】10/22\n【工地】內湖興中路\n【今天做了】\n\n【支出】\n五金 300 公司付\n【明天】\n【問題】', '2026-10-22');
@@ -608,7 +608,7 @@ test('v6.0.234 【支出】：範本有【支出】；公司群拆得出支出�
   assert.match(core.DEFAULT_TEXTS.dailyFmtHead, /支出（選填）/);
 });
 
-test('v6.0.234 LINE【支出】：日報草稿建好就把支出放進 fydata/lineExp/<主報價>/<草稿id_序號>（追加報價放主約底下）；已經有的不覆蓋；草稿已存在不重寫', async () => {
+test('v6.0.235 LINE【支出】：日報草稿建好就把支出放進 fydata/lineExp/<主報價>/<草稿id_序號>（追加報價放主約底下）；已經有的不覆蓋；草稿已存在不重寫', async () => {
   const d = mkDeps({ owners: {}, groups: { Gadd: { qid: 'qa1', name: '追加案' } } });
   d.createDraft = async (rec) => { if (d.drafts[rec.id]) return false; d.drafts[rec.id] = rec; return true; };
   d.getQuote = async (id) => (id === 'qa1' ? { id: 'qa1', parentId: 'qm1', items: [] } : null);

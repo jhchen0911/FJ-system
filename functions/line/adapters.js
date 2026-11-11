@@ -50,7 +50,7 @@ function mkDeps(token) {
     },
     dbSet: async (path, val) => { await db.ref(path).set(val); },
     dbGet: async path => (await db.ref(path).once('value')).val(),
-    // v6.0.234 17:30 日報問句列工項：報價（RTDB 的 key 可能被編碼、陣列可能存成物件）
+    // v6.0.235 17:30 日報問句列工項：報價（RTDB 的 key 可能被編碼、陣列可能存成物件）
     getQuote: async (qid) => {
       const enc = String(qid).replace(/\./g, '~d~').replace(/#/g, '~h~').replace(/\$/g, '~s~').replace(/\//g, '~sl~').replace(/\[/g, '~lb~').replace(/\]/g, '~rb~');   // 同前端 _fbEncKey
       let raw = (await db.ref('fydata/shared/quotes/' + enc).once('value')).val();

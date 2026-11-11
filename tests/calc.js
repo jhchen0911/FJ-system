@@ -484,7 +484,7 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   const logs = [{ date: '2026-11-01', progressRows: [{ itemIdx: 0, qty: 100 }, { itemIdx: 0, qty: 5, ph: 'remove' }] }, { date: '2026-11-02', photoOnly: true, progressRows: [{ itemIdx: 0, qty: 9 }] }];
   check('LINE 日報拆數量：累計只算確認過的日報（只有照片的不算）、打設拔除分開', DL.cumOf(logs, 0, 'install', (r) => r.ph === 'remove' ? 'remove' : 'install') === 100 && DL.cumOf(logs, 0, 'remove', (r) => r.ph === 'remove' ? 'remove' : 'install') === 5);
 }
-// ── v6.0.234 新格式日報（Lotion 11/11）：17:30 範本帶工項編號；tests/synthetic/daily-line-fmt.json 新格式、舊格式、亂寫 28 則
+// ── v6.0.235 新格式日報（Lotion 11/11）：17:30 範本帶工項編號；tests/synthetic/daily-line-fmt.json 新格式、舊格式、亂寫 28 則
 {
   const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl, F = require(path.join(__dirname, 'synthetic', 'daily-line.json')), G = require(path.join(__dirname, 'synthetic', 'daily-line-fmt.json'));
   const list = DL.askList(F.items, []); let ok = 0, tot = 0; const miss = [];
@@ -506,7 +506,7 @@ check('收款現金比例：空白／0／非數字＝全現金；60＝0.6；超�
   check('新格式日報：一個群組好幾個工地＝好幾段【工地】，編號各自從 1 開始；範本的【本工地工項】不算回報內容（stripList）',
     (T.match(/【工地】/g) || []).length === 2 && /【工地】B 案\n【本工地工項】\n1 /.test(T) && !/追加/.test(DL.stripList('【本工地工項】\n1 追加 H300\n【今天做了】\n1 打設 3')) && /打設 3/.test(DL.stripList('【本工地工項】\n1 追加 H300\n【今天做了】\n1 打設 3')));
 }
-// ── v6.0.234 LINE 日報【支出】（Lotion 11/11，選填）：一行一筆「項目＋金額＋付款方式」
+// ── v6.0.235 LINE 日報【支出】（Lotion 11/11，選填）：一行一筆「項目＋金額＋付款方式」
 {
   const DL = require(path.join(__dirname, '..', 'calc', 'dailyparse.js')).dl;
   const E = DL.expOf('【今天做了】\n1 打設 12\n【支出】\n便當 5 個 600 零用金\n五金 1,250 代墊 阿明\n吊車費 8000 公司付\n涼水 300\n加油 1500元 零用金 小陳\n例：便當 5 個 600 零用金\n雜支 代墊\n【明天】\n續打');
