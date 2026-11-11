@@ -46575,8 +46575,8 @@ function _drPRow(scope,gi,w,els){
   var h='<div class="dr-pp" data-wid="'+esc(w.id)+'" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:5px 0;border-top:1px solid var(--b1);font-size:13px">'
     +'<label style="display:inline-flex;align-items:center;gap:6px;flex:1 1 150px;min-width:0;cursor:pointer"><input type="checkbox" class="dr-pp-on"'+(on?' checked':'')+' onchange="drPpTog('+arg+',this.checked)" style="-webkit-appearance:checkbox;appearance:auto;width:18px;height:18px;min-width:0;padding:0;margin:0;flex:0 0 auto;accent-color:var(--g)">'
     +'<b>'+esc(w.name)+'</b>'+(scope==='own'?'<span style="font-size:11px;background:var(--gl);color:var(--g3);border-radius:99px;padding:1px 7px">員工</span>':'')
-    +(els[w.id]?'<span style="font-size:11px;color:#b26a00">今天已在 '+esc(els[w.id])+'</span>':'')+'</label>';
-  if(on){var R=function(v,l){return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:12.5px"><input type="radio" name="dr-pp-'+scope+gi+'-'+esc(w.id)+'"'+((+st.day)===v?' checked':'')+' onchange="drPpDay('+arg+','+v+')" style="-webkit-appearance:radio;appearance:auto;width:16px;height:16px;min-width:0;padding:0;margin:0;flex:0 0 auto;accent-color:var(--g)">'+l+'</label>';};
+    +(els[w.id]?'<span style="font-size:11px;color:#b26a00">'+((window._drCtx&&window._drCtx.elseLb)||'今天已在')+' '+esc(els[w.id])+'</span>':'')+'</label>';
+  if(on&&!(window._drCtx&&window._drCtx.noDay)){   /* 派工板只排誰去，不填全天半天加班 */var R=function(v,l){return '<label style="display:inline-flex;align-items:center;gap:3px;font-size:12.5px"><input type="radio" name="dr-pp-'+scope+gi+'-'+esc(w.id)+'"'+((+st.day)===v?' checked':'')+' onchange="drPpDay('+arg+','+v+')" style="-webkit-appearance:radio;appearance:auto;width:16px;height:16px;min-width:0;padding:0;margin:0;flex:0 0 auto;accent-color:var(--g)">'+l+'</label>';};
     h+='<span style="display:inline-flex;gap:8px;align-items:center">'+R(1,'全天')+R(0.5,'半天')
       +'<label style="display:inline-flex;align-items:center;gap:3px;font-size:12.5px">加班<input type="number" inputmode="decimal" min="0" step="0.5" value="'+(st.ot||'')+'" oninput="drPpOt('+arg+',this.value)" style="width:56px;font-size:13px;padding:4px 6px;border:1px solid var(--b2);border-radius:6px;text-align:right">時</label></span>';}
   return h+'</div>';
@@ -46755,7 +46755,7 @@ function _dpEdElse(qid){var m={};Object.keys(_dpEd.st).forEach(function(k){if(k=
 function _dpEdShow(qid){
   if(!_dpEd)return;_dpEdStash();_dpEd.cur=qid;var st=_dpEd.st[qid];
   _drLab=st.lab;_drOwn=st.own;_drCrews=st.subs.length?st.subs:[{type:'sub',vendor:'',n:''}];_drMoreOpen={};
-  window._drCtx={box:'dp-crews',qid:qid,date:_dpEd.date,elsewhere:_dpEdElse(qid)};
+  window._drCtx={box:'dp-crews',qid:qid,date:_dpEd.date,elsewhere:_dpEdElse(qid),elseLb:'明天已排在',noDay:1};
   var tb=document.getElementById('dp-tabs');if(tb)tb.innerHTML=_dpEd.qs.map(function(q){var on=q.id===qid;return '<button type="button" class="btn btn-xs" onclick="_dpEdShow(\''+escq(q.id)+'\')" style="'+(on?'background:var(--g);color:#fff;border-color:var(--g)':'')+'">'+esc(String(q.name||'').slice(0,14))+'</button>';}).join(' ');
   var eq=document.getElementById('dp-equip'),L=(P.equipList||[]);
   if(eq)eq.innerHTML='<div style="font-weight:700;font-size:13px;margin:8px 0 4px">機具</div>'+(L.length?L.map(function(n){return '<label style="display:inline-flex;align-items:center;gap:4px;margin:0 10px 6px 0;font-size:13px"><input type="checkbox" value="'+esc(n)+'"'+(st.equip.indexOf(n)>=0?' checked':'')+' style="-webkit-appearance:checkbox;appearance:auto;width:18px;height:18px;min-width:0;padding:0;margin:0;accent-color:var(--g)">'+esc(n)+'</label>';}).join(''):'<div style="font-size:12px;color:var(--b4)">參數設定「自有機具清單」填了機具，這裡就可以勾</div>');

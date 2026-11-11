@@ -15023,7 +15023,7 @@ async function newPage(browser, width, height) {
         _DEC.dispatch.edit(L1[0]); await T(80);
         out.edTabs = document.querySelectorAll('#dp-tabs button').length === 2 && !!document.querySelector('#dp-crews .dr-lab');
         _dpEdShow('qK2'); await T(40);
-        out.edElse = /今天已在 範例派工甲/.test(document.querySelector('#dp-crews .dr-pp[data-wid="w1"]').textContent);
+        out.edElse = /明天已排在 範例派工甲/.test(document.querySelector('#dp-crews .dr-pp[data-wid="w1"]').textContent) && !document.querySelector('#dp-crews input[type="radio"]');
         drPpTog('lab', 0, 'w1', false); drPpTog('lab', 0, 'w3', true); document.querySelector('#dp-equip input[value="吊車"]').checked = true;
         document.getElementById('fy-modal-o').click(); await T(80);
         const det2 = _DEC.dispatch.detail(_DEC.dispatch.list()[0]);
