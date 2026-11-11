@@ -41,11 +41,34 @@ jobs:
         with:
           node-version: '20'
 
+      # 11/11：GitHub runner 連不到 archive.ubuntu.com（DNS 暫時失敗）超過 1.5 小時，裝瀏覽器那一步失敗、測試沒跑到。
+      #   ① 瀏覽器快取（key 跟著 package.json 的 playwright 版本走，升級就換新快取）
+      #   ② 每一步重試 4 次（間隔 30／60／90 秒）
+      #   ③ apt 一直不通的退路：改用 Playwright 自己的 CDN 下載瀏覽器（不走 apt），系統套件用 runner 本來裝好的；
+      #      缺套件就讓測試自己紅（測試一項都不跳過）
+      - name: 快取 playwright 瀏覽器
+        id: pwcache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package.json') }}
+
       - name: 安裝 playwright 與 chromium
-        # 11/11：GitHub runner 連不到 archive.ubuntu.com（DNS 暫時失敗），裝瀏覽器那一步失敗、測試沒跑到 → 同一步重試 4 次（間隔 30／60／90 秒），全部失敗才紅（不跳過測試）
+        env:
+          PW_HIT: ${{ steps.pwcache.outputs.cache-hit }}
         run: |
-          for i in 1 2 3 4; do npm install --no-audit --no-fund && break; [ $i = 4 ] && exit 1; echo "npm install 失敗，第 $i 次重試"; sleep $((i*30)); done
-          for i in 1 2 3 4; do npx playwright install --with-deps chromium && break; [ $i = 4 ] && exit 1; echo "playwright 安裝失敗，第 $i 次重試"; sleep $((i*30)); done
+          retry() { n=$1; shift; for i in $(seq 1 "$n"); do "$@" && return 0; [ "$i" = "$n" ] && return 1; echo "第 $i 次失敗，$((i*30)) 秒後重試：$*"; sleep $((i*30)); done; }
+          retry 4 npm install --no-audit --no-fund
+          if [ "$PW_HIT" = "true" ]; then
+            echo "瀏覽器快取命中，只補系統套件"
+            retry 4 npx playwright install-deps chromium || echo "::warning::apt 不通，改用 runner 內建系統套件"
+            retry 4 npx playwright install chromium
+          else
+            if ! retry 4 npx playwright install --with-deps chromium; then
+              echo "::warning::apt 不通，改用 runner 內建系統套件"
+              retry 4 npx playwright install chromium
+            fi
+          fi
 
       - name: 計算模組（Node 單獨跑，不開瀏覽器）
         run: npm run calc
