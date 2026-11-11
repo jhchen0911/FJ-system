@@ -681,7 +681,7 @@ details.me-sec>.me-secb{padding:8px 10px}
 details.me-adv{margin-top:8px}details.me-adv>summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--g3)}details.me-adv>div{margin-top:6px}
 .led-fold>:not(.acct-led):not(#finance-retention){display:none!important}   /* v6.0.225 帳務帳本：舊清單收進「更多」（保留款那塊照常顯示） */
 .q7-off{display:none!important}
-body.nav5:not(.v7old-acct) #page-acct .ph .ph-r{display:none!important}   /* v6.0.234 帳務頁首 Excel／？收進帳本「⋯ 更多」 */
+body.nav5:not(.v7old-acct) #page-acct.acct-ledon .ph .ph-r{display:none!important}   /* v6.0.234 帳務頁首 Excel／？收進帳本「⋯ 更多」 */
 .cost7-on .cost-tabs,.cost7-on [onclick="costAddPick()"],#cost-v7 .cost-hist-row{display:none!important}   /* v6.0.233 施工成本頁新選單：舊分頁、新增成本鈕、回寫單價庫收起 */   /* v6.0.225 報價頁新選單拿掉的按鈕 */
 </style>
 
@@ -1101,7 +1101,7 @@ body.nav5:not(.v7old-acct) #page-acct .ph .ph-r{display:none!important}   /* v6.
 <!-- ████ EDITOR ████ -->
 <div class="page" id="page-editor"><span id="editor-top"></span>
   <div class="ph">
-    <div class="ph-l"><div class="ph-t" id="etitle">新增報價</div><div class="ph-s" id="esub">填寫工程資訊與報價明細</div></div>
+    <div class="ph-l"><div class="ph-t" id="etitle">新增報價</div><div class="ph-s" id="esub">填寫工程資訊與報價明細</div><div id="q-as-st" class="ph-s" style="display:none;font-weight:700"></div></div>
     <div class="ph-r">
       <button type="button" class="btn btn-sm desk-only" data-q7off="1" onclick="newQ()">↺ 清除</button>
       <button type="button" class="btn btn-sm" onclick="openRmkModal()"><svg class="ic ib" aria-hidden="true"><use href="#i-pencil"/></svg> 備註填寫</button>
@@ -2924,7 +2924,7 @@ body.nav5:not(.v7old-acct) #page-acct .ph .ph-r{display:none!important}   /* v6.
 <script src="calc/matmove.js?v=6.0.221" defer></script>
 <script src="calc/bid.js?v=6.0.209" defer></script>
 <script src="calc/dailyparse.js?v=6.0.227" defer></script>
-<script src="app.js?v=6.0.234" defer></script><script src="beta.js?v=6.0.234" defer></script>
+<script src="app.js?v=6.0.235" defer></script><script src="beta.js?v=6.0.235" defer></script>
 
 <!-- ████ 施工成本合併 ████ -->
 <div id="merge-cost-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);padding:16px;align-items:center;justify-content:center" onclick="if(event.target===this)closeMergeCost()">

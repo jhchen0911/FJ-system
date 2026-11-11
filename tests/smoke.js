@@ -14465,7 +14465,7 @@ async function newPage(browser, width, height) {
         const oA2 = _isAdminUser, oU2 = _fbUser; _isAdminUser = false; _fbUser = { email: 'staff@example.com', uid: 's' }; acctLedSetF('ap', 'all'); await T(40);
         const staffChips = Array.from(document.querySelectorAll('#acct-p-ap .acct-led-f [data-ledf]')).map((b) => b.getAttribute('data-ledf')).join(',');
         const staffTx = document.querySelector('#acct-p-ap > .acct-led').textContent; _isAdminUser = oA2; _fbUser = oU2;
-        out.chipsAp = /範例員工/.test(ls) && !/範例廠商乙/.test(ls) && /範例廠商乙/.test(lv) && !/範例員工/.test(lv) && staffChips === 'all,vendor,petty' && !/範例員工/.test(staffTx);
+        out.chipsAp = /範例員工/.test(ls) && !/範例廠商乙/.test(ls) && /範例廠商乙/.test(lv) && !/範例員工/.test(lv) && staffChips === 'all,vendor' && !/範例員工/.test(staffTx);
         localStorage.removeItem('fy_acctLedF_ar'); localStorage.removeItem('fy_acctLedF_ap');
         // 舊選單：沒有帳本、清單照舊
         localStorage.setItem('fy_nav_old', '1'); _nav5Apply(); acctTab('ap'); await T(80);
@@ -14781,6 +14781,37 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.235 報價自動存檔（寬 ' + W + '）：沒改不存、打字停 3 秒才存且留在編輯頁、日報成本不動、10 分鐘一份備份、驗證沒過不存寫原因、別台改別欄兩邊都留、同欄記衝突、離開才加客戶、新報價填名稱才存且重號改號、唯讀與舊選單不自動存', !r.err && r.noChg && r.wait && r.saved && r.backup && r.invalid && r.items && r.backupOnce && r.merge && r.conflict && r.custWait && r.leave && r.newWait && r.newSaved && r.codeShown && r.newOnce && r.ro && r.old, JSON.stringify(r));
     check('v6.0.235 報價自動存檔測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+  // ── v6.0.234 審查修正：舊整筆應付付一部分照總額、介紹費不算施工成本、薪資／零用金照 id 判斷且唯讀帳號看不到、已收款要真的收了 ──
+  {
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(async () => {
+      const out = {}; const keepP = PAYABLES.slice(), keepI = INV.slice(), oR = window._isReaderUser, oU = window._fbUser;
+      try {
+        window.toast = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); _nav5Apply();
+        PAYABLES.length = 0; INV.length = 0;
+        const legacy = { id: 'cL1', type: 'sub', vendor: '舊廠商', rows: [{ id: 'x', linkedItemIdx: 0, qty: 10, unitPrice: 1000 }] };
+        PAYABLES.push({ id: 'paycL1', costId: 'cL1', amount: 10000, status: 'unpaid', pays: [{ amt: 4000, at: Date.now(), date: '2026-10-01' }], _mt: 1 });
+        out.partPaid = _cost7Inc(legacy) === 10000;
+        out.intro = _cost7Inc({ id: 'cI1', type: 'sub', isIntro: true, vendor: '介紹人', rows: [{ id: 'y', qty: 1, unitPrice: 5000 }] }) === 0;
+        PAYABLES.length = 0;
+        PAYABLES.push({ id: 'pay_ps_x1', to: '某員工', amount: 30000, status: 'unpaid', date: '2026-10-05', _mt: 1 });
+        PAYABLES.push({ id: 'pay_pc_x2', to: '零用金', amount: 3000, status: 'unpaid', date: '2026-10-05', _mt: 1 });
+        PAYABLES.push({ id: 'payV1_p1', to: '範例廠商', amount: 12000, status: 'unpaid', date: '2026-10-05', _mt: 1 });
+        out.cat = _acctPayCat(PAYABLES[0]) === 'salary' && _acctPayCat(PAYABLES[1]) === 'petty' && _acctPayCat(PAYABLES[2]) === 'vendor';
+        _fbUser = null; _isReaderUser = false; localStorage.removeItem('fy_acctLedF_ap');
+        out.admin = _acctLedRows('ap').length === 3;
+        _isReaderUser = true;
+        const rr = _acctLedRows('ap'), hh = _acctLedHtml('ap');
+        out.reader = rr.length === 1 && rr[0].who === '範例廠商' && !/30,000|3,000/.test(hh) && !/data-ledf="salary"|data-ledf="petty"/.test(hh);
+        _isReaderUser = false;
+        INV.push({ id: 'iZ0', project: '零元案', periodNo: 1, items: [], totals: { sub: 0, tax: 0, total: 0 }, _mt: 1 });
+        localStorage.setItem('fy_acctLedF_ar', 'paid'); out.zero = !_acctLedRows('ar').some((x) => x.id === 'iZ0'); localStorage.removeItem('fy_acctLedF_ar');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      PAYABLES.length = 0; keepP.forEach((x) => PAYABLES.push(x)); INV.length = 0; keepI.forEach((x) => INV.push(x)); _isReaderUser = oR; _fbUser = oU;
+      return out;
+    });
+    check('v6.0.234 審查修正：舊整筆應付付一部分照總額、介紹費不算施工成本、薪資／零用金照 id 判斷且唯讀帳號帳本看不到、金額 0 的單不算已收', !r.err && r.partPaid && r.intro && r.cat && r.admin && r.reader && r.zero, JSON.stringify(r));
+    check('v6.0.234 審查修正測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
