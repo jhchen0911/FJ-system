@@ -11895,6 +11895,39 @@ async function newPage(browser, width, height) {
     check('v6.0.235 LINE 支出工務名單測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── 第 2 層（陳軒 11/12）：唯讀帳號開帳務薪資頁，不會把看不到薪資條的人事應付當成已刪（本機拿掉＋立墓碑）；誤立的墓碑下次套用雲端修好 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {}; const keep = { P: PAYABLES, S: PAYSLIPS, C: PETTY, T: TOMBS, ro: _isReaderUser, push: window._pushCloud };
+      try {
+        const mk = () => [
+          { id: 'pay_ps_hr_A_2026-09', hrRef: 'ps_hr_A_2026-09', to: '甲', amount: 30000, status: 'pending', category: 'salary' },
+          { id: 'pay_ps_hr_B_2026-09', hrRef: 'ps_hr_B_2026-09', to: '乙', amount: 28000, status: 'paid', paidDate: '2026-10-05', category: 'salary' },
+          { id: 'pay_pc_x', hrRef: 'pc_x', to: '丙', amount: 3000, status: 'pending', category: 'petty' },
+          { id: 'pay_ins_2026-09', hrRef: 'ins_2026-09', to: '勞保局', amount: 9000, status: 'pending', category: 'salary' },
+          { id: 'payV1_p1', to: '廠商', amount: 50000, status: 'pending' }];
+        let pushes = 0; window._pushCloud = () => { pushes++; };
+        _isReaderUser = true; PAYABLES = mk(); PAYSLIPS = []; PETTY = []; TOMBS = {};
+        _hrSyncPayables('2026-10');
+        out.keep = PAYABLES.length === 5 && !Object.keys(TOMBS.payables || {}).length && pushes === 0;
+        out.noTomb = _tomb('payables', 'pay_pc_x') === false && !Object.keys(TOMBS.payables || {}).length;
+        // 舊版唯讀裝置誤立的墓碑：套用雲端（雲端沒有這些墓碑）→ 墓碑照雲端、人事應付回來
+        PAYABLES = [mk()[4]]; TOMBS = { payables: { 'pay_ps_hr_A_2026-09': Date.now(), 'pay_pc_x': Date.now(), 'pay_ins_2026-09': Date.now() } };
+        _applyCloud({ quotes: (Q || []).slice(), payables: mk(), tombs: {} });   // 共用區套用（墓碑照雲端）
+        _applySensColls({ payables: mk() }, TOMBS);   // 私有區套用（跟正式流程一樣用目前的墓碑）
+        out.heal = !Object.keys(TOMBS.payables || {}).length && ['pay_ps_hr_A_2026-09', 'pay_pc_x', 'pay_ins_2026-09', 'payV1_p1'].every(id => PAYABLES.some(p => p.id === id));
+        // 管理員照舊：薪資條真的刪了 → 未付人事應付撤掉
+        _isReaderUser = false; PAYABLES = mk(); PAYSLIPS = []; PETTY = []; TOMBS = {};
+        _hrSyncPayables('2026-10');
+        out.admin = !PAYABLES.some(p => p.id === 'pay_ps_hr_A_2026-09') && !!(TOMBS.payables || {})['pay_ps_hr_A_2026-09'];
+      } finally { PAYABLES = keep.P; PAYSLIPS = keep.S; PETTY = keep.C; TOMBS = keep.T; _isReaderUser = keep.ro; window._pushCloud = keep.push; window._applyingCloud = false; }
+      return out;
+    });
+    check('第 2 層：唯讀帳號開帳務薪資頁不會拿掉看不到的人事應付、不立墓碑、不上傳；誤立的墓碑套用雲端後照雲端、人事應付回來；管理員刪薪資條照舊撤應付', Object.values(r).length === 4 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('唯讀人事應付測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── 請款單改兩下（Lotion 11/11 驗收）：草稿卡按確認存的 vs 編輯頁手動按儲存的，同一份資料交給 PDF 的內容要一字不差 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

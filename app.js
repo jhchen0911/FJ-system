@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.240';
+var APP_VERSION='v6.0.241';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -8285,6 +8285,7 @@ var MAT_MOVE_FIN={};try{var _mfx=localStorage.getItem('fy_matmovefin');if(_mfx)M
 var MAT_MOVE_LOG=[],MAT_AUDIT=[];try{MAT_MOVE_LOG=JSON.parse(localStorage.getItem('fy_matmovelog')||'[]')||[];MAT_AUDIT=JSON.parse(localStorage.getItem('fy_mataudit')||'[]')||[];}catch(e){_err('matMoveLog.load',e);}   // v6.0.200 進退料追溯紀錄（只增不減）
 function _tomb(coll,id,moved){   // moved：改編號（舊 id 換新 id，付款帳本已搬過去）→ 舊 id 照樣立墓碑
   if(!id)return false;
+  if(_isReaderUser){console.warn('[唯讀] 不立墓碑 '+coll+' '+id);return false;}   /* 第 2 層（陳軒 11/12）：唯讀帳號不能刪任何東西；本機被拿掉的下次從雲端套用就回來 */
   if(coll==='payables'&&!moved){
     // 批次 G3：已付的應付不立墓碑、付款帳本也不刪（要刪得先改回未付）；呼叫端若照樣從陣列拿掉，savePayables 的 _paidVanishGuard 會救回
     try{var _pr=(PAYABLES||[]).find(function(x){return x&&x.id===id;});var _pl=(typeof PAID_LOG!=='undefined')&&PAID_LOG[id];
@@ -10381,6 +10382,7 @@ function _applyCloud(data){
   var _sensSnap=null;try{_sensSnap=_snapshotQuoteSens();}catch(e){_err('_applyCloud',e);}
   try{
     try{_mergeTombs(data.tombs);}catch(e){console.error('[同步] 墓碑合併失敗',e);}
+    if(_isReaderUser){try{TOMBS=JSON.parse(JSON.stringify((data.tombs&&typeof data.tombs==='object')?data.tombs:{}));localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e){_err('_applyCloud.roTombs',e);}}   /* 唯讀帳號自己不會刪東西：墓碑一律照雲端（修好 v6.0.240 以前唯讀裝置誤立的人事應付墓碑，被藏起來的會回來） */
     var _safeMerge=function(loc,cld,nm){try{return _mergeColl(loc,cld,nm,data.tombs);}catch(e){console.error('[同步] '+nm+' 合併失敗，改用雲端版',e);return Array.isArray(cld)?cld:(cld?Object.values(cld):loc);}};
     // v5.375：正在編輯中的報價若被雲端版本取代，當場提醒，不要等到按儲存才發現
     var _editingId=(window._qEditBase&&window._qEditBase.id)||null;
@@ -30824,6 +30826,7 @@ function _hrRemovePay(id){
   if(PAYABLES.length!==n)_tomb('payables',id);
 }
 function _hrSyncPayables(ym){
+  if(_isReaderUser)return;   /* 第 2 層（陳軒 11/12）：唯讀帳號讀不到薪資條／零用金，不准整理人事應付（原本會把看不到的當成「薪資條已刪」從這台拿掉、立墓碑） */
   try{
     var chgPs=false,chgPc=false;
     // 逐人薪資（實發）
