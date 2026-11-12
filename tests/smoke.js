@@ -11917,6 +11917,14 @@ async function newPage(browser, width, height) {
         _applyCloud({ quotes: (Q || []).slice(), payables: mk(), tombs: {} });   // 共用區套用（墓碑照雲端）
         _applySensColls({ payables: mk() }, TOMBS);   // 私有區套用（跟正式流程一樣用目前的墓碑）
         out.heal = !Object.keys(TOMBS.payables || {}).length && ['pay_ps_hr_A_2026-09', 'pay_pc_x', 'pay_ins_2026-09', 'payV1_p1'].every(id => PAYABLES.some(p => p.id === id));
+        // 唯讀判定還沒回來（pending）：上次確認是唯讀的同一個人 → 不整理、不立墓碑；別人照舊可以刪
+        const keepU = window._fbUser, keepS = _roState;
+        _isReaderUser = false; window._fbUser = { uid: 'uRO', email: 'ro@example.com' }; _roState = 'pending'; localStorage.setItem('fy_ro_uid', 'uRO');
+        PAYABLES = mk(); PAYSLIPS = []; PETTY = []; TOMBS = {};
+        _hrSyncPayables('2026-10');
+        out.pending = PAYABLES.length === 5 && _tomb('payables', 'payV1_p1') === false && !Object.keys(TOMBS.payables || {}).length;
+        localStorage.setItem('fy_ro_uid', 'someoneElse'); out.pendingOther = _roLikely() === false;
+        localStorage.removeItem('fy_ro_uid'); window._fbUser = keepU; _roState = keepS;
         // 管理員照舊：薪資條真的刪了 → 未付人事應付撤掉
         _isReaderUser = false; PAYABLES = mk(); PAYSLIPS = []; PETTY = []; TOMBS = {};
         _hrSyncPayables('2026-10');
@@ -11924,7 +11932,7 @@ async function newPage(browser, width, height) {
       } finally { PAYABLES = keep.P; PAYSLIPS = keep.S; PETTY = keep.C; TOMBS = keep.T; _isReaderUser = keep.ro; window._pushCloud = keep.push; window._applyingCloud = false; }
       return out;
     });
-    check('第 2 層：唯讀帳號開帳務薪資頁不會拿掉看不到的人事應付、不立墓碑、不上傳；誤立的墓碑套用雲端後照雲端、人事應付回來；管理員刪薪資條照舊撤應付', Object.values(r).length === 4 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('第 2 層：唯讀帳號（含唯讀判定還沒回來時）開帳務薪資頁不會拿掉看不到的人事應付、不立墓碑、不上傳；誤立的墓碑套用雲端後照雲端、人事應付回來；管理員刪薪資條照舊撤應付', Object.values(r).length === 6 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('唯讀人事應付測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

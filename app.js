@@ -8216,7 +8216,7 @@ function _autoSyncOnLogin(){
 function _readerOn(v){return v===true||!!(v&&typeof v==='object'&&!Array.isArray(v));}
 function _readerCheck(cb){
   _isReaderUser=false;_readerName='';_roState='pending';
-  var done=function(ro){_isReaderUser=!!ro;_roState=ro?'reader':'rw';if(ro){try{localStorage.removeItem('fy_aikey');if(P)delete P.aiKey;}catch(e){_err('_readerCheck.aikey',e);}}if(cb){var c=cb;cb=null;c(!!ro);}};
+  var done=function(ro){_isReaderUser=!!ro;_roState=ro?'reader':'rw';try{if(ro&&_fbUser)localStorage.setItem('fy_ro_uid',_fbUser.uid);else localStorage.removeItem('fy_ro_uid');}catch(e){_err('_readerCheck.cache',e);}if(ro){try{localStorage.removeItem('fy_aikey');if(P)delete P.aiKey;}catch(e){_err('_readerCheck.aikey',e);}}if(cb){var c=cb;cb=null;c(!!ro);}};
   try{
     if(!_fbUser||!_fbDb||!_fbUser.email){_roState='';if(cb)cb(false);return;}
     if(String(_fbUser.email).toLowerCase()===_RULES_OWNER){done(false);return;}
@@ -8235,7 +8235,10 @@ function _readerCheck(cb){
   }catch(e){_err('_readerCheck',e);if(cb)cb(false);}
 }
 // 重查後才發現是唯讀帳號：補上唯讀模式
+// 唯讀判定還沒回來（剛登入、離線開頁）時，上次確認過是唯讀帳號的同一個人也當唯讀看（v6.0.241 審查）
+function _roLikely(){if(_isReaderUser)return true;try{return !!(_fbUser&&_roState!=='rw'&&localStorage.getItem('fy_ro_uid')===_fbUser.uid);}catch(e){_err('_roLikely',e);return false;}}
 function _readerApply(){
+  try{if(!localStorage.getItem('fy_ro_tombfix_241')){localStorage.removeItem('fy_last_fb_sync');localStorage.setItem('fy_ro_tombfix_241','1');}}catch(e){_err('_readerApply.tombfix',e);}   /* v6.0.241：一次強制整份套用共用區，墓碑照雲端、舊版誤立的人事應付墓碑馬上清掉（不用等別人上傳） */
   _privReadOk=null;   // v6.0.108：唯讀帳號可讀 private（規則已放行），一樣不寫
   try{localStorage.removeItem('fy_pending_sync');}catch(e){/* 可忽略 */}
   try{_syncChip();}catch(e){/* 可忽略 */}
@@ -8285,7 +8288,7 @@ var MAT_MOVE_FIN={};try{var _mfx=localStorage.getItem('fy_matmovefin');if(_mfx)M
 var MAT_MOVE_LOG=[],MAT_AUDIT=[];try{MAT_MOVE_LOG=JSON.parse(localStorage.getItem('fy_matmovelog')||'[]')||[];MAT_AUDIT=JSON.parse(localStorage.getItem('fy_mataudit')||'[]')||[];}catch(e){_err('matMoveLog.load',e);}   // v6.0.200 進退料追溯紀錄（只增不減）
 function _tomb(coll,id,moved){   // moved：改編號（舊 id 換新 id，付款帳本已搬過去）→ 舊 id 照樣立墓碑
   if(!id)return false;
-  if(_isReaderUser){console.warn('[唯讀] 不立墓碑 '+coll+' '+id);return false;}   /* 第 2 層（陳軒 11/12）：唯讀帳號不能刪任何東西；本機被拿掉的下次從雲端套用就回來 */
+  if(_roLikely()){console.warn('[唯讀] 不立墓碑 '+coll+' '+id);return false;}   /* 第 2 層（陳軒 11/12）：唯讀帳號不能刪任何東西；本機被拿掉的下次從雲端套用就回來 */
   if(coll==='payables'&&!moved){
     // 批次 G3：已付的應付不立墓碑、付款帳本也不刪（要刪得先改回未付）；呼叫端若照樣從陣列拿掉，savePayables 的 _paidVanishGuard 會救回
     try{var _pr=(PAYABLES||[]).find(function(x){return x&&x.id===id;});var _pl=(typeof PAID_LOG!=='undefined')&&PAID_LOG[id];
@@ -30826,7 +30829,7 @@ function _hrRemovePay(id){
   if(PAYABLES.length!==n)_tomb('payables',id);
 }
 function _hrSyncPayables(ym){
-  if(_isReaderUser)return;   /* 第 2 層（陳軒 11/12）：唯讀帳號讀不到薪資條／零用金，不准整理人事應付（原本會把看不到的當成「薪資條已刪」從這台拿掉、立墓碑） */
+  if(_isReaderUser||(_fbUser&&_roState!=='rw'))return;   /* 唯讀判定還沒確認（剛登入、離線開頁）也先不整理，確認後再整理；第 2 層（陳軒 11/12）：唯讀帳號讀不到薪資條／零用金，不准整理人事應付（原本會把看不到的當成「薪資條已刪」從這台拿掉、立墓碑） */
   try{
     var chgPs=false,chgPc=false;
     // 逐人薪資（實發）
