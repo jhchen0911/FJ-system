@@ -14943,6 +14943,86 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.237 付款修正（端到端補驗 11/12，陳軒派工；第 2 層）：部分已付不准刪期別、改到低於已付要寫原因、計算書沒讀到不當 0、擋下原因不被蓋掉、廠商請款卡應付到期、業主還沒請款只標資訊 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keep = { Q: Q, I: INV.slice(), C: CONTRACTS.slice(), PAY: PAYABLES.slice(), PJ: PROJECTS, day: P.vendorPayDay, dl: P.vendorPayDelay, pob: P.subPayOnBill, pr: window.prompt };
+      try {
+        P.vendorPayDay = 25; P.vendorPayDelay = 1; P.subPayOnBill = false;
+        Q = [{ id: 'qPF', code: '1171', name: '範例付款案', client: '範例營造甲', date: '2026-01-01', awarded: true, exs: [], rmk: {}, _mt: 1,
+          items: [{ desc: '範例鋼樁打設', unit: 'M', qty: '100', price: '1000', sec: false }],
+          costs: [{ id: 'cPF', type: 'sub', vendor: '範例工程行', cat: '打設', date: '2026-02-01', amt: 0, retRate: 5, invoice: true, rows: [{ id: 'r1', linkedItemIdx: 0, desc: '', qty: 100, unitPrice: 500 }] }],
+          dailyLogs: [{ id: 'd1', date: '2026-03-05', progressRows: [{ itemIdx: 0, desc: '範例鋼樁打設', qty: 60, note: '' }], progress: '', photos: [] }] }];
+        INV.length = 0; CONTRACTS.splice(0); PAYABLES.length = 0;
+        openProjectCosts('qPF'); const c = Q[0].costs[0];
+        openSubPeriod('cPF'); document.getElementById('sp-date').value = '2026-03-31'; document.getElementById('sp-from').value = '2026-02-01'; document.getElementById('sp-to').value = '2026-03-31'; _spFillDaily();
+        document.getElementById('gen-confirm-ok').click();
+        const pp = () => PAYABLES.find((p) => p.id === 'paycPF_p1');
+        out.base = c.periods.length === 1 && _payEff(pp()) === 29925;
+        // 先付一部分 10,000（真的付款函式）
+        payMarkPaid('paycPF_p1'); await T(60); const amtEl = document.querySelector('#gen-confirm-modal input[type=number]'); if (amtEl) { amtEl.value = '10000'; amtEl.dispatchEvent(new Event('input')); } document.getElementById('gen-confirm-ok').click(); await T(60);
+        out.part = _payPaidSum(pp()) === 10000 && pp().status !== 'paid';
+        // ① 刪除部分已付的期別 → 擋下，不開確認視窗
+        document.getElementById('gen-confirm-modal').style.display = 'none';
+        delSubPeriod('cPF', 1); out.delBlocked = c.periods.length === 1 && document.getElementById('gen-confirm-modal').style.display !== 'flex' && /已付一部分/.test((document.querySelector('.toast') || {}).textContent || '') && !!pp();
+        // ③ 改成 10M（應付 4,988 < 已付 10,000）：沒寫原因不存；寫了原因才存、記在期別
+        window.prompt = () => null;
+        openSubPeriod('cPF', 1); document.querySelector('.sp-qty').value = '10'; _spRecalc(); document.getElementById('gen-confirm-ok').click(); await T(40);
+        out.overNo = c.periods[0].amt === 30000 && !c.periods[0].overWhy && /要寫原因才能存/.test((document.querySelector('.toast') || {}).textContent || '') && document.getElementById('gen-confirm-modal').style.display === 'flex' && document.querySelector('.sp-qty').value === '10';   // 視窗留著、填的還在
+        document.getElementById('gen-confirm-modal').style.display = 'none';
+        let asked = ''; window.prompt = (m) => { asked = m; return '廠商退回差額'; };
+        openSubPeriod('cPF', 1); document.querySelector('.sp-qty').value = '10'; _spRecalc(); document.getElementById('gen-confirm-ok').click(); await T(40);
+        const pr0 = c.periods[0];
+        out.overYes = pr0.amt === 5000 && !!pr0.overWhy && pr0.overWhy.why === '廠商退回差額' && pr0.overWhy.paid === 10000 && pr0.overWhy.amt === 10000 - 4988 && /已付 NT\$ 10,000/.test(asked) && /4,988/.test(asked) && JSON.parse(localStorage.getItem('fy6_q')).find((q) => q.id === 'qPF').costs[0].periods[0].overWhy.why === '廠商退回差額';
+        // （整筆已付的期別本來就不能修改：openSubPeriod 擋「已付款，不能直接修改」，所以多付檢查只會遇到付過一部分的期別）
+        document.getElementById('gen-confirm-modal').style.display = 'none';
+        // 刪期別：本體以外的應付（例：已付後差額筆、提前放款）付過也擋
+        PAYABLES.push({ id: 'paycPF_p1_d1', costId: 'cPF', costPeriod: 1, deltaOf: 'paycPF_p1', amount: 100, vat: false, status: 'paid', paidDate: '2026-05-01', to: '範例工程行' });
+        const pS = pp(); const keepSt = pS.status; pS.status = 'pending'; pS.pays = []; pS.paidDate = '';
+        document.getElementById('gen-confirm-modal').style.display = 'none';
+        delSubPeriod('cPF', 1); out.delDelta = c.periods.length === 1 && document.getElementById('gen-confirm-modal').style.display !== 'flex';
+        PAYABLES.splice(PAYABLES.findIndex((x) => x.id === 'paycPF_p1_d1'), 1); pS.status = keepSt;
+        // ⑥ 付包商款核對：業主還沒請款＝資訊，不算差異
+        const k = _vpCheck(pp());
+        const kqr = window._qtyRecon; window._qtyRecon = (q) => kqr(q).map((r) => Object.assign({}, r, { billQ: 30, warns: ['廠商已請 60、業主已請 30，差 30 尚未向業主請款'] }));
+        const kPart = _vpCheck(pp()); window._qtyRecon = kqr;
+        out.vpPart = kPart.bad === 1 && kPart.rows[0].info.length === 0;   // 業主請了一部分但比廠商少：照算差異
+        out.vp = !!k && k.bad === 0 && k.ok === true && k.rows[0].info.join() === '業主這期還沒請款，等請了再對' && k.rows[0].warns.length === 0 && _qtyRecon(Q[0])[0].warns.some((w) => /尚未向業主請款/.test(w));
+        // ⑤ 廠商請款卡：應付到期（遇假日順延）
+        out.due = _vbDueTxt('2026-11-25') === '12/28（12/25 遇假日順延）' && _vbDueTxt('2026-10-10') === '11/25' && /kv\('應付到期',_vbDueTxt/.test(String(_vbDetailHtml));
+        // ④ 拍板卡擋下：卡片自己說的原因跟「這張還留著」併成一則
+        _decReg('tPF', { title: 't', todo: () => 't', list: () => [{ k: 'a' }], key: (x) => x.k, head: () => 't', detail: () => 'x', ok: () => { toast('沒寫放行原因，不能確認'); return false; }, reject: () => true, edit: () => {} });
+        _DEC_READY['tPF|a'] = 1; decAct('tPF', 'a', 'ok'); await T(30);
+        out.toastKeep = ((document.querySelector('.toast') || {}).textContent || '') === '沒寫放行原因，不能確認（這張還留著）';
+        _DEC.tPF.ok = () => false; decAct('tPF', 'a', 'ok'); await T(30);
+        out.toastDef = ((document.querySelector('.toast') || {}).textContent || '') === '沒有完成，這張還留著';
+        delete _DEC.tPF; delete _DEC_READY['tPF|a'];
+        // ② 技師計算書：AI 沒讀到（null）保持空白、卡片寫沒讀到、不產生「數量改成 0」
+        Q = [{ id: 'qSD2', name: '範例計算書案', client: '範例營造甲', code: 'SD2', date: '2026-10-01', awarded: true, _mt: 1, costs: [],
+          items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 100, price: 2000 }, { desc: '中間樁打設', unit: '支', qty: 20, price: 3000 }] }];
+        PROJECTS = []; _prjSync(); const p = _prjOfQ('qSD2');
+        p.docs = { d3: { id: 'd3', name: '計算書.pdf', path: 'projects/' + p.id + '/docs/3_計算書.pdf', cat: '計算書', st: 'wait', at: 3000, by: 'x', size: 1, url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' } };
+        _sdocCalcSet('qSD2', 'd3', { items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 110 }, { desc: '中間樁打設', unit: '支', qty: null }, { desc: '角撐', unit: '組', qty: '' }] });
+        const cc = _sdocMap(_prjOfQ('qSD2')).d3.calc;
+        out.nullKept = cc.rows[1].qty === null && cc.rows[2].qty === null && cc.rows[0].qty === 110;
+        const C = _decItems('sdocCalc'); const dc = await Promise.resolve(_DEC.sdocCalc.detail(C[0]));
+        out.calcCard = /差異 1 項/.test(_DEC.sdocCalc.head(C[0])) && /沒讀到/.test(dc) && /\+20,000/.test(dc) && !/-60,000/.test(dc);
+        const ops = _sdocCalcOps(Q[0], cc); out.calcOps = ops.length === 1 && ops[0].fields.qty === 110;
+        out.aiNum = _aiQtyOrNaN(null) !== _aiQtyOrNaN(null) && isNaN(_aiQtyOrNaN('—')) && _aiQtyOrNaN('1,200') === 1200 && _aiNum(null) === 0;   // 舊的 _aiNum 不變（別處照用）
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      Q = keep.Q; INV.length = 0; keep.I.forEach((x) => INV.push(x)); CONTRACTS.splice(0); keep.C.forEach((x) => CONTRACTS.push(x)); PAYABLES.length = 0; keep.PAY.forEach((x) => PAYABLES.push(x)); PROJECTS = keep.PJ;
+      P.vendorPayDay = keep.day; P.vendorPayDelay = keep.dl; P.subPayOnBill = keep.pob; window.prompt = keep.pr;
+      return out;
+    });
+    check('付款修正①：期別已付一部分不准刪（不開確認視窗、應付留著、提示要先撤銷付款）；同期的差額筆／提前放款付過也擋', !r.err && r.base && r.part && r.delBlocked && r.delDelta, JSON.stringify(r));
+    check('付款修正③：已付過的期別改到應付低於已付，沒寫原因不存（視窗留著、填的還在）；寫了原因才存、原因與多付金額記在期別', !r.err && r.overNo && r.overYes, JSON.stringify(r));
+    check('付款修正②：技師計算書 AI 沒讀到的數量保持空白、卡片寫沒讀到、不產生數量改成 0 的改單', !r.err && r.nullKept && r.calcCard && r.calcOps && r.aiNum, JSON.stringify(r));
+    check('付款修正④⑤⑥：擋下原因跟「這張還留著」併成一則；廠商請款卡應付到期（遇假日順延）；付包商款核對業主還沒請款只標資訊不算差異（業主請了一部分但比較少照算差異）', !r.err && r.toastKeep && r.toastDef && r.due && r.vp && r.vpPart, JSON.stringify(r));
+    check('付款修正測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.232 送審文件三張拍板卡：歸檔記版次、業主回覆、技師計算書比對（只比數量）──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);

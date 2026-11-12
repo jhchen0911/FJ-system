@@ -41,10 +41,62 @@ jobs:
         with:
           node-version: '20'
 
+      # 11/11：GitHub runner 連不到 archive.ubuntu.com（DNS 暫時失敗）超過 1.5 小時，裝瀏覽器那一步失敗、測試沒跑到。
+      #   ① 瀏覽器快取（key 跟著 package.json 的 playwright 版本走，升級就換新快取）
+      #   ② 每一步重試（間隔 30／60 秒）；走 apt 的每次最多 6 分鐘（DNS 不通時 apt 會卡很久，不然 40 分鐘工作上限會先到）
+      #   ③ apt 一直不通的退路：改用 Playwright 自己的 CDN 下載瀏覽器（不走 apt），系統套件用 runner 本來裝好的；
+      #      缺套件就讓測試自己紅（測試一項都不跳過）
+      - name: 快取 playwright 瀏覽器（＋退路下載的字型）
+        id: pwcache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.local/share/fonts/fydeb
+          key: pw-${{ runner.os }}-${{ hashFiles('package.json') }}
+
       - name: 安裝 playwright 與 chromium
+        env:
+          PW_HIT: ${{ steps.pwcache.outputs.cache-hit }}
         run: |
-          npm install --no-audit --no-fund
-          npx playwright install --with-deps chromium
+          retry() { n=$1; shift; for i in $(seq 1 "$n"); do "$@" && return 0; [ "$i" = "$n" ] && return 1; echo "第 $i 次失敗，$((i*30)) 秒後重試：$*"; sleep $((i*30)); done; }
+          # 退路的字型：跟 --with-deps 裝的同一組字型套件（中文 wqy-zenhei 等），改從 Debian 映像站下載、解開放到使用者字型資料夾（不走 apt）
+          debfonts() {
+            mkdir -p ~/.local/share/fonts/fydeb /tmp/fdeb/x
+            for pair in fonts-wqy-zenhei:fonts-wqy-zenhei fonts-ipafont-gothic:fonts-ipafont fonts-freefont-ttf:fonts-freefont fonts-liberation:fonts-liberation fonts-noto-color-emoji:fonts-noto-color-emoji fonts-tlwg-loma-otf:fonts-tlwg fonts-unifont:unifont; do
+              b=${pair%%:*}; src=${pair##*:}; u="https://deb.debian.org/debian/pool/main/${src:0:1}/$src/"
+              f=$(curl -fsSL --retry 3 "$u" | grep -o "${b}_[^\"]*_all\.deb" | sort -V | tail -1) || f=""
+              if [ -n "$f" ] && curl -fsSL --retry 3 -o "/tmp/fdeb/$f" "$u$f" && dpkg-deb -x "/tmp/fdeb/$f" /tmp/fdeb/x; then echo "字型 $b：$f"; else echo "::warning::字型 $b 下載失敗"; fi
+            done
+            find /tmp/fdeb/x -type f \( -name '*.ttf' -o -name '*.ttc' -o -name '*.otf' \) -exec cp {} ~/.local/share/fonts/fydeb/ \;
+            fc-cache -f >/dev/null 2>&1 || true
+            echo "退路字型 $(ls ~/.local/share/fonts/fydeb | wc -l) 個檔"
+          }
+          retry 4 npm install --no-audit --no-fund
+          if [ "$PW_HIT" = "true" ]; then
+            echo "瀏覽器快取命中，只補系統套件"
+            if ! retry 2 timeout 360 npx playwright install-deps chromium; then
+              echo "::warning::apt 不通，改用 runner 內建系統套件"
+              [ -n "$(ls ~/.local/share/fonts/fydeb 2>/dev/null)" ] && fc-cache -f >/dev/null 2>&1 || debfonts
+            fi
+            retry 4 npx playwright install chromium
+          else
+            if ! retry 2 timeout 360 npx playwright install --with-deps chromium; then
+              echo "::warning::apt 不通，改用 runner 內建系統套件"
+              retry 4 npx playwright install chromium
+              debfonts
+            fi
+          fi
+
+      # 測試失敗也先把瀏覽器（和退路字型）存進快取，下一次不用重新下載
+      - name: 存瀏覽器快取
+        if: steps.pwcache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.local/share/fonts/fydeb
+          key: pw-${{ runner.os }}-${{ hashFiles('package.json') }}
 
       - name: 計算模組（Node 單獨跑，不開瀏覽器）
         run: npm run calc
