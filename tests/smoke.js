@@ -8192,8 +8192,10 @@ async function newPage(browser, width, height) {
     await page.close();
     /* Cloud Functions 單元測試（不需 Firebase／網路） */
     let fo = '', fok = false;
+    // 先把 calc/ 複製進 functions/calc/：雲端程式優先讀 functions/calc 的副本，本機留著舊副本（例如合併 main 之後）會測到舊算法、一次紅 15 項（11/12 查到的根本原因）；CI 沒有副本所以不會遇到
+    try { require('child_process').execFileSync(process.execPath, [require('path').join(__dirname, '..', 'tools', 'copy-calc.js')], { stdio: 'ignore' }); } catch (e) { fo = '[copy-calc 失敗] ' + String(e.message || e); }
     try { fo = require('child_process').execFileSync(process.execPath, ['--test', require('path').join(__dirname, '..', 'functions', 'test', 'line.test.js'), require('path').join(__dirname, '..', 'functions', 'test', 'ops.test.js')], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); fok = /# fail 0/.test(fo); } catch (e) { fo = String(e.stdout || e.message); }
-    check('v6.0.110 LINE Cloud Functions 單元測試（簽章、轉傳歸檔、現場追加、事故前兆與否定詞、日報問／整理／提醒、推播佇列與失敗、重送去重、待綁定上限）全過', fok, fo.slice(-300));
+    check('v6.0.110 LINE Cloud Functions 單元測試（簽章、轉傳歸檔、現場追加、事故前兆與否定詞、日報問／整理／提醒、推播佇列與失敗、重送去重、待綁定上限）全過', fok, ((fo.match(/# pass \d+[\s\S]*?# fail \d+/) || [''])[0].replace(/\s+/g, ' ') + '｜沒過：' + (fo.match(/^not ok \d+ - .*$/mg) || []).slice(0, 5).join('；')).slice(0, 300));   // 審查：失敗時寫幾項過幾項沒過、哪幾項
   }
 
 
