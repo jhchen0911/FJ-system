@@ -8192,8 +8192,10 @@ async function newPage(browser, width, height) {
     await page.close();
     /* Cloud Functions 單元測試（不需 Firebase／網路） */
     let fo = '', fok = false;
+    // 先把 calc/ 複製進 functions/calc/：雲端程式優先讀 functions/calc 的副本，本機留著舊副本（例如合併 main 之後）會測到舊算法、一次紅 15 項（11/12 查到的根本原因）；CI 沒有副本所以不會遇到
+    try { require('child_process').execFileSync(process.execPath, [require('path').join(__dirname, '..', 'tools', 'copy-calc.js')], { stdio: 'ignore' }); } catch (e) { fo = '[copy-calc 失敗] ' + String(e.message || e); }
     try { fo = require('child_process').execFileSync(process.execPath, ['--test', require('path').join(__dirname, '..', 'functions', 'test', 'line.test.js'), require('path').join(__dirname, '..', 'functions', 'test', 'ops.test.js')], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); fok = /# fail 0/.test(fo); } catch (e) { fo = String(e.stdout || e.message); }
-    check('v6.0.110 LINE Cloud Functions 單元測試（簽章、轉傳歸檔、現場追加、事故前兆與否定詞、日報問／整理／提醒、推播佇列與失敗、重送去重、待綁定上限）全過', fok, fo.slice(-300));
+    check('v6.0.110 LINE Cloud Functions 單元測試（簽章、轉傳歸檔、現場追加、事故前兆與否定詞、日報問／整理／提醒、推播佇列與失敗、重送去重、待綁定上限）全過', fok, ((fo.match(/# pass \d+[\s\S]*?# fail \d+/) || [''])[0].replace(/\s+/g, ' ') + '｜沒過：' + (fo.match(/^not ok \d+ - .*$/mg) || []).slice(0, 5).join('；')).slice(0, 300));   // 審查：失敗時寫幾項過幾項沒過、哪幾項
   }
 
 
@@ -11893,6 +11895,47 @@ async function newPage(browser, width, height) {
     check('v6.0.235 LINE 支出工務名單測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── 第 2 層（陳軒 11/12）：唯讀帳號開帳務薪資頁，不會把看不到薪資條的人事應付當成已刪（本機拿掉＋立墓碑）；誤立的墓碑下次套用雲端修好 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {}; const keep = { P: PAYABLES, S: PAYSLIPS, C: PETTY, T: TOMBS, ro: _isReaderUser, push: window._pushCloud };
+      try {
+        const mk = () => [
+          { id: 'pay_ps_hr_A_2026-09', hrRef: 'ps_hr_A_2026-09', to: '甲', amount: 30000, status: 'pending', category: 'salary' },
+          { id: 'pay_ps_hr_B_2026-09', hrRef: 'ps_hr_B_2026-09', to: '乙', amount: 28000, status: 'paid', paidDate: '2026-10-05', category: 'salary' },
+          { id: 'pay_pc_x', hrRef: 'pc_x', to: '丙', amount: 3000, status: 'pending', category: 'petty' },
+          { id: 'pay_ins_2026-09', hrRef: 'ins_2026-09', to: '勞保局', amount: 9000, status: 'pending', category: 'salary' },
+          { id: 'payV1_p1', to: '廠商', amount: 50000, status: 'pending' }];
+        let pushes = 0; window._pushCloud = () => { pushes++; };
+        _isReaderUser = true; PAYABLES = mk(); PAYSLIPS = []; PETTY = []; TOMBS = {};
+        _hrSyncPayables('2026-10');
+        out.keep = PAYABLES.length === 5 && !Object.keys(TOMBS.payables || {}).length && pushes === 0;
+        out.noTomb = _tomb('payables', 'pay_pc_x') === false && !Object.keys(TOMBS.payables || {}).length;
+        // 舊版唯讀裝置誤立的墓碑：套用雲端（雲端沒有這些墓碑）→ 墓碑照雲端、人事應付回來
+        PAYABLES = [mk()[4]]; TOMBS = { payables: { 'pay_ps_hr_A_2026-09': Date.now(), 'pay_pc_x': Date.now(), 'pay_ins_2026-09': Date.now() } };
+        _applyCloud({ quotes: (Q || []).slice(), payables: mk(), tombs: {} });   // 共用區套用（墓碑照雲端）
+        _applySensColls({ payables: mk() }, TOMBS);   // 私有區套用（跟正式流程一樣用目前的墓碑）
+        out.heal = !Object.keys(TOMBS.payables || {}).length && ['pay_ps_hr_A_2026-09', 'pay_pc_x', 'pay_ins_2026-09', 'payV1_p1'].every(id => PAYABLES.some(p => p.id === id));
+        // 唯讀判定還沒回來（pending）：上次確認是唯讀的同一個人 → 不整理、不立墓碑；別人照舊可以刪
+        const keepU = window._fbUser, keepS = _roState;
+        _isReaderUser = false; window._fbUser = { uid: 'uRO', email: 'ro@example.com' }; _roState = 'pending'; localStorage.setItem('fy_ro_uid', 'uRO');
+        PAYABLES = mk(); PAYSLIPS = []; PETTY = []; TOMBS = {};
+        _hrSyncPayables('2026-10');
+        out.pending = PAYABLES.length === 5 && _tomb('payables', 'payV1_p1') === false && !Object.keys(TOMBS.payables || {}).length;
+        localStorage.setItem('fy_ro_uid', 'someoneElse'); out.pendingOther = _roLikely() === false;
+        localStorage.removeItem('fy_ro_uid'); window._fbUser = keepU; _roState = keepS;
+        // 管理員照舊：薪資條真的刪了 → 未付人事應付撤掉
+        _isReaderUser = false; PAYABLES = mk(); PAYSLIPS = []; PETTY = []; TOMBS = {};
+        _hrSyncPayables('2026-10');
+        out.admin = !PAYABLES.some(p => p.id === 'pay_ps_hr_A_2026-09') && !!(TOMBS.payables || {})['pay_ps_hr_A_2026-09'];
+      } finally { PAYABLES = keep.P; PAYSLIPS = keep.S; PETTY = keep.C; TOMBS = keep.T; _isReaderUser = keep.ro; window._pushCloud = keep.push; window._applyingCloud = false; }
+      return out;
+    });
+    check('第 2 層：唯讀帳號（含唯讀判定還沒回來時）開帳務薪資頁不會拿掉看不到的人事應付、不立墓碑、不上傳；誤立的墓碑套用雲端後照雲端、人事應付回來；管理員刪薪資條照舊撤應付', Object.values(r).length === 6 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('唯讀人事應付測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── 請款單改兩下（Lotion 11/11 驗收）：草稿卡按確認存的 vs 編輯頁手動按儲存的，同一份資料交給 PDF 的內容要一字不差 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);
@@ -14932,6 +14975,86 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── v6.0.237 付款修正（端到端補驗 11/12，陳軒派工；第 2 層）：部分已付不准刪期別、改到低於已付要寫原因、計算書沒讀到不當 0、擋下原因不被蓋掉、廠商請款卡應付到期、業主還沒請款只標資訊 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keep = { Q: Q, I: INV.slice(), C: CONTRACTS.slice(), PAY: PAYABLES.slice(), PJ: PROJECTS, day: P.vendorPayDay, dl: P.vendorPayDelay, pob: P.subPayOnBill, pr: window.prompt };
+      try {
+        P.vendorPayDay = 25; P.vendorPayDelay = 1; P.subPayOnBill = false;
+        Q = [{ id: 'qPF', code: '1171', name: '範例付款案', client: '範例營造甲', date: '2026-01-01', awarded: true, exs: [], rmk: {}, _mt: 1,
+          items: [{ desc: '範例鋼樁打設', unit: 'M', qty: '100', price: '1000', sec: false }],
+          costs: [{ id: 'cPF', type: 'sub', vendor: '範例工程行', cat: '打設', date: '2026-02-01', amt: 0, retRate: 5, invoice: true, rows: [{ id: 'r1', linkedItemIdx: 0, desc: '', qty: 100, unitPrice: 500 }] }],
+          dailyLogs: [{ id: 'd1', date: '2026-03-05', progressRows: [{ itemIdx: 0, desc: '範例鋼樁打設', qty: 60, note: '' }], progress: '', photos: [] }] }];
+        INV.length = 0; CONTRACTS.splice(0); PAYABLES.length = 0;
+        openProjectCosts('qPF'); const c = Q[0].costs[0];
+        openSubPeriod('cPF'); document.getElementById('sp-date').value = '2026-03-31'; document.getElementById('sp-from').value = '2026-02-01'; document.getElementById('sp-to').value = '2026-03-31'; _spFillDaily();
+        document.getElementById('gen-confirm-ok').click();
+        const pp = () => PAYABLES.find((p) => p.id === 'paycPF_p1');
+        out.base = c.periods.length === 1 && _payEff(pp()) === 29925;
+        // 先付一部分 10,000（真的付款函式）
+        payMarkPaid('paycPF_p1'); await T(60); const amtEl = document.querySelector('#gen-confirm-modal input[type=number]'); if (amtEl) { amtEl.value = '10000'; amtEl.dispatchEvent(new Event('input')); } document.getElementById('gen-confirm-ok').click(); await T(60);
+        out.part = _payPaidSum(pp()) === 10000 && pp().status !== 'paid';
+        // ① 刪除部分已付的期別 → 擋下，不開確認視窗
+        document.getElementById('gen-confirm-modal').style.display = 'none';
+        delSubPeriod('cPF', 1); out.delBlocked = c.periods.length === 1 && document.getElementById('gen-confirm-modal').style.display !== 'flex' && /已付一部分/.test((document.querySelector('.toast') || {}).textContent || '') && !!pp();
+        // ③ 改成 10M（應付 4,988 < 已付 10,000）：沒寫原因不存；寫了原因才存、記在期別
+        window.prompt = () => null;
+        openSubPeriod('cPF', 1); document.querySelector('.sp-qty').value = '10'; _spRecalc(); document.getElementById('gen-confirm-ok').click(); await T(40);
+        out.overNo = c.periods[0].amt === 30000 && !c.periods[0].overWhy && /要寫原因才能存/.test((document.querySelector('.toast') || {}).textContent || '') && document.getElementById('gen-confirm-modal').style.display === 'flex' && document.querySelector('.sp-qty').value === '10';   // 視窗留著、填的還在
+        document.getElementById('gen-confirm-modal').style.display = 'none';
+        let asked = ''; window.prompt = (m) => { asked = m; return '廠商退回差額'; };
+        openSubPeriod('cPF', 1); document.querySelector('.sp-qty').value = '10'; _spRecalc(); document.getElementById('gen-confirm-ok').click(); await T(40);
+        const pr0 = c.periods[0];
+        out.overYes = pr0.amt === 5000 && !!pr0.overWhy && pr0.overWhy.why === '廠商退回差額' && pr0.overWhy.paid === 10000 && pr0.overWhy.amt === 10000 - 4988 && /已付 NT\$ 10,000/.test(asked) && /4,988/.test(asked) && JSON.parse(localStorage.getItem('fy6_q')).find((q) => q.id === 'qPF').costs[0].periods[0].overWhy.why === '廠商退回差額';
+        // （整筆已付的期別本來就不能修改：openSubPeriod 擋「已付款，不能直接修改」，所以多付檢查只會遇到付過一部分的期別）
+        document.getElementById('gen-confirm-modal').style.display = 'none';
+        // 刪期別：本體以外的應付（例：已付後差額筆、提前放款）付過也擋
+        PAYABLES.push({ id: 'paycPF_p1_d1', costId: 'cPF', costPeriod: 1, deltaOf: 'paycPF_p1', amount: 100, vat: false, status: 'paid', paidDate: '2026-05-01', to: '範例工程行' });
+        const pS = pp(); const keepSt = pS.status; pS.status = 'pending'; pS.pays = []; pS.paidDate = '';
+        document.getElementById('gen-confirm-modal').style.display = 'none';
+        delSubPeriod('cPF', 1); out.delDelta = c.periods.length === 1 && document.getElementById('gen-confirm-modal').style.display !== 'flex';
+        PAYABLES.splice(PAYABLES.findIndex((x) => x.id === 'paycPF_p1_d1'), 1); pS.status = keepSt;
+        // ⑥ 付包商款核對：業主還沒請款＝資訊，不算差異
+        const k = _vpCheck(pp());
+        const kqr = window._qtyRecon; window._qtyRecon = (q) => kqr(q).map((r) => Object.assign({}, r, { billQ: 30, warns: ['廠商已請 60、業主已請 30，差 30 尚未向業主請款'] }));
+        const kPart = _vpCheck(pp()); window._qtyRecon = kqr;
+        out.vpPart = kPart.bad === 1 && kPart.rows[0].info.length === 0;   // 業主請了一部分但比廠商少：照算差異
+        out.vp = !!k && k.bad === 0 && k.ok === true && k.rows[0].info.join() === '業主這期還沒請款，等請了再對' && k.rows[0].warns.length === 0 && _qtyRecon(Q[0])[0].warns.some((w) => /尚未向業主請款/.test(w));
+        // ⑤ 廠商請款卡：應付到期（遇假日順延）
+        out.due = _vbDueTxt('2026-11-25') === '12/28（12/25 遇假日順延）' && _vbDueTxt('2026-10-10') === '11/25' && /kv\('應付到期',_vbDueTxt/.test(String(_vbDetailHtml));
+        // ④ 拍板卡擋下：卡片自己說的原因跟「這張還留著」併成一則
+        _decReg('tPF', { title: 't', todo: () => 't', list: () => [{ k: 'a' }], key: (x) => x.k, head: () => 't', detail: () => 'x', ok: () => { toast('沒寫放行原因，不能確認'); return false; }, reject: () => true, edit: () => {} });
+        _DEC_READY['tPF|a'] = 1; decAct('tPF', 'a', 'ok'); await T(30);
+        out.toastKeep = ((document.querySelector('.toast') || {}).textContent || '') === '沒寫放行原因，不能確認（這張還留著）';
+        _DEC.tPF.ok = () => false; decAct('tPF', 'a', 'ok'); await T(30);
+        out.toastDef = ((document.querySelector('.toast') || {}).textContent || '') === '沒有完成，這張還留著';
+        delete _DEC.tPF; delete _DEC_READY['tPF|a'];
+        // ② 技師計算書：AI 沒讀到（null）保持空白、卡片寫沒讀到、不產生「數量改成 0」
+        Q = [{ id: 'qSD2', name: '範例計算書案', client: '範例營造甲', code: 'SD2', date: '2026-10-01', awarded: true, _mt: 1, costs: [],
+          items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 100, price: 2000 }, { desc: '中間樁打設', unit: '支', qty: 20, price: 3000 }] }];
+        PROJECTS = []; _prjSync(); const p = _prjOfQ('qSD2');
+        p.docs = { d3: { id: 'd3', name: '計算書.pdf', path: 'projects/' + p.id + '/docs/3_計算書.pdf', cat: '計算書', st: 'wait', at: 3000, by: 'x', size: 1, url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' } };
+        _sdocCalcSet('qSD2', 'd3', { items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 110 }, { desc: '中間樁打設', unit: '支', qty: null }, { desc: '角撐', unit: '組', qty: '' }] });
+        const cc = _sdocMap(_prjOfQ('qSD2')).d3.calc;
+        out.nullKept = cc.rows[1].qty === null && cc.rows[2].qty === null && cc.rows[0].qty === 110;
+        const C = _decItems('sdocCalc'); const dc = await Promise.resolve(_DEC.sdocCalc.detail(C[0]));
+        out.calcCard = /差異 1 項/.test(_DEC.sdocCalc.head(C[0])) && /沒讀到/.test(dc) && /\+20,000/.test(dc) && !/-60,000/.test(dc);
+        const ops = _sdocCalcOps(Q[0], cc); out.calcOps = ops.length === 1 && ops[0].fields.qty === 110;
+        out.aiNum = _aiQtyOrNaN(null) !== _aiQtyOrNaN(null) && isNaN(_aiQtyOrNaN('—')) && _aiQtyOrNaN('1,200') === 1200 && _aiNum(null) === 0;   // 舊的 _aiNum 不變（別處照用）
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 500); }
+      Q = keep.Q; INV.length = 0; keep.I.forEach((x) => INV.push(x)); CONTRACTS.splice(0); keep.C.forEach((x) => CONTRACTS.push(x)); PAYABLES.length = 0; keep.PAY.forEach((x) => PAYABLES.push(x)); PROJECTS = keep.PJ;
+      P.vendorPayDay = keep.day; P.vendorPayDelay = keep.dl; P.subPayOnBill = keep.pob; window.prompt = keep.pr;
+      return out;
+    });
+    check('付款修正①：期別已付一部分不准刪（不開確認視窗、應付留著、提示要先撤銷付款）；同期的差額筆／提前放款付過也擋', !r.err && r.base && r.part && r.delBlocked && r.delDelta, JSON.stringify(r));
+    check('付款修正③：已付過的期別改到應付低於已付，沒寫原因不存（視窗留著、填的還在）；寫了原因才存、原因與多付金額記在期別', !r.err && r.overNo && r.overYes, JSON.stringify(r));
+    check('付款修正②：技師計算書 AI 沒讀到的數量保持空白、卡片寫沒讀到、不產生數量改成 0 的改單', !r.err && r.nullKept && r.calcCard && r.calcOps && r.aiNum, JSON.stringify(r));
+    check('付款修正④⑤⑥：擋下原因跟「這張還留著」併成一則；廠商請款卡應付到期（遇假日順延）；付包商款核對業主還沒請款只標資訊不算差異（業主請了一部分但比較少照算差異）', !r.err && r.toastKeep && r.toastDef && r.due && r.vp && r.vpPart, JSON.stringify(r));
+    check('付款修正測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
   // ── v6.0.232 送審文件三張拍板卡：歸檔記版次、業主回覆、技師計算書比對（只比數量）──
   for (const [W, H] of [[1440, 900], [390, 844]]) {
     const { page, errors } = await newPage(browser, W, H);
@@ -15064,6 +15187,83 @@ async function newPage(browser, width, height) {
     await page.close();
   }
 
+  // ── 報價頁自動存檔（版號推 main 時編）（Lotion 11/11：A1 填了工程名稱就存、B1 同一格兩台都改＝用較新的＋同步衝突、C1 儲存鈕並排）──
+  for (const [W, H] of [[1440, 900], [390, 844]]) {
+    const { page, errors } = await newPage(browser, W, H);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 40));
+      const keepQ = Q, keepI = INV.slice(), keepC = CUSTOMERS.slice(), keepH = JSON.parse(JSON.stringify(Q_HISTORY || {})), oR = window._isReaderUser, keepCf = SYNC_CONFLICTS.slice();
+      const setV = (id, v) => { const e = document.getElementById(id); e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); };
+      try {
+        window._pushCloud = () => {}; localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_nav_old'); _nav5Apply();
+        _isReaderUser = false; SYNC_CONFLICTS = [];
+        Q = [{ id: 'qA1', code: 'A1', name: '範例自動存', client: '甲營造', loc: '桃園', date: '2026-11-01', _mt: 1000, _by: 'x@example.com',
+          items: [{ desc: 'H型鋼樁打設', unit: '支', qty: 10, price: 3000 }], costs: [{ id: 'c1', type: 'own', rows: [] }], dailyLogs: [{ id: 'd1', date: '2026-11-02' }] },
+          { id: 'qB2', code: '115111101', name: '別張', client: '乙', items: [], _mt: 1 }];
+        loadQ('qA1'); await T(80);
+        const q0 = () => Q.find((x) => x.id === 'qA1');
+        // 沒改＝不存
+        const mt0 = q0()._mt; _qAS.inAt = 0; _qASTick(); out.noChg = q0()._mt === mt0;
+        // 打字 → 3 秒內不存、超過就存，而且留在編輯頁、日報與成本還在
+        setV('fn', '範例自動存（改）'); _qASTick(); out.wait = q0().name === '範例自動存';
+        _qAS.inAt = Date.now() - 4000; _qASTick();
+        out.saved = q0().name === '範例自動存（改）' && document.getElementById('page-editor').classList.contains('active') && (q0().dailyLogs || []).length === 1 && (q0().costs || []).length === 1
+          && /已自動存/.test(document.getElementById('q-as-st').textContent);
+        out.backup = !(Q_HISTORY.qA1 || []).some((e) => e && !e.formal && !e.pre && !e.sent);   // 不留自動存檔版本
+        // 驗證沒過：不存，頁首寫原因
+        items[0].qty = -5; _qAS.inAt = 0; _qASTick();
+        out.invalid = q0().items[0].qty === 10 && /沒存：數量不可為負數/.test(document.getElementById('q-as-st').textContent);
+        items[0].qty = 12; _qAS.inAt = 0; _qASTick(); out.items = q0().items[0].qty === 12;
+        out.backupOnce = !(Q_HISTORY.qA1 || []).length;
+        // 別台改了別的欄位（地點）、這台改業主 → 兩個都留下、沒有衝突
+        Q[0] = Object.assign({}, q0(), { loc: '新竹（別台改）', _mt: Date.now() + 5, _by: 'other@example.com' });
+        setV('fcl', '丙營造'); _qAS.inAt = 0; _qASTick();
+        out.merge = q0().loc === '新竹（別台改）' && q0().client === '丙營造' && !SYNC_CONFLICTS.length;
+        // 別台也改了業主 → 用這台的（較新）、記一筆同步衝突
+        Q[0] = Object.assign({}, q0(), { client: '丁營造（別台）', _mt: Date.now() + 5, _by: 'other@example.com' });
+        setV('fcl', '戊營造'); _qAS.inAt = 0; _qASTick();
+        out.conflict = q0().client === '戊營造' && SYNC_CONFLICTS.length === 1 && SYNC_CONFLICTS[0].field === 'client' && SYNC_CONFLICTS[0].theirs === '丁營造（別台）' && SYNC_CONFLICTS[0].kept === 'local';
+        // 自動存的時候不自動加客戶；離開編輯頁才加
+        out.custWait = !CUSTOMERS.some((c) => c.name === '戊營造');
+        go('quotes'); await T(60);
+        out.leave = CUSTOMERS.some((c) => c.name === '戊營造') && document.getElementById('page-quotes').classList.contains('active');
+        // 審查：每 3 秒只寫報價本身（請款單不動、修改時間不跳）；離開編輯頁才做連動（改名連動請款單）
+        loadQ('qA1'); await T(60);
+        INV.length = 0; INV.push({ id: 'iA1', sourceQid: 'qA1', quoteId: 'qA1', project: q0().name, periodNo: 1, items: [{ type: 'item', desc: 'H型鋼樁打設', contractPrice: 3000, contractQty: 12, curQty: 0 }], totals: { total: 0 }, _mt: 5 });
+        const imt = INV[0]._mt; setV('fn', '範例自動存（改名）'); _qAS.inAt = 0; _qASTick();
+        out.light = q0().name === '範例自動存（改名）' && INV[0]._mt === imt && INV[0].project !== '範例自動存（改名）';
+        const qmt = q0()._mt; _qAS.inAt = 0; _qASTick(); out.noopMt = q0()._mt === qmt;
+        go('quotes'); await T(60); out.cascade = INV[0].project === '範例自動存（改名）';
+        // 審查：別台改過（_qCloudTouched）→ 自動存檔不清，之後按儲存照樣會問
+        loadQ('qA1'); await T(60); window._qCloudTouched = true; Q[0] = Object.assign(q0(), { _mt: Date.now() + 99 });
+        setV('fl', '台南'); _qAS.inAt = 0; _qASTick(); out.sticky = window._qCloudTouched === true;
+        window._qCloudTouched = false; window._qSnap = null; go('quotes'); await T(40);
+        // 審查：編輯中被別台刪掉 → 不會被自動存檔救回來
+        loadQ('qA1'); await T(60); const keepA1 = Q.splice(Q.findIndex((x) => x.id === 'qA1'), 1)[0];
+        setV('fl', '屏東'); _qAS.inAt = 0; _qASTick(); out.noResurrect = !Q.some((x) => x.id === 'qA1') && /已被刪除/.test(document.getElementById('q-as-st').textContent);
+        window._qSnap = null; go('quotes'); await T(40); Q.unshift(keepA1); INV.length = 0;
+        // 新報價：沒填工程名稱不存；填了才存、編號重號自動改下一號
+        const n0 = Q.length; newQ(); await T(60); document.getElementById('fc').value = '115111101';
+        _qAS.inAt = 0; _qASTick(); out.newWait = Q.length === n0 && /填了工程名稱就會自動存/.test(document.getElementById('q-as-st').textContent);
+        setV('fn', '新報價甲'); _qAS.inAt = 0; _qASTick();
+        const nq = Q.find((x) => x.name === '新報價甲');
+        out.newSaved = Q.length === n0 + 1 && !!nq && eid === nq.id && nq.code === '115111102' && (nq.codeLog || []).length === 1;
+        out.codeShown = document.getElementById('fc').value === '115111102' && /編號改成 115111102/.test(document.getElementById('q-as-st').textContent);
+        setV('fl', '台中'); _qAS.inAt = 0; _qASTick(); const nq2 = Q.find((x) => x.name === '新報價甲'); out.newOnce = Q.length === n0 + 1 && nq2.loc === '台中' && nq2.code === '115111102';
+        // 唯讀帳號、舊選單：不自動存
+        go('quotes'); loadQ('qB2'); await T(60); _isReaderUser = true; setV('fn', '唯讀改'); _qAS.inAt = 0; _qASTick(); out.ro = Q.find((x) => x.id === 'qB2').name === '別張'; window._qSnap = null; go('quotes'); await T(30); _isReaderUser = false;
+        localStorage.setItem('fy_v7old', JSON.stringify({ editor: 1 })); loadQ('qB2'); await T(60); setV('fn', '舊選單改'); _qAS.inAt = 0; _qASTick();
+        out.old = Q.find((x) => x.id === 'qB2').name === '別張' && !/已自動存/.test(document.getElementById('q-as-st').textContent);
+        window._qSnap = null; go('quotes'); localStorage.removeItem('fy_v7old');
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      Q = keepQ; INV.length = 0; keepI.forEach((x) => INV.push(x)); CUSTOMERS.length = 0; keepC.forEach((x) => CUSTOMERS.push(x)); Q_HISTORY = keepH; _isReaderUser = oR; SYNC_CONFLICTS = keepCf;
+      return out;
+    });
+    check('報價自動存檔（寬 ' + W + '）：沒改不存、打字停 3 秒才存且留在編輯頁、日報成本不動、不留自動存檔版本、驗證沒過不存寫原因、別台改別欄兩邊都留、同欄記衝突、離開才加客戶、新報價填名稱才存且重號改號、唯讀與舊選單不自動存', !r.err && r.noChg && r.wait && r.saved && r.backup && r.invalid && r.items && r.backupOnce && r.merge && r.conflict && r.custWait && r.leave && r.light && r.noopMt && r.cascade && r.sticky && r.noResurrect && r.newWait && r.newSaved && r.codeShown && r.newOnce && r.ro && r.old, JSON.stringify(r));
+    check('報價自動存檔測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
   // ── v6.0.234 審查修正：舊整筆應付付一部分照總額、介紹費不算施工成本、薪資／零用金照 id 判斷且唯讀帳號看不到、已收款要真的收了 ──
   {
     const { page, errors } = await newPage(browser, 390, 844);
@@ -15167,6 +15367,53 @@ async function newPage(browser, width, height) {
     });
     check('v6.0.234 Lotion 回覆（寬 ' + W + '）：施工成本明細四組＋小計、發包列看這一期（登錄本期請款／去付款／本期已付下期截止）、⋯ 收預付合約書計價紀錄編輯刪除、帳務頁首收進⋯更多、日報工項清單＝本工地工項、管理員預設公司付、收據選填缺收據可補', !r.err && r.groups && r.subNew && r.subPay && r.subPaid && r.inc && r.more && r.edit && r.noHScroll && r.acctHead && r.items && r.payAdm && r.rcptMiss && r.rcptCard && r.rcptHeal, JSON.stringify(r));
     check('v6.0.234 Lotion 回覆測試無 JS 錯誤（寬 ' + W + '）', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await page.close();
+  }
+
+  // ── 7e 舊頁進入次數改存雲端（Lotion 11/12 E1a）──
+  {
+    const RF7 = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'database.rules.json'), 'utf8')).rules.fydata;
+    const ru = RF7.v7oldUse || {};
+    const rulesOk = !!ru['.read'] && !/fydata\/access/.test(ru['.read']) && ru.$who && /\$who === auth\.token\.email\.toLowerCase\(\)\.replace/.test(ru.$who['.write'] || '') && /\$who === auth/.test(ru.$who['.read'] || '') && /readers/.test(ru.$who['.write'] || '') && ru.$who.$pg && ru.$who.$pg.$other && ru.$who.$pg.$other['.validate'] === 'false';
+    const { page, errors } = await newPage(browser, 390, 844);
+    const r = await page.evaluate(async () => {
+      const out = {}; const T = (ms) => new Promise((res) => setTimeout(res, ms || 60));
+      const oDb = window._fbDb, oU = window._fbUser, oA = window._isAdminUser, oR = window._isReaderUser, oP = JSON.parse(JSON.stringify({ off: P.v7oldOff, ask: P.v7oldAsk })), oFrom = _V7USE_FROM, oSave = window._salesSave;
+      try {
+        window.toast = () => {}; window._salesSave = () => {}; localStorage.removeItem('fy_nav_old'); localStorage.removeItem('fy_v7use_pend'); delete P.v7oldOff; delete P.v7oldAsk;
+        _fbUser = null; _isReaderUser = false; _nav5Apply();
+        // 進新版頁不記；切回舊版的頁每進一次記一次
+        localStorage.setItem('fy_v7old', JSON.stringify({ proj: 1 })); _nav5Apply();
+        go('dash'); await T(); go('proj'); await T(); go('proj'); await T(); go('costs'); await T(); go('dash'); await T(); go('proj'); await T(); go('dash'); await T();
+        const pend = JSON.parse(localStorage.getItem('fy_v7use_pend') || '{}');
+        out.note = pend.proj && pend.proj.n === 2 && !pend.dash && pend.proj.d[localToday()] === 2;
+        // 唯讀帳號不記
+        _isReaderUser = true; go('proj'); await T(); out.ro = JSON.parse(localStorage.getItem('fy_v7use_pend') || '{}').proj.n === 2; _isReaderUser = false;
+        // 上傳：寫自己那一格，成功才扣掉本機
+        const writes = []; window._fbDb = { ref: (path) => ({ transaction: (fn) => { const v = fn({ n: 5, last: 1, d: { '2000-01-01': 3 } }); writes.push({ path, v }); return Promise.resolve({ committed: true }); } }) };
+        _fbUser = { email: 'Staff.A@example.com', uid: 's' }; _v7UseFlush(); await T(120);
+        out.flush = writes.length === 1 && writes[0].path === 'fydata/v7oldUse/staff,a@example,com/proj' && writes[0].v.n === 7 && writes[0].v.d[localToday()] === 2 && !writes[0].v.d['2000-01-01']
+          && !(JSON.parse(localStorage.getItem('fy_v7use_pend') || '{}').proj);
+        // 卡片：12/10 以前不出；之後一頁一列（只有管理員）
+        _fbUser = { email: 'jhchen0911@gmail.com', uid: 'a' }; _isAdminUser = true;
+        _V7USE = { 'staff,a@example,com': { proj: { n: 9, last: Date.now(), d: { [localToday()]: 4 } } }, 'staff,b@example,com': { proj: { n: 3, last: Date.now() - 864e5, d: {} }, acct: { n: 1, last: Date.now(), d: { [localToday()]: 1 } } } };
+        out.before = localToday() >= '2026-12-10' || _v7UseRows().length === 0;
+        _V7USE_FROM = '2000-01-01';
+        const rows = _v7UseRows();
+        out.rows = rows.length === 2 && rows[0].k === 'proj' && rows[0].who.length === 2 && rows[0].n === 12 && rows[0].n7 === 4 && /2 個帳號用舊版，最近 7 天進了 4 次/.test(_DEC.v7old.head(rows[0]));
+        out.detail = /staff\.a@example\.com/.test(_DEC.v7old.detail(rows[0]));
+        // 確認＝這頁不再提供舊版；退回＝30 天後再問
+        _DEC.v7old.ok(rows[0]);
+        out.off = !!P.v7oldOff.proj && !_v7OldMap().proj && _v7New('proj') && _v7UseRows().every((x) => x.k !== 'proj');
+        go('more'); await T(150); out.moreHidden = !/專案：切回舊版|專案：目前舊版/.test(document.getElementById('page-more').innerText) && /帳務：/.test(document.getElementById('page-more').innerText);
+        _DEC.v7old.reject(_v7UseRows()[0]); out.ask = _v7UseRows().length === 0 && P.v7oldAsk.acct > Date.now() + 29 * 864e5;
+      } catch (e) { out.err = String(e && e.stack || e).slice(0, 400); }
+      window._fbDb = oDb; _fbUser = oU; _isAdminUser = oA; _isReaderUser = oR; P.v7oldOff = oP.off; P.v7oldAsk = oP.ask; if (!oP.off) delete P.v7oldOff; if (!oP.ask) delete P.v7oldAsk; _V7USE_FROM = oFrom; _V7USE = null; window._salesSave = oSave;
+      localStorage.removeItem('fy_v7old'); localStorage.removeItem('fy_v7use_pend'); _nav5Apply();
+      return out;
+    });
+    check('7e 舊頁進入次數：用舊版的頁每進一次記一次（新版不記、唯讀不記）、上傳到自己那一格成功才扣、12/10 前不出卡、之後一頁一列、確認＝不再提供舊版（更多頁也拿掉）、退回 30 天後再問；規則只能寫自己、只有管理員讀', rulesOk && !r.err && r.note && r.ro && r.flush && r.before && r.rows && r.detail && r.off && r.moreHidden && r.ask, JSON.stringify(Object.assign({ rulesOk }, r)));
+    check('7e 舊頁進入次數測試無 JS 錯誤', errors.length === 0, errors.slice(0, 3).join(' | '));
     await page.close();
   }
 
