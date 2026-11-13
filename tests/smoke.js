@@ -11895,6 +11895,32 @@ async function newPage(browser, width, height) {
     check('v6.0.235 LINE 支出工務名單測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
+  // ── Lotion 11/13：包商評分卡一直存不進去（這家的分包卡已合併到別張）→ 不出卡；存不進去時不再顯示「已記」 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {}; const keep = { Q, PR: PROJECTS, adm: window._decIsAdmin, t: window.toast, m: window._modal };
+      try {
+        window._decIsAdmin = () => true; const toasts = []; window.toast = (x) => toasts.push(x); const now = Date.now();
+        const mk = (costs) => { Q = [{ id: 'qV', name: '合成結案案', closed: true, closedAt: now - 864e5, awarded: true, costs, items: [], t: {} }]; PROJECTS = [{ id: 'p_qV', qid: 'qV', no: '2026-001' }]; };
+        mk([{ id: 'c1', type: 'sub', vendor: '甲工程行', rows: [] }]);
+        out.normal = _veList().length === 1 && _veSave('qV', '甲工程行', { s: { q: 3, t: 3, sa: 3, c: 3, p: 3 } }) === true && !_veList().length;
+        mk([{ id: 'c2', type: 'sub', vendor: '乙實業有限公司', mergedInto: 'c3', rows: [] }, { id: 'c3', type: 'sub', vendor: '乙實業', rows: [] }]);
+        const L = _veList().map(x => x.v);
+        out.merged = L.length === 1 && L[0] === '乙實業' && _veSave('qV', '乙實業', { s: { q: 4, t: 4, sa: 4, c: 4, p: 4 } }) === true && !_veList().length;
+        // 存不進去（找不到卡）：視窗不關、不顯示「已記」
+        let cb = null; window._modal = (t, h, fn) => { cb = fn; };
+        _veModal({ qid: 'qV', v: '不存在的廠商' });
+        document.body.insertAdjacentHTML('beforeend', '<div id="__veT">' + ['q', 't', 'sa', 'c', 'p'].map(k => '<input type="radio" name="ve-' + k + '" value="3" checked>').join('') + '<input id="ve-note" value=""></div>');
+        toasts.length = 0; const ret = cb(); document.getElementById('__veT').remove();
+        out.fail = ret === false && toasts.some(x => /沒有存成/.test(x)) && !toasts.some(x => /已記/.test(x));
+      } finally { Q = keep.Q; PROJECTS = keep.PR; window._decIsAdmin = keep.adm; window.toast = keep.t; window._modal = keep.m; }
+      return out;
+    });
+    check('包商評分（Lotion 11/13）：分包卡已合併到別張的那家不出卡、評合併後那家；存不進去時視窗不關、不顯示「已記」', Object.values(r).length === 3 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('包商評分測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
   // ── 第 2 層（陳軒 11/12）：唯讀帳號開帳務薪資頁，不會把看不到薪資條的人事應付當成已刪（本機拿掉＋立墓碑）；誤立的墓碑下次套用雲端修好 ──
   {
     const { page, errors } = await newPage(browser, 1280, 900);

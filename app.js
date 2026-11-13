@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.242';
+var APP_VERSION='v6.0.243';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -45229,7 +45229,7 @@ function sdocDel(qid,id){
 // 平均分數 _veAvg(廠商名)：廠商清單只有管理員看得到 ★（全公司各案平均）
 var _VE_ITEMS=[['q','品質'],['t','工期'],['sa','安全'],['c','配合度'],['p','價格']];
 function _veKey(v){var d=String(v||'').trim(),h=5381;for(var k=0;k<d.length;k++)h=((h*33)^d.charCodeAt(k))>>>0;return 'v'+h.toString(36);}
-function _veVendors(q){var o=[];[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;})).forEach(function(x){(x.costs||[]).forEach(function(c){var v=String((c&&c.vendor)||'').trim();if(c&&c.type==='sub'&&!c.followOf&&v&&o.indexOf(v)<0)o.push(v);});});return o;}
+function _veVendors(q){var o=[];[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;})).forEach(function(x){(x.costs||[]).forEach(function(c){var v=String((c&&c.vendor)||'').trim();if(c&&c.type==='sub'&&!c.followOf&&!c.mergedInto&&v&&o.indexOf(v)<0)o.push(v);});});return o;}   /* Lotion 11/13：已合併到別張的分包卡不算一家（存分數只找沒合併的卡，不一致會一直存不進去、卡片一直出現） */
 // v6.0.233 統一（陳軒 11/11 M5，Lotion 11/11：分數只給管理員看）：評分改存這家在這案（含追加）的分包成本卡 c.eval（q.costs 走 private），不再存專案 p.vendorEval（shared）；
 //   舊的 p.vendorEval 由管理員裝置搬進成本卡後刪掉（_veMigrate）；結案卡的包商評鑑（_cevSave）與這張卡寫同一個地方、同 5 項
 function _veCards(qid,v){var q=(Q||[]).find(function(x){return x&&x.id===qid;});if(!q)return [];var m=q.parentId?((Q||[]).find(function(x){return x&&x.id===q.parentId;})||q):q,out=[],nm=String(v||'').trim();
@@ -45260,7 +45260,7 @@ function _veModal(x){
     +'<div class="f" style="margin-top:8px"><label>一句話（選填）</label><input id="ve-note" maxlength="120" value="'+esc(e.note||'')+'" style="width:100%;box-sizing:border-box"></div>',function(){
     var s2={},miss=[];_VE_ITEMS.forEach(function(k){var c=document.querySelector('input[name="ve-'+k[0]+'"]:checked');if(c)s2[k[0]]=parseInt(c.value);else miss.push(k[1]);});
     if(miss.length){toast('還沒評：'+miss.join('、'));return false;}
-    _veSave(x.qid,x.v,{s:s2,note:String(gv('ve-note')||'').trim().slice(0,120)});toast('已記 '+x.v+' 的評分');
+    if(!_veSave(x.qid,x.v,{s:s2,note:String(gv('ve-note')||'').trim().slice(0,120)})){toast('沒有存成：這案找不到 '+x.v+' 的分包卡（可能已合併到別張），請到施工成本頁確認');return false;}toast('已記 '+x.v+' 的評分');
     try{_decRefresh('vendorEval');}catch(er){_err('_veModal.refresh',er);}
   });
 }
