@@ -61,7 +61,7 @@ function fixture() {
       { type: 'item', desc: 'H型鋼樁 H300×300', unit: 'M', contractPrice: 720, contractQty: 960.5, prevQty: 0, curQty: 400.25, payRate: 70 }] };
   const inv2 = { id: 'iDOC2', sourceQid: 'qDOC1', quoteId: 'qDOC1', project: '範例工程甲', client: '甲營造股份有限公司', periodNo: 2, date: '2026-11-25', retention: true, retentionPct: 5,
     items: [{ type: 'item', desc: '鋼軌樁打設', unit: '支', contractPrice: 1850, contractQty: 120, prevQty: 60, curQty: 60, payRate: 100 },
-      { type: 'item', desc: 'H型鋼樁 H300×300', unit: 'M', contractPrice: 720, contractQty: 960.5, prevQty: 400.25, curQty: 560.25, payRate: 70 }] };
+      { type: 'item', desc: 'H型鋼樁 H300×300', unit: 'M', contractPrice: 720, contractQty: 960.5, prevQty: 280.18, curQty: 560.25, payRate: 70 }] };   // 前期 400.25 × 70%（v5.385 起前期數量依請款比例加權存）
   const ret = { id: 'irDOC1', kind: 'retReturn', project: '範例工程甲', client: '甲營造股份有限公司', quoteId: 'qDOC1', date: '2026-12-20', periodNo: '退', items: [], retention: false, retentionPct: 0,
     totals: { curTotal: 0, tax: 0, total: 0, retention: 0 }, retRet: { amt: 12000, rows: [{ periodNo: 1, date: '2026-10-25', pct: 5, amt: 7000 }, { periodNo: 2, date: '2026-11-25', pct: 5, amt: 4000 }], holds: [{ periodNo: 2, date: '2026-12-05', amt: 1000 }], cond: '完工驗收後 60 日', done: false } };
   const vendors = [{ id: 'vDOC1', name: '乙工程行', taxid: '12345675', addr: '新北市範例區範例街 2 號', contact: '李老闆', boss: '李老闆', phone: '02-2222-3333' }];
@@ -132,6 +132,8 @@ if (require.main === module) (async () => {
   }
   const t0 = snap ? (Date.parse(snap.exportDate || '') || Date.UTC(2026, 9, 15, 2, 0, 0)) : Date.UTC(2026, 9, 15, 2, 0, 0);
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
+  const REPEAT = Math.max(1, parseInt(arg('repeat', '1'), 10) || 1);   // 同一份資料重跑幾次，每次都要一字不差（HQ 11/13：iDOC2 偶發不同）
+  const runOnce = async () => {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, timezoneId: 'Asia/Taipei', locale: 'zh-TW' });
   await ctx.route(/^https?:\/\//, r => r.abort());
   await ctx.addInitScript((base) => {
@@ -139,6 +141,9 @@ if (require.main === module) (async () => {
     class FakeDate extends RealDate { constructor(...a) { if (a.length) super(...a); else super(base); } static now() { return base; } }
     window.Date = FakeDate;
     Math.random = (() => { let s = 12345; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; })();
+    // 正式裝置早就跑過的一次性校正（v5.388 前期累計依請款比例加權，開頁 1.4 秒後跑）：當成已跑過。
+    // 不然它會跟載入假資料（約 1.5 秒）搶先後，第 2 期請款單的前期數量有時被改成加權值、有時沒有（HQ 11/13：iDOC2 每 5 次約 1 次不同）
+    try { localStorage.setItem('fy_fix_cumw_v388', '1'); } catch (e) { /* 可忽略 */ }
   }, t0);
   const page = await ctx.newPage();
   const pageErrs = [];
@@ -164,9 +169,23 @@ if (require.main === module) (async () => {
     await page.waitForTimeout(300);
   }
   const r = await capture(page, mode);
+  r.pageErrs = pageErrs;
+  await ctx.close();
+  return r;
+  };
+  const r = await runOnce();
+  const md5h = s => crypto.createHash('md5').update(s, 'utf8').digest('hex'), sig = x => Object.keys(x.docs).sort().map(k => k + '=' + md5h(x.docs[k].html) + md5h(x.docs[k].fn)).join('|');
+  if (REPEAT > 1) {
+    const s0 = sig(r);
+    for (let i = 2; i <= REPEAT; i++) {
+      const ri = await runOnce();
+      if (sig(ri) !== s0) { const diff = Object.keys(r.docs).filter(k => !ri.docs[k] || md5h(ri.docs[k].html) !== md5h(r.docs[k].html)); console.error('第 ' + i + ' 次跟第 1 次不一樣：' + diff.join('、')); await browser.close(); process.exit(1); }
+    }
+    console.log('同一份資料重跑 ' + REPEAT + ' 次：每次都一字不差');
+  }
   await browser.close();
   const md5 = s => crypto.createHash('md5').update(s, 'utf8').digest('hex');
-  const out = { kind: 'fy-doc-print', mode, at: new Date().toISOString(), docs: {}, errors: r.errors.concat(pageErrs.map(e => 'page：' + e)) };
+  const out = { kind: 'fy-doc-print', mode, at: new Date().toISOString(), docs: {}, errors: r.errors.concat(r.pageErrs.map(e => 'page：' + e)) };
   Object.keys(r.docs).sort().forEach(k => { const d = r.docs[k]; out.docs[k] = { html: md5(d.html), fn: md5(d.fn), ls: d.ls, len: d.html.length }; });
   if (UPDATE) { fs.writeFileSync(DEF_EXPECT, JSON.stringify({ docs: out.docs }, null, 1) + '\n'); console.log('已更新 ' + path.relative(process.cwd(), DEF_EXPECT) + '（' + Object.keys(out.docs).length + ' 張）'); return; }
   if (OUT) { fs.writeFileSync(OUT, JSON.stringify(out, null, 1) + '\n'); console.log('已寫入 ' + OUT + '：' + Object.keys(out.docs).length + ' 張單據' + (out.errors.length ? '，' + out.errors.length + ' 個錯誤' : '')); }
