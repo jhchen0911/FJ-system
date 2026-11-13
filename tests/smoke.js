@@ -11947,10 +11947,12 @@ async function newPage(browser, width, height) {
         out.other = _ctAmtOf(Q[1]) === 0 && _ctAmtOf(Q[0]) === 1000000;
         CONTRACTS.push({ id: 'ct2', name: '同名工程', amount: 500000 });
         out.unlinked = _ctAmtOf(Q[1]) === 500000;
+        Q.push({ id: 'qa', parentId: 'q1', name: '同名工程追加', items: [], t: {} });
+        out.parent = _ctLinkOk({ linkedQid: 'q1' }, 'qa') && !_ctLinkOk({ linkedQid: 'q2' }, 'qa') && _ctLinkOk({}, 'qa');
       } finally { Q = keep.Q; CONTRACTS = keep.C; }
       return out;
     });
-    check('A 批：兩案同名時，第二案不會抓到已連到第一案的合約（用名稱備案只找沒連結的）', r.other && r.unlinked, JSON.stringify(r));
+    check('A 批：兩案同名時，第二案不會抓到已連到第一案的合約（用名稱備案只找沒連結的；追加案可用主約）', r.other && r.unlinked && r.parent, JSON.stringify(r));
     check('合約名稱備案測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

@@ -3108,8 +3108,8 @@ function settleInvItem(i){
   let _contract=null;
   try{
     _contract=CONTRACTS.find(function(c){return _invsOfContract(c).some(function(v){return v.id===(_inv&&_inv.id);});})
-      ||((_inv&&_inv.project)?CONTRACTS.find(x=>(!x.linkedQid||x.linkedQid===_inv.quoteId||x.linkedQid===_inv.sourceQid)&&x.name===_inv.project):null);
-  }catch(e){_contract=(_inv&&_inv.project)?CONTRACTS.find(x=>(!x.linkedQid||x.linkedQid===_inv.quoteId||x.linkedQid===_inv.sourceQid)&&x.name===_inv.project):null;}
+      ||((_inv&&_inv.project)?CONTRACTS.find(x=>_ctLinkOk(x,_inv.quoteId,_inv.sourceQid)&&x.name===_inv.project):null);
+  }catch(e){_contract=(_inv&&_inv.project)?CONTRACTS.find(x=>_ctLinkOk(x,_inv.quoteId,_inv.sourceQid)&&x.name===_inv.project):null;}
   const _tm=_taxM();
   const _delta=Math.round((orig-cum)*(parseFloat(it.contractPrice)||0)*_tm); // 正=追減、負=追加
   const _willSync=_contract&&(_contract.amount||0)>0&&_delta!==0;
@@ -27146,7 +27146,7 @@ function _retentionRows(){
   });
   var rows=Object.values(byProj);
   rows.forEach(function(r){
-    var ct=(r.q&&(CONTRACTS||[]).find(function(c){return c&&c.linkedQid===r.q.id;}))||(CONTRACTS||[]).find(function(c){return c&&!c.linkedQid&&c.name===r.proj;});   /* 健檢🟡3：先找連到這案的、名稱備案排除已連到別案的 */
+    var ct=(r.q&&(CONTRACTS||[]).find(function(c){return c&&c.linkedQid&&(c.linkedQid===r.q.id||c.linkedQid===r.q.parentId);}))||(CONTRACTS||[]).find(function(c){return c&&!c.linkedQid&&c.name===r.proj;});   /* 健檢🟡3：先找連到這案的、名稱備案排除已連到別案的 */
     r.status=ct?(ct.status==='completed'||ct.status==='done'?'completed':'active'):'';
     r.end=(ct&&ct.end)||'';
     r.due=r.status==='completed'&&(r.pending+r.hold)>0;            // 已完工還押著 → 該請退
@@ -42601,7 +42601,7 @@ function _retAskDueRows2(){
 function _retAskRows(){return _retAskAll().filter(function(x){return !x.open&&!x.skip;});}
 // 新選單＋管理員：到期的保留款一律由卡處理（出卡、退回後 30 天內不問、已開退還單）→ 舊「可請退／逾期未退」待辦不再出
 function _retAskCovers(r){try{if(!_nav5On()||!_decIsAdmin()||!r||!r.q)return false;var m=_retAskFam(r.q)[0];return _retAskAll().some(function(x){return x.q===m;});}catch(e){return false;}}
-function _retAskEnd(r){var ct=(r.q&&(CONTRACTS||[]).find(function(c){return c&&c.linkedQid===r.q.id;}))||(CONTRACTS||[]).find(function(c){return c&&!c.linkedQid&&c.name===r.proj;});   // 審查：跟 _retentionRows 判斷完工同一份合約（名稱優先）
+function _retAskEnd(r){var ct=(r.q&&(CONTRACTS||[]).find(function(c){return c&&c.linkedQid&&(c.linkedQid===r.q.id||c.linkedQid===r.q.parentId);}))||(CONTRACTS||[]).find(function(c){return c&&!c.linkedQid&&c.name===r.proj;});   // 審查：跟 _retentionRows 判斷完工同一份合約（名稱優先）
   var cl='';try{if(r.q.closed&&r.q.closedAt){var dt=new Date(r.q.closedAt);if(!isNaN(dt))cl=_ymd(dt.getTime());}}catch(e){_err('_retAskEnd',e);}
   return {end:(ct&&ct.end)||'',closed:cl,status:ct?ct.status:''};}
 function _retAskLine(r){
@@ -46886,6 +46886,8 @@ function _qASBoot(){
   document.addEventListener('visibilitychange',function(){if(document.visibilityState==='hidden'){try{var pg=document.querySelector('.page.active');if(pg&&pg.id==='page-editor')_qASRun('hide');}catch(e){_err('_qASBoot.hide',e);}}});
 }
 try{_qASBoot();}catch(e){_err('_qASBoot',e);}
+// 健檢🟡3（v6.0.244）：合約用名稱當備案時，只接受沒連結的、或連到這張單的報價（含追加案的主約）
+function _ctLinkOk(c,qid,qid2){if(!c||!c.linkedQid)return true;return [qid,qid2].some(function(id){if(!id)return false;if(c.linkedQid===id)return true;var q0=(Q||[]).find(function(x){return x&&x.id===id;});return !!(q0&&q0.parentId&&c.linkedQid===q0.parentId);});}
 function _modal(title,bodyHtml,onOk){
   var old=document.getElementById('fy-modal');if(old)old.remove();
   var d=document.createElement('div');
