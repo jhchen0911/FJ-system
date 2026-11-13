@@ -11904,11 +11904,13 @@ async function newPage(browser, width, height) {
         Q = [{ id: 'qC', name: '合成成本案', items: [], costs: [
           { id: 'cA', type: 'sub', vendor: '甲工程行', rows: [{ qty: 1, unitPrice: 100 }] },
           { id: 'cB', type: 'sub', vendor: '乙工程行', rows: [], periods: [{ no: 1, date: '2026-10-01', rows: [] }] },
-          { id: 'cC', type: 'mat', vendor: '丙材料', rows: [] }], t: {}, _mt: 1 }];
+          { id: 'cC', type: 'mat', vendor: '丙材料', rows: [] },
+          { id: 'cE', type: 'mat', vendor: '丁估算', rows: [{ id: 'e1', qty: 1, unitPrice: 300 }, { id: 'e2', offset: true, qty: 1, unitPrice: -300 }], offsetBy: 'cF' },
+          { id: 'cF', type: 'mat', vendor: '丁實購', estOf: 'cE', rows: [{ id: 'f1', qty: 1, unitPrice: 280 }] }], t: {}, _mt: 1 }];
         PAYABLES = [{ id: 'paycC', costId: 'cC', to: '丙材料', amount: 500, status: 'paid', paidDate: '2026-10-02' }];
         TRASH_PRIV = []; eid = 'qC'; const modal = document.getElementById('gen-confirm-modal'); modal.style.display = 'none';
         delCostItem('cA');
-        out.ask = modal.style.display === 'flex' && Q[0].costs.length === 3;
+        out.ask = modal.style.display === 'flex' && Q[0].costs.length === 5;
         document.getElementById('gen-confirm-ok').click();
         out.del = !Q[0].costs.some(c => c.id === 'cA') && TRASH_PRIV.some(x => x.coll === 'costs' && x.rid === 'cA' && x.qid === 'qC' && x.rec && x.rec.vendor === '甲工程行');
         modal.style.display = 'none'; delCostItem('cB');
@@ -11917,11 +11919,20 @@ async function newPage(browser, width, height) {
         out.blockPaid = modal.style.display !== 'flex' && Q[0].costs.some(c => c.id === 'cC') && /付過款/.test(msg);
         trashRestore('costs|qC|cA');
         out.restore = Q[0].costs.some(c => c.id === 'cA' && c.vendor === '甲工程行') && !TRASH_PRIV.some(x => x.id === 'costs|qC|cA');
+        delCostItem('cA'); document.getElementById('gen-confirm-ok').click();
+        const ent = TRASH_PRIV.find(x => x.id === 'costs|qC|cA');
+        out.reDel = !!ent && !_tombDead(TOMBS.trashPriv || {}, {}, 'costs|qC|cA', ent);
+        delCostItem('cF'); document.getElementById('gen-confirm-ok').click();
+        const e0 = Q[0].costs.find(c => c.id === 'cE');
+        out.estCleared = !e0.offsetBy && !e0.rows.some(r => r.offset);
+        trashRestore('costs|qC|cF');
+        const e1 = Q[0].costs.find(c => c.id === 'cE');
+        out.estBack = Q[0].costs.some(c => c.id === 'cF') && e1.offsetBy === 'cF' && e1.rows.filter(r => r.offset).length === 1;
         modal.style.display = 'none';
       } finally { Q = keep.Q; PAYABLES = keep.P; TRASH_PRIV = keep.TP; window.eid = keep.eid; window.toast = keep.t; }
       return out;
     });
-    check('A 批：刪成本卡要先確認、刪掉進回收筒；有計價期別或付過款的分包卡擋下；從回收筒還原放回原報價', Object.values(r).length === 5 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('A 批：刪成本卡要先確認、刪掉進回收筒；有計價期別或付過款的分包卡擋下；從回收筒還原放回原報價（再刪一次不被墓碑吃掉、實購卡還原估算卡重新沖銷）', Object.values(r).length === 8 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('刪成本卡測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }

@@ -21961,6 +21961,7 @@ function _spRecalc(){
     +(over?'<div style="color:#1565C0;font-weight:700;margin-top:4px">實作實算：'+over+' 個工項累計超過發包量，本期超出 NT$ '+fmt(Math.round(overAmt))+'（未稅）'+((document.getElementById('sp-absorb')||{}).checked?'，已勾自行吸收':'，記得向業主追加請款')+'</div>':'');
 }
 function _spSave(){
+  var _overAns=_spCtx?_spCtx.overAns:null;if(_spCtx)delete _spCtx.overAns;   // 審查：超付原因只用在緊接的這一次存檔
   var q=Q.find(function(x){return x.id===eid;});if(!q||!_spCtx)return;
   var c=(q.costs||[]).find(function(x){return x.id===_spCtx.cid;});if(!c)return;
   var rows=[],lumpOver=0;
@@ -21993,7 +21994,7 @@ function _spSave(){
     if(paid0>0){var t0=JSON.parse(JSON.stringify(per0));t0.date=date;t0.rows=rows;var ab0=document.getElementById('sp-absorb');t0.absorb=!!(ab0&&ab0.checked);var av0=document.getElementById('sp-adv');t0.adv=av0?Math.max(0,Math.min(Math.round(parseFloat(av0.value)||0),Math.round(parseFloat(av0.getAttribute('data-avail'))||0))):0;
       var c0=Object.assign({},c,{periods:c.periods.map(function(p){return p===per0?t0:p;})}),k0=_subPeriodCalc(c0,t0),pa0=_subPerPayAmt(c0,t0,k0,_subAdvInclAlloc(c0));
       var sim={amount:pa0.amt,vat:(p0.vatManual&&p0.vat!=null)?p0.vat:_subInvoice(c)};if(pa0.incl!=null)sim.incl=pa0.incl;var eff0=_payEff(sim);
-      if(paid0>=eff0+1){var why0=_spCtx.overAns;delete _spCtx.overAns;if(why0==null){_askText('改完會多付','這期已付 NT$ '+fmt(paid0)+'，改完應付只剩 NT$ '+fmt(eff0)+'（多付 NT$ '+fmt(paid0-eff0)+'）。要存的話請寫原因（例：廠商退回差額、下期扣回）：','',function(a){_spCtx.overAns=a;setTimeout(function(){var b=document.getElementById('gen-confirm-ok');if(b)b.click();},0);},{required:true,reqMsg:'要寫原因才能存',onCancel:function(){toast('這期已付 NT$ '+fmt(paid0)+'，改完會多付 NT$ '+fmt(paid0-eff0)+'：要寫原因才能存（本期未存）');}});return;}   /* 健檢🟡12：系統視窗；寫完自動再按一次存檔 */
+      if(paid0>=eff0+1){var why0=_overAns;if(why0==null){_askText('改完會多付','這期已付 NT$ '+fmt(paid0)+'，改完應付只剩 NT$ '+fmt(eff0)+'（多付 NT$ '+fmt(paid0-eff0)+'）。要存的話請寫原因（例：廠商退回差額、下期扣回）：','',function(a){_spCtx.overAns=a;setTimeout(function(){var b=document.getElementById('gen-confirm-ok');if(b)b.click();},0);},{required:true,reqMsg:'要寫原因才能存',onCancel:function(){toast('這期已付 NT$ '+fmt(paid0)+'，改完會多付 NT$ '+fmt(paid0-eff0)+'：要寫原因才能存（本期未存）');}});return;}   /* 健檢🟡12：系統視窗；寫完自動再按一次存檔 */
         if(why0==null||!String(why0).trim()){toast('這期已付 NT$ '+fmt(paid0)+'，改完會多付 NT$ '+fmt(paid0-eff0)+'：要寫原因才能存（本期未存）');return;}
         overWhy={amt:Math.round(paid0-eff0),paid:Math.round(paid0),why:String(why0).trim().slice(0,200),at:Date.now(),by:String(_meEmail()||'').slice(0,80)};}}}catch(e){_err('_spSave.over',e);toast('多付檢查算不出來，這期先不存（請重開再試）');return;}}   // 審查：付款守門算錯就擋，不放行
   var per=(_spCtx.editNo!=null)?c.periods.find(function(p){return p.no===_spCtx.editNo;}):null;
@@ -23470,12 +23471,12 @@ function delCostItem(cid){
   var _dc=q.costs.find(function(x){return x.id===cid;});if(!_dc)return;
   var bl=_costDelBlock(_dc);if(bl){toast('這張不能刪：'+bl+'。要刪請先刪掉期別、撤銷付款');return;}
   var nm=String(_dc.vendor||_dc.name||_dc.desc||(_dc.type==='sub'?'分包':'成本')).slice(0,40);
-  showConfirm('刪除成本卡','確定刪除「'+esc(nm)+'」這張成本卡？<br><span style="font-size:12px;color:var(--b4)">刪掉的會放進回收筒（'+_trashDays()+' 天內管理員可以還原）</span>',function(){_costDelDo(q,cid);});
+  showConfirm('刪除成本卡','確定刪除「'+esc(nm)+'」這張成本卡？<br><span style="font-size:12px;color:var(--b4)">刪掉的會放進回收筒（'+_trashDays()+' 天內管理員可以還原）</span>',function(){var q2=(Q||[]).find(function(x){return x&&x.id===q.id;});if(q2)_costDelDo(q2,cid);});
 }
 function _costDelDo(q,cid){
   var _dc=q.costs.find(function(x){return x.id===cid;});if(!_dc)return;
   try{var now=_srvNow(),key='costs|'+q.id+'|'+cid;try{var _t0=+((TOMBS.trashPriv||{})[key])||0;if(now<=_t0)now=_t0+1;}catch(e1){_err('delCostItem.tomb',e1);}TRASH_PRIV=TRASH_PRIV.filter(function(x){return x&&x.id!==key;});
-    TRASH_PRIV.unshift({id:key,coll:'costs',rid:String(cid),qid:q.id,at:now,_mt:now,by:_meEmail()||'',name:(String(q.name||'').slice(0,24)+' '+String(_dc.vendor||_dc.name||_dc.desc||'').slice(0,30)).trim(),rec:JSON.parse(JSON.stringify(_dc))});_trashSave();}catch(e){_err('delCostItem.trash',e);}
+    TRASH_PRIV.unshift({id:key,coll:'costs',rid:String(cid),qid:q.id,at:now,_mt:now,by:_meEmail()||'',name:(String(q.name||'').slice(0,24)+' '+String(_dc.vendor||_dc.name||_dc.desc||'').slice(0,30)).trim(),rec:JSON.parse(JSON.stringify(_dc)),est:(function(){var _e0=_dc.estOf&&q.costs.find(function(x){return x.id===_dc.estOf;});return _e0&&_e0.offsetBy===cid?{id:_e0.id,rows:JSON.parse(JSON.stringify((_e0.rows||[]).filter(function(r){return r&&r.offset;})))}:null;})()});_trashSave();}catch(e){_err('delCostItem.trash',e);}
   if(_dc&&_dc.estOf){var _es=q.costs.find(function(x){return x.id===_dc.estOf;});if(_es&&_es.offsetBy===cid){_es.rows=(_es.rows||[]).filter(function(r){return !r.offset;});delete _es.offsetBy;_es.mt=Date.now();try{recalcCostAmt(_es);}catch(e){_err('delCostItem.est',e);}}}   // 刪實際採購卡＝還原估算卡（Lotion 10/21 第 9 題）
   q.costs=q.costs.filter(function(x){return x.id!==cid;});
   removePayableByCostId(cid);
@@ -41364,7 +41365,7 @@ function _tombDead(lt,ct,id,r){
   var t=Math.max(+((lt||{})[id])||0,+((ct||{})[id])||0);
   if(!t&&(lt||{})[id]==null&&(ct||{})[id]==null)return false;
   if(r&&r._restoredAt&&+r._restoredAt>t)return false;
-  if(r&&r.coll&&r.rid&&r.id===r.coll+'|'+r.rid&&+r.at>t)return false;   // 5a 審查：回收筒紀錄（刪→還原→再刪）比回收筒墓碑新 → 是新的一筆
+  if(r&&r.coll&&r.rid&&(r.id===r.coll+'|'+r.rid||(r.qid&&r.id===r.coll+'|'+r.qid+'|'+r.rid))&&+r.at>t)return false;   // 5a 審查：回收筒紀錄（刪→還原→再刪）比回收筒墓碑新 → 是新的一筆
   return true;
 }
 function _trashPurge(){
@@ -41375,7 +41376,9 @@ function _trashPurge(){
 // 成本卡回收筒還原（A 批）：放回原報價的成本卡、重建自動應付
 function _costTrashRestore(e,key){var q=(Q||[]).find(function(x){return x&&x.id===e.qid;});if(!q){toast('原本的報價已經不在，不能還原');return;}
   q.costs=q.costs||[];if(q.costs.some(function(c){return c&&c.id===e.rid;})){toast('同一張已經存在，不用還原');return;}
-  var rec=JSON.parse(JSON.stringify(e.rec));rec.mt=Date.now();q.costs.push(rec);_touch(q);
+  var rec=JSON.parse(JSON.stringify(e.rec));rec.mt=Date.now();q.costs.push(rec);
+  if(e.est&&e.est.id){var _es=q.costs.find(function(c){return c&&c.id===e.est.id;});if(_es&&!_es.offsetBy){_es.rows=(_es.rows||[]).filter(function(r){return !r.offset;}).concat(JSON.parse(JSON.stringify(e.est.rows||[])));_es.offsetBy=rec.id;_es.mt=Date.now();try{recalcCostAmt(_es);}catch(e6){_err('costTrashRestore.est',e6);}}}   // 審查：還原實際採購卡＝估算卡重新沖銷，不重複算成本
+  _touch(q);
   TRASH_PRIV=TRASH_PRIV.filter(function(x){return x&&x.id!==key;});TOMBS.trashPriv=TOMBS.trashPriv||{};TOMBS.trashPriv[key]=_srvNow();try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e2){_err('costTrashRestore.tomb',e2);}
   try{syncCostToPayable(q,rec);}catch(e3){_err('costTrashRestore.pay',e3);}
   try{_trashSave();persist();_immediateUpload();}catch(e4){_err('costTrashRestore',e4);}
@@ -43243,13 +43246,14 @@ function _vbDetailHtml(d){
 function _vbTmpPurge(q,c,did){if(!q||!c)return;var used={};(c.periods||[]).forEach(function(p){(p.rows||[]).forEach(function(pr){used[pr.rid]=1;});});var n=(c.rows||[]).length;c.rows=(c.rows||[]).filter(function(r){return !(r&&r.fromDraft===did&&!used[r.id]);});if(c.rows.length!==n){c.mt=Date.now();_touch(q);try{persist();}catch(e){_err('_vbTmpPurge',e);}}}
 var _VB_DUP_ANS={};   // 重複請款放行原因（系統視窗答完再進來一次）
 function _vbConfirm(d){
+  var ans0=_VB_DUP_ANS[d.id];delete _VB_DUP_ANS[d.id];   // 審查：放行原因只用這一次，提早結束也不留給下一次
   if(!_decIsAdmin()){toast('只有管理員能確認廠商請款');return Promise.resolve(false);}
   (Q||[]).forEach(function(q0){(q0.costs||[]).forEach(function(c0){if(c0&&c0.type==='sub'&&(c0.rows||[]).some(function(r){return r&&r.fromDraft===d.id;}))_vbTmpPurge(q0,c0,d.id);});});
   var v=_vbView(d);
   if(v.again){_draftMark(d.id,'applied',{resultId:(v.again.qid+'|'+v.again.cid+'|'+v.again.no).slice(0,80)});toast('這張已經入帳（'+v.again.ref+'），已標成已處理');return Promise.resolve(true);}
   var why=_vbWhy(v,false);if(why.length){toast('還不能確認：'+why.join('；').slice(0,120));return Promise.resolve(false);}
-  if(v.dup&&_VB_DUP_ANS[d.id]==null){return new Promise(function(res){_askText('這張看起來重複','這張單看起來已經入帳過（'+v.dup.ref+'）。確定不是重複、要放行，請寫原因：','',function(a){_VB_DUP_ANS[d.id]=a;res(_vbConfirm(d));},{required:true,reqMsg:'沒寫放行原因，不能確認',onCancel:function(){toast('沒寫放行原因，不能確認');res(false);}});});}
-  if(v.dup){var r=_VB_DUP_ANS[d.id];delete _VB_DUP_ANS[d.id];if(r==null||!String(r).trim()){toast('沒寫放行原因，不能確認');return Promise.resolve(false);}var st=_vbStGet(d.id);st.dupReason=String(r).trim().slice(0,200);_vbStSet(d.id,st);v=_vbView(d);}
+  if(v.dup&&ans0==null){return new Promise(function(res){_askText('這張看起來重複','這張單看起來已經入帳過（'+v.dup.ref+'）。確定不是重複、要放行，請寫原因：','',function(a){_VB_DUP_ANS[d.id]=a;res(_vbConfirm(d));},{required:true,reqMsg:'沒寫放行原因，不能確認',onCancel:function(){toast('沒寫放行原因，不能確認');res(false);}});});}
+  if(v.dup){var r=ans0;if(r==null||!String(r).trim()){toast('沒寫放行原因，不能確認');return Promise.resolve(false);}var st=_vbStGet(d.id);st.dupReason=String(r).trim().slice(0,200);_vbStSet(d.id,st);v=_vbView(d);}
   var q=v.q,c=v.c;
   // 選「新增分包列」的先加到分包卡（數量 0、單價＝單據）；期別視窗取消就拿掉
   var tmp=[];v.rows.forEach(function(x){if(x.pick!=='new')return;var id='vb'+Date.now().toString(36)+x.i;(c.rows=c.rows||[]).push({id:id,desc:x.ln.text||'新增工項',qty:0,unitPrice:x.up.up,linkedItemIdx:-1,fromDraft:d.id});x.pick=id;tmp.push(id);});
