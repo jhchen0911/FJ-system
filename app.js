@@ -1,7 +1,7 @@
 /* 豐有工程管理系統 主程式（由 index.html 載入：<script src="app.js?v=…" defer>）
  * v6.0.34 起主程式自 index.html 外部化：瀏覽器可串流編譯、重複開啟走程式碼快取；sw.js 對 app.js 快取優先。
  * 改版規則不變：APP_VERSION 在此檔、index.html 的 app.js?v= 要一起改。*/
-var APP_VERSION='v6.0.243';
+var APP_VERSION='v6.0.244';
 // v6.0.130 第 3a 步：計算模組（calc/*.js）沒載到就提示重新整理——稅、請款合計、應收都靠它，缺了會到處算錯
 if(typeof FJC==='undefined'||!FJC.inv||!FJC.pay||!FJC.rpt||!FJC.comm||!FJC.hr||!FJC.ll||!FJC.settle||!FJC.route||!FJC.inv.totals2||!FJC.todo){window.addEventListener('DOMContentLoaded',function(){try{var b=document.createElement('div');b.id='fy-calc-missing';b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100001;background:#c62828;color:#fff;font-size:13px;font-weight:700;padding:8px 12px;text-align:center';b.textContent='計算模組沒有載入（可能是網路不穩），請連上網路後重新整理，再開始操作。';document.body.appendChild(b);}catch(e){console.error('[calc]',e);}});console.error('[calc] 計算模組沒有載入');}
 // ══════════ v5.376：錯誤日誌收集器 ══════════
@@ -427,7 +427,7 @@ function _rentScan(q,endDate){
 function _ctAmtOf(q){
   if(!q)return 0;
   var ct=(CONTRACTS||[]).find(function(c){return c.linkedQid===q.id;})
-       ||(CONTRACTS||[]).find(function(c){return c.name&&c.name===q.name;});
+       ||(CONTRACTS||[]).find(function(c){return !c.linkedQid&&c.name&&c.name===q.name;});
   return ct?(parseFloat(ct.amount)||0):0;
 }
 function _addsWonAmt(q){
@@ -2053,7 +2053,7 @@ function _saveQCore(o){
   if(_oldName&&_oldName!==String(q.name||'').trim()){
     let _rn=0;
     INV.forEach(v=>{if(v.sourceQid===q.id||v.quoteId===q.id||v.project===_oldName){if(v.project!==q.name){v.project=q.name;_touch(v);_rn++;}}});
-    CONTRACTS.forEach(c=>{if(c.linkedQid===q.id||c.name===_oldName){if(c.name!==q.name){c.name=q.name;_touch(c);_rn++;}}});
+    CONTRACTS.forEach(c=>{if(c.linkedQid===q.id||(!c.linkedQid&&c.name===_oldName)){if(c.name!==q.name){c.name=q.name;_touch(c);_rn++;}}});
     PAYABLES.forEach(p=>{if(p.project===_oldName){p.project=q.name;_touch(p);_rn++;}});
     if(_rn){try{saveInv();saveContracts();savePayables();}catch(e){_err('top',e);}toast('工程名稱已連動更新 '+_rn+' 筆關聯記錄（請款單／合約／應付）');}
   }
@@ -2826,7 +2826,7 @@ function renderInvPrevSummary(){
   }).join('');
   let contractLine='';
   try{
-    const ct=(cur.quoteId?(CONTRACTS||[]).find(c=>c.linkedQid===cur.quoteId):null)||(CONTRACTS||[]).find(c=>c.name===proj);
+    const ct=(cur.quoteId?(CONTRACTS||[]).find(c=>c.linkedQid===cur.quoteId):null)||(CONTRACTS||[]).find(c=>!c.linkedQid&&c.name===proj);
     if(ct&&ct.amount){
       const remain=ct.amount-cum;
       contractLine='<span style="margin-left:auto;font-size:12px;color:var(--b4)">合約 NT$ '+fmt(ct.amount)
@@ -3108,8 +3108,8 @@ function settleInvItem(i){
   let _contract=null;
   try{
     _contract=CONTRACTS.find(function(c){return _invsOfContract(c).some(function(v){return v.id===(_inv&&_inv.id);});})
-      ||((_inv&&_inv.project)?CONTRACTS.find(x=>x.name===_inv.project):null);
-  }catch(e){_contract=(_inv&&_inv.project)?CONTRACTS.find(x=>x.name===_inv.project):null;}
+      ||((_inv&&_inv.project)?CONTRACTS.find(x=>(!x.linkedQid||x.linkedQid===_inv.quoteId||x.linkedQid===_inv.sourceQid)&&x.name===_inv.project):null);
+  }catch(e){_contract=(_inv&&_inv.project)?CONTRACTS.find(x=>(!x.linkedQid||x.linkedQid===_inv.quoteId||x.linkedQid===_inv.sourceQid)&&x.name===_inv.project):null;}
   const _tm=_taxM();
   const _delta=Math.round((orig-cum)*(parseFloat(it.contractPrice)||0)*_tm); // 正=追減、負=追加
   const _willSync=_contract&&(_contract.amount||0)>0&&_delta!==0;
@@ -11253,7 +11253,7 @@ function _pullCloudIfNewer(opts){
         _fbDb.ref('fydata/shared').once('value').then(function(fs){
           var data=fs.val();
           var who=(data&&data.uploadedBy)||'他人';
-          _applyCloudSnapshot(data,cloudTime,'<svg class="ic ib" aria-hidden="true"><use href="#i-cloud"/></svg> 已同步最新資料（'+who+' 於 '+new Date(cloudTime).toLocaleString('zh-TW')+'）');
+          _applyCloudSnapshot(data,cloudTime,'☁ 已同步最新資料（'+who+' 於 '+new Date(cloudTime).toLocaleString('zh-TW')+'）');
           window._pullInFlight=false;
         }).catch(function(){window._pullInFlight=false;});
       } else {
@@ -11264,7 +11264,7 @@ function _pullCloudIfNewer(opts){
         window._pullInFlight=false;
         _fbDb.ref('fydata/shared/uploadedBy').once('value').then(function(u){
           var who=u.val()||'他人';
-          try{toast('<svg class="ic ib" aria-hidden="true"><use href="#i-cloud"/></svg> '+who+' 也更新了資料，已逐筆合併並上傳');}catch(e){_err('_pullCloudIfNewer',e);}
+          try{toast('☁ '+who+' 也更新了資料，已逐筆合併並上傳');}catch(e){_err('_pullCloudIfNewer',e);}
           _pushCloud({silent:true});
         }).catch(function(){_pushCloud({silent:true});});
       }
@@ -21993,7 +21993,7 @@ function _spSave(){
     if(paid0>0){var t0=JSON.parse(JSON.stringify(per0));t0.date=date;t0.rows=rows;var ab0=document.getElementById('sp-absorb');t0.absorb=!!(ab0&&ab0.checked);var av0=document.getElementById('sp-adv');t0.adv=av0?Math.max(0,Math.min(Math.round(parseFloat(av0.value)||0),Math.round(parseFloat(av0.getAttribute('data-avail'))||0))):0;
       var c0=Object.assign({},c,{periods:c.periods.map(function(p){return p===per0?t0:p;})}),k0=_subPeriodCalc(c0,t0),pa0=_subPerPayAmt(c0,t0,k0,_subAdvInclAlloc(c0));
       var sim={amount:pa0.amt,vat:(p0.vatManual&&p0.vat!=null)?p0.vat:_subInvoice(c)};if(pa0.incl!=null)sim.incl=pa0.incl;var eff0=_payEff(sim);
-      if(paid0>=eff0+1){var why0=window.prompt('這期已付 NT$ '+fmt(paid0)+'，改完應付只剩 NT$ '+fmt(eff0)+'（多付 NT$ '+fmt(paid0-eff0)+'）。要存的話請寫原因（例：廠商退回差額、下期扣回）：','');
+      if(paid0>=eff0+1){var why0=_spCtx.overAns;delete _spCtx.overAns;if(why0==null){_askText('改完會多付','這期已付 NT$ '+fmt(paid0)+'，改完應付只剩 NT$ '+fmt(eff0)+'（多付 NT$ '+fmt(paid0-eff0)+'）。要存的話請寫原因（例：廠商退回差額、下期扣回）：','',function(a){_spCtx.overAns=a;setTimeout(function(){var b=document.getElementById('gen-confirm-ok');if(b)b.click();},0);},{required:true,reqMsg:'要寫原因才能存',onCancel:function(){toast('這期已付 NT$ '+fmt(paid0)+'，改完會多付 NT$ '+fmt(paid0-eff0)+'：要寫原因才能存（本期未存）');}});return;}   /* 健檢🟡12：系統視窗；寫完自動再按一次存檔 */
         if(why0==null||!String(why0).trim()){toast('這期已付 NT$ '+fmt(paid0)+'，改完會多付 NT$ '+fmt(paid0-eff0)+'：要寫原因才能存（本期未存）');return;}
         overWhy={amt:Math.round(paid0-eff0),paid:Math.round(paid0),why:String(why0).trim().slice(0,200),at:Date.now(),by:String(_meEmail()||'').slice(0,80)};}}}catch(e){_err('_spSave.over',e);toast('多付檢查算不出來，這期先不存（請重開再試）');return;}}   // 審查：付款守門算錯就擋，不放行
   var per=(_spCtx.editNo!=null)?c.periods.find(function(p){return p.no===_spCtx.editNo;}):null;
@@ -23458,10 +23458,24 @@ function fixCostPayable(cid){
   rCostItems();toast('已重新同步應付帳款');
 }
 
+// 健檢🔴4（Lotion 11/13 A 批）：刪成本卡要先確認；有計價期別或付過款的分包卡不准刪（要先處理期別／付款）；刪掉的卡進私有回收筒（管理員可還原）
+function _costDelBlock(c){if(!c)return '';var cid=c.id,why=[];
+  if(c.type==='sub'&&(c.periods||[]).length)why.push('已經有 '+c.periods.length+' 期廠商請款（計價期別）');
+  try{if((PAYABLES||[]).some(function(p){return p&&(p.costId===cid||String(p.id||'').indexOf('pay'+cid+'_')===0||p.id==='pay'+cid)&&_payPaidAny(p);}))why.push('已經付過款');}catch(e){_err('_costDelBlock',e);}
+  return why.join('、');}
 function delCostItem(cid){
+  if(_roDeny())return;
   var q=Q.find(function(x){return x.id===eid;});
   if(!q||!q.costs)return;
-  var _dc=q.costs.find(function(x){return x.id===cid;});
+  var _dc=q.costs.find(function(x){return x.id===cid;});if(!_dc)return;
+  var bl=_costDelBlock(_dc);if(bl){toast('這張不能刪：'+bl+'。要刪請先刪掉期別、撤銷付款');return;}
+  var nm=String(_dc.vendor||_dc.name||_dc.desc||(_dc.type==='sub'?'分包':'成本')).slice(0,40);
+  showConfirm('刪除成本卡','確定刪除「'+esc(nm)+'」這張成本卡？<br><span style="font-size:12px;color:var(--b4)">刪掉的會放進回收筒（'+_trashDays()+' 天內管理員可以還原）</span>',function(){_costDelDo(q,cid);});
+}
+function _costDelDo(q,cid){
+  var _dc=q.costs.find(function(x){return x.id===cid;});if(!_dc)return;
+  try{var now=_srvNow(),key='costs|'+q.id+'|'+cid;try{var _t0=+((TOMBS.trashPriv||{})[key])||0;if(now<=_t0)now=_t0+1;}catch(e1){_err('delCostItem.tomb',e1);}TRASH_PRIV=TRASH_PRIV.filter(function(x){return x&&x.id!==key;});
+    TRASH_PRIV.unshift({id:key,coll:'costs',rid:String(cid),qid:q.id,at:now,_mt:now,by:_meEmail()||'',name:(String(q.name||'').slice(0,24)+' '+String(_dc.vendor||_dc.name||_dc.desc||'').slice(0,30)).trim(),rec:JSON.parse(JSON.stringify(_dc))});_trashSave();}catch(e){_err('delCostItem.trash',e);}
   if(_dc&&_dc.estOf){var _es=q.costs.find(function(x){return x.id===_dc.estOf;});if(_es&&_es.offsetBy===cid){_es.rows=(_es.rows||[]).filter(function(r){return !r.offset;});delete _es.offsetBy;_es.mt=Date.now();try{recalcCostAmt(_es);}catch(e){_err('delCostItem.est',e);}}}   // 刪實際採購卡＝還原估算卡（Lotion 10/21 第 9 題）
   q.costs=q.costs.filter(function(x){return x.id!==cid;});
   removePayableByCostId(cid);
@@ -25995,7 +26009,7 @@ function projUpload(type,qid){
 function _projAttachMeta(qid,type,name,url,path){
   var q=Q.find(x=>x.id===qid);if(!q)return;
   if(type==='contract'){
-    var ct=(CONTRACTS||[]).find(c=>c.linkedQid===qid)||(CONTRACTS||[]).find(c=>c.name===q.name);
+    var ct=(CONTRACTS||[]).find(c=>c.linkedQid===qid)||(CONTRACTS||[]).find(c=>!c.linkedQid&&c.name===q.name);
     if(!ct){toast('尚未建立合約（報價標記得標時會自動建立）');return;}
     // 汰換舊雲端檔（best-effort）
     if(ct.filePath)_stDel(ct.filePath);
@@ -26017,7 +26031,7 @@ function _projAttachMeta(qid,type,name,url,path){
 function _projAttachFile(qid,type,name,dataUrl){
   var q=Q.find(x=>x.id===qid);if(!q)return;
   if(type==='contract'){
-    var ct=(CONTRACTS||[]).find(c=>c.linkedQid===qid)||(CONTRACTS||[]).find(c=>c.name===q.name);
+    var ct=(CONTRACTS||[]).find(c=>c.linkedQid===qid)||(CONTRACTS||[]).find(c=>!c.linkedQid&&c.name===q.name);
     if(!ct){toast('尚未建立合約（報價標記得標時會自動建立）');return;}
     if(ct.filePath)_stDel(ct.filePath);
     ct.fileName=name;ct.fileData=dataUrl;ct.fileTs=Date.now();
@@ -26039,7 +26053,7 @@ function _projAttachFile(qid,type,name,dataUrl){
 function projDownload(qid,type,idx){
   var q=Q.find(x=>x.id===qid);if(!q)return;
   if(type==='contract'){
-    var ct=(CONTRACTS||[]).find(c=>c.linkedQid===qid)||(CONTRACTS||[]).find(c=>c.name===q.name);
+    var ct=(CONTRACTS||[]).find(c=>c.linkedQid===qid)||(CONTRACTS||[]).find(c=>!c.linkedQid&&c.name===q.name);
     if(!ct||(!ct.fileData&&!ct.fileUrl)){toast('尚未上傳合約檔');return;}
     _viewFile(ct.fileName||'合約檔',ct.fileUrl||ct.fileData);   // 點擊直接預覽（視窗內可下載）
   }else{
@@ -26086,7 +26100,7 @@ function _renderProjectsCore(){
   const cards=mains.map(q=>{
     const adds=Q.filter(x=>x.parentId===q.id);
     const quoteTotal=(q.t&&q.t.total||0)+adds.reduce((a,x)=>a+((x.t&&x.t.total)||0),0);
-    const ct=(CONTRACTS||[]).find(c=>c.linkedQid===q.id)||(CONTRACTS||[]).find(c=>c.name===q.name);
+    const ct=(CONTRACTS||[]).find(c=>c.linkedQid===q.id)||(CONTRACTS||[]).find(c=>!c.linkedQid&&c.name===q.name);
     // v5.318：改用統一歸戶函式（含追加案的請款單，原本追加案的請款在專案卡完全看不到，
     // 應收與估驗進度不含追加額、成本卻含，毛利被系統性低估）
     const invs=_invsOfQuoteAll(q).slice().sort((a,b)=>(parseInt(a.periodNo)||1)-(parseInt(b.periodNo)||1));
@@ -26780,7 +26794,7 @@ function renderCashForecast(){
     var invs=_invsOfQuoteAll(q).filter(function(x){return x&&x.kind!=='retReturn';});
     var billed=invs.reduce(function(a,x){return a+_invGrossOf(x);},0);   // 第 3b 步：已請＝本期＋稅（加回保留款、清潔費），跟合約總額同口徑
     var adds=Q.filter(function(x){return x.parentId===q.id;});
-    var ct=(CONTRACTS||[]).find(function(c){return c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return c.name===q.name;});
+    var ct=(CONTRACTS||[]).find(function(c){return c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return !c.linkedQid&&c.name===q.name;});
     var total=(ct&&parseFloat(ct.amount))||((q.t&&q.t.total)||0)+adds.reduce(function(a,x){return a+((x.t&&x.t.total)||0);},0);
     if(total<=0)return;
     var estG=Math.round(pr.pct/100*total-billed);
@@ -27131,7 +27145,7 @@ function _retentionRows(){
   });
   var rows=Object.values(byProj);
   rows.forEach(function(r){
-    var ct=(CONTRACTS||[]).find(function(c){return c.name===r.proj;});
+    var ct=(r.q&&(CONTRACTS||[]).find(function(c){return c&&c.linkedQid===r.q.id;}))||(CONTRACTS||[]).find(function(c){return c&&!c.linkedQid&&c.name===r.proj;});   /* 健檢🟡3：先找連到這案的、名稱備案排除已連到別案的 */
     r.status=ct?(ct.status==='completed'||ct.status==='done'?'completed':'active'):'';
     r.end=(ct&&ct.end)||'';
     r.due=r.status==='completed'&&(r.pending+r.hold)>0;            // 已完工還押著 → 該請退
@@ -27596,7 +27610,7 @@ function _ikSubHit(name){
 function _ikIsPdf(f){return !!f&&(/^application\/pdf$/.test(f.type||'')||/\.pdf$/i.test(f.name||''));}
 // PDF 逐頁畫成 JPEG（最多 6 頁、寬約 1400px），每頁當一張照片進佇列
 function _ikPdfPages(f){
-  return _ensurePdfJs().then(function(lib){return f.arrayBuffer().then(function(buf){return lib.getDocument({data:new Uint8Array(buf)}).promise;}).then(function(doc){
+  return _ensurePdfJs().then(function(lib){return f.arrayBuffer().then(function(buf){return lib.getDocument({data:new Uint8Array(buf),isEvalSupported:false}).promise;   /* 安全🔴2（CVE-2024-4367）：特製 PDF 不能在畫字型時執行程式 */}).then(function(doc){
     if((doc.numPages||0)>6)toast('PDF 共 '+doc.numPages+' 頁，只讀前 6 頁；其餘請另存成另一個 PDF 再選');var n=Math.min(doc.numPages||0,6),out=[],base=String(f.name||'file').replace(/\.pdf$/i,'');
     var one=function(i){if(i>n)return Promise.resolve(out);return doc.getPage(i).then(function(pg){var v0=pg.getViewport({scale:1}),sc=Math.min(3,1400/(v0.width||1400)),v=pg.getViewport({scale:sc});
       var c=document.createElement('canvas');c.width=Math.ceil(v.width);c.height=Math.ceil(v.height);var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
@@ -29070,7 +29084,7 @@ window._trackEx=window._trackEx||{};   // 勾掉不放進實績表的案件 id
 function _trackRows(y1,y2){
   var rows=[];
   (Q||[]).filter(function(q){return q&&q.awarded&&!q.parentId;}).forEach(function(q){
-    var ct=(CONTRACTS||[]).find(function(c){return c&&(c.linkedQid===q.id||(c.name&&c.name===q.name));});
+    var ct=(CONTRACTS||[]).find(function(c){return c&&(c.linkedQid===q.id||(!c.linkedQid&&c.name&&c.name===q.name));});
     var invs=(INV||[]).filter(function(i){return i&&((i.quoteId&&i.quoteId===q.id)||String(i.project||'').trim()===String(q.name||'').trim());})
       .sort(function(a,b){return String(a.date||'').localeCompare(String(b.date||''));});
     var start=(ct&&ct.start)||(invs[0]&&invs[0].date)||q.date||'';
@@ -32452,7 +32466,7 @@ function _pjStat(q){
   var adds=Q.filter(function(x){return x.parentId===q.id;});
   var all=[q].concat(adds);
   var st={adds:adds,all:all};
-  st.ct=(CONTRACTS||[]).find(function(c){return c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return c.name&&c.name===q.name;})||null;
+  st.ct=(CONTRACTS||[]).find(function(c){return c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return !c.linkedQid&&c.name&&c.name===q.name;})||null;
   st.quoteTotal=all.reduce(function(a,x){var t=(x.t&&parseFloat(x.t.total))||0;if(!t){var sub=0;(x.items||[]).forEach(function(it){if(it&&!it.sec&&!_isSpare(it))sub+=Math.abs(parseFloat(it.qty)||0)*(parseFloat(it.price)||0);});t=Math.round(sub*_taxM());}return a+t;},0);
   st.base=(st.ct&&parseFloat(st.ct.amount)>0)?parseFloat(st.ct.amount)+_addsWonAmt(q):st.quoteTotal;   // 健檢1 #6：主約＋已得標追加案
   // 議價：items.origPrice 保留議價前單價
@@ -33790,7 +33804,7 @@ function _rfqIntroPreview(rid){
 function rfqAward(rid){
   var q=_rfqQ();if(!q)return;var r=_rfqs(q).find(function(x){return x.id===rid;});if(!r)return;
   var cands=(r.vendors||[]).filter(function(v){return _rfqVendorTotal(r,v,true).n>0;});
-  if(!cands.length){toast('還沒有任何廠商的報價，請先「填價」');return;}
+  if(!cands.length){toast('還沒有任何廠商的報價，請先按「＋ 回傳廠商」填價');return;}
   var IN='width:100%;box-sizing:border-box;font-size:13px;padding:7px 8px;border:1px solid var(--b2);border-radius:var(--r8);font-family:inherit';
   var minT=Math.min.apply(null,cands.map(function(v){return _rfqCmpTotal(r,v);}));   // v6.0.109 同口徑（含豐有提供材料／隱藏成本）
   var anyM=(r.items||[]).some(function(it){return _rfqIsM(it)||_rfqLen(it.desc)>0;});
@@ -34582,12 +34596,12 @@ var _INTRO_CALC={pct:'合約金額 %',lump:'一筆金額',m:'每 M × 實作量'
 var _INTRO_PAY={follow:'隨廠商每期計價',b2b:'依主約裝設／拆除比例（70／30，不等業主付款）',first:'一次付清（第一期請款後）',done:'竣工（結案）',remove:'拔除完成'};
 function _introFollows(f){return !!f&&(!f.introPay||f.introPay==='follow'||f.introPay==='b2b');}   // Lotion 10/21：b2b＝跟隨主約，分段列照裝設／拆除比例
 function _ymd(ts){var d=new Date(ts);if(isNaN(d))return localToday();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
-function _introBase(q){var ct=(CONTRACTS||[]).find(function(c){return c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return c.name&&c.name===q.name;});var a=ct?(parseFloat(ct.amount)||0):0;return a>0?Math.round(a/_taxM()):Math.round((q.t&&q.t.sub)||0);}
+function _introBase(q){var ct=(CONTRACTS||[]).find(function(c){return c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return !c.linkedQid&&c.name&&c.name===q.name;});var a=ct?(parseFloat(ct.amount)||0):0;return a>0?Math.round(a/_taxM()):Math.round((q.t&&q.t.sub)||0);}
 function _introCalcOf(f){return f.introCalc||((f.rows||[]).some(function(r){return r.ppm!=null;})?'m':'pc');}
 function _introTrigger(q,f){
   var pay=f.introPay||'follow';
   if(pay==='first'){var inv=_invsOfQuoteAll(q).slice().sort(function(a,b){return (parseInt(a.periodNo)||1)-(parseInt(b.periodNo)||1);})[0];return inv?(inv.date||localToday()):'';}
-  if(pay==='done'){if(q.closed)return _ymd(q.closedAt||Date.now());var ct=(CONTRACTS||[]).find(function(c){return c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return c.name&&c.name===q.name;});return (ct&&(ct.status==='completed'||ct.status==='done'))?localToday():'';}
+  if(pay==='done'){if(q.closed)return _ymd(q.closedAt||Date.now());var ct=(CONTRACTS||[]).find(function(c){return c.linkedQid===q.id;})||(CONTRACTS||[]).find(function(c){return !c.linkedQid&&c.name&&c.name===q.name;});return (ct&&(ct.status==='completed'||ct.status==='done'))?localToday():'';}
   if(pay==='remove'){var L='';(q.dailyLogs||[]).forEach(function(x){if(x&&x.status==='stage'&&x.stageOf==='remove'){var d=x.stageDate||x.date||'';if(!L||d<L)L=d;}});return L;}
   return '';
 }
@@ -36549,7 +36563,7 @@ function _ensurePdfJs(){
 // 文字片段 → 列（y 相近）→ 欄（x 間距大於 1.2 個字高即換欄）
 async function _qiPdfRows(buf){
   var lib=await _ensurePdfJs();
-  var doc=await lib.getDocument({data:buf}).promise,rows=[],texts=[],key=0;
+  var doc=await lib.getDocument({data:buf,isEvalSupported:false}).promise,rows=[],texts=[],key=0;   /* 安全🔴2（CVE-2024-4367） */
   for(var p=1;p<=doc.numPages;p++){
     var page=await doc.getPage(p),tc=await page.getTextContent();
     var its=tc.items.filter(function(it){return it&&String(it.str||'').trim();}).map(function(it){var h=Math.abs(it.transform[3])||Math.abs(it.transform[0])||10;return {x:it.transform[4],y:it.transform[5],w:it.width||0,h:h,s:String(it.str)};});
@@ -39186,9 +39200,10 @@ function openDrafts(){
   _modal('AI 草稿待確認','<div id="draft-list-box" style="max-height:60vh;overflow:auto">'+_draftListHtml()+'</div>',function(){return true;});
   _lineImgFill(document.getElementById('draft-list-box'));
 }
-function draftReject(id){
+function draftReject(id,r0){
   if(_roDeny())return;var d=DRAFTS[id];if(!d)return;
-  var r=window.prompt('退回原因（選填）','')||'';
+  if(arguments.length<2){_askText('退回草稿','退回原因（選填）','',function(v){draftReject(id,v);});return;}
+  var r=r0||'';
   if(d.type==='dailyLog'){try{var _o=_dlOf(d);if(_o.q&&_dlExpQueue(_o.q,d,_o.dt)){_touch(_o.q);persist();}}catch(e){_err('draftReject.exp',e);}}   /* v6.0.235 審查：日報退回，支出照樣留給支出卡 */
   _draftMark(id,'rejected',{reason:String(r).slice(0,200),'payload/file':null}).then(function(){var b=document.getElementById('draft-list-box');if(b)b.innerHTML=_draftListHtml();try{updateDashTodo();}catch(e){_err('draftReject',e);}toast('已退回');});
 }
@@ -41314,7 +41329,7 @@ var TRASH=[],TRASH_PRIV=[];
 try{TRASH=JSON.parse(localStorage.getItem('fy_trash')||'[]')||[];}catch(e){TRASH=[];}
 try{TRASH_PRIV=JSON.parse(localStorage.getItem('fy_trash_priv')||'[]')||[];}catch(e){TRASH_PRIV=[];}
 var _TRASH_PRIV_COLLS={payables:1,expenses:1};
-var _TRASH_NAME={quotes:'報價',invoices:'請款單',contracts:'合約',customers:'客戶',vendors:'廠商',invoiceRecs:'發票紀錄',workers:'人員',projects:'專案',payables:'應付',expenses:'費用'};
+var _TRASH_NAME={costs:'成本卡',quotes:'報價',invoices:'請款單',contracts:'合約',customers:'客戶',vendors:'廠商',invoiceRecs:'發票紀錄',workers:'人員',projects:'專案',payables:'應付',expenses:'費用'};
 var _TRASH_SAVE={quotes:function(){persist();},invoices:function(){saveInv();},contracts:function(){saveContracts();},customers:function(){saveCustomers();},vendors:function(){saveVendors();},
   invoiceRecs:function(){saveInvoiceRecs();},workers:function(){saveWorkers();},projects:function(){saveProjects();},payables:function(){savePayables();},expenses:function(){saveExpenses();}};
 function _trashDays(){var d=parseInt(P&&P.trashDays,10);return d>0&&d<=365?d:30;}
@@ -41357,11 +41372,20 @@ function _trashPurge(){
   TRASH=TRASH.filter(function(x){return x&&(+x.at||0)>=lim;});TRASH_PRIV=TRASH_PRIV.filter(function(x){return x&&(+x.at||0)>=lim;});
   var n=n0-TRASH.length-TRASH_PRIV.length;if(n)_trashSave();return n;
 }
+// 成本卡回收筒還原（A 批）：放回原報價的成本卡、重建自動應付
+function _costTrashRestore(e,key){var q=(Q||[]).find(function(x){return x&&x.id===e.qid;});if(!q){toast('原本的報價已經不在，不能還原');return;}
+  q.costs=q.costs||[];if(q.costs.some(function(c){return c&&c.id===e.rid;})){toast('同一張已經存在，不用還原');return;}
+  var rec=JSON.parse(JSON.stringify(e.rec));rec.mt=Date.now();q.costs.push(rec);_touch(q);
+  TRASH_PRIV=TRASH_PRIV.filter(function(x){return x&&x.id!==key;});TOMBS.trashPriv=TOMBS.trashPriv||{};TOMBS.trashPriv[key]=_srvNow();try{localStorage.setItem('fy_tombs',JSON.stringify(TOMBS));}catch(e2){_err('costTrashRestore.tomb',e2);}
+  try{syncCostToPayable(q,rec);}catch(e3){_err('costTrashRestore.pay',e3);}
+  try{_trashSave();persist();_immediateUpload();}catch(e4){_err('costTrashRestore',e4);}
+  toast('已還原成本卡：'+(e.name||''));try{openTrash();}catch(e5){_err('costTrashRestore.open',e5);}}
 function trashRestore(key){
   if(_roDeny())return;
   try{if(_fbUser&&!isAdmin(_fbUser.email)){toast('只有管理員可以還原');return;}}catch(e){_err('trashRestore.admin',e);}
   var e=TRASH.find(function(x){return x&&x.id===key;})||TRASH_PRIV.find(function(x){return x&&x.id===key&&x.rec;});
   if(!e||!e.rec){toast('找不到這筆（可能已過期清除）');return;}
+  if(e.coll==='costs'){_costTrashRestore(e,key);return;}
   var g=_TOMB_COLLS[e.coll],a=g&&g();if(!Array.isArray(a)){toast('這類資料不能還原');return;}
   if(a.some(function(x){return x&&x.id===e.rid;})){toast('同一筆已經存在，不用還原');return;}
   var rec=JSON.parse(JSON.stringify(e.rec));
@@ -41741,7 +41765,7 @@ function decAct(kind,id,act){
   if(_decActs(kind,it).indexOf(act)<0){toast('這張你只能補資料');return;}
   if(act==='edit'){try{k.edit(it);}catch(e){_err('decAct.edit',e);}return;}
   if(act==='ok'&&!_DEC_READY[bk]){toast('先按「展開明細」看完整內容才能確認');return;}   // v6.0.179 Lotion 11/05
-  var r=null;if(act==='reject'){r=window.prompt('退回原因（選填）','');if(r==null)return;}
+  var r=null;if(act==='reject'){if(arguments.length<4){_askText('退回','退回原因（選填）','',function(v){decAct(kind,id,act,v);});return;}r=String(arguments[3]==null?'':arguments[3]);}
   _DEC_BUSY[bk]=1;_decLock(kind,id,true);
   var fin=function(){delete _DEC_BUSY[bk];_decLock(kind,id,false);};
   var t0=Date.now(),p;try{p=act==='reject'?k.reject(it,String(r).slice(0,200)):k.ok(it);}catch(e){p=Promise.reject(e);}   // 審查：同步丟錯也要解鎖
@@ -42574,7 +42598,7 @@ function _retAskDueRows2(){
 function _retAskRows(){return _retAskAll().filter(function(x){return !x.open&&!x.skip;});}
 // 新選單＋管理員：到期的保留款一律由卡處理（出卡、退回後 30 天內不問、已開退還單）→ 舊「可請退／逾期未退」待辦不再出
 function _retAskCovers(r){try{if(!_nav5On()||!_decIsAdmin()||!r||!r.q)return false;var m=_retAskFam(r.q)[0];return _retAskAll().some(function(x){return x.q===m;});}catch(e){return false;}}
-function _retAskEnd(r){var ct=(CONTRACTS||[]).find(function(c){return c&&c.name===r.proj;})||(CONTRACTS||[]).find(function(c){return c&&c.linkedQid===r.q.id;});   // 審查：跟 _retentionRows 判斷完工同一份合約（名稱優先）
+function _retAskEnd(r){var ct=(r.q&&(CONTRACTS||[]).find(function(c){return c&&c.linkedQid===r.q.id;}))||(CONTRACTS||[]).find(function(c){return c&&!c.linkedQid&&c.name===r.proj;});   // 審查：跟 _retentionRows 判斷完工同一份合約（名稱優先）
   var cl='';try{if(r.q.closed&&r.q.closedAt){var dt=new Date(r.q.closedAt);if(!isNaN(dt))cl=_ymd(dt.getTime());}}catch(e){_err('_retAskEnd',e);}
   return {end:(ct&&ct.end)||'',closed:cl,status:ct?ct.status:''};}
 function _retAskLine(r){
@@ -43217,13 +43241,15 @@ function _vbDetailHtml(d){
 // 確認：檢查 → 開期別視窗帶入（存檔才標已套用）
 // 審查：上次確認時暫加、但沒有任何期別用到的「新增分包列」先清掉（視窗被其他方式關掉時 onCancel 不會跑）
 function _vbTmpPurge(q,c,did){if(!q||!c)return;var used={};(c.periods||[]).forEach(function(p){(p.rows||[]).forEach(function(pr){used[pr.rid]=1;});});var n=(c.rows||[]).length;c.rows=(c.rows||[]).filter(function(r){return !(r&&r.fromDraft===did&&!used[r.id]);});if(c.rows.length!==n){c.mt=Date.now();_touch(q);try{persist();}catch(e){_err('_vbTmpPurge',e);}}}
+var _VB_DUP_ANS={};   // 重複請款放行原因（系統視窗答完再進來一次）
 function _vbConfirm(d){
   if(!_decIsAdmin()){toast('只有管理員能確認廠商請款');return Promise.resolve(false);}
   (Q||[]).forEach(function(q0){(q0.costs||[]).forEach(function(c0){if(c0&&c0.type==='sub'&&(c0.rows||[]).some(function(r){return r&&r.fromDraft===d.id;}))_vbTmpPurge(q0,c0,d.id);});});
   var v=_vbView(d);
   if(v.again){_draftMark(d.id,'applied',{resultId:(v.again.qid+'|'+v.again.cid+'|'+v.again.no).slice(0,80)});toast('這張已經入帳（'+v.again.ref+'），已標成已處理');return Promise.resolve(true);}
   var why=_vbWhy(v,false);if(why.length){toast('還不能確認：'+why.join('；').slice(0,120));return Promise.resolve(false);}
-  if(v.dup){var r=window.prompt('這張單看起來已經入帳過（'+v.dup.ref+'）。確定不是重複、要放行，請寫原因：','');if(r==null||!String(r).trim()){toast('沒寫放行原因，不能確認');return Promise.resolve(false);}var st=_vbStGet(d.id);st.dupReason=String(r).trim().slice(0,200);_vbStSet(d.id,st);v=_vbView(d);}
+  if(v.dup&&_VB_DUP_ANS[d.id]==null){return new Promise(function(res){_askText('這張看起來重複','這張單看起來已經入帳過（'+v.dup.ref+'）。確定不是重複、要放行，請寫原因：','',function(a){_VB_DUP_ANS[d.id]=a;res(_vbConfirm(d));},{required:true,reqMsg:'沒寫放行原因，不能確認',onCancel:function(){toast('沒寫放行原因，不能確認');res(false);}});});}
+  if(v.dup){var r=_VB_DUP_ANS[d.id];delete _VB_DUP_ANS[d.id];if(r==null||!String(r).trim()){toast('沒寫放行原因，不能確認');return Promise.resolve(false);}var st=_vbStGet(d.id);st.dupReason=String(r).trim().slice(0,200);_vbStSet(d.id,st);v=_vbView(d);}
   var q=v.q,c=v.c;
   // 選「新增分包列」的先加到分包卡（數量 0、單價＝單據）；期別視窗取消就拿掉
   var tmp=[];v.rows.forEach(function(x){if(x.pick!=='new')return;var id='vb'+Date.now().toString(36)+x.i;(c.rows=c.rows||[]).push({id:id,desc:x.ln.text||'新增工項',qty:0,unitPrice:x.up.up,linkedItemIdx:-1,fromDraft:d.id});x.pick=id;tmp.push(id);});
@@ -47089,6 +47115,16 @@ document.addEventListener('keydown',function(e){
   }
   document.querySelectorAll('[id^="qmenu_"]').forEach(function(mm){mm.style.display='none';});
 });
+// 健檢🟡12（A 批）：要使用者打一段字（退回原因、放行原因…）改用系統自己的小視窗，不再用瀏覽器原生 window.prompt（手機字小、iPhone 主畫面 App 會被擋）
+//   獨立一層（不佔用 showConfirm 那個視窗，開在別的視窗上面也不會把底下的內容蓋掉）；cb(文字)；opts.required＝一定要寫、opts.reqMsg、opts.onCancel
+function _askText(title,msg,def,cb,opts){opts=opts||{};var old=document.getElementById('fy-ask');if(old)old.remove();
+  var d=document.createElement('div');d.id='fy-ask';d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px';
+  d.innerHTML='<div style="background:#fff;border-radius:12px;max-width:440px;width:100%;padding:16px;box-shadow:0 8px 30px rgba(0,0,0,.25)"><div style="font-weight:700;font-size:15px;margin-bottom:8px">'+esc(title)+'</div>'
+    +'<div style="font-size:13px;line-height:1.6;margin-bottom:8px;white-space:pre-wrap">'+esc(msg)+'</div><textarea id="fy-ask-in" rows="3" maxlength="300" style="width:100%;box-sizing:border-box;font-size:15px;padding:8px;border:1px solid var(--b2);border-radius:8px;font-family:inherit">'+esc(def||'')+'</textarea>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button type="button" class="btn" id="fy-ask-no">取消</button><button type="button" class="btn btn-p" id="fy-ask-ok">確認</button></div></div>';
+  document.body.appendChild(d);var inp=document.getElementById('fy-ask-in');try{inp.focus();}catch(e){/* 可忽略 */}
+  document.getElementById('fy-ask-no').onclick=function(){d.remove();if(opts.onCancel)try{opts.onCancel();}catch(e){_err('_askText.cancel',e);}};
+  document.getElementById('fy-ask-ok').onclick=function(){var v=String(inp.value||'').trim();if(opts.required&&!v){toast(opts.reqMsg||'要寫原因');return;}d.remove();try{cb(v);}catch(e){_err('_askText.cb',e);}};}
 function showConfirm(title, msg, onOk, danger, onCancel, wide, labels){   // labels（v6.0.159，可省略）：{ok,cancel} 按鈕文字
   if(danger===undefined)danger=true;
   var _box=document.getElementById('gen-confirm-box');

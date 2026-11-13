@@ -7945,7 +7945,7 @@ async function newPage(browser, width, height) {
         out.introLock = /付款時機已鎖住/.test(String(_piSave)) && /pay'\+f\.id\+'_intro'/.test(String(_piSave));
         out.estAct = !!act && est.offsetBy === act.id && Math.round(est.amt) === 0 && act.amt === 50000 && est.rows.length === 2 && /實際採購/.test(act.rows[0].desc);
         delOwnRow('cEm', 'cEm_off'); out.offKeep = qE.costs[0].rows.some(r => r.offset);
-        delCostItem(act.id); out.offUndo = !qE.costs[0].offsetBy && !qE.costs[0].rows.some(r => r.offset) && Math.round(qE.costs[0].amt) === 50000;
+        delCostItem(act.id); document.getElementById('gen-confirm-ok').click(); out.offUndo = !qE.costs[0].offsetBy && !qE.costs[0].rows.some(r => r.offset) && Math.round(qE.costs[0].amt) === 50000;
         /* 第 6 項：未登入不能匯入條件卡 */
         { let m6 = ''; const t6 = window.toast; window.toast = m => { m6 = m; }; _fbUser = null; pjCardImport('qE'); out.cardLogin = /請先登入管理員帳號/.test(m6); window.toast = t6; }
         _fbUser = { email: 'staff@x.com' }; const qN = { id: 'qN', ownerCard: { fields: {} } }; Q = [qN]; _regraftQuoteSens({ qN: { ownerCard: { fields: {} } } });
@@ -8114,7 +8114,7 @@ async function newPage(browser, width, height) {
         Q.find(q => q.id === 'qD').awarded = false; delete DRAFTS.dAwd1;
         /* 5. 退回 */
         const dRej = { id: 'dXXX', type: 'bid', by: 'x', at: 1, status: 'pending', summary: 'x', payload: { qid: 'qD', to: 'void' } }; DRAFTS.dXXX = dRej;
-        const oP = window.prompt; window.prompt = () => '不對'; draftReject('dXXX'); window.prompt = oP; await new Promise(res => setTimeout(res, 30));
+        const oP = window._askText; window._askText = (t, m, d, cb) => cb('不對'); draftReject('dXXX'); window._askText = oP; await new Promise(res => setTimeout(res, 30));
         out.rej = DRAFTS.dXXX.status === 'rejected' && DRAFTS.dXXX.reason === '不對' && Q.find(q => q.id === 'qD').bidStatus === 'lost';
         /* 6. 規則檔：唯讀帳號只能新增 pending、不能改 */
         out.rules = typeof _draftPush === 'function';
@@ -10889,7 +10889,7 @@ async function newPage(browser, width, height) {
         out.three = JSON.stringify(btns) === JSON.stringify(['退回', '修改', '確認']) && box.querySelectorAll('.dec-card').length === 3 && /&lt;b&gt;x/.test(box.innerHTML) && !box.querySelector(".dec-card b");
         decAct('dailyOut', 'doaaaa1111', 'ok'); await new Promise((r) => setTimeout(r, 60));
         out.ok = window.__clip === '日報甲<b>x</b>' && marks[0][0] === 'doaaaa1111' && marks[0][1] === 'applied' && document.getElementById('dec-box').querySelectorAll('.dec-card').length === 2;
-        const oP = window.prompt; window.prompt = () => '這份不用'; decAct('dailyOut', 'dobbbb2222', 'reject'); window.prompt = oP; await new Promise((r) => setTimeout(r, 60));
+        const oP = window._askText; window._askText = (t, m, d, cb) => cb('這份不用'); decAct('dailyOut', 'dobbbb2222', 'reject'); window._askText = oP; await new Promise((r) => setTimeout(r, 60));
         out.rej = marks[1][1] === 'rejected' && marks[1][2] === '這份不用';
         const oC = window.showConfirm; window.showConfirm = (t, b, ok) => { document.body.insertAdjacentHTML('beforeend', b); document.getElementById('do-edit').value = '改過的日報丙'; ok(); };
         decAct('dailyOut', 'docccc3333', 'edit'); window.showConfirm = oC; await new Promise((r) => setTimeout(r, 60));
@@ -10980,9 +10980,9 @@ async function newPage(browser, width, height) {
         _vbStSet('dvb0000001', { map: { 1: 'skip' }, useBill: {} }); out.pass = _vbWhy(_vbView(DRAFTS.dvb0000001), false).length === 0;
         // 重複請款：同廠商＋發票號已入帳 → 確認時要寫原因；沒寫不放
         Q[0].costs[0].periods.push({ no: 1, date: '2026-10-25', from: '2026-10-01', to: '2026-10-25', rows: [{ rid: 'r1', qty: 10 }], amt: 9000, ret: 0, net: 9000, invNo: 'AB12345678' });
-        const oP = window.prompt; window.prompt = () => ''; const r1 = await _vbConfirm(DRAFTS.dvb0000001); out.dupBlock = r1 === false && /放行原因/.test(tt);
+        const oP = window._askText; window._askText = (t, m, d, cb) => cb(''); const r1 = await _vbConfirm(DRAFTS.dvb0000001); out.dupBlock = r1 === false && /放行原因/.test(tt);
         // 放行 → 開期別視窗帶入
-        window.prompt = () => '同號補開，不是重複'; const r2 = await _vbConfirm(DRAFTS.dvb0000001); window.prompt = oP;
+        window._askText = (t, m, d, cb) => cb('同號補開，不是重複'); const r2 = await _vbConfirm(DRAFTS.dvb0000001); window._askText = oP;
         const md = document.getElementById('gen-confirm-msg'), row1 = md.querySelector('.sp-row[data-rid="r1"] .sp-qty'), row2 = md.querySelector('.sp-row[data-rid="r2"] .sp-qty');
         out.prefill = r2 === 'open' && document.getElementById('gen-confirm-modal').style.display === 'flex' && row1.value === '40' && row1.dataset.touched === '1' && row2.value === '' && document.getElementById('sp-invno').value === 'AB12345678' && document.getElementById('sp-date').value === '2026-11-25' && /由廠商請款草稿帶入/.test(md.innerHTML) && /放行：同號補開/.test(document.getElementById('sp-note').value);
         out.noMarkYet = marks.length === 0;
@@ -11893,6 +11893,54 @@ async function newPage(browser, width, height) {
       check('v6.0.235 規則：工務名單 siteEng 管理員寫、員工可讀；LINE 支出 lineExp 只有管理員和那一案工務可讀（唯讀帳號不行）、工務只能寫 fix（處理過的不行、只能署名自己）', ok);
     }
     check('v6.0.235 LINE 支出工務名單測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── A 批（健檢🔴4，Lotion 11/13）：刪成本卡要確認；有計價期別或付過款的分包卡擋下；刪掉進回收筒、還原放回原報價 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const out = {}; const keep = { Q, P: PAYABLES, TP: TRASH_PRIV, eid: window.eid, t: window.toast }; let msg = ''; window.toast = (m) => { msg = m; };
+      try {
+        Q = [{ id: 'qC', name: '合成成本案', items: [], costs: [
+          { id: 'cA', type: 'sub', vendor: '甲工程行', rows: [{ qty: 1, unitPrice: 100 }] },
+          { id: 'cB', type: 'sub', vendor: '乙工程行', rows: [], periods: [{ no: 1, date: '2026-10-01', rows: [] }] },
+          { id: 'cC', type: 'mat', vendor: '丙材料', rows: [] }], t: {}, _mt: 1 }];
+        PAYABLES = [{ id: 'paycC', costId: 'cC', to: '丙材料', amount: 500, status: 'paid', paidDate: '2026-10-02' }];
+        TRASH_PRIV = []; eid = 'qC'; const modal = document.getElementById('gen-confirm-modal'); modal.style.display = 'none';
+        delCostItem('cA');
+        out.ask = modal.style.display === 'flex' && Q[0].costs.length === 3;
+        document.getElementById('gen-confirm-ok').click();
+        out.del = !Q[0].costs.some(c => c.id === 'cA') && TRASH_PRIV.some(x => x.coll === 'costs' && x.rid === 'cA' && x.qid === 'qC' && x.rec && x.rec.vendor === '甲工程行');
+        modal.style.display = 'none'; delCostItem('cB');
+        out.blockPer = modal.style.display !== 'flex' && Q[0].costs.some(c => c.id === 'cB') && /計價期別/.test(msg);
+        delCostItem('cC');
+        out.blockPaid = modal.style.display !== 'flex' && Q[0].costs.some(c => c.id === 'cC') && /付過款/.test(msg);
+        trashRestore('costs|qC|cA');
+        out.restore = Q[0].costs.some(c => c.id === 'cA' && c.vendor === '甲工程行') && !TRASH_PRIV.some(x => x.id === 'costs|qC|cA');
+        modal.style.display = 'none';
+      } finally { Q = keep.Q; PAYABLES = keep.P; TRASH_PRIV = keep.TP; window.eid = keep.eid; window.toast = keep.t; }
+      return out;
+    });
+    check('A 批：刪成本卡要先確認、刪掉進回收筒；有計價期別或付過款的分包卡擋下；從回收筒還原放回原報價', Object.values(r).length === 5 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('刪成本卡測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
+    await page.close();
+  }
+  // ── A 批（健檢🟡3）：合約用名稱當備案時，排除已經連到別案的同名合約 ──
+  {
+    const { page, errors } = await newPage(browser, 1280, 900);
+    const r = await page.evaluate(() => {
+      const keep = { Q, C: CONTRACTS }; const out = {};
+      try {
+        Q = [{ id: 'q1', name: '同名工程', items: [], t: {} }, { id: 'q2', name: '同名工程', items: [], t: {} }];
+        CONTRACTS = [{ id: 'ct1', name: '同名工程', linkedQid: 'q1', amount: 1000000 }];
+        out.other = _ctAmtOf(Q[1]) === 0 && _ctAmtOf(Q[0]) === 1000000;
+        CONTRACTS.push({ id: 'ct2', name: '同名工程', amount: 500000 });
+        out.unlinked = _ctAmtOf(Q[1]) === 500000;
+      } finally { Q = keep.Q; CONTRACTS = keep.C; }
+      return out;
+    });
+    check('A 批：兩案同名時，第二案不會抓到已連到第一案的合約（用名稱備案只找沒連結的）', r.other && r.unlinked, JSON.stringify(r));
+    check('合約名稱備案測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
   // ── Lotion 11/13：包商評分卡一直存不進去（這家的分包卡已合併到別張）→ 不出卡；存不進去時不再顯示「已記」 ──
@@ -13274,8 +13322,8 @@ async function newPage(browser, width, height) {
         decAct('lbxSug', 'batch', 'ok'); await W(120);
         out.ok = calls.length === 1 && calls[0][0] === 'm1' && calls[0][1] === 'filed' && calls[0][2] === 'q1' && calls[0][4] === '第 1 批' && LBX.m1.status === 'filed' && LBX.m2.status === 'new';
         // 退回：剩下的建議清掉（狀態、備註不動）
-        calls.length = 0; const oP = window.prompt; window.prompt = () => '不對'; decAct('lbxSug', 'batch', 'ok'); await W(20);
-        decToggle('lbxSug', 'batch', true); await W(80); decAct('lbxSug', 'batch', 'reject'); window.prompt = oP; await W(120);
+        calls.length = 0; const oP = window._askText; window._askText = (t, m, d, cb) => cb('不對'); decAct('lbxSug', 'batch', 'ok'); await W(20);
+        decToggle('lbxSug', 'batch', true); await W(80); decAct('lbxSug', 'batch', 'reject'); window._askText = oP; await W(120);
         out.rej = calls.some((x) => x[0] === 'm2' && x[1] === 'unsug') && !LBX.m2.sug && LBX.m2.status === 'new';
         // 只剩超過 7 天的：卡片還在（列出來），確認不做事
         const its2 = []; _v6TodoItems(its2); const c2 = its2.find((x) => x.type === 'dec_lbxSug');
@@ -15027,13 +15075,13 @@ async function newPage(browser, width, height) {
         document.getElementById('gen-confirm-modal').style.display = 'none';
         delSubPeriod('cPF', 1); out.delBlocked = c.periods.length === 1 && document.getElementById('gen-confirm-modal').style.display !== 'flex' && /已付一部分/.test((document.querySelector('.toast') || {}).textContent || '') && !!pp();
         // ③ 改成 10M（應付 4,988 < 已付 10,000）：沒寫原因不存；寫了原因才存、記在期別
-        window.prompt = () => null;
+        const oAsk = window._askText; window._askText = (t, m, d, cb, o) => { if (o && o.onCancel) o.onCancel(); };   // 健檢🟡12：系統視窗按取消
         openSubPeriod('cPF', 1); document.querySelector('.sp-qty').value = '10'; _spRecalc(); document.getElementById('gen-confirm-ok').click(); await T(40);
         out.overNo = c.periods[0].amt === 30000 && !c.periods[0].overWhy && /要寫原因才能存/.test((document.querySelector('.toast') || {}).textContent || '') && document.getElementById('gen-confirm-modal').style.display === 'flex' && document.querySelector('.sp-qty').value === '10';   // 視窗留著、填的還在
         document.getElementById('gen-confirm-modal').style.display = 'none';
-        let asked = ''; window.prompt = (m) => { asked = m; return '廠商退回差額'; };
+        let asked = ''; window._askText = (t, m, d, cb) => { asked = m; cb('廠商退回差額'); };
         openSubPeriod('cPF', 1); document.querySelector('.sp-qty').value = '10'; _spRecalc(); document.getElementById('gen-confirm-ok').click(); await T(40);
-        const pr0 = c.periods[0];
+        window._askText = oAsk; const pr0 = c.periods[0];
         out.overYes = pr0.amt === 5000 && !!pr0.overWhy && pr0.overWhy.why === '廠商退回差額' && pr0.overWhy.paid === 10000 && pr0.overWhy.amt === 10000 - 4988 && /已付 NT\$ 10,000/.test(asked) && /4,988/.test(asked) && JSON.parse(localStorage.getItem('fy6_q')).find((q) => q.id === 'qPF').costs[0].periods[0].overWhy.why === '廠商退回差額';
         // （整筆已付的期別本來就不能修改：openSubPeriod 擋「已付款，不能直接修改」，所以多付檢查只會遇到付過一部分的期別）
         document.getElementById('gen-confirm-modal').style.display = 'none';
