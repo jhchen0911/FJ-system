@@ -41327,7 +41327,7 @@ function _trashPut(coll,id){
     var r=a.find(function(x){return x&&x.id===id;});if(!r)return false;
     if(coll==='payables'){var _src=_paySource(r);if(_src&&_src.auto)return false;}               // 自動應付（分包期別、薪資、抽成…）由來源重建
     if(coll==='expenses'&&/^E_clean_/.test(String(id)))return false;  // 請款單清潔費自動帶出的費用
-    var now=_srvNow(),key=coll+'|'+id,me=_meEmail()||'';
+    var key=coll+'|'+id,now=_srvNow(),me=_meEmail()||'';try{var _tt0=+((TOMBS.trash||{})[key])||0;if(now<=_tt0)now=_tt0+1;}catch(e){_err('_trashPut.tomb',e);}   /* 還原後馬上再刪（同一毫秒）：新的一筆要晚於還原時立的回收筒墓碑，不然會被當成已刪（CI 偶發） */
     var nm=coll==='invoices'?((r.project||'')+(r.periodNo?(' 第'+r.periodNo+'期'):'')):coll==='payables'?((r.to||'')+' '+(r.project||'')):coll==='expenses'?((r.cat||'')+' '+(r.note||r.desc||'')):(r.name||r.no||r.code||'');
     var base={id:key,coll:coll,rid:String(id),at:now,_mt:now,by:me,name:String(nm||'').slice(0,60)};
     TRASH=TRASH.filter(function(x){return x&&x.id!==key;});TRASH_PRIV=TRASH_PRIV.filter(function(x){return x&&x.id!==key;});
