@@ -42687,8 +42687,8 @@ function _cevHtml(q){var vs=_cevVendors(q);if(!vs.length||!_decIsAdmin())return 
 function _cevSave(q){if(!_decIsAdmin())return true;var vs=_cevVendors(q),cur=_CEV[q.id]||{},todo=[];
   for(var vi=0;vi<vs.length;vi++){var o=cur[vi]||{},n=_VE_ITEMS.filter(function(k){return o[k[0]]>=1&&o[k[0]]<=5;}).length;if(!n&&!o.note)continue;if(n<_VE_ITEMS.length){toast(vs[vi]+'：'+_VE_ITEMS.map(function(k){return k[1];}).join('、')+'都要填');return false;}todo.push({name:vs[vi],o:o});}
   if(!todo.length)return true;
-  var ok=0;todo.forEach(function(x){var s2={};_VE_ITEMS.forEach(function(k){s2[k[0]]=x.o[k[0]];});if(_veSave(q.id,x.name,{s:s2,note:String(x.o.note||'').trim().slice(0,120)}))ok++;});
-  toast('已存 '+ok+' 家包商評鑑');delete _CEV[q.id];return true;}
+  var ok=0,bad=[];todo.forEach(function(x){var s2={};_VE_ITEMS.forEach(function(k){s2[k[0]]=x.o[k[0]];});if(_veSave(q.id,x.name,{s:s2,note:String(x.o.note||'').trim().slice(0,120)}))ok++;else bad.push(x.name);});
+  toast('已存 '+ok+' 家包商評鑑'+(bad.length?('；沒有存成：'+bad.join('、')):''));delete _CEV[q.id];return true;}   /* 審查：存不進去的要講出來 */
 function _retAskCopy(t){try{if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast('LINE 文字已複製');},function(){/* 可忽略：剪貼簿被擋 */});}catch(e){_err('_retAskCopy',e);}}
 // ── 整體日報（5d #8，雲端 dailyReport 建的 dailyOut 草稿）：確認＝複製文字並標已轉發、退回＝不轉發、修改＝改文字再複製 ──
 _decReg('dailyOut',{
@@ -45229,11 +45229,11 @@ function sdocDel(qid,id){
 // 平均分數 _veAvg(廠商名)：廠商清單只有管理員看得到 ★（全公司各案平均）
 var _VE_ITEMS=[['q','品質'],['t','工期'],['sa','安全'],['c','配合度'],['p','價格']];
 function _veKey(v){var d=String(v||'').trim(),h=5381;for(var k=0;k<d.length;k++)h=((h*33)^d.charCodeAt(k))>>>0;return 'v'+h.toString(36);}
-function _veVendors(q){var o=[];[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;})).forEach(function(x){(x.costs||[]).forEach(function(c){var v=String((c&&c.vendor)||'').trim();if(c&&c.type==='sub'&&!c.followOf&&!c.mergedInto&&v&&o.indexOf(v)<0)o.push(v);});});return o;}   /* Lotion 11/13：已合併到別張的分包卡不算一家（存分數只找沒合併的卡，不一致會一直存不進去、卡片一直出現） */
+function _veVendors(q){var o=[];[q].concat((Q||[]).filter(function(x){return x&&x.parentId===q.id;})).forEach(function(x){(x.costs||[]).forEach(function(c){var v=String((c&&c.vendor)||'').trim();if(c&&c.type==='sub'&&!c.followOf&&v&&o.indexOf(v)<0)o.push(v);});});return o;}
 // v6.0.233 統一（陳軒 11/11 M5，Lotion 11/11：分數只給管理員看）：評分改存這家在這案（含追加）的分包成本卡 c.eval（q.costs 走 private），不再存專案 p.vendorEval（shared）；
 //   舊的 p.vendorEval 由管理員裝置搬進成本卡後刪掉（_veMigrate）；結案卡的包商評鑑（_cevSave）與這張卡寫同一個地方、同 5 項
 function _veCards(qid,v){var q=(Q||[]).find(function(x){return x&&x.id===qid;});if(!q)return [];var m=q.parentId?((Q||[]).find(function(x){return x&&x.id===q.parentId;})||q):q,out=[],nm=String(v||'').trim();
-  [m].concat((Q||[]).filter(function(x){return x&&x.parentId===m.id;})).forEach(function(x){(x.costs||[]).forEach(function(c){if(c&&c.type==='sub'&&!c.mergedInto&&String(c.vendor||'').trim()===nm)out.push({q:x,c:c});});});return out;}
+  [m].concat((Q||[]).filter(function(x){return x&&x.parentId===m.id;})).forEach(function(x){(x.costs||[]).forEach(function(c){if(c&&c.type==='sub'&&String(c.vendor||'').trim()===nm)out.push({q:x,c:c});});});return out;}   /* Lotion 11/13（新富發）：舊的「合併應付」把這家全部分包卡標 mergedInto（指向合併後的應付，不是別張卡），原本這裡跳過 → 出卡卻存不進去、卡片一直出現；分數照樣存在這些卡上 */
 function _veOf(p,v){if(!p)return null;var e=null;_veCards(p.qid,v).forEach(function(k){if(k.c.eval&&(!e||(+k.c.eval.at||0)>(+e.at||0)))e=k.c.eval;});if(e)return e;
   var m=(p.vendorEval&&typeof p.vendorEval==='object')?p.vendorEval:{};return m[_veKey(v)]||null;}   // 還沒搬的舊資料
 function _veMigrate(){if(!_decIsAdmin()||_isReaderUser)return;var chg=false;(PROJECTS||[]).forEach(function(p){if(!p||!p.vendorEval||typeof p.vendorEval!=='object'||!Object.keys(p.vendorEval).length)return;

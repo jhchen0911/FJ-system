@@ -11905,9 +11905,10 @@ async function newPage(browser, width, height) {
         const mk = (costs) => { Q = [{ id: 'qV', name: '合成結案案', closed: true, closedAt: now - 864e5, awarded: true, costs, items: [], t: {} }]; PROJECTS = [{ id: 'p_qV', qid: 'qV', no: '2026-001' }]; };
         mk([{ id: 'c1', type: 'sub', vendor: '甲工程行', rows: [] }]);
         out.normal = _veList().length === 1 && _veSave('qV', '甲工程行', { s: { q: 3, t: 3, sa: 3, c: 3, p: 3 } }) === true && !_veList().length;
-        mk([{ id: 'c2', type: 'sub', vendor: '乙實業有限公司', mergedInto: 'c3', rows: [] }, { id: 'c3', type: 'sub', vendor: '乙實業', rows: [] }]);
+        // 舊的「合併應付」：這家全部分包卡都標 mergedInto（指向合併後的應付 merge_…，不是別張卡）→ 照樣出卡、存得進去、存完卡片消失
+        mk([{ id: 'c2', type: 'sub', vendor: '乙實業有限公司', mergedInto: 'merge_x1', rows: [] }, { id: 'c3', type: 'sub', vendor: '乙實業有限公司', mergedInto: 'merge_x1', rows: [] }]);
         const L = _veList().map(x => x.v);
-        out.merged = L.length === 1 && L[0] === '乙實業' && _veSave('qV', '乙實業', { s: { q: 4, t: 4, sa: 4, c: 4, p: 4 } }) === true && !_veList().length;
+        out.merged = L.length === 1 && L[0] === '乙實業有限公司' && _veSave('qV', '乙實業有限公司', { s: { q: 4, t: 4, sa: 4, c: 4, p: 4 } }) === true && !_veList().length && Q[0].costs.every(c => c.eval && c.eval.s.q === 4) && _veAvg('乙實業有限公司').avg === 4;
         // 存不進去（找不到卡）：視窗不關、不顯示「已記」
         let cb = null; window._modal = (t, h, fn) => { cb = fn; };
         _veModal({ qid: 'qV', v: '不存在的廠商' });
@@ -11917,7 +11918,7 @@ async function newPage(browser, width, height) {
       } finally { Q = keep.Q; PROJECTS = keep.PR; window._decIsAdmin = keep.adm; window.toast = keep.t; window._modal = keep.m; }
       return out;
     });
-    check('包商評分（Lotion 11/13）：分包卡已合併到別張的那家不出卡、評合併後那家；存不進去時視窗不關、不顯示「已記」', Object.values(r).length === 3 && Object.values(r).every(Boolean), JSON.stringify(r));
+    check('包商評分（Lotion 11/13）：分包卡被舊的「合併應付」標成已合併的那家照樣出卡、存得進去、存完卡片消失；存不進去時視窗不關、不顯示「已記」', Object.values(r).length === 3 && Object.values(r).every(Boolean), JSON.stringify(r));
     check('包商評分測試無 JS 錯誤', errors.length === 0, errors.join(' | '));
     await page.close();
   }
