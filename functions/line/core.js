@@ -8,6 +8,8 @@
 // 原則：寫進 FJ 的一律是草稿（要人在 FJ 按確認）；機器人在群組主動發的文字只用 fydata/lineCfg/texts 裡 Lotion 定稿的固定句子。
 'use strict';
 const crypto = require('crypto');
+// 新格式日報（Lotion 11/11）：問句範本、拆數量跟前端同一份 calc/dailyparse.js
+let DL = null; try { DL = require('../calc/dailyparse.js').dl; } catch (e) { DL = require('../../calc/dailyparse.js').dl; }
 
 const ADDON_RE = /(追加|多做|順便|加做|變更)/;
 const ADDON_TAG_RE = /^\s*#\s*追加\s*/;
@@ -26,10 +28,12 @@ const DEFAULT_TEXTS = {
   inboxFail: '這個檔案沒存成功，請重傳：{name}',
   inboxBig: '這個檔案超過 {mb}MB 沒存，請改傳雲端連結：{name}',
   daily3: '今天辛苦了，麻煩回三件事：\n1. 今天做了哪些？（工項、數量）\n2. 幾個人、什麼機具？\n3. 有沒有問題、等待或追加？',
-  remind: '昨天的施工日報還沒回，麻煩補一下三件事，謝謝。',
+  remind: '昨天的施工日報還沒回，麻煩照昨天的格式補一下，謝謝。',
   alarm: '{site}工地群組出現「{word}」，請判斷是否停工。',
   noReply2: '{site}工地群組連兩天沒有回施工日報。',
   dailyCo: '今天辛苦了，請複製下面格式回報（一個工地一段，可以貼好幾段；補昨天的只改日期）：\n【日期】{date}\n【工地】\n【今天】\n【明天】\n【問題】',
+  // v6.0.235 新格式（Lotion 11/11 定案）：17:30 送預先填好的範本；這一段是範本上面的說明（工務只複製【日期】以下）
+  dailyFmtHead: '今天辛苦了，請複製【日期】以下整段，填好再傳（一個工地一段）：\n．今天做了：一行一項，編號＋打設／拔除／組立／拆除＋數量，例「1 打設 12」「1 拔除 40 這段拔完」，單位不用寫\n．人和機具：例「人 5、怪手 1、吊車 1」\n．支出（選填）：一行一筆，項目＋金額＋零用金／代墊 誰／公司付，例「便當 5 個 600 零用金」「五金 1,250 代墊 阿明」，收據可以拍照傳\n．問題：追加、等料、等吊車、有異狀都寫這裡',
 };
 // v6.0.119～121 的舊預設（沒有【日期】）：存過固定句子沒改這句的，當成新預設（v6.0.122）
 const OLD_DAILYCO = '今天辛苦了，請照下面格式回報（一個工地一段，可以貼好幾段）：\n【工地】地名\n【今天】\n【明天】\n【問題】';
@@ -55,7 +59,7 @@ function fill(tpl, vars) {
 }
 const OLD_INBOXNOTE = '這批 {n} 個檔案：{text}，已記下';   // v6.0.153～176 預設：存過沒改的換成新預設（寫第幾批）
 const OLD_INBOXACK = '收到，{n} 個檔案，歸到哪一案？';   // v6.0.153 前的預設：存過沒改的換新預設
-function textsOf(cfg) { const T = Object.assign({}, DEFAULT_TEXTS, (cfg && cfg.texts) || {}); if (T.dailyCo === OLD_DAILYCO) T.dailyCo = DEFAULT_TEXTS.dailyCo; if (T.inboxAck === OLD_INBOXACK) T.inboxAck = DEFAULT_TEXTS.inboxAck; if (T.inboxNote === OLD_INBOXNOTE) T.inboxNote = DEFAULT_TEXTS.inboxNote; return T; }
+function textsOf(cfg) { const T = Object.assign({}, DEFAULT_TEXTS, (cfg && cfg.texts) || {}); if (T.dailyCo === OLD_DAILYCO) T.dailyCo = DEFAULT_TEXTS.dailyCo; if (T.inboxAck === OLD_INBOXACK) T.inboxAck = DEFAULT_TEXTS.inboxAck; if (T.inboxNote === OLD_INBOXNOTE) T.inboxNote = DEFAULT_TEXTS.inboxNote; if (T.remind === '昨天的施工日報還沒回，麻煩補一下三件事，謝謝。') T.remind = DEFAULT_TEXTS.remind; return T; }   // v6.0.235 舊提醒句（三件事）換新
 
 // 找到「沒被否定」的關鍵字：前 3 個字內有否定詞就跳過，同一句後面若再出現且沒被否定仍算
 function _hitNotNegated(t, word) {
@@ -71,6 +75,13 @@ function isAddon(text) {
   if (ADDON_TAG_RE.test(t)) return true;
   return ['追加', '多做', '順便', '加做', '變更'].some(w => _hitNotNegated(t, w));
 }
+// v6.0.235：範本的說明行和【本工地工項】那段不算工務寫的字（工項名稱、說明裡有「追加」不能觸發追加草稿）
+function stripTpl(text, T) {
+  let t = DL.stripList(String(text || ''));
+  const head = String((T && T.dailyFmtHead) || DEFAULT_TEXTS.dailyFmtHead).split('\n').map(l => l.trim()).filter(Boolean);
+  if (head.length) t = t.split('\n').filter(l => head.indexOf(l.trim()) < 0).join('\n');
+  return t;
+}
 function alarmWord(text) { const t = String(text || ''); return ALARM_WORDS.find(w => _hitNotNegated(t, w)) || ''; }
 // 「#追加 鋼板樁 12 支」→ {qty:12, unit:'支'}；沒寫數量回 null
 function parseQty(text) {
@@ -82,7 +93,7 @@ function groupOf(cfg, groupId) { const g = groupId && cfg && cfg.groups && cfg.g
 function siteName(g) { return (g && (g.name || g.qName)) || '（未命名）'; }
 // ── 公司大群組（v6.0.119 批次 I）：一個群組多個工地，工務用固定格式回報，依【工地】地名對到 FJ 專案 ──
 function coGroupOf(cfg, groupId) { const g = groupId && cfg && cfg.groups && cfg.groups[groupId]; return g && g.mode === 'company' ? g : null; }
-const CO_TAGS = { '工地': 'site', '今天': 'today', '明天': 'tomorrow', '問題': 'issue', '日期': 'date' };
+const CO_TAGS = { '工地': 'site', '今天': 'today', '今天做了': 'today', '人和機具': 'crew', '支出': 'exp', '本工地工項': 'list', '明天': 'tomorrow', '問題': 'issue', '日期': 'date' };   // v6.0.235 新格式三個欄位
 // 補傳日期（v6.0.121）：一行只寫日期才算，例「10/31」「10/31 補」「10月31日 補傳」「日期：10/31」「2026/10/31」「115/10/31」
 //   （審查：避免「H300 1/2」「3/4 吋」這類規格被當成日期）；只認收到當天往前 7 天內（含當天），跨年回推
 const DATE_LINE = /^(?:日期\s*[:：]?\s*)?(?:(\d{2,4})\s*[\/年.-]\s*)?(\d{1,2})\s*[\/月.-]\s*(\d{1,2})\s*日?\s*(?:[（(]?\s*(?:補傳|補報|補)\s*[）)]?)?$/;
@@ -112,7 +123,7 @@ function parseCoReport(text, refYmd) {
   const t = String(text || '').replace(/\r/g, '');
   if (!/【\s*工地\s*】/.test(t)) return [];
   const out = []; let cur = null, key = '';
-  const re = /【\s*(工地|今天|明天|問題|日期)\s*】/g; let m; const segs = [];
+  const re = /【\s*(本工地工項|今天做了|人和機具|支出|工地|今天|明天|問題|日期)\s*】/g; let m; const segs = [];
   while ((m = re.exec(t))) { segs.push({ tag: m[1], start: m.index, end: re.lastIndex }); }
   let pre = null;   // 【工地】前面就先寫的欄位（順序寫反）→ 併到第一段
   // 日期：訊息開頭（第一個【】之前）寫的日期套用全部段落；【日期】套用它所在的段落與之後的段落
@@ -121,17 +132,18 @@ function parseCoReport(text, refYmd) {
   segs.forEach((g, i) => {
     const val = t.slice(g.end, i + 1 < segs.length ? segs[i + 1].start : t.length).trim();
     key = CO_TAGS[g.tag];
+    if (key === 'list') return;   // 範本列的工項清單：不是回報內容
     if (key === 'date') {
       const p = parseDateLine(val, refYmd);
       if (p.ymd || p.raw) {
         curDate = p.ymd; curRaw = p.raw;
         // 【日期】寫在這段還沒有內容時才改這段（審查：放在下一段【工地】前當標題，不回頭改上一段）
-        if (cur && !cur.today && !cur.tomorrow && !cur.issue) { cur.date = p.ymd; cur.dateRaw = p.raw; }
+        if (cur && !cur.today && !cur.tomorrow && !cur.issue && !cur.crew) { cur.date = p.ymd; cur.dateRaw = p.raw; }
       }
       return;
     }
     if (key === 'site') {
-      cur = { site: val.split('\n')[0].trim().slice(0, 60), today: '', tomorrow: '', issue: '', date: curDate, dateRaw: curRaw }; out.push(cur);
+      cur = { site: val.split('\n')[0].trim().slice(0, 60), today: '', crew: '', exp: '', tomorrow: '', issue: '', date: curDate, dateRaw: curRaw }; out.push(cur);
       const rest = val.split('\n').slice(1).join('\n').trim(); if (rest) cur.today = rest.slice(0, 1000);
       if (pre) { Object.keys(pre).forEach(k => { cur[k] = (pre[k] + (cur[k] ? '\n' + cur[k] : '')).slice(0, 1000); }); pre = null; }
     } else if (cur) cur[key] = (cur[key] ? cur[key] + '\n' : '') + val.slice(0, 1000);
@@ -139,7 +151,7 @@ function parseCoReport(text, refYmd) {
   });
   // 空白格式（把機器人的範本原樣貼回）、地名還是「地名」的段落不算
   const EMPTY = /^(無|没有|沒有|none|-|－|—)?$/i;
-  return out.filter(b => b.site && !/^(地名|地點|工地名稱?)$/.test(b.site) && !(EMPTY.test(b.today.trim()) && EMPTY.test(b.tomorrow.trim()) && EMPTY.test(b.issue.trim())));
+  return out.filter(b => b.site && !/^(地名|地點|工地名稱?)$/.test(b.site) && !(EMPTY.test(b.today.trim()) && EMPTY.test(b.tomorrow.trim()) && EMPTY.test(b.issue.trim()) && EMPTY.test(String(b.crew || '').trim()) && EMPTY.test(String(b.exp || '').trim())));
 }
 const _nrmSite = (x) => String(x || '').replace(/[\s()（）［］\[\]「」『』\-－_／/、，,.。]/g, '').toLowerCase();
 // 地名對專案：專案名稱（格式「（業主）地名工程名稱」）含地名、或地名含專案短名；只有唯一一案對得上才算，否則待分類
@@ -156,7 +168,7 @@ function matchSite(sites, site) {
   });
   return hits.length === 1 ? hits[0] : '';
 }
-function coBlockText(b) { return ['【今天】' + (b.today || ''), '【明天】' + (b.tomorrow || ''), '【問題】' + (b.issue || '')].join('\n'); }
+function coBlockText(b) { return ['【今天】' + (b.today || '')].concat(b.crew ? ['【人和機具】' + b.crew] : []).concat(b.exp ? ['【支出】\n' + b.exp] : []).concat(['【明天】' + (b.tomorrow || ''), '【問題】' + (b.issue || '')]).join('\n'); }   // v6.0.235 有寫人和機具才多一欄（前端只拆【今天】那段）
 function extOf(msg) {
   if (msg.type === 'image') return 'jpg';
   if (msg.type === 'video') return 'mp4';
@@ -385,9 +397,10 @@ async function handleEvent(ev, cfg, T, deps, t0) {
     rec.text = text;
     await deps.dbSet(base, rec);
     const res = { kind: 'groupText' };
-    const w = alarmWord(text);
+    const own = stripTpl(text, T);   // v6.0.235：範本說明與工項清單不算
+    const w = alarmWord(own);
     if (w) { await pushOwners(cfg, deps, fill(T.alarm, { site: siteName(g), word: w })); res.alarm = w; }
-    if (isAddon(text)) {
+    if (isAddon(own)) {
       // 前 10 分鐘的照片一起附上
       const before = ((await deps.dbGet('fydata/lineLog/' + src.groupId + '/' + date)) || {});
       const photos = Object.keys(before).map(k => before[k]).filter(r => r && r.path && r.type === 'image' && r.at >= now - PHOTO_WINDOW_MS && r.at <= now).map(r => r.path);
@@ -434,7 +447,7 @@ async function handleCoGroup(ev, msg, src, now, date, cfg, T, deps) {
   const res = { kind: 'coText', blocks: blocks.length };
   if (!blocks.length) {
     // 沒用格式：照樣看警報字（工地名寫群組名）
-    const w0 = alarmWord(text);
+    const w0 = alarmWord(stripTpl(text, T));
     if (w0) { await pushOwners(cfg, deps, fill(T.alarm, { site: siteName(cfg.groups[gid]), word: w0 })); res.alarm = w0; }
     await deps.dbSet(base, rec);
     return res;
@@ -450,10 +463,10 @@ async function handleCoGroup(ev, msg, src, now, date, cfg, T, deps) {
     const b = blocks[i], qid = matchSite(cfg.sites, b.site);
     const photos = {}; prevPhotos.forEach(r => { photos[r.id] = r.path; });
     const day = b.date || date;   // 補傳：內文寫的日期；沒寫＝收到日期
-    await deps.dbSet(coPath + '/' + msg.id + '_' + i, { at: now, user, msgId: msg.id, site: b.site, qid, today: b.today, tomorrow: b.tomorrow, issue: b.issue, photos, day, dateRaw: b.dateRaw || '' });
+    await deps.dbSet(coPath + '/' + msg.id + '_' + i, { at: now, user, msgId: msg.id, site: b.site, qid, today: b.today, crew: b.crew || '', exp: b.exp || '', tomorrow: b.tomorrow, issue: b.issue, photos, day, dateRaw: b.dateRaw || '' });
     for (const r of prevPhotos) await deps.dbSet('fydata/lineLog/' + gid + '/' + date + '/' + r.id + '/claimed', msg.id + '_' + i);   // 一張照片只掛一個工地
     res.qids.push(qid);
-    const all = [b.today, b.tomorrow, b.issue].join('\n');
+    const all = stripTpl([b.today, b.tomorrow, b.issue].join('\n'), T);
     const w = alarmWord(all);
     if (w) { await pushOwners(cfg, deps, fill(T.alarm, { site: b.site, word: w })); res.alarm = w; }
     if (isAddon(all)) {
@@ -474,16 +487,35 @@ async function pushOwners(cfg, deps, text) {
   return ok;
 }
 
-// ── 17:30 問三句：已綁定且開啟日報的群組 ──
+// ── 17:30 日報問句（v6.0.235 起：預先填好日期、工地、本工地還沒做完的工項（短編號）的範本；編號清單存 lineDaily/<群組>/<日期>/list/<報價id>，20:00 帶進草稿）──
+// deps.getQuote(qid) → 報價（已解碼）；沒有就只列日期、工地
+async function _askList(deps, qid) {
+  if (!qid || !deps.getQuote) return [];
+  try { const q = await deps.getQuote(qid); return q ? DL.askList(q.items, q.dailyLogs) : []; } catch (e) { (deps.log || console.error)('line.askList', qid, e); return []; }
+}
+// 公司大群組：最近 14 天在這個群組回報過、對得到專案的工地（最多 5 個，最近的在前）
+async function _coRecentSites(deps, cfg, gid, date) {
+  const seen = {};
+  for (let k = 1; k <= 14; k++) {
+    const day = (await deps.dbGet('fydata/lineCo/' + gid + '/' + addDays(date, -k))) || {};
+    Object.keys(day).forEach(x => { const r = day[x]; if (r && r.qid && cfg.sites && cfg.sites[r.qid] && !(r.qid in seen)) seen[r.qid] = k; });
+  }
+  return Object.keys(seen).sort((a, b) => seen[a] - seen[b]).slice(0, 5);
+}
 async function dailyAsk(deps, now) {
-  const cfg = (await deps.getCfg()) || {}; const T = textsOf(cfg); const date = tpeDate(now);
+  const cfg = (await deps.getCfg()) || {}; const T = textsOf(cfg); const date = tpeDate(now), md = date.slice(5).replace('-', '/');
   let n = 0;
   for (const gid of Object.keys(cfg.groups || {})) {
     const g = cfg.groups[gid]; if (!g || (!g.qid && g.mode !== 'company') || g.daily === false) continue;
     if (await deps.dbGet('fydata/lineDaily/' + gid + '/' + date + '/askedAt')) continue;   // 排程重跑：今天問過就不再問
-    // 公司群範本帶入當天日期（{date}＝MM/DD），工務複製後改內容就好
-    const txt = g.mode === 'company' ? fill(T.dailyCo, { date: date.slice(5).replace('-', '/') }) : T.daily3;
+    const blocks = [], lists = {};
+    if (g.mode === 'company') {
+      let recent = []; try { recent = await _coRecentSites(deps, cfg, gid, date); } catch (e) { (deps.log || console.error)('line.coRecentSites', gid, e); }   // 審查：讀不到就只發空白範本，其他群組照問
+      for (const qid of recent) { const L = await _askList(deps, qid); blocks.push({ site: String((cfg.sites[qid] || {}).name || '').replace(/^\s*[（(][^）)]*[）)]/, '').trim().slice(0, 40), list: L }); if (L.length) lists[qid] = L; }
+    } else { const L = await _askList(deps, g.qid); blocks.push({ site: siteName(g), list: L }); if (L.length) lists[g.qid] = L; }
+    const txt = DL.askText(T.dailyFmtHead, blocks, md);
     if (!(await safePush(deps, gid, txt))) continue;   // 這個群組推不到（例如機器人被移出），其他群組照問
+    if (Object.keys(lists).length) await deps.dbSet('fydata/lineDaily/' + gid + '/' + date + '/list', lists);
     await deps.dbSet('fydata/lineDaily/' + gid + '/' + date + '/askedAt', now || Date.now());
     n++;
   }
@@ -497,6 +529,26 @@ function _dayContent(logs, askedAt) {
   const photos = L.filter(r => r.type === 'image' && r.path).map(r => r.path);
   const allTexts = L.filter(r => r.type === 'text' && r.text).map(r => r.text);
   return { texts, photos, allTexts };
+}
+
+// v6.0.235 LINE【支出】第 3、4 項（Lotion 11/11 題 3＝A）：日報草稿一建好就把【支出】放進 fydata/lineExp/<主報價 id>/<草稿id_序號>，
+//   這一案的工務當天就能在 FJ 補零用金是誰、收據照片；記帳仍要管理員在 FJ 拍板卡確認。列的鍵、內容跟前端 _dlExpQueue 一樣（同一份 calc/dailyparse.js 的 expOf）
+async function expQueue(deps, d) {
+  try {
+    const pl = (d && d.payload) || {}; if (!pl.qid || !DL || !DL.expOf) return 0;
+    const R = DL.expOf((Array.isArray(pl.answers) ? pl.answers : []).join('\n')); if (!R.length) return 0;
+    let mq = pl.qid;
+    try { const q = deps.getQuote ? await deps.getQuote(pl.qid) : null; if (q && q.parentId) mq = String(q.parentId); } catch (e) { (deps.log || console.error)('line.expQueue.q', pl.qid, e); }
+    const photos = (Array.isArray(pl.photos) ? pl.photos : []).filter(p => /^line\//.test(String(p))).slice(0, 6);
+    let n = 0;
+    for (let i = 0; i < R.length; i++) {
+      const r = R[i], path = 'fydata/lineExp/' + mq + '/' + d.id + '_' + i;
+      if (await deps.dbGet(path)) continue;   // 已經有（前端先寫了、或排程重跑）就不動
+      await deps.dbSet(path, JSON.parse(JSON.stringify({ key: d.id + '#' + i, qid: pl.qid, src: d.id, date: pl.date, text: r.text, item: r.item, amt: r.amt, pay: r.pay, who: r.who, why: r.why, photos, at: d.at || Date.now(), by: 'line-bot' })));
+      n++;
+    }
+    return n;
+  } catch (e) { (deps.log || console.error)('line.expQueue', e); return 0; }
 }
 
 // ── 20:00 整理成日報草稿 ──
@@ -513,9 +565,10 @@ async function dailyCompile(deps, now) {
     const replied = !!day.askedAt && c.texts.length > 0;   // 當天沒問（17:30 排程沒跑）就不算回了
     await deps.dbSet('fydata/lineDaily/' + gid + '/' + date + '/replied', replied);
     if (!replied && !c.photos.length && !c.allTexts.length) continue;
-    await deps.createDraft({ id: 'dd' + gid.slice(-8) + date.replace(/-/g, ''), type: 'dailyLog', by: 'line-bot', byName: 'LINE 機器人', at: now || Date.now(), status: 'pending',
+    const rec1 = { id: 'dd' + gid.slice(-8) + date.replace(/-/g, ''), type: 'dailyLog', by: 'line-bot', byName: 'LINE 機器人', at: now || Date.now(), status: 'pending',
       summary: ('施工日報：' + siteName(g) + '　' + date + (replied ? '' : '（尚未回三句）')).slice(0, 200),
-      payload: { qid: g.qid, groupId: gid, date, answers: day.askedAt ? c.texts : [], dayTexts: c.allTexts.slice(-30), photos: c.photos.slice(0, 20), replied } });
+      payload: { qid: g.qid, groupId: gid, date, answers: day.askedAt ? c.texts.map(x => stripTpl(x, textsOf(cfg))) : [], dayTexts: c.allTexts.slice(-30), photos: c.photos.slice(0, 20), replied, fmtList: day.list || null } };
+    if (await deps.createDraft(rec1)) await expQueue(deps, rec1);
     n++;
   }
   return n;
@@ -534,10 +587,13 @@ async function coCompile(deps, cfg, gid, date, now, late) {
     const bad = L.map(r => r.dateRaw).filter(Boolean);   // 有寫日期但超過 7 天／不合法 → 照收到日，草稿註明
     const photos = []; L.forEach(r => Object.keys(r.photos || {}).forEach(p => photos.push(r.photos[p])));
     // 補傳的另加收到日（MMDD），不跟那一天自己的草稿撞號
+    // v6.0.235 編號清單：工務多半是複製「收到那天」的範本再改【日期】補報，先用收到那天的清單，沒有才用回報那天的（審查）
+    const lst = qid ? (((await deps.dbGet('fydata/lineDaily/' + gid + '/' + date + '/list/' + qid)) || (await deps.dbGet('fydata/lineDaily/' + gid + '/' + day + '/list/' + qid))) || null) : null;
     const id = qid ? ('dc' + gid.slice(-6) + qid.replace(/[^\w]/g, '').slice(-10) + day.replace(/-/g, '') + (back ? 'b' + date.slice(5).replace('-', '') : '') + (late ? 'L' : '')) : ('du' + gid.slice(-6) + String(L[0].key).replace(/[^\w]/g, '').slice(-16));
-    await deps.createDraft({ id, type: 'dailyLog', by: 'line-bot', byName: 'LINE 機器人', at: now || Date.now(), status: 'pending',
+    const rec2 = { id, type: 'dailyLog', by: 'line-bot', byName: 'LINE 機器人', at: now || Date.now(), status: 'pending',
       summary: ('施工日報' + (qid ? '' : '（待分類）') + '：' + L[0].site + '　' + day + (back ? '（補傳，' + date.slice(5) + ' 收到）' : '') + (bad.length ? '（內文日期「' + bad[0] + '」超過 7 天或不正確，先照收到日）' : '')).slice(0, 200),
-      payload: { qid, site: L[0].site, unmatched: !qid, groupId: gid, date: day, backfill: back, recvDate: date, dateBad: bad.slice(0, 3), answers: L.map(r => coBlockText(r)), dayTexts: [], photos: photos.slice(0, 20), replied: true } });
+      payload: { qid, site: L[0].site, unmatched: !qid, groupId: gid, date: day, backfill: back, recvDate: date, dateBad: bad.slice(0, 3), answers: L.map(r => coBlockText(r)), dayTexts: [], photos: photos.slice(0, 20), replied: true, fmtList: lst ? { [qid]: lst } : null } };
+    if (await deps.createDraft(rec2)) await expQueue(deps, rec2);
     for (const r of L) await deps.dbSet('fydata/lineCo/' + gid + '/' + date + '/' + r.key + '/compiled', id);
     n++;
   }
@@ -586,4 +642,4 @@ async function processPush(id, rec, deps) {
   return n > 0;
 }
 
-module.exports = { MAX_FILE_BYTES, INBOX_BUDGET_MS, BATCH_GAP_MS, NOTE_WIN_MS, verifySignature, handleEvents, dailyAsk, dailyCompile, morningCheck, processPush, pushOwners, isAddon, alarmWord, parseQty, parseCoReport, parseMD, matchSite, tpeDate, addDays, fill, DEFAULT_TEXTS, ALARM_WORDS };
+module.exports = { expQueue, MAX_FILE_BYTES, INBOX_BUDGET_MS, BATCH_GAP_MS, NOTE_WIN_MS, verifySignature, handleEvents, dailyAsk, dailyCompile, morningCheck, processPush, pushOwners, isAddon, alarmWord, parseQty, parseCoReport, parseMD, matchSite, tpeDate, addDays, fill, DEFAULT_TEXTS, ALARM_WORDS, stripTpl };
